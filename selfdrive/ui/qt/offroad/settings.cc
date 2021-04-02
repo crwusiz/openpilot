@@ -81,6 +81,21 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
   QString serial = QString::fromStdString(params.get("HardwareSerial", false));
   device_layout->addWidget(new LabelControl("Serial", serial));
 
+  QHBoxLayout *reset_layout = new QHBoxLayout();
+  reset_layout->setSpacing(30);
+
+  // reset calibration button
+  QPushButton *reset_calib_btn = new QPushButton("Reset Calibration");
+  reset_layout->addWidget(reset_calib_btn);
+  QObject::connect(reset_calib_btn, &QPushButton::released, [=]() {
+    if (ConfirmationDialog::confirm("Are you sure you want to reset calibration?")) {
+      Params().remove("CalibrationParams");
+    }
+  });
+
+  device_layout->addWidget(horizontal_line());
+  device_layout->addLayout(reset_layout);
+
   // offroad-only buttons
   QList<ButtonControl*> offroad_btns;
 
