@@ -22,11 +22,6 @@ from selfdrive.hardware.eon.apk import system
 
 def manager_init():
 
-  Process(name="shutdownd", target=launcher, args=("selfdrive.shutdownd",)).start()
-  system("am startservice com.neokii.optool/.MainService")
-  system("am startservice com.neokii.openpilot/.MainService")
-
-
   params = Params()
   params.manager_start()
 
@@ -115,6 +110,10 @@ def manager_cleanup():
 
 
 def manager_thread():
+
+  Process(name="shutdownd", target=launcher, args=("selfdrive.shutdownd",)).start()
+  system("am startservice com.neokii.optool/.MainService")
+  system("am startservice com.neokii.openpilot/.MainService")
 
   cloudlog.info("manager start")
   cloudlog.info({"environ": os.environ})
