@@ -8,7 +8,6 @@ from multiprocessing.context import Process
 
 import cereal.messaging as messaging
 import selfdrive.crash as crash
-from common.basedir import BASEDIR
 from common.params import Params
 from common.text_window import TextWindow
 from selfdrive.hardware import HARDWARE
@@ -18,21 +17,12 @@ from selfdrive.manager.process_config import managed_processes
 from selfdrive.registration import register
 from selfdrive.swaglog import cloudlog, add_file_handler
 from selfdrive.version import dirty, version
-from selfdrive.hardware.eon.apk import update_apks, pm_grant, appops_set, system
+from selfdrive.hardware.eon.apk import system
 
 
 def manager_init():
 
   Process(name="shutdownd", target=launcher, args=("selfdrive.shutdownd",)).start()
-
-  update_apks()
-  os.chmod(BASEDIR, 0o755)
-  os.chmod("/dev/shm", 0o777)
-  os.chmod(os.path.join(BASEDIR, "cereal"), 0o755)
-  os.chmod(os.path.join(BASEDIR, "cereal", "libmessaging_shared.so"), 0o755)
-
-  pm_grant("com.neokii.openpilot", "android.permission.ACCESS_FINE_LOCATION")
-  appops_set("com.neokii.optool", "SU", "allow")
   system("am startservice com.neokii.optool/.MainService")
   system("am startservice com.neokii.openpilot/.MainService")
 
