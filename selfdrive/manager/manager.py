@@ -22,6 +22,21 @@ from selfdrive.hardware.eon.apk import update_apks, pm_grant, appops_set, system
 
 
 def manager_init():
+
+  Process(name="shutdownd", target=launcher, args=("selfdrive.shutdownd",)).start()
+
+  update_apks()
+  os.chmod(BASEDIR, 0o755)
+  os.chmod("/dev/shm", 0o777)
+  os.chmod(os.path.join(BASEDIR, "cereal"), 0o755)
+  os.chmod(os.path.join(BASEDIR, "cereal", "libmessaging_shared.so"), 0o755)
+
+  pm_grant("com.neokii.openpilot", "android.permission.ACCESS_FINE_LOCATION")
+  appops_set("com.neokii.optool", "SU", "allow")
+  system("am startservice com.neokii.optool/.MainService")
+  system("am startservice com.neokii.openpilot/.MainService")
+
+
   params = Params()
   params.manager_start()
 
@@ -110,20 +125,6 @@ def manager_cleanup():
 
 
 def manager_thread():
-
-  Process(name="shutdownd", target=launcher, args=("selfdrive.shutdownd",)).start()
-
-  update_apks()
-  os.chmod(BASEDIR, 0o755)
-  os.chmod("/dev/shm", 0o777)
-  os.chmod(os.path.join(BASEDIR, "cereal"), 0o755)
-  os.chmod(os.path.join(BASEDIR, "cereal", "libmessaging_shared.so"), 0o755)
-
-  pm_grant("com.neokii.openpilot", "android.permission.ACCESS_FINE_LOCATION")
-  appops_set("com.neokii.optool", "SU", "allow")
-  system("am startservice com.neokii.optool/.MainService")
-  system("am startservice com.neokii.openpilot/.MainService")
-
 
   cloudlog.info("manager start")
   cloudlog.info({"environ": os.environ})
