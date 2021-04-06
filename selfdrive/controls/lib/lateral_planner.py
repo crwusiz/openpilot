@@ -79,7 +79,7 @@ class LateralPlanner():
 
   def setup_mpc(self):
     self.libmpc = libmpc_py.libmpc
-    self.libmpc.init(MPC_COST_LAT.PATH, MPC_COST_LAT.HEADING, ntune_get('steerRateCost'))
+    self.libmpc.init(MPC_COST_LAT.PATH, 0.0, ntune_get('steerRateCost'))
 
     self.mpc_solution = libmpc_py.ffi.new("log_t *")
     self.cur_state = libmpc_py.ffi.new("state_t *")
@@ -229,7 +229,7 @@ class LateralPlanner():
     mpc_nans = any(math.isnan(x) for x in self.mpc_solution.curvature)
     t = sec_since_boot()
     if mpc_nans:
-      self.libmpc.init(MPC_COST_LAT.PATH, MPC_COST_LAT.HEADING, ntune_get('steerRateCost'))
+      self.libmpc.init(MPC_COST_LAT.PATH, 0.0, ntune_get('steerRateCost'))
       self.cur_state.curvature = measured_curvature
 
       if t > self.last_cloudlog_t + 5.0:

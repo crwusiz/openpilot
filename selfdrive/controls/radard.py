@@ -53,8 +53,7 @@ def match_vision_to_cluster(v_ego, lead, clusters):
   # stationary radar points can be false positives
   dist_sane = abs(cluster.dRel - offset_vision_dist) < max([(offset_vision_dist)*.25, 5.0])
   vel_sane = (abs(cluster.vRel - lead.xyva[2]) < 10) or (v_ego + cluster.vRel > 3)
-  #y_sane = abs(cluster.yRel - lead.xyva[1]) < 1.3
-  if dist_sane and vel_sane: # and y_sane:
+  if dist_sane and vel_sane:
     return cluster
   else:
     return None
@@ -189,7 +188,7 @@ def radard_thread(sm=None, pm=None, can_sock=None):
   if can_sock is None:
     can_sock = messaging.sub_sock('can')
   if sm is None:
-    sm = messaging.SubMaster(['modelV2', 'carState'])
+    sm = messaging.SubMaster(['modelV2', 'carState'], check_average_freq=False)  # Can't check average frequency, since radar is slower than carState
   if pm is None:
     pm = messaging.PubMaster(['radarState', 'liveTracks'])
 
