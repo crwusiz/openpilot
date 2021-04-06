@@ -37,9 +37,7 @@ void PairingQRWidget::refresh(){
     qrCode->setStyleSheet(R"(font-size: 60px;)");
     return;
   }
-  QVector<QPair<QString, QJsonValue>> payloads;
-  payloads.push_back(qMakePair(QString("pair"), true));
-  QString pairToken = CommaApi::create_jwt(payloads);
+  QString pairToken = CommaApi::create_jwt({{"pair", true}});
 
   QString qrString = IMEI + "--" + serial + "--" + pairToken;
   this->updateQrCode(qrString);
@@ -192,7 +190,7 @@ SetupWidget::SetupWidget(QWidget* parent) : QFrame(parent) {
 
   QVBoxLayout* qrLayout = new QVBoxLayout;
 
-  qrLayout->addSpacing(40);
+  qrLayout->addSpacing(30);
   QLabel* qrLabel = new QLabel("Scan with comma connect!");
   qrLabel->setWordWrap(true);
   qrLabel->setAlignment(Qt::AlignHCenter);
