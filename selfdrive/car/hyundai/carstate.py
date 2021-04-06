@@ -80,8 +80,13 @@ class CarState(CarStateBase):
     ret.steeringTorque = cp_mdps.vl["MDPS12"]['CR_Mdps_StrColTq']
     ret.steeringTorqueEps = cp_mdps.vl["MDPS12"]['CR_Mdps_OutTq']
     ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD
-    self.mdps_error_cnt += 1 if cp_mdps.vl["MDPS12"]['CF_Mdps_ToiUnavail'] != 0 else -self.mdps_error_cnt
-    ret.steerWarning = self.mdps_error_cnt > 100 #cp_mdps.vl["MDPS12"]['CF_Mdps_ToiUnavail'] != 0
+
+    if cp_mdps.vl["MDPS12"]['CF_Mdps_ToiUnavail'] != 0 or cp.vl["MDPS12"]['CF_Mdps_ToiFlt'] != 0:
+      self.mdps_error_cnt += 1
+    else:
+      self.mdps_error_cnt = 0
+
+    ret.steerWarning = self.mdps_error_cnt > 100
 
     # cruise state
     ret.cruiseState.enabled = (cp_scc.vl["SCC12"]['ACCMode'] != 0) if not self.no_radar else \
@@ -335,6 +340,7 @@ class CarState(CarStateBase):
         ("CF_Mdps_Def", "MDPS12", 0),
         ("CF_Mdps_ToiActive", "MDPS12", 0),
         ("CF_Mdps_ToiUnavail", "MDPS12", 0),
+        ("CF_Mdps_ToiFlt", "MDPS12", 0),
         ("CF_Mdps_MsgCount2", "MDPS12", 0),
         ("CF_Mdps_Chksum2", "MDPS12", 0),
         ("CF_Mdps_ToiFlt", "MDPS12", 0),
@@ -420,6 +426,7 @@ class CarState(CarStateBase):
         ("CF_Mdps_Def", "MDPS12", 0),
         ("CF_Mdps_ToiActive", "MDPS12", 0),
         ("CF_Mdps_ToiUnavail", "MDPS12", 0),
+        ("CF_Mdps_ToiFlt", "MDPS12", 0),
         ("CF_Mdps_MsgCount2", "MDPS12", 0),
         ("CF_Mdps_Chksum2", "MDPS12", 0),
         ("CF_Mdps_ToiFlt", "MDPS12", 0),
