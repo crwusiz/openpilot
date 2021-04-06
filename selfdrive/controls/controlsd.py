@@ -405,7 +405,7 @@ class Controls:
       sr = max(self.sm['liveParameters'].steerRatio, 0.1)
     else:
       if self.CP.carName in [CAR.GENESIS_G80]:
-        sr = interp(abs(self.angle_steers_des), [5., 15.], [11.8, 16.2])
+        sr = interp(abs(self.angle_steers_des), [5., 15.], [13., 17.])
       else:
         sr = max(ntune_get('steerRatio'), 0.1)
 
