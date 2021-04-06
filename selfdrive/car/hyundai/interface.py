@@ -40,6 +40,14 @@ class CarInterface(CarInterfaceBase):
     ret.steerLimitTimer = 0.8
     tire_stiffness_factor = 1.
 
+    ret.maxSteeringAngleDeg = 90.
+    ret.startAccel = 1.0
+
+    eps_modified = False
+    for fw in car_fw:
+      if fw.ecu == "eps" and b"," in fw.fwVersion:
+        eps_modified = True
+
     # genesis
     if candidate == CAR.GENESIS:
       ret.mass = 1900. + STD_CARGO_KG
@@ -74,6 +82,8 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.PALISADE:
       ret.mass = 1999. + STD_CARGO_KG
       ret.wheelbase = 2.90
+      if eps_modified:
+        ret.maxSteeringAngleDeg = 1000.
     elif candidate in [CAR.ELANTRA, CAR.ELANTRA_GT_I30]:
       ret.mass = 1275. + STD_CARGO_KG
       ret.wheelbase = 2.7
@@ -94,10 +104,12 @@ class CarInterface(CarInterfaceBase):
       tire_stiffness_factor = 0.8
       ret.mass = 1640. + STD_CARGO_KG
       ret.wheelbase = 2.845
+      ret.maxSteeringAngleDeg = 120.
     elif candidate in [CAR.GRANDEUR_IG_FL, CAR.GRANDEUR_IG_FL_HEV]:
       tire_stiffness_factor = 0.8
       ret.mass = 1640. + STD_CARGO_KG
       ret.wheelbase = 2.845
+      ret.maxSteeringAngleDeg = 120.
     elif candidate == CAR.VELOSTER:
       ret.mass = 3558. * CV.LB_TO_KG
       ret.wheelbase = 2.80
