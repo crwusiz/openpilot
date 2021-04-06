@@ -85,11 +85,15 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
   reset_layout->setSpacing(30);
 
   // reset calibration button
-  QPushButton *reset_calib_btn = new QPushButton("Reset Calibration");
+  QPushButton *reset_calib_btn = new QPushButton("Reset Calibration and LiveParameters");
   reset_layout->addWidget(reset_calib_btn);
   QObject::connect(reset_calib_btn, &QPushButton::released, [=]() {
-    if (ConfirmationDialog::confirm("Are you sure you want to reset calibration?")) {
+    if (ConfirmationDialog::confirm("Are you sure you want to reset calibration and live params?")) {
       Params().remove("CalibrationParams");
+      Params().remove("LiveParameters");
+      QTimer::singleShot(1000, []() {
+        Hardware::reboot();
+      });
     }
   });
 
