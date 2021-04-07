@@ -199,7 +199,7 @@ class LateralPlanner():
     assert len(heading_pts) == MPC_N + 1
     self.libmpc.set_weights(std_cost_mult * MPC_COST_LAT.PATH, 0.0, ntune_get('steerRateCost'))
     self.libmpc.run_mpc(self.cur_state, self.mpc_solution,
-                        float(v_ego),
+                        float(max(v_ego, 1.0)),
                         CAR_ROTATION_RADIUS,
                         list(y_pts),
                         list(heading_pts))
