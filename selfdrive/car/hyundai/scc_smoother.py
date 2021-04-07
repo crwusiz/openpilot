@@ -359,7 +359,12 @@ class SccSmoother:
         a_y_max = 2.975 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
         v_curvature = np.sqrt(a_y_max / np.clip(np.abs(curv), 1e-4, None))
         model_speed = np.mean(v_curvature) * 0.9 * self.curvature_gain
-        self.curve_speed = float(max(model_speed * CV.MS_TO_KPH, MIN_CURVE_SPEED))
+
+        if model_speed < v_ego:
+          self.curve_speed = float(max(model_speed * CV.MS_TO_KPH, MIN_CURVE_SPEED))
+        else:
+          self.curve_speed = 300.
+
         if np.isnan(self.curve_speed):
           self.curve_speed = 300.
       else:
@@ -376,7 +381,8 @@ class SccSmoother:
       else:
         self.target_speed = clu11_speed + accel
 
-      self.target_speed = clip(self.target_speed, MIN_SET_SPEED, self.max_speed)
+      if self.max_speed > MIN_SET_SPEED:
+        self.target_speed = clip(self.target_speed, MIN_SET_SPEED, self.max_speed)
 
     else:
       if CS.gas_pressed and CS.cruiseState_enabled:
