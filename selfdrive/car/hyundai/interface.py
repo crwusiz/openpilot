@@ -15,7 +15,7 @@ class CarInterface(CarInterfaceBase):
   def __init__(self, CP, CarController, CarState):
     super().__init__(CP, CarController, CarState)
     self.cp2 = self.CS.get_can2_parser(CP)
-    self.mad_mode_enabled = Params().get('MadModeEnabled') == b'1'
+    self.mad_mode_enabled = Params().get_bool('MadModeEnabled')
 
   @staticmethod
   def compute_gb(accel, speed):
@@ -25,7 +25,7 @@ class CarInterface(CarInterfaceBase):
   def get_params(candidate, fingerprint=gen_empty_fingerprint(), has_relay=False, car_fw=[]):  # pylint: disable=dangerous-default-value
     ret = CarInterfaceBase.get_std_params(candidate, fingerprint, has_relay)
 
-    ret.openpilotLongitudinalControl = Params().get('LongControlEnabled') == b'1'
+    ret.openpilotLongitudinalControl = Params().get_bool('LongControlEnabled')
 
     ret.carName = "hyundai"
     ret.safetyModel = car.CarParams.SafetyModel.hyundaiLegacy
@@ -238,7 +238,7 @@ class CarInterface(CarInterfaceBase):
     ret.enableCruise = not ret.radarOffCan
 
     # set safety_hyundai_community only for non-SCC, MDPS harrness or SCC harrness cars or cars that have unknown issue
-    if ret.radarOffCan or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or ret.sccBus == 1 or Params().get('MadModeEnabled') == b'1':
+    if ret.radarOffCan or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or ret.sccBus == 1 or Params().get_bool('MadModeEnabled'):
       ret.safetyModel = car.CarParams.SafetyModel.hyundaiCommunity
     return ret
 

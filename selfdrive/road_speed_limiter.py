@@ -20,7 +20,7 @@ class RoadSpeedLimiter:
 
     self.start_dist = 0
 
-    self.longcontrol = Params().get('LongControlEnabled') == b'1'
+    self.longcontrol = Params().get_bool('LongControlEnabled')
 
     thread = Thread(target=self.udp_recv, args=[])
     thread.setDaemon(True)

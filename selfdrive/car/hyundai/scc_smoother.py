@@ -59,13 +59,13 @@ class SccSmoother:
   def __init__(self, accel_gain, decel_gain, curvature_gain):
 
     self.state = int(Params().get('SccSmootherState'))
-    self.scc_smoother_enabled = Params().get('SccSmootherEnabled') == b'1'
-    self.slow_on_curves = Params().get('SccSmootherSlowOnCurves') == b'1'
+    self.scc_smoother_enabled = Params().get_bool('SccSmootherEnabled')
+    self.slow_on_curves = Params().get_bool('SccSmootherSlowOnCurves')
 
-    self.sync_set_speed_while_gas_pressed = Params().get('SccSmootherSyncGasPressed') == b'1'
-    self.switch_only_with_gap = Params().get('SccSmootherSwitchGapOnly') == b'1'
+    self.sync_set_speed_while_gas_pressed = Params().get_bool('SccSmootherSyncGasPressed')
+    self.switch_only_with_gap = Params().get_bool('SccSmootherSwitchGapOnly')
 
-    self.longcontrol = Params().get('LongControlEnabled') == b'1'
+    self.longcontrol = Params().get_bool('LongControlEnabled')
 
     self.accel_gain = accel_gain
     self.decel_gain = decel_gain

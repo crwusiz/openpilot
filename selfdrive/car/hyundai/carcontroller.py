@@ -91,7 +91,7 @@ class CarController():
     self.longcontrol = CP.openpilotLongitudinalControl
     self.scc_live = not CP.radarOffCan
 
-    self.mad_mode_enabled = Params().get('MadModeEnabled') == b'1'
+    self.mad_mode_enabled = Params().get_bool('MadModeEnabled')
 
     self.scc_smoother = SccSmoother(accel_gain=1.0, decel_gain=1.0, curvature_gain=1.0)
 
