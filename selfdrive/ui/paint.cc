@@ -427,13 +427,15 @@ static void bb_ui_draw_measures_right(UIState *s, int bb_x, int bb_y, int bb_w )
     bb_ry = bb_y + bb_h;
   }
 
+  float batteryTemp = scene->deviceState.getBatteryTempC();
+  bool batteryless =  batteryTemp < -20;
+
    // add battery temperature
-  if (UI_FEATURE_RIGHT_BATTERY_TEMP) {
+  if (UI_FEATURE_RIGHT_BATTERY_TEMP && !batteryless) {
+
     char val_str[16];
     char uom_str[6];
     NVGcolor val_color = nvgRGBA(255, 255, 255, 200);
-
-    float batteryTemp = scene->deviceState.getBatteryTempC();
 
     if(batteryTemp > 40.f) {
       val_color = nvgRGBA(255, 188, 3, 200);
@@ -452,7 +454,7 @@ static void bb_ui_draw_measures_right(UIState *s, int bb_x, int bb_y, int bb_w )
   }
 
   // add battery level
-    if(UI_FEATURE_RIGHT_BATTERY_LEVEL) {
+    if(UI_FEATURE_RIGHT_BATTERY_LEVEL && !batteryless) {
     char val_str[16];
     char uom_str[6];
     char bat_lvl[4] = "";
