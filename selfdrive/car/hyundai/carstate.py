@@ -81,7 +81,7 @@ class CarState(CarStateBase):
     ret.steeringTorqueEps = cp_mdps.vl["MDPS12"]['CR_Mdps_OutTq']
     ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD
 
-    if cp_mdps.vl["MDPS12"]['CF_Mdps_ToiUnavail'] != 0 or cp_mdps.vl["MDPS12"]['CF_Mdps_ToiFlt'] != 0:
+    if cp_mdps.vl["MDPS12"]['CF_Mdps_ToiUnavail'] != 0:
       self.mdps_error_cnt += 1
     else:
       self.mdps_error_cnt = 0
