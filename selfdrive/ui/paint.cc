@@ -648,6 +648,10 @@ static void bb_ui_draw_debug(UIState *s)
     y += height;
     snprintf(str, sizeof(str), "%.3f (%.3f/%.3f)", aReqValue, aReqValueMin, aReqValueMax);
     ui_draw_text(s, text_x, y, str, 22 * 2.5, textColor, "sans-regular");
+
+    y += height;
+    snprintf(str, sizeof(str), "Light: %.3f", scene->light_sensor);
+    ui_draw_text(s, text_x, y, str, 22 * 2.5, textColor, "sans-regular");
 }
 
 
