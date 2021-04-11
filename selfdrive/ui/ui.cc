@@ -215,6 +215,11 @@ static void update_sockets(UIState *s) {
       if (sensor.which() == cereal::SensorEventData::LIGHT) {
 #ifndef QCOM2
         scene.light_sensor = sensor.getLight();
+
+        float batteryTemp = scene->deviceState.getBatteryTempC();
+        bool batteryless =  batteryTemp < -20;
+        if(batteryless)
+            scene.light_sensor *= 2.3f;
 #endif
       } else if (!scene.started && sensor.which() == cereal::SensorEventData::ACCELERATION) {
         auto accel = sensor.getAcceleration().getV();
