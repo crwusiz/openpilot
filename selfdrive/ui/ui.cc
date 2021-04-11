@@ -216,7 +216,7 @@ static void update_sockets(UIState *s) {
 #ifndef QCOM2
         scene.light_sensor = sensor.getLight();
 
-        float batteryTemp = scene->deviceState.getBatteryTempC();
+        float batteryTemp = scene.deviceState.getBatteryTempC();
         bool batteryless =  batteryTemp < -20;
         if(batteryless)
             scene.light_sensor *= 2.3f;
