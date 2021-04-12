@@ -8,7 +8,6 @@ from common.profiler import Profiler
 from common.params import Params, put_nonblocking
 import cereal.messaging as messaging
 from selfdrive.car.hyundai.scc_smoother import CruiseState, SccSmoother
-from selfdrive.car.hyundai.values import CAR
 from selfdrive.config import Conversions as CV
 from selfdrive.swaglog import cloudlog
 from selfdrive.boardd.boardd import can_list_to_can_capnp
@@ -404,10 +403,7 @@ class Controls:
     if ntune_isEnabled('useLiveSteerRatio'):
       sr = max(self.sm['liveParameters'].steerRatio, 0.1)
     else:
-      if self.CP.carName in [CAR.GENESIS_G80]:
-        sr = interp(abs(self.angle_steers_des), [5., 15.], [13., 17.])
-      else:
-        sr = max(ntune_get('steerRatio'), 0.1)
+      sr = max(ntune_get('steerRatio'), 0.1)
 
     self.VM.update_params(x, sr)
 
