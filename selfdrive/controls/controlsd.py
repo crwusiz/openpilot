@@ -401,7 +401,7 @@ class Controls:
     #sr = max(params.steerRatio, 0.1)
 
     if ntune_isEnabled('useLiveSteerRatio'):
-      sr = max(self.sm['liveParameters'].steerRatio, 0.1)
+      sr = max(params.steerRatio, 0.1)
     else:
       sr = max(ntune_get('steerRatio'), 0.1)
 
