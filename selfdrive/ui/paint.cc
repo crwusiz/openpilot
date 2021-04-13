@@ -110,7 +110,7 @@ static void draw_lead(UIState *s, int idx) {
 
   if(lead.getRadar()) {
     nvgTextAlign(s->vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-    ui_draw_text(s, x + sz/2.f, y + sz/2.f, "R", 22 * 2.5, COLOR_WHITE, "sans-semibold");
+    ui_draw_text(s, x, y + sz/2.f, "R", 22 * 2.5, COLOR_WHITE, "sans-semibold");
   }
 }
 
