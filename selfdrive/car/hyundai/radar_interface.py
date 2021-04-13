@@ -50,7 +50,7 @@ class RadarInterface(RadarInterfaceBase):
       errors.append("canError")
     ret.errors = errors
 
-    valid = cpt["SCC11"]['ACC_ObjStatus'] and cpt["SCC11"]['ObjValid']
+    valid = cpt["SCC11"]['ACC_ObjStatus'] #and cpt["SCC11"]['ObjValid']
 
     for ii in range(1):
       if valid:
