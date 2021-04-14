@@ -87,19 +87,19 @@ class CarInterface(CarInterfaceBase):
     elif candidate in [CAR.ELANTRA, CAR.ELANTRA_GT_I30]:
       ret.mass = 1275. + STD_CARGO_KG
       ret.wheelbase = 2.7
-      tire_stiffness_factor = 0.385    # stiffnessFactor settled on 1.0081302973865127
+      tire_stiffness_factor = 0.7
     elif candidate == CAR.KONA:
       ret.mass = 1275. + STD_CARGO_KG
       ret.wheelbase = 2.7
-      tire_stiffness_factor = 0.385
+      tire_stiffness_factor = 0.7
     elif candidate in [CAR.KONA_HEV, CAR.KONA_EV]:
       ret.mass = 1395. + STD_CARGO_KG
       ret.wheelbase = 2.6
-      tire_stiffness_factor = 0.385
+      tire_stiffness_factor = 0.7
     elif candidate in [CAR.IONIQ, CAR.IONIQ_EV_LTD]:
       ret.mass = 1490. + STD_CARGO_KG   #weight per hyundai site https://www.hyundaiusa.com/ioniq-electric/specifications.aspx
       ret.wheelbase = 2.7
-      tire_stiffness_factor = 0.385
+      tire_stiffness_factor = 0.7
     elif candidate in [CAR.GRANDEUR_IG, CAR.GRANDEUR_IG_HEV]:
       tire_stiffness_factor = 0.8
       ret.mass = 1640. + STD_CARGO_KG
@@ -113,16 +113,16 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.VELOSTER:
       ret.mass = 3558. * CV.LB_TO_KG
       ret.wheelbase = 2.80
-      tire_stiffness_factor = 0.5
+      tire_stiffness_factor = 0.9
     # kia
     elif candidate == CAR.SORENTO:
       ret.mass = 1985. + STD_CARGO_KG
       ret.wheelbase = 2.78
-      tire_stiffness_factor = 0.5
+      tire_stiffness_factor = 0.7
     elif candidate in [CAR.K5, CAR.K5_HEV]:
       ret.mass = 3558. * CV.LB_TO_KG
       ret.wheelbase = 2.80
-      tire_stiffness_factor = 0.5
+      tire_stiffness_factor = 0.7
     elif candidate == CAR.STINGER:
       tire_stiffness_factor = 1.125 # LiveParameters (Tunder's 2020)
       ret.mass = 1825.0 + STD_CARGO_KG
@@ -130,26 +130,26 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.FORTE:
       ret.mass = 3558. * CV.LB_TO_KG
       ret.wheelbase = 2.80
-      tire_stiffness_factor = 0.5
+      tire_stiffness_factor = 0.7
     elif candidate == CAR.CEED:
       ret.mass = 1350. + STD_CARGO_KG
       ret.wheelbase = 2.65
-      tire_stiffness_factor = 0.5
+      tire_stiffness_factor = 0.6
     elif candidate == CAR.SPORTAGE:
       ret.mass = 1985. + STD_CARGO_KG
       ret.wheelbase = 2.78
     elif candidate in [CAR.NIRO_HEV, CAR.NIRO_EV]:
       ret.mass = 1737. + STD_CARGO_KG
       ret.wheelbase = 2.7
-      tire_stiffness_factor = 0.385
+      tire_stiffness_factor = 0.7
     elif candidate in [CAR.K7, CAR.K7_HEV]:
-      tire_stiffness_factor = 0.6
+      tire_stiffness_factor = 0.7
       ret.mass = 1650. + STD_CARGO_KG
       ret.wheelbase = 2.855
     elif candidate == CAR.SELTOS:
       ret.mass = 1310. + STD_CARGO_KG
       ret.wheelbase = 2.6
-      tire_stiffness_factor = 0.5
+      tire_stiffness_factor = 0.7
 
 
     ret.lateralTuning.init('lqr')
