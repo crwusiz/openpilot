@@ -91,7 +91,6 @@ keys = {
 
   # scc smoother
   b"SccSmootherState": [TxType.PERSISTENT],
-  b"SccSmootherEnabled": [TxType.PERSISTENT],
   b"SccSmootherSlowOnCurves": [TxType.PERSISTENT],
   b"SccSmootherSyncGasPressed": [TxType.PERSISTENT],
   b"SccSmootherSwitchGapOnly": [TxType.PERSISTENT],

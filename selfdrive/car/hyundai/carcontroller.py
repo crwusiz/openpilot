@@ -93,7 +93,7 @@ class CarController():
 
     self.mad_mode_enabled = Params().get_bool('MadModeEnabled')
 
-    self.scc_smoother = SccSmoother(accel_gain=1.0, decel_gain=1.0, curvature_gain=1.0)
+    self.scc_smoother = SccSmoother(1.0)
 
   def update(self, enabled, CS, frame, CC, actuators, pcm_cancel_cmd, visual_alert,
              left_lane, right_lane, left_lane_depart, right_lane_depart, set_speed, lead_visible, controls):

@@ -295,12 +295,6 @@ QWidget * community_panel() {
                                             "../assets/offroad/icon_road.png"
                                               ));
   toggles_list->addWidget(horizontal_line());
-  toggles_list->addWidget(new ParamControl("SccSmootherEnabled",
-                                            "Enable SCC Smoother",
-                                            "WARNING: Use at your own risk !!, It automatically adjusts the maximum set speed to help with slight smooth acceleration/deceleration. When this mode is activated, you can switch to stock mode using the CANCEL or GAP button on the vehicle steering wheel.",
-                                            "../assets/offroad/icon_road.png"
-                                            ));
-  toggles_list->addWidget(horizontal_line());
   toggles_list->addWidget(new ParamControl("SccSmootherSlowOnCurves",
                                             "Enable Slow On Curves",
                                             "",
@@ -313,12 +307,6 @@ QWidget * community_panel() {
                                             "../assets/offroad/icon_road.png"
                                             ));
   toggles_list->addWidget(horizontal_line());
-  toggles_list->addWidget(new ParamControl("SccSmootherSwitchGapOnly",
-                                            "Switch only with cruise gap button",
-                                            "",
-                                            "../assets/offroad/icon_road.png"
-                                            ));
-                                            toggles_list->addWidget(horizontal_line());
   toggles_list->addWidget(new ParamControl("ShowDebugUI",
                                             "Show Debug UI",
                                             "",

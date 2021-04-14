@@ -38,11 +38,8 @@ def manager_init():
     ("AutoLaneChangeEnabled", "0"),
 
     # scc smoother
-    ("SccSmootherState", "0"),
-    ("SccSmootherEnabled", "0"),
     ("SccSmootherSlowOnCurves", "0"),
     ("SccSmootherSyncGasPressed", "0"),
-    ("SccSmootherSwitchGapOnly", "0"),
     ("ShowDebugUI", "0")
   ]
 

@@ -773,11 +773,6 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
     ET.WARNING: auto_lane_change_alert,
   },
 
-  EventName.sccSmootherStatus: {
-    ET.PERMANENT: Alert("","", AlertStatus.normal, AlertSize.none,
-      Priority.HIGH, VisualAlert.none, AudibleAlert.chimeWarning1, .4, .1, .1),
-  },
-
   EventName.slowingDownSpeed: {
     ET.PERMANENT: Alert("Slowing down","", AlertStatus.normal, AlertSize.small,
       Priority.MID, VisualAlert.none, AudibleAlert.none, 0., .1, .1),
