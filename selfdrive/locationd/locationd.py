@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import gc
 import json
 import numpy as np
 import sympy as sp
@@ -289,6 +290,8 @@ class Localizer():
 
 
 def locationd_thread(sm, pm, disabled_logs=None):
+  gc.disable()
+
   if disabled_logs is None:
     disabled_logs = []
 

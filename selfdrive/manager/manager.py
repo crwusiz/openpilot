@@ -10,6 +10,7 @@ import cereal.messaging as messaging
 import selfdrive.crash as crash
 from common.params import Params
 from common.text_window import TextWindow
+from selfdrive.boardd.set_time import set_time
 from selfdrive.hardware import HARDWARE
 from selfdrive.manager.helpers import unblock_stdout
 from selfdrive.manager.process import ensure_running, launcher
@@ -21,13 +22,16 @@ from selfdrive.hardware.eon.apk import system
 
 
 def manager_init():
+
+  # update system time from panda
+  set_time(cloudlog)
+
   params = Params()
   params.manager_start()
 
   default_params = [
     ("CompletedTrainingVersion", "0"),
     ("HasAcceptedTerms", "0"),
-    ("IsUploadRawEnabled", "1"),
     ("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')),
     ("OpenpilotEnabledToggle", "1"),
     ("IsMetric", "1"),

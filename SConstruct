@@ -13,6 +13,10 @@ AddOption('--test',
           action='store_true',
           help='build test files')
 
+AddOption('--kaitai',
+          action='store_true',
+          help='Regenerate kaitai struct parsers')
+
 AddOption('--asan',
           action='store_true',
           help='turn on ASAN')
@@ -180,6 +184,7 @@ env = Environment(
     "#phonelibs/snpe/include",
     "#phonelibs/nanovg",
     "#phonelibs/qrcode",
+    "#phonelibs",
     "#selfdrive/boardd",
     "#selfdrive/common",
     "#selfdrive/camerad",
