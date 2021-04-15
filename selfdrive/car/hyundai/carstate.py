@@ -58,7 +58,7 @@ class CarState(CarStateBase):
     ret.seatbeltUnlatched = cp.vl["CGW1"]['CF_Gway_DrvSeatBeltSw'] == 0
 
     self.is_set_speed_in_mph = bool(cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"])
-    speed_conv = CV.MPH_TO_MS if self.is_set_speed_in_mph else CV.KPH_TO_MS
+    self.speed_conv_to_ms = CV.MPH_TO_MS if self.is_set_speed_in_mph else CV.KPH_TO_MS
 
     if self.use_cluster_speed:
 
@@ -67,7 +67,7 @@ class CarState(CarStateBase):
       if 0. < decimal < 0.5:
         ret.vEgoRaw += decimal
 
-      ret.vEgoRaw *= speed_conv
+      ret.vEgoRaw *= self.speed_conv_to_ms
 
     else:
       ret.wheelSpeeds.fl = cp.vl["WHL_SPD11"]['WHL_SPD_FL'] * CV.KPH_TO_MS
