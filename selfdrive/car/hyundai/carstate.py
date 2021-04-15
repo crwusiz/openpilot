@@ -3,6 +3,7 @@ from selfdrive.car.hyundai.values import DBC, STEER_THRESHOLD, FEATURES, CAR
 from selfdrive.car.interfaces import CarStateBase
 from opendbc.can.parser import CANParser
 from selfdrive.config import Conversions as CV
+from common.params import Params
 
 GearShifter = car.CarState.GearShifter
 
@@ -36,6 +37,8 @@ class CarState(CarStateBase):
     self.cruiseState_enabled = False
     self.cruiseState_speed = 0
 
+    self.use_cluster_speed = Params().get_bool('UseClusterSpeed')
+
   def update(self, cp, cp2, cp_cam):
     cp_mdps = cp2 if self.mdps_bus else cp
     cp_sas = cp2 if self.sas_bus else cp
@@ -57,20 +60,22 @@ class CarState(CarStateBase):
     self.is_set_speed_in_mph = bool(cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"])
     speed_conv = CV.MPH_TO_MS if self.is_set_speed_in_mph else CV.KPH_TO_MS
 
-    #print(cp.vl["CLU11"]["CF_Clu_Vanz"], cp.vl["CLU11"]["CF_Clu_VanzDecimal"])
+    if self.use_cluster_speed:
 
-    #ret.wheelSpeeds.fl = cp.vl["WHL_SPD11"]['WHL_SPD_FL'] * CV.KPH_TO_MS
-    #ret.wheelSpeeds.fr = cp.vl["WHL_SPD11"]['WHL_SPD_FR'] * CV.KPH_TO_MS
-    #ret.wheelSpeeds.rl = cp.vl["WHL_SPD11"]['WHL_SPD_RL'] * CV.KPH_TO_MS
-    #ret.wheelSpeeds.rr = cp.vl["WHL_SPD11"]['WHL_SPD_RR'] * CV.KPH_TO_MS
-    #ret.vEgoRaw = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
+      ret.vEgoRaw = cp.vl["CLU11"]["CF_Clu_Vanz"]
+      decimal = cp.vl["CLU11"]["CF_Clu_VanzDecimal"]
+      if 0. < decimal < 0.5:
+        ret.vEgoRaw += decimal
 
-    ret.vEgoRaw = cp.vl["CLU11"]["CF_Clu_Vanz"]
-    decimal = cp.vl["CLU11"]["CF_Clu_VanzDecimal"]
-    if 0. < decimal < 0.5:
-      ret.vEgoRaw += decimal
+      ret.vEgoRaw *= speed_conv
 
-    ret.vEgoRaw *= speed_conv
+    else:
+      ret.wheelSpeeds.fl = cp.vl["WHL_SPD11"]['WHL_SPD_FL'] * CV.KPH_TO_MS
+      ret.wheelSpeeds.fr = cp.vl["WHL_SPD11"]['WHL_SPD_FR'] * CV.KPH_TO_MS
+      ret.wheelSpeeds.rl = cp.vl["WHL_SPD11"]['WHL_SPD_RL'] * CV.KPH_TO_MS
+      ret.wheelSpeeds.rr = cp.vl["WHL_SPD11"]['WHL_SPD_RR'] * CV.KPH_TO_MS
+      ret.vEgoRaw = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
+
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
 
     ret.standstill = ret.vEgoRaw < 0.1

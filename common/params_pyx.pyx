@@ -85,6 +85,7 @@ keys = {
   b"ForcePowerDown": [TxType.CLEAR_ON_MANAGER_START],
   
   # HKG
+  b"UseClusterSpeed": [TxType.PERSISTENT],
   b"LongControlEnabled": [TxType.PERSISTENT],
   b"MadModeEnabled": [TxType.PERSISTENT],
   b"AutoLaneChangeEnabled": [TxType.PERSISTENT],

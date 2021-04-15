@@ -277,6 +277,13 @@ QWidget * community_panel() {
   QVBoxLayout *toggles_list = new QVBoxLayout();
   //toggles_list->setMargin(50);
 
+  toggles_list->addWidget(new ParamControl("UseClusterSpeed",
+                                            "Use cluster speed",
+                                            "Use cluster speed instead of wheel speed.",
+                                            "../assets/offroad/icon_road.png"
+                                              ));
+
+  toggles_list->addWidget(horizontal_line());
   toggles_list->addWidget(new ParamControl("LongControlEnabled",
                                             "Enable HKG Long Control",
                                             "warnings: it is beta, be careful!! Openpilot will control the speed of your car",

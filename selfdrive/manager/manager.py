@@ -37,11 +37,11 @@ def manager_init():
     ("IsMetric", "1"),
 
     # HKG
+    ("UseClusterSpeed", "1"),
     ("LongControlEnabled", "0"),
     ("MadModeEnabled", "1"),
     ("AutoLaneChangeEnabled", "0"),
 
-    # scc smoother
     ("SccSmootherSlowOnCurves", "0"),
     ("SccSmootherSyncGasPressed", "0"),
     ("ShowDebugUI", "0")
