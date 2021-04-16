@@ -307,15 +307,16 @@ class SccSmoother:
     if lead is not None:
       dRel = lead.dRel
 
-      if stock_accel < apply_accel < -0.1:
-        stock_weight = interp(dRel, [2., 25.], [1., 0.])
+      if lead.radar:
+
+        if stock_accel > 0.:
+          stock_weight = interp(dRel, [2., 25.], [0.7, 0.])
+        else:
+          stock_weight = interp(dRel, [2., 25.], [1., 0.])
+
         apply_accel = apply_accel * (1. - stock_weight) + stock_accel * stock_weight
 
-    self.fused_decel.append(apply_accel)
-    if len(self.fused_decel) > 3:
-      self.fused_decel.pop(0)
-
-    return mean(self.fused_decel), dRel
+    return apply_accel, dRel
 
   @staticmethod
   def update_cruise_buttons(controls, CS, longcontrol): # called by controlds's state_transition
