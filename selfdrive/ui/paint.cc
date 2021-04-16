@@ -718,6 +718,8 @@ static void ui_draw_vision_maxspeed(UIState *s) {
   // scc smoother
   cereal::CarControl::SccSmoother::Reader scc_smoother = s->scene.car_control.getSccSmoother();
   bool longControl = scc_smoother.getLongControl();
+
+  // kph
   float cruiseVirtualMaxSpeed = scc_smoother.getCruiseVirtualMaxSpeed();
   float cruiseRealMaxSpeed = scc_smoother.getCruiseRealMaxSpeed();
 
@@ -734,10 +736,18 @@ static void ui_draw_vision_maxspeed(UIState *s) {
   {
     char str[256];
 
-    snprintf(str, sizeof(str), "%d", (int)(cruiseVirtualMaxSpeed + 0.5));
+    if(s->scene.is_metric)
+        snprintf(str, sizeof(str), "%d", (int)(cruiseVirtualMaxSpeed + 0.5));
+    else
+        snprintf(str, sizeof(str), "%d", (int)(cruiseVirtualMaxSpeed*0.621371 + 0.5));
+
     ui_draw_text(s, text_x, 148, str, 33 * 2.5, COLOR_WHITE, "sans-semibold");
 
-    snprintf(str, sizeof(str), "%d", (int)(cruiseRealMaxSpeed + 0.5));
+    if(s->scene.is_metric)
+        snprintf(str, sizeof(str), "%d", (int)(cruiseRealMaxSpeed + 0.5));
+    else
+        snprintf(str, sizeof(str), "%d", (int)(cruiseRealMaxSpeed*0.621371 + 0.5));
+
     ui_draw_text(s, text_x, 242, str, 48 * 2.5, COLOR_WHITE, "sans-bold");
   }
   else
