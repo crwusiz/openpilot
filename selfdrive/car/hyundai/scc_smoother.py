@@ -187,8 +187,8 @@ class SccSmoother:
         self.wait_timer = max(ALIVE_COUNT) + max(WAIT_COUNT)
         return
 
-      if not ascc_enabled:
-        self.reset()
+    if not ascc_enabled:
+      self.reset()
 
     self.cal_target_speed(CS, clu11_speed, controls)
 
