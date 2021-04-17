@@ -146,13 +146,13 @@ class nTune():
   def checkValidLQR(self):
     updated = False
 
-    if self.checkValue("scale", 500.0, 5000.0, 2000.0):
+    if self.checkValue("scale", 500.0, 5000.0, 1800.0):
       updated = True
 
-    if self.checkValue("ki", 0.0, 0.2, 0.015):
+    if self.checkValue("ki", 0.0, 0.2, 0.01):
       updated = True
 
-    if self.checkValue("dcGain", 0.002, 0.004, 0.0029):
+    if self.checkValue("dcGain", 0.002, 0.004, 0.0028):
       updated = True
 
     if self.checkValue("steerLimitTimer", 0.5, 3.0, 2.5):
