@@ -47,6 +47,9 @@ def manager_init():
     ("ShowDebugUI", "0")
   ]
 
+  if TICI:
+    default_params.append(("IsUploadRawEnabled", "1"))
+
   if params.get_bool("RecordFrontLock"):
     params.put_bool("RecordFront", True)
 

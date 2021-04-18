@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import gc
 import json
+import gc
 import numpy as np
 import sympy as sp
 import cereal.messaging as messaging
