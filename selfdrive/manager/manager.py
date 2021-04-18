@@ -11,7 +11,7 @@ import selfdrive.crash as crash
 from common.params import Params
 from common.text_window import TextWindow
 from selfdrive.boardd.set_time import set_time
-from selfdrive.hardware import HARDWARE
+from selfdrive.hardware import HARDWARE, TICI
 from selfdrive.manager.helpers import unblock_stdout
 from selfdrive.manager.process import ensure_running, launcher
 from selfdrive.manager.process_config import managed_processes
