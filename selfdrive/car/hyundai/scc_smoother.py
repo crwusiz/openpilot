@@ -133,9 +133,11 @@ class SccSmoother:
     if lead_speed >= self.min_set_speed_clu:
       max_speed = min(max_speed, lead_speed)
 
-    max_speed_log = "{:.1f}/{:.1f}/{:.1f}".format(float(limit_speed),
-                                                  float(self.curve_speed_ms*self.speed_conv_to_clu),
-                                                  float(lead_speed))
+    #max_speed_log = "{:.1f}/{:.1f}/{:.1f}".format(float(limit_speed),
+    #                                              float(self.curve_speed_ms*self.speed_conv_to_clu),
+    #                                              float(lead_speed))
+
+    max_speed_log = ""
 
     if limit_speed >= self.kph_to_clu(30):
 
