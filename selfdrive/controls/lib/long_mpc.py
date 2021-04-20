@@ -29,7 +29,6 @@ class LongitudinalMpc():
     self.n_its = 0
     self.duration = 0
 
-    # scc smoother
     self.cruise_gap = 0
 
   def publish(self, pm):
@@ -98,8 +97,6 @@ class LongitudinalMpc():
 
     # Calculate mpc
     t = sec_since_boot()
-
-    # scc smoother
 
     cruise_gap = int(clip(CS.cruiseGap, 1., 4.))
     TR = interp(float(cruise_gap), [1., 2., 3., 4.], [1.3, 1.6, 1.9, 2.3])
