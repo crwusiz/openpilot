@@ -88,6 +88,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     startupNoCar @76;
     startupNoControl @77;
     startupMaster @78;
+    startupFuzzyFingerprint @97;
     fcw @79;
     steerSaturated @80;
     belowEngageSpeed @84;
@@ -122,13 +123,13 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     startupOneplusDEPRECATED @82;
     steerTempUnavailableMuteDEPRECATED @35;
 
-    turningIndicatorOn @97;
-    lkasButtonOff @98;
-    autoLaneChange @99;
+    turningIndicatorOn @98;
+    lkasButtonOff @99;
+    autoLaneChange @100;
 
     # scc smoother
-    slowingDownSpeed @100;
-    slowingDownSpeedSound @101;
+    slowingDownSpeed @101;
+    slowingDownSpeedSound @102;
   }
 }
 
@@ -376,6 +377,7 @@ struct CarControl {
 struct CarParams {
   carName @0 :Text;
   carFingerprint @1 :Text;
+  fuzzyFingerprint @55 :Bool;
 
   enableGasInterceptor @2 :Bool;
   enableCruise @3 :Bool;
@@ -437,13 +439,14 @@ struct CarParams {
   dashcamOnly @41: Bool;
   transmissionType @43 :TransmissionType;
   carFw @44 :List(CarFw);
+
   radarTimeStep @45: Float32 = 0.05;  # time delta between radar updates, 20Hz is very standard
   communityFeature @46: Bool;  # true if a community maintained feature is detected
   fingerprintSource @49: FingerprintSource;
   networkLocation @50 :NetworkLocation;  # Where Panda/C2 is integrated into the car's CAN network
-  mdpsBus @55: Int8;
-  sasBus @56: Int8;
-  sccBus @57: Int8;
+  mdpsBus @56: Int8;
+  sasBus @57: Int8;
+  sccBus @58: Int8;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);

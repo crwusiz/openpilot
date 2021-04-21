@@ -578,8 +578,6 @@ int main() {
 #endif
   LOG("set affinity returns %d", err);
 
-  panda_set_power(true);
-
   while (!do_exit){
     std::vector<std::thread> threads;
     threads.push_back(std::thread(panda_state_thread, getenv("STARTED") != nullptr));
@@ -589,9 +587,7 @@ int main() {
       threads.push_back(std::thread(can_send_thread, getenv("FAKESEND") != nullptr));
       threads.push_back(std::thread(can_recv_thread));
       threads.push_back(std::thread(hardware_control_thread));
-
-      if(panda->is_pigeon)
-        threads.push_back(std::thread(pigeon_thread));
+      threads.push_back(std::thread(pigeon_thread));
     }
 
     for (auto &t : threads) t.join();
