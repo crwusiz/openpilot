@@ -99,7 +99,7 @@ class LongitudinalMpc():
     t = sec_since_boot()
 
     cruise_gap = int(clip(CS.cruiseGap, 1., 4.))
-    TR = interp(float(cruise_gap), [1., 2., 3., 4.], [1.3, 1.6, 1.9, 2.3])
+    TR = interp(float(cruise_gap), [1., 2., 3., 4.], [1.3, 1.7, 2.2, 2.8])
 
     self.n_its = self.libmpc.run_mpc(self.cur_state, self.mpc_solution, self.a_lead_tau, a_lead, TR)
     self.duration = int((sec_since_boot() - t) * 1e9)
