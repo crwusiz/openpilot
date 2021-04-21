@@ -485,8 +485,6 @@ static void pigeon_publish_raw(PubMaster &pm, const std::string &dat) {
 }
 
 void pigeon_thread() {
-  if (!panda->is_pigeon) { return; };
-
   PubMaster pm({"ubloxRaw"});
   bool ignition_last = false;
 
@@ -587,7 +585,9 @@ int main() {
       threads.push_back(std::thread(can_send_thread, getenv("FAKESEND") != nullptr));
       threads.push_back(std::thread(can_recv_thread));
       threads.push_back(std::thread(hardware_control_thread));
-      threads.push_back(std::thread(pigeon_thread));
+	  
+	  if(panda->is_pigeon)
+	      threads.push_back(std::thread(pigeon_thread));
     }
 
     for (auto &t : threads) t.join();
