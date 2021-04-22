@@ -98,13 +98,6 @@ class LongitudinalMpc():
     # Calculate mpc
     t = sec_since_boot()
 
-    if lead is not None and lead.status:
-      distance_cost = interp(lead.dRel, [4., 25.], [0.01, MPC_COST_LONG.DISTANCE])
-    else:
-      distance_cost = MPC_COST_LONG.DISTANCE
-
-    self.libmpc.set_weights(MPC_COST_LONG.TTC, distance_cost, MPC_COST_LONG.ACCELERATION, MPC_COST_LONG.JERK)
-
     cruise_gap = int(clip(CS.cruiseGap, 1., 4.))
     TR = interp(float(cruise_gap), [1., 2., 3., 4.], [1.3, 1.7, 2.2, 2.8])
 
