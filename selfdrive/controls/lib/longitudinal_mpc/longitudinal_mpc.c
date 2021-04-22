@@ -34,6 +34,26 @@ typedef struct {
   double cost;
 } log_t;
 
+void set_weights(double ttcCost, double distanceCost, double accelerationCost, double jerkCost){
+  int    i;
+  const int STEP_MULTIPLIER = 3;
+
+  for (i = 0; i < N; i++) {
+    int f = 1;
+    if (i > 4){
+      f = STEP_MULTIPLIER;
+    }
+    // Setup diagonal entries
+    acadoVariables.W[NY*NY*i + (NY+1)*0] = ttcCost * f; // exponential cost for time-to-collision (ttc)
+    acadoVariables.W[NY*NY*i + (NY+1)*1] = distanceCost * f; // desired distance
+    acadoVariables.W[NY*NY*i + (NY+1)*2] = accelerationCost * f; // acceleration
+    acadoVariables.W[NY*NY*i + (NY+1)*3] = jerkCost * f; // jerk
+  }
+  acadoVariables.WN[(NYN+1)*0] = ttcCost * STEP_MULTIPLIER; // exponential cost for danger zone
+  acadoVariables.WN[(NYN+1)*1] = distanceCost * STEP_MULTIPLIER; // desired distance
+  acadoVariables.WN[(NYN+1)*2] = accelerationCost * STEP_MULTIPLIER; // acceleration
+}
+
 void init(double ttcCost, double distanceCost, double accelerationCost, double jerkCost){
   acado_initializeSolver();
   int    i;
@@ -51,21 +71,7 @@ void init(double ttcCost, double distanceCost, double accelerationCost, double j
   for (i = 0; i < NX; ++i) acadoVariables.x0[ i ] = 0.0;
   // Set weights
 
-  for (i = 0; i < N; i++) {
-    int f = 1;
-    if (i > 4){
-      f = STEP_MULTIPLIER;
-    }
-    // Setup diagonal entries
-    acadoVariables.W[NY*NY*i + (NY+1)*0] = ttcCost * f; // exponential cost for time-to-collision (ttc)
-    acadoVariables.W[NY*NY*i + (NY+1)*1] = distanceCost * f; // desired distance
-    acadoVariables.W[NY*NY*i + (NY+1)*2] = accelerationCost * f; // acceleration
-    acadoVariables.W[NY*NY*i + (NY+1)*3] = jerkCost * f; // jerk
-  }
-  acadoVariables.WN[(NYN+1)*0] = ttcCost * STEP_MULTIPLIER; // exponential cost for danger zone
-  acadoVariables.WN[(NYN+1)*1] = distanceCost * STEP_MULTIPLIER; // desired distance
-  acadoVariables.WN[(NYN+1)*2] = accelerationCost * STEP_MULTIPLIER; // acceleration
-
+  set_weights(ttcCost, distanceCost, accelerationCost, jerkCost);
 }
 
 void init_with_simulation(double v_ego, double x_l_0, double v_l_0, double a_l_0, double l){
