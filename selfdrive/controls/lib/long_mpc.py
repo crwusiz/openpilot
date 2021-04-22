@@ -99,7 +99,7 @@ class LongitudinalMpc():
     t = sec_since_boot()
 
     if lead is not None and lead.status:
-      distance_cost = interp(lead.dRel, [4., 10.], [0.01, MPC_COST_LONG.DISTANCE])
+      distance_cost = interp(lead.dRel, [4., 25.], [0.01, MPC_COST_LONG.DISTANCE])
     else:
       distance_cost = MPC_COST_LONG.DISTANCE
 
