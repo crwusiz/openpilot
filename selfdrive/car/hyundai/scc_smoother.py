@@ -330,6 +330,9 @@ class SccSmoother:
         else:
           stock_weight = interp(dRel, [3., 25.], [1., 0.])
 
+        # TEST
+        stock_weight = 0.
+
         apply_accel = apply_accel * (1. - stock_weight) + stock_accel * stock_weight
 
     return apply_accel, dRel
