@@ -15,7 +15,7 @@ RATE = 100.0
 
 
 def long_control_state_trans(active, long_control_state, v_ego, v_target, v_pid,
-                             output_gb, brake_pressed, cruise_standstill, min_speed_can):
+                             output_gb, brake_pressed, cruise_standstill, min_speed_can, d_rel):
   """Update longitudinal control state machine"""
   stopping_target_speed = min_speed_can + STOPPING_TARGET_SPEED_OFFSET
   stopping_condition = (v_ego < 2.0 and cruise_standstill) or \
@@ -24,6 +24,10 @@ def long_control_state_trans(active, long_control_state, v_ego, v_target, v_pid,
                          brake_pressed))
 
   starting_condition = v_target > STARTING_TARGET_SPEED and not cruise_standstill
+
+  if d_rel > 0.:
+    stopping_condition = stopping_condition or (v_ego < 2. and d_rel < 4.)
+    starting_condition = starting_condition and d_rel > 3.3
 
   if not active:
     long_control_state = LongCtrlState.off
@@ -76,12 +80,11 @@ class LongControl():
     # Update state machine
     output_gb = self.last_output_gb
 
-    standstill = CS.cruiseState.standstill
-
+    d_rel = -1.
     if radarState is not None and radarState.leadOne.status:
       lead = radarState.leadOne
       following = lead.dRel < 45.0 and lead.vLeadK > CS.vEgo and lead.aLeadK > 0.0
-      standstill = standstill or lead.dRel < 4.
+      d_rel = lead.dRel
     else:
       following = False
 
@@ -90,7 +93,7 @@ class LongControl():
 
     self.long_control_state = long_control_state_trans(active, self.long_control_state, CS.vEgo,
                                                        v_target_future, self.v_pid, output_gb,
-                                                       CS.brakePressed, standstill, CP.minSpeedCan)
+                                                       CS.brakePressed, CS.cruiseState.standstill, CP.minSpeedCan, d_rel)
 
     v_ego_pid = max(CS.vEgo, CP.minSpeedCan)  # Without this we get jumps, CAN bus reports 0 when speed < 0.3
 
