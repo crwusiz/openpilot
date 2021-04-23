@@ -17,15 +17,14 @@ from common.params import Params
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 min_set_speed = 30 * CV.KPH_TO_MS
 
+
 # Accel limits
-class CarControllerParams:
+class LongControlParams:
   ACCEL_HYST_GAP = 0.02  # don't change accel command for small oscilalitons within this value
-  ACCEL_MAX = 1.5  # 1.5 m/s2
-  ACCEL_MIN = -4.0  # 3   m/s2
-  ACCEL_SCALE = max(ACCEL_MAX, -ACCEL_MIN)
-  # SPAS steering limits
-  STEER_ANG_MAX = 360  # SPAS Max Angle
-  STEER_ANG_MAX_RATE = 1.5  # SPAS Degrees per ms
+  ACCEL_MAX = 1.5
+  ACCEL_MIN = -4.5
+  ACCEL_SCALE = 4.0 #max(ACCEL_MAX, -ACCEL_MIN)
+
 
 # Steer torque limits
 class SteerLimitParams:
@@ -39,10 +38,10 @@ class SteerLimitParams:
 
 def accel_hysteresis(accel, accel_steady):
   # for small accel oscillations within ACCEL_HYST_GAP, don't change the accel command
-  if accel > accel_steady + CarControllerParams.ACCEL_HYST_GAP:
-    accel_steady = accel - CarControllerParams.ACCEL_HYST_GAP
-  elif accel < accel_steady - CarControllerParams.ACCEL_HYST_GAP:
-    accel_steady = accel + CarControllerParams.ACCEL_HYST_GAP
+  if accel > accel_steady + LongControlParams.ACCEL_HYST_GAP:
+    accel_steady = accel - LongControlParams.ACCEL_HYST_GAP
+  elif accel < accel_steady - LongControlParams.ACCEL_HYST_GAP:
+    accel_steady = accel + LongControlParams.ACCEL_HYST_GAP
   accel = accel_steady
 
   return accel, accel_steady
@@ -103,8 +102,8 @@ class CarController():
     # gas and brake
     apply_accel = actuators.gas - actuators.brake
     apply_accel, self.accel_steady = accel_hysteresis(apply_accel, self.accel_steady)
-    apply_accel = clip(apply_accel * CarControllerParams.ACCEL_SCALE,
-                       CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
+    apply_accel = clip(apply_accel * LongControlParams.ACCEL_SCALE,
+                       LongControlParams.ACCEL_MIN, LongControlParams.ACCEL_MAX)
 
     # Steering Torque
     new_steer = int(round(actuators.steer * SteerLimitParams.STEER_MAX))

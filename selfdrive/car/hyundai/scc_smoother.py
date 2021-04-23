@@ -81,6 +81,8 @@ class SccSmoother:
     self.slowing_down_sound_alert = False
 
     self.max_speed = 0.
+    self.limited_lead = False
+
     self.curve_speed_ms = 0.
 
     self.fused_decel = []
@@ -129,10 +131,6 @@ class SccSmoother:
     else:
       max_speed = self.kph_to_clu(controls.v_cruise_kph)
 
-    lead_speed = self.get_long_lead_speed(CS, clu11_speed, sm)
-    if lead_speed >= self.min_set_speed_clu:
-      max_speed = min(max_speed, lead_speed)
-
     #max_speed_log = "{:.1f}/{:.1f}/{:.1f}".format(float(limit_speed),
     #                                              float(self.curve_speed_ms*self.speed_conv_to_clu),
     #                                              float(lead_speed))
@@ -160,6 +158,18 @@ class SccSmoother:
     else:
       self.slowing_down_alert = False
       self.slowing_down = False
+
+    lead_speed = self.get_long_lead_speed(CS, clu11_speed, sm)
+
+    if lead_speed >= self.min_set_speed_clu:
+      if lead_speed < max_speed:
+        max_speed = min(max_speed, lead_speed)
+
+        if not self.limited_lead:
+          self.max_speed = clu11_speed
+          self.limited_lead = True
+    else:
+      self.limited_lead = False
 
     self.update_max_speed(int(max_speed + 0.5))
 
@@ -253,7 +263,7 @@ class SccSmoother:
         if 0. < d < -lead.vRel * (9. + cruise_gap) * 2. and lead.vRel < -1.:
           t = d / lead.vRel
           accel = -(lead.vRel / t) * self.speed_conv_to_clu
-          accel *= 1.3
+          accel *= 1.4
 
           if accel < 0.:
             target_speed = clu11_speed + accel
