@@ -6,17 +6,21 @@ import cereal.messaging as messaging
 
 
 def main():
+
   shutdown_at = 60 * 10
+  shutdown_at_battery_less = 7
+
   shutdown_count = 0
   device_state_sock = messaging.sub_sock('deviceState')
 
   while 1:
     msg = messaging.recv_sock(device_state_sock, wait=True)
+
+    if msg.deviceState.batteryTempC < -20:
+      shutdown_at = shutdown_at_battery_less
+
     if not msg.deviceState.started and not msg.deviceState.usbOnline:
-      if msg.deviceState.batteryTempC < -20:
-        shutdown_count += shutdown_at + 1
-      else:
-        shutdown_count += 1
+      shutdown_count += 1
     else:
       shutdown_count = 0
 
