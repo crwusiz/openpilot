@@ -384,6 +384,7 @@ struct CarParams {
   enableCamera @4 :Bool;
   enableDsu @5 :Bool; # driving support unit
   enableApgs @6 :Bool; # advanced parking guidance system
+  enableBsm @56 :Bool; # blind spot monitoring
 
   minEnableSpeed @7 :Float32;
   minSteerSpeed @8 :Float32;
@@ -444,9 +445,9 @@ struct CarParams {
   communityFeature @46: Bool;  # true if a community maintained feature is detected
   fingerprintSource @49: FingerprintSource;
   networkLocation @50 :NetworkLocation;  # Where Panda/C2 is integrated into the car's CAN network
-  mdpsBus @56: Int8;
-  sasBus @57: Int8;
-  sccBus @58: Int8;
+  mdpsBus @57: Int8;
+  sasBus @58: Int8;
+  sccBus @59: Int8;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);

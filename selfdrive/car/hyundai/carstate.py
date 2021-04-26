@@ -185,9 +185,12 @@ class CarState(CarStateBase):
       ret.stockFcw = cp.vl["SCC12"]['CF_VSM_Warn'] == 2
 
     # Blind Spot Detection and Lane Change Assist signals
-    self.lca_state = cp.vl["LCA11"]["CF_Lca_Stat"]
-    ret.leftBlindspot = cp.vl["LCA11"]["CF_Lca_IndLeft"] != 0
-    ret.rightBlindspot = cp.vl["LCA11"]["CF_Lca_IndRight"] != 0
+    if self.CP.enableBsm:
+      ret.leftBlindspot = cp.vl["LCA11"]["CF_Lca_IndLeft"] != 0
+      ret.rightBlindspot = cp.vl["LCA11"]["CF_Lca_IndRight"] != 0
+    else:
+      ret.leftBlindspot = False
+      ret.rightBlindspot = False
 
     # save the entire LKAS11, CLU11, SCC12 and MDPS12
     self.lkas11 = cp_cam.vl["LKAS11"]
@@ -271,11 +274,7 @@ class CarState(CarStateBase):
 
       ("ESC_Off_Step", "TCS15", 0),
 
-      ("CF_Lvr_GearInf", "LVR11", 0),        # Transmission Gear (0 = N or P, 1-8 = Fwd, 14 = Rev)
-
-      ("CF_Lca_Stat", "LCA11", 0),
-      ("CF_Lca_IndLeft", "LCA11", 0),
-      ("CF_Lca_IndRight", "LCA11", 0),
+      #("CF_Lvr_GearInf", "LVR11", 0),        # Transmission Gear (0 = N or P, 1-8 = Fwd, 14 = Rev)
 
       ("MainMode_ACC", "SCC11", 1),
       ("SCCInfoDisplay", "SCC11", 0),
@@ -333,6 +332,7 @@ class CarState(CarStateBase):
       ("CLU11", 50),
       ("ESP12", 100),
       ("CGW1", 10),
+      ("CGW2", 5),
       ("CGW4", 5),
       ("WHL_SPD11", 50),
     ]
@@ -419,6 +419,13 @@ class CarState(CarStateBase):
 
     if CP.carFingerprint in [CAR.SANTA_FE]:
       checks.remove(("TCS13", 50))
+
+    if CP.enableBsm:
+      signals += [
+        ("CF_Lca_IndLeft", "LCA11", 0),
+        ("CF_Lca_IndRight", "LCA11", 0),
+      ]
+      checks += [("LCA11", 50)]
 
     return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, 0)
 

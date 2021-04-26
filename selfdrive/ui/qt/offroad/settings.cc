@@ -116,7 +116,7 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
   QPushButton *reset_calib_btn = new QPushButton("Reset Calibration and LiveParameters");
   reset_layout->addWidget(reset_calib_btn);
   QObject::connect(reset_calib_btn, &QPushButton::released, [=]() {
-    if (ConfirmationDialog::confirm("Are you sure you want to reset calibration and live params?")) {
+    if (ConfirmationDialog::confirm("Are you sure you want to reset calibration and live params?", this)) {
       Params().remove("CalibrationParams");
       Params().remove("LiveParameters");
       QTimer::singleShot(1000, []() {
@@ -140,7 +140,7 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
 
   QString resetCalibDesc = "openpilot requires the device to be mounted within 4° left or right and within 5° up or down. openpilot is continuously calibrating, resetting is rarely required.";
   ButtonControl *resetCalibBtn = new ButtonControl("Reset Calibration", "RESET", resetCalibDesc, [=]() {
-    if (ConfirmationDialog::confirm("Are you sure you want to reset calibration?")) {
+    if (ConfirmationDialog::confirm("Are you sure you want to reset calibration?", this)) {
       Params().remove("CalibrationParams");
     }
   }, "", this);
@@ -169,15 +169,15 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
 
   offroad_btns.append(new ButtonControl("Review Training Guide", "REVIEW",
                                         "Review the rules, features, and limitations of openpilot", [=]() {
-                                          if (ConfirmationDialog::confirm("Are you sure you want to review the training guide?")) {
-                                            Params().remove("CompletedTrainingVersion");
-                                            emit reviewTrainingGuide();
-                                          }
-                                        }, "", this));
+    if (ConfirmationDialog::confirm("Are you sure you want to review the training guide?", this)) {
+      Params().remove("CompletedTrainingVersion");
+      emit reviewTrainingGuide();
+    }
+  }, "", this));
 
   QString brand = params.getBool("Passive") ? "dashcam" : "openpilot";
   offroad_btns.append(new ButtonControl("Uninstall " + brand, "UNINSTALL", "", [=]() {
-    if (ConfirmationDialog::confirm("Are you sure you want to uninstall?")) {
+    if (ConfirmationDialog::confirm("Are you sure you want to uninstall?", this)) {
       Params().putBool("DoUninstall", true);
     }
   }, "", this));
@@ -195,7 +195,7 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
   QPushButton *reboot_btn = new QPushButton("Reboot");
   power_layout->addWidget(reboot_btn);
   QObject::connect(reboot_btn, &QPushButton::released, [=]() {
-    if (ConfirmationDialog::confirm("Are you sure you want to reboot?")) {
+    if (ConfirmationDialog::confirm("Are you sure you want to reboot?", this)) {
       Hardware::reboot();
     }
   });
@@ -204,7 +204,7 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
   poweroff_btn->setStyleSheet("background-color: #E22C2C;");
   power_layout->addWidget(poweroff_btn);
   QObject::connect(poweroff_btn, &QPushButton::released, [=]() {
-    if (ConfirmationDialog::confirm("Are you sure you want to power off?")) {
+    if (ConfirmationDialog::confirm("Are you sure you want to power off?", this)) {
       Hardware::poweroff();
     }
   });
@@ -431,6 +431,14 @@ void SettingsWindow::hideEvent(QHideEvent *event){
 #ifdef QCOM
   HardwareEon::close_activities();
 #endif
+
+  // TODO: this should be handled by the Dialog classes
+  QList<QWidget*> children = findChildren<QWidget *>();
+  for(auto &w : children){
+    if(w->metaObject()->superClass()->className() == QString("QDialog")){
+      w->close();
+    }
+  }
 }
 
 void SettingsWindow::showEvent(QShowEvent *event){

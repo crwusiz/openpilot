@@ -224,6 +224,7 @@ class CarInterface(CarInterfaceBase):
     ret.steerControlType = car.CarParams.SteerControlType.torque
 
     ret.enableCamera = True
+    ret.enableBsm = 0x58b in fingerprint[0]
     ret.stoppingControl = True
 
     # ignore CAN2 address if L-CAN on the same BUS
