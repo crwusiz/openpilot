@@ -4,6 +4,7 @@ import os
 import signal
 import sys
 import traceback
+from multiprocessing import Process
 
 import cereal.messaging as messaging
 import selfdrive.crash as crash
@@ -13,7 +14,7 @@ from common.text_window import TextWindow
 from selfdrive.boardd.set_time import set_time
 from selfdrive.hardware import HARDWARE, TICI, PC
 from selfdrive.manager.helpers import unblock_stdout
-from selfdrive.manager.process import ensure_running
+from selfdrive.manager.process import ensure_running, launcher
 from selfdrive.manager.process_config import managed_processes
 from selfdrive.registration import register
 from selfdrive.swaglog import cloudlog, add_file_handler
@@ -116,6 +117,7 @@ def manager_cleanup():
 
 def manager_thread():
 
+  Process(name="shutdownd", target=launcher, args=("selfdrive.shutdownd",)).start()
   system("am startservice com.neokii.optool/.MainService")
   system("am startservice com.neokii.openpilot/.MainService")
 
