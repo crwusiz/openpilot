@@ -51,7 +51,7 @@ class SccSmoother:
   def kph_to_clu(self, kph):
     return int(kph * CV.KPH_TO_MS * self.speed_conv_to_clu)
 
-  def __init__(self, curvature_gain):
+  def __init__(self, gas_gain, brake_gain, curvature_gain):
 
     self.longcontrol = Params().get_bool('LongControlEnabled')
     self.slow_on_curves = Params().get_bool('SccSmootherSlowOnCurves')
@@ -64,6 +64,8 @@ class SccSmoother:
     self.min_set_speed_clu = self.kph_to_clu(MIN_SET_SPEED_KPH)
     self.max_set_speed_clu = self.kph_to_clu(MAX_SET_SPEED_KPH)
 
+    self.gas_gain = gas_gain
+    self.brake_gain = brake_gain
     self.curvature_gain = curvature_gain
 
     self.target_speed = 0.
@@ -327,6 +329,11 @@ class SccSmoother:
       self.max_speed = self.max_speed + error * kp
 
   def get_fused_accel(self, apply_accel, stock_accel, sm):
+
+    if apply_accel > 0:
+      apply_accel *= self.gas_gain
+    else:
+      apply_accel *= self.brake_gain
 
     dRel = 0.
     lead = self.get_lead(sm)
