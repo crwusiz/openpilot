@@ -2,6 +2,7 @@
 import datetime
 import os
 import time
+from multiprocessing import Process
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -18,6 +19,7 @@ from common.dict_helpers import strip_deprecated_keys
 from selfdrive.controls.lib.alertmanager import set_offroad_alert
 from selfdrive.hardware import EON, TICI, HARDWARE
 from selfdrive.loggerd.config import get_available_percent
+from selfdrive.manager.process import launcher
 from selfdrive.pandad import get_expected_signature
 from selfdrive.swaglog import cloudlog
 from selfdrive.thermald.power_monitoring import PowerMonitoring
@@ -218,6 +220,9 @@ def thermald_thread():
           cloudlog.info("Setting up EON fan handler")
           setup_eon_fan()
           handle_fan = handle_fan_eon
+
+        if EON and not is_uno:
+          Process(name="shutdownd", target=launcher, args=("selfdrive.shutdownd",)).start()
 
       # Handle disconnect
       if pandaState_prev is not None:
