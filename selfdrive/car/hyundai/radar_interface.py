@@ -15,7 +15,7 @@ def get_radar_can_parser(CP):
     ("ACC_ObjRelSpd", "SCC11", 0),
   ]
   checks = []
-  return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, CP.sccBus)
+  return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, CP.sccBus, enforce_checks=False)
 
 
 class RadarInterface(RadarInterfaceBase):
