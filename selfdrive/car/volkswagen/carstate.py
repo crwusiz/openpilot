@@ -92,14 +92,6 @@ class CarState(CarStateBase):
     self.ldw_dlc = cam_cp.vl["LDW_02"]["LDW_DLC"]
     self.ldw_tlc = cam_cp.vl["LDW_02"]["LDW_TLC"]
 
-    # Consume factory LDW data relevant for factory SWA (Lane Change Assist)
-    # and capture it for forwarding to the blind spot radar controller
-    self.ldw_lane_warning_left = bool(cam_cp.vl["LDW_02"]["LDW_SW_Warnung_links"])
-    self.ldw_lane_warning_right = bool(cam_cp.vl["LDW_02"]["LDW_SW_Warnung_rechts"])
-    self.ldw_side_dlc_tlc = bool(cam_cp.vl["LDW_02"]["LDW_Seite_DLCTLC"])
-    self.ldw_dlc = cam_cp.vl["LDW_02"]["LDW_DLC"]
-    self.ldw_tlc = cam_cp.vl["LDW_02"]["LDW_TLC"]
-
     # Stock FCW is considered active if the release bit for brake-jerk warning
     # is set. Stock AEB considered active if the partial braking or target
     # braking release bits are set.
