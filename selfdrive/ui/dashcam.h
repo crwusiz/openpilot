@@ -176,8 +176,8 @@ bool screen_lock_button_clicked(int touch_x, int touch_y, dashcam_element el) {
 }
 
 bool screen_button_clicked(int touch_x, int touch_y) {
-  if (touch_x >= 1660 && touch_x <= 1810) {
-    if (touch_y >= 885 && touch_y <= 1035) {
+  if (touch_x >= 1600 && touch_x <= 1850) {
+    if (touch_y >= 860 && touch_y <= 1040) {
       return true;
     }
   }
@@ -194,8 +194,8 @@ void draw_date_time(UIState *s) {
 
   int rect_w = 465;
   int rect_h = 80;
-  int rect_x = (1920-rect_w)/2;
-  int rect_y = (1080-rect_h-10);
+  int rect_x = (s->viz_rect.w + (bdr_s * 2)-rect_w)/2;
+  int rect_y = (s->viz_rect.h + (bdr_s * 2)-rect_h-10);
 
   // Get local time to display
   char now[50];
@@ -207,7 +207,7 @@ void draw_date_time(UIState *s) {
     nvgFillColor(s->vg, nvgRGBA(0, 0, 0, 100));
     nvgFill(s->vg);
     nvgStrokeColor(s->vg, nvgRGBA(255,255,255,80));
-    nvgStrokeWidth(s->vg, 6);
+    nvgStrokeWidth(s->vg, 10);
     nvgStroke(s->vg);
 
   nvgFontSize(s->vg, 60);
@@ -227,8 +227,9 @@ static void rotate_video() {
 void draw_lock_button(UIState *s) {
   int btn_w = 150;
   int btn_h = 150;
-  int btn_x = 1920 - btn_w - 150;
-  int btn_y = 1080 - btn_h;
+  //int btn_x = s->viz_rect.w + (bdr_s * 2) - btn_w - (120+bdr_s);
+  int btn_x = s->viz_rect.x + s->viz_rect.w - btn_w - (bdr_s * 2) - 200;
+  int btn_y = s->viz_rect.h + (bdr_s * 2) - btn_h;
   //int imgw, imgh;
   float alpha = 0.3f;
 
@@ -249,10 +250,10 @@ void draw_lock_button(UIState *s) {
 
 
   lock_button = (dashcam_element){
-    .pos_x = 1500,
-    .pos_y = 920,
-    .width = 150,
-    .height = 150
+    .pos_x = btn_x,
+    .pos_y = btn_y,
+    .width = btn_w,
+    .height = btn_h
   };
 }
 
@@ -260,33 +261,33 @@ static void screen_draw_button(UIState *s, int touch_x, int touch_y) {
   // Set button to bottom left of screen
   if (s->vipc_client->connected){
 
-    if (captureState == CAPTURE_STATE_CAPTURING) {
-      draw_lock_button(s);
-    }
+    //if (captureState == CAPTURE_STATE_CAPTURING) {
+    //  draw_lock_button(s);
+    //}
 
-    int btn_w = 150;
-    int btn_h = 150;
-    int btn_x = 1920 - btn_w - 110;
-    int btn_y = 1080 - btn_h - 45;
+    int btn_w = 180;
+    int btn_h = 180;
+    int btn_x = s->viz_rect.x + s->viz_rect.w - btn_w - (bdr_s * 2);
+    int btn_y = s->viz_rect.h + (bdr_s * 2) - btn_h - 45;
     nvgBeginPath(s->vg);
-      nvgRoundedRect(s->vg, btn_x, btn_y, btn_w, btn_h, 100);
-      nvgStrokeColor(s->vg, nvgRGBA(255,255,255,80));
-      nvgStrokeWidth(s->vg, 6);
-      nvgStroke(s->vg);
+    nvgRoundedRect(s->vg, btn_x, btn_y, btn_w, btn_h, 100);
+    nvgStrokeColor(s->vg, nvgRGBA(255,255,255,80));
+    nvgStrokeWidth(s->vg, 6);
+    nvgStroke(s->vg);
 
-      nvgFontSize(s->vg, 70);
+    nvgFontSize(s->vg, 80);
 
-      if (captureState == CAPTURE_STATE_CAPTURING) {
-        NVGcolor fillColor = nvgRGBA(255,0,0,150);
-        nvgFillColor(s->vg, fillColor);
-        nvgFill(s->vg);
-        nvgFillColor(s->vg, nvgRGBA(255,255,255,200));
-      }
-      else {
-        nvgFillColor(s->vg, nvgRGBA(255, 255, 255, 200));
-      }
-      nvgTextAlign(s->vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-      nvgText(s->vg, btn_x+btn_w/2, btn_y+btn_h/2, "REC", NULL);
+    if (captureState == CAPTURE_STATE_CAPTURING) {
+    NVGcolor fillColor = nvgRGBA(255,0,0,150);
+    nvgFillColor(s->vg, fillColor);
+    nvgFill(s->vg);
+    nvgFillColor(s->vg, nvgRGBA(255,255,255,200));
+    }
+    else {
+    nvgFillColor(s->vg, nvgRGBA(255, 255, 255, 200));
+    }
+    nvgTextAlign(s->vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+    nvgText(s->vg, btn_x+btn_w/2, btn_y+btn_h/2, "REC", NULL);
   }
 
   if (captureState == CAPTURE_STATE_CAPTURING) {
@@ -336,10 +337,10 @@ bool dashcam( UIState *s, int touch_x, int touch_y ) {
     }
   }
 
-  if (screen_lock_button_clicked(touch_x,touch_y,lock_button)) {
-    screen_toggle_lock();
-    touched = true;
-  }
+  //if (screen_lock_button_clicked(touch_x,touch_y,lock_button)) {
+  //  screen_toggle_lock();
+  //  touched = true;
+  //}
   if (!s->vipc_client->connected) {
     // Assume car is not in drive so stop recording
     stop_capture();
