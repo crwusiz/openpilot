@@ -102,6 +102,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     gpsMalfunction @94;
     processNotRunning @95;
     dashcamMode @96;
+    controlsInitializing @98;
 
     radarCanErrorDEPRECATED @15;
     radarCommIssueDEPRECATED @67;
@@ -123,13 +124,13 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     modelLagWarningDEPRECATED @93;
     startupOneplusDEPRECATED @82;
 
-    turningIndicatorOn @98;
-    lkasButtonOff @99;
-    autoLaneChange @100;
+    turningIndicatorOn @99;
+    lkasButtonOff @100;
+    autoLaneChange @101;
 
     # scc smoother
-    slowingDownSpeed @101;
-    slowingDownSpeedSound @102;
+    slowingDownSpeed @102;
+    slowingDownSpeedSound @103;
   }
 }
 

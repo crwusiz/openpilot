@@ -287,7 +287,7 @@ QWidget * community_panel() {
   //toggles_list->setMargin(50);
 
   toggles_list->addWidget(new ParamControl("UseClusterSpeed",
-                                            "Use cluster speed",
+                                            "Use Cluster Speed",
                                             "Use cluster speed instead of wheel speed.",
                                             "../assets/offroad/icon_road.png"
                                               ));
@@ -301,7 +301,7 @@ QWidget * community_panel() {
   toggles_list->addWidget(horizontal_line());
   toggles_list->addWidget(new ParamControl("MadModeEnabled",
                                             "Enable HKG MAD mode",
-                                            "Only for Car without long control, Openpilot will engage when turn cruise control on",
+                                            "Openpilot will engage when turn cruise control on",
                                             "../assets/offroad/icon_openpilot.png"
                                               ));
   toggles_list->addWidget(horizontal_line());
