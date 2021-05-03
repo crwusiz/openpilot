@@ -1,7 +1,7 @@
 #include <QNetworkReply>
 #include <QHBoxLayout>
-#include "widgets/input.hpp"
-#include "widgets/ssh_keys.hpp"
+#include "widgets/input.h"
+#include "widgets/ssh_keys.h"
 #include "common/params.h"
 
 
@@ -67,13 +67,6 @@ void SshControl::getUserKeys(QString username){
 
   QNetworkRequest request;
   request.setUrl(QUrl(url));
-#ifdef QCOM
-  QSslConfiguration ssl = QSslConfiguration::defaultConfiguration();
-  ssl.setCaCertificates(QSslCertificate::fromPath("/usr/etc/tls/cert.pem",
-                        QSsl::Pem, QRegExp::Wildcard));
-  request.setSslConfiguration(ssl);
-#endif
-
   reply = manager->get(request);
   connect(reply, &QNetworkReply::finished, this, &SshControl::parseResponse);
   networkTimer->start();

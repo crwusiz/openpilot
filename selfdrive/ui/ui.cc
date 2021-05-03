@@ -9,9 +9,9 @@
 #include "common/visionimg.h"
 #include "common/watchdog.h"
 #include "hardware/hw.h"
-#include "ui.hpp"
-#include "paint.hpp"
-#include "qt_window.hpp"
+#include "ui.h"
+#include "paint.h"
+#include "qt_window.h"
 #include "dashcam.h"
 
 #define BACKLIGHT_DT 0.25

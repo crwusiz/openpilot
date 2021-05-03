@@ -112,7 +112,6 @@ class LongControl():
       prevent_overshoot = not CP.stoppingControl and CS.vEgo < 1.5 and v_target_future < 0.7
       deadzone = interp(v_ego_pid, CP.longitudinalTuning.deadzoneBP, CP.longitudinalTuning.deadzoneV)
 
-      # neokii
       if d_rel > 0.:
         a_target *= interp(d_rel, [10., 25., 70.], [1.0, 0.8, 0.6])
 

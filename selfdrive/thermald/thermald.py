@@ -350,12 +350,14 @@ def thermald_thread():
 
     # Handle offroad/onroad transition
     should_start = all(startup_conditions.values())
-    if should_start:
-      if not should_start_prev:
-        params.delete("IsOffroad")
-        if TICI:
-          os.system("sudo systemctl stop --no-block lte")
+    if should_start != should_start_prev or (count == 0):
+      params.put_bool("IsOffroad", not should_start)
+      HARDWARE.set_power_save(not should_start)
+      if TICI and not params.get_bool("EnableLteOnroad"):
+        fxn = "stop" if should_start else "start"
+        os.system(f"sudo systemctl {fxn} --no-block lte")
 
+    if should_start:
       off_ts = None
       if started_ts is None:
         started_ts = sec_since_boot()
@@ -363,11 +365,6 @@ def thermald_thread():
     else:
       if startup_conditions["ignition"] and (startup_conditions != startup_conditions_prev):
         cloudlog.event("Startup blocked", startup_conditions=startup_conditions)
-
-      if should_start_prev or (count == 0):
-        params.put_bool("IsOffroad", True)
-        if TICI:
-          os.system("sudo systemctl start --no-block lte")
 
       started_ts = None
       if off_ts is None:

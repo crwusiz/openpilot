@@ -10,7 +10,7 @@
 #include <QTimer>
 #include <QRandomGenerator>
 
-#include "api.hpp"
+#include "api.h"
 #include "common/params.h"
 #include "common/util.h"
 
@@ -103,13 +103,6 @@ void HttpRequest::sendRequest(const QString &requestURL){
   QNetworkRequest request;
   request.setUrl(QUrl(requestURL));
   request.setRawHeader(QByteArray("Authorization"), ("JWT " + token).toUtf8());
-
-#ifdef QCOM
-  QSslConfiguration ssl = QSslConfiguration::defaultConfiguration();
-  ssl.setCaCertificates(QSslCertificate::fromPath("/usr/etc/tls/cert.pem",
-                        QSsl::Pem, QRegExp::Wildcard));
-  request.setSslConfiguration(ssl);
-#endif
 
   reply = networkAccessManager->get(request);
 

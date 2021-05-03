@@ -41,7 +41,7 @@
 #include "visionipc.h"
 #include "visionipc_client.h"
 
-#include "qt/sound.hpp"
+#include "qt/sound.h"
 
 #include <QObject>
 #include <QTimer>
