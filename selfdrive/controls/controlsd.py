@@ -272,7 +272,7 @@ class Controls:
       #    (not TICI or self.enable_lte_onroad):
       #    # Not show in first 1 km to allow for driving out of garage. This event shows after 5 minutes
       #    self.events.add(EventName.noGps)
-      if not self.sm.all_alive(['roadCameraState', 'driverCameraState']) and (self.sm.frame > 5 / DT_CTRL):
+      if not self.sm.all_alive(['roadCameraState', 'driverCameraState']):
         self.events.add(EventName.cameraMalfunction)
       if self.sm['modelV2'].frameDropPerc > 20:
         self.events.add(EventName.modeldLagging)
