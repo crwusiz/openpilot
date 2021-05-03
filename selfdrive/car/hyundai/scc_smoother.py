@@ -330,11 +330,6 @@ class SccSmoother:
 
   def get_fused_accel(self, apply_accel, stock_accel, sm):
 
-    if apply_accel > 0:
-      apply_accel *= self.gas_gain
-    else:
-      apply_accel *= self.brake_gain
-
     dRel = 0.
     lead = self.get_lead(sm)
     if lead is not None:
@@ -350,6 +345,14 @@ class SccSmoother:
         apply_accel = apply_accel * (1. - stock_weight) + stock_accel * stock_weight
 
     return apply_accel, dRel
+
+  def get_accel(self, actuators):
+    accel = actuators.gas - actuators.brake
+    if accel > 0:
+      accel *= self.gas_gain
+    else:
+      accel *= self.brake_gain
+    return accel
 
   @staticmethod
   def update_cruise_buttons(controls, CS, longcontrol): # called by controlds's state_transition
