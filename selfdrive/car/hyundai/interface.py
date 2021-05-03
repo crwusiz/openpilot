@@ -37,18 +37,53 @@ class CarInterface(CarInterfaceBase):
     # Most Hyundai car ports are community features for now
     ret.communityFeature = True
 
-    ret.steerActuatorDelay = 0.1  # Default delay
-    ret.steerRateCost = 0.5
-    ret.steerLimitTimer = 0.8
     tire_stiffness_factor = 1.
-
-    ret.maxSteeringAngleDeg = 90.
-    ret.startAccel = 1.0
 
     eps_modified = False
     for fw in car_fw:
       if fw.ecu == "eps" and b"," in fw.fwVersion:
         eps_modified = True
+
+    ret.maxSteeringAngleDeg = 90.
+
+    # lateral
+    ret.lateralTuning.init('lqr')
+
+    ret.lateralTuning.lqr.scale = 1650.
+    ret.lateralTuning.lqr.ki = 0.01
+    ret.lateralTuning.lqr.dcGain = 0.00275
+
+    ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
+    ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
+    ret.lateralTuning.lqr.c = [1., 0.]
+    ret.lateralTuning.lqr.k = [-110., 451.]
+    ret.lateralTuning.lqr.l = [0.33, 0.318]
+
+    ret.steerRatio = 16.5
+    ret.steerActuatorDelay = 0.1
+    ret.steerLimitTimer = 2.5
+    ret.steerRateCost = 0.4
+    ret.steerMaxBP = [0.]
+    ret.steerMaxV = [1.5]
+
+    # longitudinal
+    ret.longitudinalTuning.kpBP = [0., 10. * CV.KPH_TO_MS, 20. * CV.KPH_TO_MS, 40. * CV.KPH_TO_MS, 70. * CV.KPH_TO_MS, 100. * CV.KPH_TO_MS]
+    ret.longitudinalTuning.kpV = [1., 0.75, 0.55, 0.42, 0.37, 0.33]
+    ret.longitudinalTuning.kiBP = [0.]
+    ret.longitudinalTuning.kiV = [0.015]
+    ret.longitudinalTuning.kf = 0.7
+    ret.longitudinalTuning.deadzoneBP = [0., 100. * CV.KPH_TO_MS]
+    ret.longitudinalTuning.deadzoneV = [0., 0.015]
+
+    ret.gasMaxBP = [0., 10. * CV.KPH_TO_MS, 20. * CV.KPH_TO_MS, 70. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]
+    ret.gasMaxV = [0.4, 0.28, 0.2, 0.14, 0.11]
+
+    ret.brakeMaxBP = [0., 100. * CV.KPH_TO_MS]
+    ret.brakeMaxV = [1.35, 1.]
+
+    ret.stoppingBrakeRate = 0.15  # brake_travel/s while trying to stop
+    ret.startingBrakeRate = 0.6  # brake_travel/s while releasing on restart
+    ret.startAccel = 1.5
 
     # genesis
     if candidate == CAR.GENESIS:
@@ -153,61 +188,6 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.6
       tire_stiffness_factor = 0.7
 
-
-    ret.lateralTuning.init('lqr')
-
-    ret.lateralTuning.lqr.scale = 1600.
-    ret.lateralTuning.lqr.ki = 0.01
-    ret.lateralTuning.lqr.dcGain = 0.0027
-
-    ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-    ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-    ret.lateralTuning.lqr.c = [1., 0.]
-    ret.lateralTuning.lqr.k = [-110., 451.]
-    ret.lateralTuning.lqr.l = [0.33, 0.318]
-
-    ret.steerRatio = 16.5
-    ret.steerActuatorDelay = 0.1
-    ret.steerLimitTimer = 2.5
-
-    ret.steerRateCost = 0.4
-
-    ret.steerMaxBP = [0.]
-    ret.steerMaxV = [1.5]
-
-    if ret.openpilotLongitudinalControl:
-
-      ret.longitudinalTuning.kpBP = [0., 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 40.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS]
-      ret.longitudinalTuning.kpV = [1., 0.75, 0.56, 0.44, 0.39, 0.35]
-      ret.longitudinalTuning.kiBP = [0.]
-      ret.longitudinalTuning.kiV = [0.015]
-      ret.longitudinalTuning.kf = 0.7
-      ret.longitudinalTuning.deadzoneBP = [0., 100.*CV.KPH_TO_MS]
-      ret.longitudinalTuning.deadzoneV = [0., 0.015]
-
-      ret.gasMaxBP = [0., 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS ]
-      ret.gasMaxV = [0.4, 0.28, 0.2, 0.14, 0.11]
-
-      ret.brakeMaxBP = [0., 100.*CV.KPH_TO_MS]
-      ret.brakeMaxV = [1.35, 1.]
-
-      ret.stoppingBrakeRate = 0.15  # brake_travel/s while trying to stop
-      ret.startingBrakeRate = 0.6  # brake_travel/s while releasing on restart
-      ret.startAccel = 1.5
-
-    else:
-      # scc smoother
-      ret.longitudinalTuning.kpBP = [0., 10. * CV.KPH_TO_MS, 40. * CV.KPH_TO_MS, 100. * CV.KPH_TO_MS]
-      ret.longitudinalTuning.kpV = [1.3, 1.2, 1.0, 0.45]
-      ret.longitudinalTuning.kiBP = [0.]
-      ret.longitudinalTuning.kiV = [0.]
-      ret.longitudinalTuning.deadzoneBP = [0., 40]
-      ret.longitudinalTuning.deadzoneV = [0., 0.02]
-
-      ret.gasMaxBP = [0.]
-      ret.gasMaxV = [0.5]
-      ret.brakeMaxBP = [0., 20.]
-      ret.brakeMaxV = [1., 0.8]
 
     ret.radarTimeStep = 0.05
     ret.centerToFront = ret.wheelbase * 0.4

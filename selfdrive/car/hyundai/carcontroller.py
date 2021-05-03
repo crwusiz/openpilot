@@ -1,15 +1,13 @@
-import copy
-from random import randint
 
 from cereal import car
 from common.realtime import DT_CTRL
-from common.numpy_fast import clip, interp
+from common.numpy_fast import clip
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, create_lfahda_mfc, \
   create_scc11, create_scc12, create_scc13, create_scc14, \
   create_mdps12
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
-from selfdrive.car.hyundai.values import Buttons, CAR, FEATURES
+from selfdrive.car.hyundai.values import Buttons, CAR, FEATURES, CarControllerParams
 from opendbc.can.packer import CANPacker
 from selfdrive.config import Conversions as CV
 from common.params import Params
@@ -18,30 +16,12 @@ VisualAlert = car.CarControl.HUDControl.VisualAlert
 min_set_speed = 30 * CV.KPH_TO_MS
 
 
-# Accel limits
-class LongControlParams:
-  ACCEL_HYST_GAP = 0.02  # don't change accel command for small oscilalitons within this value
-  ACCEL_MAX = 1.5
-  ACCEL_MIN = -4.5
-  ACCEL_SCALE = 4.0 #max(ACCEL_MAX, -ACCEL_MIN)
-
-
-# Steer torque limits
-class SteerLimitParams:
-  STEER_MAX = 384   # 409 is the max, 255 is stock
-  STEER_DELTA_UP = 3
-  STEER_DELTA_DOWN = 4
-  STEER_DRIVER_ALLOWANCE = 50
-  STEER_DRIVER_MULTIPLIER = 2
-  STEER_DRIVER_FACTOR = 1
-
-
 def accel_hysteresis(accel, accel_steady):
   # for small accel oscillations within ACCEL_HYST_GAP, don't change the accel command
-  if accel > accel_steady + LongControlParams.ACCEL_HYST_GAP:
-    accel_steady = accel - LongControlParams.ACCEL_HYST_GAP
-  elif accel < accel_steady - LongControlParams.ACCEL_HYST_GAP:
-    accel_steady = accel + LongControlParams.ACCEL_HYST_GAP
+  if accel > accel_steady + CarControllerParams.ACCEL_HYST_GAP:
+    accel_steady = accel - CarControllerParams.ACCEL_HYST_GAP
+  elif accel < accel_steady - CarControllerParams.ACCEL_HYST_GAP:
+    accel_steady = accel + CarControllerParams.ACCEL_HYST_GAP
   accel = accel_steady
 
   return accel, accel_steady
@@ -102,13 +82,13 @@ class CarController():
     # gas and brake
     apply_accel = actuators.gas - actuators.brake
     apply_accel, self.accel_steady = accel_hysteresis(apply_accel, self.accel_steady)
-    apply_accel = clip(apply_accel * LongControlParams.ACCEL_SCALE,
-                       LongControlParams.ACCEL_MIN, LongControlParams.ACCEL_MAX)
+    apply_accel = clip(apply_accel * CarControllerParams.ACCEL_SCALE,
+                       CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
 
     # Steering Torque
-    new_steer = int(round(actuators.steer * SteerLimitParams.STEER_MAX))
+    new_steer = int(round(actuators.steer * CarControllerParams.STEER_MAX))
     apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque,
-                                                SteerLimitParams)
+                                                CarControllerParams)
 
     self.steer_rate_limited = new_steer != apply_steer
 

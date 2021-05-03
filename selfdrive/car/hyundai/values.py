@@ -4,6 +4,20 @@ from cereal import car
 from selfdrive.car import dbc_dict
 Ecu = car.CarParams.Ecu
 
+class CarControllerParams:
+
+  ACCEL_HYST_GAP = 0.02  # don't change accel command for small oscilalitons within this value
+  ACCEL_MAX = 1.5
+  ACCEL_MIN = -4.5
+  ACCEL_SCALE = 4.0  # max(ACCEL_MAX, -ACCEL_MIN)
+
+  STEER_MAX = 384   # 409 is the max, 255 is stock
+  STEER_DELTA_UP = 3
+  STEER_DELTA_DOWN = 4
+  STEER_DRIVER_ALLOWANCE = 50
+  STEER_DRIVER_MULTIPLIER = 2
+  STEER_DRIVER_FACTOR = 1
+
 class CAR:
   # genesis
   GENESIS = "GENESIS 2015-2016"
