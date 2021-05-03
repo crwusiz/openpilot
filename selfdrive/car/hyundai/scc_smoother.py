@@ -338,7 +338,7 @@ class SccSmoother:
       if lead.radar:
 
         if stock_accel > 0.:
-          stock_weight = interp(dRel, [3., 25.], [0.8, 0.])
+          stock_weight = interp(dRel, [3., 25.], [0.7, 0.])
         else:
           stock_weight = interp(dRel, [3., 25.], [1., 0.])
 
