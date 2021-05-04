@@ -1,6 +1,7 @@
 #pragma once
 
 #define UI_FEATURE_BRAKE 1
+#define UI_FEATURE_AUTOHOLD 1
 #define UI_FEATURE_DASHCAM 1
 
 #define UI_FEATURE_LEFT 1
