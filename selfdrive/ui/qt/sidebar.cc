@@ -8,7 +8,7 @@ StatusWidget::StatusWidget(QString label, QString msg, QColor c, QWidget* parent
   if(msg.length() > 0){
     layout.setContentsMargins(50, 24, 16, 24);
     status.setAlignment(Qt::AlignLeft | Qt::AlignHCenter);
-    status.setStyleSheet(R"(font-size: 65px; font-weight: 500;)");
+    status.setStyleSheet(R"(font-size: 60px; font-weight: 500;)");
 
     substatus.setAlignment(Qt::AlignLeft | Qt::AlignHCenter);
     substatus.setStyleSheet(R"(font-size: 30px; font-weight: 400;)");
@@ -61,7 +61,7 @@ SignalWidget::SignalWidget(QString text, int strength, QWidget* parent) : QFrame
 
   label.setText(text);
   layout.addWidget(&label, 0, Qt::AlignHCenter);
-  label.setStyleSheet(R"(font-size: 35px; font-weight: 400;)");
+  label.setStyleSheet(R"(font-size: 30px; font-weight: 400;)");
 
   setMinimumWidth(190);
   setLayout(&layout);
