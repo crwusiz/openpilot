@@ -65,7 +65,7 @@ SignalWidget::SignalWidget(QWidget *parent) : QFrame(parent), _strength(0) {
 
   label = new QLabel(this);
   label->setStyleSheet(R"(font-size: 30px; font-weight: 400;)");
-  layout->addWidget(label, 0, Qt::AlignLeft);
+  layout->addWidget(label, 0, Qt::AlignCenter);
 
   setMinimumWidth(190);
   setLayout(layout);
