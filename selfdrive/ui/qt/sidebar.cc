@@ -11,7 +11,7 @@ StatusWidget::StatusWidget(bool has_substatus, QWidget *parent) : QFrame(parent)
   if (has_substatus) {
     layout->setContentsMargins(50, 24, 16, 24);
     status->setAlignment(Qt::AlignLeft | Qt::AlignHCenter);
-    status->setStyleSheet(R"(font-size: 65px; font-weight: 500;)");
+    status->setStyleSheet(R"(font-size: 60px; font-weight: 500;)");
 
     substatus = new QLabel(this);
     substatus->setAlignment(Qt::AlignLeft | Qt::AlignHCenter);
@@ -64,7 +64,7 @@ SignalWidget::SignalWidget(QWidget *parent) : QFrame(parent), _strength(0) {
   layout->insertSpacing(0, 45);
 
   label = new QLabel(this);
-  label->setStyleSheet(R"(font-size: 35px; font-weight: 400;)");
+  label->setStyleSheet(R"(font-size: 30px; font-weight: 400;)");
   layout->addWidget(label, 0, Qt::AlignLeft);
 
   setMinimumWidth(190);
