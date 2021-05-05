@@ -24,7 +24,7 @@
 #include "common/util.h"
 #include "camerad/cameras/camera_common.h"
 #include "logger.h"
-#include "messaging.hpp"
+#include "messaging.h"
 #include "services.h"
 
 #include "visionipc.h"
@@ -326,8 +326,7 @@ void clear_locks() {
 } // namespace
 
 int main(int argc, char** argv) {
-
-  setpriority(PRIO_PROCESS, 0, -12);
+  setpriority(PRIO_PROCESS, 0, -20);
 
   clear_locks();
 

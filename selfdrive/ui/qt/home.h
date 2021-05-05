@@ -18,6 +18,9 @@ class OffroadHome : public QFrame {
 public:
   explicit OffroadHome(QWidget* parent = 0);
 
+protected:
+  void showEvent(QShowEvent *event) override;
+
 private:
   QTimer* timer;
 
@@ -45,6 +48,7 @@ signals:
   // forwarded signals
   void displayPowerChanged(bool on);
   void update(const UIState &s);
+  void offroadTransitionSignal(bool offroad);
 
 public slots:
   void offroadTransition(bool offroad);
