@@ -144,7 +144,7 @@ class RoadSpeedLimiter:
           td = self.start_dist - base
           d = cam_limit_speed_left_dist - base
 
-          if d > 0 and td > 0. and diff_speed > 0:
+          if d > 0 and td > 0. and diff_speed > 0 and (section_left_dist is None or section_left_dist < 10):
             pp = d / td
           else:
             pp = 0
