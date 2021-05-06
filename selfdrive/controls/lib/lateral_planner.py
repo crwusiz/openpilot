@@ -187,7 +187,7 @@ class LateralPlanner():
       self.LP.rll_prob *= self.lane_change_ll_prob
     if self.use_lanelines:
       d_path_xyz = self.LP.get_d_path(v_ego, self.t_idxs, self.path_xyz)
-      heading_cost = interp(v_ego, [0., 1.5], [MPC_COST_LAT.HEADING*2., MPC_COST_LAT.HEADING])
+      heading_cost = interp(v_ego, [1.5, 5.], [MPC_COST_LAT.HEADING*2., MPC_COST_LAT.HEADING])
       self.libmpc.set_weights(MPC_COST_LAT.PATH, heading_cost, ntune_get('steerRateCost'))
     else:
       d_path_xyz = self.path_xyz
