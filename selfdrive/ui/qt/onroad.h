@@ -40,7 +40,8 @@ private:
     {AudibleAlert::CHIME_WARNING2_REPEAT, {"../assets/sounds/warning_2.wav", true}},
     {AudibleAlert::CHIME_WARNING_REPEAT, {"../assets/sounds/warning_repeat.wav", true}},
     {AudibleAlert::CHIME_ERROR, {"../assets/sounds/error.wav", false}},
-    {AudibleAlert::CHIME_PROMPT, {"../assets/sounds/error.wav", false}}
+    {AudibleAlert::CHIME_PROMPT, {"../assets/sounds/error.wav", false}},
+    {AudibleAlert::CHIME_SLOWING_DOWN_SPEED, {"../assets/sounds/slowing_down_speed.wav", 0}}
   };
   float volume = Hardware::MIN_VOLUME;
   float blinking_rate = 0;
