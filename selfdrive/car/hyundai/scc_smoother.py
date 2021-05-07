@@ -302,19 +302,18 @@ class SccSmoother:
   def cal_target_speed(self, CS, clu11_speed, controls):
 
     if not self.longcontrol:
-      if CS.gas_pressed:
-        self.target_speed = clu11_speed
-        if self.sync_set_speed_while_gas_pressed and clu11_speed + 2. > self.kph_to_clu(controls.v_cruise_kph):
+      if CS.gas_pressed and self.sync_set_speed_while_gas_pressed and CS.cruise_buttons == Buttons.NONE:
+        if clu11_speed + 2. > self.kph_to_clu(controls.v_cruise_kph):
           set_speed = clip(clu11_speed + 2., self.min_set_speed_clu, self.max_set_speed_clu)
           controls.v_cruise_kph = set_speed * self.speed_conv_to_ms * CV.MS_TO_KPH
-      else:
-        self.target_speed = self.kph_to_clu(controls.v_cruise_kph)
+
+      self.target_speed = self.kph_to_clu(controls.v_cruise_kph)
 
       if self.max_speed > self.min_set_speed_clu:
         self.target_speed = clip(self.target_speed, self.min_set_speed_clu, self.max_speed)
 
-    else:
-      if CS.gas_pressed and CS.cruiseState_enabled and self.sync_set_speed_while_gas_pressed:
+    elif CS.cruiseState_enabled:
+      if CS.gas_pressed and self.sync_set_speed_while_gas_pressed and CS.cruise_buttons == Buttons.NONE:
         if clu11_speed + 2. > self.kph_to_clu(controls.v_cruise_kph):
           set_speed = clip(clu11_speed + 2., self.min_set_speed_clu, self.max_set_speed_clu)
           self.target_speed = set_speed
