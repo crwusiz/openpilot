@@ -82,7 +82,7 @@ class SccSmoother:
     self.slowing_down_alert = False
     self.slowing_down_sound_alert = False
 
-    self.max_speed = 0.
+    self.max_speed_clu = 0.
     self.limited_lead = False
 
     self.curve_speed_ms = 0.
@@ -96,7 +96,7 @@ class SccSmoother:
     self.btn = Buttons.NONE
     self.target_speed = 0.
 
-    self.max_speed = 0.
+    self.max_speed_clu = 0.
     self.curve_speed_ms = 0.
 
     self.fused_decel.clear()
@@ -129,9 +129,9 @@ class SccSmoother:
 
     self.cal_curve_speed(sm, CS.out.vEgo, frame)
     if self.slow_on_curves and self.curve_speed_ms >= MIN_CURVE_SPEED:
-      max_speed = min(controls.v_cruise_kph * CV.KPH_TO_MS, self.curve_speed_ms) * self.speed_conv_to_clu
+      max_speed_clu = min(controls.v_cruise_kph * CV.KPH_TO_MS, self.curve_speed_ms) * self.speed_conv_to_clu
     else:
-      max_speed = self.kph_to_clu(controls.v_cruise_kph)
+      max_speed_clu = self.kph_to_clu(controls.v_cruise_kph)
 
     #max_speed_log = "{:.1f}/{:.1f}/{:.1f}".format(float(limit_speed),
     #                                              float(self.curve_speed_ms*self.speed_conv_to_clu),
@@ -142,9 +142,9 @@ class SccSmoother:
     if limit_speed >= self.kph_to_clu(30):
 
       if first_started:
-        self.max_speed = clu11_speed
+        self.max_speed_clu = clu11_speed
 
-      max_speed = min(max_speed, limit_speed)
+      max_speed_clu = min(max_speed_clu, limit_speed)
 
       if clu11_speed > limit_speed:
 
@@ -164,16 +164,16 @@ class SccSmoother:
     lead_speed = self.get_long_lead_speed(CS, clu11_speed, sm)
 
     if lead_speed >= self.min_set_speed_clu:
-      if lead_speed < max_speed:
-        max_speed = min(max_speed, lead_speed)
+      if lead_speed < max_speed_clu:
+        max_speed_clu = min(max_speed_clu, lead_speed)
 
         if not self.limited_lead:
-          self.max_speed = clu11_speed
+          self.max_speed_clu = clu11_speed
           self.limited_lead = True
     else:
       self.limited_lead = False
 
-    self.update_max_speed(int(max_speed + 0.5))
+    self.update_max_speed(int(max_speed_clu + 0.5))
 
     return road_limit_speed, left_dist, max_speed_log
 
@@ -187,7 +187,8 @@ class SccSmoother:
     CC.sccSmoother.roadLimitSpeedLeftDist = left_dist
 
     # kph
-    controls.cruiseVirtualMaxSpeed = float(clip(CS.cruiseState_speed * CV.MS_TO_KPH, MIN_SET_SPEED_KPH, self.max_speed))
+    controls.cruiseVirtualMaxSpeed = float(clip(CS.cruiseState_speed * CV.MS_TO_KPH, MIN_SET_SPEED_KPH,
+                                                self.max_speed_clu * self.speed_conv_to_ms * CV.MS_TO_KPH))
     CC.sccSmoother.longControl = self.longcontrol
     CC.sccSmoother.cruiseVirtualMaxSpeed = controls.cruiseVirtualMaxSpeed
     CC.sccSmoother.cruiseRealMaxSpeed = controls.v_cruise_kph
@@ -309,8 +310,8 @@ class SccSmoother:
 
       self.target_speed = self.kph_to_clu(controls.v_cruise_kph)
 
-      if self.max_speed > self.min_set_speed_clu:
-        self.target_speed = clip(self.target_speed, self.min_set_speed_clu, self.max_speed)
+      if self.max_speed_clu > self.min_set_speed_clu:
+        self.target_speed = clip(self.target_speed, self.min_set_speed_clu, self.max_speed_clu)
 
     elif CS.cruiseState_enabled:
       if CS.gas_pressed and self.sync_set_speed_while_gas_pressed and CS.cruise_buttons == Buttons.NONE:
@@ -320,12 +321,12 @@ class SccSmoother:
 
   def update_max_speed(self, max_speed):
 
-    if not self.longcontrol or self.max_speed <= 0:
-      self.max_speed = max_speed
+    if not self.longcontrol or self.max_speed_clu <= 0:
+      self.max_speed_clu = max_speed
     else:
       kp = 0.01
-      error = max_speed - self.max_speed
-      self.max_speed = self.max_speed + error * kp
+      error = max_speed - self.max_speed_clu
+      self.max_speed_clu = self.max_speed_clu + error * kp
 
   def get_fused_accel(self, apply_accel, stock_accel, sm):
 
@@ -352,62 +353,3 @@ class SccSmoother:
     else:
       accel *= self.brake_gain
     return accel
-
-  @staticmethod
-  def update_cruise_buttons(controls, CS, longcontrol): # called by controlds's state_transition
-
-    car_set_speed = CS.cruiseState.speed * CV.MS_TO_KPH
-    is_cruise_enabled = car_set_speed != 0 and car_set_speed != 255 and CS.cruiseState.enabled and controls.CP.enableCruise
-
-    if is_cruise_enabled:
-      if longcontrol:
-        v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
-      else:
-        v_cruise_kph = SccSmoother.update_v_cruise(controls.v_cruise_kph, CS.buttonEvents, controls.enabled, controls.is_metric)
-    else:
-      v_cruise_kph = 0
-
-    if controls.is_cruise_enabled != is_cruise_enabled:
-      controls.is_cruise_enabled = is_cruise_enabled
-
-      if controls.is_cruise_enabled:
-        v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
-      else:
-        v_cruise_kph = 0
-
-      controls.LoC.reset(v_pid=CS.vEgo)
-
-    controls.v_cruise_kph = v_cruise_kph
-
-
-  @staticmethod
-  def update_v_cruise(v_cruise_kph, buttonEvents, enabled, metric):
-
-    global ButtonCnt, LongPressed, ButtonPrev
-    if enabled:
-      if ButtonCnt:
-        ButtonCnt += 1
-      for b in buttonEvents:
-        if b.pressed and not ButtonCnt and (b.type == ButtonType.accelCruise or b.type == ButtonType.decelCruise):
-          ButtonCnt = 1
-          ButtonPrev = b.type
-        elif not b.pressed and ButtonCnt:
-          if not LongPressed and b.type == ButtonType.accelCruise:
-            v_cruise_kph += 1 if metric else 1 * CV.MPH_TO_KPH
-          elif not LongPressed and b.type == ButtonType.decelCruise:
-            v_cruise_kph -= 1 if metric else 1 * CV.MPH_TO_KPH
-          LongPressed = False
-          ButtonCnt = 0
-      if ButtonCnt > 70:
-        LongPressed = True
-        V_CRUISE_DELTA = V_CRUISE_DELTA_KM if metric else V_CRUISE_DELTA_MI
-        if ButtonPrev == ButtonType.accelCruise:
-          v_cruise_kph += V_CRUISE_DELTA - v_cruise_kph % V_CRUISE_DELTA
-        elif ButtonPrev == ButtonType.decelCruise:
-          v_cruise_kph -= V_CRUISE_DELTA - -v_cruise_kph % V_CRUISE_DELTA
-        ButtonCnt %= 70
-      v_cruise_kph = clip(v_cruise_kph, MIN_SET_SPEED_KPH, MAX_SET_SPEED_KPH)
-
-    return v_cruise_kph
-
-
