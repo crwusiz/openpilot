@@ -783,15 +783,6 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
       Priority.LOW, VisualAlert.none, AudibleAlert.none, .0, .0, .2),
   },
 
-  EventName.lkasButtonOff: {
-    ET.WARNING: Alert(
-      "lkasButtonOff",
-      "LKAS button off",
-      "",
-      AlertStatus.userPrompt, AlertSize.small,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, 0., 0., .1),
-  },
-
   EventName.autoLaneChange: {
     ET.WARNING: auto_lane_change_alert,
   },

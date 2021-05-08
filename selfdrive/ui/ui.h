@@ -72,12 +72,6 @@ const int footer_h = 280;
 
 const int UI_FREQ = 20;   // Hz
 
-typedef enum NetStatus {
-  NET_CONNECTED,
-  NET_DISCONNECTED,
-  NET_ERROR,
-} NetStatus;
-
 typedef enum UIStatus {
   STATUS_DISENGAGED,
   STATUS_ENGAGED,
@@ -88,7 +82,6 @@ typedef enum UIStatus {
 static std::map<UIStatus, NVGcolor> bg_colors = {
   {STATUS_DISENGAGED, nvgRGBA(0x17, 0x33, 0x49, 0xc8)},
   {STATUS_ENGAGED, nvgRGBA(0x17, 0x86, 0x44, 0xf1)},
-  //{STATUS_ENGAGED, nvgRGBA(0x02, 0x70, 0xB9, 0xf1)},
   {STATUS_WARNING, nvgRGBA(0xDA, 0x6F, 0x25, 0xf1)},
   {STATUS_ALERT, nvgRGBA(0xC9, 0x22, 0x31, 0xf1)},
 };
@@ -111,7 +104,6 @@ typedef struct UIScene {
   bool driver_view;
 
   cereal::PandaState::PandaType pandaType;
-  NetStatus athenaStatus;
 
   cereal::DeviceState::Reader deviceState;
   cereal::RadarState::LeadData::Reader lead_data[2];

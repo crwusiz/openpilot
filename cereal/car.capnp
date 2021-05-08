@@ -125,12 +125,11 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     startupOneplusDEPRECATED @82;
 
     turningIndicatorOn @99;
-    lkasButtonOff @100;
-    autoLaneChange @101;
+    autoLaneChange @100;
 
     # scc smoother
-    slowingDownSpeed @102;
-    slowingDownSpeedSound @103;
+    slowingDownSpeed @101;
+    slowingDownSpeedSound @102;
   }
 }
 
