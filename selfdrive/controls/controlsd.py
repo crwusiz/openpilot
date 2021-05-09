@@ -335,18 +335,7 @@ class Controls:
     #elif self.CP.enableCruise and CS.cruiseState.enabled:
     #  self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
 
-    set_speed_kph = CS.cruiseState.speed * CV.MS_TO_KPH
-    is_cruise_enabled = set_speed_kph != 0 and set_speed_kph != 255 and CS.cruiseState.enabled and self.CP.enableCruise
-
-    if self.is_cruise_enabled != is_cruise_enabled:
-      self.is_cruise_enabled = is_cruise_enabled
-
-      if self.is_cruise_enabled:
-        self.v_cruise_kph = set_speed_kph
-      else:
-        self.v_cruise_kph = 0
-
-      self.LoC.reset(v_pid=CS.vEgo)
+    SccSmoother.update_cruise_buttons(self, CS, self.CP.openpilotLongitudinalControl)
 
     # decrease the soft disable timer at every step, as it's reset on
     # entrance in SOFT_DISABLING state

@@ -353,3 +353,60 @@ class SccSmoother:
     else:
       accel *= self.brake_gain
     return accel
+
+  @staticmethod
+  def update_cruise_buttons(controls, CS, longcontrol):  # called by controlds's state_transition
+
+    car_set_speed = CS.cruiseState.speed * CV.MS_TO_KPH
+    is_cruise_enabled = car_set_speed != 0 and car_set_speed != 255 and CS.cruiseState.enabled and controls.CP.enableCruise
+
+    if is_cruise_enabled:
+      if longcontrol:
+        v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
+      else:
+        v_cruise_kph = SccSmoother.update_v_cruise(controls.v_cruise_kph, CS.buttonEvents, controls.enabled,
+                                                   controls.is_metric)
+    else:
+      v_cruise_kph = 0
+
+    if controls.is_cruise_enabled != is_cruise_enabled:
+      controls.is_cruise_enabled = is_cruise_enabled
+
+      if controls.is_cruise_enabled:
+        v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
+      else:
+        v_cruise_kph = 0
+
+      controls.LoC.reset(v_pid=CS.vEgo)
+
+    controls.v_cruise_kph = v_cruise_kph
+
+  @staticmethod
+  def update_v_cruise(v_cruise_kph, buttonEvents, enabled, metric):
+
+    global ButtonCnt, LongPressed, ButtonPrev
+    if enabled:
+      if ButtonCnt:
+        ButtonCnt += 1
+      for b in buttonEvents:
+        if b.pressed and not ButtonCnt and (b.type == ButtonType.accelCruise or b.type == ButtonType.decelCruise):
+          ButtonCnt = 1
+          ButtonPrev = b.type
+        elif not b.pressed and ButtonCnt:
+          if not LongPressed and b.type == ButtonType.accelCruise:
+            v_cruise_kph += 1 if metric else 1 * CV.MPH_TO_KPH
+          elif not LongPressed and b.type == ButtonType.decelCruise:
+            v_cruise_kph -= 1 if metric else 1 * CV.MPH_TO_KPH
+          LongPressed = False
+          ButtonCnt = 0
+      if ButtonCnt > 70:
+        LongPressed = True
+        V_CRUISE_DELTA = V_CRUISE_DELTA_KM if metric else V_CRUISE_DELTA_MI
+        if ButtonPrev == ButtonType.accelCruise:
+          v_cruise_kph += V_CRUISE_DELTA - v_cruise_kph % V_CRUISE_DELTA
+        elif ButtonPrev == ButtonType.decelCruise:
+          v_cruise_kph -= V_CRUISE_DELTA - -v_cruise_kph % V_CRUISE_DELTA
+        ButtonCnt %= 70
+      v_cruise_kph = clip(v_cruise_kph, MIN_SET_SPEED_KPH, MAX_SET_SPEED_KPH)
+
+    return v_cruise_kph
