@@ -23,7 +23,7 @@
 #include "selfdrive/hardware/hw.h"
 
 #include "selfdrive/ui/ui.h"
-#include "selfdrive/ui/ui/extras.h"
+#include "selfdrive/ui/extras.h"
 
 #ifdef QCOM2
 const int vwp_w = 2160;
@@ -576,13 +576,14 @@ static void bb_ui_draw_basic_info(UIState *s)
 
     int mdps_bus = scene->car_params.getMdpsBus();
     int scc_bus = scene->car_params.getSccBus();
+    bool has_hda = scene->car_params.getHasHda();
 
-    snprintf(str, sizeof(str), "SR(%.2f) SRC(%.2f) SAD(%.2f) AO(%.2f/%.2f) MDPS(%d) SCC(%d)%s%s", scene->controls_state.getSteerRatio(),
+    snprintf(str, sizeof(str), "SR(%.2f) SRC(%.2f) SAD(%.2f) AO(%.2f/%.2f) MDPS(%d) SCC(%d) HDA(%d)%s%s", scene->controls_state.getSteerRatio(),
                                                         scene->controls_state.getSteerRateCost(),
                                                         scene->controls_state.getSteerActuatorDelay(),
                                                         scene->live_params.getAngleOffsetDeg(),
                                                         scene->live_params.getAngleOffsetAverageDeg(),
-                                                        mdps_bus, scc_bus,
+                                                        mdps_bus, scc_bus, has_hda ? 1 : 0,
                                                         sccLogMessage.size() > 0 ? ", " : "",
                                                         sccLogMessage.c_str()
                                                         );
@@ -663,9 +664,14 @@ static void bb_ui_draw_debug(UIState *s)
     snprintf(str, sizeof(str), "%.3f (%.3f/%.3f)", aReqValue, aReqValueMin, aReqValueMax);
     ui_draw_text(s, text_x, y, str, 22 * 2.5, textColor, "sans-regular");
 
-    y += height;
-    snprintf(str, sizeof(str), "Light: %.3f", scene->light_sensor);
-    ui_draw_text(s, text_x, y, str, 22 * 2.5, textColor, "sans-regular");
+    cereal::CarControl::SccSmoother::Reader scc_smoother = scene->car_control.getSccSmoother();
+    int activeNDA = scc_smoother.getRoadLimitSpeedActive();
+
+    if(activeNDA > 0)
+    {
+        y += height;
+        ui_draw_text(s, text_x, y, "NDA", 22 * 2.5, nvgRGBA(0, 255, 0, 255), "sans-regular");
+    }
 }
 
 
@@ -1042,6 +1048,8 @@ void ui_nvg_init(UIState *s) {
 	{"brake", "../assets/img_brake_disc.png"},
 	{"autohold_warning", "../assets/img_autohold_warning.png"},
 	{"autohold_active", "../assets/img_autohold_active.png"},
+	{"img_nda", "../assets/img_nda.png"},
+	{"img_hda", "../assets/img_hda.png"},
   };
   for (auto [name, file] : images) {
     s->images[name] = nvgCreateImage(s->vg, file, 1);

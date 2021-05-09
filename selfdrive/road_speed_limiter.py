@@ -12,7 +12,8 @@ current_milli_time = lambda: int(round(time.time() * 1000))
 
 class RoadSpeedLimiter:
   def __init__(self):
-    self.json = None
+    self.json_road_limit = None
+    self.active = 0
     self.last_updated = 0
     self.slowing_down = False
     self.last_exception = None
@@ -41,8 +42,14 @@ class RoadSpeedLimiter:
 
             try:
               self.lock.acquire()
-              self.json = json_obj
-              self.last_updated = current_milli_time()
+
+              if json_obj['active'] is not None:
+                self.active = json_obj['active']
+
+              if json_obj['road_limit'] is not None:
+                self.json_road_limit = json_obj['road_limit']
+                self.last_updated = current_milli_time()
+
             finally:
               self.lock.release()
 
@@ -50,7 +57,7 @@ class RoadSpeedLimiter:
 
             try:
               self.lock.acquire()
-              self.json = None
+              self.json_road_limit = None
             finally:
               self.lock.release()
 
@@ -58,14 +65,21 @@ class RoadSpeedLimiter:
       except Exception as e:
         self.last_exception = e
 
-  def get_val(self, key, default=None):
+  def get_limit_val(self, key, default=None):
 
-    if self.json is None:
+    if self.json_road_limit is None:
       return default
 
-    if key in self.json:
-      return self.json[key]
+    if key in self.json_road_limit:
+      return self.json_road_limit[key]
     return default
+
+  def get_active(self):
+
+    if self.active is None:
+      return 0
+
+    return self.active
 
   def get_max_speed(self, CS, v_cruise_kph):
 
@@ -83,17 +97,17 @@ class RoadSpeedLimiter:
 
     try:
 
-      road_limit_speed = self.get_val('road_limit_speed')
-      is_highway = self.get_val('is_highway')
+      road_limit_speed = self.get_limit_val('road_limit_speed')
+      is_highway = self.get_limit_val('is_highway')
 
-      cam_type = int(self.get_val('cam_type', 0))
+      cam_type = int(self.get_limit_val('cam_type', 0))
 
-      cam_limit_speed_left_dist = self.get_val('cam_limit_speed_left_dist')
-      cam_limit_speed = self.get_val('cam_limit_speed')
+      cam_limit_speed_left_dist = self.get_limit_val('cam_limit_speed_left_dist')
+      cam_limit_speed = self.get_limit_val('cam_limit_speed')
 
-      section_limit_speed = self.get_val('section_limit_speed')
+      section_limit_speed = self.get_limit_val('section_limit_speed')
       # section_avg_speed = self.get_val('section_avg_speed')
-      section_left_dist = self.get_val('section_left_dist')
+      section_left_dist = self.get_limit_val('section_left_dist')
       # section_left_time = self.get_val('section_left_time')
 
       if is_highway is not None:
@@ -178,6 +192,12 @@ class RoadSpeedLimiter:
 
 road_speed_limiter = None
 
+def road_speed_limiter_get_active():
+  global road_speed_limiter
+  if road_speed_limiter is None:
+    road_speed_limiter = RoadSpeedLimiter()
+
+  return road_speed_limiter.get_active()
 
 def road_speed_limiter_get_max_speed(CS, v_cruise_kph):
   global road_speed_limiter

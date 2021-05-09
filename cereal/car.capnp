@@ -309,8 +309,10 @@ struct CarControl {
     cruiseRealMaxSpeed @2 :Float32;
 
     logMessage @3 :Text;
-    roadLimitSpeed @4 :UInt32;
-    roadLimitSpeedLeftDist @5 :UInt32;
+
+    roadLimitSpeedActive @4 :Int32;
+    roadLimitSpeed @5 :UInt32;
+    roadLimitSpeedLeftDist @6 :UInt32;
   }
 
   struct Actuators {
@@ -449,6 +451,7 @@ struct CarParams {
   mdpsBus @57: Int8;
   sasBus @58: Int8;
   sccBus @59: Int8;
+  hasHda @60: Bool;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);

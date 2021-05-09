@@ -8,7 +8,7 @@ from selfdrive.car.hyundai.values import Buttons
 from common.params import Params
 from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, V_CRUISE_MIN, V_CRUISE_DELTA_KM, V_CRUISE_DELTA_MI
 from selfdrive.controls.lib.lane_planner import TRAJECTORY_SIZE
-from selfdrive.road_speed_limiter import road_speed_limiter_get_max_speed
+from selfdrive.road_speed_limiter import road_speed_limiter_get_max_speed, road_speed_limiter_get_active
 
 # do not modify
 MIN_SET_SPEED_KPH = V_CRUISE_MIN
@@ -183,6 +183,8 @@ class SccSmoother:
     clu11_speed = CS.clu11["CF_Clu_Vanz"]
 
     road_limit_speed, left_dist, max_speed_log = self.cal_max_speed(frame, CC, CS, controls.sm, clu11_speed, controls)
+
+    CC.sccSmoother.roadLimitSpeedActive = road_speed_limiter_get_active()
     CC.sccSmoother.roadLimitSpeed = road_limit_speed
     CC.sccSmoother.roadLimitSpeedLeftDist = left_dist
 

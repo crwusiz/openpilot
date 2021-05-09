@@ -3,14 +3,15 @@ from cereal import car
 from common.realtime import DT_CTRL
 from common.numpy_fast import clip
 from selfdrive.car import apply_std_steer_torque_limits
-from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, create_lfahda_mfc, \
+from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, \
   create_scc11, create_scc12, create_scc13, create_scc14, \
-  create_mdps12
+  create_mdps12, create_lfahda_mfc
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
 from selfdrive.car.hyundai.values import Buttons, CAR, FEATURES, CarControllerParams
 from opendbc.can.packer import CANPacker
 from selfdrive.config import Conversions as CV
 from common.params import Params
+from selfdrive.road_speed_limiter import road_speed_limiter_get_active
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 min_set_speed = 30 * CV.KPH_TO_MS
@@ -226,8 +227,9 @@ class CarController():
         can_sends.append(create_scc14(self.packer, enabled, CS.scc14))
       self.scc12_cnt += 1
 
-      # 20 Hz LFA MFA message
-    if frame % 5 == 0 and self.car_fingerprint in FEATURES["send_lfa_mfa"]:
-      can_sends.append(create_lfahda_mfc(self.packer, enabled))
+    # 20 Hz LFA MFA message
+    if frame % 5 == 0:
+      if CS.CP.hasHda or self.car_fingerprint in FEATURES["send_lfa_mfa"]:
+        can_sends.append(create_lfahda_mfc(self.packer, enabled, road_speed_limiter_get_active()))
 
     return can_sends

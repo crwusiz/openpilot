@@ -14,7 +14,7 @@
 #include "selfdrive/hardware/hw.h"
 
 #include "selfdrive/ui/paint.h"
-#include "selfdrive/ui/qt_window.h"
+#include "selfdrive/ui/qt/qt_window.h"
 #include "selfdrive/ui/dashcam.h"
 
 #define BACKLIGHT_DT 0.25
