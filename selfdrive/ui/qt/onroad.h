@@ -1,4 +1,5 @@
 #pragma once
+
 #include <map>
 
 #include <QSoundEffect>
@@ -8,7 +9,6 @@
 #include "selfdrive/hardware/hw.h"
 #include "selfdrive/ui/ui.h"
 #include "selfdrive/ui/qt/qt_window.h"
-
 
 typedef cereal::CarControl::HUDControl::AudibleAlert AudibleAlert;
 

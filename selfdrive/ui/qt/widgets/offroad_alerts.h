@@ -2,12 +2,12 @@
 #include <map>
 
 #include <QFrame>
-#include <QPushButton>
 #include <QLabel>
+#include <QPushButton>
 #include <QVBoxLayout>
 
-#include "common/params.h"
-#include "widgets/scrollview.h"
+#include "selfdrive/common/params.h"
+#include "selfdrive/ui/qt/widgets/scrollview.h"
 
 class OffroadAlert : public QFrame {
   Q_OBJECT
