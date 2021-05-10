@@ -14,9 +14,9 @@ static void ui_draw_extras_limit_speed(UIState *s)
     if(activeNDA > 0)
     {
         int w = 171;
-        int h = 80;
+        int h = 65;
         int x = (s->viz_rect.x + (bdr_s*2)) + 300 - (w/2);
-        int y = 60;
+        int y = 50;
 
         const char* img = activeNDA == 1 ? "img_nda" : "img_hda";
 
@@ -28,7 +28,7 @@ static void ui_draw_extras_limit_speed(UIState *s)
         int w = 200;
         int h = 200;
         int x = (s->viz_rect.x + (bdr_s*2)) + 300;
-        int y = 60 + 80 + 60;
+        int y = 50 + 65 + 60;
         char str[32];
 
         nvgBeginPath(s->vg);

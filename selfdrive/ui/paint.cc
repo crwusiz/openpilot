@@ -663,15 +663,6 @@ static void bb_ui_draw_debug(UIState *s)
     y += height;
     snprintf(str, sizeof(str), "%.3f (%.3f/%.3f)", aReqValue, aReqValueMin, aReqValueMax);
     ui_draw_text(s, text_x, y, str, 22 * 2.5, textColor, "sans-regular");
-
-    cereal::CarControl::SccSmoother::Reader scc_smoother = scene->car_control.getSccSmoother();
-    int activeNDA = scc_smoother.getRoadLimitSpeedActive();
-
-    if(activeNDA > 0)
-    {
-        y += height;
-        ui_draw_text(s, text_x, y, "NDA", 22 * 2.5, nvgRGBA(0, 255, 0, 255), "sans-regular");
-    }
 }
 
 
