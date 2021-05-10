@@ -43,10 +43,10 @@ class RoadSpeedLimiter:
             try:
               self.lock.acquire()
 
-              if json_obj['active'] is not None:
+              if 'active' in json_obj:
                 self.active = json_obj['active']
 
-              if json_obj['road_limit'] is not None:
+              if 'road_limit' in json_obj:
                 self.json_road_limit = json_obj['road_limit']
                 self.last_updated = current_milli_time()
 
