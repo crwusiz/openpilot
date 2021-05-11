@@ -281,7 +281,7 @@ static void bb_ui_draw_measures_left(UIState *s, int bb_x, int bb_y, int bb_w ) 
         val_color = nvgRGBA(255, 0, 0, 200);
       }
       // lead car relative distance is always in meters
-      snprintf(val_str, sizeof(val_str), "%d", (int)scene->lead_data[0].getDRel());
+      snprintf(val_str, sizeof(val_str), "%.1f", scene->lead_data[0].getDRel());
     } else {
        snprintf(val_str, sizeof(val_str), "-");
     }
