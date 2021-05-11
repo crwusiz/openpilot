@@ -17,50 +17,45 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   QObject::connect(this, &OnroadWindow::update, nvg, &NvgWindow::update);
 
   alerts = new OnroadAlerts(this);
-  QObject::connect(this, &OnroadWindow::update, alerts, &OnroadAlerts::update);
+  QObject::connect(this, &OnroadWindow::update, alerts, &OnroadAlerts::updateState);
   QObject::connect(this, &OnroadWindow::offroadTransition, alerts, &OnroadAlerts::offroadTransition);
   layout->addWidget(alerts);
 
+  // setup stacking order
+  alerts->raise();
+
   setLayout(layout);
+  setAttribute(Qt::WA_OpaquePaintEvent);
 }
 
 // ***** onroad widgets *****
 
-OnroadAlerts::OnroadAlerts(QWidget *parent) : QOpenGLWidget(parent) {
-  setAttribute(Qt::WA_AlwaysStackOnTop);
-  setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-
-  QSurfaceFormat format = QSurfaceFormat::defaultFormat();
-  format.setSamples(4);
-  setFormat(format);
-
-  // setup sounds
+OnroadAlerts::OnroadAlerts(QWidget *parent) : QWidget(parent) {
   for (auto &kv : sound_map) {
     auto path = QUrl::fromLocalFile(kv.second.first);
     sounds[kv.first].setSource(path);
   }
 }
 
-void OnroadAlerts::update(const UIState &s) {
+void OnroadAlerts::updateState(const UIState &s) {
   SubMaster &sm = *(s.sm);
   if (sm.updated("carState")) {
     // scale volume with speed
     volume = util::map_val(sm["carState"].getCarState().getVEgo(), 0.f, 20.f,
                            Hardware::MIN_VOLUME, Hardware::MAX_VOLUME);
   }
-  if (sm.updated("controlsState")) {
-    const cereal::ControlsState::Reader &cs = sm["controlsState"].getControlsState();
-    updateAlert(QString::fromStdString(cs.getAlertText1()), QString::fromStdString(cs.getAlertText2()),
-                cs.getAlertBlinkingRate(), cs.getAlertType(), cs.getAlertSize(), cs.getAlertSound());
-  } else {
-    // Handle controls timeout
-    if (s.scene.deviceState.getStarted() && (sm.frame - s.scene.started_frame) > 10 * UI_FREQ) {
-      const uint64_t cs_frame = sm.rcv_frame("controlsState");
-      if (cs_frame < s.scene.started_frame) {
+  if (s.scene.deviceState.getStarted()) {
+    if (sm.updated("controlsState")) {
+      const cereal::ControlsState::Reader &cs = sm["controlsState"].getControlsState();
+      updateAlert(QString::fromStdString(cs.getAlertText1()), QString::fromStdString(cs.getAlertText2()),
+                  cs.getAlertBlinkingRate(), cs.getAlertType(), cs.getAlertSize(), cs.getAlertSound());
+    } else if ((sm.frame - s.scene.started_frame) > 10 * UI_FREQ) {
+      // Handle controls timeout
+      if (sm.rcv_frame("controlsState") < s.scene.started_frame) {
         // car is started, but controlsState hasn't been seen at all
         updateAlert("openpilot Unavailable", "Waiting for controls to start", 0,
                     "controlsWaiting", cereal::ControlsState::AlertSize::MID, AudibleAlert::NONE);
-      } else if ((sm.frame - cs_frame) > 5 * UI_FREQ) {
+      } else if ((sm.frame - sm.rcv_frame("controlsState")) > 5 * UI_FREQ) {
         // car is started, but controls is lagging or died
         updateAlert("TAKE CONTROL IMMEDIATELY", "Controls Unresponsive", 0,
                     "controlsUnresponsive", cereal::ControlsState::AlertSize::FULL, AudibleAlert::CHIME_WARNING_REPEAT);
@@ -71,35 +66,34 @@ void OnroadAlerts::update(const UIState &s) {
     }
   }
 
+  // TODO: add blinking back if performant
+  //float alpha = 0.375 * cos((millis_since_boot() / 1000) * 2 * M_PI * blinking_rate) + 0.625;
   auto c = bg_colors[s.status];
-  float alpha = 0.375 * cos((millis_since_boot() / 1000) * 2 * M_PI * blinking_rate) + 0.625;
-  bg.setRgbF(c.r, c.g, c.b, c.a*alpha);
+  bg.setRgbF(c.r, c.g, c.b, c.a);
 }
 
 void OnroadAlerts::offroadTransition(bool offroad) {
-  stopSounds();
-  setVisible(false);
-  alert_type = "";
+  updateAlert("", "", 0, "", cereal::ControlsState::AlertSize::NONE, AudibleAlert::NONE);
 }
 
 void OnroadAlerts::updateAlert(const QString &t1, const QString &t2, float blink_rate,
                                const std::string &type, cereal::ControlsState::AlertSize size, AudibleAlert sound) {
+  if (alert_type.compare(type) == 0 && text1.compare(t1) == 0) {
+    return;
+  }
 
-  if (alert_type.compare(type) != 0) {
-    stopSounds();
-    if (sound != AudibleAlert::NONE) {
-      playSound(sound);
-    }
+  stopSounds();
+  if (sound != AudibleAlert::NONE) {
+    playSound(sound);
   }
 
   text1 = t1;
   text2 = t2;
-  alert_size = size;
   alert_type = type;
+  alert_size = size;
   blinking_rate = blink_rate;
 
-  setVisible(size != cereal::ControlsState::AlertSize::NONE);
-  repaint();
+  update();
 }
 
 void OnroadAlerts::playSound(AudibleAlert alert) {
@@ -121,51 +115,61 @@ void OnroadAlerts::stopSounds() {
 void OnroadAlerts::paintEvent(QPaintEvent *event) {
   QPainter p(this);
 
-  // setup transparent widget
-  p.beginNativePainting();
-  glClearColor(0.0, 0.0, 0.0, 0.0);
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  p.endNativePainting();
-
-  int h = height();
-  if (alert_size != cereal::ControlsState::AlertSize::FULL) {
-    h = alert_size == cereal::ControlsState::AlertSize::SMALL ? 271 : 420;
+  static std::map<cereal::ControlsState::AlertSize, const int> alert_sizes = {
+    {cereal::ControlsState::AlertSize::NONE, 0},
+    {cereal::ControlsState::AlertSize::SMALL, 271},
+    {cereal::ControlsState::AlertSize::MID, 420},
+    {cereal::ControlsState::AlertSize::FULL, height()},
+  };
+  int h = alert_sizes[alert_size];
+  if (h == 0) {
+    return;
   }
+
   QRect r = QRect(0, height() - h, width(), h);
 
   // draw background + gradient
   p.setPen(Qt::NoPen);
+  p.setCompositionMode(QPainter::CompositionMode_DestinationOver);
+
   p.setBrush(QBrush(bg));
   p.drawRect(r);
 
-  QLinearGradient g(0, 0, 0, height());
+  QLinearGradient g(0, r.y(), 0, r.bottom());
   g.setColorAt(0, QColor::fromRgbF(0, 0, 0, 0.05));
   g.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0.35));
   p.setBrush(QBrush(g));
   p.fillRect(r, g);
+  p.setCompositionMode(QPainter::CompositionMode_SourceOver);
 
-  // remove sidebar
+  // remove bottom border
   r = QRect(0, height() - h, width(), h - 30);
 
   // text
   const QPoint c = r.center();
   p.setPen(QColor(0xff, 0xff, 0xff));
-  p.setRenderHint(QPainter::Antialiasing);
+  p.setRenderHint(QPainter::TextAntialiasing);
   if (alert_size == cereal::ControlsState::AlertSize::SMALL) {
-    configFont(p, "Open Sans SemiBold", 74, 400);
+    configFont(p, "Open Sans", 74, "SemiBold");
     p.drawText(r, Qt::AlignCenter, text1);
   } else if (alert_size == cereal::ControlsState::AlertSize::MID) {
-    configFont(p, "Open Sans", 88, 600); // TODO: bold
-    p.drawText(QRect(0, c.y() - 125, width(), 110), Qt::AlignHCenter | Qt::AlignTop, text1);
-    configFont(p, "Open Sans", 64, 400);
+    configFont(p, "Open Sans", 88, "Bold");
+    p.drawText(QRect(0, c.y() - 125, width(), 150), Qt::AlignHCenter | Qt::AlignTop, text1);
+    configFont(p, "Open Sans", 66, "Regular");
     p.drawText(QRect(0, c.y() + 21, width(), 90), Qt::AlignHCenter, text2);
   } else if (alert_size == cereal::ControlsState::AlertSize::FULL) {
+    // TODO: offset from center to match old NVG UI, but why was it this way?
     bool l = text1.length() > 15;
-    configFont(p, "Open Sans", l ? 72 : 96, 700);
-    p.drawText(QRect(0, c.y() + (l ? 360 : 420), width(), 90), Qt::AlignHCenter, text1);
-    configFont(p, "Open Sans", 60, 400);
-    p.drawText(QRect(0, r.height() - (l ? 300 : 360), width(), 90), Qt::AlignHCenter, text2);
+    configFont(p, "Open Sans", l ? 132 : 177, "Bold");
+    p.drawText(QRect(0, r.y() + (l ? 240 : 270), width(), 350), Qt::AlignHCenter | Qt::TextWordWrap, text1);
+    configFont(p, "Open Sans", 88, "Regular");
+    p.drawText(QRect(0, r.height() - (l ? 361 : 420), width(), 300), Qt::AlignHCenter | Qt::TextWordWrap, text2);
   }
+}
+
+
+NvgWindow::NvgWindow(QWidget *parent) : QOpenGLWidget(parent) {
+  setAttribute(Qt::WA_OpaquePaintEvent);
 }
 
 NvgWindow::~NvgWindow() {

@@ -14,7 +14,7 @@ typedef cereal::CarControl::HUDControl::AudibleAlert AudibleAlert;
 
 // ***** onroad widgets *****
 
-class OnroadAlerts : public QOpenGLWidget {
+class OnroadAlerts : public QWidget {
   Q_OBJECT
 
 public:
@@ -29,12 +29,6 @@ private:
   void updateAlert(const QString &t1, const QString &t2, float blink_rate,
                    const std::string &type, cereal::ControlsState::AlertSize size, AudibleAlert sound);
 
-  std::map<cereal::ControlsState::AlertSize, const int> alert_sizes = {
-    {cereal::ControlsState::AlertSize::NONE, 0},
-    {cereal::ControlsState::AlertSize::SMALL, 241},
-    {cereal::ControlsState::AlertSize::MID, 390},
-    {cereal::ControlsState::AlertSize::FULL, vwp_h},
-  };
   std::map<AudibleAlert, std::pair<QString, bool>> sound_map {
     // AudibleAlert, (file path, inf loop)
     {AudibleAlert::CHIME_DISENGAGE, {"../assets/sounds/disengaged.wav", false}},
@@ -57,7 +51,7 @@ private:
   cereal::ControlsState::AlertSize alert_size;
 
 public slots:
-  void update(const UIState &s);
+  void updateState(const UIState &s);
   void offroadTransition(bool offroad);
 };
 
@@ -67,7 +61,7 @@ class NvgWindow : public QOpenGLWidget, protected QOpenGLFunctions {
 
 public:
   using QOpenGLWidget::QOpenGLWidget;
-  explicit NvgWindow(QWidget* parent = 0) : QOpenGLWidget(parent) {};
+  explicit NvgWindow(QWidget* parent = 0);
   ~NvgWindow();
 
 protected:
