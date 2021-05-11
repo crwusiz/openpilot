@@ -37,14 +37,17 @@ class RoadSpeedLimiter:
         while True:
 
           try:
-            data, addr = sock.recvfrom(2048)
+            data, addr = sock.recvfrom(4096)
             json_obj = json.loads(data.decode())
 
             try:
               self.lock.acquire()
 
-              if 'active' in json_obj:
-                self.active = json_obj['active']
+              try:
+                if 'active' in json_obj:
+                  self.active = json_obj['active']
+              except:
+                pass
 
               if 'road_limit' in json_obj:
                 self.json_road_limit = json_obj['road_limit']
@@ -60,7 +63,6 @@ class RoadSpeedLimiter:
               self.json_road_limit = None
             finally:
               self.lock.release()
-
 
       except Exception as e:
         self.last_exception = e
