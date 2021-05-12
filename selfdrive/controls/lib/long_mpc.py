@@ -11,6 +11,9 @@ from selfdrive.controls.lib.drive_helpers import MPC_COST_LONG
 
 LOG_MPC = os.environ.get('LOG_MPC', False)
 
+CRUISE_GAP_BP = [1., 2., 3., 4.]
+CRUISE_GAP_V = [1.2, 1.5, 2.0, 2.6]
+
 
 class LongitudinalMpc():
   def __init__(self, mpc_id):
@@ -104,7 +107,7 @@ class LongitudinalMpc():
     t = sec_since_boot()
 
     cruise_gap = int(clip(CS.cruiseGap, 1., 4.))
-    TR = interp(float(cruise_gap), [1., 2., 3., 4.], [1.2, 1.5, 2.0, 2.6])
+    TR = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
 
     self.n_its = self.libmpc.run_mpc(self.cur_state, self.mpc_solution, self.a_lead_tau, a_lead, TR)
     self.duration = int((sec_since_boot() - t) * 1e9)

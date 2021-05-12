@@ -336,7 +336,7 @@ class SccSmoother:
     lead = self.get_lead(sm)
     if lead is not None:
       dRel = lead.dRel
-
+      """
       if lead.radar:
 
         if stock_accel > 0.:
@@ -345,15 +345,18 @@ class SccSmoother:
           stock_weight = interp(dRel, [3., 25.], [1., 0.])
 
         apply_accel = apply_accel * (1. - stock_weight) + stock_accel * stock_weight
+      """
 
     return apply_accel, dRel
 
-  def get_accel(self, actuators):
+  def get_accel(self, CS, sm, actuators):
+
     accel = actuators.gas - actuators.brake
     if accel > 0:
       accel *= self.gas_gain
     else:
       accel *= self.brake_gain
+
     return accel
 
   @staticmethod

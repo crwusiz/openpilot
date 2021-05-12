@@ -113,7 +113,7 @@ class LongControl():
       deadzone = interp(v_ego_pid, CP.longitudinalTuning.deadzoneBP, CP.longitudinalTuning.deadzoneV)
 
       if d_rel > 0.:
-        a_target *= interp(d_rel, [10., 25., 70.], [1.0, 0.8, 0.6])
+        a_target *= interp(d_rel, [10., 25., 70.], [1.0, 0.9, 0.7])
 
       output_gb = self.pid.update(self.v_pid, v_ego_pid, speed=v_ego_pid, deadzone=deadzone, feedforward=a_target, freeze_integrator=prevent_overshoot)
 
