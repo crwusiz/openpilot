@@ -507,7 +507,7 @@ FEATURES = {
 
   # send LFA MFA message for new HKG models
   "send_lfa_mfa": {CAR.SONATA, CAR.PALISADE, CAR.SONATA_HEV, CAR.SANTA_FE, CAR.NIRO_EV, CAR.GRANDEUR_IG_FL, CAR.GRANDEUR_IG_FL_HEV,
-                   CAR.SELTOS, CAR.KONA_EV, CAR.KONA_HEV},
+                   CAR.SELTOS, CAR.KONA_EV, CAR.KONA_HEV, CAR.TUCSON_TL_SCC},
 
   "has_scc13": {},
   "has_scc14": {},
