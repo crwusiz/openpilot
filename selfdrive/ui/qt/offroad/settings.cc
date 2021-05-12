@@ -387,7 +387,7 @@ void SettingsWindow::showEvent(QShowEvent *event) {
         color: grey;
         border: none;
         background: none;
-        font-size: 65px;
+        font-size: 60px;
         font-weight: 500;
         padding-top: 35px;
         padding-bottom: 35px;
