@@ -247,7 +247,7 @@ class CarInterface(CarInterfaceBase):
     ret.sccBus = 0 if 1056 in fingerprint[0] else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
                                                                      else 2 if 1056 in fingerprint[2] else -1
 
-    ret.hasHda = 1157 in fingerprint[0]
+    ret.hasHda = 1157 in fingerprint[0] or candidate in FEATURES['has_hda']
 
     ret.radarOffCan = ret.sccBus == -1
     ret.enableCruise = not ret.radarOffCan
