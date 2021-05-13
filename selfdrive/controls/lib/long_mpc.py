@@ -12,7 +12,7 @@ from selfdrive.controls.lib.drive_helpers import MPC_COST_LONG
 LOG_MPC = os.environ.get('LOG_MPC', False)
 
 CRUISE_GAP_BP = [1., 2., 3., 4.]
-CRUISE_GAP_V = [1.2, 1.5, 2.0, 2.6]
+CRUISE_GAP_V = [1.2, 1.5, 2.1, 2.73]
 
 
 class LongitudinalMpc():
