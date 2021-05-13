@@ -268,7 +268,7 @@ class SccSmoother:
         if 0. < d < -lead.vRel * (10. + cruise_gap) * 2. and lead.vRel < -1.:
           t = d / lead.vRel
           accel = -(lead.vRel / t) * self.speed_conv_to_clu
-          accel *= 1.5
+          accel *= 1.4
 
           if accel < 0.:
             target_speed = clu11_speed + accel
