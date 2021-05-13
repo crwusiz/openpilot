@@ -8,6 +8,7 @@ from common.realtime import sec_since_boot
 from selfdrive.controls.lib.radar_helpers import _LEAD_ACCEL_TAU
 from selfdrive.controls.lib.longitudinal_mpc import libmpc_py
 from selfdrive.controls.lib.drive_helpers import MPC_COST_LONG
+from selfdrive.config import Conversions as CV
 
 LOG_MPC = os.environ.get('LOG_MPC', False)
 
@@ -33,6 +34,7 @@ class LongitudinalMpc():
     self.duration = 0
 
     self.cruise_gap = 0
+    self.auto_tr = True
 
   def publish(self, pm):
     if LOG_MPC:
@@ -107,7 +109,13 @@ class LongitudinalMpc():
     t = sec_since_boot()
 
     cruise_gap = int(clip(CS.cruiseGap, 1., 4.))
-    TR = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
+
+    if self.auto_tr and cruise_gap == 1:
+      TR = interp(v_ego,
+                  [10.*CV.KPH_TO_MS, 40.*CV.KPH_TO_MS, 60.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS],
+                  [1.0, 1.1, 1.25, 1.6, 2., 2.7])
+    else:
+      TR = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
 
     self.n_its = self.libmpc.run_mpc(self.cur_state, self.mpc_solution, self.a_lead_tau, a_lead, TR)
     self.duration = int((sec_since_boot() - t) * 1e9)
