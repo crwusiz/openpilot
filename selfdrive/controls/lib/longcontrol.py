@@ -26,7 +26,7 @@ def long_control_state_trans(active, long_control_state, v_ego, v_target, v_pid,
   starting_condition = v_target > STARTING_TARGET_SPEED and not cruise_standstill
 
   if d_rel > 0.:
-    stopping_condition = stopping_condition or (v_ego < 1.5 and d_rel < 4.)
+    stopping_condition = stopping_condition or (v_ego < 1.0 and d_rel < 4.)
     starting_condition = starting_condition and d_rel > 3.3
 
   if not active:
