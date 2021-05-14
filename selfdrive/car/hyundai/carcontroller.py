@@ -219,7 +219,7 @@ class CarController():
       controls.lead_drel = lead_drel
 
       can_sends.append(create_scc12(self.packer, apply_accel, enabled, self.scc12_cnt, self.scc_live, CS.scc12))
-      can_sends.append(create_scc11(self.packer, frame, enabled, set_speed, controls.sm['radarState'], self.scc_live, CS.scc11))
+      can_sends.append(create_scc11(self.packer, frame, enabled, set_speed, lead_visible, self.scc_live, CS.scc11))
 
       if CS.has_scc13 and frame % 20 == 0:
         can_sends.append(create_scc13(self.packer, CS.scc13))

@@ -264,8 +264,8 @@ class SccSmoother:
       lead = self.get_lead(sm)
       if lead is not None:
         d = lead.dRel - 5.
-        cruise_gap = clip(CS.cruise_gap, 1., 4.)
-        if 0. < d < -lead.vRel * (10. + cruise_gap) * 2. and lead.vRel < -1.:
+        #cruise_gap = clip(CS.cruise_gap, 1., 4.)
+        if 0. < d < -lead.vRel * (10. + 3.) * 2. and lead.vRel < -1.:
           t = d / lead.vRel
           accel = -(lead.vRel / t) * self.speed_conv_to_clu
           accel *= 1.4

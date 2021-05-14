@@ -112,8 +112,8 @@ class LongitudinalMpc():
 
     if self.auto_tr and cruise_gap == 1:
       TR = interp(v_ego,
-                  [10.*CV.KPH_TO_MS, 40.*CV.KPH_TO_MS, 60.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS],
-                  [1.0, 1.1, 1.25, 1.6, 2., 2.7])
+                  [40.*CV.KPH_TO_MS, 60.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS],
+                  [1.1, 1.25, 1.6, 2., 2.7])
     else:
       TR = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
 
