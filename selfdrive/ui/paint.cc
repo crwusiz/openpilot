@@ -88,16 +88,15 @@ static void ui_draw_circle_image(const UIState *s, int center_x, int center_y, i
   ui_draw_circle_image(s, center_x, center_y, radius, image, nvgRGBA(0, 0, 0, (255 * bg_alpha)), img_alpha);
 }
 
-static void draw_lead(UIState *s, int idx) {
+static void draw_lead(UIState *s, const cereal::RadarState::LeadData::Reader &lead_data, const vertex_data &vd) {
   // Draw lead car indicator
-  const auto &lead = s->scene.lead_data[idx];
-  auto [x, y] = s->scene.lead_vertices[idx];
+  auto [x, y] = vd;
 
   float fillAlpha = 0;
   float speedBuff = 10.;
   float leadBuff = 40.;
-  float d_rel = lead.getDRel();
-  float v_rel = lead.getVRel();
+  float d_rel = lead_data.getDRel();
+  float v_rel = lead_data.getVRel();
   if (d_rel < leadBuff) {
     fillAlpha = 255*(1.0-(d_rel/leadBuff));
     if (v_rel < 0) {
@@ -111,12 +110,12 @@ static void draw_lead(UIState *s, int idx) {
   y = std::fmin(s->viz_rect.bottom() - sz * .6, y);
 
   NVGcolor color = COLOR_YELLOW;
-  if(lead.getRadar())
+  if(lead_data.getRadar())
     color = nvgRGBA(112, 128, 255, 255);
 
   draw_chevron(s, x, y, sz, nvgRGBA(201, 34, 49, fillAlpha), color);
 
-  if(lead.getRadar()) {
+  if(lead_data.getRadar()) {
     nvgTextAlign(s->vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
     ui_draw_text(s, x, y + sz/2.f, "R", 18 * 2.5, COLOR_WHITE, "sans-semibold");
   }
@@ -198,7 +197,6 @@ static void ui_draw_vision_lane_lines(UIState *s) {
 
 // Draw all world space objects.
 static void ui_draw_world(UIState *s) {
-  const UIScene *scene = &s->scene;
   // Don't draw on top of sidebar
   nvgScissor(s->vg, s->viz_rect.x, s->viz_rect.y, s->viz_rect.w, s->viz_rect.h);
 
@@ -207,14 +205,17 @@ static void ui_draw_world(UIState *s) {
 
   // Draw lead indicators if openpilot is handling longitudinal
   //if (s->scene.longitudinal_control) {
-    if (scene->lead_data[0].getStatus()) {
-      draw_lead(s, 0);
+    auto radar_state = (*s->sm)["radarState"].getRadarState();
+    auto lead_one = radar_state.getLeadOne();
+    auto lead_two = radar_state.getLeadTwo();
+    if (lead_one.getStatus()) {
+      draw_lead(s, lead_one, s->scene.lead_vertices[0]);
     }
-    if (scene->lead_data[1].getStatus() && (std::abs(scene->lead_data[0].getDRel() - scene->lead_data[1].getDRel()) > 3.0)) {
-      draw_lead(s, 1);
+    if (lead_two.getStatus() && (std::abs(lead_one.getDRel() - lead_two.getDRel()) > 3.0)) {
+      draw_lead(s, lead_two, s->scene.lead_vertices[1]);
     }
   //}
-  
+
   nvgResetScissor(s->vg);
 }
 
@@ -271,17 +272,21 @@ static void bb_ui_draw_measures_left(UIState *s, int bb_x, int bb_y, int bb_w ) 
     char val_str[16];
     char uom_str[6];
     NVGcolor val_color = nvgRGBA(255, 255, 255, 200);
-    if (scene->lead_data[0].getStatus()) {
+
+    auto radar_state = (*s->sm)["radarState"].getRadarState();
+    auto lead_one = radar_state.getLeadOne();
+
+    if (lead_one.getStatus()) {
       //show RED if less than 5 meters
       //show orange if less than 15 meters
-      if((int)(scene->lead_data[0].getDRel()) < 15) {
+      if((int)(lead_one.getDRel()) < 15) {
         val_color = nvgRGBA(255, 188, 3, 200);
       }
-      if((int)(scene->lead_data[0].getDRel()) < 5) {
+      if((int)(lead_one.getDRel()) < 5) {
         val_color = nvgRGBA(255, 0, 0, 200);
       }
       // lead car relative distance is always in meters
-      snprintf(val_str, sizeof(val_str), "%.1f", scene->lead_data[0].getDRel());
+      snprintf(val_str, sizeof(val_str), "%.1f", lead_one.getDRel());
     } else {
        snprintf(val_str, sizeof(val_str), "-");
     }
@@ -295,23 +300,27 @@ static void bb_ui_draw_measures_left(UIState *s, int bb_x, int bb_y, int bb_w ) 
 
   //add visual radar relative speed
   if (UI_FEATURE_LEFT_REL_SPEED) {
+
+    auto radar_state = (*s->sm)["radarState"].getRadarState();
+    auto lead_one = radar_state.getLeadOne();
+
     char val_str[16];
     char uom_str[6];
     NVGcolor val_color = nvgRGBA(255, 255, 255, 200);
-    if (scene->lead_data[0].getStatus()) {
+    if (lead_one.getStatus()) {
       //show Orange if negative speed (approaching)
       //show Orange if negative speed faster than 5mph (approaching fast)
-      if((int)(scene->lead_data[0].getVRel()) < 0) {
+      if((int)(lead_one.getVRel()) < 0) {
         val_color = nvgRGBA(255, 188, 3, 200);
       }
-      if((int)(scene->lead_data[0].getVRel()) < -5) {
+      if((int)(lead_one.getVRel()) < -5) {
         val_color = nvgRGBA(255, 0, 0, 200);
       }
       // lead car relative speed is always in meters
       if (s->scene.is_metric) {
-         snprintf(val_str, sizeof(val_str), "%d", (int)(scene->lead_data[0].getVRel() * 3.6 + 0.5));
+         snprintf(val_str, sizeof(val_str), "%d", (int)(lead_one.getVRel() * 3.6 + 0.5));
       } else {
-         snprintf(val_str, sizeof(val_str), "%d", (int)(scene->lead_data[0].getVRel() * 2.2374144 + 0.5));
+         snprintf(val_str, sizeof(val_str), "%d", (int)(lead_one.getVRel() * 2.2374144 + 0.5));
       }
     } else {
        snprintf(val_str, sizeof(val_str), "-");
@@ -336,7 +345,8 @@ static void bb_ui_draw_measures_left(UIState *s, int bb_x, int bb_y, int bb_w ) 
       //show Orange if more than 30 degrees
       //show red if  more than 50 degrees
 
-      float angleSteers = scene->controls_state.getAngleSteers();
+      auto controls_state = (*s->sm)["controlsState"].getControlsState();
+      float angleSteers = controls_state.getAngleSteers();
 
       if(((int)(angleSteers) < -30) || ((int)(angleSteers) > 30)) {
         val_color = nvgRGBA(255, 175, 3, 200);
@@ -360,11 +370,13 @@ static void bb_ui_draw_measures_left(UIState *s, int bb_x, int bb_y, int bb_w ) 
     char val_str[16];
     char uom_str[6];
     NVGcolor val_color = nvgRGBA(255, 255, 255, 200);
-    if (scene->controls_state.getEnabled()) {
+
+    auto controls_state = (*s->sm)["controlsState"].getControlsState();
+    if (controls_state.getEnabled()) {
       //show Orange if more than 6 degrees
       //show red if  more than 12 degrees
 
-      float steeringAngleDesiredDeg  = scene->controls_state.getSteeringAngleDesiredDeg ();
+      float steeringAngleDesiredDeg  = controls_state.getSteeringAngleDesiredDeg ();
 
       if(((int)(steeringAngleDesiredDeg ) < -30) || ((int)(steeringAngleDesiredDeg ) > 30)) {
         val_color = nvgRGBA(255, 255, 255, 200);
@@ -407,6 +419,8 @@ static void bb_ui_draw_measures_right(UIState *s, int bb_x, int bb_y, int bb_w )
   int uom_fontSize = 15;
   int bb_uom_dx =  (int)(bb_w /2 - uom_fontSize*2.5) ;
 
+  auto device_state = (*s->sm)["deviceState"].getDeviceState();
+
   // add CPU temperature
   if (UI_FEATURE_RIGHT_CPU_TEMP) {
         char val_str[16];
@@ -414,7 +428,7 @@ static void bb_ui_draw_measures_right(UIState *s, int bb_x, int bb_y, int bb_w )
     NVGcolor val_color = nvgRGBA(255, 255, 255, 200);
 
     float cpuTemp = 0;
-    auto cpuList = scene->deviceState.getCpuTempC();
+    auto cpuList = device_state.getCpuTempC();
 
     if(cpuList.size() > 0)
     {
@@ -440,7 +454,7 @@ static void bb_ui_draw_measures_right(UIState *s, int bb_x, int bb_y, int bb_w )
     bb_ry = bb_y + bb_h;
   }
 
-  float ambientTemp = scene->deviceState.getAmbientTempC();
+  float ambientTemp = device_state.getAmbientTempC();
 
    // add ambient temperature
   if (UI_FEATURE_RIGHT_AMBIENT_TEMP) {
@@ -464,7 +478,7 @@ static void bb_ui_draw_measures_right(UIState *s, int bb_x, int bb_y, int bb_w )
     bb_ry = bb_y + bb_h;
   }
 
-  float batteryTemp = scene->deviceState.getBatteryTempC();
+  float batteryTemp = device_state.getBatteryTempC();
   bool batteryless =  batteryTemp < -20;
 
   // add battery level
@@ -474,7 +488,7 @@ static void bb_ui_draw_measures_right(UIState *s, int bb_x, int bb_y, int bb_w )
     char bat_lvl[4] = "";
     NVGcolor val_color = nvgRGBA(255, 255, 255, 200);
 
-    int batteryPercent = scene->deviceState.getBatteryPercent();
+    int batteryPercent = device_state.getBatteryPercent();
 
     snprintf(val_str, sizeof(val_str), "%d%%", batteryPercent);
     snprintf(uom_str, sizeof(uom_str), "");
@@ -574,14 +588,18 @@ static void bb_ui_draw_basic_info(UIState *s)
         sccLogMessage = std::string(scc_smoother.getLogMessage());
     }
 
+    auto controls_state = (*s->sm)["controlsState"].getControlsState();
+    auto car_params = (*s->sm)["carParams"].getCarParams();
+    auto live_params = (*s->sm)["liveParameters"].getLiveParameters();
+
     int mdps_bus = scene->car_params.getMdpsBus();
     int scc_bus = scene->car_params.getSccBus();
 
-    snprintf(str, sizeof(str), "SR(%.2f) SRC(%.2f) SAD(%.2f) AO(%.2f/%.2f) MDPS(%d) SCC(%d)%s%s", scene->controls_state.getSteerRatio(),
-                                                        scene->controls_state.getSteerRateCost(),
-                                                        scene->controls_state.getSteerActuatorDelay(),
-                                                        scene->live_params.getAngleOffsetDeg(),
-                                                        scene->live_params.getAngleOffsetAverageDeg(),
+    snprintf(str, sizeof(str), "SR(%.2f) SRC(%.2f) SAD(%.2f) AO(%.2f/%.2f) MDPS(%d) SCC(%d)%s%s", controls_state.getSteerRatio(),
+                                                        controls_state.getSteerRateCost(),
+                                                        controls_state.getSteerActuatorDelay(),
+                                                        live_params.getAngleOffsetDeg(),
+                                                        live_params.getAngleOffsetAverageDeg(),
                                                         mdps_bus, scc_bus,
                                                         sccLogMessage.size() > 0 ? ", " : "",
                                                         sccLogMessage.c_str()
@@ -607,21 +625,24 @@ static void bb_ui_draw_debug(UIState *s)
 
     const int text_x = s->viz_rect.centerX() + s->viz_rect.w * 10 / 55;
 
-    float applyAccel = scene->controls_state.getApplyAccel();
-    float fusedAccel = scene->controls_state.getFusedAccel();
-    float leadDist = scene->controls_state.getLeadDist();
+    auto controls_state = (*s->sm)["controlsState"].getControlsState();
+    auto car_control = (*s->sm)["carControl"].getCarControl();
 
-    float aReqValue = scene->controls_state.getAReqValue();
-    float aReqValueMin = scene->controls_state.getAReqValueMin();
-    float aReqValueMax = scene->controls_state.getAReqValueMax();
+    float applyAccel = controls_state.getApplyAccel();
+    float fusedAccel = controls_state.getFusedAccel();
+    float leadDist = controls_state.getLeadDist();
 
-    int longControlState = (int)scene->controls_state.getLongControlState();
-    float vPid = scene->controls_state.getVPid();
-    float upAccelCmd = scene->controls_state.getUpAccelCmd();
-    float uiAccelCmd = scene->controls_state.getUiAccelCmd();
-    float ufAccelCmd = scene->controls_state.getUfAccelCmd();
-    float gas = scene->car_control.getActuators().getGas();
-    float brake = scene->car_control.getActuators().getBrake();
+    float aReqValue = controls_state.getAReqValue();
+    float aReqValueMin = controls_state.getAReqValueMin();
+    float aReqValueMax = controls_state.getAReqValueMax();
+
+    int longControlState = (int)controls_state.getLongControlState();
+    float vPid = controls_state.getVPid();
+    float upAccelCmd = controls_state.getUpAccelCmd();
+    float uiAccelCmd = controls_state.getUiAccelCmd();
+    float ufAccelCmd = controls_state.getUfAccelCmd();
+    float gas = car_control.getActuators().getGas();
+    float brake = car_control.getActuators().getBrake();
 
     const char* long_state[] = {"off", "pid", "stopping", "starting"};
 
@@ -696,7 +717,8 @@ static void ui_draw_vision_brake(UIState *s) {
   const int center_x = s->viz_rect.x + radius + (bdr_s * 2) + radius*2 + 60;
   const int center_y = s->viz_rect.bottom() - footer_h / 2;
 
-  bool brake_valid = scene->car_state.getBrakeLights();
+  auto car_state = (*s->sm)["carState"].getCarState();
+  bool brake_valid = car_state.getBrakeLights();
   float brake_img_alpha = brake_valid ? 1.0f : 0.15f;
   float brake_bg_alpha = brake_valid ? 0.3f : 0.1f;
   NVGcolor brake_bg = nvgRGBA(0, 0, 0, (255 * brake_bg_alpha));
@@ -705,8 +727,8 @@ static void ui_draw_vision_brake(UIState *s) {
 }
 
 static void ui_draw_vision_autohold(UIState *s) {
-  const UIScene *scene = &s->scene;
-  int autohold = scene->car_state.getAutoHold();
+  auto car_state = (*s->sm)["carState"].getCarState();
+  int autohold = car_state.getAutoHold();
   if(autohold < 0)
     return;
 
@@ -772,7 +794,7 @@ static void ui_draw_vision_maxspeed(UIState *s) {
 }
 
 static void ui_draw_vision_speed(UIState *s) {
-  const float speed = std::max(0.0, s->scene.controls_state.getCluSpeedMs() * (s->scene.is_metric ? 3.6 : 2.2369363));
+  const float speed = std::max(0.0, (*s->sm)["controlsState"].getControlsState().getCluSpeedMs() * (s->scene.is_metric ? 3.6 : 2.2369363));
   const std::string speed_str = std::to_string((int)std::nearbyint(speed));
   nvgTextAlign(s->vg, NVG_ALIGN_CENTER | NVG_ALIGN_BASELINE);
   ui_draw_text(s, s->viz_rect.centerX(), 240, speed_str.c_str(), 96 * 2.5, COLOR_WHITE, "sans-bold");
@@ -780,7 +802,7 @@ static void ui_draw_vision_speed(UIState *s) {
 }
 
 static void ui_draw_vision_event(UIState *s) {
-  if (s->scene.controls_state.getEngageable()) {
+  if ((*s->sm)["controlsState"].getControlsState().getEngageable()) {
     // draw steering wheel
     const int radius = 96;
     const int center_x = s->viz_rect.right() - radius - bdr_s * 2;
@@ -793,7 +815,8 @@ static void ui_draw_vision_face(UIState *s) {
   const int radius = 96;
   const int center_x = s->viz_rect.x + radius + (bdr_s * 2);
   const int center_y = s->viz_rect.bottom() - footer_h / 2;
-  ui_draw_circle_image(s, center_x, center_y, radius, "driver_face", s->scene.dmonitoring_state.getIsActiveMode());
+  bool is_active = (*s->sm)["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode();
+  ui_draw_circle_image(s, center_x, center_y, radius, "driver_face", is_active);
 }
 
 static void ui_draw_driver_view(UIState *s) {
@@ -811,9 +834,10 @@ static void ui_draw_driver_view(UIState *s) {
   ui_fill_rect(s->vg, {blackout_x_l, rect.y, blackout_w_l, rect.h}, COLOR_BLACK_ALPHA(144));
   ui_fill_rect(s->vg, {blackout_x_r, rect.y, blackout_w_r, rect.h}, COLOR_BLACK_ALPHA(144));
 
-  const bool face_detected = s->scene.driver_state.getFaceProb() > 0.4;
+  auto driver_state = (*s->sm)["driverState"].getDriverState();
+  const bool face_detected = driver_state.getFaceProb() > 0.4;
   if (face_detected) {
-    auto fxy_list = s->scene.driver_state.getFacePosition();
+    auto fxy_list = driver_state.getFacePosition();
     float face_x = fxy_list[0];
     float face_y = fxy_list[1];
     int fbox_x = valid_rect.centerX() + (is_rhd ? face_x : -face_x) * valid_rect.w;

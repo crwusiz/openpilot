@@ -103,6 +103,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     processNotRunning @95;
     dashcamMode @96;
     controlsInitializing @98;
+    usbError @99;
 
     radarCanErrorDEPRECATED @15;
     radarCommIssueDEPRECATED @67;
@@ -124,12 +125,11 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     modelLagWarningDEPRECATED @93;
     startupOneplusDEPRECATED @82;
 
-    turningIndicatorOn @99;
-    autoLaneChange @100;
+    turningIndicatorOn @100;
+    autoLaneChange @101;
 
-    # scc smoother
-    slowingDownSpeed @101;
-    slowingDownSpeedSound @102;
+    slowingDownSpeed @102;
+    slowingDownSpeedSound @103;
   }
 }
 
@@ -299,7 +299,6 @@ struct CarControl {
   cruiseControl @4 :CruiseControl;
   hudControl @5 :HUDControl;
 
-  # scc smoother
   sccSmoother @8 :SccSmoother;
 
   struct SccSmoother {

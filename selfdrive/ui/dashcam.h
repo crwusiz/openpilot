@@ -346,7 +346,7 @@ bool dashcam( UIState *s, int touch_x, int touch_y ) {
     stop_capture();
   }
 
-  if (s->scene.car_state.getVEgo() < 1.5 && !s->scene.controls_state.getEnabled()) {
+  if ((*s->sm)["carState"].getCarState().getVEgo() < 1.5 && !(*s->sm)["controlsState"].getControlsState().getEnabled()) {
     stop_capture();
   }
   //s->scene.recording = (captureState != CAPTURE_STATE_NOT_CAPTURING);
