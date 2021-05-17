@@ -51,8 +51,7 @@ class LatControlLQR():
     lqr_log = log.ControlsState.LateralLQRState.new_message()
 
     steers_max = get_steer_max(CP, CS.vEgo)
-    # torque_scale = (0.45 + CS.vEgo / 60.0)**2  # Scale actuator model with speed
-    torque_scale = (0.43 + CS.vEgo / 70.0)**2
+    torque_scale = (0.45 + CS.vEgo / 60.0)**2  # Scale actuator model with speed
 
     # Subtract offset. Zero angle should correspond to zero torque
     steering_angle_no_offset = CS.steeringAngleDeg - params.angleOffsetAverageDeg
@@ -65,7 +64,7 @@ class LatControlLQR():
     # Update Kalman filter
     angle_steers_k = float(self.C.dot(self.x_hat))
     e = steering_angle_no_offset - angle_steers_k
-    self.x_hat = self.A.dot(self.x_hat) + self.B.dot(CS.steeringTorqueEps / torque_scale) + self.L.dot(e)
+    self.x_hat = self.A.dot(self.x_hat) + self.B.dot(CS.steeringTorqueEps * 0.9 / torque_scale) + self.L.dot(e)
 
     if CS.vEgo < 0.3 or not active:
       lqr_log.active = False
