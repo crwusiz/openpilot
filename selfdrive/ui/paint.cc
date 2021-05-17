@@ -1024,7 +1024,7 @@ static mat4 get_driver_view_transform() {
       0.0,  0.0, 1.0, 0.0,
       0.0,  0.0, 0.0, 1.0,
     }};
-  
+
   } else {
      // frame from 4/3 to 16/9 display
     transform = (mat4){{
@@ -1120,6 +1120,14 @@ void ui_nvg_init(UIState *s) {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
   }
+
+  ui_resize(s, s->fb_w, s->fb_h);
+}
+
+
+void ui_resize(UIState *s, int width, int height){
+  s->fb_w = width;
+  s->fb_h = height;
 
   auto intrinsic_matrix = s->wide_camera ? ecam_intrinsic_matrix : fcam_intrinsic_matrix;
 
