@@ -11,6 +11,7 @@ from selfdrive.car.hyundai.values import Buttons, CAR, FEATURES, CarControllerPa
 from opendbc.can.packer import CANPacker
 from selfdrive.config import Conversions as CV
 from common.params import Params
+from selfdrive.controls.lib.longcontrol import LongCtrlState
 from selfdrive.road_speed_limiter import road_speed_limiter_get_active
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
@@ -224,7 +225,23 @@ class CarController():
       if CS.has_scc13 and frame % 20 == 0:
         can_sends.append(create_scc13(self.packer, CS.scc13))
       if CS.has_scc14:
-        can_sends.append(create_scc14(self.packer, enabled, CS.scc14))
+
+        if CS.out.vEgo < 2.:
+          long_control_state = controls.sm['controlsState'].longControlState
+          acc_standstill = True if long_control_state == LongCtrlState.stopping else False
+        else:
+          acc_standstill = False
+
+        lead = self.scc_smoother.get_lead(controls.sm)
+
+        if lead is not None:
+          d = lead.dRel
+          obj_gap = 1 if d < 25 else 2 if d < 40 else 3 if d < 60 else 4 if d < 80 else 5
+        else:
+          obj_gap = 0
+
+        can_sends.append(create_scc14(self.packer, enabled, CS.out.vEgo, acc_standstill, apply_accel, CS.out.gasPressed,
+                                      obj_gap, CS.scc14))
       self.scc12_cnt += 1
 
     # 20 Hz LFA MFA message
