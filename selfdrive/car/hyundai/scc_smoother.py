@@ -169,7 +169,7 @@ class SccSmoother:
         max_speed_clu = min(max_speed_clu, lead_speed)
 
         if not self.limited_lead:
-          self.max_speed_clu = clu11_speed
+          self.max_speed_clu = clu11_speed + 5.
           self.limited_lead = True
     else:
       self.limited_lead = False
