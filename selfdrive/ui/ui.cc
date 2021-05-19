@@ -171,6 +171,9 @@ static void update_state(UIState *s) {
       scene.satelliteCount = data.getMeasurementReport().getNumMeas();
     }
   }
+  if (sm.updated("gpsLocationExternal")) {
+    scene.gpsAccuracy = sm["gpsLocationExternal"].getGpsLocationExternal().getAccuracy();
+  }
   if (sm.updated("carParams")) {
     scene.car_params = sm["carParams"].getCarParams();
     scene.longitudinal_control = sm["carParams"].getCarParams().getOpenpilotLongitudinalControl();
@@ -301,10 +304,11 @@ QUIState::QUIState(QObject *parent) : QObject(parent) {
   ui_state.sm = std::make_unique<SubMaster, const std::initializer_list<const char *>>({
     "modelV2", "controlsState", "liveCalibration", "radarState", "deviceState", "liveLocationKalman",
     "pandaState", "carParams", "driverState", "driverMonitoringState", "sensorEvents", "carState", "ubloxGnss",
+    "gpsLocationExternal",
 #ifdef QCOM2
     "roadCameraState",
 #endif
-    "carControl", "gpsLocationExternal", "liveParameters"});
+    "carControl", "liveParameters"});
 
   ui_state.fb_w = vwp_w;
   ui_state.fb_h = vwp_h;
