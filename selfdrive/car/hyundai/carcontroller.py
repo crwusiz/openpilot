@@ -227,7 +227,7 @@ class CarController():
       if CS.has_scc14:
 
         if CS.out.vEgo < 2.:
-          long_control_state = controls.sm['controlsState'].longControlState
+          long_control_state = controls.LoC.long_control_state
           acc_standstill = True if long_control_state == LongCtrlState.stopping else False
         else:
           acc_standstill = False
