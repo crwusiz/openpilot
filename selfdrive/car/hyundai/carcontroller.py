@@ -74,6 +74,8 @@ class CarController():
 
     self.mad_mode_enabled = Params().get_bool('MadModeEnabled')
 
+    # gas_gain, brake_gain
+    # Adjust it in the range of 0.7 to 1.3
     self.scc_smoother = SccSmoother(gas_gain=1.0, brake_gain=1.0, curvature_gain=1.0)
 
   def update(self, enabled, CS, frame, CC, actuators, pcm_cancel_cmd, visual_alert,

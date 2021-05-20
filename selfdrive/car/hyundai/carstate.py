@@ -96,7 +96,8 @@ class CarState(CarStateBase):
 
     ret.steerWarning = self.mdps_error_cnt > 100
 
-    ret.autoHold = cp.vl["ESP11"]['AVH_STAT']
+    if self.CP.enableAutoHold:
+      ret.autoHold = cp.vl["ESP11"]['AVH_STAT']
 
     # cruise state
     ret.cruiseState.enabled = (cp_scc.vl["SCC12"]['ACCMode'] != 0) if not self.no_radar else \
@@ -325,9 +326,6 @@ class CarState(CarStateBase):
       ("SCCMode2", "SCC14", 0),
       ("ComfortBandUpper", "SCC14", 0),
       ("ComfortBandLower", "SCC14", 0),
-
-      ("AVH_STAT", "ESP11", 0),
-      ("LDM_STAT", "ESP11", 0),
     ]
 
     checks = [
@@ -335,13 +333,13 @@ class CarState(CarStateBase):
       ("TCS13", 50),
       ("TCS15", 10),
       ("CLU11", 50),
-      ("ESP11", 50),
       ("ESP12", 100),
       ("CGW1", 10),
       ("CGW2", 5),
       ("CGW4", 5),
       ("WHL_SPD11", 50),
     ]
+
     if CP.sccBus == 0 and CP.enableCruise:
       checks += [
         ("SCC11", 50),
@@ -432,6 +430,13 @@ class CarState(CarStateBase):
         ("CF_Lca_IndRight", "LCA11", 0),
       ]
       checks += [("LCA11", 50)]
+
+    if CP.enableAutoHold:
+      signals += [
+        ("AVH_STAT", "ESP11", 0),
+        ("LDM_STAT", "ESP11", 0),
+      ]
+      checks += [("ESP11", 50)]
 
     return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, 0, enforce_checks=False)
 
