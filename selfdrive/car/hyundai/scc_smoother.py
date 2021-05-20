@@ -65,8 +65,8 @@ class SccSmoother:
     self.min_set_speed_clu = self.kph_to_clu(MIN_SET_SPEED_KPH)
     self.max_set_speed_clu = self.kph_to_clu(MAX_SET_SPEED_KPH)
 
-    self.gas_gain = gas_gain
-    self.brake_gain = brake_gain
+    self.gas_gain = clip(gas_gain, 0.7, 1.3)
+    self.brake_gain = clip(brake_gain, 0.7, 1.3)
     self.curvature_gain = curvature_gain
 
     self.target_speed = 0.
@@ -349,13 +349,15 @@ class SccSmoother:
 
     return apply_accel, dRel
 
-  def get_accel(self, CS, sm, actuators):
+  def get_accel(self, CS, sm, accel):
 
-    accel = actuators.gas - actuators.brake
+    gas_gain = clip(self.gas_gain, 0.7, 1.3)
+    brake_gain = clip(self.brake_gain, 0.7, 1.3)
+
     if accel > 0:
-      accel *= self.gas_gain
+      accel *= gas_gain
     else:
-      accel *= self.brake_gain
+      accel *= brake_gain
 
     return accel
 

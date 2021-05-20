@@ -104,6 +104,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     dashcamMode @96;
     controlsInitializing @98;
     usbError @99;
+    cameraError @100;
 
     radarCanErrorDEPRECATED @15;
     radarCommIssueDEPRECATED @67;
@@ -125,11 +126,11 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     modelLagWarningDEPRECATED @93;
     startupOneplusDEPRECATED @82;
 
-    turningIndicatorOn @100;
-    autoLaneChange @101;
+    turningIndicatorOn @101;
+    autoLaneChange @102;
 
-    slowingDownSpeed @102;
-    slowingDownSpeedSound @103;
+    slowingDownSpeed @103;
+    slowingDownSpeedSound @104;
   }
 }
 
