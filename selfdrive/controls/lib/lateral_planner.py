@@ -59,7 +59,7 @@ class LateralPlanner():
     self.setup_mpc()
     self.solution_invalid_cnt = 0
 
-    self.lane_change_enabled = True
+    self.lane_change_enabled = Params().get_bool('LaneChangeEnabled')
     self.auto_lane_change_enabled = Params().get_bool('AutoLaneChangeEnabled')
     self.lane_change_state = LaneChangeState.off
     self.lane_change_direction = LaneChangeDirection.none
