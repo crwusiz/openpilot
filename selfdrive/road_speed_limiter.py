@@ -10,6 +10,8 @@ from common.numpy_fast import interp
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
+CAMERA_SPEED_FACTOR = 1.05
+
 class RoadSpeedLimiter:
   def __init__(self):
     self.json_road_limit = None
@@ -165,7 +167,7 @@ class RoadSpeedLimiter:
           else:
             pp = 0
 
-          return cam_limit_speed + int(pp * diff_speed), cam_limit_speed, cam_limit_speed_left_dist, first_started, log
+          return cam_limit_speed * CAMERA_SPEED_FACTOR + int(pp * diff_speed), cam_limit_speed, cam_limit_speed_left_dist, first_started, log
 
         self.slowing_down = False
         return 0, cam_limit_speed, cam_limit_speed_left_dist, False, log
