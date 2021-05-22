@@ -454,6 +454,8 @@ struct CarParams {
   sasBus @58: Int8;
   sccBus @59: Int8;
   enableAutoHold @60 :Bool;
+  hasScc13 @61 :Bool;
+  hasScc14 @62 :Bool;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);

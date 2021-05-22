@@ -20,8 +20,6 @@ class CarState(CarStateBase):
     self.leftBlinker = False
     self.rightBlinker = False
     self.lkas_button_on = True
-    self.has_scc13 = CP.carFingerprint in FEATURES["has_scc13"]
-    self.has_scc14 = CP.carFingerprint in FEATURES["has_scc14"]
     self.cruise_main_button = 0
     self.mdps_error_cnt = 0
     self.cruise_unavail_cnt = 0
@@ -207,9 +205,9 @@ class CarState(CarStateBase):
     self.cruise_unavail = self.cruise_unavail_cnt > 100
 
     self.lead_distance = cp_scc.vl["SCC11"]['ACC_ObjDist'] if not self.no_radar else 0
-    if self.has_scc13:
+    if self.CP.hasScc13:
       self.scc13 = cp_scc.vl["SCC13"]
-    if self.has_scc14:
+    if self.CP.hasScc14:
       self.scc14 = cp_scc.vl["SCC14"]
 
     self.lkas_error = cp_cam.vl["LKAS11"]["CF_Lkas_LdwsSysState"] == 7
