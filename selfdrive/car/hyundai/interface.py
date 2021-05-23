@@ -253,6 +253,8 @@ class CarInterface(CarInterfaceBase):
       ret.hasScc13 = 1290 in fingerprint[ret.sccBus]
       ret.hasScc14 = 905 in fingerprint[ret.sccBus]
 
+    print('fingerprint', fingerprint)
+
     ret.radarOffCan = ret.sccBus == -1
     ret.enableCruise = not ret.radarOffCan
 
