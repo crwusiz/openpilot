@@ -243,14 +243,14 @@ class CarInterface(CarInterfaceBase):
     ret.enableBsm = 0x58b in fingerprint[0]
     ret.enableAutoHold = 1151 in fingerprint[0]
 
-    ret.hasScc13 = 1290 in fingerprint[0]
-    ret.hasScc14 = 905 in fingerprint[0]
-
     # ignore CAN2 address if L-CAN on the same BUS
     ret.mdpsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
     ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
     ret.sccBus = 0 if 1056 in fingerprint[0] else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
                                                                      else 2 if 1056 in fingerprint[2] else -1
+
+    ret.hasScc13 = 1290 in fingerprint[0] or 1290 in fingerprint[2]
+    ret.hasScc14 = 905 in fingerprint[0] or 905 in fingerprint[2]
 
     ret.radarOffCan = ret.sccBus == -1
     ret.enableCruise = not ret.radarOffCan
