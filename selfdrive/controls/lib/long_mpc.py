@@ -15,6 +15,11 @@ LOG_MPC = os.environ.get('LOG_MPC', False)
 CRUISE_GAP_BP = [1., 2., 3., 4.]
 CRUISE_GAP_V = [1.2, 1.5, 2.1, 2.73]
 
+AUTO_TR_BP = [40.*CV.KPH_TO_MS, 60.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+AUTO_TR_V = [1.1, 1.25, 1.6, 2., 2.7]
+
+AUTO_TR_ENABLED = True
+AUTO_TR_CRUISE_GAP = 1
 
 class LongitudinalMpc():
   def __init__(self, mpc_id):
@@ -34,7 +39,7 @@ class LongitudinalMpc():
     self.duration = 0
 
     self.cruise_gap = 0
-    self.auto_tr = True
+    self.auto_tr = AUTO_TR_ENABLED
 
   def publish(self, pm):
     if LOG_MPC:
@@ -110,10 +115,8 @@ class LongitudinalMpc():
 
     cruise_gap = int(clip(CS.cruiseGap, 1., 4.))
 
-    if self.auto_tr and cruise_gap == 1:
-      TR = interp(v_ego,
-                  [40.*CV.KPH_TO_MS, 60.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS],
-                  [1.1, 1.25, 1.6, 2., 2.7])
+    if self.auto_tr and cruise_gap == AUTO_TR_CRUISE_GAP:
+      TR = interp(v_ego, AUTO_TR_BP, AUTO_TR_V)
     else:
       TR = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
 
