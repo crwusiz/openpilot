@@ -63,7 +63,7 @@ void Sidebar::updateState(const UIState &s) {
     setProperty("connectStr", "OFFLINE");
     setProperty("connectStatus", warning_color);
   } else {
-    bool online = nanos_since_boot() - last_ping < 80e9;
+    bool online = true;//nanos_since_boot() - last_ping < 80e9;
     setProperty("connectStr",  online ? "ONLINE" : "ERROR");
     setProperty("connectStatus", online ? good_color : danger_color);
   }
