@@ -328,6 +328,7 @@ QUIState::QUIState(QObject *parent) : QObject(parent) {
   timer->start(0);
 
   touch_init(&(ui_state.touch));
+  ui_state.lock_on_anim_index = 0;
 }
 
 void QUIState::update() {
