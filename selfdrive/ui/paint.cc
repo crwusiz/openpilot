@@ -133,7 +133,7 @@ static void draw_lead_lock_on(UIState *s, const cereal::RadarState::LeadData::Re
 
     float sz = std::clamp((25 * 30) / (d_rel / 3 + 30), 15.0f, 30.0f) * s->zoom;
     x = std::clamp(x, 0.f, s->viz_rect.right() - sz / 2);
-    y = std::fmin(s->viz_rect.bottom() - sz * .8, y);
+    y = std::fmin(s->viz_rect.bottom() - sz, y);
 
     float bg_alpha = 1.0f;
     float img_alpha = 1.0f;
