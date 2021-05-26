@@ -133,7 +133,7 @@ static void draw_lead_lock_on(UIState *s, const cereal::RadarState::LeadData::Re
 
     float sz = std::clamp((25 * 30) / (d_rel / 3 + 30), 15.0f, 30.0f) * s->zoom;
     x = std::clamp(x, 0.f, s->viz_rect.right() - sz / 2);
-    y = std::fmin(s->viz_rect.bottom() - sz * .4, y);
+    y = std::fmin(s->viz_rect.bottom() - sz * .8, y);
 
     float bg_alpha = 1.0f;
     float img_alpha = 1.0f;
@@ -149,7 +149,7 @@ static void draw_lead_lock_on(UIState *s, const cereal::RadarState::LeadData::Re
 
     nvgSave(s->vg);
     nvgTranslate(s->vg, x, y);
-    nvgRotate(s->vg, lock_on_rotation[s->lock_on_anim_index % 9]);
+    //nvgRotate(s->vg, lock_on_rotation[s->lock_on_anim_index % 9]);
     float scale = lock_on_scale[s->lock_on_anim_index % 8];
     nvgScale(s->vg, scale, scale);
     ui_draw_image(s, {-(img_size / 2), -(img_size / 2), img_size, img_size}, image, img_alpha);
