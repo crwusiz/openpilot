@@ -228,6 +228,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"SccSmootherSyncGasPressed", PERSISTENT},
     {"FuseWithStockScc", PERSISTENT},
     {"ShowDebugUI", PERSISTENT},
+    {"CustomLeadMark", PERSISTENT},
 };
 
 } // namespace

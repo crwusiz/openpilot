@@ -343,6 +343,13 @@ QWidget * community_panel() {
                                             "../assets/offroad/icon_shell.png"
                                             ));
 
+  toggles_list->addWidget(horizontal_line());
+  toggles_list->addWidget(new ParamControl("CustomLeadMark",
+                                            "Use custom lead mark",
+                                            "",
+                                            "../assets/offroad/icon_road.png"
+                                            ));
+
   QWidget *widget = new QWidget;
   widget->setLayout(toggles_list);
   return widget;

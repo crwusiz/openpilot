@@ -165,7 +165,7 @@ typedef struct UIState {
   float zoom;
 
   //
-  bool show_debug_ui;
+  bool show_debug_ui, custom_lead_mark;
   TouchState touch;
   int lock_on_anim_index;
 

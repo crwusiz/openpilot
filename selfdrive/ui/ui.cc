@@ -207,11 +207,11 @@ static void update_state(UIState *s) {
 static void update_params(UIState *s) {
   const uint64_t frame = s->sm->frame;
   UIScene &scene = s->scene;
-  Params params;
   if (frame % (5*UI_FREQ) == 0) {
+    Params params;
     scene.is_metric = params.getBool("IsMetric");
-  } else if (frame % (7*UI_FREQ) == 0) {
-	s->show_debug_ui = params.getBool("ShowDebugUI");
+    s->show_debug_ui = params.getBool("ShowDebugUI");
+	s->custom_lead_mark = params.getBool("CustomLeadMark");
   }
 }
 

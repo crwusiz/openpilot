@@ -126,20 +126,29 @@ static float lock_on_rotation[] =
 
 static float lock_on_scale[] = {1.f, 1.1f, 1.2f, 1.1f, 1.f, 0.9f, 0.8f, 0.9f};
 
-static void draw_lead_lock_on(UIState *s, const cereal::RadarState::LeadData::Reader &lead_data, const vertex_data &vd) {
+static void draw_lead_custom(UIState *s, const cereal::RadarState::LeadData::Reader &lead_data, const vertex_data &vd) {
     auto [x, y] = vd;
 
-    float d_rel = lead_data.getDRel() + 15.f;
+    float d_rel = lead_data.getDRel();
 
     float sz = std::clamp((25 * 30) / (d_rel / 3 + 30), 15.0f, 30.0f) * s->zoom;
     x = std::clamp(x, 0.f, s->viz_rect.right() - sz / 2);
+
+    if(d_rel < 10)
+    {
+      const float c = 0.7f;
+      float r = d_rel * ((1.f - c) / 10.f) + c;
+      if(r > 0.f)
+        y = y * r;
+    }
+
     y = std::fmin(s->viz_rect.bottom() - sz * .6, y);
 
     float bg_alpha = 1.0f;
     float img_alpha = 1.0f;
     NVGcolor bg_color = nvgRGBA(0, 0, 0, (255 * bg_alpha));
 
-    const char* image = lead_data.getRadar() ? "lock_on_radar" : "lock_on_vision";
+    const char* image = lead_data.getRadar() ? "custom_lead_radar" : "custom_lead_vision";
 
     if(s->sm->frame % 2 == 0) {
         s->lock_on_anim_index++;
@@ -244,10 +253,18 @@ static void ui_draw_world(UIState *s) {
     auto lead_one = radar_state.getLeadOne();
     auto lead_two = radar_state.getLeadTwo();
     if (lead_one.getStatus()) {
-      draw_lead_lock_on(s, lead_one, s->scene.lead_vertices[0]);
+
+      if (s->custom_lead_mark)
+        draw_lead_custom(s, lead_one, s->scene.lead_vertices[0]);
+      else
+        draw_lead(s, lead_one, s->scene.lead_vertices[0]);
     }
     if (lead_two.getStatus() && (std::abs(lead_one.getDRel() - lead_two.getDRel()) > 3.0)) {
-      draw_lead_lock_on(s, lead_two, s->scene.lead_vertices[1]);
+
+      if (s->custom_lead_mark)
+        draw_lead_custom(s, lead_two, s->scene.lead_vertices[1]);
+      else
+        draw_lead(s, lead_two, s->scene.lead_vertices[1]);
     }
   //}
 
@@ -1101,8 +1118,8 @@ void ui_nvg_init(UIState *s) {
 	{"img_nda", "../assets/img_nda.png"},
 	{"img_hda", "../assets/img_hda.png"},
 
-	{"lock_on_vision", "../assets/images/lock_on_vision.png"},
-	{"lock_on_radar", "../assets/images/lock_on_radar.png"},
+	{"custom_lead_vision", "../assets/images/custom_lead_vision.png"},
+	{"custom_lead_radar", "../assets/images/custom_lead_radar.png"},
   };
   for (auto [name, file] : images) {
     s->images[name] = nvgCreateImage(s->vg, file, 1);
