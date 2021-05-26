@@ -134,10 +134,10 @@ static void draw_lead_custom(UIState *s, const cereal::RadarState::LeadData::Rea
     float sz = std::clamp((25 * 30) / (d_rel / 3 + 30), 15.0f, 30.0f) * s->zoom;
     x = std::clamp(x, 0.f, s->viz_rect.right() - sz / 2);
 
-    if(d_rel < 10)
+    if(d_rel < 5)
     {
       const float c = 0.7f;
-      float r = d_rel * ((1.f - c) / 10.f) + c;
+      float r = d_rel * ((1.f - c) / 5.f) + c;
       if(r > 0.f)
         y = y * r;
     }
