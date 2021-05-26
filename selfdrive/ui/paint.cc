@@ -129,11 +129,11 @@ static float lock_on_scale[] = {1.f, 1.1f, 1.2f, 1.1f, 1.f, 0.9f, 0.8f, 0.9f};
 static void draw_lead_lock_on(UIState *s, const cereal::RadarState::LeadData::Reader &lead_data, const vertex_data &vd) {
     auto [x, y] = vd;
 
-    float d_rel = lead_data.getDRel();
+    float d_rel = lead_data.getDRel() + 15.f;
 
     float sz = std::clamp((25 * 30) / (d_rel / 3 + 30), 15.0f, 30.0f) * s->zoom;
     x = std::clamp(x, 0.f, s->viz_rect.right() - sz / 2);
-    y = std::fmin(s->viz_rect.bottom() - sz, y);
+    y = std::fmin(s->viz_rect.bottom() - sz * .6, y);
 
     float bg_alpha = 1.0f;
     float img_alpha = 1.0f;
