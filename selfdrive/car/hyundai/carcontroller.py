@@ -5,7 +5,7 @@ from common.numpy_fast import clip
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, \
   create_scc11, create_scc12, create_scc13, create_scc14, \
-  create_mdps12, create_lfahda_mfc
+  create_mdps12, create_lfahda_mfc, create_hda_mfc
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
 from selfdrive.car.hyundai.values import Buttons, CAR, FEATURES, CarControllerParams
 from opendbc.can.packer import CANPacker
@@ -253,5 +253,7 @@ class CarController():
       activated_hda = road_speed_limiter_get_active()
       if self.car_fingerprint in FEATURES["send_lfa_mfa"]:
         can_sends.append(create_lfahda_mfc(self.packer, enabled, activated_hda))
+      elif CS.mdps_bus == 0:
+        can_sends.append(create_hda_mfc(self.packer, activated_hda))
 
     return can_sends

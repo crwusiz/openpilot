@@ -93,6 +93,15 @@ def create_lfahda_mfc(packer, enabled, active):
 
   return packer.make_can_msg("LFAHDA_MFC", 0, values)
 
+def create_hda_mfc(packer, active):
+  values = {
+    "HDA_USM": 2,
+    "HDA_Active": 1 if active > 0 else 0,
+    "HDA_Icon_State": 1 if active > 0 else 0,
+  }
+
+  return packer.make_can_msg("LFAHDA_MFC", 0, values)
+
 def create_mdps12(packer, frame, mdps12):
   values = copy.copy(mdps12)
   values["CF_Mdps_ToiActive"] = 0
