@@ -58,15 +58,9 @@ void Sidebar::updateState(const UIState &s) {
   setProperty("netStrength", signal_imgs[deviceState.getNetworkStrength()]);
   setProperty("wifiAddr", deviceState.getWifiIpAddress().cStr());
 
-  auto last_ping = deviceState.getLastAthenaPingTime();
-  if (last_ping == 0) {
-    setProperty("connectStr", "OFFLINE");
-    setProperty("connectStatus", warning_color);
-  } else {
-    bool online = true;//nanos_since_boot() - last_ping < 80e9;
-    setProperty("connectStr",  online ? "ONLINE" : "ERROR");
-    setProperty("connectStatus", online ? good_color : danger_color);
-  }
+  bool online = net_type != network_type[cereal::DeviceState::NetworkType::NONE];
+  setProperty("connectStr",  online ? "ONLINE" : "OFFLINE");
+  setProperty("connectStatus", online ? good_color : danger_color);
 
   QColor tempStatus = danger_color;
   auto ts = deviceState.getThermalStatus();
