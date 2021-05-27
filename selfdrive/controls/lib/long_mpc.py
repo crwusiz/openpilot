@@ -83,7 +83,8 @@ class LongitudinalMpc():
       v_lead = max(0.0, lead.vLead)
       a_lead = lead.aLeadK
 
-      dist_cost = interp(lead.dRel, [5., 10.], [MPC_COST_LONG.DISTANCE/1.5, MPC_COST_LONG.DISTANCE])
+      dist_cost = interp(lead.dRel, [4., 20.], [MPC_COST_LONG.DISTANCE/2.0, MPC_COST_LONG.DISTANCE])
+      dist_cost = interp(v_ego, [80.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS], [dist_cost, MPC_COST_LONG.DISTANCE])
       self.libmpc.set_weights(MPC_COST_LONG.TTC, dist_cost, MPC_COST_LONG.ACCELERATION, MPC_COST_LONG.JERK)
 
       if (v_lead < 0.1 or -a_lead / 2.0 > v_lead):
