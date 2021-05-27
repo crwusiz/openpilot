@@ -134,10 +134,9 @@ static void draw_lead_custom(UIState *s, const cereal::RadarState::LeadData::Rea
     float sz = std::clamp((25 * 30) / (d_rel / 3 + 30), 15.0f, 30.0f) * s->zoom;
     x = std::clamp(x, 0.f, s->viz_rect.right() - sz / 2);
 
-    if(d_rel < 5)
-    {
-      const float c = 0.7f;
-      float r = d_rel * ((1.f - c) / 5.f) + c;
+    if(d_rel < 30) {
+      const float c = 0.77f;
+      float r = d_rel * ((1.f - c) / 30.f) + c;
       if(r > 0.f)
         y = y * r;
     }
@@ -154,7 +153,10 @@ static void draw_lead_custom(UIState *s, const cereal::RadarState::LeadData::Rea
         s->lock_on_anim_index++;
     }
 
-    const int img_size = 110;
+    int img_size = 80;
+    if(d_rel < 100) {
+        img_size = (int)(-2/5 * d_rel + 120);
+    }
 
     nvgSave(s->vg);
     nvgTranslate(s->vg, x, y);
