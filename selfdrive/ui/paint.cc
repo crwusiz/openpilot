@@ -135,13 +135,14 @@ static void draw_lead_custom(UIState *s, const cereal::RadarState::LeadData::Rea
     x = std::clamp(x, 0.f, s->viz_rect.right() - sz / 2);
 
     if(d_rel < 30) {
-      const float c = 0.77f;
+      const float c = 0.7f;
       float r = d_rel * ((1.f - c) / 30.f) + c;
       if(r > 0.f)
         y = y * r;
     }
 
     y = std::fmin(s->viz_rect.bottom() - sz * .6, y);
+    y = std::fmin(s->viz_rect.bottom() * 0.8f, y);
 
     float bg_alpha = 1.0f;
     float img_alpha = 1.0f;
