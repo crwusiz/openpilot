@@ -16,7 +16,7 @@ CRUISE_GAP_BP = [1., 2., 3., 4.]
 CRUISE_GAP_V = [1.2, 1.5, 2.1, 2.73]
 
 AUTO_TR_BP = [40.*CV.KPH_TO_MS, 60.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-AUTO_TR_V = [1.1, 1.25, 1.6, 2., 2.7]
+AUTO_TR_V = [1.2, 1.35, 1.6, 2., 2.7]
 
 AUTO_TR_ENABLED = True
 AUTO_TR_CRUISE_GAP = 1
@@ -83,8 +83,8 @@ class LongitudinalMpc():
       v_lead = max(0.0, lead.vLead)
       a_lead = lead.aLeadK
 
-      dist_cost = interp(lead.dRel, [4., 20.], [MPC_COST_LONG.DISTANCE/2.0, MPC_COST_LONG.DISTANCE])
-      dist_cost = interp(v_ego, [80.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS], [dist_cost, MPC_COST_LONG.DISTANCE])
+      dist_cost = interp(lead.dRel, [4., 20.], [MPC_COST_LONG.DISTANCE/1.75, MPC_COST_LONG.DISTANCE])
+      dist_cost = interp(v_ego, [60.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS], [dist_cost, MPC_COST_LONG.DISTANCE])
       self.libmpc.set_weights(MPC_COST_LONG.TTC, dist_cost, MPC_COST_LONG.ACCELERATION, MPC_COST_LONG.JERK)
 
       if (v_lead < 0.1 or -a_lead / 2.0 > v_lead):
