@@ -78,7 +78,7 @@ pipeline {
       when {
         not {
           anyOf {
-            branch 'master-ci'; branch 'devel'; branch 'devel-staging'; branch 'release2'; branch 'release2-staging'; branch 'dashcam'; branch 'dashcam-staging'; branch 'testing-closet*'
+            branch 'master-ci'; branch 'devel'; branch 'devel-staging'; branch 'release2'; branch 'release2-staging'; branch 'dashcam'; branch 'dashcam-staging'; branch 'testing-closet*'; branch 'hotfix-*'
           }
         }
       }
@@ -138,8 +138,8 @@ pipeline {
                 stage('Replay Tests') {
                   steps {
                     phone_steps("eon2", [
-                      ["build QCOM_REPLAY", "cd selfdrive/manager && QCOM_REPLAY=1 ./build.py"],
-                      ["camerad/modeld replay", "cd selfdrive/test/process_replay && ./camera_replay.py"],
+                      ["build", "cd selfdrive/manager && ./build.py"],
+                      ["model replay", "cd selfdrive/test/process_replay && ./model_replay.py"],
                     ])
                   }
                 }
