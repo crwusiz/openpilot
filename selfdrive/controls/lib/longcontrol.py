@@ -58,7 +58,7 @@ class LongControl():
     self.long_control_state = LongCtrlState.off  # initialized to off
     self.pid = PIController((CP.longitudinalTuning.kpBP, CP.longitudinalTuning.kpV),
                             (CP.longitudinalTuning.kiBP, CP.longitudinalTuning.kiV),
-                            CP.longitudinalTuning.kf,
+                            (CP.longitudinalTuning.kfBP, CP.longitudinalTuning.kfV),
                             rate=RATE,
                             sat_limit=0.8,
                             convert=compute_gb)
@@ -87,8 +87,8 @@ class LongControl():
     else:
       following = False
 
-    if not following:
-      gas_max *= 0.9
+    #if not following:
+    #  gas_max *= 0.9
 
     self.long_control_state = long_control_state_trans(active, self.long_control_state, CS.vEgo,
                                                        v_target_future, self.v_pid, output_gb,
@@ -110,9 +110,6 @@ class LongControl():
       # Freeze the integrator so we don't accelerate to compensate, and don't allow positive acceleration
       prevent_overshoot = not CP.stoppingControl and CS.vEgo < 1.5 and v_target_future < 0.7
       deadzone = interp(v_ego_pid, CP.longitudinalTuning.deadzoneBP, CP.longitudinalTuning.deadzoneV)
-
-      if d_rel > 0.:
-        a_target *= interp(d_rel, [10., 80.], [1.0, 0.75])
 
       output_gb = self.pid.update(self.v_pid, v_ego_pid, speed=v_ego_pid, deadzone=deadzone, feedforward=a_target, freeze_integrator=prevent_overshoot)
 
