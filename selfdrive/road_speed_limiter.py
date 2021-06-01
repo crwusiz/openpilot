@@ -1,8 +1,9 @@
-
 import json
 import threading
 import time
 import socket
+import fcntl
+import struct
 from threading import Thread
 from common.params import Params
 
@@ -12,11 +13,16 @@ current_milli_time = lambda: int(round(time.time() * 1000))
 
 CAMERA_SPEED_FACTOR = 1.05
 
+BROADCAST_PORT = 2899
+RECEIVE_PORT = 843
+
+
 class RoadSpeedLimiter:
   def __init__(self):
     self.json_road_limit = None
     self.active = 0
     self.last_updated = 0
+    self.last_updated_active = 0
     self.slowing_down = False
     self.last_exception = None
     self.lock = threading.Lock()
@@ -29,17 +35,67 @@ class RoadSpeedLimiter:
     thread.setDaemon(True)
     thread.start()
 
+    broadcast = Thread(target=self.broadcast_fun, args=[])
+    broadcast.setDaemon(True)
+    broadcast.start()
+
+  def get_broadcast_address(self):
+    try:
+      s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+      ip = fcntl.ioctl(
+        s.fileno(),
+        0x8919,
+        struct.pack('256s', 'wlan0'.encode('utf-8'))
+      )[20:24]
+
+      return socket.inet_ntoa(ip)
+    except:
+      return None
+
+  def broadcast_fun(self):
+
+    broadcast_address = None
+    frame = 0
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+      try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+        while True:
+
+          try:
+
+            if broadcast_address is None or frame % 10 == 0:
+              broadcast_address = self.get_broadcast_address()
+
+            print('broadcast_address', broadcast_address)
+
+            if broadcast_address is not None:
+              address = (broadcast_address, BROADCAST_PORT)
+              sock.sendto('EON:ROAD_LIMIT_SERVICE:v1'.encode(), address)
+          except:
+            pass
+
+          time.sleep(5.)
+          frame += 1
+
+          if current_milli_time() - self.last_updated_active > 1000*10:
+            self.active = 0
+
+      except:
+        pass
+
   def udp_recv(self):
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
 
       try:
-        sock.bind(('127.0.0.1', 843))
+        sock.bind(('0.0.0.0', RECEIVE_PORT))
 
         while True:
 
           try:
-            data, addr = sock.recvfrom(4096)
+            data, addr = sock.recvfrom(2048)
             json_obj = json.loads(data.decode())
 
             try:
@@ -48,6 +104,7 @@ class RoadSpeedLimiter:
               try:
                 if 'active' in json_obj:
                   self.active = json_obj['active']
+                  self.last_updated_active = current_milli_time()
               except:
                 pass
 
@@ -125,17 +182,17 @@ class RoadSpeedLimiter:
         MIN_LIMIT = 30
         MAX_LIMIT = 120
 
-      #log = "RECV: " + str(is_highway)
-      #log += ", " + str(cam_limit_speed)
-      #log += ", " + str(cam_limit_speed_left_dist)
-      #log += ", " + str(section_limit_speed)
-      #log += ", " + str(section_left_dist)
+      # log = "RECV: " + str(is_highway)
+      # log += ", " + str(cam_limit_speed)
+      # log += ", " + str(cam_limit_speed_left_dist)
+      # log += ", " + str(section_limit_speed)
+      # log += ", " + str(section_left_dist)
 
       v_ego = CS.clu11["CF_Clu_Vanz"] / 3.6
 
       if cam_limit_speed_left_dist is not None and cam_limit_speed is not None and cam_limit_speed_left_dist > 0:
 
-        diff_speed = v_ego*3.6 - cam_limit_speed
+        diff_speed = v_ego * 3.6 - cam_limit_speed
 
         if cam_type == 7:
           if self.longcontrol:
@@ -167,7 +224,8 @@ class RoadSpeedLimiter:
           else:
             pp = 0
 
-          return cam_limit_speed * CAMERA_SPEED_FACTOR + int(pp * diff_speed), cam_limit_speed, cam_limit_speed_left_dist, first_started, log
+          return cam_limit_speed * CAMERA_SPEED_FACTOR + int(
+            pp * diff_speed), cam_limit_speed, cam_limit_speed_left_dist, first_started, log
 
         self.slowing_down = False
         return 0, cam_limit_speed, cam_limit_speed_left_dist, False, log
@@ -196,12 +254,14 @@ class RoadSpeedLimiter:
 
 road_speed_limiter = None
 
+
 def road_speed_limiter_get_active():
   global road_speed_limiter
   if road_speed_limiter is None:
     road_speed_limiter = RoadSpeedLimiter()
 
   return road_speed_limiter.get_active()
+
 
 def road_speed_limiter_get_max_speed(CS, v_cruise_kph):
   global road_speed_limiter
