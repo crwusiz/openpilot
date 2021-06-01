@@ -515,6 +515,9 @@ FEATURES = {
 
   "use_blinker_flash": {CAR.SONATA_LF_TURBO},
 
+  "has_scc13": {CAR.PALISADE, CAR.NIRO_HEV},
+  "has_scc14": {CAR.PALISADE, CAR.NIRO_HEV},
+
   "use_ldws": False,
 }
 
