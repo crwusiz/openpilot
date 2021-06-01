@@ -6,7 +6,7 @@ import json
 import numpy as np
 
 import cereal.messaging as messaging
-from cereal import car
+from cereal import car, log
 from common.params import Params, put_nonblocking
 from common.realtime import DT_MDL
 from common.numpy_fast import clip
@@ -46,7 +46,7 @@ class ParamsLearner:
       yaw_rate_valid = yaw_rate_valid and abs(yaw_rate) < 1  # rad/s
 
       if self.active:
-        if msg.inputsOK and msg.posenetOK and yaw_rate_valid:
+        if msg.inputsOK and msg.posenetOK and msg.status == log.LiveLocationKalman.Status.valid and yaw_rate_valid:
           self.kf.predict_and_observe(t,
                                       ObservationKind.ROAD_FRAME_YAW_RATE,
                                       np.array([[-yaw_rate]]),
