@@ -72,9 +72,6 @@ class CarController():
     self.longcontrol = CP.openpilotLongitudinalControl
     self.scc_live = not CP.radarOffCan
 
-    self.has_scc13 = CP.hasScc13 or self.car_fingerprint in FEATURES["has_scc13"]
-    self.has_scc14 = CP.hasScc14 or self.car_fingerprint in FEATURES["has_scc14"]
-
     self.mad_mode_enabled = Params().get_bool('MadModeEnabled')
 
     # gas_gain, brake_gain
@@ -229,9 +226,9 @@ class CarController():
       can_sends.append(create_scc12(self.packer, apply_accel, enabled, self.scc12_cnt, self.scc_live, CS.scc12))
       can_sends.append(create_scc11(self.packer, frame, enabled, set_speed, lead_visible, self.scc_live, CS.scc11))
 
-      if frame % 20 == 0 and self.has_scc13:
+      if frame % 20 == 0 and CS.has_scc13:
         can_sends.append(create_scc13(self.packer, CS.scc13))
-      if self.has_scc14:
+      if CS.has_scc14:
         if CS.out.vEgo < 2.:
           long_control_state = controls.LoC.long_control_state
           acc_standstill = True if long_control_state == LongCtrlState.stopping else False
