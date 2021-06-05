@@ -10,7 +10,7 @@ from selfdrive.swaglog import cloudlog
 PANDA_FW_FN = os.path.join(PANDA_BASEDIR, "board", "obj", "panda.bin.signed")
 
 
-def get_expected_signature():
+def get_expected_signature() -> bytes:
   try:
     return Panda.get_signature_from_firmware(PANDA_FW_FN)
   except Exception:
@@ -18,7 +18,7 @@ def get_expected_signature():
     return b""
 
 
-def update_panda():
+def update_panda() -> None:
   panda = None
   panda_dfu = None
 
@@ -77,8 +77,18 @@ def update_panda():
     cloudlog.info("Version mismatch after flashing, exiting")
     raise AssertionError
 
-def main():
+
+def main() -> None:
   update_panda()
+
+  # check heatlh for lost heartbeat
+  panda = Panda()
+  health = panda.health()
+  if health["heartbeat_lost"]:
+    cloudlog.event("heartbeat lost", deviceState=health)
+
+  #cloudlog.info("Resetting panda")
+  #panda.reset()
 
   os.chdir(os.path.join(BASEDIR, "selfdrive/boardd"))
   os.execvp("./boardd", ["./boardd"])

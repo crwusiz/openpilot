@@ -49,7 +49,7 @@ TogglesPanel::TogglesPanel(QWidget *parent) : QWidget(parent) {
                                   "../assets/offroad/icon_shell.png",
                                   this));
 
-  toggles.append(new ParamControl("IsUploadRawEnabled",
+  toggles.append(new ParamControl("UploadRaw",
                                   "Upload Raw Logs",
                                   "Upload full logs and full resolution video by default while on WiFi. If not enabled, individual logs can be marked for upload at my.comma.ai/useradmin.",
                                   "../assets/offroad/icon_network.png",
@@ -218,7 +218,7 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
   )");
 }
 
-DeveloperPanel::DeveloperPanel(QWidget* parent) : QFrame(parent) {
+SoftwarePanel::SoftwarePanel(QWidget* parent) : QFrame(parent) {
   QVBoxLayout *main_layout = new QVBoxLayout(this);
   setLayout(main_layout);
   setStyleSheet(R"(QLabel {font-size: 50px;})");
@@ -236,11 +236,11 @@ DeveloperPanel::DeveloperPanel(QWidget* parent) : QFrame(parent) {
   });
 }
 
-void DeveloperPanel::showEvent(QShowEvent *event) {
+void SoftwarePanel::showEvent(QShowEvent *event) {
   updateLabels();
 }
 
-void DeveloperPanel::updateLabels() {
+void SoftwarePanel::updateLabels() {
   Params params = Params();
   std::string brand = params.getBool("Passive") ? "dashcam" : "openpilot";
   QList<QPair<QString, std::string>> dev_params = {
@@ -441,7 +441,7 @@ void SettingsWindow::showEvent(QShowEvent *event) {
     {"Device", device},
     {"Network", network_panel(this)},
     {"Toggles", new TogglesPanel(this)},
-    {"Developer", new DeveloperPanel()},
+    {"Software", new SoftwarePanel()},
     {"Community", community_panel()},
   };
 

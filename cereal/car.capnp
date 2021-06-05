@@ -52,7 +52,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     manualRestart @30;
     lowSpeedLockout @31;
     plannerError @32;
-    debugAlert @34;
+    joystickDebug @34;
     steerTempUnavailableUserOverride @35;
     resumeRequired @36;
     preDriverDistracted @37;
@@ -107,6 +107,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     roadCameraError @100;
     driverCameraError @101;
     wideRoadCameraError @102;
+    localizerMalfunction @103;
 
     radarCanErrorDEPRECATED @15;
     radarCommIssueDEPRECATED @67;
@@ -128,11 +129,11 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     modelLagWarningDEPRECATED @93;
     startupOneplusDEPRECATED @82;
 
-    turningIndicatorOn @103;
-    autoLaneChange @104;
+    turningIndicatorOn @104;
+    autoLaneChange @105;
 
-    slowingDownSpeed @105;
-    slowingDownSpeedSound @106;
+    slowingDownSpeed @106;
+    slowingDownSpeedSound @107;
   }
 }
 
@@ -390,6 +391,7 @@ struct CarParams {
   enableDsu @5 :Bool; # driving support unit
   enableApgs @6 :Bool; # advanced parking guidance system
   enableBsm @56 :Bool; # blind spot monitoring
+  hasStockCamera @57 :Bool; # factory LKAS/LDW camera is present
 
   minEnableSpeed @7 :Float32;
   minSteerSpeed @8 :Float32;
@@ -450,12 +452,12 @@ struct CarParams {
   communityFeature @46: Bool;  # true if a community maintained feature is detected
   fingerprintSource @49: FingerprintSource;
   networkLocation @50 :NetworkLocation;  # Where Panda/C2 is integrated into the car's CAN network
-  mdpsBus @57: Int8;
-  sasBus @58: Int8;
-  sccBus @59: Int8;
-  enableAutoHold @60 :Bool;
-  hasScc13 @61 :Bool;
-  hasScc14 @62 :Bool;
+  mdpsBus @58: Int8;
+  sasBus @59: Int8;
+  sccBus @60: Int8;
+  enableAutoHold @61 :Bool;
+  hasScc13 @62 :Bool;
+  hasScc14 @63 :Bool;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);
@@ -549,6 +551,7 @@ struct CarParams {
     automatic @1;  # Traditional auto, including DSG
     manual @2;  # True "stick shift" only
     direct @3;  # Electric vehicle or other direct drive
+    cvt @4;
   }
 
   struct CarFw {

@@ -376,6 +376,7 @@ struct PandaState @0xa7649e2575e4591e {
   uptime @17 :UInt32;
   faults @18 :List(FaultType);
   harnessStatus @21 :HarnessStatus;
+  heartbeatLost @22 :Bool;
 
   enum FaultStatus {
     none @0;
@@ -919,6 +920,7 @@ struct LiveLocationKalman {
   sensorsOK @21 :Bool = true;
   deviceStable @22 :Bool = true;
   timeSinceReset @23 :Float64;
+  excessiveResets @24 :Bool;
 
   enum Status {
     uninitialized @0;
