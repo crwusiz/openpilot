@@ -27,6 +27,7 @@ class CAR:
   GENESIS_G90_L = "GENESIS G90 LIMOUSINE"
   # hyundai
   ELANTRA = "HYUNDAI ELANTRA LIMITED ULTIMATE 2017"
+  ELANTRA_2021 = "HYUNDAI ELANTRA 2021"
   ELANTRA_GT_I30 = "HYUNDAI I30 N LINE 2019 & GT 2018 DCT"
   SONATA = "HYUNDAI SONATA 2020"
   SONATA_HEV = "HYUNDAI SONATA HEV 2020"
@@ -483,10 +484,28 @@ FW_VERSIONS = {
   CAR.K7: {
     (Ecu.eps, 0x7d4, None): [b'\xf1\000YG  MDPS C 1.00 1.01 56310F6350\000 4YG7C101',],
   },
+  CAR.ELANTRA_2021: {
+    (Ecu.fwdRadar, 0x7d0, None): [b'\xf1\x00CN7_ SCC FHCUP      1.00 1.01 99110-AA000         '],
+    (Ecu.eps, 0x7d4, None): [
+      b'\xf1\x87\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xf1\x00CN7 MDPS C 1.00 1.06 \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00 4CNDC106\xf1\xa01.06',
+      b'\xf1\x8756310AA050\x00\xf1\x00CN7 MDPS C 1.00 1.06 56310AA050\x00 4CNDC106\xf1\xa01.06',
+    ],
+    (Ecu.fwdCamera, 0x7c4, None): [b'\xf1\x00CN7 MFC  AT USA LHD 1.00 1.00 99210-AB000 200819'],
+    (Ecu.esp, 0x7d1, None): [
+      b'\xf1\x8758910-AB800\xf1\x00CN ESC \t 101 \x10\x03 58910-AB800\xf1\xa01.01',
+      b'\xf1\x00CN ESC \t 101 \x10\x03 58910-AB800',
+    ],
+    (Ecu.transmission, 0x7e1, None): [
+      b'\xf1\x00HT6WA280BLHT6VA640A1CCN0N20NS5\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+      b'\xf1\x00HT6WA280BLHT6VA640A1CCN0N20NS5\x00\x00\x00\x00\x00\x00\xe8\xba\xce\xfa',
+      b'\xf1\x87CXMQFM2135005JB2E\xb9\x89\x98W\xa9y\x97h\xa9\x98\x99wxvwh\x87\177\xffx\xff\xff\xff,,\xf1\x89HT6VA640A1\xf1\x82CCN0N20NS5\x00\x00\x00\x00\x00\x00',
+    ],
+    (Ecu.engine, 0x7e0, None): [b'\xf1\x82CNCWD0AMFCXCSFFA'],
+  }
 }
 
 CHECKSUM = {
-  "crc8": [CAR.SANTA_FE, CAR.SONATA, CAR.PALISADE, CAR.SONATA_HEV, CAR.SELTOS],
+  "crc8": [CAR.SANTA_FE, CAR.SONATA, CAR.PALISADE, CAR.SONATA_HEV, CAR.SELTOS, CAR.ELANTRA_2021],
   "6B": [CAR.SORENTO, CAR.GENESIS],
 }
 
@@ -507,11 +526,11 @@ FEATURES = {
 
   # send LFA MFA message for new HKG models
   "send_lfa_mfa": {CAR.SONATA, CAR.PALISADE, CAR.SONATA_HEV, CAR.SANTA_FE, CAR.NIRO_EV, CAR.GRANDEUR_IG_FL, CAR.GRANDEUR_IG_FL_HEV,
-                   CAR.SELTOS, CAR.KONA_EV, CAR.KONA_HEV, CAR.TUCSON_TL_SCC},
+                   CAR.SELTOS, CAR.KONA_EV, CAR.KONA_HEV, CAR.TUCSON_TL_SCC, CAR.ELANTRA_2021},
 
   # these cars use the FCA11 message for the AEB and FCW signals, all others use SCC12
   "use_fca": {CAR.SONATA, CAR.ELANTRA, CAR.ELANTRA_GT_I30, CAR.STINGER, CAR.IONIQ, CAR.KONA, CAR.KONA_EV, CAR.FORTE,
-              CAR.PALISADE, CAR.GENESIS_G70, CAR.SANTA_FE, CAR.SELTOS},
+              CAR.PALISADE, CAR.GENESIS_G70, CAR.SANTA_FE, CAR.SELTOS, CAR.ELANTRA_2021},
 
   "use_blinker_flash": {CAR.SONATA_LF_TURBO},
 
@@ -530,6 +549,7 @@ DBC = {
   CAR.GENESIS_G90_L: dbc_dict('hyundai_kia_generic', None),
   # hyundai
   CAR.ELANTRA: dbc_dict('hyundai_kia_generic', None),
+  CAR.ELANTRA_2021: dbc_dict('hyundai_kia_generic', None),
   CAR.ELANTRA_GT_I30: dbc_dict('hyundai_kia_generic', None),
   CAR.SONATA: dbc_dict('hyundai_kia_generic', None),
   CAR.SONATA_HEV: dbc_dict('hyundai_kia_generic', None),
