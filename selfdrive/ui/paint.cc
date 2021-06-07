@@ -754,6 +754,46 @@ static void bb_ui_draw_UI(UIState *s)
     bb_ui_draw_debug(s);
 }
 
+static void ui_draw_vision_scc_gap(UIState *s) {
+  const UIScene *scene = &s->scene;
+  auto car_state = (*s->sm)["carState"].getCarState();
+  int gap = car_state.getCruiseGap();
+
+  const int radius = 96;
+  const int center_x = s->viz_rect.x + radius + (bdr_s * 2);
+  const int center_y = s->viz_rect.bottom() - footer_h / 2;
+
+  NVGcolor color_bg = nvgRGBA(0, 0, 0, (255 * 0.1f));
+
+  nvgBeginPath(s->vg);
+  nvgCircle(s->vg, center_x, center_y, radius);
+  nvgFillColor(s->vg, color_bg);
+  nvgFill(s->vg);
+
+  NVGcolor textColor = nvgRGBA(255, 255, 255, 200);
+  float textSize = 33.f;
+
+  char str[64];
+  if(gap <= 0) {
+    snprintf(str, sizeof(str), "N/A");
+  }
+  else if(gap == 1) {
+    snprintf(str, sizeof(str), "AUTO");
+    textColor = nvgRGBA(120, 255, 120, 200);
+  }
+  else {
+    snprintf(str, sizeof(str), "%d", (int)gap);
+    textColor = nvgRGBA(120, 255, 120, 200);
+    textSize = 44.f;
+  }
+
+  nvgTextAlign(s->vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+
+  ui_draw_text(s, center_x, center_y-35, "GAP", 22 * 2.5f, nvgRGBA(255, 255, 255, 200), "sans-semibold");
+  ui_draw_text(s, center_x, center_y+20, str, textSize * 2.5f, textColor, "sans-semibold");
+
+}
+
 static void ui_draw_vision_brake(UIState *s) {
   const UIScene *scene = &s->scene;
 
@@ -898,6 +938,7 @@ static void ui_draw_vision(UIState *s) {
   }
   // Set Speed, Current Speed, Status/Events
   ui_draw_vision_header(s);
+  ui_draw_vision_scc_gap(s);
   ui_draw_vision_brake(s);
   ui_draw_vision_autohold(s);
 }
