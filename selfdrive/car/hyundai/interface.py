@@ -225,7 +225,11 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.6
       tire_stiffness_factor = 0.7
       ret.centerToFront = ret.wheelbase * 0.4
-
+    elif candidate == CAR.K9:
+      ret.mass = 2005. + STD_CARGO_KG
+      ret.wheelbase = 3.15
+      ret.centerToFront = ret.wheelbase * 0.4
+      tire_stiffness_factor = 0.8
 
     ret.radarTimeStep = 0.05
 
