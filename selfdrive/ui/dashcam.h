@@ -275,6 +275,7 @@ static void screen_draw_button(UIState *s, int touch_x, int touch_y) {
     nvgStrokeWidth(s->vg, 6);
     nvgStroke(s->vg);
 
+    nvgFontFace(s->vg, "sans-bold");
     nvgFontSize(s->vg, 80);
 
     if (captureState == CAPTURE_STATE_CAPTURING) {

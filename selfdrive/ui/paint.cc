@@ -771,7 +771,7 @@ static void ui_draw_vision_scc_gap(UIState *s) {
   nvgFill(s->vg);
 
   NVGcolor textColor = nvgRGBA(255, 255, 255, 200);
-  float textSize = 33.f;
+  float textSize = 30.f;
 
   char str[64];
   if(gap <= 0) {
@@ -784,13 +784,13 @@ static void ui_draw_vision_scc_gap(UIState *s) {
   else {
     snprintf(str, sizeof(str), "%d", (int)gap);
     textColor = nvgRGBA(120, 255, 120, 200);
-    textSize = 44.f;
+    textSize = 38.f;
   }
 
   nvgTextAlign(s->vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
 
-  ui_draw_text(s, center_x, center_y-35, "GAP", 22 * 2.5f, nvgRGBA(255, 255, 255, 200), "sans-semibold");
-  ui_draw_text(s, center_x, center_y+20, str, textSize * 2.5f, textColor, "sans-semibold");
+  ui_draw_text(s, center_x, center_y-36, "GAP", 22 * 2.5f, nvgRGBA(255, 255, 255, 200), "sans-bold");
+  ui_draw_text(s, center_x, center_y+22, str, textSize * 2.5f, textColor, "sans-bold");
 
 }
 
