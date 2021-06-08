@@ -107,6 +107,10 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 2290
       ret.wheelbase = 3.45
       ret.centerToFront = ret.wheelbase * 0.4
+    elif candidate == CAR.GENESIS_G90:
+      ret.mass = 2150
+      ret.wheelbase = 3.16
+      ret.centerToFront = ret.wheelbase * 0.4
     # hyundai
     elif candidate in [CAR.SANTA_FE]:
       ret.mass = 1694 + STD_CARGO_KG
