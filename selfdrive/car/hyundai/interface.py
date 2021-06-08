@@ -99,11 +99,11 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1855. + STD_CARGO_KG
       ret.wheelbase = 3.01
       ret.centerToFront = ret.wheelbase * 0.4
-    elif candidate == CAR.GENESIS_G90:
+    elif candidate == CAR.GENESIS_EQ900:
       ret.mass = 2200
       ret.wheelbase = 3.15
       ret.centerToFront = ret.wheelbase * 0.4
-    elif candidate == CAR.GENESIS_G90_L:
+    elif candidate == CAR.GENESIS_EQ900_L:
       ret.mass = 2290
       ret.wheelbase = 3.45
       ret.centerToFront = ret.wheelbase * 0.4

@@ -46,10 +46,10 @@ def process_hud_alert(enabled, fingerprint, visual_alert, left_lane,
   right_lane_warning = 0
   if left_lane_depart:
     left_lane_warning = 1 if fingerprint in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80,
-                                             CAR.GENESIS_G90, CAR.GENESIS_G90_L] else 2
+                                             CAR.GENESIS_EQ900, CAR.GENESIS_EQ900_L] else 2
   if right_lane_depart:
     right_lane_warning = 1 if fingerprint in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80,
-                                              CAR.GENESIS_G90, CAR.GENESIS_G90_L] else 2
+                                              CAR.GENESIS_EQ900, CAR.GENESIS_EQ900_L] else 2
 
   return sys_warning, sys_state, left_lane_warning, right_lane_warning
 
