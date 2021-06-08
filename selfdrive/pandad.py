@@ -83,7 +83,7 @@ def update_panda() -> Panda:
 def main() -> None:
   panda = update_panda()
 
-  # check heatlh for lost heartbeat
+  # check health for lost heartbeat
   health = panda.health()
   if health["heartbeat_lost"]:
     cloudlog.event("heartbeat lost", deviceState=health)

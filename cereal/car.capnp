@@ -90,6 +90,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     startupNoControl @77;
     startupMaster @78;
     startupFuzzyFingerprint @97;
+    startupNoFw @104;
     fcw @79;
     steerSaturated @80;
     belowEngageSpeed @84;
@@ -129,11 +130,11 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     modelLagWarningDEPRECATED @93;
     startupOneplusDEPRECATED @82;
 
-    turningIndicatorOn @104;
-    autoLaneChange @105;
+    turningIndicatorOn @105;
+    autoLaneChange @106;
 
-    slowingDownSpeed @106;
-    slowingDownSpeedSound @107;
+    slowingDownSpeed @107;
+    slowingDownSpeedSound @108;
   }
 }
 

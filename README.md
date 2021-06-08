@@ -148,6 +148,7 @@ Community Maintained Cars and Features
 | ----------| ------------------------------| ------------------| -----------------| -------------------| -------------|
 | Audi      | A3 2014-18                    | Prestige          | Stock            | 0mph               | 0mph         |
 | Audi      | A3 Sportback e-tron 2017-18   | Prestige          | Stock            | 0mph               | 0mph         |
+| Audi      | Q2 2018                       | Driver Assistance | Stock            | 0mph               | 0mph         |
 | Buick     | Regal 2018<sup>1</sup>        | Adaptive Cruise   | openpilot        | 0mph               | 7mph         |
 | Cadillac  | ATS 2018<sup>1</sup>          | Adaptive Cruise   | openpilot        | 0mph               | 7mph         |
 | Chevrolet | Malibu 2017<sup>1</sup>       | Adaptive Cruise   | openpilot        | 0mph               | 7mph         |
@@ -185,7 +186,7 @@ Community Maintained Cars and Features
 | Nissan    | Rogue 2018-20                 | ProPILOT          | Stock            | 0mph               | 0mph         |
 | Nissan    | X-Trail 2017                  | ProPILOT          | Stock            | 0mph               | 0mph         |
 | SEAT      | Ateca 2018                    | Driver Assistance | Stock            | 0mph               | 0mph         |
-| SEAT      | Leon 2017, 2020               | Driver Assistance | Stock            | 0mph               | 0mph         |
+| SEAT      | Leon 2014-2020                | Driver Assistance | Stock            | 0mph               | 0mph         |
 | Škoda     | Kodiaq 2018                   | Driver Assistance | Stock            | 0mph               | 0mph         |
 | Škoda     | Octavia 2015, 2019            | Driver Assistance | Stock            | 0mph               | 0mph         |
 | Škoda     | Scala 2020                    | Driver Assistance | Stock            | 0mph               | 0mph         |
