@@ -1,4 +1,4 @@
-#include "settings.h"
+#include "selfdrive/ui/qt/offroad/settings.h"
 
 #include <cassert>
 #include <string>
@@ -323,7 +323,7 @@ QWidget * network_panel(QWidget * parent) {
 
   layout->addStretch(1);
 
-  QWidget *w = new QWidget;
+  QWidget *w = new QWidget(parent);
   w->setLayout(layout);
 #else
   Networking *w = new Networking(parent);
@@ -408,6 +408,9 @@ void SettingsWindow::showEvent(QShowEvent *event) {
     nav_btns->buttons()[0]->setChecked(true);
     return;
   }
+}
+
+SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
 
   // setup two main layouts
   QVBoxLayout *sidebar_layout = new QVBoxLayout();
@@ -441,7 +444,7 @@ void SettingsWindow::showEvent(QShowEvent *event) {
     {"Device", device},
     {"Network", network_panel(this)},
     {"Toggles", new TogglesPanel(this)},
-    {"Software", new SoftwarePanel()},
+    {"Software", new SoftwarePanel(this)},
     {"Community", community_panel()},
   };
 
