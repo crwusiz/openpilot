@@ -86,10 +86,9 @@ class CarController():
     # gas and brake
     apply_accel = actuators.gas - actuators.brake
     apply_accel, self.accel_steady = accel_hysteresis(apply_accel, self.accel_steady)
+    apply_accel = self.scc_smoother.get_accel(CS, controls.sm, apply_accel)
     apply_accel = clip(apply_accel * CarControllerParams.ACCEL_SCALE,
                        CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
-
-    apply_accel = self.scc_smoother.get_accel(CS, controls.sm, apply_accel)
 
     # Steering Torque
     new_steer = int(round(actuators.steer * CarControllerParams.STEER_MAX))
