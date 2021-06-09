@@ -1,3 +1,37 @@
+crwusiz openpilot
+=====
+
+<b> This Branch is xx979xx HKG_community base comma devel-staging v0.8.5</b>
+- <b> v0.8.5 [ white and gray panda allow , OP3T not work(using v0.8.2) ] </b>
+- If you have any questions, please send a message to crwusiz from discord. if you like this Branch <b> [Donate](https://paypal.me/crwusiz) </b>for me
+[![](https://i.imgur.com/TMtVMV8.png)](#)
+
+[![](https://i.imgur.com/P99obkp.png)](#)
+
+[![](https://i.imgur.com/19LPhc8.png)](#)
+
+- kor NanumGothic font / Comma Bootlogo / Bootanimation Auto install
+- event message, ui kor translate
+- shutdownd (ign off auto shutdown 5min) - set is toggle
+- steeringwheel rotate, tpms display
+- brake, bsd, autohold icon
+- sidebar wifi ipaddress from neokii
+- sidebar battery charging and battery percent display
+- lateralcontrolselect ( Pid / Indi / Lqr )
+- mfcselect ( lkas / ldws / lfa )
+- longcontrolselect ( mad / long )
+- gps toggle
+
+## Harness Cable Car and Year Compatible Chart
+
+![Connector](https://i.imgur.com/kPXaLFF.jpg)
+
+![Chart](https://i.imgur.com/gw0WcZG.jpg)
+
+https://smartstore.naver.com/hyotrade/products/5341431170
+-----
+
+
 [![](https://i.imgur.com/UelUjKAh.png)](#)
 
 Table of Contents

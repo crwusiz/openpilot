@@ -94,7 +94,7 @@ OffroadHome::OffroadHome(QWidget* parent) : QFrame(parent) {
   QHBoxLayout* header_layout = new QHBoxLayout();
 
   date = new QLabel();
-  date->setStyleSheet(R"(font-size: 55px;)");
+  date->setStyleSheet(R"(font-size: 50px;)");
   header_layout->addWidget(date, 0, Qt::AlignHCenter | Qt::AlignLeft);
 
   alert_notification = new QPushButton();
@@ -102,9 +102,9 @@ OffroadHome::OffroadHome(QWidget* parent) : QFrame(parent) {
   QObject::connect(alert_notification, &QPushButton::released, this, &OffroadHome::openAlerts);
   header_layout->addWidget(alert_notification, 0, Qt::AlignHCenter | Qt::AlignRight);
 
-  std::string brand = Params().getBool("Passive") ? "dashcam" : "openpilot";
-  QLabel* version = new QLabel(QString::fromStdString(brand + " v" + Params().get("Version")));
-  version->setStyleSheet(R"(font-size: 55px;)");
+  std::string brand = Params().getBool("Passive") ? "대시캠" : "오픈파일럿";
+  QLabel* version = new QLabel(QString::fromStdString(" v" + Params().get("Version")));
+  version->setStyleSheet(R"(font-size: 50px;)");
   header_layout->addWidget(version, 0, Qt::AlignHCenter | Qt::AlignRight);
 
   main_layout->addLayout(header_layout);
@@ -169,7 +169,8 @@ void OffroadHome::refresh() {
     return;
   }
 
-  date->setText(QDateTime::currentDateTime().toString("dddd, MMMM d"));
+  // date show
+  date->setText(QDateTime::currentDateTime().toString("\U0001f4c5 yyyy년 M월 d일")+"      「 Easy Driving \U0001f60b 」");
 
   // update alerts
 
@@ -181,10 +182,10 @@ void OffroadHome::refresh() {
   }
 
   if (alerts_widget->updateAvailable) {
-    alert_notification->setText("UPDATE");
+    alert_notification->setText("업데이트");
   } else {
     int alerts = alerts_widget->alertCount;
-    alert_notification->setText(QString::number(alerts) + " ALERT" + (alerts == 1 ? "" : "S"));
+    alert_notification->setText(QString::number(alerts) + " 경고" + (alerts == 1 ? "" : "S"));
   }
 
   if (!alert_notification->isVisible() && !first_refresh) {

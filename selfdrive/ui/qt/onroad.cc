@@ -90,12 +90,12 @@ void OnroadAlerts::updateState(const UIState &s) {
       // Handle controls timeout
       if (sm.rcv_frame("controlsState") < s.scene.started_frame) {
         // car is started, but controlsState hasn't been seen at all
-        updateAlert("openpilot Unavailable", "Waiting for controls to start", 0,
-                    "controlsWaiting", cereal::ControlsState::AlertSize::MID, AudibleAlert::NONE);
+        updateAlert("오픈파일럿을 사용할수없습니다", "프로세스가 준비중입니다", 0,
+                    "프로세스가 준비중입니다", cereal::ControlsState::AlertSize::MID, AudibleAlert::NONE);
       } else if ((sm.frame - sm.rcv_frame("controlsState")) > 5 * UI_FREQ) {
         // car is started, but controls is lagging or died
-        updateAlert("TAKE CONTROL IMMEDIATELY", "Controls Unresponsive", 0,
-                    "controlsUnresponsive", cereal::ControlsState::AlertSize::FULL, AudibleAlert::CHIME_WARNING_REPEAT);
+        updateAlert("즉시 핸들을 잡아주세요", "프로세스가 응답하지않습니다", 0,
+                    "프로세스가 응답하지않습니다", cereal::ControlsState::AlertSize::FULL, AudibleAlert::CHIME_WARNING_REPEAT);
 
         // TODO: clean this up once Qt handles the border
         QUIState::ui_state.status = STATUS_ALERT;
@@ -184,18 +184,18 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
   p.setPen(QColor(0xff, 0xff, 0xff));
   p.setRenderHint(QPainter::TextAntialiasing);
   if (alert_size == cereal::ControlsState::AlertSize::SMALL) {
-    configFont(p, "Open Sans", 74, "SemiBold");
+    configFont(p, "Open Sans", 64, "SemiBold");
     p.drawText(r, Qt::AlignCenter, text1);
   } else if (alert_size == cereal::ControlsState::AlertSize::MID) {
-    configFont(p, "Open Sans", 88, "Bold");
+    configFont(p, "Open Sans", 78, "Bold");
     p.drawText(QRect(0, c.y() - 125, width(), 150), Qt::AlignHCenter | Qt::AlignTop, text1);
-    configFont(p, "Open Sans", 66, "Regular");
+    configFont(p, "Open Sans", 56, "Regular");
     p.drawText(QRect(0, c.y() + 21, width(), 90), Qt::AlignHCenter, text2);
   } else if (alert_size == cereal::ControlsState::AlertSize::FULL) {
     bool l = text1.length() > 15;
     configFont(p, "Open Sans", l ? 132 : 177, "Bold");
     p.drawText(QRect(0, r.y() + (l ? 240 : 270), width(), 600), Qt::AlignHCenter | Qt::TextWordWrap, text1);
-    configFont(p, "Open Sans", 88, "Regular");
+    configFont(p, "Open Sans", 78, "Regular");
     p.drawText(QRect(0, r.height() - (l ? 361 : 420), width(), 300), Qt::AlignHCenter | Qt::TextWordWrap, text2);
   }
 }

@@ -36,12 +36,12 @@ OffroadAlert::OffroadAlert(QWidget* parent) : QFrame(parent) {
   QHBoxLayout *footer_layout = new QHBoxLayout();
   layout->addLayout(footer_layout);
 
-  QPushButton *dismiss_btn = new QPushButton("Dismiss");
+  QPushButton *dismiss_btn = new QPushButton("확인");
   dismiss_btn->setFixedSize(400, 125);
   footer_layout->addWidget(dismiss_btn, 0, Qt::AlignBottom | Qt::AlignLeft);
   QObject::connect(dismiss_btn, &QPushButton::released, this, &OffroadAlert::closeAlerts);
 
-  rebootBtn.setText("Reboot and Update");
+  rebootBtn.setText("업데이트 및 재부팅");
   rebootBtn.setFixedSize(600, 125);
   rebootBtn.setVisible(false);
   footer_layout->addWidget(&rebootBtn, 0, Qt::AlignBottom | Qt::AlignRight);

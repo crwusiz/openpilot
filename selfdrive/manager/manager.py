@@ -34,6 +34,17 @@ def manager_init():
     ("CompletedTrainingVersion", "0"),
     ("HasAcceptedTerms", "0"),
     ("OpenpilotEnabledToggle", "1"),
+
+    # add
+    ("IsMetric", "1"),
+    ("LongControlSelect", "0"),
+    ("AutoLaneChangeEnabled", "0"),
+    ("PutPrebuilt", "0"),
+    ("MfcSelect", "0"),
+    ("LateralControlSelect", "0"),
+    ("DisableShutdownd", "0"),
+    ("DisableLogger", "0"),
+    ("DisableGps", "0"),
   ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))
@@ -112,7 +123,7 @@ def manager_thread():
   cloudlog.info({"environ": os.environ})
 
   # save boot log
-  subprocess.call("./bootlog", cwd=os.path.join(BASEDIR, "selfdrive/loggerd"))
+  #subprocess.call("./bootlog", cwd=os.path.join(BASEDIR, "selfdrive/loggerd"))
 
   params = Params()
 
@@ -136,6 +147,15 @@ def manager_thread():
 
     if sm['deviceState'].freeSpacePercent < 5:
       not_run.append("loggerd")
+
+    if params.get_bool("DisableShutdownd"):
+      not_run.append("shutdownd")
+    if params.get_bool("DisableLogger"):
+      not_run.append("loggerd")
+      not_run.append("deleter")
+      not_run.append("logmessaged")
+      not_run.append("tombstoned")
+      not_run.append("uploader")
 
     started = sm['deviceState'].started
     driverview = params.get_bool("IsDriverViewEnabled")

@@ -38,9 +38,10 @@
 Panda * panda = nullptr;
 std::atomic<bool> safety_setter_thread_running(false);
 std::atomic<bool> ignition(false);
-
-ExitHandler do_exit;
-
+volatile sig_atomic_t do_exit = 0;
+bool spoofing_started = false;
+bool fake_send = false;
+bool connected_once = false;
 
 void safety_setter_thread() {
   LOGD("Starting safety setter thread");
@@ -90,7 +91,7 @@ void safety_setter_thread() {
   cereal::CarParams::Reader car_params = cmsg.getRoot<cereal::CarParams>();
   cereal::CarParams::SafetyModel safety_model = car_params.getSafetyModel();
 
-  panda->set_unsafe_mode(0);  // see safety_declarations.h for allowed values
+  //panda->set_unsafe_mode(0);  // see safety_declarations.h for allowed values
 
   auto safety_param = car_params.getSafetyParam();
   LOGW("setting safety model: %d with param %d", (int)safety_model, safety_param);
@@ -131,6 +132,8 @@ bool usb_connect() {
 
     params.put("PandaFirmwareHex", fw_sig_hex_buf, 16);
     LOGW("fw signature: %.*s", 16, fw_sig_hex_buf);
+
+    delete[] fw_sig_buf;
   } else { return false; }
 
   // get panda serial
@@ -170,13 +173,10 @@ bool usb_connect() {
 }
 
 // must be called before threads or with mutex
-static bool usb_retry_connect() {
+void usb_retry_connect() {
   LOGW("attempting to connect");
-  while (!do_exit && !usb_connect()) { util::sleep_for(100); }
-  if (panda) {
-    LOGW("connected to board");
-  }
-  return !do_exit;
+  while (!usb_connect()) { util::sleep_for(100); }
+  LOGW("connected to board");
 }
 
 void can_recv(PubMaster &pm) {
@@ -186,7 +186,7 @@ void can_recv(PubMaster &pm) {
   pm.send("can", bytes.begin(), bytes.size());
 }
 
-void can_send_thread(bool fake_send) {
+void can_send_thread() {
   LOGD("start send thread");
 
   AlignedBuffer aligned_buf;
@@ -251,7 +251,7 @@ void can_recv_thread() {
   }
 }
 
-void panda_state_thread(bool spoofing_started) {
+void panda_state_thread() {
   LOGD("start panda state thread");
   PubMaster pm({"pandaState"});
 
@@ -260,7 +260,7 @@ void panda_state_thread(bool spoofing_started) {
   Params params = Params();
 
   // Broadcast empty pandaState message when panda is not yet connected
-  while (!do_exit && !panda) {
+  while (!panda){
     MessageBuilder msg;
     auto pandaState  = msg.initEvent().initPandaState();
 
@@ -282,7 +282,7 @@ void panda_state_thread(bool spoofing_started) {
       panda->set_safety_model(cereal::CarParams::SafetyModel::NO_OUTPUT);
     }
 
-    ignition = ((pandaState.ignition_line != 0) || (pandaState.ignition_can != 0));
+    bool ignition = ((pandaState.ignition_line != 0) || (pandaState.ignition_can != 0));
 
     if (ignition) {
       no_ignition_cnt = 0;
@@ -367,7 +367,7 @@ void panda_state_thread(bool spoofing_started) {
     ps.setIgnitionCan(pandaState.ignition_can);
     ps.setControlsAllowed(pandaState.controls_allowed);
     ps.setGasInterceptorDetected(pandaState.gas_interceptor_detected);
-    ps.setHasGps(true);
+    ps.setHasGps(panda->is_pigeon);
     ps.setCanRxErrs(pandaState.can_rx_errs);
     ps.setCanSendErrs(pandaState.can_send_errs);
     ps.setCanFwdErrs(pandaState.can_fwd_errs);
@@ -403,6 +403,9 @@ void panda_state_thread(bool spoofing_started) {
 void hardware_control_thread() {
   LOGD("start hardware control thread");
   SubMaster sm({"deviceState", "driverCameraState"});
+
+  // Other pandas don't have hardware to control
+  if (panda->hw_type != cereal::PandaState::PandaType::UNO && panda->hw_type != cereal::PandaState::PandaType::DOS) return;
 
   uint64_t last_front_frame_t = 0;
   uint16_t prev_fan_speed = 999;
@@ -475,6 +478,8 @@ static void pigeon_publish_raw(PubMaster &pm, const std::string &dat) {
 }
 
 void pigeon_thread() {
+  if (!panda->is_pigeon) { return; };
+
   PubMaster pm({"ubloxRaw"});
   bool ignition_last = false;
 
@@ -485,6 +490,8 @@ void pigeon_thread() {
     {(char)ublox::CLASS_NAV, int64_t(900000000ULL)}, // 0.9s
     {(char)ublox::CLASS_RXM, int64_t(900000000ULL)}, // 0.9s
   };
+
+  pigeon->init();
 
   while (!do_exit && panda->connected) {
     bool need_reset = false;
@@ -531,12 +538,12 @@ void pigeon_thread() {
       for (const auto& [msg_cls, dt] : cls_max_dt) {
         last_recv_time[msg_cls] = t;
       }
-    } else if (!ignition && ignition_last) {
-      // power off on falling edge of ignition
-      LOGD("powering off pigeon\n");
-      pigeon->stop();
-      pigeon->set_power(false);
     }
+    //} else if (!ignition && ignition_last) {
+    //  // power off on falling edge of ignition
+    //  LOGD("powering off pigeon\n");
+    //  pigeon->set_power(false);
+    //}
 
     ignition_last = ignition;
 
@@ -559,17 +566,26 @@ int main() {
   err = set_core_affinity(Hardware::TICI() ? 4 : 3);
   LOG("set affinity returns %d", err);
 
+  // check the environment
+  if (getenv("STARTED")) {
+    spoofing_started = true;
+  }
+
+  if (getenv("FAKESEND")) {
+    fake_send = true;
+  }
+
   while (!do_exit){
     std::vector<std::thread> threads;
-    threads.push_back(std::thread(panda_state_thread, getenv("STARTED") != nullptr));
+    threads.push_back(std::thread(panda_state_thread));
 
     // connect to the board
-    if (usb_retry_connect()) {
-      threads.push_back(std::thread(can_send_thread, getenv("FAKESEND") != nullptr));
-      threads.push_back(std::thread(can_recv_thread));
-      threads.push_back(std::thread(hardware_control_thread));
-      threads.push_back(std::thread(pigeon_thread));
-    }
+    usb_retry_connect();
+
+    threads.push_back(std::thread(can_send_thread));
+    threads.push_back(std::thread(can_recv_thread));
+    threads.push_back(std::thread(hardware_control_thread));
+    if (!Params().getBool("DisableGps")) threads.push_back(std::thread(pigeon_thread));
 
     for (auto &t : threads) t.join();
 

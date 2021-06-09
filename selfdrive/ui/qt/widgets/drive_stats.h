@@ -11,8 +11,8 @@ public:
 private:
   bool metric;
   struct StatsLabels {
-    QLabel *routes, *distance, *hours;
-  } all_, week_;
+    QLabel *routes, *hours, *distance;
+  } all_;
 
 private slots:
   void parseResponse(const QString &response);

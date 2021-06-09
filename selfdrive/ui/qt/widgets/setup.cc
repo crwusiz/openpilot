@@ -39,7 +39,7 @@ void PairingQRWidget::refresh(){
   if (std::min(IMEI.length(), serial.length()) <= 5) {
     qrCode->setText("Error getting serial: contact support");
     qrCode->setWordWrap(true);
-    qrCode->setStyleSheet(R"(font-size: 60px;)");
+    qrCode->setStyleSheet(R"(font-size: 48px;)");
     return;
   }
   QString pairToken = CommaApi::create_jwt({{"pair", true}});
@@ -80,7 +80,7 @@ PrimeUserWidget::PrimeUserWidget(QWidget* parent) : QWidget(parent) {
   mainLayout->addWidget(commaPrime, 0, Qt::AlignTop);
 
   username = new QLabel();
-  username->setStyleSheet("font-size: 55px;"); // TODO: fit width
+  username->setStyleSheet("font-size: 48px;"); // TODO: fit width
   mainLayout->addWidget(username, 0, Qt::AlignTop);
 
   mainLayout->addSpacing(100);
@@ -107,10 +107,11 @@ PrimeUserWidget::PrimeUserWidget(QWidget* parent) : QWidget(parent) {
   if (!dongleId.length()) {
     return;
   }
-
+/*
   QString url = "https://api.commadotai.com/v1/devices/" + dongleId + "/owner";
   RequestRepeater *repeater = new RequestRepeater(this, url, "ApiCache_Owner", 6);
   QObject::connect(repeater, &RequestRepeater::receivedResponse, this, &PrimeUserWidget::replyFinished);
+*/
 }
 
 void PrimeUserWidget::replyFinished(const QString &response) {
@@ -165,21 +166,21 @@ SetupWidget::SetupWidget(QWidget* parent) : QFrame(parent) {
   QVBoxLayout* finishRegistationLayout = new QVBoxLayout;
   finishRegistationLayout->setMargin(30);
 
-  QLabel* registrationDescription = new QLabel("Pair your device with the comma connect app");
+  QLabel* registrationDescription = new QLabel("COMMA CONNECT\n \n앱으로 장치와 페어링 하세요");
   registrationDescription->setWordWrap(true);
   registrationDescription->setAlignment(Qt::AlignCenter);
   registrationDescription->setStyleSheet(R"(
-    font-size: 55px;
+    font-size: 45px;
     font-weight: 400;
   )");
 
   finishRegistationLayout->addWidget(registrationDescription);
 
-  QPushButton* finishButton = new QPushButton("Finish setup");
+  QPushButton* finishButton = new QPushButton("QR코드");
   finishButton->setFixedHeight(200);
   finishButton->setStyleSheet(R"(
     border-radius: 30px;
-    font-size: 55px;
+    font-size: 45px;
     font-weight: 500;
     background: #585858;
   )");
@@ -194,12 +195,12 @@ SetupWidget::SetupWidget(QWidget* parent) : QFrame(parent) {
 
   QVBoxLayout* qrLayout = new QVBoxLayout;
 
-  qrLayout->addSpacing(30);
-  QLabel* qrLabel = new QLabel("Scan with comma connect!");
+  qrLayout->addSpacing(40);
+  QLabel* qrLabel = new QLabel("QR 코드를 스캔하세요");
   qrLabel->setWordWrap(true);
   qrLabel->setAlignment(Qt::AlignHCenter);
   qrLabel->setStyleSheet(R"(
-    font-size: 55px;
+    font-size: 45px;
     font-weight: 400;
   )");
   qrLayout->addWidget(qrLabel, 0, Qt::AlignTop);
@@ -268,6 +269,10 @@ void SetupWidget::replyFinished(const QString &response) {
   }
 
   QJsonObject json = doc.object();
+
+  mainLayout->setCurrentIndex(showQr);
+
+  /*
   bool is_paired = json["is_paired"].toBool();
   bool is_prime = json["prime"].toBool();
 
@@ -280,4 +285,5 @@ void SetupWidget::replyFinished(const QString &response) {
     showQr = false;
     mainLayout->setCurrentWidget(primeUser);
   }
+  */
 }

@@ -53,7 +53,7 @@ void DriverViewScene::paintEvent(QPaintEvent* event) {
     p.setPen(QColor(0xff, 0xff, 0xff));
     p.setRenderHint(QPainter::TextAntialiasing);
     configFont(p, "Inter", 100, "Bold");
-    p.drawText(geometry(), Qt::AlignCenter, "camera starting");
+    p.drawText(geometry(), Qt::AlignCenter, "카메라 준비중");
     return;
   }
 
