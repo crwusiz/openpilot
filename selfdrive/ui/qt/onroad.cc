@@ -50,7 +50,9 @@ void OnroadWindow::offroadTransition(bool offroad) {
     QString token = QString::fromStdString(Params().get("MapboxToken"));
     if (map == nullptr && !token.isEmpty()){
       QMapboxGLSettings settings;
-      settings.setCacheDatabasePath("/data/mbgl-cache.db");
+      if (!Hardware::PC()) {
+        settings.setCacheDatabasePath("/data/mbgl-cache.db");
+      }
       settings.setCacheDatabaseMaximumSize(20 * 1024 * 1024);
       settings.setAccessToken(token.trimmed());
 
@@ -164,7 +166,7 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
 
   // draw background + gradient
   p.setPen(Qt::NoPen);
-  p.setCompositionMode(QPainter::CompositionMode_DestinationOver);
+  p.setCompositionMode(QPainter::CompositionMode_SourceOver);
 
   p.setBrush(QBrush(bg));
   p.drawRect(r);
@@ -172,6 +174,8 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
   QLinearGradient g(0, r.y(), 0, r.bottom());
   g.setColorAt(0, QColor::fromRgbF(0, 0, 0, 0.05));
   g.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0.35));
+
+  p.setCompositionMode(QPainter::CompositionMode_DestinationOver);
   p.setBrush(QBrush(g));
   p.fillRect(r, g);
   p.setCompositionMode(QPainter::CompositionMode_SourceOver);
