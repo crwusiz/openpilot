@@ -361,7 +361,7 @@ class SccSmoother:
       if accel > 0:
         accel *= gas_gain
       else:
-        accel *= brake_gain * interp(lead.dRel, [3., 20.], [1.1, 1.0])
+        accel *= brake_gain #* interp(lead.dRel, [3., 20.], [1.1, 1.0])
     else:
       if accel > 0:
         accel *= gas_gain
