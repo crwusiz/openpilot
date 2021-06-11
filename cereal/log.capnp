@@ -540,25 +540,26 @@ struct ControlsState @0x97ff69c53601abf1 {
   cumLagMs @15 :Float32;
   canErrorCounter @57 :UInt32;
 
-  angleSteers @59 :Float32;
-  cluSpeedMs @60 :Float32;
-  applyAccel @61 :Float32;
-  fusedAccel @62 :Float32;
-  leadDist @63 :Float32;
-  aReqValue @64 :Float32;
-  aReqValueMin @65 :Float32;
-  aReqValueMax @66 :Float32;
-
-  steerRatio @67 :Float32;
-  steerRateCost @68 :Float32;
-  steerActuatorDelay @69 :Float32;
-
   lateralControlState :union {
     indiState @52 :LateralINDIState;
     pidState @53 :LateralPIDState;
     lqrState @55 :LateralLQRState;
     angleState @58 :LateralAngleState;
+    debugState @59 :LateralDebugState;
   }
+
+  angleSteers @60 :Float32;
+  cluSpeedMs @61 :Float32;
+  applyAccel @62 :Float32;
+  fusedAccel @63 :Float32;
+  leadDist @64 :Float32;
+  aReqValue @65 :Float32;
+  aReqValueMin @66 :Float32;
+  aReqValueMax @67 :Float32;
+
+  steerRatio @68 :Float32;
+  steerRateCost @69 :Float32;
+  steerActuatorDelay @70 :Float32;
 
   enum OpenpilotState @0xdbe58b96d2d1ac61 {
     disabled @0;
@@ -623,6 +624,13 @@ struct ControlsState @0x97ff69c53601abf1 {
   }
 
   struct LateralAngleState {
+    active @0 :Bool;
+    steeringAngleDeg @1 :Float32;
+    output @2 :Float32;
+    saturated @3 :Bool;
+  }
+
+  struct LateralDebugState {
     active @0 :Bool;
     steeringAngleDeg @1 :Float32;
     output @2 :Float32;

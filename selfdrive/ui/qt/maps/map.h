@@ -23,7 +23,9 @@
 #include <QMap>
 #include <QPixmap>
 
+#include "selfdrive/common/params.h"
 #include "cereal/messaging/messaging.h"
+
 class MapInstructions : public QWidget {
   Q_OBJECT
 
@@ -40,7 +42,7 @@ public:
 
 public slots:
   void updateDistance(float d);
-  void updateInstructions(QMap<QString, QVariant> banner);
+  void updateInstructions(QMap<QString, QVariant> banner, bool full);
 };
 
 class MapETA : public QWidget {
@@ -52,6 +54,7 @@ private:
   QLabel *time_unit;
   QLabel *distance;
   QLabel *distance_unit;
+  Params params;
 
 public:
   MapETA(QWidget * parent=nullptr);
@@ -129,7 +132,7 @@ public slots:
 
 signals:
   void distanceChanged(float distance);
-  void instructionsChanged(QMap<QString, QVariant> banner);
+  void instructionsChanged(QMap<QString, QVariant> banner, bool full);
   void ETAChanged(float seconds, float seconds_typical, float distance);
 };
 

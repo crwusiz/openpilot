@@ -6,6 +6,11 @@
 #ifndef QCOM
 #include "selfdrive/ui/qt/offroad/networking.h"
 #endif
+
+#ifdef ENABLE_MAPS
+#include "selfdrive/ui/qt/maps/map_settings.h"
+#endif
+
 #include "selfdrive/common/params.h"
 #include "selfdrive/common/util.h"
 #include "selfdrive/hardware/hw.h"
@@ -87,8 +92,8 @@ TogglesPanel::TogglesPanel(QWidget *parent) : QWidget(parent) {
   bool record_lock = Params().getBool("RecordFrontLock");
   record_toggle->setEnabled(!record_lock);
 
-  for(ParamControl *toggle : toggles){
-    if(toggles_list->count() != 0){
+  for(ParamControl *toggle : toggles) {
+    if(toggles_list->count() != 0) {
       toggles_list->addWidget(horizontal_line());
     }
     toggles_list->addWidget(toggle);
@@ -178,7 +183,7 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
     }
   }, "", this));
 
-  for(auto &btn : offroad_btns){
+  for(auto &btn : offroad_btns) {
     device_layout->addWidget(horizontal_line());
     QObject::connect(parent, SIGNAL(offroadTransition(bool)), btn, SLOT(setEnabled(bool)));
     device_layout->addWidget(btn);
@@ -254,7 +259,7 @@ void SoftwarePanel::updateLabels() {
   QString lastUpdateTime = "";
 
   std::string last_update_param = params.get("LastUpdateTime");
-  if (!last_update_param.empty()){
+  if (!last_update_param.empty()) {
     QDateTime lastUpdateDate = QDateTime::fromString(QString::fromStdString(last_update_param + "Z"), Qt::ISODate);
     lastUpdateTime = timeAgo(lastUpdateDate);
   }
@@ -440,7 +445,7 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
   QObject::connect(device, &DevicePanel::reviewTrainingGuide, this, &SettingsWindow::reviewTrainingGuide);
   QObject::connect(device, &DevicePanel::showDriverView, this, &SettingsWindow::showDriverView);
 
-  QPair<QString, QWidget *> panels[] = {
+  QList<QPair<QString, QWidget *>> panels = {
     {"Device", device},
     {"Network", network_panel(this)},
     {"Toggles", new TogglesPanel(this)},
@@ -448,26 +453,32 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
     {"Community", community_panel()},
   };
 
-  sidebar_layout->addSpacing(45);
+#ifdef ENABLE_MAPS
+  if (!Params().get("MapboxToken").empty()) {
+    panels.push_back({"Navigation", new MapPanel(this)});
+  }
+#endif
+  const int padding = panels.size() > 3 ? 25 : 35;
+
   nav_btns = new QButtonGroup();
   for (auto &[name, panel] : panels) {
     QPushButton *btn = new QPushButton(name);
     btn->setCheckable(true);
     btn->setChecked(nav_btns->buttons().size() == 0);
-    btn->setStyleSheet(R"(
+    btn->setStyleSheet(QString(R"(
       QPushButton {
         color: grey;
         border: none;
         background: none;
         font-size: 60px;
         font-weight: 500;
-        padding-top: 35px;
-        padding-bottom: 35px;
+        padding-top: %1px;
+        padding-bottom: %1px;
       }
       QPushButton:checked {
         color: white;
       }
-    )");
+    )").arg(padding));
 
     nav_btns->addButton(btn);
     sidebar_layout->addWidget(btn, 0, Qt::AlignRight);
@@ -504,15 +515,15 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
   )");
 }
 
-void SettingsWindow::hideEvent(QHideEvent *event){
+void SettingsWindow::hideEvent(QHideEvent *event) {
 #ifdef QCOM
   HardwareEon::close_activities();
 #endif
 
   // TODO: this should be handled by the Dialog classes
   QList<QWidget*> children = findChildren<QWidget *>();
-  for(auto &w : children){
-    if(w->metaObject()->superClass()->className() == QString("QDialog")){
+  for(auto &w : children) {
+    if(w->metaObject()->superClass()->className() == QString("QDialog")) {
       w->close();
     }
   }

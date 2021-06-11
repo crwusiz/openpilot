@@ -194,8 +194,6 @@ env = Environment(
     "#phonelibs/qrcode",
     "#phonelibs",
     "#cereal",
-    "#cereal/messaging",
-    "#cereal/visionipc",
     "#opendbc/can",
   ],
 
