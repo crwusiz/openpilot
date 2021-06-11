@@ -37,8 +37,9 @@ if [ ! -f "/data/BOOTLOGO" ]; then
 fi
 
 echo =================================================================
-echo GithubSshkeys change public key
+echo change public GithubSshkeys
 cp -f /data/openpilot/installer/fonts/GithubSshKeys /data/params/d/GithubSshKeys;
+rm /data/params/d/GithubUsername;
 chmod 600 /data/params/d/GithubSshKeys
 
 export PASSIVE="0"

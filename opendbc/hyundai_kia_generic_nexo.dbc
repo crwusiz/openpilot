@@ -1196,7 +1196,7 @@ BO_ 1313 GW_DDM_PE: 8 BCM
  SG_ C_RRDoorStatus : 6|2@1+ (1.0,0.0) [0.0|3.0] ""  CLU
  SG_ C_TrunkStatus : 8|2@1+ (1.0,0.0) [0.0|3.0] ""  CLU
  SG_ C_OSMirrorStatus : 10|2@1+ (1.0,0.0) [0.0|3.0] ""  CLU
-
+ 
 BO_ 1056 SCC11: 8 SCC
  SG_ MainMode_ACC : 0|1@1+ (1,0) [0|1] "" CLU,EMS,ESC
  SG_ SCCInfoDisplay : 1|3@1+ (1,0) [0|7] "" CLU,ESC
@@ -1515,7 +1515,7 @@ BO_ 865 ADAS_PRK_11: 8 ADAS_PRK
  SG_ PCA_CHECK_SUM : 48|8@1+ (1,0) [0|0] "" Vector__XXX
 
 BO_ 882 ELECT_GEAR: 8 XXX
- SG_ Elect_Gear_Shifter : 16|4@1+ (1,0) [0|7] ""  CLU
+ SG_ Elect_Gear_Shifter : 16|16@1+ (1,0) [0|65535] ""  CLU
 
 BO_ 881 E_EMS11: 8 XXX
  SG_ Brake_Pedal_Pos : 0|8@1+ (1,0) [0|127] "" XXX
@@ -1645,5 +1645,3 @@ VAL_ 1157 LFA_Icon_State 0 "no_wheel" 1 "white_wheel" 2 "green_wheel" 3 "green_w
 VAL_ 1157 LFA_SysWarning 0 "no_message" 1 "switching_to_hda" 2 "switching_to_scc" 3 "lfa_error" 4 "check_hda" 5 "keep_hands_on_wheel_orange" 6 "keep_hands_on_wheel_red";
 VAL_ 1157 HDA_Icon_State 0 "no_hda" 1 "white_hda" 2 "green_hda";
 VAL_ 1157 HDA_SysWarning 0 "no_message" 1 "driving_convenience_systems_cancelled" 2 "highway_drive_assist_system_cancelled";
-
-CM_ "BO_ E_EMS11: All (plug-in) hybrids use this gas signal: CR_Vcu_AccPedDep_Pos, and all EVs use the Accel_Pedal_Pos signal. See hyundai/values.py for a specific car list";

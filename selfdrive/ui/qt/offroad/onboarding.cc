@@ -120,25 +120,25 @@ void DeclinePage::showEvent(QShowEvent *event) {
   main_layout->setSpacing(40);
 
   QLabel *text = new QLabel(this);
-  text->setText("You must accept the Terms and Conditions in order to use openpilot!");
+  text->setText("오픈파일럿을 사용하려면 약관에 동의해야 합니다!");
   text->setStyleSheet(R"(font-size: 50px;)");
   main_layout->addWidget(text, 0, Qt::AlignCenter);
 
   QHBoxLayout* buttons = new QHBoxLayout;
   main_layout->addLayout(buttons);
 
-  back_btn = new QPushButton("Back");
+  back_btn = new QPushButton("뒤로");
   buttons->addWidget(back_btn);
   buttons->addSpacing(50);
 
   QObject::connect(back_btn, &QPushButton::released, this, &DeclinePage::getBack);
 
-  uninstall_btn = new QPushButton("Decline, uninstall openpilot");
+  uninstall_btn = new QPushButton("거절, 오픈파일럿 제거");
   uninstall_btn->setStyleSheet("background-color: #E22C2C;");
   buttons->addWidget(uninstall_btn);
 
   QObject::connect(uninstall_btn, &QPushButton::released, [=](){
-    if (ConfirmationDialog::confirm("Are you sure you want to uninstall?", this)) {
+    if (ConfirmationDialog::confirm("제거하시겠습니까?", this)) {
       Params().putBool("DoUninstall", true);
     }
   });

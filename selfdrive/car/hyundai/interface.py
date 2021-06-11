@@ -306,12 +306,12 @@ class CarInterface(CarInterfaceBase):
     # ignore CAN2 address if L-CAN on the same BUS
     ret.mdpsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
     ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
-    ret.sccBus = 0 if 1056 in fingerprint[0] else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
-                                                                     else 2 if 1056 in fingerprint[2] else -1
+    ret.sccBus = 0 if 1056 in fingerprint[0] else 1 \
+                   if 1056 in fingerprint[1] and 1296 not in fingerprint[1] else 2 \
+                   if 1056 in fingerprint[2] else -1
     ret.radarOffCan = ret.sccBus == -1
     ret.openpilotLongitudinalControl = Params().get("LongControlSelect", encoding='utf8') == "1"
     ret.enableCruise = not ret.radarOffCan
-    ret.spasEnabled = False
 
     # set safety_hyundai_community only for non-SCC, MDPS harrness or SCC harrness cars or cars that have unknown issue
     if ret.radarOffCan or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or ret.sccBus == 1 or Params().get("LongControlSelect", encoding='utf8') == "0":

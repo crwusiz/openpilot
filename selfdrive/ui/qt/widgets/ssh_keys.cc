@@ -47,12 +47,15 @@ SshControl::SshControl() : AbstractControl("SSH키", "Github 사용자 ID에 등
 
 void SshControl::refresh() {
   QString param = QString::fromStdString(params.get("GithubSshKeys"));
-  std::string githubusername = Params().get("GithubUsername");
-  if (param.length()) {
+  std::string paramc = Params().get("GithubUsername");
+  if (param.length() && !paramc.empty()) {
     username_label.setText(QString::fromStdString(params.get("GithubUsername")));
     btn.setText("개인키제거");
-  } else if (githubusername.empty()) {
+  } else if (param.length() && paramc.empty()) {
     username_label.setText("Public Key");
+    btn.setText("공개키제거");
+  } else {
+    username_label.setText("");
     btn.setText("개인키사용");
   }
   btn.setEnabled(true);

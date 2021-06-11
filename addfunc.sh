@@ -18,11 +18,6 @@ echo driver monitoring times up
 cd /data/openpilot/installer/fonts && cp driver_monitor.py /data/openpilot/selfdrive/monitoring;
 
 echo =================================================================
-echo GithubSshkeys change public key
-cp -f /data/openpilot/installer/fonts/GithubSshKeys /data/params/d/GithubSshKeys;
-chmod 600 /data/params/d/GithubSshKeys
-
-echo =================================================================
 echo Reboot Now..!!
 echo =================================================================
 reboot

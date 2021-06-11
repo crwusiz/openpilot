@@ -44,7 +44,6 @@ def manager_init():
     ("LateralControlSelect", "0"),
     ("DisableShutdownd", "0"),
     ("DisableLogger", "0"),
-    ("DisableGps", "0"),
   ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))

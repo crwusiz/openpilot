@@ -90,7 +90,7 @@ class LateralPlanner():
   def update(self, sm, CP):
     try:
       lateral_control_select = 0
-      lateral_control_select = sm['controlsState'].lateralControlSelect
+      lateral_control_select = int(sm['controlsState'].lateralControlSelect)
       if lateral_control_select == 0:
         self.output_scale = sm['controlsState'].lateralControlState.pidState.output
       elif lateral_control_select == 1:

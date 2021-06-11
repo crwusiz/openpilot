@@ -1,6 +1,5 @@
-import copy
 from cereal import car
-from selfdrive.car.hyundai.values import DBC, STEER_THRESHOLD, FEATURES
+from selfdrive.car.hyundai.values import DBC, STEER_THRESHOLD, FEATURES, CAR
 from selfdrive.car.interfaces import CarStateBase
 from opendbc.can.parser import CANParser
 from selfdrive.config import Conversions as CV
@@ -22,9 +21,8 @@ class CarState(CarStateBase):
     self.lkas_button_on = True
     self.cruise_main_button = 0
     self.mdps_error_cnt = 0
-    self.spas_enabled = CP.spasEnabled
 
-    #Features set
+    # Features init
     self.has_scc13 = CP.carFingerprint in FEATURES["has_scc13"]
     self.has_scc14 = CP.carFingerprint in FEATURES["has_scc14"]
     self.not_lkas = CP.carFingerprint in FEATURES["not_lkas"]
@@ -94,11 +92,12 @@ class CarState(CarStateBase):
     ret.brakePressed = cp.vl["TCS13"]["DriverBraking"] != 0
     ret.brakeLights = bool(cp.vl["TCS13"]['BrakeLight'] or ret.brakePressed)
 
-    if self.CP.carFingerprint in FEATURES["use_elect_ems_gears"]:
-      ret.gas = cp.vl["E_EMS11"]["Accel_Pedal_Pos"] / 256.
-      ret.gasPressed = ret.gas > 5
+    if self.CP.carFingerprint in FEATURES["ev_car"]:
+      ret.gas = cp.vl["E_EMS11"]["Accel_Pedal_Pos"] / 254.
+    elif self.CP.carFingerprint in FEATURES["hev_car"]:
+      ret.gas = cp.vl["E_EMS11"]["CR_Vcu_AccPedDep_Pos"] / 254.
     else:
-      ret.gas = cp.vl["EMS12"]["PV_AV_CAN"] / 100
+      ret.gas = cp.vl["EMS12"]["PV_AV_CAN"] / 100.
       ret.gasPressed = bool(cp.vl["EMS16"]["CF_Ems_AclAct"])
 
     #TPMS
@@ -144,7 +143,7 @@ class CarState(CarStateBase):
       else:
         ret.gearShifter = GearShifter.unknown
     # Gear Selecton - This is only compatible with optima hybrid 2017
-    elif self.CP.carFingerprint in FEATURES["use_elect_ems_gears"]:
+    elif self.CP.carFingerprint in FEATURES["use_elect_gears"]:
       gear = cp.vl["ELECT_GEAR"]["Elect_Gear_Shifter"]
       if gear in (5, 8):  # 5: D, 8: sport mode
         ret.gearShifter = GearShifter.drive
@@ -153,6 +152,18 @@ class CarState(CarStateBase):
       elif gear == 0:
         ret.gearShifter = GearShifter.park
       elif gear == 7:
+        ret.gearShifter = GearShifter.reverse
+      else:
+        ret.gearShifter = GearShifter.unknown
+    elif self.CP.carFingerprint in FEATURES["use_elect_gears"] and self.CP.carFingerprint in CAR[CAR.NEXO]:
+      gear = cp.vl["ELECT_GEAR"]["Elect_Gear_Shifter"]
+      if gear == 1546:
+        ret.gearShifter = GearShifter.drive
+      elif gear == 2314:
+        ret.gearShifter = GearShifter.neutral
+      elif gear == 2569:
+        ret.gearShifter = GearShifter.park
+      elif gear == 2566:
         ret.gearShifter = GearShifter.reverse
       else:
         ret.gearShifter = GearShifter.unknown
@@ -201,10 +212,6 @@ class CarState(CarStateBase):
       self.scc13 = cp_scc.vl["SCC13"]
     if self.has_scc14:
       self.scc14 = cp_scc.vl["SCC14"]
-    if self.spas_enabled:
-      self.ems11 = cp.vl["EMS11"]
-      self.mdps11_strang = cp_mdps.vl["MDPS11"]["CR_Mdps_StrAng"]
-      self.mdps11_stat = cp_mdps.vl["MDPS11"]["CF_Mdps_Stat"]
 
     self.lkas_error = cp_cam.vl["LKAS11"]["CF_Lkas_LdwsSysState"] == 7
     if not self.lkas_error and not self.not_lkas:
@@ -329,11 +336,13 @@ class CarState(CarStateBase):
       ("CGW4", 5),
       ("WHL_SPD11", 50),
     ]
+
     if CP.sccBus == 0 and CP.enableCruise:
       checks += [
         ("SCC11", 50),
         ("SCC12", 50),
       ]
+
     if CP.mdpsBus == 0:
       signals += [
         ("CR_Mdps_StrColTq", "MDPS12", 0),
@@ -351,6 +360,7 @@ class CarState(CarStateBase):
       checks += [
         ("MDPS12", 50)
       ]
+
     if CP.sasBus == 0:
       signals += [
         ("SAS_Angle", "SAS11", 0),
@@ -359,11 +369,13 @@ class CarState(CarStateBase):
       checks += [
         ("SAS11", 100)
       ]
+
     if CP.sccBus == -1:
       signals += [
         ("CRUISE_LAMP_M", "EMS16", 0),
         ("CF_Lvr_CruiseSet", "LVR12", 0),
     ]
+
     if CP.carFingerprint in FEATURES["use_cluster_gears"]:
       signals += [
         ("CF_Clu_InhibitD", "CLU15", 0),
@@ -371,19 +383,46 @@ class CarState(CarStateBase):
         ("CF_Clu_InhibitN", "CLU15", 0),
         ("CF_Clu_InhibitR", "CLU15", 0),
       ]
+      checks += [
+        ("CLU15", 5)
+      ]
     elif CP.carFingerprint in FEATURES["use_tcu_gears"]:
       signals += [
         ("CUR_GR", "TCU12",0),
       ]
-    elif CP.carFingerprint in FEATURES["use_elect_ems_gears"]:
+      checks += [
+        ("TCU12", 100)
+      ]
+    elif CP.carFingerprint in FEATURES["use_elect_gears"]:
       signals += [
         ("Elect_Gear_Shifter", "ELECT_GEAR", 0),
-    ]
+      ]
+      checks += [
+        ("ELECT_GEAR", 20)
+      ]
     else:
       signals += [
         ("CF_Lvr_Gear","LVR12",0),
       ]
-    if CP.carFingerprint not in FEATURES["use_elect_ems_gears"]:
+      checks += [
+        ("LVR12", 100)
+      ]
+
+    if CP.carFingerprint in FEATURES["ev_car"]:
+      signals += [
+        ("Accel_Pedal_Pos", "E_EMS11", 0)
+      ]
+      checks += [
+        ("E_EMS11", 50),
+      ]
+    elif CP.carFingerprint in FEATURES["hev_car"]:
+      signals += [
+        ("CR_Vcu_AccPedDep_Pos", "E_EMS11", 0)
+      ]
+      checks += [
+        ("E_EMS11", 50),
+      ]
+    else:
       signals += [
         ("PV_AV_CAN", "EMS12", 0),
         ("CF_Ems_AclAct", "EMS16", 0),
@@ -391,14 +430,6 @@ class CarState(CarStateBase):
       checks += [
         ("EMS12", 100),
         ("EMS16", 100),
-      ]
-    else:
-      signals += [
-        ("Accel_Pedal_Pos", "E_EMS11", 0),
-        ("Brake_Pedal_Pos", "E_EMS11", 0),
-      ]
-      checks += [
-        ("E_EMS11", 100),
       ]
 
     if CP.carFingerprint in FEATURES["use_fca"]:
@@ -408,32 +439,9 @@ class CarState(CarStateBase):
       ]
       if not CP.openpilotLongitudinalControl:
         checks += [("FCA11", 50)]
+
     if CP.carFingerprint in FEATURES["tcs13_remove"]:
       checks.remove(("TCS13", 50))
-    if CP.spasEnabled:
-      if CP.mdpsBus == 1:
-        signals += [
-          ("SWI_IGK", "EMS11", 0),
-          ("F_N_ENG", "EMS11", 0),
-          ("ACK_TCS", "EMS11", 0),
-          ("PUC_STAT", "EMS11", 0),
-          ("TQ_COR_STAT", "EMS11", 0),
-          ("RLY_AC", "EMS11", 0),
-          ("F_SUB_TQI", "EMS11", 0),
-          ("TQI_ACOR", "EMS11", 0),
-          ("N", "EMS11", 0),
-          ("TQI", "EMS11", 0),
-          ("TQFR", "EMS11", 0),
-          ("VS", "EMS11", 0),
-          ("RATIO_TQI_BAS_MAX_STND", "EMS11", 0),
-        ]
-        checks += [("EMS11", 100)]
-      elif CP.mdpsBus == 0:
-        signals += [
-          ("CR_Mdps_StrAng", "MDPS11", 0),
-          ("CF_Mdps_Stat", "MDPS11", 0),
-        ]
-        checks += [("MDPS11", 100)]
 
     if CP.enableBsm:
       signals += [
@@ -472,14 +480,7 @@ class CarState(CarStateBase):
       checks += [
         ("MDPS12", 50)
       ]
-      if CP.spasEnabled:
-        signals += [
-          ("CR_Mdps_StrAng", "MDPS11", 0),
-          ("CF_Mdps_Stat", "MDPS11", 0),
-        ]
-        checks += [
-          ("MDPS11", 100),
-        ]
+
     if CP.sasBus == 1:
       signals += [
         ("SAS_Angle", "SAS11", 0),

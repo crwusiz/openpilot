@@ -452,10 +452,9 @@ struct CarParams {
   fingerprintSource @49: FingerprintSource;
   networkLocation @50 :NetworkLocation;  # Where Panda/C2 is integrated into the car's CAN network
 
-  mdpsBus @62: Int8;
   sasBus @58: Int8;
   sccBus @59: Int8;
-  spasEnabled @60: Bool;
+  mdpsBus @60: Int8;
   enableAutoHold @61 :Bool;
 
   struct LateralParams {

@@ -683,20 +683,28 @@ CHECKSUM = {
 }
 
 FEATURES = {
-  "use_cluster_gears": # Use Cluster for Gear Selection, rather than Transmission
+  "use_cluster_gears": # Use Cluster for Gear Selection, rather than Transmission [ CLU15 ]
     set([CAR.ELANTRA_I30, CAR.KONA, CAR.GRANDEUR, CAR.MOHAVE, CAR.NIRO_HEV, CAR.CADENZA]),
-  "use_tcu_gears": # Use TCU Message for Gear Selection
+  "use_tcu_gears": # Use TCU Message for Gear Selection [ TCU12 ]
     set([CAR.SONATA19, CAR.VELOSTER, CAR.OPTIMA]),
-  "use_elect_ems_gears": # Use Elect GEAR Message for Gear Selection
-    set([CAR.SONATA_HEV, CAR.SONATA19_HEV, CAR.KONA_EV, CAR.KONA_HEV, CAR.IONIQ_EV, CAR.IONIQ_HEV, CAR.GRANDEUR_HEV, CAR.GRANDEUR20_HEV, CAR.NEXO,
-         CAR.OPTIMA_HEV, CAR.OPTIMA20_HEV, CAR.CADENZA_HEV, CAR.NIRO_EV, CAR.SOUL_EV]),
-  "use_fca": # these cars use the FCA11 message for the AEB and FCW signals, all others use SCC12
+  "use_elect_gears": # Use Elect GEAR Message for Gear Selection [ ELECT_GEAR ]
+    set([CAR.KONA_EV, CAR.IONIQ_EV, CAR.NEXO, CAR.NIRO_EV, CAR.SOUL_EV,
+         CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV,
+         CAR.SONATA_HEV, CAR.SONATA19_HEV, CAR.GRANDEUR_HEV, CAR.GRANDEUR20_HEV,
+         CAR.OPTIMA_HEV, CAR.OPTIMA20_HEV, CAR.CADENZA_HEV]),
+  # Gear not set is [ LVR12 ]
+  "ev_car":
+    set([CAR.KONA_EV, CAR.IONIQ_EV, CAR.NEXO, CAR.NIRO_EV, CAR.SOUL_EV]),
+  "hev_car":
+    set([CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV,
+         CAR.SONATA_HEV, CAR.SONATA19_HEV, CAR.GRANDEUR_HEV, CAR.GRANDEUR20_HEV,
+         CAR.OPTIMA_HEV, CAR.OPTIMA20_HEV, CAR.CADENZA_HEV]),
+  "use_fca": # these cars use the [ FCA11 ] message for the AEB and FCW signals, all others use [ SCC12 ]
     set([CAR.SONATA, CAR.PALISADE, CAR.ELANTRA_I30, CAR.ELANTRA21, CAR.KONA, CAR.KONA_HEV, CAR.IONIQ_EV, CAR.IONIQ_HEV,
          CAR.GENESIS_G70, CAR.FORTE, CAR.STINGER]),
   "not_lkas": # not lkas error car set
     set([CAR.SONATA, CAR.SONATA_HEV, CAR.PALISADE, CAR.SANTA_FE, CAR.KONA, CAR.KONA_EV, CAR.NIRO_EV]),
   "tcs13_remove": set([CAR.SANTA_FE]),
-  "use_bsd": set([]), # blindspot signal
   "has_scc13": set([]), # scc13 signal
   "has_scc14": set([]), # scc14 signal
   # new lfa car - carcontroller lfamfc / hyundaican lfamfc using qt ui mfcselect toggle set
@@ -727,7 +735,7 @@ DBC = {
   CAR.GRANDEUR_HEV: dbc_dict('hyundai_kia_generic', None),
   CAR.GRANDEUR20: dbc_dict('hyundai_kia_generic', None),
   CAR.GRANDEUR20_HEV: dbc_dict('hyundai_kia_generic', None),
-  CAR.NEXO: dbc_dict('hyundai_kia_generic', None),
+  CAR.NEXO: dbc_dict('hyundai_kia_generic_nexo', None),
   # kia
   CAR.FORTE: dbc_dict('hyundai_kia_generic', None),
   CAR.OPTIMA: dbc_dict('hyundai_kia_generic', None),

@@ -323,7 +323,6 @@ QWidget * network_panel(QWidget * parent) {
   layout->addWidget(new PrebuiltToggle());
   layout->addWidget(new ShutdowndToggle());
   layout->addWidget(new LoggerToggle());
-  layout->addWidget(new GpsToggle());
   layout->addWidget(horizontal_line());
   const char* gitpull = "/data/openpilot/gitpull.sh ''";
   layout->addWidget(new ButtonControl("Git Pull", "실행", "사용중인 브랜치의 최근 수정된 내용으로 변경됩니다.", [=]() {
