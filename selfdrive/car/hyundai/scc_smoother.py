@@ -356,17 +356,10 @@ class SccSmoother:
     gas_gain = clip(self.gas_gain, 0.7, 1.3)
     brake_gain = clip(self.brake_gain, 0.7, 1.3)
 
-    lead = self.get_lead(sm)
-    if lead is not None and lead.radar:
-      if accel > 0:
-        accel *= gas_gain
-      else:
-        accel *= brake_gain #* interp(lead.dRel, [3., 20.], [1.1, 1.0])
+    if accel > 0:
+      accel *= gas_gain
     else:
-      if accel > 0:
-        accel *= gas_gain
-      else:
-        accel *= brake_gain
+      accel *= brake_gain
 
     return accel
 
