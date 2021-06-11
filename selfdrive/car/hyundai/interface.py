@@ -68,7 +68,7 @@ class CarInterface(CarInterfaceBase):
 
     # longitudinal
     ret.longitudinalTuning.kpBP = [0, 10. * CV.KPH_TO_MS, 20. * CV.KPH_TO_MS, 40. * CV.KPH_TO_MS, 70. * CV.KPH_TO_MS, 100. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]
-    ret.longitudinalTuning.kpV = [1.1, 0.91, 0.68, 0.58, 0.52, 0.43, 0.325]
+    ret.longitudinalTuning.kpV = [1.2, 0.91, 0.68, 0.58, 0.52, 0.43, 0.325]
     ret.longitudinalTuning.kiBP = [0, 130. * CV.KPH_TO_MS]
     ret.longitudinalTuning.kiV = [0.065, 0.013]
     ret.longitudinalTuning.kfBP = [50. * CV.KPH_TO_MS, 100. * CV.KPH_TO_MS]
@@ -77,14 +77,14 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalTuning.deadzoneV = [0., 0.015]
 
     ret.gasMaxBP = [0., 10. * CV.KPH_TO_MS, 20. * CV.KPH_TO_MS, 50. * CV.KPH_TO_MS, 70. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]
-    ret.gasMaxV = [0.52, 0.39, 0.312, 0.2145, 0.169, 0.143]
+    ret.gasMaxV = [0.52, 0.39, 0.3, 0.21, 0.169, 0.143]
 
     ret.brakeMaxBP = [0, 70. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]
     ret.brakeMaxV = [1.7, 1.3, 0.78]
 
-    ret.stoppingBrakeRate = 0.15  # brake_travel/s while trying to stop
+    ret.stoppingBrakeRate = 0.2  # brake_travel/s while trying to stop
     ret.startingBrakeRate = 1.0  # brake_travel/s while releasing on restart
-    ret.startAccel = 1.2
+    ret.startAccel = 1.5
 
     # genesis
     if candidate == CAR.GENESIS:
@@ -156,11 +156,12 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.6
       tire_stiffness_factor = 0.7
       ret.centerToFront = ret.wheelbase * 0.4
-    elif candidate in [CAR.IONIQ, CAR.IONIQ_EV_LTD]:
+    elif candidate in [CAR.IONIQ, CAR.IONIQ_EV_LTD, CAR.IONIQ_EV_2020, CAR.IONIQ_PHEV]:
       ret.mass = 1490. + STD_CARGO_KG
       ret.wheelbase = 2.7
-      tire_stiffness_factor = 0.7
-      ret.centerToFront = ret.wheelbase * 0.4
+      tire_stiffness_factor = 0.385
+      #if candidate not in [CAR.IONIQ_EV_2020, CAR.IONIQ_PHEV]:
+      #  ret.minSteerSpeed = 32 * CV.MPH_TO_MS
     elif candidate in [CAR.GRANDEUR_IG, CAR.GRANDEUR_IG_HEV]:
       tire_stiffness_factor = 0.8
       ret.mass = 1640. + STD_CARGO_KG

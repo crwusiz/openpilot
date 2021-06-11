@@ -40,6 +40,8 @@ class CAR:
   KONA_HEV = "HYUNDAI KONA HEV 2019"
   IONIQ = "HYUNDAI IONIQ HYBRID PREMIUM 2017"
   IONIQ_EV_LTD = "HYUNDAI IONIQ ELECTRIC LIMITED 2019"
+  IONIQ_EV_2020 = "HYUNDAI IONIQ ELECTRIC 2020"
+  IONIQ_PHEV = "HYUNDAI IONIQ PHEV 2020"
   SANTA_FE = "HYUNDAI SANTA FE LIMITED 2019"
   PALISADE = "HYUNDAI PALISADE 2020"
   VELOSTER = "HYUNDAI VELOSTER 2019"
@@ -182,6 +184,9 @@ FINGERPRINTS = {
     },{
     127: 8, 304: 8, 320: 8, 339: 8, 352: 8, 356: 4, 544: 7, 593: 8, 688: 5, 832: 8, 881: 8, 882: 8, 897: 8, 902: 8, 903: 8, 916: 8, 1040: 8, 1056: 8, 1057: 8, 1078: 4, 1136: 8, 1151: 6, 1168: 7, 1173: 8, 1265: 4, 1280: 1, 1287: 4, 1290: 8, 1291: 8, 1292: 8, 1294: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1355: 8, 1363: 8, 1369: 8, 1407: 8, 1419: 8, 1425: 2, 1426: 8, 1427: 6, 1429: 8, 1430: 8, 1456: 4, 1470: 8, 1507: 8, 1535: 8
   }],
+  CAR.IONIQ_EV_2020: [{
+    127: 8, 304: 8, 320: 8, 339: 8, 352: 8, 356: 4, 524: 8, 544: 7, 593: 8, 688: 5, 832: 8, 881: 8, 882: 8, 897: 8, 902: 8, 903: 8, 905: 8, 909: 8, 916: 8, 1040: 8, 1042: 8, 1056: 8, 1057: 8, 1078: 4, 1136: 8, 1151: 6, 1155: 8, 1156: 8, 1157: 4, 1164: 8, 1168: 7, 1173: 8, 1183: 8, 1186: 2, 1191: 2, 1225: 8, 1265: 4, 1280: 1, 1287: 4, 1290: 8, 1291: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1355: 8, 1363: 8, 1369: 8, 1379: 8, 1407: 8, 1419: 8, 1426: 8, 1427: 6, 1429: 8, 1430: 8, 1456: 4, 1470: 8, 1473: 8, 1507: 8, 1535: 8, 1988: 8, 1996: 8, 2000: 8, 2004: 8, 2005: 8, 2008: 8, 2012: 8, 2013: 8
+  }],
   CAR.SANTA_FE: [{
     67: 8, 127: 8, 304: 8, 320: 8, 339: 8, 356: 4, 544: 8, 593: 8, 608: 8, 688: 6, 809: 8, 832: 8, 854: 7, 870: 7, 871: 8, 872: 8, 897: 8, 902: 8, 903: 8, 905: 8, 909: 8, 916: 8, 1040: 8, 1042: 8, 1056: 8, 1057: 8, 1078: 4, 1107: 5, 1136: 8, 1151: 6, 1155: 8, 1156: 8, 1162: 8, 1164: 8, 1168: 7, 1170: 8, 1173: 8, 1183: 8, 1186: 2, 1191: 2, 1227: 8, 1265: 4, 1280: 1, 1287: 4, 1290: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1363: 8, 1369: 8, 1379: 8, 1384: 8, 1407: 8, 1414: 3, 1419: 8, 1427: 6, 1456: 4, 1470: 8
     },{
@@ -307,6 +312,38 @@ ECU_FINGERPRINT = {
 IGNORED_FINGERPRINTS = [CAR.VELOSTER, CAR.GENESIS_G70, CAR.KONA, CAR.CEED, CAR.SELTOS]
 
 FW_VERSIONS = {
+  CAR.IONIQ_PHEV: {
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\000AEhe SCC FHCUP      1.00 1.02 99110-G2100         ',
+    ],
+    (Ecu.eps, 0x7d4, None): [
+      b'\xf1\000AE  MDPS C 1.00 1.01 56310/G2510 4APHC101',
+    ],
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\000AEP MFC  AT USA LHD 1.00 1.01 95740-G2600 190819',
+    ],
+    (Ecu.engine, 0x7e0, None): [
+      b'\xf1\x816H6F6051\000\000\000\000\000\000\000\000',
+    ],
+    (Ecu.transmission, 0x7e1, None): [
+      b'\xf1\x816U3J9051\000\000\xf1\0006U3H1_C2\000\0006U3J9051\000\000PAE0G16NL0\x82zT\xd2',
+    ],
+  },
+  CAR.IONIQ_EV_2020: {
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00AEev SCC F-CUP      1.00 1.01 99110-G7000         ',
+      b'\xf1\x00AEev SCC F-CUP      1.00 1.00 99110-G7200         ',
+    ],
+    (Ecu.eps, 0x7d4, None): [
+      b'\xf1\x00AE  MDPS C 1.00 1.01 56310/G7310 4APEC101',
+      b'\xf1\x00AE  MDPS C 1.00 1.01 56310/G7560 4APEC101',
+    ],
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00AEE MFC  AT EUR LHD 1.00 1.01 95740-G2600 190819',
+      b'\xf1\x00AEE MFC  AT EUR LHD 1.00 1.03 95740-G2500 190516',
+      b'\xf1\x00AEE MFC  AT EUR RHD 1.00 1.01 95740-G2600 190819',
+    ],
+  },
   CAR.IONIQ_EV_LTD: {
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00AEev SCC F-CUP      1.00 1.00 96400-G7000         ',
@@ -712,18 +749,14 @@ FEATURES = {
 
   # Use E_GEAR Message for Gear Selection
   "use_elect_gears": {CAR.K5_HEV, CAR.IONIQ_EV_LTD, CAR.KONA_EV, CAR.KONA_HEV, CAR.SONATA_HEV, CAR.NIRO_EV, CAR.K7_HEV,
-                      CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IG_FL_HEV},
-
-  # Use E_EMS11 Message for Gas and Brake for Hybrid/ELectric
-  "use_elect_ems": {CAR.K5_HEV, CAR.IONIQ_EV_LTD, CAR.KONA_EV, CAR.KONA_HEV, CAR.SONATA_HEV, CAR.NIRO_EV, CAR.K7_HEV,
-                    CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IG_FL_HEV},
+                      CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IG_FL_HEV, CAR.IONIQ_EV_2020, CAR.IONIQ_PHEV},
 
   # send LFA MFA message for new HKG models
   "send_lfa_mfa": {CAR.SONATA, CAR.PALISADE, CAR.SONATA_HEV, CAR.SANTA_FE, CAR.NIRO_EV, CAR.GRANDEUR_IG_FL, CAR.GRANDEUR_IG_FL_HEV,
                    CAR.SELTOS, CAR.KONA_EV, CAR.KONA_HEV, CAR.TUCSON_TL_SCC, CAR.ELANTRA_2021, CAR.K9, CAR.GENESIS_G90},
 
   # these cars use the FCA11 message for the AEB and FCW signals, all others use SCC12
-  "use_fca": {CAR.SONATA, CAR.ELANTRA, CAR.ELANTRA_GT_I30, CAR.STINGER, CAR.IONIQ, CAR.KONA, CAR.KONA_EV, CAR.FORTE,
+  "use_fca": {CAR.SONATA, CAR.ELANTRA, CAR.ELANTRA_GT_I30, CAR.STINGER, CAR.IONIQ, CAR.IONIQ_EV_2020, CAR.IONIQ_PHEV, CAR.KONA, CAR.KONA_EV, CAR.FORTE,
               CAR.PALISADE, CAR.GENESIS_G70, CAR.SANTA_FE, CAR.SELTOS, CAR.ELANTRA_2021, CAR.K9, CAR.GENESIS_G90},
 
   "use_blinker_flash": {CAR.SONATA_LF_TURBO},
@@ -733,6 +766,11 @@ FEATURES = {
 
   "use_ldws": False,
 }
+
+HYBRID_CAR = {CAR.K5_HEV, CAR.KONA_HEV, CAR.NIRO_HEV, CAR.SONATA_HEV, CAR.SONATA19_HEV, CAR.K7_HEV,
+              CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IG_FL_HEV, CAR.IONIQ_PHEV}
+
+EV_CAR = {CAR.IONIQ_EV_LTD, CAR.IONIQ_EV_2020, CAR.KONA_EV, CAR.NIRO_EV}
 
 DBC = {
   # genesis
@@ -756,6 +794,8 @@ DBC = {
   CAR.KONA_HEV: dbc_dict('hyundai_kia_generic', None),
   CAR.IONIQ: dbc_dict('hyundai_kia_generic', None),
   CAR.IONIQ_EV_LTD: dbc_dict('hyundai_kia_generic', None),
+  CAR.IONIQ_PHEV: dbc_dict('hyundai_kia_generic', None),
+  CAR.IONIQ_EV_2020: dbc_dict('hyundai_kia_generic', None),
   CAR.SANTA_FE: dbc_dict('hyundai_kia_generic', None),
   CAR.PALISADE: dbc_dict('hyundai_kia_generic', None),
   CAR.VELOSTER: dbc_dict('hyundai_kia_generic', None),
