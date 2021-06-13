@@ -127,8 +127,8 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
     }
   });
 
-  device_layout->addWidget(horizontal_line());
-  device_layout->addLayout(reset_layout);
+  main_layout->addWidget(horizontal_line());
+  main_layout->addLayout(reset_layout);
 
   // offroad-only buttons
   QList<ButtonControl*> offroad_btns;
