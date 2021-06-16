@@ -32,16 +32,19 @@ def accel_hysteresis(accel, accel_steady):
 SP_CARS = [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80,
            CAR.GENESIS_EQ900, CAR.GENESIS_EQ900_L, CAR.K9, CAR.GENESIS_G90]
 
-def process_hud_alert(enabled, fingerprint, visual_alert, left_lane, right_lane, left_lane_depart, right_lane_depart):
+def process_hud_alert(enabled, fingerprint, visual_alert, left_lane, right_lane,
+                      left_lane_depart, right_lane_depart):
 
-  sys_warning = (visual_alert == VisualAlert.steerRequired)
-  if sys_warning:
-      sys_warning = 1 if fingerprint in SP_CARS else 3
+  sys_warning = (visual_alert in [VisualAlert.steerRequired, VisualAlert.ldw])
 
-  if enabled or sys_warning:
-      sys_state = 3
-  else:
-      sys_state = 1
+  # initialize to no line visible
+  sys_state = 1
+  if left_lane and right_lane or sys_warning:  # HUD alert only display when LKAS status is active
+    sys_state = 3 if enabled or sys_warning else 4
+  elif left_lane:
+    sys_state = 5
+  elif right_lane:
+    sys_state = 6
 
   # initialize to no warnings
   left_lane_warning = 0
