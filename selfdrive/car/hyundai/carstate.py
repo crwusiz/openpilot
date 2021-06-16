@@ -121,13 +121,15 @@ class CarState(CarStateBase):
     # TODO: Check this
     ret.brakeLights = bool(cp.vl["TCS13"]['BrakeLight'] or ret.brakePressed)
 
+    ret.gasPressed = cp.vl["TCS13"]["DriverOverride"] == 1
+
     if self.CP.carFingerprint in (HYBRID_CAR | EV_CAR):
       if self.CP.carFingerprint in HYBRID_CAR:
         ret.gas = cp.vl["E_EMS11"]["CR_Vcu_AccPedDep_Pos"] / 254.
       else:
         ret.gas = cp.vl["E_EMS11"]["Accel_Pedal_Pos"] / 254.
-      ret.gasPressed = ret.gas > 0
-    else:
+
+    if self.CP.hasEms:
       ret.gas = cp.vl["EMS12"]['PV_AV_CAN'] / 100.
       ret.gasPressed = bool(cp.vl["EMS16"]["CF_Ems_AclAct"])
 

@@ -5,7 +5,7 @@ from common.numpy_fast import clip
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, \
   create_scc11, create_scc12, create_scc13, create_scc14, \
-  create_mdps12, create_lfahda_mfc, create_hda_mfc
+  create_mdps12, create_lfahda_mfc
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
 from selfdrive.car.hyundai.values import Buttons, CAR, FEATURES, CarControllerParams
 from opendbc.can.packer import CANPacker
@@ -28,28 +28,28 @@ def accel_hysteresis(accel, accel_steady):
 
   return accel, accel_steady
 
-def process_hud_alert(enabled, fingerprint, visual_alert, left_lane,
-                      right_lane, left_lane_depart, right_lane_depart):
-  sys_warning = (visual_alert in [VisualAlert.steerRequired, VisualAlert.ldw])
 
-  # initialize to no line visible
-  sys_state = 1
-  if left_lane and right_lane or sys_warning:  # HUD alert only display when LKAS status is active
-    sys_state = 3 if enabled or sys_warning else 4
-  elif left_lane:
-    sys_state = 5
-  elif right_lane:
-    sys_state = 6
+SP_CARS = [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80,
+           CAR.GENESIS_EQ900, CAR.GENESIS_EQ900_L, CAR.K9, CAR.GENESIS_G90]
+
+def process_hud_alert(enabled, fingerprint, visual_alert, left_lane, right_lane, left_lane_depart, right_lane_depart):
+
+  sys_warning = (visual_alert == VisualAlert.steerRequired)
+  if sys_warning:
+      sys_warning = 1 if fingerprint in SP_CARS else 3
+
+  if enabled or sys_warning:
+      sys_state = 3
+  else:
+      sys_state = 1
 
   # initialize to no warnings
   left_lane_warning = 0
   right_lane_warning = 0
   if left_lane_depart:
-    left_lane_warning = 1 if fingerprint in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80,
-                                             CAR.GENESIS_EQ900, CAR.GENESIS_EQ900_L] else 2
+    left_lane_warning = 1 if fingerprint in SP_CARS else 2
   if right_lane_depart:
-    right_lane_warning = 1 if fingerprint in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80,
-                                              CAR.GENESIS_EQ900, CAR.GENESIS_EQ900_L] else 2
+    right_lane_warning = 1 if fingerprint in SP_CARS else 2
 
   return sys_warning, sys_state, left_lane_warning, right_lane_warning
 
@@ -171,6 +171,8 @@ class CarController():
 
     if pcm_cancel_cmd and (self.longcontrol and not self.mad_mode_enabled):
       can_sends.append(create_clu11(self.packer, frame % 0x10, CS.scc_bus, CS.clu11, Buttons.CANCEL, clu11_speed))
+    else:
+      can_sends.append(create_mdps12(self.packer, frame, CS.mdps12))
 
     # fix auto resume - by neokii
     if CS.out.cruiseState.standstill:
@@ -201,9 +203,6 @@ class CarController():
 
     # scc smoother
     self.scc_smoother.update(enabled, can_sends, self.packer, CC, CS, frame, apply_accel, controls)
-
-    if CS.mdps_bus:  # send mdps12 to LKAS to prevent LKAS error
-      can_sends.append(create_mdps12(self.packer, frame, CS.mdps12))
 
     controls.apply_accel = apply_accel
     aReqValue = CS.scc12["aReqValue"]
@@ -248,10 +247,7 @@ class CarController():
 
     # 20 Hz LFA MFA message
     if frame % 5 == 0:
-      activated_hda = road_speed_limiter_get_active()
       if self.car_fingerprint in FEATURES["send_lfa_mfa"]:
-        can_sends.append(create_lfahda_mfc(self.packer, enabled, activated_hda))
-      elif CS.mdps_bus == 0:
-        can_sends.append(create_hda_mfc(self.packer, activated_hda))
+        can_sends.append(create_lfahda_mfc(self.packer, enabled))
 
     return can_sends
