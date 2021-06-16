@@ -53,7 +53,7 @@ class SccSmoother:
   def kph_to_clu(self, kph):
     return int(kph * CV.KPH_TO_MS * self.speed_conv_to_clu)
 
-  def __init__(self, gas_gain, brake_gain, curvature_gain):
+  def __init__(self, gas_factor, brake_factor, curvature_factor):
 
     self.longcontrol = Params().get_bool('LongControlEnabled')
     self.slow_on_curves = Params().get_bool('SccSmootherSlowOnCurves')
@@ -67,9 +67,9 @@ class SccSmoother:
     self.min_set_speed_clu = self.kph_to_clu(MIN_SET_SPEED_KPH)
     self.max_set_speed_clu = self.kph_to_clu(MAX_SET_SPEED_KPH)
 
-    self.gas_gain = clip(gas_gain, 0.7, 1.3)
-    self.brake_gain = clip(brake_gain, 0.7, 1.3)
-    self.curvature_gain = curvature_gain
+    self.gas_factor = clip(gas_factor, 0.7, 1.3)
+    self.brake_factor = clip(brake_factor, 0.7, 1.3)
+    self.curvature_factor = curvature_factor
 
     self.target_speed = 0.
 
@@ -293,7 +293,7 @@ class SccSmoother:
         curv = curv[5:TRAJECTORY_SIZE-10]
         a_y_max = 2.975 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
         v_curvature = np.sqrt(a_y_max / np.clip(np.abs(curv), 1e-4, None))
-        model_speed = np.mean(v_curvature) * 0.9 * self.curvature_gain
+        model_speed = np.mean(v_curvature) * 0.9 * self.curvature_factor
 
         if model_speed < v_ego:
           self.curve_speed_ms = float(max(model_speed, MIN_CURVE_SPEED))
@@ -353,20 +353,20 @@ class SccSmoother:
 
   def get_accel(self, CS, sm, accel):
 
-    gas_gain = clip(self.gas_gain, 0.7, 1.3)
-    brake_gain = clip(self.brake_gain, 0.7, 1.3)
+    gas_factor = clip(self.gas_factor, 0.7, 1.3)
+    brake_factor = clip(self.brake_factor, 0.7, 1.3)
 
     lead = self.get_lead(sm)
     if lead is not None:
       if accel > 0:
-        accel *= gas_gain
+        accel *= gas_factor
       else:
-        accel *= brake_gain * interp(lead.dRel, [1., 4.5], [1.5, 1.0])
+        accel *= brake_factor * interp(lead.dRel, [1., 5.], [1.5, 1.0])
     else:
       if accel > 0:
-        accel *= gas_gain
+        accel *= gas_factor
       else:
-        accel *= brake_gain
+        accel *= brake_factor
 
     return accel
 
