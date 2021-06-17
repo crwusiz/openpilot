@@ -100,6 +100,7 @@ typedef struct UIScene {
   float tpmsFl, tpmsFr, tpmsRl, tpmsRr;
   int lateralControlSelect;
   float output_scale;
+  bool ui_tpms;
 
   cereal::PandaState::PandaType pandaType;
 

@@ -43,9 +43,6 @@ Panda::Panda(){
     (hw_type == cereal::PandaState::PandaType::DOS);
   has_rtc = (hw_type == cereal::PandaState::PandaType::UNO) ||
             (hw_type == cereal::PandaState::PandaType::DOS);
-
-  printf("hw_type: %d, is_pigeon=%d !!!!!\n", (int)hw_type, (int)is_pigeon);
-
   return;
 
 fail:

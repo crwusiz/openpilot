@@ -137,12 +137,16 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 1510. + STD_CARGO_KG
         ret.wheelbase = 2.630
         ret.steerRatio = 13.0
-    elif candidate in [CAR.CADENZA, CAR.CADENZA_HEV]:
+    elif candidate in [CAR.K7, CAR.K7_HEV]:
         ret.mass = 1730. + STD_CARGO_KG
         ret.wheelbase = 2.855
         ret.steerRatio = 12.5
+    elif candidate == CAR.K9:
+        ret.mass = 2005. + STD_CARGO_KG
+        ret.wheelbase = 3.15
+        ret.steerRatio = 16.5
 
-# -----------------------------------------------------------------
+    # -----------------------------------------------------------------
     if Params().get("LateralControlSelect", encoding='utf8') == "0":
       if candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
           ret.lateralTuning.pid.kf = 0.00005
@@ -226,7 +230,7 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.lqr.c = [1., 0.]
           ret.lateralTuning.lqr.k = [-105.0, 450.0]
           ret.lateralTuning.lqr.l = [0.22, 0.318]
-      elif candidate in [CAR.CADENZA, CAR.CADENZA_HEV]:
+      elif candidate in [CAR.K7, CAR.K7_HEV]:
           ret.lateralTuning.init('lqr')
           ret.lateralTuning.lqr.scale = 1700.
           ret.lateralTuning.lqr.ki = 0.012

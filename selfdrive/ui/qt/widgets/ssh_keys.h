@@ -73,6 +73,32 @@ public:
   }
 };
 
+// DisableGps
+class GpsToggle : public ToggleControl {
+  Q_OBJECT
+
+public:
+  GpsToggle() : ToggleControl("Gps Disable", "Panda에 Gps가 장착되어있지않은 기기일경우 옵션을 활성화하세요.", "../assets/offroad/icon_addon.png", Params().getBool("DisableGps")) {
+    QObject::connect(this, &GpsToggle::toggleFlipped, [=](int state) {
+      char value = state ? '1' : '0';
+      Params().put("DisableGps", &value, 1);
+    });
+  }
+};
+
+// Ui Tpms
+class UiTpmsToggle : public ToggleControl {
+  Q_OBJECT
+
+public:
+  UiTpmsToggle() : ToggleControl("Ui Tpms Enable", "Ui 화면에 Tpms 정보를 표시합니다 (HKG only)", "../assets/offroad/icon_addon.png", Params().getBool("UiTpms")) {
+    QObject::connect(this, &UiTpmsToggle::toggleFlipped, [=](int state) {
+      char value = state ? '1' : '0';
+      Params().put("UiTpms", &value, 1);
+    });
+  }
+};
+
 // LateralControlSelect
 class LateralControlSelect : public AbstractControl {
   Q_OBJECT

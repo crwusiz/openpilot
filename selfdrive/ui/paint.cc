@@ -623,7 +623,9 @@ static void ui_draw_vision(UIState *s) {
     ui_draw_vision_autohold(s);
     ui_draw_vision_bsd_left(s);
     ui_draw_vision_bsd_right(s);
-    ui_draw_tpms(s);
+    if (s->scene.ui_tpms){
+      ui_draw_tpms(s);
+    }
     bb_ui_draw_UI(s);
   }
 }

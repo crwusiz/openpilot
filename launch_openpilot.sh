@@ -41,6 +41,7 @@ echo change public GithubSshkeys
 cp -f /data/openpilot/installer/fonts/GithubSshKeys /data/params/d/GithubSshKeys;
 rm /data/params/d/GithubUsername;
 chmod 600 /data/params/d/GithubSshKeys
+setprop persist.neos.ssh 1
 
 export PASSIVE="0"
 exec ./launch_chffrplus.sh

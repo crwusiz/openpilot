@@ -7,7 +7,7 @@ Ecu = car.CarParams.Ecu
 # Steer torque limits
 class CarControllerParams:
   def __init__(self, CP):
-    if CP.carFingerprint in [CAR.GRANDEUR, CAR.GRANDEUR_HEV, CAR.GRANDEUR20, CAR.GRANDEUR20_HEV, CAR.CADENZA, CAR.CADENZA_HEV]:
+    if CP.carFingerprint in [CAR.GRANDEUR, CAR.GRANDEUR_HEV, CAR.GRANDEUR20, CAR.GRANDEUR20_HEV, CAR.K7, CAR.K7_HEV]:
       self.STEER_MAX = 255
       self.STEER_DELTA_UP = 3
       self.STEER_DELTA_DOWN = 5
@@ -60,8 +60,9 @@ class CAR:
   NIRO_HEV = "KIA NIRO HEV 2018 (DE)"
   SOUL_EV = "KIA SOUL EV 2019 (SK3)"
   SELTOS = "KIA SELTOS 2019 (SP2)"
-  CADENZA = "KIA K7 2016-2019 (YG)"
-  CADENZA_HEV = "KIA K7 HEV 2017-2019 (YG)"
+  K7 = "KIA K7 2016-2019 (YG)"
+  K7_HEV = "KIA K7 HEV 2017-2019 (YG)"
+  K9 = "KIA K9 2019-2021 (RJ)"
 
 # ---------------------------------------------------------------------------------------
 # E-CAN Signal CAR
@@ -189,11 +190,14 @@ FINGERPRINTS = {
   CAR.SELTOS: [{
     67: 8, 127: 8, 304: 8, 320: 8, 339: 8, 354: 8, 356: 4, 544: 8, 593: 8, 608: 8, 688: 6, 809: 8, 832: 8, 854: 8, 870: 7, 871: 8, 872: 8, 897: 8, 902: 8, 905: 8, 909: 8, 910: 5, 911: 5, 913: 8, 916: 8, 1040: 8, 1042: 8, 1056: 8, 1057: 8, 1078: 4, 1107: 5, 1114: 8, 1136: 8, 1145: 8, 1151: 8, 1155: 8, 1156: 8, 1157: 4, 1162: 8, 1164: 8, 1168: 8, 1170: 8, 1173: 8, 1186: 2, 1191: 2, 1225: 8, 1265: 4, 1280: 8, 1287: 4, 1290: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1363: 8, 1369: 8, 1379: 8, 1384: 8, 1394: 8, 1407: 8, 1414: 3, 1419: 8, 1427: 6, 1446: 8, 1456: 4, 1470: 8, 1485: 8, 1911: 8
   }],
-  CAR.CADENZA: [{
+  CAR.K7: [{
     67: 8, 68: 8, 127: 8, 304: 8, 320: 8, 339: 8, 356: 4, 544: 8, 546: 8, 593: 8, 608: 8, 688: 5, 809: 8, 832: 8, 854: 7, 870: 7, 871: 8, 872: 8, 897: 8, 902: 8, 903: 8, 916: 8, 1040: 8, 1056: 8, 1057: 8, 1078: 4, 1107: 5, 1136: 8, 1151: 6, 1156: 8, 1157: 4, 1162: 4, 1168: 7, 1170: 8, 1173: 8, 1265: 4, 1280: 1, 1287: 4, 1290: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1363: 8, 1369: 8, 1371: 8, 1378: 4, 1384: 8, 1407: 8, 1419: 8, 1427: 6, 1444: 8, 1456: 4, 1470: 8
   }],
-  CAR.CADENZA_HEV: [{
+  CAR.K7_HEV: [{
     68: 8, 127: 8, 304: 8, 320: 8, 339: 8, 352: 8, 356: 4, 544: 8, 549: 8, 576: 8, 593: 8, 688: 5, 832: 8, 865: 8, 881: 8, 882: 8, 897: 8, 902: 8, 903: 8, 905: 8, 909: 8, 913: 8, 916: 8, 1040: 8, 1042: 8, 1056: 8, 1057: 8, 1078: 4, 1096: 8, 1102: 8, 1108: 8, 1136: 6, 1138: 5, 1151: 8, 1155: 8, 1156: 8, 1157: 4, 1162: 8, 1164: 8, 1168: 7, 1173: 8, 1180: 8, 1186: 2, 1191: 2, 1210: 8, 1227: 8, 1265: 4, 1268: 8, 1280: 1, 1287: 4, 1290: 8, 1291: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1343: 8, 1345: 8, 1348: 8, 1355: 8, 1363: 8, 1369: 8, 1371: 8, 1378: 8, 1379: 8, 1407: 8, 1419: 8, 1427: 6, 1429: 8, 1430: 8, 1448: 8, 1456: 4, 1470: 8, 1476: 8, 1535: 8
+  }],
+  CAR.K9: [{
+    67: 8, 127: 8, 304: 8, 320: 8, 339: 8, 356: 4, 544: 8, 593: 8, 608: 8, 688: 5, 809: 8, 832: 8, 854: 7, 870: 7, 871: 8, 872: 8, 897: 8, 902: 8, 903: 8, 905: 8, 909: 8, 916: 8, 1056: 8, 1057: 8, 1078: 4, 1107: 5, 1136: 8, 1151: 6, 1155: 8, 1156: 8, 1157: 4, 1162: 8, 1164: 8, 1168: 7, 1170: 8, 1173: 8, 1184: 8, 1186: 2, 1191: 2, 1227: 8, 1265: 4, 1280: 4, 1287: 4, 1290: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1363: 8, 1369: 8, 1379: 8, 1384: 8, 1407: 8, 1419: 8, 1427: 6, 1456: 4, 1470: 8
   }],
 }
 
@@ -672,7 +676,7 @@ FW_VERSIONS = {
       b'\xf1\x87954A22D200\xf1\x81T01950A1  \xf1\000T0190XBL  T01950A1  DSP2T16X4X950NS8\r\xfe\x9c\x8b',
      ],
   },
-  CAR.CADENZA: {
+  CAR.K7: {
     (Ecu.eps, 0x7d4, None): [b'\xf1\000YG  MDPS C 1.00 1.01 56310F6350\000 4YG7C101',],
   },
 }
@@ -684,24 +688,24 @@ CHECKSUM = {
 
 FEATURES = {
   "use_cluster_gears": # Use Cluster for Gear Selection, rather than Transmission [ CLU15 ]
-    set([CAR.ELANTRA_I30, CAR.KONA, CAR.GRANDEUR, CAR.MOHAVE, CAR.NIRO_HEV, CAR.CADENZA]),
+    set([CAR.ELANTRA_I30, CAR.KONA, CAR.GRANDEUR, CAR.MOHAVE, CAR.NIRO_HEV, CAR.K7]),
   "use_tcu_gears": # Use TCU Message for Gear Selection [ TCU12 ]
     set([CAR.SONATA19, CAR.VELOSTER, CAR.OPTIMA]),
   "use_elect_gears": # Use Elect GEAR Message for Gear Selection [ ELECT_GEAR ]
     set([CAR.KONA_EV, CAR.IONIQ_EV, CAR.NEXO, CAR.NIRO_EV, CAR.SOUL_EV,
          CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV,
          CAR.SONATA_HEV, CAR.SONATA19_HEV, CAR.GRANDEUR_HEV, CAR.GRANDEUR20_HEV,
-         CAR.OPTIMA_HEV, CAR.OPTIMA20_HEV, CAR.CADENZA_HEV]),
+         CAR.OPTIMA_HEV, CAR.OPTIMA20_HEV, CAR.K7_HEV]),
   # Gear not set is [ LVR12 ]
   "ev_car":
     set([CAR.KONA_EV, CAR.IONIQ_EV, CAR.NEXO, CAR.NIRO_EV, CAR.SOUL_EV]),
   "hev_car":
     set([CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV,
          CAR.SONATA_HEV, CAR.SONATA19_HEV, CAR.GRANDEUR_HEV, CAR.GRANDEUR20_HEV,
-         CAR.OPTIMA_HEV, CAR.OPTIMA20_HEV, CAR.CADENZA_HEV]),
+         CAR.OPTIMA_HEV, CAR.OPTIMA20_HEV, CAR.K7_HEV]),
   "use_fca": # these cars use the [ FCA11 ] message for the AEB and FCW signals, all others use [ SCC12 ]
     set([CAR.SONATA, CAR.PALISADE, CAR.ELANTRA_I30, CAR.ELANTRA21, CAR.KONA, CAR.KONA_HEV, CAR.IONIQ_EV, CAR.IONIQ_HEV,
-         CAR.GENESIS_G70, CAR.FORTE, CAR.STINGER]),
+         CAR.GENESIS_G70, CAR.FORTE, CAR.STINGER, CAR.K9]),
   "not_lkas": # not lkas error car set
     set([CAR.SONATA, CAR.SONATA_HEV, CAR.PALISADE, CAR.SANTA_FE, CAR.KONA, CAR.KONA_EV, CAR.NIRO_EV]),
   "tcs13_remove": set([CAR.SANTA_FE]),
@@ -750,8 +754,9 @@ DBC = {
   CAR.NIRO_HEV: dbc_dict('hyundai_kia_generic', None),
   CAR.SOUL_EV: dbc_dict('hyundai_kia_generic', None),
   CAR.SELTOS: dbc_dict('hyundai_kia_generic', None),
-  CAR.CADENZA: dbc_dict('hyundai_kia_generic', None),
-  CAR.CADENZA_HEV: dbc_dict('hyundai_kia_generic', None),
+  CAR.K7: dbc_dict('hyundai_kia_generic', None),
+  CAR.K7_HEV: dbc_dict('hyundai_kia_generic', None),
+  CAR.K9: dbc_dict('hyundai_kia_generic', None),
 }
 
 STEER_THRESHOLD = 150

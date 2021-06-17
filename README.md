@@ -13,7 +13,9 @@ crwusiz openpilot
 
 [![](https://i.imgur.com/W8XLxVH.png)](#)
 
-[![](https://i.imgur.com/P99obkp.png)](#)
+[![](https://i.imgur.com/aspMjGT.jpg)](#)
+
+[![](https://i.imgur.com/1DB7gyL.jpg)](#)
 
 - kor NanumGothic font / Comma Bootlogo / Bootanimation Auto install
 - event message, ui kor translate
