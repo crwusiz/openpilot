@@ -756,7 +756,11 @@ static void bb_ui_draw_UI(UIState *s)
 static void ui_draw_vision_scc_gap(UIState *s) {
   const UIScene *scene = &s->scene;
   auto car_state = (*s->sm)["carState"].getCarState();
+  auto scc_smoother = s->scene.car_control.getSccSmoother();
+
   int gap = car_state.getCruiseGap();
+  bool longControl = scc_smoother.getLongControl();
+  int autoTrGap = scc_smoother.getAutoTrGap();
 
   const int radius = 96;
   const int center_x = s->viz_rect.x + radius + (bdr_s * 2);
@@ -776,7 +780,7 @@ static void ui_draw_vision_scc_gap(UIState *s) {
   if(gap <= 0) {
     snprintf(str, sizeof(str), "N/A");
   }
-  else if(gap == 1) {
+  else if(longControl && gap == autoTrGap) {
     snprintf(str, sizeof(str), "AUTO");
     textColor = nvgRGBA(120, 255, 120, 200);
   }

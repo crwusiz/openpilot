@@ -186,11 +186,11 @@ class CarState(CarStateBase):
         ret.gearShifter = GearShifter.unknown
 
     if self.CP.carFingerprint in FEATURES["use_fca"]:
-      ret.stockAeb = cp.vl["FCA11"]['FCA_CmdAct'] != 0
-      ret.stockFcw = cp.vl["FCA11"]['CF_VSM_Warn'] == 2
+      ret.stockAeb = cp.vl["FCA11"]["FCA_CmdAct"] != 0
+      ret.stockFcw = cp.vl["FCA11"]["CF_VSM_Warn"] == 2
     else:
-      ret.stockAeb = cp.vl["SCC12"]['AEB_CmdAct'] != 0
-      ret.stockFcw = cp.vl["SCC12"]['CF_VSM_Warn'] == 2
+      ret.stockAeb = cp.vl["SCC12"]["AEB_CmdAct"] != 0
+      ret.stockFcw = cp.vl["SCC12"]["CF_VSM_Warn"] == 2
 
     # Blind Spot Detection and Lane Change Assist signals
     if self.CP.enableBsm:

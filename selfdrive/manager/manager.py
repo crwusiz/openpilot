@@ -24,6 +24,8 @@ from selfdrive.version import dirty, get_git_commit, version, origin, branch, co
                               get_git_branch, get_git_remote
 from selfdrive.hardware.eon.apk import system
 
+sys.path.append(os.path.join(BASEDIR, "pyextra"))
+
 def manager_init():
 
   # update system time from panda

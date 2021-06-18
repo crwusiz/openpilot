@@ -317,6 +317,8 @@ struct CarControl {
     roadLimitSpeedActive @4 :Int32;
     roadLimitSpeed @5 :UInt32;
     roadLimitSpeedLeftDist @6 :UInt32;
+
+    autoTrGap @7 :UInt32;
   }
 
   struct Actuators {

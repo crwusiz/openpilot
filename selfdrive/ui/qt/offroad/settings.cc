@@ -3,6 +3,8 @@
 #include <cassert>
 #include <string>
 
+#include <QDebug>
+
 #ifndef QCOM
 #include "selfdrive/ui/qt/offroad/networking.h"
 #endif
@@ -16,7 +18,6 @@
 #include "selfdrive/hardware/hw.h"
 #include "selfdrive/ui/qt/widgets/controls.h"
 #include "selfdrive/ui/qt/widgets/input.h"
-#include "selfdrive/ui/qt/widgets/offroad_alerts.h"
 #include "selfdrive/ui/qt/widgets/scrollview.h"
 #include "selfdrive/ui/qt/widgets/ssh_keys.h"
 #include "selfdrive/ui/qt/widgets/toggle.h"
@@ -277,7 +278,7 @@ void SoftwarePanel::updateLabels() {
   updateBtn->setEnabled(true);
   gitBranchLbl->setText(QString::fromStdString(params.get("GitBranch")));
   gitCommitLbl->setText(QString::fromStdString(params.get("GitCommit")).left(10));
-  osVersionLbl->setText(QString::fromStdString(Hardware::get_os_version()));
+  osVersionLbl->setText(QString::fromStdString(Hardware::get_os_version()).trimmed());
 }
 
 QWidget * network_panel(QWidget * parent) {
