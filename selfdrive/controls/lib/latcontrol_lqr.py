@@ -64,7 +64,7 @@ class LatControlLQR():
     # Update Kalman filter
     angle_steers_k = float(self.C.dot(self.x_hat))
     e = steering_angle_no_offset - angle_steers_k
-    self.x_hat = self.A.dot(self.x_hat) + self.B.dot(CS.steeringTorqueEps * 0.9 / torque_scale) + self.L.dot(e)
+    self.x_hat = self.A.dot(self.x_hat) + self.B.dot(CS.steeringTorqueEps / torque_scale) + self.L.dot(e)
 
     if CS.vEgo < 0.3 or not active:
       lqr_log.active = False

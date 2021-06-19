@@ -5,13 +5,12 @@
 #include <QString>
 #include <QTimer>
 
-class CommaApi : public QObject {
-  Q_OBJECT
+namespace CommaApi {
 
-public:
-  static QByteArray rsa_sign(const QByteArray &data);
-  static QString create_jwt(const QJsonObject &payloads = {}, int expiry = 3600);
-};
+QByteArray rsa_sign(const QByteArray &data);
+QString create_jwt(const QJsonObject &payloads = {}, int expiry = 3600);
+
+}  // namespace CommaApi
 
 /**
  * Makes a request to the request endpoint.
@@ -21,14 +20,15 @@ class HttpRequest : public QObject {
   Q_OBJECT
 
 public:
-  explicit HttpRequest(QObject* parent, const QString &requestURL, const QString &cache_key = "", bool create_jwt_ = true);
-  QNetworkReply *reply;
+  explicit HttpRequest(QObject* parent, const QString &requestURL, bool create_jwt_ = true);
   void sendRequest(const QString &requestURL);
+
+protected:
+  QNetworkReply *reply;
 
 private:
   QNetworkAccessManager *networkAccessManager;
   QTimer *networkTimer;
-  QString cache_key;
   bool create_jwt;
 
 private slots:

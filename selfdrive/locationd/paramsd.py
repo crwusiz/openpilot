@@ -6,7 +6,7 @@ import json
 import numpy as np
 
 import cereal.messaging as messaging
-from cereal import car, log
+from cereal import car
 from common.params import Params, put_nonblocking
 from common.realtime import set_realtime_priority, DT_MDL
 from common.numpy_fast import clip
