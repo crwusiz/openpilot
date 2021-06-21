@@ -50,7 +50,7 @@ def manager_init():
     ("SccSmootherSlowOnCurves", "0"),
     ("SccSmootherSyncGasPressed", "0"),
     ("ShowDebugUI", "0"),
-    ("FuseWithStockScc", "0"),
+    ("FuseWithStockScc", "1"),
     ("CustomLeadMark", "0")
   ]
   if not PC:
