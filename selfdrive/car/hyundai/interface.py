@@ -180,10 +180,12 @@ class CarInterface(CarInterfaceBase):
       tire_stiffness_factor = 0.9
       ret.centerToFront = ret.wheelbase * 0.4
     elif candidate == CAR.TUCSON_TL_SCC:
-      ret.mass = 1985. + STD_CARGO_KG #1730
-      ret.wheelbase = 2.78 # 2.67
-      tire_stiffness_factor = 0.6
+      ret.mass = 1594. + STD_CARGO_KG #1730
+      ret.wheelbase = 2.67
+      tire_stiffness_factor = 0.7
       ret.centerToFront = ret.wheelbase * 0.4
+      ret.maxSteeringAngleDeg = 120.
+      ret.startAccel = 0.5
     # kia
     elif candidate == CAR.SORENTO:
       ret.mass = 1985. + STD_CARGO_KG
