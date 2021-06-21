@@ -146,7 +146,7 @@ class CarInterface(CarInterfaceBase):
         ret.wheelbase = 3.15
         ret.steerRatio = 16.5
 
-    # -----------------------------------------------------------------
+    # -----------------------------------------------------------------PID
     if Params().get("LateralControlSelect", encoding='utf8') == "0":
       if candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
           ret.lateralTuning.pid.kf = 0.00005
@@ -166,7 +166,7 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.pid.kpV = [0.25]
           ret.lateralTuning.pid.kiBP = [0.]
           ret.lateralTuning.pid.kiV = [0.05]
-# -----------------------------------------------------------------
+    # -----------------------------------------------------------------INDI
     elif Params().get("LateralControlSelect", encoding='utf8') == "1":
       if candidate in [CAR.GENESIS]:
           ret.lateralTuning.init('indi')
@@ -208,7 +208,7 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.indi.timeConstantV = [1.4]
           ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
           ret.lateralTuning.indi.actuatorEffectivenessV = [2.3]
-# -----------------------------------------------------------------
+    # -----------------------------------------------------------------LQR
     elif Params().get("LateralControlSelect", encoding='utf8') == "2":
       if candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
           ret.lateralTuning.init('lqr')
@@ -223,13 +223,13 @@ class CarInterface(CarInterfaceBase):
       elif candidate in [CAR.OPTIMA, CAR.OPTIMA_HEV]:
           ret.lateralTuning.init('lqr')
           ret.lateralTuning.lqr.scale = 1700.0
-          ret.lateralTuning.lqr.ki = 0.03
-          ret.lateralTuning.lqr.dcGain = 0.003
+          ret.lateralTuning.lqr.ki = 0.016
+          ret.lateralTuning.lqr.dcGain = 0.002
           ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
           ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
           ret.lateralTuning.lqr.c = [1., 0.]
-          ret.lateralTuning.lqr.k = [-105.0, 450.0]
-          ret.lateralTuning.lqr.l = [0.22, 0.318]
+          ret.lateralTuning.lqr.k = [-110.0, 451.0]
+          ret.lateralTuning.lqr.l = [0.33, 0.318]
       elif candidate in [CAR.K7, CAR.K7_HEV]:
           ret.lateralTuning.init('lqr')
           ret.lateralTuning.lqr.scale = 1700.
@@ -270,7 +270,7 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.lqr.c = [1., 0.]
           ret.lateralTuning.lqr.k = [-105.0, 450.0]
           ret.lateralTuning.lqr.l = [0.22, 0.318]
-# -----------------------------------------------------------------
+    # -----------------------------------------------------------------
 
     ret.centerToFront = ret.wheelbase * 0.4
 

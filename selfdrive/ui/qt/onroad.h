@@ -42,7 +42,6 @@ private:
     {AudibleAlert::CHIME_DING, {"../assets/sounds/ding.wav", false}},
     {AudibleAlert::CHIME_DING_REPEAT, {"../assets/sounds/ding.wav", false}},
     {AudibleAlert::CHIME_GEARD, {"../assets/sounds/geard.wav", false}},
-    {AudibleAlert::CHIME_ALCA, {"../assets/sounds/alca.wav", false}},
     {AudibleAlert::CHIME_SEATBELT, {"../assets/sounds/seatbelt.wav", false}},
     {AudibleAlert::CHIME_VISION, {"../assets/sounds/vision.wav", false}},
     {AudibleAlert::CHIME_DISTRACTED, {"../assets/sounds/distracted.wav", false}},

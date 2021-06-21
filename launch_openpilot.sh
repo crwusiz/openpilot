@@ -31,13 +31,16 @@ fi
 
 if [ ! -f "/data/BOOTLOGO" ]; then
     /usr/bin/touch /data/BOOTLOGO
+    # lepro bootlogo
     dd if=/data/openpilot/installer/fonts/splash.img of=/dev/block/bootdevice/by-name/splash
+    # op3t bootlogo
+    dd if=/data/openpilot/installer/fonts/logo.bin of=/dev/block/bootdevice/by-name/LOGO
     echo =================================================================
     echo Comma boot logo change complete
 fi
 
 echo =================================================================
-echo change public GithubSshkeys
+echo change public GithubSshkeys and force ssh enable
 cp -f /data/openpilot/installer/fonts/GithubSshKeys /data/params/d/GithubSshKeys;
 rm /data/params/d/GithubUsername;
 chmod 600 /data/params/d/GithubSshKeys
@@ -45,4 +48,3 @@ setprop persist.neos.ssh 1
 
 export PASSIVE="0"
 exec ./launch_chffrplus.sh
-

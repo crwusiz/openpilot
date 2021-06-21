@@ -394,7 +394,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
       "도로를 주시하세요",
       "운전자 도로주시 불안",
       AlertStatus.userPrompt, AlertSize.mid,
-      Priority.MID, VisualAlert.steerRequired, AudibleAlert.chimeDistracted, 2., .1, .1),
+      Priority.MID, VisualAlert.steerRequired, AudibleAlert.chimeDistracted, 3., .1, .1),
   },
 
   EventName.driverDistracted: {
@@ -486,7 +486,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
       "차선을 변경합니다",
       "후측방 차량에 주의하세요",
       AlertStatus.normal, AlertSize.mid,
-      Priority.LOW, VisualAlert.none, AudibleAlert.chimeAlca, 4., .1, .1),
+      Priority.LOW, VisualAlert.none, AudibleAlert.none, .0, .1, .1),
   },
 
   EventName.steerSaturated: {

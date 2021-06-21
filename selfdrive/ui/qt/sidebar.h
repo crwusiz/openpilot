@@ -15,7 +15,7 @@ class Sidebar : public QFrame {
   Q_PROPERTY(QString netType MEMBER net_type NOTIFY valueChanged);
   Q_PROPERTY(QImage netStrength MEMBER net_strength NOTIFY valueChanged);
   Q_PROPERTY(QString wifiAddr MEMBER wifi_addr NOTIFY valueChanged);
-  
+
 public:
   explicit Sidebar(QWidget* parent = 0);
 
@@ -35,7 +35,7 @@ private:
 
   QImage home_img, settings_img;
   const QMap<cereal::DeviceState::NetworkType, QString> network_type = {
-    {cereal::DeviceState::NetworkType::NONE, "--"},
+    {cereal::DeviceState::NetworkType::NONE, "────────"},
     {cereal::DeviceState::NetworkType::WIFI, "WiFi"},
     {cereal::DeviceState::NetworkType::CELL2_G, "2G"},
     {cereal::DeviceState::NetworkType::CELL3_G, "3G"},

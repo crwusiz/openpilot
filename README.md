@@ -2,7 +2,7 @@ crwusiz openpilot
 =====
 
 <b> This Branch is xx979xx HKG_community base comma devel-staging v0.8.5</b>
-- <b> v0.8.5 [ white and gray panda allow , OP3T not work(using v0.8.2) ] </b>
+- <b> v0.8.5 [ allow white panda and gray panda, OP3T support (/installer/op3t_neos_update.sh) ] </b>
 - If you have any questions, please send a message to crwusiz from discord. if you like this Branch <b> [Donate](https://paypal.me/crwusiz) </b>for me
 
 [![](https://i.imgur.com/TMtVMV8.png)](#)
@@ -23,9 +23,9 @@ crwusiz openpilot
 - brake, bsd, autohold icon
 - sidebar wifi ipaddress from neokii
 - sidebar battery charging and battery percent display
-- lateralcontrolselect ( Pid / Indi / Lqr )
-- mfcselect ( lkas / ldws / lfa )
-- longcontrolselect ( mad / long )
+- lateralcontrolselect ( PID / INDI / LQR )
+- mfcselect ( LKAS / LDWS / LFA )
+- longcontrolselect ( MAD / LONG )
 - add toggle function
 - setting ui icon & emoji update
 

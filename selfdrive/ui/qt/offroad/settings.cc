@@ -324,7 +324,7 @@ QWidget * network_panel(QWidget * parent) {
   layout->addWidget(new ShutdowndToggle());
   layout->addWidget(new LoggerToggle());
   layout->addWidget(new GpsToggle());
-  layout->addWidget(new UiTpmsToggle());  
+  layout->addWidget(new UiTpmsToggle());
   layout->addWidget(horizontal_line());
   const char* gitpull = "/data/openpilot/gitpull.sh ''";
   layout->addWidget(new ButtonControl("Git Pull", "실행", "사용중인 브랜치의 최근 수정된 내용으로 변경됩니다.", [=]() {
@@ -352,11 +352,11 @@ QWidget * network_panel(QWidget * parent) {
                                       }));
   const char* cal_ok = "cp -f /data/openpilot/installer/fonts/CalibrationParams /data/params/d/";
   layout->addWidget(new ButtonControl("켈리브레이션 강제 활성화", "실행", "인게이지 테스트를위해 캘리브레이션을 강제 활성화 합니다",
-                                      [=]() { 
+                                      [=]() {
                                         if (ConfirmationDialog::confirm("실행하시겠습니까?")) {
                                           std::system(cal_ok);
                                         }
-                                      }));  
+                                      }));
   layout->addStretch(1);
 
   QWidget *w = new QWidget;

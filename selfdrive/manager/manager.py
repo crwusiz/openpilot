@@ -151,6 +151,7 @@ def manager_thread():
 
     if params.get_bool("DisableShutdownd"):
       not_run.append("shutdownd")
+
     if params.get_bool("DisableLogger"):
       not_run.append("loggerd")
       not_run.append("deleter")
@@ -163,9 +164,9 @@ def manager_thread():
     ensure_running(managed_processes.values(), started, driverview, not_run)
 
     # trigger an update after going offroad
-    if started_prev and not started and 'updated' in managed_processes:
-      os.sync()
-      managed_processes['updated'].signal(signal.SIGHUP)
+    #if started_prev and not started and 'updated' in managed_processes:
+    #  os.sync()
+    #  managed_processes['updated'].signal(signal.SIGHUP)
 
     started_prev = started
 

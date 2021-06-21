@@ -363,12 +363,11 @@ struct CarControl {
       chimeDing @9;
       chimeDingRepeat @ 10;
       chimeGeard @11;
-      chimeAlca @12;
-      chimeSeatbelt @13;
-      chimeVision @14;
-      chimeDistracted @15;
-      chimeEngage2 @16;
-      chimeDisengage2 @17;
+      chimeSeatbelt @12;
+      chimeVision @13;
+      chimeDistracted @14;
+      chimeEngage2 @15;
+      chimeDisengage2 @16;
     }
   }
 
