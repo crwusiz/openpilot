@@ -5,6 +5,8 @@ import socket
 import fcntl
 import struct
 from threading import Thread
+
+from cereal import messaging
 from common.params import Params
 
 from common.numpy_fast import interp
@@ -15,6 +17,7 @@ CAMERA_SPEED_FACTOR = 1.05
 
 BROADCAST_PORT = 2899
 RECEIVE_PORT = 843
+LOCATION_PORT = 2911
 
 
 class RoadSpeedLimiter:
@@ -26,18 +29,55 @@ class RoadSpeedLimiter:
     self.slowing_down = False
     self.last_exception = None
     self.lock = threading.Lock()
+    self.remote_addr = None
 
     self.start_dist = 0
 
     self.longcontrol = Params().get_bool('LongControlEnabled')
 
-    thread = Thread(target=self.udp_recv, args=[])
+    thread = Thread(target=self.udp_recv_thread, args=[])
     thread.setDaemon(True)
     thread.start()
 
-    broadcast = Thread(target=self.broadcast_fun, args=[])
+    broadcast = Thread(target=self.broadcast_thread, args=[])
     broadcast.setDaemon(True)
     broadcast.start()
+
+    #gps = Thread(target=self.gps_thread, args=[])
+    #gps.setDaemon(True)
+    #gps.start()
+
+  def gps_thread(self):
+
+    sm = messaging.SubMaster(['gpsLocationExternal'], poll=['gpsLocationExternal'])
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+      while True:
+        try:
+          sm.update()
+          if self.remote_addr is not None and sm.updated['gpsLocationExternal']:
+            location = sm['gpsLocationExternal']
+            json_location = json.dumps([
+              location.latitude,
+              location.longitude,
+              location.altitude,
+              location.speed,
+              location.bearingDeg,
+              location.accuracy,
+              location.timestamp,
+              location.source,
+              location.vNED,
+              location.verticalAccuracy,
+              location.bearingAccuracyDeg,
+              location.speedAccuracy,
+            ])
+
+            address = (self.remote_addr[0], LOCATION_PORT)
+            sock.sendto(json_location.encode(), address)
+          else:
+            time.sleep(1.)
+        except Exception as e:
+          print("exception", e)
+          time.sleep(1.)
 
   def get_broadcast_address(self):
     try:
@@ -52,7 +92,7 @@ class RoadSpeedLimiter:
     except:
       return None
 
-  def broadcast_fun(self):
+  def broadcast_thread(self):
 
     broadcast_address = None
     frame = 0
@@ -85,7 +125,7 @@ class RoadSpeedLimiter:
       except:
         pass
 
-  def udp_recv(self):
+  def udp_recv_thread(self):
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
 
@@ -95,7 +135,7 @@ class RoadSpeedLimiter:
         while True:
 
           try:
-            data, addr = sock.recvfrom(2048)
+            data, self.remote_addr = sock.recvfrom(2048)
             json_obj = json.loads(data.decode())
 
             try:
