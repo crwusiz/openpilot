@@ -157,6 +157,7 @@ def thermald_thread():
   network_strength = NetworkStrength.unknown
   wifiIpAddress = 'N/A'
   network_info = None
+  registered_count = 0
 
   current_filter = FirstOrderFilter(0., CURRENT_TAU, DT_TRML)
   cpu_temp_filter = FirstOrderFilter(0., CPU_TEMP_TAU, DT_TRML)
@@ -237,6 +238,19 @@ def thermald_thread():
         network_strength = HARDWARE.get_network_strength(network_type)
         network_info = HARDWARE.get_network_info()  # pylint: disable=assignment-from-none
         wifiIpAddress = HARDWARE.get_ip_address()
+
+        if TICI and (network_info.get('state', None) == "REGISTERED"):
+          registered_count += 1
+        else:
+          registered_count = 0
+
+        if registered_count > 10:
+          cloudlog.warning(f"Modem stuck in registered state {network_info}")
+
+          os.system("nmcli radio wwan off")
+          os.system("nmcli radio wwan on")
+          registered_count = 0
+
       except Exception:
         cloudlog.exception("Error getting network status")
 
@@ -365,9 +379,6 @@ def thermald_thread():
       params.put_bool("IsOnroad", should_start)
       params.put_bool("IsOffroad", not should_start)
       HARDWARE.set_power_save(not should_start)
-      if TICI and not params.get_bool("EnableLteOnroad"):
-        fxn = "off" if should_start else "on"
-        os.system(f"nmcli radio wwan {fxn}")
 
     if should_start:
       off_ts = None

@@ -1,6 +1,10 @@
 # flake8: noqa
 
+from collections import defaultdict
+from typing import Dict
+
 from cereal import car
+from selfdrive.car import dbc_dict
 Ecu = car.CarParams.Ecu
 
 class CarControllerParams:
@@ -25,8 +29,10 @@ class CANBUS:
   pt = 0
   cam = 2
 
-class DBC:
+class DBC_FILES:
   mqb = "vw_mqb_2010"  # Used for all cars with MQB-style CAN messaging
+
+DBC = defaultdict(lambda: dbc_dict(DBC_FILES.mqb, None))  # type: Dict[str, Dict[str, str]]
 
 TransmissionType = car.CarParams.TransmissionType
 GearShifter = car.CarState.GearShifter
@@ -206,9 +212,10 @@ FW_VERSIONS = {
       b'\xf1\x875Q0909144T \xf1\x891072\xf1\x82\00521A20B03A1',
       b'\xf1\x875QD909144B \xf1\x891072\xf1\x82\x0521A00507A1',
       b'\xf1\x875QM909144A \xf1\x891072\xf1\x82\x0521A20B03A1',
+      b'\xf1\x875QM909144B \xf1\x891081\xf1\x82\00521A00442A1',
+      b'\xf1\x875QN909144A \xf1\x895081\xf1\x82\00571A01A16A1',
       b'\xf1\x875QN909144A \xf1\x895081\xf1\x82\00571A01A18A1',
       b'\xf1\x875QN909144A \xf1\x895081\xf1\x82\x0571A01A17A1',
-      b'\xf1\x875QM909144B \xf1\x891081\xf1\x82\00521A00442A1',
     ],
     (Ecu.fwdRadar, 0x757, None): [
       b'\xf1\x875Q0907572A \xf1\x890141\xf1\x82\00101',
