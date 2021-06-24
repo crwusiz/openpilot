@@ -90,7 +90,9 @@ class LongitudinalMpc():
       v_lead = max(0.0, lead.vLead)
       a_lead = lead.aLeadK
 
-      TR *= interp(lead.dRel, [0., 5.], [1.5, 1.])
+      dist_cost = interp(lead.dRel, [4., 10.], [MPC_COST_LONG.DISTANCE*10., MPC_COST_LONG.DISTANCE])
+      dist_cost = interp(v_ego, [60. * CV.KPH_TO_MS, 80. * CV.KPH_TO_MS], [dist_cost, MPC_COST_LONG.DISTANCE])
+      self.libmpc.set_weights(MPC_COST_LONG.TTC, dist_cost, MPC_COST_LONG.ACCELERATION, MPC_COST_LONG.JERK)
 
       if (v_lead < 0.1 or -a_lead / 2.0 > v_lead):
         v_lead = 0.0
@@ -113,6 +115,7 @@ class LongitudinalMpc():
       self.cur_state[0].v_l = v_ego + 10.0
       a_lead = 0.0
       self.a_lead_tau = _LEAD_ACCEL_TAU
+      self.libmpc.set_weights(MPC_COST_LONG.TTC, MPC_COST_LONG.DISTANCE, MPC_COST_LONG.ACCELERATION, MPC_COST_LONG.JERK)
 
     # Calculate mpc
     t = sec_since_boot()
