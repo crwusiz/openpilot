@@ -41,6 +41,10 @@ protected:
 private:
   QList<LabelControl *> labels;
   LabelControl *versionLbl;
+  LabelControl *neosLbl;
+  LabelControl *remoteLbl;
+  LabelControl *branchLbl;
+  LabelControl *commitLbl;
   LabelControl *lastUpdateTimeLbl;
   ButtonControl *updateButton;
   void updateLabels();

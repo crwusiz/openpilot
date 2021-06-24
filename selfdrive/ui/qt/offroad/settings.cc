@@ -118,16 +118,49 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
   // offroad-only buttons
   QList<ButtonControl*> offroad_btns;
 
+  QString brand = params.getBool("Passive") ? "대시캠" : "오픈파일럿";
+  offroad_btns.append(new ButtonControl(brand + " 제거", "실행", "", [=]() {
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+      Params().putBool("DoUninstall", true);
+    }
+  }, "", this));
+  offroad_btns.append(new ButtonControl("트레이닝 가이드", "실행", "", [=]() {
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+      Params().remove("CompletedTrainingVersion");
+      emit reviewTrainingGuide();
+    }
+  }, "", this));
+
   offroad_btns.append(new ButtonControl("운전자 모니터링 카메라 미리보기", "실행",
                                         "운전자 모니터링 카메라를 미리보고 최적의 장착위치를 찾아보세요.",
                                         [=]() { emit showDriverView(); }, "", this));
 
-  QString resetCalibDesc = "장치장착시 ↕ (pitch) 5˚이내 / ↔ (yaw) 4˚이내에 장착해야 합니다.";
-  ButtonControl *resetCalibBtn = new ButtonControl("캘리브레이션 초기화", "실행", resetCalibDesc, [=]() {
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      Params().remove("CalibrationParams");
+  QString resetCalibDesc = "(pitch) ↕ 5˚이내 \n(yaw) ↔ 4˚이내";
+
+  ButtonControl *resetCalibBtn = new ButtonControl("캘리브레이션 정보", "확인", "", [=]() {
+    QString desc = resetCalibDesc;
+    std::string calib_bytes = Params().get("CalibrationParams");
+    if (!calib_bytes.empty()) {
+      try {
+        AlignedBuffer aligned_buf;
+        capnp::FlatArrayMessageReader cmsg(aligned_buf.align(calib_bytes.data(), calib_bytes.size()));
+        auto calib = cmsg.getRoot<cereal::Event>().getLiveCalibration();
+        if (calib.getCalStatus() != 0) {
+          double pitch = calib.getRpyCalib()[1] * (180 / M_PI);
+          double yaw = calib.getRpyCalib()[2] * (180 / M_PI);
+          desc += QString("\n현재 장착된 위치는 [ %1° %2 / %3° %4 ] 입니다.")
+                     .arg(QString::number(std::abs(pitch), 'g', 1), pitch > 0 ? "↑" : "↓",
+                            QString::number(std::abs(yaw), 'g', 1), yaw > 0 ? "→" : "←");
+        }
+      } catch (kj::Exception) {
+        qInfo() << "캘리브레이션 상태가 유효하지않습니다";
+      }
+    }
+    if (ConfirmationDialog::confirm(desc)) {
+      //Params().remove("CalibrationParams");
     }
   }, "", this);
+
   connect(resetCalibBtn, &ButtonControl::showDescription, [=]() {
     QString desc = resetCalibDesc;
     std::string calib_bytes = Params().get("CalibrationParams");
@@ -140,36 +173,44 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
           double pitch = calib.getRpyCalib()[1] * (180 / M_PI);
           double yaw = calib.getRpyCalib()[2] * (180 / M_PI);
           desc += QString("\n현재 장착된 위치는 [ %1° %2 / %3° %4 ] 입니다.")
-                                .arg(QString::number(std::abs(pitch), 'g', 1), pitch > 0 ? "↑" : "↓",
-                                     QString::number(std::abs(yaw), 'g', 1), yaw > 0 ? "→" : "←");
+                     .arg(QString::number(std::abs(pitch), 'g', 1), pitch > 0 ? "↑" : "↓",
+                            QString::number(std::abs(yaw), 'g', 1), yaw > 0 ? "→" : "←");
         }
       } catch (kj::Exception) {
-        qInfo() << "invalid CalibrationParams";
+        qInfo() << "캘리브레이션 상태가 유효하지않습니다";
       }
     }
     resetCalibBtn->setDescription(desc);
   });
+
   offroad_btns.append(resetCalibBtn);
 
-  offroad_btns.append(new ButtonControl("트레이닝 가이드", "실행", "", [=]() {
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      Params().remove("CompletedTrainingVersion");
-      emit reviewTrainingGuide();
-    }
-  }, "", this));
-
-  QString brand = params.getBool("Passive") ? "대시캠" : "오픈파일럿";
-  offroad_btns.append(new ButtonControl(brand + " 제거", "실행", "", [=]() {
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      Params().putBool("DoUninstall", true);
-    }
-  }, "", this));
-
   for(auto &btn : offroad_btns){
-    device_layout->addWidget(horizontal_line());
+    //device_layout->addWidget(horizontal_line());
     QObject::connect(parent, SIGNAL(offroadTransition(bool)), btn, SLOT(setEnabled(bool)));
     device_layout->addWidget(btn);
   }
+
+  // cal reset and param init buttons
+  QHBoxLayout *cal_param_init_layout = new QHBoxLayout();
+  cal_param_init_layout->setSpacing(30);
+
+  QPushButton *calinit_btn = new QPushButton("캘리브레이션 초기화");
+  cal_param_init_layout->addWidget(calinit_btn);
+  QObject::connect(calinit_btn, &QPushButton::released, [=]() {
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+      Params().remove("CalibrationParams");
+    }
+  });
+
+  QPushButton *calinit_btn2 = new QPushButton("캘리브레이션 초기화/재부팅");
+  cal_param_init_layout->addWidget(calinit_btn2);
+  QObject::connect(calinit_btn2, &QPushButton::released, [=]() {
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+      Params().remove("CalibrationParams");
+      Hardware::reboot();
+    }
+  });
 
   // power buttons
   QHBoxLayout *power_layout = new QHBoxLayout();
@@ -193,7 +234,7 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
       Hardware::poweroff();
     }
   });
-
+  device_layout->addLayout(cal_param_init_layout);
   device_layout->addLayout(power_layout);
 
   setLayout(device_layout);
@@ -218,7 +259,7 @@ SoftwarePanel::SoftwarePanel(QWidget* parent) : QFrame(parent) {
     int update_failed_count = Params().get<int>("UpdateFailedCount").value_or(0);
     if (path.contains("UpdateFailedCount") && update_failed_count > 0) {
       lastUpdateTimeLbl->setText("failed to fetch update");
-      updateButton->setText("CHECK");
+      updateButton->setText("확인");
       updateButton->setEnabled(true);
     } else if (path.contains("LastUpdateTime")) {
       updateLabels();
@@ -233,6 +274,8 @@ void SoftwarePanel::showEvent(QShowEvent *event) {
 void SoftwarePanel::updateLabels() {
   Params params = Params();
   std::string brand = params.getBool("Passive") ? "대시캠" : "오픈파일럿";
+
+/*
   QList<QPair<QString, std::string>> dev_params = {
     {"버전", "v" + params.get("Version")},
     {"Git Remote", params.get("GitRemote").substr(19)},
@@ -242,8 +285,6 @@ void SoftwarePanel::updateLabels() {
     {"NEOS 버전", Hardware::get_os_version()},
   };
 
-  QString version = QString::fromStdString("v" + params.get("Version")).trimmed();
-/*
   QString lastUpdateTime = "";
 
   std::string last_update_param = params.get("LastUpdateTime");
@@ -252,14 +293,10 @@ void SoftwarePanel::updateLabels() {
     lastUpdateTime = timeAgo(lastUpdateDate);
   }
 
-  if (labels.size() < dev_params.size()) {
-    versionLbl = new LabelControl("버전", version, QString::fromStdString(params.get("릴리즈 노트")).trimmed());
-    layout()->addWidget(versionLbl);
-    layout()->addWidget(horizontal_line());
+  if (true) {
 
-    lastUpdateTimeLbl = new LabelControl("최종 업데이트", lastUpdateTime, "The last time openpilot successfully checked for an update. The updater only runs while the car is off.");
+    lastUpdateTimeLbl = new LabelControl("최종 업데이트", lastUpdateTime, "");
     layout()->addWidget(lastUpdateTimeLbl);
-    layout()->addWidget(horizontal_line());
 
     updateButton = new ButtonControl("업데이트 확인", "확인", "", [=]() {
       Params params = Params();
@@ -272,14 +309,50 @@ void SoftwarePanel::updateLabels() {
       std::system("pkill -1 -f selfdrive.updated");
     }, "", this);
     layout()->addWidget(updateButton);
-    layout()->addWidget(horizontal_line());
-  } else {
-    versionLbl->setText(version);
-    lastUpdateTimeLbl->setText(lastUpdateTime);
-    updateButton->setText("확인");
-    updateButton->setEnabled(true);
-  }
 */
+  QString version = QString::fromStdString("v" + params.get("Version"));
+  versionLbl = new LabelControl("버전", version, "");
+  layout()->addWidget(versionLbl);
+
+  QString neos = QString::fromStdString(Hardware::get_os_version());
+  neosLbl = new LabelControl("NEOS", neos, "");
+  layout()->addWidget(neosLbl);
+
+  layout()->addWidget(horizontal_line());
+  QString remote = QString::fromStdString(params.get("GitRemote").substr(19));
+  remoteLbl = new LabelControl("Git Remote", remote, "");
+  layout()->addWidget(remoteLbl);
+
+  QString branch = QString::fromStdString(params.get("GitBranch"));
+  branchLbl = new LabelControl("Git Branch", branch, "");
+  layout()->addWidget(branchLbl);
+
+  QString commit = QString::fromStdString(params.get("GitCommit").substr(0, 7));
+  commitLbl = new LabelControl("Git Commit", commit, "");
+  layout()->addWidget(commitLbl);
+
+  const char* gitpull = "/data/openpilot/gitpull.sh ''";
+  layout()->addWidget(new ButtonControl("Git Pull", "실행", "", [=]() {
+                                        if (ConfirmationDialog::confirm("실행하시겠습니까?")){
+                                          std::system(gitpull);
+                                        }
+                                      }));
+  layout()->addWidget(horizontal_line());
+  const char* panda_flash = "/data/openpilot/panda/board/flash.sh ''";
+  layout()->addWidget(new ButtonControl("판다 펌웨어 플래싱", "실행", "", [=]() {
+                                        if (ConfirmationDialog::confirm("실행하시겠습니까?")) {
+                                          std::system(panda_flash);
+                                        }
+                                      }));
+  const char* panda_recover = "/data/openpilot/panda/board/recover.sh ''";
+  layout()->addWidget(new ButtonControl("판다 펌웨어 복구", "실행", "", [=]() {
+                                        if (ConfirmationDialog::confirm("실행하시겠습니까?")) {
+                                          std::system(panda_recover);
+                                        }
+                                      }));
+  }
+
+/*
   for (int i = 0; i < dev_params.size(); i++) {
     const auto &[name, value] = dev_params[i];
     QString val = QString::fromStdString(value).trimmed();
@@ -294,6 +367,7 @@ void SoftwarePanel::updateLabels() {
     }
   }
 }
+*/
 
 QWidget * network_panel(QWidget * parent) {
   QVBoxLayout *layout = new QVBoxLayout;
@@ -326,28 +400,16 @@ QWidget * network_panel(QWidget * parent) {
   layout->addWidget(new GpsToggle());
   layout->addWidget(new UiTpmsToggle());
   layout->addWidget(horizontal_line());
-  const char* gitpull = "/data/openpilot/gitpull.sh ''";
-  layout->addWidget(new ButtonControl("Git Pull", "실행", "사용중인 브랜치의 최근 수정된 내용으로 변경됩니다.", [=]() {
-                                        if (ConfirmationDialog::confirm("실행하시겠습니까?")){
-                                          std::system(gitpull);
-                                        }
-                                      }));
-  const char* addfunc = "/data/openpilot/addfunc.sh ''";
+  const char* addfunc = "cp -f /data/openpilot/installer/fonts/driver_monitor.py /data/openpilot/selfdrive/monitoring";
   layout->addWidget(new ButtonControl("추가 기능", "실행", "추가기능을 적용합니다.", [=]() {
                                         if (ConfirmationDialog::confirm("실행하시겠습니까?")) {
                                           std::system(addfunc);
                                         }
                                       }));
-  const char* panda_flash = "/data/openpilot/panda/board/flash.sh ''";
-  layout->addWidget(new ButtonControl("판다 펌웨어 플래싱", "실행", "판다 펌웨어 플래싱을 실행합니다.", [=]() {
+  const char* realdata_clear = "rm -rf /sdcard/realdata/*";
+  layout->addWidget(new ButtonControl("주행데이터 삭제", "실행", "저장공간 확보를 위해 주행데이터를 삭제합니다.", [=]() {
                                         if (ConfirmationDialog::confirm("실행하시겠습니까?")) {
-                                          std::system(panda_flash);
-                                        }
-                                      }));
-  const char* panda_recover = "/data/openpilot/panda/board/recover.sh ''";
-  layout->addWidget(new ButtonControl("판다 펌웨어 복구", "실행", "판다 펌웨어 복구를 실행합니다.", [=]() {
-                                        if (ConfirmationDialog::confirm("실행하시겠습니까?")) {
-                                          std::system(panda_recover);
+                                          std::system(realdata_clear);
                                         }
                                       }));
   const char* cal_ok = "cp -f /data/openpilot/installer/fonts/CalibrationParams /data/params/d/";

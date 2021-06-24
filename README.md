@@ -13,31 +13,38 @@ crwusiz openpilot
 
 [![](https://i.imgur.com/W8XLxVH.png)](#)
 
-[![](https://i.imgur.com/aspMjGT.jpg)](#)
-
-[![](https://i.imgur.com/1DB7gyL.jpg)](#)
-
 - kor NanumGothic font / Comma Bootlogo / Bootanimation Auto install
 - event message, ui kor translate
 - steeringwheel rotate, tpms display
 - brake, bsd, autohold icon
-- sidebar wifi ipaddress from neokii
-- sidebar battery charging and battery percent display
+- sidebar wifi ipaddress / battery charging and battery percent display
 - lateralcontrolselect ( PID / INDI / LQR )
 - mfcselect ( LKAS / LDWS / LFA )
 - longcontrolselect ( MAD / LONG )
-- add toggle function
-- setting ui icon & emoji update
+- add toggle / function / simple ui
 
-## Harness Cable Car and Year Compatible Chart
+## Source Code Reference
+- https://github.com/commaai/openpilot
+- https://github.com/xx979xx/openpilo
+- https://github.com/xps-genesis/openpilot
+- https://github.com/kegman/openpilot
+- https://github.com/dragonpilot-community/dragonpilot
+- https://github.com/wirelessnet2/openpilot
+- https://github.com/sshane/openpilot
+- https://github.com/arne182/ArnePilot
+- https://github.com/neokii
+- https://github.com/openpilotusers
+- - -
+## Harness Cable and Car Year Compatible Chart
 
-![Connector](https://i.imgur.com/kPXaLFF.jpg)
+cable order -> https://smartstore.naver.com/hyotrade/products/5341431170
 
-![Chart](https://i.imgur.com/gw0WcZG.jpg)
-
-https://smartstore.naver.com/hyotrade/products/5341431170
------
-
+[![](https://i.imgur.com/aspMjGT.jpg)](#)
+[![](https://i.imgur.com/1DB7gyL.jpg)](#)
+[![](https://i.imgur.com/2r43I6d.jpg)](#)
+[![](https://i.imgur.com/N5IkjUX.jpg)](#)
+[![](https://i.imgur.com/HaXcjPI.jpg)](#)
+ - - -
 
 [![](https://i.imgur.com/UelUjKAh.png)](#)
 

@@ -38,7 +38,7 @@ def manager_init():
     # add
     ("IsMetric", "1"),
     ("LongControlSelect", "0"),
-    ("AutoLaneChangeEnabled", "0"),
+    ("AutoLaneChangeEnabled", "1"),
     ("PutPrebuilt", "0"),
     ("MfcSelect", "0"),
     ("LateralControlSelect", "0"),
