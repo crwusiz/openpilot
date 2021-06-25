@@ -31,6 +31,9 @@ class RoadSpeedLimiter:
     self.lock = threading.Lock()
     self.remote_addr = None
 
+    self.road_limit_speed = 0
+    self.is_highway = False
+
     self.start_dist = 0
 
     self.longcontrol = Params().get_bool('LongControlEnabled')
@@ -201,6 +204,9 @@ class RoadSpeedLimiter:
       road_limit_speed = self.get_limit_val('road_limit_speed')
       is_highway = self.get_limit_val('is_highway')
 
+      self.road_limit_speed = road_limit_speed
+      self.is_highway = is_highway
+
       cam_type = int(self.get_limit_val('cam_type', 0))
 
       cam_limit_speed_left_dist = self.get_limit_val('cam_limit_speed_left_dist')
@@ -313,3 +319,11 @@ def road_speed_limiter_get_max_speed(CS, v_cruise_kph):
     return road_speed_limiter.get_max_speed(CS, v_cruise_kph)
   finally:
     road_speed_limiter.lock.release()
+
+
+def road_speed_limiter_is_highway():
+  global road_speed_limiter
+  if road_speed_limiter is None:
+    road_speed_limiter = RoadSpeedLimiter()
+
+  return road_speed_limiter.is_highway
