@@ -111,6 +111,7 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
 
   // reset calibration button
   QPushButton *reset_calib_btn = new QPushButton("Reset Calibration and LiveParameters");
+  reset_calib_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
   reset_layout->addWidget(reset_calib_btn);
   QObject::connect(reset_calib_btn, &QPushButton::released, [=]() {
     if (ConfirmationDialog::confirm("Are you sure you want to reset calibration and live params?", this)) {
