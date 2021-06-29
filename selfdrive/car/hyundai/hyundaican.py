@@ -77,10 +77,9 @@ def create_clu11(packer, frame, bus, clu11, button, speed):
   values["CF_Clu_AliveCnt1"] = frame
   return packer.make_can_msg("CLU11", bus, values)
 
-def create_lfahda_mfc(packer, enabled, active):
+def create_lfahda_mfc(packer, enabled, active, state):
   values = {
-    "HDA_USM": 2,
-    "LFA_Icon_State": 2 if enabled else 0,
+    "LFA_Icon_State": state if enabled else 0,
     "HDA_Active": 1 if active > 1 else 0,
     "HDA_Icon_State": 2 if active > 1 else 0,
     # "HDA_VSetReq": 0,

@@ -253,7 +253,8 @@ class CarController():
         activated_hda = road_speed_limiter_get_active()
         # activated_hda: 0 - off, 1 - main road, 2 - highway
         if self.car_fingerprint in FEATURES["send_lfa_mfa"]:
-          can_sends.append(create_lfahda_mfc(self.packer, enabled, activated_hda))
+          state = 1 if self.car_fingerprint in [CAR.K9] else 2
+          can_sends.append(create_lfahda_mfc(self.packer, enabled, activated_hda, state))
         elif CS.mdps_bus == 0:
           can_sends.append(create_hda_mfc(self.packer, activated_hda))
 
