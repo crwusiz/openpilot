@@ -34,7 +34,7 @@ _A_TOTAL_MAX_BP = [20., 40.]
 
 
 def calc_cruise_accel_limits(v_ego, following):
-  a_cruise_min = interp(v_ego, _A_CRUISE_MIN_BP, _A_CRUISE_MIN_V)
+  a_cruise_min = interp(v_ego, _A_CRUISE_MIN_BP, _A_CRUISE_MIN_V) * 1.2
 
   if following:
     a_cruise_max = interp(v_ego, _A_CRUISE_MAX_BP, _A_CRUISE_MAX_V_FOLLOWING)
