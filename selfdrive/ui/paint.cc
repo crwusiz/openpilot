@@ -414,21 +414,22 @@ static void bb_ui_draw_measures_left(UIState *s, int bb_x, int bb_y, int bb_w ) 
     char uom_str[6];
     NVGcolor val_color = nvgRGBA(255, 255, 255, 200);
 
-    auto controls_state = (*s->sm)["controlsState"].getControlsState();
-    if (controls_state.getEnabled()) {
+    auto carControl = (*s->sm)["carControl"].getCarControl();
+    if (carControl.getEnabled()) {
       //show Orange if more than 6 degrees
       //show red if  more than 12 degrees
 
-      float steeringAngleDesiredDeg  = controls_state.getSteeringAngleDesiredDeg ();
+      auto actuators = carControl.getActuators();
+      float steeringAngleDeg  = actuators.getSteeringAngleDeg();
 
-      if(((int)(steeringAngleDesiredDeg ) < -30) || ((int)(steeringAngleDesiredDeg ) > 30)) {
+      if(((int)(steeringAngleDeg ) < -30) || ((int)(steeringAngleDeg ) > 30)) {
         val_color = nvgRGBA(255, 255, 255, 200);
       }
-      if(((int)(steeringAngleDesiredDeg ) < -50) || ((int)(steeringAngleDesiredDeg ) > 50)) {
+      if(((int)(steeringAngleDeg ) < -50) || ((int)(steeringAngleDeg ) > 50)) {
         val_color = nvgRGBA(255, 255, 255, 200);
       }
       // steering is in degrees
-      snprintf(val_str, sizeof(val_str), "%.1f°", steeringAngleDesiredDeg );
+      snprintf(val_str, sizeof(val_str), "%.1f°", steeringAngleDeg );
     } else {
        snprintf(val_str, sizeof(val_str), "-");
     }
