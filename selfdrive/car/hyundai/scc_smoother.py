@@ -346,12 +346,10 @@ class SccSmoother:
       dRel = lead.dRel
 
       if self.fuse_with_stock and lead.radar:
-
         if stock_accel > 0.:
           stock_weight = interp(dRel, [4., 25.], [0.7, 0.])
         else:
           stock_weight = interp(dRel, [4., 25.], [1., 0.])
-
         apply_accel = apply_accel * (1. - stock_weight) + stock_accel * stock_weight
 
     return apply_accel, dRel
@@ -361,17 +359,10 @@ class SccSmoother:
     gas_factor = clip(self.gas_factor, 0.7, 1.3)
     brake_factor = clip(self.brake_factor, 0.7, 1.3)
 
-    lead = self.get_lead(sm)
-    if lead is not None:
-      if accel > 0:
-        accel *= gas_factor
-      else:
-        accel *= brake_factor * interp(lead.dRel, [1., 5.], [1.3, 1.0])
+    if accel > 0:
+      accel *= gas_factor
     else:
-      if accel > 0:
-        accel *= gas_factor
-      else:
-        accel *= brake_factor
+      accel *= brake_factor
 
     return accel
 
