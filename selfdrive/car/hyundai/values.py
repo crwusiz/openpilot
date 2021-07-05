@@ -587,13 +587,6 @@ FW_VERSIONS = {
     (Ecu.fwdCamera, 0x7c4, None): [b'\xf1\x00JFA LKAS AT USA LHD 1.00 1.02 95895-D5000 h31',],
     (Ecu.transmission, 0x7e1, None): [b'\xf1\x816U2V8051\x00\x00\xf1\x006U2V0_C2\x00\x006U2V8051\x00\x00DJF0T16NL0\t\xd2GW',],
   },
-  CAR.OPTIMA_HEV: {
-    (Ecu.fwdRadar, 0x7d0, None): [b'\xf1\x00DEhe SCC H-CUP      1.01 1.02 96400-G5100         ',],
-    (Ecu.engine, 0x7e0, None): [b'\xf1\x816H6F4051\x00\x00\x00\x00\x00\x00\x00\x00',],
-    (Ecu.eps, 0x7d4, None): [b'\xf1\x00DE  MDPS C 1.00 1.09 56310G5301\x00 4DEHC109',],
-    (Ecu.fwdCamera, 0x7c4, None): [b'\xf1\x00DEP MFC  AT USA LHD 1.00 1.01 95740-G5010 170424',],
-    (Ecu.transmission, 0x7e1, None): [b"\xf1\x816U3J2051\x00\x00\xf1\x006U3H0_C2\x00\x006U3J2051\x00\x00PDE0G16NS2\xf4'\\\x91",],
-  },
   CAR.STINGER: {
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00CK__ SCC F_CUP      1.00 1.01 96400-J5100         \xf1\xa01.01',
@@ -650,6 +643,16 @@ FW_VERSIONS = {
       b'\xf1\000DEE MFC  AT EUR LHD 1.00 1.00 99211-Q4100 200706',
       b'\xf1\x00OSE LKAS AT EUR LHD 1.00 1.00 95740-K4100 W40',
     ],
+  },
+  CAR.NIRO_HEV: {
+    (Ecu.fwdRadar, 0x7d0, None): [b'\xf1\x00DEhe SCC H-CUP      1.01 1.02 96400-G5100         ',],
+    (Ecu.engine, 0x7e0, None): [b'\xf1\x816H6F4051\000\000\000\000\000\000\000\000',],    
+    (Ecu.eps, 0x7d4, None): [b'\xf1\000DE  MDPS C 1.00 1.09 56310G5301\000 4DEHC109',],
+    (Ecu.fwdCamera, 0x7c4, None): [b'\xf1\x00DEP MFC  AT USA LHD 1.00 1.01 95740-G5010 170424',],
+    (Ecu.transmission, 0x7e1, None): [
+      b"\xf1\x816U3J2051\000\000\xf1\0006U3H0_C2\000\0006U3J2051\000\000PDE0G16NS2\xf4\'\\\x91",
+      b'\xf1\x816U3J2051\000\000\xf1\0006U3H0_C2\000\0006U3J2051\000\000PDE0G16NS2\000\000\000\000',
+    ],    
   },
   CAR.SELTOS: {
     (Ecu.fwdRadar, 0x7d0, None): [b'\xf1\x8799110Q5100\xf1\000SP2_ SCC FHCUP      1.01 1.05 99110-Q5100         \xf1\xa01.05',],

@@ -55,13 +55,13 @@ TogglesPanel::TogglesPanel(QWidget *parent) : QWidget(parent) {
                                   "60km 이상의 속도로 주행시 방향지시등을 작동하면 3초후에 차선변경을 수행합니다. 안전한 사용을위해 후측방감지기능이 있는 차량만 사용하시기바랍니다.",
                                   "../assets/offroad/icon_lca.png",
                                   this));
-/*
   toggles.append(new ParamControl("UploadRaw",
                                   "Upload Raw Logs",
-                                  "Upload full logs and full resolution video by default while on WiFi. If not enabled, individual logs can be marked for upload at my.comma.ai/useradmin.",
+                                  "Upload full logs at my.comma.ai/useradmin.",
                                   "../assets/offroad/icon_network.png",
                                   this));
 
+/*
   ParamControl *record_toggle = new ParamControl("RecordFront",
                                                  "Record and Upload Driver Camera",
                                                 "Upload data from the driver facing camera and help improve the driver monitoring algorithm.",
@@ -130,37 +130,21 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
       emit reviewTrainingGuide();
     }
   }, "", this));
-
   offroad_btns.append(new ButtonControl("운전자 모니터링 카메라 미리보기", "실행",
                                         "운전자 모니터링 카메라를 미리보고 최적의 장착위치를 찾아보세요.",
                                         [=]() { emit showDriverView(); }, "", this));
 
-  QString resetCalibDesc = "(pitch) ↕ 5˚이내 \n(yaw) ↔ 4˚이내";
-
-  ButtonControl *resetCalibBtn = new ButtonControl("캘리브레이션 정보", "확인", "", [=]() {
-    QString desc = resetCalibDesc;
-    std::string calib_bytes = Params().get("CalibrationParams");
-    if (!calib_bytes.empty()) {
-      try {
-        AlignedBuffer aligned_buf;
-        capnp::FlatArrayMessageReader cmsg(aligned_buf.align(calib_bytes.data(), calib_bytes.size()));
-        auto calib = cmsg.getRoot<cereal::Event>().getLiveCalibration();
-        if (calib.getCalStatus() != 0) {
-          double pitch = calib.getRpyCalib()[1] * (180 / M_PI);
-          double yaw = calib.getRpyCalib()[2] * (180 / M_PI);
-          desc += QString("\n현재 장착된 위치는 [ %1° %2 / %3° %4 ] 입니다.")
-                     .arg(QString::number(std::abs(pitch), 'g', 1), pitch > 0 ? "↑" : "↓",
-                            QString::number(std::abs(yaw), 'g', 1), yaw > 0 ? "→" : "←");
-        }
-      } catch (kj::Exception) {
-        qInfo() << "캘리브레이션 상태가 유효하지않습니다";
-      }
-    }
-    if (ConfirmationDialog::confirm(desc)) {
-      //Params().remove("CalibrationParams");
+  // calibration buttons
+  QString resetCalibDesc = "범위 (pitch) ↕ 5˚ (yaw) ↔ 4˚이내";
+  ButtonControl *resetCalibBtn = new ButtonControl("캘리브레이션 초기화", "실행", resetCalibDesc, [=]() {
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+      Params().remove("CalibrationParams");
+      Params().remove("LiveParameters");
+      QTimer::singleShot(1000, []() {
+        Hardware::reboot();
+      });
     }
   }, "", this);
-
   connect(resetCalibBtn, &ButtonControl::showDescription, [=]() {
     QString desc = resetCalibDesc;
     std::string calib_bytes = Params().get("CalibrationParams");
@@ -182,37 +166,15 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
     }
     resetCalibBtn->setDescription(desc);
   });
-
   offroad_btns.append(resetCalibBtn);
 
   for(auto &btn : offroad_btns){
     //device_layout->addWidget(horizontal_line());
-    QObject::connect(parent, SIGNAL(offroadTransition(bool)), btn, SLOT(setEnabled(bool)));
+    QObject::connect(parent, SIGNAL(offroadTransition(bool)), btn, SLOT(setEnabled(false)));
     device_layout->addWidget(btn);
   }
 
-  // cal reset and param init buttons
-  QHBoxLayout *cal_param_init_layout = new QHBoxLayout();
-  cal_param_init_layout->setSpacing(30);
-
-  QPushButton *calinit_btn = new QPushButton("캘리브레이션 초기화");
-  cal_param_init_layout->addWidget(calinit_btn);
-  QObject::connect(calinit_btn, &QPushButton::released, [=]() {
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      Params().remove("CalibrationParams");
-    }
-  });
-
-  QPushButton *calinit_btn2 = new QPushButton("캘리브레이션 초기화/재부팅");
-  cal_param_init_layout->addWidget(calinit_btn2);
-  QObject::connect(calinit_btn2, &QPushButton::released, [=]() {
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      Params().remove("CalibrationParams");
-      Hardware::reboot();
-    }
-  });
-
-  // power buttons
+  // reboot and power buttons
   QHBoxLayout *power_layout = new QHBoxLayout();
   power_layout->setSpacing(30);
 
@@ -234,7 +196,6 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
       Hardware::poweroff();
     }
   });
-  device_layout->addLayout(cal_param_init_layout);
   device_layout->addLayout(power_layout);
 
   setLayout(device_layout);
@@ -254,6 +215,7 @@ SoftwarePanel::SoftwarePanel(QWidget* parent) : QFrame(parent) {
   setLayout(main_layout);
   setStyleSheet(R"(QLabel {font-size: 50px;})");
 
+/*
   fs_watch = new QFileSystemWatcher(this);
   QObject::connect(fs_watch, &QFileSystemWatcher::fileChanged, [=](const QString path) {
     int update_failed_count = Params().get<int>("UpdateFailedCount").value_or(0);
@@ -265,6 +227,7 @@ SoftwarePanel::SoftwarePanel(QWidget* parent) : QFrame(parent) {
       updateLabels();
     }
   });
+  */
 }
 
 void SoftwarePanel::showEvent(QShowEvent *event) {
@@ -273,9 +236,8 @@ void SoftwarePanel::showEvent(QShowEvent *event) {
 
 void SoftwarePanel::updateLabels() {
   Params params = Params();
-  std::string brand = params.getBool("Passive") ? "대시캠" : "오픈파일럿";
-
 /*
+  std::string brand = params.getBool("Passive") ? "대시캠" : "오픈파일럿";
   QList<QPair<QString, std::string>> dev_params = {
     {"버전", "v" + params.get("Version")},
     {"Git Remote", params.get("GitRemote").substr(19)},
@@ -310,15 +272,6 @@ void SoftwarePanel::updateLabels() {
     }, "", this);
     layout()->addWidget(updateButton);
 */
-  QString version = QString::fromStdString("v" + params.get("Version"));
-  versionLbl = new LabelControl("버전", version, "");
-  layout()->addWidget(versionLbl);
-
-  QString neos = QString::fromStdString(Hardware::get_os_version());
-  neosLbl = new LabelControl("NEOS", neos, "");
-  layout()->addWidget(neosLbl);
-
-  layout()->addWidget(horizontal_line());
   QString remote = QString::fromStdString(params.get("GitRemote").substr(19));
   remoteLbl = new LabelControl("Git Remote", remote, "");
   layout()->addWidget(remoteLbl);
@@ -350,6 +303,11 @@ void SoftwarePanel::updateLabels() {
                                           std::system(panda_recover);
                                         }
                                       }));
+  layout()->addWidget(horizontal_line());
+  QString neos = QString::fromStdString(Hardware::get_os_version());
+  QString version = QString::fromStdString("v" + params.get("Version"));
+  versionLbl = new LabelControl(neos, version, "");
+  layout()->addWidget(versionLbl);
   }
 
 /*
@@ -404,19 +362,13 @@ QWidget * network_panel(QWidget * parent) {
   layout->addWidget(new ButtonControl("추가 기능", "실행", "추가기능을 적용합니다.", [=]() {
                                         if (ConfirmationDialog::confirm("실행하시겠습니까?")) {
                                           std::system(addfunc);
+                                          Hardware::reboot();
                                         }
                                       }));
   const char* realdata_clear = "rm -rf /sdcard/realdata/*";
   layout->addWidget(new ButtonControl("주행데이터 삭제", "실행", "저장공간 확보를 위해 주행데이터를 삭제합니다.", [=]() {
                                         if (ConfirmationDialog::confirm("실행하시겠습니까?")) {
                                           std::system(realdata_clear);
-                                        }
-                                      }));
-  const char* cal_ok = "cp -f /data/openpilot/installer/fonts/CalibrationParams /data/params/d/";
-  layout->addWidget(new ButtonControl("켈리브레이션 강제 활성화", "실행", "인게이지 테스트를위해 캘리브레이션을 강제 활성화 합니다",
-                                      [=]() {
-                                        if (ConfirmationDialog::confirm("실행하시겠습니까?")) {
-                                          std::system(cal_ok);
                                         }
                                       }));
   layout->addStretch(1);
