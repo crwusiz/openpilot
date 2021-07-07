@@ -24,6 +24,11 @@
 #include "selfdrive/ui/ui.h"
 #include "selfdrive/ui/qt/util.h"
 
+#include <QComboBox>
+#include <QAbstractItemView>
+#include <QScroller>
+#include <QListView>
+
 TogglesPanel::TogglesPanel(QWidget *parent) : QWidget(parent) {
   QVBoxLayout *main_layout = new QVBoxLayout(this);
 
@@ -303,10 +308,67 @@ QWidget * network_panel(QWidget * parent) {
   return w;
 }
 
+QStringList get_list(const char* path)
+{
+  QStringList stringList;
+  QFile textFile(path);
+  if(textFile.open(QIODevice::ReadOnly))
+  {
+      QTextStream textStream(&textFile);
+      while (true)
+      {
+        QString line = textStream.readLine();
+        if (line.isNull())
+            break;
+        else
+            stringList.append(line);
+      }
+  }
+
+  return stringList;
+}
+
 QWidget * community_panel() {
   QVBoxLayout *toggles_list = new QVBoxLayout();
   //toggles_list->setMargin(50);
 
+  QComboBox* supported_cars = new QComboBox();
+  supported_cars->setStyleSheet(R"(
+  QComboBox {
+    background-color: #393939;
+    border-radius: 15px;
+    padding-left: 40px
+    height: 140px;
+    }
+)");
+  QListView* list = new QListView(supported_cars);
+  list->setStyleSheet("QListView {padding: 40px; background-color: #393939; border-radius: 15px; height: 140px;} QListView::item{height: 100px}");
+  supported_cars->setView(list);
+
+  QScroller::grabGesture(supported_cars->view()->viewport(),QScroller::LeftMouseButtonGesture);
+  supported_cars->view()->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+
+  supported_cars->setMinimumSize(200, 120);
+
+  supported_cars->addItem("[ Select your car ]");
+  supported_cars->addItems(get_list("/data/params/d/SupportedCars"));
+
+  supported_cars->setCurrentText(QString(Params().get("SelectedCar").c_str()));
+
+  QObject::connect(supported_cars, QOverload<int>::of(&QComboBox::currentIndexChanged),
+    [=](int index){
+
+        if(supported_cars->currentIndex() == 0)
+            Params().remove("SelectedCar");
+        else
+            Params().put("SelectedCar", supported_cars->currentText().toStdString());
+
+    });
+
+  toggles_list->addWidget(supported_cars);
+
+
+  toggles_list->addWidget(horizontal_line());
   toggles_list->addWidget(new ParamControl("UseClusterSpeed",
                                             "Use Cluster Speed",
                                             "Use cluster speed instead of wheel speed.",
@@ -323,6 +385,12 @@ QWidget * community_panel() {
   toggles_list->addWidget(new ParamControl("MadModeEnabled",
                                             "Enable HKG MAD mode",
                                             "Openpilot will engage when turn cruise control on",
+                                            "../assets/offroad/icon_openpilot.png"
+                                              ));
+  toggles_list->addWidget(horizontal_line());
+  toggles_list->addWidget(new ParamControl("IsLdwsCar",
+                                            "LDWS",
+                                            "If your car only supports LDWS, turn it on.",
                                             "../assets/offroad/icon_openpilot.png"
                                               ));
   toggles_list->addWidget(horizontal_line());
