@@ -80,8 +80,8 @@ def create_clu11(packer, frame, bus, clu11, button, speed):
 def create_lfahda_mfc(packer, enabled, active):
   values = {
     "LFA_Icon_State": 2 if enabled else 0,
-    "HDA_Active": 1 if active > 1 else 0,
-    "HDA_Icon_State": 2 if active > 1 else 0,
+    "HDA_Active": 1 if active > 0 else 0,
+    "HDA_Icon_State": 2 if active > 0 else 0,
     # "HDA_VSetReq": 0,
   }
 
@@ -95,8 +95,8 @@ def create_lfahda_mfc(packer, enabled, active):
 def create_hda_mfc(packer, active):
   values = {
     "HDA_USM": 2,
-    "HDA_Active": 1 if active > 1 else 0,
-    "HDA_Icon_State": 1 if active > 1 else 0,
+    "HDA_Active": 1 if active > 0 else 0,
+    "HDA_Icon_State": 1 if active > 0 else 0,
   }
 
   return packer.make_can_msg("LFAHDA_MFC", 0, values)
