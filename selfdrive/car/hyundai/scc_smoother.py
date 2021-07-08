@@ -8,7 +8,7 @@ from selfdrive.car.hyundai.values import Buttons
 from common.params import Params
 from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, V_CRUISE_MIN, V_CRUISE_DELTA_KM, V_CRUISE_DELTA_MI
 from selfdrive.controls.lib.lane_planner import TRAJECTORY_SIZE
-from selfdrive.controls.lib.long_mpc import AUTO_TR_CRUISE_GAP
+from selfdrive.controls.lib.lead_mpc import AUTO_TR_CRUISE_GAP
 from selfdrive.road_speed_limiter import road_speed_limiter_get_max_speed, road_speed_limiter_get_active
 
 SYNC_MARGIN = 3.

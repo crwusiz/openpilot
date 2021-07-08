@@ -259,7 +259,6 @@ class CarInterface(CarInterfaceBase):
     ret.steerRatioRear = 0.
     ret.steerControlType = car.CarParams.SteerControlType.torque
 
-    ret.enableCamera = True
     ret.stoppingControl = True
 
     ret.enableBsm = 0x58b in fingerprint[0]

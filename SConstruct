@@ -401,8 +401,8 @@ SConscript(['selfdrive/modeld/SConscript'])
 
 SConscript(['selfdrive/controls/lib/cluster/SConscript'])
 SConscript(['selfdrive/controls/lib/lateral_mpc/SConscript'])
-SConscript(['selfdrive/controls/lib/longitudinal_mpc/SConscript'])
-SConscript(['selfdrive/controls/lib/longitudinal_mpc_model/SConscript'])
+SConscript(['selfdrive/controls/lib/lead_mpc_lib/SConscript'])
+SConscript(['selfdrive/controls/lib/longitudinal_mpc_lib/SConscript'])
 
 SConscript(['selfdrive/boardd/SConscript'])
 SConscript(['selfdrive/proclogd/SConscript'])
@@ -413,9 +413,6 @@ SConscript(['selfdrive/loggerd/SConscript'])
 SConscript(['selfdrive/locationd/SConscript'])
 SConscript(['selfdrive/sensord/SConscript'])
 SConscript(['selfdrive/ui/SConscript'])
-
-if arch == "aarch64":
-  SConscript(['selfdrive/hardware/eon/SConscript'])
 
 if arch != "Darwin":
   SConscript(['selfdrive/logcatd/SConscript'])

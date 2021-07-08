@@ -26,26 +26,7 @@ void NetworkStrengthWidget::paintEvent(QPaintEvent* event) {
 Networking::Networking(QWidget* parent, bool show_advanced) : QWidget(parent), show_advanced(show_advanced) {
   main_layout = new QStackedLayout(this);
 
-  QLabel* warning = new QLabel("Network manager is inactive!");
-  warning->setAlignment(Qt::AlignCenter);
-  warning->setStyleSheet(R"(font-size: 65px;)");
-
-  main_layout->addWidget(warning);
-
-  QTimer* timer = new QTimer(this);
-  QObject::connect(timer, &QTimer::timeout, this, &Networking::requestScan);
-  timer->start(5000);
-  attemptInitialization();
-}
-
-void Networking::attemptInitialization() {
-  // Checks if network manager is active
-  try {
-    wifi = new WifiManager(this);
-  } catch (std::exception &e) {
-    return;
-  }
-
+  wifi = new WifiManager(this);
   connect(wifi, &WifiManager::wrongPassword, this, &Networking::wrongPassword);
   connect(wifi, &WifiManager::refreshSignal, this, &Networking::refresh);
 
@@ -66,7 +47,6 @@ void Networking::attemptInitialization() {
   wifiWidget->setObjectName("wifiWidget");
   connect(wifiWidget, &WifiUI::connectToNetwork, this, &Networking::connectToNetwork);
   vlayout->addWidget(new ScrollView(wifiWidget, this), 1);
-
   main_layout->addWidget(wifiScreen);
 
   an = new AdvancedNetworking(this, wifi);
@@ -89,29 +69,11 @@ void Networking::attemptInitialization() {
     }
   )");
   main_layout->setCurrentWidget(wifiScreen);
-  ui_setup_complete = true;
-  wifi->requestScan();
-}
-
-void Networking::requestScan() {
-  if (!this->isVisible()) {
-    return;
-  }
-  if (!ui_setup_complete) {
-    attemptInitialization();
-    if (!ui_setup_complete) {
-      return;
-    }
-  }
-  wifi->requestScan();
 }
 
 void Networking::refresh() {
-  if (this->isVisible() || firstRefresh) {
-    wifiWidget->refresh();
-    an->refresh();
-    firstRefresh = false;
-  }
+  wifiWidget->refresh();
+  an->refresh();
 }
 
 void Networking::connectToNetwork(const Network &n) {
@@ -120,7 +82,7 @@ void Networking::connectToNetwork(const Network &n) {
   } else if (n.security_type == SecurityType::OPEN) {
     wifi->connect(n);
   } else if (n.security_type == SecurityType::WPA) {
-    QString pass = InputDialog::getText("Enter password for \"" + n.ssid + "\"", 8);
+    QString pass = InputDialog::getText("Enter password for \"" + n.ssid + "\"", this, 8);
     if (!pass.isEmpty()) {
       wifi->connect(n, pass);
     }
@@ -130,7 +92,7 @@ void Networking::connectToNetwork(const Network &n) {
 void Networking::wrongPassword(const QString &ssid) {
   for (Network n : wifi->seen_networks) {
     if (n.ssid == ssid) {
-      QString pass = InputDialog::getText("Wrong password for \"" + n.ssid +"\"", 8);
+      QString pass = InputDialog::getText("Wrong password for \"" + n.ssid +"\"", this, 8);
       if (!pass.isEmpty()) {
         wifi->connect(n, pass);
       }
@@ -163,8 +125,8 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   // Change tethering password
   ButtonControl *editPasswordButton = new ButtonControl("Tethering Password", "EDIT");
   connect(editPasswordButton, &ButtonControl::released, [=]() {
-    QString pass = InputDialog::getText("Enter new tethering password", 8);
-    if (pass.size()) {
+    QString pass = InputDialog::getText("Enter new tethering password", this, 8, wifi->getTetheringPassword());
+    if (!pass.isEmpty()) {
       wifi->changeTetheringPassword(pass);
     }
   });

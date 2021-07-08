@@ -321,4 +321,3 @@ int Panda::can_receive(kj::Array<capnp::word>& out_buf) {
   out_buf = capnp::messageToFlatArray(msg);
   return recv;
 }
-

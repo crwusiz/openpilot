@@ -4,15 +4,13 @@ from cereal import car
 from panda import Panda
 from common.numpy_fast import clip, interp
 from common.params import Params
-from selfdrive.swaglog import cloudlog
 from selfdrive.config import Conversions as CV
 from selfdrive.car.honda.values import CruiseButtons, CAR, HONDA_BOSCH, HONDA_BOSCH_ALT_BRAKE_SIGNAL
 from selfdrive.car.honda.hondacan import disable_radar
 from selfdrive.car import STD_CARGO_KG, CivicParams, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint
-from selfdrive.controls.lib.longitudinal_planner import _A_CRUISE_MAX_V_FOLLOWING
+from selfdrive.controls.lib.longitudinal_planner import A_CRUISE_MAX as A_ACC_MAX
 from selfdrive.car.interfaces import CarInterfaceBase
 
-A_ACC_MAX = max(_A_CRUISE_MAX_V_FOLLOWING)
 
 ButtonType = car.CarState.ButtonEvent.Type
 EventName = car.CarEvent.EventName
@@ -131,7 +129,6 @@ class CarInterface(CarInterfaceBase):
 
     if candidate in HONDA_BOSCH:
       ret.safetyModel = car.CarParams.SafetyModel.hondaBoschHarness
-      ret.enableCamera = True
       ret.radarOffCan = True
 
       # Disable the radar and let openpilot control longitudinal
@@ -142,9 +139,8 @@ class CarInterface(CarInterfaceBase):
       ret.communityFeature = ret.openpilotLongitudinalControl
     else:
       ret.safetyModel = car.CarParams.SafetyModel.hondaNidec
-      ret.enableCamera = True
       ret.enableGasInterceptor = 0x201 in fingerprint[0]
-      ret.openpilotLongitudinalControl = ret.enableCamera
+      ret.openpilotLongitudinalControl = True
 
       ret.enableCruise = not ret.enableGasInterceptor
       ret.communityFeature = ret.enableGasInterceptor
@@ -155,10 +151,6 @@ class CarInterface(CarInterfaceBase):
     # Accord 1.5T CVT has different gearbox message
     if candidate == CAR.ACCORD and 0x191 in fingerprint[1]:
       ret.transmissionType = TransmissionType.cvt
-
-    cloudlog.warning("ECU Camera Simulated: %r", ret.enableCamera)
-    cloudlog.warning("ECU Gas Interceptor: %r", ret.enableGasInterceptor)
-
 
     # Certain Hondas have an extra steering sensor at the bottom of the steering rack,
     # which improves controls quality as it removes the steering column torsion from feedback.

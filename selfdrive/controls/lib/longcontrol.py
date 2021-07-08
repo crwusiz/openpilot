@@ -1,6 +1,8 @@
 from cereal import log
 from common.numpy_fast import clip, interp
 from selfdrive.controls.lib.pid import PIController
+from selfdrive.controls.lib.drive_helpers import CONTROL_N
+from selfdrive.modeld.constants import T_IDXS
 
 LongCtrlState = log.ControlsState.LongControlState
 
@@ -12,10 +14,11 @@ BRAKE_THRESHOLD_TO_PID = 0.2
 BRAKE_STOPPING_TARGET = 0.5  # apply at least this amount of brake to maintain the vehicle stationary
 
 RATE = 100.0
+DEFAULT_LONG_LAG = 0.15
 
 
 def long_control_state_trans(active, long_control_state, v_ego, v_target, v_pid,
-                             output_gb, brake_pressed, cruise_standstill, min_speed_can, d_rel):
+                             output_gb, brake_pressed, cruise_standstill, min_speed_can):
   """Update longitudinal control state machine"""
   stopping_target_speed = min_speed_can + STOPPING_TARGET_SPEED_OFFSET
   stopping_condition = (v_ego < 2.0 and cruise_standstill) or \
@@ -24,9 +27,6 @@ def long_control_state_trans(active, long_control_state, v_ego, v_target, v_pid,
                          brake_pressed))
 
   starting_condition = v_target > STARTING_TARGET_SPEED and not cruise_standstill
-
-  if d_rel > 0.:
-    starting_condition = starting_condition and d_rel > 3.3
 
   if not active:
     long_control_state = LongCtrlState.off
@@ -70,29 +70,29 @@ class LongControl():
     self.pid.reset()
     self.v_pid = v_pid
 
-  def update(self, active, CS, v_target, v_target_future, a_target, CP, radarState = None):
+  def update(self, active, CS, CP, long_plan):
     """Update longitudinal control. This updates the state machine and runs a PID loop"""
+    # Interp control trajectory
+    # TODO estimate car specific lag, use .5s for now
+    if len(long_plan.speeds) == CONTROL_N:
+      v_target = interp(DEFAULT_LONG_LAG, T_IDXS[:CONTROL_N], long_plan.speeds)
+      v_target_future = long_plan.speeds[-1]
+      a_target = interp(DEFAULT_LONG_LAG, T_IDXS[:CONTROL_N], long_plan.accels)
+    else:
+      v_target = 0.0
+      v_target_future = 0.0
+      a_target = 0.0
+
+
     # Actuation limits
     gas_max = interp(CS.vEgo, CP.gasMaxBP, CP.gasMaxV)
     brake_max = interp(CS.vEgo, CP.brakeMaxBP, CP.brakeMaxV)
 
     # Update state machine
     output_gb = self.last_output_gb
-
-    d_rel = -1.
-    if radarState is not None and radarState.leadOne.status:
-      lead = radarState.leadOne
-      following = lead.dRel < 45.0 and lead.vLeadK > CS.vEgo and lead.aLeadK > 0.0
-      d_rel = lead.dRel
-    else:
-      following = False
-
-    #if not following:
-    #  gas_max *= 0.9
-
     self.long_control_state = long_control_state_trans(active, self.long_control_state, CS.vEgo,
                                                        v_target_future, self.v_pid, output_gb,
-                                                       CS.brakePressed, CS.cruiseState.standstill, CP.minSpeedCan, d_rel)
+                                                       CS.brakePressed, CS.cruiseState.standstill, CP.minSpeedCan)
 
     v_ego_pid = max(CS.vEgo, CP.minSpeedCan)  # Without this we get jumps, CAN bus reports 0 when speed < 0.3
 
@@ -135,4 +135,4 @@ class LongControl():
     final_gas = clip(output_gb, 0., gas_max)
     final_brake = -clip(output_gb, -brake_max, 0.)
 
-    return final_gas, final_brake
+    return final_gas, final_brake, v_target, a_target
