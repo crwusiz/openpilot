@@ -359,11 +359,6 @@ class SccSmoother:
     gas_factor = clip(self.gas_factor, 0.7, 1.3)
     brake_factor = clip(self.brake_factor, 0.7, 1.3)
 
-    lead = self.get_lead(sm)
-    if lead is not None:
-      wd = interp(lead.dRel, [4., 15.], [1.2, 1.0])
-      brake_factor *= interp(CS.out.vEgo, [0., 20.], [1., wd])
-
     if accel > 0:
       accel *= gas_factor
     else:
