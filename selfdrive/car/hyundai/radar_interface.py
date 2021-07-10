@@ -31,6 +31,7 @@ class RadarInterface(RadarInterfaceBase):
     self.track_id = 0
     self.radar_off_can = CP.radarOffCan
 
+    self.frame = 0
     self.reset_v_rel()
 
   def reset_v_rel(self):
@@ -39,6 +40,7 @@ class RadarInterface(RadarInterfaceBase):
     self.v_rel_kf = None
 
   def update(self, can_strings):
+    self.frame += 1
     if self.radar_off_can:
       self.reset_v_rel()
       return super().update(None)
@@ -80,25 +82,30 @@ class RadarInterface(RadarInterfaceBase):
         self.pts[ii].yvRel = float('nan')
         self.pts[ii].measured = True
 
-        now = time.time()
-        if self.lastdRel is not None and self.lastTime is not None:
-          dd = dRel - self.lastdRel
-          dt = now - self.lastTime
+        if self.frame % 2 == 0: # 0.1s
+          now = time.time()
+          if self.lastdRel is not None and self.lastTime is not None:
+            dd = dRel - self.lastdRel
+            dt = now - self.lastTime
 
-          if dt > 0.:
-            v = dd / dt
+            if dt > 0.:
+              v = dd / dt
 
-            if self.v_rel_kf is None:
-              self.v_rel_kf = KF1D(x0=[[0.0], [0.0]],
-                                   A=[[1.0, self.radar_ts], [0.0, 1.0]],
-                                   C=[1.0, 0.0],
-                                   K=[[0.12287673], [0.29666309]])
+              if self.v_rel_kf is None:
+                self.v_rel_kf = KF1D(x0=[[0.0], [0.0]],
+                                     A=[[1.0, self.radar_ts*2], [0.0, 1.0]],
+                                     C=[1.0, 0.0],
+                                     K=[[0.12287673], [0.29666309]])
 
-            v_rel_x = self.v_rel_kf.update(v)
-            self.pts[ii].vRel = float(v_rel_x[0])
+              self.v_rel_kf.update(v)
 
-        self.lastdRel = dRel
-        self.lastTime = now
+          self.lastdRel = dRel
+          self.lastTime = now
+
+        x = self.v_rel_kf.x
+        vRel = float(x[0][0])
+        if abs(vRel) > abs(self.pts[ii].vRel):
+          self.pts[ii].vRel = vRel
 
       else:
         if ii in self.pts:
