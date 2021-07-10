@@ -82,30 +82,26 @@ class RadarInterface(RadarInterfaceBase):
         self.pts[ii].yvRel = float('nan')
         self.pts[ii].measured = True
 
-        if self.frame % 2 == 0: # 0.1s
-          now = time.time()
-          if self.lastdRel is not None and self.lastTime is not None:
-            dd = dRel - self.lastdRel
-            dt = now - self.lastTime
+        now = time.time()
+        if self.lastdRel is not None and self.lastTime is not None:
+          dd = dRel - self.lastdRel
+          dt = now - self.lastTime
 
-            if dt > 0.:
-              v = dd / dt
+          if dt > 0.:
+            v = dd / dt
 
-              if self.v_rel_kf is None:
-                self.v_rel_kf = KF1D(x0=[[0.0], [0.0]],
-                                     A=[[1.0, self.radar_ts*2], [0.0, 1.0]],
-                                     C=[1.0, 0.0],
-                                     K=[[0.12287673], [0.29666309]])
+            if self.v_rel_kf is None:
+              self.v_rel_kf = KF1D(x0=[[0.0], [0.0]],
+                                   A=[[1.0, self.radar_ts], [0.0, 1.0]],
+                                   C=[1.0, 0.0],
+                                   K=[[0.12287673], [0.29666309]])
 
-              self.v_rel_kf.update(v)
+            vRel = self.v_rel_kf.update(v)[0]
+            if abs(vRel) > abs(self.pts[ii].vRel):
+              self.pts[ii].vRel = vRel
 
-          self.lastdRel = dRel
-          self.lastTime = now
-
-        x = self.v_rel_kf.x
-        vRel = float(x[0][0])
-        if abs(vRel) > abs(self.pts[ii].vRel):
-          self.pts[ii].vRel = vRel
+        self.lastdRel = dRel
+        self.lastTime = now
 
       else:
         if ii in self.pts:
