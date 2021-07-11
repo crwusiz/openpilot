@@ -53,7 +53,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     lowSpeedLockout @31;
     plannerError @32;
     joystickDebug @34;
-    steerTempUnavailableUserOverride @35;
+    steerTempUnavailableSilent @35;
     resumeRequired @36;
     preDriverDistracted @37;
     promptDriverDistracted @38;
@@ -389,7 +389,7 @@ struct CarParams {
   fuzzyFingerprint @55 :Bool;
 
   enableGasInterceptor @2 :Bool;
-  enableCruise @3 :Bool;
+  pcmCruise @3 :Bool;        # is openpilot's state tied to the PCM's cruise state?
   enableDsu @5 :Bool;        # driving support unit
   enableApgs @6 :Bool;       # advanced parking guidance system
   enableBsm @56 :Bool;       # blind spot monitoring
