@@ -1365,6 +1365,17 @@ struct ManagerState {
   }
 }
 
+struct RoadLimitSpeed {
+    active @0 :UInt16;
+    roadLimitSpeed @1 :UInt16;
+    isHighway @2 :Bool;
+    camType @3 :UInt16;
+    camLimitSpeedLeftDist @4 :UInt16;
+    camLimitSpeed @5 :UInt16;
+    sectionLimitSpeed @6 :UInt16;
+    sectionLeftDist @7 :UInt16;
+}
+
 struct Event {
   logMonoTime @0 :UInt64;  # nanoseconds
   valid @67 :Bool = true;
@@ -1420,6 +1431,8 @@ struct Event {
     deviceState @6 :DeviceState;
     logMessage @18 :Text;
 
+    # neokii
+    roadLimitSpeed @79 :RoadLimitSpeed;
 
     # *********** debug ***********
     testJoystick @52 :Joystick;

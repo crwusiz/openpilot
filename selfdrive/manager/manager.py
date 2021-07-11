@@ -127,6 +127,7 @@ def manager_cleanup():
 def manager_thread():
 
   Process(name="shutdownd", target=launcher, args=("selfdrive.shutdownd",)).start()
+  Process(name="road_speed_limiter", target=launcher, args=("selfdrive.road_speed_limiter",)).start()
   system("am startservice com.neokii.optool/.MainService")
   system("am startservice com.neokii.openpilot/.MainService")
 

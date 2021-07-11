@@ -1,4 +1,5 @@
 import json
+import select
 import threading
 import time
 import socket
@@ -11,7 +12,6 @@ from common.params import Params
 
 from common.numpy_fast import interp
 
-current_milli_time = lambda: int(round(time.time() * 1000))
 
 CAMERA_SPEED_FACTOR = 1.05
 
@@ -19,25 +19,18 @@ BROADCAST_PORT = 2899
 RECEIVE_PORT = 843
 LOCATION_PORT = 2911
 
+current_milli_time = lambda: int(round(time.time() * 1000))
 
-class RoadSpeedLimiter:
+class RoadLimitSpeedServer:
   def __init__(self):
     self.json_road_limit = None
     self.active = 0
     self.last_updated = 0
     self.last_updated_active = 0
-    self.slowing_down = False
     self.last_exception = None
     self.lock = threading.Lock()
+
     self.remote_addr = None
-
-    self.start_dist = 0
-
-    self.longcontrol = Params().get_bool('LongControlEnabled')
-
-    thread = Thread(target=self.udp_recv_thread, args=[])
-    thread.setDaemon(True)
-    thread.start()
 
     broadcast = Thread(target=self.broadcast_thread, args=[])
     broadcast.setDaemon(True)
@@ -125,46 +118,48 @@ class RoadSpeedLimiter:
       except:
         pass
 
-  def udp_recv_thread(self):
+  def udp_recv(self, sock):
+    ret = False
+    try:
+      ready = select.select([sock], [], [], 1.)
+      ret = bool(ready[0])
+      if ret:
+        data, self.remote_addr = sock.recvfrom(2048)
+        json_obj = json.loads(data.decode())
 
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        try:
+          self.lock.acquire()
+          try:
+            if 'active' in json_obj:
+              self.active = json_obj['active']
+              self.last_updated_active = current_milli_time()
+          except:
+            pass
+
+          if 'road_limit' in json_obj:
+            self.json_road_limit = json_obj['road_limit']
+            self.last_updated = current_milli_time()
+
+        finally:
+          self.lock.release()
+
+    except:
 
       try:
-        sock.bind(('0.0.0.0', RECEIVE_PORT))
+        self.lock.acquire()
+        self.json_road_limit = None
+      finally:
+        self.lock.release()
 
-        while True:
+    return ret
 
-          try:
-            data, self.remote_addr = sock.recvfrom(2048)
-            json_obj = json.loads(data.decode())
-
-            try:
-              self.lock.acquire()
-
-              try:
-                if 'active' in json_obj:
-                  self.active = json_obj['active']
-                  self.last_updated_active = current_milli_time()
-              except:
-                pass
-
-              if 'road_limit' in json_obj:
-                self.json_road_limit = json_obj['road_limit']
-                self.last_updated = current_milli_time()
-
-            finally:
-              self.lock.release()
-
-          except:
-
-            try:
-              self.lock.acquire()
-              self.json_road_limit = None
-            finally:
-              self.lock.release()
-
-      except Exception as e:
-        self.last_exception = e
+  def check(self):
+    if current_milli_time() - self.last_updated > 1000 * 20:
+      try:
+        self.lock.acquire()
+        self.json_road_limit = None
+      finally:
+        self.lock.release()
 
   def get_limit_val(self, key, default=None):
 
@@ -175,41 +170,81 @@ class RoadSpeedLimiter:
       return self.json_road_limit[key]
     return default
 
-  def get_active(self):
 
-    if self.active is None:
-      return 0
 
-    return self.active
 
-  def get_max_speed(self, CS, v_cruise_kph):
+def main():
+  server = RoadLimitSpeedServer()
+  roadLimitSpeed = messaging.pub_sock('roadLimitSpeed')
+
+  with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+      try:
+        sock.bind(('0.0.0.0', RECEIVE_PORT))
+        sock.setblocking(False)
+
+        while True:
+
+          if server.udp_recv(sock):
+            dat = messaging.new_message()
+            dat.init('roadLimitSpeed')
+            dat.roadLimitSpeed.active = server.active
+            dat.roadLimitSpeed.roadLimitSpeed = server.get_limit_val("road_limit_speed", 0)
+            dat.roadLimitSpeed.isHighway = server.get_limit_val("is_highway", False)
+            dat.roadLimitSpeed.camType = server.get_limit_val("cam_type", 0)
+            dat.roadLimitSpeed.camLimitSpeedLeftDist = server.get_limit_val("cam_limit_speed_left_dist", 0)
+            dat.roadLimitSpeed.camLimitSpeed = server.get_limit_val("cam_limit_speed", 0)
+            dat.roadLimitSpeed.sectionLimitSpeed = server.get_limit_val("section_limit_speed", 0)
+            dat.roadLimitSpeed.sectionLeftDist = server.get_limit_val("section_left_dist", 0)
+            roadLimitSpeed.send(dat.to_bytes())
+
+          server.check()
+
+      except Exception as e:
+        server.last_exception = e
+
+class RoadSpeedLimiter:
+  def __init__(self):
+    self.slowing_down = False
+    self.start_dist = 0
+
+    self.last_max_speed = (0, 0, 0, False, "")
+    self.last_active = 0
+
+    self.longcontrol = Params().get_bool('LongControlEnabled')
+    self.sock = messaging.sub_sock("roadLimitSpeed")
+
+  def get_active_internal(self):
+
+    try:
+      dat = messaging.recv_sock(self.sock, wait=False)
+      if dat is None:
+        return None
+      return dat.roadLimitSpeed.active
+    except:
+      pass
+
+    return 0
+
+  def get_max_speed_internal(self, CS, v_cruise_speed):
 
     log = ""
+    dat = messaging.recv_sock(self.sock, wait=False)
 
-    if current_milli_time() - self.last_updated > 1000 * 20:
-
-      if self.last_exception is not None:
-        log = str(self.last_exception)
-      else:
-        log = "expired: {:d}, {:d}".format(current_milli_time(), self.last_updated)
-
-      self.slowing_down = False
-      return 0, 0, 0, False, log
+    if dat is None:
+      return None
 
     try:
 
-      road_limit_speed = self.get_limit_val('road_limit_speed')
-      is_highway = self.get_limit_val('is_highway')
+      road_limit_speed = dat.roadLimitSpeed.roadLimitSpeed
+      is_highway = dat.roadLimitSpeed.isHighway
 
-      cam_type = int(self.get_limit_val('cam_type', 0))
+      cam_type = int(dat.roadLimitSpeed.camType)
 
-      cam_limit_speed_left_dist = self.get_limit_val('cam_limit_speed_left_dist')
-      cam_limit_speed = self.get_limit_val('cam_limit_speed')
+      cam_limit_speed_left_dist = dat.roadLimitSpeed.camLimitSpeedLeftDist
+      cam_limit_speed = dat.roadLimitSpeed.camLimitSpeed
 
-      section_limit_speed = self.get_limit_val('section_limit_speed')
-      # section_avg_speed = self.get_val('section_avg_speed')
-      section_left_dist = self.get_limit_val('section_left_dist')
-      # section_left_time = self.get_val('section_left_time')
+      section_limit_speed = dat.roadLimitSpeed.sectionLimitSpeed
+      section_left_dist = dat.roadLimitSpeed.sectionLeftDist
 
       if is_highway is not None:
         if is_highway:
@@ -291,6 +326,21 @@ class RoadSpeedLimiter:
     self.slowing_down = False
     return 0, 0, 0, False, log
 
+  def get_max_speed(self, CS, v_cruise_speed):
+    ret = self.get_max_speed_internal(CS, v_cruise_speed)
+    if ret is None:
+      return self.last_max_speed
+
+    self.last_max_speed = ret
+    return self.last_max_speed
+
+  def get_active(self):
+    ret = self.get_active_internal()
+    if ret is None:
+      return self.last_active
+
+    self.last_active = ret
+    return self.last_active
 
 road_speed_limiter = None
 
@@ -303,13 +353,13 @@ def road_speed_limiter_get_active():
   return road_speed_limiter.get_active()
 
 
-def road_speed_limiter_get_max_speed(CS, v_cruise_kph):
+def road_speed_limiter_get_max_speed(CS, v_cruise_speed):
   global road_speed_limiter
   if road_speed_limiter is None:
     road_speed_limiter = RoadSpeedLimiter()
 
-  try:
-    road_speed_limiter.lock.acquire()
-    return road_speed_limiter.get_max_speed(CS, v_cruise_kph)
-  finally:
-    road_speed_limiter.lock.release()
+  return road_speed_limiter.get_max_speed(CS, v_cruise_speed)
+
+
+if __name__ == "__main__":
+  main()
