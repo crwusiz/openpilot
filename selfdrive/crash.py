@@ -1,12 +1,22 @@
 """Install exception handler for process crash."""
 from selfdrive.swaglog import cloudlog
 from selfdrive.version import version
+import traceback
+import datetime
+
 
 import sentry_sdk
 from sentry_sdk.integrations.threading import ThreadingIntegration
 
 def capture_exception(*args, **kwargs) -> None:
   cloudlog.error("crash", exc_info=kwargs.get('exc_info', 1))
+
+  try:
+    with open('/data/log/last_exception', 'w') as f:
+      now = datetime.datetime.now()
+      f.write(now.strftime('[%Y-%m-%d %H:%M:%S]') + "\n\n" + str(traceback.format_exc()))
+  except Exception:
+    pass
 
   try:
     sentry_sdk.capture_exception(*args, **kwargs)
