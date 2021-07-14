@@ -69,11 +69,15 @@ void WifiManager::setup() {
   QDBusMessage response = device_props.call("Get", NM_DBUS_INTERFACE_DEVICE, "State");
   raw_adapter_state = get_response<uint>(response);
 
+  initActiveAp();
   initConnections();
   requestScan();
 }
 
 void WifiManager::refreshNetworks() {
+  if (adapter.isEmpty()) {
+    return;
+  }
   seen_networks.clear();
   seen_ssids.clear();
   ipv4_address = get_ipv4_address();
@@ -301,7 +305,7 @@ QString WifiManager::getAdapter() {
 void WifiManager::stateChange(unsigned int new_state, unsigned int previous_state, unsigned int change_reason) {
   raw_adapter_state = new_state;
   if (new_state == NM_DEVICE_STATE_NEED_AUTH && change_reason == NM_DEVICE_STATE_REASON_SUPPLICANT_DISCONNECT) {
-    knownConnections.remove(getConnectionPath(connecting_to_network));
+    forgetConnection(connecting_to_network);
     emit wrongPassword(connecting_to_network);
   } else if (new_state == NM_DEVICE_STATE_ACTIVATED) {
     connecting_to_network = "";
@@ -316,7 +320,6 @@ void WifiManager::stateChange(unsigned int new_state, unsigned int previous_stat
 void WifiManager::propertyChange(const QString &interface, const QVariantMap &props, const QStringList &invalidated_props) {
   if (interface == NM_DBUS_INTERFACE_DEVICE_WIRELESS && props.contains("LastScan")) {
     if (this->isVisible() || firstScan) {
-      activeAp = getActiveAp();
       refreshNetworks();
       emit refreshSignal();
       firstScan = false;
@@ -431,13 +434,12 @@ void WifiManager::setTetheringEnabled(bool enabled) {
   }
 }
 
-QString WifiManager::getActiveAp() {
+void WifiManager::initActiveAp() {
   QDBusInterface device_props(NM_DBUS_SERVICE, adapter, NM_DBUS_INTERFACE_PROPERTIES, bus);
   device_props.setTimeout(DBUS_TIMEOUT);
 
-  QDBusMessage response = device_props.call("Get", NM_DBUS_INTERFACE_DEVICE_WIRELESS, "ActiveAccessPoint");
-  QDBusObjectPath r = get_response<QDBusObjectPath>(response);
-  return r.path();
+  const QDBusMessage &response = device_props.call("Get", NM_DBUS_INTERFACE_DEVICE_WIRELESS, "ActiveAccessPoint");
+  activeAp = get_response<QDBusObjectPath>(response).path();
 }
 
 

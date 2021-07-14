@@ -268,6 +268,11 @@ def getNetworkType():
 
 
 @dispatcher.add_method
+def getNetworks():
+  return HARDWARE.get_networks()
+
+
+@dispatcher.add_method
 def takeSnapshot():
   from selfdrive.camerad.snapshot.snapshot import snapshot, jpeg_write
   ret = snapshot()
@@ -424,7 +429,7 @@ def ws_recv(ws, end_event):
     except WebSocketTimeoutException:
       ns_since_last_ping = int(sec_since_boot() * 1e9) - last_ping
       if ns_since_last_ping > RECONNECT_TIMEOUT_S * 1e9:
-        cloudlog.exception("athenad.wc_recv.timeout")
+        cloudlog.exception("athenad.ws_recv.timeout")
         end_event.set()
     except Exception:
       cloudlog.exception("athenad.ws_recv.exception")
@@ -491,6 +496,8 @@ def main():
     except (ConnectionError, TimeoutError, WebSocketException):
       conn_retries += 1
       params.delete("LastAthenaPingTime")
+      if TICI:
+        cloudlog.exception("athenad.main.exception2")
     except Exception:
       cloudlog.exception("athenad.main.exception")
 

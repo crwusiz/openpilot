@@ -1,6 +1,3 @@
-void puth(unsigned int i);
-void puts(const char *a);
-
 void dac_init(void) {
   // No buffers required since we have an opamp
   register_set(&(DAC->DHR12R1), 0U, 0xFFFU);
@@ -17,4 +14,3 @@ void dac_set(int channel, uint32_t value) {
     puts("Failed to set DAC: invalid channel value: 0x"); puth(value); puts("\n");
   }
 }
-
