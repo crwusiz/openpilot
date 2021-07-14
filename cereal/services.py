@@ -27,8 +27,7 @@ services = {
   "gpsNMEA": (True, 9.),
   "deviceState": (True, 2., 1),
   "can": (True, 100.),
-  "controlsState": (True, 100., 100),
-  "features": (True, 0.),
+  "controlsState": (True, 100., 10),
   "pandaState": (True, 2., 1),
   "radarState": (True, 20., 5),
   "roadEncodeIdx": (True, 20., 1),
@@ -36,7 +35,7 @@ services = {
   "sendcan": (True, 100.),
   "logMessage": (True, 0.),
   "liveCalibration": (True, 4., 4),
-  "androidLog": (True, 0.),
+  "androidLog": (True, 0., 1 if TICI else None),
   "carState": (True, 100., 10),
   "carControl": (True, 100., 10),
   "longitudinalPlan": (True, 20., 5),
@@ -61,6 +60,7 @@ services = {
   "wideRoadCameraState": (True, 20., 20),
   "modelV2": (True, 20., 40),
   "managerState": (True, 2., 1),
+  "uploaderState": (True, 0., 1),
 }
 service_list = {name: Service(new_port(idx), *vals) for  # type: ignore
                 idx, (name, vals) in enumerate(services.items())}

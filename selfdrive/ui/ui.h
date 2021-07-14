@@ -106,9 +106,6 @@ typedef struct UIScene {
 
   cereal::PandaState::PandaType pandaType;
 
-  // gps
-  int satelliteCount;
-
   // modelV2
   float lane_line_probs[4];
   float road_edge_stds[2];
@@ -130,6 +127,7 @@ typedef struct UIScene {
   cereal::CarParams::Reader car_params;
   cereal::GpsLocationData::Reader gps_ext;
   cereal::LiveParametersData::Reader live_params;
+  int satelliteCount;
 
 } UIScene;
 

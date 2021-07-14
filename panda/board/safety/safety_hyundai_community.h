@@ -146,7 +146,7 @@ static int hyundai_community_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
   if (addr == 832) {
     OP_LKAS_live = 20;
     int desired_torque = ((GET_BYTES_04(to_send) >> 16) & 0x7ff) - 1024;
-    uint32_t ts = TIM2->CNT;
+    uint32_t ts = microsecond_timer_get();
     bool violation = 0;
 
     if (controls_allowed) {
@@ -287,7 +287,7 @@ static void hyundai_community_init(int16_t param) {
   controls_allowed = false;
   relay_malfunction_reset();
 
-  if (board_has_obd() && HKG_forward_obd) {
+  if (current_board->has_obd && HKG_forward_obd) {
     current_board->set_can_mode(CAN_MODE_OBD_CAN2);
     puts("  MDPS or SCC on OBD2 CAN: setting can mode obd\n");
   }

@@ -223,6 +223,8 @@ struct SensorEventData {
     mmc3416x @7;  # magnetometer (c2)
     bmx055 @8;
     rpr0521 @9;
+    lsm6ds3trc @10;
+    mmc5603nj @11;
   }
 }
 
@@ -419,7 +421,7 @@ struct PandaState @0xa7649e2575e4591e {
     registerDivergent @18;
     interruptRateKlineInit @19;
     interruptRateClockSource @20;
-    interruptRateTim9 @21;
+    interruptRateTick @21;
     # Update max fault type in boardd when adding faults
   }
 
@@ -814,10 +816,11 @@ struct LongitudinalPlan @0xe00b5b3eba12876c {
   fcw @8 :Bool;
   longitudinalPlanSource @15 :LongitudinalPlanSource;
   processingDelay @29 :Float32;
-  
-  # desired speed/accel over next 2.5s
+
+  # desired speed/accel/jerk over next 2.5s
   accels @32 :List(Float32);
   speeds @33 :List(Float32);
+  jerks @34 :List(Float32);
 
   enum LongitudinalPlanSource {
     cruise @0;
@@ -1365,6 +1368,18 @@ struct ManagerState {
   }
 }
 
+struct UploaderState {
+  immediateQueueSize @0 :UInt32;
+  immediateQueueCount @1 :UInt32;
+  rawQueueSize @2 :UInt32;
+  rawQueueCount @3 :UInt32;
+
+  # stats for last successfully uploaded file
+  lastTime @4 :Float32;  # s
+  lastSpeed @5 :Float32; # MB/s
+  lastFilename @6 :Text;
+}
+
 struct RoadLimitSpeed {
     active @0 :UInt16;
     roadLimitSpeed @1 :UInt16;
@@ -1426,13 +1441,14 @@ struct Event {
     # systems stuff
     androidLog @20 :AndroidLogEntry;
     managerState @78 :ManagerState;
+    uploaderState @79 :UploaderState;
     procLog @33 :ProcLog;
     clocks @35 :Clocks;
     deviceState @6 :DeviceState;
     logMessage @18 :Text;
 
     # neokii
-    roadLimitSpeed @79 :RoadLimitSpeed;
+    roadLimitSpeed @80 :RoadLimitSpeed;
 
     # *********** debug ***********
     testJoystick @52 :Joystick;

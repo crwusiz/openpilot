@@ -1,32 +1,13 @@
 // ********************* Includes *********************
+//#define PEDAL_USB
 #include "../config.h"
-#include "libc.h"
 
-#include "main_declarations.h"
-#include "critical.h"
-#include "faults.h"
-
-#include "drivers/registers.h"
-#include "drivers/interrupts.h"
-#include "drivers/llcan.h"
-#include "drivers/llgpio.h"
-#include "drivers/adc.h"
-
-#include "board.h"
-
-#include "drivers/clock.h"
-#include "drivers/dac.h"
-#include "drivers/timer.h"
-
-#include "gpio.h"
+#include "early_init.h"
 #include "crc.h"
 
 #define CAN CAN1
 
-//#define PEDAL_USB
-
 #ifdef PEDAL_USB
-  #include "drivers/uart.h"
   #include "drivers/usb.h"
 #else
   // no serial either
@@ -46,7 +27,7 @@ uint32_t enter_bootloader_mode;
 
 // cppcheck-suppress unusedFunction ; used in headers not included in cppcheck
 void __initialize_hardware_early(void) {
-  early();
+  early_initialization();
 }
 
 // ********************* serial debugging *********************
@@ -84,6 +65,11 @@ int usb_cb_control_msg(USB_Setup_TypeDef *setup, uint8_t *resp, bool hardwired) 
   unsigned int resp_len = 0;
   uart_ring *ur = NULL;
   switch (setup->b.bRequest) {
+    // **** 0xc1: get hardware type
+    case 0xc1:
+      resp[0] = hw_type;
+      resp_len = 1;
+      break;
     // **** 0xe0: uart read
     case 0xe0:
       ur = get_ring_by_number(setup->b.wValue.w);
@@ -285,7 +271,7 @@ int main(void) {
   REGISTER_INTERRUPT(CAN1_TX_IRQn, CAN1_TX_IRQ_Handler, CAN_INTERRUPT_RATE, FAULT_INTERRUPT_RATE_CAN_1)
   REGISTER_INTERRUPT(CAN1_RX0_IRQn, CAN1_RX0_IRQ_Handler, CAN_INTERRUPT_RATE, FAULT_INTERRUPT_RATE_CAN_1)
   REGISTER_INTERRUPT(CAN1_SCE_IRQn, CAN1_SCE_IRQ_Handler, CAN_INTERRUPT_RATE, FAULT_INTERRUPT_RATE_CAN_1)
-
+  
   // Should run at around 732Hz (see init below)
   REGISTER_INTERRUPT(TIM3_IRQn, TIM3_IRQ_Handler, 1000U, FAULT_INTERRUPT_RATE_TIM3)
 
@@ -294,7 +280,7 @@ int main(void) {
   // init devices
   clock_init();
   peripherals_init();
-  detect_configuration();
+  detect_external_debug_serial();
   detect_board_type();
 
   // init board
