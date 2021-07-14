@@ -113,3 +113,11 @@ class HardwareBase:
   @abstractmethod
   def set_power_save(self, enabled):
     pass
+
+  @abstractmethod
+  def get_gpu_usage_percent(self):
+    pass
+
+  @abstractmethod
+  def get_modem_version(self):
+    pass

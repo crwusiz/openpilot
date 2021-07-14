@@ -1,4 +1,5 @@
 import os
+from functools import cached_property
 from enum import IntEnum
 import subprocess
 from pathlib import Path
@@ -51,13 +52,20 @@ def write_amplifier_reg(reg, val, offset, mask):
     v = (v & (~mask)) | ((val << offset) & mask)
     bus.write_byte_data(AMP_ADDRESS, reg, v, force=True)
 
-class Tici(HardwareBase):
-  def __init__(self):
-    import dbus  # pylint: disable=import-error
 
-    self.bus = dbus.SystemBus()
-    self.nm = self.bus.get_object(NM, '/org/freedesktop/NetworkManager')
-    self.mm = self.bus.get_object(MM, '/org/freedesktop/ModemManager1')
+class Tici(HardwareBase):
+  @cached_property
+  def bus(self):
+    import dbus  # pylint: disable=import-error
+    return dbus.SystemBus()
+
+  @cached_property
+  def nm(self):
+    return self.bus.get_object(NM, '/org/freedesktop/NetworkManager')
+
+  @cached_property
+  def mm(self):
+    return self.bus.get_object(MM, '/org/freedesktop/ModemManager1')
 
   def get_os_version(self):
     with open("/VERSION") as f:
@@ -85,19 +93,27 @@ class Tici(HardwareBase):
     try:
       primary_connection = self.nm.Get(NM, 'PrimaryConnection', dbus_interface=DBUS_PROPS, timeout=TIMEOUT)
       primary_connection = self.bus.get_object(NM, primary_connection)
-      tp = primary_connection.Get(NM_CON_ACT, 'Type', dbus_interface=DBUS_PROPS, timeout=TIMEOUT)
+      primary_type = primary_connection.Get(NM_CON_ACT, 'Type', dbus_interface=DBUS_PROPS, timeout=TIMEOUT)
+      primary_id = primary_connection.Get(NM_CON_ACT, 'Id', dbus_interface=DBUS_PROPS, timeout=TIMEOUT)
 
-      if tp in ['802-3-ethernet', '802-11-wireless']:
+      if primary_type == '802-3-ethernet':
+        return NetworkType.ethernet
+      elif primary_type == '802-11-wireless' and primary_id != 'Hotspot':
         return NetworkType.wifi
-      elif tp in ['gsm']:
-        modem = self.get_modem()
-        access_t = modem.Get(MM_MODEM, 'AccessTechnologies', dbus_interface=DBUS_PROPS, timeout=TIMEOUT)
-        if access_t >= MM_MODEM_ACCESS_TECHNOLOGY_LTE:
-          return NetworkType.cell4G
-        elif access_t >= MM_MODEM_ACCESS_TECHNOLOGY_UMTS:
-          return NetworkType.cell3G
-        else:
-          return NetworkType.cell2G
+      else:
+        active_connections = self.nm.Get(NM, 'ActiveConnections', dbus_interface=DBUS_PROPS, timeout=TIMEOUT)
+        for conn in active_connections:
+          c = self.bus.get_object(NM, conn)
+          tp = c.Get(NM_CON_ACT, 'Type', dbus_interface=DBUS_PROPS, timeout=TIMEOUT)
+          if tp == 'gsm':
+            modem = self.get_modem()
+            access_t = modem.Get(MM_MODEM, 'AccessTechnologies', dbus_interface=DBUS_PROPS, timeout=TIMEOUT)
+            if access_t >= MM_MODEM_ACCESS_TECHNOLOGY_LTE:
+              return NetworkType.cell4G
+            elif access_t >= MM_MODEM_ACCESS_TECHNOLOGY_UMTS:
+              return NetworkType.cell3G
+            else:
+              return NetworkType.cell2G
     except Exception:
       pass
 
@@ -205,6 +221,13 @@ class Tici(HardwareBase):
 
     return network_strength
 
+  def get_modem_version(self):
+    try:
+      modem = self.get_modem()
+      return modem.Get(MM_MODEM, 'Revision', dbus_interface=DBUS_PROPS, timeout=TIMEOUT)
+    except Exception:
+      return None
+
   # We don't have a battery, so let's use some sane constants
   def get_battery_capacity(self):
     return 100
@@ -255,6 +278,9 @@ class Tici(HardwareBase):
       val = "0" if enabled else "1"
       os.system(f"sudo su -c 'echo {val} > /sys/devices/system/cpu/cpu{i}/online'")
 
-if __name__ == "__main__":
-  import sys
-  Tici().set_power_save(bool(int(sys.argv[1])))
+  def get_gpu_usage_percent(self):
+    try:
+      used, total = open('/sys/class/kgsl/kgsl-3d0/gpubusy').read().strip().split()
+      return 100.0 * int(used) / int(total)
+    except Exception:
+      return 0
