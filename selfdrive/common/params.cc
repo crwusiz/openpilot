@@ -212,6 +212,18 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"UpdateFailedCount", CLEAR_ON_MANAGER_START},
     {"Version", PERSISTENT},
     {"VisionRadarToggle", PERSISTENT},
+
+    // add
+    {"LongControlSelect", PERSISTENT},
+    {"AutoLaneChangeEnabled", PERSISTENT},
+    {"PutPrebuilt", PERSISTENT},
+    {"MfcSelect", PERSISTENT},
+    {"LateralControlSelect", PERSISTENT},
+    {"DisableShutdownd", PERSISTENT},
+    {"DisableLogger", PERSISTENT},
+    {"DisableGps", PERSISTENT},
+    {"UiTpms", PERSISTENT},
+
     {"Offroad_ChargeDisabled", CLEAR_ON_MANAGER_START | CLEAR_ON_PANDA_DISCONNECT},
     {"Offroad_ConnectivityNeeded", CLEAR_ON_MANAGER_START},
     {"Offroad_ConnectivityNeededPrompt", CLEAR_ON_MANAGER_START},

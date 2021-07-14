@@ -321,6 +321,7 @@ struct DeviceState @0xa4d8b5af2aa492eb {
   batteryTempC @29 :Float32;
   ambientTempC @30 :Float32;
   thermalStatus @14 :ThermalStatus;
+  wifiIpAddress @34 :Text;
 
   enum ThermalStatus {
     green @0;
@@ -552,6 +553,9 @@ struct ControlsState @0x97ff69c53601abf1 {
 
   cumLagMs @15 :Float32;
   canErrorCounter @57 :UInt32;
+
+  # add
+  lateralControlSelect  @60 :UInt8;
 
   lateralControlState :union {
     indiState @52 :LateralINDIState;
@@ -861,6 +865,8 @@ struct LateralPlan @0xe1e9318e2ae8b51e {
   desire @17 :Desire;
   laneChangeState @18 :LaneChangeState;
   laneChangeDirection @19 :LaneChangeDirection;
+  autoLaneChangeEnabled @29 :Bool;
+  autoLaneChangeTimer @30 :Int8;
 
 
   # desired curvatures over next 2.5s in rad/m

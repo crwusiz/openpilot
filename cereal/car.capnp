@@ -109,6 +109,11 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     wideRoadCameraError @102;
     localizerMalfunction @103;
 
+    #hkg
+    autoLaneChange @107;
+    turningIndicatorOn @105;
+    lkasButtonOff @106;
+
     driverMonitorLowAccDEPRECATED @68;
     radarCanErrorDEPRECATED @15;
     radarCommIssueDEPRECATED @67;
@@ -153,6 +158,7 @@ struct CarState {
   # brake pedal, 0.0-1.0
   brake @5 :Float32;      # this is user pedal only
   brakePressed @6 :Bool;  # this is user pedal only
+  brakeLights @19 :Bool;
 
   # steering wheel
   steeringAngleDeg @7 :Float32;
@@ -193,6 +199,15 @@ struct CarState {
   # blindspot sensors
   leftBlindspot @33 :Bool; # Is there something blocking the left lane change
   rightBlindspot @34 :Bool; # Is there something blocking the right lane change
+
+  # tpms
+  tpmsFl @37 :Float32;
+  tpmsFr @38 :Float32;
+  tpmsRl @39 :Float32;
+  tpmsRr @40 :Float32;
+
+  # autohold
+  autoHold @41 : Int32;
 
   struct WheelSpeeds {
     # optional wheel speeds
@@ -246,7 +261,6 @@ struct CarState {
   }
 
   errorsDEPRECATED @0 :List(CarEvent.EventName);
-  brakeLightsDEPRECATED @19 :Bool;
 }
 
 # ******* radar state @ 20hz *******
@@ -346,6 +360,14 @@ struct CarControl {
       chimeWarningRepeat @6;
       chimePrompt @7;
       chimeWarning2Repeat @8;
+      chimeDing @9;
+      chimeDingRepeat @ 10;
+      chimeGeard @11;
+      chimeSeatbelt @12;
+      chimeVision @13;
+      chimeDistracted @14;
+      chimeEngage2 @15;
+      chimeDisengage2 @16;
     }
   }
 
@@ -427,6 +449,14 @@ struct CarParams {
   communityFeature @46: Bool;  # true if a community maintained feature is detected
   fingerprintSource @49: FingerprintSource;
   networkLocation @50 :NetworkLocation;  # Where Panda/C2 is integrated into the car's CAN network
+
+  sasBus @58: Int8;
+  sccBus @59: Int8;
+  mdpsBus @60: Int8;
+  enableAutoHold @61 :Bool;
+  hasScc13 @62 :Bool;
+  hasScc14 @63 :Bool;
+  hasEms @64 :Bool;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);

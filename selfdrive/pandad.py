@@ -88,8 +88,8 @@ def main() -> None:
   if health["heartbeat_lost"]:
     cloudlog.event("heartbeat lost", deviceState=health)
 
-  cloudlog.info("Resetting panda")
-  panda.reset()
+  #cloudlog.info("Resetting panda")
+  #panda.reset()
 
   os.chdir(os.path.join(BASEDIR, "selfdrive/boardd"))
   os.execvp("./boardd", ["./boardd"])
