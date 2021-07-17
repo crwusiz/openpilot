@@ -43,7 +43,7 @@ public slots:
   int exec() override;
 
 private slots:
-  void handleInput(const QString &s);
+  void handleEnter();
 
 signals:
   void cancel();
@@ -58,10 +58,6 @@ public:
                               const QString &cancel_text, QWidget* parent);
   static bool alert(const QString &prompt_text, QWidget *parent);
   static bool confirm(const QString &prompt_text, QWidget *parent);
-
-private:
-  QLabel *prompt;
-  QVBoxLayout *main_layout;
 
 public slots:
   int exec() override;

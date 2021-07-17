@@ -10,10 +10,10 @@ from selfdrive.swaglog import cloudlog
 from selfdrive.config import Conversions as CV
 
 CRUISE_GAP_BP = [1., 2., 3., 4.]
-CRUISE_GAP_V = [1.3, 1.6, 2.1, 2.7]
+CRUISE_GAP_V = [1.3, 1.6, 2., 2.5]
 
 AUTO_TR_BP = [20.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-AUTO_TR_V = [1.3, 1.7, 2.5]
+AUTO_TR_V = [1.3, 1.6, 2.3]
 
 AUTO_TR_ENABLED = True
 AUTO_TR_CRUISE_GAP = 2
@@ -67,6 +67,13 @@ class LeadMpc():
     # Setup current mpc state
     self.cur_state[0].x_ego = 0.0
 
+    cruise_gap = int(clip(CS.cruiseGap, 1., 4.))
+
+    if AUTO_TR_ENABLED and cruise_gap == AUTO_TR_CRUISE_GAP:
+      TR = interp(v_ego, AUTO_TR_BP, AUTO_TR_V)
+    else:
+      TR = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
+
     if lead is not None and lead.status:
       x_lead = lead.dRel
       v_lead = max(0.0, lead.vLead)
@@ -78,7 +85,7 @@ class LeadMpc():
 
       self.a_lead_tau = lead.aLeadTau
       self.new_lead = False
-      if not self.prev_lead_status or abs(x_lead - self.prev_lead_x) > 2.5:
+      if not self.prev_lead_status: # or abs(x_lead - self.prev_lead_x) > 2.5:
         self.libmpc.init_with_simulation(v_ego, x_lead, v_lead, a_lead, self.a_lead_tau)
         self.new_lead = True
 
@@ -93,13 +100,6 @@ class LeadMpc():
       self.cur_state[0].v_l = v_ego + 10.0
       a_lead = 0.0
       self.a_lead_tau = _LEAD_ACCEL_TAU
-
-    cruise_gap = int(clip(CS.cruiseGap, 1., 4.))
-
-    if AUTO_TR_ENABLED and cruise_gap == AUTO_TR_CRUISE_GAP:
-      TR = interp(v_ego, AUTO_TR_BP, AUTO_TR_V)
-    else:
-      TR = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
 
     # Calculate mpc
     t = sec_since_boot()
