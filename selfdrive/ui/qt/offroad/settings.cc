@@ -468,13 +468,15 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
   )");
 
   // close button
-  QPushButton *close_btn = new QPushButton("X");
+  QPushButton *close_btn = new QPushButton("×");
   close_btn->setStyleSheet(R"(
-    font-size: 90px;
+    font-size: 140px;
+    padding-bottom: 20px;
     font-weight: bold;
     border 1px grey solid;
     border-radius: 100px;
     background-color: #292929;
+    font-weight: 400;
   )");
   close_btn->setFixedSize(200, 200);
   sidebar_layout->addSpacing(45);
@@ -495,12 +497,11 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
   };
 
 #ifdef ENABLE_MAPS
-  if (!Params().get("MapboxToken").empty()) {
-    auto map_panel = new MapPanel(this);
-    panels.push_back({"Navigation", map_panel});
-    QObject::connect(map_panel, &MapPanel::closeSettings, this, &SettingsWindow::closeSettings);
-  }
+  auto map_panel = new MapPanel(this);
+  panels.push_back({"Navigation", map_panel});
+  QObject::connect(map_panel, &MapPanel::closeSettings, this, &SettingsWindow::closeSettings);
 #endif
+
   const int padding = panels.size() > 3 ? 25 : 35;
 
   nav_btns = new QButtonGroup();
