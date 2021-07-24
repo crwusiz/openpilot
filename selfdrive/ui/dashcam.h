@@ -194,8 +194,8 @@ void draw_date_time(UIState *s) {
 
   int rect_w = 465;
   int rect_h = 80;
-  int rect_x = (s->viz_rect.w + (bdr_s * 2)-rect_w)/2;
-  int rect_y = (s->viz_rect.h + (bdr_s * 2)-rect_h-10);
+  int rect_x = (s->fb_w + (bdr_s * 2)-rect_w)/2;
+  int rect_y = (s->fb_h + (bdr_s * 2)-rect_h-10);
 
   // Get local time to display
   char now[50];
@@ -227,9 +227,9 @@ static void rotate_video() {
 void draw_lock_button(UIState *s) {
   int btn_w = 150;
   int btn_h = 150;
-  //int btn_x = s->viz_rect.w + (bdr_s * 2) - btn_w - (120+bdr_s);
-  int btn_x = s->viz_rect.x + s->viz_rect.w - btn_w - (bdr_s * 2) - 200;
-  int btn_y = s->viz_rect.h + (bdr_s * 2) - btn_h;
+  //int btn_x = s->fb_w + (bdr_s * 2) - btn_w - (120+bdr_s);
+  int btn_x = s->fb_w - btn_w - (bdr_s * 2) - 200;
+  int btn_y = (bdr_s * 2) - btn_h;
   //int imgw, imgh;
   float alpha = 0.3f;
 
@@ -267,8 +267,8 @@ static void screen_draw_button(UIState *s, int touch_x, int touch_y) {
 
     int btn_w = 180;
     int btn_h = 180;
-    int btn_x = s->viz_rect.x + s->viz_rect.w - btn_w - (bdr_s * 2);
-    int btn_y = s->viz_rect.h + (bdr_s * 2) - btn_h - 45;
+    int btn_x = s->fb_w - btn_w - (bdr_s * 2);
+    int btn_y = s->fb_h + (bdr_s * 2) - btn_h - 45;
     nvgBeginPath(s->vg);
     nvgRoundedRect(s->vg, btn_x, btn_y, btn_w, btn_h, 100);
     nvgStrokeColor(s->vg, nvgRGBA(255,255,255,80));
