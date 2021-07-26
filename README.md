@@ -3,7 +3,7 @@
 
 https://github.com/xx979xx/openpilot
 
-It is open source and inherits MIT license. It is open source and inherits MIT license.  By installing this software you accept all responsibility for anything that might occur while you use it.  All contributors to this fork are not liable.  <b>Use at your own risk.</b>
+It is open source and inherits MIT license.  By installing this software you accept all responsibility for anything that might occur while you use it.  All contributors to this fork are not liable.  <b>Use at your own risk.</b>
 
 
 ------------------------------------------------------
@@ -215,6 +215,7 @@ Community Maintained Cars and Features
 | Volkswagen| Jetta 2018-20                 | Driver Assistance | Stock            | 0mph               | 0mph         |
 | Volkswagen| Jetta GLI 2021                | Driver Assistance | Stock            | 0mph               | 0mph         |
 | Volkswagen| Passat 2016-17<sup>2</sup>    | Driver Assistance | Stock            | 0mph               | 0mph         |
+| Volkswagen| T-Cross 2021                  | Driver Assistance | Stock            | 0mph               | 0mph         |
 | Volkswagen| Tiguan 2020                   | Driver Assistance | Stock            | 0mph               | 0mph         |
 | Volkswagen| Touran 2017                   | Driver Assistance | Stock            | 0mph               | 0mph         |
 
