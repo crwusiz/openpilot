@@ -75,9 +75,8 @@ class CarController():
     self.longcontrol = CP.openpilotLongitudinalControl
     self.scc_live = not CP.radarOffCan
 
-    self.mad_mode_enabled = Params().get_bool("MadModeEnabled")
-    self.ldws_opt = Params().get_bool("IsLdwsCar")
-    self.fix_lkas = self.car_fingerprint in FEATURES["fix_lkas"]
+    self.mad_mode_enabled = Params().get_bool('MadModeEnabled')
+    self.ldws_opt = Params().get_bool('IsLdwsCar')
 
     # gas_factor, brake_factor
     # Adjust it in the range of 0.7 to 1.3
@@ -176,8 +175,7 @@ class CarController():
 
     if pcm_cancel_cmd and (self.longcontrol and not self.mad_mode_enabled):
       can_sends.append(create_clu11(self.packer, frame % 0x10, CS.scc_bus, CS.clu11, Buttons.CANCEL, clu11_speed))
-
-    if CS.mdps_bus or self.fix_lkas:  # send mdps12 to LKAS to prevent LKAS error
+    else:
       can_sends.append(create_mdps12(self.packer, frame, CS.mdps12))
 
     # fix auto resume - by neokii

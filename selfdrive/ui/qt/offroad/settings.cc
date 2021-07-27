@@ -388,7 +388,6 @@ QWidget * community_panel() {
                                             "If your car only supports LDWS, turn it on.",
                                             "../assets/offroad/icon_openpilot.png"
                                               ));
-
   toggles_list->addWidget(horizontal_line());
   toggles_list->addWidget(new ParamControl("LaneChangeEnabled",
                                             "Enable Lane Change Assist",
