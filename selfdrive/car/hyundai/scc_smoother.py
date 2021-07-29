@@ -85,6 +85,7 @@ class SccSmoother:
     self.slowing_down = False
     self.slowing_down_alert = False
     self.slowing_down_sound_alert = False
+    self.active_cam = False
 
     self.max_speed_clu = 0.
     self.limited_lead = False
@@ -144,6 +145,7 @@ class SccSmoother:
     max_speed_log = ""
 
     if limit_speed >= self.kph_to_clu(30):
+      self.active_cam = True
 
       if first_started:
         self.max_speed_clu = clu11_speed
@@ -162,6 +164,7 @@ class SccSmoother:
         self.slowing_down_alert = False
 
     else:
+      self.active_cam = False
       self.slowing_down_alert = False
       self.slowing_down = False
 
