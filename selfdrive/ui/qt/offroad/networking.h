@@ -21,6 +21,7 @@ private:
   QVBoxLayout* main_layout;
   QPixmap lock;
   QPixmap checkmark;
+  QPixmap circled_slash;
   QVector<QPixmap> strengths;
 
 signals:
@@ -52,6 +53,7 @@ class Networking : public QFrame {
 
 public:
   explicit Networking(QWidget* parent = 0, bool show_advanced = true);
+  WifiManager* wifi = nullptr;
 
 private:
   QStackedLayout* main_layout = nullptr;
@@ -59,7 +61,6 @@ private:
   AdvancedNetworking* an = nullptr;
 
   WifiUI* wifiWidget;
-  WifiManager* wifi = nullptr;
 
 protected:
   void showEvent(QShowEvent* event) override;
