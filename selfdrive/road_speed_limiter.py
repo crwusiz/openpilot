@@ -126,13 +126,13 @@ class RoadLimitSpeedServer:
           try:
             if 'active' in json_obj:
               self.active = json_obj['active']
-              self.last_updated_active = time.time()
+              self.last_updated_active = time.monotonic()
           except:
             pass
 
           if 'road_limit' in json_obj:
             self.json_road_limit = json_obj['road_limit']
-            self.last_updated = time.time()
+            self.last_updated = time.monotonic()
 
         finally:
           self.lock.release()
@@ -148,7 +148,7 @@ class RoadLimitSpeedServer:
     return ret
 
   def check(self):
-    now = time.time()
+    now = time.monotonic()
     if now - self.last_updated > 20.:
       try:
         self.lock.acquire()

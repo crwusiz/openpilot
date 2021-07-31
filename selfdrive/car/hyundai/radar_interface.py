@@ -82,7 +82,7 @@ class RadarInterface(RadarInterfaceBase):
         self.pts[ii].yvRel = float('nan')
         self.pts[ii].measured = True
 
-        now = time.time()
+        now = time.monotonic()
         if self.lastdRel is not None and self.lastTime is not None:
           dd = dRel - self.lastdRel
           dt = now - self.lastTime
