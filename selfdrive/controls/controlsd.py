@@ -160,6 +160,9 @@ class Controls:
     self.aReqValueMin = 0.
     self.aReqValueMax = 0.
 
+    self.left_lane_visible = False
+    self.right_lane_visible = False
+
     # TODO: no longer necessary, aside from process replay
     self.sm['liveParameters'].valid = True
 
@@ -555,8 +558,13 @@ class Controls:
 
     right_lane_visible = self.sm['lateralPlan'].rProb > 0.5
     left_lane_visible = self.sm['lateralPlan'].lProb > 0.5
-    CC.hudControl.rightLaneVisible = bool(right_lane_visible)
-    CC.hudControl.leftLaneVisible = bool(left_lane_visible)
+
+    if self.sm.frame % 100 == 0:
+      self.right_lane_visible = right_lane_visible
+      self.left_lane_visible = left_lane_visible
+
+    CC.hudControl.rightLaneVisible = self.right_lane_visible
+    CC.hudControl.leftLaneVisible = self.left_lane_visible
 
     recent_blinker = (self.sm.frame - self.last_blinker_frame) * DT_CTRL < 5.0  # 5s blinker cooldown
     ldw_allowed = self.is_ldw_enabled and CS.vEgo > LDW_MIN_SPEED and not recent_blinker \
