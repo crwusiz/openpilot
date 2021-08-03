@@ -364,9 +364,6 @@ class SccSmoother:
 
     lead = self.get_lead(sm)
     if lead is not None:
-      wd = interp(lead.dRel, [4., 15.], [1.2, 1.0])
-      brake_factor *= interp(CS.out.vEgo, [0., 20.], [1., wd])
-
       if not lead.radar:
         brake_factor *= 0.9
 
