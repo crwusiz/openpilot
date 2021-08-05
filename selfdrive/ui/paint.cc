@@ -675,8 +675,6 @@ static void bb_ui_draw_debug(UIState *s)
     auto car_control = (*s->sm)["carControl"].getCarControl();
 
     float applyAccel = controls_state.getApplyAccel();
-    float fusedAccel = controls_state.getFusedAccel();
-    float leadDist = controls_state.getLeadDist();
 
     float aReqValue = controls_state.getAReqValue();
     float aReqValueMin = controls_state.getAReqValueMin();
@@ -719,11 +717,7 @@ static void bb_ui_draw_debug(UIState *s)
     ui_draw_text(s, text_x, y, str, 22 * 2.5, textColor, "sans-regular");
 
     y += height;
-    snprintf(str, sizeof(str), "LeadDist: %.3f", leadDist);
-    ui_draw_text(s, text_x, y, str, 22 * 2.5, textColor, "sans-regular");
-
-    y += height;
-    snprintf(str, sizeof(str), "Accel: %.3f/%.3f/%.3f", applyAccel, fusedAccel, aReqValue);
+    snprintf(str, sizeof(str), "Accel: %.3f/%.3f", applyAccel, aReqValue);
     ui_draw_text(s, text_x, y, str, 22 * 2.5, textColor, "sans-regular");
 
     y += height;

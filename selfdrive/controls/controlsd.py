@@ -636,8 +636,6 @@ class Controls:
     controlsState.angleSteers = steer_angle_without_offset * CV.RAD_TO_DEG
     controlsState.cluSpeedMs = self.clu_speed_ms
     controlsState.applyAccel = self.apply_accel
-    controlsState.fusedAccel = self.fused_accel
-    controlsState.leadDist = self.lead_drel
     controlsState.aReqValue = self.aReqValue
     controlsState.aReqValueMin = self.aReqValueMin
     controlsState.aReqValueMax = self.aReqValueMax

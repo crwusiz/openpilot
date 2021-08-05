@@ -60,7 +60,6 @@ class SccSmoother:
     self.slow_on_curves = Params().get_bool('SccSmootherSlowOnCurves')
     self.sync_set_speed_while_gas_pressed = Params().get_bool('SccSmootherSyncGasPressed')
     self.is_metric = Params().get_bool('IsMetric')
-    self.fuse_with_stock = Params().get_bool('FuseWithStockScc')
 
     self.speed_conv_to_ms = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
     self.speed_conv_to_clu = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH
@@ -340,22 +339,6 @@ class SccSmoother:
       kp = 0.01
       error = max_speed - self.max_speed_clu
       self.max_speed_clu = self.max_speed_clu + error * kp
-
-  def get_fused_accel(self, apply_accel, stock_accel, sm):
-
-    dRel = 0.
-    lead = self.get_lead(sm)
-    if lead is not None:
-      dRel = lead.dRel
-
-      if self.fuse_with_stock and lead.radar:
-        if stock_accel > 0.:
-          stock_weight = interp(dRel, [4., 25.], [0.7, 0.])
-        else:
-          stock_weight = interp(dRel, [4., 25.], [1., 0.])
-        apply_accel = apply_accel * (1. - stock_weight) + stock_accel * stock_weight
-
-    return apply_accel, dRel
 
   def get_accel(self, CS, sm, accel):
 
