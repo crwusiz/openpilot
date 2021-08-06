@@ -480,6 +480,9 @@ class Controls:
       self.LaC.reset()
       self.LoC.reset(v_pid=CS.vEgo)
 
+    if not CS.cruiseState.enabled:
+      self.LoC.reset(v_pid=CS.vEgo)
+
     if not self.joystick_mode:
       # Gas/Brake PID loop
       actuators.gas, actuators.brake, self.v_target, self.a_target = self.LoC.update(self.active, CS, self.CP, long_plan)
