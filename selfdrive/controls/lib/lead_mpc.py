@@ -12,11 +12,11 @@ from selfdrive.config import Conversions as CV
 CRUISE_GAP_BP = [1., 2., 3., 4.]
 CRUISE_GAP_V = [1.2, 1.5, 1.8, 2.4]
 
-AUTO_TR_BP = [20.*CV.KPH_TO_MS, 50.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-AUTO_TR_V = [1.2, 1.3, 1.5, 2.2]
+AUTO_TR_BP = [20.*CV.KPH_TO_MS, 90.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+AUTO_TR_V = [1.3, 1.6, 2.3]
 
 AUTO_TR_ENABLED = True
-AUTO_TR_CRUISE_GAP = 2
+AUTO_TR_CRUISE_GAP = 1
 
 MPC_T = list(np.arange(0,1.,.2)) + list(np.arange(1.,10.6,.6))
 
