@@ -26,7 +26,7 @@ from selfdrive.locationd.calibrationd import Calibration
 from selfdrive.hardware import HARDWARE, TICI
 from selfdrive.manager.process_config import managed_processes
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
-from selfdrive.ntune import ntune_get, ntune_isEnabled
+from selfdrive.ntune import ntune_common_get, ntune_common_enabled, ntune_scc_get
 
 LDW_MIN_SPEED = 31 * CV.MPH_TO_MS
 LANE_DEPARTURE_THRESHOLD = 0.1
@@ -462,10 +462,10 @@ class Controls:
     x = max(params.stiffnessFactor, 0.1)
     #sr = max(params.steerRatio, 0.1)
 
-    if ntune_isEnabled('useLiveSteerRatio'):
+    if ntune_common_enabled('useLiveSteerRatio'):
       sr = max(params.steerRatio, 0.1)
     else:
-      sr = max(ntune_get('steerRatio'), 0.1)
+      sr = max(ntune_common_get('steerRatio'), 0.1)
 
     self.VM.update_params(x, sr)
 
@@ -580,7 +580,7 @@ class Controls:
     if len(meta.desirePrediction) and ldw_allowed:
       l_lane_change_prob = meta.desirePrediction[Desire.laneChangeLeft - 1]
       r_lane_change_prob = meta.desirePrediction[Desire.laneChangeRight - 1]
-      cameraOffset = ntune_get("cameraOffset")
+      cameraOffset = ntune_common_get("cameraOffset")
       l_lane_close = left_lane_visible and (self.sm['modelV2'].laneLines[1].y[0] > -(1.08 + cameraOffset))
       r_lane_close = right_lane_visible and (self.sm['modelV2'].laneLines[2].y[0] < (1.08 - cameraOffset))
 
@@ -647,8 +647,12 @@ class Controls:
     controlsState.aReqValueMax = self.aReqValueMax
 
     controlsState.steerRatio = self.VM.sR
-    controlsState.steerRateCost = ntune_get('steerRateCost')
-    controlsState.steerActuatorDelay = ntune_get('steerActuatorDelay')
+    controlsState.steerRateCost = ntune_common_get('steerRateCost')
+    controlsState.steerActuatorDelay = ntune_common_get('steerActuatorDelay')
+
+    controlsState.sccGasFactor = ntune_scc_get('sccGasFactor')
+    controlsState.sccBrakeFactor = ntune_scc_get('sccBrakeFactor')
+    controlsState.sccCurvatureFactor = ntune_scc_get('sccCurvatureFactor')
 
     if self.joystick_mode:
       controlsState.lateralControlState.debugState = lac_log

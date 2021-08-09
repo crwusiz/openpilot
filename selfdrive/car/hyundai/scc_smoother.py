@@ -9,6 +9,7 @@ from common.params import Params
 from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, V_CRUISE_MIN, V_CRUISE_DELTA_KM, V_CRUISE_DELTA_MI
 from selfdrive.controls.lib.lane_planner import TRAJECTORY_SIZE
 from selfdrive.controls.lib.lead_mpc import AUTO_TR_CRUISE_GAP
+from selfdrive.ntune import ntune_scc_get
 from selfdrive.road_speed_limiter import road_speed_limiter_get_max_speed, road_speed_limiter_get_active
 
 SYNC_MARGIN = 3.
@@ -54,7 +55,7 @@ class SccSmoother:
   def kph_to_clu(self, kph):
     return int(kph * CV.KPH_TO_MS * self.speed_conv_to_clu)
 
-  def __init__(self, gas_factor, brake_factor, curvature_factor):
+  def __init__(self):
 
     self.longcontrol = Params().get_bool('LongControlEnabled')
     self.slow_on_curves = Params().get_bool('SccSmootherSlowOnCurves')
@@ -66,10 +67,6 @@ class SccSmoother:
 
     self.min_set_speed_clu = self.kph_to_clu(MIN_SET_SPEED_KPH)
     self.max_set_speed_clu = self.kph_to_clu(MAX_SET_SPEED_KPH)
-
-    self.gas_factor = clip(gas_factor, 0.7, 1.3)
-    self.brake_factor = clip(brake_factor, 0.7, 1.3)
-    self.curvature_factor = curvature_factor
 
     self.target_speed = 0.
 
@@ -300,7 +297,7 @@ class SccSmoother:
         curv = curv[start:min(start+10, TRAJECTORY_SIZE)]
         a_y_max = 2.975 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
         v_curvature = np.sqrt(a_y_max / np.clip(np.abs(curv), 1e-4, None))
-        model_speed = np.mean(v_curvature) * 0.85 * self.curvature_factor
+        model_speed = np.mean(v_curvature) * 0.85 * ntune_scc_get("sccCurvatureFactor")
 
         if model_speed < v_ego:
           self.curve_speed_ms = float(max(model_speed, MIN_CURVE_SPEED))
@@ -342,8 +339,8 @@ class SccSmoother:
 
   def get_accel(self, CS, sm, accel):
 
-    gas_factor = clip(self.gas_factor, 0.7, 1.3)
-    brake_factor = clip(self.brake_factor, 0.7, 1.3)
+    gas_factor = ntune_scc_get("sccGasFactor")
+    brake_factor = ntune_scc_get("sccBrakeFactor")
 
     lead = self.get_lead(sm)
     if lead is not None:

@@ -224,10 +224,10 @@ static void ui_draw_vision_lane_lines(UIState *s) {
       ui_draw_line(s, scene.road_edge_vertices[i], &color, nullptr);
     }
     track_bg = nvgLinearGradient(s->vg, s->fb_w, s->fb_h, s->fb_w, s->fb_h * .4,
-                                          COLOR_WHITE_ALPHA(180), COLOR_WHITE_ALPHA(0));
+                                          COLOR_WHITE_ALPHA(150), COLOR_WHITE_ALPHA(0));
   } else {
     track_bg = nvgLinearGradient(s->vg, s->fb_w, s->fb_h, s->fb_w, s->fb_h * .4,
-                                          COLOR_RED_ALPHA(180), COLOR_RED_ALPHA(0));
+                                          COLOR_RED_ALPHA(150), COLOR_RED_ALPHA(0));
   }
   // paint path
   ui_draw_line(s, scene.track_vertices, nullptr, &track_bg);
@@ -641,15 +641,21 @@ static void bb_ui_draw_basic_info(UIState *s)
     int mdps_bus = scene->car_params.getMdpsBus();
     int scc_bus = scene->car_params.getSccBus();
 
-    snprintf(str, sizeof(str), "SR(%.2f) SRC(%.2f) SAD(%.2f) AO(%.2f/%.2f) MDPS(%d) SCC(%d)%s%s", controls_state.getSteerRatio(),
-                                                        controls_state.getSteerRateCost(),
-                                                        controls_state.getSteerActuatorDelay(),
-                                                        live_params.getAngleOffsetDeg(),
-                                                        live_params.getAngleOffsetAverageDeg(),
-                                                        mdps_bus, scc_bus,
-                                                        sccLogMessage.size() > 0 ? ", " : "",
-                                                        sccLogMessage.c_str()
-                                                        );
+    snprintf(str, sizeof(str), "AO(%.2f/%.2f) SR(%.2f) SRC(%.2f) SAD(%.2f) BUS(MDPS:%d SCC:%d) SCC(%.2f/%.2f/%.2f)%s%s",
+
+                        live_params.getAngleOffsetDeg(),
+                        live_params.getAngleOffsetAverageDeg(),
+                        controls_state.getSteerRatio(),
+                        controls_state.getSteerRateCost(),
+                        controls_state.getSteerActuatorDelay(),
+
+                        mdps_bus, scc_bus,
+                        controls_state.getSccGasFactor(),
+                        controls_state.getSccBrakeFactor(),
+                        controls_state.getSccCurvatureFactor(),
+                        sccLogMessage.size() > 0 ? ", " : "",
+                        sccLogMessage.c_str()
+                        );
 
     int x = bdr_s * 2;
     int y = s->fb_h - 24;

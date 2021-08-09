@@ -7,7 +7,7 @@ from common.realtime import DT_MDL
 from selfdrive.hardware import EON, TICI
 from selfdrive.swaglog import cloudlog
 from cereal import log
-from selfdrive.ntune import ntune_get
+from selfdrive.ntune import ntune_common_get
 
 ENABLE_ZORROBYTE = True
 ENABLE_INC_LANE_PROB = True
@@ -56,7 +56,7 @@ class LanePlanner:
       # left and right ll x is the same
       self.ll_x = md.laneLines[1].x
       # only offset left and right lane lines; offsetting path does not make sense
-      cameraOffset = ntune_get("cameraOffset")
+      cameraOffset = ntune_common_get("cameraOffset")
       self.lll_y = np.array(md.laneLines[1].y) - cameraOffset
       self.rll_y = np.array(md.laneLines[2].y) - cameraOffset
       self.lll_prob = md.laneLineProbs[1]
