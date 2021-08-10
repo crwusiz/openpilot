@@ -211,7 +211,7 @@ class nTune():
     try:
       with open(self.file, 'w') as f:
         json.dump(conf, f, indent=2, sort_keys=False)
-        os.chmod(self.file, 0o764)
+        os.chmod(self.file, 0o666)
     except IOError:
 
       try:
@@ -220,7 +220,7 @@ class nTune():
 
         with open(self.file, 'w') as f:
           json.dump(conf, f, indent=2, sort_keys=False)
-          os.chmod(self.file, 0o764)
+          os.chmod(self.file, 0o666)
       except:
         pass
 
