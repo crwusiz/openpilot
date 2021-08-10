@@ -13,6 +13,7 @@ from common.numpy_fast import clip
 from selfdrive.locationd.models.car_kf import CarKalman, ObservationKind, States
 from selfdrive.locationd.models.constants import GENERATED_DIR
 from selfdrive.swaglog import cloudlog
+from common.realtime import sec_since_boot
 
 
 MAX_ANGLE_OFFSET_DELTA = 20 * DT_MDL  # Max 20 deg/s
@@ -35,6 +36,8 @@ class ParamsLearner:
     self.steering_angle = 0
 
     self.valid = True
+
+    self.start_time = sec_since_boot()
 
   def handle_log(self, t, which, msg):
     if which == 'liveLocationKalman':
@@ -59,7 +62,7 @@ class ParamsLearner:
       self.speed = msg.vEgo
 
       in_linear_region = abs(self.steering_angle) < 45 or not self.steering_pressed
-      self.active = self.speed > 5 and in_linear_region
+      self.active = self.speed > 5 and in_linear_region and sec_since_boot() - self.start_time > 5.
 
       if self.active:
         self.kf.predict_and_observe(t, ObservationKind.STEER_ANGLE, np.array([[math.radians(msg.steeringAngleDeg)]]))
