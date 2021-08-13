@@ -33,6 +33,7 @@ class CAR:
   ELANTRA_GT_I30 = "HYUNDAI I30 N LINE 2019 & GT 2018 DCT"
   SONATA = "HYUNDAI SONATA 2020"
   SONATA_HEV = "HYUNDAI SONATA HEV 2020"
+  SONATA21_HEV = "HYUNDAI SONATA HEV 2021"
   SONATA19 = "HYUNDAI SONATA 2019"
   SONATA19_HEV = "HYUNDAI SONATA 2019 HEV"
   SONATA_LF_TURBO = "HYUNDAI SONATA LF TURBO"
@@ -60,6 +61,7 @@ class CAR:
   STINGER = "KIA STINGER GT2 2018"
   NIRO_EV = "KIA NIRO EV 2020 PLATINUM"
   NIRO_HEV = "KIA NIRO HEV 2018"
+  NIRO21_HEV = "KIA NIRO HEV 2021"
   CEED = "KIA CEED 2019"
   SELTOS = "KIA SELTOS 2021"
   K7 = "KIA K7 2016-2019"
@@ -434,6 +436,13 @@ FW_VERSIONS = {
       b'\xf1\x87SAMDBA8054504GJ3gw\x87xffvgffffwwwweUVUf?\xfc\xffvU_\xff\xddl\xf1\x89HT6WAD10A1\xf1\x82SDN8G25NB2\x00\x00\x00\x00\x00\x00',
     ],
   },
+  CAR.SONATA21_HEV: {
+    (Ecu.fwdRadar, 0x7d0, None): [b'\xf1\000DNhe SCC FHCUP      1.00 1.02 99110-L5000         ',],
+    (Ecu.eps, 0x7d4, None): [b'\xf1\x8756310-L5500\xf1\000DN8 MDPS C 1.00 1.02 56310-L5500 4DNHC102\xf1\xa01.02',],
+    (Ecu.fwdCamera, 0x7c4, None): [b'\xf1\000DN8HMFC  AT USA LHD 1.00 1.04 99211-L1000 191016',],
+    (Ecu.transmission, 0x7e1, None): [b'\xf1\000PSBG2323  E09\000\000\000\000\000\000\000TDN2H20SA5\x97R\x88\x9e',],
+    (Ecu.engine, 0x7e0, None): [b'\xf1\x87391162J012\xf1\xa0000R',],
+  },
   CAR.SANTA_FE: {
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00TM__ SCC F-CUP      1.00 1.01 99110-S2000         \xf1\xa01.01',
@@ -750,29 +759,47 @@ FW_VERSIONS = {
     (Ecu.engine, 0x7e0, None) : [
       b'\xf1\x816H6G5051\000\000\000\000\000\000\000\000'
     ]
-  }
+  },
+  CAR.NIRO21_HEV: {
+    (Ecu.engine, 0x7e0, None): [
+      b'\xf1\x816H6G5051\x00\x00\x00\x00\x00\x00\x00\x00',
+    ],
+    (Ecu.transmission, 0x7e1, None): [
+      b'\xf1\x816U3J9051\x00\x00\xf1\x006U3H1_C2\x00\x006U3J9051\x00\x00HDE0G16NL3\x00\x00\x00\x00',
+      b'\xf1\x816U3J9051\x00\x00\xf1\x006U3H1_C2\x00\x006U3J9051\x00\x00HDE0G16NL3\xb9\xd3\xfaW',
+    ],
+    (Ecu.eps, 0x7d4, None): [
+      b'\xf1\x00DE  MDPS C 1.00 1.01 56310G5520\x00 4DEPC101',
+    ],
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00DEH MFC  AT USA LHD 1.00 1.07 99211-G5000 201221',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00DEhe SCC FHCUP      1.00 1.00 99110-G5600         ',
+    ],
+  },
 }
 
 CHECKSUM = {
-  "crc8": [CAR.SANTA_FE, CAR.SONATA, CAR.PALISADE, CAR.SONATA_HEV, CAR.SELTOS, CAR.ELANTRA_2021, CAR.ELANTRA_HEV_2021],
+  "crc8": [CAR.SANTA_FE, CAR.SONATA, CAR.PALISADE, CAR.SONATA_HEV, CAR.SONATA21_HEV, CAR.SELTOS, CAR.ELANTRA_2021, CAR.ELANTRA_HEV_2021],
   "6B": [CAR.SORENTO, CAR.GENESIS],
 }
 
 FEATURES = {
   # Use Cluster for Gear Selection, rather than Transmission
-  "use_cluster_gears": {CAR.ELANTRA, CAR.KONA, CAR.ELANTRA_GT_I30, CAR.K7, CAR.NIRO_HEV, CAR.GRANDEUR_IG, CAR.GRANDEUR_IG_FL},
+  "use_cluster_gears": {CAR.ELANTRA, CAR.KONA, CAR.ELANTRA_GT_I30, CAR.K7, CAR.GRANDEUR_IG, CAR.GRANDEUR_IG_FL},
 
   # Use TCU Message for Gear Selection
   "use_tcu_gears": {CAR.K5, CAR.SONATA19, CAR.VELOSTER, CAR.SONATA_LF_TURBO, CAR.TUCSON_TL_SCC},
 
   # Use E_GEAR Message for Gear Selection
-  "use_elect_gears": {CAR.K5_HEV, CAR.IONIQ_EV_LTD, CAR.KONA_EV, CAR.KONA_HEV, CAR.SONATA_HEV, CAR.NIRO_EV, CAR.K7_HEV,
-                      CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IG_FL_HEV, CAR.IONIQ_EV_2020, CAR.IONIQ_PHEV, CAR.ELANTRA_HEV_2021},
+  "use_elect_gears": {CAR.K5_HEV, CAR.IONIQ_EV_LTD, CAR.KONA_EV, CAR.KONA_HEV, CAR.SONATA_HEV, CAR.SONATA21_HEV, CAR.SONATA21_HEV, CAR.NIRO_EV, CAR.K7_HEV,
+                      CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IG_FL_HEV, CAR.IONIQ_EV_2020, CAR.IONIQ_PHEV, CAR.ELANTRA_HEV_2021, CAR.NIRO_HEV, CAR.NIRO21_HEV},
 
   # send LFA MFA message for new HKG models
-  "send_lfa_mfa": {CAR.SONATA, CAR.PALISADE, CAR.SONATA_HEV, CAR.SANTA_FE, CAR.NIRO_EV, CAR.GRANDEUR_IG_FL, CAR.GRANDEUR_IG_FL_HEV,
+  "send_lfa_mfa": {CAR.SONATA, CAR.PALISADE, CAR.SONATA_HEV, CAR.SONATA21_HEV, CAR.SANTA_FE, CAR.NIRO_EV, CAR.GRANDEUR_IG_FL, CAR.GRANDEUR_IG_FL_HEV,
                    CAR.SELTOS, CAR.KONA_EV, CAR.KONA_HEV, CAR.TUCSON_TL_SCC, CAR.ELANTRA_2021, CAR.ELANTRA_HEV_2021,
-                   CAR.K9, CAR.GENESIS_G90},
+                   CAR.K9, CAR.GENESIS_G90, CAR.NIRO21_HEV},
 
   # these cars use the FCA11 message for the AEB and FCW signals, all others use SCC12
   "use_fca": {CAR.SONATA, CAR.ELANTRA, CAR.ELANTRA_GT_I30, CAR.STINGER, CAR.IONIQ, CAR.IONIQ_EV_2020, CAR.IONIQ_PHEV, CAR.KONA, CAR.KONA_EV, CAR.FORTE,
@@ -781,12 +808,12 @@ FEATURES = {
 
   "use_blinker_flash": {CAR.SONATA_LF_TURBO},
 
-  "has_scc13": {CAR.PALISADE, CAR.NIRO_HEV, CAR.K9, CAR.GENESIS_G90},
-  "has_scc14": {CAR.PALISADE, CAR.NIRO_HEV, CAR.K9, CAR.GENESIS_G90},
+  "has_scc13": {CAR.PALISADE, CAR.NIRO_HEV, CAR.NIRO21_HEV, CAR.K9, CAR.GENESIS_G90},
+  "has_scc14": {CAR.PALISADE, CAR.NIRO_HEV, CAR.NIRO21_HEV, CAR.K9, CAR.GENESIS_G90},
 
 }
 
-HYBRID_CAR = {CAR.K5_HEV, CAR.KONA_HEV, CAR.NIRO_HEV, CAR.SONATA_HEV, CAR.SONATA19_HEV, CAR.K7_HEV,
+HYBRID_CAR = {CAR.K5_HEV, CAR.KONA_HEV, CAR.NIRO_HEV, CAR.NIRO21_HEV, CAR.SONATA_HEV, CAR.SONATA21_HEV, CAR.SONATA19_HEV, CAR.K7_HEV,
               CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IG_FL_HEV, CAR.IONIQ_PHEV, CAR.ELANTRA_HEV_2021}
 
 EV_CAR = {CAR.IONIQ_EV_LTD, CAR.IONIQ_EV_2020, CAR.KONA_EV, CAR.NIRO_EV}
@@ -806,6 +833,7 @@ DBC = {
   CAR.ELANTRA_GT_I30: dbc_dict('hyundai_kia_generic', None),
   CAR.SONATA: dbc_dict('hyundai_kia_generic', None),
   CAR.SONATA_HEV: dbc_dict('hyundai_kia_generic', None),
+  CAR.SONATA21_HEV: dbc_dict('hyundai_kia_generic', None),
   CAR.SONATA19: dbc_dict('hyundai_kia_generic', None),
   CAR.SONATA19_HEV: dbc_dict('hyundai_kia_generic', None),
   CAR.SONATA_LF_TURBO: dbc_dict('hyundai_kia_generic', None),
@@ -833,6 +861,7 @@ DBC = {
   CAR.STINGER: dbc_dict('hyundai_kia_generic', None),  
   CAR.NIRO_EV: dbc_dict('hyundai_kia_generic', None),
   CAR.NIRO_HEV: dbc_dict('hyundai_kia_generic', None),
+  CAR.NIRO21_HEV: dbc_dict('hyundai_kia_generic', None),
   CAR.CEED: dbc_dict('hyundai_kia_generic', None),
   CAR.SELTOS: dbc_dict('hyundai_kia_generic', None),
   CAR.K7: dbc_dict('hyundai_kia_generic', None),

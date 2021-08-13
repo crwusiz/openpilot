@@ -138,6 +138,7 @@ typedef struct UIScene {
   bool dm_active, engageable;
 
   // lead
+  vertex_data lead_vertices_radar[2];
   vertex_data lead_vertices[2];
 
   float light_sensor, accel_sensor, gyro_sensor;
