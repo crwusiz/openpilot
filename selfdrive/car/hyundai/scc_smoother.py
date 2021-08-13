@@ -341,7 +341,7 @@ class SccSmoother:
     lead = self.get_lead(sm)
     if lead is not None:
       if not lead.radar:
-        brake_factor *= 0.93
+        brake_factor *= 0.95
 
     if accel > 0:
       accel *= gas_factor
