@@ -146,11 +146,13 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.72
       ret.steerRatio = 13.27 * 1.15   # 15% higher at the center seems reasonable
       tire_stiffness_factor = 0.65
+      ret.centerToFront = ret.wheelbase * 0.4
     elif candidate == CAR.ELANTRA_HEV_2021:
       ret.mass = (3017. * CV.LB_TO_KG) + STD_CARGO_KG
       ret.wheelbase = 2.72
       ret.steerRatio = 13.27 * 1.15  # 15% higher at the center seems reasonable
       tire_stiffness_factor = 0.65
+      ret.centerToFront = ret.wheelbase * 0.4
     elif candidate == CAR.KONA:
       ret.mass = 1275. + STD_CARGO_KG
       ret.wheelbase = 2.7
@@ -167,6 +169,7 @@ class CarInterface(CarInterfaceBase):
       tire_stiffness_factor = 0.385
       #if candidate not in [CAR.IONIQ_EV_2020, CAR.IONIQ_PHEV]:
       #  ret.minSteerSpeed = 32 * CV.MPH_TO_MS
+      ret.centerToFront = ret.wheelbase * 0.4
     elif candidate in [CAR.GRANDEUR_IG, CAR.GRANDEUR_IG_HEV]:
       tire_stiffness_factor = 0.8
       ret.mass = 1640. + STD_CARGO_KG
@@ -244,6 +247,9 @@ class CarInterface(CarInterfaceBase):
       tire_stiffness_factor = 0.8
 
     ret.radarTimeStep = 0.05
+
+    if ret.centerToFront == 0:
+      ret.centerToFront = ret.wheelbase * 0.4
 
 
     # TODO: get actual value, for now starting with reasonable value for

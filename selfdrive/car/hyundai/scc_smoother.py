@@ -3,6 +3,7 @@ import random
 import numpy as np
 from common.numpy_fast import clip, interp, mean
 from cereal import car
+from common.realtime import DT_CTRL
 from selfdrive.config import Conversions as CV
 from selfdrive.car.hyundai.values import Buttons
 from common.params import Params
@@ -87,6 +88,7 @@ class SccSmoother:
     self.limited_lead = False
 
     self.curve_speed_ms = 0.
+    self.stock_weight = 0.
 
   def reset(self):
 
@@ -349,6 +351,18 @@ class SccSmoother:
       accel *= brake_factor
 
     return accel
+
+  def get_stock_cam_accel(self, apply_accel, stock_accel, scc11):
+    stock_cam = scc11["Navi_SCC_Camera_Act"] == 2 and scc11["Navi_SCC_Camera_Status"] == 2
+    if stock_cam:
+      self.stock_weight += DT_CTRL / 3.
+    else:
+      self.stock_weight -= DT_CTRL / 3.
+
+    self.stock_weight = clip(self.stock_weight, 0., 1.)
+
+    accel = stock_accel * self.stock_weight + apply_accel * (1. - self.stock_weight)
+    return min(accel, apply_accel), stock_cam
 
   @staticmethod
   def update_cruise_buttons(controls, CS, longcontrol):  # called by controlds's state_transition

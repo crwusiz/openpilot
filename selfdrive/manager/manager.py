@@ -50,6 +50,7 @@ def manager_init():
 
     ("SccSmootherSlowOnCurves", "0"),
     ("SccSmootherSyncGasPressed", "0"),
+    ("StockNaviDecelEnabled", "0"),
     ("ShowDebugUI", "0"),
     ("CustomLeadMark", "0")
   ]

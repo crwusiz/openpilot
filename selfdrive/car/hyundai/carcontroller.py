@@ -77,6 +77,7 @@ class CarController():
 
     self.mad_mode_enabled = Params().get_bool('MadModeEnabled')
     self.ldws_opt = Params().get_bool('IsLdwsCar')
+    self.stock_navi_decel_enabled = Params().get_bool('StockNaviDecelEnabled')
 
     # gas_factor, brake_factor
     # Adjust it in the range of 0.7 to 1.3
@@ -221,9 +222,18 @@ class CarController():
     # send scc to car if longcontrol enabled and SCC not on bus 0 or ont live
     if self.longcontrol and CS.cruiseState_enabled and (CS.scc_bus or not self.scc_live) and frame % 2 == 0:
 
+      if self.stock_navi_decel_enabled:
+        controls.sccStockCamAct = CS.scc11["Navi_SCC_Camera_Act"]
+        controls.sccStockCamStatus = CS.scc11["Navi_SCC_Camera_Status"]
+        apply_accel, stock_cam = self.scc_smoother.get_stock_cam_accel(apply_accel, aReqValue, CS.scc11)
+      else:
+        controls.sccStockCamAct = 0
+        controls.sccStockCamStatus = 0
+        stock_cam = False
+
       can_sends.append(create_scc12(self.packer, apply_accel, enabled, self.scc12_cnt, self.scc_live, CS.scc12))
       can_sends.append(create_scc11(self.packer, frame, enabled, set_speed, lead_visible, self.scc_live, CS.scc11,
-                                    self.scc_smoother.active_cam))
+                                    self.scc_smoother.active_cam, stock_cam))
 
       if frame % 20 == 0 and CS.has_scc13:
         can_sends.append(create_scc13(self.packer, CS.scc13))

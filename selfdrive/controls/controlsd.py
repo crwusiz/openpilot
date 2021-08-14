@@ -162,6 +162,8 @@ class Controls:
     self.aReqValue = 0.
     self.aReqValueMin = 0.
     self.aReqValueMax = 0.
+    self.sccStockCamStatus = 0
+    self.sccStockCamAct = 0
 
     self.left_lane_visible = False
     self.right_lane_visible = False
@@ -645,6 +647,8 @@ class Controls:
     controlsState.aReqValue = self.aReqValue
     controlsState.aReqValueMin = self.aReqValueMin
     controlsState.aReqValueMax = self.aReqValueMax
+    controlsState.sccStockCamAct = self.sccStockCamAct
+    controlsState.sccStockCamStatus = self.sccStockCamStatus
 
     controlsState.steerRatio = self.VM.sR
     controlsState.steerRateCost = ntune_common_get('steerRateCost')

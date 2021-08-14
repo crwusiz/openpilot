@@ -710,6 +710,9 @@ static void bb_ui_draw_debug(UIState *s)
     float aReqValueMin = controls_state.getAReqValueMin();
     float aReqValueMax = controls_state.getAReqValueMax();
 
+    int sccStockCamAct = (int)controls_state.getSccStockCamAct();
+    int sccStockCamStatus = (int)controls_state.getSccStockCamStatus();
+
     int longControlState = (int)controls_state.getLongControlState();
     float vPid = controls_state.getVPid();
     float upAccelCmd = controls_state.getUpAccelCmd();
@@ -752,6 +755,10 @@ static void bb_ui_draw_debug(UIState *s)
 
     y += height;
     snprintf(str, sizeof(str), "%.3f (%.3f/%.3f)", aReqValue, aReqValueMin, aReqValueMax);
+    ui_draw_text(s, text_x, y, str, 22 * 2.5, textColor, "sans-regular");
+
+    y += height;
+    snprintf(str, sizeof(str), "Cam: %d/%d", sccStockCamAct, sccStockCamStatus);
     ui_draw_text(s, text_x, y, str, 22 * 2.5, textColor, "sans-regular");
 }
 
