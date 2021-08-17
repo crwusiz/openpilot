@@ -770,7 +770,7 @@ static void bb_ui_draw_debug(UIState *s)
     auto lead_one = (*s->sm)["modelV2"].getModelV2().getLeadsV3()[0];
 
     float radar_dist = lead_radar.getStatus() && lead_radar.getRadar() ? lead_radar.getDRel() : 0;
-    float vision_dist = lead_one.getProb() > .5 ? lead_one..getX()[0] : 0;
+    float vision_dist = lead_one.getProb() > .5 ? lead_one.getX()[0] : 0;
 
     y += height;
     snprintf(str, sizeof(str), "Lead: %.1f/%.1f/%.1f", radar_dist, vision_dist, (radar_dist - vision_dist));
