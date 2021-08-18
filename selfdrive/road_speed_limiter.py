@@ -269,9 +269,9 @@ class RoadSpeedLimiter:
         diff_speed = v_ego * 3.6 - cam_limit_speed
 
         if self.longcontrol:
-          sec = interp(diff_speed, [10., 30.], [13., 18.])
-        else:
           sec = interp(diff_speed, [10., 30.], [15., 20.])
+        else:
+          sec = interp(diff_speed, [10., 30.], [17., 23.])
 
         if MIN_LIMIT <= cam_limit_speed <= MAX_LIMIT and (self.slowing_down or cam_limit_speed_left_dist < v_ego * sec):
 
@@ -307,7 +307,7 @@ class RoadSpeedLimiter:
           else:
             first_started = False
 
-          return section_limit_speed, section_limit_speed, section_left_dist, first_started, log
+          return section_limit_speed * CAMERA_SPEED_FACTOR, section_limit_speed, section_left_dist, first_started, log
 
         self.slowing_down = False
         return 0, section_limit_speed, section_left_dist, False, log
