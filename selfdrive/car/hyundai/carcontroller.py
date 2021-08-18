@@ -263,6 +263,7 @@ class CarController():
       if self.car_fingerprint in FEATURES["send_lfa_mfa"]:
         can_sends.append(create_lfahda_mfc(self.packer, enabled, activated_hda))
       elif CS.mdps_bus == 0:
-        can_sends.append(create_hda_mfc(self.packer, activated_hda))
+        state = 2 if self.car_fingerprint in FEATURES["send_hda_state_2"] else 1
+        can_sends.append(create_hda_mfc(self.packer, activated_hda, state))
 
     return can_sends
