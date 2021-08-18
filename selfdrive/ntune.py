@@ -50,7 +50,7 @@ class nTune():
 
   def handle(self):
     try:
-      if os.path.isfile(self.file):
+      if os.path.getsize(self.file) > 0:
         with open(self.file, 'r') as f:
           self.config = json.load(f)
 
@@ -68,27 +68,29 @@ class nTune():
       self.update()
 
   def read(self):
-
+    success = False
     try:
-      if os.path.isfile(self.file):
+      if os.path.getsize(self.file) > 0:
         with open(self.file, 'r') as f:
           self.config = json.load(f)
 
         if self.checkValid():
           self.write_config(self.config)
-
           self.update()
-      else:
-        self.write_default()
+        success = True
+    except:
+      pass
 
+    if not success:
+      try:
+        self.write_default()
         with open(self.file, 'r') as f:
           self.config = json.load(f)
           if self.checkValid():
             self.write_config(self.config)
           self.update()
-
-    except:
-      pass
+      except:
+        pass
 
   def checkValue(self, key, min_, max_, default_):
     updated = False
