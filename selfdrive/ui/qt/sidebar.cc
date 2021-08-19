@@ -60,32 +60,31 @@ void Sidebar::updateState(const UIState &s) {
   setProperty("netStrength", strength > 0 ? strength + 1 : 0);
   setProperty("wifiAddr", deviceState.getWifiIpAddress().cStr());
 
-  bool online = net_type != network_type[cereal::DeviceState::NetworkType::NONE];
-  setProperty("connectStr",  online ? "CONNECT\nONLINE" : "CONNECT\nOFFLINE");
-  setProperty("connectStatus", online ? good_color : danger_color);
+  ItemStatus connectstatus;
+  auto last_ping = deviceState.getLastAthenaPingTime();
+  if (last_ping == 0) {
+    connectstatus = params.getBool("PrimeRedirected") ? ItemStatus{"NO\nPRIME", danger_color} : ItemStatus{"CONNECT\nOFFLINE", warning_color};
+  } else {
+    connectstatus = nanos_since_boot() - last_ping < 80e9 ? ItemStatus{"CONNECT\nONLINE", good_color} : ItemStatus{"CONNECT\nERROR", danger_color};
+  }
+  setProperty("connectStatus", QVariant::fromValue(connectstatus));
 
-
-  QColor tempStatus = danger_color;
+  QColor tempColor = danger_color;
   auto ts = deviceState.getThermalStatus();
   if (ts == cereal::DeviceState::ThermalStatus::GREEN) {
-    tempStatus = good_color;
+    tempColor = good_color;
   } else if (ts == cereal::DeviceState::ThermalStatus::YELLOW) {
-    tempStatus = warning_color;
+    tempColor = warning_color;
   }
-  setProperty("tempStatus", tempStatus);
-  setProperty("tempVal", (int)deviceState.getAmbientTempC());
+  setProperty("tempStatus", QVariant::fromValue(ItemStatus{QString("%1°C").arg((int)deviceState.getAmbientTempC()), tempColor}));
 
-  QString pandaStr = "VEHICLE\nONLINE";
-  QColor pandaStatus = good_color;
+  ItemStatus pandaStatus = {"VEHICLE\nONLINE", good_color};
   if (s.scene.pandaType == cereal::PandaState::PandaType::UNKNOWN) {
-    pandaStatus = danger_color;
-    pandaStr = "NO\nPANDA";
+    pandaStatus = {"NO\nPANDA", danger_color};
   } /*else if (s.scene.started && !sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK()) {
-    pandaStatus = warning_color;
-    pandaStr = "GPS\nSEARCHING";
+    pandaStatus = {"GPS\nSEARCHING", warning_color};
   }*/
-  setProperty("pandaStr", pandaStr);
-  setProperty("pandaStatus", pandaStatus);
+  setProperty("pandaStatus", QVariant::fromValue(pandaStatus));
 }
 
 void Sidebar::paintEvent(QPaintEvent *event) {
@@ -122,7 +121,7 @@ void Sidebar::paintEvent(QPaintEvent *event) {
 
   // metrics
   configFont(p, "Open Sans", 35, "Regular");
-  drawMetric(p, "TEMP", QString("%1°C").arg(temp_val), temp_status, 338);
-  drawMetric(p, panda_str, "", panda_status, 518);
-  drawMetric(p, connect_str, "", connect_status, 676);
+  drawMetric(p, "TEMP", temp_status.first, temp_status.second, 338);
+  drawMetric(p, panda_status.first, "", panda_status.second, 518);
+  drawMetric(p, connect_status.first, "", connect_status.second, 676);
 }
