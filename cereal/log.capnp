@@ -1395,6 +1395,7 @@ struct RoadLimitSpeed {
     camLimitSpeed @5 :UInt16;
     sectionLimitSpeed @6 :UInt16;
     sectionLeftDist @7 :UInt16;
+    camSpeedFactor @8 :Float32;
 }
 
 struct Event {
