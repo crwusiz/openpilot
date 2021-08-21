@@ -10,6 +10,7 @@ from cereal import messaging
 from common.params import Params
 from common.numpy_fast import interp, clip
 from common.realtime import sec_since_boot
+from selfdrive.config import Conversions as CV
 
 
 CAMERA_SPEED_FACTOR = 1.05
@@ -229,7 +230,7 @@ class RoadSpeedLimiter:
       return self.roadLimitSpeed.active
     return 0
 
-  def get_max_speed(self, CS, v_cruise_speed):
+  def get_max_speed(self, cluster_speed, is_metric):
 
     log = ""
     self.recv()
@@ -268,16 +269,18 @@ class RoadSpeedLimiter:
       # log += ", " + str(section_limit_speed)
       # log += ", " + str(section_left_dist)
 
-      v_ego = CS.clu11["CF_Clu_Vanz"] / 3.6
-
       if cam_limit_speed_left_dist is not None and cam_limit_speed is not None and cam_limit_speed_left_dist > 0:
 
-        diff_speed = v_ego * 3.6 - cam_limit_speed
+        v_ego = cluster_speed * (CV.KPH_TO_MS if is_metric else CV.MPH_TO_MS)
+        v_limit = cam_limit_speed * (CV.KPH_TO_MS if is_metric else CV.MPH_TO_MS)
+
+        diff_speed = cluster_speed - cam_limit_speed
+        v_diff = v_ego - v_limit
 
         if self.longcontrol:
-          sec = interp(diff_speed, [10., 30.], [15., 20.])
+          sec = interp(v_diff, [2.7, 8.3], [15., 20.])
         else:
-          sec = interp(diff_speed, [10., 30.], [17., 23.])
+          sec = interp(v_diff, [2.7, 8.3], [17., 23.])
 
         if MIN_LIMIT <= cam_limit_speed <= MAX_LIMIT and (self.slowing_down or cam_limit_speed_left_dist < v_ego * sec):
 
@@ -336,12 +339,12 @@ def road_speed_limiter_get_active():
   return road_speed_limiter.get_active()
 
 
-def road_speed_limiter_get_max_speed(CS, v_cruise_speed):
+def road_speed_limiter_get_max_speed(cluster_speed, is_metric):
   global road_speed_limiter
   if road_speed_limiter is None:
     road_speed_limiter = RoadSpeedLimiter()
 
-  return road_speed_limiter.get_max_speed(CS, v_cruise_speed)
+  return road_speed_limiter.get_max_speed(cluster_speed, is_metric)
 
 
 if __name__ == "__main__":
