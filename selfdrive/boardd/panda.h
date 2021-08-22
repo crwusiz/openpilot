@@ -49,7 +49,7 @@ class Panda {
   void cleanup();
 
  public:
-  Panda(std::string serial="");
+  Panda();
   ~Panda();
 
   std::atomic<bool> connected = true;
