@@ -890,10 +890,10 @@ static void ui_draw_vision_maxspeed(UIState *s) {
   bool longControl = scc_smoother.getLongControl();
 
   // kph
-  float cruiseVirtualMaxSpeed = scc_smoother.getCruiseVirtualMaxSpeed();
-  float cruiseRealMaxSpeed = scc_smoother.getCruiseRealMaxSpeed();
+  float applyMaxSpeed = scc_smoother.getApplyMaxSpeed();
+  float cruiseMaxSpeed = scc_smoother.getCruiseMaxSpeed();
 
-  bool is_cruise_set = (cruiseRealMaxSpeed > 0 && cruiseRealMaxSpeed < 255);
+  bool is_cruise_set = (cruiseMaxSpeed > 0 && cruiseMaxSpeed < 255);
 
   const Rect rect = {bdr_s * 2, int(bdr_s * 1.5), 184, 202};
   ui_fill_rect(s->vg, rect, COLOR_BLACK_ALPHA(100), 30.);
@@ -907,16 +907,16 @@ static void ui_draw_vision_maxspeed(UIState *s) {
     char str[256];
 
     if(s->scene.is_metric)
-        snprintf(str, sizeof(str), "%d", (int)(cruiseVirtualMaxSpeed + 0.5));
+        snprintf(str, sizeof(str), "%d", (int)(applyMaxSpeed + 0.5));
     else
-        snprintf(str, sizeof(str), "%d", (int)(cruiseVirtualMaxSpeed*0.621371 + 0.5));
+        snprintf(str, sizeof(str), "%d", (int)(applyMaxSpeed*0.621371 + 0.5));
 
     ui_draw_text(s, text_x, 100, str, 33 * 2.5, COLOR_WHITE, "sans-semibold");
 
     if(s->scene.is_metric)
-        snprintf(str, sizeof(str), "%d", (int)(cruiseRealMaxSpeed + 0.5));
+        snprintf(str, sizeof(str), "%d", (int)(cruiseMaxSpeed + 0.5));
     else
-        snprintf(str, sizeof(str), "%d", (int)(cruiseRealMaxSpeed*0.621371 + 0.5));
+        snprintf(str, sizeof(str), "%d", (int)(cruiseMaxSpeed*0.621371 + 0.5));
 
     ui_draw_text(s, text_x, 195, str, 48 * 2.5, COLOR_WHITE, "sans-bold");
   }

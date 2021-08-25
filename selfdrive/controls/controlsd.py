@@ -156,7 +156,7 @@ class Controls:
 
     # scc smoother
     self.is_cruise_enabled = False
-    self.cruiseVirtualMaxSpeed = 0
+    self.applyMaxSpeed = 0
     self.clu_speed_ms = 0.
     self.apply_accel = 0.
     self.fused_accel = 0.
@@ -645,7 +645,7 @@ class Controls:
     controlsState.engageable = not self.events.any(ET.NO_ENTRY)
     controlsState.longControlState = self.LoC.long_control_state
     controlsState.vPid = float(self.LoC.v_pid)
-    controlsState.vCruise = float(self.cruiseVirtualMaxSpeed if self.CP.openpilotLongitudinalControl else self.v_cruise_kph)
+    controlsState.vCruise = float(self.applyMaxSpeed if self.CP.openpilotLongitudinalControl else self.v_cruise_kph)
     controlsState.upAccelCmd = float(self.LoC.pid.p)
     controlsState.uiAccelCmd = float(self.LoC.pid.i)
     controlsState.ufAccelCmd = float(self.LoC.pid.f)
