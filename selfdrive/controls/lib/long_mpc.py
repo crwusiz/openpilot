@@ -1,8 +1,6 @@
 import numpy as np
 import math
 
-import cereal.messaging as messaging
-from common.numpy_fast import clip, interp
 from selfdrive.swaglog import cloudlog
 from common.realtime import sec_since_boot
 from selfdrive.controls.lib.longitudinal_mpc_lib import libmpc_py
