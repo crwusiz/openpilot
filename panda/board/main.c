@@ -723,9 +723,9 @@ void tick_handler(void) {
             set_safety_mode(SAFETY_NOOUTPUT, 0U);
           }
 
-          if (power_save_status != POWER_SAVE_STATUS_ENABLED) {
-            set_power_save_state(POWER_SAVE_STATUS_ENABLED);
-          }
+          //if (power_save_status != POWER_SAVE_STATUS_ENABLED) {
+          //  set_power_save_state(POWER_SAVE_STATUS_ENABLED);
+          //}
 
           // Also disable IR when the heartbeat goes missing
           current_board->set_ir_power(0U);
