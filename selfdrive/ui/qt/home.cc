@@ -87,7 +87,8 @@ OffroadHome::OffroadHome(QWidget* parent) : QFrame(parent) {
   date = new QLabel();
   header_layout->addWidget(date, 1, Qt::AlignHCenter | Qt::AlignLeft);
 
-  update_notif = new QPushButton("UPDATE");
+  //update_notif = new QPushButton("UPDATE");
+  update_notif = new QPushButton("업데이트");
   update_notif->setVisible(false);
   update_notif->setStyleSheet("background-color: #364DEF;");
   QObject::connect(update_notif, &QPushButton::clicked, [=]() { center_layout->setCurrentIndex(1); });
@@ -110,8 +111,11 @@ OffroadHome::OffroadHome(QWidget* parent) : QFrame(parent) {
   QWidget* statsAndSetupWidget = new QWidget(this);
   QHBoxLayout* statsAndSetup = new QHBoxLayout(statsAndSetupWidget);
   statsAndSetup->setMargin(0);
-  statsAndSetup->setSpacing(30);
-  statsAndSetup->addWidget(new DriveStats, 1);
+//  statsAndSetup->setSpacing(30);
+//  statsAndSetup->addWidget(new DriveStats, 1);
+  DriveStats* drive = new DriveStats();
+  drive->setFixedSize(700, 700);
+  statsAndSetup->addWidget(drive);
   statsAndSetup->addWidget(new SetupWidget);
 
   center_layout->addWidget(statsAndSetupWidget);
@@ -159,7 +163,8 @@ void OffroadHome::hideEvent(QHideEvent *event) {
 }
 
 void OffroadHome::refresh() {
-  date->setText(QDateTime::currentDateTime().toString("dddd, MMMM d"));
+//  date->setText(QDateTime::currentDateTime().toString("dddd, MMMM d"));
+  date->setText(QDateTime::currentDateTime().toString("\U0001f4c5 yyyy년 M월 d일"));
 
   bool updateAvailable = update_widget->refresh();
   int alerts = alerts_widget->refresh();
@@ -178,6 +183,7 @@ void OffroadHome::refresh() {
   update_notif->setVisible(updateAvailable);
   alert_notif->setVisible(alerts);
   if (alerts) {
-    alert_notif->setText(QString::number(alerts) + " ALERT" + (alerts > 1 ? "S" : ""));
+    //alert_notif->setText(QString::number(alerts) + " ALERT" + (alerts > 1 ? "S" : ""));
+    alert_notif->setText(QString::number(alerts) + " 경고" + (alerts > 1 ? "S" : ""));
   }
 }

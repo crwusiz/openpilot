@@ -81,6 +81,7 @@ class CarState(CarStateBase):
                                                                       cp.vl["CGW1"]["CF_Gway_TurnSigRh"])
     ret.steeringTorque = cp_mdps.vl["MDPS12"]["CR_Mdps_StrColTq"]
     ret.steeringTorqueEps = cp_mdps.vl["MDPS12"]["CR_Mdps_OutTq"]
+    ret.steeringWheelTorque = cp_mdps.vl["MDPS11"]["CR_Mdps_DrvTq"]
     ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD
     #ret.steerWarning = cp.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 or cp.vl["MDPS12"]["CF_Mdps_ToiFlt"] != 0
 
@@ -101,8 +102,6 @@ class CarState(CarStateBase):
                                       cp.vl['EMS16']['CRUISE_LAMP_M'] != 0
     ret.cruiseState.standstill = cp_scc.vl["SCC11"]['SCCInfoDisplay'] == 4. if not self.no_radar else False
 
-    ret.cruiseState.enabledAcc = ret.cruiseState.enabled
-
     if ret.cruiseState.enabled:
       ret.cruiseState.speed = cp_scc.vl["SCC11"]["VSetDis"] * self.speed_conv_to_ms if not self.no_radar else \
                                          cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * self.speed_conv_to_ms
@@ -116,6 +115,7 @@ class CarState(CarStateBase):
     ret.brakePressed = cp.vl["TCS13"]["DriverBraking"] != 0
     ret.brakeLights = bool(cp.vl["TCS13"]['BrakeLight'] or ret.brakePressed)
 
+    ret.gasPressed = cp.vl["TCS13"]["DriverOverride"] == 1
     if self.CP.carFingerprint in FEATURES["ev_car"]:
       ret.gas = cp.vl["E_EMS11"]["Accel_Pedal_Pos"] / 254.
     elif self.CP.carFingerprint in FEATURES["hev_car"]:
@@ -326,10 +326,12 @@ class CarState(CarStateBase):
         ("CF_Mdps_SErr", "MDPS12", 0),
         ("CR_Mdps_StrTq", "MDPS12", 0),
         ("CF_Mdps_FailStat", "MDPS12", 0),
-        ("CR_Mdps_OutTq", "MDPS12", 0)
+        ("CR_Mdps_OutTq", "MDPS12", 0),
+        ("CR_Mdps_DrvTq", "MDPS11", 0),
       ]
       checks += [
-        ("MDPS12", 50)
+        ("MDPS12", 50),
+        ("MDPS11", 100),
       ]
     if CP.sasBus == 0:
       signals += [
@@ -442,10 +444,12 @@ class CarState(CarStateBase):
         ("CF_Mdps_SErr", "MDPS12", 0),
         ("CR_Mdps_StrTq", "MDPS12", 0),
         ("CF_Mdps_FailStat", "MDPS12", 0),
-        ("CR_Mdps_OutTq", "MDPS12", 0)
+        ("CR_Mdps_OutTq", "MDPS12", 0),
+        ("CR_Mdps_DrvTq", "MDPS11", 0),
       ]
       checks += [
-        ("MDPS12", 50)
+        ("MDPS12", 50),
+        ("MDPS11", 100),
       ]
 
     if CP.sasBus == 1:

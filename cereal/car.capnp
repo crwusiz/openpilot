@@ -165,6 +165,7 @@ struct CarState {
   steeringRateDeg @15 :Float32;
   steeringTorque @8 :Float32;      # TODO: standardize units
   steeringTorqueEps @27 :Float32;  # TODO: standardize units
+  steeringWheelTorque @43:Float32;
   steeringPressed @9 :Bool;        # if the user is using the steering wheel
   steeringRateLimited @29 :Bool;   # if the torque is limited by the rate limiter
   steerWarning @35 :Bool;          # temporary steer unavailble
@@ -224,7 +225,6 @@ struct CarState {
     speedOffset @3 :Float32;
     standstill @4 :Bool;
     nonAdaptive @5 :Bool;
-    enabledAcc @6 :Bool;
   }
 
   enum GearShifter {
@@ -488,10 +488,8 @@ struct CarParams {
     kpV @1 :List(Float32);
     kiBP @2 :List(Float32);
     kiV @3 :List(Float32);
-    kfBP @4 :List(Float32);
-    kfV @5 :List(Float32);
-    deadzoneBP @6 :List(Float32);
-    deadzoneV @7 :List(Float32);
+    deadzoneBP @4 :List(Float32);
+    deadzoneV @5 :List(Float32);
   }
 
   struct LateralINDITuning {

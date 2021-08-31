@@ -16,6 +16,7 @@ class Sidebar : public QFrame {
   Q_PROPERTY(ItemStatus tempStatus MEMBER temp_status NOTIFY valueChanged);
   Q_PROPERTY(QString netType MEMBER net_type NOTIFY valueChanged);
   Q_PROPERTY(int netStrength MEMBER net_strength NOTIFY valueChanged);
+  Q_PROPERTY(QString wifiAddr MEMBER wifi_addr NOTIFY valueChanged);
 
 public:
   explicit Sidebar(QWidget* parent = 0);
@@ -34,7 +35,7 @@ protected:
 
   QImage home_img, settings_img;
   const QMap<cereal::DeviceState::NetworkType, QString> network_type = {
-    {cereal::DeviceState::NetworkType::NONE, "--"},
+    {cereal::DeviceState::NetworkType::NONE, "────────"},
     {cereal::DeviceState::NetworkType::WIFI, "WiFi"},
     {cereal::DeviceState::NetworkType::ETHERNET, "ETH"},
     {cereal::DeviceState::NetworkType::CELL2_G, "2G"},
@@ -52,4 +53,11 @@ protected:
   ItemStatus connect_status, panda_status, temp_status;
   QString net_type;
   int net_strength = 0;
+  QString wifi_addr = "────────";
+  const QMap<int, QImage> battery_imgs = {
+    {0, QImage("../assets/images/battery.png")},
+    {1, QImage("../assets/images/battery_charging.png")},
+  };
+  int m_batteryPercent = 0;
+  int m_battery_img;
 };

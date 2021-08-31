@@ -2,6 +2,7 @@
 
 #include <QMouseEvent>
 
+#include "selfdrive/hardware/hw.h"
 #include "selfdrive/ui/qt/util.h"
 
 void Sidebar::drawMetric(QPainter &p, const QString &label, QColor c, int y) {
@@ -26,7 +27,7 @@ void Sidebar::drawMetric(QPainter &p, const QString &label, QColor c, int y) {
 }
 
 Sidebar::Sidebar(QWidget *parent) : QFrame(parent) {
-  home_img = QImage("../assets/images/button_home.png").scaled(180, 180, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+  home_img = QImage("../assets/offroad/icon_openpilot.png").scaled(180, 180, Qt::KeepAspectRatio, Qt::SmoothTransformation);
   settings_img = QImage("../assets/images/button_settings.png").scaled(settings_btn.width(), settings_btn.height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 
   connect(this, &Sidebar::valueChanged, [=] { update(); });
@@ -47,6 +48,7 @@ void Sidebar::updateState(const UIState &s) {
 
   auto deviceState = sm["deviceState"].getDeviceState();
   setProperty("netType", network_type[deviceState.getNetworkType()]);
+  setProperty("wifiAddr", deviceState.getWifiIpAddress().cStr());
   int strength = (int)deviceState.getNetworkStrength();
   setProperty("netStrength", strength > 0 ? strength + 1 : 0);
 
@@ -68,13 +70,22 @@ void Sidebar::updateState(const UIState &s) {
   }
   setProperty("tempStatus", QVariant::fromValue(tempStatus));
 
-  ItemStatus pandaStatus = {"VEHICLE\nONLINE", good_color};
+//  ItemStatus pandaStatus = {"VEHICLE\nONLINE", good_color};
+  ItemStatus pandaStatus = {"차량\n연결됨", good_color};
   if (s.scene.pandaType == cereal::PandaState::PandaType::UNKNOWN) {
-    pandaStatus = {"NO\nPANDA", danger_color};
+//    pandaStatus = {"NO\nPANDA", danger_color};
+    pandaStatus = {"차량\n연결안됨", danger_color};
   } else if (s.scene.started && !sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK()) {
     pandaStatus = {"GPS\nSEARCHING", warning_color};
+/*
+    } else if (s.scene.satelliteCount > 0) {
+      pandaStr = QString("위성수 %1\n정확도 %2").arg(s.scene.satelliteCount).arg(fmin(10, s.scene.gpsAccuracy), 0, 'f', 2);
+      pandaStatus = sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK() ? good_color : warning_color;
+*/
   }
   setProperty("pandaStatus", QVariant::fromValue(pandaStatus));
+  m_battery_img = s.scene.deviceState.getBatteryStatus() == "Charging" ? 1 : 0;
+  m_batteryPercent = s.scene.deviceState.getBatteryPercent();
 }
 
 void Sidebar::paintEvent(QPaintEvent *event) {
@@ -90,6 +101,7 @@ void Sidebar::paintEvent(QPaintEvent *event) {
   p.setOpacity(1.0);
   p.drawImage(60, 1080 - 180 - 40, home_img);
 
+/*
   // network
   int x = 58;
   const QColor gray(0x54, 0x54, 0x54);
@@ -103,6 +115,22 @@ void Sidebar::paintEvent(QPaintEvent *event) {
   p.setPen(QColor(0xff, 0xff, 0xff));
   const QRect r = QRect(50, 247, 100, 50);
   p.drawText(r, Qt::AlignCenter, net_type);
+*/
+
+  p.drawImage(68, 180, battery_imgs[m_battery_img]); // signal_imgs to battery_imgs
+  configFont(p, "Open Sans", 32, "Bold");
+  p.setPen(QColor(0x00, 0x00, 0x00));
+  const QRect r = QRect(80, 193, 100, 50);
+  char battery_str[5];
+  snprintf(battery_str, sizeof(battery_str), "%d%%", m_batteryPercent);
+  p.drawText(r, Qt::AlignCenter, battery_str);
+
+  p.setPen(QColor(0xff, 0xff, 0xff));
+  const QRect r2 = QRect(0, 267, event->rect().width(), 50);
+  if(Hardware::EON() && net_type == network_type[cereal::DeviceState::NetworkType::WIFI])
+    p.drawText(r2, Qt::AlignCenter, wifi_addr);
+  else
+    p.drawText(r2, Qt::AlignCenter, net_type);
 
   // metrics
   drawMetric(p, temp_status.first, temp_status.second, 338);

@@ -134,6 +134,29 @@ static void update_state(UIState *s) {
     scene.engageable = sm["controlsState"].getControlsState().getEngageable();
     scene.dm_active = sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode();
   }
+  if (scene.started && sm.updated("controlsState")) {
+    scene.controls_state = sm["controlsState"].getControlsState();
+    scene.lateralControlSelect = scene.controls_state.getLateralControlSelect();
+    if (scene.lateralControlSelect == 0) {
+      scene.output_scale = scene.controls_state.getLateralControlState().getPidState().getOutput();
+    } else if (scene.lateralControlSelect == 1) {
+      scene.output_scale = scene.controls_state.getLateralControlState().getIndiState().getOutput();
+    } else if (s->scene.lateralControlSelect == 2) {
+      scene.output_scale = scene.controls_state.getLateralControlState().getLqrState().getOutput();
+    }
+  }
+  if (sm.updated("carState")) {
+    scene.car_state = sm["carState"].getCarState();
+    if(scene.leftBlinker!=scene.car_state.getLeftBlinker() || scene.rightBlinker!=scene.car_state.getRightBlinker()){
+      scene.blinker_blinkingrate = 120;
+    }
+    scene.leftBlinker = scene.car_state.getLeftBlinker();
+    scene.rightBlinker = scene.car_state.getRightBlinker();
+    scene.tpmsFl = scene.car_state.getTpmsFl();
+    scene.tpmsFr = scene.car_state.getTpmsFr();
+    scene.tpmsRl = scene.car_state.getTpmsRl();
+    scene.tpmsRr = scene.car_state.getTpmsRr();
+  }
   if (sm.updated("modelV2") && s->vg) {
     auto model = sm["modelV2"].getModelV2();
     update_model(s, model);
@@ -155,6 +178,10 @@ static void update_state(UIState *s) {
         scene.view_from_calib.v[i*3 + j] = view_from_calib(i,j);
       }
     }
+  }
+  if (sm.updated("deviceState")) {
+    scene.deviceState = sm["deviceState"].getDeviceState();
+    scene.cpuTempAvg = (scene.deviceState.getCpuTempC()[0] + scene.deviceState.getCpuTempC()[1] + scene.deviceState.getCpuTempC()[2] + scene.deviceState.getCpuTempC()[3]) / 4;
   }
   if (sm.updated("pandaState")) {
     auto pandaState = sm["pandaState"].getPandaState();
@@ -247,6 +274,7 @@ static void update_status(UIState *s) {
       s->scene.started_frame = s->sm->frame;
 
       s->scene.end_to_end = Params().getBool("EndToEndToggle");
+      s->scene.ui_tpms = Params().getBool("UiTpms");
       s->wide_camera = Hardware::TICI() ? Params().getBool("EnableWideCamera") : false;
 
       // Update intrinsics matrix after possible wide camera toggle change
@@ -267,11 +295,33 @@ static void update_status(UIState *s) {
   started_prev = s->scene.started;
 }
 
+static void update_extras(UIState *s){
+   UIScene &scene = s->scene;
+   SubMaster &sm = *(s->sm);
+   if(sm.updated("carControl"))
+    scene.car_control = sm["carControl"].getCarControl();
+   if (sm.updated("ubloxGnss")) {
+     auto data = sm["ubloxGnss"].getUbloxGnss();
+     if (data.which() == cereal::UbloxGnss::MEASUREMENT_REPORT) {
+     scene.satelliteCount = data.getMeasurementReport().getNumMeas();
+    }
+   }
+   if (sm.updated("gpsLocationExternal")) {
+     scene.gpsAccuracy = sm["gpsLocationExternal"].getGpsLocationExternal().getAccuracy();
+   }
+   if (sm.updated("radarState") && s->vg) {
+    std::optional<cereal::ModelDataV2::XYZTData::Reader> line;
+    if (sm.rcv_frame("modelV2") > 0) {
+      line = sm["modelV2"].getModelV2().getPosition();
+    }
+  }
+}
 
 QUIState::QUIState(QObject *parent) : QObject(parent) {
   ui_state.sm = std::make_unique<SubMaster, const std::initializer_list<const char *>>({
-    "modelV2", "controlsState", "liveCalibration", "deviceState", "roadCameraState",
+    "modelV2", "controlsState", "liveCalibration", "radarState", "deviceState", "roadCameraState",
     "pandaState", "carParams", "driverMonitoringState", "sensorEvents", "carState", "liveLocationKalman",
+    "gpsLocationExternal", "ubloxGnss", "carControl",
   });
 
   ui_state.fb_w = vwp_w;
@@ -296,13 +346,14 @@ void QUIState::update() {
   update_sockets(&ui_state);
   update_state(&ui_state);
   update_status(&ui_state);
+  update_extras(&ui_state);
   update_vision(&ui_state);
 
   if (ui_state.scene.started != started_prev || ui_state.sm->frame == 1) {
     started_prev = ui_state.scene.started;
     emit offroadTransition(!ui_state.scene.started);
 
-    // Change timeout to 0 when onroad, this will call update continuously.
+    // Change timeout to 0 when onroad, this will call update continously.
     // This puts visionIPC in charge of update frequency, reducing video latency
     timer->start(ui_state.scene.started ? 0 : 1000 / UI_FREQ);
   }

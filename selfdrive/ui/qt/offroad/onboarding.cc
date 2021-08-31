@@ -95,11 +95,13 @@ void TermsPage::showEvent(QShowEvent *event) {
   buttons->setSpacing(45);
   main_layout->addLayout(buttons);
 
-  QPushButton *decline_btn = new QPushButton("Decline");
+  //QPushButton *decline_btn = new QPushButton("Decline");
+  QPushButton *decline_btn = new QPushButton("거절");
   buttons->addWidget(decline_btn);
   QObject::connect(decline_btn, &QPushButton::clicked, this, &TermsPage::declinedTerms);
 
-  accept_btn = new QPushButton("Scroll to accept");
+  //accept_btn = new QPushButton("Scroll to accept");
+  accept_btn = new QPushButton("스크롤하세요");
   accept_btn->setEnabled(false);
   accept_btn->setStyleSheet(R"(
     QPushButton {
@@ -114,7 +116,8 @@ void TermsPage::showEvent(QShowEvent *event) {
 }
 
 void TermsPage::enableAccept() {
-  accept_btn->setText("Agree");
+  //accept_btn->setText("Agree");
+  accept_btn->setText("수락");
   accept_btn->setEnabled(true);
 }
 
@@ -128,7 +131,8 @@ void DeclinePage::showEvent(QShowEvent *event) {
   main_layout->setSpacing(40);
 
   QLabel *text = new QLabel(this);
-  text->setText("You must accept the Terms and Conditions in order to use openpilot.");
+  //text->setText("You must accept the Terms and Conditions in order to use openpilot.");
+  text->setText("오픈파일럿을 사용하려면 약관에 동의해야 합니다!");
   text->setStyleSheet(R"(font-size: 80px; font-weight: 300; margin: 200px;)");
   text->setWordWrap(true);
   main_layout->addWidget(text, 0, Qt::AlignCenter);
@@ -142,7 +146,8 @@ void DeclinePage::showEvent(QShowEvent *event) {
 
   QObject::connect(back_btn, &QPushButton::clicked, this, &DeclinePage::getBack);
 
-  QPushButton *uninstall_btn = new QPushButton("Decline, uninstall " + getBrand());
+  //QPushButton *uninstall_btn = new QPushButton("Decline, uninstall " + getBrand());
+  QPushButton *uninstall_btn = new QPushButton("거절, 오픈파일럿 제거");
   uninstall_btn->setStyleSheet("background-color: #B73D3D");
   buttons->addWidget(uninstall_btn);
   QObject::connect(uninstall_btn, &QPushButton::clicked, [=]() {

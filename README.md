@@ -1,5 +1,53 @@
 ![](https://user-images.githubusercontent.com/37757984/127420744-89ca219c-8f8e-46d3-bccf-c1cb53b81bb1.png)
 
+crwusiz openpilot
+=====
+
+<b> crwusiz branch is comma.ai devel-staging base xx979xx HKG_community source add </b>
+- <b> v0.8.8 [ allow white panda and gray panda, OP3T support (/installer/op3t_neos_update.sh) ] </b>
+- If you have any questions, please send a message to crwusiz from discord. if you like this Branch <b> [Donate](https://paypal.me/crwusiz) </b>for me
+
+[![](https://i.imgur.com/TMtVMV8.png)](#)
+
+- kor NanumGothic font / Comma Bootlogo / Bootanimation Auto install
+- event message, ui kor translate
+- steeringwheel rotate, tpms display
+- brake, bsd, autohold icon
+- sidebar wifi ipaddress / battery charging and battery percent display
+- lateralcontrolselect ( PID / INDI / LQR )
+- mfcselect ( LKAS / LDWS / LFA )
+- longcontrolselect ( MAD / LONG )
+- add toggle / function / simple ui
+
+## Source Code Reference
+- https://github.com/commaai/openpilot
+- https://github.com/xx979xx/openpilo
+- https://github.com/xps-genesis/openpilot
+- https://github.com/kegman/openpilot
+- https://github.com/dragonpilot-community/dragonpilot
+- https://github.com/wirelessnet2/openpilot
+- https://github.com/sshane/openpilot
+- https://github.com/arne182/ArnePilot
+- https://github.com/neokii
+- https://github.com/openpilotusers
+- https://github.com/Circuit-Pro/openpilot
+- - -
+## Harness Cable and Car Year Compatible Chart
+
+cable order -> https://smartstore.naver.com/hyotrade/products/5341431170
+
+[![](https://i.imgur.com/aspMjGT.jpg)](#)
+[![](https://i.imgur.com/1DB7gyL.jpg)](#)
+[![](https://i.imgur.com/2r43I6d.jpg)](#)
+[![](https://i.imgur.com/N5IkjUX.jpg)](#)
+[![](https://i.imgur.com/HaXcjPI.jpg)](#)
+ 
+## chevrolet bolt branch
+- https://github.com/JasonJShuler/openpilot
+- https://github.com/hanabi95/openpilot
+- https://github.com/jc01rho-openpilot-BoltEV2019-KoKr
+- https://github.com/parksunkyu81
+- - -
 Table of Contents
 =======================
 
