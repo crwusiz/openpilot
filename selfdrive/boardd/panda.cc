@@ -59,7 +59,6 @@ Panda::Panda(std::string serial) {
   }
   if (dev_handle == NULL) goto fail;
   libusb_free_device_list(dev_list, 1);
-  dev_list = nullptr;
 
   if (libusb_kernel_driver_active(dev_handle, 0) == 1) {
     libusb_detach_kernel_driver(dev_handle, 0);
@@ -72,20 +71,21 @@ Panda::Panda(std::string serial) {
   if (err != 0) { goto fail; }
 
   hw_type = get_hw_type();
-
-  assert((hw_type != cereal::PandaState::PandaType::WHITE_PANDA) &&
-         (hw_type != cereal::PandaState::PandaType::GREY_PANDA));
-
+  is_pigeon =
+    (hw_type == cereal::PandaState::PandaType::GREY_PANDA) ||
+    (hw_type == cereal::PandaState::PandaType::BLACK_PANDA) ||
+    (hw_type == cereal::PandaState::PandaType::UNO) ||
+    (hw_type == cereal::PandaState::PandaType::DOS);
   has_rtc = (hw_type == cereal::PandaState::PandaType::UNO) ||
             (hw_type == cereal::PandaState::PandaType::DOS);
 
   return;
 
 fail:
+  cleanup();
   if (dev_list != NULL) {
     libusb_free_device_list(dev_list, 1);
   }
-  cleanup();
   throw std::runtime_error("Error connecting to panda");
 }
 
@@ -130,6 +130,7 @@ std::vector<std::string> Panda::list() {
       libusb_open(device, &handle);
       unsigned char desc_serial[26] = { 0 };
       int ret = libusb_get_string_descriptor_ascii(handle, desc.iSerialNumber, desc_serial, std::size(desc_serial));
+      libusb_release_interface(handle, 0);
       libusb_close(handle);
 
       if (ret < 0) { goto finish; }
@@ -138,11 +139,11 @@ std::vector<std::string> Panda::list() {
   }
 
 finish:
-  if (dev_list != NULL) {
-    libusb_free_device_list(dev_list, 1);
-  }
   if (context) {
     libusb_exit(context);
+  }
+  if (dev_list != NULL) {
+    libusb_free_device_list(dev_list, 1);
   }
   return serials;
 }

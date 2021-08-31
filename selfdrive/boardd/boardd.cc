@@ -88,7 +88,7 @@ void safety_setter_thread(Panda *panda) {
   cereal::CarParams::Reader car_params = cmsg.getRoot<cereal::CarParams>();
   cereal::CarParams::SafetyModel safety_model = car_params.getSafetyModel();
 
-  panda->set_unsafe_mode(0);  // see safety_declarations.h for allowed values
+  //panda->set_unsafe_mode(0);  // see safety_declarations.h for allowed values
 
   auto safety_param = car_params.getSafetyParam();
   LOGW("setting safety model: %d with param %d", (int)safety_model, safety_param);
@@ -363,7 +363,7 @@ void panda_state_thread(Panda *&panda, bool spoofing_started) {
     ps.setIgnitionCan(pandaState.ignition_can);
     ps.setControlsAllowed(pandaState.controls_allowed);
     ps.setGasInterceptorDetected(pandaState.gas_interceptor_detected);
-    ps.setHasGps(true);
+    ps.setHasGps(panda->is_pigeon);
     ps.setCanRxErrs(pandaState.can_rx_errs);
     ps.setCanSendErrs(pandaState.can_send_errs);
     ps.setCanFwdErrs(pandaState.can_fwd_errs);
@@ -571,7 +571,7 @@ int main() {
       threads.emplace_back(can_send_thread, panda, getenv("FAKESEND") != nullptr);
       threads.emplace_back(can_recv_thread, panda);
       threads.emplace_back(hardware_control_thread, panda);
-      threads.emplace_back(pigeon_thread, panda);
+      if (!Params().getBool("DisableGps")) threads.emplace_back(pigeon_thread, panda);
     }
 
     for (auto &t : threads) t.join();

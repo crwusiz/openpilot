@@ -108,21 +108,21 @@ void set_safety_mode(uint16_t mode, int16_t param) {
   }
   switch (mode_copy) {
     case SAFETY_SILENT:
-      set_intercept_relay(false);
+      set_intercept_relay(true);
       if (current_board->has_obd) {
         current_board->set_can_mode(CAN_MODE_NORMAL);
       }
       can_silent = ALL_CAN_SILENT;
       break;
     case SAFETY_NOOUTPUT:
-      set_intercept_relay(false);
+      set_intercept_relay(true);
       if (current_board->has_obd) {
         current_board->set_can_mode(CAN_MODE_NORMAL);
       }
       can_silent = ALL_CAN_LIVE;
       break;
     case SAFETY_ELM327:
-      set_intercept_relay(false);
+      set_intercept_relay(true);
       heartbeat_counter = 0U;
       heartbeat_lost = false;
       if (current_board->has_obd) {
@@ -703,24 +703,15 @@ void tick_handler(void) {
         siren_countdown -= 1U;
       }
 
-      if (controls_allowed) {
-        controls_allowed_countdown = 30U;
-      } else if (controls_allowed_countdown > 0U) {
-        controls_allowed_countdown -= 1U;
-      } else {
-
-      }
-
       if (!heartbeat_disabled) {
         // if the heartbeat has been gone for a while, go to SILENT safety mode and enter power save
+		// MDPS will hard fault if SAFETY_SILENT set or panda slept
         if (heartbeat_counter >= (check_started() ? HEARTBEAT_IGNITION_CNT_ON : HEARTBEAT_IGNITION_CNT_OFF)) {
           puts("device hasn't sent a heartbeat for 0x");
           puth(heartbeat_counter);
-          puts(" seconds. Safety is set to SILENT mode.\n");
-
-          if (controls_allowed_countdown > 0U) {
+          puts(" seconds. Safety is set to NOOUTPUT mode.\n");
+          if (controls_allowed) {
             siren_countdown = 5U;
-            controls_allowed_countdown = 0U;
           }
 
           // set flag to indicate the heartbeat was lost
@@ -728,12 +719,13 @@ void tick_handler(void) {
             heartbeat_lost = true;
           }
 
-          if (current_safety_mode != SAFETY_SILENT) {
-            set_safety_mode(SAFETY_SILENT, 0U);
+          if (current_safety_mode != SAFETY_NOOUTPUT) {
+            set_safety_mode(SAFETY_NOOUTPUT, 0U);
           }
-          if (power_save_status != POWER_SAVE_STATUS_ENABLED) {
-            set_power_save_state(POWER_SAVE_STATUS_ENABLED);
-          }
+
+          //if (power_save_status != POWER_SAVE_STATUS_ENABLED) {
+          //  set_power_save_state(POWER_SAVE_STATUS_ENABLED);
+          //}
 
           // Also disable IR when the heartbeat goes missing
           current_board->set_ir_power(0U);
@@ -833,8 +825,8 @@ int main(void) {
 
   microsecond_timer_init();
 
-  // init to SILENT and can silent
-  set_safety_mode(SAFETY_SILENT, 0);
+  // MDPS will hard fault if SAFETY_SILENT set
+  set_safety_mode(SAFETY_NOOUTPUT, 0);
 
   // enable CAN TXs
   current_board->enable_can_transceivers(true);
