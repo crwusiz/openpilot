@@ -109,6 +109,9 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     wideRoadCameraError @102;
     localizerMalfunction @103;
     highCpuUsage @105;
+    turningIndicatorOn @106;
+    autoLaneChange @107;
+    lkasButtonOff @108;
 
     driverMonitorLowAccDEPRECATED @68;
     radarCanErrorDEPRECATED @15;
@@ -154,6 +157,7 @@ struct CarState {
   # brake pedal, 0.0-1.0
   brake @5 :Float32;      # this is user pedal only
   brakePressed @6 :Bool;  # this is user pedal only
+  brakeLights @19 :Bool;
 
   # steering wheel
   steeringAngleDeg @7 :Float32;
@@ -196,6 +200,15 @@ struct CarState {
   leftBlindspot @33 :Bool; # Is there something blocking the left lane change
   rightBlindspot @34 :Bool; # Is there something blocking the right lane change
 
+  # tpms
+  tpmsFl @38 :Float32;
+  tpmsFr @39 :Float32;
+  tpmsRl @40 :Float32;
+  tpmsRr @41 :Float32;
+
+  # autohold
+  autoHold @42 : Int32;
+
   struct WheelSpeeds {
     # optional wheel speeds
     fl @0 :Float32;
@@ -211,6 +224,7 @@ struct CarState {
     speedOffset @3 :Float32;
     standstill @4 :Bool;
     nonAdaptive @5 :Bool;
+    enabledAcc @6 :Bool;
   }
 
   enum GearShifter {
@@ -248,7 +262,6 @@ struct CarState {
   }
 
   errorsDEPRECATED @0 :List(CarEvent.EventName);
-  brakeLightsDEPRECATED @19 :Bool;
 }
 
 # ******* radar state @ 20hz *******
@@ -359,6 +372,13 @@ struct CarControl {
       chimeWarningRepeat @6;
       chimePrompt @7;
       chimeWarning2Repeat @8;
+      chimeDing @9;
+      chimeDingRepeat @ 10;
+      chimeGeard @11;
+      chimeSeatbelt @12;
+      chimeDistracted @13;
+      chimeEngage2 @14;
+      chimeDisengage2 @15;
     }
   }
 
@@ -442,6 +462,14 @@ struct CarParams {
   fingerprintSource @49: FingerprintSource;
   networkLocation @50 :NetworkLocation;  # Where Panda/C2 is integrated into the car's CAN network
 
+  sasBus @58: Int8;
+  sccBus @59: Int8;
+  mdpsBus @60: Int8;
+  enableAutoHold @61 :Bool;
+  hasScc13 @62 :Bool;
+  hasScc14 @63 :Bool;
+  hasEms @64 :Bool;
+
   struct LateralParams {
     torqueBP @0 :List(Int32);
     torqueV @1 :List(Int32);
@@ -460,8 +488,10 @@ struct CarParams {
     kpV @1 :List(Float32);
     kiBP @2 :List(Float32);
     kiV @3 :List(Float32);
-    deadzoneBP @4 :List(Float32);
-    deadzoneV @5 :List(Float32);
+    kfBP @4 :List(Float32);
+    kfV @5 :List(Float32);
+    deadzoneBP @6 :List(Float32);
+    deadzoneV @7 :List(Float32);
   }
 
   struct LateralINDITuning {
