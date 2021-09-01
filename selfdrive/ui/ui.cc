@@ -312,7 +312,7 @@ static void update_extras(UIState *s)
 
 
 #if UI_FEATURE_DASHCAM
-   if(s->awake)
+   if(s->awake && Hardware::EON())
    {
         int touch_x = -1, touch_y = -1;
         int touched = touch_poll(&(s->touch), &touch_x, &touch_y, 0);
