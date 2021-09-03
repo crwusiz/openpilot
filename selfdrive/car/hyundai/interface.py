@@ -2,8 +2,9 @@
 import numpy as np
 
 from cereal import car
+from common.numpy_fast import interp
 from selfdrive.config import Conversions as CV
-from selfdrive.car.hyundai.values import Ecu, ECU_FINGERPRINT, CAR, FINGERPRINTS, Buttons, FEATURES
+from selfdrive.car.hyundai.values import CAR, Buttons
 from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint
 from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.controls.lib.lateral_planner import LANE_CHANGE_SPEED_MIN
@@ -20,8 +21,15 @@ class CarInterface(CarInterfaceBase):
     self.mad_mode_enabled = Params().get_bool('MadModeEnabled')
 
   @staticmethod
-  def compute_gb(accel, speed):
-    return float(accel) / 3.0
+  def get_pid_accel_limits(current_speed, cruise_speed):
+
+    gas_max_bp = [0., 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 50.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+    gas_max_v = [1.7, 1.14, 0.87, 0.63, 0.45, 0.33]
+
+    brake_max_bp = [0, 70.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+    brake_max_v = [-4., -3., -2.1]
+
+    return interp(current_speed, brake_max_bp, brake_max_v), interp(current_speed, gas_max_bp, gas_max_v)
 
   @staticmethod
   def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=[]):  # pylint: disable=dangerous-default-value
@@ -71,20 +79,22 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalTuning.kpV = [1.2, 0.98, 0.83, 0.75, 0.655, 0.57, 0.48]
     ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
     ret.longitudinalTuning.kiV = [0.05, 0.03]
-    ret.longitudinalTuning.kfBP = [0.]
-    ret.longitudinalTuning.kfV = [1.0]
     ret.longitudinalTuning.deadzoneBP = [0., 100.*CV.KPH_TO_MS]
     ret.longitudinalTuning.deadzoneV = [0., 0.015]
 
-    ret.gasMaxBP = [0., 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 50.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-    ret.gasMaxV = [0.5, 0.37, 0.28, 0.2, 0.14, 0.1]
+    #ret.gasMaxBP = [0., 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 50.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+    #ret.gasMaxV = [0.5, 0.37, 0.28, 0.2, 0.14, 0.1]
 
-    ret.brakeMaxBP = [0, 70.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-    ret.brakeMaxV = [1.5, 1.0, 0.7]
+    #ret.brakeMaxBP = [0, 70.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+    #ret.brakeMaxV = [1.5, 1.0, 0.7]
 
-    ret.stoppingBrakeRate = 0.15  # brake_travel/s while trying to stop
-    ret.startingBrakeRate = 1.0  # brake_travel/s while releasing on restart
-    ret.startAccel = 1.5
+    #ret.stoppingBrakeRate = 0.15  # brake_travel/s while trying to stop
+    #ret.startingBrakeRate = 1.0  # brake_travel/s while releasing on restart
+
+    ret.stoppingDecelRate = 0.6  # m/s^2/s while trying to stop
+    ret.startingAccelRate = 3.2  # m/s^2/s while trying to start
+
+    ret.startAccel = 1.5  # not used
 
     # genesis
     if candidate == CAR.GENESIS:

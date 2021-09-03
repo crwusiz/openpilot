@@ -1,4 +1,3 @@
-import os
 import math
 import numpy as np
 from common.params import Params
@@ -19,9 +18,7 @@ AUTO_LCA_START_TIME = 1.0
 LaneChangeState = log.LateralPlan.LaneChangeState
 LaneChangeDirection = log.LateralPlan.LaneChangeDirection
 
-LOG_MPC = os.environ.get('LOG_MPC', False)
-
-LANE_CHANGE_SPEED_MIN = 60 * CV.KPH_TO_MS
+LANE_CHANGE_SPEED_MIN = 30 * CV.MPH_TO_MS
 LANE_CHANGE_TIME_MAX = 10.
 
 DESIRES = {
@@ -49,6 +46,7 @@ DESIRES = {
 class LateralPlanner():
   def __init__(self, CP, use_lanelines=True, wide_camera=False):
     self.use_lanelines = use_lanelines
+    self.wide_camera = wide_camera
     self.LP = LanePlanner(wide_camera)
 
     self.last_cloudlog_t = 0
@@ -75,7 +73,6 @@ class LateralPlanner():
     self.auto_lane_change_timer = 0.0
     self.prev_torque_applied = False
     self.steerRatio = 0.0
-    self.wide_camera = wide_camera
 
   def setup_mpc(self):
     self.libmpc = libmpc_py.libmpc
@@ -152,7 +149,7 @@ class LateralPlanner():
         elif not torque_applied and self.auto_lane_change_timer == 10.0 and not self.prev_torque_applied:
           self.prev_torque_applied = True
 
-      # starting
+      # LaneChangeState.laneChangeStarting
       elif self.lane_change_state == LaneChangeState.laneChangeStarting:
         # fade out over .5s
         self.lane_change_ll_prob = max(self.lane_change_ll_prob - 2*DT_MDL, 0.0)
@@ -160,7 +157,7 @@ class LateralPlanner():
         if lane_change_prob < 0.02 and self.lane_change_ll_prob < 0.01:
           self.lane_change_state = LaneChangeState.laneChangeFinishing
 
-      # finishing
+      # LaneChangeState.laneChangeFinishing
       elif self.lane_change_state == LaneChangeState.laneChangeFinishing:
         # fade in laneline over 1s
         self.lane_change_ll_prob = min(self.lane_change_ll_prob + DT_MDL, 1.0)
@@ -203,7 +200,7 @@ class LateralPlanner():
       self.libmpc.set_weights(MPC_COST_LAT.PATH, MPC_COST_LAT.HEADING, ntune_common_get('steerRateCost'))
     else:
       d_path_xyz = self.path_xyz
-      path_cost = np.clip(abs(self.path_xyz[0, 1] / self.path_xyz_stds[0, 1]), 0.5, 5.0) * MPC_COST_LAT.PATH
+      path_cost = np.clip(abs(self.path_xyz[0,1]/self.path_xyz_stds[0,1]), 0.5, 5.0) * MPC_COST_LAT.PATH
       # Heading cost is useful at low speed, otherwise end of plan can be off-heading
       heading_cost = interp(v_ego, [5.0, 10.0], [MPC_COST_LAT.HEADING, 0.0])
       self.libmpc.set_weights(path_cost, heading_cost, ntune_common_get('steerRateCost'))
@@ -266,12 +263,3 @@ class LateralPlanner():
     plan_send.lateralPlan.autoLaneChangeTimer = int(AUTO_LCA_START_TIME) - int(self.auto_lane_change_timer)
 
     pm.send('lateralPlan', plan_send)
-
-    if LOG_MPC:
-      dat = messaging.new_message('liveMpc')
-      dat.liveMpc.x = list(self.mpc_solution.x)
-      dat.liveMpc.y = list(self.mpc_solution.y)
-      dat.liveMpc.psi = list(self.mpc_solution.psi)
-      dat.liveMpc.curvature = list(self.mpc_solution.curvature)
-      dat.liveMpc.cost = self.mpc_solution.cost
-      pm.send('liveMpc', dat)

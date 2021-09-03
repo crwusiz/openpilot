@@ -107,7 +107,7 @@ void Sidebar::paintEvent(QPaintEvent *event) {
 
   const QRect r = QRect(0, 247, event->rect().width(), 50);
 
-  if(Hardware::EON() && net_type == network_type[cereal::DeviceState::NetworkType::WIFI])
+  if(net_type == network_type[cereal::DeviceState::NetworkType::WIFI])
     p.drawText(r, Qt::AlignCenter, wifi_addr);
   else
     p.drawText(r, Qt::AlignCenter, net_type);
