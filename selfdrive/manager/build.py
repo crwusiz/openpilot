@@ -106,6 +106,4 @@ if __name__ == "__main__" and not PREBUILT:
     os.chmod(BASEDIR, 0o755)
     os.chmod(os.path.join(BASEDIR, "cereal"), 0o755)
     os.chmod(os.path.join(BASEDIR, "cereal", "libmessaging_shared.so"), 0o755)
-
-    pm_grant("com.neokii.openpilot", "android.permission.ACCESS_FINE_LOCATION")
     appops_set("com.neokii.optool", "SU", "allow")

@@ -129,7 +129,6 @@ def manager_thread():
 
   if EON:
     system("am startservice com.neokii.optool/.MainService")
-    system("am startservice com.neokii.openpilot/.MainService")
 
   cloudlog.info("manager start")
   cloudlog.info({"environ": os.environ})
