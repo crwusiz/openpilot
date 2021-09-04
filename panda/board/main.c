@@ -758,7 +758,7 @@ void tick_handler(void) {
       ignition_can_cnt += 1U;
 
       // synchronous safety check
-      safety_tick(current_hooks);
+      safety_tick(current_rx_checks);
     }
 
     loop_counter++;

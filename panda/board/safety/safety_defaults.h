@@ -9,6 +9,11 @@ int HKG_MDPS12_checksum = -1;
 int HKG_MDPS12_cnt = 0;
 int HKG_last_StrColT = 0;
 
+const addr_checks default_rx_checks = {
+  .check = NULL,
+  .len = 0,
+};
+
 int default_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
   int bus = GET_BUS(to_push);
   int addr = GET_ADDR(to_push);
@@ -69,7 +74,7 @@ int default_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
 
 // *** no output safety mode ***
 
-static void nooutput_init(int16_t param) {
+static const addr_checks* nooutput_init(int16_t param) {
   UNUSED(param);
   controls_allowed = false;
   relay_malfunction_reset();
@@ -77,6 +82,7 @@ static void nooutput_init(int16_t param) {
     current_board->set_can_mode(CAN_MODE_OBD_CAN2);
     puts("setting can mode obd\n");
   }
+  return &default_rx_checks;
 }
 
 static int nooutput_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
@@ -176,7 +182,7 @@ const safety_hooks nooutput_hooks = {
 
 // *** all output safety mode ***
 
-static void alloutput_init(int16_t param) {
+static const addr_checks* alloutput_init(int16_t param) {
   UNUSED(param);
   controls_allowed = true;
   relay_malfunction_reset();
@@ -184,6 +190,7 @@ static void alloutput_init(int16_t param) {
     current_board->set_can_mode(CAN_MODE_OBD_CAN2);
     puts("  setting can mode obd\n");
   }
+  return &default_rx_checks;
 }
 
 static int alloutput_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
