@@ -23,13 +23,15 @@ class CarInterface(CarInterfaceBase):
   @staticmethod
   def get_pid_accel_limits(current_speed, cruise_speed):
 
-    gas_max_bp = [0., 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 50.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-    gas_max_v = [1.7, 1.14, 0.87, 0.63, 0.45, 0.33]
+    v_current_kph = current_speed * CV.MS_TO_KPH
 
-    brake_max_bp = [0, 70.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+    gas_max_bp = [0., 10., 20., 50., 70., 130.]
+    gas_max_v = [1.8, 1.15, 0.87, 0.63, 0.45, 0.33]
+
+    brake_max_bp = [0, 70., 130.]
     brake_max_v = [-4., -3., -2.1]
 
-    return interp(current_speed, brake_max_bp, brake_max_v), interp(current_speed, gas_max_bp, gas_max_v)
+    return interp(v_current_kph, brake_max_bp, brake_max_v), interp(v_current_kph, gas_max_bp, gas_max_v)
 
   @staticmethod
   def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=[]):  # pylint: disable=dangerous-default-value
@@ -76,7 +78,7 @@ class CarInterface(CarInterfaceBase):
 
     # longitudinal
     ret.longitudinalTuning.kpBP = [0., 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 40.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-    ret.longitudinalTuning.kpV = [1.2, 0.98, 0.83, 0.75, 0.655, 0.57, 0.48]
+    ret.longitudinalTuning.kpV = [1.3, 0.98, 0.83, 0.75, 0.655, 0.57, 0.48]
     ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
     ret.longitudinalTuning.kiV = [0.05, 0.03]
     ret.longitudinalTuning.deadzoneBP = [0., 100.*CV.KPH_TO_MS]
