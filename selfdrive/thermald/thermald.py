@@ -194,6 +194,8 @@ def thermald_thread():
   HARDWARE.initialize_hardware()
   thermal_config = HARDWARE.get_thermal_config()
 
+  restart_triggered_ts = 0.
+
   # TODO: use PI controller for UNO
   controller = PIController(k_p=0, k_i=2e-3, neg_limit=-80, pos_limit=0, rate=(1 / DT_TRML))
 
@@ -217,6 +219,16 @@ def thermald_thread():
   while 1:
     pandaState = messaging.recv_sock(pandaState_sock, wait=True)
     msg = read_thermal(thermal_config)
+
+    # neokii
+    if sec_since_boot() - restart_triggered_ts < 5.:
+      startup_conditions["not_restart_triggered"] = False
+    else:
+      startup_conditions["not_restart_triggered"] = True
+
+      if params.get_bool("SoftRestartTriggered"):
+        params.put_bool("SoftRestartTriggered", False)
+        restart_triggered_ts = sec_since_boot()
 
     if pandaState is not None:
       usb_power = pandaState.pandaState.usbPowerMode != log.PandaState.UsbPowerMode.client
