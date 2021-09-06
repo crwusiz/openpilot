@@ -4,7 +4,7 @@ crwusiz openpilot
 =====
 
 <b> crwusiz branch is comma.ai devel-staging base xx979xx HKG_community source add </b>
-- <b> v0.8.8 [ allow white panda and gray panda, OP3T support (/installer/op3t_neos_update.sh) ] </b>
+- <b> v0.8.9 [ allow white panda and gray panda, OP3T support (installer/howto_op3t_update.md) ] </b>
 - If you have any questions, please send a message to crwusiz from discord. if you like this Branch <b> [Donate](https://paypal.me/crwusiz) </b>for me
 
 [![](https://i.imgur.com/TMtVMV8.png)](#)
@@ -12,7 +12,7 @@ crwusiz openpilot
 - kor NanumGothic font / Comma Bootlogo / Bootanimation Auto install
 - event message, ui kor translate
 - steeringwheel rotate, tpms display
-- brake, bsd, autohold icon
+- brake, bsd, autohold, gps icon
 - sidebar wifi ipaddress / battery charging and battery percent display
 - lateralcontrolselect ( PID / INDI / LQR )
 - mfcselect ( LKAS / LDWS / LFA )

@@ -81,13 +81,12 @@ const Alert CONTROLS_WAITING_ALERT = {"오픈파일럿을 사용할수없습니�
                                       "프로세스가 준비중입니다", cereal::ControlsState::AlertSize::MID,
                                       AudibleAlert::NONE};
 
-const Alert CONTROLS_UNRESPONSIVE_ALERT = {"즉시 핸들을 잡아주세요", "프로세스가 응답하지않습니다",
+const Alert CONTROLS_UNRESPONSIVE_ALERT = {"핸들을 잡아주세요", "프로세스가 응답하지않습니다",
                                            "프로세스가 응답하지않습니다", cereal::ControlsState::AlertSize::FULL,
                                            AudibleAlert::CHIME_WARNING_REPEAT};
 
 const int CONTROLS_TIMEOUT = 5;
 
-const int sbr_w = 300;
 const int bdr_s = 10;
 const int header_h = 420;
 const int footer_h = 280;

@@ -376,9 +376,7 @@ struct CarControl {
       chimeDingRepeat @ 10;
       chimeGeard @11;
       chimeSeatbelt @12;
-      chimeDistracted @13;
-      chimeEngage2 @14;
-      chimeDisengage2 @15;
+      chimeReady @13;
     }
   }
 
@@ -461,14 +459,13 @@ struct CarParams {
   communityFeature @46: Bool;  # true if a community maintained feature is detected
   fingerprintSource @49: FingerprintSource;
   networkLocation @50 :NetworkLocation;  # Where Panda/C2 is integrated into the car's CAN network
-
-  sasBus @58: Int8;
-  sccBus @59: Int8;
-  mdpsBus @60: Int8;
-  enableAutoHold @61 :Bool;
-  hasScc13 @62 :Bool;
-  hasScc14 @63 :Bool;
-  hasEms @64 :Bool;
+  mdpsBus @59: Int8;
+  sasBus @60: Int8;
+  sccBus @61: Int8;
+  enableAutoHold @62 :Bool;
+  hasScc13 @63 :Bool;
+  hasScc14 @64 :Bool;
+  hasEms @65 :Bool;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);

@@ -49,7 +49,7 @@ class Panda {
   void cleanup();
 
  public:
-  Panda();
+  Panda(std::string serial="");
   ~Panda();
 
   std::string usb_serial;

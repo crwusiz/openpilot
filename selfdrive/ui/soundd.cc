@@ -32,9 +32,7 @@ public:
       {AudibleAlert::CHIME_DING_REPEAT, sound_asset_path + "ding.wav", true},
       {AudibleAlert::CHIME_GEARD, sound_asset_path + "geard.wav", false},
       {AudibleAlert::CHIME_SEATBELT, sound_asset_path + "seatbelt.wav", false},
-      {AudibleAlert::CHIME_DISTRACTED, sound_asset_path + "distracted.wav", false},
-      {AudibleAlert::CHIME_ENGAGE2, sound_asset_path + "engagedt.wav", false},
-      {AudibleAlert::CHIME_DISENGAGE2, sound_asset_path + "disengagedt.wav", false}
+      {AudibleAlert::CHIME_READY, sound_asset_path + "ready.wav", false}
     };
     for (auto &[alert, fn, loops] : sound_list) {
       QSoundEffect *s = new QSoundEffect(this);

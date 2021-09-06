@@ -703,6 +703,14 @@ void tick_handler(void) {
         siren_countdown -= 1U;
       }
 
+      if (controls_allowed) {
+        controls_allowed_countdown = 30U;
+      } else if (controls_allowed_countdown > 0U) {
+        controls_allowed_countdown -= 1U;
+      } else {
+
+      }
+
       if (!heartbeat_disabled) {
         // if the heartbeat has been gone for a while, go to SILENT safety mode and enter power save
 		// MDPS will hard fault if SAFETY_SILENT set or panda slept
@@ -710,8 +718,9 @@ void tick_handler(void) {
           puts("device hasn't sent a heartbeat for 0x");
           puth(heartbeat_counter);
           puts(" seconds. Safety is set to NOOUTPUT mode.\n");
-          if (controls_allowed) {
+          if (controls_allowed_countdown > 0U) {
             siren_countdown = 5U;
+            controls_allowed_countdown = 0U;
           }
 
           // set flag to indicate the heartbeat was lost
