@@ -331,7 +331,17 @@ struct CarControl {
     # range from -1.0 - 1.0
     steer @2: Float32;
     steeringAngleDeg @3: Float32;
+
     accel @4: Float32; # m/s^2
+    longControlState @5: LongControlState;
+
+    enum LongControlState @0xe40f3a917d908282{
+      off @0;
+      pid @1;
+      stopping @2;
+      starting @3;
+    }
+
   }
 
   struct CruiseControl {
@@ -448,6 +458,7 @@ struct CarParams {
   startingAccelRate @53 :Float32; # m/s^2/s while trying to start
 
   steerActuatorDelay @36 :Float32; # Steering wheel actuator delay in seconds
+  longitudinalActuatorDelay @58 :Float32; # Gas/Brake actuator delay in seconds
   openpilotLongitudinalControl @37 :Bool; # is openpilot doing the longitudinal control?
   carVin @38 :Text; # VIN number queried during fingerprinting
   dashcamOnly @41: Bool;
@@ -458,13 +469,13 @@ struct CarParams {
   communityFeature @46: Bool;  # true if a community maintained feature is detected
   fingerprintSource @49: FingerprintSource;
   networkLocation @50 :NetworkLocation;  # Where Panda/C2 is integrated into the car's CAN network
-  mdpsBus @58: Int8;
-  sasBus @59: Int8;
-  sccBus @60: Int8;
-  enableAutoHold @61 :Bool;
-  hasScc13 @62 :Bool;
-  hasScc14 @63 :Bool;
-  hasEms @64 :Bool;
+  mdpsBus @59: Int8;
+  sasBus @60: Int8;
+  sccBus @61: Int8;
+  enableAutoHold @62 :Bool;
+  hasScc13 @63 :Bool;
+  hasScc14 @64 :Bool;
+  hasEms @65 :Bool;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);
