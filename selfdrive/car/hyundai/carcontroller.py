@@ -65,7 +65,7 @@ class CarController():
     self.apply_steer_last = 0
     self.steer_rate_limited = False
     self.lkas11_cnt = 0
-    self.scc12_cnt = 0
+    self.scc12_cnt = -1
 
     self.resume_cnt = 0
     self.last_lead_distance = 0
@@ -140,7 +140,6 @@ class CarController():
 
     if frame == 0:  # initialize counts from last received count signals
       self.lkas11_cnt = CS.lkas11["CF_Lkas_MsgCount"]
-      self.scc12_cnt = CS.scc12["CR_VSM_Alive"] + 1 if not CS.no_radar else 0
 
       # TODO: fix this
       # self.prev_scc_cnt = CS.scc11["AliveCounterACC"]
@@ -159,7 +158,6 @@ class CarController():
     self.prev_scc_cnt = CS.scc11["AliveCounterACC"]
 
     self.lkas11_cnt = (self.lkas11_cnt + 1) % 0x10
-    self.scc12_cnt %= 0xF
 
     can_sends = []
     can_sends.append(create_lkas11(self.packer, frame, self.car_fingerprint, apply_steer, lkas_active,
@@ -220,41 +218,50 @@ class CarController():
       controls.aReqValueMax = controls.aReqValue
 
     # send scc to car if longcontrol enabled and SCC not on bus 0 or ont live
-    if self.longcontrol and CS.cruiseState_enabled and (CS.scc_bus or not self.scc_live) and frame % 2 == 0:
+    if self.longcontrol and CS.cruiseState_enabled and (CS.scc_bus or not self.scc_live):
 
-      if self.stock_navi_decel_enabled:
-        controls.sccStockCamAct = CS.scc11["Navi_SCC_Camera_Act"]
-        controls.sccStockCamStatus = CS.scc11["Navi_SCC_Camera_Status"]
-        apply_accel, stock_cam = self.scc_smoother.get_stock_cam_accel(apply_accel, aReqValue, CS.scc11)
-      else:
-        controls.sccStockCamAct = 0
-        controls.sccStockCamStatus = 0
-        stock_cam = False
+      if frame % 2 == 0:
 
-      can_sends.append(create_scc12(self.packer, apply_accel, enabled, self.scc12_cnt, self.scc_live, CS.scc12))
-      can_sends.append(create_scc11(self.packer, frame, enabled, set_speed, lead_visible, self.scc_live, CS.scc11,
-                                    self.scc_smoother.active_cam, stock_cam))
-
-      if frame % 20 == 0 and CS.has_scc13:
-        can_sends.append(create_scc13(self.packer, CS.scc13))
-      if CS.has_scc14:
-        if CS.out.vEgo < 2.:
-          long_control_state = controls.LoC.long_control_state
-          acc_standstill = True if long_control_state == LongCtrlState.stopping else False
+        if self.stock_navi_decel_enabled:
+          controls.sccStockCamAct = CS.scc11["Navi_SCC_Camera_Act"]
+          controls.sccStockCamStatus = CS.scc11["Navi_SCC_Camera_Status"]
+          apply_accel, stock_cam = self.scc_smoother.get_stock_cam_accel(apply_accel, aReqValue, CS.scc11)
         else:
-          acc_standstill = False
+          controls.sccStockCamAct = 0
+          controls.sccStockCamStatus = 0
+          stock_cam = False
 
-        lead = self.scc_smoother.get_lead(controls.sm)
+        if self.scc12_cnt < 0:
+          self.scc12_cnt = CS.scc12["CR_VSM_Alive"] if not CS.no_radar else 0
 
-        if lead is not None:
-          d = lead.dRel
-          obj_gap = 1 if d < 25 else 2 if d < 40 else 3 if d < 60 else 4 if d < 80 else 5
-        else:
-          obj_gap = 0
+        self.scc12_cnt += 1
+        self.scc12_cnt %= 0xF
 
-        can_sends.append(create_scc14(self.packer, enabled, CS.out.vEgo, acc_standstill, apply_accel, CS.out.gasPressed,
-                                      obj_gap, CS.scc14))
-      self.scc12_cnt += 1
+        can_sends.append(create_scc12(self.packer, apply_accel, enabled, self.scc12_cnt, self.scc_live, CS.scc12))
+        can_sends.append(create_scc11(self.packer, frame, enabled, set_speed, lead_visible, self.scc_live, CS.scc11,
+                                      self.scc_smoother.active_cam, stock_cam))
+
+        if frame % 20 == 0 and CS.has_scc13:
+          can_sends.append(create_scc13(self.packer, CS.scc13))
+        if CS.has_scc14:
+          if CS.out.vEgo < 2.:
+            long_control_state = controls.LoC.long_control_state
+            acc_standstill = True if long_control_state == LongCtrlState.stopping else False
+          else:
+            acc_standstill = False
+
+          lead = self.scc_smoother.get_lead(controls.sm)
+
+          if lead is not None:
+            d = lead.dRel
+            obj_gap = 1 if d < 25 else 2 if d < 40 else 3 if d < 60 else 4 if d < 80 else 5
+          else:
+            obj_gap = 0
+
+          can_sends.append(create_scc14(self.packer, enabled, CS.out.vEgo, acc_standstill, apply_accel, CS.out.gasPressed,
+                                        obj_gap, CS.scc14))
+    else:
+      self.scc12_cnt = -1
 
     # 20 Hz LFA MFA message
     if frame % 5 == 0:
