@@ -580,9 +580,10 @@ struct ControlsState @0x97ff69c53601abf1 {
   sccGasFactor @69 :Float32;
   sccBrakeFactor @70 :Float32;
   sccCurvatureFactor @71 :Float32;
+  longitudinalActuatorDelay @72 :Float32;
 
-  sccStockCamAct @72 :Float32;
-  sccStockCamStatus @73 :Float32;
+  sccStockCamAct @73 :Float32;
+  sccStockCamStatus @74 :Float32;
 
 
   enum OpenpilotState @0xdbe58b96d2d1ac61 {
