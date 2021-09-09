@@ -1,7 +1,7 @@
 import copy
 
 import crcmod
-from selfdrive.car.hyundai.values import CAR, CHECKSUM, FEATURES
+from selfdrive.car.hyundai.values import CAR, CHECKSUM, FEATURES, EV_HYBRID_CAR
 
 hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 
@@ -129,15 +129,34 @@ def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc1
 
   return packer.make_can_msg("SCC11", 0, values)
 
-def create_scc12(packer, apply_accel, enabled, cnt, scc_live, scc12):
+def create_scc12(packer, apply_accel, enabled, cnt, scc_live, scc12, gaspressed, brakepressed,
+                 standstill, car_fingerprint):
   values = copy.copy(scc12)
-  values["aReqRaw"] = apply_accel if enabled else 0 #aReqMax
-  values["aReqValue"] = apply_accel if enabled else 0 #aReqMin
-  values["CR_VSM_Alive"] = cnt
-  values["CR_VSM_ChkSum"] = 0
-  if not scc_live:
-    values["ACCMode"] = 1  if enabled else 0 # 2 if gas padel pressed
 
+  if car_fingerprint in EV_HYBRID_CAR:
+    # from xps-genesis
+    if enabled and not brakepressed:
+      values["ACCMode"] = 2 if gaspressed and (apply_accel > -0.2) else 1
+      if apply_accel < 0.0 and standstill:
+        values["StopReq"] = 1
+      values["aReqRaw"] = apply_accel
+      values["aReqValue"] = apply_accel
+    else:
+      values["ACCMode"] = 0
+      values["aReqRaw"] = 0
+      values["aReqValue"] = 0
+
+    if not scc_live:
+      values["CR_VSM_Alive"] = cnt
+
+  else:
+    values["aReqRaw"] = apply_accel if enabled else 0  # aReqMax
+    values["aReqValue"] = apply_accel if enabled else 0  # aReqMin
+    values["CR_VSM_Alive"] = cnt
+    if not scc_live:
+      values["ACCMode"] = 1 if enabled else 0  # 2 if gas padel pressed
+
+  values["CR_VSM_ChkSum"] = 0
   dat = packer.make_can_msg("SCC12", 0, values)[2]
   values["CR_VSM_ChkSum"] = 16 - sum([sum(divmod(i, 16)) for i in dat]) % 16
 
@@ -150,7 +169,7 @@ def create_scc13(packer, scc13):
 def create_scc14(packer, enabled, e_vgo, standstill, accel, gaspressed, objgap, scc14):
   values = copy.copy(scc14)
 
-  # xps-genesis
+  # from xps-genesis
   if enabled:
     values["ACCMode"] = 2 if gaspressed and (accel > -0.2) else 1
     values["ObjGap"] = objgap
