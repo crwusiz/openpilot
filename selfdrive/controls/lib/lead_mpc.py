@@ -79,6 +79,9 @@ class LeadMpc():
       v_lead = max(0.0, lead.vLead)
       a_lead = lead.aLeadK
 
+      if not lead.radar:
+        x_lead = max(0., x_lead - 1.)
+
       if (v_lead < 0.1 or -a_lead / 2.0 > v_lead):
         v_lead = 0.0
         a_lead = 0.0
