@@ -2,6 +2,7 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <cmath>
 
 static void ui_draw_extras_limit_speed(UIState *s)
 {
@@ -93,7 +94,65 @@ static void ui_draw_extras_limit_speed(UIState *s)
     }
 }
 
+static NVGcolor get_tpms_color(float tpms) {
+    if(tpms < 5 || tpms > 60) // N/A
+        return nvgRGBA(255, 255, 255, 200);
+    if(tpms < 30)
+        return nvgRGBA(255, 90, 90, 200);
+    return nvgRGBA(255, 255, 255, 200);
+}
+
+static std::string get_tpms_text(float tpms) {
+    if(tpms < 5 || tpms > 60)
+        return "";
+
+    char str[32];
+    snprintf(str, sizeof(str), "%.0f", round(tpms));
+    return std::string(str);
+}
+
+static void ui_draw_extras_tire_pressure(UIState *s)
+{
+    const UIScene *scene = &s->scene;
+    auto car_state = (*s->sm)["carState"].getCarState();
+    auto tpms = car_state.getTpms();
+
+    const float fl = tpms.getFl();
+    const float fr = tpms.getFr();
+    const float rl = tpms.getRl();
+    const float rr = tpms.getRr();
+
+    const int w = 58;
+    const int h = 126;
+    int x = bdr_s + 80;
+    int y = s->fb_h - bdr_s - h - 60;
+
+    const int margin = 10;
+
+    ui_draw_image(s, {x, y, w, h}, "tire_pressure", 0.8f);
+
+    nvgFontSize(s->vg, 60);
+    nvgFontFace(s->vg, "sans-semibold");
+
+    nvgTextAlign(s->vg, NVG_ALIGN_RIGHT);
+    nvgFillColor(s->vg, get_tpms_color(fl));
+    nvgText(s->vg, x-margin, y+45, get_tpms_text(fl).c_str(), NULL);
+
+    nvgTextAlign(s->vg, NVG_ALIGN_LEFT);
+    nvgFillColor(s->vg, get_tpms_color(fr));
+    nvgText(s->vg, x+w+margin, y+45, get_tpms_text(fr).c_str(), NULL);
+
+    nvgTextAlign(s->vg, NVG_ALIGN_RIGHT);
+    nvgFillColor(s->vg, get_tpms_color(rl));
+    nvgText(s->vg, x-margin, y+h-15, get_tpms_text(rl).c_str(), NULL);
+
+    nvgTextAlign(s->vg, NVG_ALIGN_LEFT);
+    nvgFillColor(s->vg, get_tpms_color(rr));
+    nvgText(s->vg, x+w+margin, y+h-15, get_tpms_text(rr).c_str(), NULL);
+}
+
 static void ui_draw_extras(UIState *s)
 {
     ui_draw_extras_limit_speed(s);
+    ui_draw_extras_tire_pressure(s);
 }

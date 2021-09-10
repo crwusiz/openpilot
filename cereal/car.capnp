@@ -204,6 +204,14 @@ struct CarState {
 
   cruiseGap @38 : Int32;
   autoHold @39 : Int32;
+  tpms @40 : Tpms;
+
+  struct Tpms {
+    fl @0 :Float32;
+    fr @1 :Float32;
+    rl @2 :Float32;
+    rr @3 :Float32;
+  }
 
   struct WheelSpeeds {
     # optional wheel speeds
