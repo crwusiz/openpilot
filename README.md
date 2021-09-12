@@ -199,6 +199,7 @@ Community Maintained Cars and Features
 | Nissan    | X-Trail 2017                  | ProPILOT          | Stock            | 0mph               | 0mph         |
 | SEAT      | Ateca 2018                    | Driver Assistance | Stock            | 0mph               | 0mph         |
 | SEAT      | Leon 2014-2020                | Driver Assistance | Stock            | 0mph               | 0mph         |
+| Škoda     | Karoq 2019                    | Driver Assistance | Stock            | 0mph               | 0mph         |
 | Škoda     | Kodiaq 2018-19                | Driver Assistance | Stock            | 0mph               | 0mph         |
 | Škoda     | Octavia 2015, 2018-19         | Driver Assistance | Stock            | 0mph               | 0mph         |
 | Škoda     | Octavia RS 2016               | Driver Assistance | Stock            | 0mph               | 0mph         |
@@ -364,7 +365,6 @@ Directory Structure
     .
     ├── cereal              # The messaging spec and libs used for all logs
     ├── common              # Library like functionality we've developed here
-    ├── installer/updater   # Manages updates of NEOS
     ├── opendbc             # Files showing how to interpret data from cars
     ├── panda               # Code used to communicate on CAN
     ├── phonelibs           # External libraries
