@@ -38,6 +38,17 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   setAttribute(Qt::WA_OpaquePaintEvent);
   QObject::connect(this, &OnroadWindow::updateStateSignal, this, &OnroadWindow::updateState);
   QObject::connect(this, &OnroadWindow::offroadTransitionSignal, this, &OnroadWindow::offroadTransition);
+
+  // screen recoder
+  QWidget* recorder_widget = new QWidget(this);
+  QVBoxLayout * recorder_layout = new QVBoxLayout (recorder_widget);
+  recorder = new ScreenRecoder(this);
+  recorder_layout->addWidget(recorder);
+  recorder_layout->setAlignment(recorder, Qt::AlignRight | Qt::AlignBottom);
+
+  stacked_layout->addWidget(recorder_widget);
+  recorder_widget->raise();
+  alerts->raise();
 }
 
 void OnroadWindow::updateState(const UIState &s) {
