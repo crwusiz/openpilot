@@ -129,6 +129,7 @@ static void ui_draw_extras_tire_pressure(UIState *s)
 
     const int margin = 10;
 
+    nvgBeginPath(s->vg);
     ui_draw_image(s, {x, y, w, h}, "tire_pressure", 0.8f);
 
     nvgFontSize(s->vg, 60);
