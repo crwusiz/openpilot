@@ -172,7 +172,7 @@ class nTune():
     if self.checkValue("sccCurvatureFactor", 0.5, 1.5, 1.0):
       updated = True
 
-    if self.checkValue("longitudinalActuatorDelay", 0.1, 1.5, 0.2):
+    if self.checkValue("longitudinalActuatorDelay", 0.1, 1.5, 0.15):
       updated = True
 
     return updated
