@@ -20,6 +20,7 @@
 #include "selfdrive/hardware/hw.h"
 #include "selfdrive/ui/ui.h"
 #include "selfdrive/ui/extras.h"
+#include "selfdrive/ui/dashcam.h"
 
 #ifdef QCOM2
 const int vwp_w = 2160;
@@ -946,6 +947,15 @@ static void ui_draw_vision(UIState *s) {
   ui_draw_vision_scc_gap(s);
   ui_draw_vision_brake(s);
   ui_draw_vision_autohold(s);
+
+#if UI_FEATURE_DASHCAM
+   if(s->awake && Hardware::EON())
+   {
+        int touch_x = -1, touch_y = -1;
+        int touched = touch_poll(&(s->touch), &touch_x, &touch_y, 0);
+        dashcam(s, touch_x, touch_y);
+   }
+#endif
 }
 
 void ui_draw(UIState *s, int w, int h) {

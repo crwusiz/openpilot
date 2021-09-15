@@ -11,7 +11,6 @@
 #include "selfdrive/hardware/hw.h"
 #include "selfdrive/ui/paint.h"
 #include "selfdrive/ui/qt/qt_window.h"
-#include "selfdrive/ui/dashcam.h"
 
 #define BACKLIGHT_DT 0.05
 #define BACKLIGHT_TS 10.00
@@ -256,16 +255,6 @@ static void update_extras(UIState *s)
     }
     update_leads_radar(s, sm["radarState"].getRadarState(), line);
   }
-
-
-#if UI_FEATURE_DASHCAM
-   if(s->awake && Hardware::EON())
-   {
-        int touch_x = -1, touch_y = -1;
-        int touched = touch_poll(&(s->touch), &touch_x, &touch_y, 0);
-        dashcam(s, touch_x, touch_y);
-   }
-#endif
 }
 
 
