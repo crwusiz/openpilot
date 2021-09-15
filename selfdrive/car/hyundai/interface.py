@@ -184,8 +184,8 @@ class CarInterface(CarInterfaceBase):
       ret.centerToFront = ret.wheelbase * 0.385
     elif candidate in [CAR.GRANDEUR_IG_FL, CAR.GRANDEUR_IG_FL_HEV]:
       tire_stiffness_factor = 0.8
-      ret.mass = 1640. + STD_CARGO_KG
-      ret.wheelbase = 2.845
+      ret.mass = 1725. + STD_CARGO_KG
+      ret.wheelbase = 2.885
       ret.maxSteeringAngleDeg = 120.
       ret.centerToFront = ret.wheelbase * 0.385
     elif candidate == CAR.VELOSTER:
