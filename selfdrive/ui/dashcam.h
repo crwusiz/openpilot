@@ -264,7 +264,7 @@ void draw_lock_button(UIState *s) {
 
 static void screen_draw_button(UIState *s, int touch_x, int touch_y) {
   // Set button to bottom left of screen
-  if (s->scene.world_objects_visible){
+  if (s->scene.started){
 
     //if (captureState == CAPTURE_STATE_CAPTURING) {
     //  draw_lock_button(s);
@@ -347,7 +347,7 @@ bool dashcam( UIState *s, int touch_x, int touch_y ) {
   //  screen_toggle_lock();
   //  touched = true;
   //}
-  if (!s->scene.world_objects_visible) {
+  if (!s->scene.started) {
     // Assume car is not in drive so stop recording
     stop_capture();
   }
