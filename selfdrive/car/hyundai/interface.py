@@ -84,7 +84,8 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalTuning.kiV = [0.05, 0.03]
     ret.longitudinalTuning.deadzoneBP = [0., 100.*CV.KPH_TO_MS]
     ret.longitudinalTuning.deadzoneV = [0., 0.015]
-    ret.longitudinalActuatorDelay = 0.2
+    ret.longitudinalActuatorDelayLowerBound = 0.15
+    ret.longitudinalActuatorDelayUpperBound = 0.15
 
     ret.startAccel = -0.8
     ret.stopAccel = -2.0
