@@ -259,9 +259,16 @@ void CameraViewWidget::updateFrame() {
       latest_frame = buf;
       update();
       emit frameUpdated();
-    } else {
+    } else if (!Hardware::PC()) {
       LOGE("visionIPC receive timeout");
     }
+  } else {
+    // try to connect again quickly
+    QTimer::singleShot(1000. / UI_FREQ, this, &CameraViewWidget::updateFrame);
+  }
+  if (buf == nullptr) {
+    // try to connect or recv again
+    QTimer::singleShot(1000. / UI_FREQ, this, &CameraViewWidget::updateFrame);
   }
   if (buf == nullptr) {
     // try to connect or recv again
