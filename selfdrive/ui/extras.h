@@ -97,7 +97,7 @@ static void ui_draw_extras_limit_speed(UIState *s)
 static NVGcolor get_tpms_color(float tpms) {
     if(tpms < 5 || tpms > 60) // N/A
         return nvgRGBA(255, 255, 255, 200);
-    if(tpms < 30)
+    if(tpms < 31)
         return nvgRGBA(255, 90, 90, 200);
     return nvgRGBA(255, 255, 255, 200);
 }

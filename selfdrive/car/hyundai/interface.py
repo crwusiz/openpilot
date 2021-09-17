@@ -3,6 +3,7 @@ import numpy as np
 
 from cereal import car
 from common.numpy_fast import interp
+from selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR, RADAR_MSG_COUNT
 from selfdrive.config import Conversions as CV
 from selfdrive.car.hyundai.values import CAR, Buttons
 from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint
@@ -83,7 +84,8 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalTuning.kiV = [0.05, 0.03]
     ret.longitudinalTuning.deadzoneBP = [0., 100.*CV.KPH_TO_MS]
     ret.longitudinalTuning.deadzoneV = [0., 0.015]
-    ret.longitudinalActuatorDelay = 0.2
+    ret.longitudinalActuatorDelayLowerBound = 0.15
+    ret.longitudinalActuatorDelayUpperBound = 0.15
 
     ret.startAccel = -0.8
     ret.stopAccel = -2.0
@@ -286,8 +288,6 @@ class CarInterface(CarInterfaceBase):
       ret.hasScc14 = 905 in fingerprint[ret.sccBus]
 
     ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
-
-    print('fingerprint', fingerprint)
 
     ret.radarOffCan = ret.sccBus == -1
     ret.pcmCruise = not ret.radarOffCan

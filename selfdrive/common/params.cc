@@ -153,8 +153,9 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"GsmRoaming", PERSISTENT},
     {"HardwareSerial", PERSISTENT},
     {"HasAcceptedTerms", PERSISTENT},
-    {"IsDriverViewEnabled", CLEAR_ON_MANAGER_START},
     {"IMEI", PERSISTENT},
+    {"InstallDate", PERSISTENT},
+    {"IsDriverViewEnabled", CLEAR_ON_MANAGER_START},
     {"IsLdwEnabled", PERSISTENT},
     {"IsMetric", PERSISTENT},
     {"IsOffroad", CLEAR_ON_MANAGER_START},
@@ -219,6 +220,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"SccSmootherSlowOnCurves", PERSISTENT},
     {"SccSmootherSyncGasPressed", PERSISTENT},
     {"StockNaviDecelEnabled", PERSISTENT},
+    {"NewRadarInterface", PERSISTENT},
     {"ShowDebugUI", PERSISTENT},
     {"CustomLeadMark", PERSISTENT},
 
