@@ -1,24 +1,22 @@
 #pragma once
 
+#include <memory>
+#include <cstdint>
 #include <QPainter>
 #include <QPushButton>
+#include <QSoundEffect>
 
-#include "selfdrive/loggerd/encoder.h"
-#include "selfdrive/loggerd/logger.h"
-#if defined(QCOM) || defined(QCOM2)
-#include "selfdrive/loggerd/omx_encoder.h"
-#define Encoder OmxEncoder
-#else
-#include "selfdrive/loggerd/raw_logger.h"
-#define Encoder RawLogger
-#endif
+#include "omx_encoder.h"
+#include "selfdrive/ui/ui.h"
 
 class ScreenRecoder : public QPushButton {
   Q_OBJECT
 
 public:
   ScreenRecoder(QWidget *parent = 0);
-  //void update(const Alert &a, const QColor &color);
+  virtual ~ScreenRecoder();
+
+  void ui_draw(UIState *s, int w, int h);
 public slots:
     void btnReleased(void);
     void btnPressed(void);
@@ -28,10 +26,22 @@ protected:
 
 private:
     bool recording;
-    Encoder* encoder;
+    long long started;
+    int src_width, src_height;
+    int dst_width, dst_height;
+    std::unique_ptr<OmxEncoder> encoder;
+    std::unique_ptr<uint8_t[]> rgb_buffer;
+    std::unique_ptr<uint8_t[]> rgb_scale_buffer;
 
-    void initEncoder();
+    QSoundEffect soundStart;
+    QSoundEffect soundStop;
 
+    void openEncoder(const char* filename);
+    void closeEncoder();
+    void start();
+    void stop();
+
+public:
     void toggle();
 
 };

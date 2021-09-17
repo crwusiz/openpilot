@@ -39,16 +39,22 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   QObject::connect(this, &OnroadWindow::updateStateSignal, this, &OnroadWindow::updateState);
   QObject::connect(this, &OnroadWindow::offroadTransitionSignal, this, &OnroadWindow::offroadTransition);
 
-  // screen recoder
-  QWidget* recorder_widget = new QWidget(this);
-  QVBoxLayout * recorder_layout = new QVBoxLayout (recorder_widget);
-  recorder = new ScreenRecoder(this);
-  recorder_layout->addWidget(recorder);
-  recorder_layout->setAlignment(recorder, Qt::AlignRight | Qt::AlignBottom);
+  // screen recoder - neokii
+  if(Hardware::TICI()) {
+      QWidget* recorder_widget = new QWidget(this);
+      QVBoxLayout * recorder_layout = new QVBoxLayout (recorder_widget);
+      recorder_layout->setMargin(35);
+      recorder = new ScreenRecoder(this);
+      recorder_layout->addWidget(recorder);
+      recorder_layout->setAlignment(recorder, Qt::AlignRight | Qt::AlignBottom);
 
-  stacked_layout->addWidget(recorder_widget);
-  recorder_widget->raise();
-  alerts->raise();
+      nvg->recorder = recorder;
+      stacked_layout->addWidget(recorder_widget);
+      recorder_widget->raise();
+      alerts->raise();
+
+      grabGesture(Qt::SwipeGesture);
+  }
 }
 
 void OnroadWindow::updateState(const UIState &s) {
@@ -78,13 +84,31 @@ void OnroadWindow::updateState(const UIState &s) {
   }
 }
 
-void OnroadWindow::mousePressEvent(QMouseEvent* e) {
+void OnroadWindow::mouseReleaseEvent(QMouseEvent* e) {
+
+  // neokii
+  QPoint endPos = e->pos();
+  if(std::abs(endPos.x() - startPos.x()) > 200 || std::abs(endPos.y() - startPos.y()) > 200) {
+      if(recorder)
+        recorder->toggle();
+      return;
+  }
+
   if (map != nullptr) {
     bool sidebarVisible = geometry().x() > 0;
     map->setVisible(!sidebarVisible && !map->isVisible());
   }
+
   // propagation event to parent(HomeWindow)
-  QWidget::mousePressEvent(e);
+  QWidget::mouseReleaseEvent(e);
+}
+
+void OnroadWindow::mousePressEvent(QMouseEvent* e) {
+    startPos = e->pos();
+}
+
+void OnroadWindow::mouseDoubleClickEvent(QMouseEvent *e) {
+    printf("mouseDoubleClickEvent: 0x%08x\n", (unsigned int)e->buttons());
 }
 
 void OnroadWindow::offroadTransition(bool offroad) {
@@ -207,6 +231,9 @@ void NvgWindow::updateState(const UIState &s) {
 void NvgWindow::paintGL() {
   CameraViewWidget::paintGL();
   ui_draw(&QUIState::ui_state, width(), height());
+
+  if(recorder)
+    recorder->ui_draw(&QUIState::ui_state, width(), height());
 
   double cur_draw_t = millis_since_boot();
   double dt = cur_draw_t - prev_draw_t;

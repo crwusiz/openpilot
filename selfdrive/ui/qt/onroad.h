@@ -33,6 +33,8 @@ public:
   explicit NvgWindow(VisionStreamType type, QWidget* parent = 0) : CameraViewWidget(type, true, parent) {}
   void updateState(const UIState &s);
 
+  ScreenRecoder* recorder;
+
 protected:
   void paintGL() override;
   void initializeGL() override;
@@ -49,13 +51,19 @@ public:
 
 private:
   void paintEvent(QPaintEvent *event);
-  void mousePressEvent(QMouseEvent* e) override;
+  void mouseReleaseEvent(QMouseEvent* e) override;
   OnroadAlerts *alerts;
   NvgWindow *nvg;
   QColor bg = bg_colors[STATUS_DISENGAGED];
   QWidget *map = nullptr;
   QHBoxLayout* split;
+
+  // neokii
+  void mousePressEvent(QMouseEvent* e) override;
+  void mouseDoubleClickEvent(QMouseEvent *) override;
+private:
   ScreenRecoder* recorder;
+  QPoint startPos;
 
 signals:
   void updateStateSignal(const UIState &s);

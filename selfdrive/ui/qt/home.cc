@@ -66,7 +66,7 @@ void HomeWindow::showDriverView(bool show) {
   sidebar->setVisible(show == false);
 }
 
-void HomeWindow::mousePressEvent(QMouseEvent* e) {
+void HomeWindow::mouseReleaseEvent(QMouseEvent* e) {
   // Handle sidebar collapsing
   if (onroad->isVisible() && (!sidebar->isVisible() || e->x() > sidebar->width())) {
     sidebar->setVisible(!sidebar->isVisible() && !onroad->isMapVisible());
