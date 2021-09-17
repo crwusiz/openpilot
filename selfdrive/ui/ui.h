@@ -129,7 +129,6 @@ typedef struct UIScene {
   int batteryPercent;
   char batteryStatus[64];
   float cpuTempAvg;
-  float tpmsFl, tpmsFr, tpmsRl, tpmsRr;
   int lateralControlSelect;
   float output_scale;
   bool ui_tpms;

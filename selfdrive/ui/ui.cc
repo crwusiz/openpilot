@@ -153,10 +153,6 @@ static void update_state(UIState *s) {
     }
     scene.leftBlinker = scene.car_state.getLeftBlinker();
     scene.rightBlinker = scene.car_state.getRightBlinker();
-    scene.tpmsFl = scene.car_state.getTpmsFl();
-    scene.tpmsFr = scene.car_state.getTpmsFr();
-    scene.tpmsRl = scene.car_state.getTpmsRl();
-    scene.tpmsRr = scene.car_state.getTpmsRr();
   }
   if (sm.updated("modelV2") && s->vg) {
     auto model = sm["modelV2"].getModelV2();

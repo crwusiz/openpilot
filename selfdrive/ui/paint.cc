@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 
 #ifdef __APPLE__
 #include <OpenGL/gl3.h>
@@ -17,10 +18,8 @@
 #include <nanovg_gl.h>
 #include <nanovg_gl_utils.h>
 
-#include "selfdrive/common/timing.h"
 #include "selfdrive/common/util.h"
 #include "selfdrive/hardware/hw.h"
-
 #include "selfdrive/ui/ui.h"
 
 static void ui_draw_text(const UIState *s, float x, float y, const char *string, float size, NVGcolor color, const char *font_name) {
@@ -274,8 +273,6 @@ static void ui_draw_vision_speed(UIState *s) {
 
 static void ui_draw_vision_event(UIState *s) {
   // draw steering wheel, bdr_s=10,
-  float angleSteers = s->scene.car_state.getSteeringAngleDeg();
-  int steerOverride = s->scene.car_state.getSteeringPressed();
   const int radius = 96;
   const int center_x = s->fb_w - radius;
   const int center_y = radius;
@@ -284,11 +281,14 @@ static void ui_draw_vision_event(UIState *s) {
   const int img_wheel_size = radius + 54; // wheel_size = 150
   const int img_wheel_x = bg_wheel_x - (img_wheel_size/2);
   const int img_wheel_y = bg_wheel_y - (img_wheel_size/2);
+  float angleSteers = s->scene.car_state.getSteeringAngleDeg();
   const float img_rotation = angleSteers/180*3.141592;
+  int steerOverride = s->scene.car_state.getSteeringPressed();
   bool is_engaged = (s->status == STATUS_ENGAGED) && ! steerOverride;
   bool is_warning = (s->status == STATUS_WARNING);
   bool is_engageable = s->scene.controls_state.getEngageable();
-  if (is_engaged || is_warning || is_engageable) {
+  bool is_enabled = s->scene.controls_state.getEnabled();
+  if (is_engaged || is_warning || is_engageable || is_enabled) {
     nvgBeginPath(s->vg);
     nvgCircle(s->vg, bg_wheel_x, bg_wheel_y, radius); // circle_size = 96
     if (is_engaged) {
@@ -297,6 +297,8 @@ static void ui_draw_vision_event(UIState *s) {
       nvgFillColor(s->vg, COLOR_WARNING_ALPHA(120));
     } else if (is_engageable) {
       nvgFillColor(s->vg, COLOR_ENGAGEABLE_ALPHA(120));
+    } else if (is_enabled) {
+      nvgFillColor(s->vg, COLOR_BLACK_ALPHA(120));
     }
     nvgFill(s->vg);
   }
@@ -304,7 +306,7 @@ static void ui_draw_vision_event(UIState *s) {
   nvgTranslate(s->vg, bg_wheel_x, bg_wheel_y);
   nvgRotate(s->vg,-img_rotation);
   nvgBeginPath(s->vg);
-  NVGpaint imgPaint = nvgImagePattern(s->vg, img_wheel_x - bg_wheel_x, img_wheel_y - bg_wheel_y, img_wheel_size, img_wheel_size, 0, s->images["wheel"], 1.0f);
+  NVGpaint imgPaint = nvgImagePattern(s->vg, img_wheel_x - bg_wheel_x, img_wheel_y - bg_wheel_y, img_wheel_size, img_wheel_size, 0,  s->images["wheel"], 1.0f);
   nvgRect(s->vg, img_wheel_x - bg_wheel_x, img_wheel_y - bg_wheel_y, img_wheel_size, img_wheel_size);
   nvgFillPaint(s->vg, imgPaint);
   nvgFill(s->vg);
@@ -326,14 +328,14 @@ static void ui_draw_gps(UIState *s) {
 static void ui_draw_vision_face(UIState *s) {
   const int radius = 85;
   const int center_x = radius + (bdr_s*2);
-  const int center_y = s->fb_h - (footer_h/2);
+  const int center_y = s->fb_h - (footer_h/2) + 20;
   ui_draw_circle_image(s, center_x, center_y, radius, "driver_face", s->scene.dm_active);
 }
 
 static void ui_draw_brake(UIState *s) {
   const int radius = 85;
   const int brake_x = radius + (bdr_s*2) + (radius*2);
-  const int brake_y = s->fb_h - (footer_h/2);
+  const int brake_y = s->fb_h - (footer_h/2) + 20;
   ui_draw_circle_image(s, brake_x, brake_y, radius, "brake_disc", s->scene.car_state.getBrakeLights());
 }
 
@@ -343,7 +345,7 @@ static void ui_draw_autohold(UIState *s) {
     return;
   const int radius = 85;
   const int autohold_x = (radius*2) + (bdr_s*2) + (radius*3);
-  const int autohold_y = s->fb_h - (footer_h/2);
+  const int autohold_y = s->fb_h - (footer_h/2) + 20;
   if (autohold > 1) {
     ui_draw_circle_image(s, autohold_x, autohold_y, radius, "autohold_warning", s->scene.car_state.getAutoHold());
   } else {
@@ -354,14 +356,14 @@ static void ui_draw_autohold(UIState *s) {
 static void ui_draw_bsd_left(UIState *s) {
   const int radius = 85;
   const int bsd_x = radius + (bdr_s*2);
-  const int bsd_y = s->fb_h - (footer_h/2) - (radius*2);
+  const int bsd_y = s->fb_h - (footer_h/2) - (radius*2) + 20;
   ui_draw_circle_image(s, bsd_x, bsd_y, radius, "bsd_l", s->scene.car_state.getLeftBlindspot());
 }
 
 static void ui_draw_bsd_right(UIState *s) {
   const int radius = 85;
   const int bsd_x = radius + (bdr_s*2) + (radius*2);
-  const int bsd_y = s->fb_h - (footer_h/2) - (radius*2);
+  const int bsd_y = s->fb_h - (footer_h/2) - (radius*2) + 20;
   ui_draw_circle_image(s, bsd_x, bsd_y, radius, "bsd_r", s->scene.car_state.getRightBlindspot());
 }
 
@@ -373,6 +375,60 @@ static void ui_draw_vision_header(UIState *s) {
   ui_draw_vision_event(s);
 }
 
+// tpms from neokii
+static NVGcolor get_tpms_color(float tpms) {
+    if(tpms < 30 || tpms > 45)
+        return COLOR_WHITE_ALPHA(200);
+    if(tpms < 33 || tpms > 42)
+        return COLOR_RED_ALPHA(200);
+    return COLOR_WHITE_ALPHA(200);
+}
+
+static std::string get_tpms_text(float tpms) {
+    if(tpms < 5 || tpms > 60)
+        return "";
+    char str[32];
+    snprintf(str, sizeof(str), "%.0f", round(tpms));
+    return std::string(str);
+}
+
+static void ui_draw_tpms(UIState *s) {
+    auto car_state = (*s->sm)["carState"].getCarState();
+    auto tpms = car_state.getTpms();
+    const float fl = tpms.getFl();
+    const float fr = tpms.getFr();
+    const float rl = tpms.getRl();
+    const float rr = tpms.getRr();
+
+    int margin = 10;
+    int x = s->fb_w - 170;
+    int y = 850;
+    int w = 66;
+    int h = 146;
+
+    ui_draw_image(s, {x, y, w, h}, "tire_pressure", 0.8f);
+
+    nvgFontSize(s->vg, 60);
+    nvgFontFace(s->vg, "sans-semibold");
+
+    nvgTextAlign(s->vg, NVG_ALIGN_RIGHT);
+    nvgFillColor(s->vg, get_tpms_color(fl));
+    nvgText(s->vg, x-margin, y+45, get_tpms_text(fl).c_str(), NULL);
+
+    nvgTextAlign(s->vg, NVG_ALIGN_LEFT);
+    nvgFillColor(s->vg, get_tpms_color(fr));
+    nvgText(s->vg, x+w+margin, y+45, get_tpms_text(fr).c_str(), NULL);
+
+    nvgTextAlign(s->vg, NVG_ALIGN_RIGHT);
+    nvgFillColor(s->vg, get_tpms_color(rl));
+    nvgText(s->vg, x-margin, y+h-15, get_tpms_text(rl).c_str(), NULL);
+
+    nvgTextAlign(s->vg, NVG_ALIGN_LEFT);
+    nvgFillColor(s->vg, get_tpms_color(rr));
+    nvgText(s->vg, x+w+margin, y+h-15, get_tpms_text(rr).c_str(), NULL);
+}
+
+/*
 static void ui_draw_tpms(UIState *s) {
   int tpms_x = s->fb_w - 270;
   int tpms_y = 875;
@@ -427,7 +483,7 @@ static void ui_draw_tpms(UIState *s) {
     ui_draw_text(s, pos_x + pos_add, pos_y, tpmsRr, fontsize, COLOR_WHITE_ALPHA(200), "sans-semibold");
   }
 }
-
+*/
 //START: functions added for the display of various items
 
 static int bb_ui_draw_measure(UIState *s, const char* value, const char* label, int bb_x, int bb_y,
@@ -562,7 +618,7 @@ static void bb_ui_draw_measures_right(UIState *s, int bb_x, int bb_y, int bb_w) 
     bb_h += bb_ui_draw_measure(s, val_str, "OP 조향각", bb_rx, bb_ry, val_color, lab_color, value_fontSize, label_fontSize);
     bb_ry = bb_y + bb_h;
   }
-
+/*
   //add LateralControl
   if (true) {
     char val_str[16];
@@ -577,7 +633,7 @@ static void bb_ui_draw_measures_right(UIState *s, int bb_x, int bb_y, int bb_w) 
     bb_h += bb_ui_draw_measure(s, val_str, "조향로직", bb_rx, bb_ry, val_color, lab_color, value_fontSize, label_fontSize);
     bb_ry = bb_y + bb_h;
   }
-
+*/
   //finally draw the frame
   bb_h += 20;
   nvgBeginPath(s->vg);
@@ -590,7 +646,7 @@ static void bb_ui_draw_measures_right(UIState *s, int bb_x, int bb_y, int bb_w) 
 static void bb_ui_draw_UI(UIState *s) {
   const int bb_dmr_w = 180;
   const int bb_dmr_x = s->fb_w - bb_dmr_w - (bdr_s*4.5);
-  const int bb_dmr_y = (bdr_s*4.5) + 190;
+  const int bb_dmr_y = (bdr_s*4.5) + 200;
   bb_ui_draw_measures_right(s, bb_dmr_x, bb_dmr_y, bb_dmr_w);
 }
 
@@ -734,6 +790,7 @@ void ui_nvg_init(UIState *s) {
     {"gps", "../assets/img_gps.png"},
     {"autohold_warning", "../assets/img_autohold_warning.png"},
     {"autohold_active", "../assets/img_autohold_active.png"},
+    {"tire_pressure", "../assets/img_tire_pressure.png"},
   };
   for (auto [name, file] : images) {
     s->images[name] = nvgCreateImage(s->vg, file, 1);
@@ -785,9 +842,7 @@ void ui_resize(UIState *s, int width, int height) {
   s->fb_h = height;
 
   auto intrinsic_matrix = s->wide_camera ? ecam_intrinsic_matrix : fcam_intrinsic_matrix;
-
   float zoom = ZOOM / intrinsic_matrix.v[0];
-
   if (s->wide_camera) {
     zoom *= 0.5;
   }

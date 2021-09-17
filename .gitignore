@@ -78,3 +78,4 @@ selfdrive/modeld/thneed/compile
 models/*.thneed
 
 *.bz2
+rednose/helpers/ekf_sym_pyx.cpp

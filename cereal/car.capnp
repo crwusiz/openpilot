@@ -165,7 +165,7 @@ struct CarState {
   steeringRateDeg @15 :Float32;
   steeringTorque @8 :Float32;      # TODO: standardize units
   steeringTorqueEps @27 :Float32;  # TODO: standardize units
-  steeringWheelTorque @43:Float32;
+  steeringWheelTorque @38:Float32; # add
   steeringPressed @9 :Bool;        # if the user is using the steering wheel
   steeringRateLimited @29 :Bool;   # if the torque is limited by the rate limiter
   steerWarning @35 :Bool;          # temporary steer unavailble
@@ -201,14 +201,16 @@ struct CarState {
   leftBlindspot @33 :Bool; # Is there something blocking the left lane change
   rightBlindspot @34 :Bool; # Is there something blocking the right lane change
 
-  # tpms
-  tpmsFl @38 :Float32;
-  tpmsFr @39 :Float32;
-  tpmsRl @40 :Float32;
-  tpmsRr @41 :Float32;
+  # add
+  autoHold @39 : Int32;
+  tpms @40 : Tpms;
 
-  # autohold
-  autoHold @42 : Int32;
+  struct Tpms {
+    fl @0 :Float32;
+    fr @1 :Float32;
+    rl @2 :Float32;
+    rr @3 :Float32;
+  }
 
   struct WheelSpeeds {
     # optional wheel speeds
