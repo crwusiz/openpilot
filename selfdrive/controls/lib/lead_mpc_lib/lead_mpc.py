@@ -221,7 +221,7 @@ class LeadMpc():
     if lead is not None and lead.status:
       x_lead = lead.dRel
       v_lead = max(0.0, lead.vLead)
-      a_lead = lead.aLeadK
+      a_lead = clip(lead.aLeadK, -5.0, 5.0)
 
       # MPC will not converge if immidiate crash is expected
       # Clip lead distance to what is still possible to brake for
