@@ -80,7 +80,7 @@ class Planner():
     v_cruise = v_cruise_kph * CV.KPH_TO_MS
 
     if not self.use_cluster_speed or self.long_control_enabled:
-      cluSpeedMs = sm['controlsState'].cluSpeedMs
+      cluSpeedMs = sm['carState'].cluSpeedMs
       if v_ego > 3. and cluSpeedMs > 3.:
         v_cruise *= v_ego / cluSpeedMs
         v_cruise = int(v_cruise * CV.MS_TO_KPH) * CV.KPH_TO_MS

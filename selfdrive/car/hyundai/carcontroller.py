@@ -132,8 +132,6 @@ class CarController():
     if clu11_speed > enabled_speed or not lkas_active:
       enabled_speed = clu11_speed
 
-    controls.clu_speed_ms = clu11_speed * CS.speed_conv_to_ms
-
     if not (min_set_speed < set_speed < 255 * CV.KPH_TO_MS):
       set_speed = min_set_speed
     set_speed *= CV.MS_TO_MPH if CS.is_set_speed_in_mph else CV.MS_TO_KPH

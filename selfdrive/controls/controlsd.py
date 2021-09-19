@@ -157,7 +157,6 @@ class Controls:
     # scc smoother
     self.is_cruise_enabled = False
     self.applyMaxSpeed = 0
-    self.clu_speed_ms = 0.
     self.apply_accel = 0.
     self.fused_accel = 0.
     self.lead_drel = 0.
@@ -650,7 +649,6 @@ class Controls:
     controlsState.canErrorCounter = self.can_error_counter
 
     controlsState.angleSteers = steer_angle_without_offset * CV.RAD_TO_DEG
-    controlsState.cluSpeedMs = self.clu_speed_ms
     controlsState.applyAccel = self.apply_accel
     controlsState.aReqValue = self.aReqValue
     controlsState.aReqValueMin = self.aReqValueMin

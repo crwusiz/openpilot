@@ -71,6 +71,13 @@ class CarState(CarStateBase):
     self.is_set_speed_in_mph = bool(cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"])
     self.speed_conv_to_ms = CV.MPH_TO_MS if self.is_set_speed_in_mph else CV.KPH_TO_MS
 
+    cluSpeed = cp.vl["CLU11"]["CF_Clu_Vanz"]
+    decimal = cp.vl["CLU11"]["CF_Clu_VanzDecimal"]
+    if 0. < decimal < 0.5:
+      cluSpeed += decimal
+
+    ret.cluSpeedMs = cluSpeed * self.speed_conv_to_ms
+
     if not self.use_cluster_speed or self.long_control_enabled:
       ret.wheelSpeeds.fl = cp.vl["WHL_SPD11"]['WHL_SPD_FL'] * CV.KPH_TO_MS
       ret.wheelSpeeds.fr = cp.vl["WHL_SPD11"]['WHL_SPD_FR'] * CV.KPH_TO_MS
@@ -78,12 +85,7 @@ class CarState(CarStateBase):
       ret.wheelSpeeds.rr = cp.vl["WHL_SPD11"]['WHL_SPD_RR'] * CV.KPH_TO_MS
       ret.vEgoRaw = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
     else:
-      ret.vEgoRaw = cp.vl["CLU11"]["CF_Clu_Vanz"]
-      decimal = cp.vl["CLU11"]["CF_Clu_VanzDecimal"]
-      if 0. < decimal < 0.5:
-        ret.vEgoRaw += decimal
-
-      ret.vEgoRaw *= self.speed_conv_to_ms
+      ret.vEgoRaw = cluSpeed * self.speed_conv_to_ms
 
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
 
