@@ -52,8 +52,6 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
       stacked_layout->addWidget(recorder_widget);
       recorder_widget->raise();
       alerts->raise();
-
-      grabGesture(Qt::SwipeGesture);
   }
 }
 
