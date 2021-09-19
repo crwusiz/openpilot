@@ -18,7 +18,7 @@ def get_radar_can_parser(CP):
     checks = []
 
     for addr in range(RADAR_START_ADDR, RADAR_START_ADDR + RADAR_MSG_COUNT):
-      msg = f"R_{hex(addr)}"
+      msg = f"RADAR_TRACK_{addr:x}"
       signals += [
         ("STATE", msg, 0),
         ("AZIMUTH", msg, 0),
@@ -84,7 +84,7 @@ class RadarInterface(RadarInterfaceBase):
     if self.new_radar:
 
       for addr in range(RADAR_START_ADDR, RADAR_START_ADDR + RADAR_MSG_COUNT):
-        msg = self.rcp.vl[f"R_{hex(addr)}"]
+        msg = self.rcp.vl[f"RADAR_TRACK_{addr:x}"]
 
         if addr not in self.pts:
           self.pts[addr] = car.RadarData.RadarPoint.new_message()
