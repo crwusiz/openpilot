@@ -135,6 +135,12 @@ void OnroadWindow::offroadTransition(bool offroad) {
   // update stream type
   bool wide_cam = Hardware::TICI() && Params().getBool("EnableWideCamera");
   nvg->setStreamType(wide_cam ? VISION_STREAM_RGB_WIDE : VISION_STREAM_RGB_BACK);
+
+#ifdef QCOM2
+  if(offroad && recorder) {
+    recorder->stop(false);
+  }
+#endif
 }
 
 void OnroadWindow::paintEvent(QPaintEvent *event) {

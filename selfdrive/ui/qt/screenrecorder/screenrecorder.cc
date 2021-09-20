@@ -66,6 +66,7 @@ ScreenRecoder::ScreenRecoder(QWidget *parent) : QPushButton(parent) {
 }
 
 ScreenRecoder::~ScreenRecoder() {
+  stop(false);
 }
 
 void ScreenRecoder::paintEvent(QPaintEvent *event) {
@@ -116,6 +117,9 @@ void ScreenRecoder::toggle() {
 
 void ScreenRecoder::start(bool sound) {
 
+    if(recording)
+      return;
+
     char filename[64];
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
@@ -132,12 +136,15 @@ void ScreenRecoder::start(bool sound) {
 }
 
 void ScreenRecoder::stop(bool sound) {
-    closeEncoder();
-    recording = false;
-    update();
 
-    if(sound)
-        soundStop.play();
+    if(recording) {
+      closeEncoder();
+      recording = false;
+      update();
+
+      if(sound)
+          soundStop.play();
+    }
 }
 
 void ScreenRecoder::ui_draw(UIState *s, int w, int h) {
