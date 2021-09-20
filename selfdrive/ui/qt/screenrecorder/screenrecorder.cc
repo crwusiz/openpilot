@@ -109,12 +109,12 @@ void ScreenRecoder::closeEncoder() {
 void ScreenRecoder::toggle() {
 
     if(!recording)
-        start();
+        start(true);
     else
-        stop();
+        stop(true);
 }
 
-void ScreenRecoder::start() {
+void ScreenRecoder::start(bool sound) {
 
     char filename[64];
     time_t t = time(NULL);
@@ -127,24 +127,26 @@ void ScreenRecoder::start() {
 
     started = milliseconds();
 
-    soundStart.play();
+    if(sound)
+        soundStart.play();
 }
 
-void ScreenRecoder::stop() {
+void ScreenRecoder::stop(bool sound) {
     closeEncoder();
     recording = false;
     update();
 
-    soundStop.play();
+    if(sound)
+        soundStop.play();
 }
 
 void ScreenRecoder::ui_draw(UIState *s, int w, int h) {
 
     if(recording && encoder) {
 
-        if(milliseconds() - started > 1000*60*5) {
-            stop();
-            start();
+        if(milliseconds() - started > 1000*60*3) {
+            stop(false);
+            start(false);
             return;
         }
 

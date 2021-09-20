@@ -38,8 +38,8 @@ private:
 
     void openEncoder(const char* filename);
     void closeEncoder();
-    void start();
-    void stop();
+    void start(bool sound);
+    void stop(bool sound);
 
 public:
     void toggle();
