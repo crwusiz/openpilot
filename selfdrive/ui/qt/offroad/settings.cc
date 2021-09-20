@@ -122,9 +122,6 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
     });
   });
 
-  main_layout->addWidget(horizontal_line());
-  main_layout->addLayout(reset_layout);
-
   // reset calibration button
   QPushButton *reset_calib_btn = new QPushButton("Reset Calibration");
   reset_calib_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
@@ -140,6 +137,7 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
     }
   });
 
+  main_layout->addWidget(horizontal_line());
   main_layout->addLayout(reset_layout);
 
   // offroad-only buttons

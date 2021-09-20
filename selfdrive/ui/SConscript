@@ -51,20 +51,25 @@ qt_env.Program("qt/text", ["qt/text.cc"], LIBS=qt_libs)
 qt_env.Program("qt/spinner", ["qt/spinner.cc"], LIBS=qt_libs)
 
 # build main UI
-qt_src = ["main.cc", "ui.cc", "paint.cc", "qt/sidebar.cc", "qt/onroad.cc",
+
+if arch == "aarch64":
+  qt_src = ["main.cc", "ui.cc", "paint.cc", "qt/sidebar.cc", "qt/onroad.cc",
           "qt/window.cc", "qt/home.cc", "qt/offroad/settings.cc",
           "qt/offroad/onboarding.cc", "qt/offroad/driverview.cc",
-          "#phonelibs/nanovg/nanovg.c",
-          "qt/screenrecorder/screenrecorder.cc",
-          'qt/screenrecorder/omx_encoder.cc',]
+          "#phonelibs/nanovg/nanovg.c"]
+  qt_env.Program("_ui", qt_src + [asset_obj], LIBS=qt_libs)
 
-ui_libs = ['OmxCore', 'gsl', 'CB', 'avformat', 'avcodec', 'swscale', 'avutil', 'yuv']
-if arch == "aarch64":
-  ui_libs += ['OmxVenc', 'cutils']
 else:
-  ui_libs += ['pthread']
+  qt_src = ["main.cc", "ui.cc", "paint.cc", "qt/sidebar.cc", "qt/onroad.cc",
+        "qt/window.cc", "qt/home.cc", "qt/offroad/settings.cc",
+        "qt/offroad/onboarding.cc", "qt/offroad/driverview.cc",
+        "#phonelibs/nanovg/nanovg.c",
+        "qt/screenrecorder/screenrecorder.cc",
+        'qt/screenrecorder/omx_encoder.cc',]
 
-qt_env.Program("_ui", qt_src + [asset_obj], LIBS=qt_libs + ui_libs)
+  ui_libs = ['OmxCore', 'gsl', 'CB', 'avformat', 'avcodec', 'swscale', 'avutil', 'yuv', 'pthread']
+
+  qt_env.Program("_ui", qt_src + [asset_obj], LIBS=qt_libs + ui_libs)
 
 
 # setup and factory resetter

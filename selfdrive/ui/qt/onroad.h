@@ -5,7 +5,10 @@
 
 #include "selfdrive/ui/qt/widgets/cameraview.h"
 #include "selfdrive/ui/ui.h"
+
+#ifdef QCOM2
 #include "selfdrive/ui/qt/screenrecorder/screenrecorder.h"
+#endif
 
 
 // ***** onroad widgets *****
@@ -33,7 +36,9 @@ public:
   explicit NvgWindow(VisionStreamType type, QWidget* parent = 0) : CameraViewWidget(type, true, parent) {}
   void updateState(const UIState &s);
 
+#ifdef QCOM2
   ScreenRecoder* recorder;
+#endif
 
 protected:
   void paintGL() override;
@@ -59,11 +64,12 @@ private:
   QHBoxLayout* split;
 
   // neokii
+#ifdef QCOM2
   void mousePressEvent(QMouseEvent* e) override;
-  void mouseDoubleClickEvent(QMouseEvent *) override;
 private:
   ScreenRecoder* recorder;
   QPoint startPos;
+#endif
 
 signals:
   void updateStateSignal(const UIState &s);
