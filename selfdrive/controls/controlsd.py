@@ -665,6 +665,7 @@ class Controls:
     controlsState.sccCurvatureFactor = ntune_scc_get('sccCurvatureFactor')
     controlsState.longitudinalActuatorDelayLowerBound = ntune_scc_get('longitudinalActuatorDelayLowerBound')
     controlsState.longitudinalActuatorDelayUpperBound = ntune_scc_get('longitudinalActuatorDelayUpperBound')
+    controlsState.vCruiseFactor = ntune_scc_get('vCruiseFactor')
 
     if self.joystick_mode:
       controlsState.lateralControlState.debugState = lac_log

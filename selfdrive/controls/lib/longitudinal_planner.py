@@ -14,6 +14,7 @@ from selfdrive.controls.lib.longcontrol import LongCtrlState
 from selfdrive.controls.lib.lead_mpc_lib.lead_mpc import LeadMpc
 from selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import LongitudinalMpc
 from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, CONTROL_N
+from selfdrive.ntune import ntune_scc_get
 from selfdrive.swaglog import cloudlog
 from common.params import Params
 
@@ -84,6 +85,8 @@ class Planner():
       if v_ego > 3. and cluSpeedMs > 3.:
         v_cruise *= v_ego / cluSpeedMs
         v_cruise = int(v_cruise * CV.MS_TO_KPH) * CV.KPH_TO_MS
+
+    v_cruise *= ntune_scc_get("vCruiseFactor")
 
     long_control_state = sm['controlsState'].longControlState
     force_slow_decel = sm['controlsState'].forceDecel

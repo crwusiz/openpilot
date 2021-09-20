@@ -178,6 +178,9 @@ class nTune():
     if self.checkValue("longitudinalActuatorDelayUpperBound", 0.1, 1.5, 0.15):
       updated = True
 
+    if self.checkValue("vCruiseFactor", 0.8, 1.2, 1.0):
+      updated = True
+
     return updated
 
   def updateLQR(self):
