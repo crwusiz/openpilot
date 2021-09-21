@@ -33,9 +33,13 @@ private:
     std::unique_ptr<uint8_t[]> rgb_buffer;
     std::unique_ptr<uint8_t[]> rgb_scale_buffer;
 
+    QColor recording_color;
+    int frame;
+
     QSoundEffect soundStart;
     QSoundEffect soundStop;
 
+    void applyColor();
     void openEncoder(const char* filename);
     void closeEncoder();
 

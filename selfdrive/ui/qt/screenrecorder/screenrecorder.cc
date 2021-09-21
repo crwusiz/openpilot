@@ -25,14 +25,13 @@ ScreenRecoder::ScreenRecoder(QWidget *parent) : QPushButton(parent) {
 
     recording = false;
     started = 0;
+    frame = 0;
 
     const int size = 190;
     setFixedSize(size, size);
     setFocusPolicy(Qt::NoFocus);
     connect(this, SIGNAL(pressed()),this,SLOT(btnPressed()));
     connect(this, SIGNAL(released()),this,SLOT(btnReleased()));
-
-    setText("R");
 
     const int bitrate = Hardware::TICI() ? 4*1024*1024 : 3*1024*1024;
 
@@ -69,26 +68,36 @@ ScreenRecoder::~ScreenRecoder() {
   stop(false);
 }
 
+void ScreenRecoder::applyColor() {
+
+  if(frame % (UI_FREQ/2) == 0) {
+
+    if(frame % UI_FREQ < (UI_FREQ/2))
+      recording_color = QColor::fromRgbF(1, 0, 0, 0.6);
+    else
+      recording_color = QColor::fromRgbF(0, 0, 0, 0.3);
+
+    update();
+  }
+}
+
 void ScreenRecoder::paintEvent(QPaintEvent *event) {
 
     QRect r = QRect(0, 0, width(), height());
-    r -= QMargins(2, 2, 2, 2);
-    QColor bg = recording ? QColor::fromRgbF(1., 0, 0, 0.7) : QColor::fromRgbF(0, 0, 0, 0.3);
+    r -= QMargins(5, 5, 5, 5);
     QPainter p(this);
-
-    //p.setPen(Qt::NoPen);
-    p.setPen(QPen(QColor::fromRgbF(1., 1., 1., 0.7), 4, Qt::SolidLine, Qt::FlatCap));
     p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+    p.setPen(QPen(QColor::fromRgbF(1, 1, 1, 0.4), 10, Qt::SolidLine, Qt::FlatCap));
 
-    p.setBrush(QBrush(bg));
+    p.setBrush(QBrush(QColor::fromRgbF(0, 0, 0, 0)));
     p.drawEllipse(r);
 
-    // text
-    const QPoint c = r.center();
-    p.setPen(QColor(0xff, 0xff, 0xff));
-    p.setRenderHint(QPainter::TextAntialiasing);
-    configFont(p, "Open Sans", 100, "SemiBold");
-    p.drawText(r, Qt::AlignCenter, "R");
+    r -= QMargins(40, 40, 40, 40);
+    p.setPen(Qt::NoPen);
+
+    QColor bg = recording ? recording_color : QColor::fromRgbF(0, 0, 0, 0.3);
+    p.setBrush(QBrush(bg));
+    p.drawEllipse(r);
 }
 
 void ScreenRecoder::btnReleased(void) {
@@ -127,6 +136,7 @@ void ScreenRecoder::start(bool sound) {
 
     openEncoder(filename);
     recording = true;
+    frame = 0;
     update();
 
     started = milliseconds();
@@ -157,6 +167,8 @@ void ScreenRecoder::ui_draw(UIState *s, int w, int h) {
             return;
         }
 
+        applyColor();
+
         int src_w = std::min(src_width, w);
         int src_h = std::min(src_height, h);
 
@@ -180,4 +192,6 @@ void ScreenRecoder::ui_draw(UIState *s, int w, int h) {
 
         encoder->encode_frame_rgba(dst, dst_width, dst_height, (uint64_t)nanos_since_boot());
     }
+
+    frame++;
 }
