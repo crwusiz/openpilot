@@ -30,10 +30,10 @@ MPC_T = list(np.arange(0,1.,.2)) + list(np.arange(1.,10.6,.6))
 N = len(MPC_T) - 1
 
 
-def RW(v_ego, v_l):
+def desired_follow_distance(v_ego, v_lead):
   TR = 1.8
   G = 9.81
-  return (v_ego * TR - (v_l - v_ego) * TR + v_ego * v_ego / (2 * G) - v_l * v_l / (2 * G))
+  return (v_ego * TR - (v_lead - v_ego) * TR + v_ego * v_ego / (2 * G) - v_lead * v_lead / (2 * G)) + 4.0
 
 
 def gen_lead_model():
@@ -94,21 +94,16 @@ def gen_lead_mpc_solver():
   ocp.cost.yref_e = np.zeros((3, ))
 
   x_lead, v_lead = ocp.model.p[0], ocp.model.p[1]
-  G = 9.81
-  TR = 1.8
-  desired_dist = (v_ego * TR
-                  - (v_lead - v_ego) * TR
-                  + v_ego*v_ego/(2*G)
-                  - v_lead * v_lead / (2*G))
-  dist_err = (desired_dist + 4.0 - (x_lead - x_ego))/(sqrt(v_ego + 0.5) + 0.1)
+  desired_dist = desired_follow_distance(v_ego, v_lead)
+  dist_err = (desired_dist - (x_lead - x_ego))/(sqrt(v_ego + 0.5) + 0.1)
 
   # TODO hacky weights to keep behavior the same
   ocp.model.cost_y_expr = vertcat(exp(.3 * dist_err) - 1.,
-                                  ((x_lead - x_ego) - (desired_dist + 4.0)) / (0.05 * v_ego + 0.5),
+                                  ((x_lead - x_ego) - (desired_dist)) / (0.05 * v_ego + 0.5),
                                   a_ego * (.1 * v_ego + 1.0),
                                   j_ego * (.1 * v_ego + 1.0))
   ocp.model.cost_y_expr_e = vertcat(exp(.3 * dist_err) - 1.,
-                                  ((x_lead - x_ego) - (desired_dist + 4.0)) / (0.05 * v_ego + 0.5),
+                                  ((x_lead - x_ego) - (desired_dist)) / (0.05 * v_ego + 0.5),
                                   a_ego * (.1 * v_ego + 1.0))
   ocp.parameter_values = np.array([0., .0])
 
@@ -238,16 +233,16 @@ class LeadMpc():
       cruise_gap = int(clip(carstate.cruiseGap, 1., 4.))
 
       if cruise_gap == AUTO_TR_CRUISE_GAP:
-        TR = interp(v_ego, AUTO_TR_BP, AUTO_TR_V)
+        tr = interp(v_ego, AUTO_TR_BP, AUTO_TR_V)
       else:
-        TR = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
+        tr = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
 
       if not lead.radar:
         x_lead = max(0., x_lead - 1.)
 
       self.a_lead_tau = lead.aLeadTau
       self.new_lead = False
-      self.extrapolate_lead(x_lead * (1.8 / TR), v_lead, a_lead, self.a_lead_tau)
+      self.extrapolate_lead(x_lead * (1.8 / tr), v_lead, a_lead, self.a_lead_tau)
       if not self.prev_lead_status: # or abs(x_lead - self.prev_lead_x) > 2.5:
         self.init_with_sim(v_ego, self.lead_xv, a_lead)
         self.new_lead = True
