@@ -92,7 +92,6 @@ void OnroadWindow::mouseReleaseEvent(QMouseEvent* e) {
         recorder->toggle();
       return;
   }
-#endif
 
   if (map != nullptr) {
     bool sidebarVisible = geometry().x() > 0;
@@ -101,13 +100,22 @@ void OnroadWindow::mouseReleaseEvent(QMouseEvent* e) {
 
   // propagation event to parent(HomeWindow)
   QWidget::mouseReleaseEvent(e);
+#endif
 }
 
-#ifdef QCOM2
 void OnroadWindow::mousePressEvent(QMouseEvent* e) {
-    startPos = e->pos();
-}
+#ifdef QCOM2
+  startPos = e->pos();
+#else
+  if (map != nullptr) {
+    bool sidebarVisible = geometry().x() > 0;
+    map->setVisible(!sidebarVisible && !map->isVisible());
+  }
+
+  // propagation event to parent(HomeWindow)
+  QWidget::mouseReleaseEvent(e);
 #endif
+}
 
 void OnroadWindow::offroadTransition(bool offroad) {
 #ifdef ENABLE_MAPS
