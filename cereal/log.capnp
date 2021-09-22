@@ -319,9 +319,11 @@ struct DeviceState @0xa4d8b5af2aa492eb {
   gpuTempC @27 :List(Float32);
   memoryTempC @28 :Float32;
   ambientTempC @30 :Float32;
+  nvmeTempC @35 :List(Float32);
+  modemTempC @36 :List(Float32);
   thermalStatus @14 :ThermalStatus;
   
-  wifiIpAddress @35 :Text;
+  wifiIpAddress @37 :Text;
 
   enum ThermalStatus {
     green @0;
