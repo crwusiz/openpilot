@@ -298,7 +298,8 @@ def thermald_thread():
           registered_count = 0
 
       except Exception:
-        cloudlog.exception("Error getting network status")
+        #cloudlog.exception("Error getting network status")
+        pass
 
     msg.deviceState.freeSpacePercent = get_available_percent(default=100.0)
     msg.deviceState.memoryUsagePercent = int(round(psutil.virtual_memory().percent))
