@@ -86,8 +86,6 @@ class Planner():
         v_cruise *= v_ego / cluSpeedMs
         v_cruise = int(v_cruise * CV.MS_TO_KPH) * CV.KPH_TO_MS
 
-    v_cruise *= ntune_scc_get("vCruiseFactor")
-
     long_control_state = sm['controlsState'].longControlState
     force_slow_decel = sm['controlsState'].forceDecel
 
