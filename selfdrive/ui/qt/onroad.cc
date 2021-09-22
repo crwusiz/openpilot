@@ -1,6 +1,7 @@
 #include "selfdrive/ui/qt/onroad.h"
 
 #include <QDebug>
+#include <QSound>
 
 #include "selfdrive/common/timing.h"
 #include "selfdrive/ui/paint.h"
@@ -87,10 +88,25 @@ void OnroadWindow::mouseReleaseEvent(QMouseEvent* e) {
 #ifdef QCOM2
   // neokii
   QPoint endPos = e->pos();
-  if(std::abs(endPos.x() - startPos.x()) > 200 || std::abs(endPos.y() - startPos.y()) > 200) {
+  int dx = endPos.x() - startPos.x();
+  int dy = endPos.y() - startPos.y();
+  if(std::abs(dx) > 200 || std::abs(dy) > 200) {
+
+    if(std::abs(dx) < std::abs(dy) && dy < 0) { // up
+      Params().remove("CalibrationParams");
+      Params().remove("LiveParameters");
+      QTimer::singleShot(1000, []() {
+        Params().putBool("SoftRestartTriggered", true);
+      });
+
+      QSound::play("../assets/sounds/reset_calibration.wav");
+    }
+    else {
       if(recorder)
         recorder->toggle();
-      return;
+    }
+
+    return;
   }
 
   if (map != nullptr) {
