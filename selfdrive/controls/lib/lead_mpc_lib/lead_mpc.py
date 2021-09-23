@@ -171,7 +171,7 @@ class LeadMpc():
     self.solver.cost_set(N, 'W', (3./5.)*W[:3,:3])
 
   def set_cur_state(self, v, a):
-    self.x0[1] = v
+    self.x0[1] = max(v, 1e-3)
     self.x0[2] = a
 
   def extrapolate_lead(self, x_lead, v_lead, a_lead_0, a_lead_tau):
@@ -207,7 +207,7 @@ class LeadMpc():
 
   def update(self, carstate, radarstate, v_cruise):
     self.crashing = False
-    v_ego = self.x0[1]
+    v_ego = carstate.vEgo #self.x0[1]
     if self.lead_id == 0:
       lead = radarstate.leadOne
     else:
@@ -217,6 +217,15 @@ class LeadMpc():
       x_lead = lead.dRel
       v_lead = max(0.0, lead.vLead)
       a_lead = clip(lead.aLeadK, -5.0, 5.0)
+      
+      if not lead.radar:
+        x_lead = max(0., x_lead - 1.)
+
+      cruise_gap = int(clip(carstate.cruiseGap, 1., 4.))
+      if cruise_gap == AUTO_TR_CRUISE_GAP:
+        tr = interp(v_ego, AUTO_TR_BP, AUTO_TR_V)
+      else:
+        tr = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
 
       # MPC will not converge if immidiate crash is expected
       # Clip lead distance to what is still possible to brake for
@@ -229,16 +238,6 @@ class LeadMpc():
       if (v_lead < 0.1 or -a_lead / 2.0 > v_lead):
         v_lead = 0.0
         a_lead = 0.0
-
-      cruise_gap = int(clip(carstate.cruiseGap, 1., 4.))
-
-      if cruise_gap == AUTO_TR_CRUISE_GAP:
-        tr = interp(v_ego, AUTO_TR_BP, AUTO_TR_V)
-      else:
-        tr = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
-
-      if not lead.radar:
-        x_lead = max(0., x_lead - 1.)
 
       self.a_lead_tau = lead.aLeadTau
       self.new_lead = False
@@ -275,7 +274,7 @@ class LeadMpc():
     self.crashing = self.crashing or np.sum(self.lead_xv[:,0] - self.x_sol[:,0] < 0) > 0
 
     t = sec_since_boot()
-    if self.solution_status != 0:
+    if self.crashing or self.solution_status != 0:
       if t > self.last_cloudlog_t + 5.0:
         self.last_cloudlog_t = t
         cloudlog.warning("Lead mpc %d reset, solution_status: %s" % (
