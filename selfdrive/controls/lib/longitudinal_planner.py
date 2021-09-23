@@ -14,7 +14,6 @@ from selfdrive.controls.lib.longcontrol import LongCtrlState
 from selfdrive.controls.lib.lead_mpc_lib.lead_mpc import LeadMpc
 from selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import LongitudinalMpc
 from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, CONTROL_N
-from selfdrive.ntune import ntune_scc_get
 from selfdrive.swaglog import cloudlog
 from common.params import Params
 
