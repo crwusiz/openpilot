@@ -37,6 +37,10 @@ AddOption('--compile_db',
           action='store_true',
           help='build clang compilation database')
 
+AddOption('--mpc-generate',
+          action='store_true',
+          help='regenerates the mpc sources')
+
 AddOption('--snpe',
           action='store_true',
           help='use SNPE on PC')
