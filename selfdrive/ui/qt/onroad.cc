@@ -90,20 +90,34 @@ void OnroadWindow::mouseReleaseEvent(QMouseEvent* e) {
   QPoint endPos = e->pos();
   int dx = endPos.x() - startPos.x();
   int dy = endPos.y() - startPos.y();
-  if(std::abs(dx) > 200 || std::abs(dy) > 200) {
+  if(std::abs(dx) > 250 || std::abs(dy) > 200) {
 
-    if(std::abs(dx) < std::abs(dy) && dy < 0) { // up
-      Params().remove("CalibrationParams");
-      Params().remove("LiveParameters");
-      QTimer::singleShot(1000, []() {
-        Params().putBool("SoftRestartTriggered", true);
-      });
+    if(std::abs(dx) < std::abs(dy)) {
 
-      QSound::play("../assets/sounds/reset_calibration.wav");
+      if(dy < 0) { // upward
+        Params().remove("CalibrationParams");
+        Params().remove("LiveParameters");
+        QTimer::singleShot(500, []() {
+          Params().putBool("SoftRestartTriggered", true);
+        });
+
+        QSound::play("../assets/sounds/reset_calibration.wav");
+      }
+      else { // downward
+        QTimer::singleShot(500, []() {
+          Params().putBool("SoftRestartTriggered", true);
+        });
+      }
     }
-    else {
-      if(recorder)
-        recorder->toggle();
+    else if(std::abs(dx) > std::abs(dy)) {
+      if(dx < 0) { // right to left
+        if(recorder)
+          recorder->toggle();
+      }
+      else { // left to right
+        if(recorder)
+          recorder->toggle();
+      }
     }
 
     return;
