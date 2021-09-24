@@ -124,6 +124,10 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1694 + STD_CARGO_KG
       ret.wheelbase = 2.766
       ret.centerToFront = ret.wheelbase * 0.4
+    elif candidate in [CAR.SANTA_FE_2022]:
+      ret.mass = 1750 + STD_CARGO_KG
+      ret.wheelbase = 2.766
+      ret.centerToFront = ret.wheelbase * 0.4
     elif candidate in [CAR.SONATA, CAR.SONATA_HEV, CAR.SONATA21_HEV]:
       ret.mass = 1513. + STD_CARGO_KG
       ret.wheelbase = 2.84
@@ -360,8 +364,6 @@ class CarInterface(CarInterfaceBase):
       events.add(EventName.belowSteerSpeed)
     if self.CC.turning_indicator_alert:
       events.add(EventName.turningIndicatorOn)
-    #if self.CS.lkas_button_on != self.CS.prev_lkas_button:
-    #  events.add(EventName.buttonCancel)
     if self.mad_mode_enabled and EventName.pedalPressed in events.events:
       events.events.remove(EventName.pedalPressed)
 

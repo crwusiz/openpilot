@@ -31,7 +31,6 @@ class CarState(CarStateBase):
     self.has_scc14 = CP.hasScc14 or CP.carFingerprint in FEATURES["has_scc14"]
     self.leftBlinker = False
     self.rightBlinker = False
-    self.lkas_button_on = True
     self.cruise_main_button = 0
     self.mdps_error_cnt = 0
     self.cruise_unavail_cnt = 0
@@ -59,7 +58,6 @@ class CarState(CarStateBase):
     self.prev_cruise_main_button = self.cruise_main_button
     self.prev_left_blinker = self.leftBlinker
     self.prev_right_blinker = self.rightBlinker
-    self.prev_lkas_button = self.lkas_button_on
 
     ret = car.CarState.new_message()
 
@@ -191,12 +189,6 @@ class CarState(CarStateBase):
       self.scc13 = cp_scc.vl["SCC13"]
     if self.has_scc14:
       self.scc14 = cp_scc.vl["SCC14"]
-
-    self.lkas_error = cp_cam.vl["LKAS11"]["CF_Lkas_LdwsSysState"] == 7
-    if not self.lkas_error and self.car_fingerprint not in [CAR.SONATA,CAR.PALISADE,
-                    CAR.SONATA_HEV, CAR.SONATA21_HEV, CAR.SANTA_FE, CAR.KONA_EV, CAR.NIRO_EV, CAR.KONA]:
-      self.lkas_button_on = bool(cp_cam.vl["LKAS11"]["CF_Lkas_LdwsSysState"])
-
 
     # scc smoother
     driver_override = cp.vl["TCS13"]["DriverOverride"]
@@ -416,7 +408,7 @@ class CarState(CarStateBase):
       if not CP.openpilotLongitudinalControl:
         checks += [("FCA11", 50)]
 
-    if CP.carFingerprint in [CAR.SANTA_FE]:
+    if CP.carFingerprint in [CAR.SANTA_FE, CAR.SANTA_FE_2022]:
       checks.remove(("TCS13", 50))
 
     if CP.enableBsm:

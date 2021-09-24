@@ -45,6 +45,7 @@ class CAR:
   IONIQ_EV_2020 = "HYUNDAI IONIQ ELECTRIC 2020"
   IONIQ_PHEV = "HYUNDAI IONIQ PHEV 2020"
   SANTA_FE = "HYUNDAI SANTA FE LIMITED 2019"
+  SANTA_FE_2022 = "HYUNDAI SANTA FE 2022"
   PALISADE = "HYUNDAI PALISADE 2020"
   VELOSTER = "HYUNDAI VELOSTER 2019"
   GRANDEUR_IG = "HYUNDAI GRANDEUR IG 2017"
@@ -504,6 +505,26 @@ FW_VERSIONS = {
       b'\xf1\x87SBLWAA4899564GG0VfvgUU\x85Xx\x88\x87\x88vfgf\x87wxwvO\xfb\xff\x97f\xb1\xffSB\xf1\x816W3E1051\x00\x00\xf1\x006W351_C2\x00\x006W3E1051\x00\x00TTM2G24NS7\x00\x00\x00\x00',
     ],
   },
+  CAR.SANTA_FE_2022: {
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00TM__ SCC F-CUP      1.00 1.00 99110-S1500         ',
+    ],
+    (Ecu.esp, 0x7d1, None): [
+      b'\xf1\x00TM ESC \x02 101 \x08\x04 58910-S2GA0',
+    ],
+    (Ecu.engine, 0x7e0, None): [
+      b'\xf1\x82TMBZN5TMD3XXXG2E',
+    ],
+    (Ecu.eps, 0x7d4, None): [
+      b'\xf1\x00TM  MDPS C 1.00 1.02 56370-S2AA0 0B19',
+    ],
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00TMA MFC  AT MEX LHD 1.00 1.01 99211-S2500 210205',
+    ],
+    (Ecu.transmission, 0x7e1, None): [
+      b'\xf1\x00T02601BL  T02730A1  VTMPT25XXX730NS2\xa6\x06\x88\xf7',
+    ],
+  },
   CAR.STINGER: {
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00CK__ SCC F_CUP      1.00 1.01 96400-J5100         \xf1\xa01.01',
@@ -788,7 +809,7 @@ FW_VERSIONS = {
 
 CHECKSUM = {
   "crc8": [CAR.SANTA_FE, CAR.SONATA, CAR.PALISADE, CAR.SONATA_HEV, CAR.SONATA21_HEV, CAR.SELTOS, CAR.ELANTRA_2021, CAR.ELANTRA_HEV_2021],
-  "6B": [CAR.SORENTO, CAR.GENESIS],
+  "6B": [CAR.SORENTO, CAR.GENESIS, CAR.SANTA_FE_2022],
 }
 
 FEATURES = {
@@ -805,14 +826,14 @@ FEATURES = {
   # send LFA MFA message for new HKG models
   "send_lfa_mfa": {CAR.SONATA, CAR.PALISADE, CAR.SONATA_HEV, CAR.SONATA21_HEV, CAR.SANTA_FE, CAR.NIRO_EV, CAR.GRANDEUR_IG_FL, CAR.GRANDEUR_IG_FL_HEV,
                    CAR.SELTOS, CAR.KONA_EV, CAR.KONA_HEV, CAR.TUCSON_TL_SCC, CAR.ELANTRA_2021, CAR.ELANTRA_HEV_2021,
-                   CAR.K9, CAR.GENESIS_G90, CAR.NIRO21_HEV},
+                   CAR.K9, CAR.GENESIS_G90, CAR.NIRO21_HEV, CAR.SANTA_FE_2022},
 
   "send_hda_state_2": {CAR.GENESIS_G80, CAR.GENESIS_EQ900, CAR.GENESIS_EQ900_L},
 
   # these cars use the FCA11 message for the AEB and FCW signals, all others use SCC12
   "use_fca": {CAR.SONATA, CAR.ELANTRA, CAR.ELANTRA_GT_I30, CAR.STINGER, CAR.IONIQ, CAR.IONIQ_EV_2020, CAR.IONIQ_PHEV, CAR.KONA, CAR.KONA_EV, CAR.FORTE,
               CAR.PALISADE, CAR.GENESIS_G70, CAR.SANTA_FE, CAR.SELTOS, CAR.ELANTRA_2021, CAR.ELANTRA_HEV_2021,
-              CAR.K9, CAR.GENESIS_G90},
+              CAR.K9, CAR.GENESIS_G90, CAR.SANTA_FE_2022},
 
   "use_blinker_flash": {CAR.SONATA_LF_TURBO},
 
@@ -855,6 +876,7 @@ DBC = {
   CAR.IONIQ_PHEV: dbc_dict('hyundai_kia_generic', None),
   CAR.IONIQ_EV_2020: dbc_dict('hyundai_kia_generic', None),
   CAR.SANTA_FE: dbc_dict('hyundai_kia_generic', None),
+  CAR.SANTA_FE_2022: dbc_dict('hyundai_kia_generic', None),
   CAR.PALISADE: dbc_dict('hyundai_kia_generic', None),
   CAR.VELOSTER: dbc_dict('hyundai_kia_generic', None),
   CAR.GRANDEUR_IG: dbc_dict('hyundai_kia_generic', None),
