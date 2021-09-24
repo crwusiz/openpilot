@@ -30,8 +30,8 @@ MPC_T = list(np.arange(0,1.,.2)) + list(np.arange(1.,10.6,.6))
 N = len(MPC_T) - 1
 
 
-def desired_follow_distance(v_ego, v_lead):
-  TR = 1.8
+def desired_follow_distance(v_ego, v_lead, tr):
+  TR = tr
   G = 9.81
   return (v_ego * TR - (v_lead - v_ego) * TR + v_ego * v_ego / (2 * G) - v_lead * v_lead / (2 * G)) + 4.0
 
@@ -59,7 +59,8 @@ def gen_lead_model():
   # live parameters
   x_lead = SX.sym('x_lead')
   v_lead = SX.sym('v_lead')
-  model.p = vertcat(x_lead, v_lead)
+  tr = SX.sym('tr')
+  model.p = vertcat(x_lead, v_lead, tr)
 
   # dynamics model
   f_expl = vertcat(v_ego, a_ego, j_ego)
@@ -93,8 +94,8 @@ def gen_lead_mpc_solver():
   ocp.cost.yref = np.zeros((4, ))
   ocp.cost.yref_e = np.zeros((3, ))
 
-  x_lead, v_lead = ocp.model.p[0], ocp.model.p[1]
-  desired_dist = desired_follow_distance(v_ego, v_lead)
+  x_lead, v_lead, tr = ocp.model.p[0], ocp.model.p[1], ocp.model.p[2]
+  desired_dist = desired_follow_distance(v_ego, v_lead, tr)
   dist_err = (desired_dist - (x_lead - x_ego))/(sqrt(v_ego + 0.5) + 0.1)
 
   # TODO hacky weights to keep behavior the same
@@ -105,7 +106,7 @@ def gen_lead_mpc_solver():
   ocp.model.cost_y_expr_e = vertcat(exp(.3 * dist_err) - 1.,
                                   ((x_lead - x_ego) - (desired_dist)) / (0.05 * v_ego + 0.5),
                                   a_ego * (.1 * v_ego + 1.0))
-  ocp.parameter_values = np.array([0., .0])
+  ocp.parameter_values = np.array([0., 0., 1.8])
 
   # set constraints
   ocp.constraints.constr_type = 'BGH'
@@ -146,7 +147,7 @@ class LeadMpc():
     self.solver.set(N, "yref", yref[N][:3])
     self.x_sol = np.zeros((N+1, 3))
     self.u_sol = np.zeros((N,1))
-    self.lead_xv = np.zeros((N+1,2))
+    self.lead_xv = np.zeros((N+1,3))
     self.reset()
     self.set_weights()
 
@@ -174,13 +175,13 @@ class LeadMpc():
     self.x0[1] = max(v, 1e-3)
     self.x0[2] = a
 
-  def extrapolate_lead(self, x_lead, v_lead, a_lead_0, a_lead_tau):
+  def extrapolate_lead(self, x_lead, v_lead, a_lead_0, a_lead_tau, tr):
     dt =.2
     t = .0
     for i in range(N+1):
       if i > 4:
         dt = .6
-      self.lead_xv[i, 0], self.lead_xv[i, 1] = x_lead, v_lead
+      self.lead_xv[i, 0], self.lead_xv[i, 1], self.lead_xv[i, 2] = x_lead, v_lead, tr
       a_lead = a_lead_0 * math.exp(-a_lead_tau * (t**2)/2.)
       x_lead += v_lead * dt
       v_lead += a_lead * dt
@@ -206,8 +207,15 @@ class LeadMpc():
       self.solver.set(i, 'x', np.array([x_ego, v_ego, a_ego]))
 
   def update(self, carstate, radarstate, v_cruise):
+  
+    cruise_gap = int(clip(carstate.cruiseGap, 1., 4.))
+    if cruise_gap == AUTO_TR_CRUISE_GAP:
+      tr = interp(carstate.vEgo, AUTO_TR_BP, AUTO_TR_V)
+    else:
+      tr = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
+    
     self.crashing = False
-    v_ego = carstate.vEgo #self.x0[1]
+    v_ego = self.x0[1]
     if self.lead_id == 0:
       lead = radarstate.leadOne
     else:
@@ -220,12 +228,6 @@ class LeadMpc():
       
       if not lead.radar:
         x_lead = max(0., x_lead - 1.)
-
-      cruise_gap = int(clip(carstate.cruiseGap, 1., 4.))
-      if cruise_gap == AUTO_TR_CRUISE_GAP:
-        tr = interp(v_ego, AUTO_TR_BP, AUTO_TR_V)
-      else:
-        tr = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
 
       # MPC will not converge if immidiate crash is expected
       # Clip lead distance to what is still possible to brake for
@@ -241,7 +243,7 @@ class LeadMpc():
 
       self.a_lead_tau = lead.aLeadTau
       self.new_lead = False
-      self.extrapolate_lead(x_lead * (1.8 / tr), v_lead, a_lead, self.a_lead_tau)
+      self.extrapolate_lead(x_lead, v_lead, a_lead, self.a_lead_tau, tr)
       if not self.prev_lead_status: # or abs(x_lead - self.prev_lead_x) > 2.5:
         self.init_with_sim(v_ego, self.lead_xv, a_lead)
         self.new_lead = True
@@ -255,7 +257,7 @@ class LeadMpc():
       v_lead = v_ego + 10.0
       a_lead = 0.0
       self.a_lead_tau = _LEAD_ACCEL_TAU
-      self.extrapolate_lead(x_lead, v_lead, a_lead, self.a_lead_tau)
+      self.extrapolate_lead(x_lead, v_lead, a_lead, self.a_lead_tau, tr)
     self.solver.constraints_set(0, "lbx", self.x0)
     self.solver.constraints_set(0, "ubx", self.x0)
     for i in range(N+1):
