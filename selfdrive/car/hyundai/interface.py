@@ -45,7 +45,6 @@ class CarInterface(CarInterfaceBase):
     if candidate in [CAR.SONATA]:
       ret.safetyModel = car.CarParams.SafetyModel.hyundai
 
-    # Most Hyundai car ports are community features for now
     ret.communityFeature = True
 
     tire_stiffness_factor = 1.
