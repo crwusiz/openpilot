@@ -25,16 +25,16 @@ static void ui_draw_extras_limit_speed(UIState *s)
 
     if(limit_speed > 10 && left_dist > 0)
     {
-        int w = 200;
-        int h = 200;
-        int x = (bdr_s*2) + 300;
-        int y = 80;
+        int w = s->fb_w / 10;
+        int h = s->fb_w / 10;
+        int x = (bdr_s*2) + 200 + s->fb_w / 25;
+        int y = 30;
         char str[32];
 
         nvgBeginPath(s->vg);
-        nvgRoundedRect(s->vg, x, y, w, h, 210);
+        nvgRoundedRect(s->vg, x, y, w, h, s->fb_w / 9);
         nvgStrokeColor(s->vg, nvgRGBA(255, 0, 0, 200));
-        nvgStrokeWidth(s->vg, 30);
+        nvgStrokeWidth(s->vg, s->fb_w / 72);
         nvgStroke(s->vg);
 
         NVGcolor fillColor = nvgRGBA(0, 0, 0, 50);
@@ -43,14 +43,14 @@ static void ui_draw_extras_limit_speed(UIState *s)
 
         nvgFillColor(s->vg, nvgRGBA(255, 255, 255, 250));
 
-        nvgFontSize(s->vg, 140);
+        nvgFontSize(s->vg, s->fb_w / 15);
         nvgFontFace(s->vg, "sans-bold");
         nvgTextAlign(s->vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
 
         snprintf(str, sizeof(str), "%d", limit_speed);
         nvgText(s->vg, x+w/2, y+h/2, str, NULL);
 
-        nvgFontSize(s->vg, 120);
+        nvgFontSize(s->vg, s->fb_w / 18);
 
         if(left_dist >= 1000)
             snprintf(str, sizeof(str), "%.1fkm", left_dist / 1000.f);
@@ -67,16 +67,16 @@ static void ui_draw_extras_limit_speed(UIState *s)
 
         if(sccStockCamAct == 2 && sccStockCamStatus == 2)
         {
-            int w = 200;
-            int h = 200;
-            int x = (bdr_s*2) + 300;
-            int y = 80;
+            int w = s->fb_w / 10;
+            int h = s->fb_w / 10;
+            int x = (bdr_s*2) + 200 + s->fb_w / 25;
+            int y = 30;
             char str[32];
 
             nvgBeginPath(s->vg);
-            nvgRoundedRect(s->vg, x, y, w, h, 210);
+            nvgRoundedRect(s->vg, x, y, w, h, s->fb_w / 9);
             nvgStrokeColor(s->vg, nvgRGBA(255, 0, 0, 200));
-            nvgStrokeWidth(s->vg, 30);
+            nvgStrokeWidth(s->vg, s->fb_w / 72);
             nvgStroke(s->vg);
 
             NVGcolor fillColor = nvgRGBA(0, 0, 0, 50);
@@ -85,7 +85,7 @@ static void ui_draw_extras_limit_speed(UIState *s)
 
             nvgFillColor(s->vg, nvgRGBA(255, 255, 255, 250));
 
-            nvgFontSize(s->vg, 140);
+            nvgFontSize(s->vg, s->fb_w / 15);
             nvgFontFace(s->vg, "sans-bold");
             nvgTextAlign(s->vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
 
