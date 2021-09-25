@@ -1,10 +1,6 @@
 using Cxx = import "./include/c++.capnp";
 $Cxx.namespace("cereal");
 
-using Java = import "./include/java.capnp";
-$Java.package("ai.comma.openpilot.cereal");
-$Java.outerClassname("Car");
-
 @0x8e2af1e708af8b8d;
 
 # ******* events causing controls state machine transition *******
@@ -88,7 +84,6 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     startupNoCar @76;
     startupNoControl @77;
     startupMaster @78;
-    startupFuzzyFingerprint @97;
     startupNoFw @104;
     fcw @79;
     steerSaturated @80;
@@ -130,10 +125,10 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     neosUpdateRequiredDEPRECATED @88;
     modelLagWarningDEPRECATED @93;
     startupOneplusDEPRECATED @82;
-
+    startupFuzzyFingerprintDEPRECATED @97;
+    
     turningIndicatorOn @106;
     autoLaneChange @107;
-
     slowingDownSpeed @108;
     slowingDownSpeedSound @109;
   }

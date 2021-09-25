@@ -276,7 +276,7 @@ class LeadMpc():
     self.crashing = self.crashing or np.sum(self.lead_xv[:,0] - self.x_sol[:,0] < 0) > 0
 
     t = sec_since_boot()
-    if self.crashing or self.solution_status != 0:
+    if self.solution_status != 0:
       if t > self.last_cloudlog_t + 5.0:
         self.last_cloudlog_t = t
         cloudlog.warning("Lead mpc %d reset, solution_status: %s" % (
