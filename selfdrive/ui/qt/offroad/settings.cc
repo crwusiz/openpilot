@@ -202,15 +202,6 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
     });
   }
 
-  //auto uninstallBtn = new ButtonControl("Uninstall " + getBrand(), "UNINSTALL");
-  auto uninstallBtn = new ButtonControl(getBrand() + " 제거", "실행");
-  connect(uninstallBtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)) {
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      Params().putBool("DoUninstall", true);
-    }
-  });
-
   ButtonControl *regulatoryBtn = nullptr;
   if (Hardware::TICI()) {
     regulatoryBtn = new ButtonControl("Regulatory", "VIEW", "");
@@ -220,28 +211,33 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
     });
   }
 
-  for (auto btn : {dcamBtn, resetCalibBtn, retrainingBtn, uninstallBtn, regulatoryBtn}) {
+  for (auto btn : {dcamBtn, retrainingBtn, regulatoryBtn, resetCalibBtn}) {
     if (btn) {
-      connect(parent, SIGNAL(offroadTransition(bool)), btn, SLOT(setEnabled(false)));
+      connect(parent, SIGNAL(offroadTransition(bool)), btn, SLOT(setEnabled(bool)));
       main_layout->addWidget(btn);
     }
   }
   QHBoxLayout *reset_layout = new QHBoxLayout();
   reset_layout->setSpacing(30);
 
-  // reset calibration button
-  QPushButton *restart_openpilot_btn = new QPushButton("재시작");
-  restart_openpilot_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
-  reset_layout->addWidget(restart_openpilot_btn);
-  QObject::connect(restart_openpilot_btn, &QPushButton::released, [=]() {
-    emit closeSettings();
-    QTimer::singleShot(1000, []() {
-      Params().putBool("SoftRestartTriggered", true);
-    });
+  // addfunc button
+  const char* addfunc = "cp -f /data/openpilot/installer/fonts/driver_monitor.py /data/openpilot/selfdrive/monitoring";
+  QPushButton *addfuncbtn = new QPushButton("추가기능");
+  addfuncbtn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
+  reset_layout->addWidget(addfuncbtn);
+  QObject::connect(addfuncbtn, &QPushButton::released, [=]() {
+    //if (ConfirmationDialog::confirm("Process?", this)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+      std::system(addfunc);
+      emit closeSettings();
+      QTimer::singleShot(1000, []() {
+        Params().putBool("SoftRestartTriggered", true);
+      });
+    }
   });
-  main_layout->addLayout(reset_layout);
+
   // reset calibration button
-  QPushButton *reset_calib_btn = new QPushButton("Calibration LiveParameters 리셋");
+  QPushButton *reset_calib_btn = new QPushButton("Calibration,LiveParameters 리셋");
   reset_calib_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
   reset_layout->addWidget(reset_calib_btn);
   QObject::connect(reset_calib_btn, &QPushButton::released, [=]() {
@@ -256,9 +252,21 @@ DevicePanel::DevicePanel(QWidget* parent) : QWidget(parent) {
     }
   });
   main_layout->addLayout(reset_layout);
+
   // power buttons
   QHBoxLayout *power_layout = new QHBoxLayout();
   power_layout->setSpacing(30);
+
+  // softreset button
+  QPushButton *restart_openpilot_btn = new QPushButton("재시작");
+  restart_openpilot_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
+  power_layout->addWidget(restart_openpilot_btn);
+  QObject::connect(restart_openpilot_btn, &QPushButton::released, [=]() {
+    emit closeSettings();
+    QTimer::singleShot(1000, []() {
+      Params().putBool("SoftRestartTriggered", true);
+    });
+  });
 
   //QPushButton *reboot_btn = new QPushButton("Reboot");
   QPushButton *reboot_btn = new QPushButton("재부팅");
@@ -319,6 +327,15 @@ SoftwarePanel::SoftwarePanel(QWidget* parent) : QWidget(parent) {
   for (int i = 0; i < std::size(widgets); ++i) {
     main_layout->addWidget(widgets[i]);
   }
+
+  auto uninstallBtn = new ButtonControl(getBrand() + " 제거", "실행");
+  connect(uninstallBtn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+      Params().putBool("DoUninstall", true);
+    }
+  });
+  connect(parent, SIGNAL(offroadTransition(bool)), uninstallBtn, SLOT(setEnabled(bool)));
+  main_layout->addWidget(uninstallBtn);
 
   fs_watch = new QFileSystemWatcher(this);
   QObject::connect(fs_watch, &QFileSystemWatcher::fileChanged, [=](const QString path) {
@@ -444,6 +461,17 @@ QWidget * network_panel(QWidget * parent) {
   });
   layout->addWidget(gitpullbtn);
 
+  const char* realdata_clear = "rm -rf /sdcard/realdata/*";
+  //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");
+  auto realdataclearbtn = new ButtonControl("주행로그 삭제", "실행");
+  QObject::connect(realdataclearbtn, &ButtonControl::clicked, [=]() {
+    //if (ConfirmationDialog::confirm("Process?", w)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", w)) {
+      std::system(realdata_clear);
+    }
+  });
+  layout->addWidget(realdataclearbtn);
+
   const char* panda_flash = "sh /data/openpilot/panda/board/flash.sh";
   //auto pandaflashbtn = new ButtonControl("Panda Firmware Flash", "RUN");
   auto pandaflashbtn = new ButtonControl("판다 펌웨어 플래싱", "실행");
@@ -467,29 +495,6 @@ QWidget * network_panel(QWidget * parent) {
     }
   });
   layout->addWidget(pandarecoverbtn);
-
-  const char* addfunc = "cp -f /data/openpilot/installer/fonts/driver_monitor.py /data/openpilot/selfdrive/monitoring";
-  //auto addfuncbtn = new ButtonControl("Add Function", "RUN");
-  auto addfuncbtn = new ButtonControl("추가 기능", "실행");
-  QObject::connect(addfuncbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", w)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", w)) {
-      std::system(addfunc);
-      QTimer::singleShot(1000, []() { Hardware::reboot(); });
-    }
-  });
-  layout->addWidget(addfuncbtn);
-
-  const char* realdata_clear = "rm -rf /sdcard/realdata/*";
-  //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");
-  auto realdataclearbtn = new ButtonControl("주행로그 삭제", "실행");
-  QObject::connect(realdataclearbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", w)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", w)) {
-      std::system(realdata_clear);
-    }
-  });
-  layout->addWidget(realdataclearbtn);
 
   layout->addStretch(1);
 #else

@@ -149,7 +149,7 @@ static void update_state(UIState *s) {
   if (sm.updated("carState")) {
     scene.car_state = sm["carState"].getCarState();
     if(scene.leftBlinker!=scene.car_state.getLeftBlinker() || scene.rightBlinker!=scene.car_state.getRightBlinker()){
-      scene.blinker_blinkingrate = 120;
+      scene.blinkingrate = 120;
     }
     scene.leftBlinker = scene.car_state.getLeftBlinker();
     scene.rightBlinker = scene.car_state.getRightBlinker();
@@ -295,7 +295,7 @@ static void update_status(UIState *s) {
 static void update_extras(UIState *s){
    UIScene &scene = s->scene;
    SubMaster &sm = *(s->sm);
-   if(sm.updated("carControl"))
+   if (sm.updated("carControl"))
     scene.car_control = sm["carControl"].getCarControl();
    if (sm.updated("ubloxGnss")) {
      auto data = sm["ubloxGnss"].getUbloxGnss();

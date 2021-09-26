@@ -487,7 +487,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
     ET.WARNING: Alert(
       #"DISENGAGE IMMEDIATELY",
       #"Driver Distracted",
-      "조향제어가 강제로 해제됩니다",
+      "조향제어가 해제됩니다",
       "운전자 도로주시 불안",
       AlertStatus.critical, AlertSize.full,
       Priority.HIGH, VisualAlert.steerRequired, AudibleAlert.chimeWarningRepeat, .1, .1, .1),
@@ -516,7 +516,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
     ET.WARNING: Alert(
       #"DISENGAGE IMMEDIATELY",
       #"Driver Unresponsive",
-      "조향제어가 강제로 해제됩니다",
+      "조향제어가 해제됩니다",
       "운전자 응답하지않음",
       AlertStatus.critical, AlertSize.full,
       Priority.HIGH, VisualAlert.steerRequired, AudibleAlert.chimeWarningRepeat, .1, .1, .1),
