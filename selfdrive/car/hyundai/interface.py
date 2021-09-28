@@ -61,7 +61,7 @@ class CarInterface(CarInterfaceBase):
         ret.wheelbase = 3.160
         ret.steerRatio = 12.0
     # hyundai
-    elif candidate in [CAR.ELANTRA_I30, CAR.ELANTRA21]:
+    elif candidate in [CAR.ELANTRA_I30, CAR.ELANTRA21, CAR.ELANTRA21_HEV]:
         ret.mass = 1340. + STD_CARGO_KG
         ret.wheelbase = 2.720
         ret.steerRatio = 15.4
