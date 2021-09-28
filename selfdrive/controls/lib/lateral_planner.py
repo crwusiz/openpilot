@@ -2,9 +2,8 @@ import math
 import numpy as np
 from common.params import Params
 from common.realtime import sec_since_boot, DT_MDL
-from common.numpy_fast import interp, clip
-from selfdrive.car.hyundai.values import CAR
-from selfdrive.ntune import ntune_common_get, ntune_common_enabled
+from common.numpy_fast import interp
+from selfdrive.ntune import ntune_common_get
 from selfdrive.swaglog import cloudlog
 from selfdrive.controls.lib.lateral_mpc_lib.lat_mpc import LateralMpc
 from selfdrive.controls.lib.drive_helpers import CONTROL_N, MPC_COST_LAT, LAT_MPC_N, CAR_ROTATION_RADIUS
