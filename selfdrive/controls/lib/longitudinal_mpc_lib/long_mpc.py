@@ -282,7 +282,7 @@ class LongitudinalMpc():
       self.a_lead_tau = lead.aLeadTau
       self.new_lead = False
       lead_xv = self.extrapolate_lead(x_lead, v_lead, a_lead, self.a_lead_tau)
-      if not self.prev_lead_status or abs(x_lead - self.prev_lead_x) > 2.5:
+      if not self.prev_lead_status: # or abs(x_lead - self.prev_lead_x) > 2.5:
         self.new_lead = True
 
       self.prev_lead_status = True
