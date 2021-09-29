@@ -267,6 +267,9 @@ class LongitudinalMpc():
       x_lead = lead.dRel
       v_lead = max(0.0, lead.vLead)
       a_lead = clip(lead.aLeadK, -10.0, 5.0)
+      
+      if not lead.radar:
+        x_lead -= 0.5
 
       # MPC will not converge if immidiate crash is expected
       # Clip lead distance to what is still possible to brake for
