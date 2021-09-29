@@ -40,10 +40,10 @@ MAX_BRAKE = 9.81
 
 
 CRUISE_GAP_BP = [1., 2., 3., 4.]
-CRUISE_GAP_V = [1.3, 1.6, 2., 2.5]
+CRUISE_GAP_V = [1.3, 1.6, 1.9, 2.3]
 
 AUTO_TR_BP = [10.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-AUTO_TR_V = [1.4, 1.6, 1.8]
+AUTO_TR_V = [1.3, 1.6, 1.9]
 
 AUTO_TR_CRUISE_GAP = 1
 
@@ -266,9 +266,6 @@ class LongitudinalMpc():
       x_lead = lead.dRel
       v_lead = max(0.0, lead.vLead)
       a_lead = clip(lead.aLeadK, -10.0, 5.0)
-      
-      if not lead.radar:
-        x_lead -= 0.5
 
       # MPC will not converge if immidiate crash is expected
       # Clip lead distance to what is still possible to brake for

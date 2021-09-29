@@ -16,7 +16,7 @@ ACCEL_MAX_ISO = 2.0 # m/s^2
 
 
 def long_control_state_trans(CP, active, long_control_state, v_ego, v_target, v_pid,
-                             output_accel, brake_pressed, cruise_standstill, min_speed_can):
+                             output_accel, brake_pressed, cruise_standstill, min_speed_can, radarState):
   """Update longitudinal control state machine"""
   stopping_target_speed = min_speed_can + STOPPING_TARGET_SPEED_OFFSET
   stopping_condition = (v_ego < 2.0 and cruise_standstill) or \
@@ -25,6 +25,10 @@ def long_control_state_trans(CP, active, long_control_state, v_ego, v_target, v_
                          brake_pressed))
 
   starting_condition = v_target > CP.vEgoStarting and not cruise_standstill
+  
+  # neokii
+  if radarState is not None and radarState.leadOne is not None and radarState.leadOne.status:
+    starting_condition = starting_condition and radarState.leadOne.vLead > CP.vEgoStarting
 
   if not active:
     long_control_state = LongCtrlState.off
@@ -56,7 +60,6 @@ class LongControl():
     self.long_control_state = LongCtrlState.off  # initialized to off
     self.pid = PIController((CP.longitudinalTuning.kpBP, CP.longitudinalTuning.kpV),
                             (CP.longitudinalTuning.kiBP, CP.longitudinalTuning.kiV),
-                            k_f=0.95,
                             rate=1/DT_CTRL,
                             sat_limit=0.8)
     self.v_pid = 0.0
@@ -67,7 +70,7 @@ class LongControl():
     self.pid.reset()
     self.v_pid = v_pid
 
-  def update(self, active, CS, CP, long_plan, accel_limits):
+  def update(self, active, CS, CP, long_plan, accel_limits, radarState):
     """Update longitudinal control. This updates the state machine and runs a PID loop"""
     # Interp control trajectory
     # TODO estimate car specific lag, use .15s for now
@@ -101,7 +104,7 @@ class LongControl():
     output_accel = self.last_output_accel
     self.long_control_state = long_control_state_trans(CP, active, self.long_control_state, CS.vEgo,
                                                        v_target_future, self.v_pid, output_accel,
-                                                       CS.brakePressed, CS.cruiseState.standstill, CP.minSpeedCan)
+                                                       CS.brakePressed, CS.cruiseState.standstill, CP.minSpeedCan, radarState)
 
     v_ego_pid = max(CS.vEgo, CP.minSpeedCan)  # Without this we get jumps, CAN bus reports 0 when speed < 0.3
 
