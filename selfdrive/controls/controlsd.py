@@ -50,6 +50,7 @@ Desire = log.LateralPlan.Desire
 LaneChangeState = log.LateralPlan.LaneChangeState
 LaneChangeDirection = log.LateralPlan.LaneChangeDirection
 EventName = car.CarEvent.EventName
+ButtonEvent = car.CarState.ButtonEvent
 
 
 class Controls:
@@ -153,6 +154,7 @@ class Controls:
     self.events_prev = []
     self.current_alert_types = [ET.PERMANENT]
     self.logged_comm_issue = False
+    self.button_timers = {ButtonEvent.Type.decelCruise: 0, ButtonEvent.Type.accelCruise: 0}
 
     # scc smoother
     self.is_cruise_enabled = False
@@ -388,11 +390,11 @@ class Controls:
 
     self.v_cruise_kph_last = self.v_cruise_kph
 
-    # if stock cruise is completely disabled, then we can use our own set speed logic
     self.CP.pcmCruise = self.CI.CP.pcmCruise
 
+    # if stock cruise is completely disabled, then we can use our own set speed logic
     #if not self.CP.pcmCruise:
-    #  self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.buttonEvents, self.enabled, self.is_metric)
+    #  self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.buttonEvents, self.button_timers, self.enabled)
     #elif self.CP.pcmCruise and CS.cruiseState.enabled:
     #  self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
 
@@ -555,6 +557,16 @@ class Controls:
         setattr(actuators, p, 0.0)
 
     return actuators, lac_log
+
+  def update_button_timers(self, buttonEvents):
+    # increment timer for buttons still pressed
+    for k in self.button_timers.keys():
+      if self.button_timers[k] > 0:
+        self.button_timers[k] += 1
+
+    for b in buttonEvents:
+      if b.type.raw in self.button_timers:
+        self.button_timers[b.type.raw] = 1 if b.pressed else 0
 
   def publish_logs(self, CS, start_time, actuators, lac_log):
     """Send actuators and hud commands to the car, send controlsstate and MPC logging"""
@@ -732,6 +744,8 @@ class Controls:
     # Publish data
     self.publish_logs(CS, start_time, actuators, lac_log)
     self.prof.checkpoint("Sent")
+
+    self.update_button_timers(CS.buttonEvents)
 
   def controlsd_thread(self):
     while True:
