@@ -98,12 +98,12 @@ class CarState(CarStateBase):
     ret.steeringTorqueEps = cp_mdps.vl["MDPS12"]['CR_Mdps_OutTq']
     ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD
 
-    if not ret.standstill and cp_mdps.vl["MDPS12"]['CF_Mdps_ToiUnavail'] != 0:
+    if not ret.standstill and cp_mdps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0:
       self.mdps_error_cnt += 1
     else:
       self.mdps_error_cnt = 0
 
-    ret.steerWarning = self.mdps_error_cnt > 100
+    ret.steerWarning = self.mdps_error_cnt > 50
 
     if self.CP.enableAutoHold:
       ret.autoHold = cp.vl["ESP11"]['AVH_STAT']
