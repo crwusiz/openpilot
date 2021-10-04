@@ -314,6 +314,7 @@ class LongitudinalMpc():
     # distance that lead needs as a minimum. We can add that to the current distance
     # and then treat that as a stopped car/obstacle at this new distance.
 
+    # neokii
     cruise_gap = int(clip(carstate.cruiseGap, 1., 4.))
     if cruise_gap == AUTO_TR_CRUISE_GAP:
       tr = interp(carstate.vEgo, AUTO_TR_BP, AUTO_TR_V)

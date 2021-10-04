@@ -48,13 +48,7 @@ class CarInterface(CarInterfaceBase):
     ret.communityFeature = True
 
     tire_stiffness_factor = 1.
-
-    eps_modified = False
-    for fw in car_fw:
-      if fw.ecu == "eps" and b"," in fw.fwVersion:
-        eps_modified = True
-
-    ret.maxSteeringAngleDeg = 90.
+    ret.maxSteeringAngleDeg = 1000.
 
     # lateral
     ret.lateralTuning.init('lqr')
@@ -106,6 +100,7 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1855. + STD_CARGO_KG
       ret.wheelbase = 3.01
       ret.centerToFront = ret.wheelbase * 0.4
+      ret.maxSteeringAngleDeg = 90.
     elif candidate == CAR.GENESIS_EQ900:
       ret.mass = 2200
       ret.wheelbase = 3.15
@@ -145,8 +140,6 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1999. + STD_CARGO_KG
       ret.wheelbase = 2.90
       ret.centerToFront = ret.wheelbase * 0.4
-      if eps_modified:
-        ret.maxSteeringAngleDeg = 1000.
     elif candidate in [CAR.ELANTRA, CAR.ELANTRA_GT_I30]:
       ret.mass = 1275. + STD_CARGO_KG
       ret.wheelbase = 2.7
@@ -185,13 +178,11 @@ class CarInterface(CarInterfaceBase):
       tire_stiffness_factor = 0.8
       ret.mass = 1640. + STD_CARGO_KG
       ret.wheelbase = 2.845
-      ret.maxSteeringAngleDeg = 120.
       ret.centerToFront = ret.wheelbase * 0.385
     elif candidate in [CAR.GRANDEUR_IG_FL, CAR.GRANDEUR_IG_FL_HEV]:
       tire_stiffness_factor = 0.8
       ret.mass = 1725. + STD_CARGO_KG
       ret.wheelbase = 2.885
-      ret.maxSteeringAngleDeg = 120.
       ret.centerToFront = ret.wheelbase * 0.385
     elif candidate == CAR.VELOSTER:
       ret.mass = 3558. * CV.LB_TO_KG
@@ -203,7 +194,6 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.67
       tire_stiffness_factor = 0.7
       ret.centerToFront = ret.wheelbase * 0.4
-      ret.maxSteeringAngleDeg = 120.
     # kia
     elif candidate == CAR.SORENTO:
       ret.mass = 1985. + STD_CARGO_KG
