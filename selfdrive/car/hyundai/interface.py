@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-import numpy as np
 
 from cereal import car
 from common.numpy_fast import interp
-from selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR, RADAR_MSG_COUNT
 from selfdrive.config import Conversions as CV
 from selfdrive.car.hyundai.values import CAR, Buttons
 from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint
@@ -27,7 +25,7 @@ class CarInterface(CarInterfaceBase):
     v_current_kph = current_speed * CV.MS_TO_KPH
 
     gas_max_bp = [0., 10., 20., 50., 70., 130.]
-    gas_max_v = [1.75, 1.12, 0.84, 0.61, 0.43, 0.32]
+    gas_max_v = [1.8, 1.2, 0.84, 0.61, 0.43, 0.32]
 
     brake_max_bp = [0, 70., 130.]
     brake_max_v = [-4., -3., -2.1]
@@ -72,9 +70,9 @@ class CarInterface(CarInterfaceBase):
 
     # longitudinal
     ret.longitudinalTuning.kpBP = [0., 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 40.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-    ret.longitudinalTuning.kpV = [1.2, 0.88, 0.75, 0.68, 0.59, 0.51, 0.43]
+    ret.longitudinalTuning.kpV = [1.1, 0.86, 0.73, 0.66, 0.57, 0.5, 0.42]
     ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
-    ret.longitudinalTuning.kiV = [0.06, 0.04]
+    ret.longitudinalTuning.kiV = [0.06, 0.03]
     ret.longitudinalTuning.deadzoneBP = [0., 100.*CV.KPH_TO_MS]
     ret.longitudinalTuning.deadzoneV = [0., 0.015]
     ret.longitudinalActuatorDelayLowerBound = 0.15
@@ -82,8 +80,8 @@ class CarInterface(CarInterfaceBase):
 
     ret.startAccel = -0.8
     ret.stopAccel = -2.0
-    ret.startingAccelRate = 3.2  # brake_travel/s while releasing on restart
-    ret.stoppingDecelRate = 0.8  # brake_travel/s while trying to stop
+    ret.startingAccelRate = 4.0  # brake_travel/s while releasing on restart
+    ret.stoppingDecelRate = 0.35  # brake_travel/s while trying to stop
     ret.vEgoStopping = 0.5
     ret.vEgoStarting = 0.5
 
@@ -92,6 +90,7 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1900. + STD_CARGO_KG
       ret.wheelbase = 3.01
       ret.centerToFront = ret.wheelbase * 0.4
+      ret.maxSteeringAngleDeg = 90.
     elif candidate == CAR.GENESIS_G70:
       ret.mass = 1640. + STD_CARGO_KG
       ret.wheelbase = 2.84
@@ -100,7 +99,6 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1855. + STD_CARGO_KG
       ret.wheelbase = 3.01
       ret.centerToFront = ret.wheelbase * 0.4
-      ret.maxSteeringAngleDeg = 90.
     elif candidate == CAR.GENESIS_EQ900:
       ret.mass = 2200
       ret.wheelbase = 3.15

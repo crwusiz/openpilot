@@ -180,7 +180,7 @@ class SccSmoother:
 
     return road_limit_speed, left_dist, max_speed_log
 
-  def update(self, enabled, can_sends, packer, CC, CS, frame, apply_accel, controls):
+  def update(self, enabled, can_sends, packer, CC, CS, frame, controls):
 
     # mph or kph
     clu11_speed = CS.clu11["CF_Clu_Vanz"]
@@ -351,10 +351,7 @@ class SccSmoother:
       accel *= gas_factor
     else:
       accel *= brake_factor
-
-    if accel < 0:
-      accel = interp(accel - CS.out.aEgo, [-1.0, -0.5], [2 * accel, accel])
-
+      
     return accel
 
   def get_stock_cam_accel(self, apply_accel, stock_accel, scc11):
