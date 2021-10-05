@@ -56,7 +56,6 @@ class Panda {
   std::atomic<bool> connected = true;
   std::atomic<bool> comms_healthy = true;
   cereal::PandaState::PandaType hw_type = cereal::PandaState::PandaType::UNKNOWN;
-  bool is_pigeon = false;
   bool has_rtc = false;
 
   // Static functions
@@ -82,7 +81,7 @@ class Panda {
   std::optional<std::vector<uint8_t>> get_firmware_version();
   std::optional<std::string> get_serial();
   void set_power_saving(bool power_saving);
-  void set_usb_power_mode(cereal::PandaState::UsbPowerMode power_mode);
+  void set_usb_power_mode(cereal::PeripheralState::UsbPowerMode power_mode);
   void send_heartbeat();
   void can_send(capnp::List<cereal::CanData>::Reader can_data_list);
   int can_receive(kj::Array<capnp::word>& out_buf);

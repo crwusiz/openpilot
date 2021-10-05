@@ -72,15 +72,12 @@ Panda::Panda(std::string serial) {
   if (err != 0) { goto fail; }
 
   hw_type = get_hw_type();
-  is_pigeon =
-    (hw_type == cereal::PandaState::PandaType::GREY_PANDA) ||
-    (hw_type == cereal::PandaState::PandaType::BLACK_PANDA) ||
-    (hw_type == cereal::PandaState::PandaType::UNO) ||
-    (hw_type == cereal::PandaState::PandaType::DOS);
+
+  assert((hw_type != cereal::PandaState::PandaType::WHITE_PANDA) &&
+         (hw_type != cereal::PandaState::PandaType::GREY_PANDA));
+
   has_rtc = (hw_type == cereal::PandaState::PandaType::UNO) ||
             (hw_type == cereal::PandaState::PandaType::DOS);
-
-  printf("hw_type: %d, is_pigeon=%d !!!!!\n", (int)hw_type, (int)is_pigeon);
 
   return;
 
@@ -336,7 +333,7 @@ void Panda::set_power_saving(bool power_saving) {
   usb_write(0xe7, power_saving, 0);
 }
 
-void Panda::set_usb_power_mode(cereal::PandaState::UsbPowerMode power_mode) {
+void Panda::set_usb_power_mode(cereal::PeripheralState::UsbPowerMode power_mode) {
   usb_write(0xe6, (uint16_t)power_mode, 0);
 }
 

@@ -1,7 +1,6 @@
 import os
 from common.params import Params
 from common.basedir import BASEDIR
-from selfdrive.version import comma_remote, tested_branch
 from selfdrive.car.fingerprints import eliminate_incompatible_cars, all_legacy_fingerprint_cars
 from selfdrive.car.vin import get_vin, VIN_UNKNOWN
 from selfdrive.car.fw_versions import get_fw_versions, match_fw_to_car
@@ -82,11 +81,11 @@ def only_toyota_left(candidate_cars):
 
 
 # **** for use live only ****
-def fingerprint(logcan, sendcan, has_relay):
+def fingerprint(logcan, sendcan):
   fixed_fingerprint = os.environ.get('FINGERPRINT', "")
   skip_fw_query = os.environ.get('SKIP_FW_QUERY', False)
 
-  if has_relay and not fixed_fingerprint and not skip_fw_query:
+  if not fixed_fingerprint and not skip_fw_query:
     # Vin query only reliably works thorugh OBDII
     bus = 1
 
@@ -171,8 +170,8 @@ def fingerprint(logcan, sendcan, has_relay):
   return car_fingerprint, finger, vin, car_fw, source, exact_match
 
 
-def get_car(logcan, sendcan, has_relay=False):
-  candidate, fingerprints, vin, car_fw, source, exact_match = fingerprint(logcan, sendcan, has_relay)
+def get_car(logcan, sendcan):
+  candidate, fingerprints, vin, car_fw, source, exact_match = fingerprint(logcan, sendcan)
 
   if candidate is None:
     cloudlog.warning("car doesn't match any fingerprints: %r", fingerprints)
