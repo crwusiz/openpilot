@@ -337,7 +337,7 @@ class SccSmoother:
       error = max_speed - self.max_speed_clu
       self.max_speed_clu = self.max_speed_clu + error * kp
 
-  def get_accel(self, CS, sm, accel):
+  def get_apply_accel(self, CS, sm, accel, stopping):
 
     gas_factor = ntune_scc_get("sccGasFactor")
     brake_factor = ntune_scc_get("sccBrakeFactor")
@@ -351,6 +351,9 @@ class SccSmoother:
       accel *= gas_factor
     else:
       accel *= brake_factor
+
+    if accel < 0 and not stopping:
+      accel = interp(accel - CS.out.aEgo, [-1.0, -0.5], [1.6 * accel, accel])
       
     return accel
 

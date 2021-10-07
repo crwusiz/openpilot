@@ -184,13 +184,10 @@ class CarController():
     if self.longcontrol and CS.cruiseState_enabled and (CS.scc_bus or not self.scc_live):
 
       if frame % 2 == 0:
-  
-        accel = actuators.accel
-        if accel < 0:
-          accel = interp(accel - CS.out.aEgo, [-1.0, -0.5], [2 * accel, accel])
-  
-        accel = self.scc_smoother.get_accel(CS, controls.sm, accel)
-        apply_accel = clip(accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
+        
+        stopping = controls.LoC.long_control_state == LongCtrlState.stopping
+        apply_accel = self.scc_smoother.get_apply_accel(CS, controls.sm, actuators.accel, stopping)
+        apply_accel = clip(apply_accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
 
         controls.apply_accel = apply_accel
         aReqValue = CS.scc12["aReqValue"]
@@ -228,11 +225,7 @@ class CarController():
           can_sends.append(create_scc13(self.packer, CS.scc13))
           
         if CS.has_scc14:
-          if CS.out.vEgo < 2.:
-            long_control_state = controls.LoC.long_control_state
-            acc_standstill = True if long_control_state == LongCtrlState.stopping else False
-          else:
-            acc_standstill = False
+          acc_standstill = stopping if CS.out.vEgo < 2. else False
 
           lead = self.scc_smoother.get_lead(controls.sm)
 
