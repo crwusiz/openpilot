@@ -22,7 +22,7 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, lkas11
     values["CF_Lkas_LdwsActivemode"] = 2
     values["CF_Lkas_SysWarning"] = lkas11["CF_Lkas_SysWarning"]
 
-  elif car_fingerprint in [CAR.OPTIMA, CAR.OPTIMA_HEV, CAR.K7, CAR.K7_HEV]:
+  elif car_fingerprint in [CAR.K5, CAR.K5_HEV, CAR.K7, CAR.K7_HEV]:
     values["CF_Lkas_LdwsActivemode"] = 0
 
   # This field is LDWS Mfc car ( qt ui toggle set )

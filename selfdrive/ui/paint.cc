@@ -343,11 +343,7 @@ static void ui_draw_autohold(UIState *s) {
   const int radius = 85;
   const int autohold_x = (radius*2) + (bdr_s*2) + (radius*3);
   const int autohold_y = s->fb_h - (footer_h/2) + 20;
-  if (autohold > 1) {
-    ui_draw_circle_image(s, autohold_x, autohold_y, radius, "autohold_warning", s->scene.car_state.getAutoHold());
-  } else {
-    ui_draw_circle_image(s, autohold_x, autohold_y, radius, "autohold_active", s->scene.car_state.getAutoHold());
-  }
+  ui_draw_circle_image(s, autohold_x, autohold_y, radius, autohold > 1 ? "autohold_warning" : "autohold_active", s->scene.car_state.getAutoHold());
 }
 
 static void ui_draw_bsd_left(UIState *s) {

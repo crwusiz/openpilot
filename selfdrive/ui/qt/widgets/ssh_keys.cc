@@ -33,15 +33,13 @@ SshControl::SshControl() : ButtonControl("SSH Keys", "", "Github 사용자 ID에
 
 void SshControl::refresh() {
   QString param = QString::fromStdString(params.get("GithubSshKeys"));
-  std::string paramc = Params().get("GithubUsername");
-  if (param.length() && !paramc.empty()) {
+  if (param.length()) {
     username_label.setText(QString::fromStdString(params.get("GithubUsername")));
+    //setText("REMOVE");
     setText("개인키제거");
-  } else if (param.length() && paramc.empty()) {
-    username_label.setText("Public Key");
-    setText("공개키제거");
   } else {
     username_label.setText("");
+    //setText("ADD");
     setText("개인키사용");
   }
   setEnabled(true);

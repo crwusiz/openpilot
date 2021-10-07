@@ -36,7 +36,8 @@ def manager_init():
     ("OpenpilotEnabledToggle", "1"),
     ("CommunityFeaturesToggle", "1"),
     ("IsMetric", "1"),
-    # HKG
+    # add
+    ("SshEnabled", "1"),
     ("LongControlSelect", "0"),
     ("AutoLaneChangeEnabled", "1"),
     ("PutPrebuilt", "0"),

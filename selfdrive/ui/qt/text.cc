@@ -4,6 +4,10 @@
 #include <QScrollBar>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <QProcess>
+#include <QHostAddress>
+#include <QNetworkInterface>
+#include <QAbstractSocket>
 
 #include "selfdrive/hardware/hw.h"
 #include "selfdrive/ui/qt/util.h"
@@ -33,10 +37,28 @@ int main(int argc, char *argv[]) {
 
   QPushButton *btn = new QPushButton();
 #ifdef __aarch64__
+  QPushButton *btn2 = new QPushButton();
+  QLabel *label2 = new QLabel();
+  QString device_ip = "────────";
+  const QHostAddress &localhost = QHostAddress(QHostAddress::LocalHost);
+  for (const QHostAddress &address: QNetworkInterface::allAddresses()) {
+    if (address.protocol() == QAbstractSocket::IPv4Protocol && address != localhost)
+      device_ip = address.toString();
+  }
+  label2->setText(device_ip);
+  label2->setStyleSheet("color: #e0e879");
+  main_layout->addWidget(label2, 0, 0, Qt::AlignRight | Qt::AlignTop);
   btn->setText("Reboot");
   QObject::connect(btn, &QPushButton::clicked, [=]() {
     Hardware::reboot();
   });
+  btn2->setText("Git Pull");
+  QObject::connect(btn2, &QPushButton::clicked, [=]() {
+    QProcess::execute("sh /data/openpilot/gitpull.sh");
+    Hardware::reboot();    
+    btn2->setEnabled(false);
+  });
+  main_layout->addWidget(btn2, 0, 0, Qt::AlignLeft | Qt::AlignBottom);
 #else
   btn->setText("Exit");
   QObject::connect(btn, &QPushButton::clicked, &a, &QApplication::quit);

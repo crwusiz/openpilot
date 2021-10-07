@@ -69,7 +69,7 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 1615. + STD_CARGO_KG
         ret.wheelbase = 2.840
         ret.steerRatio = 15.2
-    elif candidate in [CAR.SONATA19, CAR.SONATA19_HEV]:
+    elif candidate in [CAR.SONATA_LF, CAR.SONATA_LF_HEV]:
         ret.mass = 1640. + STD_CARGO_KG
         ret.wheelbase = 2.805
         ret.steerRatio = 15.2
@@ -106,10 +106,18 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 1345. + STD_CARGO_KG
         ret.wheelbase = 2.700
         ret.steerRatio = 13.7
-    elif candidate in [CAR.OPTIMA, CAR.OPTIMA_HEV, CAR.OPTIMA20, CAR.OPTIMA20_HEV]:
+    elif candidate in [CAR.K5, CAR.K5_HEV, CAR.K5_DL3, CAR.K5_DL3_HEV]:
         ret.mass = 1565. + STD_CARGO_KG
         ret.wheelbase = 2.805
         ret.steerRatio = 15.8
+    elif candidate in [CAR.K7, CAR.K7_HEV]:
+        ret.mass = 1730. + STD_CARGO_KG
+        ret.wheelbase = 2.855
+        ret.steerRatio = 12.5
+    elif candidate == CAR.K9:
+        ret.mass = 2005. + STD_CARGO_KG
+        ret.wheelbase = 3.15
+        ret.steerRatio = 16.5
     elif candidate == CAR.SPORTAGE:
         ret.mass = 1770. + STD_CARGO_KG
         ret.wheelbase = 2.670
@@ -138,14 +146,6 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 1510. + STD_CARGO_KG
         ret.wheelbase = 2.630
         ret.steerRatio = 13.0
-    elif candidate in [CAR.K7, CAR.K7_HEV]:
-        ret.mass = 1730. + STD_CARGO_KG
-        ret.wheelbase = 2.855
-        ret.steerRatio = 12.5
-    elif candidate == CAR.K9:
-        ret.mass = 2005. + STD_CARGO_KG
-        ret.wheelbase = 3.15
-        ret.steerRatio = 16.5
 
     # -----------------------------------------------------------------PID
     if Params().get("LateralControlSelect", encoding='utf8') == "0":
@@ -221,7 +221,7 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.lqr.c = [1., 0.]
           ret.lateralTuning.lqr.k = [-110., 451.]
           ret.lateralTuning.lqr.l = [0.33, 0.318]
-      elif candidate in [CAR.OPTIMA, CAR.OPTIMA_HEV]:
+      elif candidate in [CAR.K5, CAR.K5_HEV, CAR.K5_DL3, CAR.K5_DL3_HEV]:
           ret.lateralTuning.init('lqr')
           ret.lateralTuning.lqr.scale = 1700.0
           ret.lateralTuning.lqr.ki = 0.016
@@ -378,8 +378,8 @@ class CarInterface(CarInterfaceBase):
         be.type = ButtonType.decelCruise
       elif but == Buttons.GAP_DIST:
         be.type = ButtonType.gapAdjustCruise
-      elif but == Buttons.CANCEL:
-        be.type = ButtonType.cancel
+      #elif but == Buttons.CANCEL:
+      #  be.type = ButtonType.cancel
       else:
         be.type = ButtonType.unknown
       buttonEvents.append(be)
