@@ -415,9 +415,7 @@ struct CarParams {
   minEnableSpeed @7 :Float32;
   minSteerSpeed @8 :Float32;
   maxSteeringAngleDeg @54 :Float32;
-  safetyModel @9 :SafetyModel;
-  safetyModelPassive @42 :SafetyModel = silent;
-  safetyParam @10 :Int16;
+  safetyConfigs @62 :List(SafetyConfig);
 
   steerMaxBP @11 :List(Float32);
   steerMaxV @12 :List(Float32);
@@ -475,13 +473,19 @@ struct CarParams {
   communityFeature @46: Bool;  # true if a community maintained feature is detected
   fingerprintSource @49: FingerprintSource;
   networkLocation @50 :NetworkLocation;  # Where Panda/C2 is integrated into the car's CAN network
-  mdpsBus @62: Int8;
-  sasBus @63: Int8;
-  sccBus @64: Int8;
-  enableAutoHold @65 :Bool;
-  hasScc13 @66 :Bool;
-  hasScc14 @67 :Bool;
-  hasEms @68 :Bool;
+  
+  struct SafetyConfig {
+    safetyModel @0 :SafetyModel;
+    safetyParam @1 :Int16;
+  }
+  
+  mdpsBus @63: Int8;
+  sasBus @64: Int8;
+  sccBus @65: Int8;
+  enableAutoHold @66 :Bool;
+  hasScc13 @67 :Bool;
+  hasScc14 @68 :Bool;
+  hasEms @69 :Bool;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);
@@ -622,4 +626,7 @@ struct CarParams {
   enableCameraDEPRECATED @4 :Bool;
   isPandaBlackDEPRECATED @39: Bool;
   hasStockCameraDEPRECATED @57 :Bool;
+  safetyParamDEPRECATED @10 :Int16;
+  safetyModelDEPRECATED @9 :SafetyModel;
+  safetyModelPassiveDEPRECATED @42 :SafetyModel = silent;
 }
