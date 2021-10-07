@@ -21,7 +21,7 @@ MIN_SET_SPEED_KPH = V_CRUISE_MIN
 MAX_SET_SPEED_KPH = V_CRUISE_MAX
 
 ALIVE_COUNT = [6, 8]
-WAIT_COUNT = [10, 12, 15]
+WAIT_COUNT = [12, 13, 14, 15, 16]
 AliveIndex = 0
 WaitIndex = 0
 
@@ -218,7 +218,7 @@ class SccSmoother:
 
     if self.wait_timer > 0:
       self.wait_timer -= 1
-    elif ascc_enabled:
+    elif ascc_enabled and not CS.out.cruiseState.standstill:
 
       if self.alive_timer == 0:
         self.btn = self.get_button(CS.cruiseState_speed * self.speed_conv_to_clu)
