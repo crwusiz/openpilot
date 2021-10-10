@@ -353,7 +353,7 @@ class SccSmoother:
       accel *= brake_factor
 
     if accel < 0 and not stopping:
-      accel = interp(accel - CS.out.aEgo, [-1.0, -0.5], [1.6 * accel, accel])
+      accel = interp(accel - CS.out.aEgo, [-1.0, -0.5], [1.5 * accel, accel])
       
     return accel
 
