@@ -39,6 +39,7 @@ private:
   void showEvent(QShowEvent *event) override;
   void updateLabels();
 
+  LabelControl *gitRemoteLbl;
   LabelControl *gitBranchLbl;
   LabelControl *gitCommitLbl;
   LabelControl *osVersionLbl;

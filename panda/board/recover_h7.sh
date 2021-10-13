@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 set -e
+cd /data/openpilot/panda/board;
 
 DFU_UTIL="dfu-util"
 

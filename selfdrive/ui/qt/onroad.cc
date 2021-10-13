@@ -39,21 +39,6 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   setAttribute(Qt::WA_OpaquePaintEvent);
   QObject::connect(this, &OnroadWindow::updateStateSignal, this, &OnroadWindow::updateState);
   QObject::connect(this, &OnroadWindow::offroadTransitionSignal, this, &OnroadWindow::offroadTransition);
-
-#ifdef QCOM2
-  // screen recoder - neokii
-  QWidget* recorder_widget = new QWidget(this);
-  QVBoxLayout * recorder_layout = new QVBoxLayout (recorder_widget);
-  recorder_layout->setMargin(35);
-  recorder = new ScreenRecoder(this);
-  recorder_layout->addWidget(recorder);
-  recorder_layout->setAlignment(recorder, Qt::AlignRight | Qt::AlignBottom);
-
-  nvg->recorder = recorder;
-  stacked_layout->addWidget(recorder_widget);
-  recorder_widget->raise();
-  alerts->raise();
-#endif
 }
 
 void OnroadWindow::updateState(const UIState &s) {
@@ -100,26 +85,13 @@ void OnroadWindow::mouseReleaseEvent(QMouseEvent* e) {
         QTimer::singleShot(500, []() {
           Params().putBool("SoftRestartTriggered", true);
         });
-
         QSound::play("../assets/sounds/reset_calibration.wav");
-      }
-      else { // downward
+      } else { // downward
         QTimer::singleShot(500, []() {
           Params().putBool("SoftRestartTriggered", true);
         });
       }
     }
-    else if(std::abs(dx) > std::abs(dy)) {
-      if(dx < 0) { // right to left
-        if(recorder)
-          recorder->toggle();
-      }
-      else { // left to right
-        if(recorder)
-          recorder->toggle();
-      }
-    }
-
     return;
   }
 
@@ -174,11 +146,6 @@ void OnroadWindow::offroadTransition(bool offroad) {
   bool wide_cam = Hardware::TICI() && Params().getBool("EnableWideCamera");
   nvg->setStreamType(wide_cam ? VISION_STREAM_RGB_WIDE : VISION_STREAM_RGB_BACK);
 
-#ifdef QCOM2
-  if(offroad && recorder) {
-    recorder->stop(false);
-  }
-#endif
 }
 
 void OnroadWindow::paintEvent(QPaintEvent *event) {
@@ -273,11 +240,6 @@ void NvgWindow::updateState(const UIState &s) {
 void NvgWindow::paintGL() {
   CameraViewWidget::paintGL();
   ui_draw(&QUIState::ui_state, width(), height());
-
-#ifdef QCOM2
-  if(recorder)
-    recorder->ui_draw(&QUIState::ui_state, width(), height());
-#endif
 
   double cur_draw_t = millis_since_boot();
   double dt = cur_draw_t - prev_draw_t;

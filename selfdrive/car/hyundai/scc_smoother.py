@@ -59,7 +59,7 @@ class SccSmoother:
 
   def __init__(self):
 
-    self.longcontrol = Params().get_bool('LongControlEnabled')
+    self.longcontrol = Params().get("LongControlSelect", encoding='utf8') == "1"
     self.slow_on_curves = Params().get_bool('SccSmootherSlowOnCurves')
     self.sync_set_speed_while_gas_pressed = Params().get_bool('SccSmootherSyncGasPressed')
     self.is_metric = Params().get_bool('IsMetric')

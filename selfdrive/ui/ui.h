@@ -1,27 +1,5 @@
 #pragma once
 
-#define UI_FEATURE_BRAKE 1
-#define UI_FEATURE_AUTOHOLD 1
-#define UI_FEATURE_DASHCAM 1
-
-#define UI_FEATURE_LEFT 1
-#define UI_FEATURE_RIGHT 1
-
-#define UI_FEATURE_LEFT_Y 220
-#define UI_FEATURE_RIGHT_Y 10
-
-#define UI_FEATURE_LEFT_REL_DIST 1
-#define UI_FEATURE_LEFT_REL_SPEED 1
-#define UI_FEATURE_LEFT_REAL_STEER 1
-#define UI_FEATURE_LEFT_DESIRED_STEER 1
-
-#define UI_FEATURE_RIGHT_CPU_TEMP 1
-#define UI_FEATURE_RIGHT_AMBIENT_TEMP 1
-#define UI_FEATURE_RIGHT_BATTERY_LEVEL 1
-#define UI_FEATURE_RIGHT_GPS_ALTITUDE 1
-#define UI_FEATURE_RIGHT_GPS_ACCURACY 1
-#define UI_FEATURE_RIGHT_GPS_SATELLITE 1
-
 #include <atomic>
 #include <map>
 #include <memory>
@@ -47,9 +25,16 @@
 #define COLOR_BLACK_ALPHA(x) nvgRGBA(0, 0, 0, x)
 #define COLOR_WHITE nvgRGBA(255, 255, 255, 255)
 #define COLOR_WHITE_ALPHA(x) nvgRGBA(255, 255, 255, x)
-#define COLOR_RED_ALPHA(x) nvgRGBA(201, 34, 49, x)
-#define COLOR_YELLOW nvgRGBA(218, 202, 37, 255)
-#define COLOR_RED nvgRGBA(201, 34, 49, 255)
+#define COLOR_RED nvgRGBA(255, 0, 0, 255)
+#define COLOR_RED_ALPHA(x) nvgRGBA(255, 0, 0, x)
+#define COLOR_YELLOW nvgRGBA(255, 255, 0, 255)
+#define COLOR_YELLOW_ALPHA(x) nvgRGBA(255, 255, 0, x)
+#define COLOR_ENGAGED nvgRGBA(23, 134, 68, 255)
+#define COLOR_ENGAGED_ALPHA(x) nvgRGBA(23, 134, 68, x)
+#define COLOR_WARNING nvgRGBA(218, 111, 37, 255)
+#define COLOR_WARNING_ALPHA(x) nvgRGBA(218, 111, 37, x)
+#define COLOR_ENGAGEABLE nvgRGBA(23, 51, 73, 255)
+#define COLOR_ENGAGEABLE_ALPHA(x) nvgRGBA(23, 51, 73, x)
 
 typedef cereal::CarControl::HUDControl::AudibleAlert AudibleAlert;
 
@@ -80,16 +65,27 @@ typedef struct Alert {
   }
 } Alert;
 
-const Alert CONTROLS_WAITING_ALERT = {"openpilot Unavailable", "Waiting for controls to start", 
+/* eng
+const Alert CONTROLS_WAITING_ALERT = {"openpilot Unavailable", "Waiting for controls to start",
                                       "controlsWaiting", cereal::ControlsState::AlertSize::MID,
                                       AudibleAlert::NONE};
 
 const Alert CONTROLS_UNRESPONSIVE_ALERT = {"TAKE CONTROL IMMEDIATELY", "Controls Unresponsive",
                                            "controlsUnresponsive", cereal::ControlsState::AlertSize::FULL,
                                            AudibleAlert::CHIME_WARNING_REPEAT};
+*/
+
+const Alert CONTROLS_WAITING_ALERT = {"오픈파일럿을 사용할수없습니다", "프로세스가 준비중입니다",
+                                      "프로세스가 준비중입니다", cereal::ControlsState::AlertSize::MID,
+                                      AudibleAlert::NONE};
+
+const Alert CONTROLS_UNRESPONSIVE_ALERT = {"핸들을 잡아주세요", "프로세스가 응답하지않습니다",
+                                           "프로세스가 응답하지않습니다", cereal::ControlsState::AlertSize::FULL,
+                                           AudibleAlert::CHIME_WARNING_REPEAT};
+
 const int CONTROLS_TIMEOUT = 5;
 
-const int bdr_s = 20;
+const int bdr_s = 10;
 const int header_h = 420;
 const int footer_h = 280;
 
@@ -104,8 +100,8 @@ typedef enum UIStatus {
 
 const QColor bg_colors [] = {
   [STATUS_DISENGAGED] =  QColor(0x17, 0x33, 0x49, 0xc8),
-  [STATUS_ENGAGED] = QColor(0x17, 0x86, 0x44, 0xf1),
-  [STATUS_WARNING] = QColor(0xDA, 0x6F, 0x25, 0xf1),
+  [STATUS_ENGAGED] = QColor(0x17, 0x86, 0x44, 0x01),
+  [STATUS_WARNING] = QColor(0xDA, 0x6F, 0x25, 0x01),
   [STATUS_ALERT] = QColor(0xC9, 0x22, 0x31, 0xf1),
 };
 
@@ -122,6 +118,17 @@ typedef struct UIScene {
 
   mat3 view_from_calib;
   bool world_objects_visible;
+
+  // ui add
+  float cpuTempAvg;
+  int lateralControlSelect;
+  float output_scale;
+  bool leftBlinker, rightBlinker;
+  int blinkingrate;
+
+  // gps
+  int satelliteCount;
+  float gpsAccuracy;
 
   cereal::PandaState::PandaType pandaType;
 
@@ -144,10 +151,12 @@ typedef struct UIScene {
 
   // neokii dev UI
   cereal::CarControl::Reader car_control;
+  cereal::DeviceState::Reader deviceState;
+  cereal::CarState::Reader car_state;
+  cereal::ControlsState::Reader controls_state;
   cereal::CarParams::Reader car_params;
   cereal::GpsLocationData::Reader gps_ext;
   cereal::LiveParametersData::Reader live_params;
-  int satelliteCount;
 
 } UIScene;
 
@@ -169,7 +178,7 @@ typedef struct UIState {
   bool wide_camera;
 
   //
-  bool show_debug_ui, custom_lead_mark;
+  bool show_debug_ui;
   TouchState touch;
   int lock_on_anim_index;
 

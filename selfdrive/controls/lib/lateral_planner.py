@@ -52,7 +52,6 @@ class LateralPlanner():
 
     self.solution_invalid_cnt = 0
 
-    self.lane_change_enabled = Params().get_bool('LaneChangeEnabled')
     self.auto_lane_change_enabled = Params().get_bool('AutoLaneChangeEnabled')
     self.auto_lane_change_timer = 0.0
     self.prev_torque_applied = False
@@ -83,6 +82,16 @@ class LateralPlanner():
     self.safe_desired_curvature_rate = 0.0
 
   def update(self, sm, CP):
+    try:
+      if CP.lateralTuning.which() == 'pid':
+        self.output_scale = sm['controlsState'].lateralControlState.pidState.output
+      elif CP.lateralTuning.which() == 'indi':
+        self.output_scale = sm['controlsState'].lateralControlState.indiState.output
+      elif CP.lateralTuning.which() == 'lqr':
+        self.output_scale = sm['controlsState'].lateralControlState.lqrState.output
+    except:
+      pass
+
     v_ego = sm['carState'].vEgo
     active = sm['controlsState'].active
     measured_curvature = sm['controlsState'].curvature
@@ -104,7 +113,7 @@ class LateralPlanner():
     one_blinker = sm['carState'].leftBlinker != sm['carState'].rightBlinker
     below_lane_change_speed = v_ego < LANE_CHANGE_SPEED_MIN
 
-    if (not active) or (self.lane_change_timer > LANE_CHANGE_TIME_MAX) or (not one_blinker) or (not self.lane_change_enabled):
+    if (not active) or (self.lane_change_timer > LANE_CHANGE_TIME_MAX) or (not one_blinker):
       self.lane_change_state = LaneChangeState.off
       self.lane_change_direction = LaneChangeDirection.none
     else:
@@ -119,8 +128,7 @@ class LateralPlanner():
 
       lane_change_prob = self.LP.l_lane_change_prob + self.LP.r_lane_change_prob
 
-      # State transitions
-      # off
+      # LaneChangeState.off
       if self.lane_change_state == LaneChangeState.off and one_blinker and not self.prev_one_blinker and not below_lane_change_speed:
         if sm['carState'].leftBlinker:
           self.lane_change_direction = LaneChangeDirection.left
@@ -130,7 +138,7 @@ class LateralPlanner():
         self.lane_change_state = LaneChangeState.preLaneChange
         self.lane_change_ll_prob = 1.0
 
-      # pre
+      # LaneChangeState.preLaneChange
       elif self.lane_change_state == LaneChangeState.preLaneChange:
         if not one_blinker or below_lane_change_speed:
           self.lane_change_state = LaneChangeState.off

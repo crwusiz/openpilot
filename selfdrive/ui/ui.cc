@@ -123,6 +123,25 @@ static void update_state(UIState *s) {
     scene.engageable = cs.getEngageable() || cs.getEnabled();
     scene.dm_active = sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode();
   }
+  if (scene.started && sm.updated("controlsState")) {
+    scene.controls_state = sm["controlsState"].getControlsState();
+    scene.lateralControlSelect = scene.controls_state.getLateralControlSelect();
+    if (scene.lateralControlSelect == 0) {
+      scene.output_scale = scene.controls_state.getLateralControlState().getPidState().getOutput();
+    } else if (scene.lateralControlSelect == 1) {
+      scene.output_scale = scene.controls_state.getLateralControlState().getIndiState().getOutput();
+    } else if (s->scene.lateralControlSelect == 2) {
+      scene.output_scale = scene.controls_state.getLateralControlState().getLqrState().getOutput();
+    }
+  }
+  if (sm.updated("carState")) {
+    scene.car_state = sm["carState"].getCarState();
+    if(scene.leftBlinker!=scene.car_state.getLeftBlinker() || scene.rightBlinker!=scene.car_state.getRightBlinker()){
+      scene.blinkingrate = 120;
+    }
+    scene.leftBlinker = scene.car_state.getLeftBlinker();
+    scene.rightBlinker = scene.car_state.getRightBlinker();
+  }
   if (sm.updated("modelV2") && s->vg) {
     auto model = sm["modelV2"].getModelV2();
     update_model(s, model);
@@ -144,6 +163,10 @@ static void update_state(UIState *s) {
         scene.view_from_calib.v[i*3 + j] = view_from_calib(i,j);
       }
     }
+  }
+  if (sm.updated("deviceState")) {
+    scene.deviceState = sm["deviceState"].getDeviceState();
+    scene.cpuTempAvg = (scene.deviceState.getCpuTempC()[0] + scene.deviceState.getCpuTempC()[1] + scene.deviceState.getCpuTempC()[2] + scene.deviceState.getCpuTempC()[3]) / 4;
   }
   if (sm.updated("pandaStates")) {
     auto pandaStates = sm["pandaStates"].getPandaStates();
@@ -204,7 +227,6 @@ static void update_params(UIState *s) {
     Params params;
     scene.is_metric = params.getBool("IsMetric");
     s->show_debug_ui = params.getBool("ShowDebugUI");
-	s->custom_lead_mark = params.getBool("CustomLeadMark");
   }
 }
 
@@ -236,8 +258,7 @@ static void update_status(UIState *s) {
   started_prev = s->scene.started;
 }
 
-static void update_extras(UIState *s)
-{
+static void update_extras(UIState *s) {
    UIScene &scene = s->scene;
    SubMaster &sm = *(s->sm);
 

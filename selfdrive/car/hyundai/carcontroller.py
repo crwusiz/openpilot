@@ -18,8 +18,7 @@ VisualAlert = car.CarControl.HUDControl.VisualAlert
 min_set_speed = 30 * CV.KPH_TO_MS
 
 
-SP_CARS = [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80,
-           CAR.GENESIS_EQ900, CAR.GENESIS_EQ900_L, CAR.K9, CAR.GENESIS_G90]
+SP_CARS = [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90, CAR.K9]
 
 def process_hud_alert(enabled, fingerprint, visual_alert, left_lane, right_lane,
                       left_lane_depart, right_lane_depart):
@@ -63,8 +62,9 @@ class CarController():
     self.longcontrol = CP.openpilotLongitudinalControl
     self.scc_live = not CP.radarOffCan
 
-    self.mad_mode_enabled = Params().get_bool('MadModeEnabled')
-    self.ldws_opt = Params().get_bool('IsLdwsCar')
+    # params init
+    self.lfamfc = Params().get("MfcSelect", encoding='utf8') == "2"
+    self.mad_mode_enabled = Params().get("LongControlSelect", encoding='utf8') == "0" or Params().get("LongControlSelect", encoding='utf8') == "1"
     self.stock_navi_decel_enabled = Params().get_bool('StockNaviDecelEnabled')
 
     # gas_factor, brake_factor
@@ -135,12 +135,12 @@ class CarController():
     can_sends = []
     can_sends.append(create_lkas11(self.packer, frame, self.car_fingerprint, apply_steer, lkas_active,
                                    CS.lkas11, sys_warning, sys_state, enabled, left_lane, right_lane,
-                                   left_lane_warning, right_lane_warning, 0, self.ldws_opt))
+                                   left_lane_warning, right_lane_warning, 0))
 
     if CS.mdps_bus or CS.scc_bus == 1:  # send lkas11 bus 1 if mdps or scc is on bus 1
       can_sends.append(create_lkas11(self.packer, frame, self.car_fingerprint, apply_steer, lkas_active,
                                      CS.lkas11, sys_warning, sys_state, enabled, left_lane, right_lane,
-                                     left_lane_warning, right_lane_warning, 1, self.ldws_opt))
+                                     left_lane_warning, right_lane_warning, 1))
 
     if frame % 2 and CS.mdps_bus: # send clu11 to mdps if it is not on bus 0
       can_sends.append(create_clu11(self.packer, frame // 2 % 0x10, CS.mdps_bus, CS.clu11, Buttons.NONE, enabled_speed))
@@ -244,7 +244,7 @@ class CarController():
     if frame % 5 == 0:
       activated_hda = road_speed_limiter_get_active()
       # activated_hda: 0 - off, 1 - main road, 2 - highway
-      if self.car_fingerprint in FEATURES["send_lfa_mfa"]:
+      if self.lfamfc:
         can_sends.append(create_lfahda_mfc(self.packer, enabled, activated_hda))
       elif CS.mdps_bus == 0:
         state = 2 if self.car_fingerprint in FEATURES["send_hda_state_2"] else 1

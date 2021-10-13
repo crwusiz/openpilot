@@ -40,20 +40,23 @@ def manager_init():
     ("CommunityFeaturesToggle", "1"),
     ("IsMetric", "1"),
 
-    # HKG
-    ("UseClusterSpeed", "1"),
-    ("LongControlEnabled", "0"),
-    ("MadModeEnabled", "1"),
-    ("IsLdwsCar", "0"),
-    ("LaneChangeEnabled", "0"),
-    ("AutoLaneChangeEnabled", "0"),
+    # add
+    ("SshEnabled", "1"),
+    ("LongControlSelect", "0"),
+    ("AutoLaneChangeEnabled", "1"),
+    ("PutPrebuilt", "0"),
+    ("MfcSelect", "0"),
+    ("LateralControlSelect", "0"),
+    ("DisableShutdownd", "1"),
+    ("DisableLogger", "0"),
 
     ("SccSmootherSlowOnCurves", "0"),
     ("SccSmootherSyncGasPressed", "0"),
     ("StockNaviDecelEnabled", "0"),
     ("ShowDebugUI", "0"),
     ("DisableOpFcw", "0"),
-    ("CustomLeadMark", "0"),
+
+    # not use
     ("NewRadarInterface", "0"),
   ]
   if not PC:
@@ -164,14 +167,22 @@ def manager_thread():
     if sm['deviceState'].freeSpacePercent < 5:
       not_run.append("loggerd")
 
+    if params.get_bool("DisableShutdownd"):
+      not_run.append("shutdownd")
+    if params.get_bool("DisableLogger"):
+      not_run.append("loggerd")
+      not_run.append("deleter")
+      not_run.append("logmessaged")
+      not_run.append("tombstoned")
+      not_run.append("uploader")
     started = sm['deviceState'].started
     driverview = params.get_bool("IsDriverViewEnabled")
     ensure_running(managed_processes.values(), started, driverview, not_run)
 
     # trigger an update after going offroad
-    if started_prev and not started and 'updated' in managed_processes:
-      os.sync()
-      managed_processes['updated'].signal(signal.SIGHUP)
+    #if started_prev and not started and 'updated' in managed_processes:
+    #  os.sync()
+    #  managed_processes['updated'].signal(signal.SIGHUP)
 
     started_prev = started
 

@@ -62,6 +62,7 @@ def read_tz(x):
   except FileNotFoundError:
     return 0
 
+prebuiltfile = '/data/openpilot/prebuilt'
 
 def read_thermal(thermal_config):
   dat = messaging.new_message('deviceState')
@@ -173,7 +174,7 @@ def thermald_thread():
 
   network_type = NetworkType.none
   network_strength = NetworkStrength.unknown
-  wifiIpAddress = 'N/A'
+  wifiIpAddress = '────────'
   network_info = None
   modem_version = None
   registered_count = 0
@@ -306,6 +307,7 @@ def thermald_thread():
 
     msg.deviceState.wifiIpAddress = wifiIpAddress
     msg.deviceState.batteryPercent = HARDWARE.get_battery_capacity()
+    msg.deviceState.batteryStatus = HARDWARE.get_battery_status()
     msg.deviceState.batteryCurrent = HARDWARE.get_battery_current()
     msg.deviceState.usbOnline = HARDWARE.get_usb_present()
     current_filter.update(msg.deviceState.batteryCurrent / 1e6)
@@ -338,7 +340,7 @@ def thermald_thread():
 
     # show invalid date/time alert
     startup_conditions["time_valid"] = True #(now.year > 2020) or (now.year == 2020 and now.month >= 10)
-    set_offroad_alert_if_changed("Offroad_InvalidTime", (not startup_conditions["time_valid"]))
+    #set_offroad_alert_if_changed("Offroad_InvalidTime", (not startup_conditions["time_valid"]))
 
     # Show update prompt
     try:
@@ -416,20 +418,25 @@ def thermald_thread():
       if off_ts is None:
         off_ts = sec_since_boot()
 
+    prebuiltlet = params.get_bool("PutPrebuilt")
+    if not os.path.isfile(prebuiltfile) and prebuiltlet:
+      os.system("cd /data/openpilot; touch prebuilt")
+    elif os.path.isfile(prebuiltfile) and not prebuiltlet:
+      os.system("cd /data/openpilot; rm -f prebuilt")
     # Offroad power monitoring
     power_monitor.calculate(peripheralState, startup_conditions["ignition"])
     msg.deviceState.offroadPowerUsageUwh = power_monitor.get_power_used()
     msg.deviceState.carBatteryCapacityUwh = max(0, power_monitor.get_car_battery_capacity())
 
     # Check if we need to disable charging (handled by boardd)
-    msg.deviceState.chargingDisabled = power_monitor.should_disable_charging(startup_conditions["ignition"], in_car, off_ts)
+    #msg.deviceState.chargingDisabled = power_monitor.should_disable_charging(startup_conditions["ignition"], in_car, off_ts)
 
     # Check if we need to shut down
-    if power_monitor.should_shutdown(peripheralState, startup_conditions["ignition"], in_car, off_ts, started_seen):
-      cloudlog.info(f"shutting device down, offroad since {off_ts}")
+    #if power_monitor.should_shutdown(peripheralState, startup_conditions["ignition"], in_car, off_ts, started_seen):
+    #  cloudlog.info(f"shutting device down, offroad since {off_ts}")
       # TODO: add function for blocking cloudlog instead of sleep
-      time.sleep(10)
-      HARDWARE.shutdown()
+    #  time.sleep(10)
+    #  HARDWARE.shutdown()
 
     # If UI has crashed, set the brightness to reasonable non-zero value
     ui_running = "ui" in (p.name for p in sm["managerState"].processes if p.running)

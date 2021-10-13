@@ -408,4 +408,4 @@ class Android(HardwareBase):
       pattern = re.compile(r'inet addr:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})')
       return pattern.search(wlan).group(1)
     except Exception:
-      return "--"
+      return "────────"

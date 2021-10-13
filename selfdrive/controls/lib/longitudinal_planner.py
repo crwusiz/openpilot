@@ -57,9 +57,6 @@ class Planner():
     self.a_desired_trajectory = np.zeros(CONTROL_N)
     self.j_desired_trajectory = np.zeros(CONTROL_N)
 
-    self.use_cluster_speed = Params().get_bool('UseClusterSpeed')
-    self.long_control_enabled = Params().get_bool('LongControlEnabled')
-
   def update(self, sm, CP):
     v_ego = sm['carState'].vEgo
     a_ego = sm['carState'].aEgo
@@ -69,11 +66,10 @@ class Planner():
     v_cruise = v_cruise_kph * CV.KPH_TO_MS
 
 	# neokii
-    if not self.use_cluster_speed or self.long_control_enabled:
-      cluSpeedMs = sm['carState'].cluSpeedMs
-      if v_ego > 3. and cluSpeedMs > 3.:
-        v_cruise *= v_ego / cluSpeedMs
-        v_cruise = int(v_cruise * CV.MS_TO_KPH) * CV.KPH_TO_MS
+    cluSpeedMs = sm['carState'].cluSpeedMs
+    if v_ego > 3. and cluSpeedMs > 3.:
+      v_cruise *= v_ego / cluSpeedMs
+      v_cruise = int(v_cruise * CV.MS_TO_KPH) * CV.KPH_TO_MS
 
     long_control_state = sm['controlsState'].longControlState
     force_slow_decel = sm['controlsState'].forceDecel

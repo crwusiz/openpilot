@@ -12,13 +12,13 @@ public:
 private:
   void showEvent(QShowEvent *event) override;
   void updateStats();
-  inline QString getDistanceUnit() const { return metric_ ? "KM" : "Miles"; }
+  inline QString getDistanceUnit() const { return metric_ ? "㎞" : "MILES"; }
 
   bool metric_;
   QJsonDocument stats_;
   struct StatsLabels {
-    QLabel *routes, *distance, *distance_unit, *hours;
-  } all_, week_;
+    QLabel *routes, *hours, *distance, *distance_unit;
+  } all_;
 
 private slots:
   void parseResponse(const QString &response);

@@ -232,7 +232,7 @@ class RoadSpeedLimiter:
     self.slowing_down = False
     self.start_dist = 0
     
-    self.longcontrol = Params().get_bool('LongControlEnabled')
+    self.longcontrol = Params().get("LongControlSelect", encoding='utf8') == "1"
     self.sock = messaging.sub_sock("roadLimitSpeed")
     self.roadLimitSpeed = None
   
