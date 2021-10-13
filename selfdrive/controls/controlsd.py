@@ -173,6 +173,7 @@ class Controls:
     self.right_lane_visible = False
 
     self.wide_camera = TICI and params.get_bool('EnableWideCamera')
+    self.disable_op_fcw = params.get_bool('DisableOpFcw')
 
     # TODO: no longer necessary, aside from process replay
     self.sm['liveParameters'].valid = True
@@ -304,7 +305,7 @@ class Controls:
         self.events.add(EventName.relayMalfunction)
     planner_fcw = self.sm['longitudinalPlan'].fcw and self.enabled
     model_fcw = self.sm['modelV2'].meta.hardBrakePredicted and not CS.brakePressed
-    if planner_fcw or model_fcw:
+    if not self.disable_op_fcw and (planner_fcw or model_fcw):
       self.events.add(EventName.fcw)
 
     if TICI:

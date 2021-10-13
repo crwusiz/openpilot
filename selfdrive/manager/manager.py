@@ -52,6 +52,7 @@ def manager_init():
     ("SccSmootherSyncGasPressed", "0"),
     ("StockNaviDecelEnabled", "0"),
     ("ShowDebugUI", "0"),
+    ("DisableOpFcw", "0"),
     ("CustomLeadMark", "0"),
     ("NewRadarInterface", "0"),
   ]
