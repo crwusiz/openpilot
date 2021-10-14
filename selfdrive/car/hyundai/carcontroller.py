@@ -1,13 +1,12 @@
-
 from cereal import car
 from common.realtime import DT_CTRL
 from common.numpy_fast import clip, interp
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, \
-  create_scc11, create_scc12, create_scc13, create_scc14, \
-  create_mdps12, create_lfahda_mfc, create_hda_mfc
+                                             create_scc11, create_scc12, create_scc13, create_scc14, \
+                                             create_mdps12, create_lfahda_mfc, create_hda_mfc
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
-from selfdrive.car.hyundai.values import Buttons, CAR, FEATURES, CarControllerParams
+from selfdrive.car.hyundai.values import Buttons, FEATURES, CarControllerParams, SP_CARS
 from opendbc.can.packer import CANPacker
 from selfdrive.config import Conversions as CV
 from common.params import Params
@@ -16,9 +15,6 @@ from selfdrive.road_speed_limiter import road_speed_limiter_get_active
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 min_set_speed = 30 * CV.KPH_TO_MS
-
-
-SP_CARS = [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90, CAR.K9]
 
 def process_hud_alert(enabled, fingerprint, visual_alert, left_lane, right_lane,
                       left_lane_depart, right_lane_depart):
@@ -53,18 +49,17 @@ class CarController():
     self.steer_rate_limited = False
     self.lkas11_cnt = 0
     self.scc12_cnt = -1
-
     self.resume_cnt = 0
     self.last_lead_distance = 0
     self.resume_wait_timer = 0
-
     self.turning_signal_timer = 0
     self.longcontrol = CP.openpilotLongitudinalControl
     self.scc_live = not CP.radarOffCan
 
     # params init
     self.lfamfc = Params().get("MfcSelect", encoding='utf8') == "2"
-    self.mad_mode_enabled = Params().get("LongControlSelect", encoding='utf8') == "0" or Params().get("LongControlSelect", encoding='utf8') == "1"
+    self.mad_mode_enabled = Params().get("LongControlSelect", encoding='utf8') == "0" or \
+                            Params().get("LongControlSelect", encoding='utf8') == "1"
     self.stock_navi_decel_enabled = Params().get_bool('StockNaviDecelEnabled')
 
     # gas_factor, brake_factor
@@ -129,7 +124,6 @@ class CarController():
     # self.scc_update_frame = frame
 
     self.prev_scc_cnt = CS.scc11["AliveCounterACC"]
-
     self.lkas11_cnt = (self.lkas11_cnt + 1) % 0x10
 
     can_sends = []
@@ -182,20 +176,16 @@ class CarController():
 
     # send scc to car if longcontrol enabled and SCC not on bus 0 or ont live
     if self.longcontrol and CS.cruiseState_enabled and (CS.scc_bus or not self.scc_live):
-
       if frame % 2 == 0:
-        
         stopping = controls.LoC.long_control_state == LongCtrlState.stopping
         apply_accel = self.scc_smoother.get_apply_accel(CS, controls.sm, actuators.accel, stopping)
         apply_accel = clip(apply_accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
-
         controls.apply_accel = apply_accel
         aReqValue = CS.scc12["aReqValue"]
         controls.aReqValue = aReqValue
 
         if aReqValue < controls.aReqValueMin:
           controls.aReqValueMin = controls.aReqValue
-
         if aReqValue > controls.aReqValueMax:
           controls.aReqValueMax = controls.aReqValue
 
@@ -226,7 +216,6 @@ class CarController():
           
         if CS.has_scc14:
           acc_standstill = stopping if CS.out.vEgo < 2. else False
-
           lead = self.scc_smoother.get_lead(controls.sm)
 
           if lead is not None:

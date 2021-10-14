@@ -219,7 +219,6 @@ class CarState(CarStateBase):
       ("YAW_RATE", "ESP12", 0),
 
       ("CF_Gway_DrvSeatBeltInd", "CGW4", 1),
-
       ("CF_Gway_DrvSeatBeltSw", "CGW1", 0),
       ("CF_Gway_DrvDrSw", "CGW1", 0),       # Driver Door
       ("CF_Gway_AstDrSw", "CGW1", 0),       # Passenger door

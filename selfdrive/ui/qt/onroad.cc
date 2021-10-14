@@ -1,7 +1,6 @@
 #include "selfdrive/ui/qt/onroad.h"
 
 #include <QDebug>
-#include <QSound>
 
 #include "selfdrive/common/timing.h"
 #include "selfdrive/ui/paint.h"
@@ -68,55 +67,14 @@ void OnroadWindow::updateState(const UIState &s) {
   }
 }
 
-void OnroadWindow::mouseReleaseEvent(QMouseEvent* e) {
-
-#ifdef QCOM2
-  // neokii
-  QPoint endPos = e->pos();
-  int dx = endPos.x() - startPos.x();
-  int dy = endPos.y() - startPos.y();
-  if(std::abs(dx) > 250 || std::abs(dy) > 200) {
-
-    if(std::abs(dx) < std::abs(dy)) {
-
-      if(dy < 0) { // upward
-        Params().remove("CalibrationParams");
-        Params().remove("LiveParameters");
-        QTimer::singleShot(500, []() {
-          Params().putBool("SoftRestartTriggered", true);
-        });
-        QSound::play("../assets/sounds/reset_calibration.wav");
-      } else { // downward
-        QTimer::singleShot(500, []() {
-          Params().putBool("SoftRestartTriggered", true);
-        });
-      }
-    }
-    return;
-  }
-
-  if (map != nullptr) {
-    bool sidebarVisible = geometry().x() > 0;
-    map->setVisible(!sidebarVisible && !map->isVisible());
-  }
-
-  // propagation event to parent(HomeWindow)
-  QWidget::mouseReleaseEvent(e);
-#endif
-}
-
 void OnroadWindow::mousePressEvent(QMouseEvent* e) {
-#ifdef QCOM2
-  startPos = e->pos();
-#else
   if (map != nullptr) {
     bool sidebarVisible = geometry().x() > 0;
     map->setVisible(!sidebarVisible && !map->isVisible());
   }
 
   // propagation event to parent(HomeWindow)
-  QWidget::mouseReleaseEvent(e);
-#endif
+  QWidget::mousePressEvent(e);
 }
 
 void OnroadWindow::offroadTransition(bool offroad) {
@@ -145,7 +103,6 @@ void OnroadWindow::offroadTransition(bool offroad) {
   // update stream type
   bool wide_cam = Hardware::TICI() && Params().getBool("EnableWideCamera");
   nvg->setStreamType(wide_cam ? VISION_STREAM_RGB_WIDE : VISION_STREAM_RGB_BACK);
-
 }
 
 void OnroadWindow::paintEvent(QPaintEvent *event) {

@@ -54,10 +54,8 @@ int main(int argc, char *argv[]) {
   });
   btn2->setText("Git Pull");
   QObject::connect(btn2, &QPushButton::clicked, [=]() {
-    QProcess::execute("sh /data/openpilot/publickey.sh");
-    QProcess::execute("sh /data/openpilot/gitpull.sh");
+    QProcess::execute("sh /data/openpilot/scripts/gitpull.sh");
     Hardware::reboot();
-    btn2->setEnabled(false);
   });
   main_layout->addWidget(btn2, 0, 0, Qt::AlignLeft | Qt::AlignBottom);
 #else

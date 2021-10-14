@@ -17,16 +17,14 @@ class CarInterface(CarInterfaceBase):
   def __init__(self, CP, CarController, CarState):
     super().__init__(CP, CarController, CarState)
     self.cp2 = self.CS.get_can2_parser(CP)
-    self.mad_mode_enabled = Params().get("LongControlSelect", encoding='utf8') == "0" or Params().get("LongControlSelect", encoding='utf8') == "1"
+    self.mad_mode_enabled = Params().get("LongControlSelect", encoding='utf8') == "0" or \
+                            Params().get("LongControlSelect", encoding='utf8') == "1"
 
   @staticmethod
   def get_pid_accel_limits(CP, current_speed, cruise_speed):
-
     v_current_kph = current_speed * CV.MS_TO_KPH
-
     gas_max_bp = [0., 10., 20., 50., 70., 130.]
     gas_max_v = [1.94, 1.29, 0.9, 0.66, 0.46, 0.34]
-
     brake_max_bp = [0, 70., 130.]
     brake_max_v = [CarControllerParams.ACCEL_MIN, -3.2, -2.3]
 
@@ -35,16 +33,11 @@ class CarInterface(CarInterfaceBase):
   @staticmethod
   def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=[]):  # pylint: disable=dangerous-default-value
     ret = CarInterfaceBase.get_std_params(candidate, fingerprint)
-
     ret.openpilotLongitudinalControl = Params().get("LongControlSelect", encoding='utf8') == "1"
 
     ret.carName = "hyundai"
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy, 0)]
-
     ret.communityFeature = True
-
-    tire_stiffness_factor = 1.
-    ret.maxSteeringAngleDeg = 1000.
 
     # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
     # genesis
@@ -73,7 +66,7 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 1615. + STD_CARGO_KG
         ret.wheelbase = 2.840
         ret.steerRatio = 15.2
-    elif candidate in [CAR.SONATA19, CAR.SONATA19_HEV]:
+    elif candidate in [CAR.SONATA_LF, CAR.SONATA_LF_HEV]:
         ret.mass = 1640. + STD_CARGO_KG
         ret.wheelbase = 2.805
         ret.steerRatio = 15.2
@@ -110,10 +103,18 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 1345. + STD_CARGO_KG
         ret.wheelbase = 2.700
         ret.steerRatio = 13.7
-    elif candidate in [CAR.OPTIMA, CAR.OPTIMA_HEV, CAR.OPTIMA20, CAR.OPTIMA20_HEV]:
+    elif candidate in [CAR.K5, CAR.K5_HEV, CAR.K5_DL3, CAR.K5_DL3_HEV]:
         ret.mass = 1565. + STD_CARGO_KG
         ret.wheelbase = 2.805
         ret.steerRatio = 15.8
+    elif candidate in [CAR.K7, CAR.K7_HEV]:
+        ret.mass = 1730. + STD_CARGO_KG
+        ret.wheelbase = 2.855
+        ret.steerRatio = 12.5
+    elif candidate == CAR.K9:
+        ret.mass = 2005. + STD_CARGO_KG
+        ret.wheelbase = 3.15
+        ret.steerRatio = 16.5
     elif candidate == CAR.SPORTAGE:
         ret.mass = 1770. + STD_CARGO_KG
         ret.wheelbase = 2.670
@@ -142,14 +143,6 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 1510. + STD_CARGO_KG
         ret.wheelbase = 2.630
         ret.steerRatio = 13.0
-    elif candidate in [CAR.K7, CAR.K7_HEV]:
-        ret.mass = 1730. + STD_CARGO_KG
-        ret.wheelbase = 2.855
-        ret.steerRatio = 12.5
-    elif candidate == CAR.K9:
-        ret.mass = 2005. + STD_CARGO_KG
-        ret.wheelbase = 3.15
-        ret.steerRatio = 16.5
 
     # -----------------------------------------------------------------PID
     if Params().get("LateralControlSelect", encoding='utf8') == "0":
@@ -225,7 +218,7 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.lqr.c = [1., 0.]
           ret.lateralTuning.lqr.k = [-110., 451.]
           ret.lateralTuning.lqr.l = [0.33, 0.318]
-      elif candidate in [CAR.OPTIMA, CAR.OPTIMA_HEV]:
+      elif candidate in [CAR.K5, CAR.K5_HEV]:
           ret.lateralTuning.init('lqr')
           ret.lateralTuning.lqr.scale = 1700.0
           ret.lateralTuning.lqr.ki = 0.016
@@ -277,11 +270,12 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.lqr.l = [0.22, 0.318]
     # -----------------------------------------------------------------
 
+    tire_stiffness_factor = 1.
+    ret.maxSteeringAngleDeg = 1000.
     ret.radarTimeStep = 0.05
 
     if ret.centerToFront == 0:
       ret.centerToFront = ret.wheelbase * 0.4
-
 
     # TODO: get actual value, for now starting with reasonable value for
     # civic and scaling by mass and wheelbase
@@ -359,7 +353,6 @@ class CarInterface(CarInterfaceBase):
       self.CP.pcmCruise = True
 
     # most HKG cars has no long control, it is safer and easier to engage by main on
-
     if self.mad_mode_enabled:
       ret.cruiseState.enabled = ret.cruiseState.available
 

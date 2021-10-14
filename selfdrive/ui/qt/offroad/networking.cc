@@ -27,7 +27,8 @@ Networking::Networking(QWidget* parent, bool show_advanced) : QFrame(parent) {
   QVBoxLayout* vlayout = new QVBoxLayout(wifiScreen);
   vlayout->setContentsMargins(20, 20, 20, 20);
   if (show_advanced) {
-    QPushButton* advancedSettings = new QPushButton("Advanced");
+    //QPushButton* advancedSettings = new QPushButton("Advanced");
+    QPushButton* advancedSettings = new QPushButton("고급 설정");
     advancedSettings->setObjectName("advancedBtn");
     advancedSettings->setStyleSheet("margin-right: 30px;");
     advancedSettings->setFixedSize(350, 100);
@@ -136,7 +137,7 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   list->addItem(horizontal_line());
 
   // add
-  const char* gitpull = "sh /data/openpilot/gitpull.sh";
+  const char* gitpull = "sh /data/openpilot/scripts/gitpull.sh";
   //auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "RUN");
   auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "실행");
   QObject::connect(gitpullbtn, &ButtonControl::clicked, [=]() {
@@ -148,7 +149,7 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   });
   list->addItem(gitpullbtn);
 
-  const char* realdata_clear = "rm -rf /sdcard/realdata/*";
+  const char* realdata_clear = "sh /data/openpilot/scripts/realdataclear.sh";
   //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");
   auto realdataclearbtn = new ButtonControl("주행로그 삭제", "실행");
   QObject::connect(realdataclearbtn, &ButtonControl::clicked, [=]() {
@@ -258,7 +259,8 @@ WifiUI::WifiUI(QWidget *parent, WifiManager* wifi) : QWidget(parent), wifi(wifi)
   checkmark = QPixmap(ASSET_PATH + "offroad/icon_checkmark.svg").scaledToWidth(49, Qt::SmoothTransformation);
   circled_slash = QPixmap(ASSET_PATH + "img_circled_slash.svg").scaledToWidth(49, Qt::SmoothTransformation);
 
-  QLabel *scanning = new QLabel("Scanning for networks...");
+  //QLabel *scanning = new QLabel("Scanning for networks...");
+  QLabel *scanning = new QLabel("Wifi SSID를 검색중입니다...");
   scanning->setStyleSheet("font-size: 65px;");
   main_layout->addWidget(scanning, 0, Qt::AlignCenter);
 
@@ -311,7 +313,8 @@ void WifiUI::refresh() {
   clearLayout(main_layout);
 
   if (wifi->seenNetworks.size() == 0) {
-    QLabel *scanning = new QLabel("Scanning for networks...");
+    //QLabel *scanning = new QLabel("Scanning for networks...");
+    QLabel *scanning = new QLabel("Wifi SSID를 검색중입니다...");
     scanning->setStyleSheet("font-size: 65px;");
     main_layout->addWidget(scanning, 0, Qt::AlignCenter);
     return;

@@ -25,7 +25,7 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req,
     values["CF_Lkas_LdwsActivemode"] = 2
     values["CF_Lkas_SysWarning"] = lkas11["CF_Lkas_SysWarning"]
 
-  elif car_fingerprint in [CAR.OPTIMA, CAR.OPTIMA_HEV, CAR.K7, CAR.K7_HEV]:
+  elif car_fingerprint in [CAR.K5, CAR.K5_HEV, CAR.K7, CAR.K7_HEV]:
     values["CF_Lkas_LdwsActivemode"] = 0
 
   # This field is LDWS Mfc car ( qt ui toggle set )
@@ -75,6 +75,26 @@ def create_clu11(packer, frame, bus, clu11, button, speed):
   values["CF_Clu_AliveCnt1"] = frame
   return packer.make_can_msg("CLU11", bus, values)
 
+  # ---------------------------------------------------------------------------------------
+  # LFA_Icon_State 0 = no_wheel
+  #                1 = white_wheel
+  #                2 = green_wheel
+  #                3 = green_wheel_blink
+  # LFA_SysWarning 0 = no_message
+  #                1 = switching_to_hda
+  #                2 = switching_to_scc
+  #                3 = lfa_error
+  #                4 = check_hda
+  #                5 = keep_hands_on_wheel_orange
+  #                6 = keep_hands_on_wheel_red
+  # HDA_Icon_State 0 = no_hda
+  #                1 = white_hda
+  #                2 = green_hda
+  # HDA_SysWarning 0 = no_message
+  #                1 = driving_convenience_systems_cancelled
+  #                2 = highway_drive_assist_system_cancelled
+  # ---------------------------------------------------------------------------------------
+
 def create_lfahda_mfc(packer, enabled, active):
   values = {
     "LFA_Icon_State": 2 if enabled else 0,
@@ -82,11 +102,6 @@ def create_lfahda_mfc(packer, enabled, active):
     "HDA_Icon_State": 2 if active > 0 else 0,
     # "HDA_VSetReq": 0,
   }
-
-  # VAL_ 1157 LFA_Icon_State 0 "no_wheel" 1 "white_wheel" 2 "green_wheel" 3 "green_wheel_blink";
-  # VAL_ 1157 LFA_SysWarning 0 "no_message" 1 "switching_to_hda" 2 "switching_to_scc" 3 "lfa_error" 4 "check_hda" 5 "keep_hands_on_wheel_orange" 6 "keep_hands_on_wheel_red";
-  # VAL_ 1157 HDA_Icon_State 0 "no_hda" 1 "white_hda" 2 "green_hda";
-  # VAL_ 1157 HDA_SysWarning 0 "no_message" 1 "driving_convenience_systems_cancelled" 2 "highway_drive_assist_system_cancelled";
 
   return packer.make_can_msg("LFAHDA_MFC", 0, values)
 

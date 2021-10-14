@@ -117,14 +117,11 @@ TogglesPanel::TogglesPanel(QWidget *parent) : ListWidget(parent) {
 }
 
 DevicePanel::DevicePanel(QWidget* parent) : ListWidget(parent) {
-  setSpacing(50);
+  setSpacing(20);
   Params params = Params();
   addItem(new LabelControl("Dongle ID", getDongleId().value_or("N/A")));
-
   QString serial = QString::fromStdString(params.get("HardwareSerial", false));
   addItem(new LabelControl("Serial", serial));
-
-  // offroad-only buttons
 
   //auto dcamBtn = new ButtonControl("Driver Camera", "PREVIEW", "Preview the driver facing camera to help optimize device mounting position for best driver monitoring experience. (vehicle must be off)");
   auto dcamBtn = new ButtonControl("운전자 모니터링 카메라 미리보기", "실행", "운전자 모니터링 카메라를 미리보고 최적의 장착위치를 찾아보세요.");
@@ -177,14 +174,15 @@ DevicePanel::DevicePanel(QWidget* parent) : ListWidget(parent) {
 
   ButtonControl *regulatoryBtn = nullptr;
   if (Hardware::TICI()) {
-    regulatoryBtn = new ButtonControl("Regulatory", "VIEW", "");
+    //regulatoryBtn = new ButtonControl("Regulatory", "VIEW", "");
+    regulatoryBtn = new ButtonControl("규제", "보기", "");
     connect(regulatoryBtn, &ButtonControl::clicked, [=]() {
       const std::string txt = util::read_file(ASSET_PATH.toStdString() + "/offroad/fcc.html");
       RichTextDialog::alert(QString::fromStdString(txt), this);
     });
   }
 
-  for (auto btn : {dcamBtn, retrainingBtn, regulatoryBtn, resetCalibBtn}) {
+  for (auto btn : {dcamBtn, retrainingBtn, resetCalibBtn}) {
     if (btn) {
       connect(parent, SIGNAL(offroadTransition(bool)), btn, SLOT(setEnabled(bool)));
       addItem(btn);
@@ -194,7 +192,7 @@ DevicePanel::DevicePanel(QWidget* parent) : ListWidget(parent) {
   reset_layout->setSpacing(30);
 
   // addfunc button
-  const char* addfunc = "cp -f /data/openpilot/installer/fonts/driver_monitor.py /data/openpilot/selfdrive/monitoring";
+  const char* addfunc = "sh /data/openpilot/scripts/addfunc.sh";
   QPushButton *addfuncbtn = new QPushButton("추가기능");
   addfuncbtn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
   reset_layout->addWidget(addfuncbtn);
@@ -303,7 +301,8 @@ SoftwarePanel::SoftwarePanel(QWidget* parent) : ListWidget(parent) {
   });
   connect(parent, SIGNAL(offroadTransition(bool)), uninstallBtn, SLOT(setEnabled(bool)));
 
-  QWidget *widgets[] = {versionLbl, gitRemoteLbl, gitBranchLbl, gitCommitLbl, lastUpdateLbl, updateBtn, osVersionLbl, uninstallBtn};
+  //QWidget *widgets[] = {versionLbl, gitRemoteLbl, gitBranchLbl, gitCommitLbl, lastUpdateLbl, updateBtn, osVersionLbl, uninstallBtn};
+  QWidget *widgets[] = {versionLbl, gitRemoteLbl, gitBranchLbl, gitCommitLbl, osVersionLbl, uninstallBtn};
   for (QWidget* w : widgets) {
     addItem(w);
   }
@@ -350,14 +349,20 @@ QWidget * network_panel(QWidget * parent) {
 
   ListWidget *list = new ListWidget();
   list->setSpacing(30);
-  // wifi + tethering buttons
-  auto wifiBtn = new ButtonControl("Wi-Fi Settings", "OPEN");
+  //auto wifiBtn = new ButtonControl("WiFi Settings", "OPEN");
+  auto wifiBtn = new ButtonControl("\U0001f4f6 WiFi 설정", "열기");
   QObject::connect(wifiBtn, &ButtonControl::clicked, [=]() { HardwareEon::launch_wifi(); });
   list->addItem(wifiBtn);
 
-  auto tetheringBtn = new ButtonControl("Tethering Settings", "OPEN");
+  //auto tetheringBtn = new ButtonControl("Tethering Settings", "OPEN");
+  auto tetheringBtn = new ButtonControl("\U0001f4f6 테더링 설정", "열기");
   QObject::connect(tetheringBtn, &ButtonControl::clicked, [=]() { HardwareEon::launch_tethering(); });
   list->addItem(tetheringBtn);
+
+  //auto androidBtn = new ButtonControl("\U00002699 Android Setting", "OPEN");
+  auto androidBtn = new ButtonControl("\U00002699 안드로이드 설정", "열기");
+  QObject::connect(androidBtn, &ButtonControl::clicked, [=]() { HardwareEon::launch_setting(); });
+  list->addItem(androidBtn);
 
   // SSH key management
   list->addItem(new SshToggle());
@@ -369,7 +374,7 @@ QWidget * network_panel(QWidget * parent) {
   list->addItem(horizontal_line());
 
   // add
-  const char* gitpull = "sh /data/openpilot/gitpull.sh";
+  const char* gitpull = "sh /data/openpilot/scripts/gitpull.sh";
   //auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "RUN");
   auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "실행");
   QObject::connect(gitpullbtn, &ButtonControl::clicked, [=]() {
@@ -381,7 +386,7 @@ QWidget * network_panel(QWidget * parent) {
   });
   list->addItem(gitpullbtn);
 
-  const char* realdata_clear = "rm -rf /sdcard/realdata/*";
+  const char* realdata_clear = "sh /data/openpilot/scripts/realdataclear.sh";
   //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");
   auto realdataclearbtn = new ButtonControl("주행로그 삭제", "실행");
   QObject::connect(realdataclearbtn, &ButtonControl::clicked, [=]() {
@@ -489,14 +494,14 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
 
   QList<QPair<QString, QWidget *>> panels = {
     //{"Device", device},
-    {"장치", device},
     //{"Network", network_panel(this)},
-    {"설정", network_panel(this)},
     //{"Toggles", new TogglesPanel(this)},
-    {"토글", new TogglesPanel(this)},
     //{"Software", new SoftwarePanel(this)},
-    {"정보", new SoftwarePanel(this)},
     //{"Community", new CommunityPanel(this)},
+    {"장치", device},
+    {"설정", network_panel(this)},
+    {"토글", new TogglesPanel(this)},
+    {"정보", new SoftwarePanel(this)},
     {"커뮤니티", new CommunityPanel(this)},
   };
 
@@ -571,13 +576,9 @@ void SettingsWindow::hideEvent(QHideEvent *event) {
 #endif
 }
 
-
 /////////////////////////////////////////////////////////////////////////
-
 CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
-
   main_layout = new QStackedLayout(this);
-
   QWidget* homeScreen = new QWidget(this);
   QVBoxLayout* vlayout = new QVBoxLayout(homeScreen);
   vlayout->setContentsMargins(0, 20, 0, 20);
@@ -606,7 +607,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   selectCar = new SelectCar(this);
   connect(selectCar, &SelectCar::backPress, [=]() { main_layout->setCurrentWidget(homeScreen); });
   connect(selectCar, &SelectCar::selectedCar, [=]() {
-
      QString selected = QString::fromStdString(Params().get("SelectedCar"));
      selectCarBtn->setText(selected.length() ? selected : "Select your car");
      main_layout->setCurrentWidget(homeScreen);
@@ -659,6 +659,9 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   toggles.append(new ParamControl("ShowDebugUI", "Show Debug UI",
                                   "",
                                   "../assets/offroad/icon_shell.png", this));
+  toggles.append(new ParamControl("NewRadarInterface", "Use new radar interface",
+                                  "",
+                                  "../assets/offroad/icon_road.png", this));
   /*
   toggles.append(new ParamControl("DisableGps", "GPS Disable",
                                   //"If you're using a panda without GPS, activate the option",
@@ -673,9 +676,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   toggles.append(new ParamControl("MadModeEnabled", "Enable HKG MAD mode",
                                   "Openpilot will engage when turn cruise control on",
                                   "../assets/offroad/icon_openpilot.png", this));
-  toggles.append(new ParamControl("NewRadarInterface", "Use new radar interface",
-                                  "",
-                                  "../assets/offroad/icon_road.png", this));
   */
   for(ParamControl *toggle : toggles) {
     if(main_layout->count() != 0) {
