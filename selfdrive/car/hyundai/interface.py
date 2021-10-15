@@ -24,7 +24,7 @@ class CarInterface(CarInterfaceBase):
   def get_pid_accel_limits(CP, current_speed, cruise_speed):
     v_current_kph = current_speed * CV.MS_TO_KPH
     gas_max_bp = [0., 10., 20., 50., 70., 130.]
-    gas_max_v = [1.94, 1.29, 0.9, 0.66, 0.46, 0.34]
+    gas_max_v = [2., 1.3, 0.9, 0.63, 0.4, 0.17]
     brake_max_bp = [0, 70., 130.]
     brake_max_v = [CarControllerParams.ACCEL_MIN, -3.2, -2.3]
 
@@ -292,7 +292,7 @@ class CarInterface(CarInterfaceBase):
 
     # longitudinal
     ret.longitudinalTuning.kpBP = [0., 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 40.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-    ret.longitudinalTuning.kpV = [1.2, 0.91, 0.77, 0.7, 0.61, 0.53, 0.44]
+    ret.longitudinalTuning.kpV = [1.1, 0.8, 0.65, 0.57, 0.48, 0.4, 0.32]
     ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
     ret.longitudinalTuning.kiV = [0.06, 0.03]
     ret.longitudinalTuning.deadzoneBP = [0., 100.*CV.KPH_TO_MS]
