@@ -54,11 +54,7 @@ public slots:
   void showSidebar(bool show);
 
 protected:
-#ifdef QCOM2
-  void mouseReleaseEvent(QMouseEvent* e) override;
-#else
   void mousePressEvent(QMouseEvent* e) override;
-#endif
 
 private:
   Sidebar *sidebar;

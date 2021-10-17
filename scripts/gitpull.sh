@@ -5,7 +5,7 @@ cd /data/openpilot
 if [ -f /EON ]; then
   echo -n "0" > /data/params/d/PutPrebuilt
   rm -f prebuilt
-elif [ -f /TICI ];
+elif [ -f /TICI ]; then
   echo -n "0" > /data/params/d/PutPrebuilt
   sudo rm -f prebuilt
 fi

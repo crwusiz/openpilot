@@ -19,7 +19,6 @@
 #include "selfdrive/common/params.h"
 #include "selfdrive/common/util.h"
 #include "selfdrive/common/visionimg.h"
-#include "selfdrive/common/touch.h"
 
 #define COLOR_BLACK nvgRGBA(0, 0, 0, 255)
 #define COLOR_BLACK_ALPHA(x) nvgRGBA(0, 0, 0, x)
@@ -35,6 +34,8 @@
 #define COLOR_WARNING_ALPHA(x) nvgRGBA(218, 111, 37, x)
 #define COLOR_ENGAGEABLE nvgRGBA(23, 51, 73, 255)
 #define COLOR_ENGAGEABLE_ALPHA(x) nvgRGBA(23, 51, 73, x)
+#define COLOR_LIME nvgRGBA(120, 255, 120, 255)
+#define COLOR_LIME_ALPHA(x) nvgRGBA(120, 255, 120, x)
 
 typedef cereal::CarControl::HUDControl::AudibleAlert AudibleAlert;
 
@@ -179,7 +180,6 @@ typedef struct UIState {
 
   //
   bool show_debug_ui;
-  TouchState touch;
   int lock_on_anim_index;
 
 } UIState;

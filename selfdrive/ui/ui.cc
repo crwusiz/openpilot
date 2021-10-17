@@ -300,6 +300,7 @@ QUIState::QUIState(QObject *parent) : QObject(parent) {
   timer = new QTimer(this);
   QObject::connect(timer, &QTimer::timeout, this, &QUIState::update);
   timer->start(1000 / UI_FREQ);
+  
   // neokii add lead custom
   ui_state.lock_on_anim_index = 0;
 }

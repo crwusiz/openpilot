@@ -120,6 +120,7 @@ void Sidebar::paintEvent(QPaintEvent *event) {
   p.drawText(r, Qt::AlignCenter, battery_str);
 #endif
 
+  configFont(p, "Open Sans", 32, "Bold");
   p.setPen(QColor(0xff, 0xff, 0xff));
   const QRect r2 = QRect(0, 267, event->rect().width(), 50);
 
