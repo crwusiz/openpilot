@@ -306,6 +306,7 @@ def thermald_thread():
       msg.deviceState.modemTempC = modem_temps
 
     msg.deviceState.wifiIpAddress = wifiIpAddress
+    msg.deviceState.screenBrightnessPercent = HARDWARE.get_screen_brightness()
     msg.deviceState.batteryPercent = HARDWARE.get_battery_capacity()
     msg.deviceState.batteryStatus = HARDWARE.get_battery_status()
     msg.deviceState.batteryCurrent = HARDWARE.get_battery_current()

@@ -289,14 +289,10 @@ struct DeviceState @0xa4d8b5af2aa492eb {
   networkType @22 :NetworkType;
   networkInfo @31 :NetworkInfo;
   networkStrength @24 :NetworkStrength;
-  offroadPowerUsageUwh @23 :UInt32;
-  carBatteryCapacityUwh @25 :UInt32;
+  lastAthenaPingTime @32 :UInt64;
 
-  fanSpeedPercentDesired @10 :UInt16;
   started @11 :Bool;
   startedMonoTime @13 :UInt64;
-
-  lastAthenaPingTime @32 :UInt64;
 
   # system utilization
   freeSpacePercent @7 :Float32;
@@ -310,6 +306,8 @@ struct DeviceState @0xa4d8b5af2aa492eb {
   batteryCurrent @15 :Int32;
   chargingError @17 :Bool;
   chargingDisabled @18 :Bool;
+  offroadPowerUsageUwh @23 :UInt32;
+  carBatteryCapacityUwh @25 :UInt32;
 
   # device thermals
   cpuTempC @26 :List(Float32);
@@ -319,8 +317,11 @@ struct DeviceState @0xa4d8b5af2aa492eb {
   nvmeTempC @35 :List(Float32);
   modemTempC @36 :List(Float32);
   thermalStatus @14 :ThermalStatus;
+
+  fanSpeedPercentDesired @10 :UInt16;
+  screenBrightnessPercent @37 :Int8;
   
-  wifiIpAddress @37 :Text;
+  wifiIpAddress @38 :Text;
 
   enum ThermalStatus {
     green @0;
