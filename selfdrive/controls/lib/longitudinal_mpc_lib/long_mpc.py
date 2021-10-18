@@ -271,7 +271,7 @@ class LongitudinalMpc():
   def process_lead(self, lead):
     v_ego = self.x0[1]
     if lead is not None and lead.status:
-      x_lead = max(0, lead.dRel if lead.radar else lead.dRel - 0.5)
+      x_lead = lead.dRel
       v_lead = lead.vLead
       a_lead = lead.aLeadK
       a_lead_tau = lead.aLeadTau
