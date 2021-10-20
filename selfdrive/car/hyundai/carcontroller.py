@@ -1,6 +1,6 @@
 from cereal import car
 from common.realtime import DT_CTRL
-from common.numpy_fast import clip, interp
+from common.numpy_fast import clip
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, \
                                              create_scc11, create_scc12, create_scc13, create_scc14, \
@@ -213,7 +213,7 @@ class CarController():
 
         if frame % 20 == 0 and CS.has_scc13:
           can_sends.append(create_scc13(self.packer, CS.scc13))
-          
+
         if CS.has_scc14:
           acc_standstill = stopping if CS.out.vEgo < 2. else False
           lead = self.scc_smoother.get_lead(controls.sm)

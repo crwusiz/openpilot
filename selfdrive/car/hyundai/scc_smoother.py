@@ -370,7 +370,7 @@ class SccSmoother:
   def update_cruise_buttons(controls, CS, longcontrol):  # called by controlds's state_transition
 
     car_set_speed = CS.cruiseState.speed * CV.MS_TO_KPH
-    is_cruise_enabled = 0 < car_set_speed < 200 and CS.cruiseState.enabledAcc #and controls.CP.pcmCruise
+    is_cruise_enabled = car_set_speed != 0 and car_set_speed != 255 and CS.cruiseState.enabled and controls.CP.pcmCruise
 
     if is_cruise_enabled:
       if longcontrol:
@@ -381,7 +381,17 @@ class SccSmoother:
     else:
       v_cruise_kph = 0
 
-    return v_cruise_kph
+    if controls.is_cruise_enabled != is_cruise_enabled:
+      controls.is_cruise_enabled = is_cruise_enabled
+
+      if controls.is_cruise_enabled:
+        v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
+      else:
+        v_cruise_kph = 0
+
+      controls.LoC.reset(v_pid=CS.vEgo)
+
+    controls.v_cruise_kph = v_cruise_kph
 
   @staticmethod
   def update_v_cruise(v_cruise_kph, buttonEvents, enabled, metric):

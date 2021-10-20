@@ -66,12 +66,7 @@ class CarState(CarStateBase):
     self.is_set_speed_in_mph = bool(cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"])
     self.speed_conv_to_ms = CV.MPH_TO_MS if self.is_set_speed_in_mph else CV.KPH_TO_MS
 
-    cluSpeed = cp.vl["CLU11"]["CF_Clu_Vanz"]
-    decimal = cp.vl["CLU11"]["CF_Clu_VanzDecimal"]
-    if 0. < decimal < 0.5:
-      cluSpeed += decimal
-
-    ret.cluSpeedMs = cluSpeed * self.speed_conv_to_ms
+    # ret.cluSpeedMs = cluSpeed * self.speed_conv_to_ms
 
     if self.CP.openpilotLongitudinalControl:
       ret.wheelSpeeds.fl = cp.vl["WHL_SPD11"]["WHL_SPD_FL"] * CV.KPH_TO_MS
@@ -80,6 +75,10 @@ class CarState(CarStateBase):
       ret.wheelSpeeds.rr = cp.vl["WHL_SPD11"]["WHL_SPD_RR"] * CV.KPH_TO_MS
       ret.vEgoRaw = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
     else:
+      cluSpeed = cp.vl["CLU11"]["CF_Clu_Vanz"]
+      decimal = cp.vl["CLU11"]["CF_Clu_VanzDecimal"]
+      if 0. < decimal < 0.5:
+        cluSpeed += decimal
       ret.vEgoRaw = cluSpeed * self.speed_conv_to_ms
 
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
