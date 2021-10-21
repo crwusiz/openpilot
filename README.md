@@ -5,6 +5,7 @@ crwusiz openpilot
 
 <b> crwusiz branch is comma.ai devel-staging base xx979xx HKG_community source add </b>
 - <b> v0.8.9 [ allow white panda and gray panda, OP3T support (installer/howto_op3t_update.md) ] </b>
+- <b> comma three not support use v0.8.10 </b>
 - If you have any questions, please send a message to crwusiz from discord. if you like this Branch <b> [Donate](https://paypal.me/crwusiz) </b>for me
 
 [![](https://i.imgur.com/TMtVMV8.png)](#)

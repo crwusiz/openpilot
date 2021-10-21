@@ -489,9 +489,9 @@ static void sensors_init(MultiCameraState *s) {
 
   unique_fd sensorinit_fd;
   if (s->device == DEVICE_LP3) {
-    sensorinit_fd = open("/dev/v4l-subdev11", O_RDWR | O_NONBLOCK);
+    sensorinit_fd = HANDLE_EINTR(open("/dev/v4l-subdev11", O_RDWR | O_NONBLOCK));
   } else {
-    sensorinit_fd = open("/dev/v4l-subdev12", O_RDWR | O_NONBLOCK);
+    sensorinit_fd = (open("/dev/v4l-subdev12", O_RDWR | O_NONBLOCK));
   }
   assert(sensorinit_fd >= 0);
 
@@ -748,12 +748,12 @@ static void camera_open(CameraState *s, bool is_road_cam) {
       sensor_dev = "/dev/v4l-subdev19";
     }
     if (s->device == DEVICE_LP3) {
-      s->isp_fd = HANDLE_EINTR(open("/dev/v4l-subdev14", O_RDWR | O_NONBLOCK));
+      s->isp_fd = open("/dev/v4l-subdev14", O_RDWR | O_NONBLOCK);
     } else {
-      s->isp_fd = HANDLE_EINTR(open("/dev/v4l-subdev15", O_RDWR | O_NONBLOCK));
+      s->isp_fd = open("/dev/v4l-subdev15", O_RDWR | O_NONBLOCK);
     }
     assert(s->isp_fd >= 0);
-    s->eeprom_fd = HANDLE_EINTR(open("/dev/v4l-subdev9", O_RDWR | O_NONBLOCK));
+    s->eeprom_fd = open("/dev/v4l-subdev9", O_RDWR | O_NONBLOCK);
     assert(s->eeprom_fd >= 0);
   }
 
@@ -1212,14 +1212,6 @@ static void road_camera_start(CameraState *s) {
 void actuator_move(CameraState *s, uint16_t target) {
   int step = target - s->cur_lens_pos;
   // LP3 moves only on even positions. TODO: use proper sensor params
-
-  // focus on infinity assuming phone is perpendicular
-  static struct damping_params_t actuator_ringing_params = {
-      .damping_step = 1023,
-      .damping_delay = 20000,
-      .hw_params = 13,
-  };
-
   if (s->device == DEVICE_LP3) {
     step /= 2;
   }

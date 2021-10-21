@@ -6,14 +6,19 @@ fi
 
 source "$BASEDIR/launch_env.sh"
 
-if ! $(grep -q "letv" /proc/cmdline); then
-  mount -o remount,rw /system
-  sed -i -e 's#/dev/input/event1#/dev/input/event2#g' ~/.bash_profile
-  mount -o remount,r /system
-fi
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 function two_init {
+  mount -o remount,rw /system
+  if [ ! -f /data/ONEPLUS ] && ! $(grep -q "letv" /proc/cmdline); then
+    sed -i -e 's#/dev/input/event1#/dev/input/event2#g' ~/.bash_profile
+    touch /data/ONEPLUS
+  else
+    if [ ! -f /data/LEECO ]; then
+      touch /data/LEECO
+    fi
+  fi
+  mount -o remount,r /system
 
   # set IO scheduler
   setprop sys.io.scheduler noop
@@ -71,7 +76,9 @@ function two_init {
 
   # USB traffic needs realtime handling on cpu 3
   [ -d "/proc/irq/733" ] && echo 3 > /proc/irq/733/smp_affinity_list
-  [ -d "/proc/irq/736" ] && echo 3 > /proc/irq/736/smp_affinity_list # USB for OP3T
+  if [ -f /data/ONEPLUS ]; then
+    [ -d "/proc/irq/736" ] && echo 3 > /proc/irq/736/smp_affinity_list # USB for OP3T
+  fi
 
   # GPU and camera get cpu 2
   CAM_IRQS="177 178 179 180 181 182 183 184 185 186 192"
@@ -95,7 +102,7 @@ function two_init {
   wpa_cli IFNAME=wlan0 SCAN
 
   # Check for NEOS update
-  if $(grep -q "letv" /proc/cmdline); then
+  if [ -f data/LEECO ]; then
   if [ $(< /VERSION) != "$REQUIRED_NEOS_VERSION" ]; then
     if [ -f "$DIR/scripts/continue.sh" ]; then
       cp "$DIR/scripts/continue.sh" "/data/data/com.termux/files/continue.sh"
@@ -118,7 +125,7 @@ function two_init {
   # Remove and regenerate qcom sensor registry. Only done on OP3T mainboards.
   # Performed exactly once. The old registry is preserved just-in-case, and
   # doubles as a flag denoting we've already done the reset.
-  if ! $(grep -q "letv" /proc/cmdline) && [ ! -f "/persist/comma/op3t-sns-reg-backup" ]; then
+  if [ -f /data/ONEPLUS ] && [ ! -f "/persist/comma/op3t-sns-reg-backup" ]; then
     echo "Performing OP3T sensor registry reset"
     mv /persist/sensors/sns.reg /persist/comma/op3t-sns-reg-backup &&
       rm -f /persist/sensors/sensors_settings /persist/sensors/error_log /persist/sensors/gyro_sensitity_cal &&

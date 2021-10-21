@@ -37,6 +37,8 @@
 #define COLOR_WARNING_ALPHA(x) nvgRGBA(218, 111, 37, x)
 #define COLOR_ENGAGEABLE nvgRGBA(23, 51, 73, 255)
 #define COLOR_ENGAGEABLE_ALPHA(x) nvgRGBA(23, 51, 73, x)
+#define COLOR_LIME nvgRGBA(120, 255, 120, 255)
+#define COLOR_LIME_ALPHA(x) nvgRGBA(120, 255, 120, x)
 
 typedef cereal::CarControl::HUDControl::AudibleAlert AudibleAlert;
 
