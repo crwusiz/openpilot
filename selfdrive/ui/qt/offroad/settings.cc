@@ -78,7 +78,7 @@ TogglesPanel::TogglesPanel(QWidget *parent) : ListWidget(parent) {
   addItem(new ParamControl("UploadRaw",
                                   //"Upload Raw Logs",
                                   //"Upload full logs at [ connect.comma.ai/useradmin ]",
-                                  "주행로그 업로드",
+                                  "주행로그 업로드 사용",
                                   "주행로그를 업로드합니다. [ connect.comma.ai/useradmin ] 에서 확인할수있습니다",
                                   "../assets/offroad/icon_network.png",
                                   this));
@@ -365,14 +365,6 @@ QWidget * network_panel(QWidget * parent) {
   list->addItem(androidBtn);
 
   // SSH key management
-  list->addItem(new SshToggle());
-  list->addItem(new SshControl());
-  list->addItem(horizontal_line());
-  list->addItem(new LateralControlSelect());
-  list->addItem(new MfcSelect());
-  list->addItem(new LongControlSelect());
-  list->addItem(horizontal_line());
-
   // add
   const char* gitpull = "sh /data/openpilot/scripts/gitpull.sh";
   //auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "RUN");
@@ -385,6 +377,15 @@ QWidget * network_panel(QWidget * parent) {
     }
   });
   list->addItem(gitpullbtn);
+  list->addItem(horizontal_line());
+
+  list->addItem(new SshToggle());
+  list->addItem(new SshControl());
+  list->addItem(horizontal_line());
+  list->addItem(new LateralControlSelect());
+  list->addItem(new MfcSelect());
+  list->addItem(new LongControlSelect());
+  list->addItem(horizontal_line());
 
   const char* realdata_clear = "sh /data/openpilot/scripts/realdataclear.sh";
   //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");
@@ -585,7 +586,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   QString selected = QString::fromStdString(Params().get("SelectedCar"));
 
-  QPushButton* selectCarBtn = new QPushButton(selected.length() ? selected : "Select your car");
+  //QPushButton* selectCarBtn = new QPushButton(selected.length() ? selected : "Select your car");
+  QPushButton* selectCarBtn = new QPushButton(selected.length() ? selected : "차량을 선택하세요");
   selectCarBtn->setObjectName("selectCarBtn");
   selectCarBtn->setStyleSheet("margin-right: 30px;");
   //selectCarBtn->setFixedSize(350, 100);
@@ -644,24 +646,24 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   //"Disable Logger is Reduce system load",
                                   "Logger 프로세스를 종료하여 시스템 부하를 줄입니다.",
                                   "../assets/offroad/icon_addon.png", this));
-  toggles.append(new ParamControl("SccSmootherSlowOnCurves", "Enable Slow On Curves",
+  toggles.append(new ParamControl("SccSmootherSlowOnCurves", "Slow On Curves Enable",
                                   "",
                                   "../assets/offroad/icon_road.png", this));
-  toggles.append(new ParamControl("SccSmootherSyncGasPressed", "Sync set speed on gas pressed",
+  toggles.append(new ParamControl("SccSmootherSyncGasPressed", "Sync set speed on gas pressed Enable",
                                   "",
                                   "../assets/offroad/icon_road.png", this));
-  toggles.append(new ParamControl("StockNaviDecelEnabled", "Stock Navi based deceleration",
+  toggles.append(new ParamControl("StockNaviDecelEnabled", "Stock Navi based deceleration Enable",
                                   "Use the stock navi based deceleration for longcontrol",
                                   "../assets/offroad/icon_road.png", this));
-  toggles.append(new ParamControl("DisableOpFcw", "Disable Openpilot FCW",
-                                  "",
-                                  "../assets/offroad/icon_shell.png", this));
-  toggles.append(new ParamControl("ShowDebugUI", "Show Debug UI",
-                                  "",
-                                  "../assets/offroad/icon_shell.png", this));
-  toggles.append(new ParamControl("NewRadarInterface", "Use new radar interface",
+  toggles.append(new ParamControl("NewRadarInterface", "New radar interface Enable",
                                   "",
                                   "../assets/offroad/icon_road.png", this));
+  toggles.append(new ParamControl("DisableOpFcw", "Openpilot FCW Disable",
+                                  "",
+                                  "../assets/offroad/icon_shell.png", this));
+  toggles.append(new ParamControl("ShowDebugUI", "Show Debug UI Enable",
+                                  "",
+                                  "../assets/offroad/icon_shell.png", this));
   /*
   toggles.append(new ParamControl("DisableGps", "GPS Disable",
                                   //"If you're using a panda without GPS, activate the option",

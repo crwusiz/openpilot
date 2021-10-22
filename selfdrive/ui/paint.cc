@@ -617,9 +617,9 @@ static void ui_draw_vision_header(UIState *s) {
 
 // tpms from neokii
 static NVGcolor get_tpms_color(float tpms) {
-    if(tpms < 30 || tpms > 45)
+    if(tpms < 5 || tpms > 60) // N/A
         return COLOR_WHITE_ALPHA(200);
-    if(tpms < 33 || tpms > 42)
+    if(tpms < 31 || tpms > 42)
         return COLOR_RED_ALPHA(200);
     return COLOR_WHITE_ALPHA(200);
 }

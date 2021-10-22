@@ -35,7 +35,6 @@ def manager_init():
   params.clear_all(ParamKeyType.CLEAR_ON_MANAGER_START)
 
   default_params = [
-
     ("OpenpilotEnabledToggle", "1"),
     ("CommunityFeaturesToggle", "1"),
     ("IsMetric", "1"),
@@ -53,11 +52,9 @@ def manager_init():
     ("SccSmootherSlowOnCurves", "0"),
     ("SccSmootherSyncGasPressed", "0"),
     ("StockNaviDecelEnabled", "0"),
+    ("NewRadarInterface", "0"),
     ("ShowDebugUI", "0"),
     ("DisableOpFcw", "0"),
-
-    # not use
-    ("NewRadarInterface", "0"),
   ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))

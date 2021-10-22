@@ -23,13 +23,15 @@ AbstractAlert::AbstractAlert(bool hasRebootBtn, QWidget *parent) : QFrame(parent
   QHBoxLayout *footer_layout = new QHBoxLayout();
   main_layout->addLayout(footer_layout);
 
-  QPushButton *dismiss_btn = new QPushButton("Dismiss");
+  //QPushButton *dismiss_btn = new QPushButton("Dismiss");
+  QPushButton *dismiss_btn = new QPushButton("확인");
   dismiss_btn->setFixedSize(400, 125);
   footer_layout->addWidget(dismiss_btn, 0, Qt::AlignBottom | Qt::AlignLeft);
   QObject::connect(dismiss_btn, &QPushButton::clicked, this, &AbstractAlert::dismiss);
 
   if (hasRebootBtn) {
-    QPushButton *rebootBtn = new QPushButton("Reboot and Update");
+    //QPushButton *rebootBtn = new QPushButton("Reboot and Update");
+    QPushButton *rebootBtn = new QPushButton("업데이트 및 재부팅");
     rebootBtn->setFixedSize(600, 125);
     footer_layout->addWidget(rebootBtn, 0, Qt::AlignBottom | Qt::AlignRight);
     QObject::connect(rebootBtn, &QPushButton::clicked, [=]() { Hardware::reboot(); });
