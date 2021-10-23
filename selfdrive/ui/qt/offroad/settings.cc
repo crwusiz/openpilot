@@ -177,7 +177,7 @@ DevicePanel::DevicePanel(QWidget* parent) : ListWidget(parent) {
     //regulatoryBtn = new ButtonControl("Regulatory", "VIEW", "");
     regulatoryBtn = new ButtonControl("규제", "보기", "");
     connect(regulatoryBtn, &ButtonControl::clicked, [=]() {
-      const std::string txt = util::read_file(ASSET_PATH.toStdString() + "/offroad/fcc.html");
+      const std::string txt = util::read_file("../assets/offroad/fcc.html");
       RichTextDialog::alert(QString::fromStdString(txt), this);
     });
   }
