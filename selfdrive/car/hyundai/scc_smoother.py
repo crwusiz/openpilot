@@ -193,7 +193,7 @@ class SccSmoother:
 
     # kph
     controls.applyMaxSpeed = float(clip(CS.cruiseState_speed * CV.MS_TO_KPH, MIN_SET_SPEED_KPH,
-                                                self.max_speed_clu * self.speed_conv_to_ms * CV.MS_TO_KPH))
+                                        self.max_speed_clu * self.speed_conv_to_ms * CV.MS_TO_KPH))
     CC.sccSmoother.longControl = self.longcontrol
     CC.sccSmoother.applyMaxSpeed = controls.applyMaxSpeed
     CC.sccSmoother.cruiseMaxSpeed = controls.v_cruise_kph
@@ -351,7 +351,7 @@ class SccSmoother:
       accel *= gas_factor
     else:
       accel *= brake_factor
-      
+
     return accel
 
   def get_stock_cam_accel(self, apply_accel, stock_accel, scc11):

@@ -661,10 +661,10 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   toggles.append(new ParamControl("DisableOpFcw", "Openpilot FCW Disable",
                                   "",
                                   "../assets/offroad/icon_shell.png", this));
+  /*
   toggles.append(new ParamControl("ShowDebugUI", "Show Debug UI Enable",
                                   "",
                                   "../assets/offroad/icon_shell.png", this));
-  /*
   toggles.append(new ParamControl("DisableGps", "GPS Disable",
                                   //"If you're using a panda without GPS, activate the option",
                                   "Panda에 Gps가 장착되어있지않은 기기일경우 옵션을 활성화하세요.",

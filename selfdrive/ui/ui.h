@@ -179,7 +179,6 @@ typedef struct UIState {
   bool wide_camera;
 
   //
-  bool show_debug_ui;
   int lock_on_anim_index;
 
 } UIState;
