@@ -165,8 +165,7 @@ static void update_state(UIState *s) {
     }
   }
   if (sm.updated("deviceState")) {
-    scene.deviceState = sm["deviceState"].getDeviceState();
-    scene.cpuTempAvg = (scene.deviceState.getCpuTempC()[0] + scene.deviceState.getCpuTempC()[1] + scene.deviceState.getCpuTempC()[2] + scene.deviceState.getCpuTempC()[3]) / 4;
+    scene.device_state = sm["deviceState"].getDeviceState();
   }
   if (sm.updated("pandaStates")) {
     auto pandaStates = sm["pandaStates"].getPandaStates();

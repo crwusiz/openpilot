@@ -28,12 +28,15 @@ if [ ! -f "/system/fonts/opensans_regular.ttf" ]; then
 fi
 
 if [ ! -f "/data/BOOTLOGO" ]; then
-    /usr/bin/touch /data/BOOTLOGO
-    if $(grep -q "letv" /proc/cmdline); then
+    touch /data/BOOTLOGO
+    #if $(grep -q "letv" /proc/cmdline); then
+    if [ ! -f /data/LEECO ] && $(grep -q "letv" /proc/cmdline); then
       # lepro bootlogo
+      touch /data/LEECO
       dd if=/data/openpilot/installer/fonts/splash.img of=/dev/block/bootdevice/by-name/splash
-    else
+    elif [ ! -f /data/ONEPLUS ]; then
       # op3t bootlogo
+      touch /data/ONEPLUS
       dd if=/data/openpilot/installer/fonts/logo.bin of=/dev/block/bootdevice/by-name/LOGO
     fi
     echo =================================================================

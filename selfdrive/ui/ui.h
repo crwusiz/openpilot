@@ -152,7 +152,7 @@ typedef struct UIScene {
 
   // neokii dev UI
   cereal::CarControl::Reader car_control;
-  cereal::DeviceState::Reader deviceState;
+  cereal::DeviceState::Reader device_state;
   cereal::CarState::Reader car_state;
   cereal::ControlsState::Reader controls_state;
   cereal::CarParams::Reader car_params;

@@ -79,8 +79,8 @@ void Sidebar::updateState(const UIState &s) {
     pandaStatus = {"GPS\nSEARCHING", warning_color};
   }*/
   setProperty("pandaStatus", QVariant::fromValue(pandaStatus));
-  m_battery_img = s.scene.deviceState.getBatteryStatus() == "Charging" ? 1 : 0;
-  m_batteryPercent = s.scene.deviceState.getBatteryPercent();
+  m_battery_img = s.scene.device_state.getBatteryStatus() == "Charging" ? 1 : 0;
+  m_batteryPercent = s.scene.device_state.getBatteryPercent();
 }
 
 void Sidebar::paintEvent(QPaintEvent *event) {

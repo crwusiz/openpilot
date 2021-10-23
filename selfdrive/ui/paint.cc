@@ -238,7 +238,7 @@ static void ui_draw_bottom_info(UIState *s) {
     const char* lateral_state[] = {"Pid", "Indi", "Lqr"};
 
     snprintf(str, sizeof(str),
-    "[ %s ] SR[%.2f] MDPS[%d] SCC[%d] LongControlStatus[%s]",
+    "[ %s ] SR[%.2f] MDPS[%d] SCC[%d] LongControl[ %s ]",
     lateral_state[lateralControlState],
     controls_state.getSteerRatio(),
     car_params.getMdpsBus(), car_params.getSccBus(),
@@ -296,10 +296,10 @@ static void ui_draw_vision_speed(UIState *s) {
   nvgTextAlign(s->vg, NVG_ALIGN_CENTER | NVG_ALIGN_BASELINE);
 
   if(s->fb_w > 1500) {
-    ui_draw_text(s, s->fb_w/2, 220, speed_str.c_str(), 90 * 2.5, COLOR_WHITE, "sans-bold");
+    ui_draw_text(s, s->fb_w/2, 220, speed_str.c_str(), 200, COLOR_WHITE, "sans-bold");
     ui_draw_text(s, s->fb_w/2, 300, s->scene.is_metric ? "㎞/h" : "mph", 36 * 2.5, COLOR_YELLOW_ALPHA(200), "sans-regular");
   } else {
-    ui_draw_text(s, s->fb_w/2, 180, speed_str.c_str(), 60 * 2.5, COLOR_WHITE, "sans-bold");
+    ui_draw_text(s, s->fb_w/2, 180, speed_str.c_str(), 150, COLOR_WHITE, "sans-bold");
     ui_draw_text(s, s->fb_w/2, 230, s->scene.is_metric ? "㎞/h" : "mph", 25 * 2.5, COLOR_YELLOW_ALPHA(200), "sans-regular");
   }
 
@@ -332,9 +332,9 @@ static void ui_draw_vision_speed(UIState *s) {
       nvgLineTo(s->vg, blinker_x - (pos_add*offset) - blinker_w/4, 200);
       nvgClosePath(s->vg);
       if (is_warning) {
-        nvgFillColor(s->vg, COLOR_WARNING_ALPHA(180 * alpha));
+        nvgFillColor(s->vg, COLOR_WARNING_ALPHA(200 * alpha));
       } else {
-        nvgFillColor(s->vg, COLOR_ENGAGED_ALPHA(180 * alpha));
+        nvgFillColor(s->vg, COLOR_ENGAGED_ALPHA(200 * alpha));
       }
       nvgFill(s->vg);
     }
@@ -348,9 +348,9 @@ static void ui_draw_vision_speed(UIState *s) {
       nvgLineTo(s->vg, blinker_x + (pos_add*offset) + blinker_w/4 + blinker_w, 200);
       nvgClosePath(s->vg);
       if (is_warning) {
-        nvgFillColor(s->vg, COLOR_WARNING_ALPHA(180 * alpha));
+        nvgFillColor(s->vg, COLOR_WARNING_ALPHA(200 * alpha));
       } else {
-        nvgFillColor(s->vg, COLOR_ENGAGED_ALPHA(180 * alpha));
+        nvgFillColor(s->vg, COLOR_ENGAGED_ALPHA(200 * alpha));
       }
       nvgFill(s->vg);
     }
@@ -580,13 +580,20 @@ static void ui_draw_measures_right(UIState *s, int x, int y, int w) {
     char val_add[4] = "℃";
     NVGcolor val_color = COLOR_LIME_ALPHA(200);
 
-    float cpuTempAvg = scene.cpuTempAvg;
+    auto cpuList = scene.device_state.getCpuTempC();
+    float cpuTemp = 0;
+
+    if(cpuList.size() > 0) {
+        for(int i = 0; i < cpuList.size(); i++)
+            cpuTemp += cpuList[i];
+        cpuTemp /= cpuList.size();
+    }
 
     // Orange Color if more than 70℃ / Red Color if more than 80℃
-    if((int)(cpuTempAvg) >= 70) { val_color = COLOR_WARNING; }
-    if((int)(cpuTempAvg) >= 80) { val_color = COLOR_RED_ALPHA(200); }
+    if((int)(cpuTemp) >= 70) { val_color = COLOR_WARNING_ALPHA(200); }
+    if((int)(cpuTemp) >= 80) { val_color = COLOR_RED_ALPHA(200); }
 
-    snprintf(val_str, sizeof(val_str), "%.1f", (round(cpuTempAvg)));
+    snprintf(val_str, sizeof(val_str), "%.1f", cpuTemp);
     strcat(val_str, val_add);
     h += ui_draw_measure(s, val_str, "CPU 온도", rx, ry, val_color, lab_color, value_fontSize, label_fontSize);
     ry = y + h;
@@ -601,10 +608,10 @@ static void ui_draw_measures_right(UIState *s, int x, int y, int w) {
     float angleSteers = scene.car_state.getSteeringAngleDeg();
 
     // Orange color if more than 30˚ / Red color if more than 90˚
-    if(((int)(angleSteers) < -30) || ((int)(angleSteers) > 30)) { val_color = COLOR_WARNING; }
+    if(((int)(angleSteers) < -30) || ((int)(angleSteers) > 30)) { val_color = COLOR_WARNING_ALPHA(200); }
     if(((int)(angleSteers) < -90) || ((int)(angleSteers) > 90)) { val_color = COLOR_RED_ALPHA(200); }
 
-    snprintf(val_str, sizeof(val_str), "%.1f",(angleSteers));
+    snprintf(val_str, sizeof(val_str), "%.1f", angleSteers);
     strcat(val_str, val_add);
     h += ui_draw_measure(s, val_str, "핸들 조향각", rx, ry, val_color, lab_color, value_fontSize, label_fontSize);
     ry = y + h;
@@ -620,10 +627,10 @@ static void ui_draw_measures_right(UIState *s, int x, int y, int w) {
     float steeringAngleDeg  = actuators.getSteeringAngleDeg();
 
     // Orange color if more than 30˚ / Red color if more than 90˚
-    if(((int)(steeringAngleDeg) < -30) || ((int)(steeringAngleDeg) > 30)) { val_color = COLOR_WARNING; }
+    if(((int)(steeringAngleDeg) < -30) || ((int)(steeringAngleDeg) > 30)) { val_color = COLOR_WARNING_ALPHA(200); }
     if(((int)(steeringAngleDeg) < -90) || ((int)(steeringAngleDeg) > 90)) { val_color = COLOR_RED_ALPHA(200); }
 
-    snprintf(val_str, sizeof(val_str), "%.1f",(steeringAngleDeg));
+    snprintf(val_str, sizeof(val_str), "%.1f", steeringAngleDeg);
     strcat(val_str, val_add);
     h += ui_draw_measure(s, val_str, "OP 조향각", rx, ry, val_color, lab_color, value_fontSize, label_fontSize);
     ry = y + h;
@@ -640,15 +647,15 @@ static void ui_draw_measures_right(UIState *s, int x, int y, int w) {
 
     // Orange Color if less than 15ｍ / Red Color if less than 5ｍ
     if (lead_radar.getStatus()) {
-      if(radar_dist < 15) { val_color = COLOR_WARNING; }
+      if(radar_dist < 15) { val_color = COLOR_WARNING_ALPHA(200); }
       if(radar_dist < 5) { val_color = COLOR_RED_ALPHA(200); }
-      snprintf(val_str, sizeof(val_str), "%.1f", (radar_dist));
+      snprintf(val_str, sizeof(val_str), "%.1f", radar_dist);
     } else {
       snprintf(val_str, sizeof(val_str), "-");
     }
 
     strcat(val_str, val_add);
-    h += ui_draw_measure(s, val_str, "Radar 거리차", rx, ry, val_color, lab_color, value_fontSize, label_fontSize);
+    h += ui_draw_measure(s, val_str, "Radar 거리", rx, ry, val_color, lab_color, value_fontSize, label_fontSize);
     ry = y + h;
   }
 
@@ -664,15 +671,15 @@ static void ui_draw_measures_right(UIState *s, int x, int y, int w) {
 
     // Orange Color if less than 15ｍ / Red Color if less than 5ｍ
     if (lead_vision.getProb()) {
-      if(vision_dist < 15) { val_color = COLOR_WARNING; }
+      if(vision_dist < 15) { val_color = COLOR_WARNING_ALPHA(200); }
       if(vision_dist < 5) { val_color = COLOR_RED_ALPHA(200); }
-      snprintf(val_str, sizeof(val_str), "%.1f", (vision_dist));
+      snprintf(val_str, sizeof(val_str), "%.1f", vision_dist);
     } else {
       snprintf(val_str, sizeof(val_str), "-");
     }
 
     strcat(val_str, val_add);
-    h += ui_draw_measure(s, val_str, "Vision 거리차", rx, ry, val_color, lab_color, value_fontSize, label_fontSize);
+    h += ui_draw_measure(s, val_str, "Vision 거리", rx, ry, val_color, lab_color, value_fontSize, label_fontSize);
     ry = y + h;
   }
 
