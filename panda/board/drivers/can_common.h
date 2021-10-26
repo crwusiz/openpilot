@@ -6,7 +6,8 @@ typedef struct {
 } can_ring;
 
 #define CAN_BUS_RET_FLAG 0x80U
-#define CAN_BUS_NUM_MASK 0x7FU
+#define CAN_BUS_BLK_FLAG 0x40U
+#define CAN_BUS_NUM_MASK 0x3FU
 
 #define BUS_MAX 4U
 
@@ -46,11 +47,16 @@ void process_can(uint8_t can_number);
   CAN_FIFOMailBox_TypeDef elems_##x[size]; \
   can_ring can_##x = { .w_ptr = 0, .r_ptr = 0, .fifo_size = (size), .elems = (CAN_FIFOMailBox_TypeDef *)&(elems_##x) };
 
+#ifdef STM32H7
+__attribute__((section(".ram_d1"))) can_buffer(rx_q, 0x1000)
+__attribute__((section(".ram_d1"))) can_buffer(txgmlan_q, 0x100)
+#else
 can_buffer(rx_q, 0x1000)
+can_buffer(txgmlan_q, 0x100)
+#endif
 can_buffer(tx1_q, 0x100)
 can_buffer(tx2_q, 0x100)
 can_buffer(tx3_q, 0x100)
-can_buffer(txgmlan_q, 0x100)
 // FIXME:
 // cppcheck-suppress misra-c2012-9.3
 can_ring *can_queues[] = {&can_tx1_q, &can_tx2_q, &can_tx3_q, &can_txgmlan_q};
@@ -230,6 +236,9 @@ void can_send(CAN_FIFOMailBox_TypeDef *to_push, uint8_t bus_number, bool skip_tx
         process_can(CAN_NUM_FROM_BUS_NUM(bus_number));
       }
     }
+  } else {
+    to_push->RDTR = (to_push->RDTR & 0xFFFF000FU) | ((CAN_BUS_RET_FLAG | CAN_BUS_BLK_FLAG | bus_number) << 4);
+    can_send_errs += can_push(&can_rx_q, to_push) ? 0U : 1U;
   }
 }
 
