@@ -41,7 +41,7 @@ class AText {
       }
 
       for(auto it = after_items.begin() + 1; it != after_items.end();)  {
-        it->alpha -= 70;
+        it->alpha -= 1000 / UI_FREQ;
         if(it->alpha <= 0)
           it = after_items.erase(it);
         else
