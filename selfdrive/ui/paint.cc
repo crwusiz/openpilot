@@ -101,10 +101,10 @@ static void draw_lead_custom(UIState *s, const cereal::RadarState::LeadData::Rea
     float sz = std::clamp((25 * 30) / (d_rel / 3 + 30), 15.0f, 30.0f) * zoom;
     x = std::clamp(x, 0.f, s->fb_w - sz / 2);
 
-    if(d_rel < 30) {
+    if (d_rel < 30) {
       const float c = 0.7f;
       float r = d_rel * ((1.f - c) / 30.f) + c;
-      if(r > 0.f)
+      if (r > 0.f)
         y = y * r;
     }
 
@@ -117,12 +117,12 @@ static void draw_lead_custom(UIState *s, const cereal::RadarState::LeadData::Rea
 
     const char* image = lead_data.getRadar() ? "custom_lead_radar" : "custom_lead_vision";
 
-    if(s->sm->frame % 2 == 0) {
+    if (s->sm->frame % 2 == 0) {
         s->lock_on_anim_index++;
     }
 
     int img_size = 80;
-    if(d_rel < 100) {
+    if (d_rel < 100) {
         img_size = (int)(-2/5 * d_rel + 120);
     }
 
@@ -270,7 +270,7 @@ static void ui_draw_vision_maxspeed(UIState *s) {
 
   if (is_cruise_set) {
     char str[256];
-    if(s->scene.is_metric)
+    if (s->scene.is_metric)
         snprintf(str, sizeof(str), "%d", (int)(applyMaxSpeed + 0.5));
     else
         snprintf(str, sizeof(str), "%d", (int)(applyMaxSpeed*0.621371 + 0.5));
@@ -290,18 +290,16 @@ static void ui_draw_vision_maxspeed(UIState *s) {
   }
 }
 
-AText textSpeed("sans-bold");
-
 static void ui_draw_vision_speed(UIState *s) {
   const float speed = std::max(0.0, (*s->sm)["carState"].getCarState().getVEgo() * (s->scene.is_metric ? 3.6 : 2.2369363));
   const std::string speed_str = std::to_string((int)std::nearbyint(speed));
   nvgTextAlign(s->vg, NVG_ALIGN_CENTER | NVG_ALIGN_BASELINE);
 
-  if(s->fb_w > 1500) {
-    ui_draw_text(s, s->fb_w/2, 220, speed_str.c_str(), 200, COLOR_WHITE);
+  if (s->fb_w > 1500) {
+    ui_draw_text(s, s->fb_w/2, 220, speed_str.c_str(), 200, COLOR_WHITE, "sans-bold");
     ui_draw_text(s, s->fb_w/2, 300, s->scene.is_metric ? "㎞/h" : "mph", 36 * 2.5, COLOR_YELLOW_ALPHA(200), "sans-regular");
   } else {
-    ui_draw_text(s, s->fb_w/2, 180, speed_str.c_str(), 150, COLOR_WHITE);
+    ui_draw_text(s, s->fb_w/2, 180, speed_str.c_str(), 150, COLOR_WHITE, "sans-bold");
     ui_draw_text(s, s->fb_w/2, 230, s->scene.is_metric ? "㎞/h" : "mph", 25 * 2.5, COLOR_YELLOW_ALPHA(200), "sans-regular");
   }
 
@@ -311,9 +309,9 @@ static void ui_draw_vision_speed(UIState *s) {
   const int pos_add = 50;
   bool is_warning = (s->status == STATUS_WARNING);
 
-  if(s->scene.leftBlinker || s->scene.rightBlinker) {
+  if (s->scene.leftBlinker || s->scene.rightBlinker) {
     s->scene.blinkingrate -= 5;
-    if(s->scene.blinkingrate < 0) s->scene.blinkingrate = 120;
+    if (s->scene.blinkingrate < 0) s->scene.blinkingrate = 120;
 
     float progress = (120 - s->scene.blinkingrate) / 120.0;
     float offset = progress * (6.4 - 1.0) + 1.0;
@@ -324,7 +322,7 @@ static void ui_draw_vision_speed(UIState *s) {
     if (progress < 0.25) alpha = progress / 0.25;
     if (progress > 0.75) alpha = 1.0 - ((progress - 0.75) / 0.25);
 
-    if(s->scene.leftBlinker) {
+    if (s->scene.leftBlinker) {
       nvgBeginPath(s->vg);
       nvgMoveTo(s->vg, blinker_x - (pos_add*offset)              , 100);
       nvgLineTo(s->vg, blinker_x - (pos_add*offset) - blinker_w/4, 100);
@@ -340,7 +338,7 @@ static void ui_draw_vision_speed(UIState *s) {
       }
       nvgFill(s->vg);
     }
-    if(s->scene.rightBlinker) {
+    if (s->scene.rightBlinker) {
       nvgBeginPath(s->vg);
       nvgMoveTo(s->vg, blinker_x + (pos_add*offset)               + blinker_w, 100);
       nvgLineTo(s->vg, blinker_x + (pos_add*offset) + blinker_w/4 + blinker_w, 100);
@@ -497,15 +495,15 @@ static void ui_draw_vision_header(UIState *s) {
 
 // tpms from neokii
 static NVGcolor get_tpms_color(float tpms) {
-    if(tpms < 5 || tpms > 60) // N/A
+    if (tpms < 5 || tpms > 60) // N/A
         return COLOR_WHITE_ALPHA(200);
-    if(tpms < 31 || tpms > 42)
+    if (tpms < 31 || tpms > 42)
         return COLOR_RED_ALPHA(200);
     return COLOR_WHITE_ALPHA(200);
 }
 
 static std::string get_tpms_text(float tpms) {
-    if(tpms < 5 || tpms > 60)
+    if (tpms < 5 || tpms > 60)
         return "";
     char str[32];
     snprintf(str, sizeof(str), "%.0f", round(tpms));
@@ -585,15 +583,15 @@ static void ui_draw_measures_right(UIState *s, int x, int y, int w) {
     auto cpuList = scene.device_state.getCpuTempC();
     float cpuTemp = 0;
 
-    if(cpuList.size() > 0) {
+    if (cpuList.size() > 0) {
         for(int i = 0; i < cpuList.size(); i++)
             cpuTemp += cpuList[i];
         cpuTemp /= cpuList.size();
     }
 
     // Orange Color if more than 70℃ / Red Color if more than 80℃
-    if((int)(cpuTemp) >= 70) { val_color = COLOR_WARNING_ALPHA(200); }
-    if((int)(cpuTemp) >= 80) { val_color = COLOR_RED_ALPHA(200); }
+    if ((int)(cpuTemp) >= 70) { val_color = COLOR_WARNING_ALPHA(200); }
+    if ((int)(cpuTemp) >= 80) { val_color = COLOR_RED_ALPHA(200); }
 
     snprintf(val_str, sizeof(val_str), "%.1f", cpuTemp);
     strcat(val_str, val_add);
@@ -610,8 +608,8 @@ static void ui_draw_measures_right(UIState *s, int x, int y, int w) {
     float angleSteers = scene.car_state.getSteeringAngleDeg();
 
     // Orange color if more than 30˚ / Red color if more than 90˚
-    if(((int)(angleSteers) < -30) || ((int)(angleSteers) > 30)) { val_color = COLOR_WARNING_ALPHA(200); }
-    if(((int)(angleSteers) < -90) || ((int)(angleSteers) > 90)) { val_color = COLOR_RED_ALPHA(200); }
+    if (((int)(angleSteers) < -30) || ((int)(angleSteers) > 30)) { val_color = COLOR_WARNING_ALPHA(200); }
+    if (((int)(angleSteers) < -90) || ((int)(angleSteers) > 90)) { val_color = COLOR_RED_ALPHA(200); }
 
     snprintf(val_str, sizeof(val_str), "%.1f", angleSteers);
     strcat(val_str, val_add);
@@ -629,8 +627,8 @@ static void ui_draw_measures_right(UIState *s, int x, int y, int w) {
     float steeringAngleDeg  = actuators.getSteeringAngleDeg();
 
     // Orange color if more than 30˚ / Red color if more than 90˚
-    if(((int)(steeringAngleDeg) < -30) || ((int)(steeringAngleDeg) > 30)) { val_color = COLOR_WARNING_ALPHA(200); }
-    if(((int)(steeringAngleDeg) < -90) || ((int)(steeringAngleDeg) > 90)) { val_color = COLOR_RED_ALPHA(200); }
+    if (((int)(steeringAngleDeg) < -30) || ((int)(steeringAngleDeg) > 30)) { val_color = COLOR_WARNING_ALPHA(200); }
+    if (((int)(steeringAngleDeg) < -90) || ((int)(steeringAngleDeg) > 90)) { val_color = COLOR_RED_ALPHA(200); }
 
     snprintf(val_str, sizeof(val_str), "%.1f", steeringAngleDeg);
     strcat(val_str, val_add);
@@ -649,8 +647,8 @@ static void ui_draw_measures_right(UIState *s, int x, int y, int w) {
 
     // Orange Color if less than 15ｍ / Red Color if less than 5ｍ
     if (lead_radar.getStatus()) {
-      if(radar_dist < 15) { val_color = COLOR_WARNING_ALPHA(200); }
-      if(radar_dist < 5) { val_color = COLOR_RED_ALPHA(200); }
+      if (radar_dist < 15) { val_color = COLOR_WARNING_ALPHA(200); }
+      if (radar_dist < 5) { val_color = COLOR_RED_ALPHA(200); }
       snprintf(val_str, sizeof(val_str), "%.1f", radar_dist);
     } else {
       snprintf(val_str, sizeof(val_str), "-");
@@ -673,8 +671,8 @@ static void ui_draw_measures_right(UIState *s, int x, int y, int w) {
 
     // Orange Color if less than 15ｍ / Red Color if less than 5ｍ
     if (lead_vision.getProb()) {
-      if(vision_dist < 15) { val_color = COLOR_WARNING_ALPHA(200); }
-      if(vision_dist < 5) { val_color = COLOR_RED_ALPHA(200); }
+      if (vision_dist < 15) { val_color = COLOR_WARNING_ALPHA(200); }
+      if (vision_dist < 5) { val_color = COLOR_RED_ALPHA(200); }
       snprintf(val_str, sizeof(val_str), "%.1f", vision_dist);
     } else {
       snprintf(val_str, sizeof(val_str), "-");
@@ -697,8 +695,8 @@ static void ui_draw_measures_right(UIState *s, int x, int y, int w) {
 
     // Orange Color if negative speed / Red Color if positive speed
     if (lead_one.getStatus()) {
-      if((int)(lead_one.getVRel()) < 0) { val_color = COLOR_WARNING; }
-      if((int)(lead_one.getVRel()) < -5) { val_color = COLOR_RED_ALPHA(200); }
+      if ((int)(lead_one.getVRel()) < 0) { val_color = COLOR_WARNING; }
+      if ((int)(lead_one.getVRel()) < -5) { val_color = COLOR_RED_ALPHA(200); }
       snprintf(val_str, sizeof(val_str), "%d", (int)(lead_one.getVRel() * 3.6 + 0.5));
     } else {
       snprintf(val_str, sizeof(val_str), "-");
