@@ -174,6 +174,7 @@ typedef struct UIState {
   UIScene scene = {};
 
   bool awake;
+  bool has_prime = false;
 
   float car_space_transform[6];
   bool wide_camera;

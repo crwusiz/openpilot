@@ -223,8 +223,9 @@ void encoder_thread(const LogCameraInfo &cam_info) {
         if (i == 0 && out_id != -1) {
           MessageBuilder msg;
           // this is really ugly
-          auto eidx = cam_info.type == DriverCam ? msg.initEvent().initDriverEncodeIdx() :
-                     (cam_info.type == WideRoadCam ? msg.initEvent().initWideRoadEncodeIdx() : msg.initEvent().initRoadEncodeIdx());
+          bool valid = (buf->get_frame_id() == extra.frame_id);
+          auto eidx = cam_info.type == DriverCam ? msg.initEvent(valid).initDriverEncodeIdx() :
+                     (cam_info.type == WideRoadCam ? msg.initEvent(valid).initWideRoadEncodeIdx() : msg.initEvent(valid).initRoadEncodeIdx());
           eidx.setFrameId(extra.frame_id);
           eidx.setTimestampSof(extra.timestamp_sof);
           eidx.setTimestampEof(extra.timestamp_eof);
@@ -306,7 +307,7 @@ void rotate_if_needed() {
 int main(int argc, char** argv) {
   if (Hardware::EON()) {
     setpriority(PRIO_PROCESS, 0, -20);
-  } else {
+  } else if (Hardware::TICI()) {
     int ret;
     ret = set_core_affinity({0, 1, 2, 3});
     assert(ret == 0);

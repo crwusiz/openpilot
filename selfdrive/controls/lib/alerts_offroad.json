@@ -41,8 +41,8 @@
     "text": "장치를 등록하지 못했습니다. comma.ai 서버에 연결하거나 업로드하지 않으며 comma.ai에서 지원을 받지 않습니다. 이게 공식적인 장치라면 support@comma.ai 로 문의하세요",
     "severity": 1
   },
-  "Offroad_NvmeMissing": {
-    "text": "NVME 장치가 마운트되지않았습니다.",
+  "Offroad_StorageMissing": {
+    "text": "저장장치가 마운트되지않았습니다.",
     "severity": 1
   }
 }

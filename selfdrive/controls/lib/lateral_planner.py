@@ -252,6 +252,7 @@ class LateralPlanner():
     plan_send.lateralPlan.mpcSolutionValid = bool(plan_solution_valid)
 
     plan_send.lateralPlan.desire = self.desire
+    plan_send.lateralPlan.useLaneLines = self.use_lanelines
     plan_send.lateralPlan.laneChangeState = self.lane_change_state
     plan_send.lateralPlan.laneChangeDirection = self.lane_change_direction
     plan_send.lateralPlan.autoLaneChangeEnabled = self.auto_lane_change_enabled

@@ -708,6 +708,7 @@ struct ModelDataV2 {
   orientation @5 :XYZTData;
   velocity @6 :XYZTData;
   orientationRate @7 :XYZTData;
+  acceleration @19 :XYZTData;
 
   # prediction lanelines and road edges
   laneLines @8 :List(XYZTData);
@@ -888,15 +889,15 @@ struct LateralPlan @0xe1e9318e2ae8b51e {
   desire @17 :Desire;
   laneChangeState @18 :LaneChangeState;
   laneChangeDirection @19 :LaneChangeDirection;
-
+  useLaneLines @29 :Bool;
 
   # desired curvatures over next 2.5s in rad/m
   psis @26 :List(Float32);
   curvatures @27 :List(Float32);
   curvatureRates @28 :List(Float32);
   
-  autoLaneChangeEnabled @29 :Bool;
-  autoLaneChangeTimer @30 :Int8;
+  autoLaneChangeEnabled @30 :Bool;
+  autoLaneChangeTimer @31 :Int8;
 
   enum Desire {
     none @0;
