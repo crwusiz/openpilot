@@ -365,7 +365,14 @@ QWidget * network_panel(QWidget * parent) {
   list->addItem(androidBtn);
 
   // SSH key management
-  // add
+  list->addItem(new SshToggle());
+  list->addItem(new SshControl());
+  list->addItem(horizontal_line());
+  list->addItem(new LateralControlSelect());
+  list->addItem(new MfcSelect());
+  list->addItem(new LongControlSelect());
+  list->addItem(horizontal_line());
+
   const char* gitpull = "sh /data/openpilot/scripts/gitpull.sh";
   //auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "RUN");
   auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "실행");
@@ -377,15 +384,6 @@ QWidget * network_panel(QWidget * parent) {
     }
   });
   list->addItem(gitpullbtn);
-  list->addItem(horizontal_line());
-
-  list->addItem(new SshToggle());
-  list->addItem(new SshControl());
-  list->addItem(horizontal_line());
-  list->addItem(new LateralControlSelect());
-  list->addItem(new MfcSelect());
-  list->addItem(new LongControlSelect());
-  list->addItem(horizontal_line());
 
   const char* realdata_clear = "sh /data/openpilot/scripts/realdataclear.sh";
   //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");
@@ -638,30 +636,36 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   //"Create prebuilt files to speed bootup",
                                   "Prebuilt 파일을 생성하며 부팅속도를 향상시킵니다.",
                                   "../assets/offroad/icon_addon.png", this));
-  toggles.append(new ParamControl("DisableShutdownd", "Shutdownd Disable",
+#ifdef QCOM
+  toggles.append(new ParamControl("ShutdowndDisable", "Shutdownd Disable",
                                   //"Disable Shutdownd",
                                   "Shutdownd (시동 off 5분) 자동종료를 사용하지않습니다. (batteryless 기종)",
                                   "../assets/offroad/icon_addon.png", this));
-  toggles.append(new ParamControl("DisableLogger", "Logger Disable",
+#endif
+  toggles.append(new ParamControl("LoggerDisable", "Logger Disable",
                                   //"Disable Logger is Reduce system load",
                                   "Logger 프로세스를 종료하여 시스템 부하를 줄입니다.",
                                   "../assets/offroad/icon_addon.png", this));
   toggles.append(new ParamControl("SccSmootherSlowOnCurves", "Slow On Curves Enable",
-                                  "",
+                                  //"Slow On Curves Enable",
+                                  "커브길에서 감속운행합니다.",
                                   "../assets/offroad/icon_road.png", this));
   toggles.append(new ParamControl("SccSmootherSyncGasPressed", "Sync set speed on gas pressed Enable",
-                                  "",
+                                  //"Sync set speed on gas pressed Enable",
+                                  "가속페달 사용으로 올라간 속도를 SET 속도와 일치시킵니다.",
                                   "../assets/offroad/icon_road.png", this));
   toggles.append(new ParamControl("StockNaviDecelEnabled", "Stock Navi based deceleration Enable",
-                                  "Use the stock navi based deceleration for longcontrol",
+                                  //"Use the stock navi based deceleration for longcontrol",
+                                  "Longcontrol 사용시 순정내비게이션의 속도감속정보를 사용합니다.",
                                   "../assets/offroad/icon_road.png", this));
   toggles.append(new ParamControl("NewRadarInterface", "New radar interface Enable",
-                                  "",
+                                  //"New radar interface Enable",
+                                  "scc 레이더 배선개조없이 사용가능한 일부차종을 위한 옵션입니다",
                                   "../assets/offroad/icon_road.png", this));
+  /*
   toggles.append(new ParamControl("DisableOpFcw", "Openpilot FCW Disable",
                                   "",
-                                  "../assets/offroad/icon_shell.png", this));
-  /*
+                                  "../assets/offroad/icon_road.png", this));
   toggles.append(new ParamControl("ShowDebugUI", "Show Debug UI Enable",
                                   "",
                                   "../assets/offroad/icon_shell.png", this));

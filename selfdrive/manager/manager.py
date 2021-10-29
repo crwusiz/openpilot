@@ -46,14 +46,12 @@ def manager_init():
     ("PutPrebuilt", "0"),
     ("MfcSelect", "0"),
     ("LateralControlSelect", "0"),
-    ("DisableShutdownd", "1"),
-    ("DisableLogger", "0"),
-
+    ("ShutdowndDisable", "1"),
+    ("LoggerDisable", "0"),
     ("SccSmootherSlowOnCurves", "0"),
     ("SccSmootherSyncGasPressed", "0"),
     ("StockNaviDecelEnabled", "0"),
     ("NewRadarInterface", "0"),
-    ("DisableOpFcw", "0"),
   ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))
@@ -163,9 +161,9 @@ def manager_thread():
     if sm['deviceState'].freeSpacePercent < 5:
       not_run.append("loggerd")
 
-    if params.get_bool("DisableShutdownd"):
+    if params.get_bool("ShutdowndDisable"):
       not_run.append("shutdownd")
-    if params.get_bool("DisableLogger"):
+    if params.get_bool("LoggerDisable"):
       not_run.append("loggerd")
       not_run.append("deleter")
       not_run.append("logmessaged")

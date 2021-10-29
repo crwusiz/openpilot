@@ -52,5 +52,4 @@ echo -n "Public Key" > /data/params/d/GithubUsername;
 setprop persist.neos.ssh 1
 echo =================================================================
 
-export PASSIVE="0"
 exec ./launch_chffrplus.sh

@@ -127,7 +127,15 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
 
   ListWidget *list = new ListWidget(this);
 
-  // add
+  // SSH keys
+  list->addItem(new SshToggle());
+  list->addItem(new SshControl());
+  list->addItem(horizontal_line());
+  list->addItem(new LateralControlSelect());
+  list->addItem(new MfcSelect());
+  list->addItem(new LongControlSelect());
+  list->addItem(horizontal_line());
+
   const char* gitpull = "sh /data/openpilot/scripts/gitpull.sh";
   //auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "RUN");
   auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "실행");
@@ -139,16 +147,6 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
     }
   });
   list->addItem(gitpullbtn);
-  list->addItem(horizontal_line());
-
-    // SSH keys
-  list->addItem(new SshToggle());
-  list->addItem(new SshControl());
-  list->addItem(horizontal_line());
-  list->addItem(new LateralControlSelect());
-  list->addItem(new MfcSelect());
-  list->addItem(new LongControlSelect());
-  list->addItem(horizontal_line());
 
   const char* realdata_clear = "sh /data/openpilot/scripts/realdataclear.sh";
   //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");

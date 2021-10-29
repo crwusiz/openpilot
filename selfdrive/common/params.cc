@@ -216,17 +216,15 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"LateralControlSelect", PERSISTENT},
     {"AutoLaneChangeEnabled", PERSISTENT},
     {"PutPrebuilt", PERSISTENT},
-    {"DisableShutdownd", PERSISTENT},
-    {"DisableLogger", PERSISTENT},
+    {"ShutdowndDisable", PERSISTENT},
+    {"LoggerDisable", PERSISTENT},
     {"SelectedCar", PERSISTENT},
     {"SoftRestartTriggered", CLEAR_ON_MANAGER_START},
-
     {"SccSmootherState", PERSISTENT},
     {"SccSmootherSlowOnCurves", PERSISTENT},
     {"SccSmootherSyncGasPressed", PERSISTENT},
     {"StockNaviDecelEnabled", PERSISTENT},
     {"NewRadarInterface", PERSISTENT},
-    {"DisableOpFcw", PERSISTENT},
 };
 
 } // namespace

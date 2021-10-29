@@ -96,7 +96,7 @@ void Sidebar::paintEvent(QPaintEvent *event) {
   p.setOpacity(1.0);
   p.drawImage(60, 1080 - 180 - 40, home_img);
 
-/*
+#ifndef QCOM
   // network
   int x = 58;
   const QColor gray(0x54, 0x54, 0x54);
@@ -105,12 +105,10 @@ void Sidebar::paintEvent(QPaintEvent *event) {
     p.drawEllipse(x, 196, 27, 27);
     x += 37;
   }
-
-  configFont(p, "Open Sans", 30, "Regular");
-  p.setPen(QColor(0xff, 0xff, 0xff));
-*/
+#endif
 
 #ifdef QCOM
+  // battery status
   p.drawImage(68, 180, battery_imgs[m_battery_img]); // signal_imgs to battery_imgs
   configFont(p, "Open Sans", 32, "Bold");
   p.setPen(QColor(0x00, 0x00, 0x00));
@@ -124,11 +122,10 @@ void Sidebar::paintEvent(QPaintEvent *event) {
   p.setPen(QColor(0xff, 0xff, 0xff));
   const QRect r2 = QRect(0, 267, event->rect().width(), 50);
 
-  if(net_type == network_type[cereal::DeviceState::NetworkType::WIFI])
+  if (net_type == network_type[cereal::DeviceState::NetworkType::WIFI])
     p.drawText(r2, Qt::AlignCenter, wifi_addr);
   else
     p.drawText(r2, Qt::AlignCenter, net_type);
-
 
   // metrics
   configFont(p, "Open Sans", 35, "Regular");

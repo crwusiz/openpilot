@@ -1040,7 +1040,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
     #ET.NO_ENTRY: NoEntryAlert("Cruise Fault: Restart the Car"),
     ET.NO_ENTRY: NoEntryAlert("크루즈 오류 : 차량을 재가동하세요"),
   },
-  
+
   EventName.turningIndicatorOn: {
     ET.WARNING: Alert(
       "방향지시등 동작중에는 핸들을 잡아주세요",
@@ -1054,12 +1054,14 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   },
 
   EventName.slowingDownSpeed: {
-    ET.PERMANENT: Alert("Slowing down","", AlertStatus.normal, AlertSize.small,
+    #ET.PERMANENT: Alert("Slowing down", "", AlertStatus.normal, AlertSize.small,
+    ET.PERMANENT: Alert("속도를 줄이고 있습니다", "", AlertStatus.normal, AlertSize.small,
       Priority.MID, VisualAlert.none, AudibleAlert.none, 0., .1, .1),
   },
 
   EventName.slowingDownSpeedSound: {
-    ET.PERMANENT: Alert("Slowing down","", AlertStatus.normal, AlertSize.small,
+    #ET.PERMANENT: Alert("Slowing down","", AlertStatus.normal, AlertSize.small,
+    ET.PERMANENT: Alert("속도를 줄이고 있습니다", "", AlertStatus.normal, AlertSize.small,
       Priority.HIGH, VisualAlert.none, AudibleAlert.chimeSlowingDownSpeed, 2., 2., 2.),
   },
 
