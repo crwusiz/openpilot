@@ -21,10 +21,6 @@
     "severity": 1,
     "_comment": "Append the command and error to the text."
   },
-  "Offroad_PandaFirmwareMismatch": {
-    "text": "호환되지않는 판다 펌웨어 버전입니다. 장치를 재부팅하면 판다 펌웨어가 재설치됩니다.",
-    "severity": 1
-  },
   "Offroad_InvalidTime": {
     "text": "잘못된 날짜 및 시간설정으로 시스템이 시작되지않습니다. 네트워크에 연결하여 날짜 및 시간설정을 진행하세요.",
     "severity": 1

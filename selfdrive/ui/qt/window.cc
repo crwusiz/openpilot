@@ -15,7 +15,6 @@ MainWindow::MainWindow(QWidget *parent) : QWidget(parent) {
   QObject::connect(&qs, &QUIState::uiUpdate, homeWindow, &HomeWindow::update);
   QObject::connect(&qs, &QUIState::offroadTransition, homeWindow, &HomeWindow::offroadTransition);
   QObject::connect(&qs, &QUIState::offroadTransition, homeWindow, &HomeWindow::offroadTransitionSignal);
-  QObject::connect(&device, &Device::displayPowerChanged, homeWindow, &HomeWindow::displayPowerChanged);
 
   settingsWindow = new SettingsWindow(this);
   main_layout->addWidget(settingsWindow);
@@ -54,6 +53,7 @@ MainWindow::MainWindow(QWidget *parent) : QWidget(parent) {
   // load fonts
   QFontDatabase::addApplicationFont("../assets/fonts/opensans_regular.ttf");
   QFontDatabase::addApplicationFont("../assets/fonts/opensans_bold.ttf");
+  QFontDatabase::addApplicationFont("../assets/fonts/opensans_semibold.ttf");
   QFontDatabase::addApplicationFont("../assets/fonts/Inter-Black.ttf");
   QFontDatabase::addApplicationFont("../assets/fonts/Inter-Bold.ttf");
   QFontDatabase::addApplicationFont("../assets/fonts/Inter-ExtraBold.ttf");
