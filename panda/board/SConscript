@@ -87,7 +87,7 @@ includes = [
 
 def get_version(builder, build_type):
   try:
-    git = subprocess.check_output(["git", "rev-parse", "--short=8", "HEAD"], encoding='utf8').strip()
+    git = "12345678" #subprocess.check_output(["git", "rev-parse", "--short=8", "HEAD"], encoding='utf8').strip()
   except subprocess.CalledProcessError:
     git = "unknown"
   return f"{builder}-12345678-{build_type}"
