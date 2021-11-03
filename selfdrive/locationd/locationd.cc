@@ -201,7 +201,7 @@ void Localizer::handle_sensors(double current_time, const capnp::List<cereal::Se
     const cereal::SensorEventData::Reader& sensor_reading = log[i];
 
     // Ignore empty readings (e.g. in case the magnetometer had no data ready)
-    if (sensor_reading.getTimestamp() == 0){
+    if (sensor_reading.getTimestamp() == 0) {
       continue;
     }
 
@@ -258,7 +258,7 @@ void Localizer::handle_gps(double current_time, const cereal::GpsLocationData::R
     return;
   }
 
-  if (floatlist2vector(log.getVNED()).norm() > TRANS_SANITY_CHECK){
+  if (floatlist2vector(log.getVNED()).norm() > TRANS_SANITY_CHECK) {
     return;
   }
 
@@ -319,7 +319,7 @@ void Localizer::handle_cam_odo(double current_time, const cereal::CameraOdometry
   VectorXd rot_calib_std = floatlist2vector(log.getRotStd());
   VectorXd trans_calib_std = floatlist2vector(log.getTransStd());
 
-  if ((rot_calib_std.minCoeff() <= MIN_STD_SANITY_CHECK) || (trans_calib_std.minCoeff() <= MIN_STD_SANITY_CHECK)){
+  if ((rot_calib_std.minCoeff() <= MIN_STD_SANITY_CHECK) || (trans_calib_std.minCoeff() <= MIN_STD_SANITY_CHECK)) {
     return;
   }
 
@@ -344,12 +344,12 @@ void Localizer::handle_cam_odo(double current_time, const cereal::CameraOdometry
 
 void Localizer::handle_live_calib(double current_time, const cereal::LiveCalibrationData::Reader& log) {
   if (log.getRpyCalib().size() > 0) {
-    auto calib = floatlist2vector(log.getRpyCalib());
-    if ((calib.minCoeff() < -CALIB_RPY_SANITY_CHECK) || (calib.maxCoeff() > CALIB_RPY_SANITY_CHECK)){
+    auto live_calib = floatlist2vector(log.getRpyCalib());
+    if ((live_calib.minCoeff() < -CALIB_RPY_SANITY_CHECK) || (live_calib.maxCoeff() > CALIB_RPY_SANITY_CHECK)) {
       return;
     }
 
-    this->calib = calib;
+    this->calib = live_calib;
     this->device_from_calib = euler2rot(this->calib);
     this->calib_from_device = this->device_from_calib.transpose();
     this->calibrated = log.getCalStatus() == 1;
@@ -363,7 +363,7 @@ void Localizer::reset_kalman(double current_time) {
 
 void Localizer::finite_check(double current_time) {
   bool all_finite = this->kf->get_x().array().isFinite().all() or this->kf->get_P().array().isFinite().all();
-  if (!all_finite){
+  if (!all_finite) {
     LOGE("Non-finite values detected, kalman reset");
     this->reset_kalman(current_time);
   }
@@ -375,7 +375,7 @@ void Localizer::time_check(double current_time) {
   }
   double filter_time = this->kf->get_filter_time();
   bool big_time_gap = !std::isnan(filter_time) && (current_time - filter_time > 10);
-  if (big_time_gap){
+  if (big_time_gap) {
     LOGE("Time gap of over 10s detected, kalman reset");
     this->reset_kalman(current_time);
   }

@@ -157,7 +157,7 @@ class SoftDisableAlert(Alert):
   def __init__(self, alert_text_2):
     #super().__init__("TAKE CONTROL IMMEDIATELY", alert_text_2,
     super().__init__("핸들을 즉시 잡아주세요", alert_text_2,
-                     AlertStatus.critical, AlertSize.full,
+                     AlertStatus.userPrompt, AlertSize.full,
                      Priority.MID, VisualAlert.steerRequired,
                      AudibleAlert.chimeWarningRepeat, .1, 2., 2.),
 
@@ -185,17 +185,27 @@ class NormalPermanentAlert(Alert):
                      AlertStatus.normal, AlertSize.mid if len(alert_text_2) else AlertSize.small,
                      Priority.LOWER, VisualAlert.none, AudibleAlert.none, 0., 0., duration_text),
 
+# ********** helper functions **********
+def get_display_speed(speed_ms: float, metric: bool) -> str:
+  speed = int(round(speed_ms * (CV.MS_TO_KPH if metric else CV.MS_TO_MPH)))
+  unit = 'km/h' if metric else 'mph'
+  return f"{speed} {unit}"
+
 
 # ********** alert callback functions **********
+def below_engage_speed_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool) -> Alert:
+  return NoEntryAlert(f"Speed Below {get_display_speed(CP.minEnableSpeed, metric)}")
+
+
 def below_steer_speed_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool) -> Alert:
   speed = int(round(CP.minSteerSpeed * (CV.MS_TO_KPH if metric else CV.MS_TO_MPH)))
   unit = "㎞/h" if metric else "mph"
   return Alert(
-    #"TAKE CONTROL",
-    #"Steer Unavailable Below %d %s" % (speed, unit),
-    "핸들을 잡아주세요",
-    "%d %s 이상의 속도에서 조향제어가능합니다" % (speed, unit),
-    AlertStatus.userPrompt, AlertSize.mid,
+    #f"Steer Unavailable Below {get_display_speed(CP.minSteerSpeed, metric)}",
+    #"",
+    f"{get_display_speed(CP.minSteerSpeed, metric)} 이상의 속도에서 조향제어가능합니다",
+    "",
+    AlertStatus.userPrompt, AlertSize.small,
     Priority.MID, VisualAlert.steerRequired, AudibleAlert.chimePrompt, 0., 0.4, .3)
 
 
@@ -204,9 +214,9 @@ def calibration_incomplete_alert(CP: car.CarParams, sm: messaging.SubMaster, met
   unit = "㎞/h" if metric else "mph"
   return Alert(
     #"Calibration in Progress: %d%%" % sm['liveCalibration'].calPerc,
-    #"Drive Above %d %s" % (speed, unit),
+    #f"Drive Above {get_display_speed(MIN_SPEED_FILTER, metric)}",
     "캘리브레이션 진행중입니다 : %d%%" % sm['liveCalibration'].calPerc,
-    "속도를 %d %s 이상으로 주행하세요" % (speed, unit),
+    f"속도를 {get_display_speed(MIN_SPEED_FILTER, metric)}이상으로 주행하세요",
     AlertStatus.normal, AlertSize.mid,
     Priority.LOWEST, VisualAlert.none, AudibleAlert.none, 0., 0., .2)
 
@@ -673,8 +683,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   },
 
   EventName.belowEngageSpeed: {
-    #ET.NO_ENTRY: NoEntryAlert("Speed Too Low"),
-    ET.NO_ENTRY: NoEntryAlert("속도를 높여주세요"),
+    ET.NO_ENTRY: below_engage_speed_alert,
   },
 
   EventName.sensorDataInvalid: {
@@ -1045,8 +1054,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
     ET.WARNING: Alert(
       "방향지시등 동작중에는 핸들을 잡아주세요",
       "",
-      AlertStatus.userPrompt, AlertSize.mid,
-      Priority.MID, VisualAlert.none, AudibleAlert.none, .0, .1, .2),
+      AlertStatus.userPrompt, AlertSize.small,
+      Priority.LOW, VisualAlert.none, AudibleAlert.none, .0, .1, .2),
   },
 
   EventName.autoLaneChange: {
