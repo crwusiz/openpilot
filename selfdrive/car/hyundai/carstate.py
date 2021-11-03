@@ -99,7 +99,7 @@ class CarState(CarStateBase):
     else:
       self.mdps_error_cnt = 0
 
-    ret.steerWarning = self.mdps_error_cnt > 50
+    ret.steerWarning = self.mdps_error_cnt > 100
 
     if self.CP.enableAutoHold:
       ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]

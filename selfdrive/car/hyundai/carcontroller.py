@@ -6,7 +6,7 @@ from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, \
                                              create_scc11, create_scc12, create_scc13, create_scc14, \
                                              create_mdps12, create_lfahda_mfc, create_hda_mfc
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
-from selfdrive.car.hyundai.values import Buttons, FEATURES, CarControllerParams, SP_CARS
+from selfdrive.car.hyundai.values import Buttons, FEATURES, CarControllerParams, CAR, SP_CARS
 from opendbc.can.packer import CANPacker
 from selfdrive.config import Conversions as CV
 from common.params import Params
@@ -78,7 +78,12 @@ class CarController():
     self.steer_rate_limited = new_steer != apply_steer
 
     # disable if steer angle reach 90 deg, otherwise mdps fault in some models
-    lkas_active = enabled and not CS.out.steerWarning and abs(CS.out.steeringAngleDeg) < CS.CP.maxSteeringAngleDeg
+    #lkas_active = enabled and not CS.out.steerWarning and abs(CS.out.steeringAngleDeg) < CS.CP.maxSteeringAngleDeg
+    lkas_active = enabled and abs(CS.out.steeringAngleDeg) < CS.CP.maxSteeringAngleDeg
+
+    # fix for Genesis hard fault at low speed
+    if CS.out.vEgo < 60 * CV.KPH_TO_MS and self.car_fingerprint == CAR.GENESIS and not CS.mdps_bus:
+      lkas_active = False
 
     # Disable steering while turning blinker on and speed below 60 kph
     if CS.out.leftBlinker or CS.out.rightBlinker:
