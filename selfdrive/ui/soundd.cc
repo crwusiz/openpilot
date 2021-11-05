@@ -6,6 +6,7 @@
 #include <QString>
 #include <QSoundEffect>
 
+#include "selfdrive/ui/qt/util.h"
 #include "cereal/messaging/messaging.h"
 #include "selfdrive/common/util.h"
 #include "selfdrive/hardware/hw.h"
@@ -13,6 +14,10 @@
 
 // TODO: detect when we can't play sounds
 // TODO: detect when we can't display the UI
+
+void sigHandler(int s) {
+  qApp->quit();
+}
 
 class Sound : public QObject {
 public:
@@ -64,6 +69,9 @@ private slots:
       // scale volume with speed
       volume = util::map_val((*sm)["carState"].getCarState().getVEgo(), 0.f, 20.f,
                              Hardware::MIN_VOLUME, Hardware::MAX_VOLUME);
+      for (auto &[s, loops] : sounds) {
+        s->setVolume(std::round(100 * volume) / 100);
+      }
     }
     if (sm->updated("controlsState")) {
       const cereal::ControlsState::Reader &cs = (*sm)["controlsState"].getControlsState();
@@ -92,7 +100,6 @@ private slots:
       if (alert.sound != AudibleAlert::NONE) {
         auto &[s, loops] = sounds[alert.sound];
         s->setLoopCount(loops);
-        s->setVolume(volume);
         s->play();
       }
     }
@@ -106,9 +113,13 @@ private:
 };
 
 int main(int argc, char **argv) {
+  qInstallMessageHandler(swagLogMessageHandler);
   setpriority(PRIO_PROCESS, 0, -20);
 
   QApplication a(argc, argv);
+  std::signal(SIGINT, sigHandler);
+  std::signal(SIGTERM, sigHandler);
+
   Sound sound;
   return a.exec();
 }
