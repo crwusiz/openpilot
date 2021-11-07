@@ -236,13 +236,29 @@ static void ui_draw_bottom_info(UIState *s) {
     const char* long_state[] = {"Off", "Pid", "Stopping", "Starting"};
     int lateralControlState = controls_state.getLateralControlSelect();
     const char* lateral_state[] = {"Pid", "Indi", "Lqr"};
+    auto gps_ext = s->scene.gps_ext;
+    float verticalAccuracy = gps_ext.getVerticalAccuracy();
+    float gpsAltitude = gps_ext.getAltitude();
+    float gpsAccuracy = gps_ext.getAccuracy();
+    int gpsSatelliteCount = s->scene.satelliteCount;
+
+    if(verticalAccuracy == 0 || verticalAccuracy > 100)
+        gpsAltitude = 99.99;
+
+    if (gpsAccuracy > 100)
+      gpsAccuracy = 99.99;
+    else if (gpsAccuracy == 0)
+      gpsAccuracy = 99.8;
 
     snprintf(str, sizeof(str),
-    "[ %s ] SR[%.2f] MDPS[%d] SCC[%d] LongControl[ %s ]",
+    "[ %s ] SR[%.2f] MDPS[%d] SCC[%d] LongControl[ %s ] GPS[ Alt(%.1f) Acc(%.1f) Sat(%d) ]",
     lateral_state[lateralControlState],
     controls_state.getSteerRatio(),
     car_params.getMdpsBus(), car_params.getSccBus(),
-    long_state[longControlState]
+    long_state[longControlState],
+    gpsAltitude,
+    gpsAccuracy,
+    gpsSatelliteCount
     );
 
     int x = bdr_s * 2;
