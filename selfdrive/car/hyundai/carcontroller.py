@@ -1,6 +1,8 @@
+from random import randint
+
 from cereal import car
 from common.realtime import DT_CTRL
-from common.numpy_fast import clip
+from common.numpy_fast import clip, interp
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, \
                                              create_scc11, create_scc12, create_scc13, create_scc14, \
@@ -168,9 +170,9 @@ class CarController():
         can_sends.append(create_clu11(self.packer, self.resume_cnt, CS.scc_bus, CS.clu11, Buttons.RES_ACCEL, clu11_speed))
         self.resume_cnt += 1
 
-        if self.resume_cnt >= 8:
+        if self.resume_cnt >= randint(6, 8):
           self.resume_cnt = 0
-          self.resume_wait_timer = SccSmoother.get_wait_count() * 2
+          self.resume_wait_timer = randint(30, 36)
 
     # reset lead distnce after the car starts moving
     elif self.last_lead_distance != 0:

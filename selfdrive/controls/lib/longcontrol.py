@@ -25,7 +25,7 @@ def long_control_state_trans(CP, active, long_control_state, v_ego, v_target, v_
                          brake_pressed))
 
   starting_condition = v_target > CP.vEgoStarting and not cruise_standstill
-  
+
   # neokii
   if radarState is not None and radarState.leadOne is not None and radarState.leadOne.status:
     starting_condition = starting_condition and radarState.leadOne.vLead > CP.vEgoStarting
@@ -75,10 +75,10 @@ class LongControl():
     # Interp control trajectory
     # TODO estimate car specific lag, use .15s for now
     if len(long_plan.speeds) == CONTROL_N:
-  
+
       longitudinalActuatorDelayLowerBound = ntune_scc_get('longitudinalActuatorDelayLowerBound')
       longitudinalActuatorDelayUpperBound = ntune_scc_get('longitudinalActuatorDelayUpperBound')
-      
+
       v_target_lower = interp(longitudinalActuatorDelayLowerBound, T_IDXS[:CONTROL_N], long_plan.speeds)
       a_target_lower = 2 * (v_target_lower - long_plan.speeds[0])/longitudinalActuatorDelayLowerBound - long_plan.accels[0]
 
@@ -106,7 +106,8 @@ class LongControl():
                                                        v_target_future, self.v_pid, output_accel,
                                                        CS.brakePressed, CS.cruiseState.standstill, CP.minSpeedCan, radarState)
 
-    v_ego_pid = max(CS.vEgo, CP.minSpeedCan)  # Without this we get jumps, CAN bus reports 0 when speed < 0.3
+    #v_ego_pid = max(CS.vEgo, CP.minSpeedCan)  # Without this we get jumps, CAN bus reports 0 when speed < 0.3
+    v_ego_pid = max(CS.vEgo, 0.)
 
     if self.long_control_state == LongCtrlState.off or CS.gasPressed:
       self.reset(v_ego_pid)
