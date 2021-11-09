@@ -9,16 +9,11 @@ source "$BASEDIR/launch_env.sh"
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 function two_init {
+if [ -f /data/ONEPLUS ]; then
   mount -o remount,rw /system
-  if [ ! -f /data/ONEPLUS ] && ! $(grep -q "letv" /proc/cmdline); then
-    sed -i -e 's#/dev/input/event1#/dev/input/event2#g' ~/.bash_profile
-    touch /data/ONEPLUS
-  else
-    if [ ! -f /data/LEECO ]; then
-      touch /data/LEECO
-    fi
-  fi
+  sed -i -e 's#/dev/input/event1#/dev/input/event2#g' ~/.bash_profile
   mount -o remount,r /system
+fi
 
   # set IO scheduler
   setprop sys.io.scheduler noop
