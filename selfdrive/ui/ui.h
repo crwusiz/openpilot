@@ -37,6 +37,12 @@
 #define COLOR_LIME nvgRGBA(120, 255, 120, 255)
 #define COLOR_LIME_ALPHA(x) nvgRGBA(120, 255, 120, x)
 
+const int bdr_s = 10;
+const int header_h = 420;
+const int footer_h = 280;
+
+const int UI_FREQ = 20;   // Hz
+
 typedef cereal::CarControl::HUDControl::AudibleAlert AudibleAlert;
 
 // TODO: this is also hardcoded in common/transformations/camera.py
@@ -55,7 +61,7 @@ typedef struct Rect {
   }
 } Rect;
 
-typedef struct Alert {
+struct Alert {
   QString text1;
   QString text2;
   QString type;
@@ -64,33 +70,31 @@ typedef struct Alert {
   bool equal(const Alert &a2) {
     return text1 == a2.text1 && text2 == a2.text2 && type == a2.type;
   }
-} Alert;
 
-/* eng
-const Alert CONTROLS_WAITING_ALERT = {"openpilot Unavailable", "Waiting for controls to start",
-                                      "controlsWaiting", cereal::ControlsState::AlertSize::MID,
+  static Alert get(const SubMaster &sm, uint64_t started_frame) {
+    if (sm.updated("controlsState")) {
+      const cereal::ControlsState::Reader &cs = sm["controlsState"].getControlsState();
+      return {cs.getAlertText1().cStr(), cs.getAlertText2().cStr(),
+              cs.getAlertType().cStr(), cs.getAlertSize(),
+              cs.getAlertSound()};
+    } else if ((sm.frame - started_frame) > 5 * UI_FREQ) {
+      const int CONTROLS_TIMEOUT = 5;
+      // Handle controls timeout
+      if (sm.rcv_frame("controlsState") < started_frame) {
+        // car is started, but controlsState hasn't been seen at all
+        return {"오픈파일럿을 사용할수없습니다", "프로세스가 준비중입니다",
+                "프로세스가 준비중입니다", cereal::ControlsState::AlertSize::MID,
                                       AudibleAlert::NONE};
-
-const Alert CONTROLS_UNRESPONSIVE_ALERT = {"TAKE CONTROL IMMEDIATELY", "Controls Unresponsive",
-                                           "controlsUnresponsive", cereal::ControlsState::AlertSize::FULL,
+      } else if ((nanos_since_boot() - sm.rcv_time("controlsState")) / 1e9 > CONTROLS_TIMEOUT) {
+        // car is started, but controls is lagging or died
+        return {"핸들을 잡아주세요", "프로세스가 응답하지않습니다",
+                "프로세스가 응답하지않습니다", cereal::ControlsState::AlertSize::FULL,
                                            AudibleAlert::CHIME_WARNING_REPEAT};
-*/
-
-const Alert CONTROLS_WAITING_ALERT = {"오픈파일럿을 사용할수없습니다", "프로세스가 준비중입니다",
-                                      "프로세스가 준비중입니다", cereal::ControlsState::AlertSize::MID,
-                                      AudibleAlert::NONE};
-
-const Alert CONTROLS_UNRESPONSIVE_ALERT = {"핸들을 잡아주세요", "프로세스가 응답하지않습니다",
-                                           "프로세스가 응답하지않습니다", cereal::ControlsState::AlertSize::FULL,
-                                           AudibleAlert::CHIME_WARNING_REPEAT};
-
-const int CONTROLS_TIMEOUT = 5;
-
-const int bdr_s = 10;
-const int header_h = 420;
-const int footer_h = 280;
-
-const int UI_FREQ = 20;   // Hz
+      }
+    }
+    return {};
+  }
+};
 
 typedef enum UIStatus {
   STATUS_DISENGAGED,
