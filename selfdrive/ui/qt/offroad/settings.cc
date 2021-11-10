@@ -56,7 +56,7 @@ TogglesPanel::TogglesPanel(QWidget *parent) : ListWidget(parent) {
                                   this));
   addItem(new ParamControl("CommunityFeaturesToggle",
                                   //"Enable Community Features",
-                                  //"Use features from the open source community that are not maintained or supported by comma.ai and have not been confirmed to meet the standard safety model. These features include community supported cars and community supported hardware. Be extra cautious when using these features",
+                                  //"Use features, such as community supported hardware, from the open source community that are not maintained or supported by comma.ai and have not been confirmed to meet the standard safety model. Be extra cautious when using these features",
                                   "커뮤니티 기능 사용",
                                   "커뮤니티기능은 comma.ai에서 공식적으로 지원하는 기능이 아니므로 사용시 주의하세요.",
                                   "../assets/offroad/icon_discord.png",
@@ -77,7 +77,7 @@ TogglesPanel::TogglesPanel(QWidget *parent) : ListWidget(parent) {
                                   this));
   addItem(new ParamControl("UploadRaw",
                                   //"Upload Raw Logs",
-                                  //"Upload full logs at [ connect.comma.ai/useradmin ]",
+                                  //"Upload full logs and full resolution video by default while on Wi-Fi. If not enabled, individual logs can be marked for upload at useradmin.comma.ai.",
                                   "주행로그 업로드 사용",
                                   "주행로그를 업로드합니다. [ connect.comma.ai/useradmin ] 에서 확인할수있습니다",
                                   "../assets/offroad/icon_network.png",
@@ -334,7 +334,7 @@ void SoftwarePanel::updateLabels() {
   lastUpdateLbl->setText(lastUpdate);
   updateBtn->setText("CHECK");
   updateBtn->setEnabled(true);
-  gitRemoteLbl->setText(QString::fromStdString(params.get("GitRemote").substr(19)));
+  gitRemoteLbl->setText(QString::fromStdString(params.get("GitRemote").substr(0,19)));
   gitBranchLbl->setText(QString::fromStdString(params.get("GitBranch")));
   gitCommitLbl->setText(QString::fromStdString(params.get("GitCommit")).left(7));
   osVersionLbl->setText(QString::fromStdString(Hardware::get_os_version()).trimmed());

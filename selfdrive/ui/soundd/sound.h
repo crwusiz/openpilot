@@ -16,6 +16,11 @@ const std::tuple<AudibleAlert, QString, int> sound_list[] = {
   {AudibleAlert::CHIME_ERROR, "error.wav", 0},
   {AudibleAlert::CHIME_PROMPT, "error.wav", 0},
   {AudibleAlert::CHIME_SLOWING_DOWN_SPEED, "slowing_down_speed.wav", 0},
+  {AudibleAlert::CHIME_DING, "ding.wav", 0},
+  {AudibleAlert::CHIME_DING_REPEAT, "ding.wav", 10},
+  {AudibleAlert::CHIME_GEARD, "geard.wav", 0},
+  {AudibleAlert::CHIME_SEATBELT, "seatbelt.wav", 0},
+  {AudibleAlert::CHIME_READY, "ready.wav", 0},
 };
 
 class Sound : public QObject {
