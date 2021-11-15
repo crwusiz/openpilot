@@ -25,6 +25,9 @@ MapWindow::MapWindow(const QMapboxGLSettings &settings) :
   m_settings(settings), velocity_filter(0, 10, 0.1) {
   sm = new SubMaster({"liveLocationKalman", "navInstruction", "navRoute"});
 
+  // Connect now, so any navRoutes sent while the map is initializing are not dropped
+  sm->update(0);
+
   timer = new QTimer(this);
   QObject::connect(timer, SIGNAL(timeout()), this, SLOT(timerUpdate()));
   timer->start(100);
@@ -50,6 +53,7 @@ MapWindow::MapWindow(const QMapboxGLSettings &settings) :
   }
 
   grabGesture(Qt::GestureType::PinchGesture);
+  qDebug() << "MapWindow initialized";
 }
 
 MapWindow::~MapWindow() {
@@ -112,13 +116,12 @@ void MapWindow::timerUpdate() {
   sm->update(0);
   if (sm->updated("liveLocationKalman")) {
     auto location = (*sm)["liveLocationKalman"].getLiveLocationKalman();
+    auto pos = location.getPositionGeodetic();
+    auto orientation = location.getCalibratedOrientationNED();
 
-    localizer_valid = location.getStatus() == cereal::LiveLocationKalman::Status::VALID;
+    localizer_valid = (location.getStatus() == cereal::LiveLocationKalman::Status::VALID) && pos.getValid();
 
     if (localizer_valid) {
-      auto pos = location.getPositionGeodetic();
-      auto orientation = location.getCalibratedOrientationNED();
-
       float velocity = location.getVelocityCalibrated().getValue()[0];
       float bearing = RAD2DEG(orientation.getValue()[2]);
       auto coordinate = QMapbox::Coordinate(pos.getValue()[0], pos.getValue()[1]);
@@ -179,7 +182,8 @@ void MapWindow::timerUpdate() {
     }
   }
 
-  if (sm->updated("navRoute")) {
+  if (sm->rcv_frame("navRoute") != route_rcv_frame) {
+    qWarning() << "Got new navRoute from navd";
     auto route = (*sm)["navRoute"].getNavRoute();
     auto route_points = capnp_coordinate_list_to_collection(route.getCoordinates());
     QMapbox::Feature feature(QMapbox::Feature::LineStringType, route_points, {}, {});
@@ -194,6 +198,7 @@ void MapWindow::timerUpdate() {
       setVisible(true); // Show map on destination set/change
       allow_open = false;
     }
+    route_rcv_frame = sm->rcv_frame("navRoute");
   }
 }
 

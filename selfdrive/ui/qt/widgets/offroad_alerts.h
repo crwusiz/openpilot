@@ -2,6 +2,7 @@
 #include <map>
 
 #include <QLabel>
+#include <QPushButton>
 #include <QVBoxLayout>
 
 #include "selfdrive/common/params.h"
@@ -11,6 +12,8 @@ class AbstractAlert : public QFrame {
 
 protected:
   AbstractAlert(bool hasRebootBtn, QWidget *parent = nullptr);
+
+  QPushButton *snooze_btn;
   QVBoxLayout *scrollable_layout;
   Params params;
 

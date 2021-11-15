@@ -244,9 +244,17 @@ DevicePanel::DevicePanel(QWidget* parent) : ListWidget(parent) {
   reboot_btn->setObjectName("reboot_btn");
   power_layout->addWidget(reboot_btn);
   QObject::connect(reboot_btn, &QPushButton::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)) {
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      Hardware::reboot();
+    if (QUIState::ui_state.status == UIStatus::STATUS_DISENGAGED) {
+      //if (ConfirmationDialog::confirm("Are you sure you want to reboot?", this)) {
+      if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+        // Check engaged again in case it changed while the dialog was open
+        if (QUIState::ui_state.status == UIStatus::STATUS_DISENGAGED) {
+          Params().putBool("DoReboot", true);
+        }
+      }
+    } else {
+      //ConfirmationDialog::alert("Disengage to Reboot", this);
+      ConfirmationDialog::alert("오픈파일럿 해제후 재부팅", this);
     }
   });
 
@@ -255,9 +263,17 @@ DevicePanel::DevicePanel(QWidget* parent) : ListWidget(parent) {
   poweroff_btn->setObjectName("poweroff_btn");
   power_layout->addWidget(poweroff_btn);
   QObject::connect(poweroff_btn, &QPushButton::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)) {
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      Hardware::poweroff();
+    if (QUIState::ui_state.status == UIStatus::STATUS_DISENGAGED) {
+      //if (ConfirmationDialog::confirm("Are you sure you want to power off?", this)) {
+      if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+        // Check engaged again in case it changed while the dialog was open
+        if (QUIState::ui_state.status == UIStatus::STATUS_DISENGAGED) {
+          Params().putBool("DoShutdown", true);
+        }
+      }
+    } else {
+      //ConfirmationDialog::alert("Disengage to Power Off", this);
+      ConfirmationDialog::alert("오픈파일럿 해제후 종료", this);
     }
   });
 

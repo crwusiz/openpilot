@@ -104,6 +104,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     wideRoadCameraError @102;
     localizerMalfunction @103;
     highCpuUsage @105;
+    cruiseMismatch @106;
 
     driverMonitorLowAccDEPRECATED @68;
     radarCanErrorDEPRECATED @15;
@@ -127,10 +128,10 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     startupOneplusDEPRECATED @82;
     startupFuzzyFingerprintDEPRECATED @97;
     
-    turningIndicatorOn @106;
-    autoLaneChange @107;
-    slowingDownSpeed @108;
-    slowingDownSpeedSound @109;
+    turningIndicatorOn @107;
+    autoLaneChange @108;
+    slowingDownSpeed @109;
+    slowingDownSpeedSound @110;
   }
 }
 
@@ -308,11 +309,13 @@ struct CarControl {
   active @7 :Bool;
 
   actuators @6 :Actuators;
+  roll @8 :Float32;
+  pitch @9 :Float32;
 
   cruiseControl @4 :CruiseControl;
   hudControl @5 :HUDControl;
 
-  sccSmoother @8 :SccSmoother;
+  sccSmoother @10 :SccSmoother;
 
   struct SccSmoother {
     longControl @0:Bool;

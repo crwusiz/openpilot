@@ -42,7 +42,6 @@ const int header_h = 420;
 const int footer_h = 280;
 
 const int UI_FREQ = 20;   // Hz
-
 typedef cereal::CarControl::HUDControl::AudibleAlert AudibleAlert;
 
 // TODO: this is also hardcoded in common/transformations/camera.py
@@ -68,7 +67,7 @@ struct Alert {
   cereal::ControlsState::AlertSize size;
   AudibleAlert sound;
   bool equal(const Alert &a2) {
-    return text1 == a2.text1 && text2 == a2.text2 && type == a2.type;
+    return text1 == a2.text1 && text2 == a2.text2 && type == a2.type && sound == a2.sound;
   }
 
   static Alert get(const SubMaster &sm, uint64_t started_frame) {
@@ -182,6 +181,8 @@ typedef struct UIState {
 
   float car_space_transform[6];
   bool wide_camera;
+
+  float running_time;
 
   //
   int lock_on_anim_index;
