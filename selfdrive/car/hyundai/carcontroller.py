@@ -185,8 +185,9 @@ class CarController():
     if self.longcontrol and CS.cruiseState_enabled and (CS.scc_bus or not self.scc_live):
       if frame % 2 == 0:
         stopping = controls.LoC.long_control_state == LongCtrlState.stopping
-        apply_accel = self.scc_smoother.get_apply_accel(CS, controls.sm, actuators.accel, stopping)
-        apply_accel = clip(apply_accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
+        apply_accel = clip(actuators.accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
+        apply_accel = self.scc_smoother.get_apply_accel(CS, controls.sm, apply_accel, stopping)
+
         controls.apply_accel = apply_accel
         aReqValue = CS.scc12["aReqValue"]
         controls.aReqValue = aReqValue

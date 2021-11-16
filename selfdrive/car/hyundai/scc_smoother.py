@@ -283,7 +283,7 @@ class SccSmoother:
 
   def cal_curve_speed(self, sm, v_ego, frame):
 
-    if frame % 10 == 0:
+    if frame % 20 == 0:
       md = sm['modelV2']
       if len(md.position.x) == TRAJECTORY_SIZE and len(md.position.y) == TRAJECTORY_SIZE:
         x = md.position.x
@@ -292,7 +292,7 @@ class SccSmoother:
         d2y = np.gradient(dy, x)
         curv = d2y / (1 + dy ** 2) ** 1.5
 
-        start = int(interp(v_ego, [10., 35.], [5, TRAJECTORY_SIZE-10]))
+        start = int(interp(v_ego, [10., 27.], [10, TRAJECTORY_SIZE-10]))
         curv = curv[start:min(start+10, TRAJECTORY_SIZE)]
         a_y_max = 2.975 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
         v_curvature = np.sqrt(a_y_max / np.clip(np.abs(curv), 1e-4, None))
@@ -341,10 +341,10 @@ class SccSmoother:
     gas_factor = ntune_scc_get("sccGasFactor")
     brake_factor = ntune_scc_get("sccBrakeFactor")
 
-    #lead = self.get_lead(sm)
-    #if lead is not None:
-    #  if not lead.radar:
-    #    brake_factor *= 0.95
+    lead = self.get_lead(sm)
+    if lead is not None:
+      if not lead.radar:
+        brake_factor *= 0.95
 
     if accel > 0:
       accel *= gas_factor
