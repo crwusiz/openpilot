@@ -40,5 +40,13 @@
   "Offroad_StorageMissing": {
     "text": "저장장치가 마운트되지않았습니다.",
     "severity": 1
+  },
+  "Offroad_CarUnrecognized": {
+    "text": "Choose your car in community settings.",
+    "severity": 0
+  },
+  "Offroad_NoFirmware": {
+    "text": "Choose your car in community settings.",
+    "severity": 0
   }
 }
