@@ -13,44 +13,6 @@
 #include "selfdrive/ui/qt/widgets/controls.h"
 
 // ********** settings window + top-level panels **********
-
-class DevicePanel : public ListWidget {
-  Q_OBJECT
-public:
-  explicit DevicePanel(QWidget* parent = nullptr);
-signals:
-  void reviewTrainingGuide();
-  void showDriverView();
-  void closeSettings();
-};
-
-class TogglesPanel : public ListWidget {
-  Q_OBJECT
-public:
-  explicit TogglesPanel(QWidget *parent = nullptr);
-};
-
-class SoftwarePanel : public ListWidget {
-  Q_OBJECT
-public:
-  explicit SoftwarePanel(QWidget* parent = nullptr);
-
-private:
-  void showEvent(QShowEvent *event) override;
-  void updateLabels();
-
-  LabelControl *gitRemoteLbl;
-  LabelControl *gitBranchLbl;
-  LabelControl *gitCommitLbl;
-  LabelControl *osVersionLbl;
-  LabelControl *versionLbl;
-  LabelControl *lastUpdateLbl;
-  ButtonControl *updateBtn;
-
-  Params params;
-  QFileSystemWatcher *fs_watch;
-};
-
 class SettingsWindow : public QFrame {
   Q_OBJECT
 
@@ -74,7 +36,42 @@ private:
   QStackedWidget *panel_widget;
 };
 
+class DevicePanel : public ListWidget {
+  Q_OBJECT
+public:
+  explicit DevicePanel(QWidget* parent = nullptr);
+signals:
+  void reviewTrainingGuide();
+  void showDriverView();
+  void closeSettings();
+};
 
+class TogglesPanel : public ListWidget {
+  Q_OBJECT
+public:
+  explicit TogglesPanel(SettingsWindow *parent);
+};
+
+class SoftwarePanel : public ListWidget {
+  Q_OBJECT
+public:
+  explicit SoftwarePanel(QWidget* parent = nullptr);
+
+private:
+  void showEvent(QShowEvent *event) override;
+  void updateLabels();
+
+  LabelControl *gitRemoteLbl;
+  LabelControl *gitBranchLbl;
+  LabelControl *gitCommitLbl;
+  LabelControl *osVersionLbl;
+  LabelControl *versionLbl;
+  LabelControl *lastUpdateLbl;
+  ButtonControl *updateBtn;
+
+  Params params;
+  QFileSystemWatcher *fs_watch;
+};
 
 class SelectCar : public QWidget {
   Q_OBJECT

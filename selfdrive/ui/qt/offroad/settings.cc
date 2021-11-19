@@ -31,89 +31,110 @@
 #include <QListView>
 #include <QListWidget>
 
-TogglesPanel::TogglesPanel(QWidget *parent) : ListWidget(parent) {
-  auto params = Params();
-  addItem(new ParamControl("OpenpilotEnabledToggle",
-                                  //"Enable openpilot",
-                                  //"Use the openpilot system for adaptive cruise control and lane keep driver assistance. Your attention is required at all times to use this feature. Changing this setting takes effect when the car is powered off.",
-                                  "오픈파일럿 사용",
-                                  "오픈파일럿을 사용하여 조향보조 기능을 사용합니다. 항상 핸들을 잡고 도로를 주시하세요.",
-                                  "../assets/offroad/icon_openpilot.png",
-                                  this));
+TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
+  // param, title, desc, icon
+  std::vector<std::tuple<QString, QString, QString, QString>> toggles{
+    {
+      "OpenpilotEnabledToggle",
+      //"Enable openpilot",
+      //"Use the openpilot system for adaptive cruise control and lane keep driver assistance. Your attention is required at all times to use this feature. Changing this setting takes effect when the car is powered off.",
+      "오픈파일럿 사용",
+      "오픈파일럿을 사용하여 조향보조 기능을 사용합니다. 항상 핸들을 잡고 도로를 주시하세요.",
+      "../assets/offroad/icon_openpilot.png",
+    },
 /*
-  addItem(new ParamControl("IsRHD",
-                                  "Enable Right-Hand Drive",
-                                  "Allow openpilot to obey left-hand traffic conventions and perform driver monitoring on right driver seat.",
-                                  "../assets/offroad/icon_openpilot_mirrored.png",
-                                  this));
+    {
+      "IsRHD",
+      "Enable Right-Hand Drive",
+      "Allow openpilot to obey left-hand traffic conventions and perform driver monitoring on right driver seat.",
+      "../assets/offroad/icon_openpilot_mirrored.png",
+    },
 */
-  addItem(new ParamControl("IsMetric",
-                                  //"Use Metric System",
-                                  //"Display speed in km/h instead of mp/h.",
-                                  "미터법 사용",
-                                  "주행속도 표시를 ㎞/h로 변경합니다",
-                                  "../assets/offroad/icon_metric.png",
-                                  this));
-  addItem(new ParamControl("CommunityFeaturesToggle",
-                                  //"Enable Community Features",
-                                  //"Use features, such as community supported hardware, from the open source community that are not maintained or supported by comma.ai and have not been confirmed to meet the standard safety model. Be extra cautious when using these features",
-                                  "커뮤니티 기능 사용",
-                                  "커뮤니티기능은 comma.ai에서 공식적으로 지원하는 기능이 아니므로 사용시 주의하세요.",
-                                  "../assets/offroad/icon_discord.png",
-                                  this));
-  addItem(new ParamControl("IsLdwEnabled",
-                                  //"Enable Lane Departure Warnings",
-                                  //"Receive alerts to steer back into the lane when your vehicle drifts over a detected lane line without a turn signal activated while driving over 31mph (50kph).",
-                                  "차선이탈 경보 사용",
-                                  "40㎞/h 이상의 속도로 주행시 방향지시등 조작없이 차선을 이탈하면 차선이탈경보를 보냅니다. (오픈파일럿 비활성상태에서만 사용됩니다)",
-                                  "../assets/offroad/icon_ldws.png",
-                                  this));
-  addItem(new ParamControl("AutoLaneChangeEnabled",
-                                  //"Enable AutoLaneChange",
-                                  //"Operation of the turn signal at 60㎞/h speed will result in a short change of the vehicle",
-                                  "자동 차선변경 사용",
-                                  "60㎞/h 이상의 속도로 주행시 방향지시등을 작동하면 잠시후 자동차선변경을 수행합니다. 안전한 사용을위해 후측방감지기능이 있는 차량만 사용하시기바랍니다.",
-                                  "../assets/offroad/icon_lca.png",
-                                  this));
-  addItem(new ParamControl("UploadRaw",
-                                  //"Upload Raw Logs",
-                                  //"Upload full logs and full resolution video by default while on Wi-Fi. If not enabled, individual logs can be marked for upload at useradmin.comma.ai.",
-                                  "주행로그 업로드 사용",
-                                  "주행로그를 업로드합니다. [ connect.comma.ai/useradmin ] 에서 확인할수있습니다",
-                                  "../assets/offroad/icon_network.png",
-                                  this));
+    {
+      "IsMetric",
+      //"Use Metric System",
+      //"Display speed in km/h instead of mph.",
+      "미터법 사용",
+      "주행속도 표시를 ㎞/h로 변경합니다",
+      "../assets/offroad/icon_metric.png",
+    },
+    {
+      "CommunityFeaturesToggle",
+      //"Enable Community Features",
+      //"Use features, such as community supported hardware, from the open source community that are not maintained or supported by comma.ai and have not been confirmed to meet the standard safety model. Be extra cautious when using these features",
+      "커뮤니티 기능 사용",
+      "커뮤니티기능은 comma.ai에서 공식적으로 지원하는 기능이 아니므로 사용시 주의하세요.",
+      "../assets/offroad/icon_discord.png",
+    },
+    {
+      "IsLdwEnabled",
+      //"Enable Lane Departure Warnings",
+      //"Receive alerts to steer back into the lane when your vehicle drifts over a detected lane line without a turn signal activated while driving over 31mph (50kph).",
+      "차선이탈 경보 사용",
+      "40㎞/h 이상의 속도로 주행시 방향지시등 조작없이 차선을 이탈하면 차선이탈경보를 보냅니다. (오픈파일럿 비활성상태에서만 사용됩니다)",
+      "../assets/offroad/icon_ldws.png",
+    },
+    {
+     "AutoLaneChangeEnabled",
+     //"Enable AutoLaneChange",
+     //"Operation of the turn signal at 60㎞/h speed will result in a short change of the vehicle",
+     "자동 차선변경 사용",
+     "60㎞/h 이상의 속도로 주행시 방향지시등을 작동하면 잠시후 자동차선변경을 수행합니다. 안전한 사용을위해 후측방감지기능이 있는 차량만 사용하시기바랍니다.",
+     "../assets/offroad/icon_lca.png",
+    },
+    {
+      "UploadRaw",
+      //"Upload Raw Logs",
+      //"Upload full logs and full resolution video by default while on Wi-Fi. If not enabled, individual logs can be marked for upload at useradmin.comma.ai.",
+      "주행로그 업로드 사용",
+      "주행로그를 업로드합니다. [ connect.comma.ai/useradmin ] 에서 확인할수있습니다",
+      "../assets/offroad/icon_network.png",
+    },
 /*
-  ParamControl *record_toggle = new ParamControl("RecordFront",
-                                                 "Record and Upload Driver Camera",
-                                                 "Upload data from the driver facing camera and help improve the driver monitoring algorithm.",
-                                                 "../assets/offroad/icon_monitoring.png",
-                                                 this);
-  addItem(record_toggle);
+    {
+      "RecordFront",
+      "Record and Upload Driver Camera",
+      "Upload data from the driver facing camera and help improve the driver monitoring algorithm.",
+      "../assets/offroad/icon_monitoring.png",
+    },
 */
-  addItem(new ParamControl("EndToEndToggle",
-                                  "\U0001f96c Disable use of lanelines (Alpha) \U0001f96c",
-                                  "In this mode openpilot will ignore lanelines and just drive how it thinks a human would.",
-                                  "../assets/offroad/icon_road.png",
-                                  this));
+    {
+      "EndToEndToggle",
+      "\U0001f96c Disable use of lanelines (Alpha) \U0001f96c",
+      "In this mode openpilot will ignore lanelines and just drive how it thinks a human would.",
+      "../assets/offroad/icon_road.png",
+    },
 #ifdef ENABLE_MAPS
-  addItem(new ParamControl("NavSettingTime24h",
-                                  "Show ETA in 24h format",
-                                  "Use 24h format instead of am/pm",
-                                  "../assets/offroad/icon_metric.png",
-                                  this));
+    {
+      "NavSettingTime24h",
+      "Show ETA in 24h format",
+      "Use 24h format instead of am/pm",
+      "../assets/offroad/icon_metric.png",
+    },
 #endif
-  if (params.getBool("DisableRadar_Allow")) {
-    addItem(new ParamControl("DisableRadar",
-                             "openpilot Longitudinal Control",
-                             "openpilot will disable the car's radar and will take over control of gas and brakes. Warning: this disables AEB!",
-                             "../assets/offroad/icon_speed_limit.png",
-                             this));
 
+  };
+
+  Params params;
+
+  if (params.getBool("DisableRadar_Allow")) {
+    toggles.push_back({
+      "DisableRadar",
+      "openpilot Longitudinal Control",
+      "openpilot will disable the car's radar and will take over control of gas and brakes. Warning: this disables AEB!",
+      "../assets/offroad/icon_speed_limit.png",
+    });
   }
-/*
-  bool record_lock = params.getBool("RecordFrontLock");
-  record_toggle->setEnabled(!record_lock);
-*/
+
+  for (auto &[param, title, desc, icon] : toggles) {
+    auto toggle = new ParamControl(param, title, desc, icon, this);
+    bool locked = params.getBool((param + "Lock").toStdString());
+    toggle->setEnabled(!locked);
+    if (!locked) {
+      connect(parent, &SettingsWindow::offroadTransition, toggle, &ParamControl::setEnabled);
+    }
+    addItem(toggle);
+  }
 }
 
 DevicePanel::DevicePanel(QWidget* parent) : ListWidget(parent) {
@@ -147,7 +168,9 @@ DevicePanel::DevicePanel(QWidget* parent) : ListWidget(parent) {
         if (calib.getCalStatus() != 0) {
           double pitch = calib.getRpyCalib()[1] * (180 / M_PI);
           double yaw = calib.getRpyCalib()[2] * (180 / M_PI);
-          //desc += QString("\nThe current calibration location is [ %2 %1° / %4 %3° ]")
+          //desc += QString(" Your device is pointed %1° %2 and %3° %4.")
+          //            .arg(QString::number(std::abs(pitch), 'g', 1), pitch > 0 ? "up" : "down",
+          //                 QString::number(std::abs(yaw), 'g', 1), yaw > 0 ? "right" : "left");
           desc += QString("\n현재 캘리브레이션된 위치는 [ %2 %1° / %4 %3° ] 입니다.")
                                 .arg(QString::number(std::abs(pitch), 'g', 1), pitch > 0 ? "↑" : "↓",
                                      QString::number(std::abs(yaw), 'g', 1), yaw > 0 ? "→" : "←");
