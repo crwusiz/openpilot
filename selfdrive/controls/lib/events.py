@@ -142,7 +142,7 @@ class Alert:
 class NoEntryAlert(Alert):
   def __init__(self, alert_text_2, audible_alert=AudibleAlert.chimeError,
                visual_alert=VisualAlert.none):
-    super().__init__("openpilot Unavailable", alert_text_2, AlertStatus.normal,
+    #super().__init__("openpilot Unavailable", alert_text_2, AlertStatus.normal,
     super().__init__("오픈파일럿 사용불가", alert_text_2, AlertStatus.normal,
                      AlertSize.mid, Priority.LOW, visual_alert,
                      audible_alert, 3.)
@@ -182,10 +182,10 @@ class NormalPermanentAlert(Alert):
 
 
 class StartupAlert(Alert):
-  def __init__(self, alert_text_1: str, alert_text_2: str = "Always keep hands on wheel and eyes on road", alert_status=AlertStatus.normal):
+  def __init__(self, alert_text_1: str, alert_text_2: str = "항상 핸들을 잡고 도로를 주시하세요", alert_status=AlertStatus.normal):
     super().__init__(alert_text_1, alert_text_2,
                      alert_status, AlertSize.mid,
-                     Priority.LOWER, VisualAlert.none, AudibleAlert.none, 5.),
+                     Priority.LOWER, VisualAlert.none, AudibleAlert.chimeReady, 5.),
 
 
 # ********** helper functions **********
@@ -687,7 +687,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
     #ET.NO_ENTRY: NoEntryAlert("Gear not D"),
     ET.USER_DISABLE: EngagementAlert(AudibleAlert.chimeDisengage),
     ET.NO_ENTRY: NoEntryAlert("기어를 [D]로 변경하세요",
-                              audible_alert=AudibleAlert.chimeGeard, duration=3.),
+                              audible_alert=AudibleAlert.chimeGeard),
   },
 
   # This alert is thrown when the calibration angles are outside of the acceptable range.
@@ -719,7 +719,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
       "도어 열림",
       "",
       AlertStatus.normal, AlertSize.full,
-      Priority.LOWEST, VisualAlert.none, AudibleAlert.none, 0., 0., .2, creation_delay=0.5),
+      Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay = 0.5),
     ET.USER_DISABLE: EngagementAlert(AudibleAlert.chimeDisengage),
     ET.NO_ENTRY: NoEntryAlert("도어 열림"),
   },
@@ -731,10 +731,10 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
       "안전벨트 미착용",
       "",
       AlertStatus.normal, AlertSize.full,
-      Priority.LOWEST, VisualAlert.none, AudibleAlert.none, 0., 0., .2, creation_delay=0.5),
+      Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay=0.5),
     ET.SOFT_DISABLE: SoftDisableAlert("안전벨트를 착용해주세요"),
     ET.NO_ENTRY: NoEntryAlert("안전벨트를 착용해주세요",
-                              audible_alert=AudibleAlert.chimeSeatbelt, duration=3.),
+                              audible_alert=AudibleAlert.chimeSeatbelt),
   },
 
   EventName.espDisabled: {
@@ -821,7 +821,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   EventName.highCpuUsage: {
     #ET.SOFT_DISABLE: SoftDisableAlert("System Malfunction: Reboot Your Device"),
     #ET.PERMANENT: NormalPermanentAlert("System Malfunction", "Reboot your Device"),
-    ET.NO_ENTRY: NoEntryAlert("System Malfunction: Reboot Your Device",
+    #ET.NO_ENTRY: NoEntryAlert("System Malfunction: Reboot Your Device",
+    ET.NO_ENTRY: NoEntryAlert("시스템 오작동: 장치를 재부팅 하세요",
                               audible_alert=AudibleAlert.chimeDisengage),
   },
 

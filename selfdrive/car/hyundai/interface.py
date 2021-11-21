@@ -78,7 +78,7 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 1575. + STD_CARGO_KG
         ret.wheelbase = 2.700
         ret.steerRatio = 13.7
-    elif candidate == CAR.SANTA_FE:
+    elif candidate in [CAR.SANTA_FE, CAR.SANTA_FE_HEV]:
         ret.mass = 1910. + STD_CARGO_KG
         ret.wheelbase = 2.765
         ret.steerRatio = 15.8
@@ -355,6 +355,7 @@ class CarInterface(CarInterfaceBase):
     # most HKG cars has no long control, it is safer and easier to engage by main on
     if self.mad_mode_enabled:
       ret.cruiseState.enabled = ret.cruiseState.available
+      #ret.brakePressed = ret.gasPressed = False
 
     # turning indicator alert logic
     if (ret.leftBlinker or ret.rightBlinker or self.CC.turning_signal_timer) and ret.vEgo < LANE_CHANGE_SPEED_MIN - 1.2:
