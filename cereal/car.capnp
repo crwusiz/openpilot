@@ -554,9 +554,9 @@ struct CarParams {
     toyota @2;
     elm327 @3;
     gm @4;
-    hondaBoschGiraffe @5;
+    hondaBoschGiraffeDEPRECATED @5;
     ford @6;
-    cadillac @7;
+    cadillacDEPRECATED @7;
     hyundai @8;
     chrysler @9;
     tesla @10;
@@ -565,11 +565,11 @@ struct CarParams {
     mazda @13;
     nissan @14;
     volkswagen @15;
-    toyotaIpas @16;
+    toyotaIpasDEPRECATED @16;
     allOutput @17;
-    gmAscm @18;
+    gmAscmDEPRECATED @18;
     noOutput @19;  # like silent but without silent CAN TXs
-    hondaBoschHarness @20;
+    hondaBosch @20;
     volkswagenPq @21;
     subaruLegacy @22;  # pre-Global platform
     hyundaiLegacy @23;
