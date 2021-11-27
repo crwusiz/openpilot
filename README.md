@@ -3,7 +3,7 @@
 crwusiz openpilot
 =====
 <b> crwusiz branch is neokii modify branch base (comma.ai master-ci and xx979xx HKG_community source) </b>
-- <b> v0.8.10 [ eon + black panda, comma two, comma three support ] </b>
+- <b> v0.8.12 [ eon + black panda, comma two, comma three support ] </b>
 - <b> [ ~~allow white panda and gray panda, OP3T support (installer/howto_op3t_update.md)~~ ] </b>
 - If you have any questions, please send a message to crwusiz from discord. if you like this Branch <b> [Donate](https://paypal.me/crwusiz) </b>for me
 - It is open source and inherits MIT license. 
@@ -47,9 +47,9 @@ crwusiz openpilot
 
 cable order -> https://smartstore.naver.com/hyotrade/products/5341431170
 
-[![](https://i.imgur.com/aspMjGT.jpg)](#)
-[![](https://i.imgur.com/1DB7gyL.jpg)](#)
-[![](https://i.imgur.com/2r43I6d.jpg)](#)
+[![](https://i.imgur.com/ViReSXL.jpg)](#)
+[![](https://i.imgur.com/Kj4yKv6.jpg)](#)
+[![](https://i.imgur.com/rFlZw6q.jpg)](#)
 [![](https://i.imgur.com/N5IkjUX.jpg)](#)
 [![](https://i.imgur.com/HaXcjPI.jpg)](#)
  
