@@ -49,9 +49,7 @@ cable order -> https://smartstore.naver.com/hyotrade/products/5341431170
 
 [![](https://i.imgur.com/ViReSXL.jpg)](#)
 [![](https://i.imgur.com/Kj4yKv6.jpg)](#)
-[![](https://i.imgur.com/rFlZw6q.jpg)](#)
-[![](https://i.imgur.com/N5IkjUX.jpg)](#)
-[![](https://i.imgur.com/HaXcjPI.jpg)](#)
+[![](https://i.imgur.com/j8VKdTe.png)](#)
  
 ## chevrolet bolt branch
 - https://github.com/JasonJShuler/openpilot
