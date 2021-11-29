@@ -57,16 +57,20 @@ class CarController():
     self.turning_signal_timer = 0
     self.longcontrol = CP.openpilotLongitudinalControl
     self.scc_live = not CP.radarOffCan
+    self.turning_indicator_alert = False
 
     # params init
     self.lfamfc = Params().get("MfcSelect", encoding='utf8') == "2"
     self.mad_mode_enabled = Params().get("LongControlSelect", encoding='utf8') == "0" or \
                             Params().get("LongControlSelect", encoding='utf8') == "1"
     self.stock_navi_decel_enabled = Params().get_bool('StockNaviDecelEnabled')
+    self.keep_steering_turn_signals = Params().get_bool('KeepSteeringTurnSignals')
+    self.warning_over_speed_limit = Params().get_bool('WarningOverSpeedLimit')
 
     # gas_factor, brake_factor
     # Adjust it in the range of 0.7 to 1.3
     self.scc_smoother = SccSmoother()
+    self.last_blinker_frame = 0
 
   def update(self, enabled, CS, frame, CC, actuators, pcm_cancel_cmd, visual_alert,
              left_lane, right_lane, left_lane_depart, right_lane_depart, set_speed, lead_visible, controls):
@@ -99,6 +103,12 @@ class CarController():
       apply_steer = 0
 
     self.apply_steer_last = apply_steer
+
+    if self.warning_over_speed_limit:
+      recent_blinker = (controls.sm.frame - self.last_blinker_frame) * DT_CTRL < 5.0
+      if not recent_blinker and self.scc_smoother.over_speed_limit:
+        left_lane_depart = True
+        self.last_blinker_frame = controls.sm.frame
 
     sys_warning, sys_state, left_lane_warning, right_lane_warning = \
       process_hud_alert(enabled, self.car_fingerprint, visual_alert,
