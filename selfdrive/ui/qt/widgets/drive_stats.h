@@ -21,5 +21,5 @@ private:
   } all_;
 
 private slots:
-  void parseResponse(const QString &response);
+  void parseResponse(const QString &response, bool success);
 };

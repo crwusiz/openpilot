@@ -42,7 +42,7 @@ DESIRES = {
 }
 
 
-class LateralPlanner():
+class LateralPlanner:
   def __init__(self, CP, use_lanelines=True, wide_camera=False):
     self.use_lanelines = use_lanelines
     self.wide_camera = wide_camera
@@ -64,8 +64,8 @@ class LateralPlanner():
     self.prev_one_blinker = False
     self.desire = log.LateralPlan.Desire.none
 
-    self.path_xyz = np.zeros((TRAJECTORY_SIZE,3))
-    self.path_xyz_stds = np.ones((TRAJECTORY_SIZE,3))
+    self.path_xyz = np.zeros((TRAJECTORY_SIZE, 3))
+    self.path_xyz_stds = np.ones((TRAJECTORY_SIZE, 3))
     self.plan_yaw = np.zeros((TRAJECTORY_SIZE,))
     self.t_idxs = np.arange(TRAJECTORY_SIZE)
     self.y_pts = np.zeros(TRAJECTORY_SIZE)
@@ -76,12 +76,8 @@ class LateralPlanner():
   def reset_mpc(self, x0=np.zeros(6)):
     self.x0 = x0
     self.lat_mpc.reset(x0=self.x0)
-    self.desired_curvature = 0.0
-    self.safe_desired_curvature = 0.0
-    self.desired_curvature_rate = 0.0
-    self.safe_desired_curvature_rate = 0.0
 
-  def update(self, sm, CP):
+  def update(self, sm):
     try:
       if CP.lateralTuning.which() == 'pid':
         self.output_scale = sm['controlsState'].lateralControlState.pidState.output
@@ -91,7 +87,6 @@ class LateralPlanner():
         self.output_scale = sm['controlsState'].lateralControlState.lqrState.output
     except:
       pass
-
     v_ego = sm['carState'].vEgo
     active = sm['controlsState'].active
     measured_curvature = sm['controlsState'].curvature
@@ -202,7 +197,7 @@ class LateralPlanner():
       self.lat_mpc.set_weights(MPC_COST_LAT.PATH, MPC_COST_LAT.HEADING, ntune_common_get('steerRateCost'))
     else:
       d_path_xyz = self.path_xyz
-      path_cost = np.clip(abs(self.path_xyz[0,1]/self.path_xyz_stds[0,1]), 0.5, 1.5) * MPC_COST_LAT.PATH
+      path_cost = np.clip(abs(self.path_xyz[0, 1] / self.path_xyz_stds[0, 1]), 0.5, 1.5) * MPC_COST_LAT.PATH
       # Heading cost is useful at low speed, otherwise end of plan can be off-heading
       heading_cost = interp(v_ego, [5.0, 10.0], [MPC_COST_LAT.HEADING, 0.0])
       self.lat_mpc.set_weights(path_cost, heading_cost, ntune_common_get('steerRateCost'))
@@ -220,11 +215,10 @@ class LateralPlanner():
                      y_pts,
                      heading_pts)
     # init state for next
-    self.x0[3] = interp(DT_MDL, self.t_idxs[:LAT_MPC_N + 1], self.lat_mpc.x_sol[:,3])
+    self.x0[3] = interp(DT_MDL, self.t_idxs[:LAT_MPC_N + 1], self.lat_mpc.x_sol[:, 3])
 
-
-    #  Check for infeasable MPC solution
-    mpc_nans = any(math.isnan(x) for x in self.lat_mpc.x_sol[:,3])
+    #  Check for infeasible MPC solution
+    mpc_nans = any(math.isnan(x) for x in self.lat_mpc.x_sol[:, 3])
     t = sec_since_boot()
     if mpc_nans or self.lat_mpc.solution_status != 0:
       self.reset_mpc()
@@ -245,8 +239,8 @@ class LateralPlanner():
     plan_send.lateralPlan.laneWidth = float(self.LP.lane_width)
     plan_send.lateralPlan.dPathPoints = [float(x) for x in self.y_pts]
     plan_send.lateralPlan.psis = [float(x) for x in self.lat_mpc.x_sol[0:CONTROL_N, 2]]
-    plan_send.lateralPlan.curvatures = [float(x) for x in self.lat_mpc.x_sol[0:CONTROL_N,3]]
-    plan_send.lateralPlan.curvatureRates = [float(x) for x in self.lat_mpc.u_sol[0:CONTROL_N-1]] +[0.0]
+    plan_send.lateralPlan.curvatures = [float(x) for x in self.lat_mpc.x_sol[0:CONTROL_N, 3]]
+    plan_send.lateralPlan.curvatureRates = [float(x) for x in self.lat_mpc.u_sol[0:CONTROL_N - 1]] + [0.0]
     plan_send.lateralPlan.lProb = float(self.LP.lll_prob)
     plan_send.lateralPlan.rProb = float(self.LP.rll_prob)
     plan_send.lateralPlan.dProb = float(self.LP.d_prob)

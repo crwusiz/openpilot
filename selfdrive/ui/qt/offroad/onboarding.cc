@@ -149,8 +149,8 @@ void DeclinePage::showEvent(QShowEvent *event) {
 
   QObject::connect(back_btn, &QPushButton::clicked, this, &DeclinePage::getBack);
 
-  //QPushButton *uninstall_btn = new QPushButton("Decline, uninstall " + getBrand());
-  QPushButton *uninstall_btn = new QPushButton("거절, 오픈파일럿 제거");
+  //QPushButton *uninstall_btn = new QPushButton(QString("Decline, uninstall %1").arg(getBrand()));
+  QPushButton *uninstall_btn = new QPushButton(QString("거절, uninstall %1").arg(getBrand()));
   uninstall_btn->setStyleSheet("background-color: #B73D3D");
   buttons->addWidget(uninstall_btn);
   QObject::connect(uninstall_btn, &QPushButton::clicked, [=]() {

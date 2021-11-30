@@ -180,7 +180,6 @@ void OffroadHome::refresh() {
   update_notif->setVisible(updateAvailable);
   alert_notif->setVisible(alerts);
   if (alerts) {
-    //alert_notif->setText(QString::number(alerts) + " ALERT" + (alerts > 1 ? "S" : ""));
-    alert_notif->setText(QString::number(alerts) + " 경고" + (alerts > 1 ? "S" : ""));
+    alert_notif->setText(QString::number(alerts) + (alerts > 1 ? " ALERTS" : " ALERT"));
   }
 }
