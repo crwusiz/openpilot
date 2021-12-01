@@ -140,47 +140,9 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
 DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   Params params = Params();
 
-  setSpacing(50);
+  setSpacing(20);
   addItem(new LabelControl("Dongle ID", getDongleId().value_or("N/A")));
   addItem(new LabelControl("Serial", params.get("HardwareSerial").c_str()));
-
-  QHBoxLayout *reset_layout = new QHBoxLayout();
-  reset_layout->setSpacing(30);
-
-  // addfunc button
-  const char* addfunc = "sh /data/openpilot/scripts/addfunc.sh";
-  QPushButton *addfuncbtn = new QPushButton("추가기능");
-  addfuncbtn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
-  reset_layout->addWidget(addfuncbtn);
-  QObject::connect(addfuncbtn, &QPushButton::released, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      std::system(addfunc);
-      emit closeSettings();
-      QTimer::singleShot(1000, []() {
-        Params().putBool("SoftRestartTriggered", true);
-      });
-    }
-  });
-
-  // reset calibration button
-  //QPushButton *reset_calib_btn = new QPushButton("Reset Calibration");
-  QPushButton *reset_calib_btn = new QPushButton("Calibration,LiveParameters 리셋");
-  reset_calib_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
-  reset_layout->addWidget(reset_calib_btn);
-  QObject::connect(reset_calib_btn, &QPushButton::released, [=]() {
-    //if (ConfirmationDialog::confirm("Are you sure you want to reset calibration and live params?", this)) {
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      Params().remove("CalibrationParams");
-      Params().remove("LiveParameters");
-      emit closeSettings();
-      QTimer::singleShot(1000, []() {
-        Params().putBool("SoftRestartTriggered", true);
-      });
-    }
-  });
-
-  addItem(reset_layout);
 
   // offroad-only buttons
   //auto dcamBtn = new ButtonControl("Driver Camera", "PREVIEW",
@@ -229,9 +191,59 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     //}
   });
 
+  QHBoxLayout *reset_layout = new QHBoxLayout();
+  reset_layout->setSpacing(30);
+
+  // addfunc button
+  const char* addfunc = "sh /data/openpilot/scripts/addfunc.sh";
+  QPushButton *addfuncbtn = new QPushButton("추가기능");
+  addfuncbtn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
+  reset_layout->addWidget(addfuncbtn);
+  QObject::connect(addfuncbtn, &QPushButton::released, [=]() {
+    //if (ConfirmationDialog::confirm("Process?", this)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+      std::system(addfunc);
+      emit closeSettings();
+      QTimer::singleShot(1000, []() {
+        Params().putBool("SoftRestartTriggered", true);
+      });
+    }
+  });
+
+  // reset calibration button
+  //QPushButton *reset_calib_btn = new QPushButton("Reset Calibration");
+  QPushButton *reset_calib_btn = new QPushButton("Calibration,LiveParameters 리셋");
+  reset_calib_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
+  reset_layout->addWidget(reset_calib_btn);
+  QObject::connect(reset_calib_btn, &QPushButton::released, [=]() {
+    //if (ConfirmationDialog::confirm("Are you sure you want to reset calibration and live params?", this)) {
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+      Params().remove("CalibrationParams");
+      Params().remove("LiveParameters");
+      emit closeSettings();
+      QTimer::singleShot(1000, []() {
+        Params().putBool("SoftRestartTriggered", true);
+      });
+    }
+  });
+
+  addItem(reset_layout);
+
+
   // power buttons
   QHBoxLayout *power_layout = new QHBoxLayout();
   power_layout->setSpacing(30);
+
+  // softreset button
+  QPushButton *restart_openpilot_btn = new QPushButton("재시작");
+  restart_openpilot_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
+  power_layout->addWidget(restart_openpilot_btn);
+  QObject::connect(restart_openpilot_btn, &QPushButton::released, [=]() {
+    emit closeSettings();
+    QTimer::singleShot(1000, []() {
+      Params().putBool("SoftRestartTriggered", true);
+    });
+  });
 
   //QPushButton *reboot_btn = new QPushButton("Reboot");
   QPushButton *reboot_btn = new QPushButton("재부팅");
@@ -250,7 +262,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
       height: 120px;
       border-radius: 15px;
     }
-    #reboot_btn { background-color: #393939; }
+    #reboot_btn { background-color: #2CE22C; }
     #reboot_btn:pressed { background-color: #4a4a4a; }
     #poweroff_btn { background-color: #E22C2C; }
     #poweroff_btn:pressed { background-color: #FF2424; }
@@ -702,10 +714,10 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   "../assets/offroad/icon_road.png", this));
   toggles.append(new ParamControl("KeepSteeringTurnSignals", "Keep steering while turn signals.",
                                   "",
-                                  "../assets/offroad/icon_openpilot.png", this));
+                                  "../assets/offroad/icon_road.png", this));
   toggles.append(new ParamControl("WarningOverSpeedLimit", "Warning when speed limit is exceeded.",
                                   "",
-                                  "../assets/offroad/icon_openpilot.png", this));
+                                  "../assets/offroad/icon_road.png", this));
   toggles.append(new ParamControl("NewRadarInterface", "New radar interface Enable",
                                   //"New radar interface Enable",
                                   "scc 레이더 배선개조없이 사용가능한 일부차종을 위한 옵션입니다",

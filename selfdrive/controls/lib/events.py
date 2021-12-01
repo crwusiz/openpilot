@@ -683,8 +683,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
     #ET.SOFT_DISABLE: SoftDisableAlert("Gear not D"),
     #ET.NO_ENTRY: NoEntryAlert("Gear not D"),
     ET.USER_DISABLE: EngagementAlert(AudibleAlert.disengage),
-    ET.NO_ENTRY: NoEntryAlert("기어를 [D]로 변경하세요",
-                              audible_alert=AudibleAlert.geard),
+    ET.NO_ENTRY: NoEntryAlert("기어를 [D]로 변경하세요"),
   },
 
   # This alert is thrown when the calibration angles are outside of the acceptable range.
@@ -730,8 +729,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
       AlertStatus.normal, AlertSize.full,
       Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay=0.5),
     ET.SOFT_DISABLE: SoftDisableAlert("안전벨트를 착용해주세요"),
-    ET.NO_ENTRY: NoEntryAlert("안전벨트를 착용해주세요",
-                              audible_alert=AudibleAlert.seatbelt),
+    ET.NO_ENTRY: NoEntryAlert("안전벨트를 착용해주세요"),
   },
 
   EventName.espDisabled: {
@@ -756,13 +754,13 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
     #ET.SOFT_DISABLE: SoftDisableAlert("Communication Issue between Processes"),
     #ET.NO_ENTRY: NoEntryAlert("Communication Issue between Processes"),
     ET.SOFT_DISABLE: SoftDisableAlert("장치 프로세스 동작오류"),
-    ET.NO_ENTRY: NoEntryAlert("장치 프로세스 동작오류",
+    ET.NO_ENTRY: NoEntryAlert("장치 프로세스 동작오류"),
   },
 
   # Thrown when manager detects a service exited unexpectedly while driving
   EventName.processNotRunning: {
     #ET.NO_ENTRY: NoEntryAlert("System Malfunction: Reboot Your Device"),
-    ET.NO_ENTRY: NoEntryAlert("시스템 오작동: 장치를 재부팅 하세요",
+    ET.NO_ENTRY: NoEntryAlert("시스템 오작동: 장치를 재부팅 하세요"),
   },
 
   EventName.radarFault: {
@@ -809,14 +807,14 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
     #ET.NO_ENTRY: NoEntryAlert("Low Memory: Reboot Your Device"),
     ET.SOFT_DISABLE: SoftDisableAlert("메모리 부족 : 장치를 재가동하세요"),
     ET.PERMANENT: NormalPermanentAlert("메모리 부족", "장치를 재가동하세요"),
-    ET.NO_ENTRY: NoEntryAlert("메모리 부족 : 장치를 재가동하세요",
+    ET.NO_ENTRY: NoEntryAlert("메모리 부족 : 장치를 재가동하세요"),
   },
 
   EventName.highCpuUsage: {
     #ET.SOFT_DISABLE: SoftDisableAlert("System Malfunction: Reboot Your Device"),
     #ET.PERMANENT: NormalPermanentAlert("System Malfunction", "Reboot your Device"),
     #ET.NO_ENTRY: NoEntryAlert("System Malfunction: Reboot Your Device"),
-    ET.NO_ENTRY: NoEntryAlert("시스템 오작동: 장치를 재부팅 하세요",
+    ET.NO_ENTRY: NoEntryAlert("시스템 오작동: 장치를 재부팅 하세요"),
   },
 
   EventName.accFaulted: {

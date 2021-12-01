@@ -397,9 +397,7 @@ struct CarControl {
       slowingDownSpeed @9;
       ding @10;
       dingRepeat @ 11;
-      geard @12;
-      seatbelt @13;
-      ready @14;
+      ready @12;
     }
   }
 
