@@ -127,7 +127,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     modelLagWarningDEPRECATED @93;
     startupOneplusDEPRECATED @82;
     startupFuzzyFingerprintDEPRECATED @97;
-    
+
     turningIndicatorOn @107;
     autoLaneChange @108;
     slowingDownSpeed @109;
@@ -386,20 +386,20 @@ struct CarControl {
 
     enum AudibleAlert {
       none @0;
-      chimeEngage @1;
-      chimeDisengage @2;
-      chimeError @3;
-      chimeWarning1 @4; # unused
-      chimeWarningRepeat @5;
-      chimeWarningRepeatInfinite @6;
-      chimePrompt @7;
-      chimeWarning2RepeatInfinite @8;
-      chimeSlowingDownSpeed @9;
-      chimeDing @10;
-      chimeDingRepeat @ 11;
-      chimeGeard @12;
-      chimeSeatbelt @13;
-      chimeReady @14;
+      engage @1;
+      disengage @2;
+      refuse @3;
+      warningSoft @4;
+      warningImmediate @5;
+      warningDEPRECATED @6;
+      prompt @7;
+      promptRepeat @8;
+      slowingDownSpeed @9;
+      ding @10;
+      dingRepeat @ 11;
+      geard @12;
+      seatbelt @13;
+      ready @14;
     }
   }
 
@@ -487,7 +487,7 @@ struct CarParams {
     safetyModel @0 :SafetyModel;
     safetyParam @1 :Int16;
   }
-  
+
   mdpsBus @63: Int8;
   sasBus @64: Int8;
   sccBus @65: Int8;

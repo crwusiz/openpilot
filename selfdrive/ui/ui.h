@@ -89,7 +89,7 @@ struct Alert {
         // car is started, but controls is lagging or died
         return {"핸들을 잡아주세요", "프로세스가 응답하지않습니다",
                 "프로세스가 응답하지않습니다", cereal::ControlsState::AlertSize::FULL,
-                                           AudibleAlert::CHIME_WARNING_REPEAT};
+                AudibleAlert::WARNING_IMMEDIATE};
       }
     }
     return {};
