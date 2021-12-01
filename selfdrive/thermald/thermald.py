@@ -271,7 +271,7 @@ def thermald_thread():
       pandaState_prev = pandaState
 
     else:
-      if sec_since_boot() - panda_state_ts > 5.:
+      if sec_since_boot() - panda_state_ts > 3.:
         if startup_conditions["ignition"]:
           cloudlog.error("Lost panda connection while onroad")
         startup_conditions["ignition"] = False
