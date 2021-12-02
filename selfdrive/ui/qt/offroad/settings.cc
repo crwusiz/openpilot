@@ -114,9 +114,7 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
 #endif
 
   };
-
   Params params;
-
   if (params.getBool("DisableRadar_Allow")) {
     toggles.push_back({
       "DisableRadar",
@@ -196,6 +194,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
 
   // addfunc button
   const char* addfunc = "sh /data/openpilot/scripts/addfunc.sh";
+  //QPushButton *addfuncbtn = new QPushButton("Add Func");
   QPushButton *addfuncbtn = new QPushButton("추가기능");
   addfuncbtn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
   reset_layout->addWidget(addfuncbtn);
@@ -211,7 +210,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   });
 
   // reset calibration button
-  //QPushButton *reset_calib_btn = new QPushButton("Reset Calibration");
+  //QPushButton *reset_calib_btn = new QPushButton("Reset Calibration,LiveParameters");
   QPushButton *reset_calib_btn = new QPushButton("Calibration,LiveParameters 리셋");
   reset_calib_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
   reset_layout->addWidget(reset_calib_btn);
@@ -226,17 +225,16 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
       });
     }
   });
-
   addItem(reset_layout);
-
 
   // power buttons
   QHBoxLayout *power_layout = new QHBoxLayout();
   power_layout->setSpacing(30);
 
   // softreset button
+  //QPushButton *restart_openpilot_btn = new QPushButton("Soft Reset");
   QPushButton *restart_openpilot_btn = new QPushButton("재시작");
-  restart_openpilot_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
+  restart_openpilot_btn->setObjectName("restart_openpilot_btn");
   power_layout->addWidget(restart_openpilot_btn);
   QObject::connect(restart_openpilot_btn, &QPushButton::released, [=]() {
     emit closeSettings();
@@ -262,8 +260,10 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
       height: 120px;
       border-radius: 15px;
     }
+    #restart_openpilot_btn { background-color: #2C2CE2; }
+    #restart_openpilot_btn:pressed { background-color: #2424FF; }
     #reboot_btn { background-color: #2CE22C; }
-    #reboot_btn:pressed { background-color: #4a4a4a; }
+    #reboot_btn:pressed { background-color: #24FF24; }
     #poweroff_btn { background-color: #E22C2C; }
     #poweroff_btn:pressed { background-color: #FF2424; }
   )");
@@ -629,7 +629,7 @@ void SettingsWindow::hideEvent(QHideEvent *event) {
 #endif
 }
 
-/////////////////////////////////////////////////////////////////////////
+// Community Panel
 CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   main_layout = new QStackedLayout(this);
   QWidget* homeScreen = new QWidget(this);
@@ -762,19 +762,15 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
   back->setFixedSize(500, 100);
   connect(back, &QPushButton::clicked, [=]() { emit backPress(); });
   main_layout->addWidget(back, 0, Qt::AlignLeft);
-
   QListWidget* list = new QListWidget(this);
   list->setStyleSheet("QListView {padding: 40px; background-color: #393939; border-radius: 15px; height: 140px;} QListView::item{height: 100px}");
   //list->setAttribute(Qt::WA_AcceptTouchEvents, true);
   QScroller::grabGesture(list->viewport(), QScroller::LeftMouseButtonGesture);
   list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-
   list->addItem("[ Not selected ]");
-
   QStringList items = get_list("/data/params/d/SupportedCars");
   list->addItems(items);
   list->setCurrentRow(0);
-
   QString selected = QString::fromStdString(Params().get("SelectedCar"));
 
   int index = 0;
@@ -796,6 +792,5 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
 
     emit selectedCar();
     });
-
   main_layout->addWidget(list);
 }
