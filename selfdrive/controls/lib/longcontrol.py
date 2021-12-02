@@ -18,11 +18,9 @@ ACCEL_MAX_ISO = 2.0  # m/s^2
 def long_control_state_trans(CP, active, long_control_state, v_ego, v_target_future, v_pid,
                              output_accel, brake_pressed, cruise_standstill, min_speed_can, radarState):
   """Update longitudinal control state machine"""
-  stopping_target_speed = min_speed_can + STOPPING_TARGET_SPEED_OFFSET
   stopping_condition = (v_ego < 2.0 and cruise_standstill) or \
                        (v_ego < CP.vEgoStopping and
-                        ((v_pid < stopping_target_speed and v_target_future < stopping_target_speed) or
-                         brake_pressed))
+                        (v_target_future < CP.vEgoStopping or brake_pressed))
 
   starting_condition = v_target_future > CP.vEgoStarting and not cruise_standstill
 
@@ -128,7 +126,7 @@ class LongControl():
       # Keep applying brakes until the car is stopped
       if not CS.standstill or output_accel > CP.stopAccel:
         output_accel -= CP.stoppingDecelRate * DT_CTRL * \
-                        interp(output_accel, [CP.stopAccel, CP.stopAccel/2., 0], [1., 1.3, 2.3])
+                        interp(output_accel, [CP.stopAccel, CP.stopAccel/2., 0], [0.8, 1.2, 2.8])
       output_accel = clip(output_accel, accel_limits[0], accel_limits[1])
 
       self.reset(CS.vEgo)
