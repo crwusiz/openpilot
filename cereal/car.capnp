@@ -203,6 +203,7 @@ struct CarState {
   cruiseGap @40 : Int32;
   autoHold @41 : Int32;
   tpms @42 : Tpms;
+  vCluRatio @43 :Float32;
 
   struct Tpms {
     fl @0 :Float32;
@@ -391,9 +392,9 @@ struct CarControl {
       refuse @3;
       warningSoft @4;
       warningImmediate @5;
-      warningDEPRECATED @6;
-      prompt @7;
-      promptRepeat @8;
+      prompt @6;
+      promptRepeat @7;
+      promptDistracted @8;
       slowingDownSpeed @9;
       ding @10;
       dingRepeat @ 11;
