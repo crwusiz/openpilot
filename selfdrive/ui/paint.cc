@@ -412,13 +412,26 @@ static void ui_draw_vision_event(UIState *s) {
 // gps icon upper right
 static void ui_draw_gps(UIState *s) {
   const int radius = 60;
-  const int center_x = s->fb_w - (radius*5);
+  const int center_x = s->fb_w - (radius*7);
   const int center_y = radius + 40;
   auto gps_state = (*s->sm)["liveLocationKalman"].getLiveLocationKalman();
   if (gps_state.getGpsOK()) {
     ui_draw_circle_image(s, center_x, center_y, radius, "gps", COLOR_BLACK_ALPHA(30), 1.0f);
   } else {
     ui_draw_circle_image(s, center_x, center_y, radius, "gps", COLOR_BLACK_ALPHA(10), 0.15f);
+  }
+}
+
+// wifi icon upper right 2
+static void ui_draw_wifi(UIState *s) {
+  const int radius = 60;
+  const int center_x = s->fb_w - (radius*5);
+  const int center_y = radius + 40;
+  auto device_state = (*s->sm)["deviceState"].getDeviceState();
+  if ((int)device_state.getNetworkStrength() > 0) {
+    ui_draw_circle_image(s, center_x, center_y, radius, "wifi", COLOR_BLACK_ALPHA(30), 1.0f);
+  } else {
+    ui_draw_circle_image(s, center_x, center_y, radius, "wifi", COLOR_BLACK_ALPHA(10), 0.15f);
   }
 }
 
@@ -430,7 +443,7 @@ static void ui_draw_vision_face(UIState *s) {
   ui_draw_circle_image(s, center_x, center_y, radius, "driver_face", s->scene.dm_active);
 }
 
-// face scc_gap bottom left + radius
+// scc_gap bottom left + radius
 static void ui_draw_scc_gap(UIState *s) {
   const int radius = 85;
   const int center_x = radius + (bdr_s*2) + (radius*2);
@@ -464,7 +477,7 @@ static void ui_draw_scc_gap(UIState *s) {
   ui_draw_text(s, center_x, center_y+22, str, textSize * 2.5f, textColor, "sans-bold");
 }
 
-// face brake bottom left 2
+// brake icon bottom left 2
 static void ui_draw_brake(UIState *s) {
   const int radius = 85;
   const int center_x = radius + (bdr_s*2);
@@ -472,7 +485,7 @@ static void ui_draw_brake(UIState *s) {
   ui_draw_circle_image(s, center_x, center_y, radius, "brake_disc", s->scene.car_state.getBrakeLights());
 }
 
-// face autohold bottom left 2 + radius
+// autohold icon bottom left 2 + radius
 static void ui_draw_autohold(UIState *s) {
   int autohold = s->scene.car_state.getAutoHold();
   if (autohold < 0)
@@ -483,7 +496,7 @@ static void ui_draw_autohold(UIState *s) {
   ui_draw_circle_image(s, center_x, center_y, radius, autohold > 1 ? "autohold_warning" : "autohold_active", s->scene.car_state.getAutoHold());
 }
 
-// face bsd left bottom left 3
+// bsd left icon bottom left 3
 static void ui_draw_bsd_left(UIState *s) {
   const int radius = 85;
   const int center_x = radius + (bdr_s*2);
@@ -491,7 +504,7 @@ static void ui_draw_bsd_left(UIState *s) {
   ui_draw_circle_image(s, center_x, center_y, radius, "bsd_l", s->scene.car_state.getLeftBlindspot());
 }
 
-// face bsd right bottom left 3 + radius
+// bsd right icon bottom left 3 + radius
 static void ui_draw_bsd_right(UIState *s) {
   const int radius = 85;
   const int center_x = radius + (bdr_s*2) + (radius*2);
@@ -757,6 +770,7 @@ static void ui_draw_vision(UIState *s) {
   ui_draw_autohold(s);
   ui_draw_bsd_left(s);
   ui_draw_bsd_right(s);
+  ui_draw_wifi(s);
   ui_draw_gps(s);
   ui_draw_tpms(s);
   ui_draw_extras(s);
@@ -831,9 +845,10 @@ void ui_nvg_init(UIState *s) {
     {"bsd_l", "../assets/img_bsd_l.png"},
     {"bsd_r", "../assets/img_bsd_r.png"},
     {"gps", "../assets/img_gps.png"},
+    {"wifi", "../assets/img_wifi.png"},
     {"autohold_warning", "../assets/img_autohold_warning.png"},
     {"autohold_active", "../assets/img_autohold_active.png"},
-	{"tire_pressure", "../assets/img_tire_pressure.png"},
+    {"tire_pressure", "../assets/img_tire_pressure.png"},
     {"img_nda", "../assets/img_nda.png"},
     {"img_hda", "../assets/img_hda.png"},
     {"custom_lead_vision", "../assets/custom_lead_vision.png"},
