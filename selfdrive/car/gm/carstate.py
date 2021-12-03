@@ -1,6 +1,5 @@
 from cereal import car
 from common.numpy_fast import mean
-from selfdrive.config import Conversions as CV
 from opendbc.can.can_define import CANDefine
 from opendbc.can.parser import CANParser
 from selfdrive.car.interfaces import CarStateBase
@@ -13,17 +12,20 @@ class CarState(CarStateBase):
     super().__init__(CP)
     can_define = CANDefine(DBC[CP.carFingerprint]["pt"])
     self.shifter_values = can_define.dv["ECMPRDNL"]["PRNDL"]
+    self.lka_steering_cmd_counter = 0
 
-  def update(self, pt_cp):
+  def update(self, pt_cp, loopback_cp):
     ret = car.CarState.new_message()
 
     self.prev_cruise_buttons = self.cruise_buttons
     self.cruise_buttons = pt_cp.vl["ASCMSteeringButton"]["ACCButtons"]
 
-    ret.wheelSpeeds.fl = pt_cp.vl["EBCMWheelSpdFront"]["FLWheelSpd"] * CV.KPH_TO_MS
-    ret.wheelSpeeds.fr = pt_cp.vl["EBCMWheelSpdFront"]["FRWheelSpd"] * CV.KPH_TO_MS
-    ret.wheelSpeeds.rl = pt_cp.vl["EBCMWheelSpdRear"]["RLWheelSpd"] * CV.KPH_TO_MS
-    ret.wheelSpeeds.rr = pt_cp.vl["EBCMWheelSpdRear"]["RRWheelSpd"] * CV.KPH_TO_MS
+    ret.wheelSpeeds = self.get_wheel_speeds(
+      pt_cp.vl["EBCMWheelSpdFront"]["FLWheelSpd"],
+      pt_cp.vl["EBCMWheelSpdFront"]["FRWheelSpd"],
+      pt_cp.vl["EBCMWheelSpdRear"]["RLWheelSpd"],
+      pt_cp.vl["EBCMWheelSpdRear"]["RRWheelSpd"],
+    )
     ret.vEgoRaw = mean([ret.wheelSpeeds.fl, ret.wheelSpeeds.fr, ret.wheelSpeeds.rl, ret.wheelSpeeds.rr])
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
     ret.standstill = ret.vEgoRaw < 0.01
@@ -42,6 +44,7 @@ class CarState(CarStateBase):
     ret.steeringTorque = pt_cp.vl["PSCMStatus"]["LKADriverAppldTrq"]
     ret.steeringTorqueEps = pt_cp.vl["PSCMStatus"]["LKATorqueDelivered"]
     ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD
+    self.lka_steering_cmd_counter = loopback_cp.vl["ASCMLKASteeringCmd"]["RollingCounter"]
 
     # 0 inactive, 1 active, 2 temporarily limited, 3 failed
     self.lkas_status = pt_cp.vl["PSCMStatus"]["LKATorqueDeliveredStatus"]
@@ -131,3 +134,15 @@ class CarState(CarStateBase):
       ]
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, CanBus.POWERTRAIN)
+
+  @staticmethod
+  def get_loopback_can_parser(CP):
+    signals = [
+      ("RollingCounter", "ASCMLKASteeringCmd", 0),
+    ]
+
+    checks = [
+      ("ASCMLKASteeringCmd", 50),
+    ]
+
+    return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, CanBus.LOOPBACK)
