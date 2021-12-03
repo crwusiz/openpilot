@@ -18,11 +18,13 @@ ACCEL_MAX_ISO = 2.0  # m/s^2
 def long_control_state_trans(CP, active, long_control_state, v_ego, v_target_future, v_pid,
                              output_accel, brake_pressed, cruise_standstill, min_speed_can, radarState):
   """Update longitudinal control state machine"""
+  stopping_target_speed = min_speed_can + STOPPING_TARGET_SPEED_OFFSET
   stopping_condition = (v_ego < 2.0 and cruise_standstill) or \
                        (v_ego < CP.vEgoStopping and
-                        (v_target_future < CP.vEgoStopping or brake_pressed))
+                        ((v_pid < stopping_target_speed and v_target_future < stopping_target_speed) or
+                         brake_pressed))
 
-  starting_condition = v_target_future > CP.vEgoStarting and not cruise_standstill
+  starting_condition = v_target_future > CP.vEgoStarting #and not cruise_standstill
 
   # neokii
   if radarState is not None and radarState.leadOne is not None and radarState.leadOne.status:
@@ -59,8 +61,7 @@ class LongControl():
     self.pid = PIController((CP.longitudinalTuning.kpBP, CP.longitudinalTuning.kpV),
                             (CP.longitudinalTuning.kiBP, CP.longitudinalTuning.kiV),
                             rate=1/DT_CTRL,
-                            sat_limit=0.8,
-                            i_decay_tau=5.0)
+                            sat_limit=0.8)
     self.v_pid = 0.0
     self.last_output_accel = 0.0
 

@@ -35,7 +35,7 @@ X_EGO_COST = 0.
 V_EGO_COST = 0.
 A_EGO_COST = 0.
 J_EGO_COST = 5.0
-A_CHANGE_COST = .5
+A_CHANGE_COST = .1
 DANGER_ZONE_COST = 100.
 CRASH_DISTANCE = .5
 LIMIT_COST = 1e6
@@ -54,10 +54,10 @@ T_REACT = 1.45
 COMFORT_BRAKE = 2.0
 
 CRUISE_GAP_BP = [1., 2., 3., 4.]
-CRUISE_GAP_V = [1.45, 1.7, 1.9, 2.2]
+CRUISE_GAP_V = [1.4, 1.6, 1.9, 2.2]
 
 AUTO_TR_BP = [0.]  # [10.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 110.*CV.KPH_TO_MS]
-AUTO_TR_V = [1.45]  # [1.45, 1.6, 1.8]
+AUTO_TR_V = [1.4]  # [1.45, 1.6, 1.8]
 
 AUTO_TR_CRUISE_GAP = 1
 
@@ -65,7 +65,7 @@ def get_stopped_equivalence_factor(v_lead, tr):
   return v_lead**2 / (2 * COMFORT_BRAKE) - tr * v_lead
 
 def get_safe_obstacle_distance(v_ego):
-  return (v_ego*v_ego) / (2 * COMFORT_BRAKE) + 6.0
+  return (v_ego*v_ego) / (2 * COMFORT_BRAKE) + 5.0
 
 def desired_follow_distance(v_ego, v_lead, tr):
   return get_safe_obstacle_distance(v_ego) - get_stopped_equivalence_factor(v_lead, tr)
