@@ -482,18 +482,20 @@ struct CarParams {
   fingerprintSource @49: FingerprintSource;
   networkLocation @50 :NetworkLocation;  # Where Panda/C2 is integrated into the car's CAN network
 
+  wheelSpeedFactor @63 :Float32; # Multiplier on wheels speeds to computer actual speeds
+
   struct SafetyConfig {
     safetyModel @0 :SafetyModel;
     safetyParam @1 :Int16;
   }
 
-  mdpsBus @63: Int8;
-  sasBus @64: Int8;
-  sccBus @65: Int8;
-  enableAutoHold @66 :Bool;
-  hasScc13 @67 :Bool;
-  hasScc14 @68 :Bool;
-  hasEms @69 :Bool;
+  mdpsBus @64: Int8;
+  sasBus @65: Int8;
+  sccBus @66: Int8;
+  enableAutoHold @67 :Bool;
+  hasScc13 @68 :Bool;
+  hasScc14 @69 :Bool;
+  hasEms @70 :Bool;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);

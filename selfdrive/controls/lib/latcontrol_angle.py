@@ -21,5 +21,7 @@ class LatControlAngle():
       angle_steers_des += params.angleOffsetDeg
 
     angle_log.saturated = False
-    angle_log.steeringAngleDeg = angle_steers_des
+    angle_log.steeringAngleDeg = float(CS.steeringAngleDeg)
+    angle_log.steeringAngleDesiredDeg = angle_steers_des 
+
     return 0, float(angle_steers_des), angle_log

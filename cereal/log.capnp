@@ -634,6 +634,8 @@ struct ControlsState @0x97ff69c53601abf1 {
     delta @8 :Float32;
     output @9 :Float32;
     saturated @10 :Bool;
+    steeringAngleDesiredDeg @11 :Float32;
+    steeringRateDesiredDeg @12 :Float32;
   }
 
   struct LateralPIDState {
@@ -646,6 +648,7 @@ struct ControlsState @0x97ff69c53601abf1 {
     f @6 :Float32;
     output @7 :Float32;
     saturated @8 :Bool;
+    steeringAngleDesiredDeg @9 :Float32;
    }
 
   struct LateralLQRState {
@@ -655,6 +658,7 @@ struct ControlsState @0x97ff69c53601abf1 {
     output @3 :Float32;
     lqrOutput @4 :Float32;
     saturated @5 :Bool;
+    steeringAngleDesiredDeg @6 :Float32;
   }
 
   struct LateralAngleState {
@@ -662,6 +666,7 @@ struct ControlsState @0x97ff69c53601abf1 {
     steeringAngleDeg @1 :Float32;
     output @2 :Float32;
     saturated @3 :Bool;
+    steeringAngleDesiredDeg @4 :Float32;
   }
 
   struct LateralDebugState {
