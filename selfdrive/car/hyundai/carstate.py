@@ -66,22 +66,35 @@ class CarState(CarStateBase):
     self.is_set_speed_in_mph = bool(cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"])
     self.speed_conv_to_ms = CV.MPH_TO_MS if self.is_set_speed_in_mph else CV.KPH_TO_MS
 
-    # ret.cluSpeedMs = cluSpeed * self.speed_conv_to_ms
+    cluSpeed = cp.vl["CLU11"]["CF_Clu_Vanz"]
+    decimal = cp.vl["CLU11"]["CF_Clu_VanzDecimal"]
+    if 0. < decimal < 0.5:
+      cluSpeed += decimal
+
+    ret.cluSpeedMs = cluSpeed * self.speed_conv_to_ms
+
+    ret.wheelSpeeds = self.get_wheel_speeds(
+      cp.vl["WHL_SPD11"]["WHL_SPD_FL"],
+      cp.vl["WHL_SPD11"]["WHL_SPD_FR"],
+      cp.vl["WHL_SPD11"]["WHL_SPD_RL"],
+      cp.vl["WHL_SPD11"]["WHL_SPD_RR"],
+    )
+    vEgoRawWheel = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
+    vEgoWheel, aEgoWheel = self.update_speed_kf(vEgoRawWheel)
+
+    vEgoRawClu = cluSpeed * self.speed_conv_to_ms
+    vEgoClu, aEgoClu = self.update_clu_speed_kf(vEgoRawClu)
 
     if self.CP.openpilotLongitudinalControl:
-      ret.wheelSpeeds.fl = cp.vl["WHL_SPD11"]["WHL_SPD_FL"] * CV.KPH_TO_MS
-      ret.wheelSpeeds.fr = cp.vl["WHL_SPD11"]["WHL_SPD_FR"] * CV.KPH_TO_MS
-      ret.wheelSpeeds.rl = cp.vl["WHL_SPD11"]["WHL_SPD_RL"] * CV.KPH_TO_MS
-      ret.wheelSpeeds.rr = cp.vl["WHL_SPD11"]["WHL_SPD_RR"] * CV.KPH_TO_MS
-      ret.vEgoRaw = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
+      ret.vEgoRaw = vEgoRawWheel
+      ret.vEgo = vEgoWheel
+      ret.aEgo = aEgoWheel
     else:
-      cluSpeed = cp.vl["CLU11"]["CF_Clu_Vanz"]
-      decimal = cp.vl["CLU11"]["CF_Clu_VanzDecimal"]
-      if 0. < decimal < 0.5:
-        cluSpeed += decimal
-      ret.vEgoRaw = cluSpeed * self.speed_conv_to_ms
+      ret.vEgoRaw = vEgoRawClu
+      ret.vEgo = vEgoClu
+      ret.aEgo = aEgoClu
 
-    ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
+    ret.vCluRatio = (vEgoWheel / vEgoClu) if (vEgoClu > 3. and vEgoWheel > 3.) else 1.0
 
     ret.standstill = ret.vEgoRaw < 0.01
 
@@ -99,7 +112,7 @@ class CarState(CarStateBase):
     else:
       self.mdps_error_cnt = 0
 
-    ret.steerWarning = self.mdps_error_cnt > 100
+    ret.steerWarning = self.mdps_error_cnt > 50
 
     if self.CP.enableAutoHold:
       ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]
