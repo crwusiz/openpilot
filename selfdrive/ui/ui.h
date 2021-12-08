@@ -1,7 +1,5 @@
 #pragma once
 
-#include <atomic>
-#include <map>
 #include <memory>
 #include <string>
 #include <optional>
@@ -10,33 +8,11 @@
 #include <QTimer>
 #include <QColor>
 #include <QTransform>
-#include "nanovg.h"
 
 #include "cereal/messaging/messaging.h"
-#include "common/transformations/orientation.hpp"
-#include "selfdrive/camerad/cameras/camera_common.h"
-#include "selfdrive/common/mat.h"
 #include "selfdrive/common/modeldata.h"
 #include "selfdrive/common/params.h"
-#include "selfdrive/common/util.h"
-#include "selfdrive/common/visionimg.h"
-
-#define COLOR_BLACK nvgRGBA(0, 0, 0, 255)
-#define COLOR_BLACK_ALPHA(x) nvgRGBA(0, 0, 0, x)
-#define COLOR_WHITE nvgRGBA(255, 255, 255, 255)
-#define COLOR_WHITE_ALPHA(x) nvgRGBA(255, 255, 255, x)
-#define COLOR_RED nvgRGBA(255, 0, 0, 255)
-#define COLOR_RED_ALPHA(x) nvgRGBA(255, 0, 0, x)
-#define COLOR_YELLOW nvgRGBA(255, 255, 0, 255)
-#define COLOR_YELLOW_ALPHA(x) nvgRGBA(255, 255, 0, x)
-#define COLOR_ENGAGED nvgRGBA(23, 134, 68, 255)
-#define COLOR_ENGAGED_ALPHA(x) nvgRGBA(23, 134, 68, x)
-#define COLOR_WARNING nvgRGBA(218, 111, 37, 255)
-#define COLOR_WARNING_ALPHA(x) nvgRGBA(218, 111, 37, x)
-#define COLOR_ENGAGEABLE nvgRGBA(23, 51, 73, 255)
-#define COLOR_ENGAGEABLE_ALPHA(x) nvgRGBA(23, 51, 73, x)
-#define COLOR_LIME nvgRGBA(120, 255, 120, 255)
-#define COLOR_LIME_ALPHA(x) nvgRGBA(120, 255, 120, x)
+#include "selfdrive/common/timing.h"
 
 const int bdr_s = 10;
 const int header_h = 420;
@@ -49,17 +25,6 @@ typedef cereal::CarControl::HUDControl::AudibleAlert AudibleAlert;
 // TODO: choose based on frame input size
 const float y_offset = Hardware::EON() ? 0.0 : 150.0;
 const float ZOOM = Hardware::EON() ? 2138.5 : 2912.8;
-
-typedef struct Rect {
-  int x, y, w, h;
-  int centerX() const { return x + w / 2; }
-  int centerY() const { return y + h / 2; }
-  int right() const { return x + w; }
-  int bottom() const { return y + h; }
-  bool ptInRect(int px, int py) const {
-    return px >= x && px < (x + w) && py >= y && py < (y + h);
-  }
-} Rect;
 
 struct Alert {
   QString text1;
@@ -111,29 +76,13 @@ const QColor bg_colors [] = {
 };
 
 typedef struct {
-  float x, y;
-} vertex_data;
-
-typedef struct {
-  vertex_data v[TRAJECTORY_SIZE * 2];
+  QPointF v[TRAJECTORY_SIZE * 2];
   int cnt;
 } line_vertices_data;
 
 typedef struct UIScene {
-
   mat3 view_from_calib;
   bool world_objects_visible;
-
-  // ui add
-  float cpuTempAvg;
-  int lateralControlSelect;
-  float output_scale;
-  bool leftBlinker, rightBlinker;
-  int blinkingrate;
-
-  // gps
-  int satelliteCount;
-  float gpsAccuracy;
 
   cereal::PandaState::PandaType pandaType;
 
@@ -144,33 +93,16 @@ typedef struct UIScene {
   line_vertices_data lane_line_vertices[4];
   line_vertices_data road_edge_vertices[2];
 
-  bool dm_active, engageable;
-
   // lead
-  vertex_data lead_vertices_radar[2];
-  vertex_data lead_vertices[2];
+  QPointF lead_vertices[2];
 
   float light_sensor, accel_sensor, gyro_sensor;
   bool started, ignition, is_metric, longitudinal_control, end_to_end;
   uint64_t started_frame;
-
-  // neokii dev UI
-  cereal::CarControl::Reader car_control;
-  cereal::DeviceState::Reader device_state;
-  cereal::CarState::Reader car_state;
-  cereal::ControlsState::Reader controls_state;
-  cereal::CarParams::Reader car_params;
-  cereal::GpsLocationData::Reader gps_ext;
-  cereal::LiveParametersData::Reader live_params;
-
 } UIScene;
 
 typedef struct UIState {
   int fb_w = 0, fb_h = 0;
-  NVGcontext *vg;
-
-  // images
-  std::map<std::string, int> images;
 
   std::unique_ptr<SubMaster> sm;
 
@@ -185,9 +117,7 @@ typedef struct UIState {
 
   float running_time;
 
-  //
   int lock_on_anim_index;
-
 } UIState;
 
 
@@ -244,3 +174,5 @@ public slots:
   void setAwake(bool on, bool reset);
   void update(const UIState &s);
 };
+
+void ui_update_params(UIState *s);
