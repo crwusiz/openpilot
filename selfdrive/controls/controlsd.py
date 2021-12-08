@@ -28,7 +28,7 @@ from selfdrive.manager.process_config import managed_processes
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
 from selfdrive.ntune import ntune_common_get, ntune_common_enabled, ntune_scc_get
 
-LDW_MIN_SPEED = 31 * CV.MPH_TO_MS
+LDW_MIN_SPEED = 40 * CV.KPH_TO_MS
 LANE_DEPARTURE_THRESHOLD = 0.1
 STEER_ANGLE_SATURATION_TIMEOUT = 1.0 / DT_CTRL
 STEER_ANGLE_SATURATION_THRESHOLD = 2.5  # Degrees

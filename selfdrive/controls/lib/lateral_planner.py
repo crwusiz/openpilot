@@ -12,13 +12,12 @@ from selfdrive.config import Conversions as CV
 import cereal.messaging as messaging
 from cereal import log
 
-AUTO_LCA_START_TIME = 1.0
-
 LaneChangeState = log.LateralPlan.LaneChangeState
 LaneChangeDirection = log.LateralPlan.LaneChangeDirection
 
-LANE_CHANGE_SPEED_MIN = 30 * CV.MPH_TO_MS
+LANE_CHANGE_SPEED_MIN = 60 * CV.KPH_TO_MS
 LANE_CHANGE_TIME_MAX = 10.
+AUTO_LCA_TIME = 1.0
 
 DESIRES = {
   LaneChangeDirection.none: {
@@ -116,7 +115,7 @@ class LateralPlanner:
                        ((sm['carState'].steeringTorque > 0 and self.lane_change_direction == LaneChangeDirection.left) or
                         (sm['carState'].steeringTorque < 0 and self.lane_change_direction == LaneChangeDirection.right)) or \
                         self.auto_lane_change_enabled and \
-                       (AUTO_LCA_START_TIME+0.25) > self.auto_lane_change_timer > AUTO_LCA_START_TIME
+                       (AUTO_LCA_TIME+0.25) > self.auto_lane_change_timer > AUTO_LCA_TIME
 
       blindspot_detected = ((sm['carState'].leftBlindspot and self.lane_change_direction == LaneChangeDirection.left) or
                             (sm['carState'].rightBlindspot and self.lane_change_direction == LaneChangeDirection.right))
@@ -171,7 +170,7 @@ class LateralPlanner:
     if self.lane_change_state == LaneChangeState.off:
       self.auto_lane_change_timer = 0.0
       self.prev_torque_applied = False
-    elif self.auto_lane_change_timer < (AUTO_LCA_START_TIME+0.25): # stop afer 3 sec resume from 10 when torque applied
+    elif self.auto_lane_change_timer < (AUTO_LCA_TIME+0.25): # stop afer 3 sec resume from 10 when torque applied
       self.auto_lane_change_timer += DT_MDL
 
     self.prev_one_blinker = one_blinker
@@ -252,6 +251,6 @@ class LateralPlanner:
     plan_send.lateralPlan.laneChangeState = self.lane_change_state
     plan_send.lateralPlan.laneChangeDirection = self.lane_change_direction
     plan_send.lateralPlan.autoLaneChangeEnabled = self.auto_lane_change_enabled
-    plan_send.lateralPlan.autoLaneChangeTimer = int(AUTO_LCA_START_TIME) - int(self.auto_lane_change_timer)
+    plan_send.lateralPlan.autoLaneChangeTimer = int(AUTO_LCA_TIME) - int(self.auto_lane_change_timer)
 
     pm.send('lateralPlan', plan_send)
