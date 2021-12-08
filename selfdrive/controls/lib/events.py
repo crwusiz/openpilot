@@ -256,7 +256,7 @@ def auto_lane_change_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: b
     "자동차선변경이 %d초 뒤에 시작됩니다" % alc_timer,
     "차선의 차량을 확인하세요",
     AlertStatus.normal, AlertSize.mid,
-    Priority.LOW, VisualAlert.none, AudibleAlert.dingRepeat, .1, alert_rate=0.75)
+    Priority.LOW, VisualAlert.none, AudibleAlert.dingRepeat, .75, alert_rate=0.75)
 
 
 EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, bool], Alert]]]] = {
@@ -419,7 +419,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
       "도로를 주시하세요 : 운전자 도로주시 불안",
       "",
       AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.none, AudibleAlert.ding, .1),
+      Priority.LOW, VisualAlert.none, AudibleAlert.ding, 1.),
   },
 
   EventName.promptDriverDistracted: {
@@ -448,7 +448,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
       "핸들을 잡아주세요 : 운전자 인식 불가",
       "",
       AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.ding, .1, alert_rate=0.75),
+      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.ding, .75, alert_rate=0.75),
   },
 
   EventName.promptDriverUnresponsive: {

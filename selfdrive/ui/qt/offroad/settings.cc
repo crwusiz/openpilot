@@ -173,6 +173,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     addItem(retrainingBtn);
   }
 
+  /*
   if (Hardware::TICI()) {
     //auto regulatoryBtn = new ButtonControl("Regulatory", "VIEW", "");
     auto regulatoryBtn = new ButtonControl("규제", "보기", "");
@@ -182,6 +183,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     });
     addItem(regulatoryBtn);
   }
+  */
 
   QObject::connect(parent, &SettingsWindow::offroadTransition, [=](bool offroad) {
     //for (auto btn : findChildren<ButtonControl *>()) {

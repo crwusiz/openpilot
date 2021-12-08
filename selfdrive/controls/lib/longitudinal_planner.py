@@ -66,10 +66,10 @@ class Planner:
 
     # neokii
     #if not self.use_cluster_speed:
-      vCluRatio = sm['carState'].vCluRatio
-      if vCluRatio > 0.5:
-        v_cruise *= vCluRatio
-        v_cruise = int(v_cruise * CV.MS_TO_KPH) * CV.KPH_TO_MS
+    vCluRatio = sm['carState'].vCluRatio
+    if vCluRatio > 0.5:
+      v_cruise *= vCluRatio
+      v_cruise = int(v_cruise * CV.MS_TO_KPH) * CV.KPH_TO_MS
 
     long_control_state = sm['controlsState'].longControlState
     force_slow_decel = sm['controlsState'].forceDecel
