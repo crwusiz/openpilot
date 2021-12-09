@@ -38,25 +38,8 @@ class CarInterface(CarInterfaceBase):
     ret.communityFeature = True
 
     # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
-    # genesis
-    if candidate == CAR.GENESIS:
-        ret.mass = 2060. + STD_CARGO_KG
-        ret.wheelbase = 3.010
-        ret.steerRatio = 16.5
-    elif candidate == CAR.GENESIS_G70:
-        ret.mass = 1795. + STD_CARGO_KG
-        ret.wheelbase = 2.835
-        ret.steerRatio = 16.5
-    elif candidate == CAR.GENESIS_G80:
-        ret.mass = 2035. + STD_CARGO_KG
-        ret.wheelbase = 3.010
-        ret.steerRatio = 16.5
-    elif candidate == CAR.GENESIS_G90:
-        ret.mass = 2185. + STD_CARGO_KG
-        ret.wheelbase = 3.160
-        ret.steerRatio = 12.0
     # hyundai
-    elif candidate in [CAR.ELANTRA_I30, CAR.ELANTRA21, CAR.ELANTRA21_HEV]:
+    if candidate in [CAR.ELANTRA_I30, CAR.ELANTRA21, CAR.ELANTRA21_HEV]:
         ret.mass = 1340. + STD_CARGO_KG
         ret.wheelbase = 2.720
         ret.steerRatio = 15.4
@@ -141,8 +124,26 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 1510. + STD_CARGO_KG
         ret.wheelbase = 2.630
         ret.steerRatio = 13.0
-
-    # -----------------------------------------------------------------PID
+    # genesis
+    elif candidate == CAR.GENESIS:
+        ret.mass = 2060. + STD_CARGO_KG
+        ret.wheelbase = 3.010
+        ret.steerRatio = 16.5
+    elif candidate == CAR.GENESIS_G70:
+        ret.mass = 1795. + STD_CARGO_KG
+        ret.wheelbase = 2.835
+        ret.steerRatio = 16.5
+    elif candidate == CAR.GENESIS_G80:
+        ret.mass = 2035. + STD_CARGO_KG
+        ret.wheelbase = 3.010
+        ret.steerRatio = 16.5
+    elif candidate == CAR.GENESIS_G90:
+        ret.mass = 2185. + STD_CARGO_KG
+        ret.wheelbase = 3.160
+        ret.steerRatio = 12.0
+    # -----------------------------------------------------------------
+    # PID
+    # -----------------------------------------------------------------
     if Params().get("LateralControlSelect", encoding='utf8') == "0":
       if candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
           ret.lateralTuning.pid.kf = 0.00005
@@ -162,7 +163,9 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.pid.kpV = [0.25]
           ret.lateralTuning.pid.kiBP = [0.]
           ret.lateralTuning.pid.kiV = [0.05]
-    # -----------------------------------------------------------------INDI
+    # -----------------------------------------------------------------
+    # INDI
+    # -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "1":
       if candidate in [CAR.GENESIS]:
           ret.lateralTuning.init('indi')
@@ -204,7 +207,9 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.indi.timeConstantV = [1.4]
           ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
           ret.lateralTuning.indi.actuatorEffectivenessV = [2.3]
-    # -----------------------------------------------------------------LQR
+    # -----------------------------------------------------------------
+    # LQR
+    # -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "2":
       if candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
           ret.lateralTuning.init('lqr')
@@ -312,19 +317,19 @@ class CarInterface(CarInterfaceBase):
 
     ret.stoppingControl = True
 
-    ret.enableBsm = 0x58b in fingerprint[0]
-    ret.enableAutoHold = 1151 in fingerprint[0]
-
     # ignore CAN2 address if L-CAN on the same BUS
     ret.mdpsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
     ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
-    ret.sccBus = 0 if 1056 in fingerprint[0] else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
-                                                                     else 2 if 1056 in fingerprint[2] else -1
+    ret.sccBus = 0 if 1056 in fingerprint[0] \
+        else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
+        else 2 if 1056 in fingerprint[2] else -1
 
     if ret.sccBus >= 0:
       ret.hasScc13 = 1290 in fingerprint[ret.sccBus]
       ret.hasScc14 = 905 in fingerprint[ret.sccBus]
 
+    ret.enableBsm = 0x58b in fingerprint[0]
+    ret.enableAutoHold = 1151 in fingerprint[0]
     ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
 
     ret.radarOffCan = ret.sccBus == -1
@@ -334,6 +339,7 @@ class CarInterface(CarInterfaceBase):
     if ret.radarOffCan or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or ret.sccBus == 1 or \
             Params().get("LongControlSelect", encoding='utf8') == "0" or Params().get("LongControlSelect", encoding='utf8') == "1":
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
+
     return ret
 
   def update(self, c, can_strings):

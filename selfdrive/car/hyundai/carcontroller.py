@@ -60,12 +60,12 @@ class CarController():
     self.turning_indicator_alert = False
 
     # params init
-    self.lfamfc = Params().get("MfcSelect", encoding='utf8') == "2"
-    self.mad_mode_enabled = Params().get("LongControlSelect", encoding='utf8') == "0" or \
-                            Params().get("LongControlSelect", encoding='utf8') == "1"
-    self.stock_navi_decel_enabled = Params().get_bool('StockNaviDecelEnabled')
-    self.keep_steering_turn_signals = Params().get_bool('KeepSteeringTurnSignals')
-    self.warning_over_speed_limit = Params().get_bool('WarningOverSpeedLimit')
+    params = Params()
+    self.lfamfc = params.get("MfcSelect", encoding='utf8') == "2"
+    self.mad_mode_enabled = params.get("LongControlSelect", encoding='utf8') == "0" or \
+                            params.get("LongControlSelect", encoding='utf8') == "1"
+    self.stock_navi_decel_enabled = params.get_bool('StockNaviDecelEnabled')
+    self.warning_over_speed_limit = params.get_bool('WarningOverSpeedLimit')
 
     # gas_factor, brake_factor
     # Adjust it in the range of 0.7 to 1.3

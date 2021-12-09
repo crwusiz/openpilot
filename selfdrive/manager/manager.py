@@ -52,11 +52,10 @@ def manager_init():
     ("LateralControlSelect", "0"),
     ("ShutdowndDisable", "1"),
     ("LoggerDisable", "0"),
-    ("SccSmootherSlowOnCurves", "0"),
-    ("SccSmootherSyncGasPressed", "0"),
+    ("SccSmootherSlowOnCurves", "1"),
+    ("SccSmootherSyncGasPressed", "1"),
+    ("WarningOverSpeedLimit", "1"),
     ("StockNaviDecelEnabled", "0"),
-    ("KeepSteeringTurnSignals", "0"),
-    ("WarningOverSpeedLimit", "0"),
     ("NewRadarInterface", "0"),
   ]
   if not PC:
