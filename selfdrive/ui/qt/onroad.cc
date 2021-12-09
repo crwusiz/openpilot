@@ -204,6 +204,18 @@ void OnroadHud::drawText(QPainter &p, int x, int y, const QString &text, int alp
   p.restore();
 }
 
+void OnroadHud::drawTextWithColor(QPainter &p, int x, int y, const QString &text, QColor& color) {
+  p.save();
+  QFontMetrics fm(p.font());
+  QRect init_rect = fm.boundingRect(text);
+  QRect real_rect = fm.boundingRect(init_rect, 0, text);
+  real_rect.moveCenter({x, y - real_rect.height() / 2});
+
+  p.setPen(color);
+  p.drawText(real_rect.x(), real_rect.bottom(), text);
+  p.restore();
+}
+
 void OnroadHud::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
   p.save();
   p.setPen(Qt::NoPen);
@@ -268,7 +280,7 @@ void OnroadHud::drawLaneLines(QPainter &painter, const UIScene &scene) {
   painter.drawPolygon(scene.track_vertices.v, scene.track_vertices.cnt);
 }
 
-void OnroadHud::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd) {
+void OnroadHud::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd, bool is_radar) {
   const float speedBuff = 10.;
   const float leadBuff = 40.;
   const float d_rel = lead_data.getX()[0];
@@ -291,7 +303,7 @@ void OnroadHud::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV
   float g_yo = sz / 10;
 
   QPointF glow[] = {{x + (sz * 1.35) + g_xo, y + sz + g_yo}, {x, y - g_xo}, {x - (sz * 1.35) - g_xo, y + sz + g_yo}};
-  painter.setBrush(QColor(218, 202, 37, 255));
+  painter.setBrush(is_radar ? QColor(86, 121, 216, 255) : QColor(218, 202, 37, 255));
   painter.drawPolygon(glow, std::size(glow));
 
   // chevron
@@ -326,10 +338,10 @@ void OnroadHud::drawCommunity(QPainter &p, UIState& s) {
 
   auto leads = sm["modelV2"].getModelV2().getLeadsV3();
   if (leads[0].getProb() > .5) {
-    drawLead(p, leads[0], s.scene.lead_vertices[0]);
+    drawLead(p, leads[0], s.scene.lead_vertices[0], s.scene.lead_radar[0]);
   }
   if (leads[1].getProb() > .5 && (std::abs(leads[1].getX()[0] - leads[0].getX()[0]) > 3.0)) {
-    drawLead(p, leads[1], s.scene.lead_vertices[1]);
+    drawLead(p, leads[1], s.scene.lead_vertices[1], s.scene.lead_radar[1]);
   }
 
   drawMaxSpeed(p, s);
@@ -532,8 +544,7 @@ void OnroadHud::drawBottomIcons(QPainter &p, UIState& s) {
   drawText(p, x, y-20, "GAP", 200);
 
   configFont(p, "Open Sans", textSize, "Bold");
-  p.setPen(textColor);
-  drawText(p, x, y+50, str, 200);
+  drawTextWithColor(p, x, y+50, str, textColor);
 
   // brake
   x = radius / 2 + (bdr_s * 2) + (radius + 50) * 2;
@@ -612,5 +623,36 @@ void OnroadHud::drawSpeedLimit(QPainter &p, UIState& s) {
     p.drawText(rect, Qt::AlignCenter, str_left_dist);
 
     p.restore();
+  }
+  else {
+    auto controls_state = sm["controlsState"].getControlsState();
+    int sccStockCamAct = (int)controls_state.getSccStockCamAct();
+    int sccStockCamStatus = (int)controls_state.getSccStockCamStatus();
+
+    if(sccStockCamAct == 2 && sccStockCamStatus == 2) {
+      int radius = 192;
+
+      int x = 30;
+      int y = 270;
+
+      p.save();
+      p.setPen(Qt::NoPen);
+
+      p.setBrush(QBrush(QColor(255, 0, 0, 255)));
+      QRect rect = QRect(x, y, radius, radius);
+      p.drawEllipse(rect);
+
+      p.setBrush(QBrush(QColor(255, 255, 255, 255)));
+
+      const int tickness = 14;
+      rect.adjust(tickness, tickness, -tickness, -tickness);
+      p.drawEllipse(rect);
+
+      configFont(p, "Open Sans", 70, "Bold");
+      p.setPen(QColor(0, 0, 0, 230));
+      p.drawText(rect, Qt::AlignCenter, "CAM");
+
+      p.restore();
+    }
   }
 }

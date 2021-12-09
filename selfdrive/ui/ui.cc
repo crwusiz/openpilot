@@ -49,7 +49,10 @@ static void update_leads(UIState *s, const cereal::RadarState::Reader &radar_sta
     if (lead_data.getStatus()) {
       float z = line ? (*line).getZ()[get_path_length_idx(*line, lead_data.getDRel())] : 0.0;
       calib_frame_to_full_frame(s, lead_data.getDRel(), -lead_data.getYRel(), z + 1.22, &s->scene.lead_vertices[i]);
+      s->scene.lead_radar[i] = lead_data.getRadar();
     }
+    else
+      s->scene.lead_radar[i] = false;
   }
 }
 
