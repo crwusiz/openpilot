@@ -57,6 +57,7 @@ private:
 
   void drawBottomIcons(QPainter &p, UIState& s);
   void drawSpeedLimit(QPainter &p, UIState& s);
+  void drawTurnSignals(QPainter &p, UIState& s);
 
 signals:
   void valueChanged();

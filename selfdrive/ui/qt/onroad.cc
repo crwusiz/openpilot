@@ -347,6 +347,7 @@ void OnroadHud::drawCommunity(QPainter &p, UIState& s) {
   drawMaxSpeed(p, s);
   drawSpeed(p, s);
   drawSpeedLimit(p, s);
+  drawTurnSignals(p, s);
   drawBottomIcons(p, s);
 
   const auto controls_state = sm["controlsState"].getControlsState();
@@ -653,6 +654,82 @@ void OnroadHud::drawSpeedLimit(QPainter &p, UIState& s) {
       p.drawText(rect, Qt::AlignCenter, "CAM");
 
       p.restore();
+    }
+  }
+}
+
+void OnroadHud::drawTurnSignals(QPainter &p, UIState& s) {
+  static int blink_index = 0;
+  static int blink_wait = 0;
+  static double prev_ts = 0.0;
+
+  if(blink_wait > 0) {
+    blink_wait--;
+    blink_index = 0;
+  }
+  else {
+    const SubMaster &sm = *(s.sm);
+    auto car_state = sm["carState"].getCarState();
+    bool left_on = car_state.getLeftBlinker();
+    bool right_on = car_state.getRightBlinker();
+
+    const float img_alpha = 0.8f;
+    const int fb_w = width() / 2 - 200;
+    const int center_x = width() / 2;
+    const int w = fb_w / 25;
+    const int h = 160;
+    const int gap = fb_w / 25;
+    const int margin = (int)(fb_w / 3.8f);
+    const int base_y = (height() - h) / 2;
+    const int draw_count = 8;
+
+    int x = center_x;
+    int y = base_y;
+
+    if(left_on) {
+      for(int i = 0; i < draw_count; i++) {
+        float alpha = img_alpha;
+        int d = std::abs(blink_index - i);
+        if(d > 0)
+          alpha /= d*2;
+
+        p.setOpacity(alpha);
+        float factor = (float)draw_count / (i + draw_count);
+        p.drawPixmap(x - w - margin, y + (h-h*factor)/2, w*factor, h*factor, ic_turn_signal_l);
+        x -= gap + w;
+      }
+    }
+
+    x = center_x;
+    if(right_on) {
+      for(int i = 0; i < draw_count; i++) {
+        float alpha = img_alpha;
+        int d = std::abs(blink_index - i);
+        if(d > 0)
+          alpha /= d*2;
+
+        float factor = (float)draw_count / (i + draw_count);
+        p.setOpacity(alpha);
+        p.drawPixmap(x + margin, y + (h-h*factor)/2, w*factor, h*factor, ic_turn_signal_r);
+        x += gap + w;
+      }
+    }
+
+    if(left_on || right_on) {
+
+      double now = millis_since_boot();
+      if(now - prev_ts > 900/UI_FREQ) {
+        prev_ts = now;
+        blink_index++;
+      }
+
+      if(blink_index >= draw_count) {
+        blink_index = draw_count - 1;
+        blink_wait = UI_FREQ/4;
+      }
+    }
+    else {
+      blink_index = 0;
     }
   }
 }
