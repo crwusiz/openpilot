@@ -248,15 +248,11 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   QObject::connect(poweroff_btn, &QPushButton::clicked, this, &DevicePanel::poweroff);
 
   setStyleSheet(R"(
-    QPushButton {
-      height: 120px;
-      border-radius: 15px;
-    }
-    #restart_openpilot_btn { background-color: #2C2CE2; }
+    #restart_openpilot_btn { height: 120px; border-radius: 15px; background-color: #2C2CE2; }
     #restart_openpilot_btn:pressed { background-color: #2424FF; }
-    #reboot_btn { background-color: #2CE22C; }
+    #reboot_btn { height: 120px; border-radius: 15px; background-color: #2CE22C; }
     #reboot_btn:pressed { background-color: #24FF24; }
-    #poweroff_btn { background-color: #E22C2C; }
+    #poweroff_btn { height: 120px; border-radius: 15px; background-color: #E22C2C; }
     #poweroff_btn:pressed { background-color: #FF2424; }
   )");
   addItem(power_layout);
