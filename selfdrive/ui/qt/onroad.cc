@@ -255,11 +255,10 @@ OnroadHud::OnroadHud(QWidget *parent) : QWidget(parent) {
   ic_autohold_active = QPixmap("../assets/images/img_autohold_active.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
   ic_nda = QPixmap("../assets/images/img_nda.png");
   ic_hda = QPixmap("../assets/images/img_hda.png");
-  ic_custom_lead_vision = QPixmap("../assets/images/custom_lead_vision.png");
-  ic_custom_lead_radar = QPixmap("../assets/images/custom_lead_radar.png");
   ic_tire_pressure = QPixmap("../assets/images/img_tire_pressure.png");
   ic_turn_signal_l = QPixmap("../assets/images/turn_signal_l.png");
   ic_turn_signal_r = QPixmap("../assets/images/turn_signal_r.png");
+  ic_satellite = QPixmap("../assets/images/satellite.png");
 }
 
 void OnroadHud::updateState(const UIState &s) {
@@ -443,9 +442,10 @@ void OnroadHud::drawCommunity(QPainter &p, UIState& s) {
   drawSpeed(p, s);
   drawSpeedLimit(p, s);
   drawTurnSignals(p, s);
+  drawGpsStatus(p, s);
   drawBottomIcons(p, s);
 
-  if(s.show_debug)
+  if(s.show_debug && width() > 1200)
     drawDebugText(p, s);
 
   const auto controls_state = sm["controlsState"].getControlsState();
@@ -830,6 +830,33 @@ void OnroadHud::drawTurnSignals(QPainter &p, UIState& s) {
       blink_index = 0;
     }
   }
+}
+
+void OnroadHud::drawGpsStatus(QPainter &p, UIState& s) {
+  const SubMaster &sm = *(s.sm);
+  auto gps = sm["gpsLocationExternal"].getGpsLocationExternal();
+  float accuracy = gps.getAccuracy();
+  if(accuracy < 0.01f || accuracy > 20.f)
+    return;
+
+  int w = 120;
+  int h = 100;
+  int x = width() - w - 30;
+  int y = 30;
+
+  p.setOpacity(0.8);
+  p.drawPixmap(x, y, w, h, ic_satellite);
+
+  configFont(p, "Open Sans", 40, "Bold");
+  p.setPen(QColor(255, 255, 255, 200));
+  p.setRenderHint(QPainter::TextAntialiasing);
+
+  QRect rect = QRect(x, y + h + 10, w, 40);
+  rect.adjust(-30, 0, 30, 0);
+
+  QString str;
+  str.sprintf("%.1fm", accuracy);
+  p.drawText(rect, Qt::AlignHCenter, str);
 }
 
 void OnroadHud::drawDebugText(QPainter &p, UIState& s) {

@@ -36,11 +36,10 @@ private:
   QPixmap ic_autohold_active;
   QPixmap ic_nda;
   QPixmap ic_hda;
-  QPixmap ic_custom_lead_vision;
-  QPixmap ic_custom_lead_radar;
   QPixmap ic_tire_pressure;
   QPixmap ic_turn_signal_l;
   QPixmap ic_turn_signal_r;
+  QPixmap ic_satellite;
 
   inline QColor redColor(int alpha = 255) { return QColor(201, 34, 49, alpha); }
   void drawLaneLines(QPainter &painter, const UIScene &scene);
@@ -53,6 +52,7 @@ private:
   void drawBottomIcons(QPainter &p, UIState& s);
   void drawSpeedLimit(QPainter &p, UIState& s);
   void drawTurnSignals(QPainter &p, UIState& s);
+  void drawGpsStatus(QPainter &p, UIState& s);
   void drawDebugText(QPainter &p, UIState& s);
 
 public:
