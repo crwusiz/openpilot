@@ -11,14 +11,14 @@
 
 class OnroadHud : public QWidget {
   Q_OBJECT
-  /*Q_PROPERTY(QString speed MEMBER speed NOTIFY valueChanged);
+  Q_PROPERTY(QString speed MEMBER speed NOTIFY valueChanged);
   Q_PROPERTY(QString speedUnit MEMBER speedUnit NOTIFY valueChanged);
   Q_PROPERTY(QString maxSpeed MEMBER maxSpeed NOTIFY valueChanged);
   Q_PROPERTY(bool is_cruise_set MEMBER is_cruise_set NOTIFY valueChanged);
   Q_PROPERTY(bool engageable MEMBER engageable NOTIFY valueChanged);
   Q_PROPERTY(bool dmActive MEMBER dmActive NOTIFY valueChanged);
   Q_PROPERTY(bool hideDM MEMBER hideDM NOTIFY valueChanged);
-  Q_PROPERTY(int status MEMBER status NOTIFY valueChanged);*/
+  Q_PROPERTY(int status MEMBER status NOTIFY valueChanged);
 
 public:
   explicit OnroadHud(QWidget *parent);
@@ -42,8 +42,10 @@ private:
   QPixmap ic_custom_lead_vision;
   QPixmap ic_custom_lead_radar;
   QPixmap ic_tire_pressure;
-  QPixmap ic_turn_signal_l;
-  QPixmap ic_turn_signal_r;
+  QPixmap bsd_l;
+  QPixmap bsd_r;
+  QPixmap gps;
+  QPixmap wifi;
 
   inline QColor redColor(int alpha = 255) { return QColor(201, 34, 49, alpha); }
   void drawLaneLines(QPainter &painter, const UIScene &scene);

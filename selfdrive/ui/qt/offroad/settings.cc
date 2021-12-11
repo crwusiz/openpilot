@@ -89,7 +89,6 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "Upload data from the driver facing camera and help improve the driver monitoring algorithm.",
       "../assets/offroad/icon_monitoring.png",
     },
-*/
     {
       "EndToEndToggle",
       "\U0001f96c Disable use of lanelines (Alpha) \U0001f96c",

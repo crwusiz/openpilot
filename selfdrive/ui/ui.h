@@ -86,6 +86,16 @@ typedef struct UIScene {
 
   cereal::PandaState::PandaType pandaType;
 
+  // neokii dev UI
+  cereal::CarControl::Reader car_control;
+  cereal::DeviceState::Reader device_state;
+  cereal::CarState::Reader car_state;
+  cereal::ControlsState::Reader controls_state;
+  cereal::CarParams::Reader car_params;
+  cereal::GpsLocationData::Reader gps_ext;
+  cereal::LiveParametersData::Reader live_params;
+
+
   // modelV2
   float lane_line_probs[4];
   float road_edge_stds[2];

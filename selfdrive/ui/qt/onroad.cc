@@ -96,8 +96,19 @@ void OnroadWindow::offroadTransition(bool offroad) {
 void OnroadWindow::paintEvent(QPaintEvent *event) {
   QPainter p(this);
   p.fillRect(rect(), QColor(bg.red(), bg.green(), bg.blue(), 255));
-}
 
+  // engage-ability icon
+  if (engageable) {
+    drawIcon(p, rect().right() - radius / 2 - bdr_s * 2, radius / 2 + int(bdr_s * 1.5),
+             engage_img, bg_colors[status], 1.0);
+  }
+
+  // dm icon
+  if (!hideDM) {
+    drawIcon(p, radius / 2 + (bdr_s * 2), rect().bottom() - footer_h / 2,
+             dm_img, QColor(0, 0, 0, 70), dmActive ? 1.0 : 0.2);
+  }
+}
 // ***** onroad widgets *****
 
 // OnroadAlerts
@@ -170,8 +181,14 @@ OnroadHud::OnroadHud(QWidget *parent) : QWidget(parent) {
   ic_autohold_active = QPixmap("../assets/img_autohold_active.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
   ic_nda = QPixmap("../assets/img_nda.png");
   ic_hda = QPixmap("../assets/img_hda.png");
-  ic_custom_lead_radar = QPixmap("../assets/custom_lead_radar.png");
+  ic_custom_lead_radar = QPixmap("../assets/img_custom_lead_radar.png");
+  ic_custom_lead_vision = QPixmap("../assets/img_custom_lead_vision.png");
   ic_tire_pressure = QPixmap("../assets/img_tire_pressure.png");
+
+  bsd_l = QPixmap("../assets/img_bsd_l.png");
+  bsd_r = QPixmap("../assets/img_bsd_r.png");
+  gps = QPixmap("../assets/img_gps.png");
+  wifi = QPixmap("../assets/img_wifi.png");
 }
 
 void OnroadHud::updateState(const UIState &s) {
@@ -654,82 +671,6 @@ void OnroadHud::drawSpeedLimit(QPainter &p, UIState& s) {
       p.drawText(rect, Qt::AlignCenter, "CAM");
 
       p.restore();
-    }
-  }
-}
-
-void OnroadHud::drawTurnSignals(QPainter &p, UIState& s) {
-  static int blink_index = 0;
-  static int blink_wait = 0;
-  static double prev_ts = 0.0;
-
-  if(blink_wait > 0) {
-    blink_wait--;
-    blink_index = 0;
-  }
-  else {
-    const SubMaster &sm = *(s.sm);
-    auto car_state = sm["carState"].getCarState();
-    bool left_on = car_state.getLeftBlinker();
-    bool right_on = car_state.getRightBlinker();
-
-    const float img_alpha = 0.8f;
-    const int fb_w = width() / 2 - 200;
-    const int center_x = width() / 2;
-    const int w = fb_w / 25;
-    const int h = 160;
-    const int gap = fb_w / 25;
-    const int margin = (int)(fb_w / 3.8f);
-    const int base_y = (height() - h) / 2;
-    const int draw_count = 8;
-
-    int x = center_x;
-    int y = base_y;
-
-    if(left_on) {
-      for(int i = 0; i < draw_count; i++) {
-        float alpha = img_alpha;
-        int d = std::abs(blink_index - i);
-        if(d > 0)
-          alpha /= d*2;
-
-        p.setOpacity(alpha);
-        float factor = (float)draw_count / (i + draw_count);
-        p.drawPixmap(x - w - margin, y + (h-h*factor)/2, w*factor, h*factor, ic_turn_signal_l);
-        x -= gap + w;
-      }
-    }
-
-    x = center_x;
-    if(right_on) {
-      for(int i = 0; i < draw_count; i++) {
-        float alpha = img_alpha;
-        int d = std::abs(blink_index - i);
-        if(d > 0)
-          alpha /= d*2;
-
-        float factor = (float)draw_count / (i + draw_count);
-        p.setOpacity(alpha);
-        p.drawPixmap(x + margin, y + (h-h*factor)/2, w*factor, h*factor, ic_turn_signal_r);
-        x += gap + w;
-      }
-    }
-
-    if(left_on || right_on) {
-
-      double now = millis_since_boot();
-      if(now - prev_ts > 900/UI_FREQ) {
-        prev_ts = now;
-        blink_index++;
-      }
-
-      if(blink_index >= draw_count) {
-        blink_index = draw_count - 1;
-        blink_wait = UI_FREQ/4;
-      }
-    }
-    else {
-      blink_index = 0;
     }
   }
 }
