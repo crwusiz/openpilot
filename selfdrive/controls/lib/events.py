@@ -124,7 +124,7 @@ class Alert:
     self.visual_alert = visual_alert
     self.audible_alert = audible_alert
 
-    self.duration = duration
+    self.duration = int(duration / DT_CTRL)
 
     self.alert_rate = alert_rate
     self.creation_delay = creation_delay
@@ -154,6 +154,13 @@ class SoftDisableAlert(Alert):
                      AlertStatus.userPrompt, AlertSize.full,
                      Priority.MID, VisualAlert.steerRequired,
                      AudibleAlert.warningSoft, 2.),
+
+
+# less harsh version of SoftDisable, where the condition is user-triggered
+class UserSoftDisableAlert(SoftDisableAlert):
+  def __init__(self, alert_text_2):
+    super().__init__(alert_text_2),
+    self.alert_text_1 = "openpilot will disengage"
 
 
 class ImmediateDisableAlert(Alert):
@@ -273,8 +280,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   },
 
   EventName.controlsInitializing: {
-    #ET.NO_ENTRY: NoEntryAlert("Controls Initializing"),
-    ET.NO_ENTRY: NoEntryAlert("프로세스 초기화중입니다"),
+    #ET.NO_ENTRY: NoEntryAlert("System Initializing"),
+    ET.NO_ENTRY: NoEntryAlert("시스템 초기화중입니다"),
   },
 
   EventName.startup: {
@@ -315,7 +322,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   },
 
   EventName.invalidLkasSetting: {
-    #ET.PERMANENT: NormalPermanentAlert("Stock LKAS is turned on",
+    #ET.PERMANENT: NormalPermanentAlert("Stock LKAS is on",
     #                                   "Turn off stock LKAS to engage"),
     ET.PERMANENT: NormalPermanentAlert("차량 LKAS 버튼 상태확인",
                                        "차량 LKAS 버튼 OFF후 활성화됩니다"),
@@ -329,8 +336,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   # detects the use of a community feature it switches to dashcam mode
   # until these features are allowed using a toggle in settings.
   EventName.communityFeatureDisallowed: {
-    #ET.PERMANENT: NormalPermanentAlert("openpilot Not Available",
-    #                                   "Enable Community Features in Settings to Engage"),
+    #ET.PERMANENT: NormalPermanentAlert("openpilot Unavailable",
+    #                                   "Enable Community Features in Settings"),
     ET.PERMANENT: NormalPermanentAlert("커뮤니티 기능 감지됨",
                                        "커뮤니티 기능을 활성화해주세요"),
   },
@@ -370,11 +377,11 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
 
   EventName.ldw: {
     ET.PERMANENT: Alert(
-      #"TAKE CONTROL",
       #"Lane Departure Detected",
+      #"",
       "핸들을 잡아주세요",
       "차선이탈 감지됨",
-      AlertStatus.userPrompt, AlertSize.mid,
+      AlertStatus.userPrompt, AlertSize.small,
       Priority.LOW, VisualAlert.ldw, AudibleAlert.prompt, 3.),
   },
 
@@ -382,8 +389,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
 
   EventName.gasPressed: {
     ET.PRE_ENABLE: Alert(
-      #"openpilot will not brake while gas pressed",
-      "가속패달감지시 오픈파일럿은 브레이크를 사용하지않습니다",
+      #"Release Gas Pedal to Engage",
+      "가속페달 감지되어 활성화되지않습니다",
       "",
       AlertStatus.normal, AlertSize.small,
       Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .1, creation_delay=1.),
@@ -415,8 +422,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
 
   EventName.preDriverDistracted: {
     ET.WARNING: Alert(
-      #"KEEP EYES ON ROAD: Driver Distracted",
-      "도로를 주시하세요 : 운전자 도로주시 불안",
+      #"Pay Attention",
+      "도로를 주시하세요",
       "",
       AlertStatus.normal, AlertSize.small,
       Priority.LOW, VisualAlert.none, AudibleAlert.ding, 1.),
@@ -424,7 +431,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
 
   EventName.promptDriverDistracted: {
     ET.WARNING: Alert(
-      #"KEEP EYES ON ROAD",
+      #"Pay Attention",
       #"Driver Distracted",
       "도로를 주시하세요",
       "운전자 도로주시 불안",
@@ -444,7 +451,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
 
   EventName.preDriverUnresponsive: {
     ET.WARNING: Alert(
-      #"TOUCH STEERING WHEEL: No Face Detected",
+      #"Touch Steering Wheel: No Face Detected",
       "핸들을 잡아주세요 : 운전자 인식 불가",
       "",
       AlertStatus.normal, AlertSize.small,
@@ -453,7 +460,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
 
   EventName.promptDriverUnresponsive: {
     ET.WARNING: Alert(
-      #"TOUCH STEERING WHEEL",
+      #"Touch Steering Wheel",
       #"Driver Unresponsive",
       "핸들을 잡아주세요",
       "운전자 응답하지않음",
@@ -483,10 +490,10 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
 
   EventName.resumeRequired: {
     ET.WARNING: Alert(
-      #"STOPPED",
-      #"Press Resume to Move",
+      "STOPPED",
+      "Press Resume to Go",
       "앞차량 멈춤",
-      "이동하려면 RES버튼을 누르세요",
+      "출발하려면 RES버튼을 누르세요",
       AlertStatus.userPrompt, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, .2),
   },
@@ -537,7 +544,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
 
   EventName.steerSaturated: {
     ET.WARNING: Alert(
-      #"TAKE CONTROL",
+      #"Take Control",
       #"Turn Exceeds Steering Limit",
       "핸들을 잡아주세요",
       "조향제어 제한을 초과함",
@@ -597,13 +604,13 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
 
   EventName.parkBrake: {
     ET.USER_DISABLE: EngagementAlert(AudibleAlert.disengage),
-    #ET.NO_ENTRY: NoEntryAlert("Park Brake Engaged"),
+    #ET.NO_ENTRY: NoEntryAlert("Parking Brake Engaged"),
     ET.NO_ENTRY: NoEntryAlert("주차 브레이크를 해제하세요"),
   },
 
   EventName.pedalPressed: {
     ET.USER_DISABLE: EngagementAlert(AudibleAlert.disengage),
-    #ET.NO_ENTRY: NoEntryAlert("Pedal Pressed During Attempt",
+    #ET.NO_ENTRY: NoEntryAlert("Pedal Pressed",
     ET.NO_ENTRY: NoEntryAlert("브레이크 감지됨",
                               visual_alert=VisualAlert.brakePressed),
   },
@@ -615,7 +622,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
 
   EventName.wrongCruiseMode: {
     ET.USER_DISABLE: EngagementAlert(AudibleAlert.disengage),
-    #ET.NO_ENTRY: NoEntryAlert("Enable Adaptive Cruise"),
+    #ET.NO_ENTRY: NoEntryAlert("Adaptive Cruise Disabled"),
     ET.NO_ENTRY: NoEntryAlert("어뎁티브크루즈를 활성화하세요"),
   },
 
@@ -680,8 +687,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   },
 
   EventName.wrongGear: {
-    #ET.SOFT_DISABLE: SoftDisableAlert("Gear not D"),
-    #ET.NO_ENTRY: NoEntryAlert("Gear not D"),
+    ET.SOFT_DISABLE: UserSoftDisableAlert("Gear not D"),
+    ET.NO_ENTRY: NoEntryAlert("Gear not D"),
     ET.USER_DISABLE: EngagementAlert(AudibleAlert.disengage),
     ET.NO_ENTRY: NoEntryAlert("기어를 [D]로 변경하세요"),
   },
@@ -709,19 +716,19 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   },
 
   EventName.doorOpen: {
-    #ET.SOFT_DISABLE: SoftDisableAlert("Door Open"),
+    #ET.SOFT_DISABLE: UserSoftDisableAlert("Door Open"),
     #ET.NO_ENTRY: NoEntryAlert("Door Open"),
     ET.PERMANENT: Alert(
       "도어 열림",
       "",
       AlertStatus.normal, AlertSize.full,
-      Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay = 0.5),
+      Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay=0.5),
     ET.USER_DISABLE: EngagementAlert(AudibleAlert.disengage),
     ET.NO_ENTRY: NoEntryAlert("도어 열림"),
   },
 
   EventName.seatbeltNotLatched: {
-    #ET.SOFT_DISABLE: SoftDisableAlert("Seatbelt Unlatched"),
+    #ET.SOFT_DISABLE: UserSoftDisableAlert("Seatbelt Unlatched"),
     #ET.NO_ENTRY: NoEntryAlert("Seatbelt Unlatched"),
     ET.PERMANENT: Alert(
       "안전벨트 미착용",
@@ -962,7 +969,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
       Priority.HIGH, VisualAlert.none, AudibleAlert.disengage, 3.),
   },
 
-  # When the car is driving faster than most cars in the training data the model outputs can be unpredictable
+  # When the car is driving faster than most cars in the training data, the model outputs can be unpredictable.
   EventName.speedTooHigh: {
     ET.WARNING: Alert(
       #"Speed Too High",
