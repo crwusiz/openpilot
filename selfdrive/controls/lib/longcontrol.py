@@ -24,7 +24,7 @@ def long_control_state_trans(CP, active, long_control_state, v_ego, v_target_fut
                         ((v_pid < stopping_target_speed and v_target_future < stopping_target_speed) or
                          brake_pressed))
 
-  starting_condition = v_target_future > CP.vEgoStarting #and not cruise_standstill
+  starting_condition = v_target_future > CP.vEgoStarting and not cruise_standstill
 
   # neokii
   if radarState is not None and radarState.leadOne is not None and radarState.leadOne.status:
@@ -127,7 +127,7 @@ class LongControl():
       # Keep applying brakes until the car is stopped
       if not CS.standstill or output_accel > CP.stopAccel:
         output_accel -= CP.stoppingDecelRate * DT_CTRL * \
-                        interp(output_accel, [CP.stopAccel, CP.stopAccel/2., 0], [0.8, 1.3, 3.])
+                        interp(output_accel, [CP.stopAccel, CP.stopAccel/2., 0], [0.3, 0.65, 1.2])
       output_accel = clip(output_accel, accel_limits[0], accel_limits[1])
 
       self.reset(CS.vEgo)
