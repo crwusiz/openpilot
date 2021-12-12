@@ -53,7 +53,7 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   record_timer = std::make_shared<QTimer>();
 	QObject::connect(record_timer.get(), &QTimer::timeout, [=]() {
     if(recorder) {
-      recorder->update_screen(hud);
+      recorder->update_screen();
     }
   });
 	record_timer->start(1000/UI_FREQ);
@@ -80,6 +80,8 @@ void OnroadWindow::updateState(const UIState &s) {
     }
     alerts->updateAlert(alert, bgColor);
   }
+
+  hud->updateState(s);
 
   if (bg != bgColor) {
     // repaint border
@@ -262,6 +264,8 @@ OnroadHud::OnroadHud(QWidget *parent) : QWidget(parent) {
 }
 
 void OnroadHud::updateState(const UIState &s) {
+  if(QUIState::ui_state.recording)
+    update();
 }
 
 void OnroadHud::paintEvent(QPaintEvent *event) {
