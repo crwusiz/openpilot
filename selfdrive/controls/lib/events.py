@@ -1,5 +1,5 @@
 from enum import IntEnum
-from typing import Dict, Union, Callable, Any
+from typing import Dict, Union, Callable
 
 from cereal import log, car
 import cereal.messaging as messaging
@@ -202,13 +202,31 @@ def get_display_speed(speed_ms: float, metric: bool) -> str:
 
 
 # ********** alert callback functions **********
-def below_engage_speed_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool) -> Alert:
+
+AlertCallbackType = Callable[[car.CarParams, messaging.SubMaster, bool, int], Alert]
+
+
+def soft_disable_alert(alert_text_2: str) -> AlertCallbackType:
+  def func(CP: car.CarParams, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+    #if soft_disable_time < int(0.5 / DT_CTRL):
+    #  return ImmediateDisableAlert(alert_text_2)
+    return SoftDisableAlert(alert_text_2)
+  return func
+
+
+def user_soft_disable_alert(alert_text_2: str) -> AlertCallbackType:
+  def func(CP: car.CarParams, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+    #if soft_disable_time < int(0.5 / DT_CTRL):
+    #  return ImmediateDisableAlert(alert_text_2)
+    return UserSoftDisableAlert(alert_text_2)
+  return func
+
+
+def below_engage_speed_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
   return NoEntryAlert(f"Speed Below {get_display_speed(CP.minEnableSpeed, metric)}")
 
 
-def below_steer_speed_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool) -> Alert:
-  speed = int(round(CP.minSteerSpeed * (CV.MS_TO_KPH if metric else CV.MS_TO_MPH)))
-  unit = "㎞/h" if metric else "mph"
+def below_steer_speed_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
   return Alert(
     #f"Steer Unavailable Below {get_display_speed(CP.minSteerSpeed, metric)}",
     #"",
@@ -218,9 +236,7 @@ def below_steer_speed_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: 
     Priority.MID, VisualAlert.steerRequired, AudibleAlert.prompt, 0.4)
 
 
-def calibration_incomplete_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool) -> Alert:
-  speed = int(MIN_SPEED_FILTER * (CV.MS_TO_KPH if metric else CV.MS_TO_MPH))
-  unit = "㎞/h" if metric else "mph"
+def calibration_incomplete_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
   return Alert(
     #"Calibration in Progress: %d%%" % sm['liveCalibration'].calPerc,
     #f"Drive Above {get_display_speed(MIN_SPEED_FILTER, metric)}",
@@ -230,7 +246,7 @@ def calibration_incomplete_alert(CP: car.CarParams, sm: messaging.SubMaster, met
     Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2)
 
 
-def no_gps_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool) -> Alert:
+def no_gps_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
   gps_integrated = sm['peripheralState'].pandaType in [log.PandaState.PandaType.uno, log.PandaState.PandaType.dos]
   return Alert(
     #"Poor GPS reception",
@@ -241,7 +257,7 @@ def no_gps_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool) -> Al
     Priority.LOWER, VisualAlert.none, AudibleAlert.none, .2, creation_delay=300.)
 
 
-def wrong_car_mode_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool) -> Alert:
+def wrong_car_mode_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
   #text = "Cruise Mode Disabled"
   text = "크루즈 비활성상태"
   if CP.carName == "honda":
@@ -250,14 +266,14 @@ def wrong_car_mode_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: boo
   return NoEntryAlert(text)
 
 
-def joystick_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool) -> Alert:
+def joystick_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
   axes = sm['testJoystick'].axes
   gb, steer = list(axes)[:2] if len(axes) else (0., 0.)
   vals = f"Gas: {round(gb * 100.)}%, Steer: {round(steer * 100.)}%"
   #return NormalPermanentAlert("Joystick Mode", vals)
   return NormalPermanentAlert("조이스틱 모드", vals)
 
-def auto_lane_change_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool) -> Alert:
+def auto_lane_change_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
   alc_timer = sm['lateralPlan'].autoLaneChangeTimer
   return Alert(
     "자동차선변경이 %d초 뒤에 시작됩니다" % alc_timer,
@@ -266,7 +282,8 @@ def auto_lane_change_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: b
     Priority.LOW, VisualAlert.none, AudibleAlert.dingRepeat, .75, alert_rate=0.75)
 
 
-EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, bool], Alert]]]] = {
+
+EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   # ********** events with no alerts **********
 
   EventName.stockFcw: {},
@@ -406,9 +423,9 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   # bad alignment or bad sensor data. If this happens consistently consider creating an issue on GitHub
   EventName.vehicleModelInvalid: {
     #ET.NO_ENTRY: NoEntryAlert("Vehicle Parameter Identification Failed"),
-    #ET.SOFT_DISABLE: SoftDisableAlert("Vehicle Parameter Identification Failed"),
+    #ET.SOFT_DISABLE: soft_disable_alert("Vehicle Parameter Identification Failed"),
     ET.NO_ENTRY: NoEntryAlert("차량 매개변수 식별 오류"),
-    ET.SOFT_DISABLE: SoftDisableAlert("차량 매개변수 식별 오류"),
+    ET.SOFT_DISABLE: soft_disable_alert("차량 매개변수 식별 오류"),
   },
 
   EventName.steerTempUnavailableSilent: {
@@ -627,9 +644,9 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   },
 
   EventName.steerTempUnavailable: {
-    #ET.SOFT_DISABLE: SoftDisableAlert("Steering Temporarily Unavailable"),
+    #ET.SOFT_DISABLE: soft_disable_alert("Steering Temporarily Unavailable"),
     #ET.NO_ENTRY: NoEntryAlert("Steering Temporarily Unavailable"),
-    #ET.SOFT_DISABLE: SoftDisableAlert("조향제어 일시적으로 사용불가"),
+    # ET.SOFT_DISABLE: soft_disable_alert("조향제어 일시적으로 사용불가"),
     ET.WARNING: Alert(
       "핸들을 잡아주세요",
       "조향제어 일시적으로 사용불가",
@@ -679,15 +696,15 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
 
   EventName.overheat: {
     #ET.PERMANENT: NormalPermanentAlert("System Overheated"),
-    #ET.SOFT_DISABLE: SoftDisableAlert("System Overheated"),
+    #ET.SOFT_DISABLE: soft_disable_alert("System Overheated"),
     #ET.NO_ENTRY: NoEntryAlert("System Overheated"),
     ET.PERMANENT: NormalPermanentAlert("장치 과열됨"),
-    ET.SOFT_DISABLE: SoftDisableAlert("장치 과열됨"),
+    ET.SOFT_DISABLE: soft_disable_alert("장치 과열됨"),
     ET.NO_ENTRY: NoEntryAlert("장치 과열됨"),
   },
 
   EventName.wrongGear: {
-    ET.SOFT_DISABLE: UserSoftDisableAlert("Gear not D"),
+    ET.SOFT_DISABLE: user_soft_disable_alert("Gear not D"),
     ET.NO_ENTRY: NoEntryAlert("Gear not D"),
     ET.USER_DISABLE: EngagementAlert(AudibleAlert.disengage),
     ET.NO_ENTRY: NoEntryAlert("기어를 [D]로 변경하세요"),
@@ -700,23 +717,23 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   # See https://comma.ai/setup for more information
   EventName.calibrationInvalid: {
     #ET.PERMANENT: NormalPermanentAlert("Calibration Invalid", "Remount Device and Recalibrate"),
-    #ET.SOFT_DISABLE: SoftDisableAlert("Calibration Invalid: Remount Device & Recalibrate"),
+    #ET.SOFT_DISABLE: soft_disable_alert("Calibration Invalid: Remount Device & Recalibrate"),
     #ET.NO_ENTRY: NoEntryAlert("Calibration Invalid: Remount Device & Recalibrate"),
     ET.PERMANENT: NormalPermanentAlert("캘리브레이션 오류", "장치 위치변경후 캘리브레이션을 다시하세요"),
-    ET.SOFT_DISABLE: SoftDisableAlert("캘리브레이션 오류 : 장치 위치변경후 캘리브레이션을 다시하세요"),
+    ET.SOFT_DISABLE: soft_disable_alert("캘리브레이션 오류 : 장치 위치변경후 캘리브레이션을 다시하세요"),
     ET.NO_ENTRY: NoEntryAlert("캘리브레이션 오류 : 장치 위치변경후 캘리브레이션을 다시하세요"),
   },
 
   EventName.calibrationIncomplete: {
     ET.PERMANENT: calibration_incomplete_alert,
-    #ET.SOFT_DISABLE: SoftDisableAlert("Calibration in Progress"),
+    #ET.SOFT_DISABLE: soft_disable_alert("Calibration in Progress"),
     #ET.NO_ENTRY: NoEntryAlert("Calibration in Progress"),
-    ET.SOFT_DISABLE: SoftDisableAlert("캘리브레이션 진행중입니다"),
+    ET.SOFT_DISABLE: soft_disable_alert("캘리브레이션 진행중입니다"),
     ET.NO_ENTRY: NoEntryAlert("캘리브레이션 진행중입니다"),
   },
 
   EventName.doorOpen: {
-    #ET.SOFT_DISABLE: UserSoftDisableAlert("Door Open"),
+    #ET.SOFT_DISABLE: user_soft_disable_alert("Door Open"),
     #ET.NO_ENTRY: NoEntryAlert("Door Open"),
     ET.PERMANENT: Alert(
       "도어 열림",
@@ -728,28 +745,28 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   },
 
   EventName.seatbeltNotLatched: {
-    #ET.SOFT_DISABLE: UserSoftDisableAlert("Seatbelt Unlatched"),
+    #ET.SOFT_DISABLE: user_soft_disable_alert("Seatbelt Unlatched"),
     #ET.NO_ENTRY: NoEntryAlert("Seatbelt Unlatched"),
     ET.PERMANENT: Alert(
       "안전벨트 미착용",
       "",
       AlertStatus.normal, AlertSize.full,
       Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay=0.5),
-    ET.SOFT_DISABLE: SoftDisableAlert("안전벨트를 착용해주세요"),
+    ET.SOFT_DISABLE: user_soft_disable_alert("안전벨트를 착용해주세요"),
     ET.NO_ENTRY: NoEntryAlert("안전벨트를 착용해주세요"),
   },
 
   EventName.espDisabled: {
-    #ET.SOFT_DISABLE: SoftDisableAlert("ESP Off"),
+    #ET.SOFT_DISABLE: soft_disable_alert("ESP Off"),
     #ET.NO_ENTRY: NoEntryAlert("ESP Off"),
-    ET.SOFT_DISABLE: SoftDisableAlert("ESP 꺼짐"),
+    ET.SOFT_DISABLE: soft_disable_alert("ESP 꺼짐"),
     ET.NO_ENTRY: NoEntryAlert("ESP 꺼짐"),
   },
 
   EventName.lowBattery: {
-    #ET.SOFT_DISABLE: SoftDisableAlert("Low Battery"),
+    #ET.SOFT_DISABLE: soft_disable_alert("Low Battery"),
     #ET.NO_ENTRY: NoEntryAlert("Low Battery"),
-    ET.SOFT_DISABLE: SoftDisableAlert("배터리 부족"),
+    ET.SOFT_DISABLE: soft_disable_alert("배터리 부족"),
     ET.NO_ENTRY: NoEntryAlert("배터리 부족"),
   },
 
@@ -758,9 +775,9 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   # is thrown. This can mean a service crashed, did not broadcast a message for
   # ten times the regular interval, or the average interval is more than 10% too high.
   EventName.commIssue: {
-    #ET.SOFT_DISABLE: SoftDisableAlert("Communication Issue between Processes"),
+    #ET.SOFT_DISABLE: soft_disable_alert("Communication Issue between Processes"),
     #ET.NO_ENTRY: NoEntryAlert("Communication Issue between Processes"),
-    ET.SOFT_DISABLE: SoftDisableAlert("장치 프로세스 동작오류"),
+    ET.SOFT_DISABLE: soft_disable_alert("장치 프로세스 동작오류"),
     ET.NO_ENTRY: NoEntryAlert("장치 프로세스 동작오류"),
   },
 
@@ -771,9 +788,9 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   },
 
   EventName.radarFault: {
-    #ET.SOFT_DISABLE: SoftDisableAlert("Radar Error: Restart the Car"),
+    #ET.SOFT_DISABLE: soft_disable_alert("Radar Error: Restart the Car"),
     #ET.NO_ENTRY: NoEntryAlert("Radar Error: Restart the Car"),
-    ET.SOFT_DISABLE: SoftDisableAlert("레이더 오류 : 차량을 재가동하세요"),
+    ET.SOFT_DISABLE: soft_disable_alert("레이더 오류 : 차량을 재가동하세요"),
     ET.NO_ENTRY: NoEntryAlert("레이더 오류 : 차량을 재가동하세요"),
   },
 
@@ -781,9 +798,9 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   # is not processing frames fast enough they have to be dropped. This alert is
   # thrown when over 20% of frames are dropped.
   EventName.modeldLagging: {
-    #ET.SOFT_DISABLE: SoftDisableAlert("Driving model lagging"),
+    #ET.SOFT_DISABLE: soft_disable_alert("Driving model lagging"),
     #ET.NO_ENTRY: NoEntryAlert("Driving model lagging"),
-    ET.SOFT_DISABLE: SoftDisableAlert("주행모델 지연됨"),
+    ET.SOFT_DISABLE: soft_disable_alert("주행모델 지연됨"),
     ET.NO_ENTRY: NoEntryAlert("주행모델 지연됨"),
   },
 
@@ -793,32 +810,30 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   # usually means the model has trouble understanding the scene. This is used
   # as a heuristic to warn the driver.
   EventName.posenetInvalid: {
-    #ET.SOFT_DISABLE: SoftDisableAlert("Model Output Uncertain"),
-    #ET.NO_ENTRY: NoEntryAlert("Model Output Uncertain"),
-    ET.SOFT_DISABLE: SoftDisableAlert("차선인식상태가 좋지않으니 주의운전하세요"),
-    ET.NO_ENTRY: NoEntryAlert("차선인식상태가 좋지않으니 주의운전하세요"),
+    ET.SOFT_DISABLE: soft_disable_alert("Model Output Uncertain"),
+    ET.NO_ENTRY: NoEntryAlert("Model Output Uncertain"),
   },
 
   # When the localizer detects an acceleration of more than 40 m/s^2 (~4G) we
   # alert the driver the device might have fallen from the windshield.
   EventName.deviceFalling: {
-    #ET.SOFT_DISABLE: SoftDisableAlert("Device Fell Off Mount"),
+    #ET.SOFT_DISABLE: soft_disable_alert("Device Fell Off Mount"),
     #ET.NO_ENTRY: NoEntryAlert("Device Fell Off Mount"),
-    ET.SOFT_DISABLE: SoftDisableAlert("장치가 마운트에서 떨어짐"),
+    ET.SOFT_DISABLE: soft_disable_alert("장치가 마운트에서 떨어짐"),
     ET.NO_ENTRY: NoEntryAlert("장치가 마운트에서 떨어짐"),
   },
 
   EventName.lowMemory: {
-    #ET.SOFT_DISABLE: SoftDisableAlert("Low Memory: Reboot Your Device"),
+    #ET.SOFT_DISABLE: soft_disable_alert("Low Memory: Reboot Your Device"),
     #ET.PERMANENT: NormalPermanentAlert("Low Memory", "Reboot your Device"),
     #ET.NO_ENTRY: NoEntryAlert("Low Memory: Reboot Your Device"),
-    ET.SOFT_DISABLE: SoftDisableAlert("메모리 부족 : 장치를 재가동하세요"),
+    ET.SOFT_DISABLE: soft_disable_alert("메모리 부족 : 장치를 재가동하세요"),
     ET.PERMANENT: NormalPermanentAlert("메모리 부족", "장치를 재가동하세요"),
     ET.NO_ENTRY: NoEntryAlert("메모리 부족 : 장치를 재가동하세요"),
   },
 
   EventName.highCpuUsage: {
-    #ET.SOFT_DISABLE: SoftDisableAlert("System Malfunction: Reboot Your Device"),
+    #ET.SOFT_DISABLE: soft_disable_alert("System Malfunction: Reboot Your Device"),
     #ET.PERMANENT: NormalPermanentAlert("System Malfunction", "Reboot your Device"),
     #ET.NO_ENTRY: NoEntryAlert("System Malfunction: Reboot Your Device"),
     ET.NO_ENTRY: NoEntryAlert("시스템 오작동: 장치를 재부팅 하세요"),
@@ -862,10 +877,10 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
   # Sometimes the USB stack on the device can get into a bad state
   # causing the connection to the panda to be lost
   EventName.usbError: {
-    #ET.SOFT_DISABLE: SoftDisableAlert("USB Error: Reboot Your Device"),
+    #ET.SOFT_DISABLE: soft_disable_alert("USB Error: Reboot Your Device"),
     #ET.PERMANENT: NormalPermanentAlert("USB Error: Reboot Your Device", ""),
     #ET.NO_ENTRY: NoEntryAlert("USB Error: Reboot Your Device"),
-    ET.SOFT_DISABLE: SoftDisableAlert("USB 오류: 장치를 재부팅하세요"),
+    ET.SOFT_DISABLE: soft_disable_alert("USB 오류: 장치를 재부팅하세요"),
     ET.PERMANENT: NormalPermanentAlert("USB 오류: 장치를 재부팅하세요", ""),
     ET.NO_ENTRY: NoEntryAlert("USB 오류: 장치를 재부팅하세요"),
   },
