@@ -274,9 +274,9 @@ void DevicePanel::updateCalibDescription() {
         //desc += QString(" Your device is pointed %1° %2 and %3° %4.")
         //           .arg(QString::number(std::abs(pitch), 'g', 1), pitch > 0 ? "up" : "down",
         //                QString::number(std::abs(yaw), 'g', 1), yaw > 0 ? "right" : "left");
-        desc += QString("\n현재 캘리브레이션된 위치는 [ %2 %1° / %4 %3° ] 입니다.")
-                   .arg(QString::number(std::abs(pitch), 'g', 1), pitch > 0 ? "↑" : "↓",
-                        QString::number(std::abs(yaw), 'g', 1), yaw > 0 ? "→" : "←");
+        desc += QString("\n현재 캘리브레이션된 위치는 [ %1° %2 / %3° %4 ] 입니다.")
+                   .arg(QString::number(std::abs(pitch), 'g', 1), pitch > 0 ? "↓" : "↑",
+                        QString::number(std::abs(yaw), 'g', 1), yaw > 0 ? "←" : "→");
       }
     } catch (kj::Exception) {
       //qInfo() << "invalid CalibrationParams";
