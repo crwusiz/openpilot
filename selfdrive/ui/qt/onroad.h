@@ -63,9 +63,10 @@ protected:
   QPixmap ic_nda;
   QPixmap ic_hda;
   QPixmap ic_tire_pressure;
-  QPixmap ic_turn_signal_l;
-  QPixmap ic_turn_signal_r;
-  QPixmap ic_satellite;
+  QPixmap ic_bsd_l;
+  QPixmap ic_bsd_r;
+  QPixmap ic_gps;
+  QPixmap ic_wifi;
 
   void drawMaxSpeed(QPainter &p);
   void drawSpeed(QPainter &p);

@@ -54,7 +54,6 @@ def manager_init():
     ("LoggerDisable", "0"),
     ("SccSmootherSlowOnCurves", "1"),
     ("SccSmootherSyncGasPressed", "1"),
-    ("WarningOverSpeedLimit", "1"),
     ("StockNaviDecelEnabled", "0"),
     ("NewRadarInterface", "0"),
   ]

@@ -83,12 +83,14 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
      "60㎞/h 이상의 속도로 주행시 방향지시등을 작동하면 잠시후 자동차선변경을 수행합니다. 안전한 사용을위해 후측방감지기능이 있는 차량만 사용하시기바랍니다.",
      "../assets/offroad/icon_lca.png",
     },
+/*
     {
       "RecordFront",
       "Record and Upload Driver Camera",
       "Upload data from the driver facing camera and help improve the driver monitoring algorithm.",
       "../assets/offroad/icon_monitoring.png",
     },
+*/
     {
       "EndToEndToggle",
       "\U0001f96c Disable use of lanelines (Alpha) \U0001f96c",
@@ -418,8 +420,8 @@ C2NetworkPanel::C2NetworkPanel(QWidget *parent) : QWidget(parent) {
   //auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "RUN");
   auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "실행");
   QObject::connect(gitpullbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", w)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", w)){
+    //if (ConfirmationDialog::confirm("Process?", this)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
       std::system(gitpull);
       QTimer::singleShot(1000, []() { Hardware::reboot(); });
     }
@@ -430,8 +432,8 @@ C2NetworkPanel::C2NetworkPanel(QWidget *parent) : QWidget(parent) {
   //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");
   auto realdataclearbtn = new ButtonControl("주행로그 삭제", "실행");
   QObject::connect(realdataclearbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", w)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", w)) {
+    //if (ConfirmationDialog::confirm("Process?", this)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
       std::system(realdata_clear);
     }
   });
@@ -441,8 +443,8 @@ C2NetworkPanel::C2NetworkPanel(QWidget *parent) : QWidget(parent) {
   //auto pandaflashbtn = new ButtonControl("Panda Firmware Flash", "RUN");
   auto pandaflashbtn = new ButtonControl("판다 펌웨어 플래싱", "실행");
   QObject::connect(pandaflashbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", w)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", w)){
+    //if (ConfirmationDialog::confirm("Process?", this)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
       std::system(panda_flash);
       QTimer::singleShot(1000, []() { Hardware::reboot(); });
     }
@@ -453,8 +455,8 @@ C2NetworkPanel::C2NetworkPanel(QWidget *parent) : QWidget(parent) {
   //auto pandarecoverbtn = new ButtonControl("Panda Firmware Recover", "RUN");
   auto pandarecoverbtn = new ButtonControl("판다 펌웨어 복구", "실행");
   QObject::connect(pandarecoverbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", w)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", w)){
+    //if (ConfirmationDialog::confirm("Process?", this)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
       std::system(panda_recover);
       QTimer::singleShot(1000, []() { Hardware::reboot(); });
     }
@@ -721,9 +723,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   //"Sync set speed on gas pressed Enable",
                                   "가속페달 사용으로 올라간 속도를 SET 속도와 일치시킵니다.",
                                   "../assets/offroad/icon_road.png", this));
-  toggles.append(new ParamControl("WarningOverSpeedLimit", "Warning when speed limit is exceeded.",
-                                  "",
-                                  "../assets/offroad/icon_road.png", this));
   toggles.append(new ParamControl("StockNaviDecelEnabled", "Stock Navi based deceleration Enable",
                                   //"Use the stock navi based deceleration for longcontrol",
                                   "Longcontrol 사용시 순정내비게이션의 속도감속정보를 사용합니다.",
@@ -732,30 +731,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   //"New radar interface Enable",
                                   "scc 레이더 배선개조없이 사용가능한 일부차종을 위한 옵션입니다",
                                   "../assets/offroad/icon_road.png", this));
-  /*
-  toggles.append(new ParamControl("KeepSteeringTurnSignals", "Keep steering while turn signals.",
-                                  "",
-                                  "../assets/offroad/icon_road.png", this));
-  toggles.append(new ParamControl("DisableOpFcw", "Openpilot FCW Disable",
-                                  "",
-                                  "../assets/offroad/icon_road.png", this));
-  toggles.append(new ParamControl("ShowDebugUI", "Show Debug UI Enable",
-                                  "",
-                                  "../assets/offroad/icon_shell.png", this));
-  toggles.append(new ParamControl("DisableGps", "GPS Disable",
-                                  //"If you're using a panda without GPS, activate the option",
-                                  "Panda에 Gps가 장착되어있지않은 기기일경우 옵션을 활성화하세요.",
-                                  "../assets/offroad/icon_addon.png", this));
-  toggles.append(new ParamControl("UseClusterSpeed", "Use Cluster Speed",
-                                  "Use cluster speed instead of wheel speed.",
-                                  "../assets/offroad/icon_road.png", this));
-  toggles.append(new ParamControl("LongControlEnabled", "Enable HKG Long Control",
-                                  "warnings: it is beta, be careful!! Openpilot will control the speed of your car",
-                                  "../assets/offroad/icon_road.png", this));
-  toggles.append(new ParamControl("MadModeEnabled", "Enable HKG MAD mode",
-                                  "Openpilot will engage when turn cruise control on",
-                                  "../assets/offroad/icon_openpilot.png", this));
-  */
   for(ParamControl *toggle : toggles) {
     if(main_layout->count() != 0) {
     }

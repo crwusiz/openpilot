@@ -408,6 +408,7 @@ struct CarControl {
       promptDistracted @8;
 
       slowingDownSpeed @9;
+      ready @10;
     }
   }
 
