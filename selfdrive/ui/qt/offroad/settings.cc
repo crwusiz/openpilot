@@ -120,7 +120,7 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
     bool locked = params.getBool((param + "Lock").toStdString());
     toggle->setEnabled(!locked);
     //if (!locked) {
-    //  connect(parent, &SettingsWindow::offroadTransition, toggle, &ParamControl::setEnabled);
+    //  connect(uiState(), &UIState::offroadTransition, toggle, &ParamControl::setEnabled);
     //}
     addItem(toggle);
   }
@@ -174,11 +174,11 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   }
   */
 
-  QObject::connect(parent, &SettingsWindow::offroadTransition, [=](bool offroad) {
-    //for (auto btn : findChildren<ButtonControl *>()) {
-    //  btn->setEnabled(offroad);
-    //}
-  });
+  /*QObject::connect(uiState(), &UIState::offroadTransition, [=](bool offroad) {
+    for (auto btn : findChildren<ButtonControl *>()) {
+      btn->setEnabled(offroad);
+    }
+  });*/
 
   QHBoxLayout *reset_layout = new QHBoxLayout();
   reset_layout->setSpacing(30);
@@ -287,11 +287,10 @@ void DevicePanel::updateCalibDescription() {
 }
 
 void DevicePanel::reboot() {
-  if (QUIState::ui_state.status == UIStatus::STATUS_DISENGAGED) {
-    //if (ConfirmationDialog::confirm("Are you sure you want to reboot?", this)) {
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+  if (uiState()->status == UIStatus::STATUS_DISENGAGED) {
+    if (ConfirmationDialog::confirm("Are you sure you want to reboot?", this)) {
       // Check engaged again in case it changed while the dialog was open
-      if (QUIState::ui_state.status == UIStatus::STATUS_DISENGAGED) {
+      if (uiState()->status == UIStatus::STATUS_DISENGAGED) {
         Params().putBool("DoReboot", true);
       }
     }
@@ -302,11 +301,10 @@ void DevicePanel::reboot() {
 }
 
 void DevicePanel::poweroff() {
-  if (QUIState::ui_state.status == UIStatus::STATUS_DISENGAGED) {
-    //if (ConfirmationDialog::confirm("Are you sure you want to power off?", this)) {
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+  if (uiState()->status == UIStatus::STATUS_DISENGAGED) {
+    if (ConfirmationDialog::confirm("Are you sure you want to power off?", this)) {
       // Check engaged again in case it changed while the dialog was open
-      if (QUIState::ui_state.status == UIStatus::STATUS_DISENGAGED) {
+      if (uiState()->status == UIStatus::STATUS_DISENGAGED) {
         Params().putBool("DoShutdown", true);
       }
     }
@@ -341,7 +339,7 @@ SoftwarePanel::SoftwarePanel(QWidget* parent) : ListWidget(parent) {
       params.putBool("DoUninstall", true);
     }
   });
-  connect(parent, SIGNAL(offroadTransition(bool)), uninstallBtn, SLOT(setEnabled(bool)));
+  connect(uiState(), &UIState::offroadTransition, uninstallBtn, &QPushButton::setEnabled);
 
   //QWidget *widgets[] = {versionLbl, gitRemoteLbl, gitBranchLbl, gitCommitLbl, lastUpdateLbl, updateBtn, osVersionLbl, uninstallBtn};
   QWidget *widgets[] = {versionLbl, gitRemoteLbl, gitBranchLbl, gitCommitLbl, osVersionLbl, uninstallBtn};
@@ -382,16 +380,15 @@ void SoftwarePanel::updateLabels() {
   osVersionLbl->setText(QString::fromStdString(Hardware::get_os_version()).trimmed());
 }
 
-QWidget * network_panel(QWidget * parent) {
-#ifdef QCOM
-  QWidget *w = new QWidget(parent);
-  QVBoxLayout *layout = new QVBoxLayout(w);
+C2NetworkPanel::C2NetworkPanel(QWidget *parent) : QWidget(parent) {
+  QVBoxLayout *layout = new QVBoxLayout(this);
   layout->setContentsMargins(50, 0, 50, 0);
 
   ListWidget *list = new ListWidget();
   list->setSpacing(30);
-  //auto wifiBtn = new ButtonControl("WiFi Settings", "OPEN");
-  auto wifiBtn = new ButtonControl("\U0001f4f6 WiFi 설정", "열기");
+  // wifi + tethering buttons
+#ifdef QCOM
+  auto wifiBtn = new ButtonControl("Wi-Fi Settings", "OPEN");
   QObject::connect(wifiBtn, &ButtonControl::clicked, [=]() { HardwareEon::launch_wifi(); });
   list->addItem(wifiBtn);
 
@@ -404,6 +401,9 @@ QWidget * network_panel(QWidget * parent) {
   auto androidBtn = new ButtonControl("\U00002699 안드로이드 설정", "열기");
   QObject::connect(androidBtn, &ButtonControl::clicked, [=]() { HardwareEon::launch_setting(); });
   list->addItem(androidBtn);
+#endif
+  ipaddress = new LabelControl("IP Address", "");
+  list->addItem(ipaddress);
 
   // SSH key management
   list->addItem(new SshToggle());
@@ -463,10 +463,33 @@ QWidget * network_panel(QWidget * parent) {
 
   layout->addWidget(list);
   layout->addStretch(1);
+}
+
+void C2NetworkPanel::showEvent(QShowEvent *event) {
+  ipaddress->setText(getIPAddress());
+}
+
+QString C2NetworkPanel::getIPAddress() {
+  std::string result = util::check_output("ifconfig wlan0");
+  if (result.empty()) return "";
+
+  const std::string inetaddrr = "inet addr:";
+  std::string::size_type begin = result.find(inetaddrr);
+  if (begin == std::string::npos) return "";
+
+  begin += inetaddrr.length();
+  std::string::size_type end = result.find(' ', begin);
+  if (end == std::string::npos) return "";
+
+  return result.substr(begin, end - begin).c_str();
+}
+
+QWidget *network_panel(QWidget *parent) {
+#ifdef QCOM
+  return new C2NetworkPanel(parent);
 #else
-  Networking *w = new Networking(parent);
+  return new Networking(parent);
 #endif
-  return w;
 }
 
 static QStringList get_list(const char* path)

@@ -8,21 +8,17 @@ from selfdrive.ntune import ntune_scc_get
 
 LongCtrlState = car.CarControl.Actuators.LongControlState
 
-STOPPING_TARGET_SPEED_OFFSET = 0.01
-
 # As per ISO 15622:2018 for all speeds
 ACCEL_MIN_ISO = -3.5  # m/s^2
 ACCEL_MAX_ISO = 2.0  # m/s^2
 
 
-def long_control_state_trans(CP, active, long_control_state, v_ego, v_target_future, v_pid,
-                             output_accel, brake_pressed, cruise_standstill, min_speed_can, radarState):
+def long_control_state_trans(CP, active, long_control_state, v_ego, v_target_future,
+                             output_accel, brake_pressed, cruise_standstill, radarState):
   """Update longitudinal control state machine"""
-  stopping_target_speed = min_speed_can + STOPPING_TARGET_SPEED_OFFSET
   stopping_condition = (v_ego < 2.0 and cruise_standstill) or \
                        (v_ego < CP.vEgoStopping and
-                        ((v_pid < stopping_target_speed and v_target_future < stopping_target_speed) or
-                         brake_pressed))
+                        (v_target_future < CP.vEgoStopping or brake_pressed))
 
   starting_condition = v_target_future > CP.vEgoStarting and not cruise_standstill
 
@@ -100,8 +96,8 @@ class LongControl():
     # Update state machine
     output_accel = self.last_output_accel
     self.long_control_state = long_control_state_trans(CP, active, self.long_control_state, CS.vEgo,
-                                                       v_target_future, self.v_pid, output_accel,
-                                                       CS.brakePressed, CS.cruiseState.standstill, CP.minSpeedCan, radarState)
+                                                       v_target_future, output_accel,
+                                                       CS.brakePressed, CS.cruiseState.standstill, radarState)
 
     if self.long_control_state == LongCtrlState.off or CS.gasPressed:
       self.reset(CS.vEgo)

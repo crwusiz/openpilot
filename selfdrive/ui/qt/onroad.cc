@@ -44,8 +44,8 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   alerts->raise();
 
   setAttribute(Qt::WA_OpaquePaintEvent);
-  QObject::connect(this, &OnroadWindow::updateStateSignal, this, &OnroadWindow::updateState);
-  QObject::connect(this, &OnroadWindow::offroadTransitionSignal, this, &OnroadWindow::offroadTransition);
+  QObject::connect(uiState(), &UIState::uiUpdate, this, &OnroadWindow::updateState);
+  QObject::connect(uiState(), &UIState::offroadTransition, this, &OnroadWindow::offroadTransition);
 
 #ifdef QCOM2
   // screen recoder - neokii
@@ -56,7 +56,7 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
       recorder->update_screen();
     }
   });
-	record_timer->start(1000/15);
+	record_timer->start(1000/UI_FREQ);
 
   QWidget* recorder_widget = new QWidget(this);
   QVBoxLayout * recorder_layout = new QVBoxLayout (recorder_widget);
@@ -157,10 +157,10 @@ void OnroadWindow::mousePressEvent(QMouseEvent* e) {
 void OnroadWindow::offroadTransition(bool offroad) {
 #ifdef ENABLE_MAPS
   if (!offroad) {
-    if (map == nullptr && (QUIState::ui_state.has_prime || !MAPBOX_TOKEN.isEmpty())) {
+    if (map == nullptr && (uiState()->has_prime || !MAPBOX_TOKEN.isEmpty())) {
       MapWindow * m = new MapWindow(get_mapbox_settings());
       m->setFixedWidth(topWidget(this)->width() / 2);
-      QObject::connect(this, &OnroadWindow::offroadTransitionSignal, m, &MapWindow::offroadTransition);
+      QObject::connect(uiState(), &UIState::offroadTransition, m, &MapWindow::offroadTransition);
       split->addWidget(m, 0, Qt::AlignRight);
       map = m;
     }
@@ -264,12 +264,14 @@ OnroadHud::OnroadHud(QWidget *parent) : QWidget(parent) {
 }
 
 void OnroadHud::updateState(const UIState &s) {
+  if(uiState()->recording)
+    update();
 }
 
 void OnroadHud::paintEvent(QPaintEvent *event) {
-  if(QUIState::ui_state.recording) {
+  if(uiState()->recording) {
     QPainter p(this);
-    drawCommunity(p, QUIState::ui_state);
+    drawCommunity(p);
   }
 }
 
@@ -316,7 +318,7 @@ void NvgWindow::initializeGL() {
 void NvgWindow::updateFrameMat(int w, int h) {
   CameraViewWidget::updateFrameMat(w, h);
 
-  UIState *s = &QUIState::ui_state;
+  UIState *s = uiState();
   s->fb_w = w;
   s->fb_h = h;
   auto intrinsic_matrix = s->wide_camera ? ecam_intrinsic_matrix : fcam_intrinsic_matrix;
@@ -389,14 +391,11 @@ void OnroadHud::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV
 
 void NvgWindow::paintGL() {
   CameraViewWidget::paintGL();
-  UIState *s = &QUIState::ui_state;
+  UIState *s = uiState();
   if (s->scene.world_objects_visible) {
     if(!s->recording) {
       QPainter p(this);
-      hud->drawCommunity(p, QUIState::ui_state);
-    }
-    else {
-      hud->update();
+      hud->drawCommunity(p);
     }
   }
 
@@ -412,11 +411,11 @@ void NvgWindow::paintGL() {
 void NvgWindow::showEvent(QShowEvent *event) {
   CameraViewWidget::showEvent(event);
 
-  ui_update_params(&QUIState::ui_state);
+  ui_update_params(uiState());
   prev_draw_t = millis_since_boot();
 }
 
-void OnroadHud::drawCommunity(QPainter &p, UIState& s) {
+void OnroadHud::drawCommunity(QPainter &p) {
 
   p.setRenderHint(QPainter::Antialiasing);
   p.setPen(Qt::NoPen);
@@ -428,33 +427,35 @@ void OnroadHud::drawCommunity(QPainter &p, UIState& s) {
   bg.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0));
   p.fillRect(0, 0, width(), header_h, bg);
 
-  const SubMaster &sm = *(s.sm);
+  UIState *s = uiState();
 
-  drawLaneLines(p, s.scene);
+  const SubMaster &sm = *(s->sm);
+
+  drawLaneLines(p, s->scene);
 
   auto leads = sm["modelV2"].getModelV2().getLeadsV3();
   if (leads[0].getProb() > .5) {
-    drawLead(p, leads[0], s.scene.lead_vertices[0], s.scene.lead_radar[0]);
+    drawLead(p, leads[0], s->scene.lead_vertices[0], s->scene.lead_radar[0]);
   }
   if (leads[1].getProb() > .5 && (std::abs(leads[1].getX()[0] - leads[0].getX()[0]) > 3.0)) {
-    drawLead(p, leads[1], s.scene.lead_vertices[1], s.scene.lead_radar[1]);
+    drawLead(p, leads[1], s->scene.lead_vertices[1], s->scene.lead_radar[1]);
   }
 
-  drawMaxSpeed(p, s);
-  drawSpeed(p, s);
-  drawSpeedLimit(p, s);
-  drawTurnSignals(p, s);
-  drawGpsStatus(p, s);
+  drawMaxSpeed(p);
+  drawSpeed(p);
+  drawSpeedLimit(p);
+  drawTurnSignals(p);
+  drawGpsStatus(p);
 
-  if(s.show_debug && width() > 1200)
-    drawDebugText(p, s);
+  if(s->show_debug && width() > 1200)
+    drawDebugText(p);
 
   const auto controls_state = sm["controlsState"].getControlsState();
   const auto car_params = sm["carParams"].getCarParams();
   const auto live_params = sm["liveParameters"].getLiveParameters();
 
   const auto scc_smoother = sm["carControl"].getCarControl().getSccSmoother();
-  bool is_metric = s.scene.is_metric;
+  bool is_metric = s->scene.is_metric;
   bool long_control = scc_smoother.getLongControl();
 
   // kph
@@ -483,16 +484,17 @@ void OnroadHud::drawCommunity(QPainter &p, UIState& s) {
 
   // info
   configFont(p, "Open Sans", 34, "Regular");
-  p.setPen(QColor(0xff, 0xff, 0xff, 220));
+  p.setPen(QColor(0xff, 0xff, 0xff, 0xff));
   p.drawText(rect().left() + 20, rect().height() - 15, infoText);
 
-  drawBottomIcons(p, s);
+  drawBottomIcons(p);
 }
 
-void OnroadHud::drawMaxSpeed(QPainter &p, UIState& s) {
-  const SubMaster &sm = *(s.sm);
+void OnroadHud::drawMaxSpeed(QPainter &p) {
+  UIState *s = uiState();
+  const SubMaster &sm = *(s->sm);
   const auto scc_smoother = sm["carControl"].getCarControl().getSccSmoother();
-  bool is_metric = s.scene.is_metric;
+  bool is_metric = s->scene.is_metric;
   bool long_control = scc_smoother.getLongControl();
 
   // kph
@@ -538,16 +540,17 @@ void OnroadHud::drawMaxSpeed(QPainter &p, UIState& s) {
   }
 }
 
-void OnroadHud::drawSpeed(QPainter &p, UIState& s) {
-  const SubMaster &sm = *(s.sm);
-  float cur_speed = std::max(0.0, sm["carState"].getCarState().getCluSpeedMs() * (s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH));
+void OnroadHud::drawSpeed(QPainter &p) {
+  UIState *s = uiState();
+  const SubMaster &sm = *(s->sm);
+  float cur_speed = std::max(0.0, sm["carState"].getCarState().getCluSpeedMs() * (s->scene.is_metric ? MS_TO_KPH : MS_TO_MPH));
 
   QString speed;
   speed.sprintf("%.0f", cur_speed);
   configFont(p, "Open Sans", 176, "Bold");
   drawText(p, rect().center().x(), 230, speed);
   configFont(p, "Open Sans", 66, "Regular");
-  drawText(p, rect().center().x(), 310, s.scene.is_metric ? "km/h" : "mph", 200);
+  drawText(p, rect().center().x(), 310, s->scene.is_metric ? "km/h" : "mph", 200);
 }
 
 static const QColor get_tpms_color(float tpms) {
@@ -574,8 +577,8 @@ void OnroadHud::drawText2(QPainter &p, int x, int y, int flags, const QString &t
   p.drawText(QRect(x, y, rect.width(), rect.height()), flags, text);
 }
 
-void OnroadHud::drawBottomIcons(QPainter &p, UIState& s) {
-  const SubMaster &sm = *(s.sm);
+void OnroadHud::drawBottomIcons(QPainter &p) {
+  const SubMaster &sm = *(uiState()->sm);
   auto car_state = sm["carState"].getCarState();
   auto scc_smoother = sm["carControl"].getCarControl().getSccSmoother();
 
@@ -666,8 +669,8 @@ void OnroadHud::drawBottomIcons(QPainter &p, UIState& s) {
   p.setOpacity(1.);
 }
 
-void OnroadHud::drawSpeedLimit(QPainter &p, UIState& s) {
-  const SubMaster &sm = *(s.sm);
+void OnroadHud::drawSpeedLimit(QPainter &p) {
+  const SubMaster &sm = *(uiState()->sm);
   auto car_state = sm["carState"].getCarState();
   auto scc_smoother = sm["carControl"].getCarControl().getSccSmoother();
 
@@ -752,7 +755,7 @@ void OnroadHud::drawSpeedLimit(QPainter &p, UIState& s) {
   }
 }
 
-void OnroadHud::drawTurnSignals(QPainter &p, UIState& s) {
+void OnroadHud::drawTurnSignals(QPainter &p) {
   static int blink_index = 0;
   static int blink_wait = 0;
   static double prev_ts = 0.0;
@@ -762,7 +765,7 @@ void OnroadHud::drawTurnSignals(QPainter &p, UIState& s) {
     blink_index = 0;
   }
   else {
-    const SubMaster &sm = *(s.sm);
+    const SubMaster &sm = *(uiState()->sm);
     auto car_state = sm["carState"].getCarState();
     bool left_on = car_state.getLeftBlinker();
     bool right_on = car_state.getRightBlinker();
@@ -830,8 +833,8 @@ void OnroadHud::drawTurnSignals(QPainter &p, UIState& s) {
   p.setOpacity(1.);
 }
 
-void OnroadHud::drawGpsStatus(QPainter &p, UIState& s) {
-  const SubMaster &sm = *(s.sm);
+void OnroadHud::drawGpsStatus(QPainter &p) {
+  const SubMaster &sm = *(uiState()->sm);
   auto gps = sm["gpsLocationExternal"].getGpsLocationExternal();
   float accuracy = gps.getAccuracy();
   if(accuracy < 0.01f || accuracy > 20.f)
@@ -858,8 +861,8 @@ void OnroadHud::drawGpsStatus(QPainter &p, UIState& s) {
   p.setOpacity(1.);
 }
 
-void OnroadHud::drawDebugText(QPainter &p, UIState& s) {
-  const SubMaster &sm = *(s.sm);
+void OnroadHud::drawDebugText(QPainter &p) {
+  const SubMaster &sm = *(uiState()->sm);
   QString str, temp;
 
   int y = 80;
