@@ -14,54 +14,6 @@
 
 // ***** onroad widgets *****
 
-class OnroadHud : public QWidget {
-  Q_OBJECT
-
-public:
-  explicit OnroadHud(QWidget *parent);
-  void updateState(const UIState &s);
-
-private:
-  void drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity);
-  void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
-  void drawTextWithColor(QPainter &p, int x, int y, const QString &text, QColor& color);
-  void paintEvent(QPaintEvent *event) override;
-
-  const int radius = 192;
-  const int img_size = (radius / 2) * 1.5;
-
-  // neokii
-  QPixmap ic_brake;
-  QPixmap ic_autohold_warning;
-  QPixmap ic_autohold_active;
-  QPixmap ic_nda;
-  QPixmap ic_hda;
-  QPixmap ic_tire_pressure;
-  QPixmap ic_turn_signal_l;
-  QPixmap ic_turn_signal_r;
-  QPixmap ic_satellite;
-
-  inline QColor redColor(int alpha = 255) { return QColor(201, 34, 49, alpha); }
-  void drawLaneLines(QPainter &painter, const UIScene &scene);
-  void drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd, bool is_radar);
-
-  void drawText2(QPainter &p, int x, int y, int flags, const QString &text, const QColor& color);
-
-  void drawMaxSpeed(QPainter &p);
-  void drawSpeed(QPainter &p);
-  void drawBottomIcons(QPainter &p);
-  void drawSpeedLimit(QPainter &p);
-  void drawTurnSignals(QPainter &p);
-  void drawGpsStatus(QPainter &p);
-  void drawDebugText(QPainter &p);
-
-public:
-  void drawCommunity(QPainter &p);
-
-signals:
-  void valueChanged();
-};
-
 class OnroadAlerts : public QWidget {
   Q_OBJECT
 
@@ -83,16 +35,46 @@ class NvgWindow : public CameraViewWidget {
 
 public:
   explicit NvgWindow(VisionStreamType type, QWidget* parent = 0) : CameraViewWidget("camerad", type, true, parent) {}
-  OnroadHud *hud;
+
 protected:
   void paintGL() override;
   void initializeGL() override;
   void showEvent(QShowEvent *event) override;
   void updateFrameMat(int w, int h) override;
-  //void drawLaneLines(QPainter &painter, const UIScene &scene);
-  //void drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd);
+  void drawLaneLines(QPainter &painter, const UIScene &scene);
+  void drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd, bool is_radar);
   inline QColor redColor(int alpha = 255) { return QColor(201, 34, 49, alpha); }
   double prev_draw_t = 0;
+
+  // neokii
+  void drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity);
+  void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
+  void drawText2(QPainter &p, int x, int y, int flags, const QString &text, const QColor& color);
+  void drawTextWithColor(QPainter &p, int x, int y, const QString &text, QColor& color);
+  void paintEvent(QPaintEvent *event) override;
+
+  const int radius = 192;
+  const int img_size = (radius / 2) * 1.5;
+
+  // neokii
+  QPixmap ic_brake;
+  QPixmap ic_autohold_warning;
+  QPixmap ic_autohold_active;
+  QPixmap ic_nda;
+  QPixmap ic_hda;
+  QPixmap ic_tire_pressure;
+  QPixmap ic_turn_signal_l;
+  QPixmap ic_turn_signal_r;
+  QPixmap ic_satellite;
+
+  void drawMaxSpeed(QPainter &p);
+  void drawSpeed(QPainter &p);
+  void drawBottomIcons(QPainter &p);
+  void drawSpeedLimit(QPainter &p);
+  void drawTurnSignals(QPainter &p);
+  void drawGpsStatus(QPainter &p);
+  void drawDebugText(QPainter &p);
+  void drawHud(QPainter &p);
 };
 
 // container for all onroad widgets
@@ -110,7 +92,6 @@ protected:
   void paintEvent(QPaintEvent *event) override;
 
 private:
-  OnroadHud *hud;
   OnroadAlerts *alerts;
   NvgWindow *nvg;
   QColor bg = bg_colors[STATUS_DISENGAGED];
