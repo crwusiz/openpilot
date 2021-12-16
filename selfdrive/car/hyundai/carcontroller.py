@@ -49,6 +49,7 @@ class CarController():
     self.packer = CANPacker(dbc_name)
     self.apply_steer_last = 0
     self.steer_rate_limited = False
+    self.accel = 0
     self.lkas11_cnt = 0
     self.scc12_cnt = -1
     self.resume_cnt = 0
@@ -197,6 +198,7 @@ class CarController():
         stopping = controls.LoC.long_control_state == LongCtrlState.stopping
         apply_accel = clip(actuators.accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
         apply_accel = self.scc_smoother.get_apply_accel(CS, controls.sm, apply_accel, stopping)
+        self.accel = apply_accel
 
         controls.apply_accel = apply_accel
         aReqValue = CS.scc12["aReqValue"]
@@ -257,4 +259,8 @@ class CarController():
         state = 2 if self.car_fingerprint in FEATURES["send_hda_state_2"] else 1
         can_sends.append(create_hda_mfc(self.packer, activated_hda, state))
 
-    return can_sends
+    new_actuators = actuators.copy()
+    new_actuators.steer = apply_steer / CarControllerParams.STEER_MAX
+    new_actuators.accel = self.accel
+
+    return new_actuators, can_sends
