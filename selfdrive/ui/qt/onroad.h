@@ -57,6 +57,8 @@ protected:
   QPixmap ic_nda;
   QPixmap ic_hda;
   QPixmap ic_tire_pressure;
+
+  // crwusiz
   QPixmap ic_bsd_l;
   QPixmap ic_bsd_r;
   QPixmap ic_gps;
@@ -64,11 +66,8 @@ protected:
 
   void drawMaxSpeed(QPainter &p);
   void drawSpeed(QPainter &p);
-  void drawBottomIcons(QPainter &p);
+  void drawIcons(QPainter &p);
   void drawSpeedLimit(QPainter &p);
-  void drawTurnSignals(QPainter &p);
-  void drawGpsStatus(QPainter &p);
-  void drawDebugText(QPainter &p);
   void drawHud(QPainter &p);
 };
 

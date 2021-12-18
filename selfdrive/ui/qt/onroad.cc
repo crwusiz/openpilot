@@ -175,6 +175,8 @@ void NvgWindow::initializeGL() {
   ic_nda = QPixmap("../assets/images/img_nda.png");
   ic_hda = QPixmap("../assets/images/img_hda.png");
   ic_tire_pressure = QPixmap("../assets/img_tire_pressure.png");
+
+  // crwusiz
   ic_bsd_l = QPixmap("../assets/img_bsd_l.png");
   ic_bsd_r = QPixmap("../assets/img_bsd_r.png");
   ic_gps = QPixmap("../assets/img_gps.png");
@@ -354,44 +356,46 @@ void NvgWindow::drawHud(QPainter &p) {
   drawSpeed(p);
   drawSpeedLimit(p);
 
-  const auto controls_state = sm["controlsState"].getControlsState();
-  const auto car_params = sm["carParams"].getCarParams();
-  const auto live_params = sm["liveParameters"].getLiveParameters();
+  //bottom info
+  const auto controls_state = (*s->sm)["controlsState"].getControlsState();
+  const auto car_params = (*s->sm)["carParams"].getCarParams();
+  const auto car_state = (*s->sm)["carState"].getCarState();
 
-  const auto scc_smoother = sm["carControl"].getCarControl().getSccSmoother();
-  bool is_metric = s->scene.is_metric;
-  bool long_control = scc_smoother.getLongControl();
+  int longControlState = (int)controls_state.getLongControlState();
+  const char* long_state[] = {"Off", "Pid", "Stopping", "Starting"};
+  int lateralControlState = controls_state.getLateralControlSelect();
+  const char* lateral_state[] = {"Pid", "Indi", "Lqr"};
+  const auto gps_ext = s->scene.gps_ext;
+  float verticalAccuracy = gps_ext.getVerticalAccuracy();
+  float gpsAltitude = gps_ext.getAltitude();
+  float gpsAccuracy = gps_ext.getAccuracy();
+  int gpsSatelliteCount = s->scene.satelliteCount;
 
-  // kph
-  float applyMaxSpeed = scc_smoother.getApplyMaxSpeed();
-  float cruiseMaxSpeed = scc_smoother.getCruiseMaxSpeed();
+  if(verticalAccuracy == 0 || verticalAccuracy > 100)
+      gpsAltitude = 99.99;
 
-  bool is_cruise_set = (cruiseMaxSpeed > 0 && cruiseMaxSpeed < 255);
-
-  int mdps_bus = car_params.getMdpsBus();
-  int scc_bus = car_params.getSccBus();
+  if (gpsAccuracy > 100)
+    gpsAccuracy = 99.99;
+  else if (gpsAccuracy == 0)
+    gpsAccuracy = 99.8;
 
   QString infoText;
-  infoText.sprintf("AO(%.2f/%.2f) SR(%.2f) SRC(%.2f) SAD(%.2f) MDPS(%d) SCC(%d) LAD(%.2f/%.2f) SCC(%.2f/%.2f/%.2f)",
-                      live_params.getAngleOffsetDeg(),
-                      live_params.getAngleOffsetAverageDeg(),
-                      controls_state.getSteerRatio(),
-                      controls_state.getSteerRateCost(),
-                      controls_state.getSteerActuatorDelay(),
-                      mdps_bus, scc_bus,
-                      controls_state.getLongitudinalActuatorDelayLowerBound(),
-                      controls_state.getLongitudinalActuatorDelayUpperBound(),
-                      controls_state.getSccGasFactor(),
-                      controls_state.getSccBrakeFactor(),
-                      controls_state.getSccCurvatureFactor()
-                      );
+  infoText.sprintf("[ %s ] SR[%.2f] MDPS[%d] SCC[%d] LongControl[ %s ] GPS[ Alt(%.1f) Acc(%.1f) Sat(%d) ]",
+    lateral_state[lateralControlState],
+    controls_state.getSteerRatio(),
+    car_params.getMdpsBus(), car_params.getSccBus(),
+    long_state[longControlState],
+    gpsAltitude,
+    gpsAccuracy,
+    gpsSatelliteCount
+  );
 
   // info
   configFont(p, "Open Sans", 34, "Regular");
   p.setPen(QColor(0xff, 0xff, 0xff, 200));
   p.drawText(rect().left() + 20, rect().height() - 15, infoText);
 
-  drawBottomIcons(p);
+  drawIcons(p);
 }
 
 static const QColor get_tpms_color(float tpms) {
@@ -411,7 +415,7 @@ static const QString get_tpms_text(float tpms) {
     return QString(str);
 }
 
-void NvgWindow::drawBottomIcons(QPainter &p) {
+void NvgWindow::drawIcons(QPainter &p) {
   const SubMaster &sm = *(uiState()->sm);
   auto car_state = sm["carState"].getCarState();
   auto scc_smoother = sm["carControl"].getCarControl().getSccSmoother();
@@ -421,8 +425,8 @@ void NvgWindow::drawBottomIcons(QPainter &p) {
 
   // tire pressure
   {
-    const int w = 58;
-    const int h = 126;
+    const int w = 66;
+    const int h = 146;
     const int x = 110;
     const int y = height() - h - 80;
 
@@ -499,6 +503,12 @@ void NvgWindow::drawBottomIcons(QPainter &p) {
     drawIcon(p, x, y, autohold > 1 ? ic_autohold_warning : ic_autohold_active,
             QColor(0, 0, 0, (255 * bg_alpha)), img_alpha);
   }
+
+  // gps
+
+  // wifi
+
+  // steering wheel
 
   p.setOpacity(1.);
 }
