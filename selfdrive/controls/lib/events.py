@@ -288,6 +288,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   EventName.stockFcw: {},
 
+  EventName.lkasDisabled: {},
+
   # ********** events only containing alerts displayed in all states **********
 
   EventName.joystickDebug: {

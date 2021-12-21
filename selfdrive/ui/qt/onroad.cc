@@ -269,7 +269,7 @@ void NvgWindow::paintEvent(QPaintEvent *event) {
   p.endNativePainting();
 
   UIState *s = uiState();
-  if (s->scene.world_objects_visible) {
+  if (s->worldObjectsVisible()) {
     drawHud(p);
   }
 
