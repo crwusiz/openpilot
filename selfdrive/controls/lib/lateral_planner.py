@@ -94,10 +94,6 @@ class LateralPlanner:
     self.LP.parse_model(sm['modelV2'])
     if len(md.position.x) == TRAJECTORY_SIZE and len(md.orientation.x) == TRAJECTORY_SIZE:
       self.path_xyz = np.column_stack([md.position.x, md.position.y, md.position.z])
-
-      cameraOffset = ntune_common_get("cameraOffset") + 0.08 if self.wide_camera else ntune_common_get("cameraOffset")
-      self.path_xyz[:, 1] -= cameraOffset
-
       self.t_idxs = np.array(md.position.t)
       self.plan_yaw = list(md.orientation.z)
     if len(md.position.xStd) == TRAJECTORY_SIZE:
