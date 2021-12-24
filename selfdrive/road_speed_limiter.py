@@ -367,6 +367,11 @@ def road_speed_limiter_get_max_speed(cluster_speed, is_metric):
   
   return road_speed_limiter.get_max_speed(cluster_speed, is_metric)
 
+def get_road_speed_limiter():
+  global road_speed_limiter
+  if road_speed_limiter is None:
+    road_speed_limiter = RoadSpeedLimiter()
+  return road_speed_limiter
 
 if __name__ == "__main__":
   main()
