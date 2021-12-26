@@ -4,7 +4,6 @@ from common.numpy_fast import clip, interp
 from common.realtime import DT_MDL
 from selfdrive.config import Conversions as CV
 from selfdrive.modeld.constants import T_IDXS
-from selfdrive.ntune import ntune_common_get
 
 ButtonType = car.CarState.ButtonEvent.Type
 ButtonPrev = ButtonType.unknown
@@ -106,7 +105,7 @@ def get_lag_adjusted_curvature(CP, v_ego, psis, curvatures, curvature_rates):
     curvature_rates = [0.0 for i in range(CONTROL_N)]
 
   # TODO this needs more thought, use .2s extra for now to estimate other delays
-  delay = ntune_common_get('steerActuatorDelay') + .2
+  delay = CP.steerActuatorDelay + .2
   current_curvature = curvatures[0]
   psi = interp(delay, T_IDXS[:CONTROL_N], psis)
   desired_curvature_rate = curvature_rates[0]

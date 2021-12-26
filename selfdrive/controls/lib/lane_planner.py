@@ -5,7 +5,6 @@ from common.numpy_fast import interp, clip, mean
 from common.realtime import DT_MDL
 from selfdrive.hardware import EON, TICI
 from selfdrive.swaglog import cloudlog
-from selfdrive.ntune import ntune_common_get
 
 ENABLE_ZORROBYTE = True
 ENABLE_INC_LANE_PROB = True
@@ -56,10 +55,8 @@ class LanePlanner:
       # left and right ll x is the same
       self.ll_x = md.laneLines[1].x
       # only offset left and right lane lines; offsetting path does not make sense
-
-      cameraOffset = ntune_common_get("cameraOffset") + 0.08 if self.wide_camera else ntune_common_get("cameraOffset")
-      self.lll_y = np.array(md.laneLines[1].y) - cameraOffset
-      self.rll_y = np.array(md.laneLines[2].y) - cameraOffset
+      self.lll_y = np.array(md.laneLines[1].y) - self.camera_offset
+      self.rll_y = np.array(md.laneLines[2].y) - self.camera_offset
       self.lll_prob = md.laneLineProbs[1]
       self.rll_prob = md.laneLineProbs[2]
       self.lll_std = md.laneLineStds[1]
@@ -72,9 +69,7 @@ class LanePlanner:
   def get_d_path(self, v_ego, path_t, path_xyz):
     # Reduce reliance on lanelines that are too far apart or
     # will be in a few seconds
-    #path_xyz[:, 1] -= self.path_offset
-    cameraOffset = ntune_common_get("cameraOffset") + 0.08 if self.wide_camera else ntune_common_get("cameraOffset")
-    path_xyz[:, 1] -= cameraOffset
+    path_xyz[:, 1] -= self.path_offset
     l_prob, r_prob = self.lll_prob, self.rll_prob
     width_pts = self.rll_y - self.lll_y
     prob_mods = []

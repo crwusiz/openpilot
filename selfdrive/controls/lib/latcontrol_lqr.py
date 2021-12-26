@@ -5,7 +5,6 @@ from common.numpy_fast import clip
 from common.realtime import DT_CTRL
 from cereal import log
 from selfdrive.controls.lib.drive_helpers import get_steer_max
-from selfdrive.ntune import nTune
 
 
 class LatControlLQR():
@@ -28,7 +27,6 @@ class LatControlLQR():
     self.sat_limit = CP.steerLimitTimer
 
     self.reset()
-    self.tune = nTune(CP, self)
 
   def reset(self):
     self.i_lqr = 0.0
@@ -47,7 +45,6 @@ class LatControlLQR():
     return self.sat_count > self.sat_limit
 
   def update(self, active, CS, CP, VM, params, last_actuators, desired_curvature, desired_curvature_rate):
-    self.tune.check()
     lqr_log = log.ControlsState.LateralLQRState.new_message()
 
     steers_max = get_steer_max(CP, CS.vEgo)

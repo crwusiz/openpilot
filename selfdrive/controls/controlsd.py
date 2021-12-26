@@ -28,7 +28,6 @@ from selfdrive.locationd.calibrationd import Calibration
 from selfdrive.hardware import HARDWARE, TICI, EON
 from selfdrive.manager.process_config import managed_processes
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
-from selfdrive.ntune import ntune_common_get, ntune_common_enabled, ntune_scc_get
 
 SOFT_DISABLE_TIME = 3  # seconds
 LDW_MIN_SPEED = 40 * CV.KPH_TO_MS
@@ -511,13 +510,7 @@ class Controls:
     # Update VehicleModel
     params = self.sm['liveParameters']
     x = max(params.stiffnessFactor, 0.1)
-    #sr = max(params.steerRatio, 0.1)
-
-    if ntune_common_enabled('useLiveSteerRatio'):
-      sr = max(params.steerRatio, 0.1)
-    else:
-      sr = max(ntune_common_get('steerRatio'), 0.1)
-
+    sr = max(params.steerRatio, 0.1)
     self.VM.update_params(x, sr)
 
     lat_plan = self.sm['lateralPlan']
@@ -648,9 +641,8 @@ class Controls:
     if len(meta.desirePrediction) and ldw_allowed:
       l_lane_change_prob = meta.desirePrediction[Desire.laneChangeLeft - 1]
       r_lane_change_prob = meta.desirePrediction[Desire.laneChangeRight - 1]
-      cameraOffset = ntune_common_get("cameraOffset") + 0.08 if self.wide_camera else ntune_common_get("cameraOffset")
-      l_lane_close = left_lane_visible and (self.sm['modelV2'].laneLines[1].y[0] > -(1.08 + cameraOffset))
-      r_lane_close = right_lane_visible and (self.sm['modelV2'].laneLines[2].y[0] < (1.08 - cameraOffset))
+      l_lane_close = left_lane_visible and (self.sm['modelV2'].laneLines[1].y[0] > -(1.08 + CAMERA_OFFSET))
+      r_lane_close = right_lane_visible and (self.sm['modelV2'].laneLines[2].y[0] < (1.08 - CAMERA_OFFSET))
 
       CC.hudControl.leftLaneDepart = bool(l_lane_change_prob > LANE_DEPARTURE_THRESHOLD and l_lane_close)
       CC.hudControl.rightLaneDepart = bool(r_lane_change_prob > LANE_DEPARTURE_THRESHOLD and r_lane_close)
@@ -716,16 +708,6 @@ class Controls:
     controlsState.aReqValueMax = self.aReqValueMax
     controlsState.sccStockCamAct = self.sccStockCamAct
     controlsState.sccStockCamStatus = self.sccStockCamStatus
-
-    controlsState.steerRatio = self.VM.sR
-    controlsState.steerRateCost = ntune_common_get('steerRateCost')
-    controlsState.steerActuatorDelay = ntune_common_get('steerActuatorDelay')
-
-    controlsState.sccGasFactor = ntune_scc_get('sccGasFactor')
-    controlsState.sccBrakeFactor = ntune_scc_get('sccBrakeFactor')
-    controlsState.sccCurvatureFactor = ntune_scc_get('sccCurvatureFactor')
-    controlsState.longitudinalActuatorDelayLowerBound = ntune_scc_get('longitudinalActuatorDelayLowerBound')
-    controlsState.longitudinalActuatorDelayUpperBound = ntune_scc_get('longitudinalActuatorDelayUpperBound')
 
     if self.joystick_mode:
       controlsState.lateralControlState.debugState = lac_log
