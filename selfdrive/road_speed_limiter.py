@@ -283,12 +283,6 @@ class RoadSpeedLimiter:
         MIN_LIMIT = 30
         MAX_LIMIT = 120
       
-      # log = "RECV: " + str(is_highway)
-      # log += ", " + str(cam_limit_speed)
-      # log += ", " + str(cam_limit_speed_left_dist)
-      # log += ", " + str(section_limit_speed)
-      # log += ", " + str(section_left_dist)
-      
       if cam_limit_speed_left_dist is not None and cam_limit_speed is not None and cam_limit_speed_left_dist > 0:
         
         v_ego = cluster_speed * (CV.KPH_TO_MS if is_metric else CV.MPH_TO_MS)
@@ -296,28 +290,23 @@ class RoadSpeedLimiter:
         
         diff_speed = cluster_speed - cam_limit_speed
         v_diff = v_ego - v_limit
-        
-        if self.longcontrol:
-          sec = interp(v_diff, [2.7, 8.3], [15., 20.])
-        else:
-          sec = interp(v_diff, [2.7, 8.3], [17., 23.])
-        
-        if MIN_LIMIT <= cam_limit_speed <= MAX_LIMIT and (self.slowing_down or cam_limit_speed_left_dist < v_ego * sec):
+
+        if MIN_LIMIT <= cam_limit_speed <= MAX_LIMIT:
           
           if not self.slowing_down:
-            self.start_dist = cam_limit_speed_left_dist * 1.2
+            self.start_dist = cam_limit_speed_left_dist
             self.slowing_down = True
             first_started = True
           else:
             first_started = False
           
-          base = self.start_dist / 1.2 * 0.65
+          base = v_ego * 5.
           
           td = self.start_dist - base
           d = cam_limit_speed_left_dist - base
           
           if d > 0 and td > 0. and diff_speed > 0 and (section_left_dist is None or section_left_dist < 10):
-            pp = d / td
+            pp = (d / td) ** 0.6
           else:
             pp = 0
           
