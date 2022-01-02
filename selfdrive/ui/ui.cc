@@ -207,8 +207,23 @@ static void update_status(UIState *s) {
     } else {
       s->status = controls_state.getEnabled() ? STATUS_ENGAGED : STATUS_DISENGAGED;
     }
+    s->scene.lateralControlSelect = s->scene.controls_state.getLateralControlSelect();
+    if (s->scene.lateralControlSelect == 0) {
+      s->scene.output_scale = s->scene.controls_state.getLateralControlState().getPidState().getOutput();
+    } else if (s->scene.lateralControlSelect == 1) {
+      s->scene.output_scale = s->scene.controls_state.getLateralControlState().getIndiState().getOutput();
+    } else if (s->scene.lateralControlSelect == 2) {
+      s->scene.output_scale = s->scene.controls_state.getLateralControlState().getLqrState().getOutput();
+    }
   }
-
+  if (s->sm->updated("carState")) {
+    s->scene.car_state = (*s->sm)["carState"].getCarState();
+    if(s->scene.leftBlinker!=s->scene.car_state.getLeftBlinker() || s->scene.rightBlinker!=s->scene.car_state.getRightBlinker()){
+      s->scene.blinkingrate = 120;
+    }
+    s->scene.leftBlinker = s->scene.car_state.getLeftBlinker();
+    s->scene.rightBlinker = s->scene.car_state.getRightBlinker();
+  }
   // Handle onroad/offroad transition
   static bool started_prev = false;
   if (s->scene.started != started_prev) {

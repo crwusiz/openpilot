@@ -102,6 +102,17 @@ typedef struct UIScene {
   cereal::GpsLocationData::Reader gps_ext;
   cereal::LiveParametersData::Reader live_params;
 
+  // ui add
+  float cpuTempAvg;
+  int lateralControlSelect;
+  float output_scale;
+  bool leftBlinker, rightBlinker;
+  int blinkingrate;
+  bool steeringPressed, enabled;
+
+  // gps
+  int satelliteCount;
+  float gpsAccuracy;
 
   // modelV2
   float lane_line_probs[4];

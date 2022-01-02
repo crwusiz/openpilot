@@ -51,18 +51,20 @@ protected:
   const int img_size = (radius / 2) * 1.5;
 
   // neokii
-  QPixmap ic_brake;
-  QPixmap ic_autohold_warning;
-  QPixmap ic_autohold_active;
-  QPixmap ic_nda;
-  QPixmap ic_hda;
-  QPixmap ic_tire_pressure;
+  QPixmap img_brake_disc;
+  QPixmap img_autohold_warning;
+  QPixmap img_autohold_active;
+  QPixmap img_nda;
+  QPixmap img_hda;
+  QPixmap img_tire_pressure;
 
   // crwusiz
-  QPixmap ic_bsd_l;
-  QPixmap ic_bsd_r;
-  QPixmap ic_gps;
-  QPixmap ic_wifi;
+  QPixmap img_wheel;
+  QPixmap img_dm;
+  QPixmap img_bsd_l;
+  QPixmap img_bsd_r;
+  QPixmap img_gps;
+  QPixmap img_wifi;
 
   void drawMaxSpeed(QPainter &p);
   void drawSpeed(QPainter &p);
