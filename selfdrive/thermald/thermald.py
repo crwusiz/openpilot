@@ -3,7 +3,7 @@ import datetime
 import os
 import time
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, NoReturn, Optional, Tuple
 from collections import namedtuple, OrderedDict
 
 import psutil
@@ -82,7 +82,7 @@ def set_eon_fan(val):
     try:
       i = [0x1, 0x3 | 0, 0x3 | 0x08, 0x3 | 0x10][val]
       bus.write_i2c_block_data(0x3d, 0, [i])
-    except IOError:
+    except OSError:
       # tusb320
       if val == 0:
         bus.write_i2c_block_data(0x67, 0xa, [0])
@@ -153,7 +153,7 @@ def set_offroad_alert_if_changed(offroad_alert: str, show_alert: bool, extra_tex
   set_offroad_alert(offroad_alert, show_alert, extra_text)
 
 
-def thermald_thread():
+def thermald_thread() -> NoReturn:
 
   pm = messaging.PubMaster(['deviceState'])
 
@@ -164,11 +164,11 @@ def thermald_thread():
   fan_speed = 0
   count = 0
 
-  onroad_conditions = {
+  onroad_conditions: Dict[str, bool] = {
     "ignition": False,
   }
-  startup_conditions = {}
-  startup_conditions_prev = {}
+  startup_conditions: Dict[str, bool] = {}
+  startup_conditions_prev: Dict[str, bool] = {}
 
   off_ts = None
   started_ts = None
@@ -454,7 +454,7 @@ def thermald_thread():
     count += 1
 
 
-def main():
+def main() -> NoReturn:
   thermald_thread()
 
 
