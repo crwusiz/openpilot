@@ -50,10 +50,11 @@ class LanePlanner:
     self.wide_camera = wide_camera
 
   def parse_model(self, md):
-    if len(md.laneLines) == 4 and len(md.laneLines[0].t) == TRAJECTORY_SIZE:
-      self.ll_t = (np.array(md.laneLines[1].t) + np.array(md.laneLines[2].t))/2
+    lane_lines = md.laneLines
+    if len(lane_lines) == 4 and len(lane_lines[0].t) == TRAJECTORY_SIZE:
+      self.ll_t = (np.array(lane_lines[1].t) + np.array(lane_lines[2].t))/2
       # left and right ll x is the same
-      self.ll_x = md.laneLines[1].x
+      self.ll_x = lane_lines[1].x
       # only offset left and right lane lines; offsetting path does not make sense
       self.lll_y = np.array(md.laneLines[1].y) - self.camera_offset
       self.rll_y = np.array(md.laneLines[2].y) - self.camera_offset
@@ -62,9 +63,10 @@ class LanePlanner:
       self.lll_std = md.laneLineStds[1]
       self.rll_std = md.laneLineStds[2]
 
-    if len(md.meta.desireState):
-      self.l_lane_change_prob = md.meta.desireState[log.LateralPlan.Desire.laneChangeLeft]
-      self.r_lane_change_prob = md.meta.desireState[log.LateralPlan.Desire.laneChangeRight]
+    desire_state = md.meta.desireState
+    if len(desire_state):
+      self.l_lane_change_prob = desire_state[log.LateralPlan.Desire.laneChangeLeft]
+      self.r_lane_change_prob = desire_state[log.LateralPlan.Desire.laneChangeRight]
 
   def get_d_path(self, v_ego, path_t, path_xyz):
     # Reduce reliance on lanelines that are too far apart or
