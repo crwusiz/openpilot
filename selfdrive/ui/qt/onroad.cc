@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include <QDebug>
+#include <QString>
 
 #include "selfdrive/common/timing.h"
 #include "selfdrive/ui/qt/util.h"
@@ -22,6 +23,8 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   road_view_layout->setStackingMode(QStackedLayout::StackAll);
   nvg = new NvgWindow(VISION_STREAM_RGB_BACK, this);
   road_view_layout->addWidget(nvg);
+  hud = new OnroadHud(this);
+  road_view_layout->addWidget(hud);
 
   QWidget * split_wrapper = new QWidget;
   split = new QHBoxLayout(split_wrapper);
@@ -39,8 +42,8 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   alerts->raise();
 
   setAttribute(Qt::WA_OpaquePaintEvent);
-  QObject::connect(uiState(), &UIState::uiUpdate, this, &OnroadWindow::updateState);
-  QObject::connect(uiState(), &UIState::offroadTransition, this, &OnroadWindow::offroadTransition);
+  QObject::connect(this, &OnroadWindow::updateStateSignal, this, &OnroadWindow::updateState);
+  QObject::connect(this, &OnroadWindow::offroadTransitionSignal, this, &OnroadWindow::offroadTransition);
 }
 
 void OnroadWindow::updateState(const UIState &s) {
@@ -54,6 +57,8 @@ void OnroadWindow::updateState(const UIState &s) {
     }
     alerts->updateAlert(alert, bgColor);
   }
+
+  hud->updateState(s);
 
   if (bg != bgColor) {
     // repaint border
@@ -75,11 +80,10 @@ void OnroadWindow::mousePressEvent(QMouseEvent* e) {
 void OnroadWindow::offroadTransition(bool offroad) {
 #ifdef ENABLE_MAPS
   if (!offroad) {
-    if (map == nullptr && (uiState()->has_prime || !MAPBOX_TOKEN.isEmpty())) {
+    if (map == nullptr && (QUIState::ui_state.has_prime || !MAPBOX_TOKEN.isEmpty())) {
       MapWindow * m = new MapWindow(get_mapbox_settings());
       m->setFixedWidth(topWidget(this)->width() / 2);
-      m->offroadTransition(offroad);
-      QObject::connect(uiState(), &UIState::offroadTransition, m, &MapWindow::offroadTransition);
+      QObject::connect(this, &OnroadWindow::offroadTransitionSignal, m, &MapWindow::offroadTransition);
       split->addWidget(m, 0, Qt::AlignRight);
       map = m;
     }
@@ -160,6 +164,254 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
   }
 }
 
+// OnroadHud
+// wirelessnet2 add
+OnroadHud::OnroadHud(QWidget *parent) : QWidget(parent) {
+  engage_img = QPixmap("../assets/img_chffr_wheel.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+  dm_img = QPixmap("../assets/img_driver_face.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+  // add
+  brake_img = QPixmap("../assets/img_brake_disc.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+  bsd_l_img = QPixmap("../assets/img_bsd_l.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);;
+  bsd_r_img = QPixmap("../assets/img_bsd_r.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);;
+  gps_img = QPixmap("../assets/img_gps.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);;
+  wifi_img = QPixmap("../assets/img_wifi.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);;
+
+  connect(this, &OnroadHud::valueChanged, [=] { update(); });
+}
+
+void OnroadHud::updateState(const UIState &s) {
+  const int SET_SPEED_NA = 255;
+  const SubMaster &sm = *(s.sm);
+  const auto cs = sm["controlsState"].getControlsState();
+
+  float maxspeed = cs.getVCruise();
+  bool cruise_set = maxspeed > 0 && (int)maxspeed != SET_SPEED_NA;
+  if (cruise_set && !s.scene.is_metric) {
+    maxspeed *= KM_TO_MILE;
+  }
+  QString maxspeed_str = cruise_set ? QString::number(std::nearbyint(maxspeed)) : "-";
+  float cur_speed = std::max(0.0, sm["carState"].getCarState().getVEgo() * (s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH));
+
+  setProperty("is_cruise_set", cruise_set);
+  setProperty("speed", QString::number(std::nearbyint(cur_speed)));
+  setProperty("maxSpeed", maxspeed_str);
+  setProperty("speedUnit", s.scene.is_metric ? "km/h" : "mph");
+  setProperty("hideDM", cs.getAlertSize() != cereal::ControlsState::AlertSize::NONE);
+  setProperty("status", s.status);
+  setProperty("engageable", cs.getEngageable() || cs.getEnabled());
+  setProperty("dmActive", sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode());
+  setProperty("brake_stat", sm["carControl"].getCarControl().getActuators().getLongControlState() == cereal::CarControl::Actuators::LongControlState::STOPPING || sm["carState"].getCarState().getBrakePressed());
+  setProperty("wifi_stat", sm["deviceState"].getDeviceState().getNetworkStrength() == cereal::DeviceState::NetworkStrength);
+  setProperty("gps_stat", sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK());
+
+  const auto car_state = sm["carState"].getCarState();
+  setProperty("bsd_l_stat", car_state.getLeftBlindspot());
+  setProperty("bsd_r_stat", car_state.getRightBlindspot());
+  setProperty("autohold_stat", car_state.getAutoHold());
+
+  const auto leadOne = sm["radarState"].getRadarState().getLeadOne();
+  setProperty("lead_d_rel", leadOne.getDRel());
+  setProperty("lead_v_rel", leadOne.getVRel());
+  setProperty("lead_status", leadOne.getStatus());
+  setProperty("angleSteers", car_state.getSteeringAngleDeg());
+  //setProperty("steerAngleDesired", sm["controlsState"].getControlsState().getLateralControlState().getPidState().getSteeringAngleDesiredDeg());
+  setProperty("steerAngleDesired", sm["carControl"].getCarControl().getActuators().getSteeringAngleDeg());
+}
+
+int OnroadHud::devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label) {
+  configFont(p, "Open Sans", 30 * 2, "SemiBold");
+  drawText(p, x + 92, y + 80, QString(value), 255);
+
+  configFont(p, "Open Sans", 15 * 2, "Regular");
+  drawText(p, x + 92, y + 80 + 42, QString(label), 255);
+
+  return 110;
+}
+
+void OnroadHud::drawLeftDevUi(QPainter &p, int x, int y) {
+  int rh = 5;
+  int ry = y;
+
+  // Add cputemp
+  if (true) {
+    char val_str[8];
+    auto cpuList = scene.device_state.getCpuTempC();
+    float cpuTemp = 0;
+
+    if (cpuList.size() > 0) {
+        for(int i = 0; i < cpuList.size(); i++)
+            cpuTemp += cpuList[i];
+        cpuTemp /= cpuList.size();
+    }
+
+    snprintf(val_str, sizeof(val_str), "%.1f", cpuTemp, "℃", "");
+    rh += devUiDrawElement(p, x, ry, val_str, "CPU TEMP");
+    ry = y + rh;
+  }
+
+  // Add Real Steering Angle
+  if (true) {
+    char val_str[8];
+    snprintf(val_str, sizeof(val_str), "%.0f%s%s", angleSteers, "°", "");
+    rh += devUiDrawElement(p, x, ry, val_str, "REAL STEER");
+    ry = y + rh;
+  }
+
+  // Add Desired Steering Angle
+  if (true) {
+    char val_str[8];
+    if (status != STATUS_DISENGAGED) {
+      snprintf(val_str, sizeof(val_str), "%.0f%s%s", steerAngleDesired, "°", "");
+    } else {
+      snprintf(val_str, sizeof(val_str), "-");
+    }
+    rh += devUiDrawElement(p, x, ry, val_str, "DESIR STEER");
+    ry = y + rh;
+  }
+
+  // Add Relative Distance to Primary Lead Car
+  if (true) {
+    char val_str[8];
+    if (lead_status) {
+      snprintf(val_str, sizeof(val_str), "%d", (int)lead_d_rel);
+    } else {
+      snprintf(val_str, sizeof(val_str), "-");
+    }
+    rh += devUiDrawElement(p, x, ry, val_str, "REL DIST");
+    ry = y + rh;
+  }
+
+  // Add Relative Velocity vs Primary Lead Car
+  if (true) {
+    char val_str[8];
+     if (lead_status) {
+       snprintf(val_str, sizeof(val_str), "%d", (int)(lead_v_rel * 2.2374144 + 0.5));
+     } else {
+       snprintf(val_str, sizeof(val_str), "-");
+     }
+    rh += devUiDrawElement(p, x, ry, val_str, "REL SPEED");
+    ry = y + rh;
+  }
+
+  rh += 25;
+  p.setBrush(QColor(0, 0, 0, 0));
+  QRect ldu(x, y, 184, rh);
+  p.drawRoundedRect(ldu, 20, 20);
+}
+
+void OnroadHud::paintEvent(QPaintEvent *event) {
+  QPainter p(this);
+  p.setRenderHint(QPainter::Antialiasing);
+
+  // Header gradient
+  QLinearGradient bg(0, header_h - (header_h / 2.5), 0, header_h);
+  bg.setColorAt(0, QColor::fromRgbF(0, 0, 0, 0.45));
+  bg.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0));
+  p.fillRect(0, 0, width(), header_h, bg);
+
+  // max speed
+  QRect rc(bdr_s * 2, bdr_s * 1.5, 184, 202);
+  p.setPen(QPen(QColor(0xff, 0xff, 0xff, 100), 10));
+  p.setBrush(QColor(0, 0, 0, 100));
+  p.drawRoundedRect(rc, 20, 20);
+  p.setPen(Qt::NoPen);
+
+  configFont(p, "Open Sans", 48, "Regular");
+  drawText(p, rc.center().x(), 118, "MAX", is_cruise_set ? 200 : 100);
+  if (is_cruise_set) {
+    configFont(p, "Open Sans", 88, is_cruise_set ? "Bold" : "SemiBold");
+    drawText(p, rc.center().x(), 212, maxSpeed, 255);
+  } else {
+    configFont(p, "Open Sans", 80, "SemiBold");
+    drawText(p, rc.center().x(), 212, maxSpeed, 100);
+  }
+
+  // current speed
+  configFont(p, "Open Sans", 176, "Bold");
+  drawText(p, rect().center().x(), 210, speed);
+  configFont(p, "Open Sans", 66, "Regular");
+  drawText(p, rect().center().x(), 290, speedUnit, 200);
+
+  // left Dev UI
+  if (!hideDM) {
+    drawLeftDevUi(p, bdr_s * 2, bdr_s * 2 + rc.height());
+  }
+
+  // engage-ability icon ( wheel ) (upper right 1)
+  // x = rect().right() - radius / 2 - bdr_s * 2
+  // y = radius / 2 + int(bdr_s * 1.5)
+  if (engageable) {
+    drawIcon(p, rect().right() - radius / 2 - bdr_s * 2, radius / 2 + int(bdr_s * 1.5),
+             engage_img, bg_colors[status], 1.0);
+  }
+
+  // wifi (upper right 2)
+  // x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
+  // y = radius / 2 + (bdr_s * 1.5);
+  drawIcon(p, rect().right() - (radius / 2) - (bdr_s * 2) - (radius), radius / 2 + (bdr_s * 1.5),
+           wifi_img, QColor(0, 0, 0, 70), wifi_stat ? 1.0 : 0.2);
+
+  // gps (upper right 3)
+  // x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 2);
+  // y = radius / 2 + (bdr_s * 1.5);
+  drawIcon(p, rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 2), radius / 2 + (bdr_s * 1.5),
+           gps_img, QColor(0, 0, 0, 70), gps_stat ? 1.0 : 0.2);
+
+  if (!hideDM) {
+    // dm icon
+    // x = rc.center().x()
+    // y = rect().bottom() - footer_h / 2 + 50
+    drawIcon(p, rc.center().x(), rect().bottom() - footer_h / 2 + 50,
+             dm_img, QColor(0, 0, 0, 70), dmActive ? 1.0 : 0.2);
+
+    p.setOpacity(1.0); // dmActive will determine opacity of brake_img's bg without this :/ -wirelessnet2
+
+    // brake icon
+    drawIcon(p, rc.center().x() + 250, rect().bottom() - footer_h / 2 + 50,
+              brake_img, QColor(0, 0, 0, 70), brake_stat ? 1.0 : 0.2);
+
+  // auto hold (bottom 2 right)
+  if(autohold_stat >= 0) {
+    // x = radius / 2 + (bdr_s * 2) + (radius);
+    // y = rect().bottom() - (footer_h / 2) - (radius);
+    drawIcon(p, radius / 2 + (bdr_s * 2) + (radius), rect().bottom() - (footer_h / 2) - (radius),
+             autohold_stat > 1 ? autohold_warning_img : autohold_active_img, QColor(0, 0, 0, 70), autohold_stat ? 1.0 : 0.2);
+  }
+
+  // bsd_l (bottom 3 left)
+  // x = radius / 2 + (bdr_s * 2);
+  // y = rect().bottom() - (footer_h / 2) - (radius * 2);
+  drawIcon(p, radius / 2 + (bdr_s * 2), rect().bottom() - (footer_h / 2) - (radius * 2),
+           bsd_l_img, QColor(0, 0, 0, 70), bsd_l_stat ? 1.0 : 0.2);
+
+  // bsd_r (bottom 3 right)
+  // x = radius / 2 + (bdr_s * 2) + (radius);
+  // y = rect().bottom() - (footer_h / 2) - (radius * 2);
+  drawIcon(p, radius / 2 + (bdr_s * 2) + (radius), rect().bottom() - (footer_h / 2) - (radius * 2),
+           bsd_r_img, QColor(0, 0, 0, 70), bsd_r_stat ? 1.0 : 0.2);
+
+  }
+}
+
+void OnroadHud::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
+  QFontMetrics fm(p.font());
+  QRect init_rect = fm.boundingRect(text);
+  QRect real_rect = fm.boundingRect(init_rect, 0, text);
+  real_rect.moveCenter({x, y - real_rect.height() / 2});
+
+  p.setPen(QColor(0xff, 0xff, 0xff, alpha));
+  p.drawText(real_rect.x(), real_rect.bottom(), text);
+}
+
+void OnroadHud::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
+  p.setPen(Qt::NoPen);
+  p.setBrush(bg);
+  p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
+  p.setOpacity(opacity);
+  p.drawPixmap(x - img_size / 2, y - img_size / 2, img);
+}
+
 // NvgWindow
 void NvgWindow::initializeGL() {
   CameraViewWidget::initializeGL();
@@ -172,26 +424,17 @@ void NvgWindow::initializeGL() {
   setBackgroundColor(bg_colors[STATUS_DISENGAGED]);
 
   // neokii
-  img_brake_disc = QPixmap("../assets/img_brake_disc.png").scaled(img_size, img_size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-  img_autohold_warning = QPixmap("../assets/img_autohold_warning.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  img_autohold_active = QPixmap("../assets/img_autohold_active.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  img_nda = QPixmap("../assets/images/img_nda.png");
-  img_hda = QPixmap("../assets/images/img_hda.png");
-  img_tire_pressure = QPixmap("../assets/img_tire_pressure.png");
-
-  // crwusiz
-  img_wheel = QPixmap("../assets/img_chffr_wheel.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  img_dm = QPixmap("../assets/img_driver_face.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  img_bsd_l = QPixmap("../assets/img_bsd_l.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);;
-  img_bsd_r = QPixmap("../assets/img_bsd_r.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);;
-  img_gps = QPixmap("../assets/img_gps.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);;
-  img_wifi = QPixmap("../assets/img_wifi.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);;
+  autohold_warning_img = QPixmap("../assets/img_autohold_warning.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+  autohold_active_img = QPixmap("../assets/img_autohold_active.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+  nda_img = QPixmap("../assets/images/img_nda.png");
+  hda_img = QPixmap("../assets/images/img_hda.png");
+  tire_pressure_img = QPixmap("../assets/img_tire_pressure.png");
 }
 
 void NvgWindow::updateFrameMat(int w, int h) {
   CameraViewWidget::updateFrameMat(w, h);
 
-  UIState *s = uiState();
+  UIState *s = &QUIState::ui_state;
   s->fb_w = w;
   s->fb_h = h;
   auto intrinsic_matrix = s->wide_camera ? ecam_intrinsic_matrix : fcam_intrinsic_matrix;
@@ -296,8 +539,11 @@ void NvgWindow::paintEvent(QPaintEvent *event) {
   CameraViewWidget::paintGL();
   p.endNativePainting();
 
-  UIState *s = uiState();
-  if (s->worldObjectsVisible()) {
+  UIState *s = &QUIState::ui_state;
+  if (s->scene.world_objects_visible) {
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(Qt::NoPen);
     drawHud(p);
   }
 
@@ -315,11 +561,21 @@ void NvgWindow::paintEvent(QPaintEvent *event) {
 void NvgWindow::showEvent(QShowEvent *event) {
   CameraViewWidget::showEvent(event);
 
-  ui_update_params(uiState());
+  ui_update_params(&QUIState::ui_state);
   prev_draw_t = millis_since_boot();
 }
 
-void NvgWindow::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
+// neokii add start
+
+void NvgWindow::drawIcon2(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
+  p.setPen(Qt::NoPen);
+  p.setBrush(bg);
+  p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
+  p.setOpacity(opacity);
+  p.drawPixmap(x - img_size / 2, y - img_size / 2, img_size, img_size, img);
+}
+
+void NvgWindow::drawText2(QPainter &p, int x, int y, const QString &text, int alpha) {
   QFontMetrics fm(p.font());
   QRect init_rect = fm.boundingRect(text);
   QRect real_rect = fm.boundingRect(init_rect, 0, text);
@@ -327,6 +583,13 @@ void NvgWindow::drawText(QPainter &p, int x, int y, const QString &text, int alp
 
   p.setPen(QColor(0xff, 0xff, 0xff, alpha));
   p.drawText(real_rect.x(), real_rect.bottom(), text);
+}
+
+void NvgWindow::drawText3(QPainter &p, int x, int y, int flags, const QString &text, const QColor& color) {
+  QFontMetrics fm(p.font());
+  QRect rect = fm.boundingRect(text);
+  p.setPen(color);
+  p.drawText(QRect(x, y, rect.width(), rect.height()), flags, text);
 }
 
 void NvgWindow::drawTextWithColor(QPainter &p, int x, int y, const QString &text, QColor& color) {
@@ -337,21 +600,6 @@ void NvgWindow::drawTextWithColor(QPainter &p, int x, int y, const QString &text
 
   p.setPen(color);
   p.drawText(real_rect.x(), real_rect.bottom(), text);
-}
-
-void NvgWindow::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
-  p.setPen(Qt::NoPen);
-  p.setBrush(bg);
-  p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
-  p.setOpacity(opacity);
-  p.drawPixmap(x - img_size / 2, y - img_size / 2, img_size, img_size, img);
-}
-
-void NvgWindow::drawText2(QPainter &p, int x, int y, int flags, const QString &text, const QColor& color) {
-  QFontMetrics fm(p.font());
-  QRect rect = fm.boundingRect(text);
-  p.setPen(color);
-  p.drawText(QRect(x, y, rect.width(), rect.height()), flags, text);
 }
 
 void NvgWindow::drawHud(QPainter &p) {
@@ -478,10 +726,10 @@ void NvgWindow::drawIcons(QPainter &p) {
     const int marginX = (int)(rcFont.width() * 2.7f);
     const int marginY = (int)((h/2 - rcFont.height()) * 0.7f);
 
-    drawText2(p, center_x-marginX, center_y-marginY-rcFont.height(), Qt::AlignRight, get_tpms_text(fl), get_tpms_color(fl));
-    drawText2(p, center_x+marginX, center_y-marginY-rcFont.height(), Qt::AlignLeft, get_tpms_text(fr), get_tpms_color(fr));
-    drawText2(p, center_x-marginX, center_y+marginY, Qt::AlignRight, get_tpms_text(rl), get_tpms_color(rl));
-    drawText2(p, center_x+marginX, center_y+marginY, Qt::AlignLeft, get_tpms_text(rr), get_tpms_color(rr));
+    drawText3(p, center_x-marginX, center_y-marginY-rcFont.height(), Qt::AlignRight, get_tpms_text(fl), get_tpms_color(fl));
+    drawText3(p, center_x+marginX, center_y-marginY-rcFont.height(), Qt::AlignLeft, get_tpms_text(fr), get_tpms_color(fr));
+    drawText3(p, center_x-marginX, center_y+marginY, Qt::AlignRight, get_tpms_text(rl), get_tpms_color(rl));
+    drawText3(p, center_x+marginX, center_y+marginY, Qt::AlignLeft, get_tpms_text(rr), get_tpms_color(rr));
   }
 
   // cruise gap (bottom 1 right)
@@ -512,78 +760,10 @@ void NvgWindow::drawIcons(QPainter &p) {
   }
 
   configFont(p, "Open Sans", 35, "Bold");
-  drawText(p, x, y-20, "GAP", 200);
+  drawText2(p, x, y-20, "GAP", 200);
 
   configFont(p, "Open Sans", textSize, "Bold");
   drawTextWithColor(p, x, y+50, str, textColor);
-
-  // engage-ability icon, steering wheel (upper right 1)
-  const auto cs = sm["controlsState"].getControlsState();
-  bool engageable = cs.getEngageable() || cs.getEnabled();
-  if (engageable) {
-    x = rect().right() - (radius / 2) - (bdr_s * 2);
-    y = radius / 2 + (bdr_s * 1.5);
-    drawIcon(p, x, y, img_wheel, bg_colors[status], 1.0);
-  }
-
-  // wifi (upper right 2)
-  int wifi_state = sm["deviceState"].getDeviceState().getNetworkStrength();
-  float img_alpha = wifi_state ? 1.0f : 0.15f;
-  float bg_alpha = wifi_state ? 0.3f : 0.1f;
-  x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
-  y = radius / 2 + (bdr_s * 1.5);
-  drawIcon(p, x, y, img_wifi, QColor(0, 0, 0, (255 * bg_alpha)), img_alpha);
-
-  // gps (upper right 3)
-  bool gps_state = sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK();
-  img_alpha = gps_state ? 1.0f : 0.15f;
-  bg_alpha = gps_state ? 0.3f : 0.1f;
-  x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 2);
-  y = radius / 2 + (bdr_s * 1.5);
-  drawIcon(p, x, y, img_gps, QColor(0, 0, 0, (255 * bg_alpha)), img_alpha);
-
-  // dm icon (bottom 1 left)
-  bool dmActive = sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode();
-  img_alpha = dmActive ? 1.0f : 0.15f;
-  bg_alpha = dmActive ? 0.3f : 0.1f;
-  x = radius / 2 + (bdr_s * 2);
-  y = rect().bottom() - (footer_h / 2);
-  drawIcon(p, x, y, img_dm, QColor(0, 0, 0, (255 * bg_alpha)), img_alpha);
-
-  // brake (bottom 2 left)
-  //bool brake_valid = car_state.getBrakeLights();
-  bool brake_valid = car_state.getBrakePressed();
-  img_alpha = brake_valid ? 1.0f : 0.15f;
-  bg_alpha = brake_valid ? 0.3f : 0.1f;
-  x = radius / 2 + (bdr_s * 2);
-  y = rect().bottom() - (footer_h / 2) - (radius);
-  drawIcon(p, x, y, img_brake_disc, QColor(0, 0, 0, (255 * bg_alpha)), img_alpha);
-
-  // auto hold (bottom 2 right)
-  int autohold = car_state.getAutoHold();
-  if(autohold >= 0) {
-    x = radius / 2 + (bdr_s * 2) + (radius);
-    y = rect().bottom() - (footer_h / 2) - (radius);
-    img_alpha = autohold > 0 ? 1.0f : 0.15f;
-    bg_alpha = autohold > 0 ? 0.3f : 0.1f;
-    drawIcon(p, x, y, autohold > 1 ? img_autohold_warning : img_autohold_active, QColor(0, 0, 0, (255 * bg_alpha)), img_alpha);
-  }
-
-  // bsd_l (bottom 3 left)
-  bool bsd_l = car_state.getLeftBlindspot();
-  img_alpha = bsd_l ? 1.0f : 0.15f;
-  bg_alpha = bsd_l ? 0.3f : 0.1f;
-  x = radius / 2 + (bdr_s * 2);
-  y = rect().bottom() - (footer_h / 2) - (radius * 2);
-  drawIcon(p, x, y, img_bsd_l, QColor(0, 0, 0, (255 * bg_alpha)), img_alpha);
-
-  // bsd_r (bottom 3 right)
-  bool bsd_r = car_state.getRightBlindspot();
-  img_alpha = bsd_r ? 1.0f : 0.15f;
-  bg_alpha = bsd_r ? 0.3f : 0.1f;
-  x = radius / 2 + (bdr_s * 2) + (radius);
-  y = rect().bottom() - (footer_h / 2) - (radius * 2);
-  drawIcon(p, x, y, img_bsd_r, QColor(0, 0, 0, (255 * bg_alpha)), img_alpha);
 
   p.setOpacity(1.);
 }
@@ -614,7 +794,7 @@ void NvgWindow::drawMaxSpeed(QPainter &p) {
         snprintf(str, sizeof(str), "%d", (int)(applyMaxSpeed*KM_TO_MILE + 0.5));
 
     configFont(p, "Open Sans", 45, "Bold");
-    drawText(p, rc.center().x(), 100, str, 255);
+    drawText2(p, rc.center().x(), 100, str, 255);
 
     if (is_metric)
         snprintf(str, sizeof(str), "%d", (int)(cruiseMaxSpeed + 0.5));
@@ -622,19 +802,19 @@ void NvgWindow::drawMaxSpeed(QPainter &p) {
         snprintf(str, sizeof(str), "%d", (int)(cruiseMaxSpeed*KM_TO_MILE + 0.5));
 
     configFont(p, "Open Sans", 76, "Bold");
-    drawText(p, rc.center().x(), 195, str, 255);
+    drawText2(p, rc.center().x(), 195, str, 255);
 
   } else {
 
     if(long_control) {
       configFont(p, "Open Sans", 48, "sans-semibold");
-      drawText(p, rc.center().x(), 100, "OP", 100);
+      drawText2(p, rc.center().x(), 100, "OP", 100);
     } else {
       configFont(p, "Open Sans", 48, "sans-semibold");
-      drawText(p, rc.center().x(), 100, "MAX", 100);
+      drawText2(p, rc.center().x(), 100, "MAX", 100);
     }
     configFont(p, "Open Sans", 76, "sans-semibold");
-    drawText(p, rc.center().x(), 195, "N/A", 100);
+    drawText2(p, rc.center().x(), 195, "N/A", 100);
   }
 }
 
@@ -646,62 +826,9 @@ void NvgWindow::drawSpeed(QPainter &p) {
   QString speed;
   speed.sprintf("%.0f", cur_speed);
   configFont(p, "Open Sans", 176, "Bold");
-  drawText(p, rect().center().x(), 230, speed);
+  drawText2(p, rect().center().x(), 230, speed);
   configFont(p, "Open Sans", 66, "Regular");
-  drawText(p, rect().center().x(), 310, s->scene.is_metric ? "km/h" : "mph", 200);
-
-  // turning blinker sequential crwusiz / mod by arne-fork Togo
-  const int blinker_w = 250;
-  const int blinker_x = s->fb_w/2 - blinker_w/2;
-  const int pos_add = 50;
-  bool is_warning = (s->status == STATUS_WARNING);
-
-  if (s->scene.leftBlinker || s->scene.rightBlinker) {
-    s->scene.blinkingrate -= 5;
-    if (s->scene.blinkingrate < 0) s->scene.blinkingrate = 120;
-
-    float progress = (120 - s->scene.blinkingrate) / 120.0;
-    float offset = progress * (6.4 - 1.0) + 1.0;
-    if (offset < 1.0) offset = 1.0;
-    if (offset > 6.4) offset = 6.4;
-
-    float alpha = 1.0;
-    if (progress < 0.25) alpha = progress / 0.25;
-    if (progress > 0.75) alpha = 1.0 - ((progress - 0.75) / 0.25);
-
-    if (s->scene.leftBlinker) {
-      nvgBeginPath(s->vg);
-      nvgMoveTo(s->vg, blinker_x - (pos_add*offset)              , 100);
-      nvgLineTo(s->vg, blinker_x - (pos_add*offset) - blinker_w/4, 100);
-      nvgLineTo(s->vg, blinker_x - (pos_add*offset) - blinker_w/2, 200);
-      nvgLineTo(s->vg, blinker_x - (pos_add*offset) - blinker_w/4, 300);
-      nvgLineTo(s->vg, blinker_x - (pos_add*offset)              , 300);
-      nvgLineTo(s->vg, blinker_x - (pos_add*offset) - blinker_w/4, 200);
-      nvgClosePath(s->vg);
-      if (is_warning) {
-        nvgFillColor(s->vg, COLOR_WARNING_ALPHA(200 * alpha));
-      } else {
-        nvgFillColor(s->vg, COLOR_ENGAGED_ALPHA(200 * alpha));
-      }
-      nvgFill(s->vg);
-    }
-    if (s->scene.rightBlinker) {
-      nvgBeginPath(s->vg);
-      nvgMoveTo(s->vg, blinker_x + (pos_add*offset)               + blinker_w, 100);
-      nvgLineTo(s->vg, blinker_x + (pos_add*offset) + blinker_w/4 + blinker_w, 100);
-      nvgLineTo(s->vg, blinker_x + (pos_add*offset) + blinker_w/2 + blinker_w, 200);
-      nvgLineTo(s->vg, blinker_x + (pos_add*offset) + blinker_w/4 + blinker_w, 300);
-      nvgLineTo(s->vg, blinker_x + (pos_add*offset)               + blinker_w, 300);
-      nvgLineTo(s->vg, blinker_x + (pos_add*offset) + blinker_w/4 + blinker_w, 200);
-      nvgClosePath(s->vg);
-      if (is_warning) {
-        nvgFillColor(s->vg, COLOR_WARNING_ALPHA(200 * alpha));
-      } else {
-        nvgFillColor(s->vg, COLOR_ENGAGED_ALPHA(200 * alpha));
-      }
-      nvgFill(s->vg);
-    }
-  }
+  drawText2(p, rect().center().x(), 310, s->scene.is_metric ? "km/h" : "mph", 200);
 }
 
 void NvgWindow::drawSpeedLimit(QPainter &p) {
@@ -756,8 +883,10 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
     rect.translate(0, radius/2 + 45);
     rect.adjust(-30, 0, 30, 0);
     p.setPen(QColor(255, 255, 255, 230));
-    p.drawText(rect, Qt::AlignCenter, str_left_dist);
+    p.drawText2(rect, Qt::AlignCenter, str_left_dist);
+
   } else {
+
     auto controls_state = sm["controlsState"].getControlsState();
     int sccStockCamAct = (int)controls_state.getSccStockCamAct();
     int sccStockCamStatus = (int)controls_state.getSccStockCamStatus();
@@ -779,7 +908,113 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
 
       configFont(p, "Open Sans", 70, "Bold");
       p.setPen(QColor(0, 0, 0, 230));
-      p.drawText(rect, Qt::AlignCenter, "CAM");
+      p.drawText2(rect, Qt::AlignCenter, "CAM");
     }
   }
 }
+
+// neokii add end
+
+/*
+  // turning blinker sequential crwusiz / mod by arne-fork Togo
+  const int blinker_w = 250;
+  const int blinker_x = s->fb_w/2 - blinker_w/2;
+  const int pos_add = 50;
+  bool is_warning = (s->status == STATUS_WARNING);
+
+  if (s->scene.leftBlinker || s->scene.rightBlinker) {
+    s->scene.blinkingrate -= 5;
+    if (s->scene.blinkingrate < 0) s->scene.blinkingrate = 120;
+
+    float progress = (120 - s->scene.blinkingrate) / 120.0;
+    float offset = progress * (6.4 - 1.0) + 1.0;
+    if (offset < 1.0) offset = 1.0;
+    if (offset > 6.4) offset = 6.4;
+
+    float alpha = 1.0;
+    if (progress < 0.25) alpha = progress / 0.25;
+    if (progress > 0.75) alpha = 1.0 - ((progress - 0.75) / 0.25);
+
+    if (s->scene.leftBlinker) {
+      nvgBeginPath(s->vg);
+      nvgMoveTo(s->vg, blinker_x - (pos_add*offset)              , 100);
+      nvgLineTo(s->vg, blinker_x - (pos_add*offset) - blinker_w/4, 100);
+      nvgLineTo(s->vg, blinker_x - (pos_add*offset) - blinker_w/2, 200);
+      nvgLineTo(s->vg, blinker_x - (pos_add*offset) - blinker_w/4, 300);
+      nvgLineTo(s->vg, blinker_x - (pos_add*offset)              , 300);
+      nvgLineTo(s->vg, blinker_x - (pos_add*offset) - blinker_w/4, 200);
+      nvgClosePath(s->vg);
+      if (is_warning) {
+        nvgFillColor(s->vg, COLOR_WARNING_ALPHA(200 * alpha));
+      } else {
+        nvgFillColor(s->vg, COLOR_ENGAGED_ALPHA(200 * alpha));
+      }
+      nvgFill(s->vg);
+    }
+    if (s->scene.rightBlinker) {
+      nvgBeginPath(s->vg);
+      nvgMoveTo(s->vg, blinker_x + (pos_add*offset)               + blinker_w, 100);
+      nvgLineTo(s->vg, blinker_x + (pos_add*offset) + blinker_w/4 + blinker_w, 100);
+      nvgLineTo(s->vg, blinker_x + (pos_add*offset) + blinker_w/2 + blinker_w, 200);
+      nvgLineTo(s->vg, blinker_x + (pos_add*offset) + blinker_w/4 + blinker_w, 300);
+      nvgLineTo(s->vg, blinker_x + (pos_add*offset)               + blinker_w, 300);
+      nvgLineTo(s->vg, blinker_x + (pos_add*offset) + blinker_w/4 + blinker_w, 200);
+      nvgClosePath(s->vg);
+      if (is_warning) {
+        nvgFillColor(s->vg, COLOR_WARNING_ALPHA(200 * alpha));
+      } else {
+        nvgFillColor(s->vg, COLOR_ENGAGED_ALPHA(200 * alpha));
+      }
+      nvgFill(s->vg);
+    }
+  }
+*/
+
+/*
+  //add visual radar relative distance
+  if (is_enabled) {
+    char val_str[16];
+    char val_add[4] = "ｍ";
+    NVGcolor val_color = COLOR_WHITE_ALPHA(200);
+
+    auto lead_radar = (*s->sm)["radarState"].getRadarState().getLeadOne();
+    float radar_dist = lead_radar.getStatus() && lead_radar.getRadar() ? lead_radar.getDRel() : 0;
+
+    // Orange Color if less than 15ｍ / Red Color if less than 5ｍ
+    if (lead_radar.getStatus()) {
+      if (radar_dist < 15) { val_color = COLOR_WARNING_ALPHA(200); }
+      if (radar_dist < 5) { val_color = COLOR_RED_ALPHA(200); }
+      snprintf(val_str, sizeof(val_str), "%.1f", radar_dist);
+    } else {
+      snprintf(val_str, sizeof(val_str), "-");
+    }
+
+    strcat(val_str, val_add);
+    h += ui_draw_measure(s, val_str, "Radar 거리", rx, ry, val_color, lab_color, value_fontSize, label_fontSize);
+    ry = y + h;
+  }
+
+
+  //add visual vision relative distance
+  if (is_enabled) {
+    char val_str[16];
+    char val_add[4] = "ｍ";
+    NVGcolor val_color = COLOR_WHITE_ALPHA(200);
+
+    auto lead_vision = (*s->sm)["modelV2"].getModelV2().getLeadsV3()[0];
+    float vision_dist = lead_vision.getProb() > .5 ? (lead_vision.getX()[0] - 1.5) : 0;
+
+    // Orange Color if less than 15ｍ / Red Color if less than 5ｍ
+    if (lead_vision.getProb()) {
+      if (vision_dist < 15) { val_color = COLOR_WARNING_ALPHA(200); }
+      if (vision_dist < 5) { val_color = COLOR_RED_ALPHA(200); }
+      snprintf(val_str, sizeof(val_str), "%.1f", vision_dist);
+    } else {
+      snprintf(val_str, sizeof(val_str), "-");
+    }
+
+    strcat(val_str, val_add);
+    h += ui_draw_measure(s, val_str, "Vision 거리", rx, ry, val_color, lab_color, value_fontSize, label_fontSize);
+    ry = y + h;
+  }
+*/
