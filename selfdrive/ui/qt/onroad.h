@@ -19,7 +19,14 @@ class OnroadHud : public QWidget {
   Q_PROPERTY(bool dmActive MEMBER dmActive NOTIFY valueChanged);
   Q_PROPERTY(bool hideDM MEMBER hideDM NOTIFY valueChanged);
   Q_PROPERTY(int status MEMBER status NOTIFY valueChanged);
-  Q_PROPERTY(bool braking MEMBER braking NOTIFY valueChanged);
+  Q_PROPERTY(bool brake_stat MEMBER brake_stat NOTIFY valueChanged);
+
+  Q_PROPERTY(int autohold_stat MEMBER autohold_stat NOTIFY valueChanged);
+  Q_PROPERTY(bool bsd_l_stat MEMBER bsd_l_stat NOTIFY valueChanged);
+  Q_PROPERTY(bool bsd_r_stat MEMBER bsd_r_stat NOTIFY valueChanged);
+  Q_PROPERTY(int wifi_stat MEMBER wifi_stat NOTIFY valueChanged);
+  Q_PROPERTY(bool gps_stat MEMBER gps_stat NOTIFY valueChanged);
+
   Q_PROPERTY(int lead_status MEMBER lead_status NOTIFY valueChanged);
   Q_PROPERTY(float lead_d_rel MEMBER lead_d_rel NOTIFY valueChanged);
   Q_PROPERTY(float lead_v_rel MEMBER lead_v_rel NOTIFY valueChanged);
@@ -35,17 +42,24 @@ private:
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
   void paintEvent(QPaintEvent *event) override;
   void drawLeftDevUi(QPainter &p, int x, int y);
-  int devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label);
+  int devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, QColor &color);
+  void drawColoredText(QPainter &p, int x, int y, const QString &text, QColor &color);
 
   QPixmap engage_img;
   QPixmap dm_img;
 
-  // crwusiz
+  // wirelessnet2 add
   QPixmap brake_img;
+
+  // crwusiz add
   QPixmap bsd_l_img;
   QPixmap bsd_r_img;
   QPixmap gps_img;
   QPixmap wifi_img;
+
+  // neokii
+  QPixmap autohold_warning_img;
+  QPixmap autohold_active_img;
 
   const int radius = 160;
   const int img_size = (radius / 2) * 1.5;
@@ -56,14 +70,21 @@ private:
   bool engageable = false;
   bool dmActive = false;
   bool hideDM = false;
-  bool braking = false;
+  bool brake_stat = false;
   int status = STATUS_DISENGAGED;
+
+  int autohold_stat = 0;
+  bool bsd_l_stat = false;
+  bool bsd_r_stat = false;
+  int wifi_stat = 0;
+  bool gps_stat = false;
 
   int lead_status;
   float lead_d_rel = 0;
   float lead_v_rel = 0;
   float angleSteers = 0;
   float steerAngleDesired = 0;
+  float cpuTemp = 0;
 
 signals:
   void valueChanged();
@@ -102,17 +123,15 @@ protected:
   double prev_draw_t = 0;
 
   // neokii add start
-  void drawIcon2(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity);
-  void drawText2(QPainter &p, int x, int y, const QString &text, int alpha = 255);
-  void drawText3(QPainter &p, int x, int y, int flags, const QString &text, const QColor& color);
-  void drawTextWithColor(QPainter &p, int x, int y, const QString &text, QColor& color);
+  void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
+  void drawTextFlag(QPainter &p, int x, int y, int flags, const QString &text, const QColor& color);
+  void drawTextColor(QPainter &p, int x, int y, const QString &text, QColor& color);
+  void paintEvent(QPaintEvent *event) override;
 
   const int radius = 192;
   const int img_size = (radius / 2) * 1.5;
 
   // neokii
-  QPixmap autohold_warning_img;
-  QPixmap autohold_active_img;
   QPixmap nda_img;
   QPixmap hda_img;
   QPixmap tire_pressure_img;
@@ -122,7 +141,6 @@ protected:
   void drawIcons(QPainter &p);
   void drawSpeedLimit(QPainter &p);
   void drawHud(QPainter &p);
-// neokii add end
 };
 
 // container for all onroad widgets
