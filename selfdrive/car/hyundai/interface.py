@@ -232,15 +232,15 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.lqr.k = [-110.0, 451.0]
           ret.lateralTuning.lqr.l = [0.33, 0.318]
       elif candidate in [CAR.GRANDEUR, CAR.GRANDEUR_HEV, CAR.GRANDEUR20, CAR.GRANDEUR20_HEV, CAR.K7, CAR.K7_HEV]:
-        ret.lateralTuning.init('lqr')
-        ret.lateralTuning.lqr.scale = 1550.
-        ret.lateralTuning.lqr.ki = 0.01
-        ret.lateralTuning.lqr.dcGain = 0.0027
-        ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-        ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-        ret.lateralTuning.lqr.c = [1., 0.]
-        ret.lateralTuning.lqr.k = [-110., 451.]
-        ret.lateralTuning.lqr.l = [0.33, 0.318]
+          ret.lateralTuning.init('lqr')
+          ret.lateralTuning.lqr.scale = 1550.
+          ret.lateralTuning.lqr.ki = 0.01
+          ret.lateralTuning.lqr.dcGain = 0.0027
+          ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
+          ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
+          ret.lateralTuning.lqr.c = [1., 0.]
+          ret.lateralTuning.lqr.k = [-110., 451.]
+          ret.lateralTuning.lqr.l = [0.33, 0.318]
       elif candidate == CAR.SELTOS:
           ret.lateralTuning.init('lqr')
           ret.lateralTuning.lqr.scale = 1500.0
@@ -306,13 +306,6 @@ class CarInterface(CarInterfaceBase):
     ret.steerMaxBP = [0.]
     ret.steerMaxV = [2.]
 
-    ret.stopAccel = -2.0
-    ret.stoppingDecelRate = 0.6  # brake_travel/s while trying to stop
-    ret.vEgoStopping = 0.5
-    ret.vEgoStarting = 0.5
-
-    ret.stoppingControl = True
-
     # ignore CAN2 address if L-CAN on the same BUS
     ret.mdpsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
     ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
@@ -354,7 +347,6 @@ class CarInterface(CarInterfaceBase):
     # most HKG cars has no long control, it is safer and easier to engage by main on
     if self.mad_mode_enabled:
       ret.cruiseState.enabled = ret.cruiseState.available
-      #ret.brakePressed = ret.gasPressed = False
 
     # turning indicator alert logic
     if (ret.leftBlinker or ret.rightBlinker or self.CC.turning_signal_timer) and ret.vEgo < LANE_CHANGE_SPEED_MIN - 1.2:

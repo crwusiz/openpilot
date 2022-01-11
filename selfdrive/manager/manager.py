@@ -5,7 +5,6 @@ import signal
 import subprocess
 import sys
 import traceback
-from multiprocessing import Process
 from typing import List, Tuple, Union
 
 import cereal.messaging as messaging
@@ -52,10 +51,7 @@ def manager_init() -> None:
     ("MfcSelect", "0"),
     ("LateralControlSelect", "0"),
     ("ShutdowndDisable", "1"),
-    ("LoggerDisable", "0"),
-    ("SccSmootherSlowOnCurves", "1"),
-    ("SccSmootherSyncGasPressed", "1"),
-    ("StockNaviDecelEnabled", "0"),
+    ("LoggerDisable", "1"),
     ("NewRadarInterface", "0"),
   ]
   if not PC:
@@ -134,14 +130,7 @@ def manager_cleanup() -> None:
   cloudlog.info("everything is dead")
 
 
-def manager_thread() -> None:
-
-  if EON:
-    Process(name="shutdownd", target=launcher, args=("selfdrive.shutdownd", "shutdownd")).start()
-    system("am startservice com.neokii.optool/.MainService")
-
-  Process(name="road_speed_limiter", target=launcher, args=("selfdrive.road_speed_limiter", "road_speed_limiter")).start()
-  cloudlog.bind(daemon="manager")
+def manager_thread():
   cloudlog.info("manager start")
   cloudlog.info({"environ": os.environ})
 
@@ -169,12 +158,14 @@ def manager_thread() -> None:
 
     if params.get_bool("ShutdowndDisable"):
       not_run.append("shutdownd")
+
     if params.get_bool("LoggerDisable"):
       not_run.append("loggerd")
       not_run.append("deleter")
       not_run.append("logmessaged")
       not_run.append("tombstoned")
       not_run.append("uploader")
+
     started = sm['deviceState'].started
     driverview = params.get_bool("IsDriverViewEnabled")
     ensure_running(managed_processes.values(), started, driverview, not_run)

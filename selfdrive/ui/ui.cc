@@ -214,14 +214,6 @@ void UIState::updateStatus() {
       scene.output_scale = scene.controls_state.getLateralControlState().getLqrState().getOutput();
     }
   }
-  if (sm->updated("carState")) {
-    scene.car_state = (*sm)["carState"].getCarState();
-    if(scene.leftBlinker!=scene.car_state.getLeftBlinker() || scene.rightBlinker!=scene.car_state.getRightBlinker()){
-      scene.blinkingrate = 120;
-    }
-    scene.leftBlinker = scene.car_state.getLeftBlinker();
-    scene.rightBlinker = scene.car_state.getRightBlinker();
-  }
   // Handle onroad/offroad transition
   if (scene.started != started_prev) {
     if (scene.started) {

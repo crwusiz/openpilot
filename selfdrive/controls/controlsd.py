@@ -38,8 +38,8 @@ STEER_ANGLE_SATURATION_THRESHOLD = 2.5  # Degrees
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
 NOSENSOR = "NOSENSOR" in os.environ
-IGNORE_PROCESSES = {"rtshield", "uploader", "deleter", "loggerd", "logmessaged", "tombstoned",
-                    "logcatd", "proclogd", "clocksd", "updated", "timezoned", "manage_athenad"} | \
+IGNORE_PROCESSES = {"shutdownd", "rtshield", "uploader", "deleter", "loggerd", "logmessaged", "tombstoned",
+                    "road_speed_limiter", "logcatd", "proclogd", "clocksd", "updated", "timezoned", "manage_athenad"} | \
                     {k for k, v in managed_processes.items() if not v.enabled}
 
 ACTUATOR_FIELDS = set(car.CarControl.Actuators.schema.fields.keys())
@@ -367,9 +367,9 @@ class Controls:
         self.events.add(EventName.localizerMalfunction)
 
       # Check if all manager processes are running
-      not_running = {p.name for p in self.sm['managerState'].processes if not p.running}
-      if self.sm.rcv_frame['managerState'] and (not_running - IGNORE_PROCESSES):
-        self.events.add(EventName.processNotRunning)
+      #not_running = {p.name for p in self.sm['managerState'].processes if not p.running}
+      #if self.sm.rcv_frame['managerState'] and (not_running - IGNORE_PROCESSES):
+      #  self.events.add(EventName.processNotRunning)
 
     # Only allow engagement with brake pressed when stopped behind another stopped car
     speeds = self.sm['longitudinalPlan'].speeds

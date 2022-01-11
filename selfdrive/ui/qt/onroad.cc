@@ -219,7 +219,6 @@ void OnroadHud::updateState(const UIState &s) {
   setProperty("bsd_l_stat", car_state.getLeftBlindspot());
   setProperty("bsd_r_stat", car_state.getRightBlindspot());
   setProperty("autohold_stat", car_state.getAutoHold());
-
   setProperty("lead_d_rel", leadOne.getDRel());
   setProperty("lead_v_rel", leadOne.getVRel());
   setProperty("lead_status", leadOne.getStatus());
@@ -229,7 +228,7 @@ void OnroadHud::updateState(const UIState &s) {
 }
 
 int OnroadHud::devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, QColor &color) {
-  configFont(p, "Open Sans", 30 * 2, "SemiBold");
+  configFont(p, "Open Sans", 45, "SemiBold");
   drawColoredText(p, x + 92, y + 80, QString(value), color);
 
   configFont(p, "Open Sans", 28, "Regular");
@@ -257,11 +256,11 @@ void OnroadHud::drawLeftDevUi(QPainter &p, int x, int y) {
   // QColor(120, 255, 120, 255) -> lime
   // QColor(255, 255, 0, 255) -> yellow
 
-  // Add cputemp
   UIState *s = uiState();
   const SubMaster &sm = *(s->sm);
   const auto device_state = sm["deviceState"].getDeviceState();
 
+  // Add cputemp
   if (true) {
     char val_str[8];
     QColor valueColor = QColor(255, 255, 255, 255);
@@ -405,6 +404,7 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   p.drawRoundedRect(rc, 20, 20);
   p.setPen(Qt::NoPen);
 
+  /*
   configFont(p, "Open Sans", 48, "Regular");
   drawText(p, rc.center().x(), 118, "MAX", is_cruise_set ? 200 : 100);
   if (is_cruise_set) {
@@ -414,6 +414,7 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
     configFont(p, "Open Sans", 80, "SemiBold");
     drawText(p, rc.center().x(), 212, maxSpeed, 100);
   }
+  */
 
   // current speed
   configFont(p, "Open Sans", 176, "Bold");
@@ -421,16 +422,16 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   configFont(p, "Open Sans", 66, "Regular");
   drawText(p, rect().center().x(), 290, speedUnit, 200);
 
-  // left Dev UI
+  // left Dev UI -> Right move
   if (!hideDM) {
-    drawLeftDevUi(p, bdr_s * 2, bdr_s * 2 + rc.height());
+    drawLeftDevUi(p, rect().right() - radius * 2 - bdr_s * 2, bdr_s * 2.5 + rc.height());
   }
 
   // engage-ability icon ( wheel ) (upper right 1)
   // x = rect().right() - radius / 2 - bdr_s * 2
   // y = radius / 2 + int(bdr_s * 1.5)
   if (engageable) {
-    drawIcon(p, rect().right() - radius / 2 - bdr_s * 2, radius / 2 + int(bdr_s * 1.5),
+    drawIcon(p, rect().right() - radius * 2 - bdr_s * 2, radius / 2 + int(bdr_s * 1.5),
              engage_img, bg_colors[status], 1.0);
   }
 
@@ -438,13 +439,13 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
     // dm icon
     // x = rc.center().x()
     // y = rect().bottom() - footer_h / 2 + 50
-    drawIcon(p, rc.center().x(), rect().bottom() - footer_h / 2 + 50,
+    drawIcon(p, rc.center().x(), rect().bottom() - footer_h / 2,
              dm_img, QColor(0, 0, 0, 70), dmActive ? 1.0 : 0.2);
 
     p.setOpacity(1.0); // dmActive will determine opacity of brake_img's bg without this :/ -wirelessnet2
 
     // brake icon
-    drawIcon(p, rc.center().x() + 250, rect().bottom() - footer_h / 2 + 50,
+    drawIcon(p, radius / 2 + (bdr_s * 2), rect().bottom() - (footer_h / 2) - (radius),
               brake_img, QColor(0, 0, 0, 70), brake_stat ? 1.0 : 0.2);
 
   // auto hold (bottom 2 right)
@@ -522,8 +523,10 @@ void NvgWindow::initializeGL() {
   setBackgroundColor(bg_colors[STATUS_DISENGAGED]);
 
   // neokii
-  nda_img = QPixmap("../assets/images/img_nda.png");
-  hda_img = QPixmap("../assets/images/img_hda.png");
+  nda_img = QPixmap("../assets/img_nda.png");
+  hda_img = QPixmap("../assets/img_hda.png");
+  turnsignal_l_img = QPixmap("../assets/img_turnsignal_l.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+  turnsignal_r_img = QPixmap("../assets/img_turnsignal_r.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
   tire_pressure_img = QPixmap("../assets/img_tire_pressure.png");
 }
 
@@ -637,9 +640,6 @@ void NvgWindow::paintEvent(QPaintEvent *event) {
 
   UIState *s = uiState();
   if (s->worldObjectsVisible()) {
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(Qt::NoPen);
     drawHud(p);
   }
 
@@ -663,8 +663,7 @@ void NvgWindow::showEvent(QShowEvent *event) {
 
 // neokii add start
 
-/*
-void NvgWindow::drawIcon2(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
+void NvgWindow::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
   p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
@@ -672,16 +671,6 @@ void NvgWindow::drawIcon2(QPainter &p, int x, int y, QPixmap &img, QBrush bg, fl
   p.drawPixmap(x - img_size / 2, y - img_size / 2, img_size, img_size, img);
 }
 
-void NvgWindow::drawText2(QPainter &p, int x, int y, const QString &text, int alpha) {
-  QFontMetrics fm(p.font());
-  QRect init_rect = fm.boundingRect(text);
-  QRect real_rect = fm.boundingRect(init_rect, 0, text);
-  real_rect.moveCenter({x, y - real_rect.height() / 2});
-
-  p.setPen(QColor(0xff, 0xff, 0xff, alpha));
-  p.drawText(real_rect.x(), real_rect.bottom(), text);
-}
-*/
 void NvgWindow::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
   QFontMetrics fm(p.font());
   QRect init_rect = fm.boundingRect(text);
@@ -710,7 +699,6 @@ void NvgWindow::drawTextColor(QPainter &p, int x, int y, const QString &text, QC
 }
 
 void NvgWindow::drawHud(QPainter &p) {
-
   p.setRenderHint(QPainter::Antialiasing);
   p.setPen(Qt::NoPen);
   p.setOpacity(1.);
@@ -738,6 +726,8 @@ void NvgWindow::drawHud(QPainter &p) {
   drawMaxSpeed(p);
   drawSpeed(p);
   drawSpeedLimit(p);
+  drawTurnSignals(p);
+  drawIcons(p);
 
   //bottom info
   const auto controls_state = sm["controlsState"].getControlsState();
@@ -755,9 +745,8 @@ void NvgWindow::drawHud(QPainter &p) {
   float gpsAccuracy = gps_ext.getAccuracy();
   int gpsSatelliteCount = s->scene.satelliteCount;
 
-  if(verticalAccuracy == 0 || verticalAccuracy > 100)
+  if (verticalAccuracy == 0 || verticalAccuracy > 100)
       gpsAltitude = 99.99;
-
   if (gpsAccuracy > 100)
     gpsAccuracy = 99.99;
   else if (gpsAccuracy == 0)
@@ -774,24 +763,21 @@ void NvgWindow::drawHud(QPainter &p) {
     gpsSatelliteCount
   );
 
-  // info
   configFont(p, "Open Sans", 34, "Regular");
   p.setPen(QColor(0xff, 0xff, 0xff, 200));
   p.drawText(rect().left() + 20, rect().height() - 15, infoText);
-
-  drawIcons(p);
 }
 
 static const QColor get_tpms_color(float tpms) {
-    if(tpms < 5 || tpms > 60)
+    if (tpms < 5 || tpms > 60)
         return QColor(255, 255, 255, 220);
-    if(tpms < 31)
+    if (tpms < 31)
         return QColor(255, 90, 90, 220);
     return QColor(255, 255, 255, 220);
 }
 
 static const QString get_tpms_text(float tpms) {
-    if(tpms < 5 || tpms > 60)
+    if (tpms < 5 || tpms > 60)
         return "";
 
     char str[32];
@@ -811,7 +797,7 @@ void NvgWindow::drawIcons(QPainter &p) {
   {
     const int w = 66;
     const int h = 146;
-    const int x = 110;
+    const int x = width() - w - 80;
     const int y = height() - h - 80;
 
     auto tpms = car_state.getTpms();
@@ -824,7 +810,6 @@ void NvgWindow::drawIcons(QPainter &p) {
     p.drawPixmap(x, y, w, h, tire_pressure_img);
 
     configFont(p, "Open Sans", 38, "Bold");
-
     QFontMetrics fm(p.font());
     QRect rcFont = fm.boundingRect("9");
 
@@ -855,9 +840,9 @@ void NvgWindow::drawIcons(QPainter &p) {
   float textSize = 50.f;
   QColor textColor = QColor(255, 255, 255, 200);
 
-  if(gap <= 0) {
+  if (gap <= 0) {
     str = "N/A";
-  } else if(longControl && gap == autoTrGap) {
+  } else if (longControl && gap == autoTrGap) {
     str = "AUTO";
     textColor = QColor(120, 255, 120, 200);
   } else {
@@ -868,10 +853,8 @@ void NvgWindow::drawIcons(QPainter &p) {
 
   configFont(p, "Open Sans", 35, "Bold");
   drawText(p, x, y-20, "GAP", 200);
-
   configFont(p, "Open Sans", textSize, "Bold");
   drawTextColor(p, x, y+50, str, textColor);
-
   p.setOpacity(1.);
 }
 
@@ -913,7 +896,7 @@ void NvgWindow::drawMaxSpeed(QPainter &p) {
 
   } else {
 
-    if(long_control) {
+    if (long_control) {
       configFont(p, "Open Sans", 48, "sans-semibold");
       drawText(p, rc.center().x(), 100, "OP", 100);
     } else {
@@ -921,7 +904,7 @@ void NvgWindow::drawMaxSpeed(QPainter &p) {
       drawText(p, rc.center().x(), 100, "MAX", 100);
     }
     configFont(p, "Open Sans", 76, "sans-semibold");
-    drawText(p, rc.center().x(), 195, "N/A", 100);
+    drawText(p, rc.center().x(), 195, "-", 100);
   }
 }
 
@@ -947,19 +930,17 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
   int limit_speed = scc_smoother.getRoadLimitSpeed();
   int left_dist = scc_smoother.getRoadLimitSpeedLeftDist();
 
-  if(activeNDA > 0) {
+  if (activeNDA > 0) {
       int w = 120;
       int h = 54;
       int x = (width() + (bdr_s*2))/2 - w/2 - bdr_s;
       int y = 40 - bdr_s;
-
       p.setOpacity(1.f);
       p.drawPixmap(x, y, w, h, activeNDA == 1 ? nda_img : hda_img);
   }
 
-  if(limit_speed > 10 && left_dist > 0) {
+  if (limit_speed > 10 && left_dist > 0) {
     int radius = 192;
-
     int x = 30;
     int y = 270;
 
@@ -967,7 +948,6 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
     p.setBrush(QBrush(QColor(255, 0, 0, 255)));
     QRect rect = QRect(x, y, radius, radius);
     p.drawEllipse(rect);
-
     p.setBrush(QBrush(QColor(255, 255, 255, 255)));
 
     const int tickness = 14;
@@ -977,7 +957,7 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
     QString str_limit_speed, str_left_dist;
     str_limit_speed.sprintf("%d", limit_speed);
 
-    if(left_dist >= 1000)
+    if (left_dist >= 1000)
       str_left_dist.sprintf("%.1fkm", left_dist / 1000.f);
     else
       str_left_dist.sprintf("%dm", left_dist);
@@ -998,7 +978,7 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
     int sccStockCamAct = (int)controls_state.getSccStockCamAct();
     int sccStockCamStatus = (int)controls_state.getSccStockCamStatus();
 
-    if(sccStockCamAct == 2 && sccStockCamStatus == 2) {
+    if (sccStockCamAct == 2 && sccStockCamStatus == 2) {
       int radius = 192;
       int x = 30;
       int y = 270;
@@ -1020,108 +1000,76 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
   }
 }
 
-// neokii add end
+void NvgWindow::drawTurnSignals(QPainter &p) {
+  static int blink_index = 0;
+  static int blink_wait = 0;
+  static double prev_ts = 0.0;
 
-/*
-  // turning blinker sequential crwusiz / mod by arne-fork Togo
-  const int blinker_w = 250;
-  const int blinker_x = s->fb_w/2 - blinker_w/2;
-  const int pos_add = 50;
-  bool is_warning = (s->status == STATUS_WARNING);
+  if (blink_wait > 0) {
+    blink_wait--;
+    blink_index = 0;
+  } else {
+    const SubMaster &sm = *(uiState()->sm);
+    auto car_state = sm["carState"].getCarState();
+    bool left_on = car_state.getLeftBlinker();
+    bool right_on = car_state.getRightBlinker();
 
-  if (s->scene.leftBlinker || s->scene.rightBlinker) {
-    s->scene.blinkingrate -= 5;
-    if (s->scene.blinkingrate < 0) s->scene.blinkingrate = 120;
+    const float img_alpha = 0.8f;
+    const int fb_w = width() / 2 - 200;
+    const int center_x = width() / 2;
+    const int w = fb_w / 25;
+    const int h = 160;
+    const int gap = fb_w / 25;
+    const int margin = (int)(fb_w / 3.8f);
+    const int base_y = (height() - h) / 2;
+    const int draw_count = 8;
 
-    float progress = (120 - s->scene.blinkingrate) / 120.0;
-    float offset = progress * (6.4 - 1.0) + 1.0;
-    if (offset < 1.0) offset = 1.0;
-    if (offset > 6.4) offset = 6.4;
+    int x = center_x;
+    int y = base_y;
 
-    float alpha = 1.0;
-    if (progress < 0.25) alpha = progress / 0.25;
-    if (progress > 0.75) alpha = 1.0 - ((progress - 0.75) / 0.25);
+    if (left_on) {
+      for (int i = 0; i < draw_count; i++) {
+        float alpha = img_alpha;
+        int d = std::abs(blink_index - i);
+        if (d > 0)
+          alpha /= d*2;
 
-    if (s->scene.leftBlinker) {
-      nvgBeginPath(s->vg);
-      nvgMoveTo(s->vg, blinker_x - (pos_add*offset)              , 100);
-      nvgLineTo(s->vg, blinker_x - (pos_add*offset) - blinker_w/4, 100);
-      nvgLineTo(s->vg, blinker_x - (pos_add*offset) - blinker_w/2, 200);
-      nvgLineTo(s->vg, blinker_x - (pos_add*offset) - blinker_w/4, 300);
-      nvgLineTo(s->vg, blinker_x - (pos_add*offset)              , 300);
-      nvgLineTo(s->vg, blinker_x - (pos_add*offset) - blinker_w/4, 200);
-      nvgClosePath(s->vg);
-      if (is_warning) {
-        nvgFillColor(s->vg, COLOR_WARNING_ALPHA(200 * alpha));
-      } else {
-        nvgFillColor(s->vg, COLOR_ENGAGED_ALPHA(200 * alpha));
+        p.setOpacity(alpha);
+        float factor = (float)draw_count / (i + draw_count);
+        p.drawPixmap(x - w - margin, y + (h-h*factor)/2, w*factor, h*factor, turnsignal_l_img);
+        x -= gap + w;
       }
-      nvgFill(s->vg);
     }
-    if (s->scene.rightBlinker) {
-      nvgBeginPath(s->vg);
-      nvgMoveTo(s->vg, blinker_x + (pos_add*offset)               + blinker_w, 100);
-      nvgLineTo(s->vg, blinker_x + (pos_add*offset) + blinker_w/4 + blinker_w, 100);
-      nvgLineTo(s->vg, blinker_x + (pos_add*offset) + blinker_w/2 + blinker_w, 200);
-      nvgLineTo(s->vg, blinker_x + (pos_add*offset) + blinker_w/4 + blinker_w, 300);
-      nvgLineTo(s->vg, blinker_x + (pos_add*offset)               + blinker_w, 300);
-      nvgLineTo(s->vg, blinker_x + (pos_add*offset) + blinker_w/4 + blinker_w, 200);
-      nvgClosePath(s->vg);
-      if (is_warning) {
-        nvgFillColor(s->vg, COLOR_WARNING_ALPHA(200 * alpha));
-      } else {
-        nvgFillColor(s->vg, COLOR_ENGAGED_ALPHA(200 * alpha));
+
+    x = center_x;
+    if (right_on) {
+      for (int i = 0; i < draw_count; i++) {
+        float alpha = img_alpha;
+        int d = std::abs(blink_index - i);
+        if (d > 0)
+          alpha /= d*2;
+
+        float factor = (float)draw_count / (i + draw_count);
+        p.setOpacity(alpha);
+        p.drawPixmap(x + margin, y + (h-h*factor)/2, w*factor, h*factor, turnsignal_r_img);
+        x += gap + w;
       }
-      nvgFill(s->vg);
     }
-  }
-*/
 
-/*
-  //add visual radar relative distance
-  if (is_enabled) {
-    char val_str[16];
-    char val_add[4] = "ｍ";
-    NVGcolor val_color = COLOR_WHITE_ALPHA(200);
-
-    auto lead_radar = (*s->sm)["radarState"].getRadarState().getLeadOne();
-    float radar_dist = lead_radar.getStatus() && lead_radar.getRadar() ? lead_radar.getDRel() : 0;
-
-    // Orange Color if less than 15ｍ / Red Color if less than 5ｍ
-    if (lead_radar.getStatus()) {
-      if (radar_dist < 15) { val_color = COLOR_WARNING_ALPHA(200); }
-      if (radar_dist < 5) { val_color = COLOR_RED_ALPHA(200); }
-      snprintf(val_str, sizeof(val_str), "%.1f", radar_dist);
+    if (left_on || right_on) {
+      double now = millis_since_boot();
+      if (now - prev_ts > 900/UI_FREQ) {
+        prev_ts = now;
+        blink_index++;
+      }
+      if (blink_index >= draw_count) {
+        blink_index = draw_count - 1;
+        blink_wait = UI_FREQ/4;
+      }
     } else {
-      snprintf(val_str, sizeof(val_str), "-");
+      blink_index = 0;
     }
-
-    strcat(val_str, val_add);
-    h += ui_draw_measure(s, val_str, "Radar 거리", rx, ry, val_color, lab_color, value_fontSize, label_fontSize);
-    ry = y + h;
   }
 
-
-  //add visual vision relative distance
-  if (is_enabled) {
-    char val_str[16];
-    char val_add[4] = "ｍ";
-    NVGcolor val_color = COLOR_WHITE_ALPHA(200);
-
-    auto lead_vision = (*s->sm)["modelV2"].getModelV2().getLeadsV3()[0];
-    float vision_dist = lead_vision.getProb() > .5 ? (lead_vision.getX()[0] - 1.5) : 0;
-
-    // Orange Color if less than 15ｍ / Red Color if less than 5ｍ
-    if (lead_vision.getProb()) {
-      if (vision_dist < 15) { val_color = COLOR_WARNING_ALPHA(200); }
-      if (vision_dist < 5) { val_color = COLOR_RED_ALPHA(200); }
-      snprintf(val_str, sizeof(val_str), "%.1f", vision_dist);
-    } else {
-      snprintf(val_str, sizeof(val_str), "-");
-    }
-
-    strcat(val_str, val_add);
-    h += ui_draw_measure(s, val_str, "Vision 거리", rx, ry, val_color, lab_color, value_fontSize, label_fontSize);
-    ry = y + h;
-  }
-*/
+  p.setOpacity(1.);
+}
