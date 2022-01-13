@@ -153,9 +153,6 @@ def manager_thread():
     sm.update()
     not_run = ignore[:]
 
-    if sm['deviceState'].freeSpacePercent < 5:
-      not_run.append("loggerd")
-
     if params.get_bool("ShutdowndDisable"):
       not_run.append("shutdownd")
 
