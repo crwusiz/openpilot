@@ -325,7 +325,7 @@ struct DeviceState @0xa4d8b5af2aa492eb {
   screenBrightnessPercent @37 :Int8;
 
   wifiIpAddress @41 :Text;
-  
+
   struct ThermalZone {
     name @0 :Text;
     temp @1 :Float32;
@@ -587,20 +587,9 @@ struct ControlsState @0x97ff69c53601abf1 {
   aReqValueMin @63 :Float32;
   aReqValueMax @64 :Float32;
 
-  steerRatio @65 :Float32;
-  steerRateCost @66 :Float32;
-  steerActuatorDelay @67 :Float32;
-  sccGasFactor @68 :Float32;
-  sccBrakeFactor @69 :Float32;
-  sccCurvatureFactor @70 :Float32;
-  longitudinalActuatorDelayLowerBound @71 :Float32;
-  longitudinalActuatorDelayUpperBound @72 :Float32;
-
-  sccStockCamAct @73 :Float32;
-  sccStockCamStatus @74 :Float32;
-
-  # add
-  lateralControlSelect  @75 :UInt8;
+  sccStockCamAct @65 :Float32;
+  sccStockCamStatus @66 :Float32;
+  lateralControlSelect @67 :UInt8;
 
   enum OpenpilotState @0xdbe58b96d2d1ac61 {
     disabled @0;
@@ -908,7 +897,7 @@ struct LateralPlan @0xe1e9318e2ae8b51e {
   psis @26 :List(Float32);
   curvatures @27 :List(Float32);
   curvatureRates @28 :List(Float32);
-  
+
   autoLaneChangeEnabled @30 :Bool;
   autoLaneChangeTimer @31 :Int8;
 
@@ -1019,7 +1008,6 @@ struct ProcLog {
     name @1 :Text;
     state @2 :UInt8;
     ppid @3 :Int32;
-
     cpuUser @4 :Float32;
     cpuSystem @5 :Float32;
     cpuChildrenUser @6 :Float32;
@@ -1028,12 +1016,9 @@ struct ProcLog {
     nice @9 :Int32;
     numThreads @10 :Int32;
     startTime @11 :Float64;
-
     memVms @12 :UInt64;
     memRss @13 :UInt64;
-
     processor @14 :Int32;
-
     cmdline @15 :List(Text);
     exe @16 :Text;
   }
@@ -1177,7 +1162,6 @@ struct UbloxGnss {
     ionoCoeffsValid @37 :Bool;
     ionoAlpha @38 :List(Float64);
     ionoBeta @39 :List(Float64);
-
   }
 
   struct IonoData {
@@ -1526,7 +1510,7 @@ struct Event {
     navInstruction @82 :NavInstruction;
     navRoute @83 :NavRoute;
     navThumbnail @84: Thumbnail;
-    
+
     # neokii
     roadLimitSpeed @86 :RoadLimitSpeed;
 

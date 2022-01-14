@@ -107,6 +107,11 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     cruiseMismatch @106;
     lkasDisabled @107;
 
+    turningIndicatorOn @108;
+    autoLaneChange @109;
+    slowingDownSpeed @110;
+    slowingDownSpeedSound @111;
+
     driverMonitorLowAccDEPRECATED @68;
     radarCanErrorDEPRECATED @15;
     radarCommIssueDEPRECATED @67;
@@ -128,11 +133,6 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     modelLagWarningDEPRECATED @93;
     startupOneplusDEPRECATED @82;
     startupFuzzyFingerprintDEPRECATED @97;
-
-    turningIndicatorOn @108;
-    autoLaneChange @109;
-    slowingDownSpeed @110;
-    slowingDownSpeedSound @111;
   }
 }
 
@@ -328,16 +328,12 @@ struct CarControl {
 
   struct SccSmoother {
     longControl @0:Bool;
-
     applyMaxSpeed @1 :Float32;
     cruiseMaxSpeed @2 :Float32;
-
     logMessage @3 :Text;
-
     roadLimitSpeedActive @4 :Int32;
     roadLimitSpeed @5 :UInt32;
     roadLimitSpeedLeftDist @6 :UInt32;
-
     autoTrGap @7 :UInt32;
   }
 

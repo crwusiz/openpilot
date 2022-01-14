@@ -263,7 +263,7 @@ void DevicePanel::updateCalibDescription() {
   QString desc =
       //"openpilot requires the device to be mounted within 4° left or right and "
       //"within 5° up or 8° down. openpilot is continuously calibrating, resetting is rarely required.";
-      "범위 (pitch) ↕ 5˚ (yaw) ↔ 4˚이내";
+      "범위 (pitch) ↑5˚, ↓8° / (yaw) ↔ 4˚이내";
   std::string calib_bytes = Params().get("CalibrationParams");
   if (!calib_bytes.empty()) {
     try {
@@ -290,7 +290,8 @@ void DevicePanel::updateCalibDescription() {
 
 void DevicePanel::reboot() {
   if (uiState()->status == UIStatus::STATUS_DISENGAGED) {
-    if (ConfirmationDialog::confirm("Are you sure you want to reboot?", this)) {
+    //if (ConfirmationDialog::confirm("Are you sure you want to reboot?", this)) {
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
       // Check engaged again in case it changed while the dialog was open
       if (uiState()->status == UIStatus::STATUS_DISENGAGED) {
         Params().putBool("DoReboot", true);
@@ -304,7 +305,8 @@ void DevicePanel::reboot() {
 
 void DevicePanel::poweroff() {
   if (uiState()->status == UIStatus::STATUS_DISENGAGED) {
-    if (ConfirmationDialog::confirm("Are you sure you want to power off?", this)) {
+    //if (ConfirmationDialog::confirm("Are you sure you want to power off?", this)) {
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
       // Check engaged again in case it changed while the dialog was open
       if (uiState()->status == UIStatus::STATUS_DISENGAGED) {
         Params().putBool("DoShutdown", true);
@@ -376,7 +378,7 @@ void SoftwarePanel::updateLabels() {
   lastUpdateLbl->setText(lastUpdate);
   updateBtn->setText("CHECK");
   updateBtn->setEnabled(true);
-  gitRemoteLbl->setText(QString::fromStdString(params.get("GitRemote").substr(0,19)));
+  gitRemoteLbl->setText(QString::fromStdString(params.get("GitRemote").substr(19)));
   gitBranchLbl->setText(QString::fromStdString(params.get("GitBranch")));
   gitCommitLbl->setText(QString::fromStdString(params.get("GitCommit")).left(7));
   osVersionLbl->setText(QString::fromStdString(Hardware::get_os_version()).trimmed());
@@ -388,13 +390,13 @@ C2NetworkPanel::C2NetworkPanel(QWidget *parent) : QWidget(parent) {
 
   ListWidget *list = new ListWidget();
   list->setSpacing(30);
-  // wifi + tethering buttons
 #ifdef QCOM
-  auto wifiBtn = new ButtonControl("Wi-Fi Settings", "OPEN");
+  //auto wifiBtn = new ButtonControl("\U0001f4f6 Wi-Fi Settings", "OPEN");
+  auto wifiBtn = new ButtonControl("\U0001f4f6 WiFi 설정", "열기");
   QObject::connect(wifiBtn, &ButtonControl::clicked, [=]() { HardwareEon::launch_wifi(); });
   list->addItem(wifiBtn);
 
-  //auto tetheringBtn = new ButtonControl("Tethering Settings", "OPEN");
+  //auto tetheringBtn = new ButtonControl("\U0001f4f6 Tethering Settings", "OPEN");
   auto tetheringBtn = new ButtonControl("\U0001f4f6 테더링 설정", "열기");
   QObject::connect(tetheringBtn, &ButtonControl::clicked, [=]() { HardwareEon::launch_tethering(); });
   list->addItem(tetheringBtn);
@@ -532,7 +534,7 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
   )");
 
   // close button
-  QPushButton *close_btn = new QPushButton("← Back");
+  QPushButton *close_btn = new QPushButton("◀ Back");
   close_btn->setStyleSheet(R"(
     QPushButton {
       font-size: 50px;
