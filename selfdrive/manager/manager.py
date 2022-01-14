@@ -188,8 +188,9 @@ def manager_thread():
     shutdown = False
     for param in ("DoUninstall", "DoShutdown", "DoReboot"):
       if params.get_bool(param):
-        cloudlog.warning(f"Shutting down manager - {param} set")
         shutdown = True
+        params.put("LastManagerExitReason", param)
+        cloudlog.warning(f"Shutting down manager - {param} set")
 
     if shutdown:
       break
