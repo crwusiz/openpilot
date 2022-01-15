@@ -175,8 +175,6 @@ class TestCarModel(unittest.TestCase):
     """
     if self.CP.dashcamOnly:
       self.skipTest("no need to check panda safety for dashcamOnly")
-    if self.car_model in ignore_carstate_check:
-      self.skipTest("see comments in test_models.py")
 
     checks = defaultdict(lambda: 0)
     CC = car.CarControl.new_message()

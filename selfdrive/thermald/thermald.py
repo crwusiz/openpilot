@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import datetime
 import os
-import time
 from pathlib import Path
 from typing import Dict, NoReturn, Optional, Tuple
 from collections import namedtuple, OrderedDict
@@ -13,7 +12,7 @@ import cereal.messaging as messaging
 from cereal import log
 from common.filter_simple import FirstOrderFilter
 from common.numpy_fast import interp
-from common.params import Params, ParamKeyType
+from common.params import Params
 from common.realtime import DT_TRML, sec_since_boot
 from common.dict_helpers import strip_deprecated_keys
 from selfdrive.controls.lib.alertmanager import set_offroad_alert
@@ -187,7 +186,6 @@ def thermald_thread() -> NoReturn:
 
   current_filter = FirstOrderFilter(0., CURRENT_TAU, DT_TRML)
   temp_filter = FirstOrderFilter(0., TEMP_TAU, DT_TRML)
-  pandaState_prev = None
   should_start_prev = False
   in_car = False
   handle_fan = None
@@ -196,7 +194,6 @@ def thermald_thread() -> NoReturn:
 
   params = Params()
   power_monitor = PowerMonitoring()
-  no_panda_cnt = 0
 
   HARDWARE.initialize_hardware()
   thermal_config = HARDWARE.get_thermal_config()
@@ -228,17 +225,9 @@ def thermald_thread() -> NoReturn:
     if pandaStates is not None and len(pandaStates.pandaStates) > 0:
       pandaState = pandaStates.pandaStates[0]
 
-      # If we lose connection to the panda, wait 5 seconds before going offroad
-      if pandaState.pandaType == log.PandaState.PandaType.unknown:
-        no_panda_cnt += 1
-        if no_panda_cnt > DISCONNECT_TIMEOUT / DT_TRML:
-          if onroad_conditions["ignition"]:
-            cloudlog.error("Lost panda connection while onroad")
-          onroad_conditions["ignition"] = False
-      else:
-        no_panda_cnt = 0
-        panda_state_ts = sec_since_boot()
+      if pandaState.pandaType != log.PandaState.PandaType.unknown:
         onroad_conditions["ignition"] = pandaState.ignitionLine or pandaState.ignitionCan
+        panda_state_ts = sec_since_boot()
 
       in_car = pandaState.harnessStatus != log.PandaState.HarnessStatus.notConnected
       usb_power = peripheralState.usbPowerMode != log.PeripheralState.UsbPowerMode.client
@@ -257,14 +246,6 @@ def thermald_thread() -> NoReturn:
           cloudlog.info("Setting up EON fan handler")
           setup_eon_fan()
           handle_fan = handle_fan_eon
-
-      # Handle disconnect
-      if pandaState_prev is not None:
-        if pandaState.pandaType == log.PandaState.PandaType.unknown and \
-          pandaState_prev.pandaType != log.PandaState.PandaType.unknown:
-          params.clear_all(ParamKeyType.CLEAR_ON_PANDA_DISCONNECT)
-      pandaState_prev = pandaState
-
     else:
       if sec_since_boot() - panda_state_ts > 3.:
         if onroad_conditions["ignition"]:
@@ -419,11 +400,9 @@ def thermald_thread() -> NoReturn:
     #msg.deviceState.chargingDisabled = power_monitor.should_disable_charging(onroad_conditions["ignition"], in_car, off_ts)
 
     # Check if we need to shut down
-    #if power_monitor.should_shutdown(peripheralState, onroad_conditions["ignition"], in_car, off_ts, started_seen):
-    #  cloudlog.info(f"shutting device down, offroad since {off_ts}")
-      # TODO: add function for blocking cloudlog instead of sleep
-    #  time.sleep(10)
-    #  HARDWARE.shutdown()
+    if power_monitor.should_shutdown(peripheralState, onroad_conditions["ignition"], in_car, off_ts, started_seen):
+      cloudlog.warning(f"shutting device down, offroad since {off_ts}")
+      params.put_bool("DoShutdown", True)
 
     msg.deviceState.chargingError = current_filter.x > 0. and msg.deviceState.batteryPercent < 90  # if current is positive, then battery is being discharged
     msg.deviceState.started = started_ts is not None
