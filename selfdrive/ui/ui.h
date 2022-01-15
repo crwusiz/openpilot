@@ -61,6 +61,7 @@ struct Alert {
                   "controlsUnresponsive", cereal::ControlsState::AlertSize::FULL,
                   AudibleAlert::WARNING_IMMEDIATE};
         } else {
+          //return {"Controls Unresponsive", "Reboot Device",
           return {"Controls Unresponsive", "Reboot Device",
                   "controlsUnresponsivePermanent", cereal::ControlsState::AlertSize::MID,
                   AudibleAlert::NONE};
@@ -92,6 +93,7 @@ typedef struct {
 
 typedef struct UIScene {
   mat3 view_from_calib;
+
   cereal::PandaState::PandaType pandaType;
 
   // neokii dev UI
@@ -104,11 +106,8 @@ typedef struct UIScene {
   cereal::LiveParametersData::Reader live_params;
 
   // ui add
-  float cpuTempAvg;
   int lateralControlSelect;
   float output_scale;
-  bool leftBlinker, rightBlinker;
-  int blinkingrate;
   bool steeringPressed, enabled;
 
   // gps
@@ -153,9 +152,6 @@ public:
 
   QTransform car_space_transform;
   bool wide_camera;
-
-  bool recording = false;
-  bool show_debug = false;
 
 signals:
   void uiUpdate(const UIState &s);

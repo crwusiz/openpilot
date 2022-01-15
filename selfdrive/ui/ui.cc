@@ -189,9 +189,7 @@ static void update_state(UIState *s) {
 }
 
 void ui_update_params(UIState *s) {
-  Params params;
-  s->scene.is_metric = params.getBool("IsMetric");
-  s->show_debug = params.getBool("ShowDebugUI");
+  s->scene.is_metric = Params().getBool("IsMetric");
 }
 
 void UIState::updateStatus() {
