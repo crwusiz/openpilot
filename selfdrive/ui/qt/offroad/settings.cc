@@ -97,6 +97,7 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "In this mode openpilot will ignore lanelines and just drive how it thinks a human would.",
       "../assets/offroad/icon_road.png",
     },
+/*
 #ifdef ENABLE_MAPS
     {
       "NavSettingTime24h",
@@ -105,9 +106,19 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "../assets/offroad/icon_metric.png",
     },
 #endif
+*/
 
   };
   Params params;
+  if (!params.getBool("NavDisable")) {
+    toggles.push_back({
+      "NavSettingTime24h",
+      "Show ETA in 24h format",
+      "Use 24h format instead of am/pm",
+      "../assets/offroad/icon_metric.png",
+    });
+  }
+
   if (params.getBool("DisableRadar_Allow")) {
     toggles.push_back({
       "DisableRadar",
@@ -575,11 +586,21 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
     {"커뮤니티", new CommunityPanel(this)},
   };
 
+
+/*
 #ifdef ENABLE_MAPS
   auto map_panel = new MapPanel(this);
   panels.push_back({"Navigation", map_panel});
   QObject::connect(map_panel, &MapPanel::closeSettings, this, &SettingsWindow::closeSettings);
 #endif
+*/
+
+  Params params;
+  if (!params.getBool("NavDisable")) {
+    auto map_panel = new MapPanel(this);
+    panels.push_back({"Navigation", map_panel});
+    QObject::connect(map_panel, &MapPanel::closeSettings, this, &SettingsWindow::closeSettings);
+  }
 
   const int padding = panels.size() > 3 ? 25 : 35;
 
@@ -708,7 +729,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   "Prebuilt 파일을 생성하며 부팅속도를 향상시킵니다.",
                                   "../assets/offroad/icon_addon.png", this));
 #ifdef QCOM
-  toggles.append(new ParamControl("ShutdowndDisable", "Shutdownd Disable",
+  toggles.append(new ParamControl("ShutdownDisable", "Shutdownd Disable",
                                   //"Disable Shutdownd",
                                   "Shutdownd (시동 off 5분) 자동종료를 사용하지않습니다. (batteryless 기종)",
                                   "../assets/offroad/icon_addon.png", this));
@@ -716,6 +737,10 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   toggles.append(new ParamControl("LoggerDisable", "Logger Disable",
                                   //"Disable Logger is Reduce system load",
                                   "Logger 프로세스를 종료하여 시스템 부하를 줄입니다.",
+                                  "../assets/offroad/icon_addon.png", this));
+  toggles.append(new ParamControl("NavDisable", "Navigation Disable",
+                                  //"Navigation Disable",
+                                  "Navigation 기능을 사용하지않습니다.",
                                   "../assets/offroad/icon_addon.png", this));
   toggles.append(new ParamControl("NewRadarInterface", "New radar interface Enable",
                                   //"New radar interface Enable",

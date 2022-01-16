@@ -13,15 +13,14 @@ from common.basedir import BASEDIR
 from common.params import Params, ParamKeyType
 from common.text_window import TextWindow
 from selfdrive.boardd.set_time import set_time
-from selfdrive.hardware import HARDWARE, PC, EON
+from selfdrive.hardware import HARDWARE, PC
 from selfdrive.manager.helpers import unblock_stdout
-from selfdrive.manager.process import ensure_running, launcher
+from selfdrive.manager.process import ensure_running
 from selfdrive.manager.process_config import managed_processes
 from selfdrive.athena.registration import register, UNREGISTERED_DONGLE_ID
 from selfdrive.swaglog import cloudlog, add_file_handler
 from selfdrive.version import is_dirty, get_commit, get_version, get_origin, get_short_branch, \
                               terms_version, training_version, is_comma_remote
-from selfdrive.hardware.eon.apk import system
 
 sys.path.append(os.path.join(BASEDIR, "pyextra"))
 
@@ -50,8 +49,9 @@ def manager_init() -> None:
     ("PutPrebuilt", "0"),
     ("MfcSelect", "0"),
     ("LateralControlSelect", "0"),
-    ("ShutdowndDisable", "1"),
+    ("ShutdownDisable", "1"),
     ("LoggerDisable", "1"),
+    ("NavDisable", "1"),
     ("NewRadarInterface", "0"),
   ]
   if not PC:
@@ -153,7 +153,7 @@ def manager_thread():
     sm.update()
     not_run = ignore[:]
 
-    if params.get_bool("ShutdowndDisable"):
+    if params.get_bool("ShutdownDisable"):
       not_run.append("shutdown")
 
     if params.get_bool("LoggerDisable"):
@@ -162,6 +162,9 @@ def manager_thread():
       not_run.append("logmessaged")
       not_run.append("tombstoned")
       not_run.append("uploader")
+
+    if params.get_bool("NavDisable"):
+      not_run.append("navd")
 
     started = sm['deviceState'].started
     driverview = params.get_bool("IsDriverViewEnabled")

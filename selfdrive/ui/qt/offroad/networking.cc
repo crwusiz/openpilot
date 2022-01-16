@@ -127,6 +127,10 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
 
   ListWidget *list = new ListWidget(this);
 
+  // IP address
+  ipLabel = new LabelControl("IP Address", wifi->ipv4_address);
+  list->addItem(ipLabel);
+
   // SSH keys
   list->addItem(new SshToggle());
   list->addItem(new SshControl());
@@ -233,6 +237,7 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
 }
 
 void AdvancedNetworking::refresh() {
+  ipLabel->setText(wifi->ipv4_address);
   tetheringToggle->setEnabled(true);
   update();
 }

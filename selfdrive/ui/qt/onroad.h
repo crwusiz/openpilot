@@ -7,7 +7,7 @@
 #include "selfdrive/ui/ui.h"
 
 // ***** onroad widgets *****
-// wirelessnet2 add
+// wirelessnet2, crwusiz add
 
 class OnroadHud : public QWidget {
   Q_OBJECT
@@ -26,6 +26,7 @@ class OnroadHud : public QWidget {
   Q_PROPERTY(bool bsd_r_stat MEMBER bsd_r_stat NOTIFY valueChanged);
   Q_PROPERTY(int wifi_stat MEMBER wifi_stat NOTIFY valueChanged);
   Q_PROPERTY(bool gps_stat MEMBER gps_stat NOTIFY valueChanged);
+  Q_PROPERTY(float cputemp_stat MEMBER cputemp_stat NOTIFY valueChanged);
 
   Q_PROPERTY(int lead_status MEMBER lead_status NOTIFY valueChanged);
   Q_PROPERTY(float lead_d_rel MEMBER lead_d_rel NOTIFY valueChanged);
@@ -42,8 +43,8 @@ private:
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
   void paintEvent(QPaintEvent *event) override;
   void drawRightDevUi(QPainter &p, int x, int y);
-  int devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, QColor &color);
   void drawColoredText(QPainter &p, int x, int y, const QString &text, QColor &color);
+  int devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, QColor &color);
 
   QPixmap engage_img;
   QPixmap dm_img;
@@ -57,7 +58,7 @@ private:
   QPixmap gps_img;
   QPixmap wifi_img;
 
-  // neokii
+  // neokii icon move
   QPixmap autohold_warning_img;
   QPixmap autohold_active_img;
 
@@ -78,17 +79,19 @@ private:
   bool bsd_r_stat = false;
   int wifi_stat = 0;
   bool gps_stat = false;
+  float cputemp_stat = 0;
+  int cpuTemp = 0;
 
   int lead_status;
   float lead_d_rel = 0;
   float lead_v_rel = 0;
   float angleSteers = 0;
   float steerAngleDesired = 0;
-  float cpuTemp = 0;
 
 signals:
   void valueChanged();
 };
+
 
 class OnroadAlerts : public QWidget {
   Q_OBJECT
@@ -104,6 +107,7 @@ private:
   QColor bg;
   Alert alert = {};
 };
+
 
 // container window for the NVG UI
 class NvgWindow : public CameraViewWidget {
@@ -139,12 +143,12 @@ protected:
   QPixmap turnsignal_r_img;
   QPixmap tire_pressure_img;
 
-  void drawMaxSpeed(QPainter &p);
   void drawSpeed(QPainter &p);
-  void drawIcons(QPainter &p);
+  void drawMaxSpeed(QPainter &p);
   void drawSpeedLimit(QPainter &p);
-  void drawTurnSignals(QPainter &p);
+  void drawIcons(QPainter &p);
   void drawHud(QPainter &p);
+  void drawTurnSignals(QPainter &p);
 };
 
 // container for all onroad widgets

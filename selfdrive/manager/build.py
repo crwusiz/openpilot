@@ -10,8 +10,7 @@ from pathlib import Path
 from common.basedir import BASEDIR
 from common.spinner import Spinner
 from common.text_window import TextWindow
-from selfdrive.hardware import TICI, EON
-from selfdrive.hardware.eon.apk import update_apks, pm_grant, appops_set
+from selfdrive.hardware import TICI
 from selfdrive.swaglog import cloudlog, add_file_handler
 from selfdrive.version import is_dirty
 
