@@ -111,10 +111,7 @@ typedef struct UIScene {
   int lateralControlSelect;
   float output_scale;
   bool steeringPressed, enabled;
-
-  // gps
   int satelliteCount;
-  float gpsAccuracy;
 
   // modelV2
   float lane_line_probs[4];
@@ -170,7 +167,6 @@ private:
 UIState *uiState();
 
 // device management class
-
 class Device : public QObject {
   Q_OBJECT
 

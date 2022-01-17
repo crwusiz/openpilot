@@ -22,6 +22,7 @@ class OnroadHud : public QWidget {
   Q_PROPERTY(bool brake_stat MEMBER brake_stat NOTIFY valueChanged);
 
   Q_PROPERTY(int autohold_stat MEMBER autohold_stat NOTIFY valueChanged);
+  Q_PROPERTY(int nda_stat MEMBER nda_stat NOTIFY valueChanged);
   Q_PROPERTY(bool bsd_l_stat MEMBER bsd_l_stat NOTIFY valueChanged);
   Q_PROPERTY(bool bsd_r_stat MEMBER bsd_r_stat NOTIFY valueChanged);
   Q_PROPERTY(int wifi_stat MEMBER wifi_stat NOTIFY valueChanged);
@@ -41,9 +42,9 @@ public:
 private:
   void drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity);
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
+  void drawTextColor(QPainter &p, int x, int y, const QString &text, QColor &color);
   void paintEvent(QPaintEvent *event) override;
   void drawRightDevUi(QPainter &p, int x, int y);
-  void drawColoredText(QPainter &p, int x, int y, const QString &text, QColor &color);
   int devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, QColor &color);
 
   QPixmap engage_img;
@@ -61,27 +62,30 @@ private:
   // neokii icon move
   QPixmap autohold_warning_img;
   QPixmap autohold_active_img;
+  QPixmap nda_img;
+  QPixmap hda_img;
 
   const int radius = 160;
   const int img_size = (radius / 2) * 1.5;
+
   QString speed;
   QString speedUnit;
   QString maxSpeed;
+
   bool is_cruise_set = false;
   bool engageable = false;
   bool dmActive = false;
   bool hideDM = false;
   bool brake_stat = false;
   int status = STATUS_DISENGAGED;
-
   int autohold_stat = 0;
+  int nda_stat = 0;
   bool bsd_l_stat = false;
   bool bsd_r_stat = false;
   int wifi_stat = 0;
   bool gps_stat = false;
   float cputemp_stat = 0;
   int cpuTemp = 0;
-
   int lead_status;
   float lead_d_rel = 0;
   float lead_v_rel = 0;
@@ -133,17 +137,14 @@ protected:
   void drawTextColor(QPainter &p, int x, int y, const QString &text, QColor& color);
   void paintEvent(QPaintEvent *event) override;
 
-  const int radius = 192;
+  const int radius = 160;
   const int img_size = (radius / 2) * 1.5;
 
   // neokii
-  QPixmap nda_img;
-  QPixmap hda_img;
   QPixmap turnsignal_l_img;
   QPixmap turnsignal_r_img;
   QPixmap tire_pressure_img;
 
-  void drawSpeed(QPainter &p);
   void drawMaxSpeed(QPainter &p);
   void drawSpeedLimit(QPainter &p);
   void drawIcons(QPainter &p);

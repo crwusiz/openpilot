@@ -10,20 +10,20 @@ from common.params import Params
 from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, V_CRUISE_MIN, V_CRUISE_DELTA_KM, V_CRUISE_DELTA_MI
 from selfdrive.controls.lib.lane_planner import TRAJECTORY_SIZE
 from selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import AUTO_TR_CRUISE_GAP
-from selfdrive.road_speed_limiter import road_speed_limiter_get_max_speed, road_speed_limiter_get_active
-
-SYNC_MARGIN = 3.
+from selfdrive.road_speed_limiter import road_speed_limiter_get_max_speed, road_speed_limiter_get_active, \
+  get_road_speed_limiter
 
 # do not modify
 MIN_SET_SPEED_KPH = V_CRUISE_MIN
 MAX_SET_SPEED_KPH = V_CRUISE_MAX
 
+MIN_CURVE_SPEED = 40. * CV.KPH_TO_MS
+
+SYNC_MARGIN = 3.
 ALIVE_COUNT = [6, 8]
 WAIT_COUNT = [12, 13, 14, 15, 16]
 AliveIndex = 0
 WaitIndex = 0
-
-MIN_CURVE_SPEED = 32. * CV.KPH_TO_MS
 
 EventName = car.CarEvent.EventName
 ButtonType = car.CarState.ButtonEvent.Type
@@ -55,7 +55,6 @@ class SccSmoother:
     return int(kph * CV.KPH_TO_MS * self.speed_conv_to_clu)
 
   def __init__(self):
-
     self.longcontrol = Params().get("LongControlSelect", encoding='utf8') == "1"
     self.is_metric = Params().get_bool('IsMetric')
 
@@ -87,7 +86,6 @@ class SccSmoother:
     self.limited_lead = False
 
   def reset(self):
-
     self.btn = Buttons.NONE
 
     self.wait_timer = 0
@@ -120,8 +118,9 @@ class SccSmoother:
   def cal_max_speed(self, frame, CC, CS, sm, clu11_speed, controls):
 
     # kph
+    road_speed_limiter = get_road_speed_limiter()
     apply_limit_speed, road_limit_speed, left_dist, first_started, max_speed_log = \
-      road_speed_limiter_get_max_speed(clu11_speed, self.is_metric)
+      road_speed_limiter.get_max_speed(clu11_speed, self.is_metric)
 
     self.cal_curve_speed(sm, CS.out.vEgo, frame)
     if self.curve_speed_ms >= MIN_CURVE_SPEED:
@@ -130,7 +129,13 @@ class SccSmoother:
       max_speed_clu = self.kph_to_clu(controls.v_cruise_kph)
 
     self.active_cam = road_limit_speed > 0
-    self.over_speed_limit = 0 < road_limit_speed < clu11_speed + 2
+
+    if road_speed_limiter.roadLimitSpeed is not None:
+      camSpeedFactor = clip(road_speed_limiter.roadLimitSpeed.camSpeedFactor, 1.0, 1.1)
+      self.over_speed_limit = road_speed_limiter.roadLimitSpeed.camLimitSpeedLeftDist > 0 and \
+                              0 < road_limit_speed * camSpeedFactor < clu11_speed + 2
+    else:
+      self.over_speed_limit = False
 
     #max_speed_log = "{:.1f}/{:.1f}/{:.1f}".format(float(limit_speed),
     #                                              float(self.curve_speed_ms*self.speed_conv_to_clu),
@@ -171,7 +176,6 @@ class SccSmoother:
     return road_limit_speed, left_dist, max_speed_log
 
   def update(self, enabled, can_sends, packer, CC, CS, frame, controls):
-
     # mph or kph
     clu11_speed = CS.clu11["CF_Clu_Vanz"]
     road_limit_speed, left_dist, max_speed_log = self.cal_max_speed(frame, CC, CS, controls.sm, clu11_speed, controls)
@@ -229,7 +233,6 @@ class SccSmoother:
         self.target_speed = 0.
 
   def get_button(self, current_set_speed):
-
     if self.target_speed < self.min_set_speed_clu:
       return Buttons.NONE
 
@@ -240,7 +243,6 @@ class SccSmoother:
     return Buttons.RES_ACCEL if error > 0 else Buttons.SET_DECEL
 
   def get_lead(self, sm):
-
     radar = sm['radarState']
     if radar.leadOne.status:
       return radar.leadOne
@@ -248,7 +250,6 @@ class SccSmoother:
     return None
 
   def get_long_lead_speed(self, CS, clu11_speed, sm):
-
     if self.longcontrol:
       lead = self.get_lead(sm)
       if lead is not None:
@@ -256,7 +257,7 @@ class SccSmoother:
         if 0. < d < -lead.vRel * (9. + 3.) * 2. and lead.vRel < -1.:
           t = d / lead.vRel
           accel = -(lead.vRel / t) * self.speed_conv_to_clu
-          accel *= 1.4
+          accel *= 1.2
 
           if accel < 0.:
             target_speed = clu11_speed + accel
@@ -265,7 +266,6 @@ class SccSmoother:
     return 0
 
   def cal_curve_speed(self, sm, v_ego, frame):
-
     if frame % 20 == 0:
       md = sm['modelV2']
       if len(md.position.x) == TRAJECTORY_SIZE and len(md.position.y) == TRAJECTORY_SIZE:
@@ -292,7 +292,6 @@ class SccSmoother:
         self.curve_speed_ms = 255.
 
   def cal_target_speed(self, CS, clu11_speed, controls):
-
     if not self.longcontrol:
       if CS.gas_pressed and CS.cruise_buttons == Buttons.NONE:
         if clu11_speed + SYNC_MARGIN > self.kph_to_clu(controls.v_cruise_kph):
@@ -311,7 +310,6 @@ class SccSmoother:
           self.target_speed = set_speed
 
   def update_max_speed(self, max_speed):
-
     if not self.longcontrol or self.max_speed_clu <= 0:
       self.max_speed_clu = max_speed
     else:
@@ -320,14 +318,13 @@ class SccSmoother:
       self.max_speed_clu = self.max_speed_clu + error * kp
 
   def get_apply_accel(self, CS, sm, accel, stopping):
-
     gas_factor = 1.0
     brake_factor = 1.0
 
     #lead = self.get_lead(sm)
     #if lead is not None:
     #  if not lead.radar:
-    #    brake_factor *= 0.95
+    #    brake_factor *= 0.975
 
     if accel > 0:
       accel *= gas_factor
@@ -350,7 +347,6 @@ class SccSmoother:
 
   @staticmethod
   def update_cruise_buttons(controls, CS, longcontrol):  # called by controlds's state_transition
-
     car_set_speed = CS.cruiseState.speed * CV.MS_TO_KPH
     is_cruise_enabled = car_set_speed != 0 and car_set_speed != 255 and CS.cruiseState.enabled and controls.CP.pcmCruise
 
@@ -358,8 +354,8 @@ class SccSmoother:
       if longcontrol:
         v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
       else:
-        v_cruise_kph = SccSmoother.update_v_cruise(controls.v_cruise_kph, CS.buttonEvents, controls.enabled,
-                                                   controls.is_metric)
+        v_cruise_kph = SccSmoother.update_v_cruise(controls.v_cruise_kph, CS.buttonEvents,
+                                                   controls.enabled, controls.is_metric)
     else:
       v_cruise_kph = 0
 
@@ -377,7 +373,6 @@ class SccSmoother:
 
   @staticmethod
   def update_v_cruise(v_cruise_kph, buttonEvents, enabled, metric):
-
     global ButtonCnt, LongPressed, ButtonPrev
     if enabled:
       if ButtonCnt:

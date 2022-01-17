@@ -718,7 +718,8 @@ class Controls:
     controlsState.aReqValueMax = self.aReqValueMax
     controlsState.sccStockCamAct = self.sccStockCamAct
     controlsState.sccStockCamStatus = self.sccStockCamStatus
-
+    controlsState.lateralControlSelect = int(self.lateral_control_select)
+    
     if self.joystick_mode:
       controlsState.lateralControlState.debugState = lac_log
     elif self.CP.steerControlType == car.CarParams.SteerControlType.angle:
