@@ -406,51 +406,47 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   int y = radius / 2 + int(bdr_s * 1.5);
   drawIcon(p, x, y, engage_img, bg_colors[status], 1.0);
 
-  if (!hideDM) {
-    // dm icon
-    x = rc.center().x();
-    y = rect().bottom() - footer_h / 2;
-    drawIcon(p, x, y, dm_img, QColor(0, 0, 0, 70), dmActive ? 1.0 : 0.2);
+  // Dev UI (Right Side)
+  x = rect().right() - radius - bdr_s * 5;
+  y = bdr_s * 2.5 + rc.height();
+  drawRightDevUi(p, x, y);
+  
+  // dm icon
+  x = rc.center().x();
+  y = rect().bottom() - footer_h / 2;
+  drawIcon(p, x, y, dm_img, QColor(0, 0, 0, 70), dmActive ? 1.0 : 0.2);
 
-    p.setOpacity(1.0); // dmActive will determine opacity of brake_img's bg without this :/ -wirelessnet2
+  // brake icon
+  x = radius / 2 + (bdr_s * 2);
+  y = rect().bottom() - (footer_h / 2) - (radius) - 10;
+  drawIcon(p, x, y, brake_img, QColor(0, 0, 0, 70), brake_stat ? 1.0 : 0.2);
 
-    // brake icon
-    x = radius / 2 + (bdr_s * 2);
-    y = rect().bottom() - (footer_h / 2) - (radius) - 10;
-    drawIcon(p, x, y, brake_img, QColor(0, 0, 0, 70), brake_stat ? 1.0 : 0.2);
-
-    // autohold icon (bottom 2 right)
-    if (autohold_stat >= 0) {
-      x = radius / 2 + (bdr_s * 2) + (radius) + 40;
-      y = rect().bottom() - (footer_h / 2) - (radius) - 10;
-      drawIcon(p, x, y, autohold_stat > 1 ? autohold_warning_img : autohold_active_img, QColor(0, 0, 0, 70), autohold_stat ? 1.0 : 0.2);
-    }
-
-    // bsd_l icon (bottom 3 left)
-    x = radius / 2 + (bdr_s * 2);
-    y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
-    drawIcon(p, x, y, bsd_l_img, QColor(0, 0, 0, 70), bsd_l_stat ? 1.0 : 0.2);
-
-    // bsd_r icon (bottom 3 right)
+  // autohold icon (bottom 2 right)
+  if (autohold_stat >= 0) {
     x = radius / 2 + (bdr_s * 2) + (radius) + 40;
-    y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
-    drawIcon(p, x, y, bsd_r_img, QColor(0, 0, 0, 70), bsd_r_stat ? 1.0 : 0.2);
-
-    // wifi icon (upper right 2)
-    x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
-    y = radius / 2 + (bdr_s * 1.5);
-    drawIcon(p, x, y, wifi_img, QColor(0, 0, 0, 70), wifi_stat ? 1.0 : 0.2);
-
-    // gps icon (upper right 3)
-    x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 2);
-    y = radius / 2 + (bdr_s * 1.5);
-    drawIcon(p, x, y, gps_img, QColor(0, 0, 0, 70), gps_stat ? 1.0 : 0.2);
-
-    // Dev UI (Right Side)
-    x = rect().right() - radius - bdr_s * 5;
-    y = bdr_s * 2.5 + rc.height();
-    drawRightDevUi(p, x, y);
+    y = rect().bottom() - (footer_h / 2) - (radius) - 10;
+    drawIcon(p, x, y, autohold_stat > 1 ? autohold_warning_img : autohold_active_img, QColor(0, 0, 0, 70), autohold_stat ? 1.0 : 0.2);
   }
+
+  // bsd_l icon (bottom 3 left)
+  x = radius / 2 + (bdr_s * 2);
+  y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
+  drawIcon(p, x, y, bsd_l_img, QColor(0, 0, 0, 70), bsd_l_stat ? 1.0 : 0.2);
+
+  // bsd_r icon (bottom 3 right)
+  x = radius / 2 + (bdr_s * 2) + (radius) + 40;
+  y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
+  drawIcon(p, x, y, bsd_r_img, QColor(0, 0, 0, 70), bsd_r_stat ? 1.0 : 0.2);
+
+  // wifi icon (upper right 2)
+  x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
+  y = radius / 2 + (bdr_s * 1.5);
+  drawIcon(p, x, y, wifi_img, QColor(0, 0, 0, 70), wifi_stat ? 1.0 : 0.2);
+
+  // gps icon (upper right 3)
+  x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 2);
+  y = radius / 2 + (bdr_s * 1.5);
+  drawIcon(p, x, y, gps_img, QColor(0, 0, 0, 70), gps_stat ? 1.0 : 0.2);
 }
 
 void OnroadHud::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
@@ -768,7 +764,7 @@ void NvgWindow::drawIcons(QPainter &p) {
   {
     const int w = 66;
     const int h = 146;
-    const int x = width() - w - 80;
+    const int x = width() - w - 90;
     const int y = height() - h - 80;
 
     auto tpms = car_state.getTpms();
@@ -777,7 +773,7 @@ void NvgWindow::drawIcons(QPainter &p) {
     const float rl = tpms.getRl();
     const float rr = tpms.getRr();
 
-    p.setOpacity(0.8);
+    p.setOpacity(1.0);
     p.drawPixmap(x, y, w, h, tire_pressure_img);
 
     configFont(p, "Open Sans", 38, "Bold");
@@ -912,8 +908,8 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
 
   if (limit_speed > 10 && left_dist > 0) {
     int radius = 192;
-    int x = 30;
-    int y = 270;
+    int x = radius / 2 + (bdr_s * 2) + (radius) + 40;
+    int y = 50;
 
     p.setPen(Qt::NoPen);
     p.setBrush(QBrush(QColor(255, 0, 0, 255)));
@@ -942,35 +938,8 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
     rect.adjust(-30, 0, 30, 0);
     p.setPen(QColor(255, 255, 255, 230));
     p.drawText(rect, Qt::AlignCenter, str_left_dist);
-
-  } else {
-
-    auto controls_state = sm["controlsState"].getControlsState();
-    int sccStockCamAct = (int)controls_state.getSccStockCamAct();
-    int sccStockCamStatus = (int)controls_state.getSccStockCamStatus();
-
-    if (sccStockCamAct == 2 && sccStockCamStatus == 2) {
-      int radius = 192;
-      int x = 30;
-      int y = 270;
-
-      p.setPen(Qt::NoPen);
-      p.setBrush(QBrush(QColor(255, 0, 0, 255)));
-      QRect rect = QRect(x, y, radius, radius);
-      p.drawEllipse(rect);
-      p.setBrush(QBrush(QColor(255, 255, 255, 255)));
-
-      const int tickness = 14;
-      rect.adjust(tickness, tickness, -tickness, -tickness);
-      p.drawEllipse(rect);
-
-      configFont(p, "Open Sans", 70, "Bold");
-      p.setPen(QColor(0, 0, 0, 230));
-      p.drawText(rect, Qt::AlignCenter, "CAM");
-    }
   }
 }
-
 void NvgWindow::drawTurnSignals(QPainter &p) {
   static int blink_index = 0;
   static int blink_wait = 0;
