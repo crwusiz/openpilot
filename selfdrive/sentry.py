@@ -8,6 +8,8 @@ from selfdrive.hardware import HARDWARE
 from selfdrive.swaglog import cloudlog
 from selfdrive.version import get_branch, get_commit, get_origin, get_version, \
                               is_comma_remote, is_dirty, is_tested_branch
+import datetime
+import traceback
 
 
 class SentryProject(Enum):
