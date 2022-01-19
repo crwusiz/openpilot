@@ -133,8 +133,8 @@ protected:
   // neokii add start
   void drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity);
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
-  void drawTextFlag(QPainter &p, int x, int y, int flags, const QString &text, const QColor& color);
-  void drawTextColor(QPainter &p, int x, int y, const QString &text, QColor& color);
+  void drawTextFlag(QPainter &p, int x, int y, int flags, const QString &text, const QColor &color);
+  void drawTextColor(QPainter &p, int x, int y, const QString &text, QColor &color);
   void paintEvent(QPaintEvent *event) override;
 
   const int radius = 160;

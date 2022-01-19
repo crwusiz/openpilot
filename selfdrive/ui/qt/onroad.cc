@@ -434,12 +434,10 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   p.setOpacity(1.0);
 
   // autohold icon (bottom 2 right)
-  if (autohold_stat >= 0) {
-    x = radius / 2 + (bdr_s * 2) + (radius);
-    y = rect().bottom() - (footer_h / 2) - (radius) - 10;
-    drawIcon(p, x, y, autohold_stat > 1 ? autohold_warning_img : autohold_active_img, QColor(0, 0, 0, 70), autohold_stat ? 1.0 : 0.2);
-    p.setOpacity(1.0);
-  }
+  x = radius / 2 + (bdr_s * 2) + (radius);
+  y = rect().bottom() - (footer_h / 2) - (radius) - 10;
+  drawIcon(p, x, y, autohold_stat > 1 ? autohold_warning_img : autohold_active_img, QColor(0, 0, 0, 70), autohold_stat ? 1.0 : 0.2);
+  p.setOpacity(1.0);
 
   // bsd_l icon (bottom 3 left)
   x = radius / 2 + (bdr_s * 2);
@@ -466,10 +464,12 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   p.setOpacity(1.0);
 
   // nda icon (upper center)
-  if (nda_stat >= 0) {
-    x = (width() + (bdr_s*2))/2 - 60 - bdr_s;
+  if (nda_stat > 0) {
+    int w = 120;
+    int h = 54;
+    x = (width() + (bdr_s*2))/2 - w/2 - bdr_s;
     y = 40 - bdr_s;
-    drawIcon(p, x, y, nda_stat == 1 ? nda_img : hda_img, QColor(0, 0, 0, 70), nda_stat ? 1.0 : 0.2);
+    p.drawPixmap(x, y, w, h, nda_stat == 1 ? nda_img : hda_img);
     p.setOpacity(1.0);
   }
 }
@@ -487,7 +487,6 @@ void OnroadHud::drawText(QPainter &p, int x, int y, const QString &text, int alp
   QRect init_rect = fm.boundingRect(text);
   QRect real_rect = fm.boundingRect(init_rect, 0, text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
-
   p.setPen(QColor(0xff, 0xff, 0xff, alpha));
   p.drawText(real_rect.x(), real_rect.bottom(), text);
 }
@@ -497,7 +496,6 @@ void OnroadHud::drawTextColor(QPainter &p, int x, int y, const QString &text, QC
   QRect init_rect = fm.boundingRect(text);
   QRect real_rect = fm.boundingRect(init_rect, 0, text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
-
   p.setPen(color);
   p.drawText(real_rect.x(), real_rect.bottom(), text);
 }
@@ -665,24 +663,22 @@ void NvgWindow::drawText(QPainter &p, int x, int y, const QString &text, int alp
   QRect init_rect = fm.boundingRect(text);
   QRect real_rect = fm.boundingRect(init_rect, 0, text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
-
   p.setPen(QColor(0xff, 0xff, 0xff, alpha));
   p.drawText(real_rect.x(), real_rect.bottom(), text);
 }
 
-void NvgWindow::drawTextFlag(QPainter &p, int x, int y, int flags, const QString &text, const QColor& color) {
+void NvgWindow::drawTextFlag(QPainter &p, int x, int y, int flags, const QString &text, const QColor &color) {
   QFontMetrics fm(p.font());
   QRect rect = fm.boundingRect(text);
   p.setPen(color);
   p.drawText(QRect(x, y, rect.width(), rect.height()), flags, text);
 }
 
-void NvgWindow::drawTextColor(QPainter &p, int x, int y, const QString &text, QColor& color) {
+void NvgWindow::drawTextColor(QPainter &p, int x, int y, const QString &text, QColor &color) {
   QFontMetrics fm(p.font());
   QRect init_rect = fm.boundingRect(text);
   QRect real_rect = fm.boundingRect(init_rect, 0, text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
-
   p.setPen(color);
   p.drawText(real_rect.x(), real_rect.bottom(), text);
 }
@@ -722,15 +718,12 @@ void NvgWindow::drawHud(QPainter &p) {
   const auto live_params = sm["liveParameters"].getLiveParameters();
   const auto car_params = sm["carParams"].getCarParams();
   const auto car_state = sm["carState"].getCarState();
-
   const char* lateral_state[] = {"Pid", "Indi", "Lqr"};
   const char* long_state[] = {"Off", "Pid", "Stopping"};
   int lateralControlState = controls_state.getLateralControlSelect();
   int longControlState = (int)controls_state.getLongControlState();
-  const auto gps_ext = s->scene.gps_ext;
-  float verticalAccuracy = gps_ext.getVerticalAccuracy();
-  float gpsAltitude = gps_ext.getAltitude();
-  float gpsAccuracy = gps_ext.getAccuracy();
+  float gpsAltitude = s->scene.gps_ext.getAltitude();
+  float gpsAccuracy = s->scene.gps_ext.getAccuracy();
   int gpsSatelliteCount = s->scene.satelliteCount;
 
   QString infoText;
@@ -751,16 +744,15 @@ void NvgWindow::drawHud(QPainter &p) {
 
 static const QColor get_tpms_color(float tpms) {
     if (tpms < 5 || tpms > 60)
-        return QColor(255, 255, 255, 220);
+        return QColor(255, 255, 255, 200); // white color
     if (tpms < 31)
-        return QColor(255, 90, 90, 220);
-    return QColor(255, 255, 255, 220);
+        return QColor(255, 0, 0, 200); // red color
+    return QColor(255, 255, 255, 200);
 }
 
 static const QString get_tpms_text(float tpms) {
     if (tpms < 5 || tpms > 60)
         return "";
-
     char str[32];
     snprintf(str, sizeof(str), "%.0f", round(tpms));
     return QString(str);
@@ -804,7 +796,6 @@ void NvgWindow::drawIcons(QPainter &p) {
     drawTextFlag(p, center_x-marginX, center_y+marginY, Qt::AlignRight, get_tpms_text(rl), get_tpms_color(rl));
     drawTextFlag(p, center_x+marginX, center_y+marginY, Qt::AlignLeft, get_tpms_text(rr), get_tpms_color(rr));
   }
-
 
   // cruise gap (bottom 1 right)
   x = radius / 2 + (bdr_s * 2) + radius;
@@ -890,7 +881,6 @@ void NvgWindow::drawMaxSpeed(QPainter &p) {
 
 void NvgWindow::drawSpeedLimit(QPainter &p) {
   const SubMaster &sm = *(uiState()->sm);
-  auto car_state = sm["carState"].getCarState();
   auto scc_smoother = sm["carControl"].getCarControl().getSccSmoother();
 
   int limit_speed = scc_smoother.getRoadLimitSpeed();
@@ -922,7 +912,6 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
     configFont(p, "Open Sans", 80, "Bold");
     p.setPen(QColor(0, 0, 0, 230));
     p.drawText(rect, Qt::AlignCenter, str_limit_speed);
-
     configFont(p, "Open Sans", 60, "Bold");
     rect.translate(0, radius/2 + 45);
     rect.adjust(-30, 0, 30, 0);
@@ -949,7 +938,7 @@ void NvgWindow::drawTurnSignals(QPainter &p) {
     const int fb_w = width() / 2 - 200;
     const int center_x = width() / 2;
     const int w = fb_w / 25;
-    const int h = 160;
+    const int h = 300;
     const int gap = fb_w / 25;
     const int margin = (int)(fb_w / 3.8f);
     const int base_y = (height() - h) / 2;
@@ -1001,6 +990,5 @@ void NvgWindow::drawTurnSignals(QPainter &p) {
       blink_index = 0;
     }
   }
-
   p.setOpacity(1.0);
 }

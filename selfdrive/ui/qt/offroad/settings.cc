@@ -97,19 +97,11 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "In this mode openpilot will ignore lanelines and just drive how it thinks a human would.",
       "../assets/offroad/icon_road.png",
     },
-/*
-#ifdef ENABLE_MAPS
-    {
-      "NavSettingTime24h",
-      "Show ETA in 24h format",
-      "Use 24h format instead of am/pm",
-      "../assets/offroad/icon_metric.png",
-    },
-#endif
-*/
-
   };
+
   Params params;
+
+#ifdef ENABLE_MAPS
   if (!params.getBool("NavDisable")) {
     toggles.push_back({
       "NavSettingTime24h",
@@ -118,6 +110,7 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "../assets/offroad/icon_metric.png",
     });
   }
+#endif
 
   if (params.getBool("DisableRadar_Allow")) {
     toggles.push_back({
@@ -586,21 +579,14 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
     {"커뮤니티", new CommunityPanel(this)},
   };
 
-
-/*
 #ifdef ENABLE_MAPS
-  auto map_panel = new MapPanel(this);
-  panels.push_back({"Navigation", map_panel});
-  QObject::connect(map_panel, &MapPanel::closeSettings, this, &SettingsWindow::closeSettings);
-#endif
-*/
-
   Params params;
   if (!params.getBool("NavDisable")) {
     auto map_panel = new MapPanel(this);
     panels.push_back({"Navigation", map_panel});
     QObject::connect(map_panel, &MapPanel::closeSettings, this, &SettingsWindow::closeSettings);
   }
+#endif
 
   const int padding = panels.size() > 3 ? 25 : 35;
 
@@ -738,10 +724,12 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   //"Disable Logger is Reduce system load",
                                   "Logger 프로세스를 종료하여 시스템 부하를 줄입니다.",
                                   "../assets/offroad/icon_addon.png", this));
+#ifndef QCOM
   toggles.append(new ParamControl("NavDisable", "Navigation Disable",
                                   //"Navigation Disable",
                                   "Navigation 기능을 사용하지않습니다.",
                                   "../assets/offroad/icon_addon.png", this));
+#endif
   toggles.append(new ParamControl("NewRadarInterface", "New radar interface Enable",
                                   //"New radar interface Enable",
                                   "scc 레이더 배선개조없이 사용가능한 일부차종을 위한 옵션입니다",
