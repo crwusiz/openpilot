@@ -66,6 +66,7 @@ services = {
   "navInstruction": (True, 0.),
   "navRoute": (True, 0.),
   "navThumbnail": (True, 0.),
+  "roadLimitSpeed": (False, 0.),
 
   # debug
   "testJoystick": (False, 0.),

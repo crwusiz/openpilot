@@ -180,10 +180,6 @@ class SccSmoother:
     clu11_speed = CS.clu11["CF_Clu_Vanz"]
     road_limit_speed, left_dist, max_speed_log = self.cal_max_speed(frame, CC, CS, controls.sm, clu11_speed, controls)
 
-    CC.sccSmoother.roadLimitSpeedActive = road_speed_limiter_get_active()
-    CC.sccSmoother.roadLimitSpeed = road_limit_speed
-    CC.sccSmoother.roadLimitSpeedLeftDist = left_dist
-
     # kph
     controls.applyMaxSpeed = float(clip(CS.cruiseState_speed * CV.MS_TO_KPH, MIN_SET_SPEED_KPH,
                                         self.max_speed_clu * self.speed_conv_to_ms * CV.MS_TO_KPH))

@@ -881,10 +881,27 @@ void NvgWindow::drawMaxSpeed(QPainter &p) {
 
 void NvgWindow::drawSpeedLimit(QPainter &p) {
   const SubMaster &sm = *(uiState()->sm);
-  auto scc_smoother = sm["carControl"].getCarControl().getSccSmoother();
+  auto roadLimitSpeed = sm["roadLimitSpeed"].getRoadLimitSpeed();
 
-  int limit_speed = scc_smoother.getRoadLimitSpeed();
-  int left_dist = scc_smoother.getRoadLimitSpeedLeftDist();
+  int activeNDA = roadLimitSpeed.getActive();
+
+  int camLimitSpeed = roadLimitSpeed.getCamLimitSpeed();
+  int camLimitSpeedLeftDist = roadLimitSpeed.getCamLimitSpeedLeftDist();
+
+  int sectionLimitSpeed = roadLimitSpeed.getSectionLimitSpeed();
+  int sectionLeftDist = roadLimitSpeed.getSectionLeftDist();
+
+  int limit_speed = 0;
+  int left_dist = 0;
+
+  if(camLimitSpeed >= 30 && camLimitSpeedLeftDist > 0) {
+    limit_speed = camLimitSpeed;
+    left_dist = camLimitSpeedLeftDist;
+  }
+  else if(sectionLimitSpeed >= 30 && sectionLeftDist > 0) {
+    limit_speed = sectionLimitSpeed;
+    left_dist = sectionLeftDist;
+  }
 
   if (limit_speed > 10 && left_dist > 0) {
     int radius = 192;

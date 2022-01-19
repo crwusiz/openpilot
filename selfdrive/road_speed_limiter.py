@@ -207,7 +207,6 @@ class RoadSpeedLimiter:
   def __init__(self):
     self.slowing_down = False
     self.started_dist = 0
-    self.longcontrol = Params().get("LongControlSelect", encoding='utf8') == "1"
     self.sock = messaging.sub_sock("roadLimitSpeed")
     self.roadLimitSpeed = None
 

@@ -1441,14 +1441,14 @@ struct NavRoute {
 }
 
 struct RoadLimitSpeed {
-    active @0 :UInt16;
-    roadLimitSpeed @1 :UInt16;
+    active @0 :Int16;
+    roadLimitSpeed @1 :Int16;
     isHighway @2 :Bool;
-    camType @3 :UInt16;
-    camLimitSpeedLeftDist @4 :UInt16;
-    camLimitSpeed @5 :UInt16;
-    sectionLimitSpeed @6 :UInt16;
-    sectionLeftDist @7 :UInt16;
+    camType @3 :Int16;
+    camLimitSpeedLeftDist @4 :Int16;
+    camLimitSpeed @5 :Int16;
+    sectionLimitSpeed @6 :Int16;
+    sectionLeftDist @7 :Int16;
     camSpeedFactor @8 :Float32;
 }
 

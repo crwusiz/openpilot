@@ -188,7 +188,8 @@ static void update_state(UIState *s) {
 }
 
 void ui_update_params(UIState *s) {
-  s->scene.is_metric = Params().getBool("IsMetric");
+  Params params;
+  s->scene.is_metric = params.getBool("IsMetric");
 }
 
 void UIState::updateStatus() {
@@ -247,7 +248,7 @@ UIState::UIState(QObject *parent) : QObject(parent) {
   sm = std::make_unique<SubMaster, const std::initializer_list<const char *>>({
     "modelV2", "controlsState", "liveCalibration", "radarState", "deviceState", "roadCameraState",
     "pandaStates", "carParams", "driverMonitoringState", "sensorEvents", "carState", "liveLocationKalman",
-    "gpsLocationExternal", "carControl", "liveParameters", "ubloxGnss"
+    "gpsLocationExternal", "carControl", "liveParameters", "ubloxGnss", "roadLimitSpeed",
   });
 
   Params params;
