@@ -640,7 +640,7 @@ struct CarParams {
   }
 
   enableCameraDEPRECATED @4 :Bool;
-  isPandaBlackDEPRECATED @39: Bool;
+  isPandaBlackDEPRECATED @39 :Bool;
   hasStockCameraDEPRECATED @57 :Bool;
   safetyParamDEPRECATED @10 :Int16;
   safetyModelDEPRECATED @9 :SafetyModel;
