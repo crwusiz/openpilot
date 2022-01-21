@@ -64,7 +64,6 @@ class RoadLimitSpeedServer:
             sock.sendto(json_location.encode(), address)
           else:
             time.sleep(1.)
-
         except Exception as e:
           print("exception", e)
           time.sleep(1.)
@@ -78,7 +77,6 @@ class RoadLimitSpeedServer:
         struct.pack('256s', 'wlan0'.encode('utf-8'))
       )[20:24]
       return socket.inet_ntoa(ip)
-
     except:
       return None
 
@@ -96,12 +94,10 @@ class RoadLimitSpeedServer:
             if broadcast_address is not None:
               address = (broadcast_address, Port.BROADCAST_PORT)
               sock.sendto('EON:ROAD_LIMIT_SERVICE:v1'.encode(), address)
-
           except:
             pass
           time.sleep(5.)
           frame += 1
-
       except:
         pass
 
@@ -125,7 +121,6 @@ class RoadLimitSpeedServer:
             ret = False
           except:
             pass
-
         if 'echo' in json_obj:
           try:
             echo = json.dumps(json_obj["echo"])
@@ -133,23 +128,19 @@ class RoadLimitSpeedServer:
             ret = False
           except:
             pass
-
         try:
           self.lock.acquire()
           try:
             if 'active' in json_obj:
               self.active = json_obj['active']
               self.last_updated_active = sec_since_boot()
-
           except:
             pass
-
           if 'road_limit' in json_obj:
             self.json_road_limit = json_obj['road_limit']
             self.last_updated = sec_since_boot()
         finally:
           self.lock.release()
-
     except:
       try:
         self.lock.acquire()
@@ -167,7 +158,6 @@ class RoadLimitSpeedServer:
         self.json_road_limit = None
       finally:
         self.lock.release()
-
     if now - self.last_updated_active > 10.:
       self.active = 0
 
@@ -177,7 +167,6 @@ class RoadLimitSpeedServer:
         return default
       if key in self.json_road_limit:
         return self.json_road_limit[key]
-
     except:
       pass
 
@@ -208,9 +197,7 @@ def main():
           dat.roadLimitSpeed.sectionLeftDist = server.get_limit_val("section_left_dist", 0)
           dat.roadLimitSpeed.camSpeedFactor = server.get_limit_val("cam_speed_factor", CAMERA_SPEED_FACTOR)
           roadLimitSpeed.send(dat.to_bytes())
-
           server.send_sdp(sock)
-
         server.check()
 
     except Exception as e:
@@ -229,7 +216,6 @@ class RoadSpeedLimiter:
       dat = messaging.recv_sock(self.sock, wait=False)
       if dat is not None:
         self.roadLimitSpeed = dat.roadLimitSpeed
-
     except:
       pass
 
@@ -244,7 +230,6 @@ class RoadSpeedLimiter:
     self.recv()
     if self.roadLimitSpeed is None:
       return 0, 0, 0, False, ""
-
     try:
       road_limit_speed = self.roadLimitSpeed.roadLimitSpeed
       is_highway = self.roadLimitSpeed.isHighway
@@ -320,14 +305,12 @@ def road_speed_limiter_get_active():
   global road_speed_limiter
   if road_speed_limiter is None:
     road_speed_limiter = RoadSpeedLimiter()
-
   return road_speed_limiter.get_active()
 
 def road_speed_limiter_get_max_speed(cluster_speed, is_metric):
   global road_speed_limiter
   if road_speed_limiter is None:
     road_speed_limiter = RoadSpeedLimiter()
-
   return road_speed_limiter.get_max_speed(cluster_speed, is_metric)
 
 def get_road_speed_limiter():

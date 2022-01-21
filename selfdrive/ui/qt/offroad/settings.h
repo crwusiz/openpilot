@@ -33,12 +33,16 @@ private:
   QWidget *sidebar_widget;
   QButtonGroup *nav_btns;
   QStackedWidget *panel_widget;
+  Params params;
 };
+
 
 class DevicePanel : public ListWidget {
   Q_OBJECT
+
 public:
   explicit DevicePanel(SettingsWindow *parent);
+
 signals:
   void reviewTrainingGuide();
   void showDriverView();
@@ -53,14 +57,21 @@ private:
   Params params;
 };
 
+
 class TogglesPanel : public ListWidget {
   Q_OBJECT
+
 public:
   explicit TogglesPanel(SettingsWindow *parent);
+
+private:
+  Params params;
 };
+
 
 class SoftwarePanel : public ListWidget {
   Q_OBJECT
+
 public:
   explicit SoftwarePanel(QWidget* parent = nullptr);
 
@@ -80,8 +91,10 @@ private:
   QFileSystemWatcher *fs_watch;
 };
 
+
 class C2NetworkPanel: public QWidget {
   Q_OBJECT
+
 public:
   explicit C2NetworkPanel(QWidget* parent = nullptr);
 
@@ -92,10 +105,9 @@ private:
 };
 
 
-
-
 class SelectCar : public QWidget {
   Q_OBJECT
+
 public:
   explicit SelectCar(QWidget* parent = 0);
 
@@ -104,8 +116,8 @@ private:
 signals:
   void backPress();
   void selectedCar();
-
 };
+
 
 class CommunityPanel : public QWidget {
   Q_OBJECT
@@ -114,7 +126,6 @@ private:
   QStackedLayout* main_layout = nullptr;
   QWidget* homeScreen = nullptr;
   SelectCar* selectCar = nullptr;
-
   QWidget* homeWidget;
 
 public:

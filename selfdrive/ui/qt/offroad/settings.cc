@@ -99,8 +99,6 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
     },
   };
 
-  Params params;
-
 #ifdef ENABLE_MAPS
   if (!params.getBool("NavDisable")) {
     toggles.push_back({
@@ -580,7 +578,6 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
   };
 
 #ifdef ENABLE_MAPS
-  Params params;
   if (!params.getBool("NavDisable")) {
     auto map_panel = new MapPanel(this);
     panels.push_back({"Navigation", map_panel});
