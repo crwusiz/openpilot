@@ -196,6 +196,7 @@ void OnroadHud::updateState(const UIState &s) {
   const auto car_control = sm["carControl"].getCarControl();
   const auto device_state = sm["deviceState"].getDeviceState();
   const auto leadOne = sm["radarState"].getRadarState().getLeadOne();
+  auto roadLimitSpeed = sm["roadLimitSpeed"].getRoadLimitSpeed();
 
   float maxspeed = cs.getVCruise();
   bool cruise_set = maxspeed > 0 && (int)maxspeed != SET_SPEED_NA;
@@ -223,7 +224,7 @@ void OnroadHud::updateState(const UIState &s) {
 
   setProperty("brake_stat", car_control.getActuators().getAccel() < -1.96133 || car_state.getBrakeLights() || car_state.getBrakePressed());
   setProperty("autohold_stat", car_state.getAutoHold());
-  setProperty("nda_stat", car_control.getSccSmoother().getRoadLimitSpeedActive());
+  setProperty("nda_stat", roadLimitSpeed.getActive());
   setProperty("bsd_l_stat", car_state.getLeftBlindspot());
   setProperty("bsd_r_stat", car_state.getRightBlindspot());
   setProperty("wifi_stat", (int)device_state.getNetworkStrength() > 0);
@@ -882,15 +883,10 @@ void NvgWindow::drawMaxSpeed(QPainter &p) {
 void NvgWindow::drawSpeedLimit(QPainter &p) {
   const SubMaster &sm = *(uiState()->sm);
   auto roadLimitSpeed = sm["roadLimitSpeed"].getRoadLimitSpeed();
-
-  int activeNDA = roadLimitSpeed.getActive();
-
   int camLimitSpeed = roadLimitSpeed.getCamLimitSpeed();
   int camLimitSpeedLeftDist = roadLimitSpeed.getCamLimitSpeedLeftDist();
-
   int sectionLimitSpeed = roadLimitSpeed.getSectionLimitSpeed();
   int sectionLeftDist = roadLimitSpeed.getSectionLeftDist();
-
   int limit_speed = 0;
   int left_dist = 0;
 
