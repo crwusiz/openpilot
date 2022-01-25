@@ -35,7 +35,6 @@ class CarInterface(CarInterfaceBase):
 
     ret.carName = "hyundai"
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy, 0)]
-    ret.communityFeature = True
 
     # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
     # hyundai
