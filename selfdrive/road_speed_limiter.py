@@ -8,7 +8,7 @@ import fcntl
 import struct
 from threading import Thread
 from cereal import messaging
-from common.numpy_fast import clip, mean
+from common.numpy_fast import clip
 from common.realtime import sec_since_boot
 from selfdrive.config import Conversions as CV
 
