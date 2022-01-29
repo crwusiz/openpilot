@@ -1,31 +1,7 @@
 #include "usb_protocol.h"
+#include "health.h"
 
 extern int _app_start[0xc000]; // Only first 3 sectors of size 0x4000 are used
-
-// When changing this struct, boardd and python/__init__.py needs to be kept up to date!
-#define HEALTH_PACKET_VERSION 2
-struct __attribute__((packed)) health_t {
-  uint32_t uptime_pkt;
-  uint32_t voltage_pkt;
-  uint32_t current_pkt;
-  uint32_t can_rx_errs_pkt;
-  uint32_t can_send_errs_pkt;
-  uint32_t can_fwd_errs_pkt;
-  uint32_t gmlan_send_errs_pkt;
-  uint32_t faults_pkt;
-  uint8_t ignition_line_pkt;
-  uint8_t ignition_can_pkt;
-  uint8_t controls_allowed_pkt;
-  uint8_t gas_interceptor_detected_pkt;
-  uint8_t car_harness_status_pkt;
-  uint8_t usb_power_mode_pkt;
-  uint8_t safety_mode_pkt;
-  int16_t safety_param_pkt;
-  uint8_t fault_status_pkt;
-  uint8_t power_save_enabled_pkt;
-  uint8_t heartbeat_lost_pkt;
-  uint16_t unsafe_mode_pkt;
-};
 
 // Prototypes
 void set_safety_mode(uint16_t mode, int16_t param);
@@ -56,6 +32,7 @@ int get_health_pkt(void *dat) {
   health->unsafe_mode_pkt = unsafe_mode;
   health->power_save_enabled_pkt = (uint8_t)(power_save_status == POWER_SAVE_STATUS_ENABLED);
   health->heartbeat_lost_pkt = (uint8_t)(heartbeat_lost);
+  health->blocked_msg_cnt_pkt = blocked_msg_cnt;
 
   health->fault_status_pkt = fault_status;
   health->faults_pkt = faults;

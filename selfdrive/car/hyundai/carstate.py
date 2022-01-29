@@ -223,103 +223,104 @@ class CarState(CarStateBase):
   def get_can_parser(CP):
 
     signals = [
-      # sig_name, sig_address, default
-      ("WHL_SPD_FL", "WHL_SPD11", 0),
-      ("WHL_SPD_FR", "WHL_SPD11", 0),
-      ("WHL_SPD_RL", "WHL_SPD11", 0),
-      ("WHL_SPD_RR", "WHL_SPD11", 0),
+      # sig_name, sig_address
+      ("WHL_SPD_FL", "WHL_SPD11"),
+      ("WHL_SPD_FR", "WHL_SPD11"),
+      ("WHL_SPD_RL", "WHL_SPD11"),
+      ("WHL_SPD_RR", "WHL_SPD11"),
 
-      ("YAW_RATE", "ESP12", 0),
+      ("YAW_RATE", "ESP12"),
 
-      ("CF_Gway_DrvSeatBeltInd", "CGW4", 1),
-      ("CF_Gway_DrvSeatBeltSw", "CGW1", 0),
-      ("CF_Gway_DrvDrSw", "CGW1", 0),       # Driver Door
-      ("CF_Gway_AstDrSw", "CGW1", 0),       # Passenger door
-      ("CF_Gway_RLDrSw", "CGW2", 0),        # Rear reft door
-      ("CF_Gway_RRDrSw", "CGW2", 0),        # Rear right door
-      ("CF_Gway_TurnSigLh", "CGW1", 0),
-      ("CF_Gway_TurnSigRh", "CGW1", 0),
-      ("CF_Gway_ParkBrakeSw", "CGW1", 0),   # Parking Brake
+      ("CF_Gway_DrvSeatBeltInd", "CGW4"),
 
-      ("CYL_PRES", "ESP12", 0),
+      ("CF_Gway_DrvSeatBeltSw", "CGW1"),
+      ("CF_Gway_DrvDrSw", "CGW1"),       # Driver Door
+      ("CF_Gway_AstDrSw", "CGW1"),       # Passenger door
+      ("CF_Gway_RLDrSw", "CGW2"),        # Rear reft door
+      ("CF_Gway_RRDrSw", "CGW2"),        # Rear right door
+      ("CF_Gway_TurnSigLh", "CGW1"),
+      ("CF_Gway_TurnSigRh", "CGW1"),
+      ("CF_Gway_ParkBrakeSw", "CGW1"),   # Parking Brake
 
-      ("CF_Clu_CruiseSwState", "CLU11", 0),
-      ("CF_Clu_CruiseSwMain", "CLU11", 0),
-      ("CF_Clu_SldMainSW", "CLU11", 0),
-      ("CF_Clu_ParityBit1", "CLU11", 0),
-      ("CF_Clu_VanzDecimal" , "CLU11", 0),
-      ("CF_Clu_Vanz", "CLU11", 0),
-      ("CF_Clu_SPEED_UNIT", "CLU11", 0),
-      ("CF_Clu_DetentOut", "CLU11", 0),
-      ("CF_Clu_RheostatLevel", "CLU11", 0),
-      ("CF_Clu_CluInfo", "CLU11", 0),
-      ("CF_Clu_AmpInfo", "CLU11", 0),
-      ("CF_Clu_AliveCnt1", "CLU11", 0),
+      ("CYL_PRES", "ESP12"),
 
-      ("ACCEnable", "TCS13", 0),
-      ("BrakeLight", "TCS13", 0),
-      ("DriverBraking", "TCS13", 0),
-      ("DriverOverride", "TCS13", 0), # scc smoother
-      ("CF_VSM_Avail", "TCS13", 0),
+      ("CF_Clu_CruiseSwState", "CLU11"),
+      ("CF_Clu_CruiseSwMain", "CLU11"),
+      ("CF_Clu_SldMainSW", "CLU11"),
+      ("CF_Clu_ParityBit1", "CLU11"),
+      ("CF_Clu_VanzDecimal" , "CLU11"),
+      ("CF_Clu_Vanz", "CLU11"),
+      ("CF_Clu_SPEED_UNIT", "CLU11"),
+      ("CF_Clu_DetentOut", "CLU11"),
+      ("CF_Clu_RheostatLevel", "CLU11"),
+      ("CF_Clu_CluInfo", "CLU11"),
+      ("CF_Clu_AmpInfo", "CLU11"),
+      ("CF_Clu_AliveCnt1", "CLU11"),
 
-      ("ESC_Off_Step", "TCS15", 0),
-      ("AVH_LAMP", "TCS15", 0),
+      ("ACCEnable", "TCS13"),
+      ("BrakeLight", "TCS13"),
+      ("DriverBraking", "TCS13"),
+      ("DriverOverride", "TCS13"), # scc smoother
+      ("CF_VSM_Avail", "TCS13"),
 
-      #("CF_Lvr_GearInf", "LVR11", 0),        # Transmission Gear (0 = N or P, 1-8 = Fwd, 14 = Rev)
+      ("ESC_Off_Step", "TCS15"),
+      ("AVH_LAMP", "TCS15"),
 
-      ("MainMode_ACC", "SCC11", 1),
-      ("SCCInfoDisplay", "SCC11", 0),
-      ("AliveCounterACC", "SCC11", 0),
-      ("VSetDis", "SCC11", 30),
-      ("ObjValid", "SCC11", 0),
-      ("DriverAlertDisplay", "SCC11", 0),
-      ("TauGapSet", "SCC11", 4),
-      ("ACC_ObjStatus", "SCC11", 0),
-      ("ACC_ObjLatPos", "SCC11", 0),
-      ("ACC_ObjDist", "SCC11", 150), #TK211X value is 204.6
-      ("ACC_ObjRelSpd", "SCC11", 0),
-      ("Navi_SCC_Curve_Status", "SCC11", 0),
-      ("Navi_SCC_Curve_Act", "SCC11", 0),
-      ("Navi_SCC_Camera_Act", "SCC11", 0),
-      ("Navi_SCC_Camera_Status", "SCC11", 2),
+      #("CF_Lvr_GearInf", "LVR11"),        # Transmission Gear (0 = N or P, 1-8 = Fwd, 14 = Rev)
 
-      ("ACCMode", "SCC12", 0),
-      ("CF_VSM_Prefill", "SCC12", 0),
-      ("CF_VSM_DecCmdAct", "SCC12", 0),
-      ("CF_VSM_HBACmd", "SCC12", 0),
-      ("CF_VSM_Warn", "SCC12", 0),
-      ("CF_VSM_Stat", "SCC12", 0),
-      ("CF_VSM_BeltCmd", "SCC12", 0),
-      ("ACCFailInfo", "SCC12", 0),
-      ("StopReq", "SCC12", 0),
-      ("CR_VSM_DecCmd", "SCC12", 0),
-      ("aReqRaw", "SCC12", 0), #aReqMax
-      ("TakeOverReq", "SCC12", 0),
-      ("PreFill", "SCC12", 0),
-      ("aReqValue", "SCC12", 0), #aReqMin
-      ("CF_VSM_ConfMode", "SCC12", 1),
-      ("AEB_Failinfo", "SCC12", 0),
-      ("AEB_Status", "SCC12", 2),
-      ("AEB_CmdAct", "SCC12", 0),
-      ("AEB_StopReq", "SCC12", 0),
-      ("CR_VSM_Alive", "SCC12", 0),
-      ("CR_VSM_ChkSum", "SCC12", 0),
+      ("MainMode_ACC", "SCC11"),
+      ("SCCInfoDisplay", "SCC11"),
+      ("AliveCounterACC", "SCC11"),
+      ("VSetDis", "SCC11"),
+      ("ObjValid", "SCC11"),
+      ("DriverAlertDisplay", "SCC11"),
+      ("TauGapSet", "SCC11"),
+      ("ACC_ObjStatus", "SCC11"),
+      ("ACC_ObjLatPos", "SCC11"),
+      ("ACC_ObjDist", "SCC11"), #TK211X value is 204.6
+      ("ACC_ObjRelSpd", "SCC11"),
+      ("Navi_SCC_Curve_Status", "SCC11"),
+      ("Navi_SCC_Curve_Act", "SCC11"),
+      ("Navi_SCC_Camera_Act", "SCC11"),
+      ("Navi_SCC_Camera_Status", "SCC11"),
 
-      ("SCCDrvModeRValue", "SCC13", 2),
-      ("SCC_Equip", "SCC13", 1),
-      ("AebDrvSetStatus", "SCC13", 0),
+      ("ACCMode", "SCC12"),
+      ("CF_VSM_Prefill", "SCC12"),
+      ("CF_VSM_DecCmdAct", "SCC12"),
+      ("CF_VSM_HBACmd", "SCC12"),
+      ("CF_VSM_Warn", "SCC12"),
+      ("CF_VSM_Stat", "SCC12"),
+      ("CF_VSM_BeltCmd", "SCC12"),
+      ("ACCFailInfo", "SCC12"),
+      ("StopReq", "SCC12"),
+      ("CR_VSM_DecCmd", "SCC12"),
+      ("aReqRaw", "SCC12"), #aReqMax
+      ("TakeOverReq", "SCC12"),
+      ("PreFill", "SCC12"),
+      ("aReqValue", "SCC12"), #aReqMin
+      ("CF_VSM_ConfMode", "SCC12"),
+      ("AEB_Failinfo", "SCC12"),
+      ("AEB_Status", "SCC12"),
+      ("AEB_CmdAct", "SCC12"),
+      ("AEB_StopReq", "SCC12"),
+      ("CR_VSM_Alive", "SCC12"),
+      ("CR_VSM_ChkSum", "SCC12"),
 
-      ("JerkUpperLimit", "SCC14", 0),
-      ("JerkLowerLimit", "SCC14", 0),
-      ("SCCMode2", "SCC14", 0),
-      ("ComfortBandUpper", "SCC14", 0),
-      ("ComfortBandLower", "SCC14", 0),
+      ("SCCDrvModeRValue", "SCC13"),
+      ("SCC_Equip", "SCC13"),
+      ("AebDrvSetStatus", "SCC13"),
 
-      ("UNIT", "TPMS11", 0),
-      ("PRESSURE_FL", "TPMS11", 0),
-      ("PRESSURE_FR", "TPMS11", 0),
-      ("PRESSURE_RL", "TPMS11", 0),
-      ("PRESSURE_RR", "TPMS11", 0),
+      ("JerkUpperLimit", "SCC14"),
+      ("JerkLowerLimit", "SCC14"),
+      ("SCCMode2", "SCC14"),
+      ("ComfortBandUpper", "SCC14"),
+      ("ComfortBandLower", "SCC14"),
+
+      ("UNIT", "TPMS11"),
+      ("PRESSURE_FL", "TPMS11"),
+      ("PRESSURE_FR", "TPMS11"),
+      ("PRESSURE_RL", "TPMS11"),
+      ("PRESSURE_RR", "TPMS11"),
     ]
 
     checks = [
@@ -341,59 +342,59 @@ class CarState(CarStateBase):
       ]
     if CP.mdpsBus == 0:
       signals += [
-        ("CR_Mdps_StrColTq", "MDPS12", 0),
-        ("CF_Mdps_Def", "MDPS12", 0),
-        ("CF_Mdps_ToiActive", "MDPS12", 0),
-        ("CF_Mdps_ToiUnavail", "MDPS12", 0),
-        ("CF_Mdps_ToiFlt", "MDPS12", 0),
-        ("CF_Mdps_MsgCount2", "MDPS12", 0),
-        ("CF_Mdps_Chksum2", "MDPS12", 0),
-        ("CF_Mdps_SErr", "MDPS12", 0),
-        ("CR_Mdps_StrTq", "MDPS12", 0),
-        ("CF_Mdps_FailStat", "MDPS12", 0),
-        ("CR_Mdps_OutTq", "MDPS12", 0)
+        ("CR_Mdps_StrColTq", "MDPS12"),
+        ("CF_Mdps_Def", "MDPS12"),
+        ("CF_Mdps_ToiActive", "MDPS12"),
+        ("CF_Mdps_ToiUnavail", "MDPS12"),
+        ("CF_Mdps_ToiFlt", "MDPS12"),
+        ("CF_Mdps_MsgCount2", "MDPS12"),
+        ("CF_Mdps_Chksum2", "MDPS12"),
+        ("CF_Mdps_SErr", "MDPS12"),
+        ("CR_Mdps_StrTq", "MDPS12"),
+        ("CF_Mdps_FailStat", "MDPS12"),
+        ("CR_Mdps_OutTq", "MDPS12")
       ]
       checks += [
         ("MDPS12", 50)
       ]
     if CP.sasBus == 0:
       signals += [
-        ("SAS_Angle", "SAS11", 0),
-        ("SAS_Speed", "SAS11", 0),
+        ("SAS_Angle", "SAS11"),
+        ("SAS_Speed", "SAS11"),
       ]
       checks += [
         ("SAS11", 100)
       ]
     if CP.sccBus == -1:
       signals += [
-        ("CRUISE_LAMP_M", "EMS16", 0),
-        ("CF_Lvr_CruiseSet", "LVR12", 0),
+        ("CRUISE_LAMP_M", "EMS16"),
+        ("CF_Lvr_CruiseSet", "LVR12"),
     ]
     if CP.carFingerprint in FEATURES["use_cluster_gears"]:
       signals += [
-        ("CF_Clu_Gear", "CLU15", 0),
+        ("CF_Clu_Gear", "CLU15"),
       ]
     elif CP.carFingerprint in FEATURES["use_tcu_gears"]:
       signals += [
-        ("CUR_GR", "TCU12",0),
+        ("CUR_GR", "TCU12"),
       ]
     elif CP.carFingerprint in FEATURES["use_elect_gears"]:
       signals += [
-        ("Elect_Gear_Shifter", "ELECT_GEAR", 0),
+        ("Elect_Gear_Shifter", "ELECT_GEAR"),
     ]
     else:
       signals += [
-        ("CF_Lvr_Gear","LVR12",0),
+        ("CF_Lvr_Gear","LVR12"),
       ]
 
     if CP.carFingerprint in EV_HYBRID_CAR:
       if CP.carFingerprint in HYBRID_CAR:
         signals += [
-          ("CR_Vcu_AccPedDep_Pos", "E_EMS11", 0)
+          ("CR_Vcu_AccPedDep_Pos", "E_EMS11")
         ]
       else:
         signals += [
-          ("Accel_Pedal_Pos", "E_EMS11", 0),
+          ("Accel_Pedal_Pos", "E_EMS11"),
         ]
       checks += [
         ("E_EMS11", 50),
@@ -401,8 +402,8 @@ class CarState(CarStateBase):
 
     else:
       signals += [
-        ("PV_AV_CAN", "EMS12", 0),
-        ("CF_Ems_AclAct", "EMS16", 0),
+        ("PV_AV_CAN", "EMS12"),
+        ("CF_Ems_AclAct", "EMS16"),
       ]
       checks += [
         ("EMS12", 100),
@@ -411,8 +412,8 @@ class CarState(CarStateBase):
 
     if CP.carFingerprint in FEATURES["use_fca"]:
       signals += [
-        ("FCA_CmdAct", "FCA11", 0),
-        ("CF_VSM_Warn", "FCA11", 0),
+        ("FCA_CmdAct", "FCA11"),
+        ("CF_VSM_Warn", "FCA11"),
       ]
 
       if not CP.openpilotLongitudinalControl:
@@ -423,15 +424,15 @@ class CarState(CarStateBase):
 
     if CP.enableBsm:
       signals += [
-        ("CF_Lca_IndLeft", "LCA11", 0),
-        ("CF_Lca_IndRight", "LCA11", 0),
+        ("CF_Lca_IndLeft", "LCA11"),
+        ("CF_Lca_IndRight", "LCA11"),
       ]
       checks += [("LCA11", 50)]
 
     if CP.enableAutoHold:
       signals += [
-        ("AVH_STAT", "ESP11", 0),
-        ("LDM_STAT", "ESP11", 0),
+        ("AVH_STAT", "ESP11"),
+        ("LDM_STAT", "ESP11"),
       ]
       checks += [("ESP11", 50)]
 
@@ -443,17 +444,17 @@ class CarState(CarStateBase):
     checks = []
     if CP.mdpsBus == 1:
       signals += [
-        ("CR_Mdps_StrColTq", "MDPS12", 0),
-        ("CF_Mdps_Def", "MDPS12", 0),
-        ("CF_Mdps_ToiActive", "MDPS12", 0),
-        ("CF_Mdps_ToiUnavail", "MDPS12", 0),
-        ("CF_Mdps_ToiFlt", "MDPS12", 0),
-        ("CF_Mdps_MsgCount2", "MDPS12", 0),
-        ("CF_Mdps_Chksum2", "MDPS12", 0),
-        ("CF_Mdps_SErr", "MDPS12", 0),
-        ("CR_Mdps_StrTq", "MDPS12", 0),
-        ("CF_Mdps_FailStat", "MDPS12", 0),
-        ("CR_Mdps_OutTq", "MDPS12", 0)
+        ("CR_Mdps_StrColTq", "MDPS12"),
+        ("CF_Mdps_Def", "MDPS12"),
+        ("CF_Mdps_ToiActive", "MDPS12"),
+        ("CF_Mdps_ToiUnavail", "MDPS12"),
+        ("CF_Mdps_ToiFlt", "MDPS12"),
+        ("CF_Mdps_MsgCount2", "MDPS12"),
+        ("CF_Mdps_Chksum2", "MDPS12"),
+        ("CF_Mdps_SErr", "MDPS12"),
+        ("CR_Mdps_StrTq", "MDPS12"),
+        ("CF_Mdps_FailStat", "MDPS12"),
+        ("CR_Mdps_OutTq", "MDPS12")
       ]
       checks += [
         ("MDPS12", 50)
@@ -461,62 +462,62 @@ class CarState(CarStateBase):
 
     if CP.sasBus == 1:
       signals += [
-        ("SAS_Angle", "SAS11", 0),
-        ("SAS_Speed", "SAS11", 0),
+        ("SAS_Angle", "SAS11"),
+        ("SAS_Speed", "SAS11"),
       ]
       checks += [
         ("SAS11", 100)
       ]
     if CP.sccBus == 1:
       signals += [
-        ("MainMode_ACC", "SCC11", 1),
-        ("SCCInfoDisplay", "SCC11", 0),
-        ("AliveCounterACC", "SCC11", 0),
-        ("VSetDis", "SCC11", 30),
-        ("ObjValid", "SCC11", 0),
-        ("DriverAlertDisplay", "SCC11", 0),
-        ("TauGapSet", "SCC11", 4),
-        ("ACC_ObjStatus", "SCC11", 0),
-        ("ACC_ObjLatPos", "SCC11", 0),
-        ("ACC_ObjDist", "SCC11", 150.),
-        ("ACC_ObjRelSpd", "SCC11", 0),
-        ("Navi_SCC_Curve_Status", "SCC11", 0),
-        ("Navi_SCC_Curve_Act", "SCC11", 0),
-        ("Navi_SCC_Camera_Act", "SCC11", 0),
-        ("Navi_SCC_Camera_Status", "SCC11", 2),
+        ("MainMode_ACC", "SCC11"),
+        ("SCCInfoDisplay", "SCC11"),
+        ("AliveCounterACC", "SCC11"),
+        ("VSetDis", "SCC11"),
+        ("ObjValid", "SCC11"),
+        ("DriverAlertDisplay", "SCC11"),
+        ("TauGapSet", "SCC11"),
+        ("ACC_ObjStatus", "SCC11"),
+        ("ACC_ObjLatPos", "SCC11"),
+        ("ACC_ObjDist", "SCC11"),
+        ("ACC_ObjRelSpd", "SCC11"),
+        ("Navi_SCC_Curve_Status", "SCC11"),
+        ("Navi_SCC_Curve_Act", "SCC11"),
+        ("Navi_SCC_Camera_Act", "SCC11"),
+        ("Navi_SCC_Camera_Status", "SCC11"),
 
 
-        ("ACCMode", "SCC12", 0),
-        ("CF_VSM_Prefill", "SCC12", 0),
-        ("CF_VSM_DecCmdAct", "SCC12", 0),
-        ("CF_VSM_HBACmd", "SCC12", 0),
-        ("CF_VSM_Warn", "SCC12", 0),
-        ("CF_VSM_Stat", "SCC12", 0),
-        ("CF_VSM_BeltCmd", "SCC12", 0),
-        ("ACCFailInfo", "SCC12", 0),
-        ("StopReq", "SCC12", 0),
-        ("CR_VSM_DecCmd", "SCC12", 0),
-        ("aReqRaw", "SCC12", 0), #aReqMax
-        ("TakeOverReq", "SCC12", 0),
-        ("PreFill", "SCC12", 0),
-        ("aReqValue", "SCC12", 0), #aReqMin
-        ("CF_VSM_ConfMode", "SCC12", 1),
-        ("AEB_Failinfo", "SCC12", 0),
-        ("AEB_Status", "SCC12", 2),
-        ("AEB_CmdAct", "SCC12", 0),
-        ("AEB_StopReq", "SCC12", 0),
-        ("CR_VSM_Alive", "SCC12", 0),
-        ("CR_VSM_ChkSum", "SCC12", 0),
+        ("ACCMode", "SCC12"),
+        ("CF_VSM_Prefill", "SCC12"),
+        ("CF_VSM_DecCmdAct", "SCC12"),
+        ("CF_VSM_HBACmd", "SCC12"),
+        ("CF_VSM_Warn", "SCC12"),
+        ("CF_VSM_Stat", "SCC12"),
+        ("CF_VSM_BeltCmd", "SCC12"),
+        ("ACCFailInfo", "SCC12"),
+        ("StopReq", "SCC12"),
+        ("CR_VSM_DecCmd", "SCC12"),
+        ("aReqRaw", "SCC12"), #aReqMax
+        ("TakeOverReq", "SCC12"),
+        ("PreFill", "SCC12"),
+        ("aReqValue", "SCC12"), #aReqMin
+        ("CF_VSM_ConfMode", "SCC12"),
+        ("AEB_Failinfo", "SCC12"),
+        ("AEB_Status", "SCC12"),
+        ("AEB_CmdAct", "SCC12"),
+        ("AEB_StopReq", "SCC12"),
+        ("CR_VSM_Alive", "SCC12"),
+        ("CR_VSM_ChkSum", "SCC12"),
 
-        ("SCCDrvModeRValue", "SCC13", 2),
-        ("SCC_Equip", "SCC13", 1),
-        ("AebDrvSetStatus", "SCC13", 0),
+        ("SCCDrvModeRValue", "SCC13"),
+        ("SCC_Equip", "SCC13"),
+        ("AebDrvSetStatus", "SCC13"),
 
-        ("JerkUpperLimit", "SCC14", 0),
-        ("JerkLowerLimit", "SCC14", 0),
-        ("SCCMode2", "SCC14", 0),
-        ("ComfortBandUpper", "SCC14", 0),
-        ("ComfortBandLower", "SCC14", 0),
+        ("JerkUpperLimit", "SCC14"),
+        ("JerkLowerLimit", "SCC14"),
+        ("SCCMode2", "SCC14"),
+        ("ComfortBandUpper", "SCC14"),
+        ("ComfortBandLower", "SCC14"),
 
       ]
       checks += [
@@ -530,23 +531,23 @@ class CarState(CarStateBase):
 
     signals = [
       # sig_name, sig_address, default
-      ("CF_Lkas_LdwsActivemode", "LKAS11", 0),
-      ("CF_Lkas_LdwsSysState", "LKAS11", 0),
-      ("CF_Lkas_SysWarning", "LKAS11", 0),
-      ("CF_Lkas_LdwsLHWarning", "LKAS11", 0),
-      ("CF_Lkas_LdwsRHWarning", "LKAS11", 0),
-      ("CF_Lkas_HbaLamp", "LKAS11", 0),
-      ("CF_Lkas_FcwBasReq", "LKAS11", 0),
-      ("CF_Lkas_ToiFlt", "LKAS11", 0),
-      ("CF_Lkas_HbaSysState", "LKAS11", 0),
-      ("CF_Lkas_FcwOpt", "LKAS11", 0),
-      ("CF_Lkas_HbaOpt", "LKAS11", 0),
-      ("CF_Lkas_FcwSysState", "LKAS11", 0),
-      ("CF_Lkas_FcwCollisionWarning", "LKAS11", 0),
-      ("CF_Lkas_MsgCount", "LKAS11", 0),
-      ("CF_Lkas_FusionState", "LKAS11", 0),
-      ("CF_Lkas_FcwOpt_USM", "LKAS11", 0),
-      ("CF_Lkas_LdwsOpt_USM", "LKAS11", 0),
+      ("CF_Lkas_LdwsActivemode", "LKAS11"),
+      ("CF_Lkas_LdwsSysState", "LKAS11"),
+      ("CF_Lkas_SysWarning", "LKAS11"),
+      ("CF_Lkas_LdwsLHWarning", "LKAS11"),
+      ("CF_Lkas_LdwsRHWarning", "LKAS11"),
+      ("CF_Lkas_HbaLamp", "LKAS11"),
+      ("CF_Lkas_FcwBasReq", "LKAS11"),
+      ("CF_Lkas_ToiFlt", "LKAS11"),
+      ("CF_Lkas_HbaSysState", "LKAS11"),
+      ("CF_Lkas_FcwOpt", "LKAS11"),
+      ("CF_Lkas_HbaOpt", "LKAS11"),
+      ("CF_Lkas_FcwSysState", "LKAS11"),
+      ("CF_Lkas_FcwCollisionWarning", "LKAS11"),
+      ("CF_Lkas_MsgCount", "LKAS11"),
+      ("CF_Lkas_FusionState", "LKAS11"),
+      ("CF_Lkas_FcwOpt_USM", "LKAS11"),
+      ("CF_Lkas_LdwsOpt_USM", "LKAS11"),
     ]
 
     checks = [
@@ -554,53 +555,53 @@ class CarState(CarStateBase):
     ]
     if CP.sccBus == 2:
       signals += [
-        ("MainMode_ACC", "SCC11", 1),
-        ("SCCInfoDisplay", "SCC11", 0),
-        ("AliveCounterACC", "SCC11", 0),
-        ("VSetDis", "SCC11", 30),
-        ("ObjValid", "SCC11", 0),
-        ("DriverAlertDisplay", "SCC11", 0),
-        ("TauGapSet", "SCC11", 4),
-        ("ACC_ObjStatus", "SCC11", 0),
-        ("ACC_ObjLatPos", "SCC11", 0),
-        ("ACC_ObjDist", "SCC11", 150.),
-        ("ACC_ObjRelSpd", "SCC11", 0),
-        ("Navi_SCC_Curve_Status", "SCC11", 0),
-        ("Navi_SCC_Curve_Act", "SCC11", 0),
-        ("Navi_SCC_Camera_Act", "SCC11", 0),
-        ("Navi_SCC_Camera_Status", "SCC11", 2),
+        ("MainMode_ACC", "SCC11"),
+        ("SCCInfoDisplay", "SCC11"),
+        ("AliveCounterACC", "SCC11"),
+        ("VSetDis", "SCC11"),
+        ("ObjValid", "SCC11"),
+        ("DriverAlertDisplay", "SCC11"),
+        ("TauGapSet", "SCC11"),
+        ("ACC_ObjStatus", "SCC11"),
+        ("ACC_ObjLatPos", "SCC11"),
+        ("ACC_ObjDist", "SCC11"),
+        ("ACC_ObjRelSpd", "SCC11"),
+        ("Navi_SCC_Curve_Status", "SCC11"),
+        ("Navi_SCC_Curve_Act", "SCC11"),
+        ("Navi_SCC_Camera_Act", "SCC11"),
+        ("Navi_SCC_Camera_Status", "SCC11"),
 
-        ("ACCMode", "SCC12", 0),
-        ("CF_VSM_Prefill", "SCC12", 0),
-        ("CF_VSM_DecCmdAct", "SCC12", 0),
-        ("CF_VSM_HBACmd", "SCC12", 0),
-        ("CF_VSM_Warn", "SCC12", 0),
-        ("CF_VSM_Stat", "SCC12", 0),
-        ("CF_VSM_BeltCmd", "SCC12", 0),
-        ("ACCFailInfo", "SCC12", 0),
-        ("StopReq", "SCC12", 0),
-        ("CR_VSM_DecCmd", "SCC12", 0),
-        ("aReqRaw", "SCC12", 0), #aReqMax
-        ("TakeOverReq", "SCC12", 0),
-        ("PreFill", "SCC12", 0),
-        ("aReqValue", "SCC12", 0), #aReqMin
-        ("CF_VSM_ConfMode", "SCC12", 1),
-        ("AEB_Failinfo", "SCC12", 0),
-        ("AEB_Status", "SCC12", 2),
-        ("AEB_CmdAct", "SCC12", 0),
-        ("AEB_StopReq", "SCC12", 0),
-        ("CR_VSM_Alive", "SCC12", 0),
-        ("CR_VSM_ChkSum", "SCC12", 0),
+        ("ACCMode", "SCC12"),
+        ("CF_VSM_Prefill", "SCC12"),
+        ("CF_VSM_DecCmdAct", "SCC12"),
+        ("CF_VSM_HBACmd", "SCC12"),
+        ("CF_VSM_Warn", "SCC12"),
+        ("CF_VSM_Stat", "SCC12"),
+        ("CF_VSM_BeltCmd", "SCC12"),
+        ("ACCFailInfo", "SCC12"),
+        ("StopReq", "SCC12"),
+        ("CR_VSM_DecCmd", "SCC12"),
+        ("aReqRaw", "SCC12"), #aReqMax
+        ("TakeOverReq", "SCC12"),
+        ("PreFill", "SCC12"),
+        ("aReqValue", "SCC12"), #aReqMin
+        ("CF_VSM_ConfMode", "SCC12"),
+        ("AEB_Failinfo", "SCC12"),
+        ("AEB_Status", "SCC12"),
+        ("AEB_CmdAct", "SCC12"),
+        ("AEB_StopReq", "SCC12"),
+        ("CR_VSM_Alive", "SCC12"),
+        ("CR_VSM_ChkSum", "SCC12"),
 
-        ("SCCDrvModeRValue", "SCC13", 2),
-        ("SCC_Equip", "SCC13", 1),
-        ("AebDrvSetStatus", "SCC13", 0),
+        ("SCCDrvModeRValue", "SCC13"),
+        ("SCC_Equip", "SCC13"),
+        ("AebDrvSetStatus", "SCC13"),
 
-        ("JerkUpperLimit", "SCC14", 0),
-        ("JerkLowerLimit", "SCC14", 0),
-        ("SCCMode2", "SCC14", 0),
-        ("ComfortBandUpper", "SCC14", 0),
-        ("ComfortBandLower", "SCC14", 0),
+        ("JerkUpperLimit", "SCC14"),
+        ("JerkLowerLimit", "SCC14"),
+        ("SCCMode2", "SCC14"),
+        ("ComfortBandUpper", "SCC14"),
+        ("ComfortBandLower", "SCC14"),
       ]
       checks += [
         ("SCC11", 50),
