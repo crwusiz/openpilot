@@ -244,22 +244,22 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.init('lqr')
           ret.lateralTuning.lqr.scale = 1500.0
           ret.lateralTuning.lqr.ki = 0.05
+          ret.lateralTuning.lqr.dcGain = 0.002237852961363602
           ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
           ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
           ret.lateralTuning.lqr.c = [1., 0.]
           ret.lateralTuning.lqr.k = [-110.73572306, 451.22718255]
           ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
-          ret.lateralTuning.lqr.dcGain = 0.002237852961363602
       elif candidate == CAR.IONIQ_EV:
           ret.lateralTuning.init('lqr')
           ret.lateralTuning.lqr.scale = 3000.0
           ret.lateralTuning.lqr.ki = 0.005
+          ret.lateralTuning.lqr.dcGain = 0.002237852961363602
           ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
           ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
           ret.lateralTuning.lqr.c = [1., 0.]
           ret.lateralTuning.lqr.k = [-110.73572306, 451.22718255]
           ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
-          ret.lateralTuning.lqr.dcGain = 0.002237852961363602
       else:
           ret.lateralTuning.init('lqr')
           ret.lateralTuning.lqr.scale = 1700.0
@@ -292,18 +292,18 @@ class CarInterface(CarInterfaceBase):
     ret.steerRatioRear = 0.
     ret.steerControlType = car.CarParams.SteerControlType.torque
 
-    # longitudinal
-    ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-    ret.longitudinalTuning.kpV = [1.6, 1.18, 0.9, 0.78, 0.48]
-    ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
-    ret.longitudinalTuning.kiV = [0.1, 0.06]
-
     # steer, gas, brake limitations VS speed
     ret.steerActuatorDelay = 0.1
     ret.steerLimitTimer = 2.5
     ret.steerRateCost = 0.4
     ret.steerMaxBP = [0.]
     ret.steerMaxV = [2.]
+
+    # longitudinal
+    ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+    ret.longitudinalTuning.kpV = [1.6, 1.18, 0.9, 0.78, 0.48]
+    ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
+    ret.longitudinalTuning.kiV = [0.1, 0.06]
 
     # ignore CAN2 address if L-CAN on the same BUS
     ret.mdpsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
