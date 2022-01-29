@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-
 from cereal import car
+from common.params import Params
 from common.numpy_fast import interp
 from selfdrive.config import Conversions as CV
 from selfdrive.car.hyundai.values import CAR, Buttons, CarControllerParams
 from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
-from common.params import Params
 from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
 
 GearShifter = car.CarState.GearShifter
@@ -35,6 +34,9 @@ class CarInterface(CarInterfaceBase):
 
     ret.carName = "hyundai"
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy, 0)]
+
+    tire_stiffness_factor = 1.
+    ret.maxSteeringAngleDeg = 1000.
 
     # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
     # hyundai
@@ -128,6 +130,7 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 2060. + STD_CARGO_KG
         ret.wheelbase = 3.010
         ret.steerRatio = 16.5
+        ret.maxSteeringAngleDeg = 90.
     elif candidate == CAR.GENESIS_G70:
         ret.mass = 1795. + STD_CARGO_KG
         ret.wheelbase = 2.835
@@ -272,12 +275,21 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.lqr.l = [0.22, 0.318]
     # -----------------------------------------------------------------
 
-    tire_stiffness_factor = 1.
-    ret.maxSteeringAngleDeg = 1000.
+    ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05
 
-    if ret.centerToFront == 0:
-      ret.centerToFront = ret.wheelbase * 0.4
+    ret.steerActuatorDelay = 0.1  # Default delay
+    ret.steerRateCost = 0.4
+    ret.steerLimitTimer = 2.5 # default 1.0
+    ret.steerMaxV = [2.] # default 1.
+
+    # longitudinal
+    ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+    ret.longitudinalTuning.kpV = [1.6, 1.18, 0.9, 0.78, 0.48]
+    ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
+    ret.longitudinalTuning.kiV = [0.1, 0.06]
+
+    ret.stoppingDecelRate = 0.6  # brake_travel/s while trying to stop
 
     # TODO: get actual value, for now starting with reasonable value for
     # civic and scaling by mass and wheelbase
@@ -288,31 +300,12 @@ class CarInterface(CarInterfaceBase):
     ret.tireStiffnessFront, ret.tireStiffnessRear = scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront,
                                                                          tire_stiffness_factor=tire_stiffness_factor)
 
-    # no rear steering, at least on the listed cars above
-    ret.steerRatioRear = 0.
-    ret.steerControlType = car.CarParams.SteerControlType.torque
-
-    # steer, gas, brake limitations VS speed
-    ret.steerActuatorDelay = 0.1
-    ret.steerLimitTimer = 2.5
-    ret.steerRateCost = 0.4
-    ret.steerMaxBP = [0.]
-    ret.steerMaxV = [2.]
-
-    # longitudinal
-    ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-    ret.longitudinalTuning.kpV = [1.6, 1.18, 0.9, 0.78, 0.48]
-    ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
-    ret.longitudinalTuning.kiV = [0.1, 0.06]
-
-    ret.stoppingDecelRate = 0.6  # brake_travel/s while trying to stop
-
     # ignore CAN2 address if L-CAN on the same BUS
     ret.mdpsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
     ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
-    ret.sccBus = 0 if 1056 in fingerprint[0] \
-        else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
-        else 2 if 1056 in fingerprint[2] else -1
+    ret.sccBus = 0 if 1056 in fingerprint[0] else 1 \
+                   if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
+            else 2 if 1056 in fingerprint[2] else -1
 
     if ret.sccBus >= 0:
       ret.hasScc13 = 1290 in fingerprint[ret.sccBus]
@@ -426,9 +419,9 @@ class CarInterface(CarInterfaceBase):
 
   # scc smoother - hyundai only
   def apply(self, c, controls):
-    ret = self.CC.update(c, c.enabled, self.CS, self.frame, c, c.actuators,
-                               c.cruiseControl.cancel, c.hudControl.visualAlert, c.hudControl.leftLaneVisible,
-                               c.hudControl.rightLaneVisible, c.hudControl.leftLaneDepart, c.hudControl.rightLaneDepart,
-                               c.hudControl.setSpeed, c.hudControl.leadVisible, controls)
+    hud_control = c.hudControl
+    ret = self.CC.update(c, c.enabled, self.CS, self.frame, c, c.actuators, c.cruiseControl.cancel, hud_control.visualAlert,
+                         hud_control.leftLaneVisible, hud_control.rightLaneVisible, hud_control.leftLaneDepart, hud_control.rightLaneDepart,
+                         hud_control.setSpeed, hud_control.leadVisible, controls)
     self.frame += 1
     return ret

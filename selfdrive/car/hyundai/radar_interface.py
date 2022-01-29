@@ -13,7 +13,6 @@ RADAR_MSG_COUNT = 32
 def get_radar_can_parser(CP):
 
   if Params().get_bool("NewRadarInterface"):
-
     signals = []
     checks = []
 
@@ -82,7 +81,6 @@ class RadarInterface(RadarInterfaceBase):
     ret.errors = errors
 
     if self.new_radar:
-
       for addr in range(RADAR_START_ADDR, RADAR_START_ADDR + RADAR_MSG_COUNT):
         msg = self.rcp.vl[f"RADAR_TRACK_{addr:x}"]
 

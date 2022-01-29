@@ -1,25 +1,24 @@
 from random import randint
 
 from cereal import car
+from common.params import Params
 from common.realtime import DT_CTRL
 from common.numpy_fast import clip, interp
-from selfdrive.car import apply_std_steer_torque_limits
-from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, \
-                                             create_scc11, create_scc12, create_scc13, create_scc14, \
-                                             create_mdps12, create_lfahda_mfc, create_hda_mfc
-from selfdrive.car.hyundai.scc_smoother import SccSmoother
-from selfdrive.car.hyundai.values import Buttons, FEATURES, CarControllerParams, CAR, SP_CARS
-from opendbc.can.packer import CANPacker
 from selfdrive.config import Conversions as CV
-from common.params import Params
-from selfdrive.controls.lib.longcontrol import LongCtrlState
+from selfdrive.car import apply_std_steer_torque_limits
+from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, create_scc11, create_scc12, create_scc13, create_scc14, \
+                                             create_mdps12, create_lfahda_mfc, create_hda_mfc
+from selfdrive.car.hyundai.values import Buttons, FEATURES, CarControllerParams, SP_CARS
+from opendbc.can.packer import CANPacker
+from selfdrive.car.hyundai.scc_smoother import SccSmoother
 from selfdrive.road_speed_limiter import road_speed_limiter_get_active
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
+LongCtrlState = car.CarControl.Actuators.LongControlState
+
 min_set_speed = 30 * CV.KPH_TO_MS
 
-def process_hud_alert(enabled, fingerprint, visual_alert, left_lane, right_lane,
-                      left_lane_depart, right_lane_depart):
+def process_hud_alert(enabled, fingerprint, visual_alert, left_lane, right_lane, left_lane_depart, right_lane_depart):
 
   sys_warning = (visual_alert in (VisualAlert.steerRequired, VisualAlert.ldw))
 
@@ -57,24 +56,20 @@ class CarController():
     self.turning_signal_timer = 0
     self.longcontrol = CP.openpilotLongitudinalControl
     self.scc_live = not CP.radarOffCan
+    self.turning_indicator_alert = False
 
-    # params init
     params = Params()
     self.lfamfc = params.get("MfcSelect", encoding='utf8') == "2"
     self.mad_mode_enabled = params.get("LongControlSelect", encoding='utf8') == "0" or \
                             params.get("LongControlSelect", encoding='utf8') == "1"
-    self.stock_navi_decel_enabled = params.get_bool('StockNaviDecelEnabled')
-
     self.scc_smoother = SccSmoother()
 
   def update(self, c, enabled, CS, frame, CC, actuators, pcm_cancel_cmd, visual_alert,
              left_lane, right_lane, left_lane_depart, right_lane_depart, set_speed, lead_visible, controls):
 
-
     # Steering Torque
     new_steer = int(round(actuators.steer * CarControllerParams.STEER_MAX))
-    apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque,
-                                                CarControllerParams)
+    apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, CarControllerParams)
 
     # disable when temp fault is active, or below LKA minimum speed
     lkas_active = c.active and not CS.out.steerWarning and abs(CS.out.steeringAngleDeg) < CS.CP.maxSteeringAngleDeg
@@ -175,7 +170,7 @@ class CarController():
     # send scc to car if longcontrol enabled and SCC not on bus 0 or ont live
     if self.longcontrol and CS.cruiseState_enabled and (CS.scc_bus or not self.scc_live):
       if frame % 2 == 0:
-        stopping = controls.LoC.long_control_state == LongCtrlState.stopping
+        stopping = (actuators.longControlState == LongCtrlState.stopping)
         apply_accel = clip(actuators.accel if c.active else 0,
                            CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
         apply_accel = self.scc_smoother.get_apply_accel(CS, controls.sm, apply_accel, stopping)
@@ -190,27 +185,18 @@ class CarController():
         if aReqValue > controls.aReqValueMax:
           controls.aReqValueMax = controls.aReqValue
 
-        if self.stock_navi_decel_enabled:
-          controls.sccStockCamAct = CS.scc11["Navi_SCC_Camera_Act"]
-          controls.sccStockCamStatus = CS.scc11["Navi_SCC_Camera_Status"]
-          apply_accel, stock_cam = self.scc_smoother.get_stock_cam_accel(apply_accel, aReqValue, CS.scc11)
-        else:
-          controls.sccStockCamAct = 0
-          controls.sccStockCamStatus = 0
-          stock_cam = False
-
         if self.scc12_cnt < 0:
           self.scc12_cnt = CS.scc12["CR_VSM_Alive"] if not CS.no_radar else 0
 
         self.scc12_cnt += 1
         self.scc12_cnt %= 0xF
 
+        can_sends.append(create_scc11(self.packer, frame, enabled, set_speed, lead_visible, self.scc_live, CS.scc11,
+                                      self.scc_smoother.active_cam))
+
         can_sends.append(create_scc12(self.packer, apply_accel, enabled, self.scc12_cnt, self.scc_live, CS.scc12,
                                       CS.out.gasPressed, CS.out.brakePressed, CS.out.cruiseState.standstill,
                                       self.car_fingerprint))
-
-        can_sends.append(create_scc11(self.packer, frame, enabled, set_speed, lead_visible, self.scc_live, CS.scc11,
-                                      self.scc_smoother.active_cam, stock_cam))
 
         if frame % 20 == 0 and CS.has_scc13:
           can_sends.append(create_scc13(self.packer, CS.scc13))
@@ -239,6 +225,14 @@ class CarController():
       elif CS.mdps_bus == 0:
         state = 2 if self.car_fingerprint in FEATURES["send_hda_state_2"] else 1
         can_sends.append(create_hda_mfc(self.packer, activated_hda, state))
+
+    # 5 Hz ACC options
+    #if frame % 20 == 0 and CS.CP.openpilotLongitudinalControl:
+    #  can_sends.extend(create_acc_opt(self.packer))
+
+    # 2 Hz front radar options
+    #if frame % 50 == 0 and CS.CP.openpilotLongitudinalControl:
+    #  can_sends.append(create_frt_radar_opt(self.packer))
 
     new_actuators = actuators.copy()
     new_actuators.steer = apply_steer / CarControllerParams.STEER_MAX

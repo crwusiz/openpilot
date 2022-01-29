@@ -420,7 +420,7 @@ class CarInterface(CarInterfaceBase):
 
   # pass in a car.CarControl
   # to be called @ 100hz
-  def apply(self, c):
+  def apply(self, c, controls):
     hud_control = c.hudControl
     if hud_control.speedVisible:
       hud_v_cruise = hud_control.setSpeed * CV.MS_TO_KPH

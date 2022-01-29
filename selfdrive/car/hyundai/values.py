@@ -3,11 +3,11 @@ from selfdrive.car import dbc_dict
 Ecu = car.CarParams.Ecu
 
 class CarControllerParams:
+  ACCEL_MIN = -3.6 # m/s
+  ACCEL_MAX = 2.0 # m/s
 
-  ACCEL_MAX = 2.0
-  ACCEL_MIN = -3.6
-
-  STEER_MAX = 384   # 409 is the max, 255 is stock
+  # If the max stock LKAS request is < 384, add your car to this list.
+  STEER_MAX = 384
   STEER_DELTA_UP = 3
   STEER_DELTA_DOWN = 7
   STEER_DRIVER_ALLOWANCE = 50
@@ -206,9 +206,6 @@ FINGERPRINTS = {
 ECU_FINGERPRINT = {
   Ecu.fwdCamera: [832, 1156, 1191, 1342] #832:lkas11, 1156:hda11_mfc, 1191:mfc_4a7, 1342:lkas12
 }
-
-# Don't use these fingerprints for fingerprinting, they are still used for ECU detection
-IGNORED_FINGERPRINTS = [CAR.VELOSTER, CAR.GENESIS_G70, CAR.KONA, CAR.NIRO_EV, CAR.SELTOS, CAR.ELANTRA21, CAR.ELANTRA21_HEV]
 
 FW_VERSIONS = {
   # fwdRadar, fwdCamera, eps, esp, engine, transmission
@@ -880,6 +877,8 @@ FW_VERSIONS = {
     (Ecu.esp, 0x7D1, None): [
       b'\xf1\000DL ESC \006 101 \004\002 58910-L3200',
       b'\xf1\x8758910-L3200\xf1\000DL ESC \006 101 \004\002 58910-L3200',
+      b'\xf1\x8758910-L3800\xf1\x00DL ESC \t 101 \x07\x02 58910-L3800',
+      b'\xf1\x8758910-L3600\xf1\x00DL ESC \x03 100 \x08\x02 58910-L3600',
     ],
     (Ecu.engine, 0x7E0, None): [
       b'\xf1\x87391212MKT0',
@@ -936,7 +935,9 @@ FW_VERSIONS = {
       b'\xf1\x00OSev SCC F-CUP      1.00 1.01 99110-K4000         ',
       b'\xf1\x8799110Q4000\xf1\x00DEev SCC F-CUP      1.00 1.00 99110-Q4000         ',
       b'\xf1\x8799110Q4100\xf1\x00DEev SCC F-CUP      1.00 1.00 99110-Q4100         ',
-      b'\xf1\x8799110Q4500\xf1\000DEev SCC F-CUP      1.00 1.00 99110-Q4500         ',
+      b'\xf1\x8799110Q4500\xf1\x00DEev SCC F-CUP      1.00 1.00 99110-Q4500         ',
+      b'\xf1\x8799110Q4600\xf1\x00DEev SCC FNCUP      1.00 1.00 99110-Q4600         ',
+      b'\xf1\x8799110Q4600\xf1\x00DEev SCC FHCUP      1.00 1.00 99110-Q4600         ',
     ],
     (Ecu.fwdCamera, 0x7C4, None): [
       b'\xf1\x00DEE MFC  AT USA LHD 1.00 1.03 95740-Q4000 180821',
@@ -1054,12 +1055,10 @@ FEATURES = {
      CAR.SONATA_HEV, CAR.SONATA_LF_HEV, CAR.GRANDEUR_HEV, CAR.GRANDEUR20_HEV,
      CAR.K5_HEV, CAR.K5_DL3_HEV, CAR.K7_HEV},
   # Gear not set is [ LVR12 ]
-  "use_fca":  # these cars use the [ FCA11 ] message for the AEB and FCW signals, all others use [ SCC12 ]
-    {CAR.SONATA, CAR.PALISADE, CAR.ELANTRA_I30, CAR.ELANTRA21, CAR.GENESIS_G70, CAR.FORTE, CAR.STINGER, CAR.K9,
-     CAR.ELANTRA21_HEV, CAR.KONA, CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.SANTA_FE_HEV},
-  "has_scc13": {CAR.PALISADE, CAR.NIRO_HEV, CAR.K9, CAR.GENESIS_G90, CAR.K5_DL3, CAR.K5_DL3_HEV},
-  "has_scc14": {CAR.PALISADE, CAR.NIRO_HEV, CAR.K9, CAR.GENESIS_G90, CAR.K5_DL3, CAR.K5_DL3_HEV},
-  "tcs13_remove": {CAR.SANTA_FE},
+  # these cars use the [ FCA11 ] message for the AEB and FCW signals, all others use [ SCC12 ]
+  # "use_fca": {}, carstate aeb_fcw / qt ui aebselect toggle set
+  # "has_scc13": {},
+  # "has_scc14": {},
   # new lfa car - carcontroller lfamfc / hyundaican lfamfc using qt ui mfcselect toggle set
   "send_hda_state_2": {CAR.GENESIS_G80, CAR.GENESIS_G90},
 }
@@ -1083,7 +1082,7 @@ DBC = {
   CAR.KONA: dbc_dict('hyundai_kia_generic', None),
   CAR.KONA_EV: dbc_dict('hyundai_kia_generic', None),
   CAR.KONA_HEV: dbc_dict('hyundai_kia_generic', None),
-  CAR.IONIQ_EV: dbc_dict('hyundai_kia_generic', None),
+  CAR.IONIQ_EV: dbc_dict('hyundai_kia_generic', 'hyundai_kia_mando_front_radar'),
   CAR.IONIQ_HEV: dbc_dict('hyundai_kia_generic', None),
   CAR.SANTA_FE: dbc_dict('hyundai_kia_generic', 'hyundai_kia_mando_front_radar'),
   CAR.SANTA_FE_HEV: dbc_dict('hyundai_kia_generic', None),
@@ -1105,8 +1104,8 @@ DBC = {
   CAR.SORENTO: dbc_dict('hyundai_kia_generic', None),
   CAR.MOHAVE: dbc_dict('hyundai_kia_generic', None),
   CAR.STINGER: dbc_dict('hyundai_kia_generic', None),
-  CAR.NIRO_EV: dbc_dict('hyundai_kia_generic', None),
-  CAR.NIRO_HEV: dbc_dict('hyundai_kia_generic', None),
+  CAR.NIRO_EV: dbc_dict('hyundai_kia_generic', 'hyundai_kia_mando_front_radar'),
+  CAR.NIRO_HEV: dbc_dict('hyundai_kia_generic', 'hyundai_kia_mando_front_radar'),
   CAR.SOUL_EV: dbc_dict('hyundai_kia_generic', None),
   CAR.SELTOS: dbc_dict('hyundai_kia_generic', None),
   CAR.K7: dbc_dict('hyundai_kia_generic', None),
@@ -1115,7 +1114,7 @@ DBC = {
 
   # Genesis
   CAR.GENESIS: dbc_dict('hyundai_kia_generic', None),
-  CAR.GENESIS_G70: dbc_dict('hyundai_kia_generic', None),
+  CAR.GENESIS_G70: dbc_dict('hyundai_kia_generic', 'hyundai_kia_mando_front_radar'),
   CAR.GENESIS_G80: dbc_dict('hyundai_kia_generic', None),
   CAR.GENESIS_G90: dbc_dict('hyundai_kia_generic', None),
 }

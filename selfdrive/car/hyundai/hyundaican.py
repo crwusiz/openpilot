@@ -6,11 +6,8 @@ from common.params import Params
 
 hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 
-
-def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req,
-                  lkas11, sys_warning, sys_state, enabled,
-                  left_lane, right_lane,
-                  left_lane_depart, right_lane_depart, bus):
+def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, lkas11, sys_warning, sys_state, enabled,
+                  left_lane, right_lane, left_lane_depart, right_lane_depart, bus):
   values = copy.copy(lkas11)
   values["CF_Lkas_LdwsSysState"] = sys_state
   values["CF_Lkas_SysWarning"] = 3 if sys_warning else 0
@@ -127,13 +124,14 @@ def create_mdps12(packer, frame, mdps12):
 
   return packer.make_can_msg("MDPS12", 2, values)
 
-def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc11, active_cam, stock_cam):
+def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc11, active_cam):
   values = copy.copy(scc11)
   values["AliveCounterACC"] = frame // 2 % 0x10
 
-  if not stock_cam:
-    values["Navi_SCC_Camera_Act"] = 2 if active_cam else 0
-    values["Navi_SCC_Camera_Status"] = 2 if active_cam else 0
+  #if not stock_cam:
+  if not active_cam:
+    values["Navi_SCC_Camera_Act"] = 0 #2 if active_cam else 0
+    values["Navi_SCC_Camera_Status"] = 0 #2 if active_cam else 0
 
   if not scc_live:
     values["MainMode_ACC"] = 1
@@ -203,7 +201,8 @@ def create_scc14(packer, enabled, e_vgo, standstill, accel, gaspressed, objgap, 
 
   return packer.make_can_msg("SCC14", 0, values)
 
-def create_acc_commands(packer, enabled, accel, idx, lead_visible, set_speed, stopping):
+
+def create_acc_commands(packer, enabled, accel, jerk, idx, lead_visible, set_speed, stopping):
   commands = []
 
   scc11_values = {
@@ -211,28 +210,33 @@ def create_acc_commands(packer, enabled, accel, idx, lead_visible, set_speed, st
     "TauGapSet": 4,
     "VSetDis": set_speed if enabled else 0,
     "AliveCounterACC": idx % 0x10,
+    "ObjValid": 1 if lead_visible else 0,
+    "ACC_ObjStatus": 1 if lead_visible else 0,
+    "ACC_ObjLatPos": 0,
+    "ACC_ObjRelSpd": 0,
+    "ACC_ObjDist": 0,
   }
   commands.append(packer.make_can_msg("SCC11", 0, scc11_values))
 
   scc12_values = {
     "ACCMode": 1 if enabled else 0,
-    "StopReq": 1 if stopping else 0,
-    "aReqRaw": accel,
-    "aReqValue": accel, # stock ramps up at 1.0/s and down at 0.5/s until it reaches aReqRaw
+    "StopReq": 1 if enabled and stopping else 0,
+    "aReqRaw": accel if enabled else 0,
+    "aReqValue": accel if enabled else 0, # stock ramps up and down respecting jerk limit until it reaches aReqRaw
     "CR_VSM_Alive": idx % 0xF,
   }
   scc12_dat = packer.make_can_msg("SCC12", 0, scc12_values)[2]
-  scc12_values["CR_VSM_ChkSum"] = 0x10 - sum([sum(divmod(i, 16)) for i in scc12_dat]) % 0x10
+  scc12_values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in scc12_dat) % 0x10
 
   commands.append(packer.make_can_msg("SCC12", 0, scc12_values))
 
   scc14_values = {
     "ComfortBandUpper": 0.0, # stock usually is 0 but sometimes uses higher values
     "ComfortBandLower": 0.0, # stock usually is 0 but sometimes uses higher values
-    "JerkUpperLimit": 1.0 if enabled else 0, # stock usually is 1.0 but sometimes uses higher values
-    "JerkLowerLimit": 0.5 if enabled else 0, # stock usually is 0.5 but sometimes uses higher values
+    "JerkUpperLimit": max(jerk, 1.0) if (enabled and not stopping) else 0, # stock usually is 1.0 but sometimes uses higher values
+    "JerkLowerLimit": max(-jerk, 1.0) if enabled else 0, # stock usually is 0.5 but sometimes uses higher values
     "ACCMode": 1 if enabled else 4, # stock will always be 4 instead of 0 after first disengage
-    "ObjGap": 3 if lead_visible else 0, # TODO: 1-5 based on distance to lead vehicle
+    "ObjGap": 2 if lead_visible else 0, # 5: >30, m, 4: 25-30 m, 3: 20-25 m, 2: < 20 m, 0: no lead
   }
   commands.append(packer.make_can_msg("SCC14", 0, scc14_values))
 
@@ -242,12 +246,16 @@ def create_acc_commands(packer, enabled, accel, idx, lead_visible, set_speed, st
     # test: [(idx % 0xF, -((idx % 0xF) + 2) % 4) for idx in range(0x14)]
     "CR_FCA_Alive": ((-((idx % 0xF) + 2) % 4) << 2) + 1,
     "Supplemental_Counter": idx % 0xF,
+    "PAINT1_Status": 1,
+    "FCA_DrvSetStatus": 1,
+    "FCA_Status": 1, # AEB disabled
   }
   fca11_dat = packer.make_can_msg("FCA11", 0, fca11_values)[2]
-  fca11_values["CR_FCA_ChkSum"] = 0x10 - sum([sum(divmod(i, 16)) for i in fca11_dat]) % 0x10
+  fca11_values["CR_FCA_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in fca11_dat) % 0x10
   commands.append(packer.make_can_msg("FCA11", 0, fca11_values))
 
   return commands
+
 
 def create_acc_opt(packer):
   commands = []
@@ -260,14 +268,13 @@ def create_acc_opt(packer):
   commands.append(packer.make_can_msg("SCC13", 0, scc13_values))
 
   fca12_values = {
-    # stock values may be needed if openpilot has vision based AEB some day
-    # for now we are not setting these because there is no AEB for vision only
-    # "FCA_USM": 3,
-    # "FCA_DrvSetState": 2,
+    "FCA_DrvSetState": 2,
+    "FCA_USM": 1, # AEB disabled
   }
   commands.append(packer.make_can_msg("FCA12", 0, fca12_values))
 
   return commands
+
 
 def create_frt_radar_opt(packer):
   frt_radar11_values = {

@@ -274,7 +274,7 @@ class CarInterface(CarInterfaceBase):
 
   # pass in a car.CarControl
   # to be called @ 100hz
-  def apply(self, c):
+  def apply(self, c, controls):
     hud_control = c.hudControl
     ret = self.CC.update(c.enabled, c.active, self.CS, self.frame,
                          c.actuators, c.cruiseControl.cancel,

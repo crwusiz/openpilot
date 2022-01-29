@@ -135,6 +135,7 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   list->addItem(horizontal_line());
   list->addItem(new LateralControlSelect());
   list->addItem(new MfcSelect());
+  list->addItem(new AebSelect());
   list->addItem(new LongControlSelect());
   list->addItem(horizontal_line());
 

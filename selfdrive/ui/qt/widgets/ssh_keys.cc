@@ -207,6 +207,71 @@ void MfcSelect::refresh() {
   btnplus.setText("▶");
 }
 
+//AebSelect
+AebSelect::AebSelect() : AbstractControl("AEB [√]", "AEB 신호를 선택합니다. (SCC12/FCA11)", "../assets/offroad/icon_aeb.png") {
+  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
+  label.setStyleSheet("color: #e0e879");
+  hlayout->addWidget(&label);
+
+  btnminus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnplus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnminus.setFixedSize(120, 100);
+  btnplus.setFixedSize(120, 100);
+
+  hlayout->addWidget(&btnminus);
+  hlayout->addWidget(&btnplus);
+
+  QObject::connect(&btnminus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("AebSelect"));
+    int aeb = str.toInt();
+    aeb = aeb - 1;
+    if (aeb <= 0 ) {
+      aeb = 0;
+    }
+    QString aebs = QString::number(aeb);
+    Params().put("AebSelect", aebs.toStdString());
+    refresh();
+  });
+
+  QObject::connect(&btnplus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("AebSelect"));
+    int aeb = str.toInt();
+    aeb = aeb + 1;
+    if (aeb >= 1 ) {
+      aeb = 1;
+    }
+    QString aebs = QString::number(aeb);
+    Params().put("AebSelect", aebs.toStdString());
+    refresh();
+  });
+  refresh();
+}
+
+void AebSelect::refresh() {
+  QString aeb = QString::fromStdString(Params().get("AebSelect"));
+  if (aeb == "0") {
+    label.setText(QString::fromStdString("SCC12"));
+  } else if (aeb == "1") {
+    label.setText(QString::fromStdString("FCA11"));
+  }
+  btnminus.setText("◀");
+  btnplus.setText("▶");
+}
+
 //LongControlSelect
 LongControlSelect::LongControlSelect() : AbstractControl("LongControl [√]", "LongControl 모드를 선택합니다. (MAD/MAD+LONG)", "../assets/offroad/icon_long.png") {
   label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);

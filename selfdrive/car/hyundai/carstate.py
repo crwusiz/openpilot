@@ -4,6 +4,7 @@ from selfdrive.car.interfaces import CarStateBase
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
 from selfdrive.config import Conversions as CV
+from common.params import Params
 
 GearShifter = car.CarState.GearShifter
 
@@ -32,10 +33,12 @@ class CarState(CarStateBase):
     self.mdps_error_cnt = 0
     self.cruise_unavail_cnt = 0
     self.apply_steer = 0.
+    self.has_scc13 = CP.hasScc13
+    self.has_scc14 = CP.hasScc14
 
-    # Features init
-    self.has_scc13 = CP.hasScc13 or CP.carFingerprint in FEATURES["has_scc13"]
-    self.has_scc14 = CP.hasScc14 or CP.carFingerprint in FEATURES["has_scc14"]
+    # params init
+    params = Params()
+    self.aeb_fcw = params.get("AebSelect", encoding='utf8') == "1"
 
     # scc smoother
     self.acc_mode = False
@@ -168,7 +171,7 @@ class CarState(CarStateBase):
 
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(gear))
 
-    if self.CP.carFingerprint in FEATURES["use_fca"]:
+    if self.aeb_fcw:
       ret.stockAeb = cp.vl["FCA11"]["FCA_CmdAct"] != 0
       ret.stockFcw = cp.vl["FCA11"]["CF_VSM_Warn"] == 2
     else:
@@ -384,7 +387,7 @@ class CarState(CarStateBase):
     ]
     else:
       signals += [
-        ("CF_Lvr_Gear","LVR12"),
+        ("CF_Lvr_Gear", "LVR12"),
       ]
 
     if CP.carFingerprint in EV_HYBRID_CAR:
@@ -410,17 +413,8 @@ class CarState(CarStateBase):
         ("EMS16", 100),
       ]
 
-    if CP.carFingerprint in FEATURES["use_fca"]:
-      signals += [
-        ("FCA_CmdAct", "FCA11"),
-        ("CF_VSM_Warn", "FCA11"),
-      ]
-
       if not CP.openpilotLongitudinalControl:
         checks += [("FCA11", 50)]
-
-    if CP.carFingerprint in FEATURES["tcs13_remove"]:
-      checks.remove(("TCS13", 50))
 
     if CP.enableBsm:
       signals += [

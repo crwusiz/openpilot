@@ -115,7 +115,6 @@ class SccSmoother:
       events.add(EventName.slowingDownSpeed)
 
   def cal_max_speed(self, frame, CC, CS, sm, clu11_speed, controls):
-
     # kph
     road_speed_limiter = get_road_speed_limiter()
     apply_limit_speed, road_limit_speed, left_dist, first_started, max_speed_log = \

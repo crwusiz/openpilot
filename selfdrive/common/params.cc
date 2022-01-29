@@ -179,6 +179,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     // add
     {"LongControlSelect", PERSISTENT},
     {"MfcSelect", PERSISTENT},
+    {"AebSelect", PERSISTENT},
     {"LateralControlSelect", PERSISTENT},
     {"AutoLaneChangeEnabled", PERSISTENT},
     {"PutPrebuilt", PERSISTENT},
@@ -190,7 +191,6 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"SccSmootherState", PERSISTENT},
     {"SccSmootherSlowOnCurves", PERSISTENT},
     {"SccSmootherSyncGasPressed", PERSISTENT},
-    {"StockNaviDecelEnabled", PERSISTENT},
     {"NewRadarInterface", PERSISTENT},
 };
 
