@@ -305,6 +305,8 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
     ret.longitudinalTuning.kiV = [0.1, 0.06]
 
+    ret.stoppingDecelRate = 0.6  # brake_travel/s while trying to stop
+
     # ignore CAN2 address if L-CAN on the same BUS
     ret.mdpsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
     ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
