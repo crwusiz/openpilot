@@ -278,10 +278,10 @@ class CarInterface(CarInterfaceBase):
     ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05
 
-    ret.steerActuatorDelay = 0.1  # Default delay
+    ret.steerActuatorDelay = 0.2  # default 0.1
     ret.steerRateCost = 0.4
     ret.steerLimitTimer = 2.5 # default 1.0
-    ret.steerMaxV = [2.] # default 1.
+    ret.steerMaxV = [1.5] # default 1.
 
     # longitudinal
     ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]

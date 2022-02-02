@@ -89,9 +89,12 @@ def panda_sort_cmp(a: Panda, b: Panda):
 
 def main() -> NoReturn:
   first_run = True
+  params = Params()
 
   while True:
     try:
+      params.delete("PandaSignatures")
+
       # Flash all Pandas in DFU mode
       for p in PandaDFU.list():
         cloudlog.info(f"Panda in DFU mode found, flashing recovery {p}")
@@ -113,7 +116,7 @@ def main() -> NoReturn:
       for panda in pandas:
         health = panda.health()
         if health["heartbeat_lost"]:
-          Params().put_bool("PandaHeartbeatLost", True)
+          params.put_bool("PandaHeartbeatLost", True)
           cloudlog.event("heartbeat lost", deviceState=health, serial=panda.get_usb_serial())
 
         #if first_run:
@@ -123,6 +126,9 @@ def main() -> NoReturn:
       # sort pandas to have deterministic order
       pandas.sort(key=cmp_to_key(panda_sort_cmp))
       panda_serials = list(map(lambda p: p.get_usb_serial(), pandas))
+
+      # log panda fw versions
+      params.put("PandaSignatures", b','.join(p.get_signature() for p in pandas))
 
       # close all pandas
       for p in pandas:
