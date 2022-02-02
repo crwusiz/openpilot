@@ -38,7 +38,7 @@ SIMULATION = "SIMULATION" in os.environ
 NOSENSOR = "NOSENSOR" in os.environ
 IGNORE_PROCESSES = {"rtshield", "uploader", "deleter", "loggerd", "logmessaged", "tombstoned",
                     "logcatd", "proclogd", "clocksd", "updated", "timezoned", "manage_athenad",
-                    "road_speed_limiter", "shutdown", "shutdownd", "statsd"} | \
+                    "road_speed_limiter", "auto_shutdown", "shutdownd", "statsd"} | \
                     {k for k, v in managed_processes.items() if not v.enabled}
 
 ACTUATOR_FIELDS = set(car.CarControl.Actuators.schema.fields.keys())
@@ -144,6 +144,7 @@ class Controls:
     self.enabled = False
     self.active = False
     self.can_rcv_error = False
+    self.logged_comm_issue = False
     self.soft_disable_timer = 0
     self.v_cruise_kph = 255
     self.v_cruise_kph_last = 0
@@ -155,12 +156,10 @@ class Controls:
     self.last_functional_fan_frame = 0
     self.events_prev = []
     self.current_alert_types = [ET.PERMANENT]
-    self.logged_comm_issue = False
     self.button_timers = {ButtonEvent.Type.decelCruise: 0, ButtonEvent.Type.accelCruise: 0}
     self.last_actuators = car.CarControl.Actuators.new_message()
 
     # scc smoother
-    self.is_cruise_enabled = False
     self.applyMaxSpeed = 0
     self.apply_accel = 0.
     self.fused_accel = 0.
@@ -170,7 +169,7 @@ class Controls:
     self.aReqValueMax = 0.
     self.sccStockCamStatus = 0
     self.sccStockCamAct = 0
-
+    self.is_cruise_enabled = False
     self.left_lane_visible = False
     self.right_lane_visible = False
 
@@ -353,9 +352,9 @@ class Controls:
         self.events.add(EventName.localizerMalfunction)
 
       # Check if all manager processes are running
-      #not_running = {p.name for p in self.sm['managerState'].processes if not p.running}
-      #if self.sm.rcv_frame['managerState'] and (not_running - IGNORE_PROCESSES):
-      #  self.events.add(EventName.processNotRunning)
+      not_running = {p.name for p in self.sm['managerState'].processes if not p.running}
+      if self.sm.rcv_frame['managerState'] and (not_running - IGNORE_PROCESSES):
+        self.events.add(EventName.processNotRunning)
 
     # Only allow engagement with brake pressed when stopped behind another stopped car
     speeds = self.sm['longitudinalPlan'].speeds

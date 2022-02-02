@@ -44,7 +44,7 @@ procs = [
   PythonProcess("androidd", "selfdrive.hardware.eon.androidd", enabled=EON, persistent=True),
 
   # Process add
-  PythonProcess("shutdown", "selfdrive.hardware.eon.shutdown", enabled=EON, persistent=True),
+  PythonProcess("auto_shutdown", "selfdrive.hardware.eon.shutdown", enabled=EON, persistent=True),
   PythonProcess("road_speed_limiter", "selfdrive.road_speed_limiter", persistent=True),
 ]
 

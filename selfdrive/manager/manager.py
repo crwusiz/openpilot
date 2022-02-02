@@ -152,7 +152,7 @@ def manager_thread() -> None:
     not_run = ignore[:]
 
     if params.get_bool("ShutdownDisable"):
-      not_run.append("shutdown")
+      not_run.append("auto_shutdown")
 
     if params.get_bool("LoggerDisable"):
       not_run.append("loggerd")
