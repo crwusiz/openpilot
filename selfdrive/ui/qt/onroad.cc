@@ -196,15 +196,10 @@ void OnroadHud::updateState(const UIState &s) {
   const auto car_control = sm["carControl"].getCarControl();
   const auto device_state = sm["deviceState"].getDeviceState();
   const auto leadOne = sm["radarState"].getRadarState().getLeadOne();
+  const auto scc_smoother = car_control.getSccSmoother();
   auto roadLimitSpeed = sm["roadLimitSpeed"].getRoadLimitSpeed();
 
-  float maxspeed = cs.getVCruise();
-  bool cruise_set = maxspeed > 0 && (int)maxspeed != SET_SPEED_NA;
-  if (cruise_set && !s.scene.is_metric) {
-    maxspeed *= KM_TO_MILE;
-  }
-  QString maxspeed_str = cruise_set ? QString::number(std::nearbyint(maxspeed)) : "-";
-  float cur_speed = std::max(0.0, sm["carState"].getCarState().getVEgo() * (s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH));
+  float cur_speed = std::max(0.0, car_state.getVEgo() * (s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH));
 
   auto cpuList = device_state.getCpuTempC();
   if (cpuList.size() > 0) {
@@ -213,9 +208,7 @@ void OnroadHud::updateState(const UIState &s) {
       cpuTemp /= cpuList.size();
   }
 
-  setProperty("is_cruise_set", cruise_set);
   setProperty("speed", QString::number(std::nearbyint(cur_speed)));
-  setProperty("maxSpeed", maxspeed_str);
   setProperty("speedUnit", s.scene.is_metric ? "km/h" : "mph");
   setProperty("hideDM", cs.getAlertSize() != cereal::ControlsState::AlertSize::NONE);
   setProperty("status", s.status);
@@ -235,6 +228,9 @@ void OnroadHud::updateState(const UIState &s) {
   setProperty("lead_status", leadOne.getStatus());
   setProperty("angleSteers", car_state.getSteeringAngleDeg());
   setProperty("steerAngleDesired", car_control.getActuators().getSteeringAngleDeg());
+  setProperty("longControl", scc_smoother.getLongControl());
+  setProperty("gap", car_state.getCruiseGap());
+  setProperty("autoTrGap", scc_smoother.getAutoTrGap());
 }
 
 int OnroadHud::devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, QColor &color) {
@@ -401,12 +397,15 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   bg.setColorAt(0, QColor::fromRgbF(0, 0, 0, 0.45));
   bg.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0));
   p.fillRect(0, 0, width(), header_h, bg);
-  QRect rc(bdr_s * 2, bdr_s * 1.5, 184, 202);
+  QRect rc(30, 30, 184, 202);
+
+  // color define
+  QColor yellowColor = QColor(255, 255, 0, 255);
+  QColor whiteColor = QColor(255, 255, 255, 255);
+  QColor engageColor = QColor(23, 134, 68, 70);
+  QColor warningColor = QColor(218, 111, 37, 70);
 
   // current speed
-  QColor whiteColor = QColor(255, 255, 255, 255);
-  QColor yellowColor = QColor(255, 255, 0, 255);
-
   configFont(p, "Open Sans", 176, "Bold");
   drawTextColor(p, rect().center().x(), 230, speed, whiteColor);
   configFont(p, "Open Sans", 66, "Regular");
@@ -415,7 +414,7 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   // engage-ability icon ( wheel ) (upper right 1)
   int x = rect().right() - radius / 2 - bdr_s * 2;
   int y = radius / 2 + int(bdr_s * 1.5);
-  drawIcon(p, x, y, engage_img, bg_colors[status], 1.0);
+  drawIcon(p, x, y, engage_img, engageable ? engageColor : QColor(0, 0, 0, 70), 1.0);
 
   // Dev UI (Right Side)
   x = rect().right() - radius - bdr_s * 5;
@@ -473,6 +472,34 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
     p.drawPixmap(x, y, w, h, nda_stat == 1 ? nda_img : hda_img);
     p.setOpacity(1.0);
   }
+ // cruise gap (bottom 1 right)
+  x = radius / 2 + (bdr_s * 2) + radius;
+  y = rect().bottom() - footer_h / 2;
+
+  p.setPen(Qt::NoPen);
+  p.setBrush(QBrush(QColor(0, 0, 0, 255 * .1f)));
+  p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
+
+  QString str;
+  float textSize = 50.f;
+  QColor textColor = QColor(255, 255, 255, 200);
+
+  if (gap <= 0) {
+    str = "N/A";
+  } else if (longControl && gap == autoTrGap) {
+    str = "AUTO";
+    textColor = QColor(120, 255, 120, 200);
+  } else {
+    str.sprintf("%d", (int)gap);
+    textColor = QColor(120, 255, 120, 200);
+    textSize = 70.f;
+  }
+
+  configFont(p, "Open Sans", 35, "Bold");
+  drawText(p, x, y-20, "GAP", 200);
+  configFont(p, "Open Sans", textSize, "Bold");
+  drawTextColor(p, x, y+50, str, textColor);
+  p.setOpacity(1.0);
 }
 //-------------------------------------------------------------------------------------------
 void OnroadHud::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
@@ -606,8 +633,11 @@ void NvgWindow::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV
   float g_xo = sz / 5;
   float g_yo = sz / 10;
 
+  QColor golden_yellowColor = QColor(255, 223, 0, 255);
+  QColor light_orangeColor = QColor(255, 165, 0, 255);
+
   QPointF glow[] = {{x + (sz * 1.35) + g_xo, y + sz + g_yo}, {x, y - g_yo}, {x - (sz * 1.35) - g_xo, y + sz + g_yo}};
-  painter.setBrush(is_radar ? QColor(86, 121, 216, 255) : QColor(218, 202, 37, 255));
+  painter.setBrush(is_radar ? light_orangeColor : golden_yellowColor);
   painter.drawPolygon(glow, std::size(glow));
 
   // chevron
@@ -651,14 +681,6 @@ void NvgWindow::showEvent(QShowEvent *event) {
 }
 
 //-------------------------------------------------------------------------------------------
-void NvgWindow::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
-  p.setPen(Qt::NoPen);
-  p.setBrush(bg);
-  p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
-  p.setOpacity(opacity);
-  p.drawPixmap(x - img_size / 2, y - img_size / 2, img_size, img_size, img);
-}
-
 void NvgWindow::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
   QFontMetrics fm(p.font());
   QRect init_rect = fm.boundingRect(text);
@@ -712,7 +734,7 @@ void NvgWindow::drawHud(QPainter &p) {
   drawMaxSpeed(p);
   drawSpeedLimit(p);
   drawTurnSignals(p);
-  drawIcons(p);
+  drawTpms(p);
 
   //bottom info
   const auto controls_state = sm["controlsState"].getControlsState();
@@ -759,7 +781,7 @@ static const QString get_tpms_text(float tpms) {
     return QString(str);
 }
 
-void NvgWindow::drawIcons(QPainter &p) {
+void NvgWindow::drawTpms(QPainter &p) {
   const SubMaster &sm = *(uiState()->sm);
   auto car_state = sm["carState"].getCarState();
   auto scc_smoother = sm["carControl"].getCarControl().getSccSmoother();
@@ -797,39 +819,6 @@ void NvgWindow::drawIcons(QPainter &p) {
     drawTextFlag(p, center_x-marginX, center_y+marginY, Qt::AlignRight, get_tpms_text(rl), get_tpms_color(rl));
     drawTextFlag(p, center_x+marginX, center_y+marginY, Qt::AlignLeft, get_tpms_text(rr), get_tpms_color(rr));
   }
-
-  // cruise gap (bottom 1 right)
-  x = radius / 2 + (bdr_s * 2) + radius;
-  y = rect().bottom() - footer_h / 2;
-
-  int gap = car_state.getCruiseGap();
-  bool longControl = scc_smoother.getLongControl();
-  int autoTrGap = scc_smoother.getAutoTrGap();
-
-  p.setPen(Qt::NoPen);
-  p.setBrush(QBrush(QColor(0, 0, 0, 255 * .1f)));
-  p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
-
-  QString str;
-  float textSize = 50.f;
-  QColor textColor = QColor(255, 255, 255, 200);
-
-  if (gap <= 0) {
-    str = "N/A";
-  } else if (longControl && gap == autoTrGap) {
-    str = "AUTO";
-    textColor = QColor(120, 255, 120, 200);
-  } else {
-    str.sprintf("%d", (int)gap);
-    textColor = QColor(120, 255, 120, 200);
-    textSize = 70.f;
-  }
-
-  configFont(p, "Open Sans", 35, "Bold");
-  drawText(p, x, y-20, "GAP", 200);
-  configFont(p, "Open Sans", textSize, "Bold");
-  drawTextColor(p, x, y+50, str, textColor);
-  p.setOpacity(1.0);
 }
 
 void NvgWindow::drawMaxSpeed(QPainter &p) {
@@ -930,6 +919,7 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
     rect.adjust(-30, 0, 30, 0);
     p.setPen(QColor(255, 255, 255, 230));
     p.drawText(rect, Qt::AlignCenter, str_left_dist);
+    p.setOpacity(1.0);
   }
 }
 

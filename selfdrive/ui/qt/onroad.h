@@ -13,8 +13,7 @@ class OnroadHud : public QWidget {
   Q_OBJECT
   Q_PROPERTY(QString speed MEMBER speed NOTIFY valueChanged);
   Q_PROPERTY(QString speedUnit MEMBER speedUnit NOTIFY valueChanged);
-  Q_PROPERTY(QString maxSpeed MEMBER maxSpeed NOTIFY valueChanged);
-  Q_PROPERTY(bool is_cruise_set MEMBER is_cruise_set NOTIFY valueChanged);
+
   Q_PROPERTY(bool engageable MEMBER engageable NOTIFY valueChanged);
   Q_PROPERTY(bool dmActive MEMBER dmActive NOTIFY valueChanged);
   Q_PROPERTY(bool hideDM MEMBER hideDM NOTIFY valueChanged);
@@ -34,6 +33,9 @@ class OnroadHud : public QWidget {
   Q_PROPERTY(float lead_v_rel MEMBER lead_v_rel NOTIFY valueChanged);
   Q_PROPERTY(float angleSteers MEMBER angleSteers NOTIFY valueChanged);
   Q_PROPERTY(float steerAngleDesired MEMBER steerAngleDesired NOTIFY valueChanged);
+  Q_PROPERTY(bool longControl MEMBER longControl NOTIFY valueChanged);
+  Q_PROPERTY(int gap MEMBER gap NOTIFY valueChanged);
+  Q_PROPERTY(int autoTrGap MEMBER autoTrGap NOTIFY valueChanged);
 
 public:
   explicit OnroadHud(QWidget *parent);
@@ -70,7 +72,6 @@ private:
 
   QString speed;
   QString speedUnit;
-  QString maxSpeed;
 
   bool is_cruise_set = false;
   bool engageable = false;
@@ -91,6 +92,9 @@ private:
   float lead_v_rel = 0;
   float angleSteers = 0;
   float steerAngleDesired = 0;
+  bool longControl = false;
+  int gap = 0;
+  int autoTrGap = 0;
 
 signals:
   void valueChanged();
@@ -131,7 +135,6 @@ protected:
   double prev_draw_t = 0;
 
   // neokii add start
-  void drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity);
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
   void drawTextFlag(QPainter &p, int x, int y, int flags, const QString &text, const QColor &color);
   void drawTextColor(QPainter &p, int x, int y, const QString &text, QColor &color);
@@ -145,10 +148,10 @@ protected:
   QPixmap turnsignal_r_img;
   QPixmap tire_pressure_img;
 
+  void drawHud(QPainter &p);
   void drawMaxSpeed(QPainter &p);
   void drawSpeedLimit(QPainter &p);
-  void drawIcons(QPainter &p);
-  void drawHud(QPainter &p);
+  void drawTpms(QPainter &p);
   void drawTurnSignals(QPainter &p);
 };
 
