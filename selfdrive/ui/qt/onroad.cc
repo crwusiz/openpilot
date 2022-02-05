@@ -80,7 +80,7 @@ void OnroadWindow::mousePressEvent(QMouseEvent* e) {
 void OnroadWindow::offroadTransition(bool offroad) {
 #ifdef ENABLE_MAPS
   if (!offroad) {
-    if (map == nullptr && (uiState()->has_prime || !MAPBOX_TOKEN.isEmpty())) {
+    if (map == nullptr && (uiState()->prime_type || !MAPBOX_TOKEN.isEmpty())) {
       MapWindow * m = new MapWindow(get_mapbox_settings());
       m->setFixedWidth(topWidget(this)->width() / 2);
       m->offroadTransition(offroad);
@@ -818,7 +818,7 @@ void NvgWindow::drawTpms(QPainter &p) {
     QFontMetrics fm(p.font());
     QRect rcFont = fm.boundingRect("9");
 
-    int center_x = x + 4;
+    int center_x = x + 3;
     int center_y = y + h/2;
     const int marginX = (int)(rcFont.width() * 2.7f);
     const int marginY = (int)((h/2 - rcFont.height()) * 0.7f);

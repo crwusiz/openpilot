@@ -8,7 +8,7 @@ from selfdrive.config import Conversions as CV
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, create_scc11, create_scc12, create_scc13, create_scc14, \
                                              create_mdps12, create_lfahda_mfc, create_hda_mfc
-from selfdrive.car.hyundai.values import Buttons, FEATURES, CarControllerParams, SP_CARS
+from selfdrive.car.hyundai.values import Buttons, FEATURES, CarControllerParams
 from opendbc.can.packer import CANPacker
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
 from selfdrive.road_speed_limiter import road_speed_limiter_get_active
@@ -35,9 +35,9 @@ def process_hud_alert(enabled, fingerprint, visual_alert, left_lane, right_lane,
   left_lane_warning = 0
   right_lane_warning = 0
   if left_lane_depart:
-    left_lane_warning = 1 if fingerprint in SP_CARS else 2
+    left_lane_warning = 1
   if right_lane_depart:
-    right_lane_warning = 1 if fingerprint in SP_CARS else 2
+    right_lane_warning = 1
 
   return sys_warning, sys_state, left_lane_warning, right_lane_warning
 
@@ -62,7 +62,11 @@ class CarController():
     self.lfamfc = params.get("MfcSelect", encoding='utf8') == "2"
     self.mad_mode_enabled = params.get("LongControlSelect", encoding='utf8') == "0" or \
                             params.get("LongControlSelect", encoding='utf8') == "1"
+    self.haptic_feedback_speed_camera = params.get_bool('HapticFeedbackWhenSpeedCamera')
     self.scc_smoother = SccSmoother()
+    self.last_blinker_frame = 0
+    self.prev_active_cam = False
+    self.active_cam_timer = 0
 
   def update(self, c, enabled, CS, frame, CC, actuators, pcm_cancel_cmd, visual_alert,
              left_lane, right_lane, left_lane_depart, right_lane_depart, set_speed, lead_visible, controls):
@@ -88,6 +92,16 @@ class CarController():
 
     sys_warning, sys_state, left_lane_warning, right_lane_warning = \
       process_hud_alert(enabled, self.car_fingerprint, visual_alert, left_lane, right_lane, left_lane_depart, right_lane_depart)
+
+    if self.haptic_feedback_speed_camera:
+      if self.prev_active_cam != self.scc_smoother.active_cam:
+        self.prev_active_cam = self.scc_smoother.active_cam
+        if self.scc_smoother.active_cam:
+          self.active_cam_timer = int(1.5 / DT_CTRL)
+
+      if self.active_cam_timer > 0:
+        self.active_cam_timer -= 1
+        left_lane_warning = right_lane_warning = 1
 
     clu11_speed = CS.clu11["CF_Clu_Vanz"]
     enabled_speed = 38 if CS.is_set_speed_in_mph else 60
@@ -221,9 +235,8 @@ class CarController():
       # activated_hda: 0 - off, 1 - main road, 2 - highway
       if self.lfamfc:
         can_sends.append(create_lfahda_mfc(self.packer, enabled, activated_hda))
-      elif CS.mdps_bus == 0:
-        state = 2 if self.car_fingerprint in FEATURES["send_hda_state_2"] else 1
-        can_sends.append(create_hda_mfc(self.packer, activated_hda, state))
+      elif CS.has_lfa_hda:
+        can_sends.append(create_hda_mfc(self.packer, activated_hda, CS, left_lane, right_lane))
 
     # 5 Hz ACC options
     #if frame % 20 == 0 and CS.CP.openpilotLongitudinalControl:

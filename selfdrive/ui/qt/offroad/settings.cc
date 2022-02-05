@@ -242,6 +242,10 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   power_layout->addWidget(poweroff_btn);
   QObject::connect(poweroff_btn, &QPushButton::clicked, this, &DevicePanel::poweroff);
 
+  if (Hardware::TICI()) {
+    connect(uiState(), &UIState::offroadTransition, poweroff_btn, &QPushButton::setVisible);
+  }
+
   setStyleSheet(R"(
     #restart_openpilot_btn { height: 120px; border-radius: 15px; background-color: #2C2CE2; }
     #restart_openpilot_btn:pressed { background-color: #2424FF; }
@@ -724,6 +728,9 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   //"New radar interface Enable",
                                   "scc 레이더 배선개조없이 사용가능한 일부차종을 위한 옵션입니다",
                                   "../assets/offroad/icon_road.png", this));
+  toggles.append(new ParamControl("HapticFeedbackWhenSpeedCamera", "Haptic feedback (speed-cam alert)",
+                                  "Haptic feedback when a speed camera is detected",
+                                  "../assets/offroad/icon_openpilot.png", this));
   for(ParamControl *toggle : toggles) {
     if(main_layout->count() != 0) {
     }

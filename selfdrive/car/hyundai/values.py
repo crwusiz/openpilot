@@ -1060,10 +1060,8 @@ FEATURES = {
   # "has_scc13": {},
   # "has_scc14": {},
   # new lfa car - carcontroller lfamfc / hyundaican lfamfc using qt ui mfcselect toggle set
-  "send_hda_state_2": {CAR.GENESIS_G80, CAR.GENESIS_G90},
 }
 
-SP_CARS = {CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90, CAR.K9}
 EV_CAR = {CAR.KONA_EV, CAR.IONIQ_EV, CAR.NIRO_EV, CAR.SOUL_EV, CAR.NEXO}
 HYBRID_CAR = {CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV, CAR.SANTA_FE_HEV,
               CAR.ELANTRA21_HEV, CAR.SONATA_HEV, CAR.SONATA_LF_HEV, CAR.GRANDEUR_HEV, CAR.GRANDEUR20_HEV,

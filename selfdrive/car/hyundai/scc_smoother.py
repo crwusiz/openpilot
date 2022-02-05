@@ -126,7 +126,7 @@ class SccSmoother:
     else:
       max_speed_clu = self.kph_to_clu(controls.v_cruise_kph)
 
-    self.active_cam = road_limit_speed > 0
+    self.active_cam = road_limit_speed > 0 and left_dist > 0
 
     if road_speed_limiter.roadLimitSpeed is not None:
       camSpeedFactor = clip(road_speed_limiter.roadLimitSpeed.camSpeedFactor, 1.0, 1.1)

@@ -579,7 +579,6 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   # more often than expected.
   EventName.localizerMalfunction: {
     # ET.PERMANENT: NormalPermanentAlert("Sensor Malfunction", "Contact Support"),
-    ET.PERMANENT: NormalPermanentAlert("센서 오작동", "장치를 점검하세요"),
   },
 
   # ********** events that affect controls state transitions **********

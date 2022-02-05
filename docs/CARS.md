@@ -87,10 +87,7 @@
 | Audi      | Q2 2018                         | ACC + Lane Assist | Stock            | 0mph               | 0mph         |
 | Audi      | Q3 2020-21                      | ACC + Lane Assist | Stock            | 0mph               | 0mph         |
 | Audi      | S3 2015                         | ACC + Lane Assist | Stock            | 0mph               | 0mph         |
-| Buick     | Regal 2018<sup>1</sup>          | Adaptive Cruise   | openpilot        | 0mph               | 7mph         |
-| Cadillac  | ATS 2018<sup>1</sup>            | Adaptive Cruise   | openpilot        | 0mph               | 7mph         |
 | Cadillac  | Escalade ESV 2016<sup>1</sup>   | ACC + LKAS        | openpilot        | 0mph               | 7mph         |
-| Chevrolet | Malibu 2017<sup>1</sup>         | Adaptive Cruise   | openpilot        | 0mph               | 7mph         |
 | Chevrolet | Volt 2017-18<sup>1</sup>        | Adaptive Cruise   | openpilot        | 0mph               | 7mph         |
 | Chrysler  | Pacifica 2017-18                | Adaptive Cruise   | Stock            | 0mph               | 9mph         |
 | Chrysler  | Pacifica 2020                   | Adaptive Cruise   | Stock            | 0mph               | 39mph        |
@@ -101,7 +98,6 @@
 | Genesis   | G80 2018                        | All               | Stock            | 0mph               | 0mph         |
 | Genesis   | G90 2018                        | All               | Stock            | 0mph               | 0mph         |
 | GMC       | Acadia 2018<sup>1</sup>         | Adaptive Cruise   | openpilot        | 0mph               | 7mph         |
-| Holden    | Astra 2017<sup>1</sup>          | Adaptive Cruise   | openpilot        | 0mph               | 7mph         |
 | Hyundai   | Elantra 2017-19                 | SCC + LKAS        | Stock            | 19mph              | 34mph        |
 | Hyundai   | Elantra 2021                    | SCC + LKAS        | Stock            | 0mph               | 0mph         |
 | Hyundai   | Elantra Hybrid 2021             | SCC + LKAS        | Stock            | 0mph               | 0mph         |
@@ -135,6 +131,7 @@
 | Kia       | Sorento 2018-19                 | SCC + LKAS        | Stock            | 0mph               | 0mph         |
 | Kia       | Stinger 2018                    | SCC + LKAS        | Stock            | 0mph               | 0mph         |
 | Kia       | Telluride 2020                  | SCC + LKAS        | Stock            | 0mph               | 0mph         |
+| Mazda     | CX-5 2022                       | All               | Stock            | 0mph               | 0mph         |
 | Mazda     | CX-9 2021                       | All               | Stock            | 0mph               | 28mph        |
 | Nissan    | Altima 2019-20                  | ProPILOT          | Stock            | 0mph               | 0mph         |
 | Nissan    | Leaf 2018-22                    | ProPILOT          | Stock            | 0mph               | 0mph         |
@@ -155,6 +152,7 @@
 | Škoda     | Superb 2015-18                  | Driver Assistance | Stock            | 0mph               | 0mph         |
 | Volkswagen| Arteon 2018, 2021<sup>4</sup>   | Driver Assistance | Stock            | 0mph               | 0mph         |
 | Volkswagen| Atlas 2018-19, 2022<sup>4</sup> | Driver Assistance | Stock            | 0mph               | 0mph         |
+| Volkswagen| Caravelle 2020<sup>4</sup>      | Driver Assistance | Stock            | 0mph               | 32mph        |
 | Volkswagen| California 2021<sup>4</sup>     | Driver Assistance | Stock            | 0mph               | 32mph        |
 | Volkswagen| e-Golf 2014, 2019-20            | Driver Assistance | Stock            | 0mph               | 0mph         |
 | Volkswagen| Golf 2015-20                    | Driver Assistance | Stock            | 0mph               | 0mph         |

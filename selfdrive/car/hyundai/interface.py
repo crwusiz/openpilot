@@ -311,6 +311,7 @@ class CarInterface(CarInterfaceBase):
     ret.enableBsm = 0x58b in fingerprint[0]
     ret.enableAutoHold = 1151 in fingerprint[0]
     ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
+    ret.hasLfaHda = 1157 in fingerprint[0]
 
     ret.radarOffCan = ret.sccBus == -1
     ret.pcmCruise = not ret.radarOffCan

@@ -115,7 +115,6 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"GsmRoaming", PERSISTENT},
     {"HardwareSerial", PERSISTENT},
     {"HasAcceptedTerms", PERSISTENT},
-    {"HasPrime", PERSISTENT},
     {"IMEI", PERSISTENT},
     {"InstallDate", PERSISTENT},
     {"IsDriverViewEnabled", CLEAR_ON_MANAGER_START},
@@ -146,6 +145,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"PandaSignatures", CLEAR_ON_MANAGER_START},
     {"Passive", PERSISTENT},
     {"PrimeRedirected", PERSISTENT},
+    {"PrimeType", PERSISTENT},
     {"RecordFront", PERSISTENT},
     {"RecordFrontLock", PERSISTENT},  // for the internal fleet
     {"ReleaseNotes", PERSISTENT},
@@ -193,6 +193,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"SccSmootherSlowOnCurves", PERSISTENT},
     {"SccSmootherSyncGasPressed", PERSISTENT},
     {"NewRadarInterface", PERSISTENT},
+    {"HapticFeedbackWhenSpeedCamera", PERSISTENT},
 };
 
 } // namespace
