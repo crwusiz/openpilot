@@ -141,7 +141,8 @@ class SccSmoother:
 
     max_speed_log = ""
 
-    if apply_limit_speed >= self.kph_to_clu(30):
+    if apply_limit_speed >= self.kph_to_clu(10):
+
       if first_started:
         self.max_speed_clu = clu11_speed
 

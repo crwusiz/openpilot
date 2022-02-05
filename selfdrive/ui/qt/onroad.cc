@@ -190,7 +190,6 @@ OnroadHud::OnroadHud(QWidget *parent) : QWidget(parent) {
 
 void OnroadHud::updateState(const UIState &s) {
   const SubMaster &sm = *(s.sm);
-  const int SET_SPEED_NA = 255;
   const auto cs = sm["controlsState"].getControlsState();
   const auto car_state = sm["carState"].getCarState();
   const auto car_control = sm["carControl"].getCarControl();
@@ -210,9 +209,9 @@ void OnroadHud::updateState(const UIState &s) {
 
   setProperty("speed", QString::number(std::nearbyint(cur_speed)));
   setProperty("speedUnit", s.scene.is_metric ? "km/h" : "mph");
-  setProperty("hideDM", cs.getAlertSize() != cereal::ControlsState::AlertSize::NONE);
   setProperty("status", s.status);
   setProperty("engageable", cs.getEngageable() || cs.getEnabled());
+  setProperty("steeringPressed", car_state.getSteeringPressed());
   setProperty("dmActive", sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode());
 
   setProperty("brake_stat", car_control.getActuators().getAccel() < -1.96133 || car_state.getBrakeLights() || car_state.getBrakePressed());
@@ -363,7 +362,7 @@ void OnroadHud::drawRightDevUi(QPainter &p, int x, int y) {
        // Red if approaching faster than 10mph
        // Orange if approaching (negative)
        if (lead_v_rel < -4.4704) {
-        valueColor = redColor;
+         valueColor = redColor;
        } else if (lead_v_rel < 0) {
          valueColor = orangeColor;
        }
@@ -402,8 +401,11 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   // color define
   QColor yellowColor = QColor(255, 255, 0, 255);
   QColor whiteColor = QColor(255, 255, 255, 255);
-  QColor engageColor = QColor(23, 134, 68, 70);
-  QColor warningColor = QColor(218, 111, 37, 70);
+  QColor engagedColor = QColor(23, 134, 68, 200);
+  QColor warningColor = QColor(218, 111, 37, 200);
+  QColor steeringpressedColor = QColor(0, 191, 255, 200);
+  QColor iconbgColor = QColor(0, 0, 0, 70);
+  QColor wheelbgColor = QColor(0, 0, 0, 70);
 
   // current speed
   configFont(p, "Open Sans", 176, "Bold");
@@ -414,53 +416,63 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   // engage-ability icon ( wheel ) (upper right 1)
   int x = rect().right() - radius / 2 - bdr_s * 2;
   int y = radius / 2 + int(bdr_s * 1.5);
-  drawIcon(p, x, y, engage_img, engageable ? engageColor : QColor(0, 0, 0, 70), 1.0);
+
+  if (status == STATUS_ENGAGED && ! steeringPressed) {
+    wheelbgColor = engagedColor;
+  } else if (status == STATUS_WARNING) {
+    wheelbgColor = warningColor;
+  } else if (steeringPressed) {
+    wheelbgColor = steeringpressedColor;
+  }
+
+  drawIcon(p, x, y, engage_img, wheelbgColor, 1.0);
 
   // Dev UI (Right Side)
   x = rect().right() - radius - bdr_s * 5;
   y = bdr_s * 2.5 + rc.height();
   drawRightDevUi(p, x, y);
+  p.setOpacity(1.0);
 
   // dm icon (bottom 1 left)
   x = radius / 2 + (bdr_s * 2);
   y = rect().bottom() - footer_h / 2;
-  drawIcon(p, x, y, dm_img, QColor(0, 0, 0, 70), dmActive ? 1.0 : 0.2);
+  drawIcon(p, x, y, dm_img, iconbgColor, dmActive ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // brake icon (bottom 2 left)
   x = radius / 2 + (bdr_s * 2);
   y = rect().bottom() - (footer_h / 2) - (radius) - 10;
-  drawIcon(p, x, y, brake_img, QColor(0, 0, 0, 70), brake_stat ? 1.0 : 0.2);
+  drawIcon(p, x, y, brake_img, iconbgColor, brake_stat ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // autohold icon (bottom 2 right)
   x = radius / 2 + (bdr_s * 2) + (radius);
   y = rect().bottom() - (footer_h / 2) - (radius) - 10;
-  drawIcon(p, x, y, autohold_stat > 1 ? autohold_warning_img : autohold_active_img, QColor(0, 0, 0, 70), autohold_stat ? 1.0 : 0.2);
+  drawIcon(p, x, y, autohold_stat > 1 ? autohold_warning_img : autohold_active_img, iconbgColor, autohold_stat ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // bsd_l icon (bottom 3 left)
   x = radius / 2 + (bdr_s * 2);
   y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
-  drawIcon(p, x, y, bsd_l_img, QColor(0, 0, 0, 70), bsd_l_stat ? 1.0 : 0.2);
+  drawIcon(p, x, y, bsd_l_img, iconbgColor, bsd_l_stat ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // bsd_r icon (bottom 3 right)
   x = radius / 2 + (bdr_s * 2) + (radius);
   y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
-  drawIcon(p, x, y, bsd_r_img, QColor(0, 0, 0, 70), bsd_r_stat ? 1.0 : 0.2);
+  drawIcon(p, x, y, bsd_r_img, iconbgColor, bsd_r_stat ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // wifi icon (upper right 2)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
   y = radius / 2 + (bdr_s * 1.5);
-  drawIcon(p, x, y, wifi_img, QColor(0, 0, 0, 70), wifi_stat ? 1.0 : 0.2);
+  drawIcon(p, x, y, wifi_img, iconbgColor, wifi_stat ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // gps icon (upper right 3)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 2);
   y = radius / 2 + (bdr_s * 1.5);
-  drawIcon(p, x, y, gps_img, QColor(0, 0, 0, 70), gps_stat ? 1.0 : 0.2);
+  drawIcon(p, x, y, gps_img, iconbgColor, gps_stat ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // nda icon (upper center)
@@ -742,19 +754,16 @@ void NvgWindow::drawHud(QPainter &p) {
   const auto car_params = sm["carParams"].getCarParams();
   const auto car_state = sm["carState"].getCarState();
   const char* lateral_state[] = {"Pid", "Indi", "Lqr"};
-  const char* long_state[] = {"Off", "Pid", "Stopping"};
   int lateralControlState = controls_state.getLateralControlSelect();
-  int longControlState = (int)controls_state.getLongControlState();
   float gpsAltitude = s->scene.gps_ext.getAltitude();
   float gpsAccuracy = s->scene.gps_ext.getAccuracy();
   int gpsSatelliteCount = s->scene.satelliteCount;
 
   QString infoText;
-  infoText.sprintf("[ %s ] SR[%.2f] MDPS[%d] SCC[%d] LongControl[ %s ] GPS[ Alt(%.1f) Acc(%.1f) Sat(%d) ]",
+  infoText.sprintf("[ %s ] SR[%.2f] MDPS[%d] SCC[%d] GPS[Alt(%.1f) Acc(%.1f) Sat(%d)]",
     lateral_state[lateralControlState],
     live_params.getSteerRatio(),
     car_params.getMdpsBus(), car_params.getSccBus(),
-    long_state[longControlState],
     gpsAltitude,
     gpsAccuracy,
     gpsSatelliteCount
@@ -879,11 +888,11 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
   int limit_speed = 0;
   int left_dist = 0;
 
-  if(camLimitSpeed >= 30 && camLimitSpeedLeftDist > 0) {
+  if(camLimitSpeed > 0 && camLimitSpeedLeftDist > 0) {
     limit_speed = camLimitSpeed;
     left_dist = camLimitSpeedLeftDist;
   }
-  else if(sectionLimitSpeed >= 30 && sectionLeftDist > 0) {
+  else if(sectionLimitSpeed > 0 && sectionLeftDist > 0) {
     limit_speed = sectionLimitSpeed;
     left_dist = sectionLeftDist;
   }

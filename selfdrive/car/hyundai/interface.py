@@ -22,8 +22,9 @@ class CarInterface(CarInterfaceBase):
   @staticmethod
   def get_pid_accel_limits(CP, current_speed, cruise_speed):
     v_current_kph = current_speed * CV.MS_TO_KPH
-    gas_max_bp = [0., 10., 20., 50., 70., 130.]
-    gas_max_v = [CarControllerParams.ACCEL_MAX, 1.4, 0.85, 0.72, 0.47, 0.22]
+
+    gas_max_bp = [0., 10., 20., 50., 70., 130., 150.]
+    gas_max_v = [CarControllerParams.ACCEL_MAX, 1.4, 0.82, 0.65, 0.47, 0.18, 0.1]
 
     return CarControllerParams.ACCEL_MIN, interp(v_current_kph, gas_max_bp, gas_max_v)
 
@@ -143,9 +144,8 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 2185. + STD_CARGO_KG
         ret.wheelbase = 3.160
         ret.steerRatio = 12.0
-    # -----------------------------------------------------------------
-    # PID
-    # -----------------------------------------------------------------
+
+    # PID -----------------------------------------------------------------
     if Params().get("LateralControlSelect", encoding='utf8') == "0":
       if candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
           ret.lateralTuning.pid.kf = 0.00005
@@ -165,9 +165,8 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.pid.kpV = [0.25]
           ret.lateralTuning.pid.kiBP = [0.]
           ret.lateralTuning.pid.kiV = [0.05]
-    # -----------------------------------------------------------------
-    # INDI
-    # -----------------------------------------------------------------
+
+    # INDI -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "1":
       if candidate in [CAR.GENESIS]:
           ret.lateralTuning.init('indi')
@@ -209,9 +208,8 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.indi.timeConstantV = [1.4]
           ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
           ret.lateralTuning.indi.actuatorEffectivenessV = [2.3]
-    # -----------------------------------------------------------------
-    # LQR
-    # -----------------------------------------------------------------
+
+    # LQR -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "2":
       if candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
           ret.lateralTuning.init('lqr')
@@ -235,7 +233,7 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.lqr.l = [0.33, 0.318]
       elif candidate in [CAR.GRANDEUR, CAR.GRANDEUR_HEV, CAR.GRANDEUR20, CAR.GRANDEUR20_HEV, CAR.K7, CAR.K7_HEV]:
           ret.lateralTuning.init('lqr')
-          ret.lateralTuning.lqr.scale = 1550.
+          ret.lateralTuning.lqr.scale = 1600.
           ret.lateralTuning.lqr.ki = 0.01
           ret.lateralTuning.lqr.dcGain = 0.0027
           ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
@@ -273,15 +271,14 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.lqr.c = [1., 0.]
           ret.lateralTuning.lqr.k = [-105.0, 450.0]
           ret.lateralTuning.lqr.l = [0.22, 0.318]
-    # -----------------------------------------------------------------
 
     ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05
 
-    ret.steerActuatorDelay = 0.2  # default 0.1
+    ret.steerActuatorDelay = 0.1
     ret.steerRateCost = 0.4
     ret.steerLimitTimer = 2.5 # default 1.0
-    ret.steerMaxV = [1.5] # default 1.
+    ret.steerMaxV = [2.] # default 1.
 
     # longitudinal
     ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]

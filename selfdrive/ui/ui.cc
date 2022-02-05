@@ -210,13 +210,13 @@ void UIState::updateStatus() {
       status = controls_state.getEnabled() ? STATUS_ENGAGED : STATUS_DISENGAGED;
       scene.enabled = controls_state.getEnabled();
     }
-    scene.lateralControlSelect = scene.controls_state.getLateralControlSelect();
+    scene.lateralControlSelect = controls_state.getLateralControlSelect();
     if (scene.lateralControlSelect == 0) {
-      scene.output_scale = scene.controls_state.getLateralControlState().getPidState().getOutput();
+      scene.output_scale = controls_state.getLateralControlState().getPidState().getOutput();
     } else if (scene.lateralControlSelect == 1) {
-      scene.output_scale = scene.controls_state.getLateralControlState().getIndiState().getOutput();
+      scene.output_scale = controls_state.getLateralControlState().getIndiState().getOutput();
     } else if (scene.lateralControlSelect == 2) {
-      scene.output_scale = scene.controls_state.getLateralControlState().getLqrState().getOutput();
+      scene.output_scale = controls_state.getLateralControlState().getLqrState().getOutput();
     }
   }
 

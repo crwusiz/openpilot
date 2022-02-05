@@ -152,7 +152,7 @@ def manager_thread() -> None:
     not_run = ignore[:]
 
     if params.get_bool("ShutdownDisable"):
-      not_run.append("auto_shutdown")
+      not_run.append("autoshutdownd")
 
     if params.get_bool("LoggerDisable"):
       not_run.append("loggerd")
@@ -160,6 +160,7 @@ def manager_thread() -> None:
       not_run.append("logmessaged")
       not_run.append("tombstoned")
       not_run.append("uploader")
+      not_run.append("updated")
 
     if params.get_bool("NavDisable"):
       not_run.append("navd")
@@ -169,9 +170,9 @@ def manager_thread() -> None:
     ensure_running(managed_processes.values(), started, driverview, not_run)
 
     # trigger an update after going offroad
-    #if started_prev and not started and 'updated' in managed_processes:
-    #  os.sync()
-    #  managed_processes['updated'].signal(signal.SIGHUP)
+    if started_prev and not started and 'updated' in managed_processes:
+      os.sync()
+      managed_processes['updated'].signal(signal.SIGHUP)
 
     started_prev = started
 

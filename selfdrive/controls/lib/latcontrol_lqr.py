@@ -7,8 +7,8 @@ from cereal import log
 from selfdrive.controls.lib.drive_helpers import get_steer_max
 from selfdrive.controls.lib.latcontrol import LatControl, MIN_STEER_SPEED
 
-TORQUE_SCALE_BP = [0., 30., 80., 100., 110., 120., 150.]
-TORQUE_SCALE_V = [0.2, 0.35, 0.68, 0.78, 0.8, 0.83, 0.85]
+TORQUE_SCALE_BP = [0., 30., 80., 100., 130.]
+TORQUE_SCALE_V = [0.2, 0.35, 0.65, 0.7, 0.75]
 
 class LatControlLQR(LatControl):
   def __init__(self, CP, CI):

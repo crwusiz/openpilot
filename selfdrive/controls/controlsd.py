@@ -38,7 +38,7 @@ SIMULATION = "SIMULATION" in os.environ
 NOSENSOR = "NOSENSOR" in os.environ
 IGNORE_PROCESSES = {"rtshield", "uploader", "deleter", "loggerd", "logmessaged", "tombstoned",
                     "logcatd", "proclogd", "clocksd", "updated", "timezoned", "manage_athenad",
-                    "road_speed_limiter", "auto_shutdown", "shutdownd", "statsd"} | \
+                    "statsd", "shutdownd"} | \
                     {k for k, v in managed_processes.items() if not v.enabled}
 
 ACTUATOR_FIELDS = set(car.CarControl.Actuators.schema.fields.keys())
@@ -236,7 +236,7 @@ class Controls:
     #  self.events.add(EventName.highCpuUsage)
 
     # Alert if fan isn't spinning for 5 seconds
-    if self.sm['peripheralState'].pandaType in [PandaType.uno, PandaType.dos]:
+    if self.sm['peripheralState'].pandaType in (PandaType.uno, PandaType.dos):
       if self.sm['peripheralState'].fanSpeedRpm == 0 and self.sm['deviceState'].fanSpeedPercentDesired > 50:
         if (self.sm.frame - self.last_functional_fan_frame) * DT_CTRL > 5.0:
           self.events.add(EventName.fanMalfunction)
