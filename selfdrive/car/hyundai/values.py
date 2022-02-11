@@ -3,11 +3,10 @@ from selfdrive.car import dbc_dict
 Ecu = car.CarParams.Ecu
 
 class CarControllerParams:
-  ACCEL_MIN = -3.6 # m/s
-  ACCEL_MAX = 2.0 # m/s
+  ACCEL_MAX = 2.0
+  ACCEL_MIN = -3.7
 
-  # If the max stock LKAS request is < 384, add your car to this list.
-  STEER_MAX = 384
+  STEER_MAX = 384   # 409 is the max, 255 is stock
   STEER_DELTA_UP = 3
   STEER_DELTA_DOWN = 7
   STEER_DRIVER_ALLOWANCE = 50

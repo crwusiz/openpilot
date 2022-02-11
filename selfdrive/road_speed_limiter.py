@@ -260,7 +260,7 @@ class RoadSpeedLimiter:
         starting_dist = v_ego * 30.
 
         if cam_type == 22:
-          safe_dist = v_ego * 4.
+          safe_dist = v_ego * 3.
         else:
           safe_dist = v_ego * 6.
 
