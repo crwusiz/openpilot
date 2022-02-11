@@ -98,10 +98,10 @@ class SccSmoother:
     self.slowing_down_sound_alert = False
 
   @staticmethod
-  def create_clu11(packer, frame, bus, clu11, button):
+  def create_clu11(packer, bus, clu11, button):
     values = copy.copy(clu11)
     values["CF_Clu_CruiseSwState"] = button
-    values["CF_Clu_AliveCnt1"] = frame
+    values["CF_Clu_AliveCnt1"] = (values["CF_Clu_AliveCnt1"] + 1) % 0x10
     return packer.make_can_msg("CLU11", bus, values)
 
   def is_active(self, frame):
@@ -211,7 +211,8 @@ class SccSmoother:
         self.btn = self.get_button(CS.cruiseState_speed * self.speed_conv_to_clu)
         self.alive_count = SccSmoother.get_alive_count()
       if self.btn != Buttons.NONE:
-        can_sends.append(SccSmoother.create_clu11(packer, self.alive_timer, CS.scc_bus, CS.clu11, self.btn))
+
+        can_sends.append(SccSmoother.create_clu11(packer, CS.scc_bus, CS.clu11, self.btn))
 
         if self.alive_timer == 0:
           self.started_frame = frame
