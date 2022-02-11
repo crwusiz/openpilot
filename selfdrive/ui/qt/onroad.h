@@ -26,7 +26,6 @@ class OnroadHud : public QWidget {
   Q_PROPERTY(bool bsd_r_stat MEMBER bsd_r_stat NOTIFY valueChanged);
   Q_PROPERTY(int wifi_stat MEMBER wifi_stat NOTIFY valueChanged);
   Q_PROPERTY(bool gps_stat MEMBER gps_stat NOTIFY valueChanged);
-  Q_PROPERTY(float cputemp_stat MEMBER cputemp_stat NOTIFY valueChanged);
 
   Q_PROPERTY(int lead_status MEMBER lead_status NOTIFY valueChanged);
   Q_PROPERTY(float lead_d_rel MEMBER lead_d_rel NOTIFY valueChanged);
@@ -84,8 +83,6 @@ private:
   bool bsd_r_stat = false;
   int wifi_stat = 0;
   bool gps_stat = false;
-  float cputemp_stat = 0;
-  int cpuTemp = 0;
   int lead_status;
   float lead_d_rel = 0;
   float lead_v_rel = 0;
