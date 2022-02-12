@@ -10,7 +10,10 @@ from functools import cmp_to_key
 from common.spinner import Spinner
 from panda import DEFAULT_FW_FN, DEFAULT_H7_FW_FN, MCU_TYPE_H7, Panda, PandaDFU
 from common.basedir import BASEDIR
+from common.gpio import gpio_set
 from common.params import Params
+from selfdrive.hardware import TICI
+from selfdrive.hardware.tici.pins import GPIO
 from selfdrive.swaglog import cloudlog
 
 
@@ -35,6 +38,24 @@ def flash_panda(panda_serial: str) -> Panda:
 
   if panda.bootstub or panda_signature != fw_signature:
     cloudlog.info("Panda firmware out of date, update required")
+
+    if TICI and not panda.bootstub:
+      panda.reset(enter_bootstub=True)
+      if not panda.bootstub:
+        cloudlog.error(f"Panda unable to enter bootstub. Attempting to recover.")
+
+        gpio_set(GPIO.STM_RST_N, 1)
+        gpio_set(GPIO.STM_BOOT0, 1)
+        time.sleep(2)
+        gpio_set(GPIO.STM_RST_N, 0)
+
+        panda.recover(skip_enter_dfu=True)
+
+        gpio_set(GPIO.STM_RST_N, 1)
+        gpio_set(GPIO.STM_BOOT0, 0)
+        time.sleep(2)
+        gpio_set(GPIO.STM_RST_N, 0)
+
     panda.flash()
     cloudlog.info("Done flashing")
 
@@ -63,7 +84,7 @@ def flash_panda(panda_serial: str) -> Panda:
 
   panda_signature = panda.get_signature()
   if panda_signature != fw_signature:
-    cloudlog.info("Version mismatch after flashing, exiting")
+    cloudlog.error("Version mismatch after flashing, exiting")
     raise AssertionError
 
   return panda
