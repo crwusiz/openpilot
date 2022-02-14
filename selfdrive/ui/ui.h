@@ -99,7 +99,6 @@ typedef struct UIScene {
   cereal::PandaState::PandaType pandaType;
 
   cereal::ControlsState::Reader controls_state;
-  cereal::GpsLocationData::Reader gps_ext;
 
   // ui add
   int lateralControlSelect;

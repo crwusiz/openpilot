@@ -424,7 +424,6 @@ C2NetworkPanel::C2NetworkPanel(QWidget *parent) : QWidget(parent) {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
       std::system(gitpull);
-      QTimer::singleShot(1000, []() { Hardware::reboot(); });
     }
   });
   list->addItem(gitpullbtn);
@@ -447,7 +446,6 @@ C2NetworkPanel::C2NetworkPanel(QWidget *parent) : QWidget(parent) {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
       std::system(panda_flash);
-      QTimer::singleShot(1000, []() { Hardware::reboot(); });
     }
   });
   list->addItem(pandaflashbtn);
@@ -459,7 +457,6 @@ C2NetworkPanel::C2NetworkPanel(QWidget *parent) : QWidget(parent) {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
       std::system(panda_recover);
-      QTimer::singleShot(1000, []() { Hardware::reboot(); });
     }
   });
   list->addItem(pandarecoverbtn);

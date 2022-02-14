@@ -13,7 +13,10 @@ class OnroadHud : public QWidget {
   Q_OBJECT
   Q_PROPERTY(QString speed MEMBER speed NOTIFY valueChanged);
   Q_PROPERTY(QString speedUnit MEMBER speedUnit NOTIFY valueChanged);
+  Q_PROPERTY(QString applyMaxSpeed MEMBER applyMaxSpeed NOTIFY valueChanged);
+  Q_PROPERTY(QString cruiseMaxSpeed MEMBER cruiseMaxSpeed NOTIFY valueChanged);
 
+  Q_PROPERTY(bool is_cruise_set MEMBER is_cruise_set NOTIFY valueChanged);
   Q_PROPERTY(bool engageable MEMBER engageable NOTIFY valueChanged);
   Q_PROPERTY(bool steeringPressed MEMBER steeringPressed NOTIFY valueChanged);
   Q_PROPERTY(bool dmActive MEMBER dmActive NOTIFY valueChanged);
@@ -71,7 +74,10 @@ private:
 
   QString speed;
   QString speedUnit;
+  QString applyMaxSpeed;
+  QString cruiseMaxSpeed;
 
+  bool is_cruise_set = false;
   bool engageable = false;
   bool steeringPressed = false;
   bool dmActive = false;
@@ -145,7 +151,6 @@ protected:
   QPixmap tire_pressure_img;
 
   void drawHud(QPainter &p);
-  void drawMaxSpeed(QPainter &p);
   void drawSpeedLimit(QPainter &p);
   void drawTpms(QPainter &p);
   void drawTurnSignals(QPainter &p);

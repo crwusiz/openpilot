@@ -225,9 +225,6 @@ void UIState::updateStatus() {
     scene.steeringPressed = carState.getSteeringPressed();
   }
 
-  if(sm->updated("gpsLocationExternal"))
-    scene.gps_ext = (*sm)["gpsLocationExternal"].getGpsLocationExternal();
-
   if (sm->updated("ubloxGnss")) {
     auto data = (*sm)["ubloxGnss"].getUbloxGnss();
     if (data.which() == cereal::UbloxGnss::MEASUREMENT_REPORT) {

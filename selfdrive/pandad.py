@@ -7,7 +7,6 @@ import subprocess
 from typing import NoReturn
 from functools import cmp_to_key
 
-from common.spinner import Spinner
 from panda import DEFAULT_FW_FN, DEFAULT_H7_FW_FN, MCU_TYPE_H7, Panda, PandaDFU
 from common.basedir import BASEDIR
 from common.gpio import gpio_set
@@ -60,23 +59,10 @@ def flash_panda(panda_serial: str) -> Panda:
     cloudlog.info("Done flashing")
 
   if panda.bootstub:
-    spinner = Spinner()
-    spinner.update("Restoring panda")
+    bootstub_version = panda.get_version()
+    cloudlog.info(f"Flashed firmware not booting, flashing development bootloader. Bootstub version: {bootstub_version}")
     panda.recover()
-    spinner.close()
-
-  if panda.bootstub:
-    spinner = Spinner()
-    spinner.update("Restoring panda")
-    try:
-      if panda.get_mcu_type() == MCU_TYPE_H7:
-        subprocess.run("cd /data/openpilot/panda/board; ./recover_h7.sh", capture_output=True, shell=True)
-      else:
-        subprocess.run("cd /data/openpilot/panda/board; ./recover.sh", capture_output=True, shell=True)
-      panda.reset()
-      panda.reconnect()
-    finally:
-      spinner.close()
+    cloudlog.info("Done flashing bootloader")
 
   if panda.bootstub:
     cloudlog.info("Panda still not booting, exiting")
