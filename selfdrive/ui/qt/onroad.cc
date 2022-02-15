@@ -82,11 +82,15 @@ void OnroadWindow::offroadTransition(bool offroad) {
   if (!offroad) {
     if (map == nullptr && (uiState()->prime_type || !MAPBOX_TOKEN.isEmpty())) {
       MapWindow * m = new MapWindow(get_mapbox_settings());
-      m->setFixedWidth(topWidget(this)->width() / 2);
-      m->offroadTransition(offroad);
-      QObject::connect(uiState(), &UIState::offroadTransition, m, &MapWindow::offroadTransition);
-      split->addWidget(m, 0, Qt::AlignRight);
       map = m;
+
+      QObject::connect(uiState(), &UIState::offroadTransition, m, &MapWindow::offroadTransition);
+
+      m->setFixedWidth(topWidget(this)->width() / 2);
+      split->addWidget(m, 0, Qt::AlignRight);
+
+      // Make map visible after adding to split
+      m->offroadTransition(offroad);
     }
   }
 #endif
@@ -744,10 +748,6 @@ void NvgWindow::drawHud(QPainter &p) {
     drawLead(p, leads[1], s->scene.lead_vertices[1], s->scene.lead_radar[1]);
   }
 
-  drawSpeedLimit(p);
-  drawTurnSignals(p);
-  drawTpms(p);
-
   //bottom info
   const auto controls_state = sm["controlsState"].getControlsState();
   const auto live_params = sm["liveParameters"].getLiveParameters();
@@ -792,6 +792,10 @@ void NvgWindow::drawHud(QPainter &p) {
   configFont(p, "Open Sans", 30, "Regular");
   p.setPen(QColor(0xff, 0xff, 0xff, 0xff));
   p.drawText(rect().right() - 520, bdr_s * 3, infoGps);
+
+  drawTpms(p);
+  drawTurnSignals(p);
+  drawSpeedLimit(p);
 }
 
 static const QColor get_tpms_color(float tpms) {
@@ -867,8 +871,8 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
     left_dist = sectionLeftDist;
   }
 
-  if (limit_speed > 10 && left_dist > 0) {
-    int radius = 192;
+  if(limit_speed > 10 && limit_speed < 130) {
+    int radius_ = 192;
     int x = radius / 2 + (bdr_s * 2) + (radius) + 40;
     int y = 50;
 
@@ -887,17 +891,20 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
 
     if (left_dist >= 1000)
       str_left_dist.sprintf("%.1fkm", left_dist / 1000.f);
-    else
+    else if(left_dist > 0)
       str_left_dist.sprintf("%dm", left_dist);
 
     configFont(p, "Open Sans", 80, "Bold");
     p.setPen(QColor(0, 0, 0, 230));
     p.drawText(rect, Qt::AlignCenter, str_limit_speed);
-    configFont(p, "Open Sans", 60, "Bold");
-    rect.translate(0, radius/2 + 45);
-    rect.adjust(-30, 0, 30, 0);
-    p.setPen(QColor(255, 255, 255, 230));
-    p.drawText(rect, Qt::AlignCenter, str_left_dist);
+
+    if(str_left_dist.length() > 0) {
+      configFont(p, "Open Sans", 60, "Bold");
+      rect.translate(0, radius_/2 + 45);
+      rect.adjust(-30, 0, 30, 0);
+      p.setPen(QColor(255, 255, 255, 230));
+      p.drawText(rect, Qt::AlignCenter, str_left_dist);
+    }
   }
   p.setOpacity(1.);
 }
