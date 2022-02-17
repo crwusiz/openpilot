@@ -11,17 +11,16 @@ ENABLE_INC_LANE_PROB = True
 
 TRAJECTORY_SIZE = 33
 # camera offset is meters from center car to camera
-# model path is in the frame of EON's camera. TICI is 0.1 m away,
-# however the average measured path difference is 0.04 m
+# model path is in the frame of the camera. Empirically 
+# the model knows the difference between TICI and EON
+# so a path offset is not needed
+PATH_OFFSET = 0.00
 if EON:
   CAMERA_OFFSET = -0.06
-  PATH_OFFSET = 0.0
 elif TICI:
   CAMERA_OFFSET = 0.04
-  PATH_OFFSET = 0.04
 else:
   CAMERA_OFFSET = 0.0
-  PATH_OFFSET = 0.0
 
 class LanePlanner:
   def __init__(self, wide_camera=False):

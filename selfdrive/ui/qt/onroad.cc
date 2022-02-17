@@ -1,7 +1,6 @@
 #include "selfdrive/ui/qt/onroad.h"
 
 #include <cmath>
-
 #include <QDebug>
 #include <QString>
 
@@ -820,36 +819,33 @@ void NvgWindow::drawTpms(QPainter &p) {
   auto scc_smoother = sm["carControl"].getCarControl().getSccSmoother();
 
   // tire pressure (right bottom)
-  {
-    const int w = 66;
-    const int h = 146;
-    const int x = rect().right() - h - (bdr_s * 2);
-    const int y = height() - h - 80;
+  const int w = 66;
+  const int h = 146;
+  const int x = rect().right() - h - (bdr_s * 2);
+  const int y = height() - h - 80;
 
-    auto tpms = car_state.getTpms();
-    const float fl = tpms.getFl();
-    const float fr = tpms.getFr();
-    const float rl = tpms.getRl();
-    const float rr = tpms.getRr();
+  auto tpms = car_state.getTpms();
+  const float fl = tpms.getFl();
+  const float fr = tpms.getFr();
+  const float rl = tpms.getRl();
+  const float rr = tpms.getRr();
 
-    p.setOpacity(0.8);
-    p.drawPixmap(x, y, w, h, tire_pressure_img);
+  p.setOpacity(1.0);
+  p.drawPixmap(x, y, w, h, tire_pressure_img);
 
-    configFont(p, "Open Sans", 38, "Bold");
-    QFontMetrics fm(p.font());
-    QRect rcFont = fm.boundingRect("9");
+  configFont(p, "Open Sans", 38, "Bold");
+  QFontMetrics fm(p.font());
+  QRect rcFont = fm.boundingRect("9");
 
-    int center_x = x + 3;
-    int center_y = y + h/2;
-    const int marginX = (int)(rcFont.width() * 2.7f);
-    const int marginY = (int)((h/2 - rcFont.height()) * 0.7f);
+  int center_x = x + 3;
+  int center_y = y + h/2;
+  const int marginX = (int)(rcFont.width() * 2.7f);
+  const int marginY = (int)((h/2 - rcFont.height()) * 0.7f);
 
-    drawTextFlag(p, center_x-marginX, center_y-marginY-rcFont.height(), Qt::AlignRight, get_tpms_text(fl), get_tpms_color(fl));
-    drawTextFlag(p, center_x+marginX+8, center_y-marginY-rcFont.height(), Qt::AlignLeft, get_tpms_text(fr), get_tpms_color(fr));
-    drawTextFlag(p, center_x-marginX, center_y+marginY, Qt::AlignRight, get_tpms_text(rl), get_tpms_color(rl));
-    drawTextFlag(p, center_x+marginX+8, center_y+marginY, Qt::AlignLeft, get_tpms_text(rr), get_tpms_color(rr));
-  }
-  p.setOpacity(1.);
+  drawTextFlag(p, center_x-marginX, center_y-marginY-rcFont.height(), Qt::AlignRight, get_tpms_text(fl), get_tpms_color(fl));
+  drawTextFlag(p, center_x+marginX+8, center_y-marginY-rcFont.height(), Qt::AlignLeft, get_tpms_text(fr), get_tpms_color(fr));
+  drawTextFlag(p, center_x-marginX, center_y+marginY, Qt::AlignRight, get_tpms_text(rl), get_tpms_color(rl));
+  drawTextFlag(p, center_x+marginX+8, center_y+marginY, Qt::AlignLeft, get_tpms_text(rr), get_tpms_color(rr));
 }
 
 void NvgWindow::drawSpeedLimit(QPainter &p) {
@@ -862,17 +858,17 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
   int limit_speed = 0;
   int left_dist = 0;
 
-  if(camLimitSpeed > 0 && camLimitSpeedLeftDist > 0) {
+  if (camLimitSpeed > 0 && camLimitSpeedLeftDist > 0) {
     limit_speed = camLimitSpeed;
     left_dist = camLimitSpeedLeftDist;
   }
-  else if(sectionLimitSpeed > 0 && sectionLeftDist > 0) {
+  else if (sectionLimitSpeed > 0 && sectionLeftDist > 0) {
     limit_speed = sectionLimitSpeed;
     left_dist = sectionLeftDist;
   }
 
-  if(limit_speed > 10 && limit_speed < 130) {
-    int radius_ = 192;
+  if (limit_speed > 10 && limit_speed < 130) {
+    int radius = 192;
     int x = radius / 2 + (bdr_s * 2) + (radius) + 40;
     int y = 50;
 
@@ -891,7 +887,7 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
 
     if (left_dist >= 1000)
       str_left_dist.sprintf("%.1fkm", left_dist / 1000.f);
-    else if(left_dist > 0)
+    else if (left_dist > 0)
       str_left_dist.sprintf("%dm", left_dist);
 
     configFont(p, "Open Sans", 80, "Bold");
@@ -900,13 +896,12 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
 
     if(str_left_dist.length() > 0) {
       configFont(p, "Open Sans", 60, "Bold");
-      rect.translate(0, radius_/2 + 45);
+      rect.translate(0, radius / 2 + 45);
       rect.adjust(-30, 0, 30, 0);
       p.setPen(QColor(255, 255, 255, 230));
       p.drawText(rect, Qt::AlignCenter, str_left_dist);
     }
   }
-  p.setOpacity(1.);
 }
 
 void NvgWindow::drawTurnSignals(QPainter &p) {
