@@ -298,7 +298,7 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
     wheelbgColor = steeringpressedColor;
   }
 
-  drawIcon(p, x, y, engage_img, wheelbgColor, 1.0);
+  drawIconRotate(p, x, y, engage_img, wheelbgColor, 1.0, angleSteers);
 
   // wifi icon (upper right 2)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
@@ -396,7 +396,7 @@ int OnroadHud::devUiDrawElement(QPainter &p, int x, int y, const char* value, co
 
   if (strlen(units) > 0) {
     p.save();
-    p.translate(x + 54 + 30 - 3 + 92, y + 37 + 25);
+    p.translate(x + 173, y + 62);
     p.rotate(-90);
     drawText(p, 0, 0, QString(units), 255);
     p.restore();
@@ -524,6 +524,20 @@ void OnroadHud::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, flo
   p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
   p.setOpacity(opacity);
   p.drawPixmap(x - img_size / 2, y - img_size / 2, img);
+}
+
+void OnroadHud::drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity, float angle) {
+  p.setPen(Qt::NoPen);
+  p.setBrush(bg);
+  p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
+  p.setOpacity(opacity);
+  p.save();
+  p.translate(x, y);
+  p.rotate(-angle);
+  QRect r = img.rect();
+  r.moveCenter(QPoint(0,0));
+  p.drawPixmap(r, img);
+  p.restore();
 }
 
 void OnroadHud::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
@@ -774,7 +788,7 @@ void NvgWindow::drawHud(QPainter &p) {
   float gpsAccuracy = gps_ext.getAccuracy();
   int gpsSatelliteCount = s->scene.satelliteCount;
 
-  if(verticalAccuracy == 0 || verticalAccuracy > 100)
+  if (verticalAccuracy == 0 || verticalAccuracy > 100)
     gpsAltitude = 999.9;
 
   if (gpsAccuracy > 100)
@@ -894,7 +908,7 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
     p.setPen(QColor(0, 0, 0, 230));
     p.drawText(rect, Qt::AlignCenter, str_limit_speed);
 
-    if(str_left_dist.length() > 0) {
+    if (str_left_dist.length() > 0) {
       configFont(p, "Open Sans", 60, "Bold");
       rect.translate(0, radius / 2 + 45);
       rect.adjust(-30, 0, 30, 0);

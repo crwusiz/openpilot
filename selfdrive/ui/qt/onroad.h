@@ -45,6 +45,7 @@ public:
 
 private:
   void drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity);
+  void drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity, float angle);
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
   void drawTextColor(QPainter &p, int x, int y, const QString &text, QColor &color);
   void paintEvent(QPaintEvent *event) override;
