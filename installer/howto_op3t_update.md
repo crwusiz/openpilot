@@ -14,7 +14,7 @@ rm -fr openpilot; git clone https://github.com/crwusiz/openpilot.git openpilot
 2. run command:
 
 ```
-cd /data/openpilot/installer && sh op3t_neos_update.sh
+cd /data/openpilot/scripts && ./op3t_neos_update.sh
 ```
 
 3. Let it download and complete it update, after a couple of reboot, your screen will then stay in fastboot mode.

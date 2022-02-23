@@ -9,10 +9,11 @@ source "$BASEDIR/launch_env.sh"
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 function two_init {
-if [ -f /data/ONEPLUS ]; then
+if [ -f /ONEPLUS ]; then
   mount -o remount,rw /system
   sed -i -e 's#/dev/input/event1#/dev/input/event2#g' ~/.bash_profile
   mount -o remount,r /system
+  echo -n 19.1 > /VERSION
 fi
 
   # set IO scheduler
@@ -71,7 +72,7 @@ fi
 
   # USB traffic needs realtime handling on cpu 3
   [ -d "/proc/irq/733" ] && echo 3 > /proc/irq/733/smp_affinity_list
-  if [ -f /data/ONEPLUS ]; then
+  if [ -f /ONEPLUS ]; then
     [ -d "/proc/irq/736" ] && echo 3 > /proc/irq/736/smp_affinity_list # USB for OP3T
   fi
 
@@ -97,8 +98,7 @@ fi
   wpa_cli IFNAME=wlan0 SCAN
 
   # Check for NEOS update
-  if [ -f data/LEECO ]; then
-  if [ $(< /VERSION) != "$REQUIRED_NEOS_VERSION" ]; then
+  if [ -f /LEECO ] && [ $(< /VERSION) != "$REQUIRED_NEOS_VERSION" ]; then
     if [ -f "$DIR/scripts/continue.sh" ]; then
       cp "$DIR/scripts/continue.sh" "/data/data/com.termux/files/continue.sh"
     fi
@@ -111,7 +111,6 @@ fi
     fi
 
     "$DIR/installer/updater/updater" "file://$DIR/installer/updater/update.json"
-    fi
   else
     echo -n 0 > /data/params/d/DisableUpdates
   fi
@@ -120,7 +119,7 @@ fi
   # Remove and regenerate qcom sensor registry. Only done on OP3T mainboards.
   # Performed exactly once. The old registry is preserved just-in-case, and
   # doubles as a flag denoting we've already done the reset.
-  if [ -f /data/ONEPLUS ] && [ ! -f "/persist/comma/op3t-sns-reg-backup" ]; then
+  if [ -f /ONEPLUS ] && [ ! -f "/persist/comma/op3t-sns-reg-backup" ]; then
     echo "Performing OP3T sensor registry reset"
     mv /persist/sensors/sns.reg /persist/comma/op3t-sns-reg-backup &&
       rm -f /persist/sensors/sensors_settings /persist/sensors/error_log /persist/sensors/gyro_sensitity_cal &&

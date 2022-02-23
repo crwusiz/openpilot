@@ -40,7 +40,7 @@ class CarInterface(CarInterfaceBase):
       if fw.ecu == "eps" and b"," in fw.fwVersion:
         eps_modified = True
 
-    ret.maxSteeringAngleDeg = 90.
+    ret.maxSteeringAngleDeg = 1000.
 
     # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
     # genesis
@@ -48,6 +48,7 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 2060. + STD_CARGO_KG
         ret.wheelbase = 3.010
         ret.steerRatio = 16.5
+        ret.maxSteeringAngleDeg = 90.
     elif candidate == CAR.GENESIS_G70:
         ret.mass = 1795. + STD_CARGO_KG
         ret.wheelbase = 2.835

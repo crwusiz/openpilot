@@ -66,7 +66,6 @@ class CarController():
     self.resume_cnt = 0
     self.last_lead_distance = 0
     self.resume_wait_timer = 0
-
     self.turning_signal_timer = 0
     self.longcontrol = CP.openpilotLongitudinalControl
     self.scc_live = not CP.radarOffCan
@@ -155,8 +154,6 @@ class CarController():
 
     if pcm_cancel_cmd and self.longcontrol:
       can_sends.append(create_clu11(self.packer, frame % 0x10, CS.scc_bus, CS.clu11, Buttons.CANCEL, clu11_speed))
-    else:
-      can_sends.append(create_mdps12(self.packer, frame, CS.mdps12))
 
     # fix auto resume - by neokii
     if CS.out.cruiseState.standstill and not CS.out.gasPressed:
