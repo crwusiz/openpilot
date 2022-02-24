@@ -6,9 +6,7 @@
 #include "selfdrive/ui/qt/widgets/cameraview.h"
 #include "selfdrive/ui/ui.h"
 
-// ***** onroad widgets *****
-// wirelessnet2, crwusiz add
-
+// ***** onroad widgets ***** ( wirelessnet2 init )
 class OnroadHud : public QWidget {
   Q_OBJECT
   Q_PROPERTY(QString speed MEMBER speed NOTIFY valueChanged);
@@ -20,24 +18,33 @@ class OnroadHud : public QWidget {
   Q_PROPERTY(bool engageable MEMBER engageable NOTIFY valueChanged);
   Q_PROPERTY(bool steeringPressed MEMBER steeringPressed NOTIFY valueChanged);
   Q_PROPERTY(bool dmActive MEMBER dmActive NOTIFY valueChanged);
-  Q_PROPERTY(int status MEMBER status NOTIFY valueChanged);
-  Q_PROPERTY(bool brake_stat MEMBER brake_stat NOTIFY valueChanged);
-
-  Q_PROPERTY(int autohold_stat MEMBER autohold_stat NOTIFY valueChanged);
-  Q_PROPERTY(int nda_stat MEMBER nda_stat NOTIFY valueChanged);
-  Q_PROPERTY(bool bsd_l_stat MEMBER bsd_l_stat NOTIFY valueChanged);
-  Q_PROPERTY(bool bsd_r_stat MEMBER bsd_r_stat NOTIFY valueChanged);
-  Q_PROPERTY(int wifi_stat MEMBER wifi_stat NOTIFY valueChanged);
-  Q_PROPERTY(bool gps_stat MEMBER gps_stat NOTIFY valueChanged);
-
-  Q_PROPERTY(int lead_status MEMBER lead_status NOTIFY valueChanged);
-  Q_PROPERTY(float lead_d_rel MEMBER lead_d_rel NOTIFY valueChanged);
-  Q_PROPERTY(float lead_v_rel MEMBER lead_v_rel NOTIFY valueChanged);
-  Q_PROPERTY(float angleSteers MEMBER angleSteers NOTIFY valueChanged);
-  Q_PROPERTY(float steerAngleDesired MEMBER steerAngleDesired NOTIFY valueChanged);
+  Q_PROPERTY(bool brake_status MEMBER brake_status NOTIFY valueChanged);
+  Q_PROPERTY(bool bsd_l_status MEMBER bsd_l_status NOTIFY valueChanged);
+  Q_PROPERTY(bool bsd_r_status MEMBER bsd_r_status NOTIFY valueChanged);
+  Q_PROPERTY(bool gps_status MEMBER gps_status NOTIFY valueChanged);
   Q_PROPERTY(bool longControl MEMBER longControl NOTIFY valueChanged);
+
+  Q_PROPERTY(int status MEMBER status NOTIFY valueChanged);
+  Q_PROPERTY(int lead_status MEMBER lead_status NOTIFY valueChanged);
+  Q_PROPERTY(int autohold_status MEMBER autohold_status NOTIFY valueChanged);
+  Q_PROPERTY(int nda_status MEMBER nda_status NOTIFY valueChanged);
+  Q_PROPERTY(int wifi_status MEMBER wifi_status NOTIFY valueChanged);
+  Q_PROPERTY(int gpsSatelliteCount MEMBER gpsSatelliteCount NOTIFY valueChanged);
   Q_PROPERTY(int gap MEMBER gap NOTIFY valueChanged);
   Q_PROPERTY(int autoTrGap MEMBER autoTrGap NOTIFY valueChanged);
+  Q_PROPERTY(int lateralcontrol_status MEMBER lateralcontrol_status NOTIFY valueChanged);
+  Q_PROPERTY(int mdpsBus MEMBER mdpsBus NOTIFY valueChanged);
+  Q_PROPERTY(int sccBus MEMBER sccBus NOTIFY valueChanged);
+
+  Q_PROPERTY(float lead_d_rel MEMBER lead_d_rel NOTIFY valueChanged);
+  Q_PROPERTY(float lead_v_rel MEMBER lead_v_rel NOTIFY valueChanged);
+  Q_PROPERTY(float gpsBearing MEMBER gpsBearing NOTIFY valueChanged);
+  Q_PROPERTY(float gpsVerticalAccuracy MEMBER gpsVerticalAccuracy NOTIFY valueChanged);
+  Q_PROPERTY(float gpsAltitude MEMBER gpsAltitude NOTIFY valueChanged);
+  Q_PROPERTY(float gpsAccuracy MEMBER gpsAccuracy NOTIFY valueChanged);
+  Q_PROPERTY(float angleSteers MEMBER angleSteers NOTIFY valueChanged);
+  Q_PROPERTY(float steerAngleDesired MEMBER steerAngleDesired NOTIFY valueChanged);
+  Q_PROPERTY(float steerRatio MEMBER steerRatio NOTIFY valueChanged);
 
 public:
   explicit OnroadHud(QWidget *parent);
@@ -55,16 +62,15 @@ private:
   QPixmap engage_img;
   QPixmap dm_img;
 
-  // wirelessnet2 add
-  QPixmap brake_img;
-
   // crwusiz add
+  QPixmap brake_img;
   QPixmap bsd_l_img;
   QPixmap bsd_r_img;
   QPixmap gps_img;
   QPixmap wifi_img;
+  QPixmap direction_img;
 
-  // neokii icon move
+  // neokii add
   QPixmap autohold_warning_img;
   QPixmap autohold_active_img;
   QPixmap nda_img;
@@ -82,22 +88,33 @@ private:
   bool engageable = false;
   bool steeringPressed = false;
   bool dmActive = false;
-  bool brake_stat = false;
-  int status = STATUS_DISENGAGED;
-  int autohold_stat = 0;
-  int nda_stat = 0;
-  bool bsd_l_stat = false;
-  bool bsd_r_stat = false;
-  int wifi_stat = 0;
-  bool gps_stat = false;
-  int lead_status;
-  float lead_d_rel = 0;
-  float lead_v_rel = 0;
-  float angleSteers = 0;
-  float steerAngleDesired = 0;
+  bool brake_status = false;
+  bool bsd_l_status = false;
+  bool bsd_r_status = false;
+  bool gps_status = false;
   bool longControl = false;
+
+  int status = STATUS_DISENGAGED;
+  int lead_status;
+  int autohold_status = 0;
+  int nda_status = 0;
+  int wifi_status = 0;
+  int gpsSatelliteCount = 0;
   int gap = 0;
   int autoTrGap = 0;
+  int lateralcontrol_status = 0;
+  int mdpsBus = 0;
+  int sccBus = 0;
+
+  float lead_d_rel = 0;
+  float lead_v_rel = 0;
+  float gpsBearing = 0;
+  float gpsVerticalAccuracy = 0;
+  float gpsAltitude = 0;
+  float gpsAccuracy = 0;
+  float angleSteers = 0;
+  float steerAngleDesired = 0;
+  float steerRatio = 0;
 
 signals:
   void valueChanged();
@@ -137,16 +154,10 @@ protected:
   inline QColor redColor(int alpha = 255) { return QColor(201, 34, 49, alpha); }
   double prev_draw_t = 0;
 
-  // neokii add start
-  void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
   void drawTextFlag(QPainter &p, int x, int y, int flags, const QString &text, const QColor &color);
-  void drawTextColor(QPainter &p, int x, int y, const QString &text, QColor &color);
   void paintEvent(QPaintEvent *event) override;
 
-  const int radius = 160;
-  const int img_size = (radius / 2) * 1.5;
-
-  // neokii
+  // neokii add
   QPixmap turnsignal_l_img;
   QPixmap turnsignal_r_img;
   QPixmap tire_pressure_img;
