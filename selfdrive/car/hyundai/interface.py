@@ -275,8 +275,8 @@ class CarInterface(CarInterfaceBase):
     ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05
 
-    ret.steerActuatorDelay = 0.1
-    ret.steerRateCost = 0.4
+    ret.steerActuatorDelay = 0.15
+    ret.steerRateCost = 0.35
     ret.steerLimitTimer = 2.5 # default 1.0
     ret.steerMaxV = [2.] # default 1.
 
@@ -288,7 +288,7 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalActuatorDelayLowerBound = 0.3
     ret.longitudinalActuatorDelayUpperBound = 0.3
 
-    ret.stoppingDecelRate = 0.6  # brake_travel/s while trying to stop
+    ret.stoppingDecelRate = 0.5  # brake_travel/s while trying to stop
 
     # TODO: get actual value, for now starting with reasonable value for
     # civic and scaling by mass and wheelbase

@@ -22,7 +22,7 @@ CONTROL_N = 17
 CAR_ROTATION_RADIUS = 0.0
 
 # this corresponds to 80deg/s and 20deg/s steering angle in a toyota corolla
-MAX_CURVATURE_RATES = [0.03762194918267951, 0.00940548729]
+MAX_CURVATURE_RATES = [0.03762194918267951, 0.003441203371932992]
 MAX_CURVATURE_RATE_SPEEDS = [0, 35]
 
 CRUISE_LONG_PRESS = 50
@@ -40,13 +40,6 @@ class MPC_COST_LAT:
   PATH = 1.0
   HEADING = 1.0
   STEER_RATE = 1.0
-
-
-class MPC_COST_LONG:
-  TTC = 5.0
-  DISTANCE = 0.1
-  ACCELERATION = 10.0
-  JERK = 20.0
 
 
 def rate_limit(new_value, last_value, dw_step, up_step):
@@ -121,6 +114,6 @@ def get_lag_adjusted_curvature(CP, v_ego, psis, curvatures, curvature_rates, t_s
                                      -max_curvature_rate,
                                      max_curvature_rate)
   safe_desired_curvature = clip(desired_curvature,
-                                current_curvature - max_curvature_rate * DT_MDL,
-                                current_curvature + max_curvature_rate * DT_MDL)
+                                current_curvature - max_curvature_rate,
+                                current_curvature + max_curvature_rate)
   return safe_desired_curvature, safe_desired_curvature_rate
