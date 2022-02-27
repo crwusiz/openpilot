@@ -160,7 +160,7 @@ protected:
   // neokii add
   QPixmap turnsignal_l_img;
   QPixmap turnsignal_r_img;
-  QPixmap tire_pressure_img;
+  QPixmap tpms_img;
 
   void drawHud(QPainter &p);
   void drawSpeedLimit(QPainter &p);

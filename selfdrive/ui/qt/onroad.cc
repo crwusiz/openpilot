@@ -527,7 +527,7 @@ void OnroadHud::drawRightDevUi(QPainter &p, int x, int y) {
       }
       snprintf(val_str, sizeof(val_str), "%d", (int)lead_d_rel);
     } else {
-      snprintf(val_str, sizeof(val_str), "-");
+      snprintf(val_str, sizeof(val_str), "─");
     }
     snprintf(units_str, sizeof(units_str), "m");
 
@@ -557,7 +557,7 @@ void OnroadHud::drawRightDevUi(QPainter &p, int x, int y) {
          snprintf(val_str, sizeof(val_str), "%d", (int)(lead_v_rel * 3.6)); //kph
        }
      } else {
-       snprintf(val_str, sizeof(val_str), "-");
+       snprintf(val_str, sizeof(val_str), "─");
      }
 
     //rh += devUiDrawElement(p, x, ry, val_str, "REL SPEED", speedUnit.toStdString().c_str(), valueColor);
@@ -630,7 +630,7 @@ void NvgWindow::initializeGL() {
   // neokii
   turnsignal_l_img = QPixmap("../assets/img_turnsignal_l.png").scaled(120, 120, Qt::KeepAspectRatio, Qt::SmoothTransformation);
   turnsignal_r_img = QPixmap("../assets/img_turnsignal_r.png").scaled(120, 120, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  tire_pressure_img = QPixmap("../assets/img_tire_pressure.png");
+  tpms_img = QPixmap("../assets/img_tpms.png");
 }
 
 void NvgWindow::updateFrameMat(int w, int h) {
@@ -804,18 +804,18 @@ void NvgWindow::drawHud(QPainter &p) {
 }
 
 
-// tire pressure (right bottom)
+// tpms (right bottom)
 static const QColor get_tpms_color(float tpms) {
     if (tpms < 5 || tpms > 60)
-        return QColor(255, 255, 255, 200); // white color
+        return QColor(0, 0, 0, 200); // black color
     if (tpms < 31)
         return QColor(255, 0, 0, 200); // red color
-    return QColor(255, 255, 255, 200);
+    return QColor(0, 0, 0, 200);
 }
 
 static const QString get_tpms_text(float tpms) {
     if (tpms < 5 || tpms > 60)
-        return "";
+        return "─";
     char str[32];
     snprintf(str, sizeof(str), "%.0f", round(tpms));
     return QString(str);
@@ -825,33 +825,28 @@ void NvgWindow::drawTpms(QPainter &p) {
   const SubMaster &sm = *(uiState()->sm);
   auto ce = sm["carState"].getCarState();
 
-  const int w = 66;
-  const int h = 146;
-  const int x = rect().right() - h - (bdr_s * 2);
-  const int y = height() - h - 80;
+  const int w = 200;
+  const int h = 260;
+  const int x = rect().right() - w - (bdr_s * 2);
+  const int y = height() - h - (bdr_s * 2);
 
-  auto tpms = ce.getTpms();
-  const float fl = tpms.getFl();
-  const float fr = tpms.getFr();
-  const float rl = tpms.getRl();
-  const float rr = tpms.getRr();
+  const float fl = ce.getTpms().getFl();
+  const float fr = ce.getTpms().getFr();
+  const float rl = ce.getTpms().getRl();
+  const float rr = ce.getTpms().getRr();
 
-  p.setOpacity(1.0);
-  p.drawPixmap(x, y, w, h, tire_pressure_img);
+  p.setOpacity(0.8);
+  p.drawPixmap(x, y, w, h, tpms_img);
 
-  configFont(p, "Open Sans", 38, "Bold");
+  configFont(p, "Open Sans", 35, "Bold");
   QFontMetrics fm(p.font());
   QRect rcFont = fm.boundingRect("9");
 
-  int center_x = x + 3;
-  int center_y = y + h/2;
-  const int marginX = (int)(rcFont.width() * 2.7f);
-  const int marginY = (int)((h/2 - rcFont.height()) * 0.7f);
-
-  drawTextFlag(p, center_x-marginX, center_y-marginY-rcFont.height(), Qt::AlignRight, get_tpms_text(fl), get_tpms_color(fl));
-  drawTextFlag(p, center_x+marginX+8, center_y-marginY-rcFont.height(), Qt::AlignLeft, get_tpms_text(fr), get_tpms_color(fr));
-  drawTextFlag(p, center_x-marginX, center_y+marginY, Qt::AlignRight, get_tpms_text(rl), get_tpms_color(rl));
-  drawTextFlag(p, center_x+marginX+8, center_y+marginY, Qt::AlignLeft, get_tpms_text(rr), get_tpms_color(rr));
+  drawTextFlag(p, x + 13, y + 38, Qt::AlignCenter, get_tpms_text(fl), get_tpms_color(fl));
+  drawTextFlag(p, x + 147, y + 38, Qt::AlignCenter, get_tpms_text(fr), get_tpms_color(fr));
+  drawTextFlag(p, x + 13, y + 181, Qt::AlignCenter, get_tpms_text(rl), get_tpms_color(rl));
+  drawTextFlag(p, x + 147, y + 181, Qt::AlignCenter, get_tpms_text(rr), get_tpms_color(rr));
+  p.setOpacity(1.0);
 }
 
 // speedlimit (upper left 2)
@@ -947,7 +942,7 @@ void NvgWindow::drawTurnSignals(QPainter &p) {
 
         p.setOpacity(alpha);
         float factor = (float)draw_count / (i + draw_count);
-        p.drawPixmap(x - w - margin, y + (h-h*factor)/2, w*factor, h*factor, turnsignal_l_img);
+        p.drawPixmap(x - w - margin, y + (h-h*factor) / 2, w*factor, h*factor, turnsignal_l_img);
         x -= gap + w;
       }
     }
@@ -962,20 +957,20 @@ void NvgWindow::drawTurnSignals(QPainter &p) {
 
         float factor = (float)draw_count / (i + draw_count);
         p.setOpacity(alpha);
-        p.drawPixmap(x + margin, y + (h-h*factor)/2, w*factor, h*factor, turnsignal_r_img);
+        p.drawPixmap(x + margin, y + (h-h*factor) / 2, w*factor, h*factor, turnsignal_r_img);
         x += gap + w;
       }
     }
 
     if (left_on || right_on) {
       double now = millis_since_boot();
-      if (now - prev_ts > 900/UI_FREQ) {
+      if (now - prev_ts > 900 / UI_FREQ) {
         prev_ts = now;
         blink_index++;
       }
       if (blink_index >= draw_count) {
         blink_index = draw_count - 1;
-        blink_wait = UI_FREQ/4;
+        blink_wait = UI_FREQ / 4;
       }
     } else {
       blink_index = 0;
