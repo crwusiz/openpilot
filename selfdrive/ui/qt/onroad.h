@@ -23,6 +23,8 @@ class OnroadHud : public QWidget {
   Q_PROPERTY(bool bsd_r_status MEMBER bsd_r_status NOTIFY valueChanged);
   Q_PROPERTY(bool gps_status MEMBER gps_status NOTIFY valueChanged);
   Q_PROPERTY(bool longControl MEMBER longControl NOTIFY valueChanged);
+  Q_PROPERTY(bool left_on MEMBER left_on NOTIFY valueChanged);
+  Q_PROPERTY(bool right_on MEMBER right_on NOTIFY valueChanged);
 
   Q_PROPERTY(int status MEMBER status NOTIFY valueChanged);
   Q_PROPERTY(int lead_status MEMBER lead_status NOTIFY valueChanged);
@@ -35,7 +37,11 @@ class OnroadHud : public QWidget {
   Q_PROPERTY(int lateralcontrol_status MEMBER lateralcontrol_status NOTIFY valueChanged);
   Q_PROPERTY(int mdpsBus MEMBER mdpsBus NOTIFY valueChanged);
   Q_PROPERTY(int sccBus MEMBER sccBus NOTIFY valueChanged);
-
+  Q_PROPERTY(int camLimitSpeed MEMBER camLimitSpeed NOTIFY valueChanged);
+  Q_PROPERTY(int camLimitSpeedLeftDist MEMBER camLimitSpeedLeftDist NOTIFY valueChanged);
+  Q_PROPERTY(int sectionLimitSpeed MEMBER sectionLimitSpeed NOTIFY valueChanged);
+  Q_PROPERTY(int sectionLeftDist MEMBER sectionLeftDist NOTIFY valueChanged);
+  
   Q_PROPERTY(float lead_d_rel MEMBER lead_d_rel NOTIFY valueChanged);
   Q_PROPERTY(float lead_v_rel MEMBER lead_v_rel NOTIFY valueChanged);
   Q_PROPERTY(float gpsBearing MEMBER gpsBearing NOTIFY valueChanged);
@@ -45,7 +51,11 @@ class OnroadHud : public QWidget {
   Q_PROPERTY(float angleSteers MEMBER angleSteers NOTIFY valueChanged);
   Q_PROPERTY(float steerAngleDesired MEMBER steerAngleDesired NOTIFY valueChanged);
   Q_PROPERTY(float steerRatio MEMBER steerRatio NOTIFY valueChanged);
-
+  Q_PROPERTY(float fl MEMBER fl NOTIFY valueChanged);
+  Q_PROPERTY(float fr MEMBER fr NOTIFY valueChanged);
+  Q_PROPERTY(float rl MEMBER rl NOTIFY valueChanged);
+  Q_PROPERTY(float rr MEMBER rr NOTIFY valueChanged);
+  
 public:
   explicit OnroadHud(QWidget *parent);
   void updateState(const UIState &s);
@@ -55,6 +65,7 @@ private:
   void drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity, float angle);
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
   void drawTextColor(QPainter &p, int x, int y, const QString &text, QColor &color);
+  void drawTpms(QPainter &p, int x, int y, const QString &text, const QColor &color);
   void paintEvent(QPaintEvent *event) override;
   void drawRightDevUi(QPainter &p, int x, int y);
   int devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, QColor &color);
@@ -75,6 +86,9 @@ private:
   QPixmap autohold_active_img;
   QPixmap nda_img;
   QPixmap hda_img;
+  QPixmap tpms_img;
+  QPixmap turnsignal_l_img;
+  QPixmap turnsignal_r_img;
 
   const int radius = 160;
   const int img_size = (radius / 2) * 1.5;
@@ -93,6 +107,8 @@ private:
   bool bsd_r_status = false;
   bool gps_status = false;
   bool longControl = false;
+  bool left_on = false;
+  bool right_on = false;
 
   int status = STATUS_DISENGAGED;
   int lead_status;
@@ -105,6 +121,11 @@ private:
   int lateralcontrol_status = 0;
   int mdpsBus = 0;
   int sccBus = 0;
+  int camLimitSpeed = 0;
+  int camLimitSpeedLeftDist = 0;
+  int sectionLimitSpeed = 0;
+  int sectionLeftDist = 0;
+  int x,y,w,h = 0;
 
   float lead_d_rel = 0;
   float lead_v_rel = 0;
@@ -115,11 +136,11 @@ private:
   float angleSteers = 0;
   float steerAngleDesired = 0;
   float steerRatio = 0;
+  float fl,fr,rl,rr = 0;
 
 signals:
   void valueChanged();
 };
-
 
 class OnroadAlerts : public QWidget {
   Q_OBJECT
@@ -135,7 +156,6 @@ private:
   QColor bg;
   Alert alert = {};
 };
-
 
 // container window for the NVG UI
 class NvgWindow : public CameraViewWidget {
@@ -153,19 +173,6 @@ protected:
   void drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd, bool is_radar);
   inline QColor redColor(int alpha = 255) { return QColor(201, 34, 49, alpha); }
   double prev_draw_t = 0;
-
-  void drawTextFlag(QPainter &p, int x, int y, int flags, const QString &text, const QColor &color);
-  void paintEvent(QPaintEvent *event) override;
-
-  // neokii add
-  QPixmap turnsignal_l_img;
-  QPixmap turnsignal_r_img;
-  QPixmap tpms_img;
-
-  void drawHud(QPainter &p);
-  void drawSpeedLimit(QPainter &p);
-  void drawTpms(QPainter &p);
-  void drawTurnSignals(QPainter &p);
 };
 
 // container for all onroad widgets
