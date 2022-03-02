@@ -243,10 +243,10 @@ class RoadSpeedLimiter:
           MIN_LIMIT = 40
           MAX_LIMIT = 120
         else:
-          MIN_LIMIT = 30
+          MIN_LIMIT = 20
           MAX_LIMIT = 100
       else:
-        MIN_LIMIT = 30
+        MIN_LIMIT = 20
         MAX_LIMIT = 120
 
       if cam_type == 22:  # speed bump

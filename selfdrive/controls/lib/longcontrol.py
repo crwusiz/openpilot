@@ -12,14 +12,15 @@ ACCEL_MIN_ISO = -3.5  # m/s^2
 ACCEL_MAX_ISO = 2.0  # m/s^2
 
 
-def long_control_state_trans(CP, active, long_control_state, v_ego, v_target_future, v_pid,
-                             brake_pressed, cruise_standstill, radarState):
+def long_control_state_trans(CP, active, long_control_state, v_ego, v_target,
+                             v_target_future, brake_pressed, cruise_standstill, radarState):
   """Update longitudinal control state machine"""
+  accelerating = v_target_future > v_target
   stopping_condition = (v_ego < 2.0 and cruise_standstill) or \
                        (v_ego < CP.vEgoStopping and
-                        ((v_pid < CP.vEgoStopping and v_target_future < CP.vEgoStopping) or brake_pressed))
+                        ((v_target_future < CP.vEgoStopping and not accelerating) or brake_pressed))
 
-  starting_condition = v_target_future > CP.vEgoStarting and not cruise_standstill
+  starting_condition = v_target_future > CP.vEgoStarting and accelerating and not cruise_standstill
 
   # neokii
   if radarState is not None and radarState.leadOne is not None and radarState.leadOne.status:
@@ -90,7 +91,7 @@ class LongControl():
     # Update state machine
     output_accel = self.last_output_accel
     self.long_control_state = long_control_state_trans(CP, active, self.long_control_state, CS.vEgo,
-                                                       v_target_future, self.v_pid, CS.brakePressed,
+                                                       v_target, v_target_future, CS.brakePressed,
                                                        CS.cruiseState.standstill, radarState)
 
     if self.long_control_state == LongCtrlState.off or CS.gasPressed:
@@ -117,7 +118,7 @@ class LongControl():
       # Keep applying brakes until the car is stopped
       if not CS.standstill or output_accel > CP.stopAccel:
         output_accel -= CP.stoppingDecelRate * DT_CTRL * \
-                        interp(output_accel, [CP.stopAccel, CP.stopAccel/2., CP.stopAccel/4., 0.], [0.3, 0.65, 1., 5.])
+                        interp(output_accel, [CP.stopAccel, CP.stopAccel/2., CP.stopAccel/4., 0.], [0.3, 0.65, 1., 3.])
       output_accel = clip(output_accel, accel_limits[0], accel_limits[1])
       self.reset(CS.vEgo)
 
