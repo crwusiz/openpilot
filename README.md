@@ -13,17 +13,16 @@ crwusiz openpilot
 [![](https://i.imgur.com/TMtVMV8.png)](#)
 - kor NanumGothic font
 - event message, qt ui kor translate
-- steeringwheel rotate 
-- blinker display
-- brake, bsd, gps icon
-- autohold, tpms display
-- sidebar wifi ipaddress 
-- lateralcontrolselect ( PID / INDI / LQR )
-- mfcselect ( LKAS / LDWS / LFA )
-- longcontrolselect ( MAD / MAD+LONG )
+- brake, bsd, gps, wifi icon
+- wheel, N direction icon rotate
+- lateralcontrol select ( PID / INDI / LQR )
+- mfc select ( LKAS / LDWS / LFA )
+- aebsignal select ( SCC12 / FCA11 )
+- longcontrol select ( MAD / MAD+LONG )
 - add toggle / function / simple ui
 - LongitudinalControl full support
 - comma three support
+- autohold, turnsignal, tpms, limitspeed display (neokii) 
 
 ----------- ↓ eon ( lepro x720 or comma two ) ----------- 
 - Comma Bootlogo / Bootanimation Auto install
@@ -47,9 +46,9 @@ crwusiz openpilot
 
 cable order -> https://smartstore.naver.com/hyotrade/products/5341431170
 
-[![](https://i.imgur.com/sRcmaeS.png)](#)
-[![](https://i.imgur.com/arZrs6d.png)](#)
-[![](https://i.imgur.com/uqJlVrC.jpg)](#)
+[![](https://user-images.githubusercontent.com/43285072/156672295-3443cbcb-e912-43d1-b764-0a5c470c85e4.png)](#)
+[![](https://user-images.githubusercontent.com/43285072/156672302-9cbf008a-bb85-48d9-8cce-fdde9035245a.png)](#)
+[![](https://user-images.githubusercontent.com/43285072/156672693-8802d6ec-aae4-4111-a01a-041dbb5109f2.jpg)](#)
 
 ## chevrolet bolt branch
 - https://github.com/JasonJShuler/openpilot
