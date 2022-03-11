@@ -27,32 +27,17 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, lkas11
   elif car_fingerprint in [CAR.K5, CAR.K5_HEV, CAR.K7, CAR.K7_HEV]:
     values["CF_Lkas_LdwsActivemode"] = 0
 
-  if Params().get("MfcSelect", encoding='utf8') == "1":
-    # This field is LDWS Mfc car ( qt ui toggle set )
+  if Params().get("MfcSelect", encoding='utf8') == "1": # This field is LDWS Mfc car ( qt ui toggle set )
     values["CF_Lkas_LdwsActivemode"] = 0
     values["CF_Lkas_LdwsOpt_USM"] = 3
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
     # values["CF_Lkas_SysWarning"] = 4 if sys_warning else 0
 
-  if Params().get("MfcSelect", encoding='utf8') == "2":
-    # This field is LFA Mfc car ( qt ui toggle set )
+  if Params().get("MfcSelect", encoding='utf8') == "2": # This field is LFA Mfc car ( qt ui toggle set )
     values["CF_Lkas_LdwsActivemode"] = int(left_lane) + (int(right_lane) << 1)
     values["CF_Lkas_LdwsOpt_USM"] = 2
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
     values["CF_Lkas_SysWarning"] = 4 if sys_warning else 0
-
-    # ---------------------------------------------------------------------------------------
-    # FcwOpt_USM 0 = No car + lanes
-    #            1 = White car + lanes
-    #            2 = Green car + lanes
-    #            3 = Green blinking car + lanes
-    #            4 = Orange car + lanes
-    #            5 = Orange blinking car + lanes
-    # SysWarning 4 = keep hands on wheel
-    #            5 = keep hands on wheel (red)
-    #            6 = keep hands on wheel (red) + beep
-    # Note: the warning is hidden while the blinkers are on
-    # ---------------------------------------------------------------------------------------
 
   dat = packer.make_can_msg("LKAS11", 0, values)[2]
 
@@ -72,38 +57,20 @@ def create_clu11(packer, bus, clu11, button, speed):
   values["CF_Clu_CruiseSwState"] = button
   values["CF_Clu_Vanz"] = speed
   values["CF_Clu_AliveCnt1"] = (values["CF_Clu_AliveCnt1"] + 1) % 0x10
+
   return packer.make_can_msg("CLU11", bus, values)
 
 
 def create_lfahda_mfc(packer, enabled, active):
   values = {
     "LFA_Icon_State": 2 if enabled else 0,
-    "HDA_Active": 1 if active > 0 else 0,
+    "HDA_Active": 0,
     "HDA_Icon_State": 2 if active > 0 else 0,
-    # "HDA_VSetReq": 0,
-
-    # ---------------------------------------------------------------------------------------
-    # LFA_Icon_State 0 = no_wheel
-    #                1 = white_wheel
-    #                2 = green_wheel
-    #                3 = green_wheel_blink
-    # LFA_SysWarning 0 = no_message
-    #                1 = switching_to_hda
-    #                2 = switching_to_scc
-    #                3 = lfa_error
-    #                4 = check_hda
-    #                5 = keep_hands_on_wheel_orange
-    #                6 = keep_hands_on_wheel_red
-    # HDA_Icon_State 0 = no_hda
-    #                1 = white_hda
-    #                2 = green_hda
-    # HDA_SysWarning 0 = no_message
-    #                1 = driving_convenience_systems_cancelled
-    #                2 = highway_drive_assist_system_cancelled
-    # ---------------------------------------------------------------------------------------
+    "HDA_VSetReq": 0,
   }
 
   return packer.make_can_msg("LFAHDA_MFC", 0, values)
+
 
 def create_hda_mfc(packer, active, CS, left_lane, right_lane):
   values = copy.copy(CS.lfahda_mfc)
@@ -116,7 +83,7 @@ def create_hda_mfc(packer, active, CS, left_lane, right_lane):
 
   values["HDA_LdwSysState"] = ldwSysState
   values["HDA_USM"] = 2
-  values["HDA_VSetReq"] = 100
+  values["HDA_VSetReq"] = 0
   values["HDA_Icon_Wheel"] = 1 if active > 1 and CS.out.cruiseState.enabledAcc else 0
   values["HDA_Icon_State"] = 2 if active > 1 else 0
   values["HDA_Chime"] = 1 if active > 1 else 0
@@ -137,7 +104,8 @@ def create_mdps12(packer, frame, mdps12):
 
   return packer.make_can_msg("MDPS12", 2, values)
 
-def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc11, active_cam):
+
+def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc11):
   values = copy.copy(scc11)
   values["AliveCounterACC"] = frame // 2 % 0x10
 
@@ -146,7 +114,7 @@ def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc1
     values["VSetDis"] = set_speed
     values["ObjValid"] = 1 if enabled else 0
     values["DriverAlertDisplay"] = 0
-    # values["ACC_ObjStatus"] = lead_visible
+    values["ACC_ObjStatus"] = 1 if lead_visible else 0
 
   return packer.make_can_msg("SCC11", 0, values)
 
@@ -293,3 +261,34 @@ def create_frt_radar_opt(packer):
     "CF_FCA_Equip_Front_Radar": 1,
   }
   return packer.make_can_msg("FRT_RADAR11", 0, frt_radar11_values)
+
+# ---------------------------------------------------------------------------------------
+# FcwOpt_USM 0 = No car + lanes
+#            1 = White car + lanes
+#            2 = Green car + lanes
+#            3 = Green blinking car + lanes
+#            4 = Orange car + lanes
+#            5 = Orange blinking car + lanes
+# SysWarning 4 = keep hands on wheel
+#            5 = keep hands on wheel (red)
+#            6 = keep hands on wheel (red) + beep
+# Note: the warning is hidden while the blinkers are on
+# ---------------------------------------------------------------------------------------
+# LFA_Icon_State 0 = no_wheel
+#                1 = white_wheel
+#                2 = green_wheel
+#                3 = green_wheel_blink
+# LFA_SysWarning 0 = no_message
+#                1 = switching_to_hda
+#                2 = switching_to_scc
+#                3 = lfa_error
+#                4 = check_hda
+#                5 = keep_hands_on_wheel_orange
+#                6 = keep_hands_on_wheel_red
+# HDA_Icon_State 0 = no_hda
+#                1 = white_hda
+#                2 = green_hda
+# HDA_SysWarning 0 = no_message
+#                1 = driving_convenience_systems_cancelled
+#                2 = highway_drive_assist_system_cancelled
+# ---------------------------------------------------------------------------------------

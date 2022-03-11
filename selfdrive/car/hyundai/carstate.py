@@ -615,4 +615,3 @@ class CarState(CarStateBase):
         checks += [("LFAHDA_MFC", 20)]
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 2, enforce_checks=False)
-

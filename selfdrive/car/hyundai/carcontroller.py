@@ -8,7 +8,7 @@ from selfdrive.config import Conversions as CV
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, create_scc11, create_scc12, create_scc13, create_scc14, \
                                              create_mdps12, create_lfahda_mfc, create_hda_mfc
-from selfdrive.car.hyundai.values import Buttons, FEATURES, CarControllerParams
+from selfdrive.car.hyundai.values import Buttons, CarControllerParams
 from opendbc.can.packer import CANPacker
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
 from selfdrive.road_speed_limiter import road_speed_limiter_get_active
@@ -18,7 +18,7 @@ LongCtrlState = car.CarControl.Actuators.LongControlState
 
 min_set_speed = 30 * CV.KPH_TO_MS
 
-def process_hud_alert(enabled, fingerprint, visual_alert, left_lane, right_lane, left_lane_depart, right_lane_depart):
+def process_hud_alert(enabled, visual_alert, left_lane, right_lane, left_lane_depart, right_lane_depart):
 
   sys_warning = (visual_alert in (VisualAlert.steerRequired, VisualAlert.ldw))
 
@@ -92,7 +92,7 @@ class CarController():
     self.apply_steer_last = apply_steer
 
     sys_warning, sys_state, left_lane_warning, right_lane_warning = \
-      process_hud_alert(enabled, self.car_fingerprint, visual_alert, left_lane, right_lane, left_lane_depart, right_lane_depart)
+      process_hud_alert(enabled, visual_alert, left_lane, right_lane, left_lane_depart, right_lane_depart)
 
     if self.haptic_feedback_speed_camera:
       if self.prev_active_cam != self.scc_smoother.active_cam:
@@ -148,10 +148,8 @@ class CarController():
     if frame % 2 and CS.mdps_bus: # send clu11 to mdps if it is not on bus 0
       can_sends.append(create_clu11(self.packer, CS.mdps_bus, CS.clu11, Buttons.NONE, enabled_speed))
 
-    if pcm_cancel_cmd and (self.longcontrol and not self.mad_mode_enabled):
+    if pcm_cancel_cmd and self.longcontrol:
       can_sends.append(create_clu11(self.packer, CS.scc_bus, CS.clu11, Buttons.CANCEL, clu11_speed))
-    else:
-      can_sends.append(create_mdps12(self.packer, frame, CS.mdps12))
 
     # fix auto resume - by neokii
     if CS.out.cruiseState.standstill and not CS.out.gasPressed:
@@ -179,6 +177,9 @@ class CarController():
     # reset lead distnce after the car starts moving
     elif self.last_lead_distance != 0:
       self.last_lead_distance = 0
+
+    if CS.mdps_bus:  # send mdps12 to LKAS to prevent LKAS error
+      can_sends.append(create_mdps12(self.packer, frame, CS.mdps12))
 
     # scc smoother
     self.scc_smoother.update(enabled, can_sends, self.packer, CC, CS, frame, controls)

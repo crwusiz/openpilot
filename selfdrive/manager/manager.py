@@ -162,6 +162,7 @@ def manager_thread() -> None:
       not_run.append("tombstoned")
       not_run.append("uploader")
       not_run.append("updated")
+      not_run.append("statsd")
 
     if params.get_bool("NavDisable"):
       not_run.append("navd")
