@@ -65,7 +65,6 @@ private:
   void drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity, float angle);
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
   void drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color);
-  void drawTpms(QPainter &p, int x, int y, const QString &text, const QColor &color);
   void paintEvent(QPaintEvent *event) override;
   void drawRightDevUi(QPainter &p, int x, int y);
   int devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, const QColor &color);

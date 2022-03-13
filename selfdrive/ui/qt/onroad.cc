@@ -195,10 +195,10 @@ OnroadHud::OnroadHud(QWidget *parent) : QWidget(parent) {
 
 static const QColor get_tpms_color(float tpms) {
     if (tpms < 5 || tpms > 60)
-        return QColor(0, 0, 0, 200); // black color
+        return QColor(0, 0, 0, 255); // black color
     if (tpms < 31)
-        return QColor(255, 0, 0, 200); // red color
-    return QColor(0, 0, 0, 200);
+        return QColor(255, 0, 0, 255); // red color
+    return QColor(0, 0, 0, 255);
 }
 
 static const QString get_tpms_text(float tpms) {
@@ -286,7 +286,7 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   bg.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0));
   p.fillRect(0, 0, width(), header_h, bg);
 
-  // maxspeed
+  // maxspeed (upper left 1)
   QRect rc(30, 30, 184, 202);
   p.setPen(QPen(QColor(0xff, 0xff, 0xff, 100), 10));
   p.setBrush(QColor(0, 0, 0, 100));
@@ -310,7 +310,7 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
     drawTextColor(p, rc.center().x(), 195, "──", whiteColor());
   }
 
-  // current speed
+  // current speed (upper center)
   configFont(p, "Open Sans", 176, "Bold");
   drawTextColor(p, rect().center().x(), 230, speed, whiteColor());
   configFont(p, "Open Sans", 66, "Regular");
@@ -358,19 +358,19 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
     p.drawPixmap(x, y, w, h, nda_status == 1 ? nda_img : hda_img);
   }
 
-  // Dev UI (Right Side)
+  // Dev UI (right Side)
   x = rect().right() - radius - bdr_s * 5;
   y = bdr_s * 4 + rc.height();
   drawRightDevUi(p, x, y);
   p.setOpacity(1.0);
 
-  // dm icon (bottom 1 left)
+  // dm icon (bottom 1eft 1)
   x = radius / 2 + (bdr_s * 2);
   y = rect().bottom() - footer_h / 2;
   drawIcon(p, x, y, dm_img, blackColor(70), dmActive ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
-  // cruise gap (bottom 1 right)
+  // cruise gap (bottom right 1)
   QString str;
 
   if (gap <= 0) {
@@ -394,25 +394,25 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   drawTextColor(p, x, y + 40, str, limeColor(200));
   p.setOpacity(1.0);
 
-  // brake icon (bottom 2 left)
+  // brake icon (bottom left 2)
   x = radius / 2 + (bdr_s * 2);
   y = rect().bottom() - (footer_h / 2) - (radius) - 10;
   drawIcon(p, x, y, brake_img, blackColor(70), brake_status ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
-  // autohold icon (bottom 2 right)
+  // autohold icon (bottom right 2)
   x = radius / 2 + (bdr_s * 2) + (radius);
   y = rect().bottom() - (footer_h / 2) - (radius) - 10;
   drawIcon(p, x, y, autohold_status > 1 ? autohold_warning_img : autohold_active_img, blackColor(70), autohold_status ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
-  // bsd_l icon (bottom 3 left)
+  // bsd_l icon (bottom left 3)
   x = radius / 2 + (bdr_s * 2);
   y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
   drawIcon(p, x, y, bsd_l_img, blackColor(70), bsd_l_status ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
-  // bsd_r icon (bottom 3 right)
+  // bsd_r icon (bottom right 3)
   x = radius / 2 + (bdr_s * 2) + (radius);
   y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
   drawIcon(p, x, y, bsd_r_img, blackColor(70), bsd_r_status ? 1.0 : 0.2);
@@ -430,7 +430,7 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   y = rect().height() - 15;
 
   configFont(p, "Open Sans", 30, "Regular");
-  drawText(p, x, y, infoText, 200);
+  drawTextColor(p, x, y, infoText, whiteColor(200));
   p.setOpacity(1.0);
 
   // upper gps info
@@ -451,10 +451,10 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   y = bdr_s * 3;
 
   configFont(p, "Open Sans", 30, "Regular");
-  drawText(p, x, y, infoGps, 200);
+  drawTextColor(p, x, y, infoGps, whiteColor(200));
   p.setOpacity(1.0);
 
-  // tpms (right bottom)
+  // tpms (bottom right)
   w = 200;
   h = 260;
   x = rect().right() - w - (bdr_s * 2);
@@ -464,10 +464,10 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   p.drawPixmap(x, y, w, h, tpms_img);
 
   configFont(p, "Open Sans", 35, "Bold");
-  drawTpms(p, x + 32, y + 70, get_tpms_text(fl), get_tpms_color(fl));
-  drawTpms(p, x + 167, y + 70, get_tpms_text(fr), get_tpms_color(fr));
-  drawTpms(p, x + 32, y + 214, get_tpms_text(rl), get_tpms_color(rl));
-  drawTpms(p, x + 167, y + 214, get_tpms_text(rr), get_tpms_color(rr));
+  drawTextColor(p, x + 32, y + 70, get_tpms_text(fl), get_tpms_color(fl));
+  drawTextColor(p, x + 167, y + 70, get_tpms_text(fr), get_tpms_color(fr));
+  drawTextColor(p, x + 32, y + 214, get_tpms_text(rl), get_tpms_color(rl));
+  drawTextColor(p, x + 167, y + 214, get_tpms_text(rr), get_tpms_color(rr));
   p.setOpacity(1.0);
 
   // speedlimit (upper left 2)
@@ -484,13 +484,12 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   }
 
   if (limit_speed > 10 && limit_speed < 130) {
-    int radius = 200;
-    int x = radius * 1.5 + (bdr_s * 2);
-    int y = 30;
+    x = radius * 1.5 + (bdr_s * 2);
+    y = 30;
 
     p.setPen(Qt::NoPen);
     p.setBrush(QBrush(redColor()));
-    QRect rect = QRect(x, y, radius, radius);
+    QRect rect = QRect(x, y, 200, 200);
     p.drawEllipse(rect);
     p.setBrush(QBrush(whiteColor()));
 
@@ -512,7 +511,7 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
 
     if (str_left_dist.length() > 0) {
       configFont(p, "Open Sans", 60, "Bold");
-      rect.translate(0, radius / 2 + 45);
+      rect.translate(0, 145);
       rect.adjust(-30, 0, 30, 0);
       p.setPen(whiteColor(230));
       p.drawText(rect, Qt::AlignCenter, str_left_dist);
@@ -539,8 +538,8 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
     const int base_y = (height() - h) / 2;
     const int draw_count = 8;
 
-    int x = center_x;
-    int y = base_y;
+    x = center_x;
+    y = base_y;
 
     if (left_on) {
       for (int i = 0; i < draw_count; i++) {
@@ -564,8 +563,8 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
         if (d > 0)
           alpha /= d * 2;
 
-        float factor = (float)draw_count / (i + draw_count);
         p.setOpacity(alpha);
+        float factor = (float)draw_count / (i + draw_count);
         p.drawPixmap(x + margin, y + (h - h * factor) / 2, w * factor, h * factor, turnsignal_r_img);
         x += gap + w;
       }
@@ -611,14 +610,12 @@ void OnroadHud::drawRightDevUi(QPainter &p, int x, int y) {
 
   QColor valueColor = whiteColor();
 
-  // Add Real Steering Angle
-  // Unit: Degrees
+  // Add Real Steering Angle, Unit: Degrees
   if (true) {
     char val_str[8];
     valueColor = limeColor();
 
-    // Red if large steering angle
-    // Orange if moderate steering angle
+    // Red if large steering angle, Orange if moderate steering angle
     if (std::fabs(angleSteers) > 90) {
       valueColor = redColor();
     } else if (std::fabs(angleSteers) > 30) {
@@ -631,14 +628,12 @@ void OnroadHud::drawRightDevUi(QPainter &p, int x, int y) {
     ry = y + rh;
   }
 
-  // Add Desired Steering Angle
-  // Unit: Degrees
+  // Add Desired Steering Angle, Unit: Degrees
   if (engageable) {
     char val_str[8];
     valueColor = limeColor();
 
-    // Red if large steering angle
-    // Orange if moderate steering angle
+    // Red if large steering angle, Orange if moderate steering angle
     if (std::fabs(angleSteers) > 90) {
       valueColor = redColor();
     } else if (std::fabs(angleSteers) > 30) {
@@ -651,15 +646,14 @@ void OnroadHud::drawRightDevUi(QPainter &p, int x, int y) {
     ry = y + rh;
   }
 
-  // Add Relative Distance to Primary Lead Car
-  // Unit: Meters
+  // Add Relative Distance to Primary Lead Car, Unit: Meters
   if (engageable) {
     char val_str[8];
     char units_str[8];
     valueColor = whiteColor();
 
     if (lead_status) {
-      // Orange if close, Red if very close
+      // Red if very close, Orange if close
       if (lead_d_rel < 5) {
         valueColor = redColor();
       } else if (lead_d_rel < 15) {
@@ -676,15 +670,13 @@ void OnroadHud::drawRightDevUi(QPainter &p, int x, int y) {
     ry = y + rh;
   }
 
-  // Add Relative Velocity vs Primary Lead Car
-  // Unit: kph if metric, else mph
+  // Add Relative Velocity vs Primary Lead Car, Unit: kph if metric, else mph
   if (engageable) {
     char val_str[8];
     valueColor = whiteColor();
 
      if (lead_status) {
-       // Red if approaching faster than 10mph
-       // Orange if approaching (negative)
+       // Red if approaching faster than 10mph, Orange if approaching (negative)
        if (lead_v_rel < -4.4704) {
          valueColor = redColor();
        } else if (lead_v_rel < 0) {
@@ -744,15 +736,6 @@ void OnroadHud::drawText(QPainter &p, int x, int y, const QString &text, int alp
 }
 
 void OnroadHud::drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color) {
-  QFontMetrics fm(p.font());
-  QRect init_rect = fm.boundingRect(text);
-  QRect real_rect = fm.boundingRect(init_rect, 0, text);
-  real_rect.moveCenter({x, y - real_rect.height() / 2});
-  p.setPen(color);
-  p.drawText(real_rect.x(), real_rect.bottom(), text);
-}
-
-void OnroadHud::drawTpms(QPainter &p, int x, int y, const QString &text, const QColor &color) {
   QFontMetrics fm(p.font());
   QRect init_rect = fm.boundingRect(text);
   QRect real_rect = fm.boundingRect(init_rect, 0, text);
