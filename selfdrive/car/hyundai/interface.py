@@ -2,7 +2,7 @@
 from cereal import car
 from common.params import Params
 from common.numpy_fast import interp
-from selfdrive.config import Conversions as CV
+from common.conversions import Conversions as CV
 from selfdrive.car.hyundai.values import CAR, Buttons, CarControllerParams
 from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
@@ -391,8 +391,6 @@ class CarInterface(CarInterfaceBase):
       events.add(EventName.belowSteerSpeed)
     if self.CC.turning_indicator_alert:
       events.add(EventName.turningIndicatorOn)
-    if self.mad_mode_enabled and EventName.pedalPressed in events.events:
-      events.events.remove(EventName.pedalPressed)
 
   # handle button presses
     for b in ret.buttonEvents:
@@ -423,7 +421,7 @@ class CarInterface(CarInterfaceBase):
 
   def apply(self, c, controls):
     hud_control = c.hudControl
-    ret = self.CC.update(c, c.enabled, self.CS, self.frame, c, c.actuators, c.cruiseControl.cancel, hud_control.visualAlert,
+    ret = self.CC.update(c, self.CS, self.frame, c.actuators, c.cruiseControl.cancel, hud_control.visualAlert,
                          hud_control.leftLaneVisible, hud_control.rightLaneVisible, hud_control.leftLaneDepart, hud_control.rightLaneDepart,
                          hud_control.setSpeed, hud_control.leadVisible, controls)
     self.frame += 1

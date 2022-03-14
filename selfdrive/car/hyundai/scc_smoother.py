@@ -4,7 +4,7 @@ import numpy as np
 from common.numpy_fast import clip, interp
 from cereal import car
 from common.realtime import DT_CTRL
-from selfdrive.config import Conversions as CV
+from common.conversions import Conversions as CV
 from selfdrive.car.hyundai.values import Buttons
 from common.params import Params
 from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, V_CRUISE_MIN, V_CRUISE_DELTA_KM, V_CRUISE_DELTA_MI

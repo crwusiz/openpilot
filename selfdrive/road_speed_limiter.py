@@ -10,7 +10,7 @@ from threading import Thread
 from cereal import messaging
 from common.numpy_fast import clip
 from common.realtime import sec_since_boot
-from selfdrive.config import Conversions as CV
+from common.conversions import Conversions as CV
 
 CAMERA_SPEED_FACTOR = 1.05
 
@@ -33,9 +33,9 @@ class RoadLimitSpeedServer:
     broadcast.setDaemon(True)
     broadcast.start()
 
-    gps = Thread(target=self.gps_thread, args=[])
-    gps.setDaemon(True)
-    gps.start()
+    # gps = Thread(target=self.gps_thread, args=[])
+    # gps.setDaemon(True)
+    # gps.start()
 
   def gps_thread(self):
     sm = messaging.SubMaster(['gpsLocationExternal'], poll=['gpsLocationExternal'])
@@ -45,7 +45,7 @@ class RoadLimitSpeedServer:
           sm.update()
           if self.remote_addr is not None and sm.updated['gpsLocationExternal']:
             location = sm['gpsLocationExternal']
-            json_location = json.dumps({"location": [
+            json_location = json.dumps([
               location.latitude,
               location.longitude,
               location.altitude,
@@ -58,7 +58,8 @@ class RoadLimitSpeedServer:
               location.verticalAccuracy,
               location.bearingAccuracyDeg,
               location.speedAccuracy,
-            ]})
+            ])
+
             address = (self.remote_addr[0], Port.LOCATION_PORT)
             sock.sendto(json_location.encode(), address)
           else:
@@ -151,13 +152,14 @@ class RoadLimitSpeedServer:
 
   def check(self):
     now = sec_since_boot()
-    if now - self.last_updated > 20.:
+    if now - self.last_updated > 6.:
       try:
         self.lock.acquire()
         self.json_road_limit = None
       finally:
         self.lock.release()
-    if now - self.last_updated_active > 10.:
+
+    if now - self.last_updated_active > 6.:
       self.active = 0
 
   def get_limit_val(self, key, default=None):

@@ -4,14 +4,14 @@ from cereal import car
 from common.params import Params
 from common.realtime import DT_CTRL
 from common.numpy_fast import clip, interp
-from selfdrive.config import Conversions as CV
+from common.conversions import Conversions as CV
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, create_scc11, create_scc12, create_scc13, create_scc14, \
                                              create_mdps12, create_lfahda_mfc, create_hda_mfc
 from selfdrive.car.hyundai.values import Buttons, CarControllerParams
 from opendbc.can.packer import CANPacker
-from selfdrive.car.hyundai.scc_smoother import SccSmoother
 from selfdrive.road_speed_limiter import road_speed_limiter_get_active
+from selfdrive.car.hyundai.scc_smoother import SccSmoother
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 LongCtrlState = car.CarControl.Actuators.LongControlState
@@ -54,21 +54,23 @@ class CarController():
     self.last_lead_distance = 0
     self.resume_wait_timer = 0
     self.turning_signal_timer = 0
+    self.last_blinker_frame = 0
+    self.active_cam_timer = 0
+    self.last_active_cam_frame = 0
+
     self.longcontrol = CP.openpilotLongitudinalControl
     self.scc_live = not CP.radarOffCan
     self.turning_indicator_alert = False
+    self.prev_active_cam = False
 
+    self.scc_smoother = SccSmoother()
     self.lfamfc = Params().get("MfcSelect", encoding='utf8') == "2"
     self.mad_mode_enabled = Params().get("LongControlSelect", encoding='utf8') == "0" or \
                             Params().get("LongControlSelect", encoding='utf8') == "1"
     self.haptic_feedback_speed_camera = Params().get_bool('HapticFeedbackWhenSpeedCamera')
-    self.scc_smoother = SccSmoother()
-    self.last_blinker_frame = 0
-    self.prev_active_cam = False
-    self.active_cam_timer = 0
-    self.last_active_cam_frame = 0
 
-  def update(self, c, enabled, CS, frame, CC, actuators, pcm_cancel_cmd, visual_alert,
+
+  def update(self, c, CS, frame, actuators, pcm_cancel_cmd, visual_alert,
              left_lane, right_lane, left_lane_depart, right_lane_depart, set_speed, lead_visible, controls):
 
     # Steering Torque
@@ -76,7 +78,7 @@ class CarController():
     apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, CarControllerParams)
 
     # disable when temp fault is active, or below LKA minimum speed
-    lkas_active = c.active and not CS.out.steerFaultTemporary and abs(CS.out.steeringAngleDeg) < CS.CP.maxSteeringAngleDeg
+    lkas_active = c.latActive
 
     # Disable steering while turning blinker on and speed below 60 kph
     if CS.out.leftBlinker or CS.out.rightBlinker:
@@ -91,7 +93,7 @@ class CarController():
     self.apply_steer_last = apply_steer
 
     sys_warning, sys_state, left_lane_warning, right_lane_warning = \
-      process_hud_alert(enabled, visual_alert, left_lane, right_lane, left_lane_depart, right_lane_depart)
+      process_hud_alert(c.enabled, visual_alert, left_lane, right_lane, left_lane_depart, right_lane_depart)
 
     if self.haptic_feedback_speed_camera:
       if self.prev_active_cam != self.scc_smoother.active_cam:
@@ -136,12 +138,12 @@ class CarController():
 
     can_sends = []
     can_sends.append(create_lkas11(self.packer, frame, self.car_fingerprint, apply_steer, lkas_active,
-                                   CS.lkas11, sys_warning, sys_state, enabled, left_lane, right_lane,
+                                   CS.lkas11, sys_warning, sys_state, c.enabled, left_lane, right_lane,
                                    left_lane_warning, right_lane_warning, 0))
 
     if CS.mdps_bus or CS.scc_bus == 1:  # send lkas11 bus 1 if mdps or scc is on bus 1
       can_sends.append(create_lkas11(self.packer, frame, self.car_fingerprint, apply_steer, lkas_active,
-                                     CS.lkas11, sys_warning, sys_state, enabled, left_lane, right_lane,
+                                     CS.lkas11, sys_warning, sys_state, c.enabled, left_lane, right_lane,
                                      left_lane_warning, right_lane_warning, 1))
 
     if frame % 2 and CS.mdps_bus: # send clu11 to mdps if it is not on bus 0
@@ -181,13 +183,13 @@ class CarController():
       can_sends.append(create_mdps12(self.packer, frame, CS.mdps12))
 
     # scc smoother
-    self.scc_smoother.update(enabled, can_sends, self.packer, CC, CS, frame, controls)
+    self.scc_smoother.update(c.enabled, can_sends, self.packer, c, CS, frame, controls)
 
     # send scc to car if longcontrol enabled and SCC not on bus 0 or ont live
     if self.longcontrol and CS.cruiseState_enabled and (CS.scc_bus or not self.scc_live):
       if frame % 2 == 0:
         stopping = (actuators.longControlState == LongCtrlState.stopping)
-        apply_accel = clip(actuators.accel if c.active else 0,
+        apply_accel = clip(actuators.accel if c.longActive else 0,
                            CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
         apply_accel = self.scc_smoother.get_apply_accel(CS, controls.sm, apply_accel, stopping)
         self.accel = apply_accel
@@ -207,9 +209,9 @@ class CarController():
         self.scc12_cnt += 1
         self.scc12_cnt %= 0xF
 
-        can_sends.append(create_scc11(self.packer, frame, enabled, set_speed, lead_visible, self.scc_live, CS.scc11))
+        can_sends.append(create_scc11(self.packer, frame, c.enabled, set_speed, lead_visible, self.scc_live, CS.scc11))
 
-        can_sends.append(create_scc12(self.packer, apply_accel, enabled, self.scc12_cnt, self.scc_live, CS.scc12,
+        can_sends.append(create_scc12(self.packer, apply_accel, c.enabled, self.scc12_cnt, self.scc_live, CS.scc12,
                                       CS.out.gasPressed, CS.out.brakePressed, CS.out.cruiseState.standstill,
                                       self.car_fingerprint))
 
@@ -226,17 +228,17 @@ class CarController():
           else:
             obj_gap = 0
 
-          can_sends.append(create_scc14(self.packer, enabled, CS.out.vEgo, acc_standstill, apply_accel, CS.out.gasPressed,
+          can_sends.append(create_scc14(self.packer, c.enabled, CS.out.vEgo, acc_standstill, apply_accel, CS.out.gasPressed,
                                         obj_gap, CS.scc14))
     else:
       self.scc12_cnt = -1
 
     # 20 Hz LFA MFA message
     if frame % 5 == 0:
-      activated_hda = road_speed_limiter_get_active()
       # activated_hda: 0 - off, 1 - main road, 2 - highway
+      activated_hda = road_speed_limiter_get_active()
       if self.lfamfc:
-        can_sends.append(create_lfahda_mfc(self.packer, enabled, activated_hda))
+        can_sends.append(create_lfahda_mfc(self.packer, c.enabled, activated_hda))
       elif CS.has_lfa_hda:
         can_sends.append(create_hda_mfc(self.packer, activated_hda, CS, left_lane, right_lane))
 

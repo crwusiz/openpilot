@@ -1,6 +1,7 @@
 #pragma once
 
 #ifdef SWAGLOG
+// cppcheck-suppress preprocessorErrorDirective
 #include SWAGLOG
 #else
 
