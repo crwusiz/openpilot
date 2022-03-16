@@ -31,6 +31,7 @@
 #include <QScroller>
 #include <QListView>
 #include <QListWidget>
+#include <QProcess>
 
 TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
   // param, title, desc, icon
@@ -417,49 +418,55 @@ C2NetworkPanel::C2NetworkPanel(QWidget *parent) : QWidget(parent) {
   list->addItem(new LongControlSelect());
   list->addItem(horizontal_line());
 
-  const char* gitpull = "sh /data/openpilot/scripts/gitpull.sh";
   //auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "RUN");
   auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "실행");
   QObject::connect(gitpullbtn, &ButtonControl::clicked, [=]() {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      std::system(gitpull);
+      QProcess::execute("/data/openpilot/scripts/gitpull.sh");
     }
   });
   list->addItem(gitpullbtn);
 
-  const char* realdata_clear = "sh /data/openpilot/scripts/realdataclear.sh";
-  //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");
-  auto realdataclearbtn = new ButtonControl("주행로그 삭제", "실행");
-  QObject::connect(realdataclearbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      std::system(realdata_clear);
-    }
-  });
-  list->addItem(realdataclearbtn);
-
-  const char* panda_flash = "sh /data/openpilot/panda/board/flash.sh";
   //auto pandaflashbtn = new ButtonControl("Panda Firmware Flash", "RUN");
   auto pandaflashbtn = new ButtonControl("판다 펌웨어 플래싱", "실행");
   QObject::connect(pandaflashbtn, &ButtonControl::clicked, [=]() {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      std::system(panda_flash);
+      QProcess::execute("/data/openpilot/panda/board/flash.sh");
     }
   });
   list->addItem(pandaflashbtn);
 
-  const char* panda_recover = "sh /data/openpilot/panda/board/recover.sh";
+  //auto cleardtcbtn = new ButtonControl("DTC Clear", "RUN");
+  auto cleardtcbtn = new ButtonControl("오류코드 제거", "실행");
+  QObject::connect(cleardtcbtn, &ButtonControl::clicked, [=]() {
+    //if (ConfirmationDialog::confirm("Process?", this)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
+      QProcess::execute("/data/openpilot/scripts/cleardtc.sh");
+    }
+  });
+  list->addItem(cleardtcbtn);
+
   //auto pandarecoverbtn = new ButtonControl("Panda Firmware Recover", "RUN");
   auto pandarecoverbtn = new ButtonControl("판다 펌웨어 복구", "실행");
   QObject::connect(pandarecoverbtn, &ButtonControl::clicked, [=]() {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      std::system(panda_recover);
+      QProcess::execute("/data/openpilot/panda/board/recover.sh");
     }
   });
   list->addItem(pandarecoverbtn);
+
+  //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");
+  auto realdataclearbtn = new ButtonControl("주행로그 삭제", "실행");
+  QObject::connect(realdataclearbtn, &ButtonControl::clicked, [=]() {
+    //if (ConfirmationDialog::confirm("Process?", this)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+      QProcess::execute("/data/openpilot/scripts/realdataclear.sh");
+    }
+  });
+  list->addItem(realdataclearbtn);
 
   layout->addWidget(list);
   layout->addStretch(1);
@@ -677,7 +684,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   connect(selectCar, &SelectCar::backPress, [=]() { main_layout->setCurrentWidget(homeScreen); });
   connect(selectCar, &SelectCar::selectedCar, [=]() {
      QString selected = QString::fromStdString(Params().get("SelectedCar"));
-     selectCarBtn->setText(selected.length() ? selected : "Select your car");
+     selectCarBtn->setText(selected.length() ? selected : "차량을 선택하세요");
      main_layout->setCurrentWidget(homeScreen);
   });
   main_layout->addWidget(selectCar);
@@ -715,12 +722,10 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   //"Disable Logger is Reduce system load",
                                   "Logger 프로세스를 종료하여 시스템 부하를 줄입니다.",
                                   "../assets/offroad/icon_addon.png", this));
-#ifndef QCOM
   toggles.append(new ParamControl("NavDisable", "Navigation Disable",
                                   //"Navigation Disable",
                                   "Navigation 기능을 사용하지않습니다.",
                                   "../assets/offroad/icon_addon.png", this));
-#endif
   toggles.append(new ParamControl("NewRadarInterface", "New radar interface Enable",
                                   //"New radar interface Enable",
                                   "scc 레이더 배선개조없이 사용가능한 일부차종을 위한 옵션입니다",
@@ -752,7 +757,7 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
   //list->setAttribute(Qt::WA_AcceptTouchEvents, true);
   QScroller::grabGesture(list->viewport(), QScroller::LeftMouseButtonGesture);
   list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-  list->addItem("[ Not selected ]");
+  list->addItem("[ 차량선택 사용안함 ]");
   QStringList items = get_list("/data/params/d/SupportedCars");
   list->addItems(items);
   list->setCurrentRow(0);

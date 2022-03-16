@@ -2,20 +2,22 @@
 
 // include the safety policies.
 #include "safety/safety_defaults.h"
+#include "safety/safety_elm327.h"
+#include "safety/safety_hyundai.h"
+#include "safety/safety_hyundai_community.h"
+/*
 #include "safety/safety_honda.h"
 #include "safety/safety_toyota.h"
 #include "safety/safety_tesla.h"
 #include "safety/safety_gm.h"
 #include "safety/safety_ford.h"
-#include "safety/safety_hyundai.h"
 #include "safety/safety_chrysler.h"
 #include "safety/safety_subaru.h"
 #include "safety/safety_mazda.h"
 #include "safety/safety_nissan.h"
 #include "safety/safety_volkswagen_mqb.h"
 #include "safety/safety_volkswagen_pq.h"
-#include "safety/safety_elm327.h"
-#include "safety/safety_hyundai_community.h"
+*/
 
 // from cereal.car.CarParams.SafetyModel
 #define SAFETY_SILENT 0U
@@ -239,26 +241,30 @@ typedef struct {
 
 const safety_hook_config safety_hook_registry[] = {
   {SAFETY_SILENT, &nooutput_hooks},
-  {SAFETY_HONDA_NIDEC, &honda_nidec_hooks},
-  {SAFETY_TOYOTA, &toyota_hooks},
+  {SAFETY_NOOUTPUT, &nooutput_hooks},
   {SAFETY_ELM327, &elm327_hooks},
-  {SAFETY_GM, &gm_hooks},
-  {SAFETY_HONDA_BOSCH, &honda_bosch_hooks},
   {SAFETY_HYUNDAI, &hyundai_hooks},
+  {SAFETY_HYUNDAI_LEGACY, &hyundai_legacy_hooks},
+  {SAFETY_HYUNDAI_COMMUNITY, &hyundai_community_hooks},
+  /*
+  {SAFETY_HONDA_NIDEC, &honda_nidec_hooks},
+  {SAFETY_HONDA_BOSCH, &honda_bosch_hooks},
+  {SAFETY_TOYOTA, &toyota_hooks},
+  {SAFETY_GM, &gm_hooks},
   {SAFETY_CHRYSLER, &chrysler_hooks},
   {SAFETY_SUBARU, &subaru_hooks},
   {SAFETY_VOLKSWAGEN_MQB, &volkswagen_mqb_hooks},
   {SAFETY_NISSAN, &nissan_hooks},
-  {SAFETY_NOOUTPUT, &nooutput_hooks},
-  {SAFETY_HYUNDAI_LEGACY, &hyundai_legacy_hooks},
   {SAFETY_MAZDA, &mazda_hooks},
-  {SAFETY_HYUNDAI_COMMUNITY, &hyundai_community_hooks},
+  */
 #ifdef ALLOW_DEBUG
+  {SAFETY_ALLOUTPUT, &alloutput_hooks},
+  /*
   {SAFETY_TESLA, &tesla_hooks},
   {SAFETY_SUBARU_LEGACY, &subaru_legacy_hooks},
   {SAFETY_VOLKSWAGEN_PQ, &volkswagen_pq_hooks},
-  {SAFETY_ALLOUTPUT, &alloutput_hooks},
   {SAFETY_FORD, &ford_hooks},
+  */
 #endif
 };
 

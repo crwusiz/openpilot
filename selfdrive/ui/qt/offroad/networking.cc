@@ -139,52 +139,55 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   list->addItem(new LongControlSelect());
   list->addItem(horizontal_line());
 
-  const char* gitpull = "sh /data/openpilot/scripts/gitpull.sh";
   //auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "RUN");
   auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "실행");
   QObject::connect(gitpullbtn, &ButtonControl::clicked, [=]() {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      std::system(gitpull);
-      QTimer::singleShot(1000, []() { Hardware::reboot(); });
+      QProcess::execute("/data/openpilot/scripts/gitpull.sh");
     }
   });
   list->addItem(gitpullbtn);
 
-  const char* realdata_clear = "sh /data/openpilot/scripts/realdataclear.sh";
-  //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");
-  auto realdataclearbtn = new ButtonControl("주행로그 삭제", "실행");
-  QObject::connect(realdataclearbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      std::system(realdata_clear);
-    }
-  });
-  list->addItem(realdataclearbtn);
-
-  const char* panda_flash = "sh /data/openpilot/panda/board/flash.sh";
   //auto pandaflashbtn = new ButtonControl("Panda Firmware Flash", "RUN");
   auto pandaflashbtn = new ButtonControl("판다 펌웨어 플래싱", "실행");
   QObject::connect(pandaflashbtn, &ButtonControl::clicked, [=]() {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      std::system(panda_flash);
-      QTimer::singleShot(1000, []() { Hardware::reboot(); });
+      QProcess::execute("/data/openpilot/panda/board/flash.sh");
     }
   });
   list->addItem(pandaflashbtn);
 
-  const char* panda_recover = "sh /data/openpilot/panda/board/recover.sh";
+  //auto cleardtcbtn = new ButtonControl("DTC Clear", "RUN");
+  auto cleardtcbtn = new ButtonControl("오류코드 제거", "실행");
+  QObject::connect(cleardtcbtn, &ButtonControl::clicked, [=]() {
+    //if (ConfirmationDialog::confirm("Process?", this)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
+      QProcess::execute("/data/openpilot/scripts/cleardtc.sh");
+    }
+  });
+  list->addItem(cleardtcbtn);
+
   //auto pandarecoverbtn = new ButtonControl("Panda Firmware Recover", "RUN");
   auto pandarecoverbtn = new ButtonControl("판다 펌웨어 복구", "실행");
   QObject::connect(pandarecoverbtn, &ButtonControl::clicked, [=]() {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      std::system(panda_recover);
-      QTimer::singleShot(1000, []() { Hardware::reboot(); });
+      QProcess::execute("/data/openpilot/panda/board/recover.sh");
     }
   });
   list->addItem(pandarecoverbtn);
+
+  //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");
+  auto realdataclearbtn = new ButtonControl("주행로그 삭제", "실행");
+  QObject::connect(realdataclearbtn, &ButtonControl::clicked, [=]() {
+    //if (ConfirmationDialog::confirm("Process?", this)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+      QProcess::execute("/data/openpilot/scripts/realdataclear.sh");
+    }
+  });
+  list->addItem(realdataclearbtn);
 
   list->addItem(horizontal_line());
 

@@ -60,27 +60,35 @@ def flash_panda(panda_serial: str) -> Panda:
     cloudlog.info("Done flashing")
 
   if panda.bootstub:
-    spinner = Spinner()
-    spinner.update("Restoring panda")    
     bootstub_version = panda.get_version()
     cloudlog.info(f"Flashed firmware not booting, flashing development bootloader. Bootstub version: {bootstub_version}")
-    panda.recover()
-    spinner.close()
 
-  if panda.bootstub:
     spinner = Spinner()
     spinner.update("Restoring panda")
+    h7 = panda.get_mcu_type() == MCU_TYPE_H7
+    panda.reset(enter_bootstub=True)
+    panda.reset(enter_bootloader=True)
+    time.sleep(1)
     try:
-      if panda.get_mcu_type() == MCU_TYPE_H7:
-        subprocess.run("cd /data/openpilot/panda/board; ./recover_h7.sh", capture_output=True, shell=True)
+      if h7:
+        os.system("/usr/bin/dfu-util -d 0483:df11 -a 0 -s 0x08020000 -D /data/openpilot/panda/board/obj/panda_h7.bin.signed")
+        os.system("/usr/bin/dfu-util -d 0483:df11 -a 0 -s 0x08000000:leave -D /data/openpilot/panda/board/obj/bootstub.panda_h7.bin")
+        panda.flash('/data/openpilot/panda/board/obj/panda_h7.bin.signed')
       else:
-        subprocess.run("cd /data/openpilot/panda/board; ./recover.sh", capture_output=True, shell=True)
+        os.system("/usr/bin/dfu-util -d 0483:df11 -a 0 -s 0x08004000 -D /data/openpilot/panda/board/obj/panda.bin.signed")
+        os.system("/usr/bin/dfu-util -d 0483:df11 -a 0 -s 0x08000000:leave -D /data/openpilot/panda/board/obj/bootstub.panda.bin")
+        panda.flash('/data/openpilot/panda/board/obj/panda.bin.signed')
+    finally:
       panda.reset()
       panda.reconnect()
-    finally:
-      spinner.close()    
-    
+
     cloudlog.info("Done flashing bootloader")
+
+    if panda.bootstub:
+      spinner.update("Try manualley Panda Recover")
+      time.sleep(60)
+    else:
+      spinner.close()
 
   if panda.bootstub:
     cloudlog.info("Panda still not booting, exiting")
@@ -88,11 +96,10 @@ def flash_panda(panda_serial: str) -> Panda:
 
   panda_signature = panda.get_signature()
   if panda_signature != fw_signature:
-    cloudlog.error("Version mismatch after flashing, exiting")
+    cloudlog.info("Version mismatch after flashing, exiting")
     raise AssertionError
 
   return panda
-
 
 def panda_sort_cmp(a: Panda, b: Panda):
   a_type = a.get_type()
@@ -113,7 +120,6 @@ def panda_sort_cmp(a: Panda, b: Panda):
 
 
 def main() -> NoReturn:
-  first_run = True
   params = Params()
 
   while True:
@@ -144,10 +150,6 @@ def main() -> NoReturn:
           params.put_bool("PandaHeartbeatLost", True)
           cloudlog.event("heartbeat lost", deviceState=health, serial=panda.get_usb_serial())
 
-        #if first_run:
-        #  cloudlog.info(f"Resetting panda {panda.get_usb_serial()}")
-        #  panda.reset()
-
       # sort pandas to have deterministic order
       pandas.sort(key=cmp_to_key(panda_sort_cmp))
       panda_serials = list(map(lambda p: p.get_usb_serial(), pandas))
@@ -162,8 +164,6 @@ def main() -> NoReturn:
       # a panda was disconnected while setting everything up. let's try again
       cloudlog.exception("Panda USB exception while setting up")
       continue
-
-    first_run = False
 
     # run boardd with all connected serials as arguments
     os.chdir(os.path.join(BASEDIR, "selfdrive/boardd"))
