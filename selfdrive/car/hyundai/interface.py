@@ -40,6 +40,7 @@ class CarInterface(CarInterfaceBase):
     ret.maxSteeringAngleDeg = 1000.
 
     # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
+
     # hyundai
     if candidate in [CAR.ELANTRA_I30, CAR.ELANTRA21, CAR.ELANTRA21_HEV]:
         ret.mass = 1340. + STD_CARGO_KG
@@ -81,6 +82,7 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 1873. + STD_CARGO_KG
         ret.wheelbase = 2.790
         ret.steerRatio = 13.7
+
     # kia
     elif candidate == CAR.FORTE:
         ret.mass = 1345. + STD_CARGO_KG
@@ -126,6 +128,7 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 1510. + STD_CARGO_KG
         ret.wheelbase = 2.630
         ret.steerRatio = 13.0
+
     # genesis
     elif candidate == CAR.GENESIS:
         ret.mass = 2060. + STD_CARGO_KG
@@ -314,6 +317,7 @@ class CarInterface(CarInterfaceBase):
     ret.enableAutoHold = 1151 in fingerprint[0]
     ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
     ret.hasLfaHda = 1157 in fingerprint[0]
+    ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
 
     ret.radarOffCan = ret.sccBus == -1
     ret.pcmCruise = not ret.radarOffCan
@@ -417,7 +421,6 @@ class CarInterface(CarInterfaceBase):
     self.CS.out = ret.as_reader()
     return self.CS.out
 
-  # scc smoother - hyundai only
   def apply(self, c, controls):
     hud_control = c.hudControl
     ret = self.CC.update(c, c.enabled, self.CS, self.frame, c, c.actuators, c.cruiseControl.cancel, hud_control.visualAlert,

@@ -52,6 +52,7 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, lkas11
 
   return packer.make_can_msg("LKAS11", bus, values)
 
+
 def create_clu11(packer, bus, clu11, button, speed):
   values = copy.copy(clu11)
   values["CF_Clu_CruiseSwState"] = button
@@ -182,6 +183,7 @@ def create_scc14(packer, enabled, e_vgo, standstill, accel, gaspressed, objgap, 
   return packer.make_can_msg("SCC14", 0, values)
 
 
+# ---------------------------------------------------------------------------------------
 def create_acc_commands(packer, enabled, accel, jerk, idx, lead_visible, set_speed, stopping):
   commands = []
 

@@ -70,7 +70,6 @@ class SccSmoother:
 
     self.started_frame = 0
     self.stock_weight = 0.
-
     self.wait_timer = 0
     self.alive_timer = 0
     self.target_speed = 0.

@@ -58,11 +58,10 @@ class CarController():
     self.scc_live = not CP.radarOffCan
     self.turning_indicator_alert = False
 
-    params = Params()
-    self.lfamfc = params.get("MfcSelect", encoding='utf8') == "2"
-    self.mad_mode_enabled = params.get("LongControlSelect", encoding='utf8') == "0" or \
-                            params.get("LongControlSelect", encoding='utf8') == "1"
-    self.haptic_feedback_speed_camera = params.get_bool('HapticFeedbackWhenSpeedCamera')
+    self.lfamfc = Params().get("MfcSelect", encoding='utf8') == "2"
+    self.mad_mode_enabled = Params().get("LongControlSelect", encoding='utf8') == "0" or \
+                            Params().get("LongControlSelect", encoding='utf8') == "1"
+    self.haptic_feedback_speed_camera = Params().get_bool('HapticFeedbackWhenSpeedCamera')
     self.scc_smoother = SccSmoother()
     self.last_blinker_frame = 0
     self.prev_active_cam = False

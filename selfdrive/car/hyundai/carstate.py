@@ -36,10 +36,7 @@ class CarState(CarStateBase):
     self.has_scc13 = CP.hasScc13
     self.has_scc14 = CP.hasScc14
     self.has_lfa_hda = CP.hasLfaHda
-
-    # params init
-    params = Params()
-    self.aeb_fcw = params.get("AebSelect", encoding='utf8') == "1"
+    self.aebFcw = CP.aebFcw
 
     # scc smoother
     self.acc_mode = False
@@ -172,7 +169,7 @@ class CarState(CarStateBase):
 
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(gear))
 
-    if self.aeb_fcw:
+    if self.CP.aebFcw:
       ret.stockAeb = cp.vl["FCA11"]["FCA_CmdAct"] != 0
       ret.stockFcw = cp.vl["FCA11"]["CF_VSM_Warn"] == 2
     else:
@@ -415,6 +412,11 @@ class CarState(CarStateBase):
         ("EMS16", 100),
       ]
 
+    if CP.aebFcw:
+      signals += [
+        ("FCA_CmdAct", "FCA11"),
+        ("CF_VSM_Warn", "FCA11"),
+      ]
       if not CP.openpilotLongitudinalControl:
         checks += [("FCA11", 50)]
 
