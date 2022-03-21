@@ -8,6 +8,8 @@ from common.numpy_fast import interp
 from selfdrive.swaglog import cloudlog
 from selfdrive.controls.lib.pid import PIDController
 
+LEON = False
+
 class BaseFanController(ABC):
   @abstractmethod
   def update(self, max_cpu_temp: float, ignition: bool) -> int:
@@ -30,24 +32,43 @@ class EonFanController(BaseFanController):
     self.setup_eon_fan()
 
   def setup_eon_fan(self) -> None:
+    global LEON
     os.system("echo 2 > /sys/module/dwc3_msm/parameters/otg_switch")
 
+    bus = SMBus(7, force=True)
+    try:
+      bus.write_byte_data(0x21, 0x10, 0xf)   # mask all interrupts
+      bus.write_byte_data(0x21, 0x03, 0x1)   # set drive current and global interrupt disable
+      bus.write_byte_data(0x21, 0x02, 0x2)   # needed?
+      bus.write_byte_data(0x21, 0x04, 0x4)   # manual override source
+    except OSError:
+      print("LEON detected")
+      LEON = True
+    bus.close()
+
   def set_eon_fan(self, speed: int) -> None:
+    global LEON
+
     if self.fan_speed != speed:
       # FIXME: this is such an ugly hack to get the right index
       val = speed // 16384
 
       bus = SMBus(7, force=True)
-      try:
-        i = [0x1, 0x3 | 0, 0x3 | 0x08, 0x3 | 0x10][val]
-        bus.write_i2c_block_data(0x3d, 0, [i])
-      except OSError:
-        # tusb320
-        if val == 0:
-          bus.write_i2c_block_data(0x67, 0xa, [0])
-        else:
-          bus.write_i2c_block_data(0x67, 0xa, [0x20])
-          bus.write_i2c_block_data(0x67, 0x8, [(val - 1) << 6])
+      if LEON:
+        try:
+          i = [0x1, 0x3 | 0, 0x3 | 0x08, 0x3 | 0x10][val]
+          bus.write_i2c_block_data(0x3d, 0, [i])
+        except OSError:
+          # tusb320
+          if val == 0:
+            bus.write_i2c_block_data(0x67, 0xa, [0])
+          else:
+            bus.write_i2c_block_data(0x67, 0xa, [0x20])
+            bus.write_i2c_block_data(0x67, 0x8, [(val - 1) << 6])
+      else:
+        bus.write_byte_data(0x21, 0x04, 0x2)
+        bus.write_byte_data(0x21, 0x03, (val * 2) + 1)
+        bus.write_byte_data(0x21, 0x04, 0x4)
       bus.close()
       self.fan_speed = speed
 

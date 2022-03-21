@@ -13,7 +13,7 @@ if [ -f /ONEPLUS ]; then
   mount -o remount,rw /system
   sed -i -e 's#/dev/input/event1#/dev/input/event2#g' ~/.bash_profile
   mount -o remount,r /system
-  echo -n 19.1 > /VERSION
+  echo -n 20 > /VERSION
 fi
 
   # set IO scheduler
