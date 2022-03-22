@@ -170,25 +170,25 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
 
 // OnroadHud ( wirelessnet2 init )
 OnroadHud::OnroadHud(QWidget *parent) : QWidget(parent) {
-  engage_img = QPixmap("../assets/img_chffr_wheel.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  dm_img = QPixmap("../assets/img_driver_face.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+  engage_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
+  dm_img = loadPixmap("../assets/img_driver_face.png", {img_size, img_size});
 
   // crwusiz add
-  brake_img = QPixmap("../assets/img_brake_disc.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  bsd_l_img = QPixmap("../assets/img_bsd_l.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  bsd_r_img = QPixmap("../assets/img_bsd_r.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  gps_img = QPixmap("../assets/img_gps.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  wifi_img = QPixmap("../assets/img_wifi.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  direction_img = QPixmap("../assets/img_direction.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+  brake_img = loadPixmap("../assets/img_brake_disc.png", {img_size, img_size});
+  bsd_l_img = loadPixmap("../assets/img_bsd_l.png", {img_size, img_size});
+  bsd_r_img = loadPixmap("../assets/img_bsd_r.png", {img_size, img_size});
+  gps_img = loadPixmap("../assets/img_gps.png", {img_size, img_size});
+  wifi_img = loadPixmap("../assets/img_wifi.png", {img_size, img_size});
+  direction_img = loadPixmap("../assets/img_direction.png", {img_size, img_size});
 
   // neokii add
-  autohold_warning_img = QPixmap("../assets/img_autohold_warning.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  autohold_active_img = QPixmap("../assets/img_autohold_active.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  turnsignal_l_img = QPixmap("../assets/img_turnsignal_l.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  turnsignal_r_img = QPixmap("../assets/img_turnsignal_r.png").scaled(img_size, img_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-  nda_img = QPixmap("../assets/img_nda.png");
-  hda_img = QPixmap("../assets/img_hda.png");
-  tpms_img = QPixmap("../assets/img_tpms.png");
+  autohold_warning_img = loadPixmap("../assets/img_autohold_warning.png", {img_size, img_size});
+  autohold_active_img = loadPixmap("../assets/img_autohold_active.png", {img_size, img_size});
+  turnsignal_l_img = loadPixmap("../assets/img_turnsignal_l.png", {img_size, img_size});
+  turnsignal_r_img = loadPixmap("../assets/img_turnsignal_r.png", {img_size, img_size});
+  nda_img = loadPixmap("../assets/img_nda.png");
+  hda_img = loadPixmap("../assets/img_hda.png");
+  tpms_img = loadPixmap("../assets/img_tpms.png");
 
   connect(this, &OnroadHud::valueChanged, [=] { update(); });
 }
@@ -221,7 +221,8 @@ void OnroadHud::updateState(const UIState &s) {
   const auto ge = sm["gpsLocationExternal"].getGpsLocationExternal();
   auto ls = sm["roadLimitSpeed"].getRoadLimitSpeed();
 
-  float cur_speed = std::max(0.0, ce.getVEgo() * (s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH));
+  float cur_speed = ce.getVEgo() * (s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH);
+
   float applyMaxSpeed = cc.getSccSmoother().getApplyMaxSpeed();
   float cruiseMaxSpeed = cc.getSccSmoother().getCruiseMaxSpeed();
   bool cruise_set = (cruiseMaxSpeed > 0 && cruiseMaxSpeed < 255);
@@ -746,6 +747,11 @@ void OnroadHud::drawTextColor(QPainter &p, int x, int y, const QString &text, co
 
 //-------------------------------------------------------------------------------------------
 // NvgWindow
+
+NvgWindow::NvgWindow(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraViewWidget("camerad", type, true, parent) {
+
+}
+
 void NvgWindow::initializeGL() {
   CameraViewWidget::initializeGL();
   qInfo() << "OpenGL version:" << QString((const char*)glGetString(GL_VERSION));
@@ -871,9 +877,9 @@ void NvgWindow::paintGL() {
 
   double cur_draw_t = millis_since_boot();
   double dt = cur_draw_t - prev_draw_t;
-  if (dt > 66) {
-    // warn on sub 15fps
-    LOGW("slow frame time: %.2f", dt);
+  double fps = fps_filter.update(1. / dt * 1000);
+  if (fps < 15) {
+    LOGW("slow frame rate: %.2f fps", fps);
   }
   prev_draw_t = cur_draw_t;
 }

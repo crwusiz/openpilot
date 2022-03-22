@@ -41,6 +41,10 @@
     "text": "저장장치가 마운트되지않았습니다.",
     "severity": 1
   },
+  "Offroad_BadNvme": {
+    "text": "Unsupported NVMe drive detected. Device may draw significantly more power and overheat due to the unsupported NVMe.",
+    "severity": 1
+  },
   "Offroad_CarUnrecognized": {
     "text": "Choose your car in community settings.",
     "severity": 0

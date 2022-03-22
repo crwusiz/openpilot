@@ -43,6 +43,9 @@ procs = [
   PythonProcess("shutdownd", "selfdrive.hardware.eon.shutdownd", enabled=EON),
   PythonProcess("androidd", "selfdrive.hardware.eon.androidd", enabled=EON, persistent=True),
 
+  # Experimental
+  PythonProcess("rawgpsd", "selfdrive.sensord.rawgps.rawgpsd", enabled=os.path.isfile("/persist/comma/use-quectel-rawgps")),
+
   # Process add
   PythonProcess("autoshutdownd", "selfdrive.hardware.eon.autoshutdownd", enabled=EON, persistent=True),
   PythonProcess("road_speed_limiter", "selfdrive.road_speed_limiter", persistent=True),

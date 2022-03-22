@@ -5,25 +5,22 @@ from common.realtime import DT_MDL
 from common.conversions import Conversions as CV
 from selfdrive.modeld.constants import T_IDXS
 
-ButtonType = car.CarState.ButtonEvent.Type
-ButtonPrev = ButtonType.unknown
-ButtonCnt = 0
-LongPressed = False
-
+# WARNING: this value was determined based on the model's training distribution,
+#          model predictions above this speed can be unpredictable
 # kph
 V_CRUISE_MAX = 150
 V_CRUISE_MIN = 30
 V_CRUISE_DELTA_MI = 5 * CV.MPH_TO_KPH
 V_CRUISE_DELTA_KM = 10
 V_CRUISE_ENABLE_MIN = 30
+
 LAT_MPC_N = 16
 LON_MPC_N = 32
 CONTROL_N = 17
 CAR_ROTATION_RADIUS = 0.0
 
-# this corresponds to 80deg/s and 20deg/s steering angle in a toyota corolla
-MAX_CURVATURE_RATES = [0.03762194918267951, 0.003441203371932992]
-MAX_CURVATURE_RATE_SPEEDS = [0, 35]
+# EU guidelines
+MAX_LATERAL_JERK = 5.0
 
 CRUISE_LONG_PRESS = 50
 CRUISE_NEAREST_FUNC = {
@@ -44,10 +41,6 @@ class MPC_COST_LAT:
 
 def rate_limit(new_value, last_value, dw_step, up_step):
   return clip(new_value, last_value + dw_step, last_value + up_step)
-
-
-def get_steer_max(CP, v_ego):
-  return interp(v_ego, CP.steerMaxBP, CP.steerMaxV)
 
 
 def update_v_cruise(v_cruise_kph, buttonEvents, button_timers, enabled, metric):
@@ -112,11 +105,13 @@ def get_lag_adjusted_curvature(CP, v_ego, psis, curvatures, curvature_rates):
   curvature_diff_from_psi = psi / (max(v_ego, 1e-1) * delay) - current_curvature
   desired_curvature = current_curvature + 2 * curvature_diff_from_psi
 
-  max_curvature_rate = interp(v_ego, MAX_CURVATURE_RATE_SPEEDS, MAX_CURVATURE_RATES)
+  v_ego = max(v_ego, 0.1)
+  max_curvature_rate = MAX_LATERAL_JERK / ((v_ego/2)**2)
   safe_desired_curvature_rate = clip(desired_curvature_rate,
                                           -max_curvature_rate,
                                           max_curvature_rate)
   safe_desired_curvature = clip(desired_curvature,
-                                current_curvature - max_curvature_rate,
-                                current_curvature + max_curvature_rate)
+                                     current_curvature - max_curvature_rate * DT_MDL,
+                                     current_curvature + max_curvature_rate * DT_MDL)
+
   return safe_desired_curvature, safe_desired_curvature_rate

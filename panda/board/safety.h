@@ -207,7 +207,7 @@ bool addr_safety_check(CANPacket_t *to_push,
 
 void generic_rx_checks(bool stock_ecu_detected) {
   // exit controls on rising edge of gas press
-  if (gas_pressed && !gas_pressed_prev && !(unsafe_mode & UNSAFE_DISABLE_DISENGAGE_ON_GAS)) {
+  if (gas_pressed && !gas_pressed_prev && !(alternative_experience & ALT_EXP_DISABLE_DISENGAGE_ON_GAS)) {
     controls_allowed = 0;
   }
   gas_pressed_prev = gas_pressed;
@@ -282,6 +282,7 @@ int set_safety_hooks(uint16_t mode, int16_t param) {
   vehicle_speed = 0;
   vehicle_moving = false;
   acc_main_on = false;
+  cruise_button_prev = 0;
   desired_torque_last = 0;
   rt_torque_last = 0;
   ts_angle_last = 0;

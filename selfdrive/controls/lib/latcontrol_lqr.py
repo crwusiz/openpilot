@@ -4,7 +4,6 @@ import numpy as np
 from common.numpy_fast import clip, interp
 from common.realtime import DT_CTRL
 from cereal import log
-from selfdrive.controls.lib.drive_helpers import get_steer_max
 from selfdrive.controls.lib.latcontrol import LatControl, MIN_STEER_SPEED
 
 TORQUE_SCALE_BP = [0., 30., 80., 100., 130.]
@@ -36,10 +35,7 @@ class LatControlLQR(LatControl):
   def update(self, active, CS, CP, VM, params, last_actuators, desired_curvature, desired_curvature_rate):
     lqr_log = log.ControlsState.LateralLQRState.new_message()
 
-    steers_max = get_steer_max(CP, CS.vEgo)
-    #torque_scale = (0.45 + CS.vEgo / 60.0)**2  # Scale actuator model with speed
-    #torque_scale = (0.13 + CS.vEgo / 60.0)**0.8
-    torque_scale = interp(CS.vEgo*3.6, TORQUE_SCALE_BP, TORQUE_SCALE_V)
+    torque_scale = interp(CS.vEgo * 3.6, TORQUE_SCALE_BP, TORQUE_SCALE_V)
 
     # Subtract offset. Zero angle should correspond to zero torque
     steering_angle_no_offset = CS.steeringAngleDeg - params.angleOffsetAverageDeg
@@ -75,16 +71,16 @@ class LatControlLQR(LatControl):
         i = self.i_lqr + self.ki * self.i_rate * error
         control = lqr_output + i
 
-        if (error >= 0 and (control <= steers_max or i < 0.0)) or \
-           (error <= 0 and (control >= -steers_max or i > 0.0)):
+        if (error >= 0 and (control <= self.steer_max or i < 0.0)) or \
+           (error <= 0 and (control >= -self.steer_max or i > 0.0)):
           self.i_lqr = i
 
       output_steer = lqr_output + self.i_lqr
-      output_steer = clip(output_steer, -steers_max, steers_max)
+      output_steer = clip(output_steer, -self.steer_max, self.steer_max)
 
     lqr_log.steeringAngleDeg = angle_steers_k
     lqr_log.i = self.i_lqr
     lqr_log.output = output_steer
     lqr_log.lqrOutput = lqr_output
-    lqr_log.saturated = self._check_saturation(steers_max - abs(output_steer) < 1e-3, CS)
+    lqr_log.saturated = self._check_saturation(self.steer_max - abs(output_steer) < 1e-3, CS)
     return output_steer, desired_angle, lqr_log

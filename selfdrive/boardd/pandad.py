@@ -166,6 +166,7 @@ def main() -> NoReturn:
       continue
 
     # run boardd with all connected serials as arguments
+    os.environ['MANAGER_DAEMON'] = 'boardd'
     os.chdir(os.path.join(BASEDIR, "selfdrive/boardd"))
     subprocess.run(["./boardd", *panda_serials], check=True)
 

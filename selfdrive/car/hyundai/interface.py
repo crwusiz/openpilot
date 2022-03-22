@@ -280,8 +280,7 @@ class CarInterface(CarInterfaceBase):
 
     ret.steerActuatorDelay = 0.15
     ret.steerRateCost = 0.35
-    ret.steerLimitTimer = 2.5 # default 1.0
-    ret.steerMaxV = [2.] # default 1.
+    ret.steerLimitTimer = 2.5
 
     # longitudinal
     ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
@@ -289,7 +288,7 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
     ret.longitudinalTuning.kiV = [0.08, 0.04]
     ret.longitudinalActuatorDelayLowerBound = 0.3
-    ret.longitudinalActuatorDelayUpperBound = 0.3
+    ret.longitudinalActuatorDelayUpperBound = 0.5
 
     ret.stoppingDecelRate = 0.5  # brake_travel/s while trying to stop
 
@@ -420,9 +419,4 @@ class CarInterface(CarInterfaceBase):
     return self.CS.out
 
   def apply(self, c, controls):
-    hud_control = c.hudControl
-    ret = self.CC.update(c, self.CS, self.frame, c.actuators, c.cruiseControl.cancel, hud_control.visualAlert,
-                         hud_control.leftLaneVisible, hud_control.rightLaneVisible, hud_control.leftLaneDepart, hud_control.rightLaneDepart,
-                         hud_control.setSpeed, hud_control.leadVisible, controls)
-    self.frame += 1
-    return ret
+    return self.CC.update(c, self.CS, controls)
