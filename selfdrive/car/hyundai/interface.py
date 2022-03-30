@@ -37,7 +37,6 @@ class CarInterface(CarInterfaceBase):
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy, 0)]
 
     tire_stiffness_factor = 1.
-    ret.maxSteeringAngleDeg = 1000.
 
     # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
 
@@ -134,7 +133,6 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 2060. + STD_CARGO_KG
         ret.wheelbase = 3.010
         ret.steerRatio = 16.5
-        ret.maxSteeringAngleDeg = 90.
     elif candidate == CAR.GENESIS_G70:
         ret.mass = 1795. + STD_CARGO_KG
         ret.wheelbase = 2.835

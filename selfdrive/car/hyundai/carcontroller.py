@@ -18,6 +18,10 @@ LongCtrlState = car.CarControl.Actuators.LongControlState
 
 min_set_speed = 30 * CV.KPH_TO_MS
 
+STEER_FAULT_MAX_ANGLE = 85  # EPS max is 90
+STEER_FAULT_MAX_FRAMES = 90  # EPS counter is 95
+
+
 def process_hud_alert(enabled, hud_control):
 
   sys_warning = (hud_control.visualAlert in (VisualAlert.steerRequired, VisualAlert.ldw))
@@ -47,6 +51,9 @@ class CarController:
     self.car_fingerprint = CP.carFingerprint
     self.params = CarControllerParams(CP)
     self.packer = CANPacker(dbc_name)
+    self.angle_limit_counter = 0
+    self.cut_steer_frames = 0
+    self.cut_steer = False
     self.frame = 0
 
     self.apply_steer_last = 0
@@ -82,17 +89,14 @@ class CarController:
     new_steer = int(round(actuators.steer * self.params.STEER_MAX))
     apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.params)
 
-    # disable when temp fault is active, or below LKA minimum speed
-    lkas_active = CC.latActive
-
     # Disable steering while turning blinker on and speed below 60 kph
     if CS.out.leftBlinker or CS.out.rightBlinker:
       self.turning_signal_timer = 0.5 / DT_CTRL  # Disable for 0.5 Seconds after blinker turned off
     if self.turning_indicator_alert: # set and clear by interface
-      lkas_active = 0
+      CC.latActive = False
     if self.turning_signal_timer > 0:
       self.turning_signal_timer -= 1
-    if not lkas_active:
+    if not CC.latActive:
       apply_steer = 0
 
     self.apply_steer_last = apply_steer
@@ -113,7 +117,7 @@ class CarController:
 
     clu11_speed = CS.clu11["CF_Clu_Vanz"]
     enabled_speed = 38 if CS.is_set_speed_in_mph else 60
-    if clu11_speed > enabled_speed or not lkas_active:
+    if clu11_speed > enabled_speed or not CC.latActive:
       enabled_speed = clu11_speed
 
     if self.frame == 0:  # initialize counts from last received count signals
@@ -121,13 +125,32 @@ class CarController:
 
     self.lkas11_cnt = (self.lkas11_cnt + 1) % 0x10
 
+    if CC.latActive and abs(CS.out.steeringAngleDeg) > STEER_FAULT_MAX_ANGLE:
+      self.angle_limit_counter += 1
+    else:
+      self.angle_limit_counter = 0
+
+    # stop requesting torque to avoid 90 degree fault and hold torque with induced temporary fault
+    # two cycles avoids race conditions every few minutes
+    if self.angle_limit_counter > STEER_FAULT_MAX_FRAMES:
+      self.cut_steer = True
+    elif self.cut_steer_frames > 1:
+      self.cut_steer_frames = 0
+      self.cut_steer = False
+
+    cut_steer_temp = False
+    if self.cut_steer:
+      cut_steer_temp = True
+      self.angle_limit_counter = 0
+      self.cut_steer_frames += 1
+
     can_sends = []
-    can_sends.append(create_lkas11(self.packer, self.frame, self.car_fingerprint, apply_steer, lkas_active,
+    can_sends.append(create_lkas11(self.packer, self.frame, self.car_fingerprint, apply_steer, CC.latActive, cut_steer_temp,
                                    CS.lkas11, sys_warning, sys_state, CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible,
                                    left_lane_warning, right_lane_warning, 0))
 
     if CS.mdps_bus or CS.scc_bus == 1:  # send lkas11 bus 1 if mdps or scc is on bus 1
-      can_sends.append(create_lkas11(self.packer, self.frame, self.car_fingerprint, apply_steer, lkas_active,
+      can_sends.append(create_lkas11(self.packer, self.frame, self.car_fingerprint, apply_steer, CC.latActive, cut_steer_temp,
                                      CS.lkas11, sys_warning, sys_state, CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible,
                                      left_lane_warning, right_lane_warning, 1))
 
