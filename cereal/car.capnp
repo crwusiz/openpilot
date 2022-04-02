@@ -17,6 +17,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
   immediateDisable @6 :Bool;
   preEnable @7 :Bool;
   permanent @8 :Bool; # alerts presented regardless of openpilot state
+  override @9 :Bool;
 
   enum EventName @0xbaa8c5d505f727de {
     canError @0;
@@ -31,7 +32,9 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     reverseGear @10;
     buttonCancel @11;
     buttonEnable @12;
-    pedalPressed @13;
+    pedalPressed @13;  # exits active state
+    pedalPressedPreEnable @73;  # added during pre-enable state for either pedal
+    gasPressedOverride @108;  # added when user is pressing gas with no disengage on gas
     cruiseDisabled @14;
     speedTooLow @17;
     outOfSpace @18;
@@ -77,7 +80,6 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     speedTooHigh @70;
     laneChangeBlocked @71;
     relayMalfunction @72;
-    gasPressed @73;
     stockFcw @74;
     startup @75;
     startupNoCar @76;
@@ -106,10 +108,10 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     cruiseMismatch @106;
     lkasDisabled @107;
 
-    turningIndicatorOn @108;
-    autoLaneChange @109;
-    slowingDownSpeed @110;
-    slowingDownSpeedSound @111;
+    turningIndicatorOn @109;
+    autoLaneChange @110;
+    slowingDownSpeed @111;
+    slowingDownSpeedSound @112;
 
     radarCanErrorDEPRECATED @15;
     communityFeatureDisallowedDEPRECATED @62;
@@ -424,6 +426,8 @@ struct CarParams {
   carFingerprint @1 :Text;
   fuzzyFingerprint @55 :Bool;
 
+  notCar @66 :Bool;  # flag for non-car robotics platforms
+
   enableGasInterceptor @2 :Bool;
   pcmCruise @3 :Bool;        # is openpilot's state tied to the PCM's cruise state?
   enableDsu @5 :Bool;        # driving support unit
@@ -435,7 +439,7 @@ struct CarParams {
   minSteerSpeed @8 :Float32;
   maxSteeringAngleDeg @54 :Float32;
   safetyConfigs @62 :List(SafetyConfig);
-  alternativeExperience @65 :Int16;      # panda flag for features like no disengage on gas 
+  alternativeExperience @65 :Int16;      # panda flag for features like no disengage on gas
 
   steerMaxBPDEPRECATED @11 :List(Float32);
   steerMaxVDEPRECATED @12 :List(Float32);
@@ -497,15 +501,17 @@ struct CarParams {
     safetyParam @1 :Int16;
   }
 
-  mdpsBus @66: Int8;
-  sasBus @67: Int8;
-  sccBus @68: Int8;
-  enableAutoHold @69 :Bool;
-  hasScc13 @70 :Bool;
-  hasScc14 @71 :Bool;
-  hasEms @72 :Bool;
-  hasLfaHda @73 :Bool;
-  aebFcw @74 :Bool;
+  mdpsBus @67: Int8;
+  sasBus @68: Int8;
+  sccBus @69: Int8;
+  enableAutoHold @70 :Bool;
+  hasScc13 @71 :Bool;
+  hasScc14 @72 :Bool;
+  hasEms @73 :Bool;
+  hasLfaHda @74 :Bool;
+  aebFcw @75 :Bool;
+  steerFaultMaxAngle @76 :Int16;
+  steerFaultMaxFrames @77 :Int16;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);
@@ -588,6 +594,7 @@ struct CarParams {
     hyundaiCommunity @24;
     stellantis @25;
     faw @26;
+    body @27;
   }
 
   enum SteerControlType {

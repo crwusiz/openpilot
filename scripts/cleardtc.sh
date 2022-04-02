@@ -8,4 +8,4 @@ python ./selfdrive/debug/clear_dtc.py
 
 sleep 30
 
-./selfdrive/boardd/boardd
+pkill -f openpilot;./launch_openpilot.sh

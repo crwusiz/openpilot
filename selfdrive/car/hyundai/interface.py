@@ -38,8 +38,11 @@ class CarInterface(CarInterfaceBase):
 
     tire_stiffness_factor = 1.
 
-    # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
+    ret.maxSteeringAngleDeg = 1000.
+    ret.steerFaultMaxAngle = 85
+    ret.steerFaultMaxFrames = 90
 
+    # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
     # hyundai
     if candidate in [CAR.ELANTRA_I30, CAR.ELANTRA21, CAR.ELANTRA21_HEV]:
         ret.mass = 1340. + STD_CARGO_KG

@@ -602,6 +602,7 @@ struct ControlsState @0x97ff69c53601abf1 {
     preEnabled @1;
     enabled @2;
     softDisabling @3;
+    overriding @4;
   }
 
   enum AlertStatus {
@@ -890,6 +891,7 @@ struct LongitudinalPlan @0xe00b5b3eba12876c {
 }
 
 struct LateralPlan @0xe1e9318e2ae8b51e {
+  modelMonoTime @31 :UInt64;
   laneWidth @0 :Float32;
   lProb @5 :Float32;
   rProb @7 :Float32;
@@ -909,8 +911,8 @@ struct LateralPlan @0xe1e9318e2ae8b51e {
 
   solverExecutionTime @30 :Float32;
 
-  autoLaneChangeEnabled @31 :Bool;
-  autoLaneChangeTimer @32 :Int8;
+  autoLaneChangeEnabled @32 :Bool;
+  autoLaneChangeTimer @33 :Int8;
 
   enum Desire {
     none @0;
@@ -1243,6 +1245,10 @@ struct QcomGnss @0xde94674b07ae51c1 {
     gps @0;
     glonass @1;
     beidou @2;
+    unknown3 @3;
+    unknown4 @4;
+    unknown5 @5;
+    unknown6 @6;
   }
 
   enum SVObservationState @0xe81e829a0d6c83e9 {
@@ -1748,6 +1754,14 @@ struct RoadLimitSpeed {
     sectionLimitSpeed @6 :Int16;
     sectionLeftDist @7 :Int16;
     camSpeedFactor @8 :Float32;
+    restArea @9 :List(RestArea);
+
+    struct RestArea {
+      image @0 :Text;
+      title @1 :Text;
+      oilPrice @2 :Text;
+      distance @3 :Text;
+    }
 }
 
 struct Event {

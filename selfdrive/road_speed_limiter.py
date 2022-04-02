@@ -7,7 +7,7 @@ import socket
 import fcntl
 import struct
 from threading import Thread
-from cereal import messaging
+from cereal import messaging, log
 from common.numpy_fast import clip
 from common.realtime import sec_since_boot
 from common.conversions import Conversions as CV
@@ -163,11 +163,17 @@ class RoadLimitSpeedServer:
       self.active = 0
 
   def get_limit_val(self, key, default=None):
+    return self.get_json_val(self.json_road_limit, key, default)
+
+  def get_json_val(self, json, key, default=None):
+
     try:
-      if self.json_road_limit is None:
+      if json is None:
         return default
-      if key in self.json_road_limit:
-        return self.json_road_limit[key]
+
+      if key in json:
+        return json[key]
+
     except:
       pass
 
@@ -197,6 +203,24 @@ def main():
           dat.roadLimitSpeed.sectionLimitSpeed = server.get_limit_val("section_limit_speed", 0)
           dat.roadLimitSpeed.sectionLeftDist = server.get_limit_val("section_left_dist", 0)
           dat.roadLimitSpeed.camSpeedFactor = server.get_limit_val("cam_speed_factor", CAMERA_SPEED_FACTOR)
+
+          try:
+            json = server.json_road_limit
+            if json is not None and "rest_area" in json:
+
+              restAreaList = []
+              for rest_area in json["rest_area"]:
+                restArea = log.RoadLimitSpeed.RestArea.new_message()
+                restArea.image = server.get_json_val(rest_area, "image")
+                restArea.title = server.get_json_val(rest_area, "title")
+                restArea.oilPrice = server.get_json_val(rest_area, "oilPrice")
+                restArea.distance = server.get_json_val(rest_area, "distance")
+                restAreaList.append(restArea)
+
+              dat.roadLimitSpeed.restArea = restAreaList
+          except:
+            pass
+
           roadLimitSpeed.send(dat.to_bytes())
           server.send_sdp(sock)
         server.check()

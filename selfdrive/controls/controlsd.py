@@ -428,8 +428,11 @@ class Controls:
     # if stock cruise is completely disabled, then we can use our own set speed logic
     #if not self.CP.pcmCruise:
     #  self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.buttonEvents, self.button_timers, self.enabled, self.is_metric)
-    #elif CS.cruiseState.enabled:
-    #  self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
+    #else:
+    #  if CS.cruiseState.available:
+    #    self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
+    #  else:
+    #    self.v_cruise_kph = 0
 
     SccSmoother.update_cruise_buttons(self, CS, self.CP.openpilotLongitudinalControl)
 
@@ -788,6 +791,7 @@ class Controls:
     self.prof.checkpoint("Sent")
 
     self.update_button_timers(CS.buttonEvents)
+    self.CS_prev = CS
 
   def controlsd_thread(self):
     while True:

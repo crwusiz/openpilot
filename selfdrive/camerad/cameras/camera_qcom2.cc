@@ -626,6 +626,7 @@ void CameraState::camera_open() {
     camera_id = CAMERA_ID_IMX390;
     ret = sensors_init();
   }
+  LOGD("-- Probing sensor %d done with %d", camera_num, ret);
   assert(ret == 0);
 
   // create session
@@ -1134,7 +1135,7 @@ void cameras_run(MultiCameraState *s) {
         struct cam_req_mgr_message *event_data = (struct cam_req_mgr_message *)ev.u.data;
         // LOGD("v4l2 event: sess_hdl 0x%X, link_hdl 0x%X, frame_id %d, req_id %lld, timestamp 0x%llx, sof_status %d\n", event_data->session_hdl, event_data->u.frame_msg.link_hdl, event_data->u.frame_msg.frame_id, event_data->u.frame_msg.request_id, event_data->u.frame_msg.timestamp, event_data->u.frame_msg.sof_status);
         if (env_debug_frames) {
-          printf("sess_hdl 0x%X, link_hdl 0x%X, frame_id %lu, req_id %lu, timestamp 0x%lx, sof_status %d\n", event_data->session_hdl, event_data->u.frame_msg.link_hdl, event_data->u.frame_msg.frame_id, event_data->u.frame_msg.request_id, event_data->u.frame_msg.timestamp, event_data->u.frame_msg.sof_status);
+          printf("sess_hdl 0x%6X, link_hdl 0x%6X, frame_id %lu, req_id %lu, timestamp %.2f ms, sof_status %d\n", event_data->session_hdl, event_data->u.frame_msg.link_hdl, event_data->u.frame_msg.frame_id, event_data->u.frame_msg.request_id, event_data->u.frame_msg.timestamp/1e6, event_data->u.frame_msg.sof_status);
         }
 
         if (event_data->session_hdl == s->road_cam.session_handle) {

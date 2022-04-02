@@ -17,6 +17,7 @@
 #include "safety/safety_nissan.h"
 #include "safety/safety_volkswagen_mqb.h"
 #include "safety/safety_volkswagen_pq.h"
+#include "safety/safety_body.h"
 */
 
 // from cereal.car.CarParams.SafetyModel
@@ -43,6 +44,8 @@
 #define SAFETY_HYUNDAI_LEGACY 23U
 #define SAFETY_HYUNDAI_COMMUNITY 24U
 #define SAFETY_STELLANTIS 25U
+#define SAFETY_FAW 26U
+#define SAFETY_BODY 27U
 
 uint16_t current_safety_mode = SAFETY_SILENT;
 int16_t current_safety_param = 0;

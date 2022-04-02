@@ -84,7 +84,7 @@ void Sidebar::updateState(const UIState &s) {
     //pandaStatus = {"NO\nPANDA", danger_color};
     pandaStatus = {"차량\n연결안됨", danger_color};
   } /*else if (s.scene.started && !sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK()) {
-    pandaStatus = {"GPS\nSEARCHING", warning_color};
+    pandaStatus = {"GPS\nSEARCH", warning_color};
   }*/
   setProperty("pandaStatus", QVariant::fromValue(pandaStatus));
   m_battery_img = deviceState.getBatteryStatus() == "Charging" ? 1 : 0;
