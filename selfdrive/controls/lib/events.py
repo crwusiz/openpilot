@@ -557,19 +557,24 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   # Thrown when the fan is driven at >50% but is not rotating
   EventName.fanMalfunction: {
-    ET.PERMANENT: NormalPermanentAlert("Fan Malfunction", "Hardware Malfunction"),
+    #ET.PERMANENT: NormalPermanentAlert("Fan Malfunction", "Likely Hardware Issue"),
     ET.PERMANENT: NormalPermanentAlert("FAN 오작동", "장치를 점검하세요"),
   },
 
-  # Camera is not outputting frames at a constant framerate
+  # Camera is not outputting frames
   EventName.cameraMalfunction: {
-    ET.PERMANENT: NormalPermanentAlert("Camera Malfunction", "Hardware Malfunction"),
+    #ET.PERMANENT: NormalPermanentAlert("Camera Malfunction", "Likely Hardware Issue"),
     ET.PERMANENT: NormalPermanentAlert("카메라 오작동", "장치를 점검하세요"),
+  },
+  # Camera framerate too low
+  EventName.cameraFrameRate: {
+    #ET.PERMANENT: NormalPermanentAlert("Camera Frame Rate Low", "Reboot your Device"),
+    ET.PERMANENT: NormalPermanentAlert("카메라 프레임 낮음", "장치를 재부팅 하세요"),
   },
 
   # Unused
   EventName.gpsMalfunction: {
-    ET.PERMANENT: NormalPermanentAlert("GPS Malfunction", "Hardware Malfunction"),
+    ET.PERMANENT: NormalPermanentAlert("GPS Malfunction", "Likely Hardware Issue"),
     ET.PERMANENT: NormalPermanentAlert("GPS 오작동", "장치를 점검하세요"),
   },
 
@@ -782,6 +787,12 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
     ET.SOFT_DISABLE: soft_disable_alert("장치 프로세스 동작오류"),
     ET.NO_ENTRY: NoEntryAlert("장치 프로세스 동작오류"),
   },
+  EventName.commIssueAvgFreq: {
+    #ET.SOFT_DISABLE: soft_disable_alert("Low Communication Rate between Processes"),
+    #ET.NO_ENTRY: NoEntryAlert("Low Communication Rate between Processes"),
+    ET.SOFT_DISABLE: soft_disable_alert("장치 프로세스 통신속도 오류"),
+    ET.NO_ENTRY: NoEntryAlert("장치 프로세스 통신속도 오류"),
+  },
 
   # Thrown when manager detects a service exited unexpectedly while driving
   EventName.processNotRunning: {
@@ -856,21 +867,21 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   },
 
   EventName.roadCameraError: {
-    #ET.PERMANENT: NormalPermanentAlert("Camera Error",
+    #ET.PERMANENT: NormalPermanentAlert("Camera CRC Error - Road",
     ET.PERMANENT: NormalPermanentAlert("주행 카메라 오류",
                                        duration=1.,
                                        creation_delay=30.),
   },
 
   EventName.driverCameraError: {
-    #ET.PERMANENT: NormalPermanentAlert("Camera Error",
+    #ET.PERMANENT: NormalPermanentAlert("Camera CRC Error - Road Fisheye",
     ET.PERMANENT: NormalPermanentAlert("운전자 카메라 오류",
                                        duration=1.,
                                        creation_delay=30.),
   },
 
   EventName.wideRoadCameraError: {
-    #ET.PERMANENT: NormalPermanentAlert("Camera Error",
+    #ET.PERMANENT: NormalPermanentAlert("Camera CRC Error - Driver",
     ET.PERMANENT: NormalPermanentAlert("와이드 주행카메라 오류",
                                        duration=1.,
                                        creation_delay=30.),
@@ -903,6 +914,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
     #ET.NO_ENTRY: NoEntryAlert("CAN Error: Check Connections"),
     ET.NO_ENTRY: NoEntryAlert("CAN 오류 : 장치를 점검하세요"),
   },
+
+  EventName.canBusMissing: {},
 
   EventName.steerUnavailable: {
     #ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("LKAS Fault: Restart the Car"),

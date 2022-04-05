@@ -585,17 +585,18 @@ struct ControlsState @0x97ff69c53601abf1 {
     lqrState @55 :LateralLQRState;
     angleState @58 :LateralAngleState;
     debugState @59 :LateralDebugState;
+    torqueState @60 :LateralTorqueState;
   }
 
-  angleSteers @60 :Float32;
-  applyAccel @61 :Float32;
-  aReqValue @62 :Float32;
-  aReqValueMin @63 :Float32;
-  aReqValueMax @64 :Float32;
+  angleSteers @61 :Float32;
+  applyAccel @62 :Float32;
+  aReqValue @63 :Float32;
+  aReqValueMin @64 :Float32;
+  aReqValueMax @65 :Float32;
 
-  sccStockCamAct @65 :Float32;
-  sccStockCamStatus @66 :Float32;
-  lateralControlSelect @67 :UInt8;
+  sccStockCamAct @66 :Float32;
+  sccStockCamStatus @67 :Float32;
+  lateralControlSelect @68 :UInt8;
 
   enum OpenpilotState @0xdbe58b96d2d1ac61 {
     disabled @0;
@@ -645,6 +646,18 @@ struct ControlsState @0x97ff69c53601abf1 {
     output @7 :Float32;
     saturated @8 :Bool;
     steeringAngleDesiredDeg @9 :Float32;
+   }
+
+  struct LateralTorqueState {
+    active @0 :Bool;
+    error @1 :Float32;
+    errorRate @8 :Float32;
+    p @2 :Float32;
+    i @3 :Float32;
+    d @4 :Float32;
+    f @5 :Float32;
+    output @6 :Float32;
+    saturated @7 :Bool;
    }
 
   struct LateralLQRState {
