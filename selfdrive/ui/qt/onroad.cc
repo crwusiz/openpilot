@@ -71,7 +71,6 @@ void OnroadWindow::mousePressEvent(QMouseEvent* e) {
     bool sidebarVisible = geometry().x() > 0;
     map->setVisible(!sidebarVisible && !map->isVisible());
   }
-
   // propagation event to parent(HomeWindow)
   QWidget::mousePressEvent(e);
 }
@@ -784,23 +783,23 @@ void NvgWindow::updateFrameMat(int w, int h) {
       .translate(-intrinsic_matrix.v[2], -intrinsic_matrix.v[5]);
 }
 
-void NvgWindow::drawLaneLines(QPainter &painter, const UIScene &scene) {
-  if (!scene.end_to_end) {
-    // lanelines
-    for (int i = 0; i < std::size(scene.lane_line_vertices); ++i) {
-      painter.setBrush(QColor::fromRgbF(1.0, 1.0, 1.0, scene.lane_line_probs[i]));
-      painter.drawPolygon(scene.lane_line_vertices[i].v, scene.lane_line_vertices[i].cnt);
-    }
-    // road edges
-    for (int i = 0; i < std::size(scene.road_edge_vertices); ++i) {
-      painter.setBrush(QColor::fromRgbF(1.0, 0, 0, std::clamp<float>(1.0 - scene.road_edge_stds[i], 0.0, 1.0)));
-      painter.drawPolygon(scene.road_edge_vertices[i].v, scene.road_edge_vertices[i].cnt);
-    }
+void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
+  const UIScene &scene = s->scene;
+  // lanelines
+  for (int i = 0; i < std::size(scene.lane_line_vertices); ++i) {
+    painter.setBrush(QColor::fromRgbF(1.0, 1.0, 1.0, scene.lane_line_probs[i]));
+    painter.drawPolygon(scene.lane_line_vertices[i].v, scene.lane_line_vertices[i].cnt);
   }
+  // road edges
+  for (int i = 0; i < std::size(scene.road_edge_vertices); ++i) {
+    painter.setBrush(QColor::fromRgbF(1.0, 0, 0, std::clamp<float>(1.0 - scene.road_edge_stds[i], 0.0, 1.0)));
+    painter.drawPolygon(scene.road_edge_vertices[i].v, scene.road_edge_vertices[i].cnt);
+  }
+
   // paint path
-  QLinearGradient bg(0, height(), 0, height() / 4);
+  QLinearGradient bg(0, height(), 0, height() / 2);
   // wirelessnet2's rainbow barf path
-  if (scene.enabled) {
+  if (scene.enabled && !scene.end_to_end) {
     // openpilot is not disengaged
     if (scene.steeringPressed) {
       // The user is applying torque to the steering wheel
@@ -814,11 +813,29 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIScene &scene) {
       bg.setColorAt(0, QColor(red_lvl, green_lvl, 0, 255));
       bg.setColorAt(1, QColor((int)(0.5 * red_lvl), (int)(0.5 * green_lvl), 0, 50));
     }
-  } else {
-    bg.setColorAt(0, scene.end_to_end ? redColor() : whiteColor());
-    bg.setColorAt(1, scene.end_to_end ? redColor(0) : whiteColor(0));
-  }
+  } else if (scene.enabled && scene.end_to_end) {
+    const auto &orientation = (*s->sm)["modelV2"].getModelV2().getOrientation();
+    float orientation_future = 0;
+    if (orientation.getZ().size() > 16) {
+      orientation_future = std::abs(orientation.getZ()[16]);  // 2.5 seconds
+    }
+    // straight: 101, in turns: 70
+    const float curve_hue = fmax(70, 101 - (orientation_future * 310));
 
+    if (scene.steeringPressed) {
+      // The user is applying torque to the steering wheel
+      bg.setColorAt(0, QColor(0, 191, 255, 255));
+      bg.setColorAt(1, QColor(0, 95, 128, 50));
+    } else {
+      bg.setColorAt(0.0, QColor::fromHslF(148 / 360., 1.0, 0.5, 1.0));
+      bg.setColorAt(0.35, QColor::fromHslF(148 / 360., 1.0, 0.5, 0.9));
+      bg.setColorAt(0.9, QColor::fromHslF(curve_hue / 360., 1.0, 0.65, 0.8));
+      bg.setColorAt(1.0, QColor::fromHslF(curve_hue / 360., 1.0, 0.65, 0.4));
+    }
+  } else {
+    bg.setColorAt(0, whiteColor());
+    bg.setColorAt(1, whiteColor(0));
+  }
   painter.setBrush(bg);
   painter.drawPolygon(scene.track_vertices.v, scene.track_vertices.cnt);
 }
@@ -864,7 +881,10 @@ void NvgWindow::paintGL() {
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(Qt::NoPen);
 
-    drawLaneLines(painter, s->scene);
+    double cur_t = millis_since_boot();
+    drawLaneLines(painter, s);
+    double elapsed = millis_since_boot() - cur_t;
+    qDebug() << "Took" << elapsed << "ms to draw";
 
     auto leads = (*s->sm)["modelV2"].getModelV2().getLeadsV3();
     if (leads[0].getProb() > .5) {

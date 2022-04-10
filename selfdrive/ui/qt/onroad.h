@@ -180,7 +180,7 @@ protected:
   void initializeGL() override;
   void showEvent(QShowEvent *event) override;
   void updateFrameMat(int w, int h) override;
-  void drawLaneLines(QPainter &painter, const UIScene &scene);
+  void drawLaneLines(QPainter &painter, const UIState *s);
   void drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd, bool is_radar);
   inline QColor redColor(int alpha = 255) { return QColor(255, 0, 0, alpha); }
   inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); }

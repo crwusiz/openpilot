@@ -6,6 +6,7 @@ pkill -f boardd
 
 python ./selfdrive/debug/clear_dtc.py
 
-sleep 30
+sleep 10
 
-pkill -f openpilot;./launch_openpilot.sh
+tmux kill-server
+./launch_openpilot.sh
