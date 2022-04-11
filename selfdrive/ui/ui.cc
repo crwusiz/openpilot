@@ -220,6 +220,8 @@ void UIState::updateStatus() {
       scene.output_scale = controls_state.getLateralControlState().getIndiState().getOutput();
     } else if (scene.lateralControlSelect == 2) {
       scene.output_scale = controls_state.getLateralControlState().getLqrState().getOutput();
+    } else if (scene.lateralControlSelect == 3) {
+      scene.output_scale = controls_state.getLateralControlState().getTorqueState().getOutput();
     }
   }
 

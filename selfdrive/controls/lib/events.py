@@ -130,7 +130,7 @@ class Alert:
     self.creation_delay = creation_delay
 
     self.alert_type = ""
-    self.event_type = None
+    self.event_type: Optional[str] = None
 
   def __str__(self) -> str:
     return f"{self.alert_text_1}/{self.alert_text_2} {self.priority} {self.visual_alert} {self.audible_alert}"
@@ -574,7 +574,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   # Unused
   EventName.gpsMalfunction: {
-    ET.PERMANENT: NormalPermanentAlert("GPS Malfunction", "Likely Hardware Issue"),
+    #ET.PERMANENT: NormalPermanentAlert("GPS Malfunction", "Likely Hardware Issue"),
     ET.PERMANENT: NormalPermanentAlert("GPS 오작동", "장치를 점검하세요"),
   },
 

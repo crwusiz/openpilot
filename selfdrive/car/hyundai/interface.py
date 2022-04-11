@@ -276,6 +276,16 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.lqr.k = [-105.0, 450.0]
           ret.lateralTuning.lqr.l = [0.22, 0.318]
 
+    # Torque -----------------------------------------------------------------
+    elif Params().get("LateralControlSelect", encoding='utf8') == "3":
+      ret.lateralTuning.init('torque')
+      ret.lateralTuning.torque.useSteeringAngle = True
+      ret.lateralTuning.torque.kp = 2.0
+      ret.lateralTuning.torque.kf = 0.05
+      ret.lateralTuning.torque.friction = 0.01
+      ret.lateralTuning.torque.ki = 0.05
+      ret.lateralTuning.torque.kd = 0.7
+
     ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05
 

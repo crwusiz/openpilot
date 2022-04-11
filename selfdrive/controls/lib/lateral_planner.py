@@ -41,6 +41,8 @@ class LateralPlanner:
         self.output_scale = sm['controlsState'].lateralControlState.indiState.output
       elif CP.lateralTuning.which() == 'lqr':
         self.output_scale = sm['controlsState'].lateralControlState.lqrState.output
+      elif CP.lateralTuning.which() == 'torque':
+        self.output_scale = sm['controlsState'].lateralControlState.torqueState.output
     except:
       pass
     v_ego = sm['carState'].vEgo

@@ -419,7 +419,7 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   p.setOpacity(1.0);
 
   // bottom info
-  const char* lateral[] = {"Pid", "Indi", "Lqr"};
+  const char* lateral[] = {"Pid", "Indi", "Lqr", "Torque"};
 
   QString infoText;
   infoText.sprintf("[ %s ] SR[%.2f] MDPS[%d] SCC[%d]",

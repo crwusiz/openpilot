@@ -74,7 +74,7 @@ void SshControl::getUserKeys(const QString &username) {
 }
 
 //LateralControlSelect
-LateralControlSelect::LateralControlSelect() : AbstractControl("LateralControl [√]", "조향로직을 선택합니다. (PID/INDI/LQR)", "../assets/offroad/icon_logic.png") {
+LateralControlSelect::LateralControlSelect() : AbstractControl("LateralControl [√]", "조향로직을 선택합니다. (Pid/Indi/Lqr/Torque)", "../assets/offroad/icon_logic.png") {
   label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
   label.setStyleSheet("color: #e0e879");
   hlayout->addWidget(&label);
@@ -117,8 +117,8 @@ LateralControlSelect::LateralControlSelect() : AbstractControl("LateralControl [
     auto str = QString::fromStdString(Params().get("LateralControlSelect"));
     int latcontrol = str.toInt();
     latcontrol = latcontrol + 1;
-    if (latcontrol >= 2 ) {
-      latcontrol = 2;
+    if (latcontrol >= 3 ) {
+      latcontrol = 3;
     }
     QString latcontrols = QString::number(latcontrol);
     Params().put("LateralControlSelect", latcontrols.toStdString());
@@ -130,18 +130,20 @@ LateralControlSelect::LateralControlSelect() : AbstractControl("LateralControl [
 void LateralControlSelect::refresh() {
   QString latcontrol = QString::fromStdString(Params().get("LateralControlSelect"));
   if (latcontrol == "0") {
-    label.setText(QString::fromStdString("PID"));
+    label.setText(QString::fromStdString("Pid"));
   } else if (latcontrol == "1") {
-    label.setText(QString::fromStdString("INDI"));
+    label.setText(QString::fromStdString("Indi"));
   } else if (latcontrol == "2") {
-    label.setText(QString::fromStdString("LQR"));
+    label.setText(QString::fromStdString("Lqr"));
+  } else if (latcontrol == "3") {
+    label.setText(QString::fromStdString("Torque"));
   }
   btnminus.setText("◀");
   btnplus.setText("▶");
 }
 
 //MfcSelect
-MfcSelect::MfcSelect() : AbstractControl("MFC [√]", "MFC를 선택합니다. (LKAS/LDWS/LFA)", "../assets/offroad/icon_mfc.png") {
+MfcSelect::MfcSelect() : AbstractControl("MFC [√]", "MFC를 선택합니다. (Lkas/Ldws/Lfa)", "../assets/offroad/icon_mfc.png") {
   label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
   label.setStyleSheet("color: #e0e879");
   hlayout->addWidget(&label);
@@ -197,18 +199,18 @@ MfcSelect::MfcSelect() : AbstractControl("MFC [√]", "MFC를 선택합니다. (
 void MfcSelect::refresh() {
   QString mfc = QString::fromStdString(Params().get("MfcSelect"));
   if (mfc == "0") {
-    label.setText(QString::fromStdString("LKAS"));
+    label.setText(QString::fromStdString("Lkas"));
   } else if (mfc == "1") {
-    label.setText(QString::fromStdString("LDWS"));
+    label.setText(QString::fromStdString("Ldws"));
   } else if (mfc == "2") {
-    label.setText(QString::fromStdString("LFA"));
+    label.setText(QString::fromStdString("Lfa"));
   }
   btnminus.setText("◀");
   btnplus.setText("▶");
 }
 
 //AebSelect
-AebSelect::AebSelect() : AbstractControl("AEB [√]", "AEB 신호를 선택합니다. (SCC12/FCA11)", "../assets/offroad/icon_aeb.png") {
+AebSelect::AebSelect() : AbstractControl("AEB [√]", "AEB 신호를 선택합니다. (Scc12/Fca11)", "../assets/offroad/icon_aeb.png") {
   label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
   label.setStyleSheet("color: #e0e879");
   hlayout->addWidget(&label);
@@ -264,16 +266,16 @@ AebSelect::AebSelect() : AbstractControl("AEB [√]", "AEB 신호를 선택합�
 void AebSelect::refresh() {
   QString aeb = QString::fromStdString(Params().get("AebSelect"));
   if (aeb == "0") {
-    label.setText(QString::fromStdString("SCC12"));
+    label.setText(QString::fromStdString("Scc12"));
   } else if (aeb == "1") {
-    label.setText(QString::fromStdString("FCA11"));
+    label.setText(QString::fromStdString("Fca11"));
   }
   btnminus.setText("◀");
   btnplus.setText("▶");
 }
 
 //LongControlSelect
-LongControlSelect::LongControlSelect() : AbstractControl("LongControl [√]", "LongControl 모드를 선택합니다. (MAD/MAD+LONG)", "../assets/offroad/icon_long.png") {
+LongControlSelect::LongControlSelect() : AbstractControl("LongControl [√]", "LongControl 모드를 선택합니다. (Mad/Mad+Long)", "../assets/offroad/icon_long.png") {
   label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
   label.setStyleSheet("color: #e0e879");
   hlayout->addWidget(&label);
@@ -329,9 +331,9 @@ LongControlSelect::LongControlSelect() : AbstractControl("LongControl [√]", "L
 void LongControlSelect::refresh() {
   QString longcontrol = QString::fromStdString(Params().get("LongControlSelect"));
   if (longcontrol == "0") {
-    label.setText(QString::fromStdString("MAD"));
+    label.setText(QString::fromStdString("Mad"));
   } else if (longcontrol == "1") {
-    label.setText(QString::fromStdString("MAD+LONG"));
+    label.setText(QString::fromStdString("Mad+Long"));
   }
   btnminus.setText("◀");
   btnplus.setText("▶");
