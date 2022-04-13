@@ -873,16 +873,16 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
                                        creation_delay=30.),
   },
 
-  EventName.driverCameraError: {
+  EventName.wideRoadCameraError: {
     #ET.PERMANENT: NormalPermanentAlert("Camera CRC Error - Road Fisheye",
-    ET.PERMANENT: NormalPermanentAlert("운전자 카메라 오류",
+    ET.PERMANENT: NormalPermanentAlert("와이드 주행카메라 오류",
                                        duration=1.,
                                        creation_delay=30.),
   },
 
-  EventName.wideRoadCameraError: {
+  EventName.driverCameraError: {
     #ET.PERMANENT: NormalPermanentAlert("Camera CRC Error - Driver",
-    ET.PERMANENT: NormalPermanentAlert("와이드 주행카메라 오류",
+    ET.PERMANENT: NormalPermanentAlert("운전자 카메라 오류",
                                        duration=1.,
                                        creation_delay=30.),
   },
@@ -903,7 +903,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   # - CAN data is received, but some message are not received at the right frequency
   # If you're not writing a new car port, this is usually cause by faulty wiring
   EventName.canError: {
-    #ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("CAN Error: Check Connections"),
+    #ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("CAN Error"),
     ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("CAN 오류 : 장치를 점검하세요"),
     ET.PERMANENT: Alert(
       #"CAN Error: Check Connections",
@@ -915,7 +915,18 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
     ET.NO_ENTRY: NoEntryAlert("CAN 오류 : 장치를 점검하세요"),
   },
 
-  EventName.canBusMissing: {},
+  EventName.canBusMissing: {
+    #ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("CAN Bus Disconnected"),
+    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("CAN Bus 연결 끈김"),
+    ET.PERMANENT: Alert(
+      #"CAN Bus Disconnected: Likely Faulty Cable",
+      "CAN Bus 오류 : 케이블을 점검하세요",
+      "",
+      AlertStatus.normal, AlertSize.small,
+      Priority.LOW, VisualAlert.none, AudibleAlert.none, 1., creation_delay=1.),
+    #ET.NO_ENTRY: NoEntryAlert("CAN Bus Disconnected: Check Connections"),
+    ET.NO_ENTRY: NoEntryAlert("CAN Bus 오류 : 장치를 점검하세요"),
+  },
 
   EventName.steerUnavailable: {
     #ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("LKAS Fault: Restart the Car"),
@@ -1026,6 +1037,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   EventName.turningIndicatorOn: {
     ET.WARNING: Alert(
+      #"Steer Unavailable while Turning",
       "방향지시등 동작중에는 핸들을 잡아주세요",
       "",
       AlertStatus.userPrompt, AlertSize.small,
