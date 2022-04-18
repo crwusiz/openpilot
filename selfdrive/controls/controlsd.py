@@ -4,7 +4,7 @@ import math
 from numbers import Number
 
 from cereal import car, log
-from common.numpy_fast import clip, interp
+from common.numpy_fast import clip
 from common.realtime import sec_since_boot, config_realtime_process, Priority, Ratekeeper, DT_CTRL
 from common.profiler import Profiler
 from common.params import Params, put_nonblocking
@@ -142,18 +142,19 @@ class Controls:
     self.VM = VehicleModel(self.CP)
 
     self.lateral_control_select = 0
+    lat_tuning = self.CP.lateralTuning.which()
     if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
       self.LaC = LatControlAngle(self.CP, self.CI)
-    elif self.CP.lateralTuning.which() == 'pid':
+    elif lat_tuning == 'pid':
       self.LaC = LatControlPID(self.CP, self.CI)
       self.lateral_control_select = 0
-    elif self.CP.lateralTuning.which() == 'indi':
+    elif lat_tuning == 'indi':
       self.LaC = LatControlINDI(self.CP, self.CI)
       self.lateral_control_select = 1
-    elif self.CP.lateralTuning.which() == 'lqr':
+    elif lat_tuning == 'lqr':
       self.LaC = LatControlLQR(self.CP, self.CI)
       self.lateral_control_select = 2
-    elif self.CP.lateralTuning.which() == 'torque':
+    elif lat_tuning == 'torque':
       self.LaC = LatControlTorque(self.CP, self.CI)
       self.lateral_control_select = 3
 
@@ -395,7 +396,7 @@ class Controls:
         self.events.add(EventName.localizerMalfunction)
 
       # Check if all manager processes are running
-      #not_running = {p.name for p in self.sm['managerState'].processes if not p.running}
+      #not_running = {p.name for p in self.sm['managerState'].processes if not p.running and p.shouldBeRunning}
       #if self.sm.rcv_frame['managerState'] and (not_running - IGNORE_PROCESSES):
       #  self.events.add(EventName.processNotRunning)
 
@@ -779,18 +780,20 @@ class Controls:
     controlsState.sccStockCamStatus = self.sccStockCamStatus
     controlsState.lateralControlSelect = int(self.lateral_control_select)
 
+    lat_tuning = self.CP.lateralTuning.which()
     if self.joystick_mode:
       controlsState.lateralControlState.debugState = lac_log
     elif self.CP.steerControlType == car.CarParams.SteerControlType.angle:
       controlsState.lateralControlState.angleState = lac_log
-    elif self.CP.lateralTuning.which() == 'pid':
+    elif lat_tuning == 'pid':
       controlsState.lateralControlState.pidState = lac_log
-    elif self.CP.lateralTuning.which() == 'indi':
+    elif lat_tuning == 'indi':
       controlsState.lateralControlState.indiState = lac_log
-    elif self.CP.lateralTuning.which() == 'lqr':
+    elif lat_tuning == 'lqr':
       controlsState.lateralControlState.lqrState = lac_log
-    elif self.CP.lateralTuning.which() == 'torque':
+    elif lat_tuning == 'torque':
       controlsState.lateralControlState.torqueState = lac_log
+
     self.pm.send('controlsState', dat)
 
     # carState

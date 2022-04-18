@@ -21,6 +21,7 @@ class LatControlPID(LatControl):
   def reset(self):
     super().reset()
     self.pid.reset()
+    self.errors = []
 
   def update(self, active, CS, CP, VM, params, last_actuators, desired_curvature, desired_curvature_rate, llk):
     pid_log = log.ControlsState.LateralPIDState.new_message()

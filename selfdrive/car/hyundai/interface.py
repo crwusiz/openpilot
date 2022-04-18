@@ -174,7 +174,7 @@ class CarInterface(CarInterfaceBase):
 
     # INDI -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "1":
-      if candidate in [CAR.GENESIS]:
+      if candidate == CAR.GENESIS:
           ret.lateralTuning.init('indi')
           ret.lateralTuning.indi.innerLoopGainBP = [0.]
           ret.lateralTuning.indi.innerLoopGainV = [3.5]
@@ -184,7 +184,7 @@ class CarInterface(CarInterfaceBase):
           ret.lateralTuning.indi.timeConstantV = [1.4]
           ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
           ret.lateralTuning.indi.actuatorEffectivenessV = [2.3]
-      elif candidate in [CAR.GENESIS_G70]:
+      elif candidate  == CAR.GENESIS_G70:
           ret.lateralTuning.init('indi')
           ret.lateralTuning.indi.innerLoopGainBP = [0.]
           ret.lateralTuning.indi.innerLoopGainV = [2.5]
@@ -282,16 +282,16 @@ class CarInterface(CarInterfaceBase):
     elif Params().get("LateralControlSelect", encoding='utf8') == "3":
       ret.lateralTuning.init('torque')
       ret.lateralTuning.torque.useSteeringAngle = True
-      ret.lateralTuning.torque.kp = 1.0
-      ret.lateralTuning.torque.kf = 0.05
-      ret.lateralTuning.torque.friction = 0.01
-      ret.lateralTuning.torque.ki = 0.0
-      ret.lateralTuning.torque.kd = 0.5
+      max_lat_accel = 2.5
+      ret.lateralTuning.torque.kp = 2.0 / max_lat_accel
+      ret.lateralTuning.torque.kf = 1.0 / max_lat_accel
+      ret.lateralTuning.torque.friction = 0.6
+      ret.lateralTuning.torque.ki = 0.5 / max_lat_accel
 
     ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05
 
-    ret.steerActuatorDelay = 0.2
+    ret.steerActuatorDelay = 0.1
     ret.steerRateCost = 0.35
     ret.steerLimitTimer = 2.5
 
@@ -303,10 +303,7 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalActuatorDelayLowerBound = 0.3
     ret.longitudinalActuatorDelayUpperBound = 0.3
 
-    ret.stopAccel = -2.0
     ret.stoppingDecelRate = 0.6  # brake_travel/s while trying to stop
-    ret.vEgoStopping = 0.6
-    ret.vEgoStarting = 0.5
 
     # TODO: get actual value, for now starting with reasonable value for
     # civic and scaling by mass and wheelbase
