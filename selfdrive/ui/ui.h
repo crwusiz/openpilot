@@ -105,7 +105,7 @@ typedef struct UIScene {
   // ui add
   int lateralControlSelect;
   float output_scale;
-  bool steeringPressed, enabled;
+  bool steeringPressed, engaged, override;
   int satelliteCount;
 
   // modelV2

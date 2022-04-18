@@ -101,7 +101,7 @@ static void update_model(UIState *s, const cereal::ModelDataV2::Reader &model) {
     max_distance = std::clamp((float)(lead_d - fmin(lead_d * 0.35, 10.)), 0.0f, max_distance);
   }
   max_idx = get_path_length_idx(model_position, max_distance);
-  update_line_data(s, model_position, 0.5, 1.22, &scene.track_vertices, max_idx);
+  update_line_data(s, model_position, scene.end_to_end ? 0.9 : 0.5, 1.22, &scene.track_vertices, max_idx);
 }
 
 static void update_sockets(UIState *s) {
@@ -200,9 +200,9 @@ void ui_update_params(UIState *s) {
 
 void UIState::updateStatus() {
   if (scene.started && sm->updated("controlsState")) {
-    auto controls_state = (*sm)["controlsState"].getControlsState();
-    auto alert_status = controls_state.getAlertStatus();
-    auto state = controls_state.getState();
+    auto cs = (*sm)["controlsState"].getControlsState();
+    auto alert_status = cs.getAlertStatus();
+    auto state = cs.getState();
     if (alert_status == cereal::ControlsState::AlertStatus::USER_PROMPT) {
       status = STATUS_WARNING;
     } else if (alert_status == cereal::ControlsState::AlertStatus::CRITICAL) {
@@ -210,24 +210,25 @@ void UIState::updateStatus() {
     } else if (state == cereal::ControlsState::OpenpilotState::PRE_ENABLED || state == cereal::ControlsState::OpenpilotState::OVERRIDING) {
       status = STATUS_OVERRIDE;
     } else {
-      status = controls_state.getEnabled() ? STATUS_ENGAGED : STATUS_DISENGAGED;
-      scene.enabled = controls_state.getEnabled();
+      status = cs.getEnabled() ? STATUS_ENGAGED : STATUS_DISENGAGED;
+      scene.engaged = cs.getEnabled();
     }
-    scene.lateralControlSelect = controls_state.getLateralControlSelect();
+    scene.lateralControlSelect = cs.getLateralControlSelect();
     if (scene.lateralControlSelect == 0) {
-      scene.output_scale = controls_state.getLateralControlState().getPidState().getOutput();
+      scene.output_scale = cs.getLateralControlState().getPidState().getOutput();
     } else if (scene.lateralControlSelect == 1) {
-      scene.output_scale = controls_state.getLateralControlState().getIndiState().getOutput();
+      scene.output_scale = cs.getLateralControlState().getIndiState().getOutput();
     } else if (scene.lateralControlSelect == 2) {
-      scene.output_scale = controls_state.getLateralControlState().getLqrState().getOutput();
+      scene.output_scale = cs.getLateralControlState().getLqrState().getOutput();
     } else if (scene.lateralControlSelect == 3) {
-      scene.output_scale = controls_state.getLateralControlState().getTorqueState().getOutput();
+      scene.output_scale = cs.getLateralControlState().getTorqueState().getOutput();
     }
   }
 
   if (sm->updated("carState")) {
-    auto carState = (*sm)["carState"].getCarState();
-    scene.steeringPressed = carState.getSteeringPressed();
+    auto ce = (*sm)["carState"].getCarState();
+    scene.steeringPressed = ce.getSteeringPressed();
+    scene.override = ce.getGasPressed();    
   }
 
   if (sm->updated("ubloxGnss")) {

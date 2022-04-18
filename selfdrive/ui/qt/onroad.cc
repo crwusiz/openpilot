@@ -237,7 +237,6 @@ void OnroadHud::updateState(const UIState &s) {
   setProperty("cruiseMaxSpeed", QString::number(std::nearbyint(cruiseMaxSpeed)));
   setProperty("speedUnit", s.scene.is_metric ? "km/h" : "mph");
   setProperty("status", s.status);
-  setProperty("engageable", cs.getEngageable() || cs.getEnabled());
   setProperty("steeringPressed", ce.getSteeringPressed());
   setProperty("dmActive", sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode());
   setProperty("brake_status", ce.getBrakeLights() || ce.getBrakePressed());
@@ -323,6 +322,8 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
     wheelbgColor = engagedColor(200);
   } else if (status == STATUS_WARNING) {
     wheelbgColor = warningColor(200);
+  } else if (status == STATUS_OVERRIDE) {
+    wheelbgColor = overrideColor(200);
   } else if (steeringPressed) {
     wheelbgColor = steeringpressedColor(200);
   }
@@ -629,7 +630,7 @@ void OnroadHud::drawRightDevUi(QPainter &p, int x, int y) {
   }
 
   // Add Desired Steering Angle, Unit: Degrees
-  if (engageable) {
+  if (status == STATUS_ENGAGED || STATUS_OVERRIDE) {
     char val_str[8];
     valueColor = limeColor();
 
@@ -647,7 +648,7 @@ void OnroadHud::drawRightDevUi(QPainter &p, int x, int y) {
   }
 
   // Add Relative Distance to Primary Lead Car, Unit: Meters
-  if (engageable) {
+  if (status == STATUS_ENGAGED || STATUS_OVERRIDE) {
     char val_str[8];
     char units_str[8];
     valueColor = whiteColor();
@@ -671,7 +672,7 @@ void OnroadHud::drawRightDevUi(QPainter &p, int x, int y) {
   }
 
   // Add Relative Velocity vs Primary Lead Car, Unit: kph if metric, else mph
-  if (engageable) {
+  if (status == STATUS_ENGAGED || STATUS_OVERRIDE) {
     char val_str[8];
     valueColor = whiteColor();
 
@@ -799,21 +800,24 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
   // paint path
   QLinearGradient bg(0, height(), 0, height() / 4);
   // wirelessnet2's rainbow barf path
-  if (scene.enabled && !scene.end_to_end) {
+  if (scene.engaged && !scene.end_to_end) {
     // openpilot is not disengaged
     if (scene.steeringPressed) {
       // The user is applying torque to the steering wheel
-      bg.setColorAt(0, QColor(0, 191, 255, 255));
+      bg.setColorAt(0, steeringpressedColor(200));
       bg.setColorAt(1, QColor(0, 95, 128, 50));
+    } else if (scene.override) {
+      bg.setColorAt(0, overrideColor(200));
+      bg.setColorAt(1, QColor(72, 77, 74, 50));
     } else {
       // Draw colored track
       int torqueScale = (int)std::fabs(510 * (float)scene.output_scale);
       int red_lvl = std::fmin(255, torqueScale);
       int green_lvl = std::fmin(255, 510 - torqueScale);
-      bg.setColorAt(0, QColor(red_lvl, green_lvl, 0, 255));
+      bg.setColorAt(0, QColor(red_lvl, green_lvl, 0, 200));
       bg.setColorAt(1, QColor((int)(0.5 * red_lvl), (int)(0.5 * green_lvl), 0, 50));
     }
-  } else if (scene.enabled && scene.end_to_end) {
+  } else if (scene.engaged && scene.end_to_end) {
     const auto &orientation = (*s->sm)["modelV2"].getModelV2().getOrientation();
     float orientation_future = 0;
     if (orientation.getZ().size() > 16) {
@@ -826,16 +830,18 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
 
     if (scene.steeringPressed) {
       // The user is applying torque to the steering wheel
-      bg.setColorAt(0, QColor(0, 191, 255, 255));
+      bg.setColorAt(0, steeringpressedColor(200));
       bg.setColorAt(1, QColor(0, 95, 128, 50));
+    } else if (scene.override) {
+      bg.setColorAt(0, overrideColor(200));
+      bg.setColorAt(1, QColor(72, 77, 74, 50));
     } else {
-      bg.setColorAt(0.0 / 1.5, QColor::fromHslF(148 / 360., 1.0, 0.5, 1.0));
-      bg.setColorAt(0.55 / 1.5, QColor::fromHslF(112 / 360., 1.0, 0.68, 0.8));
-      bg.setColorAt(0.9 / 1.5, QColor::fromHslF(curve_hue / 360., 1.0, 0.65, 0.6));
-      bg.setColorAt(1.0, QColor::fromHslF(curve_hue / 360., 1.0, 0.65, 0.0));
+      bg.setColorAt(0.0, QColor::fromHslF(148 / 360., 0.94, 0.51, 0.4));
+      bg.setColorAt(0.75 / 1.5, QColor::fromHslF(curve_hue / 360., 1.0, 0.68, 0.35));
+      bg.setColorAt(1.0, QColor::fromHslF(curve_hue / 360., 1.0, 0.68, 0.0));
     }
   } else {
-    bg.setColorAt(0, whiteColor());
+    bg.setColorAt(0, whiteColor(200));
     bg.setColorAt(1, whiteColor(0));
   }
   painter.setBrush(bg);

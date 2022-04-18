@@ -18,7 +18,6 @@ class OnroadHud : public QWidget {
   Q_PROPERTY(QString cruiseMaxSpeed MEMBER cruiseMaxSpeed NOTIFY valueChanged);
 
   Q_PROPERTY(bool is_cruise_set MEMBER is_cruise_set NOTIFY valueChanged);
-  Q_PROPERTY(bool engageable MEMBER engageable NOTIFY valueChanged);
   Q_PROPERTY(bool steeringPressed MEMBER steeringPressed NOTIFY valueChanged);
   Q_PROPERTY(bool dmActive MEMBER dmActive NOTIFY valueChanged);
   Q_PROPERTY(bool brake_status MEMBER brake_status NOTIFY valueChanged);
@@ -79,6 +78,7 @@ private:
   inline QColor orangeColor(int alpha = 255) { return QColor(255, 188, 0, alpha); }
   inline QColor engagedColor(int alpha = 255) { return QColor(23, 134, 68, alpha); }
   inline QColor warningColor(int alpha = 255) { return QColor(218, 111, 37, alpha); }
+  inline QColor overrideColor(int alpha = 255) { return QColor(145, 155, 149, alpha); }
   inline QColor steeringpressedColor(int alpha = 255) { return QColor(0, 191, 255, alpha); }
 
   QPixmap engage_img;
@@ -110,7 +110,6 @@ private:
   QString cruiseMaxSpeed;
 
   bool is_cruise_set = false;
-  bool engageable = false;
   bool steeringPressed = false;
   bool dmActive = false;
   bool brake_status = false;
@@ -186,6 +185,8 @@ protected:
   inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); }
   inline QColor light_orangeColor(int alpha = 255) { return QColor(255, 165, 0, alpha); }
   inline QColor golden_yellowColor(int alpha = 255) { return QColor(255, 223, 0, alpha); }
+  inline QColor steeringpressedColor(int alpha = 255) { return QColor(0, 191, 255, alpha); }
+  inline QColor overrideColor(int alpha = 255) { return QColor(145, 155, 149, alpha); }
   double prev_draw_t = 0;
   FirstOrderFilter fps_filter;
 };
