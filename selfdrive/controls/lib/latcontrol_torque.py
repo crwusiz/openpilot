@@ -5,6 +5,17 @@ from selfdrive.controls.lib.latcontrol import LatControl, MIN_STEER_SPEED
 from selfdrive.controls.lib.vehicle_model import ACCELERATION_DUE_TO_GRAVITY
 from cereal import log
 
+# At higher speeds (25+mph) we can assume:
+# Lateral acceleration achieved by a specific car correlates to
+# torque applied to the steering rack. It does not correlate to
+# wheel slip, or to speed.
+
+# This controller applies torque to achieve desired lateral
+# accelerations. To compensate for the low speed effects we
+# use a LOW_SPEED_FACTOR in the error. Additionally there is
+# friction in the steering wheel that needs to be overcome to
+# move it at all, this is compensated for too.
+
 LOW_SPEED_FACTOR = 200
 JERK_THRESHOLD = 0.2
 
@@ -32,6 +43,7 @@ class LatControlTorque(LatControl):
       output_torque = 0.0
       pid_log.active = False
       self.pid.reset()
+      angle_steers_des = 0.0
     else:
       if self.use_steering_angle:
         actual_curvature = -VM.calc_curvature(math.radians(CS.steeringAngleDeg - params.angleOffsetDeg), CS.vEgo, params.roll)
@@ -63,7 +75,7 @@ class LatControlTorque(LatControl):
       pid_log.output = -output_torque
       pid_log.saturated = self._check_saturation(self.steer_max - abs(output_torque) < 1e-3, CS)
 
-    angle_steers_des = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll)) + params.angleOffsetDeg
+      angle_steers_des = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll)) + params.angleOffsetDeg
 
     #TODO left is positive in this convention
     return -output_torque, angle_steers_des, pid_log

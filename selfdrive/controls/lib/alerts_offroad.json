@@ -1,8 +1,4 @@
 {
-  "Offroad_ChargeDisabled": {
-    "text": "차량의 시동이 하루이상 꺼져있으면 장치의 충전이 불가능합니다. 시동을 켜서 충전을 시작하세요.",
-    "severity": 0
-  },
   "Offroad_TemperatureTooHigh": {
     "text": "장치 온도가 너무 높아서 시스템이 시작되지 않습니다.",
     "severity": 1

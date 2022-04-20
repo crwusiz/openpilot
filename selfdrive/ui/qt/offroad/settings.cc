@@ -6,9 +6,7 @@
 
 #include <QDebug>
 
-#ifndef QCOM
 #include "selfdrive/ui/qt/offroad/networking.h"
-#endif
 
 #ifdef ENABLE_MAPS
 #include "selfdrive/ui/qt/maps/map_settings.h"
@@ -242,6 +240,23 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   power_layout->addWidget(reboot_btn);
   QObject::connect(reboot_btn, &QPushButton::clicked, this, &DevicePanel::reboot);
 
+  QPushButton *rebuild_btn = new QPushButton("Rebuild");
+  rebuild_btn->setObjectName("rebuild_btn");
+  power_layout->addWidget(rebuild_btn);
+  QObject::connect(rebuild_btn, &QPushButton::clicked, [=]() {
+
+    if (ConfirmationDialog::confirm("Are you sure you want to rebuild?", this)) {
+      std::system("cd /data/openpilot && scons -c");
+      std::system("rm /data/openpilot/.sconsign.dblite");
+      std::system("rm /data/openpilot/prebuilt");
+      std::system("rm -rf /tmp/scons_cache");
+      if (Hardware::TICI())
+        std::system("sudo reboot");
+      else
+        std::system("reboot");
+    }
+  });
+
   //QPushButton *poweroff_btn = new QPushButton("Power Off");
   QPushButton *poweroff_btn = new QPushButton("종료");
   poweroff_btn->setObjectName("poweroff_btn");
@@ -255,6 +270,8 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   setStyleSheet(R"(
     #restart_openpilot_btn { height: 120px; border-radius: 15px; background-color: #2C2CE2; }
     #restart_openpilot_btn:pressed { background-color: #2424FF; }
+    #rebuild_btn { height: 120px; border-radius: 15px; background-color: #393939; }
+    #rebuild_btn:pressed { background-color: #4a4a4a; }
     #reboot_btn { height: 120px; border-radius: 15px; background-color: #2CE22C; }
     #reboot_btn:pressed { background-color: #24FF24; }
     #poweroff_btn { height: 120px; border-radius: 15px; background-color: #E22C2C; }
@@ -388,120 +405,8 @@ void SoftwarePanel::updateLabels() {
   osVersionLbl->setText(QString::fromStdString(Hardware::get_os_version()).trimmed());
 }
 
-C2NetworkPanel::C2NetworkPanel(QWidget *parent) : QWidget(parent) {
-  QVBoxLayout *layout = new QVBoxLayout(this);
-  layout->setContentsMargins(50, 0, 50, 0);
-
-  ListWidget *list = new ListWidget();
-  list->setSpacing(30);
-#ifdef QCOM
-  //auto wifiBtn = new ButtonControl("\U0001f4f6 Wi-Fi Settings", "OPEN");
-  auto wifiBtn = new ButtonControl("\U0001f4f6 WiFi 설정", "열기");
-  QObject::connect(wifiBtn, &ButtonControl::clicked, [=]() { HardwareEon::launch_wifi(); });
-  list->addItem(wifiBtn);
-
-  //auto tetheringBtn = new ButtonControl("\U0001f4f6 Tethering Settings", "OPEN");
-  auto tetheringBtn = new ButtonControl("\U0001f4f6 테더링 설정", "열기");
-  QObject::connect(tetheringBtn, &ButtonControl::clicked, [=]() { HardwareEon::launch_tethering(); });
-  list->addItem(tetheringBtn);
-
-  //auto androidBtn = new ButtonControl("\U00002699 Android Setting", "OPEN");
-  auto androidBtn = new ButtonControl("\U00002699 안드로이드 설정", "열기");
-  QObject::connect(androidBtn, &ButtonControl::clicked, [=]() { HardwareEon::launch_setting(); });
-  list->addItem(androidBtn);
-#endif
-  ipaddress = new LabelControl("IP Address", "");
-  list->addItem(ipaddress);
-
-  // SSH key management
-  list->addItem(new SshToggle());
-  list->addItem(new SshControl());
-  list->addItem(horizontal_line());
-  list->addItem(new LateralControlSelect());
-  list->addItem(new MfcSelect());
-  list->addItem(new AebSelect());
-  list->addItem(new LongControlSelect());
-  list->addItem(horizontal_line());
-
-  //auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "RUN");
-  auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "실행");
-  QObject::connect(gitpullbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/scripts/gitpull.sh");
-    }
-  });
-  list->addItem(gitpullbtn);
-
-  //auto pandaflashbtn = new ButtonControl("Panda Firmware Flash", "RUN");
-  auto pandaflashbtn = new ButtonControl("판다 펌웨어 플래싱", "실행");
-  QObject::connect(pandaflashbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/panda/board/flash.sh");
-    }
-  });
-  list->addItem(pandaflashbtn);
-
-  //auto cleardtcbtn = new ButtonControl("DTC Clear", "RUN");
-  auto cleardtcbtn = new ButtonControl("오류코드 제거", "실행");
-  QObject::connect(cleardtcbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/scripts/cleardtc.sh");
-    }
-  });
-  list->addItem(cleardtcbtn);
-
-  //auto pandarecoverbtn = new ButtonControl("Panda Firmware Recover", "RUN");
-  auto pandarecoverbtn = new ButtonControl("판다 펌웨어 복구", "실행");
-  QObject::connect(pandarecoverbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/panda/board/recover.sh");
-    }
-  });
-  list->addItem(pandarecoverbtn);
-
-  //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");
-  auto realdataclearbtn = new ButtonControl("주행로그 삭제", "실행");
-  QObject::connect(realdataclearbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      QProcess::execute("/data/openpilot/scripts/realdataclear.sh");
-    }
-  });
-  list->addItem(realdataclearbtn);
-
-  layout->addWidget(list);
-  layout->addStretch(1);
-}
-
-void C2NetworkPanel::showEvent(QShowEvent *event) {
-  ipaddress->setText(getIPAddress());
-}
-
-QString C2NetworkPanel::getIPAddress() {
-  std::string result = util::check_output("ifconfig wlan0");
-  if (result.empty()) return "";
-
-  const std::string inetaddrr = "inet addr:";
-  std::string::size_type begin = result.find(inetaddrr);
-  if (begin == std::string::npos) return "";
-
-  begin += inetaddrr.length();
-  std::string::size_type end = result.find(' ', begin);
-  if (end == std::string::npos) return "";
-
-  return result.substr(begin, end - begin).c_str();
-}
-
 QWidget *network_panel(QWidget *parent) {
-#ifdef QCOM
-  return new C2NetworkPanel(parent);
-#else
   return new Networking(parent);
-#endif
 }
 
 static QStringList get_list(const char* path)
@@ -650,11 +555,6 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
   )");
 }
 
-void SettingsWindow::hideEvent(QHideEvent *event) {
-#ifdef QCOM
-  HardwareEon::close_activities();
-#endif
-}
 
 // Community Panel
 CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
@@ -717,12 +617,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   //"Create prebuilt files to speed bootup",
                                   "Prebuilt 파일을 생성하며 부팅속도를 향상시킵니다.",
                                   "../assets/offroad/icon_addon.png", this));
-#ifdef QCOM
-  toggles.append(new ParamControl("ShutdownDisable", "Shutdownd Disable",
-                                  //"Disable Shutdownd",
-                                  "Shutdownd (시동 off 5분) 자동종료를 사용하지않습니다. (batteryless 기종)",
-                                  "../assets/offroad/icon_addon.png", this));
-#endif
   toggles.append(new ParamControl("LoggerDisable", "Logger Disable",
                                   //"Disable Logger is Reduce system load",
                                   "Logger 프로세스를 종료하여 시스템 부하를 줄입니다.",

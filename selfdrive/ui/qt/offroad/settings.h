@@ -20,7 +20,6 @@ public:
   explicit SettingsWindow(QWidget *parent = 0);
 
 protected:
-  void hideEvent(QHideEvent *event) override;
   void showEvent(QShowEvent *event) override;
 
 signals:
@@ -89,19 +88,6 @@ private:
 
   Params params;
   QFileSystemWatcher *fs_watch;
-};
-
-
-class C2NetworkPanel: public QWidget {
-  Q_OBJECT
-
-public:
-  explicit C2NetworkPanel(QWidget* parent = nullptr);
-
-private:
-  void showEvent(QShowEvent *event) override;
-  QString getIPAddress();
-  LabelControl *ipaddress;
 };
 
 

@@ -339,7 +339,7 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   return bus_fwd;
 }
 
-static const addr_checks* hyundai_community_init(int16_t param) {
+static const addr_checks* hyundai_community_init(uint32_t param) {
   UNUSED(param);
   controls_allowed = false;
   relay_malfunction_reset();

@@ -51,7 +51,6 @@ def manager_init() -> None:
     ("MfcSelect", "0"),
     ("AebSelect", "0"),
     ("LateralControlSelect", "0"),
-    ("ShutdownDisable", "1"),
     ("LoggerDisable", "1"),
     ("NavDisable", "1"),
     ("NewRadarInterface", "0"),
@@ -146,15 +145,12 @@ def manager_thread() -> None:
   ensure_running(managed_processes.values(), started=False, not_run=ignore)
 
   started_prev = False
-  sm = messaging.SubMaster(['deviceState'])
+  sm = messaging.SubMaster(['deviceState', 'carParams'], poll=['deviceState'])
   pm = messaging.PubMaster(['managerState'])
 
   while True:
     sm.update()
     not_run = ignore[:]
-
-    if params.get_bool("ShutdownDisable"):
-      not_run.append("autoshutdownd")
 
     if params.get_bool("LoggerDisable"):
       not_run.append("loggerd")
@@ -170,7 +166,7 @@ def manager_thread() -> None:
 
     started = sm['deviceState'].started
     driverview = params.get_bool("IsDriverViewEnabled")
-    ensure_running(managed_processes.values(), started, driverview, not_run)
+    ensure_running(managed_processes.values(), started=started, driverview=driverview, notcar=sm['carParams'].notCar, not_run=ignore)
 
     # trigger an update after going offroad
     if started_prev and not started and 'updated' in managed_processes:
