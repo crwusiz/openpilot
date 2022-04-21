@@ -1,6 +1,5 @@
 import math
 from common.numpy_fast import interp
-from selfdrive.controls.lib.latcontrol_pid import ERROR_RATE_FRAME
 from selfdrive.controls.lib.pid import PIDController
 from selfdrive.controls.lib.latcontrol import LatControl, MIN_STEER_SPEED
 from selfdrive.controls.lib.vehicle_model import ACCELERATION_DUE_TO_GRAVITY
