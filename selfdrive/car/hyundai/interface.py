@@ -285,13 +285,13 @@ class CarInterface(CarInterfaceBase):
       max_lat_accel = 2.5
       ret.lateralTuning.torque.kp = 2.0 / max_lat_accel
       ret.lateralTuning.torque.kf = 1.0 / max_lat_accel
-      ret.lateralTuning.torque.friction = 0.6
+      ret.lateralTuning.torque.friction = 0.01
       ret.lateralTuning.torque.ki = 0.5 / max_lat_accel
 
     ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05
 
-    ret.steerActuatorDelay = 0.1
+    ret.steerActuatorDelay = 0.2
     ret.steerRateCost = 0.35
     ret.steerLimitTimer = 2.5
 
@@ -396,8 +396,8 @@ class CarInterface(CarInterfaceBase):
 
     if self.CC.longcontrol and self.CS.cruise_unavail:
       events.add(EventName.brakeUnavailable)
-    if abs(ret.steeringAngleDeg) > 90. and EventName.steerTempUnavailable not in events.events:
-      events.add(EventName.steerTempUnavailable)
+    #if abs(ret.steeringAngleDeg) > 90. and EventName.steerTempUnavailable not in events.events:
+    #  events.add(EventName.steerTempUnavailable)
     if self.low_speed_alert and not self.CS.mdps_bus:
       events.add(EventName.belowSteerSpeed)
     if self.CC.turning_indicator_alert:
