@@ -183,9 +183,26 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   QHBoxLayout *reset_layout = new QHBoxLayout();
   reset_layout->setSpacing(30);
 
+  QPushButton *rebuild_btn = new QPushButton("Rebuild");
+  rebuild_btn->setObjectName("rebuild_btn");
+  rebuild_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
+  reset_layout->addWidget(rebuild_btn);
+  QObject::connect(rebuild_btn, &QPushButton::clicked, [=]() {
+
+    //if (ConfirmationDialog::confirm("Are you sure you want to rebuild?", this)) {
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
+      std::system("cd /data/openpilot && scons -c");
+      std::system("rm /data/openpilot/.sconsign.dblite");
+      std::system("rm /data/openpilot/prebuilt");
+      std::system("rm -rf /tmp/scons_cache");
+      std::system("sudo reboot");
+    }
+  });
+
   // reset calibration button
   //QPushButton *reset_calib_btn = new QPushButton("Reset Calibration,LiveParameters");
   QPushButton *reset_calib_btn = new QPushButton("Calibration,LiveParameters 리셋");
+  reset_calib_btn->setObjectName("reset_calib_btn");
   reset_calib_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
   reset_layout->addWidget(reset_calib_btn);
   QObject::connect(reset_calib_btn, &QPushButton::released, [=]() {
@@ -199,6 +216,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
       });
     }
   });
+
   addItem(reset_layout);
 
   // power buttons
@@ -223,23 +241,6 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   power_layout->addWidget(reboot_btn);
   QObject::connect(reboot_btn, &QPushButton::clicked, this, &DevicePanel::reboot);
 
-  QPushButton *rebuild_btn = new QPushButton("Rebuild");
-  rebuild_btn->setObjectName("rebuild_btn");
-  power_layout->addWidget(rebuild_btn);
-  QObject::connect(rebuild_btn, &QPushButton::clicked, [=]() {
-
-    if (ConfirmationDialog::confirm("Are you sure you want to rebuild?", this)) {
-      std::system("cd /data/openpilot && scons -c");
-      std::system("rm /data/openpilot/.sconsign.dblite");
-      std::system("rm /data/openpilot/prebuilt");
-      std::system("rm -rf /tmp/scons_cache");
-      if (Hardware::TICI())
-        std::system("sudo reboot");
-      else
-        std::system("reboot");
-    }
-  });
-
   //QPushButton *poweroff_btn = new QPushButton("Power Off");
   QPushButton *poweroff_btn = new QPushButton("종료");
   poweroff_btn->setObjectName("poweroff_btn");
@@ -253,8 +254,6 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   setStyleSheet(R"(
     #restart_openpilot_btn { height: 120px; border-radius: 15px; background-color: #2C2CE2; }
     #restart_openpilot_btn:pressed { background-color: #2424FF; }
-    #rebuild_btn { height: 120px; border-radius: 15px; background-color: #393939; }
-    #rebuild_btn:pressed { background-color: #4a4a4a; }
     #reboot_btn { height: 120px; border-radius: 15px; background-color: #2CE22C; }
     #reboot_btn:pressed { background-color: #24FF24; }
     #poweroff_btn { height: 120px; border-radius: 15px; background-color: #E22C2C; }
