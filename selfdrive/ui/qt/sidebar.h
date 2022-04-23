@@ -54,10 +54,4 @@ protected:
   QString net_type;
   int net_strength = 0;
   QString wifi_addr = "────────";
-  const QMap<int, QImage> battery_imgs = {
-    {0, QImage("../assets/images/battery.png")},
-    {1, QImage("../assets/images/battery_charging.png")},
-  };
-  int m_batteryPercent = 0;
-  int m_battery_img;
 };

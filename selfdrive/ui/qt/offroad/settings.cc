@@ -183,23 +183,6 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   QHBoxLayout *reset_layout = new QHBoxLayout();
   reset_layout->setSpacing(30);
 
-  // addfunc button
-  const char* addfunc = "sh /data/openpilot/scripts/addfunc.sh";
-  //QPushButton *addfuncbtn = new QPushButton("Add Func");
-  QPushButton *addfuncbtn = new QPushButton("추가기능");
-  addfuncbtn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
-  reset_layout->addWidget(addfuncbtn);
-  QObject::connect(addfuncbtn, &QPushButton::released, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      std::system(addfunc);
-      emit closeSettings();
-      QTimer::singleShot(1000, []() {
-        Params().putBool("SoftRestartTriggered", true);
-      });
-    }
-  });
-
   // reset calibration button
   //QPushButton *reset_calib_btn = new QPushButton("Reset Calibration,LiveParameters");
   QPushButton *reset_calib_btn = new QPushButton("Calibration,LiveParameters 리셋");
