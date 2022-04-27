@@ -7,8 +7,6 @@
 #include "selfdrive/ui/qt/widgets/cameraview.h"
 #include "selfdrive/ui/ui.h"
 
-#include <QMap>
-
 // ***** onroad widgets ***** ( wirelessnet2 init )
 class OnroadHud : public QWidget {
   Q_OBJECT

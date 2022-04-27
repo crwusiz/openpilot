@@ -3,7 +3,7 @@ import random
 from math import sqrt
 
 import numpy as np
-from common.numpy_fast import clip, interp
+from common.numpy_fast import clip, interp, mean
 from cereal import car
 from common.realtime import DT_CTRL
 from common.conversions import Conversions as CV
@@ -270,7 +270,7 @@ class SccSmoother:
 
     lateralPlan = sm['lateralPlan']
     if len(lateralPlan.curvatures) == CONTROL_N:
-      curv = lateralPlan.curvatures[-1]
+      curv = (lateralPlan.curvatures[-1] + lateralPlan.curvatures[-2]) / 2.
       a_y_max = 2.975 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
       v_curvature = sqrt(a_y_max / max(abs(curv), 1e-4))
       model_speed = np.mean(v_curvature) * 0.85 * 0.98  # ("sccCurvatureFactor")
@@ -308,7 +308,7 @@ class SccSmoother:
     if not self.longcontrol or self.max_speed_clu <= 0:
       self.max_speed_clu = max_speed
     else:
-      kp = 0.02 if limited_curv else 0.01
+      kp = 0.01 #if limited_curv else 0.01
       error = max_speed - self.max_speed_clu
       self.max_speed_clu = self.max_speed_clu + error * kp
 

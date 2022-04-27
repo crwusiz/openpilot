@@ -12,7 +12,7 @@ from common.basedir import BASEDIR
 from common.gpio import gpio_set
 from common.params import Params
 from common.spinner import Spinner
-from selfdrive.hardware import TICI
+from selfdrive.hardware import HARDWARE, TICI
 from selfdrive.hardware.tici.pins import GPIO
 from selfdrive.swaglog import cloudlog
 
@@ -31,6 +31,7 @@ def flash_panda(panda_serial: str) -> Panda:
   panda = Panda(panda_serial)
 
   fw_signature = get_expected_signature(panda)
+  internal_panda = panda.is_internal() and not panda.bootstub
 
   panda_version = "bootstub" if panda.bootstub else panda.get_version()
   panda_signature = b"" if panda.bootstub else panda.get_signature()
@@ -65,22 +66,20 @@ def flash_panda(panda_serial: str) -> Panda:
 
     spinner = Spinner()
     spinner.update("Restoring panda")
-    h7 = panda.get_mcu_type() == MCU_TYPE_H7
     panda.reset(enter_bootstub=True)
     panda.reset(enter_bootloader=True)
     time.sleep(1)
     try:
-      if h7:
-        os.system("/usr/bin/dfu-util -d 0483:df11 -a 0 -s 0x08020000 -D /data/openpilot/panda/board/obj/panda_h7.bin.signed")
-        os.system("/usr/bin/dfu-util -d 0483:df11 -a 0 -s 0x08000000:leave -D /data/openpilot/panda/board/obj/bootstub.panda_h7.bin")
-        panda.flash('/data/openpilot/panda/board/obj/panda_h7.bin.signed')
-      else:
-        os.system("/usr/bin/dfu-util -d 0483:df11 -a 0 -s 0x08004000 -D /data/openpilot/panda/board/obj/panda.bin.signed")
-        os.system("/usr/bin/dfu-util -d 0483:df11 -a 0 -s 0x08000000:leave -D /data/openpilot/panda/board/obj/bootstub.panda.bin")
-        panda.flash('/data/openpilot/panda/board/obj/panda.bin.signed')
+      os.system("/usr/bin/dfu-util -d 0483:df11 -a 0 -s 0x08004000 -D /data/openpilot/panda/board/obj/panda.bin.signed")
+      os.system("/usr/bin/dfu-util -d 0483:df11 -a 0 -s 0x08000000:leave -D /data/openpilot/panda/board/obj/bootstub.panda.bin")
+      panda.flash('/data/openpilot/panda/board/obj/panda.bin.signed')
     finally:
       panda.reset()
       panda.reconnect()
+
+    if internal_panda:
+      HARDWARE.recover_internal_panda()
+    panda.recover(reset=(not internal_panda))
 
     cloudlog.info("Done flashing bootloader")
 
@@ -134,6 +133,10 @@ def main() -> NoReturn:
 
       panda_serials = Panda.list()
       if len(panda_serials) == 0:
+        if first_run:
+          cloudlog.info("Resetting internal panda")
+          HARDWARE.reset_internal_panda()
+          time.sleep(2)  # wait to come back up
         continue
 
       cloudlog.info(f"{len(panda_serials)} panda(s) found, connecting - {panda_serials}")

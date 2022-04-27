@@ -159,6 +159,12 @@ class HardwareBase(ABC):
   def get_networks(self):
     pass
 
+  def reset_internal_panda(self):
+    pass
+
+  def recover_internal_panda(self):
+    pass
+
   @abstractmethod
   def get_ip_address(self):
     pass

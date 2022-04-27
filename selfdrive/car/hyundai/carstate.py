@@ -81,12 +81,12 @@ class CarState(CarStateBase):
       cp.vl["WHL_SPD11"]["WHL_SPD_RR"],
     )
 
+    vEgoRawClu = cluSpeed * self.speed_conv_to_ms
+    vEgoClu, aEgoClu = self.update_clu_speed_kf(vEgoRawClu)
+
     vEgoRawWheel = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
     vEgoRawWheel = interp(vEgoRawWheel, [0., 10.], [(vEgoRawWheel + vEgoRawClu) / 2., vEgoRawWheel])
     vEgoWheel, aEgoWheel = self.update_speed_kf(vEgoRawWheel)
-
-    vEgoRawClu = cluSpeed * self.speed_conv_to_ms
-    vEgoClu, aEgoClu = self.update_clu_speed_kf(vEgoRawClu)
 
     if self.CP.openpilotLongitudinalControl:
       ret.vEgoRaw = vEgoRawWheel
@@ -99,17 +99,15 @@ class CarState(CarStateBase):
 
     ret.vCluRatio = (vEgoWheel / vEgoClu) if (vEgoClu > 3. and vEgoWheel > 3.) else 1.0
     ret.aBasis = cp.vl["TCS13"]["aBasis"]
-
     ret.standstill = ret.vEgoRaw < 0.01
-
     ret.steeringAngleDeg = cp_sas.vl["SAS11"]["SAS_Angle"]
     ret.steeringRateDeg = cp_sas.vl["SAS11"]["SAS_Speed"]
-    ret.yawRate = cp.vl["ESP12"]["YAW_RATE"]
-    ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["CGW1"]["CF_Gway_TurnSigLh"],
-                                                            cp.vl["CGW1"]["CF_Gway_TurnSigRh"])
     ret.steeringTorque = cp_mdps.vl["MDPS12"]["CR_Mdps_StrColTq"]
     ret.steeringTorqueEps = cp_mdps.vl["MDPS12"]["CR_Mdps_OutTq"] / 10.  # scale to Nm
     ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD
+    ret.yawRate = cp.vl["ESP12"]["YAW_RATE"]
+    ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["CGW1"]["CF_Gway_TurnSigLh"],
+                                                                          cp.vl["CGW1"]["CF_Gway_TurnSigRh"])
 
     if not ret.standstill and cp_mdps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0:
       self.mdps_error_cnt += 1
@@ -123,16 +121,16 @@ class CarState(CarStateBase):
 
     # cruise state
     ret.cruiseState.enabled = (cp_scc.vl["SCC12"]["ACCMode"] != 0) if not self.no_radar else \
-                                      cp.vl["LVR12"]["CF_Lvr_CruiseSet"] != 0
+                                   cp.vl["LVR12"]["CF_Lvr_CruiseSet"] != 0
     ret.cruiseState.available = (cp_scc.vl["SCC11"]["MainMode_ACC"] != 0) if not self.no_radar else \
-                                      cp.vl["EMS16"]["CRUISE_LAMP_M"] != 0
+                                     cp.vl["EMS16"]["CRUISE_LAMP_M"] != 0
     ret.cruiseState.standstill = cp_scc.vl["SCC11"]["SCCInfoDisplay"] == 4. if not self.no_radar else False
 
     ret.cruiseState.enabledAcc = ret.cruiseState.enabled
 
     if ret.cruiseState.enabled:
       ret.cruiseState.speed = cp_scc.vl["SCC11"]["VSetDis"] * self.speed_conv_to_ms if not self.no_radar else \
-                                         cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * self.speed_conv_to_ms
+                                  cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * self.speed_conv_to_ms
     else:
       ret.cruiseState.speed = 0
     self.cruise_main_button = cp.vl["CLU11"]["CF_Clu_CruiseSwMain"]
