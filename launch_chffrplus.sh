@@ -13,7 +13,6 @@ if [ -f /ONEPLUS ]; then
   mount -o remount,rw /system
   sed -i -e 's#/dev/input/event1#/dev/input/event2#g' ~/.bash_profile
   mount -o remount,r /system
-  echo -n 20 > /VERSION
 fi
 
   # set IO scheduler
@@ -98,16 +97,22 @@ fi
   wpa_cli IFNAME=wlan0 SCAN
 
   # Check for NEOS update
-  if [ -f /LEECO ]; then
-    if [ $(< /VERSION) != "$REQUIRED_NEOS_VERSION" ]; then
+  if [ $(< /VERSION) != "$REQUIRED_NEOS_VERSION" ]; then
+    if [ -f /LEECO ]; then
       echo "Installing NEOS update"
       NEOS_PY="$DIR/selfdrive/hardware/eon/neos.py"
       MANIFEST="$DIR/selfdrive/hardware/eon/neos.json"
       $NEOS_PY --swap-if-ready $MANIFEST
       $DIR/selfdrive/hardware/eon/updater $NEOS_PY $MANIFEST
+    elif [ -f /ONEPLUS ]; then
+      echo "Installing op3t NEOS update"
+      NEOS_PY="$BASEDIR/selfdrive/hardware/eon/neos.py"
+      MANIFEST="$BASEDIR/selfdrive/hardware/eon/op3t.json"
+      cp -f "$BASEDIR/selfdrive/hardware/eon/update.zip" "/sdcard/update.zip";
+      echo -n 20 > /VERSION
+      $NEOS_PY --swap-if-ready $MANIFEST
+      $BASEDIR/selfdrive/hardware/eon/updater $NEOS_PY $MANIFEST
     fi
-  else
-    echo -n 0 > /data/params/d/DisableUpdates
   fi
 
   # One-time fix for a subset of OP3T with gyro orientation offsets.

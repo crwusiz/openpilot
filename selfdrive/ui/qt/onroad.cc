@@ -1,6 +1,7 @@
 #include "selfdrive/ui/qt/onroad.h"
 
 #include <cmath>
+
 #include <QDebug>
 #include <QString>
 
@@ -220,8 +221,7 @@ void OnroadHud::updateState(const UIState &s) {
   const auto ge = sm["gpsLocationExternal"].getGpsLocationExternal();
   auto ls = sm["roadLimitSpeed"].getRoadLimitSpeed();
 
-  float cur_speed = ce.getVEgo() * (s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH);
-
+  float cur_speed = std::max(0.0, ce.getVEgo() * (s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH));
   float applyMaxSpeed = cc.getSccSmoother().getApplyMaxSpeed();
   float cruiseMaxSpeed = cc.getSccSmoother().getCruiseMaxSpeed();
   bool cruise_set = (cruiseMaxSpeed > 0 && cruiseMaxSpeed < 255);
@@ -732,6 +732,7 @@ void OnroadHud::drawText(QPainter &p, int x, int y, const QString &text, int alp
   QRect init_rect = fm.boundingRect(text);
   QRect real_rect = fm.boundingRect(init_rect, 0, text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
+
   p.setPen(QColor(0xff, 0xff, 0xff, alpha));
   p.drawText(real_rect.x(), real_rect.bottom(), text);
 }
@@ -791,6 +792,7 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
     painter.setBrush(QColor::fromRgbF(1.0, 1.0, 1.0, std::clamp<float>(scene.lane_line_probs[i], 0.0, 0.7)));
     painter.drawPolygon(scene.lane_line_vertices[i].v, scene.lane_line_vertices[i].cnt);
   }
+
   // road edges
   for (int i = 0; i < std::size(scene.road_edge_vertices); ++i) {
     painter.setBrush(QColor::fromRgbF(1.0, 0, 0, std::clamp<float>(1.0 - scene.road_edge_stds[i], 0.0, 1.0)));
@@ -889,10 +891,7 @@ void NvgWindow::paintGL() {
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(Qt::NoPen);
 
-    double cur_t = millis_since_boot();
     drawLaneLines(painter, s);
-    double elapsed = millis_since_boot() - cur_t;
-    qDebug() << "Took" << elapsed << "ms to draw";
 
     auto leads = (*s->sm)["modelV2"].getModelV2().getLeadsV3();
     if (leads[0].getProb() > .5) {
