@@ -140,6 +140,13 @@ def manager_thread() -> None:
     ignore += ["manage_athenad", "uploader"]
   if os.getenv("NOBOARD") is not None:
     ignore.append("pandad")
+
+  # add toggle
+  if params.get_bool("LoggerDisable"):
+    ignore += ["loggerd", "deleter", "logmessaged", "tombstoned", "uploader", "updated", "statsd"]
+  if params.get_bool("NavDisable"):
+    ignore += ["navd"]
+    
   ignore += [x for x in os.getenv("BLOCK", "").split(",") if len(x) > 0]
 
   ensure_running(managed_processes.values(), started=False, not_run=ignore)
@@ -149,19 +156,6 @@ def manager_thread() -> None:
 
   while True:
     sm.update()
-    not_run = ignore[:]
-
-    if params.get_bool("LoggerDisable"):
-      not_run.append("loggerd")
-      not_run.append("deleter")
-      not_run.append("logmessaged")
-      not_run.append("tombstoned")
-      not_run.append("uploader")
-      not_run.append("updated")
-      not_run.append("statsd")
-
-    if params.get_bool("NavDisable"):
-      not_run.append("navd")
 
     started = sm['deviceState'].started
     driverview = params.get_bool("IsDriverViewEnabled")
