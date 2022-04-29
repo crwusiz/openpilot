@@ -209,13 +209,14 @@ struct CarState {
   # blindspot sensors
   leftBlindspot @33 :Bool; # Is there something blocking the left lane change
   rightBlindspot @34 :Bool; # Is there something blocking the right lane change
+  fuelGauge @41 :Float32; # battery or fuel tank level from 0.0 to 1.0
 
-  cluSpeedMs @41 :Float32;
-  cruiseGap @42 : Int32;
-  autoHold @43 : Int32;
-  tpms @44 : Tpms;
-  vCluRatio @45 :Float32;
-  aBasis @46 :Float32;
+  cluSpeedMs @42 :Float32;
+  cruiseGap @43 : Int32;
+  autoHold @44 : Int32;
+  tpms @45 : Tpms;
+  vCluRatio @46 :Float32;
+  aBasis @47 :Float32;
 
   struct Tpms {
     fl @0 :Float32;
@@ -545,6 +546,7 @@ struct CarParams {
     friction @3 :Float32;
     kf @4 :Float32;
     kd @5 :Float32;
+    deadzone @6 :Float32;
   }
 
   struct LongitudinalPIDTuning {

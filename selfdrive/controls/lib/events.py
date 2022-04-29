@@ -819,10 +819,12 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   },
 
   EventName.controlsdLagging: {
+    #ET.SOFT_DISABLE: soft_disable_alert("Controls Lagging"),
+    #ET.NO_ENTRY: NoEntryAlert("Controls Process Lagging: Reboot Your Device"),
     ET.SOFT_DISABLE: soft_disable_alert("Controls Lagging"),
-    ET.NO_ENTRY: NoEntryAlert("Controls Process Lagging: Reboot Your Device"),
+    ET.NO_ENTRY: NoEntryAlert("Controls Process Lagging: 장치를 재부팅 하세요"),
   },
-  
+
   # Thrown when manager detects a service exited unexpectedly while driving
   EventName.processNotRunning: {
     #ET.NO_ENTRY: NoEntryAlert("System Malfunction: Reboot Your Device"),

@@ -9,11 +9,12 @@ from common.realtime import DT_CTRL
 from common.conversions import Conversions as CV
 from selfdrive.car.hyundai.values import Buttons
 from common.params import Params
-from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, V_CRUISE_MIN, V_CRUISE_DELTA_KM, V_CRUISE_DELTA_MI, \
-  CONTROL_N
-from selfdrive.controls.lib.lane_planner import TRAJECTORY_SIZE
+from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, V_CRUISE_MIN, V_CRUISE_DELTA_KM, V_CRUISE_DELTA_MI, CONTROL_N
 from selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import AUTO_TR_CRUISE_GAP
 from selfdrive.road_speed_limiter import get_road_speed_limiter
+
+SYNC_MARGIN = 3.
+CREEP_SPEED = 2.3
 
 # do not modify
 MIN_SET_SPEED_KPH = V_CRUISE_MIN
@@ -320,6 +321,12 @@ class SccSmoother:
     #if lead is not None:
     #  if not lead.radar:
     #    brake_factor *= 0.975
+
+    start_boost = interp(CS.out.vEgo, [0.0, CREEP_SPEED, 2 * CREEP_SPEED], [0.6, 0.6, 0.0])
+    is_accelerating = interp(accel, [0.0, 0.2], [0.0, 1.0])
+    boost = start_boost * is_accelerating
+
+    accel += boost
 
     if accel > 0:
       accel *= gas_factor
