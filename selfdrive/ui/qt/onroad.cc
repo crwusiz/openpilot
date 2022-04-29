@@ -19,18 +19,13 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   stacked_layout->setStackingMode(QStackedLayout::StackAll);
   main_layout->addLayout(stacked_layout);
 
-  QStackedLayout *road_view_layout = new QStackedLayout;
-  road_view_layout->setStackingMode(QStackedLayout::StackAll);
   nvg = new NvgWindow(VISION_STREAM_ROAD, this);
-  road_view_layout->addWidget(nvg);
-  hud = new OnroadHud(this);
-  road_view_layout->addWidget(hud);
 
   QWidget * split_wrapper = new QWidget;
   split = new QHBoxLayout(split_wrapper);
   split->setContentsMargins(0, 0, 0, 0);
   split->setSpacing(0);
-  split->addLayout(road_view_layout);
+  split->addWidget(nvg);
 
   stacked_layout->addWidget(split_wrapper);
 
@@ -58,7 +53,7 @@ void OnroadWindow::updateState(const UIState &s) {
     alerts->updateAlert(alert, bgColor);
   }
 
-  hud->updateState(s);
+  nvg->updateState(s);
 
   if (bg != bgColor) {
     // repaint border
@@ -168,8 +163,9 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
   }
 }
 
-// OnroadHud ( wirelessnet2 init )
-OnroadHud::OnroadHud(QWidget *parent) : QWidget(parent) {
+// NvgWindow
+
+NvgWindow::NvgWindow(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraViewWidget("camerad", type, true, parent) {
   engage_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
   dm_img = loadPixmap("../assets/img_driver_face.png", {img_size, img_size});
 
@@ -209,7 +205,7 @@ static const QString get_tpms_text(float tpms) {
     return QString(str);
 }
 
-void OnroadHud::updateState(const UIState &s) {
+void NvgWindow::updateState(const UIState &s) {
   const SubMaster &sm = *(s.sm);
   const auto cs = sm["controlsState"].getControlsState();
   const auto cc = sm["carControl"].getCarControl();
@@ -275,9 +271,8 @@ void OnroadHud::updateState(const UIState &s) {
   setProperty("right_on", ce.getRightBlinker());
 }
 
-void OnroadHud::paintEvent(QPaintEvent *event) {
-  QPainter p(this);
-  p.setRenderHint(QPainter::Antialiasing);
+void NvgWindow::drawHud(QPainter &p) {
+  p.save();
 
   // Header gradient
   QLinearGradient bg(0, header_h - (header_h / 2.5), 0, header_h);
@@ -705,7 +700,7 @@ void OnroadHud::drawRightDevUi(QPainter &p, int x, int y) {
 }
 
 //-------------------------------------------------------------------------------------------
-void OnroadHud::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
+void NvgWindow::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
   p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
@@ -713,7 +708,7 @@ void OnroadHud::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, flo
   p.drawPixmap(x - img_size / 2, y - img_size / 2, img);
 }
 
-void OnroadHud::drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity, float angle) {
+void NvgWindow::drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity, float angle) {
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
   p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
@@ -727,7 +722,7 @@ void OnroadHud::drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush b
   p.restore();
 }
 
-void OnroadHud::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
+void NvgWindow::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
   QFontMetrics fm(p.font());
   QRect init_rect = fm.boundingRect(text);
   QRect real_rect = fm.boundingRect(init_rect, 0, text);
@@ -737,7 +732,7 @@ void OnroadHud::drawText(QPainter &p, int x, int y, const QString &text, int alp
   p.drawText(real_rect.x(), real_rect.bottom(), text);
 }
 
-void OnroadHud::drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color) {
+void NvgWindow::drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color) {
   QFontMetrics fm(p.font());
   QRect init_rect = fm.boundingRect(text);
   QRect real_rect = fm.boundingRect(init_rect, 0, text);
@@ -746,12 +741,6 @@ void OnroadHud::drawTextColor(QPainter &p, int x, int y, const QString &text, co
   p.drawText(real_rect.x(), real_rect.bottom(), text);
 }
 
-//-------------------------------------------------------------------------------------------
-// NvgWindow
-
-NvgWindow::NvgWindow(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraViewWidget("camerad", type, true, parent) {
-
-}
 
 void NvgWindow::initializeGL() {
   CameraViewWidget::initializeGL();
@@ -885,11 +874,14 @@ void NvgWindow::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV
 void NvgWindow::paintGL() {
   CameraViewWidget::paintGL();
 
+  QPainter painter(this);
+  painter.setRenderHint(QPainter::Antialiasing);
+  painter.setPen(Qt::NoPen);
+
+  drawHud(painter);
+
   UIState *s = uiState();
   if (s->worldObjectsVisible()) {
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(Qt::NoPen);
 
     drawLaneLines(painter, s);
 
