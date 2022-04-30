@@ -185,8 +185,6 @@ NvgWindow::NvgWindow(VisionStreamType type, QWidget* parent) : fps_filter(UI_FRE
   nda_img = loadPixmap("../assets/img_nda.png");
   hda_img = loadPixmap("../assets/img_hda.png");
   tpms_img = loadPixmap("../assets/img_tpms.png");
-
-  connect(this, &OnroadHud::valueChanged, [=] { update(); });
 }
 
 static const QColor get_tpms_color(float tpms) {
@@ -583,7 +581,7 @@ void NvgWindow::drawHud(QPainter &p) {
   p.setOpacity(1.);
 }
 
-int OnroadHud::devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, const QColor &color) {
+int NvgWindow::devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, const QColor &color) {
   configFont(p, "Open Sans", 45, "SemiBold");
   drawTextColor(p, x + 92, y + 80, QString(value), color);
   configFont(p, "Open Sans", 28, "Regular");
@@ -600,7 +598,7 @@ int OnroadHud::devUiDrawElement(QPainter &p, int x, int y, const char* value, co
   return 110;
 }
 
-void OnroadHud::drawRightDevUi(QPainter &p, int x, int y) {
+void NvgWindow::drawRightDevUi(QPainter &p, int x, int y) {
   int rh = 5;
   int ry = y;
 

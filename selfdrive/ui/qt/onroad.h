@@ -84,16 +84,6 @@ private:
   void drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color);
   void drawRightDevUi(QPainter &p, int x, int y);
   int devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, const QColor &color);
-  inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); }
-  inline QColor yellowColor(int alpha = 255) { return QColor(255, 255, 0, alpha); }
-  inline QColor redColor(int alpha = 255) { return QColor(255, 0, 0, alpha); }
-  inline QColor blackColor(int alpha = 255) { return QColor(0, 0, 0, alpha); }
-  inline QColor limeColor(int alpha = 255) { return QColor(120, 255, 120, alpha); }
-  inline QColor orangeColor(int alpha = 255) { return QColor(255, 188, 0, alpha); }
-  inline QColor engagedColor(int alpha = 255) { return QColor(23, 134, 68, alpha); }
-  inline QColor warningColor(int alpha = 255) { return QColor(218, 111, 37, alpha); }
-  inline QColor overrideColor(int alpha = 255) { return QColor(145, 155, 149, alpha); }
-  inline QColor steeringpressedColor(int alpha = 255) { return QColor(0, 191, 255, alpha); }
 
   QPixmap engage_img;
   QPixmap dm_img;
@@ -168,14 +158,20 @@ protected:
   void showEvent(QShowEvent *event) override;
   void updateFrameMat(int w, int h) override;
   void drawLaneLines(QPainter &painter, const UIState *s);
-  void drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd);
+  void drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd, bool is_radar);
   void drawHud(QPainter &p);
-  inline QColor redColor(int alpha = 255) { return QColor(201, 34, 49, alpha); }
   inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); }
+  inline QColor yellowColor(int alpha = 255) { return QColor(255, 255, 0, alpha); }
+  inline QColor redColor(int alpha = 255) { return QColor(255, 0, 0, alpha); }
+  inline QColor blackColor(int alpha = 255) { return QColor(0, 0, 0, alpha); }
+  inline QColor limeColor(int alpha = 255) { return QColor(120, 255, 120, alpha); }
+  inline QColor orangeColor(int alpha = 255) { return QColor(255, 188, 0, alpha); }
+  inline QColor engagedColor(int alpha = 255) { return QColor(23, 134, 68, alpha); }
+  inline QColor warningColor(int alpha = 255) { return QColor(218, 111, 37, alpha); }
+  inline QColor overrideColor(int alpha = 255) { return QColor(145, 155, 149, alpha); }
+  inline QColor steeringpressedColor(int alpha = 255) { return QColor(0, 191, 255, alpha); }
   inline QColor light_orangeColor(int alpha = 255) { return QColor(255, 165, 0, alpha); }
   inline QColor golden_yellowColor(int alpha = 255) { return QColor(255, 223, 0, alpha); }
-  inline QColor steeringpressedColor(int alpha = 255) { return QColor(0, 191, 255, alpha); }
-  inline QColor overrideColor(int alpha = 255) { return QColor(145, 155, 149, alpha); }
   double prev_draw_t = 0;
   FirstOrderFilter fps_filter;
 };

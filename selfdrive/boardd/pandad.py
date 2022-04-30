@@ -119,6 +119,7 @@ def panda_sort_cmp(a: Panda, b: Panda):
 
 
 def main() -> NoReturn:
+  first_run = True
   params = Params()
 
   while True:
@@ -153,6 +154,10 @@ def main() -> NoReturn:
           params.put_bool("PandaHeartbeatLost", True)
           cloudlog.event("heartbeat lost", deviceState=health, serial=panda.get_usb_serial())
 
+        #if first_run:
+        #  cloudlog.info(f"Resetting panda {panda.get_usb_serial()}")
+        #  panda.reset()
+
       # sort pandas to have deterministic order
       pandas.sort(key=cmp_to_key(panda_sort_cmp))
       panda_serials = list(map(lambda p: p.get_usb_serial(), pandas))
@@ -167,6 +172,8 @@ def main() -> NoReturn:
       # a panda was disconnected while setting everything up. let's try again
       cloudlog.exception("Panda USB exception while setting up")
       continue
+
+    first_run = False
 
     # run boardd with all connected serials as arguments
     os.environ['MANAGER_DAEMON'] = 'boardd'
