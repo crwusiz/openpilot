@@ -37,6 +37,8 @@ if [ ! -f "/BOOTLOGO" ]; then
     # op3t bootlogo
     touch /ONEPLUS
     dd if=/data/openpilot/installer/fonts/logo.bin of=/dev/block/bootdevice/by-name/LOGO
+    cp -f "$BASEDIR/selfdrive/hardware/eon/update.zip" "/sdcard/update.zip";
+    echo -n 20 > /VERSION
   fi
   echo =================================================================
   echo Comma boot logo change complete

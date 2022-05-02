@@ -108,8 +108,6 @@ fi
       echo "Installing op3t NEOS update"
       NEOS_PY="$BASEDIR/selfdrive/hardware/eon/neos.py"
       MANIFEST="$BASEDIR/selfdrive/hardware/eon/op3t.json"
-      cp -f "$BASEDIR/selfdrive/hardware/eon/update.zip" "/sdcard/update.zip";
-      echo -n 20 > /VERSION
       $NEOS_PY --swap-if-ready $MANIFEST
       $BASEDIR/selfdrive/hardware/eon/updater $NEOS_PY $MANIFEST
     fi
