@@ -234,7 +234,7 @@ void UIState::updateStatus() {
   if (sm->updated("carState")) {
     auto ce = (*sm)["carState"].getCarState();
     scene.steeringPressed = ce.getSteeringPressed();
-    scene.override = ce.getGasPressed();    
+    scene.override = ce.getGasPressed();
   }
 
   if (sm->updated("ubloxGnss")) {
@@ -261,7 +261,7 @@ UIState::UIState(QObject *parent) : QObject(parent) {
   sm = std::make_unique<SubMaster, const std::initializer_list<const char *>>({
     "modelV2", "controlsState", "liveCalibration", "radarState", "deviceState", "roadCameraState",
     "pandaStates", "carParams", "driverMonitoringState", "sensorEvents", "carState", "liveLocationKalman",
-    "wideRoadCameraState",
+    "wideRoadCameraState", "managerState",
     "gpsLocationExternal", "carControl", "liveParameters", "ubloxGnss", "roadLimitSpeed",
   });
 

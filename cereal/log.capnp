@@ -396,7 +396,7 @@ struct PandaState @0xa7649e2575e4591e {
   pandaType @10 :PandaType;
   ignitionCan @13 :Bool;
   safetyModel @14 :Car.CarParams.SafetyModel;
-  safetyParam @26 :UInt32;
+  safetyParam @27 :UInt16;
   alternativeExperience @23 :Int16;
   faultStatus @15 :FaultStatus;
   powerSaveEnabled @16 :Bool;
@@ -464,6 +464,7 @@ struct PandaState @0xa7649e2575e4591e {
   fanSpeedRpmDEPRECATED @11 :UInt16;
   usbPowerModeDEPRECATED @12 :PeripheralState.UsbPowerMode;
   safetyParamDEPRECATED @20 :Int16;
+  safetyParam2DEPRECATED @26 :UInt32;
 }
 
 struct PeripheralState {
@@ -663,6 +664,8 @@ struct ControlsState @0x97ff69c53601abf1 {
     f @5 :Float32;
     output @6 :Float32;
     saturated @7 :Bool;
+    actualLateralAccel @9 :Float32;
+    desiredLateralAccel @10 :Float32;
    }
 
   struct LateralLQRState {
@@ -1079,6 +1082,40 @@ struct ProcLog {
     active @5 :UInt64;
     inactive @6 :UInt64;
     shared @7 :UInt64;
+  }
+}
+
+struct GnssMeasurements {
+  # Position in lat,long,alt for debugging purposes.
+  # Latitude and longitude in degrees. Altitude In meters above the WGS 84 reference ellipsoid.
+  position @0 :List(Float64);
+  # Todo sync this with timing pulse of ublox
+  ubloxMonoTime @1 :UInt64;
+  correctedMeasurements @2 :List(CorrectedMeasurement);
+
+  struct CorrectedMeasurement {
+    constellationId @0 :ConstellationId;
+    svId @1 :UInt8;
+    # Is 0 when not Glonass constellation.
+    glonassFrequency @2 :Int8;
+    pseudorange @3 :Float64;
+    pseudorangeStd @4 :Float64;
+    pseudorangeRate @5 :Float64;
+    pseudorangeRateStd @6 :Float64;
+    # Satellite position and velocity [x,y,z]
+    satPos @7 :List(Float64);
+    satVel @8 :List(Float64);
+  }
+
+  enum ConstellationId {
+      # Satellite Constellation using the Ublox gnssid as index
+      gps @0;
+      sbas @1;
+      galileo @2;
+      beidou @3;
+      imes @4;
+      qznss @5;
+      glonass @6;
   }
 }
 
@@ -1824,6 +1861,7 @@ struct Event {
     ubloxRaw @39 :Data;
     qcomGnss @31 :QcomGnss;
     gpsLocationExternal @48 :GpsLocationData;
+    gnssMeasurements @91 :GnssMeasurements;
     driverState @59 :DriverState;
     liveParameters @61 :LiveParametersData;
     cameraOdometry @63 :CameraOdometry;
@@ -1859,7 +1897,7 @@ struct Event {
     navThumbnail @84: Thumbnail;
 
     # neokii
-    roadLimitSpeed @91 :RoadLimitSpeed;
+    roadLimitSpeed @92 :RoadLimitSpeed;
 
     # *********** debug ***********
     testJoystick @52 :Joystick;

@@ -282,10 +282,10 @@ class CarInterface(CarInterfaceBase):
     elif Params().get("LateralControlSelect", encoding='utf8') == "3":
       ret.lateralTuning.init('torque')
       ret.lateralTuning.torque.useSteeringAngle = True
-      max_lat_accel = 1.8
+      max_lat_accel = 2.0
       ret.lateralTuning.torque.kp = 1.0 / max_lat_accel
       ret.lateralTuning.torque.kf = 1.0 / max_lat_accel
-      ret.lateralTuning.torque.ki = 0.25 / max_lat_accel
+      ret.lateralTuning.torque.ki = 0.1 / max_lat_accel
       ret.lateralTuning.torque.friction = 0.01
 
       ret.lateralTuning.torque.kd = 0.0
@@ -295,18 +295,19 @@ class CarInterface(CarInterfaceBase):
     ret.radarTimeStep = 0.05
 
     ret.steerActuatorDelay = 0.1
-    ret.steerRateCost = 0.35
+    ret.steerRateCost = 0.4
+
     ret.steerLimitTimer = 2.5
 
     # longitudinal
     ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 30.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-    ret.longitudinalTuning.kpV = [1.25, 1.1, 1.0, 0.88, 0.48]
+    ret.longitudinalTuning.kpV = [1.25, 1.1, 1.0, 0.93, 0.52]
     ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
     ret.longitudinalTuning.kiV = [0.08, 0.03]
     ret.longitudinalActuatorDelayLowerBound = 0.3
     ret.longitudinalActuatorDelayUpperBound = 0.3
 
-    ret.stoppingDecelRate = 0.5  # brake_travel/s while trying to stop
+    ret.stoppingDecelRate = 0.4  # brake_travel/s while trying to stop
 
     # TODO: get actual value, for now starting with reasonable value for
     # civic and scaling by mass and wheelbase

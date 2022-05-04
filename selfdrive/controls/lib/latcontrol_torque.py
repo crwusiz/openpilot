@@ -54,7 +54,9 @@ class LatControlTorque(LatControl):
     if CS.vEgo < MIN_STEER_SPEED or not active:
       output_torque = 0.0
       pid_log.active = False
-      self.pid.reset()
+      if not active:
+        self.pid.reset()
+        self.errors = []
       angle_steers_des = 0.0
     else:
       if self.use_steering_angle:
@@ -86,10 +88,15 @@ class LatControlTorque(LatControl):
       friction_compensation = interp(desired_lateral_jerk, [-JERK_THRESHOLD, JERK_THRESHOLD],
                                      [-self.friction, self.friction])
       ff += friction_compensation / self.CP.lateralTuning.torque.kf
+
+      # Prevent integrator windup at very low speed
+      # or when steering is limited
+      freeze_integrator = CS.steeringRateLimited or CS.vEgo < 5
+
       output_torque = self.pid.update(error_deadzone, error_rate,
                                       override=CS.steeringPressed, feedforward=ff,
                                       speed=CS.vEgo,
-                                      freeze_integrator=CS.steeringRateLimited)
+                                      freeze_integrator=freeze_integrator)
 
       pid_log.active = True
       pid_log.p = self.pid.p
@@ -98,6 +105,8 @@ class LatControlTorque(LatControl):
       pid_log.f = self.pid.f
       pid_log.output = -output_torque
       pid_log.saturated = self._check_saturation(self.steer_max - abs(output_torque) < 1e-3, CS)
+      pid_log.actualLateralAccel = actual_lateral_accel
+      pid_log.desiredLateralAccel = desired_lateral_accel
 
       angle_steers_des = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll)) + params.angleOffsetDeg
 

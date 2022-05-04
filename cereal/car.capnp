@@ -183,6 +183,7 @@ struct CarState {
   stockAeb @30 :Bool;
   stockFcw @31 :Bool;
   espDisabled @32 :Bool;
+  accFaulted @42 :Bool;
 
   # cruise state
   cruiseState @10 :CruiseState;
@@ -209,14 +210,17 @@ struct CarState {
   # blindspot sensors
   leftBlindspot @33 :Bool; # Is there something blocking the left lane change
   rightBlindspot @34 :Bool; # Is there something blocking the right lane change
-  fuelGauge @41 :Float32; # battery or fuel tank level from 0.0 to 1.0
 
-  cluSpeedMs @42 :Float32;
-  cruiseGap @43 : Int32;
-  autoHold @44 : Int32;
-  tpms @45 : Tpms;
-  vCluRatio @46 :Float32;
-  aBasis @47 :Float32;
+  fuelGauge @41 :Float32; # battery or fuel tank level from 0.0 to 1.0
+  charging @43 :Bool;
+
+
+  cluSpeedMs @44 :Float32;
+  cruiseGap @45 : Int32;
+  autoHold @46 : Int32;
+  tpms @47 : Tpms;
+  vCluRatio @48 :Float32;
+  aBasis @49 :Float32;
 
   struct Tpms {
     fl @0 :Float32;
@@ -508,8 +512,9 @@ struct CarParams {
 
   struct SafetyConfig {
     safetyModel @0 :SafetyModel;
-    safetyParam @2 :UInt32;
+    safetyParam @3 :UInt16;
     safetyParamDEPRECATED @1 :Int16;
+    safetyParam2DEPRECATED @2 :UInt32;
   }
 
   mdpsBus @68: Int8;
