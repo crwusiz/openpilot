@@ -773,6 +773,8 @@ void NvgWindow::updateFrameMat(int w, int h) {
 }
 
 void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
+  painter.save();
+
   const UIScene &scene = s->scene;
   // lanelines
   for (int i = 0; i < std::size(scene.lane_line_vertices); ++i) {
@@ -835,9 +837,13 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
   }
   painter.setBrush(bg);
   painter.drawPolygon(scene.track_vertices.v, scene.track_vertices.cnt);
+
+  painter.restore();
 }
 
 void NvgWindow::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd, bool is_radar) {
+  painter.save();
+
   const float speedBuff = 10.;
   const float leadBuff = 40.;
   const float d_rel = lead_data.getX()[0];
@@ -867,6 +873,8 @@ void NvgWindow::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV
   QPointF chevron[] = {{x + (sz * 1.25), y + sz}, {x, y}, {x - (sz * 1.25), y + sz}};
   painter.setBrush(redColor(fillAlpha));
   painter.drawPolygon(chevron, std::size(chevron));
+
+  painter.restore();
 }
 
 void NvgWindow::paintGL() {
@@ -875,8 +883,6 @@ void NvgWindow::paintGL() {
   QPainter painter(this);
   painter.setRenderHint(QPainter::Antialiasing);
   painter.setPen(Qt::NoPen);
-
-  drawHud(painter);
 
   UIState *s = uiState();
   if (s->worldObjectsVisible()) {
@@ -891,6 +897,8 @@ void NvgWindow::paintGL() {
       drawLead(painter, leads[1], s->scene.lead_vertices[1], s->scene.lead_radar[1]);
     }
   }
+
+  drawHud(painter);
 
   double cur_draw_t = millis_since_boot();
   double dt = cur_draw_t - prev_draw_t;
