@@ -107,7 +107,7 @@ pipeline {
                   }
                   steps {
                     phone_steps("tici", [
-                      ["build master-ci", "cd $SOURCE_DIR/release && EXTRA_FILES='tools/' ./build_devel.sh"],
+                      ["build master-ci", "cd $SOURCE_DIR/release && TARGET_DIR=$TEST_DIR EXTRA_FILES='tools/' ./build_devel.sh"],
                       ["build openpilot", "cd selfdrive/manager && ./build.py"],
                       ["test manager", "python selfdrive/manager/test/test_manager.py"],
                       ["onroad tests", "cd selfdrive/test/ && ./test_onroad.py"],
@@ -124,6 +124,7 @@ pipeline {
                       ["test boardd loopback", "python selfdrive/boardd/tests/test_boardd_loopback.py"],
                       ["test loggerd", "python selfdrive/loggerd/tests/test_loggerd.py"],
                       ["test encoder", "LD_LIBRARY_PATH=/usr/local/lib python selfdrive/loggerd/tests/test_encoder.py"],
+                      ["test sensord", "python selfdrive/sensord/test/test_sensord.py"],
                     ])
                   }
                 }
@@ -149,18 +150,6 @@ pipeline {
 
               }
             }
-
-            stage('Push master-ci') {
-              when {
-                branch 'master'
-              }
-              steps {
-                phone_steps("tici-build", [
-                  ["push devel", "cd $SOURCE_DIR/release && PUSH='master-ci' ./build_devel.sh"],
-                ])
-              }
-            }
-
           }
 
           post {
@@ -175,4 +164,3 @@ pipeline {
     }
   }
 }
-

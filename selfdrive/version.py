@@ -55,7 +55,7 @@ def get_origin(default: Optional[str] = None) -> Optional[str]:
 
 @cache
 def get_normalized_origin(default: Optional[str] = None) -> Optional[str]:
-  origin = get_origin()
+  origin: Optional[str] = get_origin()
 
   if origin is None:
     return default
@@ -74,7 +74,7 @@ def get_version() -> str:
 
 @cache
 def get_short_version() -> str:
-  return get_version().split('-')[0]
+  return get_version().split('-')[0]  # type: ignore
 
 @cache
 def is_prebuilt() -> bool:
@@ -83,7 +83,9 @@ def is_prebuilt() -> bool:
 
 @cache
 def is_comma_remote() -> bool:
-  origin = get_origin()
+  # note to fork maintainers, this is used for release metrics. please do not
+  # touch this to get rid of the orange startup alert. there's better ways to do that
+  origin: Optional[str] = get_origin()
   if origin is None:
     return False
 

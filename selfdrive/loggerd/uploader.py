@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import bz2
+import io
 import json
 import os
 import random
@@ -68,8 +69,8 @@ class Uploader():
     self.immediate_count = 0
 
     # stats for last successfully uploaded file
-    self.last_time = 0
-    self.last_speed = 0
+    self.last_time = 0.0
+    self.last_speed = 0.0
     self.last_filename = ""
 
     self.immediate_folders = ["crash/", "boot/"]
@@ -153,10 +154,11 @@ class Uploader():
         self.last_resp = FakeResponse()
       else:
         with open(fn, "rb") as f:
-          data = f.read()
-
           if key.endswith('.bz2') and not fn.endswith('.bz2'):
-            data = bz2.compress(data)
+            data = bz2.compress(f.read())
+            data = io.BytesIO(data)
+          else:
+            data = f
 
           self.last_resp = requests.put(url, data=data, headers=headers, timeout=10)
     except Exception as e:

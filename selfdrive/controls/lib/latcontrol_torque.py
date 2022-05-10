@@ -33,13 +33,13 @@ def apply_deadzone(error, deadzone):
 class LatControlTorque(LatControl):
   def __init__(self, CP, CI):
     super().__init__(CP, CI)
-    self.CP = CP
     self.pid = PIDController(CP.lateralTuning.torque.kp, CP.lateralTuning.torque.ki,
                              k_d=CP.lateralTuning.torque.kd,
                              k_f=CP.lateralTuning.torque.kf, pos_limit=self.steer_max, neg_limit=-self.steer_max)
     self.get_steer_feedforward = CI.get_steer_feedforward_function()
     self.use_steering_angle = CP.lateralTuning.torque.useSteeringAngle
     self.friction = CP.lateralTuning.torque.friction
+    self.kf = CP.lateralTuning.torque.kf
     self.deadzone = CP.lateralTuning.torque.deadzone
     self.errors = []
 
@@ -85,18 +85,12 @@ class LatControlTorque(LatControl):
 
       ff = desired_lateral_accel - params.roll * ACCELERATION_DUE_TO_GRAVITY
       # convert friction into lateral accel units for feedforward
-      friction_compensation = interp(desired_lateral_jerk, [-JERK_THRESHOLD, JERK_THRESHOLD],
-                                     [-self.friction, self.friction])
-      ff += friction_compensation / self.CP.lateralTuning.torque.kf
-
-      # Prevent integrator windup at very low speed
-      # or when steering is limited
-      freeze_integrator = CS.steeringRateLimited or CS.vEgo < 5
-
-      output_torque = self.pid.update(error_deadzone, error_rate,
+      friction_compensation = interp(desired_lateral_jerk, [-JERK_THRESHOLD, JERK_THRESHOLD], [-self.friction, self.friction])
+      ff += friction_compensation / self.kf
+      output_torque = self.pid.update(error, error_rate,
                                       override=CS.steeringPressed, feedforward=ff,
                                       speed=CS.vEgo,
-                                      freeze_integrator=freeze_integrator)
+                                      freeze_integrator=CS.steeringRateLimited)
 
       pid_log.active = True
       pid_log.p = self.pid.p

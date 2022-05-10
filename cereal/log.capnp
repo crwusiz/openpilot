@@ -308,7 +308,6 @@ struct DeviceState @0xa4d8b5af2aa492eb {
 
   # power
   batteryPercent @8 :Int16;
-  batteryStatus @9 :Text;
   batteryCurrent @15 :Int32;
   chargingError @17 :Bool;
   chargingDisabled @18 :Bool;
@@ -381,6 +380,7 @@ struct DeviceState @0xa4d8b5af2aa492eb {
   batDEPRECATED @6 :UInt32;
   pa0DEPRECATED @21 :UInt16;
   cpuUsagePercentDEPRECATED @20 :Int8;
+  batteryStatusDEPRECATED @9 :Text;
   batteryVoltageDEPRECATED @16 :Int32;
   batteryTempCDEPRECATED @29 :Float32;
 }
@@ -570,6 +570,8 @@ struct ControlsState @0x97ff69c53601abf1 {
   ufAccelCmd @33 :Float32;
   aTarget @35 :Float32;
   curvature @37 :Float32;  # path curvature from vehicle model
+  desiredCurvature @61 :Float32;  # lag adjusted curvatures used by lateral controllers
+  desiredCurvatureRate @62 :Float32;
   forceDecel @51 :Bool;
 
   # UI alerts
@@ -594,15 +596,15 @@ struct ControlsState @0x97ff69c53601abf1 {
     torqueState @60 :LateralTorqueState;
   }
 
-  angleSteers @61 :Float32;
-  applyAccel @62 :Float32;
-  aReqValue @63 :Float32;
-  aReqValueMin @64 :Float32;
-  aReqValueMax @65 :Float32;
+  angleSteers @63 :Float32;
+  applyAccel @64 :Float32;
+  aReqValue @65 :Float32;
+  aReqValueMin @66 :Float32;
+  aReqValueMax @67 :Float32;
 
-  sccStockCamAct @66 :Float32;
-  sccStockCamStatus @67 :Float32;
-  lateralControlSelect @68 :UInt8;
+  sccStockCamAct @68 :Float32;
+  sccStockCamStatus @69 :Float32;
+  lateralControlSelect @70 :UInt8;
 
   enum OpenpilotState @0xdbe58b96d2d1ac61 {
     disabled @0;
@@ -1047,6 +1049,7 @@ struct ProcLog {
     name @1 :Text;
     state @2 :UInt8;
     ppid @3 :Int32;
+
     cpuUser @4 :Float32;
     cpuSystem @5 :Float32;
     cpuChildrenUser @6 :Float32;
@@ -1055,9 +1058,12 @@ struct ProcLog {
     nice @9 :Int32;
     numThreads @10 :Int32;
     startTime @11 :Float64;
+
     memVms @12 :UInt64;
     memRss @13 :UInt64;
+
     processor @14 :Int32;
+
     cmdline @15 :List(Text);
     exe @16 :Text;
   }
@@ -1086,12 +1092,11 @@ struct ProcLog {
 }
 
 struct GnssMeasurements {
-  # Position in lat,long,alt for debugging purposes.
-  # Latitude and longitude in degrees. Altitude In meters above the WGS 84 reference ellipsoid.
-  position @0 :List(Float64);
+  positionECEF @0 :List(Float64);
+  velocityECEF @1 :List(Float64);
   # Todo sync this with timing pulse of ublox
-  ubloxMonoTime @1 :UInt64;
-  correctedMeasurements @2 :List(CorrectedMeasurement);
+  ubloxMonoTime @2 :UInt64;
+  correctedMeasurements @3 :List(CorrectedMeasurement);
 
   struct CorrectedMeasurement {
     constellationId @0 :ConstellationId;
