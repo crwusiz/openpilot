@@ -143,10 +143,10 @@ def manager_thread() -> None:
 
   # add toggle
   if params.get_bool("LoggerDisable"):
-    ignore += ["loggerd", "deleter", "logmessaged", "tombstoned", "uploader", "updated", "statsd"]
+    ignore += ["loggerd", "encoderd", "deleter", "logmessaged", "tombstoned", "uploader", "updated", "statsd"]
   if params.get_bool("NavDisable"):
     ignore += ["navd"]
-    
+
   ignore += [x for x in os.getenv("BLOCK", "").split(",") if len(x) > 0]
 
   sm = messaging.SubMaster(['deviceState', 'carParams'], poll=['deviceState'])
