@@ -86,6 +86,12 @@ private:
   QPixmap brake_img;
   QPixmap bsd_l_img;
   QPixmap bsd_r_img;
+  QPixmap gap_img;
+  QPixmap gap1_img;
+  QPixmap gap2_img;
+  QPixmap gap3_img;
+  QPixmap gap4_img;
+  QPixmap gap_auto_img;
   QPixmap gps_img;
   QPixmap wifi_img;
   QPixmap direction_img;

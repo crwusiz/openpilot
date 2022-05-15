@@ -180,6 +180,11 @@ OnroadHud::OnroadHud(QWidget *parent) : QWidget(parent) {
   gps_img = loadPixmap("../assets/img_gps.png", {img_size, img_size});
   wifi_img = loadPixmap("../assets/img_wifi.png", {img_size, img_size});
   direction_img = loadPixmap("../assets/img_direction.png", {img_size, img_size});
+  gap1_img = loadPixmap("../assets/img_gap1.png", {img_size, img_size});
+  gap2_img = loadPixmap("../assets/img_gap2.png", {img_size, img_size});
+  gap3_img = loadPixmap("../assets/img_gap3.png", {img_size, img_size});
+  gap4_img = loadPixmap("../assets/img_gap4.png", {img_size, img_size});
+  gap_auto_img = loadPixmap("../assets/img_gap_auto.png", {img_size, img_size});
 
   // neokii add
   autohold_warning_img = loadPixmap("../assets/img_autohold_warning.png", {img_size, img_size});
@@ -320,10 +325,10 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
 
   if (status == STATUS_ENGAGED && !steeringPressed) {
     wheelbgColor = engagedColor(200);
+  } else if (status == STATUS_OVERRIDE && !steeringPressed) {
+    wheelbgColor = overrideColor(200);
   } else if (status == STATUS_WARNING) {
     wheelbgColor = warningColor(200);
-  } else if (status == STATUS_OVERRIDE) {
-    wheelbgColor = overrideColor(200);
   } else if (steeringPressed) {
     wheelbgColor = steeringpressedColor(200);
   }
@@ -371,28 +376,22 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
   drawIcon(p, x, y, dm_img, blackColor(70), dmActive ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
-  // cruise gap (bottom right 1)
-  QString str;
-
-  if (gap <= 0) {
-    str = "──";
-  } else if (longControl && gap == autoTrGap) {
-    str = "AUTO";
-  } else {
-    str.sprintf("%d", (int)gap);
+  // scc gap icon (bottom right 1)
+  if (gap == 1) {
+    gap_img = gap1_img;
+  } else if (gap == 2) {
+    gap_img = gap2_img;
+  } else if (gap == 3) {
+    gap_img = gap3_img;
+  } else if (gap == 4 && !longControl) {
+    gap_img = gap4_img;
+  } else if ((gap == 4 || gap == autoTrGap) && longControl) {
+    gap_img = gap_auto_img;
   }
 
   x = radius / 2 + (bdr_s * 2) + radius;
   y = rect().bottom() - footer_h / 2;
-
-  p.setPen(Qt::NoPen);
-  p.setBrush(blackColor(70));
-  p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
-
-  configFont(p, "Open Sans", 35, "Bold");
-  drawTextColor(p, x, y - 20, "GAP", whiteColor(200));
-  configFont(p, "Open Sans", 50, "Bold");
-  drawTextColor(p, x, y + 40, str, limeColor(200));
+  drawIcon(p, x, y, gap_img, blackColor(70), is_cruise_set ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // brake icon (bottom left 2)
@@ -532,12 +531,12 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
     const float img_alpha = 0.8f;
     const int fb_w = width() / 2 - 200;
     const int center_x = width() / 2;
-    const int w = fb_w / 25;
-    const int h = 385;
-    const int gap = fb_w / 25;
+    const int w = fb_w / 20;
+    const int h = 220;
+    const int gap = fb_w / 20;
     const int margin = (int)(fb_w / 3.8f);
     const int base_y = (height() - h) / 2;
-    const int draw_count = 8;
+    const int draw_count = 6;
 
     x = center_x;
     y = base_y;
@@ -551,7 +550,7 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
 
         p.setOpacity(alpha);
         float factor = (float)draw_count / (i + draw_count);
-        p.drawPixmap(x - w - margin, y + (h - h * factor) / 2, w * factor, h * factor, turnsignal_l_img);
+        p.drawPixmap(x - w - margin, y, w * factor, h, turnsignal_l_img);
         x -= gap + w;
       }
     }
@@ -566,7 +565,7 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
 
         p.setOpacity(alpha);
         float factor = (float)draw_count / (i + draw_count);
-        p.drawPixmap(x + margin, y + (h - h * factor) / 2, w * factor, h * factor, turnsignal_r_img);
+        p.drawPixmap(x + margin, y, w * factor, h, turnsignal_r_img);
         x += gap + w;
       }
     }
