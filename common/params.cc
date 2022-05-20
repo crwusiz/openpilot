@@ -1,4 +1,4 @@
-#include "selfdrive/common/params.h"
+#include "common/params.h"
 
 #include <dirent.h>
 #include <sys/file.h>
@@ -6,8 +6,8 @@
 #include <csignal>
 #include <unordered_map>
 
-#include "selfdrive/common/swaglog.h"
-#include "selfdrive/common/util.h"
+#include "common/swaglog.h"
+#include "common/util.h"
 #include "selfdrive/hardware/hw.h"
 
 namespace {
@@ -91,7 +91,6 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"CarParams", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_ON},
     {"CarParamsCache", CLEAR_ON_MANAGER_START},
     {"CarVin", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_ON},
-    {"CellularUnmetered", PERSISTENT},
     {"CompletedTrainingVersion", PERSISTENT},
     {"ControlsReady", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_ON},
     {"CurrentRoute", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_ON},

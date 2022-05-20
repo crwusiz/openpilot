@@ -5,12 +5,12 @@
 #include <QMapboxGL>
 #include <QGeoCoordinate>
 
-#include "selfdrive/common/util.h"
+#include "common/util.h"
 #include "common/transformations/coordinates.hpp"
 #include "common/transformations/orientation.hpp"
 #include "cereal/messaging/messaging.h"
 
-#include "selfdrive/common/params.h"
+#include "common/params.h"
 
 //const QString MAPBOX_TOKEN = util::getenv("MAPBOX_TOKEN").c_str();
 const QString MAPBOX_TOKEN = QString::fromStdString(Params().get("MapboxToken"));

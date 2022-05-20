@@ -1142,5 +1142,4 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
     ET.PERMANENT: Alert("속도를 줄이고 있습니다", "", AlertStatus.normal, AlertSize.small,
                         Priority.HIGH, VisualAlert.none, AudibleAlert.slowingDownSpeed, 2.),
   },
-
 }

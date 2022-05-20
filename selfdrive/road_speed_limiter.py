@@ -1,5 +1,7 @@
 import json
 import os
+import random
+
 import select
 import threading
 import time
@@ -17,7 +19,7 @@ CAMERA_SPEED_FACTOR = 1.05
 class Port:
   BROADCAST_PORT = 2899
   RECEIVE_PORT = 2843
-  LOCATION_PORT = 2911
+  LOCATION_PORT = BROADCAST_PORT
 
 class RoadLimitSpeedServer:
   def __init__(self):
@@ -29,23 +31,51 @@ class RoadLimitSpeedServer:
     self.lock = threading.Lock()
     self.remote_addr = None
 
+    self.remote_gps_addr = None
+    self.last_time_location = 0
+
     broadcast = Thread(target=self.broadcast_thread, args=[])
     broadcast.setDaemon(True)
     broadcast.start()
 
-    # gps = Thread(target=self.gps_thread, args=[])
-    # gps.setDaemon(True)
-    # gps.start()
+    self.gps_sm = messaging.SubMaster(['gpsLocationExternal'], poll=['gpsLocationExternal'])
+    self.gps_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    self.gps_event = threading.Event()
+    gps_thread = Thread(target=self.gps_thread, args=[])
+    gps_thread.setDaemon(True)
+    gps_thread.start()
 
   def gps_thread(self):
-    sm = messaging.SubMaster(['gpsLocationExternal'], poll=['gpsLocationExternal'])
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+    try:
+      period = 1.0
+      wait_time = period
+      i = 0.
+      frame = 1
+      start_time = sec_since_boot()
       while True:
-        try:
-          sm.update()
-          if self.remote_addr is not None and sm.updated['gpsLocationExternal']:
-            location = sm['gpsLocationExternal']
-            json_location = json.dumps([
+        self.gps_event.wait(wait_time)
+        self.gps_timer()
+
+        now = sec_since_boot()
+        error = (frame * period - (now - start_time))
+        i += error * 0.1
+        wait_time = period + error * 0.5 + i
+        wait_time = clip(wait_time, 0.8, 1.0)
+        frame += 1
+
+    except:
+      pass
+
+  def gps_timer(self):
+    try:
+      if self.remote_gps_addr is not None:
+        self.gps_sm.update(0)
+        if self.gps_sm.updated['gpsLocationExternal']:
+          location = self.gps_sm['gpsLocationExternal']
+
+          if location.accuracy < 10.:
+            json_location = json.dumps({"location": [
               location.latitude,
               location.longitude,
               location.altitude,
@@ -53,20 +83,17 @@ class RoadLimitSpeedServer:
               location.bearingDeg,
               location.accuracy,
               location.timestamp,
-              location.source,
-              location.vNED,
+              # location.source,
+              # location.vNED,
               location.verticalAccuracy,
               location.bearingAccuracyDeg,
               location.speedAccuracy,
-            ])
+            ]})
 
-            address = (self.remote_addr[0], Port.LOCATION_PORT)
-            sock.sendto(json_location.encode(), address)
-          else:
-            time.sleep(1.)
-        except Exception as e:
-          print("exception", e)
-          time.sleep(1.)
+            address = (self.remote_gps_addr[0], Port.LOCATION_PORT)
+            self.gps_socket.sendto(json_location.encode(), address)
+    except:
+      self.remote_gps_addr = None
 
   def get_broadcast_address(self):
     try:
@@ -121,6 +148,17 @@ class RoadLimitSpeedServer:
             ret = False
           except:
             pass
+
+        if 'request_gps' in json_obj:
+          try:
+            if json_obj['request_gps'] == 1:
+              self.remote_gps_addr = self.remote_addr
+            else:
+              self.remote_gps_addr = None
+            ret = False
+          except:
+            pass
+
         if 'echo' in json_obj:
           try:
             echo = json.dumps(json_obj["echo"])
@@ -179,6 +217,7 @@ class RoadLimitSpeedServer:
 
     return default
 
+
 def main():
   server = RoadLimitSpeedServer()
   roadLimitSpeed = messaging.pub_sock('roadLimitSpeed')
@@ -227,6 +266,7 @@ def main():
 
     except Exception as e:
       server.last_exception = e
+
 
 class RoadSpeedLimiter:
   def __init__(self):
@@ -332,11 +372,13 @@ class RoadSpeedLimiter:
 
 road_speed_limiter = None
 
+
 def road_speed_limiter_get_active():
   global road_speed_limiter
   if road_speed_limiter is None:
     road_speed_limiter = RoadSpeedLimiter()
   return road_speed_limiter.get_active()
+
 
 def road_speed_limiter_get_max_speed(cluster_speed, is_metric):
   global road_speed_limiter
@@ -344,11 +386,13 @@ def road_speed_limiter_get_max_speed(cluster_speed, is_metric):
     road_speed_limiter = RoadSpeedLimiter()
   return road_speed_limiter.get_max_speed(cluster_speed, is_metric)
 
+
 def get_road_speed_limiter():
   global road_speed_limiter
   if road_speed_limiter is None:
     road_speed_limiter = RoadSpeedLimiter()
   return road_speed_limiter
+
 
 if __name__ == "__main__":
   main()

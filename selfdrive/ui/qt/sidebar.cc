@@ -2,7 +2,7 @@
 
 #include <QMouseEvent>
 
-#include "selfdrive/common/util.h"
+#include "common/util.h"
 #include "selfdrive/hardware/hw.h"
 #include "selfdrive/ui/qt/util.h"
 

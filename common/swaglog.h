@@ -1,6 +1,6 @@
 #pragma once
 
-#include "selfdrive/common/timing.h"
+#include "common/timing.h"
 
 #define CLOUDLOG_DEBUG 10
 #define CLOUDLOG_INFO 20
@@ -22,7 +22,7 @@ void cloudlog_te(int levelnum, const char* filename, int lineno, const char* fun
 #define cloudlog(lvl, fmt, ...) cloudlog_e(lvl, __FILE__, __LINE__, \
                                            __func__, \
                                            fmt, ## __VA_ARGS__);
-
+ 
 #define cloudlog_t(lvl, ...) cloudlog_te(lvl, __FILE__, __LINE__, \
                                           __func__, \
                                           __VA_ARGS__);

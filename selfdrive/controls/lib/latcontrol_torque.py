@@ -55,6 +55,7 @@ class LatControlTorque(LatControl):
       output_torque = 0.0
       pid_log.active = False
       angle_steers_des = 0.0
+      self.errors = []
     else:
       if self.use_steering_angle:
         actual_curvature = -VM.calc_curvature(math.radians(CS.steeringAngleDeg - params.angleOffsetDeg), CS.vEgo, params.roll)
