@@ -53,12 +53,12 @@ class CarState(CarStateBase):
     self.buttons_counter = 0
 
   def update(self, cp, cp2, cp_cam):
+    if self.CP.carFingerprint in HDA2_CAR:
+      return self.update_hda2(cp, cp_cam)
+
     cp_mdps = cp2 if self.mdps_bus else cp
     cp_sas = cp2 if self.sas_bus else cp
     cp_scc = cp2 if self.scc_bus == 1 else cp_cam if self.scc_bus == 2 else cp
-
-    if self.CP.carFingerprint in HDA2_CAR:
-      return self.update_hda2(cp, cp2, cp_cam)
 
     ret = car.CarState.new_message()
 
@@ -235,7 +235,6 @@ class CarState(CarStateBase):
 
     speed_factor = CV.MPH_TO_MS if cp.vl["CLUSTER_INFO"]["DISTANCE_UNIT"] == 1 else CV.KPH_TO_MS
     ret.cruiseState.speed = cp.vl["CRUISE_INFO"]["SET_SPEED"] * speed_factor
-
     self.buttons_counter = cp.vl["CRUISE_BUTTONS"]["_COUNTER"]
 
     return ret
@@ -447,6 +446,9 @@ class CarState(CarStateBase):
 
   @staticmethod
   def get_can2_parser(CP):
+    if CP.carFingerprint in HDA2_CAR:
+      return None
+
     signals = []
     checks = []
     if CP.mdpsBus == 1:

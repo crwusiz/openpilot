@@ -10,6 +10,17 @@ const int HYUNDAI_COMMUNITY_STANDSTILL_THRSLD = 30;  // ~1kph
 const int HYUNDAI_COMMUNITY_MAX_ACCEL = 200;  // 1/100 m/s2
 const int HYUNDAI_COMMUNITY_MIN_ACCEL = -350; // 1/100 m/s2
 
+bool LCAN_bus1 = false;
+bool fwd_bus1 = false;
+bool fwd_obd = false;
+bool fwd_bus2 = true;
+int OBD_cnt = 20;
+int LKAS11_bus0_cnt = 0;
+int LCAN_bus1_cnt = 0;
+int MDPS12_checksum = -1;
+int MDPS12_cnt = 0;
+int Last_StrColTq = 0;
+
 int LKAS11_op = 0;
 int MDPS12_op = 0;
 int CLU11_op = 0;
@@ -276,6 +287,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
   if (addr == 832) {
     LKAS11_op = 20;
     int desired_torque = ((GET_BYTES_04(to_send) >> 16) & 0x7ffU) - 1024U;
+    bool steer_req = GET_BIT(to_send, 27U) != 0U;
     uint32_t ts = microsecond_timer_get();
     bool violation = 0;
 
@@ -311,8 +323,8 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
       }
     }
 
-    // no torque if controls is not allowed
-    if (!controls_allowed && (desired_torque != 0)) {
+    // no torque if controls is not allowed or mismatch with CF_Lkas_ActToi bit
+    if ((!controls_allowed || !steer_req) && (desired_torque != 0)) {
       violation = 1;
       puts("  LKAS torque not allowed : controls not allowed!\n");
     }
@@ -339,22 +351,11 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
     }
   }
 
-  if (addr == 593) {
-    MDPS12_op = 20;
-  }
-  if ((addr == 1265) && (bus == 1)) {
-    CLU11_op = 20;
-  }
+  if (addr == 593) { MDPS12_op = 20; }
+  if ((addr == 1265) && (bus == 1)) { CLU11_op = 20; }
   // only count mesage created for MDPS
-  if (addr == 1057) {
-    SCC12_op = 20;
-    if (SCC12_car > 0) {
-      SCC12_car -= 1;
-    }
-  }
-  if (addr == 790) {
-    EMS11_op = 20;
-  }
+  if (addr == 1057) { SCC12_op = 20; if (SCC12_car > 0) { SCC12_car -= 1; }}
+  if (addr == 790) { EMS11_op = 20; }
 
   // 1 allows the message through
   return tx;

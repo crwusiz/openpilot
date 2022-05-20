@@ -82,6 +82,7 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1719. + STD_CARGO_KG
       ret.wheelbase = 2.885
       ret.steerRatio = 12.5
+      ret.maxLateralAccel = 2.5
     elif candidate == CAR.NEXO:
       ret.mass = 1873. + STD_CARGO_KG
       ret.wheelbase = 2.790
@@ -298,8 +299,10 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalActuatorDelayLowerBound = 0.3
     ret.longitudinalActuatorDelayUpperBound = 0.3
 
-    ret.vEgoStopping = 1.0
+    ret.stopAccel = -2.0
     ret.stoppingDecelRate = 0.4  # brake_travel/s while trying to stop
+    ret.vEgoStarting = 0.5
+    ret.vEgoStopping = 1.0
 
     # TODO: get actual value, for now starting with reasonable value for
     # civic and scaling by mass and wheelbase
@@ -327,7 +330,7 @@ class CarInterface(CarInterfaceBase):
     ret.hasLfaHda = 1157 in fingerprint[0]
     ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
 
-    ret.radarOffCan = ret.sccBus == -1
+    ret.radarOffCan = False if candidate in HDA2_CAR else ret.sccBus == -1
     ret.pcmCruise = not ret.radarOffCan
 
     return ret
@@ -387,6 +390,7 @@ class CarInterface(CarInterfaceBase):
 
     return ret
 
+  # scc smoother - hyundai only
   def apply(self, c, controls):
     ret = self.CC.update(c, self.CS, controls)
     return ret

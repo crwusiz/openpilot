@@ -1,7 +1,16 @@
 #include "safety_declarations.h"
 
 // include the safety policies.
+#ifdef STM32H7
+#define CANFD
+#endif
+
+#ifdef CANFD
 #include "safety/safety_defaults.h"
+#else
+#include "safety/safety_defaults_hyundai_community.h"
+#endif
+
 #include "safety/safety_elm327.h"
 #include "safety/safety_hyundai.h"
 #include "safety/safety_hyundai_community.h"
@@ -19,10 +28,6 @@
 #include "safety/safety_volkswagen_pq.h"
 #include "safety/safety_body.h"
 */
-
-#ifdef STM32H7
-#define CANFD
-#endif
 
 // CAN-FD only safety modes
 #ifdef CANFD

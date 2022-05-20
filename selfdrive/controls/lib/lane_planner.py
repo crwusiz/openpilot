@@ -14,6 +14,7 @@ TRAJECTORY_SIZE = 33
 PATH_OFFSET = 0.00
 CAMERA_OFFSET = 0.04
 
+
 class LanePlanner:
   def __init__(self, wide_camera=False):
     self.ll_t = np.zeros((TRAJECTORY_SIZE,))
@@ -49,8 +50,9 @@ class LanePlanner:
       # left and right ll x is the same
       self.ll_x = lane_lines[1].x
       # only offset left and right lane lines; offsetting path does not make sense
-      self.lll_y = np.array(md.laneLines[1].y) - self.camera_offset
-      self.rll_y = np.array(md.laneLines[2].y) - self.camera_offset
+
+      self.lll_y = np.array(lane_lines[1].y) + self.camera_offset
+      self.rll_y = np.array(lane_lines[2].y) + self.camera_offset
       self.lll_prob = md.laneLineProbs[1]
       self.rll_prob = md.laneLineProbs[2]
       self.lll_std = md.laneLineStds[1]
