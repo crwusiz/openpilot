@@ -20,12 +20,12 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, cut_st
   values["CF_Lkas_MsgCount"] = frame % 0x10
   values["CF_Lkas_Chksum"] = 0
 
-  if car_fingerprint == CAR.GENESIS:
-    values["CF_Lkas_LdwsActivemode"] = 2
-    values["CF_Lkas_SysWarning"] = lkas11["CF_Lkas_SysWarning"]
-
-  elif car_fingerprint in [CAR.K5, CAR.K5_HEV, CAR.K7, CAR.K7_HEV]:
-    values["CF_Lkas_LdwsActivemode"] = 0
+  if Params().get("MfcSelect", encoding='utf8') == "0": # This field is LKAS Mfc car ( qt ui toggle set )
+    if car_fingerprint == CAR.GENESIS:
+      values["CF_Lkas_LdwsActivemode"] = 2
+      values["CF_Lkas_SysWarning"] = lkas11["CF_Lkas_SysWarning"]
+    elif car_fingerprint in [CAR.K5, CAR.K5_HEV, CAR.K7, CAR.K7_HEV]:
+      values["CF_Lkas_LdwsActivemode"] = 0
 
   if Params().get("MfcSelect", encoding='utf8') == "1": # This field is LDWS Mfc car ( qt ui toggle set )
     values["CF_Lkas_LdwsActivemode"] = 0
@@ -113,9 +113,9 @@ def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc1
   if not scc_live:
     values["MainMode_ACC"] = 1
     values["VSetDis"] = set_speed
-    values["ObjValid"] = 1 if enabled else 0
+    values["ObjValid"] = lead_visible #1 if enabled else 0
     values["DriverAlertDisplay"] = 0
-    values["ACC_ObjStatus"] = 1 if lead_visible else 0
+    values["ACC_ObjStatus"] = lead_visible #1 if lead_visible else 0
 
   return packer.make_can_msg("SCC11", 0, values)
 
