@@ -493,8 +493,7 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
     p.drawEllipse(rect);
     p.setBrush(QBrush(whiteColor()));
 
-    const int tickness = 20;
-    rect.adjust(tickness, tickness, -tickness, -tickness);
+    rect.adjust(20, 20, -20, -20);
     p.drawEllipse(rect);
 
     QString str_limit_speed, str_left_dist;
@@ -531,16 +530,12 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
     const float img_alpha = 0.8f;
     const int fb_w = width() / 2 - 200;
     const int center_x = width() / 2;
-    const int w = fb_w / 20;
-    const int h = 220;
-    const int gap = fb_w / 20;
-    const int margin = (int)(fb_w / 3.8f);
-    const int base_y = (height() - h) / 2;
-    const int draw_count = 6;
+    const int w = 200;
+    const int h = 200;
+    const int y = (height() - h) / 2;
+    const int draw_count = 8;
 
     x = center_x;
-    y = base_y;
-
     if (left_on) {
       for (int i = 0; i < draw_count; i++) {
         float alpha = img_alpha;
@@ -549,9 +544,8 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
           alpha /= d * 2;
 
         p.setOpacity(alpha);
-        float factor = (float)draw_count / (i + draw_count);
-        p.drawPixmap(x - w - margin, y, w * factor, h, turnsignal_l_img);
-        x -= gap + w;
+        p.drawPixmap(x - w, y, w, h, turnsignal_l_img);
+        x -= w * 0.6;
       }
     }
 
@@ -564,9 +558,8 @@ void OnroadHud::paintEvent(QPaintEvent *event) {
           alpha /= d * 2;
 
         p.setOpacity(alpha);
-        float factor = (float)draw_count / (i + draw_count);
-        p.drawPixmap(x + margin, y, w * factor, h, turnsignal_r_img);
-        x += gap + w;
+        p.drawPixmap(x, y, w, h, turnsignal_r_img);
+        x += w * 0.6;
       }
     }
 
