@@ -797,6 +797,20 @@ FW_VERSIONS = {
       b'\xf1\x816U2V8051\x00\x00\xf1\x006U2V0_C2\x00\x006U2V8051\x00\x00DJS0T16KS2\016\xba\036\xa2',
     ],
   },
+  CAR.NEXO: {
+    (Ecu.fwdRadar, 0x7D0, None): [
+      b'\xf1\x00FE__ SCC FHCUP      1.00 1.03 99110-M5000         ',
+    ],
+    (Ecu.fwdCamera, 0x7C4, None): [
+      b'\xf1\x00FE  MFC  AT KOR LHD 1.00 1.04 99211-M5000 180918',
+    ],
+    (Ecu.eps, 0x7D4, None): [
+      b'\xf1\x00FE  MDPS C 1.00 1.05 56340-M5000 9903',
+    ],
+    (Ecu.esp, 0x7D1, None): [
+      b'\xf1\x00FE IEB \x01 312 \x11\x13 58520-M5000',
+    ],
+  },
 
   # kia
   CAR.FORTE: {
@@ -1003,7 +1017,7 @@ FW_VERSIONS = {
      ],
     (Ecu.transmission, 0x7e1, None): [
       b'\xf1\x87CZLUB49370612JF7h\xa8y\x87\x99\xa7hv\x99\x97fv\x88\x87x\x89x\x96O\xff\x88\xff\xff\xff.@\xf1\x816V2C2051\000\000\xf1\0006V2B0_C2\000\0006V2C2051\000\000CSP4N20NS3\000\000\000\000',
-      b'\xf1\x87954A22D200\xf1\x81T01950A1  \xf1\000T0190XBL  T01950A1  DSP2T16X4X950NS6\xd30\xa5\xb9',
+      b'\xf1\x87954A22D200\xf71\x81T01950A1  \xf1\000T0190XBL  T01950A1  DSP2T16X4X950NS6\xd30\xa5\xb9',
       b'\xf1\x87954A22D200\xf1\x81T01950A1  \xf1\000T0190XBL  T01950A1  DSP2T16X4X950NS8\r\xfe\x9c\x8b',
      ],
   },
@@ -1047,7 +1061,7 @@ CHECKSUM = {
 
 FEATURES = {
   "use_cluster_gears": # Use Cluster for Gear Selection, rather than Transmission [ CLU15 ]
-    {CAR.ELANTRA_I30, CAR.KONA, CAR.GRANDEUR, CAR.MOHAVE, CAR.NIRO_HEV, CAR.K7},
+    {CAR.ELANTRA_I30, CAR.KONA, CAR.GRANDEUR, CAR.NIRO_HEV, CAR.K7},
   "use_tcu_gears": # Use TCU Message for Gear Selection [ TCU12 ]
     {CAR.SONATA_LF, CAR.VELOSTER, CAR.K5},
   "use_elect_gears": # Use Elect GEAR Message for Gear Selection [ ELECT_GEAR ]
