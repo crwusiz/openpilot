@@ -1,10 +1,10 @@
-bool Lcan_bus1 = false;
-bool Fwd_bus1 = false;
-bool Fwd_obd = false;
-bool Fwd_bus2 = true;
+bool LCAN_bus1 = false;
+bool fwd_bus1 = false;
+bool fwd_obd = false;
+bool fwd_bus2 = true;
 int OBD_cnt = 20;
 int LKAS11_bus0_cnt = 0;
-int Lcan_bus1_cnt = 0;
+int LCAN_bus1_cnt = 0;
 int MDPS12_checksum = -1;
 int MDPS12_cnt = 0;
 int Last_StrColTq = 0;
@@ -22,60 +22,48 @@ int default_rx_hook(CANPacket_t *to_push) {
   if (addr == 832) {
     if (bus == 0) {
       LKAS11_bus0_cnt = 10;
-      if (Fwd_bus2) {
-        Fwd_bus2 = false;
-        puts("  LKAS11 on bus0: forwarding disabled\n");
+      if (fwd_bus2) {
+        fwd_bus2 = false;
+        puts("  LKAS11 on bus [0] : forwarding disabled\n");
       }
     }
     if (bus == 2) {
       if (LKAS11_bus0_cnt > 0) {
         LKAS11_bus0_cnt--;
-      } else if (!Fwd_bus2) {
-        Fwd_bus2 = true;
-        puts("  LKAS11 on bus2: forwarding enabled\n");
+      } else if (!fwd_bus2) {
+        fwd_bus2 = true;
+        puts("  LKAS11 on bus [2] : forwarding enabled\n");
       }
       if (OBD_cnt == 20) {
-        puts("  LKAS11 on bus2: forwarding enabled\n");
+        puts("  LKAS11 on bus [2] : forwarding enabled\n");
       }
-      if (Lcan_bus1_cnt > 0) {
-        Lcan_bus1_cnt--;
-      } else if (Lcan_bus1) {
-        Lcan_bus1 = false;
-        puts("  Lcan not on bus1\n");
-      }
-      // set CAN2 mode to normal if int_cnt expaired
-      if (OBD_cnt == 11 && !Fwd_bus1 && current_board->has_obd) {
-        current_board->set_can_mode(CAN_MODE_OBD_CAN2);
-        puts("  checking bus1: setting CAN_MODE_OBD_CAN2\n");
-      }
-      if (OBD_cnt == 1 && !Fwd_obd && !Fwd_bus1 && current_board->has_obd) {
-        current_board->set_can_mode(CAN_MODE_NORMAL);
-        puts("  OBD2 CAN empty: setting CAN_MODE_NORMAL\n");
-      }
-      if (OBD_cnt > 0) {
-        OBD_cnt--;
+      if (LCAN_bus1_cnt > 0) {
+        LCAN_bus1_cnt--;
+      } else if (LCAN_bus1) {
+        LCAN_bus1 = false;
+        puts("  LCAN not on bus [1]\n");
       }
     }
   }
 
   // check if we have a LCAN on Bus1
   if (bus == 1 && (addr == 1296 || addr == 524)) {
-    Lcan_bus1_cnt = 500;
-    if (Fwd_bus1 || !Lcan_bus1) {
-      Lcan_bus1 = true;
-      Fwd_bus1 = false;
-      puts("  LCAN on bus1: forwarding disabled\n");
+    LCAN_bus1_cnt = 500;
+    if (fwd_bus1 || !LCAN_bus1) {
+      LCAN_bus1 = true;
+      fwd_bus1 = false;
+      puts("  LCAN on bus [1] : forwarding disabled\n");
     }
   }
   // check if we have a MDPS or SCC on Bus1
   if (bus == 1 && (addr == 593 || addr == 897 || addr == 1057)) {
-    if (!Fwd_bus1 && OBD_cnt > 1 && OBD_cnt < 11 && current_board->has_obd) {
-      Fwd_obd = true;
+    if (!fwd_bus1 && OBD_cnt > 1 && OBD_cnt < 11 && current_board->has_obd) {
+      fwd_obd = true;
       OBD_cnt = 0;
-      puts("  MDPS or SCC on OBD2 CAN: setting can mode obd\n");
-    } else if (!Fwd_bus1 && !Lcan_bus1) {
-      Fwd_bus1 = true;
-      puts("  MDPS or SCC on bus1: forwarding enabled\n");
+      puts("  MDPS or SCC on OBD2 CAN : setting can mode obd\n");
+    } else if (!fwd_bus1 && !LCAN_bus1) {
+      fwd_bus1 = true;
+      puts("  MDPS or SCC on bus [1] : forwarding enabled\n");
     }
   }
   if ((addr == 593) && (MDPS12_checksum == -1)){
@@ -103,10 +91,6 @@ int default_rx_hook(CANPacket_t *to_push) {
 
 static const addr_checks* nooutput_init(uint16_t param) {
   UNUSED(param);
-  if (current_board->has_obd && Fwd_obd) {
-    current_board->set_can_mode(CAN_MODE_OBD_CAN2);
-    puts("setting CAN_MODE_OBD_CAN2\n");
-  }
   return &default_rx_checks;
 }
 
@@ -127,20 +111,21 @@ static int default_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   int addr = GET_ADDR(to_fwd);
   int bus_fwd = -1;
 
-  if (bus_num == 0 && (Fwd_bus1 || Fwd_bus2 || Fwd_obd)) {
-    if ((Fwd_bus1 || Fwd_obd) && Fwd_bus2) {
+  if (bus_num == 0 && (fwd_bus1 || fwd_bus2 || fwd_obd)) {
+    if ((fwd_bus1 || fwd_obd) && fwd_bus2) {
     bus_fwd = 12;
     } else {
-      bus_fwd = Fwd_bus2 ? 2 : 1;
+      bus_fwd = fwd_bus2 ? 2 : 1;
     }
   }
-  if (bus_num == 1 && (Fwd_bus1 || Fwd_obd)) {
-    bus_fwd = Fwd_bus2 ? 20 : 0;
+  if (bus_num == 1 && (fwd_bus1 || fwd_obd)) {
+    bus_fwd = fwd_bus2 ? 20 : 0;
   }
-  if (bus_num == 2 && Fwd_bus2) {
-    bus_fwd = (Fwd_bus1 || Fwd_obd) ? 10 : 0;
+  if (bus_num == 2 && fwd_bus2) {
+    bus_fwd = (fwd_bus1 || fwd_obd) ? 10 : 0;
   }
-    // Code for LKA/LFA/HDA anti-nagging.
+
+  // Code for LKA/LFA/HDA anti-nagging.
   if (addr == 593 && bus_fwd != -1) {
     uint8_t dat[8];
     int New_Chksum2 = 0;
@@ -179,14 +164,14 @@ static int default_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
         }
         New_Chksum2 %= 256;
       } else if (MDPS12_checksum) {
-        uint8_t crc = 0xFF;
+        uint8_t crc = 0xFFU;
         uint8_t poly = 0x1D;
         int i, j;
         for (i=0; i<8; i++){
           if (i!=3){ //don't include CRC byte
             crc ^= dat[i];
             for (j=0; j<8; j++) {
-              if ((crc & 0x80) != 0U) {
+              if ((crc & 0x80U) != 0U) {
                 crc = (crc << 1) ^ poly;
               } else {
                 crc <<= 1;
@@ -194,7 +179,7 @@ static int default_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
             }
           }
         }
-        crc ^= 0xFF;
+        crc ^= 0xFFU;
         crc %= 256;
         New_Chksum2 = crc;
       }
@@ -223,10 +208,6 @@ bool alloutput_passthrough = false;
 static const addr_checks* alloutput_init(uint16_t param) {
   controls_allowed = true;
   alloutput_passthrough = GET_FLAG(param, ALLOUTPUT_PARAM_PASSTHROUGH);
-  if (current_board->has_obd && Fwd_obd) {
-    current_board->set_can_mode(CAN_MODE_OBD_CAN2);
-    puts("  setting CAN_MODE_OBD_CAN2\n");
-  }
   return &default_rx_checks;
 }
 
