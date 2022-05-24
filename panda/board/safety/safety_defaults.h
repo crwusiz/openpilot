@@ -103,8 +103,6 @@ int default_rx_hook(CANPacket_t *to_push) {
 
 static const addr_checks* nooutput_init(uint16_t param) {
   UNUSED(param);
-  controls_allowed = false;
-  relay_malfunction_reset();
   if (current_board->has_obd && Fwd_obd) {
     current_board->set_can_mode(CAN_MODE_OBD_CAN2);
     puts("setting CAN_MODE_OBD_CAN2\n");
@@ -223,9 +221,8 @@ const uint16_t ALLOUTPUT_PARAM_PASSTHROUGH = 1;
 bool alloutput_passthrough = false;
 
 static const addr_checks* alloutput_init(uint16_t param) {
-  alloutput_passthrough = GET_FLAG(param, ALLOUTPUT_PARAM_PASSTHROUGH);
   controls_allowed = true;
-  relay_malfunction_reset();
+  alloutput_passthrough = GET_FLAG(param, ALLOUTPUT_PARAM_PASSTHROUGH);
   if (current_board->has_obd && Fwd_obd) {
     current_board->set_can_mode(CAN_MODE_OBD_CAN2);
     puts("  setting CAN_MODE_OBD_CAN2\n");

@@ -341,8 +341,6 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
 
 static const addr_checks* hyundai_community_init(uint16_t param) {
   UNUSED(param);
-  controls_allowed = false;
-  relay_malfunction_reset();
 
   if (current_board->has_obd && Fwd_obd) {
     current_board->set_can_mode(CAN_MODE_OBD_CAN2);

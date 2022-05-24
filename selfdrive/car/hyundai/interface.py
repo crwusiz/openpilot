@@ -5,7 +5,7 @@ from cereal import car
 from common.params import Params
 from common.numpy_fast import interp
 from common.conversions import Conversions as CV
-from selfdrive.car.hyundai.values import CAR, Buttons, CarControllerParams
+from selfdrive.car.hyundai.values import CAR, Buttons, CarControllerParams, HDA2_CAR
 from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
@@ -132,6 +132,13 @@ class CarInterface(CarInterfaceBase):
         ret.mass = 1510. + STD_CARGO_KG
         ret.wheelbase = 2.630
         ret.steerRatio = 13.0
+    elif candidate == CAR.EV6:
+        ret.mass = 2055 + STD_CARGO_KG
+        ret.wheelbase = 2.9
+        ret.steerRatio = 16.
+        ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.noOutput),
+                             get_safety_config(car.CarParams.SafetyModel.hyundaiHDA2)]
+        tire_stiffness_factor = 0.65
 
     # genesis
     elif candidate == CAR.GENESIS:
@@ -153,143 +160,142 @@ class CarInterface(CarInterfaceBase):
 
     # Pid -----------------------------------------------------------------
     if Params().get("LateralControlSelect", encoding='utf8') == "0":
-      if candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
-          ret.lateralTuning.pid.kf = 0.00005
-          ret.lateralTuning.pid.kpBP = [0.]
-          ret.lateralTuning.pid.kpV = [0.16]
-          ret.lateralTuning.pid.kiBP = [0.]
-          ret.lateralTuning.pid.kiV = [0.01]
-      elif candidate == CAR.PALISADE:
-          ret.lateralTuning.pid.kf = 0.00005
-          ret.lateralTuning.pid.kpBP = [0.]
-          ret.lateralTuning.pid.kpV = [0.3]
-          ret.lateralTuning.pid.kiBP = [0.]
-          ret.lateralTuning.pid.kiV = [0.05]
-      else:
-          ret.lateralTuning.pid.kf = 0.00005
-          ret.lateralTuning.pid.kpBP = [0.]
-          ret.lateralTuning.pid.kpV = [0.25]
-          ret.lateralTuning.pid.kiBP = [0.]
-          ret.lateralTuning.pid.kiV = [0.05]
+        if candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
+            ret.lateralTuning.pid.kf = 0.00005
+            ret.lateralTuning.pid.kpBP = [0.]
+            ret.lateralTuning.pid.kpV = [0.16]
+            ret.lateralTuning.pid.kiBP = [0.]
+            ret.lateralTuning.pid.kiV = [0.01]
+        elif candidate == CAR.PALISADE:
+            ret.lateralTuning.pid.kf = 0.00005
+            ret.lateralTuning.pid.kpBP = [0.]
+            ret.lateralTuning.pid.kpV = [0.3]
+            ret.lateralTuning.pid.kiBP = [0.]
+            ret.lateralTuning.pid.kiV = [0.05]
+        else:
+            ret.lateralTuning.pid.kf = 0.00005
+            ret.lateralTuning.pid.kpBP = [0.]
+            ret.lateralTuning.pid.kpV = [0.25]
+            ret.lateralTuning.pid.kiBP = [0.]
+            ret.lateralTuning.pid.kiV = [0.05]
 
     # Indi -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "1":
-      if candidate == CAR.GENESIS:
-          ret.lateralTuning.init('indi')
-          ret.lateralTuning.indi.innerLoopGainBP = [0.]
-          ret.lateralTuning.indi.innerLoopGainV = [3.5]
-          ret.lateralTuning.indi.outerLoopGainBP = [0.]
-          ret.lateralTuning.indi.outerLoopGainV = [2.0]
-          ret.lateralTuning.indi.timeConstantBP = [0.]
-          ret.lateralTuning.indi.timeConstantV = [1.4]
-          ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
-          ret.lateralTuning.indi.actuatorEffectivenessV = [2.3]
-      elif candidate  == CAR.GENESIS_G70:
-          ret.lateralTuning.init('indi')
-          ret.lateralTuning.indi.innerLoopGainBP = [0.]
-          ret.lateralTuning.indi.innerLoopGainV = [2.5]
-          ret.lateralTuning.indi.outerLoopGainBP = [0.]
-          ret.lateralTuning.indi.outerLoopGainV = [3.5]
-          ret.lateralTuning.indi.timeConstantBP = [0.]
-          ret.lateralTuning.indi.timeConstantV = [1.4]
-          ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
-          ret.lateralTuning.indi.actuatorEffectivenessV = [1.8]
-      elif candidate == CAR.SELTOS:
-          ret.lateralTuning.init('indi')
-          ret.lateralTuning.indi.innerLoopGainBP = [0.]
-          ret.lateralTuning.indi.innerLoopGainV = [4.]
-          ret.lateralTuning.indi.outerLoopGainBP = [0.]
-          ret.lateralTuning.indi.outerLoopGainV = [3.]
-          ret.lateralTuning.indi.timeConstantBP = [0.]
-          ret.lateralTuning.indi.timeConstantV = [1.4]
-          ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
-          ret.lateralTuning.indi.actuatorEffectivenessV = [1.8]
-      else:
-          ret.lateralTuning.init('indi')
-          ret.lateralTuning.indi.innerLoopGainBP = [0.]
-          ret.lateralTuning.indi.innerLoopGainV = [3.5]
-          ret.lateralTuning.indi.outerLoopGainBP = [0.]
-          ret.lateralTuning.indi.outerLoopGainV = [2.0]
-          ret.lateralTuning.indi.timeConstantBP = [0.]
-          ret.lateralTuning.indi.timeConstantV = [1.4]
-          ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
-          ret.lateralTuning.indi.actuatorEffectivenessV = [2.3]
+        ret.lateralTuning.init('indi')
+        if candidate == CAR.GENESIS:
+            ret.lateralTuning.indi.innerLoopGainBP = [0.]
+            ret.lateralTuning.indi.innerLoopGainV = [3.5]
+            ret.lateralTuning.indi.outerLoopGainBP = [0.]
+            ret.lateralTuning.indi.outerLoopGainV = [2.0]
+            ret.lateralTuning.indi.timeConstantBP = [0.]
+            ret.lateralTuning.indi.timeConstantV = [1.4]
+            ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
+            ret.lateralTuning.indi.actuatorEffectivenessV = [2.3]
+        elif candidate  == CAR.GENESIS_G70:
+            ret.lateralTuning.indi.innerLoopGainBP = [0.]
+            ret.lateralTuning.indi.innerLoopGainV = [2.5]
+            ret.lateralTuning.indi.outerLoopGainBP = [0.]
+            ret.lateralTuning.indi.outerLoopGainV = [3.5]
+            ret.lateralTuning.indi.timeConstantBP = [0.]
+            ret.lateralTuning.indi.timeConstantV = [1.4]
+            ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
+            ret.lateralTuning.indi.actuatorEffectivenessV = [1.8]
+        elif candidate == CAR.SELTOS:
+            ret.lateralTuning.indi.innerLoopGainBP = [0.]
+            ret.lateralTuning.indi.innerLoopGainV = [4.]
+            ret.lateralTuning.indi.outerLoopGainBP = [0.]
+            ret.lateralTuning.indi.outerLoopGainV = [3.]
+            ret.lateralTuning.indi.timeConstantBP = [0.]
+            ret.lateralTuning.indi.timeConstantV = [1.4]
+            ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
+            ret.lateralTuning.indi.actuatorEffectivenessV = [1.8]
+        else:
+            ret.lateralTuning.indi.innerLoopGainBP = [0.]
+            ret.lateralTuning.indi.innerLoopGainV = [3.5]
+            ret.lateralTuning.indi.outerLoopGainBP = [0.]
+            ret.lateralTuning.indi.outerLoopGainV = [2.0]
+            ret.lateralTuning.indi.timeConstantBP = [0.]
+            ret.lateralTuning.indi.timeConstantV = [1.4]
+            ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
+            ret.lateralTuning.indi.actuatorEffectivenessV = [2.3]
 
     # Lqr -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "2":
-      if candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
-          ret.lateralTuning.init('lqr')
-          ret.lateralTuning.lqr.scale = 1900.
-          ret.lateralTuning.lqr.ki = 0.01
-          ret.lateralTuning.lqr.dcGain = 0.0029
-          ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-          ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-          ret.lateralTuning.lqr.c = [1., 0.]
-          ret.lateralTuning.lqr.k = [-110., 451.]
-          ret.lateralTuning.lqr.l = [0.33, 0.318]
-      elif candidate in [CAR.K5, CAR.K5_HEV]:
-          ret.lateralTuning.init('lqr')
-          ret.lateralTuning.lqr.scale = 1700.0
-          ret.lateralTuning.lqr.ki = 0.016
-          ret.lateralTuning.lqr.dcGain = 0.002
-          ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-          ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-          ret.lateralTuning.lqr.c = [1., 0.]
-          ret.lateralTuning.lqr.k = [-110.0, 451.0]
-          ret.lateralTuning.lqr.l = [0.33, 0.318]
-      elif candidate in [CAR.GRANDEUR, CAR.GRANDEUR_HEV, CAR.GRANDEUR20, CAR.GRANDEUR20_HEV, CAR.K7, CAR.K7_HEV]:
-          ret.lateralTuning.init('lqr')
-          ret.lateralTuning.lqr.scale = 1600.
-          ret.lateralTuning.lqr.ki = 0.01
-          ret.lateralTuning.lqr.dcGain = 0.0027
-          ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-          ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-          ret.lateralTuning.lqr.c = [1., 0.]
-          ret.lateralTuning.lqr.k = [-110., 451.]
-          ret.lateralTuning.lqr.l = [0.33, 0.318]
-      elif candidate == CAR.SELTOS:
-          ret.lateralTuning.init('lqr')
-          ret.lateralTuning.lqr.scale = 1500.0
-          ret.lateralTuning.lqr.ki = 0.05
-          ret.lateralTuning.lqr.dcGain = 0.002237852961363602
-          ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-          ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-          ret.lateralTuning.lqr.c = [1., 0.]
-          ret.lateralTuning.lqr.k = [-110.73572306, 451.22718255]
-          ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
-      elif candidate == CAR.IONIQ_EV:
-          ret.lateralTuning.init('lqr')
-          ret.lateralTuning.lqr.scale = 3000.0
-          ret.lateralTuning.lqr.ki = 0.005
-          ret.lateralTuning.lqr.dcGain = 0.002237852961363602
-          ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-          ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-          ret.lateralTuning.lqr.c = [1., 0.]
-          ret.lateralTuning.lqr.k = [-110.73572306, 451.22718255]
-          ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
-      else:
-          ret.lateralTuning.init('lqr')
-          ret.lateralTuning.lqr.scale = 1700.0
-          ret.lateralTuning.lqr.ki = 0.03
-          ret.lateralTuning.lqr.dcGain = 0.003
-          ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-          ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-          ret.lateralTuning.lqr.c = [1., 0.]
-          ret.lateralTuning.lqr.k = [-105.0, 450.0]
-          ret.lateralTuning.lqr.l = [0.22, 0.318]
+        ret.lateralTuning.init('lqr')
+        if candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
+            ret.lateralTuning.lqr.scale = 1900.
+            ret.lateralTuning.lqr.ki = 0.01
+            ret.lateralTuning.lqr.dcGain = 0.0029
+            ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
+            ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
+            ret.lateralTuning.lqr.c = [1., 0.]
+            ret.lateralTuning.lqr.k = [-110., 451.]
+            ret.lateralTuning.lqr.l = [0.33, 0.318]
+        elif candidate in [CAR.K5, CAR.K5_HEV]:
+            ret.lateralTuning.lqr.scale = 1700.0
+            ret.lateralTuning.lqr.ki = 0.016
+            ret.lateralTuning.lqr.dcGain = 0.002
+            ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
+            ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
+            ret.lateralTuning.lqr.c = [1., 0.]
+            ret.lateralTuning.lqr.k = [-110.0, 451.0]
+            ret.lateralTuning.lqr.l = [0.33, 0.318]
+        elif candidate in [CAR.GRANDEUR, CAR.GRANDEUR_HEV, CAR.GRANDEUR20, CAR.GRANDEUR20_HEV, CAR.K7, CAR.K7_HEV]:
+            ret.lateralTuning.lqr.scale = 1600.
+            ret.lateralTuning.lqr.ki = 0.01
+            ret.lateralTuning.lqr.dcGain = 0.0027
+            ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
+            ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
+            ret.lateralTuning.lqr.c = [1., 0.]
+            ret.lateralTuning.lqr.k = [-110., 451.]
+            ret.lateralTuning.lqr.l = [0.33, 0.318]
+        elif candidate == CAR.SELTOS:
+            ret.lateralTuning.lqr.scale = 1500.0
+            ret.lateralTuning.lqr.ki = 0.05
+            ret.lateralTuning.lqr.dcGain = 0.002237852961363602
+            ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
+            ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
+            ret.lateralTuning.lqr.c = [1., 0.]
+            ret.lateralTuning.lqr.k = [-110.73572306, 451.22718255]
+            ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
+        elif candidate == CAR.IONIQ_EV:
+            ret.lateralTuning.lqr.scale = 3000.0
+            ret.lateralTuning.lqr.ki = 0.005
+            ret.lateralTuning.lqr.dcGain = 0.002237852961363602
+            ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
+            ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
+            ret.lateralTuning.lqr.c = [1., 0.]
+            ret.lateralTuning.lqr.k = [-110.73572306, 451.22718255]
+            ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
+        else:
+            ret.lateralTuning.lqr.scale = 1700.0
+            ret.lateralTuning.lqr.ki = 0.03
+            ret.lateralTuning.lqr.dcGain = 0.003
+            ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
+            ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
+            ret.lateralTuning.lqr.c = [1., 0.]
+            ret.lateralTuning.lqr.k = [-105.0, 450.0]
+            ret.lateralTuning.lqr.l = [0.22, 0.318]
 
     # Torque -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "3":
-      ret.lateralTuning.init('torque')
-      ret.lateralTuning.torque.useSteeringAngle = True
-      max_lat_accel = 2.5
-      ret.lateralTuning.torque.kp = 1.0 / max_lat_accel
-      ret.lateralTuning.torque.kf = 1.0 / max_lat_accel
-      ret.lateralTuning.torque.ki = 0.2 / max_lat_accel
-      ret.lateralTuning.torque.friction = 0.0
+        ret.lateralTuning.init('torque')
+        ret.lateralTuning.torque.useSteeringAngle = True
+        ret.lateralTuning.torque.kd = 1.0
+        ret.lateralTuning.torque.deadzone = 0.01
 
-      ret.lateralTuning.torque.kd = 1.0
-      ret.lateralTuning.torque.deadzone = 0.01
+        if candidate == CAR.EV6:
+            max_lat_accel = 2.
+            ret.lateralTuning.torque.kp = 1.0 / max_lat_accel
+            ret.lateralTuning.torque.kf = 1.0 / max_lat_accel
+            ret.lateralTuning.torque.ki = 0.1 / max_lat_accel
+            ret.lateralTuning.torque.friction = 0.01
+        else:
+            max_lat_accel = 2.5
+            ret.lateralTuning.torque.kp = 1.0 / max_lat_accel
+            ret.lateralTuning.torque.kf = 1.0 / max_lat_accel
+            ret.lateralTuning.torque.ki = 0.2 / max_lat_accel
+            ret.lateralTuning.torque.friction = 0.0
 
     ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05
