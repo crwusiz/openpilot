@@ -634,11 +634,19 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   # Camera is not outputting frames
   EventName.cameraMalfunction: {
     ET.PERMANENT: camera_malfunction_alert,
+    #ET.SOFT_DISABLE: soft_disable_alert("Camera Malfunction"),
+    # ET.NO_ENTRY: NoEntryAlert("Camera Malfunction: Reboot Your Device"),
+    ET.SOFT_DISABLE: soft_disable_alert("카메라 오작동"),
+    ET.NO_ENTRY: NoEntryAlert("카메라 오작동: 장치를 재부팅 하세요")
   },
   # Camera framerate too low
   EventName.cameraFrameRate: {
     #ET.PERMANENT: NormalPermanentAlert("Camera Frame Rate Low", "Reboot your Device"),
+    #ET.SOFT_DISABLE: soft_disable_alert("Camera Frame Rate Low"),
+    #ET.NO_ENTRY: NoEntryAlert("Camera Frame Rate Low: Reboot Your Device"),
     ET.PERMANENT: NormalPermanentAlert("카메라 프레임 낮음", "장치를 재부팅 하세요"),
+    ET.SOFT_DISABLE: soft_disable_alert("카메라 프레임 낮음"),
+    ET.NO_ENTRY: NoEntryAlert("카메라 프레임 낮음", "장치를 재부팅 하세요"),
   },
 
   # Unused
@@ -862,13 +870,15 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   EventName.controlsdLagging: {
     #ET.SOFT_DISABLE: soft_disable_alert("Controls Lagging"),
     #ET.NO_ENTRY: NoEntryAlert("Controls Process Lagging: Reboot Your Device"),
-    ET.SOFT_DISABLE: soft_disable_alert("Controlsd 지연됨"),
-    ET.NO_ENTRY: NoEntryAlert("Controlsd 프로세스 지연됨: 장치를 재부팅 하세요"),
+    ET.SOFT_DISABLE: soft_disable_alert("controlsd 지연됨"),
+    ET.NO_ENTRY: NoEntryAlert("controlsd 프로세스 지연됨: 장치를 재부팅 하세요"),
   },
 
   # Thrown when manager detects a service exited unexpectedly while driving
   EventName.processNotRunning: {
     ET.NO_ENTRY: process_not_running_alert,
+    #ET.SOFT_DISABLE: soft_disable_alert("Process Not Running"),
+    ET.SOFT_DISABLE: soft_disable_alert("프로세스가 실행되지 않았습니다"),
   },
 
   EventName.radarFault: {
