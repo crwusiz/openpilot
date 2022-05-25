@@ -230,38 +230,39 @@ def main():
       sock.setblocking(False)
 
       while True:
-        if server.udp_recv(sock):
-          dat = messaging.new_message()
-          dat.init('roadLimitSpeed')
-          dat.roadLimitSpeed.active = server.active
-          dat.roadLimitSpeed.roadLimitSpeed = server.get_limit_val("road_limit_speed", 0)
-          dat.roadLimitSpeed.isHighway = server.get_limit_val("is_highway", False)
-          dat.roadLimitSpeed.camType = server.get_limit_val("cam_type", 0)
-          dat.roadLimitSpeed.camLimitSpeedLeftDist = server.get_limit_val("cam_limit_speed_left_dist", 0)
-          dat.roadLimitSpeed.camLimitSpeed = server.get_limit_val("cam_limit_speed", 0)
-          dat.roadLimitSpeed.sectionLimitSpeed = server.get_limit_val("section_limit_speed", 0)
-          dat.roadLimitSpeed.sectionLeftDist = server.get_limit_val("section_left_dist", 0)
-          dat.roadLimitSpeed.camSpeedFactor = server.get_limit_val("cam_speed_factor", CAMERA_SPEED_FACTOR)
+        server.udp_recv(sock)
 
-          try:
-            json = server.json_road_limit
-            if json is not None and "rest_area" in json:
+        dat = messaging.new_message()
+        dat.init('roadLimitSpeed')
+        dat.roadLimitSpeed.active = server.active
+        dat.roadLimitSpeed.roadLimitSpeed = server.get_limit_val("road_limit_speed", 0)
+        dat.roadLimitSpeed.isHighway = server.get_limit_val("is_highway", False)
+        dat.roadLimitSpeed.camType = server.get_limit_val("cam_type", 0)
+        dat.roadLimitSpeed.camLimitSpeedLeftDist = server.get_limit_val("cam_limit_speed_left_dist", 0)
+        dat.roadLimitSpeed.camLimitSpeed = server.get_limit_val("cam_limit_speed", 0)
+        dat.roadLimitSpeed.sectionLimitSpeed = server.get_limit_val("section_limit_speed", 0)
+        dat.roadLimitSpeed.sectionLeftDist = server.get_limit_val("section_left_dist", 0)
+        dat.roadLimitSpeed.camSpeedFactor = server.get_limit_val("cam_speed_factor", CAMERA_SPEED_FACTOR)
 
-              restAreaList = []
-              for rest_area in json["rest_area"]:
-                restArea = log.RoadLimitSpeed.RestArea.new_message()
-                restArea.image = server.get_json_val(rest_area, "image")
-                restArea.title = server.get_json_val(rest_area, "title")
-                restArea.oilPrice = server.get_json_val(rest_area, "oilPrice")
-                restArea.distance = server.get_json_val(rest_area, "distance")
-                restAreaList.append(restArea)
+        try:
+          json = server.json_road_limit
+          if json is not None and "rest_area" in json:
 
-              dat.roadLimitSpeed.restArea = restAreaList
-          except:
-            pass
+            restAreaList = []
+            for rest_area in json["rest_area"]:
+              restArea = log.RoadLimitSpeed.RestArea.new_message()
+              restArea.image = server.get_json_val(rest_area, "image")
+              restArea.title = server.get_json_val(rest_area, "title")
+              restArea.oilPrice = server.get_json_val(rest_area, "oilPrice")
+              restArea.distance = server.get_json_val(rest_area, "distance")
+              restAreaList.append(restArea)
 
-          roadLimitSpeed.send(dat.to_bytes())
-          server.send_sdp(sock)
+            dat.roadLimitSpeed.restArea = restAreaList
+        except:
+          pass
+
+        roadLimitSpeed.send(dat.to_bytes())
+        server.send_sdp(sock)
         server.check()
 
     except Exception as e:
