@@ -58,6 +58,7 @@ class NvgWindow : public CameraViewWidget {
   Q_PROPERTY(int camLimitSpeedLeftDist MEMBER camLimitSpeedLeftDist);
   Q_PROPERTY(int sectionLimitSpeed MEMBER sectionLimitSpeed);
   Q_PROPERTY(int sectionLeftDist MEMBER sectionLeftDist);
+  Q_PROPERTY(int accel MEMBER accel);
 
   Q_PROPERTY(float lead_d_rel MEMBER lead_d_rel);
   Q_PROPERTY(float lead_v_rel MEMBER lead_v_rel);
@@ -145,6 +146,7 @@ private:
   int camLimitSpeedLeftDist = 0;
   int sectionLimitSpeed = 0;
   int sectionLeftDist = 0;
+  int accel = 0;
   int x,y,w,h = 0;
 
   float lead_d_rel = 0;

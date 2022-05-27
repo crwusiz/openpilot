@@ -54,7 +54,6 @@ def manager_init() -> None:
     ("LoggerDisable", "1"),
     ("NavDisable", "1"),
     ("NewRadarInterface", "0"),
-    ("HapticFeedbackWhenSpeedCamera", "0"),
   ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))

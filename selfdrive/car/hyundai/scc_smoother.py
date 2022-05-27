@@ -22,7 +22,6 @@ MAX_SET_SPEED_KPH = V_CRUISE_MAX
 
 MIN_CURVE_SPEED = 40. * CV.KPH_TO_MS
 
-SYNC_MARGIN = 3.
 ALIVE_COUNT = [6, 8]
 WAIT_COUNT = [12, 13, 14, 15, 16]
 AliveIndex = 0
@@ -212,7 +211,6 @@ class SccSmoother:
     if self.wait_timer > 0:
       self.wait_timer -= 1
     elif ascc_enabled and not CS.out.cruiseState.standstill:
-
       if self.alive_timer == 0:
         self.btn = self.get_button(CS.cruiseState_speed * self.speed_conv_to_clu)
         self.alive_count = SccSmoother.get_alive_count()
@@ -268,13 +266,12 @@ class SccSmoother:
     return 0
 
   def cal_curve_speed(self, sm, v_ego, frame):
-
     lateralPlan = sm['lateralPlan']
     if len(lateralPlan.curvatures) == CONTROL_N:
       curv = (lateralPlan.curvatures[-1] + lateralPlan.curvatures[-2]) / 2.
       a_y_max = 2.975 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
       v_curvature = sqrt(a_y_max / max(abs(curv), 1e-4))
-      model_speed = np.mean(v_curvature) * 0.85 * 0.98  # ("sccCurvatureFactor")
+      model_speed = v_curvature * 0.85
 
       if model_speed < v_ego:
         self.curve_speed_ms = float(max(model_speed, MIN_CURVE_SPEED))
@@ -305,7 +302,6 @@ class SccSmoother:
           self.target_speed = set_speed
 
   def update_max_speed(self, max_speed, limited_curv):
-
     if not self.longcontrol or self.max_speed_clu <= 0:
       self.max_speed_clu = max_speed
     else:
@@ -314,24 +310,11 @@ class SccSmoother:
       self.max_speed_clu = self.max_speed_clu + error * kp
 
   def get_apply_accel(self, CS, sm, accel, stopping):
-    gas_factor = 1.0
-    brake_factor = 1.0
-
-    #lead = self.get_lead(sm)
-    #if lead is not None:
-    #  if not lead.radar:
-    #    brake_factor *= 0.975
-
     start_boost = interp(CS.out.vEgo, [0.0, CREEP_SPEED, 2 * CREEP_SPEED], [0.6, 0.6, 0.0])
     is_accelerating = interp(accel, [0.0, 0.2], [0.0, 1.0])
     boost = start_boost * is_accelerating
 
     accel += boost
-
-    if accel > 0:
-      accel *= gas_factor
-    else:
-      accel *= brake_factor
 
     return accel
 
@@ -356,8 +339,7 @@ class SccSmoother:
       if longcontrol:
         v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
       else:
-        v_cruise_kph = SccSmoother.update_v_cruise(controls.v_cruise_kph, CS.buttonEvents,
-                                                   controls.enabled, controls.is_metric)
+        v_cruise_kph = SccSmoother.update_v_cruise(controls.v_cruise_kph, CS.buttonEvents, controls.enabled, controls.is_metric)
     else:
       v_cruise_kph = 0
 

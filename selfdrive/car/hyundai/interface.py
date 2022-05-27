@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-from typing import List
-
 from cereal import car
 from common.params import Params
 from common.numpy_fast import interp
@@ -10,16 +8,27 @@ from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness,
 from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
 
-GearShifter = car.CarState.GearShifter
-EventName = car.CarEvent.EventName
 ButtonType = car.CarState.ButtonEvent.Type
+EventName = car.CarEvent.EventName
+ENABLE_BUTTONS = (Buttons.RES_ACCEL, Buttons.SET_DECEL, Buttons.CANCEL)
+
+def get_button_type(but):
+  if but == Buttons.RES_ACCEL:
+    return ButtonType.accelCruise
+  elif but == Buttons.SET_DECEL:
+    return ButtonType.decelCruise
+  elif but == Buttons.GAP_DIST:
+    return ButtonType.gapAdjustCruise
+  #elif but == Buttons.CANCEL:
+  #  return ButtonType.cancel
+  return ButtonType.unknown
 
 class CarInterface(CarInterfaceBase):
   def __init__(self, CP, CarController, CarState):
     super().__init__(CP, CarController, CarState)
     self.cp2 = self.CS.get_can2_parser(CP)
-    self.mad_mode_enabled = Params().get("LongControlSelect", encoding='utf8') == "0" or \
-                            Params().get("LongControlSelect", encoding='utf8') == "1"
+    self.madmode = Params().get("LongControlSelect", encoding='utf8') == "0" or \
+                   Params().get("LongControlSelect", encoding='utf8') == "1"
 
   @staticmethod
   def get_pid_accel_limits(CP, current_speed, cruise_speed):
@@ -42,7 +51,7 @@ class CarInterface(CarInterfaceBase):
     ret.steerFaultMaxAngle = 85
     ret.steerFaultMaxFrames = 90
 
-    tire_stiffness_factor = 1.
+    tire_stiffness_factor = 0.8
 
     # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
     # hyundai
@@ -138,7 +147,6 @@ class CarInterface(CarInterfaceBase):
         ret.steerRatio = 16.
         ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.noOutput),
                              get_safety_config(car.CarParams.SafetyModel.hyundaiHDA2)]
-        tire_stiffness_factor = 0.65
 
     # genesis
     elif candidate == CAR.GENESIS:
@@ -302,17 +310,17 @@ class CarInterface(CarInterfaceBase):
 
     ret.steerActuatorDelay = 0.2
     ret.steerRateCost = 0.4
-
-    ret.steerLimitTimer = 2.5
+    ret.steerLimitTimer = 2.0
 
     # longitudinal
-    ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 30.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+    ret.longitudinalTuning.kpBP = [0., 5. * CV.KPH_TO_MS, 10. * CV.KPH_TO_MS, 30. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]
     ret.longitudinalTuning.kpV = [1.2, 1.0, 0.93, 0.88, 0.5]
     ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
     ret.longitudinalTuning.kiV = [0.08, 0.03]
     ret.longitudinalActuatorDelayLowerBound = 0.3
     ret.longitudinalActuatorDelayUpperBound = 0.3
 
+    ret.vEgoStopping = 1.0
     ret.stoppingDecelRate = 0.4  # brake_travel/s while trying to stop
 
     # TODO: get actual value, for now starting with reasonable value for
@@ -346,10 +354,10 @@ class CarInterface(CarInterfaceBase):
 
     return ret
 
-  def _update(self, c: car.CarControl) -> car.CarState:
+  def _update(self, c):
     pass
 
-  def update(self, c: car.CarControl, can_strings: List[bytes]) -> car.CarState:
+  def update(self, c, can_strings):
     self.cp.update_strings(can_strings)
     self.cp2.update_strings(can_strings)
     self.cp_cam.update_strings(can_strings)
@@ -358,13 +366,16 @@ class CarInterface(CarInterfaceBase):
     ret.canValid = self.cp.can_valid and self.cp2.can_valid and self.cp_cam.can_valid
     ret.canTimeout = any(cp.bus_timeout for cp in self.can_parsers if cp is not None)
 
+    if not self.cp.can_valid or not self.cp2.can_valid or not self.cp_cam.can_valid:
+      print('cp={}  cp2={}  cp_cam={}'.format(bool(self.cp.can_valid), bool(self.cp2.can_valid), bool(self.cp_cam.can_valid)))
+
     if self.CP.pcmCruise and not self.CC.scc_live:
       self.CP.pcmCruise = False
     elif self.CC.scc_live and not self.CP.pcmCruise:
       self.CP.pcmCruise = True
 
     # most HKG cars has no long control, it is safer and easier to engage by main on
-    if self.mad_mode_enabled:
+    if self.madmode:
       ret.cruiseState.enabled = ret.cruiseState.available
 
     # turning indicator alert logic
@@ -373,43 +384,35 @@ class CarInterface(CarInterfaceBase):
     else:
       self.CC.turning_indicator_alert = False
 
-    # low speed steer alert hysteresis logic (only for cars with steer cut off above 10 m/s)
-    if ret.vEgo < (self.CP.minSteerSpeed + 0.2) and self.CP.minSteerSpeed > 10.:
-      self.low_speed_alert = True
-    if ret.vEgo > (self.CP.minSteerSpeed + 0.7):
-      self.low_speed_alert = False
-
     buttonEvents = []
     if self.CS.cruise_buttons != self.CS.prev_cruise_buttons:
+        # Handle CF_Clu_CruiseSwState changing buttons mid-press
+      if self.CS.cruise_buttons != 0 and self.CS.prev_cruise_buttons != 0:
+        be = car.CarState.ButtonEvent.new_message(pressed=False)
+        be.type = get_button_type(self.CS.prev_cruise_buttons)
+        buttonEvents.append(be)
+
       be = car.CarState.ButtonEvent.new_message()
-      be.pressed = self.CS.cruise_buttons != 0
-      but = self.CS.cruise_buttons if be.pressed else self.CS.prev_cruise_buttons
-      if but == Buttons.RES_ACCEL:
-        be.type = ButtonType.accelCruise
-      elif but == Buttons.SET_DECEL:
-        be.type = ButtonType.decelCruise
-      elif but == Buttons.GAP_DIST:
-        be.type = ButtonType.gapAdjustCruise
-      #elif but == Buttons.CANCEL:
-      #  be.type = ButtonType.cancel
+      if self.CS.cruise_buttons != 0:
+        be.pressed = True
+        be.type = get_button_type(self.CS.cruise_buttons)
       else:
-        be.type = ButtonType.unknown
+        be.pressed = False
+        be.type = get_button_type(self.CS.prev_cruise_buttons)
       buttonEvents.append(be)
-    if self.CS.cruise_main_button != self.CS.prev_cruise_main_button:
+
+    if self.CS.main_buttons != self.CS.prev_main_buttons:
       be = car.CarState.ButtonEvent.new_message()
       be.type = ButtonType.altButton3
-      be.pressed = bool(self.CS.cruise_main_button)
+      be.pressed = bool(self.CS.main_buttons)
       buttonEvents.append(be)
+
     ret.buttonEvents = buttonEvents
 
     events = self.create_common_events(ret)
 
     if self.CC.longcontrol and self.CS.cruise_unavail:
       events.add(EventName.brakeUnavailable)
-    #if abs(ret.steeringAngleDeg) > 90. and EventName.steerTempUnavailable not in events.events:
-    #  events.add(EventName.steerTempUnavailable)
-    if self.low_speed_alert and not self.CS.mdps_bus:
-      events.add(EventName.belowSteerSpeed)
     if self.CC.turning_indicator_alert:
       events.add(EventName.turningIndicatorOn)
 
@@ -435,10 +438,19 @@ class CarInterface(CarInterfaceBase):
     if self.CC.scc_smoother is not None:
       self.CC.scc_smoother.inject_events(events)
 
+    # low speed steer alert hysteresis logic (only for cars with steer cut off above 10 m/s)
+    if ret.vEgo < (self.CP.minSteerSpeed + 2.) and self.CP.minSteerSpeed > 10.:
+      self.low_speed_alert = True
+    if ret.vEgo > (self.CP.minSteerSpeed + 4.):
+      self.low_speed_alert = False
+    if self.low_speed_alert and not self.CS.mdps_bus:
+      events.add(car.CarEvent.EventName.belowSteerSpeed)
+
     ret.events = events.to_msg()
 
     self.CS.out = ret.as_reader()
     return self.CS.out
 
   def apply(self, c, controls):
-    return self.CC.update(c, self.CS, controls)
+    ret = self.CC.update(c, self.CS, controls)
+    return ret

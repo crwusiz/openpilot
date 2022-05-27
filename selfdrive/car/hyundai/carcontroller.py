@@ -3,7 +3,7 @@ from random import randint
 from cereal import car
 from common.params import Params
 from common.realtime import DT_CTRL
-from common.numpy_fast import clip, interp
+from common.numpy_fast import clip
 from common.conversions import Conversions as CV
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai import hda2can, hyundaican
@@ -55,7 +55,6 @@ class CarController:
     self.cut_steer = False
     self.steer_rate_limited = False
     self.turning_indicator_alert = False
-    self.prev_active_cam = False
 
     self.angle_limit_counter = 0
     self.cut_steer_frames = 0
@@ -70,14 +69,9 @@ class CarController:
     self.resume_wait_timer = 0
     self.turning_signal_timer = 0
     self.last_blinker_frame = 0
-    self.active_cam_timer = 0
-    self.last_active_cam_frame = 0
 
     self.scc_smoother = SccSmoother()
     self.lfahdamfc = Params().get("MfcSelect", encoding='utf8') == "2"
-    self.mad_mode_enabled = Params().get("LongControlSelect", encoding='utf8') == "0" or \
-                            Params().get("LongControlSelect", encoding='utf8') == "1"
-    self.haptic_feedback_speed_camera = Params().get_bool('HapticFeedbackWhenSpeedCamera')
 
 
   def update(self, CC, CS, controls):
@@ -103,18 +97,6 @@ class CarController:
     self.apply_steer_last = apply_steer
 
     sys_warning, sys_state, left_lane_warning, right_lane_warning = process_hud_alert(CC.enabled, hud_control)
-
-    if self.haptic_feedback_speed_camera:
-      if self.prev_active_cam != self.scc_smoother.active_cam:
-        self.prev_active_cam = self.scc_smoother.active_cam
-        if self.scc_smoother.active_cam:
-          if (self.frame - self.last_active_cam_frame) * DT_CTRL > 10.0:
-            self.active_cam_timer = int(1.5 / DT_CTRL)
-            self.last_active_cam_frame = self.frame
-
-      if self.active_cam_timer > 0:
-        self.active_cam_timer -= 1
-        left_lane_warning = right_lane_warning = 1
 
     clu11_speed = CS.clu11["CF_Clu_Vanz"]
     enabled_speed = 38 if CS.is_set_speed_in_mph else 60
@@ -241,6 +223,10 @@ class CarController:
 
     # send scc to car if longcontrol enabled and SCC not on bus 0 or ont live
     if self.longcontrol and CS.cruiseState_enabled and (CS.scc_bus or not self.scc_live):
+      accel = actuators.accel
+      accel_raw = accel
+      jerk = 0
+
       if self.frame % 2 == 0:
         set_speed = hud_control.setSpeed
         if not (min_set_speed < set_speed < 255 * CV.KPH_TO_MS):
@@ -249,8 +235,13 @@ class CarController:
 
         stopping = (actuators.longControlState == LongCtrlState.stopping)
         apply_accel = self.scc_smoother.get_apply_accel(CS, controls.sm, actuators.accel, stopping)
-        apply_accel = clip(apply_accel if CC.longActive else 0, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
+        apply_accel = clip(apply_accel if CC.longActive else 0,
+                           CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
         self.accel = apply_accel
+
+        if abs(accel - CS.out.aEgo) > 0.2:
+          accel_raw = accel + (accel - CS.out.aEgo) / 2
+        accel_raw = clip(accel_raw, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
 
         controls.apply_accel = apply_accel
         aReqValue = CS.scc12["aReqValue"]
@@ -266,10 +257,10 @@ class CarController:
         self.scc12_cnt += 1
         self.scc12_cnt %= 0xF
 
-        can_sends.append(hyundaican.create_scc12(self.packer, apply_accel, CC.enabled, self.scc12_cnt, self.scc_live, CS.scc12,
-                                                 CS.out.gasPressed, CS.out.brakePressed, CS.out.cruiseState.standstill, self.car_fingerprint))
-
         can_sends.append(hyundaican.create_scc11(self.packer, self.frame, CC.enabled, set_speed, hud_control.leadVisible, self.scc_live, CS.scc11))
+
+        can_sends.append(hyundaican.create_scc12(self.packer, apply_accel, accel_raw, CC.enabled, self.scc12_cnt, self.scc_live, CS.scc12,
+                                                 CS.out.gasPressed, CS.out.brakePressed, CS.out.cruiseState.standstill, self.car_fingerprint))
 
         if self.frame % 20 == 0 and CS.has_scc13:
           can_sends.append(hyundaican.create_scc13(self.packer, CS.scc13))
@@ -277,6 +268,7 @@ class CarController:
         if CS.has_scc14:
           acc_standstill = stopping if CS.out.vEgo < 2. else False
           lead = self.scc_smoother.get_lead(controls.sm)
+          jerk = clip(2.0 * (accel - CS.out.aEgo), -12.7, 12.7)
 
           if lead is not None:
             d = lead.dRel
@@ -285,6 +277,6 @@ class CarController:
             obj_gap = 0
 
           can_sends.append(
-            hyundaican.create_scc14(self.packer, CC.enabled, CS.out.vEgo, acc_standstill, apply_accel, CS.out.gasPressed, obj_gap, CS.scc14))
+            hyundaican.create_scc14(self.packer, CC.enabled, CS.out.vEgo, jerk, acc_standstill, apply_accel, CS.out.gasPressed, obj_gap, CS.scc14))
     else:
       self.scc12_cnt = -1

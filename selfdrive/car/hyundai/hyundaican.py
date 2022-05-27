@@ -1,5 +1,3 @@
-import copy
-
 import crcmod
 from selfdrive.car.hyundai.values import CAR, CHECKSUM, EV_HYBRID_CAR
 from common.params import Params
@@ -9,7 +7,7 @@ hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 
 def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, cut_steer_temp, lkas11, sys_warning, sys_state, enabled,
                   left_lane, right_lane, left_lane_depart, right_lane_depart, bus):
-  values = copy.copy(lkas11)
+  values = lkas11
   values["CF_Lkas_LdwsSysState"] = sys_state
   values["CF_Lkas_SysWarning"] = 3 if sys_warning else 0
   values["CF_Lkas_LdwsLHWarning"] = left_lane_depart
@@ -54,7 +52,7 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, cut_st
 
 
 def create_clu11(packer, bus, clu11, button, speed):
-  values = copy.copy(clu11)
+  values = clu11
   values["CF_Clu_CruiseSwState"] = button
   values["CF_Clu_Vanz"] = speed
   values["CF_Clu_AliveCnt1"] = (values["CF_Clu_AliveCnt1"] + 1) % 0x10
@@ -74,7 +72,7 @@ def create_lfahda_mfc(packer, enabled, active):
 
 
 def create_hda_mfc(packer, active, CS, left_lane, right_lane):
-  values = copy.copy(CS.lfahda_mfc)
+  values = CS.lfahda_mfc
 
   ldwSysState = 0
   if left_lane:
@@ -93,7 +91,7 @@ def create_hda_mfc(packer, active, CS, left_lane, right_lane):
 
 
 def create_mdps12(packer, frame, mdps12):
-  values = copy.copy(mdps12)
+  values = mdps12
   values["CF_Mdps_ToiActive"] = 0
   values["CF_Mdps_ToiUnavail"] = 1
   values["CF_Mdps_MsgCount2"] = frame % 0x100
@@ -107,40 +105,38 @@ def create_mdps12(packer, frame, mdps12):
 
 
 def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc11):
-  values = copy.copy(scc11)
+  values = scc11
   values["AliveCounterACC"] = frame // 2 % 0x10
 
   if not scc_live:
     values["MainMode_ACC"] = 1
     values["VSetDis"] = set_speed
-    values["ObjValid"] = lead_visible #1 if enabled else 0
+    values["ObjValid"] = 0
     values["DriverAlertDisplay"] = 0
-    values["ACC_ObjStatus"] = lead_visible #1 if lead_visible else 0
+    values["ACC_ObjStatus"] = 0
 
   return packer.make_can_msg("SCC11", 0, values)
 
 
-def create_scc12(packer, apply_accel, enabled, cnt, scc_live, scc12, gaspressed, brakepressed, standstill, car_fingerprint):
-  values = copy.copy(scc12)
-  # from xps-genesis
+def create_scc12(packer, apply_accel, accel_raw, enabled, cnt, scc_live, scc12, gaspressed, brakepressed, standstill, car_fingerprint):
+  values = scc12
 
   if car_fingerprint in EV_HYBRID_CAR:
     if enabled and not brakepressed:
       values["ACCMode"] = 2 if gaspressed and (apply_accel > -0.2) else 1
-      if apply_accel < 0.0 and standstill:
-        values["StopReq"] = 1
-      values["aReqRaw"] = apply_accel
+      values["aReqRaw"] = accel_raw # apply_accel
       values["aReqValue"] = apply_accel
+      if apply_accel < 0.0 and standstill:
+        values["StopReq"] = 1 if standstill else 0
     else:
       values["ACCMode"] = 0
       values["aReqRaw"] = 0
       values["aReqValue"] = 0
-
     if not scc_live:
       values["CR_VSM_Alive"] = cnt
 
   else:
-    values["aReqRaw"] = apply_accel if enabled else 0  # aReqMax
+    values["aReqRaw"] = accel_raw # apply_accel if enabled else 0  # aReqMax
     values["aReqValue"] = apply_accel if enabled else 0  # aReqMin
     values["CR_VSM_Alive"] = cnt
     if not scc_live:
@@ -148,37 +144,26 @@ def create_scc12(packer, apply_accel, enabled, cnt, scc_live, scc12, gaspressed,
 
   values["CR_VSM_ChkSum"] = 0
   dat = packer.make_can_msg("SCC12", 0, values)[2]
-  values["CR_VSM_ChkSum"] = 16 - sum([sum(divmod(i, 16)) for i in dat]) % 16
+  values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in dat) % 0x10
 
   return packer.make_can_msg("SCC12", 0, values)
 
 
 def create_scc13(packer, scc13):
-  values = copy.copy(scc13)
+  values = scc13
 
   return packer.make_can_msg("SCC13", 0, values)
 
-
-def create_scc14(packer, enabled, e_vgo, standstill, accel, gaspressed, objgap, scc14):
-  values = copy.copy(scc14)
-  # from xps-genesis
+def create_scc14(packer, enabled, e_vgo, jerk, standstill, accel, gaspressed, objgap, scc14):
+  values = scc14
 
   if enabled:
-    values["ACCMode"] = 2 if gaspressed and (accel > -0.2) else 1
+    values["ComfortBandUpper"] = 0.0
+    values["ComfortBandLower"] = 0.0
+    values["JerkUpperLimit"] = max(jerk, 0.0) if enabled and not standstill else 0
+    values["JerkLowerLimit"] = max(-jerk, 1.0) if enabled else 0
+    values["ACCMode"] = 2 if gaspressed and (accel > -0.2) else 1 if enabled else 4
     values["ObjGap"] = objgap
-    if standstill:
-      values["JerkUpperLimit"] = 0.5
-      values["JerkLowerLimit"] = 10.
-      values["ComfortBandUpper"] = 0.
-      values["ComfortBandLower"] = 0.
-      if e_vgo > 0.27:
-        values["ComfortBandUpper"] = 2.
-        values["ComfortBandLower"] = 0.
-    else:
-      values["JerkUpperLimit"] = 50.
-      values["JerkLowerLimit"] = 50.
-      values["ComfortBandUpper"] = 50.
-      values["ComfortBandLower"] = 50.
 
   return packer.make_can_msg("SCC14", 0, values)
 
@@ -192,8 +177,8 @@ def create_acc_commands(packer, enabled, accel, jerk, idx, lead_visible, set_spe
     "TauGapSet": 4,
     "VSetDis": set_speed if enabled else 0,
     "AliveCounterACC": idx % 0x10,
-    "ObjValid": 1 if lead_visible else 0,
-    "ACC_ObjStatus": 1 if lead_visible else 0,
+    "ObjValid": 0,
+    "ACC_ObjStatus": 0,
     "ACC_ObjLatPos": 0,
     "ACC_ObjRelSpd": 0,
     "ACC_ObjDist": 0,
@@ -213,12 +198,12 @@ def create_acc_commands(packer, enabled, accel, jerk, idx, lead_visible, set_spe
   commands.append(packer.make_can_msg("SCC12", 0, scc12_values))
 
   scc14_values = {
-    "ComfortBandUpper": 0.0, # stock usually is 0 but sometimes uses higher values
-    "ComfortBandLower": 0.0, # stock usually is 0 but sometimes uses higher values
-    "JerkUpperLimit": max(jerk, 1.0) if not stopping else 0, # stock usually is 1.0 but sometimes uses higher values
-    "JerkLowerLimit": max(-jerk, 1.0), # stock usually is 0.5 but sometimes uses higher values
-    "ACCMode": 2 if enabled and gas_pressed else 1 if enabled else 4, # stock will always be 4 instead of 0 after first disengage
-    "ObjGap": 2 if lead_visible else 0, # 5: >30, m, 4: 25-30 m, 3: 20-25 m, 2: < 20 m, 0: no lead
+    "ComfortBandUpper": 0.0,  # stock usually is 0 but sometimes uses higher values
+    "ComfortBandLower": 0.0,  # stock usually is 0 but sometimes uses higher values
+    "JerkUpperLimit": 12.7 if not stopping and enabled else 0,  # max jerk limits, aReq should control jerk
+    "JerkLowerLimit": 12.7 if enabled else 0,
+    "ACCMode": 2 if enabled and gas_pressed else 1 if enabled else 4,  # stock will always be 4 instead of 0 after first disengage
+    "ObjGap": 2 if lead_visible else 0,  # 5: >30, m, 4: 25-30 m, 3: 20-25 m, 2: < 20 m, 0: no lead
   }
   commands.append(packer.make_can_msg("SCC14", 0, scc14_values))
 

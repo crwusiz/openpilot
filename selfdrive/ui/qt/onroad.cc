@@ -235,10 +235,11 @@ void NvgWindow::updateState(const UIState &s) {
   setProperty("applyMaxSpeed", QString::number(std::nearbyint(applyMaxSpeed)));
   setProperty("cruiseMaxSpeed", QString::number(std::nearbyint(cruiseMaxSpeed)));
   setProperty("speedUnit", s.scene.is_metric ? "km/h" : "mph");
+  setProperty("accel", ce.getAEgo());
   setProperty("status", s.status);
   setProperty("steeringPressed", ce.getSteeringPressed());
   setProperty("dmActive", sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode());
-  setProperty("brake_status", ce.getBrakeLights() || ce.getBrakePressed());
+  setProperty("brake_status", ce.getBrakeLights());
   setProperty("autohold_status", ce.getAutoHold());
   setProperty("nda_status", ls.getActive());
   setProperty("bsd_l_status", ce.getLeftBlindspot());
@@ -307,9 +308,23 @@ void NvgWindow::drawHud(QPainter &p) {
     drawTextColor(p, rc.center().x(), 195, "──", whiteColor());
   }
 
+  QColor variableColor = QColor(255, 255, 255, 230);
+
+  if (accel > 0) {
+    int a = (int)(255.f - (180.f * (accel/3.f)));
+    a = std::min(a, 255);
+    a = std::max(a, 80);
+    variableColor = QColor(a, a, 255, 255);
+  } else {
+    int a = (int)(255.f - (255.f * (-accel/4.f)));
+    a = std::min(a, 255);
+    a = std::max(a, 60);
+    variableColor = QColor(255, a, a, 255);
+  }
+
   // current speed (upper center)
   configFont(p, "Open Sans", 176, "Bold");
-  drawTextColor(p, rect().center().x(), 230, speed, whiteColor());
+  drawTextColor(p, rect().center().x(), 230, speed, variableColor);
   configFont(p, "Open Sans", 66, "Regular");
   drawTextColor(p, rect().center().x(), 310, speedUnit, yellowColor());
 
