@@ -4,24 +4,15 @@ from common.params import Params
 from common.numpy_fast import interp
 from common.conversions import Conversions as CV
 from selfdrive.car.hyundai.values import CAR, Buttons, CarControllerParams, HDA2_CAR
-from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
+from selfdrive.car import STD_CARGO_KG, create_button_enable_events, create_button_event, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
 
 ButtonType = car.CarState.ButtonEvent.Type
 EventName = car.CarEvent.EventName
 ENABLE_BUTTONS = (Buttons.RES_ACCEL, Buttons.SET_DECEL, Buttons.CANCEL)
-
-def get_button_type(but):
-  if but == Buttons.RES_ACCEL:
-    return ButtonType.accelCruise
-  elif but == Buttons.SET_DECEL:
-    return ButtonType.decelCruise
-  elif but == Buttons.GAP_DIST:
-    return ButtonType.gapAdjustCruise
-  #elif but == Buttons.CANCEL:
-  #  return ButtonType.cancel
-  return ButtonType.unknown
+BUTTONS_DICT = {Buttons.RES_ACCEL: ButtonType.accelCruise, Buttons.SET_DECEL: ButtonType.decelCruise,
+                Buttons.GAP_DIST: ButtonType.gapAdjustCruise, Buttons.CANCEL: ButtonType.cancel}
 
 class CarInterface(CarInterfaceBase):
   def __init__(self, CP, CarController, CarState):
@@ -378,61 +369,23 @@ class CarInterface(CarInterfaceBase):
     if self.madmode:
       ret.cruiseState.enabled = ret.cruiseState.available
 
+    events = self.create_common_events(ret)
+
+    if self.CS.cruise_buttons != self.CS.prev_cruise_buttons:
+      ret.buttonEvents = [create_button_event(self.CS.cruise_buttons, self.CS.prev_cruise_buttons, BUTTONS_DICT)]
+
+      events.events.extend(create_button_enable_events(ret.buttonEvents))
+
     # turning indicator alert logic
     if (ret.leftBlinker or ret.rightBlinker or self.CC.turning_signal_timer) and ret.vEgo < LANE_CHANGE_SPEED_MIN - 1.2:
       self.CC.turning_indicator_alert = True
     else:
       self.CC.turning_indicator_alert = False
 
-    buttonEvents = []
-    if self.CS.cruise_buttons != self.CS.prev_cruise_buttons:
-        # Handle CF_Clu_CruiseSwState changing buttons mid-press
-      if self.CS.cruise_buttons != 0 and self.CS.prev_cruise_buttons != 0:
-        be = car.CarState.ButtonEvent.new_message(pressed=False)
-        be.type = get_button_type(self.CS.prev_cruise_buttons)
-        buttonEvents.append(be)
-
-      be = car.CarState.ButtonEvent.new_message()
-      if self.CS.cruise_buttons != 0:
-        be.pressed = True
-        be.type = get_button_type(self.CS.cruise_buttons)
-      else:
-        be.pressed = False
-        be.type = get_button_type(self.CS.prev_cruise_buttons)
-      buttonEvents.append(be)
-
-    if self.CS.main_buttons != self.CS.prev_main_buttons:
-      be = car.CarState.ButtonEvent.new_message()
-      be.type = ButtonType.altButton3
-      be.pressed = bool(self.CS.main_buttons)
-      buttonEvents.append(be)
-
-    ret.buttonEvents = buttonEvents
-
-    events = self.create_common_events(ret)
-
     if self.CC.longcontrol and self.CS.cruise_unavail:
       events.add(EventName.brakeUnavailable)
     if self.CC.turning_indicator_alert:
       events.add(EventName.turningIndicatorOn)
-
-  # handle button presses
-    for b in ret.buttonEvents:
-      # do disable on button down
-      if b.type == ButtonType.cancel and b.pressed:
-        events.add(EventName.buttonCancel)
-      if self.CC.longcontrol and not self.CC.scc_live:
-        # do enable on both accel and decel buttons
-        if b.type in [ButtonType.accelCruise, ButtonType.decelCruise] and not b.pressed:
-          events.add(EventName.buttonEnable)
-        if EventName.wrongCarMode in events.events:
-          events.events.remove(EventName.wrongCarMode)
-        if EventName.pcmDisable in events.events:
-          events.events.remove(EventName.pcmDisable)
-      elif not self.CC.longcontrol and ret.cruiseState.enabled:
-        # do enable on decel button only
-        if b.type == ButtonType.decelCruise and not b.pressed:
-          events.add(EventName.buttonEnable)
 
     # scc smoother
     if self.CC.scc_smoother is not None:
