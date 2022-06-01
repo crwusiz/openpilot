@@ -6,6 +6,7 @@ from common.conversions import Conversions as CV
 from selfdrive.car.hyundai.values import CAR, Buttons, CarControllerParams, HDA2_CAR
 from selfdrive.car import STD_CARGO_KG, create_button_enable_events, create_button_event, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
+from selfdrive.controls.lib.latcontrol_torque import set_torque_tune
 from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
 
 ButtonType = car.CarState.ButtonEvent.Type
@@ -278,23 +279,14 @@ class CarInterface(CarInterfaceBase):
 
     # Torque -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "3":
-        ret.lateralTuning.init('torque')
-        ret.lateralTuning.torque.useSteeringAngle = True
-        ret.lateralTuning.torque.kd = 1.0
-        ret.lateralTuning.torque.deadzone = 0.01
-
         if candidate == CAR.EV6:
-            max_lat_accel = 2.
-            ret.lateralTuning.torque.kp = 1.0 / max_lat_accel
-            ret.lateralTuning.torque.kf = 1.0 / max_lat_accel
-            ret.lateralTuning.torque.ki = 0.1 / max_lat_accel
-            ret.lateralTuning.torque.friction = 0.01
+            set_torque_tune(ret.lateralTuning, 2.0, 0.1)
+        elif candidate in [CAR.K5, CAR.K5_HEV]:
+            set_torque_tune(ret.lateralTuning, 2.5, 0.05)
+        elif candidate in [CAR.SONATA, CAR.SONATA_HEV]:
+            set_torque_tune(ret.lateralTuning, 2.5, 0.05)
         else:
-            max_lat_accel = 2.5
-            ret.lateralTuning.torque.kp = 1.0 / max_lat_accel
-            ret.lateralTuning.torque.kf = 1.0 / max_lat_accel
-            ret.lateralTuning.torque.ki = 0.2 / max_lat_accel
-            ret.lateralTuning.torque.friction = 0.0
+            set_torque_tune(ret.lateralTuning, 2.5, 0.1)
 
     ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05
