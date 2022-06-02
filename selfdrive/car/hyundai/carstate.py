@@ -1,3 +1,4 @@
+from collections import deque
 import copy
 
 from cereal import car
@@ -8,10 +9,16 @@ from common.numpy_fast import interp
 from selfdrive.car.hyundai.values import DBC, STEER_THRESHOLD, FEATURES, HYBRID_CAR, EV_HYBRID_CAR, CAR, HDA2_CAR, Buttons
 from selfdrive.car.interfaces import CarStateBase
 
+PREV_BUTTON_SAMPLES = 4
+
+
 class CarState(CarStateBase):
   def __init__(self, CP):
     super().__init__(CP)
     can_define = CANDefine(DBC[CP.carFingerprint]["pt"])
+
+    self.cruise_buttons = deque([Buttons.NONE] * PREV_BUTTON_SAMPLES, maxlen=PREV_BUTTON_SAMPLES)
+    self.main_buttons = deque([Buttons.NONE] * PREV_BUTTON_SAMPLES, maxlen=PREV_BUTTON_SAMPLES)
 
     if CP.carFingerprint in HDA2_CAR:
       self.shifter_values = can_define.dv["ACCELERATOR"]["GEAR"]
@@ -31,7 +38,6 @@ class CarState(CarStateBase):
     self.has_scc14 = CP.hasScc14
     self.has_lfa_hda = CP.hasLfaHda
     self.aebFcw = CP.aebFcw
-    self.main_buttons = 0
     self.mdps_error_cnt = 0
     self.cruise_unavail_cnt = 0
     self.apply_steer = 0.
@@ -51,9 +57,6 @@ class CarState(CarStateBase):
     cp_mdps = cp2 if self.mdps_bus else cp
     cp_sas = cp2 if self.sas_bus else cp
     cp_scc = cp2 if self.scc_bus == 1 else cp_cam if self.scc_bus == 2 else cp
-
-    self.prev_cruise_buttons = self.cruise_buttons
-    self.prev_main_buttons = self.main_buttons
 
     if self.CP.carFingerprint in HDA2_CAR:
       return self.update_hda2(cp, cp2, cp_cam)
@@ -125,8 +128,9 @@ class CarState(CarStateBase):
     else:
       ret.cruiseState.speed = 0
 
-    self.cruise_buttons = cp.vl["CLU11"]["CF_Clu_CruiseSwState"]
-    self.main_buttons = cp.vl["CLU11"]["CF_Clu_CruiseSwMain"]
+    self.prev_cruise_buttons = self.cruise_buttons[-1]
+    self.cruise_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwState"])
+    self.main_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwMain"])
 
     # TODO: Find brake pressure
     ret.brake = 0
