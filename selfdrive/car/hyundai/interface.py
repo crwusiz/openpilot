@@ -37,7 +37,7 @@ class CarInterface(CarInterfaceBase):
     ret.steerFaultMaxAngle = 85
     ret.steerFaultMaxFrames = 90
 
-    tire_stiffness_factor = 0.8
+    tire_stiffness_factor = 0.65
 
     # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
     # hyundai
@@ -90,7 +90,7 @@ class CarInterface(CarInterfaceBase):
     elif candidate in [CAR.K5, CAR.K5_HEV, CAR.K5_DL3, CAR.K5_DL3_HEV]:
         ret.mass = 1565. + STD_CARGO_KG
         ret.wheelbase = 2.805
-        ret.steerRatio = 15.8
+        ret.steerRatio = 15.2
     elif candidate in [CAR.K7, CAR.K7_HEV]:
         ret.mass = 1730. + STD_CARGO_KG
         ret.wheelbase = 2.855
@@ -275,19 +275,15 @@ class CarInterface(CarInterfaceBase):
     elif Params().get("LateralControlSelect", encoding='utf8') == "3":
         if candidate == CAR.EV6:
             set_torque_tune(ret.lateralTuning, 2.0, 0.1)
-        elif candidate in [CAR.K5, CAR.K5_HEV]:
-            set_torque_tune(ret.lateralTuning, 2.5, 0.05)
-        elif candidate in [CAR.SONATA, CAR.SONATA_HEV]:
-            set_torque_tune(ret.lateralTuning, 2.5, 0.05)
         else:
-            set_torque_tune(ret.lateralTuning, 2.5, 0.1)
+            set_torque_tune(ret.lateralTuning, 2.5, 0.01)
 
     ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05
 
     ret.steerActuatorDelay = 0.2
     ret.steerRateCost = 0.4
-    ret.steerLimitTimer = 2.0
+    ret.steerLimitTimer = 2.5
 
     # longitudinal
     ret.longitudinalTuning.kpBP = [0., 5. * CV.KPH_TO_MS, 10. * CV.KPH_TO_MS, 30. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]

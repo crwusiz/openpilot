@@ -118,13 +118,13 @@ def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc1
   return packer.make_can_msg("SCC11", 0, values)
 
 
-def create_scc12(packer, apply_accel, accel_raw, enabled, cnt, scc_live, scc12, gaspressed, brakepressed, standstill, car_fingerprint):
+def create_scc12(packer, apply_accel, enabled, cnt, scc_live, scc12, gaspressed, brakepressed, standstill, car_fingerprint):
   values = scc12
 
   if car_fingerprint in EV_HYBRID_CAR:
     if enabled and not brakepressed:
       values["ACCMode"] = 2 if gaspressed and (apply_accel > -0.2) else 1
-      values["aReqRaw"] = accel_raw # apply_accel
+      values["aReqRaw"] =  apply_accel
       values["aReqValue"] = apply_accel
       if apply_accel < 0.0 and standstill:
         values["StopReq"] = 1 if standstill else 0
@@ -136,7 +136,7 @@ def create_scc12(packer, apply_accel, accel_raw, enabled, cnt, scc_live, scc12, 
       values["CR_VSM_Alive"] = cnt
 
   else:
-    values["aReqRaw"] = accel_raw # apply_accel if enabled else 0  # aReqMax
+    values["aReqRaw"] =  apply_accel if enabled else 0  # aReqMax
     values["aReqValue"] = apply_accel if enabled else 0  # aReqMin
     values["CR_VSM_Alive"] = cnt
     if not scc_live:
@@ -154,14 +154,14 @@ def create_scc13(packer, scc13):
 
   return packer.make_can_msg("SCC13", 0, values)
 
-def create_scc14(packer, enabled, e_vgo, jerk, standstill, accel, gaspressed, objgap, scc14):
+def create_scc14(packer, enabled, standstill, accel, gaspressed, objgap, scc14):
   values = scc14
 
   if enabled:
     values["ComfortBandUpper"] = 0.0
     values["ComfortBandLower"] = 0.0
-    values["JerkUpperLimit"] = max(jerk, 0.0) if enabled and not standstill else 0
-    values["JerkLowerLimit"] = max(-jerk, 1.0) if enabled else 0
+    values["JerkUpperLimit"] = 12.7 if not standstill and enabled else 0
+    values["JerkLowerLimit"] = 12.7 if enabled else 0
     values["ACCMode"] = 2 if gaspressed and (accel > -0.2) else 1 if enabled else 4
     values["ObjGap"] = objgap
 

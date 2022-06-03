@@ -5,7 +5,6 @@ from cereal import car
 from common.conversions import Conversions as CV
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
-from common.numpy_fast import interp
 from selfdrive.car.hyundai.values import DBC, STEER_THRESHOLD, FEATURES, HYBRID_CAR, EV_HYBRID_CAR, CAR, HDA2_CAR, Buttons
 from selfdrive.car.interfaces import CarStateBase
 
@@ -68,34 +67,16 @@ class CarState(CarStateBase):
 
     ret.seatbeltUnlatched = cp.vl["CGW1"]["CF_Gway_DrvSeatBeltSw"] == 0
 
-    self.is_set_speed_in_mph = bool(cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"])
-    self.speed_conv_to_ms = CV.MPH_TO_MS if self.is_set_speed_in_mph else CV.KPH_TO_MS
-
-    cluSpeed = cp.vl["CLU11"]["CF_Clu_Vanz"]
-    decimal = cp.vl["CLU11"]["CF_Clu_VanzDecimal"]
-
-    if 0. < decimal < 0.5:
-      cluSpeed += decimal
-
-    ret.cluSpeedMs = cluSpeed * self.speed_conv_to_ms
+    self.set_speed_in_mph = bool(cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"])
+    self.speed_conv_to_ms = CV.MPH_TO_MS if self.set_speed_in_mph else CV.KPH_TO_MS
 
     ret.wheelSpeeds = self.get_wheel_speeds(cp.vl["WHL_SPD11"]["WHL_SPD_FL"], cp.vl["WHL_SPD11"]["WHL_SPD_FR"],
                                             cp.vl["WHL_SPD11"]["WHL_SPD_RL"], cp.vl["WHL_SPD11"]["WHL_SPD_RR"])
 
-    vEgoRawClu = cluSpeed * self.speed_conv_to_ms
-    vEgoClu, aEgoClu = self.update_clu_speed_kf(vEgoRawClu)
+    ret.vEgoRaw = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
+    ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
 
-    vEgoRawWheel = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
-    vEgoRawWheel = interp(vEgoRawWheel, [0., 10.], [(vEgoRawWheel + vEgoRawClu) / 2., vEgoRawWheel])
-    vEgoWheel, aEgoWheel = self.update_speed_kf(vEgoRawWheel)
-
-    ret.vEgoRaw = vEgoRawWheel if self.CP.openpilotLongitudinalControl else vEgoRawClu
-    ret.vEgo = vEgoWheel if self.CP.openpilotLongitudinalControl else vEgoClu
-    ret.aEgo = aEgoWheel if self.CP.openpilotLongitudinalControl else aEgoClu
-
-    ret.vCluRatio = (vEgoWheel / vEgoClu) if (vEgoClu > 3. and vEgoWheel > 3.) else 1.0
     ret.standstill = ret.vEgoRaw < 0.01
-    ret.aBasis = cp.vl["TCS13"]["aBasis"]
     ret.steeringAngleDeg = cp_sas.vl["SAS11"]["SAS_Angle"]
     ret.steeringRateDeg = cp_sas.vl["SAS11"]["SAS_Speed"]
     ret.steeringTorque = cp_mdps.vl["MDPS12"]["CR_Mdps_StrColTq"]
@@ -302,7 +283,6 @@ class CarState(CarStateBase):
       ("ACCEnable", "TCS13"),
       ("ACC_REQ", "TCS13"),
       ("BrakeLight", "TCS13"),
-      ("aBasis", "TCS13"),
       ("DriverBraking", "TCS13"),
       ("StandStill", "TCS13"),
       ("PBRAKE_ACT", "TCS13"),

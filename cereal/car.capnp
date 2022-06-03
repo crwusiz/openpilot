@@ -214,13 +214,9 @@ struct CarState {
   fuelGauge @41 :Float32; # battery or fuel tank level from 0.0 to 1.0
   charging @43 :Bool;
 
-
-  cluSpeedMs @44 :Float32;
-  cruiseGap @45 : Int32;
-  autoHold @46 : Int32;
-  tpms @47 : Tpms;
-  vCluRatio @48 :Float32;
-  aBasis @49 :Float32;
+  cruiseGap @44 : Int32;
+  autoHold @45 : Int32;
+  tpms @46 : Tpms;
 
   struct Tpms {
     fl @0 :Float32;
