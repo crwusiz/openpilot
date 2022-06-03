@@ -230,6 +230,14 @@ void NvgWindow::updateState(const UIState &s) {
     cruiseMaxSpeed *= KM_TO_MILE;
   }
 
+  auto speed_limit_sign = sm["navInstruction"].getNavInstruction().getSpeedLimitSign();
+  float speed_limit = sm["navInstruction"].getValid() ? sm["navInstruction"].getNavInstruction().getSpeedLimit() : 0.0;
+  speed_limit *= (s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH);
+
+  setProperty("speedLimit", speed_limit > 1 ? QString::number(std::nearbyint(speed_limit)) : "");
+  setProperty("has_us_speed_limit", speed_limit > 1 && speed_limit_sign == cereal::NavInstruction::SpeedLimitSign::MUTCD);
+  setProperty("has_eu_speed_limit", speed_limit > 1 && speed_limit_sign == cereal::NavInstruction::SpeedLimitSign::VIENNA);
+
   setProperty("is_cruise_set", cruise_set);
   setProperty("speed", QString::number(std::nearbyint(cur_speed)));
   setProperty("applyMaxSpeed", QString::number(std::nearbyint(applyMaxSpeed)));
@@ -275,6 +283,12 @@ void NvgWindow::updateState(const UIState &s) {
   setProperty("right_on", ce.getRightBlinker());
 }
 
+static QRect getRect(QPainter &p, int flags, QString text) {
+  QFontMetrics fm(p.font());
+  QRect init_rect = fm.boundingRect(text);
+  return fm.boundingRect(init_rect, flags, text);
+}
+
 void NvgWindow::drawHud(QPainter &p) {
   p.save();
 
@@ -284,13 +298,93 @@ void NvgWindow::drawHud(QPainter &p) {
   bg.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0));
   p.fillRect(0, 0, width(), header_h, bg);
 
+/*
   // maxspeed (upper left 1)
   QRect rc(30, 30, 184, 202);
   p.setPen(QPen(QColor(0xff, 0xff, 0xff, 100), 10));
   p.setBrush(QColor(0, 0, 0, 100));
   p.drawRoundedRect(rc, 20, 20);
-  p.setPen(Qt::NoPen);
+*/
+  // max speed
+  int rect_width = 163;
+  if (has_us_speed_limit) rect_width = 173;
+  else if (has_eu_speed_limit) rect_width = 208;
 
+  int rect_height = 188;
+  if (has_us_speed_limit) rect_height = 386;
+  else if (has_eu_speed_limit) rect_height = 384;
+
+  QRect max_speed_rect(60 + 163/2 - rect_width / 2, 45, rect_width, rect_height);
+  p.setPen(Qt::NoPen);
+  p.setBrush(QColor(0, 0, 0, 166));
+  p.drawRoundedRect(max_speed_rect, 32, 32);
+
+  p.setPen(QColor(0xff, 0xff, 0xff, 0xff));
+
+  configFont(p, "Open Sans", 80, "Bold");
+  QRect speed_rect = getRect(p, Qt::AlignCenter, maxSpeed);
+  speed_rect.moveCenter({max_speed_rect.center().x(), 0});
+  speed_rect.moveTop(max_speed_rect.top() + 10);
+  p.drawText(speed_rect, Qt::AlignCenter, maxSpeed);
+
+  configFont(p, "Open Sans", 32, "Bold");
+  QRect max_rect = getRect(p, Qt::AlignCenter, "MAX");
+  max_rect.moveCenter({max_speed_rect.center().x(), 0});
+  max_rect.moveTop(max_speed_rect.top() + 110);
+  p.drawText(max_rect, Qt::AlignCenter, "MAX");
+
+  if (has_us_speed_limit) {
+    const int border_width = 6;
+    const int sign_width = 149;
+    const int sign_height = 186;
+
+    QRect sign_rect_outer(max_speed_rect.left() + 12, max_speed_rect.bottom() - 12 - sign_height, sign_width, sign_height);
+    QRect sign_rect(sign_rect_outer.left() + 1.5 * border_width, sign_rect_outer.top() + 1.5 * border_width, sign_width - 3 * border_width, sign_height - 3 * border_width);
+
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(255, 255, 255, 255));
+    p.drawRoundedRect(sign_rect_outer, 24, 24);
+
+    p.setPen(QPen(QColor(0, 0, 0, 255), border_width));
+    p.setBrush(QColor(255, 255, 255, 255));
+    p.drawRoundedRect(sign_rect, 16, 16);
+
+    configFont(p, "Open Sans", 28, "Bold");
+    QRect text_speed_rect = getRect(p, Qt::AlignCenter, "SPEED");
+    text_speed_rect.moveCenter({sign_rect.center().x(), 0});
+    text_speed_rect.moveTop(sign_rect.top() + 10);
+    p.drawText(text_speed_rect, Qt::AlignCenter, "SPEED");
+
+    QRect text_limit_rect = getRect(p, Qt::AlignCenter, "LIMIT");
+    text_limit_rect.moveCenter({sign_rect.center().x(), 0});
+    text_limit_rect.moveTop(sign_rect.top() + 40);
+    p.drawText(text_limit_rect, Qt::AlignCenter, "LIMIT");
+
+    configFont(p, "Open Sans", 68, "Bold");
+    QRect speed_limit_rect = getRect(p, Qt::AlignCenter, speedLimit);
+    speed_limit_rect.moveCenter({sign_rect.center().x(), 0});
+    speed_limit_rect.moveTop(sign_rect.top() + 70);
+    p.drawText(speed_limit_rect, Qt::AlignCenter, speedLimit);
+  }
+
+  if (has_eu_speed_limit) {
+    QPoint center(speed_rect.center().x(), speed_rect.top() + 270);
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(255, 255, 255, 255));
+    p.drawEllipse(center, 92, 92);
+    p.setBrush(QColor(255, 0, 0, 255));
+    p.drawEllipse(center, 86, 86);
+    p.setBrush(QColor(255, 255, 255, 255));
+    p.drawEllipse(center, 66, 66);
+
+    configFont(p, "Open Sans", 64, "Bold");
+    QRect speed_limit_rect = getRect(p, Qt::AlignCenter, speedLimit);
+    speed_limit_rect.moveCenter(center);
+    p.setPen(QColor(0, 0, 0, 255));
+    p.drawText(speed_limit_rect, Qt::AlignCenter, speedLimit);
+  }
+
+/*
   if (is_cruise_set) {
     configFont(p, "Open Sans", 55, "Bold");
     drawTextColor(p, rc.center().x(), 100, applyMaxSpeed, yellowColor());
@@ -321,6 +415,7 @@ void NvgWindow::drawHud(QPainter &p) {
     a = std::max(a, 60);
     variableColor = QColor(255, a, a, 255);
   }
+*/
 
   // current speed (upper center)
   configFont(p, "Open Sans", 176, "Bold");

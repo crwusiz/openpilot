@@ -31,8 +31,11 @@ class NvgWindow : public CameraViewWidget {
   Q_PROPERTY(QString speedUnit MEMBER speedUnit);
   Q_PROPERTY(QString applyMaxSpeed MEMBER applyMaxSpeed);
   Q_PROPERTY(QString cruiseMaxSpeed MEMBER cruiseMaxSpeed);
+  Q_PROPERTY(QString speedLimit MEMBER speedLimit);
 
   Q_PROPERTY(bool is_cruise_set MEMBER is_cruise_set);
+  Q_PROPERTY(bool has_eu_speed_limit MEMBER has_eu_speed_limit);
+  Q_PROPERTY(bool has_us_speed_limit MEMBER has_us_speed_limit);
   Q_PROPERTY(bool steeringPressed MEMBER steeringPressed);
   Q_PROPERTY(bool dmActive MEMBER dmActive);
   Q_PROPERTY(bool brake_status MEMBER brake_status);
@@ -119,6 +122,7 @@ private:
   QString speedUnit;
   QString applyMaxSpeed;
   QString cruiseMaxSpeed;
+  QString speedLimit;
 
   bool is_cruise_set = false;
   bool steeringPressed = false;
@@ -130,6 +134,8 @@ private:
   bool longControl = false;
   bool left_on = false;
   bool right_on = false;
+  bool has_us_speed_limit = false;
+  bool has_eu_speed_limit = false;
 
   int status = STATUS_DISENGAGED;
   int lead_status;
