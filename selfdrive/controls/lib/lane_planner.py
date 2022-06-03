@@ -3,7 +3,6 @@ from cereal import log
 from common.filter_simple import FirstOrderFilter
 from common.numpy_fast import interp, clip, mean
 from common.realtime import DT_MDL
-from selfdrive.hardware import TICI
 from selfdrive.swaglog import cloudlog
 
 ENABLE_ZORROBYTE = True
@@ -11,14 +10,9 @@ ENABLE_INC_LANE_PROB = True
 
 TRAJECTORY_SIZE = 33
 # camera offset is meters from center car to camera
-# model path is in the frame of the camera. Empirically 
-# the model knows the difference between TICI and EON
-# so a path offset is not needed
+# model path is in the frame of the camera
 PATH_OFFSET = 0.00
-if TICI:
-  CAMERA_OFFSET = 0.04
-else:
-  CAMERA_OFFSET = 0.0
+CAMERA_OFFSET = 0.04
 
 class LanePlanner:
   def __init__(self, wide_camera=False):
