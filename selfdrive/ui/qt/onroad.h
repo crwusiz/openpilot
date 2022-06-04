@@ -31,11 +31,8 @@ class NvgWindow : public CameraViewWidget {
   Q_PROPERTY(QString speedUnit MEMBER speedUnit);
   Q_PROPERTY(QString applyMaxSpeed MEMBER applyMaxSpeed);
   Q_PROPERTY(QString cruiseMaxSpeed MEMBER cruiseMaxSpeed);
-  Q_PROPERTY(QString speedLimit MEMBER speedLimit);
 
   Q_PROPERTY(bool is_cruise_set MEMBER is_cruise_set);
-  Q_PROPERTY(bool has_eu_speed_limit MEMBER has_eu_speed_limit);
-  Q_PROPERTY(bool has_us_speed_limit MEMBER has_us_speed_limit);
   Q_PROPERTY(bool steeringPressed MEMBER steeringPressed);
   Q_PROPERTY(bool dmActive MEMBER dmActive);
   Q_PROPERTY(bool brake_status MEMBER brake_status);
@@ -122,7 +119,6 @@ private:
   QString speedUnit;
   QString applyMaxSpeed;
   QString cruiseMaxSpeed;
-  QString speedLimit;
 
   bool is_cruise_set = false;
   bool steeringPressed = false;
@@ -134,8 +130,6 @@ private:
   bool longControl = false;
   bool left_on = false;
   bool right_on = false;
-  bool has_us_speed_limit = false;
-  bool has_eu_speed_limit = false;
 
   int status = STATUS_DISENGAGED;
   int lead_status;
@@ -176,6 +170,8 @@ protected:
   void drawHud(QPainter &p);
   inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); }
   inline QColor yellowColor(int alpha = 255) { return QColor(255, 255, 0, alpha); }
+  inline QColor longColor(int alpha = 255) { return QColor(255, 149, 0, alpha); }
+  inline QColor unitColor(int alpha = 255) { return QColor(255, 228, 191, alpha); }
   inline QColor redColor(int alpha = 255) { return QColor(255, 0, 0, alpha); }
   inline QColor blackColor(int alpha = 255) { return QColor(0, 0, 0, alpha); }
   inline QColor limeColor(int alpha = 255) { return QColor(120, 255, 120, alpha); }
@@ -183,9 +179,11 @@ protected:
   inline QColor engagedColor(int alpha = 255) { return QColor(23, 134, 68, alpha); }
   inline QColor warningColor(int alpha = 255) { return QColor(218, 111, 37, alpha); }
   inline QColor overrideColor(int alpha = 255) { return QColor(145, 155, 149, alpha); }
+  inline QColor overridehalfColor(int alpha = 255) { return QColor(72, 77, 74, alpha); }
   inline QColor steeringpressedColor(int alpha = 255) { return QColor(0, 191, 255, alpha); }
-  inline QColor light_orangeColor(int alpha = 255) { return QColor(255, 165, 0, alpha); }
-  inline QColor golden_yellowColor(int alpha = 255) { return QColor(255, 223, 0, alpha); }
+  inline QColor steeringpressedhalfColor(int alpha = 255) { return QColor(0, 191, 255, alpha); }
+  inline QColor greenColor(int alpha = 255) { return QColor(128, 216, 166, alpha); }
+  inline QColor pinkColor(int alpha = 255) { return QColor(255, 191, 191, alpha); }
   double prev_draw_t = 0;
   FirstOrderFilter fps_filter;
 };

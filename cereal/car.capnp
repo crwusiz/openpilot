@@ -514,17 +514,17 @@ struct CarParams {
     safetyParam2DEPRECATED @2 :UInt32;
   }
 
-  mdpsBus @68: Int8;
-  sasBus @69: Int8;
-  sccBus @70: Int8;
-  enableAutoHold @71 :Bool;
-  hasScc13 @72 :Bool;
-  hasScc14 @73 :Bool;
-  hasEms @74 :Bool;
-  hasLfaHda @75 :Bool;
-  steerFaultMaxAngle @76 :Int16;
-  steerFaultMaxFrames @77 :Int16;
-  aebFcw @78 :Bool;
+  steerFaultMaxAngle @69 :Int16;
+  steerFaultMaxFrames @70 :Int16;
+  mdpsBus @71: Int8;
+  sasBus @72: Int8;
+  sccBus @73: Int8;
+  enableAutoHold @74 :Bool;
+  hasScc13 @75 :Bool;
+  hasScc14 @76 :Bool;
+  hasEms @77 :Bool;
+  hasLfaHda @78 :Bool;
+  aebFcw @79 :Bool;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);
