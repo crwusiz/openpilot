@@ -193,15 +193,15 @@ NvgWindow::NvgWindow(VisionStreamType type, QWidget* parent) : fps_filter(UI_FRE
 
 static const QColor get_tpms_color(float tpms) {
     if (tpms < 5 || tpms > 60)
-        return QColor(0, 0, 0, 255); // black color
+      return QColor(0, 0, 0, 255); // black color
     if (tpms < 31)
-        return QColor(255, 0, 0, 255); // red color
+      return QColor(255, 0, 0, 255); // red color
     return QColor(0, 0, 0, 255);
 }
 
 static const QString get_tpms_text(float tpms) {
     if (tpms < 5 || tpms > 60)
-        return "─";
+      return "─";
     char str[32];
     snprintf(str, sizeof(str), "%.0f", round(tpms));
     return QString(str);
@@ -302,7 +302,7 @@ void NvgWindow::drawHud(QPainter &p) {
   p.drawRoundedRect(max_speed_rect, 32, 32);
 
   // max speed (upper left 1)
-  QRect max_speed_inner(max_speed_rect.left() + 10, max_speed_rect.top() - 10, 140, 188);
+  QRect max_speed_inner(max_speed_rect.left() + 10, max_speed_rect.top() + 10, 140, 168);
   p.setPen(QPen(whiteColor(200), 2));
   p.drawRoundedRect(max_speed_inner, 16, 16);
 
@@ -310,19 +310,19 @@ void NvgWindow::drawHud(QPainter &p) {
   configFont(p, "Open Sans", 65, "Regular");
   QRect speed_rect = getRect(p, Qt::AlignCenter, cruiseMaxSpeed);
   speed_rect.moveCenter({max_speed_inner.center().x(), 0});
-  speed_rect.moveTop(max_speed_rect.top() + 10);
-  p.drawText(speed_rect, Qt::AlignCenter, is_cruise_set ? cruiseMaxSpeed : "-");
+  speed_rect.moveTop(max_speed_rect.top() + 25);
+  p.drawText(speed_rect, Qt::AlignCenter, is_cruise_set ? cruiseMaxSpeed : "─");
 
   p.setPen(greenColor());
   configFont(p, "Open Sans", 35, "Bold");
   QRect max_rect = getRect(p, Qt::AlignCenter, "MAX");
   max_rect.moveCenter({max_speed_inner.center().x(), 0});
-  max_rect.moveTop(max_speed_rect.top() + 110);
+  max_rect.moveTop(max_speed_rect.top() + 115);
   p.drawText(max_rect, Qt::AlignCenter, "MAX");
 
   // apply speed (upper left 2)
   if (longControl) {
-    QRect apply_speed_inner(max_speed_rect.right() - 150, max_speed_rect.top() - 10, 140, 188);
+    QRect apply_speed_inner(max_speed_rect.right() - 150, max_speed_rect.top() + 10, 140, 168);
     p.setPen(QPen(whiteColor(200), 2));
     p.drawRoundedRect(apply_speed_inner, 16, 16);
 
@@ -330,14 +330,14 @@ void NvgWindow::drawHud(QPainter &p) {
     configFont(p, "Open Sans", 65, "Regular");
     QRect apply_rect = getRect(p, Qt::AlignCenter, applyMaxSpeed);
     apply_rect.moveCenter({apply_speed_inner.center().x(), 0});
-    apply_rect.moveTop(max_speed_rect.top() + 10);
-    p.drawText(apply_rect, Qt::AlignCenter, is_cruise_set ? applyMaxSpeed : "-");
+    apply_rect.moveTop(max_speed_rect.top() + 25);
+    p.drawText(apply_rect, Qt::AlignCenter, is_cruise_set ? applyMaxSpeed : "─");
 
     p.setPen(pinkColor());
     configFont(p, "Open Sans", 35, "Bold");
     QRect long_rect = getRect(p, Qt::AlignCenter, "LONG");
     long_rect.moveCenter({apply_speed_inner.center().x(), 0});
-    long_rect.moveTop(max_speed_rect.top() + 110);
+    long_rect.moveTop(max_speed_rect.top() + 115);
     p.drawText(long_rect, Qt::AlignCenter, "LONG");
   }
 
@@ -382,7 +382,7 @@ void NvgWindow::drawHud(QPainter &p) {
       configFont(p, "Open Sans", 50, "Bold");
       QRect left_rect = getRect(p, Qt::AlignCenter, str_left_dist);
       left_rect.moveCenter({max_speed_rect.center().x(), 0});
-      left_rect.moveBottom(max_speed_rect.bottom() + 255);
+      left_rect.moveBottom(max_speed_rect.bottom() + 265);
       p.setPen(whiteColor());
       p.drawText(left_rect, Qt::AlignCenter, str_left_dist);
     }
@@ -581,7 +581,6 @@ void NvgWindow::drawHud(QPainter &p) {
         int d = std::abs(blink_index - i);
         if (d > 0)
           alpha /= d * 2;
-
         p.setOpacity(alpha);
         p.drawPixmap(x - w, y, w, h, turnsignal_l_img);
         x -= w * 0.6;
@@ -595,7 +594,6 @@ void NvgWindow::drawHud(QPainter &p) {
         int d = std::abs(blink_index - i);
         if (d > 0)
           alpha /= d * 2;
-
         p.setOpacity(alpha);
         p.drawPixmap(x, y, w, h, turnsignal_r_img);
         x += w * 0.6;
@@ -632,7 +630,6 @@ int NvgWindow::devUiDrawElement(QPainter &p, int x, int y, const char* value, co
     drawText(p, 0, 0, QString(units), 255);
     p.restore();
   }
-
   return 110;
 }
 
@@ -735,7 +732,6 @@ void NvgWindow::drawRightDevUi(QPainter &p, int x, int y) {
   p.drawRoundedRect(ldu, 20, 20);
 }
 
-//-------------------------------------------------------------------------------------------
 void NvgWindow::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
@@ -777,7 +773,6 @@ void NvgWindow::drawTextColor(QPainter &p, int x, int y, const QString &text, co
   p.drawText(real_rect.x(), real_rect.bottom(), text);
 }
 
-
 void NvgWindow::initializeGL() {
   CameraViewWidget::initializeGL();
   qInfo() << "OpenGL version:" << QString((const char*)glGetString(GL_VERSION));
@@ -791,7 +786,6 @@ void NvgWindow::initializeGL() {
 
 void NvgWindow::updateFrameMat(int w, int h) {
   CameraViewWidget::updateFrameMat(w, h);
-
   UIState *s = uiState();
   s->fb_w = w;
   s->fb_h = h;
@@ -812,7 +806,6 @@ void NvgWindow::updateFrameMat(int w, int h) {
 
 void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
   painter.save();
-
   const UIScene &scene = s->scene;
   // lanelines
   for (int i = 0; i < std::size(scene.lane_line_vertices); ++i) {
@@ -881,7 +874,6 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
 
 void NvgWindow::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd, bool is_radar) {
   painter.save();
-
   const float speedBuff = 10.;
   const float leadBuff = 40.;
   const float d_rel = lead_data.getX()[0];
@@ -926,9 +918,7 @@ void NvgWindow::paintGL() {
   painter.setPen(Qt::NoPen);
 
   if (s->worldObjectsVisible()) {
-
     drawLaneLines(painter, s);
-
     const auto leads = model.getLeadsV3();
     if (leads[0].getProb() > .5) {
       drawLead(painter, leads[0], s->scene.lead_vertices[0], s->scene.lead_radar[0]);
@@ -937,7 +927,6 @@ void NvgWindow::paintGL() {
       drawLead(painter, leads[1], s->scene.lead_vertices[1], s->scene.lead_radar[1]);
     }
   }
-
   drawHud(painter);
 
   double cur_draw_t = millis_since_boot();

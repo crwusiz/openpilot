@@ -1,3 +1,5 @@
+import copy
+
 import crcmod
 from selfdrive.car.hyundai.values import CAR, CHECKSUM, EV_HYBRID_CAR
 from common.params import Params
@@ -7,7 +9,7 @@ hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 
 def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, cut_steer_temp, lkas11, sys_warning, sys_state, enabled,
                   left_lane, right_lane, left_lane_depart, right_lane_depart, bus):
-  values = lkas11
+  values = copy.copy(lkas11)
   values["CF_Lkas_LdwsSysState"] = sys_state
   values["CF_Lkas_SysWarning"] = 3 if sys_warning else 0
   values["CF_Lkas_LdwsLHWarning"] = left_lane_depart
@@ -39,20 +41,20 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, cut_st
 
   dat = packer.make_can_msg("LKAS11", 0, values)[2]
 
-  if car_fingerprint in CHECKSUM["crc8"]: # CRC Checksum
-    dat = dat[:6] + dat[7:8]
+  if car_fingerprint in CHECKSUM["crc8"]:
+    dat = dat[:6] + dat[7:8]  # CRC Checksum
     checksum = hyundai_checksum(dat)
-  elif car_fingerprint in CHECKSUM["6B"]: # Checksum of first 6 Bytes
-    checksum = sum(dat[:6]) % 256
-  else:                                   # Checksum of first 6 Bytes and last Byte
-    checksum = (sum(dat[:6]) + dat[7]) % 256
+  elif car_fingerprint in CHECKSUM["6B"]:
+    checksum = sum(dat[:6]) % 256  # Checksum of first 6 Bytes
+  else:
+    checksum = (sum(dat[:6]) + dat[7]) % 256  # Checksum of first 6 Bytes and last Byte
   values["CF_Lkas_Chksum"] = checksum
 
   return packer.make_can_msg("LKAS11", bus, values)
 
 
 def create_clu11(packer, bus, clu11, button, speed):
-  values = clu11
+  values = copy.copy(clu11)
   values["CF_Clu_CruiseSwState"] = button
   values["CF_Clu_Vanz"] = speed
   values["CF_Clu_AliveCnt1"] = (values["CF_Clu_AliveCnt1"] + 1) % 0x10
@@ -72,7 +74,7 @@ def create_lfahda_mfc(packer, enabled, active):
 
 
 def create_hda_mfc(packer, active, CS, left_lane, right_lane):
-  values = CS.lfahda_mfc
+  values = copy.copy(CS.lfahda_mfc)
 
   ldwSysState = 0
   if left_lane:
@@ -91,7 +93,7 @@ def create_hda_mfc(packer, active, CS, left_lane, right_lane):
 
 
 def create_mdps12(packer, frame, mdps12):
-  values = mdps12
+  values = copy.copy(mdps12)
   values["CF_Mdps_ToiActive"] = 0
   values["CF_Mdps_ToiUnavail"] = 1
   values["CF_Mdps_MsgCount2"] = frame % 0x100
@@ -105,7 +107,7 @@ def create_mdps12(packer, frame, mdps12):
 
 
 def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc11):
-  values = scc11
+  values = copy.copy(scc11)
   values["AliveCounterACC"] = frame // 2 % 0x10
 
   if not scc_live:
@@ -119,12 +121,12 @@ def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc1
 
 
 def create_scc12(packer, apply_accel, enabled, cnt, scc_live, scc12, gaspressed, brakepressed, standstill, car_fingerprint):
-  values = scc12
+  values = copy.copy(scc12)
 
   if car_fingerprint in EV_HYBRID_CAR:
     if enabled and not brakepressed:
       values["ACCMode"] = 2 if gaspressed and (apply_accel > -0.2) else 1
-      values["aReqRaw"] =  apply_accel
+      values["aReqRaw"] = apply_accel
       values["aReqValue"] = apply_accel
       if apply_accel < 0.0 and standstill:
         values["StopReq"] = 1 if standstill else 0
@@ -136,7 +138,7 @@ def create_scc12(packer, apply_accel, enabled, cnt, scc_live, scc12, gaspressed,
       values["CR_VSM_Alive"] = cnt
 
   else:
-    values["aReqRaw"] =  apply_accel if enabled else 0  # aReqMax
+    values["aReqRaw"] = apply_accel if enabled else 0  # aReqMax
     values["aReqValue"] = apply_accel if enabled else 0  # aReqMin
     values["CR_VSM_Alive"] = cnt
     if not scc_live:
@@ -150,12 +152,12 @@ def create_scc12(packer, apply_accel, enabled, cnt, scc_live, scc12, gaspressed,
 
 
 def create_scc13(packer, scc13):
-  values = scc13
+  values = copy.copy(scc13)
 
   return packer.make_can_msg("SCC13", 0, values)
 
 def create_scc14(packer, enabled, standstill, accel, gaspressed, objgap, scc14):
-  values = scc14
+  values = copy.copy(scc14)
 
   if enabled:
     values["ComfortBandUpper"] = 0.0

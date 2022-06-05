@@ -214,15 +214,6 @@ class CarController:
                            CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
         self.accel = apply_accel
 
-        controls.apply_accel = apply_accel
-        aReqValue = CS.scc12["aReqValue"]
-        controls.aReqValue = aReqValue
-
-        if aReqValue < controls.aReqValueMin:
-          controls.aReqValueMin = controls.aReqValue
-        if aReqValue > controls.aReqValueMax:
-          controls.aReqValueMax = controls.aReqValue
-
         if self.scc12_cnt < 0:
           self.scc12_cnt = CS.scc12["CR_VSM_Alive"] if not CS.no_radar else 0
         self.scc12_cnt += 1

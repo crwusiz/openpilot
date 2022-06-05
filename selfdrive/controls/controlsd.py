@@ -69,7 +69,6 @@ class Controls:
     if self.pm is None:
       self.pm = messaging.PubMaster(['sendcan', 'controlsState', 'carState',
                                      'carControl', 'carEvents', 'carParams'])
-
     self.camera_packets = ["roadCameraState", "driverCameraState", "wideRoadCameraState"]
 
     self.can_sock = can_sock
@@ -83,7 +82,6 @@ class Controls:
       # wait for one pandaState and one CAN packet
       print("Waiting for CAN messages...")
       get_one_can(self.can_sock)
-
       self.CI, self.CP = get_car(self.can_sock, self.pm.sock['sendcan'])
     else:
       self.CI, self.CP = CI, CI.CP
@@ -133,25 +131,23 @@ class Controls:
     self.CS_prev = car.CarState.new_message()
     self.AM = AlertManager()
     self.events = Events()
-
     self.LoC = LongControl(self.CP)
     self.VM = VehicleModel(self.CP)
 
     self.LaC: LatControl
-    lat_tuning = self.CP.lateralTuning.which()
     self.lateral_control_select = 0
     if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
       self.LaC = LatControlAngle(self.CP, self.CI)
-    elif lat_tuning == 'pid':
+    elif self.CP.lateralTuning.which() == 'pid':
       self.LaC = LatControlPID(self.CP, self.CI)
       self.lateral_control_select = 0
-    elif lat_tuning == 'indi':
+    elif self.CP.lateralTuning.which() == 'indi':
       self.LaC = LatControlINDI(self.CP, self.CI)
       self.lateral_control_select = 1
-    elif lat_tuning == 'lqr':
+    elif self.CP.lateralTuning.which() == 'lqr':
       self.LaC = LatControlLQR(self.CP, self.CI)
       self.lateral_control_select = 2
-    elif lat_tuning == 'torque':
+    elif self.CP.lateralTuning.which() == 'torque':
       self.LaC = LatControlTorque(self.CP, self.CI)
       self.lateral_control_select = 3
 
@@ -179,18 +175,9 @@ class Controls:
 
     # scc smoother
     self.applyMaxSpeed = 0
-    self.apply_accel = 0.
-    self.fused_accel = 0.
-    self.lead_drel = 0.
-    self.aReqValue = 0.
-    self.aReqValueMin = 0.
-    self.aReqValueMax = 0.
-    self.sccStockCamStatus = 0
-    self.sccStockCamAct = 0
     self.is_cruise_enabled = False
     self.left_lane_visible = False
     self.right_lane_visible = False
-    self.mad_mode_enabled = any([Params().get("LongControlSelect", encoding='utf8') == "0", Params().get("LongControlSelect", encoding='utf8') == "1"])
 
     # TODO: no longer necessary, aside from process replay
     self.sm['liveParameters'].valid = True
@@ -231,7 +218,7 @@ class Controls:
       return
 
     # Disable on rising edge of accelerator or brake. Also disable on brake when speed > 0
-    if not self.mad_mode_enabled:
+    if not any([Params().get("LongControlSelect", encoding='utf8') == "0", Params().get("LongControlSelect", encoding='utf8') == "1"]):
       if (CS.gasPressed and not self.CS_prev.gasPressed and self.disengage_on_accelerator) or \
         (CS.brakePressed and (not self.CS_prev.brakePressed or not CS.standstill)):
         self.events.add(EventName.pedalPressed)
@@ -464,7 +451,6 @@ class Controls:
     """Compute conditional state transitions and execute actions on state transitions"""
 
     self.v_cruise_kph_last = self.v_cruise_kph
-
     self.CP.pcmCruise = self.CI.CP.pcmCruise
 
     # if stock cruise is completely disabled, then we can use our own set speed logic
@@ -490,19 +476,17 @@ class Controls:
       if self.events.any(ET.USER_DISABLE):
         self.state = State.disabled
         self.current_alert_types.append(ET.USER_DISABLE)
-
       elif self.events.any(ET.IMMEDIATE_DISABLE):
         self.state = State.disabled
         self.current_alert_types.append(ET.IMMEDIATE_DISABLE)
-
       else:
+
         # ENABLED
         if self.state == State.enabled:
           if self.events.any(ET.SOFT_DISABLE):
             self.state = State.softDisabling
             self.soft_disable_timer = int(0.5 / DT_CTRL)
             self.current_alert_types.append(ET.SOFT_DISABLE)
-
           elif self.events.any(ET.OVERRIDE):
             self.state = State.overriding
             self.current_alert_types.append(ET.OVERRIDE)
@@ -512,10 +496,8 @@ class Controls:
           if not self.events.any(ET.SOFT_DISABLE):
             # no more soft disabling condition, so go back to ENABLED
             self.state = State.enabled
-
           elif self.soft_disable_timer > 0:
             self.current_alert_types.append(ET.SOFT_DISABLE)
-
           elif self.soft_disable_timer <= 0:
             self.state = State.disabled
 
@@ -545,7 +527,6 @@ class Controls:
       if self.events.any(ET.ENABLE):
         if self.events.any(ET.NO_ENTRY):
           self.current_alert_types.append(ET.NO_ENTRY)
-
         else:
           if self.events.any(ET.PRE_ENABLE):
             self.state = State.preEnabled
@@ -565,7 +546,6 @@ class Controls:
 
   def state_control(self, CS):
     """Given the state, this function returns a CarControl packet"""
-
     # Update VehicleModel
     params = self.sm['liveParameters']
     x = max(params.stiffnessFactor, 0.1)
@@ -579,8 +559,7 @@ class Controls:
     CC.enabled = self.enabled
     # Check which actuators can be enabled
     CC.latActive = self.active and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
-                     CS.vEgo > self.CP.minSteerSpeed and not CS.standstill \
-                   and abs(CS.steeringAngleDeg) < self.CP.maxSteeringAngleDeg
+                   CS.vEgo > self.CP.minSteerSpeed and not CS.standstill and abs(CS.steeringAngleDeg) < self.CP.maxSteeringAngleDeg
     CC.longActive = self.active and not self.events.any(ET.OVERRIDE) and self.CP.openpilotLongitudinalControl
 
     actuators = CC.actuators
@@ -590,41 +569,33 @@ class Controls:
       self.last_blinker_frame = self.sm.frame
 
     # State specific actions
-
     if not CC.latActive:
       self.LaC.reset()
     if not CC.longActive:
       self.LoC.reset(v_pid=CS.vEgo)
-
     if not CS.cruiseState.enabledAcc:
       self.LoC.reset(v_pid=CS.vEgo)
-
     if not self.joystick_mode:
       # accel PID loop
       pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, CS.vEgo, self.v_cruise_kph * CV.KPH_TO_MS)
       t_since_plan = (self.sm.frame - self.sm.rcv_frame['longitudinalPlan']) * DT_CTRL
-      actuators.accel = self.LoC.update(CC.longActive and CS.cruiseState.enabledAcc, CS, long_plan, pid_accel_limits, t_since_plan,
-                                        self.sm['radarState'])
+      actuators.accel = self.LoC.update(CC.longActive and CS.cruiseState.enabledAcc, CS, long_plan,
+                                        pid_accel_limits, t_since_plan, self.sm['radarState'])
 
       # Steering PID loop and lateral MPC
       self.desired_curvature, self.desired_curvature_rate = get_lag_adjusted_curvature(self.CP, CS.vEgo,
-                                                                                       lat_plan.psis,
-                                                                                       lat_plan.curvatures,
-                                                                                       lat_plan.curvatureRates)
-      actuators.steer, actuators.steeringAngleDeg, lac_log = self.LaC.update(CC.latActive, CS, self.VM, params,
-                                                                             self.last_actuators, self.desired_curvature,
-                                                                             self.desired_curvature_rate, self.sm['liveLocationKalman'])
+                                                                                       lat_plan.psis, lat_plan.curvatures, lat_plan.curvatureRates)
+      actuators.steer, actuators.steeringAngleDeg, lac_log = self.LaC.update(CC.latActive, CS, self.VM, params, self.last_actuators,
+                                                                             self.desired_curvature, self.desired_curvature_rate, self.sm['liveLocationKalman'])
     else:
       lac_log = log.ControlsState.LateralDebugState.new_message()
       if self.sm.rcv_frame['testJoystick'] > 0:
         if CC.longActive:
           actuators.accel = 4.0*clip(self.sm['testJoystick'].axes[0], -1, 1)
-
         if CC.latActive:
           steer = clip(self.sm['testJoystick'].axes[1], -1, 1)
           # max angle is 45 for angle-based cars
           actuators.steer, actuators.steeringAngleDeg = steer, steer * 45.
-
         lac_log.active = self.active
         lac_log.steeringAngleDeg = CS.steeringAngleDeg
         lac_log.output = actuators.steer
@@ -672,6 +643,7 @@ class Controls:
     orientation_value = list(self.sm['liveLocationKalman'].calibratedOrientationNED.value)
     if len(orientation_value) > 2:
       CC.orientationNED = orientation_value
+
     angular_rate_value = list(self.sm['liveLocationKalman'].angularVelocityCalibrated.value)
     if len(angular_rate_value) > 2:
       CC.angularVelocity = angular_rate_value
@@ -697,8 +669,8 @@ class Controls:
     hudControl.leftLaneVisible = self.left_lane_visible
 
     recent_blinker = (self.sm.frame - self.last_blinker_frame) * DT_CTRL < 5.0  # 5s blinker cooldown
-    ldw_allowed = self.is_ldw_enabled and CS.vEgo > LDW_MIN_SPEED and not recent_blinker \
-                  and not CC.latActive and self.sm['liveCalibration'].calStatus == Calibration.CALIBRATED
+    ldw_allowed = self.is_ldw_enabled and CS.vEgo > LDW_MIN_SPEED and not recent_blinker and \
+                  not CC.latActive and self.sm['liveCalibration'].calStatus == Calibration.CALIBRATED
 
     model_v2 = self.sm['modelV2']
     desire_prediction = model_v2.meta.desirePrediction
@@ -741,7 +713,6 @@ class Controls:
 
     # Curvature & Steering angle
     params = self.sm['liveParameters']
-
     steer_angle_without_offset = math.radians(CS.steeringAngleDeg - params.angleOffsetDeg)
     curvature = -self.VM.calc_curvature(steer_angle_without_offset, CS.vEgo, params.roll)
 
@@ -778,14 +749,6 @@ class Controls:
     controlsState.startMonoTime = int(start_time * 1e9)
     controlsState.forceDecel = bool(force_decel)
     controlsState.canErrorCounter = self.can_rcv_error_counter
-
-    controlsState.angleSteers = steer_angle_without_offset * CV.RAD_TO_DEG
-    controlsState.applyAccel = self.apply_accel
-    controlsState.aReqValue = self.aReqValue
-    controlsState.aReqValueMin = self.aReqValueMin
-    controlsState.aReqValueMax = self.aReqValueMax
-    controlsState.sccStockCamAct = self.sccStockCamAct
-    controlsState.sccStockCamStatus = self.sccStockCamStatus
     controlsState.lateralControlSelect = int(self.lateral_control_select)
 
     lat_tuning = self.CP.lateralTuning.which()

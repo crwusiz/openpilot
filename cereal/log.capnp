@@ -596,15 +596,7 @@ struct ControlsState @0x97ff69c53601abf1 {
     torqueState @60 :LateralTorqueState;
   }
 
-  angleSteers @63 :Float32;
-  applyAccel @64 :Float32;
-  aReqValue @65 :Float32;
-  aReqValueMin @66 :Float32;
-  aReqValueMax @67 :Float32;
-
-  sccStockCamAct @68 :Float32;
-  sccStockCamStatus @69 :Float32;
-  lateralControlSelect @70 :UInt8;
+  lateralControlSelect @63 :UInt8;
 
   enum OpenpilotState @0xdbe58b96d2d1ac61 {
     disabled @0;

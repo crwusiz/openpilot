@@ -326,7 +326,7 @@ static int hyundai_tx_hook(CANPacket_t *to_send, bool longitudinal_allowed) {
 
     // no torque if controls is not allowed or mismatch with CF_Lkas_ActToi bit
       if ((!controls_allowed || !steer_req) && (desired_torque != 0)) {
-      violation = 1;
+        violation = 1;
     }
 
     // reset to 0 if either controls is not allowed or there's a violation

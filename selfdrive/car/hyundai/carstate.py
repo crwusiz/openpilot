@@ -1,5 +1,4 @@
 from collections import deque
-import copy
 
 from cereal import car
 from common.conversions import Conversions as CV
@@ -161,17 +160,17 @@ class CarState(CarStateBase):
       ret.rightBlindspot = False
 
     # save the entire LKAS11, CLU11, MDPS12, LFAHDA_MFC, SCC11, SCC12, SCC13, SCC14
-    self.lkas11 = copy.copy(cp_cam.vl["LKAS11"])
-    self.clu11 = copy.copy(cp.vl["CLU11"])
-    self.mdps12 = copy.copy(cp_mdps.vl["MDPS12"])
-    self.lfahda_mfc = copy.copy(cp_cam.vl["LFAHDA_MFC"])
-    self.has_lfa_hda = copy.copy(cp_cam.vl["LFAHDA_MFC"])
-    self.scc11 = copy.copy(cp_scc.vl["SCC11"])
-    self.scc12 = copy.copy(cp_scc.vl["SCC12"])
+    self.lkas11 = cp_cam.vl["LKAS11"]
+    self.clu11 = cp.vl["CLU11"]
+    self.scc11 = cp_scc.vl["SCC11"]
+    self.scc12 = cp_scc.vl["SCC12"]
+    self.mdps12 = cp_mdps.vl["MDPS12"]
+    self.lfahda_mfc = cp_cam.vl["LFAHDA_MFC"]
+
     if self.has_scc13:
-      self.scc13 = copy.copy(cp_scc.vl["SCC13"])
+      self.scc13 = cp_scc.vl["SCC13"]
     if self.has_scc14:
-      self.scc14 = copy.copy(cp_scc.vl["SCC14"])
+      self.scc14 = cp_scc.vl["SCC14"]
 
     self.steer_state = cp_mdps.vl["MDPS12"]["CF_Mdps_ToiActive"]  # 0 NOT ACTIVE, 1 ACTIVE
     self.brake_error = cp.vl["TCS13"]["ACCEnable"] != 0  # 0 ACC CONTROL ENABLED, 1-3 ACC CONTROL DISABLED

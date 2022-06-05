@@ -1,6 +1,5 @@
 import json
 import os
-import random
 
 import select
 import threading
@@ -63,7 +62,6 @@ class RoadLimitSpeedServer:
         wait_time = period + error * 0.5 + i
         wait_time = clip(wait_time, 0.8, 1.0)
         frame += 1
-
     except:
       pass
 
@@ -73,7 +71,6 @@ class RoadLimitSpeedServer:
         self.gps_sm.update(0)
         if self.gps_sm.updated['gpsLocationExternal']:
           location = self.gps_sm['gpsLocationExternal']
-
           if location.accuracy < 10.:
             json_location = json.dumps({"location": [
               location.latitude,
@@ -117,7 +114,7 @@ class RoadLimitSpeedServer:
           try:
             if broadcast_address is None or frame % 10 == 0:
               broadcast_address = self.get_broadcast_address()
-            print('broadcast_address', broadcast_address)
+              print('broadcast_address', broadcast_address)
             if broadcast_address is not None:
               address = (broadcast_address, Port.BROADCAST_PORT)
               sock.sendto('EON:ROAD_LIMIT_SERVICE:v1'.encode(), address)
@@ -142,6 +139,7 @@ class RoadLimitSpeedServer:
       if ret:
         data, self.remote_addr = sock.recvfrom(2048)
         json_obj = json.loads(data.decode())
+
         if 'cmd' in json_obj:
           try:
             os.system(json_obj['cmd'])
@@ -204,19 +202,16 @@ class RoadLimitSpeedServer:
     return self.get_json_val(self.json_road_limit, key, default)
 
   def get_json_val(self, json, key, default=None):
-
     try:
       if json is None:
         return default
 
       if key in json:
         return json[key]
-
     except:
       pass
 
     return default
-
 
 def main():
   server = RoadLimitSpeedServer()
@@ -247,7 +242,6 @@ def main():
         try:
           json = server.json_road_limit
           if json is not None and "rest_area" in json:
-
             restAreaList = []
             for rest_area in json["rest_area"]:
               restArea = log.RoadLimitSpeed.RestArea.new_message()
@@ -256,7 +250,6 @@ def main():
               restArea.oilPrice = server.get_json_val(rest_area, "oilPrice")
               restArea.distance = server.get_json_val(rest_area, "distance")
               restAreaList.append(restArea)
-
             dat.roadLimitSpeed.restArea = restAreaList
         except:
           pass

@@ -42,11 +42,11 @@
     "severity": 1
   },
   "Offroad_CarUnrecognized": {
-    "text": "Choose your car in community settings.",
+    "text": "차량을 인식하지 못했습니다. 커뮤니티 설정에서 차량을 선택하세요.",
     "severity": 0
   },
   "Offroad_NoFirmware": {
-    "text": "Choose your car in community settings.",
+    "text": "차량을 인식하지 못했습니다. 커뮤니티 설정에서 차량을 선택하세요.",
     "severity": 0
   }
 }

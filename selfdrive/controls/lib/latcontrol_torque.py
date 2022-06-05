@@ -18,8 +18,19 @@ from selfdrive.controls.lib.vehicle_model import ACCELERATION_DUE_TO_GRAVITY
 # friction in the steering wheel that needs to be overcome to
 # move it at all, this is compensated for too.
 
+
 LOW_SPEED_FACTOR = 200
 JERK_THRESHOLD = 0.2
+
+
+def apply_deadzone(error, deadzone):
+  if error > deadzone:
+    error -= deadzone
+  elif error < - deadzone:
+    error += deadzone
+  else:
+    error = 0.
+  return error
 
 
 def set_torque_tune(tune, MAX_LAT_ACCEL=2.5, FRICTION=0.01):
@@ -32,29 +43,11 @@ def set_torque_tune(tune, MAX_LAT_ACCEL=2.5, FRICTION=0.01):
   tune.torque.kd = 1.0
   tune.torque.deadzone = 0.01
 
-def apply_deadzone(error, deadzone):
-  if error > deadzone:
-    error -= deadzone
-  elif error < - deadzone:
-    error += deadzone
-  else:
-    error = 0.
-  return error
-
-def set_torque_tune(tune, MAX_LAT_ACCEL=2.5, FRICTION=0.01):
-  tune.init('torque')
-  tune.torque.useSteeringAngle = True
-  tune.torque.kp = 1.0 / MAX_LAT_ACCEL
-  tune.torque.kf = 1.0 / MAX_LAT_ACCEL
-  tune.torque.ki = 0.1 / MAX_LAT_ACCEL
-  tune.torque.friction = FRICTION
-
 
 class LatControlTorque(LatControl):
   def __init__(self, CP, CI):
     super().__init__(CP, CI)
-    self.pid = PIDController(CP.lateralTuning.torque.kp, CP.lateralTuning.torque.ki,
-                             k_d=CP.lateralTuning.torque.kd,
+    self.pid = PIDController(CP.lateralTuning.torque.kp, CP.lateralTuning.torque.ki, k_d=CP.lateralTuning.torque.kd,
                              k_f=CP.lateralTuning.torque.kf, pos_limit=self.steer_max, neg_limit=-self.steer_max)
     self.get_steer_feedforward = CI.get_steer_feedforward_function()
     self.use_steering_angle = CP.lateralTuning.torque.useSteeringAngle

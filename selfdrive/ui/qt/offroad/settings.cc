@@ -391,23 +391,20 @@ QWidget *network_panel(QWidget *parent) {
   return new Networking(parent);
 }
 
-static QStringList get_list(const char* path)
-{
+static QStringList get_list(const char* path) {
   QStringList stringList;
   QFile textFile(path);
-  if(textFile.open(QIODevice::ReadOnly))
-  {
-      QTextStream textStream(&textFile);
-      while (true)
-      {
-        QString line = textStream.readLine();
-        if (line.isNull())
-            break;
-        else
-            stringList.append(line);
+  if (textFile.open(QIODevice::ReadOnly)) {
+    QTextStream textStream(&textFile);
+    while (true) {
+      QString line = textStream.readLine();
+      if (line.isNull()) {
+        break;
+      } else {
+        stringList.append(line);
       }
+    }
   }
-
   return stringList;
 }
 
@@ -611,15 +608,14 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   //"New radar interface Enable",
                                   "scc 레이더 배선개조없이 사용가능한 일부차종을 위한 옵션입니다",
                                   "../assets/offroad/icon_road.png", this));
-  for(ParamControl *toggle : toggles) {
-    if(main_layout->count() != 0) {
+  for (ParamControl *toggle : toggles) {
+    if (main_layout->count() != 0) {
     }
     toggleLayout->addWidget(toggle);
   }
 }
 
 SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
-
   QVBoxLayout* main_layout = new QVBoxLayout(this);
   main_layout->setMargin(20);
   main_layout->setSpacing(20);
@@ -642,10 +638,10 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
   QString selected = QString::fromStdString(Params().get("SelectedCar"));
 
   int index = 0;
-  for(QString item : items) {
-    if(selected == item) {
-        list->setCurrentRow(index + 1);
-        break;
+  for (QString item : items) {
+    if (selected == item) {
+      list->setCurrentRow(index + 1);
+      break;
     }
     index++;
   }
@@ -653,11 +649,11 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
   QObject::connect(list, QOverload<QListWidgetItem*>::of(&QListWidget::itemClicked),
     [=](QListWidgetItem* item){
 
-    if(list->currentRow() == 0)
-        Params().remove("SelectedCar");
-    else
-        Params().put("SelectedCar", list->currentItem()->text().toStdString());
-
+    if (list->currentRow() == 0) {
+      Params().remove("SelectedCar");
+    } else {
+      Params().put("SelectedCar", list->currentItem()->text().toStdString());
+    }
     emit selectedCar();
     });
   main_layout->addWidget(list);

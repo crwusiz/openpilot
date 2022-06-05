@@ -113,7 +113,7 @@ static int default_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
 
   if (bus_num == 0 && (fwd_bus1 || fwd_bus2 || fwd_obd)) {
     if ((fwd_bus1 || fwd_obd) && fwd_bus2) {
-    bus_fwd = 12;
+      bus_fwd = 12;
     } else {
       bus_fwd = fwd_bus2 ? 2 : 1;
     }
