@@ -377,8 +377,10 @@ Export('rednose_config')
 SConscript(['rednose/SConscript'])
 
 # Build system services
-
-SConscript(['system/proclogd/SConscript'])
+SConscript([
+  'system/clocksd/SConscript',
+  'system/proclogd/SConscript',
+])
 if arch != "Darwin":
   SConscript(['system/logcatd/SConscript'])
 
@@ -401,7 +403,6 @@ SConscript(['selfdrive/controls/lib/lateral_mpc_lib/SConscript'])
 SConscript(['selfdrive/controls/lib/longitudinal_mpc_lib/SConscript'])
 
 SConscript(['selfdrive/boardd/SConscript'])
-SConscript(['selfdrive/clocksd/SConscript'])
 
 SConscript(['selfdrive/loggerd/SConscript'])
 

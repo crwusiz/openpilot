@@ -58,7 +58,7 @@ class LatControlTorque(LatControl):
 
   def reset(self):
     super().reset()
-    self.pid.reset()
+    #self.pid.reset()
     self.errors = []
 
   def update(self, active, CS, VM, params, last_actuators, desired_curvature, desired_curvature_rate, llk):
@@ -77,12 +77,12 @@ class LatControlTorque(LatControl):
         actual_curvature_llk = llk.angularVelocityCalibrated.value[2] / CS.vEgo
         actual_curvature = interp(CS.vEgo, [2.0, 5.0], [actual_curvature_vm, actual_curvature_llk])
       desired_lateral_accel = desired_curvature * CS.vEgo ** 2
-      desired_lateral_jerk = desired_curvature_rate * CS.vEgo ** 2
+      #desired_lateral_jerk = desired_curvature_rate * CS.vEgo ** 2
       actual_lateral_accel = actual_curvature * CS.vEgo ** 2
 
       setpoint = desired_lateral_accel + LOW_SPEED_FACTOR * desired_curvature
       measurement = actual_lateral_accel + LOW_SPEED_FACTOR * actual_curvature
-      error = setpoint - measurement
+      error = apply_deadzone(setpoint - measurement, self.deadzone)
 
       error_rate = 0
       if len(self.errors) >= ERROR_RATE_FRAME:
@@ -92,16 +92,14 @@ class LatControlTorque(LatControl):
       while len(self.errors) > ERROR_RATE_FRAME:
         self.errors.pop(0)
 
-      error_deadzone = apply_deadzone(error, self.deadzone)
-
-      pid_log.error = error_deadzone
+      pid_log.error = error
 
       ff = desired_lateral_accel - params.roll * ACCELERATION_DUE_TO_GRAVITY
       # convert friction into lateral accel units for feedforward
-      friction_compensation = interp(desired_lateral_jerk, [-JERK_THRESHOLD, JERK_THRESHOLD], [-self.friction, self.friction])
+      friction_compensation = interp(error, [-JERK_THRESHOLD, JERK_THRESHOLD], [-self.friction, self.friction])
       ff += friction_compensation / self.kf
       freeze_integrator = CS.steeringRateLimited or CS.steeringPressed or CS.vEgo < 5
-      output_torque = self.pid.update(error_deadzone, error_rate,
+      output_torque = self.pid.update(error, error_rate,
                                       feedforward=ff,
                                       speed=CS.vEgo,
                                       freeze_integrator=freeze_integrator)
