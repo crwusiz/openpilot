@@ -264,7 +264,7 @@ class SccSmoother:
       curv = (lateralPlan.curvatures[-1] + lateralPlan.curvatures[-2]) / 2.
       a_y_max = 2.975 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
       v_curvature = sqrt(a_y_max / max(abs(curv), 1e-4))
-      model_speed = v_curvature * 0.85
+      model_speed = v_curvature * 0.85 * 0.98
 
       if model_speed < v_ego:
         self.curve_speed_ms = float(max(model_speed, MIN_CURVE_SPEED))

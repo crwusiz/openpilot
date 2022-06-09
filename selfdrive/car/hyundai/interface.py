@@ -37,7 +37,7 @@ class CarInterface(CarInterfaceBase):
     ret.steerFaultMaxAngle = 85
     ret.steerFaultMaxFrames = 90
 
-    tire_stiffness_factor = 0.65
+    tire_stiffness_factor = 0.8
 
     # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
     # hyundai
@@ -288,7 +288,7 @@ class CarInterface(CarInterfaceBase):
     ret.radarTimeStep = 0.05
 
     ret.steerActuatorDelay = 0.2
-    ret.steerRateCost = 0.4
+    ret.steerRateCost = 0.5
     ret.steerLimitTimer = 2.5
 
     # longitudinal
