@@ -149,16 +149,6 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   });
   list->addItem(gitpullbtn);
 
-  //auto pandaflashbtn = new ButtonControl("Panda Firmware Flash", "RUN");
-  auto pandaflashbtn = new ButtonControl("판다 펌웨어 플래싱", "실행");
-  QObject::connect(pandaflashbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/panda/board/flash.sh");
-    }
-  });
-  list->addItem(pandaflashbtn);
-
   //auto cleardtcbtn = new ButtonControl("DTC Clear", "RUN");
   auto cleardtcbtn = new ButtonControl("오류코드 제거", "실행");
   QObject::connect(cleardtcbtn, &ButtonControl::clicked, [=]() {
@@ -169,8 +159,38 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   });
   list->addItem(cleardtcbtn);
 
-  //auto pandarecoverbtn = new ButtonControl("Panda Firmware Recover", "RUN");
-  auto pandarecoverbtn = new ButtonControl("판다 펌웨어 복구", "실행");
+  //auto rebuildbtn = new ButtonControl("Rebuild", "RUN");
+  auto rebuildbtn = new ButtonControl("전체 재빌드", "실행");
+  QObject::connect(rebuildbtn, &ButtonControl::clicked, [=]() {
+    //if (ConfirmationDialog::confirm("Process?", this)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
+      QProcess::execute("/data/openpilot/panda/board/rebuild.sh");
+    }
+  });
+  list->addItem(rebuildbtn);
+
+  //auto pandaflashbtn = new ButtonControl("Panda Flash", "RUN");
+  auto pandaflashbtn = new ButtonControl("판다 플래싱", "실행");
+  QObject::connect(pandaflashbtn, &ButtonControl::clicked, [=]() {
+    //if (ConfirmationDialog::confirm("Process?", this)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
+      QProcess::execute("/data/openpilot/panda/board/flash.sh");
+    }
+  });
+  list->addItem(pandaflashbtn);
+
+  //auto pandaflashh7btn = new ButtonControl("RED Panda Flash", "RUN");
+  auto pandaflashh7btn = new ButtonControl("RED 판다 플래싱", "실행");
+  QObject::connect(pandaflashh7btn, &ButtonControl::clicked, [=]() {
+    //if (ConfirmationDialog::confirm("Process?", this)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
+      QProcess::execute("/data/openpilot/panda/board/flash_h7.sh");
+    }
+  });
+  list->addItem(pandaflashh7btn);
+
+  //auto pandarecoverbtn = new ButtonControl("Panda Recover", "RUN");
+  auto pandarecoverbtn = new ButtonControl("판다 복구", "실행");
   QObject::connect(pandarecoverbtn, &ButtonControl::clicked, [=]() {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
@@ -178,6 +198,16 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
     }
   });
   list->addItem(pandarecoverbtn);
+
+  //auto pandarecoverh7btn = new ButtonControl("RED Panda Recover", "RUN");
+  auto pandarecoverh7btn = new ButtonControl("RED 판다 복구", "실행");
+  QObject::connect(pandarecoverh7btn, &ButtonControl::clicked, [=]() {
+    //if (ConfirmationDialog::confirm("Process?", this)){
+    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
+      QProcess::execute("/data/openpilot/panda/board/recover_h7.sh");
+    }
+  });
+  list->addItem(pandarecoverh7btn);
 
   list->addItem(horizontal_line());
 

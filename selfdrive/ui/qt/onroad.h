@@ -51,7 +51,7 @@ class NvgWindow : public CameraViewWidget {
   Q_PROPERTY(int gpsSatelliteCount MEMBER gpsSatelliteCount);
   Q_PROPERTY(int gap MEMBER gap);
   Q_PROPERTY(int autoTrGap MEMBER autoTrGap);
-  Q_PROPERTY(int lateralcontrol_status MEMBER lateralcontrol_status);
+  Q_PROPERTY(int lateralcontrol MEMBER lateralcontrol);
   Q_PROPERTY(int mdpsBus MEMBER mdpsBus);
   Q_PROPERTY(int sccBus MEMBER sccBus);
   Q_PROPERTY(int camLimitSpeed MEMBER camLimitSpeed);
@@ -139,7 +139,7 @@ private:
   int gpsSatelliteCount = 0;
   int gap = 0;
   int autoTrGap = 0;
-  int lateralcontrol_status = 0;
+  int lateralcontrol = 0;
   int mdpsBus = 0;
   int sccBus = 0;
   int camLimitSpeed = 0;

@@ -183,25 +183,21 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   QHBoxLayout *reset_layout = new QHBoxLayout();
   reset_layout->setSpacing(30);
 
-  QPushButton *rebuild_btn = new QPushButton("Rebuild");
-  rebuild_btn->setObjectName("rebuild_btn");
+  QPushButton *rebuild_btn = new QPushButton("재시작");
+  rebuild_btn->setObjectName("restart");
   rebuild_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
   reset_layout->addWidget(rebuild_btn);
   QObject::connect(rebuild_btn, &QPushButton::clicked, [=]() {
 
     //if (ConfirmationDialog::confirm("Are you sure you want to rebuild?", this)) {
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      std::system("cd /data/openpilot && scons -c");
-      std::system("rm /data/openpilot/.sconsign.dblite");
-      std::system("rm /data/openpilot/prebuilt");
-      std::system("rm -rf /tmp/scons_cache");
-      std::system("sudo reboot");
+      QProcess::execute("/data/openpilot/scripts/restart.sh");
     }
   });
 
   // reset calibration button
   //QPushButton *reset_calib_btn = new QPushButton("Reset Calibration,LiveParameters");
-  QPushButton *reset_calib_btn = new QPushButton("Calibration,LiveParameters 리셋");
+  QPushButton *reset_calib_btn = new QPushButton("Parameters 리셋");
   reset_calib_btn->setObjectName("reset_calib_btn");
   reset_calib_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
   reset_layout->addWidget(reset_calib_btn);
@@ -225,7 +221,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
 
   // softreset button
   //QPushButton *restart_openpilot_btn = new QPushButton("Soft Reset");
-  QPushButton *restart_openpilot_btn = new QPushButton("재시작");
+  QPushButton *restart_openpilot_btn = new QPushButton("리셋");
   restart_openpilot_btn->setObjectName("restart_openpilot_btn");
   power_layout->addWidget(restart_openpilot_btn);
   QObject::connect(restart_openpilot_btn, &QPushButton::released, [=]() {
