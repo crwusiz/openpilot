@@ -12,8 +12,8 @@ from common.basedir import BASEDIR
 from common.gpio import gpio_set
 from common.params import Params
 from common.spinner import Spinner
-from selfdrive.hardware import HARDWARE, TICI
-from selfdrive.hardware.tici.pins import GPIO
+from system.hardware import HARDWARE, TICI
+from system.hardware.tici.pins import GPIO
 from selfdrive.swaglog import cloudlog
 
 
@@ -99,6 +99,7 @@ def flash_panda(panda_serial: str) -> Panda:
     raise AssertionError
 
   return panda
+
 
 def panda_sort_cmp(a: Panda, b: Panda):
   a_type = a.get_type()
