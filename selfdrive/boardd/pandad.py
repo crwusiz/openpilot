@@ -9,13 +9,12 @@ from functools import cmp_to_key
 
 from panda import DEFAULT_FW_FN, DEFAULT_H7_FW_FN, MCU_TYPE_H7, Panda, PandaDFU
 from common.basedir import BASEDIR
-from common.gpio import gpio_set
 from common.params import Params
-from common.spinner import Spinner
-from system.hardware import HARDWARE, TICI
-from system.hardware.tici.pins import GPIO
+from system.hardware import HARDWARE
 from system.swaglog import cloudlog
-
+from common.spinner import Spinner
+from common.gpio import gpio_set
+from system.hardware.tici.pins import GPIO
 
 def get_expected_signature(panda: Panda) -> bytes:
   fn = DEFAULT_H7_FW_FN if (panda.get_mcu_type() == MCU_TYPE_H7) else DEFAULT_FW_FN

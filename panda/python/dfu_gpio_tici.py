@@ -2,7 +2,7 @@
 import time
 
 from common.gpio import gpio_set, gpio_init
-from selfdrive.hardware.tici.pins import GPIO
+from system.hardware.tici.pins import GPIO
 
 def enter_dfu():
   # Enter DOS DFU

@@ -20,11 +20,10 @@ from selfdrive.controls.lib.vehicle_model import ACCELERATION_DUE_TO_GRAVITY
 # move it at all, this is compensated for too.
 
 
-LOW_SPEED_FACTOR = 200
-JERK_THRESHOLD = 0.2
+FRICTION_THRESHOLD = 0.2
 
 
-def set_torque_tune(tune, MAX_LAT_ACCEL=2.5, FRICTION=0.01):
+def set_torque_tune(tune, MAX_LAT_ACCEL=2.5, FRICTION=0.01, steering_angle_deadzone_deg=0.0):
   tune.init('torque')
   tune.torque.useSteeringAngle = True
   tune.torque.kp = 1.0 / MAX_LAT_ACCEL
@@ -32,7 +31,7 @@ def set_torque_tune(tune, MAX_LAT_ACCEL=2.5, FRICTION=0.01):
   tune.torque.ki = 0.1 / MAX_LAT_ACCEL
   tune.torque.friction = FRICTION
   tune.torque.kd = 1.0
-  tune.torque.deadzone = 0.01
+  tune.torque.steeringAngleDeadzoneDeg = steering_angle_deadzone_deg
 
 
 class LatControlTorque(LatControl):
@@ -44,7 +43,7 @@ class LatControlTorque(LatControl):
     self.use_steering_angle = CP.lateralTuning.torque.useSteeringAngle
     self.friction = CP.lateralTuning.torque.friction
     self.kf = CP.lateralTuning.torque.kf
-    self.deadzone = CP.lateralTuning.torque.deadzone
+    self.steering_angle_deadzone_deg = CP.lateralTuning.torque.steeringAngleDeadzoneDeg
     self.errors = []
 
   def reset(self):
@@ -63,17 +62,24 @@ class LatControlTorque(LatControl):
     else:
       if self.use_steering_angle:
         actual_curvature = -VM.calc_curvature(math.radians(CS.steeringAngleDeg - params.angleOffsetDeg), CS.vEgo, params.roll)
+        curvature_deadzone = abs(VM.calc_curvature(math.radians(self.steering_angle_deadzone_deg), CS.vEgo, 0.0))
       else:
         actual_curvature_vm = -VM.calc_curvature(math.radians(CS.steeringAngleDeg - params.angleOffsetDeg), CS.vEgo, params.roll)
         actual_curvature_llk = llk.angularVelocityCalibrated.value[2] / CS.vEgo
         actual_curvature = interp(CS.vEgo, [2.0, 5.0], [actual_curvature_vm, actual_curvature_llk])
+        curvature_deadzone = 0.0
       desired_lateral_accel = desired_curvature * CS.vEgo ** 2
+
+      # desired rate is the desired rate of change in the setpoint, not the absolute desired curvature
       #desired_lateral_jerk = desired_curvature_rate * CS.vEgo ** 2
       actual_lateral_accel = actual_curvature * CS.vEgo ** 2
+      lateral_accel_deadzone = curvature_deadzone * CS.vEgo ** 2
 
-      setpoint = desired_lateral_accel + LOW_SPEED_FACTOR * desired_curvature
-      measurement = actual_lateral_accel + LOW_SPEED_FACTOR * actual_curvature
-      error = apply_deadzone(setpoint - measurement, self.deadzone)
+
+      low_speed_factor = interp(CS.vEgo, [0, 15], [500, 0])
+      setpoint = desired_lateral_accel + low_speed_factor * desired_curvature
+      measurement = actual_lateral_accel + low_speed_factor * actual_curvature
+      error = apply_deadzone(setpoint - measurement, lateral_accel_deadzone)
 
       error_rate = 0
       if len(self.errors) >= ERROR_RATE_FRAME:
@@ -87,7 +93,7 @@ class LatControlTorque(LatControl):
 
       ff = desired_lateral_accel - params.roll * ACCELERATION_DUE_TO_GRAVITY
       # convert friction into lateral accel units for feedforward
-      friction_compensation = interp(error, [-JERK_THRESHOLD, JERK_THRESHOLD], [-self.friction, self.friction])
+      friction_compensation = interp(error, [-FRICTION_THRESHOLD, FRICTION_THRESHOLD], [-self.friction, self.friction])
       ff += friction_compensation / self.kf
       freeze_integrator = CS.steeringRateLimited or CS.steeringPressed or CS.vEgo < 5
       output_torque = self.pid.update(error, error_rate,
