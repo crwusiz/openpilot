@@ -14,7 +14,7 @@ from common.params import Params
 from common.spinner import Spinner
 from system.hardware import HARDWARE, TICI
 from system.hardware.tici.pins import GPIO
-from selfdrive.swaglog import cloudlog
+from system.swaglog import cloudlog
 
 
 def get_expected_signature(panda: Panda) -> bytes:
