@@ -313,24 +313,28 @@ class CarInterface(CarInterfaceBase):
     ret.tireStiffnessFront, ret.tireStiffnessRear = scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront,
                                                                          tire_stiffness_factor=tire_stiffness_factor)
 
-    # ignore CAN2 address if L-CAN on the same BUS
-    ret.mdpsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
-    ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
-    ret.sccBus = 0 if 1056 in fingerprint[0] else 1 \
-                   if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
-            else 2 if 1056 in fingerprint[2] else -1
+    if candidate in HDA2_CAR:
+      ret.enableBsm = 0x58b in fingerprint[0]
+      ret.radarOffCan = False
+    else:
+      # ignore CAN2 address if L-CAN on the same BUS
+      ret.mdpsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
+      ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
+      ret.sccBus = 0 if 1056 in fingerprint[0] else 1 \
+                     if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
+              else 2 if 1056 in fingerprint[2] else -1
 
-    if ret.sccBus >= 0:
-      ret.hasScc13 = 1290 in fingerprint[ret.sccBus]
-      ret.hasScc14 = 905 in fingerprint[ret.sccBus]
+      if ret.sccBus >= 0:
+        ret.hasScc13 = 1290 in fingerprint[ret.sccBus]
+        ret.hasScc14 = 905 in fingerprint[ret.sccBus]
 
-    ret.enableBsm = 0x58b in fingerprint[0]
-    ret.enableAutoHold = 1151 in fingerprint[0]
-    ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
-    ret.hasLfaHda = 1157 in fingerprint[0]
-    ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
+      ret.enableBsm = 0x58b in fingerprint[0]
+      ret.enableAutoHold = 1151 in fingerprint[0]
+      ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
+      ret.hasLfaHda = 1157 in fingerprint[0]
+      ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
+      ret.radarOffCan = ret.sccBus == -1
 
-    ret.radarOffCan = False if candidate in HDA2_CAR else ret.sccBus == -1
     ret.pcmCruise = not ret.radarOffCan
 
     return ret
@@ -351,13 +355,13 @@ class CarInterface(CarInterfaceBase):
     if any([Params().get("LongControlSelect", encoding='utf8') == "0", Params().get("LongControlSelect", encoding='utf8') == "1"]):
       ret.cruiseState.enabled = ret.cruiseState.available
 
-    allow_enable = any(btn in ENABLE_BUTTONS for btn in self.CS.cruise_buttons) or any(self.CS.main_buttons)
+    allow_enable = any([self.CS.cruise_buttons or self.CS.main_buttons])
     events = self.create_common_events(ret, pcm_enable=self.CS.CP.pcmCruise, allow_enable=allow_enable or True)
 
-    if self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons:
-      buttonEvents = [create_button_event(self.CS.cruise_buttons[-1], self.CS.prev_cruise_buttons, BUTTONS_DICT)]
+    if self.CS.cruise_buttons != self.CS.prev_cruise_buttons:
+      buttonEvents = [create_button_event(self.CS.cruise_buttons, self.CS.prev_cruise_buttons, BUTTONS_DICT)]
       # Handle CF_Clu_CruiseSwState changing buttons mid-press
-      if self.CS.cruise_buttons[-1] != 0 and self.CS.prev_cruise_buttons != 0:
+      if self.CS.cruise_buttons != 0 and self.CS.prev_cruise_buttons != 0:
         buttonEvents.append(create_button_event(0, self.CS.prev_cruise_buttons, BUTTONS_DICT))
 
       ret.buttonEvents = buttonEvents

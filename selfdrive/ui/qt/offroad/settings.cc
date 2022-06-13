@@ -183,23 +183,9 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   QHBoxLayout *reset_layout = new QHBoxLayout();
   reset_layout->setSpacing(30);
 
-  QPushButton *rebuild_btn = new QPushButton("재시작");
-  rebuild_btn->setObjectName("restart");
-  rebuild_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
-  reset_layout->addWidget(rebuild_btn);
-  QObject::connect(rebuild_btn, &QPushButton::clicked, [=]() {
-
-    //if (ConfirmationDialog::confirm("Are you sure you want to rebuild?", this)) {
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      QProcess::execute("/data/openpilot/scripts/restart.sh");
-    }
-  });
-
   // reset calibration button
-  //QPushButton *reset_calib_btn = new QPushButton("Reset Calibration,LiveParameters");
-  QPushButton *reset_calib_btn = new QPushButton("Parameters 리셋");
+  QPushButton *reset_calib_btn = new QPushButton("Reset Calibration, LiveParameters");
   reset_calib_btn->setObjectName("reset_calib_btn");
-  reset_calib_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
   reset_layout->addWidget(reset_calib_btn);
   QObject::connect(reset_calib_btn, &QPushButton::released, [=]() {
     //if (ConfirmationDialog::confirm("Are you sure you want to reset calibration and live params?", this)) {
@@ -213,6 +199,18 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     }
   });
 
+  reset_calib_btn->setStyleSheet(R"(
+    QPushButton {
+      height: 120px;
+      border-radius: 15px;
+      color: #000000;
+      background-color: #FFCCFF;
+    }
+    QPushButton:pressed {
+      background-color: #FFC2FF;
+    }
+  )");
+
   addItem(reset_layout);
 
   // power buttons
@@ -220,11 +218,11 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   power_layout->setSpacing(30);
 
   // softreset button
-  //QPushButton *restart_openpilot_btn = new QPushButton("Soft Reset");
-  QPushButton *restart_openpilot_btn = new QPushButton("리셋");
-  restart_openpilot_btn->setObjectName("restart_openpilot_btn");
-  power_layout->addWidget(restart_openpilot_btn);
-  QObject::connect(restart_openpilot_btn, &QPushButton::released, [=]() {
+  //QPushButton *restart_btn = new QPushButton("Soft Restart");
+  QPushButton *restart_btn = new QPushButton("재시작");
+  restart_btn->setObjectName("restart_btn");
+  power_layout->addWidget(restart_btn);
+  QObject::connect(restart_btn, &QPushButton::released, [=]() {
     emit closeSettings();
     QTimer::singleShot(1000, []() {
       Params().putBool("SoftRestartTriggered", true);
@@ -248,8 +246,8 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   }
 
   setStyleSheet(R"(
-    #restart_openpilot_btn { height: 120px; border-radius: 15px; background-color: #2C2CE2; }
-    #restart_openpilot_btn:pressed { background-color: #2424FF; }
+    #restart_btn { height: 120px; border-radius: 15px; background-color: #2C2CE2; }
+    #restart_btn:pressed { background-color: #2424FF; }
     #reboot_btn { height: 120px; border-radius: 15px; background-color: #2CE22C; }
     #reboot_btn:pressed { background-color: #24FF24; }
     #poweroff_btn { height: 120px; border-radius: 15px; background-color: #E22C2C; }
@@ -431,7 +429,7 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
       padding: 15px;
       border-width: 0;
       border-radius: 30px;
-      color: #dddddd;
+      color: #FFFFFF;
       background-color: #444444;
     }
     QPushButton:pressed {
@@ -540,14 +538,14 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   QString selected = QString::fromStdString(Params().get("SelectedCar"));
 
-  //QPushButton* selectCarBtn = new QPushButton(selected.length() ? selected : "Select your car");
-  QPushButton* selectCarBtn = new QPushButton(selected.length() ? selected : "차량을 선택하세요");
-  selectCarBtn->setObjectName("selectCarBtn");
-  selectCarBtn->setStyleSheet("margin-right: 30px;");
-  //selectCarBtn->setFixedSize(350, 100);
-  connect(selectCarBtn, &QPushButton::clicked, [=]() { main_layout->setCurrentWidget(selectCar); });
+  //QPushButton* selectcar_btn = new QPushButton(selected.length() ? selected : "Select your car");
+  QPushButton* selectcar_btn = new QPushButton(selected.length() ? selected : "차량을 선택하세요");
+  selectcar_btn->setObjectName("selectcar_btn");
+  selectcar_btn->setStyleSheet("margin-right: 30px;");
+  //selectcar_btn->setFixedSize(400, 100);
+  connect(selectcar_btn, &QPushButton::clicked, [=]() { main_layout->setCurrentWidget(selectCar); });
   vlayout->addSpacing(10);
-  vlayout->addWidget(selectCarBtn, 0, Qt::AlignRight);
+  vlayout->addWidget(selectcar_btn, 0, Qt::AlignRight);
   vlayout->addSpacing(10);
 
   homeWidget = new QWidget(this);
@@ -564,7 +562,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   connect(selectCar, &SelectCar::backPress, [=]() { main_layout->setCurrentWidget(homeScreen); });
   connect(selectCar, &SelectCar::selectedCar, [=]() {
      QString selected = QString::fromStdString(Params().get("SelectedCar"));
-     selectCarBtn->setText(selected.length() ? selected : "차량을 선택하세요");
+     selectcar_btn->setText(selected.length() ? selected : "차량을 선택하세요");
      main_layout->setCurrentWidget(homeScreen);
   });
   main_layout->addWidget(selectCar);
@@ -575,14 +573,29 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   setPalette(pal);
 
   setStyleSheet(R"(
-    #back_btn, #selectCarBtn {
+    #back_btn {
       font-size: 50px;
       margin: 0px;
-      padding: 20px;
+      padding: 15px;
       border-width: 0;
       border-radius: 30px;
-      color: #dddddd;
+      color: #FFFFFF;
       background-color: #444444;
+    }
+    #back_btn:pressed {
+      background-color: #3B3B3B;
+    }
+    #selectcar_btn {
+      font-size: 50px;
+      margin: 0px;
+      padding: 15px;
+      border-width: 0;
+      border-radius: 30px;
+      color: #FFFFFF;
+      background-color: #2C2CE2;
+    }
+    #selectcar_btn:pressed {
+      background-color: #2424FF;
     }
   )");
 
@@ -617,9 +630,9 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
   main_layout->setSpacing(20);
 
   // Back button
-  QPushButton* back = new QPushButton("Back");
+  QPushButton* back = new QPushButton("◀ Back");
   back->setObjectName("back_btn");
-  back->setFixedSize(500, 100);
+  back->setFixedSize(300, 100);
   connect(back, &QPushButton::clicked, [=]() { emit backPress(); });
   main_layout->addWidget(back, 0, Qt::AlignLeft);
   QListWidget* list = new QListWidget(this);

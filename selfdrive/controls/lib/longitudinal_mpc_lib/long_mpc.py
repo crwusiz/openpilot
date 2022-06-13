@@ -359,7 +359,6 @@ class LongitudinalMpc:
     self.source = SOURCES[np.argmin(x_obstacles[0])]
     self.params[:,2] = np.min(x_obstacles, axis=1)
     self.params[:,3] = np.copy(self.prev_a)
-
     self.params[:,4] = self.param_tr
 
     self.run()

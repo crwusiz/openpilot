@@ -133,7 +133,7 @@ class SccSmoother:
     if road_speed_limiter.roadLimitSpeed is not None:
       camSpeedFactor = clip(road_speed_limiter.roadLimitSpeed.camSpeedFactor, 1.0, 1.1)
       self.over_speed_limit = road_speed_limiter.roadLimitSpeed.camLimitSpeedLeftDist > 0 and \
-                              0 < road_limit_speed * camSpeedFactor < clu11_speed
+                              0 < road_limit_speed * camSpeedFactor < clu11_speed + 2
     else:
       self.over_speed_limit = False
 
@@ -163,7 +163,7 @@ class SccSmoother:
       if lead_speed < max_speed_clu:
         max_speed_clu = min(max_speed_clu, lead_speed)
         if not self.limited_lead:
-          self.max_speed_clu = clu11_speed
+          self.max_speed_clu = clu11_speed + 3.
           self.limited_lead = True
     else:
       self.limited_lead = False
@@ -278,9 +278,9 @@ class SccSmoother:
 
   def cal_target_speed(self, CS, clu11_speed, controls):
     if not self.longcontrol:
-      if CS.gas_pressed:
-        if clu11_speed > self.kph_to_clu(controls.v_cruise_kph):
-          set_speed = clip(clu11_speed, self.min_set_speed_clu, self.max_set_speed_clu)
+      if CS.gas_pressed and CS.cruise_buttons == Buttons.NONE:
+        if clu11_speed + SYNC_MARGIN > self.kph_to_clu(controls.v_cruise_kph):
+          set_speed = clip(clu11_speed + SYNC_MARGIN, self.min_set_speed_clu, self.max_set_speed_clu)
           controls.v_cruise_kph = set_speed * self.speed_conv_to_ms * CV.MS_TO_KPH
       self.target_speed = self.kph_to_clu(controls.v_cruise_kph)
 
@@ -288,9 +288,9 @@ class SccSmoother:
         self.target_speed = clip(self.target_speed, self.min_set_speed_clu, self.max_speed_clu)
 
     elif CS.cruiseState_enabled:
-      if CS.gas_pressed:
-        if clu11_speed > self.kph_to_clu(controls.v_cruise_kph):
-          set_speed = clip(clu11_speed, self.min_set_speed_clu, self.max_set_speed_clu)
+      if CS.gas_pressed and CS.cruise_buttons == Buttons.NONE:
+        if clu11_speed + SYNC_MARGIN > self.kph_to_clu(controls.v_cruise_kph):
+          set_speed = clip(clu11_speed + SYNC_MARGIN, self.min_set_speed_clu, self.max_set_speed_clu)
           self.target_speed = set_speed
 
   def update_max_speed(self, max_speed, limited_curv):

@@ -83,7 +83,7 @@ class CarController:
     # Steering Torque
     new_steer = int(round(actuators.steer * self.params.STEER_MAX))
     apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.params)
-    self.steer_rate_limited = new_steer != apply_steer
+    #self.steer_rate_limited = new_steer != apply_steer
 
     # Disable steering while turning blinker on and speed below 60 kph
     if CS.out.leftBlinker or CS.out.rightBlinker:
@@ -139,8 +139,8 @@ class CarController:
     if self.frame % 2 and CS.mdps_bus: # send clu11 to mdps if it is not on bus 0
       can_sends.append(hyundaican.create_clu11(self.packer, CS.mdps_bus, CS.clu11, Buttons.NONE, enabled_speed))
 
-    if pcm_cancel_cmd and self.longcontrol:
-      can_sends.append(hyundaican.create_clu11(self.packer, CS.scc_bus, CS.clu11, Buttons.CANCEL, clu11_speed))
+    #if pcm_cancel_cmd and self.longcontrol:
+    #  can_sends.append(hyundaican.create_clu11(self.packer, CS.scc_bus, CS.clu11, Buttons.CANCEL, clu11_speed))
 
     if CS.mdps_bus:  # send mdps12 to LKAS to prevent LKAS error
       can_sends.append(hyundaican.create_mdps12(self.packer, self.frame, CS.mdps12))
@@ -238,7 +238,7 @@ class CarController:
             obj_gap = 0
 
           can_sends.append(
-            hyundaican.create_scc14(self.packer, CC.enabled, acc_standstill, apply_accel, CS.out.gasPressed, obj_gap, CS.scc14))
+            hyundaican.create_scc14(self.packer, CC.enabled, CS.out.vEgo, acc_standstill, apply_accel, CS.out.gasPressed, obj_gap, CS.scc14))
     else:
       self.scc12_cnt = -1
 

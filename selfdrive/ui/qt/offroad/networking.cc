@@ -29,9 +29,9 @@ Networking::Networking(QWidget* parent, bool show_advanced) : QFrame(parent) {
   if (show_advanced) {
     //QPushButton* advancedSettings = new QPushButton("Advanced");
     QPushButton* advancedSettings = new QPushButton("고급 설정");
-    advancedSettings->setObjectName("advancedBtn");
+    advancedSettings->setObjectName("advanced_btn");
     advancedSettings->setStyleSheet("margin-right: 30px;");
-    advancedSettings->setFixedSize(350, 100);
+    advancedSettings->setFixedSize(400, 100);
     connect(advancedSettings, &QPushButton::clicked, [=]() { main_layout->setCurrentWidget(an); });
     vlayout->addSpacing(10);
     vlayout->addWidget(advancedSettings, 0, Qt::AlignRight);
@@ -58,14 +58,17 @@ Networking::Networking(QWidget* parent, bool show_advanced) : QFrame(parent) {
 
   // TODO: revisit pressed colors
   setStyleSheet(R"(
-    #wifiWidget > QPushButton, #back_btn, #advancedBtn {
+    #wifiWidget > QPushButton, #back_btn, #advanced_btn {
       font-size: 50px;
       margin: 0px;
       padding: 15px;
       border-width: 0;
       border-radius: 30px;
-      color: #dddddd;
+      color: #FFFFFF;
       background-color: #444444;
+    }
+    #back_btn:pressed, #advanced_btn:pressed {
+      background-color: #3B3B3B;
     }
   )");
   main_layout->setCurrentWidget(wifiScreen);
@@ -119,15 +122,11 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   // Back button
   QPushButton* back = new QPushButton("Wifi 설정");
   back->setObjectName("back_btn");
-  back->setFixedSize(500, 100);
+  back->setFixedSize(400, 100);
   connect(back, &QPushButton::clicked, [=]() { emit backPress(); });
   main_layout->addWidget(back, 0, Qt::AlignLeft);
 
   ListWidget *list = new ListWidget(this);
-
-  // IP address
-  ipLabel = new LabelControl("IP Address", wifi->ipv4_address);
-  list->addItem(ipLabel);
 
   // SSH keys
   list->addItem(new SshToggle());
@@ -148,26 +147,6 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
     }
   });
   list->addItem(gitpullbtn);
-
-  //auto cleardtcbtn = new ButtonControl("DTC Clear", "RUN");
-  auto cleardtcbtn = new ButtonControl("오류코드 제거", "실행");
-  QObject::connect(cleardtcbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/scripts/cleardtc.sh");
-    }
-  });
-  list->addItem(cleardtcbtn);
-
-  //auto rebuildbtn = new ButtonControl("Rebuild", "RUN");
-  auto rebuildbtn = new ButtonControl("전체 재빌드", "실행");
-  QObject::connect(rebuildbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/panda/board/rebuild.sh");
-    }
-  });
-  list->addItem(rebuildbtn);
 
   //auto pandaflashbtn = new ButtonControl("Panda Flash", "RUN");
   auto pandaflashbtn = new ButtonControl("판다 플래싱", "실행");
@@ -210,6 +189,10 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   list->addItem(pandarecoverh7btn);
 
   list->addItem(horizontal_line());
+
+  // IP address
+  ipLabel = new LabelControl("IP Address", wifi->ipv4_address);
+  list->addItem(ipLabel);
 
   // Enable tethering layout
   tetheringToggle = new ToggleControl("Enable Tethering", "", "", wifi->isTetheringEnabled());

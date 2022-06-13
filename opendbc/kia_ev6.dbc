@@ -170,6 +170,14 @@ BO_ 389 NEW_MSG_3: 8 XXX
  SG_ NEW_SIGNAL_2 : 48|4@1+ (1,0) [0|15] "" XXX
  SG_ NEW_SIGNAL_3 : 16|8@1+ (1,0) [0|255] "" XXX
 
+BO_ 426 CRUISE_BUTTONS: 16 XXX
+ SG_ ADAPTIVE_CRUISE_BTN : 34|1@0+ (1,0) [0|1] "" XXX
+ SG_ LKAS_BTN : 39|1@0+ (1,0) [0|1] "" XXX
+ SG_ PAUSE_RESUME_BTN : 38|1@0+ (1,0) [0|1] "" XXX
+ SG_ DISTANCE_BTN : 37|2@0+ (1,0) [0|3] "" XXX
+ SG_ _CHECKSUM : 7|16@0+ (1,0) [0|65535] "" XXX
+ SG_ _COUNTER : 23|8@0+ (1,0) [0|255] "" XXX
+
 
 
 
@@ -179,3 +187,4 @@ CM_ SG_ 1043 COUNTER_ALT "only increments on change";
 VAL_ 53 GEAR 0 "P" 5 "D" 6 "N" 7 "R" ;
 VAL_ 80 LKA_ICON 0 "hidden" 1 "grey" 2 "green" 3 "flashing green" ;
 VAL_ 80 LKA_MODE 1 "warning only" 2 "assist" 6 "off" ;
+VAL_ 426 DISTANCE_BTN 3 ":" Gap, "1" : "Speed" +, "2:" Speed "-" ;

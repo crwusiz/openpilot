@@ -218,10 +218,9 @@ class Controls:
       return
 
     # Disable on rising edge of accelerator or brake. Also disable on brake when speed > 0
-    if not any([Params().get("LongControlSelect", encoding='utf8') == "0", Params().get("LongControlSelect", encoding='utf8') == "1"]):
-      if (CS.gasPressed and not self.CS_prev.gasPressed and self.disengage_on_accelerator) or \
-        (CS.brakePressed and (not self.CS_prev.brakePressed or not CS.standstill)):
-        self.events.add(EventName.pedalPressed)
+    #if (CS.gasPressed and not self.CS_prev.gasPressed and self.disengage_on_accelerator) or \
+    #  (CS.brakePressed and (not self.CS_prev.brakePressed or not CS.standstill)):
+    #  self.events.add(EventName.pedalPressed)
 
     if CS.gasPressed:
       self.events.add(EventName.pedalPressedPreEnable if self.disengage_on_accelerator else

@@ -1,22 +1,15 @@
-from collections import deque
-
 from cereal import car
 from common.conversions import Conversions as CV
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
-from selfdrive.car.hyundai.values import DBC, STEER_THRESHOLD, FEATURES, HYBRID_CAR, EV_HYBRID_CAR, CAR, HDA2_CAR, Buttons
+from selfdrive.car.hyundai.values import DBC, STEER_THRESHOLD, FEATURES, HYBRID_CAR, EV_HYBRID_CAR, CAR, HDA2_CAR
 from selfdrive.car.interfaces import CarStateBase
-
-PREV_BUTTON_SAMPLES = 4
 
 
 class CarState(CarStateBase):
   def __init__(self, CP):
     super().__init__(CP)
     can_define = CANDefine(DBC[CP.carFingerprint]["pt"])
-
-    self.cruise_buttons = deque([Buttons.NONE] * PREV_BUTTON_SAMPLES, maxlen=PREV_BUTTON_SAMPLES)
-    self.main_buttons = deque([Buttons.NONE] * PREV_BUTTON_SAMPLES, maxlen=PREV_BUTTON_SAMPLES)
 
     if CP.carFingerprint in HDA2_CAR:
       self.shifter_values = can_define.dv["ACCELERATOR"]["GEAR"]
@@ -36,6 +29,7 @@ class CarState(CarStateBase):
     self.has_scc14 = CP.hasScc14
     self.has_lfa_hda = CP.hasLfaHda
     self.aebFcw = CP.aebFcw
+    self.main_buttons = 0
     self.mdps_error_cnt = 0
     self.cruise_unavail_cnt = 0
     self.apply_steer = 0.
@@ -108,9 +102,9 @@ class CarState(CarStateBase):
     else:
       ret.cruiseState.speed = 0
 
-    self.prev_cruise_buttons = self.cruise_buttons[-1]
-    self.cruise_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwState"])
-    self.main_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwMain"])
+    self.prev_cruise_buttons = self.cruise_buttons
+    self.cruise_buttons = cp.vl["CLU11"]["CF_Clu_CruiseSwState"]
+    self.main_buttons = cp.vl["CLU11"]["CF_Clu_CruiseSwMain"]
 
     # TODO: Find brake pressure
     ret.brake = 0
