@@ -29,8 +29,8 @@ class NvgWindow : public CameraViewWidget {
   Q_OBJECT
   Q_PROPERTY(float speed MEMBER speed);
   Q_PROPERTY(QString speedUnit MEMBER speedUnit);
-  Q_PROPERTY(QString applyMaxSpeed MEMBER applyMaxSpeed);
-  Q_PROPERTY(QString cruiseMaxSpeed MEMBER cruiseMaxSpeed);
+  Q_PROPERTY(float applyMaxSpeed MEMBER applyMaxSpeed);
+  Q_PROPERTY(float cruiseMaxSpeed MEMBER cruiseMaxSpeed);
 
   Q_PROPERTY(bool is_cruise_set MEMBER is_cruise_set);
   Q_PROPERTY(bool steeringPressed MEMBER steeringPressed);
@@ -117,8 +117,8 @@ private:
 
   float speed;
   QString speedUnit;
-  QString applyMaxSpeed;
-  QString cruiseMaxSpeed;
+  float applyMaxSpeed;
+  float cruiseMaxSpeed;
 
   bool is_cruise_set = false;
   bool steeringPressed = false;

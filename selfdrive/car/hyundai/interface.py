@@ -310,8 +310,8 @@ class CarInterface(CarInterfaceBase):
 
     # TODO: start from empirically derived lateral slip stiffness for the civic and scale by
     # mass and CG position, so all cars will have approximately similar dyn behaviors
-    ret.tireStiffnessFront, ret.tireStiffnessRear = scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront,
-                                                                         tire_stiffness_factor=tire_stiffness_factor)
+    ret.tireStiffnessFront, ret.tireStiffnessRear = \
+      scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront, tire_stiffness_factor=tire_stiffness_factor)
 
     if candidate in HDA2_CAR:
       ret.enableBsm = 0x58b in fingerprint[0]
@@ -320,8 +320,8 @@ class CarInterface(CarInterfaceBase):
       # ignore CAN2 address if L-CAN on the same BUS
       ret.mdpsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
       ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
-      ret.sccBus = 0 if 1056 in fingerprint[0] else 1 \
-                     if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
+      ret.sccBus = 0 if 1056 in fingerprint[0] \
+              else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
               else 2 if 1056 in fingerprint[2] else -1
 
       if ret.sccBus >= 0:
@@ -341,7 +341,7 @@ class CarInterface(CarInterfaceBase):
 
   def _update(self, c):
     ret = self.CS.update(self.cp, self.cp2, self.cp_cam)
-    ret.steeringRateLimited = self.CC.steer_rate_limited if self.CC is not None else False
+    #ret.steeringRateLimited = self.CC.steer_rate_limited if self.CC is not None else False
 
     if not self.cp.can_valid or not self.cp2.can_valid or not self.cp_cam.can_valid:
       print('cp = {}  cp2 = {}  cp_cam = {}'.format(bool(self.cp.can_valid), bool(self.cp2.can_valid), bool(self.cp_cam.can_valid)))
