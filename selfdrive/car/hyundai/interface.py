@@ -288,7 +288,6 @@ class CarInterface(CarInterfaceBase):
     ret.radarTimeStep = 0.05
 
     ret.steerActuatorDelay = 0.2
-    ret.steerRateCost = 0.5
     ret.steerLimitTimer = 2.5
 
     # longitudinal
