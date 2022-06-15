@@ -230,7 +230,7 @@ void NvgWindow::updateState(const UIState &s) {
   }
 
   setProperty("is_cruise_set", cruise_set);
-  setProperty("speed", QString::number(std::nearbyint(cur_speed)));
+  setProperty("speed", cur_speed);
   setProperty("applyMaxSpeed", QString::number(std::nearbyint(applyMaxSpeed)));
   setProperty("cruiseMaxSpeed", QString::number(std::nearbyint(cruiseMaxSpeed)));
   setProperty("speedUnit", s.scene.is_metric ? "km/h" : "mph");
@@ -340,6 +340,51 @@ void NvgWindow::drawHud(QPainter &p) {
     long_rect.moveTop(max_speed_rect.top() + 115);
     p.drawText(long_rect, Qt::AlignCenter, "LONG");
   }
+/*
+  // Draw set speed
+  if (is_cruise_set) {
+    if (speedLimit > 0 && status != STATUS_DISENGAGED && status != STATUS_OVERRIDE) {
+      p.setPen(interpColor(
+        setSpeed,
+        {speedLimit + 5, speedLimit + 15, speedLimit + 25},
+        {QColor(0xff, 0xff, 0xff, 0xff), QColor(0xff, 0x95, 0x00, 0xff), QColor(0xff, 0x00, 0x00, 0xff)}
+      ));
+    } else {
+      p.setPen(QColor(0xff, 0xff, 0xff, 0xff));
+    }
+  } else {
+    p.setPen(QColor(0x72, 0x72, 0x72, 0xff));
+  }
+  configFont(p, "Open Sans", 90, "Bold");
+  QRect speed_rect = getTextRect(p, Qt::AlignCenter, setSpeedStr);
+  speed_rect.moveCenter({set_speed_rect.center().x(), 0});
+  speed_rect.moveTop(set_speed_rect.top() + 8);
+  p.drawText(speed_rect, Qt::AlignCenter, setSpeedStr);
+
+  // Draw MAX
+  if (is_cruise_set) {
+    if (status == STATUS_DISENGAGED) {
+      p.setPen(QColor(0xff, 0xff, 0xff, 0xff));
+    } else if (status == STATUS_OVERRIDE) {
+      p.setPen(QColor(0x91, 0x9b, 0x95, 0xff));
+    } else if (speedLimit > 0) {
+      p.setPen(interpColor(
+        setSpeed,
+        {speedLimit + 5, speedLimit + 15, speedLimit + 25},
+        {QColor(0x80, 0xd8, 0xa6, 0xff), QColor(0xff, 0xe4, 0xbf, 0xff), QColor(0xff, 0xbf, 0xbf, 0xff)}
+      ));
+    } else {
+      p.setPen(QColor(0x80, 0xd8, 0xa6, 0xff));
+    }
+  } else {
+    p.setPen(QColor(0xa6, 0xa6, 0xa6, 0xff));
+  }
+  configFont(p, "Open Sans", 40, "SemiBold");
+  QRect max_rect = getTextRect(p, Qt::AlignCenter, "MAX");
+  max_rect.moveCenter({set_speed_rect.center().x(), 0});
+  max_rect.moveTop(set_speed_rect.top() + 123);
+  p.drawText(max_rect, Qt::AlignCenter, "MAX");
+*/
 
   // speedlimit
   if (nda_status > 0) {
@@ -387,7 +432,9 @@ void NvgWindow::drawHud(QPainter &p) {
       p.drawText(left_rect, Qt::AlignCenter, str_left_dist);
     }
   }
+
   // current speed (upper center)
+  QString speedStr = QString::number(std::nearbyint(speed));
   QColor variableColor = QColor(255, 255, 255, 230);
 
   if (accel > 0) {
@@ -403,7 +450,7 @@ void NvgWindow::drawHud(QPainter &p) {
   }
 
   configFont(p, "Open Sans", 176, "Bold");
-  drawTextColor(p, rect().center().x(), 230, speed, variableColor);
+  drawTextColor(p, rect().center().x(), 230, speedStr, variableColor);
   configFont(p, "Open Sans", 66, "Regular");
   drawTextColor(p, rect().center().x(), 310, speedUnit, unitColor());
 
@@ -755,9 +802,7 @@ void NvgWindow::drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush b
 }
 
 void NvgWindow::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
-  QFontMetrics fm(p.font());
-  QRect init_rect = fm.boundingRect(text);
-  QRect real_rect = fm.boundingRect(init_rect, 0, text);
+  QRect real_rect = getTextRect(p, 0, text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
 
   p.setPen(QColor(0xff, 0xff, 0xff, alpha));
@@ -765,9 +810,7 @@ void NvgWindow::drawText(QPainter &p, int x, int y, const QString &text, int alp
 }
 
 void NvgWindow::drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color) {
-  QFontMetrics fm(p.font());
-  QRect init_rect = fm.boundingRect(text);
-  QRect real_rect = fm.boundingRect(init_rect, 0, text);
+  QRect real_rect = getTextRect(p, 0, text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
   p.setPen(color);
   p.drawText(real_rect.x(), real_rect.bottom(), text);

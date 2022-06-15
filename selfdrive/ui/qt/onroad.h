@@ -27,7 +27,7 @@ private:
 // container window for the NVG UI
 class NvgWindow : public CameraViewWidget {
   Q_OBJECT
-  Q_PROPERTY(QString speed MEMBER speed);
+  Q_PROPERTY(float speed MEMBER speed);
   Q_PROPERTY(QString speedUnit MEMBER speedUnit);
   Q_PROPERTY(QString applyMaxSpeed MEMBER applyMaxSpeed);
   Q_PROPERTY(QString cruiseMaxSpeed MEMBER cruiseMaxSpeed);
@@ -115,7 +115,7 @@ private:
   const int radius = 160;
   const int img_size = (radius / 2) * 1.5;
 
-  QString speed;
+  float speed;
   QString speedUnit;
   QString applyMaxSpeed;
   QString cruiseMaxSpeed;
