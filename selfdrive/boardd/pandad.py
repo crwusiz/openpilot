@@ -12,9 +12,7 @@ from common.basedir import BASEDIR
 from common.params import Params
 from system.hardware import HARDWARE
 from system.swaglog import cloudlog
-from common.spinner import Spinner
-from common.gpio import gpio_set
-from system.hardware.tici.pins import GPIO
+
 
 def get_expected_signature(panda: Panda) -> bytes:
   fn = DEFAULT_H7_FW_FN if (panda.get_mcu_type() == MCU_TYPE_H7) else DEFAULT_FW_FN
@@ -38,55 +36,16 @@ def flash_panda(panda_serial: str) -> Panda:
 
   if panda.bootstub or panda_signature != fw_signature:
     cloudlog.info("Panda firmware out of date, update required")
-
-    if TICI and not panda.bootstub:
-      panda.reset(enter_bootstub=True)
-      if not panda.bootstub:
-        cloudlog.error(f"Panda unable to enter bootstub. Attempting to recover.")
-
-        gpio_set(GPIO.STM_RST_N, 1)
-        gpio_set(GPIO.STM_BOOT0, 1)
-        time.sleep(2)
-        gpio_set(GPIO.STM_RST_N, 0)
-
-        panda.recover(skip_enter_dfu=True)
-
-        gpio_set(GPIO.STM_RST_N, 1)
-        gpio_set(GPIO.STM_BOOT0, 0)
-        time.sleep(2)
-        gpio_set(GPIO.STM_RST_N, 0)
-
     panda.flash()
     cloudlog.info("Done flashing")
 
   if panda.bootstub:
     bootstub_version = panda.get_version()
     cloudlog.info(f"Flashed firmware not booting, flashing development bootloader. Bootstub version: {bootstub_version}")
-
-    spinner = Spinner()
-    spinner.update("Restoring panda")
-    panda.reset(enter_bootstub=True)
-    panda.reset(enter_bootloader=True)
-    time.sleep(1)
-    try:
-      os.system("/usr/bin/dfu-util -d 0483:df11 -a 0 -s 0x08004000 -D /data/openpilot/panda/board/obj/panda.bin.signed")
-      os.system("/usr/bin/dfu-util -d 0483:df11 -a 0 -s 0x08000000:leave -D /data/openpilot/panda/board/obj/bootstub.panda.bin")
-      panda.flash('/data/openpilot/panda/board/obj/panda.bin.signed')
-    finally:
-      panda.reset()
-      panda.reconnect()
-
     if internal_panda:
       HARDWARE.recover_internal_panda()
     panda.recover(reset=(not internal_panda))
-
     cloudlog.info("Done flashing bootloader")
-
-    if panda.bootstub:
-      spinner.update("Try manualley Panda Recover")
-      time.sleep(60)
-    else:
-      spinner.close()
 
   if panda.bootstub:
     cloudlog.info("Panda still not booting, exiting")

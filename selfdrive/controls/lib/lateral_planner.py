@@ -18,7 +18,6 @@ class LateralPlanner:
 
     self.last_cloudlog_t = 0
     self.solution_invalid_cnt = 0
-    self.steer_rate_cost = CP.steerRateCost
 
     self.path_xyz = np.zeros((TRAJECTORY_SIZE, 3))
     self.path_xyz_stds = np.ones((TRAJECTORY_SIZE, 3))

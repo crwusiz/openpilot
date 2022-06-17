@@ -55,6 +55,8 @@ class SccSmoother:
     return int(kph * CV.KPH_TO_MS * self.speed_conv_to_clu)
 
   def __init__(self):
+    self.btn = Buttons.NONE
+
     self.longcontrol = Params().get("LongControlSelect", encoding='utf8') == "1"
     self.is_metric = Params().get_bool('IsMetric')
 
@@ -64,13 +66,10 @@ class SccSmoother:
     self.min_set_speed_clu = self.kph_to_clu(MIN_SET_SPEED_KPH)
     self.max_set_speed_clu = self.kph_to_clu(MAX_SET_SPEED_KPH)
 
-    self.btn = Buttons.NONE
-
     self.alive_count = ALIVE_COUNT
     random.shuffle(WAIT_COUNT)
 
     self.started_frame = 0
-    self.stock_weight = 0.
     self.wait_timer = 0
     self.alive_timer = 0
     self.target_speed = 0.
@@ -80,7 +79,6 @@ class SccSmoother:
     self.slowing_down = False
     self.slowing_down_alert = False
     self.slowing_down_sound_alert = False
-    self.active_cam = False
     self.over_speed_limit = False
     self.limited_lead = False
 
@@ -117,8 +115,7 @@ class SccSmoother:
   def cal_max_speed(self, frame, CC, CS, sm, clu11_speed, controls):
     # kph
     road_speed_limiter = get_road_speed_limiter()
-    apply_limit_speed, road_limit_speed, left_dist, first_started, max_speed_log = \
-      road_speed_limiter.get_max_speed(clu11_speed, self.is_metric)
+    apply_limit_speed, road_limit_speed, left_dist, first_started = road_speed_limiter.get_max_speed(clu11_speed, self.is_metric)
 
     curv_limit = 0
     self.cal_curve_speed(sm, CS.out.vEgo, frame)
@@ -128,8 +125,6 @@ class SccSmoother:
     else:
       max_speed_clu = self.kph_to_clu(controls.v_cruise_kph)
 
-    self.active_cam = road_limit_speed > 0 and left_dist > 0
-
     if road_speed_limiter.roadLimitSpeed is not None:
       camSpeedFactor = clip(road_speed_limiter.roadLimitSpeed.camSpeedFactor, 1.0, 1.1)
       self.over_speed_limit = road_speed_limiter.roadLimitSpeed.camLimitSpeedLeftDist > 0 and \
@@ -137,10 +132,7 @@ class SccSmoother:
     else:
       self.over_speed_limit = False
 
-    max_speed_log = ""
-
     if apply_limit_speed >= self.kph_to_clu(10):
-
       if first_started:
         self.max_speed_clu = clu11_speed
 
@@ -170,12 +162,12 @@ class SccSmoother:
 
     self.update_max_speed(int(max_speed_clu + 0.5), curv_limit != 0 and curv_limit == int(max_speed_clu))
 
-    return road_limit_speed, left_dist, max_speed_log
+    return road_limit_speed, left_dist
 
   def update(self, enabled, can_sends, packer, CC, CS, frame, controls):
     # mph or kph
     clu11_speed = CS.clu11["CF_Clu_Vanz"]
-    road_limit_speed, left_dist, max_speed_log = self.cal_max_speed(frame, CC, CS, controls.sm, clu11_speed, controls)
+    road_limit_speed, left_dist = self.cal_max_speed(frame, CC, CS, controls.sm, clu11_speed, controls)
 
     # kph
     controls.applyMaxSpeed = float(clip(CS.cruiseState_speed * CV.MS_TO_KPH, MIN_SET_SPEED_KPH,
@@ -198,8 +190,6 @@ class SccSmoother:
       self.reset()
 
     self.cal_target_speed(CS, clu11_speed, controls)
-
-    CC.sccSmoother.logMessage = max_speed_log
 
     if self.wait_timer > 0:
       self.wait_timer -= 1
@@ -264,7 +254,7 @@ class SccSmoother:
       curv = (lateralPlan.curvatures[-1] + lateralPlan.curvatures[-2]) / 2.
       a_y_max = 2.975 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
       v_curvature = sqrt(a_y_max / max(abs(curv), 1e-4))
-      model_speed = v_curvature * 0.85 * 0.98
+      model_speed = v_curvature * 0.8
 
       if model_speed < v_ego:
         self.curve_speed_ms = float(max(model_speed, MIN_CURVE_SPEED))

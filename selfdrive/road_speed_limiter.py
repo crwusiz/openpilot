@@ -8,7 +8,7 @@ import socket
 import fcntl
 import struct
 from threading import Thread
-from cereal import messaging, log
+from cereal import messaging
 from common.numpy_fast import clip
 from common.realtime import sec_since_boot
 from common.conversions import Conversions as CV
@@ -22,15 +22,14 @@ class Port:
 
 class RoadLimitSpeedServer:
   def __init__(self):
+    self.lock = threading.Lock()
     self.json_road_limit = None
+    self.last_exception = None
+    self.remote_addr = None
+    self.remote_gps_addr = None
     self.active = 0
     self.last_updated = 0
     self.last_updated_active = 0
-    self.last_exception = None
-    self.lock = threading.Lock()
-    self.remote_addr = None
-
-    self.remote_gps_addr = None
     self.last_time_location = 0
 
     broadcast = Thread(target=self.broadcast_thread, args=[])
@@ -55,7 +54,6 @@ class RoadLimitSpeedServer:
       while True:
         self.gps_event.wait(wait_time)
         self.gps_timer()
-
         now = sec_since_boot()
         error = (frame * period - (now - start_time))
         i += error * 0.1
@@ -86,7 +84,6 @@ class RoadLimitSpeedServer:
               location.bearingAccuracyDeg,
               location.speedAccuracy,
             ]})
-
             address = (self.remote_gps_addr[0], Port.LOCATION_PORT)
             self.gps_socket.sendto(json_location.encode(), address)
     except:
@@ -114,12 +111,13 @@ class RoadLimitSpeedServer:
           try:
             if broadcast_address is None or frame % 10 == 0:
               broadcast_address = self.get_broadcast_address()
-              print('broadcast_address', broadcast_address)
+            print('broadcast_address', broadcast_address)
             if broadcast_address is not None:
               address = (broadcast_address, Port.BROADCAST_PORT)
               sock.sendto('EON:ROAD_LIMIT_SERVICE:v1'.encode(), address)
           except:
             pass
+
           time.sleep(5.)
           frame += 1
       except:
@@ -139,7 +137,6 @@ class RoadLimitSpeedServer:
       if ret:
         data, self.remote_addr = sock.recvfrom(2048)
         json_obj = json.loads(data.decode())
-
         if 'cmd' in json_obj:
           try:
             os.system(json_obj['cmd'])
@@ -164,6 +161,7 @@ class RoadLimitSpeedServer:
             ret = False
           except:
             pass
+
         try:
           self.lock.acquire()
           try:
@@ -172,11 +170,13 @@ class RoadLimitSpeedServer:
               self.last_updated_active = sec_since_boot()
           except:
             pass
+
           if 'road_limit' in json_obj:
             self.json_road_limit = json_obj['road_limit']
             self.last_updated = sec_since_boot()
         finally:
           self.lock.release()
+
     except:
       try:
         self.lock.acquire()
@@ -205,7 +205,6 @@ class RoadLimitSpeedServer:
     try:
       if json is None:
         return default
-
       if key in json:
         return json[key]
     except:
@@ -218,15 +217,10 @@ def main():
   roadLimitSpeed = messaging.pub_sock('roadLimitSpeed')
   with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
     try:
-      try:
-        sock.bind(('0.0.0.0', 843))
-      except:
-        sock.bind(('0.0.0.0', Port.RECEIVE_PORT))
+      sock.bind(('0.0.0.0', Port.RECEIVE_PORT))
       sock.setblocking(False)
-
       while True:
         server.udp_recv(sock)
-
         dat = messaging.new_message()
         dat.init('roadLimitSpeed')
         dat.roadLimitSpeed.active = server.active
@@ -238,29 +232,11 @@ def main():
         dat.roadLimitSpeed.sectionLimitSpeed = server.get_limit_val("section_limit_speed", 0)
         dat.roadLimitSpeed.sectionLeftDist = server.get_limit_val("section_left_dist", 0)
         dat.roadLimitSpeed.camSpeedFactor = server.get_limit_val("cam_speed_factor", CAMERA_SPEED_FACTOR)
-
-        try:
-          json = server.json_road_limit
-          if json is not None and "rest_area" in json:
-            restAreaList = []
-            for rest_area in json["rest_area"]:
-              restArea = log.RoadLimitSpeed.RestArea.new_message()
-              restArea.image = server.get_json_val(rest_area, "image")
-              restArea.title = server.get_json_val(rest_area, "title")
-              restArea.oilPrice = server.get_json_val(rest_area, "oilPrice")
-              restArea.distance = server.get_json_val(rest_area, "distance")
-              restAreaList.append(restArea)
-            dat.roadLimitSpeed.restArea = restAreaList
-        except:
-          pass
-
         roadLimitSpeed.send(dat.to_bytes())
         server.send_sdp(sock)
         server.check()
-
     except Exception as e:
       server.last_exception = e
-
 
 class RoadSpeedLimiter:
   def __init__(self):
@@ -284,10 +260,9 @@ class RoadSpeedLimiter:
     return 0
 
   def get_max_speed(self, cluster_speed, is_metric):
-    log = ""
     self.recv()
     if self.roadLimitSpeed is None:
-      return 0, 0, 0, False, ""
+      return 0, 0, 0, False
     try:
       road_limit_speed = self.roadLimitSpeed.roadLimitSpeed
       is_highway = self.roadLimitSpeed.isHighway
@@ -298,19 +273,8 @@ class RoadSpeedLimiter:
       section_left_dist = self.roadLimitSpeed.sectionLeftDist
       camSpeedFactor = clip(self.roadLimitSpeed.camSpeedFactor, 1.0, 1.1)
 
-      if is_highway is not None:
-        if is_highway:
-          MIN_LIMIT = 40
-          MAX_LIMIT = 120
-        else:
-          MIN_LIMIT = 20
-          MAX_LIMIT = 100
-      else:
-        MIN_LIMIT = 20
-        MAX_LIMIT = 120
-
-      if cam_type == 22:  # speed bump
-        MIN_LIMIT = 10
+      MIN_LIMIT = 20
+      MAX_LIMIT = 120
 
       if cam_limit_speed_left_dist is not None and cam_limit_speed is not None and cam_limit_speed_left_dist > 0:
         v_ego = cluster_speed * (CV.KPH_TO_MS if is_metric else CV.MPH_TO_MS)
@@ -318,11 +282,7 @@ class RoadSpeedLimiter:
         #cam_limit_speed_ms = cam_limit_speed * (CV.KPH_TO_MS if is_metric else CV.MPH_TO_MS)
 
         starting_dist = v_ego * 30.
-
-        if cam_type == 22:
-          safe_dist = v_ego * 3.
-        else:
-          safe_dist = v_ego * 6.
+        safe_dist = v_ego * 6.
 
         if MIN_LIMIT <= cam_limit_speed <= MAX_LIMIT and (self.slowing_down or cam_limit_speed_left_dist < starting_dist):
           if not self.slowing_down:
@@ -339,11 +299,11 @@ class RoadSpeedLimiter:
             pp = (d / td) ** 0.6
           else:
             pp = 0
-          return cam_limit_speed * camSpeedFactor + int(pp * diff_speed), \
-                 cam_limit_speed, cam_limit_speed_left_dist, first_started, log
+
+          return cam_limit_speed * camSpeedFactor + int(pp * diff_speed), cam_limit_speed, cam_limit_speed_left_dist, first_started
 
         self.slowing_down = False
-        return 0, cam_limit_speed, cam_limit_speed_left_dist, False, log
+        return 0, cam_limit_speed, cam_limit_speed_left_dist, False
 
       elif section_left_dist is not None and section_limit_speed is not None and section_left_dist > 0:
         if MIN_LIMIT <= section_limit_speed <= MAX_LIMIT:
@@ -352,17 +312,16 @@ class RoadSpeedLimiter:
             first_started = True
           else:
             first_started = False
-          return section_limit_speed * camSpeedFactor, section_limit_speed, section_left_dist, first_started, log
+          return section_limit_speed * camSpeedFactor, section_limit_speed, section_left_dist, first_started
 
         self.slowing_down = False
-        return 0, section_limit_speed, section_left_dist, False, log
+        return 0, section_limit_speed, section_left_dist, False
 
-    except Exception as e:
-      log = "Ex: " + str(e)
+    except:
       pass
 
     self.slowing_down = False
-    return 0, 0, 0, False, log
+    return 0, 0, 0, False
 
 road_speed_limiter = None
 

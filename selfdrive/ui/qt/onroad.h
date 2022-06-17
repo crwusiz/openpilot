@@ -73,6 +73,7 @@ class NvgWindow : public CameraViewWidget {
   Q_PROPERTY(float fr MEMBER fr);
   Q_PROPERTY(float rl MEMBER rl);
   Q_PROPERTY(float rr MEMBER rr);
+  Q_PROPERTY(float roadLimitSpeed MEMBER roadLimitSpeed);
 
 public:
   explicit NvgWindow(VisionStreamType type, QWidget* parent = 0);
@@ -159,6 +160,7 @@ private:
   float steerAngleDesired = 0;
   float steerRatio = 0;
   float fl,fr,rl,rr = 0;
+  float roadLimitSpeed = 0;
 
 protected:
   void paintGL() override;
@@ -170,20 +172,18 @@ protected:
   void drawHud(QPainter &p);
   inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); }
   inline QColor yellowColor(int alpha = 255) { return QColor(255, 255, 0, alpha); }
-  inline QColor longColor(int alpha = 255) { return QColor(255, 149, 0, alpha); }
-  inline QColor unitColor(int alpha = 255) { return QColor(255, 228, 191, alpha); }
   inline QColor redColor(int alpha = 255) { return QColor(255, 0, 0, alpha); }
   inline QColor blackColor(int alpha = 255) { return QColor(0, 0, 0, alpha); }
   inline QColor limeColor(int alpha = 255) { return QColor(120, 255, 120, alpha); }
-  inline QColor orangeColor(int alpha = 255) { return QColor(255, 188, 0, alpha); }
+  inline QColor orangeColor(int alpha = 255) { return QColor(255, 149, 0, alpha); }
+  inline QColor lightorangeColor(int alpha = 255) { return QColor(255, 228, 191, alpha); }
   inline QColor engagedColor(int alpha = 255) { return QColor(23, 134, 68, alpha); }
   inline QColor warningColor(int alpha = 255) { return QColor(218, 111, 37, alpha); }
   inline QColor overrideColor(int alpha = 255) { return QColor(145, 155, 149, alpha); }
-  inline QColor overridehalfColor(int alpha = 255) { return QColor(72, 77, 74, alpha); }
   inline QColor steeringpressedColor(int alpha = 255) { return QColor(0, 191, 255, alpha); }
-  inline QColor steeringpressedhalfColor(int alpha = 255) { return QColor(0, 191, 255, alpha); }
   inline QColor greenColor(int alpha = 255) { return QColor(128, 216, 166, alpha); }
   inline QColor pinkColor(int alpha = 255) { return QColor(255, 191, 191, alpha); }
+
   double prev_draw_t = 0;
   FirstOrderFilter fps_filter;
 };

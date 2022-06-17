@@ -217,7 +217,7 @@ void NvgWindow::updateState(const UIState &s) {
   const auto rs = sm["radarState"].getRadarState();
   const auto lp = sm["liveParameters"].getLiveParameters();
   const auto ge = sm["gpsLocationExternal"].getGpsLocationExternal();
-  auto ls = sm["roadLimitSpeed"].getRoadLimitSpeed();
+  const auto ls = sm["roadLimitSpeed"].getRoadLimitSpeed();
 
   float cur_speed = std::max(0.0, ce.getVEgo() * (s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH));
   float apply_speed = cc.getSccSmoother().getApplyMaxSpeed();
@@ -266,6 +266,7 @@ void NvgWindow::updateState(const UIState &s) {
   setProperty("fr", ce.getTpms().getFr());
   setProperty("rl", ce.getTpms().getRl());
   setProperty("rr", ce.getTpms().getRr());
+  setProperty("roadLimitSpeed", ls.getRoadLimitSpeed());
   setProperty("camLimitSpeed", ls.getCamLimitSpeed());
   setProperty("camLimitSpeedLeftDist", ls.getCamLimitSpeedLeftDist());
   setProperty("sectionLimitSpeed", ls.getSectionLimitSpeed());
@@ -295,7 +296,8 @@ void NvgWindow::drawHud(QPainter &p) {
     left_dist = sectionLeftDist;
   }
 
-  QString limitSpeedStr, leftDistStr;
+  QString roadLimitSpeedStr, limitSpeedStr, leftDistStr;
+  roadLimitSpeedStr.sprintf("%.0f", roadLimitSpeed);
   limitSpeedStr.sprintf("%.0f", limit_speed);
 
   if (left_dist >= 1000) {
@@ -330,7 +332,7 @@ void NvgWindow::drawHud(QPainter &p) {
       cruiseMaxSpeed,
       {limit_speed + 5, limit_speed + 15, limit_speed + 25},
       //{QColor(0xff, 0xff, 0xff, 0xff), QColor(0xff, 0x95, 0x00, 0xff), QColor(0xff, 0x00, 0x00, 0xff)}
-      {whiteColor(), longColor(), redColor()}
+      {whiteColor(), orangeColor(), redColor()}
     ));
   } else {
     p.setPen(whiteColor());
@@ -344,13 +346,13 @@ void NvgWindow::drawHud(QPainter &p) {
   if (status == STATUS_DISENGAGED) {
     p.setPen(whiteColor());
   } else if (status == STATUS_OVERRIDE) {
-    p.setPen(overrideColor(200));
+    p.setPen(overrideColor());
   } else if (limit_speed > 0) {
     p.setPen(interpColor(
       cruiseMaxSpeed,
       {limit_speed + 5, limit_speed + 15, limit_speed + 25},
       //{QColor(0x80, 0xd8, 0xa6, 0xff), QColor(0xff, 0xe4, 0xbf, 0xff), QColor(0xff, 0xbf, 0xbf, 0xff)}
-      {greenColor(), unitColor(), pinkColor()}
+      {greenColor(), lightorangeColor(), pinkColor()}
     ));
   } else {
     p.setPen(greenColor());
@@ -372,7 +374,7 @@ void NvgWindow::drawHud(QPainter &p) {
         applyMaxSpeed,
         {limit_speed + 5, limit_speed + 15, limit_speed + 25},
         //{QColor(0xff, 0xff, 0xff, 0xff), QColor(0xff, 0x95, 0x00, 0xff), QColor(0xff, 0x00, 0x00, 0xff)}
-        {whiteColor(), longColor(), redColor()}
+        {whiteColor(), orangeColor(), redColor()}
       ));
     } else {
       p.setPen(whiteColor());
@@ -386,13 +388,13 @@ void NvgWindow::drawHud(QPainter &p) {
     if (status == STATUS_DISENGAGED) {
       p.setPen(whiteColor());
     } else if (status == STATUS_OVERRIDE) {
-      p.setPen(overrideColor(200));
+      p.setPen(overrideColor());
     } else if (limit_speed > 0) {
       p.setPen(interpColor(
         applyMaxSpeed,
         {limit_speed + 5, limit_speed + 15, limit_speed + 25},
         //{QColor(0x80, 0xd8, 0xa6, 0xff), QColor(0xff, 0xe4, 0xbf, 0xff), QColor(0xff, 0xbf, 0xbf, 0xff)}
-        {greenColor(), unitColor(), pinkColor()}
+        {greenColor(), lightorangeColor(), pinkColor()}
       ));
     } else {
       p.setPen(greenColor());
@@ -405,7 +407,7 @@ void NvgWindow::drawHud(QPainter &p) {
   }
 
   // speedlimit sign
-  if (limit_speed > 10 && limit_speed < 130) {
+  if (limit_speed > 0 && left_dist > 0) {
     QPoint center(max_speed_rect.center().x(), speed_rect.top() + 280);
     p.setPen(Qt::NoPen);
     p.setBrush(whiteColor());
@@ -427,11 +429,26 @@ void NvgWindow::drawHud(QPainter &p) {
     left_rect.moveBottom(max_speed_rect.bottom() + 265);
     p.setPen(whiteColor());
     p.drawText(left_rect, Qt::AlignCenter, leftDistStr);
+  } else if (roadLimitSpeed > 0 && roadLimitSpeed < 120) {
+    QPoint center(max_speed_rect.center().x(), speed_rect.top() + 280);
+    p.setPen(Qt::NoPen);
+    p.setBrush(whiteColor());
+    p.drawEllipse(center, 92, 92);
+    p.setBrush(redColor());
+    p.drawEllipse(center, 86, 86);
+    p.setBrush(whiteColor());
+    p.drawEllipse(center, 66, 66);
+
+    configFont(p, "Open Sans", 60, "Bold");
+    QRect roadlimit_rect = getTextRect(p, Qt::AlignCenter, roadLimitSpeedStr);
+    roadlimit_rect.moveCenter(center);
+    p.setPen(blackColor());
+    p.drawText(roadlimit_rect, Qt::AlignCenter, roadLimitSpeedStr);
   }
 
   // current speed (upper center)
   QString speedStr = QString::number(std::nearbyint(speed));
-  QColor variableColor = QColor(255, 255, 255, 230);
+  QColor variableColor = QColor(255, 255, 255, 255);
 
   if (accel > 0) {
     int a = (int)(255.f - (180.f * (accel/3.f)));
@@ -448,7 +465,7 @@ void NvgWindow::drawHud(QPainter &p) {
   configFont(p, "Open Sans", 176, "Bold");
   drawTextColor(p, rect().center().x(), 230, speedStr, variableColor);
   configFont(p, "Open Sans", 66, "Regular");
-  drawTextColor(p, rect().center().x(), 310, speedUnit, unitColor());
+  drawTextColor(p, rect().center().x(), 310, speedUnit, lightorangeColor());
 
   // engage-ability icon ( wheel ) (upper right 1)
   QColor wheelbgColor = blackColor(100);
@@ -800,7 +817,6 @@ void NvgWindow::drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush b
 void NvgWindow::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
   QRect real_rect = getTextRect(p, 0, text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
-
   p.setPen(QColor(0xff, 0xff, 0xff, alpha));
   p.drawText(real_rect.x(), real_rect.bottom(), text);
 }
@@ -866,10 +882,10 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
     if (scene.steeringPressed) {
       // The user is applying torque to the steering wheel
       bg.setColorAt(0, steeringpressedColor(200));
-      bg.setColorAt(1, steeringpressedhalfColor(50));
+      bg.setColorAt(1, steeringpressedColor(0));
     } else if (scene.override) {
       bg.setColorAt(0, overrideColor(200));
-      bg.setColorAt(1, overridehalfColor(50));
+      bg.setColorAt(1, overrideColor(0));
     } else {
       // Draw colored track
       int torqueScale = (int)std::fabs(510 * (float)scene.output_scale);
@@ -892,10 +908,10 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
     if (scene.steeringPressed) {
       // The user is applying torque to the steering wheel
       bg.setColorAt(0, steeringpressedColor(200));
-      bg.setColorAt(1, steeringpressedhalfColor(50));
+      bg.setColorAt(1, steeringpressedColor(0));
     } else if (scene.override) {
       bg.setColorAt(0, overrideColor(200));
-      bg.setColorAt(1, overridehalfColor(50));
+      bg.setColorAt(1, overrideColor(0));
     } else {
       bg.setColorAt(0.0, QColor::fromHslF(148 / 360., 0.94, 0.51, 0.4));
       bg.setColorAt(0.75 / 1.5, QColor::fromHslF(curve_hue / 360., 1.0, 0.68, 0.35));
@@ -935,7 +951,7 @@ void NvgWindow::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV
   float g_yo = sz / 10;
 
   QPointF glow[] = {{x + (sz * 1.35) + g_xo, y + sz + g_yo}, {x, y - g_yo}, {x - (sz * 1.35) - g_xo, y + sz + g_yo}};
-  painter.setBrush(is_radar ? longColor() : pinkColor());
+  painter.setBrush(is_radar ? orangeColor() : pinkColor());
   painter.drawPolygon(glow, std::size(glow));
 
   // chevron
