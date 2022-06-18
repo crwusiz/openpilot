@@ -282,7 +282,7 @@ class CarInterface(CarInterfaceBase):
 
     # Torque -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "3":
-      set_torque_tune(ret.lateralTuning, ret.maxLateralAccel, 0.01, 0.5)
+      set_torque_tune(ret.lateralTuning, ret.maxLateralAccel, 0.01, 0.0)
 
     ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05
