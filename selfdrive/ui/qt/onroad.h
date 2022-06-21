@@ -36,8 +36,8 @@ class NvgWindow : public CameraViewWidget {
   Q_PROPERTY(bool steeringPressed MEMBER steeringPressed);
   Q_PROPERTY(bool dmActive MEMBER dmActive);
   Q_PROPERTY(bool brake_status MEMBER brake_status);
-  Q_PROPERTY(bool bsd_l_status MEMBER bsd_l_status);
-  Q_PROPERTY(bool bsd_r_status MEMBER bsd_r_status);
+  Q_PROPERTY(bool left_blindspot MEMBER left_blindspot);
+  Q_PROPERTY(bool right_blindspot MEMBER right_blindspot);
   Q_PROPERTY(bool gps_status MEMBER gps_status);
   Q_PROPERTY(bool longControl MEMBER longControl);
   Q_PROPERTY(bool left_on MEMBER left_on);
@@ -125,8 +125,8 @@ private:
   bool steeringPressed = false;
   bool dmActive = false;
   bool brake_status = false;
-  bool bsd_l_status = false;
-  bool bsd_r_status = false;
+  bool left_blindspot = false;
+  bool right_blindspot = false;
   bool gps_status = false;
   bool longControl = false;
   bool left_on = false;

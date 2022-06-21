@@ -241,8 +241,8 @@ void NvgWindow::updateState(const UIState &s) {
   setProperty("brake_status", ce.getBrakeLights());
   setProperty("autohold_status", ce.getAutoHold());
   setProperty("nda_status", ls.getActive());
-  setProperty("bsd_l_status", ce.getLeftBlindspot());
-  setProperty("bsd_r_status", ce.getRightBlindspot());
+  setProperty("left_blindspot", ce.getLeftBlindspot());
+  setProperty("right_blindspot", ce.getRightBlindspot());
   setProperty("wifi_status", (int)ds.getNetworkStrength() > 0);
   setProperty("gps_status", sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK());
   setProperty("gpsBearing", ge.getBearingDeg());
@@ -556,13 +556,13 @@ void NvgWindow::drawHud(QPainter &p) {
   // bsd_l icon (bottom left 3)
   x = radius / 2 + (bdr_s * 2);
   y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
-  drawIcon(p, x, y, bsd_l_img, blackColor(100), bsd_l_status ? 1.0 : 0.2);
+  drawIcon(p, x, y, bsd_l_img, blackColor(100), left_blindspot ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // bsd_r icon (bottom right 3)
   x = radius / 2 + (bdr_s * 2) + (radius);
   y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
-  drawIcon(p, x, y, bsd_r_img, blackColor(100), bsd_r_status ? 1.0 : 0.2);
+  drawIcon(p, x, y, bsd_r_img, blackColor(100), right_blindspot ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // bottom info
@@ -867,6 +867,11 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
     painter.setBrush(QColor::fromRgbF(1.0, 1.0, 1.0, std::clamp<float>(scene.lane_line_probs[i], 0.0, 0.7)));
     painter.drawPolygon(scene.lane_line_vertices[i].v, scene.lane_line_vertices[i].cnt);
   }
+
+  // TODO: Fix empty spaces when curiving back on itself
+  painter.setBrush(QColor::fromRgbF(1.0, 0.0, 0.0, 0.2));
+  if (left_blindspot) painter.drawPolygon(scene.lane_barrier_vertices[0].v, scene.lane_barrier_vertices[0].cnt);
+  if (right_blindspot) painter.drawPolygon(scene.lane_barrier_vertices[1].v, scene.lane_barrier_vertices[1].cnt);
 
   // road edges
   for (int i = 0; i < std::size(scene.road_edge_vertices); ++i) {
