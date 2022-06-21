@@ -41,6 +41,7 @@ class CarInterface(CarInterfaceBase):
 
     # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
     # hyundai
+    torque_params = CarInterfaceBase.get_torque_params(candidate)
     if candidate in [CAR.ELANTRA_I30, CAR.ELANTRA21, CAR.ELANTRA21_HEV]:
       ret.mass = 1340. + STD_CARGO_KG
       ret.wheelbase = 2.720
@@ -49,12 +50,10 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1615. + STD_CARGO_KG
       ret.wheelbase = 2.840
       ret.steerRatio = 15.2
-      ret.maxLateralAccel = 2.5
     elif candidate in [CAR.SONATA_LF, CAR.SONATA_LF_HEV]:
       ret.mass = 1640. + STD_CARGO_KG
       ret.wheelbase = 2.805
       ret.steerRatio = 15.2
-      ret.maxLateralAccel = 1.8
     elif candidate in [CAR.KONA, CAR.KONA_EV, CAR.KONA_HEV]:
       ret.mass = 1743. + STD_CARGO_KG
       ret.wheelbase = 2.600
@@ -63,17 +62,14 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1575. + STD_CARGO_KG
       ret.wheelbase = 2.700
       ret.steerRatio = 13.7
-      ret.maxLateralAccel = 3.0
     elif candidate in [CAR.SANTA_FE, CAR.SANTA_FE_HEV]:
       ret.mass = 1910. + STD_CARGO_KG
       ret.wheelbase = 2.765
       ret.steerRatio = 15.8
-      ret.maxLateralAccel = 3.2
     elif candidate == CAR.PALISADE:
       ret.mass = 2060. + STD_CARGO_KG
       ret.wheelbase = 2.900
       ret.steerRatio = 15.8
-      ret.maxLateralAccel = 2.5
     elif candidate == CAR.VELOSTER:
       ret.mass = 1350. + STD_CARGO_KG
       ret.wheelbase = 2.650
@@ -82,7 +78,6 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1719. + STD_CARGO_KG
       ret.wheelbase = 2.885
       ret.steerRatio = 12.5
-      ret.maxLateralAccel = 2.5
     elif candidate == CAR.NEXO:
       ret.mass = 1873. + STD_CARGO_KG
       ret.wheelbase = 2.790
@@ -97,7 +92,6 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1565. + STD_CARGO_KG
       ret.wheelbase = 2.805
       ret.steerRatio = 15.2
-      ret.maxLateralAccel = 2.1
     elif candidate in [CAR.K7, CAR.K7_HEV]:
       ret.mass = 1730. + STD_CARGO_KG
       ret.wheelbase = 2.855
@@ -126,7 +120,6 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1748. + STD_CARGO_KG
       ret.wheelbase = 2.700
       ret.steerRatio = 13.7
-      ret.maxLateralAccel = 2.9
     elif candidate == CAR.SOUL_EV:
       ret.mass = 1375. + STD_CARGO_KG
       ret.wheelbase = 2.600
@@ -139,7 +132,6 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 2055 + STD_CARGO_KG
       ret.wheelbase = 2.9
       ret.steerRatio = 16.
-      ret.maxLateralAccel = 2.
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.noOutput),
                            get_safety_config(car.CarParams.SafetyModel.hyundaiHDA2)]
 
@@ -282,7 +274,8 @@ class CarInterface(CarInterfaceBase):
 
     # Torque -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "3":
-      set_torque_tune(ret.lateralTuning, ret.maxLateralAccel, 0.01, 0.0)
+      #set_torque_tune(ret.lateralTuning, torque_params['LAT_ACCEL_FACTOR'], torque_params['FRICTION'])
+      set_torque_tune(ret.lateralTuning, 2.0, 0.01, 0.0)
 
     ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05

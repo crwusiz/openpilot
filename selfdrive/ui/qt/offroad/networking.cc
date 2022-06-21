@@ -119,7 +119,7 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   main_layout->setSpacing(20);
 
   // Back button
-  QPushButton* back = new QPushButton("Wifi 설정");
+  QPushButton* back = new QPushButton("wifi 설정");
   back->setObjectName("back_btn");
   back->setFixedSize(400, 100);
   connect(back, &QPushButton::clicked, [=]() { emit backPress(); });
@@ -137,55 +137,55 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   list->addItem(new LongControlSelect());
   list->addItem(horizontal_line());
 
-  //auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "RUN");
-  auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "실행");
-  QObject::connect(gitpullbtn, &ButtonControl::clicked, [=]() {
+  //auto gitpull_btn = new ButtonControl("Git Fetch and Reset", "RUN");
+  auto gitpull_btn = new ButtonControl("Git Fetch and Reset", "실행");
+  QObject::connect(gitpull_btn, &ButtonControl::clicked, [=]() {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
       QProcess::execute("/data/openpilot/scripts/gitpull.sh");
     }
   });
-  list->addItem(gitpullbtn);
+  list->addItem(gitpull_btn);
 
-  //auto pandaflashbtn = new ButtonControl("Panda Flash", "RUN");
-  auto pandaflashbtn = new ButtonControl("판다 플래싱", "실행");
-  QObject::connect(pandaflashbtn, &ButtonControl::clicked, [=]() {
+  //auto pandaflash_btn = new ButtonControl("Panda Flash", "RUN");
+  auto pandaflash_btn = new ButtonControl("판다 플래싱", "실행");
+  QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
       QProcess::execute("/data/openpilot/panda/board/flash.sh");
     }
   });
-  list->addItem(pandaflashbtn);
+  list->addItem(pandaflash_btn);
 
-  //auto pandaflashh7btn = new ButtonControl("RED Panda Flash", "RUN");
-  auto pandaflashh7btn = new ButtonControl("RED 판다 플래싱", "실행");
-  QObject::connect(pandaflashh7btn, &ButtonControl::clicked, [=]() {
+  //auto pandaflashh7_btn = new ButtonControl("RED Panda Flash", "RUN");
+  auto pandaflashh7_btn = new ButtonControl("RED 판다 플래싱", "실행");
+  QObject::connect(pandaflashh7_btn, &ButtonControl::clicked, [=]() {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
       QProcess::execute("/data/openpilot/panda/board/flash_h7.sh");
     }
   });
-  list->addItem(pandaflashh7btn);
+  list->addItem(pandaflashh7_btn);
 
-  //auto pandarecoverbtn = new ButtonControl("Panda Recover", "RUN");
-  auto pandarecoverbtn = new ButtonControl("판다 복구", "실행");
-  QObject::connect(pandarecoverbtn, &ButtonControl::clicked, [=]() {
+  //auto pandarecover_btn = new ButtonControl("Panda Recover", "RUN");
+  auto pandarecover_btn = new ButtonControl("판다 복구", "실행");
+  QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
       QProcess::execute("/data/openpilot/panda/board/recover.sh");
     }
   });
-  list->addItem(pandarecoverbtn);
+  list->addItem(pandarecover_btn);
 
-  //auto pandarecoverh7btn = new ButtonControl("RED Panda Recover", "RUN");
-  auto pandarecoverh7btn = new ButtonControl("RED 판다 복구", "실행");
-  QObject::connect(pandarecoverh7btn, &ButtonControl::clicked, [=]() {
+  //auto pandarecoverh7_btn = new ButtonControl("RED Panda Recover", "RUN");
+  auto pandarecoverh7_btn = new ButtonControl("RED 판다 복구", "실행");
+  QObject::connect(pandarecoverh7_btn, &ButtonControl::clicked, [=]() {
     //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
       QProcess::execute("/data/openpilot/panda/board/recover_h7.sh");
     }
   });
-  list->addItem(pandarecoverh7btn);
+  list->addItem(pandarecoverh7_btn);
 
   list->addItem(horizontal_line());
 
@@ -268,7 +268,7 @@ WifiUI::WifiUI(QWidget *parent, WifiManager* wifi) : QWidget(parent), wifi(wifi)
   circled_slash = QPixmap(ASSET_PATH + "img_circled_slash.svg").scaledToWidth(49, Qt::SmoothTransformation);
 
   //QLabel *scanning = new QLabel("Scanning for networks...");
-  QLabel *scanning = new QLabel("Wifi SSID를 검색중입니다...");
+  QLabel *scanning = new QLabel("wifi ssid를 검색중입니다...");
   scanning->setStyleSheet("font-size: 65px;");
   main_layout->addWidget(scanning, 0, Qt::AlignCenter);
 
@@ -278,7 +278,7 @@ WifiUI::WifiUI(QWidget *parent, WifiManager* wifi) : QWidget(parent), wifi(wifi)
       border-radius: 4px;
       background-color: #8A8A8A;
     }
-    #forgetBtn {
+    #forget_btn {
       font-size: 32px;
       font-weight: 600;
       color: #292929;
@@ -322,7 +322,7 @@ void WifiUI::refresh() {
 
   if (wifi->seenNetworks.size() == 0) {
     //QLabel *scanning = new QLabel("Scanning for networks...");
-    QLabel *scanning = new QLabel("Wifi SSID를 검색중입니다...");
+    QLabel *scanning = new QLabel("wifi ssid를 검색중입니다...");
     scanning->setStyleSheet("font-size: 65px;");
     main_layout->addWidget(scanning, 0, Qt::AlignCenter);
     return;
@@ -348,21 +348,23 @@ void WifiUI::refresh() {
     hlayout->addWidget(ssidLabel, network.connected == ConnectedType::CONNECTING ? 0 : 1);
 
     if (network.connected == ConnectedType::CONNECTING) {
-      QPushButton *connecting = new QPushButton("CONNECTING...");
+      //QPushButton *connecting = new QPushButton("CONNECTING...");
+      QPushButton *connecting = new QPushButton("연결중...");
       connecting->setObjectName("connecting");
       hlayout->addWidget(connecting, 2, Qt::AlignLeft);
     }
 
     // Forget button
     if (wifi->isKnownConnection(network.ssid) && !wifi->isTetheringEnabled()) {
-      QPushButton *forgetBtn = new QPushButton("FORGET");
-      forgetBtn->setObjectName("forgetBtn");
-      QObject::connect(forgetBtn, &QPushButton::clicked, [=]() {
-        if (ConfirmationDialog::confirm("Forget Wi-Fi Network \"" + QString::fromUtf8(network.ssid) + "\"?", this)) {
+      //QPushButton *forget_btn = new QPushButton("FORGET");
+      QPushButton *forget_btn = new QPushButton("저장안함");
+      forget_btn->setObjectName("forget_btn");
+      QObject::connect(forget_btn, &QPushButton::clicked, [=]() {
+        if (ConfirmationDialog::confirm("Forget wifi Network \"" + QString::fromUtf8(network.ssid) + "\"?", this)) {
           wifi->forgetConnection(network.ssid);
         }
       });
-      hlayout->addWidget(forgetBtn, 0, Qt::AlignRight);
+      hlayout->addWidget(forget_btn, 0, Qt::AlignRight);
     }
 
     // Status icon

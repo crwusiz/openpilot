@@ -7,10 +7,7 @@ class CarControllerParams:
   ACCEL_MAX = 2.0
 
   def __init__(self, CP):
-    if CP.carFingerprint in HDA2_CAR:
-      self.STEER_MAX = 150
-    else:
-      self.STEER_MAX = 409   # 409 is the max, 255 is stock
+    self.STEER_MAX = 409   # 409 is the max, 255 is stock
     self.STEER_DELTA_UP = 3
     self.STEER_DELTA_DOWN = 7
     self.STEER_DRIVER_ALLOWANCE = 50
@@ -1101,7 +1098,7 @@ FW_VERSIONS = {
       b'\xf1\x8795441-4E906\x00\xf1\x81E06\x00\x00\x00\x00\x00\x00\x00\xf1\x00PSBG2333  E06\x00\x00\x00'
       b'\x00\x00\x00\x00THM0D30KS3\x9a!\x0c\xeb',
     ],
-  },  
+  },
 
   # Genesis
   CAR.GENESIS_G70: {

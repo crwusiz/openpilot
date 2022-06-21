@@ -294,6 +294,8 @@ void NvgWindow::drawHud(QPainter &p) {
   } else if (sectionLimitSpeed > 0 && sectionLeftDist > 0) {
     limit_speed = sectionLimitSpeed;
     left_dist = sectionLeftDist;
+  } else {
+    limit_speed = roadLimitSpeed;
   }
 
   QString roadLimitSpeedStr, limitSpeedStr, leftDistStr;
@@ -309,12 +311,8 @@ void NvgWindow::drawHud(QPainter &p) {
   QString cruiseSpeedStr = QString::number(std::nearbyint(cruiseMaxSpeed));
   QString applySpeedStr = QString::number(std::nearbyint(applyMaxSpeed));
 
-  int rect_width = 163;
+  int rect_width = !longControl ? 163 : 300;
   int rect_height = 188;
-
-  if (longControl) {
-    rect_width = 300;
-  }
 
   QRect max_speed_rect(30, 30, rect_width, rect_height);
   p.setPen(Qt::NoPen);
@@ -323,15 +321,14 @@ void NvgWindow::drawHud(QPainter &p) {
   //drawRoundedRect(p, max_speed_rect, top_radius, top_radius, bottom_radius, bottom_radius);
 
   // max speed (upper left 1)
-  QRect max_speed_inner(max_speed_rect.left() + 10, max_speed_rect.top() + 10, 140, 168);
+  QRect max_speed_outer(max_speed_rect.left() + 10, max_speed_rect.top() + 10, 140, 168);
   p.setPen(QPen(whiteColor(200), 2));
-  p.drawRoundedRect(max_speed_inner, 16, 16);
+  p.drawRoundedRect(max_speed_outer, 16, 16);
 
   if (limit_speed > 0 && status != STATUS_DISENGAGED && status != STATUS_OVERRIDE) {
     p.setPen(interpColor(
       cruiseMaxSpeed,
       {limit_speed + 5, limit_speed + 15, limit_speed + 25},
-      //{QColor(0xff, 0xff, 0xff, 0xff), QColor(0xff, 0x95, 0x00, 0xff), QColor(0xff, 0x00, 0x00, 0xff)}
       {whiteColor(), orangeColor(), redColor()}
     ));
   } else {
@@ -339,7 +336,7 @@ void NvgWindow::drawHud(QPainter &p) {
   }
   configFont(p, "Open Sans", 65, "Regular");
   QRect speed_rect = getTextRect(p, Qt::AlignCenter, cruiseSpeedStr);
-  speed_rect.moveCenter({max_speed_inner.center().x(), 0});
+  speed_rect.moveCenter({max_speed_outer.center().x(), 0});
   speed_rect.moveTop(max_speed_rect.top() + 25);
   p.drawText(speed_rect, Qt::AlignCenter, is_cruise_set ? cruiseSpeedStr : "─");
 
@@ -351,7 +348,6 @@ void NvgWindow::drawHud(QPainter &p) {
     p.setPen(interpColor(
       cruiseMaxSpeed,
       {limit_speed + 5, limit_speed + 15, limit_speed + 25},
-      //{QColor(0x80, 0xd8, 0xa6, 0xff), QColor(0xff, 0xe4, 0xbf, 0xff), QColor(0xff, 0xbf, 0xbf, 0xff)}
       {greenColor(), lightorangeColor(), pinkColor()}
     ));
   } else {
@@ -359,21 +355,20 @@ void NvgWindow::drawHud(QPainter &p) {
   }
   configFont(p, "Open Sans", 35, "Bold");
   QRect max_rect = getTextRect(p, Qt::AlignCenter, "MAX");
-  max_rect.moveCenter({max_speed_inner.center().x(), 0});
+  max_rect.moveCenter({max_speed_outer.center().x(), 0});
   max_rect.moveTop(max_speed_rect.top() + 115);
   p.drawText(max_rect, Qt::AlignCenter, "MAX");
 
   // apply speed (upper left 2)
   if (longControl) {
-    QRect apply_speed_inner(max_speed_rect.right() - 150, max_speed_rect.top() + 10, 140, 168);
+    QRect apply_speed_outer(max_speed_rect.right() - 150, max_speed_rect.top() + 10, 140, 168);
     p.setPen(QPen(whiteColor(200), 2));
-    p.drawRoundedRect(apply_speed_inner, 16, 16);
+    p.drawRoundedRect(apply_speed_outer, 16, 16);
 
     if (limit_speed > 0 && status != STATUS_DISENGAGED && status != STATUS_OVERRIDE) {
       p.setPen(interpColor(
         applyMaxSpeed,
         {limit_speed + 5, limit_speed + 15, limit_speed + 25},
-        //{QColor(0xff, 0xff, 0xff, 0xff), QColor(0xff, 0x95, 0x00, 0xff), QColor(0xff, 0x00, 0x00, 0xff)}
         {whiteColor(), orangeColor(), redColor()}
       ));
     } else {
@@ -381,7 +376,7 @@ void NvgWindow::drawHud(QPainter &p) {
     }
     configFont(p, "Open Sans", 65, "Regular");
     QRect apply_rect = getTextRect(p, Qt::AlignCenter, applySpeedStr);
-    apply_rect.moveCenter({apply_speed_inner.center().x(), 0});
+    apply_rect.moveCenter({apply_speed_outer.center().x(), 0});
     apply_rect.moveTop(max_speed_rect.top() + 25);
     p.drawText(apply_rect, Qt::AlignCenter, is_cruise_set ? applySpeedStr : "─");
 
@@ -393,7 +388,6 @@ void NvgWindow::drawHud(QPainter &p) {
       p.setPen(interpColor(
         applyMaxSpeed,
         {limit_speed + 5, limit_speed + 15, limit_speed + 25},
-        //{QColor(0x80, 0xd8, 0xa6, 0xff), QColor(0xff, 0xe4, 0xbf, 0xff), QColor(0xff, 0xbf, 0xbf, 0xff)}
         {greenColor(), lightorangeColor(), pinkColor()}
       ));
     } else {
@@ -401,7 +395,7 @@ void NvgWindow::drawHud(QPainter &p) {
     }
     configFont(p, "Open Sans", 35, "Bold");
     QRect long_rect = getTextRect(p, Qt::AlignCenter, "LONG");
-    long_rect.moveCenter({apply_speed_inner.center().x(), 0});
+    long_rect.moveCenter({apply_speed_outer.center().x(), 0});
     long_rect.moveTop(max_speed_rect.top() + 115);
     p.drawText(long_rect, Qt::AlignCenter, "LONG");
   }
@@ -894,10 +888,10 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
     } else {
       // Draw colored track
       int torqueScale = (int)std::fabs(510 * (float)scene.output_scale);
-      int red_lvl = std::fmin(255, torqueScale);
-      int green_lvl = std::fmin(255, 510 - torqueScale);
-      bg.setColorAt(0, QColor(red_lvl, green_lvl, 0, 200));
-      bg.setColorAt(1, QColor((int)(0.5 * red_lvl), (int)(0.5 * green_lvl), 0, 50));
+      int r_lvl = std::fmin(255, torqueScale);
+      int g_lvl = std::fmin(255, 510 - torqueScale);
+      bg.setColorAt(0, QColor(r_lvl, g_lvl, 0, 200));
+      bg.setColorAt(1, QColor((int)(0.5 * r_lvl), (int)(0.5 * g_lvl), 0, 0));
     }
   } else if (scene.engaged && scene.end_to_end) {
     const auto &orientation = (*s->sm)["modelV2"].getModelV2().getOrientation();
@@ -919,7 +913,7 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
       bg.setColorAt(1, overrideColor(0));
     } else {
       bg.setColorAt(0.0, QColor::fromHslF(148 / 360., 0.94, 0.51, 0.4));
-      bg.setColorAt(0.75 / 1.5, QColor::fromHslF(curve_hue / 360., 1.0, 0.68, 0.35));
+      bg.setColorAt(0.5, QColor::fromHslF(curve_hue / 360., 1.0, 0.68, 0.2));
       bg.setColorAt(1.0, QColor::fromHslF(curve_hue / 360., 1.0, 0.68, 0.0));
     }
   } else {

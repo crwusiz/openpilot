@@ -84,14 +84,18 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
 */
     {
       "EndToEndToggle",
-      "\U0001f96c Disable use of lanelines (Alpha) \U0001f96c",
-      "In this mode openpilot will ignore lanelines and just drive how it thinks a human would.",
+      //"\U0001f96c Disable use of lanelines (Alpha) \U0001f96c",
+      //"In this mode openpilot will ignore lanelines and just drive how it thinks a human would.",
+      "차선인식 사용안함",
+      "이 모드는 차선인식없이 운전자가 조작하는것처럼 주행합니다.",
       "../assets/offroad/icon_road.png",
     },
     {
       "DisengageOnAccelerator",
-      "Disengage On Accelerator Pedal",
-      "When enabled, pressing the accelerator pedal will disengage openpilot.",
+      //"Disengage On Accelerator Pedal",
+      //"When enabled, pressing the accelerator pedal will disengage openpilot.",
+      "가속페달 조작시 해제",
+      "활성화된경우 가속페달을 누르면 오픈파일럿이 해제됩니다.",
       "../assets/offroad/icon_disengage_on_accelerator.svg",
     },
   };
