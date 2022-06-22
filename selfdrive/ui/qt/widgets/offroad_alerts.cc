@@ -22,13 +22,13 @@ AbstractAlert::AbstractAlert(bool hasRebootBtn, QWidget *parent) : QFrame(parent
   QHBoxLayout *footer_layout = new QHBoxLayout();
   main_layout->addLayout(footer_layout);
 
-  //QPushButton *dismiss_btn = new QPushButton("Close");
+  //QPushButton *dismiss_btn = new QPushButton(tr("Close"));
   QPushButton *dismiss_btn = new QPushButton("확인");
   dismiss_btn->setFixedSize(400, 125);
   footer_layout->addWidget(dismiss_btn, 0, Qt::AlignBottom | Qt::AlignLeft);
   QObject::connect(dismiss_btn, &QPushButton::clicked, this, &AbstractAlert::dismiss);
 
-  //snooze_btn = new QPushButton("Snooze Update");
+  //snooze_btn = new QPushButton(tr("Snooze Update"));
   snooze_btn = new QPushButton("업데이트 연기");
   snooze_btn->setVisible(false);
   snooze_btn->setFixedSize(550, 125);
@@ -40,7 +40,7 @@ AbstractAlert::AbstractAlert(bool hasRebootBtn, QWidget *parent) : QFrame(parent
   snooze_btn->setStyleSheet(R"(color: white; background-color: #4F4F4F;)");
 
   if (hasRebootBtn) {
-    //QPushButton *rebootBtn = new QPushButton("Reboot and Update");
+    //QPushButton *rebootBtn = new QPushButton(tr("Reboot and Update"));
     QPushButton *rebootBtn = new QPushButton("업데이트 및 재부팅");
     rebootBtn->setFixedSize(600, 125);
     footer_layout->addWidget(rebootBtn, 0, Qt::AlignBottom | Qt::AlignRight);

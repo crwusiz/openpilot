@@ -4,7 +4,6 @@
 #include <fstream>
 #include "cereal/messaging/messaging.h"
 
-
 // no-op base hw class
 class HardwareNone {
 public:

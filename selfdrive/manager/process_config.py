@@ -57,6 +57,7 @@ procs = [
 
   # Experimental
   PythonProcess("rawgpsd", "selfdrive.sensord.rawgps.rawgpsd", enabled=os.path.isfile("/persist/comma/use-quectel-rawgps")),
+  PythonProcess("laikad", "selfdrive.locationd.laikad", enabled=os.path.isfile("/persist/comma/use-laikad")),
 
   # Process add
   PythonProcess("road_speed_limiter", "selfdrive.road_speed_limiter", offroad=True),

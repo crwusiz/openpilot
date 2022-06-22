@@ -1,8 +1,9 @@
 from cereal import car
+from common.numpy_fast import interp
 from common.conversions import Conversions as CV
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
-from selfdrive.car.hyundai.values import DBC, CarControllerParams, FEATURES, HYBRID_CAR, EV_HYBRID_CAR, CAR, HDA2_CAR
+from selfdrive.car.hyundai.values import DBC, CarControllerParams, FEATURES, EV_CAR, HYBRID_CAR, EV_HYBRID_CAR, CAR, HDA2_CAR
 from selfdrive.car.interfaces import CarStateBase
 
 
@@ -116,14 +117,14 @@ class CarState(CarStateBase):
     ret.brakeLights = bool(cp.vl["TCS13"]["BrakeLight"] or ret.brakePressed)
 
     ret.gasPressed = cp.vl["TCS13"]["DriverOverride"] == 1
-    
+
     if self.CP.carFingerprint in EV_HYBRID_CAR:
       if self.CP.carFingerprint in HYBRID_CAR:
         ret.gas = cp.vl["E_EMS11"]["CR_Vcu_AccPedDep_Pos"] / 254.
       else:
         ret.gas = cp.vl["E_EMS11"]["Accel_Pedal_Pos"] / 254.
       ret.gasPressed = ret.gas > 0
-    
+
     if self.CP.hasEms:
       ret.gas = cp.vl["EMS12"]["PV_AV_CAN"] / 100.
       ret.gasPressed = bool(cp.vl["EMS16"]["CF_Ems_AclAct"])

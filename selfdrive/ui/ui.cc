@@ -19,7 +19,7 @@
 // Projects a point in car to space to the corresponding point in full frame
 // image space.
 static bool calib_frame_to_full_frame(const UIState *s, float in_x, float in_y, float in_z, QPointF *out) {
-  const float margin = 1000.0f;
+  const float margin = 500.0f;
   const QRectF clip_region{-margin, -margin, s->fb_w + 2 * margin, s->fb_h + 2 * margin};
 
   const vec3 pt = (vec3){{in_x, in_y, in_z}};
@@ -58,10 +58,13 @@ static void update_leads(UIState *s, const cereal::RadarState::Reader &radar_sta
 }
 
 static void update_line_data(const UIState *s, const cereal::ModelDataV2::XYZTData::Reader &line,
-                             float y_off, float z_off_left, float z_off_right, line_vertices_data *pvd, int max_idx, bool allow_invert=true) {
+                             float y_off, float z_off_left, float z_off_right, QPolygonF *pvd, int max_idx, bool allow_invert=true) {
   const auto line_x = line.getX(), line_y = line.getY(), line_z = line.getZ();
 
-  std::vector<QPointF> left_points, right_points;
+  QPolygonF left_points, right_points;
+  left_points.reserve(max_idx + 1);
+  right_points.reserve(max_idx + 1);
+
   for (int i = 0; i <= max_idx; i++) {
     QPointF left, right;
     bool l = calib_frame_to_full_frame(s, line_x[i], line_y[i] - y_off, line_z[i] + z_off_left, &left);
@@ -72,19 +75,10 @@ static void update_line_data(const UIState *s, const cereal::ModelDataV2::XYZTDa
         continue;
       }
       left_points.push_back(left);
-      right_points.push_back(right);
+      right_points.push_front(right);
     }
   }
-
-  pvd->cnt = 2 * left_points.size();
-  assert(left_points.size() == right_points.size());
-  assert(pvd->cnt <= std::size(pvd->v));
-
-  for (int left_idx = 0; left_idx < left_points.size(); left_idx++){
-    int right_idx = 2 * left_points.size() - left_idx - 1;
-    pvd->v[left_idx] = left_points[left_idx];
-    pvd->v[right_idx] = right_points[left_idx];
-  }
+  *pvd = left_points + right_points;
 }
 
 static void update_model(UIState *s, const cereal::ModelDataV2::Reader &model) {

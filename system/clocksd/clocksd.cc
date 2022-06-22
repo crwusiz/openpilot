@@ -46,7 +46,7 @@ int main() {
     }
 #else
   // Just run at 1Hz on apple
-  while (!do_exit){
+  while (!do_exit) {
     util::sleep_for(1000);
 #endif
 

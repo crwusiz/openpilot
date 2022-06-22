@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
   label2->setText(device_ip);
   label2->setStyleSheet("color: #e0e879");
   main_layout->addWidget(label2, 0, 0, Qt::AlignRight | Qt::AlignTop);
-  btn->setText("Reboot");
+  btn->setText(QObject::tr("Reboot"));
   QObject::connect(btn, &QPushButton::clicked, [=]() {
     Hardware::reboot();
   });
@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
   });
   main_layout->addWidget(btn2, 0, 0, Qt::AlignLeft | Qt::AlignBottom);
 #else
-  btn->setText("Exit");
+  btn->setText(QObject::tr("Exit"));
   QObject::connect(btn, &QPushButton::clicked, &a, &QApplication::quit);
 #endif
   main_layout->addWidget(btn, 0, 0, Qt::AlignRight | Qt::AlignBottom);

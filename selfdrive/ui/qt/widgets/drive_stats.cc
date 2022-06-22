@@ -35,8 +35,8 @@ DriveStats::DriveStats(QWidget* parent) : QFrame(parent) {
     grid_layout->addWidget(labels.hours = newLabel("0", "number"), row + 1, 1, Qt::AlignCenter);
     grid_layout->addWidget(labels.distance = newLabel("0", "number"), row + 1, 2, Qt::AlignCenter);
 
-    grid_layout->addWidget(newLabel("Drives", "unit"), row + 2, 0, Qt::AlignCenter);
-    grid_layout->addWidget(newLabel("Hours ", "unit"), row + 2, 1, Qt::AlignCenter);
+    grid_layout->addWidget(newLabel(tr("Drives"), "unit"), row + 2, 0, Qt::AlignCenter);
+    grid_layout->addWidget(newLabel(tr("Hours"), "unit"), row + 2, 1, Qt::AlignCenter);
     grid_layout->addWidget(labels.distance_unit = newLabel(getDistanceUnit(), "unit"), row + 2, 2, Qt::AlignCenter);
     grid_layout->addWidget(new QLabel("────────────────────────────────"), 8, 0, 1, 3, Qt::AlignCenter);
 
@@ -45,9 +45,9 @@ DriveStats::DriveStats(QWidget* parent) : QFrame(parent) {
     main_layout->addLayout(grid_layout);
   };
 
-  add_stats_layouts("ALL TIME", all_);
+  add_stats_layouts(tr("ALL TIME"), all_);
   main_layout->addStretch();
-  //add_stats_layouts("PAST WEEK", week_);
+  //add_stats_layouts(tr("PAST WEEK"), week_);
 
   if (auto dongleId = getDongleId()) {
     QString url = CommaApi::BASE_URL + "/v1.1/devices/" + *dongleId + "/stats";
