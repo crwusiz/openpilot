@@ -6,13 +6,13 @@
 #include "system/hardware/hw.h"
 #include "selfdrive/ui/qt/util.h"
 
-void Sidebar::drawMetric(QPainter &p, const QString &label, QColor c, int y) {
-  const QRect rect = {30, y, 240, label.contains("\n") ? 124 : 100};
+void Sidebar::drawMetric(QPainter &p, const QPair<QString, QString> &label, QColor c, int y) {
+  const QRect rect = {30, y, 240, 126};
 
   p.setPen(Qt::NoPen);
   p.setBrush(QBrush(c));
-  p.setClipRect(rect.x() + 6, rect.y(), 18, rect.height(), Qt::ClipOperation::ReplaceClip);
-  p.drawRoundedRect(QRect(rect.x() + 6, rect.y() + 6, 100, rect.height() - 12), 10, 10);
+  p.setClipRect(rect.x() + 4, rect.y(), 18, rect.height(), Qt::ClipOperation::ReplaceClip);
+  p.drawRoundedRect(QRect(rect.x() + 4, rect.y() + 4, 100, 118), 18, 18);
   p.setClipping(false);
 
   QPen pen = QPen(QColor(0xff, 0xff, 0xff, 0x55));
@@ -22,9 +22,16 @@ void Sidebar::drawMetric(QPainter &p, const QString &label, QColor c, int y) {
   p.drawRoundedRect(rect, 20, 20);
 
   p.setPen(QColor(0xff, 0xff, 0xff));
-  configFont(p, "Open Sans", 35, "Bold");
-  const QRect r = QRect(rect.x() + 30, rect.y(), rect.width() - 40, rect.height());
-  p.drawText(r, Qt::AlignCenter, label);
+  configFont(p, "Inter", 35, "SemiBold");
+
+  QRect label_rect = getTextRect(p, Qt::AlignCenter, label.first);
+  label_rect.setWidth(218);
+  label_rect.moveLeft(rect.left() + 22);
+  label_rect.moveTop(rect.top() + 19);
+  p.drawText(label_rect, Qt::AlignCenter, label.first);
+
+  label_rect.moveTop(rect.top() + 65);
+  p.drawText(label_rect, Qt::AlignCenter, label.second);
 }
 
 Sidebar::Sidebar(QWidget *parent) : QFrame(parent) {
@@ -60,32 +67,27 @@ void Sidebar::updateState(const UIState &s) {
   ItemStatus connectStatus;
   auto last_ping = deviceState.getLastAthenaPingTime();
   if (last_ping == 0) {
-    connectStatus = ItemStatus{"CONNECT\nOFFLINE", warning_color};
+    connectStatus = ItemStatus{{"CONNECT", "OFFLINE"}, warning_color};
   } else {
-    connectStatus = nanos_since_boot() - last_ping < 80e9 ? ItemStatus{"CONNECT\nONLINE", good_color} : ItemStatus{"CONNECT\nERROR", danger_color};
+    connectStatus = nanos_since_boot() - last_ping < 80e9 ? ItemStatus{{"CONNECT", "ONLINE"}, good_color} : ItemStatus{{"CONNECT", "ERROR"}, danger_color};
   }
   setProperty("connectStatus", QVariant::fromValue(connectStatus));
 
-  //ItemStatus tempStatus = {"TEMP\nHIGH", danger_color};
-  ItemStatus tempStatus = {"장치온도\nHIGH", danger_color};
+  ItemStatus tempStatus = {{"TEMP", "HIGH"}, danger_color};
   auto ts = deviceState.getThermalStatus();
   if (ts == cereal::DeviceState::ThermalStatus::GREEN) {
-    //tempStatus = {"TEMP\nGOOD", good_color};
-    tempStatus = {"장치온도\nGOOD", good_color};
+    tempStatus = {{"TEMP", "GOOD"}, good_color};
   } else if (ts == cereal::DeviceState::ThermalStatus::YELLOW) {
-    //tempStatus = {"TEMP\nWARNING", warning_color};
-    tempStatus = {"장치온도\nWARNING", warning_color};
+    tempStatus = {{"TEMP", "OK"}, warning_color};
   }
   setProperty("tempStatus", QVariant::fromValue(tempStatus));
 
-  //ItemStatus pandaStatus = {"VEHICLE\nONLINE", good_color};
-  ItemStatus pandaStatus = {"차량\n연결됨", good_color};
+  ItemStatus pandaStatus = {{"VEHICLE", "ONLINE"}, good_color};
   if (s.scene.pandaType == cereal::PandaState::PandaType::UNKNOWN) {
-    //pandaStatus = {"NO\nPANDA", danger_color};
-    pandaStatus = {"차량\n연결안됨", danger_color};
-  } /*else if (s.scene.started && !sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK()) {
-    pandaStatus = {"GPS\nSEARCH", warning_color};
-  }*/
+    pandaStatus = {{"NO", "PANDA"}, danger_color};
+  } else if (s.scene.started && !sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK()) {
+    pandaStatus = {{"GPS", "SEARCH"}, warning_color};
+  }
   setProperty("pandaStatus", QVariant::fromValue(pandaStatus));
 }
 
@@ -111,7 +113,7 @@ void Sidebar::paintEvent(QPaintEvent *event) {
     x += 37;
   }
 
-  configFont(p, "Open Sans", 30, "Regular");
+  configFont(p, "Inter", 30, "Regular");
   p.setPen(QColor(0xff, 0xff, 0xff));
   const QRect r2 = QRect(0, 267, event->rect().width(), 50);
 
@@ -121,7 +123,7 @@ void Sidebar::paintEvent(QPaintEvent *event) {
     p.drawText(r2, Qt::AlignCenter, net_type);
 
   // metrics
-  configFont(p, "Open Sans", 35, "Regular");
+  configFont(p, "Inter", 35, "Regular");
   drawMetric(p, temp_status.first, temp_status.second, 338);
   drawMetric(p, panda_status.first, panda_status.second, 496);
   drawMetric(p, connect_status.first, connect_status.second, 654);
