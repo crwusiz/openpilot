@@ -29,15 +29,16 @@ class CAR:
   KONA_HEV = "HYUNDAI KONA HEV 2019 (OS)"
   IONIQ_EV = "HYUNDAI IONIQ EV 2019~2020 (AE)"
   IONIQ_HEV = "HYUNDAI IONIQ HEV 2017 (AE)"
-  SANTA_FE = "HYUNDAI SANTA FE 2019~2021 (TM)"
-  SANTA_FE_HEV = "HYUNDAI SANTA FE 2021~2022 (TM)"
+  TUCSON = "HYUNDAI TUCSON 2019 (TL)"
+  SANTAFE = "HYUNDAI SANTAFE 2019~2021 (TM)"
+  SANTAFE_HEV = "HYUNDAI SANTAFE 2021~2022 (TM)"
   PALISADE = "HYUNDAI PALISADE 2020 (LX2)"
   VELOSTER = "HYUNDAI VELOSTER 2019 (JS)"
-  GRANDEUR = "GRANDEUR 2017~2019 (IG)"
-  GRANDEUR_HEV = "GRANDEUR HEV 2018~2019 (IG)"
-  GRANDEUR20 = "GRANDEUR 2020 (IG)"
-  GRANDEUR20_HEV = "GRANDEUR HEV 2020 (IG)"
-  NEXO = "HYUNDAI NEXO (FE)"
+  GRANDEUR = "HYUNDAI GRANDEUR 2017~2019 (IG)"
+  GRANDEUR_HEV = "HYUNDAI GRANDEUR HEV 2018~2019 (IG)"
+  GRANDEUR20 = "HYUNDAI GRANDEUR 2020 (IG)"
+  GRANDEUR20_HEV = "HYUNDAI GRANDEUR HEV 2020 (IG)"
+  NEXO = "HYUNDAI NEXO 2019~2020 (FE)"
 
   # Kia
   FORTE = "KIA K3 2018 (BD)"
@@ -60,8 +61,8 @@ class CAR:
 
   # Genesis
   GENESIS = "GENESIS 2014-2016 (DH)"
-  GENESIS_G70 = "GENESIS G70 2018~ (IK)"
-  GENESIS_G80 = "GENESIS G80 2018~ (DH)"
+  GENESIS_G70 = "GENESIS G70 2018~2020 (IK)"
+  GENESIS_G80 = "GENESIS G80 2018~2019 (DH)"
   GENESIS_G90 = "GENESIS G90,EQ900 2016~2019 (HI)"
 
 # ---------------------------------------------------------------------------------------
@@ -114,10 +115,10 @@ FINGERPRINTS = {
   CAR.IONIQ_HEV: [{
     68:8, 127: 8, 304: 8, 320: 8, 339: 8, 352: 8, 356: 4, 524: 8, 544: 8, 576:8, 593: 8, 688: 5, 832: 8, 881: 8, 882: 8, 897: 8, 902: 8, 903: 8, 905: 8, 909: 8, 916: 8, 1040: 8, 1042: 8, 1056: 8, 1057: 8, 1078: 4, 1136: 6, 1151: 6, 1155: 8, 1156: 8, 1157: 4, 1164: 8, 1168: 7, 1173: 8, 1183: 8, 1186: 2, 1191: 2, 1225: 8, 1265: 4, 1280: 1, 1287: 4, 1290: 8, 1291: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1355: 8, 1363: 8, 1369: 8, 1379: 8, 1407: 8, 1419: 8, 1426: 8, 1427: 6, 1429: 8, 1430: 8, 1448: 8, 1456: 4, 1470: 8, 1473: 8, 1476: 8, 1507: 8, 1535: 8, 1988: 8, 1996: 8, 2000: 8, 2004: 8, 2005: 8, 2008: 8, 2012: 8, 2013: 8
   }],
-  CAR.SANTA_FE: [{
+  CAR.SANTAFE: [{
     67: 8, 127: 8, 304: 8, 320: 8, 339: 8, 356: 4, 544: 8, 593: 8, 608: 8, 688: 6, 764: 8, 809: 8, 832: 8, 854: 7, 870: 7, 871: 8, 872: 8, 897: 8, 902: 8, 903: 8, 905: 8, 909: 8, 916: 8, 1040: 8, 1042: 8, 1056: 8, 1057: 8, 1064: 8, 1078: 4, 1107: 5, 1136: 8, 1151: 6, 1155: 8, 1156: 8, 1157: 4, 1162: 8, 1164: 8, 1168: 7, 1170: 8, 1173: 8, 1180: 8, 1183: 8, 1186: 2, 1191: 2, 1227: 8, 1265: 4, 1280: 1, 1287: 4, 1290: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1363: 8, 1369: 8, 1371: 8, 1378: 8, 1384: 8, 1407: 8, 1414: 3, 1419: 8, 1427: 6, 1456: 4, 1470: 8, 1479: 8, 1990: 8, 1998: 8, 2000: 8, 2004: 8, 2008: 8, 2012: 8, 2015: 8
   }],
-  CAR.SANTA_FE_HEV: [{
+  CAR.SANTAFE_HEV: [{
   }],
   CAR.PALISADE: [{
     67: 8, 127: 8, 304: 8, 320: 8, 339: 8, 356: 4, 544: 8, 549: 8, 576: 8, 593: 8, 608: 8, 688: 6, 809: 8, 832: 8, 854: 7, 870: 7, 871: 8, 872: 8, 897: 8, 902: 8, 903: 8, 905: 8, 909: 8, 913: 8, 916: 8, 1040: 8, 1042: 8, 1056: 8, 1057: 8, 1064: 8, 1078: 4, 1107: 5, 1123: 8, 1136: 8, 1151: 6, 1155: 8, 1156: 8, 1157: 4, 1162: 8, 1164: 8, 1168: 7, 1170: 8, 1173: 8, 1180: 8, 1186: 2, 1191: 2, 1193: 8, 1210: 8, 1225: 8, 1227: 8, 1265: 4, 1280: 8, 1287: 4, 1290: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1363: 8, 1369: 8, 1371: 8, 1378: 8, 1384: 8, 1407: 8, 1419: 8, 1427: 6, 1456: 4, 1470: 8, 2000: 8, 2005: 8, 2008: 8
@@ -155,6 +156,15 @@ FINGERPRINTS = {
   }],
   CAR.K5_DL3_HEV: [{
   }],
+  CAR.K7: [{
+    67: 8, 68: 8, 127: 8, 304: 8, 320: 8, 339: 8, 356: 4, 544: 8, 546: 8, 593: 8, 608: 8, 688: 5, 809: 8, 832: 8, 854: 7, 870: 7, 871: 8, 872: 8, 897: 8, 902: 8, 903: 8, 916: 8, 1040: 8, 1056: 8, 1057: 8, 1078: 4, 1107: 5, 1136: 8, 1151: 6, 1156: 8, 1157: 4, 1162: 4, 1168: 7, 1170: 8, 1173: 8, 1265: 4, 1280: 1, 1287: 4, 1290: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1363: 8, 1369: 8, 1371: 8, 1378: 4, 1384: 8, 1407: 8, 1419: 8, 1427: 6, 1444: 8, 1456: 4, 1470: 8
+  }],
+  CAR.K7_HEV: [{
+    68: 8, 127: 8, 304: 8, 320: 8, 339: 8, 352: 8, 356: 4, 544: 8, 549: 8, 576: 8, 593: 8, 688: 5, 832: 8, 865: 8, 881: 8, 882: 8, 897: 8, 902: 8, 903: 8, 905: 8, 909: 8, 913: 8, 916: 8, 1040: 8, 1042: 8, 1056: 8, 1057: 8, 1078: 4, 1096: 8, 1102: 8, 1108: 8, 1136: 6, 1138: 5, 1151: 8, 1155: 8, 1156: 8, 1157: 4, 1162: 8, 1164: 8, 1168: 7, 1173: 8, 1180: 8, 1186: 2, 1191: 2, 1210: 8, 1227: 8, 1265: 4, 1268: 8, 1280: 1, 1287: 4, 1290: 8, 1291: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1343: 8, 1345: 8, 1348: 8, 1355: 8, 1363: 8, 1369: 8, 1371: 8, 1378: 8, 1379: 8, 1407: 8, 1419: 8, 1427: 6, 1429: 8, 1430: 8, 1448: 8, 1456: 4, 1470: 8, 1476: 8, 1535: 8
+  }],
+  CAR.K9: [{
+    67: 8, 127: 8, 304: 8, 320: 8, 339: 8, 356: 4, 544: 8, 593: 8, 608: 8, 688: 5, 809: 8, 832: 8, 854: 7, 870: 7, 871: 8, 872: 8, 897: 8, 902: 8, 903: 8, 905: 8, 909: 8, 916: 8, 1056: 8, 1057: 8, 1078: 4, 1107: 5, 1136: 8, 1151: 6, 1155: 8, 1156: 8, 1157: 4, 1162: 8, 1164: 8, 1168: 7, 1170: 8, 1173: 8, 1184: 8, 1186: 2, 1191: 2, 1227: 8, 1265: 4, 1280: 4, 1287: 4, 1290: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1363: 8, 1369: 8, 1379: 8, 1384: 8, 1407: 8, 1419: 8, 1427: 6, 1456: 4, 1470: 8
+  }],
   CAR.SPORTAGE: [{
     67: 8, 68: 8, 127: 8, 273: 8, 274: 8, 275: 8, 339: 8, 356: 4, 399: 8, 447: 8, 512: 6, 544: 8, 593: 8, 608: 8, 688: 5, 790: 8, 809: 8, 832: 8, 884: 8, 897: 8, 899: 8, 902: 8, 903: 6, 909: 8, 916: 8, 1040: 8, 1078: 4, 1170: 8, 1191: 2, 1253: 8, 1254: 8, 1255: 8, 1265: 4, 1280: 1, 1282: 4, 1287: 4, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1349: 8, 1351: 8, 1353: 8, 1363: 8, 1365: 8, 1366: 8, 1367: 8, 1369: 8, 1407: 8, 1419: 8, 1427: 6, 1440: 8, 1456: 4, 1470: 8, 1472: 8, 1486: 8, 1487: 8, 1491: 8, 1492: 8, 1530: 8
   }],
@@ -178,15 +188,6 @@ FINGERPRINTS = {
   }],
   CAR.SELTOS: [{
     67: 8, 127: 8, 304: 8, 320: 8, 339: 8, 354: 8, 356: 4, 544: 8, 593: 8, 608: 8, 688: 6, 809: 8, 832: 8, 854: 8, 870: 7, 871: 8, 872: 8, 897: 8, 902: 8, 905: 8, 909: 8, 910: 5, 911: 5, 913: 8, 916: 8, 1040: 8, 1042: 8, 1056: 8, 1057: 8, 1078: 4, 1107: 5, 1114: 8, 1136: 8, 1145: 8, 1151: 8, 1155: 8, 1156: 8, 1157: 4, 1162: 8, 1164: 8, 1168: 8, 1170: 8, 1173: 8, 1186: 2, 1191: 2, 1225: 8, 1265: 4, 1280: 8, 1287: 4, 1290: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1363: 8, 1369: 8, 1379: 8, 1384: 8, 1394: 8, 1407: 8, 1414: 3, 1419: 8, 1427: 6, 1446: 8, 1456: 4, 1470: 8, 1485: 8, 1911: 8
-  }],
-  CAR.K7: [{
-    67: 8, 68: 8, 127: 8, 304: 8, 320: 8, 339: 8, 356: 4, 544: 8, 546: 8, 593: 8, 608: 8, 688: 5, 809: 8, 832: 8, 854: 7, 870: 7, 871: 8, 872: 8, 897: 8, 902: 8, 903: 8, 916: 8, 1040: 8, 1056: 8, 1057: 8, 1078: 4, 1107: 5, 1136: 8, 1151: 6, 1156: 8, 1157: 4, 1162: 4, 1168: 7, 1170: 8, 1173: 8, 1265: 4, 1280: 1, 1287: 4, 1290: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1363: 8, 1369: 8, 1371: 8, 1378: 4, 1384: 8, 1407: 8, 1419: 8, 1427: 6, 1444: 8, 1456: 4, 1470: 8
-  }],
-  CAR.K7_HEV: [{
-    68: 8, 127: 8, 304: 8, 320: 8, 339: 8, 352: 8, 356: 4, 544: 8, 549: 8, 576: 8, 593: 8, 688: 5, 832: 8, 865: 8, 881: 8, 882: 8, 897: 8, 902: 8, 903: 8, 905: 8, 909: 8, 913: 8, 916: 8, 1040: 8, 1042: 8, 1056: 8, 1057: 8, 1078: 4, 1096: 8, 1102: 8, 1108: 8, 1136: 6, 1138: 5, 1151: 8, 1155: 8, 1156: 8, 1157: 4, 1162: 8, 1164: 8, 1168: 7, 1173: 8, 1180: 8, 1186: 2, 1191: 2, 1210: 8, 1227: 8, 1265: 4, 1268: 8, 1280: 1, 1287: 4, 1290: 8, 1291: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1343: 8, 1345: 8, 1348: 8, 1355: 8, 1363: 8, 1369: 8, 1371: 8, 1378: 8, 1379: 8, 1407: 8, 1419: 8, 1427: 6, 1429: 8, 1430: 8, 1448: 8, 1456: 4, 1470: 8, 1476: 8, 1535: 8
-  }],
-  CAR.K9: [{
-    67: 8, 127: 8, 304: 8, 320: 8, 339: 8, 356: 4, 544: 8, 593: 8, 608: 8, 688: 5, 809: 8, 832: 8, 854: 7, 870: 7, 871: 8, 872: 8, 897: 8, 902: 8, 903: 8, 905: 8, 909: 8, 916: 8, 1056: 8, 1057: 8, 1078: 4, 1107: 5, 1136: 8, 1151: 6, 1155: 8, 1156: 8, 1157: 4, 1162: 8, 1164: 8, 1168: 7, 1170: 8, 1173: 8, 1184: 8, 1186: 2, 1191: 2, 1227: 8, 1265: 4, 1280: 4, 1287: 4, 1290: 8, 1292: 8, 1294: 8, 1312: 8, 1322: 8, 1342: 6, 1345: 8, 1348: 8, 1363: 8, 1369: 8, 1379: 8, 1384: 8, 1407: 8, 1419: 8, 1427: 6, 1456: 4, 1470: 8
   }],
 
   # Genesis
@@ -617,7 +618,25 @@ FW_VERSIONS = {
       b'\xf1\x816U3J2051\x00\x00\xf1\x006U3H0_C2\x00\x006U3J2051\x00\x00PAE0G16NS1\x00\x00\x00\x00',
     ],
   },
-  CAR.SANTA_FE: {
+  CAR.TUCSON: {
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00TL__ FCA F-CUP      1.00 1.01 99110-D3500         ',
+      b'\xf1\x00TL__ FCA F-CUP      1.00 1.02 99110-D3510         ',
+    ],
+    (Ecu.engine, 0x7e0, None): [
+      b'\xf1\x8971TLC2NAIDDIR002\xf1\x8271TLC2NAIDDIR002',
+      b'\xf1\x81606G3051\x00\x00\x00\x00\x00\x00\x00\x00',
+    ],
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00TL  MFC  AT KOR LHD 1.00 1.02 95895-D3800 180719',
+      b'\xf1\x00TL  MFC  AT USA LHD 1.00 1.06 95895-D3800 190107',
+    ],
+    (Ecu.transmission, 0x7e1, None): [
+      b'\xf1\x87LBJXAN202299KF22\x87x\x87\x88ww\x87xx\x88\x97\x88\x87\x88\x98x\x88\x99\x98\x89\x87o\xf6\xff\x87w\x7f\xff\x12\x9a\xf1\x81U083\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U083\x00\x00\x00\x00\x00\x00TTL2V20KL1\x8fRn\x8a',
+      b'\xf1\x87KMLDCU585233TJ20wx\x87\x88x\x88\x98\x89vfwfwwww\x87f\x9f\xff\x98\xff\x7f\xf9\xf7s\xf1\x816T6G4051\x00\x00\xf1\x006T6J0_C2\x00\x006T6G4051\x00\x00TTL4G24NH2\x00\x00\x00\x00',
+    ],
+  },
+  CAR.SANTAFE: {
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00TM__ SCC F-CUP      1.00 1.01 99110-S2000         ',
       b'\xf1\x00TM__ SCC F-CUP      1.00 1.02 99110-S2000         ',
@@ -700,7 +719,7 @@ FW_VERSIONS = {
       b'\xf1\x87954A02N250\x00\x00\x00\x00\x00\xf1\x81T02730A1  \xf1\x00T02601BL  T02730A1  VTMPT25XXX730NS2\xa6',
     ],
   },
-  CAR.SANTA_FE_HEV: {
+  CAR.SANTAFE_HEV: {
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x8799110CL500\xf1\x00TMhe SCC FHCUP      1.00 1.00 99110-CL500         ',
     ],
@@ -1137,8 +1156,8 @@ FW_VERSIONS = {
 }
 
 CHECKSUM = {
-  "crc8": [CAR.SONATA, CAR.SANTA_FE, CAR.PALISADE, CAR.SELTOS, CAR.ELANTRA21, CAR.K5_DL3,
-           CAR.SONATA_HEV, CAR.SANTA_FE_HEV, CAR.SOUL_EV, CAR.ELANTRA21_HEV, CAR.K5_DL3_HEV],
+  "crc8": [CAR.SONATA, CAR.SANTAFE, CAR.PALISADE, CAR.SELTOS, CAR.ELANTRA21, CAR.K5_DL3,
+           CAR.SONATA_HEV, CAR.SANTAFE_HEV, CAR.SOUL_EV, CAR.ELANTRA21_HEV, CAR.K5_DL3_HEV],
   "6B": [CAR.SORENTO, CAR.GENESIS],
 }
 
@@ -1146,7 +1165,7 @@ FEATURES = {
   "use_cluster_gears": # Use Cluster for Gear Selection, rather than Transmission [ CLU15 ]
     {CAR.ELANTRA_I30, CAR.KONA, CAR.GRANDEUR, CAR.NIRO_HEV, CAR.K7},
   "use_tcu_gears": # Use TCU Message for Gear Selection [ TCU12 ]
-    {CAR.SONATA_LF, CAR.VELOSTER, CAR.K5},
+    {CAR.SONATA_LF, CAR.TUCSON, CAR.VELOSTER, CAR.K5},
   "use_elect_gears": # Use Elect GEAR Message for Gear Selection [ ELECT_GEAR ]
     {CAR.KONA_EV, CAR.IONIQ_EV, CAR.NEXO, CAR.NIRO_EV, CAR.SOUL_EV, CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV,
      CAR.SONATA_HEV, CAR.SONATA_LF_HEV, CAR.GRANDEUR_HEV, CAR.GRANDEUR20_HEV,
@@ -1164,7 +1183,7 @@ FEATURES = {
 
 HDA2_CAR = {CAR.EV6, }
 EV_CAR = {CAR.KONA_EV, CAR.IONIQ_EV, CAR.NIRO_EV, CAR.SOUL_EV, CAR.NEXO}
-HYBRID_CAR = {CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV, CAR.SANTA_FE_HEV,
+HYBRID_CAR = {CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV, CAR.SANTAFE_HEV,
               CAR.ELANTRA21_HEV, CAR.SONATA_HEV, CAR.SONATA_LF_HEV, CAR.GRANDEUR_HEV, CAR.GRANDEUR20_HEV,
               CAR.K5_HEV, CAR.K5_DL3_HEV, CAR.K7_HEV}
 EV_HYBRID_CAR = EV_CAR | HYBRID_CAR
@@ -1183,15 +1202,16 @@ DBC = {
   CAR.KONA_HEV: dbc_dict('hyundai_kia_generic', None),
   CAR.IONIQ_EV: dbc_dict('hyundai_kia_generic', 'hyundai_kia_mando_front_radar'),
   CAR.IONIQ_HEV: dbc_dict('hyundai_kia_generic', None),
-  CAR.SANTA_FE: dbc_dict('hyundai_kia_generic', 'hyundai_kia_mando_front_radar'),
-  CAR.SANTA_FE_HEV: dbc_dict('hyundai_kia_generic', None),
+  CAR.TUCSON: dbc_dict('hyundai_kia_generic', None),
+  CAR.SANTAFE: dbc_dict('hyundai_kia_generic', 'hyundai_kia_mando_front_radar'),
+  CAR.SANTAFE_HEV: dbc_dict('hyundai_kia_generic', None),
   CAR.PALISADE: dbc_dict('hyundai_kia_generic', 'hyundai_kia_mando_front_radar'),
   CAR.VELOSTER: dbc_dict('hyundai_kia_generic', None),
   CAR.GRANDEUR: dbc_dict('hyundai_kia_generic', None),
   CAR.GRANDEUR_HEV: dbc_dict('hyundai_kia_generic', None),
   CAR.GRANDEUR20: dbc_dict('hyundai_kia_generic', None),
   CAR.GRANDEUR20_HEV: dbc_dict('hyundai_kia_generic', None),
-  CAR.NEXO: dbc_dict('hyundai_kia_generic_nexo', None),
+  CAR.NEXO: dbc_dict('hyundai_kia_generic', None),
 
   # Kia
   CAR.FORTE: dbc_dict('hyundai_kia_generic', None),
@@ -1199,6 +1219,9 @@ DBC = {
   CAR.K5_HEV: dbc_dict('hyundai_kia_generic', None),
   CAR.K5_DL3: dbc_dict('hyundai_kia_generic', None),
   CAR.K5_DL3_HEV: dbc_dict('hyundai_kia_generic', None),
+  CAR.K7: dbc_dict('hyundai_kia_generic', None),
+  CAR.K7_HEV: dbc_dict('hyundai_kia_generic', None),
+  CAR.K9: dbc_dict('hyundai_kia_generic', None),
   CAR.SPORTAGE: dbc_dict('hyundai_kia_generic', None),
   CAR.SORENTO: dbc_dict('hyundai_kia_generic', None),
   CAR.MOHAVE: dbc_dict('hyundai_kia_generic', None),
@@ -1207,9 +1230,6 @@ DBC = {
   CAR.NIRO_HEV: dbc_dict('hyundai_kia_generic', 'hyundai_kia_mando_front_radar'),
   CAR.SOUL_EV: dbc_dict('hyundai_kia_generic', None),
   CAR.SELTOS: dbc_dict('hyundai_kia_generic', None),
-  CAR.K7: dbc_dict('hyundai_kia_generic', None),
-  CAR.K7_HEV: dbc_dict('hyundai_kia_generic', None),
-  CAR.K9: dbc_dict('hyundai_kia_generic', None),
   CAR.EV6: dbc_dict('kia_ev6', None),
 
   # Genesis

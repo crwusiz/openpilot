@@ -37,64 +37,83 @@ class CarInterface(CarInterfaceBase):
     ret.steerFaultMaxAngle = 85
     ret.steerFaultMaxFrames = 90
 
-    tire_stiffness_factor = 0.8
+    tire_stiffness_factor = 1.
 
     # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
     # hyundai
     torque_params = CarInterfaceBase.get_torque_params(candidate)
-    if candidate in [CAR.ELANTRA_I30, CAR.ELANTRA21, CAR.ELANTRA21_HEV]:
+    if candidate == CAR.ELANTRA_I30:
       ret.mass = 1340. + STD_CARGO_KG
-      ret.wheelbase = 2.720
+      ret.wheelbase = 2.72
       ret.steerRatio = 15.4
+      tire_stiffness_factor = 0.385
+    elif candidate in [CAR.ELANTRA21, CAR.ELANTRA21_HEV]:
+      ret.mass = 1340. + STD_CARGO_KG
+      ret.wheelbase = 2.72
+      ret.steerRatio = 12.9
+      tire_stiffness_factor = 0.65
     elif candidate in [CAR.SONATA, CAR.SONATA_HEV]:
       ret.mass = 1615. + STD_CARGO_KG
-      ret.wheelbase = 2.840
+      ret.wheelbase = 2.84
       ret.steerRatio = 15.2
+      tire_stiffness_factor = 0.65
     elif candidate in [CAR.SONATA_LF, CAR.SONATA_LF_HEV]:
       ret.mass = 1640. + STD_CARGO_KG
-      ret.wheelbase = 2.805
+      ret.wheelbase = 2.80
       ret.steerRatio = 15.2
     elif candidate in [CAR.KONA, CAR.KONA_EV, CAR.KONA_HEV]:
       ret.mass = 1743. + STD_CARGO_KG
-      ret.wheelbase = 2.600
+      ret.wheelbase = 2.60
       ret.steerRatio = 13.7
+      tire_stiffness_factor = 0.385
     elif candidate in [CAR.IONIQ_EV, CAR.IONIQ_HEV]:
       ret.mass = 1575. + STD_CARGO_KG
-      ret.wheelbase = 2.700
+      ret.wheelbase = 2.70
       ret.steerRatio = 13.7
-    elif candidate in [CAR.SANTA_FE, CAR.SANTA_FE_HEV]:
+      tire_stiffness_factor = 0.385
+    elif candidate == CAR.TUCSON:
+      ret.mass = 1596. + STD_CARGO_KG
+      ret.wheelbase = 2.67
+      ret.steerRatio = 16.0
+      tire_stiffness_factor = 0.385
+    elif candidate in [CAR.SANTAFE, CAR.SANTAFE_HEV]:
       ret.mass = 1910. + STD_CARGO_KG
-      ret.wheelbase = 2.765
+      ret.wheelbase = 2.76
       ret.steerRatio = 15.8
+      tire_stiffness_factor = 0.82
     elif candidate == CAR.PALISADE:
       ret.mass = 2060. + STD_CARGO_KG
-      ret.wheelbase = 2.900
+      ret.wheelbase = 2.90
       ret.steerRatio = 15.8
+      tire_stiffness_factor = 0.63
     elif candidate == CAR.VELOSTER:
       ret.mass = 1350. + STD_CARGO_KG
-      ret.wheelbase = 2.650
+      ret.wheelbase = 2.65
       ret.steerRatio = 15.8
+      tire_stiffness_factor = 0.5
     elif candidate in [CAR.GRANDEUR, CAR.GRANDEUR_HEV, CAR.GRANDEUR20, CAR.GRANDEUR20_HEV]:
       ret.mass = 1719. + STD_CARGO_KG
-      ret.wheelbase = 2.885
+      ret.wheelbase = 2.88
       ret.steerRatio = 12.5
     elif candidate == CAR.NEXO:
       ret.mass = 1873. + STD_CARGO_KG
-      ret.wheelbase = 2.790
+      ret.wheelbase = 2.79
       ret.steerRatio = 13.7
 
     # kia
     elif candidate == CAR.FORTE:
       ret.mass = 1345. + STD_CARGO_KG
-      ret.wheelbase = 2.700
+      ret.wheelbase = 2.70
       ret.steerRatio = 13.7
+      tire_stiffness_factor = 0.5
     elif candidate in [CAR.K5, CAR.K5_HEV, CAR.K5_DL3, CAR.K5_DL3_HEV]:
       ret.mass = 1565. + STD_CARGO_KG
-      ret.wheelbase = 2.805
+      ret.wheelbase = 2.80
       ret.steerRatio = 15.2
+      tire_stiffness_factor = 0.5
     elif candidate in [CAR.K7, CAR.K7_HEV]:
       ret.mass = 1730. + STD_CARGO_KG
-      ret.wheelbase = 2.855
+      ret.wheelbase = 2.85
       ret.steerRatio = 12.5
     elif candidate == CAR.K9:
       ret.mass = 2005. + STD_CARGO_KG
@@ -102,71 +121,75 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 16.5
     elif candidate == CAR.SPORTAGE:
       ret.mass = 1770. + STD_CARGO_KG
-      ret.wheelbase = 2.670
+      ret.wheelbase = 2.67
       ret.steerRatio = 15.8
     elif candidate == CAR.SORENTO:
       ret.mass = 1885. + STD_CARGO_KG
-      ret.wheelbase = 2.815
+      ret.wheelbase = 2.81
       ret.steerRatio = 15.8
     elif candidate == CAR.MOHAVE:
       ret.mass = 2305. + STD_CARGO_KG
-      ret.wheelbase = 2.895
+      ret.wheelbase = 2.89
       ret.steerRatio = 14.1
     elif candidate == CAR.STINGER:
       ret.mass = 1913. + STD_CARGO_KG
-      ret.wheelbase = 2.905
+      ret.wheelbase = 2.90
       ret.steerRatio = 13.5
     elif candidate in [CAR.NIRO_EV, CAR.NIRO_HEV]:
       ret.mass = 1748. + STD_CARGO_KG
-      ret.wheelbase = 2.700
+      ret.wheelbase = 2.70
       ret.steerRatio = 13.7
+      tire_stiffness_factor = 0.385
     elif candidate == CAR.SOUL_EV:
       ret.mass = 1375. + STD_CARGO_KG
-      ret.wheelbase = 2.600
+      ret.wheelbase = 2.60
       ret.steerRatio = 13.7
+      tire_stiffness_factor = 0.385
     elif candidate == CAR.SELTOS:
       ret.mass = 1510. + STD_CARGO_KG
-      ret.wheelbase = 2.630
+      ret.wheelbase = 2.63
       ret.steerRatio = 13.0
     elif candidate == CAR.EV6:
-      ret.mass = 2055 + STD_CARGO_KG
-      ret.wheelbase = 2.9
-      ret.steerRatio = 16.
-      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.noOutput),
-                           get_safety_config(car.CarParams.SafetyModel.hyundaiHDA2)]
+      ret.mass = 2055. + STD_CARGO_KG
+      ret.wheelbase = 2.90
+      ret.steerRatio = 16.0
+      tire_stiffness_factor = 0.65
+      ret.safetyConfigs = [
+        get_safety_config(car.CarParams.SafetyModel.noOutput),
+        get_safety_config(car.CarParams.SafetyModel.hyundaiHDA2)]
 
     # genesis
     elif candidate == CAR.GENESIS:
       ret.mass = 2060. + STD_CARGO_KG
-      ret.wheelbase = 3.010
+      ret.wheelbase = 3.01
       ret.steerRatio = 16.5
     elif candidate == CAR.GENESIS_G70:
       ret.mass = 1795. + STD_CARGO_KG
-      ret.wheelbase = 2.835
+      ret.wheelbase = 2.83
       ret.steerRatio = 16.5
     elif candidate == CAR.GENESIS_G80:
       ret.mass = 2035. + STD_CARGO_KG
-      ret.wheelbase = 3.010
+      ret.wheelbase = 3.01
       ret.steerRatio = 16.5
     elif candidate == CAR.GENESIS_G90:
       ret.mass = 2185. + STD_CARGO_KG
-      ret.wheelbase = 3.160
+      ret.wheelbase = 3.16
       ret.steerRatio = 12.0
 
     # Pid -----------------------------------------------------------------
     if Params().get("LateralControlSelect", encoding='utf8') == "0":
-      if candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
-        ret.lateralTuning.pid.kf = 0.00005
-        ret.lateralTuning.pid.kpBP = [0.]
-        ret.lateralTuning.pid.kpV = [0.16]
-        ret.lateralTuning.pid.kiBP = [0.]
-        ret.lateralTuning.pid.kiV = [0.01]
-      elif candidate == CAR.PALISADE:
+      if candidate == CAR.PALISADE:
         ret.lateralTuning.pid.kf = 0.00005
         ret.lateralTuning.pid.kpBP = [0.]
         ret.lateralTuning.pid.kpV = [0.3]
         ret.lateralTuning.pid.kiBP = [0.]
         ret.lateralTuning.pid.kiV = [0.05]
+      elif candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
+        ret.lateralTuning.pid.kf = 0.00005
+        ret.lateralTuning.pid.kpBP = [0.]
+        ret.lateralTuning.pid.kpV = [0.16]
+        ret.lateralTuning.pid.kiBP = [0.]
+        ret.lateralTuning.pid.kiV = [0.01]
       else:
         ret.lateralTuning.pid.kf = 0.00005
         ret.lateralTuning.pid.kpBP = [0.]
@@ -177,16 +200,7 @@ class CarInterface(CarInterfaceBase):
     # Indi -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "1":
       ret.lateralTuning.init('indi')
-      if candidate == CAR.GENESIS:
-        ret.lateralTuning.indi.innerLoopGainBP = [0.]
-        ret.lateralTuning.indi.innerLoopGainV = [3.5]
-        ret.lateralTuning.indi.outerLoopGainBP = [0.]
-        ret.lateralTuning.indi.outerLoopGainV = [2.0]
-        ret.lateralTuning.indi.timeConstantBP = [0.]
-        ret.lateralTuning.indi.timeConstantV = [1.4]
-        ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
-        ret.lateralTuning.indi.actuatorEffectivenessV = [2.3]
-      elif candidate  == CAR.GENESIS_G70:
+      if candidate == CAR.IONIQ_HEV:
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
         ret.lateralTuning.indi.innerLoopGainV = [2.5]
         ret.lateralTuning.indi.outerLoopGainBP = [0.]
@@ -204,6 +218,24 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.indi.timeConstantV = [1.4]
         ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
         ret.lateralTuning.indi.actuatorEffectivenessV = [1.8]
+      elif candidate == CAR.GENESIS:
+        ret.lateralTuning.indi.innerLoopGainBP = [0.]
+        ret.lateralTuning.indi.innerLoopGainV = [3.5]
+        ret.lateralTuning.indi.outerLoopGainBP = [0.]
+        ret.lateralTuning.indi.outerLoopGainV = [2.0]
+        ret.lateralTuning.indi.timeConstantBP = [0.]
+        ret.lateralTuning.indi.timeConstantV = [1.4]
+        ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
+        ret.lateralTuning.indi.actuatorEffectivenessV = [2.3]
+      elif candidate == CAR.GENESIS_G70:
+        ret.lateralTuning.indi.innerLoopGainBP = [0.]
+        ret.lateralTuning.indi.innerLoopGainV = [2.5]
+        ret.lateralTuning.indi.outerLoopGainBP = [0.]
+        ret.lateralTuning.indi.outerLoopGainV = [3.5]
+        ret.lateralTuning.indi.timeConstantBP = [0.]
+        ret.lateralTuning.indi.timeConstantV = [1.4]
+        ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
+        ret.lateralTuning.indi.actuatorEffectivenessV = [1.8]
       else:
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
         ret.lateralTuning.indi.innerLoopGainV = [3.5]
@@ -217,15 +249,24 @@ class CarInterface(CarInterfaceBase):
     # Lqr -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "2":
       ret.lateralTuning.init('lqr')
-      if candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
-        ret.lateralTuning.lqr.scale = 1900.
+      if candidate in [CAR.GRANDEUR, CAR.GRANDEUR_HEV, CAR.GRANDEUR20, CAR.GRANDEUR20_HEV, CAR.K7, CAR.K7_HEV]:
+        ret.lateralTuning.lqr.scale = 1600.
         ret.lateralTuning.lqr.ki = 0.01
-        ret.lateralTuning.lqr.dcGain = 0.0029
+        ret.lateralTuning.lqr.dcGain = 0.0027
         ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
         ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
         ret.lateralTuning.lqr.c = [1., 0.]
         ret.lateralTuning.lqr.k = [-110., 451.]
         ret.lateralTuning.lqr.l = [0.33, 0.318]
+      elif candidate == CAR.IONIQ_EV:
+        ret.lateralTuning.lqr.scale = 3000.0
+        ret.lateralTuning.lqr.ki = 0.005
+        ret.lateralTuning.lqr.dcGain = 0.002237852961363602
+        ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
+        ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
+        ret.lateralTuning.lqr.c = [1., 0.]
+        ret.lateralTuning.lqr.k = [-110.73572306, 451.22718255]
+        ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
       elif candidate in [CAR.K5, CAR.K5_HEV]:
         ret.lateralTuning.lqr.scale = 1700.0
         ret.lateralTuning.lqr.ki = 0.016
@@ -234,15 +275,6 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
         ret.lateralTuning.lqr.c = [1., 0.]
         ret.lateralTuning.lqr.k = [-110.0, 451.0]
-        ret.lateralTuning.lqr.l = [0.33, 0.318]
-      elif candidate in [CAR.GRANDEUR, CAR.GRANDEUR_HEV, CAR.GRANDEUR20, CAR.GRANDEUR20_HEV, CAR.K7, CAR.K7_HEV]:
-        ret.lateralTuning.lqr.scale = 1600.
-        ret.lateralTuning.lqr.ki = 0.01
-        ret.lateralTuning.lqr.dcGain = 0.0027
-        ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-        ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-        ret.lateralTuning.lqr.c = [1., 0.]
-        ret.lateralTuning.lqr.k = [-110., 451.]
         ret.lateralTuning.lqr.l = [0.33, 0.318]
       elif candidate == CAR.SELTOS:
         ret.lateralTuning.lqr.scale = 1500.0
@@ -253,15 +285,15 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.lqr.c = [1., 0.]
         ret.lateralTuning.lqr.k = [-110.73572306, 451.22718255]
         ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
-      elif candidate == CAR.IONIQ_EV:
-        ret.lateralTuning.lqr.scale = 3000.0
-        ret.lateralTuning.lqr.ki = 0.005
-        ret.lateralTuning.lqr.dcGain = 0.002237852961363602
+      elif candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
+        ret.lateralTuning.lqr.scale = 1900.
+        ret.lateralTuning.lqr.ki = 0.01
+        ret.lateralTuning.lqr.dcGain = 0.0029
         ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
         ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
         ret.lateralTuning.lqr.c = [1., 0.]
-        ret.lateralTuning.lqr.k = [-110.73572306, 451.22718255]
-        ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
+        ret.lateralTuning.lqr.k = [-110., 451.]
+        ret.lateralTuning.lqr.l = [0.33, 0.318]
       else:
         ret.lateralTuning.lqr.scale = 1700.0
         ret.lateralTuning.lqr.ki = 0.03
@@ -274,8 +306,8 @@ class CarInterface(CarInterfaceBase):
 
     # Torque -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "3":
-      #set_torque_tune(ret.lateralTuning, torque_params['LAT_ACCEL_FACTOR'], torque_params['FRICTION'])
-      set_torque_tune(ret.lateralTuning, 2.0, 0.01, 0.0)
+      set_torque_tune(ret.lateralTuning, torque_params['LAT_ACCEL_FACTOR'], torque_params['FRICTION'])
+      #set_torque_tune(ret.lateralTuning, 2.0, 0.01, 0.0)
 
     ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05
