@@ -1,6 +1,12 @@
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Union
+
 from cereal import car
+from common.conversions import Conversions as CV
 from selfdrive.car import dbc_dict
+from selfdrive.car.docs_definitions import CarInfo, Harness
 Ecu = car.CarParams.Ecu
+
 
 class CarControllerParams:
   ACCEL_MIN = -3.5
@@ -13,7 +19,13 @@ class CarControllerParams:
     self.STEER_DRIVER_ALLOWANCE = 50
     self.STEER_DRIVER_MULTIPLIER = 2
     self.STEER_DRIVER_FACTOR = 1
+    self.STEER_THRESHOLD = 150
 
+    if CP.carFingerprint in HDA2_CAR:
+      self.STEER_MAX = 270
+      self.STEER_DRIVER_ALLOWANCE = 250
+      self.STEER_DRIVER_MULTIPLIER = 2
+      self.STEER_THRESHOLD = 250
 
 class CAR:
   # Hyundai
@@ -70,6 +82,88 @@ class CAR:
 # hyundai - G80 2020(RG3), GV70 2021(JK1), GV80 2020(JX1), TUSON 2021(NX4), STARIA 2021(UX4), IONIQ5 2021(NE)
 # kia - CARNIVAL 2021(KA4), SORENTO 2020(MQ4), K8 2021(GL3)
 # ---------------------------------------------------------------------------------------
+
+@dataclass
+class HyundaiCarInfo(CarInfo):
+  # TODO: we can probably remove LKAS. LKAS is standard on many
+  # HKG and for others, it's likely packaged together with SCC
+  package: str = "SCC + LKAS"
+  good_torque: bool = True
+
+
+CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
+  CAR.ELANTRA_I30: HyundaiCarInfo("Hyundai Elantra 2017-19", min_enable_speed=19 * CV.MPH_TO_MS, harness=Harness.hyundai_b),
+  CAR.ELANTRA21: HyundaiCarInfo("Hyundai Elantra 2021-22", video_link="https://youtu.be/_EdYQtV52-c", harness=Harness.hyundai_k),
+  CAR.ELANTRA21_HEV: HyundaiCarInfo("Hyundai Elantra Hybrid 2021-22", video_link="https://youtu.be/_EdYQtV52-c", harness=Harness.hyundai_k),
+  CAR.SONATA: HyundaiCarInfo("Hyundai Sonata 2020-22", "All", video_link="https://www.youtube.com/watch?v=ix63r9kE3Fw",
+                             harness=Harness.hyundai_a),
+  CAR.SONATA_HEV: HyundaiCarInfo("Hyundai Sonata Hybrid 2020-22", "All", harness=Harness.hyundai_a),
+  CAR.SONATA_LF: HyundaiCarInfo("Hyundai Sonata 2018-19", harness=Harness.hyundai_e),
+  CAR.KONA: HyundaiCarInfo("Hyundai Kona 2020", harness=Harness.hyundai_b),
+  CAR.KONA_EV: HyundaiCarInfo("Hyundai Kona Electric 2018-21", harness=Harness.hyundai_g),
+  CAR.KONA_HEV: HyundaiCarInfo("Hyundai Kona Hybrid 2020", harness=Harness.hyundai_i),
+  CAR.IONIQ_EV: [
+    HyundaiCarInfo("Hyundai Ioniq Electric 2019", harness=Harness.hyundai_c),
+    HyundaiCarInfo("Hyundai Ioniq Electric 2020", harness=Harness.hyundai_h),
+  ],
+  CAR.IONIQ_HEV: [
+    HyundaiCarInfo("Hyundai Ioniq Hybrid 2017-19", harness=Harness.hyundai_c),
+    HyundaiCarInfo("Hyundai Ioniq Hybrid 2020-22", "SCC + LFA", harness=Harness.hyundai_h),
+    HyundaiCarInfo("Hyundai Ioniq Plug-in Hybrid 2019", harness=Harness.hyundai_c),
+    HyundaiCarInfo("Hyundai Ioniq Plug-in Hybrid 2020-21", harness=Harness.hyundai_h),
+  ],
+  CAR.SANTAFE: [
+    HyundaiCarInfo("Hyundai Santa Fe 2019-20", "All", harness=Harness.hyundai_d),
+    HyundaiCarInfo("Hyundai Santa Fe 2021-22", "All", harness=Harness.hyundai_l),
+  ],
+  CAR.SANTAFE_HEV: [
+    HyundaiCarInfo("Hyundai Santa Fe Hybrid 2022", "All", harness=Harness.hyundai_l),
+  ],
+  CAR.TUCSON: [
+    HyundaiCarInfo("Hyundai Tucson 2021", min_enable_speed=19 * CV.MPH_TO_MS, harness=Harness.hyundai_l),
+    HyundaiCarInfo("Hyundai Tucson Diesel 2019", harness=Harness.hyundai_l),
+  ],
+  CAR.PALISADE: [
+    HyundaiCarInfo("Hyundai Palisade 2020-21", "All", video_link="https://youtu.be/TAnDqjF4fDY?t=456", harness=Harness.hyundai_h),
+    HyundaiCarInfo("Kia Telluride 2020", harness=Harness.hyundai_h),
+  ],
+  CAR.VELOSTER: HyundaiCarInfo("Hyundai Veloster 2019-20", min_enable_speed=5. * CV.MPH_TO_MS, harness=Harness.hyundai_e),
+
+  # Kia
+  CAR.FORTE: [
+    HyundaiCarInfo("Kia Forte 2018", harness=Harness.hyundai_b),
+    HyundaiCarInfo("Kia Forte 2019-21", harness=Harness.hyundai_g),
+  ],
+  CAR.K5: [
+    HyundaiCarInfo("Kia Optima 2017", min_steer_speed=32. * CV.MPH_TO_MS, harness=Harness.hyundai_b),
+    HyundaiCarInfo("Kia Optima 2019", harness=Harness.hyundai_g),
+  ],
+  CAR.K5_HEV: HyundaiCarInfo("Kia Optima 2017, 2019"),  # TODO: info may be incorrect
+  CAR.K5_DL3: HyundaiCarInfo("Kia K5 2021-22", "SCC", harness=Harness.hyundai_a),
+  CAR.NIRO_EV: [
+    HyundaiCarInfo("Kia Niro Electric 2019-20", "All", video_link="https://www.youtube.com/watch?v=lT7zcG6ZpGo", harness=Harness.hyundai_f),
+    HyundaiCarInfo("Kia Niro Electric 2021", "All", video_link="https://www.youtube.com/watch?v=lT7zcG6ZpGo", harness=Harness.hyundai_c),
+    HyundaiCarInfo("Kia Niro Electric 2022", "All", video_link="https://www.youtube.com/watch?v=lT7zcG6ZpGo", harness=Harness.hyundai_h),
+  ],
+  CAR.NIRO_HEV: [
+    HyundaiCarInfo("Kia Niro Hybrid 2019", min_enable_speed=10. * CV.MPH_TO_MS, harness=Harness.hyundai_c),
+    HyundaiCarInfo("Kia Niro Hybrid 2021", harness=Harness.hyundai_f),  # TODO: could be hyundai_d, verify
+    HyundaiCarInfo("Kia Niro Hybrid 2022", harness=Harness.hyundai_h),
+  ],
+  CAR.SELTOS: HyundaiCarInfo("Kia Seltos 2021", harness=Harness.hyundai_a),
+  CAR.SORENTO: [
+    HyundaiCarInfo("Kia Sorento 2018", video_link="https://www.youtube.com/watch?v=Fkh3s6WHJz8", harness=Harness.hyundai_c),
+    HyundaiCarInfo("Kia Sorento 2019", video_link="https://www.youtube.com/watch?v=Fkh3s6WHJz8", harness=Harness.hyundai_e),
+  ],
+  CAR.STINGER: HyundaiCarInfo("Kia Stinger 2018", video_link="https://www.youtube.com/watch?v=MJ94qoofYw0", harness=Harness.hyundai_c),
+  CAR.EV6: HyundaiCarInfo("Kia EV6 2022", "All", harness=Harness.hyundai_p),
+
+  # Genesis
+  CAR.GENESIS: HyundaiCarInfo("Hyundai Genesis 2015-16", min_enable_speed=19 * CV.MPH_TO_MS, harness=Harness.hyundai_j),
+  CAR.GENESIS_G70: HyundaiCarInfo("Genesis G70 2018", "All", harness=Harness.hyundai_f),
+  CAR.GENESIS_G80: HyundaiCarInfo("Genesis G80 2018", "All", harness=Harness.hyundai_h),
+  CAR.GENESIS_G90: HyundaiCarInfo("Genesis G90 2018", "All", harness=Harness.hyundai_c),
+}
 
 class Buttons:
   NONE = 0
@@ -337,7 +431,7 @@ FW_VERSIONS = {
       b'\xf1\x00DN ESC \x06 104\x19\x08\x01 58910-L0100',
       b'\xf1\x00DN ESC \x07 104\x19\x08\x01 58910-L0100',
       b'\xf1\x00DN ESC \x08 103\x19\x06\x01 58910-L1300',
-      b'\xf1\x8758910-L0100\xf1\x00DN ESC \a 106 \a\x01 58910-L0100',
+      b'\xf1\x8758910-L0100\xf1\x00DN ESC \x07 106 \x07\x01 58910-L0100',
       b'\xf1\x8758910-L0100\xf1\x00DN ESC \x06 104\x19\x08\x01 58910-L0100',
       b'\xf1\x8758910-L0100\xf1\x00DN ESC \x06 106 \x07\x01 58910-L0100',
       b'\xf1\x8758910-L0100\xf1\x00DN ESC \x07 104\x19\x08\x01 58910-L0100',
@@ -358,6 +452,7 @@ FW_VERSIONS = {
       b'HM6M1_0a0_F00',
       b'HM6M1_0a0_G20',
       b'HM6M2_0a0_BD0',
+      b'\xf1\x8739110-2S278\xf1\x82DNDVD5GMCCXXXL5B',
     ],
     (Ecu.transmission, 0x7e1, None): [
       b'\xf1\x00bcsh8p54  U903\x00\x00\x00\x00\x00\x00SDN8T16NB0z{\xd4v',
@@ -414,6 +509,7 @@ FW_VERSIONS = {
       b'\xf1\x87SAMFBA7978674GJ2gw\x87xgw\x97ywwwwvUGeUUeU\x87O\xfb\xff\x98w\x8f\xfffF\xf1\x81U913\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB2\n\xdd^\xbc',
       b'\xf1\x87SAMFBA9283024GJ2wwwwEUuWwwgwwwwwwwww\x87/\xfb\xff\x98w\x8f\xff<\xd3\xf1\x81U913\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB2\n\xdd^\xbc',
       b'\xf1\x87SAMFBA9708354GJ2wwwwVf\x86h\x88wx\x87xww\x87\x88\x88\x88\x88w/\xfa\xff\x97w\x8f\xff\x86\xa0\xf1\x81U913\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB2\n\xdd^\xbc',
+      b'\xf1\x87SANDB45316691GC6\x99\x99\x99\x99\x88\x88\xa8\x8avfwfwwww\x87wxwT\x9f\xfd\xff\x88wo\xff\x1c\xfa\xf1\x89HT6WAD10A1\xf1\x82SDN8G25NB3\x00\x00\x00\x00\x00\x00',
     ],
   },
   CAR.SONATA_HEV: {
@@ -474,6 +570,7 @@ FW_VERSIONS = {
       b'\xf1\x87\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xf1\x816T6B4051\x00\x00\xf1\x006T6H0_C2\x00\x006T6B4051\x00\x00TLF0G24SL2n\x8d\xbe\xd8',
       b'\xf1\x87LAHSGN012918KF10\x98\x88x\x87\x88\x88x\x87\x88\x88\x98\x88\x87w\x88w\x88\x88\x98\x886o\xf6\xff\x98w\x7f\xff3\x00\xf1\x816W3B1051\x00\x00\xf1\x006W351_C2\x00\x006W3B1051\x00\x00TLF0T20NL2\x00\x00\x00\x00',
       b'\xf1\x87LAHSGN012918KF10\x98\x88x\x87\x88\x88x\x87\x88\x88\x98\x88\x87w\x88w\x88\x88\x98\x886o\xf6\xff\x98w\x7f\xff3\x00\xf1\x816W3B1051\x00\x00\xf1\x006W351_C2\x00\x006W3B1051\x00\x00TLF0T20NL2H\r\xbdm',
+      b'\xf1\x87LAJSG49645724HF0\x87x\x87\x88\x87www\x88\x99\xa8\x89\x88\x99\xa8\x89\x88\x99\xa8\x89S_\xfb\xff\x87f\x7f\xff^2\xf1\x816W3B1051\x00\x00\xf1\x006W351_C2\x00\x006W3B1051\x00\x00TLF0T20NL2H\r\xbdm',
     ],
   },
   CAR.KONA: {
@@ -1011,6 +1108,7 @@ FW_VERSIONS = {
       b'\xf1\x8799110Q4000\xf1\x00DEev SCC F-CUP      1.00 1.00 99110-Q4000         ',
       b'\xf1\x8799110Q4100\xf1\x00DEev SCC F-CUP      1.00 1.00 99110-Q4100         ',
       b'\xf1\x8799110Q4500\xf1\x00DEev SCC F-CUP      1.00 1.00 99110-Q4500         ',
+      b'\xf1\x8799110Q4600\xf1\x00DEev SCC F-CUP      1.00 1.00 99110-Q4600         ',
       b'\xf1\x8799110Q4600\xf1\x00DEev SCC FNCUP      1.00 1.00 99110-Q4600         ',
       b'\xf1\x8799110Q4600\xf1\x00DEev SCC FHCUP      1.00 1.00 99110-Q4600         ',
     ],
@@ -1019,6 +1117,7 @@ FW_VERSIONS = {
       b'\xf1\x00DEE MFC  AT EUR LHD 1.00 1.00 99211-Q4000 191211',
       b'\xf1\x00DEE MFC  AT USA LHD 1.00 1.00 99211-Q4000 191211',
       b'\xf1\000DEE MFC  AT EUR LHD 1.00 1.00 99211-Q4100 200706',
+      b'\xf1\x00DEE MFC  AT USA LHD 1.00 1.01 99211-Q4500 210428',
       b'\xf1\x00OSE LKAS AT EUR LHD 1.00 1.00 95740-K4100 W40',
     ],
     (Ecu.eps, 0x7D4, None): [
@@ -1238,8 +1337,6 @@ DBC = {
   CAR.GENESIS_G80: dbc_dict('hyundai_kia_generic', None),
   CAR.GENESIS_G90: dbc_dict('hyundai_kia_generic', None),
 }
-
-STEER_THRESHOLD = 150
 
 
 def main():

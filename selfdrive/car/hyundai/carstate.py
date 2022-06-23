@@ -2,7 +2,7 @@ from cereal import car
 from common.conversions import Conversions as CV
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
-from selfdrive.car.hyundai.values import DBC, STEER_THRESHOLD, FEATURES, HYBRID_CAR, EV_HYBRID_CAR, CAR, HDA2_CAR
+from selfdrive.car.hyundai.values import DBC, CarControllerParams, FEATURES, HYBRID_CAR, EV_HYBRID_CAR, CAR, HDA2_CAR
 from selfdrive.car.interfaces import CarStateBase
 
 
@@ -45,6 +45,8 @@ class CarState(CarStateBase):
     self.cruiseState_speed = 0
     self.buttons_counter = 0
 
+    self.params = CarControllerParams(CP)
+
   def update(self, cp, cp2, cp_cam):
     if self.CP.carFingerprint in HDA2_CAR:
       return self.update_hda2(cp, cp_cam)
@@ -74,12 +76,12 @@ class CarState(CarStateBase):
     ret.steeringRateDeg = cp_sas.vl["SAS11"]["SAS_Speed"]
     ret.steeringTorque = cp_mdps.vl["MDPS12"]["CR_Mdps_StrColTq"]
     ret.steeringTorqueEps = cp_mdps.vl["MDPS12"]["CR_Mdps_OutTq"] / 10.  # scale to Nm
-    ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD
+    ret.steeringPressed = abs(ret.steeringTorque) > self.params.STEER_THRESHOLD
     ret.yawRate = cp.vl["ESP12"]["YAW_RATE"]
     ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["CGW1"]["CF_Gway_TurnSigLh"],
                                                                       cp.vl["CGW1"]["CF_Gway_TurnSigRh"])
 
-    if not ret.standstill and ret.steerFaultTemporary:
+    if not ret.standstill and cp_mdps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0:
       self.mdps_error_cnt += 1
     else:
       self.mdps_error_cnt = 0
@@ -113,13 +115,16 @@ class CarState(CarStateBase):
     ret.parkingBrake = cp.vl["TCS13"]["PBRAKE_ACT"] == 1
     ret.brakeLights = bool(cp.vl["TCS13"]["BrakeLight"] or ret.brakePressed)
 
+    ret.gasPressed = cp.vl["TCS13"]["DriverOverride"] == 1
+    
     if self.CP.carFingerprint in EV_HYBRID_CAR:
       if self.CP.carFingerprint in HYBRID_CAR:
         ret.gas = cp.vl["E_EMS11"]["CR_Vcu_AccPedDep_Pos"] / 254.
       else:
         ret.gas = cp.vl["E_EMS11"]["Accel_Pedal_Pos"] / 254.
       ret.gasPressed = ret.gas > 0
-    elif self.CP.hasEms:
+    
+    if self.CP.hasEms:
       ret.gas = cp.vl["EMS12"]["PV_AV_CAN"] / 100.
       ret.gasPressed = bool(cp.vl["EMS16"]["CF_Ems_AclAct"])
 
@@ -217,7 +222,7 @@ class CarState(CarStateBase):
     ret.steeringAngleDeg = cp.vl["STEERING_SENSORS"]["STEERING_ANGLE"] * -1
     ret.steeringTorque = cp.vl["MDPS"]["STEERING_COL_TORQUE"]
     ret.steeringTorqueEps = cp.vl["MDPS"]["STEERING_OUT_TORQUE"]
-    ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD
+    ret.steeringPressed = abs(ret.steeringTorque) > self.params.STEER_THRESHOLD
 
     ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["BLINKERS"]["LEFT_LAMP"],
                                                                       cp.vl["BLINKERS"]["RIGHT_LAMP"])
