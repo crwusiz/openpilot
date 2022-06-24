@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 from cereal import car
+from panda import Panda
 from common.params import Params
 from common.numpy_fast import interp
 from common.conversions import Conversions as CV
 from selfdrive.car.hyundai.values import CAR, Buttons, CarControllerParams, HDA2_CAR
 from selfdrive.car import STD_CARGO_KG, create_button_enable_events, create_button_event, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
-from selfdrive.controls.lib.latcontrol_torque import set_torque_tune
+from selfdrive.car.disable_ecu import disable_ecu
 from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
 
 ButtonType = car.CarState.ButtonEvent.Type
@@ -41,7 +42,6 @@ class CarInterface(CarInterfaceBase):
 
     # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
     # hyundai
-    torque_params = CarInterfaceBase.get_torque_params(candidate)
     if candidate == CAR.ELANTRA_I30:
       ret.mass = 1340. + STD_CARGO_KG
       ret.wheelbase = 2.72
@@ -306,8 +306,7 @@ class CarInterface(CarInterfaceBase):
 
     # Torque -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "3":
-      set_torque_tune(ret.lateralTuning, torque_params['LAT_ACCEL_FACTOR'], torque_params['FRICTION'])
-      #set_torque_tune(ret.lateralTuning, 2.0, 0.01, 0.0)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05
@@ -361,7 +360,15 @@ class CarInterface(CarInterfaceBase):
 
     ret.pcmCruise = not ret.radarOffCan
 
+    #if ret.openpilotLongitudinalControl:
+    #  ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LONG
+
     return ret
+
+  @staticmethod
+  #def init(CP, logcan, sendcan):
+  #  if CP.openpilotLongitudinalControl:
+  #    disable_ecu(logcan, sendcan, addr=0x7d0, com_cont_req=b'\x28\x83\x01')
 
   def _update(self, c):
     ret = self.CS.update(self.cp, self.cp2, self.cp_cam)
