@@ -443,16 +443,6 @@ C2NetworkPanel::C2NetworkPanel(QWidget *parent) : QWidget(parent) {
   });
   list->addItem(pandaflashbtn);
 
-  //auto cleardtcbtn = new ButtonControl("DTC Clear", "RUN");
-  auto cleardtcbtn = new ButtonControl("오류코드 제거", "실행");
-  QObject::connect(cleardtcbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/scripts/cleardtc.sh");
-    }
-  });
-  list->addItem(cleardtcbtn);
-
   //auto pandarecoverbtn = new ButtonControl("Panda Firmware Recover", "RUN");
   auto pandarecoverbtn = new ButtonControl("판다 펌웨어 복구", "실행");
   QObject::connect(pandarecoverbtn, &ButtonControl::clicked, [=]() {
@@ -735,9 +725,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   //"New radar interface Enable",
                                   "scc 레이더 배선개조없이 사용가능한 일부차종을 위한 옵션입니다",
                                   "../assets/offroad/icon_road.png", this));
-  toggles.append(new ParamControl("HapticFeedbackWhenSpeedCamera", "Haptic feedback (speed-cam alert)",
-                                  "Haptic feedback when a speed camera is detected",
-                                  "../assets/offroad/icon_openpilot.png", this));
   for(ParamControl *toggle : toggles) {
     if(main_layout->count() != 0) {
     }

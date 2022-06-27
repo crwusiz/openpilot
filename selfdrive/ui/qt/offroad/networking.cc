@@ -159,16 +159,6 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   });
   list->addItem(pandaflashbtn);
 
-  //auto cleardtcbtn = new ButtonControl("DTC Clear", "RUN");
-  auto cleardtcbtn = new ButtonControl("오류코드 제거", "실행");
-  QObject::connect(cleardtcbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/scripts/cleardtc.sh");
-    }
-  });
-  list->addItem(cleardtcbtn);
-
   //auto pandarecoverbtn = new ButtonControl("Panda Firmware Recover", "RUN");
   auto pandarecoverbtn = new ButtonControl("판다 펌웨어 복구", "실행");
   QObject::connect(pandarecoverbtn, &ButtonControl::clicked, [=]() {

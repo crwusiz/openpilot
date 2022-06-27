@@ -182,6 +182,7 @@ struct CarState {
   stockAeb @30 :Bool;
   stockFcw @31 :Bool;
   espDisabled @32 :Bool;
+  accFaulted @44 :Bool;
 
   # cruise state
   cruiseState @10 :CruiseState;
@@ -209,12 +210,9 @@ struct CarState {
   leftBlindspot @33 :Bool; # Is there something blocking the left lane change
   rightBlindspot @34 :Bool; # Is there something blocking the right lane change
 
-  cluSpeedMs @41 :Float32;
-  cruiseGap @42 : Int32;
-  autoHold @43 : Int32;
-  tpms @44 : Tpms;
-  vCluRatio @45 :Float32;
-  aBasis @46 :Float32;
+  cruiseGap @41 : Int32;
+  autoHold @42 : Int32;
+  tpms @43 : Tpms;
 
   struct Tpms {
     fl @0 :Float32;
@@ -447,6 +445,7 @@ struct CarParams {
   maxSteeringAngleDeg @54 :Float32;
   safetyConfigs @62 :List(SafetyConfig);
   alternativeExperience @65 :Int16;      # panda flag for features like no disengage on gas
+  maxLateralAccel @68 :Float32;
 
   steerMaxBPDEPRECATED @11 :List(Float32);
   steerMaxVDEPRECATED @12 :List(Float32);
@@ -509,17 +508,17 @@ struct CarParams {
     safetyParam @1 :Int16;
   }
 
-  mdpsBus @68: Int8;
-  sasBus @69: Int8;
-  sccBus @70: Int8;
-  enableAutoHold @71 :Bool;
-  hasScc13 @72 :Bool;
-  hasScc14 @73 :Bool;
-  hasEms @74 :Bool;
-  hasLfaHda @75 :Bool;
-  steerFaultMaxAngle @76 :Int16;
-  steerFaultMaxFrames @77 :Int16;
-  aebFcw @78 :Bool;
+  steerFaultMaxAngle @69 :Int16;
+  steerFaultMaxFrames @70 :Int16;
+  mdpsBus @71: Int8;
+  sasBus @72: Int8;
+  sccBus @73: Int8;
+  enableAutoHold @74 :Bool;
+  hasScc13 @75 :Bool;
+  hasScc14 @76 :Bool;
+  hasEms @77 :Bool;
+  hasLfaHda @78 :Bool;
+  aebFcw @79 :Bool;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);
@@ -542,8 +541,8 @@ struct CarParams {
     ki @2 :Float32;
     friction @3 :Float32;
     kf @4 :Float32;
-    kd @5 :Float32;
-    deadzone @6 :Float32;
+    steeringAngleDeadzoneDeg @5 :Float32;
+    kd @6 :Float32;
   }
 
   struct LongitudinalPIDTuning {

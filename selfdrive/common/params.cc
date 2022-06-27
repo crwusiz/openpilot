@@ -196,7 +196,6 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"SccSmootherSlowOnCurves", PERSISTENT},
     {"SccSmootherSyncGasPressed", PERSISTENT},
     {"NewRadarInterface", PERSISTENT},
-    {"HapticFeedbackWhenSpeedCamera", PERSISTENT},
 };
 
 } // namespace

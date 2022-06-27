@@ -565,6 +565,8 @@ struct ControlsState @0x97ff69c53601abf1 {
   ufAccelCmd @33 :Float32;
   aTarget @35 :Float32;
   curvature @37 :Float32;  # path curvature from vehicle model
+  desiredCurvature @61 :Float32;  # lag adjusted curvatures used by lateral controllers
+  desiredCurvatureRate @62 :Float32;
   forceDecel @51 :Bool;
 
   # UI alerts
@@ -589,15 +591,7 @@ struct ControlsState @0x97ff69c53601abf1 {
     torqueState @60 :LateralTorqueState;
   }
 
-  angleSteers @61 :Float32;
-  applyAccel @62 :Float32;
-  aReqValue @63 :Float32;
-  aReqValueMin @64 :Float32;
-  aReqValueMax @65 :Float32;
-
-  sccStockCamAct @66 :Float32;
-  sccStockCamStatus @67 :Float32;
-  lateralControlSelect @68 :UInt8;
+  lateralControlSelect @63 :UInt8;
 
   enum OpenpilotState @0xdbe58b96d2d1ac61 {
     disabled @0;
@@ -1767,23 +1761,15 @@ struct EncodeData {
 }
 
 struct RoadLimitSpeed {
-    active @0 :Int16;
-    roadLimitSpeed @1 :Int16;
-    isHighway @2 :Bool;
-    camType @3 :Int16;
-    camLimitSpeedLeftDist @4 :Int16;
-    camLimitSpeed @5 :Int16;
-    sectionLimitSpeed @6 :Int16;
-    sectionLeftDist @7 :Int16;
-    camSpeedFactor @8 :Float32;
-    restArea @9 :List(RestArea);
-
-    struct RestArea {
-      image @0 :Text;
-      title @1 :Text;
-      oilPrice @2 :Text;
-      distance @3 :Text;
-    }
+  active @0 :Int16;
+  roadLimitSpeed @1 :Int16;
+  isHighway @2 :Bool;
+  camType @3 :Int16;
+  camLimitSpeedLeftDist @4 :Int16;
+  camLimitSpeed @5 :Int16;
+  sectionLimitSpeed @6 :Int16;
+  sectionLeftDist @7 :Int16;
+  camSpeedFactor @8 :Float32;
 }
 
 struct Event {

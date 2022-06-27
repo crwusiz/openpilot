@@ -41,13 +41,13 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, cut_st
 
   dat = packer.make_can_msg("LKAS11", 0, values)[2]
 
-  if car_fingerprint in CHECKSUM["crc8"]: # CRC Checksum
-    dat = dat[:6] + dat[7:8]
+  if car_fingerprint in CHECKSUM["crc8"]:
+    dat = dat[:6] + dat[7:8]  # CRC Checksum
     checksum = hyundai_checksum(dat)
-  elif car_fingerprint in CHECKSUM["6B"]: # Checksum of first 6 Bytes
-    checksum = sum(dat[:6]) % 256
-  else:                                   # Checksum of first 6 Bytes and last Byte
-    checksum = (sum(dat[:6]) + dat[7]) % 256
+  elif car_fingerprint in CHECKSUM["6B"]:
+    checksum = sum(dat[:6]) % 256  # Checksum of first 6 Bytes
+  else:
+    checksum = (sum(dat[:6]) + dat[7]) % 256  # Checksum of first 6 Bytes and last Byte
   values["CF_Lkas_Chksum"] = checksum
 
   return packer.make_can_msg("LKAS11", bus, values)
@@ -65,9 +65,9 @@ def create_clu11(packer, bus, clu11, button, speed):
 def create_lfahda_mfc(packer, enabled, active):
   values = {
     "LFA_Icon_State": 2 if enabled else 0,
-    "HDA_Active": 0,
+    "HDA_Active": 1 if active > 0 else 0,
     "HDA_Icon_State": 2 if active > 0 else 0,
-    "HDA_VSetReq": 0,
+    #"HDA_VSetReq": 0,
   }
 
   return packer.make_can_msg("LFAHDA_MFC", 0, values)
@@ -84,7 +84,7 @@ def create_hda_mfc(packer, active, CS, left_lane, right_lane):
 
   values["HDA_LdwSysState"] = ldwSysState
   values["HDA_USM"] = 2
-  values["HDA_VSetReq"] = 0
+  values["HDA_VSetReq"] = 100
   values["HDA_Icon_Wheel"] = 1 if active > 1 and CS.out.cruiseState.enabledAcc else 0
   values["HDA_Icon_State"] = 2 if active > 1 else 0
   values["HDA_Chime"] = 1 if active > 1 else 0
@@ -113,16 +113,15 @@ def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc1
   if not scc_live:
     values["MainMode_ACC"] = 1
     values["VSetDis"] = set_speed
-    values["ObjValid"] = lead_visible #1 if enabled else 0
+    values["ObjValid"] = 1 if enabled else 0
     values["DriverAlertDisplay"] = 0
-    values["ACC_ObjStatus"] = lead_visible #1 if lead_visible else 0
+    #values["ACC_ObjStatus"] = 0
 
   return packer.make_can_msg("SCC11", 0, values)
 
 
 def create_scc12(packer, apply_accel, enabled, cnt, scc_live, scc12, gaspressed, brakepressed, standstill, car_fingerprint):
   values = copy.copy(scc12)
-  # from xps-genesis
 
   if car_fingerprint in EV_HYBRID_CAR:
     if enabled and not brakepressed:
@@ -135,7 +134,6 @@ def create_scc12(packer, apply_accel, enabled, cnt, scc_live, scc12, gaspressed,
       values["ACCMode"] = 0
       values["aReqRaw"] = 0
       values["aReqValue"] = 0
-
     if not scc_live:
       values["CR_VSM_Alive"] = cnt
 
@@ -148,7 +146,7 @@ def create_scc12(packer, apply_accel, enabled, cnt, scc_live, scc12, gaspressed,
 
   values["CR_VSM_ChkSum"] = 0
   dat = packer.make_can_msg("SCC12", 0, values)[2]
-  values["CR_VSM_ChkSum"] = 16 - sum([sum(divmod(i, 16)) for i in dat]) % 16
+  values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in dat) % 0x10
 
   return packer.make_can_msg("SCC12", 0, values)
 
@@ -158,10 +156,8 @@ def create_scc13(packer, scc13):
 
   return packer.make_can_msg("SCC13", 0, values)
 
-
 def create_scc14(packer, enabled, e_vgo, standstill, accel, gaspressed, objgap, scc14):
   values = copy.copy(scc14)
-  # from xps-genesis
 
   if enabled:
     values["ACCMode"] = 2 if gaspressed and (accel > -0.2) else 1
@@ -184,7 +180,7 @@ def create_scc14(packer, enabled, e_vgo, standstill, accel, gaspressed, objgap, 
 
 
 # ---------------------------------------------------------------------------------------
-def create_acc_commands(packer, enabled, accel, jerk, idx, lead_visible, set_speed, stopping):
+def create_acc_commands(packer, enabled, accel, jerk, idx, lead_visible, set_speed, stopping, gas_pressed):
   commands = []
 
   scc11_values = {
@@ -192,8 +188,8 @@ def create_acc_commands(packer, enabled, accel, jerk, idx, lead_visible, set_spe
     "TauGapSet": 4,
     "VSetDis": set_speed if enabled else 0,
     "AliveCounterACC": idx % 0x10,
-    "ObjValid": 1 if lead_visible else 0,
-    "ACC_ObjStatus": 1 if lead_visible else 0,
+    "ObjValid": 0,  # TODO: these two bits may allow for better longitudinal control
+    "ACC_ObjStatus": 0,
     "ACC_ObjLatPos": 0,
     "ACC_ObjRelSpd": 0,
     "ACC_ObjDist": 0,
@@ -201,10 +197,10 @@ def create_acc_commands(packer, enabled, accel, jerk, idx, lead_visible, set_spe
   commands.append(packer.make_can_msg("SCC11", 0, scc11_values))
 
   scc12_values = {
-    "ACCMode": 1 if enabled else 0,
-    "StopReq": 1 if enabled and stopping else 0,
-    "aReqRaw": accel if enabled else 0,
-    "aReqValue": accel if enabled else 0, # stock ramps up and down respecting jerk limit until it reaches aReqRaw
+    "ACCMode": 2 if enabled and gas_pressed else 1 if enabled else 0,
+    "StopReq": 1 if stopping else 0,
+    "aReqRaw": accel,
+    "aReqValue": accel,  # stock ramps up and down respecting jerk limit until it reaches aReqRaw
     "CR_VSM_Alive": idx % 0xF,
   }
   scc12_dat = packer.make_can_msg("SCC12", 0, scc12_values)[2]
@@ -215,9 +211,9 @@ def create_acc_commands(packer, enabled, accel, jerk, idx, lead_visible, set_spe
   scc14_values = {
     "ComfortBandUpper": 0.0, # stock usually is 0 but sometimes uses higher values
     "ComfortBandLower": 0.0, # stock usually is 0 but sometimes uses higher values
-    "JerkUpperLimit": max(jerk, 1.0) if (enabled and not stopping) else 0, # stock usually is 1.0 but sometimes uses higher values
-    "JerkLowerLimit": max(-jerk, 1.0) if enabled else 0, # stock usually is 0.5 but sometimes uses higher values
-    "ACCMode": 1 if enabled else 4, # stock will always be 4 instead of 0 after first disengage
+    "JerkUpperLimit": max(jerk, 1.0) if not stopping else 0, # stock usually is 1.0 but sometimes uses higher values
+    "JerkLowerLimit": max(-jerk, 1.0), # stock usually is 0.5 but sometimes uses higher values
+    "ACCMode": 2 if enabled and gas_pressed else 1 if enabled else 4, # stock will always be 4 instead of 0 after first disengage
     "ObjGap": 2 if lead_visible else 0, # 5: >30, m, 4: 25-30 m, 3: 20-25 m, 2: < 20 m, 0: no lead
   }
   commands.append(packer.make_can_msg("SCC14", 0, scc14_values))

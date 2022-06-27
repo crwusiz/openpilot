@@ -1,14 +1,15 @@
 import math
+
 from cereal import car
+from common.conversions import Conversions as CV
 from common.numpy_fast import clip, interp
 from common.realtime import DT_MDL
-from common.conversions import Conversions as CV
 from selfdrive.modeld.constants import T_IDXS
 
 # WARNING: this value was determined based on the model's training distribution,
 #          model predictions above this speed can be unpredictable
 # kph
-V_CRUISE_MAX = 150
+V_CRUISE_MAX = 145
 V_CRUISE_MIN = 30
 V_CRUISE_DELTA_MI = 5 * CV.MPH_TO_KPH
 V_CRUISE_DELTA_KM = 10
@@ -20,16 +21,17 @@ CONTROL_N = 17
 CAR_ROTATION_RADIUS = 0.0
 
 # EU guidelines
-MAX_LATERAL_JERK = 5.0
+MAX_LATERAL_JERK = 10.0
 
+ButtonType = car.CarState.ButtonEvent.Type
 CRUISE_LONG_PRESS = 50
 CRUISE_NEAREST_FUNC = {
-  car.CarState.ButtonEvent.Type.accelCruise: math.ceil,
-  car.CarState.ButtonEvent.Type.decelCruise: math.floor,
+  ButtonType.accelCruise: math.ceil,
+  ButtonType.decelCruise: math.floor,
 }
 CRUISE_INTERVAL_SIGN = {
-  car.CarState.ButtonEvent.Type.accelCruise: +1,
-  car.CarState.ButtonEvent.Type.decelCruise: -1,
+  ButtonType.accelCruise: +1,
+  ButtonType.decelCruise: -1,
 }
 
 
@@ -37,6 +39,16 @@ class MPC_COST_LAT:
   PATH = 1.0
   HEADING = 1.0
   STEER_RATE = 1.0
+
+
+def apply_deadzone(error, deadzone):
+  if error > deadzone:
+    error -= deadzone
+  elif error < - deadzone:
+    error += deadzone
+  else:
+    error = 0.
+  return error
 
 
 def rate_limit(new_value, last_value, dw_step, up_step):
@@ -82,7 +94,7 @@ def update_v_cruise(v_cruise_kph, buttonEvents, button_timers, enabled, metric):
 def initialize_v_cruise(v_ego, buttonEvents, v_cruise_last):
   for b in buttonEvents:
     # 250kph or above probably means we never had a set speed
-    if b.type == car.CarState.ButtonEvent.Type.accelCruise and v_cruise_last < 250:
+    if b.type in (ButtonType.accelCruise, ButtonType.resumeCruise) and v_cruise_last < 250:
       return v_cruise_last
 
   return int(round(clip(v_ego * CV.MS_TO_KPH, V_CRUISE_ENABLE_MIN, V_CRUISE_MAX)))
@@ -93,26 +105,26 @@ def get_lag_adjusted_curvature(CP, v_ego, psis, curvatures, curvature_rates):
     psis = [0.0]*CONTROL_N
     curvatures = [0.0]*CONTROL_N
     curvature_rates = [0.0]*CONTROL_N
+  v_ego = max(v_ego, 0.1)
 
   # TODO this needs more thought, use .2s extra for now to estimate other delays
   delay = CP.steerActuatorDelay + .2
-  current_curvature = curvatures[0]
-  psi = interp(delay, T_IDXS[:CONTROL_N], psis)
-  desired_curvature_rate = curvature_rates[0]
 
   # MPC can plan to turn the wheel and turn back before t_delay. This means
   # in high delay cases some corrections never even get commanded. So just use
   # psi to calculate a simple linearization of desired curvature
-  curvature_diff_from_psi = psi / (max(v_ego, 1e-1) * delay) - current_curvature
-  desired_curvature = current_curvature + 2 * curvature_diff_from_psi
+  current_curvature_desired = curvatures[0]
+  psi = interp(delay, T_IDXS[:CONTROL_N], psis)
+  average_curvature_desired = psi / (v_ego * delay)
+  desired_curvature = 2 * average_curvature_desired - current_curvature_desired
 
-  v_ego = max(v_ego, 0.1)
+  # This is the "desired rate of the setpoint" not an actual desired rate
+  desired_curvature_rate = curvature_rates[0]
   max_curvature_rate = MAX_LATERAL_JERK / (v_ego**2)
   safe_desired_curvature_rate = clip(desired_curvature_rate,
-                                          -max_curvature_rate,
-                                          max_curvature_rate)
+                                     -max_curvature_rate, max_curvature_rate)
   safe_desired_curvature = clip(desired_curvature,
-                                     current_curvature - max_curvature_rate * DT_MDL,
-                                     current_curvature + max_curvature_rate * DT_MDL)
+                                current_curvature_desired - max_curvature_rate * DT_MDL,
+                                current_curvature_desired + max_curvature_rate * DT_MDL)
 
   return safe_desired_curvature, safe_desired_curvature_rate
