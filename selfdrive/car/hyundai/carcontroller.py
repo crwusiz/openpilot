@@ -173,7 +173,7 @@ class CarController:
 
   def update_auto_resume(self, CC, CS, clu11_speed, can_sends):
     # fix auto resume - by neokii
-    if CS.out.cruiseState.standstill and not CS.out.gasPressed:
+    if CC.cruiseControl.resume and not CS.out.gasPressed:
       if self.last_lead_distance == 0:
         self.last_lead_distance = CS.lead_distance
         self.resume_cnt = 0
@@ -267,7 +267,7 @@ class CarController:
         self.last_button_frame = self.frame
 
       # cruise standstill resume
-      elif CC.enabled and CS.out.cruiseState.standstill:
+      elif CC.cruiseControl.resume:
         can_sends.append(hda2can.create_buttons(self.packer, CS.buttons_counter + 1, False, True))
         self.last_button_frame = self.frame
 

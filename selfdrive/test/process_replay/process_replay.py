@@ -239,7 +239,7 @@ def ublox_rcv_callback(msg):
 
 
 def laika_rcv_callback(msg, CP, cfg, fsm):
-  if msg.ubloxGnss.which() == "measurementReport":
+  if msg.which() == 'ubloxGnss' and msg.ubloxGnss.which() == "measurementReport":
     return ["gnssMeasurements"], True
   else:
     return [], True
@@ -352,6 +352,7 @@ CONFIGS = [
     subtest_name="Offline",
     pub_sub={
       "ubloxGnss": ["gnssMeasurements"],
+      "clocks": []
     },
     ignore=["logMonoTime"],
     init_callback=get_car_params,
@@ -364,6 +365,7 @@ CONFIGS = [
     proc_name="laikad",
     pub_sub={
       "ubloxGnss": ["gnssMeasurements"],
+      "clocks": []
     },
     ignore=["logMonoTime"],
     init_callback=get_car_params,
@@ -398,8 +400,8 @@ def setup_env(simulation=False, CP=None, cfg=None):
 
   if cfg is not None:
     # Clear all custom processConfig environment variables
-    for cfg in CONFIGS:
-      for k, _ in cfg.environ.items():
+    for config in CONFIGS:
+      for k, _ in config.environ.items():
         if k in os.environ:
           del os.environ[k]
 
