@@ -382,10 +382,6 @@ void SoftwarePanel::updateLabels() {
   osVersionLbl->setText(QString::fromStdString(Hardware::get_os_version()).trimmed());
 }
 
-QWidget *network_panel(QWidget *parent) {
-  return new Networking(parent);
-}
-
 static QStringList get_list(const char* path) {
   QStringList stringList;
   QFile textFile(path);
@@ -451,16 +447,15 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
   QObject::connect(device, &DevicePanel::closeSettings, this, &SettingsWindow::closeSettings);
 
   QList<QPair<QString, QWidget *>> panels = {
-    //{tr("Device"), device},
-    //{tr("Network"), network_panel(this)},
-    //{tr("Toggles"), new TogglesPanel(this)},
-    //{tr("Software"), new SoftwarePanel(this)},
-    //{tr("Community"), new CommunityPanel(this)},
-    {"장치", device},
-    {"설정", network_panel(this)},
-    {"토글", new TogglesPanel(this)},
-    {"정보", new SoftwarePanel(this)},
-    {"커뮤니티", new CommunityPanel(this)},
+    {tr("Device"), device},
+    {tr("Network"), new Networking(this)},
+    {tr("Toggles"), new TogglesPanel(this)},
+    {tr("Software"), new SoftwarePanel(this)},
+    {tr("장치"), device},
+    {tr("설정"), new Networking(this)},
+    {tr("토글"), new TogglesPanel(this)},
+    {tr("정보"), new SoftwarePanel(this)},
+    {tr("커뮤니티"), new CommunityPanel(this)},
   };
 
 #ifdef ENABLE_MAPS
