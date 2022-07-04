@@ -451,11 +451,11 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
     {tr("Network"), new Networking(this)},
     {tr("Toggles"), new TogglesPanel(this)},
     {tr("Software"), new SoftwarePanel(this)},
-    {tr("장치"), device},
-    {tr("설정"), new Networking(this)},
-    {tr("토글"), new TogglesPanel(this)},
-    {tr("정보"), new SoftwarePanel(this)},
-    {tr("커뮤니티"), new CommunityPanel(this)},
+    {"장치", device},
+    {"설정", new Networking(this)},
+    {"토글", new TogglesPanel(this)},
+    {"정보", new SoftwarePanel(this)},
+    {"커뮤니티", new CommunityPanel(this)},
   };
 
 #ifdef ENABLE_MAPS
