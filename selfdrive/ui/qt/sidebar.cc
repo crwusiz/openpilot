@@ -56,6 +56,12 @@ void Sidebar::updateState(const UIState &s) {
   int strength = (int)deviceState.getNetworkStrength();
   setProperty("netStrength", strength > 0 ? strength + 1 : 0);
   setProperty("wifiAddr", deviceState.getWifiIpAddress().cStr());
+  setProperty("batPercent", (int)deviceState.getBatteryPercent());
+
+  QString batStatus = "DisCharging";
+  std::string batteryStatus = deviceState.getBatteryStatus();
+  batStatus = QString::fromUtf8(batteryStatus.c_str());
+  setProperty("batStatus", batStatus);
 
   ItemStatus connectStatus;
   auto last_ping = deviceState.getLastAthenaPingTime();
@@ -87,8 +93,6 @@ void Sidebar::updateState(const UIState &s) {
     pandaStatus = {"GPS\nSEARCH", warning_color};
   }*/
   setProperty("pandaStatus", QVariant::fromValue(pandaStatus));
-  m_battery_img = deviceState.getBatteryStatus() == "Charging" ? 1 : 0;
-  m_batteryPercent = deviceState.getBatteryPercent();
 }
 
 void Sidebar::paintEvent(QPaintEvent *event) {
@@ -117,15 +121,15 @@ void Sidebar::paintEvent(QPaintEvent *event) {
 
 #ifdef QCOM
   // battery status
-  p.drawImage(68, 180, battery_imgs[m_battery_img]); // signal_imgs to battery_imgs
+
+  p.drawImage(68, 180, bat_imgs[bat_status == "Charging" ? 1 : 0]); // signal_imgs to battery_imgs
   configFont(p, "Open Sans", 32, "Bold");
   p.setPen(QColor(0x00, 0x00, 0x00));
   const QRect r = QRect(80, 193, 100, 50);
-  char battery_str[5];
-  snprintf(battery_str, sizeof(battery_str), "%d%%", m_batteryPercent);
-  p.drawText(r, Qt::AlignCenter, battery_str);
+  char bat_str[5];
+  snprintf(bat_str, sizeof(bat_str), "%d%%", bat_percent);
+  p.drawText(r, Qt::AlignCenter, bat_str);
 #endif
-
 
   configFont(p, "Open Sans", 30, "Regular");
   p.setPen(QColor(0xff, 0xff, 0xff));
