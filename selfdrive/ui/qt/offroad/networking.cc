@@ -27,8 +27,7 @@ Networking::Networking(QWidget* parent, bool show_advanced) : QFrame(parent) {
   QVBoxLayout* vlayout = new QVBoxLayout(wifiScreen);
   vlayout->setContentsMargins(20, 20, 20, 20);
   if (show_advanced) {
-    //QPushButton* advancedSettings = new QPushButton(tr("Advanced"));
-    QPushButton* advancedSettings = new QPushButton("고급 설정");
+    QPushButton* advancedSettings = new QPushButton(tr("Advanced"));
     advancedSettings->setObjectName("advanced_btn");
     advancedSettings->setStyleSheet("margin-right: 30px;");
     advancedSettings->setFixedSize(400, 100);
@@ -119,8 +118,7 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   main_layout->setSpacing(20);
 
   // Back button
-  //QPushButton* back = new QPushButton(tr("Back"));
-  QPushButton* back = new QPushButton("wifi 설정");
+  QPushButton* back = new QPushButton(tr("Back"));
   back->setObjectName("back_btn");
   back->setFixedSize(400, 100);
   connect(back, &QPushButton::clicked, [=]() { emit backPress(); });
@@ -268,8 +266,7 @@ WifiUI::WifiUI(QWidget *parent, WifiManager* wifi) : QWidget(parent), wifi(wifi)
   checkmark = QPixmap(ASSET_PATH + "offroad/icon_checkmark.svg").scaledToWidth(49, Qt::SmoothTransformation);
   circled_slash = QPixmap(ASSET_PATH + "img_circled_slash.svg").scaledToWidth(49, Qt::SmoothTransformation);
 
-  //QLabel *scanning = new QLabel(tr("Scanning for networks..."));
-  QLabel *scanning = new QLabel("wifi ssid를 검색중입니다...");
+  QLabel *scanning = new QLabel(tr("Scanning for networks..."));
   scanning->setStyleSheet("font-size: 65px;");
   main_layout->addWidget(scanning, 0, Qt::AlignCenter);
 
@@ -322,8 +319,7 @@ void WifiUI::refresh() {
   clearLayout(main_layout);
 
   if (wifi->seenNetworks.size() == 0) {
-    //QLabel *scanning = new QLabel(tr("Scanning for networks..."));
-    QLabel *scanning = new QLabel("wifi ssid를 검색중입니다...");
+    QLabel *scanning = new QLabel(tr("Scanning for networks..."));
     scanning->setStyleSheet("font-size: 65px;");
     main_layout->addWidget(scanning, 0, Qt::AlignCenter);
     return;
@@ -349,16 +345,14 @@ void WifiUI::refresh() {
     hlayout->addWidget(ssidLabel, network.connected == ConnectedType::CONNECTING ? 0 : 1);
 
     if (network.connected == ConnectedType::CONNECTING) {
-      //QPushButton *connecting = new QPushButton(tr("CONNECTING..."));
-      QPushButton *connecting = new QPushButton("연결중...");
+      QPushButton *connecting = new QPushButton(tr("CONNECTING..."));
       connecting->setObjectName("connecting");
       hlayout->addWidget(connecting, 2, Qt::AlignLeft);
     }
 
     // Forget button
     if (wifi->isKnownConnection(network.ssid) && !wifi->isTetheringEnabled()) {
-      //QPushButton *forget_btn = new QPushButton(tr("FORGET"));
-      QPushButton *forget_btn = new QPushButton("저장안함");
+      QPushButton *forget_btn = new QPushButton(tr("FORGET"));
       forget_btn->setObjectName("forget_btn");
       QObject::connect(forget_btn, &QPushButton::clicked, [=]() {
         if (ConfirmationDialog::confirm(tr("Forget Wi-Fi Network \"") + QString::fromUtf8(network.ssid) + "\"?", this)) {

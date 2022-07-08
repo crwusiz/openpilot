@@ -67,8 +67,7 @@ InputDialog::InputDialog(const QString &title, QWidget *parent, const QString &s
     vlayout->addWidget(sublabel, 1, Qt::AlignTop | Qt::AlignLeft);
   }
 
-  //QPushButton* cancel_btn = new QPushButton(tr("Cancel"));
-  QPushButton* cancel_btn = new QPushButton("취소");
+  QPushButton* cancel_btn = new QPushButton(tr("Cancel"));
   cancel_btn->setFixedSize(386, 125);
   cancel_btn->setStyleSheet(R"(
     font-size: 48px;
@@ -218,14 +217,12 @@ ConfirmationDialog::ConfirmationDialog(const QString &prompt_text, const QString
 }
 
 bool ConfirmationDialog::alert(const QString &prompt_text, QWidget *parent) {
-  //ConfirmationDialog d = ConfirmationDialog(prompt_text, tr("Ok"), "", parent);
-  ConfirmationDialog d = ConfirmationDialog(prompt_text, "확인", "", parent);
+  ConfirmationDialog d = ConfirmationDialog(prompt_text, tr("Ok"), "", parent);
   return d.exec();
 }
 
 bool ConfirmationDialog::confirm(const QString &prompt_text, QWidget *parent) {
-  //ConfirmationDialog d = ConfirmationDialog(prompt_text, tr("Ok"), tr("Cancel"), parent);
-  ConfirmationDialog d = ConfirmationDialog(prompt_text, "확인", "취소", parent);
+  ConfirmationDialog d = ConfirmationDialog(prompt_text, tr("Ok"), tr("Cancel"), parent);
   return d.exec();
 }
 
@@ -257,7 +254,6 @@ RichTextDialog::RichTextDialog(const QString &prompt_text, const QString &btn_te
 }
 
 bool RichTextDialog::alert(const QString &prompt_text, QWidget *parent) {
-  //auto d = RichTextDialog(prompt_text, tr("Ok"), parent);
-  auto d = RichTextDialog(prompt_text, "확인", parent);
+  auto d = RichTextDialog(prompt_text, tr("Ok"), parent);
   return d.exec();
 }
