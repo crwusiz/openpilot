@@ -29,3 +29,4 @@ QMapbox::CoordinatesCollections capnp_coordinate_list_to_collection(const capnp:
 QMapbox::CoordinatesCollections coordinate_list_to_collection(QList<QGeoCoordinate> coordinate_list);
 
 std::optional<QMapbox::Coordinate> coordinate_from_param(std::string param);
+double angle_difference(double angle1, double angle2);

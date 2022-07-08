@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 import argparse
-import os
 import json
+import os
 
-from common.basedir import BASEDIR
+BASEDIR = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../"))
 
 UI_DIR = os.path.join(BASEDIR, "selfdrive", "ui")
 TRANSLATIONS_DIR = os.path.join(UI_DIR, "translations")
