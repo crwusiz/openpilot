@@ -41,14 +41,12 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       tr("Use the openpilot system for adaptive cruise control and lane keep driver assistance. Your attention is required at all times to use this feature. Changing this setting takes effect when the car is powered off."),
       "../assets/offroad/icon_openpilot.png",
     },
-/*
     {
       "IsRHD",
       tr("Enable Right-Hand Drive"),
       tr("Allow openpilot to obey left-hand traffic conventions and perform driver monitoring on right driver seat."),
       "../assets/offroad/icon_openpilot_mirrored.png",
     },
-*/
     {
       "IsMetric",
       tr("Use Metric System"),
@@ -63,23 +61,19 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
     },
     {
      "AutoLaneChangeEnabled",
-     //"Enable AutoLaneChange",
-     //"Operation of the turn signal at 60㎞/h speed will result in a short change of the vehicle",
-     "자동 차선변경 사용",
-     "60㎞/h 이상의 속도로 주행시 방향지시등을 작동하면 잠시후 자동차선변경을 수행합니다. 안전한 사용을위해 후측방감지기능이 있는 차량만 사용하시기바랍니다.",
+     tr("Enable AutoLaneChange"),
+     tr("Operation of the turn signal at 60㎞/h speed will result in a short change of the vehicle"),
      "../assets/offroad/icon_lca.png",
     },
-/*
     {
       "RecordFront",
       tr("Record and Upload Driver Camera"),
       tr("Upload data from the driver facing camera and help improve the driver monitoring algorithm."),
       "../assets/offroad/icon_monitoring.png",
     },
-*/
     {
       "EndToEndToggle",
-      tr("\U0001f96c Disable use of lanelines \U0001f96c"),
+      tr("Disable use of lanelines"),
       tr("In this mode openpilot will ignore lanelines and just drive how it thinks a human would."),
       "../assets/offroad/icon_road.png",
     },
@@ -152,7 +146,6 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     addItem(retrainingBtn);
   }
 
-  /*
   if (Hardware::TICI()) {
     auto regulatoryBtn = new ButtonControl(tr("Regulatory"), tr("VIEW"), "");
     connect(regulatoryBtn, &ButtonControl::clicked, [=]() {
@@ -161,7 +154,6 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     });
     addItem(regulatoryBtn);
   }
-  */
 
   auto translateBtn = new ButtonControl(tr("Change Language"), tr("CHANGE"), "");
   connect(translateBtn, &ButtonControl::clicked, [=]() {
@@ -177,13 +169,11 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   });
   addItem(translateBtn);
 
-  /*
-  QObject::connect(uiState(), &UIState::offroadTransition, [=](bool offroad) {
+/*QObject::connect(uiState(), &UIState::offroadTransition, [=](bool offroad) {
     for (auto btn : findChildren<ButtonControl *>()) {
       btn->setEnabled(offroad);
     }
-  });
-  */
+  });*/
 
   QHBoxLayout *reset_layout = new QHBoxLayout();
   reset_layout->setSpacing(30);
@@ -193,7 +183,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   reset_calib_btn->setObjectName("reset_calib_btn");
   reset_layout->addWidget(reset_calib_btn);
   QObject::connect(reset_calib_btn, &QPushButton::released, [=]() {
-    if (ConfirmationDialog::confirm("Are you sure you want to reset calibration and live params?", this)) {
+    if (ConfirmationDialog::confirm(tr("Are you sure you want to reset calibration and live params?"), this)) {
       Params().remove("CalibrationParams");
       Params().remove("LiveParameters");
       emit closeSettings();
@@ -222,8 +212,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   power_layout->setSpacing(30);
 
   // softreset button
-  //QPushButton *restart_btn = new QPushButton("Soft Restart");
-  QPushButton *restart_btn = new QPushButton("재시작");
+  QPushButton *restart_btn = new QPushButton(tr("Soft Restart"));
   restart_btn->setObjectName("restart_btn");
   power_layout->addWidget(restart_btn);
   QObject::connect(restart_btn, &QPushButton::released, [=]() {
@@ -409,7 +398,7 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
   )");
 
   // close button
-  QPushButton *close_btn = new QPushButton(tr("← Back"));
+  QPushButton *close_btn = new QPushButton(tr("Back"));
   close_btn->setStyleSheet(R"(
     QPushButton {
       font-size: 50px;
@@ -442,7 +431,7 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
     {tr("Network"), new Networking(this)},
     {tr("Toggles"), new TogglesPanel(this)},
     {tr("Software"), new SoftwarePanel(this)},
-    {"커뮤니티", new CommunityPanel(this)},
+    {tr("Community"), new CommunityPanel(this)},
   };
 
 #ifdef ENABLE_MAPS
@@ -522,8 +511,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   QString selected = QString::fromStdString(Params().get("SelectedCar"));
 
-  //QPushButton* selectCarBtn = new QPushButton(selected.length() ? selected : tr("Select your car"));
-  QPushButton* selectcar_btn = new QPushButton(selected.length() ? selected : "차량을 선택하세요");
+  QPushButton* selectcar_btn = new QPushButton(selected.length() ? selected : tr("Select your car"));
   selectcar_btn->setObjectName("selectcar_btn");
   selectcar_btn->setStyleSheet("margin-right: 30px;");
   //selectcar_btn->setFixedSize(400, 100);
@@ -546,8 +534,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   connect(selectCar, &SelectCar::backPress, [=]() { main_layout->setCurrentWidget(homeScreen); });
   connect(selectCar, &SelectCar::selectedCar, [=]() {
      QString selected = QString::fromStdString(Params().get("SelectedCar"));
-     //selectCarBtn->setText(selected.length() ? selected : tr("Select your car"));
-     selectcar_btn->setText(selected.length() ? selected : "차량을 선택하세요");
+     selectcar_btn->setText(selected.length() ? selected : tr("Select your car"));
      main_layout->setCurrentWidget(homeScreen);
   });
   main_layout->addWidget(selectCar);
@@ -584,29 +571,75 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   )");
 
-  QList<ParamControl*> toggles;
+  toggleLayout->addWidget(new LateralControlSelect());
+  toggleLayout->addWidget(new MfcSelect());
+  toggleLayout->addWidget(new AebSelect());
+  toggleLayout->addWidget(new LongControlSelect());
+  toggleLayout->addWidget(horizontal_line());
 
-  toggles.append(new ParamControl("PutPrebuilt", "Prebuilt Enable",
-                                  //"Create prebuilt files to speed bootup",
-                                  "Prebuilt 파일을 생성하며 부팅속도를 향상시킵니다.",
+  QList<ParamControl*> toggles;
+  toggles.append(new ParamControl("PutPrebuilt",
+                                  tr("Prebuilt Enable"),
+                                  tr("Create prebuilt files to speed bootup"),
                                   "../assets/offroad/icon_addon.png", this));
-  toggles.append(new ParamControl("LoggerDisable", "Logger Disable",
-                                  //"Disable Logger is Reduce system load",
-                                  "Logger 프로세스를 종료하여 시스템 부하를 줄입니다.",
+  toggles.append(new ParamControl("LoggerDisable",
+                                  tr("Logger Disable"),
+                                  tr("Disable Logger is Reduce system load"),
                                   "../assets/offroad/icon_addon.png", this));
-  toggles.append(new ParamControl("NavDisable", "Navigation Disable",
-                                  //"Navigation Disable",
-                                  "Navigation 기능을 사용하지않습니다.",
+  toggles.append(new ParamControl("NavDisable",
+                                  tr("Navigation Disable"),
+                                  tr("Navigation Function not use"),
                                   "../assets/offroad/icon_addon.png", this));
-  toggles.append(new ParamControl("NewRadarInterface", "New radar interface Enable",
-                                  //"New radar interface Enable",
-                                  "scc 레이더 배선개조없이 사용가능한 일부차종을 위한 옵션입니다",
+  toggles.append(new ParamControl("NewRadarInterface",
+                                  tr("New radar interface Enable"),
+                                  tr("Some newer car New radar interface"),
                                   "../assets/offroad/icon_road.png", this));
   for (ParamControl *toggle : toggles) {
     if (main_layout->count() != 0) {
     }
     toggleLayout->addWidget(toggle);
   }
+  toggleLayout->addWidget(horizontal_line());
+
+  auto gitpull_btn = new ButtonControl("Git Fetch and Reset", tr("RUN"));
+  QObject::connect(gitpull_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)){
+      QProcess::execute("/data/openpilot/scripts/gitpull.sh");
+    }
+  });
+  toggleLayout->addWidget(gitpull_btn);
+
+  auto pandaflash_btn = new ButtonControl("Panda Flash", tr("RUN"));
+  QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)){
+      QProcess::execute("/data/openpilot/panda/board/flash.sh");
+    }
+  });
+  toggleLayout->addWidget(pandaflash_btn);
+
+  auto pandaflashh7_btn = new ButtonControl("RED Panda Flash", tr("RUN"));
+  QObject::connect(pandaflashh7_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)){
+      QProcess::execute("/data/openpilot/panda/board/flash_h7.sh");
+    }
+  });
+  toggleLayout->addWidget(pandaflashh7_btn);
+
+  auto pandarecover_btn = new ButtonControl("Panda Recover", tr("RUN"));
+  QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)){
+      QProcess::execute("/data/openpilot/panda/board/recover.sh");
+    }
+  });
+  toggleLayout->addWidget(pandarecover_btn);
+
+  auto pandarecoverh7_btn = new ButtonControl("RED Panda Recover", tr("RUN"));
+  QObject::connect(pandarecoverh7_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)){
+      QProcess::execute("/data/openpilot/panda/board/recover_h7.sh");
+    }
+  });
+  toggleLayout->addWidget(pandarecoverh7_btn);
 }
 
 SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
@@ -615,7 +648,7 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
   main_layout->setSpacing(20);
 
   // Back button
-  QPushButton* back = new QPushButton("◀ Back");
+  QPushButton* back = new QPushButton(tr("Back"));
   back->setObjectName("back_btn");
   back->setFixedSize(300, 100);
   connect(back, &QPushButton::clicked, [=]() { emit backPress(); });
@@ -625,7 +658,7 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
   //list->setAttribute(Qt::WA_AcceptTouchEvents, true);
   QScroller::grabGesture(list->viewport(), QScroller::LeftMouseButtonGesture);
   list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-  list->addItem("[ 차량선택 사용안함 ]");
+  list->addItem(tr("Select car not use"));
   QStringList items = get_list("/data/params/d/SupportedCars");
   list->addItems(items);
   list->setCurrentRow(0);
@@ -651,4 +684,270 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
     emit selectedCar();
     });
   main_layout->addWidget(list);
+}
+
+//LateralControlSelect
+LateralControlSelect::LateralControlSelect() : AbstractControl("LateralControl [√]", tr("LateralControl Select (Pid/Indi/Lqr/Torque)"), "../assets/offroad/icon_logic.png") {
+  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
+  label.setStyleSheet("color: #e0e879");
+  hlayout->addWidget(&label);
+
+  btnminus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnplus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnminus.setFixedSize(120, 100);
+  btnplus.setFixedSize(120, 100);
+
+  hlayout->addWidget(&btnminus);
+  hlayout->addWidget(&btnplus);
+
+  QObject::connect(&btnminus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("LateralControlSelect"));
+    int latcontrol = str.toInt();
+    latcontrol = latcontrol - 1;
+    if (latcontrol <= 0 ) {
+      latcontrol = 0;
+    }
+    QString latcontrols = QString::number(latcontrol);
+    Params().put("LateralControlSelect", latcontrols.toStdString());
+    refresh();
+  });
+
+  QObject::connect(&btnplus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("LateralControlSelect"));
+    int latcontrol = str.toInt();
+    latcontrol = latcontrol + 1;
+    if (latcontrol >= 3 ) {
+      latcontrol = 3;
+    }
+    QString latcontrols = QString::number(latcontrol);
+    Params().put("LateralControlSelect", latcontrols.toStdString());
+    refresh();
+  });
+  refresh();
+}
+
+void LateralControlSelect::refresh() {
+  QString latcontrol = QString::fromStdString(Params().get("LateralControlSelect"));
+  if (latcontrol == "0") {
+    label.setText(QString::fromStdString("Pid"));
+  } else if (latcontrol == "1") {
+    label.setText(QString::fromStdString("Indi"));
+  } else if (latcontrol == "2") {
+    label.setText(QString::fromStdString("Lqr"));
+  } else if (latcontrol == "3") {
+    label.setText(QString::fromStdString("Torque"));
+  }
+  btnminus.setText("◀");
+  btnplus.setText("▶");
+}
+
+//MfcSelect
+MfcSelect::MfcSelect() : AbstractControl("MFC [√]", tr("MFC Camera Select (Lkas/Ldws/Lfa)"), "../assets/offroad/icon_mfc.png") {
+  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
+  label.setStyleSheet("color: #e0e879");
+  hlayout->addWidget(&label);
+
+  btnminus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnplus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnminus.setFixedSize(120, 100);
+  btnplus.setFixedSize(120, 100);
+
+  hlayout->addWidget(&btnminus);
+  hlayout->addWidget(&btnplus);
+
+  QObject::connect(&btnminus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("MfcSelect"));
+    int mfc = str.toInt();
+    mfc = mfc - 1;
+    if (mfc <= 0 ) {
+      mfc = 0;
+    }
+    QString mfcs = QString::number(mfc);
+    Params().put("MfcSelect", mfcs.toStdString());
+    refresh();
+  });
+
+  QObject::connect(&btnplus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("MfcSelect"));
+    int mfc = str.toInt();
+    mfc = mfc + 1;
+    if (mfc >= 2 ) {
+      mfc = 2;
+    }
+    QString mfcs = QString::number(mfc);
+    Params().put("MfcSelect", mfcs.toStdString());
+    refresh();
+  });
+  refresh();
+}
+
+void MfcSelect::refresh() {
+  QString mfc = QString::fromStdString(Params().get("MfcSelect"));
+  if (mfc == "0") {
+    label.setText(QString::fromStdString("Lkas"));
+  } else if (mfc == "1") {
+    label.setText(QString::fromStdString("Ldws"));
+  } else if (mfc == "2") {
+    label.setText(QString::fromStdString("Lfa"));
+  }
+  btnminus.setText("◀");
+  btnplus.setText("▶");
+}
+
+//AebSelect
+AebSelect::AebSelect() : AbstractControl("AEB [√]", tr("AEB Signal Select (Scc12/Fca11)"), "../assets/offroad/icon_aeb.png") {
+  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
+  label.setStyleSheet("color: #e0e879");
+  hlayout->addWidget(&label);
+
+  btnminus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnplus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnminus.setFixedSize(120, 100);
+  btnplus.setFixedSize(120, 100);
+
+  hlayout->addWidget(&btnminus);
+  hlayout->addWidget(&btnplus);
+
+  QObject::connect(&btnminus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("AebSelect"));
+    int aeb = str.toInt();
+    aeb = aeb - 1;
+    if (aeb <= 0 ) {
+      aeb = 0;
+    }
+    QString aebs = QString::number(aeb);
+    Params().put("AebSelect", aebs.toStdString());
+    refresh();
+  });
+
+  QObject::connect(&btnplus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("AebSelect"));
+    int aeb = str.toInt();
+    aeb = aeb + 1;
+    if (aeb >= 1 ) {
+      aeb = 1;
+    }
+    QString aebs = QString::number(aeb);
+    Params().put("AebSelect", aebs.toStdString());
+    refresh();
+  });
+  refresh();
+}
+
+void AebSelect::refresh() {
+  QString aeb = QString::fromStdString(Params().get("AebSelect"));
+  if (aeb == "0") {
+    label.setText(QString::fromStdString("Scc12"));
+  } else if (aeb == "1") {
+    label.setText(QString::fromStdString("Fca11"));
+  }
+  btnminus.setText("◀");
+  btnplus.setText("▶");
+}
+
+//LongControlSelect
+LongControlSelect::LongControlSelect() : AbstractControl("LongControl [√]", tr("LongControl Select (Mad/Mad+Long)"), "../assets/offroad/icon_long.png") {
+  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
+  label.setStyleSheet("color: #e0e879");
+  hlayout->addWidget(&label);
+
+  btnminus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnplus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnminus.setFixedSize(120, 100);
+  btnplus.setFixedSize(120, 100);
+
+  hlayout->addWidget(&btnminus);
+  hlayout->addWidget(&btnplus);
+
+  QObject::connect(&btnminus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("LongControlSelect"));
+    int longcontrol = str.toInt();
+    longcontrol = longcontrol - 1;
+    if (longcontrol <= 0 ) {
+      longcontrol = 0;
+    }
+    QString longcontrols = QString::number(longcontrol);
+    Params().put("LongControlSelect", longcontrols.toStdString());
+    refresh();
+  });
+
+  QObject::connect(&btnplus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("LongControlSelect"));
+    int longcontrol = str.toInt();
+    longcontrol = longcontrol + 1;
+    if (longcontrol >= 1 ) {
+      longcontrol = 1;
+    }
+    QString longcontrols = QString::number(longcontrol);
+    Params().put("LongControlSelect", longcontrols.toStdString());
+    refresh();
+  });
+  refresh();
+}
+
+void LongControlSelect::refresh() {
+  QString longcontrol = QString::fromStdString(Params().get("LongControlSelect"));
+  if (longcontrol == "0") {
+    label.setText(QString::fromStdString("Mad"));
+  } else if (longcontrol == "1") {
+    label.setText(QString::fromStdString("Mad+Long"));
+  }
+  btnminus.setText("◀");
+  btnplus.setText("▶");
 }

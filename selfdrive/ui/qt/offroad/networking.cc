@@ -125,73 +125,6 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   main_layout->addWidget(back, 0, Qt::AlignLeft);
 
   ListWidget *list = new ListWidget(this);
-
-  // SSH keys
-  list->addItem(new SshToggle());
-  list->addItem(new SshControl());
-  list->addItem(horizontal_line());
-  list->addItem(new LateralControlSelect());
-  list->addItem(new MfcSelect());
-  list->addItem(new AebSelect());
-  list->addItem(new LongControlSelect());
-  list->addItem(horizontal_line());
-
-  //auto gitpull_btn = new ButtonControl("Git Fetch and Reset", "RUN");
-  auto gitpull_btn = new ButtonControl("Git Fetch and Reset", "실행");
-  QObject::connect(gitpull_btn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/scripts/gitpull.sh");
-    }
-  });
-  list->addItem(gitpull_btn);
-
-  //auto pandaflash_btn = new ButtonControl("Panda Flash", "RUN");
-  auto pandaflash_btn = new ButtonControl("판다 플래싱", "실행");
-  QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/panda/board/flash.sh");
-    }
-  });
-  list->addItem(pandaflash_btn);
-
-  //auto pandaflashh7_btn = new ButtonControl("RED Panda Flash", "RUN");
-  auto pandaflashh7_btn = new ButtonControl("RED 판다 플래싱", "실행");
-  QObject::connect(pandaflashh7_btn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/panda/board/flash_h7.sh");
-    }
-  });
-  list->addItem(pandaflashh7_btn);
-
-  //auto pandarecover_btn = new ButtonControl("Panda Recover", "RUN");
-  auto pandarecover_btn = new ButtonControl("판다 복구", "실행");
-  QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/panda/board/recover.sh");
-    }
-  });
-  list->addItem(pandarecover_btn);
-
-  //auto pandarecoverh7_btn = new ButtonControl("RED Panda Recover", "RUN");
-  auto pandarecoverh7_btn = new ButtonControl("RED 판다 복구", "실행");
-  QObject::connect(pandarecoverh7_btn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/panda/board/recover_h7.sh");
-    }
-  });
-  list->addItem(pandarecoverh7_btn);
-
-  list->addItem(horizontal_line());
-
-  // IP address
-  ipLabel = new LabelControl("IP Address", wifi->ipv4_address);
-  list->addItem(ipLabel);
-
   // Enable tethering layout
   tetheringToggle = new ToggleControl(tr("Enable Tethering"), "", "", wifi->isTetheringEnabled());
   list->addItem(tetheringToggle);
@@ -206,6 +139,14 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
     }
   });
   list->addItem(editPasswordButton);
+
+  // IP address
+  ipLabel = new LabelControl(tr("IP Address"), wifi->ipv4_address);
+  list->addItem(ipLabel);
+
+  // SSH keys
+  list->addItem(new SshToggle());
+  list->addItem(new SshControl());
 
   // Roaming toggle
   const bool roamingEnabled = params.getBool("GsmRoaming");

@@ -118,3 +118,62 @@ public:
   explicit CommunityPanel(QWidget *parent = nullptr);
 };
 
+// LateralControlSelect
+class LateralControlSelect : public AbstractControl {
+  Q_OBJECT
+
+public:
+  LateralControlSelect();
+
+private:
+  QPushButton btnplus;
+  QPushButton btnminus;
+  QLabel label;
+
+  void refresh();
+};
+
+// MfcSelect
+class MfcSelect : public AbstractControl {
+  Q_OBJECT
+
+public:
+  MfcSelect();
+
+private:
+  QPushButton btnplus;
+  QPushButton btnminus;
+  QLabel label;
+
+  void refresh();
+};
+
+// AebSelect
+class AebSelect : public AbstractControl {
+  Q_OBJECT
+
+public:
+  AebSelect();
+
+private:
+  QPushButton btnplus;
+  QPushButton btnminus;
+  QLabel label;
+
+  void refresh();
+};
+
+// LongControlSelect
+class LongControlSelect : public AbstractControl {
+  Q_OBJECT
+
+public:
+  LongControlSelect();
+
+private:
+  QPushButton btnplus;
+  QPushButton btnminus;
+  QLabel label;
+
+  void refresh();
+};
