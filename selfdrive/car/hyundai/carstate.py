@@ -1,3 +1,6 @@
+import copy
+from collections import deque
+
 from cereal import car
 from common.numpy_fast import interp
 from common.conversions import Conversions as CV
@@ -14,8 +17,8 @@ class CarState(CarStateBase):
     super().__init__(CP)
     can_define = CANDefine(DBC[CP.carFingerprint]["pt"])
 
-    #self.cruise_buttons = deque([Buttons.NONE] * PREV_BUTTON_SAMPLES, maxlen=PREV_BUTTON_SAMPLES)
-    #self.main_buttons = deque([Buttons.NONE] * PREV_BUTTON_SAMPLES, maxlen=PREV_BUTTON_SAMPLES)
+    self.cruise_buttons = deque([Buttons.NONE] * PREV_BUTTON_SAMPLES, maxlen=PREV_BUTTON_SAMPLES)
+    self.main_buttons = deque([Buttons.NONE] * PREV_BUTTON_SAMPLES, maxlen=PREV_BUTTON_SAMPLES)
 
     if CP.carFingerprint in HDA2_CAR:
       self.shifter_values = can_define.dv["ACCELERATOR"]["GEAR"]
@@ -34,8 +37,9 @@ class CarState(CarStateBase):
     self.has_scc13 = CP.hasScc13
     self.has_scc14 = CP.hasScc14
     self.has_lfa_hda = CP.hasLfaHda
+    self.leftBlinker = False
+    self.rightBlinker = False
     self.aebFcw = CP.aebFcw
-    self.main_buttons = 0
     self.mdps_error_cnt = 0
     self.cruise_unavail_cnt = 0
     self.apply_steer = 0.
@@ -60,6 +64,9 @@ class CarState(CarStateBase):
     cp_mdps = cp2 if self.mdps_bus else cp
     cp_sas = cp2 if self.sas_bus else cp
     cp_scc = cp2 if self.scc_bus == 1 else cp_cam if self.scc_bus == 2 else cp
+
+    self.prev_left_blinker = self.leftBlinker
+    self.prev_right_blinker = self.rightBlinker
 
     ret = car.CarState.new_message()
 
@@ -110,9 +117,10 @@ class CarState(CarStateBase):
     else:
       ret.cruiseState.speed = 0
 
-    self.prev_cruise_buttons = self.cruise_buttons
-    self.cruise_buttons = cp.vl["CLU11"]["CF_Clu_CruiseSwState"]
-    self.main_buttons = cp.vl["CLU11"]["CF_Clu_CruiseSwMain"]
+    self.prev_cruise_buttons = self.cruise_buttons[-1]
+    self.prev_main_button = self.main_buttons[-1]
+    self.cruise_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwState"])
+    self.main_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwMain"])
 
     # TODO: Find brake pressure
     ret.brake = 0
@@ -245,7 +253,6 @@ class CarState(CarStateBase):
     self.buttons_counter = cp.vl["CRUISE_BUTTONS"]["COUNTER"]
 
     self.cam_0x2a4 = copy.copy(cp_cam.vl["CAM_0x2a4"])
-
     return ret
 
   @staticmethod

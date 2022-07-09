@@ -183,8 +183,14 @@ void OffroadHome::hideEvent(QHideEvent *event) {
 }
 
 void OffroadHome::refresh() {
-//  date->setText(QDateTime::currentDateTime().toString("dddd, MMMM d"));
-  date->setText(QDateTime::currentDateTime().toString("\U0001f4c5 yyyy년 M월 d일"));
+  QString translation_file = QString::fromStdString(Params().get("LanguageSetting"));
+  if(translation_file.contains("ko")) {
+    QLocale locale(QLocale("ko_KR"));
+    date->setText(locale.toString(QDateTime::currentDateTime(), QLocale::NarrowFormat));
+  }
+  else {
+    date->setText(QLocale::system().toString(QDateTime::currentDateTime(), QLocale::NarrowFormat));
+  }
 
   bool updateAvailable = update_widget->refresh();
   int alerts = alerts_widget->refresh();
