@@ -392,13 +392,8 @@
     </message>
     <message>
         <location filename="../qt/widgets/input.cc" line="168"/>
-        <source>Need at least </source>
-        <translation>최소 </translation>
-    </message>
-    <message>
-        <location filename="../qt/widgets/input.cc" line="168"/>
-        <source> characters!</source>
-        <translation> 자가 필요합니다!</translation>
+        <source>Need at least %1 characters!</source>
+        <translation>최소 %1 자가 필요합니다!</translation>
     </message>
 </context>
 <context>
@@ -585,8 +580,8 @@ location set</source>
     <message>
         <location filename="../qt/offroad/networking.cc" line="87"/>
         <location filename="../qt/offroad/networking.cc" line="97"/>
-        <source>for &quot;</source>
-        <translation>하기위한 &quot;</translation>
+        <source>for &quot;%1&quot;</source>
+        <translation>하기위한 &quot;%1&quot;</translation>
     </message>
     <message>
         <location filename="../qt/offroad/networking.cc" line="97"/>
@@ -643,21 +638,19 @@ location set</source>
         <translation>장치를 콤마 계정과 페어링합니다</translation>
     </message>
     <message>
-        <location filename="../qt/widgets/prime.cc" line="91"/>
-        <source>
-      &lt;ol type=&apos;1&apos; style=&apos;margin-left: 15px;&apos;&gt;
-        &lt;li style=&apos;margin-bottom: 50px;&apos;&gt;Go to https://connect.comma.ai on your phone&lt;/li&gt;
-        &lt;li style=&apos;margin-bottom: 50px;&apos;&gt;Click &quot;add new device&quot; and scan the QR code on the right&lt;/li&gt;
-        &lt;li style=&apos;margin-bottom: 50px;&apos;&gt;Bookmark connect.comma.ai to your home screen to use it like an app&lt;/li&gt;
-      &lt;/ol&gt;
-    </source>
-        <translation>
-      &lt;ol type=&apos;1&apos; style=&apos;margin-left: 15px;&apos;&gt;
-        &lt;li style=&apos;margin-bottom: 50px;&apos;&gt;https://connect.comma.ai에 접속하세요&lt;/li&gt;
-        &lt;li style=&apos;margin-bottom: 50px;&apos;&gt;&quot;새 장치 추가&quot;를 클릭하고 오른쪽 QR 코드를 검색합니다.&lt;/li&gt;
-        &lt;li style=&apos;margin-bottom: 50px;&apos;&gt;connect.comma.ai을 앱처럼 사용하려면 홈 화면에 바로가기를 만드십시오.&lt;/li&gt;
-      &lt;/ol&gt;
-    </translation>
+        <location filename="../qt/widgets/prime.cc" line="97"/>
+        <source>Go to https://connect.comma.ai on your phone</source>
+        <translation>https://connect.comma.ai에 접속하세요</translation>
+    </message>
+    <message>
+        <location filename="../qt/widgets/prime.cc" line="98"/>
+        <source>Click &quot;add new device&quot; and scan the QR code on the right</source>
+        <translation>&quot;새 장치 추가&quot;를 클릭하고 오른쪽 QR 코드를 검색합니다</translation>
+    </message>
+    <message>
+        <location filename="../qt/widgets/prime.cc" line="99"/>
+        <source>Bookmark connect.comma.ai to your home screen to use it like an app</source>
+        <translation>connect.comma.ai을 앱처럼 사용하려면 홈 화면에 바로가기를 만드십시오</translation>
     </message>
 </context>
 <context>
@@ -1141,14 +1134,14 @@ location set</source>
         <translation>확인중</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="319"/>
-        <source>Uninstall </source>
-        <translation>제거 </translation>
-    </message>
-    <message>
-        <location filename="../qt/offroad/settings.cc" line="319"/>
+        <location filename="../qt/offroad/settings.cc" line="252"/>
         <source>UNINSTALL</source>
         <translation>제거</translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="252"/>
+        <source>Uninstall %1</source>
+        <translation>제거 %1</translation>
     </message>
     <message>
         <location filename="../qt/offroad/settings.cc" line="321"/>
@@ -1413,8 +1406,8 @@ location set</source>
     </message>
     <message>
         <location filename="../qt/offroad/networking.cc" line="299"/>
-        <source>Forget Wi-Fi Network &quot;</source>
-        <translation>wifi 네트워크 저장안함 &quot;</translation>
+        <source>Forget Wi-Fi Network &quot;%1&quot;?</source>
+        <translation>wifi 네트워크 저장안함 &quot;%1&quot;?</translation>
     </message>
 </context>
 </TS>
