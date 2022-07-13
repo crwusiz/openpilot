@@ -270,9 +270,9 @@ class CarController:
         self.last_button_frame = self.frame
 
         # cruise standstill resume
-        elif CC.cruiseControl.resume:
-          can_sends.append(hda2can.create_buttons(self.packer, CS.buttons_counter+1, Buttons.RES_ACCEL))
-          self.last_button_frame = self.frame
+      elif CC.cruiseControl.resume:
+        can_sends.append(hda2can.create_buttons(self.packer, CS.buttons_counter+1, Buttons.RES_ACCEL))
+        self.last_button_frame = self.frame
 
     new_actuators = actuators.copy()
     new_actuators.steer = apply_steer / self.params.STEER_MAX
