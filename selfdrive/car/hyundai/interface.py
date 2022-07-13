@@ -386,6 +386,9 @@ class CarInterface(CarInterfaceBase):
     if any([Params().get("LongControlSelect", encoding='utf8') == "0", Params().get("LongControlSelect", encoding='utf8') == "1"]):
       ret.cruiseState.enabled = ret.cruiseState.available
 
+    # On some newer model years, the CANCEL button acts as a pause/resume button based on the PCM state
+    # To avoid re-engaging when openpilot cancels, check user engagement intention via buttons
+    # Main button also can trigger an engagement on these cars
     allow_enable = any([self.CS.cruise_buttons or self.CS.main_buttons])
     events = self.create_common_events(ret, pcm_enable=self.CS.CP.pcmCruise, allow_enable=allow_enable or True)
 
