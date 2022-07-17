@@ -86,17 +86,24 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
 */
     {
       "EndToEndToggle",
-      "\U0001f96c Disable use of lanelines (Alpha) \U0001f96c",
-      "In this mode openpilot will ignore lanelines and just drive how it thinks a human would.",
+      //"Disable use of lanelines (Alpha)",
+      //"In this mode openpilot will ignore lanelines and just drive how it thinks a human would.",
+      "차선인식 사용안함",
+      "이 모드는 차선인식없이 운전자가 조작하는것처럼 주행합니다.",
       "../assets/offroad/icon_road.png",
     },
     {
       "DisengageOnAccelerator",
-      "Disengage On Accelerator Pedal",
-      "When enabled, pressing the accelerator pedal will disengage openpilot.",
+      //"Disengage On Accelerator Pedal",
+      //"When enabled, pressing the accelerator pedal will disengage openpilot.",
+      "가속페달 조작시 해제",
+      "활성화된 경우 가속 페달을 누르면 openpilot이 해제됩니다.",
       "../assets/offroad/icon_disengage_on_accelerator.svg",
     },
   };
+
+  Params params;
+
 #ifdef ENABLE_MAPS
   if (!params.getBool("NavDisable")) {
     toggles.push_back({
@@ -136,13 +143,13 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   // offroad-only buttons
   //auto dcamBtn = new ButtonControl("Driver Camera", "PREVIEW",
   //                                 "Preview the driver facing camera to help optimize device mounting position for best driver monitoring experience. (vehicle must be off)");
-  auto dcamBtn = new ButtonControl("운전자 모니터링 카메라 미리보기", "실행",
+  auto dcamBtn = new ButtonControl("운전자 모니터링 카메라 미리보기", "RUN",
                                    "운전자 모니터링 카메라를 미리보고 최적의 장착위치를 찾아보세요.");
   connect(dcamBtn, &ButtonControl::clicked, [=]() { emit showDriverView(); });
   addItem(dcamBtn);
 
   //auto resetCalibBtn = new ButtonControl("Reset Calibration", "RESET", " ");
-  auto resetCalibBtn = new ButtonControl("캘리브레이션 초기화", "실행", " ");
+  auto resetCalibBtn = new ButtonControl("캘리브레이션 초기화", "RUN", " ");
   connect(resetCalibBtn, &ButtonControl::showDescription, this, &DevicePanel::updateCalibDescription);
   connect(resetCalibBtn, &ButtonControl::clicked, [&]() {
     //if (ConfirmationDialog::confirm("Are you sure you want to reset calibration?", this)) {
@@ -154,7 +161,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
 
   if (!params.getBool("Passive")) {
     //auto retrainingBtn = new ButtonControl("Review Training Guide", "REVIEW", "Review the rules, features, and limitations of openpilot");
-    auto retrainingBtn = new ButtonControl("트레이닝 가이드", "실행", "");
+    auto retrainingBtn = new ButtonControl("트레이닝 가이드", "RUN", "");
     connect(retrainingBtn, &ButtonControl::clicked, [=]() {
       //if (ConfirmationDialog::confirm("Are you sure you want to review the training guide?", this)) {
       if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
@@ -203,12 +210,11 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   });
 
   // reset calibration button
-  //QPushButton *reset_calib_btn = new QPushButton("Reset Calibration,LiveParameters");
-  QPushButton *reset_calib_btn = new QPushButton("Calibration,LiveParameters 리셋");
-  reset_calib_btn->setStyleSheet("height: 120px;border-radius: 15px;background-color: #393939;");
+  QPushButton *reset_calib_btn = new QPushButton("Reset Calibration, LiveParameters");
+  reset_calib_btn->setObjectName("reset_calib_btn");
   reset_layout->addWidget(reset_calib_btn);
   QObject::connect(reset_calib_btn, &QPushButton::released, [=]() {
-    //if (ConfirmationDialog::confirm("Are you sure you want to reset calibration and live params?", this)) {
+    //if (ConfirmationDialog::confirm("Process?", this)){
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
       Params().remove("CalibrationParams");
       Params().remove("LiveParameters");
@@ -218,6 +224,19 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
       });
     }
   });
+
+  reset_calib_btn->setStyleSheet(R"(
+    QPushButton {
+      height: 120px;
+      border-radius: 15px;
+      color: #000000;
+      background-color: #FFCCFF;
+    }
+    QPushButton:pressed {
+      background-color: #FFC2FF;
+    }
+  )");
+
   addItem(reset_layout);
 
   // power buttons
@@ -225,11 +244,11 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   power_layout->setSpacing(30);
 
   // softreset button
-  //QPushButton *restart_openpilot_btn = new QPushButton("Soft Reset");
-  QPushButton *restart_openpilot_btn = new QPushButton("재시작");
-  restart_openpilot_btn->setObjectName("restart_openpilot_btn");
-  power_layout->addWidget(restart_openpilot_btn);
-  QObject::connect(restart_openpilot_btn, &QPushButton::released, [=]() {
+  //QPushButton *restart_btn = new QPushButton("Soft Reset");
+  QPushButton *restart_btn = new QPushButton("재시작");
+  restart_btn->setObjectName("restart_btn");
+  power_layout->addWidget(restart_btn);
+  QObject::connect(restart_btn, &QPushButton::released, [=]() {
     emit closeSettings();
     QTimer::singleShot(1000, []() {
       Params().putBool("SoftRestartTriggered", true);
@@ -253,8 +272,8 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   }
 
   setStyleSheet(R"(
-    #restart_openpilot_btn { height: 120px; border-radius: 15px; background-color: #2C2CE2; }
-    #restart_openpilot_btn:pressed { background-color: #2424FF; }
+    #restart_btn { height: 120px; border-radius: 15px; background-color: #2C2CE2; }
+    #restart_btn:pressed { background-color: #2424FF; }
     #reboot_btn { height: 120px; border-radius: 15px; background-color: #2CE22C; }
     #reboot_btn:pressed { background-color: #24FF24; }
     #poweroff_btn { height: 120px; border-radius: 15px; background-color: #E22C2C; }
@@ -341,7 +360,7 @@ SoftwarePanel::SoftwarePanel(QWidget* parent) : ListWidget(parent) {
   });
 
 
-  auto uninstallBtn = new ButtonControl(getBrand() + "제거", "실행");
+  auto uninstallBtn = new ButtonControl(getBrand() + "제거", "RUN");
   connect(uninstallBtn, &ButtonControl::clicked, [&]() {
     if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
       params.putBool("DoUninstall", true);
@@ -396,17 +415,17 @@ C2NetworkPanel::C2NetworkPanel(QWidget *parent) : QWidget(parent) {
   list->setSpacing(30);
 #ifdef QCOM
   //auto wifiBtn = new ButtonControl("\U0001f4f6 Wi-Fi Settings", "OPEN");
-  auto wifiBtn = new ButtonControl("\U0001f4f6 WiFi 설정", "열기");
+  auto wifiBtn = new ButtonControl("\U0001f4f6 WiFi 설정", "OPEN");
   QObject::connect(wifiBtn, &ButtonControl::clicked, [=]() { HardwareEon::launch_wifi(); });
   list->addItem(wifiBtn);
 
   //auto tetheringBtn = new ButtonControl("\U0001f4f6 Tethering Settings", "OPEN");
-  auto tetheringBtn = new ButtonControl("\U0001f4f6 테더링 설정", "열기");
+  auto tetheringBtn = new ButtonControl("\U0001f4f6 테더링 설정", "OPEN");
   QObject::connect(tetheringBtn, &ButtonControl::clicked, [=]() { HardwareEon::launch_tethering(); });
   list->addItem(tetheringBtn);
 
   //auto androidBtn = new ButtonControl("\U00002699 Android Setting", "OPEN");
-  auto androidBtn = new ButtonControl("\U00002699 안드로이드 설정", "열기");
+  auto androidBtn = new ButtonControl("\U00002699 안드로이드 설정", "OPEN");
   QObject::connect(androidBtn, &ButtonControl::clicked, [=]() { HardwareEon::launch_setting(); });
   list->addItem(androidBtn);
 #endif
@@ -416,52 +435,6 @@ C2NetworkPanel::C2NetworkPanel(QWidget *parent) : QWidget(parent) {
   // SSH key management
   list->addItem(new SshToggle());
   list->addItem(new SshControl());
-  list->addItem(horizontal_line());
-  list->addItem(new LateralControlSelect());
-  list->addItem(new MfcSelect());
-  list->addItem(new AebSelect());
-  list->addItem(new LongControlSelect());
-  list->addItem(horizontal_line());
-
-  //auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "RUN");
-  auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "실행");
-  QObject::connect(gitpullbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/scripts/gitpull.sh");
-    }
-  });
-  list->addItem(gitpullbtn);
-
-  //auto pandaflashbtn = new ButtonControl("Panda Firmware Flash", "RUN");
-  auto pandaflashbtn = new ButtonControl("판다 펌웨어 플래싱", "실행");
-  QObject::connect(pandaflashbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/panda/board/flash.sh");
-    }
-  });
-  list->addItem(pandaflashbtn);
-
-  //auto pandarecoverbtn = new ButtonControl("Panda Firmware Recover", "RUN");
-  auto pandarecoverbtn = new ButtonControl("판다 펌웨어 복구", "실행");
-  QObject::connect(pandarecoverbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/panda/board/recover.sh");
-    }
-  });
-  list->addItem(pandarecoverbtn);
-
-  //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");
-  auto realdataclearbtn = new ButtonControl("주행로그 삭제", "실행");
-  QObject::connect(realdataclearbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      QProcess::execute("/data/openpilot/scripts/realdataclear.sh");
-    }
-  });
-  list->addItem(realdataclearbtn);
 
   layout->addWidget(list);
   layout->addStretch(1);
@@ -494,23 +467,20 @@ QWidget *network_panel(QWidget *parent) {
 #endif
 }
 
-static QStringList get_list(const char* path)
-{
+static QStringList get_list(const char* path) {
   QStringList stringList;
   QFile textFile(path);
-  if(textFile.open(QIODevice::ReadOnly))
-  {
-      QTextStream textStream(&textFile);
-      while (true)
-      {
-        QString line = textStream.readLine();
-        if (line.isNull())
-            break;
-        else
-            stringList.append(line);
+  if (textFile.open(QIODevice::ReadOnly)) {
+    QTextStream textStream(&textFile);
+    while (true) {
+      QString line = textStream.readLine();
+      if (line.isNull()) {
+        break;
+      } else {
+        stringList.append(line);
       }
+    }
   }
-
   return stringList;
 }
 
@@ -541,7 +511,7 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
       padding: 15px;
       border-width: 0;
       border-radius: 30px;
-      color: #dddddd;
+      color: #FFFFFF;
       background-color: #444444;
     }
     QPushButton:pressed {
@@ -567,7 +537,7 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
     //{"Software", new SoftwarePanel(this)},
     //{"Community", new CommunityPanel(this)},
     {"장치", device},
-    {"설정", network_panel(this)},
+    {"네트워크", network_panel(this)},
     {"토글", new TogglesPanel(this)},
     {"정보", new SoftwarePanel(this)},
     {"커뮤니티", new CommunityPanel(this)},
@@ -655,14 +625,14 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   QString selected = QString::fromStdString(Params().get("SelectedCar"));
 
-  //QPushButton* selectCarBtn = new QPushButton(selected.length() ? selected : "Select your car");
-  QPushButton* selectCarBtn = new QPushButton(selected.length() ? selected : "차량을 선택하세요");
-  selectCarBtn->setObjectName("selectCarBtn");
-  selectCarBtn->setStyleSheet("margin-right: 30px;");
-  //selectCarBtn->setFixedSize(350, 100);
-  connect(selectCarBtn, &QPushButton::clicked, [=]() { main_layout->setCurrentWidget(selectCar); });
+  //QPushButton* selectcar_btn = new QPushButton(selected.length() ? selected : "Select your car");
+  QPushButton* selectcar_btn = new QPushButton(selected.length() ? selected : "차량을 선택하세요");
+  selectcar_btn->setObjectName("selectcar_btn");
+  selectcar_btn->setStyleSheet("margin-right: 30px;");
+  //selectcar_btn->setFixedSize(350, 100);
+  connect(selectcar_btn, &QPushButton::clicked, [=]() { main_layout->setCurrentWidget(selectCar); });
   vlayout->addSpacing(10);
-  vlayout->addWidget(selectCarBtn, 0, Qt::AlignRight);
+  vlayout->addWidget(selectcar_btn, 0, Qt::AlignRight);
   vlayout->addSpacing(10);
 
   homeWidget = new QWidget(this);
@@ -679,7 +649,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   connect(selectCar, &SelectCar::backPress, [=]() { main_layout->setCurrentWidget(homeScreen); });
   connect(selectCar, &SelectCar::selectedCar, [=]() {
      QString selected = QString::fromStdString(Params().get("SelectedCar"));
-     selectCarBtn->setText(selected.length() ? selected : "차량을 선택하세요");
+     selectcar_btn->setText(selected.length() ? selected : "차량을 선택하세요");
      main_layout->setCurrentWidget(homeScreen);
   });
   main_layout->addWidget(selectCar);
@@ -690,46 +660,99 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   setPalette(pal);
 
   setStyleSheet(R"(
-    #back_btn, #selectCarBtn {
+    #back_btn {
       font-size: 50px;
       margin: 0px;
-      padding: 20px;
+      padding: 15px;
       border-width: 0;
       border-radius: 30px;
-      color: #dddddd;
+      color: #FFFFFF;
       background-color: #444444;
+    }
+    #back_btn:pressed {
+      background-color: #3B3B3B;
+    }
+    #selectcar_btn {
+      font-size: 50px;
+      margin: 0px;
+      padding: 15px;
+      border-width: 0;
+      border-radius: 30px;
+      color: #FFFFFF;
+      background-color: #2C2CE2;
+    }
+    #selectcar_btn:pressed {
+      background-color: #2424FF;
     }
   )");
 
+  toggleLayout->addWidget(new LateralControlSelect());
+  toggleLayout->addWidget(new MfcSelect());
+  toggleLayout->addWidget(new AebSelect());
+  toggleLayout->addWidget(new LongControlSelect());
+  toggleLayout->addWidget(horizontal_line());
+
   QList<ParamControl*> toggles;
 
-  toggles.append(new ParamControl("PutPrebuilt", "Prebuilt Enable",
+  toggles.append(new ParamControl("PutPrebuilt",
+                                  "Prebuilt Enable",
                                   //"Create prebuilt files to speed bootup",
                                   "Prebuilt 파일을 생성하며 부팅속도를 향상시킵니다.",
                                   "../assets/offroad/icon_addon.png", this));
 #ifdef QCOM
-  toggles.append(new ParamControl("ShutdownDisable", "Shutdownd Disable",
+  toggles.append(new ParamControl("ShutdownDisable",
+                                  "Shutdownd Disable",
                                   //"Disable Shutdownd",
                                   "Shutdownd (시동 off 5분) 자동종료를 사용하지않습니다. (batteryless 기종)",
                                   "../assets/offroad/icon_addon.png", this));
 #endif
-  toggles.append(new ParamControl("LoggerDisable", "Logger Disable",
+  toggles.append(new ParamControl("LoggerDisable",
+                                  "Logger Disable",
                                   //"Disable Logger is Reduce system load",
                                   "Logger 프로세스를 종료하여 시스템 부하를 줄입니다.",
                                   "../assets/offroad/icon_addon.png", this));
-  toggles.append(new ParamControl("NavDisable", "Navigation Disable",
+/*
+  toggles.append(new ParamControl("NavDisable",
+                                  "Navigation Disable",
                                   //"Navigation Disable",
                                   "Navigation 기능을 사용하지않습니다.",
                                   "../assets/offroad/icon_addon.png", this));
-  toggles.append(new ParamControl("NewRadarInterface", "New radar interface Enable",
+  toggles.append(new ParamControl("NewRadarInterface",
+                                  "New radar interface Enable",
                                   //"New radar interface Enable",
                                   "scc 레이더 배선개조없이 사용가능한 일부차종을 위한 옵션입니다",
                                   "../assets/offroad/icon_road.png", this));
+*/
   for(ParamControl *toggle : toggles) {
     if(main_layout->count() != 0) {
     }
     toggleLayout->addWidget(toggle);
   }
+  toggleLayout->addWidget(horizontal_line());
+
+  auto gitpull_btn = new ButtonControl("Git Fetch and Reset", "RUN");
+  QObject::connect(gitpull_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)){
+      QProcess::execute("/data/openpilot/scripts/gitpull.sh");
+    }
+  });
+  toggleLayout->addWidget(gitpull_btn);
+
+  auto pandaflash_btn = new ButtonControl("Panda Flash", "RUN");
+  QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)){
+      QProcess::execute("/data/openpilot/panda/board/flash.sh");
+    }
+  });
+  toggleLayout->addWidget(pandaflash_btn);
+
+  auto pandarecover_btn = new ButtonControl("Panda Recover", "RUN");
+  QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)){
+      QProcess::execute("/data/openpilot/panda/board/recover.sh");
+    }
+  });
+  toggleLayout->addWidget(pandarecover_btn);
 }
 
 SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
@@ -741,7 +764,7 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
   // Back button
   QPushButton* back = new QPushButton("Back");
   back->setObjectName("back_btn");
-  back->setFixedSize(500, 100);
+  back->setFixedSize(300, 100);
   connect(back, &QPushButton::clicked, [=]() { emit backPress(); });
   main_layout->addWidget(back, 0, Qt::AlignLeft);
   QListWidget* list = new QListWidget(this);
@@ -756,10 +779,10 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
   QString selected = QString::fromStdString(Params().get("SelectedCar"));
 
   int index = 0;
-  for(QString item : items) {
-    if(selected == item) {
-        list->setCurrentRow(index + 1);
-        break;
+  for (QString item : items) {
+    if (selected == item) {
+      list->setCurrentRow(index + 1);
+      break;
     }
     index++;
   }
@@ -767,12 +790,278 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
   QObject::connect(list, QOverload<QListWidgetItem*>::of(&QListWidget::itemClicked),
     [=](QListWidgetItem* item){
 
-    if(list->currentRow() == 0)
-        Params().remove("SelectedCar");
-    else
-        Params().put("SelectedCar", list->currentItem()->text().toStdString());
-
+    if (list->currentRow() == 0) {
+      Params().remove("SelectedCar");
+    } else {
+      Params().put("SelectedCar", list->currentItem()->text().toStdString());
+    }
     emit selectedCar();
     });
   main_layout->addWidget(list);
+}
+
+//LateralControlSelect
+LateralControlSelect::LateralControlSelect() : AbstractControl("LateralControl [√]", tr("LateralControl Select (Pid/Indi/Lqr/Torque)"), "../assets/offroad/icon_logic.png") {
+  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
+  label.setStyleSheet("color: #e0e879");
+  hlayout->addWidget(&label);
+
+  btnminus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnplus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnminus.setFixedSize(120, 100);
+  btnplus.setFixedSize(120, 100);
+
+  hlayout->addWidget(&btnminus);
+  hlayout->addWidget(&btnplus);
+
+  QObject::connect(&btnminus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("LateralControlSelect"));
+    int latcontrol = str.toInt();
+    latcontrol = latcontrol - 1;
+    if (latcontrol <= 0 ) {
+      latcontrol = 0;
+    }
+    QString latcontrols = QString::number(latcontrol);
+    Params().put("LateralControlSelect", latcontrols.toStdString());
+    refresh();
+  });
+
+  QObject::connect(&btnplus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("LateralControlSelect"));
+    int latcontrol = str.toInt();
+    latcontrol = latcontrol + 1;
+    if (latcontrol >= 3 ) {
+      latcontrol = 3;
+    }
+    QString latcontrols = QString::number(latcontrol);
+    Params().put("LateralControlSelect", latcontrols.toStdString());
+    refresh();
+  });
+  refresh();
+}
+
+void LateralControlSelect::refresh() {
+  QString latcontrol = QString::fromStdString(Params().get("LateralControlSelect"));
+  if (latcontrol == "0") {
+    label.setText(QString::fromStdString("Pid"));
+  } else if (latcontrol == "1") {
+    label.setText(QString::fromStdString("Indi"));
+  } else if (latcontrol == "2") {
+    label.setText(QString::fromStdString("Lqr"));
+  } else if (latcontrol == "3") {
+    label.setText(QString::fromStdString("Torque"));
+  }
+  btnminus.setText("◀");
+  btnplus.setText("▶");
+}
+
+//MfcSelect
+MfcSelect::MfcSelect() : AbstractControl("MFC [√]", tr("MFC Camera Select (Lkas/Ldws/Lfa)"), "../assets/offroad/icon_mfc.png") {
+  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
+  label.setStyleSheet("color: #e0e879");
+  hlayout->addWidget(&label);
+
+  btnminus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnplus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnminus.setFixedSize(120, 100);
+  btnplus.setFixedSize(120, 100);
+
+  hlayout->addWidget(&btnminus);
+  hlayout->addWidget(&btnplus);
+
+  QObject::connect(&btnminus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("MfcSelect"));
+    int mfc = str.toInt();
+    mfc = mfc - 1;
+    if (mfc <= 0 ) {
+      mfc = 0;
+    }
+    QString mfcs = QString::number(mfc);
+    Params().put("MfcSelect", mfcs.toStdString());
+    refresh();
+  });
+
+  QObject::connect(&btnplus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("MfcSelect"));
+    int mfc = str.toInt();
+    mfc = mfc + 1;
+    if (mfc >= 2 ) {
+      mfc = 2;
+    }
+    QString mfcs = QString::number(mfc);
+    Params().put("MfcSelect", mfcs.toStdString());
+    refresh();
+  });
+  refresh();
+}
+
+void MfcSelect::refresh() {
+  QString mfc = QString::fromStdString(Params().get("MfcSelect"));
+  if (mfc == "0") {
+    label.setText(QString::fromStdString("Lkas"));
+  } else if (mfc == "1") {
+    label.setText(QString::fromStdString("Ldws"));
+  } else if (mfc == "2") {
+    label.setText(QString::fromStdString("Lfa"));
+  }
+  btnminus.setText("◀");
+  btnplus.setText("▶");
+}
+
+//AebSelect
+AebSelect::AebSelect() : AbstractControl("AEB [√]", tr("AEB Signal Select (Scc12/Fca11)"), "../assets/offroad/icon_aeb.png") {
+  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
+  label.setStyleSheet("color: #e0e879");
+  hlayout->addWidget(&label);
+
+  btnminus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnplus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnminus.setFixedSize(120, 100);
+  btnplus.setFixedSize(120, 100);
+
+  hlayout->addWidget(&btnminus);
+  hlayout->addWidget(&btnplus);
+
+  QObject::connect(&btnminus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("AebSelect"));
+    int aeb = str.toInt();
+    aeb = aeb - 1;
+    if (aeb <= 0 ) {
+      aeb = 0;
+    }
+    QString aebs = QString::number(aeb);
+    Params().put("AebSelect", aebs.toStdString());
+    refresh();
+  });
+
+  QObject::connect(&btnplus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("AebSelect"));
+    int aeb = str.toInt();
+    aeb = aeb + 1;
+    if (aeb >= 1 ) {
+      aeb = 1;
+    }
+    QString aebs = QString::number(aeb);
+    Params().put("AebSelect", aebs.toStdString());
+    refresh();
+  });
+  refresh();
+}
+
+void AebSelect::refresh() {
+  QString aeb = QString::fromStdString(Params().get("AebSelect"));
+  if (aeb == "0") {
+    label.setText(QString::fromStdString("Scc12"));
+  } else if (aeb == "1") {
+    label.setText(QString::fromStdString("Fca11"));
+  }
+  btnminus.setText("◀");
+  btnplus.setText("▶");
+}
+
+//LongControlSelect
+LongControlSelect::LongControlSelect() : AbstractControl("LongControl [√]", tr("LongControl Select (Mad/Mad+Long)"), "../assets/offroad/icon_long.png") {
+  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
+  label.setStyleSheet("color: #e0e879");
+  hlayout->addWidget(&label);
+
+  btnminus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnplus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnminus.setFixedSize(120, 100);
+  btnplus.setFixedSize(120, 100);
+
+  hlayout->addWidget(&btnminus);
+  hlayout->addWidget(&btnplus);
+
+  QObject::connect(&btnminus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("LongControlSelect"));
+    int longcontrol = str.toInt();
+    longcontrol = longcontrol - 1;
+    if (longcontrol <= 0 ) {
+      longcontrol = 0;
+    }
+    QString longcontrols = QString::number(longcontrol);
+    Params().put("LongControlSelect", longcontrols.toStdString());
+    refresh();
+  });
+
+  QObject::connect(&btnplus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("LongControlSelect"));
+    int longcontrol = str.toInt();
+    longcontrol = longcontrol + 1;
+    if (longcontrol >= 1 ) {
+      longcontrol = 1;
+    }
+    QString longcontrols = QString::number(longcontrol);
+    Params().put("LongControlSelect", longcontrols.toStdString());
+    refresh();
+  });
+  refresh();
+}
+
+void LongControlSelect::refresh() {
+  QString longcontrol = QString::fromStdString(Params().get("LongControlSelect"));
+  if (longcontrol == "0") {
+    label.setText(QString::fromStdString("Mad"));
+  } else if (longcontrol == "1") {
+    label.setText(QString::fromStdString("Mad+Long"));
+  }
+  btnminus.setText("◀");
+  btnplus.setText("▶");
 }

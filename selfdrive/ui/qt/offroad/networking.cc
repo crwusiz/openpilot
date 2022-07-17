@@ -132,54 +132,6 @@ AdvancedNetworking::AdvancedNetworking(QWidget* parent, WifiManager* wifi): QWid
   // SSH keys
   list->addItem(new SshToggle());
   list->addItem(new SshControl());
-  list->addItem(horizontal_line());
-  list->addItem(new LateralControlSelect());
-  list->addItem(new MfcSelect());
-  list->addItem(new AebSelect());
-  list->addItem(new LongControlSelect());
-  list->addItem(horizontal_line());
-
-  //auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "RUN");
-  auto gitpullbtn = new ButtonControl("Git Fetch and Reset", "실행");
-  QObject::connect(gitpullbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/scripts/gitpull.sh");
-    }
-  });
-  list->addItem(gitpullbtn);
-
-  //auto pandaflashbtn = new ButtonControl("Panda Firmware Flash", "RUN");
-  auto pandaflashbtn = new ButtonControl("판다 펌웨어 플래싱", "실행");
-  QObject::connect(pandaflashbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/panda/board/flash.sh");
-    }
-  });
-  list->addItem(pandaflashbtn);
-
-  //auto pandarecoverbtn = new ButtonControl("Panda Firmware Recover", "RUN");
-  auto pandarecoverbtn = new ButtonControl("판다 펌웨어 복구", "실행");
-  QObject::connect(pandarecoverbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)){
-      QProcess::execute("/data/openpilot/panda/board/recover.sh");
-    }
-  });
-  list->addItem(pandarecoverbtn);
-
-  //auto realdataclearbtn = new ButtonControl("Driving log Delete", "RUN");
-  auto realdataclearbtn = new ButtonControl("주행로그 삭제", "실행");
-  QObject::connect(realdataclearbtn, &ButtonControl::clicked, [=]() {
-    //if (ConfirmationDialog::confirm("Process?", this)){
-    if (ConfirmationDialog::confirm("실행하시겠습니까?", this)) {
-      QProcess::execute("/data/openpilot/scripts/realdataclear.sh");
-    }
-  });
-  list->addItem(realdataclearbtn);
-
-  list->addItem(horizontal_line());
 
   // Enable tethering layout
   tetheringToggle = new ToggleControl("Enable Tethering", "", "", wifi->isTetheringEnabled());
