@@ -108,6 +108,9 @@ class Controls:
     if not self.disengage_on_accelerator:
       self.CP.alternativeExperience |= ALTERNATIVE_EXPERIENCE.DISABLE_DISENGAGE_ON_GAS
 
+    if self.CP.dashcamOnly and params.get_bool("DashcamOverride"):
+      self.CP.dashcamOnly = False
+
     # read params
     self.is_metric = params.get_bool("IsMetric")
     self.is_ldw_enabled = params.get_bool("IsLdwEnabled")
@@ -687,8 +690,8 @@ class Controls:
     hudControl.leftLaneVisible = self.left_lane_visible
 
     recent_blinker = (self.sm.frame - self.last_blinker_frame) * DT_CTRL < 5.0  # 5s blinker cooldown
-    ldw_allowed = self.is_ldw_enabled and CS.vEgo > LDW_MIN_SPEED and not recent_blinker and \
-                  not CC.latActive and self.sm['liveCalibration'].calStatus == Calibration.CALIBRATED
+    ldw_allowed = self.is_ldw_enabled and CS.vEgo > LDW_MIN_SPEED and not recent_blinker \
+                  and not CC.latActive and self.sm['liveCalibration'].calStatus == Calibration.CALIBRATED
 
     model_v2 = self.sm['modelV2']
     desire_prediction = model_v2.meta.desirePrediction

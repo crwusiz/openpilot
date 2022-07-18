@@ -2,13 +2,13 @@ from random import randint
 
 from cereal import car
 from common.params import Params
-from common.realtime import DT_CTRL
-from common.numpy_fast import clip
 from common.conversions import Conversions as CV
+from common.numpy_fast import clip, interp
+from common.realtime import DT_CTRL
+from opendbc.can.packer import CANPacker
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai import hda2can, hyundaican
 from selfdrive.car.hyundai.values import Buttons, CarControllerParams, HDA2_CAR
-from opendbc.can.packer import CANPacker
 from selfdrive.road_speed_limiter import road_speed_limiter_get_active
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
 
