@@ -2,11 +2,10 @@ import copy
 from collections import deque
 
 from cereal import car
-from common.numpy_fast import interp
 from common.conversions import Conversions as CV
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
-from selfdrive.car.hyundai.values import DBC, CarControllerParams, FEATURES, EV_CAR, HYBRID_CAR, EV_HYBRID_CAR, CAR, HDA2_CAR
+from selfdrive.car.hyundai.values import DBC, CarControllerParams, Buttons, FEATURES, EV_CAR, HYBRID_CAR, EV_HYBRID_CAR, CAR, HDA2_CAR
 from selfdrive.car.interfaces import CarStateBase
 
 PREV_BUTTON_SAMPLES = 8
@@ -37,8 +36,6 @@ class CarState(CarStateBase):
     self.has_scc13 = CP.hasScc13
     self.has_scc14 = CP.hasScc14
     self.has_lfa_hda = CP.hasLfaHda
-    self.leftBlinker = False
-    self.rightBlinker = False
     self.aebFcw = CP.aebFcw
     self.mdps_error_cnt = 0
     self.cruise_unavail_cnt = 0
@@ -64,9 +61,6 @@ class CarState(CarStateBase):
     cp_mdps = cp2 if self.mdps_bus else cp
     cp_sas = cp2 if self.sas_bus else cp
     cp_scc = cp2 if self.scc_bus == 1 else cp_cam if self.scc_bus == 2 else cp
-
-    self.prev_left_blinker = self.leftBlinker
-    self.prev_right_blinker = self.rightBlinker
 
     ret = car.CarState.new_message()
 

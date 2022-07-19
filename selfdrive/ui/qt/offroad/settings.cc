@@ -94,8 +94,8 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       tr("Show ETA in 24h format"),
       tr("Use 24h format instead of am/pm"),
       "../assets/offroad/icon_metric.png",
-    },
-    {
+    }),
+    toggles.push_back({
       "NavSettingLeftSide",
       tr("Show Map on Left Side of UI"),
       tr("Show map on left side when in split screen view."),

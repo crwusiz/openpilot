@@ -62,16 +62,14 @@ void Sidebar::updateState(const UIState &s) {
   setProperty("netStrength", strength > 0 ? strength + 1 : 0);
   setProperty("wifiAddr", deviceState.getWifiIpAddress().cStr());
 
-  int freeSpacePercent = deviceState.getFreeSpacePercent();
-  QColor freeSpacePercentColor = good_color;
-  if(freeSpacePercent < 30)
-    freeSpacePercentColor = warning_color;
-  else if(freeSpacePercent < 10)
-    freeSpacePercentColor = danger_color;
-
-  QString freeSpacePercentDesc;
-  freeSpacePercentDesc.sprintf("%d%%", freeSpacePercent);
-  setProperty("storageStatus", QVariant::fromValue(ItemStatus{{tr("FREE"), freeSpacePercentDesc}, freeSpacePercentColor}));
+  ItemStatus connectStatus;
+  auto last_ping = deviceState.getLastAthenaPingTime();
+  if (last_ping == 0) {
+    connectStatus = ItemStatus{{tr("CONNECT"), tr("OFFLINE")}, warning_color};
+  } else {
+    connectStatus = nanos_since_boot() - last_ping < 80e9 ? ItemStatus{{tr("CONNECT"), tr("ONLINE")}, good_color} : ItemStatus{{tr("CONNECT"), tr("ERROR")}, danger_color};
+  }
+  setProperty("connectStatus", QVariant::fromValue(connectStatus));
 
   ItemStatus tempStatus = {{tr("TEMP"), tr("HIGH")}, danger_color};
   auto ts = deviceState.getThermalStatus();
@@ -126,5 +124,5 @@ void Sidebar::paintEvent(QPaintEvent *event) {
   configFont(p, "Open Sans", 35, "Regular");
   drawMetric(p, temp_status.first, temp_status.second, 338);
   drawMetric(p, panda_status.first, panda_status.second, 496);
-  drawMetric(p, storage_status.first, storage_status.second, 654);
+  drawMetric(p, connect_status.first, connect_status.second, 654);
 }
