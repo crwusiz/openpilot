@@ -5,7 +5,7 @@ from cereal import car
 from common.conversions import Conversions as CV
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
-from selfdrive.car.hyundai.values import DBC, CarControllerParams, FEATURES, EV_CAR, HYBRID_CAR, EV_HYBRID_CAR, CAR, HDA2_CAR
+from selfdrive.car.hyundai.values import DBC, CarControllerParams, Buttons, FEATURES, EV_CAR, HYBRID_CAR, EV_HYBRID_CAR, CAR, HDA2_CAR
 from selfdrive.car.interfaces import CarStateBase
 
 PREV_BUTTON_SAMPLES = 8
