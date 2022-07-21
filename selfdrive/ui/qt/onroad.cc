@@ -214,6 +214,7 @@ static const QString get_tpms_text(float tpms) {
 }
 
 void NvgWindow::updateState(const UIState &s) {
+  const int SET_SPEED_NA = 255;
   const SubMaster &sm = *(s.sm);
   const auto cs = sm["controlsState"].getControlsState();
   const auto cc = sm["carControl"].getCarControl();
@@ -227,17 +228,19 @@ void NvgWindow::updateState(const UIState &s) {
 
   const bool cs_alive = sm.alive("controlsState");
 
-  float v_ego = ce.getVEgoCluster() == 0.0 ? ce.getVEgo() : ce.getVEgoCluster();
-  float cur_speed = cs_alive ? std::max<float>(0.0, v_ego) : 0.0;
-  cur_speed = s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH;
+  float v_cruise =  cs.getVCruiseCluster() == 0.0 ? cs.getVCruise() : cs.getVCruiseCluster();
   float apply_speed = cc.getSccSmoother().getApplyMaxSpeed();
-  float cruise_speed = cc.getSccSmoother().getCruiseMaxSpeed();
-  bool cruise_set = cruise_speed > 0 && (int)cruise_speed != 255;
+  float cruise_speed = cs_alive ? v_cruise : SET_SPEED_NA;
+  bool cruise_set = cruise_speed > 0 && (int)cruise_speed != SET_SPEED_NA;
 
   if (cruise_set && !s.scene.is_metric) {
     apply_speed *= KM_TO_MILE;
     cruise_speed *= KM_TO_MILE;
   }
+
+  float v_ego = ce.getVEgoCluster() == 0.0 ? ce.getVEgo() : ce.getVEgoCluster();
+  float cur_speed = cs_alive ? std::max<float>(0.0, v_ego) : 0.0;
+  cur_speed *= s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH;
 
   setProperty("is_cruise_set", cruise_set);
   setProperty("speed", cur_speed);

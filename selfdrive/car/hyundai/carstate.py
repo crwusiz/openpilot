@@ -1,5 +1,5 @@
-import copy
 from collections import deque
+import copy
 
 from cereal import car
 from common.conversions import Conversions as CV
@@ -62,6 +62,9 @@ class CarState(CarStateBase):
     cp_sas = cp2 if self.sas_bus else cp
     cp_scc = cp2 if self.scc_bus == 1 else cp_cam if self.scc_bus == 2 else cp
 
+    self.metric = not cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"]
+    self.speed_conv = CV.KPH_TO_MS if self.metric else CV.MPH_TO_MS
+
     ret = car.CarState.new_message()
 
     ret.doorOpen = any([cp.vl["CGW1"]["CF_Gway_DrvDrSw"], cp.vl["CGW1"]["CF_Gway_AstDrSw"],
@@ -69,13 +72,11 @@ class CarState(CarStateBase):
 
     ret.seatbeltUnlatched = cp.vl["CGW1"]["CF_Gway_DrvSeatBeltSw"] == 0
 
-    self.set_speed_in_mph = bool(cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"])
-    self.speed_conv_to_ms = CV.MPH_TO_MS if self.set_speed_in_mph else CV.KPH_TO_MS
-
     ret.wheelSpeeds = self.get_wheel_speeds(cp.vl["WHL_SPD11"]["WHL_SPD_FL"], cp.vl["WHL_SPD11"]["WHL_SPD_FR"],
                                             cp.vl["WHL_SPD11"]["WHL_SPD_RL"], cp.vl["WHL_SPD11"]["WHL_SPD_RR"])
 
     ret.vEgoRaw = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
+    ret.vEgoCluster = (cp.vl["CLU15"]["CF_Clu_VehicleSpeed"] * CV.KPH_TO_MS) if self.metric else (cp.vl["CLU15"]["CF_Clu_VehicleSpeed2"] * CV.MPH_TO_MS)
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
 
     ret.standstill = ret.vEgoRaw < 0.01
@@ -106,13 +107,12 @@ class CarState(CarStateBase):
     ret.cruiseState.enabledAcc = ret.cruiseState.enabled
 
     if ret.cruiseState.enabled:
-      ret.cruiseState.speed = cp_scc.vl["SCC11"]["VSetDis"] * self.speed_conv_to_ms if not self.no_radar else \
-                              cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * self.speed_conv_to_ms
+      ret.cruiseState.speed = cp_scc.vl["SCC11"]["VSetDis"] * self.speed_conv if not self.no_radar else \
+                              cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * self.speed_conv
     else:
       ret.cruiseState.speed = 0
 
     self.prev_cruise_buttons = self.cruise_buttons[-1]
-    self.prev_main_button = self.main_buttons[-1]
     self.cruise_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwState"])
     self.main_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwMain"])
 
@@ -289,6 +289,9 @@ class CarState(CarStateBase):
       ("CF_Clu_AmpInfo", "CLU11"),
       ("CF_Clu_AliveCnt1", "CLU11"),
 
+      ("CF_Clu_VehicleSpeed", "CLU15"),
+      ("CF_Clu_VehicleSpeed2", "CLU15"),
+
       ("ACCEnable", "TCS13"),
       ("ACC_REQ", "TCS13"),
       ("BrakeLight", "TCS13"),
@@ -360,6 +363,7 @@ class CarState(CarStateBase):
       ("TCS13", 50),
       ("TCS15", 10),
       ("CLU11", 50),
+      ("CLU15", 4),
       ("ESP12", 100),
       ("CGW1", 10),
       ("CGW2", 5),
