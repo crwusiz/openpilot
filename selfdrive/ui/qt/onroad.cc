@@ -225,7 +225,11 @@ void NvgWindow::updateState(const UIState &s) {
   const auto ge = sm["gpsLocationExternal"].getGpsLocationExternal();
   const auto ls = sm["roadLimitSpeed"].getRoadLimitSpeed();
 
-  float cur_speed = std::max(0.0, ce.getVEgo() * (s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH));
+  const bool cs_alive = sm.alive("controlsState");
+
+  float v_ego = ce.getVEgoCluster() == 0.0 ? ce.getVEgo() : ce.getVEgoCluster();
+  float cur_speed = cs_alive ? std::max<float>(0.0, v_ego) : 0.0;
+  cur_speed = s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH;
   float apply_speed = cc.getSccSmoother().getApplyMaxSpeed();
   float cruise_speed = cc.getSccSmoother().getCruiseMaxSpeed();
   bool cruise_set = cruise_speed > 0 && (int)cruise_speed != 255;
