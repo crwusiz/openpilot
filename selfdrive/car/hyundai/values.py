@@ -149,6 +149,8 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
     HyundaiCarInfo("Kia Niro Hybrid 2021", harness=Harness.hyundai_f),  # TODO: could be hyundai_d, verify
     HyundaiCarInfo("Kia Niro Hybrid 2022", harness=Harness.hyundai_h),
   ],
+  CAR.K7_YG: HyundaiCarInfo("Kia K7 2016-19", harness=Harness.hyundai_c)
+  CAR.K7_HEV_YG: HyundaiCarInfo("Kia K7 Hybrid 2016-19", harness=Harness.hyundai_c)
   CAR.SELTOS: HyundaiCarInfo("Kia Seltos 2021", harness=Harness.hyundai_a),
   CAR.SORENTO: [
     HyundaiCarInfo("Kia Sorento 2018", video_link="https://www.youtube.com/watch?v=Fkh3s6WHJz8", harness=Harness.hyundai_c),
@@ -1190,7 +1192,19 @@ FW_VERSIONS = {
     ],
   },
   CAR.K7: {
-    (Ecu.eps, 0x7d4, None): [b'\xf1\000YG  MDPS C 1.00 1.01 56310F6350\000 4YG7C101',],
+    (Ecu.eps, 0x7d4, None): [
+      b'\xf1\000YG  MDPS C 1.00 1.00 99800F6563\000 4YGAC100',
+      b'\xf1\000YG  MDPS C 1.00 1.00 E0000F6563\000 4YGSC100',
+      b'\xf1\000YG  MDPS C 1.01 99500F6563\000 4YGDC103', 
+      b'\xf1\000YG  MDPS C 1.00 1.01 56310F6350\000 4YG7C101',
+    ],
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\000IG MFC  1.00 1.00 95740F9200 180915',
+      b'\xf1\000YG MFC  1.00 1.01 95740F6100 170717',
+      b'\xf1\000YG MFC  1.00 1.03 95740F9200 190605',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [ b'\xf1\x00YG__ SCC F_CUP   1.01 1.02 96400F6000     \xf1\xa01.01',],
+    (Ecu.esp, 0x7d1, None): [b'\xf1\x8758920-F6230\xf1\000NC MGH \t 101\031\t\005 58920F6230\xf1\xa01.01',],
   },
   CAR.EV6: {
     (Ecu.fwdRadar, 0x7d0, None): [
