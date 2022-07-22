@@ -52,7 +52,6 @@ class CarController:
     self.packer = CANPacker(dbc_name)
 
     self.cut_steer = False
-    self.steer_rate_limited = False
     self.turning_indicator_alert = False
 
     self.angle_limit_counter = 0
@@ -83,7 +82,6 @@ class CarController:
     # Steering Torque
     new_steer = int(round(actuators.steer * self.params.STEER_MAX))
     apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.params)
-    #self.steer_rate_limited = new_steer != apply_steer
 
     # Disable steering while turning blinker on and speed below 60 kph
     if CS.out.leftBlinker or CS.out.rightBlinker:
