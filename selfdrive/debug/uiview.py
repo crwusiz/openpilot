@@ -32,7 +32,7 @@ if __name__ == "__main__":
       time.sleep(1 / 100)  # continually send, rate doesn't matter
 
       msgs['carState'] = messaging.new_message('carState')
-      msgs['carState'].carState.cluSpeedMs = speed
+      msgs['carState'].carState.vEgoCluster = speed
 
       speed += 0.02
       if speed > 40.:
