@@ -1,52 +1,52 @@
 {
   "Offroad_ChargeDisabled": {
-    "text": "차량의 시동이 하루이상 꺼져있으면 장치의 충전이 불가능합니다. 시동을 켜서 충전을 시작하세요.",
+    "text": "إذا تم إيقاف تشغيل السيارة لأكثر من يوم ، فلا يمكن شحن الجهاز. قم بتشغيل الإشعال لبدء الشحن.",
     "severity": 0
   },
   "Offroad_TemperatureTooHigh": {
-    "text": "장치 온도가 너무 높아서 시스템이 시작되지 않습니다.",
+    "text": "درجة حرارة الجهاز مرتفعة جدًا لبدء تشغيل النظام.",
     "severity": 1
   },
   "Offroad_ConnectivityNeededPrompt": {
-    "text": "네트워크를 연결하여 업데이트를 확인하세요. 그렇지 않으면 오픈파일럿이 활성화되지 않습니다.",
+    "text": "اتصل بالشبكة للتحقق من وجود تحديثات. خلاف ذلك ، لن يتم تنشيط الأوبن.",
     "severity": 0,
     "_comment": "Append the number of days at the end of the text"
   },
   "Offroad_ConnectivityNeeded": {
-    "text": "네트워크를 연결하여 업데이트를 확인하세요. 그렇지 않으면 오픈파일럿이 활성화되지 않습니다.",
+    "text": "اتصل بالشبكة للتحقق من وجود تحديثات. خلاف ذلك ، لن يتم تنشيط الأوبن.",
     "severity": 1
   },
   "Offroad_UpdateFailed": {
-    "text": "업데이트를 다운로드할 수 없습니다\n",
+    "text": "تعذر تنزيل التحديث",
     "severity": 1,
     "_comment": "Append the command and error to the text."
   },
   "Offroad_PandaFirmwareMismatch": {
-    "text": "호환되지않는 판다 펌웨어 버전입니다. 장치를 재부팅하면 판다 펌웨어가 재설치됩니다.",
+    "text": "إصدار البرامج الثابتة الباندا غير متوافق. أعد تشغيل جهازك وستتم إعادة تثبيت البرامج الثابتة للباندا.",
     "severity": 1
   },
   "Offroad_InvalidTime": {
-    "text": "잘못된 날짜 및 시간설정으로 시스템이 시작되지않습니다. 네트워크에 연결하여 날짜 및 시간설정을 진행하세요.",
+    "text": "لن يبدأ النظام بإعدادات التاريخ والوقت غير الصحيحة. اتصل بالشبكة واضبط التاريخ والوقت.",
     "severity": 1
   },
   "Offroad_IsTakingSnapshot": {
-    "text": "카메라 스냅샷 촬영이 완료되지않아 시스템이 시작되지 않습니다.",
+    "text": "لن يبدأ النظام لأن التقاط لقطة الكاميرا لم يكتمل.",
     "severity": 0
   },
   "Offroad_NeosUpdate": {
-    "text": "NEOS 운영 체제에 대한 업데이트가 백그라운드에서 다운로드되는중 입니다. 설치할 준비가 되면 업데이트하라는 메시지가 표시됩니다.",
+    "text": "يجري تنزيل تحديثات نظام التشغيل NEOS في الخلفية. سيُطلب منك التحديث عندما تكون جاهزًا للتثبيت.",
     "severity": 0
   },
   "Offroad_HardwareUnsupported": {
-    "text": "화이트와 그레이판다는 더이상 호환되지않습니다. 블랙판다 또는 Comma Two를 사용하세요.",
+    "text": "الباندا البيضاء والرمادية لم تعد متوافقة. استخدم الباندا السوداء أو كوما إثنين.",
     "severity": 0
   },
   "Offroad_UnofficialHardware": {
-    "text": "장치를 등록하지 못했습니다. comma.ai 서버에 연결하거나 업로드하지 않으며 comma.ai에서 지원을 받지 않습니다. 이게 공식적인 장치라면 support@comma.ai 로 문의하세요",
+    "text": "فشل تسجيل الجهاز. نحن لا نتصل بخوادم comma.ai ولا نحملها ولا ندعمها comma.ai. إذا كان هذا جهازًا رسميًا ، فيرجى الاتصال بنا على support@comma.ai",
     "severity": 1
   },
   "Offroad_NvmeMissing": {
-    "text": "NVME drive not mounted.",
+    "text": "ذاكرة NVME غير مركبة.",
     "severity": 1
   }
 }
