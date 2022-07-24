@@ -14,7 +14,7 @@ from cereal import log
 LaneChangeState = log.LateralPlan.LaneChangeState
 LaneChangeDirection = log.LateralPlan.LaneChangeDirection
 
-LANE_CHANGE_SPEED_MIN = 60 * CV.KPH_TO_MS
+LANE_CHANGE_SPEED_MIN = 15 * CV.KPH_TO_MS
 LANE_CHANGE_TIME_MAX = 10.
 AUTO_LCA_TIME = 1.0
 
