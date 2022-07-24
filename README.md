@@ -1,32 +1,27 @@
-![](https://user-images.githubusercontent.com/37757984/127420744-89ca219c-8f8e-46d3-bccf-c1cb53b81bb1.png)
+![](https://i.imgur.com/b0ZyIx5.jpg)
 
 crwusiz openpilot
 =====
 <b> crwusiz branch is neokii modify branch base (comma.ai master and xx979xx HKG_community source) </b>
-- <b> v0.8.15 [ only comma3 support ] </b>
+- <b> v0.8.16 [ only comma3 support ] </b>
 - If you have any questions, please send a message to crwusiz from discord. if you like this Branch <b> [Donate](https://paypal.me/crwusiz) </b>for me
 - It is open source and inherits MIT license. 
 - By installing this software you accept all responsibility for anything that might occur while you use it.
 - All contributors to this fork are not liable. <b>Use at your own risk.</b>
 
 [![](https://i.imgur.com/TMtVMV8.png)](#)
-- kor NanumGothic font
-- event message, qt ui kor translate
+- kor NanumGothic font apply fontname opensans
+- event message, qt ui kor translate 
 - brake, bsd, gps, wifi icon
 - wheel, N direction icon rotate
 - lateralcontrol select ( Pid / Indi / Lqr / Torque )
 - mfc select ( LKAS / LDWS / LFA )
 - aebsignal select ( SCC12 / FCA11 )
 - longcontrol select ( MAD / MAD+LONG )
-- add toggle / function / simple ui
+- add community toggle / function / simple ui
 - LongitudinalControl full support
 - comma three support
-- autohold, turnsignal, tpms, limitspeed display (neokii) 
-
------------ ↓ eon ( lepro x720 or comma two ) ----------- 
-- Comma Bootlogo / Bootanimation Auto install
-- battery charging and battery percent display
-
+- autohold, turnsignal, tpms, roadlimitspeed display (neokii) 
 
 ## Source Code Reference
 - https://github.com/commaai/openpilot
@@ -60,7 +55,7 @@ Table of Contents
 =======================
 
 * [What is openpilot?](#what-is-openpilot)
-* [Running in a car](#running-in-a-car)
+* [Running in a car](#running-on-a-dedicated-device-in-a-car)
 * [Running on PC](#running-on-pc)
 * [Community and Contributing](#community-and-contributing)
 * [User Data and comma Account](#user-data-and-comma-account)

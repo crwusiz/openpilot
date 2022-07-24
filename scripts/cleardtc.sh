@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-cd /data/openpilot
+pushd /data/openpilot
 
 pkill -2 -f boardd
 

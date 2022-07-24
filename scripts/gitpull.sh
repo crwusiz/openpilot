@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-cd /data/openpilot
+pushd /data/openpilot
 
 echo -n "0" > /data/params/d/PutPrebuilt
 sudo rm -f prebuilt

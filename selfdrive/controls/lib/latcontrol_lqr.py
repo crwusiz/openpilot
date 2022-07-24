@@ -32,7 +32,7 @@ class LatControlLQR(LatControl):
     super().reset()
     self.i_lqr = 0.0
 
-  def update(self, active, CS, VM, params, last_actuators, desired_curvature, desired_curvature_rate, llk):
+  def update(self, active, CS, VM, params, last_actuators, steer_limited, desired_curvature, desired_curvature_rate, llk):
     lqr_log = log.ControlsState.LateralLQRState.new_message()
 
     torque_scale = interp(CS.vEgo * 3.6, TORQUE_SCALE_BP, TORQUE_SCALE_V)
@@ -83,5 +83,5 @@ class LatControlLQR(LatControl):
     lqr_log.i = self.i_lqr
     lqr_log.output = output_steer
     lqr_log.lqrOutput = lqr_output
-    lqr_log.saturated = self._check_saturation(self.steer_max - abs(output_steer) < 1e-3, CS)
+    lqr_log.saturated = self._check_saturation(self.steer_max - abs(output_steer) < 1e-3, CS, steer_limited)
     return output_steer, desired_angle, lqr_log

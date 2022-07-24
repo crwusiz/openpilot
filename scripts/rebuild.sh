@@ -2,8 +2,10 @@
 
 cd /data/openpilot && scons -c;
 rm /data/openpilot/.sconsign.dblite;
-rm /data/openpilot/prebuilt;
 rm -rf /tmp/scons_cache;
+
+echo -n "0" > /data/params/d/PutPrebuilt
+sudo rm -f prebuilt
 
 # Allows you to restart OpenPilot without rebooting the Comma 3
 tmux kill-session -t comma;

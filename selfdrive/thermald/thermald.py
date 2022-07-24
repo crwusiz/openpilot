@@ -362,9 +362,10 @@ def thermald_thread(end_event, hw_queue):
 
     prebuiltlet = params.get_bool("PutPrebuilt")
     if not os.path.isfile(prebuiltfile) and prebuiltlet:
-      os.system("cd /data/openpilot; touch prebuilt")
+      os.system("touch /data/openpilot/prebuilt")
+
     elif os.path.isfile(prebuiltfile) and not prebuiltlet:
-      os.system("cd /data/openpilot; rm -f prebuilt")
+      os.system("rm -f /data/openpilot/prebuilt")
     # Offroad power monitoring
     power_monitor.calculate(peripheralState, onroad_conditions["ignition"])
     msg.deviceState.offroadPowerUsageUwh = power_monitor.get_power_used()
@@ -372,7 +373,7 @@ def thermald_thread(end_event, hw_queue):
     current_power_draw = HARDWARE.get_current_power_draw()
     statlog.sample("power_draw", current_power_draw)
     msg.deviceState.powerDrawW = current_power_draw
-    
+
     som_power_draw = HARDWARE.get_som_power_draw()
     statlog.sample("som_power_draw", som_power_draw)
     msg.deviceState.somPowerDrawW = som_power_draw
