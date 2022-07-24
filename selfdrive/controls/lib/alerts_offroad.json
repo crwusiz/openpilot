@@ -17,7 +17,7 @@
     "severity": 1
   },
   "Offroad_UpdateFailed": {
-    "text": "تعذر تنزيل التحديث",
+    "text": "تعذر تنزيل التحديث \n",
     "severity": 1,
     "_comment": "Append the command and error to the text."
   },
