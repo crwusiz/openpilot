@@ -1,10 +1,11 @@
+from enum import Enum
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
 from cereal import car
 from common.conversions import Conversions as CV
 from selfdrive.car import dbc_dict
-from selfdrive.car.docs_definitions import CarInfo, Harness
+from selfdrive.car.docs_definitions import CarFootnote, CarInfo, Column, Harness
 Ecu = car.CarParams.Ecu
 
 
@@ -83,6 +84,12 @@ class CAR:
 # kia - CARNIVAL 2021(KA4), SORENTO 2020(MQ4), K8 2021(GL3)
 # ---------------------------------------------------------------------------------------
 
+class Footnote(Enum):
+  CANFD = CarFootnote(
+    "Requires a <a href='https://comma.ai/shop/products/panda'>red panda</a> and additional <a href='https://comma.ai/shop/products/harness-box'>harness box.</a>",
+    Column.MODEL)
+
+
 @dataclass
 class HyundaiCarInfo(CarInfo):
   # TODO: we can probably remove LKAS. LKAS is standard on many
@@ -157,7 +164,7 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
     HyundaiCarInfo("Kia Sorento 2019", video_link="https://www.youtube.com/watch?v=Fkh3s6WHJz8", harness=Harness.hyundai_e),
   ],
   CAR.STINGER: HyundaiCarInfo("Kia Stinger 2018", video_link="https://www.youtube.com/watch?v=MJ94qoofYw0", harness=Harness.hyundai_c),
-  CAR.EV6: HyundaiCarInfo("Kia EV6 2022", "All", harness=Harness.hyundai_p),
+  CAR.EV6: HyundaiCarInfo("Kia EV6 2022", "All", harness=Harness.hyundai_p, footnotes=[Footnote.CANFD,]),
 
   # Genesis
   CAR.GENESIS: HyundaiCarInfo("Hyundai Genesis 2015-16", min_enable_speed=19 * CV.MPH_TO_MS, harness=Harness.hyundai_j),
