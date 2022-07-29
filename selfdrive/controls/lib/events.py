@@ -751,14 +751,16 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   EventName.sensorDataInvalid: {
     ET.PERMANENT: Alert(
-      #"No Data from Device Sensors",
-      #"Reboot your Device",
-      "장치 센서 오류",
+      #"Sensor Data Invalid",
+      #"Ensure device is mounted securely",
+      "센서 데이터 오류",
       "장치를 점검하세요",
       AlertStatus.normal, AlertSize.mid,
       Priority.LOWER, VisualAlert.none, AudibleAlert.none, .2, creation_delay=1.),
-    #ET.NO_ENTRY: NoEntryAlert("No Data from Device Sensors"),
-    ET.NO_ENTRY: NoEntryAlert("장치 센서 오류"),
+    #ET.NO_ENTRY: NoEntryAlert("Sensor Data Invalid"),
+    #ET.SOFT_DISABLE: soft_disable_alert("Sensor Data Invalid"),
+    ET.NO_ENTRY: NoEntryAlert("센서 데이터 오류"),
+    ET.SOFT_DISABLE: soft_disable_alert("센서 데이터 오류"),
   },
 
   EventName.noGps: {
