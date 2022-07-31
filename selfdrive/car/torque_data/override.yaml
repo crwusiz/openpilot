@@ -21,6 +21,9 @@ COMMA BODY: [.nan, 1000, .nan]
 
 # Totally new cars
 KIA EV6 2022 (CV): [3.5, 2.5, 0.0]
+GENESIS GV70 2022 (JK1): [3.5, 2.5, 0.0]
+HYUNDAI TUCSON HYBRID 2022 (NX4): [3.5, 2.5, 0.0]
+HYUNDAI IONIQ 5 2022 (NE): [3.5, 2.5, 0.0]
 RAM 1500 5TH GEN: [2.0, 2.0, 0.05]
 
 # Dashcam or fallback configured as ideal car

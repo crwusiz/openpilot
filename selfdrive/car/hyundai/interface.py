@@ -32,7 +32,11 @@ class CarInterface(CarInterfaceBase):
     ret.openpilotLongitudinalControl = Params().get("LongControlSelect", encoding='utf8') == "1"
 
     ret.carName = "hyundai"
-    ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
+    if candidate in HDA2_CAR:
+      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.noOutput),
+                           get_safety_config(car.CarParams.SafetyModel.hyundaiHDA2)]
+    else:
+      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
 
     ret.maxSteeringAngleDeg = 1000.
     ret.steerFaultMaxAngle = 85
@@ -71,10 +75,20 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.70
       ret.steerRatio = 13.7
       tire_stiffness_factor = 0.385
+    elif candidate == CAR.IONIQ5:
+      ret.mass = 2012 + STD_CARGO_KG
+      ret.wheelbase = 3.0
+      ret.steerRatio = 16.
+      tire_stiffness_factor = 0.65
     elif candidate == CAR.TUCSON:
       ret.mass = 1596. + STD_CARGO_KG
       ret.wheelbase = 2.67
       ret.steerRatio = 16.0
+      tire_stiffness_factor = 0.385
+    elif candidate == CAR.TUCSON22_HEV:
+      ret.mass = 1680. + STD_CARGO_KG
+      ret.wheelbase = 2.756
+      ret.steerRatio = 16.
       tire_stiffness_factor = 0.385
     elif candidate in [CAR.SANTAFE, CAR.SANTAFE_HEV]:
       ret.mass = 1910. + STD_CARGO_KG
@@ -154,9 +168,6 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.90
       ret.steerRatio = 16.0
       tire_stiffness_factor = 0.65
-      ret.safetyConfigs = [
-        get_safety_config(car.CarParams.SafetyModel.noOutput),
-        get_safety_config(car.CarParams.SafetyModel.hyundaiHDA2)]
 
     # genesis
     elif candidate == CAR.GENESIS:
@@ -175,6 +186,11 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 2185. + STD_CARGO_KG
       ret.wheelbase = 3.16
       ret.steerRatio = 12.0
+    elif candidate == CAR.GENESIS_GV70:
+      ret.mass = 1950. + STD_CARGO_KG
+      ret.wheelbase = 2.87
+      ret.steerRatio = 13.27 * 1.15  # 15% higher at the center seems reasonable
+      tire_stiffness_factor = 0.65
 
     # Pid -----------------------------------------------------------------
     if Params().get("LateralControlSelect", encoding='utf8') == "0":
@@ -305,7 +321,7 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.lqr.l = [0.22, 0.318]
 
     # Torque -----------------------------------------------------------------
-    elif Params().get("LateralControlSelect", encoding='utf8') == "3":
+    elif any([Params().get("LateralControlSelect", encoding='utf8') == "3", candidate in HDA2_CAR]):
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     ret.centerToFront = ret.wheelbase * 0.4

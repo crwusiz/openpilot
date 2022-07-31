@@ -549,7 +549,7 @@ location set</source>
     <message>
         <location filename="../qt/offroad/settings.cc" line="775"/>
         <source>MFC Camera Select (Lkas/Ldws/Lfa)</source>
-        <translation>차량의 MFC 카메라를 선택합니다. (Lkas/Ldws/Lfa)</translation>
+        <translation>차량의 MFC 카메라를 선택합니다. (Lkas/Ldws/Lfa/HDA2)</translation>
     </message>
 </context>
 <context>

@@ -772,7 +772,7 @@ void LateralControlSelect::refresh() {
 }
 
 //MfcSelect
-MfcSelect::MfcSelect() : AbstractControl("MFC [√]", tr("MFC Camera Select (Lkas/Ldws/Lfa)"), "../assets/offroad/icon_mfc.png") {
+MfcSelect::MfcSelect() : AbstractControl("MFC [√]", tr("MFC Camera Select (Lkas/Ldws/Lfa/HDA2)"), "../assets/offroad/icon_mfc.png") {
   label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
   label.setStyleSheet("color: #e0e879");
   hlayout->addWidget(&label);
@@ -815,8 +815,8 @@ MfcSelect::MfcSelect() : AbstractControl("MFC [√]", tr("MFC Camera Select (Lka
     auto str = QString::fromStdString(Params().get("MfcSelect"));
     int mfc = str.toInt();
     mfc = mfc + 1;
-    if (mfc >= 2 ) {
-      mfc = 2;
+    if (mfc >= 3 ) {
+      mfc = 3;
     }
     QString mfcs = QString::number(mfc);
     Params().put("MfcSelect", mfcs.toStdString());
@@ -833,6 +833,8 @@ void MfcSelect::refresh() {
     label.setText(QString::fromStdString("Ldws"));
   } else if (mfc == "2") {
     label.setText(QString::fromStdString("Lfa"));
+  } else if (mfc == "3") {
+    label.setText(QString::fromStdString("HDA2"));
   }
   btnminus.setText("◀");
   btnplus.setText("▶");
