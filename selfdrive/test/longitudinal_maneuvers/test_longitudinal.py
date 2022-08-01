@@ -129,7 +129,7 @@ class LongitudinalControl(unittest.TestCase):
     os.environ['NO_CAN_TIMEOUT'] = "1"
 
     params = Params()
-    #params.clear_all()
+    params.clear_all()
     params.put_bool("Passive", bool(os.getenv("PASSIVE")))
     params.put_bool("OpenpilotEnabledToggle", True)
 

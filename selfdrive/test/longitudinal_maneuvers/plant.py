@@ -41,9 +41,9 @@ class Plant():
     time.sleep(1)
     self.sm = messaging.SubMaster(['longitudinalPlan'])
 
-    from selfdrive.car.hyundai.values import CAR
-    from selfdrive.car.hyundai.interface import CarInterface
-    self.planner = Planner(CarInterface.get_params(CAR.GRANDEUR_IG), init_v=self.speed)
+    from selfdrive.car.honda.values import CAR
+    from selfdrive.car.honda.interface import CarInterface
+    self.planner = Planner(CarInterface.get_params(CAR.CIVIC), init_v=self.speed)
 
   def current_time(self):
     return float(self.rk.frame) / self.rate
@@ -83,7 +83,6 @@ class Plant():
     lead.aLeadTau = float(1.5)
     lead.status = status
     lead.modelProb = float(prob)
-    lead.radar = True
     if not self.only_lead2:
       radar.radarState.leadOne = lead
     radar.radarState.leadTwo = lead
