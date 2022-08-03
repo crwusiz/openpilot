@@ -1,163 +1,66 @@
-def phone(String ip, String step_label, String cmd) {
-  withCredentials([file(credentialsId: 'id_rsa', variable: 'key_file')]) {
-    def ssh_cmd = """
-ssh -tt -o StrictHostKeyChecking=no -i ${key_file} 'comma@${ip}' /usr/bin/bash <<'END'
-
-set -e
-
-export CI=1
-export TEST_DIR=${env.TEST_DIR}
-export SOURCE_DIR=${env.SOURCE_DIR}
-export GIT_BRANCH=${env.GIT_BRANCH}
-export GIT_COMMIT=${env.GIT_COMMIT}
-export AZURE_TOKEN='${env.AZURE_TOKEN}'
-
-source ~/.bash_profile
-if [ -f /TICI ]; then
-  source /etc/profile
-fi
-
-ln -snf ${env.TEST_DIR} /data/pythonpath
-
-cd ${env.TEST_DIR} || true
-${cmd}
-exit 0
-
-END"""
-
-    sh script: ssh_cmd, label: step_label
-  }
-}
-
-def phone_steps(String device_type, steps) {
-  lock(resource: "", label: device_type, inversePrecedence: true, variable: 'device_ip', quantity: 1) {
-    timeout(time: 20, unit: 'MINUTES') {
-      phone(device_ip, "git checkout", readFile("selfdrive/test/setup_device_ci.sh"),)
-      steps.each { item ->
-        phone(device_ip, item[0], item[1])
-      }
-    }
-  }
-}
-
 pipeline {
-  agent none
+  agent any
   environment {
-    CI = "1"
-    TEST_DIR = "/data/openpilot"
-    SOURCE_DIR = "/data/openpilot_source/"
-    AZURE_TOKEN = credentials('azure_token')
+    DOCKER_IMAGE_TAG = "panda:build-${env.GIT_COMMIT}"
   }
-  options {
-    timeout(time: 4, unit: 'HOURS')
-  }
-
   stages {
-    stage('build release3') {
-      agent { docker { image 'ghcr.io/commaai/alpine-ssh'; args '--user=root' } }
-      when {
-        branch 'devel-staging'
-      }
+    stage('Build Docker Image') {
       steps {
-        phone_steps("tici", [
-          ["build release3-staging & dashcam3-staging", "PUSH=1 $SOURCE_DIR/release/build_release.sh"],
-        ])
+        timeout(time: 60, unit: 'MINUTES') {
+          script {
+            sh 'git archive -v -o panda.tar.gz --format=tar.gz HEAD'
+            dockerImage = docker.build("${env.DOCKER_IMAGE_TAG}")
+          }
+        }
       }
     }
-
-    stage('openpilot tests') {
-      when {
-        not {
-          anyOf {
-            branch 'master-ci'; branch 'devel'; branch 'devel-staging';
-            branch 'release3'; branch 'release3-staging'; branch 'dashcam3'; branch 'dashcam3-staging';
-            branch 'testing-closet*'; branch 'hotfix-*'
+    stage('pedal tests') {
+      steps {
+        lock(resource: "pedal", inversePrecedence: true, quantity: 1) {
+          timeout(time: 10, unit: 'MINUTES') {
+            script {
+              sh "docker run --rm --privileged \
+                    --volume /dev/bus/usb:/dev/bus/usb \
+                    --volume /var/run/dbus:/var/run/dbus \
+                    --net host \
+                    ${env.DOCKER_IMAGE_TAG} \
+                    bash -c 'cd /tmp/panda && PEDAL_JUNGLE=058010800f51363038363036 python ./tests/pedal/test_pedal.py'"
+            }
           }
         }
       }
-
-      parallel {
-
-        stage('simulator') {
-          agent {
-            dockerfile {
-              filename 'Dockerfile.sim_nvidia'
-              dir 'tools/sim'
-              args '--user=root'
+    }
+    stage('CANFD tests') {
+      steps {
+        lock(resource: "pedal", inversePrecedence: true, quantity: 1) {
+          timeout(time: 10, unit: 'MINUTES') {
+            script {
+              sh "docker run --rm --privileged \
+                    --volume /dev/bus/usb:/dev/bus/usb \
+                    --volume /var/run/dbus:/var/run/dbus \
+                    --net host \
+                    ${env.DOCKER_IMAGE_TAG} \
+                    bash -c 'cd /tmp/panda && ./board/build_all.sh && JUNGLE=058010800f51363038363036 H7_PANDAS_EXCLUDE=\"080021000c51303136383232\" ./tests/canfd/test_canfd.py'"
             }
-          }
-          steps {
-            sh "git config --global --add safe.directory ${WORKSPACE}"
-            sh "git lfs pull"
-            lock(resource: "", label: "simulator", inversePrecedence: true, quantity: 1) {
-              sh "${WORKSPACE}/tools/sim/build_container.sh"
-              sh "DETACH=1 ${WORKSPACE}/tools/sim/start_carla.sh"
-              sh "${WORKSPACE}/tools/sim/start_openpilot_docker.sh"
-            }
-          }
-
-          post {
-            always {
-              sh "docker kill carla_sim || true"
-              sh "rm -rf ${WORKSPACE}/* || true"
-              sh "rm -rf .* || true"
-            }
-          }
-        }
-
-        stage('build') {
-          agent { docker { image 'ghcr.io/commaai/alpine-ssh'; args '--user=root' } }
-          environment {
-            R3_PUSH = "${env.BRANCH_NAME == 'master' ? '1' : ' '}"
-          }
-          steps {
-            phone_steps("tici", [
-              ["build master-ci", "cd $SOURCE_DIR/release && TARGET_DIR=$TEST_DIR EXTRA_FILES='tools/' ./build_devel.sh"],
-              ["build openpilot", "cd selfdrive/manager && ./build.py"],
-              ["check dirty", "release/check-dirty.sh"],
-              ["test manager", "python selfdrive/manager/test/test_manager.py"],
-              ["onroad tests", "cd selfdrive/test/ && ./test_onroad.py"],
-              ["test car interfaces", "cd selfdrive/car/tests/ && ./test_car_interfaces.py"],
-            ])
-          }
-        }
-
-        stage('HW + Unit Tests') {
-          agent { docker { image 'ghcr.io/commaai/alpine-ssh'; args '--user=root' } }
-          steps {
-            phone_steps("tici2", [
-              ["build", "cd selfdrive/manager && ./build.py"],
-              ["test power draw", "python system/hardware/tici/test_power_draw.py"],
-              ["test boardd loopback", "python selfdrive/boardd/tests/test_boardd_loopback.py"],
-              ["test loggerd", "python selfdrive/loggerd/tests/test_loggerd.py"],
-              ["test encoder", "LD_LIBRARY_PATH=/usr/local/lib python selfdrive/loggerd/tests/test_encoder.py"],
-              ["test sensord", "python selfdrive/sensord/test/test_sensord.py"],
-            ])
-          }
-        }
-
-        stage('camerad') {
-          agent { docker { image 'ghcr.io/commaai/alpine-ssh'; args '--user=root' } }
-          steps {
-            phone_steps("tici-party", [
-              ["build", "cd selfdrive/manager && ./build.py"],
-              ["test camerad", "python system/camerad/test/test_camerad.py"],
-              ["test exposure", "python system/camerad/test/test_exposure.py"],
-            ])
-          }
-        }
-
-        stage('replay') {
-          agent { docker { image 'ghcr.io/commaai/alpine-ssh'; args '--user=root' } }
-          steps {
-            phone_steps("tici3", [
-              ["build", "cd selfdrive/manager && ./build.py"],
-              ["model replay", "cd selfdrive/test/process_replay && ./model_replay.py"],
-            ])
           }
         }
       }
-
+    }
+    stage('HITL tests') {
+      steps {
+        lock(resource: "pandas", inversePrecedence: true, quantity: 1) {
+          timeout(time: 20, unit: 'MINUTES') {
+            script {
+              sh "docker run --rm --privileged \
+                    --volume /dev/bus/usb:/dev/bus/usb \
+                    --volume /var/run/dbus:/var/run/dbus \
+                    --net host \
+                    ${env.DOCKER_IMAGE_TAG} \
+                    bash -c 'cd /tmp/panda && ./board/build_all.sh && PANDAS_JUNGLE=23002d000851393038373731 PANDAS_EXCLUDE=\"1d0002000c51303136383232 2f002e000c51303136383232\" ./tests/automated/test.sh'"
+            }
+          }
+        }
+      }
     }
   }
 }
