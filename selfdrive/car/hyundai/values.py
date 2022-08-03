@@ -104,7 +104,10 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
   CAR.SONATA_HEV: HyundaiCarInfo("Hyundai Sonata Hybrid 2020-22", "All", harness=Harness.hyundai_a),
   CAR.SONATA_LF: HyundaiCarInfo("Hyundai Sonata 2018-19", harness=Harness.hyundai_e),
   CAR.KONA: HyundaiCarInfo("Hyundai Kona 2020", harness=Harness.hyundai_b),
-  CAR.KONA_EV: HyundaiCarInfo("Hyundai Kona Electric 2018-21", harness=Harness.hyundai_g),
+  CAR.KONA_EV: [
+    HyundaiCarInfo("Hyundai Kona Electric 2018-21", harness=Harness.hyundai_g),
+    HyundaiCarInfo("Hyundai Kona Electric 2022", "Smart Cruise Control (SCC)", harness=Harness.hyundai_o),
+  ],
   CAR.KONA_HEV: HyundaiCarInfo("Hyundai Kona Hybrid 2020", harness=Harness.hyundai_i),
   CAR.IONIQ_EV: [
     HyundaiCarInfo("Hyundai Ioniq Electric 2019", harness=Harness.hyundai_c),
@@ -125,20 +128,20 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
     HyundaiCarInfo("Hyundai Santa Fe Hybrid 2022", "All", harness=Harness.hyundai_l),
   ],
   CAR.TUCSON: [
-    HyundaiCarInfo("Hyundai Tucson 2021", min_enable_speed=19 * CV.MPH_TO_MS, harness=Harness.hyundai_l),
-    HyundaiCarInfo("Hyundai Tucson Diesel 2019", harness=Harness.hyundai_l),
+    HyundaiCarInfo("Hyundai Tucson 2021", "Smart Cruise Control (SCC)", min_enable_speed=19 * CV.MPH_TO_MS, harness=Harness.hyundai_l),
+    HyundaiCarInfo("Hyundai Tucson Diesel 2019", "Smart Cruise Control (SCC)", harness=Harness.hyundai_l),
   ],
   CAR.TUCSON22_HEV: HyundaiCarInfo("Hyundai Tucson Hybrid 2022", "All", harness=Harness.hyundai_n),
   CAR.PALISADE: [
     HyundaiCarInfo("Hyundai Palisade 2020-22", "All", video_link="https://youtu.be/TAnDqjF4fDY?t=456", harness=Harness.hyundai_h),
-    HyundaiCarInfo("Kia Telluride 2020", harness=Harness.hyundai_h),
+    HyundaiCarInfo("Kia Telluride 2020", "All", harness=Harness.hyundai_h),
   ],
-  CAR.VELOSTER: HyundaiCarInfo("Hyundai Veloster 2019-20", min_enable_speed=5. * CV.MPH_TO_MS, harness=Harness.hyundai_e),
+  CAR.VELOSTER: HyundaiCarInfo("Hyundai Veloster 2019-20", "Smart Cruise Control (SCC)", min_enable_speed=5. * CV.MPH_TO_MS, harness=Harness.hyundai_e),
 
   # Kia
   CAR.FORTE: [
     HyundaiCarInfo("Kia Forte 2018", harness=Harness.hyundai_b),
-    HyundaiCarInfo("Kia Forte 2019-21", harness=Harness.hyundai_g),
+    HyundaiCarInfo("Kia Forte 2019-21", "All", harness=Harness.hyundai_g),
   ],
   CAR.K5: [
     HyundaiCarInfo("Kia Optima 2017", min_steer_speed=32. * CV.MPH_TO_MS, harness=Harness.hyundai_b),
@@ -617,6 +620,7 @@ FW_VERSIONS = {
       b'\xf1\x8799110Q4000\xf1\x00DEev SCC F-CUP      1.00 1.00 99110-Q4000         ',
       b'\xf1\x8799110Q4100\xf1\x00DEev SCC F-CUP      1.00 1.00 99110-Q4100         ',
       b'\xf1\x8799110Q4500\xf1\000DEev SCC F-CUP      1.00 1.00 99110-Q4500         ',
+      b'\xf1\x00YB__ FCA -----      1.00 1.01 99110-K4500      \x00\x00\x00',
     ],
     (Ecu.fwdCamera, 0x7C4, None): [
       b'\xf1\x00DEE MFC  AT USA LHD 1.00 1.03 95740-Q4000 180821',
@@ -628,6 +632,9 @@ FW_VERSIONS = {
       b'\xf1\x00OSE LKAS AT KOR LHD 1.00 1.00 95740-K4100 W40',
       b'\xf1\x00OE2 LKAS AT EUR LHD 1.00 1.00 95740-K4200 200',
       b'\xf1\x00OSE LKAS AT USA LHD 1.00 1.00 95740-K4300 W50',
+      b'\xf1\x00OSP LKA  AT CND LHD 1.00 1.02 99211-J9110 802',
+      b'\xf1\x00OSP LKA  AT EUR RHD 1.00 1.02 99211-J9110 802',
+      b'\xf1\x00OSP LKA  AT AUS RHD 1.00 1.04 99211-J9200 904',
     ],
     (Ecu.eps, 0x7D4, None): [
       b'\xf1\x00OS  MDPS C 1.00 1.03 56310/K4550 4OEDC103',
@@ -635,6 +642,8 @@ FW_VERSIONS = {
       b'\xf1\x00OS  MDPS C 1.00 1.04 56310K4050\x00 4OEDC104',
       b'\xf1\x00DE  MDPS C 1.00 1.05 56310Q4000\x00 4DEEC105',
       b'\xf1\x00DE  MDPS C 1.00 1.05 56310Q4100\x00 4DEEC105',
+      b'\xf1\x00OSP MDPS C 1.00 1.02 56310K4260\x00 4OEPC102',
+      b'\xf1\x00OSP MDPS C 1.00 1.02 56310/K4970 4OEPC102',
     ],
     (Ecu.esp, 0x7D1, None): [
       b'\xf1\x00OS IEB \r 105\x18\t\x18 58520-K4000',
@@ -642,6 +651,9 @@ FW_VERSIONS = {
       b'\xf1\x00OS IEB \x02 212 \x11\x13 58520-K4000',
       b'\xf1\x00OS IEB \x03 210 \x02\x14 58520-K4000',
       b'\xf1\x00OS IEB \x03 212 \x11\x13 58520-K4000',
+      b'\xf1\x8758520-K4010\xf1\x00OS IEB \x02 101 \x11\x13 58520-K4010',
+      b'\xf1\x8758520-K4010\xf1\x00OS IEB \x04 101 \x11\x13 58520-K4010',
+      b'\xf1\x8758520-K4010\xf1\x00OS IEB \x03 101 \x11\x13 58520-K4010',
     ],
   },
   CAR.KONA_HEV: {
