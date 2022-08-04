@@ -237,7 +237,14 @@ void NvgWindow::updateState(const UIState &s) {
     cruise_speed *= KM_TO_MILE;
   }
 
-  float v_ego = ce.getVEgoCluster() == 0.0 ? ce.getVEgo() : ce.getVEgoCluster();
+  // Handle older routes where vEgoCluster is not set
+  float v_ego;
+  if (ce.getVEgoCluster() == 0.0 && !v_ego_cluster_seen) {
+    v_ego = ce.getVEgo();
+  } else {
+    v_ego = ce.getVEgoCluster();
+    v_ego_cluster_seen = true;
+  }
   float cur_speed = cs_alive ? std::max<float>(0.0, v_ego) : 0.0;
   cur_speed *= s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH;
 
