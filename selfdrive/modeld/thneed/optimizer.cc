@@ -17,7 +17,6 @@ extern map<cl_program, string> g_program_source;
   clGetImageInfo(a, CL_IMAGE_ARRAY_SIZE, sizeof(a_array_size), &a_array_size, NULL);
   clGetImageInfo(a, CL_IMAGE_ROW_PITCH, sizeof(a_row_pitch), &a_row_pitch, NULL);
   clGetImageInfo(a, CL_IMAGE_SLICE_PITCH, sizeof(a_slice_pitch), &a_slice_pitch, NULL);
-
   size_t b_width, b_height, b_depth, b_array_size, b_row_pitch, b_slice_pitch;
   clGetImageInfo(b, CL_IMAGE_WIDTH, sizeof(b_width), &b_width, NULL);
   clGetImageInfo(b, CL_IMAGE_HEIGHT, sizeof(b_height), &b_height, NULL);
@@ -25,7 +24,6 @@ extern map<cl_program, string> g_program_source;
   clGetImageInfo(b, CL_IMAGE_ARRAY_SIZE, sizeof(b_array_size), &b_array_size, NULL);
   clGetImageInfo(b, CL_IMAGE_ROW_PITCH, sizeof(b_row_pitch), &b_row_pitch, NULL);
   clGetImageInfo(b, CL_IMAGE_SLICE_PITCH, sizeof(b_slice_pitch), &b_slice_pitch, NULL);
-
   return (a_width == b_width) && (a_height == b_height) &&
     (a_depth == b_depth) && (a_array_size == b_array_size) &&
     (a_row_pitch == b_row_pitch) && (a_slice_pitch == b_slice_pitch);
@@ -145,7 +143,6 @@ int Thneed::optimize() {
           cl_mem tmp = make_image_like(context, *(cl_mem *)in.data());
           replacements[in] = string((char *)&tmp, sizeof(tmp));
           replacements[out] = string((char *)&tmp, sizeof(tmp));
-
           kq.erase(kq.begin()+i); --i;
         }
       }*/
