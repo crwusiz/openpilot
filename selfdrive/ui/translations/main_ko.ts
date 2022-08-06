@@ -92,7 +92,7 @@
     <message>
         <location filename="../qt/offroad/settings.cc" line="596"/>
         <source>Prebuilt Enable</source>
-        <translation>Prebuilt Enable</translation>
+        <translation>Prebuilt 사용</translation>
     </message>
     <message>
         <location filename="../qt/offroad/settings.cc" line="597"/>
@@ -102,7 +102,7 @@
     <message>
         <location filename="../qt/offroad/settings.cc" line="600"/>
         <source>Logger Disable</source>
-        <translation>Logger Disable</translation>
+        <translation>Logger 사용안함</translation>
     </message>
     <message>
         <location filename="../qt/offroad/settings.cc" line="601"/>
@@ -112,7 +112,7 @@
     <message>
         <location filename="../qt/offroad/settings.cc" line="604"/>
         <source>Navigation Disable</source>
-        <translation>Navigation Disable</translation>
+        <translation>Navigation 사용안함</translation>
     </message>
     <message>
         <location filename="../qt/offroad/settings.cc" line="605"/>
@@ -122,7 +122,7 @@
     <message>
         <location filename="../qt/offroad/settings.cc" line="608"/>
         <source>New radar interface Enable</source>
-        <translation>New radar interface Enable</translation>
+        <translation>New radar interface 사용</translation>
     </message>
     <message>
         <location filename="../qt/offroad/settings.cc" line="609"/>
@@ -215,7 +215,7 @@
     <message>
         <location filename="../qt/offroad/settings.cc" line="131"/>
         <source>Reset Calibration</source>
-        <translation>캘리브레이션 재설정</translation>
+        <translation>캘리브레이션</translation>
     </message>
     <message>
         <location filename="../qt/offroad/settings.cc" line="131"/>
@@ -230,7 +230,7 @@
     <message>
         <location filename="../qt/offroad/settings.cc" line="141"/>
         <source>Review Training Guide</source>
-        <translation>트레이닝 가이드 다시보기</translation>
+        <translation>트레이닝 가이드</translation>
     </message>
     <message>
         <location filename="../qt/offroad/settings.cc" line="141"/>
@@ -587,7 +587,7 @@ location set</source>
         <location filename="../qt/offroad/networking.cc" line="87"/>
         <location filename="../qt/offroad/networking.cc" line="97"/>
         <source>for &quot;%1&quot;</source>
-        <translation>하기위한 &quot;%1&quot;</translation>
+        <translation>&quot;%1&quot;에 접속하려면 인증이 필요합니다</translation>
     </message>
     <message>
         <location filename="../qt/offroad/networking.cc" line="97"/>
@@ -915,7 +915,7 @@ location set</source>
     <message>
         <location filename="../qt/setup/setup.cc" line="182"/>
         <source>Continue without Wi-Fi</source>
-        <translation>wifi 없이 계속</translation>
+        <translation>wifi 연결없이 계속하기</translation>
     </message>
     <message>
         <location filename="../qt/setup/setup.cc" line="184"/>
