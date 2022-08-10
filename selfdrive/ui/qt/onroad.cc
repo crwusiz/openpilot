@@ -214,7 +214,6 @@ static const QString get_tpms_text(float tpms) {
 }
 
 void NvgWindow::updateState(const UIState &s) {
-  const int SET_SPEED_NA = 255;
   const SubMaster &sm = *(s.sm);
   const auto cs = sm["controlsState"].getControlsState();
   const auto cc = sm["carControl"].getCarControl();
@@ -230,7 +229,7 @@ void NvgWindow::updateState(const UIState &s) {
 
   float apply_speed = cc.getSccSmoother().getApplyMaxSpeed();
   float cruise_speed = cc.getSccSmoother().getCruiseMaxSpeed();
-  bool cruise_set = cruise_speed > 0 && (int)cruise_speed != SET_SPEED_NA;
+  bool cruise_set = cruise_speed > 0;
 
   if (cruise_set && !s.scene.is_metric) {
     apply_speed *= KM_TO_MILE;
