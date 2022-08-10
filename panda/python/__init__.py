@@ -9,13 +9,12 @@ import traceback
 import sys
 from functools import wraps
 from typing import Optional
-from itertools import accumulate
 from .dfu import PandaDFU, MCU_TYPE_F2, MCU_TYPE_F4, MCU_TYPE_H7  # pylint: disable=import-error
 from .flash_release import flash_release  # noqa pylint: disable=import-error
 from .update import ensure_st_up_to_date  # noqa pylint: disable=import-error
 from .serial import PandaSerial  # noqa pylint: disable=import-error
 from .isotp import isotp_send, isotp_recv  # pylint: disable=import-error
-from .config import DEFAULT_FW_FN, DEFAULT_H7_FW_FN, SECTOR_SIZES_FX, SECTOR_SIZES_H7  # noqa pylint: disable=import-error
+from .config import DEFAULT_FW_FN, DEFAULT_H7_FW_FN  # noqa pylint: disable=import-error
 
 __version__ = '0.0.10'
 
@@ -190,27 +189,19 @@ class Panda:
   FLAG_HONDA_ALT_BRAKE = 1
   FLAG_HONDA_BOSCH_LONG = 2
   FLAG_HONDA_NIDEC_ALT = 4
-  FLAG_HONDA_RADARLESS = 8
 
   FLAG_HYUNDAI_EV_GAS = 1
   FLAG_HYUNDAI_HYBRID_GAS = 2
   FLAG_HYUNDAI_LONG = 4
-  FLAG_HYUNDAI_CAMERA_SCC = 8
 
   FLAG_TESLA_POWERTRAIN = 1
   FLAG_TESLA_LONG_CONTROL = 2
 
-  FLAG_CHRYSLER_RAM_DT = 1
-
-  FLAG_SUBARU_GEN2 = 1
-
   def __init__(self, serial: Optional[str] = None, claim: bool = True):
     self._serial = serial
     self._handle = None
-    self._bcd_device = None
-
-    # connect and set mcu type
     self.connect(claim)
+    self._mcu_type = self.get_mcu_type()
 
   def close(self):
     self._handle.close()
@@ -241,12 +232,6 @@ class Panda:
               if claim:
                 self._handle.claimInterface(0)
                 # self._handle.setInterfaceAltSetting(0, 0)  # Issue in USB stack
-
-              # bcdDevice wasn't always set to the hw type, ignore if it's the old constant
-              bcd = device.getbcdDevice()
-              if bcd is not None and bcd != 0x2300:
-                self._bcd_device = bytearray([bcd >> 8, ])
-
               break
       except Exception as e:
         print("exception", e)
@@ -254,13 +239,11 @@ class Panda:
       if not wait or self._handle is not None:
         break
       context = usb1.USBContext()  # New context needed so new devices show up
-
-    assert self._handle is not None
-    self._mcu_type = self.get_mcu_type()
+    assert(self._handle is not None)
     self.health_version, self.can_version = self.get_packets_versions()
     print("connected")
 
-  def reset(self, enter_bootstub=False, enter_bootloader=False, reconnect=True):
+  def reset(self, enter_bootstub=False, enter_bootloader=False):
     try:
       if enter_bootloader:
         self._handle.controlWrite(Panda.REQUEST_IN, 0xd1, 0, 0, b'')
@@ -271,14 +254,12 @@ class Panda:
           self._handle.controlWrite(Panda.REQUEST_IN, 0xd8, 0, 0, b'')
     except Exception:
       pass
-    if not enter_bootloader and reconnect:
+    if not enter_bootloader:
       self.reconnect()
 
   def reconnect(self):
-    if self._handle is not None:
-      self.close()
-      time.sleep(1.0)
-
+    self.close()
+    time.sleep(1.0)
     success = False
     # wait up to 15 seconds
     for i in range(0, 15):
@@ -300,26 +281,18 @@ class Panda:
 
 
   @staticmethod
-  def flash_static(handle, code, mcu_type):
-    assert mcu_type is not None, "must set valid mcu_type to flash"
-
+  def flash_static(handle, code):
     # confirm flasher is present
     fr = handle.controlRead(Panda.REQUEST_IN, 0xb0, 0, 0, 0xc)
     assert fr[4:8] == b"\xde\xad\xd0\x0d"
-
-    # determine sectors to erase
-    apps_sectors_cumsum = accumulate(SECTOR_SIZES_H7[1:] if mcu_type == MCU_TYPE_H7 else SECTOR_SIZES_FX[1:])
-    last_sector = next((i + 1 for i, v in enumerate(apps_sectors_cumsum) if v > len(code)), -1)
-    assert last_sector >= 1, "Binary too small? No sector to erase."
-    assert last_sector < 7, "Binary too large! Risk of overwriting provisioning chunk."
 
     # unlock flash
     print("flash: unlocking")
     handle.controlWrite(Panda.REQUEST_IN, 0xb1, 0, 0, b'')
 
-    # erase sectors
-    print(f"flash: erasing sectors 1 - {last_sector}")
-    for i in range(1, last_sector + 1):
+    # erase sectors 1 through 3
+    print("flash: erasing")
+    for i in range(1, 4):
       handle.controlWrite(Panda.REQUEST_IN, 0xb2, i, 0, b'')
 
     # flash over EP2
@@ -351,7 +324,7 @@ class Panda:
     print("flash: bootstub version is " + self.get_version())
 
     # do flash
-    Panda.flash_static(self._handle, code, mcu_type=self._mcu_type)
+    Panda.flash_static(self._handle, code)
 
     # reconnect
     if reconnect:
@@ -449,14 +422,7 @@ class Panda:
     return bytes(part_1 + part_2)
 
   def get_type(self):
-    ret = self._handle.controlRead(Panda.REQUEST_IN, 0xc1, 0, 0, 0x40)
-
-    # bootstub doesn't implement this call, so fallback to bcdDevice
-    invalid_type = self.bootstub and (ret is None or len(ret) != 1)
-    if invalid_type and self._bcd_device is not None:
-      ret = self._bcd_device
-
-    return ret
+    return self._handle.controlRead(Panda.REQUEST_IN, 0xc1, 0, 0, 0x40)
 
   # Returns tuple with health packet version and CAN packet/USB packet version
   def get_packets_versions(self):
