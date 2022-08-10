@@ -1,10 +1,14 @@
-const int HYUNDAI_COMMUNITY_MAX_STEER = 409;             // like stock
-const int HYUNDAI_COMMUNITY_MAX_RT_DELTA = 112;          // max delta torque allowed for real time checks
-const uint32_t HYUNDAI_COMMUNITY_RT_INTERVAL = 250000;   // 250ms between real time checks
-const int HYUNDAI_COMMUNITY_MAX_RATE_UP = 3;
-const int HYUNDAI_COMMUNITY_MAX_RATE_DOWN = 7;
-const int HYUNDAI_COMMUNITY_DRIVER_TORQUE_ALLOWANCE = 50;
-const int HYUNDAI_COMMUNITY_DRIVER_TORQUE_FACTOR = 2;
+const SteeringLimits HYUNDAI_COMMUNITY_STEERING_LIMITS = {
+  .max_steer = 384,
+  .max_rt_delta = 112,
+  .max_rt_interval = 250000,
+  .max_rate_up = 3,
+  .max_rate_down = 7,
+  .driver_torque_allowance = 50,
+  .driver_torque_factor = 2,
+  .type = TorqueDriverLimited,
+};
+
 const int HYUNDAI_COMMUNITY_STANDSTILL_THRSLD = 30;  // ~1kph
 
 const int HYUNDAI_COMMUNITY_MAX_ACCEL = 200;  // 1/100 m/s2
@@ -287,58 +291,22 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
   if (addr == 832) {
     LKAS11_op = 20;
     int desired_torque = ((GET_BYTES_04(to_send) >> 16) & 0x7ffU) - 1024U;
-    uint32_t ts = microsecond_timer_get();
-    bool violation = 0;
+    //bool steer_req = GET_BIT(to_send, 27U) != 0U;
 
-    if (controls_allowed) {
-      // *** global torque limit check ***
-      bool torque_check = 0;
-      violation |= torque_check = max_limit_check(desired_torque, HYUNDAI_COMMUNITY_MAX_STEER, -HYUNDAI_COMMUNITY_MAX_STEER);
-      if (torque_check) {
-        puts("  LKAS TX not allowed : torque limit check failed!\n");}
-
-      // *** torque rate limit check ***
-      bool torque_rate_check = 0;
-      violation |= torque_rate_check = driver_limit_check(desired_torque, desired_torque_last, &torque_driver,
-        HYUNDAI_COMMUNITY_MAX_STEER, HYUNDAI_COMMUNITY_MAX_RATE_UP, HYUNDAI_COMMUNITY_MAX_RATE_DOWN,
-        HYUNDAI_COMMUNITY_DRIVER_TORQUE_ALLOWANCE, HYUNDAI_COMMUNITY_DRIVER_TORQUE_FACTOR);
-      if (torque_rate_check) {
-        puts("  LKAS TX not allowed : torque rate limit check failed!\n");}
-
-      // used next time
-      desired_torque_last = desired_torque;
-
-      // *** torque real time rate limit check ***
-      bool torque_rt_check = 0;
-      violation |= torque_rt_check = rt_rate_limit_check(desired_torque, rt_torque_last, HYUNDAI_COMMUNITY_MAX_RT_DELTA);
-      if (torque_rt_check) {
-        puts("  LKAS TX not allowed : torque real time rate limit check failed!\n");}
-
-      // every RT_INTERVAL set the new limits
-      uint32_t ts_elapsed = get_ts_elapsed(ts, ts_last);
-      if (ts_elapsed > HYUNDAI_COMMUNITY_RT_INTERVAL) {
-        rt_torque_last = desired_torque;
-        ts_last = ts;
-      }
-    }
-
-    // no torque if controls is not allowed
-    if (!controls_allowed && (desired_torque != 0)) {
-      violation = 1;
-      puts("  LKAS torque not allowed : controls not allowed!\n");
-    }
-
-    // reset to 0 if either controls is not allowed or there's a violation
-    if (!controls_allowed) { // a reset worsen the issue of Panda blocking some valid LKAS messages
-      desired_torque_last = 0;
-      rt_torque_last = 0;
-      ts_last = ts;
-    }
-
-    if (violation) {
+    //if (steer_torque_cmd_checks(desired_torque, steer_req, HYUNDAI_COMMUNITY_STEERING_LIMITS)) {
+    if (steer_torque_cmd_checks(desired_torque, -1, HYUNDAI_COMMUNITY_STEERING_LIMITS)) {
       tx = 0;
     }
   }
+
+/*
+  // UDS: Only tester present ("\x02\x3E\x80\x00\x00\x00\x00\x00") allowed on diagnostics address
+  if (addr == 2000) {
+    if ((GET_BYTES_04(to_send) != 0x00803E02U) || (GET_BYTES_48(to_send) != 0x0U)) {
+      tx = 0;
+    }
+  }
+*/
 
   // FORCE CANCEL: safety check only relevant when spamming the cancel button.
   // ensuring that only the cancel button press is sent (VAL 4) when controls are off.
