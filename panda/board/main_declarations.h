@@ -23,6 +23,7 @@ bool heartbeat_disabled = false;            // set over USB
 
 // Enter deep sleep mode
 bool deepsleep_allowed = false;
+bool ignition_seen = false;
 
 // siren state
 bool siren_enabled = false;
