@@ -4,7 +4,7 @@ from panda import Panda
 from common.params import Params
 from common.numpy_fast import interp
 from common.conversions import Conversions as CV
-from selfdrive.car.hyundai.values import CAR, Buttons, CarControllerParams, HDA2_CAR
+from selfdrive.car.hyundai.values import CAR, Buttons, CarControllerParams, CANFD_CAR
 from selfdrive.car import STD_CARGO_KG, create_button_enable_events, create_button_event, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.car.disable_ecu import disable_ecu
@@ -32,7 +32,7 @@ class CarInterface(CarInterfaceBase):
     ret.openpilotLongitudinalControl = Params().get("LongControlSelect", encoding='utf8') == "1"
 
     ret.carName = "hyundai"
-    if candidate in HDA2_CAR:
+    if candidate in CANFD_CAR:
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.noOutput),
                            get_safety_config(car.CarParams.SafetyModel.hyundaiHDA2)]
     else:
@@ -321,7 +321,7 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.lqr.l = [0.22, 0.318]
 
     # Torque -----------------------------------------------------------------
-    elif any([Params().get("LateralControlSelect", encoding='utf8') == "3", candidate in HDA2_CAR]):
+    elif any([Params().get("LateralControlSelect", encoding='utf8') == "3", candidate in CANFD_CAR]):
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     ret.centerToFront = ret.wheelbase * 0.4

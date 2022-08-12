@@ -1,11 +1,10 @@
-from enum import Enum
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
 from cereal import car
 from common.conversions import Conversions as CV
 from selfdrive.car import dbc_dict
-from selfdrive.car.docs_definitions import CarFootnote, CarInfo, Column, Harness
+from selfdrive.car.docs_definitions import CarInfo, Harness
 Ecu = car.CarParams.Ecu
 
 
@@ -22,7 +21,7 @@ class CarControllerParams:
     self.STEER_DRIVER_FACTOR = 1
     self.STEER_THRESHOLD = 150
 
-    if CP.carFingerprint in HDA2_CAR:
+    if CP.carFingerprint in CANFD_CAR:
       self.STEER_MAX = 270
       self.STEER_DRIVER_ALLOWANCE = 250
       self.STEER_DRIVER_MULTIPLIER = 2
@@ -80,12 +79,6 @@ class CAR:
   GENESIS_G80 = "GENESIS G80 2018~2019 (DH)"
   GENESIS_G90 = "GENESIS G90,EQ900 2016~2019 (HI)"
   GENESIS_GV70 = "GENESIS GV70 2022 (JK1)"
-
-
-class Footnote(Enum):
-  CANFD = CarFootnote(
-    "Requires a <a href='https://comma.ai/shop/products/panda'>red panda</a> and additional <a href='https://comma.ai/shop/products/harness-box'>harness box.</a>",
-    Column.MODEL)
 
 
 @dataclass
@@ -167,7 +160,7 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
     HyundaiCarInfo("Kia Sorento 2019", video_link="https://www.youtube.com/watch?v=Fkh3s6WHJz8", harness=Harness.hyundai_e),
   ],
   CAR.STINGER: HyundaiCarInfo("Kia Stinger 2018", video_link="https://www.youtube.com/watch?v=MJ94qoofYw0", harness=Harness.hyundai_c),
-  CAR.EV6: HyundaiCarInfo("Kia EV6 2022", "All", harness=Harness.hyundai_p, footnotes=[Footnote.CANFD,]),
+  CAR.EV6: HyundaiCarInfo("Kia EV6 2022", "All", harness=Harness.hyundai_p),
 
   # Genesis
   CAR.GENESIS: HyundaiCarInfo("Hyundai Genesis 2015-16", min_enable_speed=19 * CV.MPH_TO_MS, harness=Harness.hyundai_j),
@@ -1412,7 +1405,7 @@ FEATURES = {
   # "has_scc14": {},
 }
 
-HDA2_CAR = {CAR.EV6, CAR.GENESIS_GV70, CAR.TUCSON22_HEV, CAR.IONIQ5}
+CANFD_CAR = {CAR.EV6, CAR.GENESIS_GV70, CAR.TUCSON22_HEV, CAR.IONIQ5}
 FCA11_CAR = {CAR.SONATA, CAR.PALISADE, CAR.ELANTRA_I30, CAR.ELANTRA21, CAR.ELANTRA21_HEV, CAR.KONA, CAR.KONA_HEV, CAR.IONIQ_HEV,
          CAR.GENESIS_G70, CAR.FORTE, CAR.STINGER, CAR.K9}
 EV_CAR = {CAR.KONA_EV, CAR.IONIQ_EV, CAR.NIRO_EV, CAR.SOUL_EV, CAR.NEXO}
