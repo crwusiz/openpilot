@@ -54,7 +54,7 @@ class CarState(CarStateBase):
 
     self.params = CarControllerParams(CP)
 
-  def update(self, cp, cp_cam):
+  def update(self, cp, cp2, cp_cam):
     if self.CP.carFingerprint in CANFD_CAR:
       return self.update_canfd(cp, cp_cam)
 
@@ -461,7 +461,7 @@ class CarState(CarStateBase):
 
   @staticmethod
   def get_can2_parser(CP):
-    if CP.carFingerprint in HDA2_CAR:
+    if CP.carFingerprint in CANFD_CAR:
       return None
 
     signals = []

@@ -34,7 +34,7 @@ class CarInterface(CarInterfaceBase):
     ret.carName = "hyundai"
     if candidate in CANFD_CAR:
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.noOutput),
-                           get_safety_config(car.CarParams.SafetyModel.hyundaiHDA2)]
+                           get_safety_config(car.CarParams.SafetyModel.hyundaiCanfd)]
     else:
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
 
@@ -338,7 +338,7 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalActuatorDelayLowerBound = 0.3
     ret.longitudinalActuatorDelayUpperBound = 0.3
 
-    ret.stopAccel = -2.0
+    ret.stopAccel = -2.5
     ret.stoppingDecelRate = 0.4  # brake_travel/s while trying to stop
     ret.vEgoStarting = 0.5
     ret.vEgoStopping = 1.0
@@ -352,7 +352,7 @@ class CarInterface(CarInterfaceBase):
     ret.tireStiffnessFront, ret.tireStiffnessRear = \
       scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront, tire_stiffness_factor=tire_stiffness_factor)
 
-    if candidate in HDA2_CAR:
+    if candidate in CANFD_CAR:
       ret.enableBsm = 0x58b in fingerprint[0]
       ret.radarOffCan = False
     else:
