@@ -86,7 +86,7 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
   if (!params.getBool("NavDisable")) {
     toggles.push_back({
       "NavSettingTime24h",
-      tr("Show ETA in 24h format"),
+      tr("Show ETA in 24h Format"),
       tr("Use 24h format instead of am/pm"),
       "../assets/offroad/icon_metric.png",
     }),
