@@ -248,14 +248,12 @@
         <translation>트레이닝 가이드를 다시보시겠습니까?</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="151"/>
         <source>Regulatory</source>
-        <translation>규제</translation>
+        <translation type="vanished">규제</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="151"/>
         <source>VIEW</source>
-        <translation>보기</translation>
+        <translation type="vanished">보기</translation>
     </message>
     <message>
         <location filename="../qt/offroad/settings.cc" line="159"/>
@@ -1347,7 +1345,7 @@ location set</source>
     </message>
     <message>
         <location filename="../qt/offroad/settings.cc" line="89"/>
-        <source>Show ETA in 24h format</source>
+        <source>Show ETA in 24h Format</source>
         <translation>24시간 형식으로 도착예정시간 표시</translation>
     </message>
     <message>
