@@ -69,12 +69,11 @@ class CarInterfaceBase(ABC):
       self.CS = CarState(CP)
 
       self.cp = self.CS.get_can_parser(CP)
-      self.cp2 = self.CS.get_can2_parser(CP)
       self.cp_cam = self.CS.get_cam_can_parser(CP)
       self.cp_adas = self.CS.get_adas_can_parser(CP)
       self.cp_body = self.CS.get_body_can_parser(CP)
       self.cp_loopback = self.CS.get_loopback_can_parser(CP)
-      self.can_parsers = [self.cp, self.cp2, self.cp_cam, self.cp_adas, self.cp_body, self.cp_loopback]
+      self.can_parsers = [self.cp, self.cp_cam, self.cp_adas, self.cp_body, self.cp_loopback]
 
     self.CC = None
     if CarController is not None:
@@ -180,7 +179,7 @@ class CarInterfaceBase(ABC):
     return reader
 
   @abstractmethod
-  def apply(self, c: car.CarControl, controls) -> Tuple[car.CarControl.Actuators, List[bytes]]:
+  def apply(self, c: car.CarControl) -> Tuple[car.CarControl.Actuators, List[bytes]]:
     pass
 
   def create_common_events(self, cs_out, extra_gears=None, pcm_enable=True, allow_enable=True):
@@ -207,8 +206,8 @@ class CarInterfaceBase(ABC):
       events.add(EventName.speedTooHigh)
     if cs_out.cruiseState.nonAdaptive:
       events.add(EventName.wrongCruiseMode)
-    #if cs_out.brakeHoldActive and self.CP.openpilotLongitudinalControl:
-    #  events.add(EventName.brakeHold)
+    if cs_out.brakeHoldActive and self.CP.openpilotLongitudinalControl:
+      events.add(EventName.brakeHold)
     if cs_out.parkingBrake:
       events.add(EventName.parkBrake)
     if cs_out.accFaulted:
@@ -273,23 +272,11 @@ class CarStateBase(ABC):
                          C=[1.0, 0.0],
                          K=[[0.12287673], [0.29666309]])
 
-    self.v_ego_clu_kf = KF1D(x0=[[0.0], [0.0]],
-                         A=[[1.0, DT_CTRL], [0.0, 1.0]],
-                         C=[1.0, 0.0],
-                         K=[[0.12287673], [0.29666309]])
-
   def update_speed_kf(self, v_ego_raw):
     if abs(v_ego_raw - self.v_ego_kf.x[0][0]) > 2.0:  # Prevent large accelerations when car starts at non zero speed
       self.v_ego_kf.x = [[v_ego_raw], [0.0]]
 
     v_ego_x = self.v_ego_kf.update(v_ego_raw)
-    return float(v_ego_x[0]), float(v_ego_x[1])
-
-  def update_clu_speed_kf(self, v_ego_raw):
-    if abs(v_ego_raw - self.v_ego_clu_kf.x[0][0]) > 2.0:  # Prevent large accelerations when car starts at non zero speed
-      self.v_ego_clu_kf.x = [[v_ego_raw], [0.0]]
-
-    v_ego_x = self.v_ego_clu_kf.update(v_ego_raw)
     return float(v_ego_x[0]), float(v_ego_x[1])
 
   def get_wheel_speeds(self, fl, fr, rl, rr, unit=CV.KPH_TO_MS):

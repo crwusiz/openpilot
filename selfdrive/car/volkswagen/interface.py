@@ -1,7 +1,9 @@
 from cereal import car
-from selfdrive.car.volkswagen.values import CAR, BUTTON_STATES, CANBUS, NetworkLocation, TransmissionType, GearShifter
-from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
+from selfdrive.car import STD_CARGO_KG, create_button_enable_events, scale_rot_inertia, scale_tire_stiffness, \
+                          gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
+from selfdrive.car.volkswagen.values import CAR, CANBUS, NetworkLocation, TransmissionType, GearShifter
+
 
 EventName = car.CarEvent.EventName
 
@@ -9,8 +11,6 @@ EventName = car.CarEvent.EventName
 class CarInterface(CarInterfaceBase):
   def __init__(self, CP, CarController, CarState):
     super().__init__(CP, CarController, CarState)
-
-    self.buttonStatesPrev = BUTTON_STATES.copy()
 
     if CP.networkLocation == NetworkLocation.fwdCamera:
       self.ext_bus = CANBUS.pt
@@ -53,6 +53,13 @@ class CarInterface(CarInterfaceBase):
     ret.lateralTuning.pid.kf = 0.00006
     ret.lateralTuning.pid.kpV = [0.6]
     ret.lateralTuning.pid.kiV = [0.2]
+
+    # Global longitudinal tuning defaults, can be overridden per-vehicle
+
+    ret.pcmCruise = not ret.openpilotLongitudinalControl
+    ret.longitudinalActuatorDelayUpperBound = 0.5  # s
+    ret.longitudinalTuning.kpV = [0.1]
+    ret.longitudinalTuning.kiV = [0.0]
 
     # Per-chassis tuning values, override tuning defaults here if desired
 
@@ -160,20 +167,10 @@ class CarInterface(CarInterfaceBase):
 
   # returns a car.CarState
   def _update(self, c):
-    buttonEvents = []
-
     ret = self.CS.update(self.cp, self.cp_cam, self.cp_ext, self.CP.transmissionType)
 
-    # Check for and process state-change events (button press or release) from
-    # the turn stalk switch or ACC steering wheel/control stalk buttons.
-    for button in self.CS.buttonStates:
-      if self.CS.buttonStates[button] != self.buttonStatesPrev[button]:
-        be = car.CarState.ButtonEvent.new_message()
-        be.type = button
-        be.pressed = self.CS.buttonStates[button]
-        buttonEvents.append(be)
-
-    events = self.create_common_events(ret, extra_gears=[GearShifter.eco, GearShifter.sport, GearShifter.manumatic])
+    events = self.create_common_events(ret, extra_gears=[GearShifter.eco, GearShifter.sport, GearShifter.manumatic],
+                                       pcm_enable=not self.CS.CP.openpilotLongitudinalControl)
 
     # Low speed steer alert hysteresis logic
     if self.CP.minSteerSpeed > 0. and ret.vEgo < (self.CP.minSteerSpeed + 1.):
@@ -183,11 +180,14 @@ class CarInterface(CarInterfaceBase):
     if self.low_speed_alert:
       events.add(EventName.belowSteerSpeed)
 
-    ret.events = events.to_msg()
-    ret.buttonEvents = buttonEvents
+    if self.CS.CP.openpilotLongitudinalControl:
+      if ret.vEgo < self.CP.minEnableSpeed + 2.:
+        events.add(EventName.belowEngageSpeed)
+      if c.enabled and ret.vEgo < self.CP.minEnableSpeed:
+        events.add(EventName.speedTooLow)
 
-    # update previous car states
-    self.buttonStatesPrev = self.CS.buttonStates.copy()
+    events.events.extend(create_button_enable_events(ret.buttonEvents, pcm_cruise=self.CP.pcmCruise))
+    ret.events = events.to_msg()
 
     return ret
 

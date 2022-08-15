@@ -17,12 +17,10 @@ EventName = car.CarEvent.EventName
 
 
 def get_startup_event(car_recognized, controller_available, fw_seen):
-  #if is_comma_remote() and is_tested_branch():
-  #  event = EventName.startup
-  #else:
-  #  event = EventName.startupMaster
-
-  event = EventName.startup
+  if is_comma_remote() and is_tested_branch():
+    event = EventName.startup
+  else:
+    event = EventName.startupMaster
 
   if not car_recognized:
     if fw_seen:
@@ -180,10 +178,6 @@ def get_car(logcan, sendcan):
     candidate = "mock"
 
   disable_radar = Params().get_bool("DisableRadar")
-
-  selected_car = Params().get("SelectedCar")
-  if selected_car:
-    candidate = selected_car.decode("utf-8")
 
   CarInterface, CarController, CarState = interfaces[candidate]
   CP = CarInterface.get_params(candidate, fingerprints, car_fw, disable_radar)

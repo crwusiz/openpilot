@@ -33,7 +33,7 @@ NS_ :
 
 BS_:
 
-BU_: Airbag_MQB BAP_Tester_MQB BMS_MQB Datenlogger_MQB Gateway_MQB Getriebe_DQ_Hybrid_MQB Getriebe_DQ_MQB LEH_MQB Motor_Diesel_MQB Motor_Hybrid_MQB Motor_Otto_MQB SAK_MQB Waehlhebel_MQB Vector__XXX 9 l c i XXX
+BU_: Airbag_MQB BAP_Tester_MQB BMS_MQB Datenlogger_MQB Gateway_MQB Getriebe_DQ_Hybrid_MQB Getriebe_DQ_MQB LEH_MQB Motor_Diesel_MQB Motor_Hybrid_MQB Motor_Otto_MQB SAK_MQB Waehlhebel_MQB Vector__XXX l c i XXX
 
 
 BO_ 290 ACC_06: 8 Gateway_MQB
@@ -1253,8 +1253,17 @@ BO_ 780 ACC_02: 8 XXX
  SG_ ACC_Status_Anzeige : 61|3@1+ (1.0,0.0) [0.0|7] ""  XXX
 
 BO_ 302 ACC_07: 8 XXX
- SG_ ACC_07_BZ : 8|4@1+ (1,0) [0|15] "" XXX
- SG_ ACC_07_CRC : 0|8@1+ (1,0) [0|255] "" XXX
+ SG_ CHECKSUM : 0|8@1+ (1,0) [0|255] ""  XXX
+ SG_ COUNTER : 8|4@1+ (1,0) [0|15] ""  XXX
+ SG_ ACC_Distance_to_Stop : 12|11@1+ (0.01,0) [0|1] "m"  XXX
+ SG_ ACC_Hold_Request : 23|1@1+ (1,0) [0|1] "x"  XXX
+ SG_ ACC_Boost_Request : 24|1@1+ (1,0) [0|1] ""  XXX
+ SG_ ACC_Freewheel_Request : 25|1@1+ (1,0) [0|1] ""  XXX
+ SG_ ACC_Freewheel_Type : 26|2@1+ (1,0) [0|3] "enum"  XXX
+ SG_ ACC_Hold_Type : 28|3@1+ (1,0) [0|15] "enum"  XXX
+ SG_ ACC_Hold_Release : 31|1@1+ (1,0) [0|1] ""  XXX
+ SG_ ACC_Accel_Secondary : 32|8@1+ (0.03,-4.6) [-4.6|2.99] "m/s2"  XXX
+ SG_ ACC_Accel_TSK : 53|11@1+ (0.005,-7.22) [-7.22|3.005] "m/s2"  XXX
 
 BO_ 264 Fahrwerk_01: 8 XXX
  SG_ Fahrwerk_01_BZ : 8|4@1+ (1,0) [0|15] "" XXX
@@ -1352,6 +1361,16 @@ BO_ 1624 Licht_vorne_01: 8 XXX
 BO_ 1646 Klima_03: 8 XXX
 
 BO_ 1720 Kombi_03: 8 XXX
+ SG_ KBI_Reifenumfang : 0|12@1+ (1,0) [0|4095] "Unit_MilliMeter"  XXX
+ SG_ KBI_Variante_USA : 12|1@1+ (1.0,0.0) [0.0|1] ""  XXX
+ SG_ KBI_Variante : 13|1@1+ (1.0,0.0) [0.0|1] ""  XXX
+ SG_ KBI_BCmE_aktiv : 16|1@1+ (1.0,0.0) [0.0|1] ""  XXX
+ SG_ KBI_Sparhinweis_quittiert : 17|1@1+ (1.0,0.0) [0.0|1] ""  XXX
+ SG_ KBI_Tankfuellstand_Prozent : 18|7@1+ (1,0) [0|100] "Unit_PerCent"  XXX
+ SG_ KBI_Nachtanken_erkannt : 25|1@1+ (1.0,0.0) [0.0|1] ""  XXX
+ SG_ KBI_Tankinhalt_hochaufl : 26|14@1+ (0.01,0) [0.00|163.81] "Unit_Liter"  XXX
+ SG_ KBI_Max_Tankinhalt : 40|8@1+ (0.5,0) [0.0|126.5] ""  XXX
+ SG_ KBI_Reifenumfang_Sekundaer : 48|12@1+ (1,0) [0|4095] "Unit_MilliMeter"  XXX
 
 BO_ 391 EV_Gearshift: 8 XXX
  SG_ CHECKSUM : 0|8@1+ (1,0) [0|255] "" XXX
@@ -1360,18 +1379,24 @@ BO_ 391 EV_Gearshift: 8 XXX
  SG_ RegenBrakingMode : 12|2@1+ (1,0) [0|3] "" XXX
 
 CM_ SG_ 134 LWI_Lenkradwinkel "Steering angle WITH variable ratio effect included";
-CM_ SG_ 159 EPS_HCA_Status "Status of Heading Control Assist feature"
+CM_ SG_ 159 EPS_HCA_Status "Status of Heading Control Assist feature";
 CM_ SG_ 159 EPS_Lenkmoment "Steering input by driver, torque";
 CM_ SG_ 159 EPS_VZ_Lenkmoment "Steering input by driver, direction";
 CM_ SG_ 159 EPS_Berechneter_LW "Raw steering angle, degrees";
-CM_ SG_ 159 EPS_VZ_BLW "Raw steering angle, direction"
+CM_ SG_ 159 EPS_VZ_BLW "Raw steering angle, direction";
 CM_ SG_ 173 COUNTERXX "Message not renamed to COUNTER because J533 rate-limiting makes it look like messages are being lost";
-CM_ SG_ 294 3 "May be zero when sent by older cameras";
-CM_ SG_ 294 7 "May be zero when sent by older cameras";
-CM_ SG_ 294 254 "May be zero when sent by older cameras";
+CM_ SG_ 294 SET_ME_0X3 "May be zero when sent by older cameras";
+CM_ SG_ 294 SET_ME_0X07 "May be zero when sent by older cameras";
+CM_ SG_ 294 SET_ME_0XFE "May be zero when sent by older cameras";
 CM_ SG_ 294 Assist_Torque "Heading control input, torque";
 CM_ SG_ 294 Assist_VZ "Heading control input, direction (sign)";
 CM_ SG_ 294 HCA_Available "Must be 1 for steering rack to accept HCA commands";
+CM_ SG_ 302 ACC_Hold_Request "Active request for ABS brake hold in ACC_Hold_Type";
+CM_ SG_ 302 ACC_Boost_Request "Hybrid engine start related";
+CM_ SG_ 302 ACC_Freewheel_Request "Active request for DSG sailing/coasting in ACC_Freewheel_Type";
+CM_ SG_ 302 ACC_Hold_Release "Request to ABS to release brake hold";
+CM_ SG_ 302 ACC_Accel_Secondary "Target acceleration of the secondary controller";
+CM_ SG_ 302 ACC_Accel_TSK "Mirror of request to TSK to implement a target acceleration";
 CM_ SG_ 870 Hazard_Switch "Four-way flashers active";
 CM_ SG_ 870 Comfort_Signal_Left "Comfort turn signal active, left";
 CM_ SG_ 870 Comfort_Signal_Right "Comfort turn signal active, right";
@@ -1395,8 +1420,36 @@ CM_ SG_ 780 Abstand "Following distance";
 CM_ SG_ 780 SetSpeed "ACC set speed";
 CM_ SG_ 391 GearPosition "Traditional PRND plus B-mode aggressive regen, B-mode mapped to Drive";
 CM_ SG_ 960 ZAS_Kl_15 "Indicates ignition on";
+CM_ SG_ 1720 KBI_BCmE_aktiv "Anzeige BCmE aktiv (BCmE-Screen oder Einsparhinweis in der Anzeige)";
+CM_ SG_ 1720 KBI_Max_Tankinhalt "Mitteilung des maximalen Tankinhalts an das Reichweitenmodul";
+CM_ SG_ 1720 KBI_Nachtanken_erkannt "Statusinformation Nachtankmodus";
+CM_ SG_ 1720 KBI_Reifenumfang "Mittlerer Radumfang aus der K-Zahl gerechnet in Millimeter.  Byte 2 Bit 5,4 reserviert, Byte 2 Bit 3..0 und Byte 1 Bit 7..0; Wertebereich 0..4096 mm
+";
+CM_ SG_ 1720 KBI_Reifenumfang_Sekundaer "Fahrzeuge mit unterschiedlichen Reifenumfängen Vorderachse / Hinterachse:
+
+Primärachse: KBI_Reifenumfang
+Sekundärachse: KBI_Reifenumfang_Sekundaer
+";
+CM_ SG_ 1720 KBI_Sparhinweis_quittiert "angezeigter Sparhinweis ist quittiert. Signal wird nach zwei Sendebotschaften wieder auf '0' gesetzt.";
+CM_ SG_ 1720 KBI_Tankfuellstand_Prozent "Tankfüllstand in %";
+CM_ SG_ 1720 KBI_Tankinhalt_hochaufl "angezeigter Tankinhalt hochauflösend zur Restreichweitenberechnung";
+CM_ SG_ 1720 KBI_Variante "Zeigt an ob es sich um ein konventionelles Zeiger-Kombiinstrument handelt oder um eine Volldisplay-Kombiinstrument";
+CM_ SG_ 1720 KBI_Variante_USA "In diesem Signal wird die HW-Variante des Kombis ausgegeben, ACC plausibilisiert auf dieses Signal hin seine US-Codierung";
+
+
 VAL_ 159 EPS_HCA_Status 0 "disabled" 1 "initializing" 2 "fault" 3 "ready" 4 "rejected" 5 "active";
-VAL_ 173 GE_Fahrstufe 5 "P" 6 "R" 7 "N" 8 "D" 9 "S" 10 "E" 14 "T";
+VAL_ 173 GE_Fahrstufe 5 "P" 6 "R" 7 "N" 8 "D" 9 "S" 10 "E" 13 "T" 14 "T";
+VAL_ 288 TSK_Status 0 "init" 1 "disabled" 2 "enabled" 3 "regulating" 4 "accel_pedal_override" 5 "brake_only" 6 "temp_fault" 7 "perm_fault";
+VAL_ 302 ACC_Freewheel_Type 0 "freewheel_released" 1 "freewheel_not_permitted" 2 "freewheel_not_released" 3 "freewheel_requested" ;
+VAL_ 302 ACC_Hold_Type 0 "no_request" 1 "hold" 2 "park" 3 "hold_standby" 4 "startup" 5 "loosen_over_ramp" ;
 VAL_ 391 GearPosition 2 "P" 3 "R" 4 "N" 5 "D" 6 "D";
 VAL_ 391 RegenBrakingMode 0 "default" 1 "B1" 2 "B2" 3 "B3";
 VAL_ 870 Fast_Send_Rate_Active 0 "1 Hz" 1 "50 Hz";
+VAL_ 1720 KBI_Variante_USA 0 "keine USA-Variante" 1 "USA-Variante" ;
+VAL_ 1720 KBI_Variante 0 "Zeiger Kombiinstrument" 1 "Volldisplay Kombiinstrument" ;
+VAL_ 1720 KBI_BCmE_aktiv 0 "Anzeige_nicht_aktiv" 1 "Anzeige_aktiv" ;
+VAL_ 1720 KBI_Sparhinweis_quittiert 0 "nicht_quittiert" 1 "quittiert" ;
+VAL_ 1720 KBI_Tankfuellstand_Prozent 126 "Init" 127 "Fehler" ;
+VAL_ 1720 KBI_Nachtanken_erkannt 0 "Geberbetrieb" 1 "Nachtankmodus" ;
+VAL_ 1720 KBI_Tankinhalt_hochaufl 16382 "Init" 16383 "Fehler" ;
+VAL_ 1720 KBI_Max_Tankinhalt 254 "Init" 255 "Fehler" ;
