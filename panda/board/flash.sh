@@ -3,7 +3,7 @@ set -e
 pushd /data/openpilot/panda/board
 
 scons -u -j$(nproc)
-PYTHONPATH=.. python3 -c "from python import Panda; Panda().flash('obj/panda.bin.signed')"
+printf %b 'from python import Panda\nfor serial in Panda.list(): Panda(serial).flash()' | PYTHONPATH=.. python3
 
 sleep 10
 
