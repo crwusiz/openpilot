@@ -11,7 +11,7 @@ QFrame *horizontal_line(QWidget *parent) {
     margin-right: 40px;
     border-width: 1px;
     border-bottom-style: solid;
-    border-color: gray;
+    border-color: white;
   )");
   line->setFixedHeight(2);
   return line;

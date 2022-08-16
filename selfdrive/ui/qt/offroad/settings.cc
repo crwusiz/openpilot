@@ -338,7 +338,14 @@ SoftwarePanel::SoftwarePanel(QWidget* parent) : ListWidget(parent) {
   });
   connect(uiState(), &UIState::offroadTransition, uninstallBtn, &QPushButton::setEnabled);
 
-  QWidget *widgets[] = {versionLbl, lastUpdateLbl, updateBtn, branchSwitcherBtn, gitRemoteLbl, gitBranchLbl, gitCommitLbl, osVersionLbl, uninstallBtn};
+  auto gitpull_btn = new ButtonControl(tr("Git Fetch and Reset"), tr("RUN"));
+  connect(gitpull_btn, &ButtonControl::clicked, [&]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+      QProcess::execute("/data/openpilot/scripts/gitpull.sh");
+    }
+  });
+
+  QWidget *widgets[] = {versionLbl, lastUpdateLbl, updateBtn, branchSwitcherBtn, gitpull_btn, gitRemoteLbl, gitBranchLbl, gitCommitLbl, osVersionLbl, uninstallBtn};
   for (QWidget* w : widgets) {
     if (w == branchSwitcherBtn && params.getBool("IsTestedBranch")) {
       continue;
@@ -585,6 +592,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   )");
 
+  toggleLayout->addWidget(horizontal_line());
   toggleLayout->addWidget(new LateralControlSelect());
   toggleLayout->addWidget(new MfcSelect());
   toggleLayout->addWidget(new AebSelect());
@@ -615,33 +623,17 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   }
   toggleLayout->addWidget(horizontal_line());
 
-  auto gitpull_btn = new ButtonControl("Git Fetch and Reset", tr("RUN"));
-  QObject::connect(gitpull_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)){
-      QProcess::execute("/data/openpilot/scripts/gitpull.sh");
-    }
-  });
-  toggleLayout->addWidget(gitpull_btn);
-
   auto pandaflash_btn = new ButtonControl("Panda Flash", tr("RUN"));
   QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)){
+    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
       QProcess::execute("/data/openpilot/panda/board/flash.sh");
     }
   });
   toggleLayout->addWidget(pandaflash_btn);
 
-  auto pandaflashh7_btn = new ButtonControl("RED Panda Flash", tr("RUN"));
-  QObject::connect(pandaflashh7_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)){
-      QProcess::execute("/data/openpilot/panda/board/flash_h7.sh");
-    }
-  });
-  toggleLayout->addWidget(pandaflashh7_btn);
-
   auto pandarecover_btn = new ButtonControl("Panda Recover", tr("RUN"));
   QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)){
+    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
       QProcess::execute("/data/openpilot/panda/board/recover.sh");
     }
   });
@@ -649,11 +641,12 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   auto pandarecoverh7_btn = new ButtonControl("RED Panda Recover", tr("RUN"));
   QObject::connect(pandarecoverh7_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)){
+    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
       QProcess::execute("/data/openpilot/panda/board/recover_h7.sh");
     }
   });
   toggleLayout->addWidget(pandarecoverh7_btn);
+  toggleLayout->addWidget(horizontal_line());
 }
 
 SelectCar::SelectCar(QWidget* parent): QWidget(parent) {

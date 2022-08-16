@@ -76,7 +76,7 @@
 <context>
     <name>AebSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="842"/>
+        <location filename="../qt/offroad/settings.cc" line="835"/>
         <source>AEB Signal Select (Scc12/Fca11)</source>
         <translation>차량의 AEB 신호를 선택합니다. (Scc12/Fca11)</translation>
     </message>
@@ -84,66 +84,62 @@
 <context>
     <name>CommunityPanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="528"/>
-        <location filename="../qt/offroad/settings.cc" line="551"/>
+        <location filename="../qt/offroad/settings.cc" line="535"/>
+        <location filename="../qt/offroad/settings.cc" line="558"/>
         <source>Select your car</source>
         <translation>차량을 선택하세요</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="596"/>
+        <location filename="../qt/offroad/settings.cc" line="604"/>
         <source>Prebuilt Enable</source>
         <translation>Prebuilt 사용</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="597"/>
+        <location filename="../qt/offroad/settings.cc" line="605"/>
         <source>Create prebuilt files to speed bootup</source>
         <translation>Prebuilt 파일을 생성하며 부팅속도를 향상시킵니다.</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="600"/>
+        <location filename="../qt/offroad/settings.cc" line="608"/>
         <source>Logger Disable</source>
         <translation>Logger 사용안함</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="601"/>
+        <location filename="../qt/offroad/settings.cc" line="609"/>
         <source>Disable Logger is Reduce system load</source>
         <translation>Logger 프로세스를 종료하여 시스템 부하를 줄입니다.</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="604"/>
+        <location filename="../qt/offroad/settings.cc" line="612"/>
         <source>Navigation Disable</source>
         <translation>Navigation 사용안함</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="605"/>
+        <location filename="../qt/offroad/settings.cc" line="613"/>
         <source>Navigation Function not use</source>
         <translation>네비게이션 기능을 사용하지않습니다.</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="608"/>
+        <location filename="../qt/offroad/settings.cc" line="616"/>
         <source>New radar interface Enable</source>
         <translation>New radar interface 사용</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="609"/>
+        <location filename="../qt/offroad/settings.cc" line="617"/>
         <source>Some newer car New radar interface</source>
         <translation>레이더 CAN 신호 해독된 일부차량을위한 옵션입니다.</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="618"/>
         <location filename="../qt/offroad/settings.cc" line="626"/>
         <location filename="../qt/offroad/settings.cc" line="634"/>
         <location filename="../qt/offroad/settings.cc" line="642"/>
-        <location filename="../qt/offroad/settings.cc" line="650"/>
         <source>RUN</source>
         <translation>실행</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="620"/>
         <location filename="../qt/offroad/settings.cc" line="628"/>
         <location filename="../qt/offroad/settings.cc" line="636"/>
         <location filename="../qt/offroad/settings.cc" line="644"/>
-        <location filename="../qt/offroad/settings.cc" line="652"/>
         <source>Process?</source>
         <translation>실행하시겠습니까?</translation>
     </message>
@@ -422,7 +418,7 @@
 <context>
     <name>LateralControlSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="704"/>
+        <location filename="../qt/offroad/settings.cc" line="697"/>
         <source>LateralControl Select (Pid/Indi/Lqr/Torque)</source>
         <translation>조향 모드를 선택합니다. (Pid/Indi/Lqr/Torque)</translation>
     </message>
@@ -430,7 +426,7 @@
 <context>
     <name>LongControlSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="907"/>
+        <location filename="../qt/offroad/settings.cc" line="900"/>
         <source>LongControl Select (Mad/Mad+Long)</source>
         <translation>LongControl 모드를 선택합니다. (Mad/Mad+Long)</translation>
     </message>
@@ -551,7 +547,7 @@ location set</source>
 <context>
     <name>MfcSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="773"/>
+        <location filename="../qt/offroad/settings.cc" line="766"/>
         <source>MFC Camera Select (Lkas/Ldws/Lfa/HDA2)</source>
         <translation>차량의 MFC 카메라를 선택합니다. (Lkas/Ldws/Lfa/HDA2)</translation>
     </message>
@@ -816,12 +812,12 @@ location set</source>
 <context>
     <name>SelectCar</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="665"/>
+        <location filename="../qt/offroad/settings.cc" line="658"/>
         <source>Back</source>
         <translation>뒤로</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="675"/>
+        <location filename="../qt/offroad/settings.cc" line="668"/>
         <source>Select car not use</source>
         <translation>차량선택 사용안함</translation>
     </message>
@@ -829,38 +825,38 @@ location set</source>
 <context>
     <name>SettingsWindow</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="417"/>
+        <location filename="../qt/offroad/settings.cc" line="424"/>
         <source>×</source>
         <translation>×</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="444"/>
+        <location filename="../qt/offroad/settings.cc" line="451"/>
         <source>Device</source>
         <translation>장치</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="445"/>
-        <location filename="../qt/offroad/settings.cc" line="487"/>
+        <location filename="../qt/offroad/settings.cc" line="452"/>
+        <location filename="../qt/offroad/settings.cc" line="494"/>
         <source>Network</source>
         <translation>네트워크</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="446"/>
+        <location filename="../qt/offroad/settings.cc" line="453"/>
         <source>Toggles</source>
         <translation>토글</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="447"/>
+        <location filename="../qt/offroad/settings.cc" line="454"/>
         <source>Software</source>
         <translation>소프트웨어</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="448"/>
+        <location filename="../qt/offroad/settings.cc" line="455"/>
         <source>Community</source>
         <translation>커뮤니티</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="454"/>
+        <location filename="../qt/offroad/settings.cc" line="461"/>
         <source>Navigation</source>
         <translation>네비게이션</translation>
     </message>
@@ -1180,13 +1176,28 @@ location set</source>
         <translation>제거하시겠습니까?</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="352"/>
+        <location filename="../qt/offroad/settings.cc" line="341"/>
+        <source>RUN</source>
+        <translation>실행</translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="341"/>
+        <source>Git Fetch and Reset</source>
+        <translation>Git 리셋 및 업데이트</translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="343"/>
+        <source>Process?</source>
+        <translation>실행하시겠습니까?</translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="359"/>
         <source>failed to fetch update</source>
         <translation>업데이트를 가져올수없습니다</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="353"/>
-        <location filename="../qt/offroad/settings.cc" line="374"/>
+        <location filename="../qt/offroad/settings.cc" line="360"/>
+        <location filename="../qt/offroad/settings.cc" line="381"/>
         <source>CHECK</source>
         <translation>확인</translation>
     </message>
