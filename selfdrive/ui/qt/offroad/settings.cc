@@ -78,6 +78,31 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       tr("When enabled, pressing the accelerator pedal will disengage openpilot."),
       "../assets/offroad/icon_disengage_on_accelerator.svg",
     },
+    // add community toggle
+    {
+      "PutPrebuilt",
+      tr("Prebuilt Enable"),
+      tr("Create prebuilt files to speed bootup"),
+      "../assets/offroad/icon_addon.png",
+    },
+    {
+      "LoggerDisable",
+      tr("Logger Disable"),
+      tr("Disable Logger is Reduce system load"),
+      "../assets/offroad/icon_addon.png",
+    },
+    {
+      "NavDisable",
+      tr("Navigation Disable"),
+      tr("Navigation Function not use"),
+      "../assets/offroad/icon_addon.png",
+    },
+    {
+      "NewRadarInterface",
+      tr("New radar interface Enable"),
+      tr("Some newer car New radar interface"),
+      "../assets/offroad/icon_road.png",
+    },
   };
 
   Params params;
@@ -542,7 +567,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   vlayout->addSpacing(10);
 
   homeWidget = new QWidget(this);
-  QVBoxLayout* toggleLayout = new QVBoxLayout(homeWidget);
+  QVBoxLayout* communityLayout = new QVBoxLayout(homeWidget);
   homeWidget->setObjectName("homeWidget");
 
   ScrollView *scroller = new ScrollView(homeWidget, this);
@@ -592,36 +617,11 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   )");
 
-  toggleLayout->addWidget(horizontal_line());
-  toggleLayout->addWidget(new LateralControlSelect());
-  toggleLayout->addWidget(new MfcSelect());
-  toggleLayout->addWidget(new AebSelect());
-  toggleLayout->addWidget(new LongControlSelect());
-  toggleLayout->addWidget(horizontal_line());
-
-  QList<ParamControl*> toggles;
-  toggles.append(new ParamControl("PutPrebuilt",
-                                  tr("Prebuilt Enable"),
-                                  tr("Create prebuilt files to speed bootup"),
-                                  "../assets/offroad/icon_addon.png", this));
-  toggles.append(new ParamControl("LoggerDisable",
-                                  tr("Logger Disable"),
-                                  tr("Disable Logger is Reduce system load"),
-                                  "../assets/offroad/icon_addon.png", this));
-  toggles.append(new ParamControl("NavDisable",
-                                  tr("Navigation Disable"),
-                                  tr("Navigation Function not use"),
-                                  "../assets/offroad/icon_addon.png", this));
-  toggles.append(new ParamControl("NewRadarInterface",
-                                  tr("New radar interface Enable"),
-                                  tr("Some newer car New radar interface"),
-                                  "../assets/offroad/icon_road.png", this));
-  for (ParamControl *toggle : toggles) {
-    if (main_layout->count() != 0) {
-    }
-    toggleLayout->addWidget(toggle);
-  }
-  toggleLayout->addWidget(horizontal_line());
+  communityLayout->addWidget(new LateralControlSelect());
+  communityLayout->addWidget(new MfcSelect());
+  communityLayout->addWidget(new AebSelect());
+  communityLayout->addWidget(new LongControlSelect());
+  communityLayout->addWidget(horizontal_line());
 
   auto pandaflash_btn = new ButtonControl("Panda Flash", tr("RUN"));
   QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
@@ -629,7 +629,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
       QProcess::execute("/data/openpilot/panda/board/flash.sh");
     }
   });
-  toggleLayout->addWidget(pandaflash_btn);
+  communityLayout->addWidget(pandaflash_btn);
 
   auto pandarecover_btn = new ButtonControl("Panda Recover", tr("RUN"));
   QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
@@ -637,7 +637,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
       QProcess::execute("/data/openpilot/panda/board/recover.sh");
     }
   });
-  toggleLayout->addWidget(pandarecover_btn);
+  communityLayout->addWidget(pandarecover_btn);
 
   auto pandarecoverh7_btn = new ButtonControl("RED Panda Recover", tr("RUN"));
   QObject::connect(pandarecoverh7_btn, &ButtonControl::clicked, [=]() {
@@ -645,8 +645,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
       QProcess::execute("/data/openpilot/panda/board/recover_h7.sh");
     }
   });
-  toggleLayout->addWidget(pandarecoverh7_btn);
-  toggleLayout->addWidget(horizontal_line());
+  communityLayout->addWidget(pandarecoverh7_btn);
 }
 
 SelectCar::SelectCar(QWidget* parent): QWidget(parent) {

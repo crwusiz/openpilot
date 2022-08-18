@@ -58,9 +58,8 @@ AddrCheckStruct hyundai_community_addr_checks[] = {
   {.msg = {{608, 0, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},                     // EMS16
            {881, 0, 8, .expected_timestep = 10000U}, { 0 }}},                                                       // E_EMS11
   {.msg = {{902, 0, 8, .expected_timestep = 20000U}, { 0 }, { 0 }}},                                              // WHL_SPD11
-  {.msg = {{916, 0, 8, .expected_timestep = 20000U}}},                                                            // TCS13
+//  {.msg = {{916, 0, 8, .expected_timestep = 20000U}}},                                                            // TCS13
 //  {.msg = {{902, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 10000U}, { 0 }, { 0 }}},    // WHL_SPD11
-//  {.msg = {{916, 0, 8, .check_checksum = true, .max_counter = 7U, .expected_timestep = 10000U}, { 0 }, { 0 }}},     // TCS13
 //  {.msg = {{1057, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},  // SCC12
 //  {.msg = {{1265, 0, 4, .check_checksum = false, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}}, // CLU11
 };
