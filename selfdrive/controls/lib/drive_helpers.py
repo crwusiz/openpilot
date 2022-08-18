@@ -8,12 +8,12 @@ from selfdrive.modeld.constants import T_IDXS
 
 # WARNING: this value was determined based on the model's training distribution,
 #          model predictions above this speed can be unpredictable
-# kph
-V_CRUISE_MAX = 145
-V_CRUISE_MIN = 30
+V_CRUISE_MAX = 145  # kph
+V_CRUISE_MIN = 8  # kph
 V_CRUISE_DELTA_MI = 5 * CV.MPH_TO_KPH
 V_CRUISE_DELTA_KM = 10
-V_CRUISE_ENABLE_MIN = 30
+V_CRUISE_ENABLE_MIN = 40  # kph
+V_CRUISE_INITIAL = 255  # kph
 
 LAT_MPC_N = 16
 LON_MPC_N = 32
@@ -21,7 +21,7 @@ CONTROL_N = 17
 CAR_ROTATION_RADIUS = 0.0
 
 # EU guidelines
-MAX_LATERAL_JERK = 10.0
+MAX_LATERAL_JERK = 5.0
 
 ButtonType = car.CarState.ButtonEvent.Type
 CRUISE_LONG_PRESS = 50
@@ -38,7 +38,7 @@ CRUISE_INTERVAL_SIGN = {
 class MPC_COST_LAT:
   PATH = 1.0
   HEADING = 1.0
-  STEER_RATE = 0.4
+  STEER_RATE = 1.0
 
 
 def apply_deadzone(error, deadzone):
@@ -98,8 +98,8 @@ def update_v_cruise(v_cruise_kph, v_ego, gas_pressed, buttonEvents, button_timer
 
 def initialize_v_cruise(v_ego, buttonEvents, v_cruise_last):
   for b in buttonEvents:
-    # 0kph means we never had a set speed
-    if b.type in (ButtonType.accelCruise, ButtonType.resumeCruise) and v_cruise_last != 0:
+    # 250kph or above probably means we never had a set speed
+    if b.type in (ButtonType.accelCruise, ButtonType.resumeCruise) and v_cruise_last < 250:
       return v_cruise_last
 
   return int(round(clip(v_ego * CV.MS_TO_KPH, V_CRUISE_ENABLE_MIN, V_CRUISE_MAX)))
@@ -125,9 +125,10 @@ def get_lag_adjusted_curvature(CP, v_ego, psis, curvatures, curvature_rates):
 
   # This is the "desired rate of the setpoint" not an actual desired rate
   desired_curvature_rate = curvature_rates[0]
-  max_curvature_rate = MAX_LATERAL_JERK / (v_ego**2)
+  max_curvature_rate = MAX_LATERAL_JERK / (v_ego**2) # inexact calculation, check https://github.com/commaai/openpilot/pull/24755
   safe_desired_curvature_rate = clip(desired_curvature_rate,
-                                     -max_curvature_rate, max_curvature_rate)
+                                     -max_curvature_rate,
+                                     max_curvature_rate)
   safe_desired_curvature = clip(desired_curvature,
                                 current_curvature_desired - max_curvature_rate * DT_MDL,
                                 current_curvature_desired + max_curvature_rate * DT_MDL)
