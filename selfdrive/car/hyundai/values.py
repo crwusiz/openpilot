@@ -1442,7 +1442,7 @@ DBC = {
   CAR.KONA_HEV: dbc_dict('hyundai_kia_generic', None),
   CAR.IONIQ_EV: dbc_dict('hyundai_kia_generic', 'hyundai_kia_mando_front_radar'),
   CAR.IONIQ_HEV: dbc_dict('hyundai_kia_generic', None),
-  CAR.IONIQ5: dbc_dict('kia_ev6', None),
+  CAR.IONIQ5: dbc_dict('hyundai_canfd', None),
   CAR.TUCSON: dbc_dict('hyundai_kia_generic', None),
   CAR.TUCSON22_HEV: dbc_dict('hyundai_tucson_hev_2022', None),
   CAR.SANTAFE: dbc_dict('hyundai_kia_generic', 'hyundai_kia_mando_front_radar'),
@@ -1472,7 +1472,7 @@ DBC = {
   CAR.NIRO_HEV: dbc_dict('hyundai_kia_generic', 'hyundai_kia_mando_front_radar'),
   CAR.SOUL_EV: dbc_dict('hyundai_kia_generic', None),
   CAR.SELTOS: dbc_dict('hyundai_kia_generic', None),
-  CAR.EV6: dbc_dict('kia_ev6', None),
+  CAR.EV6: dbc_dict('hyundai_canfd', None),
 
   # Genesis
   CAR.GENESIS: dbc_dict('hyundai_kia_generic', None),
