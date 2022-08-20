@@ -4,7 +4,8 @@ from panda import Panda
 from common.params import Params
 from common.numpy_fast import interp
 from common.conversions import Conversions as CV
-from selfdrive.car.hyundai.values import CAR, Buttons, CarControllerParams, CANFD_CAR
+from selfdrive.car.hyundai.values import HyundaiFlags, CAR, Buttons, CarControllerParams, CANFD_CAR
+from selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR
 from selfdrive.car import STD_CARGO_KG, create_button_event, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.car.disable_ecu import disable_ecu
@@ -355,6 +356,13 @@ class CarInterface(CarInterfaceBase):
     if candidate in CANFD_CAR:
       ret.enableBsm = 0x58b in fingerprint[0]
       ret.radarOffCan = False
+      if 0x50 in fingerprint[6]:
+        ret.flags |= HyundaiFlags.CANFD_HDA2.value
+        ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_HDA2
+      else:
+        # non-HDA2
+        if 0x1cf not in fingerprint[4]:
+          ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
     else:
       # ignore CAN2 address if L-CAN on the same BUS
       ret.mdpsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
@@ -378,6 +386,8 @@ class CarInterface(CarInterfaceBase):
 
     #if ret.openpilotLongitudinalControl:
     #  ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LONG
+
+    #ret.radarOffCan = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
 
     return ret
 
