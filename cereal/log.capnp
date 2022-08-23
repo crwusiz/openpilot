@@ -1262,6 +1262,7 @@ struct UbloxGnss {
     ionoCoeffsValid @37 :Bool;
     ionoAlpha @38 :List(Float64);
     ionoBeta @39 :List(Float64);
+
   }
 
   struct IonoData {
@@ -1886,6 +1887,9 @@ struct RoadLimitSpeed {
   camSpeedFactor @8 :Float32;
 }
 
+struct UserFlag {
+}
+
 struct Event {
   logMonoTime @0 :UInt64;  # nanoseconds
   valid @67 :Bool = true;
@@ -1953,8 +1957,11 @@ struct Event {
     navRoute @83 :NavRoute;
     navThumbnail @84: Thumbnail;
 
+    # user flags
+    userFlag @93 :UserFlag;
+
     # neokii
-    roadLimitSpeed @93 :RoadLimitSpeed;
+    roadLimitSpeed @94 :RoadLimitSpeed;
 
     # *********** debug ***********
     testJoystick @52 :Joystick;

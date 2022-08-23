@@ -68,6 +68,7 @@ services = {
   "navRoute": (True, 0.),
   "navThumbnail": (True, 0.),
   "qRoadEncodeIdx": (False, 20.),
+  "userFlag": (True, 0., 1),
   "roadLimitSpeed": (False, 0.),
 
   # debug
