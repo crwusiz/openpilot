@@ -35,7 +35,7 @@ X_EGO_COST = 0.
 V_EGO_COST = 0.
 A_EGO_COST = 0.
 J_EGO_COST = 5.0
-A_CHANGE_COST = 200.
+A_CHANGE_COST = 20. # 200.
 DANGER_ZONE_COST = 100.
 CRASH_DISTANCE = .5
 LIMIT_COST = 1e6
@@ -44,9 +44,10 @@ ACADOS_SOLVER_TYPE = 'SQP_RTI'
 
 CRUISE_GAP_BP = [1., 2., 3., 4.]
 CRUISE_GAP_V = [1.1, 1.3, 1.58, 2.10]
-
 AUTO_TR_BP = [0., 30.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 110.*CV.KPH_TO_MS]
 AUTO_TR_V = [1.1, 1.2, 1.3, 1.45]
+
+E2E_TR_FACTOR = 1.1
 
 AUTO_TR_CRUISE_GAP = 4
 DIFF_RADAR_VISION = 1.0
@@ -64,7 +65,7 @@ MIN_ACCEL = -3.5
 MAX_ACCEL = 2.0
 T_FOLLOW = 1.45
 COMFORT_BRAKE = 2.5
-STOP_DISTANCE = 6.0
+STOP_DISTANCE = 8.0
 
 def get_stopped_equivalence_factor(v_lead):
   return (v_lead**2) / (2 * COMFORT_BRAKE)
@@ -321,16 +322,15 @@ class LongitudinalMpc:
     lead_xv_0 = self.process_lead(radarstate.leadOne)
     lead_xv_1 = self.process_lead(radarstate.leadTwo)
 
-    # set accel limits in params
-    self.params[:,0] = interp(float(self.status), [0.0, 1.0], [self.cruise_min_a, MIN_ACCEL])
-    self.params[:,1] = self.cruise_max_a
-
     # neokii
     cruise_gap = int(clip(carstate.cruiseGap, 1., 4.))
     if cruise_gap == AUTO_TR_CRUISE_GAP:
       tr = interp(carstate.vEgo, AUTO_TR_BP, AUTO_TR_V)
     else:
       tr = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
+
+    if self.mode is not 'acc':
+      tr *= E2E_TR_FACTOR
 
     self.param_tr = tr
 
@@ -352,7 +352,7 @@ class LongitudinalMpc:
       v_cruise_clipped = np.clip(v_cruise * np.ones(N+1),
                                  v_lower,
                                  v_upper)
-      cruise_obstacle = np.cumsum(T_DIFFS * v_cruise_clipped) + get_safe_obstacle_distance(v_cruise_clipped, tr)
+      cruise_obstacle = np.cumsum(T_DIFFS * v_cruise_clipped) + get_safe_obstacle_distance(v_cruise_clipped, self.param_tr)
       x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle])
       self.source = SOURCES[np.argmin(x_obstacles[0])]
 

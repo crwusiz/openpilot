@@ -284,7 +284,7 @@ class CarStateBase(ABC):
     self.v_ego_clu_kf = KF1D(x0=[[0.0], [0.0]],
                          A=[[1.0, DT_CTRL], [0.0, 1.0]],
                          C=[1.0, 0.0],
-                         K=[[0.12287673], [0.29666309]])
+                         K=[[0.17406039], [1.65925647]])
 
   def update_speed_kf(self, v_ego_raw):
     if abs(v_ego_raw - self.v_ego_kf.x[0][0]) > 2.0:  # Prevent large accelerations when car starts at non zero speed

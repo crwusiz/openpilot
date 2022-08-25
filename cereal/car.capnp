@@ -625,8 +625,8 @@ struct CarParams {
     subaruLegacy @22;  # pre-Global platform
     hyundaiLegacy @23;
     hyundaiCommunity @24;
-    stellantis @25;
-    faw @26;
+    stellantisDEPRECATED @25;  # Consolidated with Chrysler; may be recycled for the next new model
+    hongqi @26;
     body @27;
     hyundaiCanfd @28;
   }
@@ -677,6 +677,9 @@ struct CarParams {
     programmedFuelInjection @14;
     electricBrakeBooster @15;
     shiftByWire @16;
+
+    # Chrysler only
+    hcp @18;  # Hybrid Control Processor
 
     debug @17;
   }

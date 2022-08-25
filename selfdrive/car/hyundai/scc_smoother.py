@@ -60,6 +60,7 @@ class SccSmoother:
 
     self.longcontrol = Params().get("LongControlSelect", encoding='utf8') == "1"
     self.is_metric = Params().get_bool('IsMetric')
+    self.e2e_long = Params().get_bool('EndToEndLong')
 
     self.speed_conv_to_ms = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
     self.speed_conv_to_clu = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH
@@ -136,7 +137,6 @@ class SccSmoother:
     if apply_limit_speed >= self.kph_to_clu(10):
       if first_started:
         self.max_speed_clu = clu11_speed
-
       max_speed_clu = min(max_speed_clu, apply_limit_speed)
 
       if clu11_speed > apply_limit_speed:
@@ -250,7 +250,6 @@ class SccSmoother:
     return 0
 
   def cal_curve_speed(self, sm, v_ego, frame):
-
     if frame % 20 == 0:
       md = sm['modelV2']
       if len(md.position.x) == TRAJECTORY_SIZE and len(md.position.y) == TRAJECTORY_SIZE:
@@ -302,10 +301,11 @@ class SccSmoother:
       self.max_speed_clu = self.max_speed_clu + error * kp
 
   def get_apply_accel(self, CS, sm, accel, stopping):
-    start_boost = interp(CS.out.vEgo, [0.0, CREEP_SPEED, 2 * CREEP_SPEED], [0.6, 0.6, 0.0])
-    is_accelerating = interp(accel, [0.0, 0.2], [0.0, 1.0])
-    boost = start_boost * is_accelerating
-    accel += boost
+    if not self.e2e_long:
+      start_boost = interp(CS.out.vEgo, [0.0, CREEP_SPEED, 2 * CREEP_SPEED], [0.6, 0.6, 0.0])
+      is_accelerating = interp(accel, [0.0, 0.2], [0.0, 1.0])
+      boost = start_boost * is_accelerating
+      accel += boost
 
     return accel
 
