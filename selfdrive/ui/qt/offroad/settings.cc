@@ -638,14 +638,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
   communityLayout->addWidget(pandarecover_btn);
-
-  auto pandarecoverh7_btn = new ButtonControl("RED Panda Recover", tr("RUN"));
-  QObject::connect(pandarecoverh7_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
-      QProcess::execute("/data/openpilot/panda/board/recover_h7.sh");
-    }
-  });
-  communityLayout->addWidget(pandarecoverh7_btn);
 }
 
 SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
