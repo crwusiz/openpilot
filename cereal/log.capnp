@@ -1205,7 +1205,7 @@ struct UbloxGnss {
         carrierPhaseValid @1 :Bool;
         # half cycle valid
         halfCycleValid @2 :Bool;
-        # half sycle subtracted from phase
+        # half cycle subtracted from phase
         halfCycleSubtracted @3 :Bool;
       }
     }
