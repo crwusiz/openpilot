@@ -187,9 +187,9 @@ class CarController:
         can_sends.append(hyundaican.create_clu11(self.packer, CS.scc_bus, CS.clu11, Buttons.RES_ACCEL, clu11_speed))
         self.resume_cnt += 1
 
-        if self.resume_cnt >= randint(6, 8):
+        if self.resume_cnt >= int(randint(4, 5) * 2):
           self.resume_cnt = 0
-          self.resume_wait_timer = randint(30, 36)
+          self.resume_wait_timer = int(randint(20, 25) * 2)
 
     elif self.last_lead_distance != 0:
       self.last_lead_distance = 0
