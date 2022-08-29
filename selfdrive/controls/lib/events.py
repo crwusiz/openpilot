@@ -493,8 +493,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   EventName.resumeRequired: {
     ET.WARNING: Alert(
-      "STOPPED",
-      "Press Resume to Go",
+      #"STOPPED",
+      #"Press Resume to Go",
       "앞차량 멈춤",
       "출발하려면 RES버튼을 누르세요",
       AlertStatus.userPrompt, AlertSize.mid,

@@ -54,7 +54,7 @@ struct Alert {
         //return {"openpilot Unavailable", "Waiting for controls to start",
         return {"오픈파일럿을 사용할수없습니다", "프로세스가 준비중입니다",
                 "controlsWaiting", cereal::ControlsState::AlertSize::MID,
-                AudibleAlert::NONE};
+                AudibleAlert::PROMPT};
       } else if (controls_missing > CONTROLS_TIMEOUT) {
         // car is started, but controls is lagging or died
         if (cs.getEnabled() && (controls_missing - CONTROLS_TIMEOUT) < 10) {
