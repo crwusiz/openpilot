@@ -20,7 +20,7 @@ const int bdr_s = 10;
 const int header_h = 420;
 const int footer_h = 280;
 
-const int UI_FREQ = 20;   // Hz
+const int UI_FREQ = 20; // Hz
 typedef cereal::CarControl::HUDControl::AudibleAlert AudibleAlert;
 
 const mat3 DEFAULT_CALIBRATION = {{ 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0 }};
@@ -52,7 +52,7 @@ struct Alert {
         //return {"openpilot Unavailable", "Waiting for controls to start",
         return {"오픈파일럿을 사용할수없습니다", "프로세스가 준비중입니다",
                 "controlsWaiting", cereal::ControlsState::AlertSize::MID,
-                AudibleAlert::NONE};
+                AudibleAlert::PROMPT};
       } else if (controls_missing > CONTROLS_TIMEOUT && !Hardware::PC()) {
         // car is started, but controls is lagging or died
         if (cs.getEnabled() && (controls_missing - CONTROLS_TIMEOUT) < 10) {
@@ -81,7 +81,7 @@ typedef enum UIStatus {
 } UIStatus;
 
 const QColor bg_colors [] = {
-  [STATUS_DISENGAGED] =  QColor(0x17, 0x33, 0x49, 0xc8),
+  [STATUS_DISENGAGED] = QColor(0x17, 0x33, 0x49, 0xc8),
   [STATUS_OVERRIDE] = QColor(0x91, 0x9b, 0x95, 0x01),
   [STATUS_ENGAGED] = QColor(0x17, 0x86, 0x44, 0x01),
   [STATUS_WARNING] = QColor(0xDA, 0x6F, 0x25, 0x01),
