@@ -17,7 +17,8 @@ struct CarEvent @0x9b1657f34caf3ad3 {
   immediateDisable @6 :Bool;
   preEnable @7 :Bool;
   permanent @8 :Bool; # alerts presented regardless of openpilot state
-  override @9 :Bool;
+  overrideLat @10 :Bool;
+  overrideLong @9 :Bool;
 
   enum EventName @0xbaa8c5d505f727de {
     canError @0;
@@ -35,6 +36,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     pedalPressed @13;  # exits active state
     pedalPressedPreEnable @73;  # added during pre-enable state for either pedal
     gasPressedOverride @108;  # added when user is pressing gas with no disengage on gas
+    steerOverride @114;
     cruiseDisabled @14;
     speedTooLow @17;
     outOfSpace @18;
@@ -113,10 +115,10 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     controlsdLagging @112;
     resumeBlocked @113;
 
-    turningIndicatorOn @114;
-    autoLaneChange @115;
-    slowingDownSpeed @116;
-    slowingDownSpeedSound @117;
+    turningIndicatorOn @115;
+    autoLaneChange @116;
+    slowingDownSpeed @117;
+    slowingDownSpeedSound @118;
 
     radarCanErrorDEPRECATED @15;
     communityFeatureDisallowedDEPRECATED @62;
@@ -520,7 +522,7 @@ struct CarParams {
     safetyParam2DEPRECATED @2 :UInt32;
   }
 
-  steerFaultMaxAngle @69 :Int16;
+  steerFaultMaxAngle @80 :Int16;
   steerFaultMaxFrames @70 :Int16;
   mdpsBus @71: Int8;
   sasBus @72: Int8;
