@@ -3,25 +3,24 @@
 crwusiz openpilot
 =====
 <b> crwusiz branch is neokii modify branch base (comma.ai master and xx979xx HKG_community source) </b>
-- <b> v0.8.16 [ only comma3 support ] </b>
+- <b> v0.8.17 [ only comma3 support ] </b>
 - If you have any questions, please send a message to crwusiz from discord. if you like this Branch <b> [Donate](https://paypal.me/crwusiz) </b>for me
-- It is open source and inherits MIT license. 
+- It is open source and inherits MIT license.
 - By installing this software you accept all responsibility for anything that might occur while you use it.
 - All contributors to this fork are not liable. <b>Use at your own risk.</b>
 
 [![](https://i.imgur.com/TMtVMV8.png)](#)
 - kor NanumGothic font apply fontname opensans
-- event message, qt ui kor translate 
+- event message, qt ui kor translate
 - brake, bsd, gps, wifi icon
 - wheel, N direction icon rotate
 - lateralcontrol select ( Pid / Indi / Lqr / Torque )
-- mfc select ( LKAS / LDWS / LFA )
+- mfc select ( LKAS / LDWS / LFA / HDA2 )
 - aebsignal select ( SCC12 / FCA11 )
 - longcontrol select ( MAD / MAD+LONG )
 - add community toggle / function / simple ui
 - LongitudinalControl full support
-- comma three support
-- autohold, turnsignal, tpms, roadlimitspeed display (neokii) 
+- autohold, turnsignal, tpms, roadlimitspeed display (neokii)
 
 ## Source Code Reference
 - https://github.com/commaai/openpilot
