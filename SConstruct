@@ -10,10 +10,6 @@ AGNOS = TICI
 
 Decider('MD5-timestamp')
 
-AddOption('--test',
-          action='store_true',
-          help='build test files')
-
 AddOption('--extras',
           action='store_true',
           help='build misc extras, like setup and installer files')
@@ -52,6 +48,17 @@ AddOption('--no-thneed',
           action='store_true',
           dest='no_thneed',
           help='avoid using thneed')
+
+AddOption('--pc-thneed',
+          action='store_true',
+          dest='pc_thneed',
+          help='use thneed on pc')
+
+AddOption('--no-test',
+          action='store_false',
+          dest='test',
+          default=os.path.islink(Dir('#laika/').abspath),
+          help='skip building test files')
 
 real_arch = arch = subprocess.check_output(["uname", "-m"], encoding='utf8').rstrip()
 if platform.system() == "Darwin":
@@ -165,8 +172,9 @@ env = Environment(
     "-g",
     "-fPIC",
     "-O2",
+    "-Wunused",
     "-Werror",
-    "-Wno-implicit-function-declaration",
+    "-Wshadow",
     "-Wno-unknown-warning-option",
     "-Wno-deprecated-register",
     "-Wno-register",
