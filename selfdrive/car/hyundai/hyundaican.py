@@ -25,7 +25,11 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, cut_st
       values["CF_Lkas_LdwsActivemode"] = 2
       values["CF_Lkas_SysWarning"] = lkas11["CF_Lkas_SysWarning"]
     elif car_fingerprint in [CAR.K5, CAR.K5_HEV, CAR.K7, CAR.K7_HEV]:
+      values["CF_Lkas_SysWarning"] = 4 if sys_warning else 0
+      values["CF_Lkas_LdwsSysState"] = 3 if enabled else 1
+      values["CF_Lkas_LdwsOpt_USM"] = 2  # non-2 changes above SysState definition
       values["CF_Lkas_LdwsActivemode"] = 0
+      values["CF_Lkas_FcwOpt_USM"] = 0
 
   if Params().get("MfcSelect", encoding='utf8') == "1": # This field is LDWS Mfc car ( qt ui toggle set )
     values["CF_Lkas_LdwsActivemode"] = 0
@@ -261,16 +265,20 @@ def create_frt_radar_opt(packer):
   return packer.make_can_msg("FRT_RADAR11", 0, frt_radar11_values)
 
 # ---------------------------------------------------------------------------------------
-# FcwOpt_USM 0 = No car + lanes
-#            1 = White car + lanes
-#            2 = Green car + lanes
-#            3 = Green blinking car + lanes
-#            4 = Orange car + lanes
-#            5 = Orange blinking car + lanes
-# SysWarning 4 = keep hands on wheel
-#            5 = keep hands on wheel (red)
-#            6 = keep hands on wheel (red) + beep
+# CF_Lkas_FcwOpt_USM 0 = No car + lanes
+#                    1 = White car + lanes
+#                    2 = Green car + lanes
+#                    3 = Green blinking car + lanes
+#                    4 = Orange car + lanes
+#                    5 = Orange blinking car + lanes
+# CF_Lkas_SysWarning 4 = keep hands on wheel
+#                    5 = keep hands on wheel (red)
+#                    6 = keep hands on wheel (red) + beep
 # Note: the warning is hidden while the blinkers are on
+# CF_Lkas_LdwsSysState 0 = no icons
+#                    1-2 = white car + lanes
+#                      3 = green car + lanes, green steering wheel
+#                      4 = green car + lanes
 # ---------------------------------------------------------------------------------------
 # LFA_Icon_State 0 = no_wheel
 #                1 = white_wheel
