@@ -340,27 +340,27 @@
 <context>
     <name>MapETA</name>
     <message>
-        <location filename="../qt/maps/map.cc" line="622"/>
+        <location filename="../qt/maps/map.cc" line="621"/>
         <source>eta</source>
         <translation>予定到着時間</translation>
     </message>
     <message>
-        <location filename="../qt/maps/map.cc" line="632"/>
+        <location filename="../qt/maps/map.cc" line="631"/>
         <source>min</source>
         <translation>分</translation>
     </message>
     <message>
-        <location filename="../qt/maps/map.cc" line="636"/>
+        <location filename="../qt/maps/map.cc" line="635"/>
         <source>hr</source>
         <translation>時間</translation>
     </message>
     <message>
-        <location filename="../qt/maps/map.cc" line="656"/>
+        <location filename="../qt/maps/map.cc" line="655"/>
         <source>km</source>
         <translation>ｷﾛﾒｰﾄﾙ</translation>
     </message>
     <message>
-        <location filename="../qt/maps/map.cc" line="659"/>
+        <location filename="../qt/maps/map.cc" line="658"/>
         <source>mi</source>
         <translation>ﾏｲﾙ</translation>
     </message>
@@ -408,7 +408,7 @@
     <message>
         <location filename="../qt/maps/map_settings.cc" line="95"/>
         <source>Try the Navigation Beta</source>
-        <translation>ベータ版ﾅﾋﾞｹﾞｰｼｮﾝを試し</translation>
+        <translation>β版ﾅﾋﾞｹﾞｰｼｮﾝを試す</translation>
     </message>
     <message>
         <location filename="../qt/maps/map_settings.cc" line="107"/>
@@ -569,7 +569,7 @@ location set</source>
     <message>
         <location filename="../qt/widgets/prime.cc" line="192"/>
         <source>Become a comma prime member at connect.comma.ai</source>
-        <translation>connect.comma.ai でプライム会員に登録できます</translation>
+        <translation>connect.comma.ai でﾌﾟﾗｲﾑ会員に登録できます</translation>
     </message>
     <message>
         <location filename="../qt/widgets/prime.cc" line="199"/>
@@ -876,71 +876,71 @@ location set</source>
 <context>
     <name>Sidebar</name>
     <message>
-        <location filename="../qt/sidebar.cc" line="75"/>
-        <location filename="../qt/sidebar.cc" line="77"/>
+        <location filename="../qt/sidebar.cc" line="74"/>
+        <location filename="../qt/sidebar.cc" line="76"/>
         <source>CONNECT</source>
         <translation>接続</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="75"/>
+        <location filename="../qt/sidebar.cc" line="74"/>
         <source>OFFLINE</source>
         <translation>オフライン</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="77"/>
-        <location filename="../qt/sidebar.cc" line="90"/>
+        <location filename="../qt/sidebar.cc" line="76"/>
+        <location filename="../qt/sidebar.cc" line="89"/>
         <source>ONLINE</source>
         <translation>オンライン</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="77"/>
+        <location filename="../qt/sidebar.cc" line="76"/>
         <source>ERROR</source>
         <translation>エラー</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="81"/>
-        <location filename="../qt/sidebar.cc" line="84"/>
-        <location filename="../qt/sidebar.cc" line="86"/>
+        <location filename="../qt/sidebar.cc" line="80"/>
+        <location filename="../qt/sidebar.cc" line="83"/>
+        <location filename="../qt/sidebar.cc" line="85"/>
         <source>TEMP</source>
         <translation>温度</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="81"/>
+        <location filename="../qt/sidebar.cc" line="80"/>
         <source>HIGH</source>
         <translation>高温</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="84"/>
+        <location filename="../qt/sidebar.cc" line="83"/>
         <source>GOOD</source>
         <translation>最適</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="86"/>
+        <location filename="../qt/sidebar.cc" line="85"/>
         <source>OK</source>
         <translation>OK</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="90"/>
+        <location filename="../qt/sidebar.cc" line="89"/>
         <source>VEHICLE</source>
         <translation>車両</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="92"/>
+        <location filename="../qt/sidebar.cc" line="91"/>
         <source>NO</source>
         <translation>NO</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="92"/>
+        <location filename="../qt/sidebar.cc" line="91"/>
         <source>PANDA</source>
         <translation>PANDA</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="94"/>
+        <location filename="../qt/sidebar.cc" line="93"/>
         <source>GPS</source>
         <translation>GPS</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="94"/>
+        <location filename="../qt/sidebar.cc" line="93"/>
         <source>SEARCH</source>
         <translation>検索</translation>
     </message>
@@ -1204,7 +1204,7 @@ location set</source>
     </message>
     <message>
         <location filename="../qt/offroad/settings.cc" line="65"/>
-        <source>Show ETA in 24h format</source>
+        <source>Show ETA in 24h Format</source>
         <translation>24時間表示</translation>
     </message>
     <message>
