@@ -149,7 +149,6 @@ private:
   int sectionLimitSpeed = 0;
   int sectionLeftDist = 0;
   int accel = 0;
-  int x,y,w,h = 0;
 
   float lead_d_rel = 0;
   float lead_v_rel = 0;

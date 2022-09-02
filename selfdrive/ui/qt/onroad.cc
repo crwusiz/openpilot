@@ -498,6 +498,7 @@ void NvgWindow::drawHud(QPainter &p) {
     wheelbgColor = steeringpressedColor(200);
   }
 
+  int x,y,w,h = 0;
   x = rect().right() - radius / 2 - bdr_s * 2;
   y = radius / 2 + bdr_s * 4;
   drawIconRotate(p, x, y, engage_img, wheelbgColor, 1.0, angleSteers);
@@ -645,12 +646,11 @@ void NvgWindow::drawHud(QPainter &p) {
     blink_index = 0;
   } else {
     const float img_alpha = 0.8f;
-    const int fb_w = width() / 2 - 200;
     const int center_x = width() / 2;
-    const int w = 200;
-    const int h = 200;
-    const int y = (height() - h) / 2;
     const int draw_count = 8;
+    w = 200;
+    h = 200;
+    y = (height() - h) / 2;
 
     x = center_x;
     if (left_on) {

@@ -105,8 +105,6 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
     },
   };
 
-  Params params;
-
 #ifdef ENABLE_MAPS
   if (!params.getBool("NavDisable")) {
     toggles.push_back({
@@ -551,7 +549,7 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
 // Community Panel
 CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   main_layout = new QStackedLayout(this);
-  QWidget* homeScreen = new QWidget(this);
+  homeScreen = new QWidget(this);
   QVBoxLayout* vlayout = new QVBoxLayout(homeScreen);
   vlayout->setContentsMargins(0, 20, 0, 20);
 
