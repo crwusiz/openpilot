@@ -76,7 +76,7 @@
 <context>
     <name>AebSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="830"/>
+        <location filename="../qt/offroad/settings.cc" line="862"/>
         <source>AEB Signal Select (Scc12/Fca11)</source>
         <translation>차량의 AEB 신호를 선택합니다. (Scc12/Fca11)</translation>
     </message>
@@ -92,12 +92,20 @@
     <message>
         <location filename="../qt/offroad/settings.cc" line="630"/>
         <location filename="../qt/offroad/settings.cc" line="638"/>
+        <location filename="../qt/offroad/settings.cc" line="646"/>
+        <location filename="../qt/offroad/settings.cc" line="654"/>
+        <location filename="../qt/offroad/settings.cc" line="662"/>
+        <location filename="../qt/offroad/settings.cc" line="670"/>
         <source>RUN</source>
         <translation>실행</translation>
     </message>
     <message>
         <location filename="../qt/offroad/settings.cc" line="632"/>
         <location filename="../qt/offroad/settings.cc" line="640"/>
+        <location filename="../qt/offroad/settings.cc" line="648"/>
+        <location filename="../qt/offroad/settings.cc" line="656"/>
+        <location filename="../qt/offroad/settings.cc" line="664"/>
+        <location filename="../qt/offroad/settings.cc" line="672"/>
         <source>Process?</source>
         <translation>실행하시겠습니까?</translation>
     </message>
@@ -376,7 +384,7 @@
 <context>
     <name>LateralControlSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="692"/>
+        <location filename="../qt/offroad/settings.cc" line="724"/>
         <source>LateralControl Select (Pid/Indi/Lqr/Torque)</source>
         <translation>조향 모드를 선택합니다. (Pid/Indi/Lqr/Torque)</translation>
     </message>
@@ -384,7 +392,7 @@
 <context>
     <name>LongControlSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="895"/>
+        <location filename="../qt/offroad/settings.cc" line="927"/>
         <source>LongControl Select (Mad/Mad+Long)</source>
         <translation>LongControl 모드를 선택합니다. (Mad/Mad+Long)</translation>
     </message>
@@ -505,7 +513,7 @@ location set</source>
 <context>
     <name>MfcSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="761"/>
+        <location filename="../qt/offroad/settings.cc" line="793"/>
         <source>MFC Camera Select (Lkas/Ldws/Lfa/HDA2)</source>
         <translation>차량의 MFC 카메라를 선택합니다. (Lkas/Ldws/Lfa/HDA2)</translation>
     </message>
@@ -770,12 +778,12 @@ location set</source>
 <context>
     <name>SelectCar</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="653"/>
+        <location filename="../qt/offroad/settings.cc" line="685"/>
         <source>Back</source>
         <translation>뒤로</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="663"/>
+        <location filename="../qt/offroad/settings.cc" line="695"/>
         <source>Select car not use</source>
         <translation>차량선택 사용안함</translation>
     </message>

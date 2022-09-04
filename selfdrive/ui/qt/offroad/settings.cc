@@ -642,6 +642,38 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
   communityLayout->addWidget(pandarecover_btn);
+
+  auto forcewifi_btn = new ButtonControl("Wifi Force Connect", tr("RUN"));
+  QObject::connect(forcewifi_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+      QProcess::execute("/data/openpilot/scripts/wifi_force_connect.sh");
+    }
+  });
+  communityLayout->addWidget(forcewifi_btn);
+
+  auto restart_btn = new ButtonControl("Restart", tr("RUN"));
+  QObject::connect(restart_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+      QProcess::execute("/data/openpilot/scripts/restart.sh");
+    }
+  });
+  communityLayout->addWidget(restart_btn);
+
+  auto rebuild_btn = new ButtonControl("Scons rebuild", tr("RUN"));
+  QObject::connect(rebuild_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+      QProcess::execute("/data/openpilot/scripts/rebuild.sh");
+    }
+  });
+  communityLayout->addWidget(rebuild_btn);
+
+  auto cleardtc_btn = new ButtonControl("Clear DTC", tr("RUN"));
+  QObject::connect(cleardtc_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+      QProcess::execute("/data/openpilot/scripts/cleardtc.sh");
+    }
+  });
+  communityLayout->addWidget(cleardtc_btn);
 }
 
 SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
