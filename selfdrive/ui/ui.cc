@@ -251,7 +251,6 @@ void UIState::updateStatus() {
     if (scene.started) {
       status = STATUS_DISENGAGED;
       scene.started_frame = sm->frame;
-      scene.end_to_end = Params().getBool("EndToEndToggle");
       wide_camera = Params().getBool("WideCameraOnly");
     }
     started_prev = scene.started;

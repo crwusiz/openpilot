@@ -897,25 +897,7 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
 
   // paint path
   QLinearGradient bg(0, height(), 0, height() / 4);
-  // wirelessnet2's rainbow barf path
-  if (scene.engaged && !scene.end_to_end) {
-    // openpilot is not disengaged
-    if (scene.steeringPressed) {
-      // The user is applying torque to the steering wheel
-      bg.setColorAt(0, steeringpressedColor(200));
-      bg.setColorAt(1, steeringpressedColor(0));
-    } else if (scene.override) {
-      bg.setColorAt(0, overrideColor(200));
-      bg.setColorAt(1, overrideColor(0));
-    } else {
-      // Draw colored track
-      int torqueScale = (int)std::fabs(510 * (float)scene.output_scale);
-      int r_lvl = std::fmin(255, torqueScale);
-      int g_lvl = std::fmin(255, 510 - torqueScale);
-      bg.setColorAt(0, QColor(r_lvl, g_lvl, 0, 200));
-      bg.setColorAt(1, QColor((int)(0.5 * r_lvl), (int)(0.5 * g_lvl), 0, 0));
-    }
-  } else if (scene.engaged && scene.end_to_end) {
+  if (scene.engaged) {
     const auto &orientation = (*s->sm)["modelV2"].getModelV2().getOrientation();
     float orientation_future = 0;
     if (orientation.getZ().size() > 16) {
