@@ -34,7 +34,7 @@ from selfdrive.manager.process_config import managed_processes
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
 
 SOFT_DISABLE_TIME = 3  # seconds
-LDW_MIN_SPEED = 40 * CV.KPH_TO_MS
+LDW_MIN_SPEED = 31 * CV.MPH_TO_MS
 LANE_DEPARTURE_THRESHOLD = 0.1
 
 REPLAY = "REPLAY" in os.environ
@@ -190,8 +190,6 @@ class Controls:
     # scc smoother
     self.applyMaxSpeed = 0
     self.is_cruise_enabled = False
-    self.left_lane_visible = False
-    self.right_lane_visible = False
 
     # TODO: no longer necessary, aside from process replay
     self.sm['liveParameters'].valid = True
@@ -710,15 +708,8 @@ class Controls:
     hudControl.lanesVisible = self.enabled
     hudControl.leadVisible = self.sm['longitudinalPlan'].hasLead
 
-    right_lane_visible = self.sm['lateralPlan'].rProb > 0.5
-    left_lane_visible = self.sm['lateralPlan'].lProb > 0.5
-
-    if self.sm.frame % 100 == 0:
-      self.right_lane_visible = right_lane_visible
-      self.left_lane_visible = left_lane_visible
-
-    hudControl.rightLaneVisible = self.right_lane_visible
-    hudControl.leftLaneVisible = self.left_lane_visible
+    hudControl.rightLaneVisible = True
+    hudControl.leftLaneVisible = True
 
     recent_blinker = (self.sm.frame - self.last_blinker_frame) * DT_CTRL < 5.0  # 5s blinker cooldown
     ldw_allowed = self.is_ldw_enabled and CS.vEgo > LDW_MIN_SPEED and not recent_blinker \
@@ -727,8 +718,8 @@ class Controls:
     model_v2 = self.sm['modelV2']
     desire_prediction = model_v2.meta.desirePrediction
     if len(desire_prediction) and ldw_allowed:
-      right_lane_visible = self.sm['lateralPlan'].rProb > 0.5
-      left_lane_visible = self.sm['lateralPlan'].lProb > 0.5
+      right_lane_visible = model_v2.laneLineProbs[2] > 0.5
+      left_lane_visible = model_v2.laneLineProbs[1] > 0.5
       l_lane_change_prob = desire_prediction[Desire.laneChangeLeft - 1]
       r_lane_change_prob = desire_prediction[Desire.laneChangeRight - 1]
 
