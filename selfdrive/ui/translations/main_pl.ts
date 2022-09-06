@@ -74,6 +74,43 @@
     </message>
 </context>
 <context>
+    <name>AebSelect</name>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="856"/>
+        <source>AEB Signal Select (Scc12/Fca11)</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>CommunityPanel</name>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="558"/>
+        <location filename="../qt/offroad/settings.cc" line="581"/>
+        <source>Select your car</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="624"/>
+        <location filename="../qt/offroad/settings.cc" line="632"/>
+        <location filename="../qt/offroad/settings.cc" line="640"/>
+        <location filename="../qt/offroad/settings.cc" line="648"/>
+        <location filename="../qt/offroad/settings.cc" line="656"/>
+        <location filename="../qt/offroad/settings.cc" line="664"/>
+        <source>RUN</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="626"/>
+        <location filename="../qt/offroad/settings.cc" line="634"/>
+        <location filename="../qt/offroad/settings.cc" line="642"/>
+        <location filename="../qt/offroad/settings.cc" line="650"/>
+        <location filename="../qt/offroad/settings.cc" line="658"/>
+        <location filename="../qt/offroad/settings.cc" line="666"/>
+        <source>Process?</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>ConfirmationDialog</name>
     <message>
         <location filename="../qt/widgets/input.cc" line="221"/>
@@ -108,152 +145,160 @@
 <context>
     <name>DevicePanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="100"/>
+        <location filename="../qt/offroad/settings.cc" line="144"/>
         <source>Dongle ID</source>
         <translation>ID adaptera</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="100"/>
+        <location filename="../qt/offroad/settings.cc" line="144"/>
         <source>N/A</source>
         <translation>N/A</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="101"/>
+        <location filename="../qt/offroad/settings.cc" line="145"/>
         <source>Serial</source>
         <translation>Numer seryjny</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="105"/>
+        <location filename="../qt/offroad/settings.cc" line="149"/>
         <source>Driver Camera</source>
         <translation>Kamera kierowcy</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="105"/>
+        <location filename="../qt/offroad/settings.cc" line="149"/>
         <source>PREVIEW</source>
         <translation>PODGLĄD</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="106"/>
+        <location filename="../qt/offroad/settings.cc" line="150"/>
         <source>Preview the driver facing camera to ensure that driver monitoring has good visibility. (vehicle must be off)</source>
         <translation>Wyświetl podgląd z kamery skierowanej na kierowcę, aby upewnić się, że monitoring kierowcy ma dobry zakres widzenia. (pojazd musi być wyłączony)</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="110"/>
+        <location filename="../qt/offroad/settings.cc" line="154"/>
         <source>Reset Calibration</source>
         <translation>Zresetuj kalibrację</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="110"/>
+        <location filename="../qt/offroad/settings.cc" line="154"/>
         <source>RESET</source>
         <translation>ZRESETUJ</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="113"/>
+        <location filename="../qt/offroad/settings.cc" line="157"/>
         <source>Are you sure you want to reset calibration?</source>
         <translation>Czy na pewno chcesz zresetować kalibrację?</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="120"/>
+        <location filename="../qt/offroad/settings.cc" line="164"/>
         <source>Review Training Guide</source>
         <translation>Zapoznaj się z samouczkiem</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="120"/>
+        <location filename="../qt/offroad/settings.cc" line="164"/>
         <source>REVIEW</source>
         <translation>ZAPOZNAJ SIĘ</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="120"/>
+        <location filename="../qt/offroad/settings.cc" line="164"/>
         <source>Review the rules, features, and limitations of openpilot</source>
         <translation>Zapoznaj się z zasadami, funkcjami i ograniczeniami openpilota</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="122"/>
+        <location filename="../qt/offroad/settings.cc" line="166"/>
         <source>Are you sure you want to review the training guide?</source>
         <translation>Czy na pewno chcesz się zapoznać z samouczkiem?</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="130"/>
         <source>Regulatory</source>
-        <translation>Regulacja</translation>
+        <translation type="vanished">Regulacja</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="130"/>
         <source>VIEW</source>
-        <translation>WIDOK</translation>
+        <translation type="vanished">WIDOK</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="138"/>
+        <location filename="../qt/offroad/settings.cc" line="182"/>
         <source>Change Language</source>
         <translation>Zmień język</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="138"/>
+        <location filename="../qt/offroad/settings.cc" line="182"/>
         <source>CHANGE</source>
         <translation>ZMIEŃ</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="142"/>
+        <location filename="../qt/offroad/settings.cc" line="186"/>
         <source>Select a language</source>
         <translation>Wybierz język</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="162"/>
+        <location filename="../qt/offroad/settings.cc" line="210"/>
+        <source>Are you sure you want to reset calibration and live params?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="239"/>
+        <source>Soft Restart</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="249"/>
         <source>Reboot</source>
         <translation>Uruchom ponownie</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="167"/>
+        <location filename="../qt/offroad/settings.cc" line="254"/>
         <source>Power Off</source>
         <translation>Wyłącz</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="187"/>
+        <location filename="../qt/offroad/settings.cc" line="276"/>
         <source>openpilot requires the device to be mounted within 4° left or right and within 5° up or 8° down. openpilot is continuously calibrating, resetting is rarely required.</source>
         <translation>openpilot wymaga, aby urządzenie było zamontowane z maksymalnym odchyłem 4° poziomo, 5° w górę oraz 8° w dół. openpilot jest ciągle kalibrowany, rzadko konieczne jest resetowania urządzenia.</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="198"/>
+        <location filename="../qt/offroad/settings.cc" line="287"/>
         <source> Your device is pointed %1° %2 and %3° %4.</source>
         <translation> Twoje urządzenie jest skierowane %1° %2 oraz %3° %4.</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="199"/>
+        <location filename="../qt/offroad/settings.cc" line="288"/>
         <source>down</source>
         <translation>w dół</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="199"/>
+        <location filename="../qt/offroad/settings.cc" line="288"/>
         <source>up</source>
         <translation>w górę</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="200"/>
+        <location filename="../qt/offroad/settings.cc" line="289"/>
         <source>left</source>
         <translation>w lewo</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="200"/>
+        <location filename="../qt/offroad/settings.cc" line="289"/>
         <source>right</source>
         <translation>w prawo</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="211"/>
+        <location filename="../qt/offroad/settings.cc" line="300"/>
         <source>Are you sure you want to reboot?</source>
         <translation>Czy na pewno chcesz uruchomić ponownie urządzenie?</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="218"/>
+        <location filename="../qt/offroad/settings.cc" line="307"/>
         <source>Disengage to Reboot</source>
         <translation>Aby uruchomić ponownie, odłącz sterowanie</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="224"/>
+        <location filename="../qt/offroad/settings.cc" line="313"/>
         <source>Are you sure you want to power off?</source>
         <translation>Czy na pewno chcesz wyłączyć urządzenie?</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="231"/>
+        <location filename="../qt/offroad/settings.cc" line="320"/>
         <source>Disengage to Power Off</source>
         <translation>Aby wyłączyć urządzenie, odłącz sterowanie</translation>
     </message>
@@ -261,7 +306,7 @@
 <context>
     <name>DriveStats</name>
     <message>
-        <location filename="../qt/widgets/drive_stats.cc" line="37"/>
+        <location filename="../qt/widgets/drive_stats.cc" line="38"/>
         <source>Drives</source>
         <translation>Przejazdy</translation>
     </message>
@@ -271,14 +316,13 @@
         <translation>Godziny</translation>
     </message>
     <message>
-        <location filename="../qt/widgets/drive_stats.cc" line="44"/>
+        <location filename="../qt/widgets/drive_stats.cc" line="48"/>
         <source>ALL TIME</source>
         <translation>CAŁKOWICIE</translation>
     </message>
     <message>
-        <location filename="../qt/widgets/drive_stats.cc" line="46"/>
         <source>PAST WEEK</source>
-        <translation>OSTATNI TYDZIEŃ</translation>
+        <translation type="vanished">OSTATNI TYDZIEŃ</translation>
     </message>
     <message>
         <location filename="../qt/widgets/drive_stats.h" line="15"/>
@@ -337,6 +381,22 @@
         <location filename="../installer/installer.cc" line="146"/>
         <source>Updating files: </source>
         <translation>Aktualizacja plików: </translation>
+    </message>
+</context>
+<context>
+    <name>LateralControlSelect</name>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="718"/>
+        <source>LateralControl Select (Pid/Indi/Lqr/Torque)</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>LongControlSelect</name>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="921"/>
+        <source>LongControl Select (Mad/Mad+Long)</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -453,6 +513,14 @@ nie zostało ustawione</translation>
     </message>
 </context>
 <context>
+    <name>MfcSelect</name>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="787"/>
+        <source>MFC Camera Select (Lkas/Ldws/Lfa/HDA2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>MultiOptionDialog</name>
     <message>
         <location filename="../qt/widgets/input.cc" line="300"/>
@@ -492,32 +560,24 @@ nie zostało ustawione</translation>
 <context>
     <name>NvgWindow</name>
     <message>
-        <location filename="../qt/onroad.cc" line="218"/>
         <source>km/h</source>
-        <translation>km/h</translation>
+        <translation type="vanished">km/h</translation>
     </message>
     <message>
-        <location filename="../qt/onroad.cc" line="218"/>
         <source>mph</source>
-        <translation>mph</translation>
+        <translation type="vanished">mph</translation>
     </message>
     <message>
-        <location filename="../qt/onroad.cc" line="286"/>
-        <location filename="../qt/onroad.cc" line="289"/>
         <source>MAX</source>
-        <translation>MAX</translation>
+        <translation type="vanished">MAX</translation>
     </message>
     <message>
-        <location filename="../qt/onroad.cc" line="333"/>
-        <location filename="../qt/onroad.cc" line="336"/>
         <source>SPEED</source>
-        <translation>PRĘDKOŚĆ</translation>
+        <translation type="vanished">PRĘDKOŚĆ</translation>
     </message>
     <message>
-        <location filename="../qt/onroad.cc" line="339"/>
-        <location filename="../qt/onroad.cc" line="342"/>
         <source>LIMIT</source>
-        <translation>OGRANICZENIE</translation>
+        <translation type="vanished">OGRANICZENIE</translation>
     </message>
 </context>
 <context>
@@ -620,12 +680,12 @@ nie zostało ustawione</translation>
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../qt/text.cc" line="36"/>
+        <location filename="../qt/text.cc" line="51"/>
         <source>Reboot</source>
         <translation>Uruchom Ponownie</translation>
     </message>
     <message>
-        <location filename="../qt/text.cc" line="41"/>
+        <location filename="../qt/text.cc" line="62"/>
         <source>Exit</source>
         <translation>Wyjdź</translation>
     </message>
@@ -724,35 +784,53 @@ nie zostało ustawione</translation>
     </message>
 </context>
 <context>
+    <name>SelectCar</name>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="679"/>
+        <source>Back</source>
+        <translation type="unfinished">Wróć</translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="689"/>
+        <source>Select car not use</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>SettingsWindow</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="332"/>
+        <location filename="../qt/offroad/settings.cc" line="447"/>
         <source>×</source>
         <translation>x</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="358"/>
+        <location filename="../qt/offroad/settings.cc" line="474"/>
         <source>Device</source>
         <translation>Urządzenie</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="359"/>
-        <location filename="../qt/offroad/settings.cc" line="398"/>
+        <location filename="../qt/offroad/settings.cc" line="475"/>
+        <location filename="../qt/offroad/settings.cc" line="517"/>
         <source>Network</source>
         <translation>Sieć</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="360"/>
+        <location filename="../qt/offroad/settings.cc" line="476"/>
         <source>Toggles</source>
         <translation>Przełączniki</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="361"/>
+        <location filename="../qt/offroad/settings.cc" line="477"/>
         <source>Software</source>
         <translation>Oprogramowanie</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="366"/>
+        <location filename="../qt/offroad/settings.cc" line="478"/>
+        <source>Community</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="484"/>
         <source>Navigation</source>
         <translation>Nawigacja</translation>
     </message>
@@ -884,71 +962,71 @@ nie zostało ustawione</translation>
 <context>
     <name>Sidebar</name>
     <message>
-        <location filename="../qt/sidebar.cc" line="74"/>
-        <location filename="../qt/sidebar.cc" line="76"/>
+        <location filename="../qt/sidebar.cc" line="75"/>
+        <location filename="../qt/sidebar.cc" line="77"/>
         <source>CONNECT</source>
         <translation>POŁĄCZENIE</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="74"/>
+        <location filename="../qt/sidebar.cc" line="75"/>
         <source>OFFLINE</source>
         <translation>OFFLINE</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="76"/>
-        <location filename="../qt/sidebar.cc" line="89"/>
+        <location filename="../qt/sidebar.cc" line="77"/>
+        <location filename="../qt/sidebar.cc" line="90"/>
         <source>ONLINE</source>
         <translation>ONLINE</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="76"/>
+        <location filename="../qt/sidebar.cc" line="77"/>
         <source>ERROR</source>
         <translation>BŁĄD</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="80"/>
-        <location filename="../qt/sidebar.cc" line="83"/>
-        <location filename="../qt/sidebar.cc" line="85"/>
+        <location filename="../qt/sidebar.cc" line="81"/>
+        <location filename="../qt/sidebar.cc" line="84"/>
+        <location filename="../qt/sidebar.cc" line="86"/>
         <source>TEMP</source>
         <translation>TEMP</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="80"/>
+        <location filename="../qt/sidebar.cc" line="81"/>
         <source>HIGH</source>
         <translation>WYSOKA</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="83"/>
+        <location filename="../qt/sidebar.cc" line="84"/>
         <source>GOOD</source>
         <translation>DOBRA</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="85"/>
+        <location filename="../qt/sidebar.cc" line="86"/>
         <source>OK</source>
         <translation>OK</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="89"/>
+        <location filename="../qt/sidebar.cc" line="90"/>
         <source>VEHICLE</source>
         <translation>POJAZD</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="91"/>
+        <location filename="../qt/sidebar.cc" line="92"/>
         <source>NO</source>
         <translation>BRAK</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="91"/>
+        <location filename="../qt/sidebar.cc" line="92"/>
         <source>PANDA</source>
         <translation>PANDA</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="93"/>
+        <location filename="../qt/sidebar.cc" line="94"/>
         <source>GPS</source>
         <translation>GPS</translation>
     </message>
     <message>
-        <location filename="../qt/sidebar.cc" line="93"/>
+        <location filename="../qt/sidebar.cc" line="94"/>
         <source>SEARCH</source>
         <translation>SZUKAJ</translation>
     </message>
@@ -991,89 +1069,109 @@ nie zostało ustawione</translation>
 <context>
     <name>SoftwarePanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="236"/>
+        <location filename="../qt/offroad/settings.cc" line="325"/>
+        <source>Git Remote</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="326"/>
         <source>Git Branch</source>
         <translation>Gałąź Git</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="237"/>
+        <location filename="../qt/offroad/settings.cc" line="327"/>
         <source>Git Commit</source>
         <translation>Git commit</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="238"/>
+        <location filename="../qt/offroad/settings.cc" line="328"/>
         <source>OS Version</source>
         <translation>Wersja systemu</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="239"/>
+        <location filename="../qt/offroad/settings.cc" line="329"/>
         <source>Version</source>
         <translation>Wersja</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="240"/>
+        <location filename="../qt/offroad/settings.cc" line="330"/>
         <source>Last Update Check</source>
         <translation>Ostatnie sprawdzenie aktualizacji</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="240"/>
+        <location filename="../qt/offroad/settings.cc" line="330"/>
         <source>The last time openpilot successfully checked for an update. The updater only runs while the car is off.</source>
         <translation>Ostatni raz kiedy openpilot znalazł aktualizację. Aktualizator może być uruchomiony wyłącznie wtedy, kiedy pojazd jest wyłączony.</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="241"/>
+        <location filename="../qt/offroad/settings.cc" line="331"/>
         <source>Check for Update</source>
         <translation>Sprawdź uaktualnienia</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="246"/>
+        <location filename="../qt/offroad/settings.cc" line="336"/>
         <source>CHECKING</source>
         <translation>SPRAWDZANIE</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="253"/>
+        <location filename="../qt/offroad/settings.cc" line="343"/>
         <source>Switch Branch</source>
         <translation>Zmień gąłąź</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="253"/>
+        <location filename="../qt/offroad/settings.cc" line="343"/>
         <source>ENTER</source>
         <translation>WPROWADŹ</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="253"/>
-        <location filename="../qt/offroad/settings.cc" line="255"/>
+        <location filename="../qt/offroad/settings.cc" line="343"/>
+        <location filename="../qt/offroad/settings.cc" line="345"/>
         <source>The new branch will be pulled the next time the updater runs.</source>
         <translation>Nowa gałąź będzie pobrana przy następnym uruchomieniu aktualizatora.</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="255"/>
+        <location filename="../qt/offroad/settings.cc" line="345"/>
         <source>Enter branch name</source>
         <translation>Wprowadź nazwę gałęzi</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="266"/>
+        <location filename="../qt/offroad/settings.cc" line="356"/>
         <source>Uninstall %1</source>
         <translation>Odinstaluj %1</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="266"/>
+        <location filename="../qt/offroad/settings.cc" line="356"/>
         <source>UNINSTALL</source>
         <translation>ODINSTALUJ</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="268"/>
+        <location filename="../qt/offroad/settings.cc" line="358"/>
         <source>Are you sure you want to uninstall?</source>
         <translation>Czy na pewno chcesz odinstalować?</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="285"/>
+        <location filename="../qt/offroad/settings.cc" line="364"/>
+        <source>Git Fetch and Reset</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="364"/>
+        <source>RUN</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="366"/>
+        <source>Process?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="382"/>
         <source>failed to fetch update</source>
         <translation>pobieranie aktualizacji zakończone niepowodzeniem</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="286"/>
-        <location filename="../qt/offroad/settings.cc" line="307"/>
+        <location filename="../qt/offroad/settings.cc" line="383"/>
+        <location filename="../qt/offroad/settings.cc" line="404"/>
         <source>CHECK</source>
         <translation>SPRAWDŹ</translation>
     </message>
@@ -1161,82 +1259,142 @@ nie zostało ustawione</translation>
 <context>
     <name>TogglesPanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="34"/>
+        <location filename="../qt/offroad/settings.cc" line="41"/>
         <source>Enable openpilot</source>
         <translation>Włącz openpilota</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="35"/>
+        <location filename="../qt/offroad/settings.cc" line="42"/>
         <source>Use the openpilot system for adaptive cruise control and lane keep driver assistance. Your attention is required at all times to use this feature. Changing this setting takes effect when the car is powered off.</source>
         <translation>Użyj openpilota do zachowania bezpiecznego odstępu między pojazdami i do asystowania w utrzymywaniu pasa ruchu. Twoja pełna uwaga jest wymagana przez cały czas korzystania z tej funkcji. Ustawienie to może być wdrożone wyłącznie wtedy, gdy pojazd jest wyłączony.</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="40"/>
+        <location filename="../qt/offroad/settings.cc" line="53"/>
         <source>Enable Lane Departure Warnings</source>
         <translation>Włącz ostrzeganie przed zmianą pasa ruchu</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="41"/>
+        <location filename="../qt/offroad/settings.cc" line="54"/>
         <source>Receive alerts to steer back into the lane when your vehicle drifts over a detected lane line without a turn signal activated while driving over 31 mph (50 km/h).</source>
         <translation>Otrzymuj alerty o powrocie na właściwy pas, kiedy Twój pojazd przekroczy linię bez włączonego kierunkowskazu jadąc powyżej 50 km/h (31 mph).</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="46"/>
+        <location filename="../qt/offroad/settings.cc" line="47"/>
         <source>Use Metric System</source>
         <translation>Korzystaj z systemu metrycznego</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="47"/>
+        <location filename="../qt/offroad/settings.cc" line="48"/>
         <source>Display speed in km/h instead of mph.</source>
         <translation>Wyświetl prędkość w km/h zamiast mph.</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="52"/>
+        <location filename="../qt/offroad/settings.cc" line="59"/>
+        <source>Enable AutoLaneChange</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="60"/>
+        <source>Operation of the turn signal at 60㎞/h speed will result in a short change of the vehicle</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="65"/>
         <source>Record and Upload Driver Camera</source>
         <translation>Nagraj i prześlij nagranie z kamery kierowcy</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="53"/>
+        <location filename="../qt/offroad/settings.cc" line="66"/>
         <source>Upload data from the driver facing camera and help improve the driver monitoring algorithm.</source>
         <translation>Prześlij dane z kamery skierowanej na kierowcę i pomóż poprawiać algorytm monitorowania kierowcy.</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="58"/>
+        <location filename="../qt/offroad/settings.cc" line="71"/>
         <source>Disengage On Accelerator Pedal</source>
         <translation>Odłącz poprzez naciśnięcie gazu</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="59"/>
+        <location filename="../qt/offroad/settings.cc" line="72"/>
         <source>When enabled, pressing the accelerator pedal will disengage openpilot.</source>
         <translation>Po włączeniu, naciśnięcie na pedał gazu odłączy openpilota.</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="65"/>
+        <location filename="../qt/offroad/settings.cc" line="77"/>
+        <source>🌮 End-to-end longitudinal (extremely alpha) 🌮</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="78"/>
+        <source>Let the driving model control the gas and brakes, openpilot will drive as it thinks a human would. Super experimental.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="84"/>
+        <source>Prebuilt Enable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="85"/>
+        <source>Create prebuilt files to speed bootup</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="90"/>
+        <source>Logger Disable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="91"/>
+        <source>Disable Logger is Reduce system load</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="96"/>
+        <source>Navigation Disable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="97"/>
+        <source>Navigation Function not use</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="102"/>
+        <source>New radar interface Enable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="103"/>
+        <source>Some newer car New radar interface</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qt/offroad/settings.cc" line="112"/>
         <source>Show ETA in 24h Format</source>
         <translation>Pokaż oczekiwany czas dojazdu w formacie 24-godzinnym</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="66"/>
+        <location filename="../qt/offroad/settings.cc" line="113"/>
         <source>Use 24h format instead of am/pm</source>
         <translation>Korzystaj z formatu 24-godzinnego zamiast 12-godzinnego</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="71"/>
+        <location filename="../qt/offroad/settings.cc" line="118"/>
         <source>Show Map on Left Side of UI</source>
         <translation>Pokaż mapę po lewej stronie ekranu</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="72"/>
+        <location filename="../qt/offroad/settings.cc" line="119"/>
         <source>Show map on left side when in split screen view.</source>
         <translation>Pokaż mapę po lewej stronie kiedy ekran jest podzielony.</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="84"/>
+        <location filename="../qt/offroad/settings.cc" line="128"/>
         <source>openpilot Longitudinal Control</source>
         <translation>Kontrola wzdłużna openpilota</translation>
     </message>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="85"/>
+        <location filename="../qt/offroad/settings.cc" line="129"/>
         <source>openpilot will disable the car&apos;s radar and will take over control of gas and brakes. Warning: this disables AEB!</source>
         <translation>openpilot wyłączy radar samochodu i przejmie kontrolę nad gazem i hamulcem. Ostrzeżenie: wyłączony zostanie system AEB!</translation>
     </message>
