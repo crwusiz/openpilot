@@ -448,6 +448,7 @@ struct CarParams {
   enableApgs @6 :Bool;       # advanced parking guidance system
   enableBsm @56 :Bool;       # blind spot monitoring
   flags @64 :UInt32;         # flags for car specific quirks
+  experimentalLongitudinalAvailable @71 :Bool;
 
   minEnableSpeed @7 :Float32;
   minSteerSpeed @8 :Float32;
@@ -457,14 +458,7 @@ struct CarParams {
 
   # Car docs fields
   maxLateralAccel @68 :Float32;
-  autoResumeSng @69 :Bool;  # describes whether car can resume from a stop automatically
-
-  steerMaxBPDEPRECATED @11 :List(Float32);
-  steerMaxVDEPRECATED @12 :List(Float32);
-  gasMaxBPDEPRECATED @13 :List(Float32);
-  gasMaxVDEPRECATED @14 :List(Float32);
-  brakeMaxBPDEPRECATED @15 :List(Float32);
-  brakeMaxVDEPRECATED @16 :List(Float32);
+  autoResumeSng @69 :Bool;               # describes whether car can resume from a stop automatically
 
   # things about the car in the manual
   mass @17 :Float32;            # [kg] curb weight: all fluids no cargo
@@ -525,7 +519,7 @@ struct CarParams {
 
   steerFaultMaxAngle @80 :Int16;
   steerFaultMaxFrames @81 :Int16;
-  mdpsBus @71: Int8;
+  mdpsBus @82: Int8;
   sasBus @72: Int8;
   sccBus @73: Int8;
   enableAutoHold @74 :Bool;
@@ -706,4 +700,10 @@ struct CarParams {
   minSpeedCanDEPRECATED @51 :Float32;
   communityFeatureDEPRECATED @46: Bool;
   startingAccelRateDEPRECATED @53 :Float32;
+  steerMaxBPDEPRECATED @11 :List(Float32);
+  steerMaxVDEPRECATED @12 :List(Float32);
+  gasMaxBPDEPRECATED @13 :List(Float32);
+  gasMaxVDEPRECATED @14 :List(Float32);
+  brakeMaxBPDEPRECATED @15 :List(Float32);
+  brakeMaxVDEPRECATED @16 :List(Float32);
 }
