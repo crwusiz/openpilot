@@ -524,7 +524,7 @@ struct CarParams {
   }
 
   steerFaultMaxAngle @80 :Int16;
-  steerFaultMaxFrames @70 :Int16;
+  steerFaultMaxFrames @81 :Int16;
   mdpsBus @71: Int8;
   sasBus @72: Int8;
   sccBus @73: Int8;
