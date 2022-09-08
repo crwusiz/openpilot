@@ -15,9 +15,7 @@ const int HYUNDAI_COMMUNITY_MIN_ACCEL = -350; // 1/100 m/s2
 
 bool LCAN_bus1 = false;
 bool fwd_bus1 = false;
-bool fwd_obd = false;
 bool fwd_bus2 = true;
-int OBD_cnt = 20;
 int LKAS11_bus0_cnt = 0;
 int LCAN_bus1_cnt = 0;
 int MDPS12_checksum = -1;
@@ -188,16 +186,14 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
 
   // check MDPS12 or MDPS11 on Bus
   if (((addr == 593) || (addr == 897)) && (MDPS_bus != bus)) {
-    if ((bus != 1) || (!LCAN_bus1 || fwd_obd)) {
+    if ((bus != 1) || !LCAN_bus1) {
       MDPS_bus = bus;
-      if ((bus == 1) && !fwd_obd) {
+      if (bus == 1) {
         puts("  MDPS on bus [1]\n");
         if (!fwd_bus1 && !LCAN_bus1) {
           fwd_bus1 = true;
           puts("  MDPS on bus [1] forwarding enabled\n");
         }
-      } else if (bus == 1) {
-        puts("  MDPS on obd bus\n");
       }
     }
   }
@@ -338,7 +334,7 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   int bus_fwd = -1;
   int addr = GET_ADDR(to_fwd);
   int fwd_to_bus1 = -1;
-  if (fwd_bus1 || fwd_obd) {
+  if (fwd_bus1) {
     fwd_to_bus1 = 1;
   }
 
@@ -362,7 +358,7 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
         CLU11_op -= 1;
       }
     }
-    if ((bus_num == 1) && (fwd_bus1 || fwd_obd)) {
+    if ((bus_num == 1) && fwd_bus1) {
       if (!MDPS12_op || (addr != 593)) {
         if (!SCC12_op || ((addr != 1056) && (addr != 1057) && (addr != 1290) && (addr != 905))) {
           bus_fwd = 20;
@@ -394,7 +390,7 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
     if (bus_num == 0) {
       bus_fwd = fwd_to_bus1;
     }
-    if ((bus_num == 1) && (fwd_bus1 || fwd_obd)) {
+    if ((bus_num == 1) && fwd_bus1) {
       bus_fwd = 0;
     }
   }

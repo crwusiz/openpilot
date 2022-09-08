@@ -1,8 +1,6 @@
 extern bool LCAN_bus1;
 extern bool fwd_bus1;
-extern bool fwd_obd;
 extern bool fwd_bus2;
-extern int OBD_cnt;
 extern int LKAS11_bus0_cnt;
 extern int LCAN_bus1_cnt;
 extern int MDPS12_checksum;
@@ -34,9 +32,6 @@ int default_rx_hook(CANPacket_t *to_push) {
         fwd_bus2 = true;
         puts("  LKAS11 on bus [2] : forwarding enabled\n");
       }
-      if (OBD_cnt == 20) {
-        puts("  LKAS11 on bus [2] : forwarding enabled\n");
-      }
       if (LCAN_bus1_cnt > 0) {
         LCAN_bus1_cnt--;
       } else if (LCAN_bus1) {
@@ -57,11 +52,7 @@ int default_rx_hook(CANPacket_t *to_push) {
   }
   // check if we have a MDPS or SCC on Bus1
   if (bus == 1 && (addr == 593 || addr == 897 || addr == 1057)) {
-    if (!fwd_bus1 && OBD_cnt > 1 && OBD_cnt < 11) {
-      fwd_obd = true;
-      OBD_cnt = 0;
-      puts("  MDPS or SCC on OBD2 CAN : setting can mode obd\n");
-    } else if (!fwd_bus1 && !LCAN_bus1) {
+    if (!fwd_bus1 && !LCAN_bus1) {
       fwd_bus1 = true;
       puts("  MDPS or SCC on bus [1] : forwarding enabled\n");
     }
@@ -111,18 +102,18 @@ static int default_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   int addr = GET_ADDR(to_fwd);
   int bus_fwd = -1;
 
-  if (bus_num == 0 && (fwd_bus1 || fwd_bus2 || fwd_obd)) {
-    if ((fwd_bus1 || fwd_obd) && fwd_bus2) {
+  if (bus_num == 0 && (fwd_bus1 || fwd_bus2)) {
+    if (fwd_bus1 && fwd_bus2) {
       bus_fwd = 12;
     } else {
       bus_fwd = fwd_bus2 ? 2 : 1;
     }
   }
-  if (bus_num == 1 && (fwd_bus1 || fwd_obd)) {
+  if (bus_num == 1 && fwd_bus1) {
     bus_fwd = fwd_bus2 ? 20 : 0;
   }
   if (bus_num == 2 && fwd_bus2) {
-    bus_fwd = (fwd_bus1 || fwd_obd) ? 10 : 0;
+    bus_fwd = fwd_bus1 ? 10 : 0;
   }
 
   // Code for LKA/LFA/HDA anti-nagging.
