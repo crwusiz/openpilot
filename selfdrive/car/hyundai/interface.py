@@ -39,6 +39,10 @@ class CarInterface(CarInterfaceBase):
     else:
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
 
+    # WARNING: disabling radar also disables AEB (and we show the same warning on the instrument cluster as if you manually disabled AEB)
+    #ret.experimentalLongitudinalAvailable = candidate not in (LEGACY_SAFETY_MODE_CAR | CAMERA_SCC_CAR | CANFD_CAR)
+    #ret.openpilotLongitudinalControl = experimental_long and ret.experimentalLongitudinalAvailable
+
     ret.maxSteeringAngleDeg = 1000.
     ret.steerFaultMaxAngle = 85
     ret.steerFaultMaxFrames = 90
