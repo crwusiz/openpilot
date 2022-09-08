@@ -284,10 +284,55 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
   if (addr == 832) {
     LKAS11_op = 20;
     int desired_torque = ((GET_BYTES_04(to_send) >> 16) & 0x7ffU) - 1024U;
-    //bool steer_req = GET_BIT(to_send, 27U) != 0U;
+    uint32_t ts = microsecond_timer_get();
+    bool violation = 0;
 
-    //if (steer_torque_cmd_checks(desired_torque, steer_req, HYUNDAI_COMMUNITY_STEERING_LIMITS)) {
-    if (steer_torque_cmd_checks(desired_torque, -1, HYUNDAI_COMMUNITY_STEERING_LIMITS)) {
+    if (controls_allowed) {
+      // *** global torque limit check ***
+      bool torque_check = 0;
+      violation |= torque_check = max_limit_check(desired_torque, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer, -HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer);
+      if (torque_check) {
+        puts("  LKAS TX not allowed: torque limit check failed!\n");}
+
+      // *** torque rate limit check ***
+      bool torque_rate_check = 0;
+      violation |= torque_rate_check = driver_limit_check(desired_torque, desired_torque_last, &torque_driver,
+        HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_rate_up, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_rate_down,
+        HYUNDAI_COMMUNITY_STEERING_LIMITS.driver_torque_allowance, HYUNDAI_COMMUNITY_STEERING_LIMITS.driver_torque_factor);
+      if (torque_rate_check) {
+        puts("  LKAS TX not allowed: torque rate limit check failed!\n");}
+
+      // used next time
+      desired_torque_last = desired_torque;
+
+      // *** torque real time rate limit check ***
+      bool torque_rt_check = 0;
+      violation |= torque_rt_check = rt_rate_limit_check(desired_torque, rt_torque_last, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_rt_delta);
+      if (torque_rt_check) {
+        puts("  LKAS TX not allowed: torque real time rate limit check failed!\n");}
+
+      // every RT_INTERVAL set the new limits
+      uint32_t ts_elapsed = get_ts_elapsed(ts, ts_torque_check_last);
+      if (ts_elapsed > HYUNDAI_COMMUNITY_STEERING_LIMITS.max_rt_interval) {
+        rt_torque_last = desired_torque;
+        ts_torque_check_last = ts;
+      }
+    }
+
+    // no torque if controls is not allowed
+    if (!controls_allowed && (desired_torque != 0)) {
+      violation = 1;
+      puts("  LKAS torque not allowed: controls not allowed!\n");
+    }
+
+    // reset to 0 if either controls is not allowed or there's a violation
+    if (!controls_allowed) { // a reset worsen the issue of Panda blocking some valid LKAS messages
+      desired_torque_last = 0;
+      rt_torque_last = 0;
+      ts_torque_check_last = ts;
+    }
+
+    if (violation) {
       tx = 0;
     }
   }

@@ -52,15 +52,18 @@ class SccSmoother:
       WaitIndex = 0
     return count
 
+
   def kph_to_clu(self, kph):
     return int(kph * CV.KPH_TO_MS * self.speed_conv_to_clu)
+
 
   def __init__(self):
     self.btn = Buttons.NONE
 
-    self.longcontrol = Params().get_bool("LongControl")
-    self.is_metric = Params().get_bool("IsMetric")
-    self.e2e_long = Params().get_bool("EndToEndLong")
+    self.params = Params()
+    self.read_param()
+
+    self.param_read_counter = 0
 
     self.speed_conv_to_ms = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
     self.speed_conv_to_clu = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH
@@ -84,6 +87,13 @@ class SccSmoother:
     self.over_speed_limit = False
     self.limited_lead = False
 
+
+  def read_param(self):
+    self.longcontrol = self.params.get_bool("LongControl")
+    self.is_metric = self.params.get_bool("IsMetric")
+    self.e2e_long = self.params.get_bool("EndToEndLong")
+
+
   def reset(self):
     self.btn = Buttons.NONE
 
@@ -104,8 +114,10 @@ class SccSmoother:
     values["CF_Clu_AliveCnt1"] = (values["CF_Clu_AliveCnt1"] + 1) % 0x10
     return packer.make_can_msg("CLU11", bus, values)
 
+
   def is_active(self, frame):
     return frame - self.started_frame <= max(ALIVE_COUNT) + max(WAIT_COUNT)
+
 
   def inject_events(self, events):
     if self.slowing_down_sound_alert:
@@ -113,6 +125,7 @@ class SccSmoother:
       events.add(EventName.slowingDownSpeedSound)
     elif self.slowing_down_alert:
       events.add(EventName.slowingDownSpeed)
+
 
   def cal_max_speed(self, frame, CC, CS, sm, clu11_speed, controls):
     # kph
@@ -164,6 +177,10 @@ class SccSmoother:
     return road_limit_speed, left_dist
 
   def update(self, enabled, can_sends, packer, CC, CS, frame, controls):
+    if self.param_read_counter % 100 == 0:
+      self.read_param()
+    self.param_read_counter += 1
+
     # mph or kph
     clu11_speed = CS.clu11["CF_Clu_Vanz"]
     road_limit_speed, left_dist = self.cal_max_speed(frame, CC, CS, controls.sm, clu11_speed, controls)
@@ -299,7 +316,7 @@ class SccSmoother:
       self.max_speed_clu = self.max_speed_clu + error * kp
 
   def get_apply_accel(self, CS, accel):
-    boost_v = 0.3 if self.e2e_long else 0.6
+    boost_v = 0.2 if self.e2e_long else 0.5
 
     start_boost = interp(CS.out.vEgo, [CREEP_SPEED, 2 * CREEP_SPEED], [boost_v, 0.0])
     is_accelerating = interp(accel, [0.0, 0.2], [0.0, 1.0])
