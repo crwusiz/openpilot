@@ -76,7 +76,7 @@
 <context>
     <name>AebSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="+856"/>
+        <location filename="../qt/offroad/settings.cc" line="+907"/>
         <source>AEB Signal Select (Scc12/Fca11)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1251,7 +1251,7 @@ location set</source>
 <context>
     <name>TogglesPanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-363"/>
+        <location filename="../qt/offroad/settings.cc" line="-414"/>
         <source>Enable openpilot</source>
         <translation>openpilot を有効化</translation>
     </message>
@@ -1316,12 +1316,7 @@ location set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
-        <source>Let the driving model control the gas and brakes, openpilot will drive as it thinks a human would. Super experimental.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+6"/>
+        <location line="+7"/>
         <source>Prebuilt Enable</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1361,7 +1356,7 @@ location set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+6"/>
         <source>Show ETA in 24h Format</source>
         <translation>24時間表示</translation>
     </message>
@@ -1381,14 +1376,17 @@ location set</source>
         <translation>分割画面表示の場合、ディスプレイの左側にマップを表示します。</translation>
     </message>
     <message>
-        <location line="+9"/>
-        <source>openpilot Longitudinal Control</source>
-        <translation>openpilot 縦方向制御</translation>
+        <location line="+43"/>
+        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
+        <source>openpilot Longitudinal Control</source>
+        <translation type="vanished">openpilot 縦方向制御</translation>
+    </message>
+    <message>
         <source>openpilot will disable the car&apos;s radar and will take over control of gas and brakes. Warning: this disables AEB!</source>
-        <translation>openpilot は、車のレーダーを無効化し、アクセルとブレーキの制御を引き継ぎます。注意：AEB を無効化にします！</translation>
+        <translation type="vanished">openpilot は、車のレーダーを無効化し、アクセルとブレーキの制御を引き継ぎます。注意：AEB を無効化にします！</translation>
     </message>
 </context>
 <context>

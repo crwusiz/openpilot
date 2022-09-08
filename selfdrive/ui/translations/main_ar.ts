@@ -76,7 +76,7 @@
 <context>
     <name>AebSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="+856"/>
+        <location filename="../qt/offroad/settings.cc" line="+907"/>
         <source>AEB Signal Select (Scc12/Fca11)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1271,7 +1271,7 @@ location set</source>
 <context>
     <name>TogglesPanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-363"/>
+        <location filename="../qt/offroad/settings.cc" line="-414"/>
         <source>Enable openpilot</source>
         <translation>تمكين openpilot</translation>
     </message>
@@ -1336,12 +1336,7 @@ location set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
-        <source>Let the driving model control the gas and brakes, openpilot will drive as it thinks a human would. Super experimental.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+6"/>
+        <location line="+7"/>
         <source>Prebuilt Enable</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1381,7 +1376,7 @@ location set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+6"/>
         <source>Show ETA in 24h Format</source>
         <translation>إظهار الوقت المقدر للوصول بتنسيق 24 ساعة</translation>
     </message>
@@ -1401,14 +1396,17 @@ location set</source>
         <translation>إظهار الخريطة على الجانب الأيسر عندما تكون في طريقة عرض الشاشة المنقسمة.</translation>
     </message>
     <message>
-        <location line="+9"/>
-        <source>openpilot Longitudinal Control</source>
-        <translation>openpilot التحكم الطولي</translation>
+        <location line="+43"/>
+        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
+        <source>openpilot Longitudinal Control</source>
+        <translation type="vanished">openpilot التحكم الطولي</translation>
+    </message>
+    <message>
         <source>openpilot will disable the car&apos;s radar and will take over control of gas and brakes. Warning: this disables AEB!</source>
-        <translation>سوف يقوم برنامج openpilot بتعطيل رادار السيارة وسيتولى التحكم في الغاز والمكابح. تحذير: هذا يعطل AEB!</translation>
+        <translation type="vanished">سوف يقوم برنامج openpilot بتعطيل رادار السيارة وسيتولى التحكم في الغاز والمكابح. تحذير: هذا يعطل AEB!</translation>
     </message>
 </context>
 <context>

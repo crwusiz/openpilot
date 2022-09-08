@@ -76,7 +76,7 @@
 <context>
     <name>AebSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="+856"/>
+        <location filename="../qt/offroad/settings.cc" line="+907"/>
         <source>AEB Signal Select (Scc12/Fca11)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1259,7 +1259,7 @@ nie zostało ustawione</translation>
 <context>
     <name>TogglesPanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-363"/>
+        <location filename="../qt/offroad/settings.cc" line="-414"/>
         <source>Enable openpilot</source>
         <translation>Włącz openpilota</translation>
     </message>
@@ -1324,12 +1324,7 @@ nie zostało ustawione</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
-        <source>Let the driving model control the gas and brakes, openpilot will drive as it thinks a human would. Super experimental.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+6"/>
+        <location line="+7"/>
         <source>Prebuilt Enable</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1369,7 +1364,7 @@ nie zostało ustawione</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+6"/>
         <source>Show ETA in 24h Format</source>
         <translation>Pokaż oczekiwany czas dojazdu w formacie 24-godzinnym</translation>
     </message>
@@ -1389,14 +1384,17 @@ nie zostało ustawione</translation>
         <translation>Pokaż mapę po lewej stronie kiedy ekran jest podzielony.</translation>
     </message>
     <message>
-        <location line="+9"/>
-        <source>openpilot Longitudinal Control</source>
-        <translation>Kontrola wzdłużna openpilota</translation>
+        <location line="+43"/>
+        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
+        <source>openpilot Longitudinal Control</source>
+        <translation type="vanished">Kontrola wzdłużna openpilota</translation>
+    </message>
+    <message>
         <source>openpilot will disable the car&apos;s radar and will take over control of gas and brakes. Warning: this disables AEB!</source>
-        <translation>openpilot wyłączy radar samochodu i przejmie kontrolę nad gazem i hamulcem. Ostrzeżenie: wyłączony zostanie system AEB!</translation>
+        <translation type="vanished">openpilot wyłączy radar samochodu i przejmie kontrolę nad gazem i hamulcem. Ostrzeżenie: wyłączony zostanie system AEB!</translation>
     </message>
 </context>
 <context>

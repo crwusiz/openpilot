@@ -76,7 +76,7 @@
 <context>
     <name>AebSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="+856"/>
+        <location filename="../qt/offroad/settings.cc" line="+907"/>
         <source>AEB Signal Select (Scc12/Fca11)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1251,7 +1251,7 @@ location set</source>
 <context>
     <name>TogglesPanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-363"/>
+        <location filename="../qt/offroad/settings.cc" line="-414"/>
         <source>Enable openpilot</source>
         <translation>啟用 openpilot</translation>
     </message>
@@ -1316,12 +1316,7 @@ location set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
-        <source>Let the driving model control the gas and brakes, openpilot will drive as it thinks a human would. Super experimental.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+6"/>
+        <location line="+7"/>
         <source>Prebuilt Enable</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1361,7 +1356,7 @@ location set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+6"/>
         <source>Show ETA in 24h Format</source>
         <translation>預計到達時間單位改用 24 小時制</translation>
     </message>
@@ -1381,14 +1376,17 @@ location set</source>
         <translation>進入分割畫面後，地圖將會顯示在畫面的左側。</translation>
     </message>
     <message>
-        <location line="+9"/>
-        <source>openpilot Longitudinal Control</source>
-        <translation>openpilot 縱向控制</translation>
+        <location line="+43"/>
+        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
+        <source>openpilot Longitudinal Control</source>
+        <translation type="vanished">openpilot 縱向控制</translation>
+    </message>
+    <message>
         <source>openpilot will disable the car&apos;s radar and will take over control of gas and brakes. Warning: this disables AEB!</source>
-        <translation>openpilot 將會關閉雷達訊號並接管油門和剎車的控制。注意：這也會關閉自動緊急煞車 (AEB) 系統！</translation>
+        <translation type="vanished">openpilot 將會關閉雷達訊號並接管油門和剎車的控制。注意：這也會關閉自動緊急煞車 (AEB) 系統！</translation>
     </message>
 </context>
 <context>

@@ -76,7 +76,7 @@
 <context>
     <name>AebSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="+856"/>
+        <location filename="../qt/offroad/settings.cc" line="+907"/>
         <source>AEB Signal Select (Scc12/Fca11)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1255,7 +1255,7 @@ trabalho definido</translation>
 <context>
     <name>TogglesPanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-363"/>
+        <location filename="../qt/offroad/settings.cc" line="-414"/>
         <source>Enable openpilot</source>
         <translation>Ativar openpilot</translation>
     </message>
@@ -1320,12 +1320,7 @@ trabalho definido</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
-        <source>Let the driving model control the gas and brakes, openpilot will drive as it thinks a human would. Super experimental.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+6"/>
+        <location line="+7"/>
         <source>Prebuilt Enable</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1365,7 +1360,7 @@ trabalho definido</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+6"/>
         <source>Show ETA in 24h Format</source>
         <translation>Mostrar ETA em formato 24h</translation>
     </message>
@@ -1385,14 +1380,17 @@ trabalho definido</translation>
         <translation>Exibir mapa do lado esquerdo quando a tela for dividida.</translation>
     </message>
     <message>
-        <location line="+9"/>
-        <source>openpilot Longitudinal Control</source>
-        <translation>openpilot Controle Longitudinal</translation>
+        <location line="+43"/>
+        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
+        <source>openpilot Longitudinal Control</source>
+        <translation type="vanished">openpilot Controle Longitudinal</translation>
+    </message>
+    <message>
         <source>openpilot will disable the car&apos;s radar and will take over control of gas and brakes. Warning: this disables AEB!</source>
-        <translation>openpilot desativará o radar do carro e assumirá o controle do acelerador e freios. Atenção: isso desativa AEB!</translation>
+        <translation type="vanished">openpilot desativará o radar do carro e assumirá o controle do acelerador e freios. Atenção: isso desativa AEB!</translation>
     </message>
 </context>
 <context>
