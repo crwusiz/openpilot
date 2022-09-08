@@ -28,9 +28,9 @@ def create_button_enable_events(buttonEvents: capnp.lib.capnp._DynamicListBuilde
   events = []
   for b in buttonEvents:
     # do enable on both accel and decel buttons
-    if not pcm_cruise:
-      if b.type in (ButtonType.accelCruise, ButtonType.decelCruise) and not b.pressed:
-        events.append(EventName.buttonEnable)
+    #if not pcm_cruise:
+    if b.type in (ButtonType.accelCruise, ButtonType.decelCruise) and not b.pressed:
+      events.append(EventName.buttonEnable)
     # do disable on button down
     if b.type == ButtonType.cancel and b.pressed:
       events.append(EventName.buttonCancel)

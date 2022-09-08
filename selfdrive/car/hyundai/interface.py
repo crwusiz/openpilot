@@ -30,7 +30,11 @@ class CarInterface(CarInterfaceBase):
   @staticmethod
   def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=[], disable_radar=False):  # pylint: disable=dangerous-default-value
     ret = CarInterfaceBase.get_std_params(candidate, fingerprint)
-    ret.openpilotLongitudinalControl = Params().get("LongControlSelect", encoding='utf8') == "1"
+
+    # WARNING: disabling radar also disables AEB (and we show the same warning on the instrument cluster as if you manually disabled AEB)
+    #ret.experimentalLongitudinalAvailable = candidate not in (LEGACY_SAFETY_MODE_CAR | CAMERA_SCC_CAR | CANFD_CAR)
+    #ret.openpilotLongitudinalControl = experimental_long and ret.experimentalLongitudinalAvailable
+    ret.openpilotLongitudinalControl = Params().get("LongControlSelect", encoding='utf8') == "1" or ret.sccBus == 2
 
     ret.carName = "hyundai"
     if candidate in CANFD_CAR:
@@ -39,13 +43,18 @@ class CarInterface(CarInterfaceBase):
     else:
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
 
-    # WARNING: disabling radar also disables AEB (and we show the same warning on the instrument cluster as if you manually disabled AEB)
-    #ret.experimentalLongitudinalAvailable = candidate not in (LEGACY_SAFETY_MODE_CAR | CAMERA_SCC_CAR | CANFD_CAR)
-    #ret.openpilotLongitudinalControl = experimental_long and ret.experimentalLongitudinalAvailable
-
     ret.maxSteeringAngleDeg = 1000.
     ret.steerFaultMaxAngle = 85
     ret.steerFaultMaxFrames = 90
+    ret.steerActuatorDelay = 0.25
+
+    # longitudinal
+    ret.longitudinalTuning.kpBP = [0., 5. * CV.KPH_TO_MS, 10. * CV.KPH_TO_MS, 30. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]
+    ret.longitudinalTuning.kpV = [1.2, 1.0, 0.93, 0.88, 0.5]
+    ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
+    ret.longitudinalTuning.kiV = [0.1, 0.05]
+    ret.longitudinalActuatorDelayLowerBound = 0.3
+    ret.longitudinalActuatorDelayUpperBound = 0.3
 
     tire_stiffness_factor = 1.
 
@@ -331,22 +340,6 @@ class CarInterface(CarInterfaceBase):
 
     ret.centerToFront = ret.wheelbase * 0.4
     ret.radarTimeStep = 0.05
-
-    ret.steerActuatorDelay = 0.2
-    ret.steerLimitTimer = 3.0
-
-    # longitudinal
-    ret.longitudinalTuning.kpBP = [0., 5. * CV.KPH_TO_MS, 10. * CV.KPH_TO_MS, 30. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]
-    ret.longitudinalTuning.kpV = [1.2, 1.0, 0.93, 0.88, 0.5]
-    ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
-    ret.longitudinalTuning.kiV = [0.1, 0.05]
-    ret.longitudinalActuatorDelayLowerBound = 0.3
-    ret.longitudinalActuatorDelayUpperBound = 0.3
-
-    ret.stopAccel = -2.5
-    ret.stoppingDecelRate = 0.6  # brake_travel/s while trying to stop
-    ret.vEgoStarting = 0.5
-    ret.vEgoStopping = 1.0
 
     # TODO: get actual value, for now starting with reasonable value for
     # civic and scaling by mass and wheelbase
