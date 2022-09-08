@@ -84,6 +84,20 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       tr("<b>WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.</b>"),
       "../assets/offroad/icon_speed_limit.png",
     },
+#ifdef ENABLE_MAPS
+    {
+      "NavSettingTime24h",
+      tr("Show ETA in 24h Format"),
+      tr("Use 24h format instead of am/pm"),
+      "../assets/offroad/icon_metric.png",
+    },
+    {
+      "NavSettingLeftSide",
+      tr("Show Map on Left Side of UI"),
+      tr("Show map on left side when in split screen view."),
+      "../assets/offroad/icon_road.png",
+    },
+#endif
     // add community toggle
     {
       "PutPrebuilt",
@@ -109,21 +123,6 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       tr("Some newer car New radar interface"),
       "../assets/offroad/icon_road.png",
     },
-#ifdef ENABLE_MAPS
-    {
-      "NavSettingTime24h",
-      tr("Show ETA in 24h Format"),
-      tr("Use 24h format instead of am/pm"),
-      "../assets/offroad/icon_metric.png",
-    },
-    {
-      "NavSettingLeftSide",
-      tr("Show Map on Left Side of UI"),
-      tr("Show map on left side when in split screen view."),
-      "../assets/offroad/icon_road.png",
-    },
-#endif
-
   };
 
   for (auto &[param, title, desc, icon] : toggle_defs) {
@@ -664,22 +663,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   communityLayout->addWidget(new LongControlSelect());
   communityLayout->addWidget(horizontal_line());
 
-  auto pandaflash_btn = new ButtonControl("Panda Flash", tr("RUN"));
-  QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
-      QProcess::execute("/data/openpilot/panda/board/flash.sh");
-    }
-  });
-  communityLayout->addWidget(pandaflash_btn);
-
-  auto pandarecover_btn = new ButtonControl("Panda Recover", tr("RUN"));
-  QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
-      QProcess::execute("/data/openpilot/panda/board/recover.sh");
-    }
-  });
-  communityLayout->addWidget(pandarecover_btn);
-
   auto forcewifi_btn = new ButtonControl("Wifi Force Connect", tr("RUN"));
   QObject::connect(forcewifi_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), this)) {
@@ -696,14 +679,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   });
   communityLayout->addWidget(restart_btn);
 
-  auto rebuild_btn = new ButtonControl("Scons rebuild", tr("RUN"));
-  QObject::connect(rebuild_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
-      QProcess::execute("/data/openpilot/scripts/rebuild.sh");
-    }
-  });
-  communityLayout->addWidget(rebuild_btn);
-
   auto cleardtc_btn = new ButtonControl("Clear DTC", tr("RUN"));
   QObject::connect(cleardtc_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), this)) {
@@ -711,6 +686,30 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
   communityLayout->addWidget(cleardtc_btn);
+
+  auto pandaflash_btn = new ButtonControl("Panda Flash", tr("RUN"));
+  QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+      QProcess::execute("/data/openpilot/panda/board/flash.sh");
+    }
+  });
+  communityLayout->addWidget(pandaflash_btn);
+
+  auto pandarecover_btn = new ButtonControl("Panda Recover", tr("RUN"));
+  QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+      QProcess::execute("/data/openpilot/panda/board/recover.sh");
+    }
+  });
+  communityLayout->addWidget(pandarecover_btn);
+
+  auto rebuild_btn = new ButtonControl("Scons rebuild", tr("RUN"));
+  QObject::connect(rebuild_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+      QProcess::execute("/data/openpilot/scripts/rebuild.sh");
+    }
+  });
+  communityLayout->addWidget(rebuild_btn);
 }
 
 SelectCar::SelectCar(QWidget* parent): QWidget(parent) {

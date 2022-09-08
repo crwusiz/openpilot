@@ -76,7 +76,7 @@
 <context>
     <name>AebSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="+907"/>
+        <location filename="../qt/offroad/settings.cc" line="+898"/>
         <source>AEB Signal Select (Scc12/Fca11)</source>
         <translation>차량의 AEB 신호를 선택합니다. (Scc12/Fca11)</translation>
     </message>
@@ -1178,7 +1178,7 @@ location set</source>
     <message>
         <location line="+0"/>
         <source>Warning: This grants SSH access to all public keys in your GitHub settings. Never enter a GitHub username other than your own. A comma employee will NEVER ask you to add their GitHub username.</source>
-        <translation>경고：이렇게 하면 GitHub 설정의 모든 공용 키에 대한 SSH 액세스 권한이 부여됩니다. 자신의 사용자 이름이 아닌 GitHub 사용자 이름을 입력하지 마십시오. comma 직원은 GitHub 사용자 이름을 추가하도록 요청하지 않습니다.</translation>
+        <translation>경고: 허용으로 설정하면 GitHub 설정의 모든 공용 키에 대한 SSH 액세스 권한이 부여됩니다. GitHub 사용자 ID 이외에는 입력하지 마십시오. comma에서는 GitHub ID를 추가하라는 요청을 하지 않습니다.</translation>
     </message>
     <message>
         <location line="+6"/>
@@ -1251,7 +1251,7 @@ location set</source>
 <context>
     <name>TogglesPanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-414"/>
+        <location filename="../qt/offroad/settings.cc" line="-405"/>
         <source>Enable openpilot</source>
         <translation>openpilot 사용</translation>
     </message>
@@ -1303,7 +1303,7 @@ location set</source>
     <message>
         <location line="+11"/>
         <source>🌮 End-to-end longitudinal (extremely alpha) 🌮</source>
-        <translation>🌮 e2e long 사용 (매우 실험적) 🌮 </translation>
+        <translation>🌮 e2e 롱컨트롤 사용 (매우 실험적) 🌮 </translation>
     </message>
     <message>
         <location line="-6"/>
@@ -1316,7 +1316,17 @@ location set</source>
         <translation>활성화된 경우 가속 페달을 누르면 openpilot이 해제됩니다.</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+11"/>
+        <source>Experimental openpilot longitudinal control</source>
+        <translation>openpilot 롱컨트롤 (실험적)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
+        <translation>&lt;b&gt;경고: openpilot 롱컨트롤은 실험적인 기능으로 차량의 AEB를 비활성화합니다.&lt;/b&gt;</translation>
+    </message>
+    <message>
+        <location line="+20"/>
         <source>Prebuilt Enable</source>
         <translation>Prebuilt 사용</translation>
     </message>
@@ -1356,7 +1366,7 @@ location set</source>
         <translation>레이더 CAN 신호 해독된 일부차량을위한 옵션입니다.</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="-33"/>
         <source>Show ETA in 24h Format</source>
         <translation>24시간 형식으로 도착예정시간 표시</translation>
     </message>
@@ -1376,17 +1386,9 @@ location set</source>
         <translation>분할 화면 보기에서 지도를 왼쪽에 표시합니다.</translation>
     </message>
     <message>
-        <location line="+43"/>
+        <location line="+51"/>
         <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
         <translation>주행모델이 가속과 감속을 제어하도록 하면 openpilot은 운전자가 생각하는것처럼 운전합니다. (매우 실험적)</translation>
-    </message>
-    <message>
-        <source>openpilot Longitudinal Control</source>
-        <translation type="vanished">openpilot Longitudinal Control</translation>
-    </message>
-    <message>
-        <source>openpilot will disable the car&apos;s radar and will take over control of gas and brakes. Warning: this disables AEB!</source>
-        <translation type="vanished">openpilot은 차량의 레이더를 비활성화하고 가속과 감속을 제어합니다. 경고: 차량의 AEB가 비활성화됩니다!</translation>
     </message>
 </context>
 <context>
