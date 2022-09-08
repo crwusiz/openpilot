@@ -65,6 +65,13 @@ public:
 
 private:
   Params params;
+  void showEvent(QShowEvent *event) override;
+
+private:
+  Params params;
+  std::map<std::string, ParamControl*> toggles;
+
+  void updateToggles();
 };
 
 
