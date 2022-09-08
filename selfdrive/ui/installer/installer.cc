@@ -182,7 +182,6 @@ void Installer::cloneFinished(int exitCode, QProcess::ExitStatus exitStatus) {
   std::map<std::string, std::string> params = {
     {"SshEnabled", "1"},
     {"RecordFrontLock", "0"},
-    {"DisableRadar_Allow", "0"},
     {"GithubSshKeys", SSH_KEYS},
   };
   for (const auto& [key, value] : params) {
