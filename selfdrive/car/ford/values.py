@@ -46,7 +46,7 @@ FW_VERSIONS = {
     (Ecu.eps, 0x730, None): [
       b'LX6C-14D003-AH\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
-    (Ecu.esp, 0x760, None): [
+    (Ecu.abs, 0x760, None): [
       b'LX6C-2D053-NS\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
     (Ecu.fwdRadar, 0x764, None): [
@@ -63,7 +63,7 @@ FW_VERSIONS = {
     (Ecu.eps, 0x730, None): [
       b'JX6C-14D003-AH\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
-    (Ecu.esp, 0x760, None): [
+    (Ecu.abs, 0x760, None): [
       b'JX61-2D053-CJ\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
     (Ecu.fwdRadar, 0x764, None): [

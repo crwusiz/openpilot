@@ -331,7 +331,7 @@ FW_VERSIONS = {
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00PDu MDPS C 1.00 1.01 56310/G3690 4PDUC101',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00PD ESC \x11 100 \a\x03 58910-G3AC0',
     ],
     (Ecu.engine, 0x7e0, None): [
@@ -359,7 +359,7 @@ FW_VERSIONS = {
       b'\xf1\x8756310/AA070\xf1\x00CN7 MDPS C 1.00 1.06 56310/AA070 4CNDC106',
       b'\xf1\x8756310AA050\x00\xf1\x00CN7 MDPS C 1.00 1.06 56310AA050\x00 4CNDC106',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00CN ESC \t 101 \x10\x03 58910-AB800',
       b'\xf1\x8758910-AA800\xf1\x00CN ESC \t 104 \x08\x03 58910-AA800',
       b'\xf1\x8758910-AB800\xf1\x00CN ESC \t 101 \x10\x03 58910-AB800',
@@ -443,7 +443,7 @@ FW_VERSIONS = {
       b'\xf1\x8756310L0210\x00\xf1\x00DN8 MDPS C 1.00 1.01 56310L0210\x00 4DNAC101',
       b'\xf1\x8757700-L0000\xf1\x00DN8 MDPS R 1.00 1.00 57700-L0000 4DNAP100',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00DN ESC \x07 106 \x07\x01 58910-L0100',
       b'\xf1\x00DN ESC \x01 102\x19\x04\x13 58910-L1300',
       b'\xf1\x00DN ESC \x03 100 \x08\x01 58910-L0300',
@@ -561,7 +561,7 @@ FW_VERSIONS = {
       b'\xf1\x8756310-L5450\xf1\x00DN8 MDPS C 1.00 1.02 56310-L5450 4DNHC102',
       b'\xf1\x8756310-L5450\xf1\000DN8 MDPS C 1.00 1.03 56310-L5450 4DNHC103',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x8758910-L0100\xf1\x00DN ESC \x06 104\x19\x08\x01 58910-L0100\xf1\xa01.04',
     ],
     (Ecu.engine, 0x7e0, None): [
@@ -586,7 +586,7 @@ FW_VERSIONS = {
       b'\xf1\x00LFF LKAS AT USA LHD 1.00 1.01 95740-C1000 E51',
       b'\xf1\x00LFF LKAS AT USA LHD 1.01 1.02 95740-C1000 E52',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00LF ESC \f 11 \x17\x01\x13 58920-C2610',
       b'\xf1\x00LF ESC \t 11 \x17\x01\x13 58920-C2610',
     ],
@@ -615,7 +615,7 @@ FW_VERSIONS = {
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00OS  MDPS C 1.00 1.05 56310J9030\x00 4OSDC105',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x816V5RAK00018.ELF\xf1\x00\x00\x00\x00\x00\x00\x00',
     ],
     (Ecu.engine, 0x7e0, None): [
@@ -661,7 +661,7 @@ FW_VERSIONS = {
       b'\xf1\x00OSP MDPS C 1.00 1.02 56310K4260\x00 4OEPC102',
       b'\xf1\x00OSP MDPS C 1.00 1.02 56310/K4970 4OEPC102',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00OS IEB \r 105\x18\t\x18 58520-K4000',
       b'\xf1\x00OS IEB \x01 212 \x11\x13 58520-K4000',
       b'\xf1\x00OS IEB \x02 212 \x11\x13 58520-K4000',
@@ -682,7 +682,7 @@ FW_VERSIONS = {
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00OS  MDPS C 1.00 1.00 56310CM030\x00 4OHDC100',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00OS IEB \x01 104 \x11  58520-CM000',
     ],
     (Ecu.engine, 0x7e0, None): [
@@ -798,7 +798,7 @@ FW_VERSIONS = {
       b'\xf1\x00TM  MDPS C 1.00 1.02 56370-S2AA0 0B19',
       b'\xf1\x00TM  MDPS C 1.00 1.01 56310-S1AB0 4TSDC101',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00TM ESC \r 100\x18\x031 58910-S2650',
       b'\xf1\x00TM ESC \r 103\x18\x11\x08 58910-S2650',
       b'\xf1\x00TM ESC \r 104\x19\a\b 58910-S2650',
@@ -914,7 +914,7 @@ FW_VERSIONS = {
       b'\xf1\x00ON  MDPS C 1.00 1.01 56340-S9000 9201',
       b'\xf1\x00LX2 MDPS C 1.00 1.04 56310-S8420 4LXDC104',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00LX ESC \x01 103\x19\t\x10 58910-S8360',
       b'\xf1\x00LX ESC \x01 1031\t\x10 58910-S8360',
       b'\xf1\x00LX ESC \x0b 101\x19\x03\x17 58910-S8330',
@@ -1000,7 +1000,7 @@ FW_VERSIONS = {
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00JSL MDPS C 1.00 1.03 56340-J3000 8308',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00\x00\x00\x00\x00\x00\x00',
       b'\xf1\x816V8RAC00121.ELF\xf1\x00\x00\x00\x00\x00\x00\x00',
     ],
@@ -1025,7 +1025,7 @@ FW_VERSIONS = {
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00FE  MDPS C 1.00 1.05 56340-M5000 9903',
     ],
-    (Ecu.esp, 0x7c1, None): [
+    (Ecu.abs, 0x7c1, None): [
       b'\xf1\x00FE IEB \x01 312 \x11\x13 58520-M5000',
     ],
   },
@@ -1043,7 +1043,7 @@ FW_VERSIONS = {
       b'\xf1\x00BD  MDPS C 1.00 1.08 56310/M6300 4BDDC108',
       b'\xf1\x00BD  MDPS C 1.00 1.08 56310M6300\x00 4BDDC108',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x816VGRAH00018.ELF\xf1\x00\x00\x00\x00\x00\x00\x00',
     ],
     (Ecu.engine, 0x7e0, None): [
@@ -1065,7 +1065,7 @@ FW_VERSIONS = {
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00TM  MDPS C 1.00 1.00 56340-S2000 8409',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00JF ESC \v 11 \x18\x030 58920-D5180',
     ],
     (Ecu.engine, 0x7e0, None): [
@@ -1111,7 +1111,7 @@ FW_VERSIONS = {
       b'\xf1\x8756310-L3220\xf1\x00DL3 MDPS C 1.00 1.01 56310-L3220 4DLAC101',
       b'\xf1\x8757700-L3000\xf1\x00DL3 MDPS R 1.00 1.02 57700-L3000 4DLAP102',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\000DL ESC \006 101 \004\002 58910-L3200',
       b'\xf1\x8758910-L3200\xf1\000DL ESC \006 101 \004\002 58910-L3200',
       b'\xf1\x8758910-L3800\xf1\x00DL ESC \t 101 \x07\x02 58910-L3800',
@@ -1194,7 +1194,7 @@ FW_VERSIONS = {
       b'\xf1\x00DE  MDPS C 1.00 1.05 56310Q4000\x00 4DEEC105',
       b'\xf1\x00DE  MDPS C 1.00 1.05 56310Q4100\x00 4DEEC105',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00OS IEB \r 212 \x11\x13 58520-K4000',
     ],
   },
@@ -1234,7 +1234,7 @@ FW_VERSIONS = {
       b'\xf1\000SP2 MDPS C 1.00 1.04 56300Q5200          ',
       b'\xf1\000SP2 MDPS C 1.01 1.05 56300Q5200          ',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x8758910-Q5450\xf1\000SP ESC \a 101\031\t\005 58910-Q5450',
       b'\xf1\x8758910-Q5450\xf1\000SP ESC \t 101\031\t\005 58910-Q5450',
     ],
@@ -1265,7 +1265,7 @@ FW_VERSIONS = {
       b'\xf1\000YG  MDPS C 1.01 99500F6563\000 4YGDC103',
       b'\xf1\000YG  MDPS C 1.00 1.01 56310F6350\000 4YG7C101',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x8758920-F6230\xf1\000NC MGH \t 101\031\t\005 58920F6230\xf1\xa01.01',
     ],
   },
@@ -1304,7 +1304,7 @@ FW_VERSIONS = {
       b'\xf1\x00IK  MDPS R 1.00 1.08 57700-G9420 4I4VL108',
       b'\xf1\x00IK  MDPS R 1.00 1.06 57700-G9420 4I4VL106',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00\x00\x00\x00\x00\x00\x00',
     ],
     (Ecu.engine, 0x7e0, None): [
@@ -1345,14 +1345,17 @@ FW_VERSIONS = {
     ],
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00NE1 MFC  AT USA LHD 1.00 1.02 99211-GI010 211206',
+      b'\xf1\x00NE1 MFC  AT EUR LHD 1.00 1.06 99211-GI000 210813',
     ],
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00NE  MDPS R 1.00 1.06 57700GI000  4NEDR106',
       b'\xf1\x8757700GI000 \xf1\x00NE  MDPS R 1.00 1.06 57700GI000  4NEDR106',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00NE1 IEB \x07 106!\x11) 58520-GI010',
       b'\xf1\x8758520GI010\xf1\x00NE1 IEB \x07 106!\x11) 58520-GI010',
+      b'\xf1\x00NE1 IEB \x08 104!\x04\x05 58520-GI000',
+      b'\xf1\x8758520GI000\xf1\x00NE1 IEB \x08 104!\x04\x05 58520-GI000',
     ],
   },
   CAR.TUCSON22_HEV: {
@@ -1381,7 +1384,7 @@ FW_VERSIONS = {
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00CV1 MDPS R 1.00 1.04 57700-CV000 1B30',
     ],
-    (Ecu.esp, 0x7d1, None): [
+    (Ecu.abs, 0x7d1, None): [
       b'\xf1\x8758520CV100\xf1\x00CV  IEB \x02 101!\x10\x18 58520-CV100',
     ],
   },
