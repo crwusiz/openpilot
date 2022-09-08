@@ -1,5 +1,5 @@
 const SteeringLimits HYUNDAI_COMMUNITY_STEERING_LIMITS = {
-  .max_steer = 409,
+  .max_steer = 384,
   .max_rt_delta = 112,
   .max_rt_interval = 250000,
   .max_rate_up = 3,
@@ -219,8 +219,8 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
     }
   }
 
+  // MDPS12
   if (valid) {
-    // MDPS12
     if ((addr == 593) && (bus == MDPS_bus)) {
       int torque_driver_new = ((GET_BYTES_04(to_push) & 0x7ffU) * 0.79) - 808; // scale down new driver torque signal to match previous one
       // update array of samples
@@ -279,7 +279,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
   int addr = GET_ADDR(to_send);
   int bus = GET_BUS(to_send);
 
-  if (!msg_allowed(to_send, HYUNDAI_COMMUNITY_TX_MSGS, sizeof(HYUNDAI_COMMUNITY_TX_MSGS) / sizeof(HYUNDAI_COMMUNITY_TX_MSGS[0]))) {
+  if (!msg_allowed(to_send, HYUNDAI_COMMUNITY_TX_MSGS, sizeof(HYUNDAI_COMMUNITY_TX_MSGS)/sizeof(HYUNDAI_COMMUNITY_TX_MSGS[0]))) {
     tx = 0;
     puts("  CAN TX not allowed: "); puth(addr); puts(", "); puth(bus); puts("\n");
   }

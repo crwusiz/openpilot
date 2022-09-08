@@ -57,7 +57,7 @@ int default_rx_hook(CANPacket_t *to_push) {
   }
   // check if we have a MDPS or SCC on Bus1
   if (bus == 1 && (addr == 593 || addr == 897 || addr == 1057)) {
-    if (!fwd_bus1 && OBD_cnt > 1 && OBD_cnt < 11 && current_board->has_obd) {
+    if (!fwd_bus1 && OBD_cnt > 1 && OBD_cnt < 11) {
       fwd_obd = true;
       OBD_cnt = 0;
       puts("  MDPS or SCC on OBD2 CAN : setting can mode obd\n");
@@ -66,7 +66,7 @@ int default_rx_hook(CANPacket_t *to_push) {
       puts("  MDPS or SCC on bus [1] : forwarding enabled\n");
     }
   }
-  if ((addr == 593) && (MDPS12_checksum == -1)){
+  if ((addr == 593) && (MDPS12_checksum == -1)) {
     int New_Chksum2 = 0;
     uint8_t dat[8];
     for (int i=0; i<8; i++) {
@@ -167,8 +167,8 @@ static int default_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
         uint8_t crc = 0xFFU;
         uint8_t poly = 0x1D;
         int i, j;
-        for (i=0; i<8; i++){
-          if (i!=3){ //don't include CRC byte
+        for (i=0; i<8; i++) {
+          if (i!=3) { //don't include CRC byte
             crc ^= dat[i];
             for (j=0; j<8; j++) {
               if ((crc & 0x80U) != 0U) {
