@@ -2,7 +2,7 @@ const SteeringLimits HYUNDAI_COMMUNITY_STEERING_LIMITS = {
   .max_steer = 409,
   .max_rt_delta = 112,
   .max_rt_interval = 250000,
-  .max_rate_up = 5,
+  .max_rate_up = 3,
   .max_rate_down = 7,
   .driver_torque_allowance = 50,
   .driver_torque_factor = 2,
@@ -10,7 +10,6 @@ const SteeringLimits HYUNDAI_COMMUNITY_STEERING_LIMITS = {
 };
 
 const int HYUNDAI_COMMUNITY_STANDSTILL_THRSLD = 30;  // ~1kph
-
 const int HYUNDAI_COMMUNITY_MAX_ACCEL = 200;  // 1/100 m/s2
 const int HYUNDAI_COMMUNITY_MIN_ACCEL = -350; // 1/100 m/s2
 
@@ -118,7 +117,6 @@ static uint32_t hyundai_community_compute_checksum(CANPacket_t *to_push) {
     }
     chksum = (16U - (chksum %  16U)) % 16U;
   }
-
   return chksum;
 }
 
@@ -148,7 +146,7 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
   bool valid = addr_safety_check(to_push, &hyundai_community_rx_checks, hyundai_community_get_checksum,
                                  hyundai_community_compute_checksum, hyundai_community_get_counter);
 
-  if (!valid){
+  if (!valid) {
     puts("  CAN RX invalid: "); puth(addr); puts("\n");
   }
   if ((bus == 1) && LCAN_bus1) {
@@ -246,17 +244,17 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
       cruise_engaged_prev = cruise_engaged;
     }
 
-    // cruise control for car without SCC ( EMS16 )
+    // cruise control for car with SCC ( EMS16 )
     if ((addr == 608) && (bus == 0) && (SCC_bus == -1) && !SCC12_op) {
       // bit 25
       int cruise_engaged = (GET_BYTES_04(to_push) >> 25 & 0x1); // ACC main_on signal
       if (cruise_engaged && !cruise_engaged_prev) {
         controls_allowed = 1;
-        puts("  non-SCC without long control : controls allowed\n");
+        puts("  non-SCC with long control : controls allowed\n");
       }
       if (!cruise_engaged) {
         if (controls_allowed) {
-          puts("  non-SCC without long control : controls not allowed\n");
+          puts("  non-SCC with long control : controls not allowed\n");
         }
         controls_allowed = 0;
       }
@@ -281,7 +279,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
   int addr = GET_ADDR(to_send);
   int bus = GET_BUS(to_send);
 
-  if (!msg_allowed(to_send, HYUNDAI_COMMUNITY_TX_MSGS, sizeof(HYUNDAI_COMMUNITY_TX_MSGS)/sizeof(HYUNDAI_COMMUNITY_TX_MSGS[0]))) {
+  if (!msg_allowed(to_send, HYUNDAI_COMMUNITY_TX_MSGS, sizeof(HYUNDAI_COMMUNITY_TX_MSGS) / sizeof(HYUNDAI_COMMUNITY_TX_MSGS[0]))) {
     tx = 0;
     puts("  CAN TX not allowed: "); puth(addr); puts(", "); puth(bus); puts("\n");
   }
@@ -290,10 +288,9 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
   if (addr == 832) {
     LKAS11_op = 20;
     int desired_torque = ((GET_BYTES_04(to_send) >> 16) & 0x7ffU) - 1024U;
-    //bool steer_req = GET_BIT(to_send, 27U) != 0U;
+    bool steer_req = GET_BIT(to_send, 27U) != 0U;
 
-    //if (steer_torque_cmd_checks(desired_torque, steer_req, HYUNDAI_COMMUNITY_STEERING_LIMITS)) {
-    if (steer_torque_cmd_checks(desired_torque, -1, HYUNDAI_COMMUNITY_STEERING_LIMITS)) {
+    if (steer_torque_cmd_checks(desired_torque, steer_req, HYUNDAI_COMMUNITY_STEERING_LIMITS)) {
       tx = 0;
     }
   }
@@ -322,8 +319,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
   }
   if ((addr == 1265) && (bus == 1)) {
     CLU11_op = 20;
-  }
-  // only count mesage created for MDPS
+  }  // only count mesage created for MDPS
   if (addr == 1057) {
     SCC12_op = 20;
     if (SCC12_car > 0) {
@@ -342,7 +338,7 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   int bus_fwd = -1;
   int addr = GET_ADDR(to_fwd);
   int fwd_to_bus1 = -1;
-  if (fwd_bus1 || fwd_obd){
+  if (fwd_bus1 || fwd_obd) {
     fwd_to_bus1 = 1;
   }
 
@@ -408,7 +404,7 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
 static const addr_checks* hyundai_community_init(uint16_t param) {
   UNUSED(param);
 
-  hyundai_community_rx_checks = (addr_checks){hyundai_community_addr_checks, HYUNDAI_COMMUNITY_ADDR_CHECK_LEN};
+  hyundai_community_rx_checks = (addr_checks) {hyundai_community_addr_checks, HYUNDAI_COMMUNITY_ADDR_CHECK_LEN};
   return &hyundai_community_rx_checks;
 }
 
