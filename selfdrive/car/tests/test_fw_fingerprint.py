@@ -44,16 +44,19 @@ class TestFwFingerprint(unittest.TestCase):
             duplicates = {fw for fw in ecu_fw if ecu_fw.count(fw) > 1}
             self.assertFalse(len(duplicates), f"{car_model}: Duplicate FW versions: Ecu.{ECU_NAME[ecu[0]]}, {duplicates}")
 
+  def test_blacklisted_addrs(self):
+    blacklisted_addrs = {"subaru": (0x7c4, 0x7d0)}  # includes A/C ecu and an unknown ecu
+    for brand, ecus in FW_QUERY_CONFIGS.items():
+      with self.subTest(brand=brand):
+        if brand == 'subaru':
+          for ecu in ecus.keys():
+            self.assertNotIn(ecu[1], blacklisted_addrs, f'{brand}: Blacklisted ecu: (Ecu.{ECU_NAME[ecu[0]]}, {hex(ecu[1])})')
+
   def test_blacklisted_ecus(self):
-    blacklisted_addrs = (0x7c4, 0x7d0)  # includes A/C ecu and an unknown ecu
     for car_model, ecus in FW_VERSIONS.items():
       with self.subTest(car_model=car_model):
         CP = interfaces[car_model][0].get_params(car_model)
-        if CP.carName == 'subaru':
-          for ecu in ecus.keys():
-            self.assertNotIn(ecu[1], blacklisted_addrs, f'{car_model}: Blacklisted ecu: (Ecu.{ECU_NAME[ecu[0]]}, {hex(ecu[1])})')
-
-        elif CP.carName == "chrysler":
+        if CP.carName == "chrysler":
           # Some HD trucks have a combined TCM and ECM
           if CP.carFingerprint.startswith("RAM HD"):
             for ecu in ecus.keys():
@@ -69,6 +72,13 @@ class TestFwFingerprint(unittest.TestCase):
     if len(brand_versions - brand_configs):
       with self.subTest():
         self.fail(f"Brands do not implement FW_QUERY_CONFIG: {brand_versions - brand_configs}")
+
+  def test_all_version_ecus_exist_in_config(self):
+    for brand, config in FW_QUERY_CONFIGS.items():
+      for car_model, versions in FW_VERSIONS[brand]:
+        for ecu, _, _ in versions.keys():
+          with self.subTest(car_model=car_model, ecu=ecu):
+            self.assertTrue(ecu in config.ecus, f"{car_model}: Ecu not in config.ecus: Ecu.{ECU_NAME[ecu]}")
 
   def test_fw_request_ecu_whitelist(self):
     for brand, config in FW_QUERY_CONFIGS.items():
