@@ -76,7 +76,7 @@
 <context>
     <name>AebSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="+898"/>
+        <location filename="../qt/offroad/settings.cc" line="+903"/>
         <source>AEB Signal Select (Scc12/Fca11)</source>
         <translation>차량의 AEB 신호를 선택합니다. (Scc12/Fca11)</translation>
     </message>
@@ -84,13 +84,14 @@
 <context>
     <name>CommunityPanel</name>
     <message>
-        <location line="-298"/>
+        <location line="-334"/>
         <location line="+23"/>
         <source>Select your car</source>
         <translation>차량을 선택하세요</translation>
     </message>
     <message>
-        <location line="+43"/>
+        <location line="+37"/>
+        <location line="+8"/>
         <location line="+8"/>
         <location line="+8"/>
         <location line="+8"/>
@@ -100,7 +101,8 @@
         <translation>실행</translation>
     </message>
     <message>
-        <location line="-38"/>
+        <location line="-46"/>
+        <location line="+8"/>
         <location line="+8"/>
         <location line="+8"/>
         <location line="+8"/>
@@ -108,6 +110,56 @@
         <location line="+8"/>
         <source>Process?</source>
         <translation>실행하시겠습니까?</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>Longitudinal control Enable</source>
+        <translation>롱컨트롤 사용</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
+        <translation>&lt;b&gt;경고: openpilot 롱컨트롤은 실험적인 기능으로 차량의 AEB를 비활성화합니다.&lt;/b&gt;</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Prebuilt Enable</source>
+        <translation>Prebuilt 사용</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Create prebuilt files to speed bootup</source>
+        <translation>Prebuilt 파일을 생성하며 부팅속도를 향상시킵니다.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Logger Disable</source>
+        <translation>Logger 사용안함</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Disable Logger is Reduce system load</source>
+        <translation>Logger 프로세스를 종료하여 시스템 부하를 줄입니다.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Navigation Disable</source>
+        <translation>Navigation 사용안함</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Navigation Function not use</source>
+        <translation>네비게이션 기능을 사용하지않습니다.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>New radar interface Enable</source>
+        <translation>New radar interface 사용</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Some newer car New radar interface</source>
+        <translation>레이더 CAN 신호 해독된 일부차량을위한 옵션입니다.</translation>
     </message>
 </context>
 <context>
@@ -145,7 +197,7 @@
 <context>
     <name>DevicePanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-522"/>
+        <location filename="../qt/offroad/settings.cc" line="-549"/>
         <source>Dongle ID</source>
         <translation>Dongle ID</translation>
     </message>
@@ -384,17 +436,9 @@
 <context>
     <name>LateralControlSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="+398"/>
+        <location filename="../qt/offroad/settings.cc" line="+427"/>
         <source>LateralControl Select (Pid/Indi/Lqr/Torque)</source>
         <translation>조향 모드를 선택합니다. (Pid/Indi/Lqr/Torque)</translation>
-    </message>
-</context>
-<context>
-    <name>LongControlSelect</name>
-    <message>
-        <location line="+203"/>
-        <source>LongControl Select (Mad/Mad+Long)</source>
-        <translation>LongControl 모드를 선택합니다. (Mad/Mad+Long)</translation>
     </message>
 </context>
 <context>
@@ -513,7 +557,7 @@ location set</source>
 <context>
     <name>MfcSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-134"/>
+        <location filename="../qt/offroad/settings.cc" line="+69"/>
         <source>MFC Camera Select (Lkas/Ldws/Lfa/HDA2)</source>
         <translation>차량의 MFC 카메라를 선택합니다. (Lkas/Ldws/Lfa/HDA2)</translation>
     </message>
@@ -599,7 +643,7 @@ location set</source>
 <context>
     <name>PairingPopup</name>
     <message>
-        <location filename="../qt/widgets/prime.cc" line="+86"/>
+        <location filename="../qt/widgets/prime.cc" line="+88"/>
         <source>Pair your device to your comma account</source>
         <translation>장치를 콤마 계정과 페어링합니다</translation>
     </message>
@@ -791,7 +835,7 @@ location set</source>
 <context>
     <name>SettingsWindow</name>
     <message>
-        <location line="-242"/>
+        <location line="-278"/>
         <source>×</source>
         <translation>×</translation>
     </message>
@@ -1061,7 +1105,7 @@ location set</source>
 <context>
     <name>SoftwarePanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-159"/>
+        <location filename="../qt/offroad/settings.cc" line="-152"/>
         <source>Git Remote</source>
         <translation>Git 리모트</translation>
     </message>
@@ -1142,22 +1186,7 @@ location set</source>
         <translation>제거하시겠습니까?</translation>
     </message>
     <message>
-        <location line="+6"/>
-        <source>RUN</source>
-        <translation>실행</translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>Git Fetch and Reset</source>
-        <translation>Git 리셋 및 업데이트</translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>Process?</source>
-        <translation>실행하시겠습니까?</translation>
-    </message>
-    <message>
-        <location line="+16"/>
+        <location line="+17"/>
         <source>failed to fetch update</source>
         <translation>업데이트를 가져올수없습니다</translation>
     </message>
@@ -1251,7 +1280,7 @@ location set</source>
 <context>
     <name>TogglesPanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-405"/>
+        <location filename="../qt/offroad/settings.cc" line="-374"/>
         <source>Enable openpilot</source>
         <translation>openpilot 사용</translation>
     </message>
@@ -1326,47 +1355,7 @@ location set</source>
         <translation>&lt;b&gt;경고: openpilot 롱컨트롤은 실험적인 기능으로 차량의 AEB를 비활성화합니다.&lt;/b&gt;</translation>
     </message>
     <message>
-        <location line="+20"/>
-        <source>Prebuilt Enable</source>
-        <translation>Prebuilt 사용</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Create prebuilt files to speed bootup</source>
-        <translation>Prebuilt 파일을 생성하며 부팅속도를 향상시킵니다.</translation>
-    </message>
-    <message>
-        <location line="+5"/>
-        <source>Logger Disable</source>
-        <translation>Logger 사용안함</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Disable Logger is Reduce system load</source>
-        <translation>Logger 프로세스를 종료하여 시스템 부하를 줄입니다.</translation>
-    </message>
-    <message>
-        <location line="+5"/>
-        <source>Navigation Disable</source>
-        <translation>Navigation 사용안함</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Navigation Function not use</source>
-        <translation>네비게이션 기능을 사용하지않습니다.</translation>
-    </message>
-    <message>
-        <location line="+5"/>
-        <source>New radar interface Enable</source>
-        <translation>New radar interface 사용</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Some newer car New radar interface</source>
-        <translation>레이더 CAN 신호 해독된 일부차량을위한 옵션입니다.</translation>
-    </message>
-    <message>
-        <location line="-33"/>
+        <location line="+6"/>
         <source>Show ETA in 24h Format</source>
         <translation>24시간 형식으로 도착예정시간 표시</translation>
     </message>
@@ -1386,7 +1375,7 @@ location set</source>
         <translation>분할 화면 보기에서 지도를 왼쪽에 표시합니다.</translation>
     </message>
     <message>
-        <location line="+51"/>
+        <location line="+27"/>
         <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
         <translation>주행모델이 가속과 감속을 제어하도록 하면 openpilot은 운전자가 생각하는것처럼 운전합니다. (매우 실험적)</translation>
     </message>

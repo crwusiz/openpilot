@@ -17,7 +17,6 @@ crwusiz openpilot
 - lateralcontrol select ( Pid / Indi / Lqr / Torque )
 - mfc select ( LKAS / LDWS / LFA / HDA2 )
 - aebsignal select ( SCC12 / FCA11 )
-- longcontrol select ( MAD / MAD+LONG )
 - add community toggle / function / simple ui
 - LongitudinalControl full support
 - autohold, turnsignal, tpms, roadlimitspeed display (neokii)

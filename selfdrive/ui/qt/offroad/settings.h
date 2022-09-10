@@ -167,18 +167,3 @@ private:
 
   void refresh();
 };
-
-// LongControlSelect
-class LongControlSelect : public AbstractControl {
-  Q_OBJECT
-
-public:
-  LongControlSelect();
-
-private:
-  QPushButton btnplus;
-  QPushButton btnminus;
-  QLabel label;
-
-  void refresh();
-};

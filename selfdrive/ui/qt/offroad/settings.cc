@@ -98,31 +98,7 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "../assets/offroad/icon_road.png",
     },
 #endif
-    // add community toggle
-    {
-      "PutPrebuilt",
-      tr("Prebuilt Enable"),
-      tr("Create prebuilt files to speed bootup"),
-      "../assets/offroad/icon_addon.png",
-    },
-    {
-      "LoggerDisable",
-      tr("Logger Disable"),
-      tr("Disable Logger is Reduce system load"),
-      "../assets/offroad/icon_addon.png",
-    },
-    {
-      "NavDisable",
-      tr("Navigation Disable"),
-      tr("Navigation Function not use"),
-      "../assets/offroad/icon_addon.png",
-    },
-    {
-      "NewRadarInterface",
-      tr("New radar interface Enable"),
-      tr("Some newer car New radar interface"),
-      "../assets/offroad/icon_road.png",
-    },
+
   };
 
   for (auto &[param, title, desc, icon] : toggle_defs) {
@@ -403,14 +379,7 @@ SoftwarePanel::SoftwarePanel(QWidget* parent) : ListWidget(parent) {
   });
   connect(uiState(), &UIState::offroadTransition, uninstallBtn, &QPushButton::setEnabled);
 
-  auto gitpull_btn = new ButtonControl(tr("Git Fetch and Reset"), tr("RUN"));
-  connect(gitpull_btn, &ButtonControl::clicked, [&]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
-      QProcess::execute("/data/openpilot/scripts/gitpull.sh");
-    }
-  });
-
-  QWidget *widgets[] = {versionLbl, lastUpdateLbl, updateBtn, branchSwitcherBtn, gitpull_btn, gitRemoteLbl, gitBranchLbl, gitCommitLbl, osVersionLbl, uninstallBtn};
+  QWidget *widgets[] = {versionLbl, lastUpdateLbl, updateBtn, branchSwitcherBtn, gitRemoteLbl, gitBranchLbl, gitCommitLbl, osVersionLbl, uninstallBtn};
   for (QWidget* w : widgets) {
     if (w == branchSwitcherBtn && params.getBool("IsTestedBranch")) {
       continue;
@@ -657,19 +626,13 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   )");
 
-  communityLayout->addWidget(new LateralControlSelect());
-  communityLayout->addWidget(new MfcSelect());
-  communityLayout->addWidget(new AebSelect());
-  communityLayout->addWidget(new LongControlSelect());
-  communityLayout->addWidget(horizontal_line());
-
-  auto forcewifi_btn = new ButtonControl("Wifi Force Connect", tr("RUN"));
-  QObject::connect(forcewifi_btn, &ButtonControl::clicked, [=]() {
+  auto gitpull_btn = new ButtonControl("Git Fetch and Reset", tr("RUN"));
+  QObject::connect(gitpull_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), this)) {
-      QProcess::execute("/data/openpilot/scripts/wifi_force_connect.sh");
+      QProcess::execute("/data/openpilot/scripts/gitpull.sh");
     }
   });
-  communityLayout->addWidget(forcewifi_btn);
+  communityLayout->addWidget(gitpull_btn);
 
   auto restart_btn = new ButtonControl("Restart", tr("RUN"));
   QObject::connect(restart_btn, &ButtonControl::clicked, [=]() {
@@ -687,6 +650,22 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   });
   communityLayout->addWidget(cleardtc_btn);
 
+  auto forcewifi_btn = new ButtonControl("Wifi Force Connect", tr("RUN"));
+  QObject::connect(forcewifi_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+      QProcess::execute("/data/openpilot/scripts/wifi_force_connect.sh");
+    }
+  });
+  communityLayout->addWidget(forcewifi_btn);
+
+  auto rebuild_btn = new ButtonControl("Scons rebuild", tr("RUN"));
+  QObject::connect(rebuild_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+      QProcess::execute("/data/openpilot/scripts/rebuild.sh");
+    }
+  });
+  communityLayout->addWidget(rebuild_btn);
+
   auto pandaflash_btn = new ButtonControl("Panda Flash", tr("RUN"));
   QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), this)) {
@@ -703,13 +682,39 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   });
   communityLayout->addWidget(pandarecover_btn);
 
-  auto rebuild_btn = new ButtonControl("Scons rebuild", tr("RUN"));
-  QObject::connect(rebuild_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
-      QProcess::execute("/data/openpilot/scripts/rebuild.sh");
+  communityLayout->addWidget(horizontal_line());
+  communityLayout->addWidget(new LateralControlSelect());
+  communityLayout->addWidget(new MfcSelect());
+  communityLayout->addWidget(new AebSelect());
+  communityLayout->addWidget(horizontal_line());
+
+  // add community toggle
+  QList<ParamControl*> toggles;
+  toggles.append(new ParamControl("LongControl",
+                                  tr("Longitudinal control Enable"),
+                                  tr("<b>WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.</b>"),
+                                  "../assets/offroad/icon_long.png", this));
+  toggles.append(new ParamControl("PutPrebuilt",
+                                  tr("Prebuilt Enable"),
+                                  tr("Create prebuilt files to speed bootup"),
+                                  "../assets/offroad/icon_addon.png", this));
+  toggles.append(new ParamControl("LoggerDisable",
+                                  tr("Logger Disable"),
+                                  tr("Disable Logger is Reduce system load"),
+                                  "../assets/offroad/icon_addon.png", this));
+  toggles.append(new ParamControl("NavDisable",
+                                  tr("Navigation Disable"),
+                                  tr("Navigation Function not use"),
+                                  "../assets/offroad/icon_addon.png", this));
+  toggles.append(new ParamControl("NewRadarInterface",
+                                  tr("New radar interface Enable"),
+                                  tr("Some newer car New radar interface"),
+                                  "../assets/offroad/icon_road.png", this));
+  for (ParamControl *toggle : toggles) {
+    if (main_layout->count() != 0) {
     }
-  });
-  communityLayout->addWidget(rebuild_btn);
+    communityLayout->addWidget(toggle);
+  }
 }
 
 SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
@@ -954,71 +959,6 @@ void AebSelect::refresh() {
     label.setText(QString::fromStdString("Scc12"));
   } else if (aeb == "1") {
     label.setText(QString::fromStdString("Fca11"));
-  }
-  btnminus.setText("◀");
-  btnplus.setText("▶");
-}
-
-//LongControlSelect
-LongControlSelect::LongControlSelect() : AbstractControl("LongControl [√]", tr("LongControl Select (Mad/Mad+Long)"), "../assets/offroad/icon_long.png") {
-  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
-  label.setStyleSheet("color: #e0e879");
-  hlayout->addWidget(&label);
-
-  btnminus.setStyleSheet(R"(
-    padding: 0;
-    border-radius: 50px;
-    font-size: 45px;
-    font-weight: 500;
-    color: #E4E4E4;
-    background-color: #393939;
-  )");
-  btnplus.setStyleSheet(R"(
-    padding: 0;
-    border-radius: 50px;
-    font-size: 45px;
-    font-weight: 500;
-    color: #E4E4E4;
-    background-color: #393939;
-  )");
-  btnminus.setFixedSize(120, 100);
-  btnplus.setFixedSize(120, 100);
-
-  hlayout->addWidget(&btnminus);
-  hlayout->addWidget(&btnplus);
-
-  QObject::connect(&btnminus, &QPushButton::released, [=]() {
-    auto str = QString::fromStdString(Params().get("LongControlSelect"));
-    int longcontrol = str.toInt();
-    longcontrol = longcontrol - 1;
-    if (longcontrol <= 0 ) {
-      longcontrol = 0;
-    }
-    QString longcontrols = QString::number(longcontrol);
-    Params().put("LongControlSelect", longcontrols.toStdString());
-    refresh();
-  });
-
-  QObject::connect(&btnplus, &QPushButton::released, [=]() {
-    auto str = QString::fromStdString(Params().get("LongControlSelect"));
-    int longcontrol = str.toInt();
-    longcontrol = longcontrol + 1;
-    if (longcontrol >= 1 ) {
-      longcontrol = 1;
-    }
-    QString longcontrols = QString::number(longcontrol);
-    Params().put("LongControlSelect", longcontrols.toStdString());
-    refresh();
-  });
-  refresh();
-}
-
-void LongControlSelect::refresh() {
-  QString longcontrol = QString::fromStdString(Params().get("LongControlSelect"));
-  if (longcontrol == "0") {
-    label.setText(QString::fromStdString("Mad"));
-  } else if (longcontrol == "1") {
-    label.setText(QString::fromStdString("Mad+Long"));
   }
   btnminus.setText("◀");
   btnplus.setText("▶");

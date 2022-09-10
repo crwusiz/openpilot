@@ -58,9 +58,9 @@ class SccSmoother:
   def __init__(self):
     self.btn = Buttons.NONE
 
-    self.longcontrol = Params().get("LongControlSelect", encoding='utf8') == "1"
-    self.is_metric = Params().get_bool('IsMetric')
-    self.e2e_long = Params().get_bool('EndToEndLong')
+    self.longcontrol = Params().get_bool("LongControl")
+    self.is_metric = Params().get_bool("IsMetric")
+    self.e2e_long = Params().get_bool("EndToEndLong")
 
     self.speed_conv_to_ms = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
     self.speed_conv_to_clu = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH

@@ -45,7 +45,7 @@ def manager_init() -> None:
 
     # add
     ("SshEnabled", "1"),
-    ("LongControlSelect", "0"),
+    ("LongControl", "0"),
     ("IsLdwEnabled", "1"),
     ("AutoLaneChangeEnabled", "1"),
     ("PutPrebuilt", "0"),
