@@ -76,7 +76,7 @@
 <context>
     <name>AebSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="+903"/>
+        <location filename="../qt/offroad/settings.cc" line="+901"/>
         <source>AEB Signal Select (Scc12/Fca11)</source>
         <translation>차량의 AEB 신호를 선택합니다. (Scc12/Fca11)</translation>
     </message>
@@ -84,7 +84,7 @@
 <context>
     <name>CommunityPanel</name>
     <message>
-        <location line="-334"/>
+        <location line="-332"/>
         <location line="+23"/>
         <source>Select your car</source>
         <translation>차량을 선택하세요</translation>
@@ -558,8 +558,8 @@ location set</source>
     <name>MfcSelect</name>
     <message>
         <location filename="../qt/offroad/settings.cc" line="+69"/>
-        <source>MFC Camera Select (Lkas/Ldws/Lfa/HDA2)</source>
-        <translation>차량의 MFC 카메라를 선택합니다. (Lkas/Ldws/Lfa/HDA2)</translation>
+        <source>MFC Camera Select (Auto/Ldws,Lkas/Lfa)</source>
+        <translation>차량의 MFC 카메라를 선택합니다. (Auto/Ldws,Lkas/Lfa)</translation>
     </message>
 </context>
 <context>

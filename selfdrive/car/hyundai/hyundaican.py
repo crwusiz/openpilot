@@ -20,22 +20,17 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, cut_st
   values["CF_Lkas_MsgCount"] = frame % 0x10
   values["CF_Lkas_Chksum"] = 0
 
-  if Params().get("MfcSelect", encoding='utf8') == "0": # This field is LKAS Mfc car ( qt ui toggle set )
-    if car_fingerprint == CAR.GENESIS:
-      values["CF_Lkas_LdwsActivemode"] = 2
-      values["CF_Lkas_SysWarning"] = lkas11["CF_Lkas_SysWarning"]
-    elif car_fingerprint in [CAR.K5, CAR.K5_HEV, CAR.K7, CAR.K7_HEV]:
-      values["CF_Lkas_LdwsActivemode"] = 0
-      values["CF_Lkas_LdwsSysState"] = 3 if enabled else 1
-      values["CF_Lkas_LdwsOpt_USM"] = 2  # non-2 changes above SysState definition
-      values["CF_Lkas_FcwOpt_USM"] = 0
+  if car_fingerprint == CAR.GENESIS:
+    values["CF_Lkas_LdwsActivemode"] = 2
+    values["CF_Lkas_SysWarning"] = lkas11["CF_Lkas_SysWarning"]
 
-  if Params().get("MfcSelect", encoding='utf8') == "1": # This field is LDWS Mfc car ( qt ui toggle set )
+  elif Params().get("MfcSelect", encoding='utf8') == "1": # This field is LDWS & LKAS Mfc car ( qt ui toggle set )
     values["CF_Lkas_LdwsActivemode"] = 0
     values["CF_Lkas_LdwsOpt_USM"] = 3
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
+    values["CF_Lkas_SysWarning"] = 4 if sys_warning else 0
 
-  if Params().get("MfcSelect", encoding='utf8') == "2": # This field is LFA Mfc car ( qt ui toggle set )
+  elif Params().get("MfcSelect", encoding='utf8') == "2": # This field is LFA Mfc car ( qt ui toggle set )
     values["CF_Lkas_LdwsActivemode"] = int(left_lane) + (int(right_lane) << 1)
     values["CF_Lkas_LdwsOpt_USM"] = 2
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
