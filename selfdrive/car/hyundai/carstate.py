@@ -84,17 +84,14 @@ class CarState(CarStateBase):
     ret.steeringAngleDeg = cp_sas.vl["SAS11"]["SAS_Angle"]
     ret.steeringRateDeg = cp_sas.vl["SAS11"]["SAS_Speed"]
     ret.steeringTorque = cp_mdps.vl["MDPS12"]["CR_Mdps_StrColTq"]
-    ret.steeringTorqueEps = cp_mdps.vl["MDPS12"]["CR_Mdps_OutTq"] / 10.  # scale to Nm
+    ret.steeringTorqueEps = cp_mdps.vl["MDPS12"]["CR_Mdps_OutTq"]
     ret.steeringPressed = abs(ret.steeringTorque) > self.params.STEER_THRESHOLD
     ret.yawRate = cp.vl["ESP12"]["YAW_RATE"]
     ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["CGW1"]["CF_Gway_TurnSigLh"],
                                                                       cp.vl["CGW1"]["CF_Gway_TurnSigRh"])
 
-    if not ret.standstill and cp_mdps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0:
-      self.mdps_error_cnt += 1
-    else:
-      self.mdps_error_cnt = 0
-    ret.steerFaultTemporary = self.mdps_error_cnt > 50
+    self.mdps_error_cnt += 1 if cp_mdps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 else -self.mdps_error_cnt
+    ret.steerFaultTemporary = self.mdps_error_cnt > 100
 
     if self.CP.enableAutoHold:
       ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]

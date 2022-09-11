@@ -208,7 +208,7 @@ class CarController:
         set_speed *= CV.MS_TO_KPH if CS.metric else CV.MS_TO_MPH
 
         stopping = (actuators.longControlState == LongCtrlState.stopping)
-        apply_accel = self.scc_smoother.get_apply_accel(CS, controls.sm, actuators.accel, stopping)
+        apply_accel = self.scc_smoother.get_apply_accel(CS, actuators.accel)
         apply_accel = clip(apply_accel if CC.longActive else 0,
                            CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
         self.accel = apply_accel
@@ -218,7 +218,7 @@ class CarController:
         self.scc12_cnt += 1
         self.scc12_cnt %= 0xF
 
-        can_sends.append(hyundaican.create_scc11(self.packer, self.frame, CC.enabled, set_speed, hud_control.leadVisible, self.scc_live, CS.scc11))
+        can_sends.append(hyundaican.create_scc11(self.packer, self.frame, CC.enabled, set_speed, self.scc_live, CS.scc11))
 
         can_sends.append(hyundaican.create_scc12(self.packer, apply_accel, CC.enabled, self.scc12_cnt, self.scc_live, CS.scc12,
                                                  CS.out.gasPressed, CS.out.brakePressed, CS.out.cruiseState.standstill, self.CP.carFingerprint))
@@ -281,7 +281,7 @@ class CarController:
         # cruise standstill resume
       elif CC.cruiseControl.resume:
         if not (self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS):
-          can_sends.append(hyundaicanfd.create_buttons(self.packer, CS.buttons_counter+1, Buttons.RES_ACCEL))
+          can_sends.append(hyundaicanfd.create_buttons(self.packer, CS.buttons_counter + 1, Buttons.RES_ACCEL))
           self.last_button_frame = self.frame
 
     new_actuators = actuators.copy()

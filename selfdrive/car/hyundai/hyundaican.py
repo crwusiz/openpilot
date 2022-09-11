@@ -102,7 +102,7 @@ def create_mdps12(packer, frame, mdps12):
   return packer.make_can_msg("MDPS12", 2, values)
 
 
-def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc11):
+def create_scc11(packer, frame, enabled, set_speed, scc_live, scc11):
   values = copy.copy(scc11)
   values["AliveCounterACC"] = frame // 2 % 0x10
 

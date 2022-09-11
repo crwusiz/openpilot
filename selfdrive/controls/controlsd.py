@@ -425,11 +425,11 @@ class Controls:
         self.events.add(EventName.localizerMalfunction)
 
     # Only allow engagement with brake pressed when stopped behind another stopped car
-    speeds = self.sm['longitudinalPlan'].speeds
-    if len(speeds) > 1:
-      v_future = speeds[-1]
-    else:
-      v_future = 100.0
+    #speeds = self.sm['longitudinalPlan'].speeds
+    #if len(speeds) > 1:
+    #  v_future = speeds[-1]
+    #else:
+    #  v_future = 100.0
     #if CS.brakePressed and v_future >= self.CP.vEgoStarting \
     #  and self.CP.openpilotLongitudinalControl and CS.vEgo < 0.3:
     #  self.events.add(EventName.noTarget)
@@ -469,8 +469,7 @@ class Controls:
       self.mismatch_counter = 0
 
     # All pandas not in silent mode must have controlsAllowed when openpilot is enabled
-    if self.enabled and any(not ps.controlsAllowed for ps in self.sm['pandaStates']
-           if ps.safetyModel not in IGNORED_SAFETY_MODES):
+    if self.enabled and any(not ps.controlsAllowed for ps in self.sm['pandaStates'] if ps.safetyModel not in IGNORED_SAFETY_MODES):
       self.mismatch_counter += 1
 
     self.distance_traveled += CS.vEgo * DT_CTRL
@@ -486,7 +485,7 @@ class Controls:
     SccSmoother.update_cruise_buttons(self, CS, self.CP.openpilotLongitudinalControl)
 
     #if CS.cruiseState.available:
-      # if stock cruise is completely disabled, then we can use our own set speed logic
+    # if stock cruise is completely disabled, then we can use our own set speed logic
     #  if not self.CP.pcmCruise:
     #    self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents,
     #                                        self.button_timers, self.enabled, self.is_metric)

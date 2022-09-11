@@ -5,10 +5,8 @@ from common.params import Params
 from common.numpy_fast import interp
 from common.conversions import Conversions as CV
 from selfdrive.car.hyundai.values import HyundaiFlags, CAR, Buttons, CarControllerParams, CANFD_CAR
-from selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR
 from selfdrive.car import STD_CARGO_KG, create_button_event, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
-from selfdrive.car.disable_ecu import disable_ecu
 from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
 
 ButtonType = car.CarState.ButtonEvent.Type
@@ -208,72 +206,42 @@ class CarInterface(CarInterfaceBase):
 
     # Pid -----------------------------------------------------------------
     if Params().get("LateralControlSelect", encoding='utf8') == "0":
+      ret.lateralTuning.pid.kf = 0.00005
+      ret.lateralTuning.pid.kpBP = [0.]
+      ret.lateralTuning.pid.kiBP = [0.]
+
       if candidate == CAR.PALISADE:
-        ret.lateralTuning.pid.kf = 0.00005
-        ret.lateralTuning.pid.kpBP = [0.]
         ret.lateralTuning.pid.kpV = [0.3]
-        ret.lateralTuning.pid.kiBP = [0.]
         ret.lateralTuning.pid.kiV = [0.05]
       elif candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
-        ret.lateralTuning.pid.kf = 0.00005
-        ret.lateralTuning.pid.kpBP = [0.]
         ret.lateralTuning.pid.kpV = [0.16]
-        ret.lateralTuning.pid.kiBP = [0.]
         ret.lateralTuning.pid.kiV = [0.01]
       else:
-        ret.lateralTuning.pid.kf = 0.00005
-        ret.lateralTuning.pid.kpBP = [0.]
         ret.lateralTuning.pid.kpV = [0.25]
-        ret.lateralTuning.pid.kiBP = [0.]
         ret.lateralTuning.pid.kiV = [0.05]
 
     # Indi -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "1":
       ret.lateralTuning.init('indi')
-      if candidate == CAR.IONIQ_HEV:
-        ret.lateralTuning.indi.innerLoopGainBP = [0.]
+      ret.lateralTuning.indi.innerLoopGainBP = [0.]
+      ret.lateralTuning.indi.outerLoopGainBP = [0.]
+      ret.lateralTuning.indi.timeConstantBP = [0.]
+      ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
+
+      if candidate in [CAR.IONIQ_HEV, CAR.GENESIS_G70]:
         ret.lateralTuning.indi.innerLoopGainV = [2.5]
-        ret.lateralTuning.indi.outerLoopGainBP = [0.]
         ret.lateralTuning.indi.outerLoopGainV = [3.5]
-        ret.lateralTuning.indi.timeConstantBP = [0.]
         ret.lateralTuning.indi.timeConstantV = [1.4]
-        ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
         ret.lateralTuning.indi.actuatorEffectivenessV = [1.8]
       elif candidate == CAR.SELTOS:
-        ret.lateralTuning.indi.innerLoopGainBP = [0.]
         ret.lateralTuning.indi.innerLoopGainV = [4.]
-        ret.lateralTuning.indi.outerLoopGainBP = [0.]
         ret.lateralTuning.indi.outerLoopGainV = [3.]
-        ret.lateralTuning.indi.timeConstantBP = [0.]
         ret.lateralTuning.indi.timeConstantV = [1.4]
-        ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
-        ret.lateralTuning.indi.actuatorEffectivenessV = [1.8]
-      elif candidate == CAR.GENESIS:
-        ret.lateralTuning.indi.innerLoopGainBP = [0.]
-        ret.lateralTuning.indi.innerLoopGainV = [3.5]
-        ret.lateralTuning.indi.outerLoopGainBP = [0.]
-        ret.lateralTuning.indi.outerLoopGainV = [2.0]
-        ret.lateralTuning.indi.timeConstantBP = [0.]
-        ret.lateralTuning.indi.timeConstantV = [1.4]
-        ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
-        ret.lateralTuning.indi.actuatorEffectivenessV = [2.3]
-      elif candidate == CAR.GENESIS_G70:
-        ret.lateralTuning.indi.innerLoopGainBP = [0.]
-        ret.lateralTuning.indi.innerLoopGainV = [2.5]
-        ret.lateralTuning.indi.outerLoopGainBP = [0.]
-        ret.lateralTuning.indi.outerLoopGainV = [3.5]
-        ret.lateralTuning.indi.timeConstantBP = [0.]
-        ret.lateralTuning.indi.timeConstantV = [1.4]
-        ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
         ret.lateralTuning.indi.actuatorEffectivenessV = [1.8]
       else:
-        ret.lateralTuning.indi.innerLoopGainBP = [0.]
         ret.lateralTuning.indi.innerLoopGainV = [3.5]
-        ret.lateralTuning.indi.outerLoopGainBP = [0.]
         ret.lateralTuning.indi.outerLoopGainV = [2.0]
-        ret.lateralTuning.indi.timeConstantBP = [0.]
         ret.lateralTuning.indi.timeConstantV = [1.4]
-        ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
         ret.lateralTuning.indi.actuatorEffectivenessV = [2.3]
 
     # Lqr -----------------------------------------------------------------
@@ -382,17 +350,8 @@ class CarInterface(CarInterfaceBase):
 
     ret.pcmCruise = not ret.radarOffCan
 
-    #if ret.openpilotLongitudinalControl:
-    #  ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LONG
-
-    #ret.radarOffCan = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
-
     return ret
 
-  #@staticmethod
-  #def init(CP, logcan, sendcan):
-  #  if CP.openpilotLongitudinalControl:
-  #    disable_ecu(logcan, sendcan, addr=0x7d0, com_cont_req=b'\x28\x83\x01')
 
   def _update(self, c):
     ret = self.CS.update(self.cp, self.cp2, self.cp_cam)
