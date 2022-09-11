@@ -76,7 +76,7 @@
 <context>
     <name>AebSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="+901"/>
+        <location filename="../qt/offroad/settings.cc" line="+820"/>
         <source>AEB Signal Select (Scc12/Fca11)</source>
         <translation>차량의 AEB 신호를 선택합니다. (Scc12/Fca11)</translation>
     </message>
@@ -197,7 +197,7 @@
 <context>
     <name>DevicePanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-549"/>
+        <location filename="../qt/offroad/settings.cc" line="-468"/>
         <source>Dongle ID</source>
         <translation>Dongle ID</translation>
     </message>
@@ -436,7 +436,7 @@
 <context>
     <name>LateralControlSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="+427"/>
+        <location filename="../qt/offroad/settings.cc" line="+346"/>
         <source>LateralControl Select (Pid/Indi/Lqr/Torque)</source>
         <translation>조향 모드를 선택합니다. (Pid/Indi/Lqr/Torque)</translation>
     </message>
@@ -1105,7 +1105,7 @@ location set</source>
 <context>
     <name>SoftwarePanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-152"/>
+        <location filename="../qt/offroad/software_settings.cc" line="+29"/>
         <source>Git Remote</source>
         <translation>Git 리모트</translation>
     </message>
@@ -1125,53 +1125,42 @@ location set</source>
         <translation>OS 버전</translation>
     </message>
     <message>
-        <location line="+1"/>
-        <source>Version</source>
-        <translation>버전</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Last Update Check</source>
-        <translation>최신 업데이트 검사</translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>The last time openpilot successfully checked for an update. The updater only runs while the car is off.</source>
-        <translation>최근에 openpilot이 업데이트를 성공적으로 확인했습니다. 업데이트 프로그램은 차량 연결이 해제되었을때만 작동합니다.</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Check for Update</source>
-        <translation>업데이트 확인</translation>
-    </message>
-    <message>
-        <location line="+5"/>
+        <location line="+8"/>
         <source>CHECKING</source>
         <translation>확인중</translation>
     </message>
     <message>
-        <location line="+7"/>
-        <source>Switch Branch</source>
-        <translation>브랜치 변경</translation>
+        <location line="-7"/>
+        <source>Current Version</source>
+        <translation>현재 버전</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Check for update</source>
+        <translation>최신 업데이트 검사</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Target Branch</source>
+        <translation>대상 브랜치</translation>
     </message>
     <message>
         <location line="+0"/>
-        <source>ENTER</source>
-        <translation>입력하세요</translation>
+        <source>CHANGE</source>
+        <translation>변경</translation>
     </message>
     <message>
         <location line="+0"/>
-        <location line="+2"/>
-        <source>The new branch will be pulled the next time the updater runs.</source>
+        <source>The target branch will be pulled the next time the updater runs.</source>
         <translation>다음 업데이트 프로그램이 실행될 때 새 브랜치가 적용됩니다.</translation>
     </message>
     <message>
-        <location line="+0"/>
-        <source>Enter branch name</source>
-        <translation>브랜치명 입력</translation>
+        <location line="+4"/>
+        <source>Select a branch</source>
+        <translation>브랜치 선택</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+9"/>
         <source>UNINSTALL</source>
         <translation>제거</translation>
     </message>
@@ -1192,7 +1181,7 @@ location set</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+21"/>
+        <location line="+23"/>
         <source>CHECK</source>
         <translation>확인</translation>
     </message>
@@ -1210,7 +1199,7 @@ location set</source>
         <translation>경고: 허용으로 설정하면 GitHub 설정의 모든 공용 키에 대한 SSH 액세스 권한이 부여됩니다. GitHub 사용자 ID 이외에는 입력하지 마십시오. comma에서는 GitHub ID를 추가하라는 요청을 하지 않습니다.</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+2"/>
         <location line="+24"/>
         <source>ADD</source>
         <translation>추가</translation>
@@ -1280,7 +1269,7 @@ location set</source>
 <context>
     <name>TogglesPanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-374"/>
+        <location filename="../qt/offroad/settings.cc" line="-373"/>
         <source>Enable openpilot</source>
         <translation>openpilot 사용</translation>
     </message>
