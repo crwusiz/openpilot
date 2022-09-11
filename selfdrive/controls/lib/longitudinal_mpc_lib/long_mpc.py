@@ -42,7 +42,6 @@ LEAD_DANGER_FACTOR = 0.75
 LIMIT_COST = 1e6
 ACADOS_SOLVER_TYPE = 'SQP_RTI'
 
-
 CRUISE_GAP_BP = [1., 2., 3., 4.]
 CRUISE_GAP_V = [1.2, 1.4, 1.6, 1.8]
 CRUISE_GAP_E2E_V = [1.3, 1.45, 1.6, 1.8]
@@ -52,7 +51,6 @@ AUTO_TR_V = [1.2, 1.3, 1.4, 1.5]
 
 AUTO_TR_CRUISE_GAP = 4
 DIFF_RADAR_VISION = 1.0
-
 
 # Fewer timestamps don't hurt performance and lead to
 # much better convergence of the MPC with low iterations
@@ -66,7 +64,7 @@ MIN_ACCEL = -3.5
 MAX_ACCEL = 2.0
 T_FOLLOW = 1.45
 COMFORT_BRAKE = 2.5
-STOP_DISTANCE = 6.0
+STOP_DISTANCE = 8.0
 
 def get_stopped_equivalence_factor(v_lead):
   return (v_lead**2) / (2 * COMFORT_BRAKE)

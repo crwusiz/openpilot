@@ -284,9 +284,10 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
   if (addr == 832) {
     LKAS11_op = 20;
     int desired_torque = ((GET_BYTES_04(to_send) >> 16) & 0x7ffU) - 1024U;
-    bool steer_req = GET_BIT(to_send, 27U) != 0U;
+    //bool steer_req = GET_BIT(to_send, 27U) != 0U;
 
-    if (steer_torque_cmd_checks(desired_torque, steer_req, HYUNDAI_COMMUNITY_STEERING_LIMITS)) {
+    //if (steer_torque_cmd_checks(desired_torque, steer_req, HYUNDAI_COMMUNITY_STEERING_LIMITS)) {
+    if (steer_torque_cmd_checks(desired_torque, -1, HYUNDAI_COMMUNITY_STEERING_LIMITS)) {
       tx = 0;
     }
   }
