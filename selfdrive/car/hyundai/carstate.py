@@ -5,7 +5,7 @@ from cereal import car
 from common.conversions import Conversions as CV
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
-from selfdrive.car.hyundai.values import HyundaiFlags, DBC, CarControllerParams, Buttons, FEATURES, EV_CAR, HYBRID_CAR, EV_HYBRID_CAR, CAR, CANFD_CAR, FCA11_CAR
+from selfdrive.car.hyundai.values import HyundaiFlags, DBC, CarControllerParams, Buttons, FEATURES, EV_CAR, HEV_CAR, EV_HEV_CAR, CAR, CANFD_CAR, FCA11_CAR
 from selfdrive.car.interfaces import CarStateBase
 
 PREV_BUTTON_SAMPLES = 8
@@ -126,8 +126,8 @@ class CarState(CarStateBase):
 
     ret.gasPressed = cp.vl["TCS13"]["DriverOverride"] == 1
 
-    if self.CP.carFingerprint in EV_HYBRID_CAR:
-      if self.CP.carFingerprint in HYBRID_CAR:
+    if self.CP.carFingerprint in EV_HEV_CAR:
+      if self.CP.carFingerprint in HEV_CAR:
         ret.gas = cp.vl["E_EMS11"]["CR_Vcu_AccPedDep_Pos"] / 254.
       else:
         ret.gas = cp.vl["E_EMS11"]["Accel_Pedal_Pos"] / 254.
@@ -435,8 +435,8 @@ class CarState(CarStateBase):
       ]
       checks.append(("ESP11", 50))
 
-    if CP.carFingerprint in EV_HYBRID_CAR:
-      if CP.carFingerprint in HYBRID_CAR:
+    if CP.carFingerprint in EV_HEV_CAR:
+      if CP.carFingerprint in HEV_CAR:
         signals.append(("CR_Vcu_AccPedDep_Pos", "E_EMS11"))
       else:
         signals.append(("Accel_Pedal_Pos", "E_EMS11"))
