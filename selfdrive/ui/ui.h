@@ -140,6 +140,7 @@ public:
 
   bool awake;
   int prime_type = 0;
+  QString language;
 
   QTransform car_space_transform;
   bool wide_camera;
