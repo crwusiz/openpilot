@@ -292,7 +292,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
       bool torque_check = 0;
       violation |= torque_check = max_limit_check(desired_torque, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer, -HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer);
       if (torque_check) {
-        puts("  LKAS TX not allowed: torque limit check failed!\n");}
+        puts("  LKAS TX not allowed : torque limit check failed!\n");}
 
       // *** torque rate limit check ***
       bool torque_rate_check = 0;
@@ -300,7 +300,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
         HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_rate_up, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_rate_down,
         HYUNDAI_COMMUNITY_STEERING_LIMITS.driver_torque_allowance, HYUNDAI_COMMUNITY_STEERING_LIMITS.driver_torque_factor);
       if (torque_rate_check) {
-        puts("  LKAS TX not allowed: torque rate limit check failed!\n");}
+        puts("  LKAS TX not allowed : torque rate limit check failed!\n");}
 
       // used next time
       desired_torque_last = desired_torque;
@@ -309,13 +309,13 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
       bool torque_rt_check = 0;
       violation |= torque_rt_check = rt_rate_limit_check(desired_torque, rt_torque_last, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_rt_delta);
       if (torque_rt_check) {
-        puts("  LKAS TX not allowed: torque real time rate limit check failed!\n");}
+        puts("  LKAS TX not allowed : torque real time rate limit check failed!\n");}
 
       // every RT_INTERVAL set the new limits
-      uint32_t ts_elapsed = get_ts_elapsed(ts, ts_torque_check_last);
+      uint32_t ts_elapsed = get_ts_elapsed(ts, ts_last);
       if (ts_elapsed > HYUNDAI_COMMUNITY_STEERING_LIMITS.max_rt_interval) {
         rt_torque_last = desired_torque;
-        ts_torque_check_last = ts;
+        ts_last = ts;
       }
     }
 
@@ -329,7 +329,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
     if (!controls_allowed) { // a reset worsen the issue of Panda blocking some valid LKAS messages
       desired_torque_last = 0;
       rt_torque_last = 0;
-      ts_torque_check_last = ts;
+      ts_last = ts;
     }
 
     if (violation) {

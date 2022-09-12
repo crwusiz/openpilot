@@ -1105,54 +1105,34 @@ location set</source>
 <context>
     <name>SoftwarePanel</name>
     <message>
-        <location filename="../qt/offroad/software_settings.cc" line="+29"/>
-        <source>Git Remote</source>
-        <translation>Git 리모트</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Git Branch</source>
-        <translation>Git 브렌치</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Git Commit</source>
-        <translation>Git 커밋</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>OS Version</source>
-        <translation>OS 버전</translation>
-    </message>
-    <message>
-        <location line="+8"/>
-        <source>CHECKING</source>
-        <translation>확인중</translation>
-    </message>
-    <message>
-        <location line="-7"/>
+        <location filename="../qt/offroad/software_settings.cc" line="+32"/>
         <source>Current Version</source>
         <translation>현재 버전</translation>
     </message>
     <message>
-        <location line="+3"/>
-        <source>Check for update</source>
-        <translation>최신 업데이트 검사</translation>
-    </message>
-    <message>
-        <location line="+12"/>
+        <location line="+26"/>
         <source>Target Branch</source>
         <translation>대상 브랜치</translation>
     </message>
     <message>
-        <location line="+0"/>
-        <source>CHANGE</source>
-        <translation>변경</translation>
+        <location line="-26"/>
+        <source>VIEW</source>
+        <translation>보기</translation>
     </message>
     <message>
-        <location line="+0"/>
-        <source>The target branch will be pulled the next time the updater runs.</source>
-        <translation>다음 업데이트 프로그램이 실행될 때 새 브랜치가 적용됩니다.</translation>
+        <location line="+5"/>
+        <source>Download</source>
+        <translation>다운로드</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Install Update</source>
+        <translation>업데이트 설치</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>SELECT</source>
+        <translation>선택</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -1160,7 +1140,7 @@ location set</source>
         <translation>브랜치 선택</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+12"/>
         <source>UNINSTALL</source>
         <translation>제거</translation>
     </message>
@@ -1173,17 +1153,6 @@ location set</source>
         <location line="+2"/>
         <source>Are you sure you want to uninstall?</source>
         <translation>제거하시겠습니까?</translation>
-    </message>
-    <message>
-        <location line="+17"/>
-        <source>failed to fetch update</source>
-        <translation>업데이트를 가져올수없습니다</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <location line="+23"/>
-        <source>CHECK</source>
-        <translation>확인</translation>
     </message>
 </context>
 <context>
