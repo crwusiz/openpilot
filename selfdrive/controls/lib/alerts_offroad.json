@@ -1,52 +1,40 @@
 {
   "Offroad_TemperatureTooHigh": {
-    "text": "장치 온도가 너무 높아서 시스템이 시작되지 않습니다.",
     "severity": 1
   },
   "Offroad_ConnectivityNeededPrompt": {
-    "text": "네트워크를 연결하여 업데이트를 확인하세요. 그렇지 않으면 오픈파일럿이 활성화되지 않습니다.",
     "severity": 0,
     "_comment": "Append the number of days at the end of the text"
   },
   "Offroad_ConnectivityNeeded": {
-    "text": "네트워크를 연결하여 업데이트를 확인하세요. 그렇지 않으면 오픈파일럿이 활성화되지 않습니다.",
     "severity": 1
   },
   "Offroad_UpdateFailed": {
-    "text": "업데이트를 다운로드할 수 없습니다\n",
     "severity": 1,
     "_comment": "Append the command and error to the text."
   },
   "Offroad_InvalidTime": {
-    "text": "잘못된 날짜 및 시간설정으로 시스템이 시작되지않습니다. 네트워크에 연결하여 날짜 및 시간설정을 진행하세요.",
     "severity": 1
   },
   "Offroad_IsTakingSnapshot": {
-    "text": "카메라 스냅샷 촬영이 완료되지않아 시스템이 시작되지 않습니다.",
     "severity": 0
   },
   "Offroad_NeosUpdate": {
-    "text": "NEOS 운영 체제에 대한 업데이트가 백그라운드에서 다운로드되는중 입니다. 설치할 준비가 되면 업데이트하라는 메시지가 표시됩니다.",
     "severity": 0
   },
   "Offroad_UnofficialHardware": {
-    "text": "장치를 등록하지 못했습니다. comma.ai 서버에 연결하거나 업로드하지 않으며 comma.ai에서 지원을 받지 않습니다. 이게 공식적인 장치라면 support@comma.ai 로 문의하세요",
     "severity": 1
   },
   "Offroad_StorageMissing": {
-    "text": "저장장치가 마운트되지않았습니다.",
     "severity": 1
   },
   "Offroad_BadNvme": {
-    "text": "Unsupported NVMe drive detected. Device may draw significantly more power and overheat due to the unsupported NVMe.",
     "severity": 1
   },
   "Offroad_CarUnrecognized": {
-    "text": "차량을 인식하지 못했습니다. 커뮤니티 설정에서 차량을 선택하세요.",
     "severity": 0
   },
   "Offroad_NoFirmware": {
-    "text": "차량을 인식하지 못했습니다. 커뮤니티 설정에서 차량을 선택하세요.",
     "severity": 0
   }
 }
