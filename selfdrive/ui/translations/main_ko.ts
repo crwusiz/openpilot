@@ -623,6 +623,71 @@ location set</source>
     </message>
 </context>
 <context>
+    <name>OffroadAlert</name>
+    <message>
+        <location filename="../qt/widgets/offroad_alerts.cc" line="+26"/>
+        <source>Device temperature too high. System won&apos;t start.</source>
+        <translation>장치 온도가 너무 높아 시스템을 시작할수 없습니다.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Immediately connect to the internet to check for updates. If you do not connect to the internet, openpilot won&apos;t engage in %1</source>
+        <translation>네트워크를 연결하여 업데이트를 확인하세요. 네트워크 연결이 확인되지않으면 오픈파일럿이 시작되지 않습니다. %1</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Connect to internet to check for updates. openpilot won&apos;t automatically start until it connects to internet to check for updates.</source>
+        <translation>네트워크를 연결하여 업데이트를 확인하세요. 네트워크 연결이 확인되지않으면 오픈파일럿이 자동으로 시작되지 않습니다.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Unable to download updates
+%1</source>
+        <translation>업데이트를 다운로드할수 없습니다
+%1</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Invalid date and time settings, system won&apos;t start. Connect to internet to set time.</source>
+        <translation>잘못된 날짜 및 시간설정으로 시스템이 시작되지않습니다. 네트워크에 연결하여 날짜 및 시간설정을 진행하세요.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Taking camera snapshots. System won&apos;t start until finished.</source>
+        <translation>카메라 스냅샷 촬영이 완료될 때까지 시스템이 시작되지 않습니다.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>An update to your device&apos;s operating system is downloading in the background. You will be prompted to update when it&apos;s ready to install.</source>
+        <translation>백그라운드에서 운영 체제에 대한 업데이트를 다운로드하고 있습니다. 설치할 준비가 되면 업데이트하라는 메시지가 표시됩니다.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Device failed to register. It will not connect to or upload to comma.ai servers, and receives no support from comma.ai. If this is an official device, contact support@comma.ai.</source>
+        <translation>장치를 등록하지 못했습니다. comma.ai 서버에 연결하거나 업로드하지 않으며 comma.ai에서 지원을 받지 않습니다. 공식적인 장치라면 support@comma.ai 로 문의하세요</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>NVMe drive not mounted.</source>
+        <translation>NVMe 드라이브가 마운트되지 않았습니다.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Unsupported NVMe drive detected. Device may draw significantly more power and overheat due to the unsupported NVMe.</source>
+        <translation>지원되지 않는 NVMe 드라이브가 감지되었습니다. 지원되지 않는 NVMe 드라이브로 인해 장치가 훨씬 더 많은 전력을 소비하고 과열될 수 있습니다.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>openpilot was unable to identify your car. Your car is either unsupported or its ECUs are not recognized. Please submit a pull request to add the firmware versions to the proper vehicle. Need help? Join discord.comma.ai.</source>
+        <translation>opepilot이 차량을 식별할수 없었습니다. 지원되지 않는 차량이거나 ECU가 인식되지 않습니다. 해당 차량에 펌웨어 버전을 추가하려면 PR을 제출하십시오. 도움이 필요하시면 discord.comma.ai에 가입하세요.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>openpilot was unable to identify your car. Check integrity of cables and ensure all connections are secure, particularly that the comma power is fully inserted in the OBD-II port of the vehicle. Need help? Join discord.comma.ai.</source>
+        <translation>openpilot이 차량을 식별할수 없었습니다. 케이블의 무결성을 점검하고 모든 연결부, 특히 comma power가 차량의 OBD-II 포트에 완전히 삽입되었는지 확인하세요. 도움이 필요하시면 discord.comma.ai에 가입하세요.</translation>
+    </message>
+</context>
+<context>
     <name>OffroadHome</name>
     <message>
         <location filename="../qt/home.cc" line="+114"/>
@@ -630,7 +695,7 @@ location set</source>
         <translation>업데이트</translation>
     </message>
     <message>
-        <location line="+91"/>
+        <location line="+92"/>
         <source> ALERTS</source>
         <translation> 알림</translation>
     </message>
@@ -643,7 +708,7 @@ location set</source>
 <context>
     <name>PairingPopup</name>
     <message>
-        <location filename="../qt/widgets/prime.cc" line="+88"/>
+        <location filename="../qt/widgets/prime.cc" line="+89"/>
         <source>Pair your device to your comma account</source>
         <translation>장치를 콤마 계정과 페어링합니다</translation>
     </message>
@@ -1105,17 +1170,17 @@ location set</source>
 <context>
     <name>SoftwarePanel</name>
     <message>
-        <location filename="../qt/offroad/software_settings.cc" line="+32"/>
+        <location filename="../qt/offroad/software_settings.cc" line="+29"/>
         <source>Current Version</source>
         <translation>현재 버전</translation>
     </message>
     <message>
-        <location line="+26"/>
+        <location line="+25"/>
         <source>Target Branch</source>
         <translation>대상 브랜치</translation>
     </message>
     <message>
-        <location line="-26"/>
+        <location line="-25"/>
         <source>VIEW</source>
         <translation>보기</translation>
     </message>
@@ -1125,7 +1190,7 @@ location set</source>
         <translation>다운로드</translation>
     </message>
     <message>
-        <location line="+13"/>
+        <location line="+12"/>
         <source>Install Update</source>
         <translation>업데이트 설치</translation>
     </message>
@@ -1135,7 +1200,7 @@ location set</source>
         <translation>선택</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+12"/>
         <source>Select a branch</source>
         <translation>브랜치 선택</translation>
     </message>
