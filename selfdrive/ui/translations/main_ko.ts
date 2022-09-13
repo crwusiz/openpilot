@@ -76,7 +76,7 @@
 <context>
     <name>AebSelect</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="+820"/>
+        <location filename="../qt/offroad/settings.cc" line="+819"/>
         <source>AEB Signal Select (Scc12/Fca11)</source>
         <translation>차량의 AEB 신호를 선택합니다. (Scc12/Fca11)</translation>
     </message>
@@ -197,7 +197,7 @@
 <context>
     <name>DevicePanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-468"/>
+        <location filename="../qt/offroad/settings.cc" line="-467"/>
         <source>Dongle ID</source>
         <translation>Dongle ID</translation>
     </message>
@@ -280,7 +280,7 @@
         <translation>변경</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+3"/>
         <source>Select a language</source>
         <translation>언어를 선택하세요</translation>
     </message>
@@ -522,7 +522,7 @@ prime subscription. Sign up now: https://connect.comma.ai</source>
 등록：https://connect.comma.ai</translation>
     </message>
     <message>
-        <location line="+57"/>
+        <location line="+58"/>
         <source>No home
 location set</source>
         <translation>집
@@ -536,7 +536,7 @@ location set</source>
 설정되지않음</translation>
     </message>
     <message>
-        <location line="+113"/>
+        <location line="+120"/>
         <source>no recent destinations</source>
         <translation>최근 목적지 없음</translation>
     </message>
@@ -695,7 +695,7 @@ location set</source>
         <translation>업데이트</translation>
     </message>
     <message>
-        <location line="+92"/>
+        <location line="+93"/>
         <source> ALERTS</source>
         <translation> 알림</translation>
     </message>
@@ -1200,7 +1200,7 @@ location set</source>
         <translation>선택</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+13"/>
         <source>Select a branch</source>
         <translation>브랜치 선택</translation>
     </message>
@@ -1303,7 +1303,7 @@ location set</source>
 <context>
     <name>TogglesPanel</name>
     <message>
-        <location filename="../qt/offroad/settings.cc" line="-373"/>
+        <location filename="../qt/offroad/settings.cc" line="-372"/>
         <source>Enable openpilot</source>
         <translation>openpilot 사용</translation>
     </message>
