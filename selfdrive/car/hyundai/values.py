@@ -13,13 +13,13 @@ Ecu = car.CarParams.Ecu
 
 
 class CarControllerParams:
-  ACCEL_MAX = 2.0
-  ACCEL_MIN = -3.5
+  ACCEL_MIN = -3.5 # m/s
+  ACCEL_MAX = 2.0 # m/s
 
   def __init__(self, CP):
     self.STEER_MAX = 384
     self.STEER_DELTA_UP = 3
-    self.STEER_DELTA_DOWN = 6
+    self.STEER_DELTA_DOWN = 7
     self.STEER_DRIVER_ALLOWANCE = 50
     self.STEER_DRIVER_MULTIPLIER = 2
     self.STEER_DRIVER_FACTOR = 1
@@ -1400,12 +1400,14 @@ FW_VERSIONS = {
   CAR.EV6: {
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00CV1 MFC  AT USA LHD 1.00 1.05 99210-CV000 211027',
+      b'\xf1\x00CV1 MFC  AT EUR LHD 1.00 1.05 99210-CV000 211027',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00CV1_ RDR -----      1.00 1.01 99110-CV000         ',
       b'\xf1\x8799110CV000\xf1\x00CV1_ RDR -----      1.00 1.01 99110-CV000         ',
     ],
     (Ecu.abs, 0x7d1, None): [
+      b'\xf1\x00CV  IEB \x03 101!\x10\x18 58520-CV100',
       b'\xf1\x8758520CV100\xf1\x00CV  IEB \x02 101!\x10\x18 58520-CV100',
     ],
     (Ecu.eps, 0x7d4, None): [
