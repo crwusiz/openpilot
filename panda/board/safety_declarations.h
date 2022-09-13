@@ -139,6 +139,8 @@ bool gas_pressed = false;
 bool gas_pressed_prev = false;
 bool brake_pressed = false;
 bool brake_pressed_prev = false;
+bool regen_braking = false;
+bool regen_braking_prev = false;
 bool cruise_engaged_prev = false;
 float vehicle_speed = 0;
 bool vehicle_moving = false;
@@ -151,8 +153,7 @@ int rt_torque_last = 0;            // last desired torque for real time check
 int valid_steer_req_count = 0;     // counter for steer request bit matching non-zero torque
 struct sample_t torque_meas;       // last 6 motor torques produced by the eps
 struct sample_t torque_driver;     // last 6 driver torques measured
-uint32_t ts_last = 0;
-
+uint32_t ts_torque_check_last = 0;
 uint32_t ts_steer_req_mismatch_last = 0;  // last timestamp steer req was mismatched with torque
 
 // state for controls_allowed timeout logic

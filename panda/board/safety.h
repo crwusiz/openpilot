@@ -258,6 +258,12 @@ void generic_rx_checks(bool stock_ecu_detected) {
   }
   brake_pressed_prev = brake_pressed;
 
+  // exit controls on rising edge of regen paddle
+  if (regen_braking && (!regen_braking_prev || vehicle_moving)) {
+    controls_allowed = 0;
+  }
+  regen_braking_prev = regen_braking;
+
   // check if stock ECU is on bus broken by car harness
   if ((safety_mode_cnt > RELAY_TRNS_TIMEOUT) && stock_ecu_detected) {
     relay_malfunction_set();
@@ -322,6 +328,8 @@ int set_safety_hooks(uint16_t mode, uint16_t param) {
   gas_pressed_prev = false;
   brake_pressed = false;
   brake_pressed_prev = false;
+  regen_braking = false;
+  regen_braking_prev = false;
   cruise_engaged_prev = false;
   vehicle_speed = 0;
   vehicle_moving = false;
@@ -331,8 +339,7 @@ int set_safety_hooks(uint16_t mode, uint16_t param) {
   rt_torque_last = 0;
   ts_angle_last = 0;
   desired_angle_last = 0;
-  ts_last = 0;
-
+  ts_torque_check_last = 0;
   ts_steer_req_mismatch_last = 0;
   valid_steer_req_count = 0;
 
@@ -508,10 +515,10 @@ bool steer_torque_cmd_checks(int desired_torque, int steer_req, const SteeringLi
     violation |= rt_rate_limit_check(desired_torque, rt_torque_last, limits.max_rt_delta);
 
     // every RT_INTERVAL set the new limits
-    uint32_t ts_elapsed = get_ts_elapsed(ts, ts_last);
+    uint32_t ts_elapsed = get_ts_elapsed(ts, ts_torque_check_last);
     if (ts_elapsed > limits.max_rt_interval) {
       rt_torque_last = desired_torque;
-      ts_last = ts;
+      ts_torque_check_last = ts;
     }
   }
 
@@ -552,7 +559,7 @@ bool steer_torque_cmd_checks(int desired_torque, int steer_req, const SteeringLi
     valid_steer_req_count = 0;
     desired_torque_last = 0;
     rt_torque_last = 0;
-    ts_last = ts;
+    ts_torque_check_last = ts;
     ts_steer_req_mismatch_last = ts;
   }
 

@@ -54,7 +54,7 @@ const CanMsg HYUNDAI_COMMUNITY_TX_MSGS[] = {
 AddrCheckStruct hyundai_community_addr_checks[] = {
   {.msg = {{608, 0, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},                     // EMS16
            {881, 0, 8, .expected_timestep = 10000U}, { 0 }}},                                                       // E_EMS11
-  {.msg = {{902, 0, 8, .expected_timestep = 20000U}, { 0 }, { 0 }}},                                              // WHL_SPD11
+  {.msg = {{902, 0, 8, .expected_timestep = 20000U}, { 0 }, { 0 }}},                                                // WHL_SPD11
 //  {.msg = {{916, 0, 8, .expected_timestep = 20000U}}},                                                            // TCS13
 //  {.msg = {{902, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 10000U}, { 0 }, { 0 }}},    // WHL_SPD11
 //  {.msg = {{1057, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},  // SCC12
@@ -312,10 +312,10 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
         puts("  LKAS TX not allowed : torque real time rate limit check failed!\n");}
 
       // every RT_INTERVAL set the new limits
-      uint32_t ts_elapsed = get_ts_elapsed(ts, ts_last);
+      uint32_t ts_elapsed = get_ts_elapsed(ts, ts_torque_check_last);
       if (ts_elapsed > HYUNDAI_COMMUNITY_STEERING_LIMITS.max_rt_interval) {
         rt_torque_last = desired_torque;
-        ts_last = ts;
+        ts_torque_check_last = ts;
       }
     }
 
@@ -329,7 +329,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
     if (!controls_allowed) { // a reset worsen the issue of Panda blocking some valid LKAS messages
       desired_torque_last = 0;
       rt_torque_last = 0;
-      ts_last = ts;
+      ts_torque_check_last = ts;
     }
 
     if (violation) {
