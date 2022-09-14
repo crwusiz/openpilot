@@ -75,7 +75,8 @@ class CarController:
 
   def update(self, CC, CS, controls):
     if self.CP.carFingerprint in CANFD_CAR:
-      return self.update_canfd(CC, CS)
+      return self.update_canfd(CC, CS, controls)
+
     actuators = CC.actuators
     hud_control = CC.hudControl
     pcm_cancel_cmd = CC.cruiseControl.cancel
@@ -232,7 +233,7 @@ class CarController:
     else:
       self.scc12_cnt = -1
 
-  def update_canfd(self, CC, CS):
+  def update_canfd(self, CC, CS, controls):
     actuators = CC.actuators
 
     # Steering Torque

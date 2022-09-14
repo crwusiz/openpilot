@@ -3,7 +3,6 @@ import os
 import time
 from abc import abstractmethod, ABC
 from typing import Any, Dict, Optional, Tuple, List
-from common.numpy_fast import interp
 
 from cereal import car
 from common.basedir import BASEDIR
@@ -201,7 +200,7 @@ class CarInterfaceBase(ABC):
     # Many cars apply hysteresis to the ego dash speed
     if self.CS is not None:
       ret.vEgoCluster = apply_hysteresis(ret.vEgoCluster, self.CS.out.vEgoCluster, self.CS.cluster_speed_hyst_gap)
-      if ret.vEgo < self.CS.cluster_min_speed:
+      if abs(ret.vEgo) < self.CS.cluster_min_speed:
         ret.vEgoCluster = 0.0
 
     if ret.cruiseState.speedCluster == 0:
