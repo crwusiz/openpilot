@@ -21,20 +21,19 @@ void SoftwarePanel::checkForUpdates() {
 }
 
 SoftwarePanel::SoftwarePanel(QWidget* parent) : ListWidget(parent) {
-  onroadLbl = new QLabel("Updates are only downloaded while the car is off.");
+  onroadLbl = new QLabel(tr("Updates are only downloaded while the car is off."));
   onroadLbl->setStyleSheet("font-size: 50px; font-weight: 400; text-align: left; padding-top: 30px; padding-bottom: 30px;");
   addItem(onroadLbl);
 
   // current version
-  versionLbl = new ButtonControl(tr("Current Version"), tr("VIEW"));
-  connect(versionLbl, &ButtonControl::clicked, versionLbl, &ButtonControl::showDescription);
+  versionLbl = new LabelControl(tr("Current Version"), "");
   addItem(versionLbl);
 
   // download update btn
-  downloadBtn = new ButtonControl(tr("Download"), "DOWNLOAD");
+  downloadBtn = new ButtonControl(tr("Download"), tr("CHECK"));
   connect(downloadBtn, &ButtonControl::clicked, [=]() {
     downloadBtn->setEnabled(false);
-    if (downloadBtn->text() == "CHECK") {
+    if (downloadBtn->text() == tr("CHECK")) {
       checkForUpdates();
     } else {
       std::system("pkill -SIGHUP -f selfdrive.updated");
@@ -43,10 +42,10 @@ SoftwarePanel::SoftwarePanel(QWidget* parent) : ListWidget(parent) {
   addItem(downloadBtn);
 
   // install update btn
-  installBtn = new ButtonControl(tr("Install Update"), "INSTALL");
+  installBtn = new ButtonControl(tr("Install Update"), tr("INSTALL"));
   connect(installBtn, &ButtonControl::clicked, [=]() {
     installBtn->setEnabled(false);
-    Hardware::reboot();
+    params.putBool("DoShutdown", true);
   });
   addItem(installBtn);
 
@@ -121,13 +120,14 @@ void SoftwarePanel::updateLabels() {
 
   // download update
   QString updater_state = QString::fromStdString(params.get("UpdaterState"));
+  bool failed = std::atoi(params.get("UpdateFailedCount").c_str()) > 0;
   if (updater_state != "idle") {
     downloadBtn->setEnabled(false);
     downloadBtn->setValue(updater_state);
   } else {
-    if (std::atoi(params.get("UpdateFailedCount").c_str()) > 0) {
+    if (failed) {
       downloadBtn->setText("CHECK");
-      downloadBtn->setValue("failed to fetch update");
+      downloadBtn->setValue("failed to check for update");
     } else if (params.getBool("UpdaterFetchAvailable")) {
       downloadBtn->setText("DOWNLOAD");
       downloadBtn->setValue("update available");
@@ -145,7 +145,7 @@ void SoftwarePanel::updateLabels() {
   targetBranchBtn->setValue(QString::fromStdString(params.get("UpdaterTargetBranch")));
 
   // current + new versions
-  versionLbl->setValue(QString::fromStdString(params.get("UpdaterCurrentDescription")).left(35));
+  versionLbl->setText(QString::fromStdString(params.get("UpdaterCurrentDescription")).left(40));
   versionLbl->setDescription(QString::fromStdString(params.get("UpdaterCurrentReleaseNotes")));
 
   installBtn->setVisible(!is_onroad && params.getBool("UpdateAvailable"));
