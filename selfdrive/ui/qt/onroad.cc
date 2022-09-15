@@ -278,7 +278,7 @@ void NvgWindow::updateState(const UIState &s) {
   setProperty("autoTrGap", cc.getSccSmoother().getAutoTrGap());
   setProperty("lateralcontrol", cs.getLateralControlSelect());
   setProperty("steerRatio", lp.getSteerRatio());
-  setProperty("mdpsBus", cp.getMdpsBus());
+  setProperty("epsBus", cp.getEpsBus());
   setProperty("sccBus", cp.getSccBus());
   setProperty("fl", ce.getTpms().getFl());
   setProperty("fr", ce.getTpms().getFr());
@@ -588,8 +588,8 @@ void NvgWindow::drawHud(QPainter &p) {
   const char* lateral[] = {"Pid", "Indi", "Lqr", "Torque"};
 
   QString infoText;
-  infoText.sprintf("[ %s ] SR[%.2f] MDPS[%d] SCC[%d]",
-    lateral[lateralcontrol], steerRatio, mdpsBus, sccBus
+  infoText.sprintf("[ %s ] SR[%.2f] EPS[%d] SCC[%d]",
+    lateral[lateralcontrol], steerRatio, epsBus, sccBus
   );
 
   x = rect().left() + radius * 1.8;

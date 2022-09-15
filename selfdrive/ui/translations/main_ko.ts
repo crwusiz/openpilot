@@ -1175,24 +1175,35 @@ location set</source>
         <translation>현재 버전</translation>
     </message>
     <message>
-        <location line="+25"/>
+        <location line="+24"/>
         <source>Target Branch</source>
         <translation>대상 브랜치</translation>
     </message>
     <message>
-        <location line="-25"/>
-        <source>VIEW</source>
-        <translation>보기</translation>
+        <location line="-29"/>
+        <source>Updates are only downloaded while the car is off.</source>
+        <translation>업데이트는 차량 연결이 해제되어 있는 동안에만 다운로드됩니다.</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+9"/>
         <source>Download</source>
         <translation>다운로드</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+0"/>
+        <location line="+3"/>
+        <source>CHECK</source>
+        <translation>확인</translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <source>Install Update</source>
         <translation>업데이트 설치</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>INSTALL</source>
+        <translation>설치</translation>
     </message>
     <message>
         <location line="+8"/>

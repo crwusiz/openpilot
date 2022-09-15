@@ -165,7 +165,7 @@ void WifiManager::connect(const Network &n, const QString &password, const QStri
   connection["connection"]["type"] = "802-11-wireless";
   connection["connection"]["uuid"] = QUuid::createUuid().toString().remove('{').remove('}');
   connection["connection"]["id"] = "openpilot connection " + QString::fromStdString(n.ssid.toStdString());
-  connection["connection"]["autoconnect-retries"] = 5;
+  connection["connection"]["autoconnect-retries"] = 0;
 
   connection["802-11-wireless"]["ssid"] = n.ssid;
   connection["802-11-wireless"]["mode"] = "infrastructure";
@@ -254,7 +254,7 @@ void WifiManager::stateChange(unsigned int new_state, unsigned int previous_stat
     forgetConnection(connecting_to_network);
     emit wrongPassword(connecting_to_network);
   } else if (new_state == NM_DEVICE_STATE_ACTIVATED) {
-    connecting_to_network = "Android";
+    connecting_to_network = "";
     refreshNetworks();
   }
 }

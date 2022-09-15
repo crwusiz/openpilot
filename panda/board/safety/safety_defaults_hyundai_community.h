@@ -1,11 +1,5 @@
-extern bool LCAN_bus1;
-extern bool fwd_bus1;
-extern bool fwd_bus2;
-extern int LKAS11_bus0_cnt;
-extern int LCAN_bus1_cnt;
-extern int MDPS12_checksum;
-extern int MDPS12_cnt;
-extern int Last_StrColTq;
+extern bool lcan_bus1, fwd_bus1, fwd_bus2;
+extern int lkas11_bus0_cnt, lcan_bus1_cnt, mdps12_chksum, mdps12_cnt, Last_StrColTq;
 
 const addr_checks default_rx_checks = {
   .check = NULL,
@@ -19,23 +13,23 @@ int default_rx_hook(CANPacket_t *to_push) {
   // LKAS11
   if (addr == 832) {
     if (bus == 0) {
-      LKAS11_bus0_cnt = 10;
+      lkas11_bus0_cnt = 10;
       if (fwd_bus2) {
         fwd_bus2 = false;
         puts("  LKAS11 on bus [0] : forwarding disabled\n");
       }
     }
     if (bus == 2) {
-      if (LKAS11_bus0_cnt > 0) {
-        LKAS11_bus0_cnt--;
+      if (lkas11_bus0_cnt > 0) {
+        lkas11_bus0_cnt--;
       } else if (!fwd_bus2) {
         fwd_bus2 = true;
         puts("  LKAS11 on bus [2] : forwarding enabled\n");
       }
-      if (LCAN_bus1_cnt > 0) {
-        LCAN_bus1_cnt--;
-      } else if (LCAN_bus1) {
-        LCAN_bus1 = false;
+      if (lcan_bus1_cnt > 0) {
+        lcan_bus1_cnt--;
+      } else if (lcan_bus1) {
+        lcan_bus1 = false;
         puts("  LCAN not on bus [1]\n");
       }
     }
@@ -43,36 +37,36 @@ int default_rx_hook(CANPacket_t *to_push) {
 
   // check if we have a LCAN on Bus1
   if (bus == 1 && (addr == 1296 || addr == 524)) {
-    LCAN_bus1_cnt = 500;
-    if (fwd_bus1 || !LCAN_bus1) {
-      LCAN_bus1 = true;
+    lcan_bus1_cnt = 500;
+    if (fwd_bus1 || !lcan_bus1) {
+      lcan_bus1 = true;
       fwd_bus1 = false;
       puts("  LCAN on bus [1] : forwarding disabled\n");
     }
   }
-  // check if we have a MDPS or SCC on Bus1
+  // check if we have a EPS or SCC on Bus1
   if (bus == 1 && (addr == 593 || addr == 897 || addr == 1057)) {
-    if (!fwd_bus1 && !LCAN_bus1) {
+    if (!fwd_bus1 && !lcan_bus1) {
       fwd_bus1 = true;
-      puts("  MDPS or SCC on bus [1] : forwarding enabled\n");
+      puts("  EPS or SCC on bus [1] : forwarding enabled\n");
     }
   }
-  if ((addr == 593) && (MDPS12_checksum == -1)) {
-    int New_Chksum2 = 0;
+  if ((addr == 593) && (mdps12_chksum == -1)) {
+    int new_chksum2 = 0;
     uint8_t dat[8];
     for (int i=0; i<8; i++) {
       dat[i] = GET_BYTE(to_push, i);
     }
-    int Chksum2 = dat[3];
+    int chksum2 = dat[3];
     dat[3] = 0;
     for (int i=0; i<8; i++) {
-      New_Chksum2 += dat[i];
+      new_chksum2 += dat[i];
     }
-    New_Chksum2 %= 256;
-    if (Chksum2 == New_Chksum2) {
-      MDPS12_checksum = 0;
+    new_chksum2 %= 256;
+    if (chksum2 == new_chksum2) {
+      mdps12_chksum = 0;
     } else {
-      MDPS12_checksum = 1;
+      mdps12_chksum = 1;
     }
   }
   return true;
@@ -119,14 +113,14 @@ static int default_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   // Code for LKA/LFA/HDA anti-nagging.
   if (addr == 593 && bus_fwd != -1) {
     uint8_t dat[8];
-    int New_Chksum2 = 0;
+    int new_chksum2 = 0;
     for (int i=0; i<8; i++) {
       dat[i] = GET_BYTE(to_fwd, i);
     }
-    if (MDPS12_cnt > 330) {
+    if (mdps12_cnt > 330) {
       int StrColTq = dat[0] | (dat[1] & 0x7) << 8;
       int OutTq = dat[6] >> 4 | dat[7] << 4;
-      if (MDPS12_cnt == 331) {
+      if (mdps12_cnt == 331) {
         StrColTq -= 164;
       } else {
         StrColTq = Last_StrColTq + 34;
@@ -149,12 +143,12 @@ static int default_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
 
       Last_StrColTq = StrColTq;
       dat[3] = 0;
-      if (!MDPS12_checksum) {
+      if (!mdps12_chksum) {
         for (int i=0; i<8; i++) {
-          New_Chksum2 += dat[i];
+          new_chksum2 += dat[i];
         }
-        New_Chksum2 %= 256;
-      } else if (MDPS12_checksum) {
+        new_chksum2 %= 256;
+      } else if (mdps12_chksum) {
         uint8_t crc = 0xFFU;
         uint8_t poly = 0x1D;
         int i, j;
@@ -172,12 +166,12 @@ static int default_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
         }
         crc ^= 0xFFU;
         crc %= 256;
-        New_Chksum2 = crc;
+        new_chksum2 = crc;
       }
-      *RDLR |= New_Chksum2 << 24;
+      *RDLR |= new_chksum2 << 24;
     }
-    MDPS12_cnt += 1;
-    MDPS12_cnt %= 345;
+    mdps12_cnt += 1;
+    mdps12_cnt %= 345;
   }
   return bus_fwd;
 }

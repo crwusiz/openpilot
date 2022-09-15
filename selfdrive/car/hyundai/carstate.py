@@ -33,14 +33,14 @@ class CarState(CarStateBase):
 
     #Auto detection for setup
     self.no_radar = CP.sccBus == -1
-    self.mdps_bus = CP.mdpsBus
+    self.eps_bus = CP.epsBus
     self.sas_bus = CP.sasBus
     self.scc_bus = CP.sccBus
     self.has_scc13 = CP.hasScc13
     self.has_scc14 = CP.hasScc14
     self.has_lfa_hda = CP.hasLfaHda
     self.aebFcw = CP.aebFcw or CP.carFingerprint in FCA11_CAR
-    self.mdps_error_cnt = 0
+    self.eps_error_cnt = 0
     self.cruise_unavail_cnt = 0
     self.apply_steer = 0.
 
@@ -61,7 +61,7 @@ class CarState(CarStateBase):
     if self.CP.carFingerprint in CANFD_CAR:
       return self.update_canfd(cp, cp_cam)
 
-    cp_mdps = cp2 if self.mdps_bus else cp
+    cp_eps = cp2 if self.eps_bus else cp
     cp_sas = cp2 if self.sas_bus else cp
     cp_scc = cp2 if self.scc_bus == 1 else cp_cam if self.scc_bus == 2 else cp
 
@@ -86,15 +86,15 @@ class CarState(CarStateBase):
     ret.standstill = ret.vEgoRaw < 0.01
     ret.steeringAngleDeg = cp_sas.vl["SAS11"]["SAS_Angle"]
     ret.steeringRateDeg = cp_sas.vl["SAS11"]["SAS_Speed"]
-    ret.steeringTorque = cp_mdps.vl["MDPS12"]["CR_Mdps_StrColTq"]
-    ret.steeringTorqueEps = cp_mdps.vl["MDPS12"]["CR_Mdps_OutTq"]
+    ret.steeringTorque = cp_eps.vl["MDPS12"]["CR_Mdps_StrColTq"]
+    ret.steeringTorqueEps = cp_eps.vl["MDPS12"]["CR_Mdps_OutTq"]
     ret.steeringPressed = abs(ret.steeringTorque) > self.params.STEER_THRESHOLD
     ret.yawRate = cp.vl["ESP12"]["YAW_RATE"]
     ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["CGW1"]["CF_Gway_TurnSigLh"],
                                                                       cp.vl["CGW1"]["CF_Gway_TurnSigRh"])
 
-    self.mdps_error_cnt += 1 if cp_mdps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 else -self.mdps_error_cnt
-    ret.steerFaultTemporary = self.mdps_error_cnt > 100
+    self.eps_error_cnt += 1 if cp_eps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 else -self.eps_error_cnt
+    ret.steerFaultTemporary = self.eps_error_cnt > 100
 
     if self.CP.enableAutoHold:
       ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]
@@ -172,7 +172,7 @@ class CarState(CarStateBase):
     self.clu11 = cp.vl["CLU11"]
     self.scc11 = cp_scc.vl["SCC11"]
     self.scc12 = cp_scc.vl["SCC12"]
-    self.mdps12 = cp_mdps.vl["MDPS12"]
+    self.mdps12 = cp_eps.vl["MDPS12"]
     self.lfahda_mfc = cp_cam.vl["LFAHDA_MFC"]
 
     if self.has_scc13:
@@ -180,7 +180,7 @@ class CarState(CarStateBase):
     if self.has_scc14:
       self.scc14 = cp_scc.vl["SCC14"]
 
-    self.steer_state = cp_mdps.vl["MDPS12"]["CF_Mdps_ToiActive"]  # 0 NOT ACTIVE, 1 ACTIVE
+    self.steer_state = cp_eps.vl["MDPS12"]["CF_Mdps_ToiActive"]  # 0 NOT ACTIVE, 1 ACTIVE
     self.brake_error = cp.vl["TCS13"]["ACCEnable"] != 0  # 0 ACC CONTROL ENABLED, 1-3 ACC CONTROL DISABLED
     self.cruise_unavail_cnt += 1 if cp.vl["TCS13"]["CF_VSM_Avail"] != 1 and \
                                     cp.vl["TCS13"]["ACCEnable"] != 0 else -self.cruise_unavail_cnt
@@ -384,7 +384,7 @@ class CarState(CarStateBase):
         ("SCC11", 50),
         ("SCC12", 50),
       ]
-    if CP.mdpsBus == 0:
+    if CP.epsBus == 0:
       signals += [
         ("CR_Mdps_StrColTq", "MDPS12"),
         ("CF_Mdps_Def", "MDPS12"),
@@ -473,7 +473,7 @@ class CarState(CarStateBase):
 
     signals = []
     checks = []
-    if CP.mdpsBus == 1:
+    if CP.epsBus == 1:
       signals += [
         ("CR_Mdps_StrColTq", "MDPS12"),
         ("CF_Mdps_Def", "MDPS12"),
