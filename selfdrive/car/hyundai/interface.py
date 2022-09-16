@@ -41,9 +41,6 @@ class CarInterface(CarInterfaceBase):
     else:
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
 
-    ret.maxSteeringAngleDeg = 1000.
-    ret.steerFaultMaxAngle = 85
-    ret.steerFaultMaxFrames = 90
     ret.steerActuatorDelay = 0.25
     ret.steerLimitTimer = 2.5
 
