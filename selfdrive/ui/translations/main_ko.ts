@@ -444,7 +444,7 @@
 <context>
     <name>MapETA</name>
     <message>
-        <location filename="../qt/maps/map.cc" line="+621"/>
+        <location filename="../qt/maps/map.cc" line="+622"/>
         <source>eta</source>
         <translation>도착</translation>
     </message>
@@ -544,7 +544,7 @@ location set</source>
 <context>
     <name>MapWindow</name>
     <message>
-        <location filename="../qt/maps/map.cc" line="-257"/>
+        <location filename="../qt/maps/map.cc" line="-258"/>
         <source>Map Loading</source>
         <translation>지도 로딩</translation>
     </message>
@@ -1412,6 +1412,16 @@ location set</source>
         <location line="+27"/>
         <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
         <translation>주행모델이 가속과 감속을 제어하도록 하면 openpilot은 운전자가 생각하는것처럼 운전합니다. (매우 실험적)</translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>openpilot longitudinal control is not currently available for this car.</source>
+        <translation>현재 이 차량에는 openpilot 롱컨트롤을 사용할 수 없습니다.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Enable experimental longitudinal control to enable this.</source>
+        <translation>openpilot 롱컨트롤을 활성화합니다. (실험적)</translation>
     </message>
 </context>
 <context>
