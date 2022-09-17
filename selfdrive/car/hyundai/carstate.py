@@ -1,5 +1,6 @@
 from collections import deque
 import copy
+import math
 
 from cereal import car
 from common.conversions import Conversions as CV
@@ -9,15 +10,12 @@ from selfdrive.car.hyundai.values import HyundaiFlags, DBC, CarControllerParams,
 from selfdrive.car.interfaces import CarStateBase
 
 PREV_BUTTON_SAMPLES = 8
-
+CLUSTER_SAMPLE_RATE = 20  # frames
 
 class CarState(CarStateBase):
   def __init__(self, CP):
     super().__init__(CP)
     can_define = CANDefine(DBC[CP.carFingerprint]["pt"])
-
-    self.cluster_speed_hyst_gap = CV.KPH_TO_MS
-    self.cluster_min_speed = CV.KPH_TO_MS / 2.
 
     self.cruise_buttons = deque([Buttons.NONE] * PREV_BUTTON_SAMPLES, maxlen=PREV_BUTTON_SAMPLES)
     self.main_buttons = deque([Buttons.NONE] * PREV_BUTTON_SAMPLES, maxlen=PREV_BUTTON_SAMPLES)
@@ -55,6 +53,10 @@ class CarState(CarStateBase):
     self.cruiseState_speed = 0
     self.buttons_counter = 0
 
+    # On some cars, CLU15->CF_Clu_VehicleSpeed can oscillate faster than the dash updates. Sample at 5 Hz
+    self.cluster_speed = 0
+    self.cluster_speed_counter = CLUSTER_SAMPLE_RATE
+
     self.params = CarControllerParams(CP)
 
   def update(self, cp, cp2, cp_cam):
@@ -65,8 +67,8 @@ class CarState(CarStateBase):
     cp_sas = cp2 if self.sas_bus else cp
     cp_scc = cp2 if self.scc_bus == 1 else cp_cam if self.scc_bus == 2 else cp
 
-    self.metric = not cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"]
-    self.speed_conv = CV.KPH_TO_MS if self.metric else CV.MPH_TO_MS
+    self.is_metric = cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"] == 0
+    self.speed_conv = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
 
     ret = car.CarState.new_message()
 
@@ -79,11 +81,20 @@ class CarState(CarStateBase):
                                             cp.vl["WHL_SPD11"]["WHL_SPD_RL"], cp.vl["WHL_SPD11"]["WHL_SPD_RR"])
 
     ret.vEgoRaw = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
-    ret.vEgoCluster = (cp.vl["CLU15"]["CF_Clu_VehicleSpeed"] * CV.KPH_TO_MS) if self.metric else (cp.vl["CLU15"]["CF_Clu_VehicleSpeed2"] * CV.MPH_TO_MS)
-    #ret.vEgoCluster = cp.vl["CLU11"]["CF_Clu_Vanz"] * self.speed_conv
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
-
     ret.standstill = ret.vEgoRaw < 0.01
+
+    self.cluster_speed_counter += 1
+    if self.cluster_speed_counter > CLUSTER_SAMPLE_RATE:
+      self.cluster_speed = cp.vl["CLU15"]["CF_Clu_VehicleSpeed"]
+      self.cluster_speed_counter = 0
+
+      # mimic how dash converts to imperial
+      if not self.is_metric:
+        self.cluster_speed = math.floor(self.cluster_speed * CV.KPH_TO_MPH + CV.KPH_TO_MPH)
+
+    ret.vEgoCluster = self.cluster_speed * self.speed_conv
+
     ret.steeringAngleDeg = cp_sas.vl["SAS11"]["SAS_Angle"]
     ret.steeringRateDeg = cp_sas.vl["SAS11"]["SAS_Speed"]
     ret.steeringTorque = cp_eps.vl["MDPS12"]["CR_Mdps_StrColTq"]
@@ -298,7 +309,6 @@ class CarState(CarStateBase):
       ("CF_Clu_AliveCnt1", "CLU11"),
 
       ("CF_Clu_VehicleSpeed", "CLU15"),
-      ("CF_Clu_VehicleSpeed2", "CLU15"),
 
       ("ACCEnable", "TCS13"),
       ("ACC_REQ", "TCS13"),
@@ -371,7 +381,7 @@ class CarState(CarStateBase):
       ("TCS13", 50),
       ("TCS15", 10),
       ("CLU11", 50),
-      ("CLU15", 4),
+      ("CLU15", 5),
       ("ESP12", 100),
       ("CGW1", 10),
       ("CGW2", 5),
@@ -453,7 +463,7 @@ class CarState(CarStateBase):
 
     if CP.carFingerprint in FEATURES["use_cluster_gears"]:
       signals.append(("CF_Clu_Gear", "CLU15"))
-      checks.append(("CLU15", 5))
+      #checks.append(("CLU15", 5))
     elif CP.carFingerprint in FEATURES["use_tcu_gears"]:
       signals.append(("CUR_GR", "TCU12"))
       checks.append(("TCU12", 100))

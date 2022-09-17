@@ -98,7 +98,7 @@ class CarController:
     sys_warning, sys_state, left_lane_warning, right_lane_warning = process_hud_alert(CC.enabled, hud_control)
 
     clu11_speed = CS.clu11["CF_Clu_Vanz"]
-    enabled_speed = 60 if CS.metric else 38
+    enabled_speed = 60 if CS.is_metric else 38
     if clu11_speed > enabled_speed or not CC.latActive:
       enabled_speed = clu11_speed
 
@@ -195,7 +195,7 @@ class CarController:
         set_speed = hud_control.setSpeed
         if not (MIN_SET_SPEED < set_speed < 255 * CV.KPH_TO_MS):
           set_speed = MIN_SET_SPEED
-        set_speed *= CV.MS_TO_KPH if CS.metric else CV.MS_TO_MPH
+        set_speed *= CV.MS_TO_KPH if CS.is_metric else CV.MS_TO_MPH
 
         stopping = (actuators.longControlState == LongCtrlState.stopping)
         apply_accel = self.scc_smoother.get_apply_accel(CS, actuators.accel)
