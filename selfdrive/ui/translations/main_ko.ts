@@ -625,7 +625,7 @@ location set</source>
 <context>
     <name>OffroadAlert</name>
     <message>
-        <location filename="../qt/widgets/offroad_alerts.h" line="+45"/>
+        <location filename="../qt/widgets/offroad_alerts.cc" line="+59"/>
         <source>Device temperature too high. System won&apos;t start.</source>
         <translation>장치 온도가 너무 높아 시스템을 시작할수 없습니다.</translation>
     </message>
