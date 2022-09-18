@@ -186,15 +186,17 @@ NvgWindow::NvgWindow(VisionStreamType type, QWidget* parent) : fps_filter(UI_FRE
   gap3_img = loadPixmap("../assets/img_gap3.png", {img_size, img_size});
   gap4_img = loadPixmap("../assets/img_gap4.png", {img_size, img_size});
   gap_auto_img = loadPixmap("../assets/img_gap_auto.png", {img_size, img_size});
+  turnsignal_l_img = loadPixmap("../assets/img_turnsignal_l.png", {img_size, img_size});
+  turnsignal_r_img = loadPixmap("../assets/img_turnsignal_r.png", {img_size, img_size});
+  tpms_img = loadPixmap("../assets/img_tpms.png");
+  traffic_green_img = loadPixmap("../assets/img_traffic_green.png");
+  traffic_red_img = loadPixmap("../assets/img_traffic_red.png");
 
   // neokii add
   autohold_warning_img = loadPixmap("../assets/img_autohold_warning.png", {img_size, img_size});
   autohold_active_img = loadPixmap("../assets/img_autohold_active.png", {img_size, img_size});
-  turnsignal_l_img = loadPixmap("../assets/img_turnsignal_l.png", {img_size, img_size});
-  turnsignal_r_img = loadPixmap("../assets/img_turnsignal_r.png", {img_size, img_size});
   nda_img = loadPixmap("../assets/img_nda.png");
   hda_img = loadPixmap("../assets/img_hda.png");
-  tpms_img = loadPixmap("../assets/img_tpms.png");
 }
 
 static const QColor get_tpms_color(float tpms) {
@@ -224,6 +226,7 @@ void NvgWindow::updateState(const UIState &s) {
   const auto lp = sm["liveParameters"].getLiveParameters();
   const auto ge = sm["gpsLocationExternal"].getGpsLocationExternal();
   const auto ls = sm["roadLimitSpeed"].getRoadLimitSpeed();
+  const auto lo = sm["longitudinalPlan"].getLongitudinalPlan();
 
   const bool cs_alive = sm.alive("controlsState");
 
@@ -291,6 +294,7 @@ void NvgWindow::updateState(const UIState &s) {
   setProperty("sectionLeftDist", ls.getSectionLeftDist());
   setProperty("left_on", ce.getLeftBlinker());
   setProperty("right_on", ce.getRightBlinker());
+  setProperty("traffic_status", lo.getDebugLong() > 0);
 
   if (s.scene.calibration_valid) {
     CameraViewWidget::updateCalibration(s.scene.view_from_calib);
@@ -528,6 +532,19 @@ void NvgWindow::drawHud(QPainter &p) {
     x = (width() + (bdr_s * 2)) / 2 - (w / 2) - bdr_s;
     y = 30 - bdr_s;
     p.drawPixmap(x, y, w, h, nda_status == 1 ? nda_img : hda_img);
+  }
+
+  // traffic icon (upper right5)
+  if (traffic_status > 0) {
+    w = 100;
+    h = 50;
+    x = (width() + (bdr_s * 2)) / 2 + w * 2;
+    y = 30 - bdr_s;
+    if (traffic_status == 1) {
+      p.drawPixmap(x, y, w, h, traffic_red_img);
+    } else if (traffic_status == 2) {
+      p.drawPixmap(x, y, w, h, traffic_green_img);
+    }
   }
 
   // Dev UI (right Side)
@@ -984,6 +1001,17 @@ void NvgWindow::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV
   painter.restore();
 }
 
+void NvgWindow::drawStopLine(QPainter &painter, const UIState *s, const cereal::ModelDataV2::StopLineData::Reader &stop_line_data, const QPolygonF &vd) {
+    painter.save();
+
+    float prob = stop_line_data.getProb();
+    if (prob < 0.6) prob = 0.6;
+    painter.setBrush(QColor::fromRgbF(1.0, 0.0, 0.0, std::clamp<float>(prob, 0.0, 1.0)));
+    painter.drawPolygon(vd);
+
+    painter.restore();
+}
+
 void NvgWindow::paintGL() {
   UIState *s = uiState();
   const cereal::ModelDataV2::Reader &model = (*s->sm)["modelV2"].getModelV2();
@@ -1002,6 +1030,12 @@ void NvgWindow::paintGL() {
     }
     if (leads[1].getProb() > .5 && (std::abs(leads[1].getX()[0] - leads[0].getX()[0]) > 3.0)) {
       drawLead(painter, leads[1], s->scene.lead_vertices[1], s->scene.lead_radar[1]);
+    }
+    auto stop_line = model.getStopLine();
+    if (stop_line.getX() > 3.0) {
+        if (stop_line.getProb() > .1) {
+            drawStopLine(painter, s, stop_line, s->scene.stop_line_vertices);
+        }
     }
   }
   drawHud(painter);

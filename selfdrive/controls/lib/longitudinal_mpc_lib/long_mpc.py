@@ -62,7 +62,7 @@ T_IDXS_LST = [index_function(idx, max_val=MAX_T, max_idx=N) for idx in range(N+1
 
 T_IDXS = np.array(T_IDXS_LST)
 T_DIFFS = np.diff(T_IDXS, prepend=[0.])
-MIN_ACCEL = -3.5
+MIN_ACCEL = -4.0
 MAX_ACCEL = 2.0
 T_FOLLOW = 1.45
 COMFORT_BRAKE = 2.5
@@ -217,6 +217,8 @@ class LongitudinalMpc:
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
     self.reset()
     self.source = SOURCES[2]
+    self.on_stopping = False
+    self.debugLong = 0
 
   def reset(self):
     # self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
@@ -323,7 +325,7 @@ class LongitudinalMpc:
     self.cruise_min_a = min_a
     self.cruise_max_a = max_a
 
-  def update(self, carstate, radarstate, v_cruise, x, v, a, j):
+  def update(self, carstate, radarstate, model, v_cruise, x, v, a, j):
     v_ego = self.x0[1]
     self.status = radarstate.leadOne.status or radarstate.leadTwo.status
 
@@ -360,8 +362,38 @@ class LongitudinalMpc:
                                  v_lower,
                                  v_upper)
       cruise_obstacle = np.cumsum(T_DIFFS * v_cruise_clipped) + get_safe_obstacle_distance(v_cruise_clipped, self.t_follow, self.stop_dist)
-      x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle])
-      self.source = SOURCES[np.argmin(x_obstacles[0])]
+
+      # add stopline
+      probe = model.stopLine.prob
+      if abs(carstate.steeringAngleDeg) > 30:
+        probe = 0.0
+      stopping = probe > 0.5
+      
+      stopline = (model.stopLine.x + 0) * np.ones(N + 1) if stopping else 400 * np.ones(N + 1)
+      x = (x[N] + 0.) * np.ones(N + 1)
+
+      self.debugLong = 0
+      # lead
+      if self.status and not self.on_stopping:
+        x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle])
+      # start
+      elif x[N] > 30 and stopline[N] < 30 and self.v_ego < 6.0:
+        self.debugLong = 2
+        self.on_stopping = False
+        x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle, x])
+      # stopping
+      elif x[N] < 100 and stopline[N] < 100:
+        self.debugLong = 1
+        self.on_stopping = True
+        x_obstacles = np.column_stack(
+          [lead_0_obstacle, lead_1_obstacle, cruise_obstacle * 2, (stopline * 0.2) + (x * 0.8)])
+      elif x[N] < 100 and self.on_stopping:
+        x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle * 2, x])
+      else:
+        self.on_stopping = False
+        x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle])
+
+      self.source = SOURCES[np.argmin(x_obstacles[N])]
 
       # These are not used in ACC mode
       x[:], v[:], a[:], j[:] = 0.0, 0.0, 0.0, 0.0

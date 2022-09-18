@@ -59,6 +59,7 @@ class NvgWindow : public CameraViewWidget {
   Q_PROPERTY(int sectionLimitSpeed MEMBER sectionLimitSpeed);
   Q_PROPERTY(int sectionLeftDist MEMBER sectionLeftDist);
   Q_PROPERTY(int accel MEMBER accel);
+  Q_PROPERTY(int traffic_status MEMBER traffic_status);
 
   Q_PROPERTY(float lead_d_rel MEMBER lead_d_rel);
   Q_PROPERTY(float lead_v_rel MEMBER lead_v_rel);
@@ -103,15 +104,17 @@ private:
   QPixmap gps_img;
   QPixmap wifi_img;
   QPixmap direction_img;
+  QPixmap turnsignal_l_img;
+  QPixmap turnsignal_r_img;
+  QPixmap tpms_img;
+  QPixmap traffic_green_img;
+  QPixmap traffic_red_img;
 
   // neokii add
   QPixmap autohold_warning_img;
   QPixmap autohold_active_img;
   QPixmap nda_img;
   QPixmap hda_img;
-  QPixmap tpms_img;
-  QPixmap turnsignal_l_img;
-  QPixmap turnsignal_r_img;
 
   const int radius = 160;
   const int img_size = (radius / 2) * 1.5;
@@ -149,6 +152,7 @@ private:
   int sectionLimitSpeed = 0;
   int sectionLeftDist = 0;
   int accel = 0;
+  int traffic_status = 0;
 
   float lead_d_rel = 0;
   float lead_v_rel = 0;
@@ -168,6 +172,7 @@ protected:
   void showEvent(QShowEvent *event) override;
   void updateFrameMat() override;
   void drawLaneLines(QPainter &painter, const UIState *s);
+  void drawStopLine(QPainter &painter, const UIState *s, const cereal::ModelDataV2::StopLineData::Reader &stop_line_data, const QPolygonF &vd);
   void drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd, bool is_radar);
   void drawHud(QPainter &p);
   inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); }

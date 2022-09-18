@@ -81,6 +81,18 @@ static void update_line_data(const UIState *s, const cereal::ModelDataV2::XYZTDa
   *pvd = left_points + right_points;
 }
 
+static void update_stop_line_data(const UIState *s, const cereal::ModelDataV2::StopLineData::Reader &line,
+                                  float x_off, float y_off, float z_off, QPolygonF *pvd) {
+  const auto line_x = line.getX(), line_y = line.getY(), line_z = line.getZ();
+  QPolygonF points;
+  QPointF point;
+  if (calib_frame_to_full_frame(s, line_x + x_off, line_y - y_off, line_z + z_off, &point)) points+=point;
+  if (calib_frame_to_full_frame(s, line_x + x_off, line_y + y_off, line_z + z_off, &point)) points+=point;
+  if (calib_frame_to_full_frame(s, line_x - x_off, line_y + y_off, line_z + z_off, &point)) points+=point;
+  if (calib_frame_to_full_frame(s, line_x - x_off, line_y - y_off, line_z + z_off, &point)) points+=point;
+  *pvd = points;
+}
+
 static void update_model(UIState *s, const cereal::ModelDataV2::Reader &model) {
   UIScene &scene = s->scene;
   auto model_position = model.getPosition();
@@ -118,6 +130,12 @@ static void update_model(UIState *s, const cereal::ModelDataV2::Reader &model) {
   }
   max_idx = get_path_length_idx(model_position, max_distance);
   update_line_data(s, model_position, 0.8, 1.22, 1.22, &scene.track_vertices, max_idx, false);
+
+  // update stop lines
+  const auto stop_line = model.getStopLine();
+  if (stop_line.getProb() > .1) {
+    update_stop_line_data(s, stop_line, .5, 2, 1.22, &scene.stop_line_vertices);
+  }
 }
 
 static void update_sockets(UIState *s) {
@@ -265,7 +283,7 @@ UIState::UIState(QObject *parent) : QObject(parent) {
     "modelV2", "controlsState", "liveCalibration", "radarState", "deviceState", "roadCameraState",
     "pandaStates", "carParams", "driverMonitoringState", "sensorEvents", "carState", "liveLocationKalman",
     "wideRoadCameraState", "managerState", "navInstruction", "navRoute", "gnssMeasurements",
-    "gpsLocationExternal", "carControl", "liveParameters", "ubloxGnss", "roadLimitSpeed",
+    "gpsLocationExternal", "carControl", "liveParameters", "ubloxGnss", "roadLimitSpeed", "longitudinalPlan"
   });
 
   Params params;
