@@ -568,22 +568,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   });
   communityLayout->addWidget(cleardtc_btn);
 
-  auto forcewifi_btn = new ButtonControl("Wifi Force Connect", tr("RUN"));
-  QObject::connect(forcewifi_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
-      QProcess::execute("/data/openpilot/scripts/wifi_force_connect.sh");
-    }
-  });
-  communityLayout->addWidget(forcewifi_btn);
-
-  auto rebuild_btn = new ButtonControl("Scons rebuild", tr("RUN"));
-  QObject::connect(rebuild_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
-      QProcess::execute("/data/openpilot/scripts/rebuild.sh");
-    }
-  });
-  communityLayout->addWidget(rebuild_btn);
-
   auto pandaflash_btn = new ButtonControl("Panda Flash", tr("RUN"));
   QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), this)) {
@@ -608,10 +592,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   // add community toggle
   QList<ParamControl*> toggles;
-  toggles.append(new ParamControl("LongControl",
-                                  tr("Longitudinal control Enable"),
-                                  tr("<b>WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.</b>"),
-                                  "../assets/offroad/icon_long.png", this));
   toggles.append(new ParamControl("PutPrebuilt",
                                   tr("Prebuilt Enable"),
                                   tr("Create prebuilt files to speed bootup"),

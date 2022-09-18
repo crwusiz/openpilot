@@ -31,8 +31,7 @@ class CarInterface(CarInterfaceBase):
 
     # WARNING: disabling radar also disables AEB (and we show the same warning on the instrument cluster as if you manually disabled AEB)
     ret.experimentalLongitudinalAvailable = candidate not in CANFD_CAR #(LEGACY_SAFETY_MODE_CAR | CAMERA_SCC_CAR | CANFD_CAR)
-    ret.openpilotLongitudinalControl = (experimental_long and ret.experimentalLongitudinalAvailable) or \
-                                       Params().get_bool("LongControl") or ret.sccBus == 2
+    ret.openpilotLongitudinalControl = (experimental_long and ret.experimentalLongitudinalAvailable)
 
     ret.carName = "hyundai"
     if candidate in CANFD_CAR:
@@ -41,8 +40,8 @@ class CarInterface(CarInterfaceBase):
     else:
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
 
-    ret.steerActuatorDelay = 0.25
-    ret.steerLimitTimer = 2.5
+    ret.steerActuatorDelay = 0.1
+    ret.steerLimitTimer = 0.4
 
     # longitudinal
     ret.longitudinalTuning.kpBP = [0., 5. * CV.KPH_TO_MS, 10. * CV.KPH_TO_MS, 30. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]

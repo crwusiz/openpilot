@@ -6,17 +6,7 @@ from collections import defaultdict
 from tqdm import tqdm
 
 from selfdrive.car.fw_versions import match_fw_to_car_fuzzy
-from selfdrive.car.toyota.values import FW_VERSIONS as TOYOTA_FW_VERSIONS
-from selfdrive.car.honda.values import FW_VERSIONS as HONDA_FW_VERSIONS
-from selfdrive.car.hyundai.values import FW_VERSIONS as HYUNDAI_FW_VERSIONS
-from selfdrive.car.volkswagen.values import FW_VERSIONS as VW_FW_VERSIONS
-
-
-FWS = {}
-FWS.update(TOYOTA_FW_VERSIONS)
-FWS.update(HONDA_FW_VERSIONS)
-FWS.update(HYUNDAI_FW_VERSIONS)
-FWS.update(VW_FW_VERSIONS)
+from selfdrive.car.fingerprints import FW_VERSIONS
 
 if __name__ == "__main__":
   total = 0
@@ -25,10 +15,12 @@ if __name__ == "__main__":
   confusions = defaultdict(set)
 
   for _ in tqdm(range(1000)):
-    for candidate, fws in FWS.items():
+    for candidate, fws in FW_VERSIONS.items():
       fw_dict = {}
-      for (tp, addr, subaddr), fw_list in fws.items():
-        fw_dict[(addr, subaddr)] = random.choice(fw_list)
+      for tp, fw_list in fws.items():
+        if not len(fw_list):
+          continue
+        fw_dict[tp] = random.choice(fw_list)
 
       matches = match_fw_to_car_fuzzy(fw_dict, log=False, exclude=candidate)
 
@@ -48,5 +40,3 @@ if __name__ == "__main__":
   print(f"Total fuzz cases: {total}")
   print(f"Correct matches:  {match}")
   print(f"Wrong matches:    {wrong_match}")
-
-

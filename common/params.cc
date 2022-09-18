@@ -196,7 +196,6 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"Offroad_UpdateFailed", CLEAR_ON_MANAGER_START},
 
     // add
-    {"LongControl", PERSISTENT},
     {"MfcSelect", PERSISTENT},
     {"AebSelect", PERSISTENT},
     {"LateralControlSelect", PERSISTENT},

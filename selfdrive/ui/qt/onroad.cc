@@ -294,7 +294,7 @@ void NvgWindow::updateState(const UIState &s) {
   setProperty("sectionLeftDist", ls.getSectionLeftDist());
   setProperty("left_on", ce.getLeftBlinker());
   setProperty("right_on", ce.getRightBlinker());
-  setProperty("traffic_status", lo.getDebugLong() > 0);
+  setProperty("traffic_status", lo.getDebugLong());
 
   if (s.scene.calibration_valid) {
     CameraViewWidget::updateCalibration(s.scene.view_from_calib);

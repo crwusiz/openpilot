@@ -16,7 +16,7 @@ int default_rx_hook(CANPacket_t *to_push) {
       lkas11_bus0_cnt = 10;
       if (fwd_bus2) {
         fwd_bus2 = false;
-        puts("  LKAS11 on bus [0] : forwarding disabled\n");
+        puts("  forwarding disabled : LKAS11 on bus ["); puth(bus); puts("]\n");
       }
     }
     if (bus == 2) {
@@ -24,7 +24,7 @@ int default_rx_hook(CANPacket_t *to_push) {
         lkas11_bus0_cnt--;
       } else if (!fwd_bus2) {
         fwd_bus2 = true;
-        puts("  LKAS11 on bus [2] : forwarding enabled\n");
+        puts("  forwarding enabled : LKAS11 on bus ["); puth(bus); puts("]\n");
       }
       if (lcan_bus1_cnt > 0) {
         lcan_bus1_cnt--;
@@ -41,14 +41,14 @@ int default_rx_hook(CANPacket_t *to_push) {
     if (fwd_bus1 || !lcan_bus1) {
       lcan_bus1 = true;
       fwd_bus1 = false;
-      puts("  LCAN on bus [1] : forwarding disabled\n");
+      puts("  forwarding disabled : LCAN on bus ["); puth(bus); puts("]\n");
     }
   }
   // check if we have a EPS or SCC on Bus1
   if (bus == 1 && (addr == 593 || addr == 897 || addr == 1057)) {
     if (!fwd_bus1 && !lcan_bus1) {
       fwd_bus1 = true;
-      puts("  EPS or SCC on bus [1] : forwarding enabled\n");
+      puts("  forwarding enabled : EPS or SCC on bus ["); puth(bus); puts("]\n");
     }
   }
   if ((addr == 593) && (mdps12_chksum == -1)) {

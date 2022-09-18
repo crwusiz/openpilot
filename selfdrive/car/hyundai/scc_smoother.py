@@ -89,7 +89,7 @@ class SccSmoother:
 
 
   def read_param(self):
-    self.longcontrol = self.params.get_bool("LongControl")
+    self.longcontrol = self.params.get_bool("ExperimentalLongitudinalEnabled")
     self.is_metric = self.params.get_bool("IsMetric")
     self.e2e_long = self.params.get_bool("EndToEndLong")
 
