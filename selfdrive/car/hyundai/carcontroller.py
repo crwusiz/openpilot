@@ -3,7 +3,7 @@ from random import randint
 from cereal import car
 from common.params import Params
 from common.conversions import Conversions as CV
-from common.numpy_fast import clip, interp
+from common.numpy_fast import clip
 from common.realtime import DT_CTRL
 from opendbc.can.packer import CANPacker
 from selfdrive.car import apply_std_steer_torque_limits
@@ -20,7 +20,7 @@ STEER_FAULT_MAX_FRAMES = 39  # EPS counter is 95
 
 MIN_SET_SPEED = 30 * CV.KPH_TO_MS
 
-def process_hud_alert(enabled, hud_control):
+def process_hud_alert(enabled, fingerprint, hud_control):
   sys_warning = (hud_control.visualAlert in (VisualAlert.steerRequired, VisualAlert.ldw))
 
   # initialize to no line visible
@@ -37,9 +37,9 @@ def process_hud_alert(enabled, hud_control):
   left_lane_warning = 0
   right_lane_warning = 0
   if hud_control.leftLaneDepart:
-    left_lane_warning = 1
+    left_lane_warning = 1 if fingerprint in (CAR.GENESIS_G90, CAR.GENESIS_G80) else 2
   if hud_control.rightLaneDepart:
-    right_lane_warning = 1
+    right_lane_warning = 1 if fingerprint in (CAR.GENESIS_G90, CAR.GENESIS_G80) else 2
 
   return sys_warning, sys_state, left_lane_warning, right_lane_warning
 
@@ -49,6 +49,7 @@ class CarController:
     self.CP = CP
     self.longcontrol = CP.openpilotLongitudinalControl
     self.scc_live = not CP.radarOffCan
+    self.car_fingerprint = CP.carFingerprint
 
     self.params = CarControllerParams(CP)
     self.packer = CANPacker(dbc_name)
@@ -95,7 +96,7 @@ class CarController:
 
     self.apply_steer_last = apply_steer
 
-    sys_warning, sys_state, left_lane_warning, right_lane_warning = process_hud_alert(CC.enabled, hud_control)
+    sys_warning, sys_state, left_lane_warning, right_lane_warning = process_hud_alert(CC.enabled, self.car_fingerprint, hud_control)
 
     clu11_speed = CS.clu11["CF_Clu_Vanz"]
     enabled_speed = 60 if CS.is_metric else 38
@@ -271,7 +272,8 @@ class CarController:
         # cruise standstill resume
       elif CC.cruiseControl.resume:
         if not (self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS):
-          can_sends.append(hyundaicanfd.create_buttons(self.packer, CS.buttons_counter + 1, Buttons.RES_ACCEL))
+          for _ in range(20):
+            can_sends.append(hyundaicanfd.create_buttons(self.packer, CS.buttons_counter + 1, Buttons.RES_ACCEL))
           self.last_button_frame = self.frame
 
     new_actuators = actuators.copy()
