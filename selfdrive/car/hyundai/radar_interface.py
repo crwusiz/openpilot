@@ -26,7 +26,7 @@ def get_radar_can_parser(CP):
         ("REL_SPEED", msg),
       ]
       checks += [(msg, 50)]
-    return CANParser('hyundai_kia_mando_front_radar', signals, checks, 1)
+    return CANParser('hyundai_kia_mando_front_radar_generated', signals, checks, 1)
 
   else:
     signals = [
