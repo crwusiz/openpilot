@@ -24,7 +24,7 @@ if __name__ == "__main__":
       pandas = list([Panda(x, claim=claim) for x in serials])
 
       if not len(pandas):
-        sys.exit("no pandas found")
+        sys.exit("  no pandas found\n")
 
       if os.getenv("BAUD") is not None:
         for panda in pandas:
@@ -47,5 +47,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
       break
     except Exception:
-      print("panda disconnected!")
+      print("  panda disconnected!\n")
       time.sleep(0.5)

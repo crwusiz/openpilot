@@ -248,58 +248,44 @@ class CarInterface(CarInterfaceBase):
     # Lqr -----------------------------------------------------------------
     elif Params().get("LateralControlSelect", encoding='utf8') == "2":
       ret.lateralTuning.init('lqr')
+      ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
+      ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
+      ret.lateralTuning.lqr.c = [1., 0.]
+
       if candidate in [CAR.GRANDEUR, CAR.GRANDEUR_HEV, CAR.GRANDEUR20, CAR.GRANDEUR20_HEV, CAR.K7, CAR.K7_HEV]:
         ret.lateralTuning.lqr.scale = 1600.
         ret.lateralTuning.lqr.ki = 0.01
         ret.lateralTuning.lqr.dcGain = 0.0027
-        ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-        ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-        ret.lateralTuning.lqr.c = [1., 0.]
         ret.lateralTuning.lqr.k = [-110., 451.]
         ret.lateralTuning.lqr.l = [0.33, 0.318]
       elif candidate == CAR.IONIQ_EV:
         ret.lateralTuning.lqr.scale = 3000.0
         ret.lateralTuning.lqr.ki = 0.005
         ret.lateralTuning.lqr.dcGain = 0.002237852961363602
-        ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-        ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-        ret.lateralTuning.lqr.c = [1., 0.]
         ret.lateralTuning.lqr.k = [-110.73572306, 451.22718255]
         ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
       elif candidate in [CAR.K5, CAR.K5_HEV]:
         ret.lateralTuning.lqr.scale = 1700.0
         ret.lateralTuning.lqr.ki = 0.016
         ret.lateralTuning.lqr.dcGain = 0.002
-        ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-        ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-        ret.lateralTuning.lqr.c = [1., 0.]
         ret.lateralTuning.lqr.k = [-110.0, 451.0]
         ret.lateralTuning.lqr.l = [0.33, 0.318]
       elif candidate == CAR.SELTOS:
         ret.lateralTuning.lqr.scale = 1500.0
         ret.lateralTuning.lqr.ki = 0.05
         ret.lateralTuning.lqr.dcGain = 0.002237852961363602
-        ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-        ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-        ret.lateralTuning.lqr.c = [1., 0.]
         ret.lateralTuning.lqr.k = [-110.73572306, 451.22718255]
         ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
       elif candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
         ret.lateralTuning.lqr.scale = 1900.
         ret.lateralTuning.lqr.ki = 0.01
         ret.lateralTuning.lqr.dcGain = 0.0029
-        ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-        ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-        ret.lateralTuning.lqr.c = [1., 0.]
         ret.lateralTuning.lqr.k = [-110., 451.]
         ret.lateralTuning.lqr.l = [0.33, 0.318]
       else:
         ret.lateralTuning.lqr.scale = 1700.0
         ret.lateralTuning.lqr.ki = 0.03
         ret.lateralTuning.lqr.dcGain = 0.003
-        ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-        ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-        ret.lateralTuning.lqr.c = [1., 0.]
         ret.lateralTuning.lqr.k = [-105.0, 450.0]
         ret.lateralTuning.lqr.l = [0.22, 0.318]
 

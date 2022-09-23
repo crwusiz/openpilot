@@ -8,6 +8,11 @@ sudo rm -f prebuilt
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 git fetch --all
 REMOTE_HASH=$(git rev-parse --short --verify origin/$BRANCH)
+echo ""
 git reset --hard $REMOTE_HASH
+
+echo ""
+echo "  Git Fetch and Reset HEAD commit ..."
+echo ""
 
 exec /data/openpilot/scripts/restart.sh

@@ -232,6 +232,7 @@ void NvgWindow::updateState(const UIState &s) {
   const auto ge = sm["gpsLocationExternal"].getGpsLocationExternal();
   const auto ls = sm["roadLimitSpeed"].getRoadLimitSpeed();
   const auto lo = sm["longitudinalPlan"].getLongitudinalPlan();
+  const auto tp = sm["liveTorqueParameters"].getLiveTorqueParameters();
 
   const bool cs_alive = sm.alive("controlsState");
 
@@ -300,6 +301,10 @@ void NvgWindow::updateState(const UIState &s) {
   setProperty("left_on", ce.getLeftBlinker());
   setProperty("right_on", ce.getRightBlinker());
   setProperty("traffic_status", lo.getDebugLong());
+  setProperty("latAccelFactor", cs.getLateralControlState().getTorqueState().getLatAccelFactor());
+  setProperty("friction", cs.getLateralControlState().getTorqueState().getFriction());
+  setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
+  setProperty("frictionRaw", tp.getFrictionCoefficientRaw());
 
   if (s.scene.calibration_valid) {
     CameraViewWidget::updateCalibration(s.scene.view_from_calib);
@@ -610,11 +615,15 @@ void NvgWindow::drawHud(QPainter &p) {
   const char* lateral[] = {"Pid", "Indi", "Lqr", "Torque"};
 
   QString infoText;
-  infoText.sprintf("[ %s ] SR[%.2f] EPS[%d] SCC[%d]",
-    lateral[lateralcontrol], steerRatio, epsBus, sccBus
+  infoText.sprintf("EPS[%d] SCC[%d] SR[%.2f] [ %s ] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
+    epsBus, sccBus,
+    steerRatio,
+    lateral[lateralcontrol],
+    latAccelFactor, friction,
+    latAccelFactorRaw, frictionRaw
   );
 
-  x = rect().left() + radius * 1.8;
+  x = rect().left() + radius * 3.2;
   y = rect().height() - 15;
 
   configFont(p, "Open Sans", 30, "Regular");

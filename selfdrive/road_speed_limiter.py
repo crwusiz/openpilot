@@ -111,7 +111,7 @@ class RoadLimitSpeedServer:
           try:
             if broadcast_address is None or frame % 10 == 0:
               broadcast_address = self.get_broadcast_address()
-            print('broadcast_address', broadcast_address)
+            #print('broadcast_address', broadcast_address)
             if broadcast_address is not None:
               address = (broadcast_address, Port.BROADCAST_PORT)
               sock.sendto('EON:ROAD_LIMIT_SERVICE:v1'.encode(), address)

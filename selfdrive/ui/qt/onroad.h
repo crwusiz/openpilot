@@ -48,6 +48,7 @@ class NvgWindow : public CameraViewWidget {
   Q_PROPERTY(int autohold_status MEMBER autohold_status);
   Q_PROPERTY(int nda_status MEMBER nda_status);
   Q_PROPERTY(int wifi_status MEMBER wifi_status);
+  Q_PROPERTY(int traffic_status MEMBER traffic_status);
   Q_PROPERTY(int gpsSatelliteCount MEMBER gpsSatelliteCount);
   Q_PROPERTY(int gap MEMBER gap);
   Q_PROPERTY(int autoTrGap MEMBER autoTrGap);
@@ -59,7 +60,6 @@ class NvgWindow : public CameraViewWidget {
   Q_PROPERTY(int sectionLimitSpeed MEMBER sectionLimitSpeed);
   Q_PROPERTY(int sectionLeftDist MEMBER sectionLeftDist);
   Q_PROPERTY(int accel MEMBER accel);
-  Q_PROPERTY(int traffic_status MEMBER traffic_status);
 
   Q_PROPERTY(float lead_d_rel MEMBER lead_d_rel);
   Q_PROPERTY(float lead_v_rel MEMBER lead_v_rel);
@@ -75,6 +75,10 @@ class NvgWindow : public CameraViewWidget {
   Q_PROPERTY(float rl MEMBER rl);
   Q_PROPERTY(float rr MEMBER rr);
   Q_PROPERTY(float roadLimitSpeed MEMBER roadLimitSpeed);
+  Q_PROPERTY(float latAccelFactor MEMBER latAccelFactor);
+  Q_PROPERTY(float friction MEMBER friction);
+  Q_PROPERTY(float latAccelFactorRaw MEMBER latAccelFactorRaw);
+  Q_PROPERTY(float frictionRaw MEMBER frictionRaw);
 
 public:
   explicit NvgWindow(VisionStreamType type, QWidget* parent = 0);
@@ -92,48 +96,31 @@ private:
   QPixmap dm_img;
 
   // crwusiz add
-  QPixmap brake_img;
-  QPixmap bsd_l_img;
-  QPixmap bsd_r_img;
-  QPixmap gap_img;
-  QPixmap gap1_img;
-  QPixmap gap2_img;
-  QPixmap gap3_img;
-  QPixmap gap4_img;
-  QPixmap gap_auto_img;
-  QPixmap gps_img;
-  QPixmap wifi_img;
-  QPixmap direction_img;
-  QPixmap turnsignal_l_img;
-  QPixmap turnsignal_r_img;
-  QPixmap tpms_img;
-  QPixmap traffic_green_img;
-  QPixmap traffic_red_img;
+  QPixmap brake_img, bsd_l_img, bsd_r_img;
+  QPixmap gap_img, gap1_img, gap2_img, gap3_img, gap4_img, gap_auto_img;
+  QPixmap gps_img, wifi_img, direction_img, tpms_img;
+  QPixmap turnsignal_l_img, turnsignal_r_img;
+  QPixmap traffic_green_img, traffic_red_img;
 
   // neokii add
   QPixmap autohold_warning_img;
   QPixmap autohold_active_img;
-  QPixmap nda_img;
-  QPixmap hda_img;
+  QPixmap nda_img, hda_img;
 
   const int radius = 160;
   const int img_size = (radius / 2) * 1.5;
 
-  float speed;
   QString speedUnit;
-  float applyMaxSpeed;
-  float cruiseMaxSpeed;
+  float speed, applyMaxSpeed, cruiseMaxSpeed;
 
   bool is_cruise_set = false;
   bool steeringPressed = false;
   bool dmActive = false;
   bool brake_status = false;
-  bool left_blindspot = false;
-  bool right_blindspot = false;
+  bool left_blindspot, right_blindspot = false;
   bool gps_status = false;
   bool longControl = false;
-  bool left_on = false;
-  bool right_on = false;
+  bool left_on, right_on = false;
   bool v_ego_cluster_seen = false;
 
   int status = STATUS_DISENGAGED;
@@ -141,30 +128,21 @@ private:
   int autohold_status = 0;
   int nda_status = 0;
   int wifi_status = 0;
-  int gpsSatelliteCount = 0;
-  int gap = 0;
-  int autoTrGap = 0;
-  int lateralcontrol = 0;
-  int epsBus = 0;
-  int sccBus = 0;
-  int camLimitSpeed = 0;
-  int camLimitSpeedLeftDist = 0;
-  int sectionLimitSpeed = 0;
-  int sectionLeftDist = 0;
-  int accel = 0;
   int traffic_status = 0;
+  int gpsSatelliteCount = 0;
+  int gap, autoTrGap = 0;
+  int lateralcontrol = 0;
+  int epsBus, sccBus = 0;
+  int camLimitSpeed ,camLimitSpeedLeftDist = 0;
+  int sectionLimitSpeed, sectionLeftDist = 0;
+  int accel = 0;
 
-  float lead_d_rel = 0;
-  float lead_v_rel = 0;
-  float gpsBearing = 0;
-  float gpsVerticalAccuracy = 0;
-  float gpsAltitude = 0;
-  float gpsAccuracy = 0;
-  float angleSteers = 0;
-  float steerAngleDesired = 0;
-  float steerRatio = 0;
+  float lead_d_rel, lead_v_rel = 0;
+  float gpsBearing, gpsVerticalAccuracy, gpsAltitude, gpsAccuracy = 0;
+  float angleSteers, steerAngleDesired ,steerRatio = 0;
   float fl,fr,rl,rr = 0;
   float roadLimitSpeed = 0;
+  float latAccelFactor, friction, latAccelFactorRaw, frictionRaw = 0;
 
 protected:
   void paintGL() override;

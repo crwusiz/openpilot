@@ -83,3 +83,7 @@ selfdrive/modeld/models/*.thneed
 build/
 
 !**/.gitkeep
+
+selfdrive/loggerd/bootlog
+selfdrive/loggerd/encoderd
+selfdrive/loggerd/loggerd

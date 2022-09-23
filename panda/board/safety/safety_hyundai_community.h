@@ -1,5 +1,5 @@
 const SteeringLimits HYUNDAI_COMMUNITY_STEERING_LIMITS = {
-  .max_steer = 409,
+  .max_steer = 384,
   .max_rt_delta = 112,
   .max_rt_interval = 250000,
   .max_rate_up = 5,

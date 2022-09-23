@@ -4,18 +4,18 @@ from panda import Panda
 
 p = Panda()
 
-print("  Panda health")
+print("  Panda health\n")
 print(p.health())
 
-print("  relay OFF (NOOUTPUT)")
+print("  relay OFF (SAFETY_NOOUTPUT)\n")
 p.set_safety_mode(Panda.SAFETY_NOOUTPUT)
 p.send_heartbeat()
-time.sleep(5)
+time.sleep(2)
 
-print("  relay ON (HYUNDAI_COMMUNITY)")
+print("  relay ON (SAFETY_HYUNDAI_COMMUNITY)\n")
 p.set_safety_mode(Panda.SAFETY_HYUNDAI_COMMUNITY)
 p.send_heartbeat()
-time.sleep(5)
+time.sleep(2)
 
-print("  reset PANDA")
+print("  reset PANDA\n")
 p.reset()

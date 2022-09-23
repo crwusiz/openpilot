@@ -104,8 +104,12 @@ class CarState(CarStateBase):
     ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["CGW1"]["CF_Gway_TurnSigLh"],
                                                                       cp.vl["CGW1"]["CF_Gway_TurnSigRh"])
 
-    self.eps_error_cnt += 1 if cp_eps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 else -self.eps_error_cnt
-    ret.steerFaultTemporary = self.eps_error_cnt > 100
+    if not ret.standstill and cp_eps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0:
+      self.eps_error_cnt += 1
+    else:
+      self.eps_error_cnt = 0
+
+    ret.steerFaultTemporary = self.eps_error_cnt > 50
 
     if self.CP.enableAutoHold:
       ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]

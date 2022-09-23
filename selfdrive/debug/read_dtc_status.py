@@ -14,7 +14,7 @@ args = parser.parse_args()
 
 try:
   check_output(["pidof", "boardd"])
-  print("boardd is running, please kill openpilot before running this script! (aborted)")
+  print("  boardd is running, please kill openpilot before running this script! (aborted)\n")
   sys.exit(1)
 except CalledProcessError as e:
   if e.returncode != 1: # 1 == no process found (boardd not running)
@@ -23,12 +23,15 @@ except CalledProcessError as e:
 panda = Panda()
 panda.set_safety_mode(Panda.SAFETY_ELM327)
 uds_client = UdsClient(panda, args.addr, bus=args.bus, debug=args.debug)
-print("extended diagnostic session ...")
+print("  extended diagnostic session ...\n")
+
 uds_client.diagnostic_session_control(SESSION_TYPE.EXTENDED_DIAGNOSTIC)
-print("read diagnostic codes ...")
+print("  read diagnostic codes ...\n")
+
 data = uds_client.read_dtc_information(DTC_REPORT_TYPE.DTC_BY_STATUS_MASK, DTC_STATUS_MASK_TYPE.ALL)
-print("status availability:", " ".join(get_dtc_status_names(data[0])))
-print("DTC status:")
+print("  status availability:", " ".join(get_dtc_status_names(data[0])))
+print("  DTC status:\n")
+
 for i in range(1, len(data), 4):
   dtc_num = get_dtc_num_as_str(data[i:i+3])
   dtc_status = " ".join(get_dtc_status_names(data[i+3]))

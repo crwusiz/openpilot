@@ -168,7 +168,7 @@ struct ModelOutputStopLines {
   std::array<ModelOutputStopLinePrediction, STOP_LINE_MHP_N> prediction;
   float prob;
 
-  constexpr const ModelOutputStopLinePrediction &get_best_prediction(int t_idx) const {
+  constexpr const ModelOutputStopLinePrediction &get_best_prediction() const {
     int max_idx = 0;
     for (int i = 1; i < prediction.size(); i++) {
       if (prediction[i].prob > prediction[max_idx].prob) {

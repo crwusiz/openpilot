@@ -1481,7 +1481,6 @@ BO_ 1157 LFAHDA_MFC: 4 XXX
  SG_ HDA_Chime : 7|1@1+ (1,0) [0|1] "" XXX
  SG_ HDA_VSetReq : 8|8@1+ (1,0) [0|255] "km/h" XXX
  SG_ LFA_SysWarning : 16|3@1+ (1,0) [0|7] "" XXX
- SG_ NEW_SIGNAL_1 : 20|3@1+ (1,0) [0|7] "" XXX
  SG_ HDA_Icon_Wheel : 20|1@1+ (1,0) [0|1] "" XXX
  SG_ HDA_LdwSysState : 21|2@1+ (1,0) [0|3] "" XXX
  SG_ LFA_Icon_State : 24|2@1+ (1,0) [0|3] "" XXX
@@ -1517,6 +1516,8 @@ BO_ 865 ADAS_PRK_11: 8 ADAS_PRK
 BO_ 882 ELECT_GEAR: 8 XXX
  SG_ Elect_Gear_Shifter : 16|4@1+ (1,0) [0|7] ""  CLU
  SG_ Elect_Gear_Shifter_NEXO : 16|16@1+ (1,0) [0|65535] ""  CLU
+ SG_ Elect_Gear_Step : 22|3@0+ (1,0) [0|7] "" XXX
+ SG_ Elect_Motor_Speed : 0|8@1+ (1,0) [0|255] "" XXX
 
 BO_ 881 E_EMS11: 8 XXX
  SG_ Brake_Pedal_Pos : 0|8@1+ (1,0) [0|127] "" XXX
@@ -1526,12 +1527,15 @@ BO_ 881 E_EMS11: 8 XXX
  SG_ Cruise_Limit_Target : 23|8@1+ (1,0) [0|15] "" XXX
  SG_ Accel_Pedal_Pos : 31|8@1+ (1,0) [0|254] "" XXX
  SG_ CR_Vcu_AccPedDep_Pos : 56|8@1+ (1,0) [0|254] "" XXX
+ SG_ Engine_Run : 14|1@0+ (1,0) [0|1] "" XXX
+ SG_ N : 18|13@1+ (1,0) [0|15] "" XXX
 
 BO_ 1355 EV_PC6: 8 CGW
  SG_ CF_Vcu_SbwWarnMsg : 16|3@1+ (1,0) [0|7] "" Vector__XXX
 
 BO_ 1430 EV_PC2: 8 CGW
  SG_ CR_Ldc_ActVol_LS_V : 32|8@1+ (0.1,0) [0|0] "V" Vector__XXX
+ SG_ NEW_SIGNAL_1 : 8|7@1+ (1,0) [0|100] "%" XXX
 
 BO_ 1535 EV_PC10: 8 CGW
  SG_ CF_Vcu_EpbRequest : 37|1@1+ (1,0) [0|0] "" Vector__XXX

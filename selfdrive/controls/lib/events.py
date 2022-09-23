@@ -194,6 +194,7 @@ class NormalPermanentAlert(Alert):
 
 
 class StartupAlert(Alert):
+  #def __init__(self, alert_text_1: str, alert_text_2: str = "Always keep hands on wheel and eyes on road", alert_status=AlertStatus.normal):
   def __init__(self, alert_text_1: str, alert_text_2: str = "항상 핸들을 잡고 도로를 주시하세요", alert_status=AlertStatus.normal):
     super().__init__(alert_text_1, alert_text_2,
                      alert_status, AlertSize.mid,
@@ -214,16 +215,16 @@ AlertCallbackType = Callable[[car.CarParams, car.CarState, messaging.SubMaster, 
 
 def soft_disable_alert(alert_text_2: str) -> AlertCallbackType:
   def func(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
-    #if soft_disable_time < int(0.5 / DT_CTRL):
-    #  return ImmediateDisableAlert(alert_text_2)
+    if soft_disable_time < int(0.5 / DT_CTRL):
+      return ImmediateDisableAlert(alert_text_2)
     return SoftDisableAlert(alert_text_2)
   return func
 
 
 def user_soft_disable_alert(alert_text_2: str) -> AlertCallbackType:
   def func(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
-    #if soft_disable_time < int(0.5 / DT_CTRL):
-    #  return ImmediateDisableAlert(alert_text_2)
+    if soft_disable_time < int(0.5 / DT_CTRL):
+      return ImmediateDisableAlert(alert_text_2)
     return UserSoftDisableAlert(alert_text_2)
   return func
 
@@ -340,7 +341,7 @@ def modeld_lagging_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
 
 def wrong_car_mode_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
   #text = "Cruise Mode Disabled"
-  text = "크루즈 비활성상태"
+  text = "크루즈 버트을 누르세요"
   if CP.carName == "honda":
     #text = "Main Switch Off"
     text = "메인 스위치 OFF"
@@ -421,7 +422,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   EventName.invalidLkasSetting: {
     #ET.PERMANENT: NormalPermanentAlert("Stock LKAS is on",
     #                                   "Turn off stock LKAS to engage"),
-    ET.PERMANENT: NormalPermanentAlert("차량 LKAS 버튼 상태확인",
+    ET.PERMANENT: NormalPermanentAlert("차량 LKAS 버튼 ON 상태",
                                        "차량 LKAS 버튼 OFF후 활성화됩니다"),
   },
 
@@ -495,7 +496,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
       "조향제어 일시적으로 사용불가",
       "",
       AlertStatus.userPrompt, AlertSize.small,
-      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.prompt, 1.8),
+      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, 1.),
   },
 
   EventName.preDriverDistracted: {
@@ -533,7 +534,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
       "핸들을 잡아주세요 : 운전자 인식 불가",
       "",
       AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.prompt, .75, alert_rate=0.75),
+      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.prompt, .1, alert_rate=0.75),
   },
 
   EventName.promptDriverUnresponsive: {
@@ -623,7 +624,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
       "핸들을 잡아주세요",
       "조향제어 제한을 초과함",
       AlertStatus.userPrompt, AlertSize.mid,
-      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.promptRepeat, 1.),
+      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.prompt, 1.),
   },
 
   # Thrown when the fan is driven at >50% but is not rotating
@@ -731,7 +732,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   },
 
   EventName.resumeBlocked: {
-    ET.NO_ENTRY: NoEntryAlert("Press Set to Engage"),
+    #ET.NO_ENTRY: NoEntryAlert("Press Set to Engage"),
+    ET.NO_ENTRY: NoEntryAlert("SET 버튼으로 활성화됩니다"),
   },
 
   EventName.wrongCruiseMode: {
@@ -743,12 +745,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   EventName.steerTempUnavailable: {
     #ET.SOFT_DISABLE: soft_disable_alert("Steering Temporarily Unavailable"),
     #ET.NO_ENTRY: NoEntryAlert("Steering Temporarily Unavailable"),
-    # ET.SOFT_DISABLE: soft_disable_alert("조향제어 일시적으로 사용불가"),
-    ET.WARNING: Alert(
-      "핸들을 잡아주세요",
-      "조향제어 일시적으로 사용불가",
-      AlertStatus.userPrompt, AlertSize.small,
-      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, 0.),
+    ET.SOFT_DISABLE: soft_disable_alert("조향제어 일시적으로 사용불가"),
     ET.NO_ENTRY: NoEntryAlert("조향제어 일시적으로 사용불가"),
   },
 
@@ -801,8 +798,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   },
 
   EventName.wrongGear: {
-    ET.SOFT_DISABLE: user_soft_disable_alert("Gear not D"),
-    ET.NO_ENTRY: NoEntryAlert("Gear not D"),
+    #ET.SOFT_DISABLE: user_soft_disable_alert("Gear not D"),
+    #ET.NO_ENTRY: NoEntryAlert("Gear not D"),
     ET.USER_DISABLE: EngagementAlert(AudibleAlert.disengage),
     ET.NO_ENTRY: NoEntryAlert("기어를 [D]로 변경하세요"),
   },
@@ -973,7 +970,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   EventName.wideRoadCameraError: {
     #ET.PERMANENT: NormalPermanentAlert("Camera CRC Error - Road Fisheye",
-    ET.PERMANENT: NormalPermanentAlert("와이드 주행카메라 오류",
+    ET.PERMANENT: NormalPermanentAlert("와이드 카메라 오류",
                                        duration=1.,
                                        creation_delay=30.),
   },
@@ -1129,8 +1126,10 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   },
 
   EventName.lkasDisabled: {
-    ET.PERMANENT: NormalPermanentAlert("LKAS Disabled: Enable LKAS to engage"),
-    ET.NO_ENTRY: NoEntryAlert("LKAS Disabled"),
+    #ET.PERMANENT: NormalPermanentAlert("LKAS Disabled: Enable LKAS to engage"),
+    #ET.NO_ENTRY: NoEntryAlert("LKAS Disabled"),
+    ET.PERMANENT: NormalPermanentAlert("LKAS 비활성화됨 : LKAS를 활성화 하세요"),
+    ET.NO_ENTRY: NoEntryAlert("LKAS 비활성화됨"),
   },
 
   EventName.turningIndicatorOn: {

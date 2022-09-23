@@ -128,6 +128,30 @@ void fill_lead(cereal::ModelDataV2::LeadDataV3::Builder lead, const ModelOutputL
   lead.setAStd(to_kj_array_ptr(lead_a_std));
 }
 
+// added by opkr
+void fill_stop_line(cereal::ModelDataV2::StopLineData::Builder stop_line, const ModelOutputStopLines &stop_lines) {
+  const auto &best_data = stop_lines.get_best_prediction();
+  stop_line.setProb(sigmoid(stop_lines.prob));
+
+  stop_line.setX(best_data.mean.position.x);
+  stop_line.setY(best_data.mean.position.y);
+  stop_line.setZ(best_data.mean.position.z);
+  stop_line.setRoll(best_data.mean.rotation.x);
+  stop_line.setPitch(best_data.mean.rotation.y);
+  stop_line.setYaw(best_data.mean.rotation.z);
+  stop_line.setSpeedAtLine(best_data.mean.speed);
+  stop_line.setSecondsUntilLine(best_data.mean.time);
+
+  stop_line.setXStd(best_data.std.position.x);
+  stop_line.setYStd(best_data.std.position.y);
+  stop_line.setZStd(best_data.std.position.z);
+  stop_line.setRollStd(best_data.std.rotation.x);
+  stop_line.setPitchStd(best_data.std.rotation.y);
+  stop_line.setYawStd(best_data.std.rotation.z);
+  stop_line.setSpeedAtLineStd(best_data.std.speed);
+  stop_line.setSecondsUntilLineStd(best_data.std.time);
+}
+
 void fill_meta(cereal::ModelDataV2::MetaData::Builder meta, const ModelOutputMeta &meta_data) {
   std::array<float, DESIRE_LEN> desire_state_softmax;
   softmax(meta_data.desire_state_prob.array.data(), desire_state_softmax.data(), DESIRE_LEN);
@@ -322,6 +346,9 @@ void fill_model(cereal::ModelDataV2::Builder &framed, const ModelOutput &net_out
 
   // meta
   fill_meta(framed.initMeta(), net_outputs.meta);
+
+  // stop line, added by opkr
+  fill_stop_line(framed.initStopLine(), net_outputs.stop_lines);
 
   // leads
   auto leads = framed.initLeadsV3(LEAD_MHP_SELECTION);
