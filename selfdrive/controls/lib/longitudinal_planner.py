@@ -91,7 +91,7 @@ class LongitudinalPlanner:
     return x, v, a, j, z
 
   def update(self, sm):
-    if self.param_read_counter % 100 == 0:
+    if self.param_read_counter % 50 == 0:
       self.read_param()
     self.param_read_counter += 1
 

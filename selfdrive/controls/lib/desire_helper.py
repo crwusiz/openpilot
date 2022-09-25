@@ -55,28 +55,23 @@ class DesireHelper:
       self.lane_change_state = LaneChangeState.off
       self.lane_change_direction = LaneChangeDirection.none
     else:
-      torque_applied = carstate.steeringPressed and \
-                       ((carstate.steeringTorque > 0 and self.lane_change_direction == LaneChangeDirection.left) or
-                        (carstate.steeringTorque < 0 and self.lane_change_direction == LaneChangeDirection.right)) or \
-                        self.auto_lane_change_enabled and \
-                       (AUTO_LCA_START_TIME+0.25) > self.auto_lane_change_timer > AUTO_LCA_START_TIME
-
-      blindspot_detected = ((carstate.leftBlindspot and self.lane_change_direction == LaneChangeDirection.left) or
-                            (carstate.rightBlindspot and self.lane_change_direction == LaneChangeDirection.right))
-
-      # State transitions
-      # off
+      # LaneChangeState.off
       if self.lane_change_state == LaneChangeState.off and one_blinker and not self.prev_one_blinker and not below_lane_change_speed:
-        if carstate.leftBlinker:
-          self.lane_change_direction = LaneChangeDirection.left
-        elif carstate.rightBlinker:
-          self.lane_change_direction = LaneChangeDirection.right
-
         self.lane_change_state = LaneChangeState.preLaneChange
         self.lane_change_ll_prob = 1.0
 
       # LaneChangeState.preLaneChange
       elif self.lane_change_state == LaneChangeState.preLaneChange:
+        # Set lane change direction
+        self.lane_change_direction = LaneChangeDirection.left if \
+          carstate.leftBlinker else LaneChangeDirection.right
+        torque_applied = carstate.steeringPressed and\
+                         ((carstate.steeringTorque > 0 and self.lane_change_direction == LaneChangeDirection.left) or
+                          (carstate.steeringTorque < 0 and self.lane_change_direction == LaneChangeDirection.right)) or \
+                         self.auto_lane_change_enabled and (AUTO_LCA_START_TIME+0.25) > self.auto_lane_change_timer > AUTO_LCA_START_TIME
+        blindspot_detected = ((carstate.leftBlindspot and self.lane_change_direction == LaneChangeDirection.left) or
+                              (carstate.rightBlindspot and self.lane_change_direction == LaneChangeDirection.right))
+
         if not one_blinker or below_lane_change_speed:
           self.lane_change_state = LaneChangeState.off
         elif torque_applied and (not blindspot_detected or self.prev_torque_applied):

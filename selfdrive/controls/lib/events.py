@@ -496,7 +496,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
       "조향제어 일시적으로 사용불가",
       "",
       AlertStatus.userPrompt, AlertSize.small,
-      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, 1.),
+      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.prompt, 1.8),
   },
 
   EventName.preDriverDistracted: {

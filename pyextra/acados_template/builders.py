@@ -3,7 +3,7 @@
 # Copyright 2019 Gianluca Frison, Dimitris Kouzoupis, Robin Verschueren,
 # Andrea Zanelli, Niels van Duijkeren, Jonathan Frey, Tommaso Sartor,
 # Branimir Novoselnik, Rien Quirynen, Rezart Qelibari, Dang Doan,
-# Jonas Koenemann, Yutao Chen, Tobias Schols, Jonas Schlagenhauf, Moritz Diehl
+# Jonas Koenemann, Yutao Chen, Tobias Schöls, Jonas Schlagenhauf, Moritz Diehl
 #
 # This file is part of acados.
 #

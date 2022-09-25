@@ -2,7 +2,7 @@ import yaml
 import os
 import time
 from abc import abstractmethod, ABC
-from typing import Any, Dict, Optional, Tuple, List
+from typing import Any, Dict, Optional, Tuple, List, Callable
 
 from cereal import car
 from common.basedir import BASEDIR
@@ -17,6 +17,7 @@ from selfdrive.controls.lib.vehicle_model import VehicleModel
 
 GearShifter = car.CarState.GearShifter
 EventName = car.CarEvent.EventName
+TorqueFromLateralAccelCallbackType = Callable[[float, car.CarParams.LateralTorqueTuning, float, float, bool], float]
 
 MAX_CTRL_SPEED = (V_CRUISE_MAX + 4) * CV.KPH_TO_MS
 ACCEL_MAX = 2.0
@@ -109,20 +110,17 @@ class CarInterfaceBase(ABC):
     return self.get_steer_feedforward_default
 
   @staticmethod
-  def torque_from_lateral_accel_linear(lateral_accel_value, torque_params, lateral_accel_error=None, lateral_accel_deadzone=None, friction_compensation=False):
+  def torque_from_lateral_accel_linear(lateral_accel_value, torque_params, lateral_accel_error, lateral_accel_deadzone, friction_compensation):
     # The default is a linear relationship between torque and lateral acceleration (accounting for road roll and steering friction)
-    if friction_compensation:
-      assert (lateral_accel_error is not None) and (lateral_accel_deadzone is not None)
-      friction = interp(
-        apply_deadzone(lateral_accel_error, lateral_accel_deadzone),
-        [-FRICTION_THRESHOLD, FRICTION_THRESHOLD],
-        [-torque_params['friction'], torque_params['friction']]
-      )
-    else:
-      friction = 0.0
-    return (lateral_accel_value / torque_params['latAccelFactor']) + friction
+    friction_interp = interp(
+      apply_deadzone(lateral_accel_error, lateral_accel_deadzone),
+      [-FRICTION_THRESHOLD, FRICTION_THRESHOLD],
+      [-torque_params.friction, torque_params.friction]
+    )
+    friction = friction_interp if friction_compensation else 0.0
+    return (lateral_accel_value / torque_params.latAccelFactor) + friction
 
-  def torque_from_lateral_accel(self):
+  def torque_from_lateral_accel(self) -> TorqueFromLateralAccelCallbackType:
     return self.torque_from_lateral_accel_linear
 
   # returns a set of default params to avoid repetition in car specific params
@@ -224,8 +222,7 @@ class CarInterfaceBase(ABC):
       events.add(EventName.doorOpen)
     if cs_out.seatbeltUnlatched:
       events.add(EventName.seatbeltNotLatched)
-    if cs_out.gearShifter != GearShifter.drive and \
-            (extra_gears is None or cs_out.gearShifter not in extra_gears):
+    if cs_out.gearShifter != GearShifter.drive and (extra_gears is None or cs_out.gearShifter not in extra_gears):
       events.add(EventName.wrongGear)
     if cs_out.gearShifter == GearShifter.reverse:
       events.add(EventName.reverseGear)
