@@ -47,11 +47,11 @@ def process_hud_alert(enabled, fingerprint, hud_control):
 class CarController:
   def __init__(self, dbc_name, CP, VM):
     self.CP = CP
+    self.CCP = CarControllerParams(CP)
     self.longcontrol = CP.openpilotLongitudinalControl
     self.scc_live = not CP.radarOffCan
     self.car_fingerprint = CP.carFingerprint
 
-    self.params = CarControllerParams(CP)
     self.packer = CANPacker(dbc_name)
 
     self.turning_indicator_alert = False
@@ -82,8 +82,8 @@ class CarController:
     pcm_cancel_cmd = CC.cruiseControl.cancel
 
     # Steering Torque
-    new_steer = int(round(actuators.steer * self.params.STEER_MAX))
-    apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.params)
+    new_steer = int(round(actuators.steer * self.CCP.STEER_MAX))
+    apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.CCP)
 
     # Disable steering while turning blinker on and speed below 60 kph
     if CS.out.leftBlinker or CS.out.rightBlinker:
@@ -156,7 +156,7 @@ class CarController:
 #      can_sends.append(hyundaican.create_frt_radar_opt(self.packer))
 
     new_actuators = actuators.copy()
-    new_actuators.steer = apply_steer / self.params.STEER_MAX
+    new_actuators.steer = apply_steer / self.CCP.STEER_MAX
     new_actuators.accel = self.accel
 
     self.frame += 1
@@ -202,7 +202,7 @@ class CarController:
         stopping = (actuators.longControlState == LongCtrlState.stopping)
         apply_accel = self.scc_smoother.get_apply_accel(CS, actuators.accel)
         apply_accel = clip(apply_accel if CC.longActive else 0,
-                           CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
+                           self.CCP.ACCEL_MIN, self.CCP.ACCEL_MAX)
         self.accel = apply_accel
 
         if self.scc12_cnt < 0:
@@ -237,8 +237,8 @@ class CarController:
     actuators = CC.actuators
 
     # Steering Torque
-    new_steer = int(round(actuators.steer * self.params.STEER_MAX))
-    apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.params)
+    new_steer = int(round(actuators.steer * self.CCP.STEER_MAX))
+    apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.CCP)
 
     if not CC.latActive:
       apply_steer = 0
@@ -278,7 +278,7 @@ class CarController:
           self.last_button_frame = self.frame
 
     new_actuators = actuators.copy()
-    new_actuators.steer = apply_steer / self.params.STEER_MAX
+    new_actuators.steer = apply_steer / self.CCP.STEER_MAX
     new_actuators.accel = self.accel
 
     self.frame += 1

@@ -62,8 +62,8 @@ T_DIFFS = np.diff(T_IDXS, prepend=[0.])
 MIN_ACCEL = -3.5
 MAX_ACCEL = 2.0
 T_FOLLOW = 1.45
-COMFORT_BRAKE = 2.5
-STOP_DISTANCE = 6.5
+COMFORT_BRAKE = 2.3 #2.5
+STOP_DISTANCE = 7.0
 
 def get_stopped_equivalence_factor(v_lead, v_ego, t_follow=T_FOLLOW):
   # KRKeegan this offset rapidly decreases the following distance when the lead pulls
@@ -341,6 +341,7 @@ class LongitudinalMpc:
 
   def update(self, carstate, radarstate, model, v_cruise, x, v, a, j):
     v_ego = self.x0[1]
+    self.debugLong = 0
     self.status = radarstate.leadOne.status or radarstate.leadTwo.status
 
     lead_xv_0 = self.process_lead(radarstate.leadOne)
@@ -373,7 +374,7 @@ class LongitudinalMpc:
       stopline_x = model.stopLine.x
       model_x = x[N]
       probe = model.stopLine.prob if abs(carstate.steeringAngleDeg) < 20 else 0.0
-      startSign = v[-1] > 5.0 # and v_ego*CV.MS_TO_KPH < 20.0
+      startSign = v[-1] > 5.0
       stopSign = (probe > 0.3) and ((v[-1] < 3.0) or (v[-1] < v_ego*0.95))
       self.debugLong = 1 if stopSign else 2 if startSign else 0
       if carstate.gasPressed:
@@ -387,10 +388,10 @@ class LongitudinalMpc:
         self.gasPressed = False
         self.brakePressed = False
       elif stopSign:
-        if v_ego*CV.MS_TO_KPH > 20.0:
+        if v_ego * CV.MS_TO_KPH > 20.0:
           self.brakePressed = False
           self.gasPressed = False
-        if radarstate.leadOne.status and (radarstate.leadOne.dRel - stopline_x) < 2.0 and v_ego*CV.MS_TO_KPH > 20.0:
+        if radarstate.leadOne.status and (radarstate.leadOne.dRel - stopline_x) < 2.0 and v_ego * CV.MS_TO_KPH > 20.0:
           self.xstate = "LEAD"
           self.onStopping = False
         else:
@@ -410,12 +411,12 @@ class LongitudinalMpc:
         self.xstate = "E2E_STOPPING"
       else:
         self.xstate = "E2E_CRUISE"
-        if v_ego*CV.MS_TO_KPH < 80.0:
+        if v_ego * CV.MS_TO_KPH < 80.0:
           if probe > 0.1:
             self.comfort_brake = 1.5
           else:
             self.comfort_brake = 2.3
-        if v_ego*CV.MS_TO_KPH > 20.0:
+        if v_ego * CV.MS_TO_KPH > 20.0:
           self.gasPressed = False
         self.brakePressed = False
 
