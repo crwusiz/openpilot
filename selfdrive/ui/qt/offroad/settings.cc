@@ -482,35 +482,53 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   QVBoxLayout* vlayout = new QVBoxLayout(homeScreen);
   vlayout->setContentsMargins(0, 20, 0, 20);
 
-  QString selected = QString::fromStdString(Params().get("SelectedCar"));
-
-  QPushButton* selectcar_btn = new QPushButton(selected.length() ? selected : tr("Select your car"));
-  selectcar_btn->setObjectName("selectcar_btn");
-  selectcar_btn->setStyleSheet("margin-right: 30px;");
-  //selectcar_btn->setFixedSize(400, 100);
-  connect(selectcar_btn, &QPushButton::clicked, [=]() { main_layout->setCurrentWidget(selectCar); });
-  vlayout->addSpacing(10);
-  vlayout->addWidget(selectcar_btn, 0, Qt::AlignRight);
-  vlayout->addSpacing(10);
-
   homeWidget = new QWidget(this);
   QVBoxLayout* communityLayout = new QVBoxLayout(homeWidget);
   homeWidget->setObjectName("homeWidget");
 
   ScrollView *scroller = new ScrollView(homeWidget, this);
   scroller->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-  vlayout->addWidget(scroller, 1);
 
   main_layout->addWidget(homeScreen);
+
+  QString selectedManufacturer = QString::fromStdString(Params().get("SelectedManufacturer"));
+  QPushButton* selectManufacturer_btn = new QPushButton(selectedManufacturer.length() ? selectedManufacturer : tr("Select your Manufacturer"));
+  selectManufacturer_btn->setObjectName("selectManufacturer_btn");
+  connect(selectManufacturer_btn, &QPushButton::clicked, [=]() { main_layout->setCurrentWidget(selectManufacturer); });
+
+  selectManufacturer = new SelectManufacturer(this);
+  connect(selectManufacturer, &SelectManufacturer::backPress, [=]() { main_layout->setCurrentWidget(homeScreen); });
+  connect(selectManufacturer, &SelectManufacturer::selectedManufacturer, [=]() {
+     QString selected = QString::fromStdString(Params().get("SelectedManufacturer"));
+     selectManufacturer_btn->setText(selectedManufacturer.length() ? selectedManufacturer : tr("Select your Manufacturer"));
+     main_layout->setCurrentWidget(homeScreen);
+  });
+  main_layout->addWidget(selectManufacturer);
+
+  QString selectedCar = QString::fromStdString(Params().get("SelectedCar"));
+  QPushButton* selectCar_btn = new QPushButton(selectedCar.length() ? selectedCar : tr("Select your car"));
+  selectCar_btn->setObjectName("selectCar_btn");
+  connect(selectCar_btn, &QPushButton::clicked, [=]() { main_layout->setCurrentWidget(selectCar); });
 
   selectCar = new SelectCar(this);
   connect(selectCar, &SelectCar::backPress, [=]() { main_layout->setCurrentWidget(homeScreen); });
   connect(selectCar, &SelectCar::selectedCar, [=]() {
      QString selected = QString::fromStdString(Params().get("SelectedCar"));
-     selectcar_btn->setText(selected.length() ? selected : tr("Select your car"));
+     selectCar_btn->setText(selectedCar.length() ? selectedCar : tr("Select your car"));
      main_layout->setCurrentWidget(homeScreen);
   });
   main_layout->addWidget(selectCar);
+
+  QHBoxLayout* layoutBtn = new QHBoxLayout(homeWidget);
+
+  layoutBtn->addWidget(selectManufacturer_btn);
+  layoutBtn->addSpacing(10);
+  layoutBtn->addWidget(selectCar_btn);
+
+  vlayout->addSpacing(10);
+  vlayout->addLayout(layoutBtn, 0);
+  vlayout->addSpacing(10);
+  vlayout->addWidget(scroller, 1);
 
   QPalette pal = palette();
   pal.setColor(QPalette::Background, QColor(0x29, 0x29, 0x29));
@@ -530,7 +548,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     #back_btn:pressed {
       background-color: #3B3B3B;
     }
-    #selectcar_btn {
+    #selectCar_btn, #selectManufacturer_btn {
       font-size: 50px;
       margin: 0px;
       padding: 15px;
@@ -539,7 +557,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
       color: #FFFFFF;
       background-color: #2C2CE2;
     }
-    #selectcar_btn:pressed {
+    #selectCar_btn:pressed, #selectManufacturer_btn:pressed {
       background-color: #2424FF;
     }
   )");
@@ -567,6 +585,14 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
   communityLayout->addWidget(cleardtc_btn);
+
+  auto pandareset_btn = new ButtonControl("Panda Reset", tr("RUN"));
+  QObject::connect(pandareset_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+      QProcess::execute("/data/openpilot/scripts/relay_reset.sh");
+    }
+  });
+  communityLayout->addWidget(pandareset_btn);
 
   auto pandaflash_btn = new ButtonControl("Panda Flash", tr("RUN"));
   QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
@@ -623,16 +649,16 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
   // Back button
   QPushButton* back = new QPushButton(tr("Back"));
   back->setObjectName("back_btn");
-  back->setFixedSize(300, 100);
+  back->setFixedSize(500, 100);
   connect(back, &QPushButton::clicked, [=]() { emit backPress(); });
   main_layout->addWidget(back, 0, Qt::AlignLeft);
+
   QListWidget* list = new QListWidget(this);
   list->setStyleSheet("QListView {padding: 40px; background-color: #393939; border-radius: 15px; height: 140px;} QListView::item{height: 100px}");
-  //list->setAttribute(Qt::WA_AcceptTouchEvents, true);
   QScroller::grabGesture(list->viewport(), QScroller::LeftMouseButtonGesture);
   list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-  list->addItem(tr("Select car not use"));
-  QStringList items = get_list("/data/params/d/SupportedCars");
+  list->addItem(tr("Select Car not use"));
+  QStringList items = get_list("/data/params/d/CarList");
   list->addItems(items);
   list->setCurrentRow(0);
   QString selected = QString::fromStdString(Params().get("SelectedCar"));
@@ -656,6 +682,71 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
     }
     emit selectedCar();
     });
+  main_layout->addWidget(list);
+}
+
+SelectManufacturer::SelectManufacturer(QWidget* parent): QWidget(parent) {
+  QVBoxLayout* main_layout = new QVBoxLayout(this);
+  main_layout->setMargin(20);
+  main_layout->setSpacing(20);
+
+  // Back button
+  QPushButton* back = new QPushButton(tr("Back"));
+  back->setObjectName("back_btn");
+  back->setFixedSize(500, 100);
+  connect(back, &QPushButton::clicked, [=]() { emit backPress(); });
+  main_layout->addWidget(back, 0, Qt::AlignLeft);
+
+  QListWidget* list = new QListWidget(this);
+  list->setStyleSheet("QListView {padding: 40px; background-color: #393939; border-radius: 15px; height: 140px;} QListView::item{height: 100px}");
+  QScroller::grabGesture(list->viewport(), QScroller::LeftMouseButtonGesture);
+  list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+  list->addItem(tr("Select Manufacturer not use"));
+
+  QStringList items = {"HYUNDAI", "KIA", "GENESIS", "GM", "TOYOTA", "LEXUS", "HONDA"};
+  list->addItems(items);
+  list->setCurrentRow(0);
+  QString selected = QString::fromStdString(Params().get("SelectedManufacturer"));
+
+  int index = 0;
+  for(QString item : items) {
+    if(selected == item) {
+        list->setCurrentRow(index);
+        break;
+    }
+    index++;
+  }
+
+  QObject::connect(list, QOverload<QListWidgetItem*>::of(&QListWidget::itemClicked),
+    [=](QListWidgetItem* item){
+
+    if (list->currentRow() == 0) {
+      Params().remove("SelectedManufacturer");
+    } else if (list->currentRow() == 1) {
+      QProcess::execute("cp -f /data/params/d/CarList_Hyundai /data/params/d/CarList");
+      Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
+    } else if (list->currentRow() == 2) {
+      QProcess::execute("cp -f /data/params/d/CarList_Kia /data/params/d/CarList");
+      Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
+    } else if (list->currentRow() == 3) {
+      QProcess::execute("cp -f /data/params/d/CarList_Genesis /data/params/d/CarList");
+      Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
+    } else if (list->currentRow() == 4) {
+      QProcess::execute("cp -f /data/params/d/CarList_Gm /data/params/d/CarList");
+      Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
+    } else if (list->currentRow() == 5) {
+      QProcess::execute("cp -f /data/params/d/CarList_Toyota /data/params/d/CarList");
+      Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
+    } else if (list->currentRow() == 6) {
+      QProcess::execute("cp -f /data/params/d/CarList_Lexus /data/params/d/CarList");
+      Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
+    } else if (list->currentRow() == 7) {
+      QProcess::execute("cp -f /data/params/d/CarList_Honda /data/params/d/CarList");
+      Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
+    }
+    emit selectedManufacturer();
+    });
+
   main_layout->addWidget(list);
 }
 

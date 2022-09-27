@@ -82,7 +82,17 @@ function launch {
   # write tmux scrollback to a file
   tmux capture-pane -pq -S-1000 > /tmp/launch_log
 
-  python ./selfdrive/car/hyundai/values.py > /data/params/d/SupportedCars
+  # CarList
+  # sed '$a-------------------' ( add last line )
+  cat ./selfdrive/car/hyundai/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/d/CarList_HYUNDAI
+  awk '/HYUNDAI/' /data/params/d/CarList_HYUNDAI > /data/params/d/CarList_Hyundai
+  awk '/KIA/' /data/params/d/CarList_HYUNDAI > /data/params/d/CarList_Kia
+  awk '/GENESIS/' /data/params/d/CarList_HYUNDAI > /data/params/d/CarList_Genesis
+  cat ./selfdrive/car/toyota/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/d/CarList_TOYOTA
+  awk '/TOYOTA/' /data/params/d/CarList_TOYOTA > /data/params/d/CarList_Toyota
+  awk '/LEXUS/' /data/params/d/CarList_TOYOTA > /data/params/d/CarList_Lexus
+  cat ./selfdrive/car/honda/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/d/CarList_Honda
+  cat ./selfdrive/car/gm/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/d/CarList_Gm
 
   # start manager
   cd selfdrive/manager

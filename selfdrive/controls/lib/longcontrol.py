@@ -99,10 +99,6 @@ class LongControl:
     self.pid.neg_limit = accel_limits[0]
     self.pid.pos_limit = accel_limits[1]
 
-    # add curv accel limit
-    if abs(CS.steeringAngleDeg) > 60:
-      self.pid.pos_limit = accel_limits[1] * 0.1
-
     output_accel = self.last_output_accel
     self.long_control_state = long_control_state_trans(self.CP, active, self.long_control_state, CS.vEgo,
                                                        v_target, v_target_1sec, CS.brakePressed,

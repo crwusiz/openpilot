@@ -94,10 +94,7 @@ class CAR:
 
 @dataclass
 class HyundaiCarInfo(CarInfo):
-  # TODO: we can probably remove LKAS. LKAS is standard on many
-  # HKG and for others, it's likely packaged together with SCC
-  package: str = "SCC + LKAS"
-
+  package: str = "Smart Cruise Control (SCC)"
 
 CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
   CAR.ELANTRA_I30: HyundaiCarInfo("Hyundai Elantra 2017-19", min_enable_speed=19 * CV.MPH_TO_MS, harness=Harness.hyundai_b),
@@ -1529,13 +1526,3 @@ DBC = {
   CAR.EV6: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),
 }
-
-
-def main():
-  for member, value in vars(CAR).items():
-    if not member.startswith("_"):
-      print(value)
-
-
-if __name__ == "__main__":
-  main()

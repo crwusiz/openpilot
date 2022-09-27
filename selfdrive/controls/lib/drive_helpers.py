@@ -22,7 +22,7 @@ CONTROL_N = 17
 CAR_ROTATION_RADIUS = 0.0
 
 # EU guidelines
-MAX_LATERAL_JERK = 10.0  # 5.0
+MAX_LATERAL_JERK = 5.0
 
 ButtonType = car.CarState.ButtonEvent.Type
 CRUISE_LONG_PRESS = 50

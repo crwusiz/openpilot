@@ -95,6 +95,18 @@ private:
   QFileSystemWatcher *fs_watch;
 };
 
+class SelectManufacturer : public QWidget {
+  Q_OBJECT
+
+public:
+  explicit SelectManufacturer(QWidget* parent = 0);
+
+private:
+
+signals:
+  void backPress();
+  void selectedManufacturer();
+};
 
 class SelectCar : public QWidget {
   Q_OBJECT
@@ -109,7 +121,6 @@ signals:
   void selectedCar();
 };
 
-
 class CommunityPanel : public QWidget {
   Q_OBJECT
 
@@ -117,6 +128,7 @@ private:
   QStackedLayout* main_layout = nullptr;
   QWidget* homeScreen = nullptr;
   SelectCar* selectCar = nullptr;
+  SelectManufacturer* selectManufacturer = nullptr;
   QWidget* homeWidget;
 
 public:
