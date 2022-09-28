@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import traceback
 from collections import defaultdict
 from typing import Optional, Set, Tuple
 
@@ -243,9 +242,9 @@ def get_fw_versions(logcan, sendcan, query_brand=None, extra_config=None, timeou
           if addr[1] is not None:
             f.subAddress = addr[1]
 
-          car_fw.append(f)
-      except Exception:
-        cloudlog.warning(f"FW query exception: {traceback.format_exc()}")
+              car_fw.append(f)
+        except Exception:
+          cloudlog.exception("FW query exception")
 
   return car_fw
 
