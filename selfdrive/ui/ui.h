@@ -114,7 +114,7 @@ typedef struct UIScene {
   QPointF lead_vertices[2];
   bool lead_radar[2] = {false, false};
 
-  float light_sensor, accel_sensor, gyro_sensor;
+  float light_sensor;
   bool started, ignition, is_metric, map_on_left, longitudinal_control, end_to_end_long;
   uint64_t started_frame;
 } UIScene;
