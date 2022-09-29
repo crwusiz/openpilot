@@ -13,6 +13,7 @@ if __name__ == '__main__':  # generating code
   from pyextra.acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver
 else:
   from selfdrive.controls.lib.longitudinal_mpc_lib.c_generated_code.acados_ocp_solver_pyx import AcadosOcpSolverCython  # pylint: disable=no-name-in-module, import-error
+
 from casadi import SX, vertcat
 
 MODEL_NAME = 'long'
@@ -409,23 +410,13 @@ class LongitudinalMpc:
       # when the leads are no factor.
       v_lower = v_ego + (T_IDXS * self.cruise_min_a * 1.05)
       v_upper = v_ego + (T_IDXS * self.cruise_max_a * 1.05)
-      v_cruise_clipped = np.clip(v_cruise * np.ones(N+1),
-                                 v_lower,
-                                 v_upper)
+      v_cruise_clipped = np.clip(v_cruise * np.ones(N+1), v_lower, v_upper)
       cruise_obstacle = np.cumsum(T_DIFFS * v_cruise_clipped) + get_safe_obstacle_distance(v_cruise_clipped, self.t_follow, self.stop_dist)
 
-      if self.xstate == "LEAD" or self.xstate == "E2E_START":
-        x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle])
-      elif self.xstate == "E2E_STOP":
-        if cruise_obstacle[0] < min_x:
-          x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle])
-        else:
-          x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, stopline])
-      elif self.xstate == "E2E_CRUISE":
-        if cruise_obstacle[0] < min_x:
-          x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle])
-        else:
-          x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, x2])
+      if self.xstate == "E2E_STOP" and cruise_obstacle[0] > min_x:
+        x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, stopline])
+      elif self.xstate == "E2E_CRUISE" and cruise_obstacle[0] > min_x:
+        x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, x2])
       else:
         x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle])
 
@@ -440,8 +431,7 @@ class LongitudinalMpc:
 
       self.params[:,5] = 1.0
 
-      x_obstacles = np.column_stack([lead_0_obstacle,
-                                     lead_1_obstacle])
+      x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle])
       cruise_target = T_IDXS * np.clip(v_cruise, v_ego - 2.0, 1e3) + x[0]
       xforward = ((v[1:] + v[:-1]) / 2) * (T_IDXS[1:] - T_IDXS[:-1])
       x = np.cumsum(np.insert(xforward, 0, x[0]))
@@ -482,8 +472,6 @@ class LongitudinalMpc:
       if any((lead_1_obstacle - get_safe_obstacle_distance(self.x_sol[:,1], self.t_follow, self.stop_dist)) - self.x_sol[:, 0] < 0.0) and \
          (lead_1_obstacle[0] - lead_0_obstacle[0]):
         self.source = 'lead1'
-
-
 
   def update_with_xva(self, x, v, a):
     self.params[:,0] = -10.
