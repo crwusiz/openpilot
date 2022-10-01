@@ -586,6 +586,13 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   });
   communityLayout->addWidget(cleardtc_btn);
 
+  auto tmuxlog_btn = new ButtonControl("Tmux error log", tr("RUN"));
+  QObject::connect(tmuxlog_btn, &ButtonControl::clicked, [=]() {
+    const std::string txt = util::read_file("/data/tmux_error.log");
+    RichTextDialog::alert(QString::fromStdString(txt), this);
+  });
+  communityLayout->addWidget(tmuxlog_btn);
+
   auto pandareset_btn = new ButtonControl("Panda Reset", tr("RUN"));
   QObject::connect(pandareset_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), this)) {

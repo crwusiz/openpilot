@@ -37,7 +37,6 @@ int main(int argc, char *argv[]) {
 
   QPushButton *btn = new QPushButton();
 #ifdef __aarch64__
-  QPushButton *btn2 = new QPushButton();
   QLabel *label2 = new QLabel();
   QString device_ip = "────────";
   const QHostAddress &localhost = QHostAddress(QHostAddress::LocalHost);
@@ -52,12 +51,6 @@ int main(int argc, char *argv[]) {
   QObject::connect(btn, &QPushButton::clicked, [=]() {
     Hardware::reboot();
   });
-  btn2->setText("Git Pull");
-  QObject::connect(btn2, &QPushButton::clicked, [=]() {
-    QProcess::execute("sh /data/openpilot/scripts/gitpull.sh");
-    Hardware::reboot();
-  });
-  main_layout->addWidget(btn2, 0, 0, Qt::AlignLeft | Qt::AlignBottom);
 #else
   btn->setText(QObject::tr("Exit"));
   QObject::connect(btn, &QPushButton::clicked, &a, &QApplication::quit);

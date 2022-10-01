@@ -1,4 +1,5 @@
 #include "selfdrive/ui/qt/onroad.h"
+#include "selfdrive/ui/qt/onroad.h"
 
 #include <cmath>
 
@@ -623,7 +624,7 @@ void NvgWindow::drawHud(QPainter &p) {
     latAccelFactorRaw, frictionRaw
   );
 
-  x = rect().left() + radius * 3.2;
+  x = rect().left() + radius * 3.5;
   y = rect().height() - 15;
 
   configFont(p, "Open Sans", 30, "Regular");

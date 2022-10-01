@@ -132,7 +132,7 @@ static void update_model(UIState *s, const cereal::ModelDataV2::Reader &model) {
 
   // update stop lines
   const auto stop_line = model.getStopLine();
-  if (stop_line.getProb() > .1) {
+  if (stop_line.getProb() > .2) {
     update_stop_line_data(s, stop_line, .5, 2, 1.22, &scene.stop_line_vertices);
   }
 }

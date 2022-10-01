@@ -108,6 +108,8 @@ def manager_init() -> None:
   cloudlog.bind_global(dongle_id=dongle_id, version=get_version(), dirty=is_dirty(),
                        device=HARDWARE.get_device_type())
 
+  if os.path.isfile('/data/tmux_error.log'):
+    os.remove('/data/tmux_error.log')
 
 def manager_prepare() -> None:
   for p in managed_processes.values():

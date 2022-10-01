@@ -25,7 +25,7 @@ SOURCES = ['lead0', 'lead1', 'cruise', 'e2e']
 
 X_DIM = 3
 U_DIM = 1
-PARAM_DIM = 7
+PARAM_DIM = 6
 COST_E_DIM = 5
 COST_DIM = COST_E_DIM + 1
 CONSTR_DIM = 4
@@ -46,7 +46,7 @@ CRUISE_GAP_BP = [1., 2., 3., 4.]
 CRUISE_GAP_V = [1.1, 1.3, 1.6, 1.8]
 CRUISE_GAP_E2E_V = [1.3, 1.45, 1.6, 1.8]
 
-AUTO_TR_BP = [0., 30.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 110.*CV.KPH_TO_MS]
+AUTO_TR_BP = [0., 30. * CV.KPH_TO_MS, 70. * CV.KPH_TO_MS, 110. * CV.KPH_TO_MS]
 AUTO_TR_V = [1.2, 1.3, 1.4, 1.5]
 
 AUTO_TR_CRUISE_GAP = 4
@@ -60,21 +60,28 @@ T_IDXS_LST = [index_function(idx, max_val=MAX_T, max_idx=N) for idx in range(N+1
 
 T_IDXS = np.array(T_IDXS_LST)
 T_DIFFS = np.diff(T_IDXS, prepend=[0.])
-MIN_ACCEL = -3.5
+MIN_ACCEL = -4.0
 MAX_ACCEL = 2.0
 T_FOLLOW = 1.45
-COMFORT_BRAKE = 2.5
-STOP_DISTANCE = 7.0
-STOP_DISTANCE_E2E = 6.0
+COMFORT_BRAKE = 2.3
+STOP_DISTANCE = 7.5
 
-def get_stopped_equivalence_factor(v_lead):
-  return (v_lead**2) / (2 * COMFORT_BRAKE)
+def get_stopped_equivalence_factor(v_lead, v_ego, t_follow=T_FOLLOW):
+  # KRKeegan this offset rapidly decreases the following distance when the lead pulls
+  # away, resulting in an early demand for acceleration.
+  v_diff_offset = 0
+  if np.all(v_lead - v_ego > 0):
+    v_diff_offset = ((v_lead - v_ego) * 1.)
+    v_diff_offset = np.clip(v_diff_offset, 0, STOP_DISTANCE / 2)
+    v_diff_offset = np.maximum(v_diff_offset * ((10 - v_ego)/10), 0)
+  distance = (v_lead**2) / (2 * COMFORT_BRAKE) + v_diff_offset
+  return distance
 
-def get_safe_obstacle_distance(v_ego, t_follow=T_FOLLOW, stop_dist=STOP_DISTANCE):
-  return (v_ego**2) / (2 * COMFORT_BRAKE) + t_follow * v_ego + stop_dist
+def get_safe_obstacle_distance(v_ego, t_follow=T_FOLLOW):
+  return (v_ego**2) / (2 * COMFORT_BRAKE) + t_follow * v_ego + STOP_DISTANCE
 
 def desired_follow_distance(v_ego, v_lead):
-  return get_safe_obstacle_distance(v_ego) - get_stopped_equivalence_factor(v_lead)
+  return get_safe_obstacle_distance(v_ego) - get_stopped_equivalence_factor(v_lead, v_ego)
 
 
 def gen_long_model():
@@ -104,9 +111,7 @@ def gen_long_model():
   prev_a = SX.sym('prev_a')
   lead_t_follow = SX.sym('lead_t_follow')
   lead_danger_factor = SX.sym('lead_danger_factor')
-  stop_dist = SX.sym('stop_dist')
-
-  model.p = vertcat(a_min, a_max, x_obstacle, prev_a, lead_t_follow, lead_danger_factor, stop_dist)
+  model.p = vertcat(a_min, a_max, x_obstacle, prev_a, lead_t_follow, lead_danger_factor)
 
   # dynamics model
   f_expl = vertcat(v_ego, a_ego, j_ego)
@@ -142,12 +147,11 @@ def gen_long_ocp():
   prev_a = ocp.model.p[3]
   lead_t_follow = ocp.model.p[4]
   lead_danger_factor = ocp.model.p[5]
-  stop_dist = ocp.model.p[6]
 
   ocp.cost.yref = np.zeros((COST_DIM, ))
   ocp.cost.yref_e = np.zeros((COST_E_DIM, ))
 
-  desired_dist_comfort = get_safe_obstacle_distance(v_ego, lead_t_follow, stop_dist)
+  desired_dist_comfort = get_safe_obstacle_distance(v_ego, lead_t_follow)
 
   # The main cost in normal operation is how close you are to the "desired" distance
   # from an obstacle at every timestep. This obstacle can be a lead car
@@ -173,7 +177,7 @@ def gen_long_ocp():
 
   x0 = np.zeros(X_DIM)
   ocp.constraints.x0 = x0
-  ocp.parameter_values = np.array([-1.2, 1.2, 0.0, 0.0, T_FOLLOW, LEAD_DANGER_FACTOR, STOP_DISTANCE])
+  ocp.parameter_values = np.array([-1.2, 1.2, 0.0, 0.0, T_FOLLOW, LEAD_DANGER_FACTOR])
 
   # We put all constraint cost weights to 0 and only set them at runtime
   cost_weights = np.zeros(CONSTR_DIM)
@@ -213,8 +217,7 @@ class LongitudinalMpc:
   def __init__(self, mode='acc'):
     self.mode = mode
     self.onStopping = False
-    self.brakePressed = False
-    self.gasPressed = False
+    self.e2ePaused = False
     self.debugLong = 0
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
     self.reset()
@@ -236,7 +239,6 @@ class LongitudinalMpc:
     self.u_sol = np.zeros((N,1))
     self.params = np.zeros((N+1, PARAM_DIM))
     self.t_follow = T_FOLLOW
-    self.stop_dist = STOP_DISTANCE
     self.xstate = "CRUISE"
     for i in range(N+1):
       self.solver.set(i, 'x', np.zeros(X_DIM))
@@ -343,13 +345,11 @@ class LongitudinalMpc:
 
     self.t_follow = tr
 
-    self.stop_dist = STOP_DISTANCE if self.mode == 'acc' else STOP_DISTANCE_E2E
-
     # To estimate a safe distance from a moving lead, we calculate how much stopping
     # distance that lead needs as a minimum. We can add that to the current distance
     # and then treat that as a stopped car/obstacle at this new distance.
-    lead_0_obstacle = lead_xv_0[:,0] + get_stopped_equivalence_factor(lead_xv_0[:,1])
-    lead_1_obstacle = lead_xv_1[:,0] + get_stopped_equivalence_factor(lead_xv_1[:,1])
+    lead_0_obstacle = lead_xv_0[:,0] + get_stopped_equivalence_factor(lead_xv_0[:,1], self.x_sol[:,1])
+    lead_1_obstacle = lead_xv_1[:,0] + get_stopped_equivalence_factor(lead_xv_1[:,1], self.x_sol[:,1])
 
     # Update in ACC mode or ACC/e2e blend
     if self.mode == 'acc':
@@ -364,61 +364,57 @@ class LongitudinalMpc:
       startSign = v[-1] > 5.0
       stopSign = (probe > 0.3) and ((v[-1] < 3.0) or (v[-1] < v_ego * 0.95))
       self.debugLong = 1 if stopSign else 2 if startSign else 0
-      if carstate.gasPressed:
-        self.gasPressed = True
-        self.brakePressed = False
-      if carstate.brakePressed:
-        self.gasPressed = False
-        self.brakePressed = True
 
-      if self.status and not self.onStopping:
-        self.xstate = "LEAD"
-        self.gasPressed = False
-        self.brakePressed = False
-      elif stopSign:
-        if v_ego * CV.MS_TO_KPH > 20.0:
-          self.brakePressed = False
-          self.gasPressed = False
-        if radarstate.leadOne.status and (radarstate.leadOne.dRel - stopline_x) < 2.0 and v_ego * CV.MS_TO_KPH > 20.0:
+      if self.xstate == "E2E_STOP" and not self.e2ePaused:
+        if radarstate.leadOne.status and (radarstate.leadOne.dRel - model_x) < 2.0:
           self.xstate = "LEAD"
-          self.onStopping = False
-        else:
+        elif startSign:
+          self.xstate = "E2E_CRUISE"
+        if carstate.brakePressed and v_ego * CV.MS_TO_KPH < 5.0:
+          self.xstate = "E2E_STOP2"
+          self.e2ePaused = True
+        if carstate.gasPressed:
+          self.xstate = "E2E_CRUISE"
+          self.e2ePaused = True
+      elif self.xstate == "E2E_STOP2":
+        if False:
           self.xstate = "E2E_STOP"
-          self.onStopping = True
-          if self.gasPressed:
-            self.xstate = "E2E_START"
-            self.onStopping = False
-      elif startSign and self.onStopping:
-        self.xstate = "E2E_START"
-        self.onStopping = False
-        if self.brakePressed:
-          self.xstate = "E2E_STOP"
-          self.onStopping = True
-      elif self.onStopping:
-        self.xstate = "E2E_STOPPING"
+          self.e2ePaused = False
+        elif carstate.gasPressed:
+          self.xstate = "E2E_CRUISE"
       else:
-        self.xstate = "E2E_CRUISE"
-        if v_ego * CV.MS_TO_KPH > 20.0:
-          self.gasPressed = False
-        self.brakePressed = False
+        if self.status:
+          self.xstate = "LEAD"
+        elif stopSign:
+          self.xstate = "E2E_STOP"
+        else:
+          self.xstate = "E2E_CRUISE"
+
+      if v_ego * CV.MS_TO_KPH > 20.0:
+        self.e2ePaused = False
+      if self.xstate in ["LEAD", "CRUISE"]:
+        self.e2ePaused = False
+        model_x = 400.0
+      elif self.xstate == "E2E_CRUISE":
+        if probe < 0.1:
+          model_x = 400.0
+      elif self.xstate == "E2E_STOP2":
+        model_x = stopline_x
+      elif self.e2ePaused:
+        model_x = 400.0
 
       x2 = model_x * np.ones(N+1)
-      min_x = stopline_x if stopline_x < model_x else model_x
-      stopline = min_x * np.ones(N+1)
 
       # Fake an obstacle for cruise, this ensures smooth acceleration to set speed
       # when the leads are no factor.
       v_lower = v_ego + (T_IDXS * self.cruise_min_a * 1.05)
       v_upper = v_ego + (T_IDXS * self.cruise_max_a * 1.05)
-      v_cruise_clipped = np.clip(v_cruise * np.ones(N+1), v_lower, v_upper)
-      cruise_obstacle = np.cumsum(T_DIFFS * v_cruise_clipped) + get_safe_obstacle_distance(v_cruise_clipped, self.t_follow, self.stop_dist)
+      v_cruise_clipped = np.clip(v_cruise * np.ones(N+1),
+                                 v_lower,
+                                 v_upper)
+      cruise_obstacle = np.cumsum(T_DIFFS * v_cruise_clipped) + get_safe_obstacle_distance(v_cruise_clipped, self.t_follow)
 
-      if self.xstate == "E2E_STOP" and cruise_obstacle[0] > min_x:
-        x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, stopline])
-      elif self.xstate == "E2E_CRUISE" and cruise_obstacle[0] > min_x:
-        x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, x2])
-      else:
-        x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle])
+      x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle, x2])
 
       self.source = SOURCES[np.argmin(x_obstacles[0])]
 
@@ -431,7 +427,8 @@ class LongitudinalMpc:
 
       self.params[:,5] = 1.0
 
-      x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle])
+      x_obstacles = np.column_stack([lead_0_obstacle,
+                                     lead_1_obstacle])
       cruise_target = T_IDXS * np.clip(v_cruise, v_ego - 2.0, 1e3) + x[0]
       xforward = ((v[1:] + v[:-1]) / 2) * (T_IDXS[1:] - T_IDXS[:-1])
       x = np.cumsum(np.insert(xforward, 0, x[0]))
@@ -455,7 +452,6 @@ class LongitudinalMpc:
     self.params[:,2] = np.min(x_obstacles, axis=1)
     self.params[:,3] = np.copy(self.prev_a)
     self.params[:,4] = self.t_follow
-    self.params[:,6] = self.stop_dist
 
     self.run()
     if (np.any(lead_xv_0[:,0] - self.x_sol[:,0] < CRASH_DISTANCE) and
@@ -467,9 +463,9 @@ class LongitudinalMpc:
     # Check if it got within lead comfort range
     # TODO This should be done cleaner
     if self.mode == 'blended':
-      if any((lead_0_obstacle - get_safe_obstacle_distance(self.x_sol[:,1], self.t_follow, self.stop_dist)) - self.x_sol[:, 0] < 0.0):
+      if any((lead_0_obstacle - get_safe_obstacle_distance(self.x_sol[:,1], self.t_follow)) - self.x_sol[:,0] < 0.0):
         self.source = 'lead0'
-      if any((lead_1_obstacle - get_safe_obstacle_distance(self.x_sol[:,1], self.t_follow, self.stop_dist)) - self.x_sol[:, 0] < 0.0) and \
+      if any((lead_1_obstacle - get_safe_obstacle_distance(self.x_sol[:,1], self.t_follow)) - self.x_sol[:,0] < 0.0) and \
          (lead_1_obstacle[0] - lead_0_obstacle[0]):
         self.source = 'lead1'
 
@@ -479,7 +475,6 @@ class LongitudinalMpc:
     self.params[:,2] = 1e5
     self.params[:,4] = self.t_follow
     self.params[:,5] = LEAD_DANGER_FACTOR
-    self.params[:,6] = self.stop_dist
 
     # v, and a are in local frame, but x is wrt the x[0] position
     # In >90degree turns, x goes to 0 (and may even be -ve)
@@ -520,7 +515,6 @@ class LongitudinalMpc:
     for i in range(N):
       self.u_sol[i] = self.solver.get(i, 'u')
 
-    self.x_solution = self.x_sol[:,0]
     self.v_solution = self.x_sol[:,1]
     self.a_solution = self.x_sol[:,2]
     self.j_solution = self.u_sol[:,0]
