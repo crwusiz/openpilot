@@ -69,7 +69,7 @@ class CarController:
     self.turning_signal_timer = 0
     self.last_blinker_frame = 0
 
-    self.scc_smoother = SccSmoother()
+    self.scc_smoother = SccSmoother(CP)
     self.lfahdamfc = Params().get("MfcSelect", encoding='utf8') == "2"
 
 
@@ -96,6 +96,7 @@ class CarController:
       apply_steer = 0
 
     self.apply_steer_last = apply_steer
+    apply_steer = int(round(float(apply_steer)))
 
     sys_warning, sys_state, left_lane_warning, right_lane_warning = process_hud_alert(CC.enabled, self.car_fingerprint, hud_control)
 
@@ -192,7 +193,7 @@ class CarController:
     self.scc_smoother.update(CC.enabled, can_sends, self.packer, CC, CS, self.frame, controls)
 
     # send scc to car if longcontrol enabled and SCC not on bus 0 or ont live
-    if self.longcontrol and CS.cruiseState_enabled and (CS.scc_bus or not self.scc_live):
+    if self.longcontrol and CS.out.cruiseState_enabled and (CS.scc_bus or not self.scc_live):
       if self.frame % 2 == 0:
         set_speed = hud_control.setSpeed
         if not (MIN_SET_SPEED < set_speed < 255 * CV.KPH_TO_MS):
@@ -244,6 +245,7 @@ class CarController:
       apply_steer = 0
 
     self.apply_steer_last = apply_steer
+    apply_steer = int(round(float(apply_steer)))
 
     can_sends = []
 

@@ -47,12 +47,6 @@ class CarState(CarStateBase):
 
     # scc smoother
     self.acc_mode = False
-    self.brake_pressed = False
-    self.gas_pressed = False
-    self.standstill = False
-    self.cruiseState_enabled = False
-    self.cruise_gap = 1
-    self.cruiseState_speed = 0
 
     # On some cars, CLU15->CF_Clu_VehicleSpeed can oscillate faster than the dash updates. Sample at 5 Hz
     self.cluster_speed = 0
@@ -203,15 +197,8 @@ class CarState(CarStateBase):
     self.lead_distance = cp_scc.vl["SCC11"]["ACC_ObjDist"] if not self.no_radar else 0
 
     # scc smoother
-    driver_override = cp.vl["TCS13"]["DriverOverride"]
     self.acc_mode = cp_scc.vl["SCC12"]["ACCMode"] != 0
-    self.cruise_gap = cp_scc.vl["SCC11"]["TauGapSet"] if not self.no_radar else 1
-    self.gas_pressed = ret.gasPressed or driver_override == 1
-    self.brake_pressed = ret.brakePressed or driver_override == 2
-    self.standstill = ret.standstill or ret.cruiseState.standstill
-    self.cruiseState_enabled = ret.cruiseState.enabled
-    self.cruiseState_speed = ret.cruiseState.speed
-    ret.cruiseGap = self.cruise_gap
+    ret.cruiseGap = cp_scc.vl["SCC11"]["TauGapSet"] if not self.no_radar else 1
 
     tpms_unit = cp.vl["TPMS11"]["UNIT"] * 0.725 if int(cp.vl["TPMS11"]["UNIT"]) > 0 else 1.
     ret.tpms.fl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FL"]
@@ -269,6 +256,8 @@ class CarState(CarStateBase):
 
     if self.CP.flags & HyundaiFlags.CANFD_HDA2:
       self.cam_0x2a4 = copy.copy(cp_cam.vl["CAM_0x2a4"])
+
+    self.acc_mode = cp.vl["SCC1"]["CRUISE_ACTIVE"] == 1
 
     return ret
 

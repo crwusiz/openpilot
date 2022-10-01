@@ -101,7 +101,7 @@ def apply_std_steer_torque_limits(apply_torque, apply_torque_last, driver_torque
     apply_torque = clip(apply_torque, apply_torque_last - LIMITS.STEER_DELTA_UP,
                         min(apply_torque_last + LIMITS.STEER_DELTA_DOWN, LIMITS.STEER_DELTA_UP))
 
-  return int(round(float(apply_torque)))
+  return apply_torque
 
 
 def apply_toyota_steer_torque_limits(apply_torque, apply_torque_last, motor_torque, LIMITS):
