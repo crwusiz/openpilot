@@ -245,7 +245,6 @@ struct CarState {
     speedOffset @3 :Float32;
     standstill @4 :Bool;
     nonAdaptive @5 :Bool;
-    enabledAcc @7 :Bool;
   }
 
   enum GearShifter {

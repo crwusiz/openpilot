@@ -393,7 +393,7 @@ class Controls:
 
     if not REPLAY:
       # Check for mismatch between openpilot and car's PCM
-      cruise_mismatch = CS.cruiseState.enabledAcc and (not self.enabled or not self.CP.pcmCruise)
+      cruise_mismatch = CS.cruiseState.enabled and (not self.enabled or not self.CP.pcmCruise)
       self.cruise_mismatch_counter = self.cruise_mismatch_counter + 1 if cruise_mismatch else 0
       if self.cruise_mismatch_counter > int(6. / DT_CTRL):
         self.events.add(EventName.cruiseMismatch)
@@ -618,14 +618,11 @@ class Controls:
       self.LaC.reset()
     if not CC.longActive:
       self.LoC.reset(v_pid=CS.vEgo)
-    if not CS.cruiseState.enabledAcc:
-      self.LoC.reset(v_pid=CS.vEgo)
     if not self.joystick_mode:
       # accel PID loop
       pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, CS.vEgo, self.v_cruise_kph * CV.KPH_TO_MS)
       t_since_plan = (self.sm.frame - self.sm.rcv_frame['longitudinalPlan']) * DT_CTRL
-      actuators.accel = self.LoC.update(CC.longActive and CS.cruiseState.enabledAcc, CS, long_plan,
-                                        pid_accel_limits, t_since_plan, self.sm['radarState'])
+      actuators.accel = self.LoC.update(CC.longActive, CS, long_plan, pid_accel_limits, t_since_plan, self.sm['radarState'])
 
       # Steering PID loop and lateral MPC
       self.desired_curvature, self.desired_curvature_rate = get_lag_adjusted_curvature(self.CP, CS.vEgo,
@@ -707,8 +704,7 @@ class Controls:
     if len(angular_rate_value) > 2:
       CC.angularVelocity = angular_rate_value
 
-    #CC.cruiseControl.cancel = CS.cruiseState.enabled and (not self.enabled or not self.CP.pcmCruise)
-    CC.cruiseControl.cancel = self.CP.pcmCruise and not self.enabled and CS.cruiseState.enabled
+    CC.cruiseControl.cancel = CS.cruiseState.enabled and (not self.enabled or not self.CP.pcmCruise)
     if self.joystick_mode and self.sm.rcv_frame['testJoystick'] > 0 and self.sm['testJoystick'].buttons[0]:
       CC.cruiseControl.cancel = True
 

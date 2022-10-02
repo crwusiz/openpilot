@@ -340,18 +340,15 @@ class CarInterface(CarInterfaceBase):
   def _update(self, c):
     ret = self.CS.update(self.cp, self.cp2, self.cp_cam)
 
-    if not self.cp.can_valid or not self.cp2.can_valid or not self.cp_cam.can_valid:
-      print('cp = {}  cp2 = {}  cp_cam = {}'.format(bool(self.cp.can_valid), bool(self.cp2.can_valid), bool(self.cp_cam.can_valid)))
-
     if self.CP.pcmCruise and not self.CC.scc_live:
       self.CP.pcmCruise = False
-    elif self.CC.scc_live and not self.CP.pcmCruise:
+    elif CANFD_CAR or self.CC.scc_live and not self.CP.pcmCruise:
       self.CP.pcmCruise = True
 
     # most HKG cars has no long control, it is safer and easier to engage by main on
     ret.cruiseState.enabled = ret.cruiseState.available
 
-    if self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons:
+    if not CANFD_CAR and self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons:
       buttonEvents = [create_button_event(self.CS.cruise_buttons[-1], self.CS.prev_cruise_buttons, BUTTONS_DICT)]
       # Handle CF_Clu_CruiseSwState changing buttons mid-press
       if self.CS.cruise_buttons[-1] != 0 and self.CS.prev_cruise_buttons != 0:
@@ -365,15 +362,15 @@ class CarInterface(CarInterfaceBase):
     allow_enable = any(btn in ENABLE_BUTTONS for btn in self.CS.cruise_buttons) or any(self.CS.main_buttons)
     events = self.create_common_events(ret, pcm_enable=self.CS.CP.pcmCruise, allow_enable=allow_enable)
 
+    #if self.CS.brake_error:
+    #  events.add(EventName.brakeUnavailable)
+
     # turning indicator alert logic
     if any([ret.leftBlinker, ret.rightBlinker, self.CC.turning_signal_timer]) and ret.vEgo < LANE_CHANGE_SPEED_MIN - 1.2:
       self.CC.turning_indicator_alert = True
     else:
       self.CC.turning_indicator_alert = False
 
-    #if self.CC.longcontrol and self.CS.cruise_unavail:
-    if self.CS.brake_error:
-      events.add(EventName.brakeUnavailable)
     if self.CC.turning_indicator_alert:
       events.add(EventName.turningIndicatorOn)
 

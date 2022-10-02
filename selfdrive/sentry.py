@@ -1,5 +1,5 @@
 """Install exception handler for process crash."""
-import os
+import datetime
 import traceback
 
 import sentry_sdk
@@ -32,8 +32,9 @@ def report_tombstone(fn: str, message: str, contents: str) -> None:
 
 
 def capture_exception(*args, **kwargs) -> None:
-  # opkr
-  save_exception(traceback.format_exc())
+  with open('/data/tmux_error.log', 'w') as f:
+    now = datetime.datetime.now()
+    f.write(now.strftime('[%Y-%m-%d %H:%M:%S]') + "\n\n" + str(traceback.format_exc()))
   cloudlog.error("crash", exc_info=kwargs.get('exc_info', 1))
 
   try:
@@ -45,14 +46,6 @@ def capture_exception(*args, **kwargs) -> None:
 
 def set_tag(key: str, value: str) -> None:
   sentry_sdk.set_tag(key, value)
-
-
-def save_exception(exc_text):
-  if not ("athenad.py" in exc_text or "mapd.py" in exc_text): # ignore athenad.py or mapd.py error
-    log_file = '/data/tmux_error.log'
-    with open(log_file, 'w') as f:
-      f.write(exc_text)
-      f.close()
 
 
 def init(project: SentryProject) -> None:

@@ -11,8 +11,10 @@ RADAR_START_ADDR = 0x500
 RADAR_MSG_COUNT = 32
 
 def get_radar_can_parser(CP):
+  if DBC[CP.carFingerprint]['radar'] is None:
+    return None
 
-  if Params().get_bool("NewRadarInterface"):
+  elif Params().get_bool("NewRadarInterface"):
     signals = []
     checks = []
 
@@ -26,7 +28,7 @@ def get_radar_can_parser(CP):
         ("REL_SPEED", msg),
       ]
       checks += [(msg, 50)]
-    return CANParser('hyundai_kia_mando_front_radar_generated', signals, checks, 1)
+    return CANParser(DBC[CP.carFingerprint]['radar'], signals, checks, 1)
 
   else:
     signals = [

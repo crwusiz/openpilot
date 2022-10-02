@@ -45,6 +45,7 @@ class CarState(CarStateBase):
     # scc smoother
     self.acc_mode = False
     self.brake_pressed = False
+    self.brake_error = False
     self.park_brake = False
     self.gas_pressed = False
     self.standstill = False
@@ -120,7 +121,6 @@ class CarState(CarStateBase):
     ret.cruiseState.available = (cp_scc.vl["SCC11"]["MainMode_ACC"] != 0) if not self.no_radar else \
                                  cp.vl["EMS16"]["CRUISE_LAMP_M"] != 0
     ret.cruiseState.standstill = cp_scc.vl["SCC11"]["SCCInfoDisplay"] == 4. if not self.no_radar else False
-    ret.cruiseState.enabledAcc = ret.cruiseState.enabled
 
     if ret.cruiseState.enabled:
       ret.cruiseState.speed = cp_scc.vl["SCC11"]["VSetDis"] * self.speed_conv if not self.no_radar else \
