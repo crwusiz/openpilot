@@ -87,6 +87,9 @@ private:
 
   QLabel *onroadLbl;
   LabelControl *versionLbl;
+  LabelControl *gitRemoteLbl;
+  LabelControl *gitBranchLbl;
+  LabelControl *gitCommitLbl;
   ButtonControl *installBtn;
   ButtonControl *downloadBtn;
   ButtonControl *targetBranchBtn;

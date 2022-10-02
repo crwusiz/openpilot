@@ -44,10 +44,9 @@ ACADOS_SOLVER_TYPE = 'SQP_RTI'
 
 CRUISE_GAP_BP = [1., 2., 3., 4.]
 CRUISE_GAP_V = [1.1, 1.3, 1.6, 1.8]
-CRUISE_GAP_E2E_V = [1.3, 1.45, 1.6, 1.8]
 
-AUTO_TR_BP = [0., 30. * CV.KPH_TO_MS, 70. * CV.KPH_TO_MS, 110. * CV.KPH_TO_MS]
-AUTO_TR_V = [1.2, 1.3, 1.4, 1.5]
+AUTO_TR_BP = [0., 30.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 110.*CV.KPH_TO_MS]
+AUTO_TR_V = [1.1, 1.2, 1.3, 1.4]
 
 AUTO_TR_CRUISE_GAP = 4
 DIFF_RADAR_VISION = 1.0
@@ -63,25 +62,17 @@ T_DIFFS = np.diff(T_IDXS, prepend=[0.])
 MIN_ACCEL = -4.0
 MAX_ACCEL = 2.0
 T_FOLLOW = 1.45
-COMFORT_BRAKE = 2.3
-STOP_DISTANCE = 7.5
+COMFORT_BRAKE = 2.5
+STOP_DISTANCE = 8.0
 
-def get_stopped_equivalence_factor(v_lead, v_ego, t_follow=T_FOLLOW):
-  # KRKeegan this offset rapidly decreases the following distance when the lead pulls
-  # away, resulting in an early demand for acceleration.
-  v_diff_offset = 0
-  if np.all(v_lead - v_ego > 0):
-    v_diff_offset = ((v_lead - v_ego) * 1.)
-    v_diff_offset = np.clip(v_diff_offset, 0, STOP_DISTANCE / 2)
-    v_diff_offset = np.maximum(v_diff_offset * ((10 - v_ego)/10), 0)
-  distance = (v_lead**2) / (2 * COMFORT_BRAKE) + v_diff_offset
-  return distance
+def get_stopped_equivalence_factor(v_lead):
+  return (v_lead**2) / (2 * COMFORT_BRAKE)
 
 def get_safe_obstacle_distance(v_ego, t_follow=T_FOLLOW):
   return (v_ego**2) / (2 * COMFORT_BRAKE) + t_follow * v_ego + STOP_DISTANCE
 
 def desired_follow_distance(v_ego, v_lead):
-  return get_safe_obstacle_distance(v_ego) - get_stopped_equivalence_factor(v_lead, v_ego)
+  return get_safe_obstacle_distance(v_ego) - get_stopped_equivalence_factor(v_lead)
 
 
 def gen_long_model():
@@ -216,9 +207,6 @@ def gen_long_ocp():
 class LongitudinalMpc:
   def __init__(self, mode='acc'):
     self.mode = mode
-    self.onStopping = False
-    self.e2ePaused = False
-    self.debugLong = 0
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
     self.reset()
     self.source = SOURCES[2]
@@ -239,7 +227,8 @@ class LongitudinalMpc:
     self.u_sol = np.zeros((N,1))
     self.params = np.zeros((N+1, PARAM_DIM))
     self.t_follow = T_FOLLOW
-    self.xstate = "CRUISE"
+    self.xState = 0
+    self.trafficState = 0
     for i in range(N+1):
       self.solver.set(i, 'x', np.zeros(X_DIM))
     self.last_cloudlog_t = 0
@@ -330,7 +319,7 @@ class LongitudinalMpc:
 
   def update(self, carstate, radarstate, model, v_cruise, x, v, a, j):
     v_ego = self.x0[1]
-    self.debugLong = 0
+    self.trafficState = 0
     self.status = radarstate.leadOne.status or radarstate.leadTwo.status
 
     lead_xv_0 = self.process_lead(radarstate.leadOne)
@@ -341,15 +330,15 @@ class LongitudinalMpc:
     if cruise_gap == AUTO_TR_CRUISE_GAP:
       tr = interp(carstate.vEgo, AUTO_TR_BP, AUTO_TR_V) if self.mode == 'acc' else T_FOLLOW
     else:
-      tr = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V if self.mode == 'acc' else CRUISE_GAP_E2E_V)
+      tr = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V) if self.mode == 'acc' else T_FOLLOW
 
     self.t_follow = tr
 
     # To estimate a safe distance from a moving lead, we calculate how much stopping
     # distance that lead needs as a minimum. We can add that to the current distance
     # and then treat that as a stopped car/obstacle at this new distance.
-    lead_0_obstacle = lead_xv_0[:,0] + get_stopped_equivalence_factor(lead_xv_0[:,1], self.x_sol[:,1])
-    lead_1_obstacle = lead_xv_1[:,0] + get_stopped_equivalence_factor(lead_xv_1[:,1], self.x_sol[:,1])
+    lead_0_obstacle = lead_xv_0[:,0] + get_stopped_equivalence_factor(lead_xv_0[:,1])
+    lead_1_obstacle = lead_xv_1[:,0] + get_stopped_equivalence_factor(lead_xv_1[:,1])
 
     # Update in ACC mode or ACC/e2e blend
     if self.mode == 'acc':
@@ -358,52 +347,23 @@ class LongitudinalMpc:
       self.params[:,5] = LEAD_DANGER_FACTOR
 
       # add stopline by ajouatom
-      stopline_x = model.stopLine.x
+      stopline_x = (model.stopLine.x + 5.0)
       model_x = x[N]
       probe = model.stopLine.prob if abs(carstate.steeringAngleDeg) < 20 else 0.0
-      startSign = v[-1] > 5.0
       stopSign = (probe > 0.3) and ((v[-1] < 3.0) or (v[-1] < v_ego * 0.95))
-      self.debugLong = 1 if stopSign else 2 if startSign else 0
+      startSign = v[-1] > 5.0
 
-      if self.xstate == "E2E_STOP" and not self.e2ePaused:
-        if radarstate.leadOne.status and (radarstate.leadOne.dRel - model_x) < 2.0:
-          self.xstate = "LEAD"
-        elif startSign:
-          self.xstate = "E2E_CRUISE"
-        if carstate.brakePressed and v_ego * CV.MS_TO_KPH < 5.0:
-          self.xstate = "E2E_STOP2"
-          self.e2ePaused = True
-        if carstate.gasPressed:
-          self.xstate = "E2E_CRUISE"
-          self.e2ePaused = True
-      elif self.xstate == "E2E_STOP2":
-        if False:
-          self.xstate = "E2E_STOP"
-          self.e2ePaused = False
-        elif carstate.gasPressed:
-          self.xstate = "E2E_CRUISE"
-      else:
-        if self.status:
-          self.xstate = "LEAD"
-        elif stopSign:
-          self.xstate = "E2E_STOP"
-        else:
-          self.xstate = "E2E_CRUISE"
+      if radarstate.leadOne.status and (radarstate.leadOne.dRel - model_x) < 2.0:
+        self.xState = 0 # "LEAD"
+        self.trafficState = 0 # "OFF"
+      elif stopSign:
+        self.xState = 1 # "E2E_STOP"
+        self.trafficState = 1 # "RED"
+      elif startSign:
+        self.xState = 2 # "E2E_CRUISE"
+        self.trafficState = 2 # "GREEN"
 
-      if v_ego * CV.MS_TO_KPH > 20.0:
-        self.e2ePaused = False
-      if self.xstate in ["LEAD", "CRUISE"]:
-        self.e2ePaused = False
-        model_x = 400.0
-      elif self.xstate == "E2E_CRUISE":
-        if probe < 0.1:
-          model_x = 400.0
-      elif self.xstate == "E2E_STOP2":
-        model_x = stopline_x
-      elif self.e2ePaused:
-        model_x = 400.0
-
-      x2 = model_x * np.ones(N+1)
+      x2 = stopline_x * np.ones(N+1) if (self.xState == 1) else 400.0 * np.ones(N+1)
 
       # Fake an obstacle for cruise, this ensures smooth acceleration to set speed
       # when the leads are no factor.

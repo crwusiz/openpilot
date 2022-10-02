@@ -950,7 +950,8 @@ struct LongitudinalPlan @0xe00b5b3eba12876c {
 
   solverExecutionTime @35 :Float32;
 
-  debugLong @36 : Int32;
+  xState @36 : Int32;
+  trafficState @37 : Int32;
 
   enum LongitudinalPlanSource {
     cruise @0;

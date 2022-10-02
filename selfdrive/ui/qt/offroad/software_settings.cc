@@ -83,6 +83,14 @@ SoftwarePanel::SoftwarePanel(QWidget* parent) : ListWidget(parent) {
   });
   addItem(uninstallBtn);
 
+  // add software info
+  gitRemoteLbl = new LabelControl("Git Remote", "");
+  addItem(gitRemoteLbl);
+  gitBranchLbl = new LabelControl("Git Branch", "");
+  addItem(gitBranchLbl);
+  gitCommitLbl = new LabelControl("Git Commit", "");
+  addItem(gitCommitLbl);
+
   fs_watch = new QFileSystemWatcher(this);
   QObject::connect(fs_watch, &QFileSystemWatcher::fileChanged, [=](const QString path) {
     updateLabels();
@@ -151,6 +159,10 @@ void SoftwarePanel::updateLabels() {
   installBtn->setVisible(!is_onroad && params.getBool("UpdateAvailable"));
   installBtn->setValue(QString::fromStdString(params.get("UpdaterNewDescription")).left(35));
   installBtn->setDescription(QString::fromStdString(params.get("UpdaterNewReleaseNotes")));
+
+  gitRemoteLbl->setText(QString::fromStdString(params.get("GitRemote").substr(19)));
+  gitBranchLbl->setText(QString::fromStdString(params.get("GitBranch")));
+  gitCommitLbl->setText(QString::fromStdString(params.get("GitCommit")).left(7));
 
   update();
 }

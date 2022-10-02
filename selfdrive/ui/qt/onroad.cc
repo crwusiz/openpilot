@@ -266,13 +266,13 @@ void NvgWindow::updateState(const UIState &s) {
   setProperty("status", s.status);
   setProperty("steeringPressed", ce.getSteeringPressed());
   setProperty("dmActive", sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode());
-  setProperty("brake_status", ce.getBrakeLights());
-  setProperty("autohold_status", ce.getAutoHold());
-  setProperty("nda_status", ls.getActive());
+  setProperty("brake_state", ce.getBrakeLights());
+  setProperty("autohold_state", ce.getAutoHold());
+  setProperty("nda_state", ls.getActive());
   setProperty("left_blindspot", ce.getLeftBlindspot());
   setProperty("right_blindspot", ce.getRightBlindspot());
-  setProperty("wifi_status", (int)ds.getNetworkStrength() > 0);
-  setProperty("gps_status", sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK());
+  setProperty("wifi_state", (int)ds.getNetworkStrength() > 0);
+  setProperty("gps_state", sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK());
   setProperty("gpsBearing", ge.getBearingDeg());
   setProperty("gpsVerticalAccuracy", ge.getVerticalAccuracy());
   setProperty("gpsAltitude", ge.getAltitude());
@@ -301,7 +301,8 @@ void NvgWindow::updateState(const UIState &s) {
   setProperty("sectionLeftDist", ls.getSectionLeftDist());
   setProperty("left_on", ce.getLeftBlinker());
   setProperty("right_on", ce.getRightBlinker());
-  setProperty("traffic_status", lo.getDebugLong());
+  setProperty("x_state", lo.getXState());
+  setProperty("traffic_state", lo.getTrafficState());
   setProperty("latAccelFactor", cs.getLateralControlState().getTorqueState().getLatAccelFactor());
   setProperty("friction", cs.getLateralControlState().getTorqueState().getFriction());
   setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
@@ -521,39 +522,39 @@ void NvgWindow::drawHud(QPainter &p) {
   // wifi icon (upper right 2)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
   y = radius / 2 + (bdr_s * 4);
-  drawIcon(p, x, y, wifi_img, blackColor(100), wifi_status ? 1.0 : 0.2);
+  drawIcon(p, x, y, wifi_img, blackColor(100), wifi_state ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // gps icon (upper right 3)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 2);
   y = radius / 2 + (bdr_s * 4);
-  drawIcon(p, x, y, gps_img, blackColor(100), gps_status ? 1.0 : 0.2);
+  drawIcon(p, x, y, gps_img, blackColor(100), gps_state ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // N direction icon (upper right 4)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 3);
   y = radius / 2 + (bdr_s * 4);
-  drawIconRotate(p, x, y, direction_img, blackColor(100), gps_status ? 1.0 : 0.2, gpsBearing);
+  drawIconRotate(p, x, y, direction_img, blackColor(100), gps_state ? 1.0 : 0.2, gpsBearing);
   p.setOpacity(1.0);
 
   // nda icon (upper center)
-  if (nda_status > 0) {
+  if (nda_state > 0) {
     w = 120;
     h = 54;
     x = (width() + (bdr_s * 2)) / 2 - (w / 2) - bdr_s;
     y = 30 - bdr_s;
-    p.drawPixmap(x, y, w, h, nda_status == 1 ? nda_img : hda_img);
+    p.drawPixmap(x, y, w, h, nda_state == 1 ? nda_img : hda_img);
   }
 
   // traffic icon (upper right5)
-  if (traffic_status > 0) {
+  if (traffic_state > 0) {
     w = 100;
     h = 50;
     x = (width() + (bdr_s * 2)) / 2 + w * 2;
     y = 30 - bdr_s;
-    if (traffic_status == 1) {
+    if (traffic_state == 1) {
       p.drawPixmap(x, y, w, h, traffic_red_img);
-    } else if (traffic_status == 2) {
+    } else if (traffic_state == 2) {
       p.drawPixmap(x, y, w, h, traffic_green_img);
     }
   }
@@ -591,13 +592,13 @@ void NvgWindow::drawHud(QPainter &p) {
   // brake icon (bottom left 2)
   x = radius / 2 + (bdr_s * 2);
   y = rect().bottom() - (footer_h / 2) - (radius) - 10;
-  drawIcon(p, x, y, brake_img, blackColor(100), brake_status ? 1.0 : 0.2);
+  drawIcon(p, x, y, brake_img, blackColor(100), brake_state ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // autohold icon (bottom right 2)
   x = radius / 2 + (bdr_s * 2) + (radius);
   y = rect().bottom() - (footer_h / 2) - (radius) - 10;
-  drawIcon(p, x, y, autohold_status > 1 ? autohold_warning_img : autohold_active_img, blackColor(100), autohold_status ? 1.0 : 0.2);
+  drawIcon(p, x, y, autohold_state > 1 ? autohold_warning_img : autohold_active_img, blackColor(100), autohold_state ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // bsd_l icon (bottom left 3)
@@ -614,14 +615,16 @@ void NvgWindow::drawHud(QPainter &p) {
 
   // bottom info
   const char* lateral[] = {"Pid", "Indi", "Lqr", "Torque"};
+  const char* xstate[] = {"LEAD", "STOP", "CRUISE"};
 
   QString infoText;
-  infoText.sprintf("EPS[%d] SCC[%d] SR[%.2f] [ %s ] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
+  infoText.sprintf("EPS[%d] SCC[%d] SR[%.2f] [ %s ] [ (%.2f,%.2f) / (%.2f,%.2f) [ %s ]]",
     epsBus, sccBus,
     steerRatio,
     lateral[lateralcontrol],
     latAccelFactor, friction,
-    latAccelFactorRaw, frictionRaw
+    latAccelFactorRaw, frictionRaw,
+    xstate[x_state]
   );
 
   x = rect().left() + radius * 3.5;
