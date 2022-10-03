@@ -6,7 +6,7 @@ from cereal import car
 from common.conversions import Conversions as CV
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
-from selfdrive.car.hyundai.values import HyundaiFlags, DBC, CarControllerParams, Buttons, FEATURES, EV_CAR, HEV_CAR, EV_HEV_CAR, CAR, CANFD_CAR, FCA11_CAR
+from selfdrive.car.hyundai.values import HyundaiFlags, DBC, CarControllerParams, Buttons, FEATURES, EV_CAR, HEV_CAR, CAR, CANFD_CAR, FCA11_CAR
 from selfdrive.car.interfaces import CarStateBase
 
 PREV_BUTTON_SAMPLES = 8
@@ -42,17 +42,17 @@ class CarState(CarStateBase):
     self.cruise_unavail_cnt = 0
     self.apply_steer = 0.
 
+    self.brake_error = False
+    self.buttons_counter = 0
+
     # scc smoother
     self.acc_mode = False
     self.brake_pressed = False
-    self.brake_error = False
-    self.park_brake = False
     self.gas_pressed = False
     self.standstill = False
     self.cruiseState_enabled = False
     self.cruise_gap = 1
     self.cruiseState_speed = 0
-    self.buttons_counter = 0
 
     # On some cars, CLU15->CF_Clu_VehicleSpeed can oscillate faster than the dash updates. Sample at 5 Hz
     self.cluster_speed = 0
@@ -141,7 +141,7 @@ class CarState(CarStateBase):
 
     ret.gasPressed = cp.vl["TCS13"]["DriverOverride"] == 1
 
-    if self.CP.carFingerprint in EV_HEV_CAR:
+    if self.CP.carFingerprint in (EV_CAR | HEV_CAR):
       if self.CP.carFingerprint in HEV_CAR:
         ret.gas = cp.vl["E_EMS11"]["CR_Vcu_AccPedDep_Pos"] / 254.
       else:
@@ -449,7 +449,7 @@ class CarState(CarStateBase):
       ]
       checks.append(("ESP11", 50))
 
-    if CP.carFingerprint in EV_HEV_CAR:
+    if CP.carFingerprint in (EV_CAR | HEV_CAR):
       if CP.carFingerprint in HEV_CAR:
         signals.append(("CR_Vcu_AccPedDep_Pos", "E_EMS11"))
       else:

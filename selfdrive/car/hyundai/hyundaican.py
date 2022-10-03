@@ -1,7 +1,7 @@
 import copy
 
 import crcmod
-from selfdrive.car.hyundai.values import CAR, CHECKSUM, EV_HEV_CAR
+from selfdrive.car.hyundai.values import CAR, CHECKSUM, EV_CAR, HEV_CAR
 from common.params import Params
 
 hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
@@ -119,7 +119,7 @@ def create_scc11(packer, frame, enabled, set_speed, scc_live, scc11):
 def create_scc12(packer, apply_accel, enabled, cnt, scc_live, scc12, gaspressed, brakepressed, standstill, car_fingerprint):
   values = copy.copy(scc12)
 
-  if car_fingerprint in EV_HEV_CAR:
+  if car_fingerprint in (EV_CAR | HEV_CAR):
     if enabled and not brakepressed:
       values["ACCMode"] = 2 if gaspressed and (apply_accel > -0.2) else 1
       if apply_accel < 0.0 and standstill:
