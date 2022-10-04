@@ -23,7 +23,6 @@ class LateralPlanner:
     self.solution_invalid_cnt = 0
 
     self.path_xyz = np.zeros((TRAJECTORY_SIZE, 3))
-    self.path_xyz_stds = np.ones((TRAJECTORY_SIZE, 3))
     self.plan_yaw = np.zeros((TRAJECTORY_SIZE,))
     self.plan_yaw_rate = np.zeros((TRAJECTORY_SIZE,))
     self.t_idxs = np.arange(TRAJECTORY_SIZE)
@@ -58,8 +57,6 @@ class LateralPlanner:
       self.t_idxs = np.array(md.position.t)
       self.plan_yaw = np.array(md.orientation.z)
       self.plan_yaw_rate = np.array(md.orientationRate.z)
-    if len(md.position.xStd) == TRAJECTORY_SIZE:
-      self.path_xyz_stds = np.column_stack([md.position.xStd, md.position.yStd, md.position.zStd])
 
     # Lane change logic
     desire_state = md.meta.desireState
