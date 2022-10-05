@@ -40,6 +40,7 @@ class SccSmoother:
     global AliveIndex
     count = ALIVE_COUNT[AliveIndex]
     AliveIndex += 1
+
     if AliveIndex >= len(ALIVE_COUNT):
       AliveIndex = 0
     return count
@@ -49,6 +50,7 @@ class SccSmoother:
     global WaitIndex
     count = WAIT_COUNT[WaitIndex]
     WaitIndex += 1
+
     if WaitIndex >= len(WAIT_COUNT):
       WaitIndex = 0
     return count
@@ -60,20 +62,9 @@ class SccSmoother:
   def __init__(self, CP):
     self.btn = Buttons.NONE
 
-    self.params = Params()
     self.read_param()
 
     self.param_read_counter = 0
-
-    self.speed_conv_to_ms = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
-    self.speed_conv_to_clu = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH
-
-    self.min_set_speed_clu = self.kph_to_clu(MIN_SET_SPEED_KPH)
-    self.max_set_speed_clu = self.kph_to_clu(MAX_SET_SPEED_KPH)
-
-    self.alive_count = ALIVE_COUNT
-    random.shuffle(WAIT_COUNT)
-
     self.started_frame = 0
     self.wait_timer = 0
     self.alive_timer = 0
@@ -87,13 +78,21 @@ class SccSmoother:
     self.over_speed_limit = False
     self.limited_lead = False
 
+    self.speed_conv_to_ms = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
+    self.speed_conv_to_clu = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH
+
+    self.min_set_speed_clu = self.kph_to_clu(MIN_SET_SPEED_KPH)
+    self.max_set_speed_clu = self.kph_to_clu(MAX_SET_SPEED_KPH)
+
+    self.alive_count = ALIVE_COUNT
+    random.shuffle(WAIT_COUNT)
+
+    self.longcontrol = CP.openpilotLongitudinalControl
     self.can_fd = CP.carFingerprint in CANFD_CAR
 
   def read_param(self):
-    self.longcontrol = self.params.get_bool("ExperimentalLongitudinalEnabled")
-    self.is_metric = self.params.get_bool("IsMetric")
-    self.e2e_long = self.params.get_bool("EndToEndLong")
-
+    self.is_metric = Params().get_bool("IsMetric")
+    self.e2e_long = Params().get_bool("EndToEndLong")
 
   def reset(self):
     self.btn = Buttons.NONE
@@ -115,10 +114,8 @@ class SccSmoother:
     values["CF_Clu_AliveCnt1"] = (values["CF_Clu_AliveCnt1"] + 1) % 0x10
     return packer.make_can_msg("CLU11", bus, values)
 
-
   def is_active(self, frame):
     return frame - self.started_frame <= max(ALIVE_COUNT) + max(WAIT_COUNT)
-
 
   def inject_events(self, events):
     if self.slowing_down_sound_alert:
@@ -128,12 +125,12 @@ class SccSmoother:
       events.add(EventName.slowingDownSpeed)
 
   def cal_max_speed(self, frame, CC, CS, sm, clu_speed, controls):
-
     # kph
     road_speed_limiter = get_road_speed_limiter()
     apply_limit_speed, road_limit_speed, left_dist, first_started = road_speed_limiter.get_max_speed(clu_speed, self.is_metric)
 
     self.cal_curve_speed(sm, CS.out.vEgo, frame)
+
     if self.curve_speed_ms >= MIN_CURVE_SPEED:
       max_speed_clu = min(controls.v_cruise_kph * CV.KPH_TO_MS, self.curve_speed_ms) * self.speed_conv_to_clu
     else:
@@ -153,7 +150,6 @@ class SccSmoother:
       max_speed_clu = min(max_speed_clu, apply_limit_speed)
 
       if clu_speed > apply_limit_speed:
-
         if not self.slowing_down_alert and not self.slowing_down:
           self.slowing_down_sound_alert = True
           self.slowing_down = True
@@ -182,6 +178,7 @@ class SccSmoother:
   def update(self, enabled, can_sends, packer, CC, CS, frame, controls):
     if self.param_read_counter % 100 == 0:
       self.read_param()
+
     self.param_read_counter += 1
 
     # mph or kph
@@ -221,9 +218,9 @@ class SccSmoother:
       if self.btn != Buttons.NONE:
 
         if self.can_fd:
-          can_sends.append(SccSmoother.create_clu11(packer, CS.scc_bus, CS.clu11, self.btn))
-        else:
           can_sends.append(hyundaicanfd.create_buttons(packer, CS.buttons_counter + 1, self.btn))
+        else:
+          can_sends.append(SccSmoother.create_clu11(packer, CS.scc_bus, CS.clu11, self.btn))
 
         if self.alive_timer == 0:
           self.started_frame = frame
@@ -253,14 +250,15 @@ class SccSmoother:
     radar = sm['radarState']
     if radar.leadOne.status:
       return radar.leadOne
-
     return None
 
   def get_long_lead_speed(self, CS, clu_speed, sm):
     if self.longcontrol:
       lead = self.get_lead(sm)
+
       if lead is not None:
         d = lead.dRel - 5.
+
         if 0. < d < -lead.vRel * (9. + 3.) * 2. and lead.vRel < -1.:
           t = d / lead.vRel
           accel = -(lead.vRel / t) * self.speed_conv_to_clu
@@ -274,10 +272,10 @@ class SccSmoother:
 
   def cal_curve_speed(self, sm, v_ego, frame):
     if frame % 20 == 0:
-      md = sm['modelV2']
-      if len(md.position.x) == TRAJECTORY_SIZE and len(md.position.y) == TRAJECTORY_SIZE:
-        x = md.position.x
-        y = md.position.y
+      model = sm['modelV2']
+      if len(model.position.x) == TRAJECTORY_SIZE and len(model.position.y) == TRAJECTORY_SIZE:
+        x = model.position.x
+        y = model.position.y
         dy = np.gradient(y, x)
         d2y = np.gradient(dy, x)
         curv = d2y / (1 + dy ** 2) ** 1.5
@@ -325,12 +323,10 @@ class SccSmoother:
 
   def get_apply_accel(self, CS, accel):
     boost_v = 0.2 if self.e2e_long else 0.5
-
     start_boost = interp(CS.out.vEgo, [CREEP_SPEED, 2 * CREEP_SPEED], [boost_v, 0.0])
     is_accelerating = interp(accel, [0.0, 0.2], [0.0, 1.0])
     boost = start_boost * is_accelerating
     accel += boost
-
     return accel
 
   @staticmethod
@@ -381,5 +377,4 @@ class SccSmoother:
           v_cruise_kph -= V_CRUISE_DELTA - -v_cruise_kph % V_CRUISE_DELTA
         ButtonCnt %= 70
       v_cruise_kph = clip(v_cruise_kph, MIN_SET_SPEED_KPH, MAX_SET_SPEED_KPH)
-
     return v_cruise_kph

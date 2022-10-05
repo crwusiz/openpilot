@@ -193,7 +193,7 @@ class CarController:
     self.scc_smoother.update(CC.enabled, can_sends, self.packer, CC, CS, self.frame, controls)
 
     # send scc to car if longcontrol enabled and SCC not on bus 0 or ont live
-    if self.longcontrol and CS.out.cruiseState_enabled and (CS.scc_bus or not self.scc_live):
+    if self.longcontrol and CS.out.cruiseState.enabled and (CS.scc_bus or not self.scc_live):
       if self.frame % 2 == 0:
         set_speed = hud_control.setSpeed
         if not (MIN_SET_SPEED < set_speed < 255 * CV.KPH_TO_MS):
