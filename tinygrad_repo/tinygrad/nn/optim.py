@@ -3,7 +3,18 @@ from tinygrad.tensor import Tensor
 
 class Optimizer:
   def __init__(self, params):
+    # if it's None, but being put into an optimizer, set it to True
+    for x in params:
+      if x.requires_grad is None:
+        x.requires_grad = True
+
     self.params = [x for x in params if x.requires_grad]
+
+  # TODO: this probably shouldn't change the gradients, just the ones used by the optimizer
+  def clipnorm(self, amount=1):
+    for param in self.params:
+      # clipnorm is the L2 norm, not value: is this right?
+      param.grad.assign(param.grad.clip(-(amount**2), (amount**2)))
 
   def zero_grad(self):
     for param in self.params:
@@ -53,3 +64,15 @@ class Adam(Optimizer):
       self.v[i] = self.b2 * self.v[i] + (1.0 - self.b2) * (t.grad * t.grad)
       t.assign(t.detach() - a * self.m[i].div(self.v[i].sqrt() + self.eps))
     self.realize(self.m + self.v)
+
+def get_parameters(obj):
+  parameters = []
+  if isinstance(obj, Tensor):
+    parameters.append(obj)
+  elif isinstance(obj, list) or isinstance(obj, tuple):
+    for x in obj:
+      parameters.extend(get_parameters(x))
+  elif hasattr(obj, '__dict__'):
+    for v in obj.__dict__.values():
+      parameters.extend(get_parameters(v))
+  return parameters

@@ -163,4 +163,3 @@ def get_run_onnx(onnx_model):
 
     return {outp.name:intermediate_tensors[outp.name] for outp in onnx_model.graph.output}
   return run_onnx
-

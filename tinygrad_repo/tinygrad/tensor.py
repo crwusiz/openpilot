@@ -11,10 +11,9 @@ from tinygrad.ops import LazyBuffer
 # **** start with two base classes, Tensor and Function ****
 
 class Tensor:
-  # TODO: remove no_init when uniform is late bind
-  training, no_grad, no_init = False, False, False
+  training, no_grad = False, False
 
-  def __init__(self, data, device=Device.DEFAULT, requires_grad=True):
+  def __init__(self, data, device=Device.DEFAULT, requires_grad=None):
     if isinstance(data, list):
       data = np.array(data, dtype=np.float32)
     elif isinstance(data, LazyBuffer) and data.device != device:
@@ -32,7 +31,10 @@ class Tensor:
 
     # tensors have gradients, buffers do not
     self.grad : Optional[Tensor] = None
-    self.requires_grad = requires_grad
+
+    # NOTE: this can be in three states. False and None: no gradient, True: gradient
+    # None (the default) will be updated to True if it's put in an optimizer
+    self.requires_grad : Optional[bool] = requires_grad
 
     # internal variables used for autograd graph construction
     self._ctx : Optional[Function] = None
@@ -103,8 +105,17 @@ class Tensor:
   def arange(cls, stop, start=0, **kwargs): return cls(np.arange(start=start, stop=stop, dtype=np.float32), **kwargs)
 
   # TODO: uniform should be a late binding thing
+  # Return random number between -1 and 1
+  # NOTE: this behavior changed from depending on the shape to not
   @classmethod
-  def uniform(cls, *shape, **kwargs): return cls(((np.random.default_rng().random(size=shape, dtype=np.float32) * 2 - 1) * prod(shape)**-0.5), **kwargs)
+  def uniform(cls, *shape, **kwargs): return cls((np.random.default_rng().random(size=shape, dtype=np.float32) * 2 - 1), **kwargs)
+
+  @classmethod
+  def scaled_uniform(cls, *shape, **kwargs): return cls((np.random.default_rng().random(size=shape, dtype=np.float32) * 2 - 1) * (prod(shape)**-0.5), **kwargs)
+
+  @classmethod
+  # https://www.tensorflow.org/api_docs/python/tf/keras/initializers/GlorotUniform
+  def glorot_uniform(cls, *shape, **kwargs): return cls((np.random.default_rng().random(size=shape, dtype=np.float32) * 2 - 1) * ((6/(shape[0]+prod(shape[1:])))**0.5), **kwargs)
 
   @classmethod
   def eye(cls, dim, **kwargs): return cls(np.eye(dim, dtype=np.float32), **kwargs)
@@ -205,11 +216,12 @@ class Tensor:
       axis = [axis]
     axis = tuple([x if x >= 0 else x+len(self.shape) for x in axis])
     shape = [self.shape[i] for i in range(len(self.shape)) if i not in axis]
-    ret = fxn(axis=axis)
+    ret = fxn(self, axis=axis)
     return ret if keepdim else ret.reshape(shape=[1] if shape == [] else shape)
 
-  def sum(self, axis=None, keepdim=False): return self._reduce(self._sum, axis, keepdim)
-  def max(self, axis=None, keepdim=False): return self._reduce(self._max, axis, keepdim)
+  def sum(self, axis=None, keepdim=False): return self._reduce(Tensor._sum, axis, keepdim)
+  def max(self, axis=None, keepdim=False): return self._reduce(Tensor._max, axis, keepdim)
+  def min(self, axis=None, keepdim=False): return -((-self).max(axis=axis, keepdim=keepdim))
 
   def mean(self, axis=None, keepdim=False):
     out = self.sum(axis=axis, keepdim=keepdim)
@@ -250,6 +262,7 @@ class Tensor:
 
   def __neg__(self): return 0.0-self
   def sqrt(self): return self.pow(0.5)
+  def square(self): return self*self
   def clip(self, min_, max_): return ((self-min_).relu()+min_) - (self-max_).relu()
   def abs(self): return self.relu() + (-self).relu()
   def sign(self): return self / (self.abs() + 1e-10)
@@ -299,16 +312,16 @@ class Tensor:
 
   def sequential(self, ll:List[Callable[[Tensor], Tensor]]): return functools.reduce(lambda x,f: f(x), ll, self)
 
-  def layernorm(self, eps=1e-5):
-    y = (self - self.mean(axis=-1, keepdim=True))
-    return y.div((y*y).mean(axis=-1, keepdim=True).add(eps).sqrt())
+  def layernorm(self, axis=-1, eps=1e-5):
+    y = (self - self.mean(axis=axis, keepdim=True))
+    return y.div((y*y).mean(axis=axis, keepdim=True).add(eps).sqrt())
 
 # An instantiation of the Function is the Context
 class Function:
   def __init__(self, device:str, *tensors:Tensor):
     self.device, self.parents = device, tensors
     self.needs_input_grad = [t.requires_grad for t in self.parents]
-    self.requires_grad = any(self.needs_input_grad)
+    self.requires_grad = True if any(self.needs_input_grad) else (None if any([x is None for x in self.needs_input_grad]) else False)
     self.saved_tensors : List[Tensor] = []
 
   def forward(self, *args, **kwargs): raise NotImplementedError(f"forward not implemented for {type(self)}")
