@@ -514,9 +514,7 @@ struct CarParams {
     safetyParam2DEPRECATED @2 :UInt32;
   }
 
-  steerFaultMaxAngle @80 :Int16;
-  steerFaultMaxFrames @81 :Int16;
-  epsBus @82: Int8;
+  epsBus @80: Int8;
   sasBus @72: Int8;
   sccBus @73: Int8;
   enableAutoHold @74 :Bool;

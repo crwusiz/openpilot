@@ -294,8 +294,6 @@ static const addr_checks* hyundai_canfd_init(uint16_t param) {
 
 #ifdef ALLOW_DEBUG
   hyundai_longitudinal = GET_FLAG(param, HYUNDAI_PARAM_CANFD_LONG) && hyundai_canfd_hda2;
-#else
-  hyundai_longitudinal = false;
 #endif
 
   return &hyundai_canfd_rx_checks;
