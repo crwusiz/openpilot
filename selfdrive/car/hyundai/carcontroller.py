@@ -79,7 +79,6 @@ class CarController:
 
     actuators = CC.actuators
     hud_control = CC.hudControl
-    pcm_cancel_cmd = CC.cruiseControl.cancel
 
     # Steering Torque
     new_steer = int(round(actuators.steer * self.CCP.STEER_MAX))
@@ -130,9 +129,6 @@ class CarController:
 
     if self.frame % 2 and CS.eps_bus: # send clu11 to eps if it is not on bus 0
       can_sends.append(hyundaican.create_clu11(self.packer, CS.eps_bus, CS.clu11, Buttons.NONE, enabled_speed))
-
-    #if pcm_cancel_cmd and self.longcontrol:
-    #  can_sends.append(hyundaican.create_clu11(self.packer, CS.scc_bus, CS.clu11, Buttons.CANCEL, clu11_speed))
 
     if CS.eps_bus:  # send mdps12 to LKAS to prevent LKAS error
       can_sends.append(hyundaican.create_mdps12(self.packer, self.frame, CS.mdps12))
@@ -272,7 +268,7 @@ class CarController:
             can_sends.append(hyundaicanfd.create_buttons(self.packer, CS.buttons_counter + 1, Buttons.CANCEL))
           self.last_button_frame = self.frame
 
-        # cruise standstill resume
+      # cruise standstill resume
       elif CC.cruiseControl.resume:
         if not (self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS):
           for _ in range(20):

@@ -188,11 +188,11 @@ static int tesla_tx_hook(CANPacket_t *to_send, bool longitudinal_allowed) {
       float accel_max = (0.04 * raw_accel_max) - 15;
       float accel_min = (0.04 * raw_accel_min) - 15;
 
-      if ((accel_max > TESLA_MAX_ACCEL) || (accel_min > TESLA_MAX_ACCEL)){
+      if ((accel_max > TESLA_MAX_ACCEL) || (accel_min > TESLA_MAX_ACCEL)) {
         violation = true;
       }
 
-      if ((accel_max < TESLA_MIN_ACCEL) || (accel_min < TESLA_MIN_ACCEL)){
+      if ((accel_max < TESLA_MIN_ACCEL) || (accel_min < TESLA_MIN_ACCEL)) {
         violation = true;
       }
 

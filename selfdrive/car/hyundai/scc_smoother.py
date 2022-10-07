@@ -92,7 +92,6 @@ class SccSmoother:
 
   def read_param(self):
     self.is_metric = Params().get_bool("IsMetric")
-    self.e2e_long = Params().get_bool("EndToEndLong")
 
   def reset(self):
     self.btn = Buttons.NONE
@@ -272,10 +271,10 @@ class SccSmoother:
 
   def cal_curve_speed(self, sm, v_ego, frame):
     if frame % 20 == 0:
-      model = sm['modelV2']
-      if len(model.position.x) == TRAJECTORY_SIZE and len(model.position.y) == TRAJECTORY_SIZE:
-        x = model.position.x
-        y = model.position.y
+      md = sm['modelV2']
+      if len(md.position.x) == TRAJECTORY_SIZE and len(md.position.y) == TRAJECTORY_SIZE:
+        x = md.position.x
+        y = md.position.y
         dy = np.gradient(y, x)
         d2y = np.gradient(dy, x)
         curv = d2y / (1 + dy ** 2) ** 1.5
@@ -322,7 +321,7 @@ class SccSmoother:
       self.max_speed_clu = self.max_speed_clu + error * kp
 
   def get_apply_accel(self, CS, accel):
-    boost_v = 0.2 if self.e2e_long else 0.5
+    boost_v = 0.5
     start_boost = interp(CS.out.vEgo, [CREEP_SPEED, 2 * CREEP_SPEED], [boost_v, 0.0])
     is_accelerating = interp(accel, [0.0, 0.2], [0.0, 1.0])
     boost = start_boost * is_accelerating

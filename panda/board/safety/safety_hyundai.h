@@ -249,7 +249,6 @@ static int hyundai_rx_hook(CANPacket_t *to_push) {
       gas_pressed = GET_BYTE(to_push, 7) != 0U;
     } else if (addr == 608) {  // ICE
       gas_pressed = (GET_BYTE(to_push, 7) >> 6) != 0U;
-    } else {
     }
 
     // sample wheel speed, averaging opposite corners
@@ -352,7 +351,6 @@ static int hyundai_tx_hook(CANPacket_t *to_send, bool longitudinal_allowed) {
       tx = 0;
     }
   }
-
   return tx;
 }
 
@@ -368,7 +366,6 @@ static int hyundai_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   if ((bus_num == 2) && (addr != 832) && (addr != 1157)) {
     bus_fwd = 0;
   }
-
   return bus_fwd;
 }
 
@@ -385,11 +382,11 @@ static const addr_checks* hyundai_init(uint16_t param) {
 #endif
 
   if (hyundai_longitudinal) {
-    hyundai_rx_checks = (addr_checks){hyundai_long_addr_checks, HYUNDAI_LONG_ADDR_CHECK_LEN};
+    hyundai_rx_checks = (addr_checks) {hyundai_long_addr_checks, HYUNDAI_LONG_ADDR_CHECK_LEN};
   } else if (hyundai_camera_scc) {
-    hyundai_rx_checks = (addr_checks){hyundai_cam_scc_addr_checks, HYUNDAI_CAM_SCC_ADDR_CHECK_LEN};
+    hyundai_rx_checks = (addr_checks) {hyundai_cam_scc_addr_checks, HYUNDAI_CAM_SCC_ADDR_CHECK_LEN};
   } else {
-    hyundai_rx_checks = (addr_checks){hyundai_addr_checks, HYUNDAI_ADDR_CHECK_LEN};
+    hyundai_rx_checks = (addr_checks) {hyundai_addr_checks, HYUNDAI_ADDR_CHECK_LEN};
   }
   return &hyundai_rx_checks;
 }
@@ -401,7 +398,7 @@ static const addr_checks* hyundai_legacy_init(uint16_t param) {
   hyundai_ev_gas_signal = GET_FLAG(param, HYUNDAI_PARAM_EV_GAS);
   hyundai_hybrid_gas_signal = !hyundai_ev_gas_signal && GET_FLAG(param, HYUNDAI_PARAM_HYBRID_GAS);
   hyundai_last_button_interaction = HYUNDAI_PREV_BUTTON_SAMPLES;
-  hyundai_rx_checks = (addr_checks){hyundai_legacy_addr_checks, HYUNDAI_LEGACY_ADDR_CHECK_LEN};
+  hyundai_rx_checks = (addr_checks) {hyundai_legacy_addr_checks, HYUNDAI_LEGACY_ADDR_CHECK_LEN};
   return &hyundai_rx_checks;
 }
 
