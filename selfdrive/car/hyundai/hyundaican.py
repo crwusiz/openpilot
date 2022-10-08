@@ -152,7 +152,7 @@ def create_scc13(packer, scc13):
 
   return packer.make_can_msg("SCC13", 0, values)
 
-def create_scc14(packer, enabled, e_vgo, standstill, accel, gaspressed, objgap, scc14):
+def create_scc14(packer, enabled, v_ego, standstill, accel, gaspressed, objgap, scc14):
   values = copy.copy(scc14)
 
   if enabled:
@@ -163,7 +163,7 @@ def create_scc14(packer, enabled, e_vgo, standstill, accel, gaspressed, objgap, 
       values["JerkLowerLimit"] = 10.
       values["ComfortBandUpper"] = 0.
       values["ComfortBandLower"] = 0.
-      if e_vgo > 0.27:
+      if v_ego > 0.27:
         values["ComfortBandUpper"] = 2.
         values["ComfortBandLower"] = 0.
     else:

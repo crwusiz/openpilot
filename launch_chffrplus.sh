@@ -94,6 +94,12 @@ function launch {
   cat ./selfdrive/car/honda/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/d/CarList_Honda
   cat ./selfdrive/car/gm/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/d/CarList_Gm
 
+  # git last commit log
+  git log -1 --pretty=format:"%h, %cs, %cr" > /data/params/d/GitLog
+
+  # git remote
+  sed 's/.\{4\}$//' /data/params/d/GitRemote > /data/params/d/GitRemote_
+
   # start manager
   cd selfdrive/manager
   ./build.py && ./manager.py

@@ -62,8 +62,8 @@ T_DIFFS = np.diff(T_IDXS, prepend=[0.])
 MIN_ACCEL = -4.0
 MAX_ACCEL = 2.0
 T_FOLLOW = 1.45
-COMFORT_BRAKE = 2.5
-STOP_DISTANCE = 8.0
+COMFORT_BRAKE = 2.3
+STOP_DISTANCE = 6.0
 
 def get_stopped_equivalence_factor(v_lead):
   return (v_lead**2) / (2 * COMFORT_BRAKE)
@@ -345,7 +345,7 @@ class LongitudinalMpc:
       self.params[:,5] = LEAD_DANGER_FACTOR
 
       # add stopline by ajouatom
-      stopline_x = (model.stopLine.x + 5.0)
+      stopline_x = model.stopLine.x
       model_x = x[N]
       probe = model.stopLine.prob if abs(carstate.steeringAngleDeg) < 20 else 0.0
       stopSign = (probe > 0.3) and ((v[-1] < 3.0) or (v[-1] < v_ego * 0.95))

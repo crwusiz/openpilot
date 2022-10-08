@@ -225,8 +225,8 @@ class CarController:
           else:
             obj_gap = 0
 
-          can_sends.append(
-            hyundaican.create_scc14(self.packer, CC.enabled, CS.out.vEgo, acc_standstill, apply_accel, CS.out.gasPressed, obj_gap, CS.scc14))
+          can_sends.append(hyundaican.create_scc14(self.packer, CC.enabled, CS.out.vEgo, acc_standstill, apply_accel,
+                                                   CS.out.gasPressed, obj_gap, CS.scc14))
     else:
       self.scc12_cnt = -1
 

@@ -160,9 +160,9 @@ void SoftwarePanel::updateLabels() {
   installBtn->setValue(QString::fromStdString(params.get("UpdaterNewDescription")).left(35));
   installBtn->setDescription(QString::fromStdString(params.get("UpdaterNewReleaseNotes")));
 
-  gitRemoteLbl->setText(QString::fromStdString(params.get("GitRemote").substr(19)));
+  gitRemoteLbl->setText(QString::fromStdString(params.get("GitRemote_")));
   gitBranchLbl->setText(QString::fromStdString(params.get("GitBranch")));
-  gitCommitLbl->setText(QString::fromStdString(params.get("GitCommit")).left(7));
+  gitCommitLbl->setText(QString::fromStdString(params.get("GitLog")));
 
   update();
 }

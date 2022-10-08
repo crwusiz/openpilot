@@ -20,8 +20,8 @@ class CarInterface(CarInterfaceBase):
   def get_pid_accel_limits(CP, current_speed, cruise_speed):
     v_current_kph = current_speed * CV.MS_TO_KPH
 
-    gas_max_bp = [10., 20., 50., 70., 130., 150.]
-    gas_max_v = [1.3, 1.1, 0.63, 0.44, 0.15, 0.1]
+    gas_max_bp = [10., 70., 100., 150.]
+    gas_max_v = [1.5, 0.8, 0.3, 0.1]
 
     return CarControllerParams.ACCEL_MIN, interp(v_current_kph, gas_max_bp, gas_max_v)
 
@@ -53,6 +53,7 @@ class CarInterface(CarInterfaceBase):
 
     ret.stoppingControl = True
     ret.vEgoStopping = 1.0
+    ret.stopAccel = -3.0
 
     ret.startingState = True
     ret.vEgoStarting = 0.1
@@ -334,7 +335,7 @@ class CarInterface(CarInterfaceBase):
       ret.enableBsm = 0x58b in fingerprint[0]
       ret.enableAutoHold = 1151 in fingerprint[0]
       ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
-      ret.hasLfaHda = 1157 in fingerprint[0]
+      ret.hasLfaHda = 1157 in fingerprint[0] or 1157 in fingerprint[2]
       ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
       ret.radarOffCan = ret.sccBus == -1
 
