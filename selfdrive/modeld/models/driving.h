@@ -16,7 +16,7 @@
 #include "selfdrive/modeld/models/commonmodel.h"
 #include "selfdrive/modeld/runners/run.h"
 
-constexpr int FEATURE_LEN = 2048;
+constexpr int FEATURE_LEN = 128;
 constexpr int HISTORY_BUFFER_LEN = 99;
 constexpr int DESIRE_LEN = 8;
 constexpr int DESIRE_PRED_LEN = 4;
@@ -170,7 +170,7 @@ struct ModelOutputStopLines {
   std::array<ModelOutputStopLinePrediction, STOP_LINE_MHP_N> prediction;
   float prob;
 
-  constexpr const ModelOutputStopLinePrediction &get_best_prediction() const {
+  constexpr const ModelOutputStopLinePrediction &get_best_prediction(int t_idx) const {
     int max_idx = 0;
     for (int i = 1; i < prediction.size(); i++) {
       if (prediction[i].prob > prediction[max_idx].prob) {
@@ -251,6 +251,7 @@ struct ModelOutput {
 };
 
 constexpr int OUTPUT_SIZE = sizeof(ModelOutput) / sizeof(float);
+
 #ifdef TEMPORAL
   constexpr int TEMPORAL_SIZE = HISTORY_BUFFER_LEN * FEATURE_LEN;
 #else
