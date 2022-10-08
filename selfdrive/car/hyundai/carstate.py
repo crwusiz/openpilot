@@ -60,12 +60,12 @@ class CarState(CarStateBase):
 
     cp_eps = cp2 if self.eps_bus else cp
     cp_sas = cp2 if self.sas_bus else cp
-    cp_scc = cp2 if self.scc_bus == 1 else cp_cam if self.scc_bus == 2 else cp
-
-    self.is_metric = cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"] == 0
-    self.speed_conv = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
+    cp_scc = cp2 if self.scc_bus == 1 else cp_cam \
+                 if self.scc_bus == 2 else cp
 
     ret = car.CarState.new_message()
+    self.is_metric = cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"] == 0
+    self.speed_conv = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
 
     ret.doorOpen = any([cp.vl["CGW1"]["CF_Gway_DrvDrSw"], cp.vl["CGW1"]["CF_Gway_AstDrSw"],
                         cp.vl["CGW2"]["CF_Gway_RLDrSw"], cp.vl["CGW2"]["CF_Gway_RRDrSw"]])
@@ -162,19 +162,17 @@ class CarState(CarStateBase):
 
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(gear))
 
-    if self.CP.aebFcw:
-      ret.stockAeb = cp.vl["FCA11"]["FCA_CmdAct"] != 0
-      ret.stockFcw = cp.vl["FCA11"]["CF_VSM_Warn"] == 2
-    else:
-      ret.stockAeb = cp.vl["SCC12"]["AEB_CmdAct"] != 0
-      ret.stockFcw = cp.vl["SCC12"]["CF_VSM_Warn"] == 2
+    #if not self.CP.openpilotLongitudinalControl:
+    aeb_src = "FCA11" if self.CP.aebFcw else "SCC12"
+    aeb_sig = "FCA_CmdAct" if self.CP.aebFcw else "AEB_CmdAct"
+    aeb_warning = cp.vl[aeb_src]["CF_VSM_Warn"] != 0
+    aeb_braking = cp.vl[aeb_src]["CF_VSM_DecCmdAct"] != 0 or cp.vl[aeb_src][aeb_sig] != 0
+    ret.stockFcw = aeb_warning and not aeb_braking
+    ret.stockAeb = aeb_warning and aeb_braking
 
     if self.CP.enableBsm:
       ret.leftBlindspot = cp.vl["LCA11"]["CF_Lca_IndLeft"] != 0
       ret.rightBlindspot = cp.vl["LCA11"]["CF_Lca_IndRight"] != 0
-    else:
-      ret.leftBlindspot = False
-      ret.rightBlindspot = False
 
     # save the entire LKAS11, CLU11, MDPS12, LFAHDA_MFC, SCC11, SCC12, SCC13, SCC14
     self.lkas11 = cp_cam.vl["LKAS11"]
@@ -387,6 +385,7 @@ class CarState(CarStateBase):
         ("SCC11", 50),
         ("SCC12", 50),
       ]
+
     if CP.epsBus == 0:
       signals += [
         ("CR_Mdps_StrColTq", "MDPS12"),
@@ -420,9 +419,15 @@ class CarState(CarStateBase):
       signals += [
         ("FCA_CmdAct", "FCA11"),
         ("CF_VSM_Warn", "FCA11"),
+        ("CF_VSM_DecCmdAct", "FCA11"),
       ]
-      if not CP.openpilotLongitudinalControl:
-        checks.append(("FCA11", 50))
+      checks.append(("FCA11", 50))
+    else:
+      signals += [
+        ("AEB_CmdAct", "SCC12"),
+        ("CF_VSM_Warn", "SCC12"),
+        ("CF_VSM_DecCmdAct", "SCC12"),
+      ]
 
     if CP.enableBsm:
       signals += [
@@ -639,15 +644,29 @@ class CarState(CarStateBase):
         ("SCC12", 50),
       ]
 
-      if CP.hasLfaHda:
-        signals += [
-          ("HDA_USM", "LFAHDA_MFC"),
-          ("HDA_Active", "LFAHDA_MFC"),
-          ("HDA_Icon_State", "LFAHDA_MFC"),
-          ("HDA_LdwSysState", "LFAHDA_MFC"),
-          ("HDA_Icon_Wheel", "LFAHDA_MFC"),
-        ]
-        checks.append(("LFAHDA_MFC", 20))
+    if CP.hasLfaHda:
+      signals += [
+        ("HDA_USM", "LFAHDA_MFC"),
+        ("HDA_Active", "LFAHDA_MFC"),
+        ("HDA_Icon_State", "LFAHDA_MFC"),
+        ("HDA_LdwSysState", "LFAHDA_MFC"),
+        ("HDA_Icon_Wheel", "LFAHDA_MFC"),
+      ]
+    checks.append(("LFAHDA_MFC", 20))
+
+    if CP.aebFcw:
+      signals += [
+        ("FCA_CmdAct", "FCA11"),
+        ("CF_VSM_Warn", "FCA11"),
+        ("CF_VSM_DecCmdAct", "FCA11"),
+      ]
+      checks.append(("FCA11", 50))
+    else:
+      signals += [
+        ("AEB_CmdAct", "SCC12"),
+        ("CF_VSM_Warn", "SCC12"),
+        ("CF_VSM_DecCmdAct", "SCC12"),
+      ]
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 2, enforce_checks=False)
 
