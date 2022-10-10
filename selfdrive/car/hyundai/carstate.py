@@ -99,33 +99,35 @@ class CarState(CarStateBase):
     ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["CGW1"]["CF_Gway_TurnSigLh"],
                                                                       cp.vl["CGW1"]["CF_Gway_TurnSigRh"])
 
-    if not ret.standstill and cp_eps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0:
-      self.eps_error_cnt += 1
-    else:
-      self.eps_error_cnt = 0
+    self.eps_error_cnt += 1 if not ret.standstill and cp_eps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 else -self.eps_error_cnt
 
     ret.steerFaultTemporary = self.eps_error_cnt > 100
 
     if self.CP.enableAutoHold:
       ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]
 
+    # scc smoother
+    self.acc_mode = cp_scc.vl["SCC12"]["ACCMode"] != 0
+
     # cruise state
-    if not self.no_radar:
-      ret.cruiseState.available = cp_scc.vl["SCC11"]["MainMode_ACC"] == 1
-      ret.cruiseState.enabled = cp_scc.vl["SCC12"]["ACCMode"] != 0
-      ret.cruiseState.standstill = cp_scc.vl["SCC11"]["SCCInfoDisplay"] == 4.
-    else:
+    #if self.CP.openpilotLongitudinalControl:
       # These are not used for engage/disengage since openpilot keeps track of state using the buttons
+      #ret.cruiseState.available = cp.vl["TCS13"]["ACCEnable"] == 0
+      #ret.cruiseState.enabled = cp.vl["TCS13"]["ACC_REQ"] == 1
+      #ret.cruiseState.standstill = False
+    if self.no_radar:
       ret.cruiseState.available = cp.vl["EMS16"]["CRUISE_LAMP_M"] != 0
       ret.cruiseState.enabled = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] != 0
       ret.cruiseState.standstill = False
-    
-    if ret.cruiseState.enabled:
-      ret.cruiseState.speed = cp_scc.vl["SCC11"]["VSetDis"] * self.speed_conv if not self.no_radar else \
-                                         cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * self.speed_conv
+      ret.cruiseState.speed = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * self.speed_conv if ret.cruiseState.enabled else 0
     else:
-      ret.cruiseState.speed = 0
-      
+      ret.cruiseState.available = cp_scc.vl["SCC11"]["MainMode_ACC"] == 1
+      ret.cruiseState.enabled = cp_scc.vl["SCC12"]["ACCMode"] != 0
+      ret.cruiseState.standstill = cp_scc.vl["SCC11"]["SCCInfoDisplay"] == 4.
+      ret.cruiseState.speed = cp_scc.vl["SCC11"]["VSetDis"] * self.speed_conv if ret.cruiseState.enabled else 0
+
+    ret.cruiseGap = cp_scc.vl["SCC11"]["TauGapSet"]
+
     self.prev_cruise_buttons = self.cruise_buttons[-1]
     self.cruise_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwState"])
     self.main_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwMain"])
@@ -136,7 +138,6 @@ class CarState(CarStateBase):
     ret.brakeHoldActive = cp.vl["TCS15"]["AVH_LAMP"] == 2  # 0 OFF, 1 ERROR, 2 ACTIVE, 3 READY
     ret.parkingBrake = cp.vl["TCS13"]["PBRAKE_ACT"] == 1
     ret.brakeLights = bool(cp.vl["TCS13"]["BrakeLight"] or ret.brakePressed)
-    ret.gasPressed = cp.vl["TCS13"]["DriverOverride"] == 1
 
     if self.CP.carFingerprint in (EV_CAR | HEV_CAR):
       if self.CP.carFingerprint in HEV_CAR:
@@ -144,10 +145,11 @@ class CarState(CarStateBase):
       else:
         ret.gas = cp.vl["E_EMS11"]["Accel_Pedal_Pos"] / 254.
       ret.gasPressed = ret.gas > 0
-
-    if self.CP.hasEms:
+    elif self.CP.hasEms:
       ret.gas = cp.vl["EMS12"]["PV_AV_CAN"] / 100.
       ret.gasPressed = bool(cp.vl["EMS16"]["CF_Ems_AclAct"])
+    else:
+      ret.gasPressed = cp.vl["TCS13"]["DriverOverride"] == 1
 
     # Gear Selection via Cluster - For those Kia/Hyundai which are not fully discovered, we can use the Cluster Indicator for Gear Selection,
     # as this seems to be standard over all cars, but is not the preferred method.
@@ -180,15 +182,12 @@ class CarState(CarStateBase):
     # save the entire LKAS11, CLU11, MDPS12, LFAHDA_MFC, SCC11, SCC12, SCC13, SCC14
     self.lkas11 = cp_cam.vl["LKAS11"]
     self.clu11 = cp.vl["CLU11"]
-    self.scc11 = cp_scc.vl["SCC11"]
-    self.scc12 = cp_scc.vl["SCC12"]
     self.mdps12 = cp_eps.vl["MDPS12"]
     self.lfahda_mfc = cp_cam.vl["LFAHDA_MFC"]
-
-    if self.has_scc13:
-      self.scc13 = cp_scc.vl["SCC13"]
-    if self.has_scc14:
-      self.scc14 = cp_scc.vl["SCC14"]
+    self.scc11 = cp_scc.vl["SCC11"]
+    self.scc12 = cp_scc.vl["SCC12"]
+    self.scc13 = cp_scc.vl["SCC13"] if self.has_scc13 else 0
+    self.scc14 = cp_scc.vl["SCC14"] if self.has_scc14 else 0
 
     self.steer_state = cp_eps.vl["MDPS12"]["CF_Mdps_ToiActive"]  # 0 NOT ACTIVE, 1 ACTIVE
     self.brake_error = cp.vl["TCS13"]["ACCEnable"] != 0  # 0 ACC CONTROL ENABLED, 1-3 ACC CONTROL DISABLED
@@ -196,10 +195,6 @@ class CarState(CarStateBase):
                                     cp.vl["TCS13"]["ACCEnable"] != 0 else -self.cruise_unavail_cnt
     self.cruise_unavail = self.cruise_unavail_cnt > 100
     self.lead_distance = cp_scc.vl["SCC11"]["ACC_ObjDist"] if not self.no_radar else 0
-
-    # scc smoother
-    self.acc_mode = cp_scc.vl["SCC12"]["ACCMode"] != 0
-    ret.cruiseGap = cp_scc.vl["SCC11"]["TauGapSet"] if not self.no_radar else 1
 
     tpms_unit = cp.vl["TPMS11"]["UNIT"] * 0.725 if int(cp.vl["TPMS11"]["UNIT"]) > 0 else 1.
     ret.tpms.fl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FL"]

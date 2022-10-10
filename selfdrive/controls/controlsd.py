@@ -134,8 +134,8 @@ class Controls:
       safety_config.safetyModel = car.CarParams.SafetyModel.noOutput
       self.CP.safetyConfigs = [safety_config]
 
-    if is_tested_branch():
-      self.CP.experimentalLongitudinalAvailable = False
+    #if is_tested_branch():
+    #  self.CP.experimentalLongitudinalAvailable = False
 
     # Write CarParams for radard
     cp_bytes = self.CP.to_bytes()
@@ -479,7 +479,8 @@ class Controls:
       self.mismatch_counter = 0
 
     # All pandas not in silent mode must have controlsAllowed when openpilot is enabled
-    if self.enabled and any(not ps.controlsAllowed for ps in self.sm['pandaStates'] if ps.safetyModel not in IGNORED_SAFETY_MODES):
+    if self.enabled and any(not ps.controlsAllowed for ps in self.sm['pandaStates']
+                            if ps.safetyModel not in IGNORED_SAFETY_MODES):
       self.mismatch_counter += 1
 
     self.distance_traveled += CS.vEgo * DT_CTRL
@@ -490,22 +491,27 @@ class Controls:
     """Compute conditional state transitions and execute actions on state transitions"""
 
     self.v_cruise_kph_last = self.v_cruise_kph
-    self.CP.pcmCruise = self.CI.CP.pcmCruise
 
-    SccSmoother.update_cruise_buttons(self, CS, self.CP.openpilotLongitudinalControl)
+    #self.CP.pcmCruise = self.CI.CP.pcmCruise
+    #SccSmoother.update_cruise_buttons(self, CS, self.CP.openpilotLongitudinalControl)
 
-    #if CS.cruiseState.available:
+    if CS.cruiseState.available:
     # if stock cruise is completely disabled, then we can use our own set speed logic
-    #  if not self.CP.pcmCruise:
-    #    self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents,
-    #                                        self.button_timers, self.enabled, self.is_metric)
-    #    self.v_cruise_cluster_kph = self.v_cruise_kph
-    #  else:
-    #    self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
-    #    self.v_cruise_cluster_kph = CS.cruiseState.speedCluster * CV.MS_TO_KPH
-    #else:
-    #  self.v_cruise_kph = V_CRUISE_INITIAL
-    #  self.v_cruise_cluster_kph = V_CRUISE_INITIAL
+      if not self.CP.pcmCruise:
+        #self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents,
+        #                                    self.button_timers, self.enabled, self.is_metric)
+        if self.CP.carName == "hyundai": 
+          self.v_cruise_kph = SccSmoother.update_v_cruise(self.v_cruise_kph, CS.buttonEvents, self.enabled, self.is_metric)
+        else:
+          self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents,
+                                            self.button_timers, self.enabled, self.is_metric)
+        self.v_cruise_cluster_kph = self.v_cruise_kph
+      else:
+        self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
+        self.v_cruise_cluster_kph = CS.cruiseState.speedCluster * CV.MS_TO_KPH
+    else:
+      self.v_cruise_kph = 0 #V_CRUISE_INITIAL
+      self.v_cruise_cluster_kph = 0 #V_CRUISE_INITIAL
 
     # decrement the soft disable timer at every step, as it's reset on
     # entrance in SOFT_DISABLING state

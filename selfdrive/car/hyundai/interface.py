@@ -31,7 +31,7 @@ class CarInterface(CarInterfaceBase):
 
     # WARNING: disabling radar also disables AEB (and we show the same warning on the instrument cluster as if you manually disabled AEB)
     ret.experimentalLongitudinalAvailable = candidate not in CANFD_CAR #(LEGACY_SAFETY_MODE_CAR | CAMERA_SCC_CAR | CANFD_CAR)
-    ret.openpilotLongitudinalControl = (experimental_long and ret.experimentalLongitudinalAvailable)
+    ret.openpilotLongitudinalControl = (experimental_long and ret.experimentalLongitudinalAvailable) or ret.sccBus == 2
 
     ret.carName = "hyundai"
     if candidate in CANFD_CAR:
@@ -349,7 +349,7 @@ class CarInterface(CarInterfaceBase):
 
     if self.CP.pcmCruise and not self.CC.scc_live:
       self.CP.pcmCruise = False
-    elif CANFD_CAR or self.CC.scc_live and not self.CP.pcmCruise:
+    elif self.CC.scc_live and not self.CP.pcmCruise:
       self.CP.pcmCruise = True
 
     # most HKG cars has no long control, it is safer and easier to engage by main on
