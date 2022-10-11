@@ -500,7 +500,7 @@ class Controls:
       if not self.CP.pcmCruise:
         #self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents,
         #                                    self.button_timers, self.enabled, self.is_metric)
-        if self.CP.carName == "hyundai": 
+        if self.CP.carName == "hyundai":
           self.v_cruise_kph = SccSmoother.update_v_cruise(self.v_cruise_kph, CS.buttonEvents, self.enabled, self.is_metric)
         else:
           self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents,
@@ -716,6 +716,7 @@ class Controls:
     if len(angular_rate_value) > 2:
       CC.angularVelocity = angular_rate_value
 
+    CC.cruiseControl.override = CC.enabled and not CC.longActive and self.CP.openpilotLongitudinalControl
     CC.cruiseControl.cancel = CS.cruiseState.enabled and not self.enabled and self.CP.pcmCruise
     if self.joystick_mode and self.sm.rcv_frame['testJoystick'] > 0 and self.sm['testJoystick'].buttons[0]:
       CC.cruiseControl.cancel = True
