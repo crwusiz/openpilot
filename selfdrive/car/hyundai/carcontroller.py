@@ -18,7 +18,7 @@ LongCtrlState = car.CarControl.Actuators.LongControlState
 STEER_FAULT_MAX_ANGLE = 85  # EPS max is 90
 STEER_FAULT_MAX_FRAMES = 39  # EPS counter is 95
 
-MIN_SET_SPEED = 30 * CV.KPH_TO_MS
+MIN_SET_SPEED = 10 * CV.KPH_TO_MS
 
 def process_hud_alert(enabled, fingerprint, hud_control):
   sys_warning = (hud_control.visualAlert in (VisualAlert.steerRequired, VisualAlert.ldw))
@@ -67,7 +67,6 @@ class CarController:
     self.last_lead_distance = 0
     self.resume_wait_timer = 0
     self.turning_signal_timer = 0
-    self.last_blinker_frame = 0
 
     self.scc_smoother = SccSmoother(CP)
     self.lfahdamfc = Params().get("MfcSelect", encoding='utf8') == "2"
@@ -221,9 +220,7 @@ class CarController:
 
           if lead is not None:
             d = lead.dRel
-            obj_gap = 1 if d < 25 else 2 if d < 40 else 3 if d < 60 else 4 if d < 80 else 5
-          else:
-            obj_gap = 0
+            obj_gap = 1 if d < 25 else 2 if d < 40 else 3 if d < 60 else 4 if d < 80 else 0
 
           can_sends.append(hyundaican.create_scc14(self.packer, CC.enabled, CS.out.vEgo, acc_standstill, apply_accel,
                                                    CS.out.gasPressed, obj_gap, CS.scc14))
@@ -248,7 +245,7 @@ class CarController:
     # steering control
     can_sends.append(hyundaicanfd.create_lkas(self.packer, self.CP, CC.enabled, CC.latActive, apply_steer))
 
-    # block LFA on HDA2
+    # block LFA on HDA2 ( 676 )
     if self.frame % 5 == 0 and (self.CP.flags & HyundaiFlags.CANFD_HDA2):
       can_sends.append(hyundaicanfd.create_cam_0x2a4(self.packer, CS.cam_0x2a4))
 

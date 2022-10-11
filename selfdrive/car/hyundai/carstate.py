@@ -59,8 +59,7 @@ class CarState(CarStateBase):
 
     cp_eps = cp2 if self.eps_bus else cp
     cp_sas = cp2 if self.sas_bus else cp
-    cp_scc = cp2 if self.scc_bus == 1 else cp_cam \
-                 if self.scc_bus == 2 else cp
+    cp_scc = cp2 if self.scc_bus == 1 else cp_cam if self.scc_bus == 2 else cp
 
     ret = car.CarState.new_message()
 
@@ -110,12 +109,12 @@ class CarState(CarStateBase):
     self.acc_mode = cp_scc.vl["SCC12"]["ACCMode"] != 0
 
     # cruise state
-    #if self.CP.openpilotLongitudinalControl:
+    if self.CP.openpilotLongitudinalControl:
       # These are not used for engage/disengage since openpilot keeps track of state using the buttons
-      #ret.cruiseState.available = cp.vl["TCS13"]["ACCEnable"] == 0
-      #ret.cruiseState.enabled = cp.vl["TCS13"]["ACC_REQ"] == 1
-      #ret.cruiseState.standstill = False
-    if self.no_radar:
+      ret.cruiseState.available = cp.vl["TCS13"]["ACCEnable"] == 0
+      ret.cruiseState.enabled = cp.vl["TCS13"]["ACC_REQ"] == 1
+      ret.cruiseState.standstill = False
+    elif self.no_radar:
       ret.cruiseState.available = cp.vl["EMS16"]["CRUISE_LAMP_M"] != 0
       ret.cruiseState.enabled = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] != 0
       ret.cruiseState.standstill = False
@@ -194,7 +193,7 @@ class CarState(CarStateBase):
     self.cruise_unavail_cnt += 1 if cp.vl["TCS13"]["CF_VSM_Avail"] != 1 and \
                                     cp.vl["TCS13"]["ACCEnable"] != 0 else -self.cruise_unavail_cnt
     self.cruise_unavail = self.cruise_unavail_cnt > 100
-    self.lead_distance = cp_scc.vl["SCC11"]["ACC_ObjDist"] if not self.no_radar else 0
+    self.lead_distance = cp_scc.vl["SCC11"]["ACC_ObjDist"]
 
     tpms_unit = cp.vl["TPMS11"]["UNIT"] * 0.725 if int(cp.vl["TPMS11"]["UNIT"]) > 0 else 1.
     ret.tpms.fl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FL"]

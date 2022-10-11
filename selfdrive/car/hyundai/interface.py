@@ -45,15 +45,16 @@ class CarInterface(CarInterfaceBase):
 
     # longitudinal
     ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 30.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-    ret.longitudinalTuning.kpV = [1.2, 1.0, 0.93, 0.88, 0.5]
+    ret.longitudinalTuning.kpV = [1.2, 1.05, 1.0, 0.92, 0.55]
     ret.longitudinalTuning.kiBP = [0., 130.*CV.KPH_TO_MS]
     ret.longitudinalTuning.kiV = [0.1, 0.05]
-    ret.longitudinalActuatorDelayLowerBound = 0.5
-    ret.longitudinalActuatorDelayUpperBound = 0.5
+    ret.longitudinalActuatorDelayLowerBound = 0.3
+    ret.longitudinalActuatorDelayUpperBound = 0.3
 
     ret.stoppingControl = True
-    ret.vEgoStopping = 1.0
-    ret.stopAccel = -3.0
+    ret.stoppingDecelRate = 1.0
+    ret.vEgoStopping = 0.5 # m/s
+    ret.stopAccel = -3.5
 
     ret.startingState = True
     ret.vEgoStarting = 0.1
@@ -310,14 +311,14 @@ class CarInterface(CarInterfaceBase):
       scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront, tire_stiffness_factor=tire_stiffness_factor)
 
     if candidate in CANFD_CAR:
-      ret.enableBsm = 0x58b in fingerprint[0]
+      ret.enableBsm = 0x58b in fingerprint[0] # 1419
       ret.radarOffCan = False
-      if 0x50 in fingerprint[6]:
+      if 0x50 in fingerprint[6]: # 80
         ret.flags |= HyundaiFlags.CANFD_HDA2.value
         ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_HDA2
       else:
         # non-HDA2
-        if 0x1cf not in fingerprint[4]:
+        if 0x1cf not in fingerprint[4]: # 463
           ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
           ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_ALT_BUTTONS
     else:
@@ -332,14 +333,14 @@ class CarInterface(CarInterfaceBase):
         ret.hasScc13 = 1290 in fingerprint[ret.sccBus]
         ret.hasScc14 = 905 in fingerprint[ret.sccBus]
 
-      ret.enableBsm = 0x58b in fingerprint[0]
+      ret.enableBsm = 1419 in fingerprint[0]
       ret.enableAutoHold = 1151 in fingerprint[0]
       ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
       ret.hasLfaHda = 1157 in fingerprint[0] or 1157 in fingerprint[2]
       ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
       ret.radarOffCan = ret.sccBus == -1
 
-    ret.pcmCruise = not ret.radarOffCan
+    ret.pcmCruise = not ret.openpilotLongitudinalControl
 
     return ret
 
@@ -347,15 +348,21 @@ class CarInterface(CarInterfaceBase):
   def _update(self, c):
     ret = self.CS.update(self.cp, self.cp2, self.cp_cam)
 
-    if self.CP.pcmCruise and not self.CC.scc_live:
-      self.CP.pcmCruise = False
-    elif self.CC.scc_live and not self.CP.pcmCruise:
-      self.CP.pcmCruise = True
+    if CANFD_CAR:
+      canvalid = any([self.cp.can_valid, self.cp_cam.can_valid])
+      if not canvalid:
+        print('cp = {}  cp_cam = {}'.format(bool(self.cp.can_valid), bool(self.cp_cam.can_valid)))
+    else:
+      canvalid = any([self.cp.can_valid, self.cp2.can_valid, self.cp_cam.can_valid])
+      if not canvalid:
+        print('cp = {}  cp2 = {}  cp_cam = {}'.format(bool(self.cp.can_valid), bool(self.cp2.can_valid), bool(self.cp_cam.can_valid)))
 
     # most HKG cars has no long control, it is safer and easier to engage by main on
-    ret.cruiseState.enabled = ret.cruiseState.available
+    #ret.cruiseState.enabled = ret.cruiseState.available
+    if not self.CS.CP.openpilotLongitudinalControl:
+      ret.cruiseState.enabled = ret.cruiseState.available
 
-    if not CANFD_CAR and self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons:
+    if all([self.CS.CP.openpilotLongitudinalControl, not CANFD_CAR, self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons]):
       buttonEvents = [create_button_event(self.CS.cruise_buttons[-1], self.CS.prev_cruise_buttons, BUTTONS_DICT)]
       # Handle CF_Clu_CruiseSwState changing buttons mid-press
       if self.CS.cruise_buttons[-1] != 0 and self.CS.prev_cruise_buttons != 0:

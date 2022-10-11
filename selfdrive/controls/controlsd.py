@@ -492,19 +492,13 @@ class Controls:
 
     self.v_cruise_kph_last = self.v_cruise_kph
 
-    #self.CP.pcmCruise = self.CI.CP.pcmCruise
-    #SccSmoother.update_cruise_buttons(self, CS, self.CP.openpilotLongitudinalControl)
-
     if CS.cruiseState.available:
     # if stock cruise is completely disabled, then we can use our own set speed logic
       if not self.CP.pcmCruise:
-        #self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents,
-        #                                    self.button_timers, self.enabled, self.is_metric)
         if self.CP.carName == "hyundai":
           self.v_cruise_kph = SccSmoother.update_v_cruise(self.v_cruise_kph, CS.buttonEvents, self.enabled, self.is_metric)
         else:
-          self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents,
-                                            self.button_timers, self.enabled, self.is_metric)
+          self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents, self.button_timers, self.enabled, self.is_metric)
         self.v_cruise_cluster_kph = self.v_cruise_kph
       else:
         self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
@@ -717,7 +711,7 @@ class Controls:
       CC.angularVelocity = angular_rate_value
 
     CC.cruiseControl.override = CC.enabled and not CC.longActive and self.CP.openpilotLongitudinalControl
-    CC.cruiseControl.cancel = CS.cruiseState.enabled and not self.enabled and self.CP.pcmCruise
+    CC.cruiseControl.cancel = CS.cruiseState.enabled and (not self.enabled or not self.CP.pcmCruise)
     if self.joystick_mode and self.sm.rcv_frame['testJoystick'] > 0 and self.sm['testJoystick'].buttons[0]:
       CC.cruiseControl.cancel = True
 

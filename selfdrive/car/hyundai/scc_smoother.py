@@ -26,7 +26,7 @@ WAIT_COUNT = [12, 14, 16, 18]
 AliveIndex = 0
 WaitIndex = 0
 
-MIN_CURVE_SPEED = 40. * CV.KPH_TO_MS
+MIN_CURVE_SPEED = 30. * CV.KPH_TO_MS
 
 EventName = car.CarEvent.EventName
 ButtonType = car.CarState.ButtonEvent.Type
@@ -283,7 +283,7 @@ class SccSmoother:
         curv = curv[start:min(start+10, TRAJECTORY_SIZE)]
         a_y_max = 2.975 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
         v_curvature = np.sqrt(a_y_max / np.clip(np.abs(curv), 1e-4, None))
-        model_speed = np.mean(v_curvature) * 0.85
+        model_speed = np.mean(v_curvature) * 0.8
 
         if model_speed < v_ego:
           self.curve_speed_ms = float(max(model_speed, MIN_CURVE_SPEED))
@@ -327,28 +327,6 @@ class SccSmoother:
     boost = start_boost * is_accelerating
     accel += boost
     return accel
-
-  @staticmethod
-  def update_cruise_buttons(controls, CS, longcontrol):  # called by controlds's state_transition
-    car_set_speed = CS.cruiseState.speed * CV.MS_TO_KPH
-    is_cruise_enabled = car_set_speed != 0 and car_set_speed != 255 and CS.cruiseState.enabled and controls.CP.pcmCruise
-
-    if is_cruise_enabled:
-      if longcontrol:
-        v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
-      else:
-        v_cruise_kph = SccSmoother.update_v_cruise(controls.v_cruise_kph, CS.buttonEvents, controls.enabled, controls.is_metric)
-    else:
-      v_cruise_kph = 0
-
-    if controls.is_cruise_enabled != is_cruise_enabled:
-      controls.is_cruise_enabled = is_cruise_enabled
-      if controls.is_cruise_enabled:
-        v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
-      else:
-        v_cruise_kph = 0
-      controls.LoC.reset(v_pid=CS.vEgo)
-    controls.v_cruise_kph = v_cruise_kph
 
   @staticmethod
   def update_v_cruise(v_cruise_kph, buttonEvents, enabled, metric):
