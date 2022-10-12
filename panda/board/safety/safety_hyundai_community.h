@@ -234,8 +234,6 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
     if ((addr == 1056) && !scc12_op) {
       // 2 bits: 13-14
       int cruise_engaged = GET_BYTES_04(to_push) & 0x1; // ACC main_on signal
-      //if (cruise_engaged && !cruise_engaged_prev) {
-      //int cruise_engaged = (GET_BYTES_04(to_push) >> 13) & 0x3U;
       if (cruise_engaged && !cruise_engaged_prev && (hyundai_last_button_interaction < HYUNDAI_COMMUNITY_PREV_BUTTON_SAMPLES)) {
         controls_allowed = 1;
         puts("  longitudinal control : controls allowed\n");

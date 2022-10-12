@@ -340,7 +340,7 @@ class CarInterface(CarInterfaceBase):
       ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
       ret.radarOffCan = ret.sccBus == -1
 
-    ret.pcmCruise = not ret.openpilotLongitudinalControl
+    ret.pcmCruise = ret.radarOffCan
 
     return ret
 
@@ -357,10 +357,13 @@ class CarInterface(CarInterfaceBase):
       if not canvalid:
         print('cp = {}  cp2 = {}  cp_cam = {}'.format(bool(self.cp.can_valid), bool(self.cp2.can_valid), bool(self.cp_cam.can_valid)))
 
+    if self.CP.pcmCruise and not self.CC.scc_live:
+      self.CP.pcmCruise = False
+    elif self.CC.scc_live and not self.CP.pcmCruise:
+      self.CP.pcmCruise = True       
+        
     # most HKG cars has no long control, it is safer and easier to engage by main on
-    #ret.cruiseState.enabled = ret.cruiseState.available
-    if not self.CS.CP.openpilotLongitudinalControl:
-      ret.cruiseState.enabled = ret.cruiseState.available
+    ret.cruiseState.enabled = ret.cruiseState.available
 
     if all([self.CS.CP.openpilotLongitudinalControl, not CANFD_CAR, self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons]):
       buttonEvents = [create_button_event(self.CS.cruise_buttons[-1], self.CS.prev_cruise_buttons, BUTTONS_DICT)]

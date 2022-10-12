@@ -11,7 +11,6 @@ from common.kalman.simple_kalman import KF1D
 from common.numpy_fast import interp
 from common.realtime import DT_CTRL
 from selfdrive.car import apply_hysteresis, create_button_enable_events, gen_empty_fingerprint
-from selfdrive.car.hyundai.values import CANFD_CAR
 from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, apply_deadzone
 from selfdrive.controls.lib.events import Events
 from selfdrive.controls.lib.vehicle_model import VehicleModel
@@ -78,7 +77,7 @@ class CarInterfaceBase(ABC):
       self.cp_body = self.CS.get_body_can_parser(CP)
       self.cp_loopback = self.CS.get_loopback_can_parser(CP)
 
-      if self.CP.carName == "hyundai" and not CANFD_CAR:
+      if self.CP.carName == "hyundai":
         self.cp2 = self.CS.get_can2_parser(CP)
         self.can_parsers = [self.cp, self.cp2, self.cp_cam, self.cp_adas, self.cp_body, self.cp_loopback]
       else:

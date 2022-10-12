@@ -372,8 +372,8 @@ def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster
     add_int = int(add, 0)
     f.close()
     return Alert(
-      #"CAN Error: %s is missing\n Decimal Value : %d" % (add, add_int),
-      "CAN 오류: %s Missing\n Value : %d" % (add, add_int),
+      #"CAN Error : %s is missing\n Decimal Value : %d" % (add, add_int),
+      "CAN 오류 : %s Missing\n Value : %d" % (add, add_int),
       "",
       AlertStatus.normal, AlertSize.small,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, .2, creation_delay=1.)
@@ -383,8 +383,8 @@ def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster
     add_int = int(add, 0)
     f.close()
     return Alert(
-      #"CAN Error: %s is timeout\n Decimal Value : %d" % (add, add_int),
-      "CAN 오류: %s Timeout\n Value : %d" % (add, add_int),
+      #"CAN Error : %s is timeout\n Decimal Value : %d" % (add, add_int),
+      "CAN 오류 : %s Timeout\n Value : %d" % (add, add_int),
       "",
       AlertStatus.normal, AlertSize.small,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, .2, creation_delay=1.)
@@ -1016,12 +1016,12 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   # Sometimes the USB stack on the device can get into a bad state
   # causing the connection to the panda to be lost
   EventName.usbError: {
-    #ET.SOFT_DISABLE: soft_disable_alert("USB Error: Reboot Your Device"),
-    #ET.PERMANENT: NormalPermanentAlert("USB Error: Reboot Your Device", ""),
-    #ET.NO_ENTRY: NoEntryAlert("USB Error: Reboot Your Device"),
-    ET.SOFT_DISABLE: soft_disable_alert("USB 오류: 장치를 재부팅하세요"),
-    ET.PERMANENT: NormalPermanentAlert("USB 오류: 장치를 재부팅하세요", ""),
-    ET.NO_ENTRY: NoEntryAlert("USB 오류: 장치를 재부팅하세요"),
+    #ET.SOFT_DISABLE: soft_disable_alert("USB Error : Reboot Your Device"),
+    #ET.PERMANENT: NormalPermanentAlert("USB Error : Reboot Your Device", ""),
+    #ET.NO_ENTRY: NoEntryAlert("USB Error : Reboot Your Device"),
+    ET.SOFT_DISABLE: soft_disable_alert("USB 오류 : 장치를 재부팅하세요"),
+    ET.PERMANENT: NormalPermanentAlert("USB 오류 : 장치를 재부팅하세요", ""),
+    ET.NO_ENTRY: NoEntryAlert("USB 오류 : 장치를 재부팅하세요"),
   },
 
   # This alert can be thrown for the following reasons:

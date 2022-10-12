@@ -143,12 +143,6 @@ class Controls:
     put_nonblocking("CarParamsCache", cp_bytes)
     put_nonblocking("CarParamsPersistent", cp_bytes)
 
-    # cleanup old params
-    if not self.CP.experimentalLongitudinalAvailable:
-      params.remove("ExperimentalLongitudinalEnabled")
-    if not self.CP.openpilotLongitudinalControl:
-      params.remove("EndToEndLong")
-
     self.CC = car.CarControl.new_message()
     self.CS_prev = car.CarState.new_message()
     self.AM = AlertManager()
