@@ -15,8 +15,11 @@ from selfdrive.car.hyundai.scc_smoother import SccSmoother
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 LongCtrlState = car.CarControl.Actuators.LongControlState
 
-STEER_FAULT_MAX_ANGLE = 85  # EPS max is 90
-STEER_FAULT_MAX_FRAMES = 39  # EPS counter is 95
+# EPS faults if you apply torque while the steering angle is above 90 degrees for more than 1 second
+# All slightly below EPS thresholds to avoid fault
+MAX_ANGLE = 85
+MAX_ANGLE_FRAMES = 89
+MAX_ANGLE_CONSECUTIVE_FRAMES = 2
 
 MIN_SET_SPEED = 10 * CV.KPH_TO_MS
 
@@ -53,12 +56,9 @@ class CarController:
     self.car_fingerprint = CP.carFingerprint
 
     self.packer = CANPacker(dbc_name)
-
-    self.turning_indicator_alert = False
-
     self.angle_limit_counter = 0
-    self.last_button_frame = 0
     self.frame = 0
+    self.last_button_frame = 0
     self.apply_steer_last = 0
     self.accel = 0
     self.lkas11_cnt = 0
@@ -67,6 +67,7 @@ class CarController:
     self.last_lead_distance = 0
     self.resume_wait_timer = 0
     self.turning_signal_timer = 0
+    self.turning_indicator_alert = False
 
     self.scc_smoother = SccSmoother(CP)
     self.lfahdamfc = Params().get("MfcSelect", encoding='utf8') == "2"
@@ -107,23 +108,24 @@ class CarController:
       self.lkas11_cnt = CS.lkas11["CF_Lkas_MsgCount"]
     self.lkas11_cnt = (self.lkas11_cnt + 1) % 0x10
 
-    if CC.latActive and abs(CS.out.steeringAngleDeg) >= STEER_FAULT_MAX_ANGLE:
+    if CC.latActive and abs(CS.out.steeringAngleDeg) >= MAX_ANGLE:
       self.angle_limit_counter += 1
     else:
       self.angle_limit_counter = 0
 
-    # stop requesting torque to avoid 90 degree fault and hold torque with induced temporary fault
-    cut_steer_temp = False
-    if self.angle_limit_counter > STEER_FAULT_MAX_FRAMES:
-      cut_steer_temp = True
+    # Cut steer actuation bit for two frames and hold torque with induced temporary fault
+    torque_fault = CC.latActive and self.angle_limit_counter > MAX_ANGLE_FRAMES
+    lat_active = CC.latActive and not torque_fault
+
+    if self.angle_limit_counter >= MAX_ANGLE_FRAMES + MAX_ANGLE_CONSECUTIVE_FRAMES:
       self.angle_limit_counter = 0
 
     can_sends = []
-    can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, CC.latActive, cut_steer_temp, CS.lkas11, sys_warning,
+    can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, lat_active, torque_fault, CS.lkas11, sys_warning,
                                               sys_state, CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning, 0))
 
     if CS.eps_bus or CS.scc_bus == 1:  # send lkas11 bus 1 if eps or scc is on bus 1
-      can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, CC.latActive, cut_steer_temp, CS.lkas11, sys_warning,
+      can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, lat_active, torque_fault, CS.lkas11, sys_warning,
                                                 sys_state, CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning, 1))
 
     if self.frame % 2 and CS.eps_bus: # send clu11 to eps if it is not on bus 0

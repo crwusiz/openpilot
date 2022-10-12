@@ -6,8 +6,7 @@ from common.params import Params
 
 hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 
-
-def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, cut_steer_temp, lkas11, sys_warning, sys_state, enabled,
+def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque_fault, lkas11, sys_warning, sys_state, enabled,
                   left_lane, right_lane, left_lane_depart, right_lane_depart, bus):
   values = copy.copy(lkas11)
   values["CF_Lkas_LdwsSysState"] = sys_state
@@ -15,8 +14,8 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, cut_st
   values["CF_Lkas_LdwsLHWarning"] = left_lane_depart
   values["CF_Lkas_LdwsRHWarning"] = right_lane_depart
   values["CR_Lkas_StrToqReq"] = apply_steer
-  values["CF_Lkas_ActToi"] = steer_req and not cut_steer_temp
-  values["CF_Lkas_ToiFlt"] = cut_steer_temp  # seems to allow actuation on CR_Lkas_StrToqReq
+  values["CF_Lkas_ActToi"] = steer_req
+  values["CF_Lkas_ToiFlt"] = torque_fault  # seems to allow actuation on CR_Lkas_StrToqReq
   values["CF_Lkas_MsgCount"] = frame % 0x10
   values["CF_Lkas_Chksum"] = 0
 
