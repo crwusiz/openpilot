@@ -360,12 +360,12 @@ class CarInterface(CarInterfaceBase):
     if self.CP.pcmCruise and not self.CC.scc_live:
       self.CP.pcmCruise = False
     elif self.CC.scc_live and not self.CP.pcmCruise:
-      self.CP.pcmCruise = True       
-        
+      self.CP.pcmCruise = True
+
     # most HKG cars has no long control, it is safer and easier to engage by main on
     ret.cruiseState.enabled = ret.cruiseState.available
 
-    if all([self.CS.CP.openpilotLongitudinalControl, not CANFD_CAR, self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons]):
+    if all([self.CS.CP.openpilotLongitudinalControl, self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons]):
       buttonEvents = [create_button_event(self.CS.cruise_buttons[-1], self.CS.prev_cruise_buttons, BUTTONS_DICT)]
       # Handle CF_Clu_CruiseSwState changing buttons mid-press
       if self.CS.cruise_buttons[-1] != 0 and self.CS.prev_cruise_buttons != 0:

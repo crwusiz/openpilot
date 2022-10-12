@@ -1,3 +1,5 @@
+#include "safety_hyundai_common.h"
+
 const SteeringLimits HYUNDAI_COMMUNITY_STEERING_LIMITS = {
   .max_steer = 409,
   .max_rt_delta = 112,
@@ -9,20 +11,19 @@ const SteeringLimits HYUNDAI_COMMUNITY_STEERING_LIMITS = {
   .type = TorqueDriverLimited,
 
   // the EPS faults when the steering angle is above a certain threshold for too long. to prevent this,
-  // we allow setting CF_Lkas_ActToi bit to 0 while maintaining the requested torque value for a single frame
-  .min_valid_request_frames = 39,
-  .min_valid_request_rt_interval = 360000,  // 450ms; a ~10% buffer on cutting every 40 frames
+  // we allow setting CF_Lkas_ActToi bit to 0 while maintaining the requested torque value for two consecutive frames
+  .min_valid_request_frames = 89,
+  .max_invalid_request_frames = 2,
+  .min_valid_request_rt_interval = 810000,  // 810ms; a ~10% buffer on cutting every 90 frames
   .has_steer_req_tolerance = true,
 };
 
-const int HYUNDAI_COMMUNITY_STANDSTILL_THRSLD = 30;  // ~1kph
 const int HYUNDAI_COMMUNITY_MAX_ACCEL = 200;  // 1/100 m/s2
 const int HYUNDAI_COMMUNITY_MIN_ACCEL = -350; // 1/100 m/s2
 
 bool lcan_bus1, fwd_bus1 = false;
 bool fwd_bus2 = true;
 int lkas11_bus0_cnt, lcan_bus1_cnt, mdps12_cnt, Last_StrColTq = 0;
-int lkas11_op, mdps12_op, clu11_op, scc12_op, ems11_op = 0;
 int mdps12_chksum, eps_bus, scc_bus = -1;
 
 const CanMsg HYUNDAI_COMMUNITY_TX_MSGS[] = {
@@ -62,19 +63,6 @@ AddrCheckStruct hyundai_community_addr_checks[] = {
 #define HYUNDAI_COMMUNITY_ADDR_CHECK_LEN (sizeof(hyundai_community_addr_checks) / sizeof(hyundai_community_addr_checks[0]))
 
 const int HYUNDAI_COMMUNITY_PARAM_LONGITUDINAL = 4;
-
-enum {
-  HYUNDAI_COMMUNITY_BTN_NONE = 0,
-  HYUNDAI_COMMUNITY_BTN_RESUME = 1,
-  HYUNDAI_COMMUNITY_BTN_SET = 2,
-  HYUNDAI_COMMUNITY_BTN_CANCEL = 4,
-};
-
-// some newer HKG models can re-enable after spamming cancel button,
-// so keep track of user button presses to deny engagement if no interaction
-const uint8_t HYUNDAI_COMMUNITY_PREV_BUTTON_SAMPLES = 8;  // roughly 160 ms
-uint8_t hyundai_last_button_interaction;  // button messages since the user pressed an enable button
-bool hyundai_community_longitudinal = false;
 
 addr_checks hyundai_community_rx_checks = {hyundai_community_addr_checks, HYUNDAI_COMMUNITY_ADDR_CHECK_LEN};
 
@@ -231,21 +219,11 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
 
   if (valid) {
     // longitudinal control ( SCC11, SCC12 )
-    if ((addr == 1056) && !scc12_op) {
+    if (addr == 1056) {
       // 2 bits: 13-14
       int cruise_engaged = GET_BYTES_04(to_push) & 0x1; // ACC main_on signal
-      if (cruise_engaged && !cruise_engaged_prev && (hyundai_last_button_interaction < HYUNDAI_COMMUNITY_PREV_BUTTON_SAMPLES)) {
-        controls_allowed = 1;
-        puts("  longitudinal control : controls allowed\n");
-      }
-      if (!cruise_engaged) {
-        if (controls_allowed) {
-          puts("  longitudinal control : controls not allowed\n");
-        }
-        controls_allowed = 0;
-      }
-      cruise_engaged_prev = cruise_engaged;
-    }
+    hyundai_common_cruise_state_check(cruise_engaged);
+  }
 
     // MDPS12
     if ((addr == 593) && (bus == eps_bus)) {
@@ -258,45 +236,24 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
     if (addr == 1265) {  // CLU11
       int cruise_button = GET_BYTE(to_push, 0) & 0x7U;
       int main_button = GET_BIT(to_push, 3U);
-
-      if ((cruise_button == HYUNDAI_COMMUNITY_BTN_RESUME) || (cruise_button == HYUNDAI_COMMUNITY_BTN_SET) || (cruise_button == HYUNDAI_COMMUNITY_BTN_CANCEL) || (main_button != 0)) {
-        hyundai_last_button_interaction = 0U;
-      } else {
-        hyundai_last_button_interaction = MIN(hyundai_last_button_interaction + 1U, HYUNDAI_COMMUNITY_PREV_BUTTON_SAMPLES);
-      }
-
-      if (hyundai_community_longitudinal) {
-        // exit controls on cancel press
-        if (cruise_button == HYUNDAI_COMMUNITY_BTN_CANCEL) {
-          controls_allowed = 0;
-        }
-
-        // enter controls on falling edge of resume or set
-        bool set = (cruise_button == HYUNDAI_COMMUNITY_BTN_NONE) && (cruise_button_prev == HYUNDAI_COMMUNITY_BTN_SET);
-        bool res = (cruise_button == HYUNDAI_COMMUNITY_BTN_NONE) && (cruise_button_prev == HYUNDAI_COMMUNITY_BTN_RESUME);
-        if (set || res) {
-          controls_allowed = 1;
-        }
-
-        cruise_button_prev = cruise_button;
-      }
+      hyundai_common_cruise_buttons_check(cruise_button, main_button);
     }
 
     // sample wheel speed, averaging opposite corners
     if (addr == 902) {  // WHL_SPD11
-      int hyundai_speed = (GET_BYTES_04(to_push) & 0x3FFFU) + ((GET_BYTES_48(to_push) >> 16) & 0x3FFFU);  // FL + RR
+      uint32_t hyundai_speed = (GET_BYTES_04(to_push) & 0x3FFFU) + ((GET_BYTES_48(to_push) >> 16) & 0x3FFFU);  // FL + RR
       hyundai_speed /= 2;
-      vehicle_moving = hyundai_speed > HYUNDAI_COMMUNITY_STANDSTILL_THRSLD;
+      vehicle_moving = hyundai_speed > HYUNDAI_STANDSTILL_THRSLD;
     }
 
-    bool stock_ecu_detected = (addr == 832);
+    bool stock_ecu_detected = (addr == 832);  // LKAS11
 
     // If openpilot is controlling longitudinal we need to ensure the radar is turned off
     // Enforce by checking we don't see SCC12
-    if (hyundai_community_longitudinal && (addr == 1057)) {
+    if (hyundai_longitudinal && (addr == 1057)) {  // SCC12
       stock_ecu_detected = true;
     }
-    generic_rx_checks(stock_ecu_detected && (bus == 0)); // LKAS11
+    generic_rx_checks(stock_ecu_detected && (bus == 0));
   }
   return valid;
 }
@@ -352,7 +309,6 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
 
   // LKA STEER: safety check
   if (addr == 832) {  // LKAS11
-    lkas11_op = 20;
     int desired_torque = ((GET_BYTES_04(to_send) >> 16) & 0x7ffU) - 1024U;
     uint32_t ts = microsecond_timer_get();
     bool violation = 0;
@@ -407,21 +363,16 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
     }
   }
 
-  // FORCE CANCEL: safety check only relevant when spamming the cancel button.
-  // ensuring that only the cancel button press is sent (VAL 4) when controls are off.
-  // This avoids unintended engagements while still allowing resume spam
-  // allow CLU11 to be sent to EPS if EPS is not on bus0
+  // BUTTONS: used for resume spamming and cruise cancellation
   if ((addr == 1265) && !controls_allowed && (bus != eps_bus) && (eps_bus == 1)) {
-    if ((GET_BYTES_04(to_send) & 0x7U) != 4) {
+    int button = GET_BYTE(to_send, 0) & 0x7U;
+
+    bool allowed_resume = (button == 1) && controls_allowed;
+    bool allowed_cancel = (button == 4) && cruise_engaged_prev;
+    if (!(allowed_resume || allowed_cancel)) {
       tx = 0;
     }
   }
-
-  if (addr == 593) {mdps12_op = 20;}  // MDPS12
-  if (addr == 790) {ems11_op = 20;}  // EMS11
-  if (addr == 1057) {scc12_op = 20;}  // SCC12
-  if ((addr == 1265) && (bus == 1)) {clu11_op = 20;}  // CLU11
-
   return tx;
 }
 
@@ -434,49 +385,40 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   // forward LKAS to CCAN
   if (fwd_bus2) {
     if (bus_num == 0) {
-      if (!clu11_op || (addr != 1265) || (eps_bus == 0)) {  // CLU11
-        if (!mdps12_op || (addr != 593)) {  // MDPS12
-          if (!ems11_op || (addr != 790)) {  // EMS11
+      if ((addr != 1265) || (eps_bus == 0)) {  // CLU11
+        if (addr != 593) {  // MDPS12
+          if (addr != 790) {  // EMS11
             bus_fwd = fwd_to_bus1 == 1 ? 12 : 2;
           } else {  // OP create EMS11 for MDPS
             bus_fwd = 2;
-            ems11_op -= 1;
           }
         } else {  // OP create MDPS for LKAS
           bus_fwd = fwd_to_bus1;
-          mdps12_op -= 1;
         }
       } else {  // OP create CLU12 for MDPS
         bus_fwd = 2;
-        clu11_op -= 1;
       }
     }
     if ((bus_num == 1) && fwd_bus1) {
-      if (!mdps12_op || (addr != 593)) {  // MDPS12
-        if (!scc12_op || ((addr != 1056) && (addr != 1057) && (addr != 1290) && (addr != 905))) {
+      if (addr != 593) {  // MDPS12
+        if ((addr != 1056) && (addr != 1057) && (addr != 1290) && (addr != 905)) {
           bus_fwd = 20;
         } else {  // OP create SCC11 SCC12 SCC13 SCC14 for Car
           bus_fwd = 2;
-          scc12_op -= 1;
         }
       } else {  // OP create MDPS for LKAS
         bus_fwd = 0;
-        mdps12_op -= 1;
       }
     }
     if (bus_num == 2) {
-      if ((!lkas11_op || (addr != 832)) && (addr != 1157)) {
-        if (!scc12_op || ((addr != 1056) && (addr != 1057) && (addr != 1290) && (addr != 905))) {
+      if ((addr != 832) && (addr != 1157)) {  // LKAS11 , LFAHDA_MFC
+        if ((addr != 1056) && (addr != 1057) && (addr != 1290) && (addr != 905)) {
           bus_fwd = fwd_to_bus1 == 1 ? 10 : 0;
         } else {  // OP create SCC11 SCC12 SCC13 SCC14 for Car
           bus_fwd = fwd_to_bus1;
-          scc12_op -= 1;
         }
       } else if (eps_bus == 0) {  // OP create LKAS and LFA for Car
         bus_fwd = fwd_to_bus1;
-        lkas11_op -= 1;
-      } else {  // OP create LKAS and LFA for Car and MDPS
-        lkas11_op -= 1;
       }
     }
   } else {
@@ -492,8 +434,8 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
 
 static const addr_checks* hyundai_community_init(uint16_t param) {
   //UNUSED(param);
-  hyundai_community_longitudinal = GET_FLAG(param, HYUNDAI_COMMUNITY_PARAM_LONGITUDINAL);
-  hyundai_last_button_interaction = HYUNDAI_COMMUNITY_PREV_BUTTON_SAMPLES;
+  hyundai_longitudinal = GET_FLAG(param, HYUNDAI_COMMUNITY_PARAM_LONGITUDINAL);
+  hyundai_last_button_interaction = HYUNDAI_PREV_BUTTON_SAMPLES;
 
   hyundai_community_rx_checks = (addr_checks) {hyundai_community_addr_checks, HYUNDAI_COMMUNITY_ADDR_CHECK_LEN};
   return &hyundai_community_rx_checks;
