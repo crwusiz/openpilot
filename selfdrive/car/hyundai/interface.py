@@ -29,36 +29,38 @@ class CarInterface(CarInterfaceBase):
   def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=[], experimental_long=False):  # pylint: disable=dangerous-default-value
     ret = CarInterfaceBase.get_std_params(candidate, fingerprint)
 
-    # WARNING: disabling radar also disables AEB (and we show the same warning on the instrument cluster as if you manually disabled AEB)
-    ret.experimentalLongitudinalAvailable = candidate not in CANFD_CAR #(LEGACY_SAFETY_MODE_CAR | CAMERA_SCC_CAR | CANFD_CAR)
-    ret.openpilotLongitudinalControl = (experimental_long and ret.experimentalLongitudinalAvailable) or ret.sccBus == 2
-
     ret.carName = "hyundai"
+
+    # *** longitudinal control ***
     if candidate in CANFD_CAR:
-      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.noOutput),
-                           get_safety_config(car.CarParams.SafetyModel.hyundaiCanfd)]
+      ret.longitudinalTuning.kpV = [0.1]
+      ret.longitudinalTuning.kiV = [0.0]
+      ret.longitudinalActuatorDelayLowerBound = 0.15
+      ret.longitudinalActuatorDelayUpperBound = 0.5
+      ret.experimentalLongitudinalAvailable = bool(ret.flags & HyundaiFlags.CANFD_HDA2)
     else:
-      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
+      ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 30.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+      ret.longitudinalTuning.kpV = [1.2, 1.05, 1.0, 0.92, 0.55]
+      ret.longitudinalTuning.kiBP = [0., 130.*CV.KPH_TO_MS]
+      ret.longitudinalTuning.kiV = [0.1, 0.05]
+      ret.longitudinalActuatorDelayLowerBound = 0.3
+      ret.longitudinalActuatorDelayUpperBound = 0.3
+      ret.experimentalLongitudinalAvailable = ret.sccBus == 2
 
-    ret.steerActuatorDelay = 0.1
-    ret.steerLimitTimer = 0.4
-
-    # longitudinal
-    ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 30.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-    ret.longitudinalTuning.kpV = [1.2, 1.05, 1.0, 0.92, 0.55]
-    ret.longitudinalTuning.kiBP = [0., 130.*CV.KPH_TO_MS]
-    ret.longitudinalTuning.kiV = [0.1, 0.05]
-    ret.longitudinalActuatorDelayLowerBound = 0.3
-    ret.longitudinalActuatorDelayUpperBound = 0.3
+    # WARNING: disabling radar also disables AEB (and we show the same warning on the instrument cluster as if you manually disabled AEB)
+    ret.openpilotLongitudinalControl = experimental_long and ret.experimentalLongitudinalAvailable
 
     ret.stoppingControl = True
     ret.stoppingDecelRate = 1.0
-    ret.vEgoStopping = 0.5 # m/s
+    ret.vEgoStopping = 0.5
     ret.stopAccel = -3.5
 
     ret.startingState = True
     ret.vEgoStarting = 0.1
     ret.startAccel = 2.0
+
+    ret.steerActuatorDelay = 0.1
+    ret.steerLimitTimer = 0.4
 
     tire_stiffness_factor = 1.
 
@@ -298,30 +300,30 @@ class CarInterface(CarInterfaceBase):
     elif any([Params().get("LateralControlSelect", encoding='utf8') == "3", candidate in CANFD_CAR]):
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
-    ret.centerToFront = ret.wheelbase * 0.4
-    ret.radarTimeStep = 0.05
-
-    # TODO: get actual value, for now starting with reasonable value for
-    # civic and scaling by mass and wheelbase
-    ret.rotationalInertia = scale_rot_inertia(ret.mass, ret.wheelbase)
-
-    # TODO: start from empirically derived lateral slip stiffness for the civic and scale by
-    # mass and CG position, so all cars will have approximately similar dyn behaviors
-    ret.tireStiffnessFront, ret.tireStiffnessRear = \
-      scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront, tire_stiffness_factor=tire_stiffness_factor)
 
     if candidate in CANFD_CAR:
+      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.noOutput),
+                           get_safety_config(car.CarParams.SafetyModel.hyundaiCanfd)]
+
       ret.enableBsm = 0x58b in fingerprint[0] # 1419
-      ret.radarOffCan = False
+      ret.radarOffCan = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
+      ret.pcmCruise = not ret.openpilotLongitudinalControl
       if 0x50 in fingerprint[6]: # 80
         ret.flags |= HyundaiFlags.CANFD_HDA2.value
-        ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_HDA2
       else:
         # non-HDA2
         if 0x1cf not in fingerprint[4]: # 463
           ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
-          ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_ALT_BUTTONS
+
+      if ret.openpilotLongitudinalControl:
+        ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_LONG
+      if ret.flags & HyundaiFlags.CANFD_HDA2:
+        ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_HDA2
+      if ret.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
+        ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_ALT_BUTTONS
     else:
+      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
+
       # ignore CAN2 address if L-CAN on the same BUS
       ret.epsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
       ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
@@ -339,10 +341,29 @@ class CarInterface(CarInterfaceBase):
       ret.hasLfaHda = 1157 in fingerprint[0] or 1157 in fingerprint[2]
       ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
       ret.radarOffCan = ret.sccBus == -1
+      ret.pcmCruise = ret.radarOffCan
 
-    ret.pcmCruise = ret.radarOffCan
+    ret.centerToFront = ret.wheelbase * 0.4
+
+    # TODO: get actual value, for now starting with reasonable value for
+    # civic and scaling by mass and wheelbase
+    ret.rotationalInertia = scale_rot_inertia(ret.mass, ret.wheelbase)
+
+    # TODO: start from empirically derived lateral slip stiffness for the civic and scale by
+    # mass and CG position, so all cars will have approximately similar dyn behaviors
+    ret.tireStiffnessFront, ret.tireStiffnessRear = \
+      scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront, tire_stiffness_factor=tire_stiffness_factor)
 
     return ret
+
+
+  @staticmethod
+  def init(CP, logcan, sendcan):
+    if CP.openpilotLongitudinalControl and CANFD_CAR:
+      addr, bus = 0x7d0, 0
+      if CP.flags & HyundaiFlags.CANFD_HDA2.value:
+        addr, bus = 0x730, 5
+      disable_ecu(logcan, sendcan, bus=bus, addr=addr, com_cont_req=b'\x28\x83\x01')
 
 
   def _update(self, c):
