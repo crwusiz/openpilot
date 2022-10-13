@@ -8,6 +8,7 @@ from selfdrive.car.hyundai.values import HyundaiFlags, CAR, Buttons, CarControll
 from selfdrive.car import STD_CARGO_KG, create_button_event, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
+from selfdrive.car.disable_ecu import disable_ecu
 
 ButtonType = car.CarState.ButtonEvent.Type
 EventName = car.CarEvent.EventName
@@ -45,7 +46,7 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalTuning.kiV = [0.1, 0.05]
       ret.longitudinalActuatorDelayLowerBound = 0.3
       ret.longitudinalActuatorDelayUpperBound = 0.3
-      ret.experimentalLongitudinalAvailable = ret.sccBus == 2
+      ret.experimentalLongitudinalAvailable = not ret.sccBus == -1 or ret.sccBus == 2
 
     # WARNING: disabling radar also disables AEB (and we show the same warning on the instrument cluster as if you manually disabled AEB)
     ret.openpilotLongitudinalControl = experimental_long and ret.experimentalLongitudinalAvailable

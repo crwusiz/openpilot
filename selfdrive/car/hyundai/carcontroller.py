@@ -95,6 +95,8 @@ class CarController:
     self.apply_steer_last = apply_steer
     apply_steer = int(round(float(apply_steer)))
 
+    accel = clip(actuators.accel, self.CCP.ACCEL_MIN, self.CCP.ACCEL_MAX)
+
     # HUD messages
     sys_warning, sys_state, left_lane_warning, right_lane_warning = process_hud_alert(CC.enabled, self.car_fingerprint, hud_control)
 
@@ -107,6 +109,9 @@ class CarController:
       self.lkas11_cnt = CS.lkas11["CF_Lkas_MsgCount"]
     self.lkas11_cnt = (self.lkas11_cnt + 1) % 0x10
 
+    can_sends = []
+
+    # >90 degree steering fault prevention
     # Count up to MAX_ANGLE_FRAMES, at which point we need to cut torque to avoid a steering fault
     if CC.latActive and abs(CS.out.steeringAngleDeg) >= MAX_ANGLE:
       self.angle_limit_counter += 1
@@ -120,7 +125,6 @@ class CarController:
     if self.angle_limit_counter >= MAX_ANGLE_FRAMES + MAX_ANGLE_CONSECUTIVE_FRAMES:
       self.angle_limit_counter = 0
 
-    can_sends = []
     can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, lat_active, torque_fault, CS.lkas11, sys_warning,
                                               sys_state, CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning, 0))
 
@@ -241,7 +245,7 @@ class CarController:
     apply_steer = int(round(float(apply_steer)))
 
     # accel + longitudinal
-    accel = clip(actuators.accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
+    accel = clip(actuators.accel, self.CCP.ACCEL_MIN, self.CCP.ACCEL_MAX)
     stopping = actuators.longControlState == LongCtrlState.stopping
     set_speed_in_units = hud_control.setSpeed * (CV.MS_TO_KPH if CS.is_metric else CV.MS_TO_MPH)
 
@@ -253,6 +257,20 @@ class CarController:
       if self.CP.flags & HyundaiFlags.CANFD_HDA2.value:
         addr, bus = 0x730, 5
       can_sends.append([addr, 0, b"\x02\x3E\x80\x00\x00\x00\x00\x00", bus])
+
+    # >90 degree steering fault prevention
+    # Count up to MAX_ANGLE_FRAMES, at which point we need to cut torque to avoid a steering fault
+    if CC.latActive and abs(CS.out.steeringAngleDeg) >= MAX_ANGLE:
+      self.angle_limit_counter += 1
+    else:
+      self.angle_limit_counter = 0
+
+    # Cut steer actuation bit for two frames and hold torque with induced temporary fault
+    torque_fault = CC.latActive and self.angle_limit_counter > MAX_ANGLE_FRAMES
+    lat_active = CC.latActive and not torque_fault
+
+    if self.angle_limit_counter >= MAX_ANGLE_FRAMES + MAX_ANGLE_CONSECUTIVE_FRAMES:
+      self.angle_limit_counter = 0
 
     # CAN-FD platforms
     hda2 = self.CP.flags & HyundaiFlags.CANFD_HDA2
