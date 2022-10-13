@@ -43,6 +43,8 @@ def manager_init() -> None:
     ("LanguageSetting", "main_en"),
     ("OpenpilotEnabledToggle", "1"),
     ("IsMetric", "1"),
+    ("EndToEndLong", "0"),
+    ("ExperimentalLongitudinalEnabled", "0"),
 
     # add
     ("SshEnabled", "1"),
@@ -108,7 +110,13 @@ def manager_init() -> None:
   cloudlog.bind_global(dongle_id=dongle_id, version=get_version(), dirty=is_dirty(),
                        device=HARDWARE.get_device_type())
 
-
+  if os.path.isfile('/data/tmux_error.log'):
+    os.remove('/data/tmux_error.log')
+  if os.path.isfile('/data/can_missing.log'):
+    os.remove('/data/can_missing.log')
+  if os.path.isfile('/data/can_timeout.log'):
+    os.remove('/data/can_timeout.log')
+    
 def manager_prepare() -> None:
   for p in managed_processes.values():
     p.prepare()

@@ -10,6 +10,7 @@ from common.params import Params
 RADAR_START_ADDR = 0x500
 RADAR_MSG_COUNT = 32
 
+
 def get_radar_can_parser(CP):
   if DBC[CP.carFingerprint]['radar'] is None:
     return None
@@ -56,6 +57,7 @@ class RadarInterface(RadarInterfaceBase):
     self.radar_off_can = CP.radarOffCan
     self.rcp = get_radar_can_parser(CP)
 
+
   def update(self, can_strings):
     if self.radar_off_can or (self.rcp is None):
       return super().update(None)
@@ -70,6 +72,7 @@ class RadarInterface(RadarInterfaceBase):
     self.updated_messages.clear()
 
     return rr
+
 
   def _update(self, updated_messages):
     ret = car.RadarData.new_message()

@@ -228,8 +228,8 @@ class CarInterfaceBase(ABC):
       events.add(EventName.wrongGear)
     if cs_out.gearShifter == GearShifter.reverse:
       events.add(EventName.reverseGear)
-    #if not cs_out.cruiseState.available:
-    #  events.add(EventName.wrongCarMode)
+    if not cs_out.cruiseState.available:
+      events.add(EventName.wrongCarMode)
     if cs_out.espDisabled:
       events.add(EventName.espDisabled)
     if cs_out.stockFcw:
@@ -253,6 +253,8 @@ class CarInterfaceBase(ABC):
     for b in cs_out.buttonEvents:
       # Enable OP long on falling edge of enable buttons (defaults to accelCruise and decelCruise, overridable per-port)
       if not self.CP.pcmCruise and (b.type in enable_buttons and not b.pressed):
+        events.add(EventName.buttonEnable)
+      elif self.CP.pcmCruise and (b.type in enable_buttons and b.pressed):
         events.add(EventName.buttonEnable)
       # Disable on rising edge of cancel for both stock and OP long
       if b.type == ButtonType.cancel and b.pressed:

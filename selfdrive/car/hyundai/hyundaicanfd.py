@@ -3,13 +3,12 @@ from selfdrive.car.hyundai.values import HyundaiFlags
 
 def get_e_can_bus(CP):
   # On the CAN-FD platforms, the LKAS camera is on both A-CAN and E-CAN. HDA2 cars
-  # have a a different harness than the HDA1 and non-HDA variants in order to split
+  # have a different harness than the HDA1 and non-HDA variants in order to split
   # a different bus, since the steering is done by different ECUs.
   return 5 if CP.flags & HyundaiFlags.CANFD_HDA2 else 4
 
 
 def create_steering_messages(packer, CP, enabled, lat_active, apply_steer):
-
   ret = []
 
   values = {
@@ -33,11 +32,13 @@ def create_steering_messages(packer, CP, enabled, lat_active, apply_steer):
 
   return ret
 
+
 def create_cam_0x2a4(packer, camera_values):
   camera_values.update({
     "BYTE7": 0,
   })
   return packer.make_can_msg("CAM_0x2a4", 4, camera_values)
+
 
 def create_buttons(packer, cnt, btn):
   values = {
@@ -47,6 +48,7 @@ def create_buttons(packer, cnt, btn):
   }
   return packer.make_can_msg("CRUISE_BUTTONS", 5, values)
 
+
 def create_acc_cancel(packer, CP, cruise_info_copy):
   values = cruise_info_copy
   values.update({
@@ -54,6 +56,7 @@ def create_acc_cancel(packer, CP, cruise_info_copy):
     "CRUISE_INACTIVE": 1,
   })
   return packer.make_can_msg("CRUISE_INFO", get_e_can_bus(CP), values)
+
 
 def create_lfahda_cluster(packer, CP, enabled):
   values = {
@@ -90,7 +93,6 @@ def create_acc_control(packer, CP, enabled, accel, stopping, gas_override, set_s
   }
 
   return packer.make_can_msg("CRUISE_INFO", get_e_can_bus(CP), values)
-
 
 
 def create_adrv_messages(packer, frame):

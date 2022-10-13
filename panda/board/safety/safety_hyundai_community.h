@@ -24,6 +24,7 @@ const int HYUNDAI_COMMUNITY_MIN_ACCEL = -350; // 1/100 m/s2
 bool lcan_bus1, fwd_bus1 = false;
 bool fwd_bus2 = true;
 int lkas11_bus0_cnt, lcan_bus1_cnt, mdps12_cnt, Last_StrColTq = 0;
+int lkas11_op, mdps12_op, clu11_op, scc12_op, ems11_op = 0;
 int mdps12_chksum, eps_bus, scc_bus = -1;
 
 const CanMsg HYUNDAI_COMMUNITY_TX_MSGS[] = {
@@ -54,15 +55,11 @@ AddrCheckStruct hyundai_community_addr_checks[] = {
   {.msg = {{608, 0, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},                    // EMS16
            {881, 0, 8, .expected_timestep = 10000U}, { 0 }}},                                                      // E_EMS11
   {.msg = {{902, 0, 8, .expected_timestep = 20000U}, { 0 }, { 0 }}},                                               // WHL_SPD11
-//  {.msg = {{916, 0, 8, .expected_timestep = 20000U}}},                                                             // TCS13
-//  {.msg = {{902, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 10000U}, { 0 }, { 0 }}},   // WHL_SPD11
-//  {.msg = {{1057, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},  // SCC12
-//  {.msg = {{1265, 0, 4, .check_checksum = false, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}}, // CLU11
+  //{.msg = {{916, 0, 8, .expected_timestep = 20000U}}},                                                             // TCS13
+  //{.msg = {{1057, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},  // SCC12
 };
 
 #define HYUNDAI_COMMUNITY_ADDR_CHECK_LEN (sizeof(hyundai_community_addr_checks) / sizeof(hyundai_community_addr_checks[0]))
-
-const int HYUNDAI_COMMUNITY_PARAM_LONGITUDINAL = 4;
 
 addr_checks hyundai_community_rx_checks = {hyundai_community_addr_checks, HYUNDAI_COMMUNITY_ADDR_CHECK_LEN};
 
@@ -149,6 +146,7 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
   if (!valid) {
     puts("  CAN RX invalid addr : ["); puth(addr); puts("]\n");
   }
+
   if ((bus == 1) && lcan_bus1) {
     valid = false;
   }
@@ -218,15 +216,25 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
   }
 
   if (valid) {
-    // longitudinal control ( SCC11, SCC12 )
-    if (addr == 1056) {
+    if ((addr == 1056) && !scc12_op) {  // SCC11
       // 2 bits: 13-14
       int cruise_engaged = GET_BYTES_04(to_push) & 0x1; // ACC main_on signal
-    hyundai_common_cruise_state_check(cruise_engaged);
-  }
+      hyundai_common_cruise_state_check(cruise_engaged);
+    }
 
-    // MDPS12
-    if ((addr == 593) && (bus == eps_bus)) {
+    /*if (((addr == 1057) && (bus == 0)) || (bus == 2)) {  // SCC12
+      // 2 bits: 13-14
+      int cruise_engaged = (GET_BYTES_04(to_push) >> 13) & 0x3U;
+      hyundai_common_cruise_state_check(cruise_engaged);
+    }*/
+
+    /*if ((addr == 608) && (bus == 0) && (scc_bus == -1) && (!scc12_op)) {  // EMS16
+      // bit 25
+      int cruise_engaged = (GET_BYTES_04(to_push) >> 25 & 0x1); // ACC main_on signal
+      hyundai_common_cruise_state_check(cruise_engaged);
+    }*/
+    
+    if ((addr == 593) && (bus == eps_bus)) {  // MDPS12
       int torque_driver_new = ((GET_BYTES_04(to_push) & 0x7ffU) * 0.79) - 808; // scale down new driver torque signal to match previous one
       // update array of samples
       update_sample(&torque_driver, torque_driver_new);
@@ -259,8 +267,6 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
 }
 
 static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_allowed) {
-  //UNUSED(longitudinal_allowed);
-
   int tx = 1;
   int addr = GET_ADDR(to_send);
   int bus = GET_BUS(to_send);
@@ -309,6 +315,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
 
   // LKA STEER: safety check
   if (addr == 832) {  // LKAS11
+    lkas11_op = 20;
     int desired_torque = ((GET_BYTES_04(to_send) >> 16) & 0x7ffU) - 1024U;
     uint32_t ts = microsecond_timer_get();
     bool violation = 0;
@@ -373,6 +380,23 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
       tx = 0;
     }
   }
+
+  if (addr == 593) {
+    mdps12_op = 20;
+  }  // MDPS12
+
+  if (addr == 790) {
+    ems11_op = 20;
+  }  // EMS11
+
+  if (addr == 1057) {
+    scc12_op = 20;
+  }  // SCC12
+
+  if ((addr == 1265) && (bus == 1)) {
+    clu11_op = 20;
+  }  // CLU11
+
   return tx;
 }
 
@@ -385,40 +409,49 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   // forward LKAS to CCAN
   if (fwd_bus2) {
     if (bus_num == 0) {
-      if ((addr != 1265) || (eps_bus == 0)) {  // CLU11
-        if (addr != 593) {  // MDPS12
-          if (addr != 790) {  // EMS11
+      if (!clu11_op || (addr != 1265) || (eps_bus == 0)) {  // CLU11
+        if (!mdps12_op || (addr != 593)) {  // MDPS12
+          if (!ems11_op || (addr != 790)) {  // EMS11
             bus_fwd = fwd_to_bus1 == 1 ? 12 : 2;
           } else {  // OP create EMS11 for MDPS
             bus_fwd = 2;
+            ems11_op -= 1;
           }
         } else {  // OP create MDPS for LKAS
           bus_fwd = fwd_to_bus1;
+          mdps12_op -= 1;
         }
       } else {  // OP create CLU12 for MDPS
         bus_fwd = 2;
+        clu11_op -= 1;
       }
     }
     if ((bus_num == 1) && fwd_bus1) {
-      if (addr != 593) {  // MDPS12
-        if ((addr != 1056) && (addr != 1057) && (addr != 1290) && (addr != 905)) {
+      if (!mdps12_op || (addr != 593)) {  // MDPS12
+        if (!scc12_op || ((addr != 1056) && (addr != 1057) && (addr != 1290) && (addr != 905))) {
           bus_fwd = 20;
         } else {  // OP create SCC11 SCC12 SCC13 SCC14 for Car
           bus_fwd = 2;
+          scc12_op -= 1;
         }
       } else {  // OP create MDPS for LKAS
         bus_fwd = 0;
+        mdps12_op -= 1;
       }
     }
     if (bus_num == 2) {
-      if ((addr != 832) && (addr != 1157)) {  // LKAS11 , LFAHDA_MFC
-        if ((addr != 1056) && (addr != 1057) && (addr != 1290) && (addr != 905)) {
+      if ((!lkas11_op || (addr != 832)) && (addr != 1157)) {
+        if (!scc12_op || ((addr != 1056) && (addr != 1057) && (addr != 1290) && (addr != 905))) {
           bus_fwd = fwd_to_bus1 == 1 ? 10 : 0;
         } else {  // OP create SCC11 SCC12 SCC13 SCC14 for Car
           bus_fwd = fwd_to_bus1;
+          scc12_op -= 1;
         }
       } else if (eps_bus == 0) {  // OP create LKAS and LFA for Car
         bus_fwd = fwd_to_bus1;
+        lkas11_op -= 1;
+      } else {  // OP create LKAS and LFA for Car and MDPS
+        lkas11_op -= 1;
       }
     }
   } else {
@@ -433,9 +466,7 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
 }
 
 static const addr_checks* hyundai_community_init(uint16_t param) {
-  //UNUSED(param);
-  hyundai_longitudinal = GET_FLAG(param, HYUNDAI_COMMUNITY_PARAM_LONGITUDINAL);
-  hyundai_last_button_interaction = HYUNDAI_PREV_BUTTON_SAMPLES;
+  hyundai_common_init(param);
 
   hyundai_community_rx_checks = (addr_checks) {hyundai_community_addr_checks, HYUNDAI_COMMUNITY_ADDR_CHECK_LEN};
   return &hyundai_community_rx_checks;

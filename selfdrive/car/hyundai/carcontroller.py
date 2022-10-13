@@ -21,6 +21,7 @@ MAX_ANGLE = 85
 MAX_ANGLE_FRAMES = 89
 MAX_ANGLE_CONSECUTIVE_FRAMES = 2
 
+
 def process_hud_alert(enabled, fingerprint, hud_control):
   sys_warning = (hud_control.visualAlert in (VisualAlert.steerRequired, VisualAlert.ldw))
 
@@ -164,6 +165,7 @@ class CarController:
     self.frame += 1
     return new_actuators, can_sends
 
+
   def update_auto_resume(self, CC, CS, clu11_speed, can_sends):
     # fix auto resume - by neokii
     if CC.cruiseControl.resume and not CS.out.gasPressed:
@@ -188,6 +190,7 @@ class CarController:
 
     elif self.last_lead_distance != 0:
       self.last_lead_distance = 0
+
 
   def update_scc(self, CC, CS, actuators, controls, hud_control, can_sends):
     # scc smoother

@@ -1,6 +1,5 @@
 import copy
 import random
-
 import numpy as np
 
 from cereal import car
@@ -34,6 +33,7 @@ ButtonPrev = ButtonType.unknown
 ButtonCnt = 0
 LongPressed = False
 
+
 class SccSmoother:
   @staticmethod
   def get_alive_count():
@@ -44,6 +44,7 @@ class SccSmoother:
     if AliveIndex >= len(ALIVE_COUNT):
       AliveIndex = 0
     return count
+
 
   @staticmethod
   def get_wait_count():
@@ -58,6 +59,7 @@ class SccSmoother:
 
   def kph_to_clu(self, kph):
     return int(kph * CV.KPH_TO_MS * self.speed_conv_to_clu)
+
 
   def __init__(self, CP):
     self.btn = Buttons.NONE
@@ -90,8 +92,10 @@ class SccSmoother:
     self.longcontrol = CP.openpilotLongitudinalControl
     self.can_fd = CP.carFingerprint in CANFD_CAR
 
+
   def read_param(self):
     self.is_metric = Params().get_bool("IsMetric")
+
 
   def reset(self):
     self.btn = Buttons.NONE
@@ -106,6 +110,7 @@ class SccSmoother:
     self.slowing_down_alert = False
     self.slowing_down_sound_alert = False
 
+
   @staticmethod
   def create_clu11(packer, bus, clu11, button):
     values = copy.copy(clu11)
@@ -113,8 +118,10 @@ class SccSmoother:
     values["CF_Clu_AliveCnt1"] = (values["CF_Clu_AliveCnt1"] + 1) % 0x10
     return packer.make_can_msg("CLU11", bus, values)
 
+
   def is_active(self, frame):
     return frame - self.started_frame <= max(ALIVE_COUNT) + max(WAIT_COUNT)
+
 
   def inject_events(self, events):
     if self.slowing_down_sound_alert:
@@ -122,6 +129,7 @@ class SccSmoother:
       events.add(EventName.slowingDownSpeedSound)
     elif self.slowing_down_alert:
       events.add(EventName.slowingDownSpeed)
+
 
   def cal_max_speed(self, frame, CC, CS, sm, clu_speed, controls):
     # kph
@@ -173,6 +181,7 @@ class SccSmoother:
     self.update_max_speed(int(max_speed_clu + 0.5))
 
     return road_limit_speed, left_dist
+
 
   def update(self, enabled, can_sends, packer, CC, CS, frame, controls):
     if self.param_read_counter % 100 == 0:
@@ -235,6 +244,7 @@ class SccSmoother:
       if self.longcontrol:
         self.target_speed = 0.
 
+
   def get_button(self, current_set_speed):
     if self.target_speed < self.min_set_speed_clu:
       return Buttons.NONE
@@ -245,11 +255,13 @@ class SccSmoother:
 
     return Buttons.RES_ACCEL if error > 0 else Buttons.SET_DECEL
 
+
   def get_lead(self, sm):
     radar = sm['radarState']
     if radar.leadOne.status:
       return radar.leadOne
     return None
+
 
   def get_long_lead_speed(self, CS, clu_speed, sm):
     if self.longcontrol:
@@ -268,6 +280,7 @@ class SccSmoother:
             target_speed = max(target_speed, self.min_set_speed_clu)
             return target_speed
     return 0
+
 
   def cal_curve_speed(self, sm, v_ego, frame):
     if frame % 20 == 0:
@@ -295,6 +308,7 @@ class SccSmoother:
       else:
         self.curve_speed_ms = 255.
 
+
   def cal_target_speed(self, CS, clu_speed, controls):
     if not self.longcontrol:
       if CS.out.gasPressed and CS.cruise_buttons[-1] == Buttons.NONE:
@@ -312,6 +326,7 @@ class SccSmoother:
           set_speed = clip(clu_speed + SYNC_MARGIN, self.min_set_speed_clu, self.max_set_speed_clu)
           self.target_speed = set_speed
 
+
   def update_max_speed(self, max_speed):
     if not self.longcontrol or self.max_speed_clu <= 0:
       self.max_speed_clu = max_speed
@@ -320,6 +335,7 @@ class SccSmoother:
       error = max_speed - self.max_speed_clu
       self.max_speed_clu = self.max_speed_clu + error * kp
 
+
   def get_apply_accel(self, CS, accel):
     boost_v = 0.5
     start_boost = interp(CS.out.vEgo, [CREEP_SPEED, 2 * CREEP_SPEED], [boost_v, 0.0])
@@ -327,6 +343,7 @@ class SccSmoother:
     boost = start_boost * is_accelerating
     accel += boost
     return accel
+
 
   @staticmethod
   def update_v_cruise(v_cruise_kph, buttonEvents, enabled, metric):

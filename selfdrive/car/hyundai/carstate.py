@@ -12,6 +12,7 @@ from selfdrive.car.interfaces import CarStateBase
 PREV_BUTTON_SAMPLES = 8
 CLUSTER_SAMPLE_RATE = 20  # frames
 
+
 class CarState(CarStateBase):
   def __init__(self, CP):
     super().__init__(CP)
@@ -55,6 +56,7 @@ class CarState(CarStateBase):
     self.cluster_speed_counter = CLUSTER_SAMPLE_RATE
 
     self.CCP = CarControllerParams(CP)
+
 
   def update(self, cp, cp2, cp_cam):
     if self.CP.carFingerprint in CANFD_CAR:
@@ -100,9 +102,7 @@ class CarState(CarStateBase):
     ret.yawRate = cp.vl["ESP12"]["YAW_RATE"]
     ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["CGW1"]["CF_Gway_TurnSigLh"],
                                                                       cp.vl["CGW1"]["CF_Gway_TurnSigRh"])
-
     self.eps_error_cnt += 1 if not ret.standstill and cp_eps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 else -self.eps_error_cnt
-
     ret.steerFaultTemporary = self.eps_error_cnt > 100
 
     if self.CP.enableAutoHold:
@@ -206,6 +206,7 @@ class CarState(CarStateBase):
 
     return ret
 
+
   def update_canfd(self, cp, cp_cam):
     ret = car.CarState.new_message()
 
@@ -239,7 +240,6 @@ class CarState(CarStateBase):
 
     ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["BLINKERS"]["LEFT_LAMP"],
                                                                       cp.vl["BLINKERS"]["RIGHT_LAMP"])
-
     ret.cruiseState.available = True
     ret.cruiseState.enabled = cp.vl["SCC1"]["CRUISE_ACTIVE"] == 1
     self.is_metric = cp.vl["CLUSTER_INFO"]["DISTANCE_UNIT"] != 1
@@ -274,6 +274,7 @@ class CarState(CarStateBase):
     ret.vEgoCluster = self.cluster_speed * self.speed_conv
 
     return ret
+
 
   @staticmethod
   def get_can_parser(CP):
@@ -497,6 +498,7 @@ class CarState(CarStateBase):
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 0, enforce_checks=False)
 
+
   @staticmethod
   def get_can2_parser(CP):
     if CP.carFingerprint in CANFD_CAR:
@@ -582,6 +584,7 @@ class CarState(CarStateBase):
         ("SCC12", 50),
       ]
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 1, enforce_checks=False)
+
 
   @staticmethod
   def get_cam_can_parser(CP):
@@ -706,9 +709,9 @@ class CarState(CarStateBase):
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 2, enforce_checks=False)
 
+
   @staticmethod
   def get_can_parser_canfd(CP):
-
     cruise_btn_msg = "CRUISE_BUTTONS_ALT" if CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS else "CRUISE_BUTTONS"
     signals = [
       ("WHEEL_SPEED_1", "WHEEL_SPEEDS"),
@@ -723,6 +726,7 @@ class CarState(CarStateBase):
       ("STEERING_ANGLE", "STEERING_SENSORS"),
       ("STEERING_COL_TORQUE", "MDPS"),
       ("STEERING_OUT_TORQUE", "MDPS"),
+      ("LKA_FAULT", "MDPS"),
 
       ("CRUISE_ACTIVE", "SCC1"),
       ("COUNTER", cruise_btn_msg),
@@ -776,6 +780,7 @@ class CarState(CarStateBase):
 
     bus = 5 if CP.flags & HyundaiFlags.CANFD_HDA2 else 4
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, bus, enforce_checks=False)
+
 
   @staticmethod
   def get_cam_can_parser_canfd(CP):
