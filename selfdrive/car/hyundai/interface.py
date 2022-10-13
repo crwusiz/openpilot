@@ -316,8 +316,6 @@ class CarInterface(CarInterfaceBase):
         if 0x1cf not in fingerprint[4]: # 463
           ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
 
-      if ret.openpilotLongitudinalControl:
-        ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_LONG
       if ret.flags & HyundaiFlags.CANFD_HDA2:
         ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_HDA2
       if ret.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
@@ -343,6 +341,13 @@ class CarInterface(CarInterfaceBase):
       ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
       ret.radarOffCan = ret.sccBus == -1
       ret.pcmCruise = ret.radarOffCan
+
+    #if ret.openpilotLongitudinalControl:
+    #  ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
+    #if candidate in HYBRID_CAR:
+    #  ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
+    #elif candidate in EV_CAR:
+    #  ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
 
     ret.centerToFront = ret.wheelbase * 0.4
 
