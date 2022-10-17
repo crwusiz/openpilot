@@ -262,17 +262,6 @@ class CarState(CarStateBase):
 
     self.acc_mode = cp.vl["SCC1"]["CRUISE_ACTIVE"] == 1
 
-    self.cluster_speed_counter += 1
-    if self.cluster_speed_counter > CLUSTER_SAMPLE_RATE:
-      self.cluster_speed = cp.vl["CLU15"]["CF_Clu_VehicleSpeed"]
-      self.cluster_speed_counter = 0
-
-      # mimic how dash converts to imperial
-      if not self.is_metric:
-        self.cluster_speed = math.floor(self.cluster_speed * CV.KPH_TO_MPH + CV.KPH_TO_MPH)
-
-    ret.vEgoCluster = self.cluster_speed * self.speed_conv
-
     return ret
 
 

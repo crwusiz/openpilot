@@ -235,6 +235,7 @@ class CarController:
 
   def update_canfd(self, CC, CS, controls):
     actuators = CC.actuators
+    hud_control = CC.hudControl
 
     # Steering Torque
     steer = actuators.steer
