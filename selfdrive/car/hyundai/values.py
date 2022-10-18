@@ -336,6 +336,19 @@ FW_QUERY_CONFIG = FwQueryConfig(
       [HYUNDAI_VERSION_RESPONSE],
       whitelist_ecus=[Ecu.engine, Ecu.transmission, Ecu.eps, Ecu.abs, Ecu.fwdRadar],
     ),
+    # CAN-FD queries
+    Request(
+      [HYUNDAI_VERSION_REQUEST_LONG],
+      [HYUNDAI_VERSION_RESPONSE],
+      whitelist_ecus=[Ecu.fwdRadar],
+      bus=4,
+    ),
+    Request(
+      [HYUNDAI_VERSION_REQUEST_LONG],
+      [HYUNDAI_VERSION_RESPONSE],
+      whitelist_ecus=[Ecu.fwdCamera, Ecu.adas],
+      bus=5,
+    ),
   ],
   extra_ecus=[
     (Ecu.adas, 0x730, None),  # ADAS Driving ECU on HDA2 platforms
