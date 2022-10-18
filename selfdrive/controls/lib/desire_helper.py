@@ -42,6 +42,8 @@ class DesireHelper:
     self.keep_pulse_timer = 0.0
     self.prev_one_blinker = False
     self.desire = log.LateralPlan.Desire.none
+    self.blinker = log.LateralPlan.Blinker.none
+
     self.auto_lane_change_enabled = Params().get_bool('AutoLaneChangeEnabled')
     self.auto_lane_change_timer = 0.0
     self.prev_torque_applied = False
@@ -114,6 +116,8 @@ class DesireHelper:
 
     self.prev_one_blinker = one_blinker
     self.desire = DESIRES[self.lane_change_direction][self.lane_change_state]
+    # TODO use a dict
+    self.blinker = log.LateralPlan.Blinker.left if carstate.leftBlinker else log.LateralPlan.Blinker.right if carstate.rightBlinker else log.LateralPlan.Blinker.none
 
     # Send keep pulse once per second during LaneChangeStart.preLaneChange
     if self.lane_change_state in (LaneChangeState.off, LaneChangeState.laneChangeStarting):

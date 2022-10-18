@@ -21,7 +21,7 @@ LATERAL_JERK_COST = 0.05
 # when it does not cause bad jerk.
 # TODO this cost should be lowered when low
 # speed lateral control is stable on all cars
-STEERING_RATE_COST = 800.0
+STEERING_RATE_COST = 80.0
 
 MIN_SPEED = .3
 
@@ -140,6 +140,7 @@ class LateralPlanner:
     lateralPlan.solverExecutionTime = self.lat_mpc.solve_time
 
     lateralPlan.desire = self.DH.desire
+    lateralPlan.blinker = self.DH.blinker
     lateralPlan.useLaneLines = False
     lateralPlan.laneChangeState = self.DH.lane_change_state
     lateralPlan.laneChangeDirection = self.DH.lane_change_direction

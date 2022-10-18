@@ -116,6 +116,7 @@ void run_model(ModelState &model, VisionIpcClient &vipc_client_main, VisionIpcCl
     // TODO: path planner timeout?
     sm.update(0);
     int desire = ((int)sm["lateralPlan"].getLateralPlan().getDesire());
+    int blinker = ((int)sm["lateralPlan"].getLateralPlan().getBlinker());
     bool is_rhd = ((bool)sm["driverMonitoringState"].getDriverMonitoringState().getIsRHD());
     frame_id = sm["roadCameraState"].getRoadCameraState().getFrameId();
     if (sm.updated("liveCalibration")) {
@@ -130,8 +131,14 @@ void run_model(ModelState &model, VisionIpcClient &vipc_client_main, VisionIpcCl
     }
 
     float vec_desire[DESIRE_LEN] = {0};
-    if (desire >= 0 && desire < DESIRE_LEN) {
-      vec_desire[desire] = 1.0;
+    // TODO clean this up
+    if (desire == 3) {
+      vec_desire[2] = 1.0;
+    } else if (desire == 4) {
+      vec_desire[3] = 1.0;
+    }
+    if (blinker > 0 && blinker <= DESIRE_PULSE_START) {
+      vec_desire[blinker-1] = 1.0;
     }
 
     // tracked dropped frames

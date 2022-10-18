@@ -1021,8 +1021,9 @@ struct LateralPlan @0xe1e9318e2ae8b51e {
   curvatureRates @28 :List(Float32);
 
   solverExecutionTime @30 :Float32;
+  blinker @32 :Blinker;
 
-  autoLaneChangeEnabled @32 :Bool;
+  autoLaneChangeEnabled @34 :Bool;
   autoLaneChangeTimer @33 :Int8;
 
   enum Desire {
@@ -1043,6 +1044,12 @@ struct LateralPlan @0xe1e9318e2ae8b51e {
   }
 
   enum LaneChangeDirection {
+    none @0;
+    left @1;
+    right @2;
+  }
+
+  enum Blinker {
     none @0;
     left @1;
     right @2;

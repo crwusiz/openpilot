@@ -18,7 +18,9 @@
 
 constexpr int FEATURE_LEN = 128;
 constexpr int HISTORY_BUFFER_LEN = 99;
-constexpr int DESIRE_LEN = 8;
+constexpr int DESIRE_LEN = 4;
+constexpr int DESIRE_OUTPUT_LEN = 8;
+constexpr int DESIRE_PULSE_START = 2;
 constexpr int DESIRE_PRED_LEN = 4;
 constexpr int TRAFFIC_CONVENTION_LEN = 2;
 constexpr int MODEL_FREQ = 20;
@@ -220,11 +222,11 @@ struct ModelOutputDesireProb {
       float null;
     };
     struct {
-      std::array<float, DESIRE_LEN> array;
+      std::array<float, DESIRE_OUTPUT_LEN> array;
     };
   };
 };
-static_assert(sizeof(ModelOutputDesireProb) == sizeof(float)*DESIRE_LEN);
+static_assert(sizeof(ModelOutputDesireProb) == sizeof(float)*DESIRE_OUTPUT_LEN);
 
 struct ModelOutputMeta {
   ModelOutputDesireProb desire_state_prob;
