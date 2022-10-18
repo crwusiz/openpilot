@@ -475,7 +475,7 @@ location set</source>
     </message>
 </context>
 <context>
-    <name>NvgWindow</name>
+    <name>AnnotatedCameraWidget</name>
     <message>
         <source>km/h</source>
         <translation type="vanished">กม./ชม.</translation>

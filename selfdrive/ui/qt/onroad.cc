@@ -20,7 +20,7 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   stacked_layout->setStackingMode(QStackedLayout::StackAll);
   main_layout->addLayout(stacked_layout);
 
-  nvg = new NvgWindow(VISION_STREAM_ROAD, this);
+  nvg = new AnnotatedCameraWidget(VISION_STREAM_ROAD, this);
 
   QWidget * split_wrapper = new QWidget;
   split = new QHBoxLayout(split_wrapper);
@@ -29,7 +29,7 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   split->addWidget(nvg);
 
   if (getenv("DUAL_CAMERA_VIEW")) {
-    CameraViewWidget *arCam = new CameraViewWidget("camerad", VISION_STREAM_ROAD, true, this);
+    CameraWidget *arCam = new CameraWidget("camerad", VISION_STREAM_ROAD, true, this);
     split->insertWidget(0, arCam);
   }
 
@@ -175,8 +175,8 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
   }
 }
 
-// NvgWindow
-NvgWindow::NvgWindow(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraViewWidget("camerad", type, true, parent) {
+
+AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraWidget("camerad", type, true, parent) {
   pm = std::make_unique<PubMaster, const std::initializer_list<const char *>>({"uiDebug"});
 
   engage_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
@@ -223,7 +223,7 @@ static const QString get_tpms_text(float tpms) {
     return QString(str);
 }
 
-void NvgWindow::updateState(const UIState &s) {
+void AnnotatedCameraWidget::updateState(const UIState &s) {
   const SubMaster &sm = *(s.sm);
   const auto cs = sm["controlsState"].getControlsState();
   const auto cc = sm["carControl"].getCarControl();
@@ -311,13 +311,13 @@ void NvgWindow::updateState(const UIState &s) {
   setProperty("frictionRaw", tp.getFrictionCoefficientRaw());
 
   if (s.scene.calibration_valid) {
-    CameraViewWidget::updateCalibration(s.scene.view_from_calib);
+    CameraWidget::updateCalibration(s.scene.view_from_calib);
   } else {
-    CameraViewWidget::updateCalibration(DEFAULT_CALIBRATION);
+    CameraWidget::updateCalibration(DEFAULT_CALIBRATION);
   }
 }
 
-void NvgWindow::drawHud(QPainter &p) {
+void AnnotatedCameraWidget::drawHud(QPainter &p) {
   p.save();
 
   // Header gradient
@@ -732,7 +732,7 @@ void NvgWindow::drawHud(QPainter &p) {
   p.setOpacity(1.);
 }
 
-int NvgWindow::devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, const QColor &color) {
+int AnnotatedCameraWidget::devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, const QColor &color) {
   configFont(p, "Open Sans", 45, "SemiBold");
   drawTextColor(p, x + 92, y + 80, QString(value), color);
   configFont(p, "Open Sans", 28, "Regular");
@@ -748,7 +748,7 @@ int NvgWindow::devUiDrawElement(QPainter &p, int x, int y, const char* value, co
   return 110;
 }
 
-void NvgWindow::drawRightDevUi(QPainter &p, int x, int y) {
+void AnnotatedCameraWidget::drawRightDevUi(QPainter &p, int x, int y) {
   int rh = 5;
   int ry = y;
 
@@ -847,7 +847,10 @@ void NvgWindow::drawRightDevUi(QPainter &p, int x, int y) {
   p.drawRoundedRect(ldu, 20, 20);
 }
 
-void NvgWindow::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
+// Window that shows camera view and variety of
+// info drawn on top
+
+void AnnotatedCameraWidget::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
   p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
@@ -855,7 +858,7 @@ void NvgWindow::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, flo
   p.drawPixmap(x - img_size / 2, y - img_size / 2, img);
 }
 
-void NvgWindow::drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity, float angle) {
+void AnnotatedCameraWidget::drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity, float angle) {
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
   p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
@@ -869,22 +872,22 @@ void NvgWindow::drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush b
   p.restore();
 }
 
-void NvgWindow::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
+void AnnotatedCameraWidget::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
   QRect real_rect = getTextRect(p, 0, text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
   p.setPen(QColor(0xff, 0xff, 0xff, alpha));
   p.drawText(real_rect.x(), real_rect.bottom(), text);
 }
 
-void NvgWindow::drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color) {
+void AnnotatedCameraWidget::drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color) {
   QRect real_rect = getTextRect(p, 0, text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
   p.setPen(color);
   p.drawText(real_rect.x(), real_rect.bottom(), text);
 }
 
-void NvgWindow::initializeGL() {
-  CameraViewWidget::initializeGL();
+void AnnotatedCameraWidget::initializeGL() {
+  CameraWidget::initializeGL();
   qInfo() << "OpenGL version:" << QString((const char*)glGetString(GL_VERSION));
   qInfo() << "OpenGL vendor:" << QString((const char*)glGetString(GL_VENDOR));
   qInfo() << "OpenGL renderer:" << QString((const char*)glGetString(GL_RENDERER));
@@ -894,8 +897,8 @@ void NvgWindow::initializeGL() {
   setBackgroundColor(bg_colors[STATUS_DISENGAGED]);
 }
 
-void NvgWindow::updateFrameMat() {
-  CameraViewWidget::updateFrameMat();
+void AnnotatedCameraWidget::updateFrameMat() {
+  CameraWidget::updateFrameMat();
   UIState *s = uiState();
   int w = width(), h = height();
 
@@ -912,7 +915,7 @@ void NvgWindow::updateFrameMat() {
       .translate(-intrinsic_matrix.v[2], -intrinsic_matrix.v[5]);
 }
 
-void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
+void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
   painter.save();
   const UIScene &scene = s->scene;
   // lanelines
@@ -986,7 +989,7 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
   painter.restore();
 }
 
-void NvgWindow::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd, bool is_radar) {
+void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd, bool is_radar) {
   painter.save();
   const float speedBuff = 10.;
   const float leadBuff = 40.;
@@ -1021,7 +1024,7 @@ void NvgWindow::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV
   painter.restore();
 }
 
-void NvgWindow::drawStopLine(QPainter &painter, const UIState *s, const cereal::ModelDataV2::StopLineData::Reader &stop_line_data, const QPolygonF &vd) {
+void AnnotatedCameraWidget::drawStopLine(QPainter &painter, const UIState *s, const cereal::ModelDataV2::StopLineData::Reader &stop_line_data, const QPolygonF &vd) {
     painter.save();
 
     float prob = stop_line_data.getProb();
@@ -1032,13 +1035,13 @@ void NvgWindow::drawStopLine(QPainter &painter, const UIState *s, const cereal::
     painter.restore();
 }
 
-void NvgWindow::paintGL() {
+void AnnotatedCameraWidget::paintGL() {
   const double start_draw_t = millis_since_boot();
 
   UIState *s = uiState();
   const cereal::ModelDataV2::Reader &model = (*s->sm)["modelV2"].getModelV2();
-  CameraViewWidget::setFrameId(model.getFrameId());
-  CameraViewWidget::paintGL();
+  CameraWidget::setFrameId(model.getFrameId());
+  CameraWidget::paintGL();
 
   QPainter painter(this);
   painter.setRenderHint(QPainter::Antialiasing);
@@ -1077,8 +1080,8 @@ void NvgWindow::paintGL() {
   pm->send("uiDebug", msg);
 }
 
-void NvgWindow::showEvent(QShowEvent *event) {
-  CameraViewWidget::showEvent(event);
+void AnnotatedCameraWidget::showEvent(QShowEvent *event) {
+  CameraWidget::showEvent(event);
 
   ui_update_params(uiState());
   prev_draw_t = millis_since_boot();
