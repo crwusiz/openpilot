@@ -515,14 +515,13 @@ struct CarParams {
     safetyParam2DEPRECATED @2 :UInt32;
   }
 
-  epsBus @80: Int8;
-  sasBus @72: Int8;
-  sccBus @73: Int8;
-  enableAutoHold @74 :Bool;
-  hasScc13 @75 :Bool;
-  hasScc14 @76 :Bool;
-  hasEms @77 :Bool;
-  hasLfaHda @78 :Bool;
+  epsBus @72: Int8;
+  sasBus @73: Int8;
+  sccBus @74: Int8;
+  enableAutoHold @75 :Bool;
+  hasScc13 @76 :Bool;
+  hasScc14 @77 :Bool;
+  hasEms @78 :Bool;
   aebFcw @79 :Bool;
 
   struct LateralParams {

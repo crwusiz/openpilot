@@ -1,7 +1,7 @@
 import copy
 
 import crcmod
-from selfdrive.car.hyundai.values import CAR, CHECKSUM, EV_CAR, HEV_CAR
+from selfdrive.car.hyundai.values import CAR, CHECKSUM
 from common.params import Params
 
 hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
@@ -62,35 +62,6 @@ def create_clu11(packer, bus, button, speed, clu11):
   return packer.make_can_msg("CLU11", bus, values)
 
 
-def create_lfahda_mfc(packer, enabled, active):
-  values = {
-    "LFA_Icon_State": 2 if enabled else 0,
-    "HDA_Active": 1 if active > 0 else 0,
-    "HDA_Icon_State": 2 if active > 0 else 0,
-    #"HDA_VSetReq": 0,
-  }
-  return packer.make_can_msg("LFAHDA_MFC", 0, values)
-
-
-def create_hda_mfc(packer, active, CS, left_lane, right_lane):
-  values = copy.copy(CS.lfahda_mfc)
-
-  ldwSysState = 0
-  if left_lane:
-    ldwSysState += 1
-  if right_lane:
-    ldwSysState += 2
-
-  values["HDA_LdwSysState"] = ldwSysState
-  values["HDA_USM"] = 2
-  values["HDA_VSetReq"] = 100
-  values["HDA_Icon_Wheel"] = 1 if active > 1 and CS.out.cruiseState.enabled else 0
-  values["HDA_Icon_State"] = 2 if active > 1 else 0
-  values["HDA_Chime"] = 1 if active > 1 else 0
-
-  return packer.make_can_msg("LFAHDA_MFC", 0, values)
-
-
 def create_mdps12(packer, frame, mdps12):
   values = copy.copy(mdps12)
 
@@ -106,80 +77,104 @@ def create_mdps12(packer, frame, mdps12):
   return packer.make_can_msg("MDPS12", 2, values)
 
 
-def create_scc11(packer, frame, enabled, set_speed, scc_live, scc11):
-  values = copy.copy(scc11)
+def create_scc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, set_speed, stopping, long_override, scc_live, CS):
+  commands = []
 
-  values["AliveCounterACC"] = frame // 2 % 0x10
+  values = copy.copy(CS.scc11)
+  values["AliveCounterACC"] = idx % 0x10
 
   if not scc_live:
     values["MainMode_ACC"] = 1
+    values["TauGapSet"] = 4
+    values["ObjValid"] = 1  # close lead makes controls tighter
+    values["ACC_ObjStatus"] = 1  # close lead makes controls tighter
+    values["ACC_ObjLatPos"] = 0
+    values["ACC_ObjRelSpd"] = 0
+    values["ACC_ObjDist"] = 1  # close lead makes controls tighter
     values["VSetDis"] = set_speed
-    values["ObjValid"] = 1 if enabled else 0
     values["DriverAlertDisplay"] = 0
-    #values["ACC_ObjStatus"] = 0
+  commands.append(packer.make_can_msg("SCC11", 0, values))
 
-  return packer.make_can_msg("SCC11", 0, values)
+  values = copy.copy(CS.scc12)
+  if not scc_live:
+    values["ACCMode"] = 2 if enabled and long_override else 1 if enabled else 0
 
-
-def create_scc12(packer, apply_accel, enabled, cnt, scc_live, scc12, gaspressed, brakepressed, standstill, car_fingerprint):
-  values = copy.copy(scc12)
-
-  if car_fingerprint in (EV_CAR | HEV_CAR):
-    if enabled and not brakepressed:
-      values["ACCMode"] = 2 if gaspressed and (apply_accel > -0.2) else 1
-      if apply_accel < 0.0 and standstill:
-        values["StopReq"] = 1
-      values["aReqRaw"] = apply_accel
-      values["aReqValue"] = apply_accel
-    else:
-      values["ACCMode"] = 0
-      values["aReqRaw"] = 0
-      values["aReqValue"] = 0
-    if not scc_live:
-      values["CR_VSM_Alive"] = cnt
-
-  else:
-    values["aReqRaw"] = apply_accel if enabled else 0  # aReqMax
-    values["aReqValue"] = apply_accel if enabled else 0  # aReqMin
-    values["CR_VSM_Alive"] = cnt
-    if not scc_live:
-      values["ACCMode"] = 1 if enabled else 0  # 2 if gas padel pressed
-
+  values["StopReq"] = 1 if stopping else 0
+  values["aReqRaw"] = accel
+  values["aReqValue"] = accel  # stock ramps up and down respecting jerk limit until it reaches aReqRaw
+  values["CR_VSM_Alive"] = idx % 0xF
   values["CR_VSM_ChkSum"] = 0
-  dat = packer.make_can_msg("SCC12", 0, values)[2]
-  values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in dat) % 0x10
+  scc12_dat = packer.make_can_msg("SCC12", 0, values)[2]
+  values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in scc12_dat) % 0x10
 
-  return packer.make_can_msg("SCC12", 0, values)
+  commands.append(packer.make_can_msg("SCC12", 0, values))
+
+  if CS.has_scc13:
+    values = copy.copy(CS.scc13)
+    values["SCCDrvModeRValue"] = 2
+    values["SCC_Equip"] = 1
+    values["Lead_Veh_Dep_Alert_USM"] = 2
+    commands.append(packer.make_can_msg("SCC13", 0, values))
+
+  if CS.has_scc14:
+    values = copy.copy(CS.scc14)
+    values["ComfortBandUpper"] = 0.0  # stock usually is 0 but sometimes uses higher values
+    values["ComfortBandLower"] = 0.0  # stock usually is 0 but sometimes uses higher values
+    values["JerkUpperLimit"] = upper_jerk  # stock usually is 1.0 but sometimes uses higher values
+    values["JerkLowerLimit"] = 5.0  # stock usually is 0.5 but sometimes uses higher values
+    values["ACCMode"] = 2 if enabled and long_override else 1 if enabled else 4 # stock will always be 4 instead of 0 after first disengage
+    values["ObjGap"] = 2 if lead_visible else 0, # 5: >30, m, 4: 25-30 m, 3: 20-25 m, 2: < 20 m, 0: no lead
+    commands.append(packer.make_can_msg("SCC14", 0, values))
+
+  return commands
 
 
-def create_scc13(packer, scc13):
-  values = copy.copy(scc13)
+def create_lfahda_mfc(packer, enabled, active):
+  values = {
+    "LFA_Icon_State": 2 if enabled else 0,
+    "HDA_Active": 1 if active > 0 else 0,
+    "HDA_Icon_State": 2 if active > 0 else 0,
+    "HDA_VSetReq": active,
+    "HDA_USM": 2,
+    "HDA_Icon_Wheel": 1 if enabled else 0,
+    "HDA_Chime": 1 if enabled else 0,
+  }
+  return packer.make_can_msg("LFAHDA_MFC", 0, values)
 
-  return packer.make_can_msg("SCC13", 0, values)
-
-
-def create_scc14(packer, enabled, v_ego, standstill, accel, gaspressed, objgap, scc14):
-  values = copy.copy(scc14)
-
-  if enabled:
-    values["ACCMode"] = 2 if gaspressed and (accel > -0.2) else 1
-    values["ObjGap"] = objgap
-    if standstill:
-      values["JerkUpperLimit"] = 0.5
-      values["JerkLowerLimit"] = 10.
-      values["ComfortBandUpper"] = 0.
-      values["ComfortBandLower"] = 0.
-      if v_ego > 0.27:
-        values["ComfortBandUpper"] = 2.
-        values["ComfortBandLower"] = 0.
-    else:
-      values["JerkUpperLimit"] = 50.
-      values["JerkLowerLimit"] = 50.
-      values["ComfortBandUpper"] = 50.
-      values["ComfortBandLower"] = 50.
-
-  return packer.make_can_msg("SCC14", 0, values)
-
+# ---------------------------------------------------------------------------------------
+# CF_Lkas_FcwOpt_USM 0 = No car + lanes
+#                    1 = White car + lanes
+#                    2 = Green car + lanes
+#                    3 = Green blinking car + lanes
+#                    4 = Orange car + lanes
+#                    5 = Orange blinking car + lanes
+# CF_Lkas_SysWarning 4 = keep hands on wheel
+#                    5 = keep hands on wheel (red)
+#                    6 = keep hands on wheel (red) + beep
+# Note: the warning is hidden while the blinkers are on
+# CF_Lkas_LdwsSysState 0 = no icons
+#                    1-2 = white car + lanes
+#                      3 = green car + lanes, green steering wheel
+#                      4 = green car + lanes
+# ---------------------------------------------------------------------------------------
+# LFA_Icon_State 0 = no_wheel
+#                1 = white_wheel
+#                2 = green_wheel
+#                3 = green_wheel_blink
+# LFA_SysWarning 0 = no_message
+#                1 = switching_to_hda
+#                2 = switching_to_scc
+#                3 = lfa_error
+#                4 = check_hda
+#                5 = keep_hands_on_wheel_orange
+#                6 = keep_hands_on_wheel_red
+# HDA_Icon_State 0 = no_hda
+#                1 = white_hda
+#                2 = green_hda
+# HDA_SysWarning 0 = no_message
+#                1 = driving_convenience_systems_cancelled
+#                2 = highway_drive_assist_system_cancelled
+# ---------------------------------------------------------------------------------------
 
 
 
@@ -259,39 +254,3 @@ def create_frt_radar_opt(packer):
     "CF_FCA_Equip_Front_Radar": 1,
   }
   return packer.make_can_msg("FRT_RADAR11", 0, frt_radar11_values)
-
-
-# ---------------------------------------------------------------------------------------
-# CF_Lkas_FcwOpt_USM 0 = No car + lanes
-#                    1 = White car + lanes
-#                    2 = Green car + lanes
-#                    3 = Green blinking car + lanes
-#                    4 = Orange car + lanes
-#                    5 = Orange blinking car + lanes
-# CF_Lkas_SysWarning 4 = keep hands on wheel
-#                    5 = keep hands on wheel (red)
-#                    6 = keep hands on wheel (red) + beep
-# Note: the warning is hidden while the blinkers are on
-# CF_Lkas_LdwsSysState 0 = no icons
-#                    1-2 = white car + lanes
-#                      3 = green car + lanes, green steering wheel
-#                      4 = green car + lanes
-# ---------------------------------------------------------------------------------------
-# LFA_Icon_State 0 = no_wheel
-#                1 = white_wheel
-#                2 = green_wheel
-#                3 = green_wheel_blink
-# LFA_SysWarning 0 = no_message
-#                1 = switching_to_hda
-#                2 = switching_to_scc
-#                3 = lfa_error
-#                4 = check_hda
-#                5 = keep_hands_on_wheel_orange
-#                6 = keep_hands_on_wheel_red
-# HDA_Icon_State 0 = no_hda
-#                1 = white_hda
-#                2 = green_hda
-# HDA_SysWarning 0 = no_message
-#                1 = driving_convenience_systems_cancelled
-#                2 = highway_drive_assist_system_cancelled
-# ---------------------------------------------------------------------------------------

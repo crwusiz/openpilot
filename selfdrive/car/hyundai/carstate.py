@@ -37,8 +37,7 @@ class CarState(CarStateBase):
     self.scc_bus = CP.sccBus
     self.has_scc13 = CP.hasScc13
     self.has_scc14 = CP.hasScc14
-    self.has_lfa_hda = CP.hasLfaHda
-    self.aebFcw = CP.aebFcw or CP.carFingerprint in FCA11_CAR
+    self.aeb_fcw = CP.aebFcw or CP.carFingerprint in FCA11_CAR
     self.eps_error_cnt = 0
     self.cruise_unavail_cnt = 0
 
@@ -169,8 +168,9 @@ class CarState(CarStateBase):
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(gear))
 
     if not self.CP.openpilotLongitudinalControl:
-      aeb_src = "FCA11" if self.CP.aebFcw else "SCC12"
-      aeb_sig = "FCA_CmdAct" if self.CP.aebFcw else "AEB_CmdAct"
+      aebFcw = self.CP.aebFcw or self.CP.carFingerprint in FCA11_CAR
+      aeb_src = "FCA11" if aebFcw else "SCC12"
+      aeb_sig = "FCA_CmdAct" if aebFcw else "AEB_CmdAct"
       aeb_warning = cp.vl[aeb_src]["CF_VSM_Warn"] != 0
       aeb_braking = cp.vl[aeb_src]["CF_VSM_DecCmdAct"] != 0 or cp.vl[aeb_src][aeb_sig] != 0
       ret.stockFcw = aeb_warning and not aeb_braking
@@ -189,8 +189,8 @@ class CarState(CarStateBase):
     self.mfc_lfa = cp_cam.vl["LFAHDA_MFC"]
     self.scc11 = cp_scc.vl["SCC11"]
     self.scc12 = cp_scc.vl["SCC12"]
-    self.scc13 = cp_scc.vl["SCC13"] if self.has_scc13 else 0
-    self.scc14 = cp_scc.vl["SCC14"] if self.has_scc14 else 0
+    self.scc13 = cp_scc.vl["SCC13"] if self.CP.hasScc13 else 0
+    self.scc14 = cp_scc.vl["SCC14"] if self.CP.hasScc14 else 0
 
     self.steer_state = cp_eps.vl["MDPS12"]["CF_Mdps_ToiActive"]  # 0 NOT ACTIVE, 1 ACTIVE
     self.brake_error = cp.vl["TCS13"]["ACCEnable"] != 0  # 0 ACC CONTROL ENABLED, 1-3 ACC CONTROL DISABLED
@@ -408,7 +408,7 @@ class CarState(CarStateBase):
         ("SCC12", 50),
       ]
 
-      if CP.aebFcw:
+      if CP.aebFcw or CP.carFingerprint in FCA11_CAR:
         signals += [
           ("CF_VSM_Prefill", "FCA11"),
           ("CF_VSM_HBACmd", "FCA11"),
@@ -701,16 +701,6 @@ class CarState(CarStateBase):
           ("ObjGap", "SCC14"),
         ]
 
-      if CP.hasLfaHda:
-        signals += [
-          ("HDA_USM", "LFAHDA_MFC"),
-          ("HDA_Active", "LFAHDA_MFC"),
-          ("HDA_Icon_State", "LFAHDA_MFC"),
-          ("HDA_LdwSysState", "LFAHDA_MFC"),
-          ("HDA_Icon_Wheel", "LFAHDA_MFC"),
-        ]
-        checks.append(("LFAHDA_MFC", 20))
-
     if not CP.openpilotLongitudinalControl:
       signals += [
         ("MainMode_ACC", "SCC11"),
@@ -724,7 +714,7 @@ class CarState(CarStateBase):
         ("SCC12", 50),
       ]
 
-      if CP.aebFcw:
+      if CP.aebFcw or CP.carFingerprint in FCA11_CAR:
         signals += [
           ("CF_VSM_Prefill", "FCA11"),
           ("CF_VSM_HBACmd", "FCA11"),

@@ -341,7 +341,6 @@ class CarInterface(CarInterfaceBase):
       ret.sccBus = 0 if 1056 in fingerprint[0] \
               else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
               else 2 if 1056 in fingerprint[2] else -1
-      ret.fcaBus = 0 if 909 in fingerprint[0] else 2 if 909 in fingerprint[2] else -1
 
       if ret.sccBus >= 0:
         ret.hasScc13 = 1290 in fingerprint[ret.sccBus]
@@ -350,7 +349,6 @@ class CarInterface(CarInterfaceBase):
       ret.enableBsm = 1419 in fingerprint[0]
       ret.enableAutoHold = 1151 in fingerprint[0]
       ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
-      ret.hasLfaHda = 1157 in fingerprint[0] or 1157 in fingerprint[2]
       ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
       ret.radarOffCan = ret.sccBus == -1
       ret.pcmCruise = ret.radarOffCan
@@ -388,6 +386,15 @@ class CarInterface(CarInterfaceBase):
 
   def _update(self, c):
     ret = self.CS.update(self.cp, self.cp2, self.cp_cam)
+
+    if CANFD_CAR:
+      canvalid = any([self.cp.can_valid, self.cp_cam.can_valid])
+      if not canvalid:
+        print('cp = {}  cp_cam = {}'.format(bool(self.cp.can_valid), bool(self.cp_cam.can_valid)))
+    else:
+      canvalid = any([self.cp.can_valid, self.cp2.can_valid, self.cp_cam.can_valid])
+      if not canvalid:
+        print('cp = {}  cp2 = {}  cp_cam = {}'.format(bool(self.cp.can_valid), bool(self.cp2.can_valid), bool(self.cp_cam.can_valid)))
 
     if self.CP.pcmCruise and not self.CC.scc_live:
       self.CP.pcmCruise = False

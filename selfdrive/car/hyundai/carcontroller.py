@@ -142,8 +142,6 @@ class CarController:
       activated_hda = road_speed_limiter_get_active()  # 0 off, 1 main road, 2 highway
       if self.mfc_lfa:
         can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, activated_hda))
-      elif CS.has_lfa_hda:
-        can_sends.append(hyundaican.create_hda_mfc(self.packer, activated_hda, CS, hud_control.leftLaneVisible, hud_control.rightLaneVisible))
 
     # 5 Hz ACC options
     #if self.frame % 20 == 0 and self.CP.openpilotLongitudinalControl:
@@ -191,39 +189,20 @@ class CarController:
     # scc smoother
     self.scc_smoother.update(CC.enabled, can_sends, self.packer, CC, CS, self.frame, controls)
 
-    # send scc to car if longcontrol enabled and SCC not on bus 0 or ont live
+    if self.frame % 500 == 0:
+      print('scc11 = {}  scc12 = {}  scc13 = {}  scc14 = {}'.format(
+        bool(CS.scc11), bool(CS.scc12), bool(CS.scc13), bool(CS.scc14)))
+
+    # send scc to car if longcontrol enabled and SCC not on bus 0 or not live
     if self.longcontrol and CS.out.cruiseState.enabled and (CS.scc_bus or not self.scc_live):
       if self.frame % 2 == 0:
         set_speed_in_units = hud_control.setSpeed * (CV.MS_TO_KPH if CS.is_metric else CV.MS_TO_MPH)
-
         stopping = (actuators.longControlState == LongCtrlState.stopping)
+        jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0
 
-        can_sends.append(hyundaican.create_scc11(self.packer, self.frame, CC.enabled, set_speed_in_units,
-                                                 self.scc_live, CS.scc11))
-
-        if self.scc12_cnt < 0:
-          self.scc12_cnt = CS.scc12["CR_VSM_Alive"] if not CS.no_radar else 0
-        self.scc12_cnt += 1
-        self.scc12_cnt %= 0xF
-
-        can_sends.append(hyundaican.create_scc12(self.packer, self.accel, CC.enabled, self.scc12_cnt, self.scc_live, CS.scc12,
-                                                 CS.out.gasPressed, CS.out.brakePressed, CS.out.cruiseState.standstill, self.CP.carFingerprint))
-
-        if self.frame % 20 == 0 and CS.has_scc13:
-          can_sends.append(hyundaican.create_scc13(self.packer, CS.scc13))
-
-        if CS.has_scc14:
-          acc_standstill = stopping if CS.out.vEgo < 2. else False
-          lead = self.scc_smoother.get_lead(controls.sm)
-
-          if lead is not None:
-            d = lead.dRel
-            obj_gap = 1 if d < 25 else 2 if d < 40 else 3 if d < 60 else 4 if d < 80 else 0
-
-          can_sends.append(hyundaican.create_scc14(self.packer, CC.enabled, CS.out.vEgo, acc_standstill, apply_accel,
-                                                   CS.out.gasPressed, obj_gap, CS.scc14))
-    else:
-      self.scc12_cnt = -1
+        can_sends.extend(hyundaican.create_scc_commands(
+          self.packer, int(self.frame / 2), CC.enabled and CC.longActive, self.accel, jerk,
+          hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, self.scc_live, CS))
 
 
   def update_canfd(self, CC, CS, controls):
