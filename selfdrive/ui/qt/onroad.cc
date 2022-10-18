@@ -177,6 +177,8 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
 
 // NvgWindow
 NvgWindow::NvgWindow(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraViewWidget("camerad", type, true, parent) {
+  pm = std::make_unique<PubMaster, const std::initializer_list<const char *>>({"uiDebug"});
+
   engage_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
   dm_img = loadPixmap("../assets/img_driver_face.png", {img_size, img_size});
 
@@ -1031,6 +1033,8 @@ void NvgWindow::drawStopLine(QPainter &painter, const UIState *s, const cereal::
 }
 
 void NvgWindow::paintGL() {
+  const double start_draw_t = millis_since_boot();
+
   UIState *s = uiState();
   const cereal::ModelDataV2::Reader &model = (*s->sm)["modelV2"].getModelV2();
   CameraViewWidget::setFrameId(model.getFrameId());
@@ -1065,6 +1069,12 @@ void NvgWindow::paintGL() {
     LOGW("slow frame rate: %.2f fps", fps);
   }
   prev_draw_t = cur_draw_t;
+
+  // publish debug msg
+  MessageBuilder msg;
+  auto m = msg.initEvent().initUiDebug();
+  m.setDrawTimeMillis(cur_draw_t - start_draw_t);
+  pm->send("uiDebug", msg);
 }
 
 void NvgWindow::showEvent(QShowEvent *event) {

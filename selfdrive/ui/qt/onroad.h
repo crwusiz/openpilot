@@ -125,6 +125,7 @@ private:
   bool v_ego_cluster_seen = false;
 
   int status = STATUS_DISENGAGED;
+  std::unique_ptr<PubMaster> pm;
   int lead_status;
   int autohold_state = 0;
   int nda_state = 0;
