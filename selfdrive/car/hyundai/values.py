@@ -90,6 +90,7 @@ class CAR:
   IONIQ5 = "HYUNDAI IONIQ 5 (NE)"
   TUCSON22_HEV = "HYUNDAI TUCSON HEV (NX4)"
   EV6 = "KIA EV6 (CV)"
+  SPORTAGE_NQ5 = "KIA SPORTAGE (NQ5)"
   GENESIS_GV70 = "GENESIS GV70 (JK1)"
 
 @dataclass
@@ -177,6 +178,7 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
   CAR.IONIQ5: HyundaiCarInfo("Hyundai Ioniq 5 2022", "Highway Driving Assist II", harness=Harness.none),
   CAR.TUCSON22_HEV: HyundaiCarInfo("Hyundai Tucson Hybrid 2022", "Highway Driving Assist II", harness=Harness.hyundai_n),
   CAR.EV6: HyundaiCarInfo("Kia EV6 2022", "Highway Driving Assist II", harness=Harness.hyundai_p),
+  CAR.SPORTAGE_NQ5: HyundaiCarInfo("Kia Sportage Hybrid 2023", harness=Harness.hyundai_n),
   CAR.GENESIS_GV70: HyundaiCarInfo("Genesis GV70 2022", "Highway Driving Assist II", harness=Harness.hyundai_l),
 }
 
@@ -1477,6 +1479,14 @@ FW_VERSIONS = {
       b'\xf1\x87VDJLT17895112DN4\x88fVf\x99\x88\x88\x88\x87fVe\x88vhwwUFU\x97eFex\x99\xff\xb7\x82\xf1\x81E25\x00\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  E25\x00\x00\x00\x00\x00\x00\x00SIK0T33NB2\x11\x1am\xda',
     ],
   },
+  CAR.SPORTAGE_NQ5: {
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00NQ5 FR_CMR AT USA LHD 1.00 1.00 99211-P1060 665',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00NQ5__               1.01 1.03 99110-CH000         ',
+    ],
+  },
 }
 
 CHECKSUM = {
@@ -1506,7 +1516,7 @@ FEATURES = {
 }
 
 CANFD_CAR = {
-  CAR.EV6, CAR.GENESIS_GV70, CAR.TUCSON22_HEV, CAR.IONIQ5
+  CAR.EV6, CAR.GENESIS_GV70, CAR.TUCSON22_HEV, CAR.IONIQ5, CAR.SPORTAGE_NQ5
 }
 FCA11_CAR = {
   CAR.SONATA, CAR.PALISADE, CAR.ELANTRA_I30, CAR.ELANTRA21, CAR.ELANTRA21_HEV, CAR.KONA, CAR.KONA_HEV, CAR.IONIQ_HEV,
@@ -1575,5 +1585,6 @@ DBC = {
   CAR.IONIQ5: dbc_dict('hyundai_canfd', None),
   CAR.TUCSON22_HEV: dbc_dict('hyundai_canfd', None),
   CAR.EV6: dbc_dict('hyundai_canfd', None),
+  CAR.SPORTAGE_NQ5: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),
 }
