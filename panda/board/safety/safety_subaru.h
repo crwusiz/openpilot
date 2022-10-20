@@ -172,9 +172,9 @@ static const addr_checks* subaru_init(uint16_t param) {
   subaru_gen2 = GET_FLAG(param, SUBARU_PARAM_GEN2);
 
   if (subaru_gen2) {
-    subaru_rx_checks = (addr_checks) {subaru_gen2_addr_checks, SUBARU_GEN2_ADDR_CHECK_LEN};
+    subaru_rx_checks = (addr_checks){subaru_gen2_addr_checks, SUBARU_GEN2_ADDR_CHECK_LEN};
   } else {
-    subaru_rx_checks = (addr_checks) {subaru_addr_checks, SUBARU_ADDR_CHECK_LEN};
+    subaru_rx_checks = (addr_checks){subaru_addr_checks, SUBARU_ADDR_CHECK_LEN};
   }
 
   return &subaru_rx_checks;

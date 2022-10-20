@@ -277,7 +277,7 @@ static int chrysler_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
 
   // forward all messages from camera except LKAS messages
   const bool is_lkas = ((addr == chrysler_addrs->LKAS_COMMAND) || (addr == chrysler_addrs->DAS_6));
-  if ((bus_num == 2) && !is_lkas) {
+  if ((bus_num == 2) && !is_lkas){
     bus_fwd = 0;
   }
 
@@ -288,17 +288,17 @@ static const addr_checks* chrysler_init(uint16_t param) {
   if (GET_FLAG(param, CHRYSLER_PARAM_RAM_DT)) {
     chrysler_platform = CHRYSLER_RAM_DT;
     chrysler_addrs = &CHRYSLER_RAM_DT_ADDRS;
-    chrysler_rx_checks = (addr_checks) {chrysler_ram_dt_addr_checks, CHRYSLER_RAM_DT_ADDR_CHECK_LEN};
+    chrysler_rx_checks = (addr_checks){chrysler_ram_dt_addr_checks, CHRYSLER_RAM_DT_ADDR_CHECK_LEN};
   } else if (GET_FLAG(param, CHRYSLER_PARAM_RAM_HD)) {
 #ifdef ALLOW_DEBUG
     chrysler_platform = CHRYSLER_RAM_HD;
     chrysler_addrs = &CHRYSLER_RAM_HD_ADDRS;
-    chrysler_rx_checks = (addr_checks) {chrysler_ram_hd_addr_checks, CHRYSLER_RAM_HD_ADDR_CHECK_LEN};
+    chrysler_rx_checks = (addr_checks){chrysler_ram_hd_addr_checks, CHRYSLER_RAM_HD_ADDR_CHECK_LEN};
 #endif
   } else {
     chrysler_platform = CHRYSLER_PACIFICA;
     chrysler_addrs = &CHRYSLER_ADDRS;
-    chrysler_rx_checks = (addr_checks) {chrysler_addr_checks, CHRYSLER_ADDR_CHECK_LEN};
+    chrysler_rx_checks = (addr_checks){chrysler_addr_checks, CHRYSLER_ADDR_CHECK_LEN};
   }
 
   return &chrysler_rx_checks;
