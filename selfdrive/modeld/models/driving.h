@@ -192,6 +192,12 @@ struct ModelOutputPose {
 };
 static_assert(sizeof(ModelOutputPose) == sizeof(ModelOutputXYZ)*4);
 
+struct ModelOutputWideFromDeviceEuler {
+  ModelOutputXYZ mean;
+  ModelOutputXYZ std;
+};
+static_assert(sizeof(ModelOutputWideFromDeviceEuler) == sizeof(ModelOutputXYZ)*2);
+
 struct ModelOutputDisengageProb {
   float gas_disengage;
   float brake_disengage;
@@ -250,6 +256,7 @@ struct ModelOutput {
   const ModelOutputStopLines stop_lines;
   const ModelOutputMeta meta;
   const ModelOutputPose pose;
+  const ModelOutputWideFromDeviceEuler wide_from_device_euler;
 };
 
 constexpr int OUTPUT_SIZE = sizeof(ModelOutput) / sizeof(float);
@@ -259,7 +266,7 @@ constexpr int OUTPUT_SIZE = sizeof(ModelOutput) / sizeof(float);
 #else
   constexpr int TEMPORAL_SIZE = 0;
 #endif
-constexpr int NET_OUTPUT_SIZE = OUTPUT_SIZE + FEATURE_LEN;
+constexpr int NET_OUTPUT_SIZE = OUTPUT_SIZE + FEATURE_LEN + 2;
 
 // TODO: convert remaining arrays to std::array and update model runners
 struct ModelState {
