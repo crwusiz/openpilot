@@ -56,10 +56,18 @@ def preprocessing_op(x,w,C):
   C = C._replace(out_shape = (C.bs*C.oy, C.ox*C.cout//4, 4))
   #x = contiguous(ctx, x, x.shapetracker) if not x.shapetracker.contiguous else x
   #w = contiguous(ctx, w, w.shapetracker) if not w.shapetracker.contiguous else w
+
+  # contiguous before image, always
+  x = x.contiguous_op()
   w = w.contiguous_op()
 
   # early realize on the weights
-  w.realize().image
+  bw = w
+  while getattr(bw, 'op', None) and len(bw.op.src) == 1:
+    bw = bw.op.src[0]
+  if bw.realized:
+    # weights are static
+    w.realize().image
   return x,w,C
 
 def postprocessing_op(ret, C, C_initial):

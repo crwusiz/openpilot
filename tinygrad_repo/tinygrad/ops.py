@@ -15,7 +15,7 @@ BinaryOps = Enum("BinaryOps", ["ADD", "SUB", "MUL", "DIV", "POW", "CMPEQ"])
 ReduceOps = Enum("ReduceOps", ["SUM", "MAX"])
 MovementOps = Enum("MovementOps", ["RESHAPE", "PERMUTE", "EXPAND", "FLIP", "STRIDED", "PAD", "SHRINK"])
 ProcessingOps = Enum("ProcessingOps", ["CONV"])
-LoadOps = Enum("LoadOps", ["FROMCPU"])
+LoadOps = Enum("LoadOps", ["FROMCPU", "CONTIGUOUS"])
 
 Op = Union[UnaryOps, BinaryOps, ReduceOps, MovementOps, ProcessingOps, LoadOps]
 OpType = Union[Type[UnaryOps], Type[BinaryOps], Type[ReduceOps], Type[MovementOps], Type[ProcessingOps], Type[LoadOps]]
@@ -119,9 +119,15 @@ def _ast(x: Union[LazyBuffer, LazyOp], buf_names: Dict[LazyBuffer, str], code_fo
 
 # **** realize functions ****
 
-def _realize_loadops(self:LazyBuffer) -> Tuple[DeviceBuffer, List[DeviceBuffer], OpType]:
-  assert self.op.op == LoadOps.FROMCPU
-  return Device._buffers[self.device].fromCPU(self.op.arg), [], LoadOps
+def _realize_loadops(self:LazyBuffer) -> Tuple[DeviceBuffer, List[DeviceBuffer], Optional[OpType]]:
+  if self.op.op == LoadOps.FROMCPU:
+    return Device._buffers[self.device].fromCPU(self.op.arg), [], LoadOps
+  elif self.op.op == LoadOps.CONTIGUOUS:
+    real_src = self.op.src[0].realize(self.device)
+    ret = real_src.contiguous_op()
+    return ret, [real_src], LoadOps if ret != real_src else None
+  else:
+    raise NotImplementedError(f"unknown LoadOp {self.op.op}")
 
 def _realize_movementops(self:LazyBuffer) -> Tuple[DeviceBuffer, List[DeviceBuffer], OpType]:
   real_src = self.op.src[0].realize(self.device)
@@ -255,7 +261,8 @@ class LazyBuffer:
       # we haven't realized the Buffer yet
       self.realized, real_srcs, real_type = _realize[self.optype](self)
       # in lazy mode, we don't log until we realize
-      log_op(real_type, [x.op for x in get_lazyops(self.op)], self.realized, real_srcs)
+      if real_type is not None:
+        log_op(real_type, [x.op for x in get_lazyops(self.op)], self.realized, real_srcs)
       # no need to keep the op after realization
       del self.op
 
@@ -269,7 +276,7 @@ class LazyBuffer:
 
   def unary_op(self:LazyBuffer, op:UnaryOps) -> LazyBuffer: return elementwise_op(op, self)
   def binary_op(self:LazyBuffer, op:BinaryOps, y:LazyBuffer) -> LazyBuffer: return elementwise_op(op, self, y)
-  def contiguous_op(self:LazyBuffer) -> LazyBuffer: return self if self.st.contiguous else self.unary_op(UnaryOps.NOOP)
+  def contiguous_op(self:LazyBuffer) -> LazyBuffer: return LazyBuffer(self.device, self.shape, LoadOps, LazyOp(LoadOps.CONTIGUOUS, (self,)))
 
   def reduce_op(self:LazyBuffer, op:ReduceOps, new_shape:Tuple[int, ...]) -> LazyBuffer:
     if self.shape == tuple(new_shape):
