@@ -20,8 +20,6 @@ LongCtrlState = car.CarControl.Actuators.LongControlState
 MAX_ANGLE = 85
 MAX_ANGLE_FRAMES = 89
 MAX_ANGLE_CONSECUTIVE_FRAMES = 2
-CANFD_MAX_ANGLE_FRAMES = 33
-CANFD_MAX_ANGLE_CONSECUTIVE_FRAMES = 1
 
 
 def process_hud_alert(enabled, fingerprint, hud_control):
@@ -59,9 +57,9 @@ class CarController:
     self.packer = CANPacker(dbc_name)
     self.angle_limit_counter = 0
     self.frame = 0
+    self.accel = 0
     self.last_button_frame = 0
     self.apply_steer_last = 0
-    self.lkas11_cnt = 0
     self.scc12_cnt = -1
     self.resume_cnt = 0
     self.last_lead_distance = 0
@@ -70,14 +68,8 @@ class CarController:
     self.turning_indicator_alert = False
 
     self.scc_smoother = SccSmoother(CP)
-    self.lfahdamfc = Params().get("MfcSelect", encoding='utf8') == "2"
+    self.mfc_lfa = Params().get("MfcSelect", encoding='utf8') == "2"
 
-    if self.CP.carFingerprint in CANFD_CAR:
-      self.MAX_ANGLE_FRAMES = CANFD_MAX_ANGLE_FRAMES
-      self.MAX_ANGLE_CONSECUTIVE_FRAMES = CANFD_MAX_ANGLE_CONSECUTIVE_FRAMES
-    else:
-      self.MAX_ANGLE_FRAMES = MAX_ANGLE_CONSECUTIVE_FRAMES
-      self.MAX_ANGLE_CONSECUTIVE_FRAMES = MAX_ANGLE_FRAMES
 
   def update(self, CC, CS, controls):
     if self.CP.carFingerprint in CANFD_CAR:
@@ -87,8 +79,7 @@ class CarController:
     hud_control = CC.hudControl
 
     # Steering Torque
-    steer = actuators.steer
-    new_steer = int(round(steer * self.CCP.STEER_MAX))
+    new_steer = int(round(actuators.steer * self.CCP.STEER_MAX))
     apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.CCP)
 
     # Disable steering while turning blinker on and speed below 60 kph
@@ -104,7 +95,7 @@ class CarController:
     self.apply_steer_last = apply_steer
     apply_steer = int(round(float(apply_steer)))
 
-    accel = clip(actuators.accel, self.CCP.ACCEL_MIN, self.CCP.ACCEL_MAX)
+    self.accel = clip(actuators.accel, self.CCP.ACCEL_MIN, self.CCP.ACCEL_MAX)
 
     # HUD messages
     sys_warning, sys_state, left_lane_warning, right_lane_warning = process_hud_alert(CC.enabled, self.car_fingerprint, hud_control)
@@ -113,10 +104,6 @@ class CarController:
     enabled_speed = 60 if CS.is_metric else 38
     if clu11_speed > enabled_speed or not CC.latActive:
       enabled_speed = clu11_speed
-
-    if self.frame == 0:  # initialize counts from last received count signals
-      self.lkas11_cnt = CS.lkas11["CF_Lkas_MsgCount"]
-    self.lkas11_cnt = (self.lkas11_cnt + 1) % 0x10
 
     can_sends = []
 
@@ -128,21 +115,21 @@ class CarController:
       self.angle_limit_counter = 0
 
     # Cut steer actuation bit for two frames and hold torque with induced temporary fault
-    torque_fault = CC.latActive and self.angle_limit_counter > self.MAX_ANGLE_FRAMES
+    torque_fault = CC.latActive and self.angle_limit_counter > MAX_ANGLE_FRAMES
     lat_active = CC.latActive and not torque_fault
 
-    if self.angle_limit_counter >= self.MAX_ANGLE_FRAMES + self.MAX_ANGLE_CONSECUTIVE_FRAMES:
+    if self.angle_limit_counter >= MAX_ANGLE_FRAMES + MAX_ANGLE_CONSECUTIVE_FRAMES:
       self.angle_limit_counter = 0
 
-    can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, lat_active, torque_fault, CS.lkas11, sys_warning,
-                                              sys_state, CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning, 0))
+    can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, lat_active, torque_fault, sys_warning,
+                                              sys_state, CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning, 0, CS.lkas11))
 
     if CS.eps_bus or CS.scc_bus == 1:  # send lkas11 bus 1 if eps or scc is on bus 1
-      can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, lat_active, torque_fault, CS.lkas11, sys_warning,
-                                                sys_state, CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning, 1))
+      can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, lat_active, torque_fault, sys_warning,
+                                                sys_state, CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning, 1, CS.lkas11))
 
     if self.frame % 2 and CS.eps_bus: # send clu11 to eps if it is not on bus 0
-      can_sends.append(hyundaican.create_clu11(self.packer, CS.eps_bus, CS.clu11, Buttons.NONE, enabled_speed))
+      can_sends.append(hyundaican.create_clu11(self.packer, CS.eps_bus, Buttons.NONE, enabled_speed, CS.clu11))
 
     if CS.eps_bus:  # send mdps12 to LKAS to prevent LKAS error
       can_sends.append(hyundaican.create_mdps12(self.packer, self.frame, CS.mdps12))
@@ -153,7 +140,7 @@ class CarController:
     # 20 Hz LFA MFA message
     if self.frame % 5 == 0:
       activated_hda = road_speed_limiter_get_active()  # 0 off, 1 main road, 2 highway
-      if self.lfahdamfc:
+      if self.mfc_lfa:
         can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, activated_hda))
       elif CS.has_lfa_hda:
         can_sends.append(hyundaican.create_hda_mfc(self.packer, activated_hda, CS, hud_control.leftLaneVisible, hud_control.rightLaneVisible))
@@ -168,7 +155,7 @@ class CarController:
 
     new_actuators = actuators.copy()
     new_actuators.steer = apply_steer / self.CCP.STEER_MAX
-    new_actuators.accel = accel
+    new_actuators.accel = self.accel
 
     self.frame += 1
     return new_actuators, can_sends
@@ -189,7 +176,7 @@ class CarController:
         self.resume_wait_timer -= 1
 
       elif abs(CS.lead_distance - self.last_lead_distance) > 0.1:
-        can_sends.append(hyundaican.create_clu11(self.packer, CS.scc_bus, CS.clu11, Buttons.RES_ACCEL, clu11_speed))
+        can_sends.append(hyundaican.create_clu11(self.packer, CS.scc_bus, Buttons.RES_ACCEL, clu11_speed, CS.clu11))
         self.resume_cnt += 1
 
         if self.resume_cnt >= int(randint(4, 5) * 2):
@@ -210,18 +197,16 @@ class CarController:
         set_speed_in_units = hud_control.setSpeed * (CV.MS_TO_KPH if CS.is_metric else CV.MS_TO_MPH)
 
         stopping = (actuators.longControlState == LongCtrlState.stopping)
-        apply_accel = self.scc_smoother.get_apply_accel(CS, actuators.accel)
-        apply_accel = clip(apply_accel if CC.longActive else 0,
-                           self.CCP.ACCEL_MIN, self.CCP.ACCEL_MAX)
+
+        can_sends.append(hyundaican.create_scc11(self.packer, self.frame, CC.enabled, set_speed_in_units,
+                                                 self.scc_live, CS.scc11))
 
         if self.scc12_cnt < 0:
           self.scc12_cnt = CS.scc12["CR_VSM_Alive"] if not CS.no_radar else 0
         self.scc12_cnt += 1
         self.scc12_cnt %= 0xF
 
-        can_sends.append(hyundaican.create_scc11(self.packer, self.frame, CC.enabled, set_speed_in_units, self.scc_live, CS.scc11))
-
-        can_sends.append(hyundaican.create_scc12(self.packer, apply_accel, CC.enabled, self.scc12_cnt, self.scc_live, CS.scc12,
+        can_sends.append(hyundaican.create_scc12(self.packer, self.accel, CC.enabled, self.scc12_cnt, self.scc_live, CS.scc12,
                                                  CS.out.gasPressed, CS.out.brakePressed, CS.out.cruiseState.standstill, self.CP.carFingerprint))
 
         if self.frame % 20 == 0 and CS.has_scc13:
@@ -246,8 +231,7 @@ class CarController:
     hud_control = CC.hudControl
 
     # Steering Torque
-    steer = actuators.steer
-    new_steer = int(round(steer * self.CCP.STEER_MAX))
+    new_steer = int(round(actuators.steer * self.CCP.STEER_MAX))
     apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.CCP)
 
     if not CC.latActive:
@@ -256,8 +240,6 @@ class CarController:
     self.apply_steer_last = apply_steer
     apply_steer = int(round(float(apply_steer)))
 
-    # accel + longitudinal
-    accel = clip(actuators.accel, self.CCP.ACCEL_MIN, self.CCP.ACCEL_MAX)
     stopping = actuators.longControlState == LongCtrlState.stopping
     set_speed_in_units = hud_control.setSpeed * (CV.MS_TO_KPH if CS.is_metric else CV.MS_TO_MPH)
 
@@ -278,10 +260,10 @@ class CarController:
       self.angle_limit_counter = 0
 
     # Cut steer actuation bit for two frames and hold torque with induced temporary fault
-    torque_fault = CC.latActive and self.angle_limit_counter > self.MAX_ANGLE_FRAMES
+    torque_fault = CC.latActive and self.angle_limit_counter > MAX_ANGLE_FRAMES
     lat_active = CC.latActive and not torque_fault
 
-    if self.angle_limit_counter >= self.MAX_ANGLE_FRAMES + self.MAX_ANGLE_CONSECUTIVE_FRAMES:
+    if self.angle_limit_counter >= MAX_ANGLE_FRAMES + MAX_ANGLE_CONSECUTIVE_FRAMES:
       self.angle_limit_counter = 0
 
     # CAN-FD platforms
@@ -289,7 +271,7 @@ class CarController:
     hda2_long = hda2 and self.CP.openpilotLongitudinalControl
 
     # steering control
-    can_sends.extend(hyundaicanfd.create_steering_messages(self.packer, self.CP, CC.enabled, CC.latActive, apply_steer))
+    can_sends.extend(hyundaicanfd.create_steering_messages(self.packer, self.CP, CC.enabled, lat_active, apply_steer))
 
     # disable LFA on HDA2 ( 676 )
     if self.frame % 5 == 0 and hda2:
@@ -302,7 +284,7 @@ class CarController:
     if self.CP.openpilotLongitudinalControl:
       can_sends.extend(hyundaicanfd.create_adrv_messages(self.packer, self.frame))
       if self.frame % 2 == 0:
-        can_sends.append(hyundaicanfd.create_acc_control(self.packer, self.CP, CC.enabled, accel, stopping, CC.cruiseControl.override,
+        can_sends.append(hyundaicanfd.create_acc_control(self.packer, self.CP, CC.enabled, self.accel, stopping, CC.cruiseControl.override,
                                                          set_speed_in_units))
 
     # button presses
@@ -330,7 +312,7 @@ class CarController:
 
     new_actuators = actuators.copy()
     new_actuators.steer = apply_steer / self.CCP.STEER_MAX
-    new_actuators.accel = accel
+    new_actuators.accel = self.accel
 
     self.frame += 1
     return new_actuators, can_sends

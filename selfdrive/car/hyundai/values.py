@@ -18,8 +18,8 @@ class CarControllerParams:
 
   def __init__(self, CP):
     self.STEER_MAX = 409
-    self.STEER_DELTA_UP = 3
-    self.STEER_DELTA_DOWN = 7
+    self.STEER_DELTA_UP = 3.5
+    self.STEER_DELTA_DOWN = 6
     self.STEER_DRIVER_ALLOWANCE = 50
     self.STEER_DRIVER_MULTIPLIER = 2
     self.STEER_DRIVER_FACTOR = 1
@@ -1509,14 +1509,6 @@ FEATURES = {
      CAR.SONATA_HEV, CAR.SONATA_LF_HEV, CAR.GRANDEUR_HEV, CAR.GRANDEUR20_HEV,
      CAR.K5_HEV, CAR.K5_DL3_HEV, CAR.K7_HEV},
   # Gear not set is [ LVR12 ]
-
-  # new lfa car - carcontroller lfahdamfc / hyundaican lfahdamfc using qt ui mfcselect toggle set
-
-  # "use_fca": {}, carstate aeb_fcw / qt ui aebselect toggle set
-  # these cars use the [ FCA11 ] message for the AEB and FCW signals, all others use [ SCC12 ]
-
-  # "has_scc13": {},
-  # "has_scc14": {},
 }
 
 CANFD_CAR = {

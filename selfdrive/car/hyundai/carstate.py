@@ -65,7 +65,6 @@ class CarState(CarStateBase):
     cp_eps = cp2 if self.eps_bus else cp
     cp_sas = cp2 if self.sas_bus else cp
     cp_scc = cp2 if self.scc_bus == 1 else cp_cam if self.scc_bus == 2 else cp
-    cp_cruise = cp
 
     ret = car.CarState.new_message()
     self.is_metric = cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"] == 0
@@ -184,8 +183,10 @@ class CarState(CarStateBase):
     # save the entire LKAS11, CLU11, MDPS12, LFAHDA_MFC, SCC11, SCC12, SCC13, SCC14
     self.lkas11 = cp_cam.vl["LKAS11"]
     self.clu11 = cp.vl["CLU11"]
+    self.fca11 = cp.vl["FCA11"]
+    self.fca12 = cp.vl["FCA12"]
     self.mdps12 = cp_eps.vl["MDPS12"]
-    self.lfahda_mfc = cp_cam.vl["LFAHDA_MFC"]
+    self.mfc_lfa = cp_cam.vl["LFAHDA_MFC"]
     self.scc11 = cp_scc.vl["SCC11"]
     self.scc12 = cp_scc.vl["SCC12"]
     self.scc13 = cp_scc.vl["SCC13"] if self.has_scc13 else 0
@@ -357,16 +358,6 @@ class CarState(CarStateBase):
       ("CR_VSM_Alive", "SCC12"),
       ("CR_VSM_ChkSum", "SCC12"),
 
-      ("SCCDrvModeRValue", "SCC13"),
-      ("SCC_Equip", "SCC13"),
-      ("AebDrvSetStatus", "SCC13"),
-
-      ("JerkUpperLimit", "SCC14"),
-      ("JerkLowerLimit", "SCC14"),
-      ("SCCMode2", "SCC14"),
-      ("ComfortBandUpper", "SCC14"),
-      ("ComfortBandLower", "SCC14"),
-
       ("UNIT", "TPMS11"),
       ("PRESSURE_FL", "TPMS11"),
       ("PRESSURE_FR", "TPMS11"),
@@ -386,6 +377,23 @@ class CarState(CarStateBase):
       ("WHL_SPD11", 50),
     ]
 
+    if CP.hasScc13:
+      signals += [
+        ("SCCDrvModeRValue", "SCC13"),
+        ("SCC_Equip", "SCC13"),
+        ("AebDrvSetStatus", "SCC13"),
+      ]
+
+    if CP.hasScc14:
+      signals += [
+        ("JerkUpperLimit", "SCC14"),
+        ("JerkLowerLimit", "SCC14"),
+        ("ComfortBandUpper", "SCC14"),
+        ("ComfortBandLower", "SCC14"),
+        ("ACCMode", "SCC14"),
+        ("ObjGap", "SCC14"),
+      ]
+
     if not CP.openpilotLongitudinalControl:
       signals += [
         ("MainMode_ACC", "SCC11"),
@@ -402,11 +410,30 @@ class CarState(CarStateBase):
 
       if CP.aebFcw:
         signals += [
+          ("CF_VSM_Prefill", "FCA11"),
+          ("CF_VSM_HBACmd", "FCA11"),
+          ("CF_VSM_BeltCmd", "FCA11"),
+          ("CR_VSM_DecCmd", "FCA11"),
+          ("FCA_Status", "FCA11"),
+          ("FCA_StopReq", "FCA11"),
+          ("FCA_DrvSetStatus", "FCA11"),
+          ("FCA_Failinfo", "FCA11"),
+          ("CR_FCA_Alive", "FCA11"),
+          ("FCA_RelativeVelocity", "FCA11"),
+          ("FCA_TimetoCollision", "FCA11"),
+          ("CR_FCA_ChkSum", "FCA11"),
+          ("PAINT1_Status", "FCA11"),
           ("FCA_CmdAct", "FCA11"),
           ("CF_VSM_Warn", "FCA11"),
           ("CF_VSM_DecCmdAct", "FCA11"),
+
+          ("FCA_USM", "FCA12"),
+          ("FCA_DrvSetState", "FCA12"),
         ]
-        checks.append(("FCA11", 50))
+        checks += [
+          ("FCA11", 50),
+          ("FCA12", 50),
+        ]
       else:
         signals += [
           ("AEB_CmdAct", "SCC12"),
@@ -557,21 +584,29 @@ class CarState(CarStateBase):
         ("AEB_StopReq", "SCC12"),
         ("CR_VSM_Alive", "SCC12"),
         ("CR_VSM_ChkSum", "SCC12"),
-
-        ("SCCDrvModeRValue", "SCC13"),
-        ("SCC_Equip", "SCC13"),
-        ("AebDrvSetStatus", "SCC13"),
-
-        ("JerkUpperLimit", "SCC14"),
-        ("JerkLowerLimit", "SCC14"),
-        ("SCCMode2", "SCC14"),
-        ("ComfortBandUpper", "SCC14"),
-        ("ComfortBandLower", "SCC14"),
       ]
       checks += [
         ("SCC11", 50),
         ("SCC12", 50),
       ]
+
+    if CP.hasScc13:
+      signals += [
+        ("SCCDrvModeRValue", "SCC13"),
+        ("SCC_Equip", "SCC13"),
+        ("AebDrvSetStatus", "SCC13"),
+      ]
+
+    if CP.hasScc14:
+      signals += [
+        ("JerkUpperLimit", "SCC14"),
+        ("JerkLowerLimit", "SCC14"),
+        ("ComfortBandUpper", "SCC14"),
+        ("ComfortBandLower", "SCC14"),
+        ("ACCMode", "SCC14"),
+        ("ObjGap", "SCC14"),
+      ]
+
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 1, enforce_checks=False)
 
 
@@ -643,21 +678,28 @@ class CarState(CarStateBase):
         ("AEB_StopReq", "SCC12"),
         ("CR_VSM_Alive", "SCC12"),
         ("CR_VSM_ChkSum", "SCC12"),
-
-        ("SCCDrvModeRValue", "SCC13"),
-        ("SCC_Equip", "SCC13"),
-        ("AebDrvSetStatus", "SCC13"),
-
-        ("JerkUpperLimit", "SCC14"),
-        ("JerkLowerLimit", "SCC14"),
-        ("SCCMode2", "SCC14"),
-        ("ComfortBandUpper", "SCC14"),
-        ("ComfortBandLower", "SCC14"),
       ]
       checks += [
         ("SCC11", 50),
         ("SCC12", 50),
       ]
+
+      if CP.hasScc13:
+        signals += [
+          ("SCCDrvModeRValue", "SCC13"),
+          ("SCC_Equip", "SCC13"),
+          ("AebDrvSetStatus", "SCC13"),
+        ]
+
+      if CP.hasScc14:
+        signals += [
+          ("JerkUpperLimit", "SCC14"),
+          ("JerkLowerLimit", "SCC14"),
+          ("ComfortBandUpper", "SCC14"),
+          ("ComfortBandLower", "SCC14"),
+          ("ACCMode", "SCC14"),
+          ("ObjGap", "SCC14"),
+        ]
 
       if CP.hasLfaHda:
         signals += [
@@ -684,11 +726,30 @@ class CarState(CarStateBase):
 
       if CP.aebFcw:
         signals += [
+          ("CF_VSM_Prefill", "FCA11"),
+          ("CF_VSM_HBACmd", "FCA11"),
+          ("CF_VSM_BeltCmd", "FCA11"),
+          ("CR_VSM_DecCmd", "FCA11"),
+          ("FCA_Status", "FCA11"),
+          ("FCA_StopReq", "FCA11"),
+          ("FCA_DrvSetStatus", "FCA11"),
+          ("FCA_Failinfo", "FCA11"),
+          ("CR_FCA_Alive", "FCA11"),
+          ("FCA_RelativeVelocity", "FCA11"),
+          ("FCA_TimetoCollision", "FCA11"),
+          ("CR_FCA_ChkSum", "FCA11"),
+          ("PAINT1_Status", "FCA11"),
           ("FCA_CmdAct", "FCA11"),
           ("CF_VSM_Warn", "FCA11"),
           ("CF_VSM_DecCmdAct", "FCA11"),
+
+          ("FCA_USM", "FCA12"),
+          ("FCA_DrvSetState", "FCA12"),
         ]
-        checks.append(("FCA11", 50))
+        checks += [
+          ("FCA11", 50),
+          ("FCA12", 50),
+        ]
       else:
         signals += [
           ("AEB_CmdAct", "SCC12"),

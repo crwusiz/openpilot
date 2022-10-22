@@ -56,7 +56,7 @@ class CarInterface(CarInterfaceBase):
     ret.stoppingControl = True
     ret.stoppingDecelRate = 1.0
     ret.vEgoStopping = 0.8
-    ret.stopAccel = -2.0
+    ret.stopAccel = -3.5
 
     ret.startingState = True
     ret.vEgoStarting = 0.1
@@ -219,8 +219,13 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 13.27 * 1.15  # 15% higher at the center seems reasonable
       tire_stiffness_factor = 0.65
 
-    # Pid -----------------------------------------------------------------
-    if Params().get("LateralControlSelect", encoding='utf8') == "0":
+    lat_pid = Params().get("LateralControlSelect", encoding='utf8') == "0"
+    lat_indi = Params().get("LateralControlSelect", encoding='utf8') == "1"
+    lat_lqr = Params().get("LateralControlSelect", encoding='utf8') == "2"
+    lat_torque = Params().get("LateralControlSelect", encoding='utf8') == "3"
+
+    # -----------------------------------------------------------------
+    if lat_pid:
       ret.lateralTuning.pid.kf = 0.00005
       ret.lateralTuning.pid.kpBP = [0.]
       ret.lateralTuning.pid.kiBP = [0.]
@@ -235,8 +240,8 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.pid.kpV = [0.25]
         ret.lateralTuning.pid.kiV = [0.05]
 
-    # Indi -----------------------------------------------------------------
-    elif Params().get("LateralControlSelect", encoding='utf8') == "1":
+    # -----------------------------------------------------------------
+    elif lat_indi:
       ret.lateralTuning.init('indi')
       ret.lateralTuning.indi.innerLoopGainBP = [0.]
       ret.lateralTuning.indi.outerLoopGainBP = [0.]
@@ -259,8 +264,8 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.indi.timeConstantV = [1.4]
         ret.lateralTuning.indi.actuatorEffectivenessV = [2.3]
 
-    # Lqr -----------------------------------------------------------------
-    elif Params().get("LateralControlSelect", encoding='utf8') == "2":
+    # -----------------------------------------------------------------
+    elif lat_lqr:
       ret.lateralTuning.init('lqr')
       ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
       ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
@@ -303,8 +308,8 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.lqr.k = [-105.0, 450.0]
         ret.lateralTuning.lqr.l = [0.22, 0.318]
 
-    # Torque -----------------------------------------------------------------
-    elif any([Params().get("LateralControlSelect", encoding='utf8') == "3", candidate in CANFD_CAR]):
+    # -----------------------------------------------------------------
+    elif any([lat_torque, candidate in CANFD_CAR]):
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
 
@@ -336,6 +341,7 @@ class CarInterface(CarInterfaceBase):
       ret.sccBus = 0 if 1056 in fingerprint[0] \
               else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
               else 2 if 1056 in fingerprint[2] else -1
+      ret.fcaBus = 0 if 909 in fingerprint[0] else 2 if 909 in fingerprint[2] else -1
 
       if ret.sccBus >= 0:
         ret.hasScc13 = 1290 in fingerprint[ret.sccBus]
@@ -372,7 +378,8 @@ class CarInterface(CarInterfaceBase):
 
   @staticmethod
   def init(CP, logcan, sendcan):
-    if all([CP.openpilotLongitudinalControl, CANFD_CAR, CP.sccBus == 0]):
+    new_radar = Params().get_bool("NewRadarInterface")
+    if all([CP.openpilotLongitudinalControl, new_radar]):
       addr, bus = 0x7d0, 0
       if CP.flags & HyundaiFlags.CANFD_HDA2.value:
         addr, bus = 0x730, 5
@@ -381,15 +388,6 @@ class CarInterface(CarInterfaceBase):
 
   def _update(self, c):
     ret = self.CS.update(self.cp, self.cp2, self.cp_cam)
-
-    if CANFD_CAR:
-      canvalid = any([self.cp.can_valid, self.cp_cam.can_valid])
-      if not canvalid:
-        print('cp = {}  cp_cam = {}'.format(bool(self.cp.can_valid), bool(self.cp_cam.can_valid)))
-    else:
-      canvalid = any([self.cp.can_valid, self.cp2.can_valid, self.cp_cam.can_valid])
-      if not canvalid:
-        print('cp = {}  cp2 = {}  cp_cam = {}'.format(bool(self.cp.can_valid), bool(self.cp2.can_valid), bool(self.cp_cam.can_valid)))
 
     if self.CP.pcmCruise and not self.CC.scc_live:
       self.CP.pcmCruise = False
