@@ -208,7 +208,7 @@ class SccSmoother:
         if self.can_fd:
           can_sends.append(hyundaicanfd.create_buttons(packer, CS.buttons_counter + 1, self.btn))
         else:
-          can_sends.append(hyundaican.create_clu11(packer, CS.scc_bus, self.btn, clu_speed, CS.clu11))
+          can_sends.append(hyundaican.create_clu11(packer, frame, CS.scc_bus, self.btn, clu_speed, CS.clu11))
 
         if self.alive_timer == 0:
           self.started_frame = frame

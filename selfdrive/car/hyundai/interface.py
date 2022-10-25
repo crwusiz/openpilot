@@ -388,13 +388,11 @@ class CarInterface(CarInterfaceBase):
     ret = self.CS.update(self.cp, self.cp2, self.cp_cam)
 
     if CANFD_CAR:
-      canvalid = any([self.cp.can_valid, self.cp_cam.can_valid])
-      if not canvalid:
-        print('cp = {}  cp_cam = {}'.format(bool(self.cp.can_valid), bool(self.cp_cam.can_valid)))
+      if not any([self.cp.can_valid, self.cp_cam.can_valid]):
+        print(f'cp = {bool(self.cp.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
     else:
-      canvalid = any([self.cp.can_valid, self.cp2.can_valid, self.cp_cam.can_valid])
-      if not canvalid:
-        print('cp = {}  cp2 = {}  cp_cam = {}'.format(bool(self.cp.can_valid), bool(self.cp2.can_valid), bool(self.cp_cam.can_valid)))
+      if not any([self.cp.can_valid, self.cp2.can_valid, self.cp_cam.can_valid]):
+        print(f'cp = {bool(self.cp.can_valid)}  cp2 = {bool(self.cp2.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
 
     if self.CP.pcmCruise and not self.CC.scc_live:
       self.CP.pcmCruise = False

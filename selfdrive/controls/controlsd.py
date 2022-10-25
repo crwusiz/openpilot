@@ -490,10 +490,7 @@ class Controls:
     if CS.cruiseState.available:
     # if stock cruise is completely disabled, then we can use our own set speed logic
       if not self.CP.pcmCruise:
-        if self.CP.carName == "hyundai":
-          self.v_cruise_kph = SccSmoother.update_v_cruise(self.v_cruise_kph, CS.buttonEvents, self.enabled, self.is_metric)
-        else:
-          self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents, self.button_timers, self.enabled, self.is_metric)
+        self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents, self.button_timers, self.enabled, self.is_metric)
         self.v_cruise_cluster_kph = self.v_cruise_kph
       else:
         self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH

@@ -19,7 +19,6 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
   values["CF_Lkas_ActToi"] = steer_req
   values["CF_Lkas_ToiFlt"] = torque_fault  # seems to allow actuation on CR_Lkas_StrToqReq
   values["CF_Lkas_MsgCount"] = frame % 0x10
-  values["CF_Lkas_Chksum"] = 0
 
   mfc_ldwslkas = Params().get("MfcSelect", encoding='utf8') == "1"
   mfc_lfa = Params().get("MfcSelect", encoding='utf8') == "2"
@@ -39,8 +38,8 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
     values["CF_Lkas_SysWarning"] = 4 if sys_warning else 0
 
+  values["CF_Lkas_Chksum"] = 0
   dat = packer.make_can_msg("LKAS11", 0, values)[2]
-
   if car_fingerprint in CHECKSUM["crc8"]:
     checksum = hyundai_checksum(dat[:6] + dat[7:8])  # CRC Checksum
   elif car_fingerprint in CHECKSUM["6B"]:
@@ -52,12 +51,12 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
   return packer.make_can_msg("LKAS11", bus, values)
 
 
-def create_clu11(packer, bus, button, speed, clu11):
+def create_clu11(packer, frame, bus, button, speed, clu11):
   values = copy.copy(clu11)
 
   values["CF_Clu_CruiseSwState"] = button
   values["CF_Clu_Vanz"] = speed
-  values["CF_Clu_AliveCnt1"] = (values["CF_Clu_AliveCnt1"] + 1) % 0x10
+  values["CF_Clu_AliveCnt1"] = frame % 0x10
 
   return packer.make_can_msg("CLU11", bus, values)
 
@@ -68,11 +67,10 @@ def create_mdps12(packer, frame, mdps12):
   values["CF_Mdps_ToiActive"] = 0
   values["CF_Mdps_ToiUnavail"] = 1
   values["CF_Mdps_MsgCount2"] = frame % 0x100
-  values["CF_Mdps_Chksum2"] = 0
 
+  values["CF_Mdps_Chksum2"] = 0
   dat = packer.make_can_msg("MDPS12", 2, values)[2]
-  checksum = sum(dat) % 256
-  values["CF_Mdps_Chksum2"] = checksum
+  values["CF_Mdps_Chksum2"] = sum(dat) % 256
 
   return packer.make_can_msg("MDPS12", 2, values)
 
@@ -82,7 +80,6 @@ def create_scc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, s
 
   values = copy.copy(CS.scc11)
   values["AliveCounterACC"] = idx % 0x10
-
   if not scc_live:
     values["MainMode_ACC"] = 1
     values["TauGapSet"] = 4
@@ -98,15 +95,14 @@ def create_scc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, s
   values = copy.copy(CS.scc12)
   if not scc_live:
     values["ACCMode"] = 2 if enabled and long_override else 1 if enabled else 0
-
   values["StopReq"] = 1 if stopping else 0
   values["aReqRaw"] = accel
   values["aReqValue"] = accel  # stock ramps up and down respecting jerk limit until it reaches aReqRaw
   values["CR_VSM_Alive"] = idx % 0xF
-  values["CR_VSM_ChkSum"] = 0
-  scc12_dat = packer.make_can_msg("SCC12", 0, values)[2]
-  values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in scc12_dat) % 0x10
 
+  values["CR_VSM_ChkSum"] = 0
+  dat = packer.make_can_msg("SCC12", 0, values)[2]
+  values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in dat) % 0x10
   commands.append(packer.make_can_msg("SCC12", 0, values))
 
   if CS.has_scc13:
@@ -140,6 +136,7 @@ def create_lfahda_mfc(packer, enabled, active):
     "HDA_Chime": 1 if enabled else 0,
   }
   return packer.make_can_msg("LFAHDA_MFC", 0, values)
+
 
 # ---------------------------------------------------------------------------------------
 # CF_Lkas_FcwOpt_USM 0 = No car + lanes

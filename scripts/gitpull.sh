@@ -14,5 +14,7 @@ git reset --hard $REMOTE_HASH
 echo ""
 echo "  Git Fetch and Reset HEAD commit ..."
 echo ""
+echo "  current branch is [ $BRANCH ]  "
+echo ""
 
 exec /data/openpilot/scripts/restart.sh
