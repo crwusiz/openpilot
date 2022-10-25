@@ -5,7 +5,6 @@
 #include <QMouseEvent>
 #include <QVBoxLayout>
 
-#include "common/params.h"
 #include "selfdrive/ui/qt/util.h"
 #include "selfdrive/ui/qt/widgets/drive_stats.h"
 #include "selfdrive/ui/qt/widgets/prime.h"
@@ -116,15 +115,16 @@ OffroadHome::OffroadHome(QWidget* parent) : QFrame(parent) {
   update_notif->setVisible(false);
   update_notif->setStyleSheet("background-color: #364DEF;");
   QObject::connect(update_notif, &QPushButton::clicked, [=]() { center_layout->setCurrentIndex(1); });
-  header_layout->addWidget(update_notif, 0, Qt::AlignHCenter | Qt::AlignRight);
+  header_layout->addWidget(update_notif, 0, Qt::AlignHCenter | Qt::AlignLeft);
 
   alert_notif = new QPushButton();
   alert_notif->setVisible(false);
   alert_notif->setStyleSheet("background-color: #E22C2C;");
   QObject::connect(alert_notif, &QPushButton::clicked, [=] { center_layout->setCurrentIndex(2); });
-  header_layout->addWidget(alert_notif, 0, Qt::AlignHCenter | Qt::AlignRight);
+  header_layout->addWidget(alert_notif, 0, Qt::AlignHCenter | Qt::AlignLeft);
 
-  header_layout->addWidget(new QLabel(getBrandVersion()), 0, Qt::AlignHCenter | Qt::AlignRight);
+  version = new ElidedLabel();
+  header_layout->addWidget(version, 0, Qt::AlignHCenter | Qt::AlignRight);
 
   main_layout->addLayout(header_layout);
 
@@ -187,6 +187,7 @@ void OffroadHome::refresh() {
   QString locale_name = QString(uiState()->language).replace("main_", "");
   QString dateString = QLocale(locale_name).toString(QDateTime::currentDateTime(), "📅 yyyy-M-d 🕰️ AP H:m:ss");
   date->setText(dateString);
+  version->setText(getBrand() + " " +  QString::fromStdString(params.get("UpdaterCurrentDescription")));
 
   bool updateAvailable = update_widget->refresh();
   int alerts = alerts_widget->refresh();
