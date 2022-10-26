@@ -52,9 +52,6 @@ class SccSmoother:
   def __init__(self, CP):
     self.btn = Buttons.NONE
 
-    self.read_param()
-
-    self.param_read_counter = 0
     self.started_frame = 0
     self.wait_timer = 0
     self.alive_timer = 0
@@ -79,9 +76,6 @@ class SccSmoother:
 
     self.longcontrol = CP.openpilotLongitudinalControl
     self.can_fd = CP.carFingerprint in CANFD_CAR
-
-
-  def read_param(self):
     self.is_metric = Params().get_bool("IsMetric")
 
 
@@ -164,11 +158,6 @@ class SccSmoother:
 
 
   def update(self, enabled, can_sends, packer, CC, CS, frame, controls):
-    if self.param_read_counter % 100 == 0:
-      self.read_param()
-
-    self.param_read_counter += 1
-
     # mph or kph
     clu_speed = CS.out.vEgoCluster * self.speed_conv_to_clu
     cruise_speed = CS.out.cruiseState.speed
@@ -263,7 +252,7 @@ class SccSmoother:
 
 
   def cal_curve_speed(self, sm, v_ego, frame):
-    if frame % 20 == 0:
+    if frame % 10 == 0:
       md = sm['modelV2']
       if len(md.position.x) == TRAJECTORY_SIZE and len(md.position.y) == TRAJECTORY_SIZE:
         x = md.position.x
