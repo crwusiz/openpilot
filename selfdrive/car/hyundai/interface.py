@@ -317,7 +317,8 @@ class CarInterface(CarInterfaceBase):
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.noOutput),
                            get_safety_config(car.CarParams.SafetyModel.hyundaiCanfd)]
 
-      ret.enableBsm = 0x58b in fingerprint[0] # 1419
+      bus = 5 if ret.flags & HyundaiFlags.CANFD_HDA2 else 4
+      ret.enableBsm = 0x1e5 in fingerprint[bus]
       ret.radarOffCan = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
       ret.pcmCruise = not ret.openpilotLongitudinalControl
       # detect HDA2 with ADAS Driving ECU
