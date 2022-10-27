@@ -219,9 +219,9 @@ struct CarState {
   fuelGauge @41 :Float32; # battery or fuel tank level from 0.0 to 1.0
   charging @43 :Bool;
 
-  cruiseGap @45 : Int32;
-  autoHold @46 : Int32;
-  tpms @47 : Tpms;
+  # add neokii
+  autoHold @45 : Int32;
+  tpms @46 : Tpms;
 
   struct Tpms {
     fl @0 :Float32;
@@ -246,6 +246,7 @@ struct CarState {
     speedOffset @3 :Float32;
     standstill @4 :Bool;
     nonAdaptive @5 :Bool;
+    gapAdjust @7 :Int8;
   }
 
   enum GearShifter {
@@ -343,15 +344,18 @@ struct CarControl {
   cruiseControl @4 :CruiseControl;
   hudControl @5 :HUDControl;
 
-  sccSmoother @15 :SccSmoother;
+  # add neokii
+  applyMaxSpeed @15 :Float32;
+  cruiseMaxSpeed @16 :Float32;
+  autoTrGap @17 :UInt32;
+  steerRatio @18 :Float32;
+  steerActuatorDelay @19 :Float32;
+  sccBus @20 :UInt8;
+  longControl @24:Bool;
 
-  struct SccSmoother {
-    longControl @0:Bool;
-    applyMaxSpeed @1 :Float32;
-    cruiseMaxSpeed @2 :Float32;
-    logMessage @3 :Text;
-    autoTrGap @4 :UInt32;
-  }
+  applyAccel @21 :Float32;
+  aReqValue @22 :Float32;
+  debugText @23 :Text;
 
   struct Actuators {
     # range from 0.0 - 1.0

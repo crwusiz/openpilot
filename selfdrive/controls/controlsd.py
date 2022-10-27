@@ -31,6 +31,7 @@ from selfdrive.controls.lib.vehicle_model import VehicleModel
 from selfdrive.locationd.calibrationd import Calibration
 from system.hardware import HARDWARE
 from selfdrive.manager.process_config import managed_processes
+from selfdrive.controls.neokii.speed_controller import SpeedController
 
 SOFT_DISABLE_TIME = 3  # seconds
 LDW_MIN_SPEED = 50 * CV.KPH_TO_MS
@@ -197,9 +198,7 @@ class Controls:
     self.desired_curvature = 0.0
     self.desired_curvature_rate = 0.0
 
-    # scc smoother
-    self.applyMaxSpeed = 0
-    self.is_cruise_enabled = False
+    self.speed_controller = SpeedController(self.CP, self.CI)
 
     # TODO: no longer necessary, aside from process replay
     self.sm['liveParameters'].valid = True
@@ -398,7 +397,7 @@ class Controls:
 
     if not REPLAY:
       # Check for mismatch between openpilot and car's PCM
-      cruise_mismatch = CS.cruiseState.enabled and (not self.enabled or not self.CP.pcmCruise)
+      cruise_mismatch = CS.cruiseState.enabled and (not self.enabled) # or not self.CP.pcmCruise)
       self.cruise_mismatch_counter = self.cruise_mismatch_counter + 1 if cruise_mismatch else 0
       if self.cruise_mismatch_counter > int(6. / DT_CTRL):
         self.events.add(EventName.cruiseMismatch)
@@ -502,6 +501,8 @@ class Controls:
     else:
       self.v_cruise_kph = 0 #V_CRUISE_INITIAL
       self.v_cruise_cluster_kph = 0 #V_CRUISE_INITIAL
+
+    self.v_cruise_kph, self.v_cruise_cluster_kph = self.speed_controller.update_v_cruise(self, CS)
 
     # decrement the soft disable timer at every step, as it's reset on
     # entrance in SOFT_DISABLING state
@@ -752,6 +753,8 @@ class Controls:
     if self.enabled:
       clear_event_types.add(ET.NO_ENTRY)
 
+    self.speed_controller.inject_events(CS, self.events)
+
     alerts = self.events.create_alerts(self.current_alert_types, [self.CP, CS, self.sm, self.is_metric, self.soft_disable_timer])
     self.AM.add_many(self.sm.frame, alerts)
     current_alert = self.AM.process_alerts(self.sm.frame, clear_event_types)
@@ -760,10 +763,14 @@ class Controls:
 
     if not self.read_only and self.initialized:
       # send car controls over can
-      if self.CP.carName == "hyundai":
-        self.last_actuators, can_sends = self.CI.apply(CC, self)
-      else:
-        self.last_actuators, can_sends = self.CI.apply(CC)
+      self.last_actuators, can_sends = self.CI.apply(CC)
+
+      v_cruise_cluster_kph = self.speed_controller.update_can(self.enabled, CC, CS, self.sm, can_sends)
+      if v_cruise_cluster_kph > 0:
+        self.v_cruise_cluster_kph = v_cruise_cluster_kph
+
+      self.speed_controller.update_message(self, CC, CS)
+
       self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
       CC.actuatorsOutput = self.last_actuators
       self.steer_limited = abs(CC.actuators.steer - CC.actuatorsOutput.steer) > 1e-2
@@ -802,7 +809,7 @@ class Controls:
     controlsState.engageable = not self.events.any(ET.NO_ENTRY)
     controlsState.longControlState = self.LoC.long_control_state
     controlsState.vPid = float(self.LoC.v_pid)
-    controlsState.vCruise = float(self.applyMaxSpeed if self.CP.openpilotLongitudinalControl else self.v_cruise_kph)
+    controlsState.vCruise = float(self.v_cruise_kph)
     controlsState.vCruiseCluster = float(self.v_cruise_cluster_kph)
     controlsState.upAccelCmd = float(self.LoC.pid.p)
     controlsState.uiAccelCmd = float(self.LoC.pid.i)

@@ -213,8 +213,18 @@ class CarInterfaceBase(ABC):
     return reader
 
   @abstractmethod
-  def apply(self, c: car.CarControl, controls) -> Tuple[car.CarControl.Actuators, List[bytes]]:
+  def apply(self, c: car.CarControl) -> Tuple[car.CarControl.Actuators, List[bytes]]:
     pass
+
+  @staticmethod
+  def get_params_adjust_set_speed():
+    return [10], [20]
+
+  def create_buttons(self, button):
+    return None
+
+  def get_buttons_dict(self):
+    return None
 
   def create_common_events(self, cs_out, extra_gears=None, pcm_enable=True, allow_enable=True,
                            enable_buttons=(ButtonType.accelCruise, ButtonType.decelCruise)):
@@ -255,8 +265,8 @@ class CarInterfaceBase(ABC):
       if not self.CP.pcmCruise and (b.type in enable_buttons and not b.pressed):
         events.add(EventName.buttonEnable)
       # Disable on rising edge of cancel for both stock and OP long
-      if not self.CP.pcmCruise and (b.type == ButtonType.cancel and b.pressed):
-        events.add(EventName.buttonCancel)
+      #if b.type == ButtonType.cancel and b.pressed:
+      #  events.add(EventName.buttonCancel)
 
     # Handle permanent and temporary steering faults
     self.steering_unpressed = 0 if cs_out.steeringPressed else self.steering_unpressed + 1
@@ -275,9 +285,9 @@ class CarInterfaceBase(ABC):
     # we engage when pcm is active (rising edge)
     # enabling can optionally be blocked by the car interface
     if pcm_enable:
-      if cs_out.cruiseState.enabled and not self.CS.out.cruiseState.enabled and allow_enable:
+      if cs_out.cruiseState.available and not self.CS.out.cruiseState.available and allow_enable:
         events.add(EventName.pcmEnable)
-      elif not cs_out.cruiseState.enabled:
+      elif not cs_out.cruiseState.available:
         events.add(EventName.pcmDisable)
 
     return events

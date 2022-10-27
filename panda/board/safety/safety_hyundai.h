@@ -1,4 +1,5 @@
 #include "safety_hyundai_common.h"
+#include "safety_hyundai_community_common.h"
 
 const SteeringLimits HYUNDAI_STEERING_LIMITS = {
   .max_steer = 384,
@@ -257,6 +258,7 @@ static int hyundai_rx_hook(CANPacket_t *to_push) {
     }
     generic_rx_checks(stock_ecu_detected);
   }
+  hyundai_mdps12_chksum(to_push);
   return valid;
 }
 

@@ -322,7 +322,8 @@ class LongitudinalMpc:
     lead_xv_1 = self.process_lead(radarstate.leadTwo)
 
     # neokii
-    cruise_gap = int(clip(carstate.cruiseGap, 1., 4.)) if carstate.cruiseGap > 0 else AUTO_TR_CRUISE_GAP
+    gapAdjust = carstate.cruiseState.gapAdjust
+    cruise_gap = int(clip(gapAdjust, 1., 4.)) if gapAdjust > 0 else AUTO_TR_CRUISE_GAP
     if cruise_gap == AUTO_TR_CRUISE_GAP:
       tr = interp(carstate.vEgo, AUTO_TR_BP, AUTO_TR_V) if self.mode == 'acc' else T_FOLLOW
     else:

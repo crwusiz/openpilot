@@ -9,8 +9,8 @@ from opendbc.can.packer import CANPacker
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai import hyundaicanfd, hyundaican
 from selfdrive.car.hyundai.values import HyundaiFlags, Buttons, CarControllerParams, CANFD_CAR, CAR
-from selfdrive.road_speed_limiter import road_speed_limiter_get_active
-from selfdrive.car.hyundai.scc_smoother import SccSmoother
+from selfdrive.controls.neokii.cruise_state_manager import CruiseStateManager
+from selfdrive.controls.neokii.navi_controller import SpeedLimiter
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 LongCtrlState = car.CarControl.Actuators.LongControlState
@@ -51,7 +51,6 @@ class CarController:
     self.CP = CP
     self.CCP = CarControllerParams(CP)
     self.packer = CANPacker(dbc_name)
-    self.scc_smoother = SccSmoother(CP)
     self.scc_live = not CP.radarOffCan
     self.car_fingerprint = CP.carFingerprint
 
@@ -69,7 +68,7 @@ class CarController:
     self.mfc_lfa = Params().get("MfcSelect", encoding='utf8') == "2"
 
 
-  def update(self, CC, CS, controls):
+  def update(self, CC, CS):
     actuators = CC.actuators
     hud_control = CC.hudControl
 
@@ -190,42 +189,56 @@ class CarController:
       if CS.eps_bus:
         can_sends.append(hyundaican.create_mdps12(self.packer, self.frame, CS.mdps12))
 
-      # fix auto resume - by neokii
-      if CC.cruiseControl.resume and not CS.out.gasPressed:
-        if self.last_lead_distance == 0:
-          self.last_lead_distance = CS.lead_distance
-          self.resume_cnt = 0
-          self.resume_wait_timer = 0
-        elif self.scc_smoother.is_active(self.frame):
-          pass
-        elif self.resume_wait_timer > 0:
-          self.resume_wait_timer -= 1
-        elif abs(CS.lead_distance - self.last_lead_distance) > 0.1:
+      if not self.CP.openpilotLongitudinalControl or CruiseStateManager.instance().is_resume_spam_allowed(self.CP):
+        if CC.cruiseControl.cancel:
           can_sends.append(hyundaican.create_clu11(self.packer, self.frame, CS.scc_bus, Buttons.RES_ACCEL, clu11_speed, CS.clu11))
-          self.resume_cnt += 1
-          if self.resume_cnt >= int(randint(4, 5) * 2):
-            self.resume_cnt = 0
-            self.resume_wait_timer = int(randint(20, 25) * 2)
-      elif self.last_lead_distance != 0:
-        self.last_lead_distance = 0
 
-      # scc smoother
-      self.scc_smoother.update(CC.enabled, can_sends, self.packer, CC, CS, self.frame, controls)
+        # fix auto resume - by neokii
+        elif CC.cruiseControl.resume:
+          if self.scc_live:
+            if CS.lead_distance <= 0:
+              return
 
+            if CC.cruiseControl.resume and not CS.out.gasPressed:
+              if self.last_lead_distance == 0:
+                self.last_lead_distance = CS.lead_distance
+                self.resume_cnt = 0
+                self.resume_wait_timer = 0
+
+              elif self.resume_wait_timer > 0:
+                self.resume_wait_timer -= 1
+              elif abs(CS.lead_distance - self.last_lead_distance) > 0.1:
+                can_sends.append(hyundaican.create_clu11(self.packer, self.frame, CS.scc_bus, Buttons.RES_ACCEL, clu11_speed, CS.clu11))
+                self.resume_cnt += 1
+                if self.resume_cnt >= int(randint(4, 5) * 2):
+                  self.resume_cnt = 0
+                  self.resume_wait_timer = int(randint(20, 25) * 2)
+            elif self.last_lead_distance != 0:
+              self.last_lead_distance = 0
+          else:
+            # send resume at a max freq of 10Hz
+            if (self.frame - self.last_button_frame) * DT_CTRL > 0.1:
+              # send 25 messages at a time to increases the likelihood of resume being accepted
+              can_sends.extend([hyundaican.create_clu11(self.packer, CS.clu11, Buttons.RES_ACCEL, self.CP.sccBus)] * 25)
+              self.last_button_frame = self.frame
+
+      scc_commands = Params().get("SccCommands", encoding='utf8')
       # send scc to car if longcontrol enabled and SCC not on bus 0 or not live
       if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl and CS.out.cruiseState.enabled and (CS.scc_bus or not self.scc_live):
         jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0
-        can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), CC.enabled and CC.longActive, accel, jerk,
-                                                        hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, self.scc_live, CS))
+        if scc_commands == 0:
+          can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), CC.enabled and CC.longActive, accel, jerk,
+                                                          hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, self.scc_live, CS))
+        elif scc_commands == 1:
+          can_sends.extend(hyundaican.create_acc_commands(self.packer, int(self.frame / 2), CC.enabled and CC.longActive, accel, jerk,
+                                                          hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, CS))
 
       if self.frame % 500 == 0:
         print(f'scc11 = {bool(CS.scc11)}  scc12 = {bool(CS.scc12)}  scc13 = {bool(CS.scc13)}  scc14 = {bool(CS.scc14)}')
 
       # 20 Hz LFA MFA message
-      if self.frame % 5 == 0:
-        activated_hda = road_speed_limiter_get_active()  # 0 off, 1 main road, 2 highway
-        if self.mfc_lfa:
-          can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, activated_hda))
+      if self.frame % 5 == 0 and self.mfc_lfa:
+        can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, SpeedLimiter.instance().get_active()))
 
       # 5 Hz ACC options
       if self.frame % 20 == 0 and self.CP.openpilotLongitudinalControl:
@@ -234,6 +247,8 @@ class CarController:
       # 2 Hz front radar options
       #if self.frame % 50 == 0 and self.CP.openpilotLongitudinalControl:
       #  can_sends.append(hyundaican.create_frt_radar_opt(self.packer))
+
+    CC.applyAccel = accel
 
     new_actuators = actuators.copy()
     new_actuators.steer = apply_steer / self.CCP.STEER_MAX

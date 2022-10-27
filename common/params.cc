@@ -206,6 +206,8 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"LoggerDisable", PERSISTENT},
     {"NavDisable", PERSISTENT},
     {"SelectedCar", PERSISTENT},
+    {"SccCommandsSelect", PERSISTENT},
+    {"CruiseStateControl", PERSISTENT},
     {"SelectedManufacturer", PERSISTENT},
     {"SoftRestartTriggered", CLEAR_ON_MANAGER_START},
     {"NewRadarInterface", PERSISTENT},

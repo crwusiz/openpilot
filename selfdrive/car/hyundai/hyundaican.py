@@ -109,6 +109,7 @@ def create_scc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, s
   values["StopReq"] = 1 if stopping else 0
   values["aReqRaw"] = accel
   values["aReqValue"] = accel  # stock ramps up and down respecting jerk limit until it reaches aReqRaw
+  values["ACCFailInfo"] = 0
   values["CR_VSM_Alive"] = idx % 0xF
   values["CR_VSM_ChkSum"] = 0
 
@@ -116,15 +117,58 @@ def create_scc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, s
   values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in dat) % 0x10
   commands.append(packer.make_can_msg("SCC12", 0, values))
 
-  if CS.has_scc14:
-    values = copy.copy(CS.scc14)
+  if CS.scc14 is not None:
+    values = CS.scc14
     values["ComfortBandUpper"] = 0.0  # stock usually is 0 but sometimes uses higher values
     values["ComfortBandLower"] = 0.0  # stock usually is 0 but sometimes uses higher values
     values["JerkUpperLimit"] = upper_jerk  # stock usually is 1.0 but sometimes uses higher values
     values["JerkLowerLimit"] = 5.0  # stock usually is 0.5 but sometimes uses higher values
     values["ACCMode"] = 2 if enabled and long_override else 1 if enabled else 4 # stock will always be 4 instead of 0 after first disengage
     values["ObjGap"] = 2 if lead_visible else 0, # 5: >30, m, 4: 25-30 m, 3: 20-25 m, 2: < 20 m, 0: no lead
-    commands.append(packer.make_can_msg("SCC14", 0, values))
+  commands.append(packer.make_can_msg("SCC14", 0, values))
+
+
+def create_acc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, set_speed, stopping, long_override, CS):
+  commands = []
+
+  cruise_enabled = enabled and CS.out.cruiseState.enabled
+
+  values = CS.scc11
+  values["MainMode_ACC"] = CS.out.cruiseState.available
+  values["TauGapSet"] = CS.out.cruiseState.gapAdjust
+  values["VSetDis"] = set_speed if cruise_enabled else 0
+  values["AliveCounterACC"] = idx % 0x10
+  values["ObjValid"] = 1 # close lead makes controls tighter
+  #values["ACC_ObjStatus"] = 1,  # close lead makes controls tighter
+  #values["ACC_ObjLatPos"] = 0,
+  #values["ACC_ObjRelSpd"] = 10,
+  #values["ACC_ObjDist"] = 50,  # close lead makes controls tighter
+  values["DriverAlertDisplay"] = 0
+  commands.append(packer.make_can_msg("SCC11", 0, values))
+
+  values = CS.scc12
+  values["ACCMode"] = 2 if cruise_enabled and long_override else 1 if cruise_enabled else 0
+  values["StopReq"] = 1 if cruise_enabled and stopping else 0
+  values["aReqRaw"] = accel
+  values["aReqValue"] = accel
+  values["ACCFailInfo"] = 0
+  values["CR_VSM_Alive"] = idx % 0xF
+  values["CR_VSM_ChkSum"] = 0
+
+  scc12_dat = packer.make_can_msg("SCC12", 0, values)[2]
+  values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in scc12_dat) % 0x10
+  commands.append(packer.make_can_msg("SCC12", 0, values))
+
+  if CS.scc14 is not None:
+    values = CS.scc14
+    values["ComfortBandUpper"] = 0.0  # stock usually is 0 but sometimes uses higher values
+    values["ComfortBandLower"] = 0.0  # stock usually is 0 but sometimes uses higher values
+    values["JerkUpperLimit"] = upper_jerk  # stock usually is 1.0 but sometimes uses higher values
+    values["JerkLowerLimit"] = 5.0  # stock usually is 0.5 but sometimes uses higher values
+    values["ACCMode"] = 2 if enabled and long_override else 1 if enabled else 4 # stock will always be 4 instead of 0 after first disengage
+    values["ObjGap"] = 2 if lead_visible else 0, # 5: >30, m, 4: 25-30 m, 3: 20-25 m, 2: < 20 m, 0: no lead
+  commands.append(packer.make_can_msg("SCC14", 0, values))
+
 
   # note that some vehicles most likely have an alternate checksum/counter definition
   # https://github.com/commaai/opendbc/commit/9ddcdb22c4929baf310295e832668e6e7fcfa602

@@ -104,7 +104,7 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "NavSettingLeftSide",
       tr("Show Map on Left Side of UI"),
       tr("Show map on left side when in split screen view."),
-      "../assets/offroad/icon_road.png",
+      "../assets/offroad/icon_map.png",
       false,
     },
 #endif
@@ -632,6 +632,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   communityLayout->addWidget(new LateralControlSelect());
   communityLayout->addWidget(new MfcSelect());
   communityLayout->addWidget(new AebSelect());
+  communityLayout->addWidget(new SccCommandsSelect());
   communityLayout->addWidget(horizontal_line());
 
   // add community toggle
@@ -654,6 +655,11 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   toggles.append(new ParamControl("NewRadarInterface",
                                   tr("New radar interface Enable"),
                                   tr("Some newer car New radar interface"),
+                                  "../assets/offroad/icon_road.png",
+                                  false, this));
+  toggles.append(new ParamControl("CruiseStateControl",
+                                  tr("Npilot controls Cruise State (Experimental)"),
+                                  tr("Npilot controls cruise on/off, gap and set speed."),
                                   "../assets/offroad/icon_road.png",
                                   false, this));
   for (ParamControl *toggle : toggles) {
@@ -968,6 +974,71 @@ void AebSelect::refresh() {
     label.setText(QString::fromStdString("Scc12"));
   } else if (aeb == "1") {
     label.setText(QString::fromStdString("Fca11"));
+  }
+  btnminus.setText("◀");
+  btnplus.setText("▶");
+}
+
+//SccCommandsSelect
+SccCommandsSelect::SccCommandsSelect() : AbstractControl("SCC [√]", tr("Scc Commands Select (Scc/Acc)"), "../assets/offroad/icon_logic.png") {
+  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
+  label.setStyleSheet("color: #e0e879");
+  hlayout->addWidget(&label);
+
+  btnminus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnplus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 45px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnminus.setFixedSize(120, 100);
+  btnplus.setFixedSize(120, 100);
+
+  hlayout->addWidget(&btnminus);
+  hlayout->addWidget(&btnplus);
+
+  QObject::connect(&btnminus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("SccCommandsSelect"));
+    int scc = str.toInt();
+    scc = scc - 1;
+    if (scc <= 0 ) {
+      scc = 0;
+    }
+    QString sccs = QString::number(scc);
+    Params().put("SccCommandsSelect", sccs.toStdString());
+    refresh();
+  });
+
+  QObject::connect(&btnplus, &QPushButton::released, [=]() {
+    auto str = QString::fromStdString(Params().get("SccCommandsSelect"));
+    int scc = str.toInt();
+    scc = scc + 1;
+    if (scc >= 1 ) {
+      scc = 1;
+    }
+    QString sccs = QString::number(scc);
+    Params().put("SccCommandsSelect", sccs.toStdString());
+    refresh();
+  });
+  refresh();
+}
+
+void SccCommandsSelect::refresh() {
+  QString scc = QString::fromStdString(Params().get("SccCommandsSelect"));
+  if (scc == "0") {
+    label.setText(QString::fromStdString("Scc"));
+  } else if (scc == "1") {
+    label.setText(QString::fromStdString("Acc"));
   }
   btnminus.setText("◀");
   btnplus.setText("▶");

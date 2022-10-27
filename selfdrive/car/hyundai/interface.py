@@ -311,6 +311,7 @@ class CarInterface(CarInterfaceBase):
     elif any([lat_torque, candidate in CANFD_CAR]):
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
+    cruise_state_control = Params().get_bool('CruiseStateControl')
 
     if candidate in CANFD_CAR:
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.noOutput),
@@ -336,7 +337,10 @@ class CarInterface(CarInterfaceBase):
       if ret.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
         ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_ALT_BUTTONS
     else:
-      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
+      if cruise_state_control:
+        ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy)]
+      else:
+        ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
 
       # ignore CAN2 address if L-CAN on the same BUS
       ret.epsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
@@ -433,10 +437,6 @@ class CarInterface(CarInterfaceBase):
     if self.CC.turning_indicator_alert:
       events.add(EventName.turningIndicatorOn)
 
-    # scc smoother
-    if self.CC.scc_smoother is not None:
-      self.CC.scc_smoother.inject_events(events)
-
     # low speed steer alert hysteresis logic (only for cars with steer cut off above 10 m/s)
     if ret.vEgo < (self.CP.minSteerSpeed + 2.) and self.CP.minSteerSpeed > 10.:
       self.low_speed_alert = True
@@ -449,5 +449,34 @@ class CarInterface(CarInterfaceBase):
 
     return ret
 
-  def apply(self, c, controls):
-    return self.CC.update(c, self.CS, controls)
+  def apply(self, c):
+    return self.CC.update(c, self.CS)
+
+  @staticmethod
+  def get_params_adjust_set_speed():
+    return [8, 10], [12, 14, 16, 18]
+
+  def create_buttons(self, button):
+
+    if self.CP.carFingerprint in CANFD_CAR:
+      return self.create_buttons_can_fd(button)
+    else:
+      return self.create_buttons_can(button)
+
+  def get_buttons_dict(self):
+    return BUTTONS_DICT
+
+  def create_buttons_can(self, button):
+    values = self.CS.clu11
+    values["CF_Clu_CruiseSwState"] = button
+    values["CF_Clu_AliveCnt1"] = (values["CF_Clu_AliveCnt1"] + 1) % 0x10
+    return self.CC.packer.make_can_msg("CLU11", self.CP.sccBus, values)
+
+  def create_buttons_can_fd(self, button):
+    values = {
+      "COUNTER": self.CS.buttons_counter+1,
+      "SET_ME_1": 1,
+      "CRUISE_BUTTONS": button,
+    }
+    return self.CC.packer.make_can_msg("CRUISE_BUTTONS", 5, values)
+

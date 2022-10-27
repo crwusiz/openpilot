@@ -2043,7 +2043,7 @@ struct Event {
     uiDebug @102 :UIDebug;
 
     # neokii
-    roadLimitSpeed @103 :RoadLimitSpeed;
+    naviData @103 :NaviData;
 
     # *********** debug ***********
     testJoystick @52 :Joystick;
@@ -2093,7 +2093,7 @@ struct Event {
   }
 }
 
-struct RoadLimitSpeed {
+struct NaviData {
     active @0 :Int16;
     roadLimitSpeed @1 :Int16;
     isHighway @2 :Bool;

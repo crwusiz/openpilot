@@ -176,6 +176,7 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   pm = std::make_unique<PubMaster, const std::initializer_list<const char *>>({"uiDebug"});
 
   steer_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
+  lat_img = loadPixmap("../assets/img_lat.png", {img_size, img_size});
   longitudinal_img = loadPixmap("../assets/offroad/icon_disengage_on_accelerator.svg", {img_size, img_size});
   dm_img = loadPixmap("../assets/img_driver_face.png", {img_size, img_size});
 
@@ -228,13 +229,13 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   const auto rs = sm["radarState"].getRadarState();
   const auto lp = sm["liveParameters"].getLiveParameters();
   const auto ge = sm["gpsLocationExternal"].getGpsLocationExternal();
-  const auto ls = sm["roadLimitSpeed"].getRoadLimitSpeed();
+  const auto nd = sm["naviData"].getNaviData();
   const auto tp = sm["liveTorqueParameters"].getLiveTorqueParameters();
 
   const bool cs_alive = sm.alive("controlsState");
 
-  float apply_speed = cc.getSccSmoother().getApplyMaxSpeed();
-  float cruise_speed = cc.getSccSmoother().getCruiseMaxSpeed();
+  float apply_speed = cc.getApplyMaxSpeed();
+  float cruise_speed = cc.getCruiseMaxSpeed();
   bool cruise_set = cruise_speed > 0;
 
   if (cruise_set && !s.scene.is_metric) {
@@ -264,7 +265,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("dmActive", sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode());
   setProperty("brake_state", ce.getBrakeLights());
   setProperty("autohold_state", ce.getAutoHold());
-  setProperty("nda_state", ls.getActive());
+  setProperty("nda_state", nd.getActive());
   setProperty("left_blindspot", ce.getLeftBlindspot());
   setProperty("right_blindspot", ce.getRightBlindspot());
   setProperty("wifi_state", (int)ds.getNetworkStrength() > 0);
@@ -279,9 +280,9 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("lead_status", rs.getLeadOne().getStatus());
   setProperty("angleSteers", ce.getSteeringAngleDeg());
   setProperty("steerAngleDesired", cc.getActuators().getSteeringAngleDeg());
-  setProperty("longControl", cc.getSccSmoother().getLongControl());
-  setProperty("gap", ce.getCruiseGap());
-  setProperty("autoTrGap", cc.getSccSmoother().getAutoTrGap());
+  setProperty("longControl", cc.getLongControl());
+  setProperty("gap", ce.getCruiseState().getGapAdjust());
+  setProperty("autoTrGap", cc.getAutoTrGap());
   setProperty("lateralcontrol", cs.getLateralControlSelect());
   setProperty("steerRatio", lp.getSteerRatio());
   setProperty("epsBus", cp.getEpsBus());
@@ -290,11 +291,11 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("fr", ce.getTpms().getFr());
   setProperty("rl", ce.getTpms().getRl());
   setProperty("rr", ce.getTpms().getRr());
-  setProperty("roadLimitSpeed", ls.getRoadLimitSpeed());
-  setProperty("camLimitSpeed", ls.getCamLimitSpeed());
-  setProperty("camLimitSpeedLeftDist", ls.getCamLimitSpeedLeftDist());
-  setProperty("sectionLimitSpeed", ls.getSectionLimitSpeed());
-  setProperty("sectionLeftDist", ls.getSectionLeftDist());
+  setProperty("roadLimitSpeed", nd.getRoadLimitSpeed());
+  setProperty("camLimitSpeed", nd.getCamLimitSpeed());
+  setProperty("camLimitSpeedLeftDist", nd.getCamLimitSpeedLeftDist());
+  setProperty("sectionLimitSpeed", nd.getSectionLimitSpeed());
+  setProperty("sectionLeftDist", nd.getSectionLeftDist());
   setProperty("left_on", ce.getLeftBlinker());
   setProperty("right_on", ce.getRightBlinker());
   setProperty("latAccelFactor", cs.getLateralControlState().getTorqueState().getLatAccelFactor());
@@ -494,7 +495,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   if (status == STATUS_ENGAGED && !steeringPressed) {
     wheelbg_Color = engagedColor(200);
-    wheel_img = steer_img;
+    wheel_img = lat_img;
   } else if (status == STATUS_OVERRIDE && !steeringPressed) {
     wheelbg_Color = overrideColor(200);
     wheel_img = longitudinal_img;

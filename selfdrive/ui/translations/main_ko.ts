@@ -128,6 +128,14 @@
         <source>Process</source>
         <translation>실행</translation>
     </message>
+    <message>
+        <source>Npilot controls Cruise State (Experimental)</source>
+        <translation>Npilot 크루즈 컨트롤 (실험적)</translation>
+    </message>
+    <message>
+        <source>Npilot controls cruise on/off, gap and set speed.</source>
+        <translation>Npilot이 크루즈 on/off, 차량거리 및 속도를 컨트롤합니다.</translation>
+    </message>
 </context>
 <context>
     <name>ConfirmationDialog</name>
@@ -753,6 +761,13 @@ location set</source>
     </message>
 </context>
 <context>
+    <name>SccCommandsSelect</name>
+    <message>
+        <source>Scc Commands Select (Scc/Acc)</source>
+        <translation>Scc Commands 선택 (Scc/Acc)</translation>
+    </message>
+</context>
+<context>
     <name>SelectCar</name>
     <message>
         <source>Back</source>
@@ -1038,7 +1053,7 @@ location set</source>
     </message>
     <message>
         <source>Uninstall</source>
-        <translation>Uninstall</translation>
+        <translation>제거</translation>
     </message>
 </context>
 <context>
