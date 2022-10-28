@@ -102,10 +102,6 @@ void OnroadWindow::offroadTransition(bool offroad) {
 #endif
 
   alerts->updateAlert({}, bg);
-
-  // update stream type
-  bool wide_cam = Params().getBool("WideCameraOnly");
-  nvg->setStreamType(wide_cam ? VISION_STREAM_WIDE_ROAD : VISION_STREAM_ROAD);
 }
 
 void OnroadWindow::paintEvent(QPaintEvent *event) {
@@ -310,8 +306,10 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
   setProperty("frictionRaw", tp.getFrictionCoefficientRaw());
 
+  setStreamType(s.scene.wide_cam ? VISION_STREAM_WIDE_ROAD : VISION_STREAM_ROAD);
   if (s.scene.calibration_valid) {
-    CameraWidget::updateCalibration(s.scene.view_from_calib);
+    auto calib = s.scene.wide_cam ? s.scene.view_from_wide_calib : s.scene.view_from_calib;
+    CameraWidget::updateCalibration(calib);
   } else {
     CameraWidget::updateCalibration(DEFAULT_CALIBRATION);
   }
