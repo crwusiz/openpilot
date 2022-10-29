@@ -51,8 +51,8 @@ AddrCheckStruct hyundai_canfd_addr_checks[] = {
   {.msg = {{0x35, 1, 32, .check_checksum = true, .max_counter = 0xffU, .expected_timestep = 10000U},
            {0x35, 0, 32, .check_checksum = true, .max_counter = 0xffU, .expected_timestep = 10000U},
            {0x105, 0, 32, .check_checksum = true, .max_counter = 0xffU, .expected_timestep = 10000U}}},
-  {.msg = {{0x65, 1, 32, .check_checksum = true, .max_counter = 0xffU, .expected_timestep = 10000U},
-           {0x65, 0, 32, .check_checksum = true, .max_counter = 0xffU, .expected_timestep = 10000U}, { 0 }}},
+  {.msg = {{0x175, 1, 24, .check_checksum = true, .max_counter = 0xffU, .expected_timestep = 20000U},
+           {0x175, 0, 24, .check_checksum = true, .max_counter = 0xffU, .expected_timestep = 20000U}, { 0 }}},
   {.msg = {{0xa0, 1, 24, .check_checksum = true, .max_counter = 0xffU, .expected_timestep = 10000U},
            {0xa0, 0, 24, .check_checksum = true, .max_counter = 0xffU, .expected_timestep = 10000U}, { 0 }}},
   {.msg = {{0xea, 1, 24, .check_checksum = true, .max_counter = 0xffU, .expected_timestep = 10000U},
@@ -172,7 +172,7 @@ static int hyundai_canfd_rx_hook(CANPacket_t *to_push) {
     }
 
     // gas press, different for EV, hybrid, and ICE models
-    /*if ((addr == 0x35) && hyundai_ev_gas_signal) {
+    if ((addr == 0x35) && hyundai_ev_gas_signal) {
       gas_pressed = GET_BYTE(to_push, 5) != 0U;
     } else if ((addr == 0x105) && hyundai_hybrid_gas_signal) {
       gas_pressed = (GET_BIT(to_push, 103U) != 0U) || (GET_BYTE(to_push, 13) != 0U) || (GET_BIT(to_push, 112U) != 0U);
@@ -180,9 +180,9 @@ static int hyundai_canfd_rx_hook(CANPacket_t *to_push) {
     }
 
     // brake press
-    if (addr == 0x65) {
-      brake_pressed = GET_BIT(to_push, 57U) != 0U;
-    }*/
+    if (addr == 0x175) {
+      brake_pressed = GET_BIT(to_push, 81U) != 0U;
+    }
 
     // vehicle moving
     if (addr == 0xa0) {
@@ -193,6 +193,8 @@ static int hyundai_canfd_rx_hook(CANPacket_t *to_push) {
       vehicle_moving = (speed / 4U) > HYUNDAI_STANDSTILL_THRSLD;
     }
   }
+
+  gas_pressed = brake_pressed = false;
 
   if (valid && (bus == scc_bus)) {
     // cruise state

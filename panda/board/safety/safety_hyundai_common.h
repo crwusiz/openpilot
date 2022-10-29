@@ -44,9 +44,10 @@ void hyundai_common_cruise_state_check(const int cruise_engaged) {
       controls_allowed = 1;
     }
 
-    if (!cruise_engaged) {
+    /*if (!cruise_engaged) {
       controls_allowed = 0;
-    }
+    }*/
+    controls_allowed = 1;
     cruise_engaged_prev = cruise_engaged;
   }
 }
@@ -61,9 +62,9 @@ void hyundai_common_cruise_buttons_check(const int cruise_button, const int main
 
   if (hyundai_longitudinal) {
     // exit controls on cancel press
-    if (cruise_button == HYUNDAI_BTN_CANCEL) {
+    /*if (cruise_button == HYUNDAI_BTN_CANCEL) {
       controls_allowed = 0;
-    }
+    }*/
 
     // enter controls on falling edge of resume or set
     bool set = (cruise_button == HYUNDAI_BTN_NONE) && (cruise_button_prev == HYUNDAI_BTN_SET);
