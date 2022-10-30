@@ -167,7 +167,7 @@ class CarState(CarStateBase):
 
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(gear))
 
-    if not self.CP.openpilotLongitudinalControl:
+    if not self.CP.openpilotLongitudinalControl or self.CP.sccBus == 2:
       aebFcw = self.CP.aebFcw or self.CP.carFingerprint in FCA11_CAR
       aeb_src = "FCA11" if aebFcw else "SCC12"
       aeb_sig = "FCA_CmdAct" if aebFcw else "AEB_CmdAct"
@@ -643,7 +643,7 @@ class CarState(CarStateBase):
       ("LKAS11", 100)
     ]
 
-    if CP.sccBus == 2:
+    if CP.openpilotLongitudinalControl and CP.sccBus == 2:
       signals += [
         ("MainMode_ACC", "SCC11"),
         ("SCCInfoDisplay", "SCC11"),
@@ -694,6 +694,7 @@ class CarState(CarStateBase):
           ("SCC_Equip", "SCC13"),
           ("AebDrvSetStatus", "SCC13"),
         ]
+        checks.append(("SCC13", 50))
 
       if CP.hasScc14:
         signals += [
@@ -704,6 +705,7 @@ class CarState(CarStateBase):
           ("ACCMode", "SCC14"),
           ("ObjGap", "SCC14"),
         ]
+        checks.append(("SCC14", 50))
 
     if not CP.openpilotLongitudinalControl:
       signals += [
@@ -853,7 +855,6 @@ class CarState(CarStateBase):
         ("ZEROS_5", "CRUISE_INFO"),
         ("DISTANCE_SETTING", "CRUISE_INFO"),
         ("SET_SPEED", "CRUISE_INFO"),
-        ("NEW_SIGNAL_4", "CRUISE_INFO"),
       ]
       checks = [
         ("CRUISE_INFO", 50),

@@ -65,6 +65,8 @@ class SccSmoother:
     self.over_speed_limit = False
     self.limited_lead = False
 
+    self.is_metric = Params().get_bool("IsMetric")
+
     self.speed_conv_to_ms = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
     self.speed_conv_to_clu = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH
 
@@ -76,8 +78,6 @@ class SccSmoother:
 
     self.longcontrol = CP.openpilotLongitudinalControl
     self.can_fd = CP.carFingerprint in CANFD_CAR
-    self.is_metric = Params().get_bool("IsMetric")
-
 
   def reset(self):
     self.btn = Buttons.NONE
