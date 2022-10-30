@@ -193,8 +193,6 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   turnsignal_l_img = loadPixmap("../assets/img_turnsignal_l.png", {img_size, img_size});
   turnsignal_r_img = loadPixmap("../assets/img_turnsignal_r.png", {img_size, img_size});
   tpms_img = loadPixmap("../assets/img_tpms.png");
-  traffic_green_img = loadPixmap("../assets/img_traffic_green.png");
-  traffic_red_img = loadPixmap("../assets/img_traffic_red.png");
 
   // neokii add
   autohold_warning_img = loadPixmap("../assets/img_autohold_warning.png", {img_size, img_size});
@@ -230,7 +228,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   const auto lp = sm["liveParameters"].getLiveParameters();
   const auto ge = sm["gpsLocationExternal"].getGpsLocationExternal();
   const auto ls = sm["roadLimitSpeed"].getRoadLimitSpeed();
-  const auto lo = sm["longitudinalPlan"].getLongitudinalPlan();
   const auto tp = sm["liveTorqueParameters"].getLiveTorqueParameters();
 
   const bool cs_alive = sm.alive("controlsState");
@@ -299,8 +296,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("sectionLeftDist", ls.getSectionLeftDist());
   setProperty("left_on", ce.getLeftBlinker());
   setProperty("right_on", ce.getRightBlinker());
-  setProperty("x_state", lo.getXState());
-  setProperty("traffic_state", lo.getTrafficState());
   setProperty("latAccelFactor", cs.getLateralControlState().getTorqueState().getLatAccelFactor());
   setProperty("friction", cs.getLateralControlState().getTorqueState().getFriction());
   setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
@@ -538,19 +533,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     p.drawPixmap(x, y, w, h, nda_state == 1 ? nda_img : hda_img);
   }
 
-  // traffic icon (upper right5)
-  if (traffic_state > 0) {
-    w = 100;
-    h = 50;
-    x = (width() + (bdr_s * 2)) / 2 + w * 2;
-    y = 30 - bdr_s;
-    if (traffic_state == 1) {
-      p.drawPixmap(x, y, w, h, traffic_red_img);
-    } else if (traffic_state == 2) {
-      p.drawPixmap(x, y, w, h, traffic_green_img);
-    }
-  }
-
   // Dev UI (right Side)
   x = rect().right() - radius - bdr_s * 5;
   y = bdr_s * 4 + 202;
@@ -607,19 +589,17 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   // bottom info
   const char* lateral[] = {"Pid", "Indi", "Lqr", "Torque"};
-  const char* xstate[] = {"LEAD", "STOP", "CRUISE"};
 
   QString infoText;
-  infoText.sprintf("EPS[%d] SCC[%d] SR[%.2f] [ %s ] [ (%.2f,%.2f) / (%.2f,%.2f) [ %s ]]",
+  infoText.sprintf("EPS[%d] SCC[%d] SR[%.2f] [ %s ] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
     epsBus, sccBus,
     steerRatio,
     lateral[lateralcontrol],
     latAccelFactor, friction,
-    latAccelFactorRaw, frictionRaw,
-    xstate[x_state]
+    latAccelFactorRaw, frictionRaw
   );
 
-  x = rect().left() + radius * 3.5;
+  x = rect().left() + radius * 3.0;
   y = rect().height() - 15;
 
   configFont(p, "Open Sans", 30, "Regular");

@@ -48,8 +48,6 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(int autohold_state MEMBER autohold_state);
   Q_PROPERTY(int nda_state MEMBER nda_state);
   Q_PROPERTY(int wifi_state MEMBER wifi_state);
-  Q_PROPERTY(int x_state MEMBER x_state);
-  Q_PROPERTY(int traffic_state MEMBER traffic_state);
   Q_PROPERTY(int gpsSatelliteCount MEMBER gpsSatelliteCount);
   Q_PROPERTY(int gap MEMBER gap);
   Q_PROPERTY(int autoTrGap MEMBER autoTrGap);
@@ -101,7 +99,6 @@ private:
   QPixmap gap_img, gap1_img, gap2_img, gap3_img, gap4_img, gap_auto_img;
   QPixmap gps_img, wifi_img, direction_img, tpms_img;
   QPixmap turnsignal_l_img, turnsignal_r_img;
-  QPixmap traffic_green_img, traffic_red_img;
 
   // neokii add
   QPixmap autohold_warning_img;
@@ -130,14 +127,12 @@ private:
   int autohold_state = 0;
   int nda_state = 0;
   int wifi_state = 0;
-  int x_state, traffic_state = 0;
   int gpsSatelliteCount = 0;
-  int gap, autoTrGap = 0;
+  int accel, gap, autoTrGap = 0;
   int lateralcontrol = 0;
   int epsBus, sccBus = 0;
   int camLimitSpeed ,camLimitSpeedLeftDist = 0;
   int sectionLimitSpeed, sectionLeftDist = 0;
-  int accel = 0;
 
   float lead_d_rel, lead_v_rel = 0;
   float gpsBearing, gpsVerticalAccuracy, gpsAltitude, gpsAccuracy = 0;
@@ -155,7 +150,6 @@ protected:
   void showEvent(QShowEvent *event) override;
   void updateFrameMat() override;
   void drawLaneLines(QPainter &painter, const UIState *s);
-  void drawStopLine(QPainter &painter, const UIState *s, const cereal::ModelDataV2::StopLineData::Reader &stop_line_data, const QPolygonF &vd);
   void drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd, bool is_radar);
   void drawHud(QPainter &p);
   inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); }

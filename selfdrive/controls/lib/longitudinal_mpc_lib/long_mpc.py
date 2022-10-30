@@ -241,9 +241,6 @@ class LongitudinalMpc:
     self.x0 = np.zeros(X_DIM)
     self.set_weights()
 
-    self.xState = 0
-    self.trafficState = 0
-
   def set_cost_weights(self, cost_weights, constraint_cost_weights):
     W = np.asfortranarray(np.diag(cost_weights))
     for i in range(N):
@@ -316,9 +313,8 @@ class LongitudinalMpc:
     self.cruise_min_a = min_a
     self.cruise_max_a = max_a
 
-  def update(self, carstate, radarstate, model, v_cruise, x, v, a, j):
+  def update(self, carstate, radarstate, v_cruise, x, v, a, j):
     v_ego = self.x0[1]
-    self.trafficState = 0
     self.status = radarstate.leadOne.status or radarstate.leadTwo.status
 
     lead_xv_0 = self.process_lead(radarstate.leadOne)
@@ -345,25 +341,6 @@ class LongitudinalMpc:
       self.params[:,1] = self.cruise_max_a
       self.params[:,5] = LEAD_DANGER_FACTOR
 
-      # add stopline by ajouatom
-      stopline_x = model.stopLine.x
-      model_x = x[N]
-      probe = model.stopLine.prob if abs(carstate.steeringAngleDeg) < 20 else 0.0
-      stopSign = (probe > 0.3) and ((v[-1] < 3.0) or (v[-1] < v_ego * 0.95))
-      startSign = v[-1] > 5.0
-
-      if radarstate.leadOne.status and (radarstate.leadOne.dRel - model_x) < 2.0:
-        self.xState = 0 # "LEAD"
-        self.trafficState = 0 # "OFF"
-      elif stopSign:
-        self.xState = 1 # "E2E_STOP"
-        self.trafficState = 1 # "RED"
-      elif startSign:
-        self.xState = 2 # "E2E_CRUISE"
-        self.trafficState = 2 # "GREEN"
-
-      x2 = stopline_x * np.ones(N+1) if (self.xState == 1) else 400.0 * np.ones(N+1)
-
       # Fake an obstacle for cruise, this ensures smooth acceleration to set speed
       # when the leads are no factor.
       v_lower = v_ego + (T_IDXS * self.cruise_min_a * 1.05)
@@ -372,7 +349,7 @@ class LongitudinalMpc:
                                  v_lower,
                                  v_upper)
       cruise_obstacle = np.cumsum(T_DIFFS * v_cruise_clipped) + get_safe_obstacle_distance(v_cruise_clipped, self.t_follow)
-      x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle, x2])
+      x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle])
       self.source = SOURCES[np.argmin(x_obstacles[0])]
 
       # These are not used in ACC mode
