@@ -348,8 +348,9 @@ class CarInterface(CarInterfaceBase):
         ret.hasScc14 = 905 in fingerprint[ret.sccBus]
 
       ret.enableBsm = 1419 in fingerprint[0]
-      ret.enableAutoHold = 1151 in fingerprint[0]
+      ret.hasAutoHold = 1151 in fingerprint[0]
       ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
+      ret.hasLfaHda = 1157 in fingerprint[0]
       ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
       ret.radarOffCan = ret.sccBus == -1
       ret.pcmCruise = ret.radarOffCan
@@ -361,7 +362,8 @@ class CarInterface(CarInterfaceBase):
     #elif candidate in EV_CAR:
     #  ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
 
-    ret.centerToFront = ret.wheelbase * 0.4
+    if ret.centerToFront == 0:
+      ret.centerToFront = ret.wheelbase * 0.4
 
     # TODO: get actual value, for now starting with reasonable value for
     # civic and scaling by mass and wheelbase
@@ -369,8 +371,8 @@ class CarInterface(CarInterfaceBase):
 
     # TODO: start from empirically derived lateral slip stiffness for the civic and scale by
     # mass and CG position, so all cars will have approximately similar dyn behaviors
-    ret.tireStiffnessFront, ret.tireStiffnessRear = \
-      scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront, tire_stiffness_factor=tire_stiffness_factor)
+    ret.tireStiffnessFront, ret.tireStiffnessRear = scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront,
+                                                                         tire_stiffness_factor=tire_stiffness_factor)
 
     return ret
 

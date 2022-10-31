@@ -1991,21 +1991,6 @@ struct EncodeData {
 struct UserFlag {
 }
 
-struct RoadLimitSpeed {
-    active @0 :Int16;
-    roadLimitSpeed @1 :Int16;
-    isHighway @2 :Bool;
-    camType @3 :Int16;
-    camLimitSpeedLeftDist @4 :Int16;
-    camLimitSpeed @5 :Int16;
-    sectionLimitSpeed @6 :Int16;
-    sectionLeftDist @7 :Int16;
-    sectionAvgSpeed @8 :Int16;
-    sectionLeftTime @9 :Int16;
-    sectionAdjustSpeed @10 :Bool;
-    camSpeedFactor @11 :Float32;
-}
-
 struct Event {
   logMonoTime @0 :UInt64;  # nanoseconds
   valid @67 :Bool = true;
@@ -2133,4 +2118,19 @@ struct Event {
     driverStateDEPRECATED @59 :DriverStateDEPRECATED;
     sensorEventsDEPRECATED @11 :List(SensorEventData);
   }
+}
+
+struct RoadLimitSpeed {
+    active @0 :Int16;
+    roadLimitSpeed @1 :Int16;
+    isHighway @2 :Bool;
+    camType @3 :Int16;
+    camLimitSpeedLeftDist @4 :Int16;
+    camLimitSpeed @5 :Int16;
+    sectionLimitSpeed @6 :Int16;
+    sectionLeftDist @7 :Int16;
+    sectionAvgSpeed @8 :Int16;
+    sectionLeftTime @9 :Int16;
+    sectionAdjustSpeed @10 :Bool;
+    camSpeedFactor @11 :Float32;
 }

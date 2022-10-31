@@ -31,15 +31,11 @@ class CarState(CarStateBase):
       self.shifter_values = can_define.dv["LVR12"]["CF_Lvr_Gear"]
 
     #Auto detection for setup
-    self.no_radar = CP.sccBus == -1
     self.eps_bus = CP.epsBus
-    self.sas_bus = CP.sasBus
     self.scc_bus = CP.sccBus
     self.has_scc13 = CP.hasScc13
     self.has_scc14 = CP.hasScc14
-    self.aeb_fcw = CP.aebFcw or CP.carFingerprint in FCA11_CAR
     self.eps_error_cnt = 0
-    self.cruise_unavail_cnt = 0
 
     self.is_metric = False
     self.brake_error = False
@@ -61,9 +57,9 @@ class CarState(CarStateBase):
     if self.CP.carFingerprint in CANFD_CAR:
       return self.update_canfd(cp, cp_cam)
 
-    cp_eps = cp2 if self.eps_bus else cp
-    cp_sas = cp2 if self.sas_bus else cp
-    cp_scc = cp2 if self.scc_bus == 1 else cp_cam if self.scc_bus == 2 else cp
+    cp_eps = cp2 if self.CP.epsBus else cp
+    cp_sas = cp2 if self.CP.sasBus else cp
+    cp_cruise = cp2 if self.CP.sccBus == 1 else cp_cam if self.CP.sccBus == 2 else cp
 
     ret = car.CarState.new_message()
     self.is_metric = cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"] == 0
@@ -103,11 +99,11 @@ class CarState(CarStateBase):
     self.eps_error_cnt += 1 if not ret.standstill and cp_eps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 else -self.eps_error_cnt
     ret.steerFaultTemporary = self.eps_error_cnt > 100
 
-    if self.CP.enableAutoHold:
+    if self.CP.hasAutoHold:
       ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]
 
     # scc smoother
-    self.acc_mode = cp_scc.vl["SCC12"]["ACCMode"] != 0
+    self.acc_mode = cp_cruise.vl["SCC12"]["ACCMode"] != 0
 
     # cruise state
     #if self.CP.openpilotLongitudinalControl:
@@ -115,22 +111,18 @@ class CarState(CarStateBase):
       #ret.cruiseState.available = cp.vl["TCS13"]["ACCEnable"] == 0
       #ret.cruiseState.enabled = cp.vl["TCS13"]["ACC_REQ"] == 1
       #ret.cruiseState.standstill = False
-    if self.no_radar:
+    if self.CP.sccBus == -1:
       ret.cruiseState.available = cp.vl["EMS16"]["CRUISE_LAMP_M"] != 0
       ret.cruiseState.enabled = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] != 0
       ret.cruiseState.standstill = False
       ret.cruiseState.speed = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * self.speed_conv if ret.cruiseState.enabled else 0
     else:
-      ret.cruiseState.available = cp_scc.vl["SCC11"]["MainMode_ACC"] == 1
-      ret.cruiseState.enabled = cp_scc.vl["SCC12"]["ACCMode"] != 0
-      ret.cruiseState.standstill = cp_scc.vl["SCC11"]["SCCInfoDisplay"] == 4.
-      ret.cruiseState.speed = cp_scc.vl["SCC11"]["VSetDis"] * self.speed_conv if ret.cruiseState.enabled else 0
+      ret.cruiseState.available = cp_cruise.vl["SCC11"]["MainMode_ACC"] == 1
+      ret.cruiseState.enabled = cp_cruise.vl["SCC12"]["ACCMode"] != 0
+      ret.cruiseState.standstill = cp_cruise.vl["SCC11"]["SCCInfoDisplay"] == 4.
+      ret.cruiseState.speed = cp_cruise.vl["SCC11"]["VSetDis"] * self.speed_conv if ret.cruiseState.enabled else 0
 
-    ret.cruiseGap = cp_scc.vl["SCC11"]["TauGapSet"]
-
-    self.prev_cruise_buttons = self.cruise_buttons[-1]
-    self.cruise_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwState"])
-    self.main_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwMain"])
+    ret.cruiseGap = cp_cruise.vl["SCC11"]["TauGapSet"]
 
     # TODO: Find brake pressure
     ret.brake = 0
@@ -171,8 +163,8 @@ class CarState(CarStateBase):
       aebFcw = self.CP.aebFcw or self.CP.carFingerprint in FCA11_CAR
       aeb_src = "FCA11" if aebFcw else "SCC12"
       aeb_sig = "FCA_CmdAct" if aebFcw else "AEB_CmdAct"
-      aeb_warning = cp.vl[aeb_src]["CF_VSM_Warn"] != 0
-      aeb_braking = cp.vl[aeb_src]["CF_VSM_DecCmdAct"] != 0 or cp.vl[aeb_src][aeb_sig] != 0
+      aeb_warning = cp_cruise.vl[aeb_src]["CF_VSM_Warn"] != 0
+      aeb_braking = cp_cruise.vl[aeb_src]["CF_VSM_DecCmdAct"] != 0 or cp_cruise.vl[aeb_src][aeb_sig] != 0
       ret.stockFcw = aeb_warning and not aeb_braking
       ret.stockAeb = aeb_warning and aeb_braking
 
@@ -181,23 +173,24 @@ class CarState(CarStateBase):
       ret.rightBlindspot = cp.vl["LCA11"]["CF_Lca_IndRight"] != 0
 
     # save the entire LKAS11, CLU11, MDPS12, LFAHDA_MFC, SCC11, SCC12, SCC13, SCC14
-    self.lkas11 = cp_cam.vl["LKAS11"]
-    self.clu11 = cp.vl["CLU11"]
+    self.lkas11 = copy.copy(cp_cam.vl["LKAS11"])
+    self.clu11 = copy.copy(cp.vl["CLU11"])
+    self.mdps12 = copy.copy(cp_eps.vl["MDPS12"])
+    self.scc11 = copy.copy(cp_cruise.vl["SCC11"])
+    self.scc12 = copy.copy(cp_cruise.vl["SCC12"])
+    self.scc13 = copy.copy(cp_cruise.vl["SCC13"]) if self.CP.hasScc13 else None
+    self.scc14 = copy.copy(cp_cruise.vl["SCC14"]) if self.CP.hasScc14 else None
     self.fca11 = cp.vl["FCA11"]
     self.fca12 = cp.vl["FCA12"]
-    self.mdps12 = cp_eps.vl["MDPS12"]
     self.mfc_lfa = cp_cam.vl["LFAHDA_MFC"]
-    self.scc11 = cp_scc.vl["SCC11"]
-    self.scc12 = cp_scc.vl["SCC12"]
-    self.scc13 = cp_scc.vl["SCC13"] if self.CP.hasScc13 else 0
-    self.scc14 = cp_scc.vl["SCC14"] if self.CP.hasScc14 else 0
 
     self.steer_state = cp_eps.vl["MDPS12"]["CF_Mdps_ToiActive"]  # 0 NOT ACTIVE, 1 ACTIVE
     self.brake_error = cp.vl["TCS13"]["ACCEnable"] != 0  # 0 ACC CONTROL ENABLED, 1-3 ACC CONTROL DISABLED
-    self.cruise_unavail_cnt += 1 if cp.vl["TCS13"]["CF_VSM_Avail"] != 1 and \
-                                    cp.vl["TCS13"]["ACCEnable"] != 0 else -self.cruise_unavail_cnt
-    self.cruise_unavail = self.cruise_unavail_cnt > 100
-    self.lead_distance = cp_scc.vl["SCC11"]["ACC_ObjDist"]
+    self.prev_cruise_buttons = self.cruise_buttons[-1]
+    self.cruise_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwState"])
+    self.main_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwMain"])
+
+    self.lead_distance = cp_cruise.vl["SCC11"]["ACC_ObjDist"]
 
     tpms_unit = cp.vl["TPMS11"]["UNIT"] * 0.725 if int(cp.vl["TPMS11"]["UNIT"]) > 0 else 1.
     ret.tpms.fl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FL"]
@@ -379,6 +372,7 @@ class CarState(CarStateBase):
       ("CGW2", 5),
       ("CGW4", 5),
       ("WHL_SPD11", 50),
+      ("TPMS11", 0),
     ]
 
     if CP.hasScc13:
@@ -481,7 +475,7 @@ class CarState(CarStateBase):
       ]
       checks.append(("LCA11", 50))
 
-    if CP.enableAutoHold:
+    if CP.hasAutoHold:
       signals += [
         ("AVH_STAT", "ESP11"),
         ("LDM_STAT", "ESP11"),

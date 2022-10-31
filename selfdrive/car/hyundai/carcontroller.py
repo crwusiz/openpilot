@@ -6,7 +6,7 @@ from common.conversions import Conversions as CV
 from common.numpy_fast import clip
 from common.realtime import DT_CTRL
 from opendbc.can.packer import CANPacker
-from selfdrive.car import apply_std_steer_torque_limits, apply_toyota_steer_torque_limits
+from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai import hyundaicanfd, hyundaican
 from selfdrive.car.hyundai.values import HyundaiFlags, Buttons, CarControllerParams, CANFD_CAR, CAR
 from selfdrive.road_speed_limiter import road_speed_limiter_get_active
@@ -76,9 +76,6 @@ class CarController:
     steer = actuators.steer
     new_steer = int(round(steer * self.CCP.STEER_MAX))
     apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.CCP)
-    #print(f"steer {apply_steer} {min_steer_allowed} {max_steer_allowed} {CS.out.steeringTorque}")
-    #apply_steer = apply_toyota_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorqueEps, self.CCP)
-    #print(f"steer {apply_steer} {min_lim} {max_lim} {CS.out.steeringTorqueEps}")
 
     # Disable steering while turning blinker on and speed below 60 kph
     if CS.out.leftBlinker or CS.out.rightBlinker:
@@ -216,9 +213,8 @@ class CarController:
       # send scc to car if longcontrol enabled and SCC not on bus 0 or not live
       if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl and CS.out.cruiseState.enabled and (CS.scc_bus or not self.scc_live):
         jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0
-        can_sends.extend(hyundaican.create_scc_commands(
-          self.packer, int(self.frame / 2), CC.enabled and CC.longActive, accel, jerk,
-          hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, self.scc_live, CS))
+        can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), CC.enabled and CC.longActive, accel, jerk,
+                                                        hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, self.scc_live, CS))
 
       if self.frame % 500 == 0:
         print(f'scc11 = {bool(CS.scc11)}  scc12 = {bool(CS.scc12)}  scc13 = {bool(CS.scc13)}  scc14 = {bool(CS.scc14)}')
@@ -230,8 +226,8 @@ class CarController:
           can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, activated_hda))
 
       # 5 Hz ACC options
-      #if self.frame % 20 == 0 and self.CP.openpilotLongitudinalControl:
-      #  can_sends.extend(hyundaican.create_acc_opt(self.packer))
+      if self.frame % 20 == 0 and self.CP.openpilotLongitudinalControl:
+        can_sends.extend(hyundaican.create_acc_opt(self.packer))
 
       # 2 Hz front radar options
       #if self.frame % 50 == 0 and self.CP.openpilotLongitudinalControl:
