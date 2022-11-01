@@ -305,14 +305,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("friction", cs.getLateralControlState().getTorqueState().getFriction());
   setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
   setProperty("frictionRaw", tp.getFrictionCoefficientRaw());
-
-  setStreamType(s.scene.wide_cam ? VISION_STREAM_WIDE_ROAD : VISION_STREAM_ROAD);
-  if (s.scene.calibration_valid) {
-    auto calib = s.scene.wide_cam ? s.scene.view_from_wide_calib : s.scene.view_from_calib;
-    CameraWidget::updateCalibration(calib);
-  } else {
-    CameraWidget::updateCalibration(DEFAULT_CALIBRATION);
-  }
 }
 
 void AnnotatedCameraWidget::drawHud(QPainter &p) {
@@ -1022,30 +1014,64 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV
   painter.restore();
 }
 
-void AnnotatedCameraWidget::drawStopLine(QPainter &painter, const UIState *s, const cereal::ModelDataV2::StopLineData::Reader &stop_line_data, const QPolygonF &vd) {
-    painter.save();
-
-    float prob = stop_line_data.getProb();
-    if (prob < 0.6) prob = 0.6;
-    painter.setBrush(QColor::fromRgbF(1.0, 0.0, 0.0, std::clamp<float>(prob, 0.0, 1.0)));
-    painter.drawPolygon(vd);
-
-    painter.restore();
-}
-
 void AnnotatedCameraWidget::paintGL() {
-  const double start_draw_t = millis_since_boot();
-
   UIState *s = uiState();
-  const cereal::ModelDataV2::Reader &model = (*s->sm)["modelV2"].getModelV2();
-  CameraWidget::setFrameId(model.getFrameId());
-  CameraWidget::paintGL();
+  SubMaster &sm = *(s->sm);
+  const double start_draw_t = millis_since_boot();
+  const cereal::ModelDataV2::Reader &model = sm["modelV2"].getModelV2();
+
+  // draw camera frame
+  {
+    std::lock_guard lk(frame_lock);
+
+    if (frames.empty()) {
+      if (skip_frame_count > 0) {
+        skip_frame_count--;
+        qDebug() << "skipping frame, not ready";
+        return;
+      }
+    } else {
+      // skip drawing up to this many frames if we're
+      // missing camera frames. this smooths out the
+      // transitions from the narrow and wide cameras
+      skip_frame_count = 5;
+    }
+
+    // Wide or narrow cam dependent on speed
+    float v_ego = sm["carState"].getCarState().getVEgo();
+    if ((v_ego < 10) || s->wide_cam_only) {
+      wide_cam_requested = true;
+    } else if (v_ego > 15) {
+      wide_cam_requested = false;
+    }
+    // TODO: also detect when ecam vision stream isn't available
+    // for replay of old routes, never go to widecam
+    wide_cam_requested = wide_cam_requested && s->scene.calibration_wide_valid;
+    CameraWidget::setStreamType(wide_cam_requested ? VISION_STREAM_WIDE_ROAD : VISION_STREAM_ROAD);
+
+    s->scene.wide_cam = CameraWidget::getStreamType() == VISION_STREAM_WIDE_ROAD;
+    if (s->scene.calibration_valid) {
+      auto calib = s->scene.wide_cam ? s->scene.view_from_wide_calib : s->scene.view_from_calib;
+      CameraWidget::updateCalibration(calib);
+    } else {
+      CameraWidget::updateCalibration(DEFAULT_CALIBRATION);
+    }
+    CameraWidget::setFrameId(model.getFrameId());
+    CameraWidget::paintGL();
+  }
 
   QPainter painter(this);
   painter.setRenderHint(QPainter::Antialiasing);
   painter.setPen(Qt::NoPen);
 
   if (s->worldObjectsVisible()) {
+    if (sm.rcv_frame("modelV2") > s->scene.started_frame) {
+      update_model(s, sm["modelV2"].getModelV2());
+      if (sm.rcv_frame("radarState") > s->scene.started_frame) {
+        update_leads(s, sm["radarState"].getRadarState(), sm["modelV2"].getModelV2().getPosition());
+      }
+    }
+
     drawLaneLines(painter, s);
     const auto leads = model.getLeadsV3();
     if (leads[0].getProb() > .5) {
@@ -1053,12 +1079,6 @@ void AnnotatedCameraWidget::paintGL() {
     }
     if (leads[1].getProb() > .5 && (std::abs(leads[1].getX()[0] - leads[0].getX()[0]) > 3.0)) {
       drawLead(painter, leads[1], s->scene.lead_vertices[1], s->scene.lead_radar[1]);
-    }
-    auto stop_line = model.getStopLine();
-    if (stop_line.getX() > 3.0) {
-        if (stop_line.getProb() > .1) {
-            drawStopLine(painter, s, stop_line, s->scene.stop_line_vertices);
-        }
     }
   }
   drawHud(painter);

@@ -146,6 +146,9 @@ private:
   float roadLimitSpeed = 0;
   float latAccelFactor, friction, latAccelFactorRaw, frictionRaw = 0;
 
+  int skip_frame_count = 0;
+  bool wide_cam_requested = false;
+
 protected:
   void paintGL() override;
   void initializeGL() override;
