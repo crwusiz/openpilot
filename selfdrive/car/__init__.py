@@ -91,6 +91,7 @@ def apply_std_steer_torque_limits(apply_torque, apply_torque_last, driver_torque
 
   return int(round(float(apply_torque)))
 
+
 def apply_toyota_steer_torque_limits(apply_torque, apply_torque_last, motor_torque, LIMITS):
   # limits due to comparison of commanded torque VS motor reported torque
   max_lim = min(max(motor_torque + LIMITS.STEER_ERROR_MAX, LIMITS.STEER_ERROR_MAX), LIMITS.STEER_MAX)
