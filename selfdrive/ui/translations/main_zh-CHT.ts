@@ -68,57 +68,26 @@
     </message>
 </context>
 <context>
-    <name>AebSelect</name>
+    <name>AnnotatedCameraWidget</name>
     <message>
-        <source>AEB Signal Select (Scc12/Fca11)</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>CommunityPanel</name>
-    <message>
-        <source>Select your car</source>
-        <translation type="unfinished"></translation>
+        <source>km/h</source>
+        <translation>km/h</translation>
     </message>
     <message>
-        <source>RUN</source>
-        <translation type="unfinished"></translation>
+        <source>mph</source>
+        <translation>mph</translation>
     </message>
     <message>
-        <source>Process?</source>
-        <translation type="unfinished"></translation>
+        <source>MAX</source>
+        <translation>最高</translation>
     </message>
     <message>
-        <source>Prebuilt Enable</source>
-        <translation type="unfinished"></translation>
+        <source>SPEED</source>
+        <translation>速度</translation>
     </message>
     <message>
-        <source>Create prebuilt files to speed bootup</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Logger Disable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Disable Logger is Reduce system load</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Navigation Disable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Navigation Function not use</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>New radar interface Enable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Some newer car New radar interface</source>
-        <translation type="unfinished"></translation>
+        <source>LIMIT</source>
+        <translation>速限</translation>
     </message>
 </context>
 <context>
@@ -203,11 +172,11 @@
     </message>
     <message>
         <source>Regulatory</source>
-        <translation type="vanished">法規/監管</translation>
+        <translation>法規/監管</translation>
     </message>
     <message>
         <source>VIEW</source>
-        <translation type="vanished">觀看</translation>
+        <translation>觀看</translation>
     </message>
     <message>
         <source>Change Language</source>
@@ -220,14 +189,6 @@
     <message>
         <source>Select a language</source>
         <translation>選擇語言</translation>
-    </message>
-    <message>
-        <source>Are you sure you want to reset calibration and live params?</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Soft Restart</source>
-        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Reboot</source>
@@ -294,7 +255,7 @@
     </message>
     <message>
         <source>PAST WEEK</source>
-        <translation type="vanished">上周</translation>
+        <translation>上周</translation>
     </message>
     <message>
         <source>KM</source>
@@ -342,13 +303,6 @@
     <message>
         <source>Updating files: </source>
         <translation>更新檔案： </translation>
-    </message>
-</context>
-<context>
-    <name>LateralControlSelect</name>
-    <message>
-        <source>LateralControl Select (Pid/Indi/Lqr/Torque)</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -446,13 +400,6 @@ location set</source>
     </message>
 </context>
 <context>
-    <name>MfcSelect</name>
-    <message>
-        <source>MFC Camera Select (Auto/Ldws,Lkas/Lfa)</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
     <name>MultiOptionDialog</name>
     <message>
         <source>Select</source>
@@ -480,81 +427,6 @@ location set</source>
     <message>
         <source>Wrong password</source>
         <translation>密碼錯誤</translation>
-    </message>
-</context>
-<context>
-    <name>NvgWindow</name>
-    <message>
-        <source>km/h</source>
-        <translation type="vanished">km/h</translation>
-    </message>
-    <message>
-        <source>mph</source>
-        <translation type="vanished">mph</translation>
-    </message>
-    <message>
-        <source>MAX</source>
-        <translation type="vanished">最高</translation>
-    </message>
-    <message>
-        <source>SPEED</source>
-        <translation type="vanished">速度</translation>
-    </message>
-    <message>
-        <source>LIMIT</source>
-        <translation type="vanished">速限</translation>
-    </message>
-</context>
-<context>
-    <name>OffroadAlert</name>
-    <message>
-        <source>Device temperature too high. System won&apos;t start.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Connect to internet to check for updates. openpilot won&apos;t automatically start until it connects to internet to check for updates.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Unable to download updates
-%1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Invalid date and time settings, system won&apos;t start. Connect to internet to set time.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Device failed to register. It will not connect to or upload to comma.ai servers, and receives no support from comma.ai. If this is an official device, contact support@comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>NVMe drive not mounted.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Unsupported NVMe drive detected. Device may draw significantly more power and overheat due to the unsupported NVMe.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot was unable to identify your car. Your car is either unsupported or its ECUs are not recognized. Please submit a pull request to add the firmware versions to the proper vehicle. Need help? Join discord.comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Immediately connect to the internet to check for updates. If you do not connect to the internet, openpilot won&apos;t engage in %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot was unable to identify your car. Check integrity of cables and ensure all connections are secure, particularly that the comma power is fully inserted in the OBD-II port of the vehicle. Need help? Join discord.comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Taking camera snapshots. System won&apos;t start until finished.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>An update to your device&apos;s operating system is downloading in the background. You will be prompted to update when it&apos;s ready to install.</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -589,6 +461,17 @@ location set</source>
     <message>
         <source>Bookmark connect.comma.ai to your home screen to use it like an app</source>
         <translation>將 connect.comma.ai 加入您的主屏幕，以便像手機 App 一樣使用它</translation>
+    </message>
+</context>
+<context>
+    <name>ParamControl</name>
+    <message>
+        <source>Ok</source>
+        <translation type="unfinished">確定</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation type="unfinished">取消</translation>
     </message>
 </context>
 <context>
@@ -714,24 +597,6 @@ location set</source>
     </message>
 </context>
 <context>
-    <name>RichTextDialog</name>
-    <message>
-        <source>Ok</source>
-        <translation>確定</translation>
-    </message>
-</context>
-<context>
-    <name>SelectCar</name>
-    <message>
-        <source>Back</source>
-        <translation type="unfinished">回上頁</translation>
-    </message>
-    <message>
-        <source>Select car not use</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
     <name>SettingsWindow</name>
     <message>
         <source>×</source>
@@ -752,10 +617,6 @@ location set</source>
     <message>
         <source>Software</source>
         <translation>軟體</translation>
-    </message>
-    <message>
-        <source>Community</source>
-        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Navigation</source>
@@ -946,52 +807,36 @@ location set</source>
 <context>
     <name>SoftwarePanel</name>
     <message>
-        <source>Git Branch</source>
-        <translation type="vanished">Git 分支</translation>
+        <source>Updates are only downloaded while the car is off.</source>
+        <translation>系統更新只會在熄火時下載。</translation>
     </message>
     <message>
-        <source>Git Commit</source>
-        <translation type="vanished">Git 提交</translation>
+        <source>Current Version</source>
+        <translation>當前版本</translation>
     </message>
     <message>
-        <source>OS Version</source>
-        <translation type="vanished">系統版本</translation>
+        <source>Download</source>
+        <translation>下載</translation>
     </message>
     <message>
-        <source>Version</source>
-        <translation type="vanished">版本</translation>
+        <source>Install Update</source>
+        <translation>安裝更新</translation>
     </message>
     <message>
-        <source>Last Update Check</source>
-        <translation type="vanished">上次檢查時間</translation>
+        <source>INSTALL</source>
+        <translation>安裝</translation>
     </message>
     <message>
-        <source>The last time openpilot successfully checked for an update. The updater only runs while the car is off.</source>
-        <translation type="vanished">上次成功檢查更新的時間。更新系統只會在車子熄火時執行。</translation>
+        <source>Target Branch</source>
+        <translation>目標分支</translation>
     </message>
     <message>
-        <source>Check for Update</source>
-        <translation type="vanished">檢查更新</translation>
+        <source>SELECT</source>
+        <translation>選取</translation>
     </message>
     <message>
-        <source>CHECKING</source>
-        <translation type="vanished">檢查中</translation>
-    </message>
-    <message>
-        <source>Switch Branch</source>
-        <translation type="vanished">切換分支</translation>
-    </message>
-    <message>
-        <source>ENTER</source>
-        <translation type="vanished">切換</translation>
-    </message>
-    <message>
-        <source>The new branch will be pulled the next time the updater runs.</source>
-        <translation type="vanished">新的分支將會在下次檢查更新時切換過去。</translation>
-    </message>
-    <message>
-        <source>Enter branch name</source>
-        <translation type="vanished">輸入分支名稱</translation>
+        <source>Select a branch</source>
+        <translation>選取一個分支</translation>
     </message>
     <message>
         <source>UNINSTALL</source>
@@ -1006,44 +851,8 @@ location set</source>
         <translation>您確定您要卸載嗎？</translation>
     </message>
     <message>
-        <source>failed to fetch update</source>
-        <translation type="vanished">下載更新失敗</translation>
-    </message>
-    <message>
         <source>CHECK</source>
         <translation>檢查</translation>
-    </message>
-    <message>
-        <source>Updates are only downloaded while the car is off.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Current Version</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Download</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Install Update</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>INSTALL</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Target Branch</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>SELECT</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Select a branch</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -1138,14 +947,6 @@ location set</source>
         <translation>啟用後，速度單位顯示將從 mp/h 改為 km/h。</translation>
     </message>
     <message>
-        <source>Enable AutoLaneChange</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Operation of the turn signal at 60㎞/h speed will result in a short change of the vehicle</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Record and Upload Driver Camera</source>
         <translation>記錄並上傳駕駛監控影像</translation>
     </message>
@@ -1154,16 +955,36 @@ location set</source>
         <translation>上傳駕駛監控的錄像來協助我們提升駕駛監控的準確率。</translation>
     </message>
     <message>
+        <source>🌮 End-to-end longitudinal (extremely alpha) 🌮</source>
+        <translation>🌮 端對端縱向控制（實驗性功能） 🌮</translation>
+    </message>
+    <message>
+        <source>Experimental openpilot longitudinal control</source>
+        <translation>使用 openpilot 縱向控制（實驗）</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
+        <translation>&lt;b&gt;注意：這台車的 openpilot 縱向控制仍然是實驗中的功能，開啟這功能將會關閉自動緊急煞車 (AEB)。&lt;/b&gt;</translation>
+    </message>
+    <message>
+        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
+        <translation>讓駕駛模型直接控製油門和剎車，openpilot將會模仿人類司機的駕駛方式。該功能仍非常實驗性。</translation>
+    </message>
+    <message>
+        <source>openpilot longitudinal control is not currently available for this car.</source>
+        <translation>openpilot 縱向控制目前不適用於這輛車。</translation>
+    </message>
+    <message>
+        <source>Enable experimental longitudinal control to enable this.</source>
+        <translation>打開縱向控制（實驗）以啟用此功能。</translation>
+    </message>
+    <message>
         <source>Disengage On Accelerator Pedal</source>
         <translation>油門取消控車</translation>
     </message>
     <message>
         <source>When enabled, pressing the accelerator pedal will disengage openpilot.</source>
         <translation>啟用後，踩踏油門將會取消 openpilot 控制。</translation>
-    </message>
-    <message>
-        <source>🌮 End-to-end longitudinal (extremely alpha) 🌮</source>
-        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Show ETA in 24h Format</source>
@@ -1180,34 +1001,6 @@ location set</source>
     <message>
         <source>Show map on left side when in split screen view.</source>
         <translation>進入分割畫面後，地圖將會顯示在畫面的左側。</translation>
-    </message>
-    <message>
-        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot Longitudinal Control</source>
-        <translation type="vanished">openpilot 縱向控制</translation>
-    </message>
-    <message>
-        <source>openpilot will disable the car&apos;s radar and will take over control of gas and brakes. Warning: this disables AEB!</source>
-        <translation type="vanished">openpilot 將會關閉雷達訊號並接管油門和剎車的控制。注意：這也會關閉自動緊急煞車 (AEB) 系統！</translation>
-    </message>
-    <message>
-        <source>Experimental openpilot longitudinal control</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot longitudinal control is not currently available for this car.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Enable experimental longitudinal control to enable this.</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

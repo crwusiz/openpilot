@@ -60,65 +60,34 @@
     </message>
     <message>
         <source>Cellular Metered</source>
-        <translation type="unfinished"></translation>
+        <translation>Plano de Dados Limitado</translation>
     </message>
     <message>
         <source>Prevent large data uploads when on a metered connection</source>
-        <translation type="unfinished"></translation>
+        <translation>Evite grandes uploads de dados quando estiver em uma conexão limitada</translation>
     </message>
 </context>
 <context>
-    <name>AebSelect</name>
+    <name>AnnotatedCameraWidget</name>
     <message>
-        <source>AEB Signal Select (Scc12/Fca11)</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>CommunityPanel</name>
-    <message>
-        <source>Select your car</source>
-        <translation type="unfinished"></translation>
+        <source>km/h</source>
+        <translation>km/h</translation>
     </message>
     <message>
-        <source>RUN</source>
-        <translation type="unfinished"></translation>
+        <source>mph</source>
+        <translation>mph</translation>
     </message>
     <message>
-        <source>Process?</source>
-        <translation type="unfinished"></translation>
+        <source>MAX</source>
+        <translation>LIMITE</translation>
     </message>
     <message>
-        <source>Prebuilt Enable</source>
-        <translation type="unfinished"></translation>
+        <source>SPEED</source>
+        <translation>MAX</translation>
     </message>
     <message>
-        <source>Create prebuilt files to speed bootup</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Logger Disable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Disable Logger is Reduce system load</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Navigation Disable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Navigation Function not use</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>New radar interface Enable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Some newer car New radar interface</source>
-        <translation type="unfinished"></translation>
+        <source>LIMIT</source>
+        <translation>VELO</translation>
     </message>
 </context>
 <context>
@@ -187,7 +156,7 @@
     </message>
     <message>
         <source>Review Training Guide</source>
-        <translation>Revisar o Treinamento</translation>
+        <translation>Revisar Guia de Treinamento</translation>
     </message>
     <message>
         <source>REVIEW</source>
@@ -203,31 +172,23 @@
     </message>
     <message>
         <source>Regulatory</source>
-        <translation type="vanished">Regulatório</translation>
+        <translation>Regulatório</translation>
     </message>
     <message>
         <source>VIEW</source>
-        <translation type="vanished">VER</translation>
+        <translation>VER</translation>
     </message>
     <message>
         <source>Change Language</source>
-        <translation>Mudar Linguagem</translation>
+        <translation>Alterar Idioma</translation>
     </message>
     <message>
         <source>CHANGE</source>
-        <translation>MUDAR</translation>
+        <translation>ALTERAR</translation>
     </message>
     <message>
         <source>Select a language</source>
-        <translation>Selecione uma linguagem</translation>
-    </message>
-    <message>
-        <source>Are you sure you want to reset calibration and live params?</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Soft Restart</source>
-        <translation type="unfinished"></translation>
+        <translation>Selecione o Idioma</translation>
     </message>
     <message>
         <source>Reboot</source>
@@ -294,7 +255,7 @@
     </message>
     <message>
         <source>PAST WEEK</source>
-        <translation type="vanished">SEMANA PASSADA</translation>
+        <translation>SEMANA PASSADA</translation>
     </message>
     <message>
         <source>KM</source>
@@ -343,13 +304,6 @@
     <message>
         <source>Updating files: </source>
         <translation>Atualizando arquivos: </translation>
-    </message>
-</context>
-<context>
-    <name>LateralControlSelect</name>
-    <message>
-        <source>LateralControl Select (Pid/Indi/Lqr/Torque)</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -447,13 +401,6 @@ trabalho definido</translation>
     </message>
 </context>
 <context>
-    <name>MfcSelect</name>
-    <message>
-        <source>MFC Camera Select (Auto/Ldws,Lkas/Lfa)</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
     <name>MultiOptionDialog</name>
     <message>
         <source>Select</source>
@@ -481,81 +428,6 @@ trabalho definido</translation>
     <message>
         <source>Wrong password</source>
         <translation>Senha incorreta</translation>
-    </message>
-</context>
-<context>
-    <name>NvgWindow</name>
-    <message>
-        <source>km/h</source>
-        <translation type="vanished">km/h</translation>
-    </message>
-    <message>
-        <source>mph</source>
-        <translation type="vanished">mph</translation>
-    </message>
-    <message>
-        <source>MAX</source>
-        <translation type="vanished">LIMITE</translation>
-    </message>
-    <message>
-        <source>SPEED</source>
-        <translation type="vanished">MAX</translation>
-    </message>
-    <message>
-        <source>LIMIT</source>
-        <translation type="vanished">VELO</translation>
-    </message>
-</context>
-<context>
-    <name>OffroadAlert</name>
-    <message>
-        <source>Device temperature too high. System won&apos;t start.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Connect to internet to check for updates. openpilot won&apos;t automatically start until it connects to internet to check for updates.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Unable to download updates
-%1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Invalid date and time settings, system won&apos;t start. Connect to internet to set time.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Device failed to register. It will not connect to or upload to comma.ai servers, and receives no support from comma.ai. If this is an official device, contact support@comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>NVMe drive not mounted.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Unsupported NVMe drive detected. Device may draw significantly more power and overheat due to the unsupported NVMe.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot was unable to identify your car. Your car is either unsupported or its ECUs are not recognized. Please submit a pull request to add the firmware versions to the proper vehicle. Need help? Join discord.comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Immediately connect to the internet to check for updates. If you do not connect to the internet, openpilot won&apos;t engage in %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot was unable to identify your car. Check integrity of cables and ensure all connections are secure, particularly that the comma power is fully inserted in the OBD-II port of the vehicle. Need help? Join discord.comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Taking camera snapshots. System won&apos;t start until finished.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>An update to your device&apos;s operating system is downloading in the background. You will be prompted to update when it&apos;s ready to install.</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -593,6 +465,17 @@ trabalho definido</translation>
     </message>
 </context>
 <context>
+    <name>ParamControl</name>
+    <message>
+        <source>Ok</source>
+        <translation type="unfinished">OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation type="unfinished">Cancelar</translation>
+    </message>
+</context>
+<context>
     <name>PrimeAdWidget</name>
     <message>
         <source>Upgrade Now</source>
@@ -604,7 +487,7 @@ trabalho definido</translation>
     </message>
     <message>
         <source>PRIME FEATURES:</source>
-        <translation>APRIMORAMENTOS PRIME:</translation>
+        <translation>BENEFÍCIOS PRIME:</translation>
     </message>
     <message>
         <source>Remote access</source>
@@ -718,24 +601,6 @@ trabalho definido</translation>
     </message>
 </context>
 <context>
-    <name>RichTextDialog</name>
-    <message>
-        <source>Ok</source>
-        <translation>Ok</translation>
-    </message>
-</context>
-<context>
-    <name>SelectCar</name>
-    <message>
-        <source>Back</source>
-        <translation type="unfinished">Voltar</translation>
-    </message>
-    <message>
-        <source>Select car not use</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
     <name>SettingsWindow</name>
     <message>
         <source>×</source>
@@ -756,10 +621,6 @@ trabalho definido</translation>
     <message>
         <source>Software</source>
         <translation>Software</translation>
-    </message>
-    <message>
-        <source>Community</source>
-        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Navigation</source>
@@ -872,11 +733,11 @@ trabalho definido</translation>
     </message>
     <message>
         <source>OFFLINE</source>
-        <translation>DESCONEC</translation>
+        <translation>OFFLINE</translation>
     </message>
     <message>
         <source>ONLINE</source>
-        <translation>CONECTADO</translation>
+        <translation>ONLINE</translation>
     </message>
     <message>
         <source>ERROR</source>
@@ -950,56 +811,40 @@ trabalho definido</translation>
 <context>
     <name>SoftwarePanel</name>
     <message>
-        <source>Git Branch</source>
-        <translation type="vanished">Ramo Git</translation>
+        <source>Updates are only downloaded while the car is off.</source>
+        <translation>Atualizações baixadas durante o motor desligado.</translation>
     </message>
     <message>
-        <source>Git Commit</source>
-        <translation type="vanished">Commit Git</translation>
+        <source>Current Version</source>
+        <translation>Versao Atual</translation>
     </message>
     <message>
-        <source>OS Version</source>
-        <translation type="vanished">Versão do Sistema</translation>
+        <source>Download</source>
+        <translation>Download</translation>
     </message>
     <message>
-        <source>Version</source>
-        <translation type="vanished">Versão</translation>
+        <source>Install Update</source>
+        <translation>Instalar Atualização</translation>
     </message>
     <message>
-        <source>Last Update Check</source>
-        <translation type="vanished">Verificação da última atualização</translation>
+        <source>INSTALL</source>
+        <translation>INSTALAR</translation>
     </message>
     <message>
-        <source>The last time openpilot successfully checked for an update. The updater only runs while the car is off.</source>
-        <translation type="vanished">A última vez que o openpilot verificou com sucesso uma atualização. O atualizador só funciona com o carro desligado.</translation>
+        <source>Target Branch</source>
+        <translation>Alterar Branch</translation>
     </message>
     <message>
-        <source>Check for Update</source>
-        <translation type="vanished">Verifique atualizações</translation>
+        <source>SELECT</source>
+        <translation>SELECIONE</translation>
     </message>
     <message>
-        <source>CHECKING</source>
-        <translation type="vanished">VERIFICANDO</translation>
-    </message>
-    <message>
-        <source>Switch Branch</source>
-        <translation type="vanished">Trocar Branch</translation>
-    </message>
-    <message>
-        <source>ENTER</source>
-        <translation type="vanished">INSERIR</translation>
-    </message>
-    <message>
-        <source>The new branch will be pulled the next time the updater runs.</source>
-        <translation type="vanished">A nova branch será aplicada ao verificar atualizações.</translation>
-    </message>
-    <message>
-        <source>Enter branch name</source>
-        <translation type="vanished">Inserir o nome da branch</translation>
+        <source>Select a branch</source>
+        <translation>Selecione uma branch</translation>
     </message>
     <message>
         <source>UNINSTALL</source>
-        <translation>DESINSTALAR</translation>
+        <translation>DESINSTAL</translation>
     </message>
     <message>
         <source>Uninstall %1</source>
@@ -1010,44 +855,8 @@ trabalho definido</translation>
         <translation>Tem certeza que quer desinstalar?</translation>
     </message>
     <message>
-        <source>failed to fetch update</source>
-        <translation type="vanished">falha ao buscar atualização</translation>
-    </message>
-    <message>
         <source>CHECK</source>
         <translation>VERIFICAR</translation>
-    </message>
-    <message>
-        <source>Updates are only downloaded while the car is off.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Current Version</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Download</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Install Update</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>INSTALL</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Target Branch</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>SELECT</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Select a branch</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -1142,14 +951,6 @@ trabalho definido</translation>
         <translation>Exibir velocidade em km/h invés de mph.</translation>
     </message>
     <message>
-        <source>Enable AutoLaneChange</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Operation of the turn signal at 60㎞/h speed will result in a short change of the vehicle</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Record and Upload Driver Camera</source>
         <translation>Gravar e Upload Câmera Motorista</translation>
     </message>
@@ -1158,16 +959,36 @@ trabalho definido</translation>
         <translation>Upload dados da câmera voltada para o motorista e ajude a melhorar o algoritmo de monitoramentor.</translation>
     </message>
     <message>
+        <source>🌮 End-to-end longitudinal (extremely alpha) 🌮</source>
+        <translation>🌮 End-to-end longitudinal (experimental) 🌮</translation>
+    </message>
+    <message>
+        <source>Experimental openpilot longitudinal control</source>
+        <translation>Controle longitudinal experimental openpilot</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
+        <translation>&lt;b&gt;AVISO: o controle longitudinal openpilot é experimental para este carro e irá desabilitar AEB.&lt;/b&gt;</translation>
+    </message>
+    <message>
+        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
+        <translation>Deixe o modelo controlar o acelerador e os freios. openpilot irá conduzir como pensa que um humano faria. Super experimental.</translation>
+    </message>
+    <message>
+        <source>openpilot longitudinal control is not currently available for this car.</source>
+        <translation>controle longitudinal openpilot não está disponível para este carro.</translation>
+    </message>
+    <message>
+        <source>Enable experimental longitudinal control to enable this.</source>
+        <translation>Habilite o controle longitudinal experimental para habilitar isso.</translation>
+    </message>
+    <message>
         <source>Disengage On Accelerator Pedal</source>
         <translation>Desacionar Com Pedal Do Acelerador</translation>
     </message>
     <message>
         <source>When enabled, pressing the accelerator pedal will disengage openpilot.</source>
         <translation>Quando ativado, pressionar o pedal do acelerador desacionará o openpilot.</translation>
-    </message>
-    <message>
-        <source>🌮 End-to-end longitudinal (extremely alpha) 🌮</source>
-        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Show ETA in 24h Format</source>
@@ -1184,34 +1005,6 @@ trabalho definido</translation>
     <message>
         <source>Show map on left side when in split screen view.</source>
         <translation>Exibir mapa do lado esquerdo quando a tela for dividida.</translation>
-    </message>
-    <message>
-        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot Longitudinal Control</source>
-        <translation type="vanished">openpilot Controle Longitudinal</translation>
-    </message>
-    <message>
-        <source>openpilot will disable the car&apos;s radar and will take over control of gas and brakes. Warning: this disables AEB!</source>
-        <translation type="vanished">openpilot desativará o radar do carro e assumirá o controle do acelerador e freios. Atenção: isso desativa AEB!</translation>
-    </message>
-    <message>
-        <source>Experimental openpilot longitudinal control</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot longitudinal control is not currently available for this car.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Enable experimental longitudinal control to enable this.</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
