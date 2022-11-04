@@ -600,7 +600,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   auto tmuxlog_btn = new ButtonControl("Tmux error log", tr("RUN"));
   QObject::connect(tmuxlog_btn, &ButtonControl::clicked, [=]() {
     const std::string txt = util::read_file("/data/tmux_error.log");
-    RichTextDialog::alert(QString::fromStdString(txt), this);
+    ConfirmationDialog::rich(QString::fromStdString(txt), this);
   });
   communityLayout->addWidget(tmuxlog_btn);
 
@@ -639,19 +639,23 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   toggles.append(new ParamControl("PutPrebuilt",
                                   tr("Prebuilt Enable"),
                                   tr("Create prebuilt files to speed bootup"),
-                                  "../assets/offroad/icon_addon.png", this));
+                                  "../assets/offroad/icon_addon.png",
+                                  false, this));
   toggles.append(new ParamControl("LoggerDisable",
                                   tr("Logger Disable"),
                                   tr("Disable Logger is Reduce system load"),
-                                  "../assets/offroad/icon_addon.png", this));
+                                  "../assets/offroad/icon_addon.png",
+                                  false, this));
   toggles.append(new ParamControl("NavDisable",
                                   tr("Navigation Disable"),
                                   tr("Navigation Function not use"),
-                                  "../assets/offroad/icon_addon.png", this));
+                                  "../assets/offroad/icon_addon.png",
+                                  false, this));
   toggles.append(new ParamControl("NewRadarInterface",
                                   tr("New radar interface Enable"),
                                   tr("Some newer car New radar interface"),
-                                  "../assets/offroad/icon_road.png", this));
+                                  "../assets/offroad/icon_road.png",
+                                  false, this));
   for (ParamControl *toggle : toggles) {
     if (main_layout->count() != 0) {
     }
