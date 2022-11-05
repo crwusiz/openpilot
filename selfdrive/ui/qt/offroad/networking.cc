@@ -237,7 +237,7 @@ WifiUI::WifiUI(QWidget *parent, WifiManager* wifi) : QWidget(parent), wifi(wifi)
       border-radius: 4px;
       background-color: #8A8A8A;
     }
-    #forget_btn {
+    #forgetBtn {
       font-size: 32px;
       font-weight: 600;
       color: #292929;
@@ -311,14 +311,14 @@ void WifiUI::refresh() {
 
     // Forget button
     if (wifi->isKnownConnection(network.ssid) && !wifi->isTetheringEnabled()) {
-      QPushButton *forget_btn = new QPushButton(tr("FORGET"));
-      forget_btn->setObjectName("forget_btn");
-      QObject::connect(forget_btn, &QPushButton::clicked, [=]() {
-        if (ConfirmationDialog::confirm(tr("Forget Wi-Fi Network \"%1\"?").arg(QString::fromUtf8(network.ssid)), this)) {
+      QPushButton *forgetBtn = new QPushButton(tr("FORGET"));
+      forgetBtn->setObjectName("forgetBtn");
+      QObject::connect(forgetBtn, &QPushButton::clicked, [=]() {
+        if (ConfirmationDialog::confirm(tr("Forget Wi-Fi Network \"%1\"?").arg(QString::fromUtf8(network.ssid)), tr("Forget"), this)) {
           wifi->forgetConnection(network.ssid);
         }
       });
-      hlayout->addWidget(forget_btn, 0, Qt::AlignRight);
+      hlayout->addWidget(forgetBtn, 0, Qt::AlignRight);
     }
 
     // Status icon

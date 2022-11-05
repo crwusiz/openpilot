@@ -281,6 +281,14 @@
         <source>Disengage to Power Off</source>
         <translation>전원을 종료하려면 해제하세요</translation>
     </message>
+    <message>
+        <source>Reset</source>
+        <translation>리셋</translation>
+    </message>
+    <message>
+        <source>Review</source>
+        <translation>다시보기</translation>
+    </message>
 </context>
 <context>
     <name>DriveStats</name>
@@ -1020,6 +1028,14 @@ location set</source>
         <source>Are you sure you want to uninstall?</source>
         <translation>제거하시겠습니까?</translation>
     </message>
+    <message>
+        <source>CHECK</source>
+        <translation>확인</translation>
+    </message>
+    <message>
+        <source>Uninstall</source>
+        <translation>Uninstall</translation>
+    </message>
 </context>
 <context>
     <name>SshControl</name>
@@ -1229,6 +1245,10 @@ location set</source>
     <message>
         <source>Forget Wi-Fi Network &quot;%1&quot;?</source>
         <translation>wifi 네트워크 저장안함 &quot;%1&quot;?</translation>
+    </message>
+    <message>
+        <source>Forget</source>
+        <translation>저장안함</translation>
     </message>
 </context>
 </TS>
