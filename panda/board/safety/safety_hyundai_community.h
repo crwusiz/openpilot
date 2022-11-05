@@ -1,10 +1,10 @@
 #include "safety_hyundai_common.h"
 
 const SteeringLimits HYUNDAI_COMMUNITY_STEERING_LIMITS = {
-  .max_steer = 409,
+  .max_steer = 384,
   .max_rt_delta = 112,
   .max_rt_interval = 250000,
-  .max_rate_up = 5,
+  .max_rate_up = 3,
   .max_rate_down = 7,
   .driver_torque_allowance = 50,
   .driver_torque_factor = 2,
@@ -25,7 +25,7 @@ bool lcan_bus1, fwd_bus1 = false;
 bool fwd_bus2 = true;
 int lkas11_bus0_cnt, lcan_bus1_cnt, mdps12_cnt, Last_StrColTq = 0;
 int lkas11_op, mdps12_op, clu11_op, scc12_op, ems11_op = 0;
-int mdps12_chksum, eps_bus, scc_bus = -1;
+int eps_bus, scc_bus, mdps12_chksum = -1;
 
 const CanMsg HYUNDAI_COMMUNITY_TX_MSGS[] = {
   {593, 2, 8},    // MDPS12, Bus 2
@@ -165,7 +165,7 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
     if (fwd_bus1 || !lcan_bus1) {
       lcan_bus1 = true;
       fwd_bus1 = false;
-      puts("  forwarding disabled : lcan on bus ["); puth(bus); puts("]\n");
+      puts("  forwarding disabled : LCAN on bus ["); puth(bus); puts("]\n");
     }
   }
 
@@ -174,20 +174,20 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
     if ((bus == 0) && fwd_bus2) {
       fwd_bus2 = false;
       lkas11_bus0_cnt = 20;
-      puts("  forwarding disabled : lkas11 on bus ["); puth(bus); puts("]\n");
+      puts("  forwarding disabled : LKAS11 on bus ["); puth(bus); puts("]\n");
     }
     if (bus == 2) {
       if (lkas11_bus0_cnt > 0) {
         lkas11_bus0_cnt--;
       } else if (!fwd_bus2) {
         fwd_bus2 = true;
-        puts("  forwarding enabled : lkas11 on bus ["); puth(bus); puts("]\n");
+        puts("  forwarding enabled : LKAS11 on bus ["); puth(bus); puts("]\n");
       }
       if (lcan_bus1_cnt > 0) {
         lcan_bus1_cnt--;
       } else if (lcan_bus1) {
         lcan_bus1 = false;
-        puts("  lcan not on bus [1]\n");
+        puts("  LCAN not on bus [1]\n");
       }
     }
   }
@@ -200,7 +200,7 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
         puts("  eps on bus ["); puth(bus); puts("]\n");
         if (!fwd_bus1 && !lcan_bus1) {
           fwd_bus1 = true;
-          puts("  forwarding enabled : eps on bus ["); puth(bus); puts("]\n");
+          puts("  forwarding enabled : EPS on bus ["); puth(bus); puts("]\n");
         }
       }
     }
@@ -214,11 +214,11 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
         puts("  scc on bus ["); puth(bus); puts("]\n");
         if (!fwd_bus1) {
           fwd_bus1 = true;
-          puts("  forwarding enabled : scc on bus ["); puth(bus); puts("]\n");
+          puts("  forwarding enabled : SCC on bus ["); puth(bus); puts("]\n");
         }
       }
       if (bus == 2) {
-        puts("  scc on bus ["); puth(bus); puts("]\n");
+        puts("  SCC on bus ["); puth(bus); puts("]\n");
       }
     }
   }
@@ -412,10 +412,12 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
   if (is_scc12_msg) { scc12_op = 20; }
   if (is_clu11_msg && (bus == 1)) { clu11_op = 20; }
 
-  if (is_lkas11_msg) {
-    last_ts_lkas11_received_from_op = microsecond_timer_get();
-  } else if (is_scc12_msg) {
-    last_ts_scc12_received_from_op = microsecond_timer_get();
+  if (tx) {
+    if (is_lkas11_msg) {
+      last_ts_lkas11_received_from_op = microsecond_timer_get();
+    } else if (is_scc12_msg) {
+      last_ts_scc12_received_from_op = microsecond_timer_get();
+    }
   }
   return tx;
 }
@@ -491,10 +493,10 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
     } else if ((bus_num == 1) && fwd_bus1) {
       bus_fwd = 0;
     } else if (is_lkas11_msg || is_lfahda_msg) {
-      if (now - last_ts_lkas11_received_from_op >= 100000)
+      if (now - last_ts_lkas11_received_from_op >= 200000)
         bus_fwd = 0;
     } else if (is_scc_msg) {
-      if (now - last_ts_scc12_received_from_op >= 200000)
+      if (now - last_ts_scc12_received_from_op >= 400000)
         bus_fwd = 0;
     }
   }

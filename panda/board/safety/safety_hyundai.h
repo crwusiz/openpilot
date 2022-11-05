@@ -122,15 +122,15 @@ static uint8_t hyundai_get_counter(CANPacket_t *to_push) {
   int addr = GET_ADDR(to_push);
 
   uint8_t cnt;
-  if (addr == 608) {
+  if (addr == 608) {  // EMS16
     cnt = (GET_BYTE(to_push, 7) >> 4) & 0x3U;
-  } else if (addr == 902) {
+  } else if (addr == 902) {  // WHL_SPD11
     cnt = ((GET_BYTE(to_push, 3) >> 6) << 2) | (GET_BYTE(to_push, 1) >> 6);
-  } else if (addr == 916) {
+  } else if (addr == 916) {  // TCS13
     cnt = (GET_BYTE(to_push, 1) >> 5) & 0x7U;
-  } else if (addr == 1057) {
+  } else if (addr == 1057) {  // SCC12
     cnt = GET_BYTE(to_push, 7) & 0xFU;
-  } else if (addr == 1265) {
+  } else if (addr == 1265) {  // CLU11
     cnt = (GET_BYTE(to_push, 3) >> 4) & 0xFU;
   } else {
     cnt = 0;
@@ -142,13 +142,13 @@ static uint32_t hyundai_get_checksum(CANPacket_t *to_push) {
   int addr = GET_ADDR(to_push);
 
   uint8_t chksum;
-  if (addr == 608) {
+  if (addr == 608) {  // EMS16
     chksum = GET_BYTE(to_push, 7) & 0xFU;
-  } else if (addr == 902) {
+  } else if (addr == 902) {  // WHL_SPD11
     chksum = ((GET_BYTE(to_push, 7) >> 6) << 2) | (GET_BYTE(to_push, 5) >> 6);
-  } else if (addr == 916) {
+  } else if (addr == 916) {  // TCS13
     chksum = GET_BYTE(to_push, 6) & 0xFU;
-  } else if (addr == 1057) {
+  } else if (addr == 1057) {  // SCC12
     chksum = GET_BYTE(to_push, 7) >> 4;
   } else {
     chksum = 0;
@@ -160,7 +160,7 @@ static uint32_t hyundai_compute_checksum(CANPacket_t *to_push) {
   int addr = GET_ADDR(to_push);
 
   uint8_t chksum = 0;
-  if (addr == 902) {
+  if (addr == 902) {  // WHL_SPD11
     // count the bits
     for (int i = 0; i < 8; i++) {
       uint8_t b = GET_BYTE(to_push, i);
@@ -177,27 +177,24 @@ static uint32_t hyundai_compute_checksum(CANPacket_t *to_push) {
   } else {
     // sum of nibbles
     for (int i = 0; i < 8; i++) {
-      if ((addr == 916) && (i == 7)) {
+      if ((addr == 916) && (i == 7)) {  // TCS13
         continue; // exclude
       }
       uint8_t b = GET_BYTE(to_push, i);
-      if (((addr == 608) && (i == 7)) || ((addr == 916) && (i == 6)) || ((addr == 1057) && (i == 7))) {
-        b &= (addr == 1057) ? 0x0FU : 0xF0U; // remove checksum
+      if (((addr == 608) && (i == 7)) || ((addr == 916) && (i == 6)) || ((addr == 1057) && (i == 7))) {  // EMS16, TCS13, SCC12
+        b &= (addr == 1057) ? 0x0FU : 0xF0U;  // SCC12 remove checksum
       }
       chksum += (b % 16U) + (b / 16U);
     }
-    chksum = (16U - (chksum %  16U)) % 16U;
+    chksum = (16U - (chksum % 16U)) % 16U;
   }
-
   return chksum;
 }
 
 static int hyundai_rx_hook(CANPacket_t *to_push) {
-
   bool valid = addr_safety_check(to_push, &hyundai_rx_checks,
                                  hyundai_get_checksum, hyundai_compute_checksum,
                                  hyundai_get_counter);
-
   int bus = GET_BUS(to_push);
   int addr = GET_ADDR(to_push);
 
@@ -345,20 +342,20 @@ static int hyundai_tx_hook(CANPacket_t *to_send, bool longitudinal_allowed) {
     }
   }*/
 
-  //////////////////////////////////////////////////////////
-  bool is_lkas11_msg = addr == 832;
-  bool is_scc12_msg = addr == 1057;
+  if (tx) {
+    bool is_lkas11_msg = addr == 832;
+    bool is_scc12_msg = addr == 1057;
 
-  if(is_lkas11_msg)
-    last_ts_lkas11_received_from_op = microsecond_timer_get();
-  else if(is_scc12_msg)
-    last_ts_scc12_received_from_op = microsecond_timer_get();
-
+    if (is_lkas11_msg) {
+      last_ts_lkas11_received_from_op = microsecond_timer_get();
+    } else if (is_scc12_msg) {
+      last_ts_scc12_received_from_op = microsecond_timer_get();
+    }
+  }
   return tx;
 }
 
 static int hyundai_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
-
   int bus_fwd = -1;
   int addr = GET_ADDR(to_fwd);
 
@@ -376,16 +373,16 @@ static int hyundai_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
     bool block_msg = is_lkas_msg || is_lfahda_msg || is_scc_msg; //|| is_fca_msg;
     if (!block_msg) {
       bus_fwd = 0;
-    }
-    else {
+    } else {
       uint32_t now = microsecond_timer_get();
-      if(is_lkas_msg || is_lfahda_msg) {
-        if(now - last_ts_lkas11_received_from_op >= 100000)
+      if (is_lkas_msg || is_lfahda_msg) {
+        if (now - last_ts_lkas11_received_from_op >= 200000) {
           bus_fwd = 0;
-      }
-      else if(is_scc_msg) {
-        if(now - last_ts_scc12_received_from_op >= 200000)
+        }
+      } else if (is_scc_msg) {
+        if (now - last_ts_scc12_received_from_op >= 400000) {
           bus_fwd = 0;
+        }
       }
     }
   }

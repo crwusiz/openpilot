@@ -10,8 +10,11 @@ int default_rx_hook(CANPacket_t *to_push) {
   int bus = GET_BUS(to_push);
   int addr = GET_ADDR(to_push);
 
-  // LKAS11
-  if (addr == 832) {
+  bool is_mdps12_msg = addr == 593;
+  bool is_lkas11_msg = addr == 832;
+  bool is_scc12_msg = addr == 1057;
+
+  if (is_lkas11_msg) {
     if (bus == 0) {
       lkas11_bus0_cnt = 10;
       if (fwd_bus2) {
@@ -45,25 +48,25 @@ int default_rx_hook(CANPacket_t *to_push) {
     }
   }
   // check if we have a EPS or SCC on Bus1
-  if (bus == 1 && (addr == 593 || addr == 897 || addr == 1057)) {
+  if (bus == 1 && (is_mdps12_msg || is_scc12_msg)) {
     if (!fwd_bus1 && !lcan_bus1) {
       fwd_bus1 = true;
       puts("  forwarding enabled : EPS or SCC on bus ["); puth(bus); puts("]\n");
     }
   }
-  if ((addr == 593) && (mdps12_chksum == -1)) {
-    int new_chksum2 = 0;
+  if (is_mdps12_msg && (mdps12_chksum == -1)) {
+    int chksum_new = 0;
     uint8_t dat[8];
     for (int i=0; i<8; i++) {
       dat[i] = GET_BYTE(to_push, i);
     }
-    int chksum2 = dat[3];
+    int chksum = dat[3];
     dat[3] = 0;
     for (int i=0; i<8; i++) {
-      new_chksum2 += dat[i];
+      chksum_new += dat[i];
     }
-    new_chksum2 %= 256;
-    if (chksum2 == new_chksum2) {
+    chksum_new %= 256;
+    if (chksum == chksum_new) {
       mdps12_chksum = 0;
     } else {
       mdps12_chksum = 1;
@@ -96,6 +99,8 @@ static int default_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   int addr = GET_ADDR(to_fwd);
   int bus_fwd = -1;
 
+  bool is_mdps12_msg = addr == 593;
+
   if (bus_num == 0 && (fwd_bus1 || fwd_bus2)) {
     if (fwd_bus1 && fwd_bus2) {
       bus_fwd = 12;
@@ -111,9 +116,9 @@ static int default_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   }
 
   // Code for LKA/LFA/HDA anti-nagging.
-  if (addr == 593 && bus_fwd != -1) {
+  if (is_mdps12_msg && bus_fwd != -1) {
     uint8_t dat[8];
-    int new_chksum2 = 0;
+    int chksum_new = 0;
     for (int i=0; i<8; i++) {
       dat[i] = GET_BYTE(to_fwd, i);
     }
@@ -145,18 +150,18 @@ static int default_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
       dat[3] = 0;
       if (!mdps12_chksum) {
         for (int i=0; i<8; i++) {
-          new_chksum2 += dat[i];
+          chksum_new += dat[i];
         }
-        new_chksum2 %= 256;
+        chksum_new %= 256;
       } else if (mdps12_chksum) {
-        uint8_t crc = 0xFFU;
+        uint8_t crc = 0xFF;
         uint8_t poly = 0x1D;
         int i, j;
         for (i=0; i<8; i++) {
-          if (i!=3) { //don't include CRC byte
+          if (i!=3) { // don't include CRC byte
             crc ^= dat[i];
             for (j=0; j<8; j++) {
-              if ((crc & 0x80U) != 0U) {
+              if ((crc & 0x80) != 0) {
                 crc = (crc << 1) ^ poly;
               } else {
                 crc <<= 1;
@@ -164,11 +169,11 @@ static int default_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
             }
           }
         }
-        crc ^= 0xFFU;
+        crc ^= 0xFF;
         crc %= 256;
-        new_chksum2 = crc;
+        chksum_new = crc;
       }
-      *RDLR |= new_chksum2 << 24;
+      *RDLR |= chksum_new << 24;
     }
     mdps12_cnt += 1;
     mdps12_cnt %= 345;
