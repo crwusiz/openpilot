@@ -175,7 +175,8 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
 AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), accel_filter(UI_FREQ, .5, 1. / UI_FREQ), CameraWidget("camerad", type, true, parent) {
   pm = std::make_unique<PubMaster, const std::initializer_list<const char *>>({"uiDebug"});
 
-  engage_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
+  steer_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
+  longitudinal_img = loadPixmap("../assets/offroad/icon_disengage_on_accelerator.svg", {img_size, img_size});
   dm_img = loadPixmap("../assets/img_driver_face.png", {img_size, img_size});
 
   // crwusiz add
@@ -489,22 +490,23 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   drawTextColor(p, rect().center().x(), 310, speedUnit, lightorangeColor());
 
   // engage-ability icon ( wheel ) (upper right 1)
-  QColor wheelbgColor = blackColor(100);
+  QColor steerbgColor = blackColor(100);
 
   if (status == STATUS_ENGAGED && !steeringPressed) {
-    wheelbgColor = engagedColor(200);
+    steerbgColor = engagedColor(200);
   } else if (status == STATUS_OVERRIDE && !steeringPressed) {
-    wheelbgColor = overrideColor(200);
+    steerbgColor = overrideColor(200);
+    steer_img = longitudinal_img;
   } else if (status == STATUS_WARNING) {
-    wheelbgColor = warningColor(200);
+    steerbgColor = warningColor(200);
   } else if (steeringPressed) {
-    wheelbgColor = steeringpressedColor(200);
+    steerbgColor = steeringpressedColor(200);
   }
 
   int x,y,w,h = 0;
   x = rect().right() - radius / 2 - bdr_s * 2;
   y = radius / 2 + bdr_s * 4;
-  drawIconRotate(p, x, y, engage_img, wheelbgColor, 1.0, angleSteers);
+  drawIconRotate(p, x, y, steer_img, steerbgColor, 1.0, angleSteers);
 
   // wifi icon (upper right 2)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
@@ -821,11 +823,13 @@ void AnnotatedCameraWidget::drawRightDevUi(QPainter &p, int x, int y) {
 // info drawn on top
 
 void AnnotatedCameraWidget::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
+  p.save();
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
   p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
   p.setOpacity(opacity);
   p.drawPixmap(x - img_size / 2, y - img_size / 2, img);
+  p.restore();
 }
 
 void AnnotatedCameraWidget::drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity, float angle) {
@@ -907,7 +911,19 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
 
   // paint path
   QLinearGradient bg(0, height(), 0, height() / 4);
-  float start_hue, end_hue;
+  const auto &acceleration = (*s->sm)["modelV2"].getModelV2().getAcceleration();
+  float start_hue, acceleration_future = 0;
+
+  if (acceleration.getZ().size() > 10 && (*s->sm)["carControl"].getCarControl().getLongActive()) {
+    acceleration_future = acceleration.getX()[10];  // 1.0 second
+  }
+
+  // speed up: 148, slow down: 0
+  start_hue = fmax(fmin(60 + accel_filter.update(acceleration_future) * 80, 148), 0);
+
+  // FIXME: painter.drawPolygon can be slow if hue is not rounded
+  start_hue = int(start_hue * 100 + 0.5) / 100;
+
   if (scene.engaged) {
     if (scene.steeringPressed) {
       // The user is applying torque to the steering wheel
@@ -916,37 +932,10 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
     } else if (scene.override) {
       bg.setColorAt(0, overrideColor(200));
       bg.setColorAt(1, overrideColor(0));
-    } else if (scene.end_to_end_long) {
-      const auto &acceleration = (*s->sm)["modelV2"].getModelV2().getAcceleration();
-      float acceleration_future = 0;
-      if (acceleration.getZ().size() > 10 && (*s->sm)["carControl"].getCarControl().getLongActive()) {
-        acceleration_future = acceleration.getX()[10];  // 1.0 second
-      }
-      // speed up: 148, slow down: 0
-      start_hue = fmax(fmin(60 + accel_filter.update(acceleration_future) * 80, 148), 0);
-
-      // FIXME: painter.drawPolygon can be slow if hue is not rounded
-      start_hue = int(start_hue * 100 + 0.5) / 100;
-
+    } else {
       bg.setColorAt(0.0, QColor::fromHslF(start_hue / 360., 0.97, 0.56, 0.4));
       bg.setColorAt(0.75, QColor::fromHslF(63 / 360., 1.0, 0.68, 0.35));
       bg.setColorAt(1.0, QColor::fromHslF(63 / 360., 1.0, 0.68, 0.0));
-    } else {
-      const auto &orientation = (*s->sm)["modelV2"].getModelV2().getOrientation();
-      float orientation_future = 0;
-      if (orientation.getZ().size() > 16) {
-        orientation_future = std::abs(orientation.getZ()[16]);  // 2.5 seconds
-      }
-      start_hue = 148;
-      // straight: 112, in turns: 70
-      end_hue = fmax(70, 112 - (orientation_future * 420));
-
-      // FIXME: painter.drawPolygon can be slow if hue is not rounded
-      end_hue = int(end_hue * 100 + 0.5) / 100;
-
-      bg.setColorAt(0.0, QColor::fromHslF(start_hue / 360., 0.94, 0.51, 0.4));
-      bg.setColorAt(0.5, QColor::fromHslF(end_hue / 360., 1.0, 0.68, 0.35));
-      bg.setColorAt(1.0, QColor::fromHslF(end_hue / 360., 1.0, 0.68, 0.0));
     }
   } else {
     bg.setColorAt(0, whiteColor(200));

@@ -230,7 +230,6 @@ void UIState::updateStatus() {
     if (scene.started) {
       status = STATUS_DISENGAGED;
       scene.started_frame = sm->frame;
-      scene.end_to_end_long = Params().getBool("EndToEndLong");
       wide_cam_only = Params().getBool("WideCameraOnly");
     }
     started_prev = scene.started;
@@ -250,8 +249,7 @@ UIState::UIState(QObject *parent) : QObject(parent) {
     "modelV2", "carControl", "controlsState", "liveCalibration", "radarState", "deviceState", "roadCameraState",
     "pandaStates", "carParams", "driverMonitoringState", "carState", "liveLocationKalman",
     "wideRoadCameraState", "managerState", "navInstruction", "navRoute", "gnssMeasurements",
-    "gpsLocationExternal", "carControl", "liveParameters", "liveTorqueParameters",
-    "ubloxGnss", "roadLimitSpeed",
+    "gpsLocationExternal", "liveParameters", "liveTorqueParameters", "ubloxGnss", "roadLimitSpeed",
   });
 
   Params params;

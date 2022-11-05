@@ -124,6 +124,10 @@
         <source>Select your Manufacturer</source>
         <translation>제조사를 선택하세요</translation>
     </message>
+    <message>
+        <source>Process</source>
+        <translation>실행</translation>
+    </message>
 </context>
 <context>
     <name>ConfirmationDialog</name>
@@ -288,6 +292,10 @@
     <message>
         <source>Review</source>
         <translation>다시보기</translation>
+    </message>
+    <message>
+        <source>Process</source>
+        <translation>실행</translation>
     </message>
 </context>
 <context>
@@ -741,7 +749,7 @@ location set</source>
     <name>RichTextDialog</name>
     <message>
         <source>Ok</source>
-        <translation>확인</translation>
+        <translation type="vanished">확인</translation>
     </message>
 </context>
 <context>
@@ -1027,10 +1035,6 @@ location set</source>
     <message>
         <source>Are you sure you want to uninstall?</source>
         <translation>제거하시겠습니까?</translation>
-    </message>
-    <message>
-        <source>CHECK</source>
-        <translation>확인</translation>
     </message>
     <message>
         <source>Uninstall</source>

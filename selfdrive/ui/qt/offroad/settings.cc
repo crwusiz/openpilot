@@ -235,7 +235,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   reset_calib_btn->setObjectName("reset_calib_btn");
   reset_layout->addWidget(reset_calib_btn);
   QObject::connect(reset_calib_btn, &QPushButton::released, [=]() {
-    if (ConfirmationDialog::confirm(tr("Are you sure you want to reset calibration and live params?"), this)) {
+    if (ConfirmationDialog::confirm(tr("Are you sure you want to reset calibration and live params?"), tr("Process"), this)) {
       Params().remove("CalibrationParams");
       Params().remove("LiveParameters");
       emit closeSettings();
@@ -575,7 +575,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   auto gitpull_btn = new ButtonControl("Git Fetch and Reset", tr("RUN"));
   QObject::connect(gitpull_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+    if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/gitpull.sh");
     }
   });
@@ -583,7 +583,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   auto restart_btn = new ButtonControl("Restart", tr("RUN"));
   QObject::connect(restart_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+    if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/restart.sh");
     }
   });
@@ -591,7 +591,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   auto cleardtc_btn = new ButtonControl("Clear DTC", tr("RUN"));
   QObject::connect(cleardtc_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+    if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/cleardtc.sh");
     }
   });
@@ -606,7 +606,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   auto pandareset_btn = new ButtonControl("Panda Reset", tr("RUN"));
   QObject::connect(pandareset_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+    if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/relay_reset.sh");
     }
   });
@@ -614,7 +614,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   auto pandaflash_btn = new ButtonControl("Panda Flash", tr("RUN"));
   QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+    if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/panda/board/flash.sh");
     }
   });
@@ -622,7 +622,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   auto pandarecover_btn = new ButtonControl("Panda Recover", tr("RUN"));
   QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), this)) {
+    if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/panda/board/recover.sh");
     }
   });
