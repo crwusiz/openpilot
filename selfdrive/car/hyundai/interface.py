@@ -327,6 +327,9 @@ class CarInterface(CarInterfaceBase):
         # non-HDA2
         if 0x1cf not in fingerprint[4]:
           ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
+        # ICE cars do not have 0x130; GEARS message on 0x40 instead
+        if 0x130 not in fingerprint[4]:
+          ret.flags |= HyundaiFlags.CANFD_ALT_GEARS.value
 
       if ret.flags & HyundaiFlags.CANFD_HDA2:
         ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_HDA2
