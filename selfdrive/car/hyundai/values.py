@@ -92,6 +92,7 @@ class CAR:
   TUCSON22_HEV = "HYUNDAI TUCSON HEV (NX4)"
   EV6 = "KIA EV6 (CV)"
   SPORTAGE_NQ5 = "KIA SPORTAGE (NQ5)"
+  SPORTAGE_NQ5_HEV = "KIA SPORTAGE HEV (NQ5)"
   GENESIS_GV70 = "GENESIS GV70 (JK1)"
 
 @dataclass
@@ -1500,6 +1501,16 @@ FW_VERSIONS = {
   },
   CAR.SPORTAGE_NQ5: {
     (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00NQ5 FR_CMR AT USA LHD 1.00 1.00 99211-P1030 662',
+      b'\xf1\x00NQ5 FR_CMR AT USA LHD 1.00 1.00 99211-P1040 663',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00NQ5__               1.00 1.02 99110-P1000         ',
+      b'\xf1\x00NQ5__               1.00 1.03 99110-P1000         ',
+    ],
+  },
+  CAR.SPORTAGE_NQ5_HEV: {
+    (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00NQ5 FR_CMR AT USA LHD 1.00 1.00 99211-P1060 665',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
@@ -1527,7 +1538,7 @@ FEATURES = {
 }
 
 CANFD_CAR = {
-  CAR.EV6, CAR.GENESIS_GV70, CAR.TUCSON22_HEV, CAR.IONIQ5, CAR.SPORTAGE_NQ5
+  CAR.EV6, CAR.GENESIS_GV70, CAR.TUCSON22_HEV, CAR.IONIQ5, CAR.SPORTAGE_NQ5, CAR.SPORTAGE_NQ5_HEV
 }
 FCA11_CAR = {
   CAR.SONATA, CAR.PALISADE, CAR.ELANTRA_I30, CAR.ELANTRA21, CAR.ELANTRA21_HEV, CAR.KONA, CAR.KONA_HEV, CAR.IONIQ_HEV,
@@ -1597,5 +1608,6 @@ DBC = {
   CAR.TUCSON22_HEV: dbc_dict('hyundai_canfd', None),
   CAR.EV6: dbc_dict('hyundai_canfd', None),
   CAR.SPORTAGE_NQ5: dbc_dict('hyundai_canfd', None),
+  CAR.SPORTAGE_NQ5_HEV: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),
 }
