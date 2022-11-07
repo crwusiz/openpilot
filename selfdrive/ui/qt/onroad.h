@@ -91,7 +91,8 @@ private:
   void drawRightDevUi(QPainter &p, int x, int y);
   int devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, const QColor &color);
 
-  QPixmap steer_img;
+  QPixmap wheel_img,
+  QPixmap steer_img,
   QPixmap longitudinal_img;
   QPixmap dm_img;
 

@@ -490,23 +490,26 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   drawTextColor(p, rect().center().x(), 310, speedUnit, lightorangeColor());
 
   // engage-ability icon ( wheel ) (upper right 1)
-  QColor steerbgColor = blackColor(100);
+  QColor wheelbg_Color = blackColor(100);
 
   if (status == STATUS_ENGAGED && !steeringPressed) {
-    steerbgColor = engagedColor(200);
+    wheelbg_Color = engagedColor(200);
+    wheel_img = steer_img;
   } else if (status == STATUS_OVERRIDE && !steeringPressed) {
-    steerbgColor = overrideColor(200);
-    steer_img = longitudinal_img;
+    wheelbg_Color = overrideColor(200);
+    wheel_img = longitudinal_img;
   } else if (status == STATUS_WARNING) {
-    steerbgColor = warningColor(200);
+    wheelbg_Color = warningColor(200);
+    wheel_img = steer_img;
   } else if (steeringPressed) {
-    steerbgColor = steeringpressedColor(200);
+    wheelbg_Color = steeringpressedColor(200);
+    wheel_img = steer_img;
   }
 
   int x,y,w,h = 0;
   x = rect().right() - radius / 2 - bdr_s * 2;
   y = radius / 2 + bdr_s * 4;
-  drawIconRotate(p, x, y, steer_img, steerbgColor, 1.0, angleSteers);
+  drawIconRotate(p, x, y, wheel_img, wheelbg_Color, 1.0, angleSteers);
 
   // wifi icon (upper right 2)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
