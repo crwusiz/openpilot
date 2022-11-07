@@ -185,7 +185,10 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   bsd_l_img = loadPixmap("../assets/img_bsd_l.png", {img_size, img_size});
   bsd_r_img = loadPixmap("../assets/img_bsd_r.png", {img_size, img_size});
   gps_img = loadPixmap("../assets/img_gps.png", {img_size, img_size});
-  wifi_img = loadPixmap("../assets/img_wifi.png", {img_size, img_size});
+  wifi_l_img = loadPixmap("../assets/offroad/icon_wifi_strength_low.svg", {img_size, img_size});
+  wifi_m_img = loadPixmap("../assets/offroad/icon_wifi_strength_medium.svg", {img_size, img_size});
+  wifi_h_img = loadPixmap("../assets/offroad/icon_wifi_strength_high.svg", {img_size, img_size});
+  wifi_f_img = loadPixmap("../assets/offroad/icon_wifi_strength_full.svg", {img_size, img_size});
   direction_img = loadPixmap("../assets/img_direction.png", {img_size, img_size});
   gap1_img = loadPixmap("../assets/img_gap1.png", {img_size, img_size});
   gap2_img = loadPixmap("../assets/img_gap2.png", {img_size, img_size});
@@ -268,7 +271,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("nda_state", nd.getActive());
   setProperty("left_blindspot", ce.getLeftBlindspot());
   setProperty("right_blindspot", ce.getRightBlindspot());
-  setProperty("wifi_state", (int)ds.getNetworkStrength() > 0);
+  setProperty("wifi_state", (int)ds.getNetworkStrength());
   setProperty("gps_state", sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK());
   setProperty("gpsBearing", ge.getBearingDeg());
   setProperty("gpsVerticalAccuracy", ge.getVerticalAccuracy());
@@ -512,10 +515,22 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   y = radius / 2 + bdr_s * 4;
   drawIconRotate(p, x, y, wheel_img, wheelbg_Color, 1.0, angleSteers);
 
+  if (wifi_state == 0) {
+    wifi_img = wifi_f_img;
+  } else if (wifi_state == 1) {
+    wifi_img = wifi_l_img;
+  } else if (wifi_state == 2) {
+    wifi_img = wifi_m_img;
+  } else if (wifi_state == 3) {
+    wifi_img = wifi_h_img;
+  } else if (wifi_state == 4) {
+    wifi_img = wifi_f_img;
+  }
+
   // wifi icon (upper right 2)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
   y = radius / 2 + (bdr_s * 4);
-  drawIcon(p, x, y, wifi_img, blackColor(100), wifi_state ? 1.0 : 0.2);
+  drawIcon(p, x, y, wifi_img, blackColor(100), wifi_state > 0 ? 1.0 : 0.2);
   p.setOpacity(1.0);
 
   // gps icon (upper right 3)

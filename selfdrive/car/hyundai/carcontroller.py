@@ -222,7 +222,7 @@ class CarController:
               can_sends.extend([hyundaican.create_clu11(self.packer, CS.clu11, Buttons.RES_ACCEL, self.CP.sccBus)] * 25)
               self.last_button_frame = self.frame
 
-      scc_commands = Params().get("SccCommands", encoding='utf8')
+      scc_commands = Params().get("SccCommandsSelect", encoding='utf8')
       # send scc to car if longcontrol enabled and SCC not on bus 0 or not live
       if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl and CS.out.cruiseState.enabled and (CS.scc_bus or not self.scc_live):
         jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0

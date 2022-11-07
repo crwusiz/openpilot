@@ -660,7 +660,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   toggles.append(new ParamControl("CruiseStateControl",
                                   tr("Npilot controls Cruise State (Experimental)"),
                                   tr("Npilot controls cruise on/off, gap and set speed."),
-                                  "../assets/offroad/icon_road.png",
+                                  "../assets/offroad/icon_long.png",
                                   false, this));
   for (ParamControl *toggle : toggles) {
     if (main_layout->count() != 0) {

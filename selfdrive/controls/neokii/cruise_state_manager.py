@@ -76,7 +76,7 @@ class CruiseStateManager:
 
     button = self.update_buttons()
     if button != ButtonType.unknown:
-      self.update_cruise_state(CS, int(round(self.speed * CV.MS_TO_KPH, 1)), button)
+      self.update_cruise_state(CS, int(round(self.speed * CV.MS_TO_KPH)), button)
 
     if not self.available:
       self.enabled = False

@@ -91,16 +91,15 @@ private:
   void drawRightDevUi(QPainter &p, int x, int y);
   int devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, const QColor &color);
 
-  QPixmap wheel_img;
-  QPixmap steer_img;
-  QPixmap lat_img;
-  QPixmap longitudinal_img;
+  QPixmap wheel_img, steer_img;
+  QPixmap lat_img, longitudinal_img;
   QPixmap dm_img;
 
   // crwusiz add
   QPixmap brake_img, bsd_l_img, bsd_r_img;
   QPixmap gap_img, gap1_img, gap2_img, gap3_img, gap4_img, gap_auto_img;
-  QPixmap gps_img, wifi_img, direction_img, tpms_img;
+  QPixmap wifi_img, wifi_l_img, wifi_m_img, wifi_h_img, wifi_f_img;
+  QPixmap gps_img, direction_img, tpms_img;
   QPixmap turnsignal_l_img, turnsignal_r_img;
 
   // neokii add

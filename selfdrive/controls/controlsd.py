@@ -490,19 +490,20 @@ class Controls:
 
     self.v_cruise_kph_last = self.v_cruise_kph
 
-    if CS.cruiseState.available:
+    #if CS.cruiseState.available:
     # if stock cruise is completely disabled, then we can use our own set speed logic
-      if not self.CP.pcmCruise:
-        self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents, self.button_timers, self.enabled, self.is_metric)
-        self.v_cruise_cluster_kph = self.v_cruise_kph
-      else:
-        self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
-        self.v_cruise_cluster_kph = CS.cruiseState.speedCluster * CV.MS_TO_KPH
-    else:
-      self.v_cruise_kph = 0 #V_CRUISE_INITIAL
-      self.v_cruise_cluster_kph = 0 #V_CRUISE_INITIAL
+    #  if not self.CP.pcmCruise:
+    #    self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents, self.button_timers, self.enabled, self.is_metric)
+    #    self.v_cruise_cluster_kph = self.v_cruise_kph
+    #  else:
+    #    self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
+    #    self.v_cruise_cluster_kph = CS.cruiseState.speedCluster * CV.MS_TO_KPH
+    #else:
+    #  self.v_cruise_kph = V_CRUISE_INITIAL
+    #  self.v_cruise_cluster_kph = V_CRUISE_INITIAL
 
-    self.v_cruise_kph, self.v_cruise_cluster_kph = self.speed_controller.update_v_cruise(self, CS)
+    self.v_cruise_kph = self.speed_controller.update_v_cruise(self, CS)
+    self.v_cruise_cluster_kph = self.v_cruise_kph
 
     # decrement the soft disable timer at every step, as it's reset on
     # entrance in SOFT_DISABLING state
@@ -576,9 +577,9 @@ class Controls:
           else:
             self.state = State.enabled
           self.current_alert_types.append(ET.ENABLE)
-          if not self.CP.pcmCruise:
-            self.v_cruise_kph = initialize_v_cruise(CS.vEgo, CS.buttonEvents, self.v_cruise_kph_last)
-            self.v_cruise_cluster_kph = self.v_cruise_kph
+          #if not self.CP.pcmCruise:
+          #  self.v_cruise_kph = initialize_v_cruise(CS.vEgo, CS.buttonEvents, self.v_cruise_kph_last)
+          #  self.v_cruise_cluster_kph = self.v_cruise_kph
 
     # Check if openpilot is engaged and actuators are enabled
     self.enabled = self.state in ENABLED_STATES
@@ -765,9 +766,10 @@ class Controls:
       # send car controls over can
       self.last_actuators, can_sends = self.CI.apply(CC)
 
-      v_cruise_cluster_kph = self.speed_controller.update_can(self.enabled, CC, CS, self.sm, can_sends)
-      if v_cruise_cluster_kph > 0:
-        self.v_cruise_cluster_kph = v_cruise_cluster_kph
+      v = self.speed_controller.update_can(self.enabled, CC, CS, self.sm, can_sends)
+      if v > 0:
+        self.v_cruise_kph = v
+        self.v_cruise_cluster_kph = v
 
       self.speed_controller.update_message(self, CC, CS)
 
@@ -809,8 +811,8 @@ class Controls:
     controlsState.engageable = not self.events.any(ET.NO_ENTRY)
     controlsState.longControlState = self.LoC.long_control_state
     controlsState.vPid = float(self.LoC.v_pid)
-    controlsState.vCruise = float(self.v_cruise_kph)
-    controlsState.vCruiseCluster = float(self.v_cruise_cluster_kph)
+    controlsState.vCruise = float(self.speed_controller.cruise_speed_kph)
+    controlsState.vCruiseCluster = float(self.speed_controller.real_set_speed_kph)
     controlsState.upAccelCmd = float(self.LoC.pid.p)
     controlsState.uiAccelCmd = float(self.LoC.pid.i)
     controlsState.ufAccelCmd = float(self.LoC.pid.f)

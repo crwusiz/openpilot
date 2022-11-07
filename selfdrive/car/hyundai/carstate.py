@@ -114,12 +114,12 @@ class CarState(CarStateBase):
       ret.cruiseState.available = cp.vl["EMS16"]["CRUISE_LAMP_M"] != 0
       ret.cruiseState.enabled = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] != 0
       ret.cruiseState.standstill = False
-      ret.cruiseState.speed = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * self.speed_conv
+      ret.cruiseState.speed = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * self.speed_conv  if ret.cruiseState.enabled else 0
     else:
       ret.cruiseState.available = cp_cruise.vl["SCC11"]["MainMode_ACC"] == 1
       ret.cruiseState.enabled = cp_cruise.vl["SCC12"]["ACCMode"] != 0
       ret.cruiseState.standstill = cp_cruise.vl["SCC11"]["SCCInfoDisplay"] == 4.
-      ret.cruiseState.speed = cp_cruise.vl["SCC11"]["VSetDis"] * self.speed_conv
+      ret.cruiseState.speed = cp_cruise.vl["SCC11"]["VSetDis"] * self.speed_conv  if ret.cruiseState.enabled else 0
       ret.cruiseState.gapAdjust = cp_cruise.vl["SCC11"]["TauGapSet"]
 
     # TODO: Find brake pressure
@@ -158,9 +158,9 @@ class CarState(CarStateBase):
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(gear))
 
     if not self.CP.openpilotLongitudinalControl or self.CP.sccBus == 2:
-      aeb_Fcw = self.CP.aebFcw or self.CP.carFingerprint in FCA11_CAR
-      aeb_src = "FCA11" if aeb_Fcw else "SCC12"
-      aeb_sig = "FCA_CmdAct" if aeb_Fcw else "AEB_CmdAct"
+      aeb_fcw = self.CP.aebFcw or self.CP.carFingerprint in FCA11_CAR
+      aeb_src = "FCA11" if aeb_fcw else "SCC12"
+      aeb_sig = "FCA_CmdAct" if aeb_fcw else "AEB_CmdAct"
       aeb_warning = cp_cruise.vl[aeb_src]["CF_VSM_Warn"] != 0
       aeb_braking = cp_cruise.vl[aeb_src]["CF_VSM_DecCmdAct"] != 0 or cp_cruise.vl[aeb_src][aeb_sig] != 0
       ret.stockFcw = aeb_warning and not aeb_braking
@@ -188,10 +188,7 @@ class CarState(CarStateBase):
     self.cruise_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwState"])
     self.main_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwMain"])
 
-    if "SCC11" in cp_cruise.vl and "ACC_ObjDist" in cp_cruise.vl["SCC11"]:
-      self.lead_distance = cp_cruise.vl["SCC11"]["ACC_ObjDist"]
-    else:
-      self.lead_distance = -1
+    self.lead_distance = cp_cruise.vl["SCC11"]["ACC_ObjDist"]
 
     tpms_unit = cp.vl["TPMS11"]["UNIT"] * 0.725 if int(cp.vl["TPMS11"]["UNIT"]) > 0 else 1.
     ret.tpms.fl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FL"]
@@ -267,13 +264,6 @@ class CarState(CarStateBase):
     if self.CP.flags & HyundaiFlags.CANFD_HDA2:
       self.cam_0x2a4 = copy.copy(cp_cam.vl["CAM_0x2a4"])
 
-
-    # ------------------------------------------------------------------------
-    # custom messages
-
-    # TODO BrakeLights, TPMS, AutoHold
-    ret.brakeLights = ret.brakePressed
-
     # TODO
     CruiseStateManager.instance().update(ret, self.main_buttons, self.cruise_buttons, BUTTONS_DICT,
             cruise_state_control=self.CP.openpilotLongitudinalControl and CruiseStateManager.instance().cruise_state_control)
@@ -327,7 +317,7 @@ class CarState(CarStateBase):
       ("ACC_REQ", "TCS13"),
       ("BrakeLight", "TCS13"),
       ("DriverBraking", "TCS13"),
-      #("StandStill", "TCS13"),
+      ("StandStill", "TCS13"),
       ("PBRAKE_ACT", "TCS13"),
       ("DriverOverride", "TCS13"),
       ("CF_VSM_Avail", "TCS13"),
