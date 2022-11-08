@@ -975,8 +975,8 @@ location set</source>
         <translation>使用 openpilot 縱向控制（實驗）</translation>
     </message>
     <message>
-        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
-        <translation>&lt;b&gt;注意：這台車的 openpilot 縱向控制仍然是實驗中的功能，開啟這功能將會關閉自動緊急煞車 (AEB)。&lt;/b&gt;</translation>
+        <source>&lt;b&gt;WARNING:&lt;/b&gt; openpilot longitudinal control is experimental for this car and will disable AEB.</source>
+        <translation type="unfinished">&lt;b&gt;注意：&lt;/b&gt;這台車的 openpilot 縱向控制仍然是實驗中的功能，開啟這功能將會關閉自動緊急煞車 (AEB)。</translation>
     </message>
     <message>
         <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>

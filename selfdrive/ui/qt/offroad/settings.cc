@@ -88,7 +88,7 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
     {
       "ExperimentalLongitudinalEnabled",
       tr("Experimental openpilot longitudinal control"),
-      tr("<b>WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.</b>"),
+      tr("<b>WARNING:</b> openpilot longitudinal control is experimental for this car and will disable AEB."),
       "../assets/offroad/icon_speed_limit.png",
       true,
     },

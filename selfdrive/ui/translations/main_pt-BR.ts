@@ -377,7 +377,7 @@
     <message>
         <source>Get turn-by-turn directions displayed and more with a comma
 prime subscription. Sign up now: https://connect.comma.ai</source>
-        <translation>Obtenha instruções passo a passo exibidas e muito mais com 
+        <translation>Obtenha instruções passo a passo exibidas e muito mais com
 uma assinatura prime Inscreva-se agora:  https://connect.comma.ai</translation>
     </message>
     <message>
@@ -979,8 +979,8 @@ trabalho definido</translation>
         <translation>Controle longitudinal experimental openpilot</translation>
     </message>
     <message>
-        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
-        <translation>&lt;b&gt;AVISO: o controle longitudinal openpilot é experimental para este carro e irá desabilitar AEB.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;WARNING:&lt;/b&gt; openpilot longitudinal control is experimental for this car and will disable AEB.</source>
+        <translation type="unfinished">&lt;b&gt;AVISO:&lt;/b&gt; o controle longitudinal openpilot é experimental para este carro e irá desabilitar AEB.</translation>
     </message>
     <message>
         <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>

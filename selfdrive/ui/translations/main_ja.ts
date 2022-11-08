@@ -975,8 +975,8 @@ location set</source>
         <translation>実験段階のopenpilotによるアクセル制御</translation>
     </message>
     <message>
-        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
-        <translation>&lt;b&gt;警告: openpilotによるアクセル制御は実験段階であり、AEBを無効化します。&lt;/b&gt;</translation>
+        <source>&lt;b&gt;WARNING:&lt;/b&gt; openpilot longitudinal control is experimental for this car and will disable AEB.</source>
+        <translation type="unfinished">&lt;b&gt;警告:&lt;/b&gt; openpilotによるアクセル制御は実験段階であり、AEBを無効化します。</translation>
     </message>
     <message>
         <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>

@@ -376,7 +376,7 @@
     <message>
         <source>Get turn-by-turn directions displayed and more with a comma
 prime subscription. Sign up now: https://connect.comma.ai</source>
-        <translation>订阅comma prime以获取导航。 
+        <translation>订阅comma prime以获取导航。
 立即注册：https://connect.comma.ai</translation>
     </message>
     <message>
@@ -973,7 +973,7 @@ location set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
+        <source>&lt;b&gt;WARNING:&lt;/b&gt; openpilot longitudinal control is experimental for this car and will disable AEB.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

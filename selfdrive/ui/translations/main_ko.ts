@@ -1180,8 +1180,8 @@ location set</source>
         <translation>openpilot 롱컨트롤 (실험적)</translation>
     </message>
     <message>
-        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
-        <translation>&lt;b&gt;경고: openpilot 롱컨트롤은 실험적인 기능으로 차량의 AEB를 비활성화합니다.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;WARNING:&lt;/b&gt; openpilot longitudinal control is experimental for this car and will disable AEB.</source>
+        <translation>&lt;b&gt;경고:&lt;/b&gt;  openpilot 롱컨트롤은 실험적인 기능으로 차량의 AEB를 비활성화합니다.</translation>
     </message>
     <message>
         <source>Show ETA in 24h Format</source>
