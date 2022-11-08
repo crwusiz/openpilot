@@ -54,10 +54,8 @@ const CanMsg HYUNDAI_COMMUNITY_TX_MSGS[] = {
 AddrCheckStruct hyundai_community_addr_checks[] = {
   {.msg = {{608, 0, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},                    // EMS16
            {881, 0, 8, .expected_timestep = 10000U}, { 0 }}},                                                      // E_EMS11
-  {.msg = {{902, 0, 8, .expected_timestep = 10000U}, { 0 }, { 0 }}},                                               // WHL_SPD11
-  {.msg = {{916, 0, 8, .expected_timestep = 10000U}, { 0 }, { 0 }}},                                               // TCS13
-  //{.msg = {{902, 0, 8, .expected_timestep = 20000U}, { 0 }, { 0 }}},                                         // WHL_SPD11 old_value
-  //{.msg = {{916, 0, 8, .expected_timestep = 20000U}}},                                                       // TCS13 old_value
+  {.msg = {{902, 0, 8, .expected_timestep = 20000U}, { 0 }, { 0 }}},                                               // WHL_SPD11
+  {.msg = {{916, 0, 8, .expected_timestep = 20000U}, { 0 }, { 0 }}},                                               // TCS13
   //{.msg = {{1057, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},  // SCC12
 };
 
@@ -145,11 +143,11 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
   int bus = GET_BUS(to_push);
   int addr = GET_ADDR(to_push);
 
-  bool is_clu11_msg = addr == 1265;
   bool is_mdps12_msg = addr == 593;
   bool is_lkas11_msg = addr == 832;
   bool is_scc11_msg = addr == 1056;
   bool is_scc12_msg = addr == 1057;
+  bool is_clu11_msg = addr == 1265;
 
   if (!valid) {
     puts("  CAN RX invalid addr : ["); puth(addr); puts("]\n");
@@ -281,11 +279,11 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
   int addr = GET_ADDR(to_send);
   int bus = GET_BUS(to_send);
 
-  bool is_clu11_msg = addr == 1265;
   bool is_mdps12_msg = addr == 593;
   bool is_ems11_msg = addr == 790;
   bool is_lkas11_msg = addr == 832;
   bool is_scc12_msg = addr == 1057;
+  bool is_clu11_msg = addr == 1265;
 
   if (!msg_allowed(to_send, HYUNDAI_COMMUNITY_TX_MSGS, sizeof(HYUNDAI_COMMUNITY_TX_MSGS) / sizeof(HYUNDAI_COMMUNITY_TX_MSGS[0]))) {
     tx = 0;
@@ -412,13 +410,6 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
   if (is_scc12_msg) { scc12_op = 20; }
   if (is_clu11_msg && (bus == 1)) { clu11_op = 20; }
 
-  if (tx) {
-    if (is_lkas11_msg) {
-      last_ts_lkas11_received_from_op = microsecond_timer_get();
-    } else if (is_scc12_msg) {
-      last_ts_scc12_received_from_op = microsecond_timer_get();
-    }
-  }
   return tx;
 }
 
@@ -428,16 +419,15 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   int fwd_to_bus1 = -1;
   if (fwd_bus1) { fwd_to_bus1 = 1; }
 
-  bool is_clu11_msg = addr == 1265;
   bool is_mdps12_msg = addr == 593;
   bool is_ems11_msg = addr == 790;
   bool is_lkas11_msg = addr == 832;
   bool is_lfahda_msg = addr == 1157;
-  bool is_scc_msg = addr == 1056 || addr == 1057 || addr == 1290 || addr == 905;
+  bool is_clu11_msg = addr == 1265;
+  bool is_scc_msg = addr == 905 || addr == 1056 || addr == 1057 || addr == 1290;
 
   // forward LKAS to CCAN
   if (fwd_bus2) {
-
     if (bus_num == 0) {
       if (!clu11_op || !is_clu11_msg || (eps_bus == 0)) {
         if (!mdps12_op || !is_mdps12_msg) {
@@ -456,7 +446,6 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
         clu11_op -= 1;
       }
     }
-
     if ((bus_num == 1) && fwd_bus1) {
       if (!mdps12_op || !is_mdps12_msg) {
         if (!scc12_op || !is_scc_msg) {
@@ -470,7 +459,6 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
         mdps12_op -= 1;
       }
     }
-
     if (bus_num == 2) {
       if ((!lkas11_op || !is_lkas11_msg) && !is_lfahda_msg) {
         if (!scc12_op || !is_scc_msg) {
@@ -487,17 +475,11 @@ static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
       }
     }
   } else {
-    uint32_t now = microsecond_timer_get();
     if (bus_num == 0) {
       bus_fwd = fwd_to_bus1;
-    } else if ((bus_num == 1) && fwd_bus1) {
+    }
+    if ((bus_num == 1) && fwd_bus1) {
       bus_fwd = 0;
-    } else if (is_lkas11_msg || is_lfahda_msg) {
-      if (now - last_ts_lkas11_received_from_op >= 200000)
-        bus_fwd = 0;
-    } else if (is_scc_msg) {
-      if (now - last_ts_scc12_received_from_op >= 400000)
-        bus_fwd = 0;
     }
   }
   return bus_fwd;
