@@ -43,7 +43,7 @@ def manager_init() -> None:
     ("LanguageSetting", "main_en"),
     ("OpenpilotEnabledToggle", "1"),
     ("IsMetric", "1"),
-    ("EndToEndLong", "0"),
+    ("ExperimentalMode", "0"),
     ("ExperimentalLongitudinalEnabled", "0"),
 
     # add
