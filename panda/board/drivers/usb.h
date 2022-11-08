@@ -250,6 +250,7 @@ References used:
   https://wicg.github.io/webusb/#webusb-platform-capability-descriptor
   https://github.com/sowbug/weblight/blob/192ad7a0e903542e2aa28c607d98254a12a6399d/firmware/webusb.c
   https://os.mbed.com/users/larsgk/code/USBDevice_WebUSB/file/1d8a6665d607/WebUSBDevice/
+
 */
 uint8_t binary_object_store_desc[] = {
   // BOS header
@@ -762,6 +763,7 @@ void usb_irqhandler(void) {
       USBx_HOST_PORT->HPRT |= USB_OTG_HPRT_PRST;
       USBx_HOST_PORT->HPRT |= USB_OTG_HPRT_PCDET;
     }
+
   }*/
 
   if ((gintsts & USB_OTG_GINTSTS_BOUTNAKEFF) || (gintsts & USB_OTG_GINTSTS_GINAKEFF)) {

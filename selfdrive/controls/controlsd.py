@@ -490,17 +490,18 @@ class Controls:
 
     self.v_cruise_kph_last = self.v_cruise_kph
 
-    #if CS.cruiseState.available:
+    #if CS.cruiseState.enabled:
     # if stock cruise is completely disabled, then we can use our own set speed logic
-    #  if not self.CP.pcmCruise:
-    #    self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents, self.button_timers, self.enabled, self.is_metric)
+    #if not self.CP.pcmCruise:
+    #    self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents,
+    #                                        self.button_timers, self.enabled, self.is_metric)
     #    self.v_cruise_cluster_kph = self.v_cruise_kph
     #  else:
     #    self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
     #    self.v_cruise_cluster_kph = CS.cruiseState.speedCluster * CV.MS_TO_KPH
     #else:
-    #  self.v_cruise_kph = V_CRUISE_INITIAL
-    #  self.v_cruise_cluster_kph = V_CRUISE_INITIAL
+    #  self.v_cruise_kph = 0 #V_CRUISE_INITIAL
+    #  self.v_cruise_cluster_kph = 0 #V_CRUISE_INITIAL
 
     self.v_cruise_kph = self.speed_controller.update_v_cruise(self, CS)
     self.v_cruise_cluster_kph = self.v_cruise_kph
@@ -626,7 +627,7 @@ class Controls:
       # accel PID loop
       pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, CS.vEgo, self.v_cruise_kph * CV.KPH_TO_MS)
       t_since_plan = (self.sm.frame - self.sm.rcv_frame['longitudinalPlan']) * DT_CTRL
-      actuators.accel = self.LoC.update(CC.longActive, CS, long_plan, pid_accel_limits, t_since_plan, self.sm['radarState'])
+      actuators.accel = self.LoC.update(CC.longActive and CS.cruiseState.enabled, CS, long_plan, pid_accel_limits, t_since_plan, self.sm['radarState'])
 
       # Steering PID loop and lateral MPC
       self.desired_curvature, self.desired_curvature_rate = get_lag_adjusted_curvature(self.CP, CS.vEgo,

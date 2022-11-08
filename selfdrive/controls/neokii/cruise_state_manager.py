@@ -4,7 +4,10 @@ from common.numpy_fast import clip
 from selfdrive.car import create_button_event
 from common.conversions import Conversions as CV
 from common.params import Params
-from selfdrive.controls.lib.drive_helpers import V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_ENABLE_MIN, V_CRUISE_DELTA_MI, V_CRUISE_DELTA_KM
+from selfdrive.controls.lib.drive_helpers import V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_ENABLE_MIN
+
+V_CRUISE_DELTA_MI = 5 * CV.MPH_TO_KPH
+V_CRUISE_DELTA_KM = 10
 
 ButtonType = car.CarState.ButtonEvent.Type
 
@@ -20,14 +23,15 @@ class CruiseStateManager:
   def __getInstance(cls):
     return cls.__instance
 
+
   @classmethod
   def instance(cls):
     cls.__instance = cls()
     cls.instance = cls.__getInstance
     return cls.__instance
 
-  def __init__(self):
 
+  def __init__(self):
     self.available = False
     self.enabled = False
     self.speed = V_CRUISE_ENABLE_MIN * CV.KPH_TO_MS
@@ -48,16 +52,19 @@ class CruiseStateManager:
     self.is_metric = Params().get_bool('IsMetric')
     self.cruise_state_control = Params().get_bool('CruiseStateControl')
 
+
   def is_resume_spam_allowed(self, CP):
     if is_radar_disabler(CP):
       return False
     return not self.cruise_state_control
 
+
   def is_set_speed_spam_allowed(self, CP):
     return self.is_resume_spam_allowed(CP)
 
-  # CS - CarState cereal message
+
   def update(self, CS, main_buttons, cruise_buttons, buttons_dict, available=-1, cruise_state_control=True):
+    # CS - CarState cereal message
     if available >= 0:
       self.available = available
     elif main_buttons[-1] != self.prev_main_buttons and main_buttons[-1]:
@@ -142,7 +149,6 @@ class CruiseStateManager:
         elif btn == ButtonType.decelCruise:
           v_cruise_kph -= v_cruise_delta - -v_cruise_kph % v_cruise_delta
     else:
-
       if not self.btn_long_pressed:
         if btn == ButtonType.decelCruise and not self.enabled:
           self.enabled = True

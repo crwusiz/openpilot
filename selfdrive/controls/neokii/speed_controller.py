@@ -6,15 +6,16 @@ from common.conversions import Conversions as CV
 from common.numpy_fast import clip, interp
 from common.params import Params
 from selfdrive.car.hyundai.values import Buttons
-from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, V_CRUISE_MIN, V_CRUISE_INITIAL, V_CRUISE_DELTA_KM, V_CRUISE_DELTA_MI
+from selfdrive.controls.lib.drive_helpers import V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_ENABLE_MIN, V_CRUISE_INITIAL
 from selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import AUTO_TR_CRUISE_GAP
-from selfdrive.controls.neokii.cruise_state_manager import CruiseStateManager
+from selfdrive.controls.neokii.cruise_state_manager import CruiseStateManager, V_CRUISE_DELTA_KM, V_CRUISE_DELTA_MI
 from selfdrive.controls.lib.lateral_planner import TRAJECTORY_SIZE
 from selfdrive.controls.neokii.navi_controller import SpeedLimiter
 
 EventName = car.CarEvent.EventName
 ButtonType = car.CarState.ButtonEvent.Type
 
+SYNC_MARGIN = 3.
 MIN_CURVE_SPEED = 30. * CV.KPH_TO_MS
 
 
@@ -175,7 +176,6 @@ class SpeedController:
 
 
   def cal_target_speed(self, CS, clu_speed, v_cruise_kph, cruise_btn_pressed):
-    SYNC_MARGIN = 3.
     override_speed = -1
 
     if not self.longcontrol:
@@ -236,7 +236,7 @@ class SpeedController:
       else:
         v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
     else:
-      v_cruise_kph = V_CRUISE_INITIAL
+      v_cruise_kph = 0 #V_CRUISE_INITIAL
 
     if self.prev_cruise_enabled != CS.cruiseState.enabled:
       self.prev_cruise_enabled = CS.cruiseState.enabled
@@ -264,10 +264,8 @@ class SpeedController:
 
   def update_can(self, enabled, CC, CS, sm, can_sends):
     new_v_cruise_kph = -1
-
     clu_speed = CS.vEgoCluster * self.speed_conv_to_clu
     ascc_enabled = enabled and CS.cruiseState.enabled and 1 < CS.cruiseState.speed < 255 and not CS.brakePressed
-
     btn_pressed = self.CI.CS.cruise_buttons[-1] != Buttons.NONE
 
     if not self.longcontrol:
@@ -287,7 +285,7 @@ class SpeedController:
       self.wait_timer -= 1
     elif ascc_enabled and CS.vEgo > 0.1 and CruiseStateManager.instance().is_set_speed_spam_allowed(self.CP):
       if self.alive_timer == 0:
-        current_set_speed_clu = int(round(CS.cruiseState.speed * self.speed_conv_to_clu, 1))
+        current_set_speed_clu = int(round(CS.cruiseState.speed * self.speed_conv_to_clu))
         self.btn = self.get_button(current_set_speed_clu)
         self.alive_count = self.get_alive_count()
 
@@ -297,7 +295,6 @@ class SpeedController:
           can_sends.append(can)
 
         self.alive_timer += 1
-
         if self.alive_timer >= self.alive_count:
           self.alive_timer = 0
           self.wait_timer = self.get_wait_count()
