@@ -33,10 +33,13 @@ class CarControllerParams:
       self.STEER_DELTA_UP = 2
       self.STEER_DELTA_DOWN = 3
 
+
 class HyundaiFlags(IntFlag):
   CANFD_HDA2 = 1
   CANFD_ALT_BUTTONS = 2
   CANFD_ALT_GEARS = 4
+  CANFD_CAMERA_SCC = 8
+
 
 class CAR:
   # Hyundai
@@ -522,6 +525,7 @@ FW_VERSIONS = {
       b'\xf1\x87391162M013',
       b'\xf1\x87391162M023',
       b'HM6M1_0a0_F00',
+      b'HM6M1_0a0_G20',
       b'HM6M2_0a0_BD0',
       b'\xf1\x8739110-2S278\xf1\x81HM6M1_0a0_L50',
       b'\xf1\x8739110-2S278\xf1\x82DNDVD5GMCCXXXL5B',
@@ -1467,6 +1471,7 @@ FW_VERSIONS = {
       b'\xf1\x00CV1 MFC  AT USA LHD 1.00 1.05 99210-CV000 211027',
       b'\xf1\x00CV1 MFC  AT USA LHD 1.00 1.06 99210-CV000 220328',
       b'\xf1\x00CV1 MFC  AT EUR LHD 1.00 1.05 99210-CV000 211027',
+      b'\xf1\x00CV1 MFC  AT EUR LHD 1.00 1.06 99210-CV000 220328',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00CV1_ RDR -----      1.00 1.01 99110-CV000         ',

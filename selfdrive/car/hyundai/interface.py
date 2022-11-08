@@ -331,11 +331,15 @@ class CarInterface(CarInterfaceBase):
         # ICE cars do not have 0x130; GEARS message on 0x40 instead
         if 0x130 not in fingerprint[4]:
           ret.flags |= HyundaiFlags.CANFD_ALT_GEARS.value
+        if candidate not in CANFD_RADAR_SCC_CAR:
+          ret.flags |= HyundaiFlags.CANFD_CAMERA_SCC.value
 
       if ret.flags & HyundaiFlags.CANFD_HDA2:
         ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_HDA2
       if ret.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
         ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_ALT_BUTTONS
+      if ret.flags & HyundaiFlags.CANFD_CAMERA_SCC:
+        ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CAMERA_SCC
     else:
       if cruise_state_control:
         ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy)]

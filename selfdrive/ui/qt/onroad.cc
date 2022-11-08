@@ -531,19 +531,16 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
   y = radius / 2 + (bdr_s * 4);
   drawIcon(p, x, y, wifi_img, blackColor(100), wifi_state > 0 ? 1.0 : 0.2);
-  p.setOpacity(1.0);
 
   // gps icon (upper right 3)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 2);
   y = radius / 2 + (bdr_s * 4);
   drawIcon(p, x, y, gps_img, blackColor(100), gps_state ? 1.0 : 0.2);
-  p.setOpacity(1.0);
 
   // N direction icon (upper right 4)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 3);
   y = radius / 2 + (bdr_s * 4);
   drawIconRotate(p, x, y, direction_img, blackColor(100), gps_state ? 1.0 : 0.2, gpsBearing);
-  p.setOpacity(1.0);
 
   // nda icon (upper center)
   if (nda_state > 0) {
@@ -558,13 +555,11 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   x = rect().right() - radius - bdr_s * 5;
   y = bdr_s * 4 + 202;
   drawRightDevUi(p, x, y);
-  p.setOpacity(1.0);
 
   // dm icon (bottom 1eft 1)
   x = radius / 2 + (bdr_s * 2);
   y = rect().bottom() - footer_h / 2;
   drawIcon(p, x, y, dm_img, blackColor(100), dmActive ? 1.0 : 0.2);
-  p.setOpacity(1.0);
 
   // scc gap icon (bottom right 1)
   if (gap == 1) {
@@ -582,31 +577,26 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   x = radius / 2 + (bdr_s * 2) + radius;
   y = rect().bottom() - footer_h / 2;
   drawIcon(p, x, y, gap_img, blackColor(100), is_cruise_set ? 1.0 : 0.2);
-  p.setOpacity(1.0);
 
   // brake icon (bottom left 2)
   x = radius / 2 + (bdr_s * 2);
   y = rect().bottom() - (footer_h / 2) - (radius) - 10;
   drawIcon(p, x, y, brake_img, blackColor(100), brake_state ? 1.0 : 0.2);
-  p.setOpacity(1.0);
 
   // autohold icon (bottom right 2)
   x = radius / 2 + (bdr_s * 2) + (radius);
   y = rect().bottom() - (footer_h / 2) - (radius) - 10;
   drawIcon(p, x, y, autohold_state > 1 ? autohold_warning_img : autohold_active_img, blackColor(100), autohold_state ? 1.0 : 0.2);
-  p.setOpacity(1.0);
 
   // bsd_l icon (bottom left 3)
   x = radius / 2 + (bdr_s * 2);
   y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
   drawIcon(p, x, y, bsd_l_img, blackColor(100), left_blindspot ? 1.0 : 0.2);
-  p.setOpacity(1.0);
 
   // bsd_r icon (bottom right 3)
   x = radius / 2 + (bdr_s * 2) + (radius);
   y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
   drawIcon(p, x, y, bsd_r_img, blackColor(100), right_blindspot ? 1.0 : 0.2);
-  p.setOpacity(1.0);
 
   // bottom info
   const char* lateral[] = {"Pid", "Indi", "Lqr", "Torque"};
@@ -625,7 +615,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   configFont(p, "Open Sans", 30, "Regular");
   drawTextColor(p, x, y, infoText, whiteColor(200));
-  p.setOpacity(1.0);
 
   // upper gps info
   if (gpsVerticalAccuracy == 0 || gpsVerticalAccuracy > 100)
@@ -646,7 +635,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   configFont(p, "Open Sans", 30, "Regular");
   drawTextColor(p, x, y, infoGps, whiteColor(200));
-  p.setOpacity(1.0);
 
   // tpms (bottom right)
   w = 200;
@@ -654,7 +642,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   x = rect().right() - w - (bdr_s * 2);
   y = height() - h - (bdr_s * 2);
 
-  p.setOpacity(0.8);
   p.drawPixmap(x, y, w, h, tpms_img);
 
   configFont(p, "Open Sans", 35, "Bold");
@@ -662,7 +649,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   drawTextColor(p, x + 167, y + 70, get_tpms_text(fr), get_tpms_color(fr));
   drawTextColor(p, x + 32, y + 214, get_tpms_text(rl), get_tpms_color(rl));
   drawTextColor(p, x + 167, y + 214, get_tpms_text(rr), get_tpms_color(rr));
-  p.setOpacity(1.0);
 
   // turnsignal
   static int blink_index = 0;
@@ -842,16 +828,16 @@ void AnnotatedCameraWidget::drawRightDevUi(QPainter &p, int x, int y) {
 // info drawn on top
 
 void AnnotatedCameraWidget::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
-  p.save();
+  p.setOpacity(1.0);  // bg dictates opacity of ellipse
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
   p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
   p.setOpacity(opacity);
   p.drawPixmap(x - img_size / 2, y - img_size / 2, img);
-  p.restore();
 }
 
 void AnnotatedCameraWidget::drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity, float angle) {
+  p.setOpacity(1.0);  // bg dictates opacity of ellipse
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
   p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
@@ -866,6 +852,7 @@ void AnnotatedCameraWidget::drawIconRotate(QPainter &p, int x, int y, QPixmap &i
 }
 
 void AnnotatedCameraWidget::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
+  p.setOpacity(1.0);  // bg dictates opacity of ellipse
   QRect real_rect = getTextRect(p, 0, text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
   p.setPen(QColor(0xff, 0xff, 0xff, alpha));
@@ -873,6 +860,7 @@ void AnnotatedCameraWidget::drawText(QPainter &p, int x, int y, const QString &t
 }
 
 void AnnotatedCameraWidget::drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color) {
+  p.setOpacity(1.0);  // bg dictates opacity of ellipse
   QRect real_rect = getTextRect(p, 0, text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
   p.setPen(color);
