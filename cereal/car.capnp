@@ -219,9 +219,10 @@ struct CarState {
   fuelGauge @41 :Float32; # battery or fuel tank level from 0.0 to 1.0
   charging @43 :Bool;
 
-  # add neokii
-  autoHold @45 : Int32;
-  tpms @46 : Tpms;
+  # neokii
+  vCluRatio @45 :Float32;
+  autoHold @46 :Int32;
+  tpms @47 :Tpms;
 
   struct Tpms {
     fl @0 :Float32;

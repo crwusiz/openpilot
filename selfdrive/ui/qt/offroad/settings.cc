@@ -109,7 +109,6 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       false,
     },
 #endif
-
   };
 
   for (auto &[param, title, desc, icon, confirm] : toggle_defs) {
@@ -987,7 +986,7 @@ void AebSelect::refresh() {
 }
 
 //SccCommandsSelect
-SccCommandsSelect::SccCommandsSelect() : AbstractControl("SCC [√]", tr("Scc Commands Select (Scc/Acc)"), "../assets/offroad/icon_logic.png") {
+SccCommandsSelect::SccCommandsSelect() : AbstractControl("SCC [√]", tr("Scc Commands Select (Scc/Acc)"), "../assets/offroad/icon_lat.png") {
   label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
   label.setStyleSheet("color: #e0e879");
   hlayout->addWidget(&label);

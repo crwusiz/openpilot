@@ -189,38 +189,22 @@ class CarController:
       if CS.eps_bus:
         can_sends.append(hyundaican.create_mdps12(self.packer, self.frame, CS.mdps12))
 
-      if not self.CP.openpilotLongitudinalControl or CruiseStateManager.instance().is_resume_spam_allowed(self.CP):
-        if CC.cruiseControl.cancel:
+      # fix auto resume - by neokii
+      if CC.cruiseControl.resume and not CS.out.gasPressed:
+        if self.last_lead_distance == 0:
+          self.last_lead_distance = CS.lead_distance
+          self.resume_cnt = 0
+          self.resume_wait_timer = 0
+        elif self.resume_wait_timer > 0:
+          self.resume_wait_timer -= 1
+        elif abs(CS.lead_distance - self.last_lead_distance) > 0.1:
           can_sends.append(hyundaican.create_clu11(self.packer, self.frame, CS.scc_bus, Buttons.RES_ACCEL, clu11_speed, CS.clu11))
-
-        # fix auto resume - by neokii
-        elif CC.cruiseControl.resume:
-          if self.scc_live:
-            if CS.lead_distance <= 0:
-              return
-
-            if CC.cruiseControl.resume and not CS.out.gasPressed:
-              if self.last_lead_distance == 0:
-                self.last_lead_distance = CS.lead_distance
-                self.resume_cnt = 0
-                self.resume_wait_timer = 0
-
-              elif self.resume_wait_timer > 0:
-                self.resume_wait_timer -= 1
-              elif abs(CS.lead_distance - self.last_lead_distance) > 0.1:
-                can_sends.append(hyundaican.create_clu11(self.packer, self.frame, CS.scc_bus, Buttons.RES_ACCEL, clu11_speed, CS.clu11))
-                self.resume_cnt += 1
-                if self.resume_cnt >= int(randint(4, 5) * 2):
-                  self.resume_cnt = 0
-                  self.resume_wait_timer = int(randint(20, 25) * 2)
-            elif self.last_lead_distance != 0:
-              self.last_lead_distance = 0
-          else:
-            # send resume at a max freq of 10Hz
-            if (self.frame - self.last_button_frame) * DT_CTRL > 0.1:
-              # send 25 messages at a time to increases the likelihood of resume being accepted
-              can_sends.extend([hyundaican.create_clu11(self.packer, CS.clu11, Buttons.RES_ACCEL, self.CP.sccBus)] * 25)
-              self.last_button_frame = self.frame
+          self.resume_cnt += 1
+          if self.resume_cnt >= int(randint(4, 5) * 2):
+            self.resume_cnt = 0
+            self.resume_wait_timer = int(randint(20, 25) * 2)
+      elif self.last_lead_distance != 0:
+        self.last_lead_distance = 0
 
       scc_commands = Params().get("SccCommandsSelect", encoding='utf8')
       # send scc to car if longcontrol enabled and SCC not on bus 0 or not live
@@ -241,7 +225,7 @@ class CarController:
         can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, SpeedLimiter.instance().get_active()))
 
       # 5 Hz ACC options
-      if self.frame % 20 == 0 and self.CP.openpilotLongitudinalControl:
+      if all([self.frame % 20 == 0, CS.has_scc13, self.CP.openpilotLongitudinalControl]):
         can_sends.extend(hyundaican.create_acc_opt(self.packer))
 
       # 2 Hz front radar options

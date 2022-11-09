@@ -117,7 +117,7 @@ def create_scc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, s
   values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in dat) % 0x10
   commands.append(packer.make_can_msg("SCC12", 0, values))
 
-  if CS.scc14 is not None:
+  if CS.has_scc14:
     values = CS.scc14
     values["ComfortBandUpper"] = 0.0  # stock usually is 0 but sometimes uses higher values
     values["ComfortBandLower"] = 0.0  # stock usually is 0 but sometimes uses higher values
@@ -159,7 +159,7 @@ def create_acc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, s
   values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in scc12_dat) % 0x10
   commands.append(packer.make_can_msg("SCC12", 0, values))
 
-  if CS.scc14 is not None:
+  if CS.has_scc14:
     values = CS.scc14
     values["ComfortBandUpper"] = 0.0  # stock usually is 0 but sometimes uses higher values
     values["ComfortBandLower"] = 0.0  # stock usually is 0 but sometimes uses higher values

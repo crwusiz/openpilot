@@ -176,7 +176,7 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   pm = std::make_unique<PubMaster, const std::initializer_list<const char *>>({"uiDebug"});
 
   steer_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
-  lat_img = loadPixmap("../assets/img_lat.png", {img_size, img_size});
+  lat_img = loadPixmap("../assets/offroad/icon_speed_limit.png", {img_size, img_size});
   longitudinal_img = loadPixmap("../assets/offroad/icon_disengage_on_accelerator.svg", {img_size, img_size});
   dm_img = loadPixmap("../assets/img_driver_face.png", {img_size, img_size});
 
@@ -494,26 +494,22 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   drawTextColor(p, rect().center().x(), 310, speedUnit, lightorangeColor());
 
   // engage-ability icon ( wheel ) (upper right 1)
-  QColor wheelbg_Color = blackColor(100);
-
   if (status == STATUS_ENGAGED && !steeringPressed) {
-    wheelbg_Color = engagedColor(200);
     wheel_img = lat_img;
   } else if (status == STATUS_OVERRIDE && !steeringPressed) {
-    wheelbg_Color = overrideColor(200);
     wheel_img = longitudinal_img;
-  } else if (status == STATUS_WARNING) {
-    wheelbg_Color = warningColor(200);
-    wheel_img = steer_img;
-  } else if (steeringPressed) {
-    wheelbg_Color = steeringpressedColor(200);
+  } else {
     wheel_img = steer_img;
   }
 
   int x,y,w,h = 0;
   x = rect().right() - radius / 2 - bdr_s * 2;
   y = radius / 2 + bdr_s * 4;
-  drawIconRotate(p, x, y, wheel_img, wheelbg_Color, 1.0, angleSteers);
+  if ((status == STATUS_ENGAGED || status == STATUS_OVERRIDE) && !steeringPressed) {
+    drawIcon(p, x, y, wheel_img, blackColor(100), 1.0);
+  } else {
+    drawIconRotate(p, x, y, wheel_img, blackColor(100), 1.0, angleSteers);
+  }
 
   if (wifi_state == 0) {
     wifi_img = wifi_f_img;
@@ -934,19 +930,22 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
   if (scene.engaged) {
     if (scene.steeringPressed) {
       // The user is applying torque to the steering wheel
-      bg.setColorAt(0, steeringpressedColor(200));
-      bg.setColorAt(1, steeringpressedColor(0));
+      bg.setColorAt(0.0, steeringpressedColor(100));
+      bg.setColorAt(0.5, steeringpressedColor(50));
+      bg.setColorAt(1.0, steeringpressedColor(0));
     } else if (scene.override) {
-      bg.setColorAt(0, overrideColor(200));
-      bg.setColorAt(1, overrideColor(0));
+      bg.setColorAt(0.0, overrideColor(100));
+      bg.setColorAt(0.5, overrideColor(50));
+      bg.setColorAt(1.0, overrideColor(0));
     } else {
       bg.setColorAt(0.0, QColor::fromHslF(start_hue / 360., 0.97, 0.56, 0.4));
       bg.setColorAt(0.5, QColor::fromHslF(end_hue / 360., 1.0, 0.68, 0.35));
       bg.setColorAt(1.0, QColor::fromHslF(end_hue / 360., 1.0, 0.68, 0.0));
     }
   } else {
-    bg.setColorAt(0, whiteColor(200));
-    bg.setColorAt(1, whiteColor(0));
+    bg.setColorAt(0.0, whiteColor(100));
+    bg.setColorAt(0.5, whiteColor(50));
+    bg.setColorAt(1.0, whiteColor(0));
   }
   painter.setBrush(bg);
   painter.drawPolygon(scene.track_vertices);
