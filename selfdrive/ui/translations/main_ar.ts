@@ -58,12 +58,43 @@
         <source>leave blank for automatic configuration</source>
         <translation>اتركه فارغا للتكوين التلقائي</translation>
     </message>
+    <message>
+        <source>Cellular Metered</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Prevent large data uploads when on a metered connection</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>AebSelect</name>
     <message>
         <source>AEB Signal Select (Scc12/Fca11)</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>AnnotatedCameraWidget</name>
+    <message>
+        <source>km/h</source>
+        <translation type="vanished">km/h</translation>
+    </message>
+    <message>
+        <source>mph</source>
+        <translation type="vanished">mph</translation>
+    </message>
+    <message>
+        <source>MAX</source>
+        <translation type="vanished">الأعلى</translation>
+    </message>
+    <message>
+        <source>SPEED</source>
+        <translation type="vanished">سرعة</translation>
+    </message>
+    <message>
+        <source>LIMIT</source>
+        <translation type="vanished">حد</translation>
     </message>
 </context>
 <context>
@@ -110,6 +141,22 @@
     </message>
     <message>
         <source>Some newer car New radar interface</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select your Manufacturer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Process</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Npilot controls Cruise State (Experimental)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Npilot controls cruise on/off, gap and set speed.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -268,6 +315,18 @@
     <message>
         <source>Disengage to Power Off</source>
         <translation>فك الارتباط لإيقاف التشغيل</translation>
+    </message>
+    <message>
+        <source>Reset</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Review</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Process</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -480,29 +539,6 @@ location set</source>
     </message>
 </context>
 <context>
-    <name>AnnotatedCameraWidget</name>
-    <message>
-        <source>km/h</source>
-        <translation type="vanished">km/h</translation>
-    </message>
-    <message>
-        <source>mph</source>
-        <translation type="vanished">mph</translation>
-    </message>
-    <message>
-        <source>MAX</source>
-        <translation type="vanished">الأعلى</translation>
-    </message>
-    <message>
-        <source>SPEED</source>
-        <translation type="vanished">سرعة</translation>
-    </message>
-    <message>
-        <source>LIMIT</source>
-        <translation type="vanished">حد</translation>
-    </message>
-</context>
-<context>
     <name>OffroadAlert</name>
     <message>
         <source>Device temperature too high. System won&apos;t start.</source>
@@ -586,6 +622,17 @@ location set</source>
     <message>
         <source>Bookmark connect.comma.ai to your home screen to use it like an app</source>
         <translation>ضع إشارة مرجعية على connect.comma.ai على شاشتك الرئيسية لاستخدامه مثل أي تطبيق</translation>
+    </message>
+</context>
+<context>
+    <name>ParamControl</name>
+    <message>
+        <source>Ok</source>
+        <translation type="unfinished">موافق</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation type="unfinished">إلغاء</translation>
     </message>
 </context>
 <context>
@@ -729,7 +776,14 @@ location set</source>
     <name>RichTextDialog</name>
     <message>
         <source>Ok</source>
-        <translation>موافق</translation>
+        <translation type="vanished">موافق</translation>
+    </message>
+</context>
+<context>
+    <name>SccCommandsSelect</name>
+    <message>
+        <source>Scc Commands Select (Scc/Acc)</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -739,7 +793,18 @@ location set</source>
         <translation type="unfinished">خلف</translation>
     </message>
     <message>
-        <source>Select car not use</source>
+        <source>Select Car not use</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>SelectManufacturer</name>
+    <message>
+        <source>Back</source>
+        <translation type="unfinished">خلف</translation>
+    </message>
+    <message>
+        <source>Select Manufacturer not use</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1057,6 +1122,10 @@ location set</source>
         <source>Select a branch</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Uninstall</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>SshControl</name>
@@ -1174,10 +1243,6 @@ location set</source>
         <translation>عند التمكين ، سيؤدي الضغط على دواسة الوقود إلى فصل الطيار المفتوح.</translation>
     </message>
     <message>
-        <source>🌮 End-to-end longitudinal (extremely alpha) 🌮</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Show ETA in 24h Format</source>
         <translation>إظهار الوقت المقدر للوصول بتنسيق 24 ساعة</translation>
     </message>
@@ -1194,10 +1259,6 @@ location set</source>
         <translation>إظهار الخريطة على الجانب الأيسر عندما تكون في طريقة عرض الشاشة المنقسمة.</translation>
     </message>
     <message>
-        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>openpilot Longitudinal Control</source>
         <translation type="vanished">openpilot التحكم الطولي</translation>
     </message>
@@ -1210,15 +1271,23 @@ location set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>openpilot longitudinal control is not currently available for this car.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Enable experimental longitudinal control to enable this.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Experimental mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;&lt;br&gt;          openpilot defaults to the car&apos;s built-in ACC instead of openpilot&apos;s longitudinal control on this car. Enable this to switch to openpilot longitudinal control.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>    openpilot defaults to driving in &lt;b&gt;chill mode&lt;/b&gt;.    Experimental mode enables &lt;b&gt;alpha-level features&lt;/b&gt; that aren&apos;t ready for chill mode.     Experimental features are listed below:    &lt;br&gt;     &lt;h4&gt;🌮 End-to-End Longitudinal Control 🌮&lt;/h4&gt;     Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would, including stopping for red lights and stop signs.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1274,6 +1343,10 @@ location set</source>
     <message>
         <source>Forget Wi-Fi Network &quot;%1&quot;?</source>
         <translation>نزع شبكة اWi-Fi &quot;%1&quot;?</translation>
+    </message>
+    <message>
+        <source>Forget</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 </TS>

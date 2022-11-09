@@ -245,7 +245,6 @@ class TorqueEstimator:
             self.reset()
       else:
         liveTorqueParameters.liveValid = False
-
     except:
       pass
 

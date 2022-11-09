@@ -370,8 +370,8 @@ class CarInterface(CarInterfaceBase):
               else 2 if 1056 in fingerprint[2] else -1
 
       if ret.sccBus == 2:
-        ret.hasScc13 = 1290 in fingerprint[ret.sccBus]
-        ret.hasScc14 = 905 in fingerprint[ret.sccBus]
+        ret.hasScc13 = 1290 in fingerprint[0] or 1290 in fingerprint[2]
+        ret.hasScc14 = 905 in fingerprint[0] or 905 in fingerprint[2]
 
     #if ret.openpilotLongitudinalControl:
     #  ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
