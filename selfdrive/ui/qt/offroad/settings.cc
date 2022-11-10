@@ -663,12 +663,12 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   tr("New radar interface Enable"),
                                   tr("Some newer car New radar interface"),
                                   "../assets/offroad/icon_road.png",
-                                  false, this));
+                                  true, this));
   toggles.append(new ParamControl("CruiseStateControl",
                                   tr("Npilot controls Cruise State (Experimental)"),
-                                  tr("Npilot controls cruise on/off, gap and set speed."),
+                                  tr("Npilot controls cruise on/off, gap and set speed.<br>It becomes a cruise set without conditions, so do not use it if you do not understand it correctly."),
                                   "../assets/offroad/icon_long.png",
-                                  false, this));
+                                  true, this));
   for (ParamControl *toggle : toggles) {
     if (main_layout->count() != 0) {
     }

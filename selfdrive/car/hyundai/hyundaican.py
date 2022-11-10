@@ -1,6 +1,7 @@
 import crcmod
 from selfdrive.car.hyundai.values import CAR, CHECKSUM
 from common.params import Params
+from selfdrive.controls.neokii.cruise_state_manager import CruiseStateManager
 
 hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 
@@ -100,7 +101,10 @@ def create_scc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, s
     values["ACC_ObjRelSpd"] = 0
     values["ACC_ObjDist"] = 1  # close lead makes controls tighter
     values["VSetDis"] = set_speed
-    values["DriverAlertDisplay"] = 0
+
+    if CruiseStateManager.instance().cruise_state_control:
+      values["DriverAlertDisplay"] = 0
+
   commands.append(packer.make_can_msg("SCC11", 0, values))
 
   values = CS.scc12
@@ -109,7 +113,6 @@ def create_scc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, s
   values["StopReq"] = 1 if stopping else 0
   values["aReqRaw"] = accel
   values["aReqValue"] = accel  # stock ramps up and down respecting jerk limit until it reaches aReqRaw
-  values["ACCFailInfo"] = 0
   values["CR_VSM_Alive"] = idx % 0xF
   values["CR_VSM_ChkSum"] = 0
 
@@ -143,7 +146,10 @@ def create_acc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, s
   #values["ACC_ObjLatPos"] = 0,
   #values["ACC_ObjRelSpd"] = 10,
   #values["ACC_ObjDist"] = 50,  # close lead makes controls tighter
-  values["DriverAlertDisplay"] = 0
+
+  if CruiseStateManager.instance().cruise_state_control:
+    values["DriverAlertDisplay"] = 0
+
   commands.append(packer.make_can_msg("SCC11", 0, values))
 
   values = CS.scc12
@@ -151,7 +157,6 @@ def create_acc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, s
   values["StopReq"] = 1 if cruise_enabled and stopping else 0
   values["aReqRaw"] = accel
   values["aReqValue"] = accel
-  values["ACCFailInfo"] = 0
   values["CR_VSM_Alive"] = idx % 0xF
   values["CR_VSM_ChkSum"] = 0
 

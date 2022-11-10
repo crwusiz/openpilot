@@ -68,26 +68,96 @@
     </message>
 </context>
 <context>
+    <name>AebSelect</name>
+    <message>
+        <source>AEB Signal Select (Scc12/Fca11)</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>AnnotatedCameraWidget</name>
     <message>
         <source>km/h</source>
-        <translation>กม./ชม.</translation>
+        <translation type="vanished">กม./ชม.</translation>
     </message>
     <message>
         <source>mph</source>
-        <translation>ไมล์/ชม.</translation>
+        <translation type="vanished">ไมล์/ชม.</translation>
     </message>
     <message>
         <source>MAX</source>
-        <translation>สูงสุด</translation>
+        <translation type="vanished">สูงสุด</translation>
     </message>
     <message>
         <source>SPEED</source>
-        <translation>ความเร็ว</translation>
+        <translation type="vanished">ความเร็ว</translation>
     </message>
     <message>
         <source>LIMIT</source>
-        <translation>จำกัด</translation>
+        <translation type="vanished">จำกัด</translation>
+    </message>
+</context>
+<context>
+    <name>CommunityPanel</name>
+    <message>
+        <source>Select your Manufacturer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select your car</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>RUN</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Process?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Process</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Prebuilt Enable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Create prebuilt files to speed bootup</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Logger Disable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable Logger is Reduce system load</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Navigation Disable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Navigation Function not use</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>New radar interface Enable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Some newer car New radar interface</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Npilot controls Cruise State (Experimental)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Npilot controls cruise on/off, gap and set speed.&lt;br&gt;It becomes a cruise set without conditions, so do not use it if you do not understand it correctly.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -172,11 +242,11 @@
     </message>
     <message>
         <source>Regulatory</source>
-        <translation>ระเบียบข้อบังคับ</translation>
+        <translation type="vanished">ระเบียบข้อบังคับ</translation>
     </message>
     <message>
         <source>VIEW</source>
-        <translation>ดู</translation>
+        <translation type="vanished">ดู</translation>
     </message>
     <message>
         <source>Change Language</source>
@@ -238,6 +308,26 @@
         <source>Disengage to Power Off</source>
         <translation>ยกเลิกระบบช่วยขับเพื่อปิดเครื่อง</translation>
     </message>
+    <message>
+        <source>Reset</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Review</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Are you sure you want to reset calibration and live params?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Process</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Soft Restart</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>DriveStats</name>
@@ -255,7 +345,7 @@
     </message>
     <message>
         <source>PAST WEEK</source>
-        <translation>สัปดาห์ที่ผ่านมา</translation>
+        <translation type="vanished">สัปดาห์ที่ผ่านมา</translation>
     </message>
     <message>
         <source>KM</source>
@@ -303,6 +393,13 @@
     <message>
         <source>Updating files: </source>
         <translation>กำลังอัปเดตไฟล์: </translation>
+    </message>
+</context>
+<context>
+    <name>LateralControlSelect</name>
+    <message>
+        <source>LateralControl Select (Pid/Indi/Lqr/Torque)</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -400,6 +497,13 @@ location set</source>
     </message>
 </context>
 <context>
+    <name>MfcSelect</name>
+    <message>
+        <source>MFC Camera Select (Auto/Ldws,Lkas/Lfa)</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>MultiOptionDialog</name>
     <message>
         <source>Select</source>
@@ -427,6 +531,58 @@ location set</source>
     <message>
         <source>Wrong password</source>
         <translation>รหัสผ่านผิด</translation>
+    </message>
+</context>
+<context>
+    <name>OffroadAlert</name>
+    <message>
+        <source>Device temperature too high. System won&apos;t start.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connect to internet to check for updates. openpilot won&apos;t automatically start until it connects to internet to check for updates.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to download updates
+%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Invalid date and time settings, system won&apos;t start. Connect to internet to set time.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Device failed to register. It will not connect to or upload to comma.ai servers, and receives no support from comma.ai. If this is an official device, contact support@comma.ai.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>NVMe drive not mounted.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unsupported NVMe drive detected. Device may draw significantly more power and overheat due to the unsupported NVMe.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>openpilot was unable to identify your car. Your car is either unsupported or its ECUs are not recognized. Please submit a pull request to add the firmware versions to the proper vehicle. Need help? Join discord.comma.ai.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Immediately connect to the internet to check for updates. If you do not connect to the internet, openpilot won&apos;t engage in %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>openpilot was unable to identify your car. Check integrity of cables and ensure all connections are secure, particularly that the comma power is fully inserted in the OBD-II port of the vehicle. Need help? Join discord.comma.ai.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Taking camera snapshots. System won&apos;t start until finished.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>An update to your device&apos;s operating system is downloading in the background. You will be prompted to update when it&apos;s ready to install.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -461,6 +617,17 @@ location set</source>
     <message>
         <source>Bookmark connect.comma.ai to your home screen to use it like an app</source>
         <translation>จดจำ connect.comma.ai โดยการเพิ่มไปยังหน้าจอโฮม เพื่อใช้งานเหมือนเป็นแอปพลิเคชัน</translation>
+    </message>
+</context>
+<context>
+    <name>ParamControl</name>
+    <message>
+        <source>Enable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation type="unfinished">ยกเลิก</translation>
     </message>
 </context>
 <context>
@@ -589,7 +756,36 @@ location set</source>
     <name>RichTextDialog</name>
     <message>
         <source>Ok</source>
-        <translation>ตกลง</translation>
+        <translation type="vanished">ตกลง</translation>
+    </message>
+</context>
+<context>
+    <name>SccCommandsSelect</name>
+    <message>
+        <source>Scc Commands Select (Scc/Acc)</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>SelectCar</name>
+    <message>
+        <source>Back</source>
+        <translation type="unfinished">ย้อนกลับ</translation>
+    </message>
+    <message>
+        <source>Select Car not use</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>SelectManufacturer</name>
+    <message>
+        <source>Back</source>
+        <translation type="unfinished">ย้อนกลับ</translation>
+    </message>
+    <message>
+        <source>Select Manufacturer not use</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -617,6 +813,10 @@ location set</source>
     <message>
         <source>Navigation</source>
         <translation>การนำทาง</translation>
+    </message>
+    <message>
+        <source>Community</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -850,6 +1050,10 @@ location set</source>
         <source>Select a branch</source>
         <translation>เลือก Branch</translation>
     </message>
+    <message>
+        <source>Uninstall</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>SshControl</name>
@@ -976,7 +1180,7 @@ location set</source>
     </message>
     <message>
         <source>🌮 End-to-end longitudinal (extremely alpha) 🌮</source>
-        <translation>🌮 ควบคุมเร่ง/เบรคแบบ End-to-end (อยู่ขั้นพัฒนา) 🌮</translation>
+        <translation type="vanished">🌮 ควบคุมเร่ง/เบรคแบบ End-to-end (อยู่ขั้นพัฒนา) 🌮</translation>
     </message>
     <message>
         <source>Experimental openpilot Longitudinal Control</source>
@@ -984,11 +1188,11 @@ location set</source>
     </message>
     <message>
         <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
-        <translation>&lt;b&gt;คำเตือน: การควบคุมการเร่ง/เบรคโดย openpilot สำหรับรถคันนี้ยังอยู่ในขั้นทดลอง และระบบเบรคฉุกเฉินอัตโนมัติ (AEB) จะถูกปิด&lt;/b&gt;</translation>
+        <translation type="vanished">&lt;b&gt;คำเตือน: การควบคุมการเร่ง/เบรคโดย openpilot สำหรับรถคันนี้ยังอยู่ในขั้นทดลอง และระบบเบรคฉุกเฉินอัตโนมัติ (AEB) จะถูกปิด&lt;/b&gt;</translation>
     </message>
     <message>
         <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
-        <translation>ให้ openpilot ควบคุมการเร่ง/เบรคแบบ end-to-end โดย openpilot จะขับอย่างที่มนุษย์คิด ระบบยังอยู่ในขั้นทดลอง</translation>
+        <translation type="vanished">ให้ openpilot ควบคุมการเร่ง/เบรคแบบ end-to-end โดย openpilot จะขับอย่างที่มนุษย์คิด ระบบยังอยู่ในขั้นทดลอง</translation>
     </message>
     <message>
         <source>openpilot longitudinal control is not currently available for this car.</source>
@@ -997,6 +1201,30 @@ location set</source>
     <message>
         <source>Enable experimental longitudinal control to enable this.</source>
         <translation>เปิดใช้งานระบบควบคุมการเร่ง/เบรคขั้นทดลอง เพื่อเปิดใช้งานสิ่งนี้</translation>
+    </message>
+    <message>
+        <source>Experimental Mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>WARNING: openpilot longitudinal control is experimental for this car and will disable Automatic Emergency Braking (AEB).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>openpilot defaults to the car&apos;s built-in ACC instead of openpilot&apos;s longitudinal control on this car. Enable this to switch to openpilot longitudinal control.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable AutoLaneChange</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Operation of the turn signal at 60㎞/h speed will result in a short change of the vehicle</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>    openpilot defaults to driving in &lt;b&gt;chill mode&lt;/b&gt;.    Experimental mode enables &lt;b&gt;alpha-level features&lt;/b&gt; that aren&apos;t ready for chill mode.     Experimental features are listed below:    &lt;br&gt;     &lt;h4&gt;🌮 End-to-End Longitudinal Control 🌮&lt;/h4&gt;     Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would, including stopping for red lights and stop signs. Since the driving model decides which speed to drive, the set speed will only act as an upper bound.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -1051,6 +1279,10 @@ location set</source>
     <message>
         <source>Forget Wi-Fi Network &quot;%1&quot;?</source>
         <translation>เลิกใช้เครือข่าย Wi-Fi &quot;%1&quot;?</translation>
+    </message>
+    <message>
+        <source>Forget</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 </TS>
