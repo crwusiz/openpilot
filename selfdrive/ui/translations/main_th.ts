@@ -60,104 +60,34 @@
     </message>
     <message>
         <source>Cellular Metered</source>
-        <translation type="unfinished"></translation>
+        <translation>ลดการส่งข้อมูลผ่านเซลลูล่าร์</translation>
     </message>
     <message>
         <source>Prevent large data uploads when on a metered connection</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>AebSelect</name>
-    <message>
-        <source>AEB Signal Select (Scc12/Fca11)</source>
-        <translation type="unfinished"></translation>
+        <translation>ปิดการอัพโหลดข้อมูลขนาดใหญ่เมื่อเชื่อมต่อผ่านเซลลูล่าร์</translation>
     </message>
 </context>
 <context>
     <name>AnnotatedCameraWidget</name>
     <message>
         <source>km/h</source>
-        <translation type="vanished">กม./ชม.</translation>
+        <translation>กม./ชม.</translation>
     </message>
     <message>
         <source>mph</source>
-        <translation type="vanished">ไมล์/ชม.</translation>
+        <translation>ไมล์/ชม.</translation>
     </message>
     <message>
         <source>MAX</source>
-        <translation type="vanished">สูงสุด</translation>
+        <translation>สูงสุด</translation>
     </message>
     <message>
         <source>SPEED</source>
-        <translation type="vanished">ความเร็ว</translation>
+        <translation>ความเร็ว</translation>
     </message>
     <message>
         <source>LIMIT</source>
-        <translation type="vanished">จำกัด</translation>
-    </message>
-</context>
-<context>
-    <name>CommunityPanel</name>
-    <message>
-        <source>Select your car</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>RUN</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Process?</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Prebuilt Enable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Create prebuilt files to speed bootup</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Logger Disable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Disable Logger is Reduce system load</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Navigation Disable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Navigation Function not use</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>New radar interface Enable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Some newer car New radar interface</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Select your Manufacturer</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Process</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Npilot controls Cruise State (Experimental)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Npilot controls cruise on/off, gap and set speed.</source>
-        <translation type="unfinished"></translation>
+        <translation>จำกัด</translation>
     </message>
 </context>
 <context>
@@ -242,11 +172,11 @@
     </message>
     <message>
         <source>Regulatory</source>
-        <translation type="vanished">ระเบียบข้อบังคับ</translation>
+        <translation>ระเบียบข้อบังคับ</translation>
     </message>
     <message>
         <source>VIEW</source>
-        <translation type="vanished">ดู</translation>
+        <translation>ดู</translation>
     </message>
     <message>
         <source>Change Language</source>
@@ -259,14 +189,6 @@
     <message>
         <source>Select a language</source>
         <translation>เลือกภาษา</translation>
-    </message>
-    <message>
-        <source>Are you sure you want to reset calibration and live params?</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Soft Restart</source>
-        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Reboot</source>
@@ -316,18 +238,6 @@
         <source>Disengage to Power Off</source>
         <translation>ยกเลิกระบบช่วยขับเพื่อปิดเครื่อง</translation>
     </message>
-    <message>
-        <source>Reset</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Review</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Process</source>
-        <translation type="unfinished"></translation>
-    </message>
 </context>
 <context>
     <name>DriveStats</name>
@@ -345,7 +255,7 @@
     </message>
     <message>
         <source>PAST WEEK</source>
-        <translation type="vanished">สัปดาห์ที่ผ่านมา</translation>
+        <translation>สัปดาห์ที่ผ่านมา</translation>
     </message>
     <message>
         <source>KM</source>
@@ -393,13 +303,6 @@
     <message>
         <source>Updating files: </source>
         <translation>กำลังอัปเดตไฟล์: </translation>
-    </message>
-</context>
-<context>
-    <name>LateralControlSelect</name>
-    <message>
-        <source>LateralControl Select (Pid/Indi/Lqr/Torque)</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -497,13 +400,6 @@ location set</source>
     </message>
 </context>
 <context>
-    <name>MfcSelect</name>
-    <message>
-        <source>MFC Camera Select (Auto/Ldws,Lkas/Lfa)</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
     <name>MultiOptionDialog</name>
     <message>
         <source>Select</source>
@@ -531,58 +427,6 @@ location set</source>
     <message>
         <source>Wrong password</source>
         <translation>รหัสผ่านผิด</translation>
-    </message>
-</context>
-<context>
-    <name>OffroadAlert</name>
-    <message>
-        <source>Device temperature too high. System won&apos;t start.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Connect to internet to check for updates. openpilot won&apos;t automatically start until it connects to internet to check for updates.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Unable to download updates
-%1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Invalid date and time settings, system won&apos;t start. Connect to internet to set time.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Device failed to register. It will not connect to or upload to comma.ai servers, and receives no support from comma.ai. If this is an official device, contact support@comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>NVMe drive not mounted.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Unsupported NVMe drive detected. Device may draw significantly more power and overheat due to the unsupported NVMe.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot was unable to identify your car. Your car is either unsupported or its ECUs are not recognized. Please submit a pull request to add the firmware versions to the proper vehicle. Need help? Join discord.comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Immediately connect to the internet to check for updates. If you do not connect to the internet, openpilot won&apos;t engage in %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot was unable to identify your car. Check integrity of cables and ensure all connections are secure, particularly that the comma power is fully inserted in the OBD-II port of the vehicle. Need help? Join discord.comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Taking camera snapshots. System won&apos;t start until finished.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>An update to your device&apos;s operating system is downloading in the background. You will be prompted to update when it&apos;s ready to install.</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -617,17 +461,6 @@ location set</source>
     <message>
         <source>Bookmark connect.comma.ai to your home screen to use it like an app</source>
         <translation>จดจำ connect.comma.ai โดยการเพิ่มไปยังหน้าจอโฮม เพื่อใช้งานเหมือนเป็นแอปพลิเคชัน</translation>
-    </message>
-</context>
-<context>
-    <name>ParamControl</name>
-    <message>
-        <source>Ok</source>
-        <translation type="unfinished">ตกลง</translation>
-    </message>
-    <message>
-        <source>Cancel</source>
-        <translation type="unfinished">ยกเลิก</translation>
     </message>
 </context>
 <context>
@@ -756,36 +589,7 @@ location set</source>
     <name>RichTextDialog</name>
     <message>
         <source>Ok</source>
-        <translation type="vanished">ตกลง</translation>
-    </message>
-</context>
-<context>
-    <name>SccCommandsSelect</name>
-    <message>
-        <source>Scc Commands Select (Scc/Acc)</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>SelectCar</name>
-    <message>
-        <source>Back</source>
-        <translation type="unfinished">ย้อนกลับ</translation>
-    </message>
-    <message>
-        <source>Select Car not use</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>SelectManufacturer</name>
-    <message>
-        <source>Back</source>
-        <translation type="unfinished">ย้อนกลับ</translation>
-    </message>
-    <message>
-        <source>Select Manufacturer not use</source>
-        <translation type="unfinished"></translation>
+        <translation>ตกลง</translation>
     </message>
 </context>
 <context>
@@ -811,10 +615,6 @@ location set</source>
         <translation>ซอฟต์แวร์</translation>
     </message>
     <message>
-        <source>Community</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Navigation</source>
         <translation>การนำทาง</translation>
     </message>
@@ -823,7 +623,7 @@ location set</source>
     <name>Setup</name>
     <message>
         <source>WARNING: Low Voltage</source>
-        <translation>คำเตือน: แรงดันไฟฟ้าต่ำ</translation>
+        <translation>คำเตือน: แรงดันแบตเตอรี่ต่ำ</translation>
     </message>
     <message>
         <source>Power your device in a car with a harness or proceed at your own risk.</source>
@@ -1003,54 +803,6 @@ location set</source>
 <context>
     <name>SoftwarePanel</name>
     <message>
-        <source>Git Branch</source>
-        <translation type="vanished">Git Branch</translation>
-    </message>
-    <message>
-        <source>Git Commit</source>
-        <translation type="vanished">Git Commit</translation>
-    </message>
-    <message>
-        <source>OS Version</source>
-        <translation type="vanished">เวอร์ชันระบบปฏิบัติการ</translation>
-    </message>
-    <message>
-        <source>Version</source>
-        <translation type="vanished">เวอร์ชั่น</translation>
-    </message>
-    <message>
-        <source>Last Update Check</source>
-        <translation type="vanished">ตรวจสอบการอัปเดตล่าสุด</translation>
-    </message>
-    <message>
-        <source>The last time openpilot successfully checked for an update. The updater only runs while the car is off.</source>
-        <translation type="vanished">ครั้งสุดท้ายที่ openpilot ตรวจสอบการอัปเดตสำเร็จ ตัวอัปเดตจะทำงานในขณะที่รถดับเครื่องอยู่เท่านั้น</translation>
-    </message>
-    <message>
-        <source>Check for Update</source>
-        <translation type="vanished">ตรวจสอบการอัปเดต</translation>
-    </message>
-    <message>
-        <source>CHECKING</source>
-        <translation type="vanished">กำลังตรวจสอบ</translation>
-    </message>
-    <message>
-        <source>Switch Branch</source>
-        <translation type="vanished">เปลี่ยน Branch</translation>
-    </message>
-    <message>
-        <source>ENTER</source>
-        <translation type="vanished">เปลี่ยน</translation>
-    </message>
-    <message>
-        <source>The new branch will be pulled the next time the updater runs.</source>
-        <translation type="vanished">Branch ใหม่จะถูกติดตั้งในครั้งต่อไปที่ตัวอัปเดตทำงาน</translation>
-    </message>
-    <message>
-        <source>Enter branch name</source>
-        <translation type="vanished">ใส่ชื่อ Branch</translation>
-    </message>
-    <message>
         <source>Uninstall %1</source>
         <translation>ถอนการติดตั้ง %1</translation>
     </message>
@@ -1063,48 +815,40 @@ location set</source>
         <translation>คุณแน่ใจหรือไม่ว่าต้องการถอนการติดตั้ง?</translation>
     </message>
     <message>
-        <source>failed to fetch update</source>
-        <translation type="vanished">โหลดข้อมูลอัปเดตไม่สำเร็จ</translation>
-    </message>
-    <message>
         <source>CHECK</source>
         <translation>ตรวจสอบ</translation>
     </message>
     <message>
         <source>Updates are only downloaded while the car is off.</source>
-        <translation type="unfinished"></translation>
+        <translation>ตัวอัปเดตจะดำเนินการดาวน์โหลดเมื่อรถดับเครื่องยนต์อยู่เท่านั้น</translation>
     </message>
     <message>
         <source>Current Version</source>
-        <translation type="unfinished"></translation>
+        <translation>เวอร์ชั่นปัจจุบัน</translation>
     </message>
     <message>
         <source>Download</source>
-        <translation type="unfinished"></translation>
+        <translation>ดาวน์โหลด</translation>
     </message>
     <message>
         <source>Install Update</source>
-        <translation type="unfinished"></translation>
+        <translation>ติดตั้งตัวอัปเดต</translation>
     </message>
     <message>
         <source>INSTALL</source>
-        <translation type="unfinished"></translation>
+        <translation>ติดตั้ง</translation>
     </message>
     <message>
         <source>Target Branch</source>
-        <translation type="unfinished"></translation>
+        <translation>Branch ที่เลือก</translation>
     </message>
     <message>
         <source>SELECT</source>
-        <translation type="unfinished"></translation>
+        <translation>เลือก</translation>
     </message>
     <message>
         <source>Select a branch</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Uninstall</source>
-        <translation type="unfinished"></translation>
+        <translation>เลือก Branch</translation>
     </message>
 </context>
 <context>
@@ -1199,14 +943,6 @@ location set</source>
         <translation>แสดงความเร็วเป็น กม./ชม. แทน ไมล์/ชั่วโมง</translation>
     </message>
     <message>
-        <source>Enable AutoLaneChange</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Operation of the turn signal at 60㎞/h speed will result in a short change of the vehicle</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Record and Upload Driver Camera</source>
         <translation>บันทึกและอัปโหลดภาพจากกล้องคนขับ</translation>
     </message>
@@ -1215,7 +951,7 @@ location set</source>
         <translation>อัปโหลดข้อมูลจากกล้องที่หันหน้าไปทางคนขับ และช่วยปรับปรุงอัลกอริธึมการตรวจสอบผู้ขับขี่</translation>
     </message>
     <message>
-        <source>Disengage On Accelerator Pedal</source>
+        <source>Disengage on Accelerator Pedal</source>
         <translation>ยกเลิกระบบช่วยขับเมื่อเหยียบคันเร่ง</translation>
     </message>
     <message>
@@ -1239,36 +975,28 @@ location set</source>
         <translation>แสดงแผนที่ด้านซ้ายของหน้าจอเมื่ออยู่ในโหมดแบ่งหน้าจอ</translation>
     </message>
     <message>
-        <source>openpilot Longitudinal Control</source>
-        <translation type="vanished">openpilot การควบคุมการเร่งและลดความเร็ว</translation>
+        <source>🌮 End-to-end longitudinal (extremely alpha) 🌮</source>
+        <translation>🌮 ควบคุมเร่ง/เบรคแบบ End-to-end (อยู่ขั้นพัฒนา) 🌮</translation>
     </message>
     <message>
-        <source>openpilot will disable the car&apos;s radar and will take over control of gas and brakes. Warning: this disables AEB!</source>
-        <translation type="vanished">openpilot จะปิดการใช้งานเรดาร์ของรถ และจะเข้าควบคุมการเร่งและเบรก คำเตือน: สิ่งนี้จะปิดระบบ AEB!</translation>
+        <source>Experimental openpilot Longitudinal Control</source>
+        <translation>ทดลองใช้ระบบควบคุมการเร่ง/เบรคโดย openpilot</translation>
     </message>
     <message>
-        <source>Experimental openpilot longitudinal control</source>
-        <translation type="unfinished"></translation>
+        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
+        <translation>&lt;b&gt;คำเตือน: การควบคุมการเร่ง/เบรคโดย openpilot สำหรับรถคันนี้ยังอยู่ในขั้นทดลอง และระบบเบรคฉุกเฉินอัตโนมัติ (AEB) จะถูกปิด&lt;/b&gt;</translation>
+    </message>
+    <message>
+        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
+        <translation>ให้ openpilot ควบคุมการเร่ง/เบรคแบบ end-to-end โดย openpilot จะขับอย่างที่มนุษย์คิด ระบบยังอยู่ในขั้นทดลอง</translation>
     </message>
     <message>
         <source>openpilot longitudinal control is not currently available for this car.</source>
-        <translation type="unfinished"></translation>
+        <translation>ขณะนี้ยังไม่มีระบบควบคุมการเร่ง/เบรคโดย openpilot สำหรับรถคันนี้</translation>
     </message>
     <message>
         <source>Enable experimental longitudinal control to enable this.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Experimental mode</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;&lt;br&gt;          openpilot defaults to the car&apos;s built-in ACC instead of openpilot&apos;s longitudinal control on this car. Enable this to switch to openpilot longitudinal control.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>    openpilot defaults to driving in &lt;b&gt;chill mode&lt;/b&gt;.    Experimental mode enables &lt;b&gt;alpha-level features&lt;/b&gt; that aren&apos;t ready for chill mode.     Experimental features are listed below:    &lt;br&gt;     &lt;h4&gt;🌮 End-to-End Longitudinal Control 🌮&lt;/h4&gt;     Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would, including stopping for red lights and stop signs.</source>
-        <translation type="unfinished"></translation>
+        <translation>เปิดใช้งานระบบควบคุมการเร่ง/เบรคขั้นทดลอง เพื่อเปิดใช้งานสิ่งนี้</translation>
     </message>
 </context>
 <context>
@@ -1323,10 +1051,6 @@ location set</source>
     <message>
         <source>Forget Wi-Fi Network &quot;%1&quot;?</source>
         <translation>เลิกใช้เครือข่าย Wi-Fi &quot;%1&quot;?</translation>
-    </message>
-    <message>
-        <source>Forget</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 </TS>
