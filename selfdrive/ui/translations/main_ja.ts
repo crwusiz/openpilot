@@ -68,96 +68,26 @@
     </message>
 </context>
 <context>
-    <name>AebSelect</name>
-    <message>
-        <source>AEB Signal Select (Scc12/Fca11)</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
     <name>AnnotatedCameraWidget</name>
     <message>
         <source>km/h</source>
-        <translation type="vanished">km/h</translation>
+        <translation>km/h</translation>
     </message>
     <message>
         <source>mph</source>
-        <translation type="vanished">mph</translation>
+        <translation>mph</translation>
     </message>
     <message>
         <source>MAX</source>
-        <translation type="vanished">最高速度</translation>
+        <translation>最高速度</translation>
     </message>
     <message>
         <source>SPEED</source>
-        <translation type="vanished">速度</translation>
+        <translation>速度</translation>
     </message>
     <message>
         <source>LIMIT</source>
-        <translation type="vanished">制限速度</translation>
-    </message>
-</context>
-<context>
-    <name>CommunityPanel</name>
-    <message>
-        <source>Select your Manufacturer</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Select your car</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>RUN</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Process?</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Process</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Prebuilt Enable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Create prebuilt files to speed bootup</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Logger Disable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Disable Logger is Reduce system load</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Navigation Disable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Navigation Function not use</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>New radar interface Enable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Some newer car New radar interface</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Npilot controls Cruise State (Experimental)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Npilot controls cruise on/off, gap and set speed.</source>
-        <translation type="unfinished"></translation>
+        <translation>制限速度</translation>
     </message>
 </context>
 <context>
@@ -242,11 +172,11 @@
     </message>
     <message>
         <source>Regulatory</source>
-        <translation type="vanished">認証情報</translation>
+        <translation>認証情報</translation>
     </message>
     <message>
         <source>VIEW</source>
-        <translation type="vanished">見る</translation>
+        <translation>見る</translation>
     </message>
     <message>
         <source>Change Language</source>
@@ -316,18 +246,6 @@
         <source>Review</source>
         <translation type="unfinished"></translation>
     </message>
-    <message>
-        <source>Are you sure you want to reset calibration and live params?</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Process</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Soft Restart</source>
-        <translation type="unfinished"></translation>
-    </message>
 </context>
 <context>
     <name>DriveStats</name>
@@ -345,7 +263,7 @@
     </message>
     <message>
         <source>PAST WEEK</source>
-        <translation type="vanished">先週</translation>
+        <translation>先週</translation>
     </message>
     <message>
         <source>KM</source>
@@ -393,13 +311,6 @@
     <message>
         <source>Updating files: </source>
         <translation>ファイルを更新しています： </translation>
-    </message>
-</context>
-<context>
-    <name>LateralControlSelect</name>
-    <message>
-        <source>LateralControl Select (Pid/Indi/Lqr/Torque)</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -497,13 +408,6 @@ location set</source>
     </message>
 </context>
 <context>
-    <name>MfcSelect</name>
-    <message>
-        <source>MFC Camera Select (Auto/Ldws,Lkas/Lfa)</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
     <name>MultiOptionDialog</name>
     <message>
         <source>Select</source>
@@ -531,58 +435,6 @@ location set</source>
     <message>
         <source>Wrong password</source>
         <translation>ﾊﾟｽﾜｰﾄﾞが間違っています</translation>
-    </message>
-</context>
-<context>
-    <name>OffroadAlert</name>
-    <message>
-        <source>Device temperature too high. System won&apos;t start.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Connect to internet to check for updates. openpilot won&apos;t automatically start until it connects to internet to check for updates.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Unable to download updates
-%1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Invalid date and time settings, system won&apos;t start. Connect to internet to set time.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Device failed to register. It will not connect to or upload to comma.ai servers, and receives no support from comma.ai. If this is an official device, contact support@comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>NVMe drive not mounted.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Unsupported NVMe drive detected. Device may draw significantly more power and overheat due to the unsupported NVMe.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot was unable to identify your car. Your car is either unsupported or its ECUs are not recognized. Please submit a pull request to add the firmware versions to the proper vehicle. Need help? Join discord.comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Immediately connect to the internet to check for updates. If you do not connect to the internet, openpilot won&apos;t engage in %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot was unable to identify your car. Check integrity of cables and ensure all connections are secure, particularly that the comma power is fully inserted in the OBD-II port of the vehicle. Need help? Join discord.comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Taking camera snapshots. System won&apos;t start until finished.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>An update to your device&apos;s operating system is downloading in the background. You will be prompted to update when it&apos;s ready to install.</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -623,11 +475,11 @@ location set</source>
     <name>ParamControl</name>
     <message>
         <source>Ok</source>
-        <translation type="unfinished">OK</translation>
+        <translation>OK</translation>
     </message>
     <message>
         <source>Cancel</source>
-        <translation type="unfinished">キャンセル</translation>
+        <translation>キャンセル</translation>
     </message>
 </context>
 <context>
@@ -753,35 +605,6 @@ location set</source>
     </message>
 </context>
 <context>
-    <name>SccCommandsSelect</name>
-    <message>
-        <source>Scc Commands Select (Scc/Acc)</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>SelectCar</name>
-    <message>
-        <source>Back</source>
-        <translation type="unfinished">戻る</translation>
-    </message>
-    <message>
-        <source>Select Car not use</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>SelectManufacturer</name>
-    <message>
-        <source>Back</source>
-        <translation type="unfinished">戻る</translation>
-    </message>
-    <message>
-        <source>Select Manufacturer not use</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
     <name>SettingsWindow</name>
     <message>
         <source>×</source>
@@ -806,10 +629,6 @@ location set</source>
     <message>
         <source>Navigation</source>
         <translation>ﾅﾋﾞｹﾞｰｼｮﾝ</translation>
-    </message>
-    <message>
-        <source>Community</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -1148,20 +967,8 @@ location set</source>
         <translation>車内カメラの映像をアップロードし、ドライバー監視システムのアルゴリズムの向上に役立てます。</translation>
     </message>
     <message>
-        <source>🌮 End-to-end longitudinal (extremely alpha) 🌮</source>
-        <translation type="vanished">🌮 エンドツーエンドのアクセル制御 (超α版) 🌮</translation>
-    </message>
-    <message>
         <source>Experimental openpilot longitudinal control</source>
         <translation>実験段階のopenpilotによるアクセル制御</translation>
-    </message>
-    <message>
-        <source>&lt;b&gt;WARNING:&lt;/b&gt; openpilot longitudinal control is experimental for this car and will disable AEB.</source>
-        <translation type="obsolete">&lt;b&gt;警告:&lt;/b&gt; openpilotによるアクセル制御は実験段階であり、AEBを無効化します。</translation>
-    </message>
-    <message>
-        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
-        <translation type="vanished">アクセルとブレーキの制御をopenpilotに任せます。openpilotが人間と同じように運転します。最初期の実験段階です。</translation>
     </message>
     <message>
         <source>openpilot longitudinal control is not currently available for this car.</source>
@@ -1204,15 +1011,7 @@ location set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Enable AutoLaneChange</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Operation of the turn signal at 60㎞/h speed will result in a short change of the vehicle</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>    openpilot defaults to driving in &lt;b&gt;chill mode&lt;/b&gt;.    Experimental mode enables &lt;b&gt;alpha-level features&lt;/b&gt; that aren&apos;t ready for chill mode.     Experimental features are listed below:    &lt;br&gt;     &lt;h4&gt;🌮 End-to-End Longitudinal Control 🌮&lt;/h4&gt;     Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would, including stopping for red lights and stop signs.</source>
+        <source>    openpilot defaults to driving in &lt;b&gt;chill mode&lt;/b&gt;.    Experimental mode enables &lt;b&gt;alpha-level features&lt;/b&gt; that aren&apos;t ready for chill mode.     Experimental features are listed below:    &lt;br&gt;     &lt;h4&gt;🌮 End-to-End Longitudinal Control 🌮&lt;/h4&gt;     Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would, including stopping for red lights and stop signs. Since the driving model decides which speed to drive, the set speed will only act as an upper bound.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
