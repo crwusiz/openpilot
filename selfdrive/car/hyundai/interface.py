@@ -10,6 +10,7 @@ from selfdrive.car import STD_CARGO_KG, create_button_event, scale_rot_inertia, 
 from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
 from selfdrive.car.disable_ecu import disable_ecu
+from selfdrive.controls.neokii.cruise_state_manager import is_radar_disabler
 
 Ecu = car.CarParams.Ecu
 ButtonType = car.CarState.ButtonEvent.Type
