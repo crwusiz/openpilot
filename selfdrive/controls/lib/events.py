@@ -711,6 +711,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   EventName.buttonCancel: {
     ET.USER_DISABLE: EngagementAlert(AudibleAlert.disengage),
+    ET.NO_ENTRY: NoEntryAlert("Cancel Pressed"),
   },
 
   EventName.brakeHold: {
