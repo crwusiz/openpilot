@@ -44,9 +44,11 @@ class VCruiseHelper:
     self.button_timers = {ButtonType.decelCruise: 0, ButtonType.accelCruise: 0}
     self.button_change_states = {btn: {"standstill": False} for btn in self.button_timers}
 
+
   @property
   def v_cruise_initialized(self):
     return self.v_cruise_kph != V_CRUISE_INITIAL
+
 
   def update_v_cruise(self, CS, enabled, is_metric):
     self.v_cruise_kph_last = self.v_cruise_kph
@@ -63,6 +65,7 @@ class VCruiseHelper:
     else:
       self.v_cruise_kph = V_CRUISE_INITIAL
       self.v_cruise_cluster_kph = V_CRUISE_INITIAL
+
 
   def _update_v_cruise_non_pcm(self, CS, enabled, is_metric):
     # handle button presses. TODO: this should be in state_control, but a decelCruise press
@@ -109,6 +112,7 @@ class VCruiseHelper:
 
     self.v_cruise_kph = clip(round(self.v_cruise_kph, 1), V_CRUISE_MIN, V_CRUISE_MAX)
 
+
   def update_button_timers(self, CS):
     # increment timer for buttons still pressed
     for k in self.button_timers:
@@ -120,6 +124,7 @@ class VCruiseHelper:
         # Start/end timer and store current state on change of button pressed
         self.button_timers[b.type.raw] = 1 if b.pressed else 0
         self.button_change_states[b.type.raw] = {"standstill": CS.cruiseState.standstill}
+
 
   def initialize_v_cruise(self, CS):
     # initializing is handled by the PCM

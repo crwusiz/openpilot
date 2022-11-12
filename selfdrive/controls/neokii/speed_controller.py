@@ -6,7 +6,7 @@ from common.conversions import Conversions as CV
 from common.numpy_fast import clip, interp
 from common.params import Params
 from selfdrive.car.hyundai.values import Buttons
-from selfdrive.controls.lib.drive_helpers import V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_ENABLE_MIN, V_CRUISE_INITIAL
+from selfdrive.controls.lib.drive_helpers import V_CRUISE_MIN, V_CRUISE_MAX
 from selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import AUTO_TR_CRUISE_GAP
 from selfdrive.controls.neokii.cruise_state_manager import CruiseStateManager, V_CRUISE_DELTA_KM, V_CRUISE_DELTA_MI
 from selfdrive.controls.lib.lateral_planner import TRAJECTORY_SIZE
@@ -56,12 +56,6 @@ class SpeedController:
 
     self.min_set_speed_clu = self.kph_to_clu(V_CRUISE_MIN)
     self.max_set_speed_clu = self.kph_to_clu(V_CRUISE_MAX)
-
-    self.prev_cruise_enabled = False
-
-    self.prev_button = ButtonType.unknown
-    self.button_count = 0
-    self.long_pressed = False
 
 
   def kph_to_clu(self, kph):
@@ -217,36 +211,8 @@ class SpeedController:
     return Buttons.RES_ACCEL if error > 0 else Buttons.SET_DECEL
 
 
-  def initialize_v_cruise(self, v_ego, buttonEvents, v_cruise_last):
-    for b in buttonEvents:
-      # 250kph or above probably means we never had a set speed
-      if b.type in (ButtonType.accelCruise, ButtonType.resumeCruise) and v_cruise_last < 250:
-        return v_cruise_last
-
-    return int(round(clip(v_ego * CV.MS_TO_KPH, V_CRUISE_ENABLE_MIN, V_CRUISE_MAX)))
-
-
   def update_v_cruise(self, controls, CS):  # called by controlds's state_transition
-    manage_button = not self.CP.openpilotLongitudinalControl or not self.CP.pcmCruise
-
-    if CS.cruiseState.enabled:
-      if manage_button:
-        v_cruise_kph = self.update_cruise_button(controls.v_cruise_kph, CS.buttonEvents, controls.enabled,
-                                                 controls.is_metric)
-      else:
-        v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
-    else:
-      v_cruise_kph = 0 #V_CRUISE_INITIAL
-
-    if self.prev_cruise_enabled != CS.cruiseState.enabled:
-      self.prev_cruise_enabled = CS.cruiseState.enabled
-
-      if CS.cruiseState.enabled:
-        if not self.CP.pcmCruise:
-          v_cruise_kph = self.initialize_v_cruise(CS.vEgo, CS.buttonEvents, controls.v_cruise_kph_last)
-        else:
-          v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
-
+    v_cruise_kph = controls.v_cruise_helper.v_cruise_kph
     self.real_set_speed_kph = v_cruise_kph
 
     if CS.cruiseState.enabled:
@@ -259,7 +225,7 @@ class SpeedController:
       self.reset()
       controls.LoC.reset(v_pid=CS.vEgo)
 
-    return v_cruise_kph
+    return v_cruise_kph, self.real_set_speed_kph
 
 
   def update_can(self, enabled, CC, CS, sm, can_sends):
@@ -307,34 +273,6 @@ class SpeedController:
         self.target_speed = 0.
 
     return new_v_cruise_kph
-
-
-  def update_cruise_button(self, v_cruise_kph, buttonEvents, enabled, metric):
-    if enabled:
-      if self.button_count:
-        self.button_count += 1
-      for b in buttonEvents:
-        if b.pressed and not self.button_count and (b.type == ButtonType.accelCruise or b.type == ButtonType.decelCruise):
-          self.button_count = 1
-          self.prev_button = b.type
-        elif not b.pressed and self.button_count:
-          if not self.long_pressed and b.type == ButtonType.accelCruise:
-            v_cruise_kph += 1 if metric else 1 * CV.MPH_TO_KPH
-          elif not self.long_pressed and b.type == ButtonType.decelCruise:
-            v_cruise_kph -= 1 if metric else 1 * CV.MPH_TO_KPH
-          self.long_pressed = False
-          self.button_count = 0
-      if self.button_count > 70:
-        self.long_pressed = True
-        V_CRUISE_DELTA = V_CRUISE_DELTA_KM if metric else V_CRUISE_DELTA_MI
-        if self.prev_button == ButtonType.accelCruise:
-          v_cruise_kph += V_CRUISE_DELTA - v_cruise_kph % V_CRUISE_DELTA
-        elif self.prev_button == ButtonType.decelCruise:
-          v_cruise_kph -= V_CRUISE_DELTA - -v_cruise_kph % V_CRUISE_DELTA
-        self.button_count %= 70
-      v_cruise_kph = clip(v_cruise_kph, V_CRUISE_ENABLE_MIN, V_CRUISE_MAX)
-
-    return v_cruise_kph
 
 
   def update_message(self, c, CC, CS):

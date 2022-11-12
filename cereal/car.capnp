@@ -221,7 +221,7 @@ struct CarState {
   charging @43 :Bool;
 
   # neokii
-  vCluRatio @45 :Float32;
+  vCluRatio @48 :Float32;
   autoHold @46 :Int32;
   tpms @47 :Tpms;
 
