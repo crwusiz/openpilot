@@ -163,9 +163,9 @@ class CruiseStateManager:
           v_cruise_kph = clip(round(self.speed * CV.MS_TO_KPH, 1), V_CRUISE_ENABLE_MIN, V_CRUISE_MAX)
 
     if btn == ButtonType.gapAdjustCruise and not self.btn_long_pressed:
-      self.gapAdjust += 1
-      if self.gapAdjust > 4:
-        self.gapAdjust = 1
+      self.gapAdjust -= 1
+      if self.gapAdjust < 1:
+        self.gapAdjust = 4
 
     if btn == ButtonType.cancel:
       self.enabled = False

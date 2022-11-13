@@ -289,6 +289,11 @@ class CarInterfaceBase(ABC):
         events.add(EventName.pcmEnable)
       elif not cs_out.cruiseState.available:
         events.add(EventName.pcmDisable)
+      else:
+        if cs_out.cruiseState.enabled and not self.CS.out.cruiseState.enabled:
+          events.add(EventName.cruiseOn)
+        elif not cs_out.cruiseState.enabled and self.CS.out.cruiseState.enabled:
+          events.add(EventName.cruiseOff)
 
     return events
 

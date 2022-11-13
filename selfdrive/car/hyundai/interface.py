@@ -4,7 +4,7 @@ from panda import Panda
 from common.params import Params
 from common.numpy_fast import interp
 from common.conversions import Conversions as CV
-from selfdrive.car.hyundai.values import HyundaiFlags, CAR, Buttons, CarControllerParams, CANFD_CAR
+from selfdrive.car.hyundai.values import HyundaiFlags, CAR, Buttons, CarControllerParams, CANFD_CAR, EV_CAR, HEV_CAR
 from selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR
 from selfdrive.car import STD_CARGO_KG, create_button_event, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
@@ -374,12 +374,12 @@ class CarInterface(CarInterfaceBase):
         ret.hasScc13 = 1290 in fingerprint[0] or 1290 in fingerprint[2]
         ret.hasScc14 = 905 in fingerprint[0] or 905 in fingerprint[2]
 
-    #if ret.openpilotLongitudinalControl:
-    #  ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
-    #if candidate in HYBRID_CAR:
-    #  ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
-    #elif candidate in EV_CAR:
-    #  ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
+    if ret.openpilotLongitudinalControl:
+      ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
+    if candidate in HEV_CAR:
+      ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
+    elif candidate in EV_CAR:
+      ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
 
     if ret.centerToFront == 0:
       ret.centerToFront = ret.wheelbase * 0.4

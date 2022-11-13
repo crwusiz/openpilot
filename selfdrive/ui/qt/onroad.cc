@@ -172,7 +172,7 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
 }
 
 
-AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraWidget("camerad", type, true, parent) {
+AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* parent) : last_update_params(0), fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraWidget("camerad", type, true, parent) {
   pm = std::make_unique<PubMaster, const std::initializer_list<const char *>>({"uiDebug"});
 
   steer_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
@@ -937,18 +937,19 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
       bg.setColorAt(0.0, overrideColor(100));
       bg.setColorAt(0.5, overrideColor(50));
       bg.setColorAt(1.0, overrideColor(0));
-    } else {
+    } else if (scene.experimental_mode) {
       bg.setColorAt(0.0, QColor::fromHslF(start_hue / 360., 0.97, 0.56, 0.4));
       bg.setColorAt(0.5, QColor::fromHslF(end_hue / 360., 1.0, 0.68, 0.35));
       bg.setColorAt(1.0, QColor::fromHslF(end_hue / 360., 1.0, 0.68, 0.0));
+    } else {
+      bg.setColorAt(0.0, QColor::fromHslF(148 / 360., 0.94, 0.51, 0.4));
+      bg.setColorAt(0.5, QColor::fromHslF(112 / 360., 1.0, 0.68, 0.35));
+      bg.setColorAt(1.0, QColor::fromHslF(112 / 360., 1.0, 0.68, 0.0));
     }
   } else {
-    //bg.setColorAt(0.0, whiteColor(100));
-    //bg.setColorAt(0.5, whiteColor(50));
-    //bg.setColorAt(1.0, whiteColor(0));
-    bg.setColorAt(0.0, QColor::fromHslF(148 / 360., 0.94, 0.51, 0.4));
-    bg.setColorAt(0.5, QColor::fromHslF(112 / 360., 1.0, 0.68, 0.35));
-    bg.setColorAt(1.0, QColor::fromHslF(112 / 360., 1.0, 0.68, 0.0));
+    bg.setColorAt(0.0, whiteColor(100));
+    bg.setColorAt(0.5, whiteColor(50));
+    bg.setColorAt(1.0, whiteColor(0));
   }
   painter.setBrush(bg);
   painter.drawPolygon(scene.track_vertices);
@@ -1079,6 +1080,10 @@ void AnnotatedCameraWidget::paintGL() {
 void AnnotatedCameraWidget::showEvent(QShowEvent *event) {
   CameraWidget::showEvent(event);
 
-  ui_update_params(uiState());
+  auto now = millis_since_boot();
+  if (now - last_update_params > 1000 * 5) {
+    last_update_params = now;
+    ui_update_params(uiState());
+  }
   prev_draw_t = millis_since_boot();
 }

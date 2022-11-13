@@ -1181,12 +1181,28 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   EventName.slowingDownSpeed: {
     #ET.PERMANENT: Alert("Slowing down","", AlertStatus.normal, AlertSize.small,
     ET.PERMANENT: Alert("속도를 줄이고 있습니다","", AlertStatus.normal, AlertSize.small,
-      Priority.MID, VisualAlert.none, AudibleAlert.none, .1),
+                        Priority.LOW, VisualAlert.none, AudibleAlert.none, .1),
   },
 
   EventName.slowingDownSpeedSound: {
     #ET.PERMANENT: Alert("Slowing down","", AlertStatus.normal, AlertSize.small,
     ET.PERMANENT: Alert("속도를 줄이고 있습니다", "", AlertStatus.normal, AlertSize.small,
-      Priority.HIGH, VisualAlert.none, AudibleAlert.slowingDownSpeed, 2.),
+                        Priority.MID, VisualAlert.none, AudibleAlert.slowingDownSpeed, 2.),
+  },
+
+  EventName.cruiseOn: {
+    ET.PERMANENT: Alert("", "", AlertStatus.normal, AlertSize.none,
+                        Priority.MID, VisualAlert.none, AudibleAlert.cruiseOn, 1.),
+  },
+
+  EventName.cruiseOff: {
+    ET.PERMANENT: Alert("", "", AlertStatus.normal, AlertSize.none,
+                        Priority.MID, VisualAlert.none, AudibleAlert.cruiseOff, 1.),
+  },
+
+  EventName.noTargetAcc: {
+    #ET.PERMANENT: Alert("Cruise Canceled", "No close lead car", AlertStatus.normal, AlertSize.mid,
+    ET.PERMANENT: Alert("크루즈 취소됨", "선행 차량이 없습니다", AlertStatus.normal, AlertSize.mid,
+                        Priority.HIGH, VisualAlert.none, AudibleAlert.prompt, 1.),
   },
 }
