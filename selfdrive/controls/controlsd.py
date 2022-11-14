@@ -143,10 +143,10 @@ class Controls:
     put_nonblocking("CarParamsPersistent", cp_bytes)
 
     # cleanup old params
-    if not self.CP.experimentalLongitudinalAvailable:
-      self.params.remove("ExperimentalLongitudinalEnabled")
-    if not self.CP.openpilotLongitudinalControl:
-      self.params.remove("ExperimentalMode")
+    #if not self.CP.experimentalLongitudinalAvailable:
+    #  self.params.remove("ExperimentalLongitudinalEnabled")
+    #if not self.CP.openpilotLongitudinalControl:
+    #  self.params.remove("ExperimentalMode")
 
     self.CC = car.CarControl.new_message()
     self.CS_prev = car.CarState.new_message()
@@ -483,10 +483,10 @@ class Controls:
   def state_transition(self, CS):
     """Compute conditional state transitions and execute actions on state transitions"""
 
-    #self.v_cruise_helper.update_v_cruise(CS, self.enabled, self.is_metric)
+    self.v_cruise_helper.update_v_cruise(CS, self.enabled, self.is_metric)
 
-    self.v_cruise_helper.v_cruise_kph = self.speed_controller.update_v_cruise(self, CS)
-    self.v_cruise_helper.v_cruise_cluster_kph = self.v_cruise_helper.v_cruise_kph
+    #self.v_cruise_helper.v_cruise_kph = self.speed_controller.update_v_cruise(self, CS)
+    #self.v_cruise_helper.v_cruise_cluster_kph = self.v_cruise_helper.v_cruise_kph
 
     # decrement the soft disable timer at every step, as it's reset on
     # entrance in SOFT_DISABLING state

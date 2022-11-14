@@ -27,7 +27,7 @@ class CarInterface(CarInterfaceBase):
     gas_max_bp = [10., 20., 50., 70., 130., 150.]
     gas_max_v = [1.3, 1.1, 0.63, 0.44, 0.15, 0.1]
 
-    return CarControllerParams.ACCEL_MIN, interp(v_current_kph, gas_max_bp, gas_max_v)
+    return CarControllerParams.ACCEL_MIN, int(interp(v_current_kph, gas_max_bp, gas_max_v))
 
   @staticmethod
   def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=[], experimental_long=False):  # pylint: disable=dangerous-default-value

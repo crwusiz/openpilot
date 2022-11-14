@@ -173,22 +173,20 @@ class SpeedController:
     override_speed = -1
 
     if not self.longcontrol:
-      if CS.gasPressed and not cruise_btn_pressed:
-        if clu_speed + SYNC_MARGIN > self.kph_to_clu(v_cruise_kph):
-          set_speed = clip(clu_speed + SYNC_MARGIN, self.min_set_speed_clu, self.max_set_speed_clu)
-          v_cruise_kph = int(round(set_speed * self.speed_conv_to_ms * CV.MS_TO_KPH))
-          override_speed = v_cruise_kph
+      if CS.gasPressed and not cruise_btn_pressed and clu_speed + SYNC_MARGIN > self.kph_to_clu(v_cruise_kph):
+        set_speed = clip(clu_speed + SYNC_MARGIN, self.min_set_speed_clu, self.max_set_speed_clu)
+        v_cruise_kph = int(round(set_speed * self.speed_conv_to_ms * CV.MS_TO_KPH))
+        override_speed = v_cruise_kph
 
       self.target_speed = self.kph_to_clu(v_cruise_kph)
       if self.max_speed_clu > self.min_set_speed_clu:
         self.target_speed = clip(self.target_speed, self.min_set_speed_clu, self.max_speed_clu)
 
     elif CS.cruiseState.enabled:
-      if CS.gasPressed and not cruise_btn_pressed:
-        if clu_speed + SYNC_MARGIN > self.kph_to_clu(v_cruise_kph):
-          set_speed = clip(clu_speed + SYNC_MARGIN, self.min_set_speed_clu, self.max_set_speed_clu)
-          self.target_speed = set_speed
-          CruiseStateManager.instance().speed = set_speed * self.speed_conv_to_ms
+      if CS.gasPressed and not cruise_btn_pressed and clu_speed + SYNC_MARGIN > self.kph_to_clu(v_cruise_kph):
+        set_speed = clip(clu_speed + SYNC_MARGIN, self.min_set_speed_clu, self.max_set_speed_clu)
+        self.target_speed = set_speed
+        CruiseStateManager.instance().speed = set_speed * self.speed_conv_to_ms
 
     return override_speed
 
@@ -234,11 +232,10 @@ class SpeedController:
     ascc_enabled = enabled and CS.cruiseState.enabled and 1 < CS.cruiseState.speed < 255 and not CS.brakePressed
     btn_pressed = self.CI.CS.cruise_buttons[-1] != Buttons.NONE
 
-    if not self.longcontrol:
-      if not ascc_enabled or CS.cruiseState.standstill or btn_pressed:
-        self.reset()
-        self.wait_timer = max(self.alive_count_list) + max(self.wait_count_list)
-        return new_v_cruise_kph
+    if not self.longcontrol and (not ascc_enabled or CS.cruiseState.standstill or btn_pressed):
+      self.reset()
+      self.wait_timer = max(self.alive_count_list) + max(self.wait_count_list)
+      return new_v_cruise_kph
 
     if not ascc_enabled:
       self.reset()
