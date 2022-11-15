@@ -179,6 +179,7 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   lat_img = loadPixmap("../assets/offroad/icon_speed_limit.png", {img_size, img_size});
   longitudinal_img = loadPixmap("../assets/offroad/icon_disengage_on_accelerator.svg", {img_size, img_size});
   dm_img = loadPixmap("../assets/img_driver_face.png", {img_size, img_size});
+  experimental_img = loadPixmap("../assets/img_experimental.png", {img_size, img_size});
 
   // crwusiz add
   brake_img = loadPixmap("../assets/img_brake_disc.png", {img_size, img_size});
@@ -495,7 +496,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   // engage-ability icon ( wheel ) (upper right 1)
   if (status == STATUS_ENGAGED && !steeringPressed) {
-    wheel_img = lat_img;
+    wheel_img = uiState()->scene.experimental_mode ? experimental_img : lat_img;
   } else if (status == STATUS_OVERRIDE && !steeringPressed) {
     wheel_img = longitudinal_img;
   } else {

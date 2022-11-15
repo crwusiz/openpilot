@@ -94,6 +94,7 @@ private:
   QPixmap wheel_img, steer_img;
   QPixmap lat_img, longitudinal_img;
   QPixmap dm_img;
+  QPixmap experimental_img;
 
   // crwusiz add
   QPixmap brake_img, bsd_l_img, bsd_r_img;

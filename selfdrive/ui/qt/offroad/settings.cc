@@ -47,7 +47,7 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "ExperimentalMode",
       tr("Experimental Mode"),
       "",
-      "../assets/offroad/icon_warning.png",
+      "../assets/img_experimental.png",
       false,
     },
     {
@@ -374,8 +374,12 @@ static QStringList get_list(const char* path) {
 }
 
 void SettingsWindow::showEvent(QShowEvent *event) {
-  panel_widget->setCurrentIndex(0);
-  nav_btns->buttons()[0]->setChecked(true);
+  setCurrentPanel(0);
+}
+
+void SettingsWindow::setCurrentPanel(int index) {
+  panel_widget->setCurrentIndex(index);
+  nav_btns->buttons()[index]->setChecked(true);
 }
 
 SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
