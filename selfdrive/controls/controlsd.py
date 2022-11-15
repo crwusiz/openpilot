@@ -483,10 +483,10 @@ class Controls:
   def state_transition(self, CS):
     """Compute conditional state transitions and execute actions on state transitions"""
 
-    self.v_cruise_helper.update_v_cruise(CS, self.enabled, self.is_metric)
+    #self.v_cruise_helper.update_v_cruise(CS, self.enabled, self.is_metric)
 
-    #self.v_cruise_helper.v_cruise_kph = self.speed_controller.update_v_cruise(self, CS)
-    #self.v_cruise_helper.v_cruise_cluster_kph = self.v_cruise_helper.v_cruise_kph
+    self.v_cruise_helper.v_cruise_kph = self.speed_controller.update_v_cruise(self, CS)
+    self.v_cruise_helper.v_cruise_cluster_kph = self.v_cruise_helper.v_cruise_kph
 
     # decrement the soft disable timer at every step, as it's reset on
     # entrance in SOFT_DISABLING state
@@ -739,8 +739,8 @@ class Controls:
 
       v = self.speed_controller.update_can(self.enabled, CC, CS, self.sm, can_sends)
       if v > 0:
-        self.v_cruise_helper.v_cruise_kph = v
-        self.v_cruise_helper.v_cruise_cluster_kph = v
+        self.v_cruise_kph = v
+        self.v_cruise_cluster_kph = v
 
       self.speed_controller.update_message(self, CC, CS)
 
@@ -782,10 +782,10 @@ class Controls:
     controlsState.engageable = not self.events.any(ET.NO_ENTRY)
     controlsState.longControlState = self.LoC.long_control_state
     controlsState.vPid = float(self.LoC.v_pid)
-    #controlsState.vCruise = float(self.speed_controller.cruise_speed_kph)
-    #controlsState.vCruiseCluster = float(self.speed_controller.real_set_speed_kph)
-    controlsState.vCruise = float(self.v_cruise_helper.v_cruise_kph)
-    controlsState.vCruiseCluster = float(self.v_cruise_helper.v_cruise_cluster_kph)
+    controlsState.vCruise = float(self.speed_controller.cruise_speed_kph)
+    controlsState.vCruiseCluster = float(self.speed_controller.real_set_speed_kph)
+    #controlsState.vCruise = float(self.v_cruise_helper.v_cruise_kph)
+    #controlsState.vCruiseCluster = float(self.v_cruise_helper.v_cruise_cluster_kph)
     controlsState.upAccelCmd = float(self.LoC.pid.p)
     controlsState.uiAccelCmd = float(self.LoC.pid.i)
     controlsState.ufAccelCmd = float(self.LoC.pid.f)

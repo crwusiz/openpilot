@@ -51,6 +51,7 @@ void hyundai_common_cruise_state_check(const int cruise_engaged) {
       controls_allowed = 0;
     }*/
     controls_allowed = 1;
+
     cruise_engaged_prev = cruise_engaged;
   }
 }

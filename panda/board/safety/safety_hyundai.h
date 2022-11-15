@@ -204,8 +204,8 @@ static int hyundai_rx_hook(CANPacket_t *to_push) {
 
   if (valid && (addr == 1056)) { //  MainMode_ACC
     // 1 bits: 0
-    int cruise_available = (GET_BYTES_04(to_push)) & 0x1U;
-    hyundai_common_cruise_state_check(cruise_available);
+    int cruise_engaged = (GET_BYTES_04(to_push)) & 0x1U;
+    hyundai_common_cruise_state_check(cruise_engaged);
   }
 
   if (valid && (bus == 0)) {

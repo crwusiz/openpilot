@@ -80,7 +80,7 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.60
       ret.steerRatio = 13.7
       tire_stiffness_factor = 0.385
-    elif candidate in [CAR.IONIQ_EV, CAR.IONIQ_HEV]:
+    elif candidate in [CAR.IONIQ, CAR.IONIQ_EV, CAR.IONIQ_HEV]:
       ret.mass = 1575. + STD_CARGO_KG
       ret.wheelbase = 2.70
       ret.steerRatio = 13.7
@@ -374,12 +374,12 @@ class CarInterface(CarInterfaceBase):
         ret.hasScc13 = 1290 in fingerprint[0] or 1290 in fingerprint[2]
         ret.hasScc14 = 905 in fingerprint[0] or 905 in fingerprint[2]
 
-    if ret.openpilotLongitudinalControl:
-      ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
-    if candidate in HEV_CAR:
-      ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
-    elif candidate in EV_CAR:
-      ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
+    #if ret.openpilotLongitudinalControl:
+    #  ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
+    #if candidate in HEV_CAR:
+    #  ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
+    #elif candidate in EV_CAR:
+    #  ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
 
     if ret.centerToFront == 0:
       ret.centerToFront = ret.wheelbase * 0.4

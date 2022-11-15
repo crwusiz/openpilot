@@ -172,7 +172,7 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
 }
 
 
-AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* parent) : last_update_params(0), fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraWidget("camerad", type, true, parent) {
+AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraWidget("camerad", type, true, parent) {
   pm = std::make_unique<PubMaster, const std::initializer_list<const char *>>({"uiDebug"});
 
   steer_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
@@ -224,6 +224,7 @@ static const QString get_tpms_text(float tpms) {
 }
 
 void AnnotatedCameraWidget::updateState(const UIState &s) {
+  const int SET_SPEED_NA = 255;
   const SubMaster &sm = *(s.sm);
   const auto cs = sm["controlsState"].getControlsState();
   const auto cc = sm["carControl"].getCarControl();
@@ -238,9 +239,10 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
 
   const bool cs_alive = sm.alive("controlsState");
 
+  // Handle older routes where vCruiseCluster is not set
   float apply_speed = cc.getApplyMaxSpeed();
   float cruise_speed = cc.getCruiseMaxSpeed();
-  bool cruise_set = cruise_speed > 0;
+  bool cruise_set = cruise_speed > 0 && (int)cruise_speed != SET_SPEED_NA;
 
   if (cruise_set && !s.scene.is_metric) {
     apply_speed *= KM_TO_MILE;
@@ -262,7 +264,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("speed", cur_speed);
   setProperty("applyMaxSpeed", apply_speed);
   setProperty("cruiseMaxSpeed", cruise_speed);
-  setProperty("speedUnit", s.scene.is_metric ? "km/h" : "mph");
+  setProperty("speedUnit", s.scene.is_metric ? tr("km/h") : tr("mph"));
   setProperty("accel", ce.getAEgo());
   setProperty("status", s.status);
   setProperty("steeringPressed", ce.getSteeringPressed());
@@ -341,9 +343,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     leftDistStr.sprintf("%.0fm", left_dist);
   }
 
-  QString cruiseSpeedStr = QString::number(std::nearbyint(cruiseMaxSpeed));
-  QString applySpeedStr = QString::number(std::nearbyint(applyMaxSpeed));
-
   int rect_width = !longControl ? 163 : 300;
   int rect_height = 188;
 
@@ -354,6 +353,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   //drawRoundedRect(p, max_speed_rect, top_radius, top_radius, bottom_radius, bottom_radius);
 
   // max speed (upper left 1)
+  QString cruiseSpeedStr = QString::number(std::nearbyint(cruiseMaxSpeed));
   QRect max_speed_outer(max_speed_rect.left() + 10, max_speed_rect.top() + 10, 140, 168);
   p.setPen(QPen(whiteColor(200), 2));
   p.drawRoundedRect(max_speed_outer, 16, 16);
@@ -390,10 +390,11 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   QRect max_rect = getTextRect(p, Qt::AlignCenter, "MAX");
   max_rect.moveCenter({max_speed_outer.center().x(), 0});
   max_rect.moveTop(max_speed_rect.top() + 115);
-  p.drawText(max_rect, Qt::AlignCenter, "MAX");
+  p.drawText(max_rect, Qt::AlignCenter, tr("MAX"));
 
   // apply speed (upper left 2)
   if (longControl) {
+    QString applySpeedStr = QString::number(std::nearbyint(applyMaxSpeed));
     QRect apply_speed_outer(max_speed_rect.right() - 150, max_speed_rect.top() + 10, 140, 168);
     p.setPen(QPen(whiteColor(200), 2));
     p.drawRoundedRect(apply_speed_outer, 16, 16);
@@ -430,7 +431,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     QRect long_rect = getTextRect(p, Qt::AlignCenter, "LONG");
     long_rect.moveCenter({apply_speed_outer.center().x(), 0});
     long_rect.moveTop(max_speed_rect.top() + 115);
-    p.drawText(long_rect, Qt::AlignCenter, "LONG");
+    p.drawText(long_rect, Qt::AlignCenter, tr("LONG"));
   }
 
   // speedlimit sign
@@ -1081,10 +1082,6 @@ void AnnotatedCameraWidget::paintGL() {
 void AnnotatedCameraWidget::showEvent(QShowEvent *event) {
   CameraWidget::showEvent(event);
 
-  auto now = millis_since_boot();
-  if (now - last_update_params > 1000 * 5) {
-    last_update_params = now;
-    ui_update_params(uiState());
-  }
+  ui_update_params(uiState());
   prev_draw_t = millis_since_boot();
 }

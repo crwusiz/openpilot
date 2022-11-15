@@ -195,7 +195,7 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
     if ((bus != 1) || !lcan_bus1) {
       eps_bus = bus;
       if (bus == 1) {
-        puts("  eps on bus ["); puth(bus); puts("]\n");
+        puts("  EPS on bus ["); puth(bus); puts("]\n");
         if (!fwd_bus1 && !lcan_bus1) {
           fwd_bus1 = true;
           puts("  forwarding enabled : EPS on bus ["); puth(bus); puts("]\n");
@@ -223,10 +223,8 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
 
   if (valid && is_scc11_msg && !scc12_op) {
     // 1 bits: 0
-    //int cruise_engaged = GET_BYTES_04(to_push) & 0x1U; // ACC main_on signal
-    //hyundai_common_cruise_state_check(cruise_engaged);
-    int cruise_available = (GET_BYTES_04(to_push)) & 0x1U; // ACC main_on signal
-    hyundai_common_cruise_state_check(cruise_available);
+    int cruise_engaged = GET_BYTES_04(to_push) & 0x1U; // ACC main_on signal
+    hyundai_common_cruise_state_check(cruise_engaged);
   }
 
   /*if (valid && (is_scc12_msg && (bus == 0)) || (bus == 2)) {
@@ -238,7 +236,7 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
   /*if (valid && (addr == 608) && (bus == 0) && (scc_bus == -1) && (!scc12_op)) {  // EMS16
     // bit 25
     int cruise_engaged = (GET_BYTES_04(to_push) >> 25 & 0x1); // ACC main_on signal
-    hyundai_common_cruise_state_check(cruise_engaged);
+        hyundai_common_cruise_state_check(cruise_engaged);
   }*/
 
   if (valid && (bus == eps_bus)) {

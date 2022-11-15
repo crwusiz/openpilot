@@ -171,7 +171,6 @@ protected:
 
   double prev_draw_t = 0;
   FirstOrderFilter fps_filter;
-  uint64_t last_update_params;
 };
 
 // container for all onroad widgets
