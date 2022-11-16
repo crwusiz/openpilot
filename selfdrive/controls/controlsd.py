@@ -793,6 +793,7 @@ class Controls:
     controlsState.startMonoTime = int(start_time * 1e9)
     controlsState.forceDecel = bool(force_decel)
     controlsState.canErrorCounter = self.can_rcv_timeout_counter
+    controlsState.experimentalMode = self.params.get_bool("ExperimentalMode") and self.CP.openpilotLongitudinalControl
     controlsState.lateralControlSelect = int(self.lateral_control_select)
 
     lat_tuning = self.CP.lateralTuning.which()

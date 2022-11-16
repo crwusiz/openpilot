@@ -896,7 +896,10 @@ void AnnotatedCameraWidget::updateFrameMat() {
 
 void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
   painter.save();
+
   const UIScene &scene = s->scene;
+  SubMaster &sm = *(s->sm);
+
   // lanelines
   for (int i = 0; i < std::size(scene.lane_line_vertices); ++i) {
     painter.setBrush(QColor::fromRgbF(1.0, 1.0, 1.0, std::clamp<float>(scene.lane_line_probs[i], 0.0, 0.7)));
@@ -916,7 +919,7 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
 
   // paint path
   QLinearGradient bg(0, height(), 0, height() / 4);
-  const auto &acceleration = (*s->sm)["modelV2"].getModelV2().getAcceleration();
+  const auto &acceleration = sm["modelV2"].getModelV2().getAcceleration();
   float start_hue, end_hue, acceleration_future = 0;
 
   if (acceleration.getZ().size() > 16) {
@@ -1024,7 +1027,7 @@ void AnnotatedCameraWidget::paintGL() {
     } else if (v_ego > 15) {
       wide_cam_requested = false;
     }
-    wide_cam_requested = wide_cam_requested && s->scene.experimental_mode;
+    wide_cam_requested = wide_cam_requested && sm["controlsState"].getControlsState().getExperimentalMode();
     // TODO: also detect when ecam vision stream isn't available
     // for replay of old routes, never go to widecam
     wide_cam_requested = wide_cam_requested && s->scene.calibration_wide_valid;
