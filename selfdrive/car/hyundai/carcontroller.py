@@ -209,13 +209,14 @@ class CarController:
         self.last_lead_distance = 0
 
       scc_commands = Params().get("SccCommandsSelect", encoding='utf8')
+      cruise_state_control = Params().get_bool("CruiseStateControl")
       # send scc to car if longcontrol enabled and SCC not on bus 0 or not live
       if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl and CS.out.cruiseState.enabled and (CS.scc_bus or not self.scc_live):
         jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0
         if scc_commands == 0:
           can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), CC.enabled and CC.longActive, accel, jerk,
                                                           hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, self.scc_live, CS))
-        elif scc_commands == 1:
+        elif scc_commands == 1 or cruise_state_control:
           can_sends.extend(hyundaican.create_acc_commands(self.packer, int(self.frame / 2), CC.enabled and CC.longActive, accel, jerk,
                                                           hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, CS))
 
@@ -227,8 +228,8 @@ class CarController:
         can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, SpeedLimiter.instance().get_active()))
 
       # 5 Hz ACC options
-      if all([self.frame % 20 == 0, CS.has_scc13, self.CP.openpilotLongitudinalControl]):
-        can_sends.extend(hyundaican.create_acc_opt(self.packer))
+      #if all([self.frame % 20 == 0, CS.has_scc13, self.CP.openpilotLongitudinalControl]):
+      #  can_sends.extend(hyundaican.create_acc_opt(self.packer, CS))
 
       # 2 Hz front radar options
       #if self.frame % 50 == 0 and self.CP.openpilotLongitudinalControl:

@@ -59,6 +59,7 @@ def manager_init() -> None:
     ("NewRadarInterface", "0"),
     ("SccCommandsSelect", "0"),
     ("CruiseStateControl", "0"),
+    ("SccOnBus2", "0"),
   ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))

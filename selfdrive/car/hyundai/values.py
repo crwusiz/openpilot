@@ -1565,12 +1565,16 @@ FEATURES = {
   # Gear not set is [ LVR12 ]
 }
 
-CANFD_CAR = {
-  CAR.EV6, CAR.GENESIS_GV70, CAR.TUCSON22_HEV, CAR.IONIQ5, CAR.SPORTAGE_NQ5, CAR.SPORTAGE_NQ5_HEV
-}
 FCA11_CAR = {
   CAR.SONATA, CAR.PALISADE, CAR.ELANTRA_I30, CAR.ELANTRA21, CAR.ELANTRA21_HEV, CAR.KONA, CAR.KONA_HEV, CAR.IONIQ_HEV,
   CAR.GENESIS_G70, CAR.FORTE, CAR.STINGER, CAR.K9
+}
+CANFD_CAR = {
+  CAR.EV6, CAR.GENESIS_GV70, CAR.TUCSON22_HEV, CAR.IONIQ5, CAR.SPORTAGE_NQ5, CAR.SPORTAGE_NQ5_HEV
+}
+# The radar does SCC on these cars when HDA I, rather than the camera
+CANFD_RADAR_SCC_CAR = {
+  CAR.GENESIS_GV70,
 }
 EV_CAR = {
   CAR.KONA_EV, CAR.IONIQ_EV, CAR.NIRO_EV, CAR.SOUL_EV, CAR.NEXO,
@@ -1582,6 +1586,15 @@ HEV_CAR = {
   CAR.TUCSON22_HEV
 }
 
+# these cars require a special panda safety mode due to missing counters and checksums in the messages
+LEGACY_SAFETY_MODE_CAR = {
+  CAR.ELANTRA_I30, CAR.IONIQ, CAR.IONIQ_EV, CAR.IONIQ_HEV, CAR.KONA, CAR.KONA_EV, CAR.KONA_HEV, CAR.SORENTO, CAR.SONATA_LF, CAR.SONATA_LF_HEV,
+  CAR.K5, CAR.K5_HEV, CAR.VELOSTER, CAR.STINGER,
+  CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80,
+}
+
+# If 0x500 is present on bus 1 it probably has a Mando radar outputting radar points.
+# If no points are outputted by default it might be possible to turn it on using  selfdrive/debug/hyundai_enable_radar_points.py
 DBC = {
   # Hyundai
   CAR.ELANTRA_I30: dbc_dict('hyundai_kia_generic', None),

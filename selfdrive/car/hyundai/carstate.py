@@ -711,8 +711,6 @@ class CarState(CarStateBase):
           ("JerkLowerLimit", "SCC14"),
           ("ComfortBandUpper", "SCC14"),
           ("ComfortBandLower", "SCC14"),
-          ("ACCMode", "SCC14"),
-          ("ObjGap", "SCC14"),
         ]
         checks.append(("SCC14", 50))
 

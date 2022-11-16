@@ -4,7 +4,7 @@ from panda import Panda
 from common.params import Params
 from common.numpy_fast import interp
 from common.conversions import Conversions as CV
-from selfdrive.car.hyundai.values import HyundaiFlags, CAR, Buttons, CarControllerParams, CANFD_CAR, EV_CAR, HEV_CAR
+from selfdrive.car.hyundai.values import HyundaiFlags, CAR, Buttons, CarControllerParams, CANFD_CAR, EV_CAR, HEV_CAR, LEGACY_SAFETY_MODE_CAR
 from selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR
 from selfdrive.car import STD_CARGO_KG, create_button_event, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
@@ -351,7 +351,17 @@ class CarInterface(CarInterfaceBase):
     else:
       cruise_state_control = Params().get_bool("CruiseStateControl")
       if cruise_state_control:
-        ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy)]
+        if candidate in LEGACY_SAFETY_MODE_CAR:
+          # these cars require a special panda safety mode due to missing counters and checksums in the messages
+          ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy)]
+        else:
+          ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundai, 0)]
+        if ret.openpilotLongitudinalControl:
+         ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
+        if candidate in HEV_CAR:
+         ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
+        elif candidate in EV_CAR:
+         ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
       else:
         ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
 
@@ -369,17 +379,12 @@ class CarInterface(CarInterfaceBase):
       ret.sccBus = 0 if 1056 in fingerprint[0] \
               else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
               else 2 if 1056 in fingerprint[2] else -1
+      if Params().get_bool("SccOnBus2"):
+        ret.sccBus = 2
 
       if ret.sccBus == 2:
         ret.hasScc13 = 1290 in fingerprint[0] or 1290 in fingerprint[2]
         ret.hasScc14 = 905 in fingerprint[0] or 905 in fingerprint[2]
-
-    #if ret.openpilotLongitudinalControl:
-    #  ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
-    #if candidate in HEV_CAR:
-    #  ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
-    #elif candidate in EV_CAR:
-    #  ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
 
     if ret.centerToFront == 0:
       ret.centerToFront = ret.wheelbase * 0.4

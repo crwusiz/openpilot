@@ -624,6 +624,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   });
   communityLayout->addWidget(tmuxlog_btn);
 
+  communityLayout->addWidget(horizontal_line());
+
   auto pandareset_btn = new ButtonControl("Panda Reset", tr("RUN"));
   QObject::connect(pandareset_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
@@ -648,6 +650,22 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   });
   communityLayout->addWidget(pandarecover_btn);
 
+  auto pandadefault_btn = new ButtonControl("Panda Safety init Default", tr("RUN"));
+  QObject::connect(pandadefault_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/script/add/panda_default.sh");
+    }
+  });
+  communityLayout->addWidget(pandadefault_btn);
+
+  auto pandamdps_btn = new ButtonControl("Panda Safety init MDPS", tr("RUN"));
+  QObject::connect(pandamdps_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/script/add/panda_mdps.sh");
+    }
+  });
+  communityLayout->addWidget(pandamdps_btn);
+
   communityLayout->addWidget(horizontal_line());
   communityLayout->addWidget(new LateralControlSelect());
   communityLayout->addWidget(new MfcSelect());
@@ -661,27 +679,32 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   tr("Prebuilt Enable"),
                                   tr("Create prebuilt files to speed bootup"),
                                   "../assets/offroad/icon_addon.png",
-                                  false, this));
+                                  this));
   toggles.append(new ParamControl("LoggerDisable",
                                   tr("Logger Disable"),
                                   tr("Disable Logger is Reduce system load"),
                                   "../assets/offroad/icon_addon.png",
-                                  false, this));
+                                  this));
   toggles.append(new ParamControl("NavDisable",
                                   tr("Navigation Disable"),
                                   tr("Navigation Function not use"),
                                   "../assets/offroad/icon_addon.png",
-                                  false, this));
+                                  this));
   toggles.append(new ParamControl("NewRadarInterface",
                                   tr("New radar interface Enable"),
                                   tr("Some newer car New radar interface"),
                                   "../assets/offroad/icon_road.png",
-                                  true, this));
+                                  this));
   toggles.append(new ParamControl("CruiseStateControl",
                                   tr("Npilot controls Cruise State (Experimental)"),
                                   tr("Npilot controls cruise on/off, gap and set speed.<br>It becomes a cruise set without conditions, so do not use it if you do not understand it correctly."),
                                   "../assets/offroad/icon_long.png",
-                                  true, this));
+                                  this));
+  toggles.append(new ParamControl("SccOnBus2",
+                                  tr("SCC on BUS 2"),
+                                  tr("If SCC is on bus 2, turn it on."),
+                                  "../assets/offroad/icon_long.png",
+                                  this));
   for (ParamControl *toggle : toggles) {
     if (main_layout->count() != 0) {
     }

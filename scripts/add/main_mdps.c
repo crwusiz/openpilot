@@ -77,28 +77,28 @@ void set_safety_mode(uint16_t mode, uint16_t param) {
 
   switch (mode_copy) {
     case SAFETY_SILENT:
-      set_intercept_relay(false);
+      set_intercept_relay(true);
       if (current_board->has_obd) {
-        current_board->set_can_mode(CAN_MODE_NORMAL);
+        current_board->set_can_mode(CAN_MODE_OBD_CAN2);
       }
       can_silent = ALL_CAN_SILENT;
       break;
     case SAFETY_NOOUTPUT:
-      set_intercept_relay(false);
+      set_intercept_relay(true);
       if (current_board->has_obd) {
-        current_board->set_can_mode(CAN_MODE_NORMAL);
+        current_board->set_can_mode(CAN_MODE_OBD_CAN2);
       }
       can_silent = ALL_CAN_LIVE;
       break;
     case SAFETY_ELM327:
-      set_intercept_relay(false);
+      set_intercept_relay(true);
       heartbeat_counter = 0U;
       heartbeat_lost = false;
       if (current_board->has_obd) {
         if (param == 0U) {
           current_board->set_can_mode(CAN_MODE_OBD_CAN2);
         } else {
-          current_board->set_can_mode(CAN_MODE_NORMAL);
+          current_board->set_can_mode(CAN_MODE_OBD_CAN2);
         }
       }
       can_silent = ALL_CAN_LIVE;
@@ -108,7 +108,7 @@ void set_safety_mode(uint16_t mode, uint16_t param) {
       heartbeat_counter = 0U;
       heartbeat_lost = false;
       if (current_board->has_obd) {
-        current_board->set_can_mode(CAN_MODE_NORMAL);
+        current_board->set_can_mode(CAN_MODE_OBD_CAN2);
       }
       can_silent = ALL_CAN_LIVE;
       break;
@@ -227,11 +227,8 @@ void tick_handler(void) {
             heartbeat_lost = true;
           }
 
-          if (current_safety_mode != SAFETY_SILENT) {
-            set_safety_mode(SAFETY_SILENT, 0U);
-          }
-          if (power_save_status != POWER_SAVE_STATUS_ENABLED) {
-            set_power_save_state(POWER_SAVE_STATUS_ENABLED);
+          if (current_safety_mode != SAFETY_NOOUTPUT) {
+            set_safety_mode(SAFETY_NOOUTPUT, 0U);
           }
 
           // Also disable IR when the heartbeat goes missing
@@ -350,7 +347,7 @@ int main(void) {
   microsecond_timer_init();
 
   // init to SILENT and can silent
-  set_safety_mode(SAFETY_SILENT, 0U);
+  set_safety_mode(SAFETY_NOOUTPUT, 0U);
 
   // enable CAN TXs
   current_board->enable_can_transceivers(true);
