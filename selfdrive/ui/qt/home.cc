@@ -5,6 +5,7 @@
 #include <QMouseEvent>
 #include <QVBoxLayout>
 
+#include "selfdrive/ui/qt/offroad/experimental_mode.h"
 #include "selfdrive/ui/qt/util.h"
 #include "selfdrive/ui/qt/widgets/drive_stats.h"
 #include "selfdrive/ui/qt/widgets/experimental_mode.h"

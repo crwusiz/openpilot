@@ -23,7 +23,7 @@ public:
   explicit OffroadHome(QWidget* parent = 0);
 
 signals:
-  void openSettings(int index = 0);
+  void openSettings(int index = 0, const QString &param = "");
 
 private:
   void showEvent(QShowEvent *event) override;
@@ -49,7 +49,7 @@ public:
   explicit HomeWindow(QWidget* parent = 0);
 
 signals:
-  void openSettings(int index = 0);
+  void openSettings(int index = 0, const QString &param = "");
   void closeSettings();
 
 public slots:
