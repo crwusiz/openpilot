@@ -78,15 +78,15 @@
     <name>AnnotatedCameraWidget</name>
     <message>
         <source>km/h</source>
-        <translation type="vanished">km/h</translation>
+        <translation>km/h</translation>
     </message>
     <message>
         <source>mph</source>
-        <translation type="vanished">mph</translation>
+        <translation>mph</translation>
     </message>
     <message>
         <source>MAX</source>
-        <translation type="vanished">الأعلى</translation>
+        <translation>الأعلى</translation>
     </message>
     <message>
         <source>SPEED</source>
@@ -95,6 +95,10 @@
     <message>
         <source>LIMIT</source>
         <translation type="vanished">حد</translation>
+    </message>
+    <message>
+        <source>LONG</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -157,6 +161,14 @@
     </message>
     <message>
         <source>Npilot controls cruise on/off, gap and set speed.&lt;br&gt;It becomes a cruise set without conditions, so do not use it if you do not understand it correctly.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SCC on BUS 2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>If SCC is on bus 2, turn it on.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -361,6 +373,17 @@
     <message>
         <source>camera starting</source>
         <translation>بدء تشغيل الكاميرا</translation>
+    </message>
+</context>
+<context>
+    <name>ExperimentalModeButton</name>
+    <message>
+        <source>EXPERIMENTAL MODE ON</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>CHILL MODE ON</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -1263,23 +1286,11 @@ location set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>openpilot longitudinal control is not currently available for this car.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Enable experimental longitudinal control to enable this.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Experimental Mode</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>WARNING: openpilot longitudinal control is experimental for this car and will disable Automatic Emergency Braking (AEB).</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot defaults to the car&apos;s built-in ACC instead of openpilot&apos;s longitudinal control on this car. Enable this to switch to openpilot longitudinal control.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1291,7 +1302,35 @@ location set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>    openpilot defaults to driving in &lt;b&gt;chill mode&lt;/b&gt;.    Experimental mode enables &lt;b&gt;alpha-level features&lt;/b&gt; that aren&apos;t ready for chill mode.     Experimental features are listed below:    &lt;br&gt;     &lt;h4&gt;🌮 End-to-End Longitudinal Control 🌮&lt;/h4&gt;     Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would, including stopping for red lights and stop signs. Since the driving model decides which speed to drive, the set speed will only act as an upper bound.</source>
+        <source>On this car, openpilot defaults to the car&apos;s built-in ACC instead of openpilot&apos;s longitudinal control. Enable this to switch to openpilot longitudinal control. Enabling Experimental mode is recommended when using experimental openpilot longitudinal control.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>openpilot defaults to driving in &lt;b&gt;chill mode&lt;/b&gt;. Experimental mode enables &lt;b&gt;alpha-level features&lt;/b&gt; that aren&apos;t ready for chill mode. Experimental features are listed below:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>🌮 End-to-End Longitudinal Control 🌮</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would, including stopping for red lights and stop signs. Since the driving model decides the speed to drive, the set speed will only act as an upper bound. This is an alpha quality feature; mistakes should be expected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>New Driving Visualization</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The driving visualization will transition to the road-facing wide-angle camera at low speeds to better show some turns. The Experimental mode logo will also be shown in the top right corner.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Experimental mode is currently unavailable on this car, since the car&apos;s stock ACC is used for longitudinal control.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable experimental longitudinal control to allow experimental mode.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

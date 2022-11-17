@@ -4,14 +4,12 @@ from common.numpy_fast import clip
 from selfdrive.car import create_button_event
 from common.conversions import Conversions as CV
 from common.params import Params
-from selfdrive.car.hyundai.values import CANFD_CAR
 from selfdrive.controls.lib.drive_helpers import V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_ENABLE_MIN
 
 V_CRUISE_DELTA_MI = 5 * CV.MPH_TO_KPH
 V_CRUISE_DELTA_KM = 10
 
 ButtonType = car.CarState.ButtonEvent.Type
-
 
 def is_radar_disabler(CP):
   return CP.carFingerprint in CANFD_CAR or (CP.openpilotLongitudinalControl and CP.sccBus == 0)
@@ -50,8 +48,8 @@ class CruiseStateManager:
 
     self.prev_brake_pressed = False
 
-    self.is_metric = Params().get_bool('IsMetric')
-    self.cruise_state_control = Params().get_bool('CruiseStateControl')
+    self.is_metric = Params().get_bool("IsMetric")
+    self.cruise_state_control = True
 
 
   def is_resume_spam_allowed(self, CP):
@@ -132,7 +130,6 @@ class CruiseStateManager:
       self.btn_long_pressed = True
       btn = self.prev_btn
       self.btn_count %= 70
-
     return btn
 
 

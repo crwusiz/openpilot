@@ -63,6 +63,7 @@ class SpeedController:
     self.button_count = 0
     self.long_pressed = False
 
+
   def kph_to_clu(self, kph):
     return int(kph * CV.KPH_TO_MS * self.speed_conv_to_clu)
 
@@ -222,12 +223,12 @@ class SpeedController:
     return int(round(clip(v_ego * CV.MS_TO_KPH, V_CRUISE_ENABLE_MIN, V_CRUISE_MAX)))
 
 
-  def update_v_cruise(self, controls, CS):  # called by controlds's state_transition
+  def update_v_cruise(self, CS, sm, enabled, is_metric, v_cruise_kph, v_cruise_kph_last):  # called by controlds's state_transition
     manage_button = not self.CP.openpilotLongitudinalControl or not self.CP.pcmCruise
 
     if CS.cruiseState.enabled:
       if manage_button:
-        v_cruise_kph = self.update_cruise_button(controls.v_cruise_kph, CS.buttonEvents, controls.enabled, controls.is_metric)
+        v_cruise_kph = self.update_cruise_button(v_cruise_kph, CS.buttonEvents, enabled, is_metric)
       else:
         v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
     else:
@@ -238,7 +239,7 @@ class SpeedController:
 
       if CS.cruiseState.enabled:
         if not self.CP.pcmCruise:
-          v_cruise_kph = self.initialize_v_cruise(CS.vEgo, CS.buttonEvents, controls.v_cruise_kph_last)
+          v_cruise_kph = self.initialize_v_cruise(CS.vEgo, CS.buttonEvents, v_cruise_kph_last)
         else:
           v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
 
@@ -246,12 +247,15 @@ class SpeedController:
 
     if CS.cruiseState.enabled:
       clu_speed = CS.vEgoCluster * self.speed_conv_to_clu
-      self.cal_max_speed(CS, controls.sm, clu_speed, v_cruise_kph)
+
+      self.cal_max_speed(CS, sm, clu_speed, v_cruise_kph)
       self.cruise_speed_kph = float(clip(v_cruise_kph, V_CRUISE_MIN,
                                          self.max_speed_clu * self.speed_conv_to_ms * CV.MS_TO_KPH))
+      if CruiseStateManager.instance().cruise_state_control:
+        self.cruise_speed_kph = min(self.cruise_speed_kph, max(self.real_set_speed_kph, V_CRUISE_MIN))
     else:
       self.reset()
-      controls.LoC.reset(v_pid=CS.vEgo)
+
     return v_cruise_kph
 
   def update_can(self, enabled, CC, CS, sm, can_sends):
@@ -274,7 +278,7 @@ class SpeedController:
 
     if self.wait_timer > 0:
       self.wait_timer -= 1
-    elif ascc_enabled and CS.vEgo > 0.1 and CruiseStateManager.instance().is_set_speed_spam_allowed(self.CP):
+    elif ascc_enabled and CS.vEgo > 0.1:
       if self.alive_timer == 0:
         current_set_speed_clu = int(round(CS.cruiseState.speed * self.speed_conv_to_clu))
         self.btn = self.get_button(current_set_speed_clu)

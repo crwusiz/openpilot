@@ -485,7 +485,9 @@ class Controls:
 
     #self.v_cruise_helper.update_v_cruise(CS, self.enabled, self.is_metric)
 
-    self.v_cruise_helper.v_cruise_kph = self.speed_controller.update_v_cruise(self, CS)
+    self.v_cruise_helper.v_cruise_kph = self.speed_controller.update_v_cruise(CS, self.sm, self.enabled, self.is_metric,
+                                                                              self.v_cruise_helper.v_cruise_kph,
+                                                                              self.v_cruise_helper.v_cruise_kph_last)
     self.v_cruise_helper.v_cruise_cluster_kph = self.v_cruise_helper.v_cruise_kph
 
     # decrement the soft disable timer at every step, as it's reset on
@@ -590,7 +592,8 @@ class Controls:
     # Check which actuators can be enabled
     CC.latActive = self.active and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
                    CS.vEgo > self.CP.minSteerSpeed and not CS.standstill
-    CC.longActive = self.active and not self.events.any(ET.OVERRIDE_LONGITUDINAL) and self.CP.openpilotLongitudinalControl
+    CC.longActive = self.active and not self.events.any(ET.OVERRIDE_LONGITUDINAL) and self.CP.openpilotLongitudinalControl \
+                    and CS.cruiseState.enabled
 
     actuators = CC.actuators
     actuators.longControlState = self.LoC.long_control_state
@@ -607,7 +610,7 @@ class Controls:
       # accel PID loop
       pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, CS.vEgo, self.v_cruise_helper.v_cruise_kph * CV.KPH_TO_MS)
       t_since_plan = (self.sm.frame - self.sm.rcv_frame['longitudinalPlan']) * DT_CTRL
-      actuators.accel = self.LoC.update(CC.longActive and CS.cruiseState.enabled, CS, long_plan, pid_accel_limits, t_since_plan, self.sm['radarState'])
+      actuators.accel = self.LoC.update(CC.longActive, CS, long_plan, pid_accel_limits, t_since_plan, self.sm['radarState'])
 
       # Steering PID loop and lateral MPC
       self.desired_curvature, self.desired_curvature_rate = get_lag_adjusted_curvature(self.CP, CS.vEgo,
@@ -739,8 +742,8 @@ class Controls:
 
       v = self.speed_controller.update_can(self.enabled, CC, CS, self.sm, can_sends)
       if v > 0:
-        self.v_cruise_kph = v
-        self.v_cruise_cluster_kph = v
+        self.v_cruise_helper.v_cruise_kph = v
+        self.v_cruise_helper.v_cruise_cluster_kph = v
 
       self.speed_controller.update_message(self, CC, CS)
 

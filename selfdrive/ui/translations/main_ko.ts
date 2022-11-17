@@ -153,7 +153,15 @@
     </message>
     <message>
         <source>Npilot controls cruise on/off, gap and set speed.&lt;br&gt;It becomes a cruise set without conditions, so do not use it if you do not understand it correctly.</source>
-        <translation>주의!! npilot이 크루즈 상태를 제어합니다. 크루즈 켜기/끄기, 설정속도/유지거리 조절&lt;br&gt;조건없이 크루즈 셋이 되기 때문에 정확히 이해를 하지 못한 경우 사용하지 마세요.</translation>
+        <translation>주의!! 크루즈 상태를 제어합니다. 크루즈 켜기/끄기, 설정속도/유지거리 조절&lt;br&gt;조건없이 크루즈 셋이 되기 때문에 정확히 이해를 하지 못한 경우 사용하지 마세요.</translation>
+    </message>
+    <message>
+        <source>SCC on BUS 2</source>
+        <translation>SCC on BUS 2</translation>
+    </message>
+    <message>
+        <source>If SCC is on bus 2, turn it on.</source>
+        <translation>SCC 배선 개조차량은 사용으로 변경하세요.</translation>
     </message>
 </context>
 <context>

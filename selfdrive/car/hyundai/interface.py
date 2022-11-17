@@ -10,7 +10,6 @@ from selfdrive.car import STD_CARGO_KG, create_button_event, scale_rot_inertia, 
 from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
 from selfdrive.car.disable_ecu import disable_ecu
-from selfdrive.controls.neokii.cruise_state_manager import is_radar_disabler
 
 Ecu = car.CarParams.Ecu
 ButtonType = car.CarState.ButtonEvent.Type
@@ -349,8 +348,8 @@ class CarInterface(CarInterfaceBase):
       if ret.flags & HyundaiFlags.CANFD_CAMERA_SCC:
         ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CAMERA_SCC
     else:
-      cruise_state_control = Params().get_bool("CruiseStateControl")
-      if cruise_state_control:
+      scc_commands = Params().get("SccCommandsSelect", encoding='utf8')
+      if scc_commands == 1:
         if candidate in LEGACY_SAFETY_MODE_CAR:
           # these cars require a special panda safety mode due to missing counters and checksums in the messages
           ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy)]
@@ -413,12 +412,14 @@ class CarInterface(CarInterfaceBase):
   def _update(self, c):
     ret = self.CS.update(self.cp, self.cp2, self.cp_cam)
 
-    if CANFD_CAR:
-      if not any([self.cp.can_valid, self.cp_cam.can_valid]):
-        print(f'cp = {bool(self.cp.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
-    else:
-      if not any([self.cp.can_valid, self.cp2.can_valid, self.cp_cam.can_valid]):
-        print(f'cp = {bool(self.cp.can_valid)}  cp2 = {bool(self.cp2.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
+    if self.frame % 10 == 0:
+      if CANFD_CAR:
+        if not any([self.cp.can_valid, self.cp_cam.can_valid]):
+          print(f'cp = {bool(self.cp.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
+      else:
+        if not any([self.cp.can_valid, self.cp2.can_valid, self.cp_cam.can_valid]):
+          print(f'cp = {bool(self.cp.can_valid)}  cp2 = {bool(self.cp2.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
+    self.frame += 1
 
     if self.CP.pcmCruise and not self.CC.scc_live:
       self.CP.pcmCruise = False
@@ -474,7 +475,6 @@ class CarInterface(CarInterfaceBase):
     return [8, 10], [12, 14, 16, 18]
 
   def create_buttons(self, button):
-
     if self.CP.carFingerprint in CANFD_CAR:
       return self.create_buttons_can_fd(button)
     else:

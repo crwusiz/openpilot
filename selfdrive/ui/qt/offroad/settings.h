@@ -138,6 +138,7 @@ private:
   SelectCar* selectCar = nullptr;
   SelectManufacturer* selectManufacturer = nullptr;
   QWidget* homeWidget;
+  Params params;
 
 public:
   explicit CommunityPanel(QWidget *parent = nullptr);
@@ -188,7 +189,7 @@ private:
   void refresh();
 };
 
-// SccCommandsSelect
+// SccCommands
 class SccCommandsSelect : public AbstractControl {
   Q_OBJECT
 

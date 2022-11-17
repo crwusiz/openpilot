@@ -650,21 +650,25 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   });
   communityLayout->addWidget(pandarecover_btn);
 
-  auto pandadefault_btn = new ButtonControl("Panda Safety init Default", tr("RUN"));
+  auto pandadefault_btn = new ButtonControl("Panda Safety Change Default", tr("RUN"));
   QObject::connect(pandadefault_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/script/add/panda_default.sh");
     }
   });
-  communityLayout->addWidget(pandadefault_btn);
+  if (params.getBool("PandaSafetyMDPS")) {
+    communityLayout->addWidget(pandadefault_btn);
+  }
 
-  auto pandamdps_btn = new ButtonControl("Panda Safety init MDPS", tr("RUN"));
+  auto pandamdps_btn = new ButtonControl("Panda Safety Change MDPS Modify", tr("RUN"));
   QObject::connect(pandamdps_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/script/add/panda_mdps.sh");
     }
   });
-  communityLayout->addWidget(pandamdps_btn);
+  if (!params.getBool("PandaSafetyMDPS")) {
+    communityLayout->addWidget(pandamdps_btn);
+  }
 
   communityLayout->addWidget(horizontal_line());
   communityLayout->addWidget(new LateralControlSelect());
@@ -694,11 +698,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   tr("New radar interface Enable"),
                                   tr("Some newer car New radar interface"),
                                   "../assets/offroad/icon_road.png",
-                                  this));
-  toggles.append(new ParamControl("CruiseStateControl",
-                                  tr("Npilot controls Cruise State (Experimental)"),
-                                  tr("Npilot controls cruise on/off, gap and set speed.<br>It becomes a cruise set without conditions, so do not use it if you do not understand it correctly."),
-                                  "../assets/offroad/icon_long.png",
                                   this));
   toggles.append(new ParamControl("SccOnBus2",
                                   tr("SCC on BUS 2"),

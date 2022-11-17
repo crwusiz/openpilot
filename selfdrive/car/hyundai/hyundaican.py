@@ -190,16 +190,14 @@ def create_acc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, s
   return commands
 
 
-def create_acc_opt(packer, CS):
-  return packer.make_can_msg("SCC13", 0, CS.scc13)
-
-  #commands = []
-  #scc13_values = {
-  #  "SCCDrvModeRValue": 2,
-  #  "SCC_Equip": 1,
-  #  "Lead_Veh_Dep_Alert_USM": 2,
-  #}
-  #commands.append(packer.make_can_msg("SCC13", 0, scc13_values))
+def create_acc_opt(packer):
+  commands = []
+  scc13_values = {
+    "SCCDrvModeRValue": 2,
+    "SCC_Equip": 1,
+    "Lead_Veh_Dep_Alert_USM": 2,
+  }
+  commands.append(packer.make_can_msg("SCC13", 0, scc13_values))
 
   #fca12_values = {
   #  "FCA_DrvSetState": 2,
@@ -207,7 +205,7 @@ def create_acc_opt(packer, CS):
   #}
   #commands.append(packer.make_can_msg("FCA12", 0, fca12_values))
 
-  #return commands
+  return commands
 
 
 #def create_frt_radar_opt(packer):
