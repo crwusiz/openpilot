@@ -22,17 +22,16 @@ class Port:
   RECEIVE_PORT = 2843
   LOCATION_PORT = BROADCAST_PORT
 
-
-class NaviServer:
+class RoadLimitSpeedServer:
   def __init__(self):
+    self.lock = threading.Lock()
     self.json_road_limit = None
+    self.last_exception = None
+    self.remote_addr = None
+    self.remote_gps_addr = None
     self.active = 0
     self.last_updated = 0
     self.last_updated_active = 0
-    self.last_exception = None
-    self.lock = threading.Lock()
-    self.remote_addr = None
-    self.remote_gps_addr = None
     self.last_time_location = 0
 
     broadcast = Thread(target=self.broadcast_thread, args=[])
@@ -226,9 +225,8 @@ class NaviServer:
 
 
 def main():
-  server = NaviServer()
-  naviData = messaging.pub_sock('naviData')
-
+  server = RoadLimitSpeedServer()
+  roadLimitSpeed = messaging.pub_sock('roadLimitSpeed')
   with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
     try:
       sock.bind(('0.0.0.0', Port.RECEIVE_PORT))
@@ -236,84 +234,76 @@ def main():
       while True:
         server.udp_recv(sock)
         dat = messaging.new_message()
-        dat.init('naviData')
-        dat.naviData.active = server.active
-        dat.naviData.roadLimitSpeed = server.get_limit_val("road_limit_speed", 0)
-        dat.naviData.isHighway = server.get_limit_val("is_highway", False)
-        dat.naviData.camType = server.get_limit_val("cam_type", 0)
-        dat.naviData.camLimitSpeedLeftDist = server.get_limit_val("cam_limit_speed_left_dist", 0)
-        dat.naviData.camLimitSpeed = server.get_limit_val("cam_limit_speed", 0)
-        dat.naviData.sectionLimitSpeed = server.get_limit_val("section_limit_speed", 0)
-        dat.naviData.sectionLeftDist = server.get_limit_val("section_left_dist", 0)
-        dat.naviData.sectionAvgSpeed = server.get_limit_val("section_avg_speed", 0)
-        dat.naviData.sectionLeftTime = server.get_limit_val("section_left_time", 0)
-        dat.naviData.sectionAdjustSpeed = server.get_limit_val("section_adjust_speed", False)
-        dat.naviData.camSpeedFactor = server.get_limit_val("cam_speed_factor", CAMERA_SPEED_FACTOR)
-
-        naviData.send(dat.to_bytes())
+        dat.init('roadLimitSpeed')
+        dat.roadLimitSpeed.active = server.active
+        dat.roadLimitSpeed.roadLimitSpeed = server.get_limit_val("road_limit_speed", 0)
+        dat.roadLimitSpeed.isHighway = server.get_limit_val("is_highway", False)
+        dat.roadLimitSpeed.camType = server.get_limit_val("cam_type", 0)
+        dat.roadLimitSpeed.camLimitSpeedLeftDist = server.get_limit_val("cam_limit_speed_left_dist", 0)
+        dat.roadLimitSpeed.camLimitSpeed = server.get_limit_val("cam_limit_speed", 0)
+        dat.roadLimitSpeed.sectionLimitSpeed = server.get_limit_val("section_limit_speed", 0)
+        dat.roadLimitSpeed.sectionLeftDist = server.get_limit_val("section_left_dist", 0)
+        dat.roadLimitSpeed.sectionAvgSpeed = server.get_limit_val("section_avg_speed", 0)
+        dat.roadLimitSpeed.sectionLeftTime = server.get_limit_val("section_left_time", 0)
+        dat.roadLimitSpeed.sectionAdjustSpeed = server.get_limit_val("section_adjust_speed", False)
+        dat.roadLimitSpeed.camSpeedFactor = server.get_limit_val("cam_speed_factor", CAMERA_SPEED_FACTOR)
+        roadLimitSpeed.send(dat.to_bytes())
         server.send_sdp(sock)
         server.check()
     except Exception as e:
       server.last_exception = e
 
-
-class SpeedLimiter:
-  __instance = None
-
-  @classmethod
-  def __getInstance(cls):
-    return cls.__instance
-
-  @classmethod
-  def instance(cls):
-    cls.__instance = cls()
-    cls.instance = cls.__getInstance
-    return cls.__instance
-
+class RoadSpeedLimiter:
   def __init__(self):
     self.slowing_down = False
     self.started_dist = 0
-
-    self.sock = messaging.sub_sock("naviData")
-    self.naviData = None
+    self.sock = messaging.sub_sock("roadLimitSpeed")
+    self.roadLimitSpeed = None
 
   def recv(self):
     try:
       dat = messaging.recv_sock(self.sock, wait=False)
       if dat is not None:
-        self.naviData = dat.naviData
+        self.roadLimitSpeed = dat.roadLimitSpeed
     except:
       pass
 
   def get_active(self):
     self.recv()
-    if self.naviData is not None:
-      return self.naviData.active
+    if self.roadLimitSpeed is not None:
+      return self.roadLimitSpeed.active
     return 0
 
-
   def get_max_speed(self, cluster_speed, is_metric):
-
-    log = ""
     self.recv()
-    if self.naviData is None:
-      return 0, 0, 0, False, ""
-
+    if self.roadLimitSpeed is None:
+      return 0, 0, 0, False
     try:
-      road_limit_speed = self.naviData.roadLimitSpeed
-      is_highway = self.naviData.isHighway
-      cam_type = int(self.naviData.camType)
-      cam_limit_speed_left_dist = self.naviData.camLimitSpeedLeftDist
-      cam_limit_speed = self.naviData.camLimitSpeed
-      section_limit_speed = self.naviData.sectionLimitSpeed
-      section_left_dist = self.naviData.sectionLeftDist
-      section_avg_speed = self.naviData.sectionAvgSpeed
-      section_left_time = self.naviData.sectionLeftTime
-      section_adjust_speed = self.naviData.sectionAdjustSpeed
-      camSpeedFactor = clip(self.naviData.camSpeedFactor, 1.0, 1.1)
+      road_limit_speed = self.roadLimitSpeed.roadLimitSpeed
+      is_highway = self.roadLimitSpeed.isHighway
+      cam_type = int(self.roadLimitSpeed.camType)
+      cam_limit_speed_left_dist = self.roadLimitSpeed.camLimitSpeedLeftDist
+      cam_limit_speed = self.roadLimitSpeed.camLimitSpeed
+      section_limit_speed = self.roadLimitSpeed.sectionLimitSpeed
+      section_left_dist = self.roadLimitSpeed.sectionLeftDist
+      section_avg_speed = self.roadLimitSpeed.sectionAvgSpeed
+      section_left_time = self.roadLimitSpeed.sectionLeftTime
+      section_adjust_speed = self.roadLimitSpeed.sectionAdjustSpeed
+      camSpeedFactor = clip(self.roadLimitSpeed.camSpeedFactor, 1.0, 1.1)
 
-      MIN_LIMIT = 20
-      MAX_LIMIT = 120
+      if is_highway is not None:
+        if is_highway:
+          MIN_LIMIT = 40
+          MAX_LIMIT = 120
+        else:
+          MIN_LIMIT = 20
+          MAX_LIMIT = 100
+      else:
+        MIN_LIMIT = 20
+        MAX_LIMIT = 120
+
+      if cam_type == 22:  # speed bump
+        MIN_LIMIT = 10
 
       if cam_limit_speed_left_dist is not None and cam_limit_speed is not None and cam_limit_speed_left_dist > 0:
         v_ego = cluster_speed * (CV.KPH_TO_MS if is_metric else CV.MPH_TO_MS)
@@ -321,7 +311,11 @@ class SpeedLimiter:
         #cam_limit_speed_ms = cam_limit_speed * (CV.KPH_TO_MS if is_metric else CV.MPH_TO_MS)
 
         starting_dist = v_ego * 30.
-        safe_dist = v_ego * 6.
+
+        if cam_type == 22:
+          safe_dist = v_ego * 3.
+        else:
+          safe_dist = v_ego * 6.
 
         if MIN_LIMIT <= cam_limit_speed <= MAX_LIMIT and (self.slowing_down or cam_limit_speed_left_dist < starting_dist):
           if not self.slowing_down:
@@ -339,11 +333,10 @@ class SpeedLimiter:
           else:
             pp = 0
 
-          return cam_limit_speed * camSpeedFactor + int(pp * diff_speed), \
-                 cam_limit_speed, cam_limit_speed_left_dist, first_started, log
+          return cam_limit_speed * camSpeedFactor + int(pp * diff_speed), cam_limit_speed, cam_limit_speed_left_dist, first_started
 
         self.slowing_down = False
-        return 0, cam_limit_speed, cam_limit_speed_left_dist, False, log
+        return 0, cam_limit_speed, cam_limit_speed_left_dist, False
 
       elif section_left_dist is not None and section_limit_speed is not None and section_left_dist > 0:
         if MIN_LIMIT <= section_limit_speed <= MAX_LIMIT:
@@ -357,17 +350,39 @@ class SpeedLimiter:
           if section_adjust_speed is not None and section_adjust_speed:
             speed_diff = (section_limit_speed - section_avg_speed) / 2.
 
-          return section_limit_speed * camSpeedFactor + speed_diff, section_limit_speed, section_left_dist, first_started, log
+          return section_limit_speed * camSpeedFactor + speed_diff, section_limit_speed, section_left_dist, first_started
 
         self.slowing_down = False
-        return 0, section_limit_speed, section_left_dist, False, log
+        return 0, section_limit_speed, section_left_dist, False
 
-    except Exception as e:
-      log = "Ex: " + str(e)
+    except:
       pass
 
     self.slowing_down = False
-    return 0, 0, 0, False, log
+    return 0, 0, 0, False
+
+road_speed_limiter = None
+
+
+def road_speed_limiter_get_active():
+  global road_speed_limiter
+  if road_speed_limiter is None:
+    road_speed_limiter = RoadSpeedLimiter()
+  return road_speed_limiter.get_active()
+
+
+def road_speed_limiter_get_max_speed(cluster_speed, is_metric):
+  global road_speed_limiter
+  if road_speed_limiter is None:
+    road_speed_limiter = RoadSpeedLimiter()
+  return road_speed_limiter.get_max_speed(cluster_speed, is_metric)
+
+
+def get_road_speed_limiter():
+  global road_speed_limiter
+  if road_speed_limiter is None:
+    road_speed_limiter = RoadSpeedLimiter()
+  return road_speed_limiter
 
 
 if __name__ == "__main__":

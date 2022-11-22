@@ -2,6 +2,7 @@
 import datetime
 import os
 import signal
+import subprocess
 import sys
 import traceback
 from typing import List, Tuple, Union
@@ -56,7 +57,7 @@ def manager_init() -> None:
     ("LoggerDisable", "1"),
     ("NavDisable", "1"),
     ("NewRadarInterface", "0"),
-    ("SccCommandsSelect", "0"),
+    ("PandaSafetySelect", "0"),
     ("SccOnBus2", "0"),
   ]
   if not PC:

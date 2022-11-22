@@ -234,15 +234,15 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   const auto rs = sm["radarState"].getRadarState();
   const auto lp = sm["liveParameters"].getLiveParameters();
   const auto ge = sm["gpsLocationExternal"].getGpsLocationExternal();
-  const auto nd = sm["naviData"].getNaviData();
+  const auto ls = sm["roadLimitSpeed"].getRoadLimitSpeed();
   const auto tp = sm["liveTorqueParameters"].getLiveTorqueParameters();
 
   const bool cs_alive = sm.alive("controlsState");
 
   // Handle older routes where vCruiseCluster is not set
-  float apply_speed = cc.getApplyMaxSpeed();
-  float cruise_speed = cc.getCruiseMaxSpeed();
-  bool cruise_set = cruise_speed > 0 && (int)cruise_speed != SET_SPEED_NA;
+  float apply_speed = cs.getVCruise();
+  float cruise_speed = cs.getVCruiseCluster() == 0.0 ? cs.getVCruise() : cs.getVCruiseCluster();
+  bool cruise_set = cruise_speed > 0 && (int)cruise_speed != SET_SPEED_NA && ce.getCruiseState().getEnabled();
 
   if (cruise_set && !s.scene.is_metric) {
     apply_speed *= KM_TO_MILE;
@@ -271,7 +271,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("dmActive", sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode());
   setProperty("brake_state", ce.getBrakeLights());
   setProperty("autohold_state", ce.getAutoHold());
-  setProperty("nda_state", nd.getActive());
+  setProperty("nda_state", ls.getActive());
   setProperty("left_blindspot", ce.getLeftBlindspot());
   setProperty("right_blindspot", ce.getRightBlindspot());
   setProperty("wifi_state", (int)ds.getNetworkStrength());
@@ -286,9 +286,9 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("lead_status", rs.getLeadOne().getStatus());
   setProperty("angleSteers", ce.getSteeringAngleDeg());
   setProperty("steerAngleDesired", cc.getActuators().getSteeringAngleDeg());
-  setProperty("longControl", cc.getLongControl());
+  setProperty("longControl", cs.getLongControl());
   setProperty("gap", ce.getCruiseState().getGapAdjust());
-  setProperty("autoTrGap", cc.getAutoTrGap());
+  setProperty("autoTrGap", cs.getAutoTrGap());
   setProperty("lateralcontrol", cs.getLateralControlSelect());
   setProperty("steerRatio", lp.getSteerRatio());
   setProperty("epsBus", cp.getEpsBus());
@@ -297,11 +297,11 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("fr", ce.getTpms().getFr());
   setProperty("rl", ce.getTpms().getRl());
   setProperty("rr", ce.getTpms().getRr());
-  setProperty("roadLimitSpeed", nd.getRoadLimitSpeed());
-  setProperty("camLimitSpeed", nd.getCamLimitSpeed());
-  setProperty("camLimitSpeedLeftDist", nd.getCamLimitSpeedLeftDist());
-  setProperty("sectionLimitSpeed", nd.getSectionLimitSpeed());
-  setProperty("sectionLeftDist", nd.getSectionLeftDist());
+  setProperty("roadLimitSpeed", ls.getRoadLimitSpeed());
+  setProperty("camLimitSpeed", ls.getCamLimitSpeed());
+  setProperty("camLimitSpeedLeftDist", ls.getCamLimitSpeedLeftDist());
+  setProperty("sectionLimitSpeed", ls.getSectionLimitSpeed());
+  setProperty("sectionLeftDist", ls.getSectionLeftDist());
   setProperty("left_on", ce.getLeftBlinker());
   setProperty("right_on", ce.getRightBlinker());
   setProperty("latAccelFactor", cs.getLateralControlState().getTorqueState().getLatAccelFactor());

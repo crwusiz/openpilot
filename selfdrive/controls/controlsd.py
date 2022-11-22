@@ -30,7 +30,7 @@ from selfdrive.controls.lib.vehicle_model import VehicleModel
 from selfdrive.locationd.calibrationd import Calibration
 from system.hardware import HARDWARE
 from selfdrive.manager.process_config import managed_processes
-from selfdrive.controls.neokii.speed_controller import SpeedController
+from selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import AUTO_TR_CRUISE_GAP
 
 SOFT_DISABLE_TIME = 3  # seconds
 LDW_MIN_SPEED = 50 * CV.KPH_TO_MS
@@ -192,7 +192,10 @@ class Controls:
     self.desired_curvature = 0.0
     self.desired_curvature_rate = 0.0
     self.v_cruise_helper = VCruiseHelper(self.CP)
-    self.speed_controller = SpeedController(self.CP, self.CI)
+
+    # scc smoother
+    self.applyMaxSpeed = 0
+    self.longControl = self.CP.openpilotLongitudinalControl
 
     # TODO: no longer necessary, aside from process replay
     self.sm['liveParameters'].valid = True
@@ -483,12 +486,7 @@ class Controls:
   def state_transition(self, CS):
     """Compute conditional state transitions and execute actions on state transitions"""
 
-    #self.v_cruise_helper.update_v_cruise(CS, self.enabled, self.is_metric)
-
-    self.v_cruise_helper.v_cruise_kph = self.speed_controller.update_v_cruise(CS, self.sm, self.enabled, self.is_metric,
-                                                                              self.v_cruise_helper.v_cruise_kph,
-                                                                              self.v_cruise_helper.v_cruise_kph_last)
-    self.v_cruise_helper.v_cruise_cluster_kph = self.v_cruise_helper.v_cruise_kph
+    self.v_cruise_helper.update_v_cruise(CS, self.enabled, self.is_metric)
 
     # decrement the soft disable timer at every step, as it's reset on
     # entrance in SOFT_DISABLING state
@@ -513,7 +511,6 @@ class Controls:
             self.state = State.softDisabling
             self.soft_disable_timer = int(SOFT_DISABLE_TIME / DT_CTRL)
             self.current_alert_types.append(ET.SOFT_DISABLE)
-
           elif self.events.any(ET.OVERRIDE_LATERAL) or self.events.any(ET.OVERRIDE_LONGITUDINAL):
             self.state = State.overriding
             self.current_alert_types += [ET.OVERRIDE_LATERAL, ET.OVERRIDE_LONGITUDINAL]
@@ -728,8 +725,6 @@ class Controls:
     if self.enabled:
       clear_event_types.add(ET.NO_ENTRY)
 
-    self.speed_controller.inject_events(CS, self.events)
-
     alerts = self.events.create_alerts(self.current_alert_types, [self.CP, CS, self.sm, self.is_metric, self.soft_disable_timer])
     self.AM.add_many(self.sm.frame, alerts)
     current_alert = self.AM.process_alerts(self.sm.frame, clear_event_types)
@@ -738,15 +733,10 @@ class Controls:
 
     if not self.read_only and self.initialized:
       # send car controls over can
-      self.last_actuators, can_sends = self.CI.apply(CC)
-
-      v = self.speed_controller.update_can(self.enabled, CC, CS, self.sm, can_sends)
-      if v > 0:
-        self.v_cruise_helper.v_cruise_kph = v
-        self.v_cruise_helper.v_cruise_cluster_kph = v
-
-      self.speed_controller.update_message(self, CC, CS)
-
+      if self.CP.carName == "hyundai":
+        self.last_actuators, can_sends = self.CI.apply(CC, self)
+      else:
+        self.last_actuators, can_sends = self.CI.apply(CC)
       self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
       CC.actuatorsOutput = self.last_actuators
       self.steer_limited = abs(CC.actuators.steer - CC.actuatorsOutput.steer) > 1e-2
@@ -785,10 +775,8 @@ class Controls:
     controlsState.engageable = not self.events.any(ET.NO_ENTRY)
     controlsState.longControlState = self.LoC.long_control_state
     controlsState.vPid = float(self.LoC.v_pid)
-    controlsState.vCruise = float(self.speed_controller.cruise_speed_kph)
-    controlsState.vCruiseCluster = float(self.speed_controller.real_set_speed_kph)
-    #controlsState.vCruise = float(self.v_cruise_helper.v_cruise_kph)
-    #controlsState.vCruiseCluster = float(self.v_cruise_helper.v_cruise_cluster_kph)
+    controlsState.vCruise = float(self.applyMaxSpeed if self.CP.openpilotLongitudinalControl else self.v_cruise_helper.v_cruise_kph)
+    controlsState.vCruiseCluster = float(self.v_cruise_helper.v_cruise_cluster_kph)
     controlsState.upAccelCmd = float(self.LoC.pid.p)
     controlsState.uiAccelCmd = float(self.LoC.pid.i)
     controlsState.ufAccelCmd = float(self.LoC.pid.f)
@@ -797,7 +785,11 @@ class Controls:
     controlsState.forceDecel = bool(force_decel)
     controlsState.canErrorCounter = self.can_rcv_timeout_counter
     controlsState.experimentalMode = self.params.get_bool("ExperimentalMode") and self.CP.openpilotLongitudinalControl
+
+    # add
     controlsState.lateralControlSelect = int(self.lateral_control_select)
+    controlsState.autoTrGap = AUTO_TR_CRUISE_GAP
+    controlsState.longControl = self.longControl
 
     lat_tuning = self.CP.lateralTuning.which()
     if self.joystick_mode:

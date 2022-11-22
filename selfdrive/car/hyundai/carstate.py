@@ -6,8 +6,6 @@ from cereal import car
 from common.conversions import Conversions as CV
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
-from selfdrive.car.hyundai.interface import BUTTONS_DICT
-from selfdrive.controls.neokii.cruise_state_manager import CruiseStateManager
 from selfdrive.car.hyundai.values import HyundaiFlags, DBC, CarControllerParams, Buttons, FEATURES, EV_CAR, HEV_CAR, CAR, CANFD_CAR, FCA11_CAR
 from selfdrive.car.interfaces import CarStateBase
 
@@ -36,8 +34,6 @@ class CarState(CarStateBase):
     #Auto detection for setup
     self.eps_bus = CP.epsBus
     self.scc_bus = CP.sccBus
-    self.has_scc13 = CP.hasScc13
-    self.has_scc14 = CP.hasScc14
     self.eps_error_cnt = 0
 
     self.is_metric = False
@@ -86,6 +82,8 @@ class CarState(CarStateBase):
       if not self.is_metric:
         self.cluster_speed = math.floor(self.cluster_speed * CV.KPH_TO_MPH + CV.KPH_TO_MPH)
 
+    ret.vEgoCluster = self.cluster_speed * self.speed_conv
+
     ret.steeringAngleDeg = cp_sas.vl["SAS11"]["SAS_Angle"]
     ret.steeringRateDeg = cp_sas.vl["SAS11"]["SAS_Speed"]
     ret.steeringTorque = cp_eps.vl["MDPS12"]["CR_Mdps_StrColTq"]
@@ -112,12 +110,12 @@ class CarState(CarStateBase):
       ret.cruiseState.available = cp.vl["EMS16"]["CRUISE_LAMP_M"] != 0
       ret.cruiseState.enabled = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] != 0
       ret.cruiseState.standstill = False
-      ret.cruiseState.speed = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * self.speed_conv  if ret.cruiseState.enabled else 0
+      ret.cruiseState.speed = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * self.speed_conv if ret.cruiseState.enabled else 0
     else:
       ret.cruiseState.available = cp_cruise.vl["SCC11"]["MainMode_ACC"] == 1
       ret.cruiseState.enabled = cp_cruise.vl["SCC12"]["ACCMode"] != 0
       ret.cruiseState.standstill = cp_cruise.vl["SCC11"]["SCCInfoDisplay"] == 4.
-      ret.cruiseState.speed = cp_cruise.vl["SCC11"]["VSetDis"] * self.speed_conv  if ret.cruiseState.enabled else 0
+      ret.cruiseState.speed = cp_cruise.vl["SCC11"]["VSetDis"] * self.speed_conv if ret.cruiseState.enabled else 0
       ret.cruiseState.gapAdjust = cp_cruise.vl["SCC11"]["TauGapSet"]
 
     # TODO: Find brake pressure
@@ -194,19 +192,6 @@ class CarState(CarStateBase):
     ret.tpms.rl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_RL"]
     ret.tpms.rr = tpms_unit * cp.vl["TPMS11"]["PRESSURE_RR"]
 
-    cluSpeed = cp.vl["CLU11"]["CF_Clu_Vanz"]
-    decimal = cp.vl["CLU11"]["CF_Clu_VanzDecimal"]
-    if 0. < decimal < 0.5:
-      cluSpeed += decimal
-
-    ret.vEgoCluster = cluSpeed * self.speed_conv
-    vEgoClu, aEgoClu = self.update_clu_speed_kf(ret.vEgoCluster)
-    ret.vCluRatio = (ret.vEgo / vEgoClu) if (vEgoClu > 3. and ret.vEgo > 3.) else 1.0
-
-    if self.CP.openpilotLongitudinalControl and CruiseStateManager.instance().cruise_state_control:
-      available = ret.cruiseState.available if self.CP.sccBus == 2 else -1
-      CruiseStateManager.instance().update(ret, self.main_buttons, self.cruise_buttons, BUTTONS_DICT, available)
-
     return ret
 
 
@@ -270,10 +255,6 @@ class CarState(CarStateBase):
 
     if self.CP.flags & HyundaiFlags.CANFD_HDA2:
       self.cam_0x2a4 = copy.copy(cp_cam.vl["CAM_0x2a4"])
-
-    # TODO
-    CruiseStateManager.instance().update(ret, self.main_buttons, self.cruise_buttons, BUTTONS_DICT,
-            cruise_state_control=self.CP.openpilotLongitudinalControl and CruiseStateManager.instance().cruise_state_control)
 
     return ret
 

@@ -9,7 +9,8 @@ from opendbc.can.packer import CANPacker
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai import hyundaicanfd, hyundaican
 from selfdrive.car.hyundai.values import HyundaiFlags, Buttons, CarControllerParams, CANFD_CAR, CAR
-from selfdrive.controls.neokii.navi_controller import SpeedLimiter
+from selfdrive.road_speed_limiter import road_speed_limiter_get_active
+from selfdrive.car.hyundai.scc_smoother import SccSmoother
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 LongCtrlState = car.CarControl.Actuators.LongControlState
@@ -50,6 +51,7 @@ class CarController:
     self.CP = CP
     self.CCP = CarControllerParams(CP)
     self.packer = CANPacker(dbc_name)
+    self.scc_smoother = SccSmoother(CP)
     self.scc_live = not CP.radarOffCan
     self.car_fingerprint = CP.carFingerprint
 
@@ -67,7 +69,7 @@ class CarController:
     self.mfc_lfa = Params().get("MfcSelect", encoding='utf8') == "2"
 
 
-  def update(self, CC, CS):
+  def update(self, CC, CS, controls):
     actuators = CC.actuators
     hud_control = CC.hudControl
 
@@ -196,6 +198,8 @@ class CarController:
           self.last_lead_distance = CS.lead_distance
           self.resume_cnt = 0
           self.resume_wait_timer = 0
+        elif self.scc_smoother.is_active(self.frame):
+          pass
         elif self.resume_wait_timer > 0:
           self.resume_wait_timer -= 1
         elif abs(CS.lead_distance - self.last_lead_distance) > 0.1:
@@ -207,23 +211,23 @@ class CarController:
       elif self.last_lead_distance != 0:
         self.last_lead_distance = 0
 
-      scc_commands = Params().get("SccCommandsSelect", encoding='utf8')
+      # scc smoother
+      self.scc_smoother.update(CC.enabled, can_sends, self.packer, CC, CS, self.frame, controls)
+
       # send scc to car if longcontrol enabled and SCC not on bus 0 or not live
       if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl and CS.out.cruiseState.enabled and (CS.scc_bus or not self.scc_live):
         jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0
-        if scc_commands == 0:
-          can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), CC.enabled and CC.longActive, accel, jerk,
-                                                          hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, self.scc_live, CS))
-        elif scc_commands == 1:
-          can_sends.extend(hyundaican.create_acc_commands(self.packer, int(self.frame / 2), CC.enabled and CC.longActive, accel, jerk,
-                                                          hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, CS))
+        can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), CC.enabled and CC.longActive, accel, jerk,
+                                                        hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, self.scc_live, CS))
 
       if self.frame % 500 == 0:
         print(f'scc11 = {bool(CS.scc11)}  scc12 = {bool(CS.scc12)}  scc13 = {bool(CS.scc13)}  scc14 = {bool(CS.scc14)}')
 
       # 20 Hz LFA MFA message
-      if self.frame % 5 == 0 and self.mfc_lfa:
-        can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, SpeedLimiter.instance().get_active()))
+      if self.frame % 5 == 0:
+        activated_hda = road_speed_limiter_get_active()  # 0 off, 1 main road, 2 highway
+        if self.mfc_lfa:
+          can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, activated_hda))
 
       # 5 Hz ACC options
       #if all([self.frame % 20 == 0, self.CP.openpilotLongitudinalControl]):
@@ -232,8 +236,6 @@ class CarController:
       # 2 Hz front radar options
       #if self.frame % 50 == 0 and self.CP.openpilotLongitudinalControl:
       #  can_sends.append(hyundaican.create_frt_radar_opt(self.packer))
-
-    CC.applyAccel = accel
 
     new_actuators = actuators.copy()
     new_actuators.steer = apply_steer / self.CCP.STEER_MAX

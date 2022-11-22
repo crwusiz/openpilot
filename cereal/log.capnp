@@ -662,7 +662,10 @@ struct ControlsState @0x97ff69c53601abf1 {
     torqueState @60 :LateralTorqueState;
   }
 
+  # add
   lateralControlSelect @65 :UInt8;
+  autoTrGap @66 :UInt32;
+  longControl @67 :Bool;
 
   enum OpenpilotState @0xdbe58b96d2d1ac61 {
     disabled @0;
@@ -2057,7 +2060,7 @@ struct Event {
     uiDebug @102 :UIDebug;
 
     # neokii
-    naviData @103 :NaviData;
+    roadLimitSpeed @103 :RoadLimitSpeed;
 
     # *********** debug ***********
     testJoystick @52 :Joystick;
@@ -2107,7 +2110,7 @@ struct Event {
   }
 }
 
-struct NaviData {
+struct RoadLimitSpeed {
     active @0 :Int16;
     roadLimitSpeed @1 :Int16;
     isHighway @2 :Bool;

@@ -61,8 +61,8 @@ procs = [
   NativeProcess("bridge", "cereal/messaging", ["./bridge"], onroad=False, callback=notcar),
   PythonProcess("webjoystick", "tools.joystick.web", onroad=False, callback=notcar),
 
-  # Process add neokii
-  PythonProcess("navi_controller", "selfdrive.controls.neokii.navi_controller", offroad=True, enabled=TICI),
+  # Process add
+  PythonProcess("road_speed_limiter", "selfdrive.road_speed_limiter", offroad=True, enabled=TICI),
 ]
 
 managed_processes = {p.name: p for p in procs}

@@ -189,12 +189,12 @@ private:
   void refresh();
 };
 
-// SccCommands
-class SccCommandsSelect : public AbstractControl {
+// PandaSafetySelect
+class PandaSafetySelect : public AbstractControl {
   Q_OBJECT
 
 public:
-  SccCommandsSelect();
+  PandaSafetySelect();
 
 private:
   QPushButton btnplus;

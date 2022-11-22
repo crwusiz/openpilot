@@ -149,11 +149,11 @@
     </message>
     <message>
         <source>Npilot controls Cruise State (Experimental)</source>
-        <translation>크루즈 상태 제어 (실험적 기능)</translation>
+        <translation type="vanished">크루즈 상태 제어 (실험적 기능)</translation>
     </message>
     <message>
         <source>Npilot controls cruise on/off, gap and set speed.&lt;br&gt;It becomes a cruise set without conditions, so do not use it if you do not understand it correctly.</source>
-        <translation>주의!! 크루즈 상태를 제어합니다. 크루즈 켜기/끄기, 설정속도/유지거리 조절&lt;br&gt;조건없이 크루즈 셋이 되기 때문에 정확히 이해를 하지 못한 경우 사용하지 마세요.</translation>
+        <translation type="vanished">주의!! 크루즈 상태를 제어합니다. 크루즈 켜기/끄기, 설정속도/유지거리 조절&lt;br&gt;조건없이 크루즈 셋이 되기 때문에 정확히 이해를 하지 못한 경우 사용하지 마세요.</translation>
     </message>
     <message>
         <source>SCC on BUS 2</source>
@@ -659,6 +659,13 @@ location set</source>
     </message>
 </context>
 <context>
+    <name>PandaSafetySelect</name>
+    <message>
+        <source>Panda Safety Select (Default/Mdps)</source>
+        <translation>Pansa Safety 선택 (Default/Mdps)</translation>
+    </message>
+</context>
+<context>
     <name>ParamControl</name>
     <message>
         <source>Cancel</source>
@@ -795,14 +802,7 @@ location set</source>
     <name>RichTextDialog</name>
     <message>
         <source>Ok</source>
-        <translation type="vanished">확인</translation>
-    </message>
-</context>
-<context>
-    <name>SccCommandsSelect</name>
-    <message>
-        <source>Scc Commands Select (Scc/Acc)</source>
-        <translation>Scc Commands 선택 (Scc/Acc)</translation>
+        <translation>확인</translation>
     </message>
 </context>
 <context>

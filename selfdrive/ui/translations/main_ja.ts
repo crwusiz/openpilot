@@ -156,14 +156,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Npilot controls Cruise State (Experimental)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Npilot controls cruise on/off, gap and set speed.&lt;br&gt;It becomes a cruise set without conditions, so do not use it if you do not understand it correctly.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>SCC on BUS 2</source>
         <translation type="unfinished"></translation>
     </message>
@@ -643,6 +635,13 @@ location set</source>
     </message>
 </context>
 <context>
+    <name>PandaSafetySelect</name>
+    <message>
+        <source>Panda Safety Select (Default/Mdps)</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>ParamControl</name>
     <message>
         <source>Cancel</source>
@@ -773,13 +772,6 @@ location set</source>
     <message>
         <source>Unable to mount data partition. Press confirm to reset your device.</source>
         <translation>「data」パーティションをマウントできません。「確認」ボタンを押すとデバイスが初期化されます。</translation>
-    </message>
-</context>
-<context>
-    <name>SccCommandsSelect</name>
-    <message>
-        <source>Scc Commands Select (Scc/Acc)</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

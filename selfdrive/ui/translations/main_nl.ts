@@ -156,14 +156,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Npilot controls Cruise State (Experimental)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Npilot controls cruise on/off, gap and set speed.&lt;br&gt;It becomes a cruise set without conditions, so do not use it if you do not understand it correctly.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>SCC on BUS 2</source>
         <translation type="unfinished"></translation>
     </message>
@@ -644,6 +636,13 @@ ingesteld</translation>
     </message>
 </context>
 <context>
+    <name>PandaSafetySelect</name>
+    <message>
+        <source>Panda Safety Select (Default/Mdps)</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>ParamControl</name>
     <message>
         <source>Enable</source>
@@ -784,13 +783,6 @@ ingesteld</translation>
     <message>
         <source>Ok</source>
         <translation type="vanished">Ok</translation>
-    </message>
-</context>
-<context>
-    <name>SccCommandsSelect</name>
-    <message>
-        <source>Scc Commands Select (Scc/Acc)</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

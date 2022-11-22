@@ -26,7 +26,7 @@ class CarInterface(CarInterfaceBase):
     gas_max_bp = [10., 20., 50., 70., 130., 150.]
     gas_max_v = [1.3, 1.1, 0.63, 0.44, 0.15, 0.1]
 
-    return CarControllerParams.ACCEL_MIN, int(interp(v_current_kph, gas_max_bp, gas_max_v))
+    return CarControllerParams.ACCEL_MIN, interp(v_current_kph, gas_max_bp, gas_max_v)
 
   @staticmethod
   def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=[], experimental_long=False):  # pylint: disable=dangerous-default-value
@@ -348,8 +348,8 @@ class CarInterface(CarInterfaceBase):
       if ret.flags & HyundaiFlags.CANFD_CAMERA_SCC:
         ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CAMERA_SCC
     else:
-      scc_commands = Params().get("SccCommandsSelect", encoding='utf8')
-      if scc_commands == 1:
+      panda_safety_select = Params().get("PandaSafetySelect", encoding='utf8')
+      if panda_safety_select == "0":
         if candidate in LEGACY_SAFETY_MODE_CAR:
           # these cars require a special panda safety mode due to missing counters and checksums in the messages
           ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy)]
@@ -361,7 +361,7 @@ class CarInterface(CarInterfaceBase):
          ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
         elif candidate in EV_CAR:
          ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
-      else:
+      elif panda_safety_select == "1":
         ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
 
     # *** other config ***
@@ -412,7 +412,7 @@ class CarInterface(CarInterfaceBase):
   def _update(self, c):
     ret = self.CS.update(self.cp, self.cp2, self.cp_cam)
 
-    if self.frame % 10 == 0:
+    if self.frame % 20 == 0:
       if CANFD_CAR:
         if not any([self.cp.can_valid, self.cp_cam.can_valid]):
           print(f'cp = {bool(self.cp.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
@@ -455,45 +455,21 @@ class CarInterface(CarInterfaceBase):
     if self.CC.turning_indicator_alert:
       events.add(EventName.turningIndicatorOn)
 
+    # scc smoother
+    if self.CC.scc_smoother is not None:
+      self.CC.scc_smoother.inject_events(events)
+
     # low speed steer alert hysteresis logic (only for cars with steer cut off above 10 m/s)
     if ret.vEgo < (self.CP.minSteerSpeed + 2.) and self.CP.minSteerSpeed > 10.:
       self.low_speed_alert = True
     if ret.vEgo > (self.CP.minSteerSpeed + 4.):
       self.low_speed_alert = False
-    if self.low_speed_alert:
+    if self.low_speed_alert and not self.CS.eps_bus:
       events.add(car.CarEvent.EventName.belowSteerSpeed)
 
     ret.events = events.to_msg()
 
     return ret
 
-  def apply(self, c):
-    return self.CC.update(c, self.CS)
-
-  @staticmethod
-  def get_params_adjust_set_speed():
-    return [8, 10], [12, 14, 16, 18]
-
-  def create_buttons(self, button):
-    if self.CP.carFingerprint in CANFD_CAR:
-      return self.create_buttons_can_fd(button)
-    else:
-      return self.create_buttons_can(button)
-
-  def get_buttons_dict(self):
-    return BUTTONS_DICT
-
-  def create_buttons_can(self, button):
-    values = self.CS.clu11
-    values["CF_Clu_CruiseSwState"] = button
-    values["CF_Clu_AliveCnt1"] = (values["CF_Clu_AliveCnt1"] + 1) % 0x10
-    return self.CC.packer.make_can_msg("CLU11", self.CP.sccBus, values)
-
-  def create_buttons_can_fd(self, button):
-    values = {
-      "COUNTER": self.CS.buttons_counter+1,
-      "SET_ME_1": 1,
-      "CRUISE_BUTTONS": button,
-    }
-    return self.CC.packer.make_can_msg("CRUISE_BUTTONS", 5, values)
-
+  def apply(self, c, controls):
+    return self.CC.update(c, self.CS, controls)

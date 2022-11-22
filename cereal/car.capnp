@@ -224,9 +224,8 @@ struct CarState {
   charging @43 :Bool;
 
   # neokii
-  vCluRatio @48 :Float32;
-  autoHold @46 :Int32;
-  tpms @47 :Tpms;
+  autoHold @46 : Int32;
+  tpms @47 : Tpms;
 
   struct Tpms {
     fl @0 :Float32;
@@ -348,19 +347,6 @@ struct CarControl {
 
   cruiseControl @4 :CruiseControl;
   hudControl @5 :HUDControl;
-
-  # add neokii
-  applyMaxSpeed @15 :Float32;
-  cruiseMaxSpeed @16 :Float32;
-  autoTrGap @17 :UInt32;
-  steerRatio @18 :Float32;
-  steerActuatorDelay @19 :Float32;
-  sccBus @20 :UInt8;
-  longControl @24:Bool;
-
-  applyAccel @21 :Float32;
-  aReqValue @22 :Float32;
-  debugText @23 :Text;
 
   struct Actuators {
     # range from 0.0 - 1.0

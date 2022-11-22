@@ -629,7 +629,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   auto pandareset_btn = new ButtonControl("Panda Reset", tr("RUN"));
   QObject::connect(pandareset_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/scripts/relay_reset.sh");
+      QProcess::execute("/data/openpilot/scripts/panda_reset.sh");
     }
   });
   communityLayout->addWidget(pandareset_btn);
@@ -656,9 +656,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
       QProcess::execute("/data/openpilot/script/add/panda_default.sh");
     }
   });
-  if (params.getBool("PandaSafetyMDPS")) {
-    communityLayout->addWidget(pandadefault_btn);
-  }
 
   auto pandamdps_btn = new ButtonControl("Panda Safety Change MDPS Modify", tr("RUN"));
   QObject::connect(pandamdps_btn, &ButtonControl::clicked, [=]() {
@@ -666,15 +663,17 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
       QProcess::execute("/data/openpilot/script/add/panda_mdps.sh");
     }
   });
-  if (!params.getBool("PandaSafetyMDPS")) {
-    communityLayout->addWidget(pandamdps_btn);
-  }
 
   communityLayout->addWidget(horizontal_line());
   communityLayout->addWidget(new LateralControlSelect());
   communityLayout->addWidget(new MfcSelect());
   communityLayout->addWidget(new AebSelect());
-  communityLayout->addWidget(new SccCommandsSelect());
+  communityLayout->addWidget(new PandaSafetySelect());
+  if (params.getBool("PandaSafetySelect")) {
+    communityLayout->addWidget(pandadefault_btn);
+  } else if (!params.getBool("PandaSafetySelect")) {
+    communityLayout->addWidget(pandamdps_btn);
+  }
   communityLayout->addWidget(horizontal_line());
 
   // add community toggle
@@ -1021,8 +1020,8 @@ void AebSelect::refresh() {
   btnplus.setText("▶");
 }
 
-//SccCommandsSelect
-SccCommandsSelect::SccCommandsSelect() : AbstractControl("SCC [√]", tr("Scc Commands Select (Scc/Acc)"), "../assets/offroad/icon_lat.png") {
+//PandaSafetySelect
+PandaSafetySelect::PandaSafetySelect() : AbstractControl("Panda Safety [√]", tr("Panda Safety Select (Default/Mdps)"), "../assets/offroad/icon_warning.png") {
   label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
   label.setStyleSheet("color: #e0e879");
   hlayout->addWidget(&label);
@@ -1050,37 +1049,37 @@ SccCommandsSelect::SccCommandsSelect() : AbstractControl("SCC [√]", tr("Scc Co
   hlayout->addWidget(&btnplus);
 
   QObject::connect(&btnminus, &QPushButton::released, [=]() {
-    auto str = QString::fromStdString(Params().get("SccCommandsSelect"));
-    int scc = str.toInt();
-    scc = scc - 1;
-    if (scc <= 0 ) {
-      scc = 0;
+    auto str = QString::fromStdString(Params().get("PandaSafetySelect"));
+    int safety = str.toInt();
+    safety = safety - 1;
+    if (safety <= 0 ) {
+      safety = 0;
     }
-    QString sccs = QString::number(scc);
-    Params().put("SccCommandsSelect", sccs.toStdString());
+    QString safetys = QString::number(safety);
+    Params().put("PandaSafetySelect", safetys.toStdString());
     refresh();
   });
 
   QObject::connect(&btnplus, &QPushButton::released, [=]() {
-    auto str = QString::fromStdString(Params().get("SccCommandsSelect"));
-    int scc = str.toInt();
-    scc = scc + 1;
-    if (scc >= 1 ) {
-      scc = 1;
+    auto str = QString::fromStdString(Params().get("PandaSafetySelect"));
+    int safety = str.toInt();
+    safety = safety + 1;
+    if (safety >= 1 ) {
+      safety = 1;
     }
-    QString sccs = QString::number(scc);
-    Params().put("SccCommandsSelect", sccs.toStdString());
+    QString safetys = QString::number(safety);
+    Params().put("PandaSafetySelect", safetys.toStdString());
     refresh();
   });
   refresh();
 }
 
-void SccCommandsSelect::refresh() {
-  QString scc = QString::fromStdString(Params().get("SccCommandsSelect"));
-  if (scc == "0") {
-    label.setText(QString::fromStdString("Scc"));
-  } else if (scc == "1") {
-    label.setText(QString::fromStdString("Acc"));
+void PandaSafetySelect::refresh() {
+  QString safety = QString::fromStdString(Params().get("PandaSafetySelect"));
+  if (safety == "0") {
+    label.setText(QString::fromStdString("Default"));
+  } else if (safety == "1") {
+    label.setText(QString::fromStdString("MDPS"));
   }
   btnminus.setText("◀");
   btnplus.setText("▶");
