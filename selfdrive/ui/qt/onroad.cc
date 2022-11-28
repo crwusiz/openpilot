@@ -242,7 +242,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   // Handle older routes where vCruiseCluster is not set
   float apply_speed = cs.getVCruise();
   float cruise_speed = cs.getVCruiseCluster() == 0.0 ? cs.getVCruise() : cs.getVCruiseCluster();
-  bool cruise_set = cruise_speed > 0 && (int)cruise_speed != SET_SPEED_NA && ce.getCruiseState().getEnabled();
+  bool cruise_set = cruise_speed > 0 && (int)cruise_speed != SET_SPEED_NA && ce.getCruiseState().getSpeed();
 
   if (cruise_set && !s.scene.is_metric) {
     apply_speed *= KM_TO_MILE;
