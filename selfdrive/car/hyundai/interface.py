@@ -401,8 +401,8 @@ class CarInterface(CarInterfaceBase):
 
   @staticmethod
   def init(CP, logcan, sendcan):
-    new_radar = Params().get_bool("NewRadarInterface")
-    if all([CP.openpilotLongitudinalControl, new_radar]):
+    mando_radar = Params().get_bool("MandoRadarEnable")
+    if all([CP.openpilotLongitudinalControl, mando_radar]):
       addr, bus = 0x7d0, 0
       if CP.flags & HyundaiFlags.CANFD_HDA2.value:
         addr, bus = 0x730, 5

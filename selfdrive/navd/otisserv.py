@@ -160,7 +160,7 @@ class OtisServ(BaseHTTPRequestHandler):
         self.display_page_app_token("Your token was incorrect!")
         return
       params.put('CustomMapboxTokenSk', token)
-      params.put_bool('CustomMapbox', True)      
+      params.put_bool('NavEnable', True)
 
     # nav confirmed
     if postvars is not None:

@@ -362,12 +362,12 @@ def thermald_thread(end_event, hw_queue):
       if off_ts is None:
         off_ts = sec_since_boot()
 
-    prebuiltlet = params.get_bool("PutPrebuilt")
-    if not os.path.isfile(prebuiltfile) and prebuiltlet:
+    prebuilt_enable = params.get_bool("PrebuiltEnable")
+    if not os.path.isfile(prebuiltfile) and prebuilt_enable:
       os.system("touch /data/openpilot/prebuilt")
-
-    elif os.path.isfile(prebuiltfile) and not prebuiltlet:
+    elif os.path.isfile(prebuiltfile) and not prebuilt_enable:
       os.system("rm -f /data/openpilot/prebuilt")
+
     # Offroad power monitoring
     voltage = None if peripheralState.pandaType == log.PandaState.PandaType.unknown else peripheralState.voltage
     power_monitor.calculate(voltage, onroad_conditions["ignition"])

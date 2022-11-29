@@ -2,7 +2,7 @@
 
 pushd /data/openpilot
 
-echo -n "0" > /data/params/d/PutPrebuilt
+echo -n "0" > /data/params/d/PrebuiltEnable
 sudo rm -f prebuilt
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)

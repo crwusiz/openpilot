@@ -47,10 +47,10 @@ class RouteEngine:
 
     self.ui_pid = None
 
-    if not self.params.get_bool("CustomMapbox"):
+    if not self.params.get_bool("NavEnable"):
       self.params.put("CustomMapboxTokenPk", "")
       self.params.put("CustomMapboxTokenSk", "")
-    if self.params.get_bool("CustomMapbox"):
+    if self.params.get_bool("NavEnable"):
       self.mapbox_token = self.params.get("CustomMapboxTokenPk", encoding='utf8')
       self.mapbox_host = "https://api.mapbox.com"
     elif "MAPBOX_TOKEN" in os.environ:

@@ -108,38 +108,6 @@
         <translation>실행하시겠습니까?</translation>
     </message>
     <message>
-        <source>Prebuilt Enable</source>
-        <translation>Prebuilt 사용</translation>
-    </message>
-    <message>
-        <source>Create prebuilt files to speed bootup</source>
-        <translation>Prebuilt 파일을 생성하며 부팅속도를 향상시킵니다.</translation>
-    </message>
-    <message>
-        <source>Logger Disable</source>
-        <translation>Logger 사용안함</translation>
-    </message>
-    <message>
-        <source>Disable Logger is Reduce system load</source>
-        <translation>Logger 프로세스를 종료하여 시스템 부하를 줄입니다.</translation>
-    </message>
-    <message>
-        <source>Navigation Disable</source>
-        <translation>Navigation 사용안함</translation>
-    </message>
-    <message>
-        <source>Navigation Function not use</source>
-        <translation>네비게이션 기능을 사용하지않습니다.</translation>
-    </message>
-    <message>
-        <source>New radar interface Enable</source>
-        <translation>New radar interface 사용</translation>
-    </message>
-    <message>
-        <source>Some newer car New radar interface</source>
-        <translation>레이더 CAN 신호 해독된 일부차량을위한 옵션입니다.</translation>
-    </message>
-    <message>
         <source>Select your Manufacturer</source>
         <translation>제조사를 선택하세요</translation>
     </message>
@@ -148,20 +116,76 @@
         <translation>실행</translation>
     </message>
     <message>
-        <source>Npilot controls Cruise State (Experimental)</source>
-        <translation type="vanished">크루즈 상태 제어 (실험적 기능)</translation>
+        <source>Prebuilt Enable</source>
+        <translation>Prebuilt 사용</translation>
     </message>
     <message>
-        <source>Npilot controls cruise on/off, gap and set speed.&lt;br&gt;It becomes a cruise set without conditions, so do not use it if you do not understand it correctly.</source>
-        <translation type="vanished">주의!! 크루즈 상태를 제어합니다. 크루즈 켜기/끄기, 설정속도/유지거리 조절&lt;br&gt;조건없이 크루즈 셋이 되기 때문에 정확히 이해를 하지 못한 경우 사용하지 마세요.</translation>
+        <source>Create prebuilt file to speed bootup</source>
+        <translation>부팅 속도를 높이기 위해 Prebuilt 파일을 생성합니다</translation>
     </message>
     <message>
-        <source>SCC on BUS 2</source>
-        <translation>SCC on BUS 2</translation>
+        <source>Logger Enable</source>
+        <translation>Logger 사용</translation>
     </message>
     <message>
-        <source>If SCC is on bus 2, turn it on.</source>
-        <translation>SCC 배선 개조차량은 사용으로 변경하세요.</translation>
+        <source>Turn off this option to reduce system load</source>
+        <translation>시스템 부하를 줄이시려면 이 옵션을 끄세요</translation>
+    </message>
+    <message>
+        <source>Navigation Enable</source>
+        <translation>내비게이션 사용</translation>
+    </message>
+    <message>
+        <source>Navigation Features use</source>
+        <translation>내비게이션 기능을 사용합니다</translation>
+    </message>
+    <message>
+        <source>Scc on Bus 2</source>
+        <translation>Scc on Bus 2</translation>
+    </message>
+    <message>
+        <source>If Scc is on bus 2, turn it on.</source>
+        <translation>SCC 배선 개조차량은 사용으로 변경하세요</translation>
+    </message>
+    <message>
+        <source>Mando Radar interface Enable</source>
+        <translation>만도 레이더 인터페이스 사용</translation>
+    </message>
+    <message>
+        <source>Mando Radar interface use (disable AEB)</source>
+        <translation>이 기능은 만도레이더가 장착된 일부 차량만 지원되며 차량의 AEB가 비활성됩니다</translation>
+    </message>
+    <message>
+        <source>Git Fetch and Reset</source>
+        <translation>Git Fetch and Reset</translation>
+    </message>
+    <message>
+        <source>Clear DTC</source>
+        <translation>고장코드 제거</translation>
+    </message>
+    <message>
+        <source>Tmux error log</source>
+        <translation>Tmux 에러 로그</translation>
+    </message>
+    <message>
+        <source>Panda Reset</source>
+        <translation>Panda 리셋</translation>
+    </message>
+    <message>
+        <source>Panda Flash</source>
+        <translation>Panda 플래싱</translation>
+    </message>
+    <message>
+        <source>Panda Recover</source>
+        <translation>Panda 복구</translation>
+    </message>
+    <message>
+        <source>Panda Safety Change to Default</source>
+        <translation>Panda Safety 기본값으로 변경</translation>
+    </message>
+    <message>
+        <source>Panda Safety Change to MDPS</source>
+        <translation>Panda Safety MDPS로 변경</translation>
     </message>
 </context>
 <context>
@@ -796,13 +820,6 @@ location set</source>
     <message>
         <source>Unable to mount data partition. Press confirm to reset your device.</source>
         <translation>데이터 파티션을 마운트할 수 없습니다. 확인 버튼을 눌러 장치를 리셋합니다.</translation>
-    </message>
-</context>
-<context>
-    <name>RichTextDialog</name>
-    <message>
-        <source>Ok</source>
-        <translation type="vanished">확인</translation>
     </message>
 </context>
 <context>

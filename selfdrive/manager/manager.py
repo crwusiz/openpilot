@@ -50,13 +50,13 @@ def manager_init() -> None:
     ("SshEnabled", "1"),
     ("IsLdwEnabled", "1"),
     ("AutoLaneChangeEnabled", "1"),
-    ("PutPrebuilt", "0"),
+    ("PrebuiltEnable", "0"),
     ("MfcSelect", "0"),
     ("AebSelect", "0"),
     ("LateralControlSelect", "0"),
-    ("LoggerDisable", "1"),
-    ("NavDisable", "1"),
-    ("NewRadarInterface", "0"),
+    ("LoggerEnable", "0"),
+    ("NavEnable", "0"),
+    ("MandoRadarEnable", "0"),
     ("PandaSafetySelect", "0"),
     ("SccOnBus2", "0"),
   ]
@@ -151,9 +151,9 @@ def manager_thread() -> None:
     ignore.append("pandad")
 
   # add toggle
-  if params.get_bool("LoggerDisable"):
+  if not params.get_bool("LoggerEnable"):
     ignore += ["loggerd", "encoderd", "deleter", "logmessaged", "tombstoned", "uploader", "updated", "statsd"]
-  if params.get_bool("NavDisable"):
+  if not params.get_bool("NavEnable"):
     ignore += ["navd", "otisserv"]
 
   ignore += [x for x in os.getenv("BLOCK", "").split(",") if len(x) > 0]

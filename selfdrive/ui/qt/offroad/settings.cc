@@ -209,7 +209,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     addItem(retrainingBtn);
   }
 
-/*  if (Hardware::TICI()) {
+  /*if (Hardware::TICI()) {
     auto regulatoryBtn = new ButtonControl(tr("Regulatory"), tr("VIEW"), "");
     connect(regulatoryBtn, &ButtonControl::clicked, [=]() {
       const std::string txt = util::read_file("../assets/offroad/fcc.html");
@@ -439,7 +439,7 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
   };
 
 #ifdef ENABLE_MAPS
-  if (!params.getBool("NavDisable")) {
+  if (params.getBool("NavEnable")) {
     auto map_panel = new MapPanel(this);
     panels.push_back({tr("Navigation"), map_panel});
     QObject::connect(map_panel, &MapPanel::closeSettings, this, &SettingsWindow::closeSettings);
@@ -593,81 +593,81 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   )");
 
-  auto gitpull_btn = new ButtonControl("Git Fetch and Reset", tr("RUN"));
+  auto gitpull_btn = new ButtonControl(tr("Git Fetch and Reset"), tr("RUN"));
   QObject::connect(gitpull_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/gitpull.sh");
     }
   });
-  communityLayout->addWidget(gitpull_btn);
 
-  auto restart_btn = new ButtonControl("Restart", tr("RUN"));
+  /*auto restart_btn = new ButtonControl(tr("Restart"), tr("RUN"));
   QObject::connect(restart_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/restart.sh");
     }
   });
-  communityLayout->addWidget(restart_btn);
+  communityLayout->addWidget(restart_btn);*/
 
-  auto cleardtc_btn = new ButtonControl("Clear DTC", tr("RUN"));
+  auto cleardtc_btn = new ButtonControl(tr("Clear DTC"), tr("RUN"));
   QObject::connect(cleardtc_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/cleardtc.sh");
     }
   });
-  communityLayout->addWidget(cleardtc_btn);
 
-  auto tmuxlog_btn = new ButtonControl("Tmux error log", tr("RUN"));
+  auto tmuxlog_btn = new ButtonControl(tr("Tmux error log"), tr("RUN"));
   QObject::connect(tmuxlog_btn, &ButtonControl::clicked, [=]() {
     const std::string txt = util::read_file("/data/tmux_error.log");
     ConfirmationDialog::rich(QString::fromStdString(txt), this);
   });
-  communityLayout->addWidget(tmuxlog_btn);
 
+  communityLayout->addWidget(gitpull_btn);
+  communityLayout->addWidget(cleardtc_btn);
+  communityLayout->addWidget(tmuxlog_btn);
+  communityLayout->addWidget(horizontal_line());
+  communityLayout->addWidget(new LateralControlSelect());
+  communityLayout->addWidget(new MfcSelect());
+  communityLayout->addWidget(new AebSelect());
   communityLayout->addWidget(horizontal_line());
 
-  auto pandareset_btn = new ButtonControl("Panda Reset", tr("RUN"));
+  auto pandareset_btn = new ButtonControl(tr("Panda Reset"), tr("RUN"));
   QObject::connect(pandareset_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/panda_reset.sh");
     }
   });
-  communityLayout->addWidget(pandareset_btn);
 
-  auto pandaflash_btn = new ButtonControl("Panda Flash", tr("RUN"));
+  auto pandaflash_btn = new ButtonControl(tr("Panda Flash"), tr("RUN"));
   QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/panda/board/flash.sh");
     }
   });
-  communityLayout->addWidget(pandaflash_btn);
 
-  auto pandarecover_btn = new ButtonControl("Panda Recover", tr("RUN"));
+  auto pandarecover_btn = new ButtonControl(tr("Panda Recover"), tr("RUN"));
   QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/panda/board/recover.sh");
     }
   });
-  communityLayout->addWidget(pandarecover_btn);
 
-  auto pandadefault_btn = new ButtonControl("Panda Safety Change to Default", tr("RUN"));
+  auto pandadefault_btn = new ButtonControl(tr("Panda Safety Change to Default"), tr("RUN"));
   QObject::connect(pandadefault_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/script/add/panda_default.sh");
     }
   });
 
-  auto pandamdps_btn = new ButtonControl("Panda Safety Change to MDPS", tr("RUN"));
+  auto pandamdps_btn = new ButtonControl(tr("Panda Safety Change to MDPS"), tr("RUN"));
   QObject::connect(pandamdps_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/script/add/panda_mdps.sh");
     }
   });
 
-  communityLayout->addWidget(horizontal_line());
-  communityLayout->addWidget(new LateralControlSelect());
-  communityLayout->addWidget(new MfcSelect());
-  communityLayout->addWidget(new AebSelect());
+  communityLayout->addWidget(pandareset_btn);
+  communityLayout->addWidget(pandaflash_btn);
+  communityLayout->addWidget(pandarecover_btn);
   communityLayout->addWidget(new PandaSafetySelect());
   if (params.getBool("PandaSafetySelect")) {
     communityLayout->addWidget(pandadefault_btn);
@@ -678,36 +678,31 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   // add community toggle
   QList<ParamControl*> toggles;
-  toggles.append(new ParamControl("PutPrebuilt",
+  toggles.append(new ParamControl("PrebuiltEnable",
                                   tr("Prebuilt Enable"),
-                                  tr("Create prebuilt files to speed bootup"),
+                                  tr("Create prebuilt file to speed bootup"),
                                   "../assets/offroad/icon_addon.png",
                                   this));
-  toggles.append(new ParamControl("LoggerDisable",
-                                  tr("Logger Disable"),
-                                  tr("Disable Logger is Reduce system load"),
+  toggles.append(new ParamControl("LoggerEnable",
+                                  tr("Logger Enable"),
+                                  tr("Turn off this option to reduce system load"),
                                   "../assets/offroad/icon_addon.png",
                                   this));
-  toggles.append(new ParamControl("NavDisable",
-                                  tr("Navigation Disable"),
-                                  tr("Navigation Function not use"),
+  toggles.append(new ParamControl("NavEnable",
+                                  tr("Navigation Enable"),
+                                  tr("Navigation Features use"),
                                   "../assets/offroad/icon_map.png",
-                                  this));
-  toggles.append(new ParamControl("CustomMapbox",
-                                  tr("CustomMapBox Input"),
-                                  tr("Navigation Function not use"),
-                                  "../assets/offroad/icon_map.png",
-                                  this));
-  toggles.append(new ParamControl("NewRadarInterface",
-                                  tr("New radar interface Enable"),
-                                  tr("Some newer car New radar interface"),
-                                  "../assets/offroad/icon_warning.png",
                                   this));
   toggles.append(new ParamControl("SccOnBus2",
                                   tr("Scc on Bus 2"),
                                   tr("If Scc is on bus 2, turn it on."),
                                   "../assets/offroad/icon_long.png",
                                   this));
+  /*toggles.append(new ParamControl("MandoRadarEnable",
+                                  tr("Mando Radar interface Enable"),
+                                  tr("Mando Radar interface use (disable AEB)"),
+                                  "../assets/offroad/icon_warning.png",
+                                  this));*/
   for (ParamControl *toggle : toggles) {
     if (main_layout->count() != 0) {
     }
