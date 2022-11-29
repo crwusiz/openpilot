@@ -32,13 +32,10 @@ class CarState(CarStateBase):
       self.shifter_values = can_define.dv["LVR12"]["CF_Lvr_Gear"]
 
     #Auto detection for setup
-    self.eps_bus = CP.epsBus
-    self.scc_bus = CP.sccBus
-    self.eps_error_cnt = 0
-
     self.is_metric = False
     self.brake_error = False
     self.buttons_counter = 0
+    self.eps_error_cnt = 0
 
     self.cruise_info = {}
 

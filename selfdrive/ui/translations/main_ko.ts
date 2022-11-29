@@ -802,7 +802,7 @@ location set</source>
     <name>RichTextDialog</name>
     <message>
         <source>Ok</source>
-        <translation>확인</translation>
+        <translation type="vanished">확인</translation>
     </message>
 </context>
 <context>

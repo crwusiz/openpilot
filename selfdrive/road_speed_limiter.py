@@ -22,6 +22,7 @@ class Port:
   RECEIVE_PORT = 2843
   LOCATION_PORT = BROADCAST_PORT
 
+
 class RoadLimitSpeedServer:
   def __init__(self):
     self.lock = threading.Lock()
@@ -191,7 +192,6 @@ class RoadLimitSpeedServer:
         self.json_road_limit = None
       finally:
         self.lock.release()
-
     return ret
 
 
@@ -203,7 +203,6 @@ class RoadLimitSpeedServer:
         self.json_road_limit = None
       finally:
         self.lock.release()
-
     if now - self.last_updated_active > 6.:
       self.active = 0
 
@@ -220,7 +219,6 @@ class RoadLimitSpeedServer:
         return json[key]
     except:
       pass
-
     return default
 
 
@@ -253,12 +251,14 @@ def main():
     except Exception as e:
       server.last_exception = e
 
+
 class RoadSpeedLimiter:
   def __init__(self):
     self.slowing_down = False
     self.started_dist = 0
     self.sock = messaging.sub_sock("roadLimitSpeed")
     self.roadLimitSpeed = None
+
 
   def recv(self):
     try:
@@ -268,11 +268,13 @@ class RoadSpeedLimiter:
     except:
       pass
 
+
   def get_active(self):
     self.recv()
     if self.roadLimitSpeed is not None:
       return self.roadLimitSpeed.active
     return 0
+
 
   def get_max_speed(self, cluster_speed, is_metric):
     self.recv()

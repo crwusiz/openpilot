@@ -197,8 +197,6 @@ public:
   PandaSafetySelect();
 
 private:
-  QPushButton btnplus;
-  QPushButton btnminus;
   QLabel label;
 
   void refresh();

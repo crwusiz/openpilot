@@ -464,7 +464,7 @@ class CarInterface(CarInterfaceBase):
       self.low_speed_alert = True
     if ret.vEgo > (self.CP.minSteerSpeed + 4.):
       self.low_speed_alert = False
-    if self.low_speed_alert and not self.CS.eps_bus:
+    if self.low_speed_alert and not self.CP.epsBus:
       events.add(car.CarEvent.EventName.belowSteerSpeed)
 
     ret.events = events.to_msg()

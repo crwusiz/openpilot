@@ -101,12 +101,15 @@ function launch {
   sed 's/.\{4\}$//' /data/params/d/GitRemote > /data/params/d/GitRemote_
 
   # panda safety init
-  if [ -f /data/PANDA_DEFAULT ]; then
+  if [ ! -f "/data/PANDA_DEFAULT" ] && [ ! -f "/data/PANDA_MDPS" ]; then
+    touch /data/PANDA_DEFAULT
+    echo -n "0" > /data/params/d/PandaSafetySelect
+  elif [ -f "/data/PANDA_DEFAULT" ]; then
     cp -f /data/openpilot/scripts/add/main.c /data/openpilot/panda/board/
     cp -f /data/openpilot/scripts/add/safety_defaults.h /data/openpilot/panda/board/safety/
     cp -f /data/openpilot/scripts/add/bxcan.h /data/openpilot/panda/board/drivers/
     echo -n "0" > /data/params/d/PandaSafetySelect
-  elif [ -f /data/PANDA_MDPS ]; then
+  elif [ -f "/data/PANDA_MDPS" ]; then
     cp -f /data/openpilot/scripts/add/main_mdps.c /data/openpilot/panda/board/main.c
     cp -f /data/openpilot/scripts/add/safety_defaults_mdps.h /data/openpilot/panda/board/safety/safety_defaults.h
     cp -f /data/openpilot/scripts/add/bxcan_mdps.h /data/openpilot/panda/board/drivers/bxcan.h

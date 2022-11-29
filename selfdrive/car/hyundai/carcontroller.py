@@ -66,9 +66,6 @@ class CarController:
     self.turning_signal_timer = 0
     self.turning_indicator_alert = False
 
-    self.mfc_lfa = Params().get("MfcSelect", encoding='utf8') == "2"
-
-
   def update(self, CC, CS, controls):
     actuators = CC.actuators
     hud_control = CC.hudControl
@@ -169,27 +166,28 @@ class CarController:
                 can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, CS.buttons_counter+1, Buttons.RES_ACCEL))
               self.last_button_frame = self.frame
     else:
-      # mdps enabled speed message
-      clu11_speed = CS.clu11["CF_Clu_Vanz"]
-      enabled_speed = 60 if CS.is_metric else 38
-      if clu11_speed > enabled_speed or not CC.latActive:
-        enabled_speed = clu11_speed
-
       # send lkas11 bus 0
       can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, lat_active, torque_fault, sys_warning, sys_state,
-                                                CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning, 0, CS.lkas11))
+                                                CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning,
+                                                0, CS.lkas11))
 
-      # send lkas11 bus 1
-      if CS.eps_bus or CS.scc_bus == 1:
+      clu11_speed = CS.clu11["CF_Clu_Vanz"]
+      panda_safety_select = Params().get("PandaSafetySelect", encoding='utf8')
+      if panda_safety_select == "1" and self.CP.epsBus:
+        # mdps enabled speed message
+        enabled_speed = 60 if CS.is_metric else 38
+        if clu11_speed > enabled_speed or not CC.latActive:
+          enabled_speed = clu11_speed
+
+        # send lkas11 bus 1
         can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, lat_active, torque_fault, sys_warning, sys_state,
-                                                  CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning, 1, CS.lkas11))
+                                                  CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning,
+                                                  1, CS.lkas11))
 
-      # send clu11 to eps if it is not on bus 0
-      if self.frame % 2 and CS.eps_bus:
-        can_sends.append(hyundaican.create_clu11(self.packer, self.frame, CS.eps_bus, Buttons.NONE, enabled_speed, CS.clu11))
+        # send clu11 to eps
+        can_sends.append(hyundaican.create_clu11(self.packer, self.frame, self.CP.epsBus, Buttons.NONE, enabled_speed, CS.clu11))
 
-      # send mdps12 to LKAS to prevent LKAS error
-      if CS.eps_bus:
+        # send mdps12 to LKAS to prevent LKAS error
         can_sends.append(hyundaican.create_mdps12(self.packer, self.frame, CS.mdps12))
 
       # fix auto resume - by neokii
@@ -203,7 +201,7 @@ class CarController:
         elif self.resume_wait_timer > 0:
           self.resume_wait_timer -= 1
         elif abs(CS.lead_distance - self.last_lead_distance) > 0.1:
-          can_sends.append(hyundaican.create_clu11(self.packer, self.frame, CS.scc_bus, Buttons.RES_ACCEL, clu11_speed, CS.clu11))
+          can_sends.append(hyundaican.create_clu11(self.packer, self.frame, self.CP.sccBus, Buttons.RES_ACCEL, clu11_speed, CS.clu11))
           self.resume_cnt += 1
           if self.resume_cnt >= int(randint(4, 5) * 2):
             self.resume_cnt = 0
@@ -215,7 +213,7 @@ class CarController:
       self.scc_smoother.update(CC.enabled, can_sends, self.packer, CC, CS, self.frame, controls)
 
       # send scc to car if longcontrol enabled and SCC not on bus 0 or not live
-      if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl and CS.out.cruiseState.enabled and (CS.scc_bus or not self.scc_live):
+      if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl and CS.out.cruiseState.enabled and (self.CP.sccBus or not self.scc_live):
         jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0
         can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), CC.enabled and CC.longActive, accel, jerk,
                                                         hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, self.scc_live, CS))
@@ -226,12 +224,12 @@ class CarController:
       # 20 Hz LFA MFA message
       if self.frame % 5 == 0:
         activated_hda = road_speed_limiter_get_active()  # 0 off, 1 main road, 2 highway
-        if self.mfc_lfa:
+        if Params().get("MfcSelect", encoding='utf8') == "2":
           can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, activated_hda))
 
       # 5 Hz ACC options
-      #if all([self.frame % 20 == 0, self.CP.openpilotLongitudinalControl]):
-      #  can_sends.extend(hyundaican.create_acc_opt(self.packer, CS))
+      #if self.frame % 20 == 0 and self.CP.openpilotLongitudinalControl:
+      #  can_sends.extend(hyundaican.create_acc_opt(self.packer))
 
       # 2 Hz front radar options
       #if self.frame % 50 == 0 and self.CP.openpilotLongitudinalControl:

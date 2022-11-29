@@ -220,6 +220,7 @@ class Controls:
     self.rk = Ratekeeper(100, print_delay_threshold=None)
     self.prof = Profiler(False)  # off by default
 
+
   def set_initial_state(self):
     if REPLAY:
       controls_state = Params().get("ReplayControlsState")
@@ -229,6 +230,7 @@ class Controls:
 
       if any(ps.controlsAllowed for ps in self.sm['pandaStates']):
         self.state = State.enabled
+
 
   def update_events(self, CS):
     """Compute carEvents from carState"""
@@ -440,6 +442,7 @@ class Controls:
     #  and self.CP.openpilotLongitudinalControl and CS.vEgo < 0.3:
     #  self.events.add(EventName.noTarget)
 
+
   def data_sample(self):
     """Receive data from sockets and update carState"""
 
@@ -482,6 +485,7 @@ class Controls:
     self.distance_traveled += CS.vEgo * DT_CTRL
 
     return CS
+
 
   def state_transition(self, CS):
     """Compute conditional state transitions and execute actions on state transitions"""
@@ -566,6 +570,7 @@ class Controls:
     self.active = self.state in ACTIVE_STATES
     if self.active:
       self.current_alert_types.append(ET.WARNING)
+
 
   def state_control(self, CS):
     """Given the state, this function returns a CarControl packet"""
@@ -667,6 +672,7 @@ class Controls:
 
     return CC, lac_log
 
+
   def publish_logs(self, CS, start_time, CC, lac_log):
     """Send actuators and hud commands to the car, send controlsstate and MPC logging"""
 
@@ -750,6 +756,9 @@ class Controls:
     steer_angle_without_offset = math.radians(CS.steeringAngleDeg - lp.angleOffsetDeg)
     curvature = -self.VM.calc_curvature(steer_angle_without_offset, CS.vEgo, lp.roll)
 
+    if self.CP.openpilotLongitudinalControl and (self.CP.carName == "hyundai"):
+      self.v_cruise_helper.v_cruise_kph = self.applyMaxSpeed
+
     # controlsState
     dat = messaging.new_message('controlsState')
     dat.valid = CS.canValid
@@ -775,7 +784,7 @@ class Controls:
     controlsState.engageable = not self.events.any(ET.NO_ENTRY)
     controlsState.longControlState = self.LoC.long_control_state
     controlsState.vPid = float(self.LoC.v_pid)
-    controlsState.vCruise = float(self.applyMaxSpeed if self.CP.openpilotLongitudinalControl else self.v_cruise_helper.v_cruise_kph)
+    controlsState.vCruise = float(self.v_cruise_helper.v_cruise_kph)
     controlsState.vCruiseCluster = float(self.v_cruise_helper.v_cruise_cluster_kph)
     controlsState.upAccelCmd = float(self.LoC.pid.p)
     controlsState.uiAccelCmd = float(self.LoC.pid.i)
@@ -836,6 +845,7 @@ class Controls:
 
     # copy CarControl to pass to CarInterface on the next iteration
     self.CC = CC
+
 
   def step(self):
     start_time = sec_since_boot()

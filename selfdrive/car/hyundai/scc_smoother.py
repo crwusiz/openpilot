@@ -48,6 +48,7 @@ class SccSmoother:
 
 
   def __init__(self, CP):
+    self.CP = CP
     self.btn = Buttons.NONE
 
     self.started_frame = 0
@@ -69,6 +70,7 @@ class SccSmoother:
     self.is_metric = Params().get_bool("IsMetric")
     self.long_control = CP.openpilotLongitudinalControl
     self.can_fd = CP.carFingerprint in CANFD_CAR
+    self.scc_bus = CP.sccBus
 
     self.speed_conv_to_ms = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
     self.speed_conv_to_clu = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH
@@ -189,9 +191,9 @@ class SccSmoother:
       if self.btn != Buttons.NONE:
 
         if self.can_fd:
-          can_sends.append(hyundaicanfd.create_buttons(packer, CS.buttons_counter + 1, self.btn))
+          can_sends.append(hyundaicanfd.create_buttons(packer, self.CP, CS.buttons_counter + 1, self.btn))
         else:
-          can_sends.append(hyundaican.create_clu11(packer, frame, CS.scc_bus, self.btn, clu_speed, CS.clu11))
+          can_sends.append(hyundaican.create_clu11(packer, frame, self.scc_bus, self.btn, clu_speed, CS.clu11))
 
         if self.alive_timer == 0:
           self.started_frame = frame
