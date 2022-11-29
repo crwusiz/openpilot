@@ -6,7 +6,7 @@ from common.numpy_fast import interp
 from common.conversions import Conversions as CV
 from selfdrive.car.hyundai.values import HyundaiFlags, CAR, Buttons, CarControllerParams, CANFD_CAR, EV_CAR, HEV_CAR, LEGACY_SAFETY_MODE_CAR
 from selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR
-from selfdrive.car import STD_CARGO_KG, create_button_event, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
+from selfdrive.car import STD_CARGO_KG, create_button_event, scale_tire_stiffness, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
 from selfdrive.car.disable_ecu import disable_ecu
@@ -29,9 +29,7 @@ class CarInterface(CarInterfaceBase):
     return CarControllerParams.ACCEL_MIN, interp(v_current_kph, gas_max_bp, gas_max_v)
 
   @staticmethod
-  def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=[], experimental_long=False):  # pylint: disable=dangerous-default-value
-    ret = CarInterfaceBase.get_std_params(candidate, fingerprint)
-
+  def _get_params(ret, candidate, fingerprint, car_fw, experimental_long):
     ret.carName = "hyundai"
 
     if candidate in CANFD_CAR:
@@ -385,12 +383,7 @@ class CarInterface(CarInterfaceBase):
         ret.hasScc13 = 1290 in fingerprint[0] or 1290 in fingerprint[2]
         ret.hasScc14 = 905 in fingerprint[0] or 905 in fingerprint[2]
 
-    if ret.centerToFront == 0:
-      ret.centerToFront = ret.wheelbase * 0.4
-
-    # TODO: get actual value, for now starting with reasonable value for
-    # civic and scaling by mass and wheelbase
-    ret.rotationalInertia = scale_rot_inertia(ret.mass, ret.wheelbase)
+    ret.centerToFront = ret.wheelbase * 0.4
 
     # TODO: start from empirically derived lateral slip stiffness for the civic and scale by
     # mass and CG position, so all cars will have approximately similar dyn behaviors
