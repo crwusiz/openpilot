@@ -63,6 +63,7 @@ procs = [
 
   # Process add
   PythonProcess("road_speed_limiter", "selfdrive.road_speed_limiter", offroad=True, enabled=TICI),
+  PythonProcess("otisserv", "selfdrive.navd.otisserv", offroad=True),
 ]
 
 managed_processes = {p.name: p for p in procs}

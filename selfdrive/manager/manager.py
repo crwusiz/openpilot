@@ -154,7 +154,7 @@ def manager_thread() -> None:
   if params.get_bool("LoggerDisable"):
     ignore += ["loggerd", "encoderd", "deleter", "logmessaged", "tombstoned", "uploader", "updated", "statsd"]
   if params.get_bool("NavDisable"):
-    ignore += ["navd"]
+    ignore += ["navd", "otisserv"]
 
   ignore += [x for x in os.getenv("BLOCK", "").split(",") if len(x) > 0]
 

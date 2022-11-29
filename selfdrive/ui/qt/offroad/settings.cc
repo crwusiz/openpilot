@@ -97,7 +97,7 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "NavSettingLeftSide",
       tr("Show Map on Left Side of UI"),
       tr("Show map on left side when in split screen view."),
-      "../assets/offroad/icon_road.png",
+      "../assets/offroad/icon_map.png",
     },
 #endif
   };
@@ -691,12 +691,17 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   toggles.append(new ParamControl("NavDisable",
                                   tr("Navigation Disable"),
                                   tr("Navigation Function not use"),
-                                  "../assets/offroad/icon_addon.png",
+                                  "../assets/offroad/icon_map.png",
+                                  this));
+  toggles.append(new ParamControl("CustomMapbox",
+                                  tr("CustomMapBox Input"),
+                                  tr("Navigation Function not use"),
+                                  "../assets/offroad/icon_map.png",
                                   this));
   toggles.append(new ParamControl("NewRadarInterface",
                                   tr("New radar interface Enable"),
                                   tr("Some newer car New radar interface"),
-                                  "../assets/offroad/icon_road.png",
+                                  "../assets/offroad/icon_warning.png",
                                   this));
   toggles.append(new ParamControl("SccOnBus2",
                                   tr("Scc on Bus 2"),

@@ -212,6 +212,11 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"SoftRestartTriggered", CLEAR_ON_MANAGER_START},
     {"NewRadarInterface", PERSISTENT},
     {"SccOnBus2", PERSISTENT},
+    {"CustomMapbox", PERSISTENT },
+    {"CustomMapboxTokenPk", PERSISTENT },
+    {"CustomMapboxTokenSk", PERSISTENT },
+    {"EnableGmap", PERSISTENT},
+    {"GmapKey", PERSISTENT },
 };
 
 } // namespace
