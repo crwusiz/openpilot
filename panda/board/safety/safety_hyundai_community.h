@@ -152,7 +152,7 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
   bool is_clu11_msg = addr == 1265;
 
   if (!valid) {
-    puts("  CAN RX invalid addr : ["); puth(addr); puts("]\n");
+    print("  CAN RX invalid addr : ["); puth(addr); print("]\n");
   }
 
   if ((bus == 1) && lcan_bus1) {
@@ -165,7 +165,7 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
     if (fwd_bus1 || !lcan_bus1) {
       lcan_bus1 = true;
       fwd_bus1 = false;
-      puts("  forwarding disabled : LCAN on bus ["); puth(bus); puts("]\n");
+      print("  forwarding disabled : LCAN on bus ["); puth(bus); print("]\n");
     }
   }
 
@@ -174,20 +174,20 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
     if ((bus == 0) && fwd_bus2) {
       fwd_bus2 = false;
       lkas11_bus0_cnt = 20;
-      puts("  forwarding disabled : LKAS11 on bus ["); puth(bus); puts("]\n");
+      print("  forwarding disabled : LKAS11 on bus ["); puth(bus); print("]\n");
     }
     if (bus == 2) {
       if (lkas11_bus0_cnt > 0) {
         lkas11_bus0_cnt--;
       } else if (!fwd_bus2) {
         fwd_bus2 = true;
-        puts("  forwarding enabled : LKAS11 on bus ["); puth(bus); puts("]\n");
+        print("  forwarding enabled : LKAS11 on bus ["); puth(bus); print("]\n");
       }
       if (lcan_bus1_cnt > 0) {
         lcan_bus1_cnt--;
       } else if (lcan_bus1) {
         lcan_bus1 = false;
-        puts("  LCAN not on bus [1]\n");
+        print("  LCAN not on bus [1]\n");
       }
     }
   }
@@ -197,10 +197,10 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
     if ((bus != 1) || !lcan_bus1) {
       eps_bus = bus;
       if (bus == 1) {
-        puts("  EPS on bus ["); puth(bus); puts("]\n");
+        print("  EPS on bus ["); puth(bus); print("]\n");
         if (!fwd_bus1 && !lcan_bus1) {
           fwd_bus1 = true;
-          puts("  forwarding enabled : EPS on bus ["); puth(bus); puts("]\n");
+          print("  forwarding enabled : EPS on bus ["); puth(bus); print("]\n");
         }
       }
     }
@@ -211,14 +211,14 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
     if ((bus != 1) || !lcan_bus1) {
       scc_bus = bus;
       if (bus == 1) {
-        puts("  scc on bus ["); puth(bus); puts("]\n");
+        print("  scc on bus ["); puth(bus); print("]\n");
         if (!fwd_bus1) {
           fwd_bus1 = true;
-          puts("  forwarding enabled : SCC on bus ["); puth(bus); puts("]\n");
+          print("  forwarding enabled : SCC on bus ["); puth(bus); print("]\n");
         }
       }
       if (bus == 2) {
-        puts("  SCC on bus ["); puth(bus); puts("]\n");
+        print("  SCC on bus ["); puth(bus); print("]\n");
       }
     }
   }
@@ -287,7 +287,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
 
   if (!msg_allowed(to_send, HYUNDAI_COMMUNITY_TX_MSGS, sizeof(HYUNDAI_COMMUNITY_TX_MSGS) / sizeof(HYUNDAI_COMMUNITY_TX_MSGS[0]))) {
     tx = 0;
-    puts("  CAN TX not allowed: ["); puth(addr); puts("], ["); puth(bus); puts("]\n");
+    print("  CAN TX not allowed: ["); puth(addr); print("], ["); puth(bus); print("]\n");
   }
 
   // FCA11: Block any potential actuation
@@ -343,7 +343,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
       bool torque_check = 0;
       violation |= torque_check = max_limit_check(desired_torque, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer, -HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer);
       if (torque_check) {
-        puts("  lkas TX not allowed : torque limit check failed!\n");}
+        print("  lkas TX not allowed : torque limit check failed!\n");}
 
       // *** torque rate limit check ***
       bool torque_rate_check = 0;
@@ -351,7 +351,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
         HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_rate_up, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_rate_down,
         HYUNDAI_COMMUNITY_STEERING_LIMITS.driver_torque_allowance, HYUNDAI_COMMUNITY_STEERING_LIMITS.driver_torque_factor);
       if (torque_rate_check) {
-        puts("  lkas TX not allowed : torque rate limit check failed!\n");}
+        print("  lkas TX not allowed : torque rate limit check failed!\n");}
 
       // used next time
       desired_torque_last = desired_torque;
@@ -360,7 +360,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
       bool torque_rt_check = 0;
       violation |= torque_rt_check = rt_rate_limit_check(desired_torque, rt_torque_last, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_rt_delta);
       if (torque_rt_check) {
-        puts("  lkas TX not allowed : torque real time rate limit check failed!\n");}
+        print("  lkas TX not allowed : torque real time rate limit check failed!\n");}
 
       // every RT_INTERVAL set the new limits
       uint32_t ts_elapsed = get_ts_elapsed(ts, ts_torque_check_last);
@@ -373,7 +373,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
     // no torque if controls is not allowed
     if (!controls_allowed && (desired_torque != 0)) {
       violation = 1;
-      puts("  lkas torque not allowed : controls not allowed!\n");
+      print("  lkas torque not allowed : controls not allowed!\n");
     }
 
     // reset to 0 if either controls is not allowed or there's a violation
