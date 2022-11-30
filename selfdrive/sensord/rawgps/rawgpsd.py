@@ -87,11 +87,10 @@ def try_setup_logs(diag, log_types):
   else:
     raise Exception(f"setup logs failed, {log_types=}")
 
-
 def at_cmd(cmd: str) -> None:
   for _ in range(5):
     try:
-      subprocess.check_call(f"mmcli -m any --timeout 50 --command='{cmd}'", shell=True)
+      subprocess.check_call(f"mmcli -m any --timeout 30 --command='{cmd}'", shell=True)
       break
     except subprocess.CalledProcessError:
       cloudlog.exception("rawgps.mmcli_command_failed")
@@ -105,7 +104,6 @@ def gps_enabled() -> bool:
     return b"QGPS: 1" in p
   except subprocess.CalledProcessError as exc:
     raise Exception("failed to execute QGPS mmcli command") from exc
-
 
 def setup_quectel(diag: ModemDiag):
   # enable OEMDRE in the NV
@@ -149,7 +147,6 @@ def setup_quectel(diag: ModemDiag):
     0,0
   ))
 
-
 def teardown_quectel(diag):
   at_cmd("AT+QGPSCFG=\"outport\",\"none\"")
   if gps_enabled():
@@ -175,7 +172,7 @@ def main() -> NoReturn:
   # wait for ModemManager to come up
   cloudlog.warning("waiting for modem to come up")
   while True:
-    ret = subprocess.call("mmcli -m any --timeout 30 --command=\"AT+QGPS?\"", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+    ret = subprocess.call("mmcli -m any --timeout 10 --command=\"AT+QGPS?\"", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
     if ret == 0:
       break
     time.sleep(0.1)
@@ -359,7 +356,6 @@ def main() -> NoReturn:
               setattr(sv, k, v)
 
       pm.send('qcomGnss', msg)
-
 
 if __name__ == "__main__":
   main()
