@@ -732,10 +732,10 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
                               visual_alert=VisualAlert.brakePressed),
   },
 
-  EventName.pedalPressedPreEnable: {
+  EventName.preEnableStandstill: {
     ET.PRE_ENABLE: Alert(
-      #"Release Pedal to Engage",
-      "가속페달로 활성화됩니다",
+      #"Release Brake to Engage",
+      "브레이크를 해제하면 활성화됩니다",
       "",
       AlertStatus.normal, AlertSize.small,
       Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .1, creation_delay=1.),
