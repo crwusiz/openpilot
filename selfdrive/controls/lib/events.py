@@ -1116,17 +1116,6 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
     ET.NO_ENTRY: NoEntryAlert("하네스 릴레이 오작동"),
   },
 
-  EventName.noTarget: {
-    ET.IMMEDIATE_DISABLE: Alert(
-      #"openpilot Canceled",
-      #"No close lead car",
-      "오픈파일럿 사용불가",
-      "근접 앞차량이 없습니다",
-      AlertStatus.normal, AlertSize.mid,
-      Priority.HIGH, VisualAlert.none, AudibleAlert.disengage, 3.),
-    ET.NO_ENTRY: NoEntryAlert("No Close Lead Car"),
-  },
-
   EventName.speedTooLow: {
     ET.IMMEDIATE_DISABLE: Alert(
       #"openpilot Canceled",
@@ -1197,11 +1186,5 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   EventName.cruiseOff: {
     ET.PERMANENT: Alert("", "", AlertStatus.normal, AlertSize.none,
                         Priority.MID, VisualAlert.none, AudibleAlert.cruiseOff, 1.),
-  },
-
-  EventName.noTargetAcc: {
-    #ET.PERMANENT: Alert("Cruise Canceled", "No close lead car", AlertStatus.normal, AlertSize.mid,
-    ET.PERMANENT: Alert("크루즈 취소됨", "선행 차량이 없습니다", AlertStatus.normal, AlertSize.mid,
-                        Priority.HIGH, VisualAlert.none, AudibleAlert.prompt, 1.),
   },
 }
