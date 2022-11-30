@@ -18,7 +18,7 @@ const SteeringLimits HYUNDAI_COMMUNITY_STEERING_LIMITS = {
   .has_steer_req_tolerance = true,
 };
 
-const LongitudinalLimits HYUNDAI_LONG_LIMITS = {
+const LongitudinalLimits HYUNDAI_COMMUNITY_LONG_LIMITS = {
   .max_accel = 200,   // 1/100 m/s2
   .min_accel = -350,  // 1/100 m/s2
 };
@@ -311,8 +311,8 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
 
     bool violation = false;
 
-    violation |= longitudinal_accel_checks(desired_accel_raw, HYUNDAI_LONG_LIMITS, longitudinal_allowed);
-    violation |= longitudinal_accel_checks(desired_accel_val, HYUNDAI_LONG_LIMITS, longitudinal_allowed);
+    violation |= longitudinal_accel_checks(desired_accel_raw, HYUNDAI_COMMUNITY_LONG_LIMITS, longitudinal_allowed);
+    violation |= longitudinal_accel_checks(desired_accel_val, HYUNDAI_COMMUNITY_LONG_LIMITS, longitudinal_allowed);
 
     violation |= (aeb_decel_cmd != 0);
     violation |= (aeb_req != 0);
@@ -332,7 +332,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
     }
   }*/
 
-  if (is_lkas11_msg) {  // LKAS11
+  if (is_lkas11_msg) {
     lkas11_op = 20;
     int desired_torque = ((GET_BYTES_04(to_send) >> 16) & 0x7ffU) - 1024U;
     uint32_t ts = microsecond_timer_get();
@@ -387,6 +387,13 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
       tx = 0;
     }
   }
+
+  // UDS: Only tester present ("\x02\x3E\x80\x00\x00\x00\x00\x00") allowed on diagnostics address
+  /*if (addr == 2000) {
+    if ((GET_BYTES_04(to_send) != 0x00803E02U) || (GET_BYTES_48(to_send) != 0x0U)) {
+      tx = 0;
+    }
+  }*/
 
   // BUTTONS: used for resume spamming and cruise cancellation
   if (is_clu11_msg && !controls_allowed && (bus != eps_bus) && (eps_bus == 1)) {

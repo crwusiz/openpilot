@@ -1031,8 +1031,8 @@ PandaSafetySelect::PandaSafetySelect() : AbstractControl("Current Panda Safety [
 void PandaSafetySelect::refresh() {
   QString safety = QString::fromStdString(Params().get("PandaSafetySelect"));
   if (safety == "0") {
-    label.setText(QString::fromStdString("Default"));
+    label.setText(QString::fromStdString("[ Default ]"));
   } else if (safety == "1") {
-    label.setText(QString::fromStdString("MDPS"));
+    label.setText(QString::fromStdString("[ MDPS ]"));
   }
 }
