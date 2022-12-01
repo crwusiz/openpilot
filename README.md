@@ -14,7 +14,7 @@ crwusiz openpilot
 - event message, qt ui kor translate
 - brake, bsd, gps, wifi icon
 - wheel, N direction icon rotate
-- lateralcontrol select ( Pid / Indi / Lqr / Torque )
+- lateralControl select ( Pid / Indi / Lqr / Torque )
 - mfc select ( LDWS,LKAS / LFA )
 - aebsignal select ( SCC12 / FCA11 )
 - add community toggle / function / simple ui

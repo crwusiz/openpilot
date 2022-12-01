@@ -274,7 +274,7 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
   return valid;
 }
 
-static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_allowed) {
+static int hyundai_community_tx_hook(CANPacket_t *to_send) {
   int tx = 1;
   int addr = GET_ADDR(to_send);
   int bus = GET_BUS(to_send);
@@ -311,8 +311,8 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send, bool longitudinal_all
 
     bool violation = false;
 
-    violation |= longitudinal_accel_checks(desired_accel_raw, HYUNDAI_COMMUNITY_LONG_LIMITS, longitudinal_allowed);
-    violation |= longitudinal_accel_checks(desired_accel_val, HYUNDAI_COMMUNITY_LONG_LIMITS, longitudinal_allowed);
+    violation |= longitudinal_accel_checks(desired_accel_raw, HYUNDAI_COMMUNITY_LONG_LIMITS);
+    violation |= longitudinal_accel_checks(desired_accel_val, HYUNDAI_COMMUNITY_LONG_LIMITS);
 
     violation |= (aeb_decel_cmd != 0);
     violation |= (aeb_req != 0);

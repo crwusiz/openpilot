@@ -30,7 +30,6 @@ from selfdrive.controls.lib.vehicle_model import VehicleModel
 from selfdrive.locationd.calibrationd import Calibration
 from system.hardware import HARDWARE
 from selfdrive.manager.process_config import managed_processes
-from selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import AUTO_TR_CRUISE_GAP
 
 SOFT_DISABLE_TIME = 3  # seconds
 LDW_MIN_SPEED = 50 * CV.KPH_TO_MS
@@ -195,7 +194,6 @@ class Controls:
 
     # scc smoother
     self.applyMaxSpeed = 0
-    self.longControl = self.CP.openpilotLongitudinalControl
 
     # TODO: no longer necessary, aside from process replay
     self.sm['liveParameters'].valid = True
@@ -601,7 +599,7 @@ class Controls:
       # accel PID loop
       pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, CS.vEgo, self.v_cruise_helper.v_cruise_kph * CV.KPH_TO_MS)
       t_since_plan = (self.sm.frame - self.sm.rcv_frame['longitudinalPlan']) * DT_CTRL
-      actuators.accel = self.LoC.update(CC.longActive, CS, long_plan, pid_accel_limits, t_since_plan, self.sm['radarState'])
+      actuators.accel = self.LoC.update(CC.longActive, CS, long_plan, pid_accel_limits, t_since_plan)
 
       # Steering PID loop and lateral MPC
       self.desired_curvature, self.desired_curvature_rate = get_lag_adjusted_curvature(self.CP, CS.vEgo,
@@ -786,8 +784,7 @@ class Controls:
 
     # add
     controlsState.lateralControlSelect = int(self.lateral_control_select)
-    controlsState.autoTrGap = AUTO_TR_CRUISE_GAP
-    controlsState.longControl = self.longControl
+    controlsState.longControl = bool(self.CP.openpilotLongitudinalControl)
 
     lat_tuning = self.CP.lateralTuning.which()
     if self.joystick_mode:

@@ -195,7 +195,6 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   gap2_img = loadPixmap("../assets/img_gap2.png", {img_size, img_size});
   gap3_img = loadPixmap("../assets/img_gap3.png", {img_size, img_size});
   gap4_img = loadPixmap("../assets/img_gap4.png", {img_size, img_size});
-  gap_auto_img = loadPixmap("../assets/img_gap_auto.png", {img_size, img_size});
   turnsignal_l_img = loadPixmap("../assets/img_turnsignal_l.png", {img_size, img_size});
   turnsignal_r_img = loadPixmap("../assets/img_turnsignal_r.png", {img_size, img_size});
   tpms_img = loadPixmap("../assets/img_tpms.png");
@@ -287,9 +286,8 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("angleSteers", ce.getSteeringAngleDeg());
   setProperty("steerAngleDesired", cc.getActuators().getSteeringAngleDeg());
   setProperty("longControl", cs.getLongControl());
-  setProperty("gap", ce.getCruiseState().getGapAdjust());
-  setProperty("autoTrGap", cs.getAutoTrGap());
-  setProperty("lateralcontrol", cs.getLateralControlSelect());
+  setProperty("gap_state", ce.getCruiseState().getGapAdjust());
+  setProperty("lateralControl", cs.getLateralControlSelect());
   setProperty("steerRatio", lp.getSteerRatio());
   setProperty("epsBus", cp.getEpsBus());
   setProperty("sccBus", cp.getSccBus());
@@ -560,16 +558,14 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   drawIcon(p, x, y, dm_img, blackColor(100), dmActive ? 1.0 : 0.2);
 
   // scc gap icon (bottom right 1)
-  if (gap == 1) {
+  if (gap_state == 1) {
     gap_img = gap1_img;
-  } else if (gap == 2) {
+  } else if (gap_state == 2) {
     gap_img = gap2_img;
-  } else if (gap == 3) {
+  } else if (gap_state == 3) {
     gap_img = gap3_img;
-  } else if (gap == 4 && !longControl) {
+  } else if (gap_state == 4) {
     gap_img = gap4_img;
-  } else if ((gap == 4 || gap == autoTrGap) && longControl) {
-    gap_img = gap_auto_img;
   }
 
   x = radius / 2 + (bdr_s * 2) + radius;
@@ -603,7 +599,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   infoText.sprintf("EPS[%d] SCC[%d] SR[%.2f] [ %s ] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
     epsBus, sccBus,
     steerRatio,
-    lateral[lateralcontrol],
+    lateral[lateralControl],
     latAccelFactor, friction,
     latAccelFactorRaw, frictionRaw
   );
@@ -986,7 +982,7 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV
   float g_yo = sz / 10;
 
   QPointF glow[] = {{x + (sz * 1.35) + g_xo, y + sz + g_yo}, {x, y - g_yo}, {x - (sz * 1.35) - g_xo, y + sz + g_yo}};
-  painter.setBrush(is_radar ? orangeColor() : pinkColor());
+  painter.setBrush(is_radar ? redColor() : pinkColor());
   painter.drawPolygon(glow, std::size(glow));
 
   // chevron

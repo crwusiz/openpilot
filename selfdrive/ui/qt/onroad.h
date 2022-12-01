@@ -49,9 +49,8 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(int nda_state MEMBER nda_state);
   Q_PROPERTY(int wifi_state MEMBER wifi_state);
   Q_PROPERTY(int gpsSatelliteCount MEMBER gpsSatelliteCount);
-  Q_PROPERTY(int gap MEMBER gap);
-  Q_PROPERTY(int autoTrGap MEMBER autoTrGap);
-  Q_PROPERTY(int lateralcontrol MEMBER lateralcontrol);
+  Q_PROPERTY(int gap_state MEMBER gap_state);
+  Q_PROPERTY(int lateralControl MEMBER lateralControl);
   Q_PROPERTY(int epsBus MEMBER epsBus);
   Q_PROPERTY(int sccBus MEMBER sccBus);
   Q_PROPERTY(int camLimitSpeed MEMBER camLimitSpeed);
@@ -98,7 +97,7 @@ private:
 
   // crwusiz add
   QPixmap brake_img, bsd_l_img, bsd_r_img;
-  QPixmap gap_img, gap1_img, gap2_img, gap3_img, gap4_img, gap_auto_img;
+  QPixmap gap_img, gap1_img, gap2_img, gap3_img, gap4_img;
   QPixmap wifi_img, wifi_l_img, wifi_m_img, wifi_h_img, wifi_f_img;
   QPixmap gps_img, direction_img, tpms_img;
   QPixmap turnsignal_l_img, turnsignal_r_img;
@@ -112,7 +111,7 @@ private:
   const int img_size = (radius / 2) * 1.5;
 
   QString speedUnit;
-  float speed, applyMaxSpeed, cruiseMaxSpeed;
+  std::unique_ptr<PubMaster> pm;
 
   bool is_cruise_set = false;
   bool steeringPressed = false;
@@ -123,29 +122,28 @@ private:
   bool longControl = false;
   bool left_on, right_on = false;
   bool v_ego_cluster_seen = false;
+  bool wide_cam_requested = false;
 
   int status = STATUS_DISENGAGED;
-  std::unique_ptr<PubMaster> pm;
   int lead_status;
   int autohold_state = 0;
   int nda_state = 0;
   int wifi_state = 0;
   int gpsSatelliteCount = 0;
-  int accel, gap, autoTrGap = 0;
-  int lateralcontrol = 0;
+  int accel, gap_state = 0;
+  int lateralControl = 0;
   int epsBus, sccBus = 0;
   int camLimitSpeed ,camLimitSpeedLeftDist = 0;
   int sectionLimitSpeed, sectionLeftDist = 0;
+  int skip_frame_count = 0;
 
+  float speed, applyMaxSpeed, cruiseMaxSpeed;
   float lead_d_rel, lead_v_rel = 0;
   float gpsBearing, gpsVerticalAccuracy, gpsAltitude, gpsAccuracy = 0;
   float angleSteers, steerAngleDesired ,steerRatio = 0;
-  float fl,fr,rl,rr = 0;
+  float fl, fr, rl, rr = 0;
   float roadLimitSpeed = 0;
   float latAccelFactor, friction, latAccelFactorRaw, frictionRaw = 0;
-
-  int skip_frame_count = 0;
-  bool wide_cam_requested = false;
 
 protected:
   void paintGL() override;

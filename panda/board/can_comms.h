@@ -1,4 +1,4 @@
-/*
+﻿/*
   CAN transactions to and from the host come in the form of
   a 4 byte value called CAN_TRANSACTION_MAGIC followed by
   a certain number of CANPacket_t. The transaction is split

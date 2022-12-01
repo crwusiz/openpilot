@@ -110,11 +110,9 @@ class SccSmoother:
     road_speed_limiter = get_road_speed_limiter()
     apply_limit_speed, road_limit_speed, left_dist, first_started = road_speed_limiter.get_max_speed(clu_speed, self.is_metric)
 
-    curv_limit = 0
     self.cal_curve_speed(sm, CS.out.vEgo, frame)
     if self.curve_speed_ms >= MIN_CURVE_SPEED:
       max_speed_clu = min(controls.v_cruise_helper.v_cruise_kph * CV.KPH_TO_MS, self.curve_speed_ms) * self.speed_conv_to_clu
-      curv_limit = int(max_speed_clu)
     else:
       max_speed_clu = self.kph_to_clu(controls.v_cruise_helper.v_cruise_kph)
 
@@ -143,7 +141,6 @@ class SccSmoother:
       self.slowing_down = False
 
     lead_speed = self.get_long_lead_speed(clu_speed, sm)
-
     if lead_speed >= self.min_set_speed_clu:
       if lead_speed < max_speed_clu:
         max_speed_clu = min(max_speed_clu, lead_speed)
@@ -153,24 +150,27 @@ class SccSmoother:
     else:
       self.limited_lead = False
 
-    self.update_max_speed(int(round(max_speed_clu)), curv_limit != 0 and curv_limit == int(max_speed_clu))
+    max_speed = int(round(max_speed_clu))
+    if not self.long_control or self.max_speed_clu <= 0:
+      self.max_speed_clu = max_speed
+    else:
+      kp = 0.01
+      error = max_speed - self.max_speed_clu
+      self.max_speed_clu = self.max_speed_clu + error * kp
 
     return road_limit_speed, left_dist
 
 
   def update(self, enabled, can_sends, packer, CC, CS, frame, controls):
-    # mph or kph
     clu_speed = CS.out.vEgoCluster * self.speed_conv_to_clu
     cruise_speed = CS.out.cruiseState.speed
 
     road_limit_speed, left_dist = self.cal_max_speed(frame, CS, controls.sm, clu_speed, controls)
 
-    # kph
     controls.applyMaxSpeed = float(clip(cruise_speed * CV.MS_TO_KPH, V_CRUISE_MIN,
                                         self.max_speed_clu * self.speed_conv_to_ms * CV.MS_TO_KPH))
 
     ascc_enabled = enabled and CS.out.cruiseState.enabled and 1 < cruise_speed < 255 and not CS.out.brakePressed
-
     if not self.long_control:
       if not ascc_enabled or CS.out.cruiseState.standstill or CS.cruise_buttons[-1] != Buttons.NONE:
         self.reset()
@@ -231,15 +231,12 @@ class SccSmoother:
   def get_long_lead_speed(self, clu_speed, sm):
     if self.long_control:
       lead = self.get_lead(sm)
-
       if lead is not None:
         d = lead.dRel - 5.
-
         if 0. < d < -lead.vRel * (9. + 3.) * 2. and lead.vRel < -1.:
           t = d / lead.vRel
           accel = -(lead.vRel / t) * self.speed_conv_to_clu
           accel *= 1.2
-
           if accel < 0.:
             target_speed = clu_speed + accel
             target_speed = max(target_speed, self.min_set_speed_clu)
@@ -261,7 +258,7 @@ class SccSmoother:
         curv = curv[start:min(start+10, TRAJECTORY_SIZE)]
         a_y_max = 2.975 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
         v_curvature = np.sqrt(a_y_max / np.clip(np.abs(curv), 1e-4, None))
-        model_speed = np.mean(v_curvature) * 0.8
+        model_speed = np.mean(v_curvature) * 0.85
 
         if model_speed < v_ego:
           self.curve_speed_ms = float(max(model_speed, MIN_CURVE_SPEED))
@@ -290,12 +287,3 @@ class SccSmoother:
         if clu_speed + SYNC_MARGIN > self.kph_to_clu(controls.v_cruise_helper.v_cruise_kph):
           set_speed = clip(clu_speed + SYNC_MARGIN, self.min_set_speed_clu, self.max_set_speed_clu)
           self.target_speed = set_speed
-
-
-  def update_max_speed(self, max_speed, limited_curv):
-    if not self.long_control or self.max_speed_clu <= 0:
-      self.max_speed_clu = max_speed
-    else:
-      kp = 0.01 #if limited_curv else 0.01
-      error = max_speed - self.max_speed_clu
-      self.max_speed_clu = self.max_speed_clu + error * kp
