@@ -98,6 +98,7 @@ class CAR:
   SPORTAGE_NQ5 = "KIA SPORTAGE (NQ5)"
   SPORTAGE_NQ5_HEV = "KIA SPORTAGE HEV (NQ5)"
   GENESIS_GV70 = "GENESIS GV70 (JK1)"
+  SORENTO_MQ4_HEV = "KIA SORENTO HEV (MQ4)"
 
 @dataclass
 class HyundaiCarInfo(CarInfo):
@@ -185,7 +186,10 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
   CAR.TUCSON22_HEV: HyundaiCarInfo("Hyundai Tucson Hybrid 2022", "Highway Driving Assist II", harness=Harness.hyundai_n),
   CAR.EV6: HyundaiCarInfo("Kia EV6 2022", "Highway Driving Assist II", harness=Harness.hyundai_p),
   CAR.SPORTAGE_NQ5: HyundaiCarInfo("Kia Sportage Hybrid 2023", harness=Harness.hyundai_n),
+  CAR.SPORTAGE_NQ5_HEV: HyundaiCarInfo("Kia Sportage Hybrid 2023", harness=Harness.hyundai_n),
   CAR.GENESIS_GV70: HyundaiCarInfo("Genesis GV70 2022", "Highway Driving Assist II", harness=Harness.hyundai_l),
+  CAR.SORENTO_MQ4_HEV: HyundaiCarInfo("Kia Sorento Hybrid 2022-23", "Smart Cruise Control (SCC)",
+                                               harness=Harness.hyundai_a),
 }
 
 class Buttons:
@@ -1550,6 +1554,14 @@ FW_VERSIONS = {
       b'\xf1\x00JK1_ SCC FHCUP      1.00 1.02 99110-AR000         ',
     ],
   },
+  CAR.SORENTO_MQ4_HEV: {
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00MQhe SCC FHCUP      1.00 1.06 99110-P4000         ',
+    ],
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00MQ4HMFC  AT USA LHD 1.00 1.11 99210-P2000 211217',
+    ]
+  },
 }
 
 CHECKSUM = {
@@ -1579,7 +1591,7 @@ CANFD_CAR = {
 }
 # The radar does SCC on these cars when HDA I, rather than the camera
 CANFD_RADAR_SCC_CAR = {
-  CAR.GENESIS_GV70,
+  CAR.GENESIS_GV70, CAR.SORENTO_MQ4_HEV
 }
 EV_CAR = {
   CAR.KONA_EV, CAR.IONIQ_EV, CAR.NIRO_EV, CAR.SOUL_EV, CAR.NEXO,
@@ -1657,4 +1669,5 @@ DBC = {
   CAR.SPORTAGE_NQ5: dbc_dict('hyundai_canfd', None),
   CAR.SPORTAGE_NQ5_HEV: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),
+  CAR.SORENTO_MQ4_HEV: dbc_dict('hyundai_canfd', None),
 }
