@@ -775,7 +775,7 @@ class CarState(CarStateBase):
       ("DRIVER_SEATBELT_LATCHED", "DOORS_SEATBELTS"),
     ]
 
-    if CP.carFingerprint == CAR.KIA_SORENTO_PHEV_4TH_GEN:
+    if CP.carFingerprint == CAR.SORENTO_MQ4_HEV:
       signals.append(("DISTANCE_UNIT", cruise_btn_msg))
 
     checks = [

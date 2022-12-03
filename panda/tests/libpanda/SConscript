@@ -1,0 +1,12 @@
+env = Environment(
+  CC='gcc',
+  CFLAGS=[
+    '-nostdlib',
+    '-fno-builtin',
+    '-std=gnu11',
+    '-Wfatal-errors',
+  ],
+  CPPPATH=[".", "../../board/"],
+)
+
+env.SharedLibrary("libpanda.so", ["panda.c",])
