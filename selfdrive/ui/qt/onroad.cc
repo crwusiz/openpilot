@@ -990,6 +990,33 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV
   painter.setBrush(redColor(fillAlpha));
   painter.drawPolygon(chevron, std::size(chevron));
 
+  // radar & vision distance ajouatom
+  UIState* s = uiState();
+  SubMaster& sm = *(s->sm);
+  auto lead_radar = sm["radarState"].getRadarState().getLeadOne();
+  auto lead_one = sm["modelV2"].getModelV2().getLeadsV3()[0];
+  bool radar_detected = lead_radar.getStatus() && lead_radar.getRadar();
+  float radar_dist = radar_detected ? lead_radar.getDRel() : 0;
+  float vision_dist = lead_one.getProb() > .5 ? (lead_one.getX()[0] - 0) : 0;
+
+  QString str;
+  str.sprintf("%.1fm", radar_detected ? radar_dist : vision_dist);
+  QColor textColor = whiteColor(200);
+  configFont(painter, "Open Sans", 50, "Bold");
+  drawTextColor(painter, x, y + sz / 1.5f + 80.0, str, textColor);
+
+  if (radar_detected) {
+    float radar_rel_speed = lead_radar.getVRel();
+    str.sprintf("%.0fkm/h", m_cur_speed + radar_rel_speed * 3.6);
+    if (radar_rel_speed < -0.1) {
+      textColor = pinkColor(200);
+    } else if (radar_rel_speed > 0.1) {
+      textColor = greenColor(200);
+    } else
+      textColor = whiteColor(200);
+      configFont(painter, "Open Sans", 40, "Bold");
+    drawTextColor(painter, x, y + sz / 1.5f - 80.0, str, textColor);
+  }
   painter.restore();
 }
 
