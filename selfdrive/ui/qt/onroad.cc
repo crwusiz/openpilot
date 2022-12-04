@@ -761,6 +761,7 @@ void AnnotatedCameraWidget::drawRightDevUi(QPainter &p, int x, int y) {
     ry = y + rh;
   }
 
+/*
   // Add Relative Distance to Primary Lead Car, Unit: Meters
   if (status == STATUS_ENGAGED || STATUS_OVERRIDE) {
     char val_str[8];
@@ -811,7 +812,7 @@ void AnnotatedCameraWidget::drawRightDevUi(QPainter &p, int x, int y) {
     rh += devUiDrawElement(p, x, ry, val_str, "속도차", speedUnit.toStdString().c_str(), valueColor);
     ry = y + rh;
   }
-
+*/
   rh += 25;
   p.setBrush(blackColor(0));
   QRect ldu(x, y, 184, rh);
@@ -982,7 +983,7 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV
   float g_yo = sz / 10;
 
   QPointF glow[] = {{x + (sz * 1.35) + g_xo, y + sz + g_yo}, {x, y - g_yo}, {x - (sz * 1.35) - g_xo, y + sz + g_yo}};
-  painter.setBrush(is_radar ? redColor() : pinkColor());
+  painter.setBrush(is_radar ? yellowColor() : pinkColor());
   painter.drawPolygon(glow, std::size(glow));
 
   // chevron
@@ -991,32 +992,46 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV
   painter.drawPolygon(chevron, std::size(chevron));
 
   // radar & vision distance ajouatom
-  UIState* s = uiState();
-  SubMaster& sm = *(s->sm);
-  auto lead_radar = sm["radarState"].getRadarState().getLeadOne();
-  auto lead_one = sm["modelV2"].getModelV2().getLeadsV3()[0];
-  bool radar_detected = lead_radar.getStatus() && lead_radar.getRadar();
-  float radar_dist = radar_detected ? lead_radar.getDRel() : 0;
-  float vision_dist = lead_one.getProb() > .5 ? (lead_one.getX()[0] - 0) : 0;
+  float radar_dist = lead_status ? lead_d_rel : 0;
+  float vision_dist = lead_data.getProb() > .5 ? (lead_data.getX()[0]) : 0;
 
-  QString str;
-  str.sprintf("%.1fm", radar_detected ? radar_dist : vision_dist);
-  QColor textColor = whiteColor(200);
-  configFont(painter, "Open Sans", 50, "Bold");
-  drawTextColor(painter, x, y + sz / 1.5f + 80.0, str, textColor);
-
-  if (radar_detected) {
-    float radar_rel_speed = lead_radar.getVRel();
-    str.sprintf("%.0fkm/h", m_cur_speed + radar_rel_speed * 3.6);
-    if (radar_rel_speed < -0.1) {
-      textColor = pinkColor(200);
-    } else if (radar_rel_speed > 0.1) {
-      textColor = greenColor(200);
-    } else
-      textColor = whiteColor(200);
-      configFont(painter, "Open Sans", 40, "Bold");
-    drawTextColor(painter, x, y + sz / 1.5f - 80.0, str, textColor);
+  QString l_dist, l_speed;
+  QColor valueColor = whiteColor();
+  l_dist.sprintf("%.1fm", lead_status ? radar_dist : vision_dist);
+  if (lead_d_rel || d_rel < 5) {
+    valueColor = redColor(200);
+  } else if (lead_d_rel || d_rel < 15) {
+    valueColor = orangeColor(200);
+  } else {
+    valueColor = whiteColor(200);
   }
+  configFont(painter, "Open Sans", 40, "Bold");
+  drawTextColor(painter, x, y + sz / 1.5f + 80.0, l_dist, valueColor);
+
+  if (radar_dist) {
+    l_speed.sprintf("%.0fkm/h", speed + lead_v_rel * 3.6); // kph
+    //l_speed.sprintf("%.0fmph", speed + lead_v_rel * 2.236936); // mph
+    if (lead_v_rel < -4.4704) {
+      valueColor = redColor(200);
+    } else if (lead_v_rel < 0) {
+      valueColor = orangeColor(200);
+    } else {
+      valueColor = pinkColor(200);
+    }
+  } else if (vision_dist) {
+    l_speed.sprintf("%.0fkm/h", speed + v_rel * 3.6); // kph
+    //l_speed.sprintf("%.0fmph", speed + v_rel * 2.236936); // mph
+    if (v_rel < -4.4704) {
+      valueColor = redColor(200);
+    } else if (v_rel < 0) {
+      valueColor = orangeColor(200);
+    } else {
+      valueColor = yellowColor(200);
+    }
+  }
+  configFont(painter, "Open Sans", 40, "Bold");
+  drawTextColor(painter, x, y + sz / 1.5f - 80.0, l_speed, valueColor);
+
   painter.restore();
 }
 
