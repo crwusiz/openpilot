@@ -39,6 +39,7 @@ class HyundaiFlags(IntFlag):
   CANFD_ALT_BUTTONS = 2
   CANFD_ALT_GEARS = 4
   CANFD_CAMERA_SCC = 8
+  ALT_LIMITS = 16
 
 
 class CAR:
@@ -93,6 +94,7 @@ class CAR:
 
   # CANFD
   IONIQ5 = "HYUNDAI IONIQ 5 (NE)"
+  TUCSON22 = "HYUNDAI TUCSON (NX4)"
   TUCSON22_HEV = "HYUNDAI TUCSON HEV (NX4)"
   EV6 = "KIA EV6 (CV)"
   SPORTAGE_NQ5 = "KIA SPORTAGE (NQ5)"
@@ -183,6 +185,10 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
 
   # CANFD
   CAR.IONIQ5: HyundaiCarInfo("Hyundai Ioniq 5 2022", "Highway Driving Assist II", harness=Harness.none),
+  CAR.TUCSON22: [
+    HyundaiCarInfo("Hyundai Tucson 2022", harness=Harness.hyundai_n),
+    HyundaiCarInfo("Hyundai Tucson 2023", "All", harness=Harness.hyundai_n),
+  ],
   CAR.TUCSON22_HEV: HyundaiCarInfo("Hyundai Tucson Hybrid 2022", "Highway Driving Assist II", harness=Harness.hyundai_n),
   CAR.EV6: HyundaiCarInfo("Kia EV6 2022", "Highway Driving Assist II", harness=Harness.hyundai_p),
   CAR.SPORTAGE_NQ5: HyundaiCarInfo("Kia Sportage Hybrid 2023", harness=Harness.hyundai_n),
@@ -1487,6 +1493,14 @@ FW_VERSIONS = {
       b'\xf1\x00NE  MDPS R 1.00 1.07 57700GI000  4NEDR107',
     ],
   },
+  CAR.TUCSON22: { # (NX4)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00NX4 FR_CMR AT USA LHD 1.00 1.01 99211-N9240 14T',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00NX4__               1.01 1.00 99110-N9100         ',
+    ],
+  },
   CAR.TUCSON22_HEV: { # (NX4)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00NX4 FR_CMR AT USA LHD 1.00 1.00 99211-N9240 14Q',
@@ -1587,7 +1601,9 @@ FCA11_CAR = {
   CAR.GENESIS_G70, CAR.FORTE, CAR.STINGER, CAR.K9
 }
 CANFD_CAR = {
-  CAR.EV6, CAR.GENESIS_GV70, CAR.TUCSON22_HEV, CAR.IONIQ5, CAR.SPORTAGE_NQ5, CAR.SPORTAGE_NQ5_HEV
+  CAR.TUCSON22, CAR.TUCSON22_HEV, CAR.IONIQ5,
+  CAR.EV6, CAR.SPORTAGE_NQ5, CAR.SPORTAGE_NQ5_HEV,
+  CAR.GENESIS_GV70,
 }
 # The radar does SCC on these cars when HDA I, rather than the camera
 CANFD_RADAR_SCC_CAR = {
@@ -1664,6 +1680,7 @@ DBC = {
 
   # CANFD
   CAR.IONIQ5: dbc_dict('hyundai_canfd', None),
+  CAR.TUCSON22: dbc_dict('hyundai_canfd', None),
   CAR.TUCSON22_HEV: dbc_dict('hyundai_canfd', None),
   CAR.EV6: dbc_dict('hyundai_canfd', None),
   CAR.SPORTAGE_NQ5: dbc_dict('hyundai_canfd', None),
