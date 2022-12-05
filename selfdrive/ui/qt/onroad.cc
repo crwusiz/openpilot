@@ -736,7 +736,7 @@ void AnnotatedCameraWidget::drawRightDevUi(QPainter &p, int x, int y) {
     } else if (std::fabs(angleSteers) > 30) {
       valueColor = orangeColor();
     }
-    snprintf(val_str, sizeof(val_str), "%.0f%s%s", angleSteers , "°", "");
+    snprintf(val_str, sizeof(val_str), "%.0f%s", angleSteers , "°");
 
     //rh += devUiDrawElement(p, x, ry, val_str, "REAL STEER", "", valueColor);
     rh += devUiDrawElement(p, x, ry, val_str, "핸들 조향각", "", valueColor);
@@ -754,7 +754,7 @@ void AnnotatedCameraWidget::drawRightDevUi(QPainter &p, int x, int y) {
     } else if (std::fabs(angleSteers) > 30) {
       valueColor = orangeColor();
     }
-    snprintf(val_str, sizeof(val_str), "%.0f%s%s", steerAngleDesired, "°", "");
+    snprintf(val_str, sizeof(val_str), "%.0f%s", steerAngleDesired, "°");
 
     //rh += devUiDrawElement(p, x, ry, val_str, "DESIR STEER", "", valueColor);
     rh += devUiDrawElement(p, x, ry, val_str, "OP 조향각", "", valueColor);
@@ -986,14 +986,6 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV
   painter.setBrush(is_radar ? yellowColor() : pinkColor()); // vision : radar
   painter.drawPolygon(glow, std::size(glow));
 
-  if (is_radar) { // vision
-    configFont(painter, "Open Sans", 30, "Bold");
-    drawTextColor(painter, x, y + sz / 1.5f, "V", yellowColor(200));
-  } else { // radar
-    configFont(painter, "Open Sans", 30, "Bold");
-    drawTextColor(painter, x, y + sz / 1.5f, "R", pinkColor(200));
-  }
-
   // chevron
   QPointF chevron[] = {{x + (sz * 1.25), y + sz}, {x, y}, {x - (sz * 1.25), y + sz}};
   painter.setBrush(redColor(fillAlpha));
@@ -1024,10 +1016,11 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV
       valueColor = whiteColor(150);
     }
   }
-  configFont(painter, "Open Sans", 40, "Bold");
-  drawTextColor(painter, x, y + sz / 1.5f + 80.0, l_dist, valueColor);
+  configFont(painter, "Open Sans", 35, "Bold");
+  drawTextColor(painter, x, y + sz / 1.5f + 70.0, l_dist, valueColor);
 
   if (radar_dist) {
+    drawTextColor(painter, x, y + sz / 1.5f + 10, "R", blackColor(200));
     if (speedUnit == "mph") {
       l_speed.sprintf("%.0f mph", speed + lead_v_rel * 2.236936); // mph
     } else {
@@ -1041,6 +1034,7 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV
       valueColor = pinkColor(150);
     }
   } else if (vision_dist) {
+     drawTextColor(painter, x, y + sz / 1.5f + 10, "V", blackColor(200));
     if (speedUnit == "mph") {
       l_speed.sprintf("%.0f mph", speed + v_rel * 2.236936); // mph
     } else {
@@ -1054,8 +1048,8 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV
       valueColor = yellowColor(150);
     }
   }
-  configFont(painter, "Open Sans", 40, "Bold");
-  drawTextColor(painter, x, y + sz / 1.5f + 140.0, l_speed, valueColor);
+  configFont(painter, "Open Sans", 35, "Bold");
+  drawTextColor(painter, x, y + sz / 1.5f + 120.0, l_speed, valueColor);
 
   painter.restore();
 }
@@ -1067,45 +1061,43 @@ void AnnotatedCameraWidget::paintGL() {
   const cereal::ModelDataV2::Reader &model = sm["modelV2"].getModelV2();
 
   // draw camera frame
-  {
-    std::lock_guard lk(frame_lock);
+  std::lock_guard lk(frame_lock);
 
-    if (frames.empty()) {
-      if (skip_frame_count > 0) {
-        skip_frame_count--;
-        qDebug() << "skipping frame, not ready";
-        return;
-      }
-    } else {
-      // skip drawing up to this many frames if we're
-      // missing camera frames. this smooths out the
-      // transitions from the narrow and wide cameras
-      skip_frame_count = 5;
+  if (frames.empty()) {
+    if (skip_frame_count > 0) {
+      skip_frame_count--;
+      qDebug() << "skipping frame, not ready";
+      return;
     }
-
-    // Wide or narrow cam dependent on speed
-    float v_ego = sm["carState"].getCarState().getVEgo();
-    if ((v_ego < 10) || s->wide_cam_only) {
-      wide_cam_requested = true;
-    } else if (v_ego > 15) {
-      wide_cam_requested = false;
-    }
-    wide_cam_requested = wide_cam_requested && sm["controlsState"].getControlsState().getExperimentalMode();
-    // TODO: also detect when ecam vision stream isn't available
-    // for replay of old routes, never go to widecam
-    wide_cam_requested = wide_cam_requested && s->scene.calibration_wide_valid;
-    CameraWidget::setStreamType(wide_cam_requested ? VISION_STREAM_WIDE_ROAD : VISION_STREAM_ROAD);
-
-    s->scene.wide_cam = CameraWidget::getStreamType() == VISION_STREAM_WIDE_ROAD;
-    if (s->scene.calibration_valid) {
-      auto calib = s->scene.wide_cam ? s->scene.view_from_wide_calib : s->scene.view_from_calib;
-      CameraWidget::updateCalibration(calib);
-    } else {
-      CameraWidget::updateCalibration(DEFAULT_CALIBRATION);
-    }
-    CameraWidget::setFrameId(model.getFrameId());
-    CameraWidget::paintGL();
+  } else {
+    // skip drawing up to this many frames if we're
+    // missing camera frames. this smooths out the
+    // transitions from the narrow and wide cameras
+    skip_frame_count = 5;
   }
+
+  // Wide or narrow cam dependent on speed
+  float v_ego = sm["carState"].getCarState().getVEgo();
+  if ((v_ego < 10) || s->wide_cam_only) {
+    wide_cam_requested = true;
+  } else if (v_ego > 15) {
+    wide_cam_requested = false;
+  }
+  wide_cam_requested = wide_cam_requested && sm["controlsState"].getControlsState().getExperimentalMode();
+  // TODO: also detect when ecam vision stream isn't available
+  // for replay of old routes, never go to widecam
+  wide_cam_requested = wide_cam_requested && s->scene.calibration_wide_valid;
+  CameraWidget::setStreamType(wide_cam_requested ? VISION_STREAM_WIDE_ROAD : VISION_STREAM_ROAD);
+
+  s->scene.wide_cam = CameraWidget::getStreamType() == VISION_STREAM_WIDE_ROAD;
+  if (s->scene.calibration_valid) {
+    auto calib = s->scene.wide_cam ? s->scene.view_from_wide_calib : s->scene.view_from_calib;
+    CameraWidget::updateCalibration(calib);
+  } else {
+    CameraWidget::updateCalibration(DEFAULT_CALIBRATION);
+  }
+  CameraWidget::setFrameId(model.getFrameId());
+  CameraWidget::paintGL();
 
   QPainter painter(this);
   painter.setRenderHint(QPainter::Antialiasing);
