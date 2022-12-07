@@ -27,10 +27,7 @@ private:
 // container window for the NVG UI
 class AnnotatedCameraWidget : public CameraWidget {
   Q_OBJECT
-  Q_PROPERTY(float speed MEMBER speed);
   Q_PROPERTY(QString speedUnit MEMBER speedUnit);
-  Q_PROPERTY(float applyMaxSpeed MEMBER applyMaxSpeed);
-  Q_PROPERTY(float cruiseMaxSpeed MEMBER cruiseMaxSpeed);
 
   Q_PROPERTY(bool is_cruise_set MEMBER is_cruise_set);
   Q_PROPERTY(bool steeringPressed MEMBER steeringPressed);
@@ -59,6 +56,9 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(int sectionLeftDist MEMBER sectionLeftDist);
   Q_PROPERTY(int accel MEMBER accel);
 
+  Q_PROPERTY(float speed MEMBER speed);
+  Q_PROPERTY(float applyMaxSpeed MEMBER applyMaxSpeed);
+  Q_PROPERTY(float cruiseMaxSpeed MEMBER cruiseMaxSpeed);
   Q_PROPERTY(float lead_d_rel MEMBER lead_d_rel);
   Q_PROPERTY(float lead_v_rel MEMBER lead_v_rel);
   Q_PROPERTY(float gpsBearing MEMBER gpsBearing);
@@ -77,7 +77,7 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(float friction MEMBER friction);
   Q_PROPERTY(float latAccelFactorRaw MEMBER latAccelFactorRaw);
   Q_PROPERTY(float frictionRaw MEMBER frictionRaw);
-  Q_PROPERTY(float cpuTemp MEMBER cpuTemp);
+  Q_PROPERTY(float cpuTempAvg MEMBER cpuTempAvg);
 
 public:
   explicit AnnotatedCameraWidget(VisionStreamType type, QWidget* parent = 0);
@@ -145,7 +145,7 @@ private:
   float fl, fr, rl, rr = 0;
   float roadLimitSpeed = 0;
   float latAccelFactor, friction, latAccelFactorRaw, frictionRaw = 0;
-  float cpuTemp = 0;
+  float cpuTemp, cpuTempAvg = 0;
 
 protected:
   void paintGL() override;

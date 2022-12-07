@@ -264,7 +264,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
     for(int i = 0; i < std::size(cpuTempC); i++) {
       cpuTemp += cpuTempC[i];
     }
-    cpuTemp = cpuTemp / 8; //(float)std::size(cpuTempC);
+    cpuTemp = cpuTemp / (float)std::size(cpuTempC);
   }
 
   setProperty("is_cruise_set", cruise_set);
@@ -314,7 +314,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("friction", cs.getLateralControlState().getTorqueState().getFriction());
   setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
   setProperty("frictionRaw", tp.getFrictionCoefficientRaw());
-  setProperty("cpuTemp", cpuTemp);
+  setProperty("cpuTempAvg", cpuTemp);
 }
 
 void AnnotatedCameraWidget::drawHud(QPainter &p) {
@@ -720,6 +720,7 @@ int AnnotatedCameraWidget::devUiDrawElement(QPainter &p, int x, int y, const cha
 
   if (strlen(units) > 0) {
     p.save();
+    p.save();
     p.translate(x + 173, y + 62);
     p.rotate(-90);
     drawText(p, 0, 0, QString(units), 255);
@@ -740,18 +741,18 @@ void AnnotatedCameraWidget::drawRightDevUi(QPainter &p, int x, int y) {
     valueColor = limeColor();
 
     // Orange Color if more than 70℃ , Red Color if more than 80℃
-    if (cpuTemp > 80) {
+    if (cpuTempAvg > 80) {
       valueColor = redColor();
-    } else if (cpuTemp > 70) {
+    } else if (cpuTempAvg > 70) {
       valueColor = orangeColor();
     }
-    snprintf(val_str, sizeof(val_str), "%.0f%s", cpuTemp, "℃");
+    snprintf(val_str, sizeof(val_str), "%.0f %s", cpuTempAvg, "℃");
 
     rh += devUiDrawElement(p, x, ry, val_str, "CPU TEMP", "", valueColor);
     ry = y + rh;
   }
 
-  // Add Real Steering Angle, Unit: Degrees
+  // Add Real Steering Angle
   if (true) {
     char val_str[8];
     valueColor = limeColor();
@@ -762,14 +763,13 @@ void AnnotatedCameraWidget::drawRightDevUi(QPainter &p, int x, int y) {
     } else if (std::fabs(angleSteers) > 30) {
       valueColor = orangeColor();
     }
-    snprintf(val_str, sizeof(val_str), "%.0f%s", angleSteers , "°");
+    snprintf(val_str, sizeof(val_str), "%.0f %s", angleSteers, "°");
 
-    //rh += devUiDrawElement(p, x, ry, val_str, "REAL STEER", "", valueColor);
-    rh += devUiDrawElement(p, x, ry, val_str, "핸들 조향각", "", valueColor);
+    rh += devUiDrawElement(p, x, ry, val_str, "REAL STEER", "", valueColor);
     ry = y + rh;
   }
 
-  // Add Desired Steering Angle, Unit: Degrees
+  // Add Desired Steering Angle
   if (status == STATUS_ENGAGED || STATUS_OVERRIDE) {
     char val_str[8];
     valueColor = limeColor();
@@ -780,65 +780,12 @@ void AnnotatedCameraWidget::drawRightDevUi(QPainter &p, int x, int y) {
     } else if (std::fabs(angleSteers) > 30) {
       valueColor = orangeColor();
     }
-    snprintf(val_str, sizeof(val_str), "%.0f%s", steerAngleDesired, "°");
+    snprintf(val_str, sizeof(val_str), "%.0f %s", steerAngleDesired, "°");
 
-    //rh += devUiDrawElement(p, x, ry, val_str, "DESIR STEER", "", valueColor);
-    rh += devUiDrawElement(p, x, ry, val_str, "OP 조향각", "", valueColor);
+    rh += devUiDrawElement(p, x, ry, val_str, "DESIR STEER", "", valueColor);
     ry = y + rh;
   }
 
-/*
-  // Add Relative Distance to Primary Lead Car, Unit: Meters
-  if (status == STATUS_ENGAGED || STATUS_OVERRIDE) {
-    char val_str[8];
-    char units_str[8];
-    valueColor = whiteColor();
-
-    if (lead_status) {
-      // Red if very close, Orange if close
-      if (lead_d_rel < 5) {
-        valueColor = redColor();
-      } else if (lead_d_rel < 15) {
-        valueColor = orangeColor();
-      }
-      snprintf(val_str, sizeof(val_str), "%d", (int)lead_d_rel);
-    } else {
-      snprintf(val_str, sizeof(val_str), "─");
-    }
-    snprintf(units_str, sizeof(units_str), "m");
-
-    //rh += devUiDrawElement(p, x, ry, val_str, "REL DIST", units_str, valueColor);
-    rh += devUiDrawElement(p, x, ry, val_str, "거리차", units_str, valueColor);
-    ry = y + rh;
-  }
-
-  // Add Relative Velocity vs Primary Lead Car, Unit: kph if metric, else mph
-  if (status == STATUS_ENGAGED || STATUS_OVERRIDE) {
-    char val_str[8];
-    valueColor = whiteColor();
-
-     if (lead_status) {
-       // Red if approaching faster than 10mph, Orange if approaching (negative)
-       if (lead_v_rel < -4.4704) {
-         valueColor = redColor();
-       } else if (lead_v_rel < 0) {
-         valueColor = orangeColor();
-       }
-
-       if (speedUnit == "mph") {
-         snprintf(val_str, sizeof(val_str), "%d", (int)(lead_v_rel * 2.236936)); //mph
-       } else {
-         snprintf(val_str, sizeof(val_str), "%d", (int)(lead_v_rel * 3.6)); //kph
-       }
-     } else {
-       snprintf(val_str, sizeof(val_str), "─");
-     }
-
-    //rh += devUiDrawElement(p, x, ry, val_str, "REL SPEED", speedUnit.toStdString().c_str(), valueColor);
-    rh += devUiDrawElement(p, x, ry, val_str, "속도차", speedUnit.toStdString().c_str(), valueColor);
-    ry = y + rh;
-  }
-*/
   rh += 25;
   p.setBrush(blackColor(0));
   QRect ldu(x, y, 184, rh);
@@ -1019,7 +966,7 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV
 
   // radar & vision distance ajouatom
   float radar_dist = lead_status ? lead_d_rel : 0;
-  float vision_dist = lead_data.getProb() > .5 ? d_rel : 0;
+  float vision_dist = lead_data.getProb() > .5 ? (d_rel - 1.5) : 0;
 
   QString l_dist, l_speed;
   QColor valueColor = whiteColor();
