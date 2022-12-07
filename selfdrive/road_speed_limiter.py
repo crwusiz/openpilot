@@ -11,7 +11,7 @@ import struct
 from threading import Thread
 from cereal import messaging
 from common.numpy_fast import clip
-from common.realtime import sec_since_boot
+from common.realtime import sec_since_boot, Ratekeeper
 from common.conversions import Conversions as CV
 
 CAMERA_SPEED_FACTOR = 1.05
@@ -36,36 +36,25 @@ class RoadLimitSpeedServer:
     self.last_time_location = 0
 
     broadcast = Thread(target=self.broadcast_thread, args=[])
-    broadcast.setDaemon(True)
+    broadcast.daemon = True
     broadcast.start()
 
     self.gps_sm = messaging.SubMaster(['gpsLocationExternal'], poll=['gpsLocationExternal'])
     self.gps_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
+    self.location = None
+
     self.gps_event = threading.Event()
     gps_thread = Thread(target=self.gps_thread, args=[])
-    gps_thread.setDaemon(True)
+    gps_thread.daemon = True
     gps_thread.start()
 
 
   def gps_thread(self):
-    try:
-      period = 1.0
-      wait_time = period
-      i = 0.
-      frame = 1
-      start_time = sec_since_boot()
-      while True:
-        self.gps_event.wait(wait_time)
-        self.gps_timer()
-        now = sec_since_boot()
-        error = (frame * period - (now - start_time))
-        i += error * 0.1
-        wait_time = period + error * 0.5 + i
-        wait_time = clip(wait_time, 0.8, 1.0)
-        frame += 1
-    except:
-      pass
+    rk = Ratekeeper(1.0, print_delay_threshold=None)
+    while True:
+      self.gps_timer()
+      rk.keep_time()
 
 
   def gps_timer(self):
@@ -73,24 +62,26 @@ class RoadLimitSpeedServer:
       if self.remote_gps_addr is not None:
         self.gps_sm.update(0)
         if self.gps_sm.updated['gpsLocationExternal']:
-          location = self.gps_sm['gpsLocationExternal']
-          if location.accuracy < 10.:
-            json_location = json.dumps({"location": [
-              location.latitude,
-              location.longitude,
-              location.altitude,
-              location.speed,
-              location.bearingDeg,
-              location.accuracy,
-              location.unixTimestampMillis,
-              # location.source,
-              # location.vNED,
-              location.verticalAccuracy,
-              location.bearingAccuracyDeg,
-              location.speedAccuracy,
-            ]})
-            address = (self.remote_gps_addr[0], Port.LOCATION_PORT)
-            self.gps_socket.sendto(json_location.encode(), address)
+          self.location = self.gps_sm['gpsLocationExternal']
+
+        if self.location is not None:
+          json_location = json.dumps({"location": [
+            self.location.latitude,
+            self.location.longitude,
+            self.location.altitude,
+            self.location.speed,
+            self.location.bearingDeg,
+            self.location.accuracy,
+            self.location.unixTimestampMillis,
+            # self.location.source,
+            # self.location.vNED,
+            self.location.verticalAccuracy,
+            self.location.bearingAccuracyDeg,
+            self.location.speedAccuracy,
+          ]})
+
+          address = (self.remote_gps_addr[0], Port.LOCATION_PORT)
+          self.gps_socket.sendto(json_location.encode(), address)
     except:
       self.remote_gps_addr = None
 
