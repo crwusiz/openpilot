@@ -708,7 +708,7 @@ location set</source>
     </message>
     <message>
         <source>Become a comma prime member at connect.comma.ai</source>
-        <translation>connect.comma.ai에서 comma prime에 가입합니다</translation>
+        <translation>connect.comma.ai 접속 comma prime 가입</translation>
     </message>
     <message>
         <source>PRIME FEATURES:</source>

@@ -1,3 +1,4 @@
+import copy
 import random
 import numpy as np
 
@@ -91,6 +92,14 @@ class SccSmoother:
     self.slowing_down = False
     self.slowing_down_alert = False
     self.slowing_down_sound_alert = False
+
+
+  @staticmethod
+  def create_clu11(packer, frame, bus, button, clu11):
+    values = copy.copy(clu11)
+    values["CF_Clu_CruiseSwState"] = button
+    values["CF_Clu_AliveCnt1"] = frame % 0x10
+    return packer.make_can_msg("CLU11", bus, values)
 
 
   def is_active(self, frame):
@@ -193,7 +202,9 @@ class SccSmoother:
         if self.can_fd:
           can_sends.append(hyundaicanfd.create_buttons(packer, self.CP, CS.buttons_counter + 1, self.btn))
         else:
-          can_sends.append(hyundaican.create_clu11(packer, frame, self.scc_bus, self.btn, clu_speed, CS.clu11))
+          #can_sends.append(SccSmoother.create_clu11(packer, frame, self.scc_bus, self.btn, CS.clu11))
+          #can_sends.append(hyundaican.create_clu11(packer, frame, self.scc_bus, self.btn, clu_speed, CS.clu11))
+          can_sends.append(hyundaican.create_clu11(packer, frame, self.scc_bus, self.btn, CS.clu11))
 
         if self.alive_timer == 0:
           self.started_frame = frame

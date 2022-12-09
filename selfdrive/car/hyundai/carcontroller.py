@@ -185,7 +185,7 @@ class CarController:
                                                   1, CS.lkas11))
 
         # send clu11 to eps
-        can_sends.append(hyundaican.create_clu11(self.packer, self.frame, self.CP.epsBus, Buttons.NONE, enabled_speed, CS.clu11))
+        can_sends.append(hyundaican.create_clu11_mdps(self.packer, self.frame, self.CP.epsBus, Buttons.NONE, enabled_speed, CS.clu11))
 
         # send mdps12 to LKAS to prevent LKAS error
         can_sends.append(hyundaican.create_mdps12(self.packer, self.frame, CS.mdps12))
@@ -201,7 +201,10 @@ class CarController:
         elif self.resume_wait_timer > 0:
           self.resume_wait_timer -= 1
         elif abs(CS.lead_distance - self.last_lead_distance) > 0.1:
-          can_sends.append(hyundaican.create_clu11(self.packer, self.frame, self.CP.sccBus, Buttons.RES_ACCEL, clu11_speed, CS.clu11))
+          if panda_safety_select == "1" and self.CP.epsBus:
+            can_sends.append(hyundaican.create_clu11_mdps(self.packer, self.frame, self.CP.sccBus, Buttons.RES_ACCEL, clu11_speed, CS.clu11))
+          else:
+            can_sends.append(hyundaican.create_clu11(self.packer, self.frame, self.CP.sccBus, Buttons.RES_ACCEL, CS.clu11))
           self.resume_cnt += 1
           if self.resume_cnt >= int(randint(4, 5) * 2):
             self.resume_cnt = 0

@@ -11,6 +11,7 @@
 
 QString getVersion();
 QString getBrand();
+QString getBrandVersion();
 QString getUserAgent();
 std::optional<QString> getDongleId();
 QMap<QString, QString> getSupportedLanguages();

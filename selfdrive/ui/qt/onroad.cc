@@ -288,8 +288,8 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("lead_d_rel", rs.getLeadOne().getDRel());
   setProperty("lead_v_rel", rs.getLeadOne().getVRel());
   setProperty("lead_status", rs.getLeadOne().getStatus());
-  setProperty("angleSteers", ce.getSteeringAngleDeg());
-  setProperty("steerAngleDesired", cc.getActuators().getSteeringAngleDeg());
+  setProperty("steerAngle", ce.getSteeringAngleDeg());
+  setProperty("steerAngleOp", cc.getActuators().getSteeringAngleDeg());
   setProperty("longControl", cs.getLongControl());
   setProperty("gap_state", ce.getCruiseState().getGapAdjust());
   setProperty("lateralControl", cs.getLateralControlSelect());
@@ -513,7 +513,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   if ((status == STATUS_ENGAGED || status == STATUS_OVERRIDE) && !steeringPressed) {
     drawIcon(p, x, y, wheel_img, blackColor(100), 1.0);
   } else {
-    drawIconRotate(p, x, y, wheel_img, blackColor(100), 1.0, angleSteers);
+    drawIconRotate(p, x, y, wheel_img, blackColor(100), 1.0, steerAngle);
   }
 
   if (wifi_state == 0) {
@@ -737,12 +737,12 @@ void AnnotatedCameraWidget::drawRightDevUi(QPainter &p, int x, int y) {
     valueColor = limeColor();
 
     // Red if large steering angle, Orange if moderate steering angle
-    if (std::fabs(angleSteers) > 90) {
+    if (std::fabs(steerAngle) > 90) {
       valueColor = redColor();
-    } else if (std::fabs(angleSteers) > 30) {
+    } else if (std::fabs(steerAngle) > 30) {
       valueColor = orangeColor();
     }
-    snprintf(val_str, sizeof(val_str), "%.0f %s", angleSteers, "°");
+    snprintf(val_str, sizeof(val_str), "%.0f %s", steerAngle, "°");
 
     rh += devUiDrawElement(p, x, ry, val_str, "REAL STEER", "", valueColor);
     ry = y + rh;
@@ -754,14 +754,14 @@ void AnnotatedCameraWidget::drawRightDevUi(QPainter &p, int x, int y) {
     valueColor = limeColor();
 
     // Red if large steering angle, Orange if moderate steering angle
-    if (std::fabs(angleSteers) > 90) {
+    if (std::fabs(steerAngle) > 90) {
       valueColor = redColor();
-    } else if (std::fabs(angleSteers) > 30) {
+    } else if (std::fabs(steerAngle) > 30) {
       valueColor = orangeColor();
     }
-    snprintf(val_str, sizeof(val_str), "%.0f %s", steerAngleDesired, "°");
+    snprintf(val_str, sizeof(val_str), "%.0f %s", steerAngleOp, "°");
 
-    rh += devUiDrawElement(p, x, ry, val_str, "DESIR STEER", "", valueColor);
+    rh += devUiDrawElement(p, x, ry, val_str, "OP STEER", "", valueColor);
     ry = y + rh;
   }
 
@@ -948,60 +948,55 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV
   float vision_dist = lead_data.getProb() > .5 ? (d_rel - 1.5) : 0;
 
   QString l_dist, l_speed;
-  QColor valueColor = whiteColor();
-  l_dist.sprintf("%.1f m", lead_status ? radar_dist : vision_dist);
-
-  if (is_radar) { // vision
-    if (d_rel < 5) {
-      valueColor = redColor(150);
-    } else if (d_rel < 15) {
-      valueColor = orangeColor(150);
-    } else {
-      valueColor = whiteColor(150);
-    }
-  } else { // radar
-    if (lead_d_rel < 5) {
-      valueColor = redColor(150);
-    } else if (lead_d_rel < 15) {
-      valueColor = orangeColor(150);
-    } else {
-      valueColor = whiteColor(150);
-    }
-  }
-  configFont(painter, "Open Sans", 35, "Bold");
-  drawTextColor(painter, x, y + sz / 1.5f + 70.0, l_dist, valueColor);
+  QColor d_color, v_color = whiteColor(150);
 
   if (radar_dist) {
-    drawTextColor(painter, x, y + sz / 1.5f + 10, "R", blackColor(200));
+    if (lead_d_rel < 5) {
+      d_color = redColor(150);
+    } else if (lead_d_rel < 15) {
+      d_color = orangeColor(150);
+    } else {
+      d_color = whiteColor(150);
+    }
+    l_dist.sprintf("%.1f m", radar_dist);
+    if (lead_v_rel < -4.4704) {
+      v_color = redColor(150);
+    } else if (lead_v_rel < 0) {
+      v_color = orangeColor(150);
+    } else {
+      v_color = pinkColor(150);
+    }
     if (speedUnit == "mph") {
       l_speed.sprintf("%.0f mph", speed + lead_v_rel * 2.236936); // mph
     } else {
       l_speed.sprintf("%.0f km/h", speed + lead_v_rel * 3.6); // kph
     }
-    if (lead_v_rel < -4.4704) {
-      valueColor = redColor(150);
-    } else if (lead_v_rel < 0) {
-      valueColor = orangeColor(150);
-    } else {
-      valueColor = pinkColor(150);
-    }
   } else if (vision_dist) {
-     drawTextColor(painter, x, y + sz / 1.5f + 10, "V", blackColor(200));
+    if (d_rel < 5) {
+      d_color = redColor(150);
+    } else if (d_rel < 15) {
+      d_color = orangeColor(150);
+    } else {
+      d_color = whiteColor(150);
+    }
+    l_dist.sprintf("%.1f m", vision_dist);
+    if (v_rel < -4.4704) {
+      v_color = redColor(150);
+    } else if (v_rel < 0) {
+      v_color = orangeColor(150);
+    } else {
+      v_color = yellowColor(150);
+    }
     if (speedUnit == "mph") {
       l_speed.sprintf("%.0f mph", speed + v_rel * 2.236936); // mph
     } else {
       l_speed.sprintf("%.0f km/h", speed + v_rel * 3.6); // kph
     }
-    if (v_rel < -4.4704) {
-      valueColor = redColor(150);
-    } else if (v_rel < 0) {
-      valueColor = orangeColor(150);
-    } else {
-      valueColor = yellowColor(150);
-    }
   }
   configFont(painter, "Open Sans", 35, "Bold");
-  drawTextColor(painter, x, y + sz / 1.5f + 120.0, l_speed, valueColor);
+  drawTextColor(painter, x, y + sz / 1.5f + 10, is_radar ? "V" : "R", blackColor(200));
+  drawTextColor(painter, x, y + sz / 1.5f + 70.0, l_dist, d_color);
+  drawTextColor(painter, x, y + sz / 1.5f + 120.0, l_speed, v_color);
 
   painter.restore();
 }

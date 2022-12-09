@@ -33,7 +33,7 @@ void Sidebar::drawMetric(QPainter &p, const QPair<QString, QString> &label, QCol
 }
 
 Sidebar::Sidebar(QWidget *parent) : QFrame(parent), onroad(false), flag_pressed(false), settings_pressed(false) {
-  home_img = loadPixmap("../assets/images/icon_openpilot.png", home_btn.size());
+  home_img = loadPixmap("../assets/images/button_home.png", home_btn.size());
   flag_img = loadPixmap("../assets/images/button_flag.png", home_btn.size());
   settings_img = loadPixmap("../assets/images/button_settings.png", settings_btn.size(), Qt::IgnoreAspectRatio);
 

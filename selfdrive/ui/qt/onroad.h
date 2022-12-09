@@ -39,9 +39,9 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(bool longControl MEMBER longControl);
   Q_PROPERTY(bool left_on MEMBER left_on);
   Q_PROPERTY(bool right_on MEMBER right_on);
+  Q_PROPERTY(bool lead_status MEMBER lead_status);
 
   Q_PROPERTY(int status MEMBER status);
-  Q_PROPERTY(int lead_status MEMBER lead_status);
   Q_PROPERTY(int autohold_state MEMBER autohold_state);
   Q_PROPERTY(int nda_state MEMBER nda_state);
   Q_PROPERTY(int wifi_state MEMBER wifi_state);
@@ -65,8 +65,8 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(float gpsVerticalAccuracy MEMBER gpsVerticalAccuracy);
   Q_PROPERTY(float gpsAltitude MEMBER gpsAltitude);
   Q_PROPERTY(float gpsAccuracy MEMBER gpsAccuracy);
-  Q_PROPERTY(float angleSteers MEMBER angleSteers);
-  Q_PROPERTY(float steerAngleDesired MEMBER steerAngleDesired);
+  Q_PROPERTY(float steerAngle MEMBER steerAngle);
+  Q_PROPERTY(float steerAngleOp MEMBER steerAngleOp);
   Q_PROPERTY(float steerRatio MEMBER steerRatio);
   Q_PROPERTY(float fl MEMBER fl);
   Q_PROPERTY(float fr MEMBER fr);
@@ -123,9 +123,9 @@ private:
   bool left_on, right_on = false;
   bool v_ego_cluster_seen = false;
   bool wide_cam_requested = false;
+  bool lead_status = false;
 
   int status = STATUS_DISENGAGED;
-  int lead_status;
   int autohold_state = 0;
   int nda_state = 0;
   int wifi_state = 0;
@@ -140,7 +140,7 @@ private:
   float speed, applyMaxSpeed, cruiseMaxSpeed;
   float lead_d_rel, lead_v_rel = 0;
   float gpsBearing, gpsVerticalAccuracy, gpsAltitude, gpsAccuracy = 0;
-  float angleSteers, steerAngleDesired ,steerRatio = 0;
+  float steerAngle, steerAngleOp ,steerRatio = 0;
   float fl, fr, rl, rr = 0;
   float roadLimitSpeed = 0;
   float latAccelFactor, friction, latAccelFactorRaw, frictionRaw = 0;

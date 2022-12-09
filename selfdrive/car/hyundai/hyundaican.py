@@ -49,7 +49,16 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
   return packer.make_can_msg("LKAS11", bus, values)
 
 
-def create_clu11(packer, frame, bus, button, speed, clu11):
+def create_clu11(packer, frame, bus, button, clu11):
+  values = clu11
+
+  values["CF_Clu_CruiseSwState"] = button
+  values["CF_Clu_AliveCnt1"] = frame % 0x10
+
+  return packer.make_can_msg("CLU11", bus, values)
+
+
+def create_clu11_mdps(packer, frame, bus, button, speed, clu11):
   values = clu11
 
   values["CF_Clu_CruiseSwState"] = button
