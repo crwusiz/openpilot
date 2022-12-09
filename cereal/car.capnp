@@ -355,6 +355,8 @@ struct CarControl {
     steer @2: Float32;
     steeringAngleDeg @3: Float32;
 
+    curvature @7: Float32;
+
     speed @6: Float32; # m/s
     accel @4: Float32; # m/s^2
     longControlState @5: LongControlState;
@@ -365,7 +367,6 @@ struct CarControl {
       stopping @2;
       starting @3;
     }
-
   }
 
   struct CruiseControl {
@@ -611,6 +612,7 @@ struct CarParams {
   enum SteerControlType {
     torque @0;
     angle @1;
+    curvature @2;
   }
 
   enum TransmissionType {
