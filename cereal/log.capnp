@@ -664,7 +664,7 @@ struct ControlsState @0x97ff69c53601abf1 {
   }
 
   # add
-  lateralControlSelect @65 :UInt8;
+  lateralControlSelect @67 :UInt8;
   longControl @66 :Bool;
 
   enum OpenpilotState @0xdbe58b96d2d1ac61 {
@@ -2110,7 +2110,7 @@ struct Event {
     uiDebug @102 :UIDebug;
 
     # neokii
-    roadLimitSpeed @105 :RoadLimitSpeed;
+    roadLimitSpeed @106 :RoadLimitSpeed;
 
     # *********** debug ***********
     testJoystick @52 :Joystick;

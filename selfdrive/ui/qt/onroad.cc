@@ -264,14 +264,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   float cur_speed = cs_alive ? std::max<float>(0.0, v_ego) : 0.0;
   cur_speed *= s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH;
 
-  const auto cpuTempC = ds.getCpuTempC();
-  if(std::size(cpuTempC) > 0) {
-    for(int i = 0; i < std::size(cpuTempC); i++) {
-      cpuTemp += cpuTempC[i];
-    }
-    cpuTemp = cpuTemp / (float)std::size(cpuTempC);
-  }
-
   setProperty("is_cruise_set", cruise_set);
   setProperty("speed", cur_speed);
   setProperty("applyMaxSpeed", apply_speed);
@@ -319,7 +311,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("friction", cs.getLateralControlState().getTorqueState().getFriction());
   setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
   setProperty("frictionRaw", tp.getFrictionCoefficientRaw());
-  setProperty("cpuTempAvg", cpuTemp);
 }
 
 void AnnotatedCameraWidget::drawHud(QPainter &p) {
@@ -739,23 +730,6 @@ void AnnotatedCameraWidget::drawRightDevUi(QPainter &p, int x, int y) {
   int ry = y;
 
   QColor valueColor = whiteColor();
-
-  // Cpu Temp
-  if (true) {
-    char val_str[8];
-    valueColor = limeColor();
-
-    // Orange Color if more than 70℃ , Red Color if more than 80℃
-    if (cpuTempAvg > 80) {
-      valueColor = redColor();
-    } else if (cpuTempAvg > 70) {
-      valueColor = orangeColor();
-    }
-    snprintf(val_str, sizeof(val_str), "%.0f %s", cpuTempAvg, "℃");
-
-    rh += devUiDrawElement(p, x, ry, val_str, "CPU TEMP", "", valueColor);
-    ry = y + rh;
-  }
 
   // Add Real Steering Angle
   if (true) {

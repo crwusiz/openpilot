@@ -77,7 +77,6 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(float friction MEMBER friction);
   Q_PROPERTY(float latAccelFactorRaw MEMBER latAccelFactorRaw);
   Q_PROPERTY(float frictionRaw MEMBER frictionRaw);
-  Q_PROPERTY(float cpuTempAvg MEMBER cpuTempAvg);
 
 public:
   explicit AnnotatedCameraWidget(VisionStreamType type, QWidget* parent = 0);
@@ -145,7 +144,6 @@ private:
   float fl, fr, rl, rr = 0;
   float roadLimitSpeed = 0;
   float latAccelFactor, friction, latAccelFactorRaw, frictionRaw = 0;
-  float cpuTemp, cpuTempAvg = 0;
 
 protected:
   void paintGL() override;

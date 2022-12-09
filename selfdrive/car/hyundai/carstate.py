@@ -288,7 +288,7 @@ class CarState(CarStateBase):
       ("CF_Clu_CruiseSwMain", "CLU11"),
       ("CF_Clu_SldMainSW", "CLU11"),
       ("CF_Clu_ParityBit1", "CLU11"),
-      ("CF_Clu_VanzDecimal" , "CLU11"),
+      ("CF_Clu_VanzDecimal", "CLU11"),
       ("CF_Clu_Vanz", "CLU11"),
       ("CF_Clu_SPEED_UNIT", "CLU11"),
       ("CF_Clu_DetentOut", "CLU11"),
