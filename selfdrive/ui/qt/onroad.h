@@ -40,6 +40,7 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(bool left_on MEMBER left_on);
   Q_PROPERTY(bool right_on MEMBER right_on);
   Q_PROPERTY(bool lead_status MEMBER lead_status);
+  Q_PROPERTY(bool gas_pressed MEMBER gas_pressed);
 
   Q_PROPERTY(int status MEMBER status);
   Q_PROPERTY(int autohold_state MEMBER autohold_state);
@@ -87,13 +88,11 @@ private:
   void drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity, float angle);
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
   void drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color);
-  void drawRightDevUi(QPainter &p, int x, int y);
-  int devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, const QColor &color);
 
-  QPixmap wheel_img, steer_img;
-  QPixmap lat_img, longitudinal_img;
+  QPixmap long_img, steer_img;
+  QPixmap lat_img, gaspress_img;
   QPixmap dm_img;
-  QPixmap experimental_img;
+  QPixmap chill_img, experimental_img;
 
   // crwusiz add
   QPixmap brake_img, bsd_l_img, bsd_r_img;
@@ -124,6 +123,7 @@ private:
   bool v_ego_cluster_seen = false;
   bool wide_cam_requested = false;
   bool lead_status = false;
+  bool gas_pressed = false;
 
   int status = STATUS_DISENGAGED;
   int autohold_state = 0;

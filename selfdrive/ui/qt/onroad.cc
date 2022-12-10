@@ -182,8 +182,9 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
 
   steer_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
   lat_img = loadPixmap("../assets/offroad/icon_speed_limit.png", {img_size, img_size});
-  longitudinal_img = loadPixmap("../assets/offroad/icon_disengage_on_accelerator.svg", {img_size, img_size});
+  gaspress_img = loadPixmap("../assets/offroad/icon_disengage_on_accelerator.svg", {img_size, img_size});
   dm_img = loadPixmap("../assets/img_driver_face.png", {img_size, img_size});
+  chill_img = loadPixmap("../assets/img_experimental_white.svg", {img_size, img_size });
   experimental_img = loadPixmap("../assets/img_experimental.svg", {img_size, img_size });
 
   // crwusiz add
@@ -275,6 +276,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("dmActive", sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode());
   setProperty("brake_state", ce.getBrakeLights());
   setProperty("autohold_state", ce.getAutoHold());
+  setProperty("gas_pressed", ce.getGasPressed());
   setProperty("nda_state", ls.getActive());
   setProperty("left_blindspot", ce.getLeftBlindspot());
   setProperty("right_blindspot", ce.getRightBlindspot());
@@ -341,9 +343,9 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   limitSpeedStr.sprintf("%.0f", limit_speed);
 
   if (left_dist >= 1000) {
-    leftDistStr.sprintf("%.1fkm", left_dist / 1000.f);
+    leftDistStr.sprintf("%.1f km", left_dist / 1000.f);
   } else if (left_dist > 0) {
-    leftDistStr.sprintf("%.0fm", left_dist);
+    leftDistStr.sprintf("%.0f m", left_dist);
   }
 
   int rect_width = !longControl ? 163 : 300;
@@ -479,7 +481,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   // current speed (upper center)
   QString speedStr = QString::number(std::nearbyint(speed));
-  QColor variableColor = QColor(255, 255, 255, 255);
+  QColor variableColor = whiteColor();
 
   if (accel > 0) {
     int a = (int)(255.f - (180.f * (accel/3.f)));
@@ -498,23 +500,19 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   configFont(p, "Open Sans", 66, "Regular");
   drawTextColor(p, rect().center().x(), 310, speedUnit, lightorangeColor());
 
-  // engage-ability icon ( wheel ) (upper right 1)
-  if (status == STATUS_ENGAGED && !steeringPressed) {
-    wheel_img = uiState()->scene.experimental_mode ? experimental_img : lat_img;
-  } else if (status == STATUS_OVERRIDE && !steeringPressed) {
-    wheel_img = longitudinal_img;
+  // e2e mode icon (upper right 1)
+  if (uiState()->scene.experimental_mode) {
+    long_img = experimental_img;
   } else {
-    wheel_img = steer_img;
+    long_img = chill_img;
   }
 
   int x,y,w,h = 0;
-  x = rect().right() - radius / 2 - bdr_s * 2;
-  y = radius / 2 + bdr_s * 4;
-  if ((status == STATUS_ENGAGED || status == STATUS_OVERRIDE) && !steeringPressed) {
-    drawIcon(p, x, y, wheel_img, blackColor(100), 1.0);
-  } else {
-    drawIconRotate(p, x, y, wheel_img, blackColor(100), 1.0, steerAngle);
-  }
+  QColor icon_bg = blackColor(100);
+
+  x = rect().right() - (radius / 2) - (bdr_s * 2);
+  y = (radius / 2) + (bdr_s * 4);
+  drawIcon(p, x, y, long_img, icon_bg, 1.0);
 
   if (wifi_state == 0) {
     wifi_img = wifi_f_img;
@@ -530,18 +528,18 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   // wifi icon (upper right 2)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
-  y = radius / 2 + (bdr_s * 4);
-  drawIcon(p, x, y, wifi_img, blackColor(100), wifi_state > 0 ? 1.0 : 0.2);
+  y = (radius / 2) + (bdr_s * 4);
+  drawIcon(p, x, y, wifi_img, icon_bg, wifi_state > 0 ? 1.0 : 0.2);
 
   // gps icon (upper right 3)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 2);
-  y = radius / 2 + (bdr_s * 4);
-  drawIcon(p, x, y, gps_img, blackColor(100), gps_state ? 1.0 : 0.2);
+  y = (radius / 2) + (bdr_s * 4);
+  drawIcon(p, x, y, gps_img, icon_bg, gps_state ? 1.0 : 0.2);
 
   // N direction icon (upper right 4)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 3);
-  y = radius / 2 + (bdr_s * 4);
-  drawIconRotate(p, x, y, direction_img, blackColor(100), gps_state ? 1.0 : 0.2, gpsBearing);
+  y = (radius / 2) + (bdr_s * 4);
+  drawIconRotate(p, x, y, direction_img, icon_bg, gps_state ? 1.0 : 0.2, gpsBearing);
 
   // nda icon (upper center)
   if (nda_state > 0) {
@@ -552,15 +550,41 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     p.drawPixmap(x, y, w, h, nda_state == 1 ? nda_img : hda_img);
   }
 
-  // Dev UI (right Side)
-  x = rect().right() - radius - bdr_s * 5;
-  y = bdr_s * 4 + 202;
-  drawRightDevUi(p, x, y);
+  // steer img (upper right down 1)
+  x = rect().right() - (radius / 2) - (bdr_s * 2);
+  y = (radius / 2) + (bdr_s * 20);
+  drawIconRotate(p, x, y, steer_img, icon_bg, 1.0, steerAngle);
+
+  QString sa_str, saop_str;
+  QColor sa_color = limeColor(200);
+  if (std::fabs(steerAngle) > 90) {
+    sa_color = redColor(200);
+  } else if (std::fabs(steerAngle) > 30) {
+    sa_color = orangeColor(200);
+  }
+  sa_str.sprintf("%.0f °", steerAngle);
+  saop_str.sprintf("%.0f °", steerAngleOp);
+  configFont(p, "Open Sans", 35, "Bold");
+
+  drawTextColor(p, x, y + 120, sa_str, sa_color);
+  if (status != STATUS_DISENGAGED) {
+    drawTextColor(p, x, y + 170, saop_str, sa_color);
+  }
+
+  // long icon (upper right down 2)
+  x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
+  y = (radius / 2) + (bdr_s * 20);
+  drawIcon(p, x, y, lat_img, icon_bg, is_cruise_set ? 1.0 : 0.2);
+
+  // gaspress img (bottom right)
+  x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 1.5);
+  y = rect().bottom() - (footer_h / 2) + (bdr_s *2);
+  drawIcon(p, x, y, gaspress_img, icon_bg, gas_pressed ? 1.0 : 0.2);
 
   // dm icon (bottom 1eft 1)
-  x = radius / 2 + (bdr_s * 2);
-  y = rect().bottom() - footer_h / 2;
-  drawIcon(p, x, y, dm_img, blackColor(100), dmActive ? 1.0 : 0.2);
+  x = (radius / 2) + (bdr_s * 2);
+  y = rect().bottom() - (footer_h / 2);
+  drawIcon(p, x, y, dm_img, icon_bg, dmActive ? 1.0 : 0.2);
 
   // scc gap icon (bottom right 1)
   if (gap_state == 1) {
@@ -573,29 +597,29 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     gap_img = gap4_img;
   }
 
-  x = radius / 2 + (bdr_s * 2) + radius;
-  y = rect().bottom() - footer_h / 2;
-  drawIcon(p, x, y, gap_img, blackColor(100), is_cruise_set ? 1.0 : 0.2);
+  x = (radius / 2) + (bdr_s * 2) + radius;
+  y = rect().bottom() - (footer_h / 2);
+  drawIcon(p, x, y, gap_img, icon_bg, is_cruise_set ? 1.0 : 0.2);
 
   // brake icon (bottom left 2)
-  x = radius / 2 + (bdr_s * 2);
+  x = (radius / 2) + (bdr_s * 2);
   y = rect().bottom() - (footer_h / 2) - (radius) - 10;
-  drawIcon(p, x, y, brake_img, blackColor(100), brake_state ? 1.0 : 0.2);
+  drawIcon(p, x, y, brake_img, icon_bg, brake_state ? 1.0 : 0.2);
 
   // autohold icon (bottom right 2)
-  x = radius / 2 + (bdr_s * 2) + (radius);
+  x = (radius / 2) + (bdr_s * 2) + (radius);
   y = rect().bottom() - (footer_h / 2) - (radius) - 10;
-  drawIcon(p, x, y, autohold_state > 1 ? autohold_warning_img : autohold_active_img, blackColor(100), autohold_state ? 1.0 : 0.2);
+  drawIcon(p, x, y, autohold_state > 1 ? autohold_warning_img : autohold_active_img, icon_bg, autohold_state ? 1.0 : 0.2);
 
   // bsd_l icon (bottom left 3)
-  x = radius / 2 + (bdr_s * 2);
+  x = (radius / 2) + (bdr_s * 2);
   y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
-  drawIcon(p, x, y, bsd_l_img, blackColor(100), left_blindspot ? 1.0 : 0.2);
+  drawIcon(p, x, y, bsd_l_img, icon_bg, left_blindspot ? 1.0 : 0.2);
 
   // bsd_r icon (bottom right 3)
-  x = radius / 2 + (bdr_s * 2) + (radius);
+  x = (radius / 2) + (bdr_s * 2) + (radius);
   y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
-  drawIcon(p, x, y, bsd_r_img, blackColor(100), right_blindspot ? 1.0 : 0.2);
+  drawIcon(p, x, y, bsd_r_img, icon_bg, right_blindspot ? 1.0 : 0.2);
 
   // bottom info
   const char* lateral[] = {"Pid", "Indi", "Lqr", "Torque"};
@@ -629,8 +653,8 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     gpsAltitude, gpsAccuracy, gpsSatelliteCount
   );
 
-  x = rect().right() - radius * 1.8;
-  y = bdr_s * 3;
+  x = rect().right() - (radius * 1.8);
+  y = (bdr_s * 3);
 
   configFont(p, "Open Sans", 30, "Regular");
   drawTextColor(p, x, y, infoGps, whiteColor(200));
@@ -706,69 +730,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     }
   }
   p.setOpacity(1.);
-}
-
-int AnnotatedCameraWidget::devUiDrawElement(QPainter &p, int x, int y, const char* value, const char* label, const char* units, const QColor &color) {
-  configFont(p, "Open Sans", 45, "SemiBold");
-  drawTextColor(p, x + 92, y + 80, QString(value), color);
-  configFont(p, "Open Sans", 28, "Regular");
-  drawText(p, x + 92, y + 122, QString(label), 255);
-
-  if (strlen(units) > 0) {
-    p.save();
-    p.save();
-    p.translate(x + 173, y + 62);
-    p.rotate(-90);
-    drawText(p, 0, 0, QString(units), 255);
-    p.restore();
-  }
-  return 110;
-}
-
-void AnnotatedCameraWidget::drawRightDevUi(QPainter &p, int x, int y) {
-  int rh = 5;
-  int ry = y;
-
-  QColor valueColor = whiteColor();
-
-  // Add Real Steering Angle
-  if (true) {
-    char val_str[8];
-    valueColor = limeColor();
-
-    // Red if large steering angle, Orange if moderate steering angle
-    if (std::fabs(steerAngle) > 90) {
-      valueColor = redColor();
-    } else if (std::fabs(steerAngle) > 30) {
-      valueColor = orangeColor();
-    }
-    snprintf(val_str, sizeof(val_str), "%.0f %s", steerAngle, "°");
-
-    rh += devUiDrawElement(p, x, ry, val_str, "REAL STEER", "", valueColor);
-    ry = y + rh;
-  }
-
-  // Add Desired Steering Angle
-  if (status == STATUS_ENGAGED || STATUS_OVERRIDE) {
-    char val_str[8];
-    valueColor = limeColor();
-
-    // Red if large steering angle, Orange if moderate steering angle
-    if (std::fabs(steerAngle) > 90) {
-      valueColor = redColor();
-    } else if (std::fabs(steerAngle) > 30) {
-      valueColor = orangeColor();
-    }
-    snprintf(val_str, sizeof(val_str), "%.0f %s", steerAngleOp, "°");
-
-    rh += devUiDrawElement(p, x, ry, val_str, "OP STEER", "", valueColor);
-    ry = y + rh;
-  }
-
-  rh += 25;
-  p.setBrush(blackColor(0));
-  QRect ldu(x, y, 184, rh);
-  p.drawRoundedRect(ldu, 20, 20);
 }
 
 // Window that shows camera view and variety of
