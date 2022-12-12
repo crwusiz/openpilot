@@ -40,6 +40,7 @@ class HyundaiFlags(IntFlag):
   CANFD_ALT_GEARS = 4
   CANFD_CAMERA_SCC = 8
   ALT_LIMITS = 16
+  ENABLE_BLINKERS = 32
 
 
 class CAR:

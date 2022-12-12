@@ -571,10 +571,10 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     drawTextColor(p, x, y + 170, saop_str, sa_color);
   }
 
-  // long icon (upper right down 2)
+  // lat icon (upper right down 2)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
   y = (radius / 2) + (bdr_s * 20);
-  drawIcon(p, x, y, lat_img, icon_bg, is_cruise_set ? 1.0 : 0.2);
+  drawIcon(p, x, y, lat_img, icon_bg, (status != STATUS_DISENGAGED) ? 1.0 : 0.2);
 
   // gaspress img (bottom right)
   x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 1.5);
