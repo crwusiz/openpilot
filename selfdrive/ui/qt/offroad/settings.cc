@@ -654,14 +654,14 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   auto pandadefault_btn = new ButtonControl(tr("Panda Safety Change to Default"), tr("RUN"));
   QObject::connect(pandadefault_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/script/add/panda_default.sh");
+      QProcess::execute("/data/openpilot/scripts/add/panda_default.sh");
     }
   });
 
   auto pandamdps_btn = new ButtonControl(tr("Panda Safety Change to MDPS"), tr("RUN"));
   QObject::connect(pandamdps_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/script/add/panda_mdps.sh");
+      QProcess::execute("/data/openpilot/scripts/add/panda_mdps.sh");
     }
   });
 

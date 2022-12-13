@@ -13,3 +13,5 @@ fi
 if [ -f "/data/PANDA_MDPS" ]; then
   rm /data/PANDA_MDPS
 fi
+
+exec /data/openpilot/scripts/restart.sh

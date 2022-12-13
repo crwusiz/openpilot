@@ -13,3 +13,5 @@ fi
 if [ -f "/data/PANDA_DEFAULT" ]; then
   rm /data/PANDA_DEFAULT
 fi
+
+exec /data/openpilot/scripts/restart.sh
