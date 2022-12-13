@@ -100,6 +100,7 @@ class CAR:
   EV6 = "KIA EV6 (CV)"
   SPORTAGE_NQ5 = "KIA SPORTAGE (NQ5)"
   SPORTAGE_NQ5_HEV = "KIA SPORTAGE HEV (NQ5)"
+  GENESIS_GV60 = "GENESIS GV60 (JW1)"
   GENESIS_GV70 = "GENESIS GV70 (JK1)"
   SORENTO_MQ4_HEV = "KIA SORENTO HEV (MQ4)"
 
@@ -205,6 +206,7 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
   CAR.EV6: HyundaiCarInfo("Kia EV6 2022", "Highway Driving Assist II", harness=Harness.hyundai_p),
   CAR.SPORTAGE_NQ5: HyundaiCarInfo("Kia Sportage Hybrid 2023", harness=Harness.hyundai_n),
   CAR.SPORTAGE_NQ5_HEV: HyundaiCarInfo("Kia Sportage Hybrid 2023", harness=Harness.hyundai_n),
+  CAR.GENESIS_GV60: HyundaiCarInfo("Genesis GV60 2023", "All", harness=Harness.hyundai_k),
   CAR.GENESIS_GV70: HyundaiCarInfo("Genesis GV70 2022", "Highway Driving Assist II", harness=Harness.hyundai_l),
   CAR.SORENTO_MQ4_HEV: HyundaiCarInfo("Kia Sorento Hybrid 2022-23", "Smart Cruise Control (SCC)",
                                                harness=Harness.hyundai_a),
@@ -402,18 +404,22 @@ FW_VERSIONS = {
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00PDP LKAS AT AUS RHD 1.00 1.01 99211-G4000 v60',
       b'\xf1\x00PD  LKAS AT USA LHD 1.01 1.01 95740-G3100 A54',
+      b'\xf1\x00PD  LKAS AT KOR LHD 1.00 1.02 95740-G3000 A51',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00PD__ SCC F-CUP      1.00 1.01 99110-G3100         ',
+      b'\xf1\x00PD__ SCC FNCUP      1.01 1.00 96400-G3000         ',
       b'\xf1\x00PD__ SCC F-CUP      1.00 1.00 96400-G3300         ',
     ],
     (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00PD ESC \x11 100 \a\x03 58910-G3AC0',
       b'\xf1\x00PD ESC \x0b 104\x18\t\x03 58920-G3350',
+      b'\xf1\x00PD ESC \t 104\x18\t\x03 58920-G3350',
     ],
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00PDu MDPS C 1.00 1.01 56310/G3690 4PDUC101',
       b'\xf1\x00PD  MDPS C 1.00 1.04 56310/G3300 4PDDC104',
+      b'\xf1\x00PD  MDPS C 1.00 1.00 56310G3300\x00 4PDDC100',
     ],
     (Ecu.engine, 0x7e0, None): [
       b'\x01TPD-1A506F000H00',
@@ -421,6 +427,7 @@ FW_VERSIONS = {
     (Ecu.transmission, 0x7e1, None): [
       b'\xf1\x816U2VA051\x00\x00\xf1\x006U2V0_C2\x00\x006U2VA051\x00\x00DPD0H16US0\x00\x00\x00\x00',
       b'\xf1\x006U2V0_C2\x00\x006U2VA051\x00\x00DPD0H16NS0e\x0e\xcd\x8e',
+      b'\xf1\x006U2U0_C2\x00\x006U2T0051\x00\x00DPD0D16KS0u\xce\x1fk',
     ],
   },
   CAR.ELANTRA21: { # (CN7)
@@ -1572,6 +1579,14 @@ FW_VERSIONS = {
       b'\xf1\x00NQ5__               1.01 1.03 99110-CH000         ',
     ],
   },
+  CAR.GENESIS_GV60: { # (JW1)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00JW1 MFC  AT USA LHD 1.00 1.02 99211-CU100 211215',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00JW1_ RDR -----      1.00 1.00 99110-CU000         ',
+    ],
+  },
   CAR.GENESIS_GV70: { # (JK1)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00JK1 MFC  AT USA LHD 1.00 1.04 99211-AR000 210204',
@@ -1623,7 +1638,7 @@ CANFD_RADAR_SCC_CAR = {
 }
 EV_CAR = {
   CAR.KONA_EV, CAR.IONIQ_EV, CAR.NIRO_EV, CAR.SOUL_EV, CAR.NEXO,
-  CAR.EV6, CAR.IONIQ5
+  CAR.EV6, CAR.IONIQ5, CAR.GENESIS_GV60
 }
 HEV_CAR = {
   CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV, CAR.SANTAFE_HEV, CAR.ELANTRA21_HEV, CAR.SONATA_HEV, CAR.SONATA_LF_HEV, CAR.GRANDEUR_HEV, CAR.GRANDEUR20_HEV,
@@ -1697,6 +1712,7 @@ DBC = {
   CAR.EV6: dbc_dict('hyundai_canfd', None),
   CAR.SPORTAGE_NQ5: dbc_dict('hyundai_canfd', None),
   CAR.SPORTAGE_NQ5_HEV: dbc_dict('hyundai_canfd', None),
+  CAR.GENESIS_GV60: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),
   CAR.SORENTO_MQ4_HEV: dbc_dict('hyundai_canfd', None),
 }

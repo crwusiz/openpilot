@@ -976,12 +976,17 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   },
 
   EventName.accFaulted: {
-    #ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("Cruise Faulted"),
-    #ET.PERMANENT: NormalPermanentAlert("Cruise Faulted", ""),
-    #ET.NO_ENTRY: NoEntryAlert("Cruise Faulted"),
-    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("크루즈 오류"),
-    ET.PERMANENT: NormalPermanentAlert("크루즈 오류", ""),
-    ET.NO_ENTRY: NoEntryAlert("크루즈 오류"),
+    #ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("Cruise Fault: Restart the Car"),
+    #ET.PERMANENT: NormalPermanentAlert("Cruise Fault: Restart the car to engage"),
+    #ET.NO_ENTRY: NoEntryAlert("Cruise Fault: Restart the Car"),
+    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("크루즈 오류 : 차량을 재가동하세요"),
+    ET.PERMANENT: NormalPermanentAlert("크루즈 오류 : 차량을 재가동하세요"),
+    ET.NO_ENTRY: NoEntryAlert("크루즈 오류 : 차량을 재가동하세요"),
+  },
+
+  EventName.accFaultedTemp: {
+    #ET.NO_ENTRY: NoEntryAlert("Cruise Temporarily Faulted"),
+    ET.NO_ENTRY: NoEntryAlert("크루즈 일시적 오류"),
   },
 
   EventName.controlsMismatch: {

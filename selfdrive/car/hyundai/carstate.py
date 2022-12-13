@@ -33,7 +33,6 @@ class CarState(CarStateBase):
 
     #Auto detection for setup
     self.is_metric = False
-    self.brake_error = False
     self.buttons_counter = 0
     self.eps_error_cnt = 0
 
@@ -75,7 +74,7 @@ class CarState(CarStateBase):
       self.cluster_speed = cp.vl["CLU15"]["CF_Clu_VehicleSpeed"]
       self.cluster_speed_counter = 0
 
-      # mimic how dash converts to imperial
+      # Mimic how dash converts to imperial.
       if not self.is_metric:
         self.cluster_speed = math.floor(self.cluster_speed * CV.KPH_TO_MPH + CV.KPH_TO_MPH)
 
@@ -121,6 +120,7 @@ class CarState(CarStateBase):
     ret.brakeHoldActive = cp.vl["TCS15"]["AVH_LAMP"] == 2  # 0 OFF, 1 ERROR, 2 ACTIVE, 3 READY
     ret.parkingBrake = cp.vl["TCS13"]["PBRAKE_ACT"] == 1
     ret.brakeLights = bool(cp.vl["TCS13"]["BrakeLight"] or ret.brakePressed)
+    ret.accFaulted = cp.vl["TCS13"]["ACCEnable"] != 0  # 0 ACC CONTROL ENABLED, 1-3 ACC CONTROL DISABLED
 
     if self.CP.carFingerprint in (EV_CAR | HEV_CAR):
       if self.CP.carFingerprint in HEV_CAR:
@@ -176,7 +176,6 @@ class CarState(CarStateBase):
     self.mfc_lfa = cp_cam.vl["LFAHDA_MFC"]
 
     self.steer_state = cp_eps.vl["MDPS12"]["CF_Mdps_ToiActive"]  # 0 NOT ACTIVE, 1 ACTIVE
-    self.brake_error = cp.vl["TCS13"]["ACCEnable"] != 0  # 0 ACC CONTROL ENABLED, 1-3 ACC CONTROL DISABLED
     self.prev_cruise_buttons = self.cruise_buttons[-1]
     self.cruise_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwState"])
     self.main_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwMain"])
@@ -248,6 +247,7 @@ class CarState(CarStateBase):
     self.cruise_buttons.extend(cp.vl_all[cruise_btn_msg]["CRUISE_BUTTONS"])
     self.main_buttons.extend(cp.vl_all[cruise_btn_msg]["ADAPTIVE_CRUISE_MAIN_BTN"])
     self.buttons_counter = cp.vl[cruise_btn_msg]["COUNTER"]
+    ret.accFaulted = cp.vl["TCS"]["ACCEnable"] != 0  # 0 ACC CONTROL ENABLED, 1-3 ACC CONTROL DISABLED
 
     if self.CP.flags & HyundaiFlags.CANFD_HDA2:
       self.cam_0x2a4 = copy.copy(cp_cam.vl["CAM_0x2a4"])
@@ -494,13 +494,16 @@ class CarState(CarStateBase):
       signals.append(("CF_Clu_Gear", "CLU15"))
     elif CP.carFingerprint in FEATURES["use_tcu_gears"]:
       signals.append(("CUR_GR", "TCU12"))
+      checks.append(("TCU12", 100))
     elif CP.carFingerprint in FEATURES["use_elect_gears"]:
       signals += [
         ("Elect_Gear_Shifter", "ELECT_GEAR"),
         ("Elect_Gear_Shifter_NEXO", "ELECT_GEAR"),
       ]
+      checks.append(("ELECT_GEAR", 20))
     else:
       signals.append(("CF_Lvr_Gear", "LVR12"))
+      checks.append(("LVR12", 100))
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 0, enforce_checks=False)
 
@@ -759,6 +762,7 @@ class CarState(CarStateBase):
       ("LKA_FAULT", "MDPS"),
 
       ("DriverBraking", "TCS"),
+      ("ACCEnable", "TCS"),
 
       ("COUNTER", cruise_btn_msg),
       ("CRUISE_BUTTONS", cruise_btn_msg),

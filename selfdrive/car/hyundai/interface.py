@@ -201,6 +201,10 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 2185. + STD_CARGO_KG
       ret.wheelbase = 3.16
       ret.steerRatio = 12.0
+    elif candidate == CAR.GENESIS_GV60:
+      ret.mass = 2205 + STD_CARGO_KG
+      ret.wheelbase = 2.9
+      ret.steerRatio = 12.6 # https://www.motor1.com/reviews/586376/2023-genesis-gv60-first-drive/#:~:text=Relative%20to%20the%20related%20Ioniq,5%2FEV6%27s%2014.3%3A1.
     elif candidate == CAR.GENESIS_GV70:
       ret.mass = 1950. + STD_CARGO_KG
       ret.wheelbase = 2.87
@@ -429,7 +433,7 @@ class CarInterface(CarInterfaceBase):
     # most HKG cars has no long control, it is safer and easier to engage by main on
     ret.cruiseState.enabled = ret.cruiseState.available
 
-    if all([self.CS.CP.openpilotLongitudinalControl, self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons]):
+    if self.CS.CP.openpilotLongitudinalControl and self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons:
       buttonEvents = [create_button_event(self.CS.cruise_buttons[-1], self.CS.prev_cruise_buttons, BUTTONS_DICT)]
       # Handle CF_Clu_CruiseSwState changing buttons mid-press
       if self.CS.cruise_buttons[-1] != 0 and self.CS.prev_cruise_buttons != 0:
@@ -442,9 +446,6 @@ class CarInterface(CarInterfaceBase):
     # Main button also can trigger an engagement on these cars
     allow_enable = any(btn in ENABLE_BUTTONS for btn in self.CS.cruise_buttons) or any(self.CS.main_buttons)
     events = self.create_common_events(ret, pcm_enable=self.CS.CP.pcmCruise, allow_enable=allow_enable)
-
-    #if self.CS.brake_error:
-    #  events.add(EventName.brakeUnavailable)
 
     # turning indicator alert logic
     if any([ret.leftBlinker, ret.rightBlinker, self.CC.turning_signal_timer]) and ret.vEgo < LANE_CHANGE_SPEED_MIN - 1.2:
