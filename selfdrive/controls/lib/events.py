@@ -444,7 +444,6 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   EventName.dashcamMode: {
     #ET.PERMANENT: NormalPermanentAlert("Dashcam Mode",
-    #                                   priority=Priority.LOWEST),
     ET.PERMANENT: NormalPermanentAlert("대시캠 모드",
                                        priority=Priority.LOWEST),
   },
@@ -1020,9 +1019,9 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   # Sometimes the USB stack on the device can get into a bad state
   # causing the connection to the panda to be lost
   EventName.usbError: {
-    #ET.SOFT_DISABLE: soft_disable_alert("USB Error : Reboot Your Device"),
-    #ET.PERMANENT: NormalPermanentAlert("USB Error : Reboot Your Device", ""),
-    #ET.NO_ENTRY: NoEntryAlert("USB Error : Reboot Your Device"),
+    #ET.SOFT_DISABLE: soft_disable_alert("USB Error: Reboot Your Device"),
+    #ET.PERMANENT: NormalPermanentAlert("USB Error: Reboot Your Device", ""),
+    #ET.NO_ENTRY: NoEntryAlert("USB Error: Reboot Your Device"),
     ET.SOFT_DISABLE: soft_disable_alert("USB 오류 : 장치를 재부팅하세요"),
     ET.PERMANENT: NormalPermanentAlert("USB 오류 : 장치를 재부팅하세요", ""),
     ET.NO_ENTRY: NoEntryAlert("USB 오류 : 장치를 재부팅하세요"),
@@ -1084,7 +1083,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
       "",
       AlertStatus.normal, AlertSize.full,
       Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay=0.5),
-    #ET.SOFT_DISABLE: SoftDisableAlert("Reverse Gear"),
+    #ET.USER_DISABLE: ImmediateDisableAlert("Reverse Gear"),
     #ET.NO_ENTRY: NoEntryAlert("Reverse Gear"),
     ET.USER_DISABLE: SoftDisableAlert("기어 [R] 상태"),
     ET.NO_ENTRY: NoEntryAlert("기어 [R] 상태"),
