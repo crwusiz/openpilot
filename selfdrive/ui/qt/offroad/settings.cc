@@ -746,8 +746,12 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
 
     if (list->currentRow() == 0) {
       Params().remove("SelectedCar");
+      qApp->exit(18);
+      watchdog_kick(0);
     } else {
       Params().put("SelectedCar", list->currentItem()->text().toStdString());
+      qApp->exit(18);
+      watchdog_kick(0);
     }
     emit selectedCar();
     });
@@ -777,7 +781,7 @@ SelectManufacturer::SelectManufacturer(QWidget* parent): QWidget(parent) {
   list->setCurrentRow(0);
   QString selected = QString::fromStdString(Params().get("SelectedManufacturer"));
 
-  int index = 0;
+  int index = 1;
   for(QString item : items) {
     if(selected == item) {
         list->setCurrentRow(index);
@@ -791,27 +795,43 @@ SelectManufacturer::SelectManufacturer(QWidget* parent): QWidget(parent) {
 
     if (list->currentRow() == 0) {
       Params().remove("SelectedManufacturer");
+      qApp->exit(18);
+      watchdog_kick(0);
     } else if (list->currentRow() == 1) {
       QProcess::execute("cp -f /data/params/d/CarList_Hyundai /data/params/d/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
+      qApp->exit(18);
+      watchdog_kick(0);
     } else if (list->currentRow() == 2) {
       QProcess::execute("cp -f /data/params/d/CarList_Kia /data/params/d/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
+      qApp->exit(18);
+      watchdog_kick(0);
     } else if (list->currentRow() == 3) {
       QProcess::execute("cp -f /data/params/d/CarList_Genesis /data/params/d/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
+      qApp->exit(18);
+      watchdog_kick(0);
     } else if (list->currentRow() == 4) {
       QProcess::execute("cp -f /data/params/d/CarList_Gm /data/params/d/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
+      qApp->exit(18);
+      watchdog_kick(0);
     } else if (list->currentRow() == 5) {
       QProcess::execute("cp -f /data/params/d/CarList_Toyota /data/params/d/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
+      qApp->exit(18);
+      watchdog_kick(0);
     } else if (list->currentRow() == 6) {
       QProcess::execute("cp -f /data/params/d/CarList_Lexus /data/params/d/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
+      qApp->exit(18);
+      watchdog_kick(0);
     } else if (list->currentRow() == 7) {
       QProcess::execute("cp -f /data/params/d/CarList_Honda /data/params/d/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
+      qApp->exit(18);
+      watchdog_kick(0);
     }
     emit selectedManufacturer();
     });

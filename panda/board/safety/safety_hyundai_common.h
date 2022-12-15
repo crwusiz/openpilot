@@ -30,7 +30,6 @@ void hyundai_common_init(uint16_t param) {
   hyundai_hybrid_gas_signal = !hyundai_ev_gas_signal && GET_FLAG(param, HYUNDAI_PARAM_HYBRID_GAS);
   hyundai_camera_scc = GET_FLAG(param, HYUNDAI_PARAM_CAMERA_SCC);
   hyundai_alt_limits = GET_FLAG(param, HYUNDAI_PARAM_ALT_LIMITS);
-
   hyundai_last_button_interaction = HYUNDAI_PREV_BUTTON_SAMPLES;
 
 #ifdef ALLOW_DEBUG
@@ -45,17 +44,21 @@ void hyundai_common_cruise_state_check(const int cruise_engaged) {
   // so keep track of user button presses to deny engagement if no interaction
 
   // enter controls on rising edge of ACC and recent user button press, exit controls when ACC off
-  if (!hyundai_longitudinal) {
-    if (cruise_engaged && !cruise_engaged_prev && (hyundai_last_button_interaction < HYUNDAI_PREV_BUTTON_SAMPLES)) {
-      controls_allowed = 1;
-    }
-
-    /*if (!cruise_engaged) {
-      controls_allowed = 0;
-    }*/
+  //if (!hyundai_longitudinal) {
+  if (cruise_engaged && !cruise_engaged_prev && (hyundai_last_button_interaction < HYUNDAI_PREV_BUTTON_SAMPLES)) {
     controls_allowed = 1;
-    cruise_engaged_prev = cruise_engaged;
+    print("[hyundai_common_cruise_state_check] controls_allowed = 1\n");
   }
+
+  /*if (!cruise_engaged) {
+    controls_allowed = 0;
+    print("[hyundai_common_cruise_state_check] controls_allowed = 0\n");
+  }*/
+  controls_allowed = 1;
+  print("[hyundai_common_cruise_state_check] controls_allowed = 1\n");
+
+  cruise_engaged_prev = cruise_engaged;
+  //}
 }
 
 void hyundai_common_cruise_buttons_check(const int cruise_button, const int main_button) {
@@ -72,11 +75,13 @@ void hyundai_common_cruise_buttons_check(const int cruise_button, const int main
     bool res = (cruise_button != HYUNDAI_BTN_RESUME) && (cruise_button_prev == HYUNDAI_BTN_RESUME);
     if (set || res) {
       controls_allowed = 1;
+      print("[hyundai_common_cruise_buttons_check] controls_allowed = 1\n");
     }
 
     // exit controls on cancel press
     //if (cruise_button == HYUNDAI_BTN_CANCEL) {
     //  controls_allowed = 0;
+    //  print("[hyundai_common_cruise_buttons_check] controls_allowed = 0\n");
     //}
 
     cruise_button_prev = cruise_button;

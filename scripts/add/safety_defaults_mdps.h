@@ -10,9 +10,9 @@ int default_rx_hook(CANPacket_t *to_push) {
   int bus = GET_BUS(to_push);
   int addr = GET_ADDR(to_push);
 
-  bool is_mdps12_msg = addr == 593;
-  bool is_lkas11_msg = addr == 832;
-  bool is_scc12_msg = addr == 1057;
+  bool is_mdps12_msg = (addr == 593);
+  bool is_lkas11_msg = (addr == 832);
+  bool is_scc12_msg = (addr == 1057);
 
   if (is_lkas11_msg) {
     if (bus == 0) {
@@ -98,7 +98,7 @@ static int default_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   int addr = GET_ADDR(to_fwd);
   int bus_fwd = -1;
 
-  bool is_mdps12_msg = addr == 593;
+  bool is_mdps12_msg = (addr == 593);
 
   if (bus_num == 0 && (fwd_bus1 || fwd_bus2)) {
     if (fwd_bus1 && fwd_bus2) {
