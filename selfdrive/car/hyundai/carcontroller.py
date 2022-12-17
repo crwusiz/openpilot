@@ -71,8 +71,7 @@ class CarController:
     hud_control = CC.hudControl
 
     # Steering Torque
-    steer = actuators.steer
-    new_steer = int(round(steer * self.CCP.STEER_MAX))
+    new_steer = int(round(actuators.steer * self.CCP.STEER_MAX))
     apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.CCP)
 
     # Disable steering while turning blinker on and speed below 60 kph
