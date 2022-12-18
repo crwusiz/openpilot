@@ -441,7 +441,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   // speedlimit sign
   if (limit_speed > 0 && left_dist > 0) {
-    QPoint center(max_speed_rect.center().x(), speed_rect.top() + 280);
+    QPoint center(max_speed_rect.center().x(), max_rect.top() + 280);
     p.setPen(Qt::NoPen);
     p.setBrush(whiteColor());
     p.drawEllipse(center, 92, 92);
@@ -463,7 +463,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     p.setPen(whiteColor());
     p.drawText(left_rect, Qt::AlignCenter, leftDistStr);
   } else if (roadLimitSpeed > 0 && roadLimitSpeed < 120) {
-    QPoint center(max_speed_rect.center().x(), speed_rect.top() + 280);
+    QPoint center(max_speed_rect.center().x(), max_rect.top() + 280);
     p.setPen(Qt::NoPen);
     p.setBrush(whiteColor());
     p.drawEllipse(center, 92, 92);
