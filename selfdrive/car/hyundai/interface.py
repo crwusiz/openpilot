@@ -336,11 +336,16 @@ class CarInterface(CarInterfaceBase):
     if candidate in CANFD_CAR:
       bus = 5 if ret.flags & HyundaiFlags.CANFD_HDA2 else 4
       ret.enableBsm = 0x1e5 in fingerprint[bus]
+      if 0x1fa in fingerprint[bus]:
+        ret.flags |= HyundaiFlags.SP_NAV_MSG.value
     else:
       ret.enableBsm = 1419 in fingerprint[0]
+      if 0x544 in fingerprint[0]:
+        ret.flags |= HyundaiFlags.SP_NAV_MSG.value
       ret.hasAutoHold = 1151 in fingerprint[0]
       ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
       ret.hasLfaHda = 1157 in fingerprint[0]
+      ret.hasNav = 1348 in fingerprint[0]
       ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
 
     # *** panda safety config ***
@@ -367,6 +372,9 @@ class CarInterface(CarInterfaceBase):
          ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
         elif candidate in EV_CAR:
          ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
+        if 0x391 in fingerprint[0]:
+         ret.flags |= HyundaiFlags.SP_CAN_LFA_BTN.value
+         ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LFA_BTN
       elif panda_safety_select == "1":
         ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
 

@@ -69,6 +69,9 @@ class CarState(CarStateBase):
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
     ret.standstill = ret.vEgoRaw < 0.1
 
+    if self.CP.flags & HyundaiFlags.SP_CAN_LFA_BTN:
+      self.lfa_enabled = cp.vl["BCM_PO_11"]["LFA_Pressed"]
+
     self.cluster_speed_counter += 1
     if self.cluster_speed_counter > CLUSTER_SAMPLE_RATE:
       self.cluster_speed = cp.vl["CLU15"]["CF_Clu_VehicleSpeed"]
@@ -93,9 +96,6 @@ class CarState(CarStateBase):
     self.eps_error_cnt += 1 if not ret.standstill and cp_eps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 else -self.eps_error_cnt
     ret.steerFaultTemporary = self.eps_error_cnt > 100
 
-    if self.CP.hasAutoHold:
-      ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]
-
     # cruise state
     if self.CP.openpilotLongitudinalControl and self.CP.sccBus == 0:
       # These are not used for engage/disengage since openpilot keeps track of state using the buttons
@@ -119,7 +119,7 @@ class CarState(CarStateBase):
     ret.brakePressed = cp.vl["TCS13"]["DriverBraking"] != 0
     ret.brakeHoldActive = cp.vl["TCS15"]["AVH_LAMP"] == 2  # 0 OFF, 1 ERROR, 2 ACTIVE, 3 READY
     ret.parkingBrake = cp.vl["TCS13"]["PBRAKE_ACT"] == 1
-    ret.brakeLights = bool(cp.vl["TCS13"]["BrakeLight"] or ret.brakePressed)
+    ret.brakeLights = bool(ret.brakePressed)
     ret.accFaulted = cp.vl["TCS13"]["ACCEnable"] != 0  # 0 ACC CONTROL ENABLED, 1-3 ACC CONTROL DISABLED
 
     if self.CP.carFingerprint in (EV_CAR | HEV_CAR):
@@ -188,6 +188,12 @@ class CarState(CarStateBase):
     ret.tpms.rl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_RL"]
     ret.tpms.rr = tpms_unit * cp.vl["TPMS11"]["PRESSURE_RR"]
 
+    if self.CP.hasAutoHold:
+      ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]
+
+    if self.CP.hasNav:
+      ret.navSpeedLimit = cp.vl["Navi_HU"]["SpeedLim_Nav_Clu"]
+
     return ret
 
 
@@ -204,6 +210,7 @@ class CarState(CarStateBase):
       ret.gasPressed = bool(cp.vl["ACCELERATOR_BRAKE_ALT"]["ACCELERATOR_PEDAL_PRESSED"])
 
     ret.brakePressed = cp.vl["TCS"]["DriverBraking"] == 1
+    ret.brakeLights = bool(ret.brakePressed)
 
     ret.doorOpen = cp.vl["DOORS_SEATBELTS"]["DRIVER_DOOR_OPEN"] == 1
     ret.seatbeltUnlatched = cp.vl["DOORS_SEATBELTS"]["DRIVER_SEATBELT_LATCHED"] == 0
@@ -385,46 +392,28 @@ class CarState(CarStateBase):
       ]
 
     if not CP.openpilotLongitudinalControl:
-      signals += [
-        ("MainMode_ACC", "SCC11"),
-        ("VSetDis", "SCC11"),
-        ("SCCInfoDisplay", "SCC11"),
-        ("ACC_ObjDist", "SCC11"),
-        ("TauGapSet", "SCC11"),
-        ("ACCMode", "SCC12"),
-      ]
-      checks += [
-        ("SCC11", 50),
-        ("SCC12", 50),
-      ]
+      if not CP.sccBus == -1:
+        signals += [
+          ("MainMode_ACC", "SCC11"),
+          ("VSetDis", "SCC11"),
+          ("SCCInfoDisplay", "SCC11"),
+          ("ACC_ObjDist", "SCC11"),
+          ("TauGapSet", "SCC11"),
+          ("ACCMode", "SCC12"),
+        ]
+        checks += [
+          ("SCC11", 50),
+          ("SCC12", 50),
+        ]
 
       if CP.aebFcw or CP.carFingerprint in FCA11_CAR:
         signals += [
-          ("CF_VSM_Prefill", "FCA11"),
-          ("CF_VSM_HBACmd", "FCA11"),
-          ("CF_VSM_BeltCmd", "FCA11"),
-          ("CR_VSM_DecCmd", "FCA11"),
-          ("FCA_Status", "FCA11"),
-          ("FCA_StopReq", "FCA11"),
-          ("FCA_DrvSetStatus", "FCA11"),
-          ("FCA_Failinfo", "FCA11"),
-          ("CR_FCA_Alive", "FCA11"),
-          ("FCA_RelativeVelocity", "FCA11"),
-          ("FCA_TimetoCollision", "FCA11"),
-          ("CR_FCA_ChkSum", "FCA11"),
-          ("PAINT1_Status", "FCA11"),
           ("FCA_CmdAct", "FCA11"),
           ("CF_VSM_Warn", "FCA11"),
           ("CF_VSM_DecCmdAct", "FCA11"),
-
-          ("FCA_USM", "FCA12"),
-          ("FCA_DrvSetState", "FCA12"),
         ]
-        checks += [
-          ("FCA11", 50),
-          ("FCA12", 50),
-        ]
-      else:
+        checks.append(("FCA11", 50))
+      elif not CP.sccBus == -1:
         signals += [
           ("AEB_CmdAct", "SCC12"),
           ("CF_VSM_Warn", "SCC12"),
@@ -504,6 +493,14 @@ class CarState(CarStateBase):
     else:
       signals.append(("CF_Lvr_Gear", "LVR12"))
       checks.append(("LVR12", 100))
+
+    if CP.flags & HyundaiFlags.SP_CAN_LFA_BTN:
+      signals.append(("LFA_Pressed", "BCM_PO_11"))
+      checks.append(("BCM_PO_11", 50))
+
+    if CP.hasNav or CP.flags & HyundaiFlags.SP_NAV_MSG:
+      signals.append(("SpeedLim_Nav_Clu", "Navi_HU"))
+      checks.append(("Navi_HU", 5))
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 0, enforce_checks=False)
 
@@ -695,45 +692,27 @@ class CarState(CarStateBase):
         checks.append(("SCC14", 50))
 
     if not CP.openpilotLongitudinalControl:
-      signals += [
-        ("MainMode_ACC", "SCC11"),
-        ("VSetDis", "SCC11"),
-        ("SCCInfoDisplay", "SCC11"),
-        ("ACC_ObjDist", "SCC11"),
-        ("ACCMode", "SCC12"),
-      ]
-      checks += [
-        ("SCC11", 50),
-        ("SCC12", 50),
-      ]
+      if CP.sccBus == -1:
+        signals += [
+          ("MainMode_ACC", "SCC11"),
+          ("VSetDis", "SCC11"),
+          ("SCCInfoDisplay", "SCC11"),
+          ("ACC_ObjDist", "SCC11"),
+          ("ACCMode", "SCC12"),
+        ]
+        checks += [
+          ("SCC11", 50),
+          ("SCC12", 50),
+        ]
 
       if CP.aebFcw or CP.carFingerprint in FCA11_CAR:
         signals += [
-          ("CF_VSM_Prefill", "FCA11"),
-          ("CF_VSM_HBACmd", "FCA11"),
-          ("CF_VSM_BeltCmd", "FCA11"),
-          ("CR_VSM_DecCmd", "FCA11"),
-          ("FCA_Status", "FCA11"),
-          ("FCA_StopReq", "FCA11"),
-          ("FCA_DrvSetStatus", "FCA11"),
-          ("FCA_Failinfo", "FCA11"),
-          ("CR_FCA_Alive", "FCA11"),
-          ("FCA_RelativeVelocity", "FCA11"),
-          ("FCA_TimetoCollision", "FCA11"),
-          ("CR_FCA_ChkSum", "FCA11"),
-          ("PAINT1_Status", "FCA11"),
           ("FCA_CmdAct", "FCA11"),
           ("CF_VSM_Warn", "FCA11"),
           ("CF_VSM_DecCmdAct", "FCA11"),
-
-          ("FCA_USM", "FCA12"),
-          ("FCA_DrvSetState", "FCA12"),
         ]
-        checks += [
-          ("FCA11", 50),
-          ("FCA12", 50),
-        ]
-      else:
+        checks.append(("FCA11", 50))
+      elif CP.sccBus == -1:
         signals += [
           ("AEB_CmdAct", "SCC12"),
           ("CF_VSM_Warn", "SCC12"),
@@ -768,6 +747,7 @@ class CarState(CarStateBase):
       ("CRUISE_BUTTONS", cruise_btn_msg),
       ("ADAPTIVE_CRUISE_MAIN_BTN", cruise_btn_msg),
       ("DISTANCE_UNIT", "CRUISE_BUTTONS_ALT"),
+      ("LFA_BTN", cruise_btn_msg),
 
       ("LEFT_LAMP", "BLINKERS"),
       ("RIGHT_LAMP", "BLINKERS"),
@@ -804,6 +784,7 @@ class CarState(CarStateBase):
         ("ACCMode", "SCC_CONTROL"),
         ("VSetDis", "SCC_CONTROL"),
         ("CRUISE_STANDSTILL", "SCC_CONTROL"),
+        ("MainMode_ACC", "SCC_CONTROL"),
       ]
       checks += [
         ("SCC_CONTROL", 50),
@@ -830,6 +811,10 @@ class CarState(CarStateBase):
       checks += [
         ("ACCELERATOR_BRAKE_ALT", 100),
       ]
+
+    if CP.flags & HyundaiFlags.CANFD_HDA2 and CP.flags & HyundaiFlags.SP_NAV_MSG:
+      signals.append(("SPEED_LIMIT_1", "CLUSTER_SPEED_LIMIT"))
+      checks.append(("CLUSTER_SPEED_LIMIT", 10))
 
     bus = 5 if CP.flags & HyundaiFlags.CANFD_HDA2 else 4
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, bus, enforce_checks=False)
@@ -858,5 +843,9 @@ class CarState(CarStateBase):
       checks += [
         ("SCC_CONTROL", 50),
       ]
+
+    if not ((CP.flags & HyundaiFlags.CANFD_HDA2) and CP.flags & HyundaiFlags.SP_NAV_MSG):
+      signals.append(("SPEED_LIMIT_1", "CLUSTER_SPEED_LIMIT"))
+      checks.append(("CLUSTER_SPEED_LIMIT", 10))
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 6, enforce_checks=False)

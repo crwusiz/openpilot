@@ -43,6 +43,9 @@ class HyundaiFlags(IntFlag):
   ALT_LIMITS = 16
   ENABLE_BLINKERS = 32
 
+  SP_CAN_LFA_BTN = 64
+  SP_ENHANCED_SCC = 128
+  SP_NAV_MSG = 256
 
 class CAR:
   # Hyundai
