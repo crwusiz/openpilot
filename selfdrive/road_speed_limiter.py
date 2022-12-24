@@ -10,7 +10,7 @@ import fcntl
 import struct
 from threading import Thread
 from cereal import messaging
-from common.numpy_fast import clip
+from common.numpy_fast import clip, interp
 from common.realtime import sec_since_boot, Ratekeeper
 from common.conversions import Conversions as CV
 
@@ -342,6 +342,7 @@ class RoadSpeedLimiter:
           speed_diff = 0
           if section_adjust_speed is not None and section_adjust_speed:
             speed_diff = (section_limit_speed - section_avg_speed) / 2.
+            speed_diff *= interp(section_left_dist, [500, 1000], [0., 1.])
 
           return section_limit_speed * camSpeedFactor + speed_diff, section_limit_speed, section_left_dist, first_started
 
