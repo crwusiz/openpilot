@@ -15,13 +15,13 @@ CAMERA_OFFSET = 0.04
 
 PATH_COST = 1.0
 LATERAL_MOTION_COST = 0.11
-LATERAL_ACCEL_COST = 0.0
+LATERAL_ACCEL_COST = 1.0
 LATERAL_JERK_COST = 0.05
 # Extreme steering rate is unpleasant, even
 # when it does not cause bad jerk.
 # TODO this cost should be lowered when low
 # speed lateral control is stable on all cars
-STEERING_RATE_COST = 800.0
+STEERING_RATE_COST = 8.0
 
 
 class LateralPlanner:
@@ -83,7 +83,7 @@ class LateralPlanner:
     d_path_xyz = self.path_xyz
     self.lat_mpc.set_weights(PATH_COST, LATERAL_MOTION_COST,
                              LATERAL_ACCEL_COST, LATERAL_JERK_COST,
-                             interp(self.v_ego, [2., 10.], [STEERING_RATE_COST, STEERING_RATE_COST/3.]))
+                             STEERING_RATE_COST)
 
     y_pts = np.interp(self.v_ego * self.t_idxs[:LAT_MPC_N + 1], np.linalg.norm(d_path_xyz, axis=1), d_path_xyz[:, 1])
     heading_pts = np.interp(self.v_ego * self.t_idxs[:LAT_MPC_N + 1], np.linalg.norm(self.path_xyz, axis=1), self.plan_yaw)
@@ -138,7 +138,6 @@ class LateralPlanner:
     lateralPlan.solverExecutionTime = self.lat_mpc.solve_time
 
     lateralPlan.desire = self.DH.desire
-    lateralPlan.blinker = self.DH.blinker
     lateralPlan.useLaneLines = False
     lateralPlan.laneChangeState = self.DH.lane_change_state
     lateralPlan.laneChangeDirection = self.DH.lane_change_direction

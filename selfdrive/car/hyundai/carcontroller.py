@@ -69,10 +69,12 @@ class CarController:
   def update(self, CC, CS, controls):
     actuators = CC.actuators
     hud_control = CC.hudControl
+    self.CCP = CarControllerParams(self.CP, CS.out.vEgoRaw)
 
     # Steering Torque
     new_steer = int(round(actuators.steer * self.CCP.STEER_MAX))
     apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.CCP)
+    apply_steer = clip(apply_steer, -self.CCP.STEER_MAX, self.CCP.STEER_MAX)
 
     # Disable steering while turning blinker on and speed below 60 kph
     if CS.out.leftBlinker or CS.out.rightBlinker:

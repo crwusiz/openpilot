@@ -17,7 +17,7 @@
   .has_steer_req_tolerance = true, \
 }
 
-const SteeringLimits HYUNDAI_COMMUNITY_STEERING_LIMITS = HYUNDAI_COMMUNITY_LIMITS(409, 3, 7);
+const SteeringLimits HYUNDAI_COMMUNITY_STEERING_LIMITS = HYUNDAI_COMMUNITY_LIMITS(384, 10, 10);
 
 const LongitudinalLimits HYUNDAI_COMMUNITY_LONG_LIMITS = {
   .max_accel = 200,   // 1/100 m/s2
@@ -61,7 +61,6 @@ AddrCheckStruct hyundai_community_addr_checks[] = {
   {.msg = {{916, 0, 8, .expected_timestep = 20000U}, { 0 }, { 0 }}},                                               // TCS13
   //{.msg = {{1057, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},  // SCC12
 };
-
 #define HYUNDAI_COMMUNITY_ADDR_CHECK_LEN (sizeof(hyundai_community_addr_checks) / sizeof(hyundai_community_addr_checks[0]))
 
 addr_checks hyundai_community_rx_checks = {hyundai_community_addr_checks, HYUNDAI_COMMUNITY_ADDR_CHECK_LEN};
@@ -267,10 +266,10 @@ static int hyundai_community_rx_hook(CANPacket_t *to_push) {
 
     // If openpilot is controlling longitudinal we need to ensure the radar is turned off
     // Enforce by checking we don't see SCC12
-    if (hyundai_longitudinal && is_scc12_msg) {
+    if (hyundai_longitudinal && (is_scc12_msg)) {
       stock_ecu_detected = true;
     }
-    generic_rx_checks(stock_ecu_detected && (bus == 0));
+    generic_rx_checks(stock_ecu_detected);
   }
   return valid;
 }
@@ -299,6 +298,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send) {
 
     if ((CR_VSM_DecCmd != 0) || (FCA_CmdAct != 0) || (CF_VSM_DecCmdAct != 0)) {
       tx = 0;
+      print("violation[FCA11, 909]\n");
     }
   }
 
@@ -306,10 +306,8 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send) {
   if (is_scc12_msg) {
     int desired_accel_raw = (((GET_BYTE(to_send, 4) & 0x7U) << 8) | GET_BYTE(to_send, 3)) - 1023U;
     int desired_accel_val = ((GET_BYTE(to_send, 5) << 3) | (GET_BYTE(to_send, 4) >> 5)) - 1023U;
-
     int aeb_decel_cmd = GET_BYTE(to_send, 2);
     int aeb_req = GET_BIT(to_send, 54U);
-
     bool violation = false;
 
     violation |= longitudinal_accel_checks(desired_accel_raw, HYUNDAI_COMMUNITY_LONG_LIMITS);
@@ -319,19 +317,57 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send) {
 
     if (violation) {
       tx = 0;
+      print("violation[SCC12, 1057]\n");
     }
   }
 
   // LKA STEER: safety check
   if (is_lkas11_msg) {
     lkas11_op = 20;
+    uint32_t ts = microsecond_timer_get();
     int desired_torque = ((GET_BYTES_04(to_send) >> 16) & 0x7ffU) - 1024U;
-    bool steer_req = true; //GET_BIT(to_send, 27U) != 0U;
+    bool violation = false;
 
-    const SteeringLimits limits = HYUNDAI_COMMUNITY_STEERING_LIMITS;
-    if (steer_torque_cmd_checks(desired_torque, steer_req, limits)) {
-      tx = 0;
+    if (controls_allowed) {
+      // *** global torque limit check ***
+      violation |= max_limit_check(desired_torque, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer, -HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer);
+
+      // ready to blend in limits
+      desired_torque_last = MAX(-330, MIN(desired_torque, 330));
+      rt_torque_last = desired_torque;
+      ts_torque_check_last = ts;
     }
+
+    // no torque if controls is not allowed
+    if (!controls_allowed && (desired_torque != 0)) {
+      violation = true;
+      print("  lkas torque not allowed : controls not allowed!\n");
+    }
+
+    // reset to 0 if either controls is not allowed or there's a violation
+    if (violation || !controls_allowed) {
+      valid_steer_req_count = 0;
+      invalid_steer_req_count = 0;
+      desired_torque_last = 0;
+      rt_torque_last = 0;
+      ts_torque_check_last = ts;
+      ts_steer_req_mismatch_last = ts;
+    }
+
+    if (violation) {
+      tx = 0;
+      print("violation[LKAS11, 832]\n");
+      print("  lkas torque allowed : controls allowed!\n");
+    }
+
+    /*bool steer_req = GET_BIT(to_send, 27U) != 0U;
+    const SteeringLimits limits = HYUNDAI_COMMUNITY_STEERING_LIMITS;
+    //if (steer_torque_cmd_checks(desired_torque, steer_req, limits)) {
+    if (steer_torque_cmd_checks(desired_torque, -1, limits)) {
+      tx = 0;
+      print("violation[LKAS11, 832]\n");
+      print("  lkas torque allowed : controls allowed!\n");
+    }*/
   }
 
   // UDS: Only tester present ("\x02\x3E\x80\x00\x00\x00\x00\x00") allowed on diagnostics address

@@ -17,7 +17,7 @@
   .has_steer_req_tolerance = true, \
 }
 
-const SteeringLimits HYUNDAI_STEERING_LIMITS = HYUNDAI_LIMITS(409, 3, 7);
+const SteeringLimits HYUNDAI_STEERING_LIMITS = HYUNDAI_LIMITS(384, 10, 10);
 const SteeringLimits HYUNDAI_STEERING_LIMITS_ALT = HYUNDAI_LIMITS(270, 2, 3);
 
 const LongitudinalLimits HYUNDAI_LONG_LIMITS = {
@@ -199,28 +199,34 @@ static int hyundai_rx_hook(CANPacket_t *to_push) {
   int bus = GET_BUS(to_push);
   int addr = GET_ADDR(to_push);
 
+  bool is_mdps12_msg = (addr == 593);
+  bool is_lkas11_msg = (addr == 832);
+  bool is_scc11_msg = (addr == 1056);
+  bool is_scc12_msg = (addr == 1057);
+  bool is_clu11_msg = (addr == 1265);
+
   // SCC12 is on bus 2 for camera-based SCC cars, bus 0 on all others
-  /*if (valid && (addr == 1057) && (((bus == 0) && !hyundai_camera_scc) || ((bus == 2) && hyundai_camera_scc))) {
+  /*if (valid && (is_scc12_msg) && (((bus == 0) && !hyundai_camera_scc) || ((bus == 2) && hyundai_camera_scc))) {
     // 2 bits: 13-14
     int cruise_engaged = (GET_BYTES_04(to_push) >> 13) & 0x3U;
     hyundai_common_cruise_state_check(cruise_engaged);
   }*/
 
-  if (valid && (addr == 1056)) { //  MainMode_ACC
+  if (valid && (is_scc11_msg)) { //  MainMode_ACC
     // 1 bits: 0
-    int cruise_engaged = (GET_BYTES_04(to_push)) & 0x1U;
+    int cruise_engaged = GET_BYTES_04(to_push) & 0x1U;
     hyundai_common_cruise_state_check(cruise_engaged);
   }
 
   if (valid && (bus == 0)) {
-    if (addr == 593) {
+    if (is_mdps12_msg) {
       int torque_driver_new = ((GET_BYTES_04(to_push) & 0x7ffU) * 0.79) - 808; // scale down new driver torque signal to match previous one
       // update array of samples
       update_sample(&torque_driver, torque_driver_new);
     }
 
     // ACC steering wheel buttons
-    if (addr == 1265) {
+    if (is_clu11_msg) {
       int cruise_button = GET_BYTE(to_push, 0) & 0x7U;
       int main_button = GET_BIT(to_push, 3U);
       hyundai_common_cruise_buttons_check(cruise_button, main_button);
@@ -249,11 +255,11 @@ static int hyundai_rx_hook(CANPacket_t *to_push) {
 
     gas_pressed = brake_pressed = false;
 
-    bool stock_ecu_detected = (addr == 832);
+    bool stock_ecu_detected = (is_lkas11_msg);
 
     // If openpilot is controlling longitudinal we need to ensure the radar is turned off
     // Enforce by checking we don't see SCC12
-    if (hyundai_longitudinal && (addr == 1057)) {
+    if (hyundai_longitudinal && (is_scc12_msg)) {
       stock_ecu_detected = true;
     }
     generic_rx_checks(stock_ecu_detected);
@@ -266,9 +272,11 @@ uint32_t last_ts_scc12_from_op = 0;
 uint32_t last_ts_mdps12_from_op = 0;
 
 static int hyundai_tx_hook(CANPacket_t *to_send) {
-
   int tx = 1;
   int addr = GET_ADDR(to_send);
+
+  bool is_lkas11_msg = (addr == 832);
+  bool is_scc12_msg = (addr == 1057);
 
   if (hyundai_longitudinal) {
     tx = msg_allowed(to_send, HYUNDAI_LONG_TX_MSGS, sizeof(HYUNDAI_LONG_TX_MSGS)/sizeof(HYUNDAI_LONG_TX_MSGS[0]));
@@ -286,17 +294,16 @@ static int hyundai_tx_hook(CANPacket_t *to_send) {
 
     if ((CR_VSM_DecCmd != 0) || (FCA_CmdAct != 0) || (CF_VSM_DecCmdAct != 0)) {
       tx = 0;
+      print("violation[FCA11, 909]\n");
     }
   }
 
   // ACCEL: safety check
-  if (addr == 1057) {
+  if (is_scc12_msg) {
     int desired_accel_raw = (((GET_BYTE(to_send, 4) & 0x7U) << 8) | GET_BYTE(to_send, 3)) - 1023U;
     int desired_accel_val = ((GET_BYTE(to_send, 5) << 3) | (GET_BYTE(to_send, 4) >> 5)) - 1023U;
-
     int aeb_decel_cmd = GET_BYTE(to_send, 2);
     int aeb_req = GET_BIT(to_send, 54U);
-
     bool violation = false;
 
     violation |= longitudinal_accel_checks(desired_accel_raw, HYUNDAI_LONG_LIMITS);
@@ -306,18 +313,53 @@ static int hyundai_tx_hook(CANPacket_t *to_send) {
 
     if (violation) {
       tx = 0;
+      print("violation[SCC12, 1057]\n");
     }
   }
 
   // LKA STEER: safety check
-  if (addr == 832) {
+  if (is_lkas11_msg) {
+    uint32_t ts = microsecond_timer_get();
     int desired_torque = ((GET_BYTES_04(to_send) >> 16) & 0x7ffU) - 1024U;
-    bool steer_req = GET_BIT(to_send, 27U) != 0U;
+    bool violation = false;
 
+    if (controls_allowed) {
+      // *** global torque limit check ***
+      violation |= max_limit_check(desired_torque, HYUNDAI_STEERING_LIMITS.max_steer, -HYUNDAI_STEERING_LIMITS.max_steer);
+
+      // ready to blend in limits
+      desired_torque_last = MAX(-330, MIN(desired_torque, 330));
+      rt_torque_last = desired_torque;
+      ts_torque_check_last = ts;
+    }
+
+    // no torque if controls is not allowed
+    if (!controls_allowed && (desired_torque != 0)) {
+      violation = true;
+      print("  lkas torque not allowed : controls not allowed!\n");
+    }
+
+    // reset to 0 if either controls is not allowed or there's a violation
+    if (violation || !controls_allowed) {
+      valid_steer_req_count = 0;
+      invalid_steer_req_count = 0;
+      desired_torque_last = 0;
+      rt_torque_last = 0;
+      ts_torque_check_last = ts;
+      ts_steer_req_mismatch_last = ts;
+    }
+
+    if (violation) {
+      tx = 0;
+      print("violation[LKAS11, 832]\n");
+      print("  lkas torque allowed : controls allowed!\n");
+    }
+    /*bool steer_req = GET_BIT(to_send, 27U) != 0U;
     const SteeringLimits limits = hyundai_alt_limits ? HYUNDAI_STEERING_LIMITS_ALT : HYUNDAI_STEERING_LIMITS;
     if (steer_torque_cmd_checks(desired_torque, steer_req, limits)) {
       tx = 0;
-    }
+      print("violation[LKAS11, 832]\n");
+    }*/
   }
 
   // UDS: Only tester present ("\x02\x3E\x80\x00\x00\x00\x00\x00") allowed on diagnostics address
@@ -328,7 +370,7 @@ static int hyundai_tx_hook(CANPacket_t *to_send) {
   }
 
   // BUTTONS: used for resume spamming and cruise cancellation
-  /*if ((addr == 1265) && !hyundai_longitudinal) {
+  /*if ((is_clu11_msg) && !hyundai_longitudinal) {
     int button = GET_BYTE(to_send, 0) & 0x7U;
 
     bool allowed_resume = (button == 1) && controls_allowed;
@@ -370,7 +412,6 @@ static int hyundai_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   // forward cam to ccan and viceversa, except lkas cmd
   if (bus_num == 0) {
     bus_fwd = 2;
-
     if (is_mdps12_msg) {
       if (now - last_ts_mdps12_from_op < 200000) {
         bus_fwd = -1;

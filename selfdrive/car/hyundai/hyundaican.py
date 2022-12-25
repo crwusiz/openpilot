@@ -8,7 +8,6 @@ hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque_fault, sys_warning, sys_state, enabled,
                   left_lane, right_lane, left_lane_depart, right_lane_depart, bus, lkas11):
   values = lkas11
-
   values["CF_Lkas_LdwsSysState"] = sys_state
   values["CF_Lkas_SysWarning"] = 3 if sys_warning else 0
   values["CF_Lkas_LdwsLHWarning"] = left_lane_depart
@@ -51,7 +50,6 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
 
 def create_clu11(packer, frame, bus, button, clu11):
   values = clu11
-
   values["CF_Clu_CruiseSwState"] = button
   values["CF_Clu_AliveCnt1"] = frame % 0x10
 
@@ -60,7 +58,6 @@ def create_clu11(packer, frame, bus, button, clu11):
 
 def create_clu11_mdps(packer, frame, bus, button, speed, clu11):
   values = clu11
-
   values["CF_Clu_CruiseSwState"] = button
   values["CF_Clu_Vanz"] = speed
   values["CF_Clu_AliveCnt1"] = frame % 0x10
@@ -70,7 +67,6 @@ def create_clu11_mdps(packer, frame, bus, button, speed, clu11):
 
 def create_mdps12(packer, frame, mdps12):
   values = mdps12
-
   values["CF_Mdps_ToiActive"] = 0
   values["CF_Mdps_ToiUnavail"] = 1
   values["CF_Mdps_MsgCount2"] = frame % 0x100
@@ -109,7 +105,7 @@ def create_scc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, s
     values["ACC_ObjRelSpd"] = 0
     values["ACC_ObjDist"] = 1  # close lead makes controls tighter
     values["VSetDis"] = set_speed
-    #values["DriverAlertDisplay"] = 0
+  values["DriverAlertDisplay"] = 0
   commands.append(packer.make_can_msg("SCC11", 0, values))
 
   values = CS.scc12

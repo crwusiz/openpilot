@@ -327,10 +327,6 @@ class CarState(CarStateBase):
       ("ACC_ObjLatPos", "SCC11"),
       ("ACC_ObjDist", "SCC11"),
       ("ACC_ObjRelSpd", "SCC11"),
-      ("Navi_SCC_Curve_Status", "SCC11"),
-      ("Navi_SCC_Curve_Act", "SCC11"),
-      ("Navi_SCC_Camera_Act", "SCC11"),
-      ("Navi_SCC_Camera_Status", "SCC11"),
 
       ("ACCMode", "SCC12"),
       ("CF_VSM_Prefill", "SCC12"),
@@ -548,10 +544,6 @@ class CarState(CarStateBase):
         ("ACC_ObjLatPos", "SCC11"),
         ("ACC_ObjDist", "SCC11"),
         ("ACC_ObjRelSpd", "SCC11"),
-        ("Navi_SCC_Curve_Status", "SCC11"),
-        ("Navi_SCC_Curve_Act", "SCC11"),
-        ("Navi_SCC_Camera_Act", "SCC11"),
-        ("Navi_SCC_Camera_Status", "SCC11"),
 
         ("ACCMode", "SCC12"),
         ("CF_VSM_Prefill", "SCC12"),
@@ -642,10 +634,6 @@ class CarState(CarStateBase):
         ("ACC_ObjLatPos", "SCC11"),
         ("ACC_ObjDist", "SCC11"),
         ("ACC_ObjRelSpd", "SCC11"),
-        ("Navi_SCC_Curve_Status", "SCC11"),
-        ("Navi_SCC_Curve_Act", "SCC11"),
-        ("Navi_SCC_Camera_Act", "SCC11"),
-        ("Navi_SCC_Camera_Status", "SCC11"),
 
         ("ACCMode", "SCC12"),
         ("CF_VSM_Prefill", "SCC12"),
@@ -656,6 +644,7 @@ class CarState(CarStateBase):
         ("CF_VSM_BeltCmd", "SCC12"),
         ("ACCFailInfo", "SCC12"),
         ("StopReq", "SCC12"),
+        ("ACCFailInfo", "SCC12"),
         ("CR_VSM_DecCmd", "SCC12"),
         ("aReqRaw", "SCC12"), #aReqMax
         ("TakeOverReq", "SCC12"),

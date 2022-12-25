@@ -40,9 +40,9 @@ class DesireHelper:
     self.lane_change_timer = 0.0
     self.lane_change_ll_prob = 1.0
     self.keep_pulse_timer = 0.0
+    self.lane_change_pulse_timer = 0.0
     self.prev_one_blinker = False
     self.desire = log.LateralPlan.Desire.none
-    self.blinker = log.LateralPlan.Blinker.none
 
     self.auto_lane_change_enabled = Params().get_bool('AutoLaneChangeEnabled')
     self.auto_lane_change_timer = 0.0
@@ -64,6 +64,7 @@ class DesireHelper:
 
       # LaneChangeState.preLaneChange
       elif self.lane_change_state == LaneChangeState.preLaneChange:
+        self.lane_change_pulse_timer += DT_MDL
         # Set lane change direction
         self.lane_change_direction = LaneChangeDirection.left if \
           carstate.leftBlinker else LaneChangeDirection.right
@@ -76,7 +77,7 @@ class DesireHelper:
 
         if not one_blinker or below_lane_change_speed:
           self.lane_change_state = LaneChangeState.off
-        elif torque_applied and (not blindspot_detected or self.prev_torque_applied):
+        elif (torque_applied or self.lane_change_pulse_timer > 2.) and (not blindspot_detected or self.prev_torque_applied):
           self.lane_change_state = LaneChangeState.laneChangeStarting
         elif torque_applied and blindspot_detected and self.auto_lane_change_timer != 10.0:
           self.auto_lane_change_timer = 10.0
@@ -103,6 +104,8 @@ class DesireHelper:
           else:
             self.lane_change_state = LaneChangeState.off
 
+    if self.lane_change_state in (LaneChangeState.laneChangeFinishing, LaneChangeState.off):
+      self.lane_change_pulse_timer = 0.0
     if self.lane_change_state in (LaneChangeState.off, LaneChangeState.preLaneChange):
       self.lane_change_timer = 0.0
     else:
@@ -116,8 +119,6 @@ class DesireHelper:
 
     self.prev_one_blinker = one_blinker
     self.desire = DESIRES[self.lane_change_direction][self.lane_change_state]
-    # TODO use a dict
-    self.blinker = log.LateralPlan.Blinker.left if carstate.leftBlinker else log.LateralPlan.Blinker.right if carstate.rightBlinker else log.LateralPlan.Blinker.none
 
     # Send keep pulse once per second during LaneChangeStart.preLaneChange
     if self.lane_change_state in (LaneChangeState.off, LaneChangeState.laneChangeStarting):

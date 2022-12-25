@@ -16,23 +16,23 @@ class CarControllerParams:
   ACCEL_MIN = -3.5 # m/s
   ACCEL_MAX = 2.0 # m/s
 
-  def __init__(self, CP):
-    self.STEER_MAX = 409
-    self.STEER_DELTA_UP = 3
-    self.STEER_DELTA_DOWN = 7
-    self.STEER_DRIVER_ALLOWANCE = 50
+  def __init__(self, CP, vEgoRaw=100.):
+    self.STEER_MAX = 384 if vEgoRaw < 11. else 330
+    self.STEER_DELTA_UP = 10 if vEgoRaw < 11. else 3
+    self.STEER_DELTA_DOWN = 10 if vEgoRaw < 11. else 7
+    self.STEER_DRIVER_ALLOWANCE = 150 # 50
     self.STEER_DRIVER_MULTIPLIER = 2
     self.STEER_DRIVER_FACTOR = 1
-    self.STEER_THRESHOLD = 150
+    self.STEER_THRESHOLD = 250 # 150
     self.STEER_STEP = 1  # 100 Hz
 
     if CP.carFingerprint in CANFD_CAR:
-      self.STEER_MAX = 270
-      self.STEER_DRIVER_ALLOWANCE = 250
+      self.STEER_MAX = 384 if vEgoRaw < 11. else 330
+      self.STEER_DRIVER_ALLOWANCE = 350 # 250
       self.STEER_DRIVER_MULTIPLIER = 2
-      self.STEER_THRESHOLD = 250
-      self.STEER_DELTA_UP = 2
-      self.STEER_DELTA_DOWN = 3
+      self.STEER_THRESHOLD = 350 # 250
+      self.STEER_DELTA_UP = 10 if vEgoRaw < 11. else 2
+      self.STEER_DELTA_DOWN = 10 if vEgoRaw < 11. else 3
 
 
 class HyundaiFlags(IntFlag):
