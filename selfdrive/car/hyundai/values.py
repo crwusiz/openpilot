@@ -42,9 +42,9 @@ class HyundaiFlags(IntFlag):
   CANFD_CAMERA_SCC = 8
   ALT_LIMITS = 16
   ENABLE_BLINKERS = 32
+  CANFD_ALT_GEARS_2 = 64
 
-  SP_CAN_LFA_BTN = 64
-  SP_ENHANCED_SCC = 128
+  SP_CAN_LFA_BTN = 128
   SP_NAV_MSG = 256
 
 class CAR:
@@ -107,6 +107,7 @@ class CAR:
   GENESIS_GV60 = "GENESIS GV60 (JW1)"
   GENESIS_GV70 = "GENESIS GV70 (JK1)"
   SORENTO_MQ4_HEV = "KIA SORENTO HEV (MQ4)"
+  NIRO_SG2_HEV = "KIA NIRO HEV (SG2)"
 
 class Footnote(Enum):
   CANFD = CarFootnote(
@@ -229,6 +230,9 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
   CAR.GENESIS_GV70: HyundaiCarInfo("Genesis GV70 2022", "Highway Driving Assist II", harness=Harness.hyundai_l),
   CAR.SORENTO_MQ4_HEV: HyundaiCarInfo("Kia Sorento Hybrid 2022-23", "Smart Cruise Control (SCC)",
                                                harness=Harness.hyundai_a),
+  CAR.NIRO_SG2_HEV: [
+    HyundaiCarInfo("Kia Niro Hybrid 2023", harness=Harness.hyundai_a),
+  ],
 }
 
 class Buttons:
@@ -1587,13 +1591,21 @@ FW_VERSIONS = {
       b'\xf1\x00JK1_ SCC FHCUP      1.00 1.02 99110-AR000         ',
     ],
   },
-  CAR.SORENTO_MQ4_HEV: {
+  CAR.SORENTO_MQ4_HEV: { # (MQ4)
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00MQhe SCC FHCUP      1.00 1.06 99110-P4000         ',
     ],
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00MQ4HMFC  AT USA LHD 1.00 1.11 99210-P2000 211217',
     ]
+  },
+  CAR.NIRO_SG2_HEV: { # (SG2)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00SG2HMFC  AT USA LHD 1.01 1.08 99211-AT000 220531',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00SG2_ RDR -----      1.00 1.01 99110-AT000         ',
+    ],
   },
 }
 
@@ -1621,7 +1633,7 @@ FCA11_CAR = {
 }
 CANFD_CAR = {
   CAR.TUCSON22, CAR.TUCSON22_HEV, CAR.IONIQ5,
-  CAR.EV6, CAR.SPORTAGE_NQ5, CAR.SPORTAGE_NQ5_HEV,
+  CAR.EV6, CAR.SPORTAGE_NQ5, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV,
   CAR.GENESIS_GV70,
 }
 # The radar does SCC on these cars when HDA I, rather than the camera
@@ -1635,13 +1647,13 @@ EV_CAR = {
 HEV_CAR = {
   CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV, CAR.SANTAFE_HEV, CAR.ELANTRA21_HEV, CAR.SONATA_HEV, CAR.SONATA_LF_HEV, CAR.GRANDEUR_HEV, CAR.GRANDEUR20_HEV,
   CAR.K5_HEV, CAR.K5_DL3_HEV, CAR.K7_HEV,
-  CAR.TUCSON22_HEV
+  CAR.TUCSON22_HEV, CAR.SORENTO_MQ4_HEV, CAR.NIRO_SG2_HEV
 }
 
 # these cars require a special panda safety mode due to missing counters and checksums in the messages
 LEGACY_SAFETY_MODE_CAR = {
   CAR.ELANTRA_I30, CAR.IONIQ, CAR.IONIQ_EV, CAR.IONIQ_HEV, CAR.KONA, CAR.KONA_EV, CAR.KONA_HEV, CAR.SORENTO, CAR.SONATA_LF, CAR.SONATA_LF_HEV,
-  CAR.K5, CAR.K5_HEV, CAR.VELOSTER, CAR.STINGER,
+  CAR.K5, CAR.K5_HEV, CAR.K7, CAR.K7_HEV, CAR.VELOSTER, CAR.STINGER,
   CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80,
 }
 
@@ -1707,4 +1719,5 @@ DBC = {
   CAR.GENESIS_GV60: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),
   CAR.SORENTO_MQ4_HEV: dbc_dict('hyundai_canfd', None),
+  CAR.NIRO_SG2_HEV: dbc_dict('hyundai_canfd', None),
 }
