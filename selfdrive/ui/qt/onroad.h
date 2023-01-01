@@ -39,7 +39,6 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(bool longControl MEMBER longControl);
   Q_PROPERTY(bool left_on MEMBER left_on);
   Q_PROPERTY(bool right_on MEMBER right_on);
-  Q_PROPERTY(bool lead_status MEMBER lead_status);
   Q_PROPERTY(bool gas_pressed MEMBER gas_pressed);
 
   Q_PROPERTY(int status MEMBER status);
@@ -61,8 +60,6 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(float speed MEMBER speed);
   Q_PROPERTY(float applyMaxSpeed MEMBER applyMaxSpeed);
   Q_PROPERTY(float cruiseMaxSpeed MEMBER cruiseMaxSpeed);
-  Q_PROPERTY(float lead_d_rel MEMBER lead_d_rel);
-  Q_PROPERTY(float lead_v_rel MEMBER lead_v_rel);
   Q_PROPERTY(float gpsBearing MEMBER gpsBearing);
   Q_PROPERTY(float gpsVerticalAccuracy MEMBER gpsVerticalAccuracy);
   Q_PROPERTY(float gpsAltitude MEMBER gpsAltitude);
@@ -123,7 +120,6 @@ private:
   bool left_on, right_on = false;
   bool v_ego_cluster_seen = false;
   bool wide_cam_requested = false;
-  bool lead_status = false;
   bool gas_pressed = false;
 
   int status = STATUS_DISENGAGED;
@@ -139,7 +135,6 @@ private:
   int skip_frame_count = 0;
 
   float speed, applyMaxSpeed, cruiseMaxSpeed;
-  float lead_d_rel, lead_v_rel = 0;
   float gpsBearing, gpsVerticalAccuracy, gpsAltitude, gpsAccuracy = 0;
   float steerAngle, steerAngleOp ,steerRatio = 0;
   float fl, fr, rl, rr = 0;
@@ -152,7 +147,7 @@ protected:
   void showEvent(QShowEvent *event) override;
   void updateFrameMat() override;
   void drawLaneLines(QPainter &painter, const UIState *s);
-  void drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd, bool is_radar);
+  void drawLead(QPainter &painter, const cereal::RadarState::LeadData::Reader &lead_data, const QPointF &vd);
   void drawHud(QPainter &p);
   inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); }
   inline QColor yellowColor(int alpha = 255) { return QColor(255, 255, 0, alpha); }

@@ -236,7 +236,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   const auto ce = sm["carState"].getCarState();
   const auto cp = sm["carParams"].getCarParams();
   const auto ds = sm["deviceState"].getDeviceState();
-  const auto rs = sm["radarState"].getRadarState();
   const auto lp = sm["liveParameters"].getLiveParameters();
   const auto ge = sm["gpsLocationExternal"].getGpsLocationExternal();
   const auto ls = sm["roadLimitSpeed"].getRoadLimitSpeed();
@@ -288,9 +287,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("gpsAltitude", ge.getAltitude());
   setProperty("gpsAccuracy", ge.getAccuracy());
   setProperty("gpsSatelliteCount", s.scene.satelliteCount);
-  setProperty("lead_d_rel", rs.getLeadOne().getDRel());
-  setProperty("lead_v_rel", rs.getLeadOne().getVRel());
-  setProperty("lead_status", rs.getLeadOne().getStatus());
   setProperty("steerAngle", ce.getSteeringAngleDeg());
   setProperty("steerAngleOp", cc.getActuators().getSteeringAngleDeg());
   setProperty("longControl", cs.getLongControl());
@@ -875,12 +871,12 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
   painter.restore();
 }
 
-void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, const QPointF &vd, bool is_radar) {
+void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState::LeadData::Reader &lead_data, const QPointF &vd) {
   painter.save();
   const float speedBuff = 10.;
   const float leadBuff = 40.;
-  const float d_rel = lead_data.getX()[0];
-  const float v_rel = lead_data.getV()[0];
+  const float d_rel = lead_data.getDRel();
+  const float v_rel = lead_data.getVRel();
 
   float fillAlpha = 0;
   if (d_rel < leadBuff) {
@@ -899,7 +895,7 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV
   float g_yo = sz / 10;
 
   QPointF glow[] = {{x + (sz * 1.35) + g_xo, y + sz + g_yo}, {x, y - g_yo}, {x - (sz * 1.35) - g_xo, y + sz + g_yo}};
-  painter.setBrush(is_radar ? yellowColor() : pinkColor()); // vision : radar
+  painter.setBrush(pinkColor());
   painter.drawPolygon(glow, std::size(glow));
 
   // chevron
@@ -907,58 +903,32 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::ModelDataV
   painter.setBrush(redColor(fillAlpha));
   painter.drawPolygon(chevron, std::size(chevron));
 
-  // radar & vision distance ajouatom
-  float radar_dist = lead_status ? lead_d_rel : 0;
-  float vision_dist = lead_data.getProb() > .5 ? (d_rel - 1.5) : 0;
-
+  // lead car radar distance and speed
   QString l_dist, l_speed;
   QColor d_color, v_color = whiteColor(150);
 
-  if (radar_dist) {
-    if (lead_d_rel < 5) {
-      d_color = redColor(150);
-    } else if (lead_d_rel < 15) {
-      d_color = orangeColor(150);
-    } else {
-      d_color = whiteColor(150);
-    }
-    l_dist.sprintf("%.1f m", radar_dist);
-    if (lead_v_rel < -4.4704) {
-      v_color = redColor(150);
-    } else if (lead_v_rel < 0) {
-      v_color = orangeColor(150);
-    } else {
-      v_color = pinkColor(150);
-    }
-    if (speedUnit == "mph") {
-      l_speed.sprintf("%.0f mph", speed + lead_v_rel * 2.236936); // mph
-    } else {
-      l_speed.sprintf("%.0f km/h", speed + lead_v_rel * 3.6); // kph
-    }
-  } else if (vision_dist) {
-    if (d_rel < 5) {
-      d_color = redColor(150);
-    } else if (d_rel < 15) {
-      d_color = orangeColor(150);
-    } else {
-      d_color = whiteColor(150);
-    }
-    l_dist.sprintf("%.1f m", vision_dist);
-    if (v_rel < -4.4704) {
-      v_color = redColor(150);
-    } else if (v_rel < 0) {
-      v_color = orangeColor(150);
-    } else {
-      v_color = yellowColor(150);
-    }
-    if (speedUnit == "mph") {
-      l_speed.sprintf("%.0f mph", speed + v_rel * 2.236936); // mph
-    } else {
-      l_speed.sprintf("%.0f km/h", speed + v_rel * 3.6); // kph
-    }
+  if (d_rel < 5) {
+    d_color = redColor(150);
+  } else if (d_rel < 15) {
+    d_color = orangeColor(150);
+  } else {
+    d_color = whiteColor(150);
+  }
+  l_dist.sprintf("%.1f m", d_rel);
+
+  if (v_rel < -4.4704) {
+    v_color = redColor(150);
+  } else if (v_rel < 0) {
+    v_color = orangeColor(150);
+  } else {
+    v_color = pinkColor(150);
+  }
+  if (speedUnit == "mph") {
+    l_speed.sprintf("%.0f mph", speed + v_rel * 2.236936); // mph
+  } else {
+    l_speed.sprintf("%.0f km/h", speed + v_rel * 3.6); // kph
   }
   configFont(painter, "Inter", 35, "Bold");
-  drawTextColor(painter, x, y + sz / 1.5f + 10, is_radar ? "V" : "R", blackColor(200));
   drawTextColor(painter, x, y + sz / 1.5f + 70.0, l_dist, d_color);
   drawTextColor(painter, x, y + sz / 1.5f + 120.0, l_speed, v_color);
 
@@ -970,6 +940,7 @@ void AnnotatedCameraWidget::paintGL() {
   SubMaster &sm = *(s->sm);
   const double start_draw_t = millis_since_boot();
   const cereal::ModelDataV2::Reader &model = sm["modelV2"].getModelV2();
+  const cereal::RadarState::Reader &radar_state = sm["radarState"].getRadarState();
 
   // draw camera frame
   std::lock_guard lk(frame_lock);
@@ -1018,17 +989,18 @@ void AnnotatedCameraWidget::paintGL() {
     if (sm.rcv_frame("modelV2") > s->scene.started_frame) {
       update_model(s, sm["modelV2"].getModelV2());
       if (sm.rcv_frame("radarState") > s->scene.started_frame) {
-        update_leads(s, sm["radarState"].getRadarState(), sm["modelV2"].getModelV2().getPosition());
+        update_leads(s, radar_state, sm["modelV2"].getModelV2().getPosition());
       }
     }
 
     drawLaneLines(painter, s);
-    const auto leads = model.getLeadsV3();
-    if (leads[0].getProb() > .5) {
-      drawLead(painter, leads[0], s->scene.lead_vertices[0], s->scene.lead_radar[0]);
+    auto lead_one = radar_state.getLeadOne();
+    auto lead_two = radar_state.getLeadTwo();
+    if (lead_one.getStatus()) {
+      drawLead(painter, lead_one, s->scene.lead_vertices[0]);
     }
-    if (leads[1].getProb() > .5 && (std::abs(leads[1].getX()[0] - leads[0].getX()[0]) > 3.0)) {
-      drawLead(painter, leads[1], s->scene.lead_vertices[1], s->scene.lead_radar[1]);
+    if (lead_two.getStatus() && (std::abs(lead_one.getDRel() - lead_two.getDRel()) > 3.0)) {
+      drawLead(painter, lead_two, s->scene.lead_vertices[1]);
     }
   }
   drawHud(painter);
