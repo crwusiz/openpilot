@@ -21,8 +21,6 @@ from selfdrive.athena.registration import register, UNREGISTERED_DONGLE_ID
 from system.swaglog import cloudlog, add_file_handler
 from system.version import is_dirty, get_commit, get_version, get_origin, get_short_branch, terms_version, training_version, is_tested_branch
 
-sys.path.append(os.path.join(BASEDIR, "pyextra"))
-
 
 def manager_init() -> None:
   # update system time from panda
