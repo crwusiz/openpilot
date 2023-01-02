@@ -86,6 +86,16 @@ class Tici(HardwareBase):
   def amplifier(self):
     return Amplifier()
 
+  @cached_property
+  def model(self):
+    with open("/sys/firmware/devicetree/base/model") as f:
+      model = f.read().strip('\x00')
+    model = model.split('comma ')[-1]
+    # TODO: remove this with AGNOS 7+
+    if model.startswith('Qualcomm'):
+      model = 'tici'
+    return model
+
   def get_os_version(self):
     with open("/VERSION") as f:
       return f.read().strip()
@@ -402,7 +412,7 @@ class Tici(HardwareBase):
     # amplifier, 100mW at idle
     self.amplifier.set_global_shutdown(amp_disabled=powersave_enabled)
     if not powersave_enabled:
-      self.amplifier.initialize_configuration()
+      self.amplifier.initialize_configuration(self.model)
 
     # *** CPU config ***
 
@@ -431,7 +441,7 @@ class Tici(HardwareBase):
       return 0
 
   def initialize_hardware(self):
-    self.amplifier.initialize_configuration()
+    self.amplifier.initialize_configuration(self.model)
 
     # Allow thermald to write engagement status to kmsg
     os.system("sudo chmod a+w /dev/kmsg")
