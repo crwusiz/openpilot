@@ -929,6 +929,7 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState
     l_speed.sprintf("%.0f km/h", speed + v_rel * 3.6); // kph
   }
   configFont(painter, "Inter", 35, "Bold");
+  drawTextColor(painter, x, y + sz / 1.5f + 10, cruise_set ? "▲" : "", blackColor(200));
   drawTextColor(painter, x, y + sz / 1.5f + 70.0, l_dist, d_color);
   drawTextColor(painter, x, y + sz / 1.5f + 120.0, l_speed, v_color);
 
