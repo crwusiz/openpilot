@@ -57,7 +57,7 @@ class CarState(CarStateBase):
 
     ret = car.CarState.new_message()
     self.is_metric = cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"] == 0
-    self.speed_conv = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
+    speed_conv = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
 
     ret.doorOpen = any([cp.vl["CGW1"]["CF_Gway_DrvDrSw"], cp.vl["CGW1"]["CF_Gway_AstDrSw"],
                         cp.vl["CGW2"]["CF_Gway_RLDrSw"], cp.vl["CGW2"]["CF_Gway_RRDrSw"]])
@@ -83,7 +83,7 @@ class CarState(CarStateBase):
       if not self.is_metric:
         self.cluster_speed = math.floor(self.cluster_speed * CV.KPH_TO_MPH + CV.KPH_TO_MPH)
 
-    ret.vEgoCluster = self.cluster_speed * self.speed_conv
+    ret.vEgoCluster = self.cluster_speed * speed_conv
 
     ret.steeringAngleDeg = cp_sas.vl["SAS11"]["SAS_Angle"]
     ret.steeringRateDeg = cp_sas.vl["SAS11"]["SAS_Speed"]
@@ -108,12 +108,12 @@ class CarState(CarStateBase):
       ret.cruiseState.available = cp.vl["EMS16"]["CRUISE_LAMP_M"] != 0
       ret.cruiseState.enabled = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] != 0
       ret.cruiseState.standstill = False
-      ret.cruiseState.speed = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * self.speed_conv if ret.cruiseState.enabled else 0
+      ret.cruiseState.speed = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * speed_conv if ret.cruiseState.enabled else 0
     else:
       ret.cruiseState.available = cp_cruise.vl["SCC11"]["MainMode_ACC"] == 1
       ret.cruiseState.enabled = cp_cruise.vl["SCC12"]["ACCMode"] != 0
       ret.cruiseState.standstill = cp_cruise.vl["SCC11"]["SCCInfoDisplay"] == 4.
-      ret.cruiseState.speed = cp_cruise.vl["SCC11"]["VSetDis"] * self.speed_conv if ret.cruiseState.enabled else 0
+      ret.cruiseState.speed = cp_cruise.vl["SCC11"]["VSetDis"] * speed_conv if ret.cruiseState.enabled else 0
       ret.cruiseState.gapAdjust = cp_cruise.vl["SCC11"]["TauGapSet"]
 
     # TODO: Find brake pressure
