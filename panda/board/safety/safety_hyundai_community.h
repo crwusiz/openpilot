@@ -4,9 +4,9 @@
   .max_steer = (steer), \
   .max_rate_up = (rate_up), \
   .max_rate_down = (rate_down), \
-  .max_rt_delta = 120, \
+  .max_rt_delta = 200, \
   .max_rt_interval = 250000, \
-  .driver_torque_allowance = 50, \
+  .driver_torque_allowance = 70, \
   .driver_torque_factor = 2, \
   .type = TorqueDriverLimited, \
    /* the EPS faults when the steering angle is above a certain threshold for too long. to prevent this, */ \
@@ -17,7 +17,7 @@
   .has_steer_req_tolerance = true, \
 }
 
-const SteeringLimits HYUNDAI_COMMUNITY_STEERING_LIMITS = HYUNDAI_COMMUNITY_LIMITS(384, 10, 10);
+const SteeringLimits HYUNDAI_COMMUNITY_STEERING_LIMITS = HYUNDAI_COMMUNITY_LIMITS(384, 3, 7);
 
 const LongitudinalLimits HYUNDAI_COMMUNITY_LONG_LIMITS = {
   .max_accel = 200,   // 1/100 m/s2
@@ -333,7 +333,7 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send) {
       violation |= max_limit_check(desired_torque, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer, -HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer);
 
       // ready to blend in limits
-      desired_torque_last = MAX(-330, MIN(desired_torque, 330));
+      desired_torque_last = MAX(-HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer, MIN(desired_torque, HYUNDAI_COMMUNITY_STEERING_LIMITS.max_steer));
       rt_torque_last = desired_torque;
       ts_torque_check_last = ts;
     }

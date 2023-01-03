@@ -815,7 +815,7 @@ class CarState(CarStateBase):
       checks.append(("CLUSTER_SPEED_LIMIT", 10))
 
     bus = 5 if CP.flags & HyundaiFlags.CANFD_HDA2 else 4
-    return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, bus, enforce_checks=False)
+    return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, bus)
 
 
   @staticmethod
@@ -846,4 +846,4 @@ class CarState(CarStateBase):
       signals.append(("SPEED_LIMIT_1", "CLUSTER_SPEED_LIMIT"))
       checks.append(("CLUSTER_SPEED_LIMIT", 10))
 
-    return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 6, enforce_checks=False)
+    return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 6)

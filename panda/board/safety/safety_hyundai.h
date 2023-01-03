@@ -4,9 +4,9 @@
   .max_steer = (steer), \
   .max_rate_up = (rate_up), \
   .max_rate_down = (rate_down), \
-  .max_rt_delta = 120, \
+  .max_rt_delta = 200, \
   .max_rt_interval = 250000, \
-  .driver_torque_allowance = 50, \
+  .driver_torque_allowance = 70, \
   .driver_torque_factor = 2, \
   .type = TorqueDriverLimited, \
    /* the EPS faults when the steering angle is above a certain threshold for too long. to prevent this, */ \
@@ -17,7 +17,7 @@
   .has_steer_req_tolerance = true, \
 }
 
-const SteeringLimits HYUNDAI_STEERING_LIMITS = HYUNDAI_LIMITS(384, 10, 10);
+const SteeringLimits HYUNDAI_STEERING_LIMITS = HYUNDAI_LIMITS(409, 10, 10);
 const SteeringLimits HYUNDAI_STEERING_LIMITS_ALT = HYUNDAI_LIMITS(270, 2, 3);
 
 const LongitudinalLimits HYUNDAI_LONG_LIMITS = {
@@ -27,9 +27,9 @@ const LongitudinalLimits HYUNDAI_LONG_LIMITS = {
 
 const CanMsg HYUNDAI_TX_MSGS[] = {
   {593, 2, 8},  // MDPS12, Bus 2
-  {790, 1, 8},  // EMS11, Bus 1
+  //{790, 1, 8},  // EMS11, Bus 1
   {832, 0, 8},  // LKAS11, Bus 0
-  {832, 1, 8},  // LKAS11, Bus 1
+  //{832, 1, 8},  // LKAS11, Bus 1
   {1056, 0, 8}, // SCC11, Bus 0
   {1057, 0, 8}, // SCC12, Bus 0
   {1290, 0, 8}, // SCC13, Bus 0
@@ -39,16 +39,16 @@ const CanMsg HYUNDAI_TX_MSGS[] = {
   {1157, 0, 4}, // LFAHDA_MFC, Bus 0
   {1186, 0, 8}, // FRT_RADAR11, Bus 0
   {1265, 0, 4}, // CLU11, Bus 0
-  {1265, 1, 4}, // CLU11, Bus 1
+  //{1265, 1, 4}, // CLU11, Bus 1
   {1265, 2, 4}, // CLU11, Bus 2
 };
 
 const CanMsg HYUNDAI_LONG_TX_MSGS[] = {
   {593, 2, 8},  // MDPS12, Bus 2
-  {790, 1, 8},  // EMS11, Bus 1
+  //{790, 1, 8},  // EMS11, Bus 1
   {832, 0, 8},  // LKAS11 Bus 0
   {1265, 0, 4}, // CLU11, Bus 0
-  {1265, 1, 4}, // CLU11, Bus 1
+  //{1265, 1, 4}, // CLU11, Bus 1
   {1265, 2, 4}, // CLU11, Bus 2
   {1157, 0, 4}, // LFAHDA_MFC Bus 0
   {1056, 0, 8}, // SCC11 Bus 0
@@ -63,7 +63,7 @@ const CanMsg HYUNDAI_LONG_TX_MSGS[] = {
 
 const CanMsg HYUNDAI_CAMERA_SCC_TX_MSGS[] = {
   {593, 2, 8},  // MDPS12, Bus 2
-  {790, 1, 8},  // EMS11, Bus 1
+  //{790, 1, 8},  // EMS11, Bus 1
   {832, 0, 8},  // LKAS11, Bus 0
   {1056, 0, 8}, // SCC11, Bus 0
   {1057, 0, 8}, // SCC12, Bus 0
@@ -74,7 +74,7 @@ const CanMsg HYUNDAI_CAMERA_SCC_TX_MSGS[] = {
   {1157, 0, 4}, // LFAHDA_MFC, Bus 0
   {1186, 0, 8}, // FRT_RADAR11, Bus 0
   {1265, 0, 4}, // CLU11, Bus 0
-  {1265, 1, 4}, // CLU11, Bus 1
+  //{1265, 1, 4}, // CLU11, Bus 1
   {1265, 2, 4}, // CLU11, Bus 2
  };
 
@@ -328,7 +328,7 @@ static int hyundai_tx_hook(CANPacket_t *to_send) {
       violation |= max_limit_check(desired_torque, HYUNDAI_STEERING_LIMITS.max_steer, -HYUNDAI_STEERING_LIMITS.max_steer);
 
       // ready to blend in limits
-      desired_torque_last = MAX(-330, MIN(desired_torque, 330));
+      desired_torque_last = MAX(-HYUNDAI_STEERING_LIMITS.max_steer, MIN(desired_torque, HYUNDAI_STEERING_LIMITS.max_steer));
       rt_torque_last = desired_torque;
       ts_torque_check_last = ts;
     }
