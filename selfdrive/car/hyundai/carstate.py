@@ -439,20 +439,20 @@ class CarState(CarStateBase):
           ("CF_Lvr_CruiseSet", "LVR12"),
         ]
 
-        if CP.aebFcw or CP.carFingerprint in FCA11_CAR:
-          signals += [
-            ("FCA_CmdAct", "FCA11"),
-            ("CF_VSM_Warn", "FCA11"),
-            ("CF_VSM_DecCmdAct", "FCA11"),
-          ]
-          checks.append(("FCA11", 50))
+      if CP.aebFcw or CP.carFingerprint in FCA11_CAR:
+        signals += [
+          ("FCA_CmdAct", "FCA11"),
+          ("CF_VSM_Warn", "FCA11"),
+          ("CF_VSM_DecCmdAct", "FCA11"),
+        ]
+        checks.append(("FCA11", 50))
 
-        elif not CP.sccBus == -1:
-          signals += [
-            ("AEB_CmdAct", "SCC12"),
-            ("CF_VSM_Warn", "SCC12"),
-            ("CF_VSM_DecCmdAct", "SCC12"),
-          ]
+      elif not CP.sccBus == -1:
+        signals += [
+          ("AEB_CmdAct", "SCC12"),
+          ("CF_VSM_Warn", "SCC12"),
+          ("CF_VSM_DecCmdAct", "SCC12"),
+        ]
 
     if CP.enableBsm:
       signals += [
