@@ -105,7 +105,7 @@ def create_scc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, s
     values["ACC_ObjRelSpd"] = 0
     values["ACC_ObjDist"] = 1  # close lead makes controls tighter
     values["VSetDis"] = set_speed
-  values["DriverAlertDisplay"] = 0
+  #values["DriverAlertDisplay"] = 0
   commands.append(packer.make_can_msg("SCC11", 0, values))
 
   values = CS.scc12
