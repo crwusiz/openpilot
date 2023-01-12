@@ -182,7 +182,7 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1767. + STD_CARGO_KG
       ret.wheelbase = 2.756
       ret.steerRatio = 13.6
-    elif candidate == CAR.SORENTO_MQ4_HEV:
+    elif candidate in [CAR.SORENTO_MQ4, CAR.SORENTO_MQ4_HEV]:
       ret.mass = 1857. + STD_CARGO_KG # weight from EX and above trims, average of FWD and AWD versions (EX, X-Line EX AWD, SX, SX Pestige, X-Line SX Prestige AWD)
       ret.wheelbase = 2.81
       ret.steerRatio = 13.27 # steering ratio according to Kia News https://www.kiamedia.com/us/en/models/sorento-phev/2022/specifications
@@ -317,7 +317,7 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalTuning.kiV = [0.0]
       ret.longitudinalActuatorDelayLowerBound = 0.3
       ret.longitudinalActuatorDelayUpperBound = 0.3
-      ret.experimentalLongitudinalAvailable = bool(ret.flags & HyundaiFlags.CANFD_HDA2)
+      ret.experimentalLongitudinalAvailable = candidate in (HEV_CAR | EV_CAR) and candidate not in CANFD_RADAR_SCC_CAR
     else:
       ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 30.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
       ret.longitudinalTuning.kpV = [1.2, 1.05, 1.0, 0.92, 0.55]
@@ -325,7 +325,7 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalTuning.kiV = [0.1, 0.05]
       ret.longitudinalActuatorDelayLowerBound = 0.3
       ret.longitudinalActuatorDelayUpperBound = 0.3
-      ret.experimentalLongitudinalAvailable = not ret.radarOffCan or ret.sccBus == 2
+      ret.experimentalLongitudinalAvailable = ret.sccBus == 2
 
     # WARNING: disabling radar also disables AEB (and we show the same warning on the instrument cluster as if you manually disabled AEB)
     ret.openpilotLongitudinalControl = experimental_long and ret.experimentalLongitudinalAvailable
@@ -345,6 +345,8 @@ class CarInterface(CarInterfaceBase):
       ret.enableBsm = 0x1e5 in fingerprint[bus]
       if 0x1fa in fingerprint[bus]:
         ret.flags |= HyundaiFlags.SP_NAV_MSG.value
+      ret.radarOffCan = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
+      ret.pcmCruise = not ret.openpilotLongitudinalControl
     else:
       ret.enableBsm = 1419 in fingerprint[0]
       if 0x544 in fingerprint[0]:
@@ -354,6 +356,21 @@ class CarInterface(CarInterfaceBase):
       ret.hasLfaHda = 1157 in fingerprint[0]
       ret.hasNav = 1348 in fingerprint[0]
       ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
+      ret.radarOffCan = ret.sccBus == -1
+      ret.pcmCruise = ret.radarOffCan
+
+      # ignore CAN2 address if L-CAN on the same BUS
+      ret.epsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
+      ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
+      ret.sccBus = 0 if 1056 in fingerprint[0] \
+              else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
+              else 2 if 1056 in fingerprint[2] else -1
+      if Params().get_bool("SccOnBus2"):
+        ret.sccBus = 2
+
+      if ret.sccBus == 2:
+        ret.hasScc13 = 1290 in fingerprint[0] or 1290 in fingerprint[2]
+        ret.hasScc14 = 905 in fingerprint[0] or 905 in fingerprint[2]
 
     # *** panda safety config ***
     if candidate in CANFD_CAR:
@@ -373,38 +390,18 @@ class CarInterface(CarInterfaceBase):
           ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy)]
         else:
           ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundai, 0)]
-        if ret.openpilotLongitudinalControl:
-         ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
-        if candidate in HEV_CAR:
-         ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
-        elif candidate in EV_CAR:
-         ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
         if 0x391 in fingerprint[0]:
-         ret.flags |= HyundaiFlags.SP_CAN_LFA_BTN.value
-         ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LFA_BTN
+          ret.flags |= HyundaiFlags.SP_CAN_LFA_BTN.value
+          ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LFA_BTN
       elif panda_safety_select == "1":
         ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
 
-    # *** other config ***
-    if candidate in CANFD_CAR:
-      ret.radarOffCan = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
-      ret.pcmCruise = not ret.openpilotLongitudinalControl
-    else:
-      ret.radarOffCan = ret.sccBus == -1
-      ret.pcmCruise = ret.radarOffCan
-
-      # ignore CAN2 address if L-CAN on the same BUS
-      ret.epsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
-      ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
-      ret.sccBus = 0 if 1056 in fingerprint[0] \
-              else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
-              else 2 if 1056 in fingerprint[2] else -1
-      if Params().get_bool("SccOnBus2"):
-        ret.sccBus = 2
-
-      if ret.sccBus == 2:
-        ret.hasScc13 = 1290 in fingerprint[0] or 1290 in fingerprint[2]
-        ret.hasScc14 = 905 in fingerprint[0] or 905 in fingerprint[2]
+    if ret.openpilotLongitudinalControl:
+      ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
+    if candidate in HEV_CAR:
+      ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
+    elif candidate in EV_CAR:
+      ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
 
     ret.centerToFront = ret.wheelbase * 0.4
 
@@ -440,13 +437,15 @@ class CarInterface(CarInterfaceBase):
           print(f'cp = {bool(self.cp.can_valid)}  cp2 = {bool(self.cp2.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
     self.frame += 1
 
-    if self.CP.pcmCruise and not self.CC.scc_live:
-      self.CP.pcmCruise = False
-    elif self.CC.scc_live and not self.CP.pcmCruise:
-      self.CP.pcmCruise = True
+    if not CANFD_CAR:
+      if self.CP.pcmCruise and not self.CC.scc_live:
+        self.CP.pcmCruise = False
+      elif self.CC.scc_live and not self.CP.pcmCruise:
+        self.CP.pcmCruise = True
+      print(f'pcmCruise = {bool(self.CP.pcmCruise)}  scc_live = {bool(self.CC.scc_live)}')
 
-    # most HKG cars has no long control, it is safer and easier to engage by main on
-    ret.cruiseState.enabled = ret.cruiseState.available
+      # most HKG cars has no long control, it is safer and easier to engage by main on
+      ret.cruiseState.enabled = ret.cruiseState.available
 
     if self.CS.CP.openpilotLongitudinalControl and self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons:
       buttonEvents = [create_button_event(self.CS.cruise_buttons[-1], self.CS.prev_cruise_buttons, BUTTONS_DICT)]

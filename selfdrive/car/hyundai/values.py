@@ -106,13 +106,16 @@ class CAR:
   SPORTAGE_NQ5_HEV = "KIA SPORTAGE HEV (NQ5)"
   GENESIS_GV60 = "GENESIS GV60 (JW1)"
   GENESIS_GV70 = "GENESIS GV70 (JK1)"
+  SORENTO_MQ4 = "KIA SORENTO (MQ4)"
   SORENTO_MQ4_HEV = "KIA SORENTO HEV (MQ4)"
   NIRO_SG2_HEV = "KIA NIRO HEV (SG2)"
 
+
 class Footnote(Enum):
+  # footnotes which mention "red panda" will be replaced with the CAN FD panda kit on the shop page
   CANFD = CarFootnote(
-    "Requires a <a href=\"https://comma.ai/shop/panda\" target=\"_blank\">red panda</a>, additional <a href=\"https://comma.ai/shop/harness-box\" target=\"_blank\">harness box</a>, " +
-    "additional <a href=\"https://comma.ai/shop/obd-c-cable\" target=\"_blank\">OBD-C cable</a>, USB-A to USB-A cable, and a USB-A to USB-C OTG dongle.",
+    "Requires a <a href=\"https://comma.ai/shop/panda\" target=\"_blank\">red panda</a> for this <a href=\"https://en.wikipedia.org/wiki/CAN_FD\" target=\"_blank\">CAN FD car</a>. " +
+    "All the hardware needed is sold in the <a href=\"https://comma.ai/shop/can-fd-panda-kit\" target=\"_blank\">CAN FD kit</a>.",
     Column.MODEL, shop_footnote=True)
 
 
@@ -1599,6 +1602,14 @@ FW_VERSIONS = {
       b'\xf1\x00JK1_ SCC FHCUP      1.00 1.00 99110-AR200         ',
     ],
   },
+  CAR.SORENTO_MQ4: { # (MQ4)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00MQ4 MFC  AT USA LHD 1.00 1.05 99210-R5000 210623',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00MQ4_ SCC FHCUP      1.00 1.06 99110-P2000         ',
+    ],
+  },
   CAR.SORENTO_MQ4_HEV: { # (MQ4)
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00MQhe SCC FHCUP      1.00 1.06 99110-P4000         ',
@@ -1641,12 +1652,12 @@ FCA11_CAR = {
 }
 CANFD_CAR = {
   CAR.TUCSON22, CAR.TUCSON22_HEV, CAR.IONIQ5,
-  CAR.EV6, CAR.SPORTAGE_NQ5, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV,
+  CAR.EV6, CAR.SPORTAGE_NQ5, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV, CAR.SORENTO_MQ4, CAR.SORENTO_MQ4_HEV,
   CAR.GENESIS_GV70,
 }
 # The radar does SCC on these cars when HDA I, rather than the camera
 CANFD_RADAR_SCC_CAR = {
-  CAR.GENESIS_GV70, CAR.SORENTO_MQ4_HEV
+  CAR.GENESIS_GV70, CAR.SORENTO_MQ4, CAR.SORENTO_MQ4_HEV
 }
 EV_CAR = {
   CAR.KONA_EV, CAR.IONIQ_EV, CAR.NIRO_EV, CAR.SOUL_EV, CAR.NEXO,
@@ -1726,6 +1737,7 @@ DBC = {
   CAR.SPORTAGE_NQ5_HEV: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV60: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),
+  CAR.SORENTO_MQ4: dbc_dict('hyundai_canfd', None),
   CAR.SORENTO_MQ4_HEV: dbc_dict('hyundai_canfd', None),
   CAR.NIRO_SG2_HEV: dbc_dict('hyundai_canfd', None),
 }

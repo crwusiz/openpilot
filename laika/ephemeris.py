@@ -65,6 +65,8 @@ def convert_ublox_ephem(ublox_ephem, current_time: Optional[datetime] = None):
   ephem['omegadot'] = ublox_ephem.omegaDot
   ephem['omega0'] = ublox_ephem.omega0
 
+  ephem['healthy'] = ublox_ephem.svHealth == 0.0
+
   epoch = ephem['toe']
   return GPSEphemeris(ephem, epoch)
 
@@ -87,7 +89,7 @@ class EphemerisType(IntEnum):
       return EphemerisType.FINAL_ORBIT
     if "/rapid" in file_name or "/igr" in file_name:
       return EphemerisType.RAPID_ORBIT
-    if "/ultra" in file_name or "/igu" in file_name:
+    if "/ultra" in file_name or "/igu" in file_name or "COD0OPSULT" in file_name:
       return EphemerisType.ULTRA_RAPID_ORBIT
     raise RuntimeError(f"Ephemeris type not found in filename: {file_name}")
 
@@ -159,7 +161,7 @@ class EphemerisSerializer(json.JSONEncoder):
 
 class GLONASSEphemeris(Ephemeris):
   def __init__(self, data, epoch, healthy=True, file_name=None):
-    super().__init__(data['prn'], data, epoch, EphemerisType.NAV, healthy, max_time_diff=25*SECS_IN_MIN, file_name=file_name)
+    super().__init__(data['prn'], data, epoch, EphemerisType.NAV, data['healthy'], max_time_diff=25*SECS_IN_MIN, file_name=file_name)
     self.channel = data['freq_num']
     self.to_json()
 
@@ -248,8 +250,8 @@ class PolyEphemeris(Ephemeris):
 
 
 class GPSEphemeris(Ephemeris):
-  def __init__(self, data, epoch, healthy=True, file_name=None):
-    super().__init__('G%02i' % data['sv_id'], data, epoch, EphemerisType.NAV, healthy, max_time_diff=2*SECS_IN_HR, file_name=file_name)
+  def __init__(self, data, epoch, file_name=None):
+    super().__init__('G%02i' % data['sv_id'], data, epoch, EphemerisType.NAV, data['healthy'], max_time_diff=2*SECS_IN_HR, file_name=file_name)
     self.max_time_diff_tgd = SECS_IN_DAY
     self.to_json()
 
@@ -404,7 +406,7 @@ def read_prn_data(data, prn, deg=16, deg_t=1):
     measurements = np_data_prn[i:i + deg + 1, 1:5]
 
     times = (measurements[:, 0] - epoch).astype(float)
-    if (np.diff(times) != 900).any():
+    if not (np.diff(times) != 900).any() and not (np.diff(times) != 300).any():
       continue
 
     poly_data = {}
@@ -527,7 +529,6 @@ def parse_rinex_nav_msg_glonass(file_name):
     e['z'], e['z_vel'], e['z_acc'], e['age'] = read4(f, rinex_ver)
 
     e['healthy'] = (e['health'] == 0.0)
-
     ephems[prn].append(GLONASSEphemeris(e, epoch, file_name=file_name))
   f.close()
   return ephems
