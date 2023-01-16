@@ -113,9 +113,10 @@ def main() -> NoReturn:
           params.put_bool("PandaHeartbeatLost", True)
           cloudlog.event("heartbeat lost", deviceState=health, serial=panda.get_usb_serial())
 
-        #if first_run:
-        #  cloudlog.info(f"Resetting panda {panda.get_usb_serial()}")
-        #  panda.reset()
+        panda_safety_select = Params().get("PandaSafetySelect", encoding='utf8')
+        if first_run and panda_safety_select == "0":
+          cloudlog.info(f"Resetting panda {panda.get_usb_serial()}")
+          panda.reset()
 
       # sort pandas to have deterministic order
       pandas.sort(key=cmp_to_key(panda_sort_cmp))

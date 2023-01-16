@@ -325,10 +325,10 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalTuning.kiV = [0.1, 0.05]
       ret.longitudinalActuatorDelayLowerBound = 0.3
       ret.longitudinalActuatorDelayUpperBound = 0.3
-      ret.experimentalLongitudinalAvailable = ret.sccBus == 2
+      ret.experimentalLongitudinalAvailable = not ret.radarOffCan or ret.sccBus == 2
 
     # WARNING: disabling radar also disables AEB (and we show the same warning on the instrument cluster as if you manually disabled AEB)
-    ret.openpilotLongitudinalControl = experimental_long and ret.experimentalLongitudinalAvailable
+    ret.openpilotLongitudinalControl = experimental_long or ret.experimentalLongitudinalAvailable
 
     ret.stoppingControl = True
     ret.stoppingDecelRate = 1.0
@@ -382,6 +382,12 @@ class CarInterface(CarInterfaceBase):
         ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_ALT_BUTTONS
       if ret.flags & HyundaiFlags.CANFD_CAMERA_SCC:
         ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CAMERA_SCC
+      if ret.openpilotLongitudinalControl:
+        ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
+      if candidate in HEV_CAR:
+        ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
+      elif candidate in EV_CAR:
+        ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
     else:
       panda_safety_select = Params().get("PandaSafetySelect", encoding='utf8')
       if panda_safety_select == "0":
@@ -393,15 +399,14 @@ class CarInterface(CarInterfaceBase):
         if 0x391 in fingerprint[0]:
           ret.flags |= HyundaiFlags.SP_CAN_LFA_BTN.value
           ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LFA_BTN
+        if ret.openpilotLongitudinalControl:
+          ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
+        if candidate in HEV_CAR:
+          ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
+        elif candidate in EV_CAR:
+          ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
       elif panda_safety_select == "1":
         ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
-
-    if ret.openpilotLongitudinalControl:
-      ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
-    if candidate in HEV_CAR:
-      ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
-    elif candidate in EV_CAR:
-      ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
 
     ret.centerToFront = ret.wheelbase * 0.4
 
@@ -429,23 +434,26 @@ class CarInterface(CarInterfaceBase):
     ret = self.CS.update(self.cp, self.cp2, self.cp_cam)
 
     if self.frame % 20 == 0:
-      if CANFD_CAR:
+      if self.CP.carFingerprint in CANFD_CAR:
         if not any([self.cp.can_valid, self.cp_cam.can_valid]):
           print(f'cp = {bool(self.cp.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
       else:
         if not any([self.cp.can_valid, self.cp2.can_valid, self.cp_cam.can_valid]):
           print(f'cp = {bool(self.cp.can_valid)}  cp2 = {bool(self.cp2.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
-    self.frame += 1
 
-    if not CANFD_CAR:
+    if not self.CP.carFingerprint in CANFD_CAR:
       if self.CP.pcmCruise and not self.CC.scc_live:
         self.CP.pcmCruise = False
       elif self.CC.scc_live and not self.CP.pcmCruise:
         self.CP.pcmCruise = True
-      print(f'pcmCruise = {bool(self.CP.pcmCruise)}  scc_live = {bool(self.CC.scc_live)}')
 
-      # most HKG cars has no long control, it is safer and easier to engage by main on
-      ret.cruiseState.enabled = ret.cruiseState.available
+      if self.frame % 500 == 0:
+        print(f'pcmCruise = {bool(self.CP.pcmCruise)}  scc_live = {bool(self.CC.scc_live)}')
+
+    self.frame += 1
+
+    # most HKG cars has no long control, it is safer and easier to engage by main on
+    ret.cruiseState.enabled = ret.cruiseState.available
 
     if self.CS.CP.openpilotLongitudinalControl and self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons:
       buttonEvents = [create_button_event(self.CS.cruise_buttons[-1], self.CS.prev_cruise_buttons, BUTTONS_DICT)]
