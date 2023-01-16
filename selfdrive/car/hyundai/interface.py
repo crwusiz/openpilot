@@ -311,34 +311,6 @@ class CarInterface(CarInterfaceBase):
     elif any([lat_torque, candidate in CANFD_CAR]):
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
-    # *** longitudinal control ***
-    if candidate in CANFD_CAR:
-      ret.longitudinalTuning.kpV = [0.1]
-      ret.longitudinalTuning.kiV = [0.0]
-      ret.longitudinalActuatorDelayLowerBound = 0.3
-      ret.longitudinalActuatorDelayUpperBound = 0.3
-      ret.experimentalLongitudinalAvailable = candidate in (HEV_CAR | EV_CAR) and candidate not in CANFD_RADAR_SCC_CAR
-    else:
-      ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 30.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-      ret.longitudinalTuning.kpV = [1.2, 1.05, 1.0, 0.92, 0.55]
-      ret.longitudinalTuning.kiBP = [0., 130.*CV.KPH_TO_MS]
-      ret.longitudinalTuning.kiV = [0.1, 0.05]
-      ret.longitudinalActuatorDelayLowerBound = 0.3
-      ret.longitudinalActuatorDelayUpperBound = 0.3
-      ret.experimentalLongitudinalAvailable = not ret.radarOffCan or ret.sccBus == 2
-
-    # WARNING: disabling radar also disables AEB (and we show the same warning on the instrument cluster as if you manually disabled AEB)
-    ret.openpilotLongitudinalControl = experimental_long or ret.experimentalLongitudinalAvailable
-
-    ret.stoppingControl = True
-    ret.stoppingDecelRate = 1.0
-    ret.vEgoStopping = 0.1
-    ret.stopAccel = -3.5
-
-    ret.startingState = True
-    ret.vEgoStarting = 0.1
-    ret.startAccel = 2.0
-
     # *** feature detection ***
     if candidate in CANFD_CAR:
       bus = 5 if ret.flags & HyundaiFlags.CANFD_HDA2 else 4
@@ -357,23 +329,31 @@ class CarInterface(CarInterfaceBase):
       ret.hasNav = 1348 in fingerprint[0]
       ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
       ret.radarOffCan = ret.sccBus == -1
-      ret.pcmCruise = ret.radarOffCan
+      ret.pcmCruise = not ret.openpilotLongitudinalControl or ret.radarOffCan
 
       # ignore CAN2 address if L-CAN on the same BUS
-      ret.epsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
-      ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
+      ret.epsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] \
+              else 0
+      ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] \
+              else 0
       ret.sccBus = 0 if 1056 in fingerprint[0] \
               else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
-              else 2 if 1056 in fingerprint[2] else -1
+              else 2 if 1056 in fingerprint[2] \
+              else -1
+
       if Params().get_bool("SccOnBus2"):
         ret.sccBus = 2
+        Params().put_bool("ExperimentalLongitudinalEnabled", True)
 
       if ret.sccBus == 2:
         ret.hasScc13 = 1290 in fingerprint[0] or 1290 in fingerprint[2]
         ret.hasScc14 = 905 in fingerprint[0] or 905 in fingerprint[2]
 
     # *** panda safety config ***
+    panda_safety_select = Params().get("PandaSafetySelect", encoding='utf8')
     if candidate in CANFD_CAR:
+      if panda_safety_select == "1":
+        Params().put_bool("PandaSafetySelect", False)
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.noOutput),
                            get_safety_config(car.CarParams.SafetyModel.hyundaiCanfd)]
       if ret.flags & HyundaiFlags.CANFD_HDA2:
@@ -389,7 +369,6 @@ class CarInterface(CarInterfaceBase):
       elif candidate in EV_CAR:
         ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
     else:
-      panda_safety_select = Params().get("PandaSafetySelect", encoding='utf8')
       if panda_safety_select == "0":
         if candidate in LEGACY_SAFETY_MODE_CAR:
           # these cars require a special panda safety mode due to missing counters and checksums in the messages
@@ -407,6 +386,34 @@ class CarInterface(CarInterfaceBase):
           ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
       elif panda_safety_select == "1":
         ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
+
+    # *** longitudinal control ***
+    if candidate in CANFD_CAR:
+      ret.longitudinalTuning.kpV = [0.1]
+      ret.longitudinalTuning.kiV = [0.0]
+      ret.longitudinalActuatorDelayLowerBound = 0.3
+      ret.longitudinalActuatorDelayUpperBound = 0.3
+      ret.experimentalLongitudinalAvailable = candidate in (HEV_CAR | EV_CAR) and candidate not in CANFD_RADAR_SCC_CAR
+    else:
+      ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 30.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+      ret.longitudinalTuning.kpV = [1.2, 1.05, 1.0, 0.92, 0.55]
+      ret.longitudinalTuning.kiBP = [0., 130.*CV.KPH_TO_MS]
+      ret.longitudinalTuning.kiV = [0.1, 0.05]
+      ret.longitudinalActuatorDelayLowerBound = 0.3
+      ret.longitudinalActuatorDelayUpperBound = 0.3
+      ret.experimentalLongitudinalAvailable = not ret.radarOffCan
+
+    # WARNING: disabling radar also disables AEB (and we show the same warning on the instrument cluster as if you manually disabled AEB)
+    ret.openpilotLongitudinalControl = experimental_long and ret.experimentalLongitudinalAvailable
+
+    ret.stoppingControl = True
+    ret.stoppingDecelRate = 1.0
+    ret.vEgoStopping = 0.1
+    ret.stopAccel = -3.5
+
+    ret.startingState = True
+    ret.vEgoStarting = 0.1
+    ret.startAccel = 2.0
 
     ret.centerToFront = ret.wheelbase * 0.4
 

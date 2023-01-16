@@ -182,7 +182,7 @@ def get_car(logcan, sendcan, num_pandas=1):
     cloudlog.warning("car doesn't match any fingerprints: %r", fingerprints)
     candidate = "mock"
 
-  experimental_long = Params().get_bool("ExperimentalLongitudinalEnabled")
+  experimental_long = Params().get_bool("ExperimentalLongitudinalEnabled") or Params().get_bool("SccOnBus2")
 
   selected_car = Params().get("SelectedCar")
   if selected_car:
