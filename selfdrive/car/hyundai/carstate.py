@@ -605,6 +605,10 @@ class CarState(CarStateBase):
         ]
         checks.append(("SCC14", 50))
 
+    if CP.hasNav or CP.flags & HyundaiFlags.SP_NAV_MSG:
+      signals.append(("SpeedLim_Nav_Clu", "Navi_HU"))
+      checks.append(("Navi_HU", 5))
+
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 1, enforce_checks=False)
 
 

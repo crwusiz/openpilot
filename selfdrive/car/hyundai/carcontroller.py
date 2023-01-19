@@ -172,6 +172,14 @@ class CarController:
               for _ in range(20):
                 can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, CS.buttons_counter+1, Buttons.RES_ACCEL))
               self.last_button_frame = self.frame
+        if not CC.cruiseControl.resume and CS.out.cruiseState.enabled and not CS.out.gasPressed and not self.CP.pcmCruiseSpeed:
+          self.cruise_button = self.get_cruise_buttons(CS, self.v_cruise_kph_prev)
+          if self.cruise_button is not None:
+            for _ in range(20):
+              can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, CS.buttons_counter+self.resume_count, self.cruise_button))
+              self.resume_count += 1
+          else:
+            self.resume_count = 0
     else:
       # send lkas11 bus 0
       can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, lat_active, torque_fault, sys_warning, sys_state,
