@@ -115,6 +115,13 @@ typedef struct UIScene {
   // lead
   QPointF lead_vertices[2];
 
+  // driverStateV2
+  float driver_pose_vals[3];
+  float driver_pose_sins[3];
+  float driver_pose_coss[3];
+  QPointF face_kpts_draw[FACE_KPTS_SIZE];
+  float face_kpts_draw_d[FACE_KPTS_SIZE];
+
   float light_sensor;
   bool started, ignition, is_metric, map_on_left, longitudinal_control, experimental_mode;
   uint64_t started_frame;
@@ -195,6 +202,7 @@ public slots:
 void ui_update_params(UIState *s);
 int get_path_length_idx(const cereal::ModelDataV2::XYZTData::Reader &line, const float path_height);
 void update_model(UIState *s, const cereal::ModelDataV2::Reader &model);
+void update_dmonitoring(UIState *s, const cereal::DriverStateV2::Reader &driverstate, float dm_fade_state);
 void update_leads(UIState *s, const cereal::RadarState::Reader &radar_state, const cereal::ModelDataV2::XYZTData::Reader &line);
 void update_line_data(const UIState *s, const cereal::ModelDataV2::XYZTData::Reader &line,
                       float y_off, float z_off, QPolygonF *pvd, int max_idx, bool allow_invert);

@@ -272,6 +272,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("accel", ce.getAEgo());
   setProperty("status", s.status);
   setProperty("steeringPressed", ce.getSteeringPressed());
+  setProperty("isStandstill", ce.getStandstill());
   setProperty("dmActive", sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode());
   setProperty("brake_state", ce.getBrakeLights());
   setProperty("autohold_state", ce.getAutoHold());
@@ -309,9 +310,10 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("friction", cs.getLateralControlState().getTorqueState().getFriction());
   setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
   setProperty("frictionRaw", tp.getFrictionCoefficientRaw());
+  setProperty("dm_fade_state", fmax(0.0, fmin(1.0, dm_fade_state+0.2*(0.5-(float)(isStandstill*dmActive)))));
 }
 
-void AnnotatedCameraWidget::drawHud(QPainter &p) {
+void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
   p.save();
 
   // Header gradient
@@ -580,7 +582,8 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   // dm icon (bottom 1eft 1)
   x = (radius / 2) + (bdr_s * 2);
   y = rect().bottom() - (footer_h / 2);
-  drawIcon(p, x, y, dm_img, icon_bg, dmActive ? 1.0 : 0.2);
+  //drawIcon(p, x, y, dm_img, icon_bg, dmActive ? 1.0 : 0.2);
+  drawDriverState(p, s, x, y, dmActive ? 1.0 : 0.2);
 
   // scc gap icon (bottom right 1)
   if (gap_state == 1) {
@@ -868,6 +871,55 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
   painter.restore();
 }
 
+void AnnotatedCameraWidget::drawDriverState(QPainter &painter, const UIState *s, int x, int y, float opacity) {
+  const UIScene &scene = s->scene;
+
+  painter.save();
+
+  painter.setOpacity(1.0);
+  painter.setPen(Qt::NoPen);
+  painter.setBrush(blackColor(70));
+  painter.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
+
+  painter.setCompositionMode(QPainter::CompositionMode_Source);
+
+  QLinearGradient linearGrad;
+  QPointF start_p;
+  QPointF end_p;
+  int face_segment_idx = 0;
+  bool in_end_idxs;
+  for (int i = 0; i < std::size(scene.face_kpts_draw); ++i) {
+    in_end_idxs = false;
+    for (int ei = face_segment_idx; ei < std::size(face_end_idxs); ei++) {
+      if (i == face_end_idxs[ei]) {
+        in_end_idxs = true;
+        break;
+      }
+    }
+
+    if (in_end_idxs) {
+      face_segment_idx +=1;
+      continue;
+    }
+
+    start_p = QPointF(scene.face_kpts_draw[i].x() + x, scene.face_kpts_draw[i].y() + y);
+    end_p = QPointF(scene.face_kpts_draw[i+1].x() + x, scene.face_kpts_draw[i+1].y() + y);
+
+    linearGrad.setStart(start_p);
+    float start_shade = std::fmax(std::fmin(0.4 + 0.6*(scene.face_kpts_draw_d[i] + 20)/100, 1.0), 0.0);
+    linearGrad.setColorAt(0, QColor::fromRgbF(start_shade, start_shade, start_shade, opacity));
+
+    linearGrad.setFinalStop(end_p);
+    float end_shade = std::fmax(std::fmin(0.4 + 0.6*(scene.face_kpts_draw_d[i+1] + 20)/100, 1.0), 0.0);
+    linearGrad.setColorAt(1, QColor::fromRgbF(end_shade, end_shade, end_shade, opacity));
+
+    painter.setPen(QPen(linearGrad, i<16 ? 7 : 3, Qt::SolidLine, Qt::RoundCap));
+    painter.drawLine(start_p, end_p);
+  }
+
+  painter.restore();
+}
+
 void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState::LeadData::Reader &lead_data, const QPointF &vd) {
   painter.save();
   const float speedBuff = 10.;
@@ -1000,8 +1052,13 @@ void AnnotatedCameraWidget::paintGL() {
     if (lead_two.getStatus() && (std::abs(lead_one.getDRel() - lead_two.getDRel()) > 3.0)) {
       drawLead(painter, lead_two, s->scene.lead_vertices[1]);
     }
+
+    if (sm.rcv_frame("driverStateV2") > s->scene.started_frame) {
+      update_dmonitoring(s, sm["driverStateV2"].getDriverStateV2(), dm_fade_state);
+    }
   }
-  drawHud(painter);
+
+  drawHud(painter, s);
 
   double cur_draw_t = millis_since_boot();
   double dt = cur_draw_t - prev_draw_t;

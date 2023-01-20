@@ -40,6 +40,7 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(bool left_on MEMBER left_on);
   Q_PROPERTY(bool right_on MEMBER right_on);
   Q_PROPERTY(bool gas_pressed MEMBER gas_pressed);
+  Q_PROPERTY(bool isStandstill MEMBER isStandstill);
 
   Q_PROPERTY(int status MEMBER status);
   Q_PROPERTY(int autohold_state MEMBER autohold_state);
@@ -75,6 +76,7 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(float friction MEMBER friction);
   Q_PROPERTY(float latAccelFactorRaw MEMBER latAccelFactorRaw);
   Q_PROPERTY(float frictionRaw MEMBER frictionRaw);
+  Q_PROPERTY(float dm_fade_state MEMBER dm_fade_state);
 
 public:
   explicit AnnotatedCameraWidget(VisionStreamType type, QWidget* parent = 0);
@@ -120,6 +122,7 @@ private:
   bool v_ego_cluster_seen = false;
   bool wide_cam_requested = false;
   bool gas_pressed = false;
+  bool isStandstill = false;
 
   int status = STATUS_DISENGAGED;
   int autohold_state = 0;
@@ -139,6 +142,7 @@ private:
   float fl, fr, rl, rr = 0;
   float roadLimitSpeed = 0;
   float latAccelFactor, friction, latAccelFactorRaw, frictionRaw = 0;
+  float dm_fade_state = 1.0;
 
 protected:
   void paintGL() override;
@@ -147,7 +151,8 @@ protected:
   void updateFrameMat() override;
   void drawLaneLines(QPainter &painter, const UIState *s);
   void drawLead(QPainter &painter, const cereal::RadarState::LeadData::Reader &lead_data, const QPointF &vd);
-  void drawHud(QPainter &p);
+  void drawDriverState(QPainter &painter, const UIState *s, int x, int y, float opacity);
+  void drawHud(QPainter &p, const UIState *s);
   inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); }
   inline QColor yellowColor(int alpha = 255) { return QColor(255, 255, 0, alpha); }
   inline QColor redColor(int alpha = 255) { return QColor(255, 0, 0, alpha); }
