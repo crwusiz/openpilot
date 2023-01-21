@@ -315,18 +315,13 @@ class CarInterface(CarInterfaceBase):
     if candidate in CANFD_CAR:
       bus = 5 if ret.flags & HyundaiFlags.CANFD_HDA2 else 4
       ret.enableBsm = 0x1e5 in fingerprint[bus]
-      if 0x1fa in fingerprint[bus]:
-        ret.flags |= HyundaiFlags.SP_NAV_MSG.value
       ret.radarOffCan = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
       ret.pcmCruise = not ret.openpilotLongitudinalControl
     else:
       ret.enableBsm = 1419 in fingerprint[0]
-      if 0x544 in fingerprint[0]:
-        ret.flags |= HyundaiFlags.SP_NAV_MSG.value
       ret.hasAutoHold = 1151 in fingerprint[0]
       ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
       ret.hasLfaHda = 1157 in fingerprint[0]
-      ret.hasNav = 1348 in fingerprint[0]
       ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
       ret.radarOffCan = ret.sccBus == -1
       ret.pcmCruise = not ret.openpilotLongitudinalControl or ret.radarOffCan
@@ -354,6 +349,10 @@ class CarInterface(CarInterfaceBase):
     if candidate in CANFD_CAR:
       if panda_safety_select == "1":
         Params().put_bool("PandaSafetySelect", False)
+      if ret.sccBus == 2:
+        Params().put_bool("SccOnBus2", False)
+        ret.sccBus = 0
+
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.noOutput),
                            get_safety_config(car.CarParams.SafetyModel.hyundaiCanfd)]
       if ret.flags & HyundaiFlags.CANFD_HDA2:
@@ -375,16 +374,13 @@ class CarInterface(CarInterfaceBase):
           ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy)]
         else:
           ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundai, 0)]
-        if 0x391 in fingerprint[0]:
-          ret.flags |= HyundaiFlags.SP_CAN_LFA_BTN.value
-          ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LFA_BTN
         if ret.openpilotLongitudinalControl:
           ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
         if candidate in HEV_CAR:
           ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
         elif candidate in EV_CAR:
           ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
-      elif panda_safety_select == "1":
+      elif panda_safety_select == "1": # mdps modify car use can3 (harness board rj45 port)
         ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
 
     # *** longitudinal control ***
@@ -462,16 +458,13 @@ class CarInterface(CarInterfaceBase):
     # most HKG cars has no long control, it is safer and easier to engage by main on
     ret.cruiseState.enabled = ret.cruiseState.available
 
-    buttonEvents = []
-    #if self.CS.CP.openpilotLongitudinalControl and self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons:
     if self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons:
-      #buttonEvents = [create_button_event(self.CS.cruise_buttons[-1], self.CS.prev_cruise_buttons, BUTTONS_DICT)]
-      buttonEvents.append(create_button_event(self.CS.cruise_buttons[-1], self.CS.prev_cruise_buttons, BUTTONS_DICT))
+      buttonEvents = [create_button_event(self.CS.cruise_buttons[-1], self.CS.prev_cruise_buttons, BUTTONS_DICT)]
       # Handle CF_Clu_CruiseSwState changing buttons mid-press
       if self.CS.cruise_buttons[-1] != 0 and self.CS.prev_cruise_buttons != 0:
         buttonEvents.append(create_button_event(0, self.CS.prev_cruise_buttons, BUTTONS_DICT))
 
-    ret.buttonEvents = buttonEvents
+      ret.buttonEvents = buttonEvents
 
     # On some newer model years, the CANCEL button acts as a pause/resume button based on the PCM state
     # To avoid re-engaging when openpilot cancels, check user engagement intention via buttons

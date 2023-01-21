@@ -277,7 +277,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("autohold_state", ce.getAutoHold());
   setProperty("gas_pressed", ce.getGasPressed());
   setProperty("nda_state", ls.getActive());
-  setProperty("navSpeedLimit", ce.getNavSpeedLimit());
   setProperty("left_blindspot", ce.getLeftBlindspot());
   setProperty("right_blindspot", ce.getRightBlindspot());
   setProperty("wifi_state", (int)ds.getNetworkStrength());
@@ -331,8 +330,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   } else if (sectionLimitSpeed > 0 && sectionLeftDist > 0) {
     limit_speed = sectionLimitSpeed;
     left_dist = sectionLeftDist;
-  } else if (!nda_state) {
-    limit_speed = navSpeedLimit;
   } else {
     limit_speed = roadLimitSpeed;
   }

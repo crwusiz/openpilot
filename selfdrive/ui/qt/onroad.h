@@ -44,7 +44,6 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(int status MEMBER status);
   Q_PROPERTY(int autohold_state MEMBER autohold_state);
   Q_PROPERTY(int nda_state MEMBER nda_state);
-  Q_PROPERTY(int navSpeedLimit MEMBER navSpeedLimit);
   Q_PROPERTY(int wifi_state MEMBER wifi_state);
   Q_PROPERTY(int gpsSatelliteCount MEMBER gpsSatelliteCount);
   Q_PROPERTY(int gap_state MEMBER gap_state);
@@ -130,7 +129,7 @@ private:
   int accel, gap_state = 0;
   int lateralControl = 0;
   int epsBus, sccBus = 0;
-  int camLimitSpeed, sectionLimitSpeed, navSpeedLimit = 0;
+  int camLimitSpeed, sectionLimitSpeed = 0;
   int camLimitSpeedLeftDist, sectionLeftDist = 0;
   int skip_frame_count = 0;
 

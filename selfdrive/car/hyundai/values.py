@@ -44,8 +44,6 @@ class HyundaiFlags(IntFlag):
   ENABLE_BLINKERS = 32
   CANFD_ALT_GEARS_2 = 64
 
-  SP_CAN_LFA_BTN = 128
-  SP_NAV_MSG = 256
 
 class CAR:
   # Hyundai
@@ -422,9 +420,6 @@ FW_QUERY_CONFIG = FwQueryConfig(
   ],
 )
 
-ECU_FINGERPRINT = {
-  Ecu.fwdCamera: [832, 1156, 1191, 1342] #832:lkas11, 1156:hda11_mfc, 1191:mfc_4a7, 1342:lkas12
-}
 
 FW_VERSIONS = {
   # fwdCamera, fwdRadar, abs, eps, engine, transmission

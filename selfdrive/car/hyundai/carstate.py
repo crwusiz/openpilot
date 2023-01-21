@@ -71,9 +71,6 @@ class CarState(CarStateBase):
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
     ret.standstill = ret.vEgoRaw < 0.1
 
-    if self.CP.flags & HyundaiFlags.SP_CAN_LFA_BTN:
-      self.lfa_enabled = cp.vl["BCM_PO_11"]["LFA_Pressed"]
-
     self.cluster_speed_counter += 1
     if self.cluster_speed_counter > CLUSTER_SAMPLE_RATE:
       self.cluster_speed = cp.vl["CLU15"]["CF_Clu_VehicleSpeed"]
@@ -190,9 +187,6 @@ class CarState(CarStateBase):
 
     if self.CP.hasAutoHold:
       ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]
-
-    if self.CP.hasNav:
-      ret.navSpeedLimit = cp.vl["Navi_HU"]["SpeedLim_Nav_Clu"]
 
     return ret
 
@@ -503,14 +497,6 @@ class CarState(CarStateBase):
       signals.append(("CF_Lvr_Gear", "LVR12"))
       checks.append(("LVR12", 100))
 
-    if CP.flags & HyundaiFlags.SP_CAN_LFA_BTN:
-      signals.append(("LFA_Pressed", "BCM_PO_11"))
-      checks.append(("BCM_PO_11", 50))
-
-    if CP.hasNav or CP.flags & HyundaiFlags.SP_NAV_MSG:
-      signals.append(("SpeedLim_Nav_Clu", "Navi_HU"))
-      checks.append(("Navi_HU", 5))
-
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 0, enforce_checks=False)
 
 
@@ -604,10 +590,6 @@ class CarState(CarStateBase):
           ("ObjGap", "SCC14"),
         ]
         checks.append(("SCC14", 50))
-
-    if CP.hasNav or CP.flags & HyundaiFlags.SP_NAV_MSG:
-      signals.append(("SpeedLim_Nav_Clu", "Navi_HU"))
-      checks.append(("Navi_HU", 5))
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 1, enforce_checks=False)
 
@@ -757,7 +739,6 @@ class CarState(CarStateBase):
       ("CRUISE_BUTTONS", cruise_btn_msg),
       ("ADAPTIVE_CRUISE_MAIN_BTN", cruise_btn_msg),
       ("DISTANCE_UNIT", "CRUISE_BUTTONS_ALT"),
-      ("LFA_BTN", cruise_btn_msg),
 
       ("LEFT_LAMP", "BLINKERS"),
       ("RIGHT_LAMP", "BLINKERS"),
@@ -822,10 +803,6 @@ class CarState(CarStateBase):
         ("ACCELERATOR_BRAKE_ALT", 100),
       ]
 
-    if CP.flags & HyundaiFlags.CANFD_HDA2 and CP.flags & HyundaiFlags.SP_NAV_MSG:
-      signals.append(("SPEED_LIMIT_1", "CLUSTER_SPEED_LIMIT"))
-      checks.append(("CLUSTER_SPEED_LIMIT", 10))
-
     bus = 5 if CP.flags & HyundaiFlags.CANFD_HDA2 else 4
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, bus)
 
@@ -853,9 +830,5 @@ class CarState(CarStateBase):
       checks += [
         ("SCC_CONTROL", 50),
       ]
-
-    if not ((CP.flags & HyundaiFlags.CANFD_HDA2) and CP.flags & HyundaiFlags.SP_NAV_MSG):
-      signals.append(("SPEED_LIMIT_1", "CLUSTER_SPEED_LIMIT"))
-      checks.append(("CLUSTER_SPEED_LIMIT", 10))
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 6)
