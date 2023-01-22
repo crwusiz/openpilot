@@ -1,12 +1,17 @@
+import os
 import fcntl
 import math
 import time
 import struct
-import spidev
 import logging
 from contextlib import contextmanager
 from functools import reduce
 from typing import List
+
+try:
+  import spidev
+except ImportError:
+  spidev = None
 
 # Constants
 SYNC = 0x5A
@@ -20,8 +25,13 @@ MAX_XFER_RETRY_COUNT = 5
 
 USB_MAX_SIZE = 0x40
 
+DEV_PATH = "/dev/spidev0.0"
+
 
 class PandaSpiException(Exception):
+  pass
+
+class PandaSpiUnavailable(PandaSpiException):
   pass
 
 class PandaSpiNackResponse(PandaSpiException):
@@ -48,6 +58,11 @@ def flocked(fd):
 # This mimics the handle given by libusb1 for easy interoperability
 class SpiHandle:
   def __init__(self):
+    if not os.path.exists(DEV_PATH):
+      raise PandaSpiUnavailable(f"SPI device not found: {DEV_PATH}")
+    if spidev is None:
+      raise PandaSpiUnavailable("spidev is not installed")
+
     self.spi = spidev.SpiDev()  # pylint: disable=c-extension-no-member
     self.spi.open(0, 0)
 
@@ -75,6 +90,7 @@ class SpiHandle:
     logging.debug("starting transfer: endpoint=%d, max_rx_len=%d", endpoint, max_rx_len)
     logging.debug("==============================================")
 
+    exc = PandaSpiException()
     for n in range(MAX_XFER_RETRY_COUNT):
       logging.debug("\ntry #%d", n+1)
       try:
@@ -104,9 +120,10 @@ class SpiHandle:
           raise PandaSpiBadChecksum
 
         return dat[:-1]
-      except PandaSpiException:
-        logging.exception("SPI transfer failed, %d retries left", n)
-    raise PandaSpiTransferFailed(f"SPI transaction failed {MAX_XFER_RETRY_COUNT} times")
+      except PandaSpiException as e:
+        exc = e
+        logging.debug("SPI transfer failed, %d retries left", n, exc_info=True)
+    raise exc
 
   # libusb1 functions
   def close(self):
