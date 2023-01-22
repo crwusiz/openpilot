@@ -172,14 +172,6 @@ class CarController:
               for _ in range(20):
                 can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, CS.buttons_counter+1, Buttons.RES_ACCEL))
               self.last_button_frame = self.frame
-        if not CC.cruiseControl.resume and CS.out.cruiseState.enabled and not CS.out.gasPressed and not self.CP.pcmCruiseSpeed:
-          self.cruise_button = self.get_cruise_buttons(CS, self.v_cruise_kph_prev)
-          if self.cruise_button is not None:
-            for _ in range(20):
-              can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, CS.buttons_counter+self.resume_count, self.cruise_button))
-              self.resume_count += 1
-          else:
-            self.resume_count = 0
     else:
       # send lkas11 bus 0
       can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, lat_active, torque_fault, sys_warning, sys_state,
@@ -187,8 +179,8 @@ class CarController:
                                                 0, CS.lkas11))
 
       clu11_speed = CS.clu11["CF_Clu_Vanz"]
-      panda_safety_select = Params().get("PandaSafetySelect", encoding='utf8')
-      if panda_safety_select == "1" and self.CP.epsBus:
+      panda_safety_select = Params().get_bool("PandaSafetySelect")
+      if panda_safety_select and self.CP.epsBus:
         # mdps enabled speed message
         enabled_speed = 60 if CS.is_metric else 38
         if clu11_speed > enabled_speed or not CC.latActive:
@@ -231,7 +223,7 @@ class CarController:
       self.scc_smoother.update(CC.enabled, can_sends, self.packer, CC, CS, self.frame, controls)
 
       # send scc to car if longcontrol enabled and SCC not on bus 0 or not live
-      if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl and CS.out.cruiseState.enabled and (self.CP.sccBus or not self.scc_live):
+      if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl and CS.out.cruiseState.enabled:
         jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0
         can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), CC.enabled and CC.longActive, accel, jerk,
                                                         hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, self.scc_live, CS))

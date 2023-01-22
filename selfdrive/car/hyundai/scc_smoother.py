@@ -159,7 +159,8 @@ class SccSmoother:
     else:
       self.limited_lead = False
 
-    max_speed = int(round(max_speed_clu))
+    #max_speed = int(round(max_speed_clu))
+    max_speed = int(max_speed_clu + 0.5)
     if not self.long_control or self.max_speed_clu <= 0:
       self.max_speed_clu = max_speed
     else:
