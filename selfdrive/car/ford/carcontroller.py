@@ -1,4 +1,3 @@
-import math
 from cereal import car
 from common.numpy_fast import clip
 from opendbc.can.packer import CANPacker
@@ -46,30 +45,15 @@ class CarController:
     # send steering commands at 20Hz
     if (self.frame % CarControllerParams.STEER_STEP) == 0:
       if CC.latActive:
-        # apply limits to curvature
-        apply_curvature = -self.VM.calc_curvature(math.radians(actuators.steeringAngleDeg), CS.out.vEgo, 0.0)
-        apply_curvature = apply_std_steer_angle_limits(apply_curvature, self.apply_curvature_last, CS.out.vEgo, CarControllerParams)
-        # clip to signal range
+        # apply limits to curvature and clip to signal range
+        apply_curvature = apply_std_steer_angle_limits(actuators.curvature, self.apply_curvature_last, CS.out.vEgo, CarControllerParams)
         apply_curvature = clip(apply_curvature, -CarControllerParams.CURVATURE_MAX, CarControllerParams.CURVATURE_MAX)
       else:
         apply_curvature = 0.
 
-      # set slower ramp type when small steering angle change
-      # 0=Slow, 1=Medium, 2=Fast, 3=Immediately
-      steer_change = abs(CS.out.steeringAngleDeg - actuators.steeringAngleDeg)
-      if steer_change < 2.5:
-        ramp_type = 0
-      elif steer_change < 5.0:
-        ramp_type = 1
-      elif steer_change < 7.5:
-        ramp_type = 2
-      else:
-        ramp_type = 3
-      precision = 1  # 0=Comfortable, 1=Precise (the stock system always uses comfortable)
-
       self.apply_curvature_last = apply_curvature
       can_sends.append(create_lka_msg(self.packer))
-      can_sends.append(create_lat_ctl_msg(self.packer, CC.latActive, ramp_type, precision, 0., 0., -apply_curvature, 0.))
+      can_sends.append(create_lat_ctl_msg(self.packer, CC.latActive, 0., 0., -apply_curvature, 0.))
 
     ### ui ###
     send_ui = (self.main_on_last != main_on) or (self.lkas_enabled_last != CC.latActive) or (self.steer_alert_last != steer_alert)
