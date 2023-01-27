@@ -277,7 +277,8 @@ class CarInterfaceBase(ABC):
     # Handle button presses
     for b in cs_out.buttonEvents:
       # Enable OP long on falling edge of enable buttons (defaults to accelCruise and decelCruise, overridable per-port)
-      if not self.CP.pcmCruise and (b.type in enable_buttons and not b.pressed):
+      #if not self.CP.pcmCruise and (b.type in enable_buttons and not b.pressed):
+      if (b.type in enable_buttons and not b.pressed):
         events.add(EventName.buttonEnable)
       # Disable on rising and falling edge of cancel for both stock and OP long
       #if b.type == ButtonType.cancel:
@@ -300,9 +301,9 @@ class CarInterfaceBase(ABC):
     # we engage when pcm is active (rising edge)
     # enabling can optionally be blocked by the car interface
     if pcm_enable:
-      if cs_out.cruiseState.enabled and not self.CS.out.cruiseState.enabled and allow_enable:
+      if cs_out.cruiseState.available and not self.CS.out.cruiseState.available and allow_enable:
         events.add(EventName.pcmEnable)
-      elif not cs_out.cruiseState.enabled:
+      elif not cs_out.cruiseState.available:
         events.add(EventName.pcmDisable)
       else:
         if cs_out.cruiseState.enabled and not self.CS.out.cruiseState.enabled:

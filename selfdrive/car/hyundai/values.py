@@ -96,7 +96,7 @@ class CAR:
   GENESIS_G90 = "GENESIS EQ900, G90 (HI)"
 
   # CANFD
-  IONIQ5 = "HYUNDAI IONIQ 5 (NE)"
+  IONIQ5 = "HYUNDAI IONIQ 5 (NE1)"
   TUCSON22 = "HYUNDAI TUCSON (NX4)"
   TUCSON22_HEV = "HYUNDAI TUCSON HEV (NX4)"
   EV6 = "KIA EV6 (CV)"
@@ -1534,12 +1534,13 @@ FW_VERSIONS = {
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00NE1 MFC  AT USA LHD 1.00 1.02 99211-GI010 211206',
       b'\xf1\x00NE1 MFC  AT EUR LHD 1.00 1.06 99211-GI000 210813',
+      b'\xf1\000NE1 MFC  AT KOR LHD 1.00 1.06 99211-GI000 210813',
       b'\xf1\x00NE1 MFC  AT KOR LHD 1.00 1.05 99211-GI010 220614',
       b'\xf1\x00NE1 MFC  AT EUR RHD 1.00 1.01 99211-GI010 211007',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00NE1_ RDR -----      1.00 1.00 99110-GI000         ',
-    ],
+],
   },
   CAR.TUCSON22: { # (NX4)
     (Ecu.fwdCamera, 0x7c4, None): [
