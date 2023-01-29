@@ -230,6 +230,8 @@ struct CarState {
     rr @3 :Float32;
   }
 
+  madsEnabled @48 :Bool;
+
   struct WheelSpeeds {
     # optional wheel speeds
     fl @0 :Float32;

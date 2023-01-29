@@ -37,7 +37,6 @@ class CarState(CarStateBase):
     self.is_metric = False
     self.buttons_counter = 0
     self.eps_error_cnt = 0
-    self.cruise_unavail_cnt = 0
 
     self.cruise_info = {}
 
@@ -47,6 +46,8 @@ class CarState(CarStateBase):
 
     self.CCP = CarControllerParams(CP)
 
+    self.madsEnabled = False
+    self.mads_enabled = False
 
   def update(self, cp, cp2, cp_cam):
     if self.CP.carFingerprint in CANFD_CAR:
@@ -178,9 +179,6 @@ class CarState(CarStateBase):
     self.main_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwMain"])
     self.lead_distance = cp_cruise.vl["SCC11"]["ACC_ObjDist"]
 
-    self.cruise_unavail_cnt += 1 if cp.vl["TCS13"]["CF_VSM_Avail"] != 1 and cp.vl["TCS13"]["ACCEnable"] != 0 else -self.cruise_unavail_cnt
-    self.brake_error = self.cruise_unavail_cnt > 100
-
     tpms_unit = cp.vl["TPMS11"]["UNIT"] * 0.725 if int(cp.vl["TPMS11"]["UNIT"]) > 0 else 1.
     ret.tpms.fl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FL"]
     ret.tpms.fr = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FR"]
@@ -189,6 +187,11 @@ class CarState(CarStateBase):
 
     if self.CP.hasAutoHold:
       ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]
+
+    self.mads_enabled = ret.cruiseState.available
+
+    if self.mads_enabled:
+      self.madsEnabled = True
 
     return ret
 
@@ -242,12 +245,12 @@ class CarState(CarStateBase):
     # CAN FD cars enable on main button press, set available if no TCS faults preventing engagement
     if self.CP.openpilotLongitudinalControl:
       # These are not used for engage/disengage since openpilot keeps track of state using the buttons
-      ret.cruiseState.available = cp.vl["TCS"]["ACCEnable"] == 0 or True
+      ret.cruiseState.available = cp.vl["TCS"]["ACCEnable"] == 0
       ret.cruiseState.enabled = cp.vl["TCS"]["ACC_REQ"] == 1
       ret.cruiseState.standstill = False
     else:
       cp_cruise_info = cp_cam if self.CP.flags & HyundaiFlags.CANFD_CAMERA_SCC else cp
-      ret.cruiseState.available = cp_cruise_info.vl["SCC_CONTROL"]["MainMode_ACC"] == 1 or True
+      ret.cruiseState.available = cp_cruise_info.vl["SCC_CONTROL"]["MainMode_ACC"] == 1
       ret.cruiseState.enabled = cp_cruise_info.vl["SCC_CONTROL"]["ACCMode"] in (1, 2)
       ret.cruiseState.standstill = cp_cruise_info.vl["SCC_CONTROL"]["CRUISE_STANDSTILL"] == 1
       ret.cruiseState.speed = cp_cruise_info.vl["SCC_CONTROL"]["VSetDis"] * speed_factor
@@ -262,6 +265,11 @@ class CarState(CarStateBase):
 
     if self.CP.flags & HyundaiFlags.CANFD_HDA2:
       self.cam_0x2a4 = copy.copy(cp_cam.vl["CAM_0x2a4"])
+
+    self.mads_enabled = cp.vl[cruise_btn_msg]["LFA_BTN"]
+
+    if self.mads_enabled:
+      self.madsEnabled = True
 
     return ret
 
@@ -313,7 +321,6 @@ class CarState(CarStateBase):
       ("DriverBraking", "TCS13"),
       ("StandStill", "TCS13"),
       ("PBRAKE_ACT", "TCS13"),
-      ("CF_VSM_Avail", "TCS13"),
 
       ("ESC_Off_Step", "TCS15"),
       ("AVH_LAMP", "TCS15"),
