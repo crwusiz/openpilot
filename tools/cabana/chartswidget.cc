@@ -305,6 +305,7 @@ ChartView::ChartView(QWidget *parent) : QChartView(nullptr, parent) {
   axis_y = new QValueAxis(this);
   chart->addAxis(axis_x, Qt::AlignBottom);
   chart->addAxis(axis_y, Qt::AlignLeft);
+  chart->legend()->layout()->setContentsMargins(0, 0, 40, 0);
   chart->legend()->setShowToolTips(true);
   chart->layout()->setContentsMargins(0, 0, 0, 0);
   chart->setMargins({20, 11, 11, 11});
@@ -655,7 +656,16 @@ void ChartView::mouseMoveEvent(QMouseEvent *ev) {
   } else {
     QToolTip::hideText();
   }
+
   QChartView::mouseMoveEvent(ev);
+  if (is_zooming) {
+    QRect rubber_rect = rubber->geometry();
+    rubber_rect.setLeft(std::max(rubber_rect.left(), (int)plot_area.left()));
+    rubber_rect.setRight(std::min(rubber_rect.right(), (int)plot_area.right()));
+    if (rubber_rect != rubber->geometry()) {
+      rubber->setGeometry(rubber_rect);
+    }
+  }
 }
 
 void ChartView::dragMoveEvent(QDragMoveEvent *event) {
