@@ -57,6 +57,7 @@ def manager_init() -> None:
     ("MandoRadarEnable", "0"),
     ("PandaSafetySelect", "0"),
     ("SccOnBus2", "0"),
+    ("DisengageOnBrake", "0"),
   ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))

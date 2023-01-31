@@ -708,6 +708,11 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   tr("If Scc is on bus 2, turn it on."),
                                   "../assets/offroad/icon_long.png",
                                   this));
+  toggles.append(new ParamControl("DisengageOnBrake",
+                                  tr("Disengage on Brake Pedal"),
+                                  tr("When enabled, pressing the brake pedal will disengage openpilot."),
+                                  "../assets/offroad/icon_disengage_on_accelerator.svg",
+                                  this));
   /*toggles.append(new ParamControl("MandoRadarEnable",
                                   tr("Mando Radar interface Enable"),
                                   tr("Mando Radar interface use (disable AEB)"),

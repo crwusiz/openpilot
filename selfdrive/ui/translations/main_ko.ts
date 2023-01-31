@@ -187,6 +187,14 @@
         <source>Panda Safety Change to MDPS</source>
         <translation>Panda Safety MDPS로 변경</translation>
     </message>
+    <message>
+        <source>Disengage on Brake Pedal</source>
+        <translation>브레이크페달 조작시 해제</translation>
+    </message>
+    <message>
+        <source>When enabled, pressing the brake pedal will disengage openpilot.</source>
+        <translation>활성화된 경우 브레이크 페달을 누르면 openpilot이 해제됩니다.</translation>
+    </message>
 </context>
 <context>
     <name>ConfirmationDialog</name>
