@@ -68,13 +68,6 @@
     </message>
 </context>
 <context>
-    <name>AebSelect</name>
-    <message>
-        <source>AEB Signal Select (Scc12/Fca11)</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
     <name>AnnotatedCameraWidget</name>
     <message>
         <source>km/h</source>
@@ -90,78 +83,11 @@
     </message>
     <message>
         <source>SPEED</source>
-        <translation type="vanished">PRĘDKOŚĆ</translation>
+        <translation>PRĘDKOŚĆ</translation>
     </message>
     <message>
         <source>LIMIT</source>
-        <translation type="vanished">OGRANICZENIE</translation>
-    </message>
-    <message>
-        <source>LONG</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>CommunityPanel</name>
-    <message>
-        <source>Select your Manufacturer</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Select your car</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>RUN</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Process?</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Process</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Prebuilt Enable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Create prebuilt files to speed bootup</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Logger Disable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Disable Logger is Reduce system load</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Navigation Disable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Navigation Function not use</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>New radar interface Enable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Some newer car New radar interface</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>SCC on BUS 2</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>If SCC is on bus 2, turn it on.</source>
-        <translation type="unfinished"></translation>
+        <translation>OGRANICZENIE</translation>
     </message>
 </context>
 <context>
@@ -246,11 +172,11 @@
     </message>
     <message>
         <source>Regulatory</source>
-        <translation type="vanished">Regulacja</translation>
+        <translation>Regulacja</translation>
     </message>
     <message>
         <source>VIEW</source>
-        <translation type="vanished">WIDOK</translation>
+        <translation>WIDOK</translation>
     </message>
     <message>
         <source>Change Language</source>
@@ -312,26 +238,6 @@
         <source>Disengage to Power Off</source>
         <translation>Aby wyłączyć urządzenie, odłącz sterowanie</translation>
     </message>
-    <message>
-        <source>Reset</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Review</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Are you sure you want to reset calibration and live params?</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Process</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Soft Restart</source>
-        <translation type="unfinished"></translation>
-    </message>
 </context>
 <context>
     <name>DriveStats</name>
@@ -349,7 +255,7 @@
     </message>
     <message>
         <source>PAST WEEK</source>
-        <translation type="vanished">OSTATNI TYDZIEŃ</translation>
+        <translation>OSTATNI TYDZIEŃ</translation>
     </message>
     <message>
         <source>KM</source>
@@ -365,17 +271,6 @@
     <message>
         <source>camera starting</source>
         <translation>uruchamianie kamery</translation>
-    </message>
-</context>
-<context>
-    <name>ExperimentalModeButton</name>
-    <message>
-        <source>EXPERIMENTAL MODE ON</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>CHILL MODE ON</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -410,13 +305,6 @@
     <message>
         <source>Updating files: </source>
         <translation>Aktualizacja plików: </translation>
-    </message>
-</context>
-<context>
-    <name>LateralControlSelect</name>
-    <message>
-        <source>LateralControl Select (Pid/Indi/Lqr/Torque)</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -514,13 +402,6 @@ nie zostało ustawione</translation>
     </message>
 </context>
 <context>
-    <name>MfcSelect</name>
-    <message>
-        <source>MFC Camera Select (Auto/Ldws,Lkas/Lfa)</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
     <name>MultiOptionDialog</name>
     <message>
         <source>Select</source>
@@ -548,58 +429,6 @@ nie zostało ustawione</translation>
     <message>
         <source>Wrong password</source>
         <translation>Niepoprawne hasło</translation>
-    </message>
-</context>
-<context>
-    <name>OffroadAlert</name>
-    <message>
-        <source>Device temperature too high. System won&apos;t start.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Connect to internet to check for updates. openpilot won&apos;t automatically start until it connects to internet to check for updates.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Unable to download updates
-%1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Invalid date and time settings, system won&apos;t start. Connect to internet to set time.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Device failed to register. It will not connect to or upload to comma.ai servers, and receives no support from comma.ai. If this is an official device, contact support@comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>NVMe drive not mounted.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Unsupported NVMe drive detected. Device may draw significantly more power and overheat due to the unsupported NVMe.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot was unable to identify your car. Your car is either unsupported or its ECUs are not recognized. Please submit a pull request to add the firmware versions to the proper vehicle. Need help? Join discord.comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Immediately connect to the internet to check for updates. If you do not connect to the internet, openpilot won&apos;t engage in %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot was unable to identify your car. Check integrity of cables and ensure all connections are secure, particularly that the comma power is fully inserted in the OBD-II port of the vehicle. Need help? Join discord.comma.ai.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Taking camera snapshots. System won&apos;t start until finished.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>An update to your device&apos;s operating system is downloading in the background. You will be prompted to update when it&apos;s ready to install.</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -634,24 +463,6 @@ nie zostało ustawione</translation>
     <message>
         <source>Bookmark connect.comma.ai to your home screen to use it like an app</source>
         <translation>Dodaj connect.comma.ai do zakładek na swoim ekranie początkowym, aby korzystać z niej jak z aplikacji</translation>
-    </message>
-</context>
-<context>
-    <name>PandaSafetySelect</name>
-    <message>
-        <source>Panda Safety Select (Default/Mdps)</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>ParamControl</name>
-    <message>
-        <source>Enable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Cancel</source>
-        <translation type="unfinished">Anuluj</translation>
     </message>
 </context>
 <context>
@@ -786,29 +597,7 @@ nie zostało ustawione</translation>
     <name>RichTextDialog</name>
     <message>
         <source>Ok</source>
-        <translation type="vanished">Ok</translation>
-    </message>
-</context>
-<context>
-    <name>SelectCar</name>
-    <message>
-        <source>Back</source>
-        <translation type="unfinished">Wróć</translation>
-    </message>
-    <message>
-        <source>Select Car not use</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>SelectManufacturer</name>
-    <message>
-        <source>Back</source>
-        <translation type="unfinished">Wróć</translation>
-    </message>
-    <message>
-        <source>Select Manufacturer not use</source>
-        <translation type="unfinished"></translation>
+        <translation>Ok</translation>
     </message>
 </context>
 <context>
@@ -836,10 +625,6 @@ nie zostało ustawione</translation>
     <message>
         <source>Navigation</source>
         <translation>Nawigacja</translation>
-    </message>
-    <message>
-        <source>Community</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -1125,10 +910,6 @@ nie zostało ustawione</translation>
         <source>Select a branch</source>
         <translation type="unfinished"></translation>
     </message>
-    <message>
-        <source>Uninstall</source>
-        <translation type="unfinished"></translation>
-    </message>
 </context>
 <context>
     <name>SshControl</name>
@@ -1262,55 +1043,27 @@ nie zostało ustawione</translation>
         <translation type="vanished">openpilot wyłączy radar samochodu i przejmie kontrolę nad gazem i hamulcem. Ostrzeżenie: wyłączony zostanie system AEB!</translation>
     </message>
     <message>
+        <source>🌮 End-to-end longitudinal (extremely alpha) 🌮</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Experimental openpilot Longitudinal Control</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Experimental Mode</source>
+        <source>&lt;b&gt;WARNING: openpilot longitudinal control is experimental for this car and will disable AEB.&lt;/b&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>WARNING: openpilot longitudinal control is experimental for this car and will disable Automatic Emergency Braking (AEB).</source>
+        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would. Super experimental.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Enable AutoLaneChange</source>
+        <source>openpilot longitudinal control is not currently available for this car.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Operation of the turn signal at 60㎞/h speed will result in a short change of the vehicle</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>On this car, openpilot defaults to the car&apos;s built-in ACC instead of openpilot&apos;s longitudinal control. Enable this to switch to openpilot longitudinal control. Enabling Experimental mode is recommended when using experimental openpilot longitudinal control.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>openpilot defaults to driving in &lt;b&gt;chill mode&lt;/b&gt;. Experimental mode enables &lt;b&gt;alpha-level features&lt;/b&gt; that aren&apos;t ready for chill mode. Experimental features are listed below:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>🌮 End-to-End Longitudinal Control 🌮</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would, including stopping for red lights and stop signs. Since the driving model decides the speed to drive, the set speed will only act as an upper bound. This is an alpha quality feature; mistakes should be expected.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>New Driving Visualization</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>The driving visualization will transition to the road-facing wide-angle camera at low speeds to better show some turns. The Experimental mode logo will also be shown in the top right corner.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Experimental mode is currently unavailable on this car, since the car&apos;s stock ACC is used for longitudinal control.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Enable experimental longitudinal control to allow experimental mode.</source>
+        <source>Enable experimental longitudinal control to enable this.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1366,10 +1119,6 @@ nie zostało ustawione</translation>
     <message>
         <source>Forget Wi-Fi Network &quot;%1&quot;?</source>
         <translation>Czy chcesz zapomnieć sieć &quot;%1&quot;?</translation>
-    </message>
-    <message>
-        <source>Forget</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 </TS>
