@@ -6,7 +6,7 @@ from cereal import car
 from common.conversions import Conversions as CV
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
-from selfdrive.car.hyundai.values import HyundaiFlags, DBC, CarControllerParams, Buttons, FEATURES, EV_CAR, HEV_CAR, CAR, CANFD_CAR, FCA11_CAR
+from selfdrive.car.hyundai.values import HyundaiFlags, DBC, CarControllerParams, Buttons, FEATURES, EV_CAR, HEV_CAR, CAR, CANFD_CAR
 from selfdrive.car.interfaces import CarStateBase
 
 PREV_BUTTON_SAMPLES = 8
@@ -149,7 +149,7 @@ class CarState(CarStateBase):
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(gear))
 
     if not self.CP.openpilotLongitudinalControl or self.CP.sccBus == 2:
-      aeb_fcw = self.CP.aebFcw or self.CP.carFingerprint in FCA11_CAR
+      aeb_fcw = self.CP.aebFcw
       aeb_src = "FCA11" if aeb_fcw else "SCC12"
       aeb_sig = "FCA_CmdAct" if aeb_fcw else "AEB_CmdAct"
       aeb_warning = cp_cruise.vl[aeb_src]["CF_VSM_Warn"] != 0
@@ -451,7 +451,7 @@ class CarState(CarStateBase):
           ("CF_Lvr_CruiseSet", "LVR12"),
         ]
 
-      if CP.aebFcw or CP.carFingerprint in FCA11_CAR:
+      if CP.aebFcw:
         signals += [
           ("FCA_CmdAct", "FCA11"),
           ("CF_VSM_Warn", "FCA11"),
@@ -705,7 +705,7 @@ class CarState(CarStateBase):
         signals.append(("ACCMode", "SCC12"))
         checks.append(("SCC12", 50))
 
-        if CP.aebFcw or CP.carFingerprint in FCA11_CAR:
+        if CP.aebFcw:
           signals += [
             ("FCA_CmdAct", "FCA11"),
             ("CF_VSM_Warn", "FCA11"),

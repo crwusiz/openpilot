@@ -4,7 +4,7 @@ from panda import Panda
 from common.params import Params
 from common.numpy_fast import interp
 from common.conversions import Conversions as CV
-from selfdrive.car.hyundai.values import HyundaiFlags, CAR, Buttons, CarControllerParams, CANFD_CAR, EV_CAR, HEV_CAR, LEGACY_SAFETY_MODE_CAR, CANFD_RADAR_SCC_CAR
+from selfdrive.car.hyundai.values import HyundaiFlags, CAR, Buttons, CarControllerParams, CANFD_CAR, EV_CAR, HEV_CAR, LEGACY_SAFETY_MODE_CAR, CANFD_RADAR_SCC_CAR, FCA11_CAR
 from selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR
 from selfdrive.car import STD_CARGO_KG, create_button_event, scale_tire_stiffness, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
@@ -345,6 +345,8 @@ class CarInterface(CarInterfaceBase):
       bus = 5 if ret.flags & HyundaiFlags.CANFD_HDA2 else 4
       ret.enableBsm = 0x1e5 in fingerprint[bus]
       ret.radarOffCan = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
+      Params().put_bool("IsCanfd", True)
+      Params().put("LateralControlSelect", "3")
     else:
       ret.enableBsm = 1419 in fingerprint[0]
       ret.hasAutoHold = 1151 in fingerprint[0]
@@ -352,6 +354,13 @@ class CarInterface(CarInterfaceBase):
       ret.hasLfaHda = 1157 in fingerprint[0]
       ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
       ret.radarOffCan = ret.sccBus == -1
+      Params().put_bool("IsCanfd", False)
+
+      if candidate in FCA11_CAR:
+        Params().put("AebSelect", "1")
+
+      if candidate == CAR.GENESIS:
+        Params().put("MfcSelect", "0")
 
       # ignore CAN2 address if L-CAN on the same BUS
       ret.epsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] \

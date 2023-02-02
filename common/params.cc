@@ -219,6 +219,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"EnableGmap", PERSISTENT},
     {"GmapKey", PERSISTENT },
     {"DisengageOnBrake", PERSISTENT},
+    {"IsCanfd", PERSISTENT},
 };
 
 } // namespace

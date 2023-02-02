@@ -635,10 +635,12 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   communityLayout->addWidget(cleardtc_btn);
   communityLayout->addWidget(tmuxlog_btn);
   communityLayout->addWidget(horizontal_line());
-  communityLayout->addWidget(new LateralControlSelect());
-  communityLayout->addWidget(new MfcSelect());
-  communityLayout->addWidget(new AebSelect());
-  communityLayout->addWidget(horizontal_line());
+  if (!params.getBool("IsCanfd")) {
+    communityLayout->addWidget(new LateralControlSelect());
+    communityLayout->addWidget(new MfcSelect());
+    communityLayout->addWidget(new AebSelect());
+    communityLayout->addWidget(horizontal_line());
+  }
 
   auto pandareset_btn = new ButtonControl(tr("Panda Reset"), tr("RUN"));
   QObject::connect(pandareset_btn, &ButtonControl::clicked, [=]() {
@@ -678,11 +680,13 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   communityLayout->addWidget(pandareset_btn);
   communityLayout->addWidget(pandaflash_btn);
   communityLayout->addWidget(pandarecover_btn);
-  communityLayout->addWidget(new PandaSafetySelect());
-  if (params.getBool("PandaSafetySelect")) {
-    communityLayout->addWidget(pandadefault_btn);
-  } else if (!params.getBool("PandaSafetySelect")) {
-    communityLayout->addWidget(pandamdps_btn);
+  if (!params.getBool("IsCanfd")) {
+    communityLayout->addWidget(new PandaSafetySelect());
+    if (params.getBool("PandaSafetySelect")) {
+      communityLayout->addWidget(pandadefault_btn);
+    } else if (!params.getBool("PandaSafetySelect")) {
+      communityLayout->addWidget(pandamdps_btn);
+    }
   }
   communityLayout->addWidget(horizontal_line());
 
@@ -703,11 +707,13 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   tr("Navigation Features use"),
                                   "../assets/offroad/icon_map.png",
                                   this));
-  toggles.append(new ParamControl("SccOnBus2",
-                                  tr("Scc on Bus 2"),
-                                  tr("If Scc is on bus 2, turn it on."),
-                                  "../assets/offroad/icon_long.png",
-                                  this));
+  if (!params.getBool("IsCanfd")) {
+    toggles.append(new ParamControl("SccOnBus2",
+                                    tr("Scc on Bus 2"),
+                                    tr("If Scc is on bus 2, turn it on."),
+                                    "../assets/offroad/icon_long.png",
+                                    this));
+  }
   toggles.append(new ParamControl("DisengageOnBrake",
                                   tr("Disengage on Brake Pedal"),
                                   tr("When enabled, pressing the brake pedal will disengage openpilot."),
