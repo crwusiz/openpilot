@@ -54,7 +54,7 @@ class RadarInterface(RadarInterfaceBase):
     self.trigger_msg = 0x420 if not self.new_radar else RADAR_START_ADDR + RADAR_MSG_COUNT - 1
     self.track_id = 0
 
-    self.radar_off_can = CP.radarOffCan
+    self.radar_off_can = CP.radarUnavailable
     self.rcp = get_radar_can_parser(CP)
 
 

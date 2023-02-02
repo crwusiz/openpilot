@@ -1,12 +1,18 @@
 #pragma once
 
+#include <QPushButton>
 #include <QStackedLayout>
 #include <QWidget>
 
 #include "common/util.h"
-#include "selfdrive/ui/qt/widgets/cameraview.h"
 #include "selfdrive/ui/ui.h"
+#include "selfdrive/ui/qt/widgets/cameraview.h"
 
+
+//const int btn_size = 192;
+//const int img_size = (btn_size / 4) * 3;
+const int btn_size = 160;
+const int img_size = (btn_size / 2) * 1.5;
 
 // ***** onroad widgets *****
 class OnroadAlerts : public QWidget {
@@ -22,6 +28,21 @@ protected:
 private:
   QColor bg;
   Alert alert = {};
+};
+
+class ExperimentalButton : public QPushButton {
+  Q_OBJECT
+
+public:
+  explicit ExperimentalButton(QWidget *parent = 0);
+  void updateState(const UIState &s);
+
+private:
+  void paintEvent(QPaintEvent *event) override;
+
+  Params params;
+  QPixmap engage_img;
+  QPixmap experimental_img;
 };
 
 // container window for the NVG UI
@@ -88,10 +109,10 @@ private:
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
   void drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color);
 
+  ExperimentalButton *experimental_btn;
   QPixmap long_img, steer_img;
   QPixmap lat_img, gaspress_img;
   QPixmap dm_img;
-  QPixmap chill_img, experimental_img;
 
   // crwusiz add
   QPixmap brake_img, bsd_l_img, bsd_r_img;
@@ -104,9 +125,6 @@ private:
   QPixmap autohold_warning_img;
   QPixmap autohold_active_img;
   QPixmap nda_img, hda_img;
-
-  const int radius = 160;
-  const int img_size = (radius / 2) * 1.5;
 
   QString speedUnit;
   std::unique_ptr<PubMaster> pm;

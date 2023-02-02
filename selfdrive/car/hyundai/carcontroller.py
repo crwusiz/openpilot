@@ -52,7 +52,7 @@ class CarController:
     self.CCP = CarControllerParams(CP)
     self.packer = CANPacker(dbc_name)
     self.scc_smoother = SccSmoother(CP)
-    self.scc_live = not CP.radarOffCan
+    self.scc_live = not CP.radarUnavailable
     self.car_fingerprint = CP.carFingerprint
 
     self.frame = 0

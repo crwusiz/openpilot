@@ -177,15 +177,66 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
 }
 
 
+ExperimentalButton::ExperimentalButton(QWidget *parent) : QPushButton(parent) {
+  setVisible(false);
+  setFixedSize(btn_size, btn_size);
+  setCheckable(true);
+
+  params = Params();
+  engage_img = loadPixmap("../assets/img_experimental_white.png", {img_size, img_size});
+  experimental_img = loadPixmap("../assets/img_experimental.svg", {img_size, img_size});
+
+  QObject::connect(this, &QPushButton::toggled, [=](bool checked) {
+    params.putBool("ExperimentalMode", checked);
+  });
+}
+
+void ExperimentalButton::updateState(const UIState &s) {
+  const SubMaster &sm = *(s.sm);
+
+  // button is "visible" if engageable or enabled
+  const auto cs = sm["controlsState"].getControlsState();
+  setVisible(cs.getEngageable() || cs.getEnabled());
+
+  // button is "checked" if experimental mode is enabled
+  setChecked(sm["controlsState"].getControlsState().getExperimentalMode());
+
+  // disable button when experimental mode is not available, or has not been confirmed for the first time
+  const auto cp = sm["carParams"].getCarParams();
+  const bool experimental_mode_available = cp.getExperimentalLongitudinalAvailable() ? params.getBool("ExperimentalLongitudinalEnabled") : cp.getOpenpilotLongitudinalControl();
+  setEnabled(params.getBool("ExperimentalModeConfirmed") && experimental_mode_available);
+}
+
+void ExperimentalButton::paintEvent(QPaintEvent *event) {
+  QPainter p(this);
+  p.setRenderHint(QPainter::Antialiasing);
+
+  QPoint center(btn_size / 2, btn_size / 2);
+  QPixmap img = isChecked() ? experimental_img : engage_img;
+
+  p.setOpacity(1.0);
+  p.setPen(Qt::NoPen);
+  p.setBrush(QColor(0, 0, 0, 166));
+  p.drawEllipse(center, btn_size / 2, btn_size / 2);
+  p.setOpacity(isDown() ? 0.8 : 1.0);
+  p.drawPixmap((btn_size - img_size) / 2, (btn_size - img_size) / 2, img);
+}
+
+
 AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraWidget("camerad", type, true, parent) {
   pm = std::make_unique<PubMaster, const std::initializer_list<const char *>>({"uiDebug"});
+
+  QVBoxLayout *main_layout  = new QVBoxLayout(this);
+  main_layout->setMargin(bdr_s);
+  main_layout->setSpacing(0);
+
+  experimental_btn = new ExperimentalButton(this);
+  main_layout->addWidget(experimental_btn, 0, Qt::AlignTop | Qt::AlignRight);
 
   steer_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
   lat_img = loadPixmap("../assets/offroad/icon_speed_limit.png", {img_size, img_size});
   gaspress_img = loadPixmap("../assets/offroad/icon_disengage_on_accelerator.svg", {img_size, img_size});
   dm_img = loadPixmap("../assets/img_driver_face.png", {img_size, img_size});
-  chill_img = loadPixmap("../assets/img_experimental_white.svg", {img_size, img_size });
-  experimental_img = loadPixmap("../assets/img_experimental.svg", {img_size, img_size });
 
   // crwusiz add
   brake_img = loadPixmap("../assets/img_brake_disc.png", {img_size, img_size});
@@ -311,6 +362,9 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
   setProperty("frictionRaw", tp.getFrictionCoefficientRaw());
   setProperty("dm_fade_state", fmax(0.0, fmin(1.0, dm_fade_state+0.2*(0.5-(float)(isStandstill*dmActive)))));
+
+  // update engageability/experimental mode button
+  experimental_btn->updateState(s);
 }
 
 void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
@@ -498,20 +552,20 @@ void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
   configFont(p, "Inter", 66, "Regular");
   drawTextColor(p, rect().center().x(), 310, speedUnit, lightorangeColor());
 
+  int x,y,w,h = 0;
+  QColor icon_bg = blackColor(100);
+/*
   // e2e mode icon (upper right 1)
   if (uiState()->scene.experimental_mode) {
     long_img = experimental_img;
   } else {
-    long_img = chill_img;
+    long_img = engage_img;
   }
 
-  int x,y,w,h = 0;
-  QColor icon_bg = blackColor(100);
-
-  x = rect().right() - (radius / 2) - (bdr_s * 2);
-  y = (radius / 2) + (bdr_s * 4);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2);
+  y = (btn_size / 2) + (bdr_s * 4);
   drawIcon(p, x, y, long_img, icon_bg, 1.0);
-
+*/
   if (wifi_state == 0) {
     wifi_img = wifi_f_img;
   } else if (wifi_state == 1) {
@@ -525,18 +579,18 @@ void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
   }
 
   // wifi icon (upper right 2)
-  x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
-  y = (radius / 2) + (bdr_s * 4);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size);
+  y = (btn_size / 2) + (bdr_s * 4);
   drawIcon(p, x, y, wifi_img, icon_bg, wifi_state > 0 ? 1.0 : 0.2);
 
   // gps icon (upper right 3)
-  x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 2);
-  y = (radius / 2) + (bdr_s * 4);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 2);
+  y = (btn_size / 2) + (bdr_s * 4);
   drawIcon(p, x, y, gps_img, icon_bg, gps_state ? 1.0 : 0.2);
 
   // N direction icon (upper right 4)
-  x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 3);
-  y = (radius / 2) + (bdr_s * 4);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 3);
+  y = (btn_size / 2) + (bdr_s * 4);
   drawIconRotate(p, x, y, direction_img, icon_bg, gps_state ? 1.0 : 0.2, gpsBearing);
 
   // nda icon (upper center)
@@ -549,8 +603,8 @@ void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
   }
 
   // steer img (upper right down 1)
-  x = rect().right() - (radius / 2) - (bdr_s * 2);
-  y = (radius / 2) + (bdr_s * 20);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2);
+  y = (btn_size / 2) + (bdr_s * 20);
   drawIconRotate(p, x, y, steer_img, icon_bg, 1.0, steerAngle);
 
   QString sa_str, saop_str;
@@ -570,17 +624,17 @@ void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
   }
 
   // lat icon (upper right down 2)
-  x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius);
-  y = (radius / 2) + (bdr_s * 20);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size);
+  y = (btn_size / 2) + (bdr_s * 20);
   drawIcon(p, x, y, lat_img, icon_bg, (status != STATUS_DISENGAGED) ? 1.0 : 0.2);
 
   // gaspress img (bottom right)
-  x = rect().right() - (radius / 2) - (bdr_s * 2) - (radius * 1.5);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 1.5);
   y = rect().bottom() - (footer_h / 2) + (bdr_s *2);
   drawIcon(p, x, y, gaspress_img, icon_bg, gas_pressed ? 1.0 : 0.2);
 
   // dm icon (bottom 1eft 1)
-  x = (radius / 2) + (bdr_s * 2);
+  x = (btn_size / 2) + (bdr_s * 2);
   y = rect().bottom() - (footer_h / 2);
   //drawIcon(p, x, y, dm_img, icon_bg, dmActive ? 1.0 : 0.2);
   drawDriverState(p, s, x, y, dmActive ? 1.0 : 0.2);
@@ -596,28 +650,28 @@ void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
     gap_img = gap4_img;
   }
 
-  x = (radius / 2) + (bdr_s * 2) + radius;
+  x = (btn_size / 2) + (bdr_s * 2) + btn_size;
   y = rect().bottom() - (footer_h / 2);
   drawIcon(p, x, y, gap_img, icon_bg, is_cruise_set ? 1.0 : 0.2);
 
   // brake icon (bottom left 2)
-  x = (radius / 2) + (bdr_s * 2);
-  y = rect().bottom() - (footer_h / 2) - (radius) - 10;
+  x = (btn_size / 2) + (bdr_s * 2);
+  y = rect().bottom() - (footer_h / 2) - (btn_size) - 10;
   drawIcon(p, x, y, brake_img, icon_bg, brake_state ? 1.0 : 0.2);
 
   // autohold icon (bottom right 2)
-  x = (radius / 2) + (bdr_s * 2) + (radius);
-  y = rect().bottom() - (footer_h / 2) - (radius) - 10;
+  x = (btn_size / 2) + (bdr_s * 2) + (btn_size);
+  y = rect().bottom() - (footer_h / 2) - (btn_size) - 10;
   drawIcon(p, x, y, autohold_state > 1 ? autohold_warning_img : autohold_active_img, icon_bg, autohold_state ? 1.0 : 0.2);
 
   // bsd_l icon (bottom left 3)
-  x = (radius / 2) + (bdr_s * 2);
-  y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
+  x = (btn_size / 2) + (bdr_s * 2);
+  y = rect().bottom() - (footer_h / 2) - (btn_size * 2) - 20;
   drawIcon(p, x, y, bsd_l_img, icon_bg, left_blindspot ? 1.0 : 0.2);
 
   // bsd_r icon (bottom right 3)
-  x = (radius / 2) + (bdr_s * 2) + (radius);
-  y = rect().bottom() - (footer_h / 2) - (radius * 2) - 20;
+  x = (btn_size / 2) + (bdr_s * 2) + (btn_size);
+  y = rect().bottom() - (footer_h / 2) - (btn_size * 2) - 20;
   drawIcon(p, x, y, bsd_r_img, icon_bg, right_blindspot ? 1.0 : 0.2);
 
   // bottom info
@@ -632,7 +686,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
     latAccelFactorRaw, frictionRaw
   );
 
-  x = rect().left() + radius * 3.0;
+  x = rect().left() + btn_size * 3.0;
   y = rect().height() - 15;
 
   configFont(p, "Inter", 30, "Regular");
@@ -652,7 +706,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
     gpsAltitude, gpsAccuracy, gpsSatelliteCount
   );
 
-  x = rect().right() - (radius * 1.8);
+  x = rect().right() - (btn_size * 1.8);
   y = (bdr_s * 3);
 
   configFont(p, "Inter", 30, "Regular");
@@ -738,7 +792,7 @@ void AnnotatedCameraWidget::drawIcon(QPainter &p, int x, int y, QPixmap &img, QB
   p.setOpacity(1.0);  // bg dictates opacity of ellipse
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
-  p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
+  p.drawEllipse(x - btn_size / 2, y - btn_size / 2, btn_size, btn_size);
   p.setOpacity(opacity);
   p.drawPixmap(x - img.size().width() / 2, y - img.size().height() / 2, img);
 }
@@ -747,7 +801,7 @@ void AnnotatedCameraWidget::drawIconRotate(QPainter &p, int x, int y, QPixmap &i
   p.setOpacity(1.0);  // bg dictates opacity of ellipse
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
-  p.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
+  p.drawEllipse(x - btn_size / 2, y - btn_size / 2, btn_size, btn_size);
   p.setOpacity(opacity);
   p.save();
   p.translate(x, y);
@@ -879,7 +933,7 @@ void AnnotatedCameraWidget::drawDriverState(QPainter &painter, const UIState *s,
   painter.setOpacity(1.0);
   painter.setPen(Qt::NoPen);
   painter.setBrush(blackColor(70));
-  painter.drawEllipse(x - radius / 2, y - radius / 2, radius, radius);
+  painter.drawEllipse(x - btn_size / 2, y - btn_size / 2, btn_size, btn_size);
 
   painter.setCompositionMode(QPainter::CompositionMode_Source);
 
