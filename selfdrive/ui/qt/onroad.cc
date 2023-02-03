@@ -178,12 +178,13 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
 
 
 ExperimentalButton::ExperimentalButton(QWidget *parent) : QPushButton(parent) {
-  setVisible(false);
+  //setVisible(false);
+  setVisible(true);
   setFixedSize(btn_size, btn_size);
   setCheckable(true);
 
   params = Params();
-  engage_img = loadPixmap("../assets/img_experimental_white.png", {img_size, img_size});
+  engage_img = loadPixmap("../assets/img_experimental_white.svg", {img_size, img_size});
   experimental_img = loadPixmap("../assets/img_experimental.svg", {img_size, img_size});
 
   QObject::connect(this, &QPushButton::toggled, [=](bool checked) {
@@ -195,8 +196,8 @@ void ExperimentalButton::updateState(const UIState &s) {
   const SubMaster &sm = *(s.sm);
 
   // button is "visible" if engageable or enabled
-  const auto cs = sm["controlsState"].getControlsState();
-  setVisible(cs.getEngageable() || cs.getEnabled());
+  //const auto cs = sm["controlsState"].getControlsState();
+  //setVisible(cs.getEngageable() || cs.getEnabled());
 
   // button is "checked" if experimental mode is enabled
   setChecked(sm["controlsState"].getControlsState().getExperimentalMode());
@@ -216,19 +217,20 @@ void ExperimentalButton::paintEvent(QPaintEvent *event) {
 
   p.setOpacity(1.0);
   p.setPen(Qt::NoPen);
-  p.setBrush(QColor(0, 0, 0, 166));
+  //p.setBrush(QColor(0, 0, 0, 166));
+  p.setBrush(QColor(0, 0, 0, 100)); // icon_bg
   p.drawEllipse(center, btn_size / 2, btn_size / 2);
   p.setOpacity(isDown() ? 0.8 : 1.0);
-  p.drawPixmap((btn_size - img_size) / 2, (btn_size - img_size) / 2, img);
+  //p.drawPixmap((btn_size - img_size) / 2, (btn_size - img_size) / 2, img);
+  p.drawPixmap((btn_size - img.size().width()) / 2, (btn_size - img.size().height()) / 2, img);
 }
-
 
 AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraWidget("camerad", type, true, parent) {
   pm = std::make_unique<PubMaster, const std::initializer_list<const char *>>({"uiDebug"});
 
   QVBoxLayout *main_layout  = new QVBoxLayout(this);
-  main_layout->setMargin(bdr_s);
-  main_layout->setSpacing(0);
+  main_layout->setMargin(bdr_s * 4);
+  main_layout->setSpacing(20);
 
   experimental_btn = new ExperimentalButton(this);
   main_layout->addWidget(experimental_btn, 0, Qt::AlignTop | Qt::AlignRight);
@@ -579,17 +581,17 @@ void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
   }
 
   // wifi icon (upper right 2)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 3) - (btn_size);
   y = (btn_size / 2) + (bdr_s * 4);
   drawIcon(p, x, y, wifi_img, icon_bg, wifi_state > 0 ? 1.0 : 0.2);
 
   // gps icon (upper right 3)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 2);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 3) - (btn_size * 2);
   y = (btn_size / 2) + (bdr_s * 4);
   drawIcon(p, x, y, gps_img, icon_bg, gps_state ? 1.0 : 0.2);
 
   // N direction icon (upper right 4)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 3);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 3) - (btn_size * 3);
   y = (btn_size / 2) + (bdr_s * 4);
   drawIconRotate(p, x, y, direction_img, icon_bg, gps_state ? 1.0 : 0.2, gpsBearing);
 
@@ -603,7 +605,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
   }
 
   // steer img (upper right down 1)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 3);
   y = (btn_size / 2) + (bdr_s * 20);
   drawIconRotate(p, x, y, steer_img, icon_bg, 1.0, steerAngle);
 
@@ -624,7 +626,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
   }
 
   // lat icon (upper right down 2)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 3) - (btn_size);
   y = (btn_size / 2) + (bdr_s * 20);
   drawIcon(p, x, y, lat_img, icon_bg, (status != STATUS_DISENGAGED) ? 1.0 : 0.2);
 
