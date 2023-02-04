@@ -36,7 +36,7 @@ crwusiz openpilot
 - - -
 ## Harness Cable and Car Year Compatible Chart
 
-cable order -> https://smartstore.naver.com/hyotrade/products/5341431170
+cable order -> https://smartstore.naver.com/jmtechn
 
 [![](https://user-images.githubusercontent.com/43285072/156672295-3443cbcb-e912-43d1-b764-0a5c470c85e4.png)](#)
 [![](https://user-images.githubusercontent.com/43285072/156672302-9cbf008a-bb85-48d9-8cce-fdde9035245a.png)](#)
