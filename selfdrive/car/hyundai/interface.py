@@ -61,12 +61,12 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.72
       ret.steerRatio = 15.4
       tire_stiffness_factor = 0.385
-    elif candidate in [CAR.ELANTRA21, CAR.ELANTRA21_HEV]:
+    elif candidate in [CAR.ELANTRA_CN7, CAR.ELANTRA_CN7_HEV]:
       ret.mass = 1340. + STD_CARGO_KG
       ret.wheelbase = 2.72
       ret.steerRatio = 12.9
       tire_stiffness_factor = 0.65
-    elif candidate in [CAR.SONATA, CAR.SONATA_HEV]:
+    elif candidate in [CAR.SONATA_DN8, CAR.SONATA_DN8_HEV]:
       ret.mass = 1615. + STD_CARGO_KG
       ret.wheelbase = 2.84
       ret.steerRatio = 15.2
@@ -95,7 +95,7 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.67
       ret.steerRatio = 16.0
       tire_stiffness_factor = 0.385
-    elif candidate in [CAR.TUCSON22, CAR.TUCSON22_HEV]:
+    elif candidate in [CAR.TUCSON_NX4, CAR.TUCSON_NX4_HEV]:
       ret.mass = 1680. + STD_CARGO_KG
       ret.wheelbase = 2.756
       ret.steerRatio = 16.
@@ -115,7 +115,7 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.65
       ret.steerRatio = 15.8
       tire_stiffness_factor = 0.5
-    elif candidate in [CAR.GRANDEUR, CAR.GRANDEUR_HEV, CAR.GRANDEUR20, CAR.GRANDEUR20_HEV]:
+    elif candidate in [CAR.GRANDEUR_IG, CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IGFL, CAR.GRANDEUR_IGFL_HEV]:
       ret.mass = 1719. + STD_CARGO_KG
       ret.wheelbase = 2.88
       ret.steerRatio = 12.5
@@ -270,7 +270,7 @@ class CarInterface(CarInterfaceBase):
       ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
       ret.lateralTuning.lqr.c = [1., 0.]
 
-      if candidate in [CAR.GRANDEUR, CAR.GRANDEUR_HEV, CAR.GRANDEUR20, CAR.GRANDEUR20_HEV, CAR.K7, CAR.K7_HEV]:
+      if candidate in [CAR.GRANDEUR_IG, CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IGFL, CAR.GRANDEUR_IGFL_HEV, CAR.K7, CAR.K7_HEV]:
         ret.lateralTuning.lqr.scale = 1600.
         ret.lateralTuning.lqr.ki = 0.01
         ret.lateralTuning.lqr.dcGain = 0.0027
