@@ -36,68 +36,9 @@ optional arguments:
 ```
 
 ```
-To print debug info for Panda and Harness issue:
-python selfdrive/debug/debug_console.py
-
 To print Openpilot live data:
 python selfdrive/debug/dump.py <services>
 
 - replace `<services>` with any one of these:
-
-services = {
-  "sensorEvents"
-  "gpsNMEA"
-  "deviceState"
-  "can"
-  "controlsState"
-  "pandaStates"
-  "peripheralState"
-  "radarState"
-  "roadEncodeIdx"
-  "liveTracks"
-  "sendcan"
-  "logMessage"
-  "errorLogMessage"
-  "liveCalibration"
-  "androidLog"
-  "carState"
-  "carControl"
-  "longitudinalPlan"
-  "procLog"
-  "gpsLocationExternal"
-  "ubloxGnss"
-  "qcomGnss"
-  "gnssMeasurements"
-  "clocks"
-  "ubloxRaw"
-  "liveLocationKalman"
-  "liveParameters"
-  "cameraOdometry"
-  "lateralPlan"
-  "thumbnail"
-  "carEvents"
-  "carParams"
-  "roadCameraState"
-  "driverCameraState"
-  "driverEncodeIdx"
-  "driverState"
-  "driverMonitoringState"
-  "wideRoadEncodeIdx"
-  "wideRoadCameraState"
-  "modelV2"
-  "managerState"
-  "uploaderState"
-  "navInstruction"
-  "navRoute"
-  "navThumbnail"
-  "qRoadEncodeIdx"
-  "roadLimitSpeed"
-
-  # debug
-  "testJoystick"
-  "roadEncodeData"
-  "driverEncodeData"
-  "wideRoadEncodeData"
-  "qRoadEncodeData"
-}
+  services list in cereal/services.py
 ```
