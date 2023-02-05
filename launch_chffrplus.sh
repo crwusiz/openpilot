@@ -116,6 +116,18 @@ function launch {
     echo -n "1" > /data/params/d/PandaSafetySelect
   fi
 
+  # events language init
+  if [ ! -f "/data/EVENTS_EN" ] && [ ! -f "/data/EVENTS_KO" ]; then
+    touch /data/EVENTS_EN
+    echo -n "main_en" > /data/params/d/LanguageSetting
+  elif [ -f "/data/EVENTS_EN" ]; then
+    cp -f /data/openpilot/scripts/add/events.py /data/openpilot/selfdrive/controls/lib/events.py
+    echo -n "main_en" > /data/params/d/LanguageSetting
+  elif [ -f "/data/EVENTS_KO" ]; then
+    cp -f /data/openpilot/scripts/add/events_ko.py /data/openpilot/selfdrive/controls/lib/events.py
+    echo -n "main_ko" > /data/params/d/LanguageSetting
+  fi
+
   # start manager
   cd selfdrive/manager
   ./build.py && ./manager.py

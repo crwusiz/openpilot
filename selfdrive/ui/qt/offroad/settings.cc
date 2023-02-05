@@ -235,6 +235,11 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     if (!selection.isEmpty()) {
       // put language setting, exit Qt UI, and trigger fast restart
       Params().put("LanguageSetting", langs[selection].toStdString());
+      if (Params().get("LanguageSetting") == "main_ko") {
+        QProcess::execute("touch /data/EVENTS_KO");
+      } else {
+        QProcess::execute("touch /data/EVENTS_EN");
+      }
       qApp->exit(18);
       watchdog_kick(0);
     }
