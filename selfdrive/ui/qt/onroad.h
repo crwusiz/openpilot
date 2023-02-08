@@ -62,6 +62,7 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(bool right_on MEMBER right_on);
   Q_PROPERTY(bool gas_pressed MEMBER gas_pressed);
   Q_PROPERTY(bool isStandstill MEMBER isStandstill);
+  Q_PROPERTY(bool rightHandDM MEMBER rightHandDM);
 
   Q_PROPERTY(int status MEMBER status);
   Q_PROPERTY(int autohold_state MEMBER autohold_state);
@@ -141,6 +142,7 @@ private:
   bool wide_cam_requested = false;
   bool gas_pressed = false;
   bool isStandstill = false;
+  bool rightHandDM = false;
 
   int status = STATUS_DISENGAGED;
   int autohold_state = 0;

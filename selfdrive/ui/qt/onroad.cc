@@ -1,5 +1,4 @@
 #include "selfdrive/ui/qt/onroad.h"
-#include "selfdrive/ui/qt/onroad.h"
 
 #include <cmath>
 
@@ -238,7 +237,7 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   steer_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
   lat_img = loadPixmap("../assets/offroad/icon_speed_limit.png", {img_size, img_size});
   gaspress_img = loadPixmap("../assets/offroad/icon_disengage_on_accelerator.svg", {img_size, img_size});
-  dm_img = loadPixmap("../assets/img_driver_face.png", {img_size, img_size});
+  dm_img = loadPixmap("../assets/img_driver_face.png", {img_size + 5, img_size + 5});
 
   // crwusiz add
   brake_img = loadPixmap("../assets/img_brake_disc.png", {img_size, img_size});
@@ -326,7 +325,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("status", s.status);
   setProperty("steeringPressed", ce.getSteeringPressed());
   setProperty("isStandstill", ce.getStandstill());
-  setProperty("dmActive", sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode());
   setProperty("brake_state", ce.getBrakeLights());
   setProperty("autohold_state", ce.getAutoHold());
   setProperty("gas_pressed", ce.getGasPressed());
@@ -363,10 +361,18 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("friction", cs.getLateralControlState().getTorqueState().getFriction());
   setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
   setProperty("frictionRaw", tp.getFrictionCoefficientRaw());
-  setProperty("dm_fade_state", fmax(0.0, fmin(1.0, dm_fade_state+0.2*(0.5-(float)(isStandstill*dmActive)))));
 
   // update engageability/experimental mode button
   experimental_btn->updateState(s);
+
+  // update DM icons at 2Hz
+  if (sm.frame % (UI_FREQ / 2) == 0) {
+    setProperty("dmActive", sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode());
+    setProperty("rightHandDM", sm["driverMonitoringState"].getDriverMonitoringState().getIsRHD());
+  }
+
+  // DM icon transition
+  dm_fade_state = fmax(0.0, fmin(1.0, dm_fade_state+0.2*(0.5-(float)(dmActive))));
 }
 
 void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
@@ -636,10 +642,11 @@ void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
   drawIcon(p, x, y, gaspress_img, icon_bg, gas_pressed ? 1.0 : 0.2);
 
   // dm icon (bottom 1eft 1)
-  x = (btn_size / 2) + (bdr_s * 2);
+  x = (btn_size - 24) / 2 + (bdr_s * 2);
   y = rect().bottom() - (footer_h / 2);
-  //drawIcon(p, x, y, dm_img, icon_bg, dmActive ? 1.0 : 0.2);
-  drawDriverState(p, s, x, y, dmActive ? 1.0 : 0.2);
+  float opacity = dmActive ? 0.65 : 0.2;
+  drawDriverState(p, s, x, y, opacity);
+  drawIcon(p, x, y, dm_img, icon_bg, opacity);
 
   // scc gap icon (bottom right 1)
   if (gap_state == 1) {
@@ -932,46 +939,34 @@ void AnnotatedCameraWidget::drawDriverState(QPainter &painter, const UIState *s,
 
   painter.save();
 
+  // circle background
   painter.setOpacity(1.0);
   painter.setPen(Qt::NoPen);
   painter.setBrush(blackColor(70));
   painter.drawEllipse(x - btn_size / 2, y - btn_size / 2, btn_size, btn_size);
 
-  painter.setCompositionMode(QPainter::CompositionMode_Source);
-
-  QLinearGradient linearGrad;
-  QPointF start_p;
-  QPointF end_p;
-  int face_segment_idx = 0;
-  bool in_end_idxs;
-  for (int i = 0; i < std::size(scene.face_kpts_draw); ++i) {
-    in_end_idxs = false;
-    for (int ei = face_segment_idx; ei < std::size(face_end_idxs); ei++) {
-      if (i == face_end_idxs[ei]) {
-        in_end_idxs = true;
-        break;
-      }
-    }
-
-    if (in_end_idxs) {
-      face_segment_idx +=1;
-      continue;
-    }
-
-    start_p = QPointF(scene.face_kpts_draw[i].x() + x, scene.face_kpts_draw[i].y() + y);
-    end_p = QPointF(scene.face_kpts_draw[i+1].x() + x, scene.face_kpts_draw[i+1].y() + y);
-
-    linearGrad.setStart(start_p);
-    float start_shade = std::fmax(std::fmin(0.4 + 0.6*(scene.face_kpts_draw_d[i] + 20)/100, 1.0), 0.0);
-    linearGrad.setColorAt(0, QColor::fromRgbF(start_shade, start_shade, start_shade, opacity));
-
-    linearGrad.setFinalStop(end_p);
-    float end_shade = std::fmax(std::fmin(0.4 + 0.6*(scene.face_kpts_draw_d[i+1] + 20)/100, 1.0), 0.0);
-    linearGrad.setColorAt(1, QColor::fromRgbF(end_shade, end_shade, end_shade, opacity));
-
-    painter.setPen(QPen(linearGrad, i<16 ? 7 : 3, Qt::SolidLine, Qt::RoundCap));
-    painter.drawLine(start_p, end_p);
+  // face
+  QPointF face_kpts_draw[std::size(default_face_kpts_3d)];
+  float kp;
+  for (int i = 0; i < std::size(default_face_kpts_3d); ++i) {
+    kp = (scene.face_kpts_draw[i].v[2] - 8) / 120 + 1.0;
+    face_kpts_draw[i] = QPointF(scene.face_kpts_draw[i].v[0] * kp + x, scene.face_kpts_draw[i].v[1] * kp + y);
   }
+
+  painter.setPen(QPen(QColor::fromRgbF(1.0, 1.0, 1.0, opacity), 5.2, Qt::SolidLine, Qt::RoundCap));
+  painter.drawPolyline(face_kpts_draw, std::size(default_face_kpts_3d));
+
+  // tracking arcs
+  const int arc_l = 133;
+  const float arc_t_default = 6.7;
+  const float arc_t_extend = 12.0;
+  QColor arc_color = QColor::fromRgbF(0.09, 0.945, 0.26, 0.4*(1.0-dm_fade_state)*(s->engaged()));
+  float delta_x = -scene.driver_pose_sins[1] * arc_l / 2;
+  float delta_y = -scene.driver_pose_sins[0] * arc_l / 2;
+  painter.setPen(QPen(arc_color, arc_t_default+arc_t_extend*fmin(1.0, scene.driver_pose_diff[1] * 5.0), Qt::SolidLine, Qt::RoundCap));
+  painter.drawArc(QRectF(std::fmin(x + delta_x, x), y - arc_l / 2, fabs(delta_x), arc_l), (scene.driver_pose_sins[1]>0 ? 90 : -90) * 16, 180 * 16);
+  painter.setPen(QPen(arc_color, arc_t_default+arc_t_extend*fmin(1.0, scene.driver_pose_diff[0] * 5.0), Qt::SolidLine, Qt::RoundCap));
+  painter.drawArc(QRectF(x - arc_l / 2, std::fmin(y + delta_y, y), arc_l, fabs(delta_y)), (scene.driver_pose_sins[0]>0 ? 0 : 180) * 16, 180 * 16);
 
   painter.restore();
 }
@@ -1110,7 +1105,7 @@ void AnnotatedCameraWidget::paintGL() {
     }
 
     if (sm.rcv_frame("driverStateV2") > s->scene.started_frame) {
-      update_dmonitoring(s, sm["driverStateV2"].getDriverStateV2(), dm_fade_state);
+      update_dmonitoring(s, sm["driverStateV2"].getDriverStateV2(), dm_fade_state, rightHandDM);
     }
   }
 
