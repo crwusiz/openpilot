@@ -8,6 +8,7 @@
 #include <QGraphicsPixmapItem>
 #include <QGraphicsProxyWidget>
 #include <QSlider>
+#include <QToolButton>
 #include <QtCharts/QChartView>
 #include <QtCharts/QLegendMarker>
 #include <QtCharts/QLineSeries>
@@ -134,9 +135,12 @@ private:
   QLabel *title_label;
   QLabel *range_lb;
   QSlider *range_slider;
+  QAction *range_lb_action;
+  QAction *range_slider_action;
   bool docking = true;
   QAction *dock_btn;
-  QAction *reset_zoom_btn;
+  QAction *reset_zoom_action;
+  QToolButton *reset_zoom_btn;
   QAction *remove_all_btn;
   QGridLayout *charts_layout;
   QList<ChartView *> charts;
