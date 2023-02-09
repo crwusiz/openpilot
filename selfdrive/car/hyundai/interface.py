@@ -33,6 +33,14 @@ class CarInterface(CarInterfaceBase):
     ret.carName = "hyundai"
 
     if candidate in CANFD_CAR:
+      # 0x100 is ICE accelerator msg, 0x35 is EV, 0x105 is hybrid
+      if 0x100 not in fingerprint[4]:
+        # TODO: we should be checking PT bus, not 4 or 5. sunny's opening a PR
+        if 0x35 not in fingerprint[4] and 0x35 not in fingerprint[5]:
+          ret.flags |= HyundaiFlags.HEV_CAR.value
+        else:
+          ret.flags |= HyundaiFlags.EV_CAR.value
+
       # detect HDA2 with ADAS Driving ECU
       if Ecu.adas in [fw.ecu for fw in car_fw]:
         ret.flags |= HyundaiFlags.CANFD_HDA2.value
@@ -40,7 +48,7 @@ class CarInterface(CarInterfaceBase):
         # non-HDA2
         if 0x1cf not in fingerprint[4]:
           ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
-        # ICE cars do not have 0x130; GEARS message on 0x40 instead
+        # ICE cars do not have 0x130; GEARS message on 0x40 or 0x70 instead
         if 0x130 not in fingerprint[4]:
           if 0x40 not in fingerprint[4]:
             ret.flags |= HyundaiFlags.CANFD_ALT_GEARS_2.value
@@ -317,7 +325,7 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalTuning.kiV = [0.0]
       ret.longitudinalActuatorDelayLowerBound = 0.3
       ret.longitudinalActuatorDelayUpperBound = 0.3
-      ret.experimentalLongitudinalAvailable = candidate in (HEV_CAR | EV_CAR) and candidate not in CANFD_RADAR_SCC_CAR
+      ret.experimentalLongitudinalAvailable = ret.flags & (HyundaiFlags.EV_CAR.value | HyundaiFlags.HEV_CAR.value) != 0 and candidate not in CANFD_RADAR_SCC_CAR
     else:
       ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 30.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
       ret.longitudinalTuning.kpV = [1.2, 1.05, 1.0, 0.92, 0.55]
@@ -404,9 +412,9 @@ class CarInterface(CarInterfaceBase):
         ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CAMERA_SCC
       if ret.openpilotLongitudinalControl:
         ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
-      if candidate in HEV_CAR:
+      if ret.flags & HyundaiFlags.HEV_CAR.value:
         ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
-      elif candidate in EV_CAR:
+      elif ret.flags & HyundaiFlags.EV_CAR.value:
         ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
     else:
       if not panda_safety_select:

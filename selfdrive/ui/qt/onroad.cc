@@ -375,7 +375,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   dm_fade_state = fmax(0.0, fmin(1.0, dm_fade_state+0.2*(0.5-(float)(dmActive))));
 }
 
-void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
+void AnnotatedCameraWidget::drawHud(QPainter &p) {
   p.save();
 
   // Header gradient
@@ -642,11 +642,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p, const UIState *s) {
   drawIcon(p, x, y, gaspress_img, icon_bg, gas_pressed ? 1.0 : 0.2);
 
   // dm icon (bottom 1eft 1)
-  x = (btn_size - 24) / 2 + (bdr_s * 2);
-  y = rect().bottom() - (footer_h / 2);
-  float opacity = dmActive ? 0.65 : 0.2;
-  drawDriverState(p, s, x, y, opacity);
-  drawIcon(p, x, y, dm_img, icon_bg, opacity);
+  // AnnotatedCameraWidget::drawDriverState
 
   // scc gap icon (bottom right 1)
   if (gap_state == 1) {
@@ -934,10 +930,16 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
   painter.restore();
 }
 
-void AnnotatedCameraWidget::drawDriverState(QPainter &painter, const UIState *s, int x, int y, float opacity) {
+void AnnotatedCameraWidget::drawDriverState(QPainter &painter, const UIState *s) {
   const UIScene &scene = s->scene;
 
   painter.save();
+
+  // base icon
+  int x = rightHandDM ? rect().right() -  (btn_size - 24) / 2 - (bdr_s * 2) : (btn_size - 24) / 2 + (bdr_s * 2);
+  int y = rect().bottom() - footer_h / 2;
+  float opacity = dmActive ? 0.65 : 0.2;
+  drawIcon(painter, x, y, dm_img, blackColor(0), opacity);
 
   // circle background
   painter.setOpacity(1.0);
@@ -1103,13 +1105,15 @@ void AnnotatedCameraWidget::paintGL() {
     if (lead_two.getStatus() && (std::abs(lead_one.getDRel() - lead_two.getDRel()) > 3.0)) {
       drawLead(painter, lead_two, s->scene.lead_vertices[1]);
     }
-
-    if (sm.rcv_frame("driverStateV2") > s->scene.started_frame) {
-      update_dmonitoring(s, sm["driverStateV2"].getDriverStateV2(), dm_fade_state, rightHandDM);
-    }
   }
 
-  drawHud(painter, s);
+  // DMoji
+  if (sm.rcv_frame("driverStateV2") > s->scene.started_frame) {
+    update_dmonitoring(s, sm["driverStateV2"].getDriverStateV2(), dm_fade_state, rightHandDM);
+    drawDriverState(painter, s);
+  }
+
+  drawHud(painter);
 
   double cur_draw_t = millis_since_boot();
   double dt = cur_draw_t - prev_draw_t;
