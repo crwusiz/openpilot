@@ -429,18 +429,6 @@
         <source>Installing...</source>
         <translation>설치중...</translation>
     </message>
-    <message>
-        <source>Receiving objects: </source>
-        <translation>수신중： </translation>
-    </message>
-    <message>
-        <source>Resolving deltas: </source>
-        <translation>델타병합： </translation>
-    </message>
-    <message>
-        <source>Updating files: </source>
-        <translation>파일갱신： </translation>
-    </message>
 </context>
 <context>
     <name>LateralControlSelect</name>
@@ -581,29 +569,6 @@ location set</source>
     </message>
 </context>
 <context>
-    <name>NvgWindow</name>
-    <message>
-        <source>km/h</source>
-        <translation type="vanished">km/h</translation>
-    </message>
-    <message>
-        <source>mph</source>
-        <translation type="vanished">mph</translation>
-    </message>
-    <message>
-        <source>MAX</source>
-        <translation type="vanished">MAX</translation>
-    </message>
-    <message>
-        <source>SPEED</source>
-        <translation type="vanished">SPEED</translation>
-    </message>
-    <message>
-        <source>LIMIT</source>
-        <translation type="vanished">LIMIT</translation>
-    </message>
-</context>
-<context>
     <name>OffroadAlert</name>
     <message>
         <source>Device temperature too high. System won&apos;t start.</source>
@@ -694,7 +659,7 @@ location set</source>
     <name>PandaSafetySelect</name>
     <message>
         <source>Panda Safety Select (Default/Mdps)</source>
-        <translation>Pansa Safety 선택 (Default/Mdps)</translation>
+        <translation>Panda Safety 선택 (Default/Mdps)</translation>
     </message>
 </context>
 <context>
@@ -924,18 +889,6 @@ location set</source>
     <message>
         <source>Waiting for internet</source>
         <translation>네트워크 접속을 기다립니다</translation>
-    </message>
-    <message>
-        <source>Choose Software to Install</source>
-        <translation>설치할 소프트웨어를 선택하세요</translation>
-    </message>
-    <message>
-        <source>Dashcam</source>
-        <translation>Dashcam</translation>
-    </message>
-    <message>
-        <source>Custom Software</source>
-        <translation>Custom Software</translation>
     </message>
     <message>
         <source>Enter URL</source>

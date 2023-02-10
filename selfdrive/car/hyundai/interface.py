@@ -508,5 +508,5 @@ class CarInterface(CarInterfaceBase):
     return ret
 
 
-  def apply(self, c, controls):
-    return self.CC.update(c, self.CS, controls)
+  def apply(self, c, now_nanos, controls):
+    return self.CC.update(c, self.CS, now_nanos, controls)

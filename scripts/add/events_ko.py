@@ -779,8 +779,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   },
 
   EventName.espDisabled: {
-    ET.SOFT_DISABLE: soft_disable_alert("ESP 꺼짐"),
-    ET.NO_ENTRY: NoEntryAlert("ESP 꺼짐"),
+    ET.SOFT_DISABLE: soft_disable_alert("전자식 스태빌리티 컨트롤 비활성화"),
+    ET.NO_ENTRY: NoEntryAlert("전자식 스태빌리티 컨트롤 비활성화"),
   },
 
   EventName.lowBattery: {

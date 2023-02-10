@@ -562,18 +562,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   int x,y,w,h = 0;
   QColor icon_bg = blackColor(100);
-/*
-  // e2e mode icon (upper right 1)
-  if (uiState()->scene.experimental_mode) {
-    long_img = experimental_img;
-  } else {
-    long_img = engage_img;
-  }
 
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2);
-  y = (btn_size / 2) + (bdr_s * 4);
-  drawIcon(p, x, y, long_img, icon_bg, 1.0);
-*/
   if (wifi_state == 0) {
     wifi_img = wifi_f_img;
   } else if (wifi_state == 1) {

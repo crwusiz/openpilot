@@ -66,7 +66,7 @@ class CarController:
     self.turning_signal_timer = 0
     self.turning_indicator_alert = False
 
-  def update(self, CC, CS, controls):
+  def update(self, CC, CS, now_nanos, controls):
     actuators = CC.actuators
     hud_control = CC.hudControl
 
