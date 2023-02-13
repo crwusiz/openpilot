@@ -150,9 +150,8 @@ class CarState(CarStateBase):
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(gear))
 
     if not self.CP.openpilotLongitudinalControl or self.CP.sccBus == 2:
-      aeb_fcw = self.CP.aebFcw
-      aeb_src = "FCA11" if aeb_fcw else "SCC12"
-      aeb_sig = "FCA_CmdAct" if aeb_fcw else "AEB_CmdAct"
+      aeb_src = "FCA11" if self.CP.flags & HyundaiFlags.USE_FCA.value else "SCC12"
+      aeb_sig = "FCA_CmdAct" if self.CP.flags & HyundaiFlags.USE_FCA.value else "AEB_CmdAct"
       aeb_warning = cp_cruise.vl[aeb_src]["CF_VSM_Warn"] != 0
       aeb_braking = cp_cruise.vl[aeb_src]["CF_VSM_DecCmdAct"] != 0 or cp_cruise.vl[aeb_src][aeb_sig] != 0
       ret.stockFcw = aeb_warning and not aeb_braking
@@ -452,7 +451,7 @@ class CarState(CarStateBase):
           ("CF_Lvr_CruiseSet", "LVR12"),
         ]
 
-      if CP.aebFcw:
+      if CP.flags & HyundaiFlags.USE_FCA.value:
         signals += [
           ("FCA_CmdAct", "FCA11"),
           ("CF_VSM_Warn", "FCA11"),
@@ -706,7 +705,7 @@ class CarState(CarStateBase):
         signals.append(("ACCMode", "SCC12"))
         checks.append(("SCC12", 50))
 
-        if CP.aebFcw:
+        if CP.flags & HyundaiFlags.USE_FCA.value:
           signals += [
             ("FCA_CmdAct", "FCA11"),
             ("CF_VSM_Warn", "FCA11"),

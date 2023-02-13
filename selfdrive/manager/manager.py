@@ -50,7 +50,6 @@ def manager_init() -> None:
     ("AutoLaneChangeEnabled", "1"),
     ("PrebuiltEnable", "0"),
     ("MfcSelect", "0"),
-    ("AebSelect", "0"),
     ("LateralControlSelect", "0"),
     ("LoggerEnable", "0"),
     ("NavEnable", "0"),

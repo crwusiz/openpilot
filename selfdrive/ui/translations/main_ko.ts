@@ -68,13 +68,6 @@
     </message>
 </context>
 <context>
-    <name>AebSelect</name>
-    <message>
-        <source>AEB Signal Select (Scc12/Fca11)</source>
-        <translation>차량의 AEB 신호를 선택합니다. (Scc12/Fca11)</translation>
-    </message>
-</context>
-<context>
     <name>AnnotatedCameraWidget</name>
     <message>
         <source>km/h</source>

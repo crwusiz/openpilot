@@ -56,6 +56,11 @@ class CarInterface(CarInterfaceBase):
             ret.flags |= HyundaiFlags.CANFD_ALT_GEARS.value
         if candidate not in CANFD_RADAR_SCC_CAR:
           ret.flags |= HyundaiFlags.CANFD_CAMERA_SCC.value
+    else:
+      # these cars use the FCA11 message for the AEB and FCW signals, all others use SCC12
+      if 0x38d in fingerprint[0]:
+        ret.flags |= HyundaiFlags.USE_FCA.value
+
 
     ret.steerActuatorDelay = 0.1
     ret.steerLimitTimer = 0.4
@@ -360,12 +365,8 @@ class CarInterface(CarInterfaceBase):
       ret.hasAutoHold = 1151 in fingerprint[0]
       ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
       ret.hasLfaHda = 1157 in fingerprint[0]
-      ret.aebFcw = Params().get("AebSelect", encoding='utf8') == "1"
       ret.radarUnavailable = ret.sccBus == -1
       Params().put_bool("IsCanfd", False)
-
-      if candidate in FCA11_CAR:
-        Params().put("AebSelect", "1")
 
       if candidate == CAR.GENESIS:
         Params().put("MfcSelect", "0")

@@ -143,18 +143,6 @@ private:
   void refresh();
 };
 
-// AebSelect
-class AebSelect : public AbstractControl {
-  Q_OBJECT
-public:
-  AebSelect();
-private:
-  QPushButton btnplus;
-  QPushButton btnminus;
-  QLabel label;
-  void refresh();
-};
-
 // PandaSafetySelect
 class PandaSafetySelect : public AbstractControl {
   Q_OBJECT
