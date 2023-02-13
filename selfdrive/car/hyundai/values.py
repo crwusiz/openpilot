@@ -48,7 +48,7 @@ class HyundaiFlags(IntFlag):
   HEV_CAR = 256
 
   USE_FCA = 512
-
+  SEND_LFA = 1024
 
 class CAR:
   # Hyundai

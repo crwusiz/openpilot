@@ -713,5 +713,4 @@ struct CarParams {
   hasScc13 @76 :Bool;
   hasScc14 @77 :Bool;
   hasEms @78 :Bool;
-  hasLfaHda @79 :Bool;
 }

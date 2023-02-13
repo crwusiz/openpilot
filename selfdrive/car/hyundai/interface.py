@@ -34,9 +34,9 @@ class CarInterface(CarInterfaceBase):
 
     if candidate in CANFD_CAR:
       # 0x100 is ICE accelerator msg, 0x35 is EV, 0x105 is hybrid
-      if 0x100 not in fingerprint[4]:
+      if 0x100 not in fingerprint[4]: # 256
         # TODO: we should be checking PT bus, not 4 or 5. sunny's opening a PR
-        if 0x35 not in fingerprint[4] and 0x35 not in fingerprint[5]:
+        if 0x35 not in fingerprint[4] and 0x35 not in fingerprint[5]: # 53
           ret.flags |= HyundaiFlags.HEV_CAR.value
         else:
           ret.flags |= HyundaiFlags.EV_CAR.value
@@ -46,11 +46,11 @@ class CarInterface(CarInterfaceBase):
         ret.flags |= HyundaiFlags.CANFD_HDA2.value
       else:
         # non-HDA2
-        if 0x1cf not in fingerprint[4]:
+        if 0x1cf not in fingerprint[4]: # 463
           ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
         # ICE cars do not have 0x130; GEARS message on 0x40 or 0x70 instead
-        if 0x130 not in fingerprint[4]:
-          if 0x40 not in fingerprint[4]:
+        if 0x130 not in fingerprint[4]: # 304
+          if 0x40 not in fingerprint[4]: # 64
             ret.flags |= HyundaiFlags.CANFD_ALT_GEARS_2.value
           else:
             ret.flags |= HyundaiFlags.CANFD_ALT_GEARS.value
@@ -58,9 +58,11 @@ class CarInterface(CarInterfaceBase):
           ret.flags |= HyundaiFlags.CANFD_CAMERA_SCC.value
     else:
       # these cars use the FCA11 message for the AEB and FCW signals, all others use SCC12
-      if 0x38d in fingerprint[0]:
+      if 0x38d in fingerprint[0] or 0x38d in fingerprint[2]: # 909
         ret.flags |= HyundaiFlags.USE_FCA.value
-
+      # Send LFA message on cars with HDA
+      if 0x485 in fingerprint[2]: # 1157
+        ret.flags |= HyundaiFlags.SEND_LFA.value
 
     ret.steerActuatorDelay = 0.1
     ret.steerLimitTimer = 0.4
@@ -364,7 +366,6 @@ class CarInterface(CarInterfaceBase):
       ret.enableBsm = 1419 in fingerprint[0]
       ret.hasAutoHold = 1151 in fingerprint[0]
       ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
-      ret.hasLfaHda = 1157 in fingerprint[0]
       ret.radarUnavailable = ret.sccBus == -1
       Params().put_bool("IsCanfd", False)
 

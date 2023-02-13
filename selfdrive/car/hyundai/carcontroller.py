@@ -234,7 +234,7 @@ class CarController:
       # 20 Hz LFA MFA message
       if self.frame % 5 == 0:
         activated_hda = road_speed_limiter_get_active()  # 0 off, 1 main road, 2 highway
-        if Params().get("MfcSelect", encoding='utf8') == "2":
+        if self.CP.flags & HyundaiFlags.SEND_LFA.value:
           can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, activated_hda))
 
       # 5 Hz ACC options
