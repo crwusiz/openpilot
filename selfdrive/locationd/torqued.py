@@ -223,7 +223,7 @@ class TorqueEstimator:
     liveTorqueParameters.useParams = self.use_params
 
     try:
-      latAccelFactor, latAccelOffset, frictioncoeff = self.estimate_params()
+      latAccelFactor, latAccelOffset, frictionCoeff = self.estimate_params()
       liveTorqueParameters.latAccelFactorRaw = float(latAccelFactor)
       liveTorqueParameters.latAccelOffsetRaw = float(latAccelOffset)
       liveTorqueParameters.frictionCoefficientRaw = float(frictionCoeff)
