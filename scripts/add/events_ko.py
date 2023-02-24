@@ -295,7 +295,7 @@ def calibration_invalid_alert(CP: car.CarParams, CS: car.CarState, sm: messaging
   rpy = sm['liveCalibration'].rpyCalib
   yaw = math.degrees(rpy[2] if len(rpy) == 3 else math.nan)
   pitch = math.degrees(rpy[1] if len(rpy) == 3 else math.nan)
-  angles = f"Pitch: {pitch:.1f}°, Yaw: {yaw:.1f}°"
+  angles = f"장치 재장착 (Pitch: {pitch:.1f}°, Yaw: {yaw:.1f}°)"
   return NormalPermanentAlert("캘리브레이션 오류", angles)
 
 
@@ -320,9 +320,9 @@ def modeld_lagging_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
 
 
 def wrong_car_mode_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
-  text = "크루즈 버트을 누르세요"
+  text = "크루즈 버튼으로 활성화됩니다"
   if CP.carName == "honda":
-    text = "메인 스위치 OFF"
+    text = "메인 스위치로 활성화됩니다"
   return NoEntryAlert(text)
 
 
@@ -452,8 +452,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   EventName.ldw: {
     ET.PERMANENT: Alert(
-      "핸들을 잡아주세요",
       "차선이탈 감지됨",
+      "",
       AlertStatus.userPrompt, AlertSize.small,
       Priority.LOW, VisualAlert.ldw, AudibleAlert.prompt, 3.),
   },
@@ -469,8 +469,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   # This alert is thrown when any of these values exceed a sanity check. This can be caused by
   # bad alignment or bad sensor data. If this happens consistently consider creating an issue on GitHub
   EventName.vehicleModelInvalid: {
-    ET.NO_ENTRY: NoEntryAlert("차량 매개변수 식별 오류"),
-    ET.SOFT_DISABLE: soft_disable_alert("차량 매개변수 식별 오류"),
+    ET.NO_ENTRY: NoEntryAlert("차량 매개변수 식별 실패"),
+    ET.SOFT_DISABLE: soft_disable_alert("차량 매개변수 식별 실패"),
   },
 
   EventName.steerTempUnavailableSilent: {
@@ -598,7 +598,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   EventName.cameraMalfunction: {
     ET.PERMANENT: camera_malfunction_alert,
     ET.SOFT_DISABLE: soft_disable_alert("카메라 오작동"),
-    ET.NO_ENTRY: NoEntryAlert("카메라 오작동: 장치를 재부팅 하세요")
+    ET.NO_ENTRY: NoEntryAlert("카메라 오작동: 장치를 재부팅 하세요"),
   },
   # Camera framerate too low
   EventName.cameraFrameRate: {
@@ -1013,7 +1013,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   },
 
   EventName.slowingDownSpeedSound: {
-    ET.PERMANENT: Alert("속도를 줄이고 있습니다", "", AlertStatus.normal, AlertSize.small,
+    ET.PERMANENT: Alert("속도를 줄이고 있습니다","", AlertStatus.normal, AlertSize.small,
                         Priority.MID, VisualAlert.none, AudibleAlert.slowingDownSpeed, 2.),
   },
 
