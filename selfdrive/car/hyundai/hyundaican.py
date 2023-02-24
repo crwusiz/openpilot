@@ -91,26 +91,27 @@ def create_lfahda_mfc(packer, enabled, active):
   return packer.make_can_msg("LFAHDA_MFC", 0, values)
 
 
-def create_scc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, set_speed, stopping, long_override, scc_live, CS):
+def create_scc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, set_speed, stopping, long_override, CS):
   commands = []
+
+  cruise_enabled = enabled and CS.out.cruiseState.enabled
 
   values = CS.scc11
   values["AliveCounterACC"] = idx % 0x10
-  if not scc_live:
-    values["MainMode_ACC"] = 1
-    values["TauGapSet"] = 4
-    values["ObjValid"] = 1  # close lead makes controls tighter
-    values["ACC_ObjStatus"] = 1  # close lead makes controls tighter
-    values["ACC_ObjLatPos"] = 0
-    values["ACC_ObjRelSpd"] = 0
-    values["ACC_ObjDist"] = 1  # close lead makes controls tighter
-    values["VSetDis"] = set_speed
+  values["MainMode_ACC"] = CS.out.cruiseState.available
+  values["TauGapSet"] = CS.out.cruiseState.gapAdjust
+  values["ObjValid"] = lead_visible
+  values["VSetDis"] = set_speed
+
+  #values["ACC_ObjStatus"] = 1  # close lead makes controls tighter
+  #values["ACC_ObjLatPos"] = 0
+  #values["ACC_ObjRelSpd"] = 0
+  #values["ACC_ObjDist"] = 1  # close lead makes controls tighter
   #values["DriverAlertDisplay"] = 0
   commands.append(packer.make_can_msg("SCC11", 0, values))
 
   values = CS.scc12
-  if not scc_live:
-    values["ACCMode"] = 2 if enabled and long_override else 1 if enabled else 0
+  values["ACCMode"] = 2 if cruise_enabled and long_override else 1 if cruise_enabled else 0
   values["StopReq"] = 1 if stopping else 0
   values["aReqRaw"] = accel
   values["aReqValue"] = accel  # stock ramps up and down respecting jerk limit until it reaches aReqRaw

@@ -52,7 +52,6 @@ class CarController:
     self.CCP = CarControllerParams(CP)
     self.packer = CANPacker(dbc_name)
     self.scc_smoother = SccSmoother(CP)
-    self.scc_live = not CP.radarUnavailable
     self.car_fingerprint = CP.carFingerprint
 
     self.frame = 0
@@ -226,7 +225,7 @@ class CarController:
       if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl and CS.out.cruiseState.enabled:
         jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0
         can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), CC.enabled and CC.longActive, accel, jerk,
-                                                        hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, self.scc_live, CS))
+                                                        hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, CS))
 
       if self.frame % 500 == 0:
         print(f'scc11 = {bool(CS.scc11)}  scc12 = {bool(CS.scc12)}  scc13 = {bool(CS.scc13)}  scc14 = {bool(CS.scc14)}')
