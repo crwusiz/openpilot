@@ -58,6 +58,11 @@ MainWindow::MainWindow() : QMainWindow() {
     fingerprint_to_dbc = QJsonDocument::fromJson(json_file.readAll());
   }
 
+  setStyleSheet(QString(R"(QMainWindow::separator {
+    width: %1px; /* when vertical */
+    height: %1px; /* when horizontal */
+  })").arg(style()->pixelMetric(QStyle::PM_SplitterWidth)));
+
   QObject::connect(this, &MainWindow::showMessage, statusBar(), &QStatusBar::showMessage);
   QObject::connect(this, &MainWindow::updateProgressBar, this, &MainWindow::updateDownloadProgress);
   QObject::connect(messages_widget, &MessagesWidget::msgSelectionChanged, center_widget, &CenterWidget::setMessage);
@@ -189,6 +194,8 @@ void MainWindow::createStatusBar() {
 void MainWindow::createShortcuts() {
   auto shortcut = new QShortcut(QKeySequence(Qt::Key_Space), this, nullptr, nullptr, Qt::ApplicationShortcut);
   QObject::connect(shortcut, &QShortcut::activated, []() { can->pause(!can->isPaused()); });
+  shortcut = new QShortcut(QKeySequence(QKeySequence::FullScreen), this, nullptr, nullptr, Qt::ApplicationShortcut);
+  QObject::connect(shortcut, &QShortcut::activated, this, &MainWindow::toggleFullScreen);
   // TODO: add more shortcuts here.
 }
 
@@ -474,6 +481,19 @@ void MainWindow::onlineHelp() {
     help->setGeometry(rect());
     help->show();
     help->raise();
+  }
+}
+
+void MainWindow::toggleFullScreen() {
+  if (isFullScreen()) {
+    menuBar()->show();
+    statusBar()->show();
+    showNormal();
+    showMaximized();
+  } else {
+    menuBar()->hide();
+    statusBar()->hide();
+    showFullScreen();
   }
 }
 

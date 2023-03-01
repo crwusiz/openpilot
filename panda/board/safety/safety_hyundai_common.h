@@ -47,7 +47,7 @@ void hyundai_common_cruise_state_check(const int cruise_engaged) {
   if (!hyundai_longitudinal) {
     if (cruise_engaged && !cruise_engaged_prev && (hyundai_last_button_interaction < HYUNDAI_PREV_BUTTON_SAMPLES)) {
       controls_allowed = 1;
-      print("[hyundai_common_cruise_state_check] controls_allowed = 1\n");
+      //print("[hyundai_common_cruise_state_check] controls_allowed = 1\n");
     }
 
   /*if (!cruise_engaged) {
@@ -55,7 +55,7 @@ void hyundai_common_cruise_state_check(const int cruise_engaged) {
     print("[hyundai_common_cruise_state_check] controls_allowed = 0\n");
   }*/
   controls_allowed = 1;
-  print("[hyundai_common_cruise_state_check] controls_allowed = 1\n");
+  //print("[hyundai_common_cruise_state_check] controls_allowed = 1\n");
 
   cruise_engaged_prev = cruise_engaged;
   }
@@ -75,7 +75,7 @@ void hyundai_common_cruise_buttons_check(const int cruise_button, const int main
     bool res = (cruise_button != HYUNDAI_BTN_RESUME) && (cruise_button_prev == HYUNDAI_BTN_RESUME);
     if (set || res) {
       controls_allowed = 1;
-      print("[hyundai_common_cruise_buttons_check] controls_allowed = 1\n");
+      //print("[hyundai_common_cruise_buttons_check] controls_allowed = 1\n");
     }
 
     // exit controls on cancel press
