@@ -1,5 +1,5 @@
 import crcmod
-from selfdrive.car.hyundai.values import CAR, CHECKSUM
+from selfdrive.car.hyundai.values import CAR, CHECKSUM, HyundaiFlags
 from common.params import Params
 
 hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
@@ -18,19 +18,19 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
   values["CF_Lkas_MsgCount"] = frame % 0x10
   values["CF_Lkas_Chksum"] = 0
 
-  mfc_ldwslkas = Params().get("MfcSelect", encoding='utf8') == "1"
+  mfc_ldws_lkas = Params().get("MfcSelect", encoding='utf8') == "1"
   mfc_lfa = Params().get("MfcSelect", encoding='utf8') == "2"
 
   if car_fingerprint == CAR.GENESIS:
     values["CF_Lkas_LdwsActivemode"] = 2
     values["CF_Lkas_SysWarning"] = lkas11["CF_Lkas_SysWarning"]
 
-  elif mfc_ldwslkas:
+  elif mfc_ldws_lkas:
     values["CF_Lkas_LdwsActivemode"] = 0
     values["CF_Lkas_LdwsOpt_USM"] = 3
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
 
-  elif mfc_lfa:
+  elif CP.flags & HyundaiFlags.SEND_LFA.value or mfc_lfa:
     values["CF_Lkas_LdwsActivemode"] = int(left_lane) + (int(right_lane) << 1)
     values["CF_Lkas_LdwsOpt_USM"] = 2
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
@@ -91,28 +91,31 @@ def create_lfahda_mfc(packer, enabled, active):
   return packer.make_can_msg("LFAHDA_MFC", 0, values)
 
 
-def create_scc_commands(packer, idx, enabled, accel, upper_jerk, lead_visible, set_speed, stopping, long_override, CS):
+def create_scc_commands(packer, idx, accel, upper_jerk, lead_visible, set_speed, stopping, CC, CS):
   commands = []
 
+  enabled = CC.enabled
   cruise_enabled = enabled and CS.out.cruiseState.enabled
+  long_override = CC.cruiseControl.override
 
   values = CS.scc11
   values["AliveCounterACC"] = idx % 0x10
   values["MainMode_ACC"] = CS.out.cruiseState.available
   values["TauGapSet"] = CS.out.cruiseState.gapAdjust
-  values["ObjValid"] = lead_visible
-  values["VSetDis"] = set_speed
+  values["ObjValid"] = 1 if lead_visible else 0
+  values["VSetDis"] = set_speed if cruise_enabled else 0
 
-  #values["ACC_ObjStatus"] = 1  # close lead makes controls tighter
-  #values["ACC_ObjLatPos"] = 0
-  #values["ACC_ObjRelSpd"] = 0
-  #values["ACC_ObjDist"] = 1  # close lead makes controls tighter
+  values["ACC_ObjStatus"] = 1 if lead_visible else 0
+  values["ACC_ObjLatPos"] = 0
+  values["ACC_ObjRelSpd"] = 0
+  values["ACC_ObjDist"] = 1 # close lead makes controls tighter
+
   #values["DriverAlertDisplay"] = 0
   commands.append(packer.make_can_msg("SCC11", 0, values))
 
   values = CS.scc12
   values["ACCMode"] = 2 if cruise_enabled and long_override else 1 if cruise_enabled else 0
-  values["StopReq"] = 1 if stopping else 0
+  values["StopReq"] = 1 if cruise_enabled and stopping else 0
   values["aReqRaw"] = accel
   values["aReqValue"] = accel  # stock ramps up and down respecting jerk limit until it reaches aReqRaw
   values["CR_VSM_Alive"] = idx % 0xF
@@ -155,20 +158,24 @@ def create_acc_opt(packer):
   }
   commands.append(packer.make_can_msg("SCC13", 0, scc13_values))
 
-  #fca12_values = {
-  #  "FCA_DrvSetState": 2,
-  #  "FCA_USM": 1, # AEB disabled
-  #}
-  #commands.append(packer.make_can_msg("FCA12", 0, fca12_values))
+  fca12_values = {
+    "FCA_DrvSetState": 2,
+    "FCA_USM": 1, # AEB disabled
+  }
+  commands.append(packer.make_can_msg("FCA12", 0, fca12_values))
 
   return commands
 
 
-#def create_frt_radar_opt(packer):
-#  frt_radar11_values = {
-#    "CF_FCA_Equip_Front_Radar": 1,
-#  }
-#  return packer.make_can_msg("FRT_RADAR11", 0, frt_radar11_values)
+def create_acc_opt_none(packer, CS):
+  return packer.make_can_msg("SCC13", 0, CS.scc13)
+
+
+def create_frt_radar_opt(packer):
+  frt_radar11_values = {
+    "CF_FCA_Equip_Front_Radar": 1,
+  }
+  return packer.make_can_msg("FRT_RADAR11", 0, frt_radar11_values)
 
 
 # ---------------------------------------------------------------------------------------

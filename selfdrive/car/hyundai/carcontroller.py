@@ -222,10 +222,10 @@ class CarController:
       self.scc_smoother.update(CC.enabled, can_sends, self.packer, CC, CS, self.frame, controls)
 
       # send scc to car if longcontrol enabled and SCC not on bus 0 or not live
-      if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl and CS.out.cruiseState.enabled:
+      if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl:
         jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0
-        can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), CC.enabled and CC.longActive, accel, jerk,
-                                                        hud_control.leadVisible, set_speed_in_units, stopping, CC.cruiseControl.override, CS))
+        can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), accel, jerk,
+                                                        hud_control.leadVisible, set_speed_in_units, stopping, CC, CS))
 
       if self.frame % 500 == 0:
         print(f'scc11 = {bool(CS.scc11)}  scc12 = {bool(CS.scc12)}  scc13 = {bool(CS.scc13)}  scc14 = {bool(CS.scc14)}')
@@ -233,16 +233,20 @@ class CarController:
       # 20 Hz LFA MFA message
       if self.frame % 5 == 0:
         activated_hda = road_speed_limiter_get_active()  # 0 off, 1 main road, 2 highway
-        if self.CP.flags & HyundaiFlags.SEND_LFA.value:
+        mfc_lfa = Params().get("MfcSelect", encoding='utf8') == "2"
+        if self.CP.flags & HyundaiFlags.SEND_LFA.value or mfc_lfa:
           can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, activated_hda))
 
       # 5 Hz ACC options
-      #if self.frame % 20 == 0 and self.CP.openpilotLongitudinalControl:
-      #  can_sends.extend(hyundaican.create_acc_opt(self.packer))
+      if self.frame % 20 == 0 and self.CP.openpilotLongitudinalControl:
+        if self.CP.sccBus == 0:
+          can_sends.extend(hyundaican.create_acc_opt(self.packer))
+        elif CS.scc13 is not None:
+          can_sends.append(hyundaican.create_acc_opt_none(self.packer, CS))
 
       # 2 Hz front radar options
-      #if self.frame % 50 == 0 and self.CP.openpilotLongitudinalControl:
-      #  can_sends.append(hyundaican.create_frt_radar_opt(self.packer))
+      if self.frame % 50 == 0 and self.CP.openpilotLongitudinalControl and self.CP.sccBus == 0:
+        can_sends.append(hyundaican.create_frt_radar_opt(self.packer))
 
     new_actuators = actuators.copy()
     new_actuators.steer = apply_steer / self.CCP.STEER_MAX
