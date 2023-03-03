@@ -141,7 +141,7 @@ static uint32_t hyundai_community_compute_checksum(CANPacket_t *to_push) {
 static int hyundai_community_rx_hook(CANPacket_t *to_push) {
   bool valid = addr_safety_check(to_push, &hyundai_community_rx_checks,
                                  hyundai_community_get_checksum, hyundai_community_compute_checksum,
-                                 hyundai_community_get_counter);
+                                 hyundai_community_get_counter, NULL);
   int bus = GET_BUS(to_push);
   int addr = GET_ADDR(to_push);
 
