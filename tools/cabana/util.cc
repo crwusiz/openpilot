@@ -128,7 +128,7 @@ void MessageBytesDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
   }
 }
 
-QColor getColor(const Signal *sig) {
+QColor getColor(const cabana::Signal *sig) {
   float h = 19 * (float)sig->lsb / 64.0;
   h = fmod(h, 1.0);
 
@@ -170,6 +170,8 @@ QToolButton *toolButton(const QString &icon, const QString &tooltip) {
   btn->setIcon(utils::icon(icon));
   btn->setToolTip(tooltip);
   btn->setAutoRaise(true);
+  const int metric = qApp->style()->pixelMetric(QStyle::PM_SmallIconSize);
+  btn->setIconSize({metric, metric});
   return btn;
 };
 
