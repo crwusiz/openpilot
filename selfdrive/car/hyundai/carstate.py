@@ -188,6 +188,9 @@ class CarState(CarStateBase):
     if self.CP.hasAutoHold:
       ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]
 
+    if self.CP.hasNav:
+      ret.navLimitSpeed = cp.vl["Navi_HU"]["SpeedLim_Nav_Clu"]
+
     self.mads_enabled = ret.cruiseState.available
 
     if self.mads_enabled:
@@ -265,6 +268,9 @@ class CarState(CarStateBase):
 
     if self.CP.flags & HyundaiFlags.CANFD_HDA2:
       self.cam_0x2a4 = copy.copy(cp_cam.vl["CAM_0x2a4"])
+
+    if self.CP.hasNav:
+      ret.navLimitSpeed = cp.vl["CLUSTER_SPEED_LIMIT"]["SPEED_LIMIT_1"]
 
     self.mads_enabled = cp.vl[cruise_btn_msg]["LFA_BTN"]
 
@@ -479,6 +485,10 @@ class CarState(CarStateBase):
         ("LDM_STAT", "ESP11"),
       ]
       checks.append(("ESP11", 50))
+
+    if CP.hasNav:
+      signals += [("SpeedLim_Nav_Clu", "Navi_HU")]
+      checks += [("Navi_HU", 5)]
 
     if CP.carFingerprint in (EV_CAR | HEV_CAR):
       if CP.carFingerprint in HEV_CAR:
@@ -815,6 +825,10 @@ class CarState(CarStateBase):
         ("ACCELERATOR_BRAKE_ALT", 100),
       ]
 
+    if CP.flags & HyundaiFlags.CANFD_HDA2 and CP.hasNav:
+      signals.append(("SPEED_LIMIT_1", "CLUSTER_SPEED_LIMIT"))
+      checks.append(("CLUSTER_SPEED_LIMIT", 10))
+
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, get_e_can_bus(CP))
 
   @staticmethod
@@ -840,5 +854,9 @@ class CarState(CarStateBase):
       checks += [
         ("SCC_CONTROL", 50),
       ]
+
+    if not (CP.flags & HyundaiFlags.CANFD_HDA2) and CP.hasNav:
+      signals.append(("SPEED_LIMIT_1", "CLUSTER_SPEED_LIMIT"))
+      checks.append(("CLUSTER_SPEED_LIMIT", 10))
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 6)

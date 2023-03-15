@@ -94,6 +94,7 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(float rl MEMBER rl);
   Q_PROPERTY(float rr MEMBER rr);
   Q_PROPERTY(float roadLimitSpeed MEMBER roadLimitSpeed);
+  Q_PROPERTY(float navLimitSpeed MEMBER navLimitSpeed);
   Q_PROPERTY(float latAccelFactor MEMBER latAccelFactor);
   Q_PROPERTY(float friction MEMBER friction);
   Q_PROPERTY(float latAccelFactorRaw MEMBER latAccelFactorRaw);
@@ -160,7 +161,7 @@ private:
   float gpsBearing, gpsVerticalAccuracy, gpsAltitude, gpsAccuracy = 0;
   float steerAngle, steerAngleOp ,steerRatio = 0;
   float fl, fr, rl, rr = 0;
-  float roadLimitSpeed = 0;
+  float roadLimitSpeed, navLimitSpeed = 0;
   float latAccelFactor, friction, latAccelFactorRaw, frictionRaw = 0;
   float dm_fade_state = 1.0;
 

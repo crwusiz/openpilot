@@ -361,6 +361,7 @@ class CarInterface(CarInterfaceBase):
       bus = 5 if ret.flags & HyundaiFlags.CANFD_HDA2 else 4
       ret.enableBsm = 0x1e5 in fingerprint[get_e_can_bus(ret)] # 485
       ret.radarUnavailable = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
+      ret.hasNav = 0x1fa in fingerprint[bus]
       Params().put_bool("IsCanfd", True)
       Params().put("LateralControlSelect", "3")
     else:
@@ -368,6 +369,8 @@ class CarInterface(CarInterfaceBase):
       ret.hasAutoHold = 1151 in fingerprint[0]
       ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
       ret.radarUnavailable = ret.sccBus == -1
+      ret.hasNav = 1348 in fingerprint[0]
+
       Params().put_bool("IsCanfd", False)
 
       if candidate == CAR.GENESIS:

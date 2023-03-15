@@ -222,6 +222,7 @@ struct CarState {
   # neokii
   autoHold @46 : Int32;
   tpms @47 : Tpms;
+  navLimitSpeed @48 :Int16;
 
   struct Tpms {
     fl @0 :Float32;
@@ -230,7 +231,8 @@ struct CarState {
     rr @3 :Float32;
   }
 
-  madsEnabled @48 :Bool;
+  # add
+  madsEnabled @49 :Bool;
 
   struct WheelSpeeds {
     # optional wheel speeds
@@ -714,4 +716,5 @@ struct CarParams {
   hasScc13 @76 :Bool;
   hasScc14 @77 :Bool;
   hasEms @78 :Bool;
+  hasNav @79 :Bool;
 }

@@ -352,6 +352,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("rl", ce.getTpms().getRl());
   setProperty("rr", ce.getTpms().getRr());
   setProperty("roadLimitSpeed", ls.getRoadLimitSpeed());
+  setProperty("navLimitSpeed", ce.getNavLimitSpeed());
   setProperty("camLimitSpeed", ls.getCamLimitSpeed());
   setProperty("camLimitSpeedLeftDist", ls.getCamLimitSpeedLeftDist());
   setProperty("sectionLimitSpeed", ls.getSectionLimitSpeed());
@@ -389,14 +390,18 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   float limit_speed = 0;
   float left_dist = 0;
 
-  if (camLimitSpeed > 0 && camLimitSpeedLeftDist > 0) {
-    limit_speed = camLimitSpeed;
-    left_dist = camLimitSpeedLeftDist;
-  } else if (sectionLimitSpeed > 0 && sectionLeftDist > 0) {
-    limit_speed = sectionLimitSpeed;
-    left_dist = sectionLeftDist;
+  if (nda_state > 0) {
+    if (camLimitSpeed > 0 && camLimitSpeedLeftDist > 0) {
+      limit_speed = camLimitSpeed;
+      left_dist = camLimitSpeedLeftDist;
+    } else if (sectionLimitSpeed > 0 && sectionLeftDist > 0) {
+      limit_speed = sectionLimitSpeed;
+      left_dist = sectionLeftDist;
+    } else {
+      limit_speed = roadLimitSpeed;
+    }
   } else {
-    limit_speed = roadLimitSpeed;
+    limit_speed = navLimitSpeed;
   }
 
   QString roadLimitSpeedStr, limitSpeedStr, leftDistStr;
