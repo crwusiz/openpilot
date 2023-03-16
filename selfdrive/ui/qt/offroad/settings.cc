@@ -717,6 +717,11 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                     tr("If Scc is on bus 2, turn it on."),
                                     "../assets/offroad/icon_long.png",
                                     this));
+    toggles.append(new ParamControl("NavLimitSpeed",
+                                    tr("Navigation Limit Speed"),
+                                    tr("Use Stock Navigation Limit Speed Signal"),
+                                    "../assets/offroad/icon_speed_limit.png",
+                                    this));
   }
   toggles.append(new ParamControl("DisengageOnBrake",
                                   tr("Disengage on Brake Pedal"),

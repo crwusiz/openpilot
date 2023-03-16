@@ -214,6 +214,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"SoftRestartTriggered", CLEAR_ON_MANAGER_START},
     {"MandoRadarEnable", PERSISTENT},
     {"SccOnBus2", PERSISTENT},
+    {"NavLimitSpeed", PERSISTENT},
     {"CustomMapboxTokenPk", PERSISTENT },
     {"CustomMapboxTokenSk", PERSISTENT },
     {"EnableGmap", PERSISTENT},

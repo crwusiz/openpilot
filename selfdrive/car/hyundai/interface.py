@@ -369,7 +369,7 @@ class CarInterface(CarInterfaceBase):
       ret.hasAutoHold = 1151 in fingerprint[0]
       ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
       ret.radarUnavailable = ret.sccBus == -1
-      ret.hasNav = 1348 in fingerprint[0]
+      ret.hasNav = 1348 in fingerprint[0] and Params().get_bool("NavLimitSpeed")
 
       Params().put_bool("IsCanfd", False)
 

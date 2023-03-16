@@ -56,6 +56,7 @@ def manager_init() -> None:
     ("MandoRadarEnable", "0"),
     ("PandaSafetySelect", "0"),
     ("SccOnBus2", "0"),
+    ("NavLimitSpeed", "0"),
     ("DisengageOnBrake", "0"),
     ("IsCanfd", "0"),
   ]
