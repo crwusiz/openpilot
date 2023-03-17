@@ -362,13 +362,12 @@ class CarInterface(CarInterfaceBase):
       ret.enableBsm = 0x1e5 in fingerprint[get_e_can_bus(ret)] # 485
       ret.radarUnavailable = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
       ret.hasNav = 0x1fa in fingerprint[bus]
+
       Params().put_bool("IsCanfd", True)
       Params().put("LateralControlSelect", "3")
     else:
       ret.enableBsm = 0x58b in fingerprint[0] # 1419
       ret.hasAutoHold = 1151 in fingerprint[0]
-      ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
-      ret.radarUnavailable = ret.sccBus == -1
       ret.hasNav = 1348 in fingerprint[0] and Params().get_bool("NavLimitSpeed")
 
       Params().put_bool("IsCanfd", False)
@@ -383,14 +382,14 @@ class CarInterface(CarInterfaceBase):
               else 0
       ret.sccBus = 0 if 1056 in fingerprint[0] \
               else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
-              else 2 if 1056 in fingerprint[2] \
+              else 2 if 1056 in fingerprint[2] or Params().get_bool("SccOnBus2")\
               else -1
 
-      if Params().get_bool("SccOnBus2"):
-        ret.sccBus = 2
-        Params().put_bool("ExperimentalLongitudinalEnabled", True)
+      ret.radarUnavailable = ret.sccBus == -1
 
       if ret.sccBus == 2:
+        Params().put_bool("ExperimentalLongitudinalEnabled", True)
+
         ret.hasScc13 = 1290 in fingerprint[0] or 1290 in fingerprint[2]
         ret.hasScc14 = 905 in fingerprint[0] or 905 in fingerprint[2]
 

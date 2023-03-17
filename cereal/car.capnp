@@ -715,6 +715,5 @@ struct CarParams {
   hasAutoHold @75 :Bool;
   hasScc13 @76 :Bool;
   hasScc14 @77 :Bool;
-  hasEms @78 :Bool;
-  hasNav @79 :Bool;
+  hasNav @78 :Bool;
 }
