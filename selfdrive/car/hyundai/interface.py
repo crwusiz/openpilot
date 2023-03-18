@@ -357,6 +357,8 @@ class CarInterface(CarInterfaceBase):
     ret.startAccel = 2.0
 
     # *** feature detection ***
+    panda_safety_select = Params().get_bool("PandaSafetySelect")
+
     if candidate in CANFD_CAR:
       bus = 5 if ret.flags & HyundaiFlags.CANFD_HDA2 else 4
       ret.enableBsm = 0x1e5 in fingerprint[get_e_can_bus(ret)] # 485
@@ -380,10 +382,14 @@ class CarInterface(CarInterfaceBase):
               else 0
       ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] \
               else 0
-      ret.sccBus = 0 if 1056 in fingerprint[0] \
-              else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
-              else 2 if 1056 in fingerprint[2] or Params().get_bool("SccOnBus2")\
-              else -1
+
+      if panda_safety_select:
+        ret.sccBus = 0 if 1056 in fingerprint[0] \
+                else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
+                else 2 if 1056 in fingerprint[2]\
+                else -1
+      else:
+        ret.sccBus = 2 if Params().get_bool("SccOnBus2") else 0
 
       ret.radarUnavailable = ret.sccBus == -1
 
@@ -399,7 +405,6 @@ class CarInterface(CarInterfaceBase):
         ret.pcmCruise = True
 
     # *** panda safety config ***
-    panda_safety_select = Params().get_bool("PandaSafetySelect")
     if candidate in CANFD_CAR:
       if panda_safety_select:
         Params().put_bool("PandaSafetySelect", False)
