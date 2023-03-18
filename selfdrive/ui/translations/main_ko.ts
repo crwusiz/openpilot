@@ -188,6 +188,14 @@
         <source>When enabled, pressing the brake pedal will disengage openpilot.</source>
         <translation>활성화된 경우 브레이크 페달을 누르면 openpilot이 해제됩니다.</translation>
     </message>
+    <message>
+        <source>Navigation Limit Speed</source>
+        <translation>내비게이션 속도제한 표시</translation>
+    </message>
+    <message>
+        <source>Use Stock Navigation Limit Speed Signal</source>
+        <translation>차량 순정 내비게이션의 속도제한 정보를 표시합니다</translation>
+    </message>
 </context>
 <context>
     <name>ConfirmationDialog</name>
