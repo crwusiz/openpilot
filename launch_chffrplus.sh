@@ -121,9 +121,11 @@ function launch {
     touch /data/EVENTS_EN
     echo -n "main_en" > /data/params/d/LanguageSetting
   elif [ -f "/data/EVENTS_EN" ]; then
+    rm /data/EVENTS_KO
     cp -f /data/openpilot/scripts/add/events.py /data/openpilot/selfdrive/controls/lib/events.py
     echo -n "main_en" > /data/params/d/LanguageSetting
   elif [ -f "/data/EVENTS_KO" ]; then
+    rm /data/EVENTS_EN
     cp -f /data/openpilot/scripts/add/events_ko.py /data/openpilot/selfdrive/controls/lib/events.py
     echo -n "main_ko" > /data/params/d/LanguageSetting
   fi

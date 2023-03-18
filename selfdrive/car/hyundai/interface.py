@@ -34,14 +34,6 @@ class CarInterface(CarInterfaceBase):
     ret.carName = "hyundai"
 
     if candidate in CANFD_CAR:
-      # 0x100 is ICE accelerator msg, 0x35 is EV, 0x105 is hybrid
-      if 0x100 not in fingerprint[4]: # 256
-        # TODO: we should be checking PT bus, not 4 or 5. sunny's opening a PR
-        if 0x35 not in fingerprint[4] and 0x35 not in fingerprint[5]: # 53
-          ret.flags |= HyundaiFlags.HEV_CAR.value
-        else:
-          ret.flags |= HyundaiFlags.EV_CAR.value
-
       # detect HDA2 with ADAS Driving ECU
       if Ecu.adas in [fw.ecu for fw in car_fw]:
         ret.flags |= HyundaiFlags.CANFD_HDA2.value
@@ -333,7 +325,7 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalTuning.kiV = [0.0]
       ret.longitudinalActuatorDelayLowerBound = 0.3
       ret.longitudinalActuatorDelayUpperBound = 0.3
-      ret.experimentalLongitudinalAvailable = ret.flags & (HyundaiFlags.EV_CAR.value | HyundaiFlags.HEV_CAR.value) != 0 and candidate not in CANFD_RADAR_SCC_CAR
+      ret.experimentalLongitudinalAvailable = candidate in (EV_CAR | HEV_CAR) and candidate not in CANFD_RADAR_SCC_CAR
     else:
       ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 30.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
       ret.longitudinalTuning.kpV = [1.2, 1.05, 1.0, 0.92, 0.55]
@@ -360,10 +352,9 @@ class CarInterface(CarInterfaceBase):
     panda_safety_select = Params().get_bool("PandaSafetySelect")
 
     if candidate in CANFD_CAR:
-      bus = 5 if ret.flags & HyundaiFlags.CANFD_HDA2 else 4
       ret.enableBsm = 0x1e5 in fingerprint[get_e_can_bus(ret)] # 485
       ret.radarUnavailable = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
-      ret.hasNav = 0x1fa in fingerprint[bus]
+      ret.hasNav = 0x1fa in fingerprint[get_e_can_bus(ret)]
 
       Params().put_bool("IsCanfd", True)
       Params().put("LateralControlSelect", "3")
@@ -422,9 +413,9 @@ class CarInterface(CarInterfaceBase):
         ret.safetyConfigs[1].safetyParam |= Panda.FLAG_HYUNDAI_CAMERA_SCC
       if ret.openpilotLongitudinalControl:
         ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
-      if ret.flags & HyundaiFlags.HEV_CAR.value:
+      if candidate in HEV_CAR:
         ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
-      elif ret.flags & HyundaiFlags.EV_CAR.value:
+      elif candidate in EV_CAR:
         ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
     else:
       if not panda_safety_select:

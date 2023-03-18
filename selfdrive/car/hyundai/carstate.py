@@ -48,7 +48,7 @@ class CarState(CarStateBase):
     self.CCP = CarControllerParams(CP)
 
     self.madsEnabled = False
-    self.mads_enabled = False
+    self.lfa_btn = 0
 
   def update(self, cp, cp2, cp_cam):
     if self.CP.carFingerprint in CANFD_CAR:
@@ -191,10 +191,7 @@ class CarState(CarStateBase):
     if self.CP.hasNav:
       ret.navLimitSpeed = cp.vl["Navi_HU"]["SpeedLim_Nav_Clu"]
 
-    self.mads_enabled = ret.cruiseState.available
-
-    if self.mads_enabled:
-      self.madsEnabled = True
+    self.madsEnabled = ret.cruiseState.available
 
     return ret
 
@@ -205,8 +202,8 @@ class CarState(CarStateBase):
     self.is_metric = cp.vl["CRUISE_BUTTONS_ALT"]["DISTANCE_UNIT"] != 1
     speed_factor = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
 
-    if self.CP.flags & (HyundaiFlags.EV_CAR | HyundaiFlags.HEV_CAR):
-      if self.CP.flags & HyundaiFlags.EV_CAR:
+    if self.CP.carFingerprint in (EV_CAR | HEV_CAR):
+      if self.CP.carFingerprint in EV_CAR:
         ret.gas = cp.vl["ACCELERATOR"]["ACCELERATOR_PEDAL"] / 255.
       else:
         ret.gas = cp.vl["ACCELERATOR_ALT"]["ACCELERATOR_PEDAL"] / 1023.
@@ -246,14 +243,13 @@ class CarState(CarStateBase):
 
     # cruise state
     # CAN FD cars enable on main button press, set available if no TCS faults preventing engagement
+    ret.cruiseState.available = cp.vl["TCS"]["ACCEnable"] == 0
     if self.CP.openpilotLongitudinalControl:
       # These are not used for engage/disengage since openpilot keeps track of state using the buttons
-      ret.cruiseState.available = cp.vl["TCS"]["ACCEnable"] == 0
       ret.cruiseState.enabled = cp.vl["TCS"]["ACC_REQ"] == 1
       ret.cruiseState.standstill = False
     else:
       cp_cruise_info = cp_cam if self.CP.flags & HyundaiFlags.CANFD_CAMERA_SCC else cp
-      ret.cruiseState.available = cp_cruise_info.vl["SCC_CONTROL"]["MainMode_ACC"] == 1
       ret.cruiseState.enabled = cp_cruise_info.vl["SCC_CONTROL"]["ACCMode"] in (1, 2)
       ret.cruiseState.standstill = cp_cruise_info.vl["SCC_CONTROL"]["CRUISE_STANDSTILL"] == 1
       ret.cruiseState.speed = cp_cruise_info.vl["SCC_CONTROL"]["VSetDis"] * speed_factor
@@ -272,10 +268,13 @@ class CarState(CarStateBase):
     if self.CP.hasNav:
       ret.navLimitSpeed = cp.vl["CLUSTER_SPEED_LIMIT"]["SPEED_LIMIT_1"]
 
-    self.mads_enabled = cp.vl[cruise_btn_msg]["LFA_BTN"]
+    prev_lfa_btn = self.lfa_btn
+    self.lfa_btn = cp.vl[cruise_btn_msg]["LFA_BTN"]
 
-    if self.mads_enabled:
-      self.madsEnabled = True
+    if prev_lfa_btn != 1 and self.lfa_btn == 1:
+      self.madsEnabled = not self.madsEnabled
+
+    ret.cruiseState.available = self.madsEnabled
 
     return ret
 
@@ -497,11 +496,14 @@ class CarState(CarStateBase):
         signals.append(("Accel_Pedal_Pos", "E_EMS11"))
       checks.append(("E_EMS11", 50))
     else:
-      signals.append(("PV_AV_CAN", "EMS12"))
-      checks.append(("EMS12", 100))
-
-      signals.append(("CF_Ems_AclAct", "EMS16"))
-      checks.append(("EMS16", 100))
+      signals += [
+        ("PV_AV_CAN", "EMS12"),
+        ("CF_Ems_AclAct", "EMS16"),
+      ]
+      checks += [
+        ("EMS12", 100),
+        ("EMS16", 100),
+      ]
 
     if CP.carFingerprint in FEATURES["use_cluster_gears"]:
       signals.append(("CF_Clu_Gear", "CLU15"))
@@ -797,20 +799,19 @@ class CarState(CarStateBase):
         ("ACCMode", "SCC_CONTROL"),
         ("VSetDis", "SCC_CONTROL"),
         ("CRUISE_STANDSTILL", "SCC_CONTROL"),
-        ("MainMode_ACC", "SCC_CONTROL"),
       ]
       checks += [
         ("SCC_CONTROL", 50),
       ]
 
-    if CP.flags & HyundaiFlags.EV_CAR:
+    if CP.carFingerprint in EV_CAR:
       signals += [
         ("ACCELERATOR_PEDAL", "ACCELERATOR"),
       ]
       checks += [
         ("ACCELERATOR", 100),
       ]
-    elif CP.flags & HyundaiFlags.HEV_CAR:
+    elif CP.carFingerprint in HEV_CAR:
       signals += [
         ("ACCELERATOR_PEDAL", "ACCELERATOR_ALT"),
       ]
