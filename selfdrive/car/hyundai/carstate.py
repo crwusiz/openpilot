@@ -47,8 +47,8 @@ class CarState(CarStateBase):
 
     self.CCP = CarControllerParams(CP)
 
-    self.madsEnabled = False
-    self.lfa_btn = 0
+    self.prev_lfa_enabled = False
+    self.lfa_enabled = False
 
   def update(self, cp, cp2, cp_cam):
     if self.CP.carFingerprint in CANFD_CAR:
@@ -191,7 +191,10 @@ class CarState(CarStateBase):
     if self.CP.hasNav:
       ret.navLimitSpeed = cp.vl["Navi_HU"]["SpeedLim_Nav_Clu"]
 
-    self.madsEnabled = ret.cruiseState.available
+    if self.CP.hasLfa:
+      self.prev_lfa_enabled = self.lfa_enabled
+      self.lfa_enabled = cp.vl["BCM_PO_11"]["LFA_Pressed"]
+      ret.cruiseState.available = bool(self.lfa_enabled)
 
     return ret
 
@@ -268,13 +271,10 @@ class CarState(CarStateBase):
     if self.CP.hasNav:
       ret.navLimitSpeed = cp.vl["CLUSTER_SPEED_LIMIT"]["SPEED_LIMIT_1"]
 
-    prev_lfa_btn = self.lfa_btn
-    self.lfa_btn = cp.vl[cruise_btn_msg]["LFA_BTN"]
+    self.prev_lfa_enabled = self.lfa_enabled
+    self.lfa_enabled = cp.vl[cruise_btn_msg]["LFA_BTN"]
 
-    if prev_lfa_btn != 1 and self.lfa_btn == 1:
-      self.madsEnabled = not self.madsEnabled
-
-    ret.cruiseState.available = self.madsEnabled
+    ret.cruiseState.available = bool(self.lfa_enabled)
 
     return ret
 
@@ -431,8 +431,6 @@ class CarState(CarStateBase):
           ("JerkLowerLimit", "SCC14"),
           ("ComfortBandUpper", "SCC14"),
           ("ComfortBandLower", "SCC14"),
-          ("ACCMode", "SCC14"),
-          ("ObjGap", "SCC14"),
         ]
         checks.append(("SCC14", 50))
 
@@ -488,6 +486,10 @@ class CarState(CarStateBase):
     if CP.hasNav:
       signals += [("SpeedLim_Nav_Clu", "Navi_HU")]
       checks += [("Navi_HU", 5)]
+
+    if CP.hasLfa:
+      signals.append(("LFA_Pressed", "BCM_PO_11"))
+      checks.append(("BCM_PO_11", 50))
 
     if CP.carFingerprint in (EV_CAR | HEV_CAR):
       if CP.carFingerprint in HEV_CAR:
@@ -609,8 +611,6 @@ class CarState(CarStateBase):
           ("JerkLowerLimit", "SCC14"),
           ("ComfortBandUpper", "SCC14"),
           ("ComfortBandLower", "SCC14"),
-          ("ACCMode", "SCC14"),
-          ("ObjGap", "SCC14"),
         ]
         checks.append(("SCC14", 50))
 

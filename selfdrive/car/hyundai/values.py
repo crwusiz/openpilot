@@ -104,12 +104,11 @@ class CAR:
   EV6 = "KIA EV6 (CV)"
   SPORTAGE_NQ5 = "KIA SPORTAGE (NQ5)"
   SPORTAGE_NQ5_HEV = "KIA SPORTAGE HEV (NQ5)"
-  GENESIS_GV60 = "GENESIS GV60 (JW1)"
-  GENESIS_GV70 = "GENESIS GV70 (JK1)"
   SORENTO_MQ4 = "KIA SORENTO (MQ4)"
   SORENTO_MQ4_HEV = "KIA SORENTO HEV (MQ4)"
   NIRO_SG2_HEV = "KIA NIRO HEV (SG2)"
-
+  GENESIS_GV60 = "GENESIS GV60 (JW1)"
+  GENESIS_GV70 = "GENESIS GV70 (JK1)"
 
 class Footnote(Enum):
   # footnotes which mention "red panda" will be replaced with the CAN FD panda kit on the shop page
@@ -1585,7 +1584,7 @@ FW_VERSIONS = {
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00NE1_ RDR -----      1.00 1.00 99110-GI000         ',
-],
+    ],
   },
   CAR.TUCSON_NX4: { # (NX4)
     (Ecu.fwdCamera, 0x7c4, None): [
@@ -1636,25 +1635,6 @@ FW_VERSIONS = {
       b'\xf1\x00NQ5__               1.01 1.03 99110-CH000         ',
     ],
   },
-  CAR.GENESIS_GV60: { # (JW1)
-    (Ecu.fwdCamera, 0x7c4, None): [
-      b'\xf1\x00JW1 MFC  AT USA LHD 1.00 1.02 99211-CU100 211215',
-      b'\xf1\x00JW1 MFC  AT USA LHD 1.00 1.02 99211-CU000 211215',
-    ],
-    (Ecu.fwdRadar, 0x7d0, None): [
-      b'\xf1\x00JW1_ RDR -----      1.00 1.00 99110-CU000         ',
-    ],
-  },
-  CAR.GENESIS_GV70: { # (JK1)
-    (Ecu.fwdCamera, 0x7c4, None): [
-      b'\xf1\x00JK1 MFC  AT USA LHD 1.00 1.04 99211-AR000 210204',
-      b'\xf1\x00JK1 MFC  AT USA LHD 1.00 1.01 99211-AR200 220125',
-    ],
-    (Ecu.fwdRadar, 0x7d0, None): [
-      b'\xf1\x00JK1_ SCC FHCUP      1.00 1.02 99110-AR000         ',
-      b'\xf1\x00JK1_ SCC FHCUP      1.00 1.00 99110-AR200         ',
-    ],
-  },
   CAR.SORENTO_MQ4: { # (MQ4)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00MQ4 MFC  AT USA LHD 1.00 1.05 99210-R5000 210623',
@@ -1679,6 +1659,25 @@ FW_VERSIONS = {
       b'\xf1\x00SG2_ RDR -----      1.00 1.01 99110-AT000         ',
     ],
   },
+  CAR.GENESIS_GV60: {  # (JW1)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00JW1 MFC  AT USA LHD 1.00 1.02 99211-CU100 211215',
+      b'\xf1\x00JW1 MFC  AT USA LHD 1.00 1.02 99211-CU000 211215',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00JW1_ RDR -----      1.00 1.00 99110-CU000         ',
+    ],
+  },
+  CAR.GENESIS_GV70: {  # (JK1)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00JK1 MFC  AT USA LHD 1.00 1.04 99211-AR000 210204',
+      b'\xf1\x00JK1 MFC  AT USA LHD 1.00 1.01 99211-AR200 220125',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00JK1_ SCC FHCUP      1.00 1.02 99110-AR000         ',
+      b'\xf1\x00JK1_ SCC FHCUP      1.00 1.00 99110-AR200         ',
+    ],
+  },
 }
 
 CHECKSUM = {
@@ -1699,23 +1698,27 @@ FEATURES = {
   # Gear not set is [ LVR12 ]
 }
 
-CANFD_CAR = {
-  CAR.TUCSON_NX4, CAR.TUCSON_NX4_HEV, CAR.IONIQ5,
-  CAR.EV6, CAR.SPORTAGE_NQ5, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV, CAR.SORENTO_MQ4, CAR.SORENTO_MQ4_HEV,
-  CAR.GENESIS_GV70,
+CANFD_EV_CAR = {
+  CAR.IONIQ5, CAR.TUCSON_NX4,
+  CAR.EV6, CAR.SORENTO_MQ4, CAR.SPORTAGE_NQ5,
+  CAR.GENESIS_GV60, CAR.GENESIS_GV70,
 }
+CANFD_HEV_CAR = {
+  CAR.TUCSON_NX4_HEV,
+  CAR.SORENTO_MQ4_HEV, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV,
+}
+CANFD_CAR = CANFD_EV_CAR | CANFD_HEV_CAR
+
 # The radar does SCC on these cars when HDA I, rather than the camera
 CANFD_RADAR_SCC_CAR = {
   CAR.GENESIS_GV70, CAR.SORENTO_MQ4, CAR.SORENTO_MQ4_HEV
 }
 EV_CAR = {
   CAR.KONA_EV, CAR.IONIQ_EV, CAR.NIRO_EV, CAR.SOUL_EV, CAR.NEXO,
-  CAR.EV6, CAR.IONIQ5, CAR.TUCSON_NX4, CAR.SORENTO_MQ4, CAR.SPORTAGE_NQ5
 }
 HEV_CAR = {
   CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV, CAR.SANTAFE_HEV, CAR.ELANTRA_CN7_HEV, CAR.SONATA_DN8_HEV, CAR.SONATA_LF_HEV, CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IGFL_HEV,
   CAR.K5_HEV, CAR.K5_DL3_HEV, CAR.K7_HEV,
-  CAR.SORENTO_MQ4_HEV, CAR.TUCSON_NX4_HEV, CAR.SORENTO_MQ4_HEV, CAR.SPORTAGE_NQ5_HEV
 }
 
 # these cars require a special panda safety mode due to missing counters and checksums in the messages
@@ -1784,9 +1787,9 @@ DBC = {
   CAR.EV6: dbc_dict('hyundai_canfd', None),
   CAR.SPORTAGE_NQ5: dbc_dict('hyundai_canfd', None),
   CAR.SPORTAGE_NQ5_HEV: dbc_dict('hyundai_canfd', None),
-  CAR.GENESIS_GV60: dbc_dict('hyundai_canfd', None),
-  CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),
   CAR.SORENTO_MQ4: dbc_dict('hyundai_canfd', None),
   CAR.SORENTO_MQ4_HEV: dbc_dict('hyundai_canfd', None),
   CAR.NIRO_SG2_HEV: dbc_dict('hyundai_canfd', None),
+  CAR.GENESIS_GV60: dbc_dict('hyundai_canfd', None),
+  CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),
 }

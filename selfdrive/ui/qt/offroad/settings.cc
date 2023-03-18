@@ -237,8 +237,10 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
       Params().put("LanguageSetting", langs[selection].toStdString());
       if (Params().get("LanguageSetting") == "main_ko") {
         QProcess::execute("touch /data/EVENTS_KO");
+        QProcess::execute("rm /data/EVENTS_EN");
       } else {
         QProcess::execute("touch /data/EVENTS_EN");
+        QProcess::execute("rm /data/EVENTS_KO");
       }
       qApp->exit(18);
       watchdog_kick(0);

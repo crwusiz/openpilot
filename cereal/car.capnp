@@ -231,9 +231,6 @@ struct CarState {
     rr @3 :Float32;
   }
 
-  # add
-  madsEnabled @49 :Bool;
-
   struct WheelSpeeds {
     # optional wheel speeds
     fl @0 :Float32;
@@ -716,4 +713,5 @@ struct CarParams {
   hasScc13 @76 :Bool;
   hasScc14 @77 :Bool;
   hasNav @78 :Bool;
+  hasLfa @79 :Bool;
 }
