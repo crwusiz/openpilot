@@ -10,16 +10,22 @@ crwusiz openpilot
 - All contributors to this fork are not liable. <b>Use at your own risk.</b>
 
 [![](https://i.imgur.com/TMtVMV8.png)](#)
-- kor NanumGothic font apply fontname opensans
 - event message, qt ui kor translate
 - brake, bsd, gps, wifi icon
 - wheel, N direction icon rotate
 - lateralControl select ( Pid / Indi / Lqr / Torque )
 - mfc select ( LDWS,LKAS / LFA )
-- aebsignal select ( SCC12 / FCA11 )
 - add community toggle / function / simple ui
-- LongitudinalControl full support
 - autohold, turnsignal, tpms, roadlimitspeed display (neokii)
+- select car and manufacturer  
+
+## Harness Cable and Car Year Compatible Chart
+
+cable order -> https://smartstore.naver.com/jmtechn
+
+[![](https://i.imgur.com/v3cvfeF.png)](#)
+[![](https://i.imgur.com/uIH0dQA.png)](#)
+[![](https://i.imgur.com/6rxOQbQ.jpg)](#)
 
 ## Source Code Reference
 - https://github.com/commaai/openpilot
@@ -33,21 +39,14 @@ crwusiz openpilot
 - https://github.com/neokii/npilot
 - https://github.com/openpilotusers
 - https://github.com/Circuit-Pro/openpilot
-- - -
-## Harness Cable and Car Year Compatible Chart
-
-cable order -> https://smartstore.naver.com/jmtechn
-
-[![](https://user-images.githubusercontent.com/43285072/156672295-3443cbcb-e912-43d1-b764-0a5c470c85e4.png)](#)
-[![](https://user-images.githubusercontent.com/43285072/156672302-9cbf008a-bb85-48d9-8cce-fdde9035245a.png)](#)
-[![](https://user-images.githubusercontent.com/43285072/156672693-8802d6ec-aae4-4111-a01a-041dbb5109f2.jpg)](#)
+- https://github.com/sunnyhaibin/sunnypilot
 
 ## chevrolet bolt branch
 - https://github.com/JasonJShuler/openpilot
 - https://github.com/opgm/openpilot
 - https://github.com/hanabi95/openpilot
 - https://github.com/jc01rho-openpilot-BoltEV2019-KoKr
-- https://github.com/parksunkyu81
+- https://github.com/geniuth/openpilot
 - - -
 
 Table of Contents
