@@ -363,6 +363,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("friction", cs.getLateralControlState().getTorqueState().getFriction());
   setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
   setProperty("frictionRaw", tp.getFrictionCoefficientRaw());
+  setProperty("isCanfd", ce.getIsCanfd());
 
   // update engageability/experimental mode button
   experimental_btn->updateState(s);
@@ -660,9 +661,11 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   drawIcon(p, x, y, brake_img, icon_bg, brake_state ? 1.0 : 0.2);
 
   // autohold icon (bottom right 2)
-  x = (btn_size / 2) + (bdr_s * 2) + (btn_size);
-  y = rect().bottom() - (footer_h / 2) - (btn_size) - 10;
-  drawIcon(p, x, y, autohold_state > 1 ? autohold_warning_img : autohold_active_img, icon_bg, autohold_state ? 1.0 : 0.2);
+  if (!isCanfd) {
+    x = (btn_size / 2) + (bdr_s * 2) + (btn_size);
+    y = rect().bottom() - (footer_h / 2) - (btn_size) - 10;
+    drawIcon(p, x, y, autohold_state > 1 ? autohold_warning_img : autohold_active_img, icon_bg, autohold_state ? 1.0 : 0.2);
+  }
 
   // bsd_l icon (bottom left 3)
   x = (btn_size / 2) + (bdr_s * 2);
@@ -713,18 +716,20 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   drawTextColor(p, x, y, infoGps, whiteColor(200));
 
   // tpms (bottom right)
-  w = 200;
-  h = 260;
-  x = rect().right() - w - (bdr_s * 2);
-  y = height() - h - (bdr_s * 2);
+  if (!isCanfd) {
+    w = 200;
+    h = 260;
+    x = rect().right() - w - (bdr_s * 2);
+    y = height() - h - (bdr_s * 2);
 
-  p.drawPixmap(x, y, w, h, tpms_img);
+    p.drawPixmap(x, y, w, h, tpms_img);
 
-  configFont(p, "Inter", 35, "Bold");
-  drawTextColor(p, x + 32, y + 70, get_tpms_text(fl), get_tpms_color(fl));
-  drawTextColor(p, x + 167, y + 70, get_tpms_text(fr), get_tpms_color(fr));
-  drawTextColor(p, x + 32, y + 214, get_tpms_text(rl), get_tpms_color(rl));
-  drawTextColor(p, x + 167, y + 214, get_tpms_text(rr), get_tpms_color(rr));
+    configFont(p, "Inter", 35, "Bold");
+    drawTextColor(p, x + 32, y + 70, get_tpms_text(fl), get_tpms_color(fl));
+    drawTextColor(p, x + 167, y + 70, get_tpms_text(fr), get_tpms_color(fr));
+    drawTextColor(p, x + 32, y + 214, get_tpms_text(rl), get_tpms_color(rl));
+    drawTextColor(p, x + 167, y + 214, get_tpms_text(rr), get_tpms_color(rr));
+  }
 
   // turnsignal
   static int blink_index = 0;

@@ -224,6 +224,9 @@ struct CarState {
   tpms @47 : Tpms;
   navLimitSpeed @48 :Int16;
 
+  # add
+  isCanfd @49 :Bool;
+
   struct Tpms {
     fl @0 :Float32;
     fr @1 :Float32;

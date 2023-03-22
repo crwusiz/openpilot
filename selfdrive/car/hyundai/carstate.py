@@ -7,7 +7,7 @@ from common.conversions import Conversions as CV
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
 from selfdrive.car.hyundai.hyundaicanfd import get_e_can_bus
-from selfdrive.car.hyundai.values import HyundaiFlags, DBC, Buttons, FEATURES, EV_CAR, HEV_CAR, CAR, CANFD_CAR, CarControllerParams
+from selfdrive.car.hyundai.values import HyundaiFlags, DBC, Buttons, FEATURES, EV_CAR, HEV_CAR, CANFD_EV_CAR, CANFD_HEV_CAR, CAR, CANFD_CAR, CarControllerParams
 from selfdrive.car.interfaces import CarStateBase
 
 PREV_BUTTON_SAMPLES = 8
@@ -47,7 +47,7 @@ class CarState(CarStateBase):
 
     self.CCP = CarControllerParams(CP)
 
-    self.prev_lfa_enabled = False
+    self.lfa_btn = 0
     self.lfa_enabled = False
 
   def update(self, cp, cp2, cp_cam):
@@ -192,9 +192,12 @@ class CarState(CarStateBase):
       ret.navLimitSpeed = cp.vl["Navi_HU"]["SpeedLim_Nav_Clu"]
 
     if self.CP.hasLfa:
-      self.prev_lfa_enabled = self.lfa_enabled
-      self.lfa_enabled = cp.vl["BCM_PO_11"]["LFA_Pressed"]
-      ret.cruiseState.available = bool(self.lfa_enabled)
+      prev_lfa_btn = self.lfa_btn
+      self.lfa_btn = cp.vl["BCM_PO_11"]["LFA_Pressed"]
+      if prev_lfa_btn != 1 and self.lfa_btn == 1:
+        self.lfa_enabled = not self.lfa_enabled
+
+      ret.cruiseState.available = self.lfa_enabled
 
     return ret
 
@@ -205,8 +208,8 @@ class CarState(CarStateBase):
     self.is_metric = cp.vl["CRUISE_BUTTONS_ALT"]["DISTANCE_UNIT"] != 1
     speed_factor = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
 
-    if self.CP.carFingerprint in (EV_CAR | HEV_CAR):
-      if self.CP.carFingerprint in EV_CAR:
+    if self.CP.carFingerprint in (CANFD_EV_CAR | CANFD_HEV_CAR):
+      if self.CP.carFingerprint in CANFD_EV_CAR:
         ret.gas = cp.vl["ACCELERATOR"]["ACCELERATOR_PEDAL"] / 255.
       else:
         ret.gas = cp.vl["ACCELERATOR_ALT"]["ACCELERATOR_PEDAL"] / 1023.
@@ -271,10 +274,14 @@ class CarState(CarStateBase):
     if self.CP.hasNav:
       ret.navLimitSpeed = cp.vl["CLUSTER_SPEED_LIMIT"]["SPEED_LIMIT_1"]
 
-    self.prev_lfa_enabled = self.lfa_enabled
-    self.lfa_enabled = cp.vl[cruise_btn_msg]["LFA_BTN"]
+    prev_lfa_btn = self.lfa_btn
+    self.lfa_btn = cp.vl[cruise_btn_msg]["LFA_BTN"]
+    if prev_lfa_btn != 1 and self.lfa_btn == 1:
+      self.lfa_enabled = not self.lfa_enabled
 
-    ret.cruiseState.available = bool(self.lfa_enabled)
+    ret.cruiseState.available = self.lfa_enabled
+
+    ret.isCanfd = True
 
     return ret
 
@@ -804,14 +811,14 @@ class CarState(CarStateBase):
         ("SCC_CONTROL", 50),
       ]
 
-    if CP.carFingerprint in EV_CAR:
+    if CP.carFingerprint in CANFD_EV_CAR:
       signals += [
         ("ACCELERATOR_PEDAL", "ACCELERATOR"),
       ]
       checks += [
         ("ACCELERATOR", 100),
       ]
-    elif CP.carFingerprint in HEV_CAR:
+    elif CP.carFingerprint in CANFD_HEV_CAR:
       signals += [
         ("ACCELERATOR_PEDAL", "ACCELERATOR_ALT"),
       ]
