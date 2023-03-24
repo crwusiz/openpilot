@@ -280,7 +280,8 @@ def get_fw_versions(logcan, sendcan, query_brand=None, extra=None, timeout=0.1, 
           continue
 
         # Toggle OBD multiplexing for each request
-        set_obd_multiplexing(params, r.obd_multiplexing)
+        if r.bus % 4 == 1:
+          set_obd_multiplexing(params, r.obd_multiplexing)
 
         try:
           addrs = [(a, s) for (b, a, s) in addr_chunk if b in (brand, 'any') and
@@ -300,6 +301,7 @@ def get_fw_versions(logcan, sendcan, query_brand=None, extra=None, timeout=0.1, 
               f.brand = brand
               f.bus = r.bus
               f.logging = r.logging or ecu_key in logging_addrs
+              f.obdMultiplexing = r.obd_multiplexing
 
               if sub_addr is not None:
                 f.subAddress = sub_addr
