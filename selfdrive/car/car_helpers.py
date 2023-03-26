@@ -191,10 +191,13 @@ def get_car(logcan, sendcan, experimental_long_allowed, num_pandas=1):
   selected_car = Params().get("SelectedCar")
   if selected_car:
     candidate = selected_car.decode("utf-8")
-
-  print()
-  print(f"Selected Car : {candidate}")
-  print()
+    print()
+    print(f"Selected Car : {candidate}")
+    print()
+  else:
+    print()
+    print(f"Recognition Car : {candidate}")
+    print()
 
   CarInterface, CarController, CarState = interfaces[candidate]
   CP = CarInterface.get_params(candidate, fingerprints, car_fw, experimental_long_allowed)

@@ -7,7 +7,7 @@ import time
 import random
 import threading
 
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../.."))
 from panda import Panda, PandaSerial  # noqa: E402
 
 INIT_GPS_BAUD = 9600

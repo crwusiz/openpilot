@@ -11,7 +11,7 @@ import time
 import threading
 from collections import deque
 
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../.."))
 from panda import Panda  # noqa: E402
 
 def lin_checksum(dat):

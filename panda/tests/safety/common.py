@@ -3,7 +3,7 @@ import abc
 import unittest
 import importlib
 import numpy as np
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
 
 from opendbc.can.packer import CANPacker  # pylint: disable=import-error
 from panda import ALTERNATIVE_EXPERIENCE
@@ -131,7 +131,45 @@ class InterceptorSafetyTest(PandaSafetyTestBase):
         self.assertEqual(send, self._tx(self._interceptor_gas_cmd(gas)))
 
 
-class TorqueSteeringSafetyTestBase(PandaSafetyTestBase):
+class LongitudinalAccelSafetyTest(PandaSafetyTestBase, abc.ABC):
+
+  MAX_ACCEL: float = 2.0
+  MIN_ACCEL: float = -3.5
+  INACTIVE_ACCEL: float = 0.0
+
+  @classmethod
+  def setUpClass(cls):
+    if cls.__name__ == "LongitudinalAccelSafetyTest":
+      cls.safety = None
+      raise unittest.SkipTest
+
+  @abc.abstractmethod
+  def _accel_msg(self, accel: float):
+    pass
+
+  def test_accel_limits_correct(self):
+    self.assertGreater(self.MAX_ACCEL, 0)
+    self.assertLess(self.MIN_ACCEL, 0)
+
+  def test_accel_actuation_limits(self, stock_longitudinal=False):
+    limits = ((self.MIN_ACCEL, self.MAX_ACCEL, ALTERNATIVE_EXPERIENCE.DEFAULT),
+              (self.MIN_ACCEL, self.MAX_ACCEL, ALTERNATIVE_EXPERIENCE.RAISE_LONGITUDINAL_LIMITS_TO_ISO_MAX))
+
+    for min_accel, max_accel, alternative_experience in limits:
+      for accel in np.arange(min_accel - 1, max_accel + 1, 0.05):
+        for controls_allowed in [True, False]:
+          self.safety.set_controls_allowed(controls_allowed)
+          self.safety.set_alternative_experience(alternative_experience)
+          if stock_longitudinal:
+            should_tx = False
+          elif controls_allowed:
+            should_tx = int(min_accel * 1000) <= int(accel * 1000) <= int(max_accel * 1000)
+          else:
+            should_tx = np.isclose(accel, self.INACTIVE_ACCEL, atol=0.0001)
+          self.assertEqual(should_tx, self._tx(self._accel_msg(accel)))
+
+
+class TorqueSteeringSafetyTestBase(PandaSafetyTestBase, abc.ABC):
 
   MAX_RATE_UP = 0
   MAX_RATE_DOWN = 0
@@ -284,7 +322,7 @@ class TorqueSteeringSafetyTestBase(PandaSafetyTestBase):
       self.assertTrue(self._tx(self._torque_cmd_msg(self.MAX_TORQUE, steer_req=1)))
 
 
-class DriverTorqueSteeringSafetyTest(TorqueSteeringSafetyTestBase):
+class DriverTorqueSteeringSafetyTest(TorqueSteeringSafetyTestBase, abc.ABC):
 
   DRIVER_TORQUE_ALLOWANCE = 0
   DRIVER_TORQUE_FACTOR = 0
@@ -295,20 +333,12 @@ class DriverTorqueSteeringSafetyTest(TorqueSteeringSafetyTestBase):
       cls.safety = None
       raise unittest.SkipTest
 
-  @abc.abstractmethod
-  def _torque_cmd_msg(self, torque, steer_req=1):
-    pass
-
   def test_non_realtime_limit_up(self):
     self.safety.set_torque_driver(0, 0)
     super().test_non_realtime_limit_up()
 
-  # TODO: make this test something
-  def test_non_realtime_limit_down(self):
-    self.safety.set_torque_driver(0, 0)
-    self.safety.set_controls_allowed(True)
-
   def test_against_torque_driver(self):
+    # Tests down limits and driver torque blending
     self.safety.set_controls_allowed(True)
 
     for sign in [-1, 1]:
@@ -369,7 +399,7 @@ class DriverTorqueSteeringSafetyTest(TorqueSteeringSafetyTestBase):
       self.assertTrue(self._tx(self._torque_cmd_msg(sign * (self.MAX_RT_DELTA + 1))))
 
 
-class MotorTorqueSteeringSafetyTest(TorqueSteeringSafetyTestBase):
+class MotorTorqueSteeringSafetyTest(TorqueSteeringSafetyTestBase, abc.ABC):
 
   MAX_TORQUE_ERROR = 0
   TORQUE_MEAS_TOLERANCE = 0
@@ -382,10 +412,6 @@ class MotorTorqueSteeringSafetyTest(TorqueSteeringSafetyTestBase):
 
   @abc.abstractmethod
   def _torque_meas_msg(self, torque):
-    pass
-
-  @abc.abstractmethod
-  def _torque_cmd_msg(self, torque, steer_req=1):
     pass
 
   def _set_prev_torque(self, t):
@@ -596,6 +622,10 @@ class PandaSafetyTest(PandaSafetyTestBase):
   def _speed_msg(self, speed):
     pass
 
+  # Safety modes can override if vehicle_moving is driven by a different message
+  def _vehicle_moving_msg(self, speed: float):
+    return self._speed_msg(speed)
+
   @abc.abstractmethod
   def _user_gas_msg(self, gas):
     pass
@@ -719,7 +749,7 @@ class PandaSafetyTest(PandaSafetyTestBase):
       _user_brake_msg = self._user_brake_msg
 
     # Brake was already pressed
-    self._rx(self._speed_msg(0))
+    self._rx(self._vehicle_moving_msg(0))
     self._rx(_user_brake_msg(1))
     self.safety.set_controls_allowed(1)
     self._rx(_user_brake_msg(1))
@@ -741,29 +771,29 @@ class PandaSafetyTest(PandaSafetyTestBase):
     # Brake was already pressed
     self._rx(_user_brake_msg(1))
     self.safety.set_controls_allowed(1)
-    self._rx(self._speed_msg(self.STANDSTILL_THRESHOLD))
+    self._rx(self._vehicle_moving_msg(self.STANDSTILL_THRESHOLD))
     self._rx(_user_brake_msg(1))
     self.assertTrue(self.safety.get_controls_allowed())
     self.assertTrue(self.safety.get_longitudinal_allowed())
-    self._rx(self._speed_msg(self.STANDSTILL_THRESHOLD + 1))
+    self._rx(self._vehicle_moving_msg(self.STANDSTILL_THRESHOLD + 1))
     self._rx(_user_brake_msg(1))
     self.assertFalse(self.safety.get_controls_allowed())
     self.assertFalse(self.safety.get_longitudinal_allowed())
-    self._rx(self._speed_msg(0))
+    self._rx(self._vehicle_moving_msg(0))
 
-  def test_sample_speed(self):
+  def test_vehicle_moving(self):
     self.assertFalse(self.safety.get_vehicle_moving())
 
     # not moving
-    self.safety.safety_rx_hook(self._speed_msg(0))
+    self.safety.safety_rx_hook(self._vehicle_moving_msg(0))
     self.assertFalse(self.safety.get_vehicle_moving())
 
     # speed is at threshold
-    self.safety.safety_rx_hook(self._speed_msg(self.STANDSTILL_THRESHOLD))
+    self.safety.safety_rx_hook(self._vehicle_moving_msg(self.STANDSTILL_THRESHOLD))
     self.assertFalse(self.safety.get_vehicle_moving())
 
     # past threshold
-    self.safety.safety_rx_hook(self._speed_msg(self.STANDSTILL_THRESHOLD + 1))
+    self.safety.safety_rx_hook(self._vehicle_moving_msg(self.STANDSTILL_THRESHOLD + 1))
     self.assertTrue(self.safety.get_vehicle_moving())
 
   def test_tx_hook_on_wrong_safety_mode(self):
@@ -782,7 +812,7 @@ class PandaSafetyTest(PandaSafetyTestBase):
             # No point in comparing different Tesla safety modes
             if 'Tesla' in attr and 'Tesla' in current_test:
               continue
-            if {attr, current_test}.issubset({'TestToyotaSafety', 'TestToyotaAltBrakeSafety', 'TestToyotaStockLongitudinal'}):
+            if attr.startswith('TestToyota') and current_test.startswith('TestToyota'):
               continue
             if {attr, current_test}.issubset({'TestSubaruSafety', 'TestSubaruGen2Safety'}):
               continue
