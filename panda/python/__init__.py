@@ -402,6 +402,10 @@ class Panda:
     if not enter_bootloader and reconnect:
       self.reconnect()
 
+  @property
+  def connected(self) -> bool:
+    return self._handle_open
+
   def reconnect(self):
     if self._handle_open:
       self.close()
