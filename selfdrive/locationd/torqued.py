@@ -237,8 +237,7 @@ class TorqueEstimator:
           liveTorqueParameters.liveValid = True
           latAccelFactor = np.clip(latAccelFactor, self.min_lataccel_factor, self.max_lataccel_factor)
           frictionCoeff = np.clip(frictionCoeff, self.min_friction, self.max_friction)
-          self.update_params(
-            {'latAccelFactor': latAccelFactor, 'latAccelOffset': latAccelOffset, 'frictionCoefficient': frictionCoeff})
+          self.update_params({'latAccelFactor': latAccelFactor, 'latAccelOffset': latAccelOffset, 'frictionCoefficient': frictionCoeff})
       else:
         liveTorqueParameters.liveValid = False
     except:

@@ -697,6 +697,11 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
     ET.NO_ENTRY: NoEntryAlert("조향제어 일시적으로 사용불가"),
   },
 
+  EventName.steerTimeLimit: {
+    ET.SOFT_DISABLE: soft_disable_alert("차량 조향 시간 제한"),
+    ET.NO_ENTRY: NoEntryAlert("차량 조향 시간 제한"),
+  },
+
   EventName.outOfSpace: {
     ET.PERMANENT: out_of_space_alert,
     ET.NO_ENTRY: NoEntryAlert("저장공간 부족"),
@@ -859,10 +864,6 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
     ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("크루즈 오류 : 차량을 재가동하세요"),
     ET.PERMANENT: NormalPermanentAlert("크루즈 오류 : 차량을 재가동하세요"),
     ET.NO_ENTRY: NoEntryAlert("크루즈 오류 : 차량을 재가동하세요"),
-  },
-
-  EventName.accFaultedTemp: {
-    ET.NO_ENTRY: NoEntryAlert("크루즈 일시적 오류"),
   },
 
   EventName.controlsMismatch: {

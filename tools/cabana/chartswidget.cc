@@ -145,6 +145,7 @@ void ChartsWidget::zoomIn(double min, double max) {
 
 void ChartsWidget::zoomReset() {
   setZoom(display_range.first, display_range.second);
+  zoom_stack.clear();
 }
 
 void ChartsWidget::zoomUndo() {
@@ -188,7 +189,7 @@ void ChartsWidget::setMaxChartRange(int value) {
 void ChartsWidget::updateToolBar() {
   title_label->setText(tr("Charts: %1").arg(charts.size()));
   columns_action->setText(tr("Column: %1").arg(column_count));
-  range_lb->setText(QString("Range: %1:%2 ").arg(max_chart_range / 60, 2, 10, QLatin1Char('0')).arg(max_chart_range % 60, 2, 10, QLatin1Char('0')));
+  range_lb->setText(QString("Range: %1 ").arg(utils::formatSeconds(max_chart_range)));
   range_lb_action->setVisible(!is_zoomed);
   range_slider_action->setVisible(!is_zoomed);
   undo_zoom_action->setVisible(is_zoomed);
@@ -527,7 +528,7 @@ void ChartView::updatePlot(double cur, double min, double max) {
     updateAxisY();
     updateSeriesPoints();
   }
-  scene()->invalidate({}, QGraphicsScene::ForegroundLayer);
+  update();
 }
 
 void ChartView::updateSeriesPoints() {
@@ -535,14 +536,16 @@ void ChartView::updateSeriesPoints() {
   for (auto &s : sigs) {
     auto begin = std::lower_bound(s.vals.begin(), s.vals.end(), axis_x->min(), xLessThan);
     auto end = std::lower_bound(begin, s.vals.end(), axis_x->max(), xLessThan);
+    if (begin != end) {
+      int num_points = std::max<int>((end - begin), 1);
+      QPointF right_pt = end == s.vals.end() ? s.vals.back() : *end;
+      double pixels_per_point = (chart()->mapToPosition(right_pt).x() - chart()->mapToPosition(*begin).x()) / num_points;
 
-    int num_points = std::max<int>(end - begin, 1);
-    int pixels_per_point = width() / num_points;
-
-    if (series_type == SeriesType::Scatter) {
-      ((QScatterSeries *)s.series)->setMarkerSize(std::clamp(pixels_per_point / 3, 2, 8) * devicePixelRatioF());
-    } else {
-      s.series->setPointsVisible(pixels_per_point > 20);
+      if (series_type == SeriesType::Scatter) {
+        ((QScatterSeries *)s.series)->setMarkerSize(std::clamp(pixels_per_point / 2.0, 2.0, 8.0) * devicePixelRatioF());
+      } else {
+        s.series->setPointsVisible(pixels_per_point > 20);
+      }
     }
   }
 }
@@ -557,7 +560,7 @@ void ChartView::updateSeries(const cabana::Signal *sig) {
       }
       s.series->setColor(getColor(s.sig));
 
-      auto msgs = can->events().at(s.msg_id);
+      const auto &msgs = can->events().at(s.msg_id);
       auto first = std::upper_bound(msgs.cbegin(), msgs.cend(), CanEvent{.mono_time = s.last_value_mono_time});
       int new_size = std::max<int>(s.vals.size() + std::distance(first, msgs.cend()), settings.max_cached_minutes * 60 * 100);
       if (s.vals.capacity() <= new_size) {
@@ -714,7 +717,7 @@ void ChartView::mouseReleaseEvent(QMouseEvent *event) {
       // zoom in if selected range is greater than 0.5s
       emit zoomIn(min_rounded, max_rounded);
     } else {
-      scene()->invalidate({}, QGraphicsScene::ForegroundLayer);
+      update();
     }
     event->accept();
   } else if (!can->liveStreaming() && event->button() == Qt::RightButton) {
@@ -772,7 +775,7 @@ void ChartView::mouseMoveEvent(QMouseEvent *ev) {
     text_list.push_front(QString::number(chart()->mapToValue({x, 0}).x(), 'f', 3));
     QPointF tooltip_pt(x + 12, plot_area.top() - 20);
     QToolTip::showText(mapToGlobal(tooltip_pt.toPoint()), text_list.join("<br />"), this, plot_area.toRect());
-    scene()->invalidate({}, QGraphicsScene::ForegroundLayer);
+    update();
   } else {
     QToolTip::hideText();
   }
@@ -785,7 +788,7 @@ void ChartView::mouseMoveEvent(QMouseEvent *ev) {
     if (rubber_rect != rubber->geometry()) {
       rubber->setGeometry(rubber_rect);
     }
-    scene()->invalidate({}, QGraphicsScene::ForegroundLayer);
+    update();
   }
 }
 
@@ -846,8 +849,8 @@ void ChartView::drawForeground(QPainter *painter, const QRectF &rect) {
     if (s.series->useOpenGL() && s.series->isVisible() && s.series->pointsVisible()) {
       auto first = std::lower_bound(s.vals.begin(), s.vals.end(), axis_x->min(), xLessThan);
       auto last = std::lower_bound(first, s.vals.end(), axis_x->max(), xLessThan);
+      painter->setBrush(s.series->color());
       for (auto it = first; it != last; ++it) {
-        painter->setBrush(s.series->color());
         painter->drawEllipse(chart()->mapToPosition(*it), 4, 4);
       }
     }
