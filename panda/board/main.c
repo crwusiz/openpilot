@@ -29,6 +29,7 @@
 
 
 // ********************* Serial debugging *********************
+
 bool check_started(void) {
   bool started = current_board->check_ignition() || ignition_can;
   ignition_seen |= started;
@@ -149,6 +150,7 @@ void tick_handler(void) {
 
     // tick drivers at 8Hz
     fan_tick();
+    usb_tick();
 
     // decimated to 1Hz
     if (loop_counter == 0U) {
@@ -231,6 +233,7 @@ void tick_handler(void) {
           if (current_safety_mode != SAFETY_SILENT) {
             set_safety_mode(SAFETY_SILENT, 0U);
           }
+
           if (power_save_status != POWER_SAVE_STATUS_ENABLED) {
             set_power_save_state(POWER_SAVE_STATUS_ENABLED);
           }
@@ -369,7 +372,6 @@ int main(void) {
 #ifdef DEBUG
   print("DEBUG ENABLED\n");
 #endif
-
   // enable USB (right before interrupts or enum can fail!)
   usb_init();
 
