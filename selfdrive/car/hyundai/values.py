@@ -107,6 +107,7 @@ class CAR:
   SPORTAGE_NQ5_HEV = "KIA SPORTAGE HEV (NQ5)"
   SORENTO_MQ4 = "KIA SORENTO (MQ4)"
   SORENTO_MQ4_HEV = "KIA SORENTO HEV (MQ4)"
+  NIRO_SG2_EV = "KIA NIRO EV (SG2)"
   NIRO_SG2_HEV = "KIA NIRO HEV (SG2)"
   GENESIS_GV60 = "GENESIS GV60 (JW1)"
   GENESIS_GV70 = "GENESIS GV70 (JK1)"
@@ -234,6 +235,9 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
   CAR.GENESIS_GV70: HyundaiCarInfo("Genesis GV70 2022", "Highway Driving Assist II", harness=Harness.hyundai_l),
   CAR.SORENTO_MQ4_HEV: HyundaiCarInfo("Kia Sorento Hybrid 2022-23", "Smart Cruise Control (SCC)",
                                                harness=Harness.hyundai_a),
+  CAR.NIRO_SG2_EV: [
+    HyundaiCarInfo("Kia Niro Ev 2023", harness=Harness.hyundai_a),
+  ],
   CAR.NIRO_SG2_HEV: [
     HyundaiCarInfo("Kia Niro Hybrid 2023", harness=Harness.hyundai_a),
   ],
@@ -1367,12 +1371,14 @@ FW_VERSIONS = {
       b'\xf1\x00CK  MFC  AT EUR LHD 1.00 1.03 95740-J5000 170822',
       b'\xf1\x00CK  MFC  AT USA LHD 1.00 1.04 95740-J5000 180504',
       b'\xf1\x00CK  MFC  AT AUS RHD 1.00 1.00 99211-J5500 210622',
+      b'\xf1\x00CK  MFC  AT KOR LHD 1.00 1.00 99211-J5500 210622',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00CK__ SCC F_CUP      1.00 1.01 96400-J5000         ',
       b'\xf1\x00CK__ SCC F_CUP      1.00 1.01 96400-J5100         ',
       b'\xf1\x00CK__ SCC F_CUP      1.00 1.03 96400-J5100         ',
       b'\xf1\x00CK__ SCC F-CUP      1.00 1.00 99110-J5500         ',
+      b'\xf1\x00CK__ SCC FHCUP      1.00 1.00 99110-J5500         ',
     ],
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00CK  MDPS R 1.00 5.03 57700-J5380 4C2VR503',
@@ -1383,6 +1389,7 @@ FW_VERSIONS = {
       b'\xf1\x00CK  MDPS R 1.00 1.06 57700-J5220 4C2VL106',
       b'\xf1\x00CK  MDPS R 1.00 1.07 57700-J5220 4C2VL107',
       b'\xf1\x00CK  MDPS R 1.00 1.07 57700-J5420 4C4VL107',
+      b'\xf1\x00CK  MDPS R 1.00 5.03 57700-J5300 4C2CL503',
     ],
     (Ecu.engine, 0x7e0, None): [
       b'\xf1\x81606DE051\x00\x00\x00\x00\x00\x00\x00\x00',
@@ -1392,6 +1399,7 @@ FW_VERSIONS = {
       b'\xf1\x82CKKN3TMD_H0A\x00\x00\x00\x00',
       b'\xe0\x19\xff\xe7\xe7g\x01\xa2\x00\x0f\x00\x9e\x00\x06\x00\xff\xff\xff\xff\xff\xff\x00\x00\xff\xff\xff\xff\xff\xff\x00\x00\x0f\x0e\x0f\x0f\x0e\r\x00\x00\x7f\x02.\xff\x00\x00~p\x00\x00\x00\x00u\xff\xf9\xff\x00\x00\x00\x00V\t\xd5\x01\xc0\x00\x00\x00\x007\xfb\xfc\x0b\x8d\x00',
       b'\xf1\x81640R0051\x00\x00\x00\x00\x00\x00\x00\x00',
+      b'\xf1\x81HM6M1_0a0_H00',
     ],
     (Ecu.transmission, 0x7e1, None): [
       b'\xf1\x00bcsh8p54  E25\x00\x00\x00\x00\x00\x00\x00SCK0T33NB2\xb3\xee\xba\xdc',
@@ -1407,6 +1415,7 @@ FW_VERSIONS = {
       b'\xf1\x00bcsh8p54  E21\x00\x00\x00\x00\x00\x00\x00SCK0T33NB0\t\xb7\x17\xf5',
       b'\xf1\x00bcsh8p54  E21\x00\x00\x00\x00\x00\x00\x00SCK0T33NB0\x88\xa2\xe6\xf0',
       b'\xf1\x87VCNLF11383972DK1vffV\x99\x99\x89\x98\x86eUU\x88wg\x89vfff\x97fff\x99\x87o\xff"\xc1\xf1\x81E30\x00\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  E30\x00\x00\x00\x00\x00\x00\x00SCK0T33GH0\xbe`\xfb\xc6',
+      b'\xf1\x00bcsh8p54  E31\x00\x00\x00\x00\x00\x00\x00SCK0T25KH2B\xfbI\xe2',
     ],
   },
   CAR.K7: { # (YG)
@@ -1718,6 +1727,14 @@ FW_VERSIONS = {
       b'\xf1\x00MQ4HMFC  AT USA LHD 1.00 1.11 99210-P2000 211217',
     ]
   },
+  CAR.NIRO_SG2_EV: {
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00SG2EMFC  AT EUR LHD 1.01 1.09 99211-AT000 220801',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00SG2_ RDR -----      1.00 1.01 99110-AT000         ',
+    ],
+  },
   CAR.NIRO_SG2_HEV: { # (SG2)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00SG2HMFC  AT USA LHD 1.01 1.08 99211-AT000 220531',
@@ -1755,7 +1772,7 @@ CHECKSUM = {
   "6B": [CAR.SORENTO, CAR.GENESIS],
 }
 
-FEATURES = {
+CAN_GEARS = {
   "use_cluster_gears": # Use Cluster for Gear Selection, rather than Transmission [ CLU15 ]
     {CAR.ELANTRA_I30, CAR.KONA, CAR.GRANDEUR_IG, CAR.NIRO_HEV, CAR.K7},
   "use_tcu_gears": # Use TCU Message for Gear Selection [ TCU12 ]
@@ -1769,7 +1786,7 @@ FEATURES = {
 
 CANFD_EV_CAR = {
   CAR.IONIQ5, CAR.TUCSON_NX4,
-  CAR.EV6, CAR.SORENTO_MQ4, CAR.SPORTAGE_NQ5,
+  CAR.EV6, CAR.SORENTO_MQ4, CAR.SPORTAGE_NQ5, CAR.NIRO_SG2_EV,
   CAR.GENESIS_GV60, CAR.GENESIS_GV70,
 }
 CANFD_HEV_CAR = {
@@ -1858,6 +1875,7 @@ DBC = {
   CAR.SPORTAGE_NQ5_HEV: dbc_dict('hyundai_canfd', None),
   CAR.SORENTO_MQ4: dbc_dict('hyundai_canfd', None),
   CAR.SORENTO_MQ4_HEV: dbc_dict('hyundai_canfd', None),
+  CAR.NIRO_SG2_EV: dbc_dict('hyundai_canfd', None),
   CAR.NIRO_SG2_HEV: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV60: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),

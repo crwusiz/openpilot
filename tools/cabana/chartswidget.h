@@ -5,6 +5,7 @@
 #include <QListWidget>
 #include <QGraphicsPixmapItem>
 #include <QGraphicsProxyWidget>
+#include <QTabBar>
 #include <QTimer>
 #include <QUndoCommand>
 #include <QUndoStack>
@@ -84,7 +85,7 @@ private:
   void mouseReleaseEvent(QMouseEvent *event) override;
   void mouseMoveEvent(QMouseEvent *ev) override;
   void dragEnterEvent(QDragEnterEvent *event) override;
-  void dragLeaveEvent(QDragLeaveEvent *event) override;
+  void dragLeaveEvent(QDragLeaveEvent *event) override { drawDropIndicator(false); }
   void dragMoveEvent(QDragMoveEvent *event) override;
   void dropEvent(QDropEvent *event) override;
   void leaveEvent(QEvent *event) override;
@@ -96,6 +97,7 @@ private:
   void paintEvent(QPaintEvent *event) override;
   void drawForeground(QPainter *painter, const QRectF &rect) override;
   void drawBackground(QPainter *painter, const QRectF &rect) override;
+  void drawDropIndicator(bool draw) { can_drop = draw; viewport()->update(); }
   std::tuple<double, double, int> getNiceAxisNumbers(qreal min, qreal max, int tick_count);
   qreal niceNumber(qreal x, bool ceiling);
   QXYSeries *createSeries(SeriesType type, QColor color);
@@ -113,7 +115,6 @@ private:
   ValueTipLabel tip_label;
   QList<SigItem> sigs;
   double cur_sec = 0;
-  const QString mime_type = "application/x-cabanachartview";
   SeriesType series_type = SeriesType::Line;
   bool is_scrubbing = false;
   bool resume_after_scrub = false;
@@ -122,7 +123,22 @@ private:
   double tooltip_x = -1;
   ChartsWidget *charts_widget;
   friend class ChartsWidget;
- };
+};
+
+class ChartsContainer : public QWidget {
+public:
+  ChartsContainer(ChartsWidget *parent);
+  void dragEnterEvent(QDragEnterEvent *event) override;
+  void dropEvent(QDropEvent *event) override;
+  void dragLeaveEvent(QDragLeaveEvent *event) override { drawDropIndicator({}); }
+  void drawDropIndicator(const QPoint &pt) { drop_indictor_pos = pt; update(); }
+  void paintEvent(QPaintEvent *ev) override;
+  ChartView *getDropBefore(const QPoint &pos) const;
+
+  QGridLayout *charts_layout;
+  ChartsWidget *charts_widget;
+  QPoint drop_indictor_pos;
+};
 
 class ChartsWidget : public QFrame {
   Q_OBJECT
@@ -158,10 +174,13 @@ private:
   void doAutoScroll();
   void updateToolBar();
   void setMaxChartRange(int value);
-  void updateLayout();
+  void updateLayout(bool force = false);
   void settingChanged();
   void showValueTip(double sec);
   bool eventFilter(QObject *obj, QEvent *event) override;
+  void newTab();
+  void removeTab(int index);
+  inline QList<ChartView *> &currentCharts() { return tab_charts[tabbar->tabData(tabbar->currentIndex()).toInt()]; }
   ChartView *findChart(const MessageId &id, const cabana::Signal *sig);
 
   QLabel *title_label;
@@ -178,9 +197,10 @@ private:
   QUndoStack *zoom_undo_stack;
 
   QAction *remove_all_btn;
-  QGridLayout *charts_layout;
   QList<ChartView *> charts;
-  QWidget *charts_container;
+  std::unordered_map<int, QList<ChartView *>> tab_charts;
+  QTabBar *tabbar;
+  ChartsContainer *charts_container;
   QScrollArea *charts_scroll;
   uint32_t max_chart_range = 0;
   bool is_zoomed = false;
@@ -194,6 +214,7 @@ private:
   QTimer align_timer;
   friend class ZoomCommand;
   friend class ChartView;
+  friend class ChartsContainer;
 };
 
 class ZoomCommand : public QUndoCommand {
