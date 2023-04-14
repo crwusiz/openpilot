@@ -397,9 +397,8 @@ static int hyundai_tx_hook(CANPacket_t *to_send) {
   return tx;
 }
 
-static int hyundai_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
+static int hyundai_fwd_hook(int bus_num, int addr) {
   int bus_fwd = -1;
-  int addr = GET_ADDR(to_fwd);
 
   uint32_t now = microsecond_timer_get();
   bool is_lkas11_msg = (addr == 832);

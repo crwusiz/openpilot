@@ -397,9 +397,8 @@ static int hyundai_community_tx_hook(CANPacket_t *to_send) {
   return tx;
 }
 
-static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
+static int hyundai_community_fwd_hook(int bus_num, int addr) {
   int bus_fwd = -1;
-  int addr = GET_ADDR(to_fwd);
   int fwd_to_bus1 = -1;
   if (fwd_bus1) { fwd_to_bus1 = 1; }
 
