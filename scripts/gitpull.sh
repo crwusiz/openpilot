@@ -17,4 +17,8 @@ echo ""
 echo "  current branch is [ $BRANCH ]  "
 echo ""
 
+cp -f /data/openpilot/panda/board/main.c /data/openpilot/scripts/add/main.c
+cp -f /data/openpilot/panda/board/safety/safety_defaults.h /data/openpilot/scripts/add/safety_defaults.h
+cp -f /data/openpilot/panda/board/safety/bxcan.h /data/openpilot/scripts/add/bxcan.h
+
 exec /data/openpilot/scripts/restart.sh
