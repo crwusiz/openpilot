@@ -658,14 +658,14 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   auto pandaflash_btn = new ButtonControl(tr("Panda Flash"), tr("RUN"));
   QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/panda/board/flash.sh");
+      QProcess::execute("/data/openpilot/panda/board/flash.py");
     }
   });
 
   auto pandarecover_btn = new ButtonControl(tr("Panda Recover"), tr("RUN"));
   QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/panda/board/recover.sh");
+      QProcess::execute("/data/openpilot/panda/board/recover.py");
     }
   });
 
