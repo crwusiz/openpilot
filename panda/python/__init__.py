@@ -422,7 +422,7 @@ class Panda:
       except Exception:
         logging.debug("reconnecting is taking %d seconds...", i + 1)
         try:
-          dfu = PandaDFU(PandaDFU.st_serial_to_dfu_serial(self._serial, self._mcu_type))
+          dfu = PandaDFU(self.get_dfu_serial())
           dfu.recover()
         except Exception:
           pass
@@ -494,7 +494,7 @@ class Panda:
       self.reconnect()
 
   def recover(self, timeout: Optional[int] = None, reset: bool = True) -> bool:
-    dfu_serial = PandaDFU.st_serial_to_dfu_serial(self._serial, self._mcu_type)
+    dfu_serial = self.get_dfu_serial()
 
     if reset:
       self.reset(enter_bootstub=True)
@@ -677,6 +677,9 @@ class Panda:
       matches the MCU UID
     """
     return self._serial
+
+  def get_dfu_serial(self):
+    return PandaDFU.st_serial_to_dfu_serial(self._serial, self._mcu_type)
 
   def get_uid(self):
     """

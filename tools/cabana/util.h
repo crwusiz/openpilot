@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include <QAbstractItemView>
 #include <QApplication>
 #include <QByteArray>
 #include <QDateTime>
@@ -66,7 +67,10 @@ public:
   MessageBytesDelegate(QObject *parent, bool multiple_lines = false);
   void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
   QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+  bool helpEvent(QHelpEvent *event, QAbstractItemView *view, const QStyleOptionViewItem &option, const QModelIndex &index) override;
   void setMultipleLines(bool v);
+  int widthForBytes(int n) const;
+  bool multipleLines() const { return multiple_lines; }
 
 private:
   QFont fixed_font;
