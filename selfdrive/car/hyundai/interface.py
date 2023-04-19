@@ -30,7 +30,7 @@ class CarInterface(CarInterfaceBase):
     return CarControllerParams.ACCEL_MIN, interp(v_current_kph, gas_max_bp, gas_max_v)
 
   @staticmethod
-  def _get_params(ret, candidate, fingerprint, car_fw, experimental_long):
+  def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs):
     ret.carName = "hyundai"
 
     hda2 = Ecu.adas in [fw.ecu for fw in car_fw]
@@ -53,12 +53,13 @@ class CarInterface(CarInterfaceBase):
         if candidate not in CANFD_RADAR_SCC_CAR:
           ret.flags |= HyundaiFlags.CANFD_CAMERA_SCC.value
     else:
-      # these cars use the FCA11 message for the AEB and FCW signals, all others use SCC12
-      if 0x38d in fingerprint[0] or 0x38d in fingerprint[2]: # 909
-        ret.flags |= HyundaiFlags.USE_FCA.value
       # Send LFA message on cars with HDA
       if 0x485 in fingerprint[2]: # 1157
         ret.flags |= HyundaiFlags.SEND_LFA.value
+
+      # these cars use the FCA11 message for the AEB and FCW signals, all others use SCC12
+      if 0x38d in fingerprint[0] or 0x38d in fingerprint[2]: # 909
+        ret.flags |= HyundaiFlags.USE_FCA.value
 
     ret.steerActuatorDelay = 0.1
     ret.steerLimitTimer = 0.4
