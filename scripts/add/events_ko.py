@@ -758,7 +758,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   EventName.calibrationIncomplete: {
     ET.PERMANENT: calibration_incomplete_alert,
-    ET.SOFT_DISABLE: soft_disable_alert("캘리브레이션 진행중입니다"),
+    ET.SOFT_DISABLE: soft_disable_alert("장치 위치변경 감지됨 : 캘리브레이션 진행중입니다"),
     ET.NO_ENTRY: NoEntryAlert("캘리브레이션 진행중입니다"),
   },
 

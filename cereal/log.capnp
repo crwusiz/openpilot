@@ -1122,6 +1122,7 @@ struct LiveLocationKalman {
   deviceStable @22 :Bool = true;
   timeSinceReset @23 :Float64;
   excessiveResets @24 :Bool;
+  timeToFirstFix @25 :Float32;
 
   enum Status {
     uninitialized @0;
