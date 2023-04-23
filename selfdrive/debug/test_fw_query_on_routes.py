@@ -8,13 +8,11 @@ import traceback
 from tqdm import tqdm
 from tools.lib.logreader import LogReader
 from tools.lib.route import Route
-from selfdrive.car.interfaces import get_interface_attr
 from selfdrive.car.car_helpers import interface_names
-from selfdrive.car.fw_versions import match_fw_to_car_exact, match_fw_to_car_fuzzy, build_fw_dict
+from selfdrive.car.fw_versions import VERSIONS, match_fw_to_car
 
 
 NO_API = "NO_API" in os.environ
-VERSIONS = get_interface_attr('FW_VERSIONS', ignore_none=True)
 SUPPORTED_BRANDS = VERSIONS.keys()
 SUPPORTED_CARS = [brand for brand in SUPPORTED_BRANDS for brand in interface_names[brand]]
 UNKNOWN_BRAND = "unknown"
@@ -74,7 +72,7 @@ if __name__ == "__main__":
 
         elif msg.which() == "carParams":
           CP = msg.carParams
-          car_fw = CP.carFw
+          car_fw = [fw for fw in CP.carFw if not fw.logging]
           if len(car_fw) == 0:
             print("no fw")
             break
@@ -89,9 +87,8 @@ if __name__ == "__main__":
             print("not in supported cars")
             break
 
-          fw_versions_dict = build_fw_dict(car_fw)
-          exact_matches = match_fw_to_car_exact(fw_versions_dict)
-          fuzzy_matches = match_fw_to_car_fuzzy(fw_versions_dict)
+          _, exact_matches = match_fw_to_car(car_fw, allow_exact=True, allow_fuzzy=False)
+          _, fuzzy_matches = match_fw_to_car(car_fw, allow_exact=False, allow_fuzzy=True)
 
           if (len(exact_matches) == 1) and (list(exact_matches)[0] == live_fingerprint):
             good_exact += 1
@@ -169,7 +166,7 @@ if __name__ == "__main__":
       break
 
   print()
-  # Print FW versions that need to be added seperated out by car and address
+  # Print FW versions that need to be added separated out by car and address
   for car, m in sorted(mismatches.items()):
     print(car)
     addrs = defaultdict(list)
