@@ -3,24 +3,22 @@
 
 // include the safety policies.
 #include "safety/safety_defaults.h"
-#include "safety/safety_elm327.h"
-#include "safety/safety_hyundai.h"
-#include "safety/safety_hyundai_community.h"
 #include "safety/safety_honda.h"
 #include "safety/safety_toyota.h"
+//#include "safety/safety_tesla.h"
 #include "safety/safety_gm.h"
-/*
-#include "safety/safety_tesla.h"
-#include "safety/safety_ford.h"
-#include "safety/safety_chrysler.h"
-#include "safety/safety_subaru.h"
-#include "safety/safety_subaru_legacy.h"
-#include "safety/safety_mazda.h"
-#include "safety/safety_nissan.h"
-#include "safety/safety_volkswagen_mqb.h"
-#include "safety/safety_volkswagen_pq.h"
-#include "safety/safety_body.h"
-*/
+//#include "safety/safety_ford.h"
+#include "safety/safety_hyundai.h"
+#include "safety/safety_hyundai_community.h"
+//#include "safety/safety_chrysler.h"
+//#include "safety/safety_subaru.h"
+//#include "safety/safety_subaru_legacy.h"
+//#include "safety/safety_mazda.h"
+//#include "safety/safety_nissan.h"
+//#include "safety/safety_volkswagen_mqb.h"
+//#include "safety/safety_volkswagen_pq.h"
+#include "safety/safety_elm327.h"
+//#include "safety/safety_body.h"
 
 // CAN-FD only safety modes
 #ifdef CANFD
@@ -142,7 +140,7 @@ int get_addr_check_index(CANPacket_t *to_push, AddrCheckStruct addr_list[], cons
   for (int i = 0; i < len; i++) {
     // if multiple msgs are allowed, determine which one is present on the bus
     if (!addr_list[i].msg_seen) {
-      for (uint8_t j = 0U; addr_list[i].msg[j].addr != 0; j++) {
+      for (uint8_t j = 0U; (j < MAX_ADDR_CHECK_MSGS) && (addr_list[i].msg[j].addr != 0); j++) {
         if ((addr == addr_list[i].msg[j].addr) && (bus == addr_list[i].msg[j].bus) &&
               (length == addr_list[i].msg[j].len)) {
           addr_list[i].index = j;
@@ -152,11 +150,13 @@ int get_addr_check_index(CANPacket_t *to_push, AddrCheckStruct addr_list[], cons
       }
     }
 
-    int idx = addr_list[i].index;
-    if ((addr == addr_list[i].msg[idx].addr) && (bus == addr_list[i].msg[idx].bus) &&
-        (length == addr_list[i].msg[idx].len)) {
-      index = i;
-      break;
+    if (addr_list[i].msg_seen) {
+      int idx = addr_list[i].index;
+      if ((addr == addr_list[i].msg[idx].addr) && (bus == addr_list[i].msg[idx].bus) &&
+          (length == addr_list[i].msg[idx].len)) {
+        index = i;
+        break;
+      }
     }
   }
   return index;
@@ -294,34 +294,30 @@ typedef struct {
 
 const safety_hook_config safety_hook_registry[] = {
   {SAFETY_SILENT, &nooutput_hooks},
-  {SAFETY_NOOUTPUT, &nooutput_hooks},
+  {SAFETY_HONDA_NIDEC, &honda_nidec_hooks},
+  {SAFETY_TOYOTA, &toyota_hooks},
   {SAFETY_ELM327, &elm327_hooks},
+  {SAFETY_GM, &gm_hooks},
+  {SAFETY_HONDA_BOSCH, &honda_bosch_hooks},
   {SAFETY_HYUNDAI, &hyundai_hooks},
+  //{SAFETY_CHRYSLER, &chrysler_hooks},
+  //{SAFETY_SUBARU, &subaru_hooks},
+  //{SAFETY_VOLKSWAGEN_MQB, &volkswagen_mqb_hooks},
+  //{SAFETY_NISSAN, &nissan_hooks},
+  {SAFETY_NOOUTPUT, &nooutput_hooks},
   {SAFETY_HYUNDAI_LEGACY, &hyundai_legacy_hooks},
   {SAFETY_HYUNDAI_COMMUNITY, &hyundai_community_hooks},
-  {SAFETY_HONDA_NIDEC, &honda_nidec_hooks},
-  {SAFETY_HONDA_BOSCH, &honda_bosch_hooks},
-  {SAFETY_TOYOTA, &toyota_hooks},
-  {SAFETY_GM, &gm_hooks},
-  /*
-  {SAFETY_CHRYSLER, &chrysler_hooks},
-  {SAFETY_SUBARU, &subaru_hooks},
-  {SAFETY_VOLKSWAGEN_MQB, &volkswagen_mqb_hooks},
-  {SAFETY_NISSAN, &nissan_hooks},
-  {SAFETY_MAZDA, &mazda_hooks},
-  {SAFETY_BODY, &body_hooks},
-  */
+  //{SAFETY_MAZDA, &mazda_hooks},
+  //{SAFETY_BODY, &body_hooks},
 #ifdef CANFD
   {SAFETY_HYUNDAI_CANFD, &hyundai_canfd_hooks},
 #endif
 #ifdef ALLOW_DEBUG
+  //{SAFETY_TESLA, &tesla_hooks},
+  //{SAFETY_SUBARU_LEGACY, &subaru_legacy_hooks},
+  //{SAFETY_VOLKSWAGEN_PQ, &volkswagen_pq_hooks},
   {SAFETY_ALLOUTPUT, &alloutput_hooks},
-  /*
-  {SAFETY_TESLA, &tesla_hooks},
-  {SAFETY_SUBARU_LEGACY, &subaru_legacy_hooks},
-  {SAFETY_VOLKSWAGEN_PQ, &volkswagen_pq_hooks},
-  {SAFETY_FORD, &ford_hooks},
-  */
+  //{SAFETY_FORD, &ford_hooks},
 #endif
 };
 
@@ -417,7 +413,19 @@ bool max_limit_check(int val, const int MAX_VAL, const int MIN_VAL) {
   return (val > MAX_VAL) || (val < MIN_VAL);
 }
 
-// check that commanded value isn't too far from measured
+// check that commanded angle value isn't too far from measured
+bool angle_dist_to_meas_check(int val, struct sample_t *val_meas, const int MAX_ERROR, const int MAX_VAL) {
+
+  // val must always be near val_meas, limited to the maximum value
+  // add 1 to not false trigger the violation
+  int highest_allowed = CLAMP(val_meas->max + MAX_ERROR + 1, -MAX_VAL, MAX_VAL);
+  int lowest_allowed = CLAMP(val_meas->min - MAX_ERROR - 1, -MAX_VAL, MAX_VAL);
+
+  // check for violation
+  return max_limit_check(val, highest_allowed, lowest_allowed);
+}
+
+// check that commanded torque value isn't too far from measured
 bool dist_to_meas_check(int val, int val_last, struct sample_t *val_meas,
                         const int MAX_RATE_UP, const int MAX_RATE_DOWN, const int MAX_ERROR) {
 
@@ -430,7 +438,7 @@ bool dist_to_meas_check(int val, int val_last, struct sample_t *val_meas,
   int lowest_allowed = MAX(lowest_allowed_rl, MIN(val_last + MAX_RATE_DOWN, MIN(val_meas->min, 0) - MAX_ERROR));
 
   // check for violation
-  return (val < lowest_allowed) || (val > highest_allowed);
+  return max_limit_check(val, highest_allowed, lowest_allowed);
 }
 
 // check that commanded value isn't fighting against driver
@@ -453,7 +461,7 @@ bool driver_limit_check(int val, int val_last, struct sample_t *val_driver,
                                            MIN(driver_min_limit, 0)));
 
   // check for violation
-  return (val < lowest_allowed) || (val > highest_allowed);
+  return max_limit_check(val, highest_allowed, lowest_allowed);
 }
 
 
@@ -465,7 +473,7 @@ bool rt_rate_limit_check(int val, int val_last, const int MAX_RT_DELTA) {
   int lowest_val = MIN(val_last, 0) - MAX_RT_DELTA;
 
   // check for violation
-  return (val < lowest_val) || (val > highest_val);
+  return max_limit_check(val, highest_val, lowest_val);
 }
 
 
