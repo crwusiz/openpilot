@@ -2,10 +2,9 @@
 from cereal import car
 from panda import Panda
 from common.params import Params
-from common.numpy_fast import interp
 from common.conversions import Conversions as CV
 from selfdrive.car.hyundai.hyundaicanfd import CanBus
-from selfdrive.car.hyundai.values import HyundaiFlags, CAR, DBC, Buttons, CarControllerParams, CANFD_CAR, CANFD_EV_CAR, CANFD_HEV_CAR, EV_CAR, HEV_CAR, LEGACY_SAFETY_MODE_CAR, CANFD_RADAR_SCC_CAR
+from selfdrive.car.hyundai.values import HyundaiFlags, CAR, DBC, Buttons, CANFD_CAR, CANFD_EV_CAR, CANFD_HEV_CAR, EV_CAR, HEV_CAR, LEGACY_SAFETY_MODE_CAR, CANFD_RADAR_SCC_CAR
 from selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR
 from selfdrive.car import STD_CARGO_KG, create_button_event, scale_tire_stiffness, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
@@ -20,15 +19,6 @@ BUTTONS_DICT = {Buttons.RES_ACCEL: ButtonType.accelCruise, Buttons.SET_DECEL: Bu
                 Buttons.GAP_DIST: ButtonType.gapAdjustCruise, Buttons.CANCEL: ButtonType.cancel}
 
 class CarInterface(CarInterfaceBase):
-  @staticmethod
-  def get_pid_accel_limits(CP, current_speed, cruise_speed):
-    v_current_kph = current_speed * CV.MS_TO_KPH
-
-    gas_max_bp = [10., 20., 50., 70., 130., 150.]
-    gas_max_v = [1.3, 1.1, 0.63, 0.44, 0.15, 0.1]
-
-    return CarControllerParams.ACCEL_MIN, interp(v_current_kph, gas_max_bp, gas_max_v)
-
   @staticmethod
   def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs):
     ret.carName = "hyundai"
@@ -345,11 +335,11 @@ class CarInterface(CarInterfaceBase):
 
     ret.stoppingControl = True
     ret.stoppingDecelRate = 1.0
-    ret.vEgoStopping = 0.1
+    ret.vEgoStopping = 0.3
     ret.stopAccel = -3.5
 
     ret.startingState = True
-    ret.vEgoStarting = 0.1
+    ret.vEgoStarting = 0.3
     ret.startAccel = 2.0
 
     # *** Params Init ***
