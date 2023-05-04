@@ -582,8 +582,9 @@ class Tici(HardwareBase):
 
     gpio_set(GPIO.STM_RST_N, 1)
     gpio_set(GPIO.STM_BOOT0, 1)
-    time.sleep(2)
+    time.sleep(1)
     gpio_set(GPIO.STM_RST_N, 0)
+    time.sleep(1)
     gpio_set(GPIO.STM_BOOT0, 0)
 
   def get_ip_address(self):

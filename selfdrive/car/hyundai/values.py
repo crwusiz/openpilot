@@ -1700,6 +1700,7 @@ FW_VERSIONS = {
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00NQ5__               1.00 1.02 99110-P1000         ',
       b'\xf1\x00NQ5__               1.00 1.03 99110-P1000         ',
+      b'\xf1\x00NQ5__               1.01 1.03 99110-P1000         ',
     ],
   },
   CAR.SPORTAGE_NQ5_HEV: { # (NQ5)
