@@ -309,6 +309,7 @@ const safety_hook_config safety_hook_registry[] = {
   {SAFETY_HYUNDAI_COMMUNITY, &hyundai_community_hooks},
   //{SAFETY_MAZDA, &mazda_hooks},
   //{SAFETY_BODY, &body_hooks},
+  //{SAFETY_FORD, &ford_hooks},
 #ifdef CANFD
   {SAFETY_HYUNDAI_CANFD, &hyundai_canfd_hooks},
 #endif
@@ -317,7 +318,6 @@ const safety_hook_config safety_hook_registry[] = {
   //{SAFETY_SUBARU_LEGACY, &subaru_legacy_hooks},
   //{SAFETY_VOLKSWAGEN_PQ, &volkswagen_pq_hooks},
   {SAFETY_ALLOUTPUT, &alloutput_hooks},
-  //{SAFETY_FORD, &ford_hooks},
 #endif
 };
 

@@ -1,6 +1,6 @@
 from cereal import log
-from common.realtime import DT_MDL
 from common.conversions import Conversions as CV
+from common.realtime import DT_MDL
 from common.params import Params
 
 AUTO_LCA_START_TIME = 1.0
