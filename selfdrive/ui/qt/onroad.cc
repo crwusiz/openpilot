@@ -554,12 +554,12 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     int a = (int)(255.f - (180.f * (accel/3.f)));
     a = std::min(a, 255);
     a = std::max(a, 80);
-    variableColor = QColor(a, a, 255, 255);
+    variableColor = QColor(a, 255, a, 200);
   } else {
     int a = (int)(255.f - (255.f * (-accel/4.f)));
     a = std::min(a, 255);
     a = std::max(a, 60);
-    variableColor = QColor(255, a, a, 255);
+    variableColor = QColor(255, a, a, 200);
   }
 
   configFont(p, "Inter", 176, "Bold");
@@ -886,40 +886,45 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
   }
 
   // paint path
-  QLinearGradient bg(0, height(), 0, height() / 4);
-  const auto &acceleration = sm["modelV2"].getModelV2().getAcceleration();
-  float start_hue, end_hue, acceleration_future = 0;
-
-  if (acceleration.getZ().size() > 16) {
-    acceleration_future = acceleration.getX()[16];  // 2.5 seconds
-  }
-  start_hue = 60;
-  // speed up: 120, slow down: 0
-  end_hue = fmax(fmin(start_hue + acceleration_future * 45, 148), 0);
-
-  // FIXME: painter.drawPolygon can be slow if hue is not rounded
-  end_hue = int(end_hue * 100 + 0.5) / 100;
-
+  QLinearGradient bg(0, height(), 0, 0);
+  //if (sm["controlsState"].getControlsState().getExperimentalMode()) {
   if (scene.engaged) {
     if (scene.steeringPressed) {
       // The user is applying torque to the steering wheel
       bg.setColorAt(0.0, steeringpressedColor(100));
       bg.setColorAt(0.5, steeringpressedColor(50));
       bg.setColorAt(1.0, steeringpressedColor(0));
-    } else if (scene.override) {
-      bg.setColorAt(0.0, overrideColor(100));
-      bg.setColorAt(0.5, overrideColor(50));
-      bg.setColorAt(1.0, overrideColor(0));
-    } else if (scene.experimental_mode) {
-      bg.setColorAt(0.0, QColor::fromHslF(start_hue / 360., 0.97, 0.56, 0.4));
-      bg.setColorAt(0.5, QColor::fromHslF(end_hue / 360., 1.0, 0.68, 0.35));
-      bg.setColorAt(1.0, QColor::fromHslF(end_hue / 360., 1.0, 0.68, 0.0));
     } else {
-      bg.setColorAt(0.0, QColor::fromHslF(148 / 360., 0.94, 0.51, 0.4));
-      bg.setColorAt(0.5, QColor::fromHslF(112 / 360., 1.0, 0.68, 0.35));
-      bg.setColorAt(1.0, QColor::fromHslF(112 / 360., 1.0, 0.68, 0.0));
+      const QVector<QPointF> right_points = scene.track_vertices.mid(0, scene.track_vertices.length() / 2);
+
+      for (int i = 0; i < right_points.length(); i++) {
+        const auto &acceleration = sm["uiPlan"].getUiPlan().getAccel();
+        if (i >= acceleration.size()) break;
+
+        // Some points are out of frame
+        if (right_points[i].y() < 0 || right_points[i].y() > height()) continue;
+
+        // Flip so 0 is bottom of frame
+        float lin_grad_point = (height() - right_points[i].y()) / height();
+
+        // speed up: 120, slow down: 0
+        float path_hue = fmax(fmin(60 + acceleration[i] * 35, 120), 0);
+        // FIXME: painter.drawPolygon can be slow if hue is not rounded
+        path_hue = int(path_hue * 100 + 0.5) / 100;
+
+        float saturation = fmin(fabs(acceleration[i] * 1.5), 1);
+        float lightness = util::map_val(saturation, 0.0f, 1.0f, 0.95f, 0.62f);  // lighter when grey
+        float alpha = util::map_val(lin_grad_point, 0.75f / 2.f, 0.75f, 0.4f, 0.0f);  // matches previous alpha fade
+        bg.setColorAt(lin_grad_point, QColor::fromHslF(path_hue / 360., saturation, lightness, alpha));
+
+        // Skip a point, unless next is last
+        i += (i + 2) < right_points.length() ? 1 : 0;
+      }
     }
   } else {
+    //bg.setColorAt(0.0, QColor::fromHslF(148 / 360., 0.94, 0.51, 0.4));
+    //bg.setColorAt(0.5, QColor::fromHslF(112 / 360., 1.0, 0.68, 0.35));
+    //bg.setColorAt(1.0, QColor::fromHslF(112 / 360., 1.0, 0.68, 0.0));
     bg.setColorAt(0.0, whiteColor(100));
     bg.setColorAt(0.5, whiteColor(50));
     bg.setColorAt(1.0, whiteColor(0));
