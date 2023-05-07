@@ -108,6 +108,7 @@ class CAR:
   NIRO_SG2_HEV = "KIA NIRO HEV (SG2)"
   GENESIS_GV60 = "GENESIS GV60 (JW1)"
   GENESIS_GV70 = "GENESIS GV70 (JK1)"
+  GENESIS_GV80 = "GENESIS GV80 (JX1)"
 
 class Footnote(Enum):
   # footnotes which mention "red panda" will be replaced with the CAN FD panda kit on the shop page
@@ -230,6 +231,7 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
   CAR.SPORTAGE_NQ5_HEV: HyundaiCarInfo("Kia Sportage Hybrid 2023", harness=Harness.hyundai_n),
   CAR.GENESIS_GV60: HyundaiCarInfo("Genesis GV60 2023", "All", harness=Harness.hyundai_k),
   CAR.GENESIS_GV70: HyundaiCarInfo("Genesis GV70 2022", "Highway Driving Assist II", harness=Harness.hyundai_l),
+  CAR.GENESIS_GV80: HyundaiCarInfo("Genesis GV80 2023", "All", harness=Harness.hyundai_m),
   CAR.SORENTO_MQ4_HEV: HyundaiCarInfo("Kia Sorento Hybrid 2022-23", "Smart Cruise Control (SCC)",
                                                harness=Harness.hyundai_a),
   CAR.NIRO_SG2_EV: [
@@ -1766,6 +1768,14 @@ FW_VERSIONS = {
       b'\xf1\x00JK1_ SCC FHCUP      1.00 1.00 99110-AR200         ',
     ],
   },
+  CAR.GENESIS_GV80: {  # (JX1)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00JX1 MFC  AT USA LHD 1.00 1.02 99211-T6110 220513',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00JX1_ SCC FHCUP      1.00 1.01 99110-T6100         ',
+    ],
+  },
 }
 
 CHECKSUM = {
@@ -1789,7 +1799,7 @@ CAN_GEARS = {
 CANFD_EV_CAR = {
   CAR.IONIQ5, CAR.TUCSON_NX4,
   CAR.EV6, CAR.SORENTO_MQ4, CAR.SPORTAGE_NQ5, CAR.NIRO_SG2_EV,
-  CAR.GENESIS_GV60, CAR.GENESIS_GV70,
+  CAR.GENESIS_GV60, CAR.GENESIS_GV70, CAR.GENESIS_GV80,
 }
 CANFD_HEV_CAR = {
   CAR.TUCSON_NX4_HEV,
@@ -1799,7 +1809,7 @@ CANFD_CAR = CANFD_EV_CAR | CANFD_HEV_CAR
 
 # The radar does SCC on these cars when HDA I, rather than the camera
 CANFD_RADAR_SCC_CAR = {
-  CAR.GENESIS_GV70, CAR.SORENTO_MQ4, CAR.SORENTO_MQ4_HEV
+  CAR.GENESIS_GV70, CAR.GENESIS_GV80, CAR.SORENTO_MQ4, CAR.SORENTO_MQ4_HEV
 }
 EV_CAR = {
   CAR.KONA_EV, CAR.IONIQ_EV, CAR.NIRO_EV, CAR.SOUL_EV, CAR.NEXO,
@@ -1881,4 +1891,5 @@ DBC = {
   CAR.NIRO_SG2_HEV: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV60: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),
+  CAR.GENESIS_GV80: dbc_dict('hyundai_canfd', None),
 }

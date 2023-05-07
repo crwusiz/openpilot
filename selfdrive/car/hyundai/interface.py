@@ -219,6 +219,10 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.87
       ret.steerRatio = 13.27 * 1.15  # 15% higher at the center seems reasonable
       tire_stiffness_factor = 0.65
+    elif candidate == CAR.GENESIS_GV80:
+      ret.mass = 2258. + STD_CARGO_KG
+      ret.wheelbase = 2.95
+      ret.steerRatio = 14.14
 
     # *** lateral control ***
     lat_pid = Params().get("LateralControlSelect", encoding='utf8') == "0"
