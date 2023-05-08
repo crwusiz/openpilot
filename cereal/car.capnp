@@ -114,13 +114,14 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     controlsdLagging @112;
     resumeBlocked @113;
     steerTimeLimit @115;
+    vehicleSensorsInvalid @116;
 
-    turningIndicatorOn @116;
     autoLaneChange @117;
     slowingDownSpeed @118;
     slowingDownSpeedSound @119;
     cruiseOn @120;
     cruiseOff @121;
+    turningIndicatorOn @122;
 
     radarCanErrorDEPRECATED @15;
     communityFeatureDisallowedDEPRECATED @62;

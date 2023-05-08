@@ -236,6 +236,9 @@ void tick_handler(void) {
             heartbeat_lost = true;
           }
 
+          // clear heartbeat engaged state
+          heartbeat_engaged = false;
+
           if (current_safety_mode != SAFETY_NOOUTPUT) {
             set_safety_mode(SAFETY_NOOUTPUT, 0U);
           }
