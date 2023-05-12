@@ -397,6 +397,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   # Car is recognized, but marked as dashcam only
   EventName.startupNoControl: {
     ET.PERMANENT: StartupAlert("대시캠 모드"),
+    ET.NO_ENTRY: NoEntryAlert("대시캠 모드"),
   },
 
   # Car is not recognized
