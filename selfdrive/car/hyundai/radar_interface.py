@@ -15,7 +15,7 @@ def get_radar_can_parser(CP):
   if DBC[CP.carFingerprint]['radar'] is None:
     return None
 
-  elif Params().get_bool("MandoRadarEnable"):
+  elif CP.openpilotLongitudinalControl and Params().get_bool("RadarTrackEnable"):
     signals = []
     checks = []
 
@@ -29,6 +29,7 @@ def get_radar_can_parser(CP):
         ("REL_SPEED", msg),
       ]
       checks += [(msg, 50)]
+    print("RadarInterface: RadarTracks..")
     return CANParser(DBC[CP.carFingerprint]['radar'], signals, checks, 1)
 
   else:
@@ -43,15 +44,16 @@ def get_radar_can_parser(CP):
     checks = [
       ("SCC11", 50),
     ]
+    print("RadarInterface: SCCRadar...")
     return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, CP.sccBus)
 
 
 class RadarInterface(RadarInterfaceBase):
   def __init__(self, CP):
     super().__init__(CP)
-    self.new_radar = Params().get_bool("MandoRadarEnable")
+    self.radar_track = CP.openpilotLongitudinalControl and Params().get_bool("RadarTrackEnable")
     self.updated_messages = set()
-    self.trigger_msg = 0x420 if not self.new_radar else RADAR_START_ADDR + RADAR_MSG_COUNT - 1
+    self.trigger_msg = 0x420 if not self.radar_track else RADAR_START_ADDR + RADAR_MSG_COUNT - 1
     self.track_id = 0
 
     self.radar_off_can = CP.radarUnavailable
@@ -85,7 +87,7 @@ class RadarInterface(RadarInterfaceBase):
       errors.append("canError")
     ret.errors = errors
 
-    if self.new_radar:
+    if self.radar_track:
       for addr in range(RADAR_START_ADDR, RADAR_START_ADDR + RADAR_MSG_COUNT):
         msg = self.rcp.vl[f"RADAR_TRACK_{addr:x}"]
 

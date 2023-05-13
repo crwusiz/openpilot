@@ -730,9 +730,9 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   tr("When enabled, pressing the brake pedal will disengage openpilot."),
                                   "../assets/offroad/icon_disengage_on_accelerator.svg",
                                   this));
-  /*toggles.append(new ParamControl("MandoRadarEnable",
-                                  tr("Mando Radar interface Enable"),
-                                  tr("Mando Radar interface use (disable AEB)"),
+  /*toggles.append(new ParamControl("RadarTrackEnable",
+                                  tr("Enable Radar Track"),
+                                  tr("Enable Radar Track use (disable AEB)"),
                                   "../assets/offroad/icon_warning.png",
                                   this));*/
   for (ParamControl *toggle : toggles) {

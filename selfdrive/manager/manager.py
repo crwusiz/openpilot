@@ -53,7 +53,7 @@ def manager_init() -> None:
     ("LateralControlSelect", "0"),
     ("LoggerEnable", "0"),
     ("NavEnable", "0"),
-    ("MandoRadarEnable", "0"),
+    ("RadarTrackEnable", "0"),
     ("PandaSafetySelect", "0"),
     ("SccOnBus2", "0"),
     ("NavLimitSpeed", "0"),

@@ -214,7 +214,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"SelectedManufacturer", PERSISTENT},
     {"PandaSafetySelect", PERSISTENT},
     {"SoftRestartTriggered", CLEAR_ON_MANAGER_START},
-    {"MandoRadarEnable", PERSISTENT},
+    {"RadarTrackEnable", PERSISTENT},
     {"SccOnBus2", PERSISTENT},
     {"NavLimitSpeed", PERSISTENT},
     {"CustomMapboxTokenPk", PERSISTENT },

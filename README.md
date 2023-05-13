@@ -10,14 +10,15 @@ crwusiz openpilot
 - All contributors to this fork are not liable. <b>Use at your own risk.</b>
 
 [![](https://i.imgur.com/TMtVMV8.png)](#)
-- event message, qt ui kor translate
-- brake, bsd, gps, wifi icon
+- event message, qt ui kor translate ( language select )
+- brake, bsd, gps, wifi, cruise icon
 - wheel, N direction icon rotate
 - lateralControl select ( Pid / Indi / Lqr / Torque )
 - mfc select ( LDWS,LKAS / LFA )
 - add community toggle / function / simple ui
-- autohold, turnsignal, tpms, roadlimitspeed display (neokii)
-- select car and manufacturer  
+- autohold, turnsignal, tpms, roadlimitspeed display ( neokii )
+- select manufacturer and car
+- panda_safety select ( default / mdps(can3) modify )
 
 ## Harness Cable and Car Year Compatible Chart
 
@@ -40,6 +41,7 @@ cable order -> https://smartstore.naver.com/jmtechn
 - https://github.com/openpilotusers
 - https://github.com/Circuit-Pro/openpilot
 - https://github.com/sunnyhaibin/sunnypilot
+- https://github.com/ajouatom/apilot
 
 ## chevrolet bolt branch
 - https://github.com/JasonJShuler/openpilot
