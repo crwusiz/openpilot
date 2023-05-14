@@ -142,15 +142,15 @@ class RoadLimitSpeedServer:
           except:
             pass
 
-        #if 'request_gps' in json_obj:
-        #  try:
-        #    if json_obj['request_gps'] == 1:
-        #      self.remote_gps_addr = self.remote_addr
-        #    else:
-        #      self.remote_gps_addr = None
-        #    ret = False
-        #  except:
-        #    pass
+        if 'request_gps' in json_obj:
+          try:
+            if json_obj['request_gps'] == 1:
+              self.remote_gps_addr = self.remote_addr
+            else:
+              self.remote_gps_addr = None
+            ret = False
+          except:
+            pass
 
         if 'echo' in json_obj:
           try:
@@ -234,6 +234,7 @@ def main():
         dat.roadLimitSpeed.sectionLeftTime = server.get_limit_val("section_left_time", 0)
         dat.roadLimitSpeed.sectionAdjustSpeed = server.get_limit_val("section_adjust_speed", False)
         dat.roadLimitSpeed.camSpeedFactor = server.get_limit_val("cam_speed_factor", CAMERA_SPEED_FACTOR)
+        dat.roadLimitSpeed.currentRoadName = server.get_limit_val("current_road_name", "")
         roadLimitSpeed.send(dat.to_bytes())
         server.send_sdp(sock)
         server.check()

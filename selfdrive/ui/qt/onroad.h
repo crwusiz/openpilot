@@ -49,6 +49,7 @@ private:
 class AnnotatedCameraWidget : public CameraWidget {
   Q_OBJECT
   Q_PROPERTY(QString speedUnit MEMBER speedUnit);
+  Q_PROPERTY(QString currentRoadName MEMBER currentRoadName);
 
   Q_PROPERTY(bool is_cruise_set MEMBER is_cruise_set);
   Q_PROPERTY(bool steeringPressed MEMBER steeringPressed);
@@ -130,6 +131,7 @@ private:
   QPixmap nda_img, hda_img;
 
   QString speedUnit;
+  QString currentRoadName;
   std::unique_ptr<PubMaster> pm;
 
   bool is_cruise_set = false;

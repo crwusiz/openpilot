@@ -357,6 +357,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("camLimitSpeedLeftDist", ls.getCamLimitSpeedLeftDist());
   setProperty("sectionLimitSpeed", ls.getSectionLimitSpeed());
   setProperty("sectionLeftDist", ls.getSectionLeftDist());
+  setProperty("currentRoadName", ls.getCurrentRoadName().cStr());
   setProperty("left_on", ce.getLeftBlinker());
   setProperty("right_on", ce.getRightBlinker());
   setProperty("latAccelFactor", cs.getLateralControlState().getTorqueState().getLatAccelFactor());
@@ -627,6 +628,13 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     drawTextColor(p, x, y + 170, saop_str, sa_color);
   }
 
+  // upper current road name
+  x = rect().left() + (btn_size * 1.8);
+  y = (bdr_s * 3);
+
+  configFont(p, "Inter", 40, "Regular");
+  drawTextColor(p, x, y, currentRoadName, whiteColor(200));
+
   // lat icon (upper right down 2)
   x = rect().right() - (btn_size / 2) - (bdr_s * 3) - (btn_size);
   y = (btn_size / 2) + (bdr_s * 20);
@@ -636,9 +644,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 1.5);
   y = rect().bottom() - (footer_h / 2) + (bdr_s *2);
   drawIcon(p, x, y, gaspress_img, icon_bg, gas_pressed ? 1.0 : 0.2);
-
-  // dm icon (bottom 1eft 1)
-  // AnnotatedCameraWidget::drawDriverState
 
   // scc gap icon (bottom right 1)
   if (gap_state == 1) {
