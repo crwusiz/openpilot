@@ -257,6 +257,8 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   turnsignal_l_img = loadPixmap("../assets/img_turnsignal_l.png", {img_size, img_size});
   turnsignal_r_img = loadPixmap("../assets/img_turnsignal_r.png", {img_size, img_size});
   tpms_img = loadPixmap("../assets/img_tpms.png");
+  traffic_green_img = loadPixmap("../assets/img_traffic_green.png");
+  traffic_red_img = loadPixmap("../assets/img_traffic_red.png");
 
   // neokii add
   autohold_warning_img = loadPixmap("../assets/img_autohold_warning.png", {img_size, img_size});
@@ -293,6 +295,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   const auto ge = sm["gpsLocationExternal"].getGpsLocationExternal();
   const auto ls = sm["roadLimitSpeed"].getRoadLimitSpeed();
   const auto tp = sm["liveTorqueParameters"].getLiveTorqueParameters();
+  const auto lo = sm["longitudinalPlan"].getLongitudinalPlan();
 
   const bool cs_alive = sm.alive("controlsState");
 
@@ -365,6 +368,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
   setProperty("frictionRaw", tp.getFrictionCoefficientRaw());
   setProperty("isCanfd", ce.getIsCanfd());
+  setProperty("traffic_state", lo.getTrafficState());
 
   // update engageability/experimental mode button
   experimental_btn->updateState(s);
@@ -597,6 +601,19 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   x = rect().right() - (btn_size / 2) - (bdr_s * 3) - (btn_size * 3);
   y = (btn_size / 2) + (bdr_s * 4);
   drawIconRotate(p, x, y, direction_img, icon_bg, gps_state ? 1.0 : 0.2, gpsBearing);
+
+  // traffic icon (upper right5)
+  if (traffic_state > 0) {
+    w = 100;
+    h = 50;
+    x = (width() + (bdr_s * 2)) / 2 + w * 2;
+    y = 30 - bdr_s;
+    if (traffic_state == 1) {
+      p.drawPixmap(x, y, w, h, traffic_red_img);
+    } else if (traffic_state == 2) {
+      p.drawPixmap(x, y, w, h, traffic_green_img);
+    }
+  }
 
   // nda icon (upper center)
   if (nda_state > 0) {

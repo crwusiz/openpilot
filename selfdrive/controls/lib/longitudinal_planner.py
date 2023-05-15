@@ -16,11 +16,14 @@ from system.swaglog import cloudlog
 
 LON_MPC_STEP = 0.2  # first step is 0.2s
 A_CRUISE_MIN = -1.2
-A_CRUISE_MAX_VALS = [1.6, 1.2, 0.8, 0.6]
-A_CRUISE_MAX_BP = [0., 10.0, 25., 40.]
+#A_CRUISE_MAX_VALS = [1.6, 1.2, 0.8, 0.6]
+A_CRUISE_MAX_VALS = [2.0, 1.4, 0.5, 0.2, 0.15]
+#A_CRUISE_MAX_BP = [0., 10.0, 25., 40.]
+A_CRUISE_MAX_BP = [0., 40 * CV.KPH_TO_MS, 60 * CV.KPH_TO_MS, 80 * CV.KPH_TO_MS, 110 * CV.KPH_TO_MS, 140 * CV.KPH_TO_MS]
 
 # Lookup table for turns
-_A_TOTAL_MAX_V = [1.7, 3.2]
+#_A_TOTAL_MAX_V = [1.7, 3.2]
+_A_TOTAL_MAX_V = [2.5, 3.2]
 _A_TOTAL_MAX_BP = [20., 40.]
 
 
@@ -67,12 +70,14 @@ class LongitudinalPlanner:
       v = np.interp(T_IDXS_MPC, T_IDXS, model_msg.velocity.x) - model_error
       a = np.interp(T_IDXS_MPC, T_IDXS, model_msg.acceleration.x)
       j = np.zeros(len(T_IDXS_MPC))
+      y = np.interp(T_IDXS_MPC, T_IDXS, model_msg.position.y)
     else:
       x = np.zeros(len(T_IDXS_MPC))
       v = np.zeros(len(T_IDXS_MPC))
       a = np.zeros(len(T_IDXS_MPC))
       j = np.zeros(len(T_IDXS_MPC))
-    return x, v, a, j
+      y = np.zeros(len(T_IDXS_MPC))
+    return x, v, a, j, y
 
   def update(self, sm):
     self.mpc.mode = 'blended' if sm['controlsState'].experimentalMode else 'acc'
@@ -117,8 +122,8 @@ class LongitudinalPlanner:
     self.mpc.set_weights(prev_accel_constraint)
     self.mpc.set_accel_limits(accel_limits_turns[0], accel_limits_turns[1])
     self.mpc.set_cur_state(self.v_desired_filter.x, self.a_desired)
-    x, v, a, j = self.parse_model(sm['modelV2'], self.v_model_error)
-    self.mpc.update(sm['carState'], sm['radarState'], v_cruise, x, v, a, j)
+    x, v, a, j, y = self.parse_model(sm['modelV2'], self.v_model_error)
+    self.mpc.update(sm['carState'], sm['radarState'], sm['modelV2'], sm['controlsState'], v_cruise, x, v, a, j, y)
 
     self.v_desired_trajectory_full = np.interp(T_IDXS, T_IDXS_MPC, self.mpc.v_solution)
     self.a_desired_trajectory_full = np.interp(T_IDXS, T_IDXS_MPC, self.mpc.a_solution)
@@ -154,5 +159,9 @@ class LongitudinalPlanner:
     longitudinalPlan.fcw = self.fcw
 
     longitudinalPlan.solverExecutionTime = self.mpc.solve_time
+
+    longitudinalPlan.trafficState = self.mpc.trafficState
+    longitudinalPlan.xState = self.mpc.xState
+    longitudinalPlan.xStop = float(self.mpc.stopDist)
 
     pm.send('longitudinalPlan', plan_send)

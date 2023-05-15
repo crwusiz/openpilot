@@ -80,6 +80,7 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(int sectionLimitSpeed MEMBER sectionLimitSpeed);
   Q_PROPERTY(int sectionLeftDist MEMBER sectionLeftDist);
   Q_PROPERTY(int accel MEMBER accel);
+  Q_PROPERTY(int traffic_state MEMBER traffic_state);
 
   Q_PROPERTY(float speed MEMBER speed);
   Q_PROPERTY(float applyMaxSpeed MEMBER applyMaxSpeed);
@@ -124,6 +125,7 @@ private:
   QPixmap wifi_img, wifi_l_img, wifi_m_img, wifi_h_img, wifi_f_img;
   QPixmap gps_img, direction_img, tpms_img;
   QPixmap turnsignal_l_img, turnsignal_r_img;
+  QPixmap traffic_green_img, traffic_red_img;
 
   // neokii add
   QPixmap autohold_warning_img;
@@ -160,6 +162,7 @@ private:
   int camLimitSpeed, sectionLimitSpeed = 0;
   int camLimitSpeedLeftDist, sectionLeftDist = 0;
   int skip_frame_count = 0;
+  int traffic_state = 0;
 
   float speed, applyMaxSpeed, cruiseMaxSpeed;
   float gpsBearing, gpsVerticalAccuracy, gpsAltitude, gpsAccuracy = 0;

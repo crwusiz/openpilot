@@ -1,9 +1,13 @@
 from common.numpy_fast import mean
 from common.kalman.simple_kalman import KF1D
+from common.filter_simple import StreamingMovingAverage
 
 
 # Default lead acceleration decay set to 50% at 1s
 _LEAD_ACCEL_TAU = 1.5
+
+# Hack to maintain vision lead state
+_vision_lead_aTau = {0: _LEAD_ACCEL_TAU, 1: _LEAD_ACCEL_TAU}
 
 # radar tracks
 SPEED, ACCEL = 0, 1   # Kalman filter states enum
@@ -59,6 +63,7 @@ class Track():
 class Cluster():
   def __init__(self):
     self.tracks = set()
+    self.aLeadKFilter = StreamingMovingAverage(3)
 
   def add(self, t):
     # add the first track
@@ -130,15 +135,41 @@ class Cluster():
       "aLeadTau": float(self.aLeadTau)
     }
 
-  def get_RadarState_from_vision(self, lead_msg, v_ego):
+  def get_RadarState2(self, model_prob, lead_msg, lead_index):
+    useVisionMix = False
+    if float(lead_msg.prob) > 0.5 and abs(float(self.aLeadK)) < abs(float(lead_msg.a[0])):
+      useVisionMix = True
+
+    aLeadK = self.aLeadKFilter.process(float(lead_msg.a[0]) if useVisionMix else float(self.aLeadK))
+    return {
+      "dRel": float(self.dRel),
+      "yRel": float(self.yRel),
+      "vRel": float(self.vRel),
+      "vLead": float(self.vLead),
+      "vLeadK": float(self.vLeadK),
+      "aLeadK": aLeadK,
+      "status": True,
+      "fcw": self.is_potential_fcw(model_prob),
+      "modelProb": model_prob,
+      "radar": True,
+      "aLeadTau": _vision_lead_aTau[lead_index] if useVisionMix else float(self.aLeadTau)
+    }
+
+  def get_RadarState_from_vision(self, lead_msg, lead_index, v_ego):
+    # Learn if constant acceleration
+    if abs(float(lead_msg.a[0])) < 0.5:
+      _vision_lead_aTau[lead_index] = _LEAD_ACCEL_TAU
+    else:
+      _vision_lead_aTau[lead_index] *= 0.9
+
     return {
       "dRel": float(lead_msg.x[0] - RADAR_TO_CAMERA),
       "yRel": float(-lead_msg.y[0]),
       "vRel": float(lead_msg.v[0] - v_ego),
       "vLead": float(lead_msg.v[0]),
       "vLeadK": float(lead_msg.v[0]),
-      "aLeadK": float(0),
-      "aLeadTau": _LEAD_ACCEL_TAU,
+      "aLeadK": float(lead_msg.a[0]),
+      "aLeadTau": _vision_lead_aTau[lead_index],
       "fcw": False,
       "modelProb": float(lead_msg.prob),
       "radar": False,
