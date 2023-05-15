@@ -43,6 +43,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     overheat @19;
     calibrationIncomplete @20;
     calibrationInvalid @21;
+    calibrationRecalibrating @117;
     controlsMismatch @22;
     pcmEnable @23;
     pcmDisable @24;
@@ -116,12 +117,12 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     steerTimeLimit @115;
     vehicleSensorsInvalid @116;
 
-    autoLaneChange @117;
     slowingDownSpeed @118;
     slowingDownSpeedSound @119;
     cruiseOn @120;
     cruiseOff @121;
     turningIndicatorOn @122;
+    autoLaneChange @123;
 
     radarCanErrorDEPRECATED @15;
     communityFeatureDisallowedDEPRECATED @62;

@@ -245,9 +245,10 @@ def below_steer_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.S
 
 
 def calibration_incomplete_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+  first_word = 'Recalibration' if sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.recalibrating else 'Calibration'
   return Alert(
-    "캘리브레이션 진행중입니다 : %d%%" % sm['liveCalibration'].calPerc,
-    f"속도를 {get_display_speed(MIN_SPEED_FILTER, metric)}이상으로 주행하세요",
+    f"{first_word} 진행중입니다: {sm['liveCalibration'].calPerc:.0f}%",
+    f"속도를 {get_display_speed(MIN_SPEED_FILTER, metric)} 이상으로 주행하세요",
     AlertStatus.normal, AlertSize.mid,
     Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2)
 
@@ -759,8 +760,14 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   EventName.calibrationIncomplete: {
     ET.PERMANENT: calibration_incomplete_alert,
-    ET.SOFT_DISABLE: soft_disable_alert("장치 위치변경 감지됨 : 캘리브레이션 진행중입니다"),
+    ET.SOFT_DISABLE: soft_disable_alert("캘리브레이션 진행중입니다"),
     ET.NO_ENTRY: NoEntryAlert("캘리브레이션 진행중입니다"),
+  },
+
+  EventName.calibrationRecalibrating: {
+    ET.PERMANENT: calibration_incomplete_alert,
+    ET.SOFT_DISABLE: soft_disable_alert("장치 위치변경 감지됨 : 캘리브레이션 진행중입니다"),
+    ET.NO_ENTRY: NoEntryAlert("장치 위치변경 감지됨 : 캘리브레이션 진행중입니다"),
   },
 
   EventName.doorOpen: {

@@ -6,7 +6,7 @@ from cereal import car
 from panda.python import uds
 from common.conversions import Conversions as CV
 from selfdrive.car import dbc_dict
-from selfdrive.car.docs_definitions import CarFootnote, CarInfo, Column, Harness
+from selfdrive.car.docs_definitions import CarFootnote, CarInfo, Column, Harness, HarnessKit
 from selfdrive.car.fw_query_definitions import FwQueryConfig, Request, p16
 
 Ecu = car.CarParams.Ecu
@@ -129,117 +129,109 @@ class HyundaiCarInfo(CarInfo):
 
 CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
   CAR.ELANTRA_I30: [
-    HyundaiCarInfo("Hyundai Elantra 2017-19", min_enable_speed=19 * CV.MPH_TO_MS, harness=Harness.hyundai_b),
-    HyundaiCarInfo("Hyundai Elantra GT 2017-19", harness=Harness.hyundai_e),
-    HyundaiCarInfo("Hyundai i30 2017-19", harness=Harness.hyundai_e),
+    HyundaiCarInfo("Hyundai Elantra 2017-19", min_enable_speed=19 * CV.MPH_TO_MS, harness_kit=HarnessKit(Harness.hyundai_b)),
+    HyundaiCarInfo("Hyundai Elantra GT 2017-19", harness_kit=HarnessKit(Harness.hyundai_e)),
+    HyundaiCarInfo("Hyundai i30 2017-19", harness_kit=HarnessKit(Harness.hyundai_e)),
   ],
-  CAR.ELANTRA_CN7: HyundaiCarInfo("Hyundai Elantra 2021-23", video_link="https://youtu.be/_EdYQtV52-c", harness=Harness.hyundai_k),
-  CAR.ELANTRA_CN7_HEV: HyundaiCarInfo("Hyundai Elantra Hybrid 2021-23", video_link="https://youtu.be/_EdYQtV52-c", harness=Harness.hyundai_k),
-  CAR.SONATA_DN8: HyundaiCarInfo("Hyundai Sonata 2020-22", "All", video_link="https://www.youtube.com/watch?v=ix63r9kE3Fw",
-                             harness=Harness.hyundai_a),
-  CAR.SONATA_DN8_HEV: HyundaiCarInfo("Hyundai Sonata Hybrid 2020-22", "All", harness=Harness.hyundai_a),
-  CAR.SONATA_LF: HyundaiCarInfo("Hyundai Sonata 2018-19", harness=Harness.hyundai_e),
-  CAR.KONA: HyundaiCarInfo("Hyundai Kona 2020", harness=Harness.hyundai_b),
+  CAR.ELANTRA_CN7: HyundaiCarInfo("Hyundai Elantra 2021-23", video_link="https://youtu.be/_EdYQtV52-c", harness_kit=HarnessKit(Harness.hyundai_k)),
+  CAR.ELANTRA_CN7_HEV: HyundaiCarInfo("Hyundai Elantra Hybrid 2021-23", video_link="https://youtu.be/_EdYQtV52-c", harness_kit=HarnessKit(Harness.hyundai_k)),
+  CAR.SONATA_DN8: HyundaiCarInfo("Hyundai Sonata 2020-22", "All", video_link="https://www.youtube.com/watch?v=ix63r9kE3Fw", harness_kit=HarnessKit(Harness.hyundai_a)),
+  CAR.SONATA_DN8_HEV: HyundaiCarInfo("Hyundai Sonata Hybrid 2020-22", "All", harness_kit=HarnessKit(Harness.hyundai_a)),
+  CAR.SONATA_LF: HyundaiCarInfo("Hyundai Sonata 2018-19", harness_kit=HarnessKit(Harness.hyundai_e)),
+  CAR.KONA: HyundaiCarInfo("Hyundai Kona 2020", harness_kit=HarnessKit(Harness.hyundai_b)),
   CAR.KONA_EV: [
-    HyundaiCarInfo("Hyundai Kona Electric 2018-21", harness=Harness.hyundai_g),
-    HyundaiCarInfo("Hyundai Kona Electric 2022", "Smart Cruise Control (SCC)", harness=Harness.hyundai_o),
+    HyundaiCarInfo("Hyundai Kona Electric 2018-21", harness_kit=HarnessKit(Harness.hyundai_g)),
+    HyundaiCarInfo("Hyundai Kona Electric 2022", "Smart Cruise Control (SCC)", harness_kit=HarnessKit(Harness.hyundai_o)),
   ],
-  CAR.KONA_HEV: HyundaiCarInfo("Hyundai Kona Hybrid 2020", harness=Harness.hyundai_i),
+  CAR.KONA_HEV: HyundaiCarInfo("Hyundai Kona Hybrid 2020", harness_kit=HarnessKit(Harness.hyundai_i)),
   CAR.IONIQ_EV: [
-    HyundaiCarInfo("Hyundai Ioniq Electric 2019", harness=Harness.hyundai_c),
-    HyundaiCarInfo("Hyundai Ioniq Electric 2020", harness=Harness.hyundai_h),
+    HyundaiCarInfo("Hyundai Ioniq Electric 2019", harness_kit=HarnessKit(Harness.hyundai_c)),
+    HyundaiCarInfo("Hyundai Ioniq Electric 2020", harness_kit=HarnessKit(Harness.hyundai_h)),
   ],
   CAR.IONIQ_HEV: [
-    HyundaiCarInfo("Hyundai Ioniq Hybrid 2017-19", harness=Harness.hyundai_c),
-    HyundaiCarInfo("Hyundai Ioniq Hybrid 2020-22", "SCC + LFA", harness=Harness.hyundai_h),
-    HyundaiCarInfo("Hyundai Ioniq Plug-in Hybrid 2019", harness=Harness.hyundai_c),
-    HyundaiCarInfo("Hyundai Ioniq Plug-in Hybrid 2020-21", harness=Harness.hyundai_h),
+    HyundaiCarInfo("Hyundai Ioniq Hybrid 2017-19", harness_kit=HarnessKit(Harness.hyundai_c)),
+    HyundaiCarInfo("Hyundai Ioniq Hybrid 2020-22", "SCC + LFA", harness_kit=HarnessKit(Harness.hyundai_h)),
+    HyundaiCarInfo("Hyundai Ioniq Plug-in Hybrid 2019", harness_kit=HarnessKit(Harness.hyundai_c)),
+    HyundaiCarInfo("Hyundai Ioniq Plug-in Hybrid 2020-21", harness_kit=HarnessKit(Harness.hyundai_h)),
   ],
   CAR.SANTAFE: [
-    HyundaiCarInfo("Hyundai Santa Fe 2019-20", "All", harness=Harness.hyundai_d),
-    HyundaiCarInfo("Hyundai Santa Fe 2021-22", "All", harness=Harness.hyundai_l),
+    HyundaiCarInfo("Hyundai Santa Fe 2019-20", "All", harness_kit=HarnessKit(Harness.hyundai_d)),
+    HyundaiCarInfo("Hyundai Santa Fe 2021-22", "All", harness_kit=HarnessKit(Harness.hyundai_l)),
   ],
-  CAR.SANTAFE_HEV: [
-    HyundaiCarInfo("Hyundai Santa Fe Hybrid 2022", "All", harness=Harness.hyundai_l),
-  ],
+  CAR.SANTAFE_HEV: HyundaiCarInfo("Hyundai Santa Fe Hybrid 2022", "All", harness_kit=HarnessKit(Harness.hyundai_l)),
   CAR.TUCSON: [
-    HyundaiCarInfo("Hyundai Tucson 2021", "Smart Cruise Control (SCC)", min_enable_speed=19 * CV.MPH_TO_MS, harness=Harness.hyundai_l),
-    HyundaiCarInfo("Hyundai Tucson Diesel 2019", "Smart Cruise Control (SCC)", harness=Harness.hyundai_l),
+    HyundaiCarInfo("Hyundai Tucson 2021", "Smart Cruise Control (SCC)", min_enable_speed=19 * CV.MPH_TO_MS, harness_kit=HarnessKit(Harness.hyundai_l)),
+    HyundaiCarInfo("Hyundai Tucson Diesel 2019", "Smart Cruise Control (SCC)", harness_kit=HarnessKit(Harness.hyundai_l)),
   ],
   CAR.PALISADE: [
-    HyundaiCarInfo("Hyundai Palisade 2020-22", "All", video_link="https://youtu.be/TAnDqjF4fDY?t=456", harness=Harness.hyundai_h),
-    HyundaiCarInfo("Kia Telluride 2020", "All", harness=Harness.hyundai_h),
+    HyundaiCarInfo("Hyundai Palisade 2020-22", "All", video_link="https://youtu.be/TAnDqjF4fDY?t=456", harness_kit=HarnessKit(Harness.hyundai_h)),
+    HyundaiCarInfo("Kia Telluride 2020", "All", harness_kit=HarnessKit(Harness.hyundai_h)),
   ],
-  CAR.VELOSTER: HyundaiCarInfo("Hyundai Veloster 2019-20", "Smart Cruise Control (SCC)", min_enable_speed=5. * CV.MPH_TO_MS, harness=Harness.hyundai_e),
+  CAR.VELOSTER: HyundaiCarInfo("Hyundai Veloster 2019-20", "Smart Cruise Control (SCC)", min_enable_speed=5. * CV.MPH_TO_MS, harness_kit=HarnessKit(Harness.hyundai_e)),
 
   # Kia
   CAR.FORTE: [
-    HyundaiCarInfo("Kia Forte 2018", harness=Harness.hyundai_b),
-    HyundaiCarInfo("Kia Forte 2019-21", "All", harness=Harness.hyundai_g),
+    HyundaiCarInfo("Kia Forte 2018", harness_kit=HarnessKit(Harness.hyundai_b)),
+    HyundaiCarInfo("Kia Forte 2019-21", "All", harness_kit=HarnessKit(Harness.hyundai_g)),
   ],
   CAR.K5: [
-    HyundaiCarInfo("Kia Optima 2017", min_steer_speed=32. * CV.MPH_TO_MS, harness=Harness.hyundai_b),
-    HyundaiCarInfo("Kia Optima 2019", harness=Harness.hyundai_g),
+    HyundaiCarInfo("Kia Optima 2017", min_steer_speed=32. * CV.MPH_TO_MS, harness_kit=HarnessKit(Harness.hyundai_b)),
+    HyundaiCarInfo("Kia Optima 2019", harness_kit=HarnessKit(Harness.hyundai_g)),
   ],
   CAR.K5_HEV: [
     HyundaiCarInfo("Kia Optima Hybrid 2017", "Advanced Smart Cruise Control"),  # TODO: may support adjacent years
     HyundaiCarInfo("Kia Optima Hybrid 2019"),
   ],
-  CAR.K5_DL3: HyundaiCarInfo("Kia K5 2021-22", "SCC", harness=Harness.hyundai_a),
+  CAR.K5_DL3: HyundaiCarInfo("Kia K5 2021-22", "SCC", harness_kit=HarnessKit(Harness.hyundai_a)),
   CAR.NIRO_EV: [
-    HyundaiCarInfo("Kia Niro Electric 2019-20", "All", video_link="https://www.youtube.com/watch?v=lT7zcG6ZpGo", harness=Harness.hyundai_f),
-    HyundaiCarInfo("Kia Niro Electric 2021", "All", video_link="https://www.youtube.com/watch?v=lT7zcG6ZpGo", harness=Harness.hyundai_c),
-    HyundaiCarInfo("Kia Niro Electric 2022", "All", video_link="https://www.youtube.com/watch?v=lT7zcG6ZpGo", harness=Harness.hyundai_h),
+    HyundaiCarInfo("Kia Niro Electric 2019-20", "All", video_link="https://www.youtube.com/watch?v=lT7zcG6ZpGo", harness_kit=HarnessKit(Harness.hyundai_f)),
+    HyundaiCarInfo("Kia Niro Electric 2021", "All", video_link="https://www.youtube.com/watch?v=lT7zcG6ZpGo", harness_kit=HarnessKit(Harness.hyundai_c)),
+    HyundaiCarInfo("Kia Niro Electric 2022", "All", video_link="https://www.youtube.com/watch?v=lT7zcG6ZpGo", harness_kit=HarnessKit(Harness.hyundai_h)),
   ],
   CAR.NIRO_HEV: [
-    HyundaiCarInfo("Kia Niro Hybrid 2019", min_enable_speed=10. * CV.MPH_TO_MS, harness=Harness.hyundai_c),
-    HyundaiCarInfo("Kia Niro Hybrid 2021", harness=Harness.hyundai_f),  # TODO: could be hyundai_d, verify
-    HyundaiCarInfo("Kia Niro Hybrid 2022", harness=Harness.hyundai_h),
+    HyundaiCarInfo("Kia Niro Hybrid 2019", min_enable_speed=10. * CV.MPH_TO_MS, harness_kit=HarnessKit(Harness.hyundai_c)),
+    HyundaiCarInfo("Kia Niro Hybrid 2021", harness_kit=HarnessKit(Harness.hyundai_f)),  # TODO: could be hyundai_d, verify
+    HyundaiCarInfo("Kia Niro Hybrid 2022", harness_kit=HarnessKit(Harness.hyundai_h)),
   ],
-  CAR.K7: HyundaiCarInfo("Kia K7 2016-19", harness=Harness.hyundai_c),
-  CAR.K7_HEV: HyundaiCarInfo("Kia K7 Hybrid 2016-19", harness=Harness.hyundai_c),
-  CAR.SELTOS: HyundaiCarInfo("Kia Seltos 2021", harness=Harness.hyundai_a),
+  CAR.K7: HyundaiCarInfo("Kia K7 2016-19", harness_kit=HarnessKit(Harness.hyundai_c)),
+  CAR.K7_HEV: HyundaiCarInfo("Kia K7 Hybrid 2016-19", harness_kit=HarnessKit(Harness.hyundai_c)),
+  CAR.SELTOS: HyundaiCarInfo("Kia Seltos 2021", harness_kit=HarnessKit(Harness.hyundai_a)),
   CAR.SORENTO: [
-    HyundaiCarInfo("Kia Sorento 2018", video_link="https://www.youtube.com/watch?v=Fkh3s6WHJz8", harness=Harness.hyundai_c),
-    HyundaiCarInfo("Kia Sorento 2019", video_link="https://www.youtube.com/watch?v=Fkh3s6WHJz8", harness=Harness.hyundai_e),
+    HyundaiCarInfo("Kia Sorento 2018", video_link="https://www.youtube.com/watch?v=Fkh3s6WHJz8", harness_kit=HarnessKit(Harness.hyundai_c)),
+    HyundaiCarInfo("Kia Sorento 2019", video_link="https://www.youtube.com/watch?v=Fkh3s6WHJz8", harness_kit=HarnessKit(Harness.hyundai_e)),
   ],
-  CAR.STINGER: HyundaiCarInfo("Kia Stinger 2018", video_link="https://www.youtube.com/watch?v=MJ94qoofYw0", harness=Harness.hyundai_c),
+  CAR.STINGER: HyundaiCarInfo("Kia Stinger 2018", video_link="https://www.youtube.com/watch?v=MJ94qoofYw0", harness_kit=HarnessKit(Harness.hyundai_c)),
 
   # Genesis
-  CAR.GENESIS: HyundaiCarInfo("Hyundai Genesis 2015-16", min_enable_speed=19 * CV.MPH_TO_MS, harness=Harness.hyundai_j),
-  CAR.GENESIS_G70: HyundaiCarInfo("Genesis G70 2018", "All", harness=Harness.hyundai_f),
-  CAR.GENESIS_G80: HyundaiCarInfo("Genesis G80 2018", "All", harness=Harness.hyundai_h),
-  CAR.GENESIS_G90: HyundaiCarInfo("Genesis G90 2018", "All", harness=Harness.hyundai_c),
+  CAR.GENESIS: HyundaiCarInfo("Hyundai Genesis 2015-16", min_enable_speed=19 * CV.MPH_TO_MS, harness_kit=HarnessKit(Harness.hyundai_j)),
+  CAR.GENESIS_G70: HyundaiCarInfo("Genesis G70 2018", "All", harness_kit=HarnessKit(Harness.hyundai_f)),
+  CAR.GENESIS_G80: HyundaiCarInfo("Genesis G80 2018", "All", harness_kit=HarnessKit(Harness.hyundai_h)),
+  CAR.GENESIS_G90: HyundaiCarInfo("Genesis G90 2018", "All", harness_kit=HarnessKit(Harness.hyundai_c)),
 
   # CANFD
   CAR.IONIQ5: [
-    HyundaiCarInfo("Hyundai Ioniq 5 (Southeast Asia only) 2022-23", "All", harness=Harness.hyundai_q),
-    HyundaiCarInfo("Hyundai Ioniq 5 (without HDA II) 2022-23", "Highway Driving Assist", harness=Harness.hyundai_k),
-    HyundaiCarInfo("Hyundai Ioniq 5 (with HDA II) 2022-23", "Highway Driving Assist II", harness=Harness.hyundai_q),
+    HyundaiCarInfo("Hyundai Ioniq 5 (Southeast Asia only) 2022-23", "All", harness_kit=HarnessKit(Harness.hyundai_q)),
+    HyundaiCarInfo("Hyundai Ioniq 5 (without HDA II) 2022-23", "Highway Driving Assist", harness_kit=HarnessKit(Harness.hyundai_k)),
+    HyundaiCarInfo("Hyundai Ioniq 5 (with HDA II) 2022-23", "Highway Driving Assist II", harness_kit=HarnessKit(Harness.hyundai_q)),
   ],
   CAR.TUCSON_NX4: [
-    HyundaiCarInfo("Hyundai Tucson 2022", harness=Harness.hyundai_n),
-    HyundaiCarInfo("Hyundai Tucson 2023", "All", harness=Harness.hyundai_n),
+    HyundaiCarInfo("Hyundai Tucson 2022", harness_kit=HarnessKit(Harness.hyundai_n)),
+    HyundaiCarInfo("Hyundai Tucson 2023", "All", harness_kit=HarnessKit(Harness.hyundai_n)),
   ],
-  CAR.TUCSON_NX4_HEV: HyundaiCarInfo("Hyundai Tucson Hybrid 2022", "Highway Driving Assist II", harness=Harness.hyundai_n),
+  CAR.TUCSON_NX4_HEV: HyundaiCarInfo("Hyundai Tucson Hybrid 2022", "Highway Driving Assist II", harness_kit=HarnessKit(Harness.hyundai_n)),
   CAR.EV6: [
-    HyundaiCarInfo("Kia EV6 (Southeast Asia only) 2022-23", "All", harness=Harness.hyundai_p),
-    HyundaiCarInfo("Kia EV6 (without HDA II) 2022", "Highway Driving Assist", harness=Harness.hyundai_l),
-    HyundaiCarInfo("Kia EV6 (with HDA II) 2022", "Highway Driving Assist II", harness=Harness.hyundai_p)
+    HyundaiCarInfo("Kia EV6 (Southeast Asia only) 2022-23", "All", harness_kit=HarnessKit(Harness.hyundai_p)),
+    HyundaiCarInfo("Kia EV6 (without HDA II) 2022", "Highway Driving Assist", harness_kit=HarnessKit(Harness.hyundai_l)),
+    HyundaiCarInfo("Kia EV6 (with HDA II) 2022", "Highway Driving Assist II", harness_kit=HarnessKit(Harness.hyundai_p))
   ],
-  CAR.SPORTAGE_NQ5: HyundaiCarInfo("Kia Sportage Hybrid 2023", harness=Harness.hyundai_n),
-  CAR.SPORTAGE_NQ5_HEV: HyundaiCarInfo("Kia Sportage Hybrid 2023", harness=Harness.hyundai_n),
-  CAR.GENESIS_GV60: HyundaiCarInfo("Genesis GV60 2023", "All", harness=Harness.hyundai_k),
-  CAR.GENESIS_GV70: HyundaiCarInfo("Genesis GV70 2022", "Highway Driving Assist II", harness=Harness.hyundai_l),
-  CAR.GENESIS_GV80: HyundaiCarInfo("Genesis GV80 2023", "All", harness=Harness.hyundai_m),
-  CAR.SORENTO_MQ4_HEV: HyundaiCarInfo("Kia Sorento Hybrid 2022-23", "Smart Cruise Control (SCC)",
-                                               harness=Harness.hyundai_a),
-  CAR.NIRO_SG2_EV: [
-    HyundaiCarInfo("Kia Niro Ev 2023", harness=Harness.hyundai_a),
-  ],
-  CAR.NIRO_SG2_HEV: [
-    HyundaiCarInfo("Kia Niro Hybrid 2023", harness=Harness.hyundai_a),
-  ],
+  CAR.SPORTAGE_NQ5: HyundaiCarInfo("Kia Sportage Hybrid 2023", harness_kit=HarnessKit(Harness.hyundai_n)),
+  CAR.SPORTAGE_NQ5_HEV: HyundaiCarInfo("Kia Sportage Hybrid 2023", harness_kit=HarnessKit(Harness.hyundai_n)),
+  CAR.GENESIS_GV60: HyundaiCarInfo("Genesis GV60 2023", "All", harness_kit=HarnessKit(Harness.hyundai_k)),
+  CAR.GENESIS_GV70: HyundaiCarInfo("Genesis GV70 2022", "Highway Driving Assist II", harness_kit=HarnessKit(Harness.hyundai_l)),
+  CAR.GENESIS_GV80: HyundaiCarInfo("Genesis GV80 2023", "All", harness_kit=HarnessKit(Harness.hyundai_m)),
+  CAR.SORENTO_MQ4_HEV: HyundaiCarInfo("Kia Sorento Hybrid 2022-23", "Smart Cruise Control (SCC)", harness_kit=HarnessKit(Harness.hyundai_a)),
+  CAR.NIRO_SG2_EV: HyundaiCarInfo("Kia Niro Ev 2023", harness_kit=HarnessKit(Harness.hyundai_a)),
+  CAR.NIRO_SG2_HEV: HyundaiCarInfo("Kia Niro Hybrid 2023", harness_kit=HarnessKit(Harness.hyundai_a)),
 }
 
 class Buttons:
@@ -610,6 +602,7 @@ FW_VERSIONS = {
     ],
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00DN8 MDPS C 1,00 1,01 56310L0010\x00 4DNAC101',  # modified firmware
+      b'\xf1\x00DN8 MDPS C 1.00 1.01 56310L0210\x00 4DNAC102',
       b'\xf1\x8756310L0010\x00\xf1\x00DN8 MDPS C 1,00 1,01 56310L0010\x00 4DNAC101',  # modified firmware
       b'\xf1\x00DN8 MDPS C 1.00 1.01 \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00 4DNAC101',
       b'\xf1\x00DN8 MDPS C 1.00 1.01 56310-L0010 4DNAC101',
@@ -635,6 +628,7 @@ FW_VERSIONS = {
       b'\xf1\x82DNCVN5GMCCXXXG2B',
       b'\xf1\x870\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xf1\x81HM6M1_0a0_J10',
       b'\xf1\x870\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xf1\x82DNDWN5TMDCXXXJ1A',
+      b'\xf1\x8739110-2S041\xf1\x81HM6M1_0a0_M10',
       b'\xf1\x87391162M003',
       b'\xf1\x87391162M013',
       b'\xf1\x87391162M023',
@@ -658,6 +652,7 @@ FW_VERSIONS = {
       b'\xf1\x00HT6WA280BLHT6WAD10A1SDN8G25NB2\x00\x00\x00\x00\x00\x00\x08\xc9O:',
       b'\xf1\x00HT6WA280BLHT6WAD10A1SDN8G25NB3\x00\x00\x00\x00\x00\x00\xcb\xc8\xe6L',
       b'\xf1\x00HT6WA280BLHT6WAD10A1SDN8G25NB4\x00\x00\x00\x00\x00\x00g!l[',
+      b'\xf1\x00HT6WA280BLHT6WAE10A1SDN8G25NB5\x00\x00\x00\x00\x00\x00\xe0t\xa9\xba',
       b'\xf1\x00T02601BL  T02730A1  VDN8T25XXX730NS5\xf7_\x92\xf5',
       b'\xf1\x00T02601BL  T02832A1  VDN8T25XXX832NS8G\x0e\xfeE',
       b'\xf1\x00T02601BL  T02900A1  VDN8T25XXX900NSCF\xe4!Y',
