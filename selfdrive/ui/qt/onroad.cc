@@ -257,8 +257,8 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   turnsignal_l_img = loadPixmap("../assets/img_turnsignal_l.png", {img_size, img_size});
   turnsignal_r_img = loadPixmap("../assets/img_turnsignal_r.png", {img_size, img_size});
   tpms_img = loadPixmap("../assets/img_tpms.png");
-  traffic_green_img = loadPixmap("../assets/img_traffic_green.png");
-  traffic_red_img = loadPixmap("../assets/img_traffic_red.png");
+  traffic_go_img = loadPixmap("../assets/img_traffic_go.png");
+  traffic_stop_img = loadPixmap("../assets/img_traffic_stop.png");
 
   // neokii add
   autohold_warning_img = loadPixmap("../assets/img_autohold_warning.png", {img_size, img_size});
@@ -609,9 +609,9 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     x = (width() + (bdr_s * 2)) / 2 + w * 2;
     y = 30 - bdr_s;
     if (traffic_state == 1) {
-      p.drawPixmap(x, y, w, h, traffic_red_img);
+      p.drawPixmap(x, y, w, h, traffic_stop_img);
     } else if (traffic_state == 2) {
-      p.drawPixmap(x, y, w, h, traffic_green_img);
+      p.drawPixmap(x, y, w, h, traffic_go_img);
     }
   }
 

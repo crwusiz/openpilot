@@ -125,7 +125,7 @@ private:
   QPixmap wifi_img, wifi_l_img, wifi_m_img, wifi_h_img, wifi_f_img;
   QPixmap gps_img, direction_img, tpms_img;
   QPixmap turnsignal_l_img, turnsignal_r_img;
-  QPixmap traffic_green_img, traffic_red_img;
+  QPixmap traffic_go_img, traffic_stop_img;
 
   // neokii add
   QPixmap autohold_warning_img;
