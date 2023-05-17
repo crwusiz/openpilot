@@ -604,10 +604,10 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   // traffic icon (upper right5)
   if (traffic_state > 0) {
-    w = 100;
-    h = 50;
-    x = (width() + (bdr_s * 2)) / 2 + w * 2;
-    y = 30 - bdr_s;
+    w = 200;
+    h = 100;
+    x = (width() + (bdr_s * 2)) / 2 + 100;
+    y = 30 - bdr_s * 3;
     if (traffic_state == 1) {
       p.drawPixmap(x, y, w, h, traffic_stop_img);
     } else if (traffic_state == 2) {
@@ -838,6 +838,7 @@ void AnnotatedCameraWidget::drawIconRotate(QPainter &p, int x, int y, QPixmap &i
   r.moveCenter(QPoint(0,0));
   p.drawPixmap(r, img);
   p.restore();
+  p.setOpacity(1.0);
 }
 
 void AnnotatedCameraWidget::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
