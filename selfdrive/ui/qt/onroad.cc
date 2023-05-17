@@ -257,6 +257,7 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   turnsignal_l_img = loadPixmap("../assets/img_turnsignal_l.png", {img_size, img_size});
   turnsignal_r_img = loadPixmap("../assets/img_turnsignal_r.png", {img_size, img_size});
   tpms_img = loadPixmap("../assets/img_tpms.png");
+  traffic_none_img = loadPixmap("../assets/img_traffic_none.png");
   traffic_go_img = loadPixmap("../assets/img_traffic_go.png");
   traffic_stop_img = loadPixmap("../assets/img_traffic_stop.png");
 
@@ -612,6 +613,8 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
       p.drawPixmap(x, y, w, h, traffic_stop_img);
     } else if (traffic_state == 2) {
       p.drawPixmap(x, y, w, h, traffic_go_img);
+    } else {
+      p.drawPixmap(x, y, w, h, traffic_none_img);
     }
   }
 
