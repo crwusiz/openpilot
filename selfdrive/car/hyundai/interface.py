@@ -277,9 +277,9 @@ class CarInterface(CarInterfaceBase):
       ret.lateralTuning.lqr.c = [1., 0.]
 
       if candidate in [CAR.GRANDEUR_IG, CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IGFL, CAR.GRANDEUR_IGFL_HEV, CAR.K7, CAR.K7_HEV]:
-        ret.lateralTuning.lqr.scale = 1600.
-        ret.lateralTuning.lqr.ki = 0.01
-        ret.lateralTuning.lqr.dcGain = 0.0027
+        ret.lateralTuning.lqr.scale = 1650.
+        ret.lateralTuning.lqr.ki = 0.03
+        ret.lateralTuning.lqr.dcGain = 0.0028
         ret.lateralTuning.lqr.k = [-110., 451.]
         ret.lateralTuning.lqr.l = [0.33, 0.318]
       elif candidate == CAR.IONIQ_EV:
