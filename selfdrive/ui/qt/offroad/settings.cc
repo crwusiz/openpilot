@@ -205,6 +205,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   connect(resetCalibBtn, &ButtonControl::clicked, [&]() {
     if (ConfirmationDialog::confirm(tr("Are you sure you want to reset calibration?"), tr("Reset"), this)) {
       params.remove("CalibrationParams");
+      params.remove("LiveTorqueParameters");
     }
   });
   addItem(resetCalibBtn);
@@ -423,7 +424,6 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
     QPushButton {
       font-size: 140px;
       padding-bottom: 20px;
-      font-weight: bold;
       border 1px grey solid;
       border-radius: 100px;
       background-color: #292929;
@@ -463,22 +463,18 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
   }
 #endif
 
-  const int padding = panels.size() > 3 ? 25 : 35;
-
   nav_btns = new QButtonGroup(this);
   for (auto &[name, panel] : panels) {
     QPushButton *btn = new QPushButton(name);
     btn->setCheckable(true);
     btn->setChecked(nav_btns->buttons().size() == 0);
-    btn->setStyleSheet(QString(R"(
+    btn->setStyleSheet(R"(
       QPushButton {
         color: grey;
         border: none;
         background: none;
         font-size: 60px;
         font-weight: 500;
-        padding-top: %1px;
-        padding-bottom: %1px;
       }
       QPushButton:checked {
         color: white;
@@ -486,8 +482,8 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
       QPushButton:pressed {
         color: #ADADAD;
       }
-    )").arg(padding));
-
+    )");
+    btn->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
     nav_btns->addButton(btn);
     sidebar_layout->addWidget(btn, 0, Qt::AlignRight);
 
