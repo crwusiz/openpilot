@@ -576,15 +576,13 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   int x,y,w,h = 0;
   QColor icon_bg = blackColor(100);
 
-  if (wifi_state == 0) {
-    wifi_img = wifi_f_img;
-  } else if (wifi_state == 1) {
+  if (wifi_state == 1) {
     wifi_img = wifi_l_img;
   } else if (wifi_state == 2) {
     wifi_img = wifi_m_img;
   } else if (wifi_state == 3) {
     wifi_img = wifi_h_img;
-  } else if (wifi_state == 4) {
+  } else {
     wifi_img = wifi_f_img;
   }
 
@@ -604,7 +602,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   drawIconRotate(p, x, y, direction_img, icon_bg, gps_state ? 1.0 : 0.2, gpsBearing);
 
   // traffic icon (upper right5)
-  if (traffic_state > 0) {
+  if (traffic_state >= 0) {
     w = 200;
     h = 100;
     x = (width() + (bdr_s * 2)) / 2 + 100;
@@ -672,7 +670,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     gap_img = gap2_img;
   } else if (gap_state == 3) {
     gap_img = gap3_img;
-  } else if (gap_state == 4) {
+  } else {
     gap_img = gap4_img;
   }
 
