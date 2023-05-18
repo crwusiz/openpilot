@@ -63,8 +63,8 @@ T_IDXS_LST = [index_function(idx, max_val=MAX_T, max_idx=N) for idx in range(N+1
 T_IDXS = np.array(T_IDXS_LST)
 FCW_IDXS = T_IDXS < 5.0
 T_DIFFS = np.diff(T_IDXS, prepend=[0.])
-MIN_ACCEL = -4.0  # -3.5
-MAX_ACCEL = 2.5  # 2.0
+MIN_ACCEL = -3.5
+MAX_ACCEL = 2.0
 T_FOLLOW = 1.45
 COMFORT_BRAKE = 2.5
 STOP_DISTANCE = 6.0
@@ -295,9 +295,9 @@ class LongitudinalMpc:
       #cost_weights = [X_EGO_OBSTACLE_COST, X_EGO_COST, V_EGO_COST, A_EGO_COST, a_change_cost, J_EGO_COST]
 
       v_ego = self.x0[1]
-      x_cost = interp(v_ego, [0., 15.], [0.1, X_EGO_COST])
-      v_cost = interp(v_ego, [0., 15.], [0.2, V_EGO_COST])
-      a_cost = interp(v_ego, [0., 15.], [5.0, A_EGO_COST])
+      x_cost = interp(v_ego, [1., 6.], [0.1, X_EGO_COST])
+      v_cost = interp(v_ego, [1., 6.], [0.2, V_EGO_COST])
+      a_cost = interp(v_ego, [1., 6.], [5.0, A_EGO_COST])
 
       cost_weights = [X_EGO_OBSTACLE_COST, x_cost, v_cost, a_cost, a_change_cost, J_EGO_COST]
       constraint_cost_weights = [LIMIT_COST, LIMIT_COST, LIMIT_COST, DANGER_ZONE_COST]
@@ -510,7 +510,7 @@ class LongitudinalMpc:
     if v_ego_kph < 1.0:
       stopSign = model_x < 20.0 and model_v < 10.0
     elif v_ego_kph < 80.0:
-      stopSign = model_x < 130.0 and ((model_v < 3.0) or (model_v < v[0]*0.6)) and abs(y[-1]) < 5.0
+      stopSign = model_x < 110.0 and ((model_v < 3.0) or (model_v < v[0]*0.7)) and abs(y[-1]) < 5.0
     else:
       stopSign = False
 
