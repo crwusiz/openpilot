@@ -1242,6 +1242,13 @@ FW_VERSIONS = {
       b'\xf1\x00FE  MDPS C 1.00 1.05 56340-M5000 9903',
     ],
   },
+  CAR.GRANDEUR_IG: { # (IG)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\000IG MFC  1.00 1.00 95740F9200 180916',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+    ],
+  }
 
   # kia
   CAR.FORTE: { # (BD)
@@ -1416,10 +1423,11 @@ FW_VERSIONS = {
   CAR.K7: { # (YG)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\000YG MFC  1.00 1.01 95740F6100 170717',
-      b'\xf1\000YG MFC  1.00 1.03 95740F9200 190605',
+      b'\xf1\000YG MFC  1.00 1.03 95740F6200 190605',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
-      b'\xf1\x00YG__ SCC F_CUP   1.01 1.02 96400F6000     \xf1\xa01.01',
+      b'\xf1\x00YG__ SCC F_CUP   1.01 1.01 96400F6000     \xf1\xa01.01',
+      b'\xf1\x00YG__ SCC F_CUP   1.01 1.02 96400F6000     \xf1\xa01.02',
     ],
     (Ecu.abs, 0x7d1, None): [
       b'\xf1\x8758920-F6230\xf1\000NC MGH \t 101\031\t\005 58920F6230\xf1\xa01.01',
