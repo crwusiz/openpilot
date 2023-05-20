@@ -1247,6 +1247,8 @@ FW_VERSIONS = {
       b'\xf1\000IG MFC  1.00 1.00 95740F9200 180916',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00IG__ SCC F_CUP   1.00 1.00 95400M9500     \xf1\xa01.00',
+      b'\xf1\x00IG__ SCC F_CUP   1.00 1.00 96400G8000     \xf1\xa01.00',
     ],
   }
 
@@ -1428,6 +1430,7 @@ FW_VERSIONS = {
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00YG__ SCC F_CUP   1.01 1.01 96400F6000     \xf1\xa01.01',
       b'\xf1\x00YG__ SCC F_CUP   1.01 1.02 96400F6000     \xf1\xa01.02',
+      b'\xf1\x00YG__ SCC F_CUP   1.00 1.01 99110F6000     \xf1\xa01.01',
     ],
     (Ecu.abs, 0x7d1, None): [
       b'\xf1\x8758920-F6230\xf1\000NC MGH \t 101\031\t\005 58920F6230\xf1\xa01.01',
