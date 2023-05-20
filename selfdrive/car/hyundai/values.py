@@ -1250,7 +1250,7 @@ FW_VERSIONS = {
       b'\xf1\x00IG__ SCC F_CUP   1.00 1.00 95400M9500     \xf1\xa01.00',
       b'\xf1\x00IG__ SCC F_CUP   1.00 1.00 96400G8000     \xf1\xa01.00',
     ],
-  }
+  },
 
   # kia
   CAR.FORTE: { # (BD)
