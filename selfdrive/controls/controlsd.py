@@ -747,7 +747,7 @@ class Controls:
       now_nanos = self.can_log_mono_time if REPLAY else int(sec_since_boot() * 1e9)
 
       if self.CP.carName == "hyundai":
-        self.last_actuators, can_sends = self.CI.apply(CC, now_nanos, self)
+        self.last_actuators, can_sends = self.CI.apply_hyundai(CC, now_nanos, self)
       else:
         self.last_actuators, can_sends = self.CI.apply(CC, now_nanos)
       self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
