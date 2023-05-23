@@ -628,15 +628,23 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
 
-  auto tmuxlog_btn = new ButtonControl(tr("Tmux error log"), tr("RUN"));
-  QObject::connect(tmuxlog_btn, &ButtonControl::clicked, [=]() {
+  auto tmux_error_log_btn = new ButtonControl(tr("Tmux error log"), tr("RUN"));
+  QObject::connect(tmux_error_log_btn, &ButtonControl::clicked, [=]() {
     const std::string txt = util::read_file("/data/tmux_error.log");
+    ConfirmationDialog::rich(QString::fromStdString(txt), this);
+  });
+
+  auto tmux_launch_log_btn = new ButtonControl(tr("Tmux launch log"), tr("RUN"));
+  QObject::connect(tmux_launch_log_btn, &ButtonControl::clicked, [=]() {
+    const std::string txt = util::read_file("/tmp/launch_log");
     ConfirmationDialog::rich(QString::fromStdString(txt), this);
   });
 
   communityLayout->addWidget(gitpull_btn);
   communityLayout->addWidget(cleardtc_btn);
-  communityLayout->addWidget(tmuxlog_btn);
+  communityLayout->addWidget(horizontal_line());
+  communityLayout->addWidget(tmux_error_log_btn);
+  communityLayout->addWidget(tmux_launch_log_btn);
   communityLayout->addWidget(horizontal_line());
   if (!params.getBool("IsCanfd")) {
     communityLayout->addWidget(new LateralControlSelect());

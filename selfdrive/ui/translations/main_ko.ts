@@ -196,6 +196,10 @@
         <source>Use Stock Navigation Limit Speed Signal</source>
         <translation>차량 순정 내비게이션의 속도제한 정보를 표시합니다</translation>
     </message>
+    <message>
+        <source>Tmux launch log</source>
+        <translation>Tmux 실행 로그</translation>
+    </message>
 </context>
 <context>
     <name>ConfirmationDialog</name>
