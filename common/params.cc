@@ -115,6 +115,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"ForcePowerDown", CLEAR_ON_MANAGER_START},
     {"GitBranch", PERSISTENT},
     {"GitCommit", PERSISTENT},
+    {"GitLog", PERSISTENT},
     {"GitDiff", PERSISTENT},
     {"GithubSshKeys", PERSISTENT},
     {"GithubUsername", PERSISTENT},

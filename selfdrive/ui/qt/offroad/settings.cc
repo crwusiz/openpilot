@@ -755,7 +755,7 @@ SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
   QScroller::grabGesture(list->viewport(), QScroller::LeftMouseButtonGesture);
   list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
   list->addItem(tr("Select Car not use"));
-  QStringList items = get_list("/data/params/d/CarList");
+  QStringList items = get_list("/data/params/crwusiz/CarList");
   list->addItems(items);
   list->setCurrentRow(0);
   QString selected = QString::fromStdString(Params().get("SelectedCar"));
@@ -826,37 +826,37 @@ SelectManufacturer::SelectManufacturer(QWidget* parent): QWidget(parent) {
       qApp->exit(18);
       watchdog_kick(0);
     } else if (list->currentRow() == 1) {
-      QProcess::execute("cp -f /data/params/d/CarList_Hyundai /data/params/d/CarList");
+      QProcess::execute("cp -f /data/params/crwusiz/CarList_Hyundai /data/params/crwusiz/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
       qApp->exit(18);
       watchdog_kick(0);
     } else if (list->currentRow() == 2) {
-      QProcess::execute("cp -f /data/params/d/CarList_Kia /data/params/d/CarList");
+      QProcess::execute("cp -f /data/params/crwusiz/CarList_Kia /data/params/crwusiz/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
       qApp->exit(18);
       watchdog_kick(0);
     } else if (list->currentRow() == 3) {
-      QProcess::execute("cp -f /data/params/d/CarList_Genesis /data/params/d/CarList");
+      QProcess::execute("cp -f /data/params/crwusiz/CarList_Genesis /data/params/crwusiz/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
       qApp->exit(18);
       watchdog_kick(0);
     } else if (list->currentRow() == 4) {
-      QProcess::execute("cp -f /data/params/d/CarList_Gm /data/params/d/CarList");
+      QProcess::execute("cp -f /data/params/crwusiz/CarList_Gm /data/params/crwusiz/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
       qApp->exit(18);
       watchdog_kick(0);
     } else if (list->currentRow() == 5) {
-      QProcess::execute("cp -f /data/params/d/CarList_Toyota /data/params/d/CarList");
+      QProcess::execute("cp -f /data/params/crwusiz/CarList_Toyota /data/params/crwusiz/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
       qApp->exit(18);
       watchdog_kick(0);
     } else if (list->currentRow() == 6) {
-      QProcess::execute("cp -f /data/params/d/CarList_Lexus /data/params/d/CarList");
+      QProcess::execute("cp -f /data/params/crwusiz/CarList_Lexus /data/params/crwusiz/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
       qApp->exit(18);
       watchdog_kick(0);
     } else if (list->currentRow() == 7) {
-      QProcess::execute("cp -f /data/params/d/CarList_Honda /data/params/d/CarList");
+      QProcess::execute("cp -f /data/params/crwusiz/CarList_Honda /data/params/crwusiz/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
       qApp->exit(18);
       watchdog_kick(0);

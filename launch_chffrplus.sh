@@ -84,21 +84,26 @@ function launch {
 
   # CarList
   # sed '$a-------------------' ( add last line )
-  cat ./selfdrive/car/hyundai/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/d/CarList_HYUNDAI
-  awk '/HYUNDAI/' /data/params/d/CarList_HYUNDAI > /data/params/d/CarList_Hyundai
-  awk '/KIA/' /data/params/d/CarList_HYUNDAI > /data/params/d/CarList_Kia
-  awk '/GENESIS/' /data/params/d/CarList_HYUNDAI > /data/params/d/CarList_Genesis
-  cat ./selfdrive/car/toyota/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/d/CarList_TOYOTA
-  awk '/TOYOTA/' /data/params/d/CarList_TOYOTA > /data/params/d/CarList_Toyota
-  awk '/LEXUS/' /data/params/d/CarList_TOYOTA > /data/params/d/CarList_Lexus
-  cat ./selfdrive/car/honda/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/d/CarList_Honda
-  cat ./selfdrive/car/gm/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/d/CarList_Gm
+  if [ ! -f "/data/params/crwusiz" ] ; then
+    mkdir /data/params/crwusiz
+  fi
+
+  cat /data/openpilot/selfdrive/car/hyundai/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_HYUNDAI
+  cp -f /data/params/crwusiz/CarList_HYUNDAI /data/params/crwusiz/CarList
+  awk '/HYUNDAI/' /data/params/crwusiz/CarList_HYUNDAI > /data/params/crwusiz/CarList_Hyundai
+  awk '/KIA/' /data/params/crwusiz/CarList_HYUNDAI > /data/params/crwusiz/CarList_Kia
+  awk '/GENESIS/' /data/params/crwusiz/CarList_HYUNDAI > /data/params/crwusiz/CarList_Genesis
+  cat /data/openpilot/selfdrive/car/toyota/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_TOYOTA
+  awk '/TOYOTA/' /data/params/crwusiz/CarList_TOYOTA > /data/params/crwusiz/CarList_Toyota
+  awk '/LEXUS/' /data/params/crwusiz/CarList_TOYOTA > /data/params/crwusiz/CarList_Lexus
+  cat /data/openpilot/selfdrive/car/honda/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_Honda
+  cat /data/openpilot/selfdrive/car/gm/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_Gm
 
   # git last commit log
   git log -1 --pretty=format:"%h, %cs, %cr" > /data/params/d/GitLog
 
   # git remote
-  sed 's/.\{4\}$//' /data/params/d/GitRemote > /data/params/d/GitRemote_
+  #sed 's/.\{4\}$//' /data/params/d/GitRemote > /data/params/crwusiz/GitRemote_
 
   # panda safety init
   if [ ! -f "/data/PANDA_DEFAULT" ] && [ ! -f "/data/PANDA_MDPS" ]; then
