@@ -224,7 +224,7 @@ struct CarState {
   charging @43 :Bool;
 
   # neokii
-  autoHold @46 : Int32;
+  autoHold @50 : Int32;
   tpms @47 : Tpms;
   navLimitSpeed @48 :Int16;
 
