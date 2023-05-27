@@ -606,8 +606,8 @@ location set</source>
         <translation>백그라운드에서 운영 체제에 대한 업데이트를 다운로드하고 있습니다. 설치할 준비가 되면 업데이트하라는 메시지가 표시됩니다.</translation>
     </message>
     <message>
-        <source>Device failed to register. It will not connect to or upload to comma.ai servers, and receives no support from comma.ai. If this is an official device, contact support@comma.ai.</source>
-        <translation>장치를 등록하지 못했습니다. comma.ai 서버에 연결하거나 업로드하지 않으며 comma.ai에서 지원을 받지 않습니다. 공식적인 장치라면 support@comma.ai 로 문의하세요</translation>
+        <source>Device failed to register. It will not connect to or upload to comma.ai servers, and receives no support from comma.ai. If this is an official device, visit https://comma.ai/support.</source>
+        <translation>장치를 등록하지 못했습니다. comma.ai 서버에 연결하거나 업로드하지 않으며 comma.ai에서 지원을 받지 않습니다. 공식적인 장치라면 https://comma.ai/support 로 문의하세요</translation>
     </message>
     <message>
         <source>NVMe drive not mounted.</source>
