@@ -289,15 +289,17 @@ class LongitudinalMpc:
     for i in range(N):
       self.solver.cost_set(i, 'Zl', Zl)
 
-  def set_weights(self, prev_accel_constraint=True):
+  def set_weights(self, v_ego=0., a_desired=0., prev_accel_constraint=True):
     if self.mode == 'acc':
       a_change_cost = A_CHANGE_COST if prev_accel_constraint else 0
       #cost_weights = [X_EGO_OBSTACLE_COST, X_EGO_COST, V_EGO_COST, A_EGO_COST, a_change_cost, J_EGO_COST]
 
-      v_ego = self.x0[1]
-      x_cost = interp(v_ego, [1., 6.], [0.1, X_EGO_COST])
-      v_cost = interp(v_ego, [1., 6.], [0.2, V_EGO_COST])
-      a_cost = interp(v_ego, [1., 6.], [5.0, A_EGO_COST])
+      if v_ego < 0.1 or a_desired > 0.:
+        x_cost = interp(v_ego, [1., 6.], [0.1, X_EGO_COST])
+        v_cost = interp(v_ego, [1., 6.], [0.2, V_EGO_COST])
+        a_cost = interp(v_ego, [1., 6.], [5.0, A_EGO_COST])
+      else:
+        x_cost, v_cost, a_cost = 0., 0., 0.
 
       cost_weights = [X_EGO_OBSTACLE_COST, x_cost, v_cost, a_cost, a_change_cost, J_EGO_COST]
       constraint_cost_weights = [LIMIT_COST, LIMIT_COST, LIMIT_COST, DANGER_ZONE_COST]
@@ -372,8 +374,8 @@ class LongitudinalMpc:
     # To estimate a safe distance from a moving lead, we calculate how much stopping
     # distance that lead needs as a minimum. We can add that to the current distance
     # and then treat that as a stopped car/obstacle at this new distance.
-    lead_0_obstacle = lead_xv_0[:,0] + get_stopped_equivalence_factor(lead_xv_0[:, 1], self.x_sol[:, 1], self.t_follow, self.stop_distance)
-    lead_1_obstacle = lead_xv_1[:,0] + get_stopped_equivalence_factor(lead_xv_1[:, 1], self.x_sol[:, 1], self.t_follow, self.stop_distance)
+    lead_0_obstacle = lead_xv_0[:,0] + get_stopped_equivalence_factor(lead_xv_0[:,1], self.x_sol[:,1], self.t_follow, self.stop_distance)
+    lead_1_obstacle = lead_xv_1[:,0] + get_stopped_equivalence_factor(lead_xv_1[:,1], self.x_sol[:,1], self.t_follow, self.stop_distance)
 
     self.params[:,0] = MIN_ACCEL
     self.params[:,1] = self.max_a
@@ -452,9 +454,9 @@ class LongitudinalMpc:
     # Check if it got within lead comfort range
     # TODO This should be done cleaner
     if self.mode == 'blended':
-      if any((lead_0_obstacle - get_safe_obstacle_distance(self.x_sol[:, 1], self.t_follow, self.comfort_brake, self.stop_distance)) - self.x_sol[:, 0] < 0.0):
+      if any((lead_0_obstacle - get_safe_obstacle_distance(self.x_sol[:,1], self.t_follow, self.comfort_brake, self.stop_distance)) - self.x_sol[:,0] < 0.0):
         self.source = 'lead0'
-      if any((lead_1_obstacle - get_safe_obstacle_distance(self.x_sol[:, 1], self.t_follow, self.comfort_brake, self.stop_distance)) - self.x_sol[:, 0] < 0.0) and \
+      if any((lead_1_obstacle - get_safe_obstacle_distance(self.x_sol[:,1], self.t_follow, self.comfort_brake, self.stop_distance)) - self.x_sol[:,0] < 0.0) and \
          (lead_1_obstacle[0] - lead_0_obstacle[0]):
         self.source = 'lead1'
 
