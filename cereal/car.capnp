@@ -196,6 +196,7 @@ struct CarState {
   stockFcw @31 :Bool;
   espDisabled @32 :Bool;
   accFaulted @42 :Bool;
+  carFaultedNonCritical @47 :Bool;  # some ECU is faulted, but car remains controllable
 
   # cruise state
   cruiseState @10 :CruiseState;
@@ -225,7 +226,7 @@ struct CarState {
 
   # neokii
   autoHold @50 : Int32;
-  tpms @47 : Tpms;
+  tpms @51 : Tpms;
   navLimitSpeed @48 :Int16;
 
   # add
