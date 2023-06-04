@@ -35,6 +35,7 @@ LANE_DEPARTURE_THRESHOLD = 0.1
 
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
+TESTING_CLOSET = "TESTING_CLOSET" in os.environ
 NOSENSOR = "NOSENSOR" in os.environ
 IGNORE_PROCESSES = {"controlsd", "loggerd", "encoderd", "statsd"}
 
@@ -87,7 +88,7 @@ class Controls:
       self.sm = messaging.SubMaster(['deviceState', 'pandaStates', 'peripheralState', 'modelV2', 'liveCalibration',
                                      'driverMonitoringState', 'longitudinalPlan', 'lateralPlan', 'liveLocationKalman',
                                      'managerState', 'liveParameters', 'radarState', 'liveTorqueParameters', 'testJoystick'] + self.camera_packets,
-                                    ignore_alive=ignore, ignore_avg_freq=['radarState', 'longitudinalPlan', 'testJoystick'])
+                                    ignore_alive=ignore, ignore_avg_freq=['radarState', 'testJoystick'])
 
     if CI is None:
       # wait for one pandaState and one CAN packet
@@ -189,6 +190,7 @@ class Controls:
     self.desired_curvature_rate = 0.0
     self.experimental_mode = False
     self.v_cruise_helper = VCruiseHelper(self.CP)
+    self.recalibrating_seen = False
 
     # scc smoother
     self.applyMaxSpeed = 0
@@ -390,7 +392,7 @@ class Controls:
     else:
       self.logged_comm_issue = None
 
-    if not self.sm['liveParameters'].valid:
+    if not self.sm['liveParameters'].valid and not TESTING_CLOSET:
       self.events.add(EventName.vehicleModelInvalid)
     if not self.sm['lateralPlan'].mpcSolutionValid:
       self.events.add(EventName.plannerError)

@@ -12,7 +12,7 @@
 #include "safety/safety_hyundai_community.h"
 //#include "safety/safety_chrysler.h"
 //#include "safety/safety_subaru.h"
-//#include "safety/safety_subaru_legacy.h"
+//#include "safety/safety_subaru_preglobal.h"
 //#include "safety/safety_mazda.h"
 //#include "safety/safety_nissan.h"
 //#include "safety/safety_volkswagen_mqb.h"
@@ -315,7 +315,7 @@ const safety_hook_config safety_hook_registry[] = {
 #endif
 #ifdef ALLOW_DEBUG
   //{SAFETY_TESLA, &tesla_hooks},
-  //{SAFETY_SUBARU_LEGACY, &subaru_legacy_hooks},
+  //{SAFETY_SUBARU_PREGLOBAL, &subaru_preglobal_hooks},
   //{SAFETY_VOLKSWAGEN_PQ, &volkswagen_pq_hooks},
   {SAFETY_ALLOUTPUT, &alloutput_hooks},
 #endif

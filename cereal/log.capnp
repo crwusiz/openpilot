@@ -605,6 +605,7 @@ struct LiveCalibrationData {
   rpyCalib @7 :List(Float32);
   rpyCalibSpread @8 :List(Float32);
   wideFromDeviceEuler @10 :List(Float32);
+  height @12 :List(Float32);
 
   warpMatrixDEPRECATED @0 :List(Float32);
   calStatusDEPRECATED @1 :Int8;
@@ -2005,6 +2006,8 @@ struct CameraOdometry {
   rotStd @3 :List(Float32); # std rad/s in device frame
   wideFromDeviceEuler @6 :List(Float32);
   wideFromDeviceEulerStd @7 :List(Float32);
+  roadTransformTrans @8 :List(Float32);
+  roadTransformTransStd @9 :List(Float32);
 }
 
 struct Sentinel {
