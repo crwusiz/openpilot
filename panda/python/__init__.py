@@ -537,6 +537,18 @@ class Panda:
       dfu_list = PandaDFU.list()
     return True
 
+  @staticmethod
+  def wait_for_panda(serial: Optional[str], timeout: int) -> bool:
+    t_start = time.monotonic()
+    serials = Panda.list()
+    while (serial is None and len(serials) == 0) or (serial is not None and serial not in serials):
+      logging.debug("waiting for panda...")
+      time.sleep(0.1)
+      if timeout is not None and (time.monotonic() - t_start) > timeout:
+        return False
+      serials = Panda.list()
+    return True
+
   def up_to_date(self) -> bool:
     current = self.get_signature()
     fn = os.path.join(FW_PATH, self.get_mcu_type().config.app_fn)
@@ -622,12 +634,6 @@ class Panda:
     }
 
   # ******************* control *******************
-
-  def enter_bootloader(self):
-    try:
-      self._handle.controlWrite(Panda.REQUEST_OUT, 0xd1, 0, 0, b'')
-    except Exception:
-      logging.exception("exception while entering bootloader")
 
   def get_version(self):
     return self._handle.controlRead(Panda.REQUEST_IN, 0xd6, 0, 0, 0x40).decode('utf8')

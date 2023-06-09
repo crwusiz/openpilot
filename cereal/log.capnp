@@ -17,6 +17,12 @@ struct Map(Key, Value) {
   }
 }
 
+enum LongitudinalPersonality {
+    aggressive @0;
+    standard @1;
+    relaxed @2;
+  }
+
 struct InitData {
   kernelArgs @0 :List(Text);
   kernelVersion @15 :Text;
