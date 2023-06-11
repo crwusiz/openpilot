@@ -3,7 +3,7 @@
 crwusiz openpilot
 =====
 <b> crwusiz branch is neokii modify branch base (comma.ai master and xx979xx HKG_community source) </b>
-- <b> v0.9.2 [ only comma3 support ] </b>
+- <b> v0.9.3 [ only comma3 support ] </b>
 - If you have any questions, please send a message to crwusiz from discord. if you like this Branch <b> [Donate](https://paypal.me/crwusiz) </b>for me
 - It is open source and inherits MIT license.
 - By installing this software you accept all responsibility for anything that might occur while you use it.
@@ -18,7 +18,6 @@ crwusiz openpilot
 - add community toggle / function / simple ui
 - autohold, turnsignal, tpms, roadlimitspeed display ( neokii )
 - select manufacturer and car
-- panda_safety select ( default / mdps(can3) modify )
 
 ## Harness Cable and Car Year Compatible Chart
 

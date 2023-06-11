@@ -180,25 +180,6 @@ class CarController:
                                                 CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning,
                                                 0, CS.lkas11))
 
-      clu11_speed = CS.clu11["CF_Clu_Vanz"]
-      panda_safety_select = Params().get_bool("PandaSafetySelect")
-      if panda_safety_select and self.CP.epsBus:
-        # mdps enabled speed message
-        enabled_speed = 60 if CS.is_metric else 38
-        if clu11_speed > enabled_speed or not CC.latActive:
-          enabled_speed = clu11_speed
-
-        # send lkas11 bus 1
-        can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, lat_active, torque_fault, sys_warning, sys_state,
-                                                  CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning,
-                                                  1, CS.lkas11))
-
-        # send clu11 to eps
-        can_sends.append(hyundaican.create_clu11_mdps(self.packer, self.frame, self.CP.epsBus, Buttons.NONE, enabled_speed, CS.clu11))
-
-        # send mdps12 to LKAS to prevent LKAS error
-        can_sends.append(hyundaican.create_mdps12(self.packer, self.frame, CS.mdps12))
-
       # fix auto resume - by neokii
       if CC.cruiseControl.resume and not CS.out.gasPressed:
         if self.last_lead_distance == 0:
@@ -210,10 +191,7 @@ class CarController:
         elif self.resume_wait_timer > 0:
           self.resume_wait_timer -= 1
         elif abs(CS.lead_distance - self.last_lead_distance) > 0.1:
-          if panda_safety_select == "1" and self.CP.epsBus:
-            can_sends.append(hyundaican.create_clu11_mdps(self.packer, self.frame, self.CP.sccBus, Buttons.RES_ACCEL, clu11_speed, CS.clu11))
-          else:
-            can_sends.append(hyundaican.create_clu11(self.packer, self.frame, self.CP.sccBus, Buttons.RES_ACCEL, CS.clu11))
+          can_sends.append(hyundaican.create_clu11(self.packer, self.frame, self.CP.sccBus, Buttons.RES_ACCEL, CS.clu11))
           self.resume_cnt += 1
           if self.resume_cnt >= int(randint(4, 5) * 2):
             self.resume_cnt = 0

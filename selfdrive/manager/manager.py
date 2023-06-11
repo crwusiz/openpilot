@@ -59,7 +59,6 @@ def manager_init() -> None:
     ("LoggerEnable", "0"),
     ("NavEnable", "0"),
     ("RadarTrackEnable", "0"),
-    ("PandaSafetySelect", "0"),
     ("SccOnBus2", "0"),
     ("NavLimitSpeed", "0"),
     ("DisengageOnBrake", "0"),

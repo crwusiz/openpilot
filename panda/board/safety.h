@@ -9,7 +9,6 @@
 #include "safety/safety_gm.h"
 //#include "safety/safety_ford.h"
 #include "safety/safety_hyundai.h"
-#include "safety/safety_hyundai_community.h"
 //#include "safety/safety_chrysler.h"
 //#include "safety/safety_subaru.h"
 //#include "safety/safety_subaru_preglobal.h"
@@ -306,7 +305,6 @@ const safety_hook_config safety_hook_registry[] = {
   //{SAFETY_NISSAN, &nissan_hooks},
   {SAFETY_NOOUTPUT, &nooutput_hooks},
   {SAFETY_HYUNDAI_LEGACY, &hyundai_legacy_hooks},
-  {SAFETY_HYUNDAI_COMMUNITY, &hyundai_community_hooks},
   //{SAFETY_MAZDA, &mazda_hooks},
   //{SAFETY_BODY, &body_hooks},
   //{SAFETY_FORD, &ford_hooks},

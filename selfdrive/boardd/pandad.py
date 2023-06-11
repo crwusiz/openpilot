@@ -132,8 +132,7 @@ def main() -> NoReturn:
           params.put_bool("PandaHeartbeatLost", True)
           cloudlog.event("heartbeat lost", deviceState=health, serial=panda.get_usb_serial())
 
-        panda_safety_select = Params().get_bool("PandaSafetySelect")
-        if first_run and not panda_safety_select:
+        if first_run:
           cloudlog.info(f"Resetting panda {panda.get_usb_serial()}")
           if panda.is_internal():
             HARDWARE.reset_internal_panda()

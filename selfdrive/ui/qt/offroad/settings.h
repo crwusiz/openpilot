@@ -144,13 +144,3 @@ private:
   QLabel label;
   void refresh();
 };
-
-// PandaSafetySelect
-class PandaSafetySelect : public AbstractControl {
-  Q_OBJECT
-public:
-  PandaSafetySelect();
-private:
-  QLabel label;
-  void refresh();
-};

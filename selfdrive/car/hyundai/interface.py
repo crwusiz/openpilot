@@ -347,11 +347,9 @@ class CarInterface(CarInterfaceBase):
     ret.startAccel = 2.0
 
     # *** Params Init ***
-    panda_safety_select = Params().get_bool("PandaSafetySelect")
     if candidate in CANFD_CAR:
       Params().put_bool("IsCanfd", True)
       Params().put("LateralControlSelect", "3")
-      Params().put_bool("PandaSafetySelect", False)
       Params().put_bool("SccOnBus2", False)
     else:
       Params().put_bool("IsCanfd", False)
@@ -372,13 +370,7 @@ class CarInterface(CarInterfaceBase):
       # ignore CAN2 address if L-CAN on the same BUS
       ret.epsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
       ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
-
-      if panda_safety_select:
-        ret.sccBus = 0 if 1056 in fingerprint[0] \
-                else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
-                else 2 if 1056 in fingerprint[2] else -1
-      else:
-        ret.sccBus = 2 if Params().get_bool("SccOnBus2") else 0
+      ret.sccBus = 2 if Params().get_bool("SccOnBus2") else 0
 
       if ret.sccBus == 2:
         Params().put_bool("ExperimentalLongitudinalEnabled", True)
@@ -406,15 +398,11 @@ class CarInterface(CarInterfaceBase):
       if ret.flags & HyundaiFlags.CANFD_CAMERA_SCC:
         ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_CAMERA_SCC
     else:
-      if not panda_safety_select:
-        if candidate in LEGACY_SAFETY_MODE_CAR:
-          # these cars require a special panda safety mode due to missing counters and checksums in the messages
-          ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy)]
-        else:
-          ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundai, 0)]
-      elif panda_safety_select:
-        # mdps modify car use can3 (harness board rj45 port)
-        ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
+      if candidate in LEGACY_SAFETY_MODE_CAR:
+        # these cars require a special panda safety mode due to missing counters and checksums in the messages
+        ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy)]
+      else:
+        ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundai, 0)]
 
     if ret.openpilotLongitudinalControl:
       ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG

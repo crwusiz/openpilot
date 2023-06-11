@@ -648,30 +648,15 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     ConfirmationDialog::rich(QString::fromStdString(txt), this);
   });
 
-  auto tmux_launch_log_btn = new ButtonControl(tr("Tmux launch log"), tr("RUN"));
-  QObject::connect(tmux_launch_log_btn, &ButtonControl::clicked, [=]() {
-    const std::string txt = util::read_file("/tmp/launch_log");
-    ConfirmationDialog::rich(QString::fromStdString(txt), this);
-  });
-
   communityLayout->addWidget(gitpull_btn);
   communityLayout->addWidget(cleardtc_btn);
-  communityLayout->addWidget(horizontal_line());
   communityLayout->addWidget(tmux_error_log_btn);
-  communityLayout->addWidget(tmux_launch_log_btn);
   communityLayout->addWidget(horizontal_line());
   if (!params.getBool("IsCanfd")) {
     communityLayout->addWidget(new LateralControlSelect());
     communityLayout->addWidget(new MfcSelect());
     communityLayout->addWidget(horizontal_line());
   }
-
-  auto pandareset_btn = new ButtonControl(tr("Panda Reset"), tr("RUN"));
-  QObject::connect(pandareset_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/scripts/panda_reset.sh");
-    }
-  });
 
   auto pandaflash_btn = new ButtonControl(tr("Panda Flash"), tr("RUN"));
   QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
@@ -687,31 +672,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
 
-  auto pandadefault_btn = new ButtonControl(tr("Panda Safety Change to Default"), tr("RUN"));
-  QObject::connect(pandadefault_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/scripts/add/panda_default.sh");
-    }
-  });
-
-  auto pandamdps_btn = new ButtonControl(tr("Panda Safety Change to MDPS"), tr("RUN"));
-  QObject::connect(pandamdps_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/scripts/add/panda_mdps.sh");
-    }
-  });
-
-  communityLayout->addWidget(pandareset_btn);
   communityLayout->addWidget(pandaflash_btn);
   communityLayout->addWidget(pandarecover_btn);
-  if (!params.getBool("IsCanfd")) {
-    communityLayout->addWidget(new PandaSafetySelect());
-    if (params.getBool("PandaSafetySelect")) {
-      communityLayout->addWidget(pandadefault_btn);
-    } else if (!params.getBool("PandaSafetySelect")) {
-      communityLayout->addWidget(pandamdps_btn);
-    }
-  }
   communityLayout->addWidget(horizontal_line());
 
   // add community toggle
@@ -1023,21 +985,4 @@ void MfcSelect::refresh() {
   }
   btnminus.setText("◀");
   btnplus.setText("▶");
-}
-
-//PandaSafetySelect
-PandaSafetySelect::PandaSafetySelect() : AbstractControl("Current Panda Safety [√]", tr("Panda Safety Select (Default/Mdps)"), "../assets/offroad/icon_warning.png") {
-  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
-  label.setStyleSheet("color: #e0e879");
-  hlayout->addWidget(&label);
-  refresh();
-}
-
-void PandaSafetySelect::refresh() {
-  QString safety = QString::fromStdString(Params().get("PandaSafetySelect"));
-  if (safety == "0") {
-    label.setText(QString::fromStdString("[ Default ]"));
-  } else if (safety == "1") {
-    label.setText(QString::fromStdString("[ MDPS ]"));
-  }
 }
