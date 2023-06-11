@@ -986,8 +986,9 @@ struct LongitudinalPlan @0xe00b5b3eba12876c {
   jerks @34 :List(Float32);
 
   solverExecutionTime @35 :Float32;
+  personality @36 :LongitudinalPersonality;
 
-  trafficState @36 : Int32;
+  trafficState @39 : Int32;
   xState @37 : XState;
   xStop @38 : Float32;
 

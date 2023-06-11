@@ -998,6 +998,12 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
     ET.NO_ENTRY: NoEntryAlert("LKAS 비활성화됨"),
   },
 
+  EventName.vehicleSensorsInvalid: {
+    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("차량 센서가 유효하지 않음"),
+    ET.PERMANENT: NormalPermanentAlert("차량 센서 보정", "주행 하여 보정하세요"),
+    ET.NO_ENTRY: NoEntryAlert("차량 센서 보정"),
+  },
+
   EventName.turningIndicatorOn: {
     ET.WARNING: Alert(
       "방향지시등 동작중에는 핸들을 잡아주세요",

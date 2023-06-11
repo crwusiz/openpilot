@@ -240,7 +240,7 @@ class LongitudinalMpc:
     self.xStopFilter = StreamingMovingAverage(3)
     self.xStopFilter2 = StreamingMovingAverage(15)
     self.vFilter = StreamingMovingAverage(4)
-    self.t_follow = T_FOLLOW
+    self.t_follow = get_T_FOLLOW()
     self.stop_distance = STOP_DISTANCE
     self.comfort_brake = COMFORT_BRAKE
     self.xState = XState.cruise
@@ -266,7 +266,7 @@ class LongitudinalMpc:
     self.x_sol = np.zeros((N+1, X_DIM))
     self.u_sol = np.zeros((N,1))
     self.params = np.zeros((N+1, PARAM_DIM))
-    self.t_follow = T_FOLLOW
+    self.t_follow = get_T_FOLLOW()
     self.stop_distance = STOP_DISTANCE
     self.comfort_brake = COMFORT_BRAKE
     self.xState = XState.cruise

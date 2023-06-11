@@ -95,7 +95,7 @@ static int nooutput_tx_lin_hook(int lin_num, uint8_t *data, int len) {
 }
 
 static int default_fwd_hook(int bus_num, int addr) {
-  int addr = GET_ADDR(to_fwd);
+  int addr = GET_ADDR(addr);
   int bus_fwd = -1;
 
   bool is_mdps12_msg = (addr == 593);
@@ -119,7 +119,7 @@ static int default_fwd_hook(int bus_num, int addr) {
     uint8_t dat[8];
     int chksum_new = 0;
     for (int i=0; i<8; i++) {
-      dat[i] = GET_BYTE(to_fwd, i);
+      dat[i] = GET_BYTE(addr, i);
     }
     if (mdps12_cnt > 330) {
       int StrColTq = dat[0] | (dat[1] & 0x7) << 8;
@@ -137,8 +137,8 @@ static int default_fwd_hook(int bus_num, int addr) {
       dat[6] |= (OutTq & 0xF) << 4;
       dat[7] = OutTq >> 4;
 
-      uint32_t* RDLR = (uint32_t*)&(to_fwd->data[0]);
-      uint32_t* RDHR = (uint32_t*)&(to_fwd->data[4]);
+      uint32_t* RDLR = (uint32_t*)&(addr->data[0]);
+      uint32_t* RDHR = (uint32_t*)&(addr->data[4]);
 
       *RDLR &= 0xFFF800;
       *RDLR |= StrColTq;

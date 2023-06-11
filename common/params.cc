@@ -116,7 +116,6 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"ForcePowerDown", PERSISTENT},
     {"GitBranch", PERSISTENT},
     {"GitCommit", PERSISTENT},
-    {"GitLog", PERSISTENT},
     {"GitDiff", PERSISTENT},
     {"GithubSshKeys", PERSISTENT},
     {"GithubUsername", PERSISTENT},
@@ -225,6 +224,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"GmapKey", PERSISTENT },
     {"DisengageOnBrake", PERSISTENT},
     {"IsCanfd", PERSISTENT},
+    {"GitLog", PERSISTENT},
 };
 
 } // namespace
