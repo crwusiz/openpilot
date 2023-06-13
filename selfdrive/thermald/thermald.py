@@ -13,6 +13,7 @@ import psutil
 import cereal.messaging as messaging
 from cereal import log
 from common.dict_helpers import strip_deprecated_keys
+from common.time import MIN_DATE
 from common.filter_simple import FirstOrderFilter
 from common.params import Params
 from common.realtime import DT_TRML, sec_since_boot
@@ -288,10 +289,10 @@ def thermald_thread(end_event, hw_queue):
 
     # Ensure date/time are valid
     now = datetime.datetime.utcnow()
-    startup_conditions["time_valid"] = True #(now.year > 2020) or (now.year == 2020 and now.month >= 10)
-    #set_offroad_alert_if_changed("Offroad_InvalidTime", (not startup_conditions["time_valid"]))
+    startup_conditions["time_valid"] = now > MIN_DATE
+    set_offroad_alert_if_changed("Offroad_InvalidTime", (not startup_conditions["time_valid"]))
 
-    startup_conditions["up_to_date"] = True #params.get("Offroad_ConnectivityNeeded") is None or params.get_bool("DisableUpdates") or params.get_bool("SnoozeUpdate")
+    startup_conditions["up_to_date"] = params.get("Offroad_ConnectivityNeeded") is None or params.get_bool("DisableUpdates") or params.get_bool("SnoozeUpdate")
     startup_conditions["not_uninstalling"] = not params.get_bool("DoUninstall")
     startup_conditions["accepted_terms"] = params.get("HasAcceptedTerms") == terms_version
     startup_conditions["offroad_min_time"] = (not started_seen) or ((off_ts is not None) and (sec_since_boot() - off_ts) > 5.)
@@ -302,8 +303,11 @@ def thermald_thread(end_event, hw_queue):
                                                params.get_bool("Passive")
     startup_conditions["not_driver_view"] = not params.get_bool("IsDriverViewEnabled")
     startup_conditions["not_taking_snapshot"] = not params.get_bool("IsTakingSnapshot")
-    # if any CPU gets above 107 or the battery gets above 63, kill all processes
-    # controls will warn with CPU above 95 or battery above 60
+
+    # must be at an engageable thermal band to go onroad
+    startup_conditions["device_temp_engageable"] = thermal_status < ThermalStatus.red
+
+    # if the temperature enters the danger zone, go offroad to cool down
     onroad_conditions["device_temp_good"] = thermal_status < ThermalStatus.danger
     set_offroad_alert_if_changed("Offroad_TemperatureTooHigh", (not onroad_conditions["device_temp_good"]))
 
@@ -329,9 +333,6 @@ def thermald_thread(end_event, hw_queue):
       should_start = should_start and all(startup_conditions.values())
 
     if should_start != should_start_prev or (count == 0):
-      params.put_bool("IsOnroad", should_start)
-      params.put_bool("IsOffroad", not should_start)
-
       params.put_bool("IsEngaged", False)
       engaged_prev = False
       HARDWARE.set_power_save(not should_start)

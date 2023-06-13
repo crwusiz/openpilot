@@ -953,13 +953,16 @@ struct EncodeIndex {
   len @9 :UInt32;
 
   enum Type {
-    bigBoxLossless @0;   # rcamera.mkv
-    fullHEVC @1;         # fcamera.hevc
-    bigBoxHEVC @2;       # bcamera.hevc
-    chffrAndroidH264 @3; # acamera
-    fullLosslessClip @4; # prcamera.mkv
-    front @5;            # dcamera.hevc
-    qcameraH264 @6;      # qcamera.ts
+    bigBoxLossless @0;
+    fullHEVC @1;
+    qcameraH264 @6;
+    livestreamH264 @7;
+
+    # deprecated
+    bigBoxHEVCDEPRECATED @2;
+    chffrAndroidH264DEPRECATED @3;
+    fullLosslessClipDEPRECATED @4;
+    frontDEPRECATED @5;
   }
 }
 
@@ -2205,6 +2208,10 @@ struct Event {
     wideRoadEncodeIdx @77 :EncodeIndex;
     qRoadEncodeIdx @90 :EncodeIndex;
 
+    livestreamRoadEncodeIdx @117 :EncodeIndex;
+    livestreamWideRoadEncodeIdx @118 :EncodeIndex;
+    livestreamDriverEncodeIdx @119 :EncodeIndex;
+
     # microphone data
     microphone @103 :Microphone;
 
@@ -2235,6 +2242,13 @@ struct Event {
     wideRoadEncodeData @88 :EncodeData;
     qRoadEncodeData @89 :EncodeData;
 
+    livestreamRoadEncodeData @120 :EncodeData;
+    livestreamWideRoadEncodeData @121 :EncodeData;
+    livestreamDriverEncodeData @122 :EncodeData;
+
+    # neokii
+    roadLimitSpeed @123 :RoadLimitSpeed;
+
     # *********** Custom: reserved for forks ***********
     customReserved0 @107 :Custom.CustomReserved0;
     customReserved1 @108 :Custom.CustomReserved1;
@@ -2246,9 +2260,6 @@ struct Event {
     customReserved7 @114 :Custom.CustomReserved7;
     customReserved8 @115 :Custom.CustomReserved8;
     customReserved9 @116 :Custom.CustomReserved9;
-
-    # neokii
-    roadLimitSpeed @117 :RoadLimitSpeed;
 
     # *********** legacy + deprecated ***********
     model @9 :Legacy.ModelData; # TODO: rename modelV2 and mark this as deprecated

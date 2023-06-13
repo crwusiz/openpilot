@@ -1,6 +1,10 @@
+import re
+from datetime import datetime
+from dateutil import rrule
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum, IntFlag
-from typing import Dict, List, Optional, Union
+from typing import DefaultDict, Dict, List, Optional, Set, Union
 
 from cereal import car
 from panda.python import uds
@@ -8,6 +12,7 @@ from common.conversions import Conversions as CV
 from selfdrive.car import dbc_dict
 from selfdrive.car.docs_definitions import CarFootnote, CarHarness, CarInfo, CarParts, Column
 from selfdrive.car.fw_query_definitions import FwQueryConfig, Request, p16
+from system.swaglog import cloudlog
 
 Ecu = car.CarParams.Ecu
 
@@ -376,6 +381,36 @@ FINGERPRINTS = {
   }],
 }
 
+
+def get_platform_codes(fw_versions: List[bytes]) -> Set[bytes]:
+  codes: DefaultDict[bytes, Set[bytes]] = defaultdict(set)
+  for fw in fw_versions:
+    match = PLATFORM_CODE_FW_PATTERN.search(fw)
+    if match is not None:
+      code, date = match.groups()
+      codes[code].add(date)
+
+  # Create platform codes for all dates inclusive if ECU has FW dates
+  final_codes = set()
+  for code, dates in codes.items():
+    # Radar and some cameras don't have FW dates
+    if None in dates:
+      final_codes.add(code)
+      continue
+
+    try:
+      parsed = {datetime.strptime(date.decode()[:4], '%y%m') for date in dates}
+    except ValueError:
+      cloudlog.exception(f'Error parsing date in FW versions: {code!r}, {dates}')
+      final_codes.add(code)
+      continue
+
+    for date in rrule.rrule(rrule.MONTHLY, dtstart=min(parsed), until=max(parsed)):
+      final_codes.add(code + b'-' + date.strftime('%y%m').encode())
+
+  return final_codes
+
+
 HYUNDAI_VERSION_REQUEST_LONG = bytes([uds.SERVICE_TYPE.READ_DATA_BY_IDENTIFIER]) + \
   p16(0xf100)  # Long description
 
@@ -388,6 +423,11 @@ HYUNDAI_VERSION_REQUEST_MULTI = bytes([uds.SERVICE_TYPE.READ_DATA_BY_IDENTIFIER]
   p16(0xf100)
 
 HYUNDAI_VERSION_RESPONSE = bytes([uds.SERVICE_TYPE.READ_DATA_BY_IDENTIFIER + 0x40])
+
+# Regex patterns for parsing platform code, FW date, and part number from FW versions
+PLATFORM_CODE_FW_PATTERN = re.compile(b'((?<=' + HYUNDAI_VERSION_REQUEST_LONG[1:] +
+                                      b')[A-Z]{2}[A-Za-z0-9]{0,2})(?:.*([0-9]{6}))?')
+PART_NUMBER_FW_PATTERN = re.compile(b'(?<=[0-9][.,][0-9]{2} )([0-9]{5}[-/]?[A-Z][A-Z0-9]{3}[0-9])')
 
 FW_QUERY_CONFIG = FwQueryConfig(
   requests=[
@@ -445,6 +485,10 @@ FW_QUERY_CONFIG = FwQueryConfig(
     (Ecu.hvac, 0x7b3, None),         # HVAC Control Assembly
     (Ecu.cornerRadar, 0x7b7, None),
   ],
+  fuzzy_get_platform_codes=get_platform_codes,
+  # Camera and radar should exist on all cars
+  # TODO: use abs, it has the platform code and part number on many platforms
+  platform_code_ecus=[Ecu.fwdRadar, Ecu.fwdCamera, Ecu.eps],
 )
 
 
@@ -505,11 +549,8 @@ FW_VERSIONS = {
       b'\xf1\x8758910-AB800\xf1\x00CN ESC \t 101 \x10\x03 58910-AB800\xf1\xa01.01',
     ],
     (Ecu.eps, 0x7d4, None): [
-      b'\xf1\x87\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xf1\x00CN7 MDPS C 1.00 1.06 \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00 4CNDC106',
-      b'\xf1\x8756310/AA070\xf1\x00CN7 MDPS C 1.00 1.06 56310/AA070 4CNDC106',
-      b'\xf1\x8756310AA050\x00\xf1\x00CN7 MDPS C 1.00 1.06 56310AA050\x00 4CNDC106',
-      b'\xf1\x8756310AA050\x00\xf1\x00CN7 MDPS C 1.00 1.06 56310AA050\x00 4CNDC106\xf1\xa01.06',
       b'\xf1\x00CN7 MDPS C 1.00 1.06 56310AA050\x00 4CNDC106',
+      b'\xf1\x00CN7 MDPS C 1.00 1.06 56310/AA070 4CNDC106',
     ],
     (Ecu.engine, 0x7e0, None): [
       b'\xf1\x82CNCWD0AMFCXCSFFA',
@@ -601,11 +642,9 @@ FW_VERSIONS = {
       b'\xf1\x00DN8 MDPS C 1,00 1,01 56310L0010\x00 4DNAC101',  # modified firmware
       b'\xf1\x00DN8 MDPS C 1.00 1.01 56310L0210\x00 4DNAC102',
       b'\xf1\x8756310L0010\x00\xf1\x00DN8 MDPS C 1,00 1,01 56310L0010\x00 4DNAC101',  # modified firmware
-      b'\xf1\x00DN8 MDPS C 1.00 1.01 \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00 4DNAC101',
       b'\xf1\x00DN8 MDPS C 1.00 1.01 56310-L0010 4DNAC101',
       b'\xf1\x00DN8 MDPS C 1.00 1.01 56310L0010\x00 4DNAC101',
       b'\xf1\x00DN8 MDPS R 1.00 1.00 57700-L0000 4DNAP100',
-      b'\xf1\x87\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xf1\x00DN8 MDPS C 1.00 1.01 \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00 4DNAC101',
       b'\xf1\x8756310-L0010\xf1\x00DN8 MDPS C 1.00 1.01 56310-L0010 4DNAC101',
       b'\xf1\x8756310-L0210\xf1\x00DN8 MDPS C 1.00 1.01 56310-L0210 4DNAC101',
       b'\xf1\x8756310-L1010\xf1\x00DN8 MDPS C 1.00 1.03 56310-L1010 4DNDC103',
