@@ -270,6 +270,7 @@ static int hyundai_rx_hook(CANPacket_t *to_push) {
 uint32_t last_ts_lkas11_from_op = 0;
 uint32_t last_ts_scc12_from_op = 0;
 uint32_t last_ts_mdps12_from_op = 0;
+uint32_t last_ts_fca11_from_op = 0;
 
 static int hyundai_tx_hook(CANPacket_t *to_send) {
   int tx = 1;
@@ -277,6 +278,8 @@ static int hyundai_tx_hook(CANPacket_t *to_send) {
 
   bool is_lkas11_msg = (addr == 832);
   bool is_scc12_msg = (addr == 1057);
+  bool is_mdps12_msg = (addr == 593);
+  bool is_fca11_msg = (addr == 909);
 
   if (hyundai_longitudinal) {
     tx = msg_allowed(to_send, HYUNDAI_LONG_TX_MSGS, sizeof(HYUNDAI_LONG_TX_MSGS)/sizeof(HYUNDAI_LONG_TX_MSGS[0]));
@@ -287,7 +290,7 @@ static int hyundai_tx_hook(CANPacket_t *to_send) {
   }
 
   // FCA11: Block any potential actuation
-  if (addr == 909) {
+  if (is_fca11_msg) {
     int CR_VSM_DecCmd = GET_BYTE(to_send, 1);
     int FCA_CmdAct = GET_BIT(to_send, 20U);
     int CF_VSM_DecCmdAct = GET_BIT(to_send, 31U);
@@ -381,19 +384,16 @@ static int hyundai_tx_hook(CANPacket_t *to_send) {
     }
   }*/
 
-  if (tx) {
-    bool is_lkas11_msg = (addr == 832);
-    bool is_scc12_msg = (addr == 1057);
-    bool is_mdps12_msg = (addr == 593);
-
-    if (is_lkas11_msg) {
-      last_ts_lkas11_from_op = microsecond_timer_get();
-    } else if (is_scc12_msg) {
-      last_ts_scc12_from_op = microsecond_timer_get();
-    } else if (is_mdps12_msg) {
-      last_ts_mdps12_from_op = microsecond_timer_get();
-    }
+  if (is_lkas11_msg) {
+    last_ts_lkas11_from_op = (tx == 0 ? 0 : microsecond_timer_get());
+  } else if (is_scc12_msg) {
+    last_ts_scc12_from_op = (tx == 0 ? 0 : microsecond_timer_get());
+  } else if (is_mdps12_msg) {
+    last_ts_mdps12_from_op = (tx == 0 ? 0 : microsecond_timer_get());
+  } else if (is_fca11_msg) {
+    last_ts_fca11_from_op = (tx == 0 ? 0 : microsecond_timer_get());
   }
+
   return tx;
 }
 
@@ -405,7 +405,8 @@ static int hyundai_fwd_hook(int bus_num, int addr) {
   bool is_mdps12_msg = (addr == 593);
   bool is_lfahda_msg = (addr == 1157);
   bool is_scc_msg = (addr == 1056) || (addr == 1057) || (addr == 1290) || (addr == 905);
-  //bool is_fca_msg = (addr == 909) || (addr == 1155);
+  bool is_fca_msg = (addr == 909) || (addr == 1155);
+
   bool block_msg = is_lkas11_msg || is_lfahda_msg || is_scc_msg; //|| is_fca_msg;
 
   // forward cam to ccan and viceversa, except lkas cmd
@@ -428,6 +429,10 @@ static int hyundai_fwd_hook(int bus_num, int addr) {
         }
       } else if (is_scc_msg) {
         if (now - last_ts_scc12_from_op >= 400000) {
+          bus_fwd = 0;
+        }
+      } else if(is_fca_msg) {
+        if(now - last_ts_fca11_from_op >= 400000) {
           bus_fwd = 0;
         }
       }

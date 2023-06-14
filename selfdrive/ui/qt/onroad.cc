@@ -349,7 +349,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("gap_state", ce.getCruiseState().getGapAdjust());
   setProperty("lateralControl", cs.getLateralControlSelect());
   setProperty("steerRatio", lp.getSteerRatio());
-  setProperty("epsBus", cp.getEpsBus());
   setProperty("sccBus", cp.getSccBus());
   setProperty("fl", ce.getTpms().getFl());
   setProperty("fr", ce.getTpms().getFr());
@@ -361,7 +360,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("camLimitSpeedLeftDist", ls.getCamLimitSpeedLeftDist());
   setProperty("sectionLimitSpeed", ls.getSectionLimitSpeed());
   setProperty("sectionLeftDist", ls.getSectionLeftDist());
-  setProperty("currentRoadName", ls.getCurrentRoadName().cStr());
   setProperty("left_on", ce.getLeftBlinker());
   setProperty("right_on", ce.getRightBlinker());
   setProperty("latAccelFactor", cs.getLateralControlState().getTorqueState().getLatAccelFactor());
@@ -645,13 +643,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     drawTextColor(p, x, y + 170, saop_str, sa_color);
   }
 
-  // upper current road name
-  x = rect().left() + (btn_size * 1.8);
-  y = (bdr_s * 3);
-
-  configFont(p, "Inter", 40, "Regular");
-  drawTextColor(p, x, y, currentRoadName, whiteColor(200));
-
   // lat icon (upper right down 2)
   x = rect().right() - (btn_size / 2) - (bdr_s * 3) - (btn_size);
   y = (btn_size / 2) + (bdr_s * 20);
@@ -703,8 +694,8 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   const char* lateral[] = {"Pid", "Indi", "Lqr", "Torque"};
 
   QString infoText;
-  infoText.sprintf("EPS[%d] SCC[%d] SR[%.2f] [ %s ] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
-    epsBus, sccBus,
+  infoText.sprintf("SCC[%d] SR[%.2f] [ %s ] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
+    sccBus,
     steerRatio,
     lateral[lateralControl],
     latAccelFactor, friction,

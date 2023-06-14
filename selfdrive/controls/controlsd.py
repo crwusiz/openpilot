@@ -759,10 +759,8 @@ class Controls:
       # send car controls over can
       now_nanos = self.can_log_mono_time if REPLAY else int(sec_since_boot() * 1e9)
 
-      if self.CP.carName == "hyundai":
-        self.last_actuators, can_sends = self.CI.apply(CC, now_nanos, self)
-      else:
-        self.last_actuators, can_sends = self.CI.apply(CC, now_nanos)
+      #self.last_actuators, can_sends = self.CI.apply(CC, now_nanos)
+      self.last_actuators, can_sends = self.CI.apply(CC, now_nanos, self)
       self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
       CC.actuatorsOutput = self.last_actuators
       if self.CP.steerControlType == car.CarParams.SteerControlType.angle:

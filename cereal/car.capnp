@@ -714,12 +714,10 @@ struct CarParams {
   maxSteeringAngleDegDEPRECATED @54 :Float32;
 
   # add
-  epsBus @72: Int8;
-  sasBus @73: Int8;
-  sccBus @74: Int8;
-  hasAutoHold @75 :Bool;
-  hasScc13 @76 :Bool;
-  hasScc14 @77 :Bool;
-  hasNav @78 :Bool;
-  hasLfa @79 :Bool;
+  sccBus @72: Int8;
+  hasAutoHold @73 :Bool;
+  hasScc13 @74 :Bool;
+  hasScc14 @75 :Bool;
+  hasNav @76 :Bool;
+  hasLfa @77 :Bool;
 }

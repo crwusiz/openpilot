@@ -79,20 +79,30 @@ function launch {
 
   # CarList
   # sed '$a-------------------' ( add last line )
-  if [ ! -f "/data/params/crwusiz" ] ; then
+  if [ ! -d "/data/params/crwusiz" ] ; then
     mkdir /data/params/crwusiz
   fi
 
   cat /data/openpilot/selfdrive/car/hyundai/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_HYUNDAI
-  cp -f /data/params/crwusiz/CarList_HYUNDAI /data/params/crwusiz/CarList
   awk '/HYUNDAI/' /data/params/crwusiz/CarList_HYUNDAI > /data/params/crwusiz/CarList_Hyundai
   awk '/KIA/' /data/params/crwusiz/CarList_HYUNDAI > /data/params/crwusiz/CarList_Kia
   awk '/GENESIS/' /data/params/crwusiz/CarList_HYUNDAI > /data/params/crwusiz/CarList_Genesis
-  cat /data/openpilot/selfdrive/car/toyota/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_TOYOTA
-  awk '/TOYOTA/' /data/params/crwusiz/CarList_TOYOTA > /data/params/crwusiz/CarList_Toyota
-  awk '/LEXUS/' /data/params/crwusiz/CarList_TOYOTA > /data/params/crwusiz/CarList_Lexus
-  cat /data/openpilot/selfdrive/car/honda/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_Honda
-  cat /data/openpilot/selfdrive/car/gm/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_Gm
+
+  MANUFACTURER=$(cat /data/params/d/SelectedManufacturer)
+  if [ ${MANUFACTURER} = "HYUNDAI" ]; then
+    cp -f /data/params/crwusiz/CarList_Hyundai /data/params/crwusiz/CarList
+  elif [ ${MANUFACTURER} = "KIA" ]; then
+    cp -f /data/params/crwusiz/CarList_Kia /data/params/crwusiz/CarList
+  elif [ ${MANUFACTURER} = "GENESIS" ]; then
+    cp -f /data/params/crwusiz/CarList_Genesis /data/params/crwusiz/CarList
+  else
+    cp -f /data/params/crwusiz/CarList_HYUNDAI /data/params/crwusiz/CarList
+  fi
+  #cat /data/openpilot/selfdrive/car/gm/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_Gm
+  #cat /data/openpilot/selfdrive/car/toyota/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_TOYOTA
+  #awk '/TOYOTA/' /data/params/crwusiz/CarList_TOYOTA > /data/params/crwusiz/CarList_Toyota
+  #awk '/LEXUS/' /data/params/crwusiz/CarList_TOYOTA > /data/params/crwusiz/CarList_Lexus
+  #cat /data/openpilot/selfdrive/car/honda/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_Honda
 
   # git last commit log
   git log -1 --pretty=format:"%h, %cs, %cr" > /data/params/d/GitLog
@@ -101,15 +111,12 @@ function launch {
   #sed 's/.\{4\}$//' /data/params/d/GitRemote > /data/params/crwusiz/GitRemote_
 
   # events language init
-  if [ ! -f "/data/EVENTS_EN" ] && [ ! -f "/data/EVENTS_KO" ]; then
-    touch /data/EVENTS_EN
-    echo -n "main_en" > /data/params/d/LanguageSetting
-  elif [ -f "/data/EVENTS_EN" ]; then
-    cp -f /data/openpilot/scripts/add/events.py /data/openpilot/selfdrive/controls/lib/events.py
-    echo -n "main_en" > /data/params/d/LanguageSetting
-  elif [ -f "/data/EVENTS_KO" ]; then
+  LANG=$(cat /data/params/d/LanguageSetting)
+
+  if [ ${LANG} = "main_ko" ]; then
     cp -f /data/openpilot/scripts/add/events_ko.py /data/openpilot/selfdrive/controls/lib/events.py
-    echo -n "main_ko" > /data/params/d/LanguageSetting
+  else
+    cp -f /data/openpilot/scripts/add/events.py /data/openpilot/selfdrive/controls/lib/events.py
   fi
 
   # start manager

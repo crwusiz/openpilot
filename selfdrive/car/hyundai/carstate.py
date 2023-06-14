@@ -50,15 +50,12 @@ class CarState(CarStateBase):
     self.lfa_btn = 0
     self.lfa_enabled = False
 
-  def update(self, cp, cp2, cp_cam):
+  def update(self, cp, cp_cam):
     if self.CP.carFingerprint in CANFD_CAR:
       return self.update_canfd(cp, cp_cam)
 
-    cp_eps = cp2 if self.CP.epsBus else cp
-    cp_sas = cp2 if self.CP.sasBus else cp
-    cp_cruise = cp2 if self.CP.sccBus == 1 else cp_cam if self.CP.sccBus == 2 else cp
-
     ret = car.CarState.new_message()
+    cp_cruise = cp_cam if self.CP.sccBus == 2 else cp
     self.is_metric = cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"] == 0
     speed_conv = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
 
@@ -85,12 +82,12 @@ class CarState(CarStateBase):
 
     ret.vEgoCluster = self.cluster_speed * speed_conv
 
-    ret.steeringAngleDeg = cp_sas.vl["SAS11"]["SAS_Angle"]
-    ret.steeringRateDeg = cp_sas.vl["SAS11"]["SAS_Speed"]
-    ret.steeringTorque = cp_eps.vl["MDPS12"]["CR_Mdps_StrColTq"]
-    ret.steeringTorqueEps = cp_eps.vl["MDPS12"]["CR_Mdps_OutTq"]
+    ret.steeringAngleDeg = cp.vl["SAS11"]["SAS_Angle"]
+    ret.steeringRateDeg = cp.vl["SAS11"]["SAS_Speed"]
+    ret.steeringTorque = cp.vl["MDPS12"]["CR_Mdps_StrColTq"]
+    ret.steeringTorqueEps = cp.vl["MDPS12"]["CR_Mdps_OutTq"]
     ret.steeringPressed = abs(ret.steeringTorque) > self.CCP.STEER_THRESHOLD
-    self.eps_error_cnt += 1 if not ret.standstill and cp_eps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 else -self.eps_error_cnt
+    self.eps_error_cnt += 1 if not ret.standstill and cp.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 else -self.eps_error_cnt
     ret.steerFaultTemporary = self.eps_error_cnt > 100
 
     ret.yawRate = cp.vl["ESP12"]["YAW_RATE"]
@@ -164,7 +161,7 @@ class CarState(CarStateBase):
     # save the entire LKAS11, CLU11, MDPS12, LFAHDA_MFC, SCC11, SCC12, SCC13, SCC14
     self.lkas11 = copy.copy(cp_cam.vl["LKAS11"])
     self.clu11 = copy.copy(cp.vl["CLU11"])
-    self.mdps12 = copy.copy(cp_eps.vl["MDPS12"])
+    self.mdps12 = copy.copy(cp.vl["MDPS12"])
     self.scc11 = copy.copy(cp_cruise.vl["SCC11"])
     self.scc12 = copy.copy(cp_cruise.vl["SCC12"])
     self.scc13 = copy.copy(cp_cruise.vl["SCC13"]) if self.CP.hasScc13 else None
@@ -173,7 +170,7 @@ class CarState(CarStateBase):
     self.fca12 = cp.vl["FCA12"]
     self.mfc_lfa = cp_cam.vl["LFAHDA_MFC"]
 
-    self.steer_state = cp_eps.vl["MDPS12"]["CF_Mdps_ToiActive"]  # 0 NOT ACTIVE, 1 ACTIVE
+    self.steer_state = cp.vl["MDPS12"]["CF_Mdps_ToiActive"]  # 0 NOT ACTIVE, 1 ACTIVE
     self.prev_cruise_buttons = self.cruise_buttons[-1]
     self.cruise_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwState"])
     self.main_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwMain"])
@@ -350,28 +347,26 @@ class CarState(CarStateBase):
       ("WHL_SPD11", 50),
     ]
 
-    if CP.epsBus == 0:
-      signals += [
-        ("CR_Mdps_StrColTq", "MDPS12"),
-        ("CF_Mdps_Def", "MDPS12"),
-        ("CF_Mdps_ToiActive", "MDPS12"),
-        ("CF_Mdps_ToiUnavail", "MDPS12"),
-        ("CF_Mdps_ToiFlt", "MDPS12"),
-        ("CF_Mdps_MsgCount2", "MDPS12"),
-        ("CF_Mdps_Chksum2", "MDPS12"),
-        ("CF_Mdps_SErr", "MDPS12"),
-        ("CR_Mdps_StrTq", "MDPS12"),
-        ("CF_Mdps_FailStat", "MDPS12"),
-        ("CR_Mdps_OutTq", "MDPS12")
-      ]
-      checks.append(("MDPS12", 50))
+    signals += [
+      ("CR_Mdps_StrColTq", "MDPS12"),
+      ("CF_Mdps_Def", "MDPS12"),
+      ("CF_Mdps_ToiActive", "MDPS12"),
+      ("CF_Mdps_ToiUnavail", "MDPS12"),
+      ("CF_Mdps_ToiFlt", "MDPS12"),
+      ("CF_Mdps_MsgCount2", "MDPS12"),
+      ("CF_Mdps_Chksum2", "MDPS12"),
+      ("CF_Mdps_SErr", "MDPS12"),
+      ("CR_Mdps_StrTq", "MDPS12"),
+      ("CF_Mdps_FailStat", "MDPS12"),
+      ("CR_Mdps_OutTq", "MDPS12")
+    ]
+    checks.append(("MDPS12", 50))
 
-    if CP.sasBus == 0:
-      signals += [
-        ("SAS_Angle", "SAS11"),
-        ("SAS_Speed", "SAS11"),
-      ]
-      checks.append(("SAS11", 100))
+    signals += [
+      ("SAS_Angle", "SAS11"),
+      ("SAS_Speed", "SAS11"),
+    ]
+    checks.append(("SAS11", 100))
 
     # TPMS
     signals += [
@@ -530,99 +525,6 @@ class CarState(CarStateBase):
       checks.append(("LVR12", 100))
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 0, enforce_checks=False)
-
-
-  @staticmethod
-  def get_can2_parser(CP):
-    if CP.carFingerprint in CANFD_CAR:
-      return None
-
-    signals = []
-    checks = []
-
-    if CP.epsBus == 1:
-      signals += [
-        ("CR_Mdps_StrColTq", "MDPS12"),
-        ("CF_Mdps_Def", "MDPS12"),
-        ("CF_Mdps_ToiActive", "MDPS12"),
-        ("CF_Mdps_ToiUnavail", "MDPS12"),
-        ("CF_Mdps_ToiFlt", "MDPS12"),
-        ("CF_Mdps_MsgCount2", "MDPS12"),
-        ("CF_Mdps_Chksum2", "MDPS12"),
-        ("CF_Mdps_SErr", "MDPS12"),
-        ("CR_Mdps_StrTq", "MDPS12"),
-        ("CF_Mdps_FailStat", "MDPS12"),
-        ("CR_Mdps_OutTq", "MDPS12")
-      ]
-      checks.append(("MDPS12", 50))
-
-    if CP.sasBus == 1:
-      signals += [
-        ("SAS_Angle", "SAS11"),
-        ("SAS_Speed", "SAS11"),
-      ]
-      checks.append(("SAS11", 100))
-
-    if CP.sccBus == 1:
-      signals += [
-        ("MainMode_ACC", "SCC11"),
-        ("SCCInfoDisplay", "SCC11"),
-        ("AliveCounterACC", "SCC11"),
-        ("VSetDis", "SCC11"),
-        ("ObjValid", "SCC11"),
-        ("DriverAlertDisplay", "SCC11"),
-        ("TauGapSet", "SCC11"),
-        ("ACC_ObjStatus", "SCC11"),
-        ("ACC_ObjLatPos", "SCC11"),
-        ("ACC_ObjDist", "SCC11"),
-        ("ACC_ObjRelSpd", "SCC11"),
-      ]
-      checks.append(("SCC11", 50))
-
-      signals += [
-        ("ACCMode", "SCC12"),
-        ("CF_VSM_Prefill", "SCC12"),
-        ("CF_VSM_DecCmdAct", "SCC12"),
-        ("CF_VSM_HBACmd", "SCC12"),
-        ("CF_VSM_Warn", "SCC12"),
-        ("CF_VSM_Stat", "SCC12"),
-        ("CF_VSM_BeltCmd", "SCC12"),
-        ("ACCFailInfo", "SCC12"),
-        ("StopReq", "SCC12"),
-        ("CR_VSM_DecCmd", "SCC12"),
-        ("aReqRaw", "SCC12"), #aReqMax
-        ("TakeOverReq", "SCC12"),
-        ("PreFill", "SCC12"),
-        ("aReqValue", "SCC12"), #aReqMin
-        ("CF_VSM_ConfMode", "SCC12"),
-        ("AEB_Failinfo", "SCC12"),
-        ("AEB_Status", "SCC12"),
-        ("AEB_CmdAct", "SCC12"),
-        ("AEB_StopReq", "SCC12"),
-        ("CR_VSM_Alive", "SCC12"),
-        ("CR_VSM_ChkSum", "SCC12"),
-      ]
-      checks.append(("SCC12", 50))
-
-      if CP.hasScc13:
-        signals += [
-          ("SCCDrvModeRValue", "SCC13"),
-          ("SCC_Equip", "SCC13"),
-          ("AebDrvSetStatus", "SCC13"),
-        ]
-        checks.append(("SCC13", 50))
-
-      if CP.hasScc14:
-        signals += [
-          ("JerkUpperLimit", "SCC14"),
-          ("JerkLowerLimit", "SCC14"),
-          ("ComfortBandUpper", "SCC14"),
-          ("ComfortBandLower", "SCC14"),
-        ]
-        checks.append(("SCC14", 50))
-
-    return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 1, enforce_checks=False)
-
 
   @staticmethod
   def get_cam_can_parser(CP):

@@ -56,15 +56,6 @@ def create_clu11(packer, frame, bus, button, clu11):
   return packer.make_can_msg("CLU11", bus, values)
 
 
-def create_clu11_mdps(packer, frame, bus, button, speed, clu11):
-  values = clu11
-  values["CF_Clu_CruiseSwState"] = button
-  values["CF_Clu_Vanz"] = speed
-  values["CF_Clu_AliveCnt1"] = frame % 0x10
-
-  return packer.make_can_msg("CLU11", bus, values)
-
-
 def create_mdps12(packer, frame, mdps12):
   values = mdps12
   values["CF_Mdps_ToiActive"] = 0

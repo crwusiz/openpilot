@@ -367,9 +367,6 @@ class CarInterface(CarInterfaceBase):
       ret.hasNav = 1348 in fingerprint[0] and Params().get_bool("NavLimitSpeed")
       ret.hasLfa = 913 in fingerprint[0] and Params().get("MfcSelect", encoding='utf8') == "2"
 
-      # ignore CAN2 address if L-CAN on the same BUS
-      ret.epsBus = 1 if 593 in fingerprint[1] and 1296 not in fingerprint[1] else 0
-      ret.sasBus = 1 if 688 in fingerprint[1] and 1296 not in fingerprint[1] else 0
       ret.sccBus = 2 if Params().get_bool("SccOnBus2") else 0
 
       if ret.sccBus == 2:
@@ -435,15 +432,11 @@ class CarInterface(CarInterfaceBase):
 
 
   def _update(self, c):
-    ret = self.CS.update(self.cp, self.cp2, self.cp_cam)
+    ret = self.CS.update(self.cp, self.cp_cam)
 
     if self.frame % 20 == 0:
-      if self.CP.carFingerprint in CANFD_CAR:
-        if not any([self.cp.can_valid, self.cp_cam.can_valid]):
-          print(f'cp = {bool(self.cp.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
-      else:
-        if not any([self.cp.can_valid, self.cp2.can_valid, self.cp_cam.can_valid]):
-          print(f'cp = {bool(self.cp.can_valid)}  cp2 = {bool(self.cp2.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
+      if not any([self.cp.can_valid, self.cp_cam.can_valid]):
+        print(f'cp = {bool(self.cp.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
     self.frame += 1
 
     if self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons:
@@ -480,7 +473,7 @@ class CarInterface(CarInterfaceBase):
       self.low_speed_alert = True
     if ret.vEgo > (self.CP.minSteerSpeed + 4.):
       self.low_speed_alert = False
-    if self.low_speed_alert and not self.CP.epsBus:
+    if self.low_speed_alert:
       events.add(car.CarEvent.EventName.belowSteerSpeed)
 
     ret.events = events.to_msg()

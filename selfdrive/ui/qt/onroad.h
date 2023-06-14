@@ -49,7 +49,6 @@ private:
 class AnnotatedCameraWidget : public CameraWidget {
   Q_OBJECT
   Q_PROPERTY(QString speedUnit MEMBER speedUnit);
-  Q_PROPERTY(QString currentRoadName MEMBER currentRoadName);
 
   Q_PROPERTY(bool is_cruise_set MEMBER is_cruise_set);
   Q_PROPERTY(bool steeringPressed MEMBER steeringPressed);
@@ -73,7 +72,6 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(int gpsSatelliteCount MEMBER gpsSatelliteCount);
   Q_PROPERTY(int gap_state MEMBER gap_state);
   Q_PROPERTY(int lateralControl MEMBER lateralControl);
-  Q_PROPERTY(int epsBus MEMBER epsBus);
   Q_PROPERTY(int sccBus MEMBER sccBus);
   Q_PROPERTY(int camLimitSpeed MEMBER camLimitSpeed);
   Q_PROPERTY(int camLimitSpeedLeftDist MEMBER camLimitSpeedLeftDist);
@@ -133,7 +131,6 @@ private:
   QPixmap nda_img, hda_img;
 
   QString speedUnit;
-  QString currentRoadName;
   std::unique_ptr<PubMaster> pm;
 
   bool is_cruise_set = false;
@@ -158,7 +155,7 @@ private:
   int gpsSatelliteCount = 0;
   int accel, gap_state = 0;
   int lateralControl = 0;
-  int epsBus, sccBus = 0;
+  int sccBus = 0;
   int camLimitSpeed, sectionLimitSpeed = 0;
   int camLimitSpeedLeftDist, sectionLeftDist = 0;
   int skip_frame_count = 0;
