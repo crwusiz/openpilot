@@ -1071,9 +1071,16 @@ struct LateralPlan @0xe1e9318e2ae8b51e {
   curvatureRates @28 :List(Float32);
 
   solverExecutionTime @30 :Float32;
+  solverCost @32 :Float32;
+  solverState @33 :SolverState;
 
-  autoLaneChangeEnabled @32 :Bool;
-  autoLaneChangeTimer @33 :Int8;
+  struct SolverState {
+    x @0 :List(List(Float32));
+    u @1 :List(Float32);
+  }
+
+  autoLaneChangeEnabled @34 :Bool;
+  autoLaneChangeTimer @35 :Int8;
 
   enum Desire {
     none @0;
