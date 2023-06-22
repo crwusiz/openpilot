@@ -557,11 +557,11 @@ location set</source>
     </message>
     <message>
         <source>Immediately connect to the internet to check for updates. If you do not connect to the internet, openpilot won&apos;t engage in %1</source>
-        <translation>네트워크를 연결하여 업데이트를 확인하세요. 네트워크 연결이 확인되지않으면 오픈파일럿이 시작되지 않습니다. %1</translation>
+        <translation>즉시 인터넷에 연결하여 업데이트를 확인하세요. 인터넷에 연결되어 있지 않으면 %1 이후에는 openpilot이 활성화되지 않습니다.</translation>
     </message>
     <message>
         <source>Connect to internet to check for updates. openpilot won&apos;t automatically start until it connects to internet to check for updates.</source>
-        <translation>네트워크를 연결하여 업데이트를 확인하세요. 네트워크 연결이 확인되지않으면 오픈파일럿이 자동으로 시작되지 않습니다.</translation>
+        <translation>인터넷에 연결하여 업데이트를 확인하세요. openpilot은 업데이트를 확인하기 위해 인터넷에 연결할 때까지 자동으로 시작되지 않습니다.</translation>
     </message>
     <message>
         <source>Unable to download updates
@@ -571,19 +571,19 @@ location set</source>
     </message>
     <message>
         <source>Invalid date and time settings, system won&apos;t start. Connect to internet to set time.</source>
-        <translation>잘못된 날짜 및 시간설정으로 시스템이 시작되지않습니다. 네트워크에 연결하여 날짜 및 시간설정을 진행하세요.</translation>
+        <translation>날짜 및 시간 설정이 잘못되어 시스템이 시작되지 않습니다. 날짜와 시간을 동기화하려면 인터넷에 연결하세요.</translation>
     </message>
     <message>
         <source>Taking camera snapshots. System won&apos;t start until finished.</source>
-        <translation>카메라 스냅샷 촬영이 완료될 때까지 시스템이 시작되지 않습니다.</translation>
+        <translation>카메라 스냅샷 찍기가 완료될 때까지 시스템이 시작되지 않습니다.</translation>
     </message>
     <message>
         <source>An update to your device&apos;s operating system is downloading in the background. You will be prompted to update when it&apos;s ready to install.</source>
-        <translation>백그라운드에서 운영 체제에 대한 업데이트를 다운로드하고 있습니다. 설치할 준비가 되면 업데이트하라는 메시지가 표시됩니다.</translation>
+        <translation>백그라운드에서 운영 체제에 대한 업데이트를 다운로드되고 있습니다. 설치할 준비가 되면 업데이트하라는 메시지가 표시됩니다.</translation>
     </message>
     <message>
         <source>Device failed to register. It will not connect to or upload to comma.ai servers, and receives no support from comma.ai. If this is an official device, visit https://comma.ai/support.</source>
-        <translation>장치를 등록하지 못했습니다. comma.ai 서버에 연결하거나 업로드하지 않으며 comma.ai에서 지원을 받지 않습니다. 공식적인 장치라면 https://comma.ai/support 로 문의하세요</translation>
+        <translation>장치를 등록하지 못했습니다. comma.ai 서버에 연결하거나 업로드하지 않으며 comma.ai에서 지원을 받지 않습니다. 공식 장치는 https://comma.ai/support로 방문하세요</translation>
     </message>
     <message>
         <source>NVMe drive not mounted.</source>
@@ -860,7 +860,7 @@ This may take up to a minute.</source>
     </message>
     <message>
         <source>Waiting for internet</source>
-        <translation>네트워크 접속을 기다립니다</translation>
+        <translation>인터넷 대기중</translation>
     </message>
     <message>
         <source>Enter URL</source>
@@ -880,7 +880,7 @@ This may take up to a minute.</source>
     </message>
     <message>
         <source>Ensure the entered URL is valid, and the device’s internet connection is good.</source>
-        <translation>입력된 URL이 유효하고 장치의 네트워크 연결이 잘 되어 있는지 확인하세요.</translation>
+        <translation>입력된 URL이 유효하고 장치의 인터넷 연결이 양호한지 확인하세요.</translation>
     </message>
     <message>
         <source>Reboot device</source>
