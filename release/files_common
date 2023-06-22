@@ -65,8 +65,8 @@ tools/replay/*.cc
 tools/replay/*.h
 
 selfdrive/__init__.py
-system/sentry.py
-system/tombstoned.py
+selfdrive/sentry.py
+selfdrive/tombstoned.py
 selfdrive/updated.py
 selfdrive/rtshield.py
 selfdrive/statsd.py
@@ -440,6 +440,7 @@ third_party/libyuv/larch64/**
 third_party/snpe/include/**
 third_party/snpe/dsp**
 
+third_party/acados/.gitignore
 third_party/acados/x86_64/**
 third_party/acados/larch64/**
 third_party/acados/include/**

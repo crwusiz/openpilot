@@ -11,7 +11,7 @@ from multiprocessing import Process
 from setproctitle import setproctitle  # pylint: disable=no-name-in-module
 
 import cereal.messaging as messaging
-import system.sentry as sentry
+import selfdrive.sentry as sentry
 from cereal import car
 from common.basedir import BASEDIR
 from common.params import Params
@@ -100,8 +100,9 @@ class ManagerProcess(ABC):
 
     try:
       fn = WATCHDOG_FN + str(self.proc.pid)
-      # TODO: why can't pylint find struct.unpack?
-      self.last_watchdog_time = struct.unpack('Q', open(fn, "rb").read())[0] # pylint: disable=no-member
+      with open(fn, "rb") as f:
+        # TODO: why can't pylint find struct.unpack?
+        self.last_watchdog_time = struct.unpack('Q', f.read())[0] # pylint: disable=no-member
     except Exception:
       pass
 

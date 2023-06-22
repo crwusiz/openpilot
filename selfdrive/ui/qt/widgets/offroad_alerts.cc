@@ -62,54 +62,44 @@ AbstractAlert::AbstractAlert(bool hasRebootBtn, QWidget *parent) : QFrame(parent
   )");
 }
 
-OffroadAlert::OffroadAlert(QWidget *parent) : AbstractAlert(parent) {
-  for (auto &[key, severity, text] : allAlerts()) {
-    QLabel *l = new QLabel(this);
-    l->setMargin(60);
-    l->setWordWrap(true);
-    l->setStyleSheet(QString("background-color: %1").arg(severity == Severity::high ? "#E22C2C" : "#292929"));
-    l->setVisible(false);
-    scrollable_layout->addWidget(l);
-
-    alerts[key] = {.text = text, .label = l};
-  }
-  scrollable_layout->addStretch(1);
-}
-
 int OffroadAlert::refresh() {
-  Params params;
-  int alertCount = 0;
+  // build widgets for each offroad alert on first refresh
+  if (alerts.empty()) {
+    QString json = util::read_file("../controls/lib/alerts_offroad.json").c_str();
+    QJsonObject obj = QJsonDocument::fromJson(json.toUtf8()).object();
 
-  for (const auto &[key, a] : alerts) {
-    if (params.exists(key)) {
-      std::string extra = params.get(key);
-      a.label->setText(extra.empty() ? a.text : a.text.arg(extra.c_str()));
-      a.label->setVisible(true);
-      ++alertCount;
-    } else {
-      a.label->setVisible(false);
+    // descending sort labels by severity
+    std::vector<std::pair<std::string, int>> sorted;
+    for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+      sorted.push_back({it.key().toStdString(), it.value()["severity"].toInt()});
     }
+    std::sort(sorted.begin(), sorted.end(), [=](auto &l, auto &r) { return l.second > r.second; });
+
+    for (auto &[key, severity] : sorted) {
+      QLabel *l = new QLabel(this);
+      alerts[key] = l;
+      l->setMargin(60);
+      l->setWordWrap(true);
+      l->setStyleSheet(QString("background-color: %1").arg(severity ? "#E22C2C" : "#292929"));
+      scrollable_layout->addWidget(l);
+    }
+    scrollable_layout->addStretch(1);
   }
 
-  snooze_btn->setVisible(alerts["Offroad_ConnectivityNeeded"].label->isVisible());
+  int alertCount = 0;
+  for (const auto &[key, label] : alerts) {
+    QString text;
+    std::string bytes = params.get(key);
+    if (bytes.size()) {
+      auto doc_par = QJsonDocument::fromJson(bytes.c_str());
+      text = doc_par["text"].toString();
+    }
+    label->setText(text);
+    label->setVisible(!text.isEmpty());
+    alertCount += !text.isEmpty();
+  }
+  snooze_btn->setVisible(!alerts["Offroad_ConnectivityNeeded"]->text().isEmpty());
   return alertCount;
-}
-
-const std::vector<std::tuple<std::string, OffroadAlert::Severity, QString>> OffroadAlert::allAlerts() {
-  return {
-    {"Offroad_TemperatureTooHigh", Severity::high, tr("Device temperature too high. System won't start.")},
-    {"Offroad_ConnectivityNeeded", Severity::high, tr("Connect to internet to check for updates. openpilot won't automatically start until it connects to internet to check for updates.")},
-    {"Offroad_UpdateFailed", Severity::high, tr("Unable to download updates\n%1")},
-    {"Offroad_InvalidTime", Severity::high, tr("Invalid date and time settings, system won't start. Connect to internet to set time.")},
-    {"Offroad_UnofficialHardware", Severity::high, tr("Device failed to register. It will not connect to or upload to comma.ai servers, and receives no support from comma.ai. If this is an official device, visit https://comma.ai/support.")},
-    {"Offroad_StorageMissing", Severity::high, tr("NVMe drive not mounted.")},
-    {"Offroad_BadNvme", Severity::high, tr("Unsupported NVMe drive detected. Device may draw significantly more power and overheat due to the unsupported NVMe.")},
-    {"Offroad_CarUnrecognized", Severity::normal, tr("openpilot was unable to identify your car. Your car is either unsupported or its ECUs are not recognized. Please submit a pull request to add the firmware versions to the proper vehicle. Need help? Join discord.comma.ai.")},
-    {"Offroad_ConnectivityNeededPrompt", Severity::normal, tr("Immediately connect to the internet to check for updates. If you do not connect to the internet, openpilot won't engage in %1")},
-    {"Offroad_NoFirmware", Severity::normal, tr("openpilot was unable to identify your car. Check integrity of cables and ensure all connections are secure, particularly that the comma power is fully inserted in the OBD-II port of the vehicle. Need help? Join discord.comma.ai.")},
-    {"Offroad_IsTakingSnapshot", Severity::normal, tr("Taking camera snapshots. System won't start until finished.")},
-    {"Offroad_NeosUpdate", Severity::normal, tr("An update to your device's operating system is downloading in the background. You will be prompted to update when it's ready to install.")},
-  };
 }
 
 UpdateAlert::UpdateAlert(QWidget *parent) : AbstractAlert(true, parent) {

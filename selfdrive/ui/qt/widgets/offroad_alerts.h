@@ -37,18 +37,9 @@ class OffroadAlert : public AbstractAlert {
   Q_OBJECT
 
 public:
-  enum class Severity {
-    normal,
-    high,
-  };
-  static const std::vector<std::tuple<std::string, Severity, QString>> allAlerts();
-  explicit OffroadAlert(QWidget *parent = 0);
+  explicit OffroadAlert(QWidget *parent = 0) : AbstractAlert(false, parent) {}
   int refresh();
 
 private:
-  struct Alert {
-    QString text;
-    QLabel *label;
-  };
-  std::map<std::string, Alert> alerts;
+  std::map<std::string, QLabel*> alerts;
 };

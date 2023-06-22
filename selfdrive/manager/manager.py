@@ -2,15 +2,13 @@
 import datetime
 import os
 import signal
-import subprocess
 import sys
 import traceback
 from typing import List, Tuple, Union
 
 from cereal import log
 import cereal.messaging as messaging
-import system.sentry as sentry
-from common.basedir import BASEDIR
+import selfdrive.sentry as sentry
 from common.params import Params, ParamKeyType
 from common.text_window import TextWindow
 from selfdrive.boardd.set_time import set_time
