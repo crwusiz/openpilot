@@ -141,14 +141,6 @@
         <translation>SCC 배선 개조차량은 사용으로 변경하세요</translation>
     </message>
     <message>
-        <source>Mando Radar interface Enable</source>
-        <translation type="vanished">만도 레이더 인터페이스 사용</translation>
-    </message>
-    <message>
-        <source>Mando Radar interface use (disable AEB)</source>
-        <translation type="vanished">이 기능은 만도레이더가 장착된 일부 차량만 지원되며 차량의 AEB가 비활성됩니다</translation>
-    </message>
-    <message>
         <source>Git Fetch and Reset</source>
         <translation>Git Fetch and Reset</translation>
     </message>
@@ -161,24 +153,12 @@
         <translation>Tmux 에러 로그</translation>
     </message>
     <message>
-        <source>Panda Reset</source>
-        <translation>Panda 리셋</translation>
-    </message>
-    <message>
         <source>Panda Flash</source>
         <translation>Panda 플래싱</translation>
     </message>
     <message>
         <source>Panda Recover</source>
         <translation>Panda 복구</translation>
-    </message>
-    <message>
-        <source>Panda Safety Change to Default</source>
-        <translation>Panda Safety 기본값으로 변경</translation>
-    </message>
-    <message>
-        <source>Panda Safety Change to MDPS</source>
-        <translation>Panda Safety MDPS로 변경</translation>
     </message>
     <message>
         <source>Disengage on Brake Pedal</source>
@@ -195,10 +175,6 @@
     <message>
         <source>Use Stock Navigation Limit Speed Signal</source>
         <translation>차량 순정 내비게이션의 속도제한 정보를 표시합니다</translation>
-    </message>
-    <message>
-        <source>Tmux launch log</source>
-        <translation>Tmux 실행 로그</translation>
     </message>
 </context>
 <context>
@@ -625,6 +601,10 @@ location set</source>
         <source>openpilot was unable to identify your car. Check integrity of cables and ensure all connections are secure, particularly that the comma power is fully inserted in the OBD-II port of the vehicle. Need help? Join discord.comma.ai.</source>
         <translation>openpilot이 차량을 식별할수 없었습니다. 케이블의 무결성을 점검하고 모든 연결부, 특히 comma power가 차량의 OBD-II 포트에 완전히 삽입되었는지 확인하세요. 도움이 필요하시면 discord.comma.ai에 가입하세요.</translation>
     </message>
+    <message>
+        <source>openpilot detected a change in the device&apos;s mounting position. Ensure the device is fully seated in the mount and the mount is firmly secured to the windshield.</source>
+        <translation>openpilot이 장치의 장착 위치 변경을 감지했습니다. 장치가 마운트에 완전히 장착되고 마운트가 앞유리에 단단히 고정되었는지 확인하십시오. </translation>
+    </message>
 </context>
 <context>
     <name>OffroadHome</name>
@@ -658,13 +638,6 @@ location set</source>
     <message>
         <source>Bookmark connect.comma.ai to your home screen to use it like an app</source>
         <translation>connect.comma.ai을 앱처럼 사용하려면 홈 화면에 바로가기를 만드십시오</translation>
-    </message>
-</context>
-<context>
-    <name>PandaSafetySelect</name>
-    <message>
-        <source>Panda Safety Select (Default/Mdps)</source>
-        <translation>Panda Safety 선택 (Default/Mdps)</translation>
     </message>
 </context>
 <context>
