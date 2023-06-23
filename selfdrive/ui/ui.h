@@ -40,6 +40,7 @@ struct Alert {
   QString text2;
   QString type;
   cereal::ControlsState::AlertSize size;
+  cereal::ControlsState::AlertStatus status;
   AudibleAlert sound;
 
   bool equal(const Alert &a2) {
@@ -51,6 +52,7 @@ struct Alert {
     if (sm.updated("controlsState")) {
       return {cs.getAlertText1().cStr(), cs.getAlertText2().cStr(),
               cs.getAlertType().cStr(), cs.getAlertSize(),
+              cs.getAlertStatus(),
               cs.getAlertSound()};
     } else if ((sm.frame - started_frame) > 5 * UI_FREQ) {
       const int CONTROLS_TIMEOUT = 5;
@@ -62,18 +64,21 @@ struct Alert {
         //return {"openpilot Unavailable", "Waiting for controls to start",
         return {"오픈파일럿을 사용할수없습니다", "프로세스가 준비중입니다",
                 "controlsWaiting", cereal::ControlsState::AlertSize::MID,
-                AudibleAlert::PROMPT};
+                cereal::ControlsState::AlertStatus::NORMAL,
+                AudibleAlert::NONE};
       } else if (controls_missing > CONTROLS_TIMEOUT && !Hardware::PC()) {
         // car is started, but controls is lagging or died
         if (cs.getEnabled() && (controls_missing - CONTROLS_TIMEOUT) < 10) {
           //return {"TAKE CONTROL IMMEDIATELY", "Controls Unresponsive",
           return {"핸들을 잡아주세요", "프로세스가 응답하지않습니다",
                   "controlsUnresponsive", cereal::ControlsState::AlertSize::FULL,
+                  cereal::ControlsState::AlertStatus::CRITICAL,
                   AudibleAlert::WARNING_IMMEDIATE};
         } else {
           //return {"Controls Unresponsive", "Reboot Device",
           return {"프로세스가 응답하지않습니다", "장치를 재부팅하세요",
                   "controlsUnresponsivePermanent", cereal::ControlsState::AlertSize::MID,
+                  cereal::ControlsState::AlertStatus::NORMAL,
                   AudibleAlert::NONE};
         }
       }
@@ -96,6 +101,12 @@ const QColor bg_colors [] = {
   [STATUS_ENGAGED] = QColor(0x17, 0x86, 0x44, 0x01),
   [STATUS_WARNING] = QColor(0xDA, 0x6F, 0x25, 0x01),
   [STATUS_ALERT] = QColor(0xC9, 0x22, 0x31, 0xf1),
+};
+
+static std::map<cereal::ControlsState::AlertStatus, QColor> alert_colors = {
+  {cereal::ControlsState::AlertStatus::NORMAL, QColor(0x00, 0x00, 0x00, 0xa6)},
+  {cereal::ControlsState::AlertStatus::USER_PROMPT, QColor(0xDA, 0x6F, 0x25, 0xf1)},
+  {cereal::ControlsState::AlertStatus::CRITICAL, QColor(0xC9, 0x22, 0x31, 0xf1)},
 };
 
 typedef struct UIScene {
