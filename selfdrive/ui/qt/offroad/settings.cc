@@ -8,10 +8,6 @@
 
 #include "selfdrive/ui/qt/offroad/networking.h"
 
-#ifdef ENABLE_MAPS
-#include "selfdrive/ui/qt/maps/map_settings.h"
-#endif
-
 #include "common/params.h"
 #include "common/watchdog.h"
 #include "common/util.h"
