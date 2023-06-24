@@ -407,7 +407,7 @@ class LongitudinalMpc:
       v_cruise_clipped = np.clip(v_cruise * np.ones(N+1),
                                  v_lower,
                                  v_upper)
-      cruise_obstacle = np.cumsum(T_DIFFS * v_cruise_clipped) + get_safe_obstacle_distance(v_cruise_clipped, get_T_FOLLOW(), self.comfort_brake, self.stop_distance)
+      cruise_obstacle = np.cumsum(T_DIFFS * v_cruise_clipped) + get_safe_obstacle_distance(v_cruise_clipped, get_T_FOLLOW(personality), self.comfort_brake, self.stop_distance)
       x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle, x2])
 
       self.source = SOURCES[np.argmin(x_obstacles[0])]
