@@ -818,7 +818,6 @@ class Controls:
 
     # add
     controlsState.lateralControlSelect = int(self.lateral_control_select)
-    controlsState.longControl = bool(self.CP.openpilotLongitudinalControl)
 
     lat_tuning = self.CP.lateralTuning.which()
     if self.joystick_mode:

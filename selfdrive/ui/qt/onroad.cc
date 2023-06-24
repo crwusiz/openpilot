@@ -230,7 +230,6 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   main_layout->addWidget(experimental_btn, 0, Qt::AlignTop | Qt::AlignRight);
 
   steer_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
-  lat_img = loadPixmap("../assets/offroad/icon_speed_limit.png", {img_size, img_size});
   gaspress_img = loadPixmap("../assets/offroad/icon_disengage_on_accelerator.svg", {img_size, img_size});
   dm_img = loadPixmap("../assets/img_driver_face.png", {img_size + 5, img_size + 5});
 
@@ -282,7 +281,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   const int SET_SPEED_NA = 255;
   const SubMaster &sm = *(s.sm);
   const auto cs = sm["controlsState"].getControlsState();
-  const auto cc = sm["carControl"].getCarControl();
   const auto ce = sm["carState"].getCarState();
   const auto cp = sm["carParams"].getCarParams();
   const auto ds = sm["deviceState"].getDeviceState();
@@ -338,8 +336,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("gpsAccuracy", ge.getAccuracy());
   setProperty("gpsSatelliteCount", s.scene.satelliteCount);
   setProperty("steerAngle", ce.getSteeringAngleDeg());
-  setProperty("steerAngleOp", cc.getActuators().getSteeringAngleDeg());
-  setProperty("longControl", cs.getLongControl());
+  setProperty("longControl", cp.getOpenpilotLongitudinalControl());
   setProperty("gap_state", ce.getCruiseState().getGapAdjust());
   setProperty("lateralControl", cs.getLateralControlSelect());
   setProperty("steerRatio", lp.getSteerRatio());
@@ -360,7 +357,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("friction", cs.getLateralControlState().getTorqueState().getFriction());
   setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
   setProperty("frictionRaw", tp.getFrictionCoefficientRaw());
-  setProperty("isCanfd", ce.getIsCanfd());
   setProperty("traffic_state", lo.getTrafficState());
 
   // update engageability/experimental mode button
@@ -567,6 +563,39 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   int x,y,w,h = 0;
   QColor icon_bg = blackColor(100);
 
+  // nda icon (upper center)
+  if (nda_state > 0) {
+    w = 120;
+    h = 54;
+    x = (width() + (bdr_s * 2)) / 2 - (w / 2) - bdr_s;
+    y = 30 - bdr_s;
+    p.drawPixmap(x, y, w, h, nda_state == 1 ? nda_img : hda_img);
+  }
+
+  // traffic icon (upper right 5)
+  if (traffic_state >= 0) {
+    w = 230;
+    h = 150;
+    x = (width() + (bdr_s * 2)) / 2 + 120;
+    y = (btn_size / 2) - (bdr_s * 3.5);
+    if (traffic_state == 1) {
+      p.drawPixmap(x, y, w, h, traffic_stop_img);
+    } else if (traffic_state == 2) {
+      p.drawPixmap(x, y, w, h, traffic_go_img);
+    } else {
+      p.drawPixmap(x, y, w, h, traffic_none_img);
+    }
+  }
+
+  // N direction icon (upper right 4)
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 3.2);
+  y = (btn_size / 2) + (bdr_s * 4);
+  drawIconRotate(p, x, y, direction_img, icon_bg, gps_state ? 0.65 : 0.2, gpsBearing);
+
+  // gps icon (upper right 3)
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 2.2);
+  drawIcon(p, x, y, gps_img, icon_bg, gps_state ? 0.65 : 0.2);
+
   if (wifi_state == 1) {
     wifi_img = wifi_l_img;
   } else if (wifi_state == 2) {
@@ -578,50 +607,15 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   // wifi icon (upper right 2)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 3) - (btn_size);
-  y = (btn_size / 2) + (bdr_s * 4);
-  drawIcon(p, x, y, wifi_img, icon_bg, wifi_state > 0 ? 1.0 : 0.2);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 1.2);
+  drawIcon(p, x, y, wifi_img, icon_bg, wifi_state > 0 ? 0.65 : 0.2);
 
-  // gps icon (upper right 3)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 3) - (btn_size * 2);
-  y = (btn_size / 2) + (bdr_s * 4);
-  drawIcon(p, x, y, gps_img, icon_bg, gps_state ? 1.0 : 0.2);
-
-  // N direction icon (upper right 4)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 3) - (btn_size * 3);
-  y = (btn_size / 2) + (bdr_s * 4);
-  drawIconRotate(p, x, y, direction_img, icon_bg, gps_state ? 1.0 : 0.2, gpsBearing);
-
-  // traffic icon (upper right5)
-  if (traffic_state >= 0) {
-    w = 200;
-    h = 100;
-    x = (width() + (bdr_s * 2)) / 2 + 100;
-    y = 30 - bdr_s * 3;
-    if (traffic_state == 1) {
-      p.drawPixmap(x, y, w, h, traffic_stop_img);
-    } else if (traffic_state == 2) {
-      p.drawPixmap(x, y, w, h, traffic_go_img);
-    } else {
-      p.drawPixmap(x, y, w, h, traffic_none_img);
-    }
-  }
-
-  // nda icon (upper center)
-  if (nda_state > 0) {
-    w = 120;
-    h = 54;
-    x = (width() + (bdr_s * 2)) / 2 - (w / 2) - bdr_s;
-    y = 30 - bdr_s;
-    p.drawPixmap(x, y, w, h, nda_state == 1 ? nda_img : hda_img);
-  }
-
-  // steer img (upper right down 1)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 3);
-  y = (btn_size / 2) + (bdr_s * 20);
+  // steer img (bottom 1 right)
+  x = (btn_size / 2) + (bdr_s * 2) + (btn_size);
+  y = rect().bottom() - (footer_h / 2);
   drawIconRotate(p, x, y, steer_img, icon_bg, 1.0, steerAngle);
 
-  QString sa_str, saop_str;
+  QString sa_str;
   QColor sa_color = limeColor(200);
   if (std::fabs(steerAngle) > 90) {
     sa_color = redColor(200);
@@ -629,60 +623,18 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     sa_color = orangeColor(200);
   }
   sa_str.sprintf("%.0f °", steerAngle);
-  saop_str.sprintf("%.0f °", steerAngleOp);
-  configFont(p, "Inter", 35, "Bold");
+  configFont(p, "Inter", 30, "Bold");
 
-  drawTextColor(p, x, y + 120, sa_str, sa_color);
-  if (status != STATUS_DISENGAGED) {
-    drawTextColor(p, x, y + 170, saop_str, sa_color);
-  }
+  drawTextColor(p, x, y + 95, sa_str, sa_color);
 
-  // lat icon (upper right down 2)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 3) - (btn_size);
-  y = (btn_size / 2) + (bdr_s * 20);
-  drawIcon(p, x, y, lat_img, icon_bg, (status != STATUS_DISENGAGED) ? 1.0 : 0.2);
-
-  // gaspress img (bottom right)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 1.5);
-  y = rect().bottom() - (footer_h / 2) + (bdr_s *2);
-  drawIcon(p, x, y, gaspress_img, icon_bg, gas_pressed ? 1.0 : 0.2);
-
-  // scc gap icon (bottom right 1)
-  if (gap_state == 1) {
-    gap_img = gap1_img;
-  } else if (gap_state == 2) {
-    gap_img = gap2_img;
-  } else if (gap_state == 3) {
-    gap_img = gap3_img;
-  } else {
-    gap_img = gap4_img;
-  }
-
-  x = (btn_size / 2) + (bdr_s * 2) + btn_size;
-  y = rect().bottom() - (footer_h / 2);
-  drawIcon(p, x, y, gap_img, icon_bg, is_cruise_set ? 1.0 : 0.2);
-
-  // brake icon (bottom left 2)
+  // bsd_l icon (bottom 2 left)
   x = (btn_size / 2) + (bdr_s * 2);
   y = rect().bottom() - (footer_h / 2) - (btn_size) - 10;
-  drawIcon(p, x, y, brake_img, icon_bg, brake_state ? 1.0 : 0.2);
+  drawIcon(p, x, y, bsd_l_img, icon_bg, left_blindspot ? 0.65 : 0.2);
 
-  // autohold icon (bottom right 2)
-  if (!isCanfd) {
-    x = (btn_size / 2) + (bdr_s * 2) + (btn_size);
-    y = rect().bottom() - (footer_h / 2) - (btn_size) - 10;
-    drawIcon(p, x, y, autohold_state > 1 ? autohold_warning_img : autohold_active_img, icon_bg, autohold_state ? 1.0 : 0.2);
-  }
-
-  // bsd_l icon (bottom left 3)
-  x = (btn_size / 2) + (bdr_s * 2);
-  y = rect().bottom() - (footer_h / 2) - (btn_size * 2) - 20;
-  drawIcon(p, x, y, bsd_l_img, icon_bg, left_blindspot ? 1.0 : 0.2);
-
-  // bsd_r icon (bottom right 3)
+  // bsd_r icon (bottom 2 right)
   x = (btn_size / 2) + (bdr_s * 2) + (btn_size);
-  y = rect().bottom() - (footer_h / 2) - (btn_size * 2) - 20;
-  drawIcon(p, x, y, bsd_r_img, icon_bg, right_blindspot ? 1.0 : 0.2);
+  drawIcon(p, x, y, bsd_r_img, icon_bg, right_blindspot ? 0.65 : 0.2);
 
   // bottom info
   const char* lateral[] = {"Pid", "Indi", "Lqr", "Torque"};
@@ -696,11 +648,44 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     latAccelFactorRaw, frictionRaw
   );
 
-  x = rect().left() + btn_size * 3.0;
+  x = rect().left() + btn_size * 2.5;
   y = rect().height() - 15;
 
   configFont(p, "Inter", 30, "Regular");
   drawTextColor(p, x, y, infoText, whiteColor(200));
+
+  // new bottom info
+
+  // scc gap icon (bottom right 1)
+  if (gap_state == 1) {
+    gap_img = gap1_img;
+  } else if (gap_state == 2) {
+    gap_img = gap2_img;
+  } else if (gap_state == 3) {
+    gap_img = gap3_img;
+  } else {
+    gap_img = gap4_img;
+  }
+
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 3.2);
+  y = rect().bottom() - (footer_h / 2) + (bdr_s * 3);
+  drawIcon(p, x, y, gap_img, icon_bg, is_cruise_set ? 0.65 : 0.2);
+
+  // gaspress img (bottom right 2)
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 2.2);
+  drawIcon(p, x, y, gaspress_img, icon_bg, gas_pressed ? 0.65 : 0.2);
+
+  // brake and autohold icon (bottom right 3)
+  if (autohold_state > 1) {
+    brake_change_img = autohold_warning_img;
+  } else if (autohold_state == 1) {
+    brake_change_img = autohold_active_img;
+  } else {
+    brake_change_img = brake_img;
+  }
+
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 1.2);
+  drawIcon(p, x, y, brake_change_img, icon_bg, brake_state ? 0.65 : 0.2);
 
   // upper gps info
   if (gpsVerticalAccuracy == 0 || gpsVerticalAccuracy > 100)
@@ -723,20 +708,18 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   drawTextColor(p, x, y, infoGps, whiteColor(200));
 
   // tpms (bottom right)
-  if (!isCanfd) {
-    w = 200;
-    h = 260;
-    x = rect().right() - w - (bdr_s * 2);
-    y = height() - h - (bdr_s * 2);
+  w = 160;
+  h = 208;
+  x = rect().right() - w - (bdr_s * 2);
+  y = height() - h - (bdr_s * 2);
 
-    p.drawPixmap(x, y, w, h, tpms_img);
+  p.drawPixmap(x, y, w, h, tpms_img);
 
-    configFont(p, "Inter", 35, "Bold");
-    drawTextColor(p, x + 32, y + 70, get_tpms_text(fl), get_tpms_color(fl));
-    drawTextColor(p, x + 167, y + 70, get_tpms_text(fr), get_tpms_color(fr));
-    drawTextColor(p, x + 32, y + 214, get_tpms_text(rl), get_tpms_color(rl));
-    drawTextColor(p, x + 167, y + 214, get_tpms_text(rr), get_tpms_color(rr));
-  }
+  configFont(p, "Inter", 30, "Bold");
+  drawTextColor(p, x + 25, y + 56, get_tpms_text(fl), get_tpms_color(fl));
+  drawTextColor(p, x + 133, y + 56, get_tpms_text(fr), get_tpms_color(fr));
+  drawTextColor(p, x + 25, y + 171, get_tpms_text(rl), get_tpms_color(rl));
+  drawTextColor(p, x + 133, y + 171, get_tpms_text(rr), get_tpms_color(rr));
 
   // turnsignal
   static int blink_index = 0;
@@ -794,14 +777,14 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
       blink_index = 0;
     }
   }
-  p.setOpacity(1.);
+  p.setOpacity(1.0);
 }
 
 // Window that shows camera view and variety of
 // info drawn on top
 
 void AnnotatedCameraWidget::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
-  p.setOpacity(1.0);  // bg dictates opacity of ellipse
+  p.setOpacity(1.0);
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
   p.drawEllipse(x - btn_size / 2, y - btn_size / 2, btn_size, btn_size);
@@ -811,7 +794,7 @@ void AnnotatedCameraWidget::drawIcon(QPainter &p, int x, int y, QPixmap &img, QB
 }
 
 void AnnotatedCameraWidget::drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity, float angle) {
-  p.setOpacity(1.0);  // bg dictates opacity of ellipse
+  p.setOpacity(1.0);
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
   p.drawEllipse(x - btn_size / 2, y - btn_size / 2, btn_size, btn_size);
@@ -827,7 +810,7 @@ void AnnotatedCameraWidget::drawIconRotate(QPainter &p, int x, int y, QPixmap &i
 }
 
 void AnnotatedCameraWidget::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
-  p.setOpacity(1.0);  // bg dictates opacity of ellipse
+  p.setOpacity(1.0);
   QRect real_rect = getTextRect(p, 0, text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
   p.setPen(QColor(0xff, 0xff, 0xff, alpha));
@@ -835,7 +818,7 @@ void AnnotatedCameraWidget::drawText(QPainter &p, int x, int y, const QString &t
 }
 
 void AnnotatedCameraWidget::drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color) {
-  p.setOpacity(1.0);  // bg dictates opacity of ellipse
+  p.setOpacity(1.0);
   QRect real_rect = getTextRect(p, 0, text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
   p.setPen(color);
@@ -950,9 +933,9 @@ void AnnotatedCameraWidget::drawDriverState(QPainter &painter, const UIState *s)
   painter.save();
 
   // base icon
-  int offset = bdr_s + btn_size / 2;
+  int offset = (bdr_s * 3)+ (btn_size / 2);
   int x = rightHandDM ? width() - offset : offset;
-  int y = height() - offset;
+  int y = height() - offset - (bdr_s * 3);
   float opacity = dmActive ? 0.65 : 0.2;
   drawIcon(painter, x, y, dm_img, blackColor(100), opacity);
 
@@ -1043,7 +1026,7 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState
     l_speed.sprintf("%.0f km/h", speed + v_rel * 3.6); // kph
   }
   configFont(painter, "Inter", 35, "Bold");
-  drawTextColor(painter, x, y + sz / 1.5f + 10, is_cruise_set ? "▲" : "", blackColor(200));
+  drawTextColor(painter, x, y + sz / 1.5f + 10, is_cruise_set ? "∧" : "", blackColor(200));
   drawTextColor(painter, x, y + sz / 1.5f + 70.0, l_dist, d_color);
   drawTextColor(painter, x, y + sz / 1.5f + 120.0, l_speed, v_color);
 
