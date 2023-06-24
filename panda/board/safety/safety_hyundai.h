@@ -322,47 +322,13 @@ static int hyundai_tx_hook(CANPacket_t *to_send) {
 
   // LKA STEER: safety check
   if (is_lkas11_msg) {
-    uint32_t ts = microsecond_timer_get();
     int desired_torque = ((GET_BYTES(to_send, 0, 4) >> 16) & 0x7ffU) - 1024U;
-    bool violation = false;
+    bool steer_req = GET_BIT(to_send, 27U) != 0U;
 
-    if (controls_allowed) {
-      // *** global torque limit check ***
-      violation |= max_limit_check(desired_torque, HYUNDAI_STEERING_LIMITS.max_steer, -HYUNDAI_STEERING_LIMITS.max_steer);
-
-      // ready to blend in limits
-      desired_torque_last = MAX(-HYUNDAI_STEERING_LIMITS.max_steer + 50, MIN(desired_torque, HYUNDAI_STEERING_LIMITS.max_steer - 50));
-      rt_torque_last = desired_torque;
-      ts_torque_check_last = ts;
-    }
-
-    // no torque if controls is not allowed
-    if (!controls_allowed && (desired_torque != 0)) {
-      violation = true;
-      print("  lkas torque not allowed : controls not allowed!\n");
-    }
-
-    // reset to 0 if either controls is not allowed or there's a violation
-    if (violation || !controls_allowed) {
-      valid_steer_req_count = 0;
-      invalid_steer_req_count = 0;
-      desired_torque_last = 0;
-      rt_torque_last = 0;
-      ts_torque_check_last = ts;
-      ts_steer_req_mismatch_last = ts;
-    }
-
-    if (violation) {
-      tx = 0;
-      print("violation[LKAS11, 832]\n");
-      print("  lkas torque allowed : controls allowed!\n");
-    }
-    /*bool steer_req = GET_BIT(to_send, 27U) != 0U;
     const SteeringLimits limits = hyundai_alt_limits ? HYUNDAI_STEERING_LIMITS_ALT : HYUNDAI_STEERING_LIMITS;
     if (steer_torque_cmd_checks(desired_torque, steer_req, limits)) {
       tx = 0;
-      print("violation[LKAS11, 832]\n");
-    }*/
+    }
   }
 
   // UDS: Only tester present ("\x02\x3E\x80\x00\x00\x00\x00\x00") allowed on diagnostics address

@@ -70,7 +70,7 @@ class SccSmoother:
 
     self.is_metric = Params().get_bool("IsMetric")
     self.long_control = CP.openpilotLongitudinalControl
-    self.can_fd = CP.carFingerprint in CANFD_CAR
+    self.is_canfd = CP.carFingerprint in CANFD_CAR
     self.scc_bus = CP.sccBus
 
     self.speed_conv_to_ms = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
@@ -199,7 +199,7 @@ class SccSmoother:
         self.alive_count = SccSmoother.get_alive_count()
       if self.btn != Buttons.NONE:
 
-        if self.can_fd:
+        if self.is_canfd:
           can_sends.append(hyundaicanfd.create_buttons(packer, self.CP, CS.buttons_counter + 1, self.btn))
         else:
           can_sends.append(hyundaican.create_clu11(packer, frame, self.scc_bus, self.btn, CS.clu11))
@@ -238,18 +238,17 @@ class SccSmoother:
 
 
   def get_long_lead_speed(self, clu_speed, sm):
-    if self.long_control:
-      lead = self.get_lead(sm)
-      if lead is not None:
-        d = lead.dRel - 5.
-        if 0. < d < -lead.vRel * 11. * 2. and lead.vRel < -1.:
-          t = d / lead.vRel
-          accel = -(lead.vRel / t) * self.speed_conv_to_clu
-          accel *= 1.2
-          if accel < 0.:
-            target_speed = clu_speed + accel
-            target_speed = max(target_speed, self.min_set_speed_clu)
-            return target_speed
+    lead = self.get_lead(sm)
+    if lead is not None:
+      d = lead.dRel - 5.
+      if 0. < d < -lead.vRel * 11. * 2. and lead.vRel < -1.:
+        t = d / lead.vRel
+        accel = -(lead.vRel / t) * self.speed_conv_to_clu
+        accel *= 1.2
+        if accel < 0.:
+          target_speed = clu_speed + accel
+          target_speed = max(target_speed, self.min_set_speed_clu)
+          return target_speed
     return 0
 
 

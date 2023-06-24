@@ -63,7 +63,6 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(bool gas_pressed MEMBER gas_pressed);
   Q_PROPERTY(bool isStandstill MEMBER isStandstill);
   Q_PROPERTY(bool rightHandDM MEMBER rightHandDM);
-  Q_PROPERTY(bool isCanfd MEMBER isCanfd);
 
   Q_PROPERTY(int status MEMBER status);
   Q_PROPERTY(int autohold_state MEMBER autohold_state);
@@ -88,7 +87,6 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(float gpsAltitude MEMBER gpsAltitude);
   Q_PROPERTY(float gpsAccuracy MEMBER gpsAccuracy);
   Q_PROPERTY(float steerAngle MEMBER steerAngle);
-  Q_PROPERTY(float steerAngleOp MEMBER steerAngleOp);
   Q_PROPERTY(float steerRatio MEMBER steerRatio);
   Q_PROPERTY(float fl MEMBER fl);
   Q_PROPERTY(float fr MEMBER fr);
@@ -114,11 +112,11 @@ private:
 
   ExperimentalButton *experimental_btn;
   QPixmap long_img, steer_img;
-  QPixmap lat_img, gaspress_img;
+  QPixmap gaspress_img;
   QPixmap dm_img;
 
   // crwusiz add
-  QPixmap brake_img, bsd_l_img, bsd_r_img;
+  QPixmap brake_change_img, brake_img, bsd_l_img, bsd_r_img;
   QPixmap gap_img, gap1_img, gap2_img, gap3_img, gap4_img;
   QPixmap wifi_img, wifi_l_img, wifi_m_img, wifi_h_img, wifi_f_img;
   QPixmap gps_img, direction_img, tpms_img;
@@ -146,7 +144,6 @@ private:
   bool gas_pressed = false;
   bool isStandstill = false;
   bool rightHandDM = false;
-  bool isCanfd = false;
 
   int status = STATUS_DISENGAGED;
   int autohold_state = 0;
@@ -163,7 +160,7 @@ private:
 
   float speed, applyMaxSpeed, cruiseMaxSpeed;
   float gpsBearing, gpsVerticalAccuracy, gpsAltitude, gpsAccuracy = 0;
-  float steerAngle, steerAngleOp ,steerRatio = 0;
+  float steerAngle, steerRatio = 0;
   float fl, fr, rl, rr = 0;
   float roadLimitSpeed, navLimitSpeed = 0;
   float latAccelFactor, friction, latAccelFactorRaw, frictionRaw = 0;

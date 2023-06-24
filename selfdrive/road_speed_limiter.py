@@ -26,19 +26,19 @@ class Port:
 class RoadLimitSpeedServer:
   def __init__(self):
     self.lock = threading.Lock()
-    self.json_road_limit = None
-    self.last_exception = None
-    self.remote_addr = None
     self.active = 0
     self.last_updated = 0
     self.last_updated_active = 0
+    self.json_road_limit = None
+    self.last_exception = None
+    self.remote_addr = None
+    self.remote_gps_addr = None
+    self.location = None
 
     broadcast = Thread(target=self.broadcast_thread, args=[])
     broadcast.daemon = True
     broadcast.start()
 
-    self.remote_gps_addr = None
-    self.location = None
     self.gps_sm = messaging.SubMaster(['gpsLocationExternal'], poll=['gpsLocationExternal'])
     self.gps_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     self.gps_event = threading.Event()
