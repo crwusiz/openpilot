@@ -213,9 +213,11 @@ void ExperimentalButton::paintEvent(QPaintEvent *event) {
   //p.setBrush(QColor(0, 0, 0, 166));
   p.setBrush(QColor(0, 0, 0, 100)); // icon_bg
   p.drawEllipse(center, btn_size / 2, btn_size / 2);
-  p.setOpacity(isDown() ? 0.8 : 1.0);
+  //p.setOpacity(isDown() ? 0.8 : 1.0);
+  p.setOpacity(0.8);
   //p.drawPixmap((btn_size - img_size) / 2, (btn_size - img_size) / 2, img);
   p.drawPixmap((btn_size - img.size().width()) / 2, (btn_size - img.size().height()) / 2, img);
+  p.setOpacity(1.0);
 }
 
 
@@ -235,8 +237,6 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
 
   // crwusiz add
   brake_img = loadPixmap("../assets/img_brake_disc.png", {img_size, img_size});
-  bsd_l_img = loadPixmap("../assets/img_bsd_l.png", {img_size, img_size});
-  bsd_r_img = loadPixmap("../assets/img_bsd_r.png", {img_size, img_size});
   gps_img = loadPixmap("../assets/img_gps.png", {img_size, img_size});
   wifi_l_img = loadPixmap("../assets/offroad/icon_wifi_strength_low.svg", {img_size, img_size});
   wifi_m_img = loadPixmap("../assets/offroad/icon_wifi_strength_medium.svg", {img_size, img_size});
@@ -574,9 +574,9 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   // traffic icon (upper right 5)
   if (traffic_state >= 0) {
-    w = 230;
-    h = 150;
-    x = (width() + (bdr_s * 2)) / 2 + 120;
+    w = 207;
+    h = 135;
+    x = (width() + (bdr_s * 2)) / 2 + 160;
     y = (btn_size / 2) - (bdr_s * 3.5);
     if (traffic_state == 1) {
       p.drawPixmap(x, y, w, h, traffic_stop_img);
@@ -588,13 +588,13 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   // N direction icon (upper right 4)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 3.2);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 3.1);
   y = (btn_size / 2) + (bdr_s * 4);
-  drawIconRotate(p, x, y, direction_img, icon_bg, gps_state ? 0.65 : 0.2, gpsBearing);
+  drawIconRotate(p, x, y, direction_img, icon_bg, gps_state ? 0.8 : 0.2, gpsBearing);
 
   // gps icon (upper right 3)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 2.2);
-  drawIcon(p, x, y, gps_img, icon_bg, gps_state ? 0.65 : 0.2);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 2.1);
+  drawIcon(p, x, y, gps_img, icon_bg, gps_state ? 0.8 : 0.2);
 
   if (wifi_state == 1) {
     wifi_img = wifi_l_img;
@@ -607,34 +607,34 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   // wifi icon (upper right 2)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 1.2);
-  drawIcon(p, x, y, wifi_img, icon_bg, wifi_state > 0 ? 0.65 : 0.2);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 1.1);
+  drawIcon(p, x, y, wifi_img, icon_bg, wifi_state > 0 ? 0.8 : 0.2);
 
   // steer img (bottom 1 right)
   x = (btn_size / 2) + (bdr_s * 2) + (btn_size);
   y = rect().bottom() - (footer_h / 2);
-  drawIconRotate(p, x, y, steer_img, icon_bg, 1.0, steerAngle);
+  drawIconRotate(p, x, y, steer_img, icon_bg, 0.8, steerAngle);
 
-  QString sa_str;
+  QString sa_str, sa_direction;
   QColor sa_color = limeColor(200);
   if (std::fabs(steerAngle) > 90) {
     sa_color = redColor(200);
   } else if (std::fabs(steerAngle) > 30) {
     sa_color = orangeColor(200);
   }
+
+  if (steerAngle > 0) {
+    sa_direction.sprintf("◀");
+  } else if (steerAngle < 0) {
+    sa_direction.sprintf("▶");
+  } else {
+    sa_direction.sprintf("●");
+  }
+
   sa_str.sprintf("%.0f °", steerAngle);
   configFont(p, "Inter", 30, "Bold");
-
-  drawTextColor(p, x, y + 95, sa_str, sa_color);
-
-  // bsd_l icon (bottom 2 left)
-  x = (btn_size / 2) + (bdr_s * 2);
-  y = rect().bottom() - (footer_h / 2) - (btn_size) - 10;
-  drawIcon(p, x, y, bsd_l_img, icon_bg, left_blindspot ? 0.65 : 0.2);
-
-  // bsd_r icon (bottom 2 right)
-  x = (btn_size / 2) + (bdr_s * 2) + (btn_size);
-  drawIcon(p, x, y, bsd_r_img, icon_bg, right_blindspot ? 0.65 : 0.2);
+  drawTextColor(p, x - 30, y + 95, sa_str, sa_color);
+  drawTextColor(p, x + 30, y + 95, sa_direction, whiteColor(200));
 
   // bottom info
   const char* lateral[] = {"Pid", "Indi", "Lqr", "Torque"};
@@ -667,25 +667,21 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     gap_img = gap4_img;
   }
 
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 3.2);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 3.1);
   y = rect().bottom() - (footer_h / 2) + (bdr_s * 3);
-  drawIcon(p, x, y, gap_img, icon_bg, is_cruise_set ? 0.65 : 0.2);
+  drawIcon(p, x, y, gap_img, icon_bg, is_cruise_set ? 0.8 : 0.2);
 
   // gaspress img (bottom right 2)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 2.2);
-  drawIcon(p, x, y, gaspress_img, icon_bg, gas_pressed ? 0.65 : 0.2);
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 2.1);
+  drawIcon(p, x, y, gaspress_img, icon_bg, gas_pressed ? 0.8 : 0.2);
 
   // brake and autohold icon (bottom right 3)
-  if (autohold_state > 1) {
-    brake_change_img = autohold_warning_img;
-  } else if (autohold_state == 1) {
-    brake_change_img = autohold_active_img;
+  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 1.1);
+  if (autohold_state >= 1) {
+    drawIcon(p, x, y, autohold_state > 1 ? autohold_warning_img : autohold_active_img, icon_bg, autohold_state ? 0.8 : 0.2);
   } else {
-    brake_change_img = brake_img;
+    drawIcon(p, x, y, brake_img, icon_bg, brake_state ? 0.8 : 0.2);
   }
-
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 1.2);
-  drawIcon(p, x, y, brake_change_img, icon_bg, brake_state ? 0.65 : 0.2);
 
   // upper gps info
   if (gpsVerticalAccuracy == 0 || gpsVerticalAccuracy > 100)
@@ -936,7 +932,7 @@ void AnnotatedCameraWidget::drawDriverState(QPainter &painter, const UIState *s)
   int offset = (bdr_s * 3)+ (btn_size / 2);
   int x = rightHandDM ? width() - offset : offset;
   int y = height() - offset - (bdr_s * 3);
-  float opacity = dmActive ? 0.65 : 0.2;
+  float opacity = dmActive ? 0.8 : 0.2;
   drawIcon(painter, x, y, dm_img, blackColor(100), opacity);
 
   // face

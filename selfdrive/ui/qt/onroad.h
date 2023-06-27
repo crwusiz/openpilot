@@ -116,7 +116,7 @@ private:
   QPixmap dm_img;
 
   // crwusiz add
-  QPixmap brake_change_img, brake_img, bsd_l_img, bsd_r_img;
+  QPixmap brake_img;
   QPixmap gap_img, gap1_img, gap2_img, gap3_img, gap4_img;
   QPixmap wifi_img, wifi_l_img, wifi_m_img, wifi_h_img, wifi_f_img;
   QPixmap gps_img, direction_img, tpms_img;
