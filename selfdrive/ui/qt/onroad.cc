@@ -93,6 +93,8 @@ void OnroadWindow::offroadTransition(bool offroad) {
       auto m = new MapPanel(get_mapbox_settings());
       map = m;
 
+      QObject::connect(m, &MapPanel::mapWindowShown, this, &OnroadWindow::mapWindowShown);
+
       m->setFixedWidth(topWidget(this)->width() / 2 - bdr_s);
       split->insertWidget(0, m);
 
@@ -143,10 +145,18 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
 
   // draw background + gradient
   p.setPen(Qt::NoPen);
+  p.setCompositionMode(QPainter::CompositionMode_SourceOver);
   p.setBrush(QBrush(alert_colors[alert.status]));
   p.drawRoundedRect(r, radius, radius);
-  p.setCompositionMode(QPainter::CompositionMode_SourceOver);
 
+  QLinearGradient g(0, r.y(), 0, r.bottom());
+  g.setColorAt(0, QColor::fromRgbF(0, 0, 0, 0.05));
+  g.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0.35));
+
+  p.setCompositionMode(QPainter::CompositionMode_DestinationOver);
+  p.setBrush(QBrush(g));
+  p.drawRoundedRect(r, radius, radius);
+  p.setCompositionMode(QPainter::CompositionMode_SourceOver);
 
   // text
   const QPoint c = r.center();
@@ -169,36 +179,32 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
   }
 }
 
-
-ExperimentalButton::ExperimentalButton(QWidget *parent) : QPushButton(parent) {
-  //setVisible(false);
-  setVisible(true);
+// ExperimentalButton
+ExperimentalButton::ExperimentalButton(QWidget *parent) : experimental_mode(false), QPushButton(parent) {
+  setVisible(false);
   setFixedSize(btn_size, btn_size);
-  setCheckable(true);
 
   params = Params();
   engage_img = loadPixmap("../assets/img_experimental_white.svg", {img_size, img_size});
   experimental_img = loadPixmap("../assets/img_experimental.svg", {img_size, img_size});
+  QObject::connect(this, &QPushButton::clicked, this, &ExperimentalButton::changeMode);
+}
 
-  QObject::connect(this, &QPushButton::toggled, [=](bool checked) {
-    params.putBool("ExperimentalMode", checked);
-  });
+void ExperimentalButton::changeMode() {
+  const auto cp = (*uiState()->sm)["carParams"].getCarParams();
+  bool can_change = hasLongitudinalControl(cp) && params.getBool("ExperimentalModeConfirmed");
+  if (can_change) {
+    params.putBool("ExperimentalMode", !experimental_mode);
+  }
 }
 
 void ExperimentalButton::updateState(const UIState &s) {
-  const SubMaster &sm = *(s.sm);
-
   // button is "visible" if engageable or enabled
-  //const auto cs = sm["controlsState"].getControlsState();
-  //setVisible(cs.getEngageable() || cs.getEnabled());
-
-  // button is "checked" if experimental mode is enabled
-  setChecked(sm["controlsState"].getControlsState().getExperimentalMode());
-
-  // disable button when experimental mode is not available, or has not been confirmed for the first time
-  const auto cp = sm["carParams"].getCarParams();
-  const bool experimental_mode_available = cp.getExperimentalLongitudinalAvailable() ? params.getBool("ExperimentalLongitudinalEnabled") : cp.getOpenpilotLongitudinalControl();
-  setEnabled(params.getBool("ExperimentalModeConfirmed") && experimental_mode_available);
+  const auto cs = (*s.sm)["controlsState"].getControlsState();
+  setVisible(cs.getEngageable() || cs.getEnabled());
+  if (std::exchange(experimental_mode, cs.getExperimentalMode()) != experimental_mode) {
+    update();
+  }
 }
 
 void ExperimentalButton::paintEvent(QPaintEvent *event) {
@@ -206,7 +212,7 @@ void ExperimentalButton::paintEvent(QPaintEvent *event) {
   p.setRenderHint(QPainter::Antialiasing);
 
   QPoint center(btn_size / 2, btn_size / 2);
-  QPixmap img = isChecked() ? experimental_img : engage_img;
+  QPixmap img = experimental_mode ? experimental_img : engage_img;
 
   p.setOpacity(1.0);
   p.setPen(Qt::NoPen);
@@ -221,6 +227,7 @@ void ExperimentalButton::paintEvent(QPaintEvent *event) {
 }
 
 
+// Window that shows camera view and variety of info drawn on top
 AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraWidget("camerad", type, true, parent) {
   pm = std::make_unique<PubMaster, const std::initializer_list<const char *>>({"uiDebug"});
 
@@ -779,6 +786,22 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 // Window that shows camera view and variety of
 // info drawn on top
 
+void AnnotatedCameraWidget::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
+  p.setOpacity(1.0);
+  QRect real_rect = p.fontMetrics().boundingRect(text);
+  real_rect.moveCenter({x, y - real_rect.height() / 2});
+  p.setPen(QColor(0xff, 0xff, 0xff, alpha));
+  p.drawText(real_rect.x(), real_rect.bottom(), text);
+}
+
+void AnnotatedCameraWidget::drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color) {
+  p.setOpacity(1.0);
+  QRect real_rect = p.fontMetrics().boundingRect(text);
+  real_rect.moveCenter({x, y - real_rect.height() / 2});
+  p.setPen(color);
+  p.drawText(real_rect.x(), real_rect.bottom(), text);
+}
+
 void AnnotatedCameraWidget::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
   p.setOpacity(1.0);
   p.setPen(Qt::NoPen);
@@ -803,22 +826,6 @@ void AnnotatedCameraWidget::drawIconRotate(QPainter &p, int x, int y, QPixmap &i
   p.drawPixmap(r, img);
   p.restore();
   p.setOpacity(1.0);
-}
-
-void AnnotatedCameraWidget::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
-  p.setOpacity(1.0);
-  QRect real_rect = getTextRect(p, 0, text);
-  real_rect.moveCenter({x, y - real_rect.height() / 2});
-  p.setPen(QColor(0xff, 0xff, 0xff, alpha));
-  p.drawText(real_rect.x(), real_rect.bottom(), text);
-}
-
-void AnnotatedCameraWidget::drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color) {
-  p.setOpacity(1.0);
-  QRect real_rect = getTextRect(p, 0, text);
-  real_rect.moveCenter({x, y - real_rect.height() / 2});
-  p.setPen(color);
-  p.drawText(real_rect.x(), real_rect.bottom(), text);
 }
 
 void AnnotatedCameraWidget::initializeGL() {

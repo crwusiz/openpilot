@@ -215,7 +215,7 @@
     </message>
     <message>
         <source>No destination set</source>
-        <translation>설정된 목적지 없음</translation>
+        <translation>설적지가 설정되지 않았습니다</translation>
     </message>
     <message>
         <source>No %1 location set</source>
