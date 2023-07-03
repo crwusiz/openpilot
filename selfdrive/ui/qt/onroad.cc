@@ -280,6 +280,9 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   traffic_go_img = loadPixmap("../assets/img_traffic_go.png");
   traffic_stop_img = loadPixmap("../assets/img_traffic_stop.png");
 
+  lane_change_left_img = loadPixmap("../assets/lane_change_left.png");
+  lane_change_right_img = loadPixmap("../assets/lane_change_right.png");
+
   // neokii add
   autohold_warning_img = loadPixmap("../assets/img_autohold_warning.png", {img_size, img_size});
   autohold_active_img = loadPixmap("../assets/img_autohold_active.png", {img_size, img_size});
@@ -585,6 +588,10 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   drawTextColor(p, rect().center().x(), 230, speedStr, variableColor);
   configFont(p, "Inter", 66, "Regular");
   drawTextColor(p, rect().center().x(), 310, speedUnit, lightorangeColor());
+
+  // lane change indicator
+  drawLaneChangeIndicator(p, uiState());
+  p.restore();
 
   int x,y,w,h = 0;
   QColor icon_bg = blackColor(100);
@@ -947,6 +954,39 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
   painter.drawPolygon(scene.track_vertices);
 
   painter.restore();
+}
+
+void AnnotatedCameraWidget::drawLaneChangeIndicator(QPainter &painter, const UIState *s) {
+  typedef cereal::LateralPlan::LaneChangeDirection Direction;
+  typedef cereal::LateralPlan::LaneChangeState State;
+
+  auto draw_indicator_lambda = [this](QPainter &painter, Direction direction, QColor color) {
+    QPixmap img = direction == Direction::LEFT ? lane_change_left_img : lane_change_right_img;
+    QRect img_rc{0, (rect().height() - img.height()) / 2, img.width(), img.height()};
+    QRect ellipse_rc = img_rc.adjusted(-img_rc.width(), -img_rc.height() / 2, 20, img_rc.height() / 2);
+    if (direction == Direction::RIGHT) {
+      img_rc.moveRight(rect().right());
+      ellipse_rc.moveRight(rect().right() + img_rc.width());
+    }
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(color);
+    painter.drawEllipse(ellipse_rc);
+    painter.drawPixmap(img_rc, img);
+  };
+
+  auto lateralPlan = (*(s->sm))["lateralPlan"].getLateralPlan();
+  auto laneChangeState = lateralPlan.getLaneChangeState();
+  auto direction = lateralPlan.getLaneChangeDirection();
+
+  if (laneChangeState == State::PRE_LANE_CHANGE) {
+    auto carState = (*(s->sm))["carState"].getCarState();
+    bool blocked = (direction == Direction::LEFT && carState.getLeftBlindspot()) ||
+                   (direction == Direction::RIGHT && carState.getRightBlindspot());
+    draw_indicator_lambda(painter, direction, blocked ? redColor(200) : blackColor(200));
+  } else if (laneChangeState == State::LANE_CHANGE_STARTING ||
+             laneChangeState == State::LANE_CHANGE_FINISHING) {
+    draw_indicator_lambda(painter, direction, bg_colors[s->status]);
+  }
 }
 
 void AnnotatedCameraWidget::drawDriverState(QPainter &painter, const UIState *s) {
