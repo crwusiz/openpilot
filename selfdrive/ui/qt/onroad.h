@@ -125,6 +125,7 @@ private:
   QPixmap gps_img, direction_img, tpms_img;
   QPixmap turnsignal_l_img, turnsignal_r_img;
   QPixmap traffic_go_img, traffic_stop_img, traffic_none_img;
+  QPixmap lane_change_left_img, lane_change_right_img;
 
   // neokii add
   QPixmap autohold_warning_img;
@@ -175,6 +176,7 @@ protected:
   void showEvent(QShowEvent *event) override;
   void updateFrameMat() override;
   void drawLaneLines(QPainter &painter, const UIState *s);
+  void drawLaneChangeIndicator(QPainter &painter, const UIState *s);
   void drawLead(QPainter &painter, const cereal::RadarState::LeadData::Reader &lead_data, const QPointF &vd);
   void drawHud(QPainter &p);
   void drawDriverState(QPainter &painter, const UIState *s);
