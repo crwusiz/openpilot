@@ -61,19 +61,19 @@ struct Alert {
       // Handle controls timeout
       if (sm.rcv_frame("controlsState") < started_frame) {
         // car is started, but controlsState hasn't been seen at all
-        return {"openpilot Unavailable", "Waiting for controls to start",
+        return {"오픈파일럿을 사용할수없습니다", "프로세스가 준비중입니다",
                 "controlsWaiting", cereal::ControlsState::AlertSize::MID,
                 cereal::ControlsState::AlertStatus::NORMAL,
                 AudibleAlert::NONE};
       } else if (controls_missing > CONTROLS_TIMEOUT && !Hardware::PC()) {
         // car is started, but controls is lagging or died
         if (cs.getEnabled() && (controls_missing - CONTROLS_TIMEOUT) < 10) {
-          return {"TAKE CONTROL IMMEDIATELY", "Controls Unresponsive",
+          return {"핸들을 잡아주세요", "프로세스가 응답하지않습니다",
                   "controlsUnresponsive", cereal::ControlsState::AlertSize::FULL,
                   cereal::ControlsState::AlertStatus::CRITICAL,
                   AudibleAlert::WARNING_IMMEDIATE};
         } else {
-          return {"Controls Unresponsive", "Reboot Device",
+          return {"프로세스가 응답하지않습니다", "장치를 재부팅하세요",
                   "controlsUnresponsivePermanent", cereal::ControlsState::AlertSize::MID,
                   cereal::ControlsState::AlertStatus::NORMAL,
                   AudibleAlert::NONE};
