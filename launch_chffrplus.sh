@@ -115,8 +115,10 @@ function launch {
 
   if [ ${LANG} = "main_ko" ]; then
     cp -f /data/openpilot/scripts/add/events_ko.py /data/openpilot/selfdrive/controls/lib/events.py
+    cp -f /data/openpilot/scripts/add/ui_ko.h /data/openpilot/selfdrive/ui/ui.h
   else
     cp -f /data/openpilot/scripts/add/events.py /data/openpilot/selfdrive/controls/lib/events.py
+    cp -f /data/openpilot/scripts/add/ui.h /data/openpilot/selfdrive/ui/ui.h
   fi
 
   # start manager
