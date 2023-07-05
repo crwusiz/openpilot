@@ -15,7 +15,7 @@
 
 OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   QVBoxLayout *main_layout  = new QVBoxLayout(this);
-  main_layout->setMargin(bdr_s);
+  main_layout->setMargin(UI_BORDER_SIZE);
   QStackedLayout *stacked_layout = new QStackedLayout;
   stacked_layout->setStackingMode(QStackedLayout::StackAll);
   main_layout->addLayout(stacked_layout);
@@ -69,9 +69,9 @@ void OnroadWindow::updateState(const UIState &s) {
   bool navDisabledNow = (*s.sm)["controlsState"].getControlsState().getEnabled() &&
                         !(*s.sm)["modelV2"].getModelV2().getNavEnabled();
   if (navDisabled != navDisabledNow) {
-    split->setSpacing(navDisabledNow ? bdr_s * 2 : 0);
+    split->setSpacing(navDisabledNow ? UI_BORDER_SIZE * 2 : 0);
     if (map) {
-      map->setFixedWidth(topWidget(this)->width() / 2 - bdr_s * (navDisabledNow ? 2 : 1));
+      map->setFixedWidth(topWidget(this)->width() / 2 - UI_BORDER_SIZE * (navDisabledNow ? 2 : 1));
     }
   }
 
@@ -107,7 +107,7 @@ void OnroadWindow::offroadTransition(bool offroad) {
 
       QObject::connect(m, &MapPanel::mapWindowShown, this, &OnroadWindow::mapWindowShown);
 
-      m->setFixedWidth(topWidget(this)->width() / 2 - bdr_s);
+      m->setFixedWidth(topWidget(this)->width() / 2 - UI_BORDER_SIZE);
       split->insertWidget(0, m);
 
       // hidden by default, made visible when navRoute is published
@@ -251,7 +251,7 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   pm = std::make_unique<PubMaster, const std::initializer_list<const char *>>({"uiDebug"});
 
   QVBoxLayout *main_layout  = new QVBoxLayout(this);
-  main_layout->setMargin(bdr_s * 4);
+  main_layout->setMargin(UI_BORDER_SIZE * 4);
   main_layout->setSpacing(20);
 
   experimental_btn = new ExperimentalButton(this);
@@ -404,10 +404,10 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   p.save();
 
   // Header gradient
-  QLinearGradient bg(0, header_h - (header_h / 2.5), 0, header_h);
+  QLinearGradient bg(0, UI_HEADER_HEIGHT - (UI_HEADER_HEIGHT / 2.5), 0, UI_HEADER_HEIGHT);
   bg.setColorAt(0, QColor::fromRgbF(0, 0, 0, 0.45));
   bg.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0));
-  p.fillRect(0, 0, width(), header_h, bg);
+  p.fillRect(0, 0, width(), UI_HEADER_HEIGHT, bg);
 
   // max speed, apply speed, speed limit sign init
   float limit_speed = 0;
@@ -600,8 +600,8 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   if (nda_state > 0) {
     w = 120;
     h = 54;
-    x = (width() + (bdr_s * 2)) / 2 - (w / 2) - bdr_s;
-    y = 30 - bdr_s;
+    x = (width() + (UI_BORDER_SIZE * 2)) / 2 - (w / 2) - UI_BORDER_SIZE;
+    y = 30 - UI_BORDER_SIZE;
     p.drawPixmap(x, y, w, h, nda_state == 1 ? nda_img : hda_img);
   }
 
@@ -609,8 +609,8 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   if (traffic_state >= 0) {
     w = 207;
     h = 135;
-    x = (width() + (bdr_s * 2)) / 2 + 160;
-    y = (btn_size / 2) - (bdr_s * 3.5);
+    x = (width() + (UI_BORDER_SIZE * 2)) / 2 + 160;
+    y = (btn_size / 2) - (UI_BORDER_SIZE * 3.5);
     if (traffic_state == 1) {
       p.drawPixmap(x, y, w, h, traffic_stop_img);
     } else if (traffic_state == 2) {
@@ -621,12 +621,12 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   // N direction icon (upper right 4)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 3.1);
-  y = (btn_size / 2) + (bdr_s * 4);
+  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 3.1);
+  y = (btn_size / 2) + (UI_BORDER_SIZE * 4);
   drawIconRotate(p, x, y, direction_img, icon_bg, gps_state ? 0.8 : 0.2, gpsBearing);
 
   // gps icon (upper right 3)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 2.1);
+  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
   drawIcon(p, x, y, gps_img, icon_bg, gps_state ? 0.8 : 0.2);
 
   if (wifi_state == 1) {
@@ -640,12 +640,12 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   // wifi icon (upper right 2)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 1.1);
+  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
   drawIcon(p, x, y, wifi_img, icon_bg, wifi_state > 0 ? 0.8 : 0.2);
 
   // steer img (bottom 1 right)
-  x = (btn_size / 2) + (bdr_s * 2) + (btn_size);
-  y = rect().bottom() - (footer_h / 2);
+  x = (btn_size / 2) + (UI_BORDER_SIZE * 2) + (btn_size);
+  y = rect().bottom() - (UI_FOOTER_HEIGHT / 2);
   drawIconRotate(p, x, y, steer_img, icon_bg, 0.8, steerAngle);
 
   QString sa_str, sa_direction;
@@ -700,16 +700,16 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     gap_img = gap4_img;
   }
 
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 3.1);
-  y = rect().bottom() - (footer_h / 2) + (bdr_s * 3);
+  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 3.1);
+  y = rect().bottom() - (UI_FOOTER_HEIGHT / 2) + (UI_BORDER_SIZE * 3);
   drawIcon(p, x, y, gap_img, icon_bg, is_cruise_set ? 0.8 : 0.2);
 
   // gaspress img (bottom right 2)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 2.1);
+  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
   drawIcon(p, x, y, gaspress_img, icon_bg, gas_pressed ? 0.8 : 0.2);
 
   // brake and autohold icon (bottom right 3)
-  x = rect().right() - (btn_size / 2) - (bdr_s * 2) - (btn_size * 1.1);
+  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
   if (autohold_state >= 1) {
     drawIcon(p, x, y, autohold_state > 1 ? autohold_warning_img : autohold_active_img, icon_bg, autohold_state ? 0.8 : 0.2);
   } else {
@@ -731,7 +731,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   );
 
   x = rect().right() - (btn_size * 1.8);
-  y = (bdr_s * 3);
+  y = (UI_BORDER_SIZE * 3);
 
   configFont(p, "Inter", 30, "Regular");
   drawTextColor(p, x, y, infoGps, whiteColor(200));
@@ -739,8 +739,8 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   // tpms (bottom right)
   w = 160;
   h = 208;
-  x = rect().right() - w - (bdr_s * 2);
-  y = height() - h - (bdr_s * 2);
+  x = rect().right() - w - (UI_BORDER_SIZE * 2);
+  y = height() - h - (UI_BORDER_SIZE * 2);
 
   p.drawPixmap(x, y, w, h, tpms_img);
 
@@ -995,9 +995,9 @@ void AnnotatedCameraWidget::drawDriverState(QPainter &painter, const UIState *s)
   painter.save();
 
   // base icon
-  int offset = (bdr_s * 3)+ (btn_size / 2);
+  int offset = (UI_BORDER_SIZE * 3)+ (btn_size / 2);
   int x = rightHandDM ? width() - offset : offset;
-  int y = height() - offset - (bdr_s * 3);
+  int y = height() - offset - (UI_BORDER_SIZE * 3);
   float opacity = dmActive ? 0.8 : 0.2;
   drawIcon(painter, x, y, dm_img, blackColor(100), opacity);
 
