@@ -20,7 +20,7 @@ void Sidebar::drawMetric(QPainter &p, const QPair<QString, QString> &label, QCol
   p.drawRoundedRect(rect, 20, 20);
 
   p.setPen(QColor(0xff, 0xff, 0xff));
-  configFont(p, "Inter", 35, "SemiBold");
+  p.setFont(InterFont(35, QFont::DemiBold));
   p.drawText(rect.adjusted(22, 0, 0, 0), Qt::AlignCenter, label.first + "\n" + label.second);
 }
 
@@ -130,7 +130,7 @@ void Sidebar::paintEvent(QPaintEvent *event) {
     x += 37;
   }
 
-  configFont(p, "Inter", 30, "Regular");
+  p.setFont(InterFont(30));
   p.setPen(QColor(0xff, 0xff, 0xff));
   const QRect r2 = QRect(0, 267, event->rect().width(), 50);
 
@@ -140,7 +140,7 @@ void Sidebar::paintEvent(QPaintEvent *event) {
     p.drawText(r2, Qt::AlignCenter, net_type);
 
   // metrics
-  configFont(p, "Inter", 35, "Regular");
+  p.setFont(InterFont(35));
   drawMetric(p, temp_status.first, temp_status.second, 338);
   drawMetric(p, panda_status.first, panda_status.second, 496);
   drawMetric(p, connect_status.first, connect_status.second, 654);
