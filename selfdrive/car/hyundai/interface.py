@@ -140,7 +140,7 @@ class CarInterface(CarInterfaceBase):
     elif candidate in [CAR.K7, CAR.K7_HEV]:
       ret.mass = 1730. + STD_CARGO_KG
       ret.wheelbase = 2.85
-      ret.steerRatio = 12.5
+      ret.steerRatio = 14.4
     elif candidate == CAR.K9:
       ret.mass = 2005. + STD_CARGO_KG
       ret.wheelbase = 3.15
