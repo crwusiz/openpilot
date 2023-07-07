@@ -182,18 +182,18 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
   p.setPen(QColor(0xff, 0xff, 0xff));
   p.setRenderHint(QPainter::TextAntialiasing);
   if (alert.size == cereal::ControlsState::AlertSize::SMALL) {
-    configFont(p, "Inter", 74, "SemiBold");
+    p.setFont(InterFont(74, QFont::DemiBold));
     p.drawText(r, Qt::AlignCenter, alert.text1);
   } else if (alert.size == cereal::ControlsState::AlertSize::MID) {
-    configFont(p, "Inter", 88, "Bold");
+    p.setFont(InterFont(88, QFont::Bold));
     p.drawText(QRect(0, c.y() - 125, width(), 150), Qt::AlignHCenter | Qt::AlignTop, alert.text1);
-    configFont(p, "Inter", 66, "Regular");
+    p.setFont(InterFont(66));
     p.drawText(QRect(0, c.y() + 21, width(), 90), Qt::AlignHCenter, alert.text2);
   } else if (alert.size == cereal::ControlsState::AlertSize::FULL) {
     bool l = alert.text1.length() > 15;
-    configFont(p, "Inter", l ? 132 : 177, "Bold");
+    p.setFont(InterFont(l ? 132 : 177, QFont::Bold));
     p.drawText(QRect(0, r.y() + (l ? 240 : 270), width(), 600), Qt::AlignHCenter | Qt::TextWordWrap, alert.text1);
-    configFont(p, "Inter", 88, "Regular");
+    p.setFont(InterFont(88));
     p.drawText(QRect(0, r.height() - (l ? 361 : 420), width(), 300), Qt::AlignHCenter | Qt::TextWordWrap, alert.text2);
   }
 }
@@ -461,7 +461,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   } else {
     p.setPen(whiteColor());
   }
-  configFont(p, "Inter", 65, "Regular");
+  p.setFont(InterFont(65));
   QRect speed_rect = getTextRect(p, Qt::AlignCenter, cruiseSpeedStr);
   speed_rect.moveCenter({max_speed_outer.center().x(), 0});
   speed_rect.moveTop(max_speed_rect.top() + 90);
@@ -480,7 +480,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   } else {
     p.setPen(greenColor());
   }
-  configFont(p, "Inter", 35, "Bold");
+  p.setFont(InterFont(35, QFont::Bold));
   QRect max_rect = getTextRect(p, Qt::AlignCenter, "MAX");
   max_rect.moveCenter({max_speed_outer.center().x(), 0});
   max_rect.moveTop(max_speed_rect.top() + 25);
@@ -502,7 +502,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     } else {
       p.setPen(whiteColor());
     }
-    configFont(p, "Inter", 65, "Regular");
+    p.setFont(InterFont(65));
     QRect apply_rect = getTextRect(p, Qt::AlignCenter, applySpeedStr);
     apply_rect.moveCenter({apply_speed_outer.center().x(), 0});
     apply_rect.moveTop(max_speed_rect.top() + 90);
@@ -521,7 +521,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     } else {
       p.setPen(greenColor());
     }
-    configFont(p, "Inter", 35, "Bold");
+    p.setFont(InterFont(35, QFont::Bold));
     QRect long_rect = getTextRect(p, Qt::AlignCenter, "LONG");
     long_rect.moveCenter({apply_speed_outer.center().x(), 0});
     long_rect.moveTop(max_speed_rect.top() + 25);
@@ -539,13 +539,13 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     p.setBrush(whiteColor());
     p.drawEllipse(center, 66, 66);
 
-    configFont(p, "Inter", 60, "Bold");
+    p.setFont(InterFont(60, QFont::Bold));
     QRect limit_rect = getTextRect(p, Qt::AlignCenter, limitSpeedStr);
     limit_rect.moveCenter(center);
     p.setPen(blackColor());
     p.drawText(limit_rect, Qt::AlignCenter, limitSpeedStr);
 
-    configFont(p, "Inter", 50, "Bold");
+    p.setFont(InterFont(50, QFont::Bold));
     QRect left_rect = getTextRect(p, Qt::AlignCenter, leftDistStr);
     left_rect.moveCenter({max_speed_rect.center().x(), 0});
     left_rect.moveBottom(max_speed_rect.bottom() + 265);
@@ -561,7 +561,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     p.setBrush(whiteColor());
     p.drawEllipse(center, 66, 66);
 
-    configFont(p, "Inter", 60, "Bold");
+    p.setFont(InterFont(60, QFont::Bold));
     QRect roadlimit_rect = getTextRect(p, Qt::AlignCenter, roadLimitSpeedStr);
     roadlimit_rect.moveCenter(center);
     p.setPen(blackColor());
@@ -584,9 +584,9 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     variableColor = QColor(255, a, a, 200);
   }
 
-  configFont(p, "Inter", 176, "Bold");
+  p.setFont(InterFont(176, QFont::Bold));
   drawTextColor(p, rect().center().x(), 230, speedStr, variableColor);
-  configFont(p, "Inter", 66, "Regular");
+  p.setFont(InterFont(66));
   drawTextColor(p, rect().center().x(), 310, speedUnit, lightorangeColor());
 
   // lane change indicator
@@ -665,7 +665,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   sa_str.sprintf("%.0f °", steerAngle);
-  configFont(p, "Inter", 30, "Bold");
+  p.setFont(InterFont(30, QFont::Bold));
   drawTextColor(p, x - 30, y + 95, sa_str, sa_color);
   drawTextColor(p, x + 30, y + 95, sa_direction, whiteColor(200));
 
@@ -684,7 +684,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   x = rect().left() + btn_size * 2.5;
   y = rect().height() - 15;
 
-  configFont(p, "Inter", 30, "Regular");
+  p.setFont(InterFont(30));
   drawTextColor(p, x, y, infoText, whiteColor(200));
 
   // new bottom info
@@ -733,7 +733,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   x = rect().right() - (btn_size * 1.8);
   y = (UI_BORDER_SIZE * 3);
 
-  configFont(p, "Inter", 30, "Regular");
+  p.setFont(InterFont(30));
   drawTextColor(p, x, y, infoGps, whiteColor(200));
 
   // tpms (bottom right)
@@ -744,7 +744,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   p.drawPixmap(x, y, w, h, tpms_img);
 
-  configFont(p, "Inter", 30, "Bold");
+  p.setFont(InterFont(30, QFont::Bold));
   drawTextColor(p, x + 25, y + 56, get_tpms_text(fl), get_tpms_color(fl));
   drawTextColor(p, x + 133, y + 56, get_tpms_text(fr), get_tpms_color(fr));
   drawTextColor(p, x + 25, y + 171, get_tpms_text(rl), get_tpms_color(rl));
@@ -1087,7 +1087,7 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState
   } else {
     l_speed.sprintf("%.0f km/h", speed + v_rel * 3.6); // kph
   }
-  configFont(painter, "Inter", 35, "Bold");
+  painter.setFont(InterFont(35, QFont::Bold));
   drawTextColor(painter, x, y + sz / 1.5f + 10, is_cruise_set ? "∧" : "", blackColor(200));
   drawTextColor(painter, x, y + sz / 1.5f + 70.0, l_dist, d_color);
   drawTextColor(painter, x, y + sz / 1.5f + 120.0, l_speed, v_color);

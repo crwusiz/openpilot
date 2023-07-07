@@ -7,7 +7,23 @@ hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 
 def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque_fault, sys_warning, sys_state, enabled,
                   left_lane, right_lane, left_lane_depart, right_lane_depart, bus, lkas11):
-  values = lkas11
+  values = {s: lkas11[s] for s in [
+    "CF_Lkas_LdwsActivemode",
+    "CF_Lkas_LdwsSysState",
+    "CF_Lkas_SysWarning",
+    "CF_Lkas_LdwsLHWarning",
+    "CF_Lkas_LdwsRHWarning",
+    "CF_Lkas_HbaLamp",
+    "CF_Lkas_FcwBasReq",
+    "CF_Lkas_HbaSysState",
+    "CF_Lkas_FcwOpt",
+    "CF_Lkas_HbaOpt",
+    "CF_Lkas_FcwSysState",
+    "CF_Lkas_FcwCollisionWarning",
+    "CF_Lkas_FusionState",
+    "CF_Lkas_FcwOpt_USM",
+    "CF_Lkas_LdwsOpt_USM",
+  ]}
   values["CF_Lkas_LdwsSysState"] = sys_state
   values["CF_Lkas_SysWarning"] = 3 if sys_warning else 0
   values["CF_Lkas_LdwsLHWarning"] = left_lane_depart
@@ -49,7 +65,20 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
 
 
 def create_clu11(packer, frame, bus, button, clu11):
-  values = clu11
+  values = {s: clu11[s] for s in [
+    "CF_Clu_CruiseSwState",
+    "CF_Clu_CruiseSwMain",
+    "CF_Clu_SldMainSW",
+    "CF_Clu_ParityBit1",
+    "CF_Clu_VanzDecimal",
+    "CF_Clu_Vanz",
+    "CF_Clu_SPEED_UNIT",
+    "CF_Clu_DetentOut",
+    "CF_Clu_RheostatLevel",
+    "CF_Clu_CluInfo",
+    "CF_Clu_AmpInfo",
+    "CF_Clu_AliveCnt1",
+  ]}
   values["CF_Clu_CruiseSwState"] = button
   values["CF_Clu_AliveCnt1"] = frame % 0x10
 
