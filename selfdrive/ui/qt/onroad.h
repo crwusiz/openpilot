@@ -207,7 +207,7 @@ public:
   bool isMapVisible() const { return map && map->isVisible(); }
 
 signals:
-  void mapWindowShown();
+  void mapPanelRequested();
 
 private:
   void paintEvent(QPaintEvent *event);
@@ -217,7 +217,6 @@ private:
   QColor bg = bg_colors[STATUS_DISENGAGED];
   QWidget *map = nullptr;
   QHBoxLayout* split;
-  bool navDisabled = false;
 
 private slots:
   void offroadTransition(bool offroad);
