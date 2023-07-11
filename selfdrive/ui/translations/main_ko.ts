@@ -550,7 +550,7 @@
     <name>OffroadAlert</name>
     <message>
         <source>Device temperature too high. System won&apos;t start.</source>
-        <translation>장치 온도가 너무 높아 시스템을 시작할수 없습니다.</translation>
+        <translation type="vanished">장치 온도가 너무 높아 시스템을 시작할수 없습니다.</translation>
     </message>
     <message>
         <source>Immediately connect to the internet to check for updates. If you do not connect to the internet, openpilot won&apos;t engage in %1</source>
@@ -602,6 +602,10 @@
         <source>openpilot detected a change in the device&apos;s mounting position. Ensure the device is fully seated in the mount and the mount is firmly secured to the windshield.</source>
         <translation>openpilot이 장치의 장착 위치 변경을 감지했습니다. 장치가 마운트에 완전히 장착되고 마운트가 앞유리에 단단히 고정되었는지 확인하십시오. </translation>
     </message>
+    <message>
+        <source>Device temperature too high. System cooling down before starting. Current internal component temperature: %1</source>
+        <translation>장치 온도가 너무 높습니다. 시작하기 전에 장치온도를 낮춰주세요. 현재 내부 구성 요소 온도: %1</translation>
+    </message>
 </context>
 <context>
     <name>OffroadHome</name>
@@ -652,11 +656,11 @@
     <name>PrimeAdWidget</name>
     <message>
         <source>Upgrade Now</source>
-        <translation>지금 업그레이드</translation>
+        <translation>지금 업그레이드 하세요</translation>
     </message>
     <message>
         <source>Become a comma prime member at connect.comma.ai</source>
-        <translation>connect.comma.ai 접속 comma prime 가입</translation>
+        <translation>connect.comma.ai 접속하여 comma prime에 가입하세요</translation>
     </message>
     <message>
         <source>PRIME FEATURES:</source>
@@ -667,12 +671,16 @@
         <translation>원격 접속</translation>
     </message>
     <message>
-        <source>1 year of storage</source>
+        <source>24/7 LTE connectivity</source>
+        <translation>항상 LTE 연결</translation>
+    </message>
+    <message>
+        <source>1 year of drive storage</source>
         <translation>1년간 저장</translation>
     </message>
     <message>
-        <source>Developer perks</source>
-        <translation>개발자 혜택</translation>
+        <source>Turn-by-turn navigation</source>
+        <translation>내비게이션 경로안내</translation>
     </message>
 </context>
 <context>
