@@ -65,20 +65,9 @@ void OnroadWindow::updateState(const UIState &s) {
 
   nvg->updateState(s);
 
-  // update spacing
-  bool navDisabledNow = (*s.sm)["controlsState"].getControlsState().getEnabled() &&
-                        !(*s.sm)["modelV2"].getModelV2().getNavEnabled();
-  if (navDisabled != navDisabledNow) {
-    split->setSpacing(navDisabledNow ? UI_BORDER_SIZE * 2 : 0);
-    if (map) {
-      map->setFixedWidth(topWidget(this)->width() / 2 - UI_BORDER_SIZE * (navDisabledNow ? 2 : 1));
-    }
-  }
-
-  // repaint border
-  if (bg != bgColor || navDisabled != navDisabledNow) {
+  if (bg != bgColor) {
+    // repaint border
     bg = bgColor;
-    navDisabled = navDisabledNow;
     update();
   }
 }
@@ -87,11 +76,7 @@ void OnroadWindow::mousePressEvent(QMouseEvent* e) {
 #ifdef ENABLE_MAPS
   if (map != nullptr) {
     bool sidebarVisible = geometry().x() > 0;
-    if (map->isVisible() && !((MapPanel *)map)->isShowingMap() && e->windowPos().x() >= 1080) {
-      return;
-    }
     map->setVisible(!sidebarVisible && !map->isVisible());
-    update();
   }
 #endif
   // propagation event to parent(HomeWindow)
@@ -105,7 +90,7 @@ void OnroadWindow::offroadTransition(bool offroad) {
       auto m = new MapPanel(get_mapbox_settings());
       map = m;
 
-      QObject::connect(m, &MapPanel::mapWindowShown, this, &OnroadWindow::mapWindowShown);
+      QObject::connect(m, &MapPanel::mapPanelRequested, this, &OnroadWindow::mapPanelRequested);
 
       m->setFixedWidth(topWidget(this)->width() / 2 - UI_BORDER_SIZE);
       split->insertWidget(0, m);
@@ -122,13 +107,6 @@ void OnroadWindow::offroadTransition(bool offroad) {
 void OnroadWindow::paintEvent(QPaintEvent *event) {
   QPainter p(this);
   p.fillRect(rect(), QColor(bg.red(), bg.green(), bg.blue(), 255));
-
-  if (isMapVisible() && navDisabled) {
-    QRect map_r = uiState()->scene.map_on_left
-                    ? QRect(0, 0, width() / 2, height())
-                    : QRect(width() / 2, 0, width() / 2, height());
-    p.fillRect(map_r, bg_colors[STATUS_DISENGAGED]);
-  }
 }
 
 // ***** onroad widgets *****
@@ -199,7 +177,7 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
 }
 
 // ExperimentalButton
-ExperimentalButton::ExperimentalButton(QWidget *parent) : experimental_mode(false), QPushButton(parent) {
+ExperimentalButton::ExperimentalButton(QWidget *parent) : experimental_mode(false), engageable(false), QPushButton(parent) {
   setFixedSize(btn_size, btn_size);
 
   params = Params();
@@ -238,7 +216,7 @@ void ExperimentalButton::paintEvent(QPaintEvent *event) {
   //p.setBrush(QColor(0, 0, 0, 166));
   p.setBrush(QColor(0, 0, 0, 100)); // icon_bg
   p.drawEllipse(center, btn_size / 2, btn_size / 2);
-  //p.setOpacity(isDown() ? 0.8 : 1.0);
+  //p.setOpacity(isDown() || !engageable ? 0.8 : 1.0);
   p.setOpacity(0.8);
   //p.drawPixmap((btn_size - img_size) / 2, (btn_size - img_size) / 2, img);
   p.drawPixmap((btn_size - img.size().width()) / 2, (btn_size - img.size().height()) / 2, img);
@@ -251,8 +229,10 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   pm = std::make_unique<PubMaster, const std::initializer_list<const char *>>({"uiDebug"});
 
   QVBoxLayout *main_layout  = new QVBoxLayout(this);
-  main_layout->setMargin(UI_BORDER_SIZE * 4);
-  main_layout->setSpacing(20);
+  main_layout->setMargin(UI_BORDER_SIZE);
+  main_layout->setSpacing(0);
+  //main_layout->setMargin(UI_BORDER_SIZE * 4);
+  //main_layout->setSpacing(20);
 
   experimental_btn = new ExperimentalButton(this);
   main_layout->addWidget(experimental_btn, 0, Qt::AlignTop | Qt::AlignRight);
