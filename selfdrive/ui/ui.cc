@@ -79,7 +79,9 @@ void update_line_data(const UIState *s, const cereal::XYZTData::Reader &line,
   *pvd = left_points + right_points;
 }
 
-void update_model(UIState *s, const cereal::ModelDataV2::Reader &model, const cereal::UiPlan::Reader &plan) {
+void update_model(UIState *s,
+                  const cereal::ModelDataV2::Reader &model,
+                  const cereal::UiPlan::Reader &plan) {
   UIScene &scene = s->scene;
   auto plan_position = plan.getPosition();
   if (plan_position.getX().size() < TRAJECTORY_SIZE){
