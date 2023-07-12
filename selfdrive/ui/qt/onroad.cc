@@ -75,8 +75,10 @@ void OnroadWindow::updateState(const UIState &s) {
 void OnroadWindow::mousePressEvent(QMouseEvent* e) {
 #ifdef ENABLE_MAPS
   if (map != nullptr) {
+    // Switch between map and sidebar when using navigate on openpilot
     bool sidebarVisible = geometry().x() > 0;
-    map->setVisible(!sidebarVisible && !map->isVisible());
+    bool show_map = uiState()->scene.navigate_on_openpilot ? sidebarVisible : !sidebarVisible;
+    map->setVisible(show_map && !map->isVisible());
   }
 #endif
   // propagation event to parent(HomeWindow)
@@ -229,10 +231,8 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   pm = std::make_unique<PubMaster, const std::initializer_list<const char *>>({"uiDebug"});
 
   QVBoxLayout *main_layout  = new QVBoxLayout(this);
-  main_layout->setMargin(UI_BORDER_SIZE);
-  main_layout->setSpacing(0);
-  //main_layout->setMargin(UI_BORDER_SIZE * 4);
-  //main_layout->setSpacing(20);
+  main_layout->setMargin(UI_BORDER_SIZE * 4);
+  main_layout->setSpacing(20);
 
   experimental_btn = new ExperimentalButton(this);
   main_layout->addWidget(experimental_btn, 0, Qt::AlignTop | Qt::AlignRight);
@@ -975,7 +975,7 @@ void AnnotatedCameraWidget::drawDriverState(QPainter &painter, const UIState *s)
   painter.save();
 
   // base icon
-  int offset = (UI_BORDER_SIZE * 3)+ (btn_size / 2);
+  int offset = (UI_BORDER_SIZE * 3) + (btn_size / 2);
   int x = rightHandDM ? width() - offset : offset;
   int y = height() - offset - (UI_BORDER_SIZE * 3);
   float opacity = dmActive ? 0.8 : 0.2;
@@ -1131,9 +1131,9 @@ void AnnotatedCameraWidget::paintGL() {
 
   if (s->worldObjectsVisible()) {
     if (sm.rcv_frame("modelV2") > s->scene.started_frame) {
-      update_model(s, sm["modelV2"].getModelV2(), sm["uiPlan"].getUiPlan());
+      update_model(s, model, sm["uiPlan"].getUiPlan());
       if (sm.rcv_frame("radarState") > s->scene.started_frame) {
-        update_leads(s, radar_state, sm["modelV2"].getModelV2().getPosition());
+        update_leads(s, radar_state, model.getPosition());
       }
     }
 
