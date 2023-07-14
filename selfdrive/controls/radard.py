@@ -12,14 +12,10 @@ from common.realtime import Ratekeeper, Priority, config_realtime_process
 from system.swaglog import cloudlog
 
 from common.kalman.simple_kalman import KF1D
-from common.filter_simple import StreamingMovingAverage
 
 
 # Default lead acceleration decay set to 50% at 1s
 _LEAD_ACCEL_TAU = 1.5
-
-# Hack to maintain vision lead state
-_vision_lead_aTau = {0: _LEAD_ACCEL_TAU, 1: _LEAD_ACCEL_TAU}
 
 # radar tracks
 SPEED, ACCEL = 0, 1     # Kalman filter states enum
@@ -61,7 +57,6 @@ class Track:
     self.K_C = kalman_params.C
     self.K_K = kalman_params.K
     self.kf = KF1D([[v_lead], [0.0]], self.K_A, self.K_C, self.K_K)
-    self.aLeadKFilter = StreamingMovingAverage(3)
 
   def update(self, d_rel: float, y_rel: float, v_rel: float, v_lead: float, measured: float):
     # relative values, copy
@@ -110,12 +105,12 @@ class Track:
       "aLeadTau": float(self.aLeadTau)
     }
 
-  def get_RadarState2(self, model_prob, lead_msg, lead_index):
+  def get_RadarState2(self, model_prob, lead_msg):
     useVisionMix = False
     if float(lead_msg.prob) > 0.5 and abs(float(self.aLeadK)) < abs(float(lead_msg.a[0])):
       useVisionMix = True
 
-    aLeadK = self.aLeadKFilter.process(float(lead_msg.a[0]) if useVisionMix else float(self.aLeadK))
+    aLeadK = float(lead_msg.a[0]) if useVisionMix else float(self.aLeadK)
     return {
       "dRel": float(self.dRel),
       "yRel": float(self.yRel),
@@ -127,7 +122,7 @@ class Track:
       "fcw": self.is_potential_fcw(model_prob),
       "modelProb": model_prob,
       "radar": True,
-      "aLeadTau": _vision_lead_aTau[lead_index] if useVisionMix else float(self.aLeadTau)
+      "aLeadTau": 0.3 if useVisionMix else float(self.aLeadTau)
     }
 
 
@@ -164,7 +159,7 @@ def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks
 
   # if no 'sane' match is found return -1
   # stationary radar points can be false positives
-  dist_sane = abs(track.dRel - offset_vision_dist) < max([(offset_vision_dist)*.25, 5.0])
+  dist_sane = abs(track.dRel - offset_vision_dist) < max([(offset_vision_dist)*.35, 5.0])
   vel_sane = (abs(track.vRel + v_ego - lead.v[0]) < 10) or (v_ego + track.vRel > 3)
   if dist_sane and vel_sane:
     return track
@@ -172,24 +167,16 @@ def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks
     return None
 
 
-def get_RadarState_from_vision(lead_msg: capnp._DynamicStructReader, lead_index, v_ego: float, model_v_ego: float):
+def get_RadarState_from_vision(lead_msg: capnp._DynamicStructReader, v_ego: float, model_v_ego: float):
   lead_v_rel_pred = lead_msg.v[0] - model_v_ego
-  # Learn if constant acceleration
-  if abs(float(lead_msg.a[0])) < 0.5:
-    _vision_lead_aTau[lead_index] = _LEAD_ACCEL_TAU
-  else:
-    _vision_lead_aTau[lead_index] *= 0.9
-
   return {
     "dRel": float(lead_msg.x[0] - RADAR_TO_CAMERA),
     "yRel": float(-lead_msg.y[0]),
     "vRel": float(lead_v_rel_pred),
     "vLead": float(v_ego + lead_v_rel_pred),
     "vLeadK": float(v_ego + lead_v_rel_pred),
-    #"aLeadK": 0.0,
-    #"aLeadTau": 0.3,
-    "aLeadK": float(lead_msg.a[0]),
-    "aLeadTau": _vision_lead_aTau[lead_index],
+    "aLeadK": 0.0,
+    "aLeadTau": 0.3,
     "fcw": False,
     "modelProb": float(lead_msg.prob),
     "radar": False,
@@ -197,7 +184,7 @@ def get_RadarState_from_vision(lead_msg: capnp._DynamicStructReader, lead_index,
   }
 
 
-def get_lead(v_ego: float, ready: bool, tracks: Dict[int, Track], lead_msg: capnp._DynamicStructReader, lead_index, model_v_ego: float, low_speed_override: bool = True) -> Dict[str, Any]:
+def get_lead(v_ego: float, ready: bool, tracks: Dict[int, Track], lead_msg: capnp._DynamicStructReader, model_v_ego: float, low_speed_override: bool = True) -> Dict[str, Any]:
   # Determine leads, this is where the essential logic happens
   if len(tracks) > 0 and ready and lead_msg.prob > .5:
     track = match_vision_to_track(v_ego, lead_msg, tracks)
@@ -207,10 +194,9 @@ def get_lead(v_ego: float, ready: bool, tracks: Dict[int, Track], lead_msg: capn
   lead_dict = {'status': False}
   if track is not None:
     #lead_dict = track.get_RadarState(lead_msg.prob)
-    lead_dict = track.get_RadarState2(lead_msg.prob, lead_msg, lead_index)
+    lead_dict = track.get_RadarState2(lead_msg.prob, lead_msg)
   elif (track is None) and ready and (lead_msg.prob > .5):
-    #lead_dict = get_RadarState_from_vision(lead_msg, v_ego, model_v_ego)
-    lead_dict = get_RadarState_from_vision(lead_msg, lead_index, v_ego, model_v_ego)
+    lead_dict = get_RadarState_from_vision(lead_msg, v_ego, model_v_ego)
 
   if low_speed_override:
     low_speed_tracks = [c for c in tracks.values() if c.potential_low_speed_lead(v_ego)]
@@ -288,8 +274,8 @@ class RadarD:
       model_v_ego = self.v_ego
     leads_v3 = sm['modelV2'].leadsV3
     if len(leads_v3) > 1:
-      self.radar_state.leadOne = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[0], 0, model_v_ego, low_speed_override=True)
-      self.radar_state.leadTwo = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[1], 1, model_v_ego, low_speed_override=False)
+      self.radar_state.leadOne = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[0], model_v_ego, low_speed_override=True)
+      self.radar_state.leadTwo = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[1], model_v_ego, low_speed_override=False)
 
   def publish(self, pm: messaging.PubMaster, lag_ms: float):
     assert self.radar_state is not None

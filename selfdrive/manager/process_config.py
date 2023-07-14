@@ -58,7 +58,7 @@ procs = [
   PythonProcess("dmonitoringd", "selfdrive.monitoring.dmonitoringd", enabled=(not PC or WEBCAM), callback=driverview),
   PythonProcess("laikad", "selfdrive.locationd.laikad"),
   PythonProcess("rawgpsd", "system.sensord.rawgps.rawgpsd", enabled=TICI, onroad=False, callback=qcomgps),
-  PythonProcess("navd", "selfdrive.navd.navd"),
+  PythonProcess("navd", "selfdrive.navd.navd", enabled=not Params().get_bool('UseExternalNaviRoutes')),
   PythonProcess("pandad", "selfdrive.boardd.pandad", offroad=True),
   PythonProcess("paramsd", "selfdrive.locationd.paramsd"),
   NativeProcess("ubloxd", "system/ubloxd", ["./ubloxd"], enabled=TICI, onroad=False, callback=ublox),
@@ -76,7 +76,8 @@ procs = [
   PythonProcess("webjoystick", "tools.joystick.web", onroad=False, callback=notcar),
 
   # Process add
-  PythonProcess("road_speed_limiter", "selfdrive.road_speed_limiter", offroad=True, enabled=TICI),
+  PythonProcess("navi_controller", "selfdrive.controls.neokii.navi_controller", offroad=True),
+  PythonProcess("navi_route", "selfdrive.controls.neokii.navi_route", enabled=Params().get_bool('UseExternalNaviRoutes')),
   PythonProcess("otisserv", "selfdrive.navd.otisserv", offroad=True),
 ]
 

@@ -11,7 +11,8 @@ MapInstructions::MapInstructions(QWidget *parent) : QWidget(parent) {
   is_rhd = Params().getBool("IsRhdDetected");
   QHBoxLayout *main_layout = new QHBoxLayout(this);
   main_layout->setContentsMargins(11, 50, 11, 11);
-  main_layout->addWidget(icon_01 = new QLabel, 0, Qt::AlignTop);
+  //main_layout->addWidget(icon_01 = new QLabel, 0, Qt::AlignTop);
+  main_layout->addWidget(icon_01 = new NetworkImageWidget, 0, Qt::AlignTop);
 
   QWidget *right_container = new QWidget(this);
   right_container->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -88,7 +89,7 @@ void MapInstructions::updateInstructions(cereal::NavInstruction::Reader instruct
   distance->setText(getDistance(instruction.getManeuverDistance()));
 
   // Show arrow with direction
-  QString type = QString::fromStdString(instruction.getManeuverType());
+  /*QString type = QString::fromStdString(instruction.getManeuverType());
   QString modifier = QString::fromStdString(instruction.getManeuverModifier());
   if (!type.isEmpty()) {
     QString fn = "direction_" + type;
@@ -100,7 +101,10 @@ void MapInstructions::updateInstructions(cereal::NavInstruction::Reader instruct
     icon_01->setPixmap(pixmap_cache[!rhd ? fn : "rhd_" + fn]);
     icon_01->setSizePolicy(QSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed));
     icon_01->setVisible(true);
-  }
+  }*/
+  QString imageUrl = QString::fromStdString(instruction.getImageUrl());
+  icon_01->requestImage(imageUrl);
+  icon_01->setVisible(true);
 
   // Hide distance after arrival
   //distance->setVisible(type != "arrive" || instruction.getManeuverDistance() > 0);

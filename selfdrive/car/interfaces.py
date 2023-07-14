@@ -229,8 +229,18 @@ class CarInterfaceBase(ABC):
     return reader
 
   @abstractmethod
-  def apply(self, c: car.CarControl, now_nanos: int, controls) -> Tuple[car.CarControl.Actuators, List[bytes]]:
+  def apply(self, c: car.CarControl, now_nanos: int) -> Tuple[car.CarControl.Actuators, List[bytes]]:
     pass
+
+  @staticmethod
+  def get_params_adjust_set_speed():
+    return [10], [20]
+
+  def create_buttons(self, button):
+    return None
+
+  def get_buttons_dict(self):
+    return None
 
   def create_common_events(self, cs_out, extra_gears=None, pcm_enable=True, allow_enable=True,
                            enable_buttons=(ButtonType.accelCruise, ButtonType.decelCruise)):

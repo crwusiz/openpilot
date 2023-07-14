@@ -225,6 +225,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"DisengageOnBrake", PERSISTENT},
     {"IsCanfd", PERSISTENT},
     {"GitLog", PERSISTENT},
+    {"UseExternalNaviRoutes", PERSISTENT},
 };
 
 } // namespace

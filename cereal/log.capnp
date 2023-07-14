@@ -2102,6 +2102,7 @@ struct NavInstruction {
 
   speedLimit @10 :Float32; # m/s
   speedLimitSign @11 :SpeedLimitSign;
+  imageUrl @12 :Text;
 
   struct Lane {
     directions @0 :List(Direction);
@@ -2274,9 +2275,6 @@ struct Event {
     livestreamWideRoadEncodeData @121 :EncodeData;
     livestreamDriverEncodeData @122 :EncodeData;
 
-    # neokii
-    roadLimitSpeed @123 :RoadLimitSpeed;
-
     # *********** Custom: reserved for forks ***********
     customReserved0 @107 :Custom.CustomReserved0;
     customReserved1 @108 :Custom.CustomReserved1;
@@ -2288,6 +2286,9 @@ struct Event {
     customReserved7 @114 :Custom.CustomReserved7;
     customReserved8 @115 :Custom.CustomReserved8;
     customReserved9 @116 :Custom.CustomReserved9;
+
+    # neokii
+    naviData @123 :NaviData;
 
     # *********** legacy + deprecated ***********
     model @9 :Legacy.ModelData; # TODO: rename modelV2 and mark this as deprecated
@@ -2330,7 +2331,7 @@ struct Event {
   }
 }
 
-struct RoadLimitSpeed {
+struct NaviData {
     active @0 :Int16;
     roadLimitSpeed @1 :Int16;
     isHighway @2 :Bool;
@@ -2343,4 +2344,6 @@ struct RoadLimitSpeed {
     sectionLeftTime @9 :Int16;
     sectionAdjustSpeed @10 :Bool;
     camSpeedFactor @11 :Float32;
+    currentRoadName @12 :Text;
+    isNda2 @13 :Bool;
 }

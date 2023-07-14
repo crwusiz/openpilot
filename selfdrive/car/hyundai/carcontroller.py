@@ -11,8 +11,7 @@ from selfdrive.car.interfaces import ACCEL_MIN, ACCEL_MAX
 from selfdrive.car.hyundai import hyundaicanfd, hyundaican
 from selfdrive.car.hyundai.hyundaicanfd import CanBus
 from selfdrive.car.hyundai.values import HyundaiFlags, Buttons, CarControllerParams, CANFD_CAR, CAR
-from selfdrive.road_speed_limiter import road_speed_limiter_get_active
-from selfdrive.car.hyundai.scc_smoother import SccSmoother
+from selfdrive.controls.neokii.navi_controller import SpeedLimiter
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 LongCtrlState = car.CarControl.Actuators.LongControlState
@@ -54,7 +53,6 @@ class CarController:
     self.CAN = CanBus(CP)
     self.CCP = CarControllerParams(CP)
     self.packer = CANPacker(dbc_name)
-    self.scc_smoother = SccSmoother(CP)
     self.car_fingerprint = CP.carFingerprint
 
     self.frame = 0
@@ -68,7 +66,7 @@ class CarController:
     self.turning_signal_timer = 0
     self.turning_indicator_alert = False
 
-  def update(self, CC, CS, now_nanos, controls):
+  def update(self, CC, CS, now_nanos):
     actuators = CC.actuators
     hud_control = CC.hudControl
 
@@ -186,8 +184,6 @@ class CarController:
           self.last_lead_distance = CS.lead_distance
           self.resume_cnt = 0
           self.resume_wait_timer = 0
-        elif self.scc_smoother.is_active(self.frame):
-          pass
         elif self.resume_wait_timer > 0:
           self.resume_wait_timer -= 1
         elif abs(CS.lead_distance - self.last_lead_distance) > 0.1:
@@ -198,9 +194,6 @@ class CarController:
             self.resume_wait_timer = int(randint(20, 25) * 2)
       elif self.last_lead_distance != 0:
         self.last_lead_distance = 0
-
-      # scc smoother
-      self.scc_smoother.update(CC.enabled, can_sends, self.packer, CC, CS, self.frame, controls)
 
       # send scc to car if longcontrol enabled and SCC not on bus 0 or not live
       if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl:
@@ -213,10 +206,9 @@ class CarController:
 
       # 20 Hz LFA MFA message
       if self.frame % 5 == 0:
-        activated_hda = road_speed_limiter_get_active()  # 0 off, 1 main road, 2 highway
         mfc_lfa = Params().get("MfcSelect", encoding='utf8') == "2"
         if self.CP.flags & HyundaiFlags.SEND_LFA.value and mfc_lfa:
-          can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, activated_hda))
+          can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, SpeedLimiter.instance().get_active()))
 
       # 5 Hz ACC options
       if self.frame % 20 == 0 and self.CP.openpilotLongitudinalControl:

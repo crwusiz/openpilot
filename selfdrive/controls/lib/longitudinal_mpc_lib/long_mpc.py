@@ -12,7 +12,6 @@ from selfdrive.controls.radard import _LEAD_ACCEL_TAU
 from common.conversions import Conversions as CV
 from common.realtime import DT_MDL
 from common.filter_simple import StreamingMovingAverage
-from cereal import log
 
 XState = log.LongitudinalPlan.XState
 
@@ -68,7 +67,7 @@ def get_jerk_factor(personality=log.LongitudinalPersonality.standard):
   if personality==log.LongitudinalPersonality.relaxed:
     return 1.0
   elif personality==log.LongitudinalPersonality.standard:
-    return 1.0
+    return 0.75
   elif personality==log.LongitudinalPersonality.aggressive:
     return 0.5
   else:
@@ -305,9 +304,16 @@ class LongitudinalMpc:
       self.solver.cost_set(i, 'Zl', Zl)
 
   def set_weights(self, v_ego=0., a_desired=0., prev_accel_constraint=True, personality=log.LongitudinalPersonality.standard):
+
+    # Prevent sudden acceleration changes (jerk) after gas overriding.
+    # Proposed by ajouatom
+    if not prev_accel_constraint:
+      self.prev_a = np.full(N+1, a_desired)
+
     jerk_factor = get_jerk_factor(personality)
     if self.mode == 'acc':
       a_change_cost = A_CHANGE_COST if prev_accel_constraint else 0
+      #cost_weights = [X_EGO_OBSTACLE_COST, X_EGO_COST, V_EGO_COST, A_EGO_COST, jerk_factor * a_change_cost, jerk_factor * J_EGO_COST]
 
       if v_ego < 0.1 or a_desired > 0.:
         x_cost = interp(v_ego, [1., 6.], [0.1, X_EGO_COST])
@@ -393,11 +399,12 @@ class LongitudinalMpc:
     self.params[:,0] = MIN_ACCEL
     self.params[:,1] = self.max_a
 
+    v_cruise, stop_x = self.update_apilot(carstate, radarstate, model, v_cruise)
+
     # Update in ACC mode or ACC/e2e blend
     if self.mode == 'acc':
       self.params[:,5] = LEAD_DANGER_FACTOR
 
-      v_cruise, stop_x = self.update_apilot(carstate, radarstate, model, v_cruise)
       x2 = stop_x * np.ones(N+1) if (self.xState == XState.e2eStop) else 400.0 * np.ones(N+1)
 
       # Fake an obstacle for cruise, this ensures smooth acceleration to set speed
@@ -438,10 +445,6 @@ class LongitudinalMpc:
 
     else:
       raise NotImplementedError(f'Planner mode {self.mode} not recognized in planner update')
-
-    #if self.status:
-    #  d_rel = radarstate.leadOne.dRel if radarstate.leadOne.status else radarstate.leadTwo.dRel
-    #  self.params[:,5] = interp(d_rel, [STOP_DISTANCE, 20], [1.0, 0.7])
 
     self.yref[:,1] = x
     self.yref[:,2] = v
