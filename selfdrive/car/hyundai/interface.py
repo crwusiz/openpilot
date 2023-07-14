@@ -464,10 +464,6 @@ class CarInterface(CarInterfaceBase):
     if self.CC.turning_indicator_alert:
       events.add(EventName.turningIndicatorOn)
 
-    # scc smoother
-    if self.CC.scc_smoother is not None:
-      self.CC.scc_smoother.inject_events(events)
-
     # low speed steer alert hysteresis logic (only for cars with steer cut off above 10 m/s)
     if ret.vEgo < (self.CP.minSteerSpeed + 2.) and self.CP.minSteerSpeed > 10.:
       self.low_speed_alert = True
@@ -481,5 +477,33 @@ class CarInterface(CarInterfaceBase):
     return ret
 
 
-  def apply(self, c, now_nanos, controls):
-    return self.CC.update(c, self.CS, now_nanos, controls)
+  def apply(self, c, now_nanos):
+    return self.CC.update(c, self.CS, now_nanos)
+
+  @staticmethod
+  def get_params_adjust_set_speed():
+    return [8, 10], [12, 14, 16, 18]
+
+  def create_buttons(self, button):
+    if self.CP.carFingerprint in CANFD_CAR:
+      return self.create_buttons_can_fd(button)
+    else:
+      return self.create_buttons_can(button)
+
+  def get_buttons_dict(self):
+    return BUTTONS_DICT
+
+  def create_buttons_can(self, button):
+    values = self.CS.clu11
+    values["CF_Clu_CruiseSwState"] = button
+    values["CF_Clu_AliveCnt1"] = (values["CF_Clu_AliveCnt1"] + 1) % 0x10
+    return self.CC.packer.make_can_msg("CLU11", self.CP.sccBus, values)
+
+  def create_buttons_can_fd(self, button):
+    values = {
+      "COUNTER": self.CS.buttons_counter+1,
+      "SET_ME_1": 1,
+      "CRUISE_BUTTONS": button,
+    }
+    return self.CC.packer.make_can_msg("CRUISE_BUTTONS", 5, values)
+

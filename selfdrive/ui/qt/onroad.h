@@ -79,10 +79,12 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(bool gas_pressed MEMBER gas_pressed);
   Q_PROPERTY(bool isStandstill MEMBER isStandstill);
   Q_PROPERTY(bool rightHandDM MEMBER rightHandDM);
+  Q_PROPERTY(bool nav_enabled MEMBER nav_enabled);
 
   Q_PROPERTY(int status MEMBER status);
   Q_PROPERTY(int autohold_state MEMBER autohold_state);
   Q_PROPERTY(int nda_state MEMBER nda_state);
+  Q_PROPERTY(int isNda2 MEMBER isNda2);
   Q_PROPERTY(int wifi_state MEMBER wifi_state);
   Q_PROPERTY(int gpsSatelliteCount MEMBER gpsSatelliteCount);
   Q_PROPERTY(int gap_state MEMBER gap_state);
@@ -145,7 +147,7 @@ private:
   // neokii add
   QPixmap autohold_warning_img;
   QPixmap autohold_active_img;
-  QPixmap nda_img, hda_img;
+  QPixmap nda_img, hda_img, nda2_img, hda2_img;
 
   QString speedUnit;
   std::unique_ptr<PubMaster> pm;
@@ -163,10 +165,11 @@ private:
   bool gas_pressed = false;
   bool isStandstill = false;
   bool rightHandDM = false;
+  bool nav_enabled = false;
 
   int status = STATUS_DISENGAGED;
   int autohold_state = 0;
-  int nda_state = 0;
+  int nda_state, isNda2 = 0;
   int wifi_state = 0;
   int gpsSatelliteCount = 0;
   int accel, gap_state = 0;

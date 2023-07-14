@@ -358,7 +358,7 @@ class CarState(CarStateBase):
       ("CF_Mdps_SErr", "MDPS12"),
       ("CR_Mdps_StrTq", "MDPS12"),
       ("CF_Mdps_FailStat", "MDPS12"),
-      ("CR_Mdps_OutTq", "MDPS12")
+      ("CR_Mdps_OutTq", "MDPS12"),
     ]
     checks.append(("MDPS12", 50))
 
@@ -540,13 +540,11 @@ class CarState(CarStateBase):
       ("CF_Lkas_LdwsRHWarning", "LKAS11"),
       ("CF_Lkas_HbaLamp", "LKAS11"),
       ("CF_Lkas_FcwBasReq", "LKAS11"),
-      ("CF_Lkas_ToiFlt", "LKAS11"),
       ("CF_Lkas_HbaSysState", "LKAS11"),
       ("CF_Lkas_FcwOpt", "LKAS11"),
       ("CF_Lkas_HbaOpt", "LKAS11"),
       ("CF_Lkas_FcwSysState", "LKAS11"),
       ("CF_Lkas_FcwCollisionWarning", "LKAS11"),
-      ("CF_Lkas_MsgCount", "LKAS11"),
       ("CF_Lkas_FusionState", "LKAS11"),
       ("CF_Lkas_FcwOpt_USM", "LKAS11"),
       ("CF_Lkas_LdwsOpt_USM", "LKAS11"),

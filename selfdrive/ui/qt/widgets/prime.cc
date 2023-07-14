@@ -153,7 +153,7 @@ PrimeAdWidget::PrimeAdWidget(QWidget* parent) : QFrame(parent) {
   main_layout->addSpacing(50);
 
   QLabel *description = new QLabel(tr("Become a comma prime member at connect.comma.ai"));
-  description->setStyleSheet("font-size: 56px; font-weight: light; color: white;");
+  description->setStyleSheet("font-size: 50px; font-weight: light; color: white;");
   description->setWordWrap(true);
   main_layout->addWidget(description, 0, Qt::AlignTop);
 

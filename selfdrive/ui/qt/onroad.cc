@@ -296,6 +296,8 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   autohold_active_img = loadPixmap("../assets/img_autohold_active.png", {img_size, img_size});
   nda_img = loadPixmap("../assets/img_nda.png");
   hda_img = loadPixmap("../assets/img_hda.png");
+  nda2_img = loadPixmap("../assets/img_nda2.png");
+  hda2_img = loadPixmap("../assets/img_hda2.png");
 }
 
 static const QColor get_tpms_color(float tpms) {
@@ -323,7 +325,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   const auto ds = sm["deviceState"].getDeviceState();
   const auto lp = sm["liveParameters"].getLiveParameters();
   const auto ge = sm["gpsLocationExternal"].getGpsLocationExternal();
-  const auto ls = sm["roadLimitSpeed"].getRoadLimitSpeed();
+  const auto nd = sm["naviData"].getNaviData();
   const auto tp = sm["liveTorqueParameters"].getLiveTorqueParameters();
   const auto lo = sm["longitudinalPlan"].getLongitudinalPlan();
 
@@ -362,7 +364,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("brake_state", ce.getBrakeLights());
   setProperty("autohold_state", ce.getAutoHold());
   setProperty("gas_pressed", ce.getGasPressed());
-  setProperty("nda_state", ls.getActive());
   setProperty("left_blindspot", ce.getLeftBlindspot());
   setProperty("right_blindspot", ce.getRightBlindspot());
   setProperty("wifi_state", (int)ds.getNetworkStrength());
@@ -382,12 +383,14 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("fr", ce.getTpms().getFr());
   setProperty("rl", ce.getTpms().getRl());
   setProperty("rr", ce.getTpms().getRr());
-  setProperty("roadLimitSpeed", ls.getRoadLimitSpeed());
   setProperty("navLimitSpeed", ce.getNavLimitSpeed());
-  setProperty("camLimitSpeed", ls.getCamLimitSpeed());
-  setProperty("camLimitSpeedLeftDist", ls.getCamLimitSpeedLeftDist());
-  setProperty("sectionLimitSpeed", ls.getSectionLimitSpeed());
-  setProperty("sectionLeftDist", ls.getSectionLeftDist());
+  setProperty("nda_state", nd.getActive());
+  setProperty("isNda2", nd.getIsNda2());
+  setProperty("roadLimitSpeed", nd.getRoadLimitSpeed());
+  setProperty("camLimitSpeed", nd.getCamLimitSpeed());
+  setProperty("camLimitSpeedLeftDist", nd.getCamLimitSpeedLeftDist());
+  setProperty("sectionLimitSpeed", nd.getSectionLimitSpeed());
+  setProperty("sectionLeftDist", nd.getSectionLeftDist());
   setProperty("left_on", ce.getLeftBlinker());
   setProperty("right_on", ce.getRightBlinker());
   setProperty("latAccelFactor", cs.getLateralControlState().getTorqueState().getLatAccelFactor());
@@ -395,6 +398,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
   setProperty("frictionRaw", tp.getFrictionCoefficientRaw());
   setProperty("traffic_state", lo.getTrafficState());
+  setProperty("nav_enabled", sm["modelV2"].getModelV2().getNavEnabled());
 
   // update engageability/experimental mode button
   experimental_btn->updateState(s);
@@ -599,9 +603,9 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   p.setFont(InterFont(176, QFont::Bold));
-  drawTextColor(p, rect().center().x(), 230, speedStr, variableColor);
+  drawTextColor(p, rect().center().x(), (UI_BORDER_SIZE * 24), speedStr, variableColor);
   p.setFont(InterFont(66));
-  drawTextColor(p, rect().center().x(), 310, speedUnit, lightorangeColor());
+  drawTextColor(p, rect().center().x(), (UI_BORDER_SIZE * 31), speedUnit, lightorangeColor());
 
   // lane change indicator
   drawLaneChangeIndicator(p, uiState());
@@ -615,16 +619,25 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     w = 120;
     h = 54;
     x = (width() + (UI_BORDER_SIZE * 2)) / 2 - (w / 2) - UI_BORDER_SIZE;
-    y = 30 - UI_BORDER_SIZE;
-    p.drawPixmap(x, y, w, h, nda_state == 1 ? nda_img : hda_img);
+    y = UI_BORDER_SIZE * 4;
+    if (isNda2) {
+      p.drawPixmap(x , y, w + 35, h, nda_state == 1 ? nda2_img : hda2_img);
+    } else {
+      p.drawPixmap(x, y, w, h, nda_state == 1 ? nda_img : hda_img);
+    }
   }
 
   // traffic icon (upper right 5)
   if (traffic_state >= 0) {
     w = 207;
     h = 135;
-    x = (width() + (UI_BORDER_SIZE * 2)) / 2 + 160;
-    y = (btn_size / 2) - (UI_BORDER_SIZE * 3.5);
+    if (nav_enabled) {
+      x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1);
+      y = (btn_size / 2) + (UI_BORDER_SIZE * 28);
+    } else {
+      x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 5);
+      y = (btn_size / 2) - (UI_BORDER_SIZE * 4);
+    }
     if (traffic_state == 1) {
       p.drawPixmap(x, y, w, h, traffic_stop_img);
     } else if (traffic_state == 2) {
@@ -635,12 +648,23 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   // N direction icon (upper right 4)
-  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 3.1);
-  y = (btn_size / 2) + (UI_BORDER_SIZE * 4);
+  if (nav_enabled) {
+    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
+    y = (btn_size / 2) + (UI_BORDER_SIZE * 20);
+  } else {
+    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 3.1);
+    y = (btn_size / 2) + (UI_BORDER_SIZE * 4);
+  }
   drawIconRotate(p, x, y, direction_img, icon_bg, gps_state ? 0.8 : 0.2, gpsBearing);
 
   // gps icon (upper right 3)
-  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
+  if (nav_enabled) {
+    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 0.1);
+    y = (btn_size / 2) + (UI_BORDER_SIZE * 20);
+  } else {
+    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
+    y = (btn_size / 2) + (UI_BORDER_SIZE * 4);
+  }
   drawIcon(p, x, y, gps_img, icon_bg, gps_state ? 0.8 : 0.2);
 
   if (wifi_state == 1) {
@@ -655,6 +679,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   // wifi icon (upper right 2)
   x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
+  y = (btn_size / 2) + (UI_BORDER_SIZE * 4);
   drawIcon(p, x, y, wifi_img, icon_bg, wifi_state > 0 ? 0.8 : 0.2);
 
   // steer img (bottom 1 right)
@@ -715,7 +740,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 3.1);
-  y = rect().bottom() - (UI_FOOTER_HEIGHT / 2) + (UI_BORDER_SIZE * 3);
+  y = rect().bottom() - (UI_FOOTER_HEIGHT / 2) + (UI_BORDER_SIZE * 2);
   drawIcon(p, x, y, gap_img, icon_bg, is_cruise_set ? 0.8 : 0.2);
 
   // gaspress img (bottom right 2)

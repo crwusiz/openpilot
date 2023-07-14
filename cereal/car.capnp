@@ -225,12 +225,12 @@ struct CarState {
   charging @43 :Bool;
 
   # neokii
-  autoHold @50 : Int32;
-  tpms @51 : Tpms;
-  navLimitSpeed @48 :Int16;
+  autoHold @48 : Int32;
+  tpms @49 : Tpms;
+  navLimitSpeed @50 :Int16;
 
   # add
-  isCanfd @49 :Bool;
+  isCanfd @51 :Bool;
 
   struct Tpms {
     fl @0 :Float32;

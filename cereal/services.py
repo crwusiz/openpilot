@@ -82,7 +82,7 @@ services = {
   "microphone": (True, 10., 10),
 
   # add
-  "roadLimitSpeed": (False, 0.),
+  "naviData": (False, 0.),
 
   # debug
   "uiDebug": (True, 0., 1),
