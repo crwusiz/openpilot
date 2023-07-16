@@ -100,6 +100,7 @@ void setQtSurfaceFormat() {
   fmt.setRenderableType(QSurfaceFormat::OpenGLES);
 #endif
   fmt.setSamples(16);
+  fmt.setStencilBufferSize(1);
   QSurfaceFormat::setDefaultFormat(fmt);
 }
 
