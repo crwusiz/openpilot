@@ -189,9 +189,7 @@ ExperimentalButton::ExperimentalButton(QWidget *parent) : experimental_mode(fals
 }
 
 void ExperimentalButton::changeMode() {
-  const auto cp = (*uiState()->sm)["carParams"].getCarParams();
-  bool can_change = hasLongitudinalControl(cp) && params.getBool("ExperimentalModeConfirmed");
-  if (can_change) {
+  if (params.getBool("ExperimentalModeConfirmed")) {
     params.putBool("ExperimentalMode", !experimental_mode);
   }
 }
@@ -887,6 +885,8 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
   }
 
   // paint path
+  //const bool show_e2e_path = (sm["controlsState"].getControlsState().getExperimentalMode() && scene.longitudinal_control);
+
   QLinearGradient bg(0, height(), 0, 0);
   //if (sm["controlsState"].getControlsState().getExperimentalMode()) {
   if (scene.engaged) {
