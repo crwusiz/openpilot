@@ -171,7 +171,6 @@ public:
   UIStatus status;
   UIScene scene = {};
 
-  bool awake;
   QString language;
 
   QTransform car_space_transform;
