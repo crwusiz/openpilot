@@ -24,7 +24,7 @@ class BaseHandle(ABC):
     ...
 
   @abstractmethod
-  def bulkWrite(self, endpoint: int, data: List[int], timeout: int = TIMEOUT) -> int:
+  def bulkWrite(self, endpoint: int, data: bytes, timeout: int = TIMEOUT) -> int:
     ...
 
   @abstractmethod
