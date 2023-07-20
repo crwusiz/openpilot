@@ -10,6 +10,7 @@
 #include <QStackedLayout>
 
 
+#include "selfdrive/ui/qt/util.h"
 #include "selfdrive/ui/qt/widgets/controls.h"
 
 // ********** settings window + top-level panels **********
@@ -85,7 +86,7 @@ private:
   ButtonControl *downloadBtn;
   ButtonControl *targetBranchBtn;
   Params params;
-  QFileSystemWatcher *fs_watch;
+  ParamWatcher *fs_watch;
 };
 
 class SelectManufacturer : public QWidget {

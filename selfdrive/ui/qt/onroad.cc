@@ -189,7 +189,9 @@ ExperimentalButton::ExperimentalButton(QWidget *parent) : experimental_mode(fals
 }
 
 void ExperimentalButton::changeMode() {
-  if (params.getBool("ExperimentalModeConfirmed")) {
+  const auto cp = (*uiState()->sm)["carParams"].getCarParams();
+  bool can_change = hasLongitudinalControl(cp) && params.getBool("ExperimentalModeConfirmed");
+  if (can_change) {
     params.putBool("ExperimentalMode", !experimental_mode);
   }
 }
