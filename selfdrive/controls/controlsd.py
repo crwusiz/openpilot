@@ -7,7 +7,7 @@ from cereal import car, log
 from common.numpy_fast import clip
 from common.realtime import sec_since_boot, config_realtime_process, Priority, Ratekeeper, DT_CTRL
 from common.profiler import Profiler
-from common.params import Params, put_nonblocking
+from common.params import Params, put_nonblocking, put_bool_nonblocking
 import cereal.messaging as messaging
 from cereal.visionipc import VisionIpcClient, VisionStreamType
 from common.conversions import Conversions as CV
@@ -224,8 +224,8 @@ class Controls:
     if REPLAY:
       controls_state = Params().get("ReplayControlsState")
       if controls_state is not None:
-        controls_state = log.ControlsState.from_bytes(controls_state)
-        self.v_cruise_helper.v_cruise_kph = controls_state.vCruise
+        with log.ControlsState.from_bytes(controls_state) as controls_state:
+          self.v_cruise_helper.v_cruise_kph = controls_state.vCruise
 
       if any(ps.controlsAllowed for ps in self.sm['pandaStates']):
         self.state = State.enabled
@@ -280,7 +280,6 @@ class Controls:
     if self.sm['deviceState'].freeSpacePercent < 7 and not SIMULATION:
       # under 7% of space free no enable allowed
       self.events.add(EventName.outOfSpace)
-    # TODO: make tici threshold the same
     if self.sm['deviceState'].memoryUsagePercent > 90 and not SIMULATION:
       self.events.add(EventName.lowMemory)
 
@@ -433,7 +432,7 @@ class Controls:
         pass
 
     # TODO: fix simulator
-    if not SIMULATION:
+    if not SIMULATION or REPLAY:
       #if not NOSENSOR:
       #  if not self.sm['liveLocationKalman'].gpsOK and self.sm['liveLocationKalman'].inputsOK and (self.distance_traveled > 1000):
       #    # Not show in first 1 km to allow for driving out of garage. This event shows after 5 minutes
@@ -470,7 +469,7 @@ class Controls:
 
         self.initialized = True
         self.set_initial_state()
-        Params().put_bool("ControlsReady", True)
+        put_bool_nonblocking("ControlsReady", True)
 
     # Check for CAN timeout
     if not can_strs:
