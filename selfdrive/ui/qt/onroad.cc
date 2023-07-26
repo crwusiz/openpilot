@@ -94,7 +94,8 @@ void OnroadWindow::offroadTransition(bool offroad) {
 
       QObject::connect(m, &MapPanel::mapPanelRequested, this, &OnroadWindow::mapPanelRequested);
       QObject::connect(nvg->map_settings_btn, &MapSettingsButton::clicked, m, &MapPanel::toggleMapSettings);
-      nvg->map_settings_btn->setEnabled(true);
+      //nvg->map_settings_btn->setEnabled(true);
+      nvg->map_settings_btn->setEnabled(false);
 
       m->setFixedWidth(topWidget(this)->width() / 2 - UI_BORDER_SIZE);
       split->insertWidget(0, m);
@@ -222,8 +223,7 @@ void ExperimentalButton::paintEvent(QPaintEvent *event) {
   p.drawEllipse(center, btn_size / 2, btn_size / 2);
   //p.setOpacity(isDown() || !engageable ? 0.8 : 1.0);
   p.setOpacity(0.8);
-  //p.drawPixmap((btn_size - img_size) / 2, (btn_size - img_size) / 2, img);
-  p.drawPixmap((btn_size - img.size().width()) / 2, (btn_size - img.size().height()) / 2, img);
+  p.drawPixmap((btn_size - img_size) / 2, (btn_size - img_size) / 2, img);
   p.setOpacity(1.0);
 }
 
@@ -245,10 +245,13 @@ void MapSettingsButton::paintEvent(QPaintEvent *event) {
 
   p.setOpacity(1.0);
   p.setPen(Qt::NoPen);
-  p.setBrush(QColor(0, 0, 0, 166));
+  //p.setBrush(QColor(0, 0, 0, 166));
+  p.setBrush(QColor(0, 0, 0, 100)); // icon_bg
   p.drawEllipse(center, btn_size / 2, btn_size / 2);
-  p.setOpacity(isDown() ? 0.6 : 1.0);
+  //p.setOpacity(isDown() ? 0.6 : 1.0);
+  p.setOpacity(0.8);
   p.drawPixmap((btn_size - img_size) / 2, (btn_size - img_size) / 2, settings_img);
+  p.setOpacity(1.0);
 }
 
 // Window that shows camera view and variety of info drawn on top
@@ -358,6 +361,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   setProperty("cruiseMaxSpeed", cruise_speed);
   setProperty("speedUnit", s.scene.is_metric ? tr("km/h") : tr("mph"));
   setProperty("accel", ce.getAEgo());
+  setProperty("hideBottomIcons", (cs.getAlertSize() != cereal::ControlsState::AlertSize::NONE));
   setProperty("status", s.status);
   setProperty("steeringPressed", ce.getSteeringPressed());
   setProperty("isStandstill", ce.getStandstill());
@@ -1210,7 +1214,7 @@ void AnnotatedCameraWidget::paintGL() {
   }
 
   // DMoji
-  if (sm.rcv_frame("driverStateV2") > s->scene.started_frame) {
+  if (!hideBottomIcons && (sm.rcv_frame("driverStateV2") > s->scene.started_frame)) {
     update_dmonitoring(s, sm["driverStateV2"].getDriverStateV2(), dm_fade_state, rightHandDM);
     drawDriverState(painter, s);
   }

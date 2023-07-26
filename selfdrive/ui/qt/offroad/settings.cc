@@ -627,15 +627,35 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
 
-  auto tmux_error_log_btn = new ButtonControl(tr("Tmux error log"), tr("RUN"));
+  auto tmux_error_log_btn = new ButtonControl(tr("tmux error log"), tr("RUN"));
   QObject::connect(tmux_error_log_btn, &ButtonControl::clicked, [=]() {
     const std::string txt = util::read_file("/data/tmux_error.log");
     ConfirmationDialog::rich(QString::fromStdString(txt), this);
   });
 
+  auto can_missing_error_log_btn = new ButtonControl(tr("can missing error log"), tr("RUN"));
+  QObject::connect(can_missing_error_log_btn, &ButtonControl::clicked, [=]() {
+    const std::string txt = util::read_file("/data/can_missing.log");
+    ConfirmationDialog::rich(QString::fromStdString(txt), this);
+  });
+
+  auto can_timeout_error_log_btn = new ButtonControl(tr("can timeout error log"), tr("RUN"));
+  QObject::connect(can_timeout_error_log_btn, &ButtonControl::clicked, [=]() {
+    const std::string txt = util::read_file("/data/can_timeout.log");
+    ConfirmationDialog::rich(QString::fromStdString(txt), this);
+  });
+
   communityLayout->addWidget(gitpull_btn);
   communityLayout->addWidget(cleardtc_btn);
-  communityLayout->addWidget(tmux_error_log_btn);
+  if (access("/data/tmux_error.log", F_OK) == 0) {
+    communityLayout->addWidget(tmux_error_log_btn);
+  }
+  if (access("/data/can_missing.log", F_OK) == 0) {
+    communityLayout->addWidget(can_missing_error_log_btn);
+  }
+  if (access("/data/can_timeout.log", F_OK) == 0) {
+    communityLayout->addWidget(can_timeout_error_log_btn);
+  }
   communityLayout->addWidget(horizontal_line());
   if (!params.getBool("IsCanfd")) {
     communityLayout->addWidget(new LateralControlSelect());

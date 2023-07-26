@@ -78,6 +78,7 @@ class AnnotatedCameraWidget : public CameraWidget {
   Q_PROPERTY(bool right_on MEMBER right_on);
   Q_PROPERTY(bool gas_pressed MEMBER gas_pressed);
   Q_PROPERTY(bool isStandstill MEMBER isStandstill);
+  Q_PROPERTY(bool hideBottomIcons MEMBER hideBottomIcons);
   Q_PROPERTY(bool rightHandDM MEMBER rightHandDM);
   Q_PROPERTY(bool nav_enabled MEMBER nav_enabled);
 
@@ -130,6 +131,7 @@ private:
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
   void drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color);
 
+  QVBoxLayout *main_layout;
   ExperimentalButton *experimental_btn;
   QPixmap long_img, steer_img;
   QPixmap gaspress_img;
@@ -155,6 +157,7 @@ private:
   bool is_cruise_set = false;
   bool steeringPressed = false;
   bool dmActive = false;
+  bool hideBottomIcons = false;
   bool brake_state = false;
   bool left_blindspot, right_blindspot = false;
   bool gps_state = false;

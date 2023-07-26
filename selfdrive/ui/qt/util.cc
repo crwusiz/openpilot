@@ -12,7 +12,6 @@
 #include <QTextStream>
 #include <QtXml/QDomDocument>
 
-#include "common/params.h"
 #include "common/swaglog.h"
 #include "system/hardware/hw.h"
 

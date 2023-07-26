@@ -343,34 +343,6 @@ def auto_lane_change_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.Su
     Priority.LOW, VisualAlert.none, AudibleAlert.promptRepeat, .75, alert_rate=0.75)
 
 
-def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
-  if os.path.isfile('/data/can_missing.log'):
-    f = open('/data/can_missing.log', 'r')
-    add = f.readline()
-    add_int = int(add, 0)
-    f.close()
-    return Alert(
-      "CAN 오류 : %s Missing\n Value : %d" % (add, add_int),
-      "",
-      AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, .2, creation_delay=1.)
-  elif os.path.isfile('/data/can_timeout.log'):
-    f = open('/data/can_timeout.log', 'r')
-    add = f.readline()
-    add_int = int(add, 0)
-    f.close()
-    return Alert(
-      "CAN 오류 : %s Timeout\n Value : %d" % (add, add_int),
-      "",
-      AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, .2, creation_delay=1.)
-  else:
-    return Alert(
-      "CAN 오류 : 장치를 점검하세요",
-      "",
-      AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, .2, creation_delay=1.)
-
 EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   # ********** events with no alerts **********
 
@@ -910,13 +882,12 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   # - CAN data is received, but some message are not received at the right frequency
   # If you're not writing a new car port, this is usually cause by faulty wiring
   EventName.canError: {
-    ET.PERMANENT: can_error_alert,
     ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("CAN 오류 : 장치를 점검하세요"),
-    #ET.PERMANENT: Alert(
-    #  "CAN 오류 : 장치를 점검하세요",
-    #  "",
-    #  AlertStatus.normal, AlertSize.small,
-    #  Priority.LOW, VisualAlert.none, AudibleAlert.none, 1., creation_delay=1.),
+    ET.PERMANENT: Alert(
+      "CAN 오류 : 장치를 점검하세요",
+      "",
+      AlertStatus.normal, AlertSize.small,
+      Priority.LOW, VisualAlert.none, AudibleAlert.none, 1., creation_delay=1.),
     ET.NO_ENTRY: NoEntryAlert("CAN 오류 : 장치를 점검하세요"),
   },
 
