@@ -199,7 +199,7 @@ SetupWidget::SetupWidget(QWidget* parent) : QFrame(parent) {
 
   QLabel* registrationDescription = new QLabel(tr("Pair your device with comma connect (connect.comma.ai) and claim your comma prime offer."));
   registrationDescription->setWordWrap(true);
-  registrationDescription->setStyleSheet("font-size: 50px; font-weight: light;");
+  registrationDescription->setStyleSheet("font-size: 44px; font-weight: light;");
   finishRegistationLayout->addWidget(registrationDescription);
 
   finishRegistationLayout->addStretch();

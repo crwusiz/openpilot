@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.8
+1#!/usr/bin/env python3.8
 # The MIT License
 #
 # Copyright (c) 2019-, Rick Lan, dragonpilot community, and a number of other of contributors.
