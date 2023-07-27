@@ -150,7 +150,7 @@
     </message>
     <message>
         <source>Tmux error log</source>
-        <translation>Tmux 에러 로그</translation>
+        <translation type="vanished">Tmux 에러 로그</translation>
     </message>
     <message>
         <source>Panda Flash</source>
@@ -175,6 +175,22 @@
     <message>
         <source>Use Stock Navigation Limit Speed Signal</source>
         <translation>차량 순정 내비게이션의 속도제한 정보를 표시합니다</translation>
+    </message>
+    <message>
+        <source>tmux error log</source>
+        <translation>tmux 에러 로그</translation>
+    </message>
+    <message>
+        <source>can missing error log</source>
+        <translation>can missing 에러 로그</translation>
+    </message>
+    <message>
+        <source>can timeout error log</source>
+        <translation>can timeout 에러 로그</translation>
+    </message>
+    <message>
+        <source>Use external navi routes</source>
+        <translation>외부 내비 경로 사용</translation>
     </message>
 </context>
 <context>
