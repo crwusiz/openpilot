@@ -767,7 +767,7 @@ class Controls:
 
       self.last_actuators, can_sends = self.CI.apply(CC, now_nanos)
 
-      v = self.speed_controller.update_can(self.enabled, CC, CS, self.sm, can_sends)
+      v = self.speed_controller.update_can(self.enabled, CS, can_sends)
       if v > 0:
         self.v_cruise_helper.v_cruise_kph = v
         self.v_cruise_helper.v_cruise_cluster_kph = v
