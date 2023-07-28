@@ -8,6 +8,7 @@ from system.swaglog import cloudlog
 # WARNING: imports outside of constants will not trigger a rebuild
 from selfdrive.modeld.constants import index_function
 from selfdrive.controls.radard import _LEAD_ACCEL_TAU
+from selfdrive.car.interfaces import ACCEL_MIN, ACCEL_MAX
 
 from common.conversions import Conversions as CV
 from common.realtime import DT_MDL
@@ -58,10 +59,10 @@ T_IDXS_LST = [index_function(idx, max_val=MAX_T, max_idx=N) for idx in range(N+1
 T_IDXS = np.array(T_IDXS_LST)
 FCW_IDXS = T_IDXS < 5.0
 T_DIFFS = np.diff(T_IDXS, prepend=[0.])
-MIN_ACCEL = -3.5
-MAX_ACCEL = 2.0
+MIN_ACCEL = ACCEL_MIN
+MAX_ACCEL = ACCEL_MAX
 COMFORT_BRAKE = 2.5
-STOP_DISTANCE = 6.0
+STOP_DISTANCE = 6.5
 
 def get_jerk_factor(personality=log.LongitudinalPersonality.standard):
   if personality==log.LongitudinalPersonality.relaxed:
