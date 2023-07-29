@@ -62,7 +62,7 @@ T_DIFFS = np.diff(T_IDXS, prepend=[0.])
 MIN_ACCEL = ACCEL_MIN
 MAX_ACCEL = ACCEL_MAX
 COMFORT_BRAKE = 2.5
-STOP_DISTANCE = 6.5
+STOP_DISTANCE = 6.0
 
 def get_jerk_factor(personality=log.LongitudinalPersonality.standard):
   if personality==log.LongitudinalPersonality.relaxed:
@@ -96,8 +96,8 @@ def get_stopped_equivalence_factor(v_lead, v_ego, t_follow=get_T_FOLLOW(), stop_
 def get_safe_obstacle_distance(v_ego, t_follow=get_T_FOLLOW(), comfort_brake=COMFORT_BRAKE, stop_distance=STOP_DISTANCE):
   return (v_ego**2) / (2 * comfort_brake) + t_follow * v_ego + stop_distance
 
-def desired_follow_distance(v_ego, v_lead):
-  return get_safe_obstacle_distance(v_ego) - get_stopped_equivalence_factor(v_lead, v_ego)
+def desired_follow_distance(v_ego, v_lead, t_follow=get_T_FOLLOW()):
+  return get_safe_obstacle_distance(v_ego, t_follow) - get_stopped_equivalence_factor(v_lead, v_ego)
 
 def gen_long_model():
   model = AcadosModel()
