@@ -686,79 +686,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   y = (btn_size / 2) + (UI_BORDER_SIZE * 4);
   drawIcon(p, x, y, wifi_img, icon_bg, wifi_state > 0 ? 0.8 : 0.2);
 
-  // steer img (bottom 1 right)
-  x = (btn_size / 2) + (UI_BORDER_SIZE * 2) + (btn_size);
-  y = rect().bottom() - (UI_FOOTER_HEIGHT / 2);
-  drawIconRotate(p, x, y, steer_img, icon_bg, 0.8, steerAngle);
-
-  QString sa_str, sa_direction;
-  QColor sa_color = limeColor(200);
-  if (std::fabs(steerAngle) > 90) {
-    sa_color = redColor(200);
-  } else if (std::fabs(steerAngle) > 30) {
-    sa_color = orangeColor(200);
-  }
-
-  if (steerAngle > 0) {
-    sa_direction.sprintf("◀");
-  } else if (steerAngle < 0) {
-    sa_direction.sprintf("▶");
-  } else {
-    sa_direction.sprintf("●");
-  }
-
-  sa_str.sprintf("%.0f °", steerAngle);
-  p.setFont(InterFont(30, QFont::Bold));
-  drawTextColor(p, x - 30, y + 95, sa_str, sa_color);
-  drawTextColor(p, x + 30, y + 95, sa_direction, whiteColor(200));
-
-  // bottom info
-  const char* lateral[] = {"Pid", "Indi", "Lqr", "Torque"};
-
-  QString infoText;
-  infoText.sprintf("SCC[%d] SR[%.2f] [ %s ] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
-    sccBus,
-    steerRatio,
-    lateral[lateralControl],
-    latAccelFactor, friction,
-    latAccelFactorRaw, frictionRaw
-  );
-
-  x = rect().left() + btn_size * 2.5;
-  y = rect().height() - 15;
-
-  p.setFont(InterFont(30));
-  drawTextColor(p, x, y, infoText, whiteColor(200));
-
-  // new bottom info
-
-  // scc gap icon (bottom right 1)
-  if (gap_state == 1) {
-    gap_img = gap1_img;
-  } else if (gap_state == 2) {
-    gap_img = gap2_img;
-  } else if (gap_state == 3) {
-    gap_img = gap3_img;
-  } else {
-    gap_img = gap4_img;
-  }
-
-  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 3.1);
-  y = rect().bottom() - (UI_FOOTER_HEIGHT / 2) + (UI_BORDER_SIZE * 2);
-  drawIcon(p, x, y, gap_img, icon_bg, is_cruise_set ? 0.8 : 0.2);
-
-  // gaspress img (bottom right 2)
-  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
-  drawIcon(p, x, y, gaspress_img, icon_bg, gas_pressed ? 0.8 : 0.2);
-
-  // brake and autohold icon (bottom right 3)
-  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
-  if (autohold_state >= 1) {
-    drawIcon(p, x, y, autohold_state > 1 ? autohold_warning_img : autohold_active_img, icon_bg, autohold_state ? 0.8 : 0.2);
-  } else {
-    drawIcon(p, x, y, brake_img, icon_bg, brake_state ? 0.8 : 0.2);
-  }
-
   // upper gps info
   if (gpsVerticalAccuracy == 0 || gpsVerticalAccuracy > 100)
     gpsAltitude = 999.9;
@@ -779,19 +706,92 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   p.setFont(InterFont(30));
   drawTextColor(p, x, y, infoGps, whiteColor(200));
 
-  // tpms (bottom right)
-  w = 160;
-  h = 208;
-  x = rect().right() - w - (UI_BORDER_SIZE * 2);
-  y = height() - h - (UI_BORDER_SIZE * 2);
+  if (!hideBottomIcons) {
+    // steer img (bottom 1 right)
+    x = (btn_size / 2) + (UI_BORDER_SIZE * 2) + (btn_size);
+    y = rect().bottom() - (UI_FOOTER_HEIGHT / 2);
+    drawIconRotate(p, x, y, steer_img, icon_bg, 0.8, steerAngle);
 
-  p.drawPixmap(x, y, w, h, tpms_img);
+    QString sa_str, sa_direction;
+    QColor sa_color = limeColor(200);
+    if (std::fabs(steerAngle) > 90) {
+      sa_color = redColor(200);
+    } else if (std::fabs(steerAngle) > 30) {
+      sa_color = orangeColor(200);
+    }
 
-  p.setFont(InterFont(30, QFont::Bold));
-  drawTextColor(p, x + 25, y + 56, get_tpms_text(fl), get_tpms_color(fl));
-  drawTextColor(p, x + 133, y + 56, get_tpms_text(fr), get_tpms_color(fr));
-  drawTextColor(p, x + 25, y + 171, get_tpms_text(rl), get_tpms_color(rl));
-  drawTextColor(p, x + 133, y + 171, get_tpms_text(rr), get_tpms_color(rr));
+    if (steerAngle > 0) {
+      sa_direction.sprintf("◀");
+    } else if (steerAngle < 0) {
+      sa_direction.sprintf("▶");
+    } else {
+      sa_direction.sprintf("●");
+    }
+
+    sa_str.sprintf("%.0f °", steerAngle);
+    p.setFont(InterFont(30, QFont::Bold));
+    drawTextColor(p, x - 30, y + 95, sa_str, sa_color);
+    drawTextColor(p, x + 30, y + 95, sa_direction, whiteColor(200));
+
+    // scc gap icon (bottom right 1)
+    if (gap_state == 1) {
+      gap_img = gap1_img;
+    } else if (gap_state == 2) {
+      gap_img = gap2_img;
+    } else if (gap_state == 3) {
+      gap_img = gap3_img;
+    } else {
+      gap_img = gap4_img;
+    }
+
+    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 3.1);
+    y = rect().bottom() - (UI_FOOTER_HEIGHT / 2) + (UI_BORDER_SIZE * 2);
+    drawIcon(p, x, y, gap_img, icon_bg, is_cruise_set ? 0.8 : 0.2);
+
+    // gaspress img (bottom right 2)
+    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
+    drawIcon(p, x, y, gaspress_img, icon_bg, gas_pressed ? 0.8 : 0.2);
+
+    // brake and autohold icon (bottom right 3)
+    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
+    if (autohold_state >= 1) {
+      drawIcon(p, x, y, autohold_state > 1 ? autohold_warning_img : autohold_active_img, icon_bg, autohold_state ? 0.8 : 0.2);
+    } else {
+      drawIcon(p, x, y, brake_img, icon_bg, brake_state ? 0.8 : 0.2);
+    }
+
+    // tpms (bottom right)
+    w = 160;
+    h = 208;
+    x = rect().right() - w - (UI_BORDER_SIZE * 2);
+    y = height() - h - (UI_BORDER_SIZE * 2);
+
+    p.drawPixmap(x, y, w, h, tpms_img);
+
+    p.setFont(InterFont(30, QFont::Bold));
+    drawTextColor(p, x + 25, y + 56, get_tpms_text(fl), get_tpms_color(fl));
+    drawTextColor(p, x + 133, y + 56, get_tpms_text(fr), get_tpms_color(fr));
+    drawTextColor(p, x + 25, y + 171, get_tpms_text(rl), get_tpms_color(rl));
+    drawTextColor(p, x + 133, y + 171, get_tpms_text(rr), get_tpms_color(rr));
+  }
+
+  // bottom info
+  const char* lateral[] = {"Pid", "Indi", "Lqr", "Torque"};
+
+  QString infoText;
+  infoText.sprintf("SCC[%d] SR[%.2f] [ %s ] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
+    sccBus,
+    steerRatio,
+    lateral[lateralControl],
+    latAccelFactor, friction,
+    latAccelFactorRaw, frictionRaw
+  );
+
+  x = rect().left() + btn_size * 2.5;
+  y = rect().height() - 15;
+
+  p.setFont(InterFont(30));
+  drawTextColor(p, x, y, infoText, whiteColor(200));
 
   // turnsignal
   static int blink_index = 0;

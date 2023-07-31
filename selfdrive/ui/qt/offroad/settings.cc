@@ -647,7 +647,11 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   communityLayout->addWidget(gitpull_btn);
   communityLayout->addWidget(cleardtc_btn);
-  if (access("/data/tmux_error.log", F_OK) == 0) {
+  communityLayout->addWidget(tmux_error_log_btn);
+  communityLayout->addWidget(can_missing_error_log_btn);
+  communityLayout->addWidget(can_timeout_error_log_btn);
+
+  /*if (access("/data/tmux_error.log", F_OK) == 0) {
     communityLayout->addWidget(tmux_error_log_btn);
   }
   if (access("/data/can_missing.log", F_OK) == 0) {
@@ -655,7 +659,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   }
   if (access("/data/can_timeout.log", F_OK) == 0) {
     communityLayout->addWidget(can_timeout_error_log_btn);
-  }
+  }*/
+
   communityLayout->addWidget(horizontal_line());
   if (!params.getBool("IsCanfd")) {
     communityLayout->addWidget(new LateralControlSelect());
