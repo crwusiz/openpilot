@@ -562,6 +562,20 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   });
   main_layout->addWidget(selectCar);
 
+  QString selectedBranch = QString::fromStdString(Params().get("SelectedBranch"));
+  QPushButton* selectBranch_btn = new QPushButton(selectedBranch.length() ? selectedBranch : tr("Select Branch"));
+  selectBranch_btn->setObjectName("selectBranch_btn");
+  connect(selectBranch_btn, &QPushButton::clicked, [=]() { main_layout->setCurrentWidget(selectBranch); });
+
+  selectBranch = new SelectBranch(this);
+  connect(selectBranch, &SelectBranch::backPress, [=]() { main_layout->setCurrentWidget(homeScreen); });
+  connect(selectBranch, &SelectBranch::selectedBranch, [=]() {
+     QString selected = QString::fromStdString(Params().get("SelectedBranch"));
+     selectBranch_btn->setText(selectedBranch.length() ? selectedBranch : tr("Select Branch"));
+     main_layout->setCurrentWidget(homeScreen);
+  });
+  main_layout->addWidget(selectBranch);
+
   QHBoxLayout* layoutBtn = new QHBoxLayout(homeWidget);
 
   layoutBtn->addWidget(selectManufacturer_btn);
@@ -612,6 +626,13 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
 
+  auto gitcheckout_btn = new ButtonControl(tr("Git Checkout"), tr("RUN"));
+  QObject::connect(gitcheckout_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/scripts/gitcheckout.sh");
+    }
+  });
+
   /*auto restart_btn = new ButtonControl(tr("Restart"), tr("RUN"));
   QObject::connect(restart_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
@@ -645,6 +666,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     ConfirmationDialog::rich(QString::fromStdString(txt), this);
   });
 
+  communityLayout->addWidget(selectBranch_btn);
+  communityLayout->addWidget(gitcheckout_btn);
   communityLayout->addWidget(gitpull_btn);
   communityLayout->addWidget(cleardtc_btn);
   communityLayout->addWidget(tmux_error_log_btn);
@@ -714,12 +737,12 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                     tr("If Scc is on bus 2, turn it on."),
                                     "../assets/offroad/icon_long.png",
                                     this));
-    toggles.append(new ParamControl("NavLimitSpeed",
-                                    tr("Navigation Limit Speed"),
-                                    tr("Use Stock Navigation Limit Speed Signal"),
-                                    "../assets/offroad/icon_speed_limit.png",
-                                    this));
   }
+  toggles.append(new ParamControl("NavLimitSpeed",
+                                  tr("Navigation Limit Speed"),
+                                  tr("Use Stock Navigation Limit Speed Signal"),
+                                  "../assets/offroad/icon_speed_limit.png",
+                                  this));
   toggles.append(new ParamControl("DisengageOnBrake",
                                   tr("Disengage on Brake Pedal"),
                                   tr("When enabled, pressing the brake pedal will disengage openpilot."),
@@ -867,6 +890,54 @@ SelectManufacturer::SelectManufacturer(QWidget* parent): QWidget(parent) {
     emit selectedManufacturer();
     });
 
+  main_layout->addWidget(list);
+}
+
+SelectBranch::SelectBranch(QWidget* parent): QWidget(parent) {
+  QVBoxLayout* main_layout = new QVBoxLayout(this);
+  main_layout->setMargin(20);
+  main_layout->setSpacing(20);
+
+  // Back button
+  QPushButton* back = new QPushButton(tr("Back"));
+  back->setObjectName("back_btn");
+  back->setFixedSize(500, 100);
+  connect(back, &QPushButton::clicked, [=]() { emit backPress(); });
+  main_layout->addWidget(back, 0, Qt::AlignLeft);
+
+  QListWidget* list = new QListWidget(this);
+  list->setStyleSheet("QListView {padding: 40px; background-color: #393939; border-radius: 15px; height: 140px;} QListView::item{height: 100px}");
+  QScroller::grabGesture(list->viewport(), QScroller::LeftMouseButtonGesture);
+  list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+  list->addItem(tr("Branch Select not use"));
+  QStringList items = get_list("/data/params/crwusiz/GitBranchList");
+  list->addItems(items);
+  list->setCurrentRow(0);
+  QString selected = QString::fromStdString(Params().get("SelectedBranch"));
+
+  int index = 0;
+  for (QString item : items) {
+    if (selected == item) {
+      list->setCurrentRow(index + 1);
+      break;
+    }
+    index++;
+  }
+
+  QObject::connect(list, QOverload<QListWidgetItem*>::of(&QListWidget::itemClicked),
+    [=](QListWidgetItem* item){
+
+    if (list->currentRow() == 0) {
+      Params().remove("SelectedBranch");
+      qApp->exit(18);
+      watchdog_kick(0);
+    } else {
+      Params().put("SelectedBranch", list->currentItem()->text().toStdString());
+      qApp->exit(18);
+      watchdog_kick(0);
+    }
+    emit selectedBranch();
+    });
   main_layout->addWidget(list);
 }
 

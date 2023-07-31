@@ -109,12 +109,23 @@ signals:
   void selectedCar();
 };
 
+class SelectBranch : public QWidget {
+  Q_OBJECT
+public:
+  explicit SelectBranch(QWidget* parent = 0);
+private:
+signals:
+  void backPress();
+  void selectedBranch();
+};
+
 class CommunityPanel : public QWidget {
   Q_OBJECT
 private:
   QStackedLayout* main_layout = nullptr;
   QWidget* homeScreen = nullptr;
   SelectCar* selectCar = nullptr;
+  SelectBranch* selectBranch = nullptr;
   SelectManufacturer* selectManufacturer = nullptr;
   QWidget* homeWidget;
   Params params;

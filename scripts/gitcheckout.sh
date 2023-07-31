@@ -8,16 +8,12 @@ sudo rm -f prebuilt
 git fetch --all --prune
 git remote set-head origin -a
 
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
-REMOTE_HASH=$(git rev-parse --short --verify origin/$BRANCH)
+BRANCH=$(cat /data/params/d/SelectedBranch)
+git reset --hard HEAD
+git checkout $BRANCH
 
 echo ""
-git reset --hard $REMOTE_HASH
-
-echo ""
-echo "  Git Fetch and Reset HEAD commit ..."
-echo ""
-echo "  current branch is [ $BRANCH ]  "
+echo "  Git Checkout [ $BRANCH ]  "
 echo ""
 
 cp -f /data/openpilot/selfdrive/controls/lib/events.py /data/openpilot/scripts/add/events.py
