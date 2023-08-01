@@ -7,8 +7,8 @@ from common.numpy_fast import clip, interp
 from system.swaglog import cloudlog
 # WARNING: imports outside of constants will not trigger a rebuild
 from selfdrive.modeld.constants import index_function
+from selfdrive.car.interfaces import ACCEL_MIN
 from selfdrive.controls.radard import _LEAD_ACCEL_TAU
-from selfdrive.car.interfaces import ACCEL_MIN, ACCEL_MAX
 
 from common.conversions import Conversions as CV
 from common.realtime import DT_MDL
