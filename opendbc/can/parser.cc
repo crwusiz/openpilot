@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <ctime>
 
 #include "cereal/logger/logger.h"
 #include "opendbc/can/common.h"
@@ -301,11 +302,11 @@ void CANParser::UpdateValid(uint64_t sec) {
         char chk_cmd[100];
         if (missing) {
           LOGE("0x%X '%s' NOT SEEN", state.address, state.name.c_str());
-          sprintf(chk_cmd, "echo -n 0x%X '%s' > /data/can_missing.log", state.address, state.name.c_str());
+          sprintf(chk_cmd, "0x%X '%s' > /data/can_missing.log", state.address, state.name.c_str());
           system(chk_cmd);
         } else if (timed_out) {
           LOGE("0x%X '%s' TIMED OUT", state.address, state.name.c_str());
-          sprintf(chk_cmd,"echo -n 0x%X '%s' > /data/can_timeout.log", state.address, state.name.c_str());
+          sprintf(chk_cmd, "0x%X '%s' > /data/can_timeout.log", state.address, state.name.c_str());
           system(chk_cmd);
         }
       }

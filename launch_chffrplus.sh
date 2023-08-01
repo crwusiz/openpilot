@@ -111,7 +111,7 @@ function launch {
 
   # git last commit log
   git log -1 --pretty=format:"%h, %cs, %cr" > /data/params/d/GitLog
-  git branch -r > /data/crwusiz/GitBranchList
+  git branch -r > /data/params/crwusiz/GitBranchList
 
   # git remote
   #sed 's/.\{4\}$//' /data/params/d/GitRemote > /data/params/crwusiz/GitRemote_
