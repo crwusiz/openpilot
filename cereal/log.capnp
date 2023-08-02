@@ -2102,7 +2102,9 @@ struct NavInstruction {
 
   speedLimit @10 :Float32; # m/s
   speedLimitSign @11 :SpeedLimitSign;
-  imageUrl @12 :Text;
+
+  allManeuvers @12 :List(Maneuver);
+  imageUrl @13 :Text;
 
   struct Lane {
     directions @0 :List(Direction);
@@ -2120,7 +2122,13 @@ struct NavInstruction {
   enum SpeedLimitSign {
     mutcd @0; # US Style
     vienna @1; # EU Style
-    }
+  }
+
+  struct Maneuver {
+    distance @0 :Float32;
+    type @1 :Text;
+    modifier @2 :Text;
+  }
 }
 
 struct NavRoute {

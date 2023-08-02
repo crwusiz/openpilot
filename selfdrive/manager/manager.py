@@ -62,7 +62,6 @@ def manager_init() -> None:
     ("SccOnBus2", "0"),
     ("NavLimitSpeed", "0"),
     ("DisengageOnBrake", "0"),
-    ("IsCanfd", "0"),
   ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))

@@ -278,8 +278,6 @@ class CarState(CarStateBase):
 
     ret.cruiseState.available = self.lfa_enabled
 
-    ret.isCanfd = True
-
     return ret
 
 

@@ -348,9 +348,9 @@ class CarInterface(CarInterfaceBase):
 
     # *** Params Init ***
     if candidate in CANFD_CAR:
-      Params().put_bool("IsCanfd", True)
       Params().put("LateralControlSelect", "3")
       Params().put_bool("SccOnBus2", False)
+      Params().put_bool("IsCanfd", True)
     else:
       Params().put_bool("IsCanfd", False)
       if candidate == CAR.GENESIS:

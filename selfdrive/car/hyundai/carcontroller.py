@@ -6,7 +6,7 @@ from common.conversions import Conversions as CV
 from common.numpy_fast import clip
 from common.realtime import DT_CTRL
 from opendbc.can.packer import CANPacker
-from selfdrive.car import apply_driver_steer_torque_limits
+from selfdrive.car import apply_driver_steer_torque_limits, common_fault_avoidance
 from selfdrive.car.interfaces import ACCEL_MIN, ACCEL_MAX
 from selfdrive.car.hyundai import hyundaicanfd, hyundaican
 from selfdrive.car.hyundai.hyundaicanfd import CanBus
@@ -74,6 +74,11 @@ class CarController:
     new_steer = int(round(actuators.steer * self.CCP.STEER_MAX))
     apply_steer = apply_driver_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.CCP)
 
+    # >90 degree steering fault prevention
+    self.angle_limit_counter, apply_steer_req = common_fault_avoidance(CS.out.steeringAngleDeg, MAX_ANGLE, CC.latActive,
+                                                                       self.angle_limit_counter, MAX_ANGLE_FRAMES,
+                                                                       MAX_ANGLE_CONSECUTIVE_FRAMES)
+
     # Disable steering while turning blinker on and speed below 60 kph
     if CS.out.leftBlinker or CS.out.rightBlinker:
       self.turning_signal_timer = 0.5 / DT_CTRL  # Disable for 0.5 Seconds after blinker turned off
@@ -84,6 +89,9 @@ class CarController:
 
     if not CC.latActive:
       apply_steer = 0
+
+    # Hold torque with induced temporary fault when cutting the actuation bit
+    torque_fault = CC.latActive and not apply_steer_req
 
     self.apply_steer_last = apply_steer
 
@@ -97,19 +105,7 @@ class CarController:
 
     can_sends = []
 
-    # >90 degree steering fault prevention
-    # Count up to MAX_ANGLE_FRAMES, at which point we need to cut torque to avoid a steering fault
-    if CC.latActive and abs(CS.out.steeringAngleDeg) >= MAX_ANGLE:
-      self.angle_limit_counter += 1
-    else:
-      self.angle_limit_counter = 0
-
-    # Cut steer actuation bit for two frames and hold torque with induced temporary fault
-    torque_fault = CC.latActive and self.angle_limit_counter > MAX_ANGLE_FRAMES
-    lat_active = CC.latActive and not torque_fault
-
-    if self.angle_limit_counter >= MAX_ANGLE_FRAMES + MAX_ANGLE_CONSECUTIVE_FRAMES:
-      self.angle_limit_counter = 0
+    # *** common hyundai stuff ***
 
     # CAN-FD platforms
     if self.CP.carFingerprint in CANFD_CAR:
@@ -129,7 +125,7 @@ class CarController:
           can_sends.append([0x7b1, 0, b"\x02\x3E\x80\x00\x00\x00\x00\x00", self.CAN.ECAN])
 
       # steering control
-      can_sends.extend(hyundaicanfd.create_steering_messages(self.packer, self.CP, self.CAN, CC.enabled, lat_active, apply_steer))
+      can_sends.extend(hyundaicanfd.create_steering_messages(self.packer, self.CP, self.CAN, CC.enabled, apply_steer_req, apply_steer))
 
       # disable LFA on HDA2 ( 676 )
       if self.frame % 5 == 0 and hda2:
@@ -174,7 +170,7 @@ class CarController:
               self.last_button_frame = self.frame
     else:
       # send lkas11 bus 0
-      can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, lat_active, torque_fault, sys_warning, sys_state,
+      can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, apply_steer_req, torque_fault, sys_warning, sys_state,
                                                 CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning,
                                                 0, CS.lkas11))
 
