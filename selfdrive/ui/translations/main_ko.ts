@@ -192,6 +192,14 @@
         <source>Use external navi routes</source>
         <translation>외부 내비 경로 사용</translation>
     </message>
+    <message>
+        <source>Select Branch</source>
+        <translation>Branch 선택</translation>
+    </message>
+    <message>
+        <source>Git Checkout</source>
+        <translation>Git Checkout</translation>
+    </message>
 </context>
 <context>
     <name>ConfirmationDialog</name>
@@ -786,6 +794,17 @@
 This may take up to a minute.</source>
         <translation>장치를 초기화하는 중...
 최대 1분이 소요될 수 있습니다.</translation>
+    </message>
+</context>
+<context>
+    <name>SelectBranch</name>
+    <message>
+        <source>Back</source>
+        <translation>뒤로</translation>
+    </message>
+    <message>
+        <source>Branch Select not use</source>
+        <translation>Branch 선택 사용안함</translation>
     </message>
 </context>
 <context>

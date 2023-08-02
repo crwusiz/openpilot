@@ -121,6 +121,8 @@ signals:
 
 class CommunityPanel : public QWidget {
   Q_OBJECT
+public:
+  explicit CommunityPanel(QWidget *parent = nullptr);
 private:
   QStackedLayout* main_layout = nullptr;
   QWidget* homeScreen = nullptr;
@@ -129,8 +131,6 @@ private:
   SelectManufacturer* selectManufacturer = nullptr;
   QWidget* homeWidget;
   Params params;
-public:
-  explicit CommunityPanel(QWidget *parent = nullptr);
 };
 
 // LateralControlSelect
