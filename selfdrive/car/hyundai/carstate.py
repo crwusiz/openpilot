@@ -7,7 +7,7 @@ from common.conversions import Conversions as CV
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
 from selfdrive.car.hyundai.hyundaicanfd import CanBus
-from selfdrive.car.hyundai.values import HyundaiFlags, DBC, Buttons, CAN_GEARS, EV_CAR, HEV_CAR, CANFD_EV_CAR, CANFD_HEV_CAR, CAR, CANFD_CAR, CarControllerParams
+from selfdrive.car.hyundai.values import HyundaiFlags, CAR, DBC, Buttons, CAN_GEARS, CANFD_CAR, EV_CAR, HEV_CAR, CarControllerParams
 from selfdrive.car.interfaces import CarStateBase
 
 PREV_BUTTON_SAMPLES = 8
@@ -205,8 +205,8 @@ class CarState(CarStateBase):
     self.is_metric = cp.vl["CRUISE_BUTTONS_ALT"]["DISTANCE_UNIT"] != 1
     speed_factor = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
 
-    if self.CP.carFingerprint in (CANFD_EV_CAR | CANFD_HEV_CAR):
-      if self.CP.carFingerprint in CANFD_EV_CAR:
+    if self.CP.carFingerprint in (EV_CAR | HEV_CAR):
+      if self.CP.carFingerprint in EV_CAR:
         ret.gas = cp.vl["ACCELERATOR"]["ACCELERATOR_PEDAL"] / 255.
       else:
         ret.gas = cp.vl["ACCELERATOR_ALT"]["ACCELERATOR_PEDAL"] / 1023.
@@ -711,14 +711,14 @@ class CarState(CarStateBase):
         ("SCC_CONTROL", 50),
       ]
 
-    if CP.carFingerprint in CANFD_EV_CAR:
+    if CP.carFingerprint in EV_CAR:
       signals += [
         ("ACCELERATOR_PEDAL", "ACCELERATOR"),
       ]
       checks += [
         ("ACCELERATOR", 100),
       ]
-    elif CP.carFingerprint in CANFD_HEV_CAR:
+    elif CP.carFingerprint in HEV_CAR:
       signals += [
         ("ACCELERATOR_PEDAL", "ACCELERATOR_ALT"),
       ]

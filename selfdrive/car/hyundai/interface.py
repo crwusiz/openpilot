@@ -4,7 +4,7 @@ from panda import Panda
 from common.params import Params
 from common.conversions import Conversions as CV
 from selfdrive.car.hyundai.hyundaicanfd import CanBus
-from selfdrive.car.hyundai.values import HyundaiFlags, CAR, DBC, Buttons, CANFD_CAR, CANFD_EV_CAR, CANFD_HEV_CAR, EV_CAR, HEV_CAR, LEGACY_SAFETY_MODE_CAR, CANFD_RADAR_SCC_CAR
+from selfdrive.car.hyundai.values import HyundaiFlags, CAR, DBC, Buttons, CANFD_CAR, EV_CAR, HEV_CAR, LEGACY_SAFETY_MODE_CAR, CANFD_RADAR_SCC_CAR
 from selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR
 from selfdrive.car import STD_CARGO_KG, create_button_event, scale_tire_stiffness, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
@@ -87,7 +87,7 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.70
       ret.steerRatio = 13.7
       tire_stiffness_factor = 0.385
-    elif candidate == CAR.IONIQ5:
+    elif candidate in [CAR.IONIQ5, CAR.IONIQ6]:
       ret.mass = 2012 + STD_CARGO_KG
       ret.wheelbase = 3.0
       ret.steerRatio = 16.
@@ -185,13 +185,17 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.756
       ret.steerRatio = 13.6
     elif candidate in [CAR.SORENTO_MQ4, CAR.SORENTO_MQ4_HEV]:
-      ret.mass = 1857. + STD_CARGO_KG # weight from EX and above trims, average of FWD and AWD versions (EX, X-Line EX AWD, SX, SX Pestige, X-Line SX Prestige AWD)
+      ret.mass = 1857. + STD_CARGO_KG
       ret.wheelbase = 2.81
-      ret.steerRatio = 13.27 # steering ratio according to Kia News https://www.kiamedia.com/us/en/models/sorento-phev/2022/specifications
+      ret.steerRatio = 13.27
     elif candidate in [CAR.NIRO_SG2_EV, CAR.NIRO_SG2_HEV]:
-      ret.mass = 1472. + STD_CARGO_KG # weight from EX and above trims
+      ret.mass = 1472. + STD_CARGO_KG
       ret.wheelbase = 2.72
-      ret.steerRatio = 13.7 # steering ratio according to Kia News https://www.kiamedia.com/us/en/models/niro/2023/specifications
+      ret.steerRatio = 13.7
+    elif candidate == CAR.CARNIVAL_KA4:
+      ret.mass = 2087. + STD_CARGO_KG
+      ret.wheelbase = 3.09
+      ret.steerRatio = 14.23
 
     # genesis
     elif candidate == CAR.GENESIS:
@@ -213,7 +217,7 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.GENESIS_GV60:
       ret.mass = 2205 + STD_CARGO_KG
       ret.wheelbase = 2.9
-      ret.steerRatio = 12.6 # https://www.motor1.com/reviews/586376/2023-genesis-gv60-first-drive/#:~:text=Relative%20to%20the%20related%20Ioniq,5%2FEV6%27s%2014.3%3A1.
+      ret.steerRatio = 12.6
     elif candidate == CAR.GENESIS_GV70:
       ret.mass = 1950. + STD_CARGO_KG
       ret.wheelbase = 2.87
@@ -403,9 +407,9 @@ class CarInterface(CarInterfaceBase):
 
     if ret.openpilotLongitudinalControl:
       ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
-    if candidate in (CANFD_HEV_CAR | HEV_CAR):
+    if candidate in HEV_CAR:
       ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
-    elif candidate in (CANFD_EV_CAR | EV_CAR):
+    elif candidate in EV_CAR:
       ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
 
     ret.centerToFront = ret.wheelbase * 0.4

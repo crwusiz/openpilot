@@ -98,6 +98,7 @@ class CAR:
 
   # CANFD
   IONIQ5 = "HYUNDAI IONIQ 5 (NE1)"
+  IONIQ6 = "HYUNDAI IONIQ 6 (CE1)"
   TUCSON_NX4 = "HYUNDAI TUCSON (NX4)"
   TUCSON_NX4_HEV = "HYUNDAI TUCSON HEV (NX4)"
   EV6 = "KIA EV6 (CV)"
@@ -107,15 +108,15 @@ class CAR:
   SORENTO_MQ4_HEV = "KIA SORENTO HEV (MQ4)"
   NIRO_SG2_EV = "KIA NIRO EV (SG2)"
   NIRO_SG2_HEV = "KIA NIRO HEV (SG2)"
+  CARNIVAL_KA4 = "KIA CARNIVAL (KA4)"
   GENESIS_GV60 = "GENESIS GV60 (JW1)"
   GENESIS_GV70 = "GENESIS GV70 (JK1)"
   GENESIS_GV80 = "GENESIS GV80 (JX1)"
 
 class Footnote(Enum):
-  # footnotes which mention "red panda" will be replaced with the CAN FD panda kit on the shop page
   CANFD = CarFootnote(
-    "Requires a <a href=\"https://comma.ai/shop/panda\" target=\"_blank\">red panda</a> for this <a href=\"https://en.wikipedia.org/wiki/CAN_FD\" target=\"_blank\">CAN FD car</a>. " +
-    "All the hardware needed is sold in the <a href=\"https://comma.ai/shop/can-fd-panda-kit\" target=\"_blank\">CAN FD kit</a>.",
+    "Requires a comma 3X or <a href=\"https://comma.ai/shop/can-fd-panda-kit\" target=\"_blank\">CAN FD panda kit</a> " +
+    "for this <a href=\"https://en.wikipedia.org/wiki/CAN_FD\" target=\"_blank\">CAN FD car</a>.",
     Column.MODEL, shop_footnote=True)
 
 
@@ -215,6 +216,12 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
     HyundaiCarInfo("Hyundai Ioniq 5 (without HDA II) 2022-23", "Highway Driving Assist", car_parts=CarParts.common([CarHarness.hyundai_k])),
     HyundaiCarInfo("Hyundai Ioniq 5 (with HDA II) 2022-23", "Highway Driving Assist II", car_parts=CarParts.common([CarHarness.hyundai_q])),
   ],
+  CAR.IONIQ6: [
+    HyundaiCarInfo("Hyundai Ioniq 6 (without HDA II) 2023", "Highway Driving Assist",
+                   car_parts=CarParts.common([CarHarness.hyundai_k])),
+    HyundaiCarInfo("Hyundai Ioniq 6 (with HDA II) 2023", "Highway Driving Assist II",
+                   car_parts=CarParts.common([CarHarness.hyundai_p])),
+  ],
   CAR.TUCSON_NX4: [
     HyundaiCarInfo("Hyundai Tucson 2022", car_parts=CarParts.common([CarHarness.hyundai_n])),
     HyundaiCarInfo("Hyundai Tucson 2023", "All", car_parts=CarParts.common([CarHarness.hyundai_n])),
@@ -233,6 +240,10 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
   CAR.SORENTO_MQ4_HEV: HyundaiCarInfo("Kia Sorento Hybrid 2022-23", "Smart Cruise Control (SCC)", car_parts=CarParts.common([CarHarness.hyundai_a])),
   CAR.NIRO_SG2_EV: HyundaiCarInfo("Kia Niro Ev 2023", car_parts=CarParts.common([CarHarness.hyundai_a])),
   CAR.NIRO_SG2_HEV: HyundaiCarInfo("Kia Niro Hybrid 2023", car_parts=CarParts.common([CarHarness.hyundai_a])),
+  CAR.CARNIVAL_KA4: [
+    HyundaiCarInfo("Kia Carnival 2023", car_parts=CarParts.common([CarHarness.hyundai_a])),
+    HyundaiCarInfo("Kia Carnival (China only) 2023", car_parts=CarParts.common([CarHarness.hyundai_k]))
+  ],
 }
 
 class Buttons:
@@ -243,6 +254,7 @@ class Buttons:
   CANCEL = 4  # on newer models, this is a pause/resume button
 
 FINGERPRINTS = {
+  # pylint: disable=C0301
   # Hyundai
   CAR.ELANTRA_I30: [{
     66: 8, 67: 8, 68: 8, 127: 8, 128: 8, 129: 8, 273: 8, 274: 8, 275: 8, 339: 8, 354: 3, 356: 4, 399: 8, 512: 6, 544: 8, 546: 8, 547: 8, 593: 8, 608: 8, 688: 5, 790: 8, 809: 8, 832: 8, 838: 8, 844: 8, 884: 8, 897: 8, 899: 8, 902: 8, 903: 8, 905: 8, 909: 8, 916: 8, 1040: 8, 1056: 8, 1057: 8, 1078: 4, 1087: 8, 1151: 6, 1155: 8, 1164: 8, 1168: 7, 1170: 8, 1191: 2, 1193: 8, 1253: 8, 1254: 8, 1255: 8, 1265: 4, 1280: 1, 1282: 4, 1287: 4, 1290: 8, 1292: 8, 1294: 8, 1312: 8, 1314: 8, 1322: 8, 1331: 8, 1332: 8, 1342: 6, 1345: 8, 1348: 8, 1349: 8, 1351: 8, 1353: 8, 1356: 8, 1363: 8, 1365: 8, 1366: 8, 1367: 8, 1369: 8, 1407: 8, 1414: 3, 1415: 8, 1419: 8, 1425: 2, 1427: 6, 1440: 8, 1456: 4, 1470: 8, 1472: 8, 1485: 8, 1486: 8, 1487: 8, 1491: 8, 1530: 8, 1532: 5, 1792: 8, 1872: 8, 1937: 8, 1952: 8, 1953: 8, 1960: 8, 1968: 8, 1988: 8, 1990: 8, 1998: 8, 2000: 8, 2001: 8, 2003: 8, 2004: 8, 2005: 8, 2008: 8, 2009: 8, 2012: 8, 2013: 8, 2015: 8, 2016: 8, 2017: 8, 2024: 8, 2025: 8
@@ -533,6 +545,7 @@ FW_QUERY_CONFIG = FwQueryConfig(
 )
 
 FW_VERSIONS = {
+  # pylint: disable=C0301
   # fwdCamera, fwdRadar, abs, eps, engine, transmission
   # hyundai
   CAR.ELANTRA_I30: { # (PD)
@@ -661,8 +674,7 @@ FW_VERSIONS = {
       b'\xf1\x00DN8_ SCC F-CUP      1.00 1.02 99110-L1000         ',
       b'\xf1\x00DN8_ SCC FHCUP      1.00 1.00 99110-L0000         ',
       b'\xf1\x00DN8_ SCC FHCUP      1.00 1.01 99110-L1000         ',
-      b'\xf1\x8799110L0000\xf1\x00DN8_ SCC F-CUP      1.00 1.00 99110-L0000         ',
-      b'\xf1\x8799110L0000\xf1\x00DN8_ SCC FHCUP      1.00 1.00 99110-L0000         ',
+      b'\xf1\x00DN8_ SCC FHCUP      1.00 1.02 99110-L1000         ',
     ],
     (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00DN ESC \x07 106 \x07\x01 58910-L0100',
@@ -676,8 +688,8 @@ FW_VERSIONS = {
       b'\xf1\x8758910-L0100\xf1\x00DN ESC \x06 104\x19\x08\x01 58910-L0100',
       b'\xf1\x8758910-L0100\xf1\x00DN ESC \x06 106 \x07\x01 58910-L0100',
       b'\xf1\x8758910-L0100\xf1\x00DN ESC \x07 104\x19\x08\x01 58910-L0100',
-      b'\xf1\x8758910-L0300\xf1\x00DN ESC \x03 100 \x08\x01 58910-L0300',
       b'\xf1\x00DN ESC \x06 106 \x07\x01 58910-L0100',
+      b'\xf1\x00DN ESC \x06 107 \x07\x03 58910-L1300',
     ],
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00DN8 MDPS C 1,00 1,01 56310L0010\x00 4DNAC101',  # modified firmware
@@ -709,26 +721,25 @@ FW_VERSIONS = {
       b'\xf1\x87391162M003',
       b'\xf1\x87391162M013',
       b'\xf1\x87391162M023',
+      b'\xf1\x87391162M010',
       b'HM6M1_0a0_F00',
       b'HM6M1_0a0_G20',
       b'HM6M2_0a0_BD0',
-      b'\xf1\x8739110-2S278\xf1\x81HM6M1_0a0_L50',
       b'\xf1\x8739110-2S278\xf1\x82DNDVD5GMCCXXXL5B',
       b'\xf1\x8739110-2S041\xf1\x81HM6M1_0a0_M00',
       b'\xf1\x8739110-2S042\xf1\x81HM6M1_0a0_M00',
-      b'\xf1\x81HM6M1_0a0_DB0',
       b'\xf1\x81HM6M1_0a0_G20',
     ],
     (Ecu.transmission, 0x7e1, None): [
       b'\xf1\x00bcsh8p54  U903\x00\x00\x00\x00\x00\x00SDN8T16NB0z{\xd4v',
       b'\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB1\xe3\xc10\xa1',
       b'\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB2\n\xdd^\xbc',
+      b'\xf1\x00bcsh8p54  U903\x00\x00\x00\x00\x00\x00SDN8T16KB05\x95h%',
       b'\xf1\x00HT6TA260BLHT6TA800A1TDN8C20KS4\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
       b'\xf1\x00HT6TA260BLHT6TA810A1TDN8M25GS0\x00\x00\x00\x00\x00\x00\xaa\x8c\xd9p',
       b'\xf1\x00HT6WA250BLHT6WA910A1SDN8G25NB1\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
       b'\xf1\x00HT6WA250BLHT6WA910A1SDN8G25NB1\x00\x00\x00\x00\x00\x00\x96\xa1\xf1\x92',
       b'\xf1\x00HT6WA280BLHT6WAD10A1SDN8G25NB2\x00\x00\x00\x00\x00\x00\x08\xc9O:',
-      b'\xf1\x00HT6WA280BLHT6WAD10A1SDN8G25NB3\x00\x00\x00\x00\x00\x00\xcb\xc8\xe6L',
       b'\xf1\x00HT6WA280BLHT6WAD10A1SDN8G25NB4\x00\x00\x00\x00\x00\x00g!l[',
       b'\xf1\x00HT6WA280BLHT6WAE10A1SDN8G25NB5\x00\x00\x00\x00\x00\x00\xe0t\xa9\xba',
       b'\xf1\x00T02601BL  T02730A1  VDN8T25XXX730NS5\xf7_\x92\xf5',
@@ -780,16 +791,9 @@ FW_VERSIONS = {
       b'\xf1\x87SAMFBA9283024GJ2wwwwEUuWwwgwwwwwwwww\x87/\xfb\xff\x98w\x8f\xff<\xd3\xf1\x81U913\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB2\n\xdd^\xbc',
       b'\xf1\x87SAMFBA9708354GJ2wwwwVf\x86h\x88wx\x87xww\x87\x88\x88\x88\x88w/\xfa\xff\x97w\x8f\xff\x86\xa0\xf1\x81U913\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB2\n\xdd^\xbc',
       b'\xf1\x87SANDB45316691GC6\x99\x99\x99\x99\x88\x88\xa8\x8avfwfwwww\x87wxwT\x9f\xfd\xff\x88wo\xff\x1c\xfa\xf1\x89HT6WAD10A1\xf1\x82SDN8G25NB3\x00\x00\x00\x00\x00\x00',
-      b'\xf1\x87SANDB46244211GC6\x89\x99\x99\x99\x88\x88\xa8\x8axww\x87vfWf\x88wx\x87v\xaf\xfc\xffeUo\xffu1\xf1\x89HT6WAD10A1\xf1\x82SDN8G25NB3\x00\x00\x00\x00\x00\x00',
       b'\xf1\x87SALFBA7460044GJ2gx\x87\x88Vf\x86hx\x88\x87\x88wwwwgw\x86wd?\xfa\xff\x86U_\xff\xaf\x1f\xf1\x81U913\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB2\n\xdd^\xbc',
       b'\xf1\x87SAMFBA8105254GJ2wx\x87\x88Vf\x86hx\x88\x87\x88wwwwwwww\x86O\xfa\xff\x99\x88\x7f\xffZG\xf1\x81U913\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB2\n\xdd^\xbc',
       b'\xf1\x87SANFB45889451GC7wx\x87\x88gw\x87x\x88\x88x\x88\x87wxw\x87wxw\x87\x8f\xfc\xffeU\x8f\xff+Q\xf1\x81U913\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB2\n\xdd^\xbc',
-      b'\xf1\x87SAMFB43249211GC7wx\x87\x88ww\x97yw\x88\x87xwfgv\x87wxw\x87\x9f\xfd\xffuDO\xff\x89F\xf1\x81U913\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB2\n\xdd^\xbc',
-      b'\xf1\x87SAMFB43249031GC7\x88\x88x\x87wv\x97ivfwfwwww\x87fhv\xb9\x9f\xfc\xffwD\x7f\xff\xe7?\xf1\x81U913\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB2\n\xdd^\xbc',
-      b'\xf1\x87SANFB45728581GC7gw\x87xww\x97ywwgwvfwf\x88\x88\x88\x88\x89\x9f\xfd\xffvD\x7f\xff\x15\xf8\xf1\x81U913\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB2\n\xdd^\xbc',
-      b'\xf1\x87SAMFB44311971GC7\x88\x88\x88\x88\x88\x88\xa8\x8avwwg\x88\x88\x88\x88wwgwv\x9f\xfc\xffvf\x7f\xff\x86\t\xf1\x81U913\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB2\n\xdd^\xbc',
-      b'\xf1\x87SALFBA7173624GJ2UVuggw\x87xwwgwwwwwwfgvw_\xf9\xff\x87f\x7f\xff\xb6\xc2\xf1\x81U913\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U913\x00\x00\x00\x00\x00\x00SDN8T16NB1\xe3\xc10\xa1',
-      b'\xf1\x87SALFBA5642914GJ2ffvgvfvgffffx\x88\x97\x88vwwgu\x7f\xfa\xffeU\x7f\xff\n\x08\xf1\x81U903\x00\x00\x00\x00\x00\x00\xf1\x00bcsh8p54  U903\x00\x00\x00\x00\x00\x00SDN8T16NB0z{\xd4v',
       b'\xf1\x00T02601BL  T02900A1  VDN8T25XXX900NSA\xb9\x13\xf9p',
     ],
   },
@@ -1746,6 +1750,14 @@ FW_VERSIONS = {
       b'\xf1\x00NE1_ RDR -----      1.00 1.00 99110-GI000         ',
     ],
   },
+  CAR.IONIQ6: { # (CE1)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00CE  MFC  AT USA LHD 1.00 1.04 99211-KL000 221213',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00CE__ RDR -----      1.00 1.01 99110-KL000         ',
+    ],
+  },
   CAR.TUCSON_NX4: { # (NX4)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00NX4 FR_CMR AT USA LHD 1.00 1.00 99211-N9210 14G',
@@ -1839,6 +1851,17 @@ FW_VERSIONS = {
       b'\xf1\x00SG2_ RDR -----      1.00 1.01 99110-AT000         ',
     ],
   },
+  CAR.CARNIVAL_KA4: { # (KA4)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00KA4 MFC  AT USA LHD 1.00 1.06 99210-R0000 220221',
+      b'\xf1\x00KA4CMFC  AT CHN LHD 1.00 1.01 99211-I4000 210525',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00KA4_ SCC FHCUP      1.00 1.03 99110-R0000         ',
+      b'\xf1\x00KA4c SCC FHCUP      1.00 1.01 99110-I4000         ',
+    ],
+  },
+
   CAR.GENESIS_GV60: {  # (JW1)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00JW1 MFC  AT USA LHD 1.00 1.02 99211-CU100 211215',
@@ -1889,27 +1912,33 @@ CAN_GEARS = {
   # Gear not set is [ LVR12 ]
 }
 
-CANFD_EV_CAR = {
-  CAR.IONIQ5, CAR.TUCSON_NX4,
-  CAR.EV6, CAR.SORENTO_MQ4, CAR.SPORTAGE_NQ5, CAR.NIRO_SG2_EV,
+CANFD_CAR = {
+  CAR.TUCSON_NX4,
+  CAR.SPORTAGE_NQ5, CAR.SORENTO_MQ4, CAR.CARNIVAL_KA4,
+  CAR.IONIQ5, CAR.IONIQ6,
+  CAR.EV6, CAR.NIRO_SG2_EV,
   CAR.GENESIS_GV60, CAR.GENESIS_GV70, CAR.GENESIS_GV80,
-}
-CANFD_HEV_CAR = {
   CAR.TUCSON_NX4_HEV,
   CAR.SORENTO_MQ4_HEV, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV,
 }
-CANFD_CAR = CANFD_EV_CAR | CANFD_HEV_CAR
 
 # The radar does SCC on these cars when HDA I, rather than the camera
 CANFD_RADAR_SCC_CAR = {
   CAR.GENESIS_GV70, CAR.GENESIS_GV80, CAR.SORENTO_MQ4, CAR.SORENTO_MQ4_HEV
 }
+
 EV_CAR = {
   CAR.KONA_EV, CAR.IONIQ_EV, CAR.NIRO_EV, CAR.SOUL_EV, CAR.NEXO,
+  CAR.IONIQ5, CAR.IONIQ6,
+  CAR.EV6, CAR.NIRO_SG2_EV,
+  CAR.GENESIS_GV60, CAR.GENESIS_GV70, CAR.GENESIS_GV80,
 }
+
 HEV_CAR = {
   CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV, CAR.SANTAFE_HEV, CAR.ELANTRA_CN7_HEV, CAR.SONATA_DN8_HEV, CAR.SONATA_LF_HEV, CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IGFL_HEV,
   CAR.K5_HEV, CAR.K5_DL3_HEV, CAR.K7_HEV,
+  CAR.TUCSON_NX4_HEV,
+  CAR.SORENTO_MQ4_HEV, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV,
 }
 
 # these cars require a special panda safety mode due to missing counters and checksums in the messages
@@ -1973,6 +2002,7 @@ DBC = {
 
   # CANFD
   CAR.IONIQ5: dbc_dict('hyundai_canfd', None),
+  CAR.IONIQ6: dbc_dict('hyundai_canfd', None),
   CAR.TUCSON_NX4: dbc_dict('hyundai_canfd', None),
   CAR.TUCSON_NX4_HEV: dbc_dict('hyundai_canfd', None),
   CAR.EV6: dbc_dict('hyundai_canfd', None),
@@ -1982,6 +2012,7 @@ DBC = {
   CAR.SORENTO_MQ4_HEV: dbc_dict('hyundai_canfd', None),
   CAR.NIRO_SG2_EV: dbc_dict('hyundai_canfd', None),
   CAR.NIRO_SG2_HEV: dbc_dict('hyundai_canfd', None),
+  CAR.CARNIVAL_KA4: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV60: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV80: dbc_dict('hyundai_canfd', None),

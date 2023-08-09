@@ -15,7 +15,29 @@ void board_v1_set_led(uint8_t color, bool enabled) {
   }
 }
 
+void board_v1_enable_can_transciever(uint8_t transciever, bool enabled) {
+  switch (transciever){
+    case 1U:
+      set_gpio_output(GPIOC, 1, !enabled);
+      break;
+    case 2U:
+      set_gpio_output(GPIOC, 13, !enabled);
+      break;
+    case 3U:
+      set_gpio_output(GPIOA, 0, !enabled);
+      break;
+    case 4U:
+      set_gpio_output(GPIOB, 10, !enabled);
+      break;
+    default:
+      print("Invalid CAN transciever ("); puth(transciever); print("): enabling failed\n");
+      break;
+  }
+}
+
 void board_v1_set_can_mode(uint8_t mode) {
+  board_v1_enable_can_transciever(2U, false);
+  board_v1_enable_can_transciever(4U, false);
   switch (mode) {
     case CAN_MODE_NORMAL:
       print("Setting normal CAN mode\n");
@@ -27,6 +49,7 @@ void board_v1_set_can_mode(uint8_t mode) {
       set_gpio_alternate(GPIOB, 5, GPIO_AF9_CAN2);
       set_gpio_alternate(GPIOB, 6, GPIO_AF9_CAN2);
       can_mode = CAN_MODE_NORMAL;
+      board_v1_enable_can_transciever(2U, true);
       break;
     case CAN_MODE_OBD_CAN2:
       print("Setting OBD CAN mode\n");
@@ -38,6 +61,7 @@ void board_v1_set_can_mode(uint8_t mode) {
       set_gpio_alternate(GPIOB, 12, GPIO_AF9_CAN2);
       set_gpio_alternate(GPIOB, 13, GPIO_AF9_CAN2);
       can_mode = CAN_MODE_OBD_CAN2;
+      board_v1_enable_can_transciever(4U, true);
       break;
     default:
       print("Tried to set unsupported CAN mode: "); puth(mode); print("\n");
@@ -56,13 +80,13 @@ void board_v1_set_harness_orientation(uint8_t orientation) {
       break;
     case HARNESS_ORIENTATION_1:
       set_gpio_output(GPIOA, 2, false);
-      set_gpio_output(GPIOA, 3, ignition);
+      set_gpio_output(GPIOA, 3, (ignition != 0U));
       set_gpio_output(GPIOA, 4, true);
       set_gpio_output(GPIOA, 5, false);
       harness_orientation = orientation;
       break;
     case HARNESS_ORIENTATION_2:
-      set_gpio_output(GPIOA, 2, ignition);
+      set_gpio_output(GPIOA, 2, (ignition != 0U));
       set_gpio_output(GPIOA, 3, false);
       set_gpio_output(GPIOA, 4, false);
       set_gpio_output(GPIOA, 5, true);
@@ -85,28 +109,8 @@ bool board_v1_get_button(void) {
 }
 
 void board_v1_set_ignition(bool enabled) {
-  ignition = enabled;
+  ignition = enabled ? 0xFFU : 0U;
   board_v1_set_harness_orientation(harness_orientation);
-}
-
-void board_v1_enable_can_transciever(uint8_t transciever, bool enabled) {
-  switch (transciever){
-    case 1U:
-      set_gpio_output(GPIOC, 1, !enabled);
-      break;
-    case 2U:
-      set_gpio_output(GPIOC, 13, !enabled);
-      break;
-    case 3U:
-      set_gpio_output(GPIOA, 0, !enabled);
-      break;
-    case 4U:
-      set_gpio_output(GPIOB, 10, !enabled);
-      break;
-    default:
-      print("Invalid CAN transciever ("); puth(transciever); print("): enabling failed\n");
-      break;
-  }
 }
 
 float board_v1_get_channel_power(uint8_t channel) {
@@ -153,6 +157,7 @@ void board_v1_tick(void) {}
 const board board_v1 = {
   .board_type = "V1",
   .has_canfd = false,
+  .has_sbu_sense = false,
   .avdd_mV = 3300U,
   .init = &board_v1_init,
   .set_led = &board_v1_set_led,
@@ -160,6 +165,7 @@ const board board_v1 = {
   .get_button = &board_v1_get_button,
   .set_panda_power = &board_v1_set_panda_power,
   .set_ignition = &board_v1_set_ignition,
+  .set_individual_ignition = &unused_set_individual_ignition,
   .set_harness_orientation = &board_v1_set_harness_orientation,
   .set_can_mode = &board_v1_set_can_mode,
   .enable_can_transciever = &board_v1_enable_can_transciever,

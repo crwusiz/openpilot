@@ -72,7 +72,7 @@ procs = [
 
   # debug procs
   NativeProcess("bridge", "cereal/messaging", ["./bridge"], onroad=False, callback=notcar),
-  PythonProcess("webjoystick", "tools.joystick.web", onroad=False, callback=notcar),
+  PythonProcess("webjoystick", "tools.bodyteleop.web", onroad=False, callback=notcar),
 
   # Process add
   PythonProcess("navi_controller", "selfdrive.controls.neokii.navi_controller", offroad=True),
