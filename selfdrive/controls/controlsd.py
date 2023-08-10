@@ -501,8 +501,7 @@ class Controls:
     #self.v_cruise_helper.update_v_cruise(CS, self.enabled, self.is_metric)
 
     self.v_cruise_helper.v_cruise_kph = self.speed_controller.update_v_cruise(CS, self.sm, self.enabled, self.is_metric,
-                                                                              self.v_cruise_helper.v_cruise_kph,
-                                                                              self.v_cruise_helper.v_cruise_kph_last)
+                                                                              self.v_cruise_helper.v_cruise_kph)
     self.v_cruise_helper.v_cruise_cluster_kph = self.v_cruise_helper.v_cruise_kph
 
     # decrement the soft disable timer at every step, as it's reset on
@@ -573,7 +572,7 @@ class Controls:
           else:
             self.state = State.enabled
           self.current_alert_types.append(ET.ENABLE)
-          #self.v_cruise_helper.initialize_v_cruise(CS, self.experimental_mode)
+          self.v_cruise_helper.initialize_v_cruise(CS, self.experimental_mode)
 
     # Check if openpilot is engaged and actuators are enabled
     self.enabled = self.state in ENABLED_STATES
