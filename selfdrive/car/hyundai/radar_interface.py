@@ -17,36 +17,16 @@ def get_radar_can_parser(CP):
     return None
 
   elif CP.openpilotLongitudinalControl and Params().get_bool("RadarTrackEnable"):
-    signals = []
-    checks = []
-
-    for addr in range(RADAR_START_ADDR, RADAR_START_ADDR + RADAR_MSG_COUNT):
-      msg = f"RADAR_TRACK_{addr:x}"
-      signals += [
-        ("STATE", msg),
-        ("AZIMUTH", msg),
-        ("LONG_DIST", msg),
-        ("REL_ACCEL", msg),
-        ("REL_SPEED", msg),
-      ]
-      checks += [(msg, 50)]
+    messages = [(f"RADAR_TRACK_{addr:x}", 50) for addr in range(RADAR_START_ADDR, RADAR_START_ADDR + RADAR_MSG_COUNT)]
     print("RadarInterface: RadarTracks..")
-    return CANParser(DBC[CP.carFingerprint]['radar'], signals, checks, 1)
+    return CANParser(DBC[CP.carFingerprint]['radar'], messages, 1)
 
   else:
-    signals = [
-      # sig_name, sig_address, default
-      ("ObjValid", "SCC11"),
-      ("ACC_ObjStatus", "SCC11"),
-      ("ACC_ObjLatPos", "SCC11"),
-      ("ACC_ObjDist", "SCC11"),
-      ("ACC_ObjRelSpd", "SCC11"),
-    ]
-    checks = [
+    messages = [
       ("SCC11", 50),
     ]
     print("RadarInterface: SCCRadar...")
-    return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, CP.sccBus)
+    return CANParser(DBC[CP.carFingerprint]['pt'], messages, CP.sccBus)
 
 
 class RadarInterface(RadarInterfaceBase):
