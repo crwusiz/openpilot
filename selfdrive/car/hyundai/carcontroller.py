@@ -51,7 +51,7 @@ class CarController:
   def __init__(self, dbc_name, CP, VM):
     self.CP = CP
     self.CAN = CanBus(CP)
-    self.CCP = CarControllerParams(CP)
+    self.params = CarControllerParams(CP)
     self.packer = CANPacker(dbc_name)
     self.car_fingerprint = CP.carFingerprint
 
@@ -71,11 +71,11 @@ class CarController:
     hud_control = CC.hudControl
 
     # Steering Torque
-    new_steer = int(round(actuators.steer * self.CCP.STEER_MAX))
-    apply_steer = apply_driver_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.CCP)
+    new_steer = int(round(actuators.steer * self.params.STEER_MAX))
+    apply_steer = apply_driver_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.params)
 
     # >90 degree steering fault prevention
-    self.angle_limit_counter, apply_steer_req = common_fault_avoidance(CS.out.steeringAngleDeg, MAX_ANGLE, CC.latActive,
+    self.angle_limit_counter, apply_steer_req = common_fault_avoidance(abs(CS.out.steeringAngleDeg) >= MAX_ANGLE, CC.latActive,
                                                                        self.angle_limit_counter, MAX_ANGLE_FRAMES,
                                                                        MAX_ANGLE_CONSECUTIVE_FRAMES)
 
@@ -218,7 +218,7 @@ class CarController:
         can_sends.append(hyundaican.create_frt_radar_opt(self.packer))
 
     new_actuators = actuators.copy()
-    new_actuators.steer = apply_steer / self.CCP.STEER_MAX
+    new_actuators.steer = apply_steer / self.params.STEER_MAX
     new_actuators.steerOutputCan = apply_steer
     new_actuators.accel = accel
 

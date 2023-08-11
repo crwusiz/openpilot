@@ -45,7 +45,7 @@ class CarState(CarStateBase):
     self.cluster_speed = 0
     self.cluster_speed_counter = CLUSTER_SAMPLE_RATE
 
-    self.CCP = CarControllerParams(CP)
+    self.params = CarControllerParams(CP)
 
     self.lfa_btn = 0
     self.lfa_enabled = False
@@ -86,7 +86,7 @@ class CarState(CarStateBase):
     ret.steeringRateDeg = cp.vl["SAS11"]["SAS_Speed"]
     ret.steeringTorque = cp.vl["MDPS12"]["CR_Mdps_StrColTq"]
     ret.steeringTorqueEps = cp.vl["MDPS12"]["CR_Mdps_OutTq"]
-    ret.steeringPressed = abs(ret.steeringTorque) > self.CCP.STEER_THRESHOLD
+    ret.steeringPressed = abs(ret.steeringTorque) > self.params.STEER_THRESHOLD
     self.eps_error_cnt += 1 if not ret.standstill and cp.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 else -self.eps_error_cnt
     ret.steerFaultTemporary = self.eps_error_cnt > 100
 
@@ -235,7 +235,7 @@ class CarState(CarStateBase):
     ret.steeringAngleDeg = cp.vl["STEERING_SENSORS"]["STEERING_ANGLE"] * -1
     ret.steeringTorque = cp.vl["MDPS"]["STEERING_COL_TORQUE"]
     ret.steeringTorqueEps = cp.vl["MDPS"]["STEERING_OUT_TORQUE"]
-    ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > self.CCP.STEER_THRESHOLD, 5)
+    ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > self.params.STEER_THRESHOLD, 5)
     ret.steerFaultTemporary = cp.vl["MDPS"]["LKA_FAULT"] != 0
 
     ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["BLINKERS"]["LEFT_LAMP"],

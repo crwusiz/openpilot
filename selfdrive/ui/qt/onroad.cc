@@ -13,6 +13,33 @@
 #include "selfdrive/ui/qt/maps/map_panel.h"
 #endif
 
+static void drawIcon(QPainter &p, const QPoint &center, const QPixmap &img, const QBrush &bg, float opacity) {
+  p.setRenderHint(QPainter::Antialiasing);
+  p.setOpacity(1.0);  // bg dictates opacity of ellipse
+  p.setPen(Qt::NoPen);
+  p.setBrush(bg);
+  p.drawEllipse(center, btn_size / 2, btn_size / 2);
+  p.setOpacity(opacity);
+  p.drawPixmap(center - QPoint(img.width() / 2, img.height() / 2), img);
+  p.setOpacity(1.0);
+}
+
+static void drawIconRotate(QPainter &p, const int x, const int y, const QPixmap &img, const QBrush bg, float opacity, float angle) {
+  p.setOpacity(1.0);
+  p.setPen(Qt::NoPen);
+  p.setBrush(bg);
+  p.drawEllipse(x - btn_size / 2, y - btn_size / 2, btn_size, btn_size);
+  p.setOpacity(opacity);
+  p.save();
+  p.translate(x, y);
+  p.rotate(-angle);
+  QRect r = img.rect();
+  r.moveCenter(QPoint(0,0));
+  p.drawPixmap(r, img);
+  p.restore();
+  p.setOpacity(1.0);
+}
+
 OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
   QVBoxLayout *main_layout  = new QVBoxLayout(this);
   main_layout->setMargin(UI_BORDER_SIZE);
@@ -215,20 +242,8 @@ void ExperimentalButton::updateState(const UIState &s) {
 
 void ExperimentalButton::paintEvent(QPaintEvent *event) {
   QPainter p(this);
-  p.setRenderHint(QPainter::Antialiasing);
-
-  QPoint center(btn_size / 2, btn_size / 2);
   QPixmap img = experimental_mode ? experimental_img : engage_img;
-
-  p.setOpacity(1.0);
-  p.setPen(Qt::NoPen);
-  //p.setBrush(QColor(0, 0, 0, 166));
-  p.setBrush(QColor(0, 0, 0, 100)); // icon_bg
-  p.drawEllipse(center, btn_size / 2, btn_size / 2);
-  //p.setOpacity(isDown() || !engageable ? 0.8 : 1.0);
-  p.setOpacity(0.8);
-  p.drawPixmap((btn_size - img_size) / 2, (btn_size - img_size) / 2, img);
-  p.setOpacity(1.0);
+  drawIcon(p, QPoint(btn_size / 2, btn_size / 2), img, QColor(0, 0, 0, 100), 0.8);
 }
 
 // MapSettingsButton
@@ -243,19 +258,7 @@ MapSettingsButton::MapSettingsButton(QWidget *parent) : QPushButton(parent) {
 
 void MapSettingsButton::paintEvent(QPaintEvent *event) {
   QPainter p(this);
-  p.setRenderHint(QPainter::Antialiasing);
-
-  QPoint center(btn_size / 2, btn_size / 2);
-
-  p.setOpacity(1.0);
-  p.setPen(Qt::NoPen);
-  //p.setBrush(QColor(0, 0, 0, 166));
-  p.setBrush(QColor(0, 0, 0, 100)); // icon_bg
-  p.drawEllipse(center, btn_size / 2, btn_size / 2);
-  //p.setOpacity(isDown() ? 0.6 : 1.0);
-  p.setOpacity(0.8);
-  p.drawPixmap((btn_size - img_size) / 2, (btn_size - img_size) / 2, settings_img);
-  p.setOpacity(1.0);
+  drawIcon(p, QPoint(btn_size / 2, btn_size / 2), settings_img, QColor(0, 0, 0, 100), 0.8);
 }
 
 // Window that shows camera view and variety of info drawn on top
@@ -673,7 +676,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
     y = (btn_size / 2) + (UI_BORDER_SIZE * 4);
   }
-  drawIcon(p, x, y, gps_img, icon_bg, gps_state ? 0.8 : 0.2);
+  drawIcon(p, QPoint(x, y), gps_img, icon_bg, gps_state ? 0.8 : 0.2);
 
   if (wifi_state == 1) {
     wifi_img = wifi_l_img;
@@ -688,7 +691,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   // wifi icon (upper right 2)
   x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
   y = (btn_size / 2) + (UI_BORDER_SIZE * 4);
-  drawIcon(p, x, y, wifi_img, icon_bg, wifi_state > 0 ? 0.8 : 0.2);
+  drawIcon(p, QPoint(x, y), wifi_img, icon_bg, wifi_state > 0 ? 0.8 : 0.2);
 
   // upper gps info
   if (gpsVerticalAccuracy == 0 || gpsVerticalAccuracy > 100)
@@ -750,18 +753,18 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
     x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 3.1);
     y = rect().bottom() - (UI_FOOTER_HEIGHT / 2) + (UI_BORDER_SIZE * 2);
-    drawIcon(p, x, y, gap_img, icon_bg, is_cruise_set ? 0.8 : 0.2);
+    drawIcon(p, QPoint(x, y), gap_img, icon_bg, is_cruise_set ? 0.8 : 0.2);
 
     // gaspress img (bottom right 2)
     x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
-    drawIcon(p, x, y, gaspress_img, icon_bg, gas_pressed ? 0.8 : 0.2);
+    drawIcon(p, QPoint(x, y), gaspress_img, icon_bg, gas_pressed ? 0.8 : 0.2);
 
     // brake and autohold icon (bottom right 3)
     x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
     if (autohold_state >= 1) {
-      drawIcon(p, x, y, autohold_state > 1 ? autohold_warning_img : autohold_active_img, icon_bg, autohold_state ? 0.8 : 0.2);
+      drawIcon(p, QPoint(x, y), autohold_state > 1 ? autohold_warning_img : autohold_active_img, icon_bg, autohold_state ? 0.8 : 0.2);
     } else {
-      drawIcon(p, x, y, brake_img, icon_bg, brake_state ? 0.8 : 0.2);
+      drawIcon(p, QPoint(x, y), brake_img, icon_bg, brake_state ? 0.8 : 0.2);
     }
 
     // tpms (bottom right)
@@ -873,32 +876,6 @@ void AnnotatedCameraWidget::drawTextColor(QPainter &p, int x, int y, const QStri
   real_rect.moveCenter({x, y - real_rect.height() / 2});
   p.setPen(color);
   p.drawText(real_rect.x(), real_rect.bottom(), text);
-}
-
-void AnnotatedCameraWidget::drawIcon(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity) {
-  p.setOpacity(1.0);
-  p.setPen(Qt::NoPen);
-  p.setBrush(bg);
-  p.drawEllipse(x - btn_size / 2, y - btn_size / 2, btn_size, btn_size);
-  p.setOpacity(opacity);
-  p.drawPixmap(x - img.size().width() / 2, y - img.size().height() / 2, img);
-  p.setOpacity(1.0);
-}
-
-void AnnotatedCameraWidget::drawIconRotate(QPainter &p, int x, int y, QPixmap &img, QBrush bg, float opacity, float angle) {
-  p.setOpacity(1.0);
-  p.setPen(Qt::NoPen);
-  p.setBrush(bg);
-  p.drawEllipse(x - btn_size / 2, y - btn_size / 2, btn_size, btn_size);
-  p.setOpacity(opacity);
-  p.save();
-  p.translate(x, y);
-  p.rotate(-angle);
-  QRect r = img.rect();
-  r.moveCenter(QPoint(0,0));
-  p.drawPixmap(r, img);
-  p.restore();
-  p.setOpacity(1.0);
 }
 
 void AnnotatedCameraWidget::initializeGL() {
@@ -1048,7 +1025,7 @@ void AnnotatedCameraWidget::drawDriverState(QPainter &painter, const UIState *s)
   int x = rightHandDM ? width() - offset : offset;
   int y = height() - offset - (UI_BORDER_SIZE * 3);
   float opacity = dmActive ? 0.8 : 0.2;
-  drawIcon(painter, x, y, dm_img, blackColor(100), opacity);
+  drawIcon(painter, QPoint(x, y), dm_img, blackColor(100), opacity);
 
   // face
   QPointF face_kpts_draw[std::size(default_face_kpts_3d)];
