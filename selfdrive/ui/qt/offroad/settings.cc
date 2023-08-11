@@ -629,7 +629,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   auto gitcheckout_btn = new ButtonControl(tr("Git Checkout"), tr("RUN"));
   QObject::connect(gitcheckout_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/scripts/gitcheckout.sh");
+      QProcess::execute("/data/openpilot/scripts/checkout.sh");
     }
   });
 

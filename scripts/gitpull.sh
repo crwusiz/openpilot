@@ -6,10 +6,14 @@ echo -n "0" > /data/params/d/PrebuiltEnable
 sudo rm -f prebuilt
 
 git fetch --all --prune
-git remote set-head origin -a
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 REMOTE_HASH=$(git rev-parse --short --verify origin/$BRANCH)
+BRANCH_GONE=$(git branch -vv | grep ': gone]' | awk '{print $1}')
+
+if [ "${BRANCH_GONE}" != "" ]; then
+  echo $BRANCH_GONE | xargs git branch -D
+fi
 
 echo ""
 git reset --hard $REMOTE_HASH

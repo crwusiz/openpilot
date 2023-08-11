@@ -94,11 +94,11 @@ function launch {
   awk '/GENESIS/' /data/params/crwusiz/CarList_HYUNDAI > /data/params/crwusiz/CarList_Genesis
 
   MANUFACTURER=$(cat /data/params/d/SelectedManufacturer)
-  if [ ${MANUFACTURER} = "HYUNDAI" ]; then
+  if [ "${MANUFACTURER}" = "HYUNDAI" ]; then
     cp -f /data/params/crwusiz/CarList_Hyundai /data/params/crwusiz/CarList
-  elif [ ${MANUFACTURER} = "KIA" ]; then
+  elif [ "${MANUFACTURER}" = "KIA" ]; then
     cp -f /data/params/crwusiz/CarList_Kia /data/params/crwusiz/CarList
-  elif [ ${MANUFACTURER} = "GENESIS" ]; then
+  elif [ "${MANUFACTURER}" = "GENESIS" ]; then
     cp -f /data/params/crwusiz/CarList_Genesis /data/params/crwusiz/CarList
   else
     cp -f /data/params/crwusiz/CarList_HYUNDAI /data/params/crwusiz/CarList
@@ -111,7 +111,15 @@ function launch {
 
   # git last commit log
   git log -1 --pretty=format:"%h, %cs, %cr" > /data/params/d/GitLog
-  git branch -r > /data/params/crwusiz/GitBranchList
+
+  if [ ! -f "/data/params/d/SelectedBranch" ]; then
+    touch /data/params/d/SelectedBranch
+    git branch --show-current > /data/params/d/SelectedBranch
+    #git status | grep "origin" | awk -F'/' '{print $2}' | sed -e 's/..$//' > /data/params/d/SelectedBranch
+  fi
+
+  # git remote branch list
+  git branch -r | sed '1d' | sed -e 's/[/]//g' | sed -e 's/origin//g' | sort -r > /data/params/crwusiz/GitBranchList
 
   # git remote
   #sed 's/.\{4\}$//' /data/params/d/GitRemote > /data/params/crwusiz/GitRemote_
@@ -119,7 +127,7 @@ function launch {
   # events language init
   LANG=$(cat /data/params/d/LanguageSetting)
 
-  if [ ${LANG} = "main_ko" ]; then
+  if [ "${LANG}" = "main_ko" ]; then
     cp -f /data/openpilot/scripts/add/events_ko.py /data/openpilot/selfdrive/controls/lib/events.py
     cp -f /data/openpilot/scripts/add/ui_ko.h /data/openpilot/selfdrive/ui/ui.h
   else
