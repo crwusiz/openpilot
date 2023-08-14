@@ -4,7 +4,6 @@
 
 #include <QDateTime>
 #include <QFileSystemWatcher>
-#include <QLayout>
 #include <QPainter>
 #include <QPixmap>
 #include <QSurfaceFormat>
@@ -19,7 +18,6 @@ QString getBrandVersion();
 QString getUserAgent();
 std::optional<QString> getDongleId();
 QMap<QString, QString> getSupportedLanguages();
-void clearLayout(QLayout* layout);
 void setQtSurfaceFormat();
 void sigTermHandler(int s);
 QString timeAgo(const QDateTime &date);

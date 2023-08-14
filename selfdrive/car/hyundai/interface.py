@@ -221,7 +221,7 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.GENESIS_GV70:
       ret.mass = 1950. + STD_CARGO_KG
       ret.wheelbase = 2.87
-      ret.steerRatio = 13.27 * 1.15  # 15% higher at the center seems reasonable
+      ret.steerRatio = 15.2
       tire_stiffness_factor = 0.65
     elif candidate == CAR.GENESIS_GV80:
       ret.mass = 2258. + STD_CARGO_KG
@@ -404,6 +404,9 @@ class CarInterface(CarInterfaceBase):
         ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy)]
       else:
         ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundai, 0)]
+
+      #if candidate in CAMERA_SCC_CAR:
+      #  ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_CAMERA_SCC
 
     if ret.openpilotLongitudinalControl:
       ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG

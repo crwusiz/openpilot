@@ -113,7 +113,6 @@ function launch {
   git log -1 --pretty=format:"%h, %cs, %cr" > /data/params/d/GitLog
 
   if [ ! -f "/data/params/d/SelectedBranch" ]; then
-    touch /data/params/d/SelectedBranch
     git branch --show-current > /data/params/d/SelectedBranch
     #git status | grep "origin" | awk -F'/' '{print $2}' | sed -e 's/..$//' > /data/params/d/SelectedBranch
   fi
