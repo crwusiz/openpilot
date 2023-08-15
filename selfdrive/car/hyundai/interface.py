@@ -6,7 +6,7 @@ from common.conversions import Conversions as CV
 from selfdrive.car.hyundai.hyundaicanfd import CanBus
 from selfdrive.car.hyundai.values import HyundaiFlags, CAR, DBC, Buttons, CANFD_CAR, EV_CAR, HEV_CAR, LEGACY_SAFETY_MODE_CAR, CANFD_RADAR_SCC_CAR
 from selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR
-from selfdrive.car import STD_CARGO_KG, create_button_event, scale_tire_stiffness, get_safety_config
+from selfdrive.car import STD_CARGO_KG, create_button_event, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
 from selfdrive.car.disable_ecu import disable_ecu
@@ -51,10 +51,9 @@ class CarInterface(CarInterfaceBase):
       if 0x38d in fingerprint[0] or 0x38d in fingerprint[2]: # 909
         ret.flags |= HyundaiFlags.USE_FCA.value
 
-    ret.steerActuatorDelay = 0.1
+    ret.steerActuatorDelay = 0.1  # Default delay
     ret.steerLimitTimer = 0.4
-
-    tire_stiffness_factor = 1.
+    CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     # STD_CARGO_KG=136. wheelbase or mass date using wikipedia
     # hyundai
@@ -62,17 +61,17 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1340. + STD_CARGO_KG
       ret.wheelbase = 2.72
       ret.steerRatio = 15.4
-      tire_stiffness_factor = 0.385
+      ret.tireStiffnessFactor = 0.385
     elif candidate in [CAR.ELANTRA_CN7, CAR.ELANTRA_CN7_HEV]:
       ret.mass = 1340. + STD_CARGO_KG
       ret.wheelbase = 2.72
       ret.steerRatio = 12.9
-      tire_stiffness_factor = 0.65
+      ret.tireStiffnessFactor = 0.65
     elif candidate in [CAR.SONATA_DN8, CAR.SONATA_DN8_HEV]:
       ret.mass = 1615. + STD_CARGO_KG
       ret.wheelbase = 2.84
       ret.steerRatio = 15.2
-      tire_stiffness_factor = 0.65
+      ret.tireStiffnessFactor = 0.65
     elif candidate in [CAR.SONATA_LF, CAR.SONATA_LF_HEV]:
       ret.mass = 1640. + STD_CARGO_KG
       ret.wheelbase = 2.80
@@ -81,42 +80,42 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1743. + STD_CARGO_KG
       ret.wheelbase = 2.60
       ret.steerRatio = 13.7
-      tire_stiffness_factor = 0.385
+      ret.tireStiffnessFactor = 0.385
     elif candidate in [CAR.IONIQ, CAR.IONIQ_EV, CAR.IONIQ_HEV]:
       ret.mass = 1575. + STD_CARGO_KG
       ret.wheelbase = 2.70
       ret.steerRatio = 13.7
-      tire_stiffness_factor = 0.385
+      ret.tireStiffnessFactor = 0.385
     elif candidate in [CAR.IONIQ5, CAR.IONIQ6]:
       ret.mass = 2012 + STD_CARGO_KG
       ret.wheelbase = 3.0
       ret.steerRatio = 16.
-      tire_stiffness_factor = 0.65
+      ret.tireStiffnessFactor = 0.65
     elif candidate == CAR.TUCSON:
       ret.mass = 1596. + STD_CARGO_KG
       ret.wheelbase = 2.67
       ret.steerRatio = 16.0
-      tire_stiffness_factor = 0.385
+      ret.tireStiffnessFactor = 0.385
     elif candidate in [CAR.TUCSON_NX4, CAR.TUCSON_NX4_HEV]:
       ret.mass = 1680. + STD_CARGO_KG
       ret.wheelbase = 2.756
       ret.steerRatio = 16.
-      tire_stiffness_factor = 0.385
+      ret.tireStiffnessFactor = 0.385
     elif candidate in [CAR.SANTAFE, CAR.SANTAFE_HEV]:
       ret.mass = 1910. + STD_CARGO_KG
       ret.wheelbase = 2.76
       ret.steerRatio = 15.8
-      tire_stiffness_factor = 0.82
+      ret.tireStiffnessFactor = 0.82
     elif candidate == CAR.PALISADE:
       ret.mass = 2060. + STD_CARGO_KG
       ret.wheelbase = 2.90
       ret.steerRatio = 15.8
-      tire_stiffness_factor = 0.63
+      ret.tireStiffnessFactor = 0.63
     elif candidate == CAR.VELOSTER:
       ret.mass = 1350. + STD_CARGO_KG
       ret.wheelbase = 2.65
       ret.steerRatio = 15.8
-      tire_stiffness_factor = 0.5
+      ret.tireStiffnessFactor = 0.5
     elif candidate in [CAR.GRANDEUR_IG, CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IGFL, CAR.GRANDEUR_IGFL_HEV]:
       ret.mass = 1719. + STD_CARGO_KG
       ret.wheelbase = 2.88
@@ -131,12 +130,12 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1345. + STD_CARGO_KG
       ret.wheelbase = 2.70
       ret.steerRatio = 13.7
-      tire_stiffness_factor = 0.5
+      ret.tireStiffnessFactor = 0.5
     elif candidate in [CAR.K5, CAR.K5_HEV, CAR.K5_DL3, CAR.K5_DL3_HEV]:
       ret.mass = 1565. + STD_CARGO_KG
       ret.wheelbase = 2.80
       ret.steerRatio = 15.2
-      tire_stiffness_factor = 0.5
+      ret.tireStiffnessFactor = 0.5
     elif candidate in [CAR.K7, CAR.K7_HEV]:
       ret.mass = 1730. + STD_CARGO_KG
       ret.wheelbase = 2.85
@@ -165,12 +164,12 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1748. + STD_CARGO_KG
       ret.wheelbase = 2.70
       ret.steerRatio = 13.7
-      tire_stiffness_factor = 0.385
+      ret.tireStiffnessFactor = 0.385
     elif candidate == CAR.SOUL_EV:
       ret.mass = 1375. + STD_CARGO_KG
       ret.wheelbase = 2.60
       ret.steerRatio = 13.7
-      tire_stiffness_factor = 0.385
+      ret.tireStiffnessFactor = 0.385
     elif candidate == CAR.SELTOS:
       ret.mass = 1510. + STD_CARGO_KG
       ret.wheelbase = 2.63
@@ -179,7 +178,7 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 2055. + STD_CARGO_KG
       ret.wheelbase = 2.90
       ret.steerRatio = 16.0
-      tire_stiffness_factor = 0.65
+      ret.tireStiffnessFactor = 0.65
     elif candidate in [CAR.SPORTAGE_NQ5, CAR.SPORTAGE_NQ5_HEV]:
       ret.mass = 1767. + STD_CARGO_KG
       ret.wheelbase = 2.756
@@ -222,7 +221,7 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1950. + STD_CARGO_KG
       ret.wheelbase = 2.87
       ret.steerRatio = 15.2
-      tire_stiffness_factor = 0.65
+      ret.tireStiffnessFactor = 0.65
     elif candidate == CAR.GENESIS_GV80:
       ret.mass = 2258. + STD_CARGO_KG
       ret.wheelbase = 2.95
@@ -417,10 +416,6 @@ class CarInterface(CarInterfaceBase):
 
     ret.centerToFront = ret.wheelbase * 0.4
 
-    # TODO: start from empirically derived lateral slip stiffness for the civic and scale by
-    # mass and CG position, so all cars will have approximately similar dyn behaviors
-    ret.tireStiffnessFront, ret.tireStiffnessRear = scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront,
-                                                                         tire_stiffness_factor=tire_stiffness_factor)
     return ret
 
 
