@@ -71,11 +71,11 @@
     <name>AnnotatedCameraWidget</name>
     <message>
         <source>km/h</source>
-        <translation>كلم/س</translation>
+        <translation>km/h</translation>
     </message>
     <message>
         <source>mph</source>
-        <translation>ميل</translation>
+        <translation>mph</translation>
     </message>
     <message>
         <source>MAX</source>
@@ -526,11 +526,11 @@ location set</source>
     </message>
     <message>
         <source>dashcam</source>
-        <translation>الداش كام</translation>
+        <translation>dashcam</translation>
     </message>
     <message>
         <source>openpilot</source>
-        <translation>القائد الآلي</translation>
+        <translation>openpilot</translation>
     </message>
     <message numerus="yes">
         <source>%n minute(s) ago</source>
