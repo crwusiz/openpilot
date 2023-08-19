@@ -170,9 +170,10 @@ class CarController:
               self.last_button_frame = self.frame
     else:
       # send lkas11 bus 0
+      use_lfa = self.CP.flags & HyundaiFlags.SEND_LFA.value
       can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, apply_steer_req, torque_fault, sys_warning, sys_state,
                                                 CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning,
-                                                0, CS.lkas11))
+                                                0, CS.lkas11, use_lfa))
 
       # fix auto resume - by neokii
       if CC.cruiseControl.resume and not CS.out.gasPressed:
@@ -194,8 +195,9 @@ class CarController:
       # send scc to car if longcontrol enabled and SCC not on bus 0 or not live
       if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl:
         jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0
+        use_fca = self.CP.flags & HyundaiFlags.USE_FCA.value
         can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), accel, jerk,
-                                                        hud_control.leadVisible, set_speed_in_units, stopping, CC, CS))
+                                                        hud_control.leadVisible, set_speed_in_units, stopping, CC, CS, use_fca))
 
       if self.frame % 500 == 0:
         print(f'scc11 = {bool(CS.scc11)}  scc12 = {bool(CS.scc12)}  scc13 = {bool(CS.scc13)}  scc14 = {bool(CS.scc14)}')

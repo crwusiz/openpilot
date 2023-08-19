@@ -6,7 +6,7 @@ hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 
 
 def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque_fault, sys_warning, sys_state, enabled,
-                  left_lane, right_lane, left_lane_depart, right_lane_depart, bus, lkas11):
+                  left_lane, right_lane, left_lane_depart, right_lane_depart, bus, lkas11, use_lfa):
   values = {s: lkas11[s] for s in [
     "CF_Lkas_LdwsActivemode",
     "CF_Lkas_LdwsSysState",
@@ -46,7 +46,7 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
     values["CF_Lkas_LdwsOpt_USM"] = 3
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
 
-  elif CP.flags & HyundaiFlags.SEND_LFA.value or mfc_lfa:
+  elif use_lfa or mfc_lfa:
     values["CF_Lkas_LdwsActivemode"] = int(left_lane) + (int(right_lane) << 1)
     values["CF_Lkas_LdwsOpt_USM"] = 2
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
@@ -54,11 +54,14 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
 
   dat = packer.make_can_msg("LKAS11", 0, values)[2]
   if car_fingerprint in CHECKSUM["crc8"]:
-    checksum = hyundai_checksum(dat[:6] + dat[7:8])  # CRC Checksum
+    # CRC Checksum
+    checksum = hyundai_checksum(dat[:6] + dat[7:8])
   elif car_fingerprint in CHECKSUM["6B"]:
-    checksum = sum(dat[:6]) % 256  # Checksum of first 6 Bytes
+    # Checksum of first 6 Bytes
+    checksum = sum(dat[:6]) % 256
   else:
-    checksum = (sum(dat[:6]) + dat[7]) % 256  # Checksum of first 6 Bytes and last Byte
+    # Checksum of first 6 Bytes and last Byte
+    checksum = (sum(dat[:6]) + dat[7]) % 256
   values["CF_Lkas_Chksum"] = checksum
 
   return packer.make_can_msg("LKAS11", bus, values)
@@ -111,61 +114,66 @@ def create_lfahda_mfc(packer, enabled, active):
   return packer.make_can_msg("LFAHDA_MFC", 0, values)
 
 
-def create_scc_commands(packer, idx, accel, upper_jerk, lead_visible, set_speed, stopping, CC, CS):
+def create_scc_commands(packer, idx, accel, upper_jerk, lead_visible, set_speed, stopping, CC, CS, use_fca):
   commands = []
 
   enabled = CC.enabled
   cruise_enabled = enabled and CS.out.cruiseState.enabled
   long_override = CC.cruiseControl.override
 
-  values = CS.scc11
-  values["AliveCounterACC"] = idx % 0x10
-  values["MainMode_ACC"] = CS.out.cruiseState.available
-  values["TauGapSet"] = CS.out.cruiseState.gapAdjust
-  values["ObjValid"] = 1 if lead_visible else 0
-  values["VSetDis"] = set_speed if cruise_enabled else 0
+  scc11_values = {
+    "MainMode_ACC": CS.out.cruiseState.available,
+    "TauGapSet": CS.out.cruiseState.gapAdjust,
+    "VSetDis": set_speed if cruise_enabled else 0,
+    "AliveCounterACC": idx % 0x10,
+    "ObjValid": 1 if lead_visible else 0,  # close lead makes controls tighter
+    "ACC_ObjStatus": 1,  # close lead makes controls tighter
+    "ACC_ObjLatPos": 0,
+    "ACC_ObjRelSpd": 0,
+    "ACC_ObjDist": 1,  # close lead makes controls tighter
+    #"DriverAlertDisplay": 0,
+  }
+  commands.append(packer.make_can_msg("SCC11", 0, scc11_values))
 
-  values["ACC_ObjStatus"] = 1 if lead_visible else 0
-  values["ACC_ObjLatPos"] = 0
-  values["ACC_ObjRelSpd"] = 0
-  values["ACC_ObjDist"] = 1 # close lead makes controls tighter
+  scc12_values = {
+    "ACCMode": 2 if cruise_enabled and long_override else 1 if cruise_enabled else 0,
+    "StopReq": 1 if cruise_enabled and stopping else 0,
+    "aReqRaw": accel,
+    "aReqValue": accel,  # stock ramps up and down respecting jerk limit until it reaches aReqRaw
+    "CR_VSM_Alive": idx % 0xF,
+    "CR_VSM_ChkSum": 0,
+  }
+  scc12_dat = packer.make_can_msg("SCC12", 0, scc12_values)[2]
+  scc12_values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in scc12_dat) % 0x10
 
-  #values["DriverAlertDisplay"] = 0
-  commands.append(packer.make_can_msg("SCC11", 0, values))
-
-  values = CS.scc12
-  values["ACCMode"] = 2 if cruise_enabled and long_override else 1 if cruise_enabled else 0
-  values["StopReq"] = 1 if cruise_enabled and stopping else 0
-  values["aReqRaw"] = accel
-  values["aReqValue"] = accel  # stock ramps up and down respecting jerk limit until it reaches aReqRaw
-  values["CR_VSM_Alive"] = idx % 0xF
-  values["CR_VSM_ChkSum"] = 0
-
-  dat = packer.make_can_msg("SCC12", 0, values)[2]
-  values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in dat) % 0x10
-  commands.append(packer.make_can_msg("SCC12", 0, values))
+  commands.append(packer.make_can_msg("SCC12", 0, scc12_values))
 
   if CS.scc14 is not None:
-    values = CS.scc14
-    values["ComfortBandUpper"] = 0.0  # stock usually is 0 but sometimes uses higher values
-    values["ComfortBandLower"] = 0.0  # stock usually is 0 but sometimes uses higher values
-    values["JerkUpperLimit"] = upper_jerk  # stock usually is 1.0 but sometimes uses higher values
-    values["JerkLowerLimit"] = 5.0  # stock usually is 0.5 but sometimes uses higher values
-    values["ACCMode"] = 2 if enabled and long_override else 1 if enabled else 4  # stock will always be 4 instead of 0 after first disengage
-    values["ObjGap"] = 2 if lead_visible else 0,  # 5: >30, m, 4: 25-30 m, 3: 20-25 m, 2: < 20 m, 0: no lead
-    commands.append(packer.make_can_msg("SCC14", 0, values))
+    scc14_values = {
+      "ComfortBandUpper": 0.0,  # stock usually is 0 but sometimes uses higher values
+      "ComfortBandLower": 0.0,  # stock usually is 0 but sometimes uses higher values
+      "JerkUpperLimit": upper_jerk,  # stock usually is 1.0 but sometimes uses higher values
+      "JerkLowerLimit": 5.0,  # stock usually is 0.5 but sometimes uses higher values
+      "ACCMode": 2 if enabled and long_override else 1 if enabled else 4,
+      # stock will always be 4 instead of 0 after first disengage
+      "ObjGap": 2 if lead_visible else 0,  # 5: >30, m, 4: 25-30 m, 3: 20-25 m, 2: < 20 m, 0: no lead
+    }
+    commands.append(packer.make_can_msg("SCC14", 0, scc14_values))
 
+  # Only send FCA11 on cars where it exists on the bus
+  if use_fca:
     # note that some vehicles most likely have an alternate checksum/counter definition
     # https://github.com/commaai/opendbc/commit/9ddcdb22c4929baf310295e832668e6e7fcfa602
-    # fca11_values = {
-    #  "CR_FCA_Alive": idx % 0xF,
-    #  "PAINT1_Status": 1,
-    #  "FCA_DrvSetStatus": 1,
-    #  "FCA_Status": 1,  # AEB disabled
-    # }
-    # fca11_dat = packer.make_can_msg("FCA11", 0, fca11_values)[2]
-    # fca11_values["CR_FCA_ChkSum"] = hyundai_checksum(fca11_dat[:7])
-    # commands.append(packer.make_can_msg("FCA11", 0, fca11_values))
+    fca11_values = {
+     "CR_FCA_Alive": idx % 0xF,
+     "PAINT1_Status": 1,
+     "FCA_DrvSetStatus": 1,
+     "FCA_Status": 1,  # AEB disabled
+    }
+    fca11_dat = packer.make_can_msg("FCA11", 0, fca11_values)[2]
+    fca11_values["CR_FCA_ChkSum"] = hyundai_checksum(fca11_dat[:7])
+    commands.append(packer.make_can_msg("FCA11", 0, fca11_values))
+
   return commands
 
 
@@ -178,6 +186,7 @@ def create_acc_opt(packer):
   }
   commands.append(packer.make_can_msg("SCC13", 0, scc13_values))
 
+  # TODO: this needs to be detected and conditionally sent on unsupported long cars
   fca12_values = {
     "FCA_DrvSetState": 2,
     "FCA_USM": 1, # AEB disabled
