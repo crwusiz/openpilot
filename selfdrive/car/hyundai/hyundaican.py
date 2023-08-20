@@ -177,27 +177,25 @@ def create_scc_commands(packer, idx, accel, upper_jerk, lead_visible, set_speed,
   return commands
 
 
-def create_acc_opt(packer):
+def create_acc_opt(packer, CS, send_fca12):
   commands = []
-  scc13_values = {
-    "SCCDrvModeRValue": 2,
-    "SCC_Equip": 1,
-    "Lead_Veh_Dep_Alert_USM": 2,
-  }
+
+  if CS.scc13 is not None:
+    scc13_values = {
+      "SCCDrvModeRValue": 2,
+      "SCC_Equip": 1,
+      "Lead_Veh_Dep_Alert_USM": 2,
+    }
   commands.append(packer.make_can_msg("SCC13", 0, scc13_values))
 
-  # TODO: this needs to be detected and conditionally sent on unsupported long cars
-  fca12_values = {
-    "FCA_DrvSetState": 2,
-    "FCA_USM": 1, # AEB disabled
-  }
+  if send_fca12:
+    fca12_values = {
+      "FCA_DrvSetState": 2,
+      "FCA_USM": 1, # AEB disabled
+    }
   commands.append(packer.make_can_msg("FCA12", 0, fca12_values))
 
   return commands
-
-
-def create_acc_opt_none(packer, CS):
-  return packer.make_can_msg("SCC13", 0, CS.scc13)
 
 
 def create_frt_radar_opt(packer):
