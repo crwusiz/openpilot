@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import time
 
-from common.gpio import gpio_set, gpio_init
-from system.hardware.tici.pins import GPIO
+from openpilot.common.gpio import gpio_set, gpio_init
+from openpilot.system.hardware.tici.pins import GPIO
 
 #recover_internal_panda
 print("  GPIO init\n")

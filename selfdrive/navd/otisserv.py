@@ -27,8 +27,8 @@ from urllib.parse import parse_qs, unquote
 import json
 import requests
 import math
-from common.basedir import BASEDIR
-from common.params import Params
+from openpilot.common.basedir import BASEDIR
+from openpilot.common.params import Params
 params = Params()
 
 hostName = ""

@@ -1,17 +1,17 @@
 from random import randint
 
 from cereal import car
-from common.params import Params
-from common.conversions import Conversions as CV
-from common.numpy_fast import clip
-from common.realtime import DT_CTRL
+from openpilot.common.params import Params
+from openpilot.common.conversions import Conversions as CV
+from openpilot.common.numpy_fast import clip
+from openpilot.common.realtime import DT_CTRL
 from opendbc.can.packer import CANPacker
-from selfdrive.car import apply_driver_steer_torque_limits, common_fault_avoidance
-from selfdrive.car.interfaces import ACCEL_MIN, ACCEL_MAX
-from selfdrive.car.hyundai import hyundaicanfd, hyundaican
-from selfdrive.car.hyundai.hyundaicanfd import CanBus
-from selfdrive.car.hyundai.values import HyundaiFlags, Buttons, CarControllerParams, CANFD_CAR, CAR
-from selfdrive.controls.neokii.navi_controller import SpeedLimiter
+from openpilot.selfdrive.car import apply_driver_steer_torque_limits, common_fault_avoidance
+from openpilot.selfdrive.car.interfaces import ACCEL_MIN, ACCEL_MAX
+from openpilot.selfdrive.car.hyundai import hyundaicanfd, hyundaican
+from openpilot.selfdrive.car.hyundai.hyundaicanfd import CanBus
+from openpilot.selfdrive.car.hyundai.values import HyundaiFlags, Buttons, CarControllerParams, CANFD_CAR, CAR
+from openpilot.selfdrive.controls.neokii.navi_controller import SpeedLimiter
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 LongCtrlState = car.CarControl.Actuators.LongControlState
@@ -70,7 +70,7 @@ class CarController:
     actuators = CC.actuators
     hud_control = CC.hudControl
 
-    # Steering Torque
+    # steering torque
     new_steer = int(round(actuators.steer * self.params.STEER_MAX))
     apply_steer = apply_driver_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, self.params)
 
@@ -170,10 +170,10 @@ class CarController:
               self.last_button_frame = self.frame
     else:
       # send lkas11 bus 0
-      use_lfa = self.CP.flags & HyundaiFlags.SEND_LFA.value
+      send_lfa = self.CP.flags & HyundaiFlags.SEND_LFA.value
       can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, apply_steer_req, torque_fault, sys_warning, sys_state,
                                                 CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning,
-                                                0, CS.lkas11, use_lfa))
+                                                0, CS.lkas11, send_lfa))
 
       # fix auto resume - by neokii
       if CC.cruiseControl.resume and not CS.out.gasPressed:

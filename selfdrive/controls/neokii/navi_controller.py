@@ -10,9 +10,9 @@ import fcntl
 import struct
 from threading import Thread
 from cereal import messaging
-from common.numpy_fast import clip, interp
-from common.realtime import sec_since_boot, Ratekeeper
-from common.conversions import Conversions as CV
+from openpilot.common.numpy_fast import clip, interp
+from openpilot.common.realtime import Ratekeeper
+from openpilot.common.conversions import Conversions as CV
 
 CAMERA_SPEED_FACTOR = 1.05
 
@@ -175,13 +175,13 @@ class NaviServer:
           try:
             if 'active' in json_obj:
               self.active = json_obj['active']
-              self.last_updated_active = sec_since_boot()
+              self.last_updated_active = time.monotonic()
           except:
             pass
 
           if 'road_limit' in json_obj:
             self.json_road_limit = json_obj['road_limit']
-            self.last_updated = sec_since_boot()
+            self.last_updated = time.monotonic()
         finally:
           self.lock.release()
 
@@ -195,7 +195,7 @@ class NaviServer:
 
 
   def check(self):
-    now = sec_since_boot()
+    now = time.monotonic()
     if now - self.last_updated > 6.:
       try:
         self.lock.acquire()

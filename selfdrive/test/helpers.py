@@ -3,16 +3,15 @@ import time
 from functools import wraps
 
 import cereal.messaging as messaging
-from common.params import Params
-from selfdrive.manager.process_config import managed_processes
-from system.hardware import PC
-from system.version import training_version, terms_version
+from openpilot.common.params import Params
+from openpilot.selfdrive.manager.process_config import managed_processes
+from openpilot.system.hardware import PC
+from openpilot.system.version import training_version, terms_version
 
 
 def set_params_enabled():
   os.environ['PASSIVE'] = "0"
   os.environ['REPLAY'] = "1"
-  os.environ['SKIP_FW_QUERY'] = "1"
   os.environ['FINGERPRINT'] = "TOYOTA COROLLA TSS2 2019"
   os.environ['LOGPRINT'] = "debug"
 

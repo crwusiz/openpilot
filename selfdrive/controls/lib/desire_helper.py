@@ -1,7 +1,7 @@
 from cereal import log
-from common.conversions import Conversions as CV
-from common.realtime import DT_MDL
-from common.params import Params
+from openpilot.common.conversions import Conversions as CV
+from openpilot.common.realtime import DT_MDL
+from openpilot.common.params import Params
 
 AUTO_LCA_START_TIME = 1.0
 
@@ -77,6 +77,7 @@ class DesireHelper:
 
         if not one_blinker or below_lane_change_speed:
           self.lane_change_state = LaneChangeState.off
+          self.lane_change_direction = LaneChangeDirection.none
         elif (torque_applied or self.lane_change_pulse_timer > 2.) and (not blindspot_detected or self.prev_torque_applied):
           self.lane_change_state = LaneChangeState.laneChangeStarting
         elif torque_applied and blindspot_detected and self.auto_lane_change_timer != 10.0:

@@ -1,6 +1,6 @@
-from common.numpy_fast import clip
-from selfdrive.car import CanBusBase
-from selfdrive.car.hyundai.values import HyundaiFlags
+from openpilot.common.numpy_fast import clip
+from openpilot.selfdrive.car import CanBusBase
+from openpilot.selfdrive.car.hyundai.values import HyundaiFlags
 
 
 class CanBus(CanBusBase):
@@ -100,9 +100,10 @@ def create_acc_cancel(packer, CP, CAN, cruise_info_copy):
     ]}
   values.update({
     "ACCMode": 4,
+    "aReqRaw": 0.0,
+    "aReqValue": 0.0,
   })
   return packer.make_can_msg("SCC_CONTROL", CAN.ECAN, values)
-
 
 def create_lfahda_cluster(packer, CAN, enabled):
   values = {

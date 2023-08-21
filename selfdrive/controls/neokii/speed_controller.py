@@ -2,13 +2,13 @@ import random
 import numpy as np
 
 from cereal import car
-from common.conversions import Conversions as CV
-from common.numpy_fast import clip, interp
-from common.params import Params
-from selfdrive.car.hyundai.values import Buttons
-from selfdrive.controls.lib.drive_helpers import VCruiseHelper, V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_UNSET
-from selfdrive.controls.lib.lateral_planner import TRAJECTORY_SIZE
-from selfdrive.controls.neokii.navi_controller import SpeedLimiter
+from openpilot.common.conversions import Conversions as CV
+from openpilot.common.numpy_fast import clip, interp
+from openpilot.common.params import Params
+from openpilot.selfdrive.car.hyundai.values import Buttons
+from openpilot.selfdrive.controls.lib.drive_helpers import VCruiseHelper, V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_UNSET
+from openpilot.selfdrive.controls.lib.lateral_planner import TRAJECTORY_SIZE
+from openpilot.selfdrive.controls.neokii.navi_controller import SpeedLimiter
 
 SYNC_MARGIN = 3.
 MIN_CURVE_SPEED = 30. * CV.KPH_TO_MS

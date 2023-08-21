@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 from cereal import car
 from panda import Panda
-from common.params import Params
-from common.conversions import Conversions as CV
-from selfdrive.car.hyundai.hyundaicanfd import CanBus
-from selfdrive.car.hyundai.values import HyundaiFlags, CAR, DBC, Buttons, CANFD_CAR, EV_CAR, HEV_CAR, LEGACY_SAFETY_MODE_CAR, CANFD_RADAR_SCC_CAR
-from selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR
-from selfdrive.car import create_button_event, get_safety_config
-from selfdrive.car.interfaces import CarInterfaceBase
-from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
-from selfdrive.car.disable_ecu import disable_ecu
+from openpilot.common.params import Params
+from openpilot.common.conversions import Conversions as CV
+from openpilot.selfdrive.car.hyundai.hyundaicanfd import CanBus
+from openpilot.selfdrive.car.hyundai.values import HyundaiFlags, CAR, DBC, Buttons, CANFD_CAR, EV_CAR, HEV_CAR, LEGACY_SAFETY_MODE_CAR, CANFD_RADAR_SCC_CAR
+from openpilot.selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR
+from openpilot.selfdrive.car import create_button_event, get_safety_config
+from openpilot.selfdrive.car.interfaces import CarInterfaceBase
+from openpilot.selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
+from openpilot.selfdrive.car.disable_ecu import disable_ecu
 
 Ecu = car.CarParams.Ecu
 ButtonType = car.CarState.ButtonEvent.Type

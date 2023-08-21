@@ -6,9 +6,8 @@ import threading
 from threading import Thread
 
 from cereal import messaging
-from common.realtime import Ratekeeper
-from selfdrive.navd.helpers import Coordinate
-from common.params import Params
+from openpilot.common.realtime import Ratekeeper
+from openpilot.selfdrive.navd.helpers import Coordinate
 
 ROUTE_RECEIVE_PORT = 2845
 

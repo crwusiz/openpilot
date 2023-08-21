@@ -1,12 +1,12 @@
 import crcmod
-from selfdrive.car.hyundai.values import CAR, CHECKSUM, HyundaiFlags
-from common.params import Params
+from openpilot.selfdrive.car.hyundai.values import CAR, CHECKSUM, HyundaiFlags
+from openpilot.common.params import Params
 
 hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 
 
 def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque_fault, sys_warning, sys_state, enabled,
-                  left_lane, right_lane, left_lane_depart, right_lane_depart, bus, lkas11, use_lfa):
+                  left_lane, right_lane, left_lane_depart, right_lane_depart, bus, lkas11, send_lfa):
   values = {s: lkas11[s] for s in [
     "CF_Lkas_LdwsActivemode",
     "CF_Lkas_LdwsSysState",
@@ -46,7 +46,7 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
     values["CF_Lkas_LdwsOpt_USM"] = 3
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
 
-  elif use_lfa or mfc_lfa:
+  elif send_lfa or mfc_lfa:
     values["CF_Lkas_LdwsActivemode"] = int(left_lane) + (int(right_lane) << 1)
     values["CF_Lkas_LdwsOpt_USM"] = 2
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
@@ -186,14 +186,14 @@ def create_acc_opt(packer, CS, send_fca12):
       "SCC_Equip": 1,
       "Lead_Veh_Dep_Alert_USM": 2,
     }
-  commands.append(packer.make_can_msg("SCC13", 0, scc13_values))
+    commands.append(packer.make_can_msg("SCC13", 0, scc13_values))
 
   if send_fca12:
     fca12_values = {
       "FCA_DrvSetState": 2,
       "FCA_USM": 1, # AEB disabled
     }
-  commands.append(packer.make_can_msg("FCA12", 0, fca12_values))
+    commands.append(packer.make_can_msg("FCA12", 0, fca12_values))
 
   return commands
 
