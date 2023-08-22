@@ -232,7 +232,7 @@ class TorqueEstimator:
       liveTorqueParameters.frictionCoefficientRaw = float(frictionCoeff)
 
       if self.filtered_points.is_valid():
-        if any([val is None or np.isnan(val) for val in [latAccelFactor, latAccelOffset, frictionCoeff]]):
+        if any(val is None or np.isnan(val) for val in [latAccelFactor, latAccelOffset, frictionCoeff]):
           cloudlog.exception("Live torque parameters are invalid.")
           liveTorqueParameters.liveValid = False
           self.reset()
