@@ -128,7 +128,6 @@ void ElidedLabel::paintEvent(QPaintEvent *event) {
 
 
 // add
-
 NetworkImageWidget::NetworkImageWidget(QWidget *parent) : QWidget(parent) {
   layout = new QVBoxLayout(this);
   imageLabel = new QLabel(this);

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <map>
+#include <string>
+
 #include <QButtonGroup>
 #include <QFileSystemWatcher>
 #include <QFrame>

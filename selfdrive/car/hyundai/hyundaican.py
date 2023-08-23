@@ -143,6 +143,13 @@ def create_scc_commands(packer, idx, accel, upper_jerk, lead_visible, set_speed,
     "CR_VSM_Alive": idx % 0xF,
     "CR_VSM_ChkSum": 0,
   }
+
+  # show AEB disabled indicator on dash with SCC12 if not sending FCA messages.
+  # these signals also prevent a TCS fault on non-FCA cars with alpha longitudinal
+  if not use_fca:
+    scc12_values["CF_VSM_ConfMode"] = 1
+    scc12_values["AEB_Status"] = 1  # AEB disabled
+
   scc12_dat = packer.make_can_msg("SCC12", 0, scc12_values)[2]
   scc12_values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in scc12_dat) % 0x10
 
@@ -154,8 +161,7 @@ def create_scc_commands(packer, idx, accel, upper_jerk, lead_visible, set_speed,
       "ComfortBandLower": 0.0,  # stock usually is 0 but sometimes uses higher values
       "JerkUpperLimit": upper_jerk,  # stock usually is 1.0 but sometimes uses higher values
       "JerkLowerLimit": 5.0,  # stock usually is 0.5 but sometimes uses higher values
-      "ACCMode": 2 if enabled and long_override else 1 if enabled else 4,
-      # stock will always be 4 instead of 0 after first disengage
+      "ACCMode": 2 if enabled and long_override else 1 if enabled else 4,  # stock will always be 4 instead of 0 after first disengage
       "ObjGap": 2 if lead_visible else 0,  # 5: >30, m, 4: 25-30 m, 3: 20-25 m, 2: < 20 m, 0: no lead
     }
     commands.append(packer.make_can_msg("SCC14", 0, scc14_values))
@@ -165,10 +171,10 @@ def create_scc_commands(packer, idx, accel, upper_jerk, lead_visible, set_speed,
     # note that some vehicles most likely have an alternate checksum/counter definition
     # https://github.com/commaai/opendbc/commit/9ddcdb22c4929baf310295e832668e6e7fcfa602
     fca11_values = {
-     "CR_FCA_Alive": idx % 0xF,
-     "PAINT1_Status": 1,
-     "FCA_DrvSetStatus": 1,
-     "FCA_Status": 1,  # AEB disabled
+      "CR_FCA_Alive": idx % 0xF,
+      "PAINT1_Status": 1,
+      "FCA_DrvSetStatus": 1,
+      "FCA_Status": 1,  # AEB disabled
     }
     fca11_dat = packer.make_can_msg("FCA11", 0, fca11_values)[2]
     fca11_values["CR_FCA_ChkSum"] = hyundai_checksum(fca11_dat[:7])

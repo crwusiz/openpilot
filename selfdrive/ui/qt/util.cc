@@ -1,5 +1,9 @@
 #include "selfdrive/ui/qt/util.h"
 
+#include <map>
+#include <string>
+#include <vector>
+
 #include <QApplication>
 #include <QFile>
 #include <QFileInfo>
@@ -134,7 +138,7 @@ void swagLogMessageHandler(QtMsgType type, const QMessageLogContext &context, co
 }
 
 
-QWidget* topWidget (QWidget* widget) {
+QWidget* topWidget(QWidget* widget) {
   while (widget->parentWidget() != nullptr) widget=widget->parentWidget();
   return widget;
 }
@@ -203,8 +207,7 @@ QColor interpColor(float xv, std::vector<float> xp, std::vector<QColor> fp) {
       (xv - xp[low]) * (fp[hi].red() - fp[low].red()) / (xp[hi] - xp[low]) + fp[low].red(),
       (xv - xp[low]) * (fp[hi].green() - fp[low].green()) / (xp[hi] - xp[low]) + fp[low].green(),
       (xv - xp[low]) * (fp[hi].blue() - fp[low].blue()) / (xp[hi] - xp[low]) + fp[low].blue(),
-      (xv - xp[low]) * (fp[hi].alpha() - fp[low].alpha()) / (xp[hi] - xp[low]) + fp[low].alpha()
-    );
+      (xv - xp[low]) * (fp[hi].alpha() - fp[low].alpha()) / (xp[hi] - xp[low]) + fp[low].alpha());
   }
 }
 
