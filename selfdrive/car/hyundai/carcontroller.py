@@ -209,7 +209,7 @@ class CarController:
           can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, SpeedLimiter.instance().get_active()))
 
       # 5 Hz ACC options
-      if self.frame % 20 == 0 and self.CP.openpilotLongitudinalControl:
+      if self.frame % 20 == 0 and self.CP.openpilotLongitudinalControl and self.CP.sccBus == 0:
         send_fca12 = self.CP.flags & HyundaiFlags.SEND_FCA12.value
         can_sends.extend(hyundaican.create_acc_opt(self.packer, CS, send_fca12))
 
