@@ -2210,6 +2210,7 @@ struct Event {
     magnetometer @95 :SensorEventData;
     lightSensor @96 :SensorEventData;
     temperatureSensor @97 :SensorEventData;
+    temperatureSensor2 @123 :SensorEventData;
     pandaStates @81 :List(PandaState);
     peripheralState @80 :PeripheralState;
     radarState @13 :RadarState;
@@ -2299,7 +2300,7 @@ struct Event {
     customReserved9 @116 :Custom.CustomReserved9;
 
     # neokii
-    naviData @123 :NaviData;
+    naviData @124 :NaviData;
 
     # *********** legacy + deprecated ***********
     model @9 :Legacy.ModelData; # TODO: rename modelV2 and mark this as deprecated
