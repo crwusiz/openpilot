@@ -306,7 +306,6 @@ public:
 };
 
 // add
-
 class NetworkImageWidget : public QWidget {
   Q_OBJECT
 

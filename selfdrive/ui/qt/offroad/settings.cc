@@ -152,7 +152,7 @@ void TogglesPanel::updateToggles() {
                                           "<h4>%6</h4><br>"
                                           "%7")
                                   .arg(tr("openpilot defaults to driving in <b>chill mode</b>. Experimental mode enables <b>alpha-level features</b> that aren't ready for chill mode. Experimental features are listed below:"))
-                                  .arg(tr("End-to-End Longitudinal Control" ))
+                                  .arg(tr("End-to-End Longitudinal Control"))
                                   .arg(tr("Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would, including stopping for red lights and stop signs. "
                                           "Since the driving model decides the speed to drive, the set speed will only act as an upper bound. This is an alpha quality feature; "
                                           "mistakes should be expected."))
@@ -425,10 +425,6 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
   QVBoxLayout *sidebar_layout = new QVBoxLayout(sidebar_widget);
   sidebar_layout->setMargin(0);
   panel_widget = new QStackedWidget();
-  panel_widget->setStyleSheet(R"(
-    border-radius: 30px;
-    background-color: #292929;
-  )");
 
   // close button
   QPushButton *close_btn = new QPushButton(tr("×"));
