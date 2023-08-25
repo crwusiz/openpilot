@@ -71,8 +71,7 @@ procs = [
   PythonProcess("dmonitoringd", "selfdrive.monitoring.dmonitoringd", driverview, enabled=(not PC or WEBCAM)),
   PythonProcess("laikad", "selfdrive.locationd.laikad", only_onroad),
   PythonProcess("rawgpsd", "system.sensord.rawgps.rawgpsd", qcomgps, enabled=TICI),
-  #PythonProcess("navd", "selfdrive.navd.navd", only_onroad),
-  PythonProcess("navd", "selfdrive.navd.navd", only_onroad, enabled=not Params().get_bool('UseExternalNaviRoutes')),
+  PythonProcess("navd", "selfdrive.navd.navd", only_onroad),
   PythonProcess("pandad", "selfdrive.boardd.pandad", always_run),
   PythonProcess("paramsd", "selfdrive.locationd.paramsd", only_onroad),
   NativeProcess("ubloxd", "system/ubloxd", ["./ubloxd"], ublox, enabled=TICI),
@@ -91,7 +90,7 @@ procs = [
 
   # Process add
   PythonProcess("navi_controller", "selfdrive.controls.neokii.navi_controller", always_run),
-  PythonProcess("navi_route", "selfdrive.controls.neokii.navi_route", only_onroad, enabled=Params().get_bool('UseExternalNaviRoutes')),
+  PythonProcess("navi_route", "selfdrive.controls.neokii.navi_route", only_onroad),
   PythonProcess("otisserv", "selfdrive.navd.otisserv", always_run),
 ]
 

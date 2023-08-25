@@ -164,6 +164,10 @@ def manager_thread() -> None:
     ignore += ["loggerd", "encoderd", "deleter", "logmessaged", "tombstoned", "uploader", "updated", "statsd"]
   if not params.get_bool("NavEnable"):
     ignore += ["navd", "otisserv"]
+  if params.get_bool("UseExternalNaviRoutes"):
+    ignore += ["navd"]
+  elif not params.get_bool("UseExternalNaviRoutes"):
+    ignore += ["navi_route"]
 
   ignore += [x for x in os.getenv("BLOCK", "").split(",") if len(x) > 0]
 
