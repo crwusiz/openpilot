@@ -409,6 +409,10 @@ class LongitudinalMpc:
 
       x2 = stop_x * np.ones(N+1) if (self.xState == XState.e2eStop) else 400.0 * np.ones(N+1)
 
+      if self.status:
+        d_rel = radarstate.leadOne.dRel if radarstate.leadOne.status else radarstate.leadTwo.dRel
+        self.params[:, 5] = interp(d_rel, [STOP_DISTANCE, 20], [1.0, 0.7])
+
       # Fake an obstacle for cruise, this ensures smooth acceleration to set speed
       # when the leads are no factor.
       v_lower = v_ego + (T_IDXS * self.cruise_min_a * 1.05)
