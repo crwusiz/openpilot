@@ -107,11 +107,6 @@ class CarState(CarStateBase):
       ret.cruiseState.available = cp.vl["TCS13"]["ACCEnable"] == 0
       ret.cruiseState.enabled = cp.vl["TCS13"]["ACC_REQ"] == 1
       ret.cruiseState.standstill = False
-    elif self.CP.sccBus == -1:
-      ret.cruiseState.available = cp.vl["EMS16"]["CRUISE_LAMP_M"] != 0
-      ret.cruiseState.enabled = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] != 0
-      ret.cruiseState.standstill = False
-      ret.cruiseState.speed = cp.vl["LVR12"]["CF_Lvr_CruiseSet"] * speed_conv if ret.cruiseState.enabled else 0
     else:
       ret.cruiseState.available = cp_cruise.vl["SCC11"]["MainMode_ACC"] == 1
       ret.cruiseState.enabled = cp_cruise.vl["SCC12"]["ACCMode"] != 0
@@ -305,31 +300,14 @@ class CarState(CarStateBase):
       ("TPMS11", 0),
     ]
 
-    if CP.sccBus == 0:
+    if not CP.openpilotLongitudinalControl:
       messages += [
         ("SCC11", 50),
         ("SCC12", 50),
       ]
 
-      if CP.hasScc13:
-        messages.append(("SCC13", 50))
-
-      if CP.hasScc14:
-        messages.append(("SCC14", 50))
-
-    if not CP.openpilotLongitudinalControl:
-      if not CP.sccBus == -1:
-        messages += [
-          ("SCC11", 50),
-          ("SCC12", 50),
-        ]
-      elif CP.sccBus == -1:
-        pass
-
       if CP.flags & HyundaiFlags.USE_FCA.value:
         messages.append(("FCA11", 50))
-      elif not CP.sccBus == -1:
-        pass
 
     if CP.enableBsm:
       messages.append(("LCA11", 50))
@@ -383,16 +361,8 @@ class CarState(CarStateBase):
       if CP.hasScc14:
         messages.append(("SCC14", 50))
 
-    if not CP.openpilotLongitudinalControl:
-      messages += [
-        ("SCC11", 50),
-        ("SCC12", 50),
-      ]
-
       if CP.flags & HyundaiFlags.USE_FCA.value:
         messages.append(("FCA11", 50))
-      elif CP.sccBus == -1:
-        pass
 
     return CANParser(DBC[CP.carFingerprint]["pt"], messages, 2)
 
