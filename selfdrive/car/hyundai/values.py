@@ -1144,6 +1144,7 @@ FW_VERSIONS = {
       b'\xf1\x00T02601BL  T02900A1  VTMPT25XXX900NS8\xb7\xaa\xfe\xfc',
       b'\xf1\x87954A02N250\x00\x00\x00\x00\x00\xf1\x81T02900A1  \xf1\x00T02601BL  T02900A1  VTMPT25XXX900NS8\xb7\xaa\xfe\xfc',
       b'\xf1\x00T02601BL  T02800A1  VTMPT25XXX800NS4\xed\xaf\xed\xf5',
+      b'\xf1\x00T02601BL  T02900A1  VTMPT25XXW900NS1c\x918\xc5',
     ],
   },
   CAR.SANTAFE_HEV: { # (TM)
@@ -1776,10 +1777,12 @@ FW_VERSIONS = {
       b'\xf1\x00NX4 FR_CMR AT USA LHD 1.00 1.00 99211-N9220 14K',
       b'\xf1\x00NX4 FR_CMR AT USA LHD 1.00 1.01 99211-N9100 14A',
       b'\xf1\x00NX4 FR_CMR AT USA LHD 1.00 1.00 99211-N9250 14W',
+      b'\xf1\x00NX4 FR_CMR AT EUR LHD 1.00 2.02 99211-N9000 14E',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00NX4__               1.00 1.00 99110-N9100         ',
       b'\xf1\x00NX4__               1.01 1.00 99110-N9100         ',
+      b'\xf1\x00NX4__               1.00 1.01 99110-N9000         ',
     ],
   },
   CAR.EV6: { # (CV1)
@@ -1821,10 +1824,12 @@ FW_VERSIONS = {
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00MQ4 MFC  AT USA LHD 1.00 1.03 99210-R5000 200903',
       b'\xf1\x00MQ4 MFC  AT USA LHD 1.00 1.05 99210-R5000 210623',
+      b'\xf1\x00MQ4 MFC  AT USA LHD 1.00 1.00 99210-R5100 221019',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00MQ4_ SCC FHCUP      1.00 1.06 99110-P2000         ',
       b'\xf1\x00MQ4_ SCC F-CUP      1.00 1.06 99110-P2000         ',
+      b'\xf1\x00MQ4_ SCC FHCUP      1.00 1.08 99110-P2000         ',
     ],
   },
   CAR.SORENTO_MQ4_HEV: { # (MQ4)
