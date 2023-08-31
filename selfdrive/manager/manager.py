@@ -54,7 +54,7 @@ def manager_init() -> None:
     ("IsLdwEnabled", "1"),
     ("AutoLaneChangeEnabled", "1"),
     ("PrebuiltEnable", "0"),
-    ("LateralControlSelect", "0"),
+    ("LateralControlSelect", "3"),
     ("MfcSelect", "0"),
     ("LoggerEnable", "0"),
     ("NavEnable", "0"),
