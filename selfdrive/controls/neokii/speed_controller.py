@@ -6,13 +6,15 @@ from openpilot.common.conversions import Conversions as CV
 from openpilot.common.numpy_fast import clip, interp
 from openpilot.common.params import Params
 from openpilot.selfdrive.car.hyundai.values import Buttons
-from openpilot.selfdrive.controls.lib.drive_helpers import V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_ENABLE_MIN, V_CRUISE_UNSET
+from openpilot.selfdrive.controls.lib.drive_helpers import V_CRUISE_INITIAL, V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_ENABLE_MIN, V_CRUISE_UNSET
 from openpilot.selfdrive.controls.lib.lateral_planner import TRAJECTORY_SIZE
 from openpilot.selfdrive.controls.neokii.navi_controller import SpeedLimiter
 
 SYNC_MARGIN = 3.
 MIN_CURVE_SPEED = 30. * CV.KPH_TO_MS
 
+V_CRUISE_DELTA_MI = 5 * CV.MPH_TO_KPH
+V_CRUISE_DELTA_KM = 10
 
 EventName = car.CarEvent.EventName
 ButtonType = car.CarState.ButtonEvent.Type
@@ -30,7 +32,7 @@ class SpeedController:
     self.speed_conv_to_ms = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
     self.speed_conv_to_clu = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH
 
-    self.min_set_speed_clu = self.kph_to_clu(V_CRUISE_MIN) # TODO - neokii
+    self.min_set_speed_clu = self.kph_to_clu(V_CRUISE_MIN)  # TODO - neokii
     self.max_set_speed_clu = self.kph_to_clu(V_CRUISE_MAX)
 
     self.btn = Buttons.NONE
@@ -238,7 +240,7 @@ class SpeedController:
       # 250kph or above probably means we never had a set speed
       if b.type in (ButtonType.accelCruise, ButtonType.resumeCruise) and v_cruise_last < 250:
         return v_cruise_last
-    return int(round(clip(v_ego * CV.MS_TO_KPH, V_CRUISE_ENABLE_MIN, V_CRUISE_MAX)))
+    return int(round(clip(v_ego * CV.MS_TO_KPH, V_CRUISE_INITIAL, V_CRUISE_MAX)))
 
 
   def update_v_cruise(self, CS, sm, enabled, is_metric, v_cruise_kph, v_cruise_kph_last):  # called by controlds's state_transition
