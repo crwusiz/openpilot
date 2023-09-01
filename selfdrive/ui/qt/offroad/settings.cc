@@ -626,14 +626,14 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   auto gitpull_btn = new ButtonControl(tr("Git Fetch and Reset"), tr("RUN"));
   QObject::connect(gitpull_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Git Fetch and Reset Process?"), tr("Process"), this)) {
+    if (ConfirmationDialog::confirm(tr("Git Fetch and Reset<br><br>Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/gitpull.sh");
     }
   });
 
   auto gitcheckout_btn = new ButtonControl(tr("Git Checkout"), tr("RUN"));
   QObject::connect(gitcheckout_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Git Checkout Process?"), tr("Process"), this)) {
+    if (ConfirmationDialog::confirm(tr("Git Checkout<br><br>Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/checkout.sh");
     }
   });
@@ -648,7 +648,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   auto cleardtc_btn = new ButtonControl(tr("Clear DTC"), tr("RUN"));
   QObject::connect(cleardtc_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Clear DTC Process?"), tr("Process"), this)) {
+    if (ConfirmationDialog::confirm(tr("Clear DTC<br><br>Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/cleardtc.sh");
     }
   });
@@ -698,14 +698,14 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   auto pandaflash_btn = new ButtonControl(tr("Panda Flash"), tr("RUN"));
   QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Panda Flash Process?"), tr("Process"), this)) {
+    if (ConfirmationDialog::confirm(tr("Panda Flash<br><br>Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/panda/board/flash.py");
     }
   });
 
   auto pandarecover_btn = new ButtonControl(tr("Panda Recover"), tr("RUN"));
   QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Panda Recover Process?"), tr("Process"), this)) {
+    if (ConfirmationDialog::confirm(tr("Panda Recover<br><br>Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/panda/board/recover.py");
     }
   });

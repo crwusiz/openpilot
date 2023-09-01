@@ -84,54 +84,57 @@ function launch {
 
   # CarList
   # sed '$a-------------------' ( add last line )
-  if [ ! -d "/data/params/crwusiz" ] ; then
-    mkdir /data/params/crwusiz
+
+  PARAMS_ROOT="/data/params"
+
+  if [ ! -d "${PARAMS_ROOT}/crwusiz" ] ; then
+    mkdir ${PARAMS_ROOT}/crwusiz
   fi
 
-  cat /data/openpilot/selfdrive/car/hyundai/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_HYUNDAI
-  awk '/HYUNDAI/' /data/params/crwusiz/CarList_HYUNDAI > /data/params/crwusiz/CarList_Hyundai
-  awk '/KIA/' /data/params/crwusiz/CarList_HYUNDAI > /data/params/crwusiz/CarList_Kia
-  awk '/GENESIS/' /data/params/crwusiz/CarList_HYUNDAI > /data/params/crwusiz/CarList_Genesis
+  cat $BASEDIR/selfdrive/car/hyundai/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > ${PARAMS_ROOT}/crwusiz/CarList_HYUNDAI
+  awk '/HYUNDAI/' ${PARAMS_ROOT}/crwusiz/CarList_HYUNDAI > ${PARAMS_ROOT}/crwusiz/CarList_Hyundai
+  awk '/KIA/' ${PARAMS_ROOT}/crwusiz/CarList_HYUNDAI > ${PARAMS_ROOT}/crwusiz/CarList_Kia
+  awk '/GENESIS/' ${PARAMS_ROOT}/crwusiz/CarList_HYUNDAI > ${PARAMS_ROOT}/crwusiz/CarList_Genesis
 
-  MANUFACTURER=$(cat /data/params/d/SelectedManufacturer)
+  MANUFACTURER=$(cat ${PARAMS_ROOT}/d/SelectedManufacturer)
   if [ "${MANUFACTURER}" = "HYUNDAI" ]; then
-    cp -f /data/params/crwusiz/CarList_Hyundai /data/params/crwusiz/CarList
+    cp -f ${PARAMS_ROOT}/crwusiz/CarList_Hyundai ${PARAMS_ROOT}/crwusiz/CarList
   elif [ "${MANUFACTURER}" = "KIA" ]; then
-    cp -f /data/params/crwusiz/CarList_Kia /data/params/crwusiz/CarList
+    cp -f ${PARAMS_ROOT}/crwusiz/CarList_Kia ${PARAMS_ROOT}/crwusiz/CarList
   elif [ "${MANUFACTURER}" = "GENESIS" ]; then
-    cp -f /data/params/crwusiz/CarList_Genesis /data/params/crwusiz/CarList
+    cp -f ${PARAMS_ROOT}/crwusiz/CarList_Genesis ${PARAMS_ROOT}/crwusiz/CarList
   else
-    cp -f /data/params/crwusiz/CarList_HYUNDAI /data/params/crwusiz/CarList
+    cp -f ${PARAMS_ROOT}/crwusiz/CarList_HYUNDAI ${PARAMS_ROOT}/crwusiz/CarList
   fi
-  #cat /data/openpilot/selfdrive/car/gm/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_Gm
-  #cat /data/openpilot/selfdrive/car/toyota/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_TOYOTA
-  #awk '/TOYOTA/' /data/params/crwusiz/CarList_TOYOTA > /data/params/crwusiz/CarList_Toyota
-  #awk '/LEXUS/' /data/params/crwusiz/CarList_TOYOTA > /data/params/crwusiz/CarList_Lexus
-  #cat /data/openpilot/selfdrive/car/honda/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > /data/params/crwusiz/CarList_Honda
+  #cat $BASEDIR/selfdrive/car/gm/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > ${PARAMS_ROOT}/crwusiz/CarList_Gm
+  #cat $BASEDIR/selfdrive/car/toyota/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > ${PARAMS_ROOT}/crwusiz/CarList_TOYOTA
+  #awk '/TOYOTA/' ${PARAMS_ROOT}/crwusiz/CarList_TOYOTA > ${PARAMS_ROOT}/crwusiz/CarList_Toyota
+  #awk '/LEXUS/' ${PARAMS_ROOT}/crwusiz/CarList_TOYOTA > ${PARAMS_ROOT}/crwusiz/CarList_Lexus
+  #cat $BASEDIR/selfdrive/car/honda/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > ${PARAMS_ROOT}/crwusiz/CarList_Honda
 
   # git last commit log
-  git log -1 --pretty=format:"%h, %cs, %cr" > /data/params/d/GitLog
+  git log -1 --pretty=format:"%h, %cs, %cr" > ${PARAMS_ROOT}/d/GitLog
 
-  if [ ! -f "/data/params/d/SelectedBranch" ]; then
-    git branch --show-current > /data/params/d/SelectedBranch
-    #git status | grep "origin" | awk -F'/' '{print $2}' | sed -e 's/..$//' > /data/params/d/SelectedBranch
+  if [ ! -f "${PARAMS_ROOT}/d/SelectedBranch" ]; then
+    git branch --show-current > ${PARAMS_ROOT}/d/SelectedBranch
+    #git status | grep "origin" | awk -F'/' '{print $2}' | sed -e 's/..$//' > ${PARAMS_ROOT}/d/SelectedBranch
   fi
 
   # git remote branch list
-  git branch -r | sed '1d' | sed -e 's/[/]//g' | sed -e 's/origin//g' | sort -r > /data/params/crwusiz/GitBranchList
+  git branch -r | sed '1d' | sed -e 's/[/]//g' | sed -e 's/origin//g' | sort -r > ${PARAMS_ROOT}/crwusiz/GitBranchList
 
   # git remote
-  #sed 's/.\{4\}$//' /data/params/d/GitRemote > /data/params/crwusiz/GitRemote_
+  #sed 's/.\{4\}$//' ${PARAMS_ROOT}/d/GitRemote > ${PARAMS_ROOT}/crwusiz/GitRemote_
 
   # events language init
-  LANG=$(cat /data/params/d/LanguageSetting)
+  LANG=$(cat ${PARAMS_ROOT}/d/LanguageSetting)
 
   if [ "${LANG}" = "main_ko" ]; then
-    cp -f /data/openpilot/scripts/add/events_ko.py /data/openpilot/selfdrive/controls/lib/events.py
-    cp -f /data/openpilot/scripts/add/ui_ko.h /data/openpilot/selfdrive/ui/ui.h
+    cp -f $BASEDIR/scripts/add/events_ko.py $BASEDIR/selfdrive/controls/lib/events.py
+    cp -f $BASEDIR/scripts/add/ui_ko.h $BASEDIR/selfdrive/ui/ui.h
   else
-    cp -f /data/openpilot/scripts/add/events.py /data/openpilot/selfdrive/controls/lib/events.py
-    cp -f /data/openpilot/scripts/add/ui.h /data/openpilot/selfdrive/ui/ui.h
+    cp -f $BASEDIR/scripts/add/events.py $BASEDIR/selfdrive/controls/lib/events.py
+    cp -f $BASEDIR/scripts/add/ui.h $BASEDIR/selfdrive/ui/ui.h
   fi
 
   # start manager

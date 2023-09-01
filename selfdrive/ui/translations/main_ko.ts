@@ -149,10 +149,6 @@
         <translation>고장코드 제거</translation>
     </message>
     <message>
-        <source>Tmux error log</source>
-        <translation type="vanished">Tmux 에러 로그</translation>
-    </message>
-    <message>
         <source>Panda Flash</source>
         <translation>Panda 플래싱</translation>
     </message>
@@ -200,6 +196,27 @@
         <source>Git Checkout</source>
         <translation>Git Checkout</translation>
     </message>
+    <message>
+        <source>Git Fetch and Reset&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>Git Fetch and Reset&lt;br&gt;&lt;br>실행하시겠습니까?</translation>
+    </message>
+    <message>
+        <source>Git Checkout&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>Git Checkout&lt;br&gt;&lt;br&gt;실행하시겠습니까?</translation>
+    </message>
+    <message>
+        <source>Clear DTC&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>고장코드 제거&lt;br&gt;&lt;br&gt;실행하시겠습니까?</translation>
+    </message>
+    <message>
+        <source>Panda Flash&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>Panda 플래싱&lt;br&gt;&lt;br&gt;실행하시겠습니까?</translation>
+    </message>
+    <message>
+        <source>Panda Recover&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>Panda 복구&lt;br&gt;&lt;br&gt;실행하시겠습니까?</translation>
+    </message>
+
 </context>
 <context>
     <name>ConfirmationDialog</name>
