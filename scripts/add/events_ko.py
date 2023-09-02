@@ -412,7 +412,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
       "브레이크!",
       "추돌 위험",
       AlertStatus.critical, AlertSize.full,
-      Priority.HIGHEST, VisualAlert.fcw, AudibleAlert.none, 2.),
+      Priority.HIGHEST, VisualAlert.fcw, AudibleAlert.warningSoft, 2.),
     ET.NO_ENTRY: NoEntryAlert("AEB: 추돌위험"),
   },
 

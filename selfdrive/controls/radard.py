@@ -98,11 +98,11 @@ class Track:
       "vLead": float(self.vLead),
       "vLeadK": float(self.vLeadK),
       "aLeadK": float(self.aLeadK),
-      "aLeadTau": float(self.aLeadTau),
       "status": True,
       "fcw": self.is_potential_fcw(model_prob),
       "modelProb": model_prob,
       "radar": True,
+      "aLeadTau": float(self.aLeadTau)
     }
 
   def get_RadarState2(self, model_prob, lead_msg):
@@ -118,11 +118,11 @@ class Track:
       "vLead": float(self.vLead),
       "vLeadK": float(self.vLeadK),
       "aLeadK": aLeadK,
-      "aLeadTau": 0.3 if useVisionMix else float(self.aLeadTau),
       "status": True,
       "fcw": self.is_potential_fcw(model_prob),
       "modelProb": model_prob,
       "radar": True,
+      "aLeadTau": float(self.aLeadTau)
     }
 
 

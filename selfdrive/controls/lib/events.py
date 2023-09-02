@@ -412,7 +412,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
       "BRAKE!",
       "Stock AEB: Risk of Collision",
       AlertStatus.critical, AlertSize.full,
-      Priority.HIGHEST, VisualAlert.fcw, AudibleAlert.none, 2.),
+      Priority.HIGHEST, VisualAlert.fcw, AudibleAlert.warningSoft, 2.),
     ET.NO_ENTRY: NoEntryAlert("Stock AEB: Risk of Collision"),
   },
 
