@@ -244,10 +244,8 @@ class SpeedController:
 
 
   def update_v_cruise(self, CS, sm, enabled, is_metric, v_cruise_kph, v_cruise_kph_last):  # called by controlds's state_transition
-    manage_button = not self.CP.openpilotLongitudinalControl or not self.CP.pcmCruise
-
     if CS.cruiseState.enabled:
-      if manage_button:
+      if any([not self.CP.openpilotLongitudinalControl, not self.CP.pcmCruise]):
         v_cruise_kph = self.update_cruise_button(v_cruise_kph, CS.buttonEvents, enabled, is_metric)
       else:
         v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
