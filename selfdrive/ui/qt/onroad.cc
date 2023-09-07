@@ -357,83 +357,74 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   const bool cs_alive = sm.alive("controlsState");
 
   // Handle older routes where vCruiseCluster is not set
-  float apply_speed = cs.getVCruise();
-  float cruise_speed = cs.getVCruiseCluster() == 0.0 ? cs.getVCruise() : cs.getVCruiseCluster();
-  bool cruise_set = cruise_speed > 0 && (int)cruise_speed != SET_SPEED_NA && ce.getCruiseState().getSpeed();
+  apply_speed = cs.getVCruise();
+  cruise_speed = cs.getVCruiseCluster() == 0.0 ? cs.getVCruise() : cs.getVCruiseCluster();
+  is_cruise_set = cruise_speed > 0 && (int)cruise_speed != SET_SPEED_NA && ce.getCruiseState().getSpeed();
 
-  if (cruise_set && !s.scene.is_metric) {
+  if (is_cruise_set && !s.scene.is_metric) {
     apply_speed *= KM_TO_MILE;
     cruise_speed *= KM_TO_MILE;
   }
 
   // Handle older routes where vEgoCluster is not set
-  float v_ego;
-  if (ce.getVEgoCluster() == 0.0 && !v_ego_cluster_seen) {
-    v_ego = ce.getVEgo();
-  } else {
-    v_ego = ce.getVEgoCluster();
-    v_ego_cluster_seen = true;
-  }
-  float cur_speed = cs_alive ? std::max<float>(0.0, v_ego) : 0.0;
-  cur_speed *= s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH;
+  v_ego_cluster_seen = v_ego_cluster_seen || ce.getVEgoCluster() != 0.0;
+  float v_ego = v_ego_cluster_seen ? ce.getVEgoCluster() : ce.getVEgo();
+  speed = cs_alive ? std::max<float>(0.0, v_ego) : 0.0;
+  speed *= s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH;
 
-  setProperty("is_cruise_set", cruise_set);
-  setProperty("speed", cur_speed);
-  setProperty("applyMaxSpeed", apply_speed);
-  setProperty("cruiseMaxSpeed", cruise_speed);
-  setProperty("speedUnit", s.scene.is_metric ? tr("km/h") : tr("mph"));
-  setProperty("accel", ce.getAEgo());
-  setProperty("hideBottomIcons", (cs.getAlertSize() != cereal::ControlsState::AlertSize::NONE));
-  setProperty("status", s.status);
-  setProperty("steeringPressed", ce.getSteeringPressed());
-  setProperty("isStandstill", ce.getStandstill());
-  setProperty("brake_state", ce.getBrakeLights());
-  setProperty("autohold_state", ce.getAutoHold());
-  setProperty("gas_pressed", ce.getGasPressed());
-  setProperty("left_blindspot", ce.getLeftBlindspot());
-  setProperty("right_blindspot", ce.getRightBlindspot());
-  setProperty("wifi_state", (int)ds.getNetworkStrength());
-  setProperty("gps_state", sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK());
-  setProperty("gpsBearing", ge.getBearingDeg());
-  setProperty("gpsVerticalAccuracy", ge.getVerticalAccuracy());
-  setProperty("gpsAltitude", ge.getAltitude());
-  setProperty("gpsAccuracy", ge.getAccuracy());
-  setProperty("gpsSatelliteCount", s.scene.satelliteCount);
-  setProperty("steerAngle", ce.getSteeringAngleDeg());
-  setProperty("longControl", cp.getOpenpilotLongitudinalControl());
-  setProperty("gap_state", ce.getCruiseState().getGapAdjust());
-  setProperty("lateralControl", cs.getLateralControlSelect());
-  setProperty("steerRatio", lp.getSteerRatio());
-  setProperty("sccBus", cp.getSccBus());
-  setProperty("fl", ce.getTpms().getFl());
-  setProperty("fr", ce.getTpms().getFr());
-  setProperty("rl", ce.getTpms().getRl());
-  setProperty("rr", ce.getTpms().getRr());
-  setProperty("navLimitSpeed", ce.getNavLimitSpeed());
-  setProperty("nda_state", nd.getActive());
-  setProperty("isNda2", nd.getIsNda2());
-  setProperty("roadLimitSpeed", nd.getRoadLimitSpeed());
-  setProperty("camLimitSpeed", nd.getCamLimitSpeed());
-  setProperty("camLimitSpeedLeftDist", nd.getCamLimitSpeedLeftDist());
-  setProperty("sectionLimitSpeed", nd.getSectionLimitSpeed());
-  setProperty("sectionLeftDist", nd.getSectionLeftDist());
-  setProperty("left_on", ce.getLeftBlinker());
-  setProperty("right_on", ce.getRightBlinker());
-  setProperty("latAccelFactor", cs.getLateralControlState().getTorqueState().getLatAccelFactor());
-  setProperty("friction", cs.getLateralControlState().getTorqueState().getFriction());
-  setProperty("latAccelFactorRaw", tp.getLatAccelFactorRaw());
-  setProperty("frictionRaw", tp.getFrictionCoefficientRaw());
-  setProperty("traffic_state", lo.getTrafficState());
-  setProperty("nav_enabled", sm["modelV2"].getModelV2().getNavEnabled());
+  speedUnit =  s.scene.is_metric ? tr("km/h") : tr("mph");
+  hideBottomIcons = (cs.getAlertSize() != cereal::ControlsState::AlertSize::NONE);
+  status = s.status;
+
+  accel = ce.getAEgo();
+  steeringPressed = ce.getSteeringPressed();
+  isStandstill = ce.getStandstill();
+  brake_state = ce.getBrakeLights();
+  autohold_state = ce.getAutoHold();
+  gas_pressed = ce.getGasPressed();
+  left_blindspot = ce.getLeftBlindspot();
+  right_blindspot = ce.getRightBlindspot();
+  wifi_state = (int)ds.getNetworkStrength();
+  gps_state = sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK();
+  gpsBearing = ge.getBearingDeg();
+  gpsVerticalAccuracy = ge.getVerticalAccuracy();
+  gpsAltitude = ge.getAltitude();
+  gpsAccuracy = ge.getAccuracy();
+  gpsSatelliteCount = s.scene.satelliteCount;
+  steerAngle = ce.getSteeringAngleDeg();
+  longControl = cp.getOpenpilotLongitudinalControl();
+  gap_state = ce.getCruiseState().getGapAdjust();
+  lateralControl = cs.getLateralControlSelect();
+  steerRatio = lp.getSteerRatio();
+  sccBus = cp.getSccBus();
+  fl = ce.getTpms().getFl();
+  fr = ce.getTpms().getFr();
+  rl = ce.getTpms().getRl();
+  rr = ce.getTpms().getRr();
+  navLimitSpeed = ce.getNavLimitSpeed();
+  nda_state = nd.getActive();
+  isNda2 = nd.getIsNda2();
+  roadLimitSpeed = nd.getRoadLimitSpeed();
+  camLimitSpeed = nd.getCamLimitSpeed();
+  camLimitSpeedLeftDist = nd.getCamLimitSpeedLeftDist();
+  sectionLimitSpeed = nd.getSectionLimitSpeed();
+  sectionLeftDist = nd.getSectionLeftDist();
+  left_on = ce.getLeftBlinker();
+  right_on = ce.getRightBlinker();
+  latAccelFactor = cs.getLateralControlState().getTorqueState().getLatAccelFactor();
+  friction = cs.getLateralControlState().getTorqueState().getFriction();
+  latAccelFactorRaw = tp.getLatAccelFactorRaw();
+  frictionRaw = tp.getFrictionCoefficientRaw();
+  traffic_state = lo.getTrafficState();
+  nav_enabled = sm["modelV2"].getModelV2().getNavEnabled();
 
   // update engageability/experimental mode button
   experimental_btn->updateState(s);
 
   // update DM icon
   auto dm_state = sm["driverMonitoringState"].getDriverMonitoringState();
-  setProperty("dmActive", dm_state.getIsActiveMode());
-  setProperty("rightHandDM", dm_state.getIsRHD());
-
+  dmActive = dm_state.getIsActiveMode();
+  rightHandDM = dm_state.getIsRHD();
   // DM icon transition
   dm_fade_state = std::clamp(dm_fade_state+0.2*(0.5-dmActive), 0.0, 1.0);
 
@@ -491,14 +482,14 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   //drawRoundedRect(p, max_speed_rect, top_radius, top_radius, bottom_radius, bottom_radius);
 
   // max speed (upper left 1)
-  QString cruiseSpeedStr = QString::number(std::nearbyint(cruiseMaxSpeed));
+  QString cruiseSpeedStr = QString::number(std::nearbyint(cruise_speed));
   QRect max_speed_outer(max_speed_rect.left() + 10, max_speed_rect.top() + 10, 140, 168);
   p.setPen(QPen(whiteColor(200), 2));
   p.drawRoundedRect(max_speed_outer, 16, 16);
 
   if (limit_speed > 0 && status != STATUS_DISENGAGED && status != STATUS_OVERRIDE) {
     p.setPen(interpColor(
-      cruiseMaxSpeed,
+      cruise_speed,
       {limit_speed + 5, limit_speed + 15, limit_speed + 25},
       {whiteColor(), orangeColor(), redColor()}
     ));
@@ -517,7 +508,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     p.setPen(overrideColor());
   } else if (limit_speed > 0) {
     p.setPen(interpColor(
-      cruiseMaxSpeed,
+      cruise_speed,
       {limit_speed + 5, limit_speed + 15, limit_speed + 25},
       {greenColor(), lightorangeColor(), pinkColor()}
     ));
@@ -532,14 +523,14 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   // apply speed (upper left 2)
   if (longControl) {
-    QString applySpeedStr = QString::number(std::nearbyint(applyMaxSpeed));
+    QString applySpeedStr = QString::number(std::nearbyint(apply_speed));
     QRect apply_speed_outer(max_speed_rect.right() - 150, max_speed_rect.top() + 10, 140, 168);
     p.setPen(QPen(whiteColor(200), 2));
     p.drawRoundedRect(apply_speed_outer, 16, 16);
 
     if (limit_speed > 0 && status != STATUS_DISENGAGED && status != STATUS_OVERRIDE) {
       p.setPen(interpColor(
-        applyMaxSpeed,
+        apply_speed,
         {limit_speed + 5, limit_speed + 15, limit_speed + 25},
         {whiteColor(), orangeColor(), redColor()}
       ));
@@ -558,7 +549,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
       p.setPen(overrideColor());
     } else if (limit_speed > 0) {
       p.setPen(interpColor(
-        applyMaxSpeed,
+        apply_speed,
         {limit_speed + 5, limit_speed + 15, limit_speed + 25},
         {greenColor(), lightorangeColor(), pinkColor()}
       ));

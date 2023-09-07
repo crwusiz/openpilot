@@ -66,60 +66,6 @@ private:
 // container window for the NVG UI
 class AnnotatedCameraWidget : public CameraWidget {
   Q_OBJECT
-  Q_PROPERTY(QString speedUnit MEMBER speedUnit);
-
-  Q_PROPERTY(bool is_cruise_set MEMBER is_cruise_set);
-  Q_PROPERTY(bool steeringPressed MEMBER steeringPressed);
-  Q_PROPERTY(bool dmActive MEMBER dmActive);
-  Q_PROPERTY(bool brake_state MEMBER brake_state);
-  Q_PROPERTY(bool left_blindspot MEMBER left_blindspot);
-  Q_PROPERTY(bool right_blindspot MEMBER right_blindspot);
-  Q_PROPERTY(bool gps_state MEMBER gps_state);
-  Q_PROPERTY(bool longControl MEMBER longControl);
-  Q_PROPERTY(bool left_on MEMBER left_on);
-  Q_PROPERTY(bool right_on MEMBER right_on);
-  Q_PROPERTY(bool gas_pressed MEMBER gas_pressed);
-  Q_PROPERTY(bool isStandstill MEMBER isStandstill);
-  Q_PROPERTY(bool hideBottomIcons MEMBER hideBottomIcons);
-  Q_PROPERTY(bool rightHandDM MEMBER rightHandDM);
-  Q_PROPERTY(bool nav_enabled MEMBER nav_enabled);
-
-  Q_PROPERTY(int status MEMBER status);
-  Q_PROPERTY(int autohold_state MEMBER autohold_state);
-  Q_PROPERTY(int nda_state MEMBER nda_state);
-  Q_PROPERTY(int isNda2 MEMBER isNda2);
-  Q_PROPERTY(int wifi_state MEMBER wifi_state);
-  Q_PROPERTY(int gpsSatelliteCount MEMBER gpsSatelliteCount);
-  Q_PROPERTY(int gap_state MEMBER gap_state);
-  Q_PROPERTY(int lateralControl MEMBER lateralControl);
-  Q_PROPERTY(int sccBus MEMBER sccBus);
-  Q_PROPERTY(int camLimitSpeed MEMBER camLimitSpeed);
-  Q_PROPERTY(int camLimitSpeedLeftDist MEMBER camLimitSpeedLeftDist);
-  Q_PROPERTY(int sectionLimitSpeed MEMBER sectionLimitSpeed);
-  Q_PROPERTY(int sectionLeftDist MEMBER sectionLeftDist);
-  Q_PROPERTY(int accel MEMBER accel);
-  Q_PROPERTY(int traffic_state MEMBER traffic_state);
-
-  Q_PROPERTY(float speed MEMBER speed);
-  Q_PROPERTY(float applyMaxSpeed MEMBER applyMaxSpeed);
-  Q_PROPERTY(float cruiseMaxSpeed MEMBER cruiseMaxSpeed);
-  Q_PROPERTY(float gpsBearing MEMBER gpsBearing);
-  Q_PROPERTY(float gpsVerticalAccuracy MEMBER gpsVerticalAccuracy);
-  Q_PROPERTY(float gpsAltitude MEMBER gpsAltitude);
-  Q_PROPERTY(float gpsAccuracy MEMBER gpsAccuracy);
-  Q_PROPERTY(float steerAngle MEMBER steerAngle);
-  Q_PROPERTY(float steerRatio MEMBER steerRatio);
-  Q_PROPERTY(float fl MEMBER fl);
-  Q_PROPERTY(float fr MEMBER fr);
-  Q_PROPERTY(float rl MEMBER rl);
-  Q_PROPERTY(float rr MEMBER rr);
-  Q_PROPERTY(float roadLimitSpeed MEMBER roadLimitSpeed);
-  Q_PROPERTY(float navLimitSpeed MEMBER navLimitSpeed);
-  Q_PROPERTY(float latAccelFactor MEMBER latAccelFactor);
-  Q_PROPERTY(float friction MEMBER friction);
-  Q_PROPERTY(float latAccelFactorRaw MEMBER latAccelFactorRaw);
-  Q_PROPERTY(float frictionRaw MEMBER frictionRaw);
-  Q_PROPERTY(float dm_fade_state MEMBER dm_fade_state);
 
 public:
   explicit AnnotatedCameraWidget(VisionStreamType type, QWidget* parent = 0);
@@ -183,7 +129,7 @@ private:
   int skip_frame_count = 0;
   int traffic_state = 0;
 
-  float speed, applyMaxSpeed, cruiseMaxSpeed;
+  float speed, apply_speed, cruise_speed;
   float gpsBearing, gpsVerticalAccuracy, gpsAltitude, gpsAccuracy = 0;
   float steerAngle, steerRatio = 0;
   float fl, fr, rl, rr = 0;

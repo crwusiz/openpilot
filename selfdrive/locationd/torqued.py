@@ -225,26 +225,23 @@ class TorqueEstimator:
     liveTorqueParameters.version = VERSION
     liveTorqueParameters.useParams = self.use_params
 
-    try:
+    if self.filtered_points.is_valid():
       latAccelFactor, latAccelOffset, frictionCoeff = self.estimate_params()
       liveTorqueParameters.latAccelFactorRaw = float(latAccelFactor)
       liveTorqueParameters.latAccelOffsetRaw = float(latAccelOffset)
       liveTorqueParameters.frictionCoefficientRaw = float(frictionCoeff)
 
-      if self.filtered_points.is_valid():
-        if any(val is None or np.isnan(val) for val in [latAccelFactor, latAccelOffset, frictionCoeff]):
-          cloudlog.exception("Live torque parameters are invalid.")
-          liveTorqueParameters.liveValid = False
-          self.reset()
-        else:
-          liveTorqueParameters.liveValid = True
-          latAccelFactor = np.clip(latAccelFactor, self.min_lataccel_factor, self.max_lataccel_factor)
-          frictionCoeff = np.clip(frictionCoeff, self.min_friction, self.max_friction)
-          self.update_params({'latAccelFactor': latAccelFactor, 'latAccelOffset': latAccelOffset, 'frictionCoefficient': frictionCoeff})
-      else:
+      if any(val is None or np.isnan(val) for val in [latAccelFactor, latAccelOffset, frictionCoeff]):
+        cloudlog.exception("Live torque parameters are invalid.")
         liveTorqueParameters.liveValid = False
-    except:
-      pass
+        self.reset()
+      else:
+        liveTorqueParameters.liveValid = True
+        latAccelFactor = np.clip(latAccelFactor, self.min_lataccel_factor, self.max_lataccel_factor)
+        frictionCoeff = np.clip(frictionCoeff, self.min_friction, self.max_friction)
+        self.update_params({'latAccelFactor': latAccelFactor, 'latAccelOffset': latAccelOffset, 'frictionCoefficient': frictionCoeff})
+    else:
+      liveTorqueParameters.liveValid = False
 
     if with_points:
       liveTorqueParameters.points = self.filtered_points.get_points()[:, [0, 2]].tolist()
