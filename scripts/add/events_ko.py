@@ -245,9 +245,9 @@ def below_steer_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.S
 
 
 def calibration_incomplete_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
-  first_word = 'Recalibration' if sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.recalibrating else 'Calibration'
+  first_word = '캘리브레이션을 다시' if sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.recalibrating else '캘리브레이션'
   return Alert(
-    f"{first_word} 진행중입니다: {sm['liveCalibration'].calPerc:.0f}%",
+    f"{first_word} 진행중 : {sm['liveCalibration'].calPerc:.0f}%",
     f"속도를 {get_display_speed(MIN_SPEED_FILTER, metric)} 이상으로 주행하세요",
     AlertStatus.normal, AlertSize.mid,
     Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2)
@@ -426,7 +426,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   EventName.ldw: {
     ET.PERMANENT: Alert(
-      "차선이탈 감지됨",
+      "차선이탈",
       "",
       AlertStatus.userPrompt, AlertSize.small,
       Priority.LOW, VisualAlert.ldw, AudibleAlert.prompt, 3.),
@@ -586,11 +586,9 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
     ET.PERMANENT: NormalPermanentAlert("GPS 오작동", "장치를 점검하세요"),
   },
 
-  # When the GPS position and localizer diverge the localizer is reset to the
-  # current GPS position. This alert is thrown when the localizer is reset
-  # more often than expected.
   EventName.localizerMalfunction: {
-    #ET.PERMANENT: NormalPermanentAlert("Sensor Malfunction", "Hardware Malfunction"),
+    ET.NO_ENTRY: NoEntryAlert("로컬라이저 오작동"),
+    ET.SOFT_DISABLE: soft_disable_alert("로컬라이저 오작동"),
   },
 
   # ********** events that affect controls state transitions **********
@@ -732,14 +730,14 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   EventName.calibrationIncomplete: {
     ET.PERMANENT: calibration_incomplete_alert,
-    ET.SOFT_DISABLE: soft_disable_alert("캘리브레이션 진행중입니다"),
+    ET.SOFT_DISABLE: soft_disable_alert("캘리브레이션이 완료되지않았습니다"),
     ET.NO_ENTRY: NoEntryAlert("캘리브레이션 진행중입니다"),
   },
 
   EventName.calibrationRecalibrating: {
     ET.PERMANENT: calibration_incomplete_alert,
-    ET.SOFT_DISABLE: soft_disable_alert("장치 위치변경 감지됨 : 캘리브레이션 진행중입니다"),
-    ET.NO_ENTRY: NoEntryAlert("장치 위치변경 감지됨 : 캘리브레이션 진행중입니다"),
+    ET.SOFT_DISABLE: soft_disable_alert("장치 위치변경 감지됨 : 캘리브레이션을 다시 진행중입니다"),
+    ET.NO_ENTRY: NoEntryAlert("장치 위치변경 감지됨 : 캘리브레이션을 다시 진행중입니다"),
   },
 
   EventName.doorOpen: {
@@ -764,8 +762,8 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   },
 
   EventName.espDisabled: {
-    ET.SOFT_DISABLE: soft_disable_alert("전자식 스태빌리티 컨트롤 비활성화"),
-    ET.NO_ENTRY: NoEntryAlert("전자식 스태빌리티 컨트롤 비활성화"),
+    ET.SOFT_DISABLE: soft_disable_alert("ESP 비활성화"),
+    ET.NO_ENTRY: NoEntryAlert("ESP 비활성화"),
   },
 
   EventName.lowBattery: {
