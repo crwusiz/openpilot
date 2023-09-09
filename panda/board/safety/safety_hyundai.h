@@ -25,114 +25,93 @@ const LongitudinalLimits HYUNDAI_LONG_LIMITS = {
   .min_accel = -350,  // 1/100 m/s2
 };
 
-#define MSG_HYUNDAI_LKAS11        832
-#define MSG_HYUNDAI_CLU11         1265
-#define MSG_HYUNDAI_LFAHDA_MFC    1157
-
-#define MSG_HYUNDAI_SCC11         1056
-#define MSG_HYUNDAI_SCC12         1057
-#define MSG_HYUNDAI_SCC13         1290
-#define MSG_HYUNDAI_SCC14         905
-#define MSG_HYUNDAI_FRT_RADAR11   1186
-#define MSG_HYUNDAI_FCA11         909
-#define MSG_HYUNDAI_FCA12         1155
-#define MSG_HYUNDAI_UDS_RADAR_TX  2000
-
-#define MSG_HYUNDAI_EMS16         608
-#define MSG_HYUNDAI_EMS11         790
-#define MSG_HYUNDAI_E_EMS11       881
-#define MSG_HYUNDAI_WHL_SPD11     902
-#define MSG_HYUNDAI_TCS13         916
-#define MSG_HYUNDAI_MDPS12        593
-
-
 const CanMsg HYUNDAI_TX_MSGS[] = {
-  {MSG_HYUNDAI_MDPS12,       HYUNDAI_CAM_BUS, 8},
-  //{MSG_HYUNDAI_EMS11,        HYUNDAI_SUB_BUS, 8},
-  {MSG_HYUNDAI_LKAS11,       HYUNDAI_MAIN_BUS, 8},
-  //{MSG_HYUNDAI_LKAS11,       HYUNDAI_SUB_BUS, 8},
-  {MSG_HYUNDAI_SCC11,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_SCC12,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_SCC13,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_SCC14,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_FCA11,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_FCA12,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_LFAHDA_MFC,   HYUNDAI_MAIN_BUS, 4},
-  {MSG_HYUNDAI_FRT_RADAR11,  HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_CLU11,        HYUNDAI_MAIN_BUS, 4},
-  //{MSG_HYUNDAI_CLU11,        HYUNDAI_SUB_BUS, 4},
-  {MSG_HYUNDAI_CLU11,        HYUNDAI_CAM_BUS, 4},
+  {0x251, 2, 8},  // MDPS12, Bus 2
+  //{0x316, 1, 8},  // EMS11, Bus 1
+  {0x340, 0, 8},  // LKAS11, Bus 0
+  //{0x340, 1, 8},  // LKAS11, Bus 1
+  {0x420, 0, 8}, // SCC11, Bus 0
+  {0x421, 0, 8}, // SCC12, Bus 0
+  {0x50A, 0, 8}, // SCC13, Bus 0
+  {0x389, 0, 8},  // SCC14, Bus 0
+  {0x38D, 0, 8},  // FCA11 Bus 0
+  {0x483, 0, 8}, // FCA12 Bus 0
+  {0x485, 0, 4}, // LFAHDA_MFC, Bus 0
+  {0x4A2, 0, 8}, // FRT_RADAR11, Bus 0
+  {0x4F1, 0, 4}, // CLU11, Bus 0
+  //{0x4F1, 1, 4}, // CLU11, Bus 1
+  {0x4F1, 2, 4}, // CLU11, Bus 2
 };
 
 const CanMsg HYUNDAI_LONG_TX_MSGS[] = {
-  {MSG_HYUNDAI_MDPS12,       HYUNDAI_CAM_BUS, 8},
-  //{MSG_HYUNDAI_EMS11,        HYUNDAI_SUB_BUS, 8},
-  {MSG_HYUNDAI_LKAS11,       HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_CLU11,        HYUNDAI_MAIN_BUS, 4},
-  //{MSG_HYUNDAI_CLU11,        HYUNDAI_SUB_BUS, 4},
-  {MSG_HYUNDAI_CLU11,        HYUNDAI_CAM_BUS, 4},
-  {MSG_HYUNDAI_LFAHDA_MFC,   HYUNDAI_MAIN_BUS, 4},
-  {MSG_HYUNDAI_SCC11,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_SCC12,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_SCC13,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_SCC14,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_FRT_RADAR11,  HYUNDAI_MAIN_BUS, 2},
-  {MSG_HYUNDAI_FCA11,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_FCA12,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_UDS_RADAR_TX, HYUNDAI_MAIN_BUS, 8}, // radar UDS TX addr Bus 0 (for radar disable)
+  {0x251, 2, 8},  // MDPS12, Bus 2
+  //{0x316, 1, 8},  // EMS11, Bus 1
+  {0x340, 0, 8},  // LKAS11 Bus 0
+  {0x4F1, 0, 4}, // CLU11, Bus 0
+  //{0x4F1, 1, 4}, // CLU11, Bus 1
+  {0x4F1, 2, 4}, // CLU11, Bus 2
+  {0x485, 0, 4}, // LFAHDA_MFC Bus 0
+  {0x420, 0, 8}, // SCC11 Bus 0
+  {0x421, 0, 8}, // SCC12 Bus 0
+  {0x50A, 0, 8}, // SCC13 Bus 0
+  {0x389, 0, 8},  // SCC14 Bus 0
+  {0x4A2, 0, 2}, // FRT_RADAR11 Bus 0
+  {0x38D, 0, 8},  // FCA11 Bus 0
+  {0x483, 0, 8}, // FCA12 Bus 0
+  {0x7D0, 0, 8}, // radar UDS TX addr Bus 0 (for radar disable)
 };
 
 const CanMsg HYUNDAI_CAMERA_SCC_TX_MSGS[] = {
-  {MSG_HYUNDAI_MDPS12,       HYUNDAI_CAM_BUS, 8},
-  //{MSG_HYUNDAI_EMS11,        HYUNDAI_SUB_BUS, 8},
-  {MSG_HYUNDAI_LKAS11,       HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_SCC11,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_SCC12,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_SCC13,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_SCC14,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_FCA11,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_FCA12,        HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_LFAHDA_MFC,   HYUNDAI_MAIN_BUS, 4},
-  {MSG_HYUNDAI_FRT_RADAR11,  HYUNDAI_MAIN_BUS, 8},
-  {MSG_HYUNDAI_CLU11,        HYUNDAI_MAIN_BUS, 4},
-  //{MSG_HYUNDAI_CLU11,        HYUNDAI_SUB_BUS, 4},
-  {MSG_HYUNDAI_CLU11,        HYUNDAI_CAM_BUS, 4},
+  {0x251, 2, 8},  // MDPS12, Bus 2
+  //{0x316, 1, 8},  // EMS11, Bus 1
+  {0x340, 0, 8},  // LKAS11, Bus 0
+  {0x420, 0, 8}, // SCC11, Bus 0
+  {0x421, 0, 8}, // SCC12, Bus 0
+  {0x50A, 0, 8}, // SCC13, Bus 0
+  {0x389, 0, 8},  // SCC14, Bus 0
+  {0x38D, 0, 8},  // FCA11 Bus 0
+  {0x483, 0, 8}, // FCA12 Bus 0
+  {0x485, 0, 4}, // LFAHDA_MFC, Bus 0
+  {0x4A2, 0, 8}, // FRT_RADAR11, Bus 0
+  {0x4F1, 0, 4}, // CLU11, Bus 0
+  //{0x4F1, 1, 4}, // CLU11, Bus 1
+  {0x4F1, 2, 4}, // CLU11, Bus 2
  };
 
 AddrCheckStruct hyundai_addr_checks[] = {
-  {.msg = {{MSG_HYUNDAI_EMS16,     HYUNDAI_MAIN_BUS, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},
-           {MSG_HYUNDAI_E_EMS11,   HYUNDAI_MAIN_BUS, 8, .expected_timestep = 10000U}, { 0 }}},
-  {.msg = {{MSG_HYUNDAI_WHL_SPD11, HYUNDAI_MAIN_BUS, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 10000U}, { 0 }, { 0 }}},
-  {.msg = {{MSG_HYUNDAI_TCS13,     HYUNDAI_MAIN_BUS, 8, .check_checksum = true, .max_counter = 7U, .expected_timestep = 10000U}, { 0 }, { 0 }}},
-  {.msg = {{MSG_HYUNDAI_SCC12,     HYUNDAI_MAIN_BUS, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},
+  {.msg = {{0x260, 0, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},
+           {0x371, 0, 8, .expected_timestep = 10000U}, { 0 }}},
+  {.msg = {{0x386, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 10000U}, { 0 }, { 0 }}},
+  {.msg = {{0x394, 0, 8, .check_checksum = true, .max_counter = 7U, .expected_timestep = 10000U}, { 0 }, { 0 }}},
+  {.msg = {{0x421, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},
 };
 #define HYUNDAI_ADDR_CHECK_LEN (sizeof(hyundai_addr_checks) / sizeof(hyundai_addr_checks[0]))
 
 AddrCheckStruct hyundai_cam_scc_addr_checks[] = {
-  {.msg = {{MSG_HYUNDAI_EMS16,     HYUNDAI_MAIN_BUS, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},
-           {MSG_HYUNDAI_E_EMS11,   HYUNDAI_MAIN_BUS, 8, .expected_timestep = 10000U}, { 0 }}},
-  {.msg = {{MSG_HYUNDAI_WHL_SPD11, HYUNDAI_MAIN_BUS, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 10000U}, { 0 }, { 0 }}},
-  {.msg = {{MSG_HYUNDAI_TCS13,     HYUNDAI_MAIN_BUS, 8, .check_checksum = true, .max_counter = 7U, .expected_timestep = 10000U}, { 0 }, { 0 }}},
-  {.msg = {{MSG_HYUNDAI_SCC12,     HYUNDAI_CAM_BUS, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},
+  {.msg = {{0x260, 0, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},
+           {0x371, 0, 8, .expected_timestep = 10000U}, { 0 }}},
+  {.msg = {{0x386, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 10000U}, { 0 }, { 0 }}},
+  {.msg = {{0x394, 0, 8, .check_checksum = true, .max_counter = 7U, .expected_timestep = 10000U}, { 0 }, { 0 }}},
+  {.msg = {{0x421, 2, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},
 };
 #define HYUNDAI_CAM_SCC_ADDR_CHECK_LEN (sizeof(hyundai_cam_scc_addr_checks) / sizeof(hyundai_cam_scc_addr_checks[0]))
 
 AddrCheckStruct hyundai_long_addr_checks[] = {
-  {.msg = {{MSG_HYUNDAI_EMS16,     HYUNDAI_MAIN_BUS, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},
-           {MSG_HYUNDAI_E_EMS11,   HYUNDAI_MAIN_BUS, 8, .expected_timestep = 10000U}, { 0 }}},
-  {.msg = {{MSG_HYUNDAI_WHL_SPD11, HYUNDAI_MAIN_BUS, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 10000U}, { 0 }, { 0 }}},
-  {.msg = {{MSG_HYUNDAI_TCS13,     HYUNDAI_MAIN_BUS, 8, .check_checksum = true, .max_counter = 7U, .expected_timestep = 10000U}, { 0 }, { 0 }}},
-  {.msg = {{MSG_HYUNDAI_CLU11,     HYUNDAI_MAIN_BUS, 4, .check_checksum = false, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},
+  {.msg = {{0x260, 0, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},
+           {0x371, 0, 8, .expected_timestep = 10000U}, { 0 }}},
+  {.msg = {{0x386, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 10000U}, { 0 }, { 0 }}},
+  {.msg = {{0x394, 0, 8, .check_checksum = true, .max_counter = 7U, .expected_timestep = 10000U}, { 0 }, { 0 }}},
+  {.msg = {{0x4F1, 0, 4, .check_checksum = false, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},
 };
 #define HYUNDAI_LONG_ADDR_CHECK_LEN (sizeof(hyundai_long_addr_checks) / sizeof(hyundai_long_addr_checks[0]))
 
 // older hyundai models have less checks due to missing counters and checksums
 AddrCheckStruct hyundai_legacy_addr_checks[] = {
-  {.msg = {{MSG_HYUNDAI_EMS16,     HYUNDAI_MAIN_BUS, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},
-           {MSG_HYUNDAI_E_EMS11,   HYUNDAI_MAIN_BUS, 8, .expected_timestep = 10000U}, { 0 }}},
-  {.msg = {{MSG_HYUNDAI_WHL_SPD11, HYUNDAI_MAIN_BUS, 8, .expected_timestep = 10000U}, { 0 }, { 0 }}},
-  {.msg = {{MSG_HYUNDAI_TCS13,     HYUNDAI_MAIN_BUS, 8, .expected_timestep = 10000U}, { 0 }, { 0 }}},
-  //{.msg = {{MSG_HYUNDAI_SCC12,     HYUNDAI_MAIN_BUS, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},
+  {.msg = {{0x260, 0, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},
+           {0x371, 0, 8, .expected_timestep = 10000U}, { 0 }}},
+  {.msg = {{0x386, 0, 8, .expected_timestep = 10000U}, { 0 }, { 0 }}},
+  {.msg = {{0x394, 0, 8, .expected_timestep = 10000U}, { 0 }, { 0 }}},
+  //{.msg = {{0x421, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},
 };
 #define HYUNDAI_LEGACY_ADDR_CHECK_LEN (sizeof(hyundai_legacy_addr_checks) / sizeof(hyundai_legacy_addr_checks[0]))
 
@@ -144,15 +123,15 @@ static uint8_t hyundai_get_counter(CANPacket_t *to_push) {
   int addr = GET_ADDR(to_push);
 
   uint8_t cnt;
-  if (addr == MSG_HYUNDAI_EMS16) {
+  if (addr == 0x260) {
     cnt = (GET_BYTE(to_push, 7) >> 4) & 0x3U;
-  } else if (addr == MSG_HYUNDAI_WHL_SPD11) {
+  } else if (addr == 0x386) {
     cnt = ((GET_BYTE(to_push, 3) >> 6) << 2) | (GET_BYTE(to_push, 1) >> 6);
-  } else if (addr == MSG_HYUNDAI_TCS13) {
+  } else if (addr == 0x394) {
     cnt = (GET_BYTE(to_push, 1) >> 5) & 0x7U;
-  } else if (addr == MSG_HYUNDAI_SCC12) {
+  } else if (addr == 0x421) {
     cnt = GET_BYTE(to_push, 7) & 0xFU;
-  } else if (addr == MSG_HYUNDAI_CLU11) {
+  } else if (addr == 0x4F1) {
     cnt = (GET_BYTE(to_push, 3) >> 4) & 0xFU;
   } else {
     cnt = 0;
@@ -164,13 +143,13 @@ static uint32_t hyundai_get_checksum(CANPacket_t *to_push) {
   int addr = GET_ADDR(to_push);
 
   uint8_t chksum;
-  if (addr == MSG_HYUNDAI_EMS16) {
+  if (addr == 0x260) {
     chksum = GET_BYTE(to_push, 7) & 0xFU;
-  } else if (addr == MSG_HYUNDAI_WHL_SPD11) {
+  } else if (addr == 0x386) {
     chksum = ((GET_BYTE(to_push, 7) >> 6) << 2) | (GET_BYTE(to_push, 5) >> 6);
-  } else if (addr == MSG_HYUNDAI_TCS13) {
+  } else if (addr == 0x394) {
     chksum = GET_BYTE(to_push, 6) & 0xFU;
-  } else if (addr == MSG_HYUNDAI_SCC12) {
+  } else if (addr == 0x421) {
     chksum = GET_BYTE(to_push, 7) >> 4;
   } else {
     chksum = 0;
@@ -182,7 +161,7 @@ static uint32_t hyundai_compute_checksum(CANPacket_t *to_push) {
   int addr = GET_ADDR(to_push);
 
   uint8_t chksum = 0;
-  if (addr == MSG_HYUNDAI_WHL_SPD11) {
+  if (addr == 0x386) {
     // count the bits
     for (int i = 0; i < 8; i++) {
       uint8_t b = GET_BYTE(to_push, i);
@@ -199,12 +178,12 @@ static uint32_t hyundai_compute_checksum(CANPacket_t *to_push) {
   } else {
     // sum of nibbles
     for (int i = 0; i < 8; i++) {
-      if ((addr == MSG_HYUNDAI_TCS13) && (i == 7)) {
+      if ((addr == 0x394) && (i == 7)) {
         continue; // exclude
       }
       uint8_t b = GET_BYTE(to_push, i);
-      if (((addr == MSG_HYUNDAI_EMS16) && (i == 7)) || ((addr == MSG_HYUNDAI_TCS13) && (i == 6)) || ((addr == MSG_HYUNDAI_SCC12) && (i == 7))) {
-        b &= (addr == MSG_HYUNDAI_SCC12) ? 0x0FU : 0xF0U; // remove checksum
+      if (((addr == 0x260) && (i == 7)) || ((addr == 0x394) && (i == 6)) || ((addr == 0x421) && (i == 7))) {
+        b &= (addr == 0x421) ? 0x0FU : 0xF0U;
       }
       chksum += (b % 16U) + (b / 16U);
     }
@@ -221,60 +200,60 @@ static int hyundai_rx_hook(CANPacket_t *to_push) {
   int addr = GET_ADDR(to_push);
 
   // SCC12 is on bus 2 for camera-based SCC cars, bus 0 on all others
-  /*if (valid && (addr == MSG_HYUNDAI_SCC12) && (((bus == HYUNDAI_MAIN_BUS) && !hyundai_camera_scc) || ((bus == HYUNDAI_CAM_BUS) && hyundai_camera_scc))) {
+  /*if (valid && (addr == 0x421) && (((bus == 0) && !hyundai_camera_scc) || ((bus == 2) && hyundai_camera_scc))) {
     // 2 bits: 13-14
     int cruise_engaged = (GET_BYTES(to_push, 0, 4) >> 13) & 0x3U;
     hyundai_common_cruise_state_check(cruise_engaged);
   }*/
 
-  if (valid && (addr == MSG_HYUNDAI_SCC11)) { //  MainMode_ACC
+  if (valid && (addr == 0x420)) { //  MainMode_ACC
     // 1 bits: 0
     int cruise_engaged = GET_BYTES(to_push, 0, 4) & 0x1U;
     hyundai_common_cruise_state_check(cruise_engaged);
   }
 
-  if (valid && (bus == HYUNDAI_MAIN_BUS)) {
-    if (addr == MSG_HYUNDAI_MDPS12) {
+  if (valid && (bus == 0)) {
+    if (addr == 0x251) {
       int torque_driver_new = ((GET_BYTES(to_push, 0, 4) & 0x7ffU) * 0.79) - 808; // scale down new driver torque signal to match previous one
       // update array of samples
       update_sample(&torque_driver, torque_driver_new);
     }
 
     // ACC steering wheel buttons
-    if (addr == MSG_HYUNDAI_CLU11) {
+    if (addr == 0x4F1) {
       int cruise_button = GET_BYTE(to_push, 0) & 0x7U;
       int main_button = GET_BIT(to_push, 3U);
       hyundai_common_cruise_buttons_check(cruise_button, main_button);
     }
 
     // gas press, different for EV, hybrid, and ICE models
-    if ((addr == MSG_HYUNDAI_E_EMS11) && hyundai_ev_gas_signal) {
+    if ((addr == 0x371) && hyundai_ev_gas_signal) {
       gas_pressed = (((GET_BYTE(to_push, 4) & 0x7FU) << 1) | GET_BYTE(to_push, 3) >> 7) != 0U;
-    } else if ((addr == MSG_HYUNDAI_E_EMS11) && hyundai_hybrid_gas_signal) {
+    } else if ((addr == 0x371) && hyundai_hybrid_gas_signal) {
       gas_pressed = GET_BYTE(to_push, 7) != 0U;
-    } else if ((addr == MSG_HYUNDAI_EMS16) && !hyundai_ev_gas_signal && !hyundai_hybrid_gas_signal) {
+    } else if ((addr == 0x260) && !hyundai_ev_gas_signal && !hyundai_hybrid_gas_signal) {
       gas_pressed = (GET_BYTE(to_push, 7) >> 6) != 0U;
     } else {
     }
 
     // sample wheel speed, averaging opposite corners
-    if (addr == MSG_HYUNDAI_WHL_SPD11) {
+    if (addr == 0x386) {
       uint32_t front_left_speed = GET_BYTES(to_push, 0, 2) & 0x3FFFU;
       uint32_t rear_right_speed = GET_BYTES(to_push, 6, 2) & 0x3FFFU;
       vehicle_moving = (front_left_speed > HYUNDAI_STANDSTILL_THRSLD) || (rear_right_speed > HYUNDAI_STANDSTILL_THRSLD);
     }
 
-    if (addr == MSG_HYUNDAI_TCS13) {
+    if (addr == 0x394) {
       brake_pressed = GET_BIT(to_push, 55U) != 0U;
     }
 
     gas_pressed = brake_pressed = false;
 
-    bool stock_ecu_detected = (addr == MSG_HYUNDAI_LKAS11);
+    bool stock_ecu_detected = (addr == 0x340);
 
     // If openpilot is controlling longitudinal we need to ensure the radar is turned off
     // Enforce by checking we don't see SCC12
-    if (hyundai_longitudinal && (addr == MSG_HYUNDAI_SCC12)) {
+    if (hyundai_longitudinal && (addr == 0x421)) {
       stock_ecu_detected = true;
     }
     generic_rx_checks(stock_ecu_detected);
@@ -282,10 +261,7 @@ static int hyundai_rx_hook(CANPacket_t *to_push) {
   return valid;
 }
 
-uint32_t last_ts_lkas11_from_op = 0;
-uint32_t last_ts_scc12_from_op = 0;
-uint32_t last_ts_mdps12_from_op = 0;
-uint32_t last_ts_fca11_from_op = 0;
+uint32_t last_ts_lkas11, last_ts_scc12, last_ts_mdps12, last_ts_fca11 = 0;
 
 static int hyundai_tx_hook(CANPacket_t *to_send) {
   int tx = 1;
@@ -300,19 +276,19 @@ static int hyundai_tx_hook(CANPacket_t *to_send) {
   }
 
   // FCA11: Block any potential actuation
-  if (addr == MSG_HYUNDAI_FCA11) {
+  if (addr == 0x38D) {
     int CR_VSM_DecCmd = GET_BYTE(to_send, 1);
     int FCA_CmdAct = GET_BIT(to_send, 20U);
     int CF_VSM_DecCmdAct = GET_BIT(to_send, 31U);
 
     if ((CR_VSM_DecCmd != 0) || (FCA_CmdAct != 0) || (CF_VSM_DecCmdAct != 0)) {
       tx = 0;
-      print("violation[FCA11]\n");
+      print("violation[FCA11, 0x38D]\n");
     }
   }
 
   // ACCEL: safety check
-  if (addr == MSG_HYUNDAI_SCC12) {
+  if (addr == 0x421) {
     int desired_accel_raw = (((GET_BYTE(to_send, 4) & 0x7U) << 8) | GET_BYTE(to_send, 3)) - 1023U;
     int desired_accel_val = ((GET_BYTE(to_send, 5) << 3) | (GET_BYTE(to_send, 4) >> 5)) - 1023U;
     //int aeb_decel_cmd = GET_BYTE(to_send, 2);
@@ -326,12 +302,12 @@ static int hyundai_tx_hook(CANPacket_t *to_send) {
 
     if (violation) {
       tx = 0;
-      print("violation[SCC12]\n");
+      print("violation[SCC12, 0x421]\n");
     }
   }
 
   // LKA STEER: safety check
-  if (addr == MSG_HYUNDAI_LKAS11) {
+  if (addr == 0x340) {
     int desired_torque = ((GET_BYTES(to_send, 0, 4) >> 16) & 0x7ffU) - 1024U;
 
     /*bool steer_req = GET_BIT(to_send, 27U) != 0U;
@@ -371,19 +347,20 @@ static int hyundai_tx_hook(CANPacket_t *to_send) {
 
     if (violation) {
       tx = 0;
+      print("violation[LKAS11, 0x340]\n");
       print("  lkas torque allowed : controls allowed!\n");
     }
   }
 
   // UDS: Only tester present ("\x02\x3E\x80\x00\x00\x00\x00\x00") allowed on diagnostics address
-  if (addr == MSG_HYUNDAI_UDS_RADAR_TX) {
+  if (addr == 0x7D0) {
     if ((GET_BYTES(to_send, 0, 4) != 0x00803E02U) || (GET_BYTES(to_send, 4, 4) != 0x0U)) {
       tx = 0;
     }
   }
 
   // BUTTONS: used for resume spamming and cruise cancellation
-  /*if ((addr == MSG_HYUNDAI_CLU11) && !hyundai_longitudinal) {
+  /*if ((addr == 0x4F1) && !hyundai_longitudinal) {
     int button = GET_BYTE(to_send, 0) & 0x7U;
 
     bool allowed_resume = (button == 1) && controls_allowed;
@@ -394,14 +371,14 @@ static int hyundai_tx_hook(CANPacket_t *to_send) {
     }
   }*/
 
-  if (addr == MSG_HYUNDAI_LKAS11) {
-    last_ts_lkas11_from_op = (tx == 0 ? 0 : microsecond_timer_get());
-  } else if (addr == MSG_HYUNDAI_SCC12) {
-    last_ts_scc12_from_op = (tx == 0 ? 0 : microsecond_timer_get());
-  } else if (addr == MSG_HYUNDAI_MDPS12) {
-    last_ts_mdps12_from_op = (tx == 0 ? 0 : microsecond_timer_get());
-  } else if (addr == MSG_HYUNDAI_FCA11) {
-    last_ts_fca11_from_op = (tx == 0 ? 0 : microsecond_timer_get());
+  if (addr == 0x340) {
+    last_ts_lkas11 = (tx == 0 ? 0 : microsecond_timer_get());
+  } else if (addr == 0x421) {
+    last_ts_scc12 = (tx == 0 ? 0 : microsecond_timer_get());
+  } else if (addr == 0x251) {
+    last_ts_mdps12 = (tx == 0 ? 0 : microsecond_timer_get());
+  } else if (addr == 0x38D) {
+    last_ts_fca11 = (tx == 0 ? 0 : microsecond_timer_get());
   }
 
   return tx;
@@ -409,38 +386,32 @@ static int hyundai_tx_hook(CANPacket_t *to_send) {
 
 static int hyundai_fwd_hook(int bus_num, int addr) {
   int bus_fwd = -1;
-
-  uint32_t now = microsecond_timer_get();
+  uint32_t ts = microsecond_timer_get();
 
   // forward cam to ccan and viceversa, except lkas cmd
-  if (bus_num == HYUNDAI_MAIN_BUS) {
-    bus_fwd = HYUNDAI_CAM_BUS;
-    if (addr == MSG_HYUNDAI_MDPS12) {
-      if (now - last_ts_mdps12_from_op < 200000) {
+  if (bus_num == 0) {
+    bus_fwd = 2;
+    if (addr == 0x251) {  // mdps12
+      if (ts - last_ts_mdps12 < 200000) {
         bus_fwd = -1;
       }
     }
   }
 
-  if (bus_num == HYUNDAI_CAM_BUS) {
-    bool is_lkas_msg = (addr == MSG_HYUNDAI_LKAS11);
-    bool is_lfahda_msg = (addr == MSG_HYUNDAI_LFAHDA_MFC);
-    bool is_scc_msg = (addr == MSG_HYUNDAI_SCC11) || (addr == MSG_HYUNDAI_SCC12) || (addr == MSG_HYUNDAI_SCC13) || (addr == MSG_HYUNDAI_SCC14);
-    bool is_fca_msg = (addr == MSG_HYUNDAI_FCA11) || (addr == MSG_HYUNDAI_FCA11);
-    bool block_msg = is_lkas_msg || is_lfahda_msg || is_scc_msg; //|| is_fca_msg;
-    if (!block_msg) {
-      bus_fwd = HYUNDAI_MAIN_BUS;
+  if (bus_num == 2) {
+    if (!(addr == 0x340) || (addr == 0x485) || (addr == 0x420) || (addr == 0x421) || (addr == 0x50A) || (addr == 0x389)) {
+      bus_fwd = 0;
     } else {
-      if (is_lkas_msg || is_lfahda_msg) {
-        if (now - last_ts_lkas11_from_op >= 200000) {
+      if ((addr == 0x340) || (addr == 0x485)) {  // lkas11, lfahda_mfc
+        if (ts - last_ts_lkas11 >= 200000) {
           bus_fwd = 0;
         }
-      } else if (is_scc_msg) {
-        if (now - last_ts_scc12_from_op >= 400000) {
+      } else if ((addr == 0x420) || (addr == 0x421) || (addr == 0x50A) || (addr == 0x389)) {  // scc11, scc12, scc13, scc14
+        if (ts - last_ts_scc12 >= 400000) {
           bus_fwd = 0;
         }
-      } else if (is_fca_msg) {
-        if (now - last_ts_fca11_from_op >= 400000) {
+      } else if ((addr == 0x38D) || (addr == 0x483)) {  // fca11, fca12
+        if (ts - last_ts_fca11 >= 400000) {
           bus_fwd = 0;
         }
       }
