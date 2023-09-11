@@ -90,13 +90,13 @@ class NaviServer:
 
   def get_broadcast_address(self):
     try:
-      s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-      ip = fcntl.ioctl(
-        s.fileno(),
-        0x8919,
-        struct.pack('256s', 'wlan0'.encode('utf-8'))
-      )[20:24]
-      return socket.inet_ntoa(ip)
+      with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        ip = fcntl.ioctl(
+          s.fileno(),
+          0x8919,
+          struct.pack('256s', 'wlan0'.encode('utf-8'))
+        )[20:24]
+        return socket.inet_ntoa(ip)
     except:
       return None
 
