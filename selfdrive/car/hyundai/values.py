@@ -45,7 +45,8 @@ class HyundaiFlags(IntFlag):
   CANFD_ALT_GEARS_2 = 64
   SEND_LFA = 128
   USE_FCA = 256
-  SEND_FCA12 = 512
+  CANFD_HDA2_ALT_STEERING = 512
+  SEND_FCA12 = 1024
 
 class CAR:
   # Hyundai
@@ -1333,10 +1334,21 @@ FW_VERSIONS = {
   CAR.GRANDEUR_IG: { # (IG)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\000IG MFC  1.00 1.00 95740F9200 180916',
+      b'\xf1\x00IG  MFC  AT MES LHD 1.00 1.04 99211-G8100 200511',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00IG__ SCC F_CUP   1.00 1.00 95400M9500     \xf1\xa01.00',
       b'\xf1\x00IG__ SCC F_CUP   1.00 1.00 96400G8000     \xf1\xa01.00',
+      b'\xf1\x00IG__ SCC F-CU-      1.00 1.00 99110-G8100         ',
+    ],
+    (Ecu.eps, 0x7d4, None): [
+      b'\xf1\x00IG  MDPS C 1.00 1.02 56310G8510\x00 4IGSC103',
+    ],
+    (Ecu.engine, 0x7e0, None): [
+      b'\xf1\x81641KA051\x00\x00\x00\x00\x00\x00\x00\x00',
+    ],
+    (Ecu.transmission, 0x7e1, None): [
+      b'\xf1\x00bcsh8p54  U912\x00\x00\x00\x00\x00\x00SIG0M35MH0\xa4 |.',
     ],
   },
 

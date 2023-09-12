@@ -26,55 +26,48 @@ const LongitudinalLimits HYUNDAI_LONG_LIMITS = {
 };
 
 const CanMsg HYUNDAI_TX_MSGS[] = {
-  {0x251, 2, 8},  // MDPS12, Bus 2
-  //{0x316, 1, 8},  // EMS11, Bus 1
-  {0x340, 0, 8},  // LKAS11, Bus 0
-  //{0x340, 1, 8},  // LKAS11, Bus 1
+  {0x251, 2, 8}, // MDPS12, Bus 2
+  {0x340, 0, 8}, // LKAS11, Bus 0
   {0x420, 0, 8}, // SCC11, Bus 0
   {0x421, 0, 8}, // SCC12, Bus 0
   {0x50A, 0, 8}, // SCC13, Bus 0
-  {0x389, 0, 8},  // SCC14, Bus 0
-  {0x38D, 0, 8},  // FCA11 Bus 0
+  {0x389, 0, 8}, // SCC14, Bus 0
+  {0x38D, 0, 8}, // FCA11 Bus 0
   {0x483, 0, 8}, // FCA12 Bus 0
   {0x485, 0, 4}, // LFAHDA_MFC, Bus 0
   {0x4A2, 0, 8}, // FRT_RADAR11, Bus 0
   {0x4F1, 0, 4}, // CLU11, Bus 0
-  //{0x4F1, 1, 4}, // CLU11, Bus 1
   {0x4F1, 2, 4}, // CLU11, Bus 2
 };
 
 const CanMsg HYUNDAI_LONG_TX_MSGS[] = {
-  {0x251, 2, 8},  // MDPS12, Bus 2
-  //{0x316, 1, 8},  // EMS11, Bus 1
-  {0x340, 0, 8},  // LKAS11 Bus 0
+  {0x251, 2, 8}, // MDPS12, Bus 2
+  {0x340, 0, 8}, // LKAS11 Bus 0
   {0x4F1, 0, 4}, // CLU11, Bus 0
-  //{0x4F1, 1, 4}, // CLU11, Bus 1
   {0x4F1, 2, 4}, // CLU11, Bus 2
   {0x485, 0, 4}, // LFAHDA_MFC Bus 0
   {0x420, 0, 8}, // SCC11 Bus 0
   {0x421, 0, 8}, // SCC12 Bus 0
   {0x50A, 0, 8}, // SCC13 Bus 0
-  {0x389, 0, 8},  // SCC14 Bus 0
+  {0x389, 0, 8}, // SCC14 Bus 0
   {0x4A2, 0, 2}, // FRT_RADAR11 Bus 0
-  {0x38D, 0, 8},  // FCA11 Bus 0
+  {0x38D, 0, 8}, // FCA11 Bus 0
   {0x483, 0, 8}, // FCA12 Bus 0
   {0x7D0, 0, 8}, // radar UDS TX addr Bus 0 (for radar disable)
 };
 
 const CanMsg HYUNDAI_CAMERA_SCC_TX_MSGS[] = {
-  {0x251, 2, 8},  // MDPS12, Bus 2
-  //{0x316, 1, 8},  // EMS11, Bus 1
-  {0x340, 0, 8},  // LKAS11, Bus 0
+  {0x251, 2, 8}, // MDPS12, Bus 2
+  {0x340, 0, 8}, // LKAS11, Bus 0
   {0x420, 0, 8}, // SCC11, Bus 0
   {0x421, 0, 8}, // SCC12, Bus 0
   {0x50A, 0, 8}, // SCC13, Bus 0
-  {0x389, 0, 8},  // SCC14, Bus 0
-  {0x38D, 0, 8},  // FCA11 Bus 0
+  {0x389, 0, 8}, // SCC14, Bus 0
+  {0x38D, 0, 8}, // FCA11 Bus 0
   {0x483, 0, 8}, // FCA12 Bus 0
   {0x485, 0, 4}, // LFAHDA_MFC, Bus 0
   {0x4A2, 0, 8}, // FRT_RADAR11, Bus 0
   {0x4F1, 0, 4}, // CLU11, Bus 0
-  //{0x4F1, 1, 4}, // CLU11, Bus 1
   {0x4F1, 2, 4}, // CLU11, Bus 2
  };
 
@@ -385,7 +378,7 @@ static int hyundai_fwd_hook(int bus_num, int addr) {
   // forward cam to ccan and viceversa, except lkas cmd
   if (bus_num == 0) {
     bus_fwd = 2;
-    if (addr == 0x251) {  // mdps12
+    if (addr == 0x251) {
       if (ts - last_ts_mdps12 < 200000) {
         bus_fwd = -1;
       }
@@ -393,18 +386,24 @@ static int hyundai_fwd_hook(int bus_num, int addr) {
   }
 
   if (bus_num == 2) {
-    if (!(addr == 0x340) || (addr == 0x485) || (addr == 0x420) || (addr == 0x421) || (addr == 0x50A) || (addr == 0x389)) {
+    bool is_lkas_msg = addr == 0x340;
+    bool is_lfahda_msg = addr == 0x485;
+    bool is_scc_msg = addr == 0x420 || addr == 0x421 || addr == 0x50A || addr == 0x389;
+    bool is_fca_msg = addr == 0x38D || addr == 0x483;
+    bool block_msg = is_lkas_msg || is_lfahda_msg || is_scc_msg; //|| is_fca_msg;
+
+    if (!block_msg) {
       bus_fwd = 0;
     } else {
-      if ((addr == 0x340) || (addr == 0x485)) {  // lkas11, lfahda_mfc
+      if (is_lkas_msg || is_lfahda_msg) {
         if (ts - last_ts_lkas11 >= 200000) {
           bus_fwd = 0;
         }
-      } else if ((addr == 0x420) || (addr == 0x421) || (addr == 0x50A) || (addr == 0x389)) {  // scc11, scc12, scc13, scc14
+      } else if (is_scc_msg) {
         if (ts - last_ts_scc12 >= 400000) {
           bus_fwd = 0;
         }
-      } else if ((addr == 0x38D) || (addr == 0x483)) {  // fca11, fca12
+      } else if (is_fca_msg) {
         if (ts - last_ts_fca11 >= 400000) {
           bus_fwd = 0;
         }

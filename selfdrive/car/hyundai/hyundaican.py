@@ -6,7 +6,7 @@ hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 
 
 def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque_fault, sys_warning, sys_state, enabled,
-                  left_lane, right_lane, left_lane_depart, right_lane_depart, bus, lkas11, send_lfa):
+                  left_lane, right_lane, left_lane_depart, right_lane_depart, send_lfa, lkas11):
   values = {s: lkas11[s] for s in [
     "CF_Lkas_LdwsActivemode",
     "CF_Lkas_LdwsSysState",
@@ -64,10 +64,10 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
     checksum = (sum(dat[:6]) + dat[7]) % 256
   values["CF_Lkas_Chksum"] = checksum
 
-  return packer.make_can_msg("LKAS11", bus, values)
+  return packer.make_can_msg("LKAS11", 0, values)
 
 
-def create_clu11(packer, frame, bus, button, clu11):
+def create_clu11(packer, frame, button, bus, clu11):
   values = {s: clu11[s] for s in [
     "CF_Clu_CruiseSwState",
     "CF_Clu_CruiseSwMain",
@@ -84,7 +84,7 @@ def create_clu11(packer, frame, bus, button, clu11):
   ]}
   values["CF_Clu_CruiseSwState"] = button
   values["CF_Clu_AliveCnt1"] = frame % 0x10
-
+  # send buttons to camera on camera-scc based cars
   return packer.make_can_msg("CLU11", bus, values)
 
 
@@ -194,6 +194,7 @@ def create_acc_opt(packer, CS, send_fca12):
     }
     commands.append(packer.make_can_msg("SCC13", 0, scc13_values))
 
+  # TODO: this needs to be detected and conditionally sent on unsupported long cars
   if send_fca12:
     fca12_values = {
       "FCA_DrvSetState": 2,

@@ -127,9 +127,10 @@ class CarController:
       # steering control
       can_sends.extend(hyundaicanfd.create_steering_messages(self.packer, self.CP, self.CAN, CC.enabled, apply_steer_req, apply_steer))
 
-      # disable LFA on HDA2 ( 676 )
+      # prevent LFA from activating on HDA2 by sending "no lane lines detected" to ADAS ECU
       if self.frame % 5 == 0 and hda2:
-        can_sends.append(hyundaicanfd.create_cam_0x2a4(self.packer, self.CAN, CS.cam_0x2a4))
+        can_sends.append(hyundaicanfd.create_suppress_lfa(self.packer, self.CAN, CS.hda2_lfa_block_msg,
+                                                          self.CP.flags & HyundaiFlags.CANFD_HDA2_ALT_STEERING))
 
       # LFA and HDA icons
       if self.frame % 5 == 0 and (not hda2 or hda2_long):
@@ -148,52 +149,18 @@ class CarController:
           self.accel_last = accel
       else:
         # button presses
-        if (self.frame - self.last_button_frame) * DT_CTRL > 0.25:
-          # cruise cancel
-          if CC.cruiseControl.cancel:
-            if self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
-              can_sends.append(hyundaicanfd.create_acc_cancel(self.packer, self.CP, self.CAN, CS.cruise_info))
-              self.last_button_frame = self.frame
-            else:
-              for _ in range(20):
-                can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter+1, Buttons.CANCEL))
-              self.last_button_frame = self.frame
-
-          # cruise standstill resume
-          elif CC.cruiseControl.resume:
-            if self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
-              # TODO: resume for alt button cars
-              pass
-            else:
-              for _ in range(20):
-                can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter+1, Buttons.RES_ACCEL))
-              self.last_button_frame = self.frame
+        can_sends.extend(self.create_button_messages(CC, CS, use_clu11=False))
     else:
-      # send lkas11 bus 0
       send_lfa = self.CP.flags & HyundaiFlags.SEND_LFA.value
-      can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, apply_steer_req, torque_fault, sys_warning, sys_state,
-                                                CC.enabled, hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning,
-                                                0, CS.lkas11, send_lfa))
+      can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, apply_steer_req, torque_fault, sys_warning, sys_state, CC.enabled,
+                                                hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning,
+                                                send_lfa, CS.lkas11))
 
-      # fix auto resume - by neokii
-      if CC.cruiseControl.resume and not CS.out.gasPressed:
-        if self.last_lead_distance == 0:
-          self.last_lead_distance = CS.lead_distance
-          self.resume_cnt = 0
-          self.resume_wait_timer = 0
-        elif self.resume_wait_timer > 0:
-          self.resume_wait_timer -= 1
-        elif abs(CS.lead_distance - self.last_lead_distance) > 0.1:
-          can_sends.append(hyundaican.create_clu11(self.packer, self.frame, self.CP.sccBus, Buttons.RES_ACCEL, CS.clu11))
-          self.resume_cnt += 1
-          if self.resume_cnt >= int(randint(4, 5) * 2):
-            self.resume_cnt = 0
-            self.resume_wait_timer = int(randint(20, 25) * 2)
-      elif self.last_lead_distance != 0:
-        self.last_lead_distance = 0
+      if not self.CP.openpilotLongitudinalControl:
+        can_sends.extend(self.create_button_messages(CC, CS, use_clu11=True))
 
-      # send scc to car if longcontrol enabled and SCC not on bus 0 or not live
       if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl:
+        # TODO: unclear if this is needed
         jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0
         use_fca = self.CP.flags & HyundaiFlags.USE_FCA.value
         can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), accel, jerk,
@@ -224,3 +191,39 @@ class CarController:
 
     self.frame += 1
     return new_actuators, can_sends
+
+  def create_button_messages(self, CC: car.CarControl, CS: car.CarState, use_clu11: bool):
+    can_sends = []
+    if use_clu11:
+      if CC.cruiseControl.cancel:
+        can_sends.append(hyundaican.create_clu11(self.packer, self.frame, Buttons.CANCEL, self.CP.sccBus, CS.clu11))
+      elif CC.cruiseControl.resume:
+        # send resume at a max freq of 10Hz
+        if (self.frame - self.last_button_frame) * DT_CTRL > 0.1:
+          # send 25 messages at a time to increases the likelihood of resume being accepted
+          can_sends.extend([hyundaican.create_clu11(self.packer, self.frame, Buttons.RES_ACCEL, self.CP.sccBus, CS.clu11)] * 25)
+          if (self.frame - self.last_button_frame) * DT_CTRL >= 0.15:
+            self.last_button_frame = self.frame
+    else:
+      if (self.frame - self.last_button_frame) * DT_CTRL > 0.25:
+        # cruise cancel
+        if CC.cruiseControl.cancel:
+          if self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
+            can_sends.append(hyundaicanfd.create_acc_cancel(self.packer, self.CP, self.CAN, CS.cruise_info))
+            self.last_button_frame = self.frame
+          else:
+            for _ in range(20):
+              can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter+1, Buttons.CANCEL))
+            self.last_button_frame = self.frame
+
+        # cruise standstill resume
+        elif CC.cruiseControl.resume:
+          if self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
+            # TODO: resume for alt button cars
+            pass
+          else:
+            for _ in range(20):
+              can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter+1, Buttons.RES_ACCEL))
+            self.last_button_frame = self.frame
+
+    return can_sends

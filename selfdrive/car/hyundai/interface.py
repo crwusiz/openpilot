@@ -34,11 +34,11 @@ class CarInterface(CarInterfaceBase):
           ret.flags |= HyundaiFlags.CANFD_HDA2_ALT_STEERING.value
       else:
         # non-HDA2
-        if 0x1cf not in fingerprint[CAN.ECAN]: # 463
+        if 0x1cf not in fingerprint[CAN.ECAN]:
           ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
         # ICE cars do not have 0x130; GEARS message on 0x40 or 0x70 instead
-        if 0x130 not in fingerprint[CAN.ECAN]: # 304
-          if 0x40 not in fingerprint[CAN.ECAN]: # 64
+        if 0x130 not in fingerprint[CAN.ECAN]:
+          if 0x40 not in fingerprint[CAN.ECAN]:
             ret.flags |= HyundaiFlags.CANFD_ALT_GEARS_2.value
           else:
             ret.flags |= HyundaiFlags.CANFD_ALT_GEARS.value
@@ -46,13 +46,13 @@ class CarInterface(CarInterfaceBase):
           ret.flags |= HyundaiFlags.CANFD_CAMERA_SCC.value
     else:
       # Send LFA message on cars with HDA
-      if 0x485 in fingerprint[2]: # 1157
+      if 0x485 in fingerprint[2]:
         ret.flags |= HyundaiFlags.SEND_LFA.value
 
-      # these cars use the FCA11 message for the AEB and FCW signals, all others use SCC12
-      if 0x38d in fingerprint[0] or 0x38d in fingerprint[2]: # 909
+      # These cars use the FCA11 message for the AEB and FCW signals, all others use SCC12
+      if 0x38d in fingerprint[0] or 0x38d in fingerprint[2]:
         ret.flags |= HyundaiFlags.USE_FCA.value
-      if 0x483 in fingerprint[0] or 0x483 in fingerprint[2]: # 1155
+      if 0x483 in fingerprint[0] or 0x483 in fingerprint[2]:
         ret.flags |= HyundaiFlags.SEND_FCA12.value
 
     ret.steerActuatorDelay = 0.1  # Default delay
