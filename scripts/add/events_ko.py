@@ -1,4 +1,5 @@
-﻿import math
+﻿#!/usr/bin/env python3
+import math
 import os
 from enum import IntEnum
 from typing import Dict, Union, Callable, List, Optional
@@ -248,7 +249,7 @@ def calibration_incomplete_alert(CP: car.CarParams, CS: car.CarState, sm: messag
   first_word = '캘리브레이션을 다시' if sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.recalibrating else '캘리브레이션'
   return Alert(
     f"{first_word} 진행중 : {sm['liveCalibration'].calPerc:.0f}%",
-    f"속도를 {get_display_speed(MIN_SPEED_FILTER, metric)} 이상으로 주행하세요",
+    f"{get_display_speed(MIN_SPEED_FILTER, metric)} 이상의 속도로 주행하세요",
     AlertStatus.normal, AlertSize.mid,
     Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2)
 
@@ -434,19 +435,6 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
 
   # ********** events only containing alerts that display while engaged **********
 
-  # openpilot tries to learn certain parameters about your car by observing
-  # how the car behaves to steering inputs from both human and openpilot driving.
-  # This includes:
-  # - steer ratio: gear ratio of the steering rack. Steering angle divided by tire angle
-  # - tire stiffness: how much grip your tires have
-  # - angle offset: most steering angle sensors are offset and measure a non zero angle when driving straight
-  # This alert is thrown when any of these values exceed a sanity check. This can be caused by
-  # bad alignment or bad sensor data. If this happens consistently consider creating an issue on GitHub
-  EventName.vehicleModelInvalid: {
-    ET.NO_ENTRY: NoEntryAlert("차량 매개변수 식별 실패"),
-    ET.SOFT_DISABLE: soft_disable_alert("차량 매개변수 식별 실패"),
-  },
-
   EventName.steerTempUnavailableSilent: {
     ET.WARNING: Alert(
       "조향제어 일시적으로 사용불가",
@@ -586,9 +574,34 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
     ET.PERMANENT: NormalPermanentAlert("GPS 오작동", "장치를 점검하세요"),
   },
 
-  EventName.localizerMalfunction: {
-    ET.NO_ENTRY: NoEntryAlert("로컬라이저 오작동"),
-    ET.SOFT_DISABLE: soft_disable_alert("로컬라이저 오작동"),
+  EventName.locationdTemporaryError: {
+    ET.NO_ENTRY: NoEntryAlert("locationd 일시적 오류"),
+    ET.SOFT_DISABLE: soft_disable_alert("locationd 일시적 오류"),
+  },
+
+  EventName.locationdPermanentError: {
+    ET.NO_ENTRY: NoEntryAlert("locationd 오류"),
+    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("locationd 오류"),
+    ET.PERMANENT: NormalPermanentAlert("locationd 오류"),
+  },
+
+  # openpilot tries to learn certain parameters about your car by observing
+  # how the car behaves to steering inputs from both human and openpilot driving.
+  # This includes:
+  # - steer ratio: gear ratio of the steering rack. Steering angle divided by tire angle
+  # - tire stiffness: how much grip your tires have
+  # - angle offset: most steering angle sensors are offset and measure a non zero angle when driving straight
+  # This alert is thrown when any of these values exceed a sanity check. This can be caused by
+  # bad alignment or bad sensor data. If this happens consistently consider creating an issue on GitHub
+  EventName.paramsdTemporaryError: {
+    ET.NO_ENTRY: NoEntryAlert("paramsd 일시적 오류"),
+    ET.SOFT_DISABLE: soft_disable_alert("paramsd 일시적 오류"),
+  },
+
+  EventName.paramsdPermanentError: {
+    ET.NO_ENTRY: NoEntryAlert("paramsd 오류"),
+    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("paramsd 오류"),
+    ET.PERMANENT: NormalPermanentAlert("paramsd 오류"),
   },
 
   # ********** events that affect controls state transitions **********

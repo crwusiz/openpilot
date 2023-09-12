@@ -231,16 +231,6 @@ void UIState::updateStatus() {
       status = cs.getEnabled() ? STATUS_ENGAGED : STATUS_DISENGAGED;
       scene.engaged = cs.getEnabled();
     }
-    scene.lateralControlSelect = cs.getLateralControlSelect();
-    if (scene.lateralControlSelect == 0) {
-      scene.output_scale = cs.getLateralControlState().getPidState().getOutput();
-    } else if (scene.lateralControlSelect == 1) {
-      scene.output_scale = cs.getLateralControlState().getIndiState().getOutput();
-    } else if (scene.lateralControlSelect == 2) {
-      scene.output_scale = cs.getLateralControlState().getLqrState().getOutput();
-    } else if (scene.lateralControlSelect == 3) {
-      scene.output_scale = cs.getLateralControlState().getTorqueState().getOutput();
-    }
   }
 
   if (sm->updated("carState")) {

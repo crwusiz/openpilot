@@ -58,18 +58,6 @@ class LateralPlanner:
     self.lat_mpc.reset(x0=self.x0)
 
   def update(self, sm):
-    try:
-      if CP.lateralTuning.which() == 'pid':
-        self.output_scale = sm['controlsState'].lateralControlState.pidState.output
-      elif CP.lateralTuning.which() == 'indi':
-        self.output_scale = sm['controlsState'].lateralControlState.indiState.output
-      elif CP.lateralTuning.which() == 'lqr':
-        self.output_scale = sm['controlsState'].lateralControlState.lqrState.output
-      elif CP.lateralTuning.which() == 'torque':
-        self.output_scale = sm['controlsState'].lateralControlState.torqueState.output
-    except:
-      pass
-
     # clip speed , lateral planning is not possible at 0 speed
     measured_curvature = sm['controlsState'].curvature
     v_ego_car = sm['carState'].vEgo

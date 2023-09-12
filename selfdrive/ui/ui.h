@@ -128,8 +128,6 @@ typedef struct UIScene {
   cereal::ControlsState::Reader controls_state;
 
   // ui add
-  int lateralControlSelect;
-  float output_scale;
   bool steeringPressed, engaged, override;
   int satelliteCount;
 
