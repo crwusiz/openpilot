@@ -92,16 +92,15 @@ class CarState(CarStateBase):
 
     ret.steeringAngleDeg = cp.vl["SAS11"]["SAS_Angle"]
     ret.steeringRateDeg = cp.vl["SAS11"]["SAS_Speed"]
+    ret.yawRate = cp.vl["ESP12"]["YAW_RATE"]
+    ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["CGW1"]["CF_Gway_TurnSigLh"],
+                                                                      cp.vl["CGW1"]["CF_Gway_TurnSigRh"])
     ret.steeringTorque = cp.vl["MDPS12"]["CR_Mdps_StrColTq"]
     ret.steeringTorqueEps = cp.vl["MDPS12"]["CR_Mdps_OutTq"]
     ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > self.params.STEER_THRESHOLD, 5)
     self.eps_error_cnt += 1 if not ret.standstill and cp.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 else -self.eps_error_cnt
     #ret.steerFaultTemporary = cp.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 or cp.vl["MDPS12"]["CF_Mdps_ToiFlt"] != 0
     ret.steerFaultTemporary = self.eps_error_cnt > 100
-
-    ret.yawRate = cp.vl["ESP12"]["YAW_RATE"]
-    ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["CGW1"]["CF_Gway_TurnSigLh"],
-                                                                      cp.vl["CGW1"]["CF_Gway_TurnSigRh"])
 
     # cruise state
     if self.CP.openpilotLongitudinalControl and self.CP.sccBus == 0:
@@ -172,9 +171,9 @@ class CarState(CarStateBase):
     self.scc12 = copy.copy(cp_cruise.vl["SCC12"])
     self.scc13 = copy.copy(cp_cruise.vl["SCC13"]) if self.CP.hasScc13 else None
     self.scc14 = copy.copy(cp_cruise.vl["SCC14"]) if self.CP.hasScc14 else None
-    #self.fca11 = cp.vl["FCA11"]
-    #self.fca12 = cp.vl["FCA12"]
-    #self.mfc_lfa = cp_cam.vl["LFAHDA_MFC"]
+    self.fca11 = copy.copy(cp.vl["FCA11"])
+    self.fca12 = copy.copy(cp.vl["FCA12"])
+    self.mfc_lfa = copy.copy(cp_cam.vl["LFAHDA_MFC"])
 
     self.steer_state = cp.vl["MDPS12"]["CF_Mdps_ToiActive"]  # 0 NOT ACTIVE, 1 ACTIVE
     self.prev_cruise_buttons = self.cruise_buttons[-1]

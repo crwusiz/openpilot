@@ -369,21 +369,21 @@ class CarInterface(CarInterfaceBase):
 
     # *** feature detection ***
     if candidate in CANFD_CAR:
-      ret.enableBsm = 0x1e5 in fingerprint[CAN.ECAN] # 485
-      ret.hasNav = 0x1fa in fingerprint[CAN.ECAN] # 506
+      ret.enableBsm = 0x1e5 in fingerprint[CAN.ECAN]
+      ret.hasNav = 0x1fa in fingerprint[CAN.ECAN]
       ret.radarUnavailable = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
     else:
-      ret.enableBsm = 1419 in fingerprint[0]
-      ret.hasAutoHold = 1151 in fingerprint[0]
-      ret.hasNav = 1348 in fingerprint[0] and Params().get_bool("NavLimitSpeed")
-      ret.hasLfa = 913 in fingerprint[0] and Params().get("MfcSelect", encoding='utf8') == "2"
+      ret.enableBsm = 0x58b in fingerprint[0]
+      ret.hasAutoHold = 0x47f in fingerprint[0]
+      ret.hasNav = 0x544 in fingerprint[0] and Params().get_bool("NavLimitSpeed")
+      ret.hasLfa = 0x391 in fingerprint[0] and Params().get("MfcSelect", encoding='utf8') == "2"
 
       ret.sccBus = 2 if Params().get_bool("SccOnBus2") else 0
 
       if ret.sccBus == 2:
         Params().put_bool("ExperimentalLongitudinalEnabled", True)
-        ret.hasScc13 = 1290 in fingerprint[0] or 1290 in fingerprint[2]
-        ret.hasScc14 = 905 in fingerprint[0] or 905 in fingerprint[2]
+        ret.hasScc13 = 0x50a in fingerprint[0] or 0x50a in fingerprint[2]
+        ret.hasScc14 = 0x389 in fingerprint[0] or 0x389 in fingerprint[2]
 
       ret.radarUnavailable = ret.sccBus == -1
 
