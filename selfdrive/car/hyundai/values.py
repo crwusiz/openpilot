@@ -111,6 +111,8 @@ class CAR:
   NIRO_SG2_EV = "KIA NIRO EV (SG2)"
   NIRO_SG2_HEV = "KIA NIRO HEV (SG2)"
   CARNIVAL_KA4 = "KIA CARNIVAL (KA4)"
+  K8_GL3 = "KIA K8 (GL3)"
+  K8_GL3_HEV = "KIA K8 HEV (GL3)"
   GENESIS_GV60 = "GENESIS GV60 (JW1)"
   GENESIS_GV70 = "GENESIS GV70 (JK1)"
   GENESIS_GV80 = "GENESIS GV80 (JX1)"
@@ -246,6 +248,8 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
     HyundaiCarInfo("Kia Carnival 2023", car_parts=CarParts.common([CarHarness.hyundai_a])),
     HyundaiCarInfo("Kia Carnival (China only) 2023", car_parts=CarParts.common([CarHarness.hyundai_k]))
   ],
+  CAR.K8_GL3_HEV: HyundaiCarInfo("Kia K8 Hybrid (with HDA II) 2023", "Highway Driving Assist II",
+                                         car_parts=CarParts.common([CarHarness.hyundai_q])),
 }
 
 class Buttons:
@@ -415,6 +419,7 @@ def match_fw_to_car_fuzzy(live_fw_versions) -> Set[str]:
   # Non-electric CAN FD platforms often do not have platform code specifiers needed
   # to distinguish between hybrid and ICE. All EVs so far are either exclusively
   # electric or specify electric in the platform code.
+  # TODO: whitelist platforms that we've seen hybrid and ICE versions of that have these specifiers
   fuzzy_platform_blacklist = set(CANFD_CAR - EV_CAR)
   candidates = set()
 
@@ -484,6 +489,7 @@ PART_NUMBER_FW_PATTERN = re.compile(b'(?<=[0-9][.,][0-9]{2} )([0-9]{5}[-/]?[A-Z]
 # TODO: use abs, it has the platform code and part number on many platforms
 PLATFORM_CODE_ECUS = [Ecu.fwdRadar, Ecu.fwdCamera, Ecu.eps]
 # So far we've only seen dates in fwdCamera
+# TODO: there are date codes in the ABS firmware versions in hex
 DATE_FW_ECUS = [Ecu.fwdCamera]
 
 FW_QUERY_CONFIG = FwQueryConfig(
@@ -1879,7 +1885,14 @@ FW_VERSIONS = {
       b'\xf1\x00KA4c SCC FHCUP      1.00 1.01 99110-I4000         ',
     ],
   },
-
+  CAR.K8_GL3_HEV: { # (GL3)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00GL3HMFC  AT KOR LHD 1.00 1.03 99211-L8000 210907',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00GL3_ RDR -----      1.00 1.02 99110-L8000         ',
+    ],
+  },
   CAR.GENESIS_GV60: {  # (JW1)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00JW1 MFC  AT USA LHD 1.00 1.02 99211-CU100 211215',
@@ -1932,12 +1945,12 @@ CAN_GEARS = {
 
 CANFD_CAR = {
   CAR.TUCSON_NX4,
-  CAR.SPORTAGE_NQ5, CAR.SORENTO_MQ4, CAR.CARNIVAL_KA4,
+  CAR.SPORTAGE_NQ5, CAR.SORENTO_MQ4, CAR.CARNIVAL_KA4, CAR.K8_GL3,
   CAR.IONIQ5, CAR.IONIQ6,
   CAR.EV6, CAR.NIRO_SG2_EV,
   CAR.GENESIS_GV60, CAR.GENESIS_GV70, CAR.GENESIS_GV80,
   CAR.TUCSON_NX4_HEV,
-  CAR.SORENTO_MQ4_HEV, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV,
+  CAR.SORENTO_MQ4_HEV, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV, CAR.K8_GL3_HEV,
 }
 
 # The radar does SCC on these cars when HDA I, rather than the camera
@@ -1956,7 +1969,7 @@ HEV_CAR = {
   CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV, CAR.SANTAFE_HEV, CAR.ELANTRA_CN7_HEV, CAR.SONATA_DN8_HEV, CAR.SONATA_LF_HEV, CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IGFL_HEV,
   CAR.K5_HEV, CAR.K5_DL3_HEV, CAR.K7_HEV,
   CAR.TUCSON_NX4_HEV,
-  CAR.SORENTO_MQ4_HEV, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV,
+  CAR.SORENTO_MQ4_HEV, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV, CAR.K8_GL3_HEV,
 }
 
 # these cars require a special panda safety mode due to missing counters and checksums in the messages
@@ -2031,6 +2044,8 @@ DBC = {
   CAR.NIRO_SG2_EV: dbc_dict('hyundai_canfd', None),
   CAR.NIRO_SG2_HEV: dbc_dict('hyundai_canfd', None),
   CAR.CARNIVAL_KA4: dbc_dict('hyundai_canfd', None),
+  CAR.K8_GL3: dbc_dict('hyundai_canfd', None),
+  CAR.K8_GL3_HEV: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV60: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV80: dbc_dict('hyundai_canfd', None),
