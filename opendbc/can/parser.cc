@@ -287,15 +287,21 @@ void CANParser::UpdateValid(uint64_t sec) {
     const bool timed_out = (sec - state.last_seen_nanos) > state.check_threshold;
     if (state.check_threshold > 0 && (missing || timed_out)) {
       if (show_missing && !bus_timeout) {
-        char chk_cmd[100];
+        char can_log[100];
+        char can_event_log[100];
+        //char datetime = system("echo | date +'[%Y-%m-%d %H:%M:%S]'");
         if (missing) {
           LOGE("0x%X '%s' NOT SEEN", state.address, state.name.c_str());
-          sprintf(chk_cmd, "0x%X '%s' > /data/can_missing.log", state.address, state.name.c_str());
-          system(chk_cmd);
+          sprintf(can_log, "echo -n 0x%X '%s' > /data/can_missing.log", state.address, state.name.c_str());
+          system(can_log);
+          sprintf(can_event_log, "echo -n 0x%X > /data/can_event_missing.log", state.address);
+          system(can_event_log);
         } else if (timed_out) {
           LOGE("0x%X '%s' TIMED OUT", state.address, state.name.c_str());
-          sprintf(chk_cmd, "0x%X '%s' > /data/can_timeout.log", state.address, state.name.c_str());
-          system(chk_cmd);
+          sprintf(can_log, "echo -n 0x%X '%s' > /data/can_timeout.log", state.address, state.name.c_str());
+          system(can_log);
+          sprintf(can_event_log, "echo -n 0x%X > /data/can_event_timeout.log", state.address);
+          system(can_event_log);
         }
       }
       _valid = false;

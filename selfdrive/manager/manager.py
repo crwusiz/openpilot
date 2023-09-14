@@ -128,6 +128,10 @@ def manager_init() -> None:
     os.remove('/data/can_missing.log')
   if os.path.isfile('/data/can_timeout.log'):
     os.remove('/data/can_timeout.log')
+  if os.path.isfile('/data/can_event_missing.log'):
+    os.remove('/data/can_event_missing.log')
+  if os.path.isfile('/data/can_event_timeout.log'):
+    os.remove('/data/can_event_timeout.log')
 
 def manager_prepare() -> None:
   for p in managed_processes.values():
