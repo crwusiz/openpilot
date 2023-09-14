@@ -171,9 +171,6 @@ class CarState(CarStateBase):
     self.scc12 = copy.copy(cp_cruise.vl["SCC12"])
     self.scc13 = copy.copy(cp_cruise.vl["SCC13"]) if self.CP.hasScc13 else None
     self.scc14 = copy.copy(cp_cruise.vl["SCC14"]) if self.CP.hasScc14 else None
-    self.fca11 = copy.copy(cp.vl["FCA11"])
-    self.fca12 = copy.copy(cp.vl["FCA12"])
-    self.mfc_lfa = copy.copy(cp_cam.vl["LFAHDA_MFC"])
 
     self.steer_state = cp.vl["MDPS12"]["CF_Mdps_ToiActive"]  # 0 NOT ACTIVE, 1 ACTIVE
     self.prev_cruise_buttons = self.cruise_buttons[-1]

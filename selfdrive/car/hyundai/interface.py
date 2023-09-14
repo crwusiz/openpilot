@@ -446,7 +446,7 @@ class CarInterface(CarInterfaceBase):
   def _update(self, c):
     ret = self.CS.update(self.cp, self.cp_cam)
 
-    if self.frame % 20 == 0:
+    if self.frame % 500 == 0:
       if not any([self.cp.can_valid, self.cp_cam.can_valid]):
         print(f'cp = {bool(self.cp.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
     self.frame += 1

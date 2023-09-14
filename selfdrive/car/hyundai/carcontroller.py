@@ -168,8 +168,7 @@ class CarController:
 
       # car signal status
       if self.frame % 1000 == 0:
-        print(f'scc11 = {bool(CS.scc11)}  scc12 = {bool(CS.scc12)}  scc13 = {bool(CS.scc13)}  scc14 = {bool(CS.scc14)}')
-        print(f'mdps12 = {bool(CS.mdps12)}  fca11 = {bool(CS.fca11)}  fca12 = {bool(CS.fca12)}  mfc_lfa = {bool(CS.mfc_lfa)}')
+        print(f'scc11 = {bool(CS.scc11)}  scc12 = {bool(CS.scc12)}  scc13 = {bool(CS.scc13)}  scc14 = {bool(CS.scc14)}  mdps12 = {bool(CS.mdps12)}')
 
       # 20 Hz LFA MFA message
       if self.frame % 5 == 0:
