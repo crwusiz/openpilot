@@ -1340,11 +1340,17 @@ FW_VERSIONS = {
   CAR.GRANDEUR_IG: { # (IG)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\000IG MFC  1.00 1.00 95740F9200 180916',
-      b'\xf1\x00IG  MFC  AT MES LHD 1.00 1.04 99211-G8100 200511',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00IG__ SCC F_CUP   1.00 1.00 95400M9500     \xf1\xa01.00',
       b'\xf1\x00IG__ SCC F_CUP   1.00 1.00 96400G8000     \xf1\xa01.00',
+    ],
+  },
+  CAR.GRANDEUR_IGFL: { # (IG)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00IG  MFC  AT MES LHD 1.00 1.04 99211-G8100 200511',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00IG__ SCC F-CU-      1.00 1.00 99110-G8100         ',
     ],
     (Ecu.eps, 0x7d4, None): [
@@ -1357,28 +1363,41 @@ FW_VERSIONS = {
       b'\xf1\x00bcsh8p54  U912\x00\x00\x00\x00\x00\x00SIG0M35MH0\xa4 |.',
     ],
   },
+  CAR.GRANDEUR_IGFL_HEV: {  # (IG)
+    (Ecu.fwdCamera, 0x7C4, None): [
+      b'\xf1\x00IGH MFC  AT KOR LHD 1.00 1.02 99211-G8100 191029',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00IGhe SCC FHCUP      1.00 1.00 99110-M9100         ',
+    ],
+  },
 
   # kia
   CAR.FORTE: { # (BD)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00BD  LKAS AT USA LHD 1.00 1.04 95740-M6000 J33',
+      b'\xf1\x00BDP LKAS AT USA LHD 1.00 1.05 99211-M6500 744',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00BD__ SCC H-CUP      1.00 1.02 99110-M6000         ',
+      b'\xf1\x00BDPE_SCC FHCUPC     1.00 1.04 99110-M6500\x00\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
     (Ecu.abs, 0x7d1, None): [
       b'\xf1\x816VGRAH00018.ELF\xf1\x00\x00\x00\x00\x00\x00\x00',
+      b'\xf1\x8758900-M7AB0 \xf1\x816VQRAD00127.ELF\xf1\x00\x00\x00\x00\x00\x00\x00',
     ],
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00BD  MDPS C 1.00 1.02 56310-XX000 4BD2C102',
       b'\xf1\x00BD  MDPS C 1.00 1.08 56310/M6300 4BDDC108',
       b'\xf1\x00BD  MDPS C 1.00 1.08 56310M6300\x00 4BDDC108',
+      b'\xf1\x00BDm MDPS C A.01 1.03 56310M7800\x00 4BPMC103',
     ],
     (Ecu.engine, 0x7e0, None): [
       b'\x01TBDM1NU06F200H01',
       b'391182B945\x00',
     ],
     (Ecu.transmission, 0x7e1, None): [
+      b'\xf1\x006V2B0_C2\x00\x006V2C6051\x00\x00CBD0N20NL1\x00\x00\x00\x00',
       b'\xf1\x816U2VC051\x00\x00\xf1\x006U2V0_C2\x00\x006U2VC051\x00\x00DBD0T16SS0\x00\x00\x00\x00',
       b"\xf1\x816U2VC051\x00\x00\xf1\x006U2V0_C2\x00\x006U2VC051\x00\x00DBD0T16SS0\xcf\x1e'\xc3",
     ],
@@ -1772,6 +1791,7 @@ FW_VERSIONS = {
   },
   CAR.IONIQ6: { # (CE1)
     (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00CE  MFC  AT EUR LHD 1.00 1.03 99211-KL000 221011',
       b'\xf1\x00CE  MFC  AT USA LHD 1.00 1.04 99211-KL000 221213',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
