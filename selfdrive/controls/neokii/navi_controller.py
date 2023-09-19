@@ -3,6 +3,7 @@ import json
 import os
 
 import select
+import subprocess
 import threading
 import time
 import socket
@@ -165,6 +166,15 @@ class NaviServer:
         if 'echo' in json_obj:
           try:
             echo = json.dumps(json_obj["echo"])
+            sock.sendto(echo.encode(), (self.remote_addr[0], Port.BROADCAST_PORT))
+            ret = False
+          except:
+            pass
+
+        if 'echo_cmd' in json_obj:
+          try:
+            result = subprocess.run(json_obj['echo_cmd'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            echo = json.dumps({"echo_cmd": json_obj['echo_cmd'], "result": result.stdout})
             sock.sendto(echo.encode(), (self.remote_addr[0], Port.BROADCAST_PORT))
             ret = False
           except:
