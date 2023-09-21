@@ -9,7 +9,7 @@
 #include "selfdrive/modeld/models/commonmodel.h"
 #include "selfdrive/modeld/runners/run.h"
 
-constexpr int FEATURE_LEN = 128;
+constexpr int FEATURE_LEN = 512;
 constexpr int HISTORY_BUFFER_LEN = 99;
 constexpr int DESIRE_LEN = 8;
 constexpr int DESIRE_PRED_LEN = 4;
@@ -46,20 +46,6 @@ struct ModelOutputYZ {
   float z;
 };
 static_assert(sizeof(ModelOutputYZ) == sizeof(float)*2);
-
-struct LateralPlannerOutputElement {
-  float x;
-  float y;
-  float yaw;
-  float yaw_rate;
-};
-static_assert(sizeof(LateralPlannerOutputElement) == sizeof(float)*4);
-
-struct LateralPlannerOutput {
-  std::array<LateralPlannerOutputElement, TRAJECTORY_SIZE> mean;
-  std::array<LateralPlannerOutputElement, TRAJECTORY_SIZE> std;
-};
-static_assert(sizeof(LateralPlannerOutput) == (sizeof(LateralPlannerOutputElement)*TRAJECTORY_SIZE*2));
 
 struct ModelOutputPlanElement {
   ModelOutputXYZ position;
@@ -255,7 +241,6 @@ struct ModelOutput {
   const ModelOutputWideFromDeviceEuler wide_from_device_euler;
   const ModelOutputTemporalPose temporal_pose;
   const ModelOutputRoadTransform road_transform;
-  const LateralPlannerOutput lateral_planner_solution;
 };
 
 constexpr int OUTPUT_SIZE = sizeof(ModelOutput) / sizeof(float);
