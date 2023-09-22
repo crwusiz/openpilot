@@ -101,6 +101,7 @@ class CAR:
   # CANFD
   IONIQ5 = "HYUNDAI IONIQ 5 (NE1)"
   IONIQ6 = "HYUNDAI IONIQ 6 (CE1)"
+  KONA_SX2_EV = "HYUNDAI KONA EV (SX2)"
   TUCSON_NX4 = "HYUNDAI TUCSON (NX4)"
   TUCSON_NX4_HEV = "HYUNDAI TUCSON HEV (NX4)"
   EV6 = "KIA EV6 (CV)"
@@ -1838,6 +1839,14 @@ FW_VERSIONS = {
       b'\xf1\x00NX4__               1.00 1.01 99110-N9000         ',
     ],
   },
+  CAR.KONA_SX2_EV: {
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00SXev RDR -----      1.00 1.00 99110-BF000         ',
+    ],
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00SX2EMFC  AT KOR LHD 1.00 1.00 99211-BF000 230410',
+    ],
+  },
   CAR.EV6: { # (CV1)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00CV1 MFC  AT KOR LHD 1.00 1.04 99210-CV000 210823',
@@ -1985,7 +1994,7 @@ CAN_GEARS = {
 CANFD_CAR = {
   CAR.TUCSON_NX4,
   CAR.SPORTAGE_NQ5, CAR.SORENTO_MQ4, CAR.CARNIVAL_KA4, CAR.K8_GL3,
-  CAR.IONIQ5, CAR.IONIQ6,
+  CAR.IONIQ5, CAR.IONIQ6, CAR.KONA_SX2_EV,
   CAR.EV6, CAR.NIRO_SG2_EV,
   CAR.GENESIS_GV60, CAR.GENESIS_GV70, CAR.GENESIS_GV80,
   CAR.TUCSON_NX4_HEV,
@@ -1994,12 +2003,12 @@ CANFD_CAR = {
 
 # The radar does SCC on these cars when HDA I, rather than the camera
 CANFD_RADAR_SCC_CAR = {
-  CAR.GENESIS_GV70, CAR.GENESIS_GV80, CAR.SORENTO_MQ4, CAR.SORENTO_MQ4_HEV
+  CAR.GENESIS_GV70, CAR.GENESIS_GV80, CAR.SORENTO_MQ4, CAR.SORENTO_MQ4_HEV, CAR.KONA_SX2_EV,
 }
 
 EV_CAR = {
   CAR.KONA_EV, CAR.IONIQ_EV, CAR.NIRO_EV, CAR.SOUL_EV, CAR.NEXO,
-  CAR.IONIQ5, CAR.IONIQ6,
+  CAR.IONIQ5, CAR.IONIQ6, CAR.KONA_SX2_EV,
   CAR.EV6, CAR.NIRO_SG2_EV,
   CAR.GENESIS_GV60, CAR.GENESIS_GV70, CAR.GENESIS_GV80,
 }
@@ -2073,6 +2082,7 @@ DBC = {
   # CANFD
   CAR.IONIQ5: dbc_dict('hyundai_canfd', None),
   CAR.IONIQ6: dbc_dict('hyundai_canfd', None),
+  CAR.KONA_SX2_EV: dbc_dict('hyundai_canfd', None),
   CAR.TUCSON_NX4: dbc_dict('hyundai_canfd', None),
   CAR.TUCSON_NX4_HEV: dbc_dict('hyundai_canfd', None),
   CAR.EV6: dbc_dict('hyundai_canfd', None),

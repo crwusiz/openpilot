@@ -240,7 +240,7 @@ class CarState(CarStateBase):
 
     # TODO: alt signal usage may be described by cp.vl['BLINKERS']['USE_ALT_LAMP']
     left_blinker_sig, right_blinker_sig = "LEFT_LAMP", "RIGHT_LAMP"
-    if self.CP.carFingerprint == CAR.KONA_EV_2ND_GEN:
+    if self.CP.carFingerprint == CAR.KONA_SX2_EV:
       left_blinker_sig, right_blinker_sig = "LEFT_LAMP_ALT", "RIGHT_LAMP_ALT"
     ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["BLINKERS"][left_blinker_sig],
                                                                       cp.vl["BLINKERS"][right_blinker_sig])
@@ -283,7 +283,7 @@ class CarState(CarStateBase):
       ret.navLimitSpeed = cp.vl["CLUSTER_SPEED_LIMIT"]["SPEED_LIMIT_1"]
 
     prev_lfa_btn = self.lfa_btn
-    self.lfa_btn = cp.vl[self.cruise_btns_msg_canfd]["LFA_BTN"]
+    self.lfa_btn = cp.vl[self.cruise_btns_msg_canfd]["LKAS_BTN"]
     if prev_lfa_btn != 1 and self.lfa_btn == 1:
       self.lfa_enabled = not self.lfa_enabled
 
