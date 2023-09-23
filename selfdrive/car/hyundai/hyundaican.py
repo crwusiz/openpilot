@@ -35,7 +35,6 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
   values["CF_Lkas_Chksum"] = 0
 
   mfc_ldws_lkas = Params().get("MfcSelect", encoding='utf8') == "1"
-  mfc_lfa = Params().get("MfcSelect", encoding='utf8') == "2"
 
   if car_fingerprint == CAR.GENESIS:
     values["CF_Lkas_LdwsActivemode"] = 2
@@ -46,7 +45,7 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
     values["CF_Lkas_LdwsOpt_USM"] = 3
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
 
-  elif send_lfa or mfc_lfa:
+  elif send_lfa:
     values["CF_Lkas_LdwsActivemode"] = int(left_lane) + (int(right_lane) << 1)
     values["CF_Lkas_LdwsOpt_USM"] = 2
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1

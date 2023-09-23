@@ -151,7 +151,10 @@ class CarController:
         # button presses
         can_sends.extend(self.create_button_messages(CC, CS, use_clu11=False))
     else:
-      send_lfa = self.CP.flags & HyundaiFlags.SEND_LFA.value
+      send_lfa = self.CP.flags & HyundaiFlags.SEND_LFA.value or Params().get("MfcSelect", encoding='utf8') == "2"
+      send_fca12 = self.CP.flags & HyundaiFlags.SEND_FCA12.value
+      use_fca = self.CP.flags & HyundaiFlags.USE_FCA.value
+
       can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, apply_steer_req, torque_fault, sys_warning, sys_state, CC.enabled,
                                                 hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning,
                                                 send_lfa, CS.lkas11))
@@ -162,7 +165,6 @@ class CarController:
       if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl:
         # TODO: unclear if this is needed
         jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0
-        use_fca = self.CP.flags & HyundaiFlags.USE_FCA.value
         can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), accel, jerk,
                                                         hud_control.leadVisible, set_speed_in_units, stopping, CC, CS, use_fca))
 
@@ -171,14 +173,11 @@ class CarController:
         print(f'scc11 = {bool(CS.scc11)}  scc12 = {bool(CS.scc12)}  scc13 = {bool(CS.scc13)}  scc14 = {bool(CS.scc14)}  mdps12 = {bool(CS.mdps12)}')
 
       # 20 Hz LFA MFA message
-      if self.frame % 5 == 0:
-        mfc_lfa = Params().get("MfcSelect", encoding='utf8') == "2"
-        if self.CP.flags & HyundaiFlags.SEND_LFA.value and mfc_lfa:
-          can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, SpeedLimiter.instance().get_active()))
+      if self.frame % 5 == 0 and send_lfa:
+        can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, SpeedLimiter.instance().get_active()))
 
       # 5 Hz ACC options
       if self.frame % 20 == 0 and self.CP.openpilotLongitudinalControl and self.CP.sccBus == 0:
-        send_fca12 = self.CP.flags & HyundaiFlags.SEND_FCA12.value
         can_sends.extend(hyundaican.create_acc_opt(self.packer, CS, send_fca12))
 
       # 2 Hz front radar options
