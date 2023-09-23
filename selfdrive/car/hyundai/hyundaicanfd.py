@@ -183,7 +183,8 @@ def create_adrv_messages(packer, CAN, frame):
 
   if frame % 2 == 0:
     values = {
-      'AEB_SETTING': 0x1,  # show AEB disabled icon
+      #'AEB_SETTING': 0x1,  # show AEB disabled icon
+      'AEB_SETTING': 0x0,  # not show AEB disabled icon
       'SET_ME_2': 0x2,
       'SET_ME_FF': 0xff,
       'SET_ME_FC': 0xfc,

@@ -1371,6 +1371,15 @@ FW_VERSIONS = {
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00IGhe SCC FHCUP      1.00 1.00 99110-M9100         ',
     ],
+    (Ecu.eps, 0x7d4, None): [
+      b'\xf1\x00IG  MDPS C 1.00 1.00 56310M9600\x00 4IHSC100',
+    ],
+    (Ecu.engine, 0x7e0, None): [
+      b'\xf1\x816H590051\x00\x00\x00\x00\x00\x00\x00\x00',
+    ],
+    (Ecu.transmission, 0x7e1, None): [
+      b'\xf1\x006T7N0_C2\x00\x006T7VA051\x00\x00TIGSH24KA1\xc7\x85\xe2`',
+    ],
   },
 
   # kia
@@ -1984,10 +1993,7 @@ CAN_GEARS = {
     {CAR.ELANTRA_I30, CAR.KONA, CAR.GRANDEUR_IG, CAR.NIRO_HEV, CAR.K7},
   "use_tcu_gears": # Use TCU Message for Gear Selection [ TCU12 ]
     {CAR.SONATA_LF, CAR.TUCSON, CAR.VELOSTER, CAR.K5},
-  "use_elect_gears": # Use Elect GEAR Message for Gear Selection [ ELECT_GEAR ]
-    {CAR.KONA_EV, CAR.IONIQ_EV, CAR.NEXO, CAR.NIRO_EV, CAR.SOUL_EV, CAR.KONA_HEV, CAR.IONIQ, CAR.IONIQ_HEV, CAR.NIRO_HEV,
-     CAR.SONATA_DN8_HEV, CAR.SONATA_LF_HEV, CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IGFL_HEV,
-     CAR.K5_HEV, CAR.K5_DL3_HEV, CAR.K7_HEV},
+  # Use Elect GEAR Message for Gear Selection [ ELECT_GEAR ]
   # Gear not set is [ LVR12 ]
 }
 
