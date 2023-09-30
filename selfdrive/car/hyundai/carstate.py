@@ -345,7 +345,7 @@ class CarState(CarStateBase):
       pass
     elif CP.carFingerprint in CAN_GEARS["use_tcu_gears"]:
       messages.append(("TCU12", 100))
-    elif CP.carFingerprint in CAN_GEARS["use_elect_gears"]:
+    elif CP.carFingerprint in (EV_CAR | HEV_CAR):
       messages.append(("ELECT_GEAR", 20))
     else:
       messages.append(("LVR12", 100))
