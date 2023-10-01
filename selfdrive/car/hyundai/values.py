@@ -114,7 +114,7 @@ class CAR(StrEnum):
   CARNIVAL_KA4 = "KIA CARNIVAL (KA4)"
   K8_GL3 = "KIA K8 (GL3)"
   K8_GL3_HEV = "KIA K8 HEV (GL3)"
-  GENESIS_GV60 = "GENESIS GV60 (JW1)"
+  GENESIS_GV60_EV = "GENESIS GV60 (JW1)"
   GENESIS_GV70 = "GENESIS GV70 (JK1)"
   GENESIS_GV80 = "GENESIS GV80 (JX1)"
 
@@ -239,7 +239,7 @@ CAR_INFO: Dict[str, Optional[Union[HyundaiCarInfo, List[HyundaiCarInfo]]]] = {
   ],
   CAR.SPORTAGE_NQ5: HyundaiCarInfo("Kia Sportage Hybrid 2023", car_parts=CarParts.common([CarHarness.hyundai_n])),
   CAR.SPORTAGE_NQ5_HEV: HyundaiCarInfo("Kia Sportage Hybrid 2023", car_parts=CarParts.common([CarHarness.hyundai_n])),
-  CAR.GENESIS_GV60: HyundaiCarInfo("Genesis GV60 2023", "All", car_parts=CarParts.common([CarHarness.hyundai_k])),
+  CAR.GENESIS_GV60_EV: HyundaiCarInfo("Genesis GV60 2023", "All", car_parts=CarParts.common([CarHarness.hyundai_k])),
   CAR.GENESIS_GV70: HyundaiCarInfo("Genesis GV70 2022", "Highway Driving Assist II", car_parts=CarParts.common([CarHarness.hyundai_l])),
   CAR.GENESIS_GV80: HyundaiCarInfo("Genesis GV80 2023", "All", car_parts=CarParts.common([CarHarness.hyundai_m])),
   CAR.SORENTO_MQ4_HEV: HyundaiCarInfo("Kia Sorento Hybrid 2022-23", "Smart Cruise Control (SCC)", car_parts=CarParts.common([CarHarness.hyundai_a])),
@@ -1949,7 +1949,7 @@ FW_VERSIONS = {
       b'\xf1\x00GL3_ RDR -----      1.00 1.02 99110-L8000         ',
     ],
   },
-  CAR.GENESIS_GV60: {  # (JW1)
+  CAR.GENESIS_GV60_EV: {  # (JW1)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00JW1 MFC  AT USA LHD 1.00 1.02 99211-CU100 211215',
       b'\xf1\x00JW1 MFC  AT USA LHD 1.00 1.02 99211-CU000 211215',
@@ -2001,7 +2001,7 @@ CANFD_CAR = {
   CAR.SPORTAGE_NQ5, CAR.SORENTO_MQ4, CAR.CARNIVAL_KA4, CAR.K8_GL3,
   CAR.IONIQ5, CAR.IONIQ6, CAR.KONA_SX2_EV,
   CAR.EV6, CAR.NIRO_SG2_EV,
-  CAR.GENESIS_GV60, CAR.GENESIS_GV70, CAR.GENESIS_GV80,
+  CAR.GENESIS_GV60_EV, CAR.GENESIS_GV70, CAR.GENESIS_GV80,
   CAR.TUCSON_NX4_HEV,
   CAR.SORENTO_MQ4_HEV, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV, CAR.K8_GL3_HEV,
 }
@@ -2015,7 +2015,7 @@ EV_CAR = {
   CAR.KONA_EV, CAR.IONIQ_EV, CAR.NIRO_EV, CAR.SOUL_EV, CAR.NEXO,
   CAR.IONIQ5, CAR.IONIQ6, CAR.KONA_SX2_EV,
   CAR.EV6, CAR.NIRO_SG2_EV,
-  CAR.GENESIS_GV60, CAR.GENESIS_GV70, CAR.GENESIS_GV80,
+  CAR.GENESIS_GV60_EV,
 }
 
 HEV_CAR = {
@@ -2100,7 +2100,7 @@ DBC = {
   CAR.CARNIVAL_KA4: dbc_dict('hyundai_canfd', None),
   CAR.K8_GL3: dbc_dict('hyundai_canfd', None),
   CAR.K8_GL3_HEV: dbc_dict('hyundai_canfd', None),
-  CAR.GENESIS_GV60: dbc_dict('hyundai_canfd', None),
+  CAR.GENESIS_GV60_EV: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV80: dbc_dict('hyundai_canfd', None),
 }
