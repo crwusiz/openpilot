@@ -151,7 +151,7 @@ class CarController:
         # button presses
         can_sends.extend(self.create_button_messages(CC, CS, use_clu11=False))
     else:
-      send_lfa = self.CP.flags & HyundaiFlags.SEND_LFA.value or Params().get("MfcSelect", encoding='utf8') == "2"
+      send_lfa = self.CP.flags & HyundaiFlags.SEND_LFA.value and Params().get("MfcSelect", encoding='utf8') == "2"
       send_fca12 = self.CP.flags & HyundaiFlags.SEND_FCA12.value
       use_fca = self.CP.flags & HyundaiFlags.USE_FCA.value
 

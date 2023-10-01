@@ -133,6 +133,14 @@ def manager_init() -> None:
   if os.path.isfile('/data/can_event_timeout.log'):
     os.remove('/data/can_event_timeout.log')
 
+  # prebuilt
+  prebuiltfile = '/data/openpilot/prebuilt'
+  prebuilt_enable = params.get_bool("PrebuiltEnable")
+  if not os.path.isfile(prebuiltfile) and prebuilt_enable:
+    os.system("touch /data/openpilot/prebuilt")
+  elif os.path.isfile(prebuiltfile) and not prebuilt_enable:
+    os.system("rm -f /data/openpilot/prebuilt")
+
 def manager_prepare() -> None:
   for p in managed_processes.values():
     p.prepare()
@@ -167,7 +175,8 @@ def manager_thread() -> None:
   if not params.get_bool("LoggerEnable"):
     ignore += ["loggerd", "encoderd", "deleter", "logmessaged", "tombstoned", "uploader", "updated", "statsd"]
   if not params.get_bool("NavEnable"):
-    ignore += ["navd", "otisserv"]
+    ignore += ["navd", "otisserv", "navi_route"]
+
   if params.get_bool("UseExternalNaviRoutes"):
     ignore += ["navd"]
   elif not params.get_bool("UseExternalNaviRoutes"):

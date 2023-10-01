@@ -500,33 +500,6 @@
         <source>hr</source>
         <translation>시간</translation>
     </message>
-    <message>
-        <source>km</source>
-        <translation>km</translation>
-    </message>
-    <message>
-        <source>mi</source>
-        <translation>mi</translation>
-    </message>
-</context>
-<context>
-    <name>MapInstructions</name>
-    <message>
-        <source> km</source>
-        <translation> km</translation>
-    </message>
-    <message>
-        <source> m</source>
-        <translation> m</translation>
-    </message>
-    <message>
-        <source> mi</source>
-        <translation> mi</translation>
-    </message>
-    <message>
-        <source> ft</source>
-        <translation> ft</translation>
-    </message>
 </context>
 <context>
     <name>MapSettings</name>
@@ -771,6 +744,22 @@
             <numerusform>%n 일 전</numerusform>
         </translation>
     </message>
+    <message>
+        <source>km</source>
+        <translation>km</translation>
+    </message>
+    <message>
+        <source>m</source>
+        <translation>m</translation>
+    </message>
+    <message>
+        <source>mi</source>
+        <translation>mi</translation>
+    </message>
+    <message>
+        <source>ft</source>
+        <translation>ft</translation>
+    </message>
 </context>
 <context>
     <name>Reset</name>
@@ -950,6 +939,10 @@ This may take up to a minute.</source>
     <message>
         <source>No custom software found at this URL.</source>
         <translation>이 URL에서 커스텀 소프트웨어를 찾을 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>Select a language</source>
+        <translation>언어를 선택하세요</translation>
     </message>
 </context>
 <context>

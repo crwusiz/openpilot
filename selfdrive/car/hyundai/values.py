@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 import re
 from dataclasses import dataclass
-from enum import Enum, IntFlag
+from enum import Enum, IntFlag, StrEnum
 from typing import Dict, List, Optional, Set, Tuple, Union
 
 from cereal import car
@@ -48,7 +48,7 @@ class HyundaiFlags(IntFlag):
   CANFD_HDA2_ALT_STEERING = 512
   SEND_FCA12 = 1024
 
-class CAR:
+class CAR(StrEnum):
   # Hyundai
   ELANTRA_I30 = "HYUNDAI AVANTE,I30 (AD,PD)"
   ELANTRA_CN7 = "HYUNDAI AVANTE (CN7)"
@@ -120,9 +120,9 @@ class CAR:
 
 class Footnote(Enum):
   CANFD = CarFootnote(
-    "Requires a comma 3X or <a href=\"https://comma.ai/shop/can-fd-panda-kit\" target=\"_blank\">CAN FD panda kit</a> " +
-    "for this <a href=\"https://en.wikipedia.org/wiki/CAN_FD\" target=\"_blank\">CAN FD car</a>.",
-    Column.MODEL, shop_footnote=True)
+    "Requires a <a href=\"https://comma.ai/shop/can-fd-panda-kit\" target=\"_blank\">CAN FD panda kit</a> if not using " +
+    "comma 3X for this <a href=\"https://en.wikipedia.org/wiki/CAN_FD\" target=\"_blank\">CAN FD car</a>.",
+    Column.MODEL, shop_footnote=False)
 
 
 @dataclass
@@ -421,8 +421,8 @@ def match_fw_to_car_fuzzy(live_fw_versions) -> Set[str]:
   # to distinguish between hybrid and ICE. All EVs so far are either exclusively
   # electric or specify electric in the platform code.
   # TODO: whitelist platforms that we've seen hybrid and ICE versions of that have these specifiers
-  fuzzy_platform_blacklist = set(CANFD_CAR - EV_CAR)
-  candidates = set()
+  fuzzy_platform_blacklist = {str(car) for car in set(CANFD_CAR - EV_CAR)}
+  candidates: Set[str] = set()
 
   for candidate, fws in FW_VERSIONS.items():
     # Keep track of ECUs which pass all checks (platform codes, within date range)
@@ -554,7 +554,6 @@ FW_QUERY_CONFIG = FwQueryConfig(
 )
 
 FW_VERSIONS = {
-  # pylint: disable=C0301
   # fwdCamera, fwdRadar, abs, eps, engine, transmission
   # hyundai
   CAR.ELANTRA_I30: { # (PD)
