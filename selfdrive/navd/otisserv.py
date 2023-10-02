@@ -29,6 +29,9 @@ import requests
 import math
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.params import Params
+from openpilot.common.realtime import set_core_affinity
+from openpilot.system.swaglog import cloudlog
+
 params = Params()
 
 hostName = ""
@@ -148,7 +151,7 @@ class OtisServ(BaseHTTPRequestHandler):
         if "pk." not in token:
           self.display_page_public_token("Your token was incorrect!")
           return
-        params.put('CustomMapboxTokenPk', token)
+        params.put('MapboxTokenPk', token)
 
     # app key
     if self.get_app_token() is None:
@@ -159,7 +162,7 @@ class OtisServ(BaseHTTPRequestHandler):
       if "sk." not in token:
         self.display_page_app_token("Your token was incorrect!")
         return
-      params.put('CustomMapboxTokenSk', token)
+      params.put('MapboxTokenSk', token)
       params.put_bool('NavEnable', True)
 
     # nav confirmed
@@ -232,13 +235,13 @@ class OtisServ(BaseHTTPRequestHandler):
     return None
 
   def get_public_token(self):
-    token = params.get("CustomMapboxTokenPk", encoding='utf8')
+    token = params.get("MapboxTokenPk", encoding='utf8')
     if token is not None and token != "":
       return token.rstrip('\x00')
     return None
 
   def get_app_token(self):
-    token = params.get("CustomMapboxTokenSk", encoding='utf8')
+    token = params.get("MapboxTokenSk", encoding='utf8')
     if token is not None and token != "":
       return token.rstrip('\x00')
     return None
@@ -383,6 +386,10 @@ class OtisServ(BaseHTTPRequestHandler):
     params.put("ApiCache_NavDestinations", json.dumps(dests).rstrip("\n\r"))
 
 def main():
+  try:
+    set_core_affinity([0, 1, 2, 3])
+  except Exception:
+    cloudlog.exception("otisserv: failed to set core affinity")
   webServer = HTTPServer((hostName, serverPort), OtisServ)
 
   try:

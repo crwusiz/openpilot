@@ -2292,7 +2292,7 @@ struct Event {
     customReservedRawData2 @126 :Data;
 
     # *********** Custom: reserved for forks ***********
-    customReserved0 @107 :Custom.CustomReserved0;
+    naviData @107 :Custom.NaviData;
     customReserved1 @108 :Custom.CustomReserved1;
     customReserved2 @109 :Custom.CustomReserved2;
     customReserved3 @110 :Custom.CustomReserved3;
@@ -2302,9 +2302,6 @@ struct Event {
     customReserved7 @114 :Custom.CustomReserved7;
     customReserved8 @115 :Custom.CustomReserved8;
     customReserved9 @116 :Custom.CustomReserved9;
-
-    # neokii
-    naviData @127 :NaviData;
 
     # *********** legacy + deprecated ***********
     model @9 :Legacy.ModelData; # TODO: rename modelV2 and mark this as deprecated
@@ -2345,21 +2342,4 @@ struct Event {
     driverStateDEPRECATED @59 :DriverStateDEPRECATED;
     sensorEventsDEPRECATED @11 :List(SensorEventData);
   }
-}
-
-struct NaviData {
-    active @0 :Int16;
-    roadLimitSpeed @1 :Int16;
-    isHighway @2 :Bool;
-    camType @3 :Int16;
-    camLimitSpeedLeftDist @4 :Int16;
-    camLimitSpeed @5 :Int16;
-    sectionLimitSpeed @6 :Int16;
-    sectionLeftDist @7 :Int16;
-    sectionAvgSpeed @8 :Int16;
-    sectionLeftTime @9 :Int16;
-    sectionAdjustSpeed @10 :Bool;
-    camSpeedFactor @11 :Float32;
-    currentRoadName @12 :Text;
-    isNda2 @13 :Bool;
 }

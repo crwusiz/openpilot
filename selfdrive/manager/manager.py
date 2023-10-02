@@ -60,7 +60,6 @@ def manager_init() -> None:
     ("NavEnable", "0"),
     ("RadarTrackEnable", "0"),
     ("SccOnBus2", "0"),
-    ("NavLimitSpeed", "0"),
     ("DisengageOnBrake", "0"),
   ]
   if not PC:
@@ -170,6 +169,7 @@ def manager_thread() -> None:
     ignore += ["manage_athenad", "uploader"]
   if os.getenv("NOBOARD") is not None:
     ignore.append("pandad")
+  ignore += [x for x in os.getenv("BLOCK", "").split(",") if len(x) > 0]
 
   # add toggle
   if not params.get_bool("LoggerEnable"):
@@ -182,7 +182,8 @@ def manager_thread() -> None:
   elif not params.get_bool("UseExternalNaviRoutes"):
     ignore += ["navi_route"]
 
-  ignore += [x for x in os.getenv("BLOCK", "").split(",") if len(x) > 0]
+  if params.get("DriverCameraHardwareMissing"):
+    ignore += ["dmonitoringd", "dmonitoringmodeld"]
 
   sm = messaging.SubMaster(['deviceState', 'carParams'], poll=['deviceState'])
   pm = messaging.PubMaster(['managerState'])

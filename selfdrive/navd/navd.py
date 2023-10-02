@@ -49,10 +49,10 @@ class RouteEngine:
     self.reroute_counter = 0
 
     if not self.params.get_bool("NavEnable"):
-      self.params.put("CustomMapboxTokenPk", "")
-      self.params.put("CustomMapboxTokenSk", "")
+      self.params.put("MapboxTokenPk", "")
+      self.params.put("MapboxTokenSk", "")
     if self.params.get_bool("NavEnable"):
-      self.mapbox_token = self.params.get("CustomMapboxTokenPk", encoding='utf8')
+      self.mapbox_token = self.params.get("MapboxTokenPk", encoding='utf8')
       self.mapbox_host = "https://api.mapbox.com"
     elif "MAPBOX_TOKEN" in os.environ:
       self.mapbox_token = os.environ["MAPBOX_TOKEN"]

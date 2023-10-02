@@ -742,21 +742,21 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                     "../assets/offroad/icon_long.png",
                                     this));
   }
-  toggles.append(new ParamControl("NavLimitSpeed",
-                                  tr("Navigation Limit Speed"),
-                                  tr("Use Stock Navigation Limit Speed Signal"),
-                                  "../assets/offroad/icon_speed_limit.png",
-                                  this));
   toggles.append(new ParamControl("DisengageOnBrake",
                                   tr("Disengage on Brake Pedal"),
                                   tr("When enabled, pressing the brake pedal will disengage openpilot."),
                                   "../assets/offroad/icon_disengage_on_accelerator.svg",
                                   this));
-  /*toggles.append(new ParamControl("RadarTrackEnable",
+  toggles.append(new ParamControl("DriverCameraHardwareMissing",
+                                  tr("DriverCamera Hardware Missing"),
+                                  tr("DriverCamera Hardware Missing"),
+                                  "../assets/offroad/icon_monitoring.png",
+                                  this));
+  toggles.append(new ParamControl("RadarTrackEnable",
                                   tr("Enable Radar Track"),
                                   tr("Enable Radar Track use (disable AEB)"),
                                   "../assets/offroad/icon_warning.png",
-                                  this));*/
+                                  this));
   for (ParamControl *toggle : toggles) {
     if (main_layout->count() != 0) {
     }

@@ -136,6 +136,7 @@ private:
   float roadLimitSpeed, navLimitSpeed = 0;
   float latAccelFactor, friction, latAccelFactorRaw, frictionRaw = 0;
   float dm_fade_state = 1.0;
+  Params params;
 
 protected:
   void paintGL() override;
