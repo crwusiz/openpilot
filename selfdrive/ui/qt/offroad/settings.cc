@@ -689,7 +689,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   }*/
 
   communityLayout->addWidget(horizontal_line());
-  if (!params.getBool("IsCanfd")) {
+  bool is_canfd = params.getBool("IsCanfd");
+  if (!is_canfd) {
     communityLayout->addWidget(new LateralControlSelect());
     communityLayout->addWidget(new MfcSelect());
     communityLayout->addWidget(horizontal_line());
@@ -735,7 +736,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   tr("Use external navi routes"),
                                   "../assets/offroad/icon_map.png",
                                   this));
-  if (!params.getBool("IsCanfd")) {
+  if (!is_canfd) {
     toggles.append(new ParamControl("SccOnBus2",
                                     tr("Scc on Bus 2"),
                                     tr("If Scc is on bus 2, turn it on."),
