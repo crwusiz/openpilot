@@ -97,10 +97,6 @@
         <translation>실행</translation>
     </message>
     <message>
-        <source>Process?</source>
-        <translation>실행하시겠습니까?</translation>
-    </message>
-    <message>
         <source>Select your Manufacturer</source>
         <translation>제조사를 선택하세요</translation>
     </message>
@@ -165,14 +161,6 @@
         <translation>활성화된 경우 브레이크 페달을 누르면 openpilot이 해제됩니다.</translation>
     </message>
     <message>
-        <source>Navigation Limit Speed</source>
-        <translation>내비게이션 속도제한 표시</translation>
-    </message>
-    <message>
-        <source>Use Stock Navigation Limit Speed Signal</source>
-        <translation>차량 순정 내비게이션의 속도제한 정보를 표시합니다</translation>
-    </message>
-    <message>
         <source>tmux error log</source>
         <translation>tmux 에러 로그</translation>
     </message>
@@ -198,7 +186,7 @@
     </message>
     <message>
         <source>Git Fetch and Reset&lt;br&gt;&lt;br&gt;Process?</source>
-        <translation>Git Fetch and Reset&lt;br&gt;&lt;br>실행하시겠습니까?</translation>
+        <translation>Git Fetch and Reset&lt;br&gt;&lt;br&gt;실행하시겠습니까?</translation>
     </message>
     <message>
         <source>Git Checkout&lt;br&gt;&lt;br&gt;Process?</source>
@@ -216,7 +204,22 @@
         <source>Panda Recover&lt;br&gt;&lt;br&gt;Process?</source>
         <translation>Panda 복구&lt;br&gt;&lt;br&gt;실행하시겠습니까?</translation>
     </message>
-
+    <message>
+        <source>DriverCamera Hardware Missing</source>
+        <translation>운전자 카메라 비활성화</translation>
+    </message>
+    <message>
+        <source>If there is a problem with the driver camera hardware, drive without the driver camera.</source>
+        <translation>운전자 카메라 하드웨어 문제시 운전자 카메라 없이 주행합니다.</translation>
+    </message>
+    <message>
+        <source>Enable Radar Track use</source>
+        <translation>레이더 트랙을 활성화 합니다</translation>
+    </message>
+    <message>
+        <source>Enable Radar Track use (disable AEB)</source>
+        <translation>레이더 트랙을 활성화 합니다 (차량의 AEB는 비활성화됩니다)</translation>
+    </message>
 </context>
 <context>
     <name>ConfirmationDialog</name>

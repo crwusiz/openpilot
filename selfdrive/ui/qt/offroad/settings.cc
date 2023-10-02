@@ -750,11 +750,11 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   this));
   toggles.append(new ParamControl("DriverCameraHardwareMissing",
                                   tr("DriverCamera Hardware Missing"),
-                                  tr("DriverCamera Hardware Missing"),
+                                  tr("If there is a problem with the driver camera hardware, drive without the driver camera."),
                                   "../assets/offroad/icon_monitoring.png",
                                   this));
   toggles.append(new ParamControl("RadarTrackEnable",
-                                  tr("Enable Radar Track"),
+                                  tr("Enable Radar Track use"),
                                   tr("Enable Radar Track use (disable AEB)"),
                                   "../assets/offroad/icon_warning.png",
                                   this));
