@@ -12,8 +12,6 @@
 
 #ifdef ENABLE_MAPS
 #include "selfdrive/ui/qt/maps/map_settings.h"
-#else
-#include "selfdrive/ui/qt/widgets/drive_stats.h"
 #endif
 
 // HomeWindow: the container for the offroad and onroad UIs
