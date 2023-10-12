@@ -743,6 +743,13 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                     "../assets/offroad/icon_long.png",
                                     this));
   }
+  if (is_canfd) {
+    toggles.append(new ParamControl("IsHda2",
+                                    tr("CANFD Car HDA2"),
+                                    tr("Highway Drive Assist 2, turn it on."),
+                                    "../assets/offroad/icon_long.png",
+                                    this));
+  }
   toggles.append(new ParamControl("DisengageOnBrake",
                                   tr("Disengage on Brake Pedal"),
                                   tr("When enabled, pressing the brake pedal will disengage openpilot."),

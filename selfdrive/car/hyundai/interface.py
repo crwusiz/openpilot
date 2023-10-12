@@ -23,7 +23,7 @@ class CarInterface(CarInterfaceBase):
   def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs):
     ret.carName = "hyundai"
 
-    hda2 = Ecu.adas in [fw.ecu for fw in car_fw]
+    hda2 = Ecu.adas in [fw.ecu for fw in car_fw] or Params().get_bool("IsHda2")
     CAN = CanBus(None, hda2, fingerprint)
 
     if candidate in CANFD_CAR:
