@@ -4,7 +4,7 @@ from openpilot.common.numpy_fast import clip
 from openpilot.selfdrive.car import create_button_event
 from openpilot.common.conversions import Conversions as CV
 from openpilot.common.params import Params
-from openpilot.selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, V_CRUISE_ENABLE_MIN
+from openpilot.selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, V_CRUISE_MIN
 
 V_CRUISE_MIN_CRUISE_STATE = 10
 
@@ -28,7 +28,7 @@ class CruiseStateManager:
   def __init__(self):
     self.available = False
     self.enabled = False
-    self.speed = V_CRUISE_ENABLE_MIN * CV.KPH_TO_MS
+    self.speed = V_CRUISE_MIN * CV.KPH_TO_MS
 
     self.prev_speed = 0
     self.prev_main_buttons = 0
@@ -134,12 +134,12 @@ class CruiseStateManager:
           self.enabled = True
           v_cruise_kph = CS.vEgoCluster * CV.MS_TO_KPH
           if CS.vEgoCluster < 0.1:
-            v_cruise_kph = clip(round(v_cruise_kph, 1), V_CRUISE_ENABLE_MIN, V_CRUISE_MAX)
+            v_cruise_kph = clip(round(v_cruise_kph, 1), V_CRUISE_MIN, V_CRUISE_MAX)
           else:
             v_cruise_kph = clip(round(v_cruise_kph, 1), V_CRUISE_MIN_CRUISE_STATE, V_CRUISE_MAX)
         elif btn == ButtonType.accelCruise and not self.enabled:
           self.enabled = True
-          v_cruise_kph = clip(round(self.speed * CV.MS_TO_KPH, 1), V_CRUISE_ENABLE_MIN, V_CRUISE_MAX)
+          v_cruise_kph = clip(round(self.speed * CV.MS_TO_KPH, 1), V_CRUISE_MIN, V_CRUISE_MAX)
           v_cruise_kph = clip(v_cruise_kph, round(CS.vEgoCluster * CV.MS_TO_KPH, 1), V_CRUISE_MAX)
 
     if btn == ButtonType.cancel:
