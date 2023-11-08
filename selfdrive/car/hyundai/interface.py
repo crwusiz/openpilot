@@ -375,7 +375,7 @@ class CarInterface(CarInterfaceBase):
     else:
       ret.enableBsm = 0x58b in fingerprint[0]
       ret.hasAutoHold = 0x47f in fingerprint[0]
-      ret.hasNav = 0x544 in fingerprint[0]
+      ret.hasNav = 0x544 in fingerprint[0] and Params().get_bool("NavLimitSpeed")
       ret.hasLfa = 0x391 in fingerprint[0] and Params().get("MfcSelect", encoding='utf8') == "2"
 
       ret.sccBus = 2 if Params().get_bool("SccOnBus2") else 0

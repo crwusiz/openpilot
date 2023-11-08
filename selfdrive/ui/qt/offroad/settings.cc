@@ -750,6 +750,11 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                     "../assets/offroad/icon_long.png",
                                     this));
   }
+  toggles.append(new ParamControl("NavLimitSpeed",
+                                  tr("Navigation Limit Speed"),
+                                  tr("Use Stock Navigation Limit Speed Signal"),
+                                  "../assets/offroad/icon_speed_limit.png",
+                                  this));
   toggles.append(new ParamControl("DisengageOnBrake",
                                   tr("Disengage on Brake Pedal"),
                                   tr("When enabled, pressing the brake pedal will disengage openpilot."),
