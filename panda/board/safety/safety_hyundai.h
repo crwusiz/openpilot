@@ -4,9 +4,9 @@
   .max_steer = (steer), \
   .max_rate_up = (rate_up), \
   .max_rate_down = (rate_down), \
-  .max_rt_delta = 150, \
+  .max_rt_delta = 112, \
   .max_rt_interval = 250000, \
-  .driver_torque_allowance = 60, \
+  .driver_torque_allowance = 50, \
   .driver_torque_factor = 2, \
   .type = TorqueDriverLimited, \
    /* the EPS faults when the steering angle is above a certain threshold for too long. to prevent this, */ \
@@ -17,7 +17,7 @@
   .has_steer_req_tolerance = true, \
 }
 
-const SteeringLimits HYUNDAI_STEERING_LIMITS = HYUNDAI_LIMITS(409, 10, 10);
+const SteeringLimits HYUNDAI_STEERING_LIMITS = HYUNDAI_LIMITS(384, 3, 7);
 const SteeringLimits HYUNDAI_STEERING_LIMITS_ALT = HYUNDAI_LIMITS(270, 2, 3);
 
 const LongitudinalLimits HYUNDAI_LONG_LIMITS = {
@@ -109,7 +109,7 @@ addr_checks hyundai_rx_checks = SET_ADDR_CHECKS(hyundai_addr_checks);
 static uint8_t hyundai_get_counter(CANPacket_t *to_push) {
   int addr = GET_ADDR(to_push);
 
-  uint8_t cnt;
+  uint8_t cnt = 0;
   if (addr == 0x260) {
     cnt = (GET_BYTE(to_push, 7) >> 4) & 0x3U;
   } else if (addr == 0x386) {
@@ -121,7 +121,6 @@ static uint8_t hyundai_get_counter(CANPacket_t *to_push) {
   } else if (addr == 0x4F1) {
     cnt = (GET_BYTE(to_push, 3) >> 4) & 0xFU;
   } else {
-    cnt = 0;
   }
   return cnt;
 }
@@ -129,7 +128,7 @@ static uint8_t hyundai_get_counter(CANPacket_t *to_push) {
 static uint32_t hyundai_get_checksum(CANPacket_t *to_push) {
   int addr = GET_ADDR(to_push);
 
-  uint8_t chksum;
+  uint8_t chksum = 0;
   if (addr == 0x260) {
     chksum = GET_BYTE(to_push, 7) & 0xFU;
   } else if (addr == 0x386) {
@@ -139,7 +138,6 @@ static uint32_t hyundai_get_checksum(CANPacket_t *to_push) {
   } else if (addr == 0x421) {
     chksum = GET_BYTE(to_push, 7) >> 4;
   } else {
-    chksum = 0;
   }
   return chksum;
 }
@@ -201,9 +199,7 @@ static int hyundai_rx_hook(CANPacket_t *to_push) {
 
   if (valid && (bus == 0)) {
     if (addr == 0x251) {
-      int torque_driver_new = ((int)(GET_BYTES(to_push, 0, 4) & 0x7ffU) - 982) * 0.4;
-      //int torque_driver_new = (GET_BYTES(to_push, 0, 2) & 0x7ffU) - 1024U;
-      //int torque_driver_new = ((GET_BYTES(to_push, 0, 4) & 0x7ffU) * 0.79) - 808; // scale down new driver torque signal to match previous one
+      int torque_driver_new = (GET_BYTES(to_push, 0, 2) & 0x7ffU) - 1024U;
       // update array of samples
       update_sample(&torque_driver, torque_driver_new);
     }
