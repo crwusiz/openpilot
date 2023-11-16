@@ -321,8 +321,6 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   autohold_active_img = loadPixmap("../assets/img_autohold_active.png", {img_size, img_size});
   nda_img = loadPixmap("../assets/img_nda.png");
   hda_img = loadPixmap("../assets/img_hda.png");
-  nda2_img = loadPixmap("../assets/img_nda2.png");
-  hda2_img = loadPixmap("../assets/img_hda2.png");
 }
 
 static const QColor get_tpms_color(float tpms) {
@@ -403,7 +401,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   rr = ce.getTpms().getRr();
   navLimitSpeed = ce.getNavLimitSpeed();
   nda_state = nd.getActive();
-  isNda2 = nd.getIsNda2();
   roadLimitSpeed = nd.getRoadLimitSpeed();
   camLimitSpeed = nd.getCamLimitSpeed();
   camLimitSpeedLeftDist = nd.getCamLimitSpeedLeftDist();
@@ -637,11 +634,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     h = 54;
     x = (width() + (UI_BORDER_SIZE * 2)) / 2 - (w / 2) - UI_BORDER_SIZE;
     y = UI_BORDER_SIZE * 4;
-    if (isNda2) {
-      p.drawPixmap(x , y, w + 35, h, nda_state == 1 ? nda2_img : hda2_img);
-    } else {
-      p.drawPixmap(x, y, w, h, nda_state == 1 ? nda_img : hda_img);
-    }
+    p.drawPixmap(x, y, w, h, nda_state == 1 ? nda_img : hda_img);
   }
 
   // traffic icon (upper right 5)

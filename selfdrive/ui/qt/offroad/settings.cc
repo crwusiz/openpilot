@@ -731,11 +731,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   tr("Navigation Features use"),
                                   "../assets/offroad/icon_map.png",
                                   this));
-  toggles.append(new ParamControl("UseExternalNaviRoutes",
-                                  tr("Use external navi routes"),
-                                  tr("Use external navi routes"),
-                                  "../assets/offroad/icon_map.png",
-                                  this));
   if (!is_canfd) {
     toggles.append(new ParamControl("SccOnBus2",
                                     tr("Scc on Bus 2"),
