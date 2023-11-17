@@ -42,10 +42,10 @@ X_EGO_COST = 0.
 V_EGO_COST = 0.
 A_EGO_COST = 0.
 J_EGO_COST = 5.0
-A_CHANGE_COST = 100.  # 200.
+A_CHANGE_COST = 200.
 DANGER_ZONE_COST = 100.
 CRASH_DISTANCE = .25
-LEAD_DANGER_FACTOR = 0.75
+LEAD_DANGER_FACTOR = 0.8  # 0.75
 LIMIT_COST = 1e6
 ACADOS_SOLVER_TYPE = 'SQP_RTI'
 
@@ -240,7 +240,7 @@ class LongitudinalMpc:
     self.trafficState = 0
     self.xStopFilter = StreamingMovingAverage(3)
     self.xStopFilter2 = StreamingMovingAverage(15)
-    self.vFilter = StreamingMovingAverage(4)
+    self.vFilter = StreamingMovingAverage(10)
     self.t_follow = get_T_FOLLOW()
     self.stop_distance = STOP_DISTANCE
     self.comfort_brake = COMFORT_BRAKE
@@ -256,6 +256,7 @@ class LongitudinalMpc:
     # self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
     self.solver.reset()
     # self.solver.options_set('print_level', 2)
+    self.x_solution = np.zeros(N+1)
     self.v_solution = np.zeros(N+1)
     self.a_solution = np.zeros(N+1)
     self.prev_a = np.array(self.a_solution)
@@ -510,6 +511,7 @@ class LongitudinalMpc:
     for i in range(N):
       self.u_sol[i] = self.solver.get(i, 'u')
 
+    self.x_solution = self.x_sol[:,0]
     self.v_solution = self.x_sol[:,1]
     self.a_solution = self.x_sol[:,2]
     self.j_solution = self.u_sol[:,0]
@@ -590,7 +592,7 @@ class LongitudinalMpc:
     elif stop_x == 1000.0:
       self.stopDist = 0.0
     elif self.stopDist > 0:
-      stop_dist = v_ego ** 2 / (2.2 * 2)
+      stop_dist = v_ego ** 2 / (2.5 * 2)
       self.stopDist = self.stopDist if self.stopDist > stop_dist else stop_dist
       stop_x = 0.0
     return v_cruise, stop_x + self.stopDist

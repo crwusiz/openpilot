@@ -13,65 +13,74 @@ RADAR_MSG_COUNT = 32
 
 
 def get_radar_can_parser(CP):
-  if DBC[CP.carFingerprint]['radar'] is None:
+  radar_tracks_enable = Params().get_bool("RadarTrackEnable")
+
+  if DBC[CP.carFingerprint]['radar'] is None or not radar_tracks_enable:
     return None
 
-  elif CP.openpilotLongitudinalControl and (CP.sccBus == 0 or Params().get_bool("RadarTrackEnable")):
-    messages = [(f"RADAR_TRACK_{addr:x}", 50) for addr in range(RADAR_START_ADDR, RADAR_START_ADDR + RADAR_MSG_COUNT)]
-    print("RadarInterface: RadarTracks..")
-    return CANParser(DBC[CP.carFingerprint]['radar'], messages, 1)
+  print("RadarInterface: RadarTracks...")
+  messages = [(f"RADAR_TRACK_{addr:x}", 50) for addr in range(RADAR_START_ADDR, RADAR_START_ADDR + RADAR_MSG_COUNT)]
+  return CANParser(DBC[CP.carFingerprint]['radar'], messages, 1)
 
-  else:
-    messages = [
-      ("SCC11", 50),
-    ]
-    print("RadarInterface: SCCRadar...")
-    return CANParser(DBC[CP.carFingerprint]['pt'], messages, CP.sccBus)
+def get_radar_can_parser_scc(CP):
+  scc2 = Params().get_bool("SccOnBus2")
 
+  print("RadarInterface: SCC Radar (Bus{})".format( 2 if scc2 else 0))
+  messages = [("SCC11", 50)]
+  return CANParser(DBC[CP.carFingerprint]['pt'], messages, 2 if scc2 else 0)
 
 class RadarInterface(RadarInterfaceBase):
   def __init__(self, CP):
     super().__init__(CP)
-    self.radar_track = CP.openpilotLongitudinalControl and (CP.sccBus == 0 or Params().get_bool("RadarTrackEnable"))
     self.updated_messages = set()
-    self.trigger_msg = 0x420 if not self.radar_track else RADAR_START_ADDR + RADAR_MSG_COUNT - 1
-    self.track_id = 0
+    self.trigger_msg = RADAR_START_ADDR + RADAR_MSG_COUNT - 1
+    self.track_id = 1
 
     self.radar_off_can = CP.radarUnavailable
     self.rcp = get_radar_can_parser(CP)
 
+    self.rcp_scc = get_radar_can_parser_scc(CP)
+    self.updated_messages_scc = set()
+    self.trigger_msg_scc = 0x420
     self.dRelFilter = StreamingMovingAverage(2)
-    self.vRelFilter = StreamingMovingAverage(4)
-    self.valid_prev = False
+    self.vRelFilter = StreamingMovingAverage(2)
 
   def update(self, can_strings):
-    if self.radar_off_can or (self.rcp is None):
+    if self.radar_off_can or (self.rcp is None) and (self.rcp_scc is None):
       return super().update(None)
 
-    vls = self.rcp.update_strings(can_strings)
-    self.updated_messages.update(vls)
+    if self.rcp is not None:
+      vls = self.rcp.update_strings(can_strings)
+      self.updated_messages.update(vls)
 
-    if self.trigger_msg not in self.updated_messages:
+    if self.rcp_scc is not None:
+      vls_scc = self.rcp_scc.update_strings(can_strings)
+      self.updated_messages_scc.update(vls_scc)
+
+    trigger_msg_radar = True if self.trigger_msg in self.updated_messages else False
+    trigger_msg_scc = True if self.trigger_msg_scc in self.updated_messages_scc else False
+
+    if trigger_msg_radar or trigger_msg_scc:
+      rr = self._update(self.updated_messages, trigger_msg_radar, trigger_msg_scc)
+    else:
       return None
 
-    rr = self._update(self.updated_messages)
     self.updated_messages.clear()
+    self.updated_messages_scc.clear()
 
     return rr
 
-
-  def _update(self, updated_messages):
+  def _update(self, updated_messages, trigger_msg_radar, trigger_msg_scc):
     ret = car.RadarData.new_message()
-    if self.rcp is None:
+    if self.rcp is None and self.rcp_scc is None:
       return ret
 
     errors = []
 
-    if not self.rcp.can_valid:
-      errors.append("canError")
-    ret.errors = errors
+    if self.rcp is not None and trigger_msg_radar:
+      if not self.rcp.can_valid:
+        errors.append("canError")
 
-    if self.radar_track:
       for addr in range(RADAR_START_ADDR, RADAR_START_ADDR + RADAR_MSG_COUNT):
         msg = self.rcp.vl[f"RADAR_TRACK_{addr:x}"]
 
@@ -93,39 +102,35 @@ class RadarInterface(RadarInterfaceBase):
         else:
           del self.pts[addr]
 
-      ret.points = list(self.pts.values())
-      return ret
+    if self.rcp_scc is not None and trigger_msg_scc:
+      if not self.rcp_scc.can_valid:
+        errors.append("canError")
 
-    else:
-      cpt = self.rcp.vl
-
-      valid = cpt["SCC11"]['ACC_ObjStatus']
-
+      cpt = self.rcp_scc.vl
+      dRel = cpt["SCC11"]['ACC_ObjDist']
+      vRel = cpt["SCC11"]['ACC_ObjRelSpd']
+      valid = cpt["SCC11"]['ACC_ObjStatus'] and dRel < 150
       for ii in range(1):
         if valid:
           if ii not in self.pts:
             self.pts[ii] = car.RadarData.RadarPoint.new_message()
-            self.pts[ii].trackId = self.track_id
-            self.track_id += 1
-
-          if not self.valid_prev:
-            dRel = self.dRelFilter.set(cpt["SCC11"]['ACC_ObjDist'])
-            vRel = self.vRelFilter.set(cpt["SCC11"]['ACC_ObjRelSpd'])
+            self.pts[ii].trackId = 0 #self.track_id
+            #self.track_id += 1
+            dRel = self.dRelFilter.set(dRel)
+            vRel = self.vRelFilter.set(vRel)
           else:
-            dRel = self.dRelFilter.process(cpt["SCC11"]['ACC_ObjDist'])
-            vRel = self.vRelFilter.process(cpt["SCC11"]['ACC_ObjRelSpd'])
-
+            dRel = self.dRelFilter.process(dRel)
+            vRel = self.vRelFilter.process(vRel)
           self.pts[ii].dRel = dRel #cpt["SCC11"]['ACC_ObjDist']  # from front of car
           self.pts[ii].yRel = -cpt["SCC11"]['ACC_ObjLatPos']  # in car frame's y axis, left is negative
           self.pts[ii].vRel = vRel #cpt["SCC11"]['ACC_ObjRelSpd']
           self.pts[ii].aRel = float('nan')
           self.pts[ii].yvRel = float('nan')
           self.pts[ii].measured = True
-
         else:
           if ii in self.pts:
             del self.pts[ii]
 
-      self.valid_prev = valid
-      ret.points = list(self.pts.values())
-      return ret
+    ret.points = list(self.pts.values())
+    ret.errors = errors
+    return ret

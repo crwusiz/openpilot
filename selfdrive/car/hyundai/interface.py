@@ -381,6 +381,7 @@ class CarInterface(CarInterfaceBase):
         Params().put_bool("ExperimentalLongitudinalEnabled", True)
         ret.hasScc13 = 0x50a in fingerprint[0] or 0x50a in fingerprint[2]
         ret.hasScc14 = 0x389 in fingerprint[0] or 0x389 in fingerprint[2]
+        ret.radarTimeStep = (1.0 / 50)  # 50Hz
 
       ret.radarUnavailable = ret.sccBus == -1
 
