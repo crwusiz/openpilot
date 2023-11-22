@@ -58,8 +58,15 @@ class Track:
     self.K_C = kalman_params.C
     self.K_K = kalman_params.K
     self.kf = KF1D([[v_lead], [0.0]], self.K_A, self.K_C, self.K_K)
+    self.dRel = 0
 
   def update(self, d_rel: float, y_rel: float, v_rel: float, v_lead: float, measured: float):
+
+    #apilot: changed radar target
+    if abs(self.dRel - d_rel) > 3.0: # 3M이상 차이날때 초기화
+      self.cnt = 0
+      self.kf = KF1D([[v_lead], [0.0]], self.K_A, self.K_C, self.K_K)
+
     # relative values, copy
     self.dRel = d_rel   # LONG_DIST
     self.yRel = y_rel   # -LAT_DIST
@@ -280,7 +287,8 @@ class RadarD:
       model_v_ego = self.v_ego
     leads_v3 = sm['modelV2'].leadsV3
     if len(leads_v3) > 1:
-      self.radar_state.leadOne = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[0], model_v_ego, low_speed_override=True)
+      #self.radar_state.leadOne = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[0], model_v_ego, low_speed_override=True)
+      self.radar_state.leadOne = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[0], model_v_ego, low_speed_override=False)
       self.radar_state.leadTwo = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[1], model_v_ego, low_speed_override=False)
 
   def publish(self, pm: messaging.PubMaster, lag_ms: float):

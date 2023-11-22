@@ -43,7 +43,7 @@ class RadarInterface(RadarInterfaceBase):
     self.updated_messages_scc = set()
     self.trigger_msg_scc = 0x420
     self.dRelFilter = StreamingMovingAverage(2)
-    self.vRelFilter = StreamingMovingAverage(2)
+    self.vRelFilter = StreamingMovingAverage(4)
 
   def update(self, can_strings):
     if self.radar_off_can or (self.rcp is None) and (self.rcp_scc is None):
