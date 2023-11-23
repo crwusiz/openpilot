@@ -156,22 +156,32 @@ def laplacian_pdf(x: float, mu: float, b: float):
 
 def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks: Dict[int, Track]):
   offset_vision_dist = lead.x[0] - RADAR_TO_CAMERA
+  tracks_len = len(tracks)
 
-  def prob(c):
+  def prob(c, c_key):
     prob_d = laplacian_pdf(c.dRel, offset_vision_dist, lead.xStd[0])
     prob_y = laplacian_pdf(c.yRel, -lead.y[0], lead.yStd[0])
     prob_v = laplacian_pdf(c.vRel + v_ego, lead.v[0], lead.vStd[0])
 
-    # This is isn't exactly right, but good heuristic
-    return prob_d * prob_y * prob_v
+    #속도가 빠른것에 weight를 더줌. apilot,
+    #231120: 감속정지중, 전방차량정지상태인데, 주변의 노이즈성 레이더포인트가 검출되어 버림.
+    #       이 포인트는 약간 먼데, 주행하고 있는것처럼.. 인식됨. 아주 잠깐 인식됨.
+    #        속도관련 weight를 없애야하나?  TG를 지나고 있는 차를 우선시하도록 만든건데...
 
-  track = max(tracks.values(), key=prob)
+    weight_scc = 0.1 if tracks_len > 1 and c_key == 0 else 1.0  ## SCC레이더데이터의 prob는 작게잡아 레이더트랙의 것을 우선순위로 둠. SCC레이더값은 0번에 저장됨.
+    weight_v = interp(c.vRel + v_ego, [0, 10], [0.3, 1])
+    # This is isn't exactly right, but good heuristic
+    return prob_d * prob_y * prob_v * weight_v * weight_scc
+
+  track_key, track = max(tracks.items(), key=lambda item: prob(item[1], item[0]))
 
   # if no 'sane' match is found return -1
   # stationary radar points can be false positives
   dist_sane = abs(track.dRel - offset_vision_dist) < max([(offset_vision_dist)*.35, 5.0])
   vel_sane = (abs(track.vRel + v_ego - lead.v[0]) < 15) or (v_ego + track.vRel > 3)
-  if dist_sane and vel_sane:
+  ##간혹 어수선한경우, 전방에 차가 없지만, 좌우에 차가많은경우 억지로 레이더를 가져오는 경우가 있음..(레이더트랙의 경우)
+  y_sane = (abs(-lead.y[0]-track.yRel) < 3.2 / 2.)  #lane_width assumed 3.2M, laplacian_pdf 의 prob값을 검증하려했지만, y값으로 처리해도 될듯함.
+  if dist_sane and vel_sane and y_sane:
     return track
   else:
     return None
@@ -202,6 +212,16 @@ def get_lead(v_ego: float, ready: bool, tracks: Dict[int, Track], lead_msg: capn
     track = match_vision_to_track(v_ego, lead_msg, tracks)
   else:
     track = None
+
+  ## vision match후 SCC radar값이 버져졌으면, 다시 살려서 처리함.
+  ##  SCC레이더 값 우선처리하도록함.
+  ##     가끔씩 SCC레이더값이 작은데도 비전과의 차이가 35%(5M)이상 차이나면, 버리는 경우가 있음.
+  if len(tracks) > 0 and track is None:
+    track = tracks.get(0)  ## SCC radar always 0
+    if track is not None and lead_msg.prob > .5:
+      offset_vision_dist = lead_msg.x[0] - RADAR_TO_CAMERA
+      if offset_vision_dist < track.dRel - 5.0: #끼어드는 차량이 있는 경우 처리..
+        track = None
 
   lead_dict = {'status': False}
   if track is not None:
@@ -246,7 +266,6 @@ class RadarD:
     if rr is not None:
       radar_points = rr.points
       radar_errors = rr.errors
-
     if sm.updated['carState']:
       self.v_ego = sm['carState'].vEgo
       self.v_ego_hist.append(self.v_ego)

@@ -111,7 +111,7 @@ class RadarInterface(RadarInterfaceBase):
       cpt = self.rcp_scc.vl
       dRel = cpt["SCC11"]['ACC_ObjDist']
       vRel = cpt["SCC11"]['ACC_ObjRelSpd']
-      valid = cpt["SCC11"]['ACC_ObjStatus']
+      valid = cpt["SCC11"]['ACC_ObjStatus'] # and dRel < 150
       if valid:
         if abs(dRel - self.prev_dist) > clip(dRel/20., 1., 5.):
           self.pts.clear()
