@@ -2,6 +2,7 @@
 import math
 
 from cereal import car
+from common.numpy_fast import clip
 from opendbc.can.parser import CANParser
 from openpilot.selfdrive.car.interfaces import RadarInterfaceBase
 from openpilot.selfdrive.car.hyundai.values import DBC
@@ -34,7 +35,8 @@ class RadarInterface(RadarInterfaceBase):
     super().__init__(CP)
     self.updated_messages = set()
     self.trigger_msg = RADAR_START_ADDR + RADAR_MSG_COUNT - 1
-    self.track_id = 1
+    self.track_id = 0
+    self.prev_dist = 0
 
     self.radar_off_can = CP.radarUnavailable
     self.rcp = get_radar_can_parser(CP)
@@ -109,27 +111,31 @@ class RadarInterface(RadarInterfaceBase):
       cpt = self.rcp_scc.vl
       dRel = cpt["SCC11"]['ACC_ObjDist']
       vRel = cpt["SCC11"]['ACC_ObjRelSpd']
-      valid = cpt["SCC11"]['ACC_ObjStatus'] and dRel < 150
-      for ii in range(1):
-        if valid:
-          if ii not in self.pts:
-            self.pts[ii] = car.RadarData.RadarPoint.new_message()
-            self.pts[ii].trackId = 0 #self.track_id
-            #self.track_id += 1
-            dRel = self.dRelFilter.set(dRel)
-            vRel = self.vRelFilter.set(vRel)
-          else:
-            dRel = self.dRelFilter.process(dRel)
-            vRel = self.vRelFilter.process(vRel)
-          self.pts[ii].dRel = dRel #cpt["SCC11"]['ACC_ObjDist']  # from front of car
-          self.pts[ii].yRel = -cpt["SCC11"]['ACC_ObjLatPos']  # in car frame's y axis, left is negative
-          self.pts[ii].vRel = vRel #cpt["SCC11"]['ACC_ObjRelSpd']
-          self.pts[ii].aRel = float('nan')
-          self.pts[ii].yvRel = float('nan')
-          self.pts[ii].measured = True
+      valid = cpt["SCC11"]['ACC_ObjStatus']
+      if valid:
+        if abs(dRel - self.prev_dist) > clip(dRel/20., 1., 5.):
+          self.pts.clear()
+
+        self.prev_dist = dRel
+
+        target_id = 0
+        if target_id not in self.pts:
+          self.pts[target_id] = car.RadarData.RadarPoint.new_message()
+          self.pts[target_id].trackId = self.track_id
+          self.track_id += 1
+          dRel = self.dRelFilter.set(dRel)
+          vRel = self.vRelFilter.set(vRel)
         else:
-          if ii in self.pts:
-            del self.pts[ii]
+          dRel = self.dRelFilter.process(dRel)
+          vRel = self.vRelFilter.process(vRel)
+          self.pts[target_id].dRel = dRel
+          self.pts[target_id].yRel = -cpt["SCC11"]['ACC_ObjLatPos']  # in car frame's y axis, left is negative
+          self.pts[target_id].vRel = vRel
+          self.pts[target_id].aRel = float('nan')
+          self.pts[target_id].yvRel = float('nan')
+          self.pts[target_id].measured = True
+      else:
+        self.pts.clear()
 
     ret.points = list(self.pts.values())
     ret.errors = errors
