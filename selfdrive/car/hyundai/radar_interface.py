@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import math
 
 from cereal import car
@@ -12,6 +11,7 @@ from openpilot.common.filter_simple import StreamingMovingAverage
 RADAR_START_ADDR = 0x500
 RADAR_MSG_COUNT = 32
 
+# POC for parsing corner radars: https://github.com/commaai/openpilot/pull/24221/
 
 def get_radar_can_parser(CP):
   radar_tracks_enable = Params().get_bool("RadarTrackEnable")
@@ -35,8 +35,7 @@ class RadarInterface(RadarInterfaceBase):
     super().__init__(CP)
     self.updated_messages = set()
     self.trigger_msg = RADAR_START_ADDR + RADAR_MSG_COUNT - 1
-    self.track_id = 0
-    self.prev_dist = 0
+    self.track_id = 1
 
     self.radar_off_can = CP.radarUnavailable
     self.rcp = get_radar_can_parser(CP)
@@ -111,18 +110,13 @@ class RadarInterface(RadarInterfaceBase):
       cpt = self.rcp_scc.vl
       dRel = cpt["SCC11"]['ACC_ObjDist']
       vRel = cpt["SCC11"]['ACC_ObjRelSpd']
-      valid = cpt["SCC11"]['ACC_ObjStatus'] # and dRel < 150
+      valid = cpt["SCC11"]['ACC_ObjStatus'] and dRel < 150
       if valid:
-        if abs(dRel - self.prev_dist) > clip(dRel/20., 1., 5.):
-          self.pts.clear()
-
-        self.prev_dist = dRel
-
         target_id = 0
         if target_id not in self.pts:
           self.pts[target_id] = car.RadarData.RadarPoint.new_message()
-          self.pts[target_id].trackId = self.track_id
-          self.track_id += 1
+          self.pts[target_id].trackId = 0 #self.track_id
+          #self.track_id += 1
           dRel = self.dRelFilter.set(dRel)
           vRel = self.vRelFilter.set(vRel)
         else:

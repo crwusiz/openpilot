@@ -1,5 +1,3 @@
-from random import randint
-
 from cereal import car
 from openpilot.common.params import Params
 from openpilot.common.conversions import Conversions as CV
