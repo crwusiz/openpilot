@@ -50,7 +50,7 @@ class KalmanParams:
 
 
 class Track:
-  def __init__(self, identifier: int, v_lead: float, kalman_params: KalmanParams):
+  def __init__(self, identifier: int, v_lead: float, y_rel: float, kalman_params: KalmanParams):
     self.identifier = identifier
     self.cnt = 0
     self.aLeadTau = _LEAD_ACCEL_TAU
@@ -58,25 +58,31 @@ class Track:
     self.K_C = kalman_params.C
     self.K_K = kalman_params.K
     self.kf = KF1D([[v_lead], [0.0]], self.K_A, self.K_C, self.K_K)
+    self.kf_y = KF1D([[y_rel], [0.0]], self.K_A, self.K_C, self.K_K)
     self.dRel = 0
+    self.vision_prob = 0.0
 
-  def update(self, d_rel: float, y_rel: float, v_rel: float, v_lead: float, measured: float):
+  def update(self, d_rel: float, y_rel: float, v_rel: float, v_lead: float, measured: float, a_rel: float):
 
     #apilot: changed radar target
     if abs(self.dRel - d_rel) > 3.0: # 3M이상 차이날때 초기화
       self.cnt = 0
       self.kf = KF1D([[v_lead], [0.0]], self.K_A, self.K_C, self.K_K)
-
+      self.kf_y = KF1D([[y_rel], [0.0]], self.K_A, self.K_C, self.K_K)
     # relative values, copy
     self.dRel = d_rel   # LONG_DIST
     self.yRel = y_rel   # -LAT_DIST
     self.vRel = v_rel   # REL_SPEED
+    self.aRel = a_rel   # REL_ACCEL: radar track만 나옴.
     self.vLead = v_lead
     self.measured = measured   # measured or estimate
 
     # computed velocity and accelerations
     if self.cnt > 0:
       self.kf.update(self.vLead)
+      self.kf_y.update(self.yRel)
+
+    self.vLat = float(self.kf_y.x[1][0])
 
     self.vLeadK = float(self.kf.x[SPEED][0])
     self.aLeadK = float(self.kf.x[ACCEL][0])
@@ -112,6 +118,8 @@ class Track:
       "modelProb": model_prob,
       "radar": True,
       "radarTrackId": self.identifier,
+      "aRel": float(self.aRel),
+      "vLat": float(self.vLat),
     }
 
   def get_RadarState2(self, model_prob, lead_msg):
@@ -133,6 +141,8 @@ class Track:
       "modelProb": model_prob,
       "radar": True,
       "radarTrackId": self.identifier,
+      "aRel": float(self.aRel),
+      "vLat": float(self.vLat),
     }
 
 
@@ -160,18 +170,18 @@ def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks
 
   def prob(c, c_key):
     prob_d = laplacian_pdf(c.dRel, offset_vision_dist, lead.xStd[0])
-    prob_y = laplacian_pdf(c.yRel, -lead.y[0], lead.yStd[0])
+    prob_y = laplacian_pdf(c.yRel+c.vLat, -lead.y[0], lead.yStd[0])
     prob_v = laplacian_pdf(c.vRel + v_ego, lead.v[0], lead.vStd[0])
 
     #속도가 빠른것에 weight를 더줌. apilot,
     #231120: 감속정지중, 전방차량정지상태인데, 주변의 노이즈성 레이더포인트가 검출되어 버림.
     #       이 포인트는 약간 먼데, 주행하고 있는것처럼.. 인식됨. 아주 잠깐 인식됨.
     #        속도관련 weight를 없애야하나?  TG를 지나고 있는 차를 우선시하도록 만든건데...
-
-    weight_scc = 0.1 if tracks_len > 1 and c_key == 0 else 1.0  ## SCC레이더데이터의 prob는 작게잡아 레이더트랙의 것을 우선순위로 둠. SCC레이더값은 0번에 저장됨.
     weight_v = interp(c.vRel + v_ego, [0, 10], [0.3, 1])
     # This is isn't exactly right, but good heuristic
-    return prob_d * prob_y * prob_v * weight_v * weight_scc
+    prob = prob_d * prob_y * prob_v * weight_v
+    c.vision_prob = prob
+    return prob
 
   track_key, track = max(tracks.items(), key=lambda item: prob(item[1], item[0]))
 
@@ -195,7 +205,7 @@ def get_RadarState_from_vision(lead_msg: capnp._DynamicStructReader, v_ego: floa
     "vRel": float(lead_v_rel_pred),
     "vLead": float(v_ego + lead_v_rel_pred),
     "vLeadK": float(v_ego + lead_v_rel_pred),
-    "aLeadK": 0.0,
+    "aLeadK": float(lead_msg.a[0]), #0.0,
     "aLeadTau": 0.3,
     "fcw": False,
     "modelProb": float(lead_msg.prob),
@@ -207,18 +217,22 @@ def get_RadarState_from_vision(lead_msg: capnp._DynamicStructReader, v_ego: floa
 
 def get_lead(v_ego: float, ready: bool, tracks: Dict[int, Track], lead_msg: capnp._DynamicStructReader,
              model_v_ego: float, low_speed_override: bool = True) -> Dict[str, Any]:
+  ## SCC레이더는 일단 보관하고 리스트에서 삭제...
+  track_scc = tracks.get(0)
+  if track_scc is not None:
+    del tracks[0]
   # Determine leads, this is where the essential logic happens
   if len(tracks) > 0 and ready and lead_msg.prob > .5:
     track = match_vision_to_track(v_ego, lead_msg, tracks)
   else:
     track = None
 
-  ## vision match후 SCC radar값이 버져졌으면, 다시 살려서 처리함.
-  ##  SCC레이더 값 우선처리하도록함.
-  ##     가끔씩 SCC레이더값이 작은데도 비전과의 차이가 35%(5M)이상 차이나면, 버리는 경우가 있음.
-  if len(tracks) > 0 and track is None:
-    track = tracks.get(0)  ## SCC radar always 0
-    if track is not None and lead_msg.prob > .5:
+  ## vision match후 발견된 track이 없으면
+  ##  track_scc 가 있는 지 확인하고
+  ##    비전과의 차이가 35%(5M)이상 차이나면 scc가 발견못한것이기 때문에 비전것으로 처리함.
+  if track_scc is not None and track is None:
+    track = track_scc
+    if lead_msg.prob > .5:
       offset_vision_dist = lead_msg.x[0] - RADAR_TO_CAMERA
       if offset_vision_dist < track.dRel - 5.0: #끼어드는 차량이 있는 경우 처리..
         track = None
@@ -274,7 +288,7 @@ class RadarD:
 
     ar_pts = {}
     for pt in radar_points:
-      ar_pts[pt.trackId] = [pt.dRel, pt.yRel, pt.vRel, pt.measured]
+      ar_pts[pt.trackId] = [pt.dRel, pt.yRel, pt.vRel, pt.measured, pt.aRel]
 
     # *** remove missing points from meta data ***
     for ids in list(self.tracks.keys()):
@@ -290,8 +304,8 @@ class RadarD:
 
       # create the track if it doesn't exist or it's a new track
       if ids not in self.tracks:
-        self.tracks[ids] = Track(ids, v_lead, self.kalman_params)
-      self.tracks[ids].update(rpt[0], rpt[1], rpt[2], v_lead, rpt[3])
+        self.tracks[ids] = Track(ids, v_lead, rpt[1], self.kalman_params)
+      self.tracks[ids].update(rpt[0], rpt[1], rpt[2], v_lead, rpt[3], rpt[4])
 
     # *** publish radarState ***
     self.radar_state_valid = sm.all_checks() and len(radar_errors) == 0
@@ -306,7 +320,6 @@ class RadarD:
       model_v_ego = self.v_ego
     leads_v3 = sm['modelV2'].leadsV3
     if len(leads_v3) > 1:
-      #self.radar_state.leadOne = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[0], model_v_ego, low_speed_override=True)
       self.radar_state.leadOne = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[0], model_v_ego, low_speed_override=False)
       self.radar_state.leadTwo = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[1], model_v_ego, low_speed_override=False)
 
@@ -327,6 +340,8 @@ class RadarD:
         "dRel": float(self.tracks[tid].dRel),
         "yRel": float(self.tracks[tid].yRel),
         "vRel": float(self.tracks[tid].vRel),
+        "aRel": float(self.tracks[tid].aRel),
+        "vLat": float(self.tracks[tid].vLat),
       }
     pm.send('liveTracks', tracks_msg)
 
@@ -349,7 +364,8 @@ def radard_thread(sm: Optional[messaging.SubMaster] = None, pm: Optional[messagi
   if can_sock is None:
     can_sock = messaging.sub_sock('can')
   if sm is None:
-    sm = messaging.SubMaster(['modelV2', 'carState'], ignore_avg_freq=['modelV2', 'carState'])  # Can't check average frequency, since radar determines timing
+    # Can't check average frequency, since radar determines timing
+    sm = messaging.SubMaster(['modelV2', 'carState'], ignore_avg_freq=['modelV2', 'carState'])
   if pm is None:
     pm = messaging.PubMaster(['radarState', 'liveTracks'])
 

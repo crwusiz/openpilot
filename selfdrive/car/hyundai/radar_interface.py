@@ -1,7 +1,6 @@
 import math
 
 from cereal import car
-from common.numpy_fast import clip
 from opendbc.can.parser import CANParser
 from openpilot.selfdrive.car.interfaces import RadarInterfaceBase
 from openpilot.selfdrive.car.hyundai.values import DBC

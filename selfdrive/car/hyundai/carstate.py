@@ -100,7 +100,7 @@ class CarState(CarStateBase):
     ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > self.params.STEER_THRESHOLD, 5)
     self.eps_error_cnt += 1 if not ret.standstill and cp.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 else -self.eps_error_cnt
     #ret.steerFaultTemporary = cp.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0 or cp.vl["MDPS12"]["CF_Mdps_ToiFlt"] != 0
-    ret.steerFaultTemporary = self.eps_error_cnt > 100
+    ret.steerFaultTemporary = self.eps_error_cnt > 200
 
     # cruise state
     if self.CP.openpilotLongitudinalControl and self.CP.sccBus == 0:
