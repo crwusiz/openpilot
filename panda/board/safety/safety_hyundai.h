@@ -272,7 +272,7 @@ static bool hyundai_tx_hook(CANPacket_t *to_send) {
     //violation |= (aeb_req != 0);
 
     if (violation) {
-      tx =false;
+      tx = false;
       print("violation[SCC12, 0x421]\n");
     }
   }
@@ -284,7 +284,7 @@ static bool hyundai_tx_hook(CANPacket_t *to_send) {
     /*bool steer_req = GET_BIT(to_send, 27U) != 0U;
     const SteeringLimits limits = hyundai_alt_limits ? HYUNDAI_STEERING_LIMITS_ALT : HYUNDAI_STEERING_LIMITS;
     if (steer_torque_cmd_checks(desired_torque, steer_req, limits)) {
-      tx = 0;
+      tx = false;
     }*/
 
     uint32_t ts = microsecond_timer_get();
