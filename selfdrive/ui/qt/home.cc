@@ -153,7 +153,7 @@ OffroadHome::OffroadHome(QWidget* parent) : QFrame(parent) {
 #ifdef ENABLE_MAPS
     left_widget->addWidget(new MapSettings);
 #else
-    left_widget->addWidget(new DriveStats);
+    left_widget->addWidget(new QWidget);
 #endif
     left_widget->addWidget(new PrimeAdWidget);
     left_widget->setStyleSheet("border-radius: 10px;");
