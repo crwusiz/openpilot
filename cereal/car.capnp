@@ -510,6 +510,7 @@ struct CarParams {
   openpilotLongitudinalControl @37 :Bool; # is openpilot doing the longitudinal control?
   carVin @38 :Text; # VIN number queried during fingerprinting
   dashcamOnly @41: Bool;
+  passive @73: Bool;   # is openpilot in control?
   transmissionType @43 :TransmissionType;
   carFw @44 :List(CarFw);
 
@@ -716,7 +717,7 @@ struct CarParams {
 
   # add
   sccBus @78: Int8;
-  hasAutoHold @73 :Bool;
+  hasAutoHold @79 :Bool;
   hasScc13 @74 :Bool;
   hasScc14 @75 :Bool;
   hasNav @76 :Bool;

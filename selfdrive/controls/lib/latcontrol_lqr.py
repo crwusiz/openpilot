@@ -32,7 +32,7 @@ class LatControlLQR(LatControl):
     super().reset()
     self.i_lqr = 0.0
 
-  def update(self, active, CS, VM, params, last_actuators, steer_limited, desired_curvature, desired_curvature_rate, llk):
+  def update(self, active, CS, VM, params, steer_limited, desired_curvature, desired_curvature_rate, llk):
     lqr_log = log.ControlsState.LateralLQRState.new_message()
 
     torque_scale = interp(CS.vEgo * 3.6, TORQUE_SCALE_BP, TORQUE_SCALE_V)
