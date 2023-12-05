@@ -28,6 +28,8 @@ const LongitudinalLimits HYUNDAI_LONG_LIMITS = {
 const CanMsg HYUNDAI_TX_MSGS[] = {
   {0x251, 2, 8}, // MDPS12 Bus 2
   {0x340, 0, 8}, // LKAS11 Bus 0
+  {0x4F1, 0, 4}, // CLU11 Bus 0
+  {0x4F1, 2, 4}, // CLU11 Bus 2
   {0x420, 0, 8}, // SCC11 Bus 0
   {0x421, 0, 8}, // SCC12 Bus 0
   {0x50A, 0, 8}, // SCC13 Bus 0
@@ -36,8 +38,6 @@ const CanMsg HYUNDAI_TX_MSGS[] = {
   {0x483, 0, 8}, // FCA12 Bus 0
   {0x485, 0, 4}, // LFAHDA_MFC Bus 0
   {0x4A2, 0, 8}, // FRT_RADAR11 Bus 0
-  {0x4F1, 0, 4}, // CLU11 Bus 0
-  {0x4F1, 2, 4}, // CLU11 Bus 2
 };
 
 const CanMsg HYUNDAI_LONG_TX_MSGS[] = {
@@ -45,20 +45,22 @@ const CanMsg HYUNDAI_LONG_TX_MSGS[] = {
   {0x340, 0, 8}, // LKAS11 Bus 0
   {0x4F1, 0, 4}, // CLU11 Bus 0
   {0x4F1, 2, 4}, // CLU11 Bus 2
-  {0x485, 0, 4}, // LFAHDA_MFC Bus 0
   {0x420, 0, 8}, // SCC11 Bus 0
   {0x421, 0, 8}, // SCC12 Bus 0
   {0x50A, 0, 8}, // SCC13 Bus 0
   {0x389, 0, 8}, // SCC14 Bus 0
-  {0x4A2, 0, 2}, // FRT_RADAR11 Bus 0
   {0x38D, 0, 8}, // FCA11 Bus 0
   {0x483, 0, 8}, // FCA12 Bus 0
+  {0x485, 0, 4}, // LFAHDA_MFC Bus 0
+  {0x4A2, 0, 2}, // FRT_RADAR11 Bus 0
   {0x7D0, 0, 8}, // radar UDS TX addr Bus 0 (for radar disable)
 };
 
 const CanMsg HYUNDAI_CAMERA_SCC_TX_MSGS[] = {
   {0x251, 2, 8}, // MDPS12 Bus 2
   {0x340, 0, 8}, // LKAS11 Bus 0
+  {0x4F1, 0, 4}, // CLU11 Bus 0
+  {0x4F1, 2, 4}, // CLU11 Bus 2
   {0x420, 0, 8}, // SCC11 Bus 0
   {0x421, 0, 8}, // SCC12 Bus 0
   {0x50A, 0, 8}, // SCC13 Bus 0
@@ -67,18 +69,16 @@ const CanMsg HYUNDAI_CAMERA_SCC_TX_MSGS[] = {
   {0x483, 0, 8}, // FCA12 Bus 0
   {0x485, 0, 4}, // LFAHDA_MFC Bus 0
   {0x4A2, 0, 8}, // FRT_RADAR11 Bus 0
-  {0x4F1, 0, 4}, // CLU11 Bus 0
-  {0x4F1, 2, 4}, // CLU11 Bus 2
  };
 
 #define HYUNDAI_COMMON_RX_CHECKS(legacy)                                                                                              \
-  {.msg = {{0x260, 0, 8, .check_checksum = true, .max_counter = 3U, .expected_freq = 100U},                                       \
-           {0x371, 0, 8, .expected_freq = 100U}, { 0 }}},                                                                         \
-  {.msg = {{0x386, 0, 8, .check_checksum = !(legacy), .max_counter = (legacy) ? 0U : 15U, .expected_freq = 100U}, { 0 }, { 0 }}}, \
-  {.msg = {{0x394, 0, 8, .check_checksum = !(legacy), .max_counter = (legacy) ? 0U : 7U, .expected_freq = 100U}, { 0 }, { 0 }}},  \
+  {.msg = {{0x260, 0, 8, .check_checksum = true, .max_counter = 3U, .frequency = 100U},                                       \
+           {0x371, 0, 8, .frequency = 100U}, { 0 }}},                                                                         \
+  {.msg = {{0x386, 0, 8, .check_checksum = !(legacy), .max_counter = (legacy) ? 0U : 15U, .frequency = 100U}, { 0 }, { 0 }}}, \
+  {.msg = {{0x394, 0, 8, .check_checksum = !(legacy), .max_counter = (legacy) ? 0U : 7U, .frequency = 100U}, { 0 }, { 0 }}},  \
 
 #define HYUNDAI_SCC12_ADDR_CHECK(scc_bus)                                                                                  \
-  {.msg = {{0x421, (scc_bus), 8, .check_checksum = true, .max_counter = 15U, .expected_freq = 50U}, { 0 }, { 0 }}}, \
+  {.msg = {{0x421, (scc_bus), 8, .check_checksum = true, .max_counter = 15U, .frequency = 50U}, { 0 }, { 0 }}}, \
 
 RxCheck hyundai_rx_checks[] = {
    HYUNDAI_COMMON_RX_CHECKS(false)
@@ -93,7 +93,7 @@ RxCheck hyundai_cam_scc_rx_checks[] = {
 RxCheck hyundai_long_rx_checks[] = {
   HYUNDAI_COMMON_RX_CHECKS(false)
   // Use CLU11 (buttons) to manage controls allowed instead of SCC cruise state
-  {.msg = {{0x4F1, 0, 4, .check_checksum = false, .max_counter = 15U, .expected_freq = 50U}, { 0 }, { 0 }}},
+  {.msg = {{0x4F1, 0, 4, .check_checksum = false, .max_counter = 15U, .frequency = 50U}, { 0 }, { 0 }}},
 };
 
 // older hyundai models have less checks due to missing counters and checksums
