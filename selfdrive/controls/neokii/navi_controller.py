@@ -231,8 +231,7 @@ def main():
       sock.setblocking(False)
       while True:
         server.udp_recv(sock)
-        dat = messaging.new_message()
-        dat.init('naviData')
+        dat = messaging.new_message('naviData', valid=True)
         dat.naviData.active = server.active
         dat.naviData.roadLimitSpeed = server.get_limit_val("road_limit_speed", 0)
         dat.naviData.isHighway = server.get_limit_val("is_highway", False)
