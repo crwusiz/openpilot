@@ -30,7 +30,7 @@ import math
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.params import Params
 from openpilot.common.realtime import set_core_affinity
-from openpilot.system.swaglog import cloudlog
+from openpilot.common.swaglog import cloudlog
 
 params = Params()
 
