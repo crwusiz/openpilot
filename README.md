@@ -3,14 +3,13 @@
 crwusiz openpilot
 =====
 <b> crwusiz branch is neokii modify branch base (comma.ai master and xx979xx HKG_community source) </b>
-- <b> v0.9.5 [ only comma3 or comma3x support ] </b>
+- <b> v0.9.6 [ only comma3 or comma3x support ] </b>
 - If you have any questions, please send a message to crwusiz from discord.
 - It is open source and inherits MIT license.
 - By installing this software you accept all responsibility for anything that might occur while you use it.
 - All contributors to this fork are not liable. <b>Use at your own risk.</b>
 - if you like this Branch <b> [Donate](https://paypal.me/crwusiz) </b> for me
 
-Support me  
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/J3J4RXA92)
 
 [![](https://i.imgur.com/TMtVMV8.png)](#)
