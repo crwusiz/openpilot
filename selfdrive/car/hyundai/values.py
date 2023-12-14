@@ -105,6 +105,8 @@ class CAR(StrEnum):
   KONA_SX2_EV = "HYUNDAI KONA EV (SX2)"
   TUCSON_NX4 = "HYUNDAI TUCSON (NX4)"
   TUCSON_NX4_HEV = "HYUNDAI TUCSON HEV (NX4)"
+  STARRIA = "HYUNDAI STARRIA (US4)"
+  SONATA_DN8_24 = "HYUNDAI SONATA_2024 (DN8)"
 
   # Kia
   EV6 = "KIA EV6 (CV)"
@@ -1885,6 +1887,22 @@ FW_VERSIONS = {
       b'\xf1\x00SX2EMFC  AT KOR LHD 1.00 1.00 99211-BF000 230410',
     ],
   },
+  CAR.STARRIA: {  # (US4)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00US4 MFC  AT KOR LHD 1.00 1.06 99211-CG000 230524',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00US4_ RDR -----      1.00 1.00 99110-CG000         ',
+    ],
+  },
+  CAR.SONATA_DN8_24: {  # (DN8)
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00DN8_ RDR -----      1.00 1.00 99110-L1800         ',
+    ],
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00DN8 MFC  AT KOR LHD 1.00 1.01 99211-L1800 230512',
+    ],
+  },
   CAR.EV6: { # (CV1)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00CV1 MFC  AT KOR LHD 1.00 1.04 99210-CV000 210823',
@@ -1936,10 +1954,15 @@ FW_VERSIONS = {
   },
   CAR.SORENTO_MQ4_HEV: { # (MQ4)
     (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00MQhe SCC FHCUP      1.00 1.04 99110-P4000         ',
       b'\xf1\x00MQhe SCC FHCUP      1.00 1.06 99110-P4000         ',
+      b'\xf1\x00MQhe SCC FHCUP      1.00 1.07 99110-P4000         ',
     ],
     (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00MQ4HMFC  AT KOR LHD 1.00 1.04 99210-P2000 200330',
       b'\xf1\x00MQ4HMFC  AT USA LHD 1.00 1.11 99210-P2000 211217',
+      b'\xf1\x00MQ4HMFC  AT KOR LHD 1.00 1.12 99210-P2000 230331',
+      b'\xf1\x00MQ4HMFC  AT USA LHD 1.00 1.13 99210-P2000 230619',
     ]
   },
   CAR.NIRO_SG2_EV: {
@@ -1961,8 +1984,9 @@ FW_VERSIONS = {
   },
   CAR.CARNIVAL_KA4: { # (KA4)
     (Ecu.fwdCamera, 0x7c4, None): [
-      b'\xf1\x00KA4 MFC  AT USA LHD 1.00 1.06 99210-R0000 220221',
+      b'\xf1\x00KA4 MFC  AT USA LHD 1.00 1.05 99210-R0000 201221',
       b'\xf1\x00KA4CMFC  AT CHN LHD 1.00 1.01 99211-I4000 210525',
+      b'\xf1\x00KA4 MFC  AT USA LHD 1.00 1.06 99210-R0000 220221',
       b'\xf1\x00KA4 MFC  AT USA LHD 1.00 1.00 99210-R0100 230105',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
@@ -2030,9 +2054,9 @@ CAN_GEARS = {
 }
 
 CANFD_CAR = {
-  CAR.TUCSON_NX4,
+  CAR.TUCSON_NX4, CAR.STARRIA,
   CAR.SPORTAGE_NQ5, CAR.SORENTO_MQ4, CAR.CARNIVAL_KA4, CAR.K8_GL3,
-  CAR.IONIQ5, CAR.IONIQ6, CAR.KONA_SX2_EV,
+  CAR.IONIQ5, CAR.IONIQ6, CAR.KONA_SX2_EV, CAR.SONATA_DN8_24,
   CAR.EV6, CAR.NIRO_SG2_EV,
   CAR.GENESIS_GV60_EV, CAR.GENESIS_GV70, CAR.GENESIS_GV80,
   CAR.TUCSON_NX4_HEV,
@@ -2123,6 +2147,8 @@ DBC = {
   CAR.KONA_SX2_EV: dbc_dict('hyundai_canfd', None),
   CAR.TUCSON_NX4: dbc_dict('hyundai_canfd', None),
   CAR.TUCSON_NX4_HEV: dbc_dict('hyundai_canfd', None),
+  CAR.STARRIA: dbc_dict('hyundai_canfd', None),
+  CAR.SONATA_DN8_24: dbc_dict('hyundai_canfd', None),
   CAR.EV6: dbc_dict('hyundai_canfd', None),
   CAR.SPORTAGE_NQ5: dbc_dict('hyundai_canfd', None),
   CAR.SPORTAGE_NQ5_HEV: dbc_dict('hyundai_canfd', None),

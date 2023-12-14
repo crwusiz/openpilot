@@ -166,7 +166,6 @@ def laplacian_pdf(x: float, mu: float, b: float):
 
 def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks: Dict[int, Track]):
   offset_vision_dist = lead.x[0] - RADAR_TO_CAMERA
-  tracks_len = len(tracks)
 
   def prob(c, c_key):
     prob_d = laplacian_pdf(c.dRel, offset_vision_dist, lead.xStd[0])
