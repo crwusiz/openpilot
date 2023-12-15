@@ -105,7 +105,7 @@ class CAR(StrEnum):
   KONA_SX2_EV = "HYUNDAI KONA EV (SX2)"
   TUCSON_NX4 = "HYUNDAI TUCSON (NX4)"
   TUCSON_NX4_HEV = "HYUNDAI TUCSON HEV (NX4)"
-  STARRIA = "HYUNDAI STARRIA (US4)"
+  STARIA = "HYUNDAI STARIA (US4)"
   SONATA_DN8_24 = "HYUNDAI SONATA_2024 (DN8)"
 
   # Kia
@@ -1887,7 +1887,7 @@ FW_VERSIONS = {
       b'\xf1\x00SX2EMFC  AT KOR LHD 1.00 1.00 99211-BF000 230410',
     ],
   },
-  CAR.STARRIA: {  # (US4)
+  CAR.STARIA: {  # (US4)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00US4 MFC  AT KOR LHD 1.00 1.06 99211-CG000 230524',
     ],
@@ -2054,7 +2054,7 @@ CAN_GEARS = {
 }
 
 CANFD_CAR = {
-  CAR.TUCSON_NX4, CAR.STARRIA,
+  CAR.TUCSON_NX4, CAR.STARIA,
   CAR.SPORTAGE_NQ5, CAR.SORENTO_MQ4, CAR.CARNIVAL_KA4, CAR.K8_GL3,
   CAR.IONIQ5, CAR.IONIQ6, CAR.KONA_SX2_EV, CAR.SONATA_DN8_24,
   CAR.EV6, CAR.NIRO_SG2_EV,
@@ -2147,7 +2147,7 @@ DBC = {
   CAR.KONA_SX2_EV: dbc_dict('hyundai_canfd', None),
   CAR.TUCSON_NX4: dbc_dict('hyundai_canfd', None),
   CAR.TUCSON_NX4_HEV: dbc_dict('hyundai_canfd', None),
-  CAR.STARRIA: dbc_dict('hyundai_canfd', None),
+  CAR.STARIA: dbc_dict('hyundai_canfd', None),
   CAR.SONATA_DN8_24: dbc_dict('hyundai_canfd', None),
   CAR.EV6: dbc_dict('hyundai_canfd', None),
   CAR.SPORTAGE_NQ5: dbc_dict('hyundai_canfd', None),
