@@ -28,18 +28,20 @@ static void drawIcon(QPainter &p, const QPoint &center, const QPixmap &img, cons
   p.setOpacity(1.0);
 }
 
-static void drawIconRotate(QPainter &p, const int x, const int y, const QPixmap &img, const QBrush bg, float opacity, float angle) {
-  p.setOpacity(1.0);
+static void drawIconRotate(QPainter &p, const QPoint &center, const QPixmap &img, const QBrush &bg, float opacity, float angle) {
+  p.setRenderHint(QPainter::Antialiasing);
+  p.setOpacity(1.0);  // bg dictates opacity of ellipse
   p.setPen(Qt::NoPen);
   p.setBrush(bg);
-  p.drawEllipse(x - btn_size / 2, y - btn_size / 2, btn_size, btn_size);
+  p.drawEllipse(center, btn_size / 2, btn_size / 2);
   p.setOpacity(opacity);
   p.save();
-  p.translate(x, y);
+  p.translate(center);
   p.rotate(-angle);
-  QRect r = img.rect();
-  r.moveCenter(QPoint(0,0));
-  p.drawPixmap(r, img);
+  //QRect r = img.rect();
+  //r.moveCenter(QPoint(0,0));
+  //p.drawPixmap(r, img);
+  p.drawPixmap(-QPoint(img.width() / 2, img.height() / 2), img);
   p.restore();
   p.setOpacity(1.0);
 }
@@ -241,7 +243,7 @@ void ExperimentalButton::changeMode() {
   const auto cp = (*uiState()->sm)["carParams"].getCarParams();
   bool can_change = hasLongitudinalControl(cp) && params.getBool("ExperimentalModeConfirmed");
   if (can_change) {
-    params.putBool("ExperimentalMode", !experimental_mode);
+    params.putBoolNonBlocking("ExperimentalMode", !experimental_mode);
   }
 }
 
@@ -665,7 +667,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 3.1);
     y = (btn_size / 2) + (UI_BORDER_SIZE * 4);
   }
-  drawIconRotate(p, x, y, direction_img, icon_bg, gps_state ? 0.8 : 0.2, gpsBearing);
+  drawIconRotate(p, QPoint(x, y), direction_img, icon_bg, gps_state ? 0.8 : 0.2, gpsBearing);
 
   // gps icon (upper right 3)
   if (nav_enabled) {
@@ -716,7 +718,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     // steer img (bottom 1 right)
     x = (btn_size / 2) + (UI_BORDER_SIZE * 2) + (btn_size);
     y = rect().bottom() - (UI_FOOTER_HEIGHT / 2);
-    drawIconRotate(p, x, y, steer_img, icon_bg, 0.8, steerAngle);
+    drawIconRotate(p, QPoint(x, y), steer_img, icon_bg, 0.8, steerAngle);
 
     QString sa_str, sa_direction;
     QColor sa_color = limeColor(200);
