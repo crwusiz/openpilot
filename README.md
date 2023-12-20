@@ -1,4 +1,4 @@
-![openpilot on the comma 3X](https://github.com/commaai/openpilot/assets/4038174/f1081737-8718-4241-a22a-3ceba526361a)
+[![openpilot on the comma 3X](https://github.com/commaai/openpilot/assets/8762862/f09e6d29-db2d-4179-80c2-51e8d92bdb5c)](https://comma.ai/shop/comma-3x)
 
 crwusiz openpilot
 =====
@@ -52,8 +52,6 @@ cable order -> https://smartstore.naver.com/jmtechn
 - https://github.com/jc01rho-openpilot-BoltEV2019-KoKr
 - https://github.com/geniuth/openpilot
 - - -
-
-[![openpilot on the comma 3X](https://github.com/commaai/openpilot/assets/8762862/f09e6d29-db2d-4179-80c2-51e8d92bdb5c)](https://comma.ai/shop/comma-3x)
 
 What is openpilot?
 ------
