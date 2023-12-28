@@ -207,7 +207,7 @@ static void hyundai_canfd_rx_hook(CANPacket_t *to_push) {
 
   gas_pressed = brake_pressed = false;
 
-  if ((bus == scc_bus)) {
+  if (bus == scc_bus) {
     // cruise state
     if ((addr == 0x1a0) && !hyundai_longitudinal) {
       // 1=enabled, 2=driver override

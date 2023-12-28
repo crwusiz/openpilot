@@ -1,5 +1,5 @@
 import math
-from typing import Tuple, Optional, cast
+from typing import Tuple, Optional
 from tinygrad.helpers import argsort, DType
 from tinygrad.ops import UnaryOps, BinaryOps, TernaryOps, ReduceOps
 from tinygrad.tensor import Function
@@ -47,7 +47,7 @@ class Relu(Function):
     return self.ret
 
   def backward(self, grad_output:LazyBuffer) -> LazyBuffer:
-    return self.ret.const(0).e(BinaryOps.CMPLT, self.ret).e(BinaryOps.MUL, grad_output)
+    return self.ret.const(0).e(BinaryOps.CMPLT, self.ret).cast(grad_output.dtype).e(BinaryOps.MUL, grad_output)
 
 class Log(Function):
   def forward(self, x:LazyBuffer) -> LazyBuffer:
@@ -90,6 +90,14 @@ class Less(Function):
   def forward(self, x:LazyBuffer, y:LazyBuffer) -> LazyBuffer:
     return x.e(BinaryOps.CMPLT, y)
 
+class Eq(Function):
+  def forward(self, x:LazyBuffer, y:LazyBuffer) -> LazyBuffer:
+    return x.e(BinaryOps.CMPEQ, y)
+
+class Xor(Function):
+  def forward(self, x:LazyBuffer, y:LazyBuffer) -> LazyBuffer:
+    return x.e(BinaryOps.XOR, y)
+
 class Add(Function):
   def forward(self, x:LazyBuffer, y:LazyBuffer) -> LazyBuffer:
     return x.e(BinaryOps.ADD, y)
@@ -100,6 +108,7 @@ class Add(Function):
 
 class Sub(Function):
   def forward(self, x:LazyBuffer, y:LazyBuffer) -> LazyBuffer:
+    self.x_dtype, self.y_dtype = x.dtype, y.dtype
     return x.e(BinaryOps.SUB, y)
 
   def backward(self, grad_output:LazyBuffer) -> Tuple[Optional[LazyBuffer], Optional[LazyBuffer]]:
@@ -122,19 +131,19 @@ class Div(Function):
 
   def backward(self, grad_output:LazyBuffer) -> Tuple[Optional[LazyBuffer], Optional[LazyBuffer]]:
     return grad_output.e(BinaryOps.DIV, self.y) if self.needs_input_grad[0] else None, \
-           grad_output.e(UnaryOps.NEG).e(BinaryOps.MUL, self.x).e(BinaryOps.DIV, self.y.e(BinaryOps.MUL, self.y)) if self.needs_input_grad[1] else None
+           grad_output.e(UnaryOps.NEG).e(BinaryOps.MUL, self.x).e(BinaryOps.DIV, self.y.e(BinaryOps.MUL, self.y)) if self.needs_input_grad[1] else None  # noqa: E501
 
 # ************* ternary ops *************
 
 class Where(Function):
   def forward(self, x:LazyBuffer, y:LazyBuffer, z:LazyBuffer) -> LazyBuffer:
     self.x = x
-    return x.e(TernaryOps.WHERE, y, z)
+    return self.x.e(TernaryOps.WHERE, y, z)
 
   def backward(self, grad_output:LazyBuffer) -> Tuple[None, Optional[LazyBuffer], Optional[LazyBuffer]]:
     return None, \
-           self.x.e(TernaryOps.WHERE, grad_output, grad_output.const(0)) if self.needs_input_grad[1] else None, \
-           self.x.e(TernaryOps.WHERE, grad_output.const(0), grad_output) if self.needs_input_grad[2] else None
+      self.x.e(TernaryOps.WHERE, grad_output, grad_output.const(0)) if self.needs_input_grad[1] else None, \
+      self.x.e(TernaryOps.WHERE, grad_output.const(0), grad_output) if self.needs_input_grad[2] else None
 
 # ************* reduce ops *************
 
@@ -153,7 +162,7 @@ class Max(Function):
 
   def backward(self, grad_output:LazyBuffer) -> LazyBuffer:
     # 1s in locations where the max was chosen (can be two locations)
-    max_is_1s = self.x.const(1.0).e(BinaryOps.SUB, self.x.e(BinaryOps.CMPLT, self.ret.expand(self.x.shape)))
+    max_is_1s = self.x.e(BinaryOps.CMPEQ, self.ret.expand(self.x.shape)).cast(self.x.dtype)
     div = max_is_1s.r(ReduceOps.SUM, grad_output.shape).expand(self.x.shape)
     return max_is_1s.e(BinaryOps.DIV, div).e(BinaryOps.MUL, grad_output.expand(self.x.shape))
 
@@ -198,9 +207,7 @@ class Shrink(Function):
     return x.shrink(arg)
 
   def backward(self, grad_output:LazyBuffer) -> LazyBuffer:
-    assert all(isinstance(x[0], int) and isinstance(x[1], int) for x in self.narg), "symbolic shrink does not support backward"
-    # need this cast because mypy cannot narrow the type even with assert
-    return grad_output.pad(cast(Tuple[Tuple[int, int], ...], self.narg))
+    return grad_output.pad(self.narg)
 
 class Flip(Function):
   def forward(self, x:LazyBuffer, axis:Tuple[int, ...]) -> LazyBuffer:

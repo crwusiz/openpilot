@@ -412,7 +412,6 @@ struct DeviceState @0xa4d8b5af2aa492eb {
 
 struct PandaState @0xa7649e2575e4591e {
   ignitionLine @2 :Bool;
-  gasInterceptorDetected @4 :Bool;
   rxBufferOverflow @7 :UInt32;
   txBufferOverflow @8 :UInt32;
   gmlanSendErrs @9 :UInt32;
@@ -545,6 +544,7 @@ struct PandaState @0xa7649e2575e4591e {
     }
   }
 
+  gasInterceptorDetectedDEPRECATED @4 :Bool;
   startedSignalDetectedDEPRECATED @5 :Bool;
   hasGpsDEPRECATED @6 :Bool;
   fanSpeedRpmDEPRECATED @11 :UInt16;

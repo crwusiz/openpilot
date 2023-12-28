@@ -2,9 +2,10 @@ import math
 from typing import Optional, Union, Tuple
 from tinygrad.tensor import Tensor
 from tinygrad.helpers import prod, all_int
+from tinygrad.nn import optim, state  # noqa: F401
 
 class BatchNorm2d:
-  def __init__(self, sz, eps=1e-5, affine=True, track_running_stats=True, momentum=0.1):
+  def __init__(self, sz:int, eps=1e-5, affine=True, track_running_stats=True, momentum=0.1):
     self.eps, self.track_running_stats, self.momentum = eps, track_running_stats, momentum
 
     if affine: self.weight, self.bias = Tensor.ones(sz), Tensor.zeros(sz)
@@ -26,7 +27,7 @@ class BatchNorm2d:
       # NOTE: wow, this is done all throughout training in most PyTorch models
       if self.track_running_stats:
         self.running_mean.assign((1 - self.momentum) * self.running_mean + self.momentum * batch_mean.detach())
-        self.running_var.assign((1 - self.momentum) * self.running_var + self.momentum * prod(y.shape)/(prod(y.shape) - y.shape[1]) * batch_var.detach() )
+        self.running_var.assign((1 - self.momentum) * self.running_var + self.momentum * prod(y.shape)/(prod(y.shape) - y.shape[1]) * batch_var.detach() )  # noqa: E501
         self.num_batches_tracked += 1
     else:
       batch_mean = self.running_mean
@@ -51,7 +52,8 @@ class Conv2d:
   def __call__(self, x:Tensor):
     return x.conv2d(self.weight, self.bias, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
 
-  def initialize_weight(self, out_channels, in_channels, groups): return Tensor.kaiming_uniform(out_channels, in_channels//groups, *self.kernel_size, a=math.sqrt(5))
+  def initialize_weight(self, out_channels, in_channels, groups):
+    return Tensor.kaiming_uniform(out_channels, in_channels//groups, *self.kernel_size, a=math.sqrt(5))
 
 def ConvTranspose1d(in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, dilation=1, groups=1, bias=True):
   return ConvTranspose2d(in_channels, out_channels, (kernel_size,), stride, padding, output_padding, dilation, groups, bias)
@@ -62,9 +64,10 @@ class ConvTranspose2d(Conv2d):
     self.output_padding = output_padding
 
   def __call__(self, x:Tensor):
-    return x.conv_transpose2d(self.weight, self.bias, padding=self.padding, output_padding=self.output_padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+    return x.conv_transpose2d(self.weight, self.bias, padding=self.padding, output_padding=self.output_padding, stride=self.stride, dilation=self.dilation, groups=self.groups)  # noqa: E501
 
-  def initialize_weight(self, out_channels, in_channels, groups): return Tensor.kaiming_uniform(in_channels, out_channels//groups, *self.kernel_size, a=math.sqrt(5))
+  def initialize_weight(self, out_channels, in_channels, groups):
+    return Tensor.kaiming_uniform(in_channels, out_channels//groups, *self.kernel_size, a=math.sqrt(5))
 
 class Linear:
   def __init__(self, in_features, out_features, bias=True):
