@@ -1236,6 +1236,7 @@ FW_VERSIONS = {
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00YG__ SCC F_CUP   1.01 1.01 96400F6000     \xf1\xa01.01',
+      b'\xf1\x00YG__ SCC F_CUP   1.00 1.04 96400F6400     \xf1\xa01.04',
       b'\xf1\x00YG__ SCC F_CUP   1.01 1.02 96400F6000     \xf1\xa01.02',
       b'\xf1\x00YG__ SCC F_CUP   1.00 1.01 99110F6000     \xf1\xa01.01',
     ],
@@ -1247,6 +1248,12 @@ FW_VERSIONS = {
       b'\xf1\000YG  MDPS C 1.00 1.00 E0000F6563\000 4YGSC100',
       b'\xf1\000YG  MDPS C 1.01 99500F6563\000 4YGDC103',
       b'\xf1\000YG  MDPS C 1.00 1.01 56310F6350\000 4YG7C101',
+    ],
+    (Ecu.transmission, 0x7e1, None): [
+      b'\xf1\x00bcshcm49  A0572\x00\x00\x00\x00\x00\x00TYG0G33US4\xb3\xee\xba\xdc',
+    ],
+    (Ecu.engine, 0x7e0, None): [
+      b'\xf1\x8164096051\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
   },
   CAR.SORENTO: { # (UM)
