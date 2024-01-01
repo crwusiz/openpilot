@@ -216,7 +216,10 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1630.
       ret.wheelbase = 2.895
       ret.steerRatio = 13.27
-
+    elif candidate == CAR.EV9:
+      ret.mass = 2625
+      ret.wheelbase = 3.1
+      ret.steerRatio = 16.02
 
     # genesis
     elif candidate == CAR.GENESIS:
