@@ -1658,6 +1658,14 @@ FW_VERSIONS = {
       b'\xf1\x00MV__ RDR -----      1.00 1.02 99110-DO700         ',
     ],
   },
+  CAR.K5_DL3_24_HEV: {  # (DL3)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00DL3HMFC  AT KOR LHD 1.00 1.02 99210-L2500 230911'
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00DL3_ RDR -----      1.00 1.01 99110-L2500         ',
+    ],
+  },
   CAR.GENESIS_GV60_EV: {  # (JW1)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00JW1 MFC  AT USA LHD 1.00 1.02 99211-CU100 211215',

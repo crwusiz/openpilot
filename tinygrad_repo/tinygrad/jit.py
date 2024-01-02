@@ -1,148 +1,77 @@
-from __future__ import annotations
-from typing import Callable, List, Tuple, Dict, cast, Union, Optional, TypeVar, Generic
-import functools, itertools, operator
-from tinygrad.helpers import DEBUG, DType, merge_dicts, getenv, all_int, Context, GRAPH
-from tinygrad.device import Device, JITRunner, CompiledASTRunner, Buffer
+from typing import Callable, List, Tuple, Any, Dict, cast, Union, Optional
+from collections import defaultdict
+import functools, itertools
+from tinygrad.helpers import DEBUG, DType, merge_dicts
+from tinygrad.ops import RawBuffer, Device
 from tinygrad.tensor import Tensor
 from tinygrad.shape.shapetracker import ShapeTracker
-from tinygrad.shape.symbolic import Variable, NumNode, Node
-from weakref import ref, WeakKeyDictionary
-from dataclasses import dataclass
+from tinygrad.shape.symbolic import Variable
 
-@dataclass(frozen=True)
-class JitItem:
-  prg: JITRunner  # or a graph executor like MetalGraph
-  rawbufs: List[Optional[Buffer]]
+JIT_SUPPORTED_DEVICE = ["GPU", "CLANG", "METAL", "CUDA", "HIP", "WEBGPU", "LLVM"]
 
-def get_jit_stats(jit_cache: List[JitItem]) -> Tuple[Node, Node]:
-  return functools.reduce(operator.__add__, [ji.prg.op_estimate for ji in jit_cache], NumNode(0)), functools.reduce(operator.__add__, [ji.prg.mem_estimate for ji in jit_cache], NumNode(0))  # noqa: E501
-def get_input_replace(jit_cache: List[JitItem], input_rawbuffers:List[Buffer]) -> Dict[Tuple[int, int], int]:
-  input_replace: Dict[Tuple[int, int], int] = {}
-  for j,ji in enumerate(jit_cache):
-    for i,a in enumerate(ji.rawbufs):
-      if a in input_rawbuffers:
-        input_replace[(j,i)] = input_rawbuffers.index(a)
-  return input_replace
-def get_jc_idxs_with_updatable_launch_dims(jit_cache: List[JitItem]) -> List[int]:
-  return [j for j,ji in enumerate(jit_cache) if isinstance(ji.prg, CompiledASTRunner) and ((ji.prg.global_size and not all_int(tuple(ji.prg.global_size))) or (ji.prg.local_size and not all_int(tuple(ji.prg.local_size))))]  # noqa: E501
-def get_jc_idxs_with_updatable_var_vals(jit_cache: List[JitItem]) -> List[int]:
-  return [j for j,ji in enumerate(jit_cache) if isinstance(ji.prg, CompiledASTRunner) and ji.prg.vars]
-
-class GraphException(Exception): pass
-
-ReturnType = TypeVar('ReturnType')
-class TinyJit(Generic[ReturnType]):
-  def __init__(self, fxn:Callable[..., ReturnType]):
-    self.fxn = fxn
-    self.reset()
-
-  def reset(self):
-    self.jit_cache: List[JitItem] = []
-    self.input_replace: Dict[Tuple[int, int], int] = {}
+class TinyJit:
+  def __init__(self, fxn:Callable):
+    self.fxn: Callable = fxn
     self.cnt: int = 0
-    self.ret: Optional[ReturnType] = None
-    self.expected_vals: Optional[Tuple[Variable, ...]] = None
-    self.expected_name_sts_dtype: Optional[Tuple[Tuple[Union[int, str], ShapeTracker, DType], ...]] = None
+    self.jit_cache: List[Tuple[Any, List[Optional[RawBuffer]], Dict[Variable, int]]] = []
+    self.ret: Any = None
+    self.input_replace: Dict[Tuple[int, int], Tuple[Union[int, str], ShapeTracker, DType]]= {}   # (kernel_number, buffer_number) -> (input_name, expected_shapetracker, expected_type)
+    self.updatable_entries: Dict[int, List[int]] = defaultdict(list) # (kernel_number) -> list(argument id). These are buffers from input + variables.
 
   # add support for instance methods
   def __get__(self, obj, objtype): return functools.partial(self.__call__, obj)
 
-  def __call__(self, *args, **kwargs) -> ReturnType:
-    # all inputs (except const) are realized
-    input_tensors: Dict[Union[int, str], Tensor] = {cast(Union[int, str], k):v.realize() for k,v in itertools.chain(enumerate(args), kwargs.items()) if v.__class__ is Tensor}  # noqa: E501
-    expected_name_sts_dtype = tuple([(k, v.lazydata.st.unbind(), v.dtype) for k,v in input_tensors.items()])
-
-    # get rawbuffers
-    # TODO: why can .realized have Any type?
-    input_rawbuffers: List[Buffer] = [v.lazydata.base.realized for v in input_tensors.values() if v.lazydata.base.realized is not None]
-    assert len(set(input_rawbuffers)) == len(input_rawbuffers), "duplicate inputs to JIT"
-
-    # get variables: they can either be in Tensors or passed in as arguments, and all must be bound. these are all global
-    var_vals: Dict[Variable, int] = merge_dicts([arg.lazydata.st.var_vals for arg in input_tensors.values()] + [dict(x.unbind() for x in itertools.chain(args, kwargs.values()) if isinstance(x, Variable))])  # noqa: E501
-    expected_vals = tuple(var_vals.keys())
-
+  def __call__(self, *args, **kwargs) -> Any:
+    if Device.DEFAULT.split(":")[0] not in JIT_SUPPORTED_DEVICE: return self.fxn(*args, **kwargs)  # only jit on supported device
+    # NOTE: this cast is needed since although we know realize will create a ".realized" RawBuffer, the type checker doesn't
+    input_rawbuffers: Dict[Union[int, str], Tuple[RawBuffer, ShapeTracker]] = {cast(Union[int, str], k):(cast(RawBuffer, v.realize().lazydata.realized), v.lazydata.st) for k,v in itertools.chain(enumerate(args), kwargs.items()) if v.__class__ is Tensor}
+    assert len(input_rawbuffers) != 0, "no inputs to JIT"
+    assert len(set(input_rawbuffers.values())) == len(input_rawbuffers), "duplicate inputs to JIT"
     if self.cnt >= 2:
-      # jit exec
-      assert self.expected_vals == expected_vals, "mismatch of var_vals"
-      assert self.expected_name_sts_dtype == expected_name_sts_dtype, f"mismatch of sts, expected {self.expected_name_sts_dtype} got {expected_name_sts_dtype}"  # noqa: E501
-      for (j,i),input_idx in self.input_replace.items(): self.jit_cache[j].rawbufs[i] = input_rawbuffers[input_idx]
-      for ji in self.jit_cache: ji.prg(cast(List[Buffer], ji.rawbufs), var_vals, wait=DEBUG>=2, jit=True)
+      try: var_vals: Dict[Variable, int] = kwargs["jit_ctx"]
+      except KeyError: var_vals = merge_dicts([arg.lazydata.st.var_vals for arg in args if arg.__class__ is Tensor])
+      if len(var_vals) > 1: var_vals = dict(sorted(var_vals.items(), key=lambda kv: kv[0].key))
+      for (j,i),(input_name, expected_st, expected_type) in self.input_replace.items():
+        assert input_rawbuffers[input_name][0].dtype == expected_type, f"type mismatch in JIT, {input_rawbuffers[input_name][0].dtype} != {expected_type}"
+        # NOTE: if we pass jit_ctx instead of using reshape to update the var_vals, we cannot compare the shapetracker directly
+        if "jit_ctx" not in kwargs: assert input_rawbuffers[input_name][1].unbind() == expected_st, f"ShapeTracker mismatch in JIT, {input_rawbuffers[input_name][1].unbind()} != {expected_st}"
+        self.jit_cache[j][1][i] = input_rawbuffers[input_name][0]
+      for j in self.updatable_entries.keys():
+        for k in self.jit_cache[j][2].keys():
+          try: self.jit_cache[j][2][k] = var_vals[k]
+          except KeyError: pass
+      for prg, pargs, variables in self.jit_cache: prg(pargs, variables, jit=True)
+      for (j,i) in self.input_replace.keys(): self.jit_cache[j][1][i] = None
     elif self.cnt == 1:
-      # jit capture
-      self.expected_vals, self.expected_name_sts_dtype = expected_vals, expected_name_sts_dtype
-      CacheCollector.start(var_vals)
-      with Context(GRAPH=getenv("JITGRAPH", GRAPH.value)):
-        self.ret = self.fxn(*args, **kwargs)
+      CacheCollector.start()
+      self.ret = self.fxn(*args, **kwargs)
       self.jit_cache = CacheCollector.finish()
       assert len(self.jit_cache) != 0, "didn't JIT anything!"
-      assert len(set(get_input_replace(self.jit_cache, input_rawbuffers).values())) == len(input_rawbuffers), "some input tensors not found"
       if DEBUG >= 1: print(f"JIT captured {len(self.jit_cache)} kernels with {len(input_rawbuffers)} inputs")
 
-      # if your Device supports it, condense the items into a graph executor.
-      if (make_graph := Device[Device.DEFAULT].graph) and getenv("JIT") != 2:
-        # Split JIT cache into batches for faster graph execution.
-        # This allows the accelerator to run some batches while subsequent graphs are still being updated.
-        graphed_jit_cache, current_batch = [], []
-        for i,ji in enumerate(self.jit_cache):
-          # If the jit item can potentially be graphed, put it in a batch.
-          if isinstance(ji.prg, CompiledASTRunner): current_batch.append(ji)
-
-          # The flush is done when (1) ji is the last one, (2) the size of batch exceeds the maximum batch size or
-          # (3) the current jit item cannot be graphed, so the current batch is flushed before such a jit item is added.
-          if len(current_batch) > 0 and (i==len(self.jit_cache)-1 or len(current_batch) >= getenv("JIT_BATCH_SIZE", 64) or not isinstance(ji.prg, CompiledASTRunner)):  # noqa: E501
-            try:
-              graphed_jit_cache.append(JitItem(make_graph(current_batch, input_rawbuffers, var_vals), cast(List[Optional[Buffer]], input_rawbuffers)))
-              if DEBUG >= 2: print(f"\tJIT GRAPHing batch with {len(current_batch)} kernels")
-            except GraphException as e:
-              graphed_jit_cache.extend(current_batch)
-              if DEBUG >= 2: print(f"\tJIT GRAPHing failed batch with {len(current_batch)} kernels: {e}")
-            current_batch = []
-
-          # If the jit item cannot be graphed, put it right into the final cache after the flush.
-          if not isinstance(ji.prg, CompiledASTRunner): graphed_jit_cache.append(ji)
-
-        self.jit_cache = graphed_jit_cache
-
-      self.input_replace = get_input_replace(self.jit_cache, input_rawbuffers)
+      # get the inputs for replacement
+      for j_,cache in enumerate(self.jit_cache): # type: Tuple[int, Tuple[Callable, List[Optional[RawBuffer]], Dict[Variable, int]]]
+        for i,a in enumerate(cache[1]):
+          if a in [v[0] for v in input_rawbuffers.values()]:
+            self.input_replace[(j_,i)] = [(k, v[1].unbind(), v[0].dtype) for k,v in input_rawbuffers.items() if v[0] == a][0]
+            self.updatable_entries[j_].append(i)
+        for i in range(len(cache[2])): self.updatable_entries[j_].append(len(cache[1])+i)
+      assert set([x[0] for x in self.input_replace.values()]) == set(input_rawbuffers.keys()), "some input tensors not found"
+      for (j,i) in self.input_replace.keys(): self.jit_cache[j][1][i] = None
     elif self.cnt == 0:
-      # jit ignore
       self.ret = self.fxn(*args, **kwargs)
-
-    # clear jit inputs
-    for (j,i) in self.input_replace.keys(): self.jit_cache[j].rawbufs[i] = None
-
     self.cnt += 1
-    return cast(ReturnType, self.ret)
-
-class PlaceHolder:
-  def __init__(self, buf:Buffer): self.size, self.dtype, self.device, self.ref, self.bufid = buf.size, buf.dtype, buf.device, ref(buf), id(buf._buf)
-  def to_tuple(self): return (self.size, self.dtype, self.device, self.bufid)
-  def __hash__(self): return hash(self.to_tuple())
-  def __eq__(self, x): return isinstance(x, PlaceHolder) and self.to_tuple() == x.to_tuple()
-  def alloc_if_needed(self, buffer_cache: Dict[PlaceHolder, Buffer]) -> Buffer:
-    ret = self.ref()
-    if ret: return ret
-    if self not in buffer_cache: buffer_cache[self] = Buffer(self.device, self.size, self.dtype)
-    return buffer_cache[self]
+    return self.ret
 
 class _CacheCollector:
-  def __init__(self):
-    self.cache: Optional[List[Tuple[JITRunner, List[Union[Buffer, PlaceHolder]]]]] = None
-
-  def start(self, var_vals:Optional[Dict[Variable, int]]=None):
-    self.cache = []
-    self.placeholders: WeakKeyDictionary[Buffer, PlaceHolder] = WeakKeyDictionary()
-    self.var_vals = var_vals if var_vals is not None else {}
-
+  def __init__(self): self.cache: Optional[List[Tuple[Callable, List[Any], Dict[Any,Any]]]] = None
+  def start(self): self.cache = []
   def add(self, prg, rawbufs, var_vals):
     if self.cache is None: return
-    for k,v in var_vals.items(): assert k in self.var_vals and self.var_vals[k] == v, f"var_vals {k} mismatch {v} != {self.var_vals.get(k)}"
-    self.placeholders[rawbufs[0]] = PlaceHolder(rawbufs[0])    # NOTE: this is making an assumption that 0 is special
-    self.cache.append((prg, [self.placeholders.get(x, x) if isinstance(x, Buffer) else x for x in rawbufs]))
-
-  def finish(self) -> List[JitItem]:
+    self.cache.append((prg, rawbufs, var_vals))
+  def finish(self):
     if self.cache is None: return []
-    buffer_cache: Dict[PlaceHolder, Buffer] = {}
-    saved_cache, self.cache = self.cache, None
-    return [JitItem(prg, [x.alloc_if_needed(buffer_cache) if isinstance(x, PlaceHolder) else x for x in pl]) for prg, pl in saved_cache]
+    ret = self.cache
+    self.cache = None
+    return ret
 CacheCollector = _CacheCollector()

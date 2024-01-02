@@ -1,53 +1,41 @@
-import os, mmap, _posixshmem
+import os, mmap
+from typing import Optional
 from typing import Callable, Dict, Tuple
-from tinygrad.helpers import prod, DType, OSX, dtypes
-from tinygrad.device import Interpreted, Allocator
-from tinygrad.ops import Op, MovementOps, UnaryOps
-from tinygrad.shape.view import strides_for_shape
+from tinygrad.helpers import prod, DType
+from tinygrad.runtime.lib import RawBufferMapped
+from tinygrad.ops import Interpreted, Op, MovementOps, UnaryOps, BufferOps
 
-class UnderlyingDiskBuffer:
-  def __init__(self, fd, mem): self.fd, self.mem = fd, mem
+class RawDiskBuffer(RawBufferMapped):
+  def __init__(self, size, dtype:DType, device:Optional[str]=None, buf=None, shape=None, offset=0):  # pylint: disable=super-init-not-called
+    self.shape = (size, ) if shape is None else shape
+    self.offset = offset  # this is an offset in bytes
+    assert device is not None or buf is not None, "disk tensor needs a path or a buf"
+    if device is not None:
+      f = open(device, "a+b")
+      if os.path.getsize(device) < size * dtype.itemsize: os.ftruncate(f.fileno(), size * dtype.itemsize)
+      buf = [f, mmap.mmap(f.fileno(), size * dtype.itemsize), 1]
+    else:
+      buf[2] += 1
+    # NOTE: we don't call super since disk tensors don't use RAM
+    self.size, self.dtype, self._buf = size, dtype, buf
   def __del__(self):
-    if self.fd: self.fd.close()
+    self._buf[2] -= 1
+    if self._buf[2] == 0: self._buf[0].close()
+  def cast(self, arg:Tuple[DType, bool]): return RawDiskBuffer(self.size, arg[0], buf=self._buf, shape=self.shape, offset=self.offset)
+  def reshape(self, arg): return RawDiskBuffer(self.size, self.dtype, buf=self._buf, shape=arg, offset=self.offset)
+  def shrink(self, arg):
+    assert arg[1:] == tuple([(0,x) for x in self.shape[1:]]), f"can only slice the first dim of disk tensor {arg}"
+    offset = arg[0][0]*prod(self.shape[1:])*self.dtype.itemsize
+    size = (arg[0][1]-arg[0][0]) * prod(self.shape[1:])
+    return RawDiskBuffer(size, self.dtype, buf=self._buf, offset=self.offset+offset, shape=(arg[0][1]-arg[0][0],)+self.shape[1:])
 
-class DiskBuffer:
-  def __init__(self, ud:UnderlyingDiskBuffer, size:int, dtype:DType=dtypes.uint8, offset=0):
-    self.ud, self.size, self.dtype, self.offset = ud, size, dtype, offset
-  def __repr__(self): return f"<DiskBuffer size={self.size} dtype={self.dtype} offset={self.offset}>"
-  def cast(self, arg:Tuple[DType, bool]):
-    # TODO: support shape changing bitcast
-    #assert arg[1], "DiskTensor only supports bitcast"
-    return DiskBuffer(self.ud, self.size, arg[0], offset=self.offset)
   def as_strided(self, arg):
-    assert strides_for_shape(arg[0]) == arg[1], "disk tensors don't support strides"
-    return DiskBuffer(self.ud, prod(arg[0]), self.dtype, offset=self.offset+arg[2]*self.dtype.itemsize)
-  def _buf(self) -> memoryview: return memoryview(self.ud.mem)[self.offset:self.offset+self.size*self.dtype.itemsize]
+    return RawDiskBuffer(prod(arg[0]), self.dtype, buf=self._buf, offset=self.offset+arg[2]*self.dtype.itemsize, shape=arg[0])
 
-disk_fxn_for_op: Dict[Op, Callable] = { UnaryOps.CAST: DiskBuffer.cast, MovementOps.AS_STRIDED: DiskBuffer.as_strided }
+  def _buffer(self): return memoryview(self._buf[1])[self.offset:self.offset+self.size*self.dtype.itemsize]
+  def readinto(self, buf):
+    self._buf[0].seek(self.offset)
+    self._buf[0].readinto(buf)
 
-MAP_LOCKED, MAP_POPULATE = 0 if OSX else 0x2000, getattr(mmap, "MAP_POPULATE", 0 if OSX else 0x008000)
-class DiskAllocator(Allocator):
-  def __init__(self, device): self.device = device
-  def _alloc(self, size):
-    if str(self.device).startswith("shm:"):
-      fd = _posixshmem.shm_open("/"+self.device[4:].lstrip("/"), os.O_RDWR, 0o600)
-      shm = mmap.mmap(fd, size, flags=mmap.MAP_SHARED | MAP_POPULATE | MAP_LOCKED)
-      if (hp := getattr(mmap, "MADV_HUGEPAGE", None)) is not None: shm.madvise(hp) # type: ignore
-      os.close(fd)
-      buf = UnderlyingDiskBuffer(None, shm)
-    else:
-      f = open(self.device, "a+b")
-      if os.path.getsize(self.device) < size: os.ftruncate(f.fileno(), size)
-      buf = UnderlyingDiskBuffer(f, mmap.mmap(f.fileno(), size))
-    return DiskBuffer(buf, size)
-  def as_buffer(self, src:DiskBuffer): return src._buf()
-  def copyin(self, dest:DiskBuffer, src:memoryview): dest._buf()[:] = src
-  def copyout(self, dest:memoryview, src:DiskBuffer):
-    if src.ud.fd is not None:
-      src.ud.fd.seek(src.offset)
-      src.ud.fd.readinto(dest)
-    else:
-      dest[:] = src._buf()
-
-class DiskDevice(Interpreted):
-  def __init__(self, device): super().__init__(DiskAllocator(device[5:]), disk_fxn_for_op)
+disk_fxn_for_op: Dict[Op, Callable] = { BufferOps.MEM: lambda x: x, UnaryOps.NOOP: lambda x: x, UnaryOps.CAST: RawDiskBuffer.cast, MovementOps.AS_STRIDED: RawDiskBuffer.as_strided }
+DiskBuffer = Interpreted(RawDiskBuffer, disk_fxn_for_op, from_underlying=lambda x:x)

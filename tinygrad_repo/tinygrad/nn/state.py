@@ -1,12 +1,12 @@
-import os, json, pathlib, zipfile, pickle, tarfile, struct
+import os, json, pathlib, zipfile, pickle
 from tqdm import tqdm
 from typing import Dict, Union, List, Optional, Any, Tuple
 from tinygrad.tensor import Tensor
-from tinygrad.helpers import dtypes, prod, argsort, DEBUG, Timing, GlobalCounters, CI, unwrap
+from tinygrad.helpers import dtypes, prod, argsort, DEBUG, Timing, GlobalCounters, CI
 from tinygrad.shape.view import strides_for_shape
+from tinygrad.ops import Device
 
-safe_dtypes = {"F16": dtypes.float16, "F32": dtypes.float32, "U8": dtypes.uint8, "I8": dtypes.int8, "I32": dtypes.int32, "I64": dtypes.int64,
-               "F64": dtypes.double, "B": dtypes.bool, "I16": dtypes.short, "U16": dtypes.ushort, "UI": dtypes.uint, "UL": dtypes.ulong}
+safe_dtypes = {"F16": dtypes.float16, "F32": dtypes.float32, "U8": dtypes.uint8, "I8": dtypes.int8, "I32": dtypes.int32, "I64": dtypes.int64}
 inverse_safe_dtypes = {v:k for k,v in safe_dtypes.items()}
 
 def safe_load_metadata(fn:Union[Tensor,str]) -> Tuple[Tensor, int, Any]:
@@ -16,13 +16,7 @@ def safe_load_metadata(fn:Union[Tensor,str]) -> Tuple[Tensor, int, Any]:
 
 def safe_load(fn:Union[Tensor,str]) -> Dict[str, Tensor]:
   t, json_len, metadata = safe_load_metadata(fn)
-  ret = {}
-  for k,v in metadata.items():
-    if k == "__metadata__": continue
-    dtype = safe_dtypes[v['dtype']]
-    sz = (v['data_offsets'][1]-v['data_offsets'][0])//dtype.itemsize
-    ret[k] = t[8+json_len+v['data_offsets'][0]:8+json_len+v['data_offsets'][0]+sz].cast(dtype).reshape(v['shape'])
-  return ret
+  return {k:t[8+json_len+v['data_offsets'][0]:].cast(safe_dtypes[v['dtype']])[:prod(v['shape'])].reshape(v['shape']) for k,v in metadata.items() if k != "__metadata__"}
 
 def safe_save(tensors:Dict[str, Tensor], fn:str, metadata:Optional[Dict[str, Any]]=None):
   headers, offset = {}, 0
@@ -55,11 +49,9 @@ def get_state_dict(obj, prefix:str='', tensor_type=Tensor) -> Dict[str, Tensor]:
 def get_parameters(obj) -> List[Tensor]: return list(get_state_dict(obj).values())
 
 def load_state_dict(model, state_dict, strict=True, verbose=True):
-  start_mem_used = GlobalCounters.mem_used
-  with Timing("loaded weights in ", lambda et_ns: f", {(GlobalCounters.mem_used-start_mem_used)/1e9:.2f} GB loaded at {(GlobalCounters.mem_used-start_mem_used)/et_ns:.2f} GB/s"):  # noqa: E501
+  with Timing("loaded weights in ", lambda et_ns: f", {GlobalCounters.mem_used/1e9:.2f} GB loaded at {GlobalCounters.mem_used/et_ns:.2f} GB/s"):
     model_state_dict = get_state_dict(model)
-    if DEBUG >= 1 and len(state_dict) > len(model_state_dict):
-      print("WARNING: unused weights in state_dict", sorted(list(state_dict.keys() - model_state_dict.keys())))
+    if DEBUG >= 1 and len(state_dict) > len(model_state_dict): print("WARNING: unused weights in state_dict", sorted(list(state_dict.keys() - model_state_dict.keys())))
     for k,v in (t := tqdm(model_state_dict.items(), disable=CI or not verbose)):
       t.set_description(f"ram used: {GlobalCounters.mem_used/1e9:5.2f} GB, {k:50s}")
       if k not in state_dict and not strict:
@@ -69,17 +61,24 @@ def load_state_dict(model, state_dict, strict=True, verbose=True):
 
 # torch support!
 
-def torch_load(fn:str) -> Dict[str, Tensor]:
+def torch_load(fn:str):
   t = Tensor.empty(os.stat(fn).st_size, dtype=dtypes.uint8, device=f"disk:{fn}")
 
-  offsets: Dict[Union[str, int], int] = {}
-  lens: Dict[Union[str, int], int] = {}
-  def _rebuild_tensor_v2(storage, storage_offset, size, stride, requires_grad=None, backward_hooks=None, metadata=None):
+  offsets: Dict[str, int] = {}
+  lens: Dict[str, int] = {}
+  def _rebuild_tensor_v2(storage, storage_offset, size, stride, requires_grad, backward_hooks, metadata=None):
     #print(storage, storage_offset, size, stride, requires_grad, backward_hooks, metadata)
     lens[storage[2]] = storage[4] * storage[1].itemsize
     if storage[2] not in offsets: return None
     byte_offset = offsets[storage[2]]+storage_offset*storage[1].itemsize
     ret = t[byte_offset:byte_offset+prod(size)].cast(storage[1])
+    # convert bfloat16 -> float16 using LLVM for Llama 2
+    # upstream LLaMA also does this conversion:
+    # https://github.com/facebookresearch/llama/blob/6c7fe276574e78057f917549435a2554000a876d/llama/generation.py#L95
+    # TODO: should this be done in the example instead? or maybe we don't need this anymore with better bfloat16 support
+    if storage[1] == dtypes.bfloat16:
+      ret = ret.bitcast(dtypes.uint16).to("CPU").cast(dtypes.uint32).mul(1<<16).bitcast(dtypes.float32).to(Device.DEFAULT).half()
+      #ret = ret.to("LLVM").half().to(Device.DEFAULT)
 
     # 7 lines to deal with permuted tensors. NOTE: this currently requires reading off the disk
     shape_strides = [(s, st) for s,st in zip(size, stride) if s != 1]
@@ -87,19 +86,13 @@ def torch_load(fn:str) -> Dict[str, Tensor]:
     if tuple(permute_indexes) != tuple(range(len(permute_indexes))):
       intermediate_shape = tuple([shape_strides[x][0] for x in argsort(permute_indexes)])
       assert tuple([shape_strides[i][1] for i in argsort(permute_indexes)]) == strides_for_shape(intermediate_shape), "nonpermutable strides"
-      if DEBUG >= 3: print(f"WARNING: this torch load is slow. CPU to permute {intermediate_shape} with {permute_indexes}")
-      assert storage[1] != dtypes.bfloat16, "can't CPU permute BF16"
+      if DEBUG >= 2: print(f"WARNING: this torch load is slow. CPU to permute {intermediate_shape} with {permute_indexes}")
       # TODO: find a nice way to support all shapetracker on disktensors
       ret = ret.cpu().reshape(intermediate_shape).permute(permute_indexes)
 
     return ret.reshape(size)
 
-  class Parameter:
-    def __setstate__(self, state): self.tensor = state[0]
-
-  deserialized_objects: Dict[str, Any] = {}
-  intercept = {"HalfStorage": dtypes.float16, "FloatStorage": dtypes.float32, "BFloat16Storage": dtypes.bfloat16, "IntStorage": dtypes.int32,
-               "LongStorage": dtypes.int64, "_rebuild_tensor_v2": _rebuild_tensor_v2, "FloatTensor": None, "Parameter": Parameter}
+  intercept = {"HalfStorage": dtypes.float16, "FloatStorage": dtypes.float32, "BFloat16Storage": dtypes.bfloat16, "IntStorage": dtypes.int32, "LongStorage": dtypes.int64, "_rebuild_tensor_v2": _rebuild_tensor_v2}
   whitelist = {"torch", "collections", "numpy", "_codecs"}  # NOTE: this is not for security, only speed
   class Dummy: pass
   class TorchPickle(pickle.Unpickler):
@@ -109,9 +102,9 @@ def torch_load(fn:str) -> Dict[str, Tensor]:
         if DEBUG >= 2: print(f"WARNING: returning Dummy for {module} {name}")
         return Dummy
       return intercept[name] if module_root == "torch" else super().find_class(module, name)
-    def persistent_load(self, pid): return deserialized_objects[pid] if pid in deserialized_objects else pid
+    def persistent_load(self, pid): return pid
 
-  if zipfile.is_zipfile(fn):
+  if tuple(t[0:2].numpy()) == (0x50, 0x4b):
     myzip = zipfile.ZipFile(fn, 'r')
     base_name = myzip.namelist()[0].split('/', 1)[0]
     for n in myzip.namelist():
@@ -120,21 +113,6 @@ def torch_load(fn:str) -> Dict[str, Tensor]:
           offsets[n.split("/")[-1]] = myfile._orig_compress_start # type: ignore
     with myzip.open(f'{base_name}/data.pkl') as myfile:
       return TorchPickle(myfile).load()
-  elif tarfile.is_tarfile(fn):
-    with tarfile.open(fn, "r") as tar:
-      storages_offset = tar.getmember('storages').offset_data
-      f = unwrap(tar.extractfile('storages'))
-      for i in range(TorchPickle(f).load()):  # num_storages
-        (key, _, storage_type), sz = TorchPickle(f).load(), struct.unpack('<q', f.read(8))[0]
-        offsets[key] = storages_offset + f.tell()
-        f.seek(sz*storage_type.itemsize, 1)
-      f = unwrap(tar.extractfile('tensors'))
-      for _ in range(TorchPickle(f).load()):  # num_tensors
-        (key, storage_id, _), ndim, _ = TorchPickle(f).load(), struct.unpack('<i', f.read(4))[0], f.read(4)
-        size, stride = struct.unpack(f'<{ndim}q', f.read(8 * ndim)), struct.unpack(f'<{ndim}q', f.read(8 * ndim))
-        storage_offset = struct.unpack('<q', f.read(8))[0]
-        deserialized_objects[str(key)] = _rebuild_tensor_v2((None, storage_type, storage_id, None, -1), storage_offset, size, stride)
-      return {k:v.tensor if isinstance(v, Parameter) else v for k,v in TorchPickle(unwrap(tar.extractfile('pickle'))).load().items()}
   else:
     with open(fn, "rb") as f:
       pkl = TorchPickle(f)

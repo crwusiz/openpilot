@@ -119,6 +119,8 @@ class CAR(StrEnum):
   K8_GL3 = "KIA K8 (GL3)"
   K8_GL3_HEV = "KIA K8 HEV (GL3)"
   EV9 = "KIA EV9 (MV)"
+  K5_DL3_24 = "KIA K5_2024 (DL3)"
+  K5_DL3_24_HEV = "KIA K5_2024 HEV (DL3)"
 
   # Genesis
   GENESIS_GV60_EV = "GENESIS GV60 (JW1)"
@@ -443,7 +445,7 @@ CANFD_CAR = {
   CAR.TUCSON_NX4, CAR.STARIA,
   CAR.SPORTAGE_NQ5, CAR.SORENTO_MQ4, CAR.CARNIVAL_KA4, CAR.K8_GL3,
   CAR.IONIQ5, CAR.IONIQ6, CAR.KONA_SX2_EV, CAR.SONATA_DN8_24,
-  CAR.EV6, CAR.NIRO_SG2_EV, CAR.EV9,
+  CAR.EV6, CAR.NIRO_SG2_EV, CAR.EV9, CAR.K5_DL3_24, CAR.K5_DL3_24_HEV,
   CAR.GENESIS_GV60_EV, CAR.GENESIS_GV70, CAR.GENESIS_GV80,
   CAR.TUCSON_NX4_HEV,
   CAR.SORENTO_MQ4_HEV, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV, CAR.K8_GL3_HEV,
@@ -465,7 +467,7 @@ HEV_CAR = {
   CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV, CAR.SANTAFE_HEV, CAR.ELANTRA_CN7_HEV, CAR.SONATA_DN8_HEV, CAR.SONATA_LF_HEV, CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IGFL_HEV,
   CAR.K5_HEV, CAR.K5_DL3_HEV, CAR.K7_HEV,
   CAR.TUCSON_NX4_HEV,
-  CAR.SORENTO_MQ4_HEV, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV, CAR.K8_GL3_HEV,
+  CAR.SORENTO_MQ4_HEV, CAR.SPORTAGE_NQ5_HEV, CAR.NIRO_SG2_HEV, CAR.K8_GL3_HEV, CAR.K5_DL3_24_HEV,
 }
 
 # these cars require a special panda safety mode due to missing counters and checksums in the messages
@@ -546,6 +548,8 @@ DBC = {
   CAR.K8_GL3: dbc_dict('hyundai_canfd', None),
   CAR.K8_GL3_HEV: dbc_dict('hyundai_canfd', None),
   CAR.EV9: dbc_dict('hyundai_canfd', None),
+  CAR.K5_DL3_24: dbc_dict('hyundai_canfd', None),
+  CAR.K5_DL3_24_HEV: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV60_EV: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV70: dbc_dict('hyundai_canfd', None),
   CAR.GENESIS_GV80: dbc_dict('hyundai_canfd', None),
