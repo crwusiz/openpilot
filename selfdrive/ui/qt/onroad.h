@@ -95,7 +95,7 @@ private:
   // neokii add
   QPixmap autohold_warning_img;
   QPixmap autohold_active_img;
-  QPixmap nda_img, hda_img;
+  QPixmap nda_img, hda_img, nda2_img, hda2_img;
 
   QString speedUnit;
   std::unique_ptr<PubMaster> pm;
@@ -118,7 +118,7 @@ private:
 
   int status = STATUS_DISENGAGED;
   int autohold_state = 0;
-  int nda_state = 0;
+  int nda_state, isNda2 = 0;
   int wifi_state = 0;
   int gpsSatelliteCount = 0;
   int accel, gap_state = 0;

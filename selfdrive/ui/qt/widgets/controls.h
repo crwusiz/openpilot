@@ -288,3 +288,23 @@ public:
     setLayout(l);
   }
 };
+
+// add
+class NetworkImageWidget : public QWidget {
+  Q_OBJECT
+
+public:
+  explicit NetworkImageWidget(QWidget *parent = nullptr);
+
+public slots:
+  void requestImage(const QString &imageUrl);
+
+private slots:
+  void onImageDownloaded(QNetworkReply *reply);
+
+private:
+  QVBoxLayout *layout;
+  QLabel *imageLabel;
+  QNetworkAccessManager *networkManager;
+  QString lastUrl;
+};

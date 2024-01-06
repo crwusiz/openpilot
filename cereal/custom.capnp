@@ -21,6 +21,8 @@ struct NaviData @0x81c2f05a394cf4af {
     sectionLeftTime @9 :Int16;
     sectionAdjustSpeed @10 :Bool;
     camSpeedFactor @11 :Float32;
+    currentRoadName @12 :Text;
+    isNda2 @13 :Bool;
 }
 
 struct CustomReserved1 @0xaedffd8f31e7b55d {
