@@ -127,6 +127,7 @@ private:
   int camLimitSpeed, sectionLimitSpeed = 0;
   int camLimitSpeedLeftDist, sectionLeftDist = 0;
   int traffic_state = 0;
+  int skip_frame_count = 0;
 
   float speed, apply_speed, cruise_speed;
   float gpsBearing, gpsVerticalAccuracy, gpsAltitude, gpsAccuracy = 0;
