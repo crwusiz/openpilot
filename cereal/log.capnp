@@ -130,8 +130,9 @@ struct InitData {
 
 struct FrameData {
   frameId @0 :UInt32;
-  encodeId @1 :UInt32; # DEPRECATED
   frameIdSensor @25 :UInt32;
+  requestId @28 :UInt32;
+  encodeId @1 :UInt32;
 
   frameType @7 :FrameType;
 
