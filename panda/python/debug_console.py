@@ -20,7 +20,7 @@ no_reconnect = os.getenv("NO_RECONNECT") is not None
 if __name__ == "__main__":
   while True:
     try:
-      serials = Panda.list()
+      serials = Panda.list()`
       if os.getenv("SERIAL"):
         serials = [x for x in serials if x == os.getenv("SERIAL")]
 
