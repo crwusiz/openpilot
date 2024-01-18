@@ -36,16 +36,13 @@ class LatControlTorque(LatControl):
     self.torque_params.latAccelOffset = latAccelOffset
     self.torque_params.friction = friction
 
-  def update(self, active, CS, VM, params, steer_limited, desired_curvature, desired_curvature_rate, llk):
+  def update(self, active, CS, VM, params, steer_limited, desired_curvature, llk):
     pid_log = log.ControlsState.LateralTorqueState.new_message()
 
     if not active:
       output_torque = 0.0
       pid_log.active = False
-      angle_steers_des = 0.0
-      pid_log.latAccelFactor = self.torque_params.latAccelFactor
-      pid_log.latAccelOffset = self.torque_params.latAccelOffset
-      pid_log.friction = self.torque_params.friction
+      angle_steers_des = 0.
     else:
       if self.use_steering_angle:
         actual_curvature = -VM.calc_curvature(math.radians(CS.steeringAngleDeg - params.angleOffsetDeg), CS.vEgo, params.roll)

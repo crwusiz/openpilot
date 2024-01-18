@@ -397,7 +397,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   steerAngle = ce.getSteeringAngleDeg();
   longControl = cp.getOpenpilotLongitudinalControl();
   gap_state = ce.getCruiseState().getGapAdjust();
-  lateralControl = cs.getLateralControlSelect();
   steerRatio = lp.getSteerRatio();
   sccBus = cp.getSccBus();
   fl = ce.getTpms().getFl();
@@ -795,13 +794,11 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   // bottom info
-  const char* lateral[] = {"Pid", "Indi", "Lqr", "Torque"};
 
   QString infoText;
-  infoText.sprintf("SCC[%d] SR[%.2f] [ %s ] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
+  infoText.sprintf("SCC[%d] SR[%.2f] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
     sccBus,
     steerRatio,
-    lateral[lateralControl],
     latAccelFactor, friction,
     latAccelFactorRaw, frictionRaw
   );

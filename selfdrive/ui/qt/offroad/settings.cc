@@ -691,7 +691,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   communityLayout->addWidget(horizontal_line());
   bool is_canfd = params.getBool("IsCanfd");
   if (!is_canfd) {
-    communityLayout->addWidget(new LateralControlSelect());
     communityLayout->addWidget(new MfcSelect());
     communityLayout->addWidget(horizontal_line());
   }
@@ -956,75 +955,6 @@ SelectBranch::SelectBranch(QWidget* parent): QWidget(parent) {
     emit selectedBranch();
     });
   main_layout->addWidget(list);
-}
-
-//LateralControlSelect
-LateralControlSelect::LateralControlSelect() : AbstractControl("LateralControl [√]", tr("LateralControl Select (Pid/Indi/Lqr/Torque)"), "../assets/offroad/icon_logic.png") {
-  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
-  label.setStyleSheet("color: #e0e879");
-  hlayout->addWidget(&label);
-
-  btnminus.setStyleSheet(R"(
-    padding: 0;
-    border-radius: 50px;
-    font-size: 45px;
-    font-weight: 500;
-    color: #E4E4E4;
-    background-color: #393939;
-  )");
-  btnplus.setStyleSheet(R"(
-    padding: 0;
-    border-radius: 50px;
-    font-size: 45px;
-    font-weight: 500;
-    color: #E4E4E4;
-    background-color: #393939;
-  )");
-  btnminus.setFixedSize(120, 100);
-  btnplus.setFixedSize(120, 100);
-
-  hlayout->addWidget(&btnminus);
-  hlayout->addWidget(&btnplus);
-
-  QObject::connect(&btnminus, &QPushButton::released, [=]() {
-    auto str = QString::fromStdString(Params().get("LateralControlSelect"));
-    int latcontrol = str.toInt();
-    latcontrol = latcontrol - 1;
-    if (latcontrol <= 0 ) {
-      latcontrol = 0;
-    }
-    QString latcontrols = QString::number(latcontrol);
-    Params().put("LateralControlSelect", latcontrols.toStdString());
-    refresh();
-  });
-
-  QObject::connect(&btnplus, &QPushButton::released, [=]() {
-    auto str = QString::fromStdString(Params().get("LateralControlSelect"));
-    int latcontrol = str.toInt();
-    latcontrol = latcontrol + 1;
-    if (latcontrol >= 3 ) {
-      latcontrol = 3;
-    }
-    QString latcontrols = QString::number(latcontrol);
-    Params().put("LateralControlSelect", latcontrols.toStdString());
-    refresh();
-  });
-  refresh();
-}
-
-void LateralControlSelect::refresh() {
-  QString latcontrol = QString::fromStdString(Params().get("LateralControlSelect"));
-  if (latcontrol == "0") {
-    label.setText(QString::fromStdString("Pid"));
-  } else if (latcontrol == "1") {
-    label.setText(QString::fromStdString("Indi"));
-  } else if (latcontrol == "2") {
-    label.setText(QString::fromStdString("Lqr"));
-  } else if (latcontrol == "3") {
-    label.setText(QString::fromStdString("Torque"));
-  }
-  btnminus.setText("◀");
-  btnplus.setText("▶");
 }
 
 //MfcSelect

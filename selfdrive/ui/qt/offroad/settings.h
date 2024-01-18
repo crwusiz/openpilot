@@ -136,18 +136,6 @@ private:
   Params params;
 };
 
-// LateralControlSelect
-class LateralControlSelect : public AbstractControl {
-  Q_OBJECT
-public:
-  LateralControlSelect();
-private:
-  QPushButton btnplus;
-  QPushButton btnminus;
-  QLabel label;
-  void refresh();
-};
-
 // MfcSelect
 class MfcSelect : public AbstractControl {
   Q_OBJECT

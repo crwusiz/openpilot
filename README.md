@@ -7,7 +7,7 @@ openpilot by crwusiz branch
  * version 0.9.6 [ only comma3 or comma3x support ]
  * event message, qt ui kor translate ( language select )
  * brake, gps, wifi icon and wheel, N direction icon rotate
- * lateralControl select ( Pid / Indi / Lqr / Torque )
+ * lateralControl select ( Pid / Torque )
  * mfc select ( LDWS,LKAS / LFA )
  * add community toggle / function / simple ui
  * autohold, turnsignal, tpms, roadlimitspeed display ( neokii )

@@ -484,13 +484,6 @@
     </message>
 </context>
 <context>
-    <name>LateralControlSelect</name>
-    <message>
-        <source>LateralControl Select (Pid/Indi/Lqr/Torque)</source>
-        <translation>조향 모드를 선택합니다. (Pid/Indi/Lqr/Torque)</translation>
-    </message>
-</context>
-<context>
     <name>MapETA</name>
     <message>
         <source>eta</source>

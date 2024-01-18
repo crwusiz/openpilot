@@ -252,99 +252,6 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.95
       ret.steerRatio = 14.14
 
-    # *** lateral control ***
-    lat_pid = Params().get("LateralControlSelect", encoding='utf8') == "0"
-    lat_indi = Params().get("LateralControlSelect", encoding='utf8') == "1"
-    lat_lqr = Params().get("LateralControlSelect", encoding='utf8') == "2"
-    lat_torque = Params().get("LateralControlSelect", encoding='utf8') == "3"
-    # -----------------------------------------------------------------
-    if lat_pid:
-      ret.lateralTuning.pid.kf = 0.00005
-      ret.lateralTuning.pid.kpBP = [0.]
-      ret.lateralTuning.pid.kiBP = [0.]
-
-      if candidate == CAR.PALISADE:
-        ret.lateralTuning.pid.kpV = [0.3]
-        ret.lateralTuning.pid.kiV = [0.05]
-      elif candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
-        ret.lateralTuning.pid.kpV = [0.16]
-        ret.lateralTuning.pid.kiV = [0.01]
-      else:
-        ret.lateralTuning.pid.kpV = [0.25]
-        ret.lateralTuning.pid.kiV = [0.05]
-
-    # -----------------------------------------------------------------
-    elif lat_indi:
-      ret.lateralTuning.init('indi')
-      ret.lateralTuning.indi.innerLoopGainBP = [0.]
-      ret.lateralTuning.indi.outerLoopGainBP = [0.]
-      ret.lateralTuning.indi.timeConstantBP = [0.]
-      ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
-
-      if candidate in [CAR.IONIQ_HEV, CAR.GENESIS_G70]:
-        ret.lateralTuning.indi.innerLoopGainV = [2.5]
-        ret.lateralTuning.indi.outerLoopGainV = [3.5]
-        ret.lateralTuning.indi.timeConstantV = [1.4]
-        ret.lateralTuning.indi.actuatorEffectivenessV = [1.8]
-      elif candidate == CAR.SELTOS:
-        ret.lateralTuning.indi.innerLoopGainV = [4.]
-        ret.lateralTuning.indi.outerLoopGainV = [3.]
-        ret.lateralTuning.indi.timeConstantV = [1.4]
-        ret.lateralTuning.indi.actuatorEffectivenessV = [1.8]
-      else:
-        ret.lateralTuning.indi.innerLoopGainV = [3.5]
-        ret.lateralTuning.indi.outerLoopGainV = [2.0]
-        ret.lateralTuning.indi.timeConstantV = [1.4]
-        ret.lateralTuning.indi.actuatorEffectivenessV = [2.3]
-
-    # -----------------------------------------------------------------
-    elif lat_lqr:
-      ret.lateralTuning.init('lqr')
-      ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-      ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-      ret.lateralTuning.lqr.c = [1., 0.]
-
-      if candidate in [CAR.GRANDEUR_IG, CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IGFL, CAR.GRANDEUR_IGFL_HEV, CAR.K7, CAR.K7_HEV]:
-        ret.lateralTuning.lqr.scale = 1650.
-        ret.lateralTuning.lqr.ki = 0.03
-        ret.lateralTuning.lqr.dcGain = 0.0028
-        ret.lateralTuning.lqr.k = [-110., 451.]
-        ret.lateralTuning.lqr.l = [0.33, 0.318]
-      elif candidate == CAR.IONIQ_EV:
-        ret.lateralTuning.lqr.scale = 3000.0
-        ret.lateralTuning.lqr.ki = 0.005
-        ret.lateralTuning.lqr.dcGain = 0.002237852961363602
-        ret.lateralTuning.lqr.k = [-110.73572306, 451.22718255]
-        ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
-      elif candidate in [CAR.K5, CAR.K5_HEV]:
-        ret.lateralTuning.lqr.scale = 1700.0
-        ret.lateralTuning.lqr.ki = 0.016
-        ret.lateralTuning.lqr.dcGain = 0.002
-        ret.lateralTuning.lqr.k = [-110.0, 451.0]
-        ret.lateralTuning.lqr.l = [0.33, 0.318]
-      elif candidate == CAR.SELTOS:
-        ret.lateralTuning.lqr.scale = 1500.0
-        ret.lateralTuning.lqr.ki = 0.05
-        ret.lateralTuning.lqr.dcGain = 0.002237852961363602
-        ret.lateralTuning.lqr.k = [-110.73572306, 451.22718255]
-        ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
-      elif candidate in [CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80, CAR.GENESIS_G90]:
-        ret.lateralTuning.lqr.scale = 1900.
-        ret.lateralTuning.lqr.ki = 0.01
-        ret.lateralTuning.lqr.dcGain = 0.0029
-        ret.lateralTuning.lqr.k = [-110., 451.]
-        ret.lateralTuning.lqr.l = [0.33, 0.318]
-      else:
-        ret.lateralTuning.lqr.scale = 1700.0
-        ret.lateralTuning.lqr.ki = 0.03
-        ret.lateralTuning.lqr.dcGain = 0.003
-        ret.lateralTuning.lqr.k = [-105.0, 450.0]
-        ret.lateralTuning.lqr.l = [0.22, 0.318]
-
-    # -----------------------------------------------------------------
-    elif any([lat_torque, candidate in CANFD_CAR]):
-      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
-
     # *** longitudinal control ***
     if candidate in CANFD_CAR:
       ret.longitudinalTuning.kpV = [0.1]
@@ -373,7 +280,6 @@ class CarInterface(CarInterfaceBase):
 
     # *** Params Init ***
     if candidate in CANFD_CAR:
-      Params().put("LateralControlSelect", "3")
       Params().put_bool("SccOnBus2", False)
       Params().put_bool("IsCanfd", True)
     else:
