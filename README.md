@@ -1,57 +1,55 @@
 [![openpilot on the comma 3X](https://github.com/commaai/openpilot/assets/8762862/f09e6d29-db2d-4179-80c2-51e8d92bdb5c)](https://comma.ai/shop/comma-3x)
 
-crwusiz openpilot
-=====
-<b> crwusiz branch is neokii modify branch base (comma.ai master and xx979xx HKG_community source) </b>
-- <b> v0.9.6 [ only comma3 or comma3x support ] </b>
-- If you have any questions, please send a message to crwusiz from discord.
-- It is open source and inherits MIT license.
-- By installing this software you accept all responsibility for anything that might occur while you use it.
-- All contributors to this fork are not liable. <b>Use at your own risk.</b>
-- if you like this Branch <b> [Donate](https://paypal.me/crwusiz) </b> for me
+[![](https://i.imgur.com/TMtVMV8.png)](#)
+
+openpilot by crwusiz branch
+------
+ * version 0.9.6 [ only comma3 or comma3x support ]
+ * event message, qt ui kor translate ( language select )
+ * brake, gps, wifi icon and wheel, N direction icon rotate
+ * lateralControl select ( Pid / Indi / Lqr / Torque )
+ * mfc select ( LDWS,LKAS / LFA )
+ * add community toggle / function / simple ui
+ * autohold, turnsignal, tpms, roadlimitspeed display ( neokii )
+ * select manufacturer and car
+ * If you have any questions, please send DM to [crwusiz](https://discord.com/channels/@me) from discord.
+ * It is open source and inherits MIT license.
+ * By installing this software you accept all responsibility for anything that might occur while you use it.
+ * All contributors to this fork are not liable. <b>Use at your own risk.</b>
+ * if you like this Branch <b> [Donate](https://paypal.me/crwusiz) </b> for me
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/J3J4RXA92)
 
-[![](https://i.imgur.com/TMtVMV8.png)](#)
-- event message, qt ui kor translate ( language select )
-- brake, bsd, gps, wifi, cruise icon
-- wheel, N direction icon rotate
-- lateralControl select ( Pid / Indi / Lqr / Torque )
-- mfc select ( LDWS,LKAS / LFA )
-- add community toggle / function / simple ui
-- autohold, turnsignal, tpms, roadlimitspeed display ( neokii )
-- select manufacturer and car
-
 ## Harness Cable and Car Year Compatible Chart
 
-cable order -> https://smartstore.naver.com/jmtechn
+ * cable order -> https://smartstore.naver.com/jmtechn
+ * If you want to buy a cable from a country other than Korea, please DM to [crwusiz](https://discord.com/channels/@me) on the discord comma.ai channel.
 
 [![](https://i.imgur.com/v3cvfeF.png)](#)
 [![](https://i.imgur.com/uIH0dQA.png)](#)
 [![](https://i.imgur.com/6rxOQbQ.jpg)](#)
 
 ## Source Code Reference
-- https://github.com/commaai/openpilot
-- https://github.com/xx979xx/openpilot
-- https://github.com/xps-genesis/openpilot
-- https://github.com/kegman/openpilot
-- https://github.com/dragonpilot-community/dragonpilot
-- https://github.com/wirelessnet2/openpilot
-- https://github.com/sshane/openpilot
-- https://github.com/arne182/ArnePilot
-- https://github.com/neokii/npilot
-- https://github.com/openpilotusers
-- https://github.com/Circuit-Pro/openpilot
-- https://github.com/sunnyhaibin/sunnypilot
-- https://github.com/ajouatom/apilot
+ * https://github.com/commaai/openpilot
+ * https://github.com/xx979xx/openpilot
+ * https://github.com/xps-genesis/openpilot
+ * https://github.com/kegman/openpilot
+ * https://github.com/dragonpilot-community/dragonpilot
+ * https://github.com/wirelessnet2/openpilot
+ * https://github.com/sshane/openpilot
+ * https://github.com/arne182/ArnePilot
+ * https://github.com/neokii/glidepilot
+ * https://github.com/openpilotusers
+ * https://github.com/Circuit-Pro/openpilot
+ * https://github.com/sunnyhaibin/sunnypilot
+ * https://github.com/ajouatom/carrotpilot
 
 ## chevrolet bolt branch
-- https://github.com/JasonJShuler/openpilot
-- https://github.com/opgm/openpilot
-- https://github.com/hanabi95/openpilot
-- https://github.com/jc01rho-openpilot-BoltEV2019-KoKr
-- https://github.com/geniuth/openpilot
-- - -
+ * https://github.com/JasonJShuler/openpilot
+ * https://github.com/opgm/openpilot
+ * https://github.com/hanabi95/openpilot
+ * https://github.com/jc01rho-openpilot-BoltEV2019-KoKr
+ * https://github.com/geniuth/openpilot
 
 What is openpilot?
 ------
