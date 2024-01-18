@@ -60,6 +60,8 @@ class LateralPlanner:
     lateralPlan.curvatures = (self.x_sol[0:CONTROL_N, 3]/self.v_ego).tolist()
     lateralPlan.curvatureRates = [float(0) for _ in range(CONTROL_N-1)] # TODO: unused
 
+    lateralPlan.fullCurvatures = (self.x_sol[:,3]/self.v_ego).tolist()
+
     lateralPlan.mpcSolutionValid = bool(1)
     lateralPlan.solverExecutionTime = 0.0
     if self.debug_mode:
