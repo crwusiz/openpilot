@@ -7,7 +7,7 @@ import select
 import codecs
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
-from panda import Panda  # noqa: E402
+from panda import Panda
 
 setcolor = ["\033[1;32;40m", "\033[1;31;40m"]
 unsetcolor = "\033[00m"
@@ -20,7 +20,7 @@ no_reconnect = os.getenv("NO_RECONNECT") is not None
 if __name__ == "__main__":
   while True:
     try:
-      serials = Panda.list()`
+      serials = Panda.list()
       if os.getenv("SERIAL"):
         serials = [x for x in serials if x == os.getenv("SERIAL")]
 

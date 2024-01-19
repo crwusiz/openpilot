@@ -263,7 +263,8 @@ struct sample_t angle_meas;         // last 6 steer angles/curvatures
 // See ISO 15622:2018 for more information.
 #define ALT_EXP_RAISE_LONGITUDINAL_LIMITS_TO_ISO_MAX 8
 
-#define ALT_EXP_DISABLE_DISENGAGE_ON_BRAKE 16
+// This flag allows AEB to be commanded from openpilot.
+#define ALT_EXP_ALLOW_AEB 16
 
 int alternative_experience = 0;
 

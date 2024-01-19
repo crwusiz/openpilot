@@ -113,7 +113,7 @@ class Controls:
       self.CP.alternativeExperience |= ALTERNATIVE_EXPERIENCE.DISABLE_DISENGAGE_ON_GAS
 
     if not self.disengage_on_brake:
-      self.CP.alternativeExperience |= ALTERNATIVE_EXPERIENCE.DISABLE_DISENGAGE_ON_BRAKE
+      self.CP.alternativeExperience |= ALTERNATIVE_EXPERIENCE.ALLOW_AEB
 
     # read params
     self.is_metric = self.params.get_bool("IsMetric")
