@@ -3,7 +3,7 @@ import math
 from cereal import car
 from opendbc.can.parser import CANParser
 from openpilot.selfdrive.car.interfaces import RadarInterfaceBase
-from openpilot.selfdrive.car.hyundai.values import DBC
+from openpilot.selfdrive.car.hyundai.values import DBC, CANFD_CAR
 from openpilot.common.params import Params
 from openpilot.common.filter_simple import StreamingMovingAverage
 
@@ -24,6 +24,9 @@ def get_radar_can_parser(CP):
 
 def get_radar_can_parser_scc(CP):
   scc2 = Params().get_bool("SccOnBus2")
+
+  if CP.carFingerprint in CANFD_CAR:
+    return None
 
   print("RadarInterface: SCC Radar (Bus{})".format( 2 if scc2 else 0))
   messages = [("SCC11", 50)]
