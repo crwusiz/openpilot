@@ -336,7 +336,7 @@ def joystick_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster,
 
 
 def auto_lane_change_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
-  alc_timer = sm['lateralPlan'].autoLaneChangeTimer
+  alc_timer = sm['modelV2'].meta.autoLaneChangeTimer
   return Alert(
     "자동차선변경이 %d초 뒤에 시작됩니다" % alc_timer,
     "차선의 차량을 확인하세요",
@@ -961,14 +961,6 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   # When this happens we can no long control the car so the user needs to be warned immediately.
   EventName.cruiseDisabled: {
     ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("크루즈 꺼짐"),
-  },
-
-  # For planning the trajectory Model Predictive Control (MPC) is used. This is
-  # an optimization algorithm that is not guaranteed to find a feasible solution.
-  # If no solution is found or the solution has a very high cost this alert is thrown.
-  EventName.plannerError: {
-    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("플래너 솔루션 오류"),
-    ET.NO_ENTRY: NoEntryAlert("플래너 솔루션 오류"),
   },
 
   # When the relay in the harness box opens the CAN bus between the LKAS camera

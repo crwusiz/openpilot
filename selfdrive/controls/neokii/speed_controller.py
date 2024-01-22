@@ -7,11 +7,11 @@ from openpilot.common.numpy_fast import clip, interp
 from openpilot.common.params import Params
 from openpilot.selfdrive.car.hyundai.values import Buttons
 from openpilot.selfdrive.controls.lib.drive_helpers import V_CRUISE_MIN, V_CRUISE_MAX
-from openpilot.selfdrive.controls.lib.lateral_planner import TRAJECTORY_SIZE
 from openpilot.selfdrive.controls.neokii.navi_controller import SpeedLimiter
 
 SYNC_MARGIN = 3.
 MIN_CURVE_SPEED = 30. * CV.KPH_TO_MS
+TRAJECTORY_SIZE = 33
 
 EventName = car.CarEvent.EventName
 ButtonType = car.CarState.ButtonEvent.Type
@@ -174,10 +174,16 @@ class SpeedController:
 
 
   def cal_curve_speed(self, sm, v_ego):
-    lat_plan = sm['lateralPlan']
-    if len(lat_plan.fullCurvatures) == TRAJECTORY_SIZE:
+    model = sm['modelV2']
+    if len(model.position.x) == TRAJECTORY_SIZE and len(model.position.y) == TRAJECTORY_SIZE:
+      x = model.position.x
+      y = model.position.y
+      dy = np.gradient(y, x)
+      d2y = np.gradient(dy, x)
+      curv = d2y / (1 + dy ** 2) ** 1.5
+
       start = int(interp(v_ego, [10., 27.], [10, TRAJECTORY_SIZE - 10]))
-      curv = list(lat_plan.fullCurvatures)[start:min(start + 10, TRAJECTORY_SIZE)]
+      curv = curv[start:min(start + 10, TRAJECTORY_SIZE)]
       a_y_max = 2.975 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
       v_curvature = np.sqrt(a_y_max / np.clip(np.abs(curv), 1e-4, None))
       model_speed = np.mean(v_curvature) * 0.85
