@@ -655,6 +655,13 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     ConfirmationDialog::rich(QString::fromStdString(txt), this);
   });
 
+  auto tmux_error_log_upload_btn = new ButtonControl(tr("tmux error log upload"), tr("RUN"));
+  QObject::connect(tmux_error_log_upload_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("tmux error log upload<br><br>Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/scripts/log_upload.sh");
+    }
+  });
+
   auto can_missing_error_log_btn = new ButtonControl(tr("can missing error log"), tr("RUN"));
   QObject::connect(can_missing_error_log_btn, &ButtonControl::clicked, [=]() {
     const std::string txt = util::read_file("/data/can_missing.log");
@@ -672,6 +679,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   communityLayout->addWidget(gitpull_btn);
   communityLayout->addWidget(cleardtc_btn);
   communityLayout->addWidget(tmux_error_log_btn);
+  communityLayout->addWidget(tmux_error_log_upload_btn);  
   communityLayout->addWidget(can_missing_error_log_btn);
   communityLayout->addWidget(can_timeout_error_log_btn);
 
