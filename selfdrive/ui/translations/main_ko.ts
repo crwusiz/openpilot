@@ -248,6 +248,22 @@
         <source>Enable Radar Track use (disable AEB)</source>
         <translation>레이더 트랙을 활성화 합니다 (차량의 AEB는 비활성화됩니다)</translation>
     </message>
+    <message>
+        <source>tmux error log upload</source>
+        <translation>tmux 에러 로그 업로드</translation>
+    </message>
+    <message>
+        <source>tmux error log upload&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>tmux 에러 로그 업로드&lt;br&gt;&lt;br&gt;실행하시겠습니까?</translation>
+    </message>
+    <message>
+        <source>CANFD Car HDA2</source>
+        <translation>CANFD 차량 HDA2 옵션</translation>
+    </message>
+    <message>
+        <source>Highway Drive Assist 2, turn it on.</source>
+        <translation>HDA2 옵션이 있다면 이 옵션을 켜세요</translation>
+    </message>
 </context>
 <context>
     <name>ConfirmationDialog</name>
