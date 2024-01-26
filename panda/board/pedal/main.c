@@ -46,11 +46,11 @@ int comms_can_read(uint8_t *data, uint32_t max_len) {
   UNUSED(max_len);
   return 0;
 }
-void comms_can_write(uint8_t *data, uint32_t len) {
+void comms_can_write(const uint8_t *data, uint32_t len) {
   UNUSED(data);
   UNUSED(len);
 }
-void comms_endpoint2_write(uint8_t *data, uint32_t len) {
+void comms_endpoint2_write(const uint8_t *data, uint32_t len) {
   UNUSED(data);
   UNUSED(len);
 }
@@ -92,7 +92,7 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
 
 // addresses to be used on CAN
 #define CAN_GAS_INPUT  0x200
-#define CAN_GAS_OUTPUT 0x201U
+#define CAN_GAS_OUTPUT 0x201UL
 #define CAN_GAS_SIZE 6
 #define COUNTER_CYCLE 0xFU
 

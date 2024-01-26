@@ -794,6 +794,10 @@ This may take up to a minute.</source>
         <translation>장치를 초기화하는 중...
 최대 1분이 소요될 수 있습니다.</translation>
     </message>
+    <message>
+        <source>System reset triggered. Press confirm to erase all content and settings. Press cancel to resume boot.</source>
+        <translation>시스템 재설정이 시작되었습니다. 모든 콘텐츠와 설정을 지우려면 확인을 누르시고 부팅을 재개하려면 취소를 누르세요.</translation>
+    </message>
 </context>
 <context>
     <name>SelectBranch</name>
