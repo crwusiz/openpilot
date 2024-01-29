@@ -767,7 +767,12 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   toggles.append(new ParamControl("DriverCameraHardwareMissing",
                                   tr("DriverCamera Hardware Missing"),
                                   tr("If there is a problem with the driver camera hardware, drive without the driver camera."),
-                                  "../assets/offroad/icon_monitoring.png",
+                                  "../assets/img_driver_face_static_x.png",
+                                  this));
+  toggles.append(new ParamControl("DriverCameraOnReverse",
+                                  tr("Driver Camera On Reverse"),
+                                  tr("Displays the driver camera when in reverse."),
+                                  "../assets/img_driver_face_static.png",
                                   this));
   toggles.append(new ParamControl("RadarTrackEnable",
                                   tr("Enable Radar Track use"),

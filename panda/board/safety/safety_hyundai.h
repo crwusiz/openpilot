@@ -374,7 +374,7 @@ static int hyundai_fwd_hook(int bus_num, int addr) {
     bool is_lfahda_msg = addr == 0x485;
     bool is_scc_msg = addr == 0x420 || addr == 0x421 || addr == 0x50A || addr == 0x389;
     bool is_fca_msg = addr == 0x38D || addr == 0x483;
-    bool block_msg = is_lkas_msg || is_lfahda_msg || is_scc_msg; //|| is_fca_msg;
+    bool block_msg = is_lkas_msg || is_lfahda_msg || is_scc_msg || is_fca_msg;
 
     if (!block_msg) {
       bus_fwd = 0;

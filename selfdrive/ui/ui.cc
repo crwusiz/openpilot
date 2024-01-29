@@ -219,12 +219,18 @@ static void update_state(UIState *s) {
                                  sm.rcv_frame("liveCalibration") > scene.started_frame &&
                                  sm.rcv_frame("modelV2") > scene.started_frame &&
                                  sm.rcv_frame("uiPlan") > scene.started_frame);
+
+  if (sm.updated("carState")) {
+    const auto carState = sm["carState"].getCarState();
+    scene.show_driver_camera = scene.driver_camera && carState.getGearShifter() == cereal::CarState::GearShifter::REVERSE;
+  }
 }
 
 void ui_update_params(UIState *s) {
   auto params = Params();
   s->scene.is_metric = params.getBool("IsMetric");
   s->scene.map_on_left = params.getBool("NavSettingLeftSide");
+  s->scene.driver_camera = params.getBool("DriverCameraOnReverse");
 }
 
 void UIState::updateStatus() {

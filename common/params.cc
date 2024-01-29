@@ -230,6 +230,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"GitLog", PERSISTENT},
     {"UseExternalNaviRoutes", PERSISTENT},
     {"DriverCameraHardwareMissing", PERSISTENT},
+    {"DriverCameraOnReverse", PERSISTENT},
 };
 
 } // namespace
