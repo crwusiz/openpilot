@@ -521,6 +521,7 @@ struct PandaState @0xa7649e2575e4591e {
     redPanda @7;
     redPandaV2 @8;
     tres @9;
+    cuatro @10;
   }
 
   enum HarnessStatus {
