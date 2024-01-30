@@ -264,6 +264,14 @@
         <source>Highway Drive Assist 2, turn it on.</source>
         <translation>HDA2 옵션이 있다면 이 옵션을 켜세요</translation>
     </message>
+    <message>
+        <source>Driver Camera On Reverse</source>
+        <translation>후진시 운전자 카메라 표시</translation>
+    </message>
+    <message>
+        <source>Displays the driver camera when in reverse.</source>
+        <translation>후진시 운전자 감시 카메라를 보여줍니다</translation>
+    </message>
 </context>
 <context>
     <name>ConfirmationDialog</name>
@@ -802,7 +810,7 @@
     </message>
     <message>
         <source>Press confirm to erase all content and settings. Press cancel to resume boot.</source>
-        <translation>모든 콘텐츠와 설정을 삭제하려면 확인을 누르세요. 계속 부팅하려면 취소를 누르세요.</translation>
+        <translation type="vanished">모든 콘텐츠와 설정을 삭제하려면 확인을 누르세요. 계속 부팅하려면 취소를 누르세요.</translation>
     </message>
     <message>
         <source>Resetting device...
