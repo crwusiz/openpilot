@@ -45,7 +45,6 @@ class HyundaiFlags(IntFlag):
   SEND_LFA = 128
   USE_FCA = 256
   CANFD_HDA2_ALT_STEERING = 512
-  SEND_FCA12 = 1024
 
 class CAR(StrEnum):
   # Hyundai
@@ -440,6 +439,7 @@ CAN_GEARS = {
     {CAR.SONATA_LF, CAR.TUCSON, CAR.VELOSTER, CAR.K5},
   # Use Elect GEAR Message for Gear Selection [ ELECT_GEAR ]
   # Gear not set is [ LVR12 ]
+  "send_mdps12": {CAR.GENESIS_G90, CAR.K9},
 }
 
 CANFD_CAR = {

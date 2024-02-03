@@ -50,7 +50,7 @@ class KalmanParams:
 
 
 class Track:
-  def __init__(self, identifier: int, v_lead: float, y_rel: float, kalman_params: KalmanParams):
+  def __init__(self, identifier: int, v_lead: float, y_rel: float, kalman_params: KalmanParams, radar_ts: float):
     self.identifier = identifier
     self.cnt = 0
     self.aLeadTau = _LEAD_ACCEL_TAU
@@ -59,14 +59,16 @@ class Track:
     self.K_K = kalman_params.K
     self.kf = KF1D([[v_lead], [0.0]], self.K_A, self.K_C, self.K_K)
     self.kf_y = KF1D([[y_rel], [0.0]], self.K_A, self.K_C, self.K_K)
-    self.dRel = 0
+    self.dRel = 0.0
+    self.vRel = 0.0
     self.vLat = 0.0
     self.vision_prob = 0.0
+    self.radar_ts = radar_ts
 
   def update(self, d_rel: float, y_rel: float, v_rel: float, v_lead: float, measured: float, a_rel: float):
 
     #apilot: changed radar target
-    if abs(self.dRel - d_rel) > 3.0: # 3M이상 차이날때 초기화
+    if abs(self.dRel - d_rel) > 3.0 or abs(self.vRel - v_rel) > 20.0 * self.radar_ts: # 거리3M이상, 20m/s^2이상 상대속도 차이날때 초기화
       self.cnt = 0
       self.kf = KF1D([[v_lead], [0.0]], self.K_A, self.K_C, self.K_K)
       self.kf_y = KF1D([[y_rel], [0.0]], self.K_A, self.K_C, self.K_K)
@@ -124,18 +126,13 @@ class Track:
     }
 
   def get_RadarState2(self, model_prob, lead_msg):
-    useVisionMix = False
-    if float(lead_msg.prob) > 0.5 and abs(float(self.aLeadK)) < abs(float(lead_msg.a[0])):
-      useVisionMix = True
-
-    aLeadK = float(lead_msg.a[0]) if useVisionMix else float(self.aLeadK)
     return {
       "dRel": float(self.dRel),
-      "yRel": float(self.yRel),
+      "yRel": float(self.yRel) if self.yRel != 0 else float(-lead_msg.y[0]),
       "vRel": float(self.vRel),
       "vLead": float(self.vLead),
       "vLeadK": float(self.vLeadK),
-      "aLeadK": aLeadK,
+      "aLeadK": self.aLeadK,
       "aLeadTau": float(self.aLeadTau),
       "status": True,
       "fcw": self.is_potential_fcw(model_prob),
@@ -145,7 +142,6 @@ class Track:
       "aRel": float(self.aRel),
       "vLat": float(self.vLat),
     }
-
 
   def potential_low_speed_lead(self, v_ego: float):
     # stop for stuff in front of you and low speed, even without model confirmation
@@ -170,7 +166,7 @@ def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks
 
   def prob(c):
     prob_d = laplacian_pdf(c.dRel, offset_vision_dist, lead.xStd[0])
-    prob_y = laplacian_pdf(c.yRel+c.vLat, -lead.y[0], lead.yStd[0])
+    prob_y = laplacian_pdf(c.yRel + c.vLat * 2.0, -lead.y[0], lead.yStd[0])
     prob_v = laplacian_pdf(c.vRel + v_ego, lead.v[0], lead.vStd[0])
 
     #속도가 빠른것에 weight를 더줌. apilot,
@@ -181,9 +177,10 @@ def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks
     # This is isn't exactly right, but good heuristic
     prob = prob_d * prob_y * prob_v * weight_v
     c.vision_prob = prob
+
     return prob
 
-  track_key, track = max(tracks.items(), key=lambda item: prob(item[1], item[0]))
+  track = max(tracks.values(), key=prob)
 
   # if no 'sane' match is found return -1
   # stationary radar points can be false positives
@@ -220,8 +217,9 @@ def get_lead(v_ego: float, ready: bool, tracks: Dict[int, Track], lead_msg: capn
              model_v_ego: float, low_speed_override: bool = True) -> Dict[str, Any]:
   ## SCC레이더는 일단 보관하고 리스트에서 삭제...
   track_scc = tracks.get(0)
-  if track_scc is not None:
-    del tracks[0]
+  #if track_scc is not None:
+  #  del tracks[0]            ## tracks에서 삭제하면안됨... ㅠㅠ
+
   # Determine leads, this is where the essential logic happens
   if len(tracks) > 0 and ready and lead_msg.prob > .5:
     track = match_vision_to_track(v_ego, lead_msg, tracks)
@@ -273,6 +271,9 @@ class RadarD:
 
     self.ready = False
 
+    self.a_ego = 0.0
+    self.radar_ts = radar_ts
+
   def update(self, sm: messaging.SubMaster, rr: Optional[car.RadarData]):
     self.current_time = 1e-9*max(sm.logMonoTime.values())
 
@@ -284,6 +285,7 @@ class RadarD:
     if sm.updated['carState']:
       self.v_ego = sm['carState'].vEgo
       self.v_ego_hist.append(self.v_ego)
+      self.a_ego = sm['carState'].aEgo
     if sm.updated['modelV2']:
       self.ready = True
 
@@ -305,7 +307,7 @@ class RadarD:
 
       # create the track if it doesn't exist or it's a new track
       if ids not in self.tracks:
-        self.tracks[ids] = Track(ids, v_lead, rpt[1], self.kalman_params)
+        self.tracks[ids] = Track(ids, v_lead, rpt[1], self.kalman_params, self.radar_ts)
       self.tracks[ids].update(rpt[0], rpt[1], rpt[2], v_lead, rpt[3], rpt[4])
 
     # *** publish radarState ***

@@ -620,6 +620,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   )");
 
+  bool is_canfd = params.getBool("IsCanfd");
+
   auto gitpull_btn = new ButtonControl(tr("Git Fetch and Reset"), tr("RUN"));
   QObject::connect(gitpull_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Git Fetch and Reset<br><br>Process?"), tr("Process"), this)) {
@@ -679,7 +681,12 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   communityLayout->addWidget(gitpull_btn);
   communityLayout->addWidget(cleardtc_btn);
   communityLayout->addWidget(tmux_error_log_btn);
-  communityLayout->addWidget(tmux_error_log_upload_btn);  
+  communityLayout->addWidget(tmux_error_log_upload_btn);
+
+  if (!is_canfd) {
+    communityLayout->addWidget(new MfcSelect());
+  }
+
   communityLayout->addWidget(can_missing_error_log_btn);
   communityLayout->addWidget(can_timeout_error_log_btn);
 
@@ -692,31 +699,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   if (access("/data/can_timeout.log", F_OK) == 0) {
     communityLayout->addWidget(can_timeout_error_log_btn);
   }*/
-
-  communityLayout->addWidget(horizontal_line());
-  bool is_canfd = params.getBool("IsCanfd");
-  if (!is_canfd) {
-    communityLayout->addWidget(new MfcSelect());
-    communityLayout->addWidget(horizontal_line());
-  }
-
-  auto pandaflash_btn = new ButtonControl(tr("Panda Flash"), tr("RUN"));
-  QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Panda Flash<br><br>Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/panda/board/flash.py");
-    }
-  });
-
-  auto pandarecover_btn = new ButtonControl(tr("Panda Recover"), tr("RUN"));
-  QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Panda Recover<br><br>Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/panda/board/recover.py");
-    }
-  });
-
-  communityLayout->addWidget(pandaflash_btn);
-  communityLayout->addWidget(pandarecover_btn);
-  communityLayout->addWidget(horizontal_line());
 
   // add community toggle
   QList<ParamControl*> toggles;
@@ -740,30 +722,24 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   tr("Use external navi routes"),
                                   "../assets/offroad/icon_map.png",
                                   this));
-  if (!is_canfd) {
-    toggles.append(new ParamControl("SccOnBus2",
-                                    tr("Scc on Bus 2"),
-                                    tr("If Scc is on bus 2, turn it on."),
-                                    "../assets/offroad/icon_long.png",
-                                    this));
-  }
+  toggles.append(new ParamControl("NavLimitSpeed",
+                                  tr("Navigation Limit Speed"),
+                                  tr("Use Stock Navigation Limit Speed Signal"),
+                                  "../assets/offroad/icon_speed_limit.png",
+                                  this));
   if (is_canfd) {
     toggles.append(new ParamControl("IsHda2",
                                     tr("CANFD Car HDA2"),
                                     tr("Highway Drive Assist 2, turn it on."),
                                     "../assets/offroad/icon_long.png",
                                     this));
+  } else {
+    toggles.append(new ParamControl("SccOnBus2",
+                                    tr("Scc on Bus 2"),
+                                    tr("If Scc is on bus 2, turn it on."),
+                                    "../assets/offroad/icon_long.png",
+                                    this));
   }
-  toggles.append(new ParamControl("NavLimitSpeed",
-                                  tr("Navigation Limit Speed"),
-                                  tr("Use Stock Navigation Limit Speed Signal"),
-                                  "../assets/offroad/icon_speed_limit.png",
-                                  this));
-  toggles.append(new ParamControl("DisengageOnBrake",
-                                  tr("Disengage on Brake Pedal"),
-                                  tr("When enabled, pressing the brake pedal will disengage openpilot."),
-                                  "../assets/offroad/icon_disengage_on_accelerator.svg",
-                                  this));
   toggles.append(new ParamControl("DriverCameraHardwareMissing",
                                   tr("DriverCamera Hardware Missing"),
                                   tr("If there is a problem with the driver camera hardware, drive without the driver camera."),
@@ -779,11 +755,35 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   tr("Enable Radar Track use (disable AEB)"),
                                   "../assets/offroad/icon_warning.png",
                                   this));
+  toggles.append(new ParamControl("DisengageOnBrake",
+                                  tr("Disengage on Brake Pedal"),
+                                  tr("When enabled, pressing the brake pedal will disengage openpilot."),
+                                  "../assets/offroad/icon_disengage_on_accelerator.svg",
+                                  this));
   for (ParamControl *toggle : toggles) {
     if (main_layout->count() != 0) {
     }
     communityLayout->addWidget(toggle);
   }
+
+  auto pandaflash_btn = new ButtonControl(tr("Panda Flash"), tr("RUN"));
+  QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Panda Flash<br><br>Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/panda/board/flash.py");
+    }
+  });
+
+  auto pandarecover_btn = new ButtonControl(tr("Panda Recover"), tr("RUN"));
+  QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Panda Recover<br><br>Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/panda/board/recover.py");
+    }
+  });
+
+  communityLayout->addWidget(horizontal_line());
+  communityLayout->addWidget(pandaflash_btn);
+  communityLayout->addWidget(pandarecover_btn);
+  communityLayout->addWidget(horizontal_line());
 }
 
 SelectCar::SelectCar(QWidget* parent): QWidget(parent) {

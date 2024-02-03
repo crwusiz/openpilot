@@ -8,7 +8,7 @@ from openpilot.selfdrive.car import apply_driver_steer_torque_limits, common_fau
 from openpilot.selfdrive.car.interfaces import ACCEL_MIN, ACCEL_MAX
 from openpilot.selfdrive.car.hyundai import hyundaicanfd, hyundaican
 from openpilot.selfdrive.car.hyundai.hyundaicanfd import CanBus
-from openpilot.selfdrive.car.hyundai.values import HyundaiFlags, Buttons, CarControllerParams, CANFD_CAR, CAR
+from openpilot.selfdrive.car.hyundai.values import HyundaiFlags, Buttons, CarControllerParams, CANFD_CAR, CAR, CAN_GEARS
 from openpilot.selfdrive.controls.neokii.navi_controller import SpeedLimiter
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
@@ -150,7 +150,6 @@ class CarController:
         can_sends.extend(self.create_button_messages(CC, CS, use_clu11=False))
     else:
       send_lfa = self.CP.flags & HyundaiFlags.SEND_LFA.value and Params().get("MfcSelect", encoding='utf8') == "2"
-      send_fca12 = self.CP.flags & HyundaiFlags.SEND_FCA12.value
       use_fca = self.CP.flags & HyundaiFlags.USE_FCA.value
 
       can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, apply_steer_req, torque_fault, sys_warning, sys_state, CC.enabled,
@@ -176,7 +175,9 @@ class CarController:
 
       # 5 Hz ACC options
       if self.frame % 20 == 0 and self.CP.openpilotLongitudinalControl and self.CP.sccBus == 0:
-        can_sends.extend(hyundaican.create_acc_opt(self.packer, CS, send_fca12))
+        can_sends.extend(hyundaican.create_acc_opt(self.packer, use_fca))
+      elif CS.scc13 is not None:
+        can_sends.append(hyundaican.create_acc_opt_none(self.packer, CS))
 
       # 2 Hz front radar options
       if self.frame % 50 == 0 and self.CP.openpilotLongitudinalControl and self.CP.sccBus == 0:
@@ -203,6 +204,9 @@ class CarController:
           if (self.frame - self.last_button_frame) * DT_CTRL >= 0.15:
             self.last_button_frame = self.frame
     else:
+      if self.CP.carFingerprint in CAN_GEARS["send_mdps12"]:  # send mdps12 to LKAS to prevent LKAS error
+        can_sends.append(hyundaican.create_mdps12(self.packer, self.frame, CS.mdps12))
+
       if (self.frame - self.last_button_frame) * DT_CTRL > 0.25:
         # cruise cancel
         if CC.cruiseControl.cancel:
