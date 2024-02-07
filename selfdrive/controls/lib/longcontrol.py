@@ -60,12 +60,10 @@ class LongControl:
     self.v_pid = 0.0
     self.last_output_accel = 0.0
 
-
   def reset(self, v_pid):
     """Reset PID controller and change setpoint"""
     self.pid.reset()
     self.v_pid = v_pid
-
 
   def update(self, active, CS, long_plan, accel_limits, t_since_plan):
     """Update longitudinal control. This updates the state machine and runs a PID loop"""

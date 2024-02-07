@@ -45,6 +45,9 @@ class HyundaiFlags(IntFlag):
   SEND_LFA = 128
   USE_FCA = 256
   CANFD_HDA2_ALT_STEERING = 512
+  HYBRID = 1024
+  EV = 2048
+
 
 class CAR(StrEnum):
   # Hyundai
@@ -293,8 +296,7 @@ def match_fw_to_car_fuzzy(live_fw_versions, offline_fw_versions) -> Set[str]:
   # Non-electric CAN FD platforms often do not have platform code specifiers needed
   # to distinguish between hybrid and ICE. All EVs so far are either exclusively
   # electric or specify electric in the platform code.
-  # TODO: whitelist platforms that we've seen hybrid and ICE versions of that have these specifiers
-  fuzzy_platform_blacklist = {str(c) for c in set(CANFD_CAR - EV_CAR)}
+  fuzzy_platform_blacklist = {str(c) for c in (CANFD_CAR - EV_CAR - CANFD_FUZZY_WHITELIST)}
   candidates: Set[str] = set()
 
   for candidate, fws in offline_fw_versions.items():
@@ -351,6 +353,9 @@ HYUNDAI_VERSION_REQUEST_MULTI = bytes([uds.SERVICE_TYPE.READ_DATA_BY_IDENTIFIER]
   p16(uds.DATA_IDENTIFIER_TYPE.APPLICATION_SOFTWARE_IDENTIFICATION) + \
   p16(0xf100)
 
+HYUNDAI_ECU_MANUFACTURING_DATE = bytes([uds.SERVICE_TYPE.READ_DATA_BY_IDENTIFIER]) + \
+  p16(uds.DATA_IDENTIFIER_TYPE.ECU_MANUFACTURING_DATE)
+
 HYUNDAI_VERSION_RESPONSE = bytes([uds.SERVICE_TYPE.READ_DATA_BY_IDENTIFIER + 0x40])
 
 # Regex patterns for parsing platform code, FW date, and part number from FW versions
@@ -359,12 +364,17 @@ PLATFORM_CODE_FW_PATTERN = re.compile(b'((?<=' + HYUNDAI_VERSION_REQUEST_LONG[1:
 DATE_FW_PATTERN = re.compile(b'(?<=[ -])([0-9]{6}$)')
 PART_NUMBER_FW_PATTERN = re.compile(b'(?<=[0-9][.,][0-9]{2} )([0-9]{5}[-/]?[A-Z][A-Z0-9]{3}[0-9])')
 
+# We've seen both ICE and hybrid for these platforms, and they have hybrid descriptors (e.g. MQ4 vs MQ4H)
+CANFD_FUZZY_WHITELIST = {CAR.SORENTO_MQ4, CAR.SORENTO_MQ4_HEV}
+
 # List of ECUs expected to have platform codes, camera and radar should exist on all cars
 # TODO: use abs, it has the platform code and part number on many platforms
 PLATFORM_CODE_ECUS = [Ecu.fwdRadar, Ecu.fwdCamera, Ecu.eps]
 # So far we've only seen dates in fwdCamera
 # TODO: there are date codes in the ABS firmware versions in hex
 DATE_FW_ECUS = [Ecu.fwdCamera]
+
+ALL_HYUNDAI_ECUS = [Ecu.eps, Ecu.abs, Ecu.fwdRadar, Ecu.fwdCamera, Ecu.engine, Ecu.parkingAdas, Ecu.transmission, Ecu.adas, Ecu.hvac, Ecu.cornerRadar]
 
 FW_QUERY_CONFIG = FwQueryConfig(
   requests=[
@@ -399,13 +409,52 @@ FW_QUERY_CONFIG = FwQueryConfig(
       obd_multiplexing=False,
     ),
 
-    # CAN-FD debugging queries
+    # CAN & CAN FD query to understand the three digit date code
+    # HDA2 cars usually use 6 digit date codes, so skip bus 1
+    Request(
+      [HYUNDAI_ECU_MANUFACTURING_DATE],
+      [HYUNDAI_VERSION_RESPONSE],
+      whitelist_ecus=[Ecu.fwdCamera],
+      bus=0,
+      auxiliary=True,
+      logging=True,
+    ),
+
+    # CAN & CAN FD logging queries (from camera)
+    Request(
+      [HYUNDAI_VERSION_REQUEST_LONG],
+      [HYUNDAI_VERSION_RESPONSE],
+      whitelist_ecus=ALL_HYUNDAI_ECUS,
+      bus=0,
+      auxiliary=True,
+      logging=True,
+    ),
+    Request(
+      [HYUNDAI_VERSION_REQUEST_MULTI],
+      [HYUNDAI_VERSION_RESPONSE],
+      whitelist_ecus=ALL_HYUNDAI_ECUS,
+      bus=0,
+      auxiliary=True,
+      logging=True,
+    ),
+    Request(
+      [HYUNDAI_VERSION_REQUEST_LONG],
+      [HYUNDAI_VERSION_RESPONSE],
+      whitelist_ecus=ALL_HYUNDAI_ECUS,
+      bus=1,
+      auxiliary=True,
+      obd_multiplexing=False,
+      logging=True,
+    ),
+
+    # CAN-FD alt request logging queries
     Request(
       [HYUNDAI_VERSION_REQUEST_ALT],
       [HYUNDAI_VERSION_RESPONSE],
       whitelist_ecus=[Ecu.parkingAdas, Ecu.hvac],
       bus=0,
       auxiliary=True,
+      logging=True,
     ),
     Request(
       [HYUNDAI_VERSION_REQUEST_ALT],
@@ -413,6 +462,7 @@ FW_QUERY_CONFIG = FwQueryConfig(
       whitelist_ecus=[Ecu.parkingAdas, Ecu.hvac],
       bus=1,
       auxiliary=True,
+      logging=True,
       obd_multiplexing=False,
     ),
   ],
@@ -425,6 +475,7 @@ FW_QUERY_CONFIG = FwQueryConfig(
   # Custom fuzzy fingerprinting function using platform codes, part numbers + FW dates:
   match_fw_to_car_fuzzy=match_fw_to_car_fuzzy,
 )
+
 
 CHECKSUM = {
   "crc8": [CAR.SONATA_DN8, CAR.SANTAFE, CAR.PALISADE, CAR.SELTOS, CAR.ELANTRA_CN7, CAR.K5_DL3,
@@ -464,7 +515,7 @@ EV_CAR = {
   CAR.GENESIS_GV60_EV,
 }
 
-HEV_CAR = {
+HYBRID_CAR = {
   CAR.KONA_HEV, CAR.IONIQ_HEV, CAR.NIRO_HEV, CAR.SANTAFE_HEV, CAR.ELANTRA_CN7_HEV, CAR.SONATA_DN8_HEV, CAR.SONATA_LF_HEV, CAR.GRANDEUR_IG_HEV, CAR.GRANDEUR_IGFL_HEV,
   CAR.K5_HEV, CAR.K5_DL3_HEV, CAR.K7_HEV,
   CAR.TUCSON_NX4_HEV,
