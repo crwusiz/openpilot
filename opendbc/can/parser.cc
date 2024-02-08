@@ -5,6 +5,12 @@
 #include <stdexcept>
 #include <sstream>
 
+#include <ctime>
+#include <iostream>
+#include <chrono>
+#include <fstream>
+#include <cstdlib>
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -285,24 +291,30 @@ void CANParser::UpdateValid(uint64_t nanos) {
       _counters_valid = false;
     }
 
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    char time_buffer[20];
+    std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", std::localtime(&now_c));
+
     const bool missing = state.last_seen_nanos == 0;
     const bool timed_out = (nanos - state.last_seen_nanos) > state.check_threshold;
     if (state.check_threshold > 0 && (missing || timed_out)) {
       if (show_missing && !bus_timeout) {
         char can_log[100];
         char can_event_log[100];
-        //char datetime = system("echo | date +'[%Y-%m-%d %H:%M:%S]'");
         if (missing) {
           LOGE("0x%X '%s' NOT SEEN", state.address, state.name.c_str());
-          sprintf(can_log, "echo -n 0x%X '%s' > /data/can_missing.log", state.address, state.name.c_str());
+          int address_decimal = std::strtoul(std::to_string(state.address).c_str(), nullptr, 16);
+          snprintf(can_log, sizeof(can_log), "echo -n \"%s\n0x%X (%d) '%s'\" > /data/can_missing.log", time_buffer, state.address, address_decimal, state.name.c_str());
           system(can_log);
-          sprintf(can_event_log, "echo -n 0x%X > /data/can_event_missing.log", state.address);
+          snprintf(can_event_log, sizeof(can_event_log), "echo -n 0x%X > /data/can_event_missing.log", state.address);
           system(can_event_log);
         } else if (timed_out) {
           LOGE("0x%X '%s' TIMED OUT", state.address, state.name.c_str());
-          sprintf(can_log, "echo -n 0x%X '%s' > /data/can_timeout.log", state.address, state.name.c_str());
+          int address_decimal = std::strtoul(std::to_string(state.address).c_str(), nullptr, 16);
+          snprintf(can_log, sizeof(can_log), "echo -n \"%s\n0x%X (%d) '%s'\" > /data/can_timeout.log", time_buffer, state.address, address_decimal, state.name.c_str());
           system(can_log);
-          sprintf(can_event_log, "echo -n 0x%X > /data/can_event_timeout.log", state.address);
+          snprintf(can_event_log, sizeof(can_event_log), "echo -n 0x%X > /data/can_event_timeout.log", state.address);
           system(can_event_log);
         }
       }

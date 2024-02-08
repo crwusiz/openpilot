@@ -636,14 +636,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
 
-  /*auto restart_btn = new ButtonControl(tr("Restart"), tr("RUN"));
-  QObject::connect(restart_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/scripts/restart.sh");
-    }
-  });
-  communityLayout->addWidget(restart_btn);*/
-
   auto cleardtc_btn = new ButtonControl(tr("Clear DTC"), tr("RUN"));
   QObject::connect(cleardtc_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Clear DTC<br><br>Process?"), tr("Process"), this)) {
@@ -684,16 +676,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   communityLayout->addWidget(tmux_error_log_upload_btn);
   communityLayout->addWidget(can_missing_error_log_btn);
   communityLayout->addWidget(can_timeout_error_log_btn);
-
-  /*if (access("/data/tmux_error.log", F_OK) == 0) {
-    communityLayout->addWidget(tmux_error_log_btn);
-  }
-  if (access("/data/can_missing.log", F_OK) == 0) {
-    communityLayout->addWidget(can_missing_error_log_btn);
-  }
-  if (access("/data/can_timeout.log", F_OK) == 0) {
-    communityLayout->addWidget(can_timeout_error_log_btn);
-  }*/
 
   // add community toggle
   QList<ParamControl*> toggles;
