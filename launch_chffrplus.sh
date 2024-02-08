@@ -123,12 +123,23 @@ function launch {
   # events language init
   LANG=$(cat ${PARAMS_ROOT}/d/LanguageSetting)
 
+  # events.py 한글로 변경 / ui.h 영문 내용 바꾸기
   if [ "${LANG}" = "main_ko" ]; then
     cp -f $BASEDIR/scripts/add/events_ko.py $BASEDIR/selfdrive/controls/lib/events.py
-    cp -f $BASEDIR/scripts/add/ui_ko.h $BASEDIR/selfdrive/ui/ui.h
+    E1='"openpilot Unavailable"'
+    E2='"Waiting for controls to start"'
+    E3='"TAKE CONTROL IMMEDIATELY"'
+    E4='"Controls Unresponsive"'
+    E5='"Reboot Device"'
+    K1='"오픈파일럿을 사용할수없습니다"'
+    K2='"프로세스가 준비중입니다"'
+    K3='"핸들을 잡아주세요"'
+    K4='"프로세스가 응답하지않습니다"'
+    K5='"장치를 재부팅하세요"'
+    UIFILE="$BASEDIR/selfdrive/ui/ui.h"
+    sed -i -e "s/${E1}/${K1}/g" -e "s/${E2}/${K2}/g" -e "s/${E3}/${K3}/g" -e "s/${E4}/${K4}/g" -e "s/${E5}/${K5}/g" "$UIFILE"
   else
     cp -f $BASEDIR/scripts/add/events.py $BASEDIR/selfdrive/controls/lib/events.py
-    cp -f $BASEDIR/scripts/add/ui.h $BASEDIR/selfdrive/ui/ui.h
   fi
 
   # start manager
