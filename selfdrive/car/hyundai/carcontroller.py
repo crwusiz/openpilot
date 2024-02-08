@@ -149,7 +149,7 @@ class CarController:
         # button presses
         can_sends.extend(self.create_button_messages(CC, CS, use_clu11=False))
     else:
-      send_lfa = self.CP.flags & HyundaiFlags.SEND_LFA.value and Params().get("MfcSelect", encoding='utf8') == "2"
+      send_lfa = self.CP.flags & HyundaiFlags.SEND_LFA.value
       use_fca = self.CP.flags & HyundaiFlags.USE_FCA.value
 
       can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, apply_steer_req, torque_fault, sys_warning, sys_state, CC.enabled,
@@ -165,10 +165,6 @@ class CarController:
         can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), accel, jerk,
                                                         hud_control.leadVisible, set_speed_in_units, stopping, CC, CS, use_fca))
 
-      # car signal status
-      if self.frame % 1000 == 0:
-        print(f'scc11 = {bool(CS.scc11)}  scc12 = {bool(CS.scc12)}  scc13 = {bool(CS.scc13)}  scc14 = {bool(CS.scc14)}  mdps12 = {bool(CS.mdps12)}')
-
       # 20 Hz LFA MFA message
       if self.frame % 5 == 0 and send_lfa:
         can_sends.append(hyundaican.create_lfahda_mfc(self.packer, CC.enabled, SpeedLimiter.instance().get_active()))
@@ -182,6 +178,10 @@ class CarController:
       # 2 Hz front radar options
       if self.frame % 50 == 0 and self.CP.openpilotLongitudinalControl and self.CP.sccBus == 0:
         can_sends.append(hyundaican.create_frt_radar_opt(self.packer))
+
+      # car signal status
+      if self.frame % 1000 == 0:
+        print(f'scc11 = {bool(CS.scc11)}  scc12 = {bool(CS.scc12)}  scc13 = {bool(CS.scc13)}  scc14 = {bool(CS.scc14)}  mdps12 = {bool(CS.mdps12)}')
 
     new_actuators = actuators.copy()
     new_actuators.steer = apply_steer / self.params.STEER_MAX

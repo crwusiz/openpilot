@@ -209,7 +209,6 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"WheeledBody", PERSISTENT},
 
     // add
-    {"MfcSelect", PERSISTENT},
     {"AutoLaneChangeEnabled", PERSISTENT},
     {"PrebuiltEnable", PERSISTENT},
     {"LoggerEnable", PERSISTENT},

@@ -34,22 +34,18 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
   values["CF_Lkas_MsgCount"] = frame % 0x10
   values["CF_Lkas_Chksum"] = 0
 
-  mfc_ldws_lkas = Params().get("MfcSelect", encoding='utf8') == "1"
-
   if car_fingerprint == CAR.GENESIS:
     values["CF_Lkas_LdwsActivemode"] = 2
     values["CF_Lkas_SysWarning"] = lkas11["CF_Lkas_SysWarning"]
-
-  elif mfc_ldws_lkas:
-    values["CF_Lkas_LdwsActivemode"] = 0
-    values["CF_Lkas_LdwsOpt_USM"] = 3
-    values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
-
   elif send_lfa:
     values["CF_Lkas_LdwsActivemode"] = int(left_lane) + (int(right_lane) << 1)
     values["CF_Lkas_LdwsOpt_USM"] = 2
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
     values["CF_Lkas_SysWarning"] = 4 if sys_warning else 0
+  else:
+    values["CF_Lkas_LdwsActivemode"] = 0
+    values["CF_Lkas_LdwsOpt_USM"] = 3
+    values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
 
   dat = packer.make_can_msg("LKAS11", 0, values)[2]
   if car_fingerprint in CHECKSUM["crc8"]:

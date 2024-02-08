@@ -135,15 +135,3 @@ private:
   QWidget* homeWidget;
   Params params;
 };
-
-// MfcSelect
-class MfcSelect : public AbstractControl {
-  Q_OBJECT
-public:
-  MfcSelect();
-private:
-  QPushButton btnplus;
-  QPushButton btnminus;
-  QLabel label;
-  void refresh();
-};

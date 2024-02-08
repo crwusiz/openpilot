@@ -682,11 +682,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   communityLayout->addWidget(cleardtc_btn);
   communityLayout->addWidget(tmux_error_log_btn);
   communityLayout->addWidget(tmux_error_log_upload_btn);
-
-  if (!is_canfd) {
-    communityLayout->addWidget(new MfcSelect());
-  }
-
   communityLayout->addWidget(can_missing_error_log_btn);
   communityLayout->addWidget(can_timeout_error_log_btn);
 
@@ -965,71 +960,4 @@ SelectBranch::SelectBranch(QWidget* parent): QWidget(parent) {
     emit selectedBranch();
     });
   main_layout->addWidget(list);
-}
-
-//MfcSelect
-MfcSelect::MfcSelect() : AbstractControl("MFC [√]", tr("MFC Camera Select (Auto/Ldws,Lkas/Lfa)"), "../assets/offroad/icon_mfc.png") {
-  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
-  label.setStyleSheet("color: #e0e879");
-  hlayout->addWidget(&label);
-
-  btnminus.setStyleSheet(R"(
-    padding: 0;
-    border-radius: 50px;
-    font-size: 45px;
-    font-weight: 500;
-    color: #E4E4E4;
-    background-color: #393939;
-  )");
-  btnplus.setStyleSheet(R"(
-    padding: 0;
-    border-radius: 50px;
-    font-size: 45px;
-    font-weight: 500;
-    color: #E4E4E4;
-    background-color: #393939;
-  )");
-  btnminus.setFixedSize(120, 100);
-  btnplus.setFixedSize(120, 100);
-
-  hlayout->addWidget(&btnminus);
-  hlayout->addWidget(&btnplus);
-
-  QObject::connect(&btnminus, &QPushButton::released, [=]() {
-    auto str = QString::fromStdString(Params().get("MfcSelect"));
-    int mfc = str.toInt();
-    mfc = mfc - 1;
-    if (mfc <= 0 ) {
-      mfc = 0;
-    }
-    QString mfcs = QString::number(mfc);
-    Params().put("MfcSelect", mfcs.toStdString());
-    refresh();
-  });
-
-  QObject::connect(&btnplus, &QPushButton::released, [=]() {
-    auto str = QString::fromStdString(Params().get("MfcSelect"));
-    int mfc = str.toInt();
-    mfc = mfc + 1;
-    if (mfc >= 2 ) {
-      mfc = 2;
-    }
-    QString mfcs = QString::number(mfc);
-    Params().put("MfcSelect", mfcs.toStdString());
-    refresh();
-  });
-  refresh();
-}
-
-void MfcSelect::refresh() {
-  QString mfc = QString::fromStdString(Params().get("MfcSelect"));
-  if (mfc == "0") {
-    label.setText(QString::fromStdString("Auto"));
-  } else if (mfc == "1") {
-    label.setText(QString::fromStdString("Ldws,Lkas"));
-  } else if (mfc == "2") {
-    label.setText(QString::fromStdString("Lfa"));
-  }
-  btnminus.setText("◀");
-  btnplus.setText("▶");
 }

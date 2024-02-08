@@ -290,26 +290,21 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalActuatorDelayLowerBound = 0.5
     ret.longitudinalActuatorDelayUpperBound = 0.5
 
-    # *** Params Init ***
+    # *** feature detection and  Params Init ***
     if candidate in CANFD_CAR:
-      Params().put_bool("SccOnBus2", False)
       Params().put_bool("IsCanfd", True)
-    else:
-      Params().put_bool("IsCanfd", False)
-      if candidate == CAR.GENESIS:
-        Params().put("MfcSelect", "0")
+      Params().put_bool("SccOnBus2", False)
 
-    # *** feature detection ***
-    if candidate in CANFD_CAR:
       ret.enableBsm = 0x1e5 in fingerprint[CAN.ECAN]
       ret.hasNav = 0x1fa in fingerprint[CAN.ECAN]
       ret.radarUnavailable = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
     else:
+      Params().put_bool("IsCanfd", False)
+
       ret.enableBsm = 0x58b in fingerprint[0]
       ret.hasAutoHold = 0x47f in fingerprint[0]
       ret.hasNav = 0x544 in fingerprint[0] and Params().get_bool("NavLimitSpeed")
-      ret.hasLfa = 0x391 in fingerprint[0] and Params().get("MfcSelect", encoding='utf8') == "2"
-
+      ret.hasLfa = 0x391 in fingerprint[0]
       ret.sccBus = 2 if Params().get_bool("SccOnBus2") else 0
 
       if ret.sccBus == 2:
