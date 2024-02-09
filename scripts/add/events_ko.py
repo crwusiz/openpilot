@@ -346,20 +346,18 @@ def auto_lane_change_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.Su
 
 def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
   if os.path.isfile('/data/can_event_missing.log'):
-    f = open('/data/can_event_missing.log', 'r')
-    add = f.readline()
-    add_int = int(add, 0)
-    f.close()
+    with open('/data/can_event_missing.log', 'r') as f:
+      add = f.readline()
+      add_int = int(add, 0)
     return Alert(
       "CAN 오류 : %s Missing\n Value : %d" % (add, add_int),
       "",
       AlertStatus.normal, AlertSize.small,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, .2, creation_delay=1.)
   elif os.path.isfile('/data/can_event_timeout.log'):
-    f = open('/data/can_event_timeout.log', 'r')
-    add = f.readline()
-    add_int = int(add, 0)
-    f.close()
+    with open('/data/can_event_timeout.log', 'r') as f:
+      add = f.readline()
+      add_int = int(add, 0)
     return Alert(
       "CAN 오류 : %s Timeout\n Value : %d" % (add, add_int),
       "",
