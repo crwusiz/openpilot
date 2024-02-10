@@ -139,10 +139,14 @@ function launch {
   if [ "${LANG}" = "main_ko" ] && [[ ! "${EVENTSTAT}" == *"modified:   selfdrive/controls/lib/events.py"* ]]; then
     cp -f $BASEDIR/selfdrive/controls/lib/events.py $BASEDIR/scripts/add/events_en.py
     cp -f $BASEDIR/scripts/add/events_ko.py $BASEDIR/selfdrive/controls/lib/events.py
+    if [[ ! "${EVENTSTAT}" == *"modified:   selfdrive/controls/ui/ui.h"* ]]; then
     sed -i -e "s/${E1}/${K1}/g" -e "s/${E2}/${K2}/g" -e "s/${E3}/${K3}/g" -e "s/${E4}/${K4}/g" -e "s/${E5}/${K5}/g" "$UIFILE"
-  else
+    fi
+  elif [ "${LANG}" = "main_en" ] && [[ "${EVENTSTAT}" == *"modified:   selfdrive/controls/lib/events.py"* ]]; then
     cp -f $BASEDIR/scripts/add/events_en.py $BASEDIR/selfdrive/controls/lib/events.py
+    if [[ "${EVENTSTAT}" == *"modified:   selfdrive/controls/ui/ui.h"* ]]; then
     sed -i -e "s/${K1}/${E1}/g" -e "s/${K2}/${E2}/g" -e "s/${K3}/${E3}/g" -e "s/${K4}/${E4}/g" -e "s/${K5}/${E5}/g" "$UIFILE"
+    fi
   fi
 
   # start manager
