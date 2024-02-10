@@ -176,7 +176,6 @@ def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks
     weight_v = interp(c.vRel + v_ego, [0, 10], [0.3, 1])
     # This is isn't exactly right, but good heuristic
     prob = prob_d * prob_y * prob_v * weight_v
-    c.vision_prob = prob
 
     return prob
 
@@ -215,10 +214,7 @@ def get_RadarState_from_vision(lead_msg: capnp._DynamicStructReader, v_ego: floa
 
 def get_lead(v_ego: float, ready: bool, tracks: Dict[int, Track], lead_msg: capnp._DynamicStructReader,
              model_v_ego: float, low_speed_override: bool = True) -> Dict[str, Any]:
-  ## SCC레이더는 일단 보관하고 리스트에서 삭제...
   track_scc = tracks.get(0)
-  #if track_scc is not None:
-  #  del tracks[0]            ## tracks에서 삭제하면안됨... ㅠㅠ
 
   # Determine leads, this is where the essential logic happens
   if len(tracks) > 0 and ready and lead_msg.prob > .5:
@@ -351,7 +347,7 @@ class RadarD:
 
 
 # fuses camera and radar data for best lead detection
-def radard_thread(sm: Optional[messaging.SubMaster] = None, pm: Optional[messaging.PubMaster] = None, can_sock: Optional[messaging.SubSocket] = None):
+def main():
   config_realtime_process(5, Priority.CTRL_LOW)
 
   # wait for stats about the car to come in from controls
@@ -365,12 +361,9 @@ def radard_thread(sm: Optional[messaging.SubMaster] = None, pm: Optional[messagi
   RadarInterface = importlib.import_module(f'selfdrive.car.{CP.carName}.radar_interface').RadarInterface
 
   # *** setup messaging
-  if can_sock is None:
-    can_sock = messaging.sub_sock('can')
-  if sm is None:
-    sm = messaging.SubMaster(['modelV2', 'carState'], ignore_avg_freq=['modelV2', 'carState'])  # Can't check average frequency, since radar determines timing
-  if pm is None:
-    pm = messaging.PubMaster(['radarState', 'liveTracks'])
+  can_sock = messaging.sub_sock('can')
+  sm = messaging.SubMaster(['modelV2', 'carState'], ignore_avg_freq=['modelV2', 'carState'])  # Can't check average frequency, since radar determines timing
+  pm = messaging.PubMaster(['radarState', 'liveTracks'])
 
   RI = RadarInterface(CP)
 
@@ -390,10 +383,6 @@ def radard_thread(sm: Optional[messaging.SubMaster] = None, pm: Optional[messagi
     RD.publish(pm, -rk.remaining*1000.0)
 
     rk.monitor_time()
-
-
-def main(sm: Optional[messaging.SubMaster] = None, pm: Optional[messaging.PubMaster] = None, can_sock: messaging.SubSocket = None):
-  radard_thread(sm, pm, can_sock)
 
 
 if __name__ == "__main__":
