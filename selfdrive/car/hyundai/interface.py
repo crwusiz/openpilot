@@ -369,7 +369,7 @@ class CarInterface(CarInterfaceBase):
         print(f'cp = {bool(self.cp.can_valid)}  cp_cam = {bool(self.cp_cam.can_valid)}')
     self.frame += 1
 
-    if self.CS.CP.openpilotLongitudinalControl:
+    if self.CS.cruise_buttons[-1] != self.CS.prev_cruise_buttons:
       ret.buttonEvents = create_button_events(self.CS.cruise_buttons[-1], self.CS.prev_cruise_buttons, BUTTONS_DICT)
 
     # On some newer model years, the CANCEL button acts as a pause/resume button based on the PCM state
@@ -411,12 +411,9 @@ class CarInterface(CarInterfaceBase):
 
   def create_buttons(self, button):
     if self.CP.carFingerprint in CANFD_CAR:
-      return self.create_buttons_can_fd(button)
+      return self.create_buttons_canfd(button)
     else:
       return self.create_buttons_can(button)
-
-  def get_buttons_dict(self):
-    return BUTTONS_DICT
 
   def create_buttons_can(self, button):
     values = self.CS.clu11
@@ -424,7 +421,7 @@ class CarInterface(CarInterfaceBase):
     values["CF_Clu_AliveCnt1"] = (values["CF_Clu_AliveCnt1"] + 1) % 0x10
     return self.CC.packer.make_can_msg("CLU11", self.CP.sccBus, values)
 
-  def create_buttons_can_fd(self, button):
+  def create_buttons_canfd(self, button):
     values = {
       "COUNTER": self.CS.buttons_counter+1,
       "SET_ME_1": 1,

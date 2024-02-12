@@ -249,9 +249,6 @@ class CarInterfaceBase(ABC):
   def create_buttons(self, button):
     return None
 
-  def get_buttons_dict(self):
-    return None
-
   def create_common_events(self, cs_out, extra_gears=None, pcm_enable=True, allow_enable=True,
                            enable_buttons=(ButtonType.accelCruise, ButtonType.decelCruise)):
     events = Events()
