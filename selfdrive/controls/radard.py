@@ -169,15 +169,8 @@ def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks
     prob_y = laplacian_pdf(c.yRel + c.vLat * 2.0, -lead.y[0], lead.yStd[0])
     prob_v = laplacian_pdf(c.vRel + v_ego, lead.v[0], lead.vStd[0])
 
-    #속도가 빠른것에 weight를 더줌. apilot,
-    #231120: 감속정지중, 전방차량정지상태인데, 주변의 노이즈성 레이더포인트가 검출되어 버림.
-    #       이 포인트는 약간 먼데, 주행하고 있는것처럼.. 인식됨. 아주 잠깐 인식됨.
-    #        속도관련 weight를 없애야하나?  TG를 지나고 있는 차를 우선시하도록 만든건데...
-    weight_v = interp(c.vRel + v_ego, [0, 10], [0.3, 1])
     # This is isn't exactly right, but good heuristic
-    prob = prob_d * prob_y * prob_v * weight_v
-
-    return prob
+    return prob_d * prob_y * prob_v
 
   track = max(tracks.values(), key=prob)
 

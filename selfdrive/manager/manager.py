@@ -175,7 +175,7 @@ def manager_thread() -> None:
   if params.get("DriverCameraHardwareMissing"):
     ignore += ["dmonitoringd", "dmonitoringmodeld"]
 
-  sm = messaging.SubMaster(['deviceState', 'carParams'], poll=['deviceState'])
+  sm = messaging.SubMaster(['deviceState', 'carParams'], poll='deviceState')
   pm = messaging.PubMaster(['managerState'])
 
   write_onroad_params(False, params)
@@ -184,7 +184,7 @@ def manager_thread() -> None:
 
   print_timer = 0
   while True:
-    sm.update()
+    sm.update(1000)
 
     started = sm['deviceState'].started
 
