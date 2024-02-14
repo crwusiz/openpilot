@@ -40,7 +40,7 @@ class NaviServer:
     broadcast.daemon = True
     broadcast.start()
 
-    self.gps_sm = messaging.SubMaster(['gpsLocationExternal'], poll=['gpsLocationExternal'])
+    self.gps_sm = messaging.SubMaster(['gpsLocationExternal'], poll='gpsLocationExternal')
     self.gps_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     self.location = None

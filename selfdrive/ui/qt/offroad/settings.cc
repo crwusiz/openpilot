@@ -595,29 +595,11 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   setStyleSheet(R"(
     #back_btn {
-      font-size: 50px;
-      margin: 0px;
-      padding: 15px;
-      border-width: 0;
-      border-radius: 30px;
-      color: #FFFFFF;
-      background-color: #444444;
-    }
-    #back_btn:pressed {
-      background-color: #3B3B3B;
-    }
+      font-size: 50px; margin: 0px; padding: 15px; border-width: 0; border-radius: 30px; color: #FFFFFF; background-color: #444444; }
+    #back_btn:pressed { background-color: #3B3B3B; }
     #selectCar_btn, #selectManufacturer_btn {
-      font-size: 50px;
-      margin: 0px;
-      padding: 15px;
-      border-width: 0;
-      border-radius: 30px;
-      color: #FFFFFF;
-      background-color: #2C2CE2;
-    }
-    #selectCar_btn:pressed, #selectManufacturer_btn:pressed {
-      background-color: #2424FF;
-    }
+      font-size: 50px; margin: 0px; padding: 15px; border-width: 0; border-radius: 30px; color: #FFFFFF; background-color: #2C2CE2; }
+    #selectCar_btn:pressed, #selectManufacturer_btn:pressed { background-color: #2424FF; }
   )");
 
   bool is_canfd = params.getBool("IsCanfd");

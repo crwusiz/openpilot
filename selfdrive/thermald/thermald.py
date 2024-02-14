@@ -167,7 +167,7 @@ def hw_state_thread(end_event, hw_queue):
 
 def thermald_thread(end_event, hw_queue) -> None:
   pm = messaging.PubMaster(['deviceState'])
-  sm = messaging.SubMaster(["peripheralState", "gpsLocationExternal", "controlsState", "pandaStates"], poll=["pandaStates"])
+  sm = messaging.SubMaster(['peripheralState', 'gpsLocationExternal', 'controlsState', 'pandaStates'], poll='pandaStates')
 
   count = 0
 
