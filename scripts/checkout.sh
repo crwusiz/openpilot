@@ -16,7 +16,4 @@ echo ""
 echo "  Git Checkout [ $BRANCH ]  "
 echo ""
 
-cp -f /data/openpilot/selfdrive/controls/lib/events.py /data/openpilot/scripts/add/events.py
-cp -f /data/openpilot/selfdrive/ui/ui.h /data/openpilot/scripts/add/ui.h
-
 exec /data/openpilot/scripts/restart.sh

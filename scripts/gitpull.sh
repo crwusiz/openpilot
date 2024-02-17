@@ -5,7 +5,10 @@ pushd /data/openpilot
 echo -n "0" > /data/params/d/PrebuiltEnable
 sudo rm -f prebuilt
 
+#FETCH_STATUS=$(git fetch --all --prune | zenity --text-info --title="Git Fetch Status" --width=200 --height=200) && sleep 5
+
 git fetch --all --prune
+echo "Fetch completed!"
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 REMOTE_HASH=$(git rev-parse --short --verify origin/$BRANCH)
@@ -23,8 +26,5 @@ echo "  Git Fetch and Reset HEAD commit ..."
 echo ""
 echo "  current branch is [ $BRANCH ]  "
 echo ""
-
-cp -f /data/openpilot/selfdrive/controls/lib/events.py /data/openpilot/scripts/add/events.py
-cp -f /data/openpilot/selfdrive/ui/ui.h /data/openpilot/scripts/add/ui.h
 
 exec /data/openpilot/scripts/restart.sh
