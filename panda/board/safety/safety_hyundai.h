@@ -203,7 +203,7 @@ static void hyundai_rx_hook(const CANPacket_t *to_push) {
     // ACC steering wheel buttons
     if (addr == 0x4F1) {
       int cruise_button = GET_BYTE(to_push, 0) & 0x7U;
-      int main_button = GET_BIT(to_push, 3U);
+      bool main_button = GET_BIT(to_push, 3U);
       hyundai_common_cruise_buttons_check(cruise_button, main_button);
     }
 
@@ -248,28 +248,28 @@ static bool hyundai_tx_hook(const CANPacket_t *to_send) {
   int addr = GET_ADDR(to_send);
 
   // FCA11: Block any potential actuation
-  if (addr == 0x38D) {
+  /*if (addr == 0x38D) {
     int CR_VSM_DecCmd = GET_BYTE(to_send, 1);
-    int FCA_CmdAct = GET_BIT(to_send, 20U);
-    int CF_VSM_DecCmdAct = GET_BIT(to_send, 31U);
+    bool FCA_CmdAct = GET_BIT(to_send, 20U);
+    bool CF_VSM_DecCmdAct = GET_BIT(to_send, 31U);
 
-    if ((CR_VSM_DecCmd != 0) || (FCA_CmdAct != 0) || (CF_VSM_DecCmdAct != 0)) {
+    if ((CR_VSM_DecCmd != 0) || FCA_CmdAct || CF_VSM_DecCmdAct) {
       tx = false;
     }
-  }
+  }*/
 
   // ACCEL: safety check
   if (addr == 0x421) {
     int desired_accel_raw = (((GET_BYTE(to_send, 4) & 0x7U) << 8) | GET_BYTE(to_send, 3)) - 1023U;
     int desired_accel_val = ((GET_BYTE(to_send, 5) << 3) | (GET_BYTE(to_send, 4) >> 5)) - 1023U;
     //int aeb_decel_cmd = GET_BYTE(to_send, 2);
-    //int aeb_req = GET_BIT(to_send, 54U);
+    //bool aeb_req = GET_BIT(to_send, 54U);
     bool violation = false;
 
     violation |= longitudinal_accel_checks(desired_accel_raw, HYUNDAI_LONG_LIMITS);
     violation |= longitudinal_accel_checks(desired_accel_val, HYUNDAI_LONG_LIMITS);
     //violation |= (aeb_decel_cmd != 0);
-    //violation |= (aeb_req != 0);
+    //violation |= aeb_req;
 
     if (violation) {
       tx = false;
