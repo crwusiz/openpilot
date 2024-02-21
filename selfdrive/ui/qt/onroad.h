@@ -90,6 +90,7 @@ private:
   QPixmap gps_img, direction_img, tpms_img;
   QPixmap turnsignal_l_img, turnsignal_r_img;
   QPixmap traffic_go_img, traffic_stop_img, traffic_none_img;
+  QPixmap sign_go_img, sign_stop_img, sign_none_img;
   QPixmap lane_change_left_img, lane_change_right_img;
 
   // neokii add

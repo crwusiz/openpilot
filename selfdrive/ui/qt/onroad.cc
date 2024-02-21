@@ -315,6 +315,9 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   traffic_none_img = loadPixmap("../assets/img_traffic_none.png");
   traffic_go_img = loadPixmap("../assets/img_traffic_go.png");
   traffic_stop_img = loadPixmap("../assets/img_traffic_stop.png");
+  sign_none_img = loadPixmap("../assets/img_sign_none.png", {img_size, img_size});
+  sign_go_img = loadPixmap("../assets/img_sign_go.png", {img_size, img_size});
+  sign_stop_img = loadPixmap("../assets/img_sign_stop.png", {img_size, img_size});
 
   lane_change_left_img = loadPixmap("../assets/lane_change_left.png");
   lane_change_right_img = loadPixmap("../assets/lane_change_right.png");
@@ -644,7 +647,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     }
   }
 
-  // traffic icon (upper right 5)
+  /*// traffic icon (upper right 5)
   if (traffic_state >= 0) {
     w = 207;
     h = 135;
@@ -662,26 +665,29 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     } else {
       p.drawPixmap(x, y, w, h, traffic_none_img);
     }
+  }*/
+
+  // sign icon (upper right 3)
+  if (traffic_state >= 0) {
+    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
+    y = (btn_size / 2) + (UI_BORDER_SIZE * 4);
+    if (traffic_state == 1 && is_cruise_set) {
+      drawIcon(p, QPoint(x, y), sign_stop_img, icon_bg, 0.8);
+    } else if (traffic_state == 2 && is_cruise_set) {
+      drawIcon(p, QPoint(x, y), sign_go_img, icon_bg, 0.8);
+    } else {
+      drawIcon(p, QPoint(x, y), sign_none_img, icon_bg, 0.2);
+    }
   }
 
   // N direction icon (upper right 4)
-  if (nav_enabled) {
-    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
-    y = (btn_size / 2) + (UI_BORDER_SIZE * 20);
-  } else {
-    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 3.1);
-    y = (btn_size / 2) + (UI_BORDER_SIZE * 4);
-  }
+  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
+  y = (btn_size / 2) + (UI_BORDER_SIZE * 20);
   drawIconRotate(p, QPoint(x, y), direction_img, icon_bg, gps_state ? 0.8 : 0.2, gpsBearing);
 
   // gps icon (upper right 3)
-  if (nav_enabled) {
-    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 0.1);
-    y = (btn_size / 2) + (UI_BORDER_SIZE * 20);
-  } else {
-    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
-    y = (btn_size / 2) + (UI_BORDER_SIZE * 4);
-  }
+  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 0.1);
+  y = (btn_size / 2) + (UI_BORDER_SIZE * 20);
   drawIcon(p, QPoint(x, y), gps_img, icon_bg, gps_state ? 0.8 : 0.2);
 
   if (wifi_state == 1) {
