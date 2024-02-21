@@ -26,6 +26,7 @@ class Port:
 class NaviServer:
   def __init__(self):
     self.json_road_limit = None
+    self.json_traffic_signal = None
     self.active = 0
     self.last_updated = 0
     self.last_updated_active = 0
@@ -182,6 +183,10 @@ class NaviServer:
           if 'road_limit' in json_obj:
             self.json_road_limit = json_obj['road_limit']
             self.last_updated = time.monotonic()
+
+          if 'traffic_signal' in json_obj:
+            self.json_traffic_signal = json_obj['traffic_signal']
+
         finally:
           self.lock.release()
 
@@ -200,6 +205,7 @@ class NaviServer:
       try:
         self.lock.acquire()
         self.json_road_limit = None
+        self.json_traffic_signal = None
       finally:
         self.lock.release()
     if now - self.last_updated_active > 6.:
@@ -209,6 +215,8 @@ class NaviServer:
   def get_limit_val(self, key, default=None):
     return self.get_json_val(self.json_road_limit, key, default)
 
+  def get_ts_val(self, key, default=None):
+    return self.get_json_val(self.json_traffic_signal, key, default)
 
   def get_json_val(self, json, key, default=None):
     try:
@@ -230,24 +238,34 @@ def main():
       sock.bind(('0.0.0.0', Port.RECEIVE_PORT))
       sock.setblocking(False)
       while True:
-        server.udp_recv(sock)
-        dat = messaging.new_message('naviData', valid=True)
-        dat.naviData.active = server.active
-        dat.naviData.roadLimitSpeed = server.get_limit_val("road_limit_speed", 0)
-        dat.naviData.isHighway = server.get_limit_val("is_highway", False)
-        dat.naviData.camType = server.get_limit_val("cam_type", 0)
-        dat.naviData.camLimitSpeedLeftDist = server.get_limit_val("cam_limit_speed_left_dist", 0)
-        dat.naviData.camLimitSpeed = server.get_limit_val("cam_limit_speed", 0)
-        dat.naviData.sectionLimitSpeed = server.get_limit_val("section_limit_speed", 0)
-        dat.naviData.sectionLeftDist = server.get_limit_val("section_left_dist", 0)
-        dat.naviData.sectionAvgSpeed = server.get_limit_val("section_avg_speed", 0)
-        dat.naviData.sectionLeftTime = server.get_limit_val("section_left_time", 0)
-        dat.naviData.sectionAdjustSpeed = server.get_limit_val("section_adjust_speed", False)
-        dat.naviData.camSpeedFactor = server.get_limit_val("cam_speed_factor", CAMERA_SPEED_FACTOR)
-        dat.naviData.currentRoadName = server.get_limit_val("current_road_name", "")
-        dat.naviData.isNda2 = server.get_limit_val("is_nda2", False)
+        if server.udp_recv(sock):
+          dat = messaging.new_message('naviData', valid=True)
+          dat.naviData.active = server.active
+          dat.naviData.roadLimitSpeed = server.get_limit_val("road_limit_speed", 0)
+          dat.naviData.isHighway = server.get_limit_val("is_highway", False)
+          dat.naviData.camType = server.get_limit_val("cam_type", 0)
+          dat.naviData.camLimitSpeedLeftDist = server.get_limit_val("cam_limit_speed_left_dist", 0)
+          dat.naviData.camLimitSpeed = server.get_limit_val("cam_limit_speed", 0)
+          dat.naviData.sectionLimitSpeed = server.get_limit_val("section_limit_speed", 0)
+          dat.naviData.sectionLeftDist = server.get_limit_val("section_left_dist", 0)
+          dat.naviData.sectionAvgSpeed = server.get_limit_val("section_avg_speed", 0)
+          dat.naviData.sectionLeftTime = server.get_limit_val("section_left_time", 0)
+          dat.naviData.sectionAdjustSpeed = server.get_limit_val("section_adjust_speed", False)
+          dat.naviData.camSpeedFactor = server.get_limit_val("cam_speed_factor", CAMERA_SPEED_FACTOR)
+          dat.naviData.currentRoadName = server.get_limit_val("current_road_name", "")
+          dat.naviData.isNda2 = server.get_limit_val("is_nda2", False)
 
-        naviData.send(dat.to_bytes())
+          ts = {'isGreenLightOn': server.get_ts_val("isGreenLightOn", False),
+                'isLeftLightOn': server.get_ts_val("isLeftLightOn", False),
+                'isRedLightOn': server.get_ts_val("isRedLightOn", False),
+                'greenLightRemainTime': server.get_ts_val("greenLightRemainTime", 0),
+                'leftLightRemainTime': server.get_ts_val("leftLightRemainTime", 0),
+                'redLightRemainTime': server.get_ts_val("redLightRemainTime", 0),
+                'distance': server.get_ts_val("distance", 0)}
+          dat.naviData.ts = ts
+
+          naviData.send(dat.to_bytes())
+
         server.send_sdp(sock)
         server.check()
     except Exception as e:
