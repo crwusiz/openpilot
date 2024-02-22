@@ -117,6 +117,10 @@
         <translation>실행</translation>
     </message>
     <message>
+        <source>VIEW</source>
+        <translation>보기</translation>
+    </message>
+    <message>
         <source>Select your Manufacturer</source>
         <translation>제조사를 선택하세요</translation>
     </message>
@@ -181,16 +185,16 @@
         <translation>활성화된 경우 브레이크 페달을 누르면 openpilot이 해제됩니다.</translation>
     </message>
     <message>
-        <source>tmux error log</source>
-        <translation>tmux 에러 로그</translation>
+        <source>tmux log</source>
+        <translation>tmux 로그</translation>
     </message>
     <message>
-        <source>can missing error log</source>
-        <translation>can missing 에러 로그</translation>
+        <source>can missing log</source>
+        <translation>can missing 로그</translation>
     </message>
     <message>
-        <source>can timeout error log</source>
-        <translation>can timeout 에러 로그</translation>
+        <source>can timeout log</source>
+        <translation>can timeout 로그</translation>
     </message>
     <message>
         <source>Use external navi routes</source>
@@ -249,12 +253,12 @@
         <translation>레이더 트랙을 활성화 합니다 (차량의 AEB는 비활성화됩니다)</translation>
     </message>
     <message>
-        <source>tmux error log upload</source>
-        <translation>tmux 에러 로그 업로드</translation>
+        <source>tmux log upload</source>
+        <translation>tmux 로그 업로드</translation>
     </message>
     <message>
-        <source>tmux error log upload&lt;br&gt;&lt;br&gt;Process?</source>
-        <translation>tmux 에러 로그 업로드&lt;br&gt;&lt;br&gt;실행하시겠습니까?</translation>
+        <source>tmux log upload&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>tmux 로그 업로드&lt;br&gt;&lt;br&gt;실행하시겠습니까?</translation>
     </message>
     <message>
         <source>CANFD Car HDA2</source>

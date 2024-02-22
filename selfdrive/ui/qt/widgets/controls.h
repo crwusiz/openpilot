@@ -18,6 +18,7 @@
 #include "selfdrive/ui/qt/widgets/toggle.h"
 
 QFrame *horizontal_line(QWidget *parent = nullptr);
+QFrame *vertical_line(QWidget *parent = nullptr);
 
 class ElidedLabel : public QLabel {
   Q_OBJECT
@@ -106,6 +107,25 @@ class ButtonControl : public AbstractControl {
 
 public:
   ButtonControl(const QString &title, const QString &text, const QString &desc = "", QWidget *parent = nullptr);
+  inline void setText(const QString &text) { btn.setText(text); }
+  inline QString text() const { return btn.text(); }
+
+signals:
+  void clicked();
+
+public slots:
+  void setEnabled(bool enabled) { btn.setEnabled(enabled); }
+
+private:
+  QPushButton btn;
+};
+
+// ButtonControl2 (small button)
+class ButtonControl2 : public AbstractControl {
+  Q_OBJECT
+
+public:
+  ButtonControl2(const QString &title, const QString &text, const QString &desc = "", QWidget *parent = nullptr);
   inline void setText(const QString &text) { btn.setText(text); }
   inline QString text() const { return btn.text(); }
 
