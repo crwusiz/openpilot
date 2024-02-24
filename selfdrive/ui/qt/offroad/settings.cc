@@ -650,20 +650,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     ConfirmationDialog::rich(QString::fromStdString(txt), this);
   });
 
-  auto pandaflash_btn = new ButtonControl(tr("Panda Flash"), tr("RUN"));
-  QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Panda Flash<br><br>Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/panda/board/flash.py");
-    }
-  });
-
-  auto pandarecover_btn = new ButtonControl(tr("Panda Recover"), tr("RUN"));
-  QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("Panda Recover<br><br>Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/panda/board/recover.py");
-    }
-  });
-
   QHBoxLayout *buttonLayout = new QHBoxLayout;
   buttonLayout->addWidget(vertical_line());
   buttonLayout->addWidget(selectBranch_btn);
@@ -694,13 +680,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   buttonLayout3->addWidget(can_timeout_error_log_btn);
   buttonLayout3->addWidget(vertical_line());
 
-  QHBoxLayout *buttonLayout4 = new QHBoxLayout;
-  buttonLayout4->addWidget(vertical_line());
-  buttonLayout4->addWidget(pandaflash_btn);
-  buttonLayout4->addWidget(vertical_line());
-  buttonLayout4->addWidget(pandarecover_btn);
-  buttonLayout4->addWidget(vertical_line());
-
   communityLayout->addWidget(horizontal_line());
   communityLayout->addLayout(buttonLayout);
   communityLayout->addWidget(horizontal_line());
@@ -709,8 +688,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   communityLayout->addLayout(buttonLayout2);
   communityLayout->addWidget(horizontal_line());
   communityLayout->addLayout(buttonLayout3);
-  communityLayout->addWidget(horizontal_line());
-  communityLayout->addLayout(buttonLayout4);
   communityLayout->addWidget(horizontal_line());
 
   // add community toggle
@@ -778,6 +755,45 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
     communityLayout->addWidget(toggle);
   }
+
+  auto pandaflash_btn = new ButtonControl(tr("Panda Flash"), tr("RUN"));
+  QObject::connect(pandaflash_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Panda Flash<br><br>Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/panda/board/flash.py");
+    }
+  });
+
+  auto pandarecover_btn = new ButtonControl(tr("Panda Recover"), tr("RUN"));
+  QObject::connect(pandarecover_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Panda Recover<br><br>Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/panda/board/recover.py");
+    }
+  });
+
+  auto scons_rebuild_btn = new ButtonControl(tr("Scons Rebuild"), tr("RUN"));
+  QObject::connect(scons_rebuild_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Scons Rebuild<br><br>Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/scripts/scons_rebuild.sh");
+    }
+  });
+
+  QHBoxLayout *buttonLayout4 = new QHBoxLayout;
+  buttonLayout4->addWidget(vertical_line());
+  buttonLayout4->addWidget(pandaflash_btn);
+  buttonLayout4->addWidget(vertical_line());
+  buttonLayout4->addWidget(pandarecover_btn);
+  buttonLayout4->addWidget(vertical_line());
+
+  QHBoxLayout *buttonLayout5 = new QHBoxLayout;
+  buttonLayout5->addWidget(vertical_line());
+  buttonLayout5->addWidget(scons_rebuild_btn);
+  buttonLayout5->addWidget(vertical_line());
+
+  communityLayout->addWidget(horizontal_line());
+  communityLayout->addLayout(buttonLayout4);
+  communityLayout->addWidget(horizontal_line());
+  communityLayout->addLayout(buttonLayout5);
+  communityLayout->addWidget(horizontal_line());
 }
 
 SelectCar::SelectCar(QWidget* parent): QWidget(parent) {
