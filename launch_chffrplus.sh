@@ -114,11 +114,6 @@ function launch {
   # git last commit log
   git log -1 --pretty=format:"%h, %cs, %cr" > ${PARAMS_ROOT}/d/GitLog
 
-  if [ ! -f "${PARAMS_ROOT}/d/SelectedBranch" ]; then
-    git branch --show-current > ${PARAMS_ROOT}/d/SelectedBranch
-    #git status | grep "origin" | awk -F'/' '{print $2}' | sed -e 's/..$//' > ${PARAMS_ROOT}/d/SelectedBranch
-  fi
-
   # git remote branch list
   git branch -r | sed '1d' | sed -e 's/[/]//g' | sed -e 's/origin//g' | sort -r > ${PARAMS_ROOT}/crwusiz/GitBranchList
 
