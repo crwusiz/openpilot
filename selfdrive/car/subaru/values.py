@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from enum import Enum, IntFlag
-from typing import List
 
 from cereal import car
 from panda.python import uds
@@ -81,7 +80,7 @@ class Footnote(Enum):
 class SubaruCarInfo(CarInfo):
   package: str = "EyeSight Driver Assistance"
   car_parts: CarParts = field(default_factory=CarParts.common([CarHarness.subaru_a]))
-  footnotes: List[Enum] = field(default_factory=lambda: [Footnote.GLOBAL])
+  footnotes: list[Enum] = field(default_factory=lambda: [Footnote.GLOBAL])
 
   def init_make(self, CP: car.CarParams):
     self.car_parts.parts.extend([Tool.socket_8mm_deep, Tool.pry_tool])
@@ -140,7 +139,7 @@ class CAR(Platforms):
   FORESTER = SubaruPlatformConfig(
     "SUBARU FORESTER 2019",
     SubaruCarInfo("Subaru Forester 2019-21", "All"),
-    specs=CarSpecs(mass=1668, wheelbase=2.67, steerRatio=17),
+    specs=CarSpecs(mass=1568, wheelbase=2.67, steerRatio=17),
   )
   FORESTER_HYBRID = SubaruPlatformConfig(
     "SUBARU FORESTER HYBRID 2020",
