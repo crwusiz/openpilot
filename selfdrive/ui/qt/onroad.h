@@ -76,6 +76,7 @@ public:
 private:
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
   void drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color);
+  void drawTextColorLeft(QPainter &p, int x, int y, const QString &text, const QColor &color);
 
   QVBoxLayout *main_layout;
   ExperimentalButton *experimental_btn;
@@ -86,10 +87,9 @@ private:
   // crwusiz add
   QPixmap brake_img;
   QPixmap gap_img, gap1_img, gap2_img, gap3_img, gap4_img;
-  QPixmap wifi_img, wifi_l_img, wifi_m_img, wifi_h_img, wifi_f_img;
+  QPixmap wifi_img, wifi_l_img, wifi_m_img, wifi_h_img, wifi_f_img, wifi_ok_img;
   QPixmap gps_img, direction_img, tpms_img;
   QPixmap turnsignal_l_img, turnsignal_r_img;
-  QPixmap traffic_go_img, traffic_stop_img, traffic_none_img;
   QPixmap sign_go_img, sign_stop_img, sign_none_img;
   QPixmap lane_change_left_img, lane_change_right_img;
 
@@ -115,7 +115,6 @@ private:
   bool gas_pressed = false;
   bool isStandstill = false;
   bool rightHandDM = false;
-  bool nav_enabled = false;
 
   int status = STATUS_DISENGAGED;
   int autohold_state = 0;

@@ -18,6 +18,8 @@ if [ "${BRANCH_GONE}" != "" ]; then
   echo $BRANCH_GONE | xargs git branch -D
 fi
 
+#fetch = +refs/heads/*:refs/remotes/origin/*
+
 echo ""
 git reset --hard $REMOTE_HASH
 

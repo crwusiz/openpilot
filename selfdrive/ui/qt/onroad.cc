@@ -133,11 +133,22 @@ void OnroadWindow::offroadTransition(bool offroad) {
 
       QObject::connect(m, &MapPanel::mapPanelRequested, this, &OnroadWindow::mapPanelRequested);
       QObject::connect(nvg->map_settings_btn, &MapSettingsButton::clicked, m, &MapPanel::toggleMapSettings);
-      //nvg->map_settings_btn->setEnabled(true);
-      nvg->map_settings_btn->setEnabled(false);
+      nvg->map_settings_btn->setEnabled(true);
+      //nvg->map_settings_btn->setEnabled(false);
 
-      m->setFixedWidth(topWidget(this)->width() / 2 - UI_BORDER_SIZE);
+      //m->setFixedWidth(topWidget(this)->width() / 2 - UI_BORDER_SIZE);
+      //split->insertWidget(0, m);
+
+      // Adjusting widget's size policy to allow resizing
+      m->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+      // Inserting the widget at the right middle position
       split->insertWidget(0, m);
+
+      // Move the widget to the right middle position
+      int newX = (topWidget(this)->width() / 4) - (m->width() / 2); // Calculate new X position
+      int newY = (topWidget(this)->height() / 2) - (m->height() / 2); // Calculate new Y position
+      m->move(newX, newY);
 
       // hidden by default, made visible when navRoute is published
       m->setVisible(false);
@@ -304,6 +315,7 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   wifi_m_img = loadPixmap("../assets/offroad/icon_wifi_strength_medium.svg", {img_size, img_size});
   wifi_h_img = loadPixmap("../assets/offroad/icon_wifi_strength_high.svg", {img_size, img_size});
   wifi_f_img = loadPixmap("../assets/offroad/icon_wifi_strength_full.svg", {img_size, img_size});
+  wifi_ok_img = loadPixmap("../assets/img_wifi.png", {img_size, img_size});
   direction_img = loadPixmap("../assets/img_direction.png", {img_size, img_size});
   gap1_img = loadPixmap("../assets/img_gap1.png", {img_size, img_size});
   gap2_img = loadPixmap("../assets/img_gap2.png", {img_size, img_size});
@@ -312,9 +324,6 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   turnsignal_l_img = loadPixmap("../assets/img_turnsignal_l.png", {img_size, img_size});
   turnsignal_r_img = loadPixmap("../assets/img_turnsignal_r.png", {img_size, img_size});
   tpms_img = loadPixmap("../assets/img_tpms.png");
-  traffic_none_img = loadPixmap("../assets/img_traffic_none.png");
-  traffic_go_img = loadPixmap("../assets/img_traffic_go.png");
-  traffic_stop_img = loadPixmap("../assets/img_traffic_stop.png");
   sign_none_img = loadPixmap("../assets/img_sign_none.png", {img_size, img_size});
   sign_go_img = loadPixmap("../assets/img_sign_go.png", {img_size, img_size});
   sign_stop_img = loadPixmap("../assets/img_sign_stop.png", {img_size, img_size});
@@ -421,7 +430,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   latAccelFactorRaw = tp.getLatAccelFactorRaw();
   frictionRaw = tp.getFrictionCoefficientRaw();
   traffic_state = lo.getTrafficState();
-  nav_enabled = sm["modelV2"].getModelV2().getNavEnabled();
 
   // update engageability/experimental mode button
   experimental_btn->updateState(s);
@@ -647,26 +655,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     }
   }
 
-  /*// traffic icon (upper right 5)
-  if (traffic_state >= 0) {
-    w = 207;
-    h = 135;
-    if (nav_enabled) {
-      x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1);
-      y = (btn_size / 2) + (UI_BORDER_SIZE * 28);
-    } else {
-      x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 5);
-      y = (btn_size / 2) - (UI_BORDER_SIZE * 4);
-    }
-    if (traffic_state == 1) {
-      p.drawPixmap(x, y, w, h, traffic_stop_img);
-    } else if (traffic_state == 2) {
-      p.drawPixmap(x, y, w, h, traffic_go_img);
-    } else {
-      p.drawPixmap(x, y, w, h, traffic_none_img);
-    }
-  }*/
-
   // sign icon (upper right 3)
   if (traffic_state >= 0) {
     x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
@@ -719,11 +707,11 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     gpsAltitude, gpsAccuracy, gpsSatelliteCount
   );
 
-  x = rect().right() - (btn_size * 1.8);
-  y = (UI_BORDER_SIZE * 3);
+  x = rect().right() - (btn_size * 3.2);
+  y = (UI_BORDER_SIZE * 2);
 
   p.setFont(InterFont(30));
-  drawTextColor(p, x, y, infoGps, whiteColor(200));
+  drawTextColorLeft(p, x, y, infoGps, whiteColor(200));
 
   if (!hideBottomIcons) {
     // steer img (bottom 1 right)
@@ -798,7 +786,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   // bottom info
-
   QString infoText;
   infoText.sprintf("SCC[%d] SR[%.2f] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
     sccBus,
@@ -807,11 +794,11 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     latAccelFactorRaw, frictionRaw
   );
 
-  x = rect().left() + btn_size * 2;
-  y = rect().height() - 15;
+  x = rect().left() + 20;
+  y = rect().height() - 20;
 
   p.setFont(InterFont(30));
-  drawTextColor(p, x, y, infoText, whiteColor(200));
+  drawTextColorLeft(p, x, y, infoText, whiteColor(200));
 
   // turnsignal
   static int blink_index = 0;
@@ -889,6 +876,15 @@ void AnnotatedCameraWidget::drawTextColor(QPainter &p, int x, int y, const QStri
   real_rect.moveCenter({x, y - real_rect.height() / 2});
   p.setPen(color);
   p.drawText(real_rect.x(), real_rect.bottom(), text);
+}
+
+void AnnotatedCameraWidget::drawTextColorLeft(QPainter &p, int x, int y, const QString &text, const QColor &color) {
+    p.setOpacity(1.0);
+    QRect real_rect = p.fontMetrics().boundingRect(text);
+    real_rect.moveLeft(x);
+    real_rect.moveTop(y - real_rect.height() / 2);
+    p.setPen(color);
+    p.drawText(real_rect, text);
 }
 
 void AnnotatedCameraWidget::initializeGL() {
