@@ -2,7 +2,7 @@
 import importlib
 import math
 from collections import deque
-from typing import Optional, Dict, Any
+from typing import Any, Optional
 
 import capnp
 from cereal import messaging, log, car
@@ -161,7 +161,7 @@ def laplacian_pdf(x: float, mu: float, b: float):
   return math.exp(-abs(x-mu)/b)
 
 
-def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks: Dict[int, Track]):
+def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks: dict[int, Track]):
   offset_vision_dist = lead.x[0] - RADAR_TO_CAMERA
 
   def prob(c):
@@ -205,10 +205,8 @@ def get_RadarState_from_vision(lead_msg: capnp._DynamicStructReader, v_ego: floa
   }
 
 
-def get_lead(v_ego: float, ready: bool, tracks: Dict[int, Track], lead_msg: capnp._DynamicStructReader,
-             model_v_ego: float, low_speed_override: bool = True) -> Dict[str, Any]:
-  track_scc = tracks.get(0)
-
+def get_lead(v_ego: float, ready: bool, tracks: dict[int, Track], lead_msg: capnp._DynamicStructReader,
+             model_v_ego: float, low_speed_override: bool = True) -> dict[str, Any]:
   # Determine leads, this is where the essential logic happens
   if len(tracks) > 0 and ready and lead_msg.prob > .5:
     track = match_vision_to_track(v_ego, lead_msg, tracks)
@@ -218,6 +216,8 @@ def get_lead(v_ego: float, ready: bool, tracks: Dict[int, Track], lead_msg: capn
   ## vision match후 발견된 track이 없으면
   ##  track_scc 가 있는 지 확인하고
   ##    비전과의 차이가 35%(5M)이상 차이나면 scc가 발견못한것이기 때문에 비전것으로 처리함.
+  track_scc = tracks.get(0)
+
   if track_scc is not None and track is None:
     track = track_scc
     if lead_msg.prob > .5:
@@ -249,14 +249,14 @@ class RadarD:
   def __init__(self, radar_ts: float, delay: int = 0):
     self.current_time = 0.0
 
-    self.tracks: Dict[int, Track] = {}
+    self.tracks: dict[int, Track] = {}
     self.kalman_params = KalmanParams(radar_ts)
 
     self.v_ego = 0.0
     self.v_ego_hist = deque([0.0], maxlen=delay+1)
     self.last_v_ego_frame = -1
 
-    self.radar_state: Optional[capnp._DynamicStructBuilder] = None
+    self.radar_state: capnp._DynamicStructBuilder | None = None
     self.radar_state_valid = False
 
     self.ready = False
