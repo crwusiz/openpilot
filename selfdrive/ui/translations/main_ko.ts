@@ -276,6 +276,14 @@
         <source>Displays the driver camera when in reverse.</source>
         <translation>후진시 운전자 감시 카메라를 보여줍니다</translation>
     </message>
+    <message>
+        <source>Scons Rebuild</source>
+        <translation>Scons 재빌드</translation>
+    </message>
+    <message>
+        <source>Scons Rebuild&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>Scons 재빌드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
+    </message>
 </context>
 <context>
     <name>ConfirmationDialog</name>
@@ -471,6 +479,29 @@
     <message>
         <source>Process</source>
         <translation>실행</translation>
+    </message>
+</context>
+<context>
+    <name>DriveStats</name>
+    <message>
+        <source>Drives</source>
+        <translation>주행수</translation>
+    </message>
+    <message>
+        <source>Hours</source>
+        <translation>시간</translation>
+    </message>
+    <message>
+        <source>ALL TIME</source>
+        <translation>전체 시간</translation>
+    </message>
+    <message>
+        <source>KM</source>
+        <translation>KM</translation>
+    </message>
+    <message>
+        <source>Miles</source>
+        <translation>Miles</translation>
     </message>
 </context>
 <context>
