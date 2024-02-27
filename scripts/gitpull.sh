@@ -18,7 +18,15 @@ if [ "${BRANCH_GONE}" != "" ]; then
   echo $BRANCH_GONE | xargs git branch -D
 fi
 
-#fetch = +refs/heads/*:refs/remotes/origin/*
+#git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+#sed -i 's/fetch = .*/fetch = +refs\/heads\/*:refs\/remotes\/origin\/*/' .git/config
+
+DESIRED_FETCH="+refs/heads/*:refs/remotes/origin/*"
+CURRENT_FETCH=$(git config --get remote.origin.fetch)
+
+if [ "$CURRENT_FETCH" != "$DESIRED_FETCH" ]; then
+    sed -i "s@$CURRENT_FETCH@${DESIRED_FETCH//\//\\\/}@" .git/config
+fi
 
 echo ""
 git reset --hard $REMOTE_HASH

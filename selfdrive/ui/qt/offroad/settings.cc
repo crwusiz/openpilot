@@ -236,14 +236,14 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   });
   addItem(retrainingBtn);
 
-  /*if (Hardware::TICI()) {
+  if (Hardware::TICI()) {
     auto regulatoryBtn = new ButtonControl(tr("Regulatory"), tr("VIEW"), "");
     connect(regulatoryBtn, &ButtonControl::clicked, [=]() {
       const std::string txt = util::read_file("../assets/offroad/fcc.html");
       ConfirmationDialog::rich(QString::fromStdString(txt), this);
     });
     addItem(regulatoryBtn);
-  }*/
+  }
 
   auto translateBtn = new ButtonControl(tr("Change Language"), tr("CHANGE"), "");
   connect(translateBtn, &ButtonControl::clicked, [=]() {
@@ -257,44 +257,17 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     }
   });
   addItem(translateBtn);
+  addItem(new QWidget());
+  addItem(horizontal_line());
+  addItem(new QWidget());
 
   QObject::connect(uiState(), &UIState::offroadTransition, [=](bool offroad) {
     for (auto btn : findChildren<ButtonControl *>()) {
       btn->setEnabled(offroad);
     }
+    resetCalibBtn->setEnabled(true);
+    translateBtn->setEnabled(true);
   });
-
-  QHBoxLayout *reset_layout = new QHBoxLayout();
-  reset_layout->setSpacing(30);
-
-  // reset calibration button
-  QPushButton *reset_calib_btn = new QPushButton("Reset Calibration, LiveParameters");
-  reset_calib_btn->setObjectName("reset_calib_btn");
-  reset_layout->addWidget(reset_calib_btn);
-  QObject::connect(reset_calib_btn, &QPushButton::released, [=]() {
-    if (ConfirmationDialog::confirm(tr("Are you sure you want to reset calibration and live params?"), tr("Process"), this)) {
-      Params().remove("CalibrationParams");
-      Params().remove("LiveParameters");
-      emit closeSettings();
-      QTimer::singleShot(1000, []() {
-        Params().putBool("SoftRestartTriggered", true);
-      });
-    }
-  });
-
-  reset_calib_btn->setStyleSheet(R"(
-    QPushButton {
-      height: 120px;
-      border-radius: 15px;
-      color: #000000;
-      background-color: #FFCCFF;
-    }
-    QPushButton:pressed {
-      background-color: #FFC2FF;
-    }
-  )");
-
-  addItem(reset_layout);
 
   // power buttons
   QHBoxLayout *power_layout = new QHBoxLayout();
@@ -303,6 +276,7 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   // softreset button
   QPushButton *restart_btn = new QPushButton(tr("Soft Restart"));
   restart_btn->setObjectName("restart_btn");
+  power_layout->addWidget(vertical_line());
   power_layout->addWidget(restart_btn);
   QObject::connect(restart_btn, &QPushButton::released, [=]() {
     emit closeSettings();
@@ -313,12 +287,15 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
 
   QPushButton *reboot_btn = new QPushButton(tr("Reboot"));
   reboot_btn->setObjectName("reboot_btn");
+  power_layout->addWidget(vertical_line());
   power_layout->addWidget(reboot_btn);
   QObject::connect(reboot_btn, &QPushButton::clicked, this, &DevicePanel::reboot);
 
   QPushButton *poweroff_btn = new QPushButton(tr("Power Off"));
   poweroff_btn->setObjectName("poweroff_btn");
+  power_layout->addWidget(vertical_line());
   power_layout->addWidget(poweroff_btn);
+  power_layout->addWidget(vertical_line());
   QObject::connect(poweroff_btn, &QPushButton::clicked, this, &DevicePanel::poweroff);
 
   if (!Hardware::PC()) {
@@ -334,6 +311,8 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     #poweroff_btn:pressed { background-color: #FF2424; }
   )");
   addItem(power_layout);
+  addItem(new QWidget());
+  addItem(horizontal_line());
 }
 
 void DevicePanel::updateCalibDescription() {

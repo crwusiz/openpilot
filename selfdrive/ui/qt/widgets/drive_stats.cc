@@ -23,31 +23,30 @@ DriveStats::DriveStats(QWidget* parent) : QFrame(parent) {
 
   auto add_stats_layouts = [=](const QString &title, StatsLabels& labels) {
     QGridLayout* grid_layout = new QGridLayout;
-    grid_layout->setVerticalSpacing(10);
+    grid_layout->setVerticalSpacing(20);
     grid_layout->setContentsMargins(0, 10, 0, 10);
 
-    int row = 0;
-    grid_layout->addWidget(new QLabel("〔  누적 주행기록  〕 \U00002728"), 0, 0, 1, 3, Qt::AlignCenter);
-    grid_layout->addItem(new QSpacerItem(0, 50), row++, 0, 1, 1);
-    grid_layout->addWidget(new QLabel("────────────────────────────────"), row, 0, 1, 3, Qt::AlignCenter);
+    grid_layout->addWidget(newLabel(tr("Drive Stats"), "title"), 0, 0, 1, 3, Qt::AlignCenter);
+    grid_layout->addWidget(new QLabel("────────────────────────────────"), 3, 0, 1, 3, Qt::AlignCenter);
 
-    grid_layout->addWidget(labels.routes = newLabel("0", "number"), row + 1, 0, Qt::AlignCenter);
-    grid_layout->addWidget(labels.hours = newLabel("0", "number"), row + 1, 1, Qt::AlignCenter);
-    grid_layout->addWidget(labels.distance = newLabel("0", "number"), row + 1, 2, Qt::AlignCenter);
+    grid_layout->addWidget(labels.routes = newLabel("0", "number"), 4, 0, Qt::AlignCenter);
+    grid_layout->addWidget(labels.hours = newLabel("0", "number"), 4, 1, Qt::AlignCenter);
+    grid_layout->addWidget(labels.distance = newLabel("0", "number"), 4, 2, Qt::AlignCenter);
 
-    grid_layout->addWidget(newLabel(tr("Drives"), "unit"), row + 2, 0, Qt::AlignCenter);
-    grid_layout->addWidget(newLabel(tr("Hours"), "unit"), row + 2, 1, Qt::AlignCenter);
-    grid_layout->addWidget(labels.distance_unit = newLabel(getDistanceUnit(), "unit"), row + 2, 2, Qt::AlignCenter);
+    grid_layout->addWidget(newLabel(tr("Drives"), "unit"), 6, 0, Qt::AlignCenter);
+    grid_layout->addWidget(newLabel(tr("Hours"), "unit"), 6, 1, Qt::AlignCenter);
+    grid_layout->addWidget(labels.distance_unit = newLabel(getDistanceUnit(), "unit"), 6, 2, Qt::AlignCenter);
+
     grid_layout->addWidget(new QLabel("────────────────────────────────"), 8, 0, 1, 3, Qt::AlignCenter);
 
     grid_layout->addWidget(new QLabel("━ crwusiz branch ━"), 9, 0, 1, 3, Qt::AlignCenter);
+
     grid_layout->addWidget(new QLabel("「 Easy Driving \U0001f60b 」"), 11, 0, 1, 3, Qt::AlignCenter);
     main_layout->addLayout(grid_layout);
   };
 
   add_stats_layouts(tr("ALL TIME"), all_);
   main_layout->addStretch();
-  //add_stats_layouts(tr("PAST WEEK"), week_);
 
   if (auto dongleId = getDongleId()) {
     QString url = CommaApi::BASE_URL + "/v1.1/devices/" + *dongleId + "/stats";
