@@ -24,7 +24,7 @@ void Sidebar::drawMetric(QPainter &p, const QPair<QString, QString> &label, QCol
   p.drawText(rect.adjusted(22, 0, 0, 0), Qt::AlignCenter, label.first + "\n" + label.second);
 }
 
-Sidebar::Sidebar(QWidget *parent) : QFrame(parent), onroad(false), flag_pressed(false), settings_pressed(false) {
+Sidebar::Sidebar(QWidget *parent) : QFrame(parent), onroad(false), flag_pressed(false), settings_pressed(false), scene(uiState()->scene) {
   home_img = loadPixmap("../assets/images/button_home.png", home_btn.size());
   flag_img = loadPixmap("../assets/images/button_flag.png", home_btn.size());
   settings_img = loadPixmap("../assets/images/button_settings.png", settings_btn.size(), Qt::IgnoreAspectRatio);
@@ -78,7 +78,6 @@ void Sidebar::updateState(const UIState &s) {
   setProperty("netType", network_type[deviceState.getNetworkType()]);
   int strength = (int)deviceState.getNetworkStrength();
   setProperty("netStrength", strength > 0 ? strength + 1 : 0);
-  setProperty("wifiAddr", deviceState.getWifiIpAddress().cStr());
 
   ItemStatus connectStatus;
   auto last_ping = deviceState.getLastAthenaPingTime();
@@ -137,7 +136,7 @@ void Sidebar::paintEvent(QPaintEvent *event) {
   const QRect r2 = QRect(0, 267, event->rect().width(), 50);
 
   if (net_type == network_type[cereal::DeviceState::NetworkType::WIFI])
-    p.drawText(r2, Qt::AlignCenter, wifi_addr);
+    p.drawText(r2, Qt::AlignCenter, uiState()->wifi->getIp4Address());
   else
     p.drawText(r2, Qt::AlignCenter, net_type);
 

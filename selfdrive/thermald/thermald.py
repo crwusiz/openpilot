@@ -35,7 +35,7 @@ PANDA_STATES_TIMEOUT = round(1000 / SERVICE_LIST['pandaStates'].frequency * 1.5)
 
 ThermalBand = namedtuple("ThermalBand", ['min_temp', 'max_temp'])
 HardwareState = namedtuple("HardwareState", ['network_type', 'network_info', 'network_strength', 'network_stats',
-                                             'network_metered', 'nvme_temps', 'modem_temps', 'wifi_address'])
+                                             'network_metered', 'nvme_temps', 'modem_temps'])
 
 # List of thermal bands. We will stay within this region as long as we are within the bounds.
 # When exiting the bounds, we'll jump to the lower or higher band. Bands are ordered in the dict.
@@ -141,7 +141,6 @@ def hw_state_thread(end_event, hw_queue):
           network_metered=HARDWARE.get_network_metered(network_type),
           nvme_temps=HARDWARE.get_nvme_temperatures(),
           modem_temps=modem_temps,
-          wifi_address=HARDWARE.get_ip_address(),
         )
 
         try:
@@ -189,7 +188,6 @@ def thermald_thread(end_event, hw_queue) -> None:
     network_stats={'wwanTx': -1, 'wwanRx': -1},
     nvme_temps=[],
     modem_temps=[],
-    wifi_address='────────',
   )
 
   all_temp_filter = FirstOrderFilter(0., TEMP_TAU, DT_TRML, initialized=False)
@@ -271,7 +269,6 @@ def thermald_thread(end_event, hw_queue) -> None:
 
     msg.deviceState.nvmeTempC = last_hw_state.nvme_temps
     msg.deviceState.modemTempC = last_hw_state.modem_temps
-    msg.deviceState.wifiIpAddress = last_hw_state.wifi_address
 
     msg.deviceState.screenBrightnessPercent = HARDWARE.get_screen_brightness()
 
