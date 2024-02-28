@@ -257,9 +257,6 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     }
   });
   addItem(translateBtn);
-  addItem(new QWidget());
-  addItem(horizontal_line());
-  addItem(new QWidget());
 
   QObject::connect(uiState(), &UIState::offroadTransition, [=](bool offroad) {
     for (auto btn : findChildren<ButtonControl *>()) {
@@ -276,7 +273,6 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   // softreset button
   QPushButton *restart_btn = new QPushButton(tr("Soft Restart"));
   restart_btn->setObjectName("restart_btn");
-  power_layout->addWidget(vertical_line());
   power_layout->addWidget(restart_btn);
   QObject::connect(restart_btn, &QPushButton::released, [=]() {
     emit closeSettings();
@@ -287,15 +283,12 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
 
   QPushButton *reboot_btn = new QPushButton(tr("Reboot"));
   reboot_btn->setObjectName("reboot_btn");
-  power_layout->addWidget(vertical_line());
   power_layout->addWidget(reboot_btn);
   QObject::connect(reboot_btn, &QPushButton::clicked, this, &DevicePanel::reboot);
 
   QPushButton *poweroff_btn = new QPushButton(tr("Power Off"));
   poweroff_btn->setObjectName("poweroff_btn");
-  power_layout->addWidget(vertical_line());
   power_layout->addWidget(poweroff_btn);
-  power_layout->addWidget(vertical_line());
   QObject::connect(poweroff_btn, &QPushButton::clicked, this, &DevicePanel::poweroff);
 
   if (!Hardware::PC()) {
@@ -311,8 +304,6 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
     #poweroff_btn:pressed { background-color: #FF2424; }
   )");
   addItem(power_layout);
-  addItem(new QWidget());
-  addItem(horizontal_line());
 }
 
 void DevicePanel::updateCalibDescription() {

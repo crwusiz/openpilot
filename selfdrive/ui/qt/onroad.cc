@@ -133,22 +133,10 @@ void OnroadWindow::offroadTransition(bool offroad) {
 
       QObject::connect(m, &MapPanel::mapPanelRequested, this, &OnroadWindow::mapPanelRequested);
       QObject::connect(nvg->map_settings_btn, &MapSettingsButton::clicked, m, &MapPanel::toggleMapSettings);
-      nvg->map_settings_btn->setEnabled(true);
-      //nvg->map_settings_btn->setEnabled(false);
+      nvg->map_settings_btn->setEnabled(false);
 
-      //m->setFixedWidth(topWidget(this)->width() / 2 - UI_BORDER_SIZE);
-      //split->insertWidget(0, m);
-
-      // Adjusting widget's size policy to allow resizing
-      m->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-
-      // Inserting the widget at the right middle position
+      m->setFixedWidth(topWidget(this)->width() / 2 - UI_BORDER_SIZE);
       split->insertWidget(0, m);
-
-      // Move the widget to the right middle position
-      int newX = (topWidget(this)->width() / 4) - (m->width() / 2); // Calculate new X position
-      int newY = (topWidget(this)->height() / 2) - (m->height() / 2); // Calculate new Y position
-      m->move(newX, newY);
 
       // hidden by default, made visible when navRoute is published
       m->setVisible(false);
