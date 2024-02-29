@@ -677,11 +677,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   tr("Navigation Features use"),
                                   "../assets/offroad/icon_map.png",
                                   this));
-  toggles.append(new ParamControl("UseExternalNaviRoutes",
-                                  tr("Use external navi routes"),
-                                  tr("Use external navi routes"),
-                                  "../assets/offroad/icon_map.png",
-                                  this));
   toggles.append(new ParamControl("NavLimitSpeed",
                                   tr("Navigation Limit Speed"),
                                   tr("Use Stock Navigation Limit Speed Signal"),

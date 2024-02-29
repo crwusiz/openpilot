@@ -392,7 +392,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   gpsBearing = ge.getBearingDeg();
   gpsVerticalAccuracy = ge.getVerticalAccuracy();
   gpsAltitude = ge.getAltitude();
-  gpsAccuracy = ge.getAccuracy();
+  gpsAccuracy = ge.getHorizontalAccuracy();
   gpsSatelliteCount = s.scene.satelliteCount;
   steerAngle = ce.getSteeringAngleDeg();
   longControl = cp.getOpenpilotLongitudinalControl();
@@ -695,7 +695,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     gpsAltitude, gpsAccuracy, gpsSatelliteCount
   );
 
-  x = rect().right() - (btn_size * 3.2);
+  x = rect().right() - (btn_size * 3.3);
   y = (UI_BORDER_SIZE * 2);
 
   p.setFont(InterFont(30));

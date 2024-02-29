@@ -270,8 +270,8 @@ struct GpsLocationData {
   # Represents heading in degrees.
   bearingDeg @5 :Float32;
 
-  # Represents expected accuracy in meters. (presumably 1 sigma?)
-  accuracy @6 :Float32;
+  # Represents expected horizontal accuracy in meters.
+  horizontalAccuracy @6 :Float32;
 
   unixTimestampMillis @7 :Int64;
 
@@ -368,8 +368,6 @@ struct DeviceState @0xa4d8b5af2aa492eb {
 
   fanSpeedPercentDesired @10 :UInt16;
   screenBrightnessPercent @37 :Int8;
-
-  wifiIpAddress @45 :Text;
 
   struct ThermalZone {
     name @0 :Text;
@@ -2155,7 +2153,6 @@ struct NavInstruction {
   speedLimitSign @11 :SpeedLimitSign;
 
   allManeuvers @12 :List(Maneuver);
-  imageUrl @13 :Text;
 
   struct Lane {
     directions @0 :List(Direction);

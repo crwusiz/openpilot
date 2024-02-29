@@ -229,7 +229,6 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"IsHda2", PERSISTENT},
     {"NavLimitSpeed", PERSISTENT},
     {"GitLog", PERSISTENT},
-    {"UseExternalNaviRoutes", PERSISTENT},
     {"DriverCameraHardwareMissing", PERSISTENT},
     {"DriverCameraOnReverse", PERSISTENT},
 };
