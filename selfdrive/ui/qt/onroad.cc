@@ -691,11 +691,11 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     gpsAccuracy = 0;
 
   QString infoGps;
-  infoGps.sprintf("GPS [ Alt(%.1f) Acc(%.1f) Sat(%d) ]",
+  infoGps.sprintf("GPS [ Alt(%.1f)m Acc(%.1f)m Sat(%d) ]",
     gpsAltitude, gpsAccuracy, gpsSatelliteCount
   );
 
-  x = rect().right() - (btn_size * 3.3);
+  x = rect().right() - (btn_size * 3.5);
   y = (UI_BORDER_SIZE * 2);
 
   p.setFont(InterFont(30));
@@ -773,7 +773,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     }
   }
 
-  // bottom info
+  // bottom left info
   QString infoText;
   infoText.sprintf("SCC[%d] SR[%.2f] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
     sccBus,
@@ -787,6 +787,20 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   p.setFont(InterFont(30));
   drawTextColorLeft(p, x, y, infoText, whiteColor(200));
+
+/*
+  // bottom right info
+  QString infoWifi;
+  infoWifi.sprintf("IP[%d]",
+    ip
+  );
+
+  x = rect().right() - (btn_size * 3.3);
+  y = rect().height() - 20;
+
+  p.setFont(InterFont(30));
+  drawTextColorLeft(p, x, y, infoWifi, whiteColor(200));
+*/
 
   // turnsignal
   static int blink_index = 0;
