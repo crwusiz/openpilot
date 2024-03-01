@@ -1,11 +1,10 @@
 import crcmod
-from openpilot.selfdrive.car.hyundai.values import CAR, CHECKSUM, HyundaiFlags
-from openpilot.common.params import Params
+from openpilot.selfdrive.car.hyundai.values import CAR, HyundaiFlags
 
 hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 
 
-def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque_fault, sys_warning, sys_state, enabled,
+def create_lkas11(packer, frame, CP, apply_steer, steer_req, torque_fault, sys_warning, sys_state, enabled,
                   left_lane, right_lane, left_lane_depart, right_lane_depart, send_lfa, lkas11):
   values = {s: lkas11[s] for s in [
     "CF_Lkas_LdwsActivemode",
@@ -34,7 +33,7 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
   values["CF_Lkas_MsgCount"] = frame % 0x10
   values["CF_Lkas_Chksum"] = 0
 
-  if car_fingerprint == CAR.GENESIS:
+  if CP.carFingerprint == CAR.GENESIS:
     values["CF_Lkas_LdwsActivemode"] = 2
     values["CF_Lkas_SysWarning"] = lkas11["CF_Lkas_SysWarning"]
   elif send_lfa:
@@ -48,10 +47,10 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req, torque
     values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
 
   dat = packer.make_can_msg("LKAS11", 0, values)[2]
-  if car_fingerprint in CHECKSUM["crc8"]:
+  if CP.flags & HyundaiFlags.CHECKSUM_CRC8:
     # CRC Checksum
     checksum = hyundai_checksum(dat[:6] + dat[7:8])
-  elif car_fingerprint in CHECKSUM["6B"]:
+  elif CP.flags & HyundaiFlags.CHECKSUM_6B:
     # Checksum of first 6 Bytes
     checksum = sum(dat[:6]) % 256
   else:
@@ -79,7 +78,6 @@ def create_clu11(packer, frame, button, bus, clu11):
   ]}
   values["CF_Clu_CruiseSwState"] = button
   values["CF_Clu_AliveCnt1"] = frame % 0x10
-  # send buttons to camera on camera-scc based cars
   return packer.make_can_msg("CLU11", bus, values)
 
 

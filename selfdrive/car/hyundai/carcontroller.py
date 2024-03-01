@@ -152,7 +152,7 @@ class CarController(CarControllerBase):
       send_lfa = self.CP.flags & HyundaiFlags.SEND_LFA.value
       use_fca = self.CP.flags & HyundaiFlags.USE_FCA.value
 
-      can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP.carFingerprint, apply_steer, apply_steer_req, torque_fault, sys_warning, sys_state, CC.enabled,
+      can_sends.append(hyundaican.create_lkas11(self.packer, self.frame, self.CP, apply_steer, apply_steer_req, torque_fault, sys_warning, sys_state, CC.enabled,
                                                 hud_control.leftLaneVisible, hud_control.rightLaneVisible, left_lane_warning, right_lane_warning,
                                                 send_lfa, CS.lkas11))
 

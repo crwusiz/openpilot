@@ -144,7 +144,7 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 11.94
 
     # kia
-    elif candidate == CAR.FORTE:
+    elif candidate == CAR.K3:
       ret.mass = 1345.
       ret.wheelbase = 2.70
       ret.steerRatio = 13.7
@@ -239,7 +239,7 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 2185.
       ret.wheelbase = 3.16
       ret.steerRatio = 12.0
-    elif candidate == CAR.GENESIS_GV60_EV:
+    elif candidate == CAR.GENESIS_GV60:
       ret.mass = 2205
       ret.wheelbase = 2.9
       ret.steerRatio = 12.6

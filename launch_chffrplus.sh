@@ -81,19 +81,16 @@ function launch {
   # write tmux scrollback to a file
   tmux capture-pane -pq -S-1000 > /tmp/launch_log
 
-  # CarList
-  # sed '$a-------------------' ( add last line )
-
   PARAMS_ROOT="/data/params"
 
   if [ ! -d "${PARAMS_ROOT}/crwusiz" ] ; then
     mkdir ${PARAMS_ROOT}/crwusiz
   fi
 
-  cat $BASEDIR/selfdrive/car/hyundai/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > ${PARAMS_ROOT}/crwusiz/CarList_HYUNDAI
-  awk '/HYUNDAI/' ${PARAMS_ROOT}/crwusiz/CarList_HYUNDAI > ${PARAMS_ROOT}/crwusiz/CarList_Hyundai
-  awk '/KIA/' ${PARAMS_ROOT}/crwusiz/CarList_HYUNDAI > ${PARAMS_ROOT}/crwusiz/CarList_Kia
-  awk '/GENESIS/' ${PARAMS_ROOT}/crwusiz/CarList_HYUNDAI > ${PARAMS_ROOT}/crwusiz/CarList_Genesis
+  VALUE_PATH="$BASEDIR/selfdrive/car/hyundai/values.py"
+  grep -A 1 -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_PATH" | grep -B 1 "HYUNDAI" | grep -Eo '^\s*\w+\s*=' | sed 's/\s*=.*//' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Hyundai
+  grep -A 1 -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_PATH" | grep -B 1 "KIA" | grep -Eo '^\s*\w+\s*=' | sed 's/\s*=.*//' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Kia
+  grep -A 1 -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_PATH" | grep -B 1 "GENESIS" | grep -Eo '^\s*\w+\s*=' | sed 's/\s*=.*//' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Genesis
 
   MANUFACTURER=$(cat ${PARAMS_ROOT}/d/SelectedManufacturer)
   if [ "${MANUFACTURER}" = "HYUNDAI" ]; then
@@ -103,22 +100,16 @@ function launch {
   elif [ "${MANUFACTURER}" = "GENESIS" ]; then
     cp -f ${PARAMS_ROOT}/crwusiz/CarList_Genesis ${PARAMS_ROOT}/crwusiz/CarList
   else
-    cp -f ${PARAMS_ROOT}/crwusiz/CarList_HYUNDAI ${PARAMS_ROOT}/crwusiz/CarList
+    pushd ${PARAMS_ROOT}/crwusiz
+    cat CarList_Hyundai CarList_Kia CarList_Genesis > CarList
+    popd
   fi
-  #cat $BASEDIR/selfdrive/car/gm/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > ${PARAMS_ROOT}/crwusiz/CarList_Gm
-  #cat $BASEDIR/selfdrive/car/toyota/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > ${PARAMS_ROOT}/crwusiz/CarList_TOYOTA
-  #awk '/TOYOTA/' ${PARAMS_ROOT}/crwusiz/CarList_TOYOTA > ${PARAMS_ROOT}/crwusiz/CarList_Toyota
-  #awk '/LEXUS/' ${PARAMS_ROOT}/crwusiz/CarList_TOYOTA > ${PARAMS_ROOT}/crwusiz/CarList_Lexus
-  #cat $BASEDIR/selfdrive/car/honda/values.py | grep ' = "' | awk -F'"' '{print $2}' | sed '$d' > ${PARAMS_ROOT}/crwusiz/CarList_Honda
 
   # git last commit log
   git log -1 --pretty=format:"%h, %cs, %cr" > ${PARAMS_ROOT}/d/GitLog
 
   # git remote branch list
   git branch -r | sed '1d' | sed -e 's/[/]//g' | sed -e 's/origin//g' | sort -r > ${PARAMS_ROOT}/crwusiz/GitBranchList
-
-  # git remote
-  #sed 's/.\{4\}$//' ${PARAMS_ROOT}/d/GitRemote > ${PARAMS_ROOT}/crwusiz/GitRemote_
 
   # events language init
   LANG=$(cat ${PARAMS_ROOT}/d/LanguageSetting)
