@@ -194,6 +194,7 @@ class NaviServer:
       try:
         self.lock.acquire()
         self.json_road_limit = None
+        self.json_traffic_signal = None
       finally:
         self.lock.release()
     return ret

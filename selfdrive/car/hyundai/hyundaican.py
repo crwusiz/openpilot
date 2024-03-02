@@ -31,7 +31,7 @@ def create_lkas11(packer, frame, CP, apply_steer, steer_req, torque_fault, sys_w
   values["CF_Lkas_ActToi"] = steer_req
   values["CF_Lkas_ToiFlt"] = torque_fault  # seems to allow actuation on CR_Lkas_StrToqReq
   values["CF_Lkas_MsgCount"] = frame % 0x10
-  values["CF_Lkas_Chksum"] = 0
+  #values["CF_Lkas_Chksum"] = 0
 
   if CP.carFingerprint == CAR.GENESIS:
     values["CF_Lkas_LdwsActivemode"] = 2
@@ -44,7 +44,9 @@ def create_lkas11(packer, frame, CP, apply_steer, steer_req, torque_fault, sys_w
   else:
     values["CF_Lkas_LdwsActivemode"] = 0
     values["CF_Lkas_LdwsOpt_USM"] = 3
-    values["CF_Lkas_FcwOpt_USM"] = 2 if enabled else 1
+    values["CF_Lkas_FcwOpt_USM"] = 0
+    values["CF_Lkas_SysWarning"] = 4 if sys_warning else 0
+    values["CF_Lkas_LdwsSysState"] = 3 if enabled else 1
 
   dat = packer.make_can_msg("LKAS11", 0, values)[2]
   if CP.flags & HyundaiFlags.CHECKSUM_CRC8:

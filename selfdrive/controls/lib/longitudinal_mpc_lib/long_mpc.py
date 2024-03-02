@@ -429,7 +429,7 @@ class LongitudinalMpc:
       self.source = SOURCES[np.argmin(x_obstacles[0])]
 
       # These are not used in ACC mode
-      #x[:], v[:], a[:], j[:] = 0.0, 0.0, 0.0, 0.0
+      x[:], v[:], a[:], j[:] = 0.0, 0.0, 0.0, 0.0
 
       cruise_target = T_IDXS * np.clip(v_cruise, v_ego - 2.0, 1e3) + x[0]
       xforward = ((v[1:] + v[:-1]) / 2) * (T_IDXS[1:] - T_IDXS[:-1])
