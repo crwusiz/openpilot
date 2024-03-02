@@ -27,19 +27,19 @@ class StreamingMovingAverage:
     self.result = 0
 
   def set(self, value):
-    #for i in range(len(self.values)):
-    #  self.values[i] = value
-    #self.sum = value * len(self.values)
     self.values.clear()
     self.values.append(value)
     self.sum = value
     self.result = value
     return value
 
-  def process(self, value, median = False):
+  def process(self, value, median=False):
     self.values.append(value)
     self.sum += value
     if len(self.values) > self.window_size:
       self.sum -= self.values.pop(0)
-    self.result = float(np.median(self.values)) if median else float(self.sum) / len(self.values)
+    if median:
+      self.result = float(np.median(self.values))
+    else:
+      self.result = float(self.sum) / len(self.values)
     return self.result
