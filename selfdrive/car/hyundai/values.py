@@ -15,7 +15,7 @@ Ecu = car.CarParams.Ecu
 class CarControllerParams:
   def __init__(self, CP):
     self.STEER_DELTA_UP = 3
-    self.STEER_DELTA_DOWN = 6
+    self.STEER_DELTA_DOWN = 7
     self.STEER_DRIVER_ALLOWANCE = 50
     self.STEER_DRIVER_MULTIPLIER = 2
     self.STEER_DRIVER_FACTOR = 1
@@ -32,10 +32,10 @@ class CarControllerParams:
 
     # To determine the limit for your car, find the maximum value that the stock LKAS will request.
     # If the max stock LKAS request is <384, add your car to this list.
-    elif CP.carFingerprint in (CAR.ELANTRA_I30, CAR.IONIQ, CAR.IONIQ_EV, CAR.SONATA_LF,
-                               CAR.K3, CAR.K5, CAR.K5_HEV, CAR.SORENTO,
-                               CAR.GENESIS_G80, CAR.GENESIS_G90):
-      self.STEER_MAX = 255
+    #elif CP.carFingerprint in (CAR.ELANTRA_I30, CAR.IONIQ, CAR.IONIQ_EV, CAR.SONATA_LF,
+    #                           CAR.K3, CAR.K5, CAR.K5_HEV, CAR.SORENTO,
+    #                           CAR.GENESIS_G80, CAR.GENESIS_G90):
+    #  self.STEER_MAX = 255
 
     # these cars have significantly more torque than most HKG; limit to 70% of max
     elif CP.flags & HyundaiFlags.ALT_LIMITS:
