@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import math
 import time
@@ -745,7 +746,6 @@ class Controls:
         self.v_cruise_helper.v_cruise_kph = v
         self.v_cruise_helper.v_cruise_cluster_kph = v
 
-      CC.actuatorsOutput = self.last_actuators
       if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
         self.steer_limited = abs(CC.actuators.steeringAngleDeg - CO.actuatorsOutput.steeringAngleDeg) > \
                              STEER_ANGLE_SATURATION_THRESHOLD
