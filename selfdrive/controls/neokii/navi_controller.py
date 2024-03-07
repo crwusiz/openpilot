@@ -74,7 +74,7 @@ class NaviServer:
             self.location.altitude,
             self.location.speed,
             self.location.bearingDeg,
-            self.location.accuracy,
+            self.location.horizontalAccuracy,
             self.location.unixTimestampMillis,
             # self.location.source,
             # self.location.vNED,

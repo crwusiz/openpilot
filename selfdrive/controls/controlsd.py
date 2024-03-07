@@ -597,7 +597,7 @@ class Controls:
       # accel PID loop
       pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, CS.vEgo, self.v_cruise_helper.v_cruise_kph * CV.KPH_TO_MS)
       t_since_plan = (self.sm.frame - self.sm.recv_frame['longitudinalPlan']) * DT_CTRL
-      actuators.accel = self.LoC.update(CC.longActive, CS, long_plan, pid_accel_limits, t_since_plan)
+      actuators.accel = self.LoC.update(CC.longActive, CS, long_plan, pid_accel_limits, t_since_plan, self.experimental_mode)
 
       # Steering PID loop and lateral MPC
       self.desired_curvature = clip_curvature(CS.vEgo, self.desired_curvature, model_v2.action.desiredCurvature)
@@ -739,13 +739,7 @@ class Controls:
       hudControl.visualAlert = current_alert.visual_alert
 
     if not self.CP.passive and self.initialized:
-      self.card.controls_update(CC)
-
-      v = self.speed_controller.update_can(self.enabled, CS, self.card.controls_update(CC))
-      if v > 0:
-        self.v_cruise_helper.v_cruise_kph = v
-        self.v_cruise_helper.v_cruise_cluster_kph = v
-
+      self.card.controls_update(CC, CS, self)
       if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
         self.steer_limited = abs(CC.actuators.steeringAngleDeg - CO.actuatorsOutput.steeringAngleDeg) > \
                              STEER_ANGLE_SATURATION_THRESHOLD
@@ -825,6 +819,14 @@ class Controls:
 
     # copy CarControl to pass to CarInterface on the next iteration
     self.CC = CC
+
+  def speed_controller_update(self, CC, CS, can_sends):
+    v = self.speed_controller.update_can(self.enabled, CS, can_sends)
+    if v > 0:
+      self.v_cruise_helper.v_cruise_kph = v
+      self.v_cruise_helper.v_cruise_cluster_kph = v
+
+    self.speed_controller.update_message(self, CC, CS)
 
   def step(self):
     start_time = time.monotonic()

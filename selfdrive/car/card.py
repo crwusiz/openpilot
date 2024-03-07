@@ -135,12 +135,13 @@ class CarD:
       co_send.carOutput.actuatorsOutput = self.last_actuators
     self.pm.send('carOutput', co_send)
 
-  def controls_update(self, CC: car.CarControl):
+  def controls_update(self, CC: car.CarControl, CS, controlsd):
     """control update loop, driven by carControl"""
 
     # send car controls over can
     now_nanos = self.can_log_mono_time if REPLAY else int(time.monotonic() * 1e9)
     self.last_actuators, can_sends = self.CI.apply(CC, now_nanos)
+    controlsd.speed_controller_update(CC, CS, can_sends)
     self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=self.CS.canValid))
 
     self.CC_prev = CC

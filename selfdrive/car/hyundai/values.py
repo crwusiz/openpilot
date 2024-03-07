@@ -813,8 +813,8 @@ FW_QUERY_CONFIG = FwQueryConfig(
   # We lose these ECUs without the comma power on these cars.
   # Note that we still attempt to match with them when they are present
   non_essential_ecus={
-    Ecu.transmission: [CAR.GRANDEUR_IGFL, CAR.GRANDEUR_IGFL_HEV, CAR.SONATA_DN8],
-    Ecu.engine: [CAR.GRANDEUR_IGFL, CAR.GRANDEUR_IGFL_HEV, CAR.SONATA_DN8],
+    Ecu.transmission: [CAR.GRANDEUR_IGFL, CAR.GRANDEUR_IGFL_HEV, CAR.PALISADE, CAR.SONATA_DN8],
+    Ecu.engine: [CAR.GRANDEUR_IGFL, CAR.GRANDEUR_IGFL_HEV, CAR.PALISADE, CAR.SONATA_DN8],
     Ecu.abs: [CAR.SONATA_DN8],
   },
   extra_ecus=[
