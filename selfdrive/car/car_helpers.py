@@ -199,6 +199,11 @@ def fingerprint(logcan, sendcan, num_pandas):
   return car_platform, finger, vin, car_fw, source, exact_match
 
 
+def get_car_interface(CP):
+  CarInterface, CarController, CarState = interfaces[CP.carFingerprint]
+  return CarInterface(CP, CarController, CarState)
+
+
 def get_car(logcan, sendcan, experimental_long_allowed, num_pandas=1):
   candidate, fingerprints, vin, car_fw, source, exact_match = fingerprint(logcan, sendcan, num_pandas)
 
@@ -217,14 +222,14 @@ def get_car(logcan, sendcan, experimental_long_allowed, num_pandas=1):
     print(f"Recognition Car : {candidate}")
     print()
 
-  CarInterface, CarController, CarState = interfaces[candidate]
+  CarInterface, _, _ = interfaces[candidate]
   CP = CarInterface.get_params(candidate, fingerprints, car_fw, experimental_long_allowed, docs=False)
   CP.carVin = vin
   CP.carFw = car_fw
   CP.fingerprintSource = source
   CP.fuzzyFingerprint = not exact_match
 
-  return CarInterface(CP, CarController, CarState), CP
+  return get_car_interface(CP), CP
 
 def write_car_param(platform=MOCK.MOCK):
   params = Params()
