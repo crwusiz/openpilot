@@ -695,7 +695,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     gpsAltitude, gpsAccuracy, gpsSatelliteCount
   );
 
-  x = rect().right() - (btn_size * 3.5);
+  x = rect().right() - (btn_size * 3.8);
   y = (UI_BORDER_SIZE * 2);
 
   p.setFont(InterFont(30));
