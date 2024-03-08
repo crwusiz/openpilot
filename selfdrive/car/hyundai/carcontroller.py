@@ -175,6 +175,9 @@ class CarController(CarControllerBase):
       elif CS.scc13 is not None:
         can_sends.append(hyundaican.create_acc_opt_none(self.packer, CS))
 
+      if self.CP.carFingerprint in CAN_GEARS["send_mdps12"]:  # send mdps12 to LKAS to prevent LKAS error
+        can_sends.append(hyundaican.create_mdps12(self.packer, self.frame, CS.mdps12))
+
       # 2 Hz front radar options
       if self.frame % 50 == 0 and self.CP.openpilotLongitudinalControl and self.CP.sccBus == 0:
         can_sends.append(hyundaican.create_frt_radar_opt(self.packer))
@@ -195,18 +198,15 @@ class CarController(CarControllerBase):
     can_sends = []
     if use_clu11:
       if CC.cruiseControl.cancel:
-        can_sends.append(hyundaican.create_clu11(self.packer, self.frame, Buttons.CANCEL, self.CP.sccBus, CS.clu11))
+        can_sends.append(hyundaican.create_clu11(self.packer, Buttons.CANCEL, self.CP.sccBus, CS.clu11))
       elif CC.cruiseControl.resume:
         # send resume at a max freq of 10Hz
         if (self.frame - self.last_button_frame) * DT_CTRL > 0.1:
           # send 25 messages at a time to increases the likelihood of resume being accepted
-          can_sends.extend([hyundaican.create_clu11(self.packer, self.frame, Buttons.RES_ACCEL, self.CP.sccBus, CS.clu11)] * 25)
+          can_sends.extend([hyundaican.create_clu11(self.packer, Buttons.RES_ACCEL, self.CP.sccBus, CS.clu11)] * 25)
           if (self.frame - self.last_button_frame) * DT_CTRL >= 0.15:
             self.last_button_frame = self.frame
     else:
-      if self.CP.carFingerprint in CAN_GEARS["send_mdps12"]:  # send mdps12 to LKAS to prevent LKAS error
-        can_sends.append(hyundaican.create_mdps12(self.packer, self.frame, CS.mdps12))
-
       if (self.frame - self.last_button_frame) * DT_CTRL > 0.25:
         # cruise cancel
         if CC.cruiseControl.cancel:

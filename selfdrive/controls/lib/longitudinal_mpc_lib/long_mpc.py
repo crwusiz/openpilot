@@ -542,8 +542,8 @@ class LongitudinalMpc:
 
     if v_ego_kph < 1.0:
       stopSign = model_x < 20.0 and model_v < 10.0
-    elif v_ego_kph < 80.0:
-      stopSign = model_x < 120.0 and ((model_v < 3.0) or (model_v < v[0]*0.7))  and abs(y[-1]) < 5.0
+    elif v_ego_kph < 82.0:
+      stopSign = model_x < interp(v[0], [60/3.6, 80/3.6], [120.0, 150]) and ((model_v < 3.0) or (model_v < v[0]*0.7)) and abs(y[-1]) < 5.0
     else:
       stopSign = False
 
@@ -568,7 +568,7 @@ class LongitudinalMpc:
     radar_detected = radarstate.leadOne.status & radarstate.leadOne.radar
 
     ## 모델의 정지거리 필터링
-    stop_x = x[32]
+    stop_x = x[31]
     self.xStop = self.update_stop_dist(stop_x)
     stop_x = self.xStop
 
@@ -588,7 +588,7 @@ class LongitudinalMpc:
 
     self.stopDist -= (v_ego * DT_MDL)
     if self.stopDist < 0:
-      self.stopDist = 0.
+      self.stopDist = 0.0
     elif stop_x == 1000.0:
       self.stopDist = 0.0
     elif self.stopDist > 0:

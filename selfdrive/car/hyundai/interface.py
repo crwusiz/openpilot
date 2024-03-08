@@ -120,6 +120,8 @@ class CarInterface(CarInterfaceBase):
         ret.hasScc13 = 0x50a in fingerprint[0] or 0x50a in fingerprint[2]
         ret.hasScc14 = 0x389 in fingerprint[0] or 0x389 in fingerprint[2]
         ret.radarTimeStep = (1.0 / 50)  # 50Hz   SCC11, RadarTrack은 50Hz
+      else:
+        ret.radarTimeStep = (1.0 / 20)  # 20Hz  RadarTrack 20Hz
 
       ret.radarUnavailable = ret.sccBus == -1
 

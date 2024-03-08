@@ -63,7 +63,7 @@ def create_lkas11(packer, frame, CP, apply_steer, steer_req, torque_fault, sys_w
   return packer.make_can_msg("LKAS11", 0, values)
 
 
-def create_clu11(packer, frame, button, bus, clu11):
+def create_clu11(packer, button, bus, clu11):
   values = {s: clu11[s] for s in [
     "CF_Clu_CruiseSwState",
     "CF_Clu_CruiseSwMain",
@@ -79,7 +79,7 @@ def create_clu11(packer, frame, button, bus, clu11):
     "CF_Clu_AliveCnt1",
   ]}
   values["CF_Clu_CruiseSwState"] = button
-  values["CF_Clu_AliveCnt1"] = frame % 0x10
+  values["CF_Clu_AliveCnt1"] = (values["CF_Clu_AliveCnt1"] + 1) % 0x10
   return packer.make_can_msg("CLU11", bus, values)
 
 
