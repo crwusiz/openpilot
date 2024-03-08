@@ -248,7 +248,7 @@ static bool hyundai_tx_hook(const CANPacket_t *to_send) {
   int addr = GET_ADDR(to_send);
 
   // FCA11: Block any potential actuation
-  /*if (addr == 0x38D) {
+  if (addr == 0x38D) {
     int CR_VSM_DecCmd = GET_BYTE(to_send, 1);
     bool FCA_CmdAct = GET_BIT(to_send, 20U);
     bool CF_VSM_DecCmdAct = GET_BIT(to_send, 31U);
@@ -256,7 +256,7 @@ static bool hyundai_tx_hook(const CANPacket_t *to_send) {
     if ((CR_VSM_DecCmd != 0) || FCA_CmdAct || CF_VSM_DecCmdAct) {
       tx = false;
     }
-  }*/
+  }
 
   // ACCEL: safety check
   if (addr == 0x421) {
@@ -281,13 +281,13 @@ static bool hyundai_tx_hook(const CANPacket_t *to_send) {
   if (addr == 0x340) {
     int desired_torque = ((GET_BYTES(to_send, 0, 4) >> 16) & 0x7ffU) - 1024U;
 
-    /*bool steer_req = GET_BIT(to_send, 27U) != 0U;
+    bool steer_req = GET_BIT(to_send, 27U) != 0U;
     const SteeringLimits limits = hyundai_alt_limits ? HYUNDAI_STEERING_LIMITS_ALT : HYUNDAI_STEERING_LIMITS;
     if (steer_torque_cmd_checks(desired_torque, steer_req, limits)) {
       tx = false;
-    }*/
+    }
 
-    uint32_t ts = microsecond_timer_get();
+    /*uint32_t ts = microsecond_timer_get();
     bool violation = false;
 
     if (controls_allowed) {
@@ -320,7 +320,7 @@ static bool hyundai_tx_hook(const CANPacket_t *to_send) {
       tx = 0;
       print("violation[LKAS11, 0x340]\n");
       print("  lkas torque allowed : controls allowed!\n");
-    }
+    }*/
   }
 
   // UDS: Only tester present ("\x02\x3E\x80\x00\x00\x00\x00\x00") allowed on diagnostics address
