@@ -32,7 +32,7 @@ class CarControllerParams:
 
     # To determine the limit for your car, find the maximum value that the stock LKAS will request.
     # If the max stock LKAS request is <384, add your car to this list.
-    #elif CP.carFingerprint in (CAR.ELANTRA_I30, CAR.IONIQ, CAR.IONIQ_EV, CAR.SONATA_LF,
+    #elif CP.carFingerprint in (CAR.AVANTE, CAR.I30, CAR.IONIQ, CAR.IONIQ_EV, CAR.SONATA_LF,
     #                           CAR.K3, CAR.K5, CAR.K5_HEV, CAR.SORENTO,
     #                           CAR.GENESIS_G80, CAR.GENESIS_G90):
     #  self.STEER_MAX = 255
@@ -131,24 +131,31 @@ class HyundaiCanFDPlatformConfig(PlatformConfig):
 
 class CAR(Platforms):
   # Hyundai
-  ELANTRA_I30 = HyundaiPlatformConfig(
-    "HYUNDAI AVANTE,I30 (AD,PD)",
+  AVANTE = HyundaiPlatformConfig(
+    "HYUNDAI AVANTE (AD)",
     [
       HyundaiCarInfo("Hyundai Elantra 2017-18", min_enable_speed=19 * CV.MPH_TO_MS, car_parts=CarParts.common([CarHarness.hyundai_b])),
       HyundaiCarInfo("Hyundai Elantra 2019", min_enable_speed=19 * CV.MPH_TO_MS, car_parts=CarParts.common([CarHarness.hyundai_g])),
       HyundaiCarInfo("Hyundai Elantra GT 2017-19", car_parts=CarParts.common([CarHarness.hyundai_e])),
-      HyundaiCarInfo("Hyundai i30 2017-19", car_parts=CarParts.common([CarHarness.hyundai_e])),
     ],
     CarSpecs(mass=1340, wheelbase=2.72, steerRatio=15.4, tireStiffnessFactor=0.385),
     flags=HyundaiFlags.LEGACY | HyundaiFlags.CLUSTER_GEARS,
   )
-  ELANTRA_CN7 = HyundaiPlatformConfig(
+  I30 = HyundaiPlatformConfig(
+    "HYUNDAI I30 (PD)",
+    [
+      HyundaiCarInfo("Hyundai i30 2017-19", car_parts=CarParts.common([CarHarness.hyundai_e])),
+    ],
+    AVANTE.specs,
+    flags=HyundaiFlags.LEGACY | HyundaiFlags.CLUSTER_GEARS,
+  )
+  AVANTE_CN7 = HyundaiPlatformConfig(
     "HYUNDAI AVANTE (CN7)",
     HyundaiCarInfo("Hyundai Elantra 2021-23", video_link="https://youtu.be/_EdYQtV52-c", car_parts=CarParts.common([CarHarness.hyundai_k])),
     CarSpecs(mass=1270, wheelbase=2.72, steerRatio=12.9, tireStiffnessFactor=0.65),
     flags=HyundaiFlags.CHECKSUM_CRC8,
   )
-  ELANTRA_CN7_HEV = HyundaiPlatformConfig(
+  AVANTE_CN7_HEV = HyundaiPlatformConfig(
     "HYUNDAI AVANTE HEV (CN7)",
     HyundaiCarInfo("Hyundai Elantra Hybrid 2021-23", video_link="https://youtu.be/_EdYQtV52-c", car_parts=CarParts.common([CarHarness.hyundai_k])),
     CarSpecs(mass=1368, wheelbase=2.72, steerRatio=12.9, tireStiffnessFactor=0.65),

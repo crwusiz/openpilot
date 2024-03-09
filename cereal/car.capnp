@@ -398,6 +398,7 @@ struct CarControl {
     leftLaneVisible @7: Bool;
     rightLaneDepart @8: Bool;
     leftLaneDepart @9: Bool;
+    leadDistanceBars @10: Int8;  # 1-3: 1 is closest, 3 is farthest. some ports may utilize 2-4 bars instead
 
     enum VisualAlert {
       # these are the choices from the Honda
@@ -623,6 +624,7 @@ struct CarParams {
     hyundaiCanfd @28;
     volkswagenMqbEvo @29;
     chryslerCusw @30;
+    psa @31;
   }
 
   enum SteerControlType {
