@@ -455,7 +455,7 @@ class CAR(Platforms):
     flags=HyundaiFlags.LEGACY,
   )
   GENESIS_G90 = HyundaiPlatformConfig(
-    "GENESIS EQ900, G90 (HI)",
+    "GENESIS G90 (HI)",
     HyundaiCarInfo("Genesis G90 2017-18", "All", car_parts=CarParts.common([CarHarness.hyundai_c])),
     CarSpecs(mass=2185, wheelbase=3.16, steerRatio=12.0),
   )
@@ -490,7 +490,7 @@ class CAR(Platforms):
     flags=HyundaiFlags.EV | HyundaiFlags.CANFD_NO_RADAR_DISABLE,
   )
   TUCSON_NX4 = HyundaiCanFDPlatformConfig(
-     "HYUNDAI TUCSON (NX4)",
+    "HYUNDAI TUCSON (NX4)",
     [
       HyundaiCarInfo("Hyundai Tucson 2022", car_parts=CarParts.common([CarHarness.hyundai_n])),
       HyundaiCarInfo("Hyundai Tucson 2023", "All", car_parts=CarParts.common([CarHarness.hyundai_n])),

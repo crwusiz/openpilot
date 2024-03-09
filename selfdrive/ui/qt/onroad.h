@@ -77,6 +77,7 @@ private:
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
   void drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color);
   void drawTextColorLeft(QPainter &p, int x, int y, const QString &text, const QColor &color);
+  void drawTextColorRight(QPainter &p, int x, int y, const QString &text, const QColor &color);
 
   QVBoxLayout *main_layout;
   ExperimentalButton *experimental_btn;

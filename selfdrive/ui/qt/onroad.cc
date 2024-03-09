@@ -691,15 +691,15 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     gpsAccuracy = 0;
 
   QString infoGps;
-  infoGps.sprintf("GPS [ Alt(%.1f)m Acc(%.1f)m Sat(%d) ]",
+  infoGps.sprintf("🛰️[ Alt(%.1fm) Acc(%.1fm) Sat(%d) ]",
     gpsAltitude, gpsAccuracy, gpsSatelliteCount
   );
 
-  x = rect().right() - (btn_size * 3.8);
+  x = rect().right() - 20;
   y = (UI_BORDER_SIZE * 2);
 
   p.setFont(InterFont(30));
-  drawTextColorLeft(p, x, y, infoGps, whiteColor(200));
+  drawTextColorRight(p, x, y, infoGps, whiteColor(200));
 
   if (!hideBottomIcons) {
     // steer img (bottom 1 right)
@@ -884,6 +884,15 @@ void AnnotatedCameraWidget::drawTextColorLeft(QPainter &p, int x, int y, const Q
     p.setOpacity(1.0);
     QRect real_rect = p.fontMetrics().boundingRect(text);
     real_rect.moveLeft(x);
+    real_rect.moveTop(y - real_rect.height() / 2);
+    p.setPen(color);
+    p.drawText(real_rect, text);
+}
+
+void AnnotatedCameraWidget::drawTextColorRight(QPainter &p, int x, int y, const QString &text, const QColor &color) {
+    p.setOpacity(1.0);
+    QRect real_rect = p.fontMetrics().boundingRect(text);
+    real_rect.moveRight(x);
     real_rect.moveTop(y - real_rect.height() / 2);
     p.setPen(color);
     p.drawText(real_rect, text);
