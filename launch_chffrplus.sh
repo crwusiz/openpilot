@@ -87,10 +87,12 @@ function launch {
     mkdir ${PARAMS_ROOT}/crwusiz
   fi
 
-  VALUE_PATH="$BASEDIR/selfdrive/car/hyundai/values.py"
-  grep -A 1 -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_PATH" | grep "HYUNDAI" | sed 's/^ *//;s/, *$//' | sed 's/^"//;s/"$//' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Hyundai
-  grep -A 1 -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_PATH" | grep "KIA" | sed 's/^ *//;s/, *$//' | sed 's/^"//;s/"$//' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Kia
-  grep -A 1 -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_PATH" | grep "GENESIS" | sed 's/^ *//;s/, *$//' | sed 's/^"//;s/"$//' | grep -v "=" | sort > ${PARAMS_ROOT}/crwusiz/CarList_Genesis
+  VALUE_HYUNDAI="$BASEDIR/selfdrive/car/hyundai/values.py"
+  grep -A 1 -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_HYUNDAI" | grep "HYUNDAI" | sed 's/^ *//;s/, *$//' | sed 's/^"//;s/"$//' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Hyundai
+  grep -A 1 -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_HYUNDAI" | grep "KIA" | sed 's/^ *//;s/, *$//' | sed 's/^"//;s/"$//' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Kia
+  grep -A 1 -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_HYUNDAI" | grep "GENESIS" | sed 's/^ *//;s/, *$//' | sed 's/^"//;s/"$//' | grep -v "=" | sort > ${PARAMS_ROOT}/crwusiz/CarList_Genesis
+  VALUE_GM="$BASEDIR/selfdrive/car/gm/values.py"
+  grep -A 1 -E 'GMPlatformConfig' "$VALUE_GM" | grep "CHEVROLET" | sed 's/^ *//;s/, *$//' | sed 's/^"//;s/"$//' | grep -v "=" | sort > ${PARAMS_ROOT}/crwusiz/CarList_Chevrolet
 
   MANUFACTURER=$(cat ${PARAMS_ROOT}/d/SelectedManufacturer)
   if [ "${MANUFACTURER}" = "HYUNDAI" ]; then
@@ -99,9 +101,11 @@ function launch {
     cp -f ${PARAMS_ROOT}/crwusiz/CarList_Kia ${PARAMS_ROOT}/crwusiz/CarList
   elif [ "${MANUFACTURER}" = "GENESIS" ]; then
     cp -f ${PARAMS_ROOT}/crwusiz/CarList_Genesis ${PARAMS_ROOT}/crwusiz/CarList
+  elif [ "${MANUFACTURER}" = "CHEVROLET" ]; then
+    cp -f ${PARAMS_ROOT}/crwusiz/CarList_Chevrolet ${PARAMS_ROOT}/crwusiz/CarList
   else
     pushd ${PARAMS_ROOT}/crwusiz
-    cat CarList_Hyundai CarList_Kia CarList_Genesis > CarList
+    cat CarList_Hyundai CarList_Kia CarList_Genesis CarList_Chevrolet > CarList
     popd
   fi
 

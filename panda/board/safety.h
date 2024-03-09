@@ -6,7 +6,7 @@
 //#include "safety/safety_honda.h"
 //#include "safety/safety_toyota.h"
 //#include "safety/safety_tesla.h"
-//#include "safety/safety_gm.h"
+#include "safety/safety_gm.h"
 //#include "safety/safety_ford.h"
 #include "safety/safety_hyundai.h"
 //#include "safety/safety_chrysler.h"
@@ -300,7 +300,7 @@ const safety_hook_config safety_hook_registry[] = {
   //{SAFETY_HONDA_NIDEC, &honda_nidec_hooks},
   //{SAFETY_TOYOTA, &toyota_hooks},
   {SAFETY_ELM327, &elm327_hooks},
-  //{SAFETY_GM, &gm_hooks},
+  {SAFETY_GM, &gm_hooks},
   //{SAFETY_HONDA_BOSCH, &honda_bosch_hooks},
   {SAFETY_HYUNDAI, &hyundai_hooks},
   //{SAFETY_CHRYSLER, &chrysler_hooks},

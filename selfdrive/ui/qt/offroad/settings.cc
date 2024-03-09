@@ -827,8 +827,7 @@ SelectManufacturer::SelectManufacturer(QWidget* parent): QWidget(parent) {
   list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
   list->addItem(tr("Select Manufacturer not use"));
 
-  //QStringList items = {"HYUNDAI", "KIA", "GENESIS", "GM", "TOYOTA", "LEXUS", "HONDA"};
-  QStringList items = {"HYUNDAI", "KIA", "GENESIS"};
+  QStringList items = {"HYUNDAI", "KIA", "GENESIS", "CHEVROLET"};
   list->addItems(items);
   list->setCurrentRow(0);
   QString selected = QString::fromStdString(Params().get("SelectedManufacturer"));
@@ -865,12 +864,13 @@ SelectManufacturer::SelectManufacturer(QWidget* parent): QWidget(parent) {
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
       qApp->exit(18);
       watchdog_kick(0);
-/*
     } else if (list->currentRow() == 4) {
-      QProcess::execute("cp -f /data/params/crwusiz/CarList_Gm /data/params/crwusiz/CarList");
+      QProcess::execute("cp -f /data/params/crwusiz/CarList_Chevrolet /data/params/crwusiz/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
       qApp->exit(18);
       watchdog_kick(0);
+/*
+
     } else if (list->currentRow() == 5) {
       QProcess::execute("cp -f /data/params/crwusiz/CarList_Toyota /data/params/crwusiz/CarList");
       Params().put("SelectedManufacturer", list->currentItem()->text().toStdString());
