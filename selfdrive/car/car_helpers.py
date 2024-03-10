@@ -1,4 +1,5 @@
 import os
+import requests
 import time
 from collections.abc import Callable
 
@@ -15,6 +16,7 @@ from openpilot.selfdrive.car.mock.values import CAR as MOCK
 from openpilot.common.swaglog import cloudlog
 import cereal.messaging as messaging
 from openpilot.selfdrive.car import gen_empty_fingerprint
+import openpilot.selfdrive.sentry as sentry
 
 FRAME_FINGERPRINT = 100  # 1s
 
@@ -190,6 +192,10 @@ def fingerprint(logcan, sendcan, num_pandas):
     car_fingerprint = fixed_fingerprint
     source = car.CarParams.FingerprintSource.fixed
 
+  selected_car = params.get("SelectedCar").decode("utf-8")
+  if selected_car:
+    car_fingerprint = selected_car
+
   cloudlog.event("fingerprinted", car_fingerprint=car_fingerprint, source=source, fuzzy=not exact_match, cached=cached,
                  fw_count=len(car_fw), ecu_responses=list(ecu_rx_addrs), vin_rx_addr=vin_rx_addr, vin_rx_bus=vin_rx_bus,
                  fingerprints=repr(finger), fw_query_time=fw_query_time, error=True)
@@ -198,6 +204,42 @@ def fingerprint(logcan, sendcan, num_pandas):
 
   return car_platform, finger, vin, car_fw, source, exact_match
 
+
+def is_connected_to_internet(timeout=5):
+  try:
+    requests.get("https://sentry.io", timeout=timeout)
+    return True
+  except Exception:
+    return False
+
+
+def crash_log(candidate):
+  no_internet = 0
+  while True:
+    if is_connected_to_internet():
+      sentry.get_init()
+      sentry.capture_warning("fingerprinted %s" % candidate)
+      break
+    else:
+      no_internet += 1
+      if no_internet >= 2:
+        break
+      time.sleep(600)
+
+
+def crash_log2(fingerprints, fw):
+  no_internet = 0
+  while True:
+    if is_connected_to_internet():
+      sentry.get_init()
+      sentry.capture_warning("car doesn't match any fingerprints: %s" % fingerprints)
+      sentry.capture_warning("car doesn't match any fw: %s" % fw)
+      break
+    else:
+      no_internet += 1
+      if no_internet >= 2:
+        break
+      time.sleep(600)
 
 def get_car_interface(CP):
   CarInterface, CarController, CarState = interfaces[CP.carFingerprint]
@@ -210,17 +252,6 @@ def get_car(logcan, sendcan, experimental_long_allowed, num_pandas=1):
   if candidate is None:
     cloudlog.event("car doesn't match any fingerprints", fingerprints=repr(fingerprints), error=True)
     candidate = "mock"
-
-  selected_car = Params().get("SelectedCar")
-  if selected_car:
-    candidate = selected_car.decode("utf-8")
-    print()
-    print(f"Selected Car : {candidate}")
-    print()
-  else:
-    print()
-    print(f"Recognition Car : {candidate}")
-    print()
 
   CarInterface, _, _ = interfaces[candidate]
   CP = CarInterface.get_params(candidate, fingerprints, car_fw, experimental_long_allowed, docs=False)
