@@ -218,6 +218,7 @@ def thermald_thread(end_event, hw_queue) -> None:
     peripheral_panda_present = peripheralState.pandaType != log.PandaState.PandaType.unknown
 
     msg = read_thermal(thermal_config)
+    msg.deviceState.deviceType = HARDWARE.get_device_type()
 
     # neokii
     if time.monotonic() - restart_triggered_ts < 5.:
