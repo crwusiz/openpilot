@@ -143,7 +143,7 @@ class CarController(CarControllerBase):
           can_sends.extend(hyundaicanfd.create_adrv_messages(self.packer, self.CAN, self.frame))
         if self.frame % 2 == 0:
           can_sends.append(hyundaicanfd.create_acc_control(self.packer, self.CAN, CC.enabled, self.accel_last, accel, stopping, CC.cruiseControl.override,
-                                                           set_speed_in_units))
+                                                           set_speed_in_units, hud_control))
           self.accel_last = accel
       else:
         # button presses
@@ -162,8 +162,8 @@ class CarController(CarControllerBase):
       if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl:
         # TODO: unclear if this is needed
         jerk = 3.0 if actuators.longControlState == LongCtrlState.pid else 1.0
-        can_sends.extend(hyundaican.create_scc_commands(self.packer, int(self.frame / 2), accel, jerk,
-                                                        hud_control.leadVisible, set_speed_in_units, stopping, CC, CS, use_fca))
+        can_sends.extend(hyundaican.create_scc_commands(self.packer, accel, jerk, int(self.frame / 2),
+                                                        hud_control, set_speed_in_units, stopping, CC, CS, use_fca))
 
       # 20 Hz LFA MFA message
       if self.frame % 5 == 0 and send_lfa:
