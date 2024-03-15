@@ -304,8 +304,9 @@ static bool hyundai_tx_hook(const CANPacket_t *to_send) {
 
     bool allowed_resume = (button == 1) && controls_allowed;
     bool allowed_set_decel = (button == 2) && controls_allowed;
+    bool allowed_gap_dist = (button == 3) && controls_allowed;
     bool allowed_cancel = (button == 4) && cruise_engaged_prev;
-    if (!(allowed_resume || allowed_set_decel || allowed_cancel)) {
+    if (!(allowed_resume || allowed_set_decel || allowed_gap_dist || allowed_cancel)) {
       tx = false;
     }
   }*/
