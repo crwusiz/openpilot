@@ -266,7 +266,7 @@ BO_ 416 SCC_CONTROL: 32 ADRV
  SG_ aReqValue : 128|11@1+ (0.01,-10.23) [-10.23|10.24] "m/s^2" XXX
  SG_ ZEROS_7 : 63|8@0+ (1,0) [0|255] "" XXX
  SG_ ACCMode : 68|3@1+ (1,0) [0|7] "" XXX
- SG_ ACC_ObjRelSpd : 35|9@1+ (0.1,-16.4) [0|255] "" XXX
+ SG_ ACC_ObjRelSpd : 35|9@1+ (0.1,-16.4) [-16.4|34.7] "m/s" XXX
  SG_ JerkLowerLimit : 166|7@0+ (0.1,0) [0|12.7] "m/s^3" XXX
  SG_ StopReq : 184|1@0+ (1,0) [0|1] "" XXX
  SG_ NEW_SIGNAL_15 : 192|11@1+ (0.1,0) [0|204.7] "m" XXX
@@ -669,7 +669,8 @@ CM_ 1043 "Lamp signals do not seem universal on cars that use LKAS_ALT, but stal
 CM_ SG_ 80 HAS_LANE_SAFETY "If 0, hides LKAS 'Lane Safety' menu from vehicle settings";
 CM_ SG_ 96 BRAKE_PRESSURE "User applied brake pedal pressure. Ramps from computer applied pressure on falling edge of cruise. Cruise cancels if !=0";
 CM_ SG_ 101 BRAKE_POSITION "User applied brake pedal position, max is ~700. Signed on some vehicles";
-CM_ SG_ 272 LKAS_ANGLE_CMD "tracks MDPS->STEERING_ANGLE when not engaged, not STEERING_SENSORS->STEERING_ANGLE";CM_ SG_ 373 PROBABLY_EQUIP "aeb equip?";
+CM_ SG_ 272 LKAS_ANGLE_CMD "tracks MDPS->STEERING_ANGLE when not engaged, not STEERING_SENSORS->STEERING_ANGLE";
+CM_ SG_ 373 PROBABLY_EQUIP "aeb equip?";
 CM_ SG_ 373 ACCEnable "Likely a copy of CAN's TCS13->ACCEnable";
 CM_ SG_ 373 DriverBraking "Likely derived from BRAKE->BRAKE_POSITION";
 CM_ SG_ 373 DriverBrakingLowSens "Higher threshold version of DriverBraking";

@@ -51,16 +51,14 @@ class CarController(CarControllerBase):
     self.CAN = CanBus(CP)
     self.params = CarControllerParams(CP)
     self.packer = CANPacker(dbc_name)
-    self.car_fingerprint = CP.carFingerprint
-
+    self.angle_limit_counter = 0
     self.frame = 0
-    self.last_button_frame = 0
+
     self.accel_last = 0
     self.apply_steer_last = 0
-    self.angle_limit_counter = 0
-    self.resume_cnt = 0
-    self.resume_wait_timer = 0
-    self.last_lead_distance = 0
+    self.car_fingerprint = CP.carFingerprint
+    self.last_button_frame = 0
+
     self.turning_signal_timer = 0
     self.turning_indicator_alert = False
 

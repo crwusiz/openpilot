@@ -41,8 +41,6 @@ class CarState(CarStateBase):
                                  "ACCELERATOR_BRAKE_ALT"
     self.cruise_btns_msg_canfd = "CRUISE_BUTTONS_ALT" if CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS else \
                                  "CRUISE_BUTTONS"
-
-    #Auto detection for setup
     self.is_metric = False
     self.buttons_counter = 0
     self.eps_error_cnt = 0
