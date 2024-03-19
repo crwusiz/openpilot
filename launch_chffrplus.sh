@@ -88,11 +88,11 @@ function launch {
   fi
 
   VALUE_HYUNDAI="$BASEDIR/selfdrive/car/hyundai/values.py"
-  grep -A 1 -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_HYUNDAI" | grep "HYUNDAI" | sed 's/^ *//;s/, *$//' | sed 's/^"//;s/"$//' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Hyundai
-  grep -A 1 -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_HYUNDAI" | grep "KIA" | sed 's/^ *//;s/, *$//' | sed 's/^"//;s/"$//' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Kia
-  grep -A 1 -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_HYUNDAI" | grep "GENESIS" | sed 's/^ *//;s/, *$//' | sed 's/^"//;s/"$//' | grep -v "=" | sort > ${PARAMS_ROOT}/crwusiz/CarList_Genesis
+  grep -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_HYUNDAI" | grep "HYUNDAI" | awk -F'=' '{print $1}' | awk '{$1=$1};1' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Hyundai
+  grep -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_HYUNDAI" | grep "KIA" | awk -F'=' '{print $1}' | awk '{$1=$1};1' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Kia
+  grep -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_HYUNDAI" | grep "GENESIS" | awk -F'=' '{print $1}' | awk '{$1=$1};1' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Genesis
   VALUE_GM="$BASEDIR/selfdrive/car/gm/values.py"
-  grep -A 1 -E 'GMPlatformConfig' "$VALUE_GM" | grep "CHEVROLET" | sed 's/^ *//;s/, *$//' | sed 's/^"//;s/"$//' | grep -v "=" | sort > ${PARAMS_ROOT}/crwusiz/CarList_Chevrolet
+  grep -E 'GMPlatformConfig' "$VALUE_GM" | grep -v 'class GMPlatformConfig' | awk -F'=' '{print $1}' | awk '{$1=$1};1' | sort > "${PARAMS_ROOT}/crwusiz/CarList_Gm"
 
   MANUFACTURER=$(cat ${PARAMS_ROOT}/d/SelectedManufacturer)
   if [ "${MANUFACTURER}" = "HYUNDAI" ]; then
@@ -101,11 +101,11 @@ function launch {
     cp -f ${PARAMS_ROOT}/crwusiz/CarList_Kia ${PARAMS_ROOT}/crwusiz/CarList
   elif [ "${MANUFACTURER}" = "GENESIS" ]; then
     cp -f ${PARAMS_ROOT}/crwusiz/CarList_Genesis ${PARAMS_ROOT}/crwusiz/CarList
-  elif [ "${MANUFACTURER}" = "CHEVROLET" ]; then
-    cp -f ${PARAMS_ROOT}/crwusiz/CarList_Chevrolet ${PARAMS_ROOT}/crwusiz/CarList
+  elif [ "${MANUFACTURER}" = "GM" ]; then
+    cp -f ${PARAMS_ROOT}/crwusiz/CarList_Gm ${PARAMS_ROOT}/crwusiz/CarList
   else
     pushd ${PARAMS_ROOT}/crwusiz
-    cat CarList_Hyundai CarList_Kia CarList_Genesis CarList_Chevrolet > CarList
+    cat CarList_Hyundai CarList_Kia CarList_Genesis CarList_Gm > CarList
     popd
   fi
 

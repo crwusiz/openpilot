@@ -248,10 +248,6 @@ class CarInterfaceBase(ABC):
 
     return reader
 
-  @abstractmethod
-  def apply(self, c: car.CarControl, now_nanos: int) -> tuple[car.CarControl.Actuators, list[bytes]]:
-    pass
-
   @staticmethod
   def get_params_adjust_set_speed():
     return [10], [20]

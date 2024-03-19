@@ -844,7 +844,7 @@ SelectManufacturer::SelectManufacturer(QWidget* parent): QWidget(parent) {
   list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
   list->addItem(tr("Select Manufacturer not use"));
 
-  QStringList items = {"HYUNDAI", "KIA", "GENESIS", "CHEVROLET"};
+  QStringList items = {"HYUNDAI", "KIA", "GENESIS", "GM"};
   list->addItems(items);
   list->setCurrentRow(0);
   QString selected = QString::fromStdString(Params().get("SelectedManufacturer"));
