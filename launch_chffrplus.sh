@@ -87,12 +87,11 @@ function launch {
     mkdir ${PARAMS_ROOT}/crwusiz
   fi
 
-  VALUE_HYUNDAI="$BASEDIR/selfdrive/car/hyundai/values.py"
-  grep -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_HYUNDAI" | grep "HYUNDAI" | awk -F'=' '{print $1}' | awk '{$1=$1};1' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Hyundai
-  grep -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_HYUNDAI" | grep "KIA" | awk -F'=' '{print $1}' | awk '{$1=$1};1' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Kia
-  grep -E 'HyundaiPlatformConfig|HyundaiCanFDPlatformConfig' "$VALUE_HYUNDAI" | grep "GENESIS" | awk -F'=' '{print $1}' | awk '{$1=$1};1' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Genesis
-  VALUE_GM="$BASEDIR/selfdrive/car/gm/values.py"
-  grep -E 'GMPlatformConfig' "$VALUE_GM" | grep 'CHEVROLET' | awk -F'=' '{print $1}' | awk '{$1=$1};1' | sort > "${PARAMS_ROOT}/crwusiz/CarList_Gm"
+  FINGERPRINTS="$BASEDIR/selfdrive/car/fingerprints.py"
+  grep -E '' "$FINGERPRINTS" | grep "HYUNDAI.HYUNDAI" | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Hyundai
+  grep -E '' "$FINGERPRINTS" | grep "HYUNDAI.KIA" | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Kia
+  grep -E '' "$FINGERPRINTS" | grep "HYUNDAI.GENESIS" | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Genesis
+  grep -E '' "$FINGERPRINTS" | grep 'GM.CHEVROLET' | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Gm
 
   MANUFACTURER=$(cat ${PARAMS_ROOT}/d/SelectedManufacturer)
   if [ "${MANUFACTURER}" = "HYUNDAI" ]; then

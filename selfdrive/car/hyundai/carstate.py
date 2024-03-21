@@ -136,7 +136,7 @@ class CarState(CarStateBase):
     # Gear Selection via Cluster - For those Kia/Hyundai which are not fully discovered, we can use the Cluster Indicator for Gear Selection,
     # as this seems to be standard over all cars, but is not the preferred method.
     if self.CP.flags & (HyundaiFlags.HYBRID | HyundaiFlags.EV):
-      if self.CP.carFingerprint == CAR.NEXO:
+      if self.CP.carFingerprint == CAR.HYUNDAI_NEXO:
         gear = cp.vl["ELECT_GEAR"]["Elect_Gear_Shifter_NEXO"]
       else:
         gear = cp.vl["ELECT_GEAR"]["Elect_Gear_Shifter"]

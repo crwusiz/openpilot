@@ -181,9 +181,9 @@ def fingerprint(logcan, sendcan, num_pandas):
     car_fingerprint = fixed_fingerprint
     source = car.CarParams.FingerprintSource.fixed
 
-  selected_car = params.get("SelectedCar").decode("utf-8")
+  selected_car = params.get("SelectedCar")
   if selected_car:
-    car_fingerprint = selected_car
+    car_fingerprint = selected_car.decode("utf-8")
 
   cloudlog.event("fingerprinted", car_fingerprint=car_fingerprint, source=source, fuzzy=not exact_match, cached=cached,
                  fw_count=len(car_fw), ecu_responses=list(ecu_rx_addrs), vin_rx_addr=vin_rx_addr, vin_rx_bus=vin_rx_bus,

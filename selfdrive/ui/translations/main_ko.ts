@@ -394,11 +394,11 @@
     </message>
     <message>
         <source>Regulatory</source>
-        <translation type="vanished">규제</translation>
+        <translation>규제</translation>
     </message>
     <message>
         <source>VIEW</source>
-        <translation type="vanished">보기</translation>
+        <translation>보기</translation>
     </message>
     <message>
         <source>Change Language</source>
@@ -804,6 +804,10 @@
     <message>
         <source>ft</source>
         <translation>ft</translation>
+    </message>
+    <message>
+        <source>now</source>
+        <translation>now</translation>
     </message>
 </context>
 <context>
