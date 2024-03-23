@@ -795,8 +795,8 @@ PLATFORM_CODE_ECUS = [Ecu.fwdRadar, Ecu.fwdCamera, Ecu.eps]
 # TODO: there are date codes in the ABS firmware versions in hex
 DATE_FW_ECUS = [Ecu.fwdCamera]
 
-ALL_HYUNDAI_ECUS = [Ecu.eps, Ecu.abs, Ecu.fwdRadar, Ecu.fwdCamera, Ecu.engine, Ecu.parkingAdas,
-                    Ecu.transmission, Ecu.adas, Ecu.hvac, Ecu.cornerRadar, Ecu.combinationMeter]
+ALL_HYUNDAI_ECUS = [Ecu.eps, Ecu.abs, Ecu.fwdRadar, Ecu.fwdCamera, Ecu.parkingAdas,
+                    Ecu.adas, Ecu.hvac, Ecu.cornerRadar, Ecu.combinationMeter]
 
 FW_QUERY_CONFIG = FwQueryConfig(
   requests=[
@@ -805,12 +805,12 @@ FW_QUERY_CONFIG = FwQueryConfig(
     Request(
       [HYUNDAI_VERSION_REQUEST_LONG],
       [HYUNDAI_VERSION_RESPONSE],
-      whitelist_ecus=[Ecu.transmission, Ecu.eps, Ecu.abs, Ecu.fwdRadar, Ecu.fwdCamera],
+      whitelist_ecus=[Ecu.eps, Ecu.abs, Ecu.fwdRadar, Ecu.fwdCamera],
     ),
     Request(
       [HYUNDAI_VERSION_REQUEST_MULTI],
       [HYUNDAI_VERSION_RESPONSE],
-      whitelist_ecus=[Ecu.engine, Ecu.transmission, Ecu.eps, Ecu.abs, Ecu.fwdRadar],
+      whitelist_ecus=[Ecu.eps, Ecu.abs, Ecu.fwdRadar],
     ),
 
     # CAN-FD queries (from camera)
@@ -891,12 +891,6 @@ FW_QUERY_CONFIG = FwQueryConfig(
   # We lose these ECUs without the comma power on these cars.
   # Note that we still attempt to match with them when they are present
   non_essential_ecus={
-    Ecu.transmission: [CAR.HYUNDAI_GRANDEUR_FL, CAR.HYUNDAI_GRANDEUR_FL_HEV, CAR.HYUNDAI_PALISADE, CAR.HYUNDAI_SONATA_DN8, CAR.HYUNDAI_SANTAFE,
-                       CAR.GENESIS_G70, CAR.KIA_K5_DL3, CAR.HYUNDAI_SONATA_DN8_HEV, CAR.HYUNDAI_AVANTE_CN7, CAR.HYUNDAI_AVANTE_CN7_HEV,
-                       CAR.KIA_STINGER, CAR.KIA_NIRO_HEV, CAR.KIA_K3, CAR.HYUNDAI_IONIQ_HEV, CAR.GENESIS_G90],
-    Ecu.engine: [CAR.HYUNDAI_GRANDEUR_FL, CAR.HYUNDAI_GRANDEUR_FL_HEV, CAR.HYUNDAI_PALISADE, CAR.HYUNDAI_SONATA_DN8, CAR.HYUNDAI_SANTAFE,
-                 CAR.GENESIS_G70, CAR.KIA_K5_DL3, CAR.HYUNDAI_SONATA_DN8_HEV, CAR.HYUNDAI_AVANTE_CN7, CAR.HYUNDAI_AVANTE_CN7_HEV,
-                 CAR.KIA_STINGER, CAR.KIA_NIRO_HEV, CAR.KIA_K3, CAR.HYUNDAI_IONIQ_HEV, CAR.GENESIS_G90, CAR.KIA_K5],
     Ecu.abs: [CAR.HYUNDAI_PALISADE, CAR.HYUNDAI_SONATA_DN8, CAR.HYUNDAI_SANTAFE, CAR.KIA_K5_DL3, CAR.HYUNDAI_AVANTE_CN7,
               CAR.KIA_K3, CAR.HYUNDAI_KONA_EV],
   },
