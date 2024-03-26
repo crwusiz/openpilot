@@ -243,6 +243,8 @@ def get_car(logcan, sendcan, experimental_long_allowed, num_pandas=1):
   else:
     print('candidate !!!!!!!!!', candidate)
 
+  Params().put("CarName", candidate)
+
   CarInterface, _, _ = interfaces[candidate]
   CP = CarInterface.get_params(candidate, fingerprints, car_fw, experimental_long_allowed, docs=False)
   CP.carVin = vin

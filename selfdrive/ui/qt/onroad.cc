@@ -774,8 +774,10 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   // bottom left info
+  QString carName = QString::fromStdString(params.get("CarName"));
   QString infoText;
-  infoText.sprintf("SCC[%d] SR[%.2f] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
+  infoText.sprintf("[%s] SCC[%d] SR[%.2f] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
+    carName.toStdString().c_str(),
     sccBus,
     steerRatio,
     latAccelFactor, friction,
@@ -787,20 +789,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
   p.setFont(InterFont(30));
   drawTextColorLeft(p, x, y, infoText, whiteColor(200));
-
-/*
-  // bottom right info
-  QString infoWifi;
-  infoWifi.sprintf("IP[%d]",
-    ip
-  );
-
-  x = rect().right() - (btn_size * 3.3);
-  y = rect().height() - 20;
-
-  p.setFont(InterFont(30));
-  drawTextColorLeft(p, x, y, infoWifi, whiteColor(200));
-*/
 
   // turnsignal
   static int blink_index = 0;
