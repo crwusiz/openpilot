@@ -891,8 +891,8 @@ FW_QUERY_CONFIG = FwQueryConfig(
   # We lose these ECUs without the comma power on these cars.
   # Note that we still attempt to match with them when they are present
   non_essential_ecus={
-    Ecu.abs: [CAR.HYUNDAI_PALISADE, CAR.HYUNDAI_SONATA_DN8, CAR.HYUNDAI_SANTAFE, CAR.KIA_K5_DL3, CAR.HYUNDAI_AVANTE_CN7,
-              CAR.KIA_K3, CAR.HYUNDAI_KONA_EV],
+    Ecu.abs: [CAR.HYUNDAI_PALISADE, CAR.HYUNDAI_SONATA_DN8, CAR.HYUNDAI_SANTAFE, CAR.HYUNDAI_AVANTE_CN7, CAR.HYUNDAI_KONA_EV,
+              CAR.KIA_K5_DL3],
   },
   extra_ecus=[
     (Ecu.adas, 0x730, None),              # ADAS Driving ECU on HDA2 platforms

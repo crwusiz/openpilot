@@ -71,9 +71,8 @@ FW_VERSIONS = {
     ],
     (Ecu.abs, 0x7d1, None): [
       b'\xf1\x00CN ESC \t 101 \x10\x03 58910-AB800',
-      b'\xf1\x8758910-AA800\xf1\x00CN ESC \t 104 \x08\x03 58910-AA800',
-      b'\xf1\x8758910-AA800\xf1\x00CN ESC \t 105 \x10\x03 58910-AA800',
-      b'\xf1\x8758910-AB800\xf1\x00CN ESC \t 101 \x10\x03 58910-AB800\xf1\xa01.01',
+      b'\xf1\x00CN ESC \t 104 \x08\x03 58910-AA800',
+      b'\xf1\x00CN ESC \t 105 \x10\x03 58910-AA800',
     ],
   },
   CAR.HYUNDAI_AVANTE_CN7_HEV: { # (CN7)
@@ -114,10 +113,6 @@ FW_VERSIONS = {
       b'\xf1\x00DN ESC \x07 106 \x07\x01 58910-L0100',
       b'\xf1\x00DN ESC \x07 107"\x08\x07 58910-L0100',
       b'\xf1\x00DN ESC \x08 103\x19\x06\x01 58910-L1300',
-      b'\xf1\x8758910-L0100\xf1\x00DN ESC \x06 104\x19\x08\x01 58910-L0100',
-      b'\xf1\x8758910-L0100\xf1\x00DN ESC \x06 106 \x07\x01 58910-L0100',
-      b'\xf1\x8758910-L0100\xf1\x00DN ESC \x07 104\x19\x08\x01 58910-L0100',
-      b'\xf1\x8758910-L0100\xf1\x00DN ESC \x07 106 \x07\x01 58910-L0100',
     ],
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00DN8 MDPS C 1,00 1,01 56310L0010\x00 4DNAC101',
@@ -191,9 +186,6 @@ FW_VERSIONS = {
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00OS__ SCC F-CUP      1.00 1.00 95655-J9200         ',
     ],
-    (Ecu.abs, 0x7d1, None): [
-      b'\xf1\x816V5RAK00018.ELF\xf1\x00\x00\x00\x00\x00\x00\x00',
-    ],
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00OS  MDPS C 1.00 1.05 56310J9030\x00 4OSDC105',
     ],
@@ -210,11 +202,9 @@ FW_VERSIONS = {
       b'\xf1\x00OS IEB \r 105\x18\t\x18 58520-K4000',
       # 2022
       b'\xf1\x00OS IEB \x02 102"\x05\x16 58520-K4010',
+      b'\xf1\x00OS IEB \x03 101 \x11\x13 58520-K4010',
       b'\xf1\x00OS IEB \x03 102"\x05\x16 58520-K4010',
       b'\xf1\x00OS IEB \r 102"\x05\x16 58520-K4010',
-      b'\xf1\x8758520-K4010\xf1\x00OS IEB \x02 101 \x11\x13 58520-K4010',
-      b'\xf1\x8758520-K4010\xf1\x00OS IEB \x03 101 \x11\x13 58520-K4010',
-      b'\xf1\x8758520-K4010\xf1\x00OS IEB \x04 101 \x11\x13 58520-K4010',
     ],
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00OE2 LKAS AT EUR LHD 1.00 1.00 95740-K4200 200',
@@ -376,11 +366,8 @@ FW_VERSIONS = {
       b'\xf1\x00TM ESC \x03 101 \x08\x02 58910-S2DA0',
       b'\xf1\x00TM ESC \x04 101 \x08\x04 58910-S2GA0',
       b'\xf1\x00TM ESC \x04 102!\x04\x05 58910-S2GA0',
+      b'\xf1\x00TM ESC \x1e 102 \x08\x08 58910-S1DA0',
       b'\xf1\x00TM ESC   103!\x030 58910-S1MA0',
-      b'\xf1\x8758910-S1DA0\xf1\x00TM ESC \x1e 102 \x08\x08 58910-S1DA0',
-      b'\xf1\x8758910-S2DA0\xf1\x00TM ESC \x03 101 \x08\x02 58910-S2DA0',
-      b'\xf1\x8758910-S2GA0\xf1\x00TM ESC \x02 101 \x08\x04 58910-S2GA0',
-      b'\xf1\x8758910-S2GA0\xf1\x00TM ESC \x04 102!\x04\x05 58910-S2GA0',
     ],
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00TM  MDPS C 1.00 1.00 56340-S2000 8409',
@@ -483,10 +470,6 @@ FW_VERSIONS = {
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x00JS__ SCC H-CUP      1.00 1.02 95650-J3200         ',
       b'\xf1\x00JS__ SCC HNCUP      1.00 1.02 95650-J3100         ',
-    ],
-    (Ecu.abs, 0x7d1, None): [
-      b'\xf1\x00\x00\x00\x00\x00\x00\x00',
-      b'\xf1\x816V8RAC00121.ELF\xf1\x00\x00\x00\x00\x00\x00\x00',
     ],
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00JSL MDPS C 1.00 1.03 56340-J3000 8308',
@@ -662,11 +645,6 @@ FW_VERSIONS = {
       b'\xf1\x00BDPE_SCC FHCUPC     1.00 1.04 99110-M6500\x00\x00\x00\x00\x00\x00\x00\x00\x00',
       b'\xf1\x00BD__ SCC H-CUP      1.00 1.02 99110-M6000         ',
     ],
-    (Ecu.abs, 0x7d1, None): [
-      b'\xf1\x00\x00\x00\x00\x00\x00\x00',
-      b'\xf1\x816VGRAH00018.ELF\xf1\x00\x00\x00\x00\x00\x00\x00',
-      b'\xf1\x8758900-M7AB0 \xf1\x816VQRAD00127.ELF\xf1\x00\x00\x00\x00\x00\x00\x00',
-    ],
   },
   CAR.KIA_K5: { # (JF)
     (Ecu.fwdRadar, 0x7d0, None): [
@@ -729,9 +707,7 @@ FW_VERSIONS = {
       b'\xf1\x00DL ESC \x06 101 \x04\x02 58910-L3200',
       b'\xf1\x00DL ESC \x06 103"\x08\x06 58910-L3200',
       b'\xf1\x00DL ESC \t 100 \x06\x02 58910-L3800',
-      b'\xf1\x8758910-L3200\xf1\x00DL ESC \x06 101 \x04\x02 58910-L3200',
-      b'\xf1\x8758910-L3600\xf1\x00DL ESC \x03 100 \x08\x02 58910-L3600',
-      b'\xf1\x8758910-L3800\xf1\x00DL ESC \t 101 \x07\x02 58910-L3800',
+      b'\xf1\x00DL ESC \t 101 \x07\x02 58910-L3800',
     ],
   },
   CAR.KIA_K5_DL3_HEV: { # (DL3)
@@ -888,8 +864,8 @@ FW_VERSIONS = {
       b'\xf1\x8799110Q5100\xf1\x00SP2_ SCC FHCUP      1.01 1.05 99110-Q5100         ',
     ],
     (Ecu.abs, 0x7d1, None): [
-      b'\xf1\x8758910-Q5450\xf1\x00SP ESC \x07 101\x19\t\x05 58910-Q5450',
-      b'\xf1\x8758910-Q5450\xf1\x00SP ESC \t 101\x19\t\x05 58910-Q5450',
+      b'\xf1\x00SP ESC \x07 101\x19\t\x05 58910-Q5450',
+      b'\xf1\x00SP ESC \t 101\x19\t\x05 58910-Q5450',
     ],
     (Ecu.eps, 0x7d4, None): [
       b'\xf1\x00SP2 MDPS C 1.00 1.04 56300Q5200          ',

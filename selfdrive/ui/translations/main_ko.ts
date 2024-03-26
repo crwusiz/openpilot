@@ -482,11 +482,11 @@
     </message>
     <message>
         <source>Pair Device</source>
-        <translation>장치 페어링</translation>
+        <translation>장치 동기화</translation>
     </message>
     <message>
-        <source>Pair</source>
-        <translation>페어링</translation>
+        <source>PAIR</source>
+        <translation>동기화</translation>
     </message>
     <message>
         <source>Process</source>

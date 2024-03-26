@@ -396,7 +396,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   gpsSatelliteCount = s.scene.satelliteCount;
   steerAngle = ce.getSteeringAngleDeg();
   longControl = cp.getOpenpilotLongitudinalControl();
-  gap_state = ce.getCruiseState().getGapAdjust();
+  gap_state = ce.getCruiseState().getLeadDistanceBars();
   steerRatio = lp.getSteerRatio();
   sccBus = cp.getSccBus();
   fl = ce.getTpms().getFl();
