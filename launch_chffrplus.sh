@@ -117,30 +117,13 @@ function launch {
   # events language init
   LANG=$(cat ${PARAMS_ROOT}/d/LanguageSetting)
   EVENTSTAT=$(git status)
-  UIFILE="$BASEDIR/selfdrive/ui/ui.h"
-  E1='"openpilot Unavailable"'
-  E2='"Waiting for controls to start"'
-  E3='"TAKE CONTROL IMMEDIATELY"'
-  E4='"Controls Unresponsive"'
-  E5='"Reboot Device"'
-  K1='"오픈파일럿을 사용할수없습니다"'
-  K2='"프로세스가 준비중입니다"'
-  K3='"핸들을 잡아주세요"'
-  K4='"프로세스가 응답하지않습니다"'
-  K5='"장치를 재부팅하세요"'
 
-  # events.py 한글로 변경 및 파일이 교체된 상태인지 확인 / ui.h 영문 내용 바꾸기
+  # events.py 한글로 변경 및 파일이 교체된 상태인지 확인
   if [ "${LANG}" = "main_ko" ] && [[ ! "${EVENTSTAT}" == *"modified:   selfdrive/controls/lib/events.py"* ]]; then
     cp -f $BASEDIR/selfdrive/controls/lib/events.py $BASEDIR/scripts/add/events_en.py
     cp -f $BASEDIR/scripts/add/events_ko.py $BASEDIR/selfdrive/controls/lib/events.py
-    if [[ ! "${EVENTSTAT}" == *"modified:   selfdrive/controls/ui/ui.h"* ]]; then
-    sed -i -e "s/${E1}/${K1}/g" -e "s/${E2}/${K2}/g" -e "s/${E3}/${K3}/g" -e "s/${E4}/${K4}/g" -e "s/${E5}/${K5}/g" "$UIFILE"
-    fi
   elif [ "${LANG}" = "main_en" ] && [[ "${EVENTSTAT}" == *"modified:   selfdrive/controls/lib/events.py"* ]]; then
     cp -f $BASEDIR/scripts/add/events_en.py $BASEDIR/selfdrive/controls/lib/events.py
-    if [[ "${EVENTSTAT}" == *"modified:   selfdrive/controls/ui/ui.h"* ]]; then
-    sed -i -e "s/${K1}/${E1}/g" -e "s/${K2}/${E2}/g" -e "s/${K3}/${E3}/g" -e "s/${K4}/${E4}/g" -e "s/${K5}/${E5}/g" "$UIFILE"
-    fi
   fi
 
   # start manager

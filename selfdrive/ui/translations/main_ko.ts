@@ -698,10 +698,33 @@
     </message>
 </context>
 <context>
+    <name>OnroadAlerts</name>
+    <message>
+        <source>openpilot Unavailable</source>
+        <translation>오픈파일럿을 사용할수없습니다</translation>
+    </message>
+    <message>
+        <source>Waiting for controls to start</source>
+        <translation>프로세스가 준비중입니다</translation>
+    </message>
+    <message>
+        <source>TAKE CONTROL IMMEDIATELY</source>
+        <translation>핸들을 잡아주세요</translation>
+    </message>
+    <message>
+        <source>Controls Unresponsive</source>
+        <translation>프로세스가 응답하지않습니다</translation>
+    </message>
+    <message>
+        <source>Reboot Device</source>
+        <translation>장치를 재부팅하세요</translation>
+    </message>
+</context>
+<context>
     <name>PairingPopup</name>
     <message>
         <source>Pair your device to your comma account</source>
-        <translation>장치를 comma 계정에 페어링합니다</translation>
+        <translation>장치를 comma 계정에 동기화합니다</translation>
     </message>
     <message>
         <source>Go to https://connect.comma.ai on your phone</source>
