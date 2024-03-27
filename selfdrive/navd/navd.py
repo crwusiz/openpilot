@@ -48,6 +48,9 @@ class RouteEngine:
 
     self.reroute_counter = 0
 
+    self.api = None
+    self.mapbox_token = None
+
     if not self.params.get_bool("NavEnable"):
       self.params.put("MapboxTokenPk", "")
       self.params.put("MapboxTokenSk", "")
@@ -58,11 +61,7 @@ class RouteEngine:
       self.mapbox_token = os.environ["MAPBOX_TOKEN"]
       self.mapbox_host = "https://api.mapbox.com"
     else:
-      try:
-        self.mapbox_token = Api(self.params.get("DongleId", encoding='utf8')).get_token(expiry_hours=4 * 7 * 24)
-      except FileNotFoundError:
-        cloudlog.exception("Failed to generate mapbox token due to missing private key. Ensure device is registered.")
-        self.mapbox_token = ""
+      self.api = Api(self.params.get("DongleId", encoding='utf8'))
       self.mapbox_host = "https://maps.comma.ai"
 
   def update(self):
@@ -128,8 +127,12 @@ class RouteEngine:
     if lang is not None:
       lang = lang.replace('main_', '')
 
+    token = self.mapbox_token
+    if token is None:
+      token = self.api.get_token()
+
     params = {
-      'access_token': self.mapbox_token,
+      'access_token': token,
       'annotations': 'maxspeed',
       'geometries': 'geojson',
       'overview': 'full',
