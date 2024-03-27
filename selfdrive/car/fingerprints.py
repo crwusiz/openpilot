@@ -345,3 +345,8 @@ def create_platform_map(func: MapFunc):
     ret[m] = ret[MIGRATION[m]]
 
   return ret
+
+
+def extract_platform(info: str) -> str:
+  platform_name = MIGRATION[info].split(".")[-1]
+  return platform_name

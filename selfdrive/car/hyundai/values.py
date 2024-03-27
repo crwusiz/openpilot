@@ -895,11 +895,4 @@ UNSUPPORTED_LONGITUDINAL_CAR = CAR.with_flags(HyundaiFlags.UNSUPPORTED_LONGITUDI
 DBC = CAR.create_dbc_map()
 
 if __name__ == "__main__":
-  #CAR.print_debug(HyundaiFlags)
-  cars = []
-  for platform in CAR:
-    for doc in platform.config.car_docs:
-      cars.append(doc.name)
-  cars.sort()
-  for c in cars:
-    print(c)
+  CAR.print_debug(HyundaiFlags)

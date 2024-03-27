@@ -100,11 +100,11 @@ function launch {
     cp -f ${PARAMS_ROOT}/crwusiz/CarList_Kia ${PARAMS_ROOT}/crwusiz/CarList
   elif [ "${MANUFACTURER}" = "GENESIS" ]; then
     cp -f ${PARAMS_ROOT}/crwusiz/CarList_Genesis ${PARAMS_ROOT}/crwusiz/CarList
-  #elif [ "${MANUFACTURER}" = "CHEVROLET" ]; then
-  #  cp -f ${PARAMS_ROOT}/crwusiz/CarList_Gm ${PARAMS_ROOT}/crwusiz/CarList
+  elif [ "${MANUFACTURER}" = "CHEVROLET" ]; then
+    cp -f ${PARAMS_ROOT}/crwusiz/CarList_Gm ${PARAMS_ROOT}/crwusiz/CarList
   else
     pushd ${PARAMS_ROOT}/crwusiz
-    cat CarList_Hyundai CarList_Kia CarList_Genesis > CarList
+    cat CarList_Hyundai CarList_Kia CarList_Genesis CarList_Gm > CarList
     popd
   fi
 
