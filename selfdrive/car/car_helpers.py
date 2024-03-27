@@ -240,8 +240,19 @@ def get_car(logcan, sendcan, experimental_long_allowed, num_pandas=1):
   if candidate is None:
     cloudlog.event("car doesn't match any fingerprints", fingerprints=repr(fingerprints), error=True)
     candidate = "MOCK"
-  else:
-    print('candidate !!!!!!!!!', candidate)
+
+  selected_car = Params().get("SelectedCar")
+  if selected_car:
+    def find_platform_from_hyundai(name: str):
+      from openpilot.selfdrive.car.hyundai.values import CAR as HYUNDAI
+      for platform in HYUNDAI:
+        for doc in platform.config.car_docs:
+          if name == doc.name:
+            return platform
+      return None
+    found_platform = find_platform_from_hyundai(selected_car.decode("utf-8"))
+    if found_platform is not None:
+      candidate = found_platform
 
   Params().put("CarName", candidate)
 
