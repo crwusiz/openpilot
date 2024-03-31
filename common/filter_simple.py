@@ -38,8 +38,5 @@ class StreamingMovingAverage:
     self.sum += value
     if len(self.values) > self.window_size:
       self.sum -= self.values.pop(0)
-    if median:
-      self.result = float(np.median(self.values))
-    else:
-      self.result = float(self.sum) / len(self.values)
+    self.result = float(np.median(self.values)) if median else float(self.sum) / len(self.values)
     return self.result
