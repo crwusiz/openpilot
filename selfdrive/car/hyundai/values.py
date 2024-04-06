@@ -5,7 +5,7 @@ from enum import Enum, IntFlag
 from cereal import car
 from panda.python import uds
 from openpilot.common.conversions import Conversions as CV
-from openpilot.selfdrive.car import CarSpecs, DbcDict, PlatformConfig, Platforms, dbc_dict
+from openpilot.selfdrive.car import CarSpecs, DbcDict, PlatformConfig, Platforms, dbc_dict, AngleRateLimit
 from openpilot.selfdrive.car.docs_definitions import CarFootnote, CarHarness, CarDocs, CarParts, Column
 from openpilot.selfdrive.car.fw_query_definitions import FwQueryConfig, Request, p16
 
@@ -13,6 +13,11 @@ Ecu = car.CarParams.Ecu
 
 
 class CarControllerParams:
+
+  # seen changing at 0.2 deg/frame down, 0.1 deg/frame up at 100Hz
+  ANGLE_RATE_LIMIT_UP = AngleRateLimit(speed_bp=[0., 5., 15.], angle_v=[5., .8, .15])
+  ANGLE_RATE_LIMIT_DOWN = AngleRateLimit(speed_bp=[0., 5., 15.], angle_v=[5., 3.5, 0.4])
+
   def __init__(self, CP):
     self.STEER_DELTA_UP = 3
     self.STEER_DELTA_DOWN = 7
@@ -91,6 +96,9 @@ class HyundaiFlags(IntFlag):
   TCU_GEARS = 2 ** 22
 
   MIN_STEER_32_MPH = 2 ** 23
+
+  # LFA2 car angle steer type
+  STEER_ANGLE = 2 ** 24
 
 
 class Footnote(Enum):
@@ -620,6 +628,7 @@ class CAR(Platforms):
       HyundaiCarDocs("KIA EV9 (MV)", car_parts=CarParts.common([CarHarness.hyundai_k])),
     ],
     CarSpecs(mass=2625, wheelbase=3.1, steerRatio=16.02),
+    flags=HyundaiFlags.STEER_ANGLE,
   )
 
   # Genesis
@@ -889,6 +898,8 @@ HYBRID_CAR = CAR.with_flags(HyundaiFlags.HYBRID)
 EV_CAR = CAR.with_flags(HyundaiFlags.EV)
 
 LEGACY_SAFETY_MODE_CAR = CAR.with_flags(HyundaiFlags.LEGACY)
+
+STEER_ANGLE = CAR.with_flags(HyundaiFlags.STEER_ANGLE)
 
 UNSUPPORTED_LONGITUDINAL_CAR = CAR.with_flags(HyundaiFlags.UNSUPPORTED_LONGITUDINAL) #| CAR.with_flags(HyundaiFlags.LEGACY)
 

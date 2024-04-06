@@ -3,7 +3,7 @@ from openpilot.common.conversions import Conversions as CV
 from openpilot.common.numpy_fast import clip
 from openpilot.common.realtime import DT_CTRL
 from opendbc.can.packer import CANPacker
-from openpilot.selfdrive.car import apply_driver_steer_torque_limits, common_fault_avoidance
+from openpilot.selfdrive.car import apply_driver_steer_torque_limits, common_fault_avoidance, apply_std_steer_angle_limits
 from openpilot.selfdrive.car.hyundai import hyundaicanfd, hyundaican
 from openpilot.selfdrive.car.hyundai.hyundaicanfd import CanBus
 from openpilot.selfdrive.car.hyundai.values import HyundaiFlags, Buttons, CarControllerParams, CANFD_CAR, CAR, CAN_GEARS
@@ -59,6 +59,9 @@ class CarController(CarControllerBase):
     self.car_fingerprint = CP.carFingerprint
     self.last_button_frame = 0
 
+    self.apply_angle_last = 0
+    self.lkas_max_torque = 0
+
     self.turning_signal_timer = 0
     self.turning_indicator_alert = False
 
@@ -75,6 +78,25 @@ class CarController(CarControllerBase):
                                                                        self.angle_limit_counter, MAX_ANGLE_FRAMES,
                                                                        MAX_ANGLE_CONSECUTIVE_FRAMES)
 
+    apply_angle = apply_std_steer_angle_limits(actuators.steeringAngleDeg, self.apply_angle_last, CS.out.vEgoRaw, self.params)
+
+    # Figure out torque value.  On Stock when LKAS is active, this is variable,
+    # but 0 when LKAS is not actively steering, so because we're "tricking" ADAS
+    # into thinking LKAS is always active, we need to make sure we're applying
+    # torque when the driver is not actively steering. The default value chosen
+    # here is based on observations of the stock LKAS system when it's engaged
+    # CS.out.steeringPressed and steeringTorque are based on the
+    # STEERING_COL_TORQUE value
+    if not bool(CS.out.steeringPressed):
+      self.lkas_max_torque = 130
+    else:
+      # Steering torque seems to be a different scale than applied torque, so we
+      # calculate a percentage based on observed "max" values (~|1200| based on
+      # MDPS STEERING_COL_TORQUE) and then apply that percentage to our normal
+      # max torque
+      driver_applied_torque_pct = min(abs(CS.out.steeringTorque) / 1200.0, 1.0)
+      self.lkas_max_torque = 130 - (driver_applied_torque_pct * 130)
+
     # Disable steering while turning blinker on and speed below 60 kph
     if CS.out.leftBlinker or CS.out.rightBlinker:
       self.turning_signal_timer = 0.5 / DT_CTRL  # Disable for 0.5 Seconds after blinker turned off
@@ -84,7 +106,11 @@ class CarController(CarControllerBase):
       self.turning_signal_timer -= 1
 
     if not CC.latActive:
+      apply_angle = CS.out.steeringAngleDeg
       apply_steer = 0
+      self.lkas_max_torque = 0
+
+    self.apply_angle_last = apply_angle
 
     # Hold torque with induced temporary fault when cutting the actuation bit
     torque_fault = CC.latActive and not apply_steer_req
@@ -121,7 +147,12 @@ class CarController(CarControllerBase):
           can_sends.append([0x7b1, 0, b"\x02\x3E\x80\x00\x00\x00\x00\x00", self.CAN.ECAN])
 
       # steering control
-      can_sends.extend(hyundaicanfd.create_steering_messages(self.packer, self.CP, self.CAN, CC.enabled, apply_steer_req, apply_steer))
+      if self.CP.flags & HyundaiFlags.STEER_ANGLE:
+        can_sends.extend(hyundaicanfd.create_steering_messages_angle(self.packer, self.CP, self.CAN, CC.enabled,
+                                                                     apply_steer_req, CS.out.steeringPressed,
+                                                                     apply_steer, apply_angle, self.lkas_max_torque))
+      else:
+        can_sends.extend(hyundaicanfd.create_steering_messages(self.packer, self.CP, self.CAN, CC.enabled, apply_steer_req, apply_steer))
 
       # prevent LFA from activating on HDA2 by sending "no lane lines detected" to ADAS ECU
       if self.frame % 5 == 0 and hda2:
