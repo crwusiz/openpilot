@@ -1,6 +1,10 @@
 #pragma once
 
+#include <QVBoxLayout>
 #include <memory>
+
+#include "selfdrive/ui/qt/onroad/buttons.h"
+#include "selfdrive/ui/qt/widgets/cameraview.h"
 
 #include <QPushButton>
 #include <QStackedLayout>
@@ -8,81 +12,7 @@
 
 #include "common/util.h"
 #include "selfdrive/ui/ui.h"
-#include "selfdrive/ui/qt/widgets/cameraview.h"
 
-
-//const int btn_size = 192;
-//const int img_size = (btn_size / 4) * 3;
-const int btn_size = 160;
-const int img_size = (btn_size / 2) * 1.5;
-
-// ***** onroad widgets *****
-class OnroadAlerts : public QWidget {
-  Q_OBJECT
-
-public:
-  OnroadAlerts(QWidget *parent = 0) : QWidget(parent) {}
-  void updateState(const UIState &s);
-  void clear();
-
-protected:
-  struct Alert {
-    QString text1;
-    QString text2;
-    QString type;
-    cereal::ControlsState::AlertSize size;
-    cereal::ControlsState::AlertStatus status;
-
-    bool equal(const Alert &other) const {
-      return text1 == other.text1 && other.text2 == other.text2 && type == other.type;
-    }
-  };
-
-  const QMap<cereal::ControlsState::AlertStatus, QColor> alert_colors = {
-    {cereal::ControlsState::AlertStatus::NORMAL, QColor(0x15, 0x15, 0x15, 0x64)},
-    {cereal::ControlsState::AlertStatus::USER_PROMPT, QColor(0xDA, 0x6F, 0x25, 0x64)},
-    {cereal::ControlsState::AlertStatus::CRITICAL, QColor(0xC9, 0x22, 0x31, 0x64)},
-  };
-
-  void paintEvent(QPaintEvent*) override;
-  OnroadAlerts::Alert getAlert(const SubMaster &sm, uint64_t started_frame);
-
-  QColor bg;
-  Alert alert = {};
-};
-
-class ExperimentalButton : public QPushButton {
-  Q_OBJECT
-
-public:
-  explicit ExperimentalButton(QWidget *parent = 0);
-  void updateState(const UIState &s);
-
-private:
-  void paintEvent(QPaintEvent *event) override;
-  void changeMode();
-
-  Params params;
-  QPixmap engage_img;
-  QPixmap experimental_img;
-  bool experimental_mode;
-  bool engageable;
-};
-
-
-class MapSettingsButton : public QPushButton {
-  Q_OBJECT
-
-public:
-  explicit MapSettingsButton(QWidget *parent = 0);
-
-private:
-  void paintEvent(QPaintEvent *event) override;
-
-  QPixmap settings_img;
-};
-
-// container window for the NVG UI
 class AnnotatedCameraWidget : public CameraWidget {
   Q_OBJECT
 
@@ -184,32 +114,4 @@ protected:
 
   double prev_draw_t = 0;
   FirstOrderFilter fps_filter;
-};
-
-// container for all onroad widgets
-class OnroadWindow : public QWidget {
-  Q_OBJECT
-
-public:
-  OnroadWindow(QWidget* parent = 0);
-  bool isMapVisible() const { return map && map->isVisible(); }
-  void showMapPanel(bool show) { if (map) map->setVisible(show); }
-
-signals:
-  void mapPanelRequested();
-
-private:
-  void createMapWidget();
-  void paintEvent(QPaintEvent *event);
-  void mousePressEvent(QMouseEvent* e) override;
-  OnroadAlerts *alerts;
-  AnnotatedCameraWidget *nvg;
-  QColor bg = bg_colors[STATUS_DISENGAGED];
-  QWidget *map = nullptr;
-  QHBoxLayout* split;
-
-private slots:
-  void offroadTransition(bool offroad);
-  void primeChanged(bool prime);
-  void updateState(const UIState &s);
 };
