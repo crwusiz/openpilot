@@ -628,7 +628,7 @@ class CAR(Platforms):
       HyundaiCarDocs("KIA EV9 (MV)", car_parts=CarParts.common([CarHarness.hyundai_k])),
     ],
     CarSpecs(mass=2625, wheelbase=3.1, steerRatio=16.02),
-    flags=HyundaiFlags.STEER_ANGLE,
+    flags=HyundaiFlags.EV | HyundaiFlags.STEER_ANGLE,
   )
 
   # Genesis

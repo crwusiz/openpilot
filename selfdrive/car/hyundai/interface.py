@@ -71,7 +71,8 @@ class CarInterface(CarInterfaceBase):
 
     ret.steerActuatorDelay = 0.1  # Default delay
     ret.steerLimitTimer = 0.4
-    CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
+    if candidate not in STEER_ANGLE:
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     if candidate in STEER_ANGLE:
       ret.steerControlType = SteerControlType.angle
