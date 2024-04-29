@@ -1,3 +1,5 @@
+import copy
+
 from cereal import car
 from panda import Panda
 from openpilot.common.params import Params
@@ -21,6 +23,10 @@ BUTTONS_DICT = {Buttons.RES_ACCEL: ButtonType.accelCruise, Buttons.SET_DECEL: Bu
 
 
 class CarInterface(CarInterfaceBase):
+  def __init__(self, CP, CarController, CarState):
+    super().__init__(CP, CarController, CarState)
+    self.CAN = CanBus(CP)
+
   @staticmethod
   def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs):
     ret.carName = "hyundai"
@@ -225,28 +231,33 @@ class CarInterface(CarInterfaceBase):
 
     return ret
 
-
   @staticmethod
   def get_params_adjust_set_speed():
-    return [8, 10], [12, 14, 16, 18]
+    return [16, 20], [12, 14, 16, 18]
 
   def create_buttons(self, button):
     if self.CP.carFingerprint in CANFD_CAR:
-      return self.create_buttons_canfd(button)
+      if self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
+        return self.create_buttons_can_fd_alt(button)
+      return self.create_buttons_can_fd(button)
     else:
       return self.create_buttons_can(button)
 
   def create_buttons_can(self, button):
-    values = self.CS.clu11
+    values = copy.copy(self.CS.clu11)
     values["CF_Clu_CruiseSwState"] = button
     values["CF_Clu_AliveCnt1"] = (values["CF_Clu_AliveCnt1"] + 1) % 0x10
     return self.CC.packer.make_can_msg("CLU11", self.CP.sccBus, values)
 
-  def create_buttons_canfd(self, button):
+  def create_buttons_can_fd(self, button):
     values = {
-      "COUNTER": self.CS.buttons_counter+1,
+      "COUNTER": (self.CS.buttons_counter + 1) % 15,
       "SET_ME_1": 1,
       "CRUISE_BUTTONS": button,
     }
-    return self.CC.packer.make_can_msg("CRUISE_BUTTONS", 5, values)
+    bus = self.CAN.ECAN if self.CP.flags & HyundaiFlags.CANFD_HDA2 else self.CAN.CAM
+    return self.CC.packer.make_can_msg("CRUISE_BUTTONS", bus, values)
+
+  def create_buttons_can_fd_alt(self, button):
+    return None
 

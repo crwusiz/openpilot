@@ -159,17 +159,19 @@ class SpeedController:
 
 
   def get_long_lead_speed(self, clu_speed, sm):
-    lead = self.get_lead(sm)
-    if lead is not None:
-      d = lead.dRel - 5.
-      if 0. < d < -lead.vRel * 11. * 2. and lead.vRel < -1.:
-        t = d / lead.vRel
-        accel = -(lead.vRel / t) * self.speed_conv_to_clu
-        accel *= 1.5 #1.2
-        if accel < 0.:
-          target_speed = clu_speed + accel
-          target_speed = max(target_speed, self.min_set_speed_clu)
-          return target_speed
+    if self.long_control:
+      lead = self.get_lead(sm)
+      if lead is not None:
+        d = lead.dRel - 5.
+        if 0. < d < -lead.vRel * 11. * 2. and lead.vRel < -1.:
+          t = d / lead.vRel
+          accel = -(lead.vRel / t) * self.speed_conv_to_clu
+          accel *= 1.5 #1.2
+
+          if accel < 0.:
+            target_speed = clu_speed + accel
+            target_speed = max(target_speed, self.min_set_speed_clu)
+            return target_speed
     return 0
 
 
@@ -269,12 +271,13 @@ class SpeedController:
       if self.alive_timer == 0:
         current_set_speed_clu = int(round(CS.cruiseState.speed * self.speed_conv_to_clu))
         self.btn = self.get_button(current_set_speed_clu)
-        self.alive_count = self.get_alive_count()
+        self.alive_count = 1
 
       if self.btn != Buttons.NONE:
         can = self.CI.create_buttons(self.btn)
         if can is not None:
-          can_sends.append(can)
+          for _ in range(self.get_alive_count()):
+            can_sends.append(can)
 
         self.alive_timer += 1
 
