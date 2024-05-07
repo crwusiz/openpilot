@@ -225,6 +225,12 @@ class CarState(CarStateBase):
     gear = cp.vl[self.gear_msg_canfd]["GEAR"]
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(gear))
 
+    tpms_unit = cp.vl["TPMS"]["UNIT"] * 0.725 if int(cp.vl["TPMS"]["UNIT"]) > 0 else 1.
+    ret.tpms.fl = tpms_unit * cp.vl["TPMS"]["PRESSURE_FL"]
+    ret.tpms.fr = tpms_unit * cp.vl["TPMS"]["PRESSURE_FR"]
+    ret.tpms.rl = tpms_unit * cp.vl["TPMS"]["PRESSURE_RL"]
+    ret.tpms.rr = tpms_unit * cp.vl["TPMS"]["PRESSURE_RR"]
+
     # TODO: figure out positions
     ret.wheelSpeeds = self.get_wheel_speeds(cp.vl["WHEEL_SPEEDS"]["WHEEL_SPEED_1"], cp.vl["WHEEL_SPEEDS"]["WHEEL_SPEED_2"],
                                             cp.vl["WHEEL_SPEEDS"]["WHEEL_SPEED_3"], cp.vl["WHEEL_SPEEDS"]["WHEEL_SPEED_4"])
@@ -394,6 +400,7 @@ class CarState(CarStateBase):
       ("MDPS", 100),
       ("TCS", 50),
       ("CRUISE_BUTTONS_ALT", 50),
+      ("TPMS", 5),
       ("BLINKERS", 4),
       ("DOORS_SEATBELTS", 4),
     ]

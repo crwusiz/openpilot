@@ -494,21 +494,18 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     }
 
     // tpms (bottom right)
-    bool is_canfd = params.getBool("IsCanfd");
-    if (!is_canfd) {
-      w = 160;
-      h = 208;
-      x = rect().right() - w - (UI_BORDER_SIZE * 2);
-      y = height() - h - (UI_BORDER_SIZE * 2);
+    w = 160;
+    h = 208;
+    x = rect().right() - w - (UI_BORDER_SIZE * 2);
+    y = height() - h - (UI_BORDER_SIZE * 2);
 
-      p.drawPixmap(x, y, w, h, tpms_img);
+    p.drawPixmap(x, y, w, h, tpms_img);
 
-      p.setFont(InterFont(30, QFont::Bold));
-      drawTextColor(p, x + 25, y + 56, get_tpms_text(fl), get_tpms_color(fl));
-      drawTextColor(p, x + 133, y + 56, get_tpms_text(fr), get_tpms_color(fr));
-      drawTextColor(p, x + 25, y + 171, get_tpms_text(rl), get_tpms_color(rl));
-      drawTextColor(p, x + 133, y + 171, get_tpms_text(rr), get_tpms_color(rr));
-    }
+    p.setFont(InterFont(30, QFont::Bold));
+    drawTextColor(p, x + 25, y + 56, get_tpms_text(fl), get_tpms_color(fl));
+    drawTextColor(p, x + 133, y + 56, get_tpms_text(fr), get_tpms_color(fr));
+    drawTextColor(p, x + 25, y + 171, get_tpms_text(rl), get_tpms_color(rl));
+    drawTextColor(p, x + 133, y + 171, get_tpms_text(rr), get_tpms_color(rr));
   }
 
   // bottom left info
