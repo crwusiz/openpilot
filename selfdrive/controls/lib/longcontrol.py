@@ -9,8 +9,8 @@ LongCtrlState = car.CarControl.Actuators.LongControlState
 
 
 def long_control_state_trans(CP, active, long_control_state, v_ego, v_target,
-                             v_target_1sec, brake_pressed, cruise_standstill):
-  accelerating = v_target_1sec > v_target
+                             v_target_1sec, brake_pressed, cruise_standstill, lead):
+  accelerating = v_target_1sec > v_target and (not lead.status or (lead.vLeadK > 0.3 and lead.dRel > 3.5))
   planned_stop = (v_target < CP.vEgoStopping and
                   v_target_1sec < CP.vEgoStopping and
                   not accelerating)
@@ -34,7 +34,7 @@ def long_control_state_trans(CP, active, long_control_state, v_ego, v_target,
         long_control_state = LongCtrlState.stopping
 
     elif long_control_state == LongCtrlState.stopping:
-      if starting_condition and CP.startingState:
+      if starting_condition and CP.startingState and v_ego < 0.01:
         long_control_state = LongCtrlState.starting
       elif starting_condition:
         long_control_state = LongCtrlState.pid
@@ -63,7 +63,7 @@ class LongControl:
     self.pid.reset()
     self.v_pid = v_pid
 
-  def update(self, active, CS, long_plan, accel_limits, t_since_plan):
+  def update(self, active, CS, sm, long_plan, accel_limits, t_since_plan):
     """Update longitudinal control. This updates the state machine and runs a PID loop"""
     # Interp control trajectory
     speeds = long_plan.speeds
@@ -93,7 +93,7 @@ class LongControl:
     output_accel = self.last_output_accel
     self.long_control_state = long_control_state_trans(self.CP, active, self.long_control_state, CS.vEgo,
                                                        v_target, v_target_1sec, CS.brakePressed,
-                                                       CS.cruiseState.standstill)
+                                                       CS.cruiseState.standstill, sm['radarState'].leadOne)
 
     if self.long_control_state == LongCtrlState.off:
       self.reset(CS.vEgo)

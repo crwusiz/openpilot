@@ -116,6 +116,8 @@ class CarInterface(CarInterfaceBase):
 
       ret.enableBsm = 0x1e5 in fingerprint[CAN.ECAN]
       ret.hasNav = 0x1fa in fingerprint[CAN.ECAN]
+      ret.hasAutoHold = 0x60 in fingerprint[CAN.ECAN]
+
       ret.radarUnavailable = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
     else:
       Params().put_bool("IsCanfd", False)

@@ -88,6 +88,7 @@ procs = [
 
   # Process add
   PythonProcess("navi_controller", "selfdrive.controls.neokii.navi_controller", always_run),
+  PythonProcess("navi_route", "selfdrive.controls.neokii.navi_route", only_onroad, enabled=Params().get_bool('UseExternalNaviRoutes')),
   PythonProcess("otisserv", "selfdrive.navd.otisserv", always_run),
 ]
 

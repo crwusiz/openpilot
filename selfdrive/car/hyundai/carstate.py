@@ -231,6 +231,9 @@ class CarState(CarStateBase):
     ret.tpms.rl = tpms_unit * cp.vl["TPMS"]["PRESSURE_RL"]
     ret.tpms.rr = tpms_unit * cp.vl["TPMS"]["PRESSURE_RR"]
 
+    if self.CP.hasAutoHold:
+      ret.autoHold = cp.vl["ESP_STATUS"]["AUTO_HOLD"]
+
     # TODO: figure out positions
     ret.wheelSpeeds = self.get_wheel_speeds(cp.vl["WHEEL_SPEEDS"]["WHEEL_SPEED_1"], cp.vl["WHEEL_SPEEDS"]["WHEEL_SPEED_2"],
                                             cp.vl["WHEEL_SPEEDS"]["WHEEL_SPEED_3"], cp.vl["WHEEL_SPEEDS"]["WHEEL_SPEED_4"])
@@ -403,6 +406,7 @@ class CarState(CarStateBase):
       ("TPMS", 5),
       ("BLINKERS", 4),
       ("DOORS_SEATBELTS", 4),
+      ("ESP_STATUS", 0),
     ]
 
     if CP.flags & HyundaiFlags.EV:

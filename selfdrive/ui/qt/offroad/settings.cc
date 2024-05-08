@@ -712,6 +712,11 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   tr("Use Stock Navigation Limit Speed Signal"),
                                   "../assets/offroad/icon_speed_limit.png",
                                   this));
+  toggles.append(new ParamControl("UseExternalNaviRoutes",
+                                  tr("Use external navi routes"),
+                                  tr("Use external navi routes"),
+                                  "../assets/offroad/icon_map.png",
+                                  this));
   if (is_canfd) {
     toggles.append(new ParamControl("IsHda2",
                                     tr("CANFD Car HDA2"),

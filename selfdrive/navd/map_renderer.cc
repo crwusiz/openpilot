@@ -10,6 +10,9 @@
 #include "common/swaglog.h"
 #include "selfdrive/ui/qt/maps/map_helpers.h"
 
+#include "selfdrive/controls/neokii/navi_gps_manager.h"
+NaviGpsManager navi_gps_manager;
+
 const float DEFAULT_ZOOM = 13.5; // Don't go below 13 or features will start to disappear
 const int HEIGHT = 256, WIDTH = 256;
 const int NUM_VIPC_BUFFERS = 4;
@@ -119,7 +122,7 @@ MapRenderer::MapRenderer(const QMapLibre::Settings &settings, bool online) : m_s
 void MapRenderer::msgUpdate() {
   sm->update(1000);
 
-  if (sm->updated("liveLocationKalman")) {
+  if (sm->updated("liveLocationKalman") || navi_gps_manager.isValid()) {
     auto location = (*sm)["liveLocationKalman"].getLiveLocationKalman();
     auto pos = location.getPositionGeodetic();
     auto orientation = location.getCalibratedOrientationNED();
@@ -162,6 +165,11 @@ void MapRenderer::updatePosition(QMapLibre::Coordinate position, float bearing) 
   float meters_per_pixel = 2;
   float zoom = get_zoom_level_for_scale(position.first, meters_per_pixel);
 
+  if(navi_gps_manager.check()) {
+    float speed;
+    navi_gps_manager.update(position, bearing, speed);
+  }
+
   m_map->setCoordinate(position);
   m_map->setBearing(bearing);
   m_map->setZoom(zoom);
@@ -195,6 +203,7 @@ void MapRenderer::publish(const double render_time, const bool loaded) {
 
   auto location = (*sm)["liveLocationKalman"].getLiveLocationKalman();
   bool valid = loaded && (location.getStatus() == cereal::LiveLocationKalman::Status::VALID) && location.getPositionGeodetic().getValid();
+  valid = valid || navi_gps_manager.isValid();
   ever_loaded = ever_loaded || loaded;
   uint64_t ts = nanos_since_boot();
   VisionBuf* buf = vipc_server->get_buffer(VisionStreamType::VISION_STREAM_MAP);

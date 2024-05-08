@@ -104,7 +104,7 @@ class SpeedController:
 
   def cal_max_speed(self, CS, sm, clu_speed, v_cruise_kph):
     # kph
-    apply_limit_speed, road_limit_speed, left_dist, first_started, max_speed_log = \
+    apply_limit_speed, road_limit_speed, left_dist, first_started, cam_type, max_speed_log = \
       SpeedLimiter.instance().get_max_speed(clu_speed, self.is_metric)
 
     self.cal_curve_speed(sm, CS.vEgo, sm.frame)

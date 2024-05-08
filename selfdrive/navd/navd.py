@@ -128,8 +128,8 @@ class RouteEngine:
       lang = lang.replace('main_', '')
 
     token = self.mapbox_token
-    if token is None:
-      token = self.api.get_token()
+    #if token is None:
+    #  token = self.api.get_token()
 
     params = {
       'access_token': token,
