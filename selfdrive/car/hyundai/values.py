@@ -904,6 +904,3 @@ STEER_ANGLE = CAR.with_flags(HyundaiFlags.STEER_ANGLE)
 UNSUPPORTED_LONGITUDINAL_CAR = CAR.with_flags(HyundaiFlags.UNSUPPORTED_LONGITUDINAL) #| CAR.with_flags(HyundaiFlags.LEGACY)
 
 DBC = CAR.create_dbc_map()
-
-if __name__ == "__main__":
-  CAR.print_debug(HyundaiFlags)
