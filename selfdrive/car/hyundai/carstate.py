@@ -298,7 +298,7 @@ class CarState(CarStateBase):
       ret.navLimitSpeed = cp.vl["CLUSTER_SPEED_LIMIT"]["SPEED_LIMIT_1"]
 
     prev_lfa_btn = self.lfa_btn
-    self.lfa_btn = cp.vl[self.cruise_btns_msg_canfd]["LKAS_BTN"]
+    self.lfa_btn = cp.vl[self.cruise_btns_msg_canfd]["LFA_BTN"]
     if prev_lfa_btn != 1 and self.lfa_btn == 1:
       self.lfa_enabled = not self.lfa_enabled
 
