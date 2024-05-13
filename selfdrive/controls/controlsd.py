@@ -119,7 +119,6 @@ class Controls:
     #if not self.CP.openpilotLongitudinalControl:
     #  self.params.remove("ExperimentalMode")
 
-    self.CS_prev = car.CarState.new_message()
     self.AM = AlertManager()
     self.events = Events()
 
@@ -214,18 +213,6 @@ class Controls:
     resume_pressed = any(be.type in (ButtonType.accelCruise, ButtonType.resumeCruise) for be in CS.buttonEvents)
     if not self.CP.pcmCruise and not self.v_cruise_helper.v_cruise_initialized and resume_pressed:
       self.events.add(EventName.resumeBlocked)
-
-    # Disable on rising edge of accelerator or brake. Also disable on brake when speed > 0
-    #if (CS.gasPressed and not self.CS_prev.gasPressed and self.disengage_on_accelerator) or \
-    #  (CS.brakePressed and (not self.CS_prev.brakePressed or not CS.standstill)) or \
-    #  (CS.regenBraking and (not self.CS_prev.regenBraking or not CS.standstill)):
-    #  self.events.add(EventName.pedalPressed)
-
-    #if CS.brakePressed and CS.standstill:
-    #  self.events.add(EventName.preEnableStandstill)
-
-    if CS.gasPressed:
-      self.events.add(EventName.gasPressedOverride)
 
     if not self.CP.notCar and not self.d_camera_hardware_missing:
       self.events.add_from_msg(self.sm['driverMonitoringState'].events)
@@ -849,8 +836,6 @@ class Controls:
 
     # Publish data
     self.publish_logs(CS, start_time, CC, lac_log)
-
-    self.CS_prev = CS
 
   def read_personality_param(self):
     try:

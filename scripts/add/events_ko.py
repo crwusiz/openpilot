@@ -3,6 +3,7 @@ import math
 import os
 from enum import IntEnum
 from collections.abc import Callable
+from sortedcontainers import SortedList
 
 from cereal import log, car
 import cereal.messaging as messaging
@@ -48,12 +49,12 @@ EVENT_NAME = {v: k for k, v in EventName.schema.enumerants.items()}
 
 class Events:
   def __init__(self):
-    self.events: list[int] = []
-    self.static_events: list[int] = []
+    self.events: SortedList[int] = SortedList()
+    self.static_events: SortedList[int] = SortedList()
     self.events_prev = dict.fromkeys(EVENTS.keys(), 0)
 
   @property
-  def names(self) -> list[int]:
+  def names(self) -> SortedList[int]:
     return self.events
 
   def __len__(self) -> int:
@@ -61,8 +62,8 @@ class Events:
 
   def add(self, event_name: int, static: bool=False) -> None:
     if static:
-      self.static_events.append(event_name)
-    self.events.append(event_name)
+      self.static_events.add(event_name)
+    self.events.add(event_name)
 
   def clear(self) -> None:
     self.events_prev = {k: (v + 1 if k in self.events else 0) for k, v in self.events_prev.items()}
@@ -92,7 +93,7 @@ class Events:
 
   def add_from_msg(self, events):
     for e in events:
-      self.events.append(e.name.raw)
+      self.events.add(e.name.raw)
 
   def to_msg(self):
     ret = []
@@ -216,7 +217,6 @@ def soft_disable_alert(alert_text_2: str) -> AlertCallbackType:
     return SoftDisableAlert(alert_text_2)
   return func
 
-
 def user_soft_disable_alert(alert_text_2: str) -> AlertCallbackType:
   def func(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
     if soft_disable_time < int(0.5 / DT_CTRL):
@@ -224,14 +224,12 @@ def user_soft_disable_alert(alert_text_2: str) -> AlertCallbackType:
     return UserSoftDisableAlert(alert_text_2)
   return func
 
-
 def startup_master_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
   branch = get_short_branch()  # Ensure get_short_branch is cached to avoid lags on startup
   if "REPLAY" in os.environ:
     branch = "replay"
 
   return StartupAlert("경고: 이 브랜치는 테스트되지 않았습니다", branch, alert_status=AlertStatus.userPrompt)
-
 
 def below_engage_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
   return NoEntryAlert(f"{get_display_speed(CP.minEnableSpeed, metric)} 이상의 속도에서 활성됩니다")
