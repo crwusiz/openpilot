@@ -266,6 +266,7 @@ FW_VERSIONS = {
     (Ecu.combinationMeter, 0x742, None): [
       b'68302211AC',
       b'68302212AD',
+      b'68302223AC',
       b'68302246AC',
       b'68331511AC',
       b'68331574AC',
@@ -424,6 +425,7 @@ FW_VERSIONS = {
       b'68631938AA',
       b'68631939AA',
       b'68631940AA',
+      b'68631940AB',
       b'68631942AA',
       b'68631943AB',
     ],
