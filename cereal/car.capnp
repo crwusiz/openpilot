@@ -115,10 +115,11 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     locationdPermanentError @118;
     paramsdTemporaryError @50;
     paramsdPermanentError @119;
+    actuatorsApiUnavailable @120;
 
     slowingDownSpeed @124;
     slowingDownSpeedSound @125;
-    cruiseOn @120;
+    cruiseOn @126;
     cruiseOff @121;
     turningIndicatorOn @122;
     autoLaneChange @123;
