@@ -6,7 +6,7 @@ from openpilot.common.params import Params
 from openpilot.selfdrive.car.hyundai.hyundaicanfd import CanBus
 from openpilot.selfdrive.car.hyundai.values import HyundaiFlags, CAR, DBC, CANFD_CAR, CAMERA_SCC_CAR, CANFD_RADAR_SCC_CAR, \
                                          CANFD_UNSUPPORTED_LONGITUDINAL_CAR, EV_CAR, HYBRID_CAR, LEGACY_SAFETY_MODE_CAR, \
-                                         UNSUPPORTED_LONGITUDINAL_CAR, Buttons, STEER_ANGLE
+                                         UNSUPPORTED_LONGITUDINAL_CAR, Buttons, STEER_ANGLE, HyundaiExFlags
 from openpilot.selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR
 from openpilot.selfdrive.car import create_button_events, get_safety_config
 from openpilot.selfdrive.car.interfaces import CarInterfaceBase
@@ -115,23 +115,39 @@ class CarInterface(CarInterfaceBase):
       Params().put_bool("SccOnBus2", False)
 
       ret.enableBsm = 0x1e5 in fingerprint[CAN.ECAN]
-      ret.hasNav = 0x1fa in fingerprint[CAN.ECAN]
-      ret.hasAutoHold = 0x60 in fingerprint[CAN.ECAN]
+
+      if 0x60 in fingerprint[CAN.ECAN]:
+        ret.exFlags |= HyundaiExFlags.AUTOHOLD.value
+      if 0x3a0 in fingerprint[CAN.ECAN]:
+        ret.exFlags |= HyundaiExFlags.TPMS.value
+      if 0x1fa in fingerprint[CAN.ECAN]:
+        ret.exFlags |= HyundaiExFlags.NAVI.value
+      if {0x1AA, 0x1CF} & set(fingerprint[CAN.ECAN]):
+        ret.exFlags |= HyundaiExFlags.LFA.value
 
       ret.radarUnavailable = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
     else:
       Params().put_bool("IsCanfd", False)
 
       ret.enableBsm = 0x58b in fingerprint[0]
-      ret.hasAutoHold = 0x47f in fingerprint[0]
-      ret.hasNav = 0x544 in fingerprint[0] and Params().get_bool("NavLimitSpeed")
-      ret.hasLfa = 0x391 in fingerprint[0]
+
+      if 0x47f in fingerprint[0]:
+        ret.exFlags |= HyundaiExFlags.AUTOHOLD.value
+      if 0x593 in fingerprint[0]:
+        ret.exFlags |= HyundaiExFlags.TPMS.value
+      if 0x544 in fingerprint[0]:
+        ret.exFlags |= HyundaiExFlags.NAVI.value
+      if 0x391 in fingerprint[0]:
+        ret.exFlags |= HyundaiExFlags.LFA.value
+
       ret.sccBus = 2 if Params().get_bool("SccOnBus2") else 0
 
       if ret.sccBus == 2:
         Params().put_bool("ExperimentalLongitudinalEnabled", True)
-        ret.hasScc13 = 0x50a in fingerprint[2] #or 0x50a in fingerprint[0]
-        ret.hasScc14 = 0x389 in fingerprint[2] #or 0x389 in fingerprint[0]
+        if any(0x50a in fingerprint[i] for i in [0, 2]):
+          ret.exFlags |= HyundaiExFlags.SCC13.value
+        if any(0x389 in fingerprint[i] for i in [0, 2]):
+          ret.exFlags|=  HyundaiExFlags.SCC14.value
         ret.radarTimeStep = (1.0 / 50)  # 50Hz   SCC11, RadarTrack은 50Hz
       else:
         ret.radarTimeStep = (1.0 / 20)  # 20Hz  RadarTrack 20Hz

@@ -8,7 +8,7 @@ from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
 from openpilot.selfdrive.car.hyundai.hyundaicanfd import CanBus
 from openpilot.selfdrive.car.hyundai.values import (HyundaiFlags, CAR, DBC, Buttons, CAN_GEARS,
-                                                    CANFD_CAR, CarControllerParams)
+                                                    CANFD_CAR, CarControllerParams, HyundaiExFlags)
 from openpilot.selfdrive.car.interfaces import CarStateBase
 
 PREV_BUTTON_SAMPLES = 8
@@ -169,8 +169,9 @@ class CarState(CarStateBase):
     self.mdps12 = copy.copy(cp.vl["MDPS12"])
     self.scc11 = copy.copy(cp_cruise.vl["SCC11"]) if "SCC11" in cp_cruise.vl else None
     self.scc12 = copy.copy(cp_cruise.vl["SCC12"]) if "SCC12" in cp_cruise.vl else None
-    self.scc13 = copy.copy(cp_cruise.vl["SCC13"]) if self.CP.hasScc13 else None
-    self.scc14 = copy.copy(cp_cruise.vl["SCC14"]) if self.CP.hasScc14 else None
+    self.scc13 = copy.copy(cp_cruise.vl["SCC13"]) if self.CP.exFlags & HyundaiExFlags.SCC13 else None
+    self.scc14 = copy.copy(cp_cruise.vl["SCC14"]) if self.CP.exFlags & HyundaiExFlags.SCC14 else None
+
     #self.fca11 = copy.copy(cp_cruise.vl["FCA11"]) if "FCA11" in cp_cruise.vl else None
     #self.fca12 = copy.copy(cp_cruise.vl["FCA12"]) if "FCA12" in cp_cruise.vl else None
 
@@ -180,19 +181,20 @@ class CarState(CarStateBase):
     self.main_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwMain"])
     self.lead_distance = cp_cruise.vl["SCC11"]["ACC_ObjDist"]
 
-    tpms_unit = cp.vl["TPMS11"]["UNIT"] * 0.725 if int(cp.vl["TPMS11"]["UNIT"]) > 0 else 1.
-    ret.tpms.fl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FL"]
-    ret.tpms.fr = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FR"]
-    ret.tpms.rl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_RL"]
-    ret.tpms.rr = tpms_unit * cp.vl["TPMS11"]["PRESSURE_RR"]
+    if self.CP.exFlags & HyundaiExFlags.TPMS:
+      tpms_unit = cp.vl["TPMS11"]["UNIT"] * 0.725 if int(cp.vl["TPMS11"]["UNIT"]) > 0 else 1.
+      ret.tpms.fl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FL"]
+      ret.tpms.fr = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FR"]
+      ret.tpms.rl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_RL"]
+      ret.tpms.rr = tpms_unit * cp.vl["TPMS11"]["PRESSURE_RR"]
 
-    if self.CP.hasAutoHold:
+    if self.CP.exFlags & HyundaiExFlags.AUTOHOLD:
       ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]
 
-    if self.CP.hasNav:
+    if self.CP.exFlags & HyundaiExFlags.NAVI:
       ret.navLimitSpeed = cp.vl["Navi_HU"]["SpeedLim_Nav_Clu"]
 
-    if self.CP.hasLfa:
+    if self.CP.exFlags & HyundaiExFlags.LFA:
       prev_lfa_btn = self.lfa_btn
       self.lfa_btn = cp.vl["BCM_PO_11"]["LFA_Pressed"]
       if prev_lfa_btn != 1 and self.lfa_btn == 1:
@@ -224,15 +226,6 @@ class CarState(CarStateBase):
 
     gear = cp.vl[self.gear_msg_canfd]["GEAR"]
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(gear))
-
-    tpms_unit = cp.vl["TPMS"]["UNIT"] * 0.725 if int(cp.vl["TPMS"]["UNIT"]) > 0 else 1.
-    ret.tpms.fl = tpms_unit * cp.vl["TPMS"]["PRESSURE_FL"]
-    ret.tpms.fr = tpms_unit * cp.vl["TPMS"]["PRESSURE_FR"]
-    ret.tpms.rl = tpms_unit * cp.vl["TPMS"]["PRESSURE_RL"]
-    ret.tpms.rr = tpms_unit * cp.vl["TPMS"]["PRESSURE_RR"]
-
-    if self.CP.hasAutoHold:
-      ret.autoHold = cp.vl["ESP_STATUS"]["AUTO_HOLD"]
 
     # TODO: figure out positions
     ret.wheelSpeeds = self.get_wheel_speeds(cp.vl["WHEEL_SPEEDS"]["WHEEL_SPEED_1"], cp.vl["WHEEL_SPEEDS"]["WHEEL_SPEED_2"],
@@ -294,15 +287,26 @@ class CarState(CarStateBase):
       self.hda2_lfa_block_msg = copy.copy(cp_cam.vl["CAM_0x362"] if self.CP.flags & HyundaiFlags.CANFD_HDA2_ALT_STEERING
                                           else cp_cam.vl["CAM_0x2a4"])
 
-    if self.CP.hasNav:
+    if self.CP.exFlags & HyundaiExFlags.TPMS:
+      tpms_unit = cp.vl["TPMS"]["UNIT"] * 0.725 if int(cp.vl["TPMS"]["UNIT"]) > 0 else 1.
+      ret.tpms.fl = tpms_unit * cp.vl["TPMS"]["PRESSURE_FL"]
+      ret.tpms.fr = tpms_unit * cp.vl["TPMS"]["PRESSURE_FR"]
+      ret.tpms.rl = tpms_unit * cp.vl["TPMS"]["PRESSURE_RL"]
+      ret.tpms.rr = tpms_unit * cp.vl["TPMS"]["PRESSURE_RR"]
+
+    if self.CP.exFlags & HyundaiExFlags.AUTOHOLD:
+      ret.autoHold = cp.vl["ESP_STATUS"]["AUTO_HOLD"]
+
+    if self.CP.exFlags & HyundaiExFlags.NAVI:
       ret.navLimitSpeed = cp.vl["CLUSTER_SPEED_LIMIT"]["SPEED_LIMIT_1"]
 
-    prev_lfa_btn = self.lfa_btn
-    self.lfa_btn = cp.vl[self.cruise_btns_msg_canfd]["LFA_BTN"]
-    if prev_lfa_btn != 1 and self.lfa_btn == 1:
-      self.lfa_enabled = not self.lfa_enabled
+    if self.CP.exFlags & HyundaiExFlags.LFA:
+      prev_lfa_btn = self.lfa_btn
+      self.lfa_btn = cp.vl[self.cruise_btns_msg_canfd]["LFA_BTN"]
+      if prev_lfa_btn != 1 and self.lfa_btn == 1:
+        self.lfa_enabled = not self.lfa_enabled
 
-    ret.cruiseState.available = self.lfa_enabled
+      ret.cruiseState.available = self.lfa_enabled
 
     return ret
 
@@ -325,7 +329,6 @@ class CarState(CarStateBase):
       ("CGW4", 5),
       ("WHL_SPD11", 50),
       ("SAS11", 100),
-      ("TPMS11", 0),
     ]
 
     if not CP.openpilotLongitudinalControl:
@@ -340,13 +343,16 @@ class CarState(CarStateBase):
     if CP.enableBsm:
       messages.append(("LCA11", 50))
 
-    if CP.hasAutoHold:
+    if CP.exFlags & HyundaiExFlags.TPMS:
+      messages.append(("TPMS11", 0))
+
+    if CP.exFlags & HyundaiExFlags.AUTOHOLD:
       messages.append(("ESP11", 50))
 
-    if CP.hasNav:
+    if CP.exFlags & HyundaiExFlags.NAVI:
       messages.append(("Navi_HU", 5))
 
-    if CP.hasLfa:
+    if CP.exFlags & HyundaiExFlags.LFA:
       messages.append(("BCM_PO_11", 50))
 
     if CP.flags & (HyundaiFlags.HYBRID | HyundaiFlags.EV):
@@ -383,10 +389,10 @@ class CarState(CarStateBase):
         ("SCC12", 50),
       ]
 
-      if CP.hasScc13:
+      if CP.exFlags & HyundaiExFlags.SCC13:
         messages.append(("SCC13", 50))
 
-      if CP.hasScc14:
+      if CP.exFlags & HyundaiExFlags.SCC14:
         messages.append(("SCC14", 50))
 
       if CP.flags & HyundaiFlags.USE_FCA.value:
@@ -403,10 +409,8 @@ class CarState(CarStateBase):
       ("MDPS", 100),
       ("TCS", 50),
       ("CRUISE_BUTTONS_ALT", 50),
-      ("TPMS", 5),
       ("BLINKERS", 4),
       ("DOORS_SEATBELTS", 4),
-      ("ESP_STATUS", 0),
     ]
 
     if CP.flags & HyundaiFlags.EV:
@@ -429,7 +433,13 @@ class CarState(CarStateBase):
         ("SCC_CONTROL", 50),
       ]
 
-    if CP.flags & HyundaiFlags.CANFD_HDA2 and CP.hasNav:
+    if CP.exFlags & HyundaiExFlags.TPMS:
+      messages.append(("TPMS", 0))
+
+    if CP.exFlags & HyundaiExFlags.AUTOHOLD:
+      messages.append(("ESP_STATUS", 0))
+
+    if CP.flags & HyundaiFlags.CANFD_HDA2 and CP.exFlags & HyundaiExFlags.NAVI:
       messages.append(("CLUSTER_SPEED_LIMIT", 10))
 
     return CANParser(DBC[CP.carFingerprint]["pt"], messages, CanBus(CP).ECAN)
@@ -445,7 +455,7 @@ class CarState(CarStateBase):
         ("SCC_CONTROL", 50),
       ]
 
-    if not (CP.flags & HyundaiFlags.CANFD_HDA2) and CP.hasNav:
+    if not (CP.flags & HyundaiFlags.CANFD_HDA2) and CP.exFlags & HyundaiExFlags.NAVI:
       messages.append(("CLUSTER_SPEED_LIMIT", 10))
 
     return CANParser(DBC[CP.carFingerprint]["pt"], messages, CanBus(CP).CAM)

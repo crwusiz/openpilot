@@ -201,10 +201,6 @@
         <translation>외부 내비 경로 사용</translation>
     </message>
     <message>
-        <source>Navigation Limit Speed</source>
-        <translation>내비게이션 속도제한 표시</translation>
-    </message>
-    <message>
         <source>Use Stock Navigation Limit Speed Signal</source>
         <translation>차량 순정 내비게이션의 속도제한 정보를 표시합니다</translation>
     </message>
@@ -1056,7 +1052,7 @@ This may take up to a minute.</source>
     <name>Sidebar</name>
     <message>
         <source>CONNECT</source>
-        <translation>연결됨</translation>
+        <translation>커넥트</translation>
     </message>
     <message>
         <source>OFFLINE</source>

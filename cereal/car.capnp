@@ -162,6 +162,8 @@ struct CarState {
   # CAN health
   canValid @26 :Bool;       # invalid counter/checksums
   canTimeout @40 :Bool;     # CAN bus dropped out
+  canErrorCounter @48 :UInt32;
+  canRcvTimeout @49 :Bool;
 
   # car speed
   vEgo @1 :Float32;          # best estimate of speed
@@ -227,10 +229,13 @@ struct CarState {
   fuelGauge @41 :Float32; # battery or fuel tank level from 0.0 to 1.0
   charging @43 :Bool;
 
+  # process meta
+  cumLagMs @50 :Float32;
+
   # neokii
-  autoHold @48 : Int32;
-  tpms @49 : Tpms;
-  navLimitSpeed @50 :Int16;
+  autoHold @51 : Int32;
+  navLimitSpeed @52 :Int16;
+  tpms @53 :Tpms;
 
   struct Tpms {
     fl @0 :Float32;
@@ -721,10 +726,6 @@ struct CarParams {
   maxSteeringAngleDegDEPRECATED @54 :Float32;
 
   # add
-  sccBus @78: Int8;
-  hasAutoHold @79 :Bool;
-  hasScc13 @74 :Bool;
-  hasScc14 @75 :Bool;
-  hasNav @76 :Bool;
-  hasLfa @77 :Bool;
+  sccBus @74: Int8;
+  exFlags @75 :UInt32;
 }

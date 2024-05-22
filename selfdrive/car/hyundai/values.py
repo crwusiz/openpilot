@@ -100,6 +100,13 @@ class HyundaiFlags(IntFlag):
   # LFA2 car angle steer type
   STEER_ANGLE = 2 ** 24
 
+class HyundaiExFlags(IntFlag):
+  AUTOHOLD = 1
+  SCC13 = 2
+  SCC14 = 2 ** 2
+  NAVI = 2 ** 3
+  TPMS = 2 ** 4
+  LFA = 2 ** 5
 
 class Footnote(Enum):
   CANFD = CarFootnote(

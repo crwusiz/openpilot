@@ -62,9 +62,6 @@ class CarController(CarControllerBase):
     self.apply_angle_last = 0
     self.lkas_max_torque = 0
 
-    self.turning_signal_timer = 0
-    self.turning_indicator_alert = False
-
   def update(self, CC, CS, now_nanos):
     actuators = CC.actuators
     hud_control = CC.hudControl
@@ -99,14 +96,6 @@ class CarController(CarControllerBase):
       driver_applied_torque_pct = min(abs(CS.out.steeringTorque) / 1200.0, 1.0)
       # Use max(0, ...) to avoid negative torque in case the
       self.lkas_max_torque = MAX_TORQUE - (driver_applied_torque_pct * MAX_TORQUE)
-
-    # Disable steering while turning blinker on and speed below 60 kph
-    if CS.out.leftBlinker or CS.out.rightBlinker:
-      self.turning_signal_timer = 0.5 / DT_CTRL  # Disable for 0.5 Seconds after blinker turned off
-    if self.turning_indicator_alert: # set and clear by interface
-      CC.latActive = False
-    if self.turning_signal_timer > 0:
-      self.turning_signal_timer -= 1
 
     if not CC.latActive:
       apply_angle = CS.out.steeringAngleDeg
@@ -218,7 +207,7 @@ class CarController(CarControllerBase):
       if self.frame % 1000 == 0:
         print(f'scc11 = {bool(CS.scc11)}  scc12 = {bool(CS.scc12)}  scc13 = {bool(CS.scc13)}  scc14 = {bool(CS.scc14)}  mdps12 = {bool(CS.mdps12)}')
 
-    new_actuators = actuators.copy()
+    new_actuators = actuators.as_builder()
     new_actuators.steer = apply_steer / self.params.STEER_MAX
     new_actuators.steerOutputCan = apply_steer
     new_actuators.steeringAngleDeg = apply_angle
