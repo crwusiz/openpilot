@@ -138,7 +138,7 @@ class CarState(CarStateBase):
     # as this seems to be standard over all cars, but is not the preferred method.
     if self.CP.flags & (HyundaiFlags.HYBRID | HyundaiFlags.EV):
       if self.CP.carFingerprint == CAR.HYUNDAI_NEXO:
-        gear = cp.vl["ELECT_GEAR"]["Elect_Gear_Shifter_NEXO"]
+        gear = cp.vl["EMS20"]["Elect_Gear_Shifter_NEXO"]
       else:
         gear = cp.vl["ELECT_GEAR"]["Elect_Gear_Shifter"]
     elif self.CP.carFingerprint in CAN_GEARS["use_cluster_gears"]:
@@ -365,6 +365,8 @@ class CarState(CarStateBase):
 
     if CP.flags & (HyundaiFlags.HYBRID | HyundaiFlags.EV):
       messages.append(("ELECT_GEAR", 20))
+      if CP.carFingerprint == CAR.HYUNDAI_NEXO:
+        messages.append(("EMS20", 20))
     elif CP.carFingerprint in CAN_GEARS["use_cluster_gears"]:
       pass
     elif CP.carFingerprint in CAN_GEARS["use_tcu_gears"]:

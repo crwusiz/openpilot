@@ -114,6 +114,7 @@ BO_ 234 MDPS: 24 XXX
  SG_ STEERING_COL_TORQUE : 80|13@1+ (1,-4095) [0|4095] "" XXX
  SG_ STEERING_ANGLE : 96|16@1- (-0.1,0) [0|255] "deg" XXX
  SG_ STEERING_ANGLE_2 : 128|16@1- (-0.1,0) [0|65535] "deg" XXX
+ SG_ LFA_ACTIVE : 145|1@0+ (1,0) [0|3] "" XXX
 
 BO_ 256 ACCELERATOR_BRAKE_ALT: 32 XXX
  SG_ CHECKSUM : 0|16@1+ (1,0) [0|65535] "" XXX
@@ -130,7 +131,7 @@ BO_ 272 LKAS_ALT: 32 XXX
  SG_ STEER_REQ : 52|1@1+ (1,0) [0|1] "" XXX
  SG_ TORQUE_REQUEST : 41|11@1+ (1,-1024) [0|4095] "" XXX
  SG_ LKA_ICON : 38|2@1+ (1,0) [0|255] "" XXX
- SG_ NEW_SIGNAL_1 : 27|2@1+ (1,0) [0|255] "" XXX
+ SG_ LKA_ACTIVE : 27|2@1+ (1,0) [0|255] "" XXX
  SG_ LFA_BUTTON : 56|1@1+ (1,0) [0|255] "" XXX
  SG_ COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
  SG_ CHECKSUM : 0|16@1+ (1,0) [0|65535] "" XXX
@@ -156,7 +157,7 @@ BO_ 298 LFA: 16 ADRV
  SG_ STEER_REQ : 52|1@1+ (1,0) [0|1] "" XXX
  SG_ TORQUE_REQUEST : 41|11@1+ (1,-1024) [0|4095] "" XXX
  SG_ LKA_ICON : 38|2@1+ (1,0) [0|255] "" XXX
- SG_ NEW_SIGNAL_1 : 27|2@1+ (1,0) [0|255] "" XXX
+ SG_ LKA_ACTIVE : 27|2@1+ (1,0) [0|255] "" XXX
  SG_ LFA_BUTTON : 56|1@1+ (1,0) [0|255] "" XXX
  SG_ COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
  SG_ CHECKSUM : 0|16@1+ (1,0) [0|65535] "" XXX
@@ -209,6 +210,7 @@ BO_ 373 TCS: 24 XXX
  SG_ PROBABLY_EQUIP : 136|2@1+ (1,0) [0|3] "" XXX
  SG_ AEB_EQUIP_MAYBE : 96|1@0+ (1,0) [0|1] "" XXX
  SG_ EQUIP_MAYBE : 64|1@0+ (1,0) [0|1] "" XXX
+ SG_ DriverOverride : 80|1@0+ (1,0) [0|1] "" XXX
  SG_ DriverBraking : 81|1@0+ (1,0) [0|1] "" XXX
  SG_ DriverBrakingLowSens : 84|1@1+ (1,0) [0|1] "" XXX
  SG_ ACC_REQ : 68|1@0+ (1,0) [0|1] "" XXX
@@ -426,6 +428,7 @@ BO_ 512 ADRV_0x200: 8 ADRV
  SG_ COUNTER : 16|8@1+ (1,0) [0|255] "" XXX
  SG_ SET_ME_E1 : 24|8@1+ (1,0) [0|255] "" XXX
  SG_ SET_ME_3A : 32|8@1+ (1,0) [0|255] "" XXX
+ SG_ TauGapSet : 42|3@0+ (1,0) [0|31] "" XXX
 
 BO_ 513 RADAR_0x201: 32 FRONT_RADAR
  SG_ CHECKSUM : 0|16@1+ (1,0) [0|65535] "" XXX
@@ -724,6 +727,7 @@ VAL_ 426 CRUISE_BUTTONS 0 "none" 1 "res_accel" 2 "set_decel" 3 "gap_distance" 4 
 VAL_ 463 CRUISE_BUTTONS 0 "none" 1 "res_accel" 2 "set_decel" 3 "gap_distance" 4 "pause_resume" ;
 VAL_ 463 RIGHT_PADDLE 0 "Not Pulled" 1 "Pulled";
 VAL_ 463 LEFT_PADDLE 0 "Not Pulled" 1 "Pulled";
+VAL_ 480 LFA_ICON 0 "hidden" 1 "grey" 2 "green" 3 "flashing white";
 VAL_ 676 LEFT_LANE_LINE 0 "Not Detected" 1 "Low Confidence" 2 "Medium Confidence" 3 "High Confidence";
 VAL_ 676 RIGHT_LANE_LINE 0 "Not Detected" 1 "Low Confidence" 2 "Medium Confidence" 3 "High Confidence";
 VAL_ 736 MSLA_STATUS 0 "disabled" 1 "active" 2 "paused";

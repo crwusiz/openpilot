@@ -97,6 +97,9 @@ class Controls:
     ignore = self.sensor_packets + ['testJoystick']
     if SIMULATION:
       ignore += ['driverCameraState', 'managerState']
+    if REPLAY:
+      # no vipc in replay will make them ignored anyways
+      ignore += ['roadCameraState', 'wideRoadCameraState']
     if self.d_camera_hardware_missing:
       ignore += ['driverMonitoringState']
     self.sm = messaging.SubMaster(['deviceState', 'pandaStates', 'peripheralState', 'modelV2', 'liveCalibration',
@@ -421,7 +424,6 @@ class Controls:
 
         self.initialized = True
         self.set_initial_state()
-        self.params.put_bool_nonblocking("ControlsReady", True)
 
         cloudlog.event(
           "controlsd.initialized",

@@ -15,6 +15,7 @@ from openpilot.selfdrive.boardd.boardd import can_list_to_can_capnp
 from openpilot.selfdrive.car.car_helpers import get_car, get_one_can
 from openpilot.selfdrive.car.interfaces import CarInterfaceBase
 from openpilot.selfdrive.controls.lib.events import Events
+from openpilot.selfdrive.controls import controlsd
 
 REPLAY = "REPLAY" in os.environ
 
@@ -38,7 +39,7 @@ class Car:
 
     self.last_actuators_output = car.CarControl.Actuators.new_message()
 
-    params = Params()
+    self.params = Params()
 
     if CI is None:
       # wait for one pandaState and one CAN packet
@@ -46,14 +47,14 @@ class Car:
       get_one_can(self.can_sock)
 
       num_pandas = len(messaging.recv_one_retry(self.sm.sock['pandaStates']).pandaStates)
-      experimental_long_allowed = params.get_bool("ExperimentalLongitudinalEnabled")
+      experimental_long_allowed = self.params.get_bool("ExperimentalLongitudinalEnabled")
       self.CI, self.CP = get_car(self.can_sock, self.pm.sock['sendcan'], experimental_long_allowed, num_pandas)
     else:
       self.CI, self.CP = CI, CI.CP
 
     # set alternative experiences from parameters
-    self.disengage_on_accelerator = params.get_bool("DisengageOnAccelerator")
-    self.disengage_on_brake = params.get_bool("DisengageOnBrake")
+    self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
+    self.disengage_on_brake = self.params.get_bool("DisengageOnBrake")
 
     self.CP.alternativeExperience = 0
     if not self.disengage_on_accelerator:
@@ -62,7 +63,7 @@ class Car:
     if not self.disengage_on_brake:
       self.CP.alternativeExperience |= ALTERNATIVE_EXPERIENCE.ALLOW_AEB
 
-    openpilot_enabled_toggle = params.get_bool("OpenpilotEnabledToggle")
+    openpilot_enabled_toggle = self.params.get_bool("OpenpilotEnabledToggle")
 
     controller_available = self.CI.CC is not None and openpilot_enabled_toggle and not self.CP.dashcamOnly
 
@@ -73,15 +74,15 @@ class Car:
       self.CP.safetyConfigs = [safety_config]
 
     # Write previous route's CarParams
-    prev_cp = params.get("CarParamsPersistent")
+    prev_cp = self.params.get("CarParamsPersistent")
     if prev_cp is not None:
-      params.put("CarParamsPrevRoute", prev_cp)
+      self.params.put("CarParamsPrevRoute", prev_cp)
 
     # Write CarParams for controls and radard
     cp_bytes = self.CP.to_bytes()
-    params.put("CarParams", cp_bytes)
-    params.put_nonblocking("CarParamsCache", cp_bytes)
-    params.put_nonblocking("CarParamsPersistent", cp_bytes)
+    self.params.put("CarParams", cp_bytes)
+    self.params.put_nonblocking("CarParamsCache", cp_bytes)
+    self.params.put_nonblocking("CarParamsPersistent", cp_bytes)
 
     self.events = Events()
 
@@ -151,23 +152,26 @@ class Car:
     cs_send.carState.cumLagMs = -self.rk.remaining * 1000.
     self.pm.send('carState', cs_send)
 
-  def controls_update(self, CS: car.CarState, CC: car.CarControl, controlsd):
+  def controls_update(self, CS: car.CarState, CC: car.CarControl, controlsd_instance):
     """control update loop, driven by carControl"""
 
     if not self.initialized_prev:
       # Initialize CarInterface, once controls are ready
+      # TODO: this can make us miss at least a few cycles when doing an ECU knockout
       self.CI.init(self.CP, self.can_sock, self.pm.sock['sendcan'])
+      # signal boardd to switch to car safety mode
+      self.params.put_bool_nonblocking("ControlsReady", True)
 
     if self.sm.all_alive(['carControl']):
       # send car controls over can
       now_nanos = self.can_log_mono_time if REPLAY else int(time.monotonic() * 1e9)
       self.last_actuators_output, can_sends = self.CI.apply(CC, now_nanos)
-      controlsd.speed_controller_update(CS, can_sends)
+      controlsd_instance.speed_controller_update(CS, can_sends)
       self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
 
       self.CC_prev = CC
 
-  def step(self):
+  def step(self, controlsd_instance):
     CS = self.state_update()
 
     self.update_events(CS)
@@ -177,14 +181,15 @@ class Car:
     initialized = (not any(e.name == EventName.controlsInitializing for e in self.sm['onroadEvents']) and
                    self.sm.seen['onroadEvents'])
     if not self.CP.passive and initialized:
-      self.controls_update(CS, self.sm['carControl'])
+      self.controls_update(CS, self.sm['carControl'], controlsd_instance)
 
     self.initialized_prev = initialized
     self.CS_prev = CS.as_reader()
 
   def card_thread(self):
+    controlsd_instance = controlsd.Controls()
     while True:
-      self.step()
+      self.step(controlsd_instance)
       self.rk.monitor_time()
 
 
