@@ -164,7 +164,7 @@ def hw_state_thread(end_event, hw_queue):
 
 def thermald_thread(end_event, hw_queue) -> None:
   pm = messaging.PubMaster(['deviceState'])
-  sm = messaging.SubMaster(["peripheralState", "gpsLocationExternal", "controlsState", "pandaStates"], poll="pandaStates")
+  sm = messaging.SubMaster(['peripheralState', 'gpsLocationExternal', 'controlsState', 'pandaStates'], poll='pandaStates')
 
   count = 0
 
@@ -204,12 +204,24 @@ def thermald_thread(end_event, hw_queue) -> None:
 
   fan_controller = None
 
+  restart_triggered_ts = 0.
+
   while not end_event.is_set():
     sm.update(PANDA_STATES_TIMEOUT)
 
     pandaStates = sm['pandaStates']
     peripheralState = sm['peripheralState']
     peripheral_panda_present = peripheralState.pandaType != log.PandaState.PandaType.unknown
+
+    # neokii
+    if time.monotonic() - restart_triggered_ts < 5.:
+      onroad_conditions["not_restart_triggered"] = False
+    else:
+      onroad_conditions["not_restart_triggered"] = True
+
+      if params.get_bool("SoftRestartTriggered"):
+        params.put_bool("SoftRestartTriggered", False)
+        restart_triggered_ts = time.monotonic()
 
     if sm.updated['pandaStates'] and len(pandaStates) > 0:
 
