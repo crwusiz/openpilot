@@ -88,9 +88,9 @@ procs = [
   PythonProcess("webjoystick", "tools.bodyteleop.web", notcar),
 
   # Process add
-  PythonProcess("navi_controller", "selfdrive.controls.neokii.navi_controller", always_run),
+  PythonProcess("navi_controller", "selfdrive.controls.neokii.navi_controller", always_run, enabled=not PC),
   PythonProcess("navi_route", "selfdrive.controls.neokii.navi_route", only_onroad, enabled=Params().get_bool('UseExternalNaviRoutes')),
-  PythonProcess("otisserv", "selfdrive.navd.otisserv", always_run),
+  PythonProcess("otisserv", "selfdrive.navd.otisserv", always_run, enabled=not PC),
 ]
 
 managed_processes = {p.name: p for p in procs}
