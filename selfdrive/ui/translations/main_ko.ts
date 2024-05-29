@@ -201,10 +201,6 @@
         <translation>외부 내비 경로 사용</translation>
     </message>
     <message>
-        <source>Use Stock Navigation Limit Speed Signal</source>
-        <translation>차량 순정 내비게이션의 속도제한 정보를 표시합니다</translation>
-    </message>
-    <message>
         <source>Select Branch</source>
         <translation>Branch 선택</translation>
     </message>
@@ -279,6 +275,38 @@
     <message>
         <source>Scons Rebuild&lt;br&gt;&lt;br&gt;Process?</source>
         <translation>Scons 재빌드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
+    </message>
+    <message>
+        <source>carState dump upload</source>
+        <translation>carState 덤프 업로드</translation>
+    </message>
+    <message>
+        <source>carState dump upload&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>carState 덤프 업로드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
+    </message>
+    <message>
+        <source>carParams dump upload</source>
+        <translation>carParams 덤프 업로드</translation>
+    </message>
+    <message>
+        <source>carParams dump upload&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>carParams 덤프 업로드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
+    </message>
+    <message>
+        <source>deviceState dump upload</source>
+        <translation>deviceState 덤프 업로드</translation>
+    </message>
+    <message>
+        <source>deviceState dump upload&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>deviceState 덤프 업로드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
+    </message>
+    <message>
+        <source>pandaStates dump upload</source>
+        <translation>pandaStates 덤프 업로드</translation>
+    </message>
+    <message>
+        <source>pandaStates dump upload&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>pandaStates 덤프 업로드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
     </message>
 </context>
 <context>
@@ -390,11 +418,11 @@
     </message>
     <message>
         <source>Regulatory</source>
-        <translation>규제</translation>
+        <translation type="vanished">규제</translation>
     </message>
     <message>
         <source>VIEW</source>
-        <translation>보기</translation>
+        <translation type="vanished">보기</translation>
     </message>
     <message>
         <source>Change Language</source>
@@ -407,10 +435,6 @@
     <message>
         <source>Select a language</source>
         <translation>언어를 선택하세요</translation>
-    </message>
-    <message>
-        <source>Are you sure you want to reset calibration and live params?</source>
-        <translation>캘리브레이션과 라이브파라미터를 재설정하시겠습니까?</translation>
     </message>
     <message>
         <source>Soft Restart</source>
@@ -484,10 +508,6 @@
         <source>PAIR</source>
         <translation>동기화</translation>
     </message>
-    <message>
-        <source>Process</source>
-        <translation>실행</translation>
-    </message>
 </context>
 <context>
     <name>DriveStats</name>
@@ -510,6 +530,10 @@
     <message>
         <source>Miles</source>
         <translation>Miles</translation>
+    </message>
+    <message>
+        <source>Drive Stats</source>
+        <translation>운행 기록</translation>
     </message>
 </context>
 <context>
@@ -835,6 +859,10 @@
     <message>
         <source>now</source>
         <translation>now</translation>
+    </message>
+    <message>
+        <source>Git Fetch and Reset</source>
+        <translation>Git Fetch and Reset</translation>
     </message>
 </context>
 <context>

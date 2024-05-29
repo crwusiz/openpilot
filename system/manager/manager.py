@@ -111,24 +111,28 @@ def manager_init() -> None:
                        device=HARDWARE.get_device_type())
 
   # log cleanup
-  if os.path.isfile('/data/tmux_error.log'):
-    os.remove('/data/tmux_error.log')
-  if os.path.isfile('/data/can_missing.log'):
-    os.remove('/data/can_missing.log')
-  if os.path.isfile('/data/can_timeout.log'):
-    os.remove('/data/can_timeout.log')
-  if os.path.isfile('/data/can_event_missing.log'):
-    os.remove('/data/can_event_missing.log')
-  if os.path.isfile('/data/can_event_timeout.log'):
-    os.remove('/data/can_event_timeout.log')
+  log_files = [
+    '/data/can_missing.log',
+    '/data/can_timeout.log',
+    '/data/tmux_error.log',
+    '/data/carparams.log',
+    '/data/carstate.log',
+    '/data/devicestate.log',
+    '/data/pandastates.log',
+  ]
+
+  for log_file in log_files:
+    if os.path.isfile(log_file):
+      os.remove(log_file)
 
   # prebuilt
   prebuiltfile = '/data/openpilot/prebuilt'
   prebuilt_enable = params.get_bool("PrebuiltEnable")
-  if not os.path.isfile(prebuiltfile) and prebuilt_enable:
-    os.system("touch /data/openpilot/prebuilt")
-  elif os.path.isfile(prebuiltfile) and not prebuilt_enable:
-    os.system("rm -f /data/openpilot/prebuilt")
+
+  if prebuilt_enable and not os.path.isfile(prebuiltfile):
+    open(prebuiltfile, 'a').close()
+  elif not prebuilt_enable and os.path.isfile(prebuiltfile):
+    os.remove(prebuiltfile)
 
   # preimport all processes
   for p in managed_processes.values():

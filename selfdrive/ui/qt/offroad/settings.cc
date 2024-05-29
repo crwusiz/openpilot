@@ -650,6 +650,34 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     ConfirmationDialog::rich(QString::fromStdString(txt), this);
   });
 
+  auto carstate_dump_upload_btn = new ButtonControl(tr("carState dump upload"), tr("RUN"));
+  QObject::connect(carstate_dump_upload_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("carState dump upload<br><br>Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/scripts/carstate_upload.sh");
+    }
+  });
+
+  auto carparams_dump_upload_btn = new ButtonControl(tr("carParams dump upload"), tr("RUN"));
+  QObject::connect(carparams_dump_upload_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("carParams dump upload<br><br>Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/scripts/carparams_upload.sh");
+    }
+  });
+
+  auto devicestate_dump_upload_btn = new ButtonControl(tr("deviceState dump upload"), tr("RUN"));
+  QObject::connect(devicestate_dump_upload_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("deviceState dump upload<br><br>Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/scripts/devicestate_upload.sh");
+    }
+  });
+
+  auto pandastates_dump_upload_btn = new ButtonControl(tr("pandaStates dump upload"), tr("RUN"));
+  QObject::connect(pandastates_dump_upload_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("pandaStates dump upload<br><br>Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/scripts/pandastates_upload.sh");
+    }
+  });
+
   QHBoxLayout *buttonLayout = new QHBoxLayout;
   buttonLayout->addWidget(vertical_line());
   buttonLayout->addWidget(selectBranch_btn);
@@ -784,10 +812,38 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   buttonLayout5->addWidget(scons_rebuild_btn);
   buttonLayout5->addWidget(vertical_line());
 
+  QHBoxLayout *buttonLayout6 = new QHBoxLayout;
+  buttonLayout6->addWidget(vertical_line());
+  buttonLayout6->addWidget(carstate_dump_upload_btn);
+  buttonLayout6->addWidget(vertical_line());
+
+  QHBoxLayout *buttonLayout7 = new QHBoxLayout;
+  buttonLayout7->addWidget(vertical_line());
+  buttonLayout7->addWidget(carparams_dump_upload_btn);
+  buttonLayout7->addWidget(vertical_line());
+
+  QHBoxLayout *buttonLayout8 = new QHBoxLayout;
+  buttonLayout8->addWidget(vertical_line());
+  buttonLayout8->addWidget(devicestate_dump_upload_btn);
+  buttonLayout8->addWidget(vertical_line());
+
+  QHBoxLayout *buttonLayout9 = new QHBoxLayout;
+  buttonLayout9->addWidget(vertical_line());
+  buttonLayout9->addWidget(pandastates_dump_upload_btn);
+  buttonLayout9->addWidget(vertical_line());
+
   communityLayout->addWidget(horizontal_line());
   communityLayout->addLayout(buttonLayout4);
   communityLayout->addWidget(horizontal_line());
   communityLayout->addLayout(buttonLayout5);
+  communityLayout->addWidget(horizontal_line());
+  communityLayout->addLayout(buttonLayout6);
+  communityLayout->addWidget(horizontal_line());
+  communityLayout->addLayout(buttonLayout7);
+  communityLayout->addWidget(horizontal_line());
+  communityLayout->addLayout(buttonLayout8);
+  communityLayout->addWidget(horizontal_line());
+  communityLayout->addLayout(buttonLayout9);
   communityLayout->addWidget(horizontal_line());
 }
 

@@ -65,6 +65,8 @@ class CarController(CarControllerBase):
     self.turning_signal_timer = 0
     self.turning_indicator_alert = False
 
+    self.driver_steering_angle_above_timer = 150
+
   def update(self, CC, CS, now_nanos):
     actuators = CC.actuators
     hud_control = CC.hudControl
@@ -98,7 +100,7 @@ class CarController(CarControllerBase):
       if self.driver_steering_angle_above_timer >= 150:
         self.driver_steering_angle_above_timer = 150
 
-    ego_weight = interp(CS.out.vEgo, [0, 10, 20], [0.2, 0.4, 1.0])
+    ego_weight = interp(CS.out.vEgo, [0, 5, 10, 20], [0.2, 0.3, 0.5, 1.0])
 
     if 0 <= self.driver_steering_angle_above_timer < 150:
       self.lkas_max_torque = int(round(lkas_max_torque * (self.driver_steering_angle_above_timer / 150) * ego_weight))

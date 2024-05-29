@@ -302,19 +302,14 @@ void CANParser::UpdateValid(uint64_t nanos) {
     if (state.check_threshold > 0 && (missing || timed_out)) {
       if (show_missing && !bus_timeout) {
         char can_log[100];
-        char can_event_log[100];
         if (missing) {
           LOGE("0x%X '%s' NOT SEEN", state.address, state.name.c_str());
           snprintf(can_log, sizeof(can_log), "echo -n \"%s\n0x%X (%d) '%s'\" > /data/can_missing.log", time_buffer, state.address, state.address, state.name.c_str());
           system(can_log);
-          snprintf(can_event_log, sizeof(can_event_log), "echo -n 0x%X > /data/can_event_missing.log", state.address);
-          system(can_event_log);
         } else if (timed_out) {
           LOGE("0x%X '%s' TIMED OUT", state.address, state.name.c_str());
           snprintf(can_log, sizeof(can_log), "echo -n \"%s\n0x%X (%d) '%s'\" > /data/can_timeout.log", time_buffer, state.address, state.address, state.name.c_str());
           system(can_log);
-          snprintf(can_event_log, sizeof(can_event_log), "echo -n 0x%X > /data/can_event_timeout.log", state.address);
-          system(can_event_log);
         }
       }
       _valid = false;
