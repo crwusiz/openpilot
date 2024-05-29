@@ -6,7 +6,7 @@ from openpilot.common.params import Params
 from openpilot.selfdrive.car.hyundai.hyundaicanfd import CanBus
 from openpilot.selfdrive.car.hyundai.values import HyundaiFlags, CAR, DBC, CANFD_CAR, CAMERA_SCC_CAR, CANFD_RADAR_SCC_CAR, \
                                          CANFD_UNSUPPORTED_LONGITUDINAL_CAR, EV_CAR, HYBRID_CAR, LEGACY_SAFETY_MODE_CAR, \
-                                         UNSUPPORTED_LONGITUDINAL_CAR, Buttons, STEER_ANGLE, HyundaiExFlags
+                                         UNSUPPORTED_LONGITUDINAL_CAR, Buttons, ANGLE_CONTROL_CAR, HyundaiExFlags
 from openpilot.selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR
 from openpilot.selfdrive.car import create_button_events, get_safety_config
 from openpilot.selfdrive.car.interfaces import CarInterfaceBase
@@ -77,11 +77,11 @@ class CarInterface(CarInterfaceBase):
 
     ret.steerActuatorDelay = 0.1  # Default delay
     ret.steerLimitTimer = 0.4
-    if candidate not in STEER_ANGLE:
-      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
-    if candidate in STEER_ANGLE:
+    if candidate in ANGLE_CONTROL_CAR:
       ret.steerControlType = SteerControlType.angle
+    else:
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     # *** longitudinal control ***
     if candidate in CANFD_CAR:

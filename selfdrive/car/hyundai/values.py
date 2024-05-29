@@ -98,7 +98,7 @@ class HyundaiFlags(IntFlag):
   MIN_STEER_32_MPH = 2 ** 23
 
   # LFA2 car angle steer type
-  STEER_ANGLE = 2 ** 24
+  ANGLE_CONTROL = 2 ** 24
 
 class HyundaiExFlags(IntFlag):
   AUTOHOLD = 1
@@ -373,6 +373,13 @@ class CAR(Platforms):
     CarSpecs(mass=2012, wheelbase=3.0, steerRatio=16, tireStiffnessFactor=0.65),
     flags=HyundaiFlags.EV,
   )
+  HYUNDAI_IONIQ5_PE = HyundaiCanFDPlatformConfig(
+    [
+      HyundaiCarDocs("Hyundai Ioniq 5 PE (with HDA II) 2024", "Highway Driving Assist II", car_parts=CarParts.common([CarHarness.hyundai_q])),
+    ],
+    CarSpecs(mass=2012, wheelbase=3.0, steerRatio=16, tireStiffnessFactor=0.65),
+    flags=HyundaiFlags.EV | HyundaiFlags.ANGLE_CONTROL,
+  )
   HYUNDAI_IONIQ6 = HyundaiCanFDPlatformConfig(
     [
       HyundaiCarDocs("HYUNDAI IONIQ 6 (CE1)", car_parts=CarParts.common([CarHarness.hyundai_p])),
@@ -635,7 +642,7 @@ class CAR(Platforms):
       HyundaiCarDocs("KIA EV9 (MV)", car_parts=CarParts.common([CarHarness.hyundai_k])),
     ],
     CarSpecs(mass=2625, wheelbase=3.1, steerRatio=16.02),
-    flags=HyundaiFlags.EV | HyundaiFlags.STEER_ANGLE,
+    flags=HyundaiFlags.EV | HyundaiFlags.ANGLE_CONTROL,
   )
 
   # Genesis
@@ -906,7 +913,7 @@ EV_CAR = CAR.with_flags(HyundaiFlags.EV)
 
 LEGACY_SAFETY_MODE_CAR = CAR.with_flags(HyundaiFlags.LEGACY)
 
-STEER_ANGLE = CAR.with_flags(HyundaiFlags.STEER_ANGLE)
+ANGLE_CONTROL_CAR = CAR.with_flags(HyundaiFlags.ANGLE_CONTROL)
 
 UNSUPPORTED_LONGITUDINAL_CAR = CAR.with_flags(HyundaiFlags.UNSUPPORTED_LONGITUDINAL) #| CAR.with_flags(HyundaiFlags.LEGACY)
 

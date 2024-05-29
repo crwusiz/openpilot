@@ -8,7 +8,7 @@ from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
 from openpilot.selfdrive.car.hyundai.hyundaicanfd import CanBus
 from openpilot.selfdrive.car.hyundai.values import (HyundaiFlags, CAR, DBC, Buttons, CAN_GEARS,
-                                                    CANFD_CAR, CarControllerParams, HyundaiExFlags)
+                                                    CANFD_CAR, ANGLE_CONTROL_CAR, CarControllerParams, HyundaiExFlags)
 from openpilot.selfdrive.car.interfaces import CarStateBase
 
 PREV_BUTTON_SAMPLES = 8
@@ -120,7 +120,8 @@ class CarState(CarStateBase):
     ret.brakePressed = cp.vl["TCS13"]["DriverOverride"] == 2  # 2 includes regen braking by user on HEV/EV
     ret.brakeHoldActive = cp.vl["TCS15"]["AVH_LAMP"] == 2  # 0 OFF, 1 ERROR, 2 ACTIVE, 3 READY
     ret.parkingBrake = cp.vl["TCS13"]["PBRAKE_ACT"] == 1
-    ret.espDisabled = cp.vl["TCS11"]["TCS_PAS"] == 1
+    #ret.espDisabled = cp.vl["TCS11"]["TCS_PAS"] == 1
+    ret.espDisabled = cp.vl["TCS15"]["ESC_Off_Step"] != 0
     ret.accFaulted = cp.vl["TCS13"]["ACCEnable"] != 0  # 0 ACC CONTROL ENABLED, 1-3 ACC CONTROL DISABLED
     ret.brakeLights = bool(ret.brakePressed)
 
@@ -244,12 +245,12 @@ class CarState(CarStateBase):
 
     # TODO: alt signal usage may be described by cp.vl['BLINKERS']['USE_ALT_LAMP']
     left_blinker_sig, right_blinker_sig = "LEFT_LAMP", "RIGHT_LAMP"
-    if self.CP.carFingerprint in (CAR.HYUNDAI_KONA_SX2_EV, CAR.KIA_EV9):
+    if self.CP.carFingerprint in (CAR.HYUNDAI_KONA_SX2_EV, CAR.HYUNDAI_IONIQ5_PE, CAR.KIA_EV9):
       left_blinker_sig, right_blinker_sig = "LEFT_LAMP_ALT", "RIGHT_LAMP_ALT"
     ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["BLINKERS"][left_blinker_sig],
                                                                       cp.vl["BLINKERS"][right_blinker_sig])
     if self.CP.enableBsm:
-      if self.CP.carFingerprint == CAR.KIA_EV9:
+      if self.CP.carFingerprint in ANGLE_CONTROL_CAR:
         ret.leftBlindspot = cp.vl["BLINDSPOTS_REAR_CORNERS"]["INDICATOR_LEFT_FOUR"] != 0
         ret.rightBlindspot = cp.vl["BLINDSPOTS_REAR_CORNERS"]["INDICATOR_RIGHT_FOUR"] != 0
       else:
@@ -318,7 +319,7 @@ class CarState(CarStateBase):
     messages = [
       # address, frequency
       ("MDPS12", 50),
-      ("TCS11", 100),
+      #("TCS11", 100),
       ("TCS13", 50),
       ("TCS15", 10),
       ("CLU11", 50),

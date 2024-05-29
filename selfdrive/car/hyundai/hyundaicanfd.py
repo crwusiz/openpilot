@@ -35,50 +35,38 @@ class CanBus(CanBusBase):
     return self._cam
 
 
-def create_steering_messages(packer, CP, CAN, enabled, lat_active, apply_steer):
+def create_steering_messages(packer, CP, CAN, enabled, lat_active, steering_pressed, apply_steer, apply_angle, max_torque, angle_control):
   ret = []
 
-  values = {
-    "LKA_MODE": 2,
-    "LKA_ICON": 2 if enabled else 1,
-    "TORQUE_REQUEST": apply_steer,
-    "LKA_ASSIST": 0,
-    "STEER_REQ": 1 if lat_active else 0,
-    "STEER_MODE": 0,
-    "HAS_LANE_SAFETY": 0,  # hide LKAS settings
-    "NEW_SIGNAL_1": 0,
-    "NEW_SIGNAL_2": 0,
-  }
-
-  if CP.flags & HyundaiFlags.CANFD_HDA2:
-    hda2_lkas_msg = "LKAS_ALT" if CP.flags & HyundaiFlags.CANFD_HDA2_ALT_STEERING else "LKAS"
-    if CP.openpilotLongitudinalControl:
-      ret.append(packer.make_can_msg("LFA", CAN.ECAN, values))
-    ret.append(packer.make_can_msg(hda2_lkas_msg, CAN.ACAN, values))
+  if angle_control:
+    values = {
+      "LKA_MODE": 0,
+      "LKA_ICON": 2 if enabled else 1,
+      "TORQUE_REQUEST": 0,  # apply_steer,
+      "LKA_ASSIST": 0,
+      "STEER_REQ": 0,  # 1 if lat_active else 0,
+      "STEER_MODE": 0,
+      "HAS_LANE_SAFETY": 0,  # hide LKAS settings
+      "LKA_ACTIVE": 3 if lat_active else 0,  # this changes sometimes, 3 seems to indicate engaged
+      "NEW_SIGNAL_2": 0,
+      "LKAS_ANGLE_CMD": -apply_angle,
+      "LKAS_ANGLE_ACTIVE": 2 if lat_active else 1,
+      # a torque scale value? ramps up when steering, highest seen is 234
+      # "UNKNOWN": 50 if lat_active and not steering_pressed else 0,
+      "UNKNOWN": max_torque if lat_active else 0,
+    }
   else:
-    ret.append(packer.make_can_msg("LFA", CAN.ECAN, values))
-
-  return ret
-
-def create_steering_messages_angle(packer, CP, CAN, enabled, lat_active, steering_pressed, apply_steer, apply_angle, max_torque):
-  ret = []
-
-  values = {
-    "LKA_MODE": 0,
-    "LKA_ICON": 2 if enabled else 1,
-    "TORQUE_REQUEST": 0,  # apply_steer,
-    "LKA_ASSIST": 0,
-    "STEER_REQ": 0,  # 1 if lat_active else 0,
-    "STEER_MODE": 0,
-    "HAS_LANE_SAFETY": 0,  # hide LKAS settings
-    "NEW_SIGNAL_1": 3 if lat_active else 0,  # this changes sometimes, 3 seems to indicate engaged
-    "NEW_SIGNAL_2": 0,
-    "LKAS_ANGLE_CMD": -apply_angle,
-    "LKAS_ANGLE_ACTIVE": 2 if lat_active else 1,
-    # a torque scale value? ramps up when steering, highest seen is 234
-    # "UNKNOWN": 50 if lat_active and not steering_pressed else 0,
-    "UNKNOWN": max_torque if lat_active else 0,
-  }
+    values = {
+      "LKA_MODE": 2,
+      "LKA_ICON": 2 if enabled else 1,
+      "TORQUE_REQUEST": apply_steer,
+      "LKA_ASSIST": 0,
+      "STEER_REQ": 1 if lat_active else 0,
+      "STEER_MODE": 0,
+      "HAS_LANE_SAFETY": 0,  # hide LKAS settings
+      "NEW_SIGNAL_1": 0,
+      "NEW_SIGNAL_2": 0,
+    }
 
   if CP.flags & HyundaiFlags.CANFD_HDA2:
     hda2_lkas_msg = "LKAS_ALT" if CP.flags & HyundaiFlags.CANFD_HDA2_ALT_STEERING else "LKAS"
