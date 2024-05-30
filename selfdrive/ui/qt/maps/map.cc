@@ -5,6 +5,7 @@
 
 #include <QDebug>
 
+#include "common/swaglog.h"
 #include "selfdrive/ui/qt/maps/map_helpers.h"
 #include "selfdrive/ui/qt/util.h"
 #include "selfdrive/ui/ui.h"
@@ -120,7 +121,15 @@ void MapWindow::updateState(const UIState &s) {
   const SubMaster &sm = *(s.sm);
   update();
 
-  if(navi_gps_manager.check()) {
+  // on rising edge of a valid system time, reinitialize the map to set a new token
+  if (sm.valid("clocks") && !prev_time_valid) {
+    LOGW("Time is now valid, reinitializing map");
+    m_settings.setApiKey(get_mapbox_token());
+    initializeGL();
+  }
+  prev_time_valid = sm.valid("clocks");
+
+  if (navi_gps_manager.check()) {
     locationd_valid = true;
     QMapLibre::Coordinate position;
     float bearing = 0.0f, speed = 0.0f;
@@ -128,7 +137,7 @@ void MapWindow::updateState(const UIState &s) {
     last_position = position;
     last_bearing = bearing;
     velocity_filter.update(std::max(10.0, (double)speed));
-    if(m_map && m_map->isFullyLoaded()) {
+    if (m_map && m_map->isFullyLoaded()) {
       navi_gps_manager.setPosition(m_map.data(), position);
       navi_gps_manager.setBearing(m_map.data(), bearing);
     }
@@ -194,7 +203,7 @@ void MapWindow::updateState(const UIState &s) {
 
     // Map bearing isn't updated when interacting, keep location marker up to date
     if (last_bearing) {
-      if(!navi_gps_manager.isValid())
+      if (!navi_gps_manager.isValid())
         m_map->setLayoutProperty("carPosLayer", "icon-rotate", *last_bearing - m_map->bearing());
       else
         m_map->setLayoutProperty("carPosLayer", "icon-rotate", 0);
@@ -202,7 +211,7 @@ void MapWindow::updateState(const UIState &s) {
   }
 
   if (interaction_counter == 0) {
-    if(!navi_gps_manager.isValid()) {
+    if (!navi_gps_manager.isValid()) {
       if (last_position) m_map->setCoordinate(*last_position);
       if (last_bearing) m_map->setBearing(*last_bearing);
     }
@@ -223,7 +232,7 @@ void MapWindow::updateState(const UIState &s) {
       map_eta->updateETA(i.getTimeRemaining(), i.getTimeRemainingTypical(), i.getDistanceRemaining());
 
       if (locationd_valid) {
-        if(!navi_gps_manager.isValid())  m_map->setPitch(MAX_PITCH); // TODO: smooth pitching based on maneuver distance
+        if (!navi_gps_manager.isValid())  m_map->setPitch(MAX_PITCH); // TODO: smooth pitching based on maneuver distance
         map_instructions->updateInstructions(i);
       }
     } else {
@@ -281,6 +290,10 @@ void MapWindow::initializeGL() {
     if (change == QMapLibre::Map::MapChange::MapChangeDidFinishLoadingMap) {
       loaded_once = true;
     }
+  });
+
+  QObject::connect(m_map.data(), &QMapLibre::Map::mapLoadingFailed, [=](QMapLibre::Map::MapLoadingFailure err_code, const QString &reason) {
+    LOGE("Map loading failed with %d: '%s'\n", err_code, reason.toStdString().c_str());
   });
 }
 
