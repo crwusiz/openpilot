@@ -4,6 +4,7 @@ import os
 import signal
 import sys
 import traceback
+import glob
 
 from cereal import log
 import cereal.messaging as messaging
@@ -111,15 +112,7 @@ def manager_init() -> None:
                        device=HARDWARE.get_device_type())
 
   # log cleanup
-  log_files = [
-    '/data/can_missing.log',
-    '/data/can_timeout.log',
-    '/data/tmux_error.log',
-    '/data/carparams.log',
-    '/data/carstate.log',
-    '/data/devicestate.log',
-    '/data/pandastates.log',
-  ]
+  log_files = glob.glob('/data/*.log')
 
   for log_file in log_files:
     if os.path.isfile(log_file):

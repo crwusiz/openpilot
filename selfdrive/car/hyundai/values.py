@@ -375,6 +375,7 @@ class CAR(Platforms):
   )
   HYUNDAI_IONIQ5_PE = HyundaiCanFDPlatformConfig(
     [
+      HyundaiCarDocs("HYUNDAI IONIQ 5 PE (NE1)", car_parts=CarParts.common([CarHarness.hyundai_q])),
       HyundaiCarDocs("Hyundai Ioniq 5 PE (with HDA II) 2024", "Highway Driving Assist II", car_parts=CarParts.common([CarHarness.hyundai_q])),
     ],
     CarSpecs(mass=2012, wheelbase=3.0, steerRatio=16, tireStiffnessFactor=0.65),

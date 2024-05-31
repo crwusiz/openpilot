@@ -214,14 +214,15 @@ def thermald_thread(end_event, hw_queue) -> None:
     peripheral_panda_present = peripheralState.pandaType != log.PandaState.PandaType.unknown
 
     # neokii
-    if time.monotonic() - restart_triggered_ts < 5.:
+    current_time = time.monotonic()
+    if current_time - restart_triggered_ts < 5.:
       onroad_conditions["not_restart_triggered"] = False
     else:
       onroad_conditions["not_restart_triggered"] = True
 
       if params.get_bool("SoftRestartTriggered"):
         params.put_bool("SoftRestartTriggered", False)
-        restart_triggered_ts = time.monotonic()
+        restart_triggered_ts = current_time
 
     if sm.updated['pandaStates'] and len(pandaStates) > 0:
 
