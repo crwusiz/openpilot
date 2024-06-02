@@ -15,7 +15,7 @@ from openpilot.selfdrive.boardd.boardd import can_list_to_can_capnp
 from openpilot.selfdrive.car.car_helpers import get_car, get_one_can
 from openpilot.selfdrive.car.interfaces import CarInterfaceBase
 from openpilot.selfdrive.controls.lib.events import Events
-from openpilot.selfdrive.controls import controlsd
+from openpilot.selfdrive.controls import speed_controller_update
 
 REPLAY = "REPLAY" in os.environ
 
@@ -152,7 +152,7 @@ class Car:
     cs_send.carState.cumLagMs = -self.rk.remaining * 1000.
     self.pm.send('carState', cs_send)
 
-  def controls_update(self, CS: car.CarState, CC: car.CarControl, controlsd_instance):
+  def controls_update(self, CS: car.CarState, CC: car.CarControl):
     """control update loop, driven by carControl"""
 
     if not self.initialized_prev:
@@ -166,12 +166,12 @@ class Car:
       # send car controls over can
       now_nanos = self.can_log_mono_time if REPLAY else int(time.monotonic() * 1e9)
       self.last_actuators_output, can_sends = self.CI.apply(CC, now_nanos)
-      controlsd_instance.speed_controller_update(CS, can_sends)
+      speed_controller_update(CS, can_sends)
       self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
 
       self.CC_prev = CC
 
-  def step(self, controlsd_instance):
+  def step(self):
     CS = self.state_update()
 
     self.update_events(CS)
@@ -181,15 +181,14 @@ class Car:
     initialized = (not any(e.name == EventName.controlsInitializing for e in self.sm['onroadEvents']) and
                    self.sm.seen['onroadEvents'])
     if not self.CP.passive and initialized:
-      self.controls_update(CS, self.sm['carControl'], controlsd_instance)
+      self.controls_update(CS, self.sm['carControl'])
 
     self.initialized_prev = initialized
     self.CS_prev = CS.as_reader()
 
   def card_thread(self):
-    controlsd_instance = controlsd.Controls()
     while True:
-      self.step(controlsd_instance)
+      self.step()
       self.rk.monitor_time()
 
 
