@@ -5,6 +5,7 @@ import time
 import cereal.messaging as messaging
 
 from cereal import car
+from openpilot.selfdrive.controls.neokii.speed_controller import SpeedController
 
 from panda import ALTERNATIVE_EXPERIENCE
 
@@ -15,7 +16,6 @@ from openpilot.selfdrive.boardd.boardd import can_list_to_can_capnp
 from openpilot.selfdrive.car.car_helpers import get_car, get_one_can
 from openpilot.selfdrive.car.interfaces import CarInterfaceBase
 from openpilot.selfdrive.controls.lib.events import Events
-from openpilot.selfdrive.controls import speed_controller_update
 
 REPLAY = "REPLAY" in os.environ
 
@@ -27,7 +27,7 @@ class Car:
 
   def __init__(self, CI=None):
     self.can_sock = messaging.sub_sock('can', timeout=20)
-    self.sm = messaging.SubMaster(['pandaStates', 'carControl', 'onroadEvents'])
+    self.sm = messaging.SubMaster(['pandaStates', 'carControl', 'onroadEvents', 'modelV2', 'radarState'])
     self.pm = messaging.PubMaster(['sendcan', 'carState', 'carParams', 'carOutput'])
 
     self.can_rcv_timeout_counter = 0  # consecutive timeout count
@@ -89,6 +89,8 @@ class Car:
     # card is driven by can recv, expected at 100Hz
     self.rk = Ratekeeper(100, print_delay_threshold=None)
 
+    self.speed_controller = SpeedController(self.CP, self.CI)
+
   def state_update(self) -> car.CarState:
     """carState update loop, driven by can"""
 
@@ -112,6 +114,8 @@ class Car:
     if can_rcv_valid and REPLAY:
       self.can_log_mono_time = messaging.log_from_bytes(can_strs[0]).logMonoTime
 
+    self.speed_controller.update_v_cruise(CS, self.sm, self.sm['carControl'].enabled)
+
     return CS
 
   def update_events(self, CS: car.CarState) -> car.CarState:
@@ -125,6 +129,7 @@ class Car:
     #  (CS.regenBraking and (not self.CS_prev.regenBraking or not CS.standstill)):
     #  self.events.add(EventName.pedalPressed)
 
+    self.speed_controller.inject_events(CS, self.events)
     CS.events = self.events.to_msg()
 
   def state_publish(self, CS: car.CarState):
@@ -166,7 +171,7 @@ class Car:
       # send car controls over can
       now_nanos = self.can_log_mono_time if REPLAY else int(time.monotonic() * 1e9)
       self.last_actuators_output, can_sends = self.CI.apply(CC, now_nanos)
-      speed_controller_update(CS, can_sends)
+      self.speed_controller.spam_message(CS, can_sends)
       self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
 
       self.CC_prev = CC

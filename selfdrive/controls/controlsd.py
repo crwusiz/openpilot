@@ -31,8 +31,6 @@ from openpilot.selfdrive.controls.lib.vehicle_model import VehicleModel
 
 from openpilot.system.hardware import HARDWARE
 
-from openpilot.selfdrive.controls.neokii.speed_controller import SpeedController
-
 SOFT_DISABLE_TIME = 3  # seconds
 LDW_MIN_SPEED = 50 * CV.KPH_TO_MS
 LANE_DEPARTURE_THRESHOLD = 0.1
@@ -165,8 +163,6 @@ class Controls:
     self.recalibrating_seen = False
 
     self.can_log_mono_time = 0
-
-    self.speed_controller = SpeedController(self.CP, self.CI)
 
     self.startup_event = get_startup_event(car_recognized, not self.CP.passive, len(self.CP.carFw) > 0)
 
@@ -453,9 +449,8 @@ class Controls:
   def state_transition(self, CS):
     """Compute conditional state transitions and execute actions on state transitions"""
 
-    self.v_cruise_helper.update_v_cruise(CS, self.enabled, self.is_metric)
-
-    self.v_cruise_helper.v_cruise_kph = self.speed_controller.update_v_cruise(CS, self.sm, self.v_cruise_helper.v_cruise_kph)
+    #self.v_cruise_helper.update_v_cruise(CS, self.enabled, self.is_metric)
+    self.v_cruise_helper.v_cruise_kph = CS.exState.vCruiseKph
     self.v_cruise_helper.v_cruise_cluster_kph = self.v_cruise_helper.v_cruise_kph
 
     # decrement the soft disable timer at every step, as it's reset on
@@ -728,8 +723,6 @@ class Controls:
     if self.enabled:
       clear_event_types.add(ET.NO_ENTRY)
 
-    self.speed_controller.inject_events(CS, self.events)
-
     alerts = self.events.create_alerts(self.current_alert_types, [self.CP, CS, self.sm, self.is_metric, self.soft_disable_timer])
     self.AM.add_many(self.sm.frame, alerts)
     current_alert = self.AM.process_alerts(self.sm.frame, clear_event_types)
@@ -777,9 +770,9 @@ class Controls:
     controlsState.longControlState = self.LoC.long_control_state
     controlsState.vPid = float(self.LoC.v_pid)
     #controlsState.vCruise = float(self.v_cruise_helper.v_cruise_kph)
-    controlsState.vCruise = float(self.speed_controller.cruise_speed_kph)
+    controlsState.vCruise = float(CS.exState.applyMaxSpeed)
     #controlsState.vCruiseCluster = float(self.v_cruise_helper.v_cruise_cluster_kph)
-    controlsState.vCruiseCluster = float(self.speed_controller.real_set_speed_kph)
+    controlsState.vCruiseCluster = float(CS.exState.cruiseMaxSpeed)
     controlsState.upAccelCmd = float(self.LoC.pid.p)
     controlsState.uiAccelCmd = float(self.LoC.pid.i)
     controlsState.ufAccelCmd = float(self.LoC.pid.f)
@@ -814,12 +807,6 @@ class Controls:
     cc_send.valid = CS.canValid
     cc_send.carControl = CC
     self.pm.send('carControl', cc_send)
-
-  def speed_controller_update(self, CS, can_sends):
-    v = self.speed_controller.update_can(self.enabled, CS, can_sends)
-    if v > 0:
-      self.v_cruise_helper.v_cruise_kph = v
-      self.v_cruise_helper.v_cruise_cluster_kph = v
 
   def step(self):
     start_time = time.monotonic()
