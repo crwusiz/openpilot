@@ -26,8 +26,8 @@ def setup_logging(debug):
   logging.basicConfig(level=logging.DEBUG if debug else logging.INFO)
   return logging.getLogger(__name__)
 
-def clear_dtc(panda, addr, bus, logger):
-  uds_client = UdsClient(panda, addr, bus=bus, debug=args.debug)
+def clear_dtc(panda, addr, bus, debug, logger):
+  uds_client = UdsClient(panda, addr, bus, debug)
   logger.info("  Starting extended diagnostic session ...")
   try:
     uds_client.diagnostic_session_control(SESSION_TYPE.EXTENDED_DIAGNOSTIC)
@@ -52,7 +52,7 @@ def main():
   panda = Panda()
   panda.set_safety_mode(Panda.SAFETY_ELM327)
 
-  clear_dtc(panda, args.addr, args.bus, logger)
+  clear_dtc(panda, args.addr, args.bus, args.debug, logger)
 
   logger.info("  You may need to power cycle your vehicle now\n")
 
