@@ -684,7 +684,6 @@ struct LiveTracks {
   currentTime @7 :Float32;
   stationary @8 :Bool;
   oncoming @9 :Bool;
-  vLat @10 :Float32;
 }
 
 struct ControlsState @0x97ff69c53601abf1 {
