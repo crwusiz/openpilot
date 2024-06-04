@@ -2,7 +2,7 @@
 import sys
 import argparse
 import logging
-from subprocess import check_output, CalledProcessError
+from subprocess import check_output, CalledProcessError, run
 from panda import Panda
 from panda.python.uds import UdsClient, MessageTimeoutError, SESSION_TYPE, DTC_GROUP_TYPE
 
@@ -13,14 +13,14 @@ def parse_arguments():
   parser.add_argument('--debug', action='store_true', help="Enable debug mode")
   return parser.parse_args()
 
-def check_boardd_running():
+def check_and_kill_boardd():
   try:
     check_output(["pidof", "boardd"])
-    print("  boardd is running, please kill openpilot before running this script! (aborted)\n")
-    sys.exit(1)
-  except CalledProcessError as e:
-    if e.returncode != 1:  # 1 == no process found (boardd not running)
-      raise e
+    print("  boardd process is running...\n")
+    run(["pkill", "-f", "boardd"])
+    print("  boardd process force terminated.\n")
+  except CalledProcessError:
+    pass  # boardd process not running
 
 def setup_logging(debug):
   logging.basicConfig(level=logging.DEBUG if debug else logging.INFO)
@@ -47,7 +47,7 @@ def main():
   args = parse_arguments()
   logger = setup_logging(args.debug)
 
-  check_boardd_running()
+  check_and_kill_boardd()
 
   panda = Panda()
   panda.set_safety_mode(Panda.SAFETY_ELM327)
