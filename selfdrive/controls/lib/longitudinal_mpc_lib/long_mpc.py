@@ -42,7 +42,7 @@ X_EGO_COST = 0.
 V_EGO_COST = 0.
 A_EGO_COST = 0.
 J_EGO_COST = 5.0
-A_CHANGE_COST = 200.
+A_CHANGE_COST = 100.
 DANGER_ZONE_COST = 100.
 CRASH_DISTANCE = .25
 LEAD_DANGER_FACTOR = 0.75
@@ -60,7 +60,7 @@ T_IDXS = np.array(T_IDXS_LST)
 FCW_IDXS = T_IDXS < 5.0
 T_DIFFS = np.diff(T_IDXS, prepend=[0.])
 COMFORT_BRAKE = 2.5
-STOP_DISTANCE = 6.0
+STOP_DISTANCE = 6.5
 
 def get_jerk_factor(personality=log.LongitudinalPersonality.standard):
   if personality==log.LongitudinalPersonality.relaxed:
@@ -246,7 +246,6 @@ class LongitudinalMpc:
     # self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
     self.solver.reset()
     # self.solver.options_set('print_level', 2)
-    self.x_solution = np.zeros(N+1)
     self.v_solution = np.zeros(N+1)
     self.a_solution = np.zeros(N+1)
     self.prev_a = np.array(self.a_solution)
@@ -258,6 +257,7 @@ class LongitudinalMpc:
     self.x_sol = np.zeros((N+1, X_DIM))
     self.u_sol = np.zeros((N,1))
     self.params = np.zeros((N+1, PARAM_DIM))
+
     self.xState = XState.cruise
     self.startSignCount = 0
     self.stopSignCount = 0
@@ -300,9 +300,9 @@ class LongitudinalMpc:
       cost_weights = [X_EGO_OBSTACLE_COST, X_EGO_COST, V_EGO_COST, A_EGO_COST, jerk_factor * a_change_cost, jerk_factor * J_EGO_COST]
       constraint_cost_weights = [LIMIT_COST, LIMIT_COST, LIMIT_COST, DANGER_ZONE_COST]
     elif self.mode == 'blended':
-      a_change_cost = 50.0 if prev_accel_constraint else 0
+      a_change_cost = 40.0 if prev_accel_constraint else 0
       cost_weights = [0., 0.1, 0.2, 5.0, a_change_cost, 1.0]
-      constraint_cost_weights = [LIMIT_COST, LIMIT_COST, LIMIT_COST, DANGER_ZONE_COST]
+      constraint_cost_weights = [LIMIT_COST, LIMIT_COST, LIMIT_COST, 50.0]
     else:
       raise NotImplementedError(f'Planner mode {self.mode} not recognized in planner cost set')
     self.set_cost_weights(cost_weights, constraint_cost_weights)
@@ -372,7 +372,7 @@ class LongitudinalMpc:
     self.params[:,0] = ACCEL_MIN
     self.params[:,1] = self.max_a
 
-    v_cruise, stop_x = self.update_apilot(sm['carstate'], radarstate, sm['modelV2'], v_cruise)
+    v_cruise, stop_x = self._update_apilot(sm['carState'], sm['modelV2'], v_cruise)
 
     # Update in ACC mode or ACC/e2e blend
     if self.mode == 'acc':
@@ -478,7 +478,6 @@ class LongitudinalMpc:
     for i in range(N):
       self.u_sol[i] = self.solver.get(i, 'u')
 
-    self.x_solution = self.x_sol[:,0]
     self.v_solution = self.x_sol[:,1]
     self.a_solution = self.x_sol[:,2]
     self.j_solution = self.u_sol[:,0]
@@ -495,25 +494,60 @@ class LongitudinalMpc:
     # print(f"long_mpc timings: total internal {self.solve_time:.2e}, external: {(time.monotonic() - t0):.2e} qp {self.time_qp_solution:.2e}, \
     # lin {self.time_linearization:.2e} qp_iter {qp_iter}, reset {reset}")
 
+  def _update_apilot(self, carstate, model, v_cruise):
+    v_ego_kph = carstate.vEgo * CV.MS_TO_KPH
+    x = model.position.x
+    y = model.position.y
+    v = model.velocity.x
 
-  def update_stop_dist(self, stop_x):
-    stop_x = self.xStopFilter.process(stop_x, median = True)
+    ## 모델의 정지거리 필터링
+    self.xStop = self._update_stop_dist(x[31])
+    stop_x_filtered = self.xStop
+
+    ## 모델의 신호정지 검사
+    self._check_model_stopping(self.xStop, y, v, v_ego_kph)
+
+    if self.status:
+      self.xState = XState.lead
+      stop_x_filtered = 1000.0
+    elif self.trafficState == 1 and not carstate.gasPressed:
+      self.xState = XState.e2eStop
+    else:
+      self.xState = XState.e2eCruise
+
+    if self.trafficState in [0, 2]:
+      stop_x_filtered = 1000.0
+
+    self.stopDist -= v_ego_kph * DT_MDL
+    if self.stopDist < 0:
+      self.stopDist = 0.0
+    elif stop_x_filtered == 1000.0:
+      self.stopDist = 0.0
+    else:
+      stop_dist_calculated = v_ego_kph ** 2 / (2.5 * 2)
+      self.stopDist = max(self.stopDist, stop_dist_calculated)
+      stop_x_filtered = 0.0
+
+    return v_cruise, stop_x_filtered + self.stopDist
+
+  def _update_stop_dist(self, stop_x):
+    stop_x = self.xStopFilter.process(stop_x, median=True)
     stop_x = self.xStopFilter2.process(stop_x)
     return stop_x
 
-  def check_model_stopping(self, v, v_ego, model_x, y):
+  def _check_model_stopping(self, model_x, y, v, v_ego):
     v_ego_kph = v_ego * CV.MS_TO_KPH
     model_v = self.vFilter.process(v[-1])
-    startSign = model_v > 5.0 or model_v > (v[0]+2)
+    startSign = model_v > 5.0 or model_v > (v[0] + 2)
 
     if v_ego_kph < 1.0:
       stopSign = model_x < 20.0 and model_v < 10.0
     elif v_ego_kph < 82.0:
-      stopSign = model_x < interp(v[0], [60/3.6, 80/3.6], [120.0, 150]) and ((model_v < 3.0) or (model_v < v[0]*0.7)) and abs(y[-1]) < 5.0
+      stopSign = (model_x < interp(v[0], [60 / 3.6, 80 / 3.6], [120.0, 150]) and ((model_v < 3.0) or (model_v < v[0] * 0.7)) and abs(y[-1]) < 5.0)
     else:
       stopSign = False
 
-    self.stopSignCount = self.stopSignCount + 1 if (stopSign and (model_x > get_safe_obstacle_distance(v_ego, t_follow=0, comfort_brake=COMFORT_BRAKE, stop_distance=-1.0))) else 0
+    self.stopSignCount = self.stopSignCount + 1 if stopSign else 0
     self.startSignCount = self.startSignCount + 1 if startSign else 0
 
     if self.stopSignCount * DT_MDL > 0.0:
@@ -522,35 +556,6 @@ class LongitudinalMpc:
       self.trafficState = 2  # "GREEN"
     else:
       self.trafficState = 0  # "OFF"
-
-  def update_apilot(self, carstate, radarstate, model, v_cruise):
-    v_ego_kph = carstate.vEgo * CV.MS_TO_KPH
-
-    # 위치와 속도를 상태 벡터로 결합
-    state = np.array([model.position.x, model.position.y, model.velocity.x])
-
-    # 레이더 감지 여부 확인 및 정지 거리 업데이트
-    radar_detected = radarstate.leadOne.status & radarstate.leadOne.radar
-    self.xStop = self.update_stop_dist(state[0] if radar_detected else 1000.0)
-
-    # 현재 상황에 따라 상태 업데이트
-    self.xState = self._get_state(v_ego_kph, carstate.gasPressed, self.trafficState, self.xStop)
-
-    # 최소 정지 거리 계산 및 적용
-    self.stopDist = max(0.0, min(self.stopDist - (v_ego_kph * DT_MDL), v_ego_kph ** 2 / (2.5 * 2)))
-
-    return v_cruise, self.stopDist + (self.xStop if radar_detected else 0.0)
-
-  def _get_state(self, v_ego_kph, gas_pressed, traffic_state, x_stop):
-    if self.status:
-      return XState.lead
-    elif traffic_state == 1 and not gas_pressed:
-      return XState.e2eStop
-    elif traffic_state in [0, 2]:
-      return XState.e2eCruise
-    else:
-      return self.xState  # 불분명한 조건에서 이전 상태 유지
-
 
 if __name__ == "__main__":
   ocp = gen_long_ocp()
