@@ -341,8 +341,8 @@ def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster
       f.readline()
       line = f.readline().strip()
       return Alert(
-        "CAN Error : Missing",
-        "%s" % line,
+        "CAN Error : Missing\n%s" % line,
+        "",
         AlertStatus.normal, AlertSize.small,
         Priority.LOW, VisualAlert.none, AudibleAlert.none, .2, creation_delay=10.)
   elif os.path.isfile('/data/can_timeout.log'):
@@ -350,8 +350,8 @@ def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster
       f.readline()
       line = f.readline().strip()
       return Alert(
-        "CAN Error : Timeout \n",
-        "%s" % line,
+        "CAN Error : Timeout\n%s" % line,
+        "",
         AlertStatus.normal, AlertSize.small,
         Priority.LOW, VisualAlert.none, AudibleAlert.none, .2, creation_delay=10.)
   else:

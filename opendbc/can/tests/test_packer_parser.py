@@ -10,7 +10,7 @@ from opendbc.can.tests import TEST_DBC
 MAX_BAD_COUNTER = 5
 
 
-# Python implementation so we don't have to depend on boardd
+# Python implementation so we don't have to depend on pandad
 def can_list_to_can_capnp(can_msgs, msgtype='can', logMonoTime=None):
   dat = messaging.new_message(msgtype, len(can_msgs))
 

@@ -13,14 +13,14 @@ def parse_arguments():
   parser.add_argument('--debug', action='store_true', help="Enable debug mode")
   return parser.parse_args()
 
-def check_and_kill_boardd():
+def check_and_kill_pandad():
   try:
-    check_output(["pidof", "boardd"])
-    print("  boardd process is running...\n")
-    run(["pkill", "-f", "boardd"])
-    print("  boardd process force terminated.\n")
+    check_output(["pidof", "pandad"])
+    print("  pandad process is running...\n")
+    run(["pkill", "-f", "pandad"])
+    print("  pandad process force terminated.\n")
   except CalledProcessError:
-    pass  # boardd process not running
+    pass  # pandad process not running
 
 def setup_logging(debug):
   logging.basicConfig(level=logging.DEBUG if debug else logging.INFO)
@@ -47,7 +47,7 @@ def main():
   args = parse_arguments()
   logger = setup_logging(args.debug)
 
-  check_and_kill_boardd()
+  check_and_kill_pandad()
 
   panda = Panda()
   panda.set_safety_mode(Panda.SAFETY_ELM327)
