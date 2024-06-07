@@ -166,7 +166,7 @@ def manager_thread() -> None:
 
   if params.get_bool("UseExternalNaviRoutes"):
     ignore += ["navd"]
-  elif not params.get_bool("UseExternalNaviRoutes"):
+  else:
     ignore += ["navi_route"]
 
   if params.get("DriverCameraHardwareMissing"):
