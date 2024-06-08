@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+play_sound() {
+    local sound_file="$1"
+    if [ -f "$sound_file" ]; then
+        play "$sound_file"
+    else
+        echo "Error: File $sound_file not found."
+    fi
+}
+
 pushd /data/openpilot
 
 if [ -f /data/openpilot/prebuilt ]; then
@@ -44,5 +53,11 @@ if [ $? -eq 0 ]; then
 
   exec /data/openpilot/scripts/restart.sh
 else
-  echo -e '\a'
+  echo "wifi not connect check your network" > /data/gitpull.log
+  if ! command -v play &> /dev/null; then
+    echo "Installing sox..."
+    sudo apt-get update
+    sudo apt-get install -y sox
+  fi
+  play_sound "/data/openpilot/selfdrive/assets/sounds/warning_soft.wav"
 fi

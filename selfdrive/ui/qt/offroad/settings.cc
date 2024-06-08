@@ -623,31 +623,56 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     if (ConfirmationDialog::confirm(tr("Git Fetch and Reset<br><br>Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/gitpull.sh");
     }
-  });
-
-  auto tmux_error_log_btn = new ButtonControl(tr("tmux log"), tr("VIEW"));
-  QObject::connect(tmux_error_log_btn, &ButtonControl::clicked, [=]() {
-    const std::string txt = util::read_file("/data/tmux_error.log");
-    ConfirmationDialog::rich(QString::fromStdString(txt), this);
-  });
-
-  auto tmux_error_log_upload_btn = new ButtonControl(tr("tmux log upload"), tr("RUN"));
-  QObject::connect(tmux_error_log_upload_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("tmux log upload<br><br>Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/scripts/log_upload.sh");
+    const QString file_path = "/data/gitpull.log";
+    if (QFile::exists(file_path)) {
+      const std::string txt = util::read_file(file_path.toStdString());
+      ConfirmationDialog::rich(QString::fromStdString(txt), this);
     }
   });
 
-  auto can_missing_error_log_btn = new ButtonControl(tr("can missing log"), tr("VIEW"));
+	auto tmux_error_log_btn = new ButtonControl(tr("tmux log"), tr("VIEW"));
+	QObject::connect(tmux_error_log_btn, &ButtonControl::clicked, [=]() {
+    const QString file_path = "/data/tmux_error.log";
+    if (QFile::exists(file_path)) {
+      const std::string txt = util::read_file(file_path.toStdString());
+      ConfirmationDialog::rich(QString::fromStdString(txt), this);
+    } else {
+      ConfirmationDialog::message("log file not found", this);
+    }
+	});
+
+	auto tmux_error_log_upload_btn = new ButtonControl(tr("tmux log upload"), tr("RUN"));
+  QObject::connect(tmux_error_log_upload_btn, &ButtonControl::clicked, [=]() {
+    const QString file_path = "/data/tmux_error.log";
+    if (QFile::exists(file_path)) {
+      if (ConfirmationDialog::confirm(tr("tmux log upload<br><br>Process?"), tr("Process"), this)) {
+        QProcess::execute("/data/openpilot/scripts/log_upload.sh");
+      }
+    } else {
+      ConfirmationDialog::message("log file not found", this);
+    }
+	});
+
+	auto can_missing_error_log_btn = new ButtonControl(tr("can missing log"), tr("VIEW"));
   QObject::connect(can_missing_error_log_btn, &ButtonControl::clicked, [=]() {
-    const std::string txt = util::read_file("/data/can_missing.log");
-    ConfirmationDialog::rich(QString::fromStdString(txt), this);
+    const QString file_path = "/data/can_missing.log";
+    if (QFile::exists(file_path)) {
+      const std::string txt = util::read_file(file_path.toStdString());
+      ConfirmationDialog::rich(QString::fromStdString(txt), this);
+    } else {
+      ConfirmationDialog::message("log file not found", this);
+    }
   });
 
-  auto can_timeout_error_log_btn = new ButtonControl(tr("can timeout log"), tr("VIEW"));
+	auto can_timeout_error_log_btn = new ButtonControl(tr("can timeout log"), tr("VIEW"));
   QObject::connect(can_timeout_error_log_btn, &ButtonControl::clicked, [=]() {
-    const std::string txt = util::read_file("/data/can_timeout.log");
-    ConfirmationDialog::rich(QString::fromStdString(txt), this);
+    const QString file_path = "/data/can_timeout.log";
+    if (QFile::exists(file_path)) {
+      const std::string txt = util::read_file(file_path.toStdString());
+      ConfirmationDialog::rich(QString::fromStdString(txt), this);
+    } else {
+      ConfirmationDialog::message("log file not found", this);
+    }
   });
 
   auto carstate_dump_upload_btn = new ButtonControl(tr("carState dump upload"), tr("RUN"));

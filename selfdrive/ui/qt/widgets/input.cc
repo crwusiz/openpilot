@@ -2,6 +2,7 @@
 
 #include <QPushButton>
 #include <QButtonGroup>
+#include <QMessageBox>
 
 #include "system/hardware/hw.h"
 #include "selfdrive/ui/qt/util.h"
@@ -242,6 +243,10 @@ bool ConfirmationDialog::confirm(const QString &prompt_text, const QString &conf
 bool ConfirmationDialog::rich(const QString &prompt_text, QWidget *parent) {
   ConfirmationDialog d = ConfirmationDialog(prompt_text, tr("Ok"), "", true, parent);
   return d.exec();
+}
+
+void ConfirmationDialog::message(const QString &message, QWidget *parent) {
+    QMessageBox::information(parent, "Message", message);
 }
 
 // MultiOptionDialog
