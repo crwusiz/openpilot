@@ -182,3 +182,7 @@ SConscript('board/SConscript')
 
 # panda jungle fw
 SConscript('board/jungle/SConscript')
+
+# test files
+if GetOption('extras'):
+  SConscript('tests/libpanda/SConscript')

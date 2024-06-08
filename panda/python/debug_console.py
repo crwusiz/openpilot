@@ -6,6 +6,7 @@ import time
 import select
 import codecs
 
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 from panda import Panda
 
 setcolor = ["\033[1;32;40m", "\033[1;31;40m"]
@@ -23,11 +24,11 @@ if __name__ == "__main__":
       if os.getenv("SERIAL"):
         serials = [x for x in serials if x == os.getenv("SERIAL")]
 
-      pandas = [Panda(x, claim=claim) for x in serials]
+      pandas = list([Panda(x, claim=claim) for x in serials])
       decoders = [codecs.getincrementaldecoder('utf-8')() for _ in pandas]
 
       if not len(pandas):
-        print("no pandas found")
+        print("  no pandas found\n")
         if no_reconnect:
           sys.exit(0)
         time.sleep(1)
@@ -58,5 +59,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
       break
     except Exception:
-      print("panda disconnected!")
+      print("  panda disconnected!\n")
       time.sleep(0.5)
