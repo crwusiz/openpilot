@@ -16,7 +16,6 @@ from cereal import messaging
 from openpilot.common.numpy_fast import clip, interp, mean
 from openpilot.common.realtime import Ratekeeper
 from openpilot.common.conversions import Conversions as CV
-import time
 
 CAMERA_SPEED_FACTOR = 1.05
 terminate_flag = threading.Event()
@@ -28,7 +27,6 @@ class Port:
 
 class NaviServer:
   def __init__(self):
-
     self.sm = messaging.SubMaster(['gpsLocationExternal', 'carState'])
 
     self.json_road_limit = None
@@ -46,8 +44,10 @@ class NaviServer:
     broadcast = Thread(target=self.broadcast_thread, args=[])
     broadcast.start()
 
-    subprocess.Popen([os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ngpsd')])
-    subprocess.Popen([os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nobsd')])
+    subprocess.Popen([
+      os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ngpsd'),
+      os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nobsd')
+    ])
 
     update = Thread(target=self.update_thread, args=[self.sm])
     update.start()
@@ -106,7 +106,6 @@ class NaviServer:
       return None
 
   def broadcast_thread(self):
-
     broadcast_address = None
     frame = 0
 
@@ -116,7 +115,6 @@ class NaviServer:
         while not terminate_flag.is_set():
 
           try:
-
             if broadcast_address is None or frame % 10 == 0:
               broadcast_address = self.get_broadcast_address()
 
@@ -429,7 +427,6 @@ class SpeedLimiter:
     return False
 
   def get_max_speed(self, cluster_speed, is_metric):
-
     log = ""
     self.recv()
 
@@ -437,7 +434,6 @@ class SpeedLimiter:
       return 0, 0, 0, False, 0, ""
 
     try:
-
       road_limit_speed = self.naviData.roadLimitSpeed
       is_highway = self.naviData.isHighway
 

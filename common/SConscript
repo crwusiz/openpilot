@@ -21,6 +21,11 @@ files = [
 _gpucommon = env.Library('gpucommon', files)
 Export('_common', '_gpucommon')
 
+if GetOption('extras'):
+  env.Program('tests/test_common',
+              ['tests/test_runner.cc', 'tests/test_params.cc', 'tests/test_util.cc', 'tests/test_swaglog.cc'],
+              LIBS=[_common, 'json11', 'zmq', 'pthread'])
+
 # Cython bindings
 params_python = envCython.Program('params_pyx.so', 'params_pyx.pyx', LIBS=envCython['LIBS'] + [_common, 'zmq', 'json11'])
 
