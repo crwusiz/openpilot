@@ -294,7 +294,7 @@ class SpeedController:
     btn_pressed = self.CI.CS.cruise_buttons[-1] != Buttons.NONE
 
     if not self.long_control:
-      if not ascc_enabled or CS.cruiseState.standstill or btn_pressed:
+      if not ascc_enabled or btn_pressed:
         self.reset()
         self.wait_timer = max(self.alive_count_list) + max(self.wait_count_list)
         return
