@@ -2,7 +2,7 @@
 import concurrent.futures
 
 from panda import PandaJungle, PandaJungleDFU, McuType
-from panda.python.resetter import Resetter
+from panda.tests.libs.resetter import Resetter
 
 SERIALS = {'180019001451313236343430', '1d0017000c50435635333720'}
 
