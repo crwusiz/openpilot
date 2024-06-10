@@ -59,7 +59,6 @@ public:
   static bool alert(const QString &prompt_text, QWidget *parent);
   static bool confirm(const QString &prompt_text, const QString &confirm_text, QWidget *parent);
   static bool rich(const QString &prompt_text, QWidget *parent);
-  static void message(const QString &message, QWidget *parent);
 };
 
 class MultiOptionDialog : public DialogBase {

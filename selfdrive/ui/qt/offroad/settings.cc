@@ -637,7 +637,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
       const std::string txt = util::read_file(file_path.toStdString());
       ConfirmationDialog::rich(QString::fromStdString(txt), this);
     } else {
-      ConfirmationDialog::message("log file not found", this);
+      const std::string txt = "log file not found";
+      ConfirmationDialog::rich(QString::fromStdString(txt), this);
     }
 	});
 
@@ -649,7 +650,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
         QProcess::execute("/data/openpilot/scripts/log_upload.sh");
       }
     } else {
-      ConfirmationDialog::message("log file not found", this);
+      const std::string txt = "log file not found";
+      ConfirmationDialog::rich(QString::fromStdString(txt), this);
     }
 	});
 
@@ -660,7 +662,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
       const std::string txt = util::read_file(file_path.toStdString());
       ConfirmationDialog::rich(QString::fromStdString(txt), this);
     } else {
-      ConfirmationDialog::message("log file not found", this);
+      const std::string txt = "log file not found";
+      ConfirmationDialog::rich(QString::fromStdString(txt), this);
     }
   });
 
@@ -671,7 +674,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
       const std::string txt = util::read_file(file_path.toStdString());
       ConfirmationDialog::rich(QString::fromStdString(txt), this);
     } else {
-      ConfirmationDialog::message("log file not found", this);
+      const std::string txt = "log file not found";
+      ConfirmationDialog::rich(QString::fromStdString(txt), this);
     }
   });
 
