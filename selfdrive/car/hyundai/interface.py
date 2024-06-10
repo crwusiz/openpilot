@@ -105,9 +105,7 @@ class CarInterface(CarInterfaceBase):
     ret.startingState = True
     ret.vEgoStarting = 0.3
     ret.startAccel = 2.0
-
-    ret.longitudinalActuatorDelayLowerBound = 0.5
-    ret.longitudinalActuatorDelayUpperBound = 0.5
+    ret.longitudinalActuatorDelay = 0.5
 
     # *** feature detection and  Params Init ***
     if candidate in CANFD_CAR:
