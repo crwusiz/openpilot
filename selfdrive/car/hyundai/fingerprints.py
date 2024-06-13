@@ -2,6 +2,9 @@
 from cereal import car
 from openpilot.selfdrive.car.hyundai.values import CAR
 
+# The existence of SCC or RDR in the fwdRadar FW usually determines the radar's function,
+# i.e. if it sends the SCC messages or if another ECU like the camera or ADAS Driving ECU does
+
 Ecu = car.CarParams.Ecu
 
 FINGERPRINTS = {
@@ -566,6 +569,7 @@ FW_VERSIONS = {
       b'\xf1\x00NE1N RDR -----      1.00 1.00 99110-NI000         ',
     ],
     (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00NE1 MFC  AT CAN LHD 1.00 1.01 99211-GI010 211007',
       b'\xf1\x00NE1 MFC  AT CAN LHD 1.00 1.05 99211-GI010 220614',
       b'\xf1\x00NE1 MFC  AT EUR LHD 1.00 1.01 99211-GI010 211007',
       b'\xf1\x00NE1 MFC  AT EUR LHD 1.00 1.06 99211-GI000 210813',
@@ -581,6 +585,8 @@ FW_VERSIONS = {
       b'\xf1\x00NE1 MFC  AT USA LHD 1.00 1.03 99211-GI010 220401',
       b'\xf1\x00NE1 MFC  AT USA LHD 1.00 1.05 99211-GI010 220614',
       b'\xf1\x00NE1 MFC  AT USA LHD 1.00 1.06 99211-GI010 230110',
+      b'\xf1\x00NE1 MFC  AT USA LHD 1.00 1.00 99211-GI100 230915',
+      b'\xf1\x00NE1 MFC  AT EUR LHD 1.00 1.00 99211-GI100 230915',
       # 5N
       b'\xf1\x00NE1NMFC  AT KOR LHD 1.00 1.04 99211-NI000 231219',
     ],
@@ -936,6 +942,7 @@ FW_VERSIONS = {
   CAR.KIA_SPORTAGE_NQ5: {  # (NQ5)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00NQ5 FR_CMR AT AUS RHD 1.00 1.00 99211-P1040 663',
+      b'\xf1\x00NQ5 FR_CMR AT EUR LHD 1.00 1.00 99211-P1040 663',
       b'\xf1\x00NQ5 FR_CMR AT GEN LHD 1.00 1.00 99211-P1060 665',
       b'\xf1\x00NQ5 FR_CMR AT USA LHD 1.00 1.00 99211-P1030 662',
       b'\xf1\x00NQ5 FR_CMR AT USA LHD 1.00 1.00 99211-P1040 663',

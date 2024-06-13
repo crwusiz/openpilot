@@ -684,7 +684,6 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
       bg.setColorAt(1.0, steeringpressedColor(0));
     } else {
       // The first half of track_vertices are the points for the right side of the path
-      // and the indices match the positions of accel from uiPlan
       const auto &acceleration = sm["modelV2"].getModelV2().getAcceleration().getX();
       const int max_len = std::min<int>(scene.track_vertices.length() / 2, acceleration.size());
 
