@@ -116,13 +116,14 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     paramsdTemporaryError @50;
     paramsdPermanentError @119;
     actuatorsApiUnavailable @120;
+    espActive @121;
 
-    slowingDownSpeed @124;
-    slowingDownSpeedSound @125;
-    cruiseOn @126;
-    cruiseOff @121;
-    turningIndicatorOn @122;
-    autoLaneChange @123;
+    slowingDownSpeed @122;
+    slowingDownSpeedSound @123;
+    cruiseOn @124;
+    cruiseOff @125;
+    turningIndicatorOn @126;
+    autoLaneChange @127;
 
     radarCanErrorDEPRECATED @15;
     communityFeatureDisallowedDEPRECATED @62;
@@ -201,6 +202,7 @@ struct CarState {
   espDisabled @32 :Bool;
   accFaulted @42 :Bool;
   carFaultedNonCritical @47 :Bool;  # some ECU is faulted, but car remains controllable
+  espActive @51 :Bool;
 
   # cruise state
   cruiseState @10 :CruiseState;
@@ -232,10 +234,10 @@ struct CarState {
   cumLagMs @50 :Float32;
 
   # neokii
-  autoHold @51 : Int32;
-  navLimitSpeed @52 :Int16;
-  tpms @53 :Tpms;
-  exState @54 :ExState;
+  autoHold @52 : Int32;
+  navLimitSpeed @53 :Int16;
+  tpms @54 :Tpms;
+  exState @55 :ExState;
 
   struct ExState {
     vCruiseKph @0 :Float32;
@@ -569,8 +571,8 @@ struct CarParams {
     kiBP @2 :List(Float32);
     kiV @3 :List(Float32);
     kf @6 :Float32;
-    deadzoneBP @4 :List(Float32);
-    deadzoneV @5 :List(Float32);
+    deadzoneBPDEPRECATED @4 :List(Float32);
+    deadzoneVDEPRECATED @5 :List(Float32);
   }
 
   struct LateralINDITuning {

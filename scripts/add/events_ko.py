@@ -237,7 +237,7 @@ def below_engage_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.
 
 def below_steer_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
   return Alert(
-    f"{get_display_speed(CP.minSteerSpeed, metric)} 이상의 속도에서 조향됩니다",
+    f"{get_display_speed(CP.minSteerSpeed, metric)} 이상의 속도에서 조향 됩니다",
     "",
     AlertStatus.userPrompt, AlertSize.small,
     Priority.LOW, VisualAlert.steerRequired, AudibleAlert.prompt, 0.4)
@@ -374,7 +374,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventName.controlsInitializing: {
-    ET.NO_ENTRY: NoEntryAlert("시스템 초기화중입니다"),
+    ET.NO_ENTRY: NoEntryAlert("시스템 준비중입니다"),
   },
 
   EventName.startup: {
@@ -454,7 +454,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.steerTempUnavailableSilent: {
     ET.WARNING: Alert(
-      "조향제어 일시적으로 사용불가",
+      "조향 일시적 불가능",
       "",
       AlertStatus.userPrompt, AlertSize.small,
       Priority.LOW, VisualAlert.steerRequired, AudibleAlert.prompt, 1.8),
@@ -511,7 +511,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   EventName.manualRestart: {
     ET.WARNING: Alert(
       "핸들을 잡아주세요",
-      "수동으로 재활성하세요",
+      "장치를 재부팅 하세요",
       AlertStatus.userPrompt, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, .2),
   },
@@ -563,7 +563,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   EventName.steerSaturated: {
     ET.WARNING: Alert(
       "핸들을 잡아주세요",
-      "조향제어 제한을 초과함",
+      "회전이 조향 한도를 초과함",
       AlertStatus.userPrompt, AlertSize.mid,
       Priority.LOW, VisualAlert.steerRequired, AudibleAlert.promptRepeat, 2.),
   },
@@ -634,7 +634,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.buttonCancel: {
     ET.USER_DISABLE: EngagementAlert(AudibleAlert.disengage),
-    ET.NO_ENTRY: NoEntryAlert("Cancel Pressed"),
+    ET.NO_ENTRY: NoEntryAlert("Cancel 버튼을 눌렀습니다"),
   },
 
   EventName.brakeHold: {
@@ -692,8 +692,8 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventName.steerTempUnavailable: {
-    ET.SOFT_DISABLE: soft_disable_alert("조향제어 일시적으로 사용불가"),
-    ET.NO_ENTRY: NoEntryAlert("조향제어 일시적으로 사용불가"),
+    ET.SOFT_DISABLE: soft_disable_alert("조향 일시적 불가능"),
+    ET.NO_ENTRY: NoEntryAlert("조향 일시적 불가능"),
   },
 
   EventName.steerTimeLimit: {
@@ -793,8 +793,13 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventName.espDisabled: {
-    ET.SOFT_DISABLE: soft_disable_alert("ESP 비활성화"),
-    ET.NO_ENTRY: NoEntryAlert("ESP 비활성화"),
+    ET.SOFT_DISABLE: soft_disable_alert("차량자세제어 비활성화됨"),
+    ET.NO_ENTRY: NoEntryAlert("차량자세제어 비활성화됨"),
+  },
+
+  EventName.espActive: {
+    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("차량자세제어 동작됨"),
+    ET.NO_ENTRY: NoEntryAlert("차량자세제어 동작됨"),
   },
 
   EventName.lowBattery: {
@@ -827,8 +832,8 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventName.radarFault: {
-    ET.SOFT_DISABLE: soft_disable_alert("레이더 오류 : 차량을 재가동하세요"),
-    ET.NO_ENTRY: NoEntryAlert("레이더 오류 : 차량을 재가동하세요"),
+    ET.SOFT_DISABLE: soft_disable_alert("레이더 오류 : 차량 시동을 다시켜세요"),
+    ET.NO_ENTRY: NoEntryAlert("레이더 오류 : 차량 시동을 다시켜세요"),
   },
 
   # Every frame from the camera should be processed by the model. If modeld
@@ -846,7 +851,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   # usually means the model has trouble understanding the scene. This is used
   # as a heuristic to warn the driver.
   EventName.posenetInvalid: {
-    ET.SOFT_DISABLE: soft_disable_alert("잘못된 Posenet 속도"),
+    ET.SOFT_DISABLE: soft_disable_alert("Posenet 속도 잘못됨"),
     ET.NO_ENTRY: posenet_invalid_alert,
   },
 
@@ -858,9 +863,9 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventName.lowMemory: {
-    ET.SOFT_DISABLE: soft_disable_alert("메모리 부족 : 장치를 재가동하세요"),
+    ET.SOFT_DISABLE: soft_disable_alert("메모리 부족 : 장치를 재부팅 하세요"),
     ET.PERMANENT: low_memory_alert,
-    ET.NO_ENTRY: NoEntryAlert("메모리 부족 : 장치를 재가동하세요"),
+    ET.NO_ENTRY: NoEntryAlert("메모리 부족 : 장치를 재부팅 하세요"),
   },
 
   EventName.highCpuUsage: {
@@ -870,9 +875,9 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventName.accFaulted: {
-    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("크루즈 오류 : 차량을 재가동하세요"),
-    ET.PERMANENT: NormalPermanentAlert("크루즈 오류 : 차량을 재가동하세요"),
-    ET.NO_ENTRY: NoEntryAlert("크루즈 오류 : 차량을 재가동하세요"),
+    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("크루즈 오류 : 차량 시동을 다시켜세요"),
+    ET.PERMANENT: NormalPermanentAlert("크루즈 오류 : 차량 시동을 다시켜세요"),
+    ET.NO_ENTRY: NoEntryAlert("크루즈 오류 : 차량 시동을 다시켜세요"),
   },
 
   EventName.controlsMismatch: {
@@ -901,9 +906,9 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   # Sometimes the USB stack on the device can get into a bad state
   # causing the connection to the panda to be lost
   EventName.usbError: {
-    ET.SOFT_DISABLE: soft_disable_alert("USB 오류 : 장치를 재부팅하세요"),
-    ET.PERMANENT: NormalPermanentAlert("USB 오류 : 장치를 재부팅하세요", ""),
-    ET.NO_ENTRY: NoEntryAlert("USB 오류 : 장치를 재부팅하세요"),
+    ET.SOFT_DISABLE: soft_disable_alert("USB 오류 : 장치를 재부팅 하세요"),
+    ET.PERMANENT: NormalPermanentAlert("USB 오류 : 장치를 재부팅 하세요", ""),
+    ET.NO_ENTRY: NoEntryAlert("USB 오류 : 장치를 재부팅 하세요"),
   },
 
   # This alert can be thrown for the following reasons:
@@ -932,9 +937,9 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventName.steerUnavailable: {
-    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("LKAS 오류 : 차량을 재가동하세요"),
-    ET.PERMANENT: NormalPermanentAlert("LKAS 오류 : 차량을 재가동하세요"),
-    ET.NO_ENTRY: NoEntryAlert("LKAS 오류 : 차량을 재가동하세요"),
+    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("LKAS 오류 : 차량 시동을 다시켜세요"),
+    ET.PERMANENT: NormalPermanentAlert("LKAS 오류 : 차량 시동을 다시켜세요"),
+    ET.NO_ENTRY: NoEntryAlert("LKAS 오류 : 차량 시동을 다시켜세요"),
   },
 
   EventName.reverseGear: {
@@ -966,7 +971,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   EventName.speedTooLow: {
     ET.IMMEDIATE_DISABLE: Alert(
       "오픈파일럿 사용불가",
-      "속도를 높이고 재가동하세요",
+      "속도를 높이고 활성화하세요",
       AlertStatus.normal, AlertSize.mid,
       Priority.HIGH, VisualAlert.none, AudibleAlert.disengage, 3.),
   },
@@ -978,12 +983,12 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       "속도를 줄여주세요",
       AlertStatus.userPrompt, AlertSize.mid,
       Priority.HIGH, VisualAlert.steerRequired, AudibleAlert.promptRepeat, 4.),
-    ET.NO_ENTRY: NoEntryAlert("속도를 줄이고 재가동하세요"),
+    ET.NO_ENTRY: NoEntryAlert("속도를 줄이고 활성화하세요"),
   },
 
   EventName.lowSpeedLockout: {
-    ET.PERMANENT: NormalPermanentAlert("크루즈 오류 : 차량을 재가동하세요"),
-    ET.NO_ENTRY: NoEntryAlert("크루즈 오류 : 차량을 재가동하세요"),
+    ET.PERMANENT: NormalPermanentAlert("크루즈 오류 : 차량 시동을 다시켜세요"),
+    ET.NO_ENTRY: NoEntryAlert("크루즈 오류 : 차량 시동을 다시켜세요"),
   },
 
   EventName.lkasDisabled: {
@@ -992,7 +997,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventName.vehicleSensorsInvalid: {
-    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("차량 센서가 유효하지 않음"),
+    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("차량 센서 정보가 유효하지 않습니다"),
     ET.PERMANENT: NormalPermanentAlert("차량 센서 보정", "주행 하여 보정하세요"),
     ET.NO_ENTRY: NoEntryAlert("차량 센서 보정"),
   },

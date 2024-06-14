@@ -798,6 +798,11 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("Electronic Stability Control Disabled"),
   },
 
+  EventName.espActive: {
+    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("Electronic Stability Control Active"),
+    ET.NO_ENTRY: NoEntryAlert("Electronic Stability Control Active"),
+  },
+
   EventName.lowBattery: {
     ET.SOFT_DISABLE: soft_disable_alert("Low Battery"),
     ET.NO_ENTRY: NoEntryAlert("Low Battery"),
