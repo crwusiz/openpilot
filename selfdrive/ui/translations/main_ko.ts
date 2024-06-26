@@ -796,6 +796,10 @@
         <source>1 year of drive storage</source>
         <translation>1년간 드라이브 로그 저장</translation>
     </message>
+    <message>
+        <source>Remote snapshots</source>
+        <translation>원격 스냅샷</translation>
+    </message>
 </context>
 <context>
     <name>PrimeUserWidget</name>
