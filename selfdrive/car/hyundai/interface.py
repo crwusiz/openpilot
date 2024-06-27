@@ -244,7 +244,9 @@ class CarInterface(CarInterfaceBase):
     return ret
 
   @staticmethod
-  def get_params_adjust_set_speed():
+  def get_params_adjust_set_speed(CP):
+    if CP.carFingerprint in CANFD_CAR:
+      return [16], [20]
     return [16, 20], [12, 14, 16, 18]
 
   def create_buttons(self, button):
@@ -263,13 +265,17 @@ class CarInterface(CarInterfaceBase):
 
   def create_buttons_can_fd(self, button):
     values = {
-      "COUNTER": (self.CS.buttons_counter + 1) % 15,
+      "COUNTER": self.CS.buttons_counter + 1,
       "SET_ME_1": 1,
       "CRUISE_BUTTONS": button,
     }
-    bus = self.CAN.ECAN if self.CP.flags & HyundaiFlags.CANFD_HDA2 else self.CAN.CAM
+    bus = self.CC.CAN.ECAN if self.CP.flags & HyundaiFlags.CANFD_HDA2 else self.CC.CAN.CAM
     return self.CC.packer.make_can_msg("CRUISE_BUTTONS", bus, values)
 
   def create_buttons_can_fd_alt(self, button):
-    return None
+    values = copy.copy(self.CS.canfd_buttons)
+    values["CRUISE_BUTTONS"] = button
+    values["COUNTER"] = (values["COUNTER"] + 1) % 256
+    bus = self.CC.CAN.ECAN if self.CP.flags & HyundaiFlags.CANFD_HDA2 else self.CC.CAN.CAM
+    return self.CC.packer.make_can_msg("CRUISE_BUTTONS_ALT", bus, values)
 

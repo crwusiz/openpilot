@@ -62,7 +62,7 @@ class SpeedController:
     self.alive_index = 0
     self.wait_index = 0
     self.alive_count = 0
-    self.wait_count_list, self.alive_count_list = CI.get_params_adjust_set_speed()
+    self.wait_count_list, self.alive_count_list = CI.get_params_adjust_set_speed(CP)
     random.shuffle(self.wait_count_list)
     random.shuffle(self.alive_count_list)
 
@@ -308,13 +308,12 @@ class SpeedController:
       if self.alive_timer == 0:
         current_set_speed_clu = int(round(CS.cruiseState.speed * self.speed_conv_to_clu))
         self.btn = self._get_button(current_set_speed_clu)
-        self.alive_count = 1
+        self.alive_count = self.get_alive_count()
 
       if self.btn != Buttons.NONE:
         can = self.CI.create_buttons(self.btn)
         if can is not None:
-          for _ in range(self.get_alive_count()):
-            can_sends.append(can)
+          can_sends.append(can)
 
         self.alive_timer += 1
 
