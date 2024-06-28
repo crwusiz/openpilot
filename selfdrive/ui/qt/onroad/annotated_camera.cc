@@ -509,15 +509,23 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   // bottom left info
+  bool angle_control = params.getBool("IsAngleControl");
   QString carName = QString::fromStdString(params.get("CarName"));
   QString infoText;
-  infoText.sprintf("[%s] SCC[%d] SR[%.2f] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
-    carName.toStdString().c_str(),
-    sccBus,
-    steerRatio,
-    latAccelFactor, friction,
-    latAccelFactorRaw, frictionRaw
-  );
+  if (angle_control) {
+    infoText.sprintf("[%s] SR[%.2f] AngleControl",
+      carName.toStdString().c_str(),
+      steerRatio
+    );
+  } else {
+    infoText.sprintf("[%s] SCC[%d] SR[%.2f] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
+      carName.toStdString().c_str(),
+      sccBus,
+      steerRatio,
+      latAccelFactor, friction,
+      latAccelFactorRaw, frictionRaw
+    );
+  }
 
   x = rect().left() + 20;
   y = rect().height() - 20;

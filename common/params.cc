@@ -224,6 +224,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"GmapKey", PERSISTENT},
     {"DisengageOnBrake", PERSISTENT},
     {"IsCanfd", PERSISTENT},
+    {"IsAngleControl", PERSISTENT},
     {"IsHda2", PERSISTENT},
     {"GitLog", PERSISTENT},
     {"DriverCameraHardwareMissing", PERSISTENT},
