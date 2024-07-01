@@ -186,6 +186,8 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   // max speed, apply speed, speed limit sign init
   float limit_speed = 0;
   float left_dist = 0;
+  bool angle_control = params.getBool("IsAngleControl");
+  bool set_speed = angle_control || longControl;
 
   if (nda_state > 0) {
     if (camLimitSpeed > 0 && camLimitSpeedLeftDist > 0) {
@@ -211,7 +213,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     leftDistStr.sprintf("%.0f m", left_dist);
   }
 
-  int rect_width = !longControl ? 163 : 300;
+  int rect_width = !set_speed ? 163 : 300;
   int rect_height = 188;
 
   QRect max_speed_rect(30, 30, rect_width, rect_height);
@@ -261,7 +263,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   p.drawText(max_rect, Qt::AlignCenter, tr("MAX"));
 
   // apply speed (upper left 2)
-  if (longControl) {
+  if (set_speed) {
     QString applySpeedStr = QString::number(std::nearbyint(apply_speed));
     QRect apply_speed_outer(max_speed_rect.right() - 150, max_speed_rect.top() + 10, 140, 168);
     p.setPen(QPen(whiteColor(200), 2));
@@ -296,10 +298,10 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
       p.setPen(greenColor());
     }
     p.setFont(InterFont(35, QFont::Bold));
-    QRect long_rect = getTextRect(p, Qt::AlignCenter, "LONG");
+    QRect long_rect = getTextRect(p, Qt::AlignCenter, "SET");
     long_rect.moveCenter({apply_speed_outer.center().x(), 0});
     long_rect.moveTop(max_speed_rect.top() + 25);
-    p.drawText(long_rect, Qt::AlignCenter, tr("LONG"));
+    p.drawText(long_rect, Qt::AlignCenter, tr("SET"));
   }
 
   // speedlimit sign
@@ -509,7 +511,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   // bottom left info
-  bool angle_control = params.getBool("IsAngleControl");
   QString carName = QString::fromStdString(params.get("CarName"));
   QString infoText;
   if (angle_control) {
