@@ -107,6 +107,7 @@ class HyundaiExFlags(IntFlag):
   NAVI = 2 ** 3
   TPMS = 2 ** 4
   LFA = 2 ** 5
+  ADRV = 2 ** 6
 
 class Footnote(Enum):
   CANFD = CarFootnote(
