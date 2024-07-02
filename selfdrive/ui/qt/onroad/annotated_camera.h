@@ -36,7 +36,6 @@ private:
 
   // crwusiz add
   QPixmap brake_img;
-  QPixmap gap_img, gap1_img, gap2_img, gap3_img, gap4_img;
   QPixmap wifi_img, wifi_l_img, wifi_m_img, wifi_h_img, wifi_f_img, wifi_ok_img;
   QPixmap gps_img, direction_img, tpms_img;
   QPixmap turnsignal_l_img, turnsignal_r_img;
@@ -71,7 +70,7 @@ private:
   int nda_state, isNda2 = 0;
   int wifi_state = 0;
   int gpsSatelliteCount = 0;
-  int accel, gap_state = 0;
+  int accel = 0;
   int lateralControl = 0;
   int sccBus = 0;
   int camLimitSpeed, sectionLimitSpeed = 0;

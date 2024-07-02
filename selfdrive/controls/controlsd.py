@@ -687,8 +687,7 @@ class Controls:
     hudControl.speedVisible = self.enabled
     hudControl.lanesVisible = self.enabled
     hudControl.leadVisible = self.sm['longitudinalPlan'].hasLead
-    #hudControl.leadDistanceBars = self.personality + 1
-    hudControl.leadDistanceBars = CS.cruiseState.leadDistanceBars
+    hudControl.leadDistanceBars = self.personality + 1
 
     hudControl.rightLaneVisible = True
     hudControl.leftLaneVisible = True

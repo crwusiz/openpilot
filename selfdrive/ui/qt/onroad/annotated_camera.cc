@@ -43,10 +43,6 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   wifi_f_img = loadPixmap("../assets/offroad/icon_wifi_strength_full.svg", {img_size, img_size});
   wifi_ok_img = loadPixmap("../assets/img_wifi.png", {img_size, img_size});
   direction_img = loadPixmap("../assets/img_direction.png", {img_size, img_size});
-  gap1_img = loadPixmap("../assets/img_gap1.png", {img_size, img_size});
-  gap2_img = loadPixmap("../assets/img_gap2.png", {img_size, img_size});
-  gap3_img = loadPixmap("../assets/img_gap3.png", {img_size, img_size});
-  gap4_img = loadPixmap("../assets/img_gap4.png", {img_size, img_size});
   turnsignal_l_img = loadPixmap("../assets/img_turnsignal_l.png", {img_size, img_size});
   turnsignal_r_img = loadPixmap("../assets/img_turnsignal_r.png", {img_size, img_size});
   tpms_img = loadPixmap("../assets/img_tpms.png");
@@ -134,7 +130,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   gpsSatelliteCount = s.scene.satelliteCount;
   steerAngle = ce.getSteeringAngleDeg();
   longControl = cp.getOpenpilotLongitudinalControl();
-  gap_state = ce.getCruiseState().getLeadDistanceBars();
   steerRatio = lp.getSteerRatio();
   sccBus = cp.getSccBus();
   fl = ce.getTpms().getFl();
@@ -467,21 +462,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     p.setFont(InterFont(30, QFont::Bold));
     drawTextColor(p, x - 30, y + 95, sa_str, sa_color);
     drawTextColor(p, x + 30, y + 95, sa_direction, whiteColor(200));
-
-    // scc gap icon (bottom right 1)
-    if (gap_state == 1) {
-      gap_img = gap1_img;
-    } else if (gap_state == 2) {
-      gap_img = gap2_img;
-    } else if (gap_state == 3) {
-      gap_img = gap3_img;
-    } else {
-      gap_img = gap4_img;
-    }
-
-    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 3.1);
-    y = rect().bottom() - (UI_FOOTER_HEIGHT / 2) + (UI_BORDER_SIZE * 2);
-    drawIcon(p, QPoint(x, y), gap_img, icon_bg, is_cruise_set ? 0.8 : 0.2);
 
     // gaspress img (bottom right 2)
     x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
