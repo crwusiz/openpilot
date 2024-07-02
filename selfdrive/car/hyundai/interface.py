@@ -119,8 +119,6 @@ class CarInterface(CarInterfaceBase):
         ret.exFlags |= HyundaiExFlags.NAVI.value
       if {0x1AA, 0x1CF} & set(fingerprint[CAN.ECAN]):
         ret.exFlags |= HyundaiExFlags.LFA.value
-      if 0x200 in fingerprint[CAN.ECAN]:
-        ret.exFlags |= HyundaiExFlags.ADRV.value
 
       ret.radarUnavailable = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
     else:
