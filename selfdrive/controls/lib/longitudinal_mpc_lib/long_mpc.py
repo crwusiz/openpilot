@@ -427,11 +427,6 @@ class LongitudinalMpc:
       self.solver.set(i, "yref", self.yref[i])
     self.solver.set(N, "yref", self.yref[N][:COST_E_DIM])
 
-    navi_obstacles = sm['naviObstacles']
-    for obstacle in navi_obstacles.obstacles:
-      if obstacle.valid and len(obstacle.obstacle) == 13:
-        x_obstacles = np.column_stack([x_obstacles, obstacle.obstacle])
-
     self.params[:,2] = np.min(x_obstacles, axis=1)
     self.params[:,3] = np.copy(self.prev_a)
     self.params[:,4] = t_follow

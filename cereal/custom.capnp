@@ -21,36 +21,12 @@ struct NaviData @0x81c2f05a394cf4af {
   sectionLeftTime @9 :Int16;
   sectionAdjustSpeed @10 :Bool;
   camSpeedFactor @11 :Float32;
-  currentRoadName @12 :Text;
-  isNda2 @13 :Bool;
-  ts @14 :TrafficSignal;
-
-  struct TrafficSignal {
-    isGreenLightOn @0 :Bool;
-    isLeftLightOn @1 :Bool;
-    isRedLightOn @2 :Bool;
-    greenLightRemainTime @3 :Int16;
-    leftLightRemainTime @4 :Int16;
-    redLightRemainTime @5 :Int16;
-    distance @6 :Int16;
-  }
 }
 
-struct NaviGps @0xaedffd8f31e7b55d {
-  latitude @0 :Float32;
-  longitude @1 :Float32;
-  heading @2 :Float32;
-  speed @3 :Float32;
+struct CustomReserved1 @0xaedffd8f31e7b55d {
 }
 
-struct NaviObstacles @0xf35cc4560bbf6ec2 {
-  obstacles @0 :List(Obstacle);
-
-  struct Obstacle {
-    valid @0: Bool;
-    type @1: Int16;
-    obstacle @2:List(Float32);
-  }
+struct CustomReserved2 @0xf35cc4560bbf6ec2 {
 }
 
 struct CustomReserved3 @0xda96579883444c35 {

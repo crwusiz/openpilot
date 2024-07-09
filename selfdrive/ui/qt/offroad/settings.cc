@@ -59,16 +59,16 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "../assets/offroad/icon_ldws.png",
     },
     {
-      "AlwaysOnDM",
-      tr("Always-On Driver Monitoring"),
-      tr("Enable driver monitoring even when openpilot is not engaged."),
-      "../assets/offroad/icon_monitoring.png",
-    },
-    {
       "AutoLaneChangeEnabled",
       tr("Enable AutoLaneChange"),
       tr("Operation of the turn signal at 60㎞/h speed will result in a short change of the vehicle"),
       "../assets/offroad/icon_lca.png",
+    },
+    {
+      "AlwaysOnDM",
+      tr("Always-On Driver Monitoring"),
+      tr("Enable driver monitoring even when openpilot is not engaged."),
+      "../assets/offroad/icon_monitoring.png",
     },
     {
       "RecordFront",
@@ -82,20 +82,6 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       tr("Display speed in km/h instead of mph."),
       "../assets/offroad/icon_metric.png",
     },
-#ifdef ENABLE_MAPS
-    {
-      "NavSettingTime24h",
-      tr("Show ETA in 24h Format"),
-      tr("Use 24h format instead of am/pm"),
-      "../assets/offroad/icon_metric.png",
-    },
-    {
-      "NavSettingLeftSide",
-      tr("Show Map on Left Side of UI"),
-      tr("Show map on left side when in split screen view."),
-      "../assets/offroad/icon_map.png",
-    },
-#endif
   };
 
 
@@ -758,16 +744,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                   tr("Logger Enable"),
                                   tr("Turn off this option to reduce system load"),
                                   "../assets/offroad/icon_addon.png",
-                                  this));
-  toggles.append(new ParamControl("NavEnable",
-                                  tr("Navigation Enable"),
-                                  tr("Navigation Features use"),
-                                  "../assets/offroad/icon_map.png",
-                                  this));
-  toggles.append(new ParamControl("UseExternalNaviRoutes",
-                                  tr("Use external navi routes"),
-                                  tr("Use external navi routes"),
-                                  "../assets/offroad/icon_map.png",
                                   this));
   if (is_canfd) {
     toggles.append(new ParamControl("IsHda2",

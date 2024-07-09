@@ -51,7 +51,6 @@ def manager_init() -> None:
     ("AutoLaneChangeEnabled", "1"),
     ("PrebuiltEnable", "0"),
     ("LoggerEnable", "0"),
-    ("NavEnable", "0"),
     ("RadarTrackEnable", "0"),
     ("SccOnBus2", "0"),
     ("DisengageOnBrake", "0"),
@@ -161,13 +160,6 @@ def manager_thread() -> None:
   # add toggle
   if not params.get_bool("LoggerEnable"):
     ignore += ["loggerd", "encoderd", "deleter", "logmessaged", "tombstoned", "uploader", "updated", "statsd"]
-  if not params.get_bool("NavEnable"):
-    ignore += ["navd", "otisserv", "navi_route"]
-
-  if params.get_bool("UseExternalNaviRoutes"):
-    ignore += ["navd"]
-  else:
-    ignore += ["navi_route"]
 
   if params.get("DriverCameraHardwareMissing"):
     ignore += ["dmonitoringd", "dmonitoringmodeld"]

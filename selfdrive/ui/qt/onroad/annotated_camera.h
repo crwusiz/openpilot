@@ -20,8 +20,6 @@ public:
   explicit AnnotatedCameraWidget(VisionStreamType type, QWidget* parent = 0);
   void updateState(const UIState &s);
 
-  MapSettingsButton *map_settings_btn;
-
 private:
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
   void drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color);
@@ -45,7 +43,7 @@ private:
   // neokii add
   QPixmap autohold_warning_img;
   QPixmap autohold_active_img;
-  QPixmap nda_img, hda_img, nda2_img, hda2_img;
+  QPixmap nda_img, hda_img;
 
   QString speedUnit;
   std::unique_ptr<PubMaster> pm;
@@ -67,7 +65,7 @@ private:
 
   int status = STATUS_DISENGAGED;
   int autohold_state = 0;
-  int nda_state, isNda2 = 0;
+  int nda_state = 0;
   int wifi_state = 0;
   int gpsSatelliteCount = 0;
   int accel = 0;

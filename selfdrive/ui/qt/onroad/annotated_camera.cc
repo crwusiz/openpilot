@@ -27,9 +27,6 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   experimental_btn = new ExperimentalButton(this);
   main_layout->addWidget(experimental_btn, 0, Qt::AlignTop | Qt::AlignRight);
 
-  map_settings_btn = new MapSettingsButton(this);
-  main_layout->addWidget(map_settings_btn, 0, Qt::AlignBottom | Qt::AlignRight);
-
   steer_img = loadPixmap("../assets/img_chffr_wheel.png", {img_size, img_size});
   gaspress_img = loadPixmap("../assets/offroad/icon_disengage_on_accelerator.svg", {img_size, img_size});
   dm_img = loadPixmap("../assets/img_driver_face.png", {img_size + 5, img_size + 5});
@@ -58,8 +55,6 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* par
   autohold_active_img = loadPixmap("../assets/img_autohold_active.png", {img_size, img_size});
   nda_img = loadPixmap("../assets/img_nda.png");
   hda_img = loadPixmap("../assets/img_hda.png");
-  nda2_img = loadPixmap("../assets/img_nda2.png");
-  hda2_img = loadPixmap("../assets/img_hda2.png");
 }
 
 static const QColor get_tpms_color(float tpms) {
@@ -137,7 +132,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   rr = ce.getTpms().getRr();
   navLimitSpeed = ce.getNavLimitSpeed();
   nda_state = nd.getActive();
-  isNda2 = nd.getIsNda2();
   roadLimitSpeed = nd.getRoadLimitSpeed();
   camLimitSpeed = nd.getCamLimitSpeed();
   camLimitSpeedLeftDist = nd.getCamLimitSpeedLeftDist();
@@ -156,12 +150,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   rightHandDM = dm_state.getIsRHD();
   // DM icon transition
   dm_fade_state = std::clamp(dm_fade_state+0.2*(0.5-dmActive), 0.0, 1.0);
-
-  // hide map settings button for alerts and flip for right hand DM
-  if (map_settings_btn->isEnabled()) {
-    map_settings_btn->setVisible(!hideBottomIcons);
-    main_layout->setAlignment(map_settings_btn, (rightHandDM ? Qt::AlignLeft : Qt::AlignRight) | Qt::AlignBottom);
-  }
 }
 
 void AnnotatedCameraWidget::drawHud(QPainter &p) {
@@ -366,11 +354,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     h = 54;
     x = (width() + (UI_BORDER_SIZE * 2)) / 2 - (w / 2) - UI_BORDER_SIZE;
     y = UI_BORDER_SIZE * 4;
-    if (isNda2) {
-      p.drawPixmap(x , y, w + 35, h, nda_state == 1 ? nda2_img : hda2_img);
-    } else {
-      p.drawPixmap(x, y, w, h, nda_state == 1 ? nda_img : hda_img);
-    }
+    p.drawPixmap(x, y, w, h, nda_state == 1 ? nda_img : hda_img);
   }
 
   // sign icon (upper right 3)
