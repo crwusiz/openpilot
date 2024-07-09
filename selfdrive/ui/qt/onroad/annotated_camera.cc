@@ -88,7 +88,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   const auto lp = sm["liveParameters"].getLiveParameters();
   const auto ge = sm["gpsLocationExternal"].getGpsLocationExternal();
   const auto nd = sm["naviData"].getNaviData();
-  const auto tp = sm["liveTorqueParameters"].getLiveTorqueParameters();
   const auto lo = sm["longitudinalPlan"].getLongitudinalPlan();
 
   const bool cs_alive = sm.alive("controlsState");
@@ -146,10 +145,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   sectionLeftDist = nd.getSectionLeftDist();
   left_on = ce.getLeftBlinker();
   right_on = ce.getRightBlinker();
-  latAccelFactor = cs.getLateralControlState().getTorqueState().getLatAccelFactor();
-  friction = cs.getLateralControlState().getTorqueState().getFriction();
-  latAccelFactorRaw = tp.getLatAccelFactorRaw();
-  frictionRaw = tp.getFrictionCoefficientRaw();
   traffic_state = lo.getTrafficState();
 
   // update engageability/experimental mode button
@@ -494,17 +489,15 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   QString carName = QString::fromStdString(params.get("CarName"));
   QString infoText;
   if (angle_control) {
-    infoText.sprintf("[%s] SR[%.2f] AngleControl",
+    infoText.sprintf("[%s] SR[%.2f]",
       carName.toStdString().c_str(),
       steerRatio
     );
   } else {
-    infoText.sprintf("[%s] SCC[%d] SR[%.2f] [ (%.2f,%.2f) / (%.2f,%.2f) ]",
+    infoText.sprintf("[%s] SCC[%d] SR[%.2f]",
       carName.toStdString().c_str(),
       sccBus,
-      steerRatio,
-      latAccelFactor, friction,
-      latAccelFactorRaw, frictionRaw
+      steerRatio
     );
   }
 

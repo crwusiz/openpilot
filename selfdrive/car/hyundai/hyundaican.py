@@ -118,7 +118,7 @@ def create_scc_commands(packer, accel, upper_jerk, idx, hud_control, set_speed, 
 
   scc11_values = {
     "MainMode_ACC": CS.out.cruiseState.available,
-    "TauGapSet": CS.out.cruiseState.leadDistanceBars,
+    "TauGapSet": hud_control.leadDistanceBars,
     "VSetDis": set_speed if cruise_enabled else 0,
     "AliveCounterACC": idx % 0x10,
     "ObjValid": 1, # close lead makes controls tighter

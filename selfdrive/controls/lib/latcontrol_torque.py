@@ -25,7 +25,7 @@ LOW_SPEED_Y = [15, 13, 10, 5]
 class LatControlTorque(LatControl):
   def __init__(self, CP, CI):
     super().__init__(CP, CI)
-    self.torque_params = CP.lateralTuning.torque
+    self.torque_params = CP.lateralTuning.torque.as_builder()
     self.pid = PIDController(self.torque_params.kp, self.torque_params.ki,
                              k_f=self.torque_params.kf, pos_limit=self.steer_max, neg_limit=-self.steer_max)
     self.torque_from_lateral_accel = CI.torque_from_lateral_accel()
@@ -87,10 +87,6 @@ class LatControlTorque(LatControl):
       pid_log.actualLateralAccel = actual_lateral_accel
       pid_log.desiredLateralAccel = desired_lateral_accel
       pid_log.saturated = self._check_saturation(self.steer_max - abs(output_torque) < 1e-3, CS, steer_limited)
-
-    pid_log.latAccelFactor = self.torque_params.latAccelFactor
-    pid_log.latAccelOffset = self.torque_params.latAccelOffset
-    pid_log.friction = self.torque_params.friction
 
     # TODO left is positive in this convention
     return -output_torque, 0.0, pid_log
