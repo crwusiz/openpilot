@@ -66,11 +66,12 @@ static const QColor get_tpms_color(float tpms) {
 }
 
 static const QString get_tpms_text(float tpms) {
-    if (tpms < 5 || tpms > 60)
+    if (tpms < 5 || tpms > 60) {
       return "─";
-    char str[32];
-    snprintf(str, sizeof(str), "%.0f", round(tpms));
-    return QString(str);
+    } else {
+      int rounded_tpms = qRound(tpms);
+      return QString::number(rounded_tpms);
+    }
 }
 
 void AnnotatedCameraWidget::updateState(const UIState &s) {
@@ -80,7 +81,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   const auto ce = sm["carState"].getCarState();
   const auto cp = sm["carParams"].getCarParams();
   const auto ds = sm["deviceState"].getDeviceState();
-  const auto lp = sm["liveParameters"].getLiveParameters();
   const auto ge = sm["gpsLocationExternal"].getGpsLocationExternal();
   const auto nd = sm["naviData"].getNaviData();
   const auto lo = sm["longitudinalPlan"].getLongitudinalPlan();
@@ -124,7 +124,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   gpsSatelliteCount = s.scene.satelliteCount;
   steerAngle = ce.getSteeringAngleDeg();
   longControl = cp.getOpenpilotLongitudinalControl();
-  steerRatio = lp.getSteerRatio();
   sccBus = cp.getSccBus();
   fl = ce.getTpms().getFl();
   fr = ce.getTpms().getFr();
@@ -164,8 +163,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   // max speed, apply speed, speed limit sign init
   float limit_speed = 0;
   float left_dist = 0;
-  bool angle_control = params.getBool("IsAngleControl");
-  bool set_speed = angle_control || longControl;
 
   if (nda_state > 0) {
     if (camLimitSpeed > 0 && camLimitSpeedLeftDist > 0) {
@@ -181,17 +178,16 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     limit_speed = navLimitSpeed;
   }
 
-  QString roadLimitSpeedStr, limitSpeedStr, leftDistStr;
-  roadLimitSpeedStr.sprintf("%.0f", roadLimitSpeed);
-  limitSpeedStr.sprintf("%.0f", limit_speed);
+  QString roadLimitSpeedStr = QString::number(roadLimitSpeed, 'f', 0);
+  QString limitSpeedStr = QString::number(limit_speed, 'f', 0);
 
   if (left_dist >= 1000) {
-    leftDistStr.sprintf("%.1f km", left_dist / 1000.f);
+    leftDistStr = QString::asprintf("%.1f km", left_dist / 1000.0);
   } else if (left_dist > 0) {
-    leftDistStr.sprintf("%.0f m", left_dist);
+    leftDistStr = QString::asprintf("%.0f m", left_dist);
   }
 
-  int rect_width = !set_speed ? 163 : 300;
+  int rect_width = !nda_state ? 163 : 300;
   int rect_height = 188;
 
   QRect max_speed_rect(30, 30, rect_width, rect_height);
@@ -241,7 +237,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   p.drawText(max_rect, Qt::AlignCenter, tr("MAX"));
 
   // apply speed (upper left 2)
-  if (set_speed) {
+  if (nda_state) {
     QString applySpeedStr = QString::number(std::nearbyint(apply_speed));
     QRect apply_speed_outer(max_speed_rect.right() - 150, max_speed_rect.top() + 10, 140, 168);
     p.setPen(QPen(whiteColor(200), 2));
@@ -396,18 +392,26 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   drawIcon(p, QPoint(x, y), wifi_img, icon_bg, wifi_state > 0 ? 0.8 : 0.2);
 
   // upper gps info
-  if (gpsVerticalAccuracy == 0 || gpsVerticalAccuracy > 100)
-    gpsAltitude = 999.9;
+  if (gpsVerticalAccuracy == 0 || gpsVerticalAccuracy > 100) {
+    altitudeStr = "--";
+  } else {
+    altitudeStr = QString::asprintf("%.1f m", gpsAltitude);
+  }
 
-  if (gpsAccuracy > 100)
-    gpsAccuracy = 99.9;
-  else if (gpsAccuracy == 0)
-    gpsAccuracy = 0;
+  if (gpsAccuracy == 0 || gpsAccuracy > 100) {
+    accuracyStr = "--";
+  } else {
+    accuracyStr = QString::asprintf("%.1f m", gpsAccuracy);
+  }
 
-  QString infoGps;
-  infoGps.sprintf("🛰️[ Alt(%.1fm) Acc(%.1fm) Sat(%d) ]",
-    gpsAltitude, gpsAccuracy, gpsSatelliteCount
-  );
+  if (gpsSatelliteCount == 0) {
+    infoGps = "🛰️[ No Gps Signal ]";
+  } else {
+    infoGps = QString::asprintf("🛰️[ Alt(%s) Acc(%s) Sat(%d) ]",
+                                altitudeStr.toStdString().c_str(),
+                                accuracyStr.toStdString().c_str(),
+                                gpsSatelliteCount);
+  }
 
   x = rect().right() - 20;
   y = (UI_BORDER_SIZE * 2);
@@ -421,7 +425,6 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     y = rect().bottom() - (UI_FOOTER_HEIGHT / 2);
     drawIconRotate(p, QPoint(x, y), steer_img, icon_bg, 0.8, steerAngle);
 
-    QString sa_str, sa_direction;
     QColor sa_color = limeColor(200);
     if (std::fabs(steerAngle) > 90) {
       sa_color = redColor(200);
@@ -430,14 +433,14 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     }
 
     if (steerAngle > 0) {
-      sa_direction.sprintf("◀");
+      sa_direction = QString("◀");
     } else if (steerAngle < 0) {
-      sa_direction.sprintf("▶");
+      sa_direction = QString("▶");
     } else {
-      sa_direction.sprintf("●");
+      sa_direction = QString("●");
     }
 
-    sa_str.sprintf("%.0f °", steerAngle);
+    sa_str = QString::asprintf("%.0f °", steerAngle);
     p.setFont(InterFont(30, QFont::Bold));
     drawTextColor(p, x - 30, y + 95, sa_str, sa_color);
     drawTextColor(p, x + 30, y + 95, sa_direction, whiteColor(200));
@@ -470,20 +473,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   }
 
   // bottom left info
-  QString carName = QString::fromStdString(params.get("CarName"));
-  QString infoText;
-  if (angle_control) {
-    infoText.sprintf("[%s] SR[%.2f]",
-      carName.toStdString().c_str(),
-      steerRatio
-    );
-  } else {
-    infoText.sprintf("[%s] SCC[%d] SR[%.2f]",
-      carName.toStdString().c_str(),
-      sccBus,
-      steerRatio
-    );
-  }
+  QString infoText = QString("[%1]").arg(QString::fromStdString(params.get("CarName")));
 
   x = rect().left() + 20;
   y = rect().height() - 20;
@@ -775,7 +765,7 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState
   } else {
     d_color = whiteColor(150);
   }
-  l_dist.sprintf("%.1f m", d_rel);
+  l_dist = QString::asprintf("%.1f m", d_rel);
 
   if (v_rel < -4.4704) {
     v_color = redColor(150);
@@ -785,9 +775,9 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState
     v_color = pinkColor(150);
   }
   if (speedUnit == "mph") {
-    l_speed.sprintf("%.0f mph", speed + v_rel * 2.236936); // mph
+    l_speed = QString::asprintf("%.0f mph", speed + v_rel * 2.236936); // mph
   } else {
-    l_speed.sprintf("%.0f km/h", speed + v_rel * 3.6); // kph
+    l_speed = QString::asprintf("%.0f km/h", speed + v_rel * 3.6); // kph
   }
   painter.setFont(InterFont(35, QFont::Bold));
   drawTextColor(painter, x, y + sz / 1.5f + 70.0, l_dist, d_color);

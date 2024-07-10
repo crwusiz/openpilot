@@ -176,7 +176,7 @@ class SpeedController:
   def _cal_curve_speed(self, sm, v_ego, frame):
     if frame % 20 == 0:
       model_msg = sm['modelV2']
-      if len(model_msg.position.x) == len(model_msg.position.y) == ModelConstants.IDX_N:
+      if len(model_msg.position.x) == ModelConstants.IDX_N and len(model_msg.position.y) == ModelConstants.IDX_N:
         x = model_msg.position.x
         y = model_msg.position.y
         dy = np.gradient(y, x)
@@ -331,7 +331,7 @@ class SpeedController:
         return v_cruise_kph
 
     V_CRUISE_DELTA_SHORT = 1 if metric else 1 * CV.MPH_TO_KPH
-    CRUISE_LONG_PRESS = 50
+    CRUISE_LONG_PRESS = 70
     V_CRUISE_DELTA_LONG = 10 if metric else 5 * CV.MPH_TO_KPH
 
     if self.button_count:

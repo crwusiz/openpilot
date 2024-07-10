@@ -80,7 +80,6 @@ class CarInterface(CarInterfaceBase):
 
     if candidate in ANGLE_CONTROL_CAR:
       ret.steerControlType = SteerControlType.angle
-      Params().put_bool("IsAngleControl", True)
     else:
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 

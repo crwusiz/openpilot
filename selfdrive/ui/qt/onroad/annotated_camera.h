@@ -45,7 +45,8 @@ private:
   QPixmap autohold_active_img;
   QPixmap nda_img, hda_img;
 
-  QString speedUnit;
+  QString speedUnit, altitudeStr, accuracyStr, infoGps;
+  QString leftDistStr, sa_str, sa_direction;
   std::unique_ptr<PubMaster> pm;
 
   bool is_cruise_set = false;
