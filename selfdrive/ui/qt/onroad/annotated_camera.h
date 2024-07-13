@@ -50,6 +50,7 @@ private:
   std::unique_ptr<PubMaster> pm;
 
   bool is_cruise_set = false;
+  bool is_metric = false;
   bool steeringPressed = false;
   bool dmActive = false;
   bool hideBottomIcons = false;

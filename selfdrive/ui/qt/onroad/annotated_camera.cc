@@ -91,8 +91,9 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   apply_speed = cs.getVCruise();
   cruise_speed = cs.getVCruiseCluster() == 0.0 ? cs.getVCruise() : cs.getVCruiseCluster();
   is_cruise_set = cruise_speed > 0 && (int)cruise_speed != SET_SPEED_NA && ce.getCruiseState().getSpeed();
+  is_metric = s.scene.is_metric;
 
-  if (is_cruise_set && !s.scene.is_metric) {
+  if (is_cruise_set && !is_metric) {
     apply_speed *= KM_TO_MILE;
     cruise_speed *= KM_TO_MILE;
   }
@@ -101,9 +102,9 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   v_ego_cluster_seen = v_ego_cluster_seen || ce.getVEgoCluster() != 0.0;
   float v_ego = v_ego_cluster_seen ? ce.getVEgoCluster() : ce.getVEgo();
   speed = cs_alive ? std::max<float>(0.0, v_ego) : 0.0;
-  speed *= s.scene.is_metric ? MS_TO_KPH : MS_TO_MPH;
+  speed *= is_metric ? MS_TO_KPH : MS_TO_MPH;
 
-  speedUnit =  s.scene.is_metric ? tr("km/h") : tr("mph");
+  speedUnit = is_metric ? tr("km/h") : tr("mph");
   hideBottomIcons = (cs.getAlertSize() != cereal::ControlsState::AlertSize::NONE);
   status = s.status;
 
