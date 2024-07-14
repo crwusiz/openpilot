@@ -604,6 +604,13 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
 
+  auto gitreset_btn = new ButtonControl(tr("Git Reset -1"), tr("RUN"));
+  QObject::connect(gitreset_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("Git Reset<br><br>Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/scripts/gitreset.sh");
+    }
+  });
+
   auto gitpull_btn = new ButtonControl(tr("Git Fetch and Reset"), tr("RUN"));
   QObject::connect(gitpull_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Git Fetch and Reset<br><br>Process?"), tr("Process"), this)) {
@@ -813,6 +820,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   buttonLayout4->addWidget(vertical_line());
 
   QHBoxLayout *buttonLayout5 = new QHBoxLayout;
+  buttonLayout5->addWidget(vertical_line());
+  buttonLayout5->addWidget(gitreset_btn);
   buttonLayout5->addWidget(vertical_line());
   buttonLayout5->addWidget(scons_rebuild_btn);
   buttonLayout5->addWidget(vertical_line());
