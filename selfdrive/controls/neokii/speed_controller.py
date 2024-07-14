@@ -1,11 +1,12 @@
 import random
 
 import numpy as np
+import logging
+
 from common.numpy_fast import clip, interp
 from cereal import car
 from openpilot.common.conversions import Conversions as CV
-from openpilot.selfdrive.controls.lib.drive_helpers import (V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_UNSET, V_CRUISE_INITIAL_EXPERIMENTAL_MODE, V_CRUISE_INITIAL,
-                                                            CRUISE_LONG_PRESS)
+from openpilot.selfdrive.controls.lib.drive_helpers import (VCruiseHelper, V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_UNSET)
 from openpilot.selfdrive.car.hyundai.values import Buttons
 from openpilot.common.params import Params
 from openpilot.selfdrive.controls.neokii.navi_controller import SpeedLimiter
@@ -17,6 +18,21 @@ MIN_CURVE_SPEED = 32. * CV.KPH_TO_MS
 EventName = car.CarEvent.EventName
 ButtonType = car.CarState.ButtonEvent.Type
 
+logger = logging.getLogger('SpeedControllerLogger')
+logger.setLevel(logging.DEBUG)
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+
+file_handler = logging.FileHandler('speed_controller.log')
+file_handler.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
+console_handler.setFormatter(formatter)
+file_handler.setFormatter(formatter)
+
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
 
 class SpeedController:
   def __init__(self, CP, CI):
@@ -24,6 +40,7 @@ class SpeedController:
     self.CI = CI
 
     self.long_control = CP.openpilotLongitudinalControl
+    self.pcmcruise = CP.pcmCruise
 
     self.is_metric = Params().get_bool('IsMetric')
     self.experimental_mode = Params().get_bool("ExperimentalMode") and self.long_control
@@ -31,13 +48,10 @@ class SpeedController:
     self.speed_conv_to_ms = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
     self.speed_conv_to_clu = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH
 
-    self.min_set_speed_clu = self.kph_to_clu(V_CRUISE_MIN)
-    self.max_set_speed_clu = self.kph_to_clu(V_CRUISE_MAX)
+    self.min_set_speed_clu = self._kph_to_clu(V_CRUISE_MIN)
+    self.max_set_speed_clu = self._kph_to_clu(V_CRUISE_MAX)
 
     self.btn = Buttons.NONE
-    self.prev_button = ButtonType.unknown
-    self.button_count = 0
-    self.long_pressed = False
 
     self.target_speed = 0.
     self.max_speed_clu = 0.
@@ -64,10 +78,15 @@ class SpeedController:
     random.shuffle(self.wait_count_list)
     random.shuffle(self.alive_count_list)
 
-  def kph_to_clu(self, kph):
+    self.v_cruise_helper = VCruiseHelper(self.CP)
+
+    logger.debug(f'SpeedController initialized with: is_metric={self.is_metric}, experimental_mode={self.experimental_mode},'
+                 f'pcmcruise={self.pcmcruise}, longcontrol={self.long_control}')
+
+  def _kph_to_clu(self, kph):
     return int(kph * CV.KPH_TO_MS * self.speed_conv_to_clu)
 
-  def get_alive_count(self):
+  def _get_alive_count(self):
     count = self.alive_count_list[self.alive_index]
     self.alive_index += 1
     if self.alive_index >= len(self.alive_count_list):
@@ -75,7 +94,7 @@ class SpeedController:
     return count
 
 
-  def get_wait_count(self):
+  def _get_wait_count(self):
     count = self.wait_count_list[self.wait_index]
     self.wait_index += 1
     if self.wait_index >= len(self.wait_count_list):
@@ -96,6 +115,7 @@ class SpeedController:
     self.slowing_down_alert = False
     self.slowing_down_sound_alert = False
 
+    logger.debug('SpeedController state has been reset.')
 
   def inject_events(self, CS, events):
     if CS.cruiseState.enabled:
@@ -110,17 +130,15 @@ class SpeedController:
     apply_limit_speed, road_limit_speed, left_dist, first_started, cam_type, max_speed_log = \
       SpeedLimiter.instance().get_max_speed(clu_speed, self.is_metric)
 
-    curv_limit = 0
     self._cal_curve_speed(sm, CS.vEgo, sm.frame)
     if self.curve_speed_ms >= MIN_CURVE_SPEED:
       max_speed_clu = min(v_cruise_kph * CV.KPH_TO_MS, self.curve_speed_ms) * self.speed_conv_to_clu
-      curv_limit = int(max_speed_clu)
     else:
-      max_speed_clu = self.kph_to_clu(v_cruise_kph)
+      max_speed_clu = self._kph_to_clu(v_cruise_kph)
 
     self.active_cam = road_limit_speed > 0 and left_dist > 0
 
-    if apply_limit_speed >= self.kph_to_clu(10):
+    if apply_limit_speed >= self._kph_to_clu(10):
       if first_started:
         self.max_speed_clu = clu_speed
 
@@ -147,7 +165,10 @@ class SpeedController:
     else:
       self.limited_lead = False
 
-    self._update_max_speed(int(round(max_speed_clu)), curv_limit != 0 and curv_limit == int(max_speed_clu))
+    self._update_max_speed(int(round(max_speed_clu)))
+
+    logger.debug(f'Calculated max_speed_clu: {max_speed_clu}')
+
     return max_speed_clu
 
   def get_lead(self, sm):
@@ -203,30 +224,34 @@ class SpeedController:
     override_speed = -1
     if not self.long_control:
       if CS.gasPressed and not cruise_btn_pressed:
-        if clu_speed + SYNC_MARGIN > self.kph_to_clu(v_cruise_kph):
+        if clu_speed + SYNC_MARGIN > self._kph_to_clu(v_cruise_kph):
           set_speed = clip(clu_speed + SYNC_MARGIN, self.min_set_speed_clu, self.max_set_speed_clu)
           v_cruise_kph = int(round(set_speed * self.speed_conv_to_ms * CV.MS_TO_KPH))
           override_speed = v_cruise_kph
 
-      self.target_speed = self.kph_to_clu(v_cruise_kph)
+      self.target_speed = self._kph_to_clu(v_cruise_kph)
       if self.max_speed_clu > self.min_set_speed_clu:
         self.target_speed = clip(self.target_speed, self.min_set_speed_clu, self.max_speed_clu)
 
     elif CS.cruiseState.enabled:
       if CS.gasPressed and not cruise_btn_pressed:
-        if clu_speed + SYNC_MARGIN > self.kph_to_clu(v_cruise_kph):
+        if clu_speed + SYNC_MARGIN > self._kph_to_clu(v_cruise_kph):
           set_speed = clip(clu_speed + SYNC_MARGIN, self.min_set_speed_clu, self.max_set_speed_clu)
           self.target_speed = set_speed
 
+    logger.debug(f'Target speed calculated: {self.target_speed}, override speed : {override_speed}')
+
     return override_speed
 
-  def _update_max_speed(self, max_speed, limited_curv):
+  def _update_max_speed(self, max_speed):
     if not self.long_control or self.max_speed_clu <= 0:
       self.max_speed_clu = max_speed
     else:
-      kp = 0.01 #if limited_curv else 0.01
+      kp = 0.01
       error = max_speed - self.max_speed_clu
       self.max_speed_clu = self.max_speed_clu + error * kp
+
+    logger.debug(f'Updated max_speed_clu: {self.max_speed_clu}')
 
   def _get_button(self, current_set_speed):
     if self.target_speed < self.min_set_speed_clu:
@@ -236,19 +261,6 @@ class SpeedController:
       return Buttons.NONE
     return Buttons.RES_ACCEL if error > 0 else Buttons.SET_DECEL
 
-  def _initialize_v_cruise(self, CS):
-    initial = V_CRUISE_INITIAL_EXPERIMENTAL_MODE if self.experimental_mode else V_CRUISE_INITIAL
-
-    # 250kph or above probably means we never had a set speed
-    if any(b.type in (ButtonType.accelCruise, ButtonType.resumeCruise) for b in
-           CS.buttonEvents) and self.v_cruise_kph_last < 250:
-      self.v_cruise_kph = self.v_cruise_kph_last
-    else:
-      self.v_cruise_kph = int(round(clip(CS.vEgo * CV.MS_TO_KPH, initial, V_CRUISE_MAX)))
-
-    self.v_cruise_cluster_kph = self.v_cruise_kph
-    return self.v_cruise_kph
-
   def update_v_cruise(self, CS, sm, enabled):
     self.v_cruise_kph_last = self.v_cruise_kph
     v_cruise_kph = self.v_cruise_kph
@@ -257,7 +269,7 @@ class SpeedController:
 
     if CS.cruiseState.enabled:
       if manage_button:
-        v_cruise_kph = self._update_cruise_button(v_cruise_kph, CS.buttonEvents, enabled, self.is_metric)
+        v_cruise_kph = self.v_cruise_helper.update_v_cruise(CS, enabled, self.is_metric)
       else:
         v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
     else:
@@ -268,7 +280,7 @@ class SpeedController:
 
       if CS.cruiseState.enabled:
         if not self.CP.pcmCruise:
-          v_cruise_kph = self._initialize_v_cruise(CS)
+          v_cruise_kph = self.v_cruise_helper.initialize_v_cruise(CS, self.experimental_mode)
         else:
           v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
 
@@ -285,6 +297,9 @@ class SpeedController:
       self.reset()
 
     self.v_cruise_kph = v_cruise_kph
+
+    logger.debug(f'v_cruise_kph: {self.v_cruise_kph}, real set speed : {self.real_set_speed_kph}')
+
     self._update_message(CS)
 
   def spam_message(self, CS, can_sends):
@@ -306,7 +321,7 @@ class SpeedController:
       if self.alive_timer == 0:
         current_set_speed_clu = int(round(CS.cruiseState.speed * self.speed_conv_to_clu))
         self.btn = self._get_button(current_set_speed_clu)
-        self.alive_count = self.get_alive_count()
+        self.alive_count = self._get_alive_count()
 
       if self.btn != Buttons.NONE:
         can = self.CI.create_buttons(self.btn)
@@ -317,7 +332,7 @@ class SpeedController:
 
         if self.alive_timer >= self.alive_count:
           self.alive_timer = 0
-          self.wait_timer = self.get_wait_count()
+          self.wait_timer = self._get_wait_count()
           self.btn = Buttons.NONE
       else:
         if self.long_control and self.target_speed >= self.min_set_speed_clu:
@@ -326,39 +341,8 @@ class SpeedController:
       if self.long_control:
         self.target_speed = 0.
 
-  def _update_cruise_button(self, v_cruise_kph, buttonEvents, enabled, metric):
-    if not enabled:
-        return v_cruise_kph
+    logger.debug(f'Spam message - wait_timer: {self.wait_timer}, alive_timer: {self.alive_timer}, btn: {self.btn}')
 
-    V_CRUISE_DELTA_SHORT = 1 if metric else 1 * CV.MPH_TO_KPH
-    CRUISE_LONG_PRESS = 70
-    V_CRUISE_DELTA_LONG = 10 if metric else 5 * CV.MPH_TO_KPH
-
-    if self.button_count:
-      self.button_count += 1
-    for b in buttonEvents:
-      if b.pressed and not self.button_count and (b.type == ButtonType.accelCruise or b.type == ButtonType.decelCruise):
-        self.button_count = 1
-        self.prev_button = b.type
-      elif not b.pressed and self.button_count:
-        if not self.long_pressed:
-          if b.type == ButtonType.accelCruise:
-            v_cruise_kph += V_CRUISE_DELTA_SHORT
-          elif b.type == ButtonType.decelCruise:
-            v_cruise_kph -= V_CRUISE_DELTA_SHORT
-        self.long_pressed = False
-        self.button_count = 0
-
-    if self.button_count > CRUISE_LONG_PRESS:
-      self.long_pressed = True
-      if self.prev_button == ButtonType.accelCruise:
-        v_cruise_kph += V_CRUISE_DELTA_LONG - v_cruise_kph % V_CRUISE_DELTA_LONG
-      elif self.prev_button == ButtonType.decelCruise:
-        v_cruise_kph -= V_CRUISE_DELTA_LONG - (-v_cruise_kph) % V_CRUISE_DELTA_LONG
-      self.button_count %= CRUISE_LONG_PRESS
-    v_cruise_kph = clip(v_cruise_kph, V_CRUISE_MIN, V_CRUISE_MAX)
-
-    return v_cruise_kph
 
   def _update_message(self, CS):
     exState = CS.exState

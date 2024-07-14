@@ -64,6 +64,7 @@ class VCruiseHelper:
     else:
       self.v_cruise_kph = V_CRUISE_UNSET
       self.v_cruise_cluster_kph = V_CRUISE_UNSET
+    return self.v_cruise_kph
 
   def _update_v_cruise_non_pcm(self, CS, enabled, is_metric):
     # handle button presses. TODO: this should be in state_control, but a decelCruise press
@@ -112,6 +113,7 @@ class VCruiseHelper:
       self.v_cruise_kph = max(self.v_cruise_kph, CS.vEgo * CV.MS_TO_KPH)
 
     self.v_cruise_kph = clip(round(self.v_cruise_kph, 1), V_CRUISE_MIN, V_CRUISE_MAX)
+    return self.v_cruise_kph
 
   def update_button_timers(self, CS, enabled):
     # increment timer for buttons still pressed
@@ -125,7 +127,8 @@ class VCruiseHelper:
         self.button_timers[b.type.raw] = 1 if b.pressed else 0
         self.button_change_states[b.type.raw] = {"standstill": CS.cruiseState.standstill, "enabled": enabled}
 
-  def initialize_v_cruise(self, CS, experimental_mode: bool) -> None:
+  #def initialize_v_cruise(self, CS, experimental_mode: bool) -> None:
+  def initialize_v_cruise(self, CS, experimental_mode: bool):
     # initializing is handled by the PCM
     if self.CP.pcmCruise:
       return
@@ -139,7 +142,7 @@ class VCruiseHelper:
       self.v_cruise_kph = int(round(clip(CS.vEgo * CV.MS_TO_KPH, initial, V_CRUISE_MAX)))
 
     self.v_cruise_cluster_kph = self.v_cruise_kph
-
+    return self.v_cruise_kph
 
 def apply_center_deadzone(error, deadzone):
   if (error > - deadzone) and (error < deadzone):
