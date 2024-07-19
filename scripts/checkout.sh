@@ -21,4 +21,4 @@ echo ""
 echo "  Git Checkout [ $BRANCH ]  "
 echo ""
 
-exec /data/openpilot/scripts/restart.sh
+exec /data/openpilot/scripts/gitpull.sh
