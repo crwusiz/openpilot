@@ -2395,8 +2395,8 @@ struct Event {
 
     # *********** Custom: reserved for forks ***********
     naviData @107 :Custom.NaviData;
-    naviGps @108 :Custom.NaviGps;
-    naviObstacles @109 :Custom.NaviObstacles;
+    customReserved1 @108 :Custom.CustomReserved1;
+    customReserved2 @109 :Custom.CustomReserved2;
     customReserved3 @110 :Custom.CustomReserved3;
     customReserved4 @111 :Custom.CustomReserved4;
     customReserved5 @112 :Custom.CustomReserved5;
