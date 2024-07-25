@@ -102,8 +102,8 @@
         <translation>MAX</translation>
     </message>
     <message>
-        <source>LONG</source>
-        <translation>LONG</translation>
+        <source>SET</source>
+        <translation>SET</translation>
     </message>
 </context>
 <context>
@@ -146,11 +146,11 @@
     </message>
     <message>
         <source>Navigation Enable</source>
-        <translation>내비게이션 사용</translation>
+        <translation type="vanished">내비게이션 사용</translation>
     </message>
     <message>
         <source>Navigation Features use</source>
-        <translation>내비게이션 기능을 사용합니다</translation>
+        <translation type="vanished">내비게이션 기능을 사용합니다</translation>
     </message>
     <message>
         <source>Scc on Bus 2</source>
@@ -198,7 +198,7 @@
     </message>
     <message>
         <source>Use external navi routes</source>
-        <translation>외부 내비 경로 사용</translation>
+        <translation type="vanished">외부 내비 경로 사용</translation>
     </message>
     <message>
         <source>Select Branch</source>
@@ -308,6 +308,30 @@
         <source>pandaStates dump upload&lt;br&gt;&lt;br&gt;Process?</source>
         <translation>pandaStates 덤프 업로드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
     </message>
+    <message>
+        <source>Git Reset -1</source>
+        <translation>Git 리셋 -1</translation>
+    </message>
+    <message>
+        <source>Git Reset&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>Git 리셋&lt;br&gt;&lt;br&gt;실행할까요?</translation>
+    </message>
+    <message>
+        <source>carControl dump upload</source>
+        <translation>carControl 덤프 업로드</translation>
+    </message>
+    <message>
+        <source>carControl dump upload&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>carControl 덤프 업로드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
+    </message>
+    <message>
+        <source>controlsState dump upload</source>
+        <translation>controlsState 덤프 업로드</translation>
+    </message>
+    <message>
+        <source>controlsState dump upload&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>controlsState 덤프 업로드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
+    </message>
 </context>
 <context>
     <name>ConfirmationDialog</name>
@@ -339,27 +363,27 @@
     <name>DestinationWidget</name>
     <message>
         <source>Home</source>
-        <translation>집</translation>
+        <translation type="vanished">집</translation>
     </message>
     <message>
         <source>Work</source>
-        <translation>회사</translation>
+        <translation type="vanished">회사</translation>
     </message>
     <message>
         <source>No destination set</source>
-        <translation>목적지가 설정되지 않았습니다</translation>
+        <translation type="vanished">목적지가 설정되지 않았습니다</translation>
     </message>
     <message>
         <source>No %1 location set</source>
-        <translation>%1 위치가 설정되지 않았습니다</translation>
+        <translation type="vanished">%1 위치가 설정되지 않았습니다</translation>
     </message>
     <message>
         <source>home</source>
-        <translation>집</translation>
+        <translation type="vanished">집</translation>
     </message>
     <message>
         <source>work</source>
-        <translation>회사</translation>
+        <translation type="vanished">회사</translation>
     </message>
 </context>
 <context>
@@ -513,27 +537,27 @@
     <name>DriveStats</name>
     <message>
         <source>Drives</source>
-        <translation>주행수</translation>
+        <translation type="vanished">주행수</translation>
     </message>
     <message>
         <source>Hours</source>
-        <translation>시간</translation>
+        <translation type="vanished">시간</translation>
     </message>
     <message>
         <source>ALL TIME</source>
-        <translation>전체 시간</translation>
+        <translation type="vanished">전체 시간</translation>
     </message>
     <message>
         <source>KM</source>
-        <translation>KM</translation>
+        <translation type="vanished">KM</translation>
     </message>
     <message>
         <source>Miles</source>
-        <translation>Miles</translation>
+        <translation type="vanished">Miles</translation>
     </message>
     <message>
         <source>Drive Stats</source>
-        <translation>운행 기록</translation>
+        <translation type="vanished">운행 기록</translation>
     </message>
 </context>
 <context>
@@ -578,41 +602,41 @@
     <name>MapETA</name>
     <message>
         <source>eta</source>
-        <translation>도착</translation>
+        <translation type="vanished">도착</translation>
     </message>
     <message>
         <source>min</source>
-        <translation>분</translation>
+        <translation type="vanished">분</translation>
     </message>
     <message>
         <source>hr</source>
-        <translation>시간</translation>
+        <translation type="vanished">시간</translation>
     </message>
 </context>
 <context>
     <name>MapSettings</name>
     <message>
         <source>NAVIGATION</source>
-        <translation>내비게이션</translation>
+        <translation type="vanished">내비게이션</translation>
     </message>
     <message>
         <source>Manage at connect.comma.ai</source>
-        <translation>connect.comma.ai에서 관리하세요</translation>
+        <translation type="vanished">connect.comma.ai에서 관리하세요</translation>
     </message>
 </context>
 <context>
     <name>MapWindow</name>
     <message>
         <source>Map Loading</source>
-        <translation>지도 로딩 중</translation>
+        <translation type="vanished">지도 로딩 중</translation>
     </message>
     <message>
         <source>Waiting for GPS</source>
-        <translation>GPS 수신 중</translation>
+        <translation type="vanished">GPS 수신 중</translation>
     </message>
     <message>
         <source>Waiting for route</source>
-        <translation>경로를 기다리는 중</translation>
+        <translation type="vanished">경로를 기다리는 중</translation>
     </message>
 </context>
 <context>
@@ -790,7 +814,7 @@
     </message>
     <message>
         <source>Turn-by-turn navigation</source>
-        <translation>내비게이션 경로안내</translation>
+        <translation type="vanished">내비게이션 경로안내</translation>
     </message>
     <message>
         <source>1 year of drive storage</source>
@@ -846,19 +870,19 @@
     </message>
     <message>
         <source>km</source>
-        <translation>km</translation>
+        <translation type="vanished">km</translation>
     </message>
     <message>
         <source>m</source>
-        <translation>m</translation>
+        <translation type="vanished">m</translation>
     </message>
     <message>
         <source>mi</source>
-        <translation>mi</translation>
+        <translation type="vanished">mi</translation>
     </message>
     <message>
         <source>ft</source>
-        <translation>ft</translation>
+        <translation type="vanished">ft</translation>
     </message>
     <message>
         <source>now</source>
@@ -1355,19 +1379,19 @@ This may take up to a minute.</source>
     </message>
     <message>
         <source>Show ETA in 24h Format</source>
-        <translation>24시간 형식으로 도착 예정 시간 표시</translation>
+        <translation type="vanished">24시간 형식으로 도착 예정 시간 표시</translation>
     </message>
     <message>
         <source>Use 24h format instead of am/pm</source>
-        <translation>오전/오후 대신 24시간 형식 사용</translation>
+        <translation type="vanished">오전/오후 대신 24시간 형식 사용</translation>
     </message>
     <message>
         <source>Show Map on Left Side of UI</source>
-        <translation>UI 왼쪽에 지도 표시</translation>
+        <translation type="vanished">UI 왼쪽에 지도 표시</translation>
     </message>
     <message>
         <source>Show map on left side when in split screen view.</source>
-        <translation>분할 화면 보기에서 지도를 왼쪽에 표시합니다.</translation>
+        <translation type="vanished">분할 화면 보기에서 지도를 왼쪽에 표시합니다.</translation>
     </message>
     <message>
         <source>Experimental Mode</source>

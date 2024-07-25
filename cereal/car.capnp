@@ -234,15 +234,15 @@ struct CarState {
   cumLagMs @50 :Float32;
 
   # neokii
-  autoHold @52 : Int32;
-  navLimitSpeed @53 :Int16;
-  tpms @54 :Tpms;
-  exState @55 :ExState;
+  exState @52 :ExState;
 
   struct ExState {
     vCruiseKph @0 :Float32;
     applyMaxSpeed @1 :Float32;
     cruiseMaxSpeed @2 :Float32;
+    autoHold @3 : Int32;
+    navLimitSpeed @4 :Int16;
+    tpms @5 :Tpms;
   }
 
   struct Tpms {

@@ -13,7 +13,6 @@ from openpilot.selfdrive.car.mock.values import CAR as MOCK
 from openpilot.common.swaglog import cloudlog
 import cereal.messaging as messaging
 from openpilot.selfdrive.car import gen_empty_fingerprint
-from openpilot.system.version import get_build_metadata
 
 import openpilot.system.sentry as sentry
 
@@ -23,12 +22,7 @@ EventName = car.CarEvent.EventName
 
 
 def get_startup_event(car_recognized, controller_available, fw_seen):
-  build_metadata = get_build_metadata()
-  if build_metadata.openpilot.comma_remote and build_metadata.tested_channel:
-    event = EventName.startup
-  else:
-    #event = EventName.startupMaster
-    event = EventName.startup
+  event = EventName.startup
 
   if not car_recognized:
     if fw_seen:

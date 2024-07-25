@@ -55,6 +55,7 @@ class CarState(CarStateBase):
 
     self.lfa_btn = 0
     self.lfa_enabled = False
+    self.canfd_buttons = None
 
   def update(self, cp, cp_cam):
     if self.CP.carFingerprint in CANFD_CAR:
@@ -73,6 +74,14 @@ class CarState(CarStateBase):
     ret.wheelSpeeds = self.get_wheel_speeds(cp.vl["WHL_SPD11"]["WHL_SPD_FL"], cp.vl["WHL_SPD11"]["WHL_SPD_FR"],
                                             cp.vl["WHL_SPD11"]["WHL_SPD_RL"], cp.vl["WHL_SPD11"]["WHL_SPD_RR"])
 
+    cluSpeed = cp.vl["CLU11"]["CF_Clu_Vanz"]
+    decimal = cp.vl["CLU11"]["CF_Clu_VanzDecimal"]
+    if 0. < decimal < 0.5:
+      cluSpeed += decimal
+
+    vEgoClu = cluSpeed * speed_conv
+    ret.vEgoCluster, _ = self.update_clu_speed_kf(vEgoClu)
+
     ret.vEgoRaw = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
     ret.standstill = ret.wheelSpeeds.fl <= STANDSTILL_THRESHOLD and ret.wheelSpeeds.rr <= STANDSTILL_THRESHOLD
@@ -86,7 +95,7 @@ class CarState(CarStateBase):
       if not self.is_metric:
         self.cluster_speed = math.floor(self.cluster_speed * CV.KPH_TO_MPH + CV.KPH_TO_MPH)
 
-    ret.vEgoCluster = self.cluster_speed * speed_conv
+    #ret.vEgoCluster = self.cluster_speed * speed_conv
 
     ret.steeringAngleDeg = cp.vl["SAS11"]["SAS_Angle"]
     ret.steeringRateDeg = cp.vl["SAS11"]["SAS_Speed"]
@@ -182,17 +191,18 @@ class CarState(CarStateBase):
     self.lead_distance = cp_cruise.vl["SCC11"]["ACC_ObjDist"]
 
     if self.CP.exFlags & HyundaiExFlags.TPMS:
+      tpms = ret.exState.tpms
       tpms_unit = cp.vl["TPMS11"]["UNIT"] * 0.725 if int(cp.vl["TPMS11"]["UNIT"]) > 0 else 1.
-      ret.tpms.fl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FL"]
-      ret.tpms.fr = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FR"]
-      ret.tpms.rl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_RL"]
-      ret.tpms.rr = tpms_unit * cp.vl["TPMS11"]["PRESSURE_RR"]
+      tpms.fl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FL"]
+      tpms.fr = tpms_unit * cp.vl["TPMS11"]["PRESSURE_FR"]
+      tpms.rl = tpms_unit * cp.vl["TPMS11"]["PRESSURE_RL"]
+      tpms.rr = tpms_unit * cp.vl["TPMS11"]["PRESSURE_RR"]
 
     if self.CP.exFlags & HyundaiExFlags.AUTOHOLD:
-      ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]
+      ret.exState.autoHold = cp.vl["ESP11"]["AVH_STAT"]
 
     if self.CP.exFlags & HyundaiExFlags.NAVI:
-      ret.navLimitSpeed = cp.vl["Navi_HU"]["SpeedLim_Nav_Clu"]
+      ret.exState.navLimitSpeed = cp.vl["Navi_HU"]["SpeedLim_Nav_Clu"]
 
     if self.CP.exFlags & HyundaiExFlags.LFA:
       prev_lfa_btn = self.lfa_btn
@@ -288,17 +298,18 @@ class CarState(CarStateBase):
                                           else cp_cam.vl["CAM_0x2a4"])
 
     if self.CP.exFlags & HyundaiExFlags.TPMS:
+      tpms = ret.exState.tpms
       tpms_unit = cp.vl["TPMS"]["UNIT"] * 0.725 if int(cp.vl["TPMS"]["UNIT"]) > 0 else 1.
-      ret.tpms.fl = tpms_unit * cp.vl["TPMS"]["PRESSURE_FL"]
-      ret.tpms.fr = tpms_unit * cp.vl["TPMS"]["PRESSURE_FR"]
-      ret.tpms.rl = tpms_unit * cp.vl["TPMS"]["PRESSURE_RL"]
-      ret.tpms.rr = tpms_unit * cp.vl["TPMS"]["PRESSURE_RR"]
+      tpms.fl = tpms_unit * cp.vl["TPMS"]["PRESSURE_FL"]
+      tpms.fr = tpms_unit * cp.vl["TPMS"]["PRESSURE_FR"]
+      tpms.rl = tpms_unit * cp.vl["TPMS"]["PRESSURE_RL"]
+      tpms.rr = tpms_unit * cp.vl["TPMS"]["PRESSURE_RR"]
 
     if self.CP.exFlags & HyundaiExFlags.AUTOHOLD:
-      ret.autoHold = cp.vl["ESP_STATUS"]["AUTO_HOLD"]
+      ret.exState.autoHold = cp.vl["ESP_STATUS"]["AUTO_HOLD"]
 
     if self.CP.exFlags & HyundaiExFlags.NAVI:
-      ret.navLimitSpeed = cp.vl["CLUSTER_SPEED_LIMIT"]["SPEED_LIMIT_1"]
+      ret.exState.navLimitSpeed = cp.vl["CLUSTER_SPEED_LIMIT"]["SPEED_LIMIT_1"]
 
     if self.CP.exFlags & HyundaiExFlags.LFA:
       prev_lfa_btn = self.lfa_btn
@@ -307,6 +318,8 @@ class CarState(CarStateBase):
         self.lfa_enabled = not self.lfa_enabled
 
       ret.cruiseState.available = self.lfa_enabled
+
+    self.canfd_buttons = cp.vl[self.cruise_btns_msg_canfd]
 
     return ret
 

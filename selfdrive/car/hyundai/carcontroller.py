@@ -167,7 +167,7 @@ class CarController(CarControllerBase):
       # LFA and HDA icons
       updateLfaHdaIcons = (not hda2) or angle_control
       if self.frame % 5 == 0 and updateLfaHdaIcons:
-        can_sends.append(hyundaicanfd.create_lfahda_cluster(self.packer, self.CAN, CC.enabled, SpeedLimiter.instance().get_active()))
+        can_sends.append(hyundaicanfd.create_lfahda_cluster(self.packer, self.CAN, CC.enabled))
 
       # blinkers
       if hda2 and self.CP.flags & HyundaiFlags.ENABLE_BLINKERS:
@@ -257,8 +257,10 @@ class CarController(CarControllerBase):
         # cruise standstill resume
         elif CC.cruiseControl.resume:
           if self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
-            # TODO: resume for alt button cars
-            pass
+            if CS.canfd_buttons:
+              for _ in range(20):
+                can_sends.append(hyundaicanfd.create_buttons_can_fd_alt(self.packer, self.CP, self.CAN, Buttons.RES_ACCEL, CS.canfd_buttons))
+              self.last_button_frame = self.frame
           else:
             for _ in range(20):
               can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter+1, Buttons.RES_ACCEL))

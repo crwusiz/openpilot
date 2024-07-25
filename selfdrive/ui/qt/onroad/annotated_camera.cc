@@ -112,7 +112,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   steeringPressed = ce.getSteeringPressed();
   isStandstill = ce.getStandstill();
   brake_state = ce.getBrakeLights();
-  autohold_state = ce.getAutoHold();
+  autohold_state = ce.getExState().getAutoHold();
   gas_pressed = ce.getGasPressed();
   left_blindspot = ce.getLeftBlindspot();
   right_blindspot = ce.getRightBlindspot();
@@ -126,11 +126,11 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   steerAngle = ce.getSteeringAngleDeg();
   longControl = cp.getOpenpilotLongitudinalControl();
   sccBus = cp.getSccBus();
-  fl = ce.getTpms().getFl();
-  fr = ce.getTpms().getFr();
-  rl = ce.getTpms().getRl();
-  rr = ce.getTpms().getRr();
-  navLimitSpeed = ce.getNavLimitSpeed();
+  fl = ce.getExState().getTpms().getFl();
+  fr = ce.getExState().getTpms().getFr();
+  rl = ce.getExState().getTpms().getRl();
+  rr = ce.getExState().getTpms().getRr();
+  navLimitSpeed = ce.getExState().getNavLimitSpeed();
   nda_state = nd.getActive();
   roadLimitSpeed = nd.getRoadLimitSpeed();
   camLimitSpeed = nd.getCamLimitSpeed();

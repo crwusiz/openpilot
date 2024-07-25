@@ -316,6 +316,8 @@ def wrong_car_mode_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
   text = "크루즈 버튼으로 활성화됩니다"
   if CP.carName == "honda":
     text = "메인 스위치로 활성화됩니다"
+  if CP.carName == "hyundai" and CP.safetyConfigs == "hyundaiCanfd":
+    text = "LFA 버튼으로 활성화됩니다"
   return NoEntryAlert(text)
 
 
@@ -365,6 +367,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   # ********** events with no alerts **********
 
   EventName.stockFcw: {},
+  EventName.actuatorsApiUnavailable: {},
 
   # ********** events only containing alerts displayed in all states **********
 
@@ -798,7 +801,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventName.espActive: {
-    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("차량자세제어 동작됨"),
+    ET.SOFT_DISABLE: ImmediateDisableAlert("차량자세제어 동작됨"),
     ET.NO_ENTRY: NoEntryAlert("차량자세제어 동작됨"),
   },
 

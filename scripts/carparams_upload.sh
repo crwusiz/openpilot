@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 
 TODAY=$(date +%y-%m-%d-%H:%M)
-FILE="carparams.log"
+FILE="carParams.log"
 CAR=$(cat /data/params/d/CarName)
 ID=$(cat /data/params/d/DongleId)
 
