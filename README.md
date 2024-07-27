@@ -1,6 +1,48 @@
+<div align="center" style="text-align: center;">
+
+<h1>openpilot</h1>
+
+<p>
+  <b>openpilot is an operating system for robotics.</b>
+  <br>
+  Currently, it upgrades the driver assistance system in 275+ supported cars.
+</p>
+
+<h3>
+  <a href="https://docs.comma.ai">Read the docs</a>
+  <span> · </span>
+  <a href="https://github.com/commaai/openpilot/blob/master/docs/CONTRIBUTING.md">Contribute</a>
+  <span> · </span>
+  <a href="https://discord.comma.ai">Community</a>
+  <span> · </span>
+  <a href="https://comma.ai/shop">Try it on a comma 3X</a>
+</h3>
+
+Quick start: `curl -fsSL openpilot.comma.ai | bash`
+
+![openpilot tests](https://github.com/commaai/openpilot/actions/workflows/selfdrive_tests.yaml/badge.svg)
+[![codecov](https://codecov.io/gh/commaai/openpilot/branch/master/graph/badge.svg)](https://codecov.io/gh/commaai/openpilot)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![X Follow](https://img.shields.io/twitter/follow/comma_ai)](https://x.com/comma_ai)
+[![Discord](https://img.shields.io/discord/469524606043160576)](https://discord.comma.ai)
+
+</div>
+
 [![openpilot on the comma 3X](https://github.com/commaai/openpilot/assets/8762862/f09e6d29-db2d-4179-80c2-51e8d92bdb5c)](https://comma.ai/shop/comma-3x)
 
+---
+<table>
+  <tr>
+    <td><a href="https://youtu.be/NmBfgOanCyk" title="Video By Greer Viau"><img src="https://github.com/commaai/openpilot/assets/8762862/2f7112ae-f748-4f39-b617-fabd689c3772"></a></td>
+    <td><a href="https://youtu.be/VHKyqZ7t8Gw" title="Video By Logan LeGrand"><img src="https://github.com/commaai/openpilot/assets/8762862/92351544-2833-40d7-9e0b-7ef7ae37ec4c"></a></td>
+    <td><a href="https://youtu.be/SUIZYzxtMQs" title="A drive to Taco Bell"><img src="https://github.com/commaai/openpilot/assets/8762862/05ceefc5-2628-439c-a9b2-89ce77dc6f63"></a></td>
+  </tr>
+</table>
+
+---
+
 [![](https://i.imgur.com/TMtVMV8.png)](#)
+
 
 openpilot by crwusiz branch
 ------
@@ -21,7 +63,6 @@ openpilot by crwusiz branch
 ## Harness Cable and Car Year Compatible Chart
 
  * cable order -> https://smartstore.naver.com/jmtechn
- * If you want to buy a cable from a country other than Korea, please DM to [crwusiz](https://discord.com/channels/@me) on the discord comma.ai channel.
 
 [![](https://i.imgur.com/v3cvfeF.png)](#)
 [![](https://i.imgur.com/uIH0dQA.png)](#)
@@ -42,25 +83,6 @@ openpilot by crwusiz branch
  * https://github.com/sunnyhaibin/sunnypilot
  * https://github.com/ajouatom/carrotpilot
 
-## chevrolet bolt branch
- * https://github.com/JasonJShuler/openpilot
- * https://github.com/opgm/openpilot
- * https://github.com/hanabi95/openpilot
- * https://github.com/jc01rho-openpilot-BoltEV2019-KoKr
- * https://github.com/geniuth/openpilot
-
-What is openpilot?
-------
-
-[openpilot](http://github.com/commaai/openpilot) is an open source driver assistance system. Currently, openpilot performs the functions of Adaptive Cruise Control (ACC), Automated Lane Centering (ALC), Forward Collision Warning (FCW), and Lane Departure Warning (LDW) for a growing variety of [supported car makes, models, and model years](docs/CARS.md). In addition, while openpilot is engaged, a camera-based Driver Monitoring (DM) feature alerts distracted and asleep drivers. See more about [the vehicle integration](docs/INTEGRATION.md) and [limitations](docs/LIMITATIONS.md).
-
-<table>
-  <tr>
-    <td><a href="https://youtu.be/NmBfgOanCyk" title="Video By Greer Viau"><img src="https://github.com/commaai/openpilot/assets/8762862/2f7112ae-f748-4f39-b617-fabd689c3772"></a></td>
-    <td><a href="https://youtu.be/VHKyqZ7t8Gw" title="Video By Logan LeGrand"><img src="https://github.com/commaai/openpilot/assets/8762862/92351544-2833-40d7-9e0b-7ef7ae37ec4c"></a></td>
-    <td><a href="https://youtu.be/SUIZYzxtMQs" title="A drive to Taco Bell"><img src="https://github.com/commaai/openpilot/assets/8762862/05ceefc5-2628-439c-a9b2-89ce77dc6f63"></a></td>
-  </tr>
-</table>
 
 To start using openpilot in a car
 ------
@@ -98,18 +120,6 @@ Safety and Testing
 * panda has additional hardware-in-the-loop [tests](https://github.com/commaai/panda/blob/master/Jenkinsfile).
 * We run the latest openpilot in a testing closet containing 10 comma devices continuously replaying routes.
 
-User Data and comma Account
-------
-
-By default, openpilot uploads the driving data to our servers. You can also access your data through [comma connect](https://connect.comma.ai/). We use your data to train better models and improve openpilot for everyone.
-
-openpilot is open source software: the user is free to disable data collection if they wish to do so.
-
-openpilot logs the road-facing cameras, CAN, GPS, IMU, magnetometer, thermal sensors, crashes, and operating system logs.
-The driver-facing camera is only logged if you explicitly opt-in in settings. The microphone is not recorded.
-
-By using openpilot, you agree to [our Privacy Policy](https://comma.ai/privacy). You understand that use of this software or its related services will generate certain types of user data, which may be logged and stored at the sole discretion of comma. By accepting this agreement, you grant an irrevocable, perpetual, worldwide right to comma for the use of this data.
-
 Licensing
 ------
 
@@ -121,9 +131,14 @@ Any user of this software shall indemnify and hold harmless Comma.ai, Inc. and i
 YOU ARE RESPONSIBLE FOR COMPLYING WITH LOCAL LAWS AND REGULATIONS.
 NO WARRANTY EXPRESSED OR IMPLIED.**
 
----
+User Data and comma Account
+------
 
-<img src="https://d1qb2nb5cznatu.cloudfront.net/startups/i/1061157-bc7e9bf3b246ece7322e6ffe653f6af8-medium_jpg.jpg?buster=1458363130" width="75"></img> <img src="https://cdn-images-1.medium.com/max/1600/1*C87EjxGeMPrkTuVRVWVg4w.png" width="225"></img>
+By default, openpilot uploads the driving data to our servers. You can also access your data through [comma connect](https://connect.comma.ai/). We use your data to train better models and improve openpilot for everyone.
 
-![openpilot tests](https://github.com/commaai/openpilot/actions/workflows/selfdrive_tests.yaml/badge.svg)
-[![codecov](https://codecov.io/gh/commaai/openpilot/branch/master/graph/badge.svg)](https://codecov.io/gh/commaai/openpilot)
+openpilot is open source software: the user is free to disable data collection if they wish to do so.
+
+openpilot logs the road-facing cameras, CAN, GPS, IMU, magnetometer, thermal sensors, crashes, and operating system logs.
+The driver-facing camera is only logged if you explicitly opt-in in settings. The microphone is not recorded.
+
+By using openpilot, you agree to [our Privacy Policy](https://comma.ai/privacy). You understand that use of this software or its related services will generate certain types of user data, which may be logged and stored at the sole discretion of comma. By accepting this agreement, you grant an irrevocable, perpetual, worldwide right to comma for the use of this data.
