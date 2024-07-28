@@ -316,8 +316,10 @@ def wrong_car_mode_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
   text = "Enable Adaptive Cruise to Engage"
   if CP.carName == "honda":
     text = "Enable Main Switch to Engage"
-  if CP.carName == "hyundai" and CP.safetyConfigs == "hyundaiCanfd":
-    text = "Enable LFA Button to Engage"
+  if CP.carName == "hyundai":
+    for config in CP.safetyConfigs:
+      if config.safetyModel == "hyundaiCanfd":
+        text = "Enable LFA Button to Engage"
   return NoEntryAlert(text)
 
 
