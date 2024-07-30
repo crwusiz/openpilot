@@ -105,6 +105,7 @@ class CarInterface(CarInterfaceBase):
 
     # *** feature detection and  Params Init ***
     if candidate in CANFD_CAR:
+      ret.isCanfd = True
       Params().put_bool("IsCanfd", True)
       Params().put_bool("SccOnBus2", False)
 
@@ -121,6 +122,7 @@ class CarInterface(CarInterfaceBase):
 
       ret.radarUnavailable = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
     else:
+      ret.isCanfd = False
       Params().put_bool("IsCanfd", False)
 
       ret.enableBsm = 0x58b in fingerprint[0]

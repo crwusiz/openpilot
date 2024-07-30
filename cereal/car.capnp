@@ -736,4 +736,5 @@ struct CarParams {
   # add
   sccBus @74: Int8;
   exFlags @75 :UInt32;
+  isCanfd @76 :Bool;
 }
