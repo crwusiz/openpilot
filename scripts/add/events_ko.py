@@ -348,7 +348,7 @@ def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster
         "CAN 오류 : 신호 없음\n%s" % line,
         "",
         AlertStatus.normal, AlertSize.small,
-        Priority.LOW, VisualAlert.none, AudibleAlert.none, .2, creation_delay=10.)
+        Priority.LOW, VisualAlert.none, AudibleAlert.none, .2, creation_delay=1.)
   elif os.path.isfile('/data/can_timeout.log'):
     with open('/data/can_timeout.log', 'r') as f:
       f.readline()
@@ -357,7 +357,7 @@ def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster
         "CAN 오류 : 시간 초과\n%s" % line,
         "",
         AlertStatus.normal, AlertSize.small,
-        Priority.LOW, VisualAlert.none, AudibleAlert.none, .2, creation_delay=10.)
+        Priority.LOW, VisualAlert.none, AudibleAlert.none, .2, creation_delay=1.)
   else:
     return Alert(
       "CAN 오류 : 장치를 점검하세요",
