@@ -10,8 +10,9 @@ from openpilot.common.numpy_fast import interp
 from openpilot.common.params import Params
 from openpilot.common.realtime import DT_CTRL, Ratekeeper, Priority, config_realtime_process
 from openpilot.common.swaglog import cloudlog
-
 from openpilot.common.simple_kalman import KF1D
+from openpilot.selfdrive.pandad import can_capnp_to_list
+
 from openpilot.selfdrive.modeld.constants import ModelConstants
 
 
@@ -318,7 +319,7 @@ def main():
 
   while 1:
     can_strings = messaging.drain_sock_raw(can_sock, wait_for_one=True)
-    rr = RI.update(can_strings)
+    rr = RI.update(can_capnp_to_list(can_strings))
     sm.update(0)
     if rr is None:
       continue

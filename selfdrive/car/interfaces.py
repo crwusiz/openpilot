@@ -18,6 +18,7 @@ from openpilot.selfdrive.car.values import PLATFORMS
 from openpilot.selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX
 from openpilot.selfdrive.controls.lib.events import Events
 from openpilot.selfdrive.controls.lib.vehicle_model import VehicleModel
+from openpilot.selfdrive.pandad import can_capnp_to_list
 
 ButtonType = car.CarState.ButtonEvent.Type
 GearShifter = car.CarState.GearShifter
@@ -52,6 +53,7 @@ class LatControlInputs(NamedTuple):
   aego: float
 
 
+SendCan = tuple[int, bytes, int]
 TorqueFromLateralAccelCallbackType = Callable[[LatControlInputs, car.CarParams.LateralTorqueTuning, float, float, bool, bool], float]
 
 
@@ -109,7 +111,7 @@ class CarInterfaceBase(ABC):
     dbc_name = "" if self.cp is None else self.cp.dbc_name
     self.CC: CarControllerBase = CarController(dbc_name, CP, self.VM)
 
-  def apply(self, c: car.CarControl, now_nanos: int) -> tuple[car.CarControl.Actuators, list[tuple[int, int, bytes, int]]]:
+  def apply(self, c: car.CarControl, now_nanos: int) -> tuple[car.CarControl.Actuators, list[SendCan]]:
     return self.CC.update(c, self.CS, now_nanos)
 
   @staticmethod
@@ -231,9 +233,10 @@ class CarInterfaceBase(ABC):
 
   def update(self, c: car.CarControl, can_strings: list[bytes]) -> car.CarState:
     # parse can
+    can_list = can_capnp_to_list(can_strings)
     for cp in self.can_parsers:
       if cp is not None:
-        cp.update_strings(can_strings)
+        cp.update_strings(can_list)
 
     # get CarState
     ret = self._update(c)
@@ -471,9 +474,6 @@ class CarStateBase(ABC):
   @staticmethod
   def get_loopback_can_parser(CP):
     return None
-
-
-SendCan = tuple[int, int, bytes, int]
 
 
 class CarControllerBase(ABC):
