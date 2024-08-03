@@ -162,8 +162,8 @@ def get_RadarState_from_vision(lead_msg: capnp._DynamicStructReader, v_ego: floa
     "vRel": float(lead_v_rel_pred),
     "vLead": float(v_ego + lead_v_rel_pred),
     "vLeadK": float(v_ego + lead_v_rel_pred),
-    "aLeadK": float(lead_msg.a[0]),
-    "aLeadTau": 0.1,
+    "aLeadK": 0.0,
+    "aLeadTau": 0.3,
     "fcw": False,
     "modelProb": float(lead_msg.prob),
     "status": True,
@@ -175,7 +175,7 @@ def get_RadarState_from_vision(lead_msg: capnp._DynamicStructReader, v_ego: floa
 def get_lead(v_ego: float, ready: bool, tracks: dict[int, Track], model: capnp._DynamicStructReader, lead_msg: capnp._DynamicStructReader,
              model_v_ego: float, low_speed_override: bool = True) -> dict[str, Any]:
   # Determine leads, this is where the essential logic happens
-  if len(tracks) > 0 and ready: # and lead_msg.prob > .5:
+  if len(tracks) > 0 and ready and lead_msg.prob > .5:
     track = match_vision_to_track(v_ego, model, lead_msg, tracks)
   else:
     track = None
