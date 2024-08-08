@@ -1,7 +1,6 @@
 import random
 
 import numpy as np
-import logging
 
 from common.numpy_fast import clip, interp
 from cereal import car
@@ -17,22 +16,6 @@ MIN_CURVE_SPEED = 32. * CV.KPH_TO_MS
 
 EventName = car.CarEvent.EventName
 ButtonType = car.CarState.ButtonEvent.Type
-
-logger = logging.getLogger('SpeedControllerLogger')
-logger.setLevel(logging.DEBUG)
-
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-
-file_handler = logging.FileHandler('speed_controller.log')
-file_handler.setLevel(logging.DEBUG)
-
-formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
-console_handler.setFormatter(formatter)
-file_handler.setFormatter(formatter)
-
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
 
 class SpeedController:
   def __init__(self, CP, CI):
@@ -80,9 +63,6 @@ class SpeedController:
 
     self.v_cruise_helper = VCruiseHelper(self.CP)
 
-    logger.debug(f'SpeedController initialized with: is_metric={self.is_metric}, experimental_mode={self.experimental_mode},'
-                 f'pcmcruise={self.pcmcruise}, longcontrol={self.long_control}')
-
   def _kph_to_clu(self, kph):
     return int(kph * CV.KPH_TO_MS * self.speed_conv_to_clu)
 
@@ -114,8 +94,6 @@ class SpeedController:
     self.slowing_down = False
     self.slowing_down_alert = False
     self.slowing_down_sound_alert = False
-
-    logger.debug('SpeedController state has been reset.')
 
   def inject_events(self, CS, events):
     if CS.cruiseState.enabled:
@@ -166,8 +144,6 @@ class SpeedController:
       self.limited_lead = False
 
     self._update_max_speed(int(round(max_speed_clu)))
-
-    logger.debug(f'Calculated max_speed_clu: {max_speed_clu}')
 
     return max_speed_clu
 
@@ -239,8 +215,6 @@ class SpeedController:
           set_speed = clip(clu_speed + SYNC_MARGIN, self.min_set_speed_clu, self.max_set_speed_clu)
           self.target_speed = set_speed
 
-    logger.debug(f'Target speed calculated: {self.target_speed}, override speed : {override_speed}')
-
     return override_speed
 
   def _update_max_speed(self, max_speed):
@@ -250,8 +224,6 @@ class SpeedController:
       kp = 0.01
       error = max_speed - self.max_speed_clu
       self.max_speed_clu = self.max_speed_clu + error * kp
-
-    logger.debug(f'Updated max_speed_clu: {self.max_speed_clu}')
 
   def _get_button(self, current_set_speed):
     if self.target_speed < self.min_set_speed_clu:
@@ -298,8 +270,6 @@ class SpeedController:
 
     self.v_cruise_kph = v_cruise_kph
 
-    logger.debug(f'v_cruise_kph: {self.v_cruise_kph}, real set speed : {self.real_set_speed_kph}')
-
     self._update_message(CS)
 
   def spam_message(self, CS, can_sends):
@@ -340,9 +310,6 @@ class SpeedController:
     else:
       if self.long_control:
         self.target_speed = 0.
-
-    logger.debug(f'Spam message - wait_timer: {self.wait_timer}, alive_timer: {self.alive_timer}, btn: {self.btn}')
-
 
   def _update_message(self, CS):
     exState = CS.exState
