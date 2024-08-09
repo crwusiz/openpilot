@@ -14,7 +14,9 @@ from openpilot.common.swaglog import cloudlog, ForwardingHandler
 
 from openpilot.selfdrive.pandad import can_capnp_to_list, can_list_to_can_capnp
 from openpilot.selfdrive.car import DT_CTRL, carlog
-from openpilot.selfdrive.car.car_helpers import get_car, get_one_can
+from openpilot.selfdrive.car.can_definitions import CanData, CanRecvCallable, CanSendCallable
+from openpilot.selfdrive.car.fw_versions import ObdCallback
+from openpilot.selfdrive.car.car_helpers import get_car
 from openpilot.selfdrive.car.interfaces import CarInterfaceBase
 from openpilot.selfdrive.controls.lib.events import Events
 
@@ -28,7 +30,7 @@ EventName = car.CarEvent.EventName
 carlog.addHandler(ForwardingHandler(cloudlog))
 
 
-def obd_callback(params: Params):
+def obd_callback(params: Params) -> ObdCallback:
   def set_obd_multiplexing(obd_multiplexing: bool):
     if params.get_bool("ObdMultiplexingEnabled") != obd_multiplexing:
       cloudlog.warning(f"Setting OBD multiplexing to {obd_multiplexing}")
@@ -39,10 +41,28 @@ def obd_callback(params: Params):
   return set_obd_multiplexing
 
 
+def can_comm_callbacks(logcan: messaging.SubSocket, sendcan: messaging.PubSocket) -> tuple[CanRecvCallable, CanSendCallable]:
+  def can_recv(wait_for_one: bool = False) -> list[list[CanData]]:
+    """
+    wait_for_one: wait the normal logcan socket timeout for a CAN packet, may return empty list if nothing comes
+
+    Returns: CAN packets comprised of CanData objects for easy access
+    """
+    ret = []
+    for can in messaging.drain_sock(logcan, wait_for_one=wait_for_one):
+      ret.append([CanData(msg.address, msg.dat, msg.src) for msg in can.can])
+    return ret
+
+  def can_send(msgs: list[CanData]) -> None:
+    sendcan.send(can_list_to_can_capnp(msgs, msgtype='sendcan'))
+
+  return can_recv, can_send
+
+
 class Car:
   CI: CarInterfaceBase
 
-  def __init__(self, CI=None):
+  def __init__(self, CI=None) -> None:
     self.can_sock = messaging.sub_sock('can', timeout=20)
     self.sm = messaging.SubMaster(['pandaStates', 'carControl', 'onroadEvents', 'modelV2', 'radarState'])
     self.pm = messaging.PubMaster(['sendcan', 'carState', 'carParams', 'carOutput'])
@@ -57,15 +77,26 @@ class Car:
 
     self.params = Params()
 
+    self.can_callbacks = can_comm_callbacks(self.can_sock, self.pm.sock['sendcan'])
+
     if CI is None:
       # wait for one pandaState and one CAN packet
       print("Waiting for CAN messages...")
-      get_one_can(self.can_sock)
+      while True:
+        can = messaging.recv_one_retry(self.can_sock)
+        if len(can.can) > 0:
+          break
 
       experimental_long_allowed = self.params.get_bool("ExperimentalLongitudinalEnabled")
       num_pandas = len(messaging.recv_one_retry(self.sm.sock['pandaStates']).pandaStates)
-      cached_params = self.params.get("CarParamsCache")
-      self.CI = get_car(self.can_sock, self.pm.sock['sendcan'], obd_callback(self.params), experimental_long_allowed, num_pandas, cached_params)
+
+      cached_params = None
+      cached_params_raw = self.params.get("CarParamsCache")
+      if cached_params_raw is not None:
+        with car.CarParams.from_bytes(cached_params_raw) as _cached_params:
+          cached_params = _cached_params
+
+      self.CI = get_car(*self.can_callbacks, obd_callback(self.params), experimental_long_allowed, num_pandas, cached_params)
       self.CP = self.CI.CP
 
       # continue onto next fingerprinting step in pandad
@@ -178,7 +209,7 @@ class Car:
     if not self.initialized_prev:
       # Initialize CarInterface, once controls are ready
       # TODO: this can make us miss at least a few cycles when doing an ECU knockout
-      self.CI.init(self.CP, self.can_sock, self.pm.sock['sendcan'])
+      self.CI.init(self.CP, *self.can_callbacks)
       # signal pandad to switch to car safety mode
       self.params.put_bool_nonblocking("ControlsReady", True)
 
