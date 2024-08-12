@@ -203,6 +203,7 @@ struct CarState {
   accFaulted @42 :Bool;
   carFaultedNonCritical @47 :Bool;  # some ECU is faulted, but car remains controllable
   espActive @51 :Bool;
+  vehicleSensorsInvalid @52 :Bool;  # invalid steering angle readings, etc.
 
   # cruise state
   cruiseState @10 :CruiseState;
@@ -234,7 +235,7 @@ struct CarState {
   cumLagMs @50 :Float32;
 
   # neokii
-  exState @52 :ExState;
+  exState @53 :ExState;
 
   struct ExState {
     vCruiseKph @0 :Float32;
