@@ -9,9 +9,7 @@ fi
 
 #FETCH_STATUS=$(git fetch --all --prune | zenity --text-info --title="Git Fetch Status" --width=200 --height=200) && sleep 5
 
-ping -c 3 8.8.8.8 > /dev/null 2>&1
-
-if [ $? -eq 0 ]; then
+if ping -c 3 8.8.8.8 > /dev/null 2>&1; then
   git fetch --all --prune
   echo "Fetch completed!"
 

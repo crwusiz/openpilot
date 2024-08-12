@@ -133,6 +133,17 @@ function launch {
   fi
   ./manager.py
 
+  # car params first run
+  if [ ! -f /data/cp_firstrun ]; then
+    touch /data/cp_firstrun
+    sh /data/openpilot/scripts/dump_upload.sh carParams
+  fi
+
+  # tmux log upload
+  if [ -f /data/tmux_error.log ]; then
+    sh /data/openpilot/scripts/log_upload.sh
+  fi
+
   # if broken, keep on screen error
   while true; do sleep 1; done
 }

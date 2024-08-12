@@ -672,45 +672,45 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
 
-  auto carstate_dump_upload_btn = new ButtonControl(tr("carState dump upload"), tr("RUN"));
-  QObject::connect(carstate_dump_upload_btn, &ButtonControl::clicked, [=]() {
-    if (ConfirmationDialog::confirm(tr("carState dump upload<br><br>Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/scripts/carstate_upload.sh");
-    }
-  });
-
   auto carparams_dump_upload_btn = new ButtonControl(tr("carParams dump upload"), tr("RUN"));
   QObject::connect(carparams_dump_upload_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("carParams dump upload<br><br>Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/scripts/carparams_upload.sh");
+      QProcess::execute("/data/openpilot/scripts/dump_upload.sh carParams");
+    }
+  });
+
+  auto carstate_dump_upload_btn = new ButtonControl(tr("carState dump upload"), tr("RUN"));
+  QObject::connect(carstate_dump_upload_btn, &ButtonControl::clicked, [=]() {
+    if (ConfirmationDialog::confirm(tr("carState dump upload<br><br>Process?"), tr("Process"), this)) {
+      QProcess::execute("/data/openpilot/scripts/dump_upload.sh carState");
     }
   });
 
   auto carcontrol_dump_upload_btn = new ButtonControl(tr("carControl dump upload"), tr("RUN"));
   QObject::connect(carcontrol_dump_upload_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("carControl dump upload<br><br>Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/scripts/carcontrol_upload.sh");
+      QProcess::execute("/data/openpilot/scripts/dump_upload.sh carControl");
     }
   });
 
   auto controlsstate_dump_upload_btn = new ButtonControl(tr("controlsState dump upload"), tr("RUN"));
   QObject::connect(controlsstate_dump_upload_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("controlsState dump upload<br><br>Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/scripts/controlsstate_upload.sh");
+      QProcess::execute("/data/openpilot/scripts/dump_upload.sh controlsState");
     }
   });
 
   auto devicestate_dump_upload_btn = new ButtonControl(tr("deviceState dump upload"), tr("RUN"));
   QObject::connect(devicestate_dump_upload_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("deviceState dump upload<br><br>Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/scripts/devicestate_upload.sh");
+      QProcess::execute("/data/openpilot/scripts/dump_upload.sh deviceState");
     }
   });
 
   auto pandastates_dump_upload_btn = new ButtonControl(tr("pandaStates dump upload"), tr("RUN"));
   QObject::connect(pandastates_dump_upload_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("pandaStates dump upload<br><br>Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/scripts/pandastates_upload.sh");
+      QProcess::execute("/data/openpilot/scripts/dump_upload.sh pandaStates");
     }
   });
 
