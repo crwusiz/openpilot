@@ -4,7 +4,6 @@ import os
 import signal
 import sys
 import traceback
-import glob
 
 from cereal import log
 import cereal.messaging as messaging
@@ -19,7 +18,8 @@ from openpilot.system.athena.registration import register, UNREGISTERED_DONGLE_I
 from openpilot.common.swaglog import cloudlog, add_file_handler
 from openpilot.system.version import get_build_metadata, terms_version, training_version
 
-
+import glob
+import subprocess
 
 def manager_init() -> None:
   save_bootlog()
@@ -196,6 +196,15 @@ def manager_thread() -> None:
       print(running)
     print_timer += 1
     cloudlog.debug(running)
+
+    # car params first run
+    if not os.path.isfile('/data/cp_firstrun'):
+      open('/data/cp_firstrun', 'a').close()
+      subprocess.run(['sh', '/data/openpilot/scripts/dump_upload.sh', 'carParams'])
+
+    # tmux log upload
+    if os.path.isfile('/data/tmux_error.log'):
+      subprocess.run(['sh', '/data/openpilot/scripts/log_upload.sh'])
 
     # send managerState
     msg = messaging.new_message('managerState', valid=True)
