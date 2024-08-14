@@ -842,12 +842,12 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   QHBoxLayout *buttonLayout6 = new QHBoxLayout;
   buttonLayout6->addWidget(vertical_line());
-  buttonLayout6->addWidget(carstate_dump_upload_btn);
+  buttonLayout6->addWidget(carparams_dump_upload_btn);
   buttonLayout6->addWidget(vertical_line());
 
   QHBoxLayout *buttonLayout7 = new QHBoxLayout;
   buttonLayout7->addWidget(vertical_line());
-  buttonLayout7->addWidget(carparams_dump_upload_btn);
+  buttonLayout7->addWidget(carstate_dump_upload_btn);
   buttonLayout7->addWidget(vertical_line());
 
   QHBoxLayout *buttonLayout8 = new QHBoxLayout;

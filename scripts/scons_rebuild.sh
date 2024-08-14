@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
 cd /data/openpilot && scons -c;
 rm /data/openpilot/.sconsign.dblite;

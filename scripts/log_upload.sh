@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
 TODAY=$(date +%y-%m-%d-%H:%M)
 FILE="tmux_error.log"

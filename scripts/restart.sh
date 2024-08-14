@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
 # Allows you to restart Openpilot without rebooting the Comma 3
 tmux new -d -s tmp;
