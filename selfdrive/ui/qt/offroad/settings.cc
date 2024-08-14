@@ -607,7 +607,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   auto gitreset_btn = new ButtonControl(tr("Git Reset -1"), tr("RUN"));
   QObject::connect(gitreset_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("Git Reset<br><br>Process?"), tr("Process"), this)) {
-      QProcess::execute("/data/openpilot/scripts/gitreset.sh");
+      QProcess::execute("/data/openpilot/scripts/reset.sh");
     }
   });
 
