@@ -1,9 +1,10 @@
 import math
 
-from cereal import car
 from opendbc.can.parser import CANParser
+from openpilot.selfdrive.car import structs
 from openpilot.selfdrive.car.interfaces import RadarInterfaceBase
 from openpilot.selfdrive.car.hyundai.values import DBC, CANFD_CAR
+
 from openpilot.common.params import Params
 from openpilot.common.filter_simple import StreamingMovingAverage
 
@@ -77,7 +78,7 @@ class RadarInterface(RadarInterfaceBase):
     return rr
 
   def _update(self, updated_messages, trigger_msg_radar, trigger_msg_scc):
-    ret = car.RadarData.new_message()
+    ret = structs.RadarData()
     if self.rcp is None and self.rcp_scc is None:
       return ret
 
@@ -91,7 +92,7 @@ class RadarInterface(RadarInterfaceBase):
         msg = self.rcp.vl[f"RADAR_TRACK_{addr:x}"]
 
         if addr not in self.pts:
-          self.pts[addr] = car.RadarData.RadarPoint.new_message()
+          self.pts[addr] = structs.RadarData.RadarPoint()
           self.pts[addr].trackId = self.track_id
           self.track_id += 1
 
@@ -119,7 +120,7 @@ class RadarInterface(RadarInterfaceBase):
       if valid:
         target_id = 0
         if target_id not in self.pts:
-          self.pts[target_id] = car.RadarData.RadarPoint.new_message()
+          self.pts[target_id] = structs.RadarData.RadarPoint()
           self.pts[target_id].trackId = 0 #self.track_id
           #self.track_id += 1
           dRel = self.dRelFilter.set(dRel)

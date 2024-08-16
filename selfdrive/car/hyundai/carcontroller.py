@@ -1,8 +1,8 @@
-from cereal import car
+import copy
 from opendbc.can.packer import CANPacker
-from openpilot.selfdrive.car import (DT_CTRL, apply_driver_steer_torque_limits, common_fault_avoidance, make_tester_present_msg,
+from openpilot.selfdrive.car import (DT_CTRL, apply_driver_steer_torque_limits, common_fault_avoidance, make_tester_present_msg, structs,
                                      apply_std_steer_angle_limits)
-from openpilot.selfdrive.car.conversions import Conversions as CV
+from openpilot.selfdrive.car.common.conversions import Conversions as CV
 from openpilot.selfdrive.car.common.numpy_fast import clip, interp
 from openpilot.selfdrive.car.hyundai import hyundaicanfd, hyundaican
 from openpilot.selfdrive.car.hyundai.carstate import CarState
@@ -12,8 +12,8 @@ from openpilot.selfdrive.car.interfaces import CarControllerBase, ACCEL_MIN, ACC
 
 from openpilot.selfdrive.controls.neokii.navi_controller import SpeedLimiter
 
-VisualAlert = car.CarControl.HUDControl.VisualAlert
-LongCtrlState = car.CarControl.Actuators.LongControlState
+VisualAlert = structs.CarControl.HUDControl.VisualAlert
+LongCtrlState = structs.CarControl.Actuators.LongControlState
 
 # EPS faults if you apply torque while the steering angle is above 90 degrees for more than 1 second
 # All slightly below EPS thresholds to avoid fault
@@ -222,7 +222,7 @@ class CarController(CarControllerBase):
       if self.frame % 1000 == 0:
         print(f'scc11 = {bool(CS.scc11)}  scc12 = {bool(CS.scc12)}  scc13 = {bool(CS.scc13)}  scc14 = {bool(CS.scc14)}  mdps12 = {bool(CS.mdps12)}')
 
-    new_actuators = actuators.as_builder()
+    new_actuators = copy.copy(actuators)
     new_actuators.steer = apply_steer / self.params.STEER_MAX
     new_actuators.steerOutputCan = apply_steer
     new_actuators.steeringAngleDeg = apply_angle
@@ -231,7 +231,7 @@ class CarController(CarControllerBase):
     self.frame += 1
     return new_actuators, can_sends
 
-  def create_button_messages(self, CC: car.CarControl, CS: CarState, use_clu11: bool):
+  def create_button_messages(self, CC: structs.CarControl, CS: CarState, use_clu11: bool):
     can_sends = []
     if use_clu11:
       if CC.cruiseControl.cancel:

@@ -1,9 +1,9 @@
 import os
 import time
 
-from cereal import car
 from openpilot.selfdrive.car import carlog, gen_empty_fingerprint
 from openpilot.selfdrive.car.can_definitions import CanRecvCallable, CanSendCallable
+from openpilot.selfdrive.car.structs import CarParams
 from openpilot.selfdrive.car.fingerprints import eliminate_incompatible_cars, all_legacy_fingerprint_cars, extract_platform
 from openpilot.selfdrive.car.fw_versions import ObdCallback, get_fw_versions_ordered, get_present_ecus, match_fw_to_car
 from openpilot.selfdrive.car.interfaces import get_interface_attr
@@ -12,7 +12,6 @@ from openpilot.selfdrive.car.vin import get_vin, is_valid_vin, VIN_UNKNOWN
 
 import requests
 from openpilot.common.params import Params
-import openpilot.system.sentry as sentry
 
 FRAME_FINGERPRINT = 100  # 1s
 
@@ -86,7 +85,7 @@ def can_fingerprint(can_recv: CanRecvCallable) -> tuple[str | None, dict[int, di
 
 # **** for use live only ****
 def fingerprint(can_recv: CanRecvCallable, can_send: CanSendCallable, set_obd_multiplexing: ObdCallback, num_pandas: int,
-                cached_params: type[car.CarParams] | None) -> tuple[str | None, dict, str, list, int, bool]:
+                cached_params: CarParams | None) -> tuple[str | None, dict, str, list[CarParams.CarFw], CarParams.FingerprintSource, bool]:
   fixed_fingerprint = os.environ.get('FINGERPRINT', "")
   skip_fw_query = os.environ.get('SKIP_FW_QUERY', False)
   disable_fw_cache = os.environ.get('DISABLE_FW_CACHE', False)
@@ -133,17 +132,17 @@ def fingerprint(can_recv: CanRecvCallable, can_send: CanSendCallable, set_obd_mu
   car_fingerprint, finger = can_fingerprint(can_recv)
 
   exact_match = True
-  source = car.CarParams.FingerprintSource.can
+  source = CarParams.FingerprintSource.can
 
   # If FW query returns exactly 1 candidate, use it
   if len(fw_candidates) == 1:
     car_fingerprint = list(fw_candidates)[0]
-    source = car.CarParams.FingerprintSource.fw
+    source = CarParams.FingerprintSource.fw
     exact_match = exact_fw_match
 
   if fixed_fingerprint:
     car_fingerprint = fixed_fingerprint
-    source = car.CarParams.FingerprintSource.fixed
+    source = CarParams.FingerprintSource.fixed
 
   selected_car = Params().get("SelectedCar")
   if selected_car:
@@ -156,49 +155,13 @@ def fingerprint(can_recv: CanRecvCallable, can_send: CanSendCallable, set_obd_mu
   return car_fingerprint, finger, vin, car_fw, source, exact_match
 
 
-def is_connected_to_internet(timeout=5):
-  try:
-    requests.get("https://sentry.io", timeout=timeout)
-    return True
-  except Exception:
-    return False
-
-
-def crash_log(candidate):
-  no_internet = 0
-  while True:
-    if is_connected_to_internet():
-      sentry.get_init()
-      sentry.capture_warning("fingerprinted %s" % candidate)
-      break
-    else:
-      no_internet += 1
-      if no_internet >= 2:
-        break
-      time.sleep(600)
-
-
-def crash_log2(fingerprints, fw):
-  no_internet = 0
-  while True:
-    if is_connected_to_internet():
-      sentry.get_init()
-      sentry.capture_warning("car doesn't match any fingerprints: %s" % fingerprints)
-      sentry.capture_warning("car doesn't match any fw: %s" % fw)
-      break
-    else:
-      no_internet += 1
-      if no_internet >= 2:
-        break
-      time.sleep(600)
-
-def get_car_interface(CP):
+def get_car_interface(CP: CarParams):
   CarInterface, CarController, CarState = interfaces[CP.carFingerprint]
   return CarInterface(CP, CarController, CarState)
 
 
 def get_car(can_recv: CanRecvCallable, can_send: CanSendCallable, set_obd_multiplexing: ObdCallback, experimental_long_allowed: bool,
-            num_pandas: int = 1, cached_params: type[car.CarParams] | None = None):
+            num_pandas: int = 1, cached_params: CarParams | None = None):
   candidate, fingerprints, vin, car_fw, source, exact_match = fingerprint(can_recv, can_send, set_obd_multiplexing, num_pandas, cached_params)
 
   if candidate is None:
@@ -218,7 +181,7 @@ def get_car(can_recv: CanRecvCallable, can_send: CanSendCallable, set_obd_multip
   Params().put("CarName", candidate)
 
   CarInterface, _, _ = interfaces[candidate]
-  CP = CarInterface.get_params(candidate, fingerprints, car_fw, experimental_long_allowed, docs=False)
+  CP: CarParams = CarInterface.get_params(candidate, fingerprints, car_fw, experimental_long_allowed, docs=False)
   CP.carVin = vin
   CP.carFw = car_fw
   CP.fingerprintSource = source
