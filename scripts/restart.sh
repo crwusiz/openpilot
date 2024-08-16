@@ -15,5 +15,5 @@ tmux send-keys -t tmp.1 "tmux rename-session -t tmp comma" ENTER
 tmux send-keys -t tmp.1 "exit" ENTER
 
 echo ""
-echo -e "${BOLD}  Restart Now ...${NC}"
+echo -e "${GREEN}${BOLD}  Restart Now ...${NC}"
 echo ""

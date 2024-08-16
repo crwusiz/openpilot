@@ -171,7 +171,7 @@ def manager_thread() -> None:
   ensure_running(managed_processes.values(), False, params=params, CP=sm['carParams'], not_run=ignore)
   started_prev = False
 
-  print_timer = 0
+  log_timer = 0
   while True:
     sm.update(1000)
 
@@ -192,19 +192,23 @@ def manager_thread() -> None:
 
     running = ' '.join("{}{}\u001b[0m".format("\u001b[32m" if p.proc.is_alive() else "\u001b[31m", p.name)
                        for p in managed_processes.values() if p.proc)
-    if print_timer % 5 == 0:
-      print(running)
-    print_timer += 1
     cloudlog.debug(running)
 
-    # car params first run
-    if not os.path.isfile('/data/cp_firstrun'):
-      open('/data/cp_firstrun', 'a').close()
-      subprocess.run(['sh', '/data/openpilot/scripts/dump_upload.sh', 'carParams'])
+    if log_timer % 5 == 0:
+      print(running)
 
     # tmux log upload
-    if os.path.isfile('/data/tmux_error.log'):
-      subprocess.run(['sh', '/data/openpilot/scripts/log_upload.sh'])
+    if log_timer % 60 == 0:
+      if os.path.isfile('/data/tmux_error.log'):
+        subprocess.run(['sh', '/data/openpilot/scripts/log_upload.sh'])
+
+    # car params first run
+    if log_timer % 120 == 0:
+      if not os.path.isfile('/data/cp_firstrun'):
+        open('/data/cp_firstrun', 'a').close()
+        subprocess.run(['sh', '/data/openpilot/scripts/dump_upload.sh', 'carParams'])
+
+    log_timer += 1
 
     # send managerState
     msg = messaging.new_message('managerState', valid=True)
