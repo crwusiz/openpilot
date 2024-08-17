@@ -202,12 +202,6 @@ def manager_thread() -> None:
       if os.path.isfile('/data/tmux_error.log'):
         subprocess.run(['sh', '/data/openpilot/scripts/log_upload.sh'])
 
-    # car params first run
-    if log_timer % 120 == 0:
-      if not os.path.isfile('/data/cp_firstrun'):
-        open('/data/cp_firstrun', 'a').close()
-        subprocess.run(['sh', '/data/openpilot/scripts/dump_upload.sh', 'carParams'])
-
     log_timer += 1
 
     # send managerState

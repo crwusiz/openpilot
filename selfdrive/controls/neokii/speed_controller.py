@@ -1,13 +1,12 @@
 import random
-
 import numpy as np
 
 from common.numpy_fast import clip, interp
 from cereal import car
 from opendbc.car.hyundai.values import Buttons
 from openpilot.common.conversions import Conversions as CV
-from openpilot.selfdrive.controls.lib.drive_helpers import (VCruiseHelper, V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_UNSET)
 from openpilot.common.params import Params
+from openpilot.selfdrive.controls.lib.drive_helpers import (VCruiseHelper, V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_UNSET)
 from openpilot.selfdrive.controls.neokii.navi_controller import SpeedLimiter
 from openpilot.selfdrive.modeld.constants import ModelConstants
 
@@ -16,6 +15,7 @@ MIN_CURVE_SPEED = 32. * CV.KPH_TO_MS
 
 EventName = car.CarEvent.EventName
 ButtonType = car.CarState.ButtonEvent.Type
+
 
 class SpeedController:
   def __init__(self, CP, CI):
@@ -63,8 +63,10 @@ class SpeedController:
 
     self.v_cruise_helper = VCruiseHelper(self.CP)
 
+
   def _kph_to_clu(self, kph):
     return int(kph * CV.KPH_TO_MS * self.speed_conv_to_clu)
+
 
   def _get_alive_count(self):
     count = self.alive_count_list[self.alive_index]
@@ -95,6 +97,7 @@ class SpeedController:
     self.slowing_down_alert = False
     self.slowing_down_sound_alert = False
 
+
   def inject_events(self, CS, events):
     if CS.cruiseState.enabled:
       if self.slowing_down_sound_alert:
@@ -102,6 +105,7 @@ class SpeedController:
         events.add(EventName.slowingDownSpeedSound)
       elif self.slowing_down_alert:
         events.add(EventName.slowingDownSpeed)
+
 
   def _cal_max_speed(self, CS, sm, clu_speed, v_cruise_kph):
     # kph
@@ -147,11 +151,13 @@ class SpeedController:
 
     return max_speed_clu
 
+
   def get_lead(self, sm):
     radar = sm['radarState']
     if radar.leadOne.status:
       return radar.leadOne
     return None
+
 
   def _get_long_lead_speed(self, clu_speed, sm):
     if self.long_control:
@@ -196,6 +202,7 @@ class SpeedController:
       else:
         self.curve_speed_ms = 255.
 
+
   def _cal_target_speed(self, CS, clu_speed, v_cruise_kph, cruise_btn_pressed):
     override_speed = -1
     if not self.long_control:
@@ -217,6 +224,7 @@ class SpeedController:
 
     return override_speed
 
+
   def _update_max_speed(self, max_speed):
     if not self.long_control or self.max_speed_clu <= 0:
       self.max_speed_clu = max_speed
@@ -225,6 +233,7 @@ class SpeedController:
       error = max_speed - self.max_speed_clu
       self.max_speed_clu = self.max_speed_clu + error * kp
 
+
   def _get_button(self, current_set_speed):
     if self.target_speed < self.min_set_speed_clu:
       return Buttons.NONE
@@ -232,6 +241,7 @@ class SpeedController:
     if abs(error) < 0.9:
       return Buttons.NONE
     return Buttons.RES_ACCEL if error > 0 else Buttons.SET_DECEL
+
 
   def update_v_cruise(self, CS, sm, enabled):
     self.v_cruise_kph_last = self.v_cruise_kph
@@ -258,19 +268,18 @@ class SpeedController:
 
     self.real_set_speed_kph = v_cruise_kph
     if CS.cruiseState.enabled:
-      clu_speed = CS.vEgoCluster * self.speed_conv_to_clu
-      self._cal_max_speed(CS, sm, clu_speed, v_cruise_kph)
+      self._cal_max_speed(CS, sm, CS.vEgoCluster, v_cruise_kph)
       self.cruise_speed_kph = float(clip(v_cruise_kph, V_CRUISE_MIN, self.max_speed_clu * self.speed_conv_to_ms * CV.MS_TO_KPH))
 
-      override_speed = self._cal_target_speed(CS, clu_speed, self.real_set_speed_kph, self.CI.CS.cruise_buttons[-1] != Buttons.NONE)
+      override_speed = self._cal_target_speed(CS, CS.vEgoCluster, self.real_set_speed_kph, self.CI.CS.cruise_buttons[-1] != Buttons.NONE)
       if override_speed > 0:
         v_cruise_kph = override_speed
     else:
       self.reset()
 
     self.v_cruise_kph = v_cruise_kph
-
     self._update_message(CS)
+
 
   def spam_message(self, CS, can_sends):
     ascc_enabled = CS.cruiseState.enabled and 1 < CS.cruiseState.speed < 255 and not CS.brakePressed
@@ -310,6 +319,7 @@ class SpeedController:
     else:
       if self.long_control:
         self.target_speed = 0.
+
 
   def _update_message(self, CS):
     exState = CS.exState

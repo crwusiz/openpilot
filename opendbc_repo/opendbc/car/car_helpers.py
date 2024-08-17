@@ -173,9 +173,7 @@ def get_car(can_recv: CanRecvCallable, can_send: CanSendCallable, set_obd_multip
     if found_platform is not None:
       candidate = found_platform
 
-  print()
-  print(f"Recognition Car : {candidate}")
-  print()
+  print(f"\nRecognition Car : {candidate}\n")
 
   Params().put("CarName", candidate)
 

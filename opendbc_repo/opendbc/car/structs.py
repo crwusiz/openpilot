@@ -115,6 +115,7 @@ class CarState:
   # neokii
   exState: 'CarState.ExState' = field(default_factory=lambda: CarState.ExState())
 
+  @auto_dataclass
   class ExState:
     vCruiseKph: float = auto_field()
     applyMaxSpeed: float = auto_field()
@@ -123,6 +124,7 @@ class CarState:
     navLimitSpeed: int = auto_field()
     tpms: 'CarState.Tpms' = field(default_factory=lambda: CarState.Tpms())
 
+  @auto_dataclass
   class Tpms:
     fl: float = auto_field()
     fr: float = auto_field()

@@ -126,6 +126,19 @@ function launch {
     cp -f $BASEDIR/scripts/add/events_en.py $BASEDIR/selfdrive/controls/lib/events.py
   fi
 
+  # 시간동기화
+  if [ "${LANG}" = "main_ko" ]; then
+    sudo mount -o remount,rw /
+    sudo timedatectl set-timezone Asia/Seoul
+    sudo timedatectl set-ntp true
+    sudo mount -o remount,ro /
+  elif [ "${LANG}" = "main_en" ]; then
+    sudo mount -o remount,rw /
+    sudo timedatectl set-timezone America/New_York
+    sudo timedatectl set-ntp true
+    sudo mount -o remount,ro /
+  fi
+
   # start manager
   cd system/manager
   if [ ! -f $DIR/prebuilt ]; then

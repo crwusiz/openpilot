@@ -19,9 +19,7 @@ def get_radar_can_parser(CP):
   if DBC[CP.carFingerprint]['radar'] is None or not radar_tracks_enable:
     return None
 
-  print()
-  print("RadarInterface: RadarTracks...")
-  print()
+  print("\nRadarInterface: RadarTracks...\n")
   messages = [(f"RADAR_TRACK_{addr:x}", 50) for addr in range(RADAR_START_ADDR, RADAR_START_ADDR + RADAR_MSG_COUNT)]
   return CANParser(DBC[CP.carFingerprint]['radar'], messages, 1)
 
@@ -30,9 +28,7 @@ def get_radar_can_parser_scc(CP):
 
   if CP.carFingerprint in CANFD_CAR:
     return None
-  print()
-  print("RadarInterface: SCC Radar (Bus{})".format( 2 if scc2 else 0))
-  print()
+  print("\nRadarInterface: SCC Radar (Bus{})\n".format(2 if scc2 else 0))
   messages = [("SCC11", 50)]
   return CANParser(DBC[CP.carFingerprint]['pt'], messages, 2 if scc2 else 0)
 
