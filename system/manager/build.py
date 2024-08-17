@@ -17,7 +17,7 @@ CACHE_DIR = Path("/data/scons_cache" if AGNOS else "/tmp/scons_cache")
 TOTAL_SCONS_NODES = 2820
 MAX_BUILD_PROGRESS = 100
 
-def build(spinner: Spinner, dirty: bool = False, minimal: bool = True) -> None:
+def build(spinner: Spinner, dirty: bool = False, minimal: bool = False) -> None:
   env = os.environ.copy()
   env['SCONS_PROGRESS'] = "1"
   nproc = os.cpu_count()
