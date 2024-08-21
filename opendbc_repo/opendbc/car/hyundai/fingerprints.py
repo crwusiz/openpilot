@@ -818,12 +818,14 @@ FW_VERSIONS = {
   },
   CAR.KIA_MOHAVE: { # (HM)
     (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00HM  MFC  AT KOR LHD 1.00 1.02 99211-2J720 201210',
       b'\xf1\x00HM  MFC  AT KOR LHD 1.00 1.00 99211-2J730 211220',
     ],
     (Ecu.fwdRadar, 0x7d0, None): [
       b'\xf1\x87991102J730\xf1\x00HM__ SCC -----      1.00 1.00 99110-2J730         ',
     ],
     (Ecu.eps, 0x7d4, None): [
+      b'\xf1\x8757700-2J800\xf1\x00HM  MDPS R 1.00 1.01 57700-2J700 4HS1R101',
       b'\xf1\x8757700-2J800\xf1\x00HM  MDPS R 1.00 1.02 57700-2J800 4HS1R102',
     ],
   },

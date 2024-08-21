@@ -87,7 +87,7 @@ function launch {
     mkdir ${PARAMS_ROOT}/crwusiz
   fi
 
-  FINGERPRINTS="$BASEDIR/selfdrive/car/fingerprints.py"
+  FINGERPRINTS="$BASEDIR/opendbc/car/fingerprints.py"
   grep -E '' "$FINGERPRINTS" | grep "HYUNDAI.HYUNDAI" | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Hyundai
   grep -E '' "$FINGERPRINTS" | grep "HYUNDAI.KIA" | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Kia
   grep -E '' "$FINGERPRINTS" | grep "HYUNDAI.GENESIS" | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Genesis
