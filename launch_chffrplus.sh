@@ -83,15 +83,15 @@ function launch {
 
   PARAMS_ROOT="/data/params"
 
-  if [ ! -d "${PARAMS_ROOT}/crwusiz" ] ; then
-    mkdir ${PARAMS_ROOT}/crwusiz
+  if [ ! -d "${PARAMS_ROOT}/crwusiz" ]; then
+    mkdir -p ${PARAMS_ROOT}/crwusiz
   fi
 
   FINGERPRINTS="$BASEDIR/opendbc/car/fingerprints.py"
-  grep -E '' "$FINGERPRINTS" | grep "HYUNDAI.HYUNDAI" | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Hyundai
-  grep -E '' "$FINGERPRINTS" | grep "HYUNDAI.KIA" | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Kia
-  grep -E '' "$FINGERPRINTS" | grep "HYUNDAI.GENESIS" | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Genesis
-  grep -E '' "$FINGERPRINTS" | grep 'GM.CHEVROLET' | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Gm
+  grep "HYUNDAI.HYUNDAI" "$FINGERPRINTS" | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Hyundai
+  grep "HYUNDAI.KIA" "$FINGERPRINTS" | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Kia
+  grep "HYUNDAI.GENESIS" "$FINGERPRINTS" | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Genesis
+  grep 'GM.CHEVROLET' "$FINGERPRINTS" | awk -F ': ' '{print $1}' | awk '{gsub(/^ +| +$/,"")}1' | sed 's/"//g' | sort > ${PARAMS_ROOT}/crwusiz/CarList_Gm
 
   MANUFACTURER=$(cat ${PARAMS_ROOT}/d/SelectedManufacturer)
   if [ "${MANUFACTURER}" = "HYUNDAI" ]; then
@@ -104,7 +104,7 @@ function launch {
     cp -f ${PARAMS_ROOT}/crwusiz/CarList_Gm ${PARAMS_ROOT}/crwusiz/CarList
   else
     pushd ${PARAMS_ROOT}/crwusiz
-    cat CarList_Hyundai CarList_Kia CarList_Genesis CarList_Gm > CarList
+    cat CarList_Hyundai CarList_Kia CarList_Genesis CarList_Gm | sort -u > CarList
     popd
   fi
 
