@@ -346,6 +346,12 @@ class CAR(Platforms):
     CarSpecs(mass=1873, wheelbase=2.79, steerRatio=13.7),
     flags=HyundaiFlags.EV,
   )
+  HYUNDAI_CASPER = HyundaiPlatformConfig(
+    [
+      HyundaiCarDocs("HYUNDAI CASPER (AX1)", "All", car_parts=CarParts.common([CarHarness.hyundai_a]))
+    ],
+    CarSpecs(mass=1060, wheelbase=2.4, steerRatio=14.3),
+  )
 
   # CanFD Hyundai
   HYUNDAI_SONATA_DN8_24 = HyundaiCanFDPlatformConfig(
