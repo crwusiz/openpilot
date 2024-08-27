@@ -198,9 +198,8 @@ def manager_thread() -> None:
       print(running)
 
     # tmux log upload
-    if log_timer % 60 == 0:
-      if os.path.isfile('/data/tmux_error.log'):
-        subprocess.run(['sh', '/data/openpilot/scripts/log_upload.sh'])
+    if log_timer % 500 == 0 and os.path.isfile('/data/tmux_error.log'):
+      subprocess.run(['sh', '/data/openpilot/scripts/log_upload.sh'])
 
     log_timer += 1
 

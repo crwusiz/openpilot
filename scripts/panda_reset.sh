@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-python /data/openpilot/panda/python/relay_reset.py
+python3 /data/openpilot/panda/python/relay_reset.py
