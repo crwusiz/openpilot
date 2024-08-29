@@ -332,6 +332,22 @@
         <source>controlsState dump upload&lt;br&gt;&lt;br&gt;Process?</source>
         <translation>controlsState 덤프 업로드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
     </message>
+    <message>
+        <source>log file not found</source>
+        <translation>로그 파일이 없습니다</translation>
+    </message>
+    <message>
+        <source>tmux console</source>
+        <translation>tmux 콘솔</translation>
+    </message>
+    <message>
+        <source>tmux console upload</source>
+        <translation>tmux 콘솔 업로드</translation>
+    </message>
+    <message>
+        <source>tmux console log upload&lt;br&gt;&lt;br&gt;Process?</source>
+        <translation>tmux 콘솔 로그 업로드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
+    </message>
 </context>
 <context>
     <name>ConfirmationDialog</name>
@@ -1152,11 +1168,11 @@ This may take up to a minute.</source>
     </message>
     <message>
         <source>GPS</source>
-        <translation>GPS</translation>
+        <translation type="vanished">GPS</translation>
     </message>
     <message>
         <source>SEARCH</source>
-        <translation>검색중</translation>
+        <translation type="vanished">검색중</translation>
     </message>
     <message>
         <source>--</source>

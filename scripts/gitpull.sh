@@ -42,5 +42,5 @@ if ping -c 3 8.8.8.8 > /dev/null 2>&1; then
 
   exec /data/openpilot/scripts/restart.sh
 else
-  echo "wifi not connect check your network" > /data/gitpull.log
+  echo "wifi not connect check your network" > /data/check_network.log
 fi
