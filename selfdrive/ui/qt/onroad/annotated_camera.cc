@@ -117,7 +117,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   left_blindspot = ce.getLeftBlindspot();
   right_blindspot = ce.getRightBlindspot();
   wifi_state = (int)ds.getNetworkStrength();
-  gps_state = sm["liveLocationKalman"].getLiveLocationKalman().getGpsOK();
   gpsBearing = ge.getBearingDeg();
   gpsVerticalAccuracy = ge.getVerticalAccuracy();
   gpsAltitude = ge.getAltitude();
@@ -383,12 +382,12 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
   // N direction icon (upper right 4)
   x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
   y = (btn_size / 2) + (UI_BORDER_SIZE * 20);
-  drawIconRotate(p, QPoint(x, y), direction_img, icon_bg, gps_state ? 0.8 : 0.2, gpsBearing);
+  drawIconRotate(p, QPoint(x, y), direction_img, icon_bg, gpsSatelliteCount != 0 ? 0.8 : 0.2, gpsBearing);
 
   // gps icon (upper right 3)
   x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 0.1);
   y = (btn_size / 2) + (UI_BORDER_SIZE * 20);
-  drawIcon(p, QPoint(x, y), gps_img, icon_bg, gps_state ? 0.8 : 0.2);
+  drawIcon(p, QPoint(x, y), gps_img, icon_bg, gpsSatelliteCount != 0 ? 0.8 : 0.2);
 
   if (wifi_state == 1) {
     wifi_img = wifi_l_img;

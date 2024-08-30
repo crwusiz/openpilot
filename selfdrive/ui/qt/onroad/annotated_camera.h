@@ -56,7 +56,6 @@ private:
   bool hideBottomIcons = false;
   bool brake_state = false;
   bool left_blindspot, right_blindspot = false;
-  bool gps_state = false;
   bool longControl = false;
   bool left_on, right_on = false;
   bool v_ego_cluster_seen = false;
@@ -83,7 +82,6 @@ private:
   float steerAngle, steerRatio = 0;
   float fl, fr, rl, rr = 0;
   float roadLimitSpeed, navLimitSpeed = 0;
-  float latAccelFactor, friction, latAccelFactorRaw, frictionRaw = 0;
   float dm_fade_state = 1.0;
   Params params;
 
