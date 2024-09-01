@@ -229,14 +229,14 @@ void ui_update_params(UIState *s) {
 }
 
 void UIState::updateStatus() {
-  if (scene.started && sm->updated("controlsState")) {
-    auto cs = (*sm)["controlsState"].getControlsState();
-    auto state = cs.getState();
-    if (state == cereal::ControlsState::OpenpilotState::PRE_ENABLED || state == cereal::ControlsState::OpenpilotState::OVERRIDING) {
+  if (scene.started && sm->updated("selfdriveState")) {
+    auto ss = (*sm)["selfdriveState"].getSelfdriveState();
+    auto state = ss .getState();
+    if (state == cereal::SelfdriveState::OpenpilotState::PRE_ENABLED || state == cereal::SelfdriveState::OpenpilotState::OVERRIDING) {
       status = STATUS_OVERRIDE;
     } else {
-      status = cs.getEnabled() ? STATUS_ENGAGED : STATUS_DISENGAGED;
-      scene.engaged = cs.getEnabled();
+      status = ss.getEnabled() ? STATUS_ENGAGED : STATUS_DISENGAGED;
+      scene.engaged = ss.getEnabled();
     }
   }
 
@@ -269,7 +269,7 @@ UIState::UIState(QObject *parent) : QObject(parent) {
   sm = std::make_unique<SubMaster>(std::vector<const char*>{
     "modelV2", "controlsState", "liveCalibration", "radarState", "deviceState",
     "pandaStates", "carParams", "driverMonitoringState", "carState", "driverStateV2",
-    "wideRoadCameraState", "managerState", "clocks",
+    "wideRoadCameraState", "managerState", "selfdriveState",
     "longitudinalPlan", "naviData", "gpsLocationExternal" ,"ubloxGnss",
   });
 

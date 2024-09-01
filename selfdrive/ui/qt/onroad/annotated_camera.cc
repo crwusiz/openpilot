@@ -105,7 +105,7 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   speed *= is_metric ? MS_TO_KPH : MS_TO_MPH;
 
   speedUnit = is_metric ? tr("km/h") : tr("mph");
-  hideBottomIcons = (cs.getAlertSize() != cereal::ControlsState::AlertSize::NONE);
+  hideBottomIcons = (sm["selfdriveState"].getSelfdriveState().getAlertSize() != cereal::SelfdriveState::AlertSize::NONE);
   status = s.status;
 
   accel = ce.getAEgo();
@@ -644,7 +644,7 @@ void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
 
   // paint path
   QLinearGradient bg(0, height(), 0, 0);
-  //if (sm["controlsState"].getControlsState().getExperimentalMode()) {
+  //if (sm["selfdriveState"].getSelfdriveState().getExperimentalMode()) {
   if (scene.engaged) {
     if (scene.steeringPressed) {
       // The user is applying torque to the steering wheel
@@ -832,7 +832,7 @@ void AnnotatedCameraWidget::paintGL() {
       } else if (v_ego > 15) {
         wide_cam_requested = false;
       }
-      //wide_cam_requested = wide_cam_requested && sm["controlsState"].getControlsState().getExperimentalMode();
+      //wide_cam_requested = wide_cam_requested && sm["selfdriveState"].getSelfdriveState().getExperimentalMode();
       // for replay of old routes, never go to widecam
       //wide_cam_requested = wide_cam_requested && s->scene.calibration_wide_valid;
     }

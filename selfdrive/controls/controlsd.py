@@ -44,7 +44,7 @@ TESTING_CLOSET = "TESTING_CLOSET" in os.environ
 IGNORE_PROCESSES = {"loggerd", "encoderd", "statsd"}
 
 ThermalStatus = log.DeviceState.ThermalStatus
-State = log.ControlsState.OpenpilotState
+State = log.SelfdriveState.OpenpilotState
 PandaType = log.PandaState.PandaType
 Desire = log.Desire
 LaneChangeState = log.LaneChangeState
@@ -78,7 +78,7 @@ class Controls:
     self.branch = get_short_branch()
 
     # Setup sockets
-    self.pm = messaging.PubMaster(['controlsState', 'carControl', 'onroadEvents'])
+    self.pm = messaging.PubMaster(['selfdriveState', 'controlsState', 'carControl', 'onroadEvents'])
 
     self.gps_location_service = get_gps_location_service(self.params)
     self.gps_packets = [self.gps_location_service]
@@ -669,6 +669,7 @@ class Controls:
       if any(not be.pressed and be.type == ButtonType.gapAdjustCruise for be in CS.buttonEvents):
         self.personality = (self.personality - 1) % 3
         self.params.put_nonblocking('LongitudinalPersonality', str(self.personality))
+        self.events.add(EventName.personalityChanged)
 
     return CC, lac_log
 
@@ -728,7 +729,8 @@ class Controls:
     if self.enabled:
       clear_event_types.add(ET.NO_ENTRY)
 
-    alerts = self.events.create_alerts(self.current_alert_types, [self.CP, CS, self.sm, self.is_metric, self.soft_disable_timer])
+    pers = {v: k for k, v in log.LongitudinalPersonality.schema.enumerants.items()}[self.personality]
+    alerts = self.events.create_alerts(self.current_alert_types, [self.CP, CS, self.sm, self.is_metric, self.soft_disable_timer, pers])
     self.AM.add_many(self.sm.frame, alerts)
     current_alert = self.AM.process_alerts(self.sm.frame, clear_event_types)
     if current_alert:
@@ -760,7 +762,6 @@ class Controls:
       controlsState.alertText2 = current_alert.alert_text_2
       controlsState.alertSize = current_alert.alert_size
       controlsState.alertStatus = current_alert.alert_status
-      controlsState.alertBlinkingRate = current_alert.alert_rate
       controlsState.alertType = current_alert.alert_type
       controlsState.alertSound = current_alert.audible_alert
 
@@ -797,6 +798,25 @@ class Controls:
       controlsState.lateralControlState.torqueState = lac_log
 
     self.pm.send('controlsState', dat)
+
+    # selfdriveState
+    ss_msg = messaging.new_message('selfdriveState')
+    ss_msg.valid = CS.canValid
+    ss = ss_msg.selfdriveState
+    if current_alert:
+      ss.alertText1 = current_alert.alert_text_1
+      ss.alertText2 = current_alert.alert_text_2
+      ss.alertSize = current_alert.alert_size
+      ss.alertStatus = current_alert.alert_status
+      ss.alertType = current_alert.alert_type
+      ss.alertSound = current_alert.audible_alert
+    ss.enabled = self.enabled
+    ss.active = self.active
+    ss.state = self.state
+    ss.engageable = not self.events.contains(ET.NO_ENTRY)
+    ss.experimentalMode = self.experimental_mode
+    ss.personality = self.personality
+    self.pm.send('selfdriveState', ss_msg)
 
     # onroadEvents - logged every second or on change
     if (self.sm.frame % int(1. / DT_CTRL) == 0) or (self.events.names != self.events_prev):

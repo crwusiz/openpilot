@@ -117,8 +117,9 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     paramsdPermanentError @119;
     actuatorsApiUnavailable @120;
     espActive @121;
+    personalityChanged @122;
 
-    slowingDownSpeed @122;
+    slowingDownSpeed @128;
     slowingDownSpeedSound @123;
     cruiseOn @124;
     cruiseOff @125;

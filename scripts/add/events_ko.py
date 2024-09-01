@@ -12,8 +12,8 @@ from openpilot.common.git import get_short_branch
 from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.locationd.calibrationd import MIN_SPEED_FILTER
 
-AlertSize = log.ControlsState.AlertSize
-AlertStatus = log.ControlsState.AlertStatus
+AlertSize = log.SelfdriveState.AlertSize
+AlertStatus = log.SelfdriveState.AlertStatus
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 AudibleAlert = car.CarControl.HUDControl.AudibleAlert
 EventName = car.CarEvent.EventName
@@ -111,13 +111,12 @@ class Alert:
   def __init__(self,
                alert_text_1: str,
                alert_text_2: str,
-               alert_status: log.ControlsState.AlertStatus,
-               alert_size: log.ControlsState.AlertSize,
+               alert_status: log.SelfdriveState.AlertStatus,
+               alert_size: log.SelfdriveState.AlertSize,
                priority: Priority,
                visual_alert: car.CarControl.HUDControl.VisualAlert,
                audible_alert: car.CarControl.HUDControl.AudibleAlert,
                duration: float,
-               alert_rate: float = 0.,
                creation_delay: float = 0.):
 
     self.alert_text_1 = alert_text_1
@@ -130,7 +129,6 @@ class Alert:
 
     self.duration = int(duration / DT_CTRL)
 
-    self.alert_rate = alert_rate
     self.creation_delay = creation_delay
 
     self.alert_type = ""
@@ -207,35 +205,35 @@ def get_display_speed(speed_ms: float, metric: bool) -> str:
 
 # ********** alert callback functions **********
 
-AlertCallbackType = Callable[[car.CarParams, car.CarState, messaging.SubMaster, bool, int], Alert]
+AlertCallbackType = Callable[[car.CarParams, car.CarState, messaging.SubMaster, bool, int, log.ControlsState], Alert]
 
 
 def soft_disable_alert(alert_text_2: str) -> AlertCallbackType:
-  def func(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+  def func(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
     if soft_disable_time < int(0.5 / DT_CTRL):
       return ImmediateDisableAlert(alert_text_2)
     return SoftDisableAlert(alert_text_2)
   return func
 
 def user_soft_disable_alert(alert_text_2: str) -> AlertCallbackType:
-  def func(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+  def func(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
     if soft_disable_time < int(0.5 / DT_CTRL):
       return ImmediateDisableAlert(alert_text_2)
     return UserSoftDisableAlert(alert_text_2)
   return func
 
-def startup_master_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def startup_master_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   branch = get_short_branch()  # Ensure get_short_branch is cached to avoid lags on startup
   if "REPLAY" in os.environ:
     branch = "replay"
 
   return StartupAlert("경고: 이 브랜치는 테스트되지 않았습니다", branch, alert_status=AlertStatus.userPrompt)
 
-def below_engage_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def below_engage_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   return NoEntryAlert(f"{get_display_speed(CP.minEnableSpeed, metric)} 이상의 속도에서 활성됩니다")
 
 
-def below_steer_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def below_steer_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   return Alert(
     f"{get_display_speed(CP.minSteerSpeed, metric)} 이상의 속도에서 조향 됩니다",
     "",
@@ -243,7 +241,7 @@ def below_steer_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.S
     Priority.LOW, VisualAlert.steerRequired, AudibleAlert.prompt, 0.4)
 
 
-def calibration_incomplete_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def calibration_incomplete_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   first_word = '캘리브레이션을 다시' if sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.recalibrating else '캘리브레이션'
   return Alert(
     f"{first_word} 진행중 : {sm['liveCalibration'].calPerc:.0f}%",
@@ -254,37 +252,37 @@ def calibration_incomplete_alert(CP: car.CarParams, CS: car.CarState, sm: messag
 
 # *** debug alerts ***
 
-def out_of_space_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def out_of_space_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   full_perc = round(100. - sm['deviceState'].freeSpacePercent)
   return NormalPermanentAlert("저장공간이 부족합니다", f"{full_perc}% full")
 
 
-def posenet_invalid_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def posenet_invalid_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   mdl = sm['modelV2'].velocity.x[0] if len(sm['modelV2'].velocity.x) else math.nan
   err = CS.vEgo - mdl
   msg = f"Speed Error: {err:.1f} m/s"
   return NoEntryAlert(msg, alert_text_1="잘못된 Posenet 속도")
 
 
-def process_not_running_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def process_not_running_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   not_running = [p.name for p in sm['managerState'].processes if not p.running and p.shouldBeRunning]
   msg = ', '.join(not_running)
   return NoEntryAlert(msg, alert_text_1="프로세스가 실행되지 않았습니다")
 
 
-def comm_issue_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def comm_issue_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   bs = [s for s in sm.data.keys() if not sm.all_checks([s, ])]
   msg = ', '.join(bs[:4])  # can't fit too many on one line
   return NoEntryAlert(msg, alert_text_1="프로세스 동작오류")
 
 
-def camera_malfunction_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def camera_malfunction_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   all_cams = ('roadCameraState', 'driverCameraState', 'wideRoadCameraState')
   bad_cams = [s.replace('State', '') for s in all_cams if s in sm.data.keys() and not sm.all_checks([s, ])]
   return NormalPermanentAlert("카메라를 점검하세요", ', '.join(bad_cams))
 
 
-def calibration_invalid_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def calibration_invalid_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   rpy = sm['liveCalibration'].rpyCalib
   yaw = math.degrees(rpy[2] if len(rpy) == 3 else math.nan)
   pitch = math.degrees(rpy[1] if len(rpy) == 3 else math.nan)
@@ -292,27 +290,27 @@ def calibration_invalid_alert(CP: car.CarParams, CS: car.CarState, sm: messaging
   return NormalPermanentAlert("캘리브레이션 오류", angles)
 
 
-def overheat_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def overheat_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   cpu = max(sm['deviceState'].cpuTempC, default=0.)
   gpu = max(sm['deviceState'].gpuTempC, default=0.)
   temp = max((cpu, gpu, sm['deviceState'].memoryTempC))
   return NormalPermanentAlert("시스템 과열", f"{temp:.0f} °C")
 
 
-def low_memory_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def low_memory_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   return NormalPermanentAlert("메모리 부족", f"{sm['deviceState'].memoryUsagePercent}% used")
 
 
-def high_cpu_usage_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def high_cpu_usage_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   x = max(sm['deviceState'].cpuUsagePercent, default=0.)
   return NormalPermanentAlert("CPU 사용량이 높습니다", f"{x}% used")
 
 
-def modeld_lagging_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def modeld_lagging_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   return NormalPermanentAlert("주행모델 지연됨", f"{sm['modelV2'].frameDropPerc:.1f}% frames dropped")
 
 
-def wrong_car_mode_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def wrong_car_mode_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   text = "크루즈 버튼으로 활성화됩니다"
   if CP.carName == "honda":
     text = "메인 스위치로 활성화됩니다"
@@ -321,23 +319,26 @@ def wrong_car_mode_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
   return NoEntryAlert(text)
 
 
-def joystick_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def joystick_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   axes = sm['testJoystick'].axes
   gb, steer = list(axes)[:2] if len(axes) else (0., 0.)
   vals = f"Gas: {round(gb * 100.)}%, Steer: {round(steer * 100.)}%"
   return NormalPermanentAlert("조이스틱 모드", vals)
 
+def personality_changed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
+  personality = str(personality).title()
+  return NormalPermanentAlert(f"Driving Personality: {personality}", duration=1.5)
 
-def auto_lane_change_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def auto_lane_change_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   alc_timer = sm['modelV2'].meta.autoLaneChangeTimer
   return Alert(
     "자동차선변경이 %d초 뒤에 시작됩니다" % alc_timer,
     "차선의 차량을 확인하세요",
     AlertStatus.normal, AlertSize.mid,
-    Priority.LOW, VisualAlert.none, AudibleAlert.promptRepeat, .75, alert_rate=0.75)
+    Priority.LOW, VisualAlert.none, AudibleAlert.promptRepeat, .75)
 
 
-def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   if os.path.isfile('/data/can_missing.log'):
     with open('/data/can_missing.log', 'r') as f:
       f.readline()
@@ -492,7 +493,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       "핸들을 잡아주세요 : 운전자 인식 불가",
       "",
       AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.prompt, .1, alert_rate=0.75),
+      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.prompt, .1),
   },
 
   EventName.promptDriverUnresponsive: {
@@ -536,7 +537,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       "좌측차선으로 차선을 변경합니다",
       "",
       AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, .1, alert_rate=0.75),
+      Priority.LOW, VisualAlert.none, AudibleAlert.none, .1),
   },
 
   EventName.preLaneChangeRight: {
@@ -544,7 +545,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       "우측차선으로 차선을 변경합니다",
       "",
       AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, .1, alert_rate=0.75),
+      Priority.LOW, VisualAlert.none, AudibleAlert.none, .1),
   },
 
   EventName.laneChangeBlocked: {
@@ -1005,6 +1006,10 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("차량 센서 보정"),
   },
 
+  EventName.personalityChanged: {
+    ET.WARNING: personality_changed_alert,
+  },
+
   EventName.turningIndicatorOn: {
     ET.WARNING: Alert(
       "방향지시등 동작중에는 핸들을 잡아주세요",
@@ -1053,7 +1058,7 @@ if __name__ == '__main__':
   for i, alerts in EVENTS.items():
     for et, alert in alerts.items():
       if callable(alert):
-        alert = alert(CP, CS, sm, False, 1)
+        alert = alert(CP, CS, sm, False, 1, log.LongitudinalPersonality.standard)
       alerts_by_type[et][alert.priority].append(event_names[i])
 
   all_alerts: dict[str, list[tuple[Priority, list[str]]]] = {}
