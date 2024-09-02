@@ -623,29 +623,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
 
-  auto tmux_error_log_btn = new ButtonControl(tr("tmux log"), tr("VIEW"));
-  QObject::connect(tmux_error_log_btn, &ButtonControl::clicked, [=]() {
-    const QString file_path = "/data/tmux_error.log";
-    if (QFile::exists(file_path)) {
-      const std::string txt = util::read_file(file_path.toStdString());
-      ConfirmationDialog::rich(QString::fromStdString(txt), this);
-    } else {
-      ConfirmationDialog::rich(tr("log file not found"), this);
-    }
-  });
-
-  auto tmux_error_log_upload_btn = new ButtonControl(tr("tmux log upload"), tr("RUN"));
-  QObject::connect(tmux_error_log_upload_btn, &ButtonControl::clicked, [=]() {
-    const QString file_path = "/data/tmux_error.log";
-    if (QFile::exists(file_path)) {
-      if (ConfirmationDialog::confirm(tr("tmux log upload<br><br>Process?"), tr("Process"), this)) {
-        QProcess::execute("/data/openpilot/scripts/log_upload.sh tmux_error.log");
-      }
-    } else {
-      ConfirmationDialog::rich(tr("log file not found"), this);
-    }
-  });
-
   auto can_missing_error_log_btn = new ButtonControl(tr("can missing log"), tr("VIEW"));
   QObject::connect(can_missing_error_log_btn, &ButtonControl::clicked, [=]() {
     const QString file_path = "/data/can_missing.log";
@@ -668,6 +645,29 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
 
+  auto tmux_error_log_btn = new ButtonControl(tr("tmux log"), tr("VIEW"));
+  QObject::connect(tmux_error_log_btn, &ButtonControl::clicked, [=]() {
+    const QString file_path = "/data/tmux_error.log";
+    if (QFile::exists(file_path)) {
+      const std::string txt = util::read_file(file_path.toStdString());
+      ConfirmationDialog::rich(QString::fromStdString(txt), this);
+    } else {
+      ConfirmationDialog::rich(tr("log file not found"), this);
+    }
+  });
+
+  auto tmux_error_log_upload_btn = new ButtonControl(tr("tmux log"), tr("UPLOAD"));
+  QObject::connect(tmux_error_log_upload_btn, &ButtonControl::clicked, [=]() {
+    const QString file_path = "/data/tmux_error.log";
+    if (QFile::exists(file_path)) {
+      if (ConfirmationDialog::confirm(tr("tmux log upload<br><br>Process?"), tr("Process"), this)) {
+        QProcess::execute("/data/openpilot/scripts/log_upload.sh tmux_error.log");
+      }
+    } else {
+      ConfirmationDialog::rich(tr("log file not found"), this);
+    }
+  });
+
   auto tmux_console = new ButtonControl(tr("tmux console"), tr("VIEW"));
   QObject::connect(tmux_console, &ButtonControl::clicked, [=]() {
     QProcess process;
@@ -679,7 +679,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     ConfirmationDialog::rich(output, this);
   });
 
-  auto tmux_console_upload = new ButtonControl(tr("tmux console upload"), tr("VIEW"));
+  auto tmux_console_upload = new ButtonControl(tr("tmux console"), tr("UPLOAD"));
   QObject::connect(tmux_console_upload, &ButtonControl::clicked, [=]() {
     int exitCode = QProcess::execute("sh", QStringList() << "-c" << "tmux capture-pane -p -t 0 -S -250 > /data/tmux_console.log");
     if (exitCode == 0) {
@@ -691,95 +691,90 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
 
-  auto carparams_dump_upload_btn = new ButtonControl(tr("carParams dump upload"), tr("RUN"));
+  auto carparams_dump_upload_btn = new ButtonControl(tr("carParams dump"), tr("UPLOAD"));
   QObject::connect(carparams_dump_upload_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("carParams dump upload<br><br>Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/dump_upload.sh carParams");
     }
   });
 
-  auto carstate_dump_upload_btn = new ButtonControl(tr("carState dump upload"), tr("RUN"));
+  auto carstate_dump_upload_btn = new ButtonControl(tr("carState dump"), tr("UPLOAD"));
   QObject::connect(carstate_dump_upload_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("carState dump upload<br><br>Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/dump_upload.sh carState");
     }
   });
 
-  auto carcontrol_dump_upload_btn = new ButtonControl(tr("carControl dump upload"), tr("RUN"));
+  auto carcontrol_dump_upload_btn = new ButtonControl(tr("carControl dump"), tr("UPLOAD"));
   QObject::connect(carcontrol_dump_upload_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("carControl dump upload<br><br>Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/dump_upload.sh carControl");
     }
   });
 
-  auto controlsstate_dump_upload_btn = new ButtonControl(tr("controlsState dump upload"), tr("RUN"));
+  auto controlsstate_dump_upload_btn = new ButtonControl(tr("controlsState dump"), tr("UPLOAD"));
   QObject::connect(controlsstate_dump_upload_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("controlsState dump upload<br><br>Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/dump_upload.sh controlsState");
     }
   });
 
-  auto devicestate_dump_upload_btn = new ButtonControl(tr("deviceState dump upload"), tr("RUN"));
+  auto devicestate_dump_upload_btn = new ButtonControl(tr("deviceState dump"), tr("UPLOAD"));
   QObject::connect(devicestate_dump_upload_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("deviceState dump upload<br><br>Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/dump_upload.sh deviceState");
     }
   });
 
-  auto pandastates_dump_upload_btn = new ButtonControl(tr("pandaStates dump upload"), tr("RUN"));
+  auto pandastates_dump_upload_btn = new ButtonControl(tr("pandaStates dump"), tr("UPLOAD"));
   QObject::connect(pandastates_dump_upload_btn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm(tr("pandaStates dump upload<br><br>Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/dump_upload.sh pandaStates");
     }
   });
 
-  QHBoxLayout *btn = new QHBoxLayout;
-  btn->addWidget(vertical_line());
-  btn->addWidget(selectBranch_btn);
-  btn->addWidget(vertical_line());
-  btn->addWidget(cleardtc_btn);
-  btn->addWidget(vertical_line());
+  QGridLayout *gridLayout = new QGridLayout;
 
-  selectBranch_btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  gridLayout->addWidget(vertical_line(), 0, 0);
+  gridLayout->addWidget(selectBranch_btn, 0, 1);
+  gridLayout->addWidget(vertical_line(), 0, 2);
+  gridLayout->addWidget(cleardtc_btn, 0, 3);
+  gridLayout->addWidget(vertical_line(), 0, 4);
 
-  QHBoxLayout *git_btn = new QHBoxLayout;
-  git_btn->addWidget(vertical_line());
-  git_btn->addWidget(gitcheckout_btn);
-  git_btn->addWidget(vertical_line());
-  git_btn->addWidget(gitpull_btn);
-  git_btn->addWidget(vertical_line());
+  gridLayout->addWidget(horizontal_line(), 1, 0, 1, 5);
 
-  QHBoxLayout *tmux_error_btn = new QHBoxLayout;
-  tmux_error_btn->addWidget(vertical_line());
-  tmux_error_btn->addWidget(tmux_error_log_btn);
-  tmux_error_btn->addWidget(vertical_line());
-  tmux_error_btn->addWidget(tmux_error_log_upload_btn);
-  tmux_error_btn->addWidget(vertical_line());
+  gridLayout->addWidget(vertical_line(), 2, 0);
+  gridLayout->addWidget(gitcheckout_btn, 2, 1);
+  gridLayout->addWidget(vertical_line(), 2, 2);
+  gridLayout->addWidget(gitpull_btn, 2, 3);
+  gridLayout->addWidget(vertical_line(), 2, 4);
 
-  QHBoxLayout *tmux_console_btn = new QHBoxLayout;
-  tmux_console_btn->addWidget(vertical_line());
-  tmux_console_btn->addWidget(tmux_console);
-  tmux_console_btn->addWidget(vertical_line());
-  tmux_console_btn->addWidget(tmux_console_upload);
-  tmux_console_btn->addWidget(vertical_line());
+  gridLayout->addWidget(horizontal_line(), 3, 0, 1, 5);
 
-  QHBoxLayout *can_error_btn = new QHBoxLayout;
-  can_error_btn->addWidget(vertical_line());
-  can_error_btn->addWidget(can_missing_error_log_btn);
-  can_error_btn->addWidget(vertical_line());
-  can_error_btn->addWidget(can_timeout_error_log_btn);
-  can_error_btn->addWidget(vertical_line());
+  gridLayout->addWidget(vertical_line(), 4, 0);
+  gridLayout->addWidget(tmux_error_log_btn, 4, 1);
+  gridLayout->addWidget(vertical_line(), 4, 2);
+  gridLayout->addWidget(tmux_error_log_upload_btn, 4, 3);
+  gridLayout->addWidget(vertical_line(), 4, 4);
+
+  gridLayout->addWidget(horizontal_line(), 5, 0, 1, 5);
+
+  gridLayout->addWidget(vertical_line(), 6, 0);
+  gridLayout->addWidget(tmux_console, 6, 1);
+  gridLayout->addWidget(vertical_line(), 6, 2);
+  gridLayout->addWidget(tmux_console_upload, 6, 3);
+  gridLayout->addWidget(vertical_line(), 6, 4);
+
+  gridLayout->addWidget(horizontal_line(), 7, 0, 1, 5);
+
+  gridLayout->addWidget(vertical_line(), 8, 0);
+  gridLayout->addWidget(can_missing_error_log_btn, 8, 1);
+  gridLayout->addWidget(vertical_line(), 8, 2);
+  gridLayout->addWidget(can_timeout_error_log_btn, 8, 3);
+  gridLayout->addWidget(vertical_line(), 8, 4);
 
   communityLayout->addWidget(horizontal_line());
-  communityLayout->addLayout(btn);
-  communityLayout->addWidget(horizontal_line());
-  communityLayout->addLayout(git_btn);
-  communityLayout->addWidget(horizontal_line());
-  communityLayout->addLayout(tmux_error_btn);
-  communityLayout->addWidget(horizontal_line());
-  communityLayout->addLayout(tmux_console_btn);
-  communityLayout->addWidget(horizontal_line());
-  communityLayout->addLayout(can_error_btn);
+  communityLayout->addLayout(gridLayout);
   communityLayout->addWidget(horizontal_line());
 
   // add community toggle
@@ -854,66 +849,48 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     }
   });
 
-  QHBoxLayout *panda_btn = new QHBoxLayout;
-  panda_btn->addWidget(vertical_line());
-  panda_btn->addWidget(pandaflash_btn);
-  panda_btn->addWidget(vertical_line());
-  panda_btn->addWidget(pandarecover_btn);
-  panda_btn->addWidget(vertical_line());
+  QGridLayout *gridLayout2 = new QGridLayout;
 
-  QHBoxLayout *ext_btn = new QHBoxLayout;
-  ext_btn->addWidget(vertical_line());
-  ext_btn->addWidget(gitreset_btn);
-  ext_btn->addWidget(vertical_line());
-  ext_btn->addWidget(scons_rebuild_btn);
-  ext_btn->addWidget(vertical_line());
+  gridLayout2->addWidget(vertical_line(), 0, 0);
+  gridLayout2->addWidget(pandaflash_btn, 0, 1);
+  gridLayout2->addWidget(vertical_line(), 0, 2);
+  gridLayout2->addWidget(pandarecover_btn, 0, 3);
+  gridLayout2->addWidget(vertical_line(), 0, 4);
 
-  QHBoxLayout *cp_upload_btn = new QHBoxLayout;
-  cp_upload_btn->addWidget(vertical_line());
-  cp_upload_btn->addWidget(carparams_dump_upload_btn);
-  cp_upload_btn->addWidget(vertical_line());
+  gridLayout2->addWidget(horizontal_line(), 1, 0, 1, 5);
 
-  QHBoxLayout *cs_upload_btn = new QHBoxLayout;
-  cs_upload_btn->addWidget(vertical_line());
-  cs_upload_btn->addWidget(carstate_dump_upload_btn);
-  cs_upload_btn->addWidget(vertical_line());
+  gridLayout2->addWidget(vertical_line(), 2, 0);
+  gridLayout2->addWidget(gitreset_btn, 2, 1);
+  gridLayout2->addWidget(vertical_line(), 2, 2);
+  gridLayout2->addWidget(scons_rebuild_btn, 2, 3);
+  gridLayout2->addWidget(vertical_line(), 2, 4);
 
-  QHBoxLayout *cc_upload_btn = new QHBoxLayout;
-  cc_upload_btn->addWidget(vertical_line());
-  cc_upload_btn->addWidget(carcontrol_dump_upload_btn);
-  cc_upload_btn->addWidget(vertical_line());
+  gridLayout2->addWidget(horizontal_line(), 3, 0, 1, 5);
 
-  QHBoxLayout *css_upload_btn = new QHBoxLayout;
-  css_upload_btn->addWidget(vertical_line());
-  css_upload_btn->addWidget(controlsstate_dump_upload_btn);
-  css_upload_btn->addWidget(vertical_line());
+  gridLayout2->addWidget(vertical_line(), 4, 0);
+  gridLayout2->addWidget(carparams_dump_upload_btn, 4, 1);
+  gridLayout2->addWidget(vertical_line(), 4, 2);
+  gridLayout2->addWidget(carstate_dump_upload_btn, 4, 3);
+  gridLayout2->addWidget(vertical_line(), 4, 4);
 
-  QHBoxLayout *ds_upload_btn = new QHBoxLayout;
-  ds_upload_btn->addWidget(vertical_line());
-  ds_upload_btn->addWidget(devicestate_dump_upload_btn);
-  ds_upload_btn->addWidget(vertical_line());
+  gridLayout2->addWidget(horizontal_line(), 5, 0, 1, 5);
 
-  QHBoxLayout *ps_upload_btn = new QHBoxLayout;
-  ps_upload_btn->addWidget(vertical_line());
-  ps_upload_btn->addWidget(pandastates_dump_upload_btn);
-  ps_upload_btn->addWidget(vertical_line());
+  gridLayout2->addWidget(vertical_line(), 6, 0);
+  gridLayout2->addWidget(carcontrol_dump_upload_btn, 6, 1);
+  gridLayout2->addWidget(vertical_line(), 6, 2);
+  gridLayout2->addWidget(controlsstate_dump_upload_btn, 6, 3);
+  gridLayout2->addWidget(vertical_line(), 6, 4);
+
+  gridLayout2->addWidget(horizontal_line(), 7, 0, 1, 5);
+
+  gridLayout2->addWidget(vertical_line(), 8, 0);
+  gridLayout2->addWidget(devicestate_dump_upload_btn, 8, 1);
+  gridLayout2->addWidget(vertical_line(), 8, 2);
+  gridLayout2->addWidget(pandastates_dump_upload_btn, 8, 3);
+  gridLayout2->addWidget(vertical_line(), 8, 4);
 
   communityLayout->addWidget(horizontal_line());
-  communityLayout->addLayout(panda_btn);
-  communityLayout->addWidget(horizontal_line());
-  communityLayout->addLayout(ext_btn);
-  communityLayout->addWidget(horizontal_line());
-  communityLayout->addLayout(cp_upload_btn);
-  communityLayout->addWidget(horizontal_line());
-  communityLayout->addLayout(cs_upload_btn);
-  communityLayout->addWidget(horizontal_line());
-  communityLayout->addLayout(cc_upload_btn);
-  communityLayout->addWidget(horizontal_line());
-  communityLayout->addLayout(css_upload_btn);
-  communityLayout->addWidget(horizontal_line());
-  communityLayout->addLayout(ds_upload_btn);
-  communityLayout->addWidget(horizontal_line());
-  communityLayout->addLayout(ps_upload_btn);
+  communityLayout->addLayout(gridLayout2);
   communityLayout->addWidget(horizontal_line());
 }
 

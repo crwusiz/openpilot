@@ -145,14 +145,6 @@
         <translation>시스템 부하를 줄이시려면 이 옵션을 끄세요</translation>
     </message>
     <message>
-        <source>Navigation Enable</source>
-        <translation type="vanished">내비게이션 사용</translation>
-    </message>
-    <message>
-        <source>Navigation Features use</source>
-        <translation type="vanished">내비게이션 기능을 사용합니다</translation>
-    </message>
-    <message>
         <source>Scc on Bus 2</source>
         <translation>Scc on Bus 2</translation>
     </message>
@@ -195,10 +187,6 @@
     <message>
         <source>can timeout log</source>
         <translation>can timeout 로그</translation>
-    </message>
-    <message>
-        <source>Use external navi routes</source>
-        <translation type="vanished">외부 내비 경로 사용</translation>
     </message>
     <message>
         <source>Select Branch</source>
@@ -245,10 +233,6 @@
         <translation>레이더 트랙을 활성화 합니다 (차량의 AEB는 비활성화됩니다)</translation>
     </message>
     <message>
-        <source>tmux log upload</source>
-        <translation>tmux 로그 업로드</translation>
-    </message>
-    <message>
         <source>tmux log upload&lt;br&gt;&lt;br&gt;Process?</source>
         <translation>tmux 로그 업로드&lt;br&gt;&lt;br&gt;실행하시겠습니까?</translation>
     </message>
@@ -277,32 +261,16 @@
         <translation>Scons 재빌드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
     </message>
     <message>
-        <source>carState dump upload</source>
-        <translation>carState 덤프 업로드</translation>
-    </message>
-    <message>
         <source>carState dump upload&lt;br&gt;&lt;br&gt;Process?</source>
         <translation>carState 덤프 업로드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
-    </message>
-    <message>
-        <source>carParams dump upload</source>
-        <translation>carParams 덤프 업로드</translation>
     </message>
     <message>
         <source>carParams dump upload&lt;br&gt;&lt;br&gt;Process?</source>
         <translation>carParams 덤프 업로드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
     </message>
     <message>
-        <source>deviceState dump upload</source>
-        <translation>deviceState 덤프 업로드</translation>
-    </message>
-    <message>
         <source>deviceState dump upload&lt;br&gt;&lt;br&gt;Process?</source>
         <translation>deviceState 덤프 업로드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
-    </message>
-    <message>
-        <source>pandaStates dump upload</source>
-        <translation>pandaStates 덤프 업로드</translation>
     </message>
     <message>
         <source>pandaStates dump upload&lt;br&gt;&lt;br&gt;Process?</source>
@@ -317,16 +285,8 @@
         <translation>Git 리셋&lt;br&gt;&lt;br&gt;실행할까요?</translation>
     </message>
     <message>
-        <source>carControl dump upload</source>
-        <translation>carControl 덤프 업로드</translation>
-    </message>
-    <message>
         <source>carControl dump upload&lt;br&gt;&lt;br&gt;Process?</source>
         <translation>carControl 덤프 업로드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
-    </message>
-    <message>
-        <source>controlsState dump upload</source>
-        <translation>controlsState 덤프 업로드</translation>
     </message>
     <message>
         <source>controlsState dump upload&lt;br&gt;&lt;br&gt;Process?</source>
@@ -341,12 +301,36 @@
         <translation>tmux 콘솔</translation>
     </message>
     <message>
-        <source>tmux console upload</source>
-        <translation>tmux 콘솔 업로드</translation>
-    </message>
-    <message>
         <source>tmux console log upload&lt;br&gt;&lt;br&gt;Process?</source>
         <translation>tmux 콘솔 로그 업로드&lt;br&gt;&lt;br&gt;실행할까요?</translation>
+    </message>
+    <message>
+        <source>UPLOAD</source>
+        <translation>업로드</translation>
+    </message>
+    <message>
+        <source>carParams dump</source>
+        <translation>carParams 덤프</translation>
+    </message>
+    <message>
+        <source>carState dump</source>
+        <translation>carState 덤프</translation>
+    </message>
+    <message>
+        <source>carControl dump</source>
+        <translation>carControl 덤프</translation>
+    </message>
+    <message>
+        <source>controlsState dump</source>
+        <translation>controlsState 덤프</translation>
+    </message>
+    <message>
+        <source>deviceState dump</source>
+        <translation>deviceState 덤프</translation>
+    </message>
+    <message>
+        <source>pandaStates dump</source>
+        <translation>pandaStates 덤프</translation>
     </message>
 </context>
 <context>
@@ -373,33 +357,6 @@
     <message>
         <source>Decline, uninstall %1</source>
         <translation>거절, %1 제거</translation>
-    </message>
-</context>
-<context>
-    <name>DestinationWidget</name>
-    <message>
-        <source>Home</source>
-        <translation type="vanished">집</translation>
-    </message>
-    <message>
-        <source>Work</source>
-        <translation type="vanished">회사</translation>
-    </message>
-    <message>
-        <source>No destination set</source>
-        <translation type="vanished">목적지가 설정되지 않았습니다</translation>
-    </message>
-    <message>
-        <source>No %1 location set</source>
-        <translation type="vanished">%1 위치가 설정되지 않았습니다</translation>
-    </message>
-    <message>
-        <source>home</source>
-        <translation type="vanished">집</translation>
-    </message>
-    <message>
-        <source>work</source>
-        <translation type="vanished">회사</translation>
     </message>
 </context>
 <context>
@@ -550,33 +507,6 @@
     </message>
 </context>
 <context>
-    <name>DriveStats</name>
-    <message>
-        <source>Drives</source>
-        <translation type="vanished">주행수</translation>
-    </message>
-    <message>
-        <source>Hours</source>
-        <translation type="vanished">시간</translation>
-    </message>
-    <message>
-        <source>ALL TIME</source>
-        <translation type="vanished">전체 시간</translation>
-    </message>
-    <message>
-        <source>KM</source>
-        <translation type="vanished">KM</translation>
-    </message>
-    <message>
-        <source>Miles</source>
-        <translation type="vanished">Miles</translation>
-    </message>
-    <message>
-        <source>Drive Stats</source>
-        <translation type="vanished">운행 기록</translation>
-    </message>
-</context>
-<context>
     <name>DriverViewWindow</name>
     <message>
         <source>camera starting</source>
@@ -612,47 +542,6 @@
     <message>
         <source>Installing...</source>
         <translation>설치 중...</translation>
-    </message>
-</context>
-<context>
-    <name>MapETA</name>
-    <message>
-        <source>eta</source>
-        <translation type="vanished">도착</translation>
-    </message>
-    <message>
-        <source>min</source>
-        <translation type="vanished">분</translation>
-    </message>
-    <message>
-        <source>hr</source>
-        <translation type="vanished">시간</translation>
-    </message>
-</context>
-<context>
-    <name>MapSettings</name>
-    <message>
-        <source>NAVIGATION</source>
-        <translation type="vanished">내비게이션</translation>
-    </message>
-    <message>
-        <source>Manage at connect.comma.ai</source>
-        <translation type="vanished">connect.comma.ai에서 관리하세요</translation>
-    </message>
-</context>
-<context>
-    <name>MapWindow</name>
-    <message>
-        <source>Map Loading</source>
-        <translation type="vanished">지도 로딩 중</translation>
-    </message>
-    <message>
-        <source>Waiting for GPS</source>
-        <translation type="vanished">GPS 수신 중</translation>
-    </message>
-    <message>
-        <source>Waiting for route</source>
-        <translation type="vanished">경로를 기다리는 중</translation>
     </message>
 </context>
 <context>
@@ -827,10 +716,6 @@
     <message>
         <source>24/7 LTE connectivity</source>
         <translation>항상 LTE 연결</translation>
-    </message>
-    <message>
-        <source>Turn-by-turn navigation</source>
-        <translation type="vanished">내비게이션 경로안내</translation>
     </message>
     <message>
         <source>1 year of drive storage</source>
@@ -1167,14 +1052,6 @@ This may take up to a minute.</source>
         <translation>PANDA</translation>
     </message>
     <message>
-        <source>GPS</source>
-        <translation type="vanished">GPS</translation>
-    </message>
-    <message>
-        <source>SEARCH</source>
-        <translation type="vanished">검색중</translation>
-    </message>
-    <message>
         <source>--</source>
         <translation>────────</translation>
     </message>
@@ -1392,22 +1269,6 @@ This may take up to a minute.</source>
     <message>
         <source>When enabled, pressing the accelerator pedal will disengage openpilot.</source>
         <translation>활성화된 경우 가속 페달을 밟으면 openpilot이 해제됩니다.</translation>
-    </message>
-    <message>
-        <source>Show ETA in 24h Format</source>
-        <translation type="vanished">24시간 형식으로 도착 예정 시간 표시</translation>
-    </message>
-    <message>
-        <source>Use 24h format instead of am/pm</source>
-        <translation type="vanished">오전/오후 대신 24시간 형식 사용</translation>
-    </message>
-    <message>
-        <source>Show Map on Left Side of UI</source>
-        <translation type="vanished">UI 왼쪽에 지도 표시</translation>
-    </message>
-    <message>
-        <source>Show map on left side when in split screen view.</source>
-        <translation type="vanished">분할 화면 보기에서 지도를 왼쪽에 표시합니다.</translation>
     </message>
     <message>
         <source>Experimental Mode</source>
