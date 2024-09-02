@@ -13,7 +13,7 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 SYNC_MARGIN = 3.
 MIN_CURVE_SPEED = 32. * CV.KPH_TO_MS
 
-EventName = car.CarEvent.EventName
+EventName = car.OnroadEvent.EventName
 ButtonType = car.CarState.ButtonEvent.Type
 
 

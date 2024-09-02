@@ -26,7 +26,7 @@ from openpilot.selfdrive.controls.neokii.speed_controller import SpeedController
 
 REPLAY = "REPLAY" in os.environ
 
-EventName = car.CarEvent.EventName
+EventName = car.OnroadEvent.EventName
 
 # forward
 carlog.addHandler(ForwardingHandler(cloudlog))

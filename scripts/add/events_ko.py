@@ -16,7 +16,7 @@ AlertSize = log.SelfdriveState.AlertSize
 AlertStatus = log.SelfdriveState.AlertStatus
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 AudibleAlert = car.CarControl.HUDControl.AudibleAlert
-EventName = car.CarEvent.EventName
+EventName = car.OnroadEvent.EventName
 
 
 # Alert priorities

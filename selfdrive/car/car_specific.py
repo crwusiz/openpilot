@@ -11,7 +11,7 @@ from openpilot.selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
 
 ButtonType = structs.CarState.ButtonEvent.Type
 GearShifter = structs.CarState.GearShifter
-EventName = car.CarEvent.EventName
+EventName = car.OnroadEvent.EventName
 NetworkLocation = structs.CarParams.NetworkLocation
 
 
