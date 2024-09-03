@@ -6,7 +6,7 @@ from cereal import car
 from opendbc.car.hyundai.values import Buttons
 from openpilot.common.conversions import Conversions as CV
 from openpilot.common.params import Params
-from openpilot.selfdrive.controls.lib.drive_helpers import (VCruiseHelper, V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_UNSET)
+from openpilot.selfdrive.car.cruise import (VCruiseHelper, V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_UNSET)
 from openpilot.selfdrive.controls.neokii.navi_controller import SpeedLimiter
 from openpilot.selfdrive.modeld.constants import ModelConstants
 

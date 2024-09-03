@@ -87,8 +87,8 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   const bool cs_alive = sm.alive("controlsState");
 
   // Handle older routes where vCruiseCluster is not set
-  apply_speed = cs.getVCruise();
-  cruise_speed = cs.getVCruiseCluster() == 0.0 ? cs.getVCruise() : cs.getVCruiseCluster();
+  apply_speed = ce.getVCruise();
+  cruise_speed = ce.getVCruiseCluster();
   is_cruise_set = cruise_speed > 0 && (int)cruise_speed != SET_SPEED_NA && ce.getCruiseState().getSpeed();
   is_metric = s.scene.is_metric;
 
