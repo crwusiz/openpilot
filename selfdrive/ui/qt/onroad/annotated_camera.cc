@@ -76,7 +76,6 @@ static const QString get_tpms_text(float tpms) {
 void AnnotatedCameraWidget::updateState(const UIState &s) {
   const int SET_SPEED_NA = 255;
   const SubMaster &sm = *(s.sm);
-  const auto cs = sm["controlsState"].getControlsState();
   const auto ce = sm["carState"].getCarState();
   const auto cp = sm["carParams"].getCarParams();
   const auto ds = sm["deviceState"].getDeviceState();
