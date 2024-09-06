@@ -352,7 +352,6 @@ class LongitudinalMpc:
     self.cruise_min_a = min_a
     self.max_a = max_a
 
-
   def update(self, sm, v_cruise, x, v, a, j, personality=log.LongitudinalPersonality.standard):
     radarstate = sm['radarState']
     t_follow = get_T_FOLLOW(personality)

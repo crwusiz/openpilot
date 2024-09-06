@@ -15,9 +15,9 @@ from openpilot.system.version import get_build_metadata, get_version
 
 class SentryProject(Enum):
   # python project
-  SELFDRIVE = "https://cce3b2a710fba2ca03506be6abdbcffe@o4507393087111168.ingest.us.sentry.io/4507393109131264"
+  SELFDRIVE = "https://6f3c7076c1e14b2aa10f5dde6dda0cc4@o33823.ingest.sentry.io/77924"
   # native project
-  SELFDRIVE_NATIVE = "https://cce3b2a710fba2ca03506be6abdbcffe@o4507393087111168.ingest.us.sentry.io/4507393109131264"
+  SELFDRIVE_NATIVE = "https://3e4b586ed21a4479ad5d85083b639bc6@o33823.ingest.sentry.io/157615"
 
 
 def report_tombstone(fn: str, message: str, contents: str) -> None:

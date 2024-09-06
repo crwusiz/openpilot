@@ -161,6 +161,15 @@ def hw_state_thread(end_event, hw_queue):
     count += 1
     time.sleep(DT_HW)
 
+def update_restart_condition(current_time, restart_triggered_ts, params, onroad_conditions):
+  if current_time - restart_triggered_ts < 5.:
+    onroad_conditions["not_restart_triggered"] = False
+  else:
+    onroad_conditions["not_restart_triggered"] = True
+    if params.get_bool("SoftRestartTriggered"):
+      params.put_bool("SoftRestartTriggered", False)
+      restart_triggered_ts = current_time
+  return restart_triggered_ts
 
 def hardware_thread(end_event, hw_queue) -> None:
   pm = messaging.PubMaster(['deviceState'])
@@ -213,16 +222,8 @@ def hardware_thread(end_event, hw_queue) -> None:
     peripheralState = sm['peripheralState']
     peripheral_panda_present = peripheralState.pandaType != log.PandaState.PandaType.unknown
 
-    # neokii
     current_time = time.monotonic()
-    if current_time - restart_triggered_ts < 5.:
-      onroad_conditions["not_restart_triggered"] = False
-    else:
-      onroad_conditions["not_restart_triggered"] = True
-
-      if params.get_bool("SoftRestartTriggered"):
-        params.put_bool("SoftRestartTriggered", False)
-        restart_triggered_ts = current_time
+    restart_triggered_ts = update_restart_condition(current_time, restart_triggered_ts, params, onroad_conditions)
 
     if sm.updated['pandaStates'] and len(pandaStates) > 0:
 

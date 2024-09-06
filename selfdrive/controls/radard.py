@@ -1,20 +1,15 @@
 #!/usr/bin/env python3
-import importlib
 import math
 from collections import deque
 from typing import Any
 
 import capnp
 from cereal import messaging, log, car
-from opendbc.car import structs
 from openpilot.common.numpy_fast import interp
 from openpilot.common.params import Params
-from openpilot.common.realtime import DT_CTRL, Ratekeeper, Priority, config_realtime_process
+from openpilot.common.realtime import DT_MDL, Priority, config_realtime_process
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.simple_kalman import KF1D
-from openpilot.selfdrive.pandad import can_capnp_to_list
-
-from openpilot.selfdrive.modeld.constants import ModelConstants
 
 
 # Default lead acceleration decay set to 50% at 1s
@@ -128,7 +123,7 @@ def laplacian_pdf(x: float, mu: float, b: float):
   return math.exp(-abs(x-mu)/b)
 
 
-def match_vision_to_track(v_ego: float, model: capnp._DynamicStructReader, lead: capnp._DynamicStructReader, tracks: dict[int, Track]):
+def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks: dict[int, Track]):
   offset_vision_dist = lead.x[0] - RADAR_TO_CAMERA
 
   def prob(c):
@@ -143,13 +138,9 @@ def match_vision_to_track(v_ego: float, model: capnp._DynamicStructReader, lead:
 
   # if no 'sane' match is found return -1
   # stationary radar points can be false positives
-  dist_sane = abs(track.dRel - offset_vision_dist) < max([(offset_vision_dist)*.3, 5.0])
+  dist_sane = abs(track.dRel - offset_vision_dist) < max([(offset_vision_dist)*.25, 5.0])
   vel_sane = (abs(track.vRel + v_ego - lead.v[0]) < 10) or (v_ego + track.vRel > 3)
   if dist_sane and vel_sane:
-    if len(model.position.x) == ModelConstants.IDX_N:
-      path_y = interp(track.dRel, list(model.position.x), list(model.position.y))
-      if abs(path_y - track.yRel) < 2.:
-        return track
     return track
   else:
     return None
@@ -173,11 +164,11 @@ def get_RadarState_from_vision(lead_msg: capnp._DynamicStructReader, v_ego: floa
   }
 
 
-def get_lead(v_ego: float, ready: bool, tracks: dict[int, Track], model: capnp._DynamicStructReader, lead_msg: capnp._DynamicStructReader,
+def get_lead(v_ego: float, ready: bool, tracks: dict[int, Track], lead_msg: capnp._DynamicStructReader,
              model_v_ego: float, low_speed_override: bool = True) -> dict[str, Any]:
   # Determine leads, this is where the essential logic happens
   if len(tracks) > 0 and ready and lead_msg.prob > .5:
-    track = match_vision_to_track(v_ego, model, lead_msg, tracks)
+    track = match_vision_to_track(v_ego, lead_msg, tracks)
   else:
     track = None
 
@@ -200,14 +191,14 @@ def get_lead(v_ego: float, ready: bool, tracks: dict[int, Track], model: capnp._
 
 
 class RadarD:
-  def __init__(self, radar_ts: float, delay: int = 0):
+  def __init__(self, delay: float = 0.0):
     self.current_time = 0.0
 
     self.tracks: dict[int, Track] = {}
-    self.kalman_params = KalmanParams(radar_ts)
+    self.kalman_params = KalmanParams(DT_MDL)
 
     self.v_ego = 0.0
-    self.v_ego_hist = deque([0.0], maxlen=delay+1)
+    self.v_ego_hist = deque([0.0], maxlen=int(round(delay / DT_MDL))+1)
     self.last_v_ego_frame = -1
 
     self.radar_state: capnp._DynamicStructBuilder | None = None
@@ -215,7 +206,7 @@ class RadarD:
 
     self.ready = False
 
-  def update(self, sm: messaging.SubMaster, rr: structs.RadarData):
+  def update(self, sm: messaging.SubMaster, rr: car.RadarData):
     self.ready = sm.seen['modelV2']
     self.current_time = 1e-9*max(sm.logMonoTime.values())
 
@@ -258,35 +249,16 @@ class RadarD:
       model_v_ego = self.v_ego
     leads_v3 = sm['modelV2'].leadsV3
     if len(leads_v3) > 1:
-      self.radar_state.leadOne = get_lead(self.v_ego, self.ready, self.tracks, sm['modelV2'], leads_v3[0], model_v_ego, low_speed_override=True)
-      self.radar_state.leadTwo = get_lead(self.v_ego, self.ready, self.tracks, sm['modelV2'], leads_v3[1], model_v_ego, low_speed_override=False)
-      if self.radar_state.leadOne.status:
-        if self.radar_state.leadOne.radar:
-          if len(self.tracks) == 1 and leads_v3[1].prob > .5:
-            self.radar_state.leadTwo = get_RadarState_from_vision(leads_v3[1], self.v_ego, model_v_ego)
-        else:
-          self.radar_state.leadOne.dRel -= 0.5
+      self.radar_state.leadOne = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[0], model_v_ego, low_speed_override=True)
+      self.radar_state.leadTwo = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[1], model_v_ego, low_speed_override=False)
 
-  def publish(self, pm: messaging.PubMaster, lag_ms: float):
+  def publish(self, pm: messaging.PubMaster):
     assert self.radar_state is not None
 
     radar_msg = messaging.new_message("radarState")
     radar_msg.valid = self.radar_state_valid
     radar_msg.radarState = self.radar_state
-    radar_msg.radarState.cumLagMs = lag_ms
     pm.send("radarState", radar_msg)
-
-    # publish tracks for UI debugging (keep last)
-    tracks_msg = messaging.new_message('liveTracks', len(self.tracks))
-    tracks_msg.valid = self.radar_state_valid
-    for index, tid in enumerate(sorted(self.tracks.keys())):
-      tracks_msg.liveTracks[index] = {
-        "trackId": tid,
-        "dRel": float(self.tracks[tid].dRel),
-        "yRel": float(self.tracks[tid].yRel),
-        "vRel": float(self.tracks[tid].vRel),
-      }
-    pm.send('liveTracks', tracks_msg)
 
 
 # fuses camera and radar data for best lead detection
@@ -298,31 +270,17 @@ def main() -> None:
   CP = messaging.log_from_bytes(Params().get("CarParams", block=True), car.CarParams)
   cloudlog.info("radard got CarParams")
 
-  # import the radar from the fingerprint
-  cloudlog.info("radard is importing %s", CP.carName)
-  RadarInterface = importlib.import_module(f'opendbc.car.{CP.carName}.radar_interface').RadarInterface
-
   # *** setup messaging
-  can_sock = messaging.sub_sock('can')
-  sm = messaging.SubMaster(['modelV2', 'carState'], frequency=int(1./DT_CTRL))
-  pm = messaging.PubMaster(['radarState', 'liveTracks'])
+  sm = messaging.SubMaster(['modelV2', 'carState', 'liveTracks'], poll='modelV2')
+  pm = messaging.PubMaster(['radarState'])
 
-  RI = RadarInterface(CP)
-
-  rk = Ratekeeper(1.0 / CP.radarTimeStep, print_delay_threshold=None)
-  RD = RadarD(CP.radarTimeStep, RI.delay)
+  RD = RadarD(CP.radarDelay)
 
   while 1:
-    can_strings = messaging.drain_sock_raw(can_sock, wait_for_one=True)
-    rr: structs.RadarData | None = RI.update(can_capnp_to_list(can_strings))
-    sm.update(0)
-    if rr is None:
-      continue
+    sm.update()
 
-    RD.update(sm, rr)
-    RD.publish(pm, -rk.remaining*1000.0)
-
-    rk.monitor_time()
+    RD.update(sm, sm['liveTracks'])
+    RD.publish(pm)
 
 
 if __name__ == "__main__":

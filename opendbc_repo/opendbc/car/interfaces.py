@@ -267,7 +267,6 @@ class RadarInterfaceBase(ABC):
     self.CP = CP
     self.rcp = None
     self.pts: dict[int, structs.RadarData.RadarPoint] = {}
-    self.delay = 0
     self.radar_ts = CP.radarTimeStep
     self.frame = 0
 
