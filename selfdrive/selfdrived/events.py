@@ -141,6 +141,8 @@ class Alert:
       return False
     return self.priority > alert2.priority
 
+EmptyAlert = Alert("" , "", AlertStatus.normal, AlertSize.none, Priority.LOWEST,
+                   VisualAlert.none, AudibleAlert.none, 0)
 
 class NoEntryAlert(Alert):
   def __init__(self, alert_text_2: str,
@@ -320,8 +322,8 @@ def wrong_car_mode_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
 
 
 def joystick_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
-  axes = sm['testJoystick'].axes
-  gb, steer = list(axes)[:2] if len(axes) else (0., 0.)
+  gb = sm['carControl'].actuators.accel / 4.
+  steer = sm['carControl'].actuators.steer
   vals = f"Gas: {round(gb * 100.)}%, Steer: {round(steer * 100.)}%"
   return NormalPermanentAlert("Joystick Mode", vals)
 
@@ -377,7 +379,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.PERMANENT: NormalPermanentAlert("Joystick Mode"),
   },
 
-  EventName.controlsInitializing: {
+  EventName.selfdriveInitializing: {
     ET.NO_ENTRY: NoEntryAlert("System Initializing"),
   },
 
@@ -389,21 +391,13 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.PERMANENT: startup_master_alert,
   },
 
-  # Car is recognized, but marked as dashcam only
   EventName.startupNoControl: {
     ET.PERMANENT: StartupAlert("Dashcam mode"),
     ET.NO_ENTRY: NoEntryAlert("Dashcam mode"),
   },
 
-  # Car is not recognized
   EventName.startupNoCar: {
     ET.PERMANENT: StartupAlert("Dashcam mode for unsupported car"),
-  },
-
-  EventName.startupNoFw: {
-    ET.PERMANENT: StartupAlert("Car Unrecognized",
-                               "Check comma power connections",
-                               alert_status=AlertStatus.userPrompt),
   },
 
   EventName.dashcamMode: {
@@ -801,11 +795,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("Electronic Stability Control Disabled"),
   },
 
-  EventName.espActive: {
-    ET.SOFT_DISABLE: ImmediateDisableAlert("Electronic Stability Control Active"),
-    ET.NO_ENTRY: NoEntryAlert("Electronic Stability Control Active"),
-  },
-
   EventName.lowBattery: {
     ET.SOFT_DISABLE: soft_disable_alert("Low Battery"),
     ET.NO_ENTRY: NoEntryAlert("Low Battery"),
@@ -824,9 +813,9 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("Low Communication Rate Between Processes"),
   },
 
-  EventName.controlsdLagging: {
-    ET.SOFT_DISABLE: soft_disable_alert("Controls Lagging"),
-    ET.NO_ENTRY: NoEntryAlert("Controls Process Lagging: Reboot Your Device"),
+  EventName.selfdrivedLagging: {
+    ET.SOFT_DISABLE: soft_disable_alert("System Lagging"),
+    ET.NO_ENTRY: NoEntryAlert("Selfdrive Process Lagging: Reboot Your Device"),
   },
 
   # Thrown when manager detects a service exited unexpectedly while driving
@@ -872,39 +861,20 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("Low Memory: Reboot Your Device"),
   },
 
-  EventName.highCpuUsage: {
-    #ET.SOFT_DISABLE: soft_disable_alert("System Malfunction: Reboot Your Device"),
-    #ET.PERMANENT: NormalPermanentAlert("System Malfunction", "Reboot your Device"),
-    ET.NO_ENTRY: high_cpu_usage_alert,
-  },
-
   EventName.accFaulted: {
     ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("Cruise Fault: Restart the Car"),
     ET.PERMANENT: NormalPermanentAlert("Cruise Fault: Restart the car to engage"),
     ET.NO_ENTRY: NoEntryAlert("Cruise Fault: Restart the Car"),
   },
 
+  EventName.espActive: {
+    ET.SOFT_DISABLE: soft_disable_alert("Electronic Stability Control Active"),
+    ET.NO_ENTRY: NoEntryAlert("Electronic Stability Control Active"),
+  },
+
   EventName.controlsMismatch: {
     ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("Controls Mismatch"),
     ET.NO_ENTRY: NoEntryAlert("Controls Mismatch"),
-  },
-
-  EventName.roadCameraError: {
-    ET.PERMANENT: NormalPermanentAlert("Camera CRC Error - Road",
-                                       duration=1.,
-                                       creation_delay=30.),
-  },
-
-  EventName.wideRoadCameraError: {
-    ET.PERMANENT: NormalPermanentAlert("Camera CRC Error - Road Fisheye",
-                                       duration=1.,
-                                       creation_delay=30.),
-  },
-
-  EventName.driverCameraError: {
-    ET.PERMANENT: NormalPermanentAlert("Camera CRC Error - Driver",
-                                       duration=1.,
-                                       creation_delay=30.),
   },
 
   # Sometimes the USB stack on the device can get into a bad state

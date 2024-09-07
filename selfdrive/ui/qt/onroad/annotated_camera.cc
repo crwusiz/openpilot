@@ -83,9 +83,9 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   const auto nd = sm["naviData"].getNaviData();
   const auto lo = sm["longitudinalPlan"].getLongitudinalPlan();
 
-  const bool cs_alive = sm.alive("controlsState");
+  const bool cs_alive = sm.alive("carState");
 
-  // Handle older routes where vCruiseCluster is not set
+  // Handle older routes where vCruise was in controlsState
   apply_speed = ce.getVCruise();
   cruise_speed = ce.getVCruiseCluster();
   is_cruise_set = cruise_speed > 0 && (int)cruise_speed != SET_SPEED_NA && ce.getCruiseState().getSpeed();

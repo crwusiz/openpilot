@@ -142,6 +142,8 @@ class Alert:
       return False
     return self.priority > alert2.priority
 
+EmptyAlert = Alert("" , "", AlertStatus.normal, AlertSize.none, Priority.LOWEST,
+                   VisualAlert.none, AudibleAlert.none, 0)
 
 class NoEntryAlert(Alert):
   def __init__(self, alert_text_2: str,
@@ -320,8 +322,8 @@ def wrong_car_mode_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
 
 
 def joystick_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
-  axes = sm['testJoystick'].axes
-  gb, steer = list(axes)[:2] if len(axes) else (0., 0.)
+  gb = sm['carControl'].actuators.accel / 4.
+  steer = sm['carControl'].actuators.steer
   vals = f"Gas: {round(gb * 100.)}%, Steer: {round(steer * 100.)}%"
   return NormalPermanentAlert("조이스틱 모드", vals)
 
@@ -377,7 +379,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.PERMANENT: NormalPermanentAlert("조이스틱 모드"),
   },
 
-  EventName.controlsInitializing: {
+  EventName.selfdriveInitializing: {
     ET.NO_ENTRY: NoEntryAlert("시스템 준비중입니다"),
   },
 
@@ -389,21 +391,13 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.PERMANENT: startup_master_alert,
   },
 
-  # Car is recognized, but marked as dashcam only
   EventName.startupNoControl: {
     ET.PERMANENT: StartupAlert("대시캠 모드"),
     ET.NO_ENTRY: NoEntryAlert("대시캠 모드"),
   },
 
-  # Car is not recognized
   EventName.startupNoCar: {
     ET.PERMANENT: StartupAlert("대시캠 모드 : 호환되지않는 차량"),
-  },
-
-  EventName.startupNoFw: {
-    ET.PERMANENT: StartupAlert("차량이 인식되지않았습니다",
-                               "배선연결상태를 확인하세요",
-                               alert_status=AlertStatus.userPrompt),
   },
 
   EventName.dashcamMode: {
@@ -801,11 +795,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("차량자세제어 비활성화됨"),
   },
 
-  EventName.espActive: {
-    ET.SOFT_DISABLE: ImmediateDisableAlert("차량자세제어 동작됨"),
-    ET.NO_ENTRY: NoEntryAlert("차량자세제어 동작됨"),
-  },
-
   EventName.lowBattery: {
     ET.SOFT_DISABLE: soft_disable_alert("배터리 부족"),
     ET.NO_ENTRY: NoEntryAlert("배터리 부족"),
@@ -824,7 +813,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("장치 프로세스 통신속도 오류"),
   },
 
-  EventName.controlsdLagging: {
+  EventName.selfdrivedLagging: {
     ET.SOFT_DISABLE: soft_disable_alert("controlsd 지연됨"),
     ET.NO_ENTRY: NoEntryAlert("controlsd 프로세스 지연됨: 장치를 재부팅 하세요"),
   },
@@ -872,39 +861,20 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("메모리 부족 : 장치를 재부팅 하세요"),
   },
 
-  EventName.highCpuUsage: {
-    #ET.SOFT_DISABLE: soft_disable_alert("System Malfunction: Reboot Your Device"),
-    #ET.PERMANENT: NormalPermanentAlert("System Malfunction", "Reboot your Device"),
-    ET.NO_ENTRY: high_cpu_usage_alert,
-  },
-
   EventName.accFaulted: {
     ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("크루즈 오류 : 차량 시동을 다시켜세요"),
     ET.PERMANENT: NormalPermanentAlert("크루즈 오류 : 차량 시동을 다시켜세요"),
     ET.NO_ENTRY: NoEntryAlert("크루즈 오류 : 차량 시동을 다시켜세요"),
   },
 
+  EventName.espActive: {
+    ET.SOFT_DISABLE: ImmediateDisableAlert("차량자세제어 동작됨"),
+    ET.NO_ENTRY: NoEntryAlert("차량자세제어 동작됨"),
+  },
+
   EventName.controlsMismatch: {
     ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("컨트롤 불일치"),
     ET.NO_ENTRY: NoEntryAlert("컨트롤 불일치"),
-  },
-
-  EventName.roadCameraError: {
-    ET.PERMANENT: NormalPermanentAlert("주행 카메라 오류",
-                                       duration=1.,
-                                       creation_delay=30.),
-  },
-
-  EventName.wideRoadCameraError: {
-    ET.PERMANENT: NormalPermanentAlert("와이드 카메라 오류",
-                                       duration=1.,
-                                       creation_delay=30.),
-  },
-
-  EventName.driverCameraError: {
-    ET.PERMANENT: NormalPermanentAlert("운전자 카메라 오류",
-                                       duration=1.,
-                                       creation_delay=30.),
   },
 
   # Sometimes the USB stack on the device can get into a bad state

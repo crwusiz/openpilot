@@ -615,10 +615,6 @@
         <translation>openpilot이 차량을 식별할 수 없었습니다. 지원되지 않는 차량이거나 ECU가 인식되지 않습니다. 해당 차량에 맞는 펌웨어 버전을 추가하려면 PR을 제출하세요. 도움이 필요하시면 discord.comma.ai에 가입하세요.</translation>
     </message>
     <message>
-        <source>openpilot was unable to identify your car. Check integrity of cables and ensure all connections are secure, particularly that the comma power is fully inserted in the OBD-II port of the vehicle. Need help? Join discord.comma.ai.</source>
-        <translation>openpilot이 차량을 식별할 수 없었습니다. 케이블의 무결성을 점검하고 모든 연결부, 특히 comma power가 차량의 OBD-II 포트에 제대로 삽입되었는지 확인하세요. 도움이 필요하시면 discord.comma.ai에 가입하세요.</translation>
-    </message>
-    <message>
         <source>openpilot detected a change in the device&apos;s mounting position. Ensure the device is fully seated in the mount and the mount is firmly secured to the windshield.</source>
         <translation>openpilot 장치의 장착 위치가 변경되었습니다. 장치가 마운트에 완전히 장착되고 마운트가 앞유리에 단단히 고정되었는지 확인하세요. </translation>
     </message>
@@ -649,20 +645,20 @@
         <translation>오픈파일럿을 사용할수없습니다</translation>
     </message>
     <message>
-        <source>Waiting for controls to start</source>
-        <translation>프로세스가 준비중입니다</translation>
-    </message>
-    <message>
         <source>TAKE CONTROL IMMEDIATELY</source>
         <translation>핸들을 잡아주세요</translation>
     </message>
     <message>
-        <source>Controls Unresponsive</source>
-        <translation>프로세스가 응답하지않습니다</translation>
-    </message>
-    <message>
         <source>Reboot Device</source>
         <translation>장치를 재부팅하세요</translation>
+    </message>
+    <message>
+        <source>Waiting to start</source>
+        <translation>시작을 기다리는중</translation>
+    </message>
+    <message>
+        <source>System Unresponsive</source>
+        <translation>시스템이 응답하지않습니다</translation>
     </message>
 </context>
 <context>

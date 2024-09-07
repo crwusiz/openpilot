@@ -22,7 +22,7 @@ from openpilot.selfdrive.pandad import can_capnp_to_list, can_list_to_can_capnp
 from openpilot.selfdrive.car.cruise import VCruiseHelper
 from openpilot.selfdrive.car.car_specific import CarSpecificEvents, MockCarState
 from openpilot.selfdrive.car.helpers import convert_carControl, convert_to_capnp
-from openpilot.selfdrive.controls.lib.events import Events, ET
+from openpilot.selfdrive.selfdrived.events import Events, ET
 
 from openpilot.selfdrive.controls.neokii.speed_controller import SpeedController
 
@@ -165,15 +165,16 @@ class Car:
   def state_update(self) -> tuple[car.CarState, structs.RadarData | None]:
     """carState update loop, driven by can"""
 
-    # Update carState from CAN
     can_strs = messaging.drain_sock_raw(self.can_sock, wait_for_one=True)
-    CS = convert_to_capnp(self.CI.update(can_capnp_to_list(can_strs)))
+    can_list = can_capnp_to_list(can_strs)
 
+    # Update carState from CAN
+    CS = convert_to_capnp(self.CI.update(can_list))
     if self.CP.carName == 'mock':
       CS = self.mock_carstate.update(CS)
 
     # Update radar tracks from CAN
-    RD: structs.RadarData | None = self.RI.update(can_capnp_to_list(can_strs))
+    RD: structs.RadarData | None = self.RI.update(can_list)
 
     self.sm.update(0)
 
@@ -249,7 +250,7 @@ class Car:
 
     if RD is not None:
       tracks_msg = messaging.new_message('liveTracks')
-      tracks_msg.valid = CS.canValid and len(RD.errors) == 0
+      tracks_msg.valid = len(RD.errors) == 0
       tracks_msg.liveTracks = convert_to_capnp(RD)
       self.pm.send('liveTracks', tracks_msg)
 
@@ -282,7 +283,7 @@ class Car:
 
     self.state_publish(CS, RD)
 
-    initialized = (not any(e.name == EventName.controlsInitializing for e in self.sm['onroadEvents']) and
+    initialized = (not any(e.name == EventName.selfdriveInitializing for e in self.sm['onroadEvents']) and
                    self.sm.seen['onroadEvents'])
     if not self.CP.passive and initialized:
       self.controls_update(CS, self.sm['carControl'])
