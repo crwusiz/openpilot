@@ -339,7 +339,6 @@ def auto_lane_change_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.Su
     AlertStatus.normal, AlertSize.mid,
     Priority.LOW, VisualAlert.none, AudibleAlert.promptRepeat, .75)
 
-
 def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
   if os.path.isfile('/data/can_missing.log'):
     with open('/data/can_missing.log', 'r') as f:
