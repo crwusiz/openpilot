@@ -1,10 +1,11 @@
 #include "selfdrive/ui/qt/home.h"
 
-#include <QDateTime>
 #include <QHBoxLayout>
 #include <QMouseEvent>
 #include <QStackedWidget>
 #include <QVBoxLayout>
+
+#include <QDateTime>
 
 #include "selfdrive/ui/qt/offroad/experimental_mode.h"
 #include "selfdrive/ui/qt/util.h"
@@ -155,9 +156,8 @@ OffroadHome::OffroadHome(QWidget* parent) : QFrame(parent) {
     left_widget->addWidget(new PrimeAdWidget);
     left_widget->setStyleSheet("border-radius: 10px;");
 
-    left_widget->setCurrentIndex(uiState()->hasPrime() ? 0 : 1);
-    connect(uiState(), &UIState::primeChanged, [=](bool prime) {
-      left_widget->setCurrentIndex(prime ? 0 : 1);
+    connect(uiState()->prime_state, &PrimeState::changed, [left_widget]() {
+      left_widget->setCurrentIndex(uiState()->prime_state->isSubscribed() ? 0 : 1);
     });
 
     home_layout->addWidget(left_widget, 1);

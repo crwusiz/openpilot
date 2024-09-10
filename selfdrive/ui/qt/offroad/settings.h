@@ -4,14 +4,14 @@
 #include <string>
 
 #include <QButtonGroup>
-#include <QFileSystemWatcher>
 #include <QFrame>
 #include <QLabel>
 #include <QPushButton>
 #include <QStackedWidget>
 #include <QWidget>
-#include <QStackedLayout>
 
+#include <QFileSystemWatcher>
+#include <QStackedLayout>
 
 #include "selfdrive/ui/ui.h"
 #include "selfdrive/ui/qt/util.h"
@@ -20,16 +20,20 @@
 // ********** settings window + top-level panels **********
 class SettingsWindow : public QFrame {
   Q_OBJECT
+
 public:
   explicit SettingsWindow(QWidget *parent = 0);
   void setCurrentPanel(int index, const QString &param = "");
+
 protected:
   void showEvent(QShowEvent *event) override;
+
 signals:
   void closeSettings();
   void reviewTrainingGuide();
   void showDriverView();
   void expandToggleDescription(const QString &param);
+
 private:
   QPushButton *sidebar_alert_widget;
   QWidget *sidebar_widget;
@@ -38,32 +42,32 @@ private:
   Params params;
 };
 
-
 class DevicePanel : public ListWidget {
   Q_OBJECT
 public:
   explicit DevicePanel(SettingsWindow *parent);
-  void showEvent(QShowEvent *event) override;
 
 signals:
   void reviewTrainingGuide();
   void showDriverView();
   void closeSettings();
+
 private slots:
   void poweroff();
   void reboot();
   void updateCalibDescription();
+
 private:
   Params params;
   ButtonControl *pair_device;
 };
-
 
 class TogglesPanel : public ListWidget {
   Q_OBJECT
 public:
   explicit TogglesPanel(SettingsWindow *parent);
   void showEvent(QShowEvent *event) override;
+
 public slots:
   void expandToggleDescription(const QString &param);
 
@@ -78,16 +82,18 @@ private:
   void updateToggles();
 };
 
-
 class SoftwarePanel : public ListWidget {
   Q_OBJECT
 public:
   explicit SoftwarePanel(QWidget* parent = nullptr);
+
 private:
   void showEvent(QShowEvent *event) override;
   void updateLabels();
   void checkForUpdates();
+
   bool is_onroad = false;
+
   QLabel *onroadLbl;
   LabelControl *versionLbl;
   LabelControl *gitRemoteLbl;
@@ -96,6 +102,7 @@ private:
   ButtonControl *installBtn;
   ButtonControl *downloadBtn;
   ButtonControl *targetBranchBtn;
+
   Params params;
   ParamWatcher *fs_watch;
 };
@@ -104,6 +111,7 @@ class SelectManufacturer : public QWidget {
   Q_OBJECT
 public:
   explicit SelectManufacturer(QWidget* parent = 0);
+
 private:
 signals:
   void backPress();
@@ -114,6 +122,7 @@ class SelectCar : public QWidget {
   Q_OBJECT
 public:
   explicit SelectCar(QWidget* parent = 0);
+
 private:
 signals:
   void backPress();
@@ -124,6 +133,7 @@ class SelectBranch : public QWidget {
   Q_OBJECT
 public:
   explicit SelectBranch(QWidget* parent = 0);
+
 private:
 signals:
   void backPress();
@@ -134,6 +144,7 @@ class CommunityPanel : public QWidget {
   Q_OBJECT
 public:
   explicit CommunityPanel(QWidget *parent = nullptr);
+
 private:
   QStackedLayout* main_layout = nullptr;
   QWidget* homeScreen = nullptr;
