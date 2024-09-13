@@ -7,13 +7,6 @@
 #include "selfdrive/ui/qt/onroad/driver_monitoring.h"
 #include "selfdrive/ui/qt/widgets/cameraview.h"
 
-#include <QPushButton>
-#include <QStackedLayout>
-#include <QWidget>
-
-#include "common/util.h"
-#include "selfdrive/ui/ui.h"
-
 class AnnotatedCameraWidget : public CameraWidget {
   Q_OBJECT
 
@@ -56,26 +49,22 @@ private:
 
   bool steeringPressed = false;
   bool hideBottomIcons = false;
-  bool brake_state = false;
-  bool left_blindspot, right_blindspot = false;
   bool longControl = false;
-  bool left_on, right_on = false;
-  bool gas_pressed = false;
-  bool isStandstill = false;
+  bool brake_press, gas_press = false;
+  bool left_blindspot, right_blindspot = false;
+  bool left_blinker, right_blinker = false;
 
-  int autohold_state = 0;
-  int nda_state = 0;
+  int autohold_state, nda_state = 0;
   int wifi_state = 0;
   int gpsSatelliteCount = 0;
-  int accel = 0;
-  int sccBus = 0;
+  int accel, sccBus = 0;
   int camLimitSpeed, sectionLimitSpeed = 0;
   int camLimitSpeedLeftDist, sectionLeftDist = 0;
   int traffic_state = 0;
 
   float apply_speed, cruise_speed;
   float gpsBearing, gpsVerticalAccuracy, gpsAltitude, gpsAccuracy = 0;
-  float steerAngle, steerRatio = 0;
+  float steerAngle = 0;
   float fl, fr, rl, rr = 0;
   float roadLimitSpeed, navLimitSpeed = 0;
   Params params;
@@ -84,16 +73,16 @@ protected:
   void paintGL() override;
   void initializeGL() override;
   void showEvent(QShowEvent *event) override;
-  void updateFrameMat() override;
+  mat4 calcFrameMatrix() override;
   void drawLaneLines(QPainter &painter, const UIState *s);
   void drawLead(QPainter &painter, const cereal::RadarState::LeadData::Reader &lead_data, const QPointF &vd);
   void drawHud(QPainter &p);
+  inline QColor redColor(int alpha = 255) { return QColor(255, 0, 0, alpha); }
   inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); }
   inline QColor blackColor(int alpha = 255) { return QColor(0, 0, 0, alpha); }
 
   // add
   inline QColor yellowColor(int alpha = 255) { return QColor(255, 255, 0, alpha); }
-  inline QColor redColor(int alpha = 255) { return QColor(255, 0, 0, alpha); }
   inline QColor limeColor(int alpha = 255) { return QColor(120, 255, 120, alpha); }
   inline QColor orangeColor(int alpha = 255) { return QColor(255, 149, 0, alpha); }
   inline QColor lightorangeColor(int alpha = 255) { return QColor(255, 228, 191, alpha); }

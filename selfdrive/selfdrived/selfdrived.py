@@ -65,7 +65,8 @@ class SelfdriveD:
     if self.d_camera_hardware_missing:
       IGNORE_PROCESSES.update({"dmonitoringd", "dmonitoringmodeld"})
       self.camera_packets.remove("driverCameraState")
-    ignore = self.sensor_packets + self.gps_packets
+
+    ignore = self.sensor_packets + self.gps_packets + ['alertDebug']
     if SIMULATION:
       ignore += ['driverCameraState', 'managerState']
     if REPLAY:
@@ -76,7 +77,7 @@ class SelfdriveD:
     self.sm = messaging.SubMaster(['deviceState', 'pandaStates', 'peripheralState', 'modelV2', 'liveCalibration',
                                    'carOutput', 'driverMonitoringState', 'longitudinalPlan', 'livePose',
                                    'managerState', 'liveParameters', 'radarState', 'liveTorqueParameters',
-                                   'controlsState', 'carControl', 'driverAssistance'] + \
+                                   'controlsState', 'carControl', 'driverAssistance', 'alertDebug'] + \
                                    self.camera_packets + self.sensor_packets + self.gps_packets,
                                   ignore_alive=ignore, ignore_avg_freq=ignore+['radarState',],
                                   ignore_valid=ignore, frequency=int(1/DT_CTRL))
@@ -139,6 +140,10 @@ class SelfdriveD:
 
     if self.sm['controlsState'].lateralControlState.which() == 'debugState':
       self.events.add(EventName.joystickDebug)
+      self.startup_event = None
+
+    if self.sm.recv_frame['alertDebug'] > 0:
+      self.events.add(EventName.longitudinalManeuver)
       self.startup_event = None
 
     # Add startup event

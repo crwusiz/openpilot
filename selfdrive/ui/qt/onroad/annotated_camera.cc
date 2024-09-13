@@ -9,15 +9,11 @@
 #include "selfdrive/ui/qt/onroad/buttons.h"
 #include "selfdrive/ui/qt/util.h"
 
-#include <memory>
-#include <sstream>
-
-#include <QDebug>
-#include <QMouseEvent>
 #include <QString>
 
 // Window that shows camera view and variety of info drawn on top
-AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraWidget("camerad", type, true, parent) {
+AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget *parent)
+    : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraWidget("camerad", type, parent) {
   pm = std::make_unique<PubMaster>(std::vector<const char*>{"uiDebug"});
 
   main_layout = new QVBoxLayout(this);
@@ -108,12 +104,13 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
 
   accel = ce.getAEgo();
   steeringPressed = ce.getSteeringPressed();
-  isStandstill = ce.getStandstill();
-  brake_state = ce.getBrakeLights();
+  brake_press = ce.getBrakeLights();
   autohold_state = ce.getExState().getAutoHold();
-  gas_pressed = ce.getGasPressed();
+  gas_press = ce.getGasPressed();
   left_blindspot = ce.getLeftBlindspot();
   right_blindspot = ce.getRightBlindspot();
+  left_blinker = ce.getLeftBlinker();
+  right_blinker = ce.getRightBlinker();
   wifi_state = (int)ds.getNetworkStrength();
   gpsBearing = ge.getBearingDeg();
   gpsVerticalAccuracy = ge.getVerticalAccuracy();
@@ -134,8 +131,6 @@ void AnnotatedCameraWidget::updateState(const UIState &s) {
   camLimitSpeedLeftDist = nd.getCamLimitSpeedLeftDist();
   sectionLimitSpeed = nd.getSectionLimitSpeed();
   sectionLeftDist = nd.getSectionLeftDist();
-  left_on = ce.getLeftBlinker();
-  right_on = ce.getRightBlinker();
   traffic_state = lo.getTrafficState();
 
   // update engageability/experimental mode button
@@ -454,14 +449,14 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
 
     // gaspress img (bottom right 2)
     x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
-    drawIcon(p, QPoint(x, y), gaspress_img, icon_bg, gas_pressed ? 0.8 : 0.2);
+    drawIcon(p, QPoint(x, y), gaspress_img, icon_bg, gas_press ? 0.8 : 0.2);
 
     // brake and autohold icon (bottom right 3)
     x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
     if (autohold_state >= 1) {
       drawIcon(p, QPoint(x, y), autohold_state > 1 ? autohold_warning_img : autohold_active_img, icon_bg, autohold_state ? 0.8 : 0.2);
     } else {
-      drawIcon(p, QPoint(x, y), brake_img, icon_bg, brake_state ? 0.8 : 0.2);
+      drawIcon(p, QPoint(x, y), brake_img, icon_bg, brake_press ? 0.8 : 0.2);
     }
 
     // tpms (bottom right)
@@ -505,7 +500,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     y = (height() - h) / 2;
 
     x = center_x;
-    if (left_on) {
+    if (left_blinker) {
       for (int i = 0; i < draw_count; i++) {
         float alpha = img_alpha;
         int d = std::abs(blink_index - i);
@@ -518,7 +513,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
     }
 
     x = center_x;
-    if (right_on) {
+    if (right_blinker) {
       for (int i = 0; i < draw_count; i++) {
         float alpha = img_alpha;
         int d = std::abs(blink_index - i);
@@ -530,7 +525,7 @@ void AnnotatedCameraWidget::drawHud(QPainter &p) {
       }
     }
 
-    if (left_on || right_on) {
+    if (left_blinker || right_blinker) {
       double now = millis_since_boot();
       if (now - prev_ts > 900 / UI_FREQ) {
         prev_ts = now;
@@ -564,21 +559,21 @@ void AnnotatedCameraWidget::drawTextColor(QPainter &p, int x, int y, const QStri
 }
 
 void AnnotatedCameraWidget::drawTextColorLeft(QPainter &p, int x, int y, const QString &text, const QColor &color) {
-    p.setOpacity(1.0);
-    QRect real_rect = p.fontMetrics().boundingRect(text);
-    real_rect.moveLeft(x);
-    real_rect.moveTop(y - real_rect.height() / 2);
-    p.setPen(color);
-    p.drawText(real_rect, text);
+  p.setOpacity(1.0);
+  QRect real_rect = p.fontMetrics().boundingRect(text);
+  real_rect.moveLeft(x);
+  real_rect.moveTop(y - real_rect.height() / 2);
+  p.setPen(color);
+  p.drawText(real_rect, text);
 }
 
 void AnnotatedCameraWidget::drawTextColorRight(QPainter &p, int x, int y, const QString &text, const QColor &color) {
-    p.setOpacity(1.0);
-    QRect real_rect = p.fontMetrics().boundingRect(text);
-    real_rect.moveRight(x);
-    real_rect.moveTop(y - real_rect.height() / 2);
-    p.setPen(color);
-    p.drawText(real_rect, text);
+  p.setOpacity(1.0);
+  QRect real_rect = p.fontMetrics().boundingRect(text);
+  real_rect.moveRight(x);
+  real_rect.moveTop(y - real_rect.height() / 2);
+  p.setPen(color);
+  p.drawText(real_rect, text);
 }
 
 void AnnotatedCameraWidget::initializeGL() {
@@ -592,22 +587,54 @@ void AnnotatedCameraWidget::initializeGL() {
   setBackgroundColor(bg_colors[STATUS_DISENGAGED]);
 }
 
-void AnnotatedCameraWidget::updateFrameMat() {
-  CameraWidget::updateFrameMat();
-  UIState *s = uiState();
-  int w = width(), h = height();
+mat4 AnnotatedCameraWidget::calcFrameMatrix() {
+  // Project point at "infinity" to compute x and y offsets
+  // to ensure this ends up in the middle of the screen
+  // for narrow come and a little lower for wide cam.
+  // TODO: use proper perspective transform?
 
-  s->fb_w = w;
-  s->fb_h = h;
+  // Select intrinsic matrix and calibration based on camera type
+  auto *s = uiState();
+  bool wide_cam = active_stream_type == VISION_STREAM_WIDE_ROAD;
+  const auto &intrinsic_matrix = wide_cam ? ECAM_INTRINSIC_MATRIX : FCAM_INTRINSIC_MATRIX;
+  const auto &calibration = wide_cam ? s->scene.view_from_wide_calib : s->scene.view_from_calib;
+
+   // Compute the calibration transformation matrix
+  const auto calib_transform = intrinsic_matrix * calibration;
+
+  float zoom = wide_cam ? 2.0 : 1.1;
+  Eigen::Vector3f inf(1000., 0., 0.);
+  auto Kep = calib_transform * inf;
+
+  int w = width(), h = height();
+  float center_x = intrinsic_matrix(0, 2);
+  float center_y = intrinsic_matrix(1, 2);
+
+  float max_x_offset = center_x * zoom - w / 2 - 5;
+  float max_y_offset = center_y * zoom - h / 2 - 5;
+  float x_offset = std::clamp<float>((Kep.x() / Kep.z() - center_x) * zoom, -max_x_offset, max_x_offset);
+  float y_offset = std::clamp<float>((Kep.y() / Kep.z() - center_y) * zoom, -max_y_offset, max_y_offset);
 
   // Apply transformation such that video pixel coordinates match video
   // 1) Put (0, 0) in the middle of the video
   // 2) Apply same scaling as video
   // 3) Put (0, 0) in top left corner of video
-  s->car_space_transform.reset();
-  s->car_space_transform.translate(w / 2 - x_offset, h / 2 - y_offset)
-      .scale(zoom, zoom)
-      .translate(-intrinsic_matrix.v[2], -intrinsic_matrix.v[5]);
+  Eigen::Matrix3f video_transform =(Eigen::Matrix3f() <<
+    zoom, 0.0f, (w / 2 - x_offset) - (center_x * zoom),
+    0.0f, zoom, (h / 2 - y_offset) - (center_y * zoom),
+    0.0f, 0.0f, 1.0f).finished();
+
+  s->car_space_transform = video_transform * calib_transform;
+  s->clip_region = rect().adjusted(-500, -500, 500, 500);
+
+  float zx = zoom * 2 * center_x / w;
+  float zy = zoom * 2 * center_y / h;
+  return mat4{{
+    zx, 0.0, 0.0, -x_offset / w * 2,
+    0.0, zy, 0.0, y_offset / h * 2,
+    0.0, 0.0, 1.0, 0.0,
+    0.0, 0.0, 0.0, 1.0,
+  }};
 }
 
 void AnnotatedCameraWidget::drawLaneLines(QPainter &painter, const UIState *s) {
@@ -781,22 +808,12 @@ void AnnotatedCameraWidget::paintGL() {
         wide_cam_requested = false;
       }
       //wide_cam_requested = wide_cam_requested && sm["selfdriveState"].getSelfdriveState().getExperimentalMode();
-      // for replay of old routes, never go to widecam
-      //wide_cam_requested = wide_cam_requested && s->scene.calibration_wide_valid;
     }
 
     if(s->scene.show_driver_camera) {
       CameraWidget::setStreamType(VISION_STREAM_DRIVER);
     } else {
       CameraWidget::setStreamType(wide_cam_requested ? VISION_STREAM_WIDE_ROAD : VISION_STREAM_ROAD);
-    }
-
-    s->scene.wide_cam = CameraWidget::getStreamType() == VISION_STREAM_WIDE_ROAD;
-    if (s->scene.calibration_valid) {
-      auto calib = s->scene.wide_cam ? s->scene.view_from_wide_calib : s->scene.view_from_calib;
-      CameraWidget::updateCalibration(calib);
-    } else {
-      CameraWidget::updateCalibration(DEFAULT_CALIBRATION);
     }
     CameraWidget::setFrameId(model.getFrameId());
     CameraWidget::paintGL();
