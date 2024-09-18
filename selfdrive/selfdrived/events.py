@@ -1022,11 +1022,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
                         Priority.LOW, VisualAlert.none, AudibleAlert.none, .1),
   },
 
-  EventName.slowingDownSpeedSound: {
-    ET.PERMANENT: Alert("Slowing down","", AlertStatus.normal, AlertSize.small,
-                        Priority.MID, VisualAlert.none, AudibleAlert.slowingDownSpeed, 2.),
-  },
-
   EventName.cruiseOn: {
     ET.PERMANENT: Alert("", "", AlertStatus.normal, AlertSize.none,
                         Priority.MID, VisualAlert.none, AudibleAlert.cruiseOn, 1.),

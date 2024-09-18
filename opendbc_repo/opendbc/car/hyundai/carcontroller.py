@@ -63,7 +63,6 @@ class CarController(CarControllerBase):
     self.lkas_max_torque = 0
 
     self.turning_signal_timer = 0
-    self.turning_indicator_alert = False
 
     self.driver_steering_angle_above_timer = 150
 

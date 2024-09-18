@@ -118,12 +118,11 @@ struct OnroadEvent @0x9b1657f34caf3ad3 {
     personalityChanged @122;
     aeb @123;
 
-    slowingDownSpeed @128;
-    slowingDownSpeedSound @129;
-    cruiseOn @130;
-    cruiseOff @125;
-    turningIndicatorOn @126;
-    autoLaneChange @127;
+    cruiseOn @125;
+    cruiseOff @126;
+    turningIndicatorOn @127;
+    autoLaneChange @128;
+    slowingDownSpeed @129;
 
     radarCanErrorDEPRECATED @15;
     communityFeatureDisallowedDEPRECATED @62;
@@ -246,12 +245,9 @@ struct CarState {
   exState @55 :ExState;
 
   struct ExState {
-    vCruiseKph @0 :Float32;
-    applyMaxSpeed @1 :Float32;
-    cruiseMaxSpeed @2 :Float32;
-    autoHold @3 : Int32;
-    navLimitSpeed @4 :Int16;
-    tpms @5 :Tpms;
+    autoHold @0 : Int32;
+    tpms @1 :Tpms;
+    navLimitSpeed @2 :Int16;
   }
 
   struct Tpms {
@@ -444,10 +440,9 @@ struct CarControl {
       prompt @6;
       promptRepeat @7;
       promptDistracted @8;
-      slowingDownSpeed @9;
-      ready @10;
-      cruiseOn @11;
-      cruiseOff @12;
+      ready @9;
+      cruiseOn @10;
+      cruiseOff @11;
     }
   }
 

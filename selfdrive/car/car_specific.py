@@ -158,7 +158,7 @@ class CarSpecificEvents:
       # On some newer model years, the CANCEL button acts as a pause/resume button based on the PCM state
       # To avoid re-engaging when openpilot cancels, check user engagement intention via buttons
       # Main button also can trigger an engagement on these cars
-      allow_enable = any(btn in HYUNDAI_ENABLE_BUTTONS for btn in CS.cruise_buttons) or any(CS.main_buttons) or CS.lfa_btn   # type: ignore[attr-defined]
+      allow_enable = any(btn in HYUNDAI_ENABLE_BUTTONS for btn in CS.cruise_buttons) or any(CS.main_buttons) or CS.lfa_btn
       events = self.create_common_events(CS.out, CS_prev, pcm_enable=self.CP.pcmCruise, allow_enable=allow_enable)
 
       # low speed steer alert hysteresis logic (only for cars with steer cut off above 10 m/s)
@@ -171,13 +171,7 @@ class CarSpecificEvents:
 
       # turning indicator alert logic
       if any([CS.out.leftBlinker, CS.out.rightBlinker, CC.turning_signal_timer]) and CS.out.vEgo < LANE_CHANGE_SPEED_MIN - 1.2:
-        CC.turning_indicator_alert = True
-      else:
-        CC.turning_indicator_alert = False
-
-      if CC.turning_indicator_alert:
         events.add(EventName.turningIndicatorOn)
-
 
     else:
       raise ValueError(f"Unsupported car: {self.CP.carName}")

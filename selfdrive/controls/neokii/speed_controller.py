@@ -47,7 +47,6 @@ class SpeedController:
 
     self.slowing_down = False
     self.slowing_down_alert = False
-    self.slowing_down_sound_alert = False
     self.active_cam = False
     self.prev_cruise_enabled = False
     self.limited_lead = False
@@ -95,16 +94,11 @@ class SpeedController:
 
     self.slowing_down = False
     self.slowing_down_alert = False
-    self.slowing_down_sound_alert = False
 
 
   def inject_events(self, CS, events):
     if CS.cruiseState.enabled:
-      if self.slowing_down_sound_alert:
-        self.slowing_down_sound_alert = False
-        events.add(EventName.slowingDownSpeedSound)
-      elif self.slowing_down_alert:
-        events.add(EventName.slowingDownSpeed)
+      events.add(EventName.slowingDownSpeed)
 
 
   def _cal_max_speed(self, CS, sm, clu_speed, v_cruise_kph):
@@ -128,7 +122,6 @@ class SpeedController:
 
       if clu_speed > apply_limit_speed:
         if not self.slowing_down_alert and not self.slowing_down:
-          self.slowing_down_sound_alert = True
           self.slowing_down = True
         self.slowing_down_alert = True
       else:
@@ -278,7 +271,6 @@ class SpeedController:
       self.reset()
 
     self.v_cruise_kph = v_cruise_kph
-    self._update_message(CS)
 
 
   def spam_message(self, CS, can_sends):
@@ -319,11 +311,3 @@ class SpeedController:
     else:
       if self.long_control:
         self.target_speed = 0.
-
-
-  def _update_message(self, CS):
-    exState = CS.exState
-    exState.vCruiseKph = self.v_cruise_kph
-    exState.cruiseMaxSpeed = self.real_set_speed_kph
-    exState.applyMaxSpeed = self.cruise_speed_kph
-

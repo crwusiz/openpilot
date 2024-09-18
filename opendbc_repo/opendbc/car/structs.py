@@ -299,7 +299,6 @@ class CarControl:
       promptRepeat = auto()
       promptDistracted = auto()
 
-      slowingDownSpeed = auto()
       ready = auto()
       cruiseOn = auto()
       cruiseOff = auto()

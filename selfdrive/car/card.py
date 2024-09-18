@@ -189,12 +189,13 @@ class Car:
 
     # TODO: mirror the carState.cruiseState struct?
     #self.v_cruise_helper.update_v_cruise(CS, self.sm['carControl'].enabled, self.is_metric)
-    self.speed_controller.update_v_cruise(CS, self.sm, self.sm['carControl'].enabled)
-
     #CS.vCruise = float(self.v_cruise_helper.v_cruise_kph)
     #CS.vCruiseCluster = float(self.v_cruise_helper.v_cruise_cluster_kph)
-    CS.vCruise = float(CS.exState.vCruiseKph)
-    CS.vCruiseCluster = CS.vCruise
+
+    # neokii speed controller
+    self.speed_controller.update_v_cruise(CS, self.sm, self.sm['carControl'].enabled)
+    CS.vCruise = self.speed_controller.cruise_speed_kph
+    CS.vCruiseCluster = self.speed_controller.real_set_speed_kph
 
     return CS, RD
 

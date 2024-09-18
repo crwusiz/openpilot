@@ -18,7 +18,7 @@ from openpilot.common.transformations.camera import DEVICE_CAMERAS
 from openpilot.common.transformations.model import get_warp_matrix
 from openpilot.system import sentry
 from openpilot.selfdrive.car.card import convert_to_capnp
-from openpilot.selfdrive.controls.lib.desire_helper import DesireHelper, AUTO_LCA_START_TIME
+from openpilot.selfdrive.controls.lib.desire_helper import DesireHelper, ALC_START_TIME
 from openpilot.selfdrive.modeld.runners import ModelRunner, Runtime
 from openpilot.selfdrive.modeld.parse_model_outputs import Parser
 from openpilot.selfdrive.modeld.fill_model_msg import fill_model_msg, fill_pose_msg, PublishState
@@ -276,7 +276,7 @@ def main(demo=False):
       drivingdata_send.drivingModelData.meta.laneChangeDirection = DH.lane_change_direction
 
       modelv2_send.modelV2.meta.autoLaneChangeEnabled = DH.auto_lane_change_enabled
-      modelv2_send.modelV2.meta.autoLaneChangeTimer = int(AUTO_LCA_START_TIME) - int(DH.auto_lane_change_timer)
+      modelv2_send.modelV2.meta.autoLaneChangeTimer = int(ALC_START_TIME) - int(DH.auto_lane_change_timer)
 
       fill_pose_msg(posenet_send, model_output, meta_main.frame_id, vipc_dropped_frames, meta_main.timestamp_eof, live_calib_seen)
       pm.send('modelV2', modelv2_send)
