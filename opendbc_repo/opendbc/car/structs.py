@@ -117,12 +117,9 @@ class CarState:
 
   @auto_dataclass
   class ExState:
-    vCruiseKph: float = auto_field()
-    applyMaxSpeed: float = auto_field()
-    cruiseMaxSpeed: float = auto_field()
     autoHold: int = auto_field()
-    navLimitSpeed: int = auto_field()
     tpms: 'CarState.Tpms' = field(default_factory=lambda: CarState.Tpms())
+    navLimitSpeed: int = auto_field()
 
   @auto_dataclass
   class Tpms:
