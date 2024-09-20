@@ -1017,11 +1017,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.WARNING: auto_lane_change_alert,
   },
 
-  EventName.slowingDownSpeed: {
-    ET.PERMANENT: Alert("속도를 조절합니다","", AlertStatus.normal, AlertSize.small,
-                        Priority.LOW, VisualAlert.none, AudibleAlert.none, .1),
-  },
-
   EventName.cruiseOn: {
     ET.PERMANENT: Alert("크루즈 작동", "", AlertStatus.normal, AlertSize.none,
                         Priority.MID, VisualAlert.none, AudibleAlert.cruiseOn, 1.),

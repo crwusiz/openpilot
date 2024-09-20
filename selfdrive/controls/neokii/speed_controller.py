@@ -46,7 +46,6 @@ class SpeedController:
     self.v_cruise_cluster_kph = V_CRUISE_UNSET
 
     self.slowing_down = False
-    self.slowing_down_alert = False
     self.active_cam = False
     self.prev_cruise_enabled = False
     self.limited_lead = False
@@ -93,13 +92,6 @@ class SpeedController:
     self.curve_speed_ms = 0.
 
     self.slowing_down = False
-    self.slowing_down_alert = False
-
-
-  def inject_events(self, CS, events):
-    if CS.cruiseState.enabled:
-      events.add(EventName.slowingDownSpeed)
-
 
   def _cal_max_speed(self, CS, sm, clu_speed, v_cruise_kph):
     # kph
@@ -123,11 +115,7 @@ class SpeedController:
       if clu_speed > apply_limit_speed:
         if not self.slowing_down_alert and not self.slowing_down:
           self.slowing_down = True
-        self.slowing_down_alert = True
-      else:
-        self.slowing_down_alert = False
     else:
-      self.slowing_down_alert = False
       self.slowing_down = False
 
     lead_speed = self._get_long_lead_speed(clu_speed, sm)

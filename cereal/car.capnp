@@ -122,7 +122,6 @@ struct OnroadEvent @0x9b1657f34caf3ad3 {
     cruiseOff @126;
     turningIndicatorOn @127;
     autoLaneChange @128;
-    slowingDownSpeed @129;
 
     radarCanErrorDEPRECATED @15;
     communityFeatureDisallowedDEPRECATED @62;

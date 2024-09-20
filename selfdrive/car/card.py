@@ -221,8 +221,6 @@ class Car:
     if RD is not None and len(RD.errors):
       self.events.add(EventName.radarFault)
 
-    self.speed_controller.inject_events(CS, self.events)
-
     CS.events = self.events.to_msg()
 
   def state_publish(self, CS: car.CarState, RD: structs.RadarData | None):
