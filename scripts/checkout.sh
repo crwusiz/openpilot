@@ -17,8 +17,6 @@ BRANCH=$(cat /data/params/d/SelectedBranch)
 
 git checkout $BRANCH
 
-echo ""
-echo "  Git Checkout [ $BRANCH ]  "
-echo ""
+echo -e "\n  Git Checkout [ $BRANCH ]  \n"
 
 exec /data/openpilot/scripts/gitpull.sh

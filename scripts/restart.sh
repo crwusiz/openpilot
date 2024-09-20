@@ -14,6 +14,4 @@ tmux send-keys -t tmp.1 "tmux kill-session -t comma" ENTER
 tmux send-keys -t tmp.1 "tmux rename-session -t tmp comma" ENTER
 tmux send-keys -t tmp.1 "exit" ENTER
 
-echo ""
-echo -e "${GREEN}${BOLD}  Restart Now ...${NC}"
-echo ""
+echo -e "\n ${GREEN}${BOLD}  Restart Now ...${NC} \n"
