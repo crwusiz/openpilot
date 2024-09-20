@@ -342,7 +342,7 @@ def personality_changed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging
   personality = str(personality).title()
   return NormalPermanentAlert(f"Driving Personality: {personality}", duration=1.5)
 
-def auto_lane_change_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def auto_lane_change_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   alc_timer = sm['modelV2'].meta.autoLaneChangeTimer
   return Alert(
     "Autolane change will begin in %d sec" % alc_timer,
@@ -350,7 +350,7 @@ def auto_lane_change_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.Su
     AlertStatus.normal, AlertSize.mid,
     Priority.LOW, VisualAlert.none, AudibleAlert.promptRepeat, .75)
 
-def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   if os.path.isfile('/data/can_missing.log'):
     with open('/data/can_missing.log', 'r') as f:
       f.readline()
