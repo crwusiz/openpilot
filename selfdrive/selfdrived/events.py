@@ -1028,6 +1028,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 }
 
+
 if __name__ == '__main__':
   # print all alerts by type and priority
   from cereal.services import SERVICE_LIST
