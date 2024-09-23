@@ -2,7 +2,9 @@ import numpy as np
 from openpilot.selfdrive.modeld.constants import ModelConstants
 
 def sigmoid(x):
-  return 1. / (1. + np.exp(-x))
+  # -11 is around 10**14, more causes float16 overflow
+  clipped_x = np.clip(x, -11, np.inf)
+  return 1. / (1. + np.exp(-clipped_x))
 
 def softmax(x, axis=-1):
   x -= np.max(x, axis=axis, keepdims=True)
@@ -87,7 +89,6 @@ class Parser:
     self.parse_mdn('road_edges', outs, in_N=0, out_N=0, out_shape=(ModelConstants.NUM_ROAD_EDGES,ModelConstants.IDX_N,ModelConstants.LANE_LINES_WIDTH))
     self.parse_mdn('pose', outs, in_N=0, out_N=0, out_shape=(ModelConstants.POSE_WIDTH,))
     self.parse_mdn('road_transform', outs, in_N=0, out_N=0, out_shape=(ModelConstants.POSE_WIDTH,))
-    self.parse_mdn('sim_pose', outs, in_N=0, out_N=0, out_shape=(ModelConstants.POSE_WIDTH,))
     self.parse_mdn('wide_from_device_euler', outs, in_N=0, out_N=0, out_shape=(ModelConstants.WIDE_FROM_DEVICE_WIDTH,))
     self.parse_mdn('lead', outs, in_N=ModelConstants.LEAD_MHP_N, out_N=ModelConstants.LEAD_MHP_SELECTION,
                    out_shape=(ModelConstants.LEAD_TRAJ_LEN,ModelConstants.LEAD_WIDTH))
