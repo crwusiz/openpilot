@@ -174,8 +174,15 @@ void ui_update_params(UIState *s) {
 void UIState::updateStatus() {
   if (scene.started && sm->updated("selfdriveState")) {
     auto ss = (*sm)["selfdriveState"].getSelfdriveState();
+    auto ce = (*sm)["carState"].getCarState();
     auto state = ss .getState();
-    if (state == cereal::SelfdriveState::OpenpilotState::PRE_ENABLED || state == cereal::SelfdriveState::OpenpilotState::OVERRIDING) {
+    if (ce.getSteeringPressed()) {
+      status = STATUS_STEERING;
+    } else if (ce.getBrakePressed()) {
+      status = STATUS_BRAKE;
+    } else if (ce.getLeftBlinker() || ce.getRightBlinker()) {
+      status = STATUS_BLINKER;
+    } else if (state == cereal::SelfdriveState::OpenpilotState::PRE_ENABLED || state == cereal::SelfdriveState::OpenpilotState::OVERRIDING) {
       status = STATUS_OVERRIDE;
     } else {
       status = ss.getEnabled() ? STATUS_ENGAGED : STATUS_DISENGAGED;

@@ -9,6 +9,7 @@
 #include "selfdrive/ui/qt/util.h"
 
 #include <QString>
+#include "selfdrive/ui/qt/onroad/buttons.h"
 
 // Window that shows camera view and variety of info drawn on top
 AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget *parent)
@@ -24,9 +25,40 @@ AnnotatedCameraWidget::AnnotatedCameraWidget(VisionStreamType type, QWidget *par
 }
 
 void AnnotatedCameraWidget::updateState(const UIState &s) {
+  is_metric = s.scene.is_metric;
+
+  const SubMaster &sm = *(s.sm);
+  const auto ce = sm["carState"].getCarState();
+  const bool cs_alive = sm.alive("carState");
+
+  // Handle older routes where vEgoCluster is not set
+  v_ego_cluster_seen = v_ego_cluster_seen || ce.getVEgoCluster() != 0.0;
+  float v_ego = v_ego_cluster_seen ? ce.getVEgoCluster() : ce.getVEgo();
+  speed = cs_alive ? std::max<float>(0.0f, v_ego * (is_metric ? MS_TO_KPH : MS_TO_MPH)) : 0.0;
+
+  steeringPressed = ce.getSteeringPressed();
+  left_blindspot = ce.getLeftBlindspot();
+  right_blindspot = ce.getRightBlindspot();
+
   // update engageability/experimental mode button
   experimental_btn->updateState(s);
   dmon.updateState(s);
+}
+
+void AnnotatedCameraWidget::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
+  p.setOpacity(1.0);
+  QRect real_rect = p.fontMetrics().boundingRect(text);
+  real_rect.moveCenter({x, y - real_rect.height() / 2});
+  p.setPen(QColor(0xff, 0xff, 0xff, alpha));
+  p.drawText(real_rect.x(), real_rect.bottom(), text);
+}
+
+void AnnotatedCameraWidget::drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color) {
+  p.setOpacity(1.0);
+  QRect real_rect = p.fontMetrics().boundingRect(text);
+  real_rect.moveCenter({x, y - real_rect.height() / 2});
+  p.setPen(color);
+  p.drawText(real_rect.x(), real_rect.bottom(), text);
 }
 
 void AnnotatedCameraWidget::initializeGL() {
@@ -216,10 +248,10 @@ void AnnotatedCameraWidget::drawLead(QPainter &painter, const cereal::RadarState
   } else {
     v_color = pinkColor(150);
   }
-  if (speedUnit == "mph") {
-    l_speed = QString::asprintf("%.0f mph", speed + v_rel * 2.236936); // mph
+  if (is_metric) {
+    l_speed = QString::asprintf("%.0f km/h", speed + v_rel * 3.6);
   } else {
-    l_speed = QString::asprintf("%.0f km/h", speed + v_rel * 3.6); // kph
+    l_speed = QString::asprintf("%.0f mph", speed + v_rel * 2.236936);
   }
   painter.setFont(InterFont(35, QFont::Bold));
   drawTextColor(painter, x, y + sz / 1.5f + 70.0, l_dist, d_color);

@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "selfdrive/ui/qt/util.h"
+#include "selfdrive/ui/qt/onroad/buttons.h"
 
 constexpr int SET_SPEED_NA = 255;
 
@@ -83,18 +84,15 @@ void HudRenderer::updateState(const UIState &s) {
   }
 
   // Handle older routes where vEgoCluster is not set
-  v_ego_cluster_seen = v_ego_cluster_seen || car_state.getVEgoCluster() != 0.0;
-  float v_ego = v_ego_cluster_seen ? car_state.getVEgoCluster() : car_state.getVEgo();
+  v_ego_cluster_seen = v_ego_cluster_seen || ce.getVEgoCluster() != 0.0;
+  float v_ego = v_ego_cluster_seen ? ce.getVEgoCluster() : ce.getVEgo();
   speed = std::max<float>(0.0f, v_ego * (is_metric ? MS_TO_KPH : MS_TO_MPH));
 
   hideBottomIcons = (sm["selfdriveState"].getSelfdriveState().getAlertSize() != cereal::SelfdriveState::AlertSize::NONE);
   accel = ce.getAEgo();
-  steeringPressed = ce.getSteeringPressed();
   brake_press = ce.getBrakeLights();
   autohold_state = ce.getExState().getAutoHold();
   gas_press = ce.getGasPressed();
-  left_blindspot = ce.getLeftBlindspot();
-  right_blindspot = ce.getRightBlindspot();
   left_blinker = ce.getLeftBlinker();
   right_blinker = ce.getRightBlinker();
   wifi_state = (int)ds.getNetworkStrength();
@@ -141,14 +139,14 @@ void HudRenderer::draw(QPainter &p, const QRect &surface_rect) {
   if (nda_state > 0) {
     w = 120;
     h = 54;
-    x = (width() + (UI_BORDER_SIZE * 2)) / 2 - (w / 2) - UI_BORDER_SIZE;
-    y = UI_BORDER_SIZE * 4;
+    x = (surface_rect.width() + (UI_BORDER_SIZE * 2)) / 2 - (w / 2) - UI_BORDER_SIZE;
+    y = UI_BORDER_SIZE * 3;
     p.drawPixmap(x, y, w, h, nda_state == 1 ? nda_img : hda_img);
   }
 
   // sign icon (upper right 3)
   if (traffic_state >= 0) {
-    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
+    x = surface_rect.right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
     y = (btn_size / 2) + (UI_BORDER_SIZE * 4);
     if (traffic_state == 1 && is_cruise_set) {
       drawIcon(p, QPoint(x, y), sign_stop_img, icon_bg, 0.8);
@@ -160,12 +158,12 @@ void HudRenderer::draw(QPainter &p, const QRect &surface_rect) {
   }
 
   // N direction icon (upper right 4)
-  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
+  x = surface_rect.right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
   y = (btn_size / 2) + (UI_BORDER_SIZE * 20);
   drawIconRotate(p, QPoint(x, y), direction_img, icon_bg, gpsSatelliteCount != 0 ? 0.8 : 0.2, gpsBearing);
 
   // gps icon (upper right 3)
-  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 0.1);
+  x = surface_rect.right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 0.1);
   y = (btn_size / 2) + (UI_BORDER_SIZE * 20);
   drawIcon(p, QPoint(x, y), gps_img, icon_bg, gpsSatelliteCount != 0 ? 0.8 : 0.2);
 
@@ -180,7 +178,7 @@ void HudRenderer::draw(QPainter &p, const QRect &surface_rect) {
   }
 
   // wifi icon (upper right 2)
-  x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
+  x = surface_rect.right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
   y = (btn_size / 2) + (UI_BORDER_SIZE * 4);
   drawIcon(p, QPoint(x, y), wifi_img, icon_bg, wifi_state > 0 ? 0.8 : 0.2);
 
@@ -206,16 +204,16 @@ void HudRenderer::draw(QPainter &p, const QRect &surface_rect) {
                                 gpsSatelliteCount);
   }
 
-  x = rect().right() - 20;
+  x = surface_rect.right() - 20;
   y = (UI_BORDER_SIZE * 2);
 
   p.setFont(InterFont(30));
-  drawTextColorRight(p, x, y, infoGps, whiteColor(200));
+  drawTextColorLR(p, x, y, infoGps, whiteColor(200), "R");
 
   if (!hideBottomIcons) {
     // steer img (bottom 1 right)
     x = (btn_size / 2) + (UI_BORDER_SIZE * 2) + (btn_size);
-    y = rect().bottom() - (UI_FOOTER_HEIGHT / 2);
+    y = surface_rect.bottom() - (UI_FOOTER_HEIGHT / 2);
     drawIconRotate(p, QPoint(x, y), steer_img, icon_bg, 0.8, steerAngle);
 
     QColor sa_color = limeColor(200);
@@ -239,11 +237,11 @@ void HudRenderer::draw(QPainter &p, const QRect &surface_rect) {
     drawTextColor(p, x + 30, y + 95, sa_direction, whiteColor(200));
 
     // gaspress img (bottom right 2)
-    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
+    x = surface_rect.right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
     drawIcon(p, QPoint(x, y), gaspress_img, icon_bg, gas_press ? 0.8 : 0.2);
 
     // brake and autohold icon (bottom right 3)
-    x = rect().right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
+    x = surface_rect.right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
     if (autohold_state >= 1) {
       drawIcon(p, QPoint(x, y), autohold_state > 1 ? autohold_warning_img : autohold_active_img, icon_bg, autohold_state ? 0.8 : 0.2);
     } else {
@@ -253,8 +251,8 @@ void HudRenderer::draw(QPainter &p, const QRect &surface_rect) {
     // tpms (bottom right)
     w = 160;
     h = 208;
-    x = rect().right() - w - (UI_BORDER_SIZE * 2);
-    y = height() - h - (UI_BORDER_SIZE * 2);
+    x = surface_rect.right() - w - (UI_BORDER_SIZE * 2);
+    y = surface_rect.height() - h - (UI_BORDER_SIZE * 2);
 
     p.drawPixmap(x, y, w, h, tpms_img);
 
@@ -268,11 +266,11 @@ void HudRenderer::draw(QPainter &p, const QRect &surface_rect) {
   // bottom left info
   QString infoText = QString("[%1]").arg(QString::fromStdString(params.get("CarName")));
 
-  x = rect().left() + 20;
-  y = rect().height() - 20;
+  x = surface_rect.left() + 20;
+  y = surface_rect.height() - 20;
 
   p.setFont(InterFont(30));
-  drawTextColorLeft(p, x, y, infoText, whiteColor(200));
+  drawTextColorLR(p, x, y, infoText, whiteColor(200), "L");
 
   // turnsignal
   static int blink_index = 0;
@@ -284,11 +282,11 @@ void HudRenderer::draw(QPainter &p, const QRect &surface_rect) {
     blink_index = 0;
   } else {
     const float img_alpha = 0.8f;
-    const int center_x = width() / 2;
+    const int center_x = surface_rect.width() / 2;
     const int draw_count = 8;
     w = 200;
     h = 200;
-    y = (height() - h) / 2;
+    y = (surface_rect.height() - h) / 2;
 
     x = center_x;
     if (left_blinker) {
@@ -523,7 +521,7 @@ void HudRenderer::drawCurrentSpeed(QPainter &p, const QRect &surface_rect) {
   }
 
   p.setFont(InterFont(176, QFont::Bold));
-  drawTextColor(p, surface_rect.center().x(), 210, speedStr, variableColor);
+  drawTextColor(p, surface_rect.center().x(), 220, speedStr, variableColor);
 
   p.setFont(InterFont(66));
   drawTextColor(p, surface_rect.center().x(), 290, is_metric ? tr("km/h") : tr("mph"), lightorangeColor());
@@ -544,19 +542,16 @@ void HudRenderer::drawTextColor(QPainter &p, int x, int y, const QString &text, 
   p.drawText(real_rect.x(), real_rect.bottom(), text);
 }
 
-void HudRenderer::drawTextColorLeft(QPainter &p, int x, int y, const QString &text, const QColor &color) {
+void HudRenderer::drawTextColorLR(QPainter &p, int x, int y, const QString &text, const QColor &color, const QString &alignment) {
   p.setOpacity(1.0);
   QRect real_rect = p.fontMetrics().boundingRect(text);
-  real_rect.moveLeft(x);
-  real_rect.moveTop(y - real_rect.height() / 2);
-  p.setPen(color);
-  p.drawText(real_rect, text);
-}
 
-void HudRenderer::drawTextColorRight(QPainter &p, int x, int y, const QString &text, const QColor &color) {
-  p.setOpacity(1.0);
-  QRect real_rect = p.fontMetrics().boundingRect(text);
-  real_rect.moveRight(x);
+  if (alignment == "L") {
+    real_rect.moveLeft(x);
+  } else if (alignment == "R") {
+    real_rect.moveRight(x);
+  }
+
   real_rect.moveTop(y - real_rect.height() / 2);
   p.setPen(color);
   p.drawText(real_rect, text);

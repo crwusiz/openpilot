@@ -14,8 +14,7 @@ private:
   void drawCurrentSpeed(QPainter &p, const QRect &surface_rect);
   void drawText(QPainter &p, int x, int y, const QString &text, int alpha = 255);
   void drawTextColor(QPainter &p, int x, int y, const QString &text, const QColor &color);
-  void drawTextColorLeft(QPainter &p, int x, int y, const QString &text, const QColor &color);
-  void drawTextColorRight(QPainter &p, int x, int y, const QString &text, const QColor &color);
+  void drawTextColorLR(QPainter &p, int x, int y, const QString &text, const QColor &color, const QString &alignment);
 
   float speed = 0;
   float set_speed = 0;
@@ -37,11 +36,9 @@ private:
 
   QString leftDistStr, sa_str, sa_direction, altitudeStr, accuracyStr, infoGps;
 
-  bool steeringPressed = false;
   bool hideBottomIcons = false;
   bool longControl = false;
   bool brake_press, gas_press = false;
-  bool left_blindspot, right_blindspot = false;
   bool left_blinker, right_blinker = false;
 
   int autohold_state, nda_state = 0;
@@ -61,17 +58,13 @@ private:
 
 protected:
   // add
-  inline QColor redColor(int alpha = 255) { return QColor(255, 0, 0, alpha); }
+  inline QColor redColor(int alpha = 255) { return QColor(201, 34, 49, alpha); }
   inline QColor whiteColor(int alpha = 255) { return QColor(255, 255, 255, alpha); }
   inline QColor blackColor(int alpha = 255) { return QColor(0, 0, 0, alpha); }
-  inline QColor yellowColor(int alpha = 255) { return QColor(255, 255, 0, alpha); }
   inline QColor limeColor(int alpha = 255) { return QColor(120, 255, 120, alpha); }
   inline QColor orangeColor(int alpha = 255) { return QColor(255, 149, 0, alpha); }
   inline QColor lightorangeColor(int alpha = 255) { return QColor(255, 228, 191, alpha); }
-  inline QColor engagedColor(int alpha = 255) { return QColor(23, 134, 68, alpha); }
-  inline QColor warningColor(int alpha = 255) { return QColor(218, 111, 37, alpha); }
   inline QColor overrideColor(int alpha = 255) { return QColor(145, 155, 149, alpha); }
-  inline QColor steeringpressedColor(int alpha = 255) { return QColor(0, 191, 255, alpha); }
   inline QColor greenColor(int alpha = 255) { return QColor(128, 216, 166, alpha); }
   inline QColor pinkColor(int alpha = 255) { return QColor(255, 191, 191, alpha); }
 };
