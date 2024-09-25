@@ -1,12 +1,15 @@
+#pragma once
+
+#include "safety_declarations.h"
 #include "safety_hyundai_common.h"
 
 #define HYUNDAI_LIMITS(steer, rate_up, rate_down) { \
   .max_steer = (steer), \
   .max_rate_up = (rate_up), \
   .max_rate_down = (rate_down), \
-  .max_rt_delta = 150, \
+  .max_rt_delta = 112, \
   .max_rt_interval = 250000, \
-  .driver_torque_allowance = 60, \
+  .driver_torque_allowance = 50, \
   .driver_torque_factor = 2, \
   .type = TorqueDriverLimited, \
    /* the EPS faults when the steering angle is above a certain threshold for too long. to prevent this, */ \
@@ -17,15 +20,13 @@
   .has_steer_req_tolerance = true, \
 }
 
-const SteeringLimits HYUNDAI_STEERING_LIMITS = HYUNDAI_LIMITS(384, 3, 7);
-const SteeringLimits HYUNDAI_STEERING_LIMITS_ALT = HYUNDAI_LIMITS(270, 2, 3);
-
+extern const LongitudinalLimits HYUNDAI_LONG_LIMITS;
 const LongitudinalLimits HYUNDAI_LONG_LIMITS = {
   .max_accel = 250,   // 1/100 m/s2
   .min_accel = -400,  // 1/100 m/s2
 };
 
-const CanMsg HYUNDAI_TX_MSGS[] = {
+static const CanMsg HYUNDAI_TX_MSGS[] = {
   {0x251, 2, 8}, // MDPS12 Bus 2
   {0x340, 0, 8}, // LKAS11 Bus 0
   {0x4F1, 0, 4}, // CLU11 Bus 0
@@ -39,37 +40,6 @@ const CanMsg HYUNDAI_TX_MSGS[] = {
   {0x485, 0, 4}, // LFAHDA_MFC Bus 0
   {0x4A2, 0, 8}, // FRT_RADAR11 Bus 0
 };
-
-const CanMsg HYUNDAI_LONG_TX_MSGS[] = {
-  {0x251, 2, 8}, // MDPS12 Bus 2
-  {0x340, 0, 8}, // LKAS11 Bus 0
-  {0x4F1, 0, 4}, // CLU11 Bus 0
-  {0x4F1, 2, 4}, // CLU11 Bus 2
-  {0x420, 0, 8}, // SCC11 Bus 0
-  {0x421, 0, 8}, // SCC12 Bus 0
-  {0x50A, 0, 8}, // SCC13 Bus 0
-  {0x389, 0, 8}, // SCC14 Bus 0
-  {0x38D, 0, 8}, // FCA11 Bus 0
-  {0x483, 0, 8}, // FCA12 Bus 0
-  {0x485, 0, 4}, // LFAHDA_MFC Bus 0
-  {0x4A2, 0, 2}, // FRT_RADAR11 Bus 0
-  {0x7D0, 0, 8}, // radar UDS TX addr Bus 0 (for radar disable)
-};
-
-const CanMsg HYUNDAI_CAMERA_SCC_TX_MSGS[] = {
-  {0x251, 2, 8}, // MDPS12 Bus 2
-  {0x340, 0, 8}, // LKAS11 Bus 0
-  {0x4F1, 0, 4}, // CLU11 Bus 0
-  {0x4F1, 2, 4}, // CLU11 Bus 2
-  {0x420, 0, 8}, // SCC11 Bus 0
-  {0x421, 0, 8}, // SCC12 Bus 0
-  {0x50A, 0, 8}, // SCC13 Bus 0
-  {0x389, 0, 8}, // SCC14 Bus 0
-  {0x38D, 0, 8}, // FCA11 Bus 0
-  {0x483, 0, 8}, // FCA12 Bus 0
-  {0x485, 0, 4}, // LFAHDA_MFC Bus 0
-  {0x4A2, 0, 8}, // FRT_RADAR11 Bus 0
- };
 
 #define HYUNDAI_COMMON_RX_CHECKS(legacy)                                                                                              \
   {.msg = {{0x260, 0, 8, .check_checksum = true, .max_counter = 3U, .frequency = 100U},                                       \
@@ -80,30 +50,7 @@ const CanMsg HYUNDAI_CAMERA_SCC_TX_MSGS[] = {
 #define HYUNDAI_SCC12_ADDR_CHECK(scc_bus)                                                                                  \
   {.msg = {{0x421, (scc_bus), 8, .check_checksum = true, .max_counter = 15U, .frequency = 50U}, { 0 }, { 0 }}}, \
 
-RxCheck hyundai_rx_checks[] = {
-   HYUNDAI_COMMON_RX_CHECKS(false)
-   HYUNDAI_SCC12_ADDR_CHECK(0)
-};
-
-RxCheck hyundai_cam_scc_rx_checks[] = {
-  HYUNDAI_COMMON_RX_CHECKS(false)
-  HYUNDAI_SCC12_ADDR_CHECK(2)
-};
-
-RxCheck hyundai_long_rx_checks[] = {
-  HYUNDAI_COMMON_RX_CHECKS(false)
-  // Use CLU11 (buttons) to manage controls allowed instead of SCC cruise state
-  {.msg = {{0x4F1, 0, 4, .check_checksum = false, .max_counter = 15U, .frequency = 50U}, { 0 }, { 0 }}},
-};
-
-// older hyundai models have less checks due to missing counters and checksums
-RxCheck hyundai_legacy_rx_checks[] = {
-  HYUNDAI_COMMON_RX_CHECKS(true)
-  //HYUNDAI_SCC12_ADDR_CHECK(0)
-};
-
-bool hyundai_legacy = false;
-
+static bool hyundai_legacy = false;
 
 static uint8_t hyundai_get_counter(const CANPacket_t *to_push) {
   int addr = GET_ADDR(to_push);
@@ -197,8 +144,7 @@ static void hyundai_rx_hook(const CANPacket_t *to_push) {
 
   if (bus == 0) {
     if (addr == 0x251) {
-      //int torque_driver_new = (GET_BYTES(to_push, 0, 2) & 0x7ffU) - 1024U;
-      int torque_driver_new = ((int)(GET_BYTES(to_push, 0, 4) & 0x7ffU) - 982) * 0.4;
+      int torque_driver_new = (GET_BYTES(to_push, 0, 2) & 0x7ffU) - 1024U;
       // update array of samples
       update_sample(&torque_driver, torque_driver_new);
     }
@@ -247,6 +193,9 @@ static void hyundai_rx_hook(const CANPacket_t *to_push) {
 uint32_t ts_lkas11, ts_scc12, ts_mdps12, ts_fca11 = 0;
 
 static bool hyundai_tx_hook(const CANPacket_t *to_send) {
+  const SteeringLimits HYUNDAI_STEERING_LIMITS = HYUNDAI_LIMITS(384, 3, 7);
+  const SteeringLimits HYUNDAI_STEERING_LIMITS_ALT = HYUNDAI_LIMITS(270, 2, 3);
+
   bool tx = true;
   int addr = GET_ADDR(to_send);
 
@@ -367,6 +316,37 @@ static int hyundai_fwd_hook(int bus_num, int addr) {
 }
 
 static safety_config hyundai_init(uint16_t param) {
+  static const CanMsg HYUNDAI_LONG_TX_MSGS[] = {
+    {0x251, 2, 8}, // MDPS12 Bus 2
+    {0x340, 0, 8}, // LKAS11 Bus 0
+    {0x4F1, 0, 4}, // CLU11 Bus 0
+    {0x4F1, 2, 4}, // CLU11 Bus 2
+    {0x420, 0, 8}, // SCC11 Bus 0
+    {0x421, 0, 8}, // SCC12 Bus 0
+    {0x50A, 0, 8}, // SCC13 Bus 0
+    {0x389, 0, 8}, // SCC14 Bus 0
+    {0x38D, 0, 8}, // FCA11 Bus 0
+    {0x483, 0, 8}, // FCA12 Bus 0
+    {0x485, 0, 4}, // LFAHDA_MFC Bus 0
+    {0x4A2, 0, 2}, // FRT_RADAR11 Bus 0
+    {0x7D0, 0, 8}, // radar UDS TX addr Bus 0 (for radar disable)
+  };
+
+  static const CanMsg HYUNDAI_CAMERA_SCC_TX_MSGS[] = {
+    {0x251, 2, 8}, // MDPS12 Bus 2
+    {0x340, 0, 8}, // LKAS11 Bus 0
+    {0x4F1, 0, 4}, // CLU11 Bus 0
+    {0x4F1, 2, 4}, // CLU11 Bus 2
+    {0x420, 0, 8}, // SCC11 Bus 0
+    {0x421, 0, 8}, // SCC12 Bus 0
+    {0x50A, 0, 8}, // SCC13 Bus 0
+    {0x389, 0, 8}, // SCC14 Bus 0
+    {0x38D, 0, 8}, // FCA11 Bus 0
+    {0x483, 0, 8}, // FCA12 Bus 0
+    {0x485, 0, 4}, // LFAHDA_MFC Bus 0
+    {0x4A2, 0, 8}, // FRT_RADAR11 Bus 0
+  };
+
   hyundai_common_init(param);
   hyundai_legacy = false;
 
@@ -376,16 +356,38 @@ static safety_config hyundai_init(uint16_t param) {
 
   safety_config ret;
   if (hyundai_longitudinal) {
+    static RxCheck hyundai_long_rx_checks[] = {
+      HYUNDAI_COMMON_RX_CHECKS(false)
+      // Use CLU11 (buttons) to manage controls allowed instead of SCC cruise state
+      {.msg = {{0x4F1, 0, 4, .check_checksum = false, .max_counter = 15U, .frequency = 50U}, { 0 }, { 0 }}},
+    };
+
     ret = BUILD_SAFETY_CFG(hyundai_long_rx_checks, HYUNDAI_LONG_TX_MSGS);
   } else if (hyundai_camera_scc) {
+    static RxCheck hyundai_cam_scc_rx_checks[] = {
+      HYUNDAI_COMMON_RX_CHECKS(false)
+      HYUNDAI_SCC12_ADDR_CHECK(2)
+    };
+
     ret = BUILD_SAFETY_CFG(hyundai_cam_scc_rx_checks, HYUNDAI_CAMERA_SCC_TX_MSGS);
   } else {
+    static RxCheck hyundai_rx_checks[] = {
+       HYUNDAI_COMMON_RX_CHECKS(false)
+       HYUNDAI_SCC12_ADDR_CHECK(0)
+    };
+
     ret = BUILD_SAFETY_CFG(hyundai_rx_checks, HYUNDAI_TX_MSGS);
   }
   return ret;
 }
 
 static safety_config hyundai_legacy_init(uint16_t param) {
+  // older hyundai models have less checks due to missing counters and checksums
+  static RxCheck hyundai_legacy_rx_checks[] = {
+    HYUNDAI_COMMON_RX_CHECKS(true)
+    //HYUNDAI_SCC12_ADDR_CHECK(0)
+  };
+
   hyundai_common_init(param);
   hyundai_legacy = true;
   hyundai_longitudinal = false;
