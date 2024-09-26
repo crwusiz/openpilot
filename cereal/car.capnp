@@ -735,7 +735,7 @@ struct CarParams {
   brakeMaxVDEPRECATED @16 :List(Float32);
   directAccelControlDEPRECATED @30 :Bool;
   maxSteeringAngleDegDEPRECATED @54 :Float32;
-  longitudinalActuatorDelayLowerBoundDEPRECATEDDEPRECATED @61 :Float32;
+  longitudinalActuatorDelayLowerBoundDEPRECATED @61 :Float32;
 
   # add
   sccBus @77: Int8;
