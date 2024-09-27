@@ -1162,6 +1162,14 @@ FW_VERSIONS = {
       b'\xf1\x00JK1_ SCC FHCUP      1.00 1.02 99110-AR000         ',
     ],
   },
+  CAR.GENESIS_GV70_EV: {  # (JK1)
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00JK1EMFC  AT USA LHD 1.00 1.00 99211-IT100 220919',
+    ],
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00JKev SCC -----      1.00 1.01 99110-DS000         ',
+    ],
+  },
   CAR.GENESIS_GV80: {  # (JX1)
     (Ecu.fwdCamera, 0x7c4, None): [
       b'\xf1\x00JX1 MFC  AT USA LHD 1.00 1.02 99211-T6110 220513',
@@ -1173,6 +1181,14 @@ FW_VERSIONS = {
       b'\xf1\x00JX1_ SCC FHCUP      1.00 1.01 99110-T6100         ',
       #
       b'\xf1\x00JX1_ SCC -----      1.00 1.03 99110-T6000         ',
+    ],
+  },
+  CAR.GENESIS_G80_FL: {
+    (Ecu.fwdRadar, 0x7d0, None): [
+      b'\xf1\x00RG3_ SCC -----      1.00 1.02 99110-T1120         ',
+    ],
+    (Ecu.fwdCamera, 0x7c4, None): [
+      b'\xf1\x00RG3 MFC  AT USA LHD 1.00 1.01 99211-T1200 230607',
     ],
   },
 }

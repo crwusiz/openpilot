@@ -26,7 +26,6 @@ HudRenderer::HudRenderer() {
   sign_none_img = loadPixmap("../assets/img_sign_none.png", {img_size, img_size});
   sign_go_img = loadPixmap("../assets/img_sign_go.png", {img_size, img_size});
   sign_stop_img = loadPixmap("../assets/img_sign_stop.png", {img_size, img_size});
-
   lane_change_left_img = loadPixmap("../assets/lane_change_left.png");
   lane_change_right_img = loadPixmap("../assets/lane_change_right.png");
 
@@ -391,8 +390,6 @@ void HudRenderer::drawSetSpeed(QPainter &p, const QRect &surface_rect) {
 
   if (status == STATUS_DISENGAGED) {
     p.setPen(whiteColor());
-  } else if (status == STATUS_OVERRIDE) {
-    p.setPen(overrideColor());
   } else if (limit_speed > 0) {
     p.setPen(interpColor(
       cruise_speed,
@@ -431,8 +428,6 @@ void HudRenderer::drawSetSpeed(QPainter &p, const QRect &surface_rect) {
 
   if (status == STATUS_DISENGAGED) {
     p.setPen(whiteColor());
-  } else if (status == STATUS_OVERRIDE) {
-    p.setPen(overrideColor());
   } else if (limit_speed > 0) {
     p.setPen(interpColor(
       apply_speed,

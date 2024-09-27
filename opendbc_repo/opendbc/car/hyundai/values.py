@@ -678,6 +678,11 @@ class CAR(Platforms):
     CarSpecs(mass=2035, wheelbase=3.01, steerRatio=16.5),
     flags=HyundaiFlags.LEGACY,
   )
+  GENESIS_G80_FL = HyundaiCanFDPlatformConfig(
+    HyundaiCarDocs("GENESIS G80 FL (RG3)", car_parts=CarParts.common([CarHarness.hyundai_p])),
+    [HyundaiCarDocs("Genesis G80 (2.5T Advanced Trim, with HDA II) 2024", "Highway Driving Assist II", car_parts=CarParts.common([CarHarness.hyundai_p]))],
+    CarSpecs(mass=2060, wheelbase=3.00, steerRatio=14.0),
+  )
   GENESIS_G90 = HyundaiPlatformConfig(
     [
       HyundaiCarDocs("GENESIS G90 (HI)", car_parts=CarParts.common([CarHarness.hyundai_c])),
@@ -704,6 +709,13 @@ class CAR(Platforms):
     ],
     CarSpecs(mass=1950, wheelbase=2.87, steerRatio=15.2, tireStiffnessFactor=0.65),
     flags=HyundaiFlags.RADAR_SCC,
+  )
+  GENESIS_GV70_EV = HyundaiCanFDPlatformConfig(
+    [
+      HyundaiCarDocs("GENESIS GV70 EV (JK1)", car_parts=CarParts.common([CarHarness.hyundai_l])),
+    ],
+    CarSpecs(mass=1950, wheelbase=2.87, steerRatio=15.2, tireStiffnessFactor=0.65),
+    flags=HyundaiFlags.EV,
   )
   GENESIS_GV80 = HyundaiCanFDPlatformConfig(
     [
