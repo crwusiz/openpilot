@@ -80,6 +80,7 @@ class HyundaiFlags(IntFlag):
 
   # The radar does SCC on these cars when HDA I, rather than the camera
   RADAR_SCC = 2 ** 14
+  # The camera does SCC on these cars, rather than the radar
   CAMERA_SCC = 2 ** 15
   CHECKSUM_CRC8 = 2 ** 16
   CHECKSUM_6B = 2 ** 17
@@ -90,6 +91,8 @@ class HyundaiFlags(IntFlag):
   # these cars have not been verified to work with longitudinal yet - radar disable, sending correct messages, etc.
   UNSUPPORTED_LONGITUDINAL = 2 ** 19
 
+  # These CAN FD cars do not accept communication control to disable the ADAS ECU,
+  # responds with 0x7F2822 - 'conditions not correct'
   CANFD_NO_RADAR_DISABLE = 2 ** 20
 
   CLUSTER_GEARS = 2 ** 21
@@ -679,8 +682,10 @@ class CAR(Platforms):
     flags=HyundaiFlags.LEGACY,
   )
   GENESIS_G80_FL = HyundaiCanFDPlatformConfig(
-    HyundaiCarDocs("GENESIS G80 FL (RG3)", car_parts=CarParts.common([CarHarness.hyundai_p])),
-    [HyundaiCarDocs("Genesis G80 (2.5T Advanced Trim, with HDA II) 2024", "Highway Driving Assist II", car_parts=CarParts.common([CarHarness.hyundai_p]))],
+    [
+      HyundaiCarDocs("GENESIS G80 FL (RG3)", car_parts=CarParts.common([CarHarness.hyundai_p])),
+      HyundaiCarDocs("Genesis G80 (2.5T Advanced Trim, with HDA II) 2024", "Highway Driving Assist II", car_parts=CarParts.common([CarHarness.hyundai_p]))
+    ],
     CarSpecs(mass=2060, wheelbase=3.00, steerRatio=14.0),
   )
   GENESIS_G90 = HyundaiPlatformConfig(
