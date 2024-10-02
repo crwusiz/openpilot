@@ -7,7 +7,7 @@ from opendbc.car.common.numpy_fast import clip, interp
 from opendbc.car.hyundai import hyundaicanfd, hyundaican
 from opendbc.car.hyundai.carstate import CarState
 from opendbc.car.hyundai.hyundaicanfd import CanBus
-from opendbc.car.hyundai.values import HyundaiFlags, Buttons, CarControllerParams, CANFD_CAR, CAR, CAN_GEARS
+from opendbc.car.hyundai.values import HyundaiFlags, Buttons, CarControllerParams, CAR, CAN_GEARS
 from opendbc.car.interfaces import CarControllerBase, ACCEL_MIN, ACCEL_MAX
 
 from openpilot.selfdrive.controls.neokii.navi_controller import SpeedLimiter
@@ -137,7 +137,7 @@ class CarController(CarControllerBase):
     # *** common hyundai stuff ***
 
     # CAN-FD platforms
-    if self.CP.carFingerprint in CANFD_CAR:
+    if self.CP.flags & HyundaiFlags.CANFD:
       hda2 = self.CP.flags & HyundaiFlags.CANFD_HDA2
       #hda2_long = hda2 and self.CP.openpilotLongitudinalControl
 

@@ -16,7 +16,7 @@ AlertSize = log.SelfdriveState.AlertSize
 AlertStatus = log.SelfdriveState.AlertStatus
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 AudibleAlert = car.CarControl.HUDControl.AudibleAlert
-EventName = car.OnroadEvent.EventName
+EventName = log.OnroadEvent.EventName
 
 
 # Alert priorities
@@ -98,7 +98,7 @@ class Events:
   def to_msg(self):
     ret = []
     for event_name in self.events:
-      event = car.OnroadEvent.new_message()
+      event = log.OnroadEvent.new_message()
       event.name = event_name
       for event_type in EVENTS.get(event_name, {}):
         setattr(event, event_type, True)
@@ -416,14 +416,21 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.PERMANENT: StartupAlert("대시캠 모드 : 호환되지않는 차량"),
   },
 
+  EventName.startupNoSecOcKey: {
+    ET.PERMANENT: NormalPermanentAlert("대시캠 모드",
+                                       "보안키 사용불가",
+                                       priority=Priority.HIGH),
+  },
+
   EventName.dashcamMode: {
     ET.PERMANENT: NormalPermanentAlert("대시캠 모드",
                                        priority=Priority.LOWEST),
   },
 
   EventName.invalidLkasSetting: {
-    ET.PERMANENT: NormalPermanentAlert("LKAS 버튼 동작됨",
-                                       "LKAS 버튼이 해제된 후 활성화됩니다"),
+    ET.PERMANENT: NormalPermanentAlert("잘못된 LKAS 설정",
+                                       "활성화 하려면 차량의 LKAS를 켜거나 끄세요."),
+    ET.NO_ENTRY: NoEntryAlert("Invalid LKAS setting"),
   },
 
   EventName.cruiseMismatch: {
@@ -985,16 +992,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("속도를 줄인 후 활성화하세요"),
   },
 
-  EventName.lowSpeedLockout: {
-    ET.PERMANENT: NormalPermanentAlert("크루즈 오류 : 차량을 재가동 하세요"),
-    ET.NO_ENTRY: NoEntryAlert("크루즈 오류 : 차량을 재가동 하세요"),
-  },
-
-  EventName.lkasDisabled: {
-    ET.PERMANENT: NormalPermanentAlert("LKAS 해제됨: LKAS를 켜세요"),
-    ET.NO_ENTRY: NoEntryAlert("LKAS 해제됨"),
-  },
-
   EventName.vehicleSensorsInvalid: {
     ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("차량 센서 정보가 유효하지 않습니다"),
     ET.PERMANENT: NormalPermanentAlert("차량 센서 보정", "주행 하여 보정하세요"),
@@ -1018,15 +1015,16 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventName.cruiseOn: {
-    ET.PERMANENT: Alert("크루즈 작동", "", AlertStatus.normal, AlertSize.none,
+    ET.PERMANENT: Alert("", "", AlertStatus.normal, AlertSize.none,
                         Priority.MID, VisualAlert.none, AudibleAlert.cruiseOn, 1.),
   },
 
   EventName.cruiseOff: {
-    ET.PERMANENT: Alert("크루즈 해제", "", AlertStatus.normal, AlertSize.none,
+    ET.PERMANENT: Alert("", "", AlertStatus.normal, AlertSize.none,
                         Priority.MID, VisualAlert.none, AudibleAlert.cruiseOff, 1.),
   },
 }
+
 
 if __name__ == '__main__':
   # print all alerts by type and priority

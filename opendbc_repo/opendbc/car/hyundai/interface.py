@@ -1,9 +1,9 @@
 from panda import Panda
 from opendbc.car import get_safety_config, structs
 from opendbc.car.hyundai.hyundaicanfd import CanBus
-from opendbc.car.hyundai.values import HyundaiFlags, CAR, DBC, CANFD_CAR, CAMERA_SCC_CAR, CANFD_RADAR_SCC_CAR, \
-                                         CANFD_UNSUPPORTED_LONGITUDINAL_CAR, EV_CAR, HYBRID_CAR, LEGACY_SAFETY_MODE_CAR, \
-                                         UNSUPPORTED_LONGITUDINAL_CAR, Buttons, ANGLE_CONTROL_CAR, HyundaiExFlags
+from opendbc.car.hyundai.values import (HyundaiFlags, CAR, DBC, CAMERA_SCC_CAR, CANFD_RADAR_SCC_CAR,
+                                        CANFD_UNSUPPORTED_LONGITUDINAL_CAR, UNSUPPORTED_LONGITUDINAL_CAR, Buttons,
+                                        HyundaiExFlags)
 from opendbc.car.hyundai.radar_interface import RADAR_START_ADDR
 from opendbc.car.interfaces import CarInterfaceBase
 from opendbc.car.disable_ecu import disable_ecu
@@ -25,77 +25,8 @@ class CarInterface(CarInterfaceBase):
     hda2 = 0x50 in fingerprint[cam_can] or 0x110 in fingerprint[cam_can] or Params().get_bool("IsHda2")
     CAN = CanBus(None, fingerprint, hda2)
 
-    if candidate in CANFD_CAR:
-      # detect if car is hybrid
-      if 0x105 in fingerprint[CAN.ECAN]:
-        ret.flags |= HyundaiFlags.HYBRID.value
-      elif candidate in EV_CAR:
-        ret.flags |= HyundaiFlags.EV.value
-
-      # detect HDA2 with ADAS Driving ECU
-      if hda2:
-        ret.flags |= HyundaiFlags.CANFD_HDA2.value
-        if 0x110 in fingerprint[CAN.CAM]:
-          ret.flags |= HyundaiFlags.CANFD_HDA2_ALT_STEERING.value
-      else:
-        # non-HDA2
-        if 0x1cf not in fingerprint[CAN.ECAN]:
-          ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
-        # ICE cars do not have 0x130; GEARS message on 0x40 or 0x70 instead
-        if 0x130 not in fingerprint[CAN.ECAN]:
-          if 0x40 not in fingerprint[CAN.ECAN]:
-            ret.flags |= HyundaiFlags.CANFD_ALT_GEARS_2.value
-          else:
-            ret.flags |= HyundaiFlags.CANFD_ALT_GEARS.value
-        if candidate not in CANFD_RADAR_SCC_CAR:
-          ret.flags |= HyundaiFlags.CANFD_CAMERA_SCC.value
-    else:
-      # TODO: detect EV and hybrid
-      if candidate in HYBRID_CAR:
-        ret.flags |= HyundaiFlags.HYBRID.value
-      elif candidate in EV_CAR:
-        ret.flags |= HyundaiFlags.EV.value
-
-      # Send LFA message on cars with HDA
-      if 0x485 in fingerprint[2]:
-        ret.flags |= HyundaiFlags.SEND_LFA.value
-
-      # These cars use the FCA11 message for the AEB and FCW signals, all others use SCC12
-      if 0x38d in fingerprint[0] or 0x38d in fingerprint[2]:
-        ret.flags |= HyundaiFlags.USE_FCA.value
-      #if 0x483 in fingerprint[0] or 0x483 in fingerprint[2]:
-      #  ret.flags |= HyundaiFlags.SEND_FCA12.value
-
-    ret.steerActuatorDelay = 0.1  # Default delay
-    ret.steerLimitTimer = 0.4
-
-    if candidate in ANGLE_CONTROL_CAR:
-      ret.steerControlType = SteerControlType.angle
-    else:
-      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
-
-    # *** longitudinal control ***
-    if candidate in CANFD_CAR:
-      ret.experimentalLongitudinalAvailable = candidate not in (CANFD_UNSUPPORTED_LONGITUDINAL_CAR | CANFD_RADAR_SCC_CAR)
-    else:
-      ret.experimentalLongitudinalAvailable = not ret.radarUnavailable
-
-    # WARNING: disabling radar also disables AEB (and we show the same warning on the instrument cluster as if you manually disabled AEB)
-    ret.openpilotLongitudinalControl = experimental_long and ret.experimentalLongitudinalAvailable
-    ret.pcmCruise = not ret.openpilotLongitudinalControl
-
-    ret.stoppingControl = True
-    ret.stoppingDecelRate = 1.0
-    ret.vEgoStopping = 0.3
-    ret.stopAccel = -3.5
-
-    ret.startingState = True
-    ret.vEgoStarting = 0.3
-    ret.startAccel = 2.0
-    ret.longitudinalActuatorDelay = 0.5
-
-    # *** feature detection and  Params Init ***
-    if candidate in CANFD_CAR:
+    if ret.flags & HyundaiFlags.CANFD:
+      # Shared configuration for CAN-FD cars
       ret.isCanfd = True
       Params().put_bool("IsCanfd", True)
       Params().put_bool("SccOnBus2", False)
@@ -112,7 +43,47 @@ class CarInterface(CarInterfaceBase):
         ret.exFlags |= HyundaiExFlags.LFA.value
 
       ret.radarUnavailable = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
+      ret.experimentalLongitudinalAvailable = candidate not in (CANFD_UNSUPPORTED_LONGITUDINAL_CAR | CANFD_RADAR_SCC_CAR)
+
+      if 0x105 in fingerprint[CAN.ECAN]:
+        ret.flags |= HyundaiFlags.HYBRID.value
+
+      # detect HDA2 with ADAS Driving ECU
+      if hda2:
+        ret.flags |= HyundaiFlags.CANFD_HDA2.value
+        if 0x110 in fingerprint[CAN.CAM]:
+          ret.flags |= HyundaiFlags.CANFD_HDA2_ALT_STEERING.value
+      else:
+        # non-HDA2
+        if 0x1cf not in fingerprint[CAN.ECAN]:
+          ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
+        if not ret.flags & HyundaiFlags.RADAR_SCC:
+          ret.flags |= HyundaiFlags.CANFD_CAMERA_SCC.value
+
+      # Some HDA2 cars have alternative messages for gear checks
+      # ICE cars do not have 0x130; GEARS message on 0x40 or 0x70 instead
+      if 0x130 not in fingerprint[CAN.ECAN]:
+        if 0x40 not in fingerprint[CAN.ECAN]:
+          ret.flags |= HyundaiFlags.CANFD_ALT_GEARS_2.value
+        else:
+          ret.flags |= HyundaiFlags.CANFD_ALT_GEARS.value
+
+      cfgs = [get_safety_config(structs.CarParams.SafetyModel.hyundaiCanfd), ]
+      if CAN.ECAN >= 4:
+        cfgs.insert(0, get_safety_config(structs.CarParams.SafetyModel.noOutput))
+      ret.safetyConfigs = cfgs
+
+      if ret.flags & HyundaiFlags.CANFD_HDA2:
+        ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_HDA2
+        if ret.flags & HyundaiFlags.CANFD_HDA2_ALT_STEERING:
+          ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_HDA2_ALT_STEERING
+      if ret.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
+        ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_ALT_BUTTONS
+      if ret.flags & HyundaiFlags.CANFD_CAMERA_SCC:
+        ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_CAMERA_SCC
+
     else:
+      # Shared configuration for non CAN-FD cars
       ret.isCanfd = False
       Params().put_bool("IsCanfd", False)
 
@@ -140,29 +111,24 @@ class CarInterface(CarInterfaceBase):
         ret.radarTimeStep = (1.0 / 20)  # 20Hz  RadarTrack 20Hz
 
       ret.radarUnavailable = ret.sccBus == -1
+      ret.experimentalLongitudinalAvailable = not ret.radarUnavailable
 
       if ret.openpilotLongitudinalControl and ret.sccBus == 0:
         ret.pcmCruise = False
       else:
         ret.pcmCruise = True
 
-    # *** panda safety config ***
-    if candidate in CANFD_CAR:
-      cfgs = [get_safety_config(structs.CarParams.SafetyModel.hyundaiCanfd), ]
-      if CAN.ECAN >= 4:
-        cfgs.insert(0, get_safety_config(structs.CarParams.SafetyModel.noOutput))
-      ret.safetyConfigs = cfgs
+      # Send LFA message on cars with HDA
+      if 0x485 in fingerprint[2]:
+        ret.flags |= HyundaiFlags.SEND_LFA.value
 
-      if ret.flags & HyundaiFlags.CANFD_HDA2:
-        ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_HDA2
-        if ret.flags & HyundaiFlags.CANFD_HDA2_ALT_STEERING:
-          ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_HDA2_ALT_STEERING
-      if ret.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
-        ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_CANFD_ALT_BUTTONS
-      if ret.flags & HyundaiFlags.CANFD_CAMERA_SCC:
-        ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_CAMERA_SCC
-    else:
-      if candidate in LEGACY_SAFETY_MODE_CAR:
+      # These cars use the FCA11 message for the AEB and FCW signals, all others use SCC12
+      if 0x38d in fingerprint[0] or 0x38d in fingerprint[2]:
+        ret.flags |= HyundaiFlags.USE_FCA.value
+      #if 0x483 in fingerprint[0] or 0x483 in fingerprint[2]:
+      #  ret.flags |= HyundaiFlags.SEND_FCA12.value
+
+      if ret.flags & HyundaiFlags.LEGACY:
         # these cars require a special panda safety mode due to missing counters and checksums in the messages
         ret.safetyConfigs = [get_safety_config(structs.CarParams.SafetyModel.hyundaiLegacy)]
       else:
@@ -170,14 +136,38 @@ class CarInterface(CarInterfaceBase):
       #if candidate in CAMERA_SCC_CAR:
       #  ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_CAMERA_SCC
 
+
+    # Common lateral control setup
+
+    ret.centerToFront = ret.wheelbase * 0.4
+    ret.steerActuatorDelay = 0.1
+    ret.steerLimitTimer = 0.4
+
+    if ret.flags & HyundaiFlags.ANGLE_CONTROL:
+      ret.steerControlType = SteerControlType.angle
+    else:
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
+
+    # Common longitudinal control setup
+
+    ret.openpilotLongitudinalControl = experimental_long and ret.experimentalLongitudinalAvailable
+    ret.pcmCruise = not ret.openpilotLongitudinalControl
+    ret.stoppingControl = True
+    ret.startingState = True
+    ret.vEgoStarting = 0.3
+    ret.startAccel = 2.0
+    ret.stoppingDecelRate = 1.0
+    ret.vEgoStopping = 0.3
+    ret.stopAccel = -3.5
+
+    ret.longitudinalActuatorDelay = 0.5
+
     if ret.openpilotLongitudinalControl:
       ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_LONG
     if ret.flags & HyundaiFlags.HYBRID:
       ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_HYBRID_GAS
     elif ret.flags & HyundaiFlags.EV:
       ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_HYUNDAI_EV_GAS
-
-    ret.centerToFront = ret.wheelbase * 0.4
 
     return ret
 
@@ -197,12 +187,12 @@ class CarInterface(CarInterfaceBase):
 
   @staticmethod
   def get_params_adjust_set_speed(CP):
-    if CP.carFingerprint in CANFD_CAR:
+    if CP.flags & HyundaiFlags.CANFD:
       return [16], [20]
     return [16, 20], [12, 14, 16, 18]
 
   def create_buttons(self, button):
-    if self.CP.carFingerprint in CANFD_CAR:
+    if self.CP.flags & HyundaiFlags.CANFD:
       if self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
         return self.create_buttons_canfd_alt(button)
       return self.create_buttons_canfd(button)
