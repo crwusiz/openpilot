@@ -176,11 +176,11 @@ void UIState::updateStatus() {
     auto ss = (*sm)["selfdriveState"].getSelfdriveState();
     auto ce = (*sm)["carState"].getCarState();
     auto state = ss .getState();
-    if (ce.getSteeringPressed()) {
+    if (ce.getSteeringPressed() && ss.getEnabled()) {
       status = STATUS_STEERING;
-    } else if (ce.getBrakePressed()) {
+    } else if (ce.getBrakePressed() && ss.getEnabled()) {
       status = STATUS_BRAKE;
-    } else if (ce.getLeftBlinker() || ce.getRightBlinker()) {
+    } else if ((ce.getLeftBlinker() || ce.getRightBlinker()) && ss.getEnabled()) {
       status = STATUS_BLINKER;
     } else if (state == cereal::SelfdriveState::OpenpilotState::PRE_ENABLED || state == cereal::SelfdriveState::OpenpilotState::OVERRIDING) {
       status = STATUS_OVERRIDE;
