@@ -256,6 +256,8 @@ struct CarState {
     rr @3 :Float32;
   }
 
+  lfabtn @58 :Bool;
+
   struct WheelSpeeds {
     # optional wheel speeds
     fl @0 :Float32;
@@ -371,6 +373,8 @@ struct CarControl {
 
   cruiseControl @4 :CruiseControl;
   hudControl @5 :HUDControl;
+
+  turningsignaltimer @17 :List(Float32);
 
   struct Actuators {
     # lateral commands, mutually exclusive

@@ -58,7 +58,7 @@ class CarState(CarStateBase):
 
     self.params = CarControllerParams(CP)
 
-    self.lfa_btn = 0
+    self.lfabtn = 0
     self.lfa_enabled = False
     self.canfd_buttons = None
 
@@ -207,9 +207,9 @@ class CarState(CarStateBase):
       ret.exState.navLimitSpeed = cp.vl["Navi_HU"]["SpeedLim_Nav_Clu"]
 
     if self.CP.exFlags & HyundaiExFlags.LFA:
-      prev_lfa_btn = self.lfa_btn
-      self.lfa_btn = cp.vl["BCM_PO_11"]["LFA_Pressed"]
-      if prev_lfa_btn != 1 and self.lfa_btn == 1:
+      prev_lfabtn = self.lfabtn
+      self.lfabtn = cp.vl["BCM_PO_11"]["LFA_Pressed"]
+      if prev_lfabtn != 1 and self.lfabtn == 1:
         self.lfa_enabled = not self.lfa_enabled
 
       ret.cruiseState.available = self.lfa_enabled
@@ -323,9 +323,9 @@ class CarState(CarStateBase):
       ret.exState.navLimitSpeed = cp.vl["CLUSTER_SPEED_LIMIT"]["SPEED_LIMIT_1"]
 
     if self.CP.exFlags & HyundaiExFlags.LFA:
-      prev_lfa_btn = self.lfa_btn
-      self.lfa_btn = cp.vl[self.cruise_btns_msg_canfd]["LFA_BTN"]
-      if prev_lfa_btn != 1 and self.lfa_btn == 1:
+      prev_lfabtn = self.lfabtn
+      self.lfabtn = cp.vl[self.cruise_btns_msg_canfd]["LFA_BTN"]
+      if prev_lfabtn != 1 and self.lfabtn == 1:
         self.lfa_enabled = not self.lfa_enabled
 
       ret.cruiseState.available = self.lfa_enabled

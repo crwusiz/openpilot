@@ -80,7 +80,9 @@ void UIState::updateStatus() {
     auto state = ss.getState();
     scene.engaged = ss.getEnabled();
 
-    if (ss.getEnabled()) {
+    if (state == cereal::SelfdriveState::OpenpilotState::PRE_ENABLED || state == cereal::SelfdriveState::OpenpilotState::OVERRIDING) {
+      status = STATUS_OVERRIDE;
+    } else if (ss.getEnabled()) {
       status = STATUS_ENGAGED;
       if (ce.getSteeringPressed()) {
         status = STATUS_STEERING;
@@ -89,8 +91,6 @@ void UIState::updateStatus() {
       } else if (ce.getLeftBlinker() || ce.getRightBlinker()) {
         status = STATUS_BLINKER;
       }
-    } else if (state == cereal::SelfdriveState::OpenpilotState::PRE_ENABLED || state == cereal::SelfdriveState::OpenpilotState::OVERRIDING) {
-      status = STATUS_OVERRIDE;
     } else {
       status = STATUS_DISENGAGED;
     }

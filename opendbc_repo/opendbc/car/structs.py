@@ -130,6 +130,7 @@ class CarState:
     rr: float = auto_field()
 
   brakeLights: bool = auto_field()
+  lfabtn: bool = auto_field()
 
   @auto_dataclass
   class WheelSpeeds:
@@ -228,6 +229,7 @@ class CarControl:
   cruiseControl: 'CarControl.CruiseControl' = field(default_factory=lambda: CarControl.CruiseControl())
   hudControl: 'CarControl.HUDControl' = field(default_factory=lambda: CarControl.HUDControl())
 
+  turningsignaltimer: list[float] = auto_field()
   @auto_dataclass
   class Actuators:
     # range from 0.0 - 1.0
