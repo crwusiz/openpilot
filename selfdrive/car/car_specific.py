@@ -1,5 +1,5 @@
 from collections import deque
-from cereal import car
+from cereal import car, log
 import cereal.messaging as messaging
 from opendbc.car import DT_CTRL, structs
 from opendbc.car.interfaces import MAX_CTRL_SPEED
@@ -13,7 +13,7 @@ from openpilot.selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
 
 ButtonType = structs.CarState.ButtonEvent.Type
 GearShifter = structs.CarState.GearShifter
-EventName = car.OnroadEvent.EventName
+EventName = log.OnroadEvent.EventName
 NetworkLocation = structs.CarParams.NetworkLocation
 
 

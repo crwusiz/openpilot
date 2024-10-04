@@ -1,4 +1,3 @@
-import copy
 from opendbc.can.packer import CANPacker
 from opendbc.car import (DT_CTRL, apply_driver_steer_torque_limits, common_fault_avoidance, make_tester_present_msg, structs,
                                      apply_std_steer_angle_limits)
@@ -221,7 +220,7 @@ class CarController(CarControllerBase):
       if self.frame % 1000 == 0:
         print(f'scc11 = {bool(CS.scc11)}  scc12 = {bool(CS.scc12)}  scc13 = {bool(CS.scc13)}  scc14 = {bool(CS.scc14)}  mdps12 = {bool(CS.mdps12)}')
 
-    new_actuators = copy.copy(actuators)
+    new_actuators = actuators.as_builder()
     new_actuators.steer = apply_steer / self.params.STEER_MAX
     new_actuators.steerOutputCan = apply_steer
     new_actuators.steeringAngleDeg = apply_angle
