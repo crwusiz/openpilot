@@ -1,6 +1,7 @@
 #include "selfdrive/ui/qt/onroad/model.h"
 
 #include <QString>
+#include "selfdrive/ui/qt/util.h"
 
 constexpr int CLIP_MARGIN = 500;
 constexpr float MIN_DRAW_DISTANCE = 10.0;
@@ -15,11 +16,9 @@ static int get_path_length_idx(const cereal::XYZTData::Reader &line, const float
   return max_idx;
 }
 
-ModelRenderer::ModelRenderer() {
-}
-
 void ModelRenderer::updateState(const UIState &s) {
   is_metric = s.scene.is_metric;
+  engaged = s.scene.engaged;
 
   const SubMaster &sm = *(s.sm);
   const auto ce = sm["carState"].getCarState();
@@ -119,7 +118,7 @@ void ModelRenderer::update_model(const cereal::ModelDataV2::Reader &model, const
     max_distance = std::clamp((float)(lead_d - fmin(lead_d * 0.35, 10.)), 0.0f, max_distance);
   }
   max_idx = get_path_length_idx(model_position, max_distance);
-  mapLineToPolygon(model_position, 0.9, 1.22, 1.22, &track_vertices, max_idx, false);
+  mapLineToPolygon(model_position, 0.8, 1.22, 1.22, &track_vertices, max_idx, false);
 }
 
 void ModelRenderer::drawLaneLines(QPainter &painter) {
@@ -131,8 +130,8 @@ void ModelRenderer::drawLaneLines(QPainter &painter) {
 
   // TODO: Fix empty spaces when curiving back on itself
   painter.setBrush(QColor::fromRgbF(1.0, 0.0, 0.0, 0.2));
-  if (left_blindspot) painter.drawPolygon(scene.lane_barrier_vertices[0]);
-  if (right_blindspot) painter.drawPolygon(scene.lane_barrier_vertices[1]);
+  if (left_blindspot) painter.drawPolygon(lane_barrier_vertices[0]);
+  if (right_blindspot) painter.drawPolygon(lane_barrier_vertices[1]);
 
   // road edges
   for (int i = 0; i < std::size(road_edge_vertices); ++i) {
@@ -144,8 +143,8 @@ void ModelRenderer::drawLaneLines(QPainter &painter) {
 void ModelRenderer::drawPath(QPainter &painter, const cereal::ModelDataV2::Reader &model, int height) {
   QLinearGradient bg(0, height, 0, 0);
   //if (experimental_model) {
-  if (scene.engaged) {
-    if (scene.steeringPressed) {
+  if (engaged) {
+    if (steeringPressed) {
       // The user is applying torque to the steering wheel
       bg.setColorAt(0.0, steeringpressedColor(100));
       bg.setColorAt(0.5, steeringpressedColor(50));

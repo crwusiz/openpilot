@@ -21,7 +21,6 @@ from opendbc.car.interfaces import CarInterfaceBase, RadarInterfaceBase
 from openpilot.selfdrive.pandad import can_capnp_to_list, can_list_to_can_capnp
 from openpilot.selfdrive.car.cruise import VCruiseHelper
 from openpilot.selfdrive.car.car_specific import MockCarState
-from openpilot.selfdrive.car.helpers import convert_carControl, convert_to_capnp
 
 from openpilot.selfdrive.controls.neokii.speed_controller import SpeedController
 
@@ -113,14 +112,9 @@ class Car:
 
     # set alternative experiences from parameters
     disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
-    disengage_on_brake = self.params.get_bool("DisengageOnBrake")
-
     self.CP.alternativeExperience = 0
     if not disengage_on_accelerator:
       self.CP.alternativeExperience |= ALTERNATIVE_EXPERIENCE.DISABLE_DISENGAGE_ON_GAS
-
-    if not disengage_on_brake:
-      self.CP.alternativeExperience |= ALTERNATIVE_EXPERIENCE.ALLOW_AEB
 
     openpilot_enabled_toggle = self.params.get_bool("OpenpilotEnabledToggle")
 
@@ -165,7 +159,6 @@ class Car:
     self.rk = Ratekeeper(100, print_delay_threshold=None)
 
     self.speed_controller = SpeedController(self.CP, self.CI)
-
 
   def state_update(self) -> tuple[car.CarState, structs.RadarDataT | None]:
     """carState update loop, driven by can"""

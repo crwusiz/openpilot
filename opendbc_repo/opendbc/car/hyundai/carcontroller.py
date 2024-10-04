@@ -61,7 +61,7 @@ class CarController(CarControllerBase):
     self.apply_angle_last = 0
     self.lkas_max_torque = 0
 
-    self.turningsignaltimer = 0
+    self.turningSignalTimer = 0
 
     self.driver_steering_angle_above_timer = 150
 
@@ -107,9 +107,9 @@ class CarController(CarControllerBase):
 
     # Disable steering while turning blinker on and speed below 60 kph
     if CS.out.leftBlinker or CS.out.rightBlinker:
-      self.turningsignaltimer = 0.5 / DT_CTRL  # Disable for 0.5 Seconds after blinker turned off
-    if self.turningsignaltimer > 0:
-      self.turningsignaltimer -= 1
+      self.turningSignalTimer = 0.5 / DT_CTRL  # Disable for 0.5 Seconds after blinker turned off
+    if self.turningSignalTimer > 0:
+      self.turningSignalTimer -= 1
 
     if not CC.latActive:
       apply_angle = CS.out.steeringAngleDeg

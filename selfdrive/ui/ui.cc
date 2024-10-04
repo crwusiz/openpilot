@@ -96,12 +96,6 @@ void UIState::updateStatus() {
     }
   }
 
-  if (sm->updated("carState")) {
-    auto ce = (*sm)["carState"].getCarState();
-    scene.steeringPressed = ce.getSteeringPressed();
-    scene.override = ce.getGasPressed();
-  }
-
   if (sm->updated("ubloxGnss")) {
     auto data = (*sm)["ubloxGnss"].getUbloxGnss();
     if (data.which() == cereal::UbloxGnss::MEASUREMENT_REPORT) {

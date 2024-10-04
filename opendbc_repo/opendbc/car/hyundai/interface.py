@@ -11,8 +11,12 @@ from opendbc.car.disable_ecu import disable_ecu
 import copy
 from openpilot.common.params import Params
 
+ButtonType = structs.CarState.ButtonEvent.Type
 Ecu = structs.CarParams.Ecu
-ENABLE_BUTTONS = (Buttons.RES_ACCEL, Buttons.SET_DECEL, Buttons.CANCEL)
+
+# Cancel button can sometimes be ACC pause/resume button, main button can also enable on some cars
+ENABLE_BUTTONS = (ButtonType.accelCruise, ButtonType.decelCruise, ButtonType.cancel, ButtonType.mainCruise)
+
 SteerControlType = structs.CarParams.SteerControlType
 
 
@@ -55,10 +59,11 @@ class CarInterface(CarInterfaceBase):
           ret.flags |= HyundaiFlags.CANFD_HDA2_ALT_STEERING.value
       else:
         # non-HDA2
-        if 0x1cf not in fingerprint[CAN.ECAN]:
-          ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
         if not ret.flags & HyundaiFlags.RADAR_SCC:
           ret.flags |= HyundaiFlags.CANFD_CAMERA_SCC.value
+
+      if 0x1cf not in fingerprint[CAN.ECAN]:
+        ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
 
       # Some HDA2 cars have alternative messages for gear checks
       # ICE cars do not have 0x130; GEARS message on 0x40 or 0x70 instead
@@ -152,7 +157,6 @@ class CarInterface(CarInterfaceBase):
 
     ret.openpilotLongitudinalControl = experimental_long and ret.experimentalLongitudinalAvailable
     ret.pcmCruise = not ret.openpilotLongitudinalControl
-    ret.stoppingControl = True
     ret.startingState = True
     ret.vEgoStarting = 0.3
     ret.startAccel = 2.0

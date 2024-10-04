@@ -14,6 +14,18 @@ if [ -f /data/openpilot/prebuilt ]; then
 fi
 
 if ping -c 3 8.8.8.8 > /dev/null 2>&1; then
+  LANG=$(cat /data/params/d/LanguageSetting)
+  if [ "${LANG}" = "main_ko" ]; then
+    sudo mount -o remount,rw /
+    sudo timedatectl set-timezone Asia/Seoul
+    sudo timedatectl set-ntp true
+    sudo mount -o remount,ro /
+  elif [ "${LANG}" = "main_en" ]; then
+    sudo mount -o remount,rw /
+    sudo timedatectl set-timezone America/New_York
+    sudo timedatectl set-ntp true
+    sudo mount -o remount,ro /
+  fi
   SSL_VERIFY=$(git config --global http.sslVerify)
   BRANCH=$(git rev-parse --abbrev-ref HEAD)
   BRANCH_GONE=$(git branch -vv | grep ': gone]' | awk '{print $1}')

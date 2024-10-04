@@ -126,23 +126,6 @@ function launch {
     cp -f $BASEDIR/scripts/add/events_en.py $BASEDIR/selfdrive/selfdrived/events.py
   fi
 
-  # 시간동기화
-  if ping -c 3 8.8.8.8 > /dev/null 2>&1; then
-    if [ "${LANG}" = "main_ko" ]; then
-      sudo mount -o remount,rw /
-      sudo timedatectl set-timezone Asia/Seoul
-      sudo timedatectl set-ntp true
-      sudo mount -o remount,ro /
-    elif [ "${LANG}" = "main_en" ]; then
-      sudo mount -o remount,rw /
-      sudo timedatectl set-timezone America/New_York
-      sudo timedatectl set-ntp true
-      sudo mount -o remount,ro /
-    fi
-  else
-    echo "Network is not connected. Timezone and NTP settings were not changed."
-  fi
-
   # start manager
   cd system/manager
   if [ ! -f $DIR/prebuilt ]; then

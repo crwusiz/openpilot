@@ -328,7 +328,7 @@ void generic_rx_checks(bool stock_ecu_detected) {
   gas_pressed_prev = gas_pressed;
 
   // exit controls on rising edge of brake press
-  if (brake_pressed && (!brake_pressed_prev || vehicle_moving) && !(alternative_experience & ALT_EXP_ALLOW_AEB)) {
+  if (brake_pressed && (!brake_pressed_prev || vehicle_moving)) {
     controls_allowed = false;
   }
   brake_pressed_prev = brake_pressed;
@@ -360,32 +360,32 @@ static void reset_sample(struct sample_t *sample) {
 
 int set_safety_hooks(uint16_t mode, uint16_t param) {
   const safety_hook_config safety_hook_registry[] = {
-    {SAFETY_SILENT, &nooutput_hooks},
-    //{SAFETY_HONDA_NIDEC, &honda_nidec_hooks},
-    //{SAFETY_TOYOTA, &toyota_hooks},
-    {SAFETY_ELM327, &elm327_hooks},
-    {SAFETY_GM, &gm_hooks},
-    //{SAFETY_HONDA_BOSCH, &honda_bosch_hooks},
-    {SAFETY_HYUNDAI, &hyundai_hooks},
-    //{SAFETY_CHRYSLER, &chrysler_hooks},
-    //{SAFETY_SUBARU, &subaru_hooks},
-    //{SAFETY_VOLKSWAGEN_MQB, &volkswagen_mqb_hooks},
-    //{SAFETY_NISSAN, &nissan_hooks},
-    {SAFETY_NOOUTPUT, &nooutput_hooks},
-    {SAFETY_HYUNDAI_LEGACY, &hyundai_legacy_hooks},
-    //{SAFETY_MAZDA, &mazda_hooks},
-    //{SAFETY_BODY, &body_hooks},
-    //{SAFETY_FORD, &ford_hooks},
+  {SAFETY_SILENT, &nooutput_hooks},
+  //{SAFETY_HONDA_NIDEC, &honda_nidec_hooks},
+  //{SAFETY_TOYOTA, &toyota_hooks},
+  {SAFETY_ELM327, &elm327_hooks},
+  {SAFETY_GM, &gm_hooks},
+  //{SAFETY_HONDA_BOSCH, &honda_bosch_hooks},
+  {SAFETY_HYUNDAI, &hyundai_hooks},
+  //{SAFETY_CHRYSLER, &chrysler_hooks},
+  //{SAFETY_SUBARU, &subaru_hooks},
+  //{SAFETY_VOLKSWAGEN_MQB, &volkswagen_mqb_hooks},
+  //{SAFETY_NISSAN, &nissan_hooks},
+  {SAFETY_NOOUTPUT, &nooutput_hooks},
+  {SAFETY_HYUNDAI_LEGACY, &hyundai_legacy_hooks},
+  //{SAFETY_MAZDA, &mazda_hooks},
+  //{SAFETY_BODY, &body_hooks},
+  //{SAFETY_FORD, &ford_hooks},
 #ifdef CANFD
-    {SAFETY_HYUNDAI_CANFD, &hyundai_canfd_hooks},
+  {SAFETY_HYUNDAI_CANFD, &hyundai_canfd_hooks},
 #endif
 #ifdef ALLOW_DEBUG
-    //{SAFETY_TESLA, &tesla_hooks},
-    //{SAFETY_SUBARU_PREGLOBAL, &subaru_preglobal_hooks},
-    //{SAFETY_VOLKSWAGEN_PQ, &volkswagen_pq_hooks},
-    {SAFETY_ALLOUTPUT, &alloutput_hooks},
+  //{SAFETY_TESLA, &tesla_hooks},
+  //{SAFETY_SUBARU_PREGLOBAL, &subaru_preglobal_hooks},
+  //{SAFETY_VOLKSWAGEN_PQ, &volkswagen_pq_hooks},
+  {SAFETY_ALLOUTPUT, &alloutput_hooks},
 #endif
-  };
+};
 
   // reset state set by safety mode
   safety_mode_cnt = 0U;

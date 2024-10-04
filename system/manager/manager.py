@@ -53,7 +53,6 @@ def manager_init() -> None:
     ("LoggerEnable", "0"),
     ("RadarTrackEnable", "0"),
     ("SccOnBus2", "0"),
-    ("DisengageOnBrake", "0"),
   ]
 
   if params.get_bool("RecordFrontLock"):

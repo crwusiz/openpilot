@@ -256,7 +256,7 @@ struct CarState {
     rr @3 :Float32;
   }
 
-  lfabtn @58 :Bool;
+  lfaBtn @58 :Int32;
 
   struct WheelSpeeds {
     # optional wheel speeds
@@ -312,7 +312,7 @@ struct CarState {
 
   # deprecated
   errorsDEPRECATED @0 :List(OnroadEventDEPRECATED.EventName);
-  brakeLights @19 :Bool;
+  brakeLightsDEPRECATED @19 :Bool;
   steeringRateLimitedDEPRECATED @29 :Bool;
   canMonoTimesDEPRECATED @12: List(UInt64);
   canRcvTimeoutDEPRECATED @49 :Bool;
@@ -374,7 +374,7 @@ struct CarControl {
   cruiseControl @4 :CruiseControl;
   hudControl @5 :HUDControl;
 
-  turningsignaltimer @17 :List(Float32);
+  turningSignalTimer @17 :List(Float32);
 
   struct Actuators {
     # lateral commands, mutually exclusive

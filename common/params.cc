@@ -212,7 +212,6 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"SoftRestartTriggered", CLEAR_ON_MANAGER_START},
     {"RadarTrackEnable", PERSISTENT},
     {"SccOnBus2", PERSISTENT},
-    {"DisengageOnBrake", PERSISTENT},
     {"IsCanfd", PERSISTENT},
     {"IsHda2", PERSISTENT},
     {"GitLog", PERSISTENT},

@@ -58,7 +58,7 @@ class CarState(CarStateBase):
 
     self.params = CarControllerParams(CP)
 
-    self.lfabtn = 0
+    self.lfa_btn = 0
     self.lfa_enabled = False
     self.canfd_buttons = None
 
@@ -76,9 +76,12 @@ class CarState(CarStateBase):
 
     ret.seatbeltUnlatched = cp.vl["CGW1"]["CF_Gway_DrvSeatBeltSw"] == 0
 
-    ret.wheelSpeeds = self.get_wheel_speeds(cp.vl["WHL_SPD11"]["WHL_SPD_FL"], cp.vl["WHL_SPD11"]["WHL_SPD_FR"],
-                                            cp.vl["WHL_SPD11"]["WHL_SPD_RL"], cp.vl["WHL_SPD11"]["WHL_SPD_RR"])
-
+    ret.wheelSpeeds = self.get_wheel_speeds(
+      cp.vl["WHL_SPD11"]["WHL_SPD_FL"],
+      cp.vl["WHL_SPD11"]["WHL_SPD_FR"],
+      cp.vl["WHL_SPD11"]["WHL_SPD_RL"],
+      cp.vl["WHL_SPD11"]["WHL_SPD_RR"]
+    )
     ret.vEgoRaw = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
     ret.standstill = ret.wheelSpeeds.fl <= STANDSTILL_THRESHOLD and ret.wheelSpeeds.rr <= STANDSTILL_THRESHOLD
@@ -129,7 +132,6 @@ class CarState(CarStateBase):
     ret.espDisabled = cp.vl["TCS11"]["TCS_PAS"] == 1
     ret.espActive = cp.vl["TCS11"]["ABS_ACT"] == 1
     ret.accFaulted = cp.vl["TCS13"]["ACCEnable"] != 0  # 0 ACC CONTROL ENABLED, 1-3 ACC CONTROL DISABLED
-    ret.brakeLights = bool(ret.brakePressed)
 
     if self.CP.flags & (HyundaiFlags.HYBRID | HyundaiFlags.EV):
       if self.CP.flags & HyundaiFlags.HYBRID:
@@ -207,12 +209,13 @@ class CarState(CarStateBase):
       ret.exState.navLimitSpeed = cp.vl["Navi_HU"]["SpeedLim_Nav_Clu"]
 
     if self.CP.exFlags & HyundaiExFlags.LFA:
-      prev_lfabtn = self.lfabtn
-      self.lfabtn = cp.vl["BCM_PO_11"]["LFA_Pressed"]
-      if prev_lfabtn != 1 and self.lfabtn == 1:
+      prev_lfa_btn = self.lfa_btn
+      self.lfa_btn = cp.vl["BCM_PO_11"]["LFA_Pressed"]
+      if prev_lfa_btn != 1 and self.lfa_btn == 1:
         self.lfa_enabled = not self.lfa_enabled
+      ret.lfaBtn = self.lfa_btn
 
-      ret.cruiseState.available = self.lfa_enabled
+    ret.cruiseState.available = self.lfa_enabled
 
     return ret
 
@@ -230,7 +233,6 @@ class CarState(CarStateBase):
       ret.gasPressed = bool(cp.vl[self.accelerator_msg_canfd]["ACCELERATOR_PEDAL_PRESSED"])
 
     ret.brakePressed = cp.vl["TCS"]["DriverBraking"] == 1
-    ret.brakeLights = bool(ret.brakePressed)
 
     ret.doorOpen = cp.vl["DOORS_SEATBELTS"]["DRIVER_DOOR"] == 1
     ret.seatbeltUnlatched = cp.vl["DOORS_SEATBELTS"]["DRIVER_SEATBELT"] == 0
@@ -323,12 +325,13 @@ class CarState(CarStateBase):
       ret.exState.navLimitSpeed = cp.vl["CLUSTER_SPEED_LIMIT"]["SPEED_LIMIT_1"]
 
     if self.CP.exFlags & HyundaiExFlags.LFA:
-      prev_lfabtn = self.lfabtn
-      self.lfabtn = cp.vl[self.cruise_btns_msg_canfd]["LFA_BTN"]
-      if prev_lfabtn != 1 and self.lfabtn == 1:
+      prev_lfa_btn = self.lfa_btn
+      self.lfa_btn = cp.vl[self.cruise_btns_msg_canfd]["LFA_BTN"]
+      if prev_lfa_btn != 1 and self.lfa_btn == 1:
         self.lfa_enabled = not self.lfa_enabled
+      ret.lfaBtn = self.lfa_btn
 
-      ret.cruiseState.available = self.lfa_enabled
+    ret.cruiseState.available = self.lfa_enabled
 
     self.canfd_buttons = cp.vl[self.cruise_btns_msg_canfd]
 

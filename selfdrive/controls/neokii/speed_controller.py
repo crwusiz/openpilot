@@ -2,7 +2,6 @@ import random
 import numpy as np
 
 from common.numpy_fast import clip, interp
-from cereal import car
 from opendbc.car.hyundai.values import Buttons
 from openpilot.common.conversions import Conversions as CV
 from openpilot.common.params import Params
@@ -12,10 +11,6 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 
 SYNC_MARGIN = 3.
 MIN_CURVE_SPEED = 32. * CV.KPH_TO_MS
-
-EventName = car.OnroadEvent.EventName
-ButtonType = car.CarState.ButtonEvent.Type
-
 
 class SpeedController:
   def __init__(self, CP, CI):
