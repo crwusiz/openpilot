@@ -79,6 +79,7 @@ void UIState::updateStatus() {
     auto ce = (*sm)["carState"].getCarState();
     auto state = ss.getState();
     scene.engaged = ss.getEnabled();
+    scene.steeringPressed = ce.getSteeringPressed();
 
     if (state == cereal::SelfdriveState::OpenpilotState::PRE_ENABLED || state == cereal::SelfdriveState::OpenpilotState::OVERRIDING) {
       status = STATUS_OVERRIDE;
