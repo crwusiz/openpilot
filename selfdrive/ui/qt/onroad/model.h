@@ -25,9 +25,6 @@ private:
 
   bool v_ego_cluster_seen = false;
   float speed = 0;
-  bool is_metric = false;
-  bool engaged = false;
-  bool steeringPressed = false;
   bool left_blindspot, right_blindspot = false;
 
   bool longitudinal_control = false;

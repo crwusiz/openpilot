@@ -80,7 +80,7 @@ class CarState(CarStateBase):
       cp.vl["WHL_SPD11"]["WHL_SPD_FL"],
       cp.vl["WHL_SPD11"]["WHL_SPD_FR"],
       cp.vl["WHL_SPD11"]["WHL_SPD_RL"],
-      cp.vl["WHL_SPD11"]["WHL_SPD_RR"]
+      cp.vl["WHL_SPD11"]["WHL_SPD_RR"],
     )
     ret.vEgoRaw = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
@@ -191,8 +191,11 @@ class CarState(CarStateBase):
     self.main_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwMain"])
     self.lead_distance = cp_cruise.vl["SCC11"]["ACC_ObjDist"]
 
-    ret.buttonEvents = [*create_button_events(self.cruise_buttons[-1], prev_cruise_buttons, BUTTONS_DICT),
-                        *create_button_events(self.main_buttons[-1], prev_main_buttons, {1: ButtonType.mainCruise})]
+    if self.cruise_buttons[-1] != prev_cruise_buttons:
+      ret.buttonEvents = create_button_events(self.cruise_buttons[-1], prev_cruise_buttons, BUTTONS_DICT)
+
+    #ret.buttonEvents = [*create_button_events(self.cruise_buttons[-1], prev_cruise_buttons, BUTTONS_DICT),
+    #                    *create_button_events(self.main_buttons[-1], prev_main_buttons, {1: ButtonType.mainCruise})]
 
     if self.CP.exFlags & HyundaiExFlags.TPMS:
       tpms = ret.exState.tpms
@@ -214,8 +217,7 @@ class CarState(CarStateBase):
       if prev_lfa_btn != 1 and self.lfa_btn == 1:
         self.lfa_enabled = not self.lfa_enabled
       ret.lfaBtn = self.lfa_btn
-
-    ret.cruiseState.available = self.lfa_enabled
+      ret.cruiseState.available = self.lfa_enabled
 
     return ret
 
@@ -307,8 +309,11 @@ class CarState(CarStateBase):
       self.hda2_lfa_block_msg = copy.copy(cp_cam.vl["CAM_0x362"] if self.CP.flags & HyundaiFlags.CANFD_HDA2_ALT_STEERING
                                           else cp_cam.vl["CAM_0x2a4"])
 
-    ret.buttonEvents = [*create_button_events(self.cruise_buttons[-1], prev_cruise_buttons, BUTTONS_DICT),
-                        *create_button_events(self.main_buttons[-1], prev_main_buttons, {1: ButtonType.mainCruise})]
+    if self.cruise_buttons[-1] != prev_cruise_buttons:
+      ret.buttonEvents = create_button_events(self.cruise_buttons[-1], prev_cruise_buttons, BUTTONS_DICT)
+
+    #ret.buttonEvents = [*create_button_events(self.cruise_buttons[-1], prev_cruise_buttons, BUTTONS_DICT),
+    #                    *create_button_events(self.main_buttons[-1], prev_main_buttons, {1: ButtonType.mainCruise})]
 
     if self.CP.exFlags & HyundaiExFlags.TPMS:
       tpms = ret.exState.tpms
@@ -330,8 +335,7 @@ class CarState(CarStateBase):
       if prev_lfa_btn != 1 and self.lfa_btn == 1:
         self.lfa_enabled = not self.lfa_enabled
       ret.lfaBtn = self.lfa_btn
-
-    ret.cruiseState.available = self.lfa_enabled
+      ret.cruiseState.available = self.lfa_enabled
 
     self.canfd_buttons = cp.vl[self.cruise_btns_msg_canfd]
 

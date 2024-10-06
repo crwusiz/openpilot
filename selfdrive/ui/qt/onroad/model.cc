@@ -17,9 +17,7 @@ static int get_path_length_idx(const cereal::XYZTData::Reader &line, const float
 }
 
 void ModelRenderer::updateState(const UIState &s) {
-  is_metric = s.scene.is_metric;
-  engaged = s.scene.engaged;
-
+  const UIScene &scene = s.scene;
   const SubMaster &sm = *(s.sm);
   const auto ce = sm["carState"].getCarState();
   const bool cs_alive = sm.alive("carState");
@@ -27,9 +25,8 @@ void ModelRenderer::updateState(const UIState &s) {
   // Handle older routes where vEgoCluster is not set
   v_ego_cluster_seen = v_ego_cluster_seen || ce.getVEgoCluster() != 0.0;
   float v_ego = v_ego_cluster_seen ? ce.getVEgoCluster() : ce.getVEgo();
-  speed = cs_alive ? std::max<float>(0.0f, v_ego * (is_metric ? MS_TO_KPH : MS_TO_MPH)) : 0.0;
+  speed = cs_alive ? std::max<float>(0.0f, v_ego * (scene.is_metric ? MS_TO_KPH : MS_TO_MPH)) : 0.0;
 
-  steeringPressed = ce.getSteeringPressed();
   left_blindspot = ce.getLeftBlindspot();
   right_blindspot = ce.getRightBlindspot();
 }
@@ -142,9 +139,11 @@ void ModelRenderer::drawLaneLines(QPainter &painter) {
 
 void ModelRenderer::drawPath(QPainter &painter, const cereal::ModelDataV2::Reader &model, int height) {
   QLinearGradient bg(0, height, 0, 0);
+  UIState *s = uiState();
+
   //if (experimental_model) {
-  if (engaged) {
-    if (steeringPressed) {
+  if (s->scene.engaged) {
+    if (s->scene.steeringPressed) {
       // The user is applying torque to the steering wheel
       bg.setColorAt(0.0, steeringpressedColor(100));
       bg.setColorAt(0.5, steeringpressedColor(50));
@@ -195,6 +194,7 @@ void ModelRenderer::drawLead(QPainter &painter, const cereal::RadarState::LeadDa
   const float leadBuff = 40.;
   const float d_rel = lead_data.getDRel();
   const float v_rel = lead_data.getVRel();
+  UIState *s = uiState();
 
   float fillAlpha = 0;
   if (d_rel < leadBuff) {
@@ -241,7 +241,7 @@ void ModelRenderer::drawLead(QPainter &painter, const cereal::RadarState::LeadDa
   } else {
     v_color = pinkColor(150);
   }
-  if (is_metric) {
+  if (s->scene.is_metric) {
     l_speed = QString::asprintf("%.0f km/h", speed + v_rel * 3.6);
   } else {
     l_speed = QString::asprintf("%.0f mph", speed + v_rel * 2.236936);
