@@ -149,8 +149,8 @@ class CarSpecificEvents:
       # On some newer model years, the CANCEL button acts as a pause/resume button based on the PCM state
       # To avoid re-engaging when openpilot cancels, check user engagement intention via buttons
       # Main button also can trigger an engagement on these cars
-      self.cruise_buttons.append(any(ev.type in HYUNDAI_ENABLE_BUTTONS for ev in CS.buttonEvents))
-      events = self.create_common_events(CS, CS_prev, pcm_enable=self.CP.pcmCruise, allow_enable=any(self.cruise_buttons) or CS.lfaBtn)
+      self.cruise_buttons.append(any(ev.type in HYUNDAI_ENABLE_BUTTONS for ev in CS.buttonEvents) or CS.lfaBtn)
+      events = self.create_common_events(CS, CS_prev, pcm_enable=self.CP.pcmCruise, allow_enable=any(self.cruise_buttons))
 
       # low speed steer alert hysteresis logic (only for cars with steer cut off above 10 m/s)
       if CS.vEgo < (self.CP.minSteerSpeed + 2.) and self.CP.minSteerSpeed > 10.:
