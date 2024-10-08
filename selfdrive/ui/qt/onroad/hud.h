@@ -40,7 +40,7 @@ private:
 
   bool hideBottomIcons = false;
   bool longControl = false;
-  bool brake_pressed, gas_pressed = false;
+  bool brake_press, gas_press = false;
   bool left_blinker, right_blinker = false;
 
   int autohold_state, nda_state = 0;

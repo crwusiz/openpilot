@@ -108,7 +108,7 @@ class SpeedController:
       max_speed_clu = min(max_speed_clu, apply_limit_speed)
 
       if clu_speed > apply_limit_speed:
-        if not self.slowing_down_alert and not self.slowing_down:
+        if not self.slowing_down:
           self.slowing_down = True
     else:
       self.slowing_down = False
@@ -244,10 +244,12 @@ class SpeedController:
 
     self.real_set_speed_kph = v_cruise_kph
     if CS.cruiseState.enabled:
-      self._cal_max_speed(CS, sm, CS.vEgoCluster, v_cruise_kph)
+      clu_speed = CS.vEgoCluster * self.speed_conv_to_clu
+
+      self._cal_max_speed(CS, sm, clu_speed, v_cruise_kph)
       self.cruise_speed_kph = float(clip(v_cruise_kph, V_CRUISE_MIN, self.max_speed_clu * self.speed_conv_to_ms * CV.MS_TO_KPH))
 
-      override_speed = self._cal_target_speed(CS, CS.vEgoCluster, self.real_set_speed_kph, self.CI.CS.cruise_buttons[-1] != Buttons.NONE)
+      override_speed = self._cal_target_speed(CS, clu_speed, self.real_set_speed_kph, self.CI.CS.cruise_buttons[-1] != Buttons.NONE)
       if override_speed > 0:
         v_cruise_kph = override_speed
     else:

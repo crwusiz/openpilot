@@ -132,6 +132,7 @@ class CarState(CarStateBase):
     ret.espDisabled = cp.vl["TCS11"]["TCS_PAS"] == 1
     ret.espActive = cp.vl["TCS11"]["ABS_ACT"] == 1
     ret.accFaulted = cp.vl["TCS13"]["ACCEnable"] != 0  # 0 ACC CONTROL ENABLED, 1-3 ACC CONTROL DISABLED
+    ret.brakeLights = bool(ret.brakePressed)
 
     if self.CP.flags & (HyundaiFlags.HYBRID | HyundaiFlags.EV):
       if self.CP.flags & HyundaiFlags.HYBRID:
@@ -150,7 +151,7 @@ class CarState(CarStateBase):
         gear = cp.vl["EMS20"]["HYDROGEN_GEAR_SHIFTER"]
       else:
         gear = cp.vl["ELECT_GEAR"]["Elect_Gear_Shifter"]
-    elif self.CP.flags & HyundaiFlags.CLUSTER_GEARS:\
+    elif self.CP.flags & HyundaiFlags.CLUSTER_GEARS:
       gear = cp.vl["CLU15"]["CF_Clu_Gear"]
     elif self.CP.flags & HyundaiFlags.TCU_GEARS:
       gear = cp.vl["TCU12"]["CUR_GR"]
@@ -191,11 +192,8 @@ class CarState(CarStateBase):
     self.main_buttons.extend(cp.vl_all["CLU11"]["CF_Clu_CruiseSwMain"])
     self.lead_distance = cp_cruise.vl["SCC11"]["ACC_ObjDist"]
 
-    if self.cruise_buttons[-1] != prev_cruise_buttons:
-      ret.buttonEvents = create_button_events(self.cruise_buttons[-1], prev_cruise_buttons, BUTTONS_DICT)
-
-    #ret.buttonEvents = [*create_button_events(self.cruise_buttons[-1], prev_cruise_buttons, BUTTONS_DICT),
-    #                    *create_button_events(self.main_buttons[-1], prev_main_buttons, {1: ButtonType.mainCruise})]
+    ret.buttonEvents = [*create_button_events(self.cruise_buttons[-1], prev_cruise_buttons, BUTTONS_DICT),
+                        *create_button_events(self.main_buttons[-1], prev_main_buttons, {1: ButtonType.mainCruise})]
 
     if self.CP.exFlags & HyundaiExFlags.TPMS:
       tpms = ret.exState.tpms
@@ -235,6 +233,7 @@ class CarState(CarStateBase):
       ret.gasPressed = bool(cp.vl[self.accelerator_msg_canfd]["ACCELERATOR_PEDAL_PRESSED"])
 
     ret.brakePressed = cp.vl["TCS"]["DriverBraking"] == 1
+    ret.brakeLights = bool(ret.brakePressed)
 
     ret.doorOpen = cp.vl["DOORS_SEATBELTS"]["DRIVER_DOOR"] == 1
     ret.seatbeltUnlatched = cp.vl["DOORS_SEATBELTS"]["DRIVER_SEATBELT"] == 0
@@ -309,11 +308,8 @@ class CarState(CarStateBase):
       self.hda2_lfa_block_msg = copy.copy(cp_cam.vl["CAM_0x362"] if self.CP.flags & HyundaiFlags.CANFD_HDA2_ALT_STEERING
                                           else cp_cam.vl["CAM_0x2a4"])
 
-    if self.cruise_buttons[-1] != prev_cruise_buttons:
-      ret.buttonEvents = create_button_events(self.cruise_buttons[-1], prev_cruise_buttons, BUTTONS_DICT)
-
-    #ret.buttonEvents = [*create_button_events(self.cruise_buttons[-1], prev_cruise_buttons, BUTTONS_DICT),
-    #                    *create_button_events(self.main_buttons[-1], prev_main_buttons, {1: ButtonType.mainCruise})]
+    ret.buttonEvents = [*create_button_events(self.cruise_buttons[-1], prev_cruise_buttons, BUTTONS_DICT),
+                        *create_button_events(self.main_buttons[-1], prev_main_buttons, {1: ButtonType.mainCruise})]
 
     if self.CP.exFlags & HyundaiExFlags.TPMS:
       tpms = ret.exState.tpms

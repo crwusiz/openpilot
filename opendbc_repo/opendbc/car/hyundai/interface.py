@@ -15,7 +15,7 @@ ButtonType = structs.CarState.ButtonEvent.Type
 Ecu = structs.CarParams.Ecu
 
 # Cancel button can sometimes be ACC pause/resume button, main button can also enable on some cars
-ENABLE_BUTTONS = (ButtonType.accelCruise, ButtonType.decelCruise, ButtonType.cancel) #, ButtonType.mainCruise)
+ENABLE_BUTTONS = (ButtonType.accelCruise, ButtonType.decelCruise, ButtonType.cancel, ButtonType.mainCruise)
 
 SteerControlType = structs.CarParams.SteerControlType
 
@@ -48,6 +48,7 @@ class CarInterface(CarInterfaceBase):
 
       ret.radarUnavailable = RADAR_START_ADDR not in fingerprint[1] or DBC[ret.carFingerprint]["radar"] is None
       ret.experimentalLongitudinalAvailable = candidate not in (CANFD_UNSUPPORTED_LONGITUDINAL_CAR | CANFD_RADAR_SCC_CAR)
+      ret.pcmCruise = not ret.openpilotLongitudinalControl
 
       if 0x105 in fingerprint[CAN.ECAN]:
         ret.flags |= HyundaiFlags.HYBRID.value
@@ -156,7 +157,6 @@ class CarInterface(CarInterfaceBase):
     # Common longitudinal control setup
 
     ret.openpilotLongitudinalControl = experimental_long and ret.experimentalLongitudinalAvailable
-    ret.pcmCruise = not ret.openpilotLongitudinalControl
     ret.startingState = True
     ret.vEgoStarting = 0.3
     ret.startAccel = 2.0

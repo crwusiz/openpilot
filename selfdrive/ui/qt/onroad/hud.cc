@@ -89,9 +89,9 @@ void HudRenderer::updateState(const UIState &s) {
 
   hideBottomIcons = (sm["selfdriveState"].getSelfdriveState().getAlertSize() != cereal::SelfdriveState::AlertSize::NONE);
   accel = ce.getAEgo();
-  brake_pressed = ce.getBrakePressed();
+  brake_press = ce.getBrakeLights();
   autohold_state = ce.getExState().getAutoHold();
-  gas_pressed = ce.getGasPressed();
+  gas_press = ce.getGasPressed();
   left_blinker = ce.getLeftBlinker();
   right_blinker = ce.getRightBlinker();
   wifi_state = (int)ds.getNetworkStrength();
@@ -237,14 +237,14 @@ void HudRenderer::draw(QPainter &p, const QRect &surface_rect) {
 
     // gaspress img (bottom right 2)
     x = surface_rect.right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 2.1);
-    drawIcon(p, QPoint(x, y), gaspress_img, icon_bg, gas_pressed ? 0.8 : 0.2);
+    drawIcon(p, QPoint(x, y), gaspress_img, icon_bg, gas_press ? 0.8 : 0.2);
 
     // brake and autohold icon (bottom right 3)
     x = surface_rect.right() - (btn_size / 2) - (UI_BORDER_SIZE * 2) - (btn_size * 1.1);
     if (autohold_state >= 1) {
       drawIcon(p, QPoint(x, y), autohold_state > 1 ? autohold_warning_img : autohold_active_img, icon_bg, autohold_state ? 0.8 : 0.2);
     } else {
-      drawIcon(p, QPoint(x, y), brake_img, icon_bg, brake_pressed ? 0.8 : 0.2);
+      drawIcon(p, QPoint(x, y), brake_img, icon_bg, brake_press ? 0.8 : 0.2);
     }
 
     // tpms (bottom right)

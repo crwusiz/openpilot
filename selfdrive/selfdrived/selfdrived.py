@@ -185,10 +185,10 @@ class SelfdriveD:
           self.events.add(EventName.pcmEnable)
 
       # Disable on rising edge of accelerator or brake. Also disable on brake when speed > 0
-      if (CS.gasPressed and not self.CS_prev.gasPressed and self.disengage_on_accelerator) or \
-        (CS.brakePressed and (not self.CS_prev.brakePressed or not CS.standstill)) or \
-        (CS.regenBraking and (not self.CS_prev.regenBraking or not CS.standstill)):
-        self.events.add(EventName.pedalPressed)
+      #if (CS.gasPressed and not self.CS_prev.gasPressed and self.disengage_on_accelerator) or \
+      #  (CS.brakePressed and (not self.CS_prev.brakePressed or not CS.standstill)) or \
+      #  (CS.regenBraking and (not self.CS_prev.regenBraking or not CS.standstill)):
+      #  self.events.add(EventName.pedalPressed)
 
     # Create events for temperature, disk space, and memory
     if self.sm['deviceState'].thermalStatus >= ThermalStatus.red:
@@ -348,10 +348,10 @@ class SelfdriveD:
 
     # Check for FCW
     stock_long_is_braking = self.enabled and not self.CP.openpilotLongitudinalControl and CS.aEgo < -1.25
-    model_fcw = self.sm['modelV2'].meta.hardBrakePredicted and not CS.brakePressed and not stock_long_is_braking
-    planner_fcw = self.sm['longitudinalPlan'].fcw and self.enabled
-    if (planner_fcw or model_fcw) and not self.CP.notCar:
-      self.events.add(EventName.fcw)
+    #model_fcw = self.sm['modelV2'].meta.hardBrakePredicted and not CS.brakePressed and not stock_long_is_braking
+    #planner_fcw = self.sm['longitudinalPlan'].fcw and self.enabled
+    #if (planner_fcw or model_fcw) and not self.CP.notCar:
+    #  self.events.add(EventName.fcw)
 
     # TODO: fix simulator
     if not SIMULATION or REPLAY:
@@ -367,11 +367,11 @@ class SelfdriveD:
         self.events.add(EventName.modeldLagging)
 
     # decrement personality on distance button press
-    if self.CP.openpilotLongitudinalControl:
-      if any(not be.pressed and be.type == ButtonType.gapAdjustCruise for be in CS.buttonEvents):
-        self.personality = (self.personality - 1) % 3
-        self.params.put_nonblocking('LongitudinalPersonality', str(self.personality))
-        self.events.add(EventName.personalityChanged)
+    #if self.CP.openpilotLongitudinalControl:
+    #  if any(not be.pressed and be.type == ButtonType.gapAdjustCruise for be in CS.buttonEvents):
+    #    self.personality = (self.personality - 1) % 3
+    #    self.params.put_nonblocking('LongitudinalPersonality', str(self.personality))
+    #    self.events.add(EventName.personalityChanged)
 
   def data_sample(self):
     car_state = messaging.recv_one(self.car_state_sock)
