@@ -150,7 +150,7 @@ class CarState(CarStateBase):
         gear = cp.vl["EMS20"]["HYDROGEN_GEAR_SHIFTER"]
       else:
         gear = cp.vl["ELECT_GEAR"]["Elect_Gear_Shifter"]
-    elif self.CP.flags & HyundaiFlags.CLUSTER_GEARS:\
+    elif self.CP.flags & HyundaiFlags.CLUSTER_GEARS:
       gear = cp.vl["CLU15"]["CF_Clu_Gear"]
     elif self.CP.flags & HyundaiFlags.TCU_GEARS:
       gear = cp.vl["TCU12"]["CUR_GR"]
