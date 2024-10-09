@@ -89,7 +89,7 @@ void HudRenderer::updateState(const UIState &s) {
 
   hideBottomIcons = (sm["selfdriveState"].getSelfdriveState().getAlertSize() != cereal::SelfdriveState::AlertSize::NONE);
   accel = ce.getAEgo();
-  brake_press = ce.getBrakePressed();
+  brake_press = ce.getBrakeLights();
   autohold_state = ce.getExState().getAutoHold();
   gas_press = ce.getGasPressed();
   left_blinker = ce.getLeftBlinker();
