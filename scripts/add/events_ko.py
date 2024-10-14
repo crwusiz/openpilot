@@ -758,11 +758,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       Priority.LOWER, VisualAlert.none, AudibleAlert.none, .2, creation_delay=600.)
   },
 
-  EventName.soundsUnavailable: {
-    ET.PERMANENT: NormalPermanentAlert("스피커가 감지되지않습니다", "장치를 점검하세요"),
-    ET.NO_ENTRY: NoEntryAlert("스피커가 감지되지않습니다"),
-  },
-
   EventName.tooDistracted: {
     ET.NO_ENTRY: NoEntryAlert("방해 수준이 너무높습니다"),
   },
