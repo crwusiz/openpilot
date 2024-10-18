@@ -40,9 +40,11 @@ void ModelRenderer::drawTextColor(QPainter &p, int x, int y, const QString &text
 }
 
 void ModelRenderer::draw(QPainter &painter, const QRect &surface_rect) {
-  auto &sm = *(uiState()->sm);
+  auto *s = uiState();
+  auto &sm = *(s->sm);
   // Check if data is up-to-date
-  if (!(sm.alive("liveCalibration") && sm.alive("modelV2"))) {
+  if (sm.rcv_frame("liveCalibration") < s->scene.started_frame ||
+      sm.rcv_frame("modelV2") < s->scene.started_frame) {
     return;
   }
 
