@@ -231,6 +231,8 @@ class CarController(CarControllerBase):
 
   def create_button_messages(self, CC: structs.CarControl, CS: CarState, use_clu11: bool):
     can_sends = []
+    if CS.out.brakePressed or CS.out.brakeHoldActive:
+      return can_sends
     if use_clu11:
       if CC.cruiseControl.cancel:
         can_sends.append(hyundaican.create_clu11(self.packer, Buttons.CANCEL, self.CP.sccBus, CS.clu11))
