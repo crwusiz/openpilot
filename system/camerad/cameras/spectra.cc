@@ -495,11 +495,11 @@ void SpectraCamera::config_ife(int idx, int request_id, bool init) {
     // stream of IFE register writes
     if (!is_raw) {
       if (init) {
-        buf_desc[0].length = build_initial_config((unsigned char*)ife_cmd.ptr + buf_desc[0].offset);
+        buf_desc[0].length = build_initial_config((unsigned char*)ife_cmd.ptr + buf_desc[0].offset, sensor.get());
       } else if (request_id == 1) {
         buf_desc[0].length = build_first_update((unsigned char*)ife_cmd.ptr + buf_desc[0].offset);
       } else {
-        buf_desc[0].length = build_update((unsigned char*)ife_cmd.ptr + buf_desc[0].offset);
+        buf_desc[0].length = build_update((unsigned char*)ife_cmd.ptr + buf_desc[0].offset, cc, sensor.get());
       }
     }
 
@@ -589,8 +589,8 @@ void SpectraCamera::config_ife(int idx, int request_id, bool init) {
       io_cfg[0].planes[0] = (struct cam_plane_cfg){
         .width = sensor->frame_width,
         .height = sensor->frame_height,
-        .plane_stride = stride,
-        .slice_height = y_height,
+        .plane_stride = sensor->frame_stride,
+        .slice_height = sensor->frame_height + sensor->extra_height,
       };
       io_cfg[0].format = sensor->mipi_format;
       io_cfg[0].color_space = CAM_COLOR_SPACE_BASE;
@@ -799,9 +799,9 @@ void SpectraCamera::configISP() {
     .right_stop = sensor->frame_width - 1,
     .right_width = sensor->frame_width,
 
-    .line_start = 0,
-    .line_stop = sensor->frame_height + sensor->extra_height - 1,
-    .height = sensor->frame_height + sensor->extra_height,
+    .line_start = sensor->frame_offset,
+    .line_stop = sensor->frame_height + sensor->frame_offset - 1,
+    .height = sensor->frame_height + sensor->frame_offset,
 
     .pixel_clk = 0x0,
     .batch_size = 0x0,
@@ -821,6 +821,10 @@ void SpectraCamera::configISP() {
   };
 
   if (is_raw) {
+    in_port_info.line_start = 0;
+    in_port_info.line_stop = sensor->frame_height + sensor->extra_height - 1;
+    in_port_info.height = sensor->frame_height + sensor->extra_height;
+
     in_port_info.data[0].res_type = CAM_ISP_IFE_OUT_RES_RDI_0;
     in_port_info.data[0].format = sensor->mipi_format;
   }
