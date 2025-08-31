@@ -18,7 +18,6 @@ from cereal import messaging
 from openpilot.common.realtime import Ratekeeper
 from openpilot.common.constants import UnitConverter
 
-CAMERA_SPEED_FACTOR = 1.05
 terminate_flag = threading.Event()
 
 class Port:
@@ -84,7 +83,7 @@ class NaviServer:
         pass
 
   def update_thread(self, sm):
-    rk = Ratekeeper(10, print_delay_threshold=None)
+    rk = Ratekeeper(20, print_delay_threshold=None)
 
     while not terminate_flag.is_set():
       sm.update(0)
@@ -186,7 +185,7 @@ class NaviServer:
 def publish_thread(server):
   sm = server.sm
   naviData = messaging.pub_sock('naviData')
-  rk = Ratekeeper(10.0, print_delay_threshold=None)
+  rk = Ratekeeper(20.0, print_delay_threshold=None)
   v_ego_q = deque(maxlen=3)
 
   while not terminate_flag.is_set():
@@ -208,7 +207,7 @@ def publish_thread(server):
       navi.sectionAvgSpeed = server.get_limit_val("section_avg_speed", 0)
       navi.sectionLeftTime = server.get_limit_val("section_left_time", 0)
       navi.sectionAdjustSpeed = server.get_limit_val("section_adjust_speed", False)
-      navi.camSpeedFactor = server.get_limit_val("cam_speed_factor", CAMERA_SPEED_FACTOR)
+      navi.camSpeedFactor = server.get_limit_val("cam_speed_factor", 1.0)
       navi.currentRoadName = server.get_limit_val("current_road_name", "")
     finally:
       server.lock.release()
@@ -370,15 +369,12 @@ class SpeedLimiter:
       self.decelerating = False
       return 0, False
 
-    safety_factor = 1.05
-    safe_speed_kph = speed_limit * safety_factor
-
     safe_time = 7
     safe_decel_rate = 1.2
 
-    safe_speed_ms = self.conv.to_ms(safe_speed_kph)
+    speed_limit_ms = self.conv.to_ms(speed_limit)
 
-    safe_dist = safe_speed_ms * safe_time
+    safe_dist = speed_limit_ms * safe_time
     decel_dist = speed_limit_distance - safe_dist
 
     is_limit_zone = not self.decelerating
@@ -387,15 +383,15 @@ class SpeedLimiter:
         self.decelerating = True
 
     # v_i^2 = v_f^2 + 2ad (physics formula)
-    temp = safe_speed_ms**2 + 2 * safe_decel_rate * decel_dist
+    temp = speed_limit_ms**2 + 2 * safe_decel_rate * decel_dist
 
     if temp < 0:
-      speed_ms = safe_speed_ms
+      speed_ms = speed_limit_ms
     else:
       speed_ms = np.sqrt(temp)
 
     calculated_speed = self.conv.to_clu(speed_ms)
-    safe_speed_clu = max(safe_speed_kph, min(255., calculated_speed))
+    safe_speed_clu = max(speed_limit, min(255., calculated_speed))
 
     return safe_speed_clu, is_limit_zone
 
