@@ -302,7 +302,7 @@ class RadarD:
     self.ready = False
     self.vision_tracks = [VisionTrack(DT_MDL), VisionTrack(DT_MDL)]
     self.params = Params()
-    self.radar_track_enable = self.params.get_int("RadarTrackEnable")
+    self.radar_track_enable = self.params.get_bool("RadarTrackEnable")
     self.radar_detected = False
     self.leadCutIn = {'status': False}
     self.leadCenter = {'status': False}
