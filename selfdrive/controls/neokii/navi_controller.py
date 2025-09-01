@@ -18,6 +18,8 @@ from cereal import messaging
 from openpilot.common.realtime import Ratekeeper
 from openpilot.common.constants import UnitConverter
 
+CAMERA_SPEED_FACTOR = 1.05
+
 terminate_flag = threading.Event()
 
 class Port:
@@ -83,7 +85,7 @@ class NaviServer:
         pass
 
   def update_thread(self, sm):
-    rk = Ratekeeper(20, print_delay_threshold=None)
+    rk = Ratekeeper(10, print_delay_threshold=None)
 
     while not terminate_flag.is_set():
       sm.update(0)
@@ -185,7 +187,7 @@ class NaviServer:
 def publish_thread(server):
   sm = server.sm
   naviData = messaging.pub_sock('naviData')
-  rk = Ratekeeper(20.0, print_delay_threshold=None)
+  rk = Ratekeeper(10.0, print_delay_threshold=None)
   v_ego_q = deque(maxlen=3)
 
   while not terminate_flag.is_set():
@@ -207,7 +209,7 @@ def publish_thread(server):
       navi.sectionAvgSpeed = server.get_limit_val("section_avg_speed", 0)
       navi.sectionLeftTime = server.get_limit_val("section_left_time", 0)
       navi.sectionAdjustSpeed = server.get_limit_val("section_adjust_speed", False)
-      navi.camSpeedFactor = server.get_limit_val("cam_speed_factor", 1.0)
+      navi.camSpeedFactor = server.get_limit_val("cam_speed_factor", CAMERA_SPEED_FACTOR)
       navi.currentRoadName = server.get_limit_val("current_road_name", "")
     finally:
       server.lock.release()
@@ -288,7 +290,7 @@ class SpeedLimiter:
       return self.naviData.sectionLimitSpeed, self.naviData.sectionLeftDist
     return 0, 0
 
-  def get_max_speed(self, cluster_speed):
+  def get_max_speed(self, cluster_speed_clu):
     self.recv()
     default_return_value = (0, False)
 
@@ -313,14 +315,14 @@ class SpeedLimiter:
       max_limit = 120 if is_highway else 100
 
       if cam_limit_speed_left_dist is not None and cam_limit_speed is not None and cam_limit_speed_left_dist > 0:
-        v_ego = self.conv.to_ms(cluster_speed)
-        diff_speed = cluster_speed - (cam_limit_speed * cam_speed_factor)
+        cluster_speed_ms = self.conv.to_ms(cluster_speed_clu)
+        diff_speed = cluster_speed_clu - (cam_limit_speed * cam_speed_factor)
 
-        safe_dist = v_ego * 8.
-        starting_dist = v_ego * 30.
+        safe_dist = cluster_speed_ms * 8.
+        starting_dist = cluster_speed_ms * 30.
 
         if self.decelerating and self.last_limit_speed_left_dist > 0 and \
-           cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - (v_ego * 5)):
+           cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - (cluster_speed_ms * 5)):
           self.decelerating = False
 
         if min_limit <= cam_limit_speed <= max_limit and (self.decelerating or cam_limit_speed_left_dist < starting_dist):
@@ -330,15 +332,15 @@ class SpeedLimiter:
             self.started_dist = cam_limit_speed_left_dist
             self.decelerating = True
 
-          td = self.started_dist - safe_dist
-          d = cam_limit_speed_left_dist - safe_dist
+          total_decel_dist = self.started_dist - safe_dist
+          remain_decel_dist = cam_limit_speed_left_dist - safe_dist
 
-          pp = 0
-          if d > 0. and td > 0. and diff_speed > 0. and (section_left_dist is None or section_left_dist < 10 or cam_type == 2):
-            pp = (d / td) ** 0.6
+          decel_rate_factor = 0
+          if remain_decel_dist > 0. and total_decel_dist > 0. and diff_speed > 0. and (section_left_dist is None or section_left_dist < 10 or cam_type == 2):
+            decel_rate_factor = (remain_decel_dist / total_decel_dist) ** 0.6
 
           self.last_limit_speed_left_dist = cam_limit_speed_left_dist
-          target_speed = cam_limit_speed * cam_speed_factor + int(pp * diff_speed)
+          target_speed = cam_limit_speed * cam_speed_factor + int(decel_rate_factor * diff_speed)
 
           return target_speed, is_limit_zone
 
@@ -364,17 +366,17 @@ class SpeedLimiter:
     self.decelerating = False
     return default_return_value
 
-  def get_camera_limit_speed_stock(self, speed_limit_distance, speed_limit):
+  def get_camera_limit_speed_stock(self, CS, cluster_speed_clu):
+    speed_limit = CS.speedLimit
+    speed_limit_distance = CS.speedLimitDistance
+    cluster_speed_ms = self.conv.to_ms(cluster_speed_clu)
+    speed_limit_ms = self.conv.to_ms(speed_limit)
+
     if speed_limit_distance <= 0 or speed_limit <= 0:
       self.decelerating = False
       return 0, False
 
-    safe_time = 7
-    safe_decel_rate = 1.2
-
-    speed_limit_ms = self.conv.to_ms(speed_limit)
-
-    safe_dist = speed_limit_ms * safe_time
+    safe_dist = cluster_speed_ms * 8.
     decel_dist = speed_limit_distance - safe_dist
 
     is_limit_zone = not self.decelerating
@@ -382,6 +384,7 @@ class SpeedLimiter:
       if not self.decelerating:
         self.decelerating = True
 
+    safe_decel_rate = 1.2
     # v_i^2 = v_f^2 + 2ad (physics formula)
     temp = speed_limit_ms**2 + 2 * safe_decel_rate * decel_dist
 
@@ -391,9 +394,9 @@ class SpeedLimiter:
       speed_ms = np.sqrt(temp)
 
     calculated_speed = self.conv.to_clu(speed_ms)
-    safe_speed_clu = max(speed_limit, min(255., calculated_speed))
+    target_speed = max(speed_limit, min(255., calculated_speed))
 
-    return safe_speed_clu, is_limit_zone
+    return target_speed, is_limit_zone
 
 def signal_handler(sig, frame):
   print('Ctrl+C pressed, exiting.')
