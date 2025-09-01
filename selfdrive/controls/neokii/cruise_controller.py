@@ -103,7 +103,6 @@ class CruiseController:
     self.prev_gas_pressed = False
     self.v_cruise_kph = V_CRUISE_UNSET
     self.v_cruise_cluster_kph = V_CRUISE_UNSET
-    self.predictive_speed_ms = NO_LIMIT_SPEED
 
     self.wait_timer = 0
     self.alive_timer = 0
@@ -266,14 +265,6 @@ class CruiseController:
       return NO_LIMIT_SPEED, 0.0
 
     curvatures = np.abs(self._calculate_curvature(x_positions, y_positions))
-    if len(curvatures) > 0:
-      min_future_curvature = np.min(curvatures[-10:])
-      if min_future_curvature < 0.001 and current_speed_ms < self.conv.to_ms(self.real_set_speed_kph):
-        self.predictive_speed_ms = self.conv.to_ms(self.real_set_speed_kph)
-        if self.apply_limit_speed_clu < self.conv.to_clu(self.predictive_speed_ms):
-          self.apply_limit_speed_clu += 0.5
-          return NO_LIMIT_SPEED, 0.0
-
     curv_segment = curvatures[-10:]
     curv_variance = np.var(curv_segment)
     trajectory_length = np.sum(np.sqrt(np.diff(x_positions) ** 2 + np.diff(y_positions) ** 2))
@@ -348,15 +339,6 @@ class CruiseController:
     min_curve_speed_ms = max(self.conv.to_ms(30.0), current_speed_ms * 0.5)
     model_speed, model_confidence = self._get_model_based_speed(model, current_speed_ms, min_curve_speed_ms)
     acc_speed, acc_confidence = self._get_acc_based_speed(model, current_speed_ms, min_curve_speed_ms)
-
-    if self.predictive_speed_ms != NO_LIMIT_SPEED:
-      target_speed_clu = self.conv.to_clu(self.predictive_speed_ms)
-      current_limit_clu = self.apply_limit_speed_clu
-      if current_limit_clu < target_speed_clu:
-        self.apply_limit_speed_clu += 0.25
-      else:
-        self.predictive_speed_ms = NO_LIMIT_SPEED
-      return self.apply_limit_speed_clu
 
     model_weight = np.interp(current_speed_ms,
                              [self.conv.to_ms(30.0), self.conv.to_ms(60.0), self.conv.to_ms(100.0)],

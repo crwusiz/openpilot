@@ -18,8 +18,6 @@ from cereal import messaging
 from openpilot.common.realtime import Ratekeeper
 from openpilot.common.constants import UnitConverter
 
-CAMERA_SPEED_FACTOR = 1.05
-
 terminate_flag = threading.Event()
 
 class Port:
@@ -85,7 +83,7 @@ class NaviServer:
         pass
 
   def update_thread(self, sm):
-    rk = Ratekeeper(10, print_delay_threshold=None)
+    rk = Ratekeeper(15, print_delay_threshold=None)
 
     while not terminate_flag.is_set():
       sm.update(0)
@@ -187,7 +185,7 @@ class NaviServer:
 def publish_thread(server):
   sm = server.sm
   naviData = messaging.pub_sock('naviData')
-  rk = Ratekeeper(10.0, print_delay_threshold=None)
+  rk = Ratekeeper(15, print_delay_threshold=None)
   v_ego_q = deque(maxlen=3)
 
   while not terminate_flag.is_set():
@@ -209,7 +207,7 @@ def publish_thread(server):
       navi.sectionAvgSpeed = server.get_limit_val("section_avg_speed", 0)
       navi.sectionLeftTime = server.get_limit_val("section_left_time", 0)
       navi.sectionAdjustSpeed = server.get_limit_val("section_adjust_speed", False)
-      navi.camSpeedFactor = server.get_limit_val("cam_speed_factor", CAMERA_SPEED_FACTOR)
+      navi.camSpeedFactor = server.get_limit_val("cam_speed_factor", 1.0)
       navi.currentRoadName = server.get_limit_val("current_road_name", "")
     finally:
       server.lock.release()
@@ -322,7 +320,7 @@ class SpeedLimiter:
         starting_dist = cluster_speed_ms * 30.
 
         if self.decelerating and self.last_limit_speed_left_dist > 0 and \
-           cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - (cluster_speed_ms * 5)):
+           cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - (cluster_speed_ms * 6)):
           self.decelerating = False
 
         if min_limit <= cam_limit_speed <= max_limit and (self.decelerating or cam_limit_speed_left_dist < starting_dist):
