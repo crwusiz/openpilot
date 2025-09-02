@@ -5,6 +5,7 @@
 #include "selfdrive/ui/qt/util.h"
 
 #include <QProcess>
+#include <QTimer>
 
 void Sidebar::drawMetric(QPainter &p, const QPair<QString, QString> &label, QColor c, int y) {
   const QRect rect = {30, y, 240, 126};
@@ -41,6 +42,7 @@ Sidebar::Sidebar(QWidget *parent) : QFrame(parent), onroad(false), flag_pressed(
   setFixedWidth(300);
 
   QObject::connect(uiState(), &UIState::uiUpdate, this, &Sidebar::updateState);
+  QObject::connect(this, &Sidebar::commitCheckFinished, this, &Sidebar::onCommitCheckFinished);
 
   pm = std::make_unique<PubMaster>(std::vector<const char*>{"bookmarkButton"});
 }
@@ -81,12 +83,60 @@ void Sidebar::mouseReleaseEvent(QMouseEvent *event) {
   } else if (recording_audio && mic_indicator_btn.contains(event->pos())) {
     emit openSettings(2, "RecordAudio");
   } else if (commit_rect.contains(event->pos())) {
-    QProcess::startDetached("sh /data/openpilot/scripts/gitpull.sh");
+    startCommitCheck();
   }
 }
 
 void Sidebar::offroadTransition(bool offroad) {
   onroad = !offroad;
+  update();
+}
+
+void Sidebar::startCommitCheck() {
+  if (commit_process) {
+    return;
+  }
+
+  setProperty("commitStatus", QVariant::fromValue(ItemStatus{{tr("CHECKING..."), tr("")}, warning_color}));
+  commit_process = new QProcess(this);
+  connect(commit_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+          this, &Sidebar::onCommitCheckFinished);
+  commit_process->start("sh", QStringList{"/data/openpilot/scripts/commit_compare.sh"});
+}
+
+void Sidebar::onCommitCheckFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+  if (commit_process) {
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+      QString commit_compare_raw = QString(commit_process->readAllStandardOutput()).trimmed();
+      QColor commit_color = warning_color;
+      QString remote_commit = "--";
+      QString local_commit = "--";
+
+      if (!commit_compare_raw.isEmpty()) {
+        QStringList parts = commit_compare_raw.split(" ");
+        if (parts.size() >= 3) {
+          local_commit = parts[0].remove("\"");
+          remote_commit = parts[parts.size()-1].remove("\"");
+
+          if (commit_compare_raw.contains("!=")) {
+            commit_color = danger_color;
+          } else if (commit_compare_raw.contains("==")) {
+            commit_color = QColor(0x80, 0xd8, 0xa6);
+          }
+        }
+      }
+      ItemStatus newStatus = {{remote_commit, local_commit}, commit_color};
+      setProperty("commitStatus", QVariant::fromValue(newStatus));
+    } else {
+      setProperty("commitStatus", QVariant::fromValue(ItemStatus{{tr("ERROR"), tr("CHECK")}, danger_color}));
+    }
+  }
+
+  if (commit_process) {
+    commit_process->deleteLater();
+    commit_process = nullptr;
+  }
+
   update();
 }
 
@@ -105,7 +155,7 @@ void Sidebar::updateState(const UIState &s) {
   if (strength > 0 && !commit_check_done) {
     QString commit_compare = QString("%1").arg(QString::fromStdString(params.get("CommitCompare")));
     if (commit_compare.isEmpty()) {
-      QProcess::startDetached("sh /data/openpilot/scripts/commit_compare.sh");
+      startCommitCheck();
       commit_check_done = true;
     }
   }
@@ -217,8 +267,8 @@ void Sidebar::paintEvent(QPaintEvent *event) {
   p.setFont(InterFont(30));
   p.setPen(QColor(0xff, 0xff, 0xff));
 
-  const QRect r = QRect(58, 247, width() - 100, 50);
-  const QRect r2 = QRect(0, 247, event->rect().width(), 50);
+  const QRect r = QRect(58, 237, width() - 100, 50);
+  const QRect r2 = QRect(0, 237, event->rect().width(), 50);
 
   if (net_type == "Hotspot") {
     p.drawPixmap(r.x(), r.y() + (r.height() - link_img.height()) / 2, link_img);

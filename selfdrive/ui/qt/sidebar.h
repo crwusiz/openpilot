@@ -27,10 +27,13 @@ public:
 signals:
   void openSettings(int index = 0, const QString &param = "");
   void valueChanged();
+  void commitCheckFinished(const QString &result);
 
 public slots:
   void offroadTransition(bool offroad);
   void updateState(const UIState &s);
+  void onCommitCheckFinished(int exitCode, QProcess::ExitStatus exitStatus);
+  void startCommitCheck();
 
 protected:
   void paintEvent(QPaintEvent *event) override;
@@ -61,7 +64,7 @@ protected:
   const QRect commit_rect = QRect(30, 812, 240, 126);
 
   ItemStatus connect_status, panda_status, temp_status;
-  ItemStatus commit_status;
+  ItemStatus commit_status = {{tr("CHECKING..."), tr("")}, warning_color};
   QString net_type;
   int net_strength = 0;
 
@@ -71,4 +74,5 @@ private:
 
   UIScene &scene;
   Params params;
+  QProcess *commit_process = nullptr;
 };
