@@ -42,7 +42,6 @@ Sidebar::Sidebar(QWidget *parent) : QFrame(parent), onroad(false), flag_pressed(
   setFixedWidth(300);
 
   QObject::connect(uiState(), &UIState::uiUpdate, this, &Sidebar::updateState);
-  QObject::connect(this, &Sidebar::commitCheckFinished, this, &Sidebar::onCommitCheckFinished);
 
   pm = std::make_unique<PubMaster>(std::vector<const char*>{"bookmarkButton"});
 }
