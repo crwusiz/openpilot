@@ -82,7 +82,10 @@ void Sidebar::mouseReleaseEvent(QMouseEvent *event) {
   } else if (recording_audio && mic_indicator_btn.contains(event->pos())) {
     emit openSettings(2, "RecordAudio");
   } else if (commit_rect.contains(event->pos())) {
-    startCommitCheck();
+    ItemStatus newStatus = {{tr("gitpull"), tr("progress")}, warning_color};
+    setProperty("commitStatus", QVariant::fromValue(newStatus));
+    update();
+    QProcess::startDetached("sh /data/openpilot/scripts/gitpull.sh");
   }
 }
 
