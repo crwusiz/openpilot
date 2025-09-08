@@ -116,6 +116,10 @@ function launch {
     cp -f $DIR/scripts/add/events_en.py $DIR/selfdrive/selfdrived/events.py
   fi
 
+  if ! python3 -c "import kaitaistruct" &> /dev/null; then
+    pip install kaitaistruct
+  fi
+
   # start manager
   cd system/manager
   if [ ! -f $DIR/prebuilt ]; then
