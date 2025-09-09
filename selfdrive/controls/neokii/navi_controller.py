@@ -83,7 +83,7 @@ class NaviServer:
         pass
 
   def update_thread(self, sm):
-    rk = Ratekeeper(15, print_delay_threshold=None)
+    rk = Ratekeeper(10, print_delay_threshold=None)
 
     while not terminate_flag.is_set():
       sm.update(0)
@@ -185,7 +185,7 @@ class NaviServer:
 def publish_thread(server):
   sm = server.sm
   naviData = messaging.pub_sock('naviData')
-  rk = Ratekeeper(15, print_delay_threshold=None)
+  rk = Ratekeeper(10, print_delay_threshold=None)
   v_ego_q = deque(maxlen=3)
 
   while not terminate_flag.is_set():
