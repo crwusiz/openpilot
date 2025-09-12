@@ -4,6 +4,7 @@
 
 #include <QFrame>
 #include <QMap>
+#include <QProcess>
 
 #include "selfdrive/ui/ui.h"
 #include "selfdrive/ui/qt/network/networking.h"

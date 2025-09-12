@@ -85,7 +85,13 @@ void Sidebar::mouseReleaseEvent(QMouseEvent *event) {
     ItemStatus newStatus = {{tr("gitpull"), tr("progress")}, warning_color};
     setProperty("commitStatus", QVariant::fromValue(newStatus));
     update();
-    QProcess::startDetached("sh /data/openpilot/scripts/gitpull.sh");
+    if (commit_process) {
+      return;
+    }
+    commit_process = new QProcess(this);
+    connect(commit_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Sidebar::onCommitCheckFinished);
+    commit_process->start("sh", QStringList{"/data/openpilot/scripts/gitpull.sh"});
   }
 }
 
@@ -109,28 +115,36 @@ void Sidebar::startCommitCheck() {
 void Sidebar::onCommitCheckFinished(int exitCode, QProcess::ExitStatus exitStatus) {
   if (commit_process) {
     if (exitStatus == QProcess::NormalExit && exitCode == 0) {
-      QString commit_compare_raw = QString(commit_process->readAllStandardOutput()).trimmed();
-      QColor commit_color = warning_color;
-      QString remote_commit = "--";
-      QString local_commit = "--";
+      QString output = QString(commit_process->readAllStandardOutput()).trimmed();
 
-      if (!commit_compare_raw.isEmpty()) {
-        QStringList parts = commit_compare_raw.split(" ");
+      if (output.contains("==") || output.contains("!=")) { // commit_compare.sh 결과 처리
+        QStringList parts = output.split(" ");
+        QColor commit_color = warning_color;
+        QString remote_commit = "--";
+        QString local_commit = "--";
+
         if (parts.size() >= 3) {
           local_commit = parts[0].remove("\"");
           remote_commit = parts[parts.size()-1].remove("\"");
 
-          if (commit_compare_raw.contains("!=")) {
+          if (output.contains("!=")) {
             commit_color = danger_color;
-          } else if (commit_compare_raw.contains("==")) {
+          } else if (output.contains("==")) {
             commit_color = QColor(0x80, 0xd8, 0xa6);
           }
         }
+        ItemStatus newStatus = {{remote_commit, local_commit}, commit_color};
+        setProperty("commitStatus", QVariant::fromValue(newStatus));
+      } else {
+        setProperty("commitStatus", QVariant::fromValue(ItemStatus{{tr("gitpull"), tr("success")}, good_color}));
       }
-      ItemStatus newStatus = {{remote_commit, local_commit}, commit_color};
-      setProperty("commitStatus", QVariant::fromValue(newStatus));
     } else {
-      setProperty("commitStatus", QVariant::fromValue(ItemStatus{{tr("ERROR"), tr("CHECK")}, danger_color}));
+      QString error_output = QString(commit_process->readAllStandardError()).trimmed();
+      if (!error_output.isEmpty()) {
+          setProperty("commitStatus", QVariant::fromValue(ItemStatus{{tr("ERROR"), error_output}, danger_color}));
+      } else {
+          setProperty("commitStatus", QVariant::fromValue(ItemStatus{{tr("ERROR"), tr("CHECK")}, danger_color}));
+      }
     }
   }
 
