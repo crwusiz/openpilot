@@ -118,6 +118,7 @@ void HudRenderer::updateState(const UIState &s) {
   rr = ce.getExState().getTpms().getRr();
   navLimitSpeed = ce.getExState().getNavLimitSpeed();
   stockLimitSpeed = ce.getSpeedLimit();
+  stockSpeedLimitDistance = ce.getSpeedLimitDistance();
   road_signs = ce.getExState().getRoadSigns();
   nda_state = nd.getActive();
   roadLimitSpeed = nd.getRoadLimitSpeed();
@@ -451,6 +452,7 @@ void HudRenderer::drawSetSpeed(QPainter &p, const QRect &surface_rect) {
     }
   } else if (stockLimitSpeed > 0) {
     limit_speed = stockLimitSpeed;
+    left_dist = stockSpeedLimitDistance;
   } else if (navLimitSpeed > 0) {
     limit_speed = navLimitSpeed;
   }

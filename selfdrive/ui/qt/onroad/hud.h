@@ -55,7 +55,7 @@ private:
   int wifi_state, traffic_state = 0;
   int blink_index, blink_wait = 0;
   int autohold_state, nda_state = 0;
-  int road_signs = 0;
+  int road_signs, stockSpeedLimitDistance = 0;
 
   float apply_speed, cruise_speed;
   float gpsBearing, gpsVerticalAccuracy, gpsAltitude, gpsAccuracy = 0;
