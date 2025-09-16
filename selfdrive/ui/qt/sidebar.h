@@ -34,10 +34,12 @@ public slots:
   void offroadTransition(bool offroad);
   void updateState(const UIState &s);
   void onCommitCheckFinished(int exitCode, QProcess::ExitStatus exitStatus);
+  void onGitPullFinished(int exitCode, QProcess::ExitStatus exitStatus);
   void startCommitCheck();
 
 protected:
-  void paintEvent(QPaintEvent *event) override;  void mousePressEvent(QMouseEvent *event) override;
+  void paintEvent(QPaintEvent *event) override;
+  void mousePressEvent(QMouseEvent *event) override;
   void mouseReleaseEvent(QMouseEvent *event) override;
 
 private:
@@ -45,7 +47,7 @@ private:
 
   QPixmap home_img, flag_img, settings_img, mic_img, link_img, c3x_img;
   bool onroad, recording_audio, flag_pressed, settings_pressed, mic_indicator_pressed;
-  bool commit_check_done, commit_pressed;
+  bool commit_pressed, is_update_available;
   const QMap<cereal::DeviceState::NetworkType, QString> network_type = {
     {cereal::DeviceState::NetworkType::NONE, tr("--")},
     {cereal::DeviceState::NetworkType::WIFI, tr("Wi-Fi")},
@@ -73,6 +75,6 @@ private:
   UIScene &scene;
   Params params;
 
-  ItemStatus commit_status = {{tr("CHECK"), tr("STATUS")}, warning_color};
+  ItemStatus commit_status = {{tr("UPDATE"), tr("CHECK")}, warning_color};
   QProcess *commit_process = nullptr;
 };

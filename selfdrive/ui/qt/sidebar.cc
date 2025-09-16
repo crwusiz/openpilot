@@ -6,6 +6,8 @@
 
 #include <QProcess>
 #include <QTimer>
+#include <QFile>
+#include <QTextStream>
 
 void Sidebar::drawMetric(QPainter &p, const QPair<QString, QString> &label, QColor c, int y) {
   const QRect rect = {30, y, 240, 126};
@@ -27,7 +29,7 @@ void Sidebar::drawMetric(QPainter &p, const QPair<QString, QString> &label, QCol
   p.drawText(rect.adjusted(22, 0, 0, 0), Qt::AlignCenter, label.first + "\n" + label.second);
 }
 
-Sidebar::Sidebar(QWidget *parent) : QFrame(parent), onroad(false), flag_pressed(false), settings_pressed(false), mic_indicator_pressed(false), scene(uiState()->scene), commit_check_done(false) {
+Sidebar::Sidebar(QWidget *parent) : QFrame(parent), onroad(false), flag_pressed(false), settings_pressed(false), mic_indicator_pressed(false), scene(uiState()->scene), is_update_available(false) {
   home_img = loadPixmap("../assets/images/button_home.png", home_btn.size());
   flag_img = loadPixmap("../assets/images/button_flag.png", home_btn.size());
   settings_img = loadPixmap("../assets/images/button_settings.png", settings_btn.size(), Qt::IgnoreAspectRatio);
@@ -43,9 +45,7 @@ Sidebar::Sidebar(QWidget *parent) : QFrame(parent), onroad(false), flag_pressed(
 
   QObject::connect(uiState(), &UIState::uiUpdate, this, &Sidebar::updateState);
 
-  QTimer *commit_timer = new QTimer(this);
-  connect(commit_timer, &QTimer::timeout, this, &Sidebar::startCommitCheck);
-  commit_timer->start(300000);
+  startCommitCheck();
 
   pm = std::make_unique<PubMaster>(std::vector<const char*>{"bookmarkButton"});
 }
@@ -86,16 +86,41 @@ void Sidebar::mouseReleaseEvent(QMouseEvent *event) {
   } else if (recording_audio && mic_indicator_btn.contains(event->pos())) {
     emit openSettings(2, "RecordAudio");
   } else if (commit_btn.contains(event->pos())) {
-    ItemStatus newStatus = {{tr("gitpull"), tr("progress")}, warning_color};
-    setProperty("commitStatus", QVariant::fromValue(newStatus));
-    update();
-    if (commit_process) {
-      return;
+    if (is_update_available) {
+      ItemStatus newStatus = {{tr("git pull"), tr("progress")}, warning_color};
+      setProperty("commitStatus", QVariant::fromValue(newStatus));
+      update();
+      if (commit_process) return;
+
+      commit_process = new QProcess(this);
+      commit_process->startDetached("sh", QStringList{"/data/openpilot/scripts/gitpull.sh"});
+
+      QTimer *timer = new QTimer(this);
+      timer->setInterval(1000);
+      connect(timer, &QTimer::timeout, this, [this, timer]() {
+        QFile file("/data/gitpull_exit_code.txt");
+        if (file.exists()) {
+          if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QTextStream in(&file);
+            int exitCode = in.readLine().toInt();
+            file.close();
+            file.remove();
+
+            onGitPullFinished(exitCode, QProcess::NormalExit);
+
+            if (commit_process) {
+              commit_process->deleteLater();
+              commit_process = nullptr;
+            }
+          }
+          timer->stop();
+          timer->deleteLater();
+        }
+      });
+      timer->start();
+    } else {
+      startCommitCheck();
     }
-    commit_process = new QProcess(this);
-    connect(commit_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this, &Sidebar::onCommitCheckFinished);
-    commit_process->start("sh", QStringList{"/data/openpilot/scripts/gitpull.sh"});
   }
 }
 
@@ -108,11 +133,36 @@ void Sidebar::startCommitCheck() {
   if (commit_process) {
     return;
   }
+  ItemStatus newStatus = {{tr("commit"), tr("compare")}, warning_color};
+  setProperty("commitStatus", QVariant::fromValue(newStatus));
+  update();
 
   commit_process = new QProcess(this);
-  connect(commit_process, static_cast<void(QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
-          this, &Sidebar::onCommitCheckFinished);
-  commit_process->start("sh", QStringList{"-c", "cd /data/openpilot && local_commit=$(git rev-parse --short=7 HEAD) && remote_commit=$(git ls-remote origin $(git rev-parse --abbrev-ref HEAD) | awk '{print substr($1,1,7)}' || echo \"\") && if [ \"$local_commit\" != \"$remote_commit\" ]; then echo \"$local_commit != $remote_commit\"; else echo \"$local_commit == $remote_commit\"; fi"});
+  commit_process->startDetached("sh", QStringList{"/data/openpilot/scripts/commit_compare.sh"});
+
+  QTimer *timer = new QTimer(this);
+  timer->setInterval(1000);
+  connect(timer, &QTimer::timeout, this, [this, timer]() {
+    QFile file("/data/commit_check_exit_code.txt");
+    if (file.exists()) {
+      if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream in(&file);
+        int exitCode = in.readLine().toInt();
+        file.close();
+        file.remove();
+
+        onCommitCheckFinished(exitCode, QProcess::NormalExit);
+
+        if (commit_process) {
+          commit_process->deleteLater();
+          commit_process = nullptr;
+        }
+      }
+      timer->stop();
+      timer->deleteLater();
+    }
+  });
+  timer->start();
 }
 
 void Sidebar::updateState(const UIState &s) {
@@ -233,26 +283,55 @@ void Sidebar::paintEvent(QPaintEvent *event) {
 
 void Sidebar::onCommitCheckFinished(int exitCode, QProcess::ExitStatus exitStatus) {
   if (exitStatus == QProcess::NormalExit && exitCode == 0) {
-    QString output = QString(commit_process->readAllStandardOutput()).trimmed();
-    QStringList parts = output.split(" ");
+    QString output = QString::fromStdString(params.get("CommitCompare"));
+    QString trimmed_output = output.trimmed().mid(1, output.length() - 2);
 
-    if (parts.size() >= 3) {
-      QString local_commit = parts[0];
-      QString remote_commit = parts[2];
+    QStringList parts;
+    QString operator_symbol;
 
-      if (parts[1] == "!=") {
-        commit_status = {{tr("UPDATE"), tr("AVAILABLE")}, danger_color};
-      } else {
+    if (trimmed_output.contains(" == ")) {
+      parts = trimmed_output.split(" == ");
+      operator_symbol = "==";
+    } else if (trimmed_output.contains(" != ")) {
+      parts = trimmed_output.split(" != ");
+      operator_symbol = "!=";
+    }
+
+    if (parts.size() == 2) {
+      QString local_commit = parts[0].mid(1, parts[0].length() - 2);
+      QString remote_commit = parts[1].mid(1, parts[1].length() - 2);
+
+      if (operator_symbol == "==") {
         commit_status = {{tr("UP TO DATE"), local_commit}, QColor(0x80, 0xd8, 0xa6)};
+        is_update_available = false;
+      } else {
+        commit_status = {{local_commit, remote_commit}, danger_color};
+        is_update_available = true;
       }
     } else {
       commit_status = {{tr("CHECK"), tr("ERROR")}, danger_color};
+      is_update_available = false;
     }
   } else {
     commit_status = {{tr("CHECK"), tr("ERROR")}, danger_color};
+    is_update_available = false;
   }
   update();
 
+  commit_process->deleteLater();
+  commit_process = nullptr;
+}
+
+void Sidebar::onGitPullFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+  if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+    ItemStatus newStatus = {{tr("git pull"), tr("SUCCESS")}, good_color};
+    setProperty("commitStatus", QVariant::fromValue(newStatus));
+    update();
+  } else {
+    ItemStatus newStatus = {{tr("git pull"), tr("FAILED")}, danger_color};
+    setProperty("commitStatus", QVariant::fromValue(newStatus));
+    update();
+  }
   commit_process->deleteLater();
   commit_process = nullptr;
 }
