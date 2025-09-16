@@ -43,6 +43,10 @@ Sidebar::Sidebar(QWidget *parent) : QFrame(parent), onroad(false), flag_pressed(
 
   QObject::connect(uiState(), &UIState::uiUpdate, this, &Sidebar::updateState);
 
+  QTimer *commit_timer = new QTimer(this);
+  connect(commit_timer, &QTimer::timeout, this, &Sidebar::startCommitCheck);
+  commit_timer->start(300000);
+
   pm = std::make_unique<PubMaster>(std::vector<const char*>{"bookmarkButton"});
 }
 
@@ -56,7 +60,7 @@ void Sidebar::mousePressEvent(QMouseEvent *event) {
   } else if (recording_audio && mic_indicator_btn.contains(event->pos())) {
     mic_indicator_pressed = true;
     update();
-  } else if (commit_rect.contains(event->pos())) {
+  } else if (commit_btn.contains(event->pos())) {
     commit_pressed = true;
     update();
   }
@@ -81,7 +85,7 @@ void Sidebar::mouseReleaseEvent(QMouseEvent *event) {
     emit openSettings();
   } else if (recording_audio && mic_indicator_btn.contains(event->pos())) {
     emit openSettings(2, "RecordAudio");
-  } else if (commit_rect.contains(event->pos())) {
+  } else if (commit_btn.contains(event->pos())) {
     ItemStatus newStatus = {{tr("gitpull"), tr("progress")}, warning_color};
     setProperty("commitStatus", QVariant::fromValue(newStatus));
     update();
@@ -105,59 +109,16 @@ void Sidebar::startCommitCheck() {
     return;
   }
 
-  setProperty("commitStatus", QVariant::fromValue(ItemStatus{{tr("CHECKING..."), tr("")}, warning_color}));
   commit_process = new QProcess(this);
-  connect(commit_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+  connect(commit_process, static_cast<void(QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
           this, &Sidebar::onCommitCheckFinished);
-  commit_process->start("sh", QStringList{"/data/openpilot/scripts/commit_compare.sh"});
-}
-
-void Sidebar::onCommitCheckFinished(int exitCode, QProcess::ExitStatus exitStatus) {
-  if (commit_process) {
-    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
-      QString output = QString(commit_process->readAllStandardOutput()).trimmed();
-
-      if (output.contains("==") || output.contains("!=")) { // commit_compare.sh 결과 처리
-        QStringList parts = output.split(" ");
-        QColor commit_color = warning_color;
-        QString remote_commit = "--";
-        QString local_commit = "--";
-
-        if (parts.size() >= 3) {
-          local_commit = parts[0].remove("\"");
-          remote_commit = parts[parts.size()-1].remove("\"");
-
-          if (output.contains("!=")) {
-            commit_color = danger_color;
-          } else if (output.contains("==")) {
-            commit_color = QColor(0x80, 0xd8, 0xa6);
-          }
-        }
-        ItemStatus newStatus = {{remote_commit, local_commit}, commit_color};
-        setProperty("commitStatus", QVariant::fromValue(newStatus));
-      } else {
-        setProperty("commitStatus", QVariant::fromValue(ItemStatus{{tr("gitpull"), tr("success")}, good_color}));
-      }
-    } else {
-      QString error_output = QString(commit_process->readAllStandardError()).trimmed();
-      if (!error_output.isEmpty()) {
-          setProperty("commitStatus", QVariant::fromValue(ItemStatus{{tr("ERROR"), error_output}, danger_color}));
-      } else {
-          setProperty("commitStatus", QVariant::fromValue(ItemStatus{{tr("ERROR"), tr("CHECK")}, danger_color}));
-      }
-    }
-  }
-
-  if (commit_process) {
-    commit_process->deleteLater();
-    commit_process = nullptr;
-  }
-
-  update();
+  commit_process->start("sh", QStringList{"-c", "cd /data/openpilot && local_commit=$(git rev-parse --short=7 HEAD) && remote_commit=$(git ls-remote origin $(git rev-parse --abbrev-ref HEAD) | awk '{print substr($1,1,7)}' || echo \"\") && if [ \"$local_commit\" != \"$remote_commit\" ]; then echo \"$local_commit != $remote_commit\"; else echo \"$local_commit == $remote_commit\"; fi"});
 }
 
 void Sidebar::updateState(const UIState &s) {
-  if (!isVisible()) return;
+  if (!isVisible()) {
+    return;
+  }
 
   auto &sm = *(s.sm);
 
@@ -167,41 +128,6 @@ void Sidebar::updateState(const UIState &s) {
   setProperty("netType", tethering_on ? "Hotspot": network_type[deviceState.getNetworkType()]);
   int strength = tethering_on ? 4 : (int)deviceState.getNetworkStrength();
   setProperty("netStrength", strength > 0 ? strength + 1 : 0);
-
-  if (strength > 0 && !commit_check_done) {
-    QString commit_compare = QString("%1").arg(QString::fromStdString(params.get("CommitCompare")));
-    if (commit_compare.isEmpty()) {
-      startCommitCheck();
-      commit_check_done = true;
-    }
-  }
-
-  if (strength == 0) {
-    commit_check_done = false;
-  }
-
-  QString commit_compare_raw = QString::fromStdString(params.get("CommitCompare"));
-  QColor commit_color = warning_color;
-  QString remote_commit = "--";
-  QString local_commit = "--";
-
-  if (!commit_compare_raw.isEmpty()) {
-    QStringList parts = commit_compare_raw.split(" ");
-
-    if (parts.size() >= 3) {
-      local_commit = parts[0].remove("\"");
-      remote_commit = parts[parts.size()-1].remove("\"");
-
-      if (commit_compare_raw.contains("!=")) {
-        commit_color = danger_color;
-      } else if (commit_compare_raw.contains("==")) {
-        commit_color = QColor(0x80, 0xd8, 0xa6);
-      }
-    }
-  }
-
-  ItemStatus commitStatus = {{remote_commit, local_commit}, commit_color};
-  setProperty("commitStatus", QVariant::fromValue(commitStatus));
 
   ItemStatus connectStatus;
   auto last_ping = deviceState.getLastAthenaPingTime();
@@ -303,4 +229,30 @@ void Sidebar::paintEvent(QPaintEvent *event) {
   p.setOpacity(commit_pressed ? 0.65 : 1.0);
   drawMetric(p, commit_status.first, commit_status.second, 812 - 50);
   p.setOpacity(1.0);
+}
+
+void Sidebar::onCommitCheckFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+  if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+    QString output = QString(commit_process->readAllStandardOutput()).trimmed();
+    QStringList parts = output.split(" ");
+
+    if (parts.size() >= 3) {
+      QString local_commit = parts[0];
+      QString remote_commit = parts[2];
+
+      if (parts[1] == "!=") {
+        commit_status = {{tr("UPDATE"), tr("AVAILABLE")}, danger_color};
+      } else {
+        commit_status = {{tr("UP TO DATE"), local_commit}, QColor(0x80, 0xd8, 0xa6)};
+      }
+    } else {
+      commit_status = {{tr("CHECK"), tr("ERROR")}, danger_color};
+    }
+  } else {
+    commit_status = {{tr("CHECK"), tr("ERROR")}, danger_color};
+  }
+  update();
+
+  commit_process->deleteLater();
+  commit_process = nullptr;
 }

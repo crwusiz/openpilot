@@ -37,9 +37,10 @@ public slots:
   void startCommitCheck();
 
 protected:
-  void paintEvent(QPaintEvent *event) override;
-  void mousePressEvent(QMouseEvent *event) override;
+  void paintEvent(QPaintEvent *event) override;  void mousePressEvent(QMouseEvent *event) override;
   void mouseReleaseEvent(QMouseEvent *event) override;
+
+private:
   void drawMetric(QPainter &p, const QPair<QString, QString> &label, QColor c, int y);
 
   QPixmap home_img, flag_img, settings_img, mic_img, link_img, c3x_img;
@@ -61,19 +62,17 @@ protected:
   const QColor good_color = QColor(255, 255, 255);
   const QColor warning_color = QColor(218, 202, 37);
   const QColor danger_color = QColor(201, 34, 49);
-
-  const QRect commit_rect = QRect(30, 812, 240, 126);
+  const QRect commit_btn = QRect(30, 812, 240, 126);
 
   ItemStatus connect_status, panda_status, temp_status;
-  ItemStatus commit_status = {{tr("CHECKING..."), tr("")}, warning_color};
-  QString net_type;
+  QString net_type = "--";
   int net_strength = 0;
 
-private:
   std::unique_ptr<PubMaster> pm;
   Networking *networking = nullptr;
-
   UIScene &scene;
   Params params;
+
+  ItemStatus commit_status = {{tr("CHECK"), tr("STATUS")}, warning_color};
   QProcess *commit_process = nullptr;
 };

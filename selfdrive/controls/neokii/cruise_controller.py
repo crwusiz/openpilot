@@ -95,12 +95,8 @@ class CruiseController:
     self.steer_limit_speed_clu = 0.
     self.lead_limit_speed_clu = 0.
     self.prev_steering_angle = 0.
-    self.gas_pressed_timer = 0
-    self.gas_override_timer = 0
     self.prev_cruise_enabled = False
     self.steer_decel_active = False
-    self.gas_pressed_override = False
-    self.prev_gas_pressed = False
     self.v_cruise_kph = V_CRUISE_UNSET
     self.v_cruise_cluster_kph = V_CRUISE_UNSET
 
@@ -197,26 +193,7 @@ class CruiseController:
     ]
 
     valid_limits = [s for s in speed_candidates if s >= self.min_set_speed_clu and s != NO_LIMIT_SPEED]
-    base_calculated_max_speed_clu = min(v_cruise_kph, min(valid_limits)) if valid_limits else v_cruise_kph
-
-    if gas_pressed:
-      self.gas_override_timer += 1
-      if self.gas_override_timer > 5 * 20:
-        self.gas_pressed_override = True
-        calculated_max_speed_clu = max(cluster_speed_clu, self.apply_limit_speed_clu)
-        calculated_max_speed_clu = min(calculated_max_speed_clu, v_cruise_kph)
-      else:
-        self.gas_pressed_override = False
-        calculated_max_speed_clu = base_calculated_max_speed_clu
-    else:
-      self.gas_override_timer = 0
-      if self.gas_pressed_override and base_calculated_max_speed_clu < self.apply_limit_speed_clu:
-        self.gas_pressed_override = False
-
-      if self.gas_pressed_override:
-        calculated_max_speed_clu = self.apply_limit_speed_clu
-      else:
-        calculated_max_speed_clu = base_calculated_max_speed_clu
+    calculated_max_speed_clu = min(v_cruise_kph, min(valid_limits)) if valid_limits else self.apply_limit_speed_clu
 
     is_curve_limit = (curve_limit_speed_clu != NO_LIMIT_SPEED and curve_limit_speed_clu == min(valid_limits))
 
