@@ -394,7 +394,7 @@ main() {
 
   if ! safe_fetch_and_reset "$branch"; then
     log_error "Failed to fetch and reset main repository."
-    echo 1 > /data/gitpull_exit_code.txt
+    echo 1 > /data/gitpull_exit_code.log
     exit 1
   fi
 
@@ -424,11 +424,11 @@ main() {
     echo -e "\nCommit Compare [${GREEN}${BOLD} match ${NC}]\n"
     if [ -x "/data/openpilot/scripts/restart.sh" ]; then
       log_success "Executing restart script...\n"
-      echo 0 > /data/gitpull_exit_code.txt
+      echo 0 > /data/gitpull_exit_code.log
       exec /data/openpilot/scripts/restart.sh
     else
       log_error "Restart script '/data/openpilot/scripts/restart.sh' not found. Please check path."
-      echo 1 > /data/gitpull_exit_code.txt
+      echo 1 > /data/gitpull_exit_code.log
       exit 1
     fi
   else

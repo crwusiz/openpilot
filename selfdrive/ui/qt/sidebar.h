@@ -9,6 +9,10 @@
 #include "selfdrive/ui/ui.h"
 #include "selfdrive/ui/qt/network/networking.h"
 
+#include <QFileSystemWatcher>
+#include <functional>
+#include <QTimer>
+
 typedef QPair<QPair<QString, QString>, QColor> ItemStatus;
 Q_DECLARE_METATYPE(ItemStatus);
 
@@ -24,6 +28,7 @@ class Sidebar : public QFrame {
 
 public:
   explicit Sidebar(QWidget* parent = 0);
+  ~Sidebar();
 
 signals:
   void openSettings(int index = 0, const QString &param = "");
@@ -33,9 +38,27 @@ signals:
 public slots:
   void offroadTransition(bool offroad);
   void updateState(const UIState &s);
-  void onCommitCheckFinished(int exitCode, QProcess::ExitStatus exitStatus);
-  void onGitPullFinished(int exitCode, QProcess::ExitStatus exitStatus);
-  void startCommitCheck();
+
+private slots:
+  void handleCommitButtonPress();
+  void executeGitPullDetached();
+  void executeGitPullWithRetryDetached();
+  void onGitPullFileChanged();
+  void checkGitPullStatus();
+  void handleGitPullCompletion(int exitCode);
+  void onGitPullFailed(const QString &reason);
+  void onGitPullTimeout();
+
+  void startCommitCheckDetached();
+  void onCommitCheckFileChanged();
+  void checkCommitCheckStatus();
+  void onCommitCheckFailed(const QString &reason);
+
+  void setupFileWatcher(const QString &filePath, std::function<void()> callback);
+  void setupGitPullPollingTimer();
+  void parseCommitCompareResult(const QString &output);
+  bool checkNetworkConnectivity();
+  void cleanupTimers();
 
 protected:
   void paintEvent(QPaintEvent *event) override;
@@ -48,6 +71,17 @@ private:
   QPixmap home_img, flag_img, settings_img, mic_img, link_img, c3x_img;
   bool onroad, recording_audio, flag_pressed, settings_pressed, mic_indicator_pressed;
   bool commit_pressed, is_update_available;
+
+  bool is_processing = false;
+  int retry_count = 0;
+  static const int MAX_RETRIES = 3;
+  static const int CHECK_INTERVAL_MS = 1000;
+  static const int MAX_WAIT_TIME_MS = 120000;
+
+  QTimer *commit_check_timer = nullptr;
+  QTimer *git_pull_timer = nullptr;
+  QFileSystemWatcher *file_watcher = nullptr;
+
   const QMap<cereal::DeviceState::NetworkType, QString> network_type = {
     {cereal::DeviceState::NetworkType::NONE, tr("--")},
     {cereal::DeviceState::NetworkType::WIFI, tr("Wi-Fi")},

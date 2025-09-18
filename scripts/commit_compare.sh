@@ -12,4 +12,4 @@ fi
 
 echo "\"$local_commit\" $([ "$local_commit" = "$remote_commit" ] && echo "==" || echo "!=") \"$remote_commit\"" > /data/params/d/CommitCompare
 
-echo 0 > /data/commit_check_exit_code.txt
+echo 0 > /data/commit_check_exit_code.log
