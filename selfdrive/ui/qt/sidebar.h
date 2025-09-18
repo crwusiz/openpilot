@@ -41,8 +41,7 @@ public slots:
 
 private slots:
   void handleCommitButtonPress();
-  void executeGitPullDetached();
-  void executeGitPullWithRetryDetached();
+  void startGitPullDetached();
   void onGitPullFileChanged();
   void checkGitPullStatus();
   void handleGitPullCompletion(int exitCode);
@@ -73,8 +72,6 @@ private:
   bool commit_pressed, is_update_available;
 
   bool is_processing = false;
-  int retry_count = 0;
-  static const int MAX_RETRIES = 3;
   static const int CHECK_INTERVAL_MS = 1000;
   static const int MAX_WAIT_TIME_MS = 120000;
 

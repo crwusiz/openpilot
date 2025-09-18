@@ -40,8 +40,7 @@ Sidebar::Sidebar(QWidget *parent)
     mic_indicator_pressed(false),
     scene(uiState()->scene),
     is_update_available(false),
-    is_processing(false),
-    retry_count(0) {
+    is_processing(false) {
 
   home_img = loadPixmap("../assets/images/button_home.png", home_btn.size());
   flag_img = loadPixmap("../assets/images/button_flag.png", home_btn.size());
@@ -127,13 +126,13 @@ void Sidebar::handleCommitButtonPress() {
   }
 
   if (is_update_available) {
-    executeGitPullDetached();
+    startGitPullDetached();
   } else {
     startCommitCheckDetached();
   }
 }
 
-void Sidebar::executeGitPullDetached() {
+void Sidebar::startGitPullDetached() {
   if (!checkNetworkConnectivity()) {
     ItemStatus errorStatus = {{tr("NETWORK"), tr("ERROR")}, danger_color};
     setProperty("commitStatus", QVariant::fromValue(errorStatus));
@@ -142,52 +141,12 @@ void Sidebar::executeGitPullDetached() {
   }
 
   is_processing = true;
-  retry_count = 0;
 
   ItemStatus processingStatus = {{tr("git pull"), tr("STARTING")}, warning_color};
   setProperty("commitStatus", QVariant::fromValue(processingStatus));
   update();
 
   cleanupTimers();
-  executeGitPullWithRetryDetached();
-}
-
-void Sidebar::executeGitPullWithRetryDetached() {
-  if (retry_count >= MAX_RETRIES) {
-    onGitPullFailed(tr("MAX RETRIES REACHED"));
-    return;
-  }
-
-  retry_count++;
-  qDebug() << "Starting git pull attempt" << retry_count << "of" << MAX_RETRIES;
-
-  QFile::remove("/data/gitpull_exit_code.log");
-
-  ItemStatus progressStatus = {{tr("git pull"), tr("ATTEMPT ") + QString::number(retry_count)}, warning_color};
-  setProperty("commitStatus", QVariant::fromValue(progressStatus));
-  update();
-
-  bool started = QProcess::startDetached("sh",
-                                       QStringList{"/data/openpilot/scripts/gitpull.sh"});
-
-  if (!started) {
-    qCritical() << "Failed to start git pull script";
-    if (retry_count < MAX_RETRIES) {
-      QTimer::singleShot(5000, this, [this]() {
-        executeGitPullWithRetryDetached();
-      });
-    } else {
-      onGitPullFailed(tr("FAILED TO START"));
-    }
-    return;
-  }
-
-  qDebug() << "Git pull script started successfully (detached)";
-
-  setupFileWatcher("/data/gitpull_exit_code.log",
-                   [this](){ this->onGitPullFileChanged(); });
-
-  setupGitPullPollingTimer();
 }
 
 void Sidebar::setupFileWatcher(const QString &filePath, std::function<void()> callback) {
@@ -299,21 +258,8 @@ void Sidebar::handleGitPullCompletion(int exitCode) {
   } else {
     qWarning() << "Git pull failed with exit code:" << exitCode;
 
-    if (retry_count < MAX_RETRIES) {
-      qDebug() << "Retrying git pull in 5 seconds...";
-      ItemStatus retryStatus = {{tr("git pull"), tr("RETRY IN 5S")}, warning_color};
-      setProperty("commitStatus", QVariant::fromValue(retryStatus));
-      update();
-
-      QTimer::singleShot(5000, this, [this]() {
-        executeGitPullWithRetryDetached();
-      });
-      return;
-    }
-
     onGitPullFailed(tr("EXIT CODE: ") + QString::number(exitCode));
   }
-
   update();
 }
 
@@ -329,19 +275,6 @@ void Sidebar::onGitPullFailed(const QString &reason) {
 
 void Sidebar::onGitPullTimeout() {
   qWarning() << "Git pull process timed out";
-
-  if (retry_count < MAX_RETRIES) {
-    qDebug() << "Retrying git pull after timeout in 10 seconds...";
-    ItemStatus retryStatus = {{tr("git pull"), tr("TIMEOUT RETRY")}, warning_color};
-    setProperty("commitStatus", QVariant::fromValue(retryStatus));
-    update();
-
-    QTimer::singleShot(10000, this, [this]() {
-      executeGitPullWithRetryDetached();
-    });
-    return;
-  }
-
   onGitPullFailed(tr("TIMEOUT"));
 }
 
