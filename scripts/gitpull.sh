@@ -369,7 +369,7 @@ main() {
   fi
 
   if ! check_network; then
-    touch /data/check_network
+    touch /data/check_network.log
     log_error "Network check failed, exiting"
     exit 1
   fi

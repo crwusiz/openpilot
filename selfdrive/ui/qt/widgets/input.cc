@@ -292,7 +292,7 @@ RichTextDialog::RichTextDialog(const QString &prompt_text, const QString &btn_te
     if (ConfirmationDialog::confirm(tr("Git Fetch and Reset<br><br>Process?"), tr("Process"), this)) {
       QProcess::execute("/data/openpilot/scripts/gitpull.sh");
     }
-    const QString file_path = "/data/check_network";
+    const QString file_path = "/data/check_network.log";
     if (QFile::exists(file_path)) {
       ConfirmationDialog::alert(tr("Please Check Network Connection"), this);
     }
