@@ -164,51 +164,13 @@ void Sidebar::startGitPullDetached() {
   setupFileWatcher("/data/gitpull_exit_code.log",
                    [this](){ this->onGitPullFileChanged(); });
 
-  setupGitPullPollingTimer();
-}
-
-void Sidebar::setupFileWatcher(const QString &filePath, std::function<void()> callback) {
-  if (!file_watcher) {
-    file_watcher = new QFileSystemWatcher(this);
-  }
-
-  if (!file_watcher->files().isEmpty()) {
-    file_watcher->removePaths(file_watcher->files());
-  }
-  if (!file_watcher->directories().isEmpty()) {
-    file_watcher->removePaths(file_watcher->directories());
-  }
-
-  QString dirPath = QFileInfo(filePath).absolutePath();
-  if (QDir(dirPath).exists()) {
-    file_watcher->addPath(dirPath);
-
-    disconnect(file_watcher, &QFileSystemWatcher::directoryChanged, nullptr, nullptr);
-    connect(file_watcher, &QFileSystemWatcher::directoryChanged,
-            this, [filePath, callback](const QString &path) {
-      Q_UNUSED(path);
-      if (QFile::exists(filePath)) {
-        callback();
-      }
-    });
-  }
-}
-
-void Sidebar::setupGitPullPollingTimer() {
   if (!git_pull_timer) {
     git_pull_timer = new QTimer(this);
-    git_pull_timer->setInterval(CHECK_INTERVAL_MS);
+    git_pull_timer->setInterval(1000);
     connect(git_pull_timer, &QTimer::timeout, this, &Sidebar::checkGitPullStatus);
   }
 
   git_pull_timer->start();
-
-  QTimer::singleShot(MAX_WAIT_TIME_MS, this, [this]() {
-    if (is_processing && git_pull_timer && git_pull_timer->isActive()) {
-      qWarning() << "Git pull process timed out after" << (MAX_WAIT_TIME_MS/1000) << "seconds";
-      onGitPullTimeout();
-    }
-  });
 }
 
 void Sidebar::checkGitPullStatus() {
@@ -247,11 +209,9 @@ void Sidebar::onGitPullFileChanged() {
     file.close();
 
     bool ok;
-    int exitCode = exitCodeStr.toInt(&ok);
+    //int exitCode = exitCodeStr.toInt(&ok);
 
-    if (ok) {
-      handleGitPullCompletion(exitCode);
-    } else {
+    if (!ok) {
       qWarning() << "Invalid exit code format:" << exitCodeStr;
       onGitPullFailed(tr("INVALID EXIT CODE"));
     }
@@ -263,25 +223,6 @@ void Sidebar::onGitPullFileChanged() {
   }
 }
 
-void Sidebar::handleGitPullCompletion(int exitCode) {
-  is_processing = false;
-  cleanupTimers();
-
-  if (exitCode == 0) {
-    ItemStatus successStatus = {{tr("git pull"), tr("SUCCESS")}, good_color};
-    setProperty("commitStatus", QVariant::fromValue(successStatus));
-    qDebug() << "Git pull completed successfully";
-
-    QTimer::singleShot(2000, this, [this]() {
-      startCommitCheckDetached();
-    });
-  } else {
-    qWarning() << "Git pull failed with exit code:" << exitCode;
-    onGitPullFailed(tr("EXIT CODE: ") + QString::number(exitCode));
-  }
-  update();
-}
-
 void Sidebar::onGitPullFailed(const QString &reason) {
   is_processing = false;
   cleanupTimers();
@@ -290,11 +231,6 @@ void Sidebar::onGitPullFailed(const QString &reason) {
   ItemStatus failStatus = {{tr("git pull"), reason}, danger_color};
   setProperty("commitStatus", QVariant::fromValue(failStatus));
   update();
-}
-
-void Sidebar::onGitPullTimeout() {
-  qWarning() << "Git pull process timed out";
-  onGitPullFailed(tr("TIMEOUT"));
 }
 
 void Sidebar::startCommitCheckDetached() {
@@ -326,7 +262,7 @@ void Sidebar::startCommitCheckDetached() {
 
   if (!commit_check_timer) {
     commit_check_timer = new QTimer(this);
-    commit_check_timer->setInterval(CHECK_INTERVAL_MS);
+    commit_check_timer->setInterval(1000);
     connect(commit_check_timer, &QTimer::timeout, this, &Sidebar::checkCommitCheckStatus);
   }
   commit_check_timer->start();
@@ -405,6 +341,33 @@ void Sidebar::onCommitCheckFailed(const QString &reason) {
   update();
 }
 
+void Sidebar::setupFileWatcher(const QString &filePath, std::function<void()> callback) {
+  if (!file_watcher) {
+    file_watcher = new QFileSystemWatcher(this);
+  }
+
+  if (!file_watcher->files().isEmpty()) {
+    file_watcher->removePaths(file_watcher->files());
+  }
+  if (!file_watcher->directories().isEmpty()) {
+    file_watcher->removePaths(file_watcher->directories());
+  }
+
+  QString dirPath = QFileInfo(filePath).absolutePath();
+  if (QDir(dirPath).exists()) {
+    file_watcher->addPath(dirPath);
+
+    disconnect(file_watcher, &QFileSystemWatcher::directoryChanged, nullptr, nullptr);
+    connect(file_watcher, &QFileSystemWatcher::directoryChanged,
+            this, [filePath, callback](const QString &path) {
+      Q_UNUSED(path);
+      if (QFile::exists(filePath)) {
+        callback();
+      }
+    });
+  }
+}
+
 void Sidebar::parseCommitCompareResult(const QString &output) {
   QString trimmed_output = output.trimmed();
   if (trimmed_output.isEmpty()) {
@@ -471,7 +434,7 @@ void Sidebar::cleanupTimers() {
 void Sidebar::setupWatchdogTimer() {
   if (!watchdog_timer) {
     watchdog_timer = new QTimer(this);
-    watchdog_timer->setInterval(5000); // 5초
+    watchdog_timer->setInterval(3000);
     connect(watchdog_timer, &QTimer::timeout, this, &Sidebar::kickWatchdog);
   }
   watchdog_timer->start();

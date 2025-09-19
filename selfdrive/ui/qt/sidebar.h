@@ -40,12 +40,11 @@ public slots:
 
 private slots:
   void handleCommitButtonPress();
+
   void startGitPullDetached();
   void onGitPullFileChanged();
   void checkGitPullStatus();
-  void handleGitPullCompletion(int exitCode);
   void onGitPullFailed(const QString &reason);
-  void onGitPullTimeout();
 
   void startCommitCheckDetached();
   void onCommitCheckFileChanged();
@@ -53,7 +52,6 @@ private slots:
   void onCommitCheckFailed(const QString &reason);
 
   void setupFileWatcher(const QString &filePath, std::function<void()> callback);
-  void setupGitPullPollingTimer();
   void parseCommitCompareResult(const QString &output);
   void cleanupTimers();
 
@@ -72,10 +70,7 @@ private:
   QPixmap home_img, flag_img, settings_img, mic_img, link_img, c3x_img;
   bool onroad, recording_audio, flag_pressed, settings_pressed, mic_indicator_pressed;
   bool commit_pressed, is_update_available;
-
   bool is_processing = false;
-  static const int CHECK_INTERVAL_MS = 1000;
-  static const int MAX_WAIT_TIME_MS = 120000;
 
   QTimer *commit_check_timer = nullptr;
   QTimer *git_pull_timer = nullptr;
