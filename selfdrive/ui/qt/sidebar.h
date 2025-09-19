@@ -4,7 +4,6 @@
 
 #include <QFrame>
 #include <QMap>
-#include <QProcess>
 
 #include "selfdrive/ui/ui.h"
 #include "selfdrive/ui/qt/network/networking.h"
@@ -56,8 +55,11 @@ private slots:
   void setupFileWatcher(const QString &filePath, std::function<void()> callback);
   void setupGitPullPollingTimer();
   void parseCommitCompareResult(const QString &output);
-  bool checkNetworkConnectivity();
   void cleanupTimers();
+
+  void setupWatchdogTimer();
+  void kickWatchdog();
+  void ensureWatchdogActive();
 
 protected:
   void paintEvent(QPaintEvent *event) override;
@@ -77,6 +79,7 @@ private:
 
   QTimer *commit_check_timer = nullptr;
   QTimer *git_pull_timer = nullptr;
+  QTimer *watchdog_timer = nullptr;
   QFileSystemWatcher *file_watcher = nullptr;
 
   const QMap<cereal::DeviceState::NetworkType, QString> network_type = {
@@ -107,5 +110,4 @@ private:
   Params params;
 
   ItemStatus commit_status = {{tr("UPDATE"), tr("CHECK")}, warning_color};
-  QProcess *commit_process = nullptr;
 };

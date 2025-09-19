@@ -12,6 +12,8 @@
 #include <QDir>
 #include <QFileInfo>
 
+#include "common/watchdog.h"
+
 void Sidebar::drawMetric(QPainter &p, const QPair<QString, QString> &label, QColor c, int y) {
   const QRect rect = {30, y, 240, 126};
 
@@ -57,22 +59,22 @@ Sidebar::Sidebar(QWidget *parent)
 
   QObject::connect(uiState(), &UIState::uiUpdate, this, &Sidebar::updateState);
 
+  setupWatchdogTimer();
+
   startCommitCheckDetached();
 
   pm = std::make_unique<PubMaster>(std::vector<const char*>{"bookmarkButton"});
 }
 
 Sidebar::~Sidebar() {
+  if (watchdog_timer) {
+    watchdog_timer->stop();
+    watchdog_timer->deleteLater();
+  }
+
   cleanupTimers();
   if (file_watcher) {
     file_watcher->deleteLater();
-  }
-  if (commit_process) {
-    if (commit_process->state() != QProcess::NotRunning) {
-      commit_process->kill();
-      commit_process->waitForFinished(3000);
-    }
-    commit_process->deleteLater();
   }
 }
 
@@ -133,13 +135,6 @@ void Sidebar::handleCommitButtonPress() {
 }
 
 void Sidebar::startGitPullDetached() {
-  if (!checkNetworkConnectivity()) {
-    ItemStatus errorStatus = {{tr("NETWORK"), tr("ERROR")}, danger_color};
-    setProperty("commitStatus", QVariant::fromValue(errorStatus));
-    update();
-    return;
-  }
-
   is_processing = true;
 
   ItemStatus processingStatus = {{tr("git pull"), tr("STARTING")}, warning_color};
@@ -147,6 +142,29 @@ void Sidebar::startGitPullDetached() {
   update();
 
   cleanupTimers();
+  ensureWatchdogActive();
+
+  QFile::remove("/data/gitpull_exit_code.log");
+
+  ItemStatus progressStatus = {{tr("git pull"), tr("Progress ")}, warning_color};
+  setProperty("commitStatus", QVariant::fromValue(progressStatus));
+  update();
+
+  bool started = QProcess::startDetached("sh",
+                                       QStringList{"/data/openpilot/scripts/gitpull.sh"});
+
+  if (!started) {
+    qCritical() << "Failed to start git pull script";
+    onGitPullFailed(tr("FAILED TO START"));
+    return;
+  }
+
+  qDebug() << "Git pull script started successfully (detached)";
+
+  setupFileWatcher("/data/gitpull_exit_code.log",
+                   [this](){ this->onGitPullFileChanged(); });
+
+  setupGitPullPollingTimer();
 }
 
 void Sidebar::setupFileWatcher(const QString &filePath, std::function<void()> callback) {
@@ -200,6 +218,8 @@ void Sidebar::checkGitPullStatus() {
     }
     return;
   }
+
+  kickWatchdog();
 
   static int dots = 0;
   dots = (dots + 1) % 4;
@@ -257,7 +277,6 @@ void Sidebar::handleGitPullCompletion(int exitCode) {
     });
   } else {
     qWarning() << "Git pull failed with exit code:" << exitCode;
-
     onGitPullFailed(tr("EXIT CODE: ") + QString::number(exitCode));
   }
   update();
@@ -281,13 +300,6 @@ void Sidebar::onGitPullTimeout() {
 void Sidebar::startCommitCheckDetached() {
   if (is_processing) {
     qDebug() << "Already processing, skipping commit check";
-    return;
-  }
-
-  if (!checkNetworkConnectivity()) {
-    ItemStatus networkError = {{tr("NETWORK"), tr("ERROR")}, danger_color};
-    setProperty("commitStatus", QVariant::fromValue(networkError));
-    update();
     return;
   }
 
@@ -333,6 +345,8 @@ void Sidebar::checkCommitCheckStatus() {
     }
     return;
   }
+
+  kickWatchdog();
 
   static int dots = 0;
   dots = (dots + 1) % 4;
@@ -454,19 +468,31 @@ void Sidebar::cleanupTimers() {
   }
 }
 
-bool Sidebar::checkNetworkConnectivity() {
-  if (net_strength <= 0) {
-    qWarning() << "No network connection detected (strength:" << net_strength << ")";
-    return false;
+void Sidebar::setupWatchdogTimer() {
+  if (!watchdog_timer) {
+    watchdog_timer = new QTimer(this);
+    watchdog_timer->setInterval(5000); // 5초
+    connect(watchdog_timer, &QTimer::timeout, this, &Sidebar::kickWatchdog);
+  }
+  watchdog_timer->start();
+  qDebug() << "Watchdog timer started (5 second interval)";
+}
+
+void Sidebar::kickWatchdog() {
+  uint64_t current_time = nanos_since_boot();
+
+  if (!watchdog_kick(current_time)) {
+    qWarning() << "Failed to kick watchdog at" << current_time;
+  }
+}
+
+void Sidebar::ensureWatchdogActive() {
+  if (!watchdog_timer || !watchdog_timer->isActive()) {
+    qWarning() << "Watchdog timer was inactive, restarting...";
+    setupWatchdogTimer();
   }
 
-  if (connect_status.first.second == tr("OFFLINE") ||
-      connect_status.first.second == tr("ERROR")) {
-    qWarning() << "Device is offline or has connection errors";
-    return false;
-  }
-
-  return true;
+  kickWatchdog();
 }
 
 void Sidebar::offroadTransition(bool offroad) {
