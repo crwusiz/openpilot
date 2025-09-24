@@ -66,11 +66,14 @@ protected:
 
 private:
   void drawMetric(QPainter &p, const QPair<QString, QString> &label, QColor c, int y);
+  bool isNetworkConnected();
 
   QPixmap home_img, flag_img, settings_img, mic_img, link_img, c3x_img;
   bool onroad, recording_audio, flag_pressed, settings_pressed, mic_indicator_pressed;
   bool commit_pressed, is_update_available;
   bool is_processing = false;
+  int watchdog_failure_count;
+  bool initial_commit_check_done;
 
   QTimer *commit_check_timer = nullptr;
   QTimer *git_pull_timer = nullptr;

@@ -42,7 +42,9 @@ Sidebar::Sidebar(QWidget *parent)
     mic_indicator_pressed(false),
     scene(uiState()->scene),
     is_update_available(false),
-    is_processing(false) {
+    is_processing(false),
+    watchdog_failure_count(0),
+    initial_commit_check_done(false) {
 
   home_img = loadPixmap("../assets/images/button_home.png", home_btn.size());
   flag_img = loadPixmap("../assets/images/button_flag.png", home_btn.size());
@@ -61,8 +63,6 @@ Sidebar::Sidebar(QWidget *parent)
 
   setupWatchdogTimer();
 
-  startCommitCheckDetached();
-
   pm = std::make_unique<PubMaster>(std::vector<const char*>{"bookmarkButton"});
 }
 
@@ -70,11 +70,13 @@ Sidebar::~Sidebar() {
   if (watchdog_timer) {
     watchdog_timer->stop();
     watchdog_timer->deleteLater();
+    watchdog_timer = nullptr;
   }
 
   cleanupTimers();
   if (file_watcher) {
     file_watcher->deleteLater();
+    file_watcher = nullptr;
   }
 }
 
@@ -127,6 +129,14 @@ void Sidebar::handleCommitButtonPress() {
     return;
   }
 
+  if (!isNetworkConnected()) {
+    qWarning() << "Network not connected, cannot perform git operations";
+    ItemStatus networkStatus = {{tr("NO NETWORK"), tr("OFFLINE")}, danger_color};
+    setProperty("commitStatus", QVariant::fromValue(networkStatus));
+    update();
+    return;
+  }
+
   if (is_update_available) {
     startGitPullDetached();
   } else {
@@ -137,18 +147,10 @@ void Sidebar::handleCommitButtonPress() {
 void Sidebar::startGitPullDetached() {
   is_processing = true;
 
-  ItemStatus processingStatus = {{tr("git pull"), tr("STARTING")}, warning_color};
-  setProperty("commitStatus", QVariant::fromValue(processingStatus));
-  update();
-
   cleanupTimers();
   ensureWatchdogActive();
 
   QFile::remove("/data/gitpull_exit_code.log");
-
-  ItemStatus progressStatus = {{tr("git pull"), tr("Progress ")}, warning_color};
-  setProperty("commitStatus", QVariant::fromValue(progressStatus));
-  update();
 
   bool started = QProcess::startDetached("sh",
                                        QStringList{"/data/openpilot/scripts/gitpull.sh"});
@@ -186,7 +188,7 @@ void Sidebar::checkGitPullStatus() {
   static int dots = 0;
   dots = (dots + 1) % 4;
   QString dotStr = QString(".").repeated(dots);
-  ItemStatus progressStatus = {{tr("git pull"), tr("RUNNING") + dotStr}, warning_color};
+  ItemStatus progressStatus = {{tr("git pull"), tr("progress") + dotStr}, warning_color};
   setProperty("commitStatus", QVariant::fromValue(progressStatus));
   update();
 
@@ -242,10 +244,6 @@ void Sidebar::startCommitCheckDetached() {
   is_processing = true;
   cleanupTimers();
 
-  ItemStatus checkingStatus = {{tr("commit"), tr("CHECKING")}, warning_color};
-  setProperty("commitStatus", QVariant::fromValue(checkingStatus));
-  update();
-
   QFile::remove("/data/commit_check_exit_code.log");
 
   bool started = QProcess::startDetached("sh",
@@ -287,7 +285,7 @@ void Sidebar::checkCommitCheckStatus() {
   static int dots = 0;
   dots = (dots + 1) % 4;
   QString dotStr = QString(".").repeated(dots);
-  ItemStatus progressStatus = {{tr("commit"), tr("CHECKING") + dotStr}, warning_color};
+  ItemStatus progressStatus = {{tr("check"), tr("progress") + dotStr}, warning_color};
   setProperty("commitStatus", QVariant::fromValue(progressStatus));
   update();
 
@@ -434,7 +432,7 @@ void Sidebar::cleanupTimers() {
 void Sidebar::setupWatchdogTimer() {
   if (!watchdog_timer) {
     watchdog_timer = new QTimer(this);
-    watchdog_timer->setInterval(3000);
+    watchdog_timer->setInterval(5000);
     connect(watchdog_timer, &QTimer::timeout, this, &Sidebar::kickWatchdog);
   }
   watchdog_timer->start();
@@ -445,7 +443,19 @@ void Sidebar::kickWatchdog() {
   uint64_t current_time = nanos_since_boot();
 
   if (!watchdog_kick(current_time)) {
-    qWarning() << "Failed to kick watchdog at" << current_time;
+    watchdog_failure_count++;
+
+    if (watchdog_failure_count % 10 == 0) {
+      uint64_t seconds_since_boot = current_time / 1000000000ULL;
+
+      qWarning() << "Watchdog kick failed" << watchdog_failure_count
+                 << "times (boot+" << seconds_since_boot << "s)";
+    }
+  } else {
+    if (watchdog_failure_count > 0) {
+      qDebug() << "Watchdog kick recovered after" << watchdog_failure_count << "failures";
+      watchdog_failure_count = 0;
+    }
   }
 }
 
@@ -456,6 +466,10 @@ void Sidebar::ensureWatchdogActive() {
   }
 
   kickWatchdog();
+}
+
+bool Sidebar::isNetworkConnected() {
+  return connect_status.second == good_color;
 }
 
 void Sidebar::offroadTransition(bool offroad) {
@@ -479,14 +493,25 @@ void Sidebar::updateState(const UIState &s) {
 
   ItemStatus connectStatus;
   auto last_ping = deviceState.getLastAthenaPingTime();
+  bool is_online = false;
+
   if (last_ping == 0) {
     connectStatus = ItemStatus{{tr("CONNECT"), tr("OFFLINE")}, warning_color};
+    is_online = false;
   } else {
-    connectStatus = nanos_since_boot() - last_ping < 80e9
+    bool ping_ok = nanos_since_boot() - last_ping < 80e9;
+    connectStatus = ping_ok
                         ? ItemStatus{{tr("CONNECT"), tr("ONLINE")}, good_color}
                         : ItemStatus{{tr("CONNECT"), tr("ERROR")}, danger_color};
+    is_online = ping_ok;
   }
   setProperty("connectStatus", QVariant::fromValue(connectStatus));
+
+  if (is_online && !initial_commit_check_done && !is_processing) {
+    qDebug() << "Network connected, starting initial commit check";
+    initial_commit_check_done = true;
+    startCommitCheckDetached();
+  }
 
   int maxTempC = deviceState.getMaxTempC();
   QString max_temp = QString::number(maxTempC) + "°C";
