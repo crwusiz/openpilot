@@ -452,7 +452,7 @@ void HudRenderer::drawSetSpeed(QPainter &p, const QRect &surface_rect) {
     }
   } else if (stockLimitSpeed > 0) {
     limit_speed = stockLimitSpeed;
-    left_dist = stockSpeedLimitDistance;
+    //left_dist = stockSpeedLimitDistance;
   } else if (navLimitSpeed > 0) {
     limit_speed = navLimitSpeed;
   }
