@@ -1,6 +1,7 @@
 import pyray as rl
 from enum import IntEnum
 import cereal.messaging as messaging
+from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.layouts.sidebar import Sidebar, SIDEBAR_WIDTH
 from openpilot.selfdrive.ui.layouts.home import HomeLayout
 from openpilot.selfdrive.ui.layouts.settings.settings import SettingsLayout, PanelType
@@ -46,7 +47,8 @@ class MainLayout(Widget):
 
   def _setup_callbacks(self):
     self._sidebar.set_callbacks(on_settings=self._on_settings_clicked,
-                                on_flag=self._on_bookmark_clicked)
+                                on_flag=self._on_bookmark_clicked,
+                                open_settings=lambda: self.open_settings(PanelType.TOGGLES))
     self._layouts[MainState.HOME]._setup_widget.set_open_settings_callback(lambda: self.open_settings(PanelType.FIREHOSE))
     self._layouts[MainState.SETTINGS].set_callbacks(on_close=self._set_mode_for_state)
     self._layouts[MainState.ONROAD].set_click_callback(self._on_onroad_clicked)

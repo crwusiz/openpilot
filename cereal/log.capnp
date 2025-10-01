@@ -2168,13 +2168,10 @@ struct Joystick {
 struct DriverStateV2 {
   frameId @0 :UInt32;
   modelExecutionTime @1 :Float32;
-  dspExecutionTimeDEPRECATED @2 :Float32;
   gpuExecutionTime @8 :Float32;
   rawPredictions @3 :Data;
 
-  poorVisionProb @4 :Float32;
   wheelOnRightProb @5 :Float32;
-
   leftDriverData @6 :DriverData;
   rightDriverData @7 :DriverData;
 
@@ -2189,10 +2186,13 @@ struct DriverStateV2 {
     leftBlinkProb @7 :Float32;
     rightBlinkProb @8 :Float32;
     sunglassesProb @9 :Float32;
-    occludedProb @10 :Float32;
-    readyProb @11 :List(Float32);
     notReadyProb @12 :List(Float32);
+    occludedProbDEPRECATED @10 :Float32;
+    readyProbDEPRECATED @11 :List(Float32);
   }
+
+  dspExecutionTimeDEPRECATED @2 :Float32;
+  poorVisionProbDEPRECATED @4 :Float32;
 }
 
 struct DriverStateDEPRECATED @0xb83c6cc593ed0a00 {
