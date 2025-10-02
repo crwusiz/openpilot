@@ -3,7 +3,6 @@ from functools import partial
 from typing import cast
 
 import pyray as rl
-from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.scroll_panel import GuiScrollPanel
@@ -50,16 +49,6 @@ class NavButton(Widget):
     super().__init__()
     self.text = text
     self.set_rect(rl.Rectangle(0, 0, 400, 100))
-    self._x_pos_filter = FirstOrderFilter(0.0, 0.05, 1 / gui_app.target_fps, initialized=False)
-    self._y_pos_filter = FirstOrderFilter(0.0, 0.05, 1 / gui_app.target_fps, initialized=False)
-
-  def set_position(self, x: float, y: float) -> None:
-    x = self._x_pos_filter.update(x)
-    y = self._y_pos_filter.update(y)
-    changed = (self._rect.x != x or self._rect.y != y)
-    self._rect.x, self._rect.y = x, y
-    if changed:
-      self._update_layout_rects()
 
   def _render(self, _):
     color = rl.Color(74, 74, 74, 255) if self.is_pressed else rl.Color(57, 57, 57, 255)
@@ -76,9 +65,6 @@ class NetworkUI(Widget):
     self._advanced_panel = AdvancedNetworkSettings(wifi_manager)
     self._nav_button = NavButton("Advanced")
     self._nav_button.set_click_callback(self._cycle_panel)
-
-  def _update_state(self):
-    self._wifi_manager.process_callbacks()
 
   def show_event(self):
     self._set_current_panel(PanelType.WIFI)
@@ -305,6 +291,9 @@ class WifiManagerUI(Widget):
     for icon in STRENGTH_ICONS + ["icons/checkmark.png", "icons/circled_slash.png", "icons/lock_closed.png"]:
       gui_app.texture(icon, ICON_SIZE, ICON_SIZE)
 
+  def _update_state(self):
+    self._wifi_manager.process_callbacks()
+
   def _render(self, rect: rl.Rectangle):
     if not self._networks:
       gui_label(rect, "Scanning Wi-Fi networks...", 72, alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER)
@@ -445,7 +434,7 @@ class WifiManagerUI(Widget):
     self._networks = networks
     for n in self._networks:
       self._networks_buttons[n.ssid] = Button(n.ssid, partial(self._networks_buttons_callback, n), font_size=55, text_alignment=TextAlignment.LEFT,
-                                              button_style=ButtonStyle.TRANSPARENT_WHITE)
+                                              button_style=ButtonStyle.TRANSPARENT_WHITE_TEXT)
       self._networks_buttons[n.ssid].set_touch_valid_callback(lambda: self.scroll_panel.is_touch_valid())
       self._forget_networks_buttons[n.ssid] = Button("Forget", partial(self._forget_networks_buttons_callback, n), button_style=ButtonStyle.FORGET_WIFI,
                                                      font_size=45)
