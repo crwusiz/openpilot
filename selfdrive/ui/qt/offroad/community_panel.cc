@@ -205,6 +205,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                         "../assets/icons/logger.png", this));
   mainToggles->addItem(new ParamControl("RadarTrackEnable", tr("Enable Radar Track use"), tr("Enable Radar Track use (disable AEB)"),
                                         "../assets/icons/warning.png", this));
+  mainToggles->addItem(new ParamControl("HardwareC3xLite", tr("Hardware is C3x Lite"), tr("Enable mr.one c3x lite hardware use"),
+                                        "../assets/icons/warning.png", this));
 
   // func
   QPushButton* gitpull_btn = new QPushButton("Git Pull");
