@@ -186,6 +186,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   QVBoxLayout* toggles_layout = new QVBoxLayout(toggles);
 
   // main toggle
+  const bool is_c3xl = params.getBool("HardwareC3xLite");
+
   mainToggles = new ListWidget(this);
   mainToggles->addItem(new ParamControl("PcmCruiseEnable", tr("PcmCruise"), tr("Change the openpilot cruise engagement. use the PcmCruise method"),
                                         "../assets/icons/lat.png", this));
@@ -195,18 +197,20 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                         "../assets/icons/hda.png", this));
   mainToggles->addItem(new ParamControl("CameraSccEnable", tr("CameraSCC"), tr("HDA1 CameraSCC CAR, HDA2 Connect the ADAS ECAN line to CAMERA modify, turn it on"),
                                         "../assets/icons/hda.png", this));
-  mainToggles->addItem(new ParamControl("DriverCameraOnReverse", tr("Driver Camera On Reverse"), tr("Displays the driver camera when in reverse"),
-                                        "../assets/icons/driver_face_static.png", this));
-  mainToggles->addItem(new ParamControl("DriverCameraHardwareMissing", tr("DriverCamera Hardware Missing"), tr("If there is a problem with the driver camera hardware, drive without the driver camera"),
-                                        "../assets/icons/driver_face_static_x.png", this));
-  mainToggles->addItem(new ParamControl("PrebuiltEnable", tr("Prebuilt Enable"), tr("Create prebuilt file to speed bootup"),
-                                        "../assets/icons/prebuilt.png", this));
-  mainToggles->addItem(new ParamControl("LoggerEnable", tr("Logger Enable"), tr("Turn off this option to reduce system load"),
-                                        "../assets/icons/logger.png", this));
   mainToggles->addItem(new ParamControl("RadarTrackEnable", tr("Enable Radar Track use"), tr("Enable Radar Track use (disable AEB)"),
                                         "../assets/icons/warning.png", this));
+  if (!is_c3xl) {
+    mainToggles->addItem(new ParamControl("DriverCameraOnReverse", tr("Driver Camera On Reverse"), tr("Displays the driver camera when in reverse"),
+                                          "../assets/icons/driver_face_static.png", this));
+  }
+  mainToggles->addItem(new ParamControl("DriverCameraHardwareMissing", tr("DriverCamera Hardware Missing"), tr("If there is a problem with the driver camera hardware, drive without the driver camera"),
+                                        "../assets/icons/driver_face_static_x.png", this));
   mainToggles->addItem(new ParamControl("HardwareC3xLite", tr("Hardware is C3x Lite"), tr("Enable mr.one c3x lite hardware use"),
                                         "../assets/icons/warning.png", this));
+  mainToggles->addItem(new ParamControl("LoggerEnable", tr("Logger Enable"), tr("Turn off this option to reduce system load"),
+                                        "../assets/icons/logger.png", this));
+  mainToggles->addItem(new ParamControl("PrebuiltEnable", tr("Prebuilt Enable"), tr("Create prebuilt file to speed bootup"),
+                                        "../assets/icons/prebuilt.png", this));
 
   // func
   QPushButton* gitpull_btn = new QPushButton("Git Pull");

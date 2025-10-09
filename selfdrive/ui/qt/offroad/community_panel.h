@@ -14,6 +14,8 @@ private slots:
   void uploadRouteSegments(const QStringList& segmentPaths, const QString& scriptPath);
 
 private:
+  Params params;
+
   struct RouteInfo {
     QString routeName;
     QStringList segmentPaths;
