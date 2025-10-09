@@ -20,7 +20,7 @@ class LatControlAngle(LatControl):
     self.filter_speed_matrox = [0, 2.5, 8.3, 13.8, 22.22]
     self.filter_alpha_matrix = [0.05, 0.1, 0.3, 0.6, 1]
 
-  def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature, curvature_limited):
+  def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature, curvature_limited, lat_delay):
     angle_log = log.ControlsState.LateralAngleState.new_message()
 
     if not active:
