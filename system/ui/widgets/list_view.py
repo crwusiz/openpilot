@@ -56,10 +56,10 @@ class ItemAction(Widget, ABC):
 
 
 class ToggleAction(ItemAction):
-  def __init__(self, initial_state: bool = False, width: int = TOGGLE_WIDTH, enabled: bool | Callable[[], bool] = True):
+  def __init__(self, initial_state: bool = False, width: int = TOGGLE_WIDTH, enabled: bool | Callable[[], bool] = True,
+               callback: Callable[[bool], None] | None = None):
     super().__init__(width, enabled)
-    self.toggle = Toggle(initial_state=initial_state)
-    self.state = initial_state
+    self.toggle = Toggle(initial_state=initial_state, callback=callback)
 
   def set_touch_valid_callback(self, touch_callback: Callable[[], bool]) -> None:
     super().set_touch_valid_callback(touch_callback)
@@ -68,15 +68,13 @@ class ToggleAction(ItemAction):
   def _render(self, rect: rl.Rectangle) -> bool:
     self.toggle.set_enabled(self.enabled)
     clicked = self.toggle.render(rl.Rectangle(rect.x, rect.y + (rect.height - TOGGLE_HEIGHT) / 2, self._rect.width, TOGGLE_HEIGHT))
-    self.state = self.toggle.get_state()
     return bool(clicked)
 
   def set_state(self, state: bool):
-    self.state = state
     self.toggle.set_state(state)
 
   def get_state(self) -> bool:
-    return self.state
+    return self.toggle.get_state()
 
 
 class ButtonAction(ItemAction):
@@ -207,6 +205,13 @@ class MultipleButtonAction(ItemAction):
     self.callback = callback
     self._font = gui_app.font(FontWeight.MEDIUM)
 
+  def set_selected_button(self, index: int):
+    if 0 <= index < len(self.buttons):
+      self.selected_button = index
+
+  def get_selected_button(self) -> int:
+    return self.selected_button
+
   def _render(self, rect: rl.Rectangle):
     spacing = RIGHT_ITEM_PADDING
     button_y = rect.y + (rect.height - BUTTON_HEIGHT) / 2
@@ -259,15 +264,15 @@ class ListItem(Widget):
                action_item: ItemAction | None = None):
     super().__init__()
     self.title = title
-    self.icon = icon
+    self.set_icon(icon)
     self._description = description
     self.description_visible = description_visible
     self.callback = callback
+    self.description_opened_callback: Callable | None = None
     self.action_item = action_item
 
     self.set_rect(rl.Rectangle(0, 0, ITEM_BASE_WIDTH, ITEM_BASE_HEIGHT))
     self._font = gui_app.font(FontWeight.NORMAL)
-    self._icon_texture = gui_app.texture(os.path.join("icons", self.icon), ICON_SIZE, ICON_SIZE) if self.icon else None
 
     self._html_renderer = HtmlRenderer(text="", text_size={ElementType.P: ITEM_DESC_FONT_SIZE},
                                        text_color=ITEM_DESC_TEXT_COLOR)
@@ -275,6 +280,9 @@ class ListItem(Widget):
 
     # Cached properties for performance
     self._prev_description: str | None = self.description
+
+  def set_description_opened_callback(self, callback: Callable) -> None:
+    self.description_opened_callback = callback
 
   def set_touch_valid_callback(self, touch_callback: Callable[[], bool]) -> None:
     super().set_touch_valid_callback(touch_callback)
@@ -298,6 +306,10 @@ class ListItem(Widget):
 
     if self.description:
       self.description_visible = not self.description_visible
+      # do callback first in case receiver changes description
+      if self.description_visible and self.description_opened_callback is not None:
+        self.description_opened_callback()
+
       content_width = int(self._rect.width - ITEM_PADDING * 2)
       self._rect.height = self.get_item_height(self._font, content_width)
 
@@ -352,6 +364,10 @@ class ListItem(Widget):
         if self.callback:
           self.callback()
 
+  def set_icon(self, icon: str | None):
+    self.icon = icon
+    self._icon_texture = gui_app.texture(os.path.join("icons", self.icon), ICON_SIZE, ICON_SIZE) if self.icon else None
+
   def set_description(self, description: str | Callable[[], str] | None):
     self._description = description
     new_desc = self.description
@@ -398,8 +414,8 @@ def simple_item(title: str, callback: Callable | None = None) -> ListItem:
 
 def toggle_item(title: str, description: str | Callable[[], str] | None = None, initial_state: bool = False,
                 callback: Callable | None = None, icon: str = "", enabled: bool | Callable[[], bool] = True) -> ListItem:
-  action = ToggleAction(initial_state=initial_state, enabled=enabled)
-  return ListItem(title=title, description=description, action_item=action, icon=icon, callback=callback)
+  action = ToggleAction(initial_state=initial_state, enabled=enabled, callback=callback)
+  return ListItem(title=title, description=description, action_item=action, icon=icon)
 
 
 def button_item(title: str, button_text: str | Callable[[], str], description: str | Callable[[], str] | None = None,

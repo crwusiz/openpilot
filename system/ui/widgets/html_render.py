@@ -121,15 +121,18 @@ class HtmlRenderer(Widget):
       is_start_tag, is_end_tag, tag = is_tag(token)
       if tag is not None:
         if tag == ElementType.BR:
+          # Close current tag and add a line break
+          close_tag()
           self._add_element(ElementType.BR, "")
 
         elif is_start_tag or is_end_tag:
           # Always add content regardless of opening or closing tag
           close_tag()
 
-          # TODO: reset to None if end tag?
           if is_start_tag:
             current_tag = tag
+          else:
+            current_tag = None
 
         # increment after we add the content for the current tag
         if tag == ElementType.UL:
