@@ -14,6 +14,7 @@ from typing import NamedTuple
 from importlib.resources import as_file, files
 from openpilot.common.swaglog import cloudlog
 from openpilot.system.hardware import HARDWARE, PC, TICI
+from openpilot.system.ui.lib.multilang import TRANSLATIONS_DIR, multilang
 from openpilot.common.realtime import Ratekeeper
 
 _DEFAULT_FPS = int(os.getenv("FPS", 20 if TICI else 60))
@@ -50,6 +51,14 @@ class FontWeight(StrEnum):
   BOLD = "Inter-Bold.ttf"
   EXTRA_BOLD = "Inter-ExtraBold.ttf"
   BLACK = "Inter-Black.ttf"
+  UNIFONT = "unifont.otf"
+
+
+def font_fallback(font: rl.Font) -> rl.Font:
+  """Fall back to unifont for languages that require it."""
+  if multilang.requires_unifont():
+    return gui_app.font(FontWeight.UNIFONT)
+  return font
 
 
 @dataclass
@@ -334,7 +343,7 @@ class GuiApplication:
     except KeyboardInterrupt:
       pass
 
-  def font(self, font_weight: FontWeight = FontWeight.NORMAL):
+  def font(self, font_weight: FontWeight = FontWeight.NORMAL) -> rl.Font:
     return self._fonts[font_weight]
 
   @property
@@ -352,8 +361,19 @@ class GuiApplication:
     all_chars = set()
     for layout in KEYBOARD_LAYOUTS.values():
       all_chars.update(key for row in layout for key in row)
+    all_chars |= set("–‑✓×°§•")
+
+    # Load only the characters used in translations
+    for language, code in multilang.languages.items():
+      all_chars |= set(language)
+      try:
+        with open(os.path.join(TRANSLATIONS_DIR, f"app_{code}.po")) as f:
+          all_chars |= set(f.read())
+      except FileNotFoundError:
+        cloudlog.warning(f"Translation file for language '{code}' not found when loading fonts.")
+
     all_chars = "".join(all_chars)
-    all_chars += "–✓×°§•"
+    cloudlog.debug(f"Loading fonts with {len(all_chars)} glyphs.")
 
     codepoint_count = rl.ffi.new("int *", 1)
     codepoints = rl.load_codepoints(all_chars, codepoint_count)
@@ -380,6 +400,7 @@ class GuiApplication:
       rl._orig_draw_text_ex = rl.draw_text_ex
 
     def _draw_text_ex_scaled(font, text, position, font_size, spacing, tint):
+      font = font_fallback(font)
       return rl._orig_draw_text_ex(font, text, position, font_size * FONT_SCALE, spacing, tint)
 
     rl.draw_text_ex = _draw_text_ex_scaled

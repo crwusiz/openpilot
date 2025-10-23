@@ -1,4 +1,4 @@
-#include "selfdrive/ui/qt/api.h"
+#include "tools/cabana/utils/api.h"
 
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
@@ -13,9 +13,29 @@
 #include <memory>
 #include <string>
 
+#include "common/params.h"
 #include "common/util.h"
 #include "system/hardware/hw.h"
-#include "selfdrive/ui/qt/util.h"
+#include "tools/cabana/utils/util.h"
+
+QString getVersion() {
+  static QString version =  QString::fromStdString(Params().get("Version"));
+  return version;
+}
+
+QString getUserAgent() {
+  return "openpilot-" + getVersion();
+}
+
+std::optional<QString> getDongleId() {
+  std::string id = Params().get("DongleId");
+
+  if (!id.empty() && (id != "UnregisteredDevice")) {
+    return QString::fromStdString(id);
+  } else {
+    return {};
+  }
+}
 
 namespace CommaApi {
 
