@@ -120,6 +120,10 @@ function launch {
     pip install kaitaistruct
   fi
 
+  if ! command -v msgfmt &> /dev/null; then
+    sudo apt install gettext -y
+  fi
+
   # init github ssh-keys or username
   SSH_KEYS_DEFAULT="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDckQYK31fUOge/qXx0e+uv46CPWgk1F5o07ERzgAnHVlCYz7dibvajpMFC4hfFWU1yTMtl6LlejU/bylMXVcdrkH82VygLzrczQ3ZTWdIwCo1ToeN+zEk6yzhpHTSZlfHSx6Hv1TwrA+MJaKGRCfX9OUHaq9Rv0ere2ZmYSaXMmNn9P7MLt60T36Ncg2A4TrNgADH/Lo4hErLVoRttyM7QFDY8gYVG/Gy1qAxRAEnM26FNEtuWhhi5u8wcU+g8CeB0t9NYtNWw4OcohD9whr+FRzmET1c+qxcuk5L2wv7nNigJ55pGUNFqfPf5ShZdAakVp3IAMtfAtjNLVk5JXfTdWvaaZIKacTaCOcdmAaXwT3HTb+mn9kPESnsmoTliX2DCuYOXe1ekg79KbN4Q7YyBNwrXRbSE/L80NJua//ox14vk3jbwulOWczUG4LekEhFWFQ/5u17V3zd9VH6g+xMkYYM+nOekO8K1TzYGXllaz1FNJ5HdPWuc92CX5mFnY8dWV5Qw2BDXnJYJ97EYl3cqQaQrGBvOqAVSLsfHmEJcUJ+FZ2mcNGtcSvG4j7UxTfRay0DR7aiydbglnq7agrLYEhEkpIFrxV/MT850hPqhHD95c7T2lkVc+NMNlPoP+9N2A+7/L2LWMTJTPVs6dJzkd1GS1MKylBSC2KVIm0lsaw=="
   SSH_USERNAME_DEFAULT="crwusiz"
