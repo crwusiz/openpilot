@@ -68,10 +68,10 @@ msgid ""
 "control alpha. Changing this setting will restart openpilot if the car is "
 "powered on."
 msgstr ""
-"<b>경고: 이 차량에서 openpilot의 종방향 제어는 알파 버전이며 자동 긴급 제동"
-"(AEB)을 비활성화합니다.</b><br><br>이 차량에서는 openpilot 종방향 제어 대신 "
-"차량 내장 ACC가 기본으로 사용됩니다. openpilot 종방향 제어로 전환하려면 이 설"
-"정을 켜세요. 종방향 제어 알파를 켤 때는 실험 모드 사용을 권장합니다. 차량 전"
+"<b>경고: 이 차량에서 openpilot의 롱컨 제어는 알파 버전이며 자동 긴급 제동"
+"(AEB)을 비활성화합니다.</b><br><br>이 차량에서는 openpilot 롱컨 제어 대신 "
+"차량 내장 ACC가 기본으로 사용됩니다. openpilot 롱컨 제어로 전환하려면 이 설"
+"정을 켜세요. 롱컨 제어 알파를 켤 때는 실험 모드 사용을 권장합니다. 차량 전"
 "원이 켜져 있는 경우 이 설정을 변경하면 openpilot이 재시작됩니다."
 
 #: selfdrive/ui/layouts/settings/device.py:148
@@ -130,7 +130,7 @@ msgstr "동의"
 #: selfdrive/ui/layouts/settings/toggles.py:70
 #, python-format
 msgid "Always-On Driver Monitoring"
-msgstr "항상 켜짐 운전자 모니터링"
+msgstr "운전자 모니터링 항상 켜짐"
 
 #: selfdrive/ui/layouts/settings/toggles.py:186
 #, python-format
@@ -138,7 +138,7 @@ msgid ""
 "An alpha version of openpilot longitudinal control can be tested, along with "
 "Experimental mode, on non-release branches."
 msgstr ""
-"openpilot 종방향 제어 알파 버전은 실험 모드와 함께 비릴리스 브랜치에서 테스트"
+"openpilot 롱컨 제어 알파 버전은 실험 모드와 함께 비릴리스 브랜치에서 테스트"
 "할 수 있습니다."
 
 #: selfdrive/ui/layouts/settings/device.py:187
@@ -192,7 +192,7 @@ msgstr "확인"
 #: selfdrive/ui/widgets/exp_mode_button.py:50
 #, python-format
 msgid "CHILL MODE ON"
-msgstr "칠 모드 켜짐"
+msgstr "안정적 모드 켜짐"
 
 #: system/ui/widgets/network.py:155 selfdrive/ui/layouts/sidebar.py:73
 #: selfdrive/ui/layouts/sidebar.py:134 selfdrive/ui/layouts/sidebar.py:136
@@ -283,7 +283,7 @@ msgstr "해제 후 재시작"
 #: selfdrive/ui/layouts/settings/device.py:103
 #, python-format
 msgid "Disengage to Reset Calibration"
-msgstr "해제 후 보정 재설정"
+msgstr "해제 후 캘리브레이션 재설정"
 
 #: selfdrive/ui/layouts/settings/toggles.py:32
 msgid "Display speed in km/h instead of mph."
@@ -372,7 +372,7 @@ msgstr "openpilot 사용"
 msgid ""
 "Enable the openpilot longitudinal control (alpha) toggle to allow "
 "Experimental mode."
-msgstr "실험 모드를 사용하려면 openpilot 종방향 제어(알파) 토글을 켜세요."
+msgstr "실험 모드를 사용하려면 openpilot 롱컨 제어(알파) 토글을 켜세요."
 
 #: system/ui/widgets/network.py:204
 #, python-format
@@ -415,7 +415,7 @@ msgid ""
 "Experimental mode is currently unavailable on this car since the car's stock "
 "ACC is used for longitudinal control."
 msgstr ""
-"이 차량은 종방향 제어에 순정 ACC를 사용하므로 현재 실험 모드를 사용할 수 없습"
+"이 차량은 롱컨 제어에 순정 ACC를 사용하므로 현재 실험 모드를 사용할 수 없습"
 "니다."
 
 #: system/ui/widgets/network.py:373
@@ -470,7 +470,7 @@ msgstr ""
 "\n"
 "어떻게, 어디서 운전하는지가 중요한가요? 아니요. 평소처럼 운전하세요.\n"
 "\n"
-"Firehose 모드에서 모든 세그먼트가 가져가지나요? 아니요. 일부 세그먼트만 선택"
+"Firehose 모드에서 모든 구간을 가져가지나요? 아니요. 일부 구간만 선택"
 "적으로 가져갑니다.\n"
 "\n"
 "좋은 USB‑C 어댑터는 무엇인가요? 빠른 휴대폰 또는 노트북 충전기면 충분합니"
@@ -544,7 +544,7 @@ msgstr "LTE"
 #: selfdrive/ui/layouts/settings/developer.py:64
 #, python-format
 msgid "Longitudinal Maneuver Mode"
-msgstr "종방향 매뉴버 모드"
+msgstr "롱컨 기동 모드"
 
 #: selfdrive/ui/onroad/hud_renderer.py:148
 #, python-format
@@ -773,7 +773,7 @@ msgstr "재설정"
 #: selfdrive/ui/layouts/settings/device.py:51
 #, python-format
 msgid "Reset Calibration"
-msgstr "보정 재설정"
+msgstr "캘리브레이션 재설정"
 
 #: selfdrive/ui/layouts/settings/device.py:65
 #, python-format
@@ -1054,7 +1054,7 @@ msgstr "지금"
 #: selfdrive/ui/layouts/settings/developer.py:71
 #, python-format
 msgid "openpilot Longitudinal Control (Alpha)"
-msgstr "openpilot 종방향 제어(알파)"
+msgstr "openpilot 롱컨 제어(알파)"
 
 #: selfdrive/ui/onroad/alert_renderer.py:51
 #, python-format
@@ -1076,9 +1076,9 @@ msgid ""
 "some turns. The Experimental mode logo will also be shown in the top right "
 "corner."
 msgstr ""
-"openpilot은 기본적으로 칠 모드로 주행합니다. 실험 모드를 사용하면 칠 모드에 "
+"openpilot은 기본적으로 안정적 모드로 주행합니다. 실험 모드를 사용하면 안정적 모드에 "
 "아직 준비되지 않은 알파 수준의 기능이 활성화됩니다. 실험 기능은 아래와 같습니"
-"다:<br><h4>엔드투엔드 종방향 제어</h4><br>주행 모델이 가속과 제동을 제어합니"
+"다:<br><h4>엔드투엔드 롱컨 제어</h4><br>주행 모델이 가속과 제동을 제어합니"
 "다. openpilot은 빨간 신호 및 정지 표지에서의 정지를 포함해 사람이 운전한다고 "
 "판단하는 방식으로 주행합니다. 주행 속도는 모델이 결정하므로 설정 속도는 상한"
 "으로만 동작합니다. 알파 품질 기능이므로 오작동이 발생할 수 있습니다.<br><h4>"
@@ -1111,7 +1111,7 @@ msgstr ""
 #: selfdrive/ui/layouts/settings/toggles.py:183
 #, python-format
 msgid "openpilot longitudinal control may come in a future update."
-msgstr "openpilot 종방향 제어는 향후 업데이트에서 제공될 수 있습니다."
+msgstr "openpilot 롱컨 제어는 향후 업데이트에서 제공될 수 있습니다."
 
 #: selfdrive/ui/layouts/settings/device.py:26
 msgid ""
@@ -1177,7 +1177,7 @@ msgstr[0] "{}분 전"
 #, python-format
 msgid "{} segment of your driving is in the training dataset so far."
 msgid_plural "{} segments of your driving is in the training dataset so far."
-msgstr[0] "현재까지 귀하의 주행 {}세그먼트가 학습 데이터셋에 포함되었습니다."
+msgstr[0] "현재까지 귀하의 주행 {}구간이 학습 데이터셋에 포함되었습니다."
 
 #: selfdrive/ui/widgets/prime.py:62
 #, python-format
