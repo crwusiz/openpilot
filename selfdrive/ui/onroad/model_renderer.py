@@ -37,6 +37,13 @@ class ModelPoints:
 
 
 @dataclass
+class LeadInfo:
+  d_rel: float = 0.0
+  v_rel: float = 0.0
+  point: tuple[float, float] | None = None
+
+
+@dataclass
 class LeadVehicle:
   glow: list[float] = field(default_factory=list)
   chevron: list[float] = field(default_factory=list)
@@ -53,12 +60,17 @@ class ModelRenderer(Widget):
     self._lane_line_probs = np.zeros(4, dtype=np.float32)
     self._road_edge_stds = np.zeros(2, dtype=np.float32)
     self._lead_vehicles = [LeadVehicle(), LeadVehicle()]
+    self._lead_info = [LeadInfo(), LeadInfo()]
     self._path_offset_z = HEIGHT_INIT[0]
+    self._speed = 0.0
+    self._left_blindspot = False
+    self._right_blindspot = False
 
     # Initialize ModelPoints objects
     self._path = ModelPoints()
     self._lane_lines = [ModelPoints() for _ in range(4)]
     self._road_edges = [ModelPoints() for _ in range(2)]
+    self._lane_barriers = [ModelPoints(), ModelPoints()]
     self._acceleration_x = np.empty((0,), dtype=np.float32)
 
     # Transform matrix (3x3 for car space to screen space)
@@ -98,6 +110,14 @@ class ModelRenderer(Widget):
     # Update state
     self._experimental_mode = sm['selfdriveState'].experimentalMode
 
+    # Update speed and blindspot info
+    car_state = sm['carState']
+    if sm.valid['carState']:
+      v_ego = car_state.vEgoCluster if car_state.vEgoCluster != 0.0 else car_state.vEgo
+      self._speed = max(0.0, v_ego * (3.6 if ui_state.scene.is_metric else 2.23694))
+      self._left_blindspot = car_state.leftBlindspot
+      self._right_blindspot = car_state.rightBlindspot
+
     live_calib = sm['liveCalibration']
     self._path_offset_z = live_calib.height[0] if live_calib.height else HEIGHT_INIT[0]
 
@@ -107,7 +127,8 @@ class ModelRenderer(Widget):
     model = sm['modelV2']
     radar_state = sm['radarState'] if sm.valid['radarState'] else None
     lead_one = radar_state.leadOne if radar_state else None
-    render_lead_indicator = self._longitudinal_control and radar_state is not None
+    #render_lead_indicator = self._longitudinal_control and radar_state is not None
+    render_lead_indicator = radar_state is not None
 
     # Update model data when needed
     model_updated = sm.updated['modelV2']
@@ -129,7 +150,7 @@ class ModelRenderer(Widget):
     self._draw_path(sm)
 
     if render_lead_indicator and radar_state:
-      self._draw_lead_indicator()
+      self._draw_lead_indicators(radar_state, rect)
 
   def _update_raw_points(self, model):
     """Update raw 3D points from model data"""
@@ -148,6 +169,7 @@ class ModelRenderer(Widget):
   def _update_leads(self, radar_state, path_x_array):
     """Update positions of lead vehicles"""
     self._lead_vehicles = [LeadVehicle(), LeadVehicle()]
+    self._lead_info = [LeadInfo(), LeadInfo()]
     leads = [radar_state.leadOne, radar_state.leadTwo]
 
     for i, lead_data in enumerate(leads):
@@ -160,6 +182,7 @@ class ModelRenderer(Widget):
         point = self._map_to_screen(d_rel, -y_rel, z + self._path_offset_z)
         if point:
           self._lead_vehicles[i] = self._update_lead_vehicle(d_rel, v_rel, point, self._rect)
+          self._lead_info[i] = LeadInfo(d_rel=d_rel, v_rel=v_rel, point=point)
 
   def _update_model(self, lead, path_x_array):
     """Update model visualization data based on model message"""
@@ -170,6 +193,15 @@ class ModelRenderer(Widget):
     for i, lane_line in enumerate(self._lane_lines):
       lane_line.projected_points = self._map_line_to_polygon(
         lane_line.raw_points, 0.025 * self._lane_line_probs[i], 0.0, max_idx, max_distance
+      )
+
+    # Update lane barriers for blindspot visualization (using lane lines 1 and 2)
+    if self._left_blindspot or self._right_blindspot:
+      self._lane_barriers[0].projected_points = self._map_line_to_polygon(
+        self._lane_lines[1].raw_points, 0.025, 0.0, max_idx, max_distance
+      )
+      self._lane_barriers[1].projected_points = self._map_line_to_polygon(
+        self._lane_lines[2].raw_points, 0.025, 0.0, max_idx, max_distance
       )
 
     # Update road edges using raw points
@@ -190,7 +222,21 @@ class ModelRenderer(Widget):
 
   def _update_experimental_gradient(self):
     """Pre-calculate experimental mode gradient colors"""
-    if not self._experimental_mode:
+    if not self._experimental_mode or not ui_state.scene.engaged:
+      return
+
+    # Check if user is steering
+    if ui_state.scene.steering_pressed:
+      # Use steering pressed color (cyan/deep sky blue)
+      steering_color = rl.Color(0, 191, 255, 100)
+      mid_color = rl.Color(0, 191, 255, 50)
+      end_color = rl.Color(0, 191, 255, 0)
+      self._exp_gradient = Gradient(
+        start=(0.0, 1.0),
+        end=(0.0, 0.0),
+        colors=[steering_color, mid_color, end_color],
+        stops=[0.0, 0.5, 1.0],
+      )
       return
 
     max_len = min(len(self._path.projected_points) // 2, len(self._acceleration_x))
@@ -267,6 +313,15 @@ class ModelRenderer(Widget):
       color = rl.Color(255, 255, 255, int(alpha * 255))
       draw_polygon(self._rect, lane_line.projected_points, color)
 
+    # Draw blindspot barriers
+    if self._left_blindspot and self._lane_barriers[0].projected_points.size > 0:
+      color = rl.Color(255, 0, 0, 51)  # Red with 0.2 alpha
+      draw_polygon(self._rect, self._lane_barriers[0].projected_points, color)
+
+    if self._right_blindspot and self._lane_barriers[1].projected_points.size > 0:
+      color = rl.Color(255, 0, 0, 51)  # Red with 0.2 alpha
+      draw_polygon(self._rect, self._lane_barriers[1].projected_points, color)
+
     for i, road_edge in enumerate(self._road_edges):
       if road_edge.projected_points.size == 0:
         continue
@@ -280,16 +335,24 @@ class ModelRenderer(Widget):
     if not self._path.projected_points.size:
       return
 
-    allow_throttle = sm['longitudinalPlan'].allowThrottle or not self._longitudinal_control
-    self._blend_filter.update(int(allow_throttle))
-
-    if self._experimental_mode:
-      # Draw with acceleration coloring
-      if len(self._exp_gradient.colors) > 1:
-        draw_polygon(self._rect, self._path.projected_points, gradient=self._exp_gradient)
+    if ui_state.scene.engaged:
+      if ui_state.scene.steering_pressed or self._experimental_mode:
+        # Draw with acceleration coloring or steering pressed color
+        if len(self._exp_gradient.colors) > 1:
+          draw_polygon(self._rect, self._path.projected_points, gradient=self._exp_gradient)
+        else:
+          draw_polygon(self._rect, self._path.projected_points, rl.Color(255, 255, 255, 30))
       else:
-        draw_polygon(self._rect, self._path.projected_points, rl.Color(255, 255, 255, 30))
+        # Draw acceleration gradient when engaged but not in experimental mode
+        if len(self._exp_gradient.colors) > 1:
+          draw_polygon(self._rect, self._path.projected_points, gradient=self._exp_gradient)
+        else:
+          draw_polygon(self._rect, self._path.projected_points, rl.Color(255, 255, 255, 30))
     else:
+      # Not engaged - show throttle/no throttle colors
+      allow_throttle = sm['longitudinalPlan'].allowThrottle
+      self._blend_filter.update(int(allow_throttle))
+
       # Blend throttle/no throttle colors based on transition
       blend_factor = round(self._blend_filter.x * 100) / 100
       blended_colors = self._blend_colors(NO_THROTTLE_COLORS, THROTTLE_COLORS, blend_factor)
@@ -301,14 +364,56 @@ class ModelRenderer(Widget):
       )
       draw_polygon(self._rect, self._path.projected_points, gradient=gradient)
 
-  def _draw_lead_indicator(self):
-    # Draw lead vehicles if available
-    for lead in self._lead_vehicles:
-      if not lead.glow or not lead.chevron:
+  def _draw_lead_indicators(self, radar_state, rect):
+    """Draw lead vehicle indicators with distance and speed information"""
+    leads_data = [radar_state.leadOne, radar_state.leadTwo]
+
+    for i, (lead_vehicle, lead_info, lead_data) in enumerate(zip(self._lead_vehicles, self._lead_info, leads_data, strict=True)):
+      # Skip if no lead or if lead two is too close to lead one
+      if not lead_vehicle.glow or not lead_vehicle.chevron:
         continue
 
-      rl.draw_triangle_fan(lead.glow, len(lead.glow), rl.Color(218, 202, 37, 255))
-      rl.draw_triangle_fan(lead.chevron, len(lead.chevron), rl.Color(201, 34, 49, lead.fill_alpha))
+      if i == 1 and abs(leads_data[0].dRel - leads_data[1].dRel) <= 3.0:
+        continue
+
+      # Draw glow and chevron
+      rl.draw_triangle_fan(lead_vehicle.glow, len(lead_vehicle.glow), rl.Color(255, 191, 191, 255))
+      rl.draw_triangle_fan(lead_vehicle.chevron, len(lead_vehicle.chevron), rl.Color(201, 34, 49, lead_vehicle.fill_alpha))
+
+      # Draw distance and speed text
+      if lead_info.point:
+        x, y = lead_info.point
+        d_rel = lead_info.d_rel
+        v_rel = lead_info.v_rel
+
+        # Calculate size for text positioning
+        sz = np.clip((25 * 30) / (d_rel / 3 + 30), 15.0, 30.0) * 2.35
+        text_y = y + sz / 1.5
+
+        # Distance text
+        d_color = rl.WHITE
+        if d_rel < 15:
+          d_color = rl.RED if d_rel < 5 else rl.Color(255, 149, 0, 255)  # Orange
+
+        l_dist = f"{d_rel:.1f} m"
+        self._draw_text_centered(x, text_y + 70.0, l_dist, 35, d_color)
+
+        # Speed text
+        v_color = rl.Color(255, 191, 191, 255)  # Pink
+        if v_rel < 0:
+          v_color = rl.RED if v_rel < -4.4704 else rl.Color(255, 149, 0, 255)
+
+        if ui_state.scene.is_metric:
+          l_speed = f"{self._speed + v_rel * 3.6:.0f} km/h"
+        else:
+          l_speed = f"{self._speed + v_rel * 2.236936:.0f} mph"
+
+        self._draw_text_centered(x, text_y + 120.0, l_speed, 35, v_color)
+
+  def _draw_text_centered(self, x: float, y: float, text: str, font_size: int, color: rl.Color):
+    """Draw text centered at the given position"""
+    text_width = rl.measure_text(text, font_size)
+    rl.draw_text(text, int(x - text_width / 2), int(y - font_size / 2), font_size, color)
 
   @staticmethod
   def _get_path_length_idx(pos_x_array: np.ndarray, path_distance: float) -> int:
