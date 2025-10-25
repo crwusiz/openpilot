@@ -14,6 +14,8 @@ from openpilot.system.ui.lib.wifi_manager import WifiManager
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NetworkUI
 
+from openpilot.selfdrive.ui.layouts.settings.community import CommunityLayout
+
 # Settings close button
 SETTINGS_CLOSE_TEXT = "×"
 SETTINGS_CLOSE_TEXT_Y_OFFSET = 8  # The '×' character isn't quite vertically centered in the font so we need to offset it a bit to fully center it
@@ -40,6 +42,7 @@ class PanelType(IntEnum):
   SOFTWARE = 3
   FIREHOSE = 4
   DEVELOPER = 5
+  COMMUNITY = 6
 
 
 @dataclass
@@ -65,6 +68,7 @@ class SettingsLayout(Widget):
       PanelType.SOFTWARE: PanelInfo(tr_noop("Software"), SoftwareLayout()),
       PanelType.FIREHOSE: PanelInfo(tr_noop("Firehose"), FirehoseLayout()),
       PanelType.DEVELOPER: PanelInfo(tr_noop("Developer"), DeveloperLayout()),
+      PanelType.COMMUNITY: PanelInfo(tr_noop("Community"), CommunityLayout()),
     }
 
     self._font_medium = gui_app.font(FontWeight.MEDIUM)
