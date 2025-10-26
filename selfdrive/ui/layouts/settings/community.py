@@ -14,9 +14,9 @@ from openpilot.system.ui.widgets import Widget, DialogResult
 from openpilot.system.ui.widgets.list_view import toggle_item, button_item, ListItem
 from openpilot.system.ui.widgets.scroller import Scroller
 from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
-from openpilot.system.ui.widgets.select_dialog import SelectDialog
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr, tr_noop
+from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog # MultiOptionDialog 임포트 추가
 
 # Description constants
 DESCRIPTIONS = {
@@ -104,13 +104,18 @@ class CommunityLayout(Widget):
     manufacturers = ["[ Not Selected ]", "HYUNDAI", "KIA", "GENESIS"]
     current_selection = self._params.get("SelectedManufacturer")
 
-    dialog = SelectDialog(tr("Select your Manufacturer"), manufacturers,
-                          current_selection if current_selection else manufacturers[0])
+    # MultiOptionDialog 사용
+    dialog = MultiOptionDialog(tr("Select your Manufacturer"), manufacturers,
+                               current=(current_selection if current_selection else manufacturers[0]))
     gui_app.set_modal_overlay(dialog)
-    selected_option = dialog.result
 
-    if selected_option is not DialogResult.CANCEL:
-      selected_manufacturer = manufacturers[selected_option] if selected_option != -1 else "[ Not Selected ]"
+    # MultiOptionDialog는 선택 결과를 dialog.result가 아닌 dialog._result (DialogResult)와 dialog.selection (선택된 값)에 저장
+    # MultiOptionDialog의 _render 메서드는 self._result를 반환하며, 이는 gui_app.set_modal_overlay의 반환값으로 사용될 수 있지만,
+    # 여기서는 modal_overlay가 닫힌 후 dialog 객체에서 직접 결과를 가져옵니다.
+    dialog_result = dialog._result
+
+    if dialog_result is DialogResult.CONFIRM: # 'Select' 버튼을 눌렀을 때
+      selected_manufacturer = dialog.selection # MultiOptionDialog는 선택된 문자열을 selection에 저장
       if selected_manufacturer == "[ Not Selected ]":
         self._params.remove("SelectedManufacturer")
         subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
@@ -138,13 +143,14 @@ class CommunityLayout(Widget):
     cars = ["[ Not Selected ]"] + get_list("/data/params/crwusiz/CarList")
     current_selection = self._params.get("SelectedCar")
 
-    dialog = SelectDialog(tr("Select your car"), cars,
-                          current_selection if current_selection else cars[0])
+    # MultiOptionDialog 사용
+    dialog = MultiOptionDialog(tr("Select your car"), cars,
+                               current=(current_selection if current_selection else cars[0]))
     gui_app.set_modal_overlay(dialog)
-    selected_option = dialog.result
+    dialog_result = dialog._result
 
-    if selected_option is not DialogResult.CANCEL:
-      selected_car = cars[selected_option] if selected_option != -1 else "[ Not Selected ]"
+    if dialog_result is DialogResult.CONFIRM: # 'Select' 버튼을 눌렀을 때
+      selected_car = dialog.selection
       if selected_car == "[ Not Selected ]":
         self._params.remove("SelectedCar")
         subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
@@ -160,13 +166,14 @@ class CommunityLayout(Widget):
     branches = ["[ Not Selected ]"] + get_list("/data/params/crwusiz/GitBranchList")
     current_selection = self._params.get("SelectedBranch")
 
-    dialog = SelectDialog(tr("Select Branch"), branches,
-                          current_selection if current_selection else branches[0])
+    # MultiOptionDialog 사용
+    dialog = MultiOptionDialog(tr("Select Branch"), branches,
+                               current=(current_selection if current_selection else branches[0]))
     gui_app.set_modal_overlay(dialog)
-    selected_option = dialog.result
+    dialog_result = dialog._result
 
-    if selected_option is not DialogResult.CANCEL:
-      selected_branch = branches[selected_option] if selected_option != -1 else "[ Not Selected ]"
+    if dialog_result is DialogResult.CONFIRM: # 'Select' 버튼을 눌렀을 때
+      selected_branch = dialog.selection
       if selected_branch == "[ Not Selected ]":
         self._params.remove("SelectedBranch")
         subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
