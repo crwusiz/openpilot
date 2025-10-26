@@ -340,6 +340,9 @@ class GuiApplication:
           else:
             raise Exception
 
+          if result is None:
+            result = -1
+
           if result >= 0:
             # Clear the overlay and execute the callback
             original_modal = self._modal_overlay

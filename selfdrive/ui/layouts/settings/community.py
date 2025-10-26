@@ -1,16 +1,22 @@
 import subprocess
+import shutil
+import os
+import time
+import pyray as rl
+
+from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import List, Callable, Union
 
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.system.ui.widgets import Widget
+from openpilot.system.ui.widgets import Widget, DialogResult
 from openpilot.system.ui.widgets.list_view import toggle_item, button_item, ListItem
 from openpilot.system.ui.widgets.scroller import Scroller
 from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
+from openpilot.system.ui.widgets.select_dialog import SelectDialog
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr, tr_noop
-from openpilot.system.ui.widgets import DialogResult
 
 # Description constants
 DESCRIPTIONS = {
@@ -60,7 +66,7 @@ def execute_script(script_path: str, *args) -> int:
   """Execute shell script and return exit code"""
   try:
     cmd = [script_path] + list(args)
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     return result.returncode
   except Exception as e:
     print(f"Error executing script: {e}")
@@ -71,17 +77,18 @@ class CommunityLayout(Widget):
   def __init__(self):
     super().__init__()
     self._params = Params()
+
     self._current_tab = 0  # 0: toggles, 1: functions, 2: logs
 
-    # Build header buttons (always visible)
+    # Header Widgets
     self._header_items = []
     self._build_header_buttons()
 
-    # Build tab buttons (always visible)
+    # Tab Widgets
     self._tab_items = []
-    self._build_tab_buttons()
+    self._build_tab_buttons() # 🌟 초기화 시 버튼 상태를 결정
 
-    # Build content for each tab
+    # Content Items
     self._toggle_items = []
     self._function_items = []
     self._log_items = []
@@ -90,11 +97,89 @@ class CommunityLayout(Widget):
     self._build_function_items()
     self._build_log_items()
 
-    # Create initial scroller
+    self._update_scroller()
+
+  # --- Dialog Action Helpers (복구된 SelectDialog 로직) ---
+  def _on_select_manufacturer(self):
+    manufacturers = ["[ Not Selected ]", "HYUNDAI", "KIA", "GENESIS"]
+    current_selection = self._params.get("SelectedManufacturer")
+
+    dialog = SelectDialog(tr("Select your Manufacturer"), manufacturers,
+                          current_selection if current_selection else manufacturers[0])
+    gui_app.set_modal_overlay(dialog)
+    selected_option = dialog.result
+
+    if selected_option is not DialogResult.CANCEL:
+      selected_manufacturer = manufacturers[selected_option] if selected_option != -1 else "[ Not Selected ]"
+      if selected_manufacturer == "[ Not Selected ]":
+        self._params.remove("SelectedManufacturer")
+        subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
+      else:
+        car_list_file = ""
+        if selected_manufacturer == "HYUNDAI":
+          car_list_file = "/data/params/crwusiz/CarList_Hyundai"
+        elif selected_manufacturer == "KIA":
+          car_list_file = "/data/params/crwusiz/CarList_Kia"
+        elif selected_manufacturer == "GENESIS":
+          car_list_file = "/data/params/crwusiz/CarList_Genesis"
+
+        if car_list_file:
+          execute_script("cp", "-f", car_list_file, "/data/params/crwusiz/CarList")
+
+        self._params.put("SelectedManufacturer", selected_manufacturer)
+        dlg = ConfirmDialog(selected_manufacturer, tr("OK"))
+        gui_app.set_modal_overlay(dlg)
+        subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
+
+    self._build_header_buttons()
+    self._update_scroller()
+
+  def _on_select_car(self):
+    cars = ["[ Not Selected ]"] + get_list("/data/params/crwusiz/CarList")
+    current_selection = self._params.get("SelectedCar")
+
+    dialog = SelectDialog(tr("Select your car"), cars,
+                          current_selection if current_selection else cars[0])
+    gui_app.set_modal_overlay(dialog)
+    selected_option = dialog.result
+
+    if selected_option is not DialogResult.CANCEL:
+      selected_car = cars[selected_option] if selected_option != -1 else "[ Not Selected ]"
+      if selected_car == "[ Not Selected ]":
+        self._params.remove("SelectedCar")
+        subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
+      else:
+        self._params.put("SelectedCar", selected_car)
+        dlg = ConfirmDialog(selected_car, tr("OK"))
+        gui_app.set_modal_overlay(dlg)
+        subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
+    self._build_header_buttons()
+    self._update_scroller()
+
+  def _on_select_branch(self):
+    branches = ["[ Not Selected ]"] + get_list("/data/params/crwusiz/GitBranchList")
+    current_selection = self._params.get("SelectedBranch")
+
+    dialog = SelectDialog(tr("Select Branch"), branches,
+                          current_selection if current_selection else branches[0])
+    gui_app.set_modal_overlay(dialog)
+    selected_option = dialog.result
+
+    if selected_option is not DialogResult.CANCEL:
+      selected_branch = branches[selected_option] if selected_option != -1 else "[ Not Selected ]"
+      if selected_branch == "[ Not Selected ]":
+        self._params.remove("SelectedBranch")
+        subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
+      else:
+        self._params.put("SelectedBranch", selected_branch)
+        dlg = ConfirmDialog(selected_branch, tr("OK"))
+        gui_app.set_modal_overlay(dlg)
+        subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
+    self._build_header_buttons()
     self._update_scroller()
 
   def _build_header_buttons(self):
-    """Build manufacturer, car, and branch selection buttons (row 1)"""
+    """Build manufacturer, car, and branch selection buttons (row 1, 3-column layout)"""
 
     def get_manufacturer_text():
       selected = self._params.get("SelectedManufacturer")
@@ -133,25 +218,34 @@ class CommunityLayout(Widget):
     ]
 
   def _build_tab_buttons(self):
-    """Build tab switcher buttons (row 2)"""
+    """Build tab switcher buttons (row 2) - 🌟 FIX: Add visual feedback"""
+
+    def get_button_text(index: int, default_text: str):
+      text = tr(default_text)
+      # 현재 탭이 선택된 경우 대괄호로 강조
+      if self._current_tab == index:
+          return f"[{text}]"
+      return text
+
     self._toggle_tab_btn = button_item(
-      title=lambda: tr("View"),
-      button_text=lambda: tr("Toggle"),
+      title=lambda: tr("Tab"), # title을 'Tab'으로 통일
+      button_text=lambda: get_button_text(0, "Toggle"),
       callback=lambda: self._switch_tab(0),
     )
 
     self._func_tab_btn = button_item(
-      title=lambda: tr("View"),
-      button_text=lambda: tr("Function"),
+      title=lambda: tr("Tab"),
+      button_text=lambda: get_button_text(1, "Function"),
       callback=lambda: self._switch_tab(1),
     )
 
     self._log_tab_btn = button_item(
-      title=lambda: tr("View"),
-      button_text=lambda: tr("Log"),
+      title=lambda: tr("Tab"),
+      button_text=lambda: get_button_text(2, "Log"),
       callback=lambda: self._switch_tab(2),
     )
 
+    # 탭 버튼을 세로로 나열 (기존 코드 구조 유지)
     self._tab_items = [
       self._toggle_tab_btn,
       self._func_tab_btn,
@@ -234,6 +328,7 @@ class CommunityLayout(Widget):
 
   def _build_function_items(self):
     """Build function button items (shown in Function tab, 2-column grid)"""
+    # 2열 그리드 구현을 위해 ListItem을 세로로 나열하는 기존 구조 유지
     self._function_items = [
       # Row 1
       button_item(
@@ -283,6 +378,7 @@ class CommunityLayout(Widget):
 
   def _build_log_items(self):
     """Build log view and upload button items (shown in Log tab, 2-column grid)"""
+    # 2열 그리드 구현을 위해 ListItem을 세로로 나열하는 기존 구조 유지
     self._log_items = [
       # Row 1
       button_item(
@@ -330,12 +426,12 @@ class CommunityLayout(Widget):
       ),
     ]
 
+
+  # --- Tab Logic ---
   def _update_scroller(self):
     """Update scroller with current tab's content"""
-    # Always include header and tab buttons
     items = self._header_items + self._tab_items
 
-    # Add content based on current tab
     if self._current_tab == 0:
       items.extend(self._toggle_items)
     elif self._current_tab == 1:
@@ -352,35 +448,16 @@ class CommunityLayout(Widget):
     self._scroller.show_event()
 
   def _switch_tab(self, tab_index: int):
-    """Switch between toggle/function/log tabs"""
     if self._current_tab != tab_index:
       self._current_tab = tab_index
+      # 🌟 탭이 변경되면 버튼 상태를 새로고침하여 시각적 피드백(대괄호)을 업데이트
+      self._build_tab_buttons()
+      # 🌟 스크롤러 내용을 새 탭으로 업데이트
+      self._update_scroller()
+    else:
+      # 이미 선택된 탭을 눌러도 렌더링 꼬임 방지를 위해 업데이트
       self._update_scroller()
 
-  # Manufacturer/Car/Branch selection callbacks
-  def _on_select_manufacturer(self):
-    manufacturers = ["[ Not Selected ]", "HYUNDAI", "KIA", "GENESIS"]
-    selected = self._params.get("SelectedManufacturer")
-
-    # TODO: Show selection dialog and get result
-    # This would need a multi-option dialog implementation
-    pass
-
-  def _on_select_car(self):
-    cars = ["[ Not Selected ]"] + get_list("/data/params/crwusiz/CarList")
-    selected = self._params.get("SelectedCar")
-
-    # TODO: Show selection dialog and get result
-    pass
-
-  def _on_select_branch(self):
-    branches = ["[ Not Selected ]"] + get_list("/data/params/crwusiz/GitBranchList")
-    selected = self._params.get("SelectedBranch")
-
-    # TODO: Show selection dialog and get result
-    pass
-
-  # Function button callbacks
   def _on_git_pull(self):
     def confirm_callback(result: int):
       if result == DialogResult.CONFIRM:
@@ -520,6 +597,7 @@ class CommunityLayout(Widget):
 
   def _on_realdata_upload(self):
     """Upload realdata routes"""
+
     target_path = Path("/data/media/0/realdata")
 
     if not target_path.exists():
@@ -527,7 +605,6 @@ class CommunityLayout(Widget):
       gui_app.set_modal_overlay(dlg)
       return
 
-    # Get all route directories (excluding 'boot')
     route_map = {}
     for item in target_path.iterdir():
       if not item.is_dir() or item.name == "boot":
@@ -557,15 +634,45 @@ class CommunityLayout(Widget):
       gui_app.set_modal_overlay(dlg)
       return
 
-    # Sort by last modified time
     sorted_routes = sorted(
       route_map.values(),
       key=lambda x: x['last_modified'],
       reverse=True
     )
 
-    # TODO: Show route selection dialog
-    # This would need a multi-option dialog implementation
-    # For now, just show a message
-    dlg = ConfirmDialog(tr("Route selection dialog not implemented yet"), tr("OK"))
-    gui_app.set_modal_overlay(dlg)
+    recent_routes = sorted_routes[:10]
+    options = []
+    for route in recent_routes:
+      dt_object = datetime.fromtimestamp(route['last_modified'])
+      formatted_date = dt_object.strftime('%Y-%m-%d %H:%M')
+      options.append(f"[{formatted_date}] {route['route_name']} ({route['segment_count']} segments)")
+
+    dialog = SelectDialog(tr("Select Route to Upload"), options)
+    gui_app.set_modal_overlay(dialog)
+    selected_index = dialog.result
+
+    if selected_index is not DialogResult.CANCEL:
+      selected_route_info = recent_routes[selected_index]
+      route_name = selected_route_info['route_name']
+      segment_paths = selected_route_info['segment_paths']
+
+      upload_dlg = ConfirmDialog(tr(f"Upload route {route_name}?"), tr("Yes"), tr("No"))
+      gui_app.set_modal_overlay(upload_dlg)
+
+      if upload_dlg.result == DialogResult.CONFIRM:
+        script_path = "/data/openpilot/scripts/upload_realdata.sh"
+        cmd = [script_path] + segment_paths
+
+        try:
+          result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+
+          if result.returncode == 0:
+            dlg = ConfirmDialog(tr("Upload completed successfully"), tr("OK"))
+          else:
+            error_msg = tr("Upload failed") + f"\nExit Code: {result.returncode}"
+            dlg = ConfirmDialog(error_msg, tr("OK"))
+
+        except Exception as e:
+          dlg = ConfirmDialog(tr("Error executing script:") + f"\n{e}", tr("OK"))
+
+        gui_app.set_modal_overlay(dlg)
