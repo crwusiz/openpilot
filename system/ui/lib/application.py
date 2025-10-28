@@ -15,7 +15,7 @@ from typing import NamedTuple
 from importlib.resources import as_file, files
 from openpilot.common.swaglog import cloudlog
 from openpilot.system.hardware import HARDWARE, PC, TICI
-from openpilot.system.ui.lib.multilang import TRANSLATIONS_DIR, UNIFONT_LANGUAGES, multilang
+from openpilot.system.ui.lib.multilang import multilang
 from openpilot.common.realtime import Ratekeeper
 
 _DEFAULT_FPS = int(os.getenv("FPS", 20 if TICI else 60))
@@ -43,16 +43,12 @@ FONT_DIR = ASSETS_DIR.joinpath("fonts")
 
 
 class FontWeight(StrEnum):
-  THIN = "Inter-Thin.ttf"
-  EXTRA_LIGHT = "Inter-ExtraLight.ttf"
-  LIGHT = "Inter-Light.ttf"
-  NORMAL = "Inter-Regular.ttf"
-  MEDIUM = "Inter-Medium.ttf"
-  SEMI_BOLD = "Inter-SemiBold.ttf"
-  BOLD = "Inter-Bold.ttf"
-  EXTRA_BOLD = "Inter-ExtraBold.ttf"
-  BLACK = "Inter-Black.ttf"
-  UNIFONT = "NotoSansKR-Medium.ttf"
+  LIGHT = "Inter-Light.fnt"
+  NORMAL = "Inter-Regular.fnt"
+  MEDIUM = "Inter-Medium.fnt"
+  SEMI_BOLD = "Inter-SemiBold.fnt"
+  BOLD = "Inter-Bold.fnt"
+  UNIFONT = "unifont.fnt"
 
 
 def font_fallback(font: rl.Font) -> rl.Font:
@@ -278,6 +274,8 @@ class GuiApplication:
         rl.image_resize(image, new_width, new_height)
       else:
         rl.image_resize(image, width, height)
+    else:
+      assert keep_aspect_ratio, "Cannot resize without specifying width and height"
     return image
 
   def _load_texture_from_image(self, image: rl.Image) -> rl.Texture:
@@ -340,9 +338,6 @@ class GuiApplication:
           else:
             raise Exception
 
-          if result is None:
-            result = -1
-
           if result >= 0:
             # Clear the overlay and execute the callback
             original_modal = self._modal_overlay
@@ -395,51 +390,12 @@ class GuiApplication:
     return self._height
 
   def _load_fonts(self):
-    # Create a character set from our keyboard layouts
-    from openpilot.system.ui.widgets.keyboard import KEYBOARD_LAYOUTS
-
-    base_chars = set()
-    for layout in KEYBOARD_LAYOUTS.values():
-      base_chars.update(key for row in layout for key in row)
-    base_chars |= set("–‑✓×°§•")
-
-    # Load only the characters used in translations
-    unifont_chars = set(base_chars)
-    for language, code in multilang.languages.items():
-      unifont_chars |= set(language)
-      try:
-        with open(os.path.join(TRANSLATIONS_DIR, f"app_{code}.po")) as f:
-          lang_chars = set(f.read())
-          if code in UNIFONT_LANGUAGES:
-            unifont_chars |= lang_chars
-          else:
-            base_chars |= lang_chars
-      except FileNotFoundError:
-        cloudlog.warning(f"Translation file for language '{code}' not found when loading fonts.")
-
-    base_chars = "".join(base_chars)
-    cloudlog.debug(f"Loading fonts with {len(base_chars)} glyphs.")
-
-    unifont_chars = "".join(unifont_chars)
-    cloudlog.debug(f"Loading unifont with {len(unifont_chars)} glyphs.")
-
-    base_codepoint_count = rl.ffi.new("int *", 1)
-    base_codepoints = rl.load_codepoints(base_chars, base_codepoint_count)
-
-    unifont_codepoint_count = rl.ffi.new("int *", 1)
-    unifont_codepoints = rl.load_codepoints(unifont_chars, unifont_codepoint_count)
-
     for font_weight_file in FontWeight:
-      with as_file(FONT_DIR.joinpath(font_weight_file)) as fspath:
-        if font_weight_file == FontWeight.UNIFONT:
-          font = rl.load_font_ex(fspath.as_posix(), 200, unifont_codepoints, unifont_codepoint_count[0])
-        else:
-          font = rl.load_font_ex(fspath.as_posix(), 200, base_codepoints, base_codepoint_count[0])
+      with as_file(FONT_DIR) as fspath:
+        fnt_path = fspath / font_weight_file
+        font = rl.load_font(fnt_path.as_posix())
         rl.set_texture_filter(font.texture, rl.TextureFilter.TEXTURE_FILTER_BILINEAR)
         self._fonts[font_weight_file] = font
-
-    rl.unload_codepoints(base_codepoints)
-    rl.unload_codepoints(unifont_codepoints)
     rl.gui_set_font(self._fonts[FontWeight.NORMAL])
 
   def _set_styles(self):
