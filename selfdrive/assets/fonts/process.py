@@ -9,7 +9,7 @@ SELFDRIVE_DIR = FONT_DIR.parents[1]
 TRANSLATIONS_DIR = SELFDRIVE_DIR / "ui" / "translations"
 LANGUAGES_FILE = TRANSLATIONS_DIR / "languages.json"
 
-GLYPH_PADDING = 6
+GLYPH_PADDING = 2
 EXTRA_CHARS = "–‑✓×°§•€£¥"
 UNIFONT_LANGUAGES = {"ar", "th", "zh-CHT", "zh-CHS", "ko", "ja"}
 
@@ -86,7 +86,8 @@ def _process_font(font_path: Path, codepoints: tuple[int, ...]):
   print(f"Processing {font_path.name}...")
 
   font_size = {
-    "unifont.otf": 16,  # unifont is only 16x8 or 16x16 pixels per glyph
+    #"unifont.otf": 16,  # unifont is only 16x8 or 16x16 pixels per glyph
+    "NotoSansKR-Medium.ttf": 40,
   }.get(font_path.name, 200)
 
   data = font_path.read_bytes()
@@ -119,7 +120,7 @@ def main():
   for font in fonts:
     if "emoji" in font.name.lower():
       continue
-    glyphs = unifont_cp if font.stem.lower().startswith("unifont") else base_cp
+    glyphs = unifont_cp if font.stem.lower().startswith("notosanskr") else base_cp
     _process_font(font, glyphs)
   return 0
 
