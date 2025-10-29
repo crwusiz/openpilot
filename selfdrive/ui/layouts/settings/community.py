@@ -16,7 +16,7 @@ from openpilot.system.ui.widgets.scroller import Scroller
 from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr, tr_noop
-from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog # MultiOptionDialog 임포트 추가
+from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
 
 # Description constants
 DESCRIPTIONS = {
@@ -52,6 +52,12 @@ DESCRIPTIONS = {
   ),
 }
 
+# 고정 헤더 높이 상수
+HEADER_ROW_HEIGHT = 120
+FIXED_HEADER_HEIGHT = HEADER_ROW_HEIGHT * 2
+FONT_SIZE = 40
+BUTTON_PADDING = 20
+
 
 def get_list(path: str) -> List[str]:
   """Read lines from file and return as list"""
@@ -78,15 +84,7 @@ class CommunityLayout(Widget):
     super().__init__()
     self._params = Params()
 
-    self._current_tab = 0  # 0: toggles, 1: functions, 2: logs
-
-    # Header Widgets
-    self._header_items = []
-    self._build_header_buttons()
-
-    # Tab Widgets
-    self._tab_items = []
-    self._build_tab_buttons() # 🌟 초기화 시 버튼 상태를 결정
+    self._current_tab = 0
 
     # Content Items
     self._toggle_items = []
@@ -97,25 +95,20 @@ class CommunityLayout(Widget):
     self._build_function_items()
     self._build_log_items()
 
-    self._update_scroller()
+    self._content_scroller = None
+    self._update_content_scroller()
 
-  # --- Dialog Action Helpers (복구된 SelectDialog 로직) ---
   def _on_select_manufacturer(self):
     manufacturers = ["[ Not Selected ]", "HYUNDAI", "KIA", "GENESIS"]
     current_selection = self._params.get("SelectedManufacturer")
 
-    # MultiOptionDialog 사용
     dialog = MultiOptionDialog(tr("Select your Manufacturer"), manufacturers,
                                current=(current_selection if current_selection else manufacturers[0]))
     gui_app.set_modal_overlay(dialog)
-
-    # MultiOptionDialog는 선택 결과를 dialog.result가 아닌 dialog._result (DialogResult)와 dialog.selection (선택된 값)에 저장
-    # MultiOptionDialog의 _render 메서드는 self._result를 반환하며, 이는 gui_app.set_modal_overlay의 반환값으로 사용될 수 있지만,
-    # 여기서는 modal_overlay가 닫힌 후 dialog 객체에서 직접 결과를 가져옵니다.
     dialog_result = dialog._result
 
-    if dialog_result is DialogResult.CONFIRM: # 'Select' 버튼을 눌렀을 때
-      selected_manufacturer = dialog.selection # MultiOptionDialog는 선택된 문자열을 selection에 저장
+    if dialog_result is DialogResult.CONFIRM:
+      selected_manufacturer = dialog.selection
       if selected_manufacturer == "[ Not Selected ]":
         self._params.remove("SelectedManufacturer")
         subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
@@ -136,20 +129,16 @@ class CommunityLayout(Widget):
         gui_app.set_modal_overlay(dlg)
         subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
 
-    self._build_header_buttons()
-    self._update_scroller()
-
   def _on_select_car(self):
     cars = ["[ Not Selected ]"] + get_list("/data/params/crwusiz/CarList")
     current_selection = self._params.get("SelectedCar")
 
-    # MultiOptionDialog 사용
     dialog = MultiOptionDialog(tr("Select your car"), cars,
                                current=(current_selection if current_selection else cars[0]))
     gui_app.set_modal_overlay(dialog)
     dialog_result = dialog._result
 
-    if dialog_result is DialogResult.CONFIRM: # 'Select' 버튼을 눌렀을 때
+    if dialog_result is DialogResult.CONFIRM:
       selected_car = dialog.selection
       if selected_car == "[ Not Selected ]":
         self._params.remove("SelectedCar")
@@ -159,20 +148,17 @@ class CommunityLayout(Widget):
         dlg = ConfirmDialog(selected_car, tr("OK"))
         gui_app.set_modal_overlay(dlg)
         subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
-    self._build_header_buttons()
-    self._update_scroller()
 
   def _on_select_branch(self):
     branches = ["[ Not Selected ]"] + get_list("/data/params/crwusiz/GitBranchList")
     current_selection = self._params.get("SelectedBranch")
 
-    # MultiOptionDialog 사용
     dialog = MultiOptionDialog(tr("Select Branch"), branches,
                                current=(current_selection if current_selection else branches[0]))
     gui_app.set_modal_overlay(dialog)
     dialog_result = dialog._result
 
-    if dialog_result is DialogResult.CONFIRM: # 'Select' 버튼을 눌렀을 때
+    if dialog_result is DialogResult.CONFIRM:
       selected_branch = dialog.selection
       if selected_branch == "[ Not Selected ]":
         self._params.remove("SelectedBranch")
@@ -182,85 +168,34 @@ class CommunityLayout(Widget):
         dlg = ConfirmDialog(selected_branch, tr("OK"))
         gui_app.set_modal_overlay(dlg)
         subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
-    self._build_header_buttons()
-    self._update_scroller()
 
-  def _build_header_buttons(self):
-    """Build manufacturer, car, and branch selection buttons (row 1, 3-column layout)"""
+  def _draw_button(self, rect, text, is_selected=False, is_header=False):
+    """커스텀 버튼 그리기"""
+    # 배경 (헤더는 파란색, 선택된 탭은 어두운 회색)
+    if is_header:
+      rl.draw_rectangle_rec(rect, rl.Color(44, 44, 226, 255))  # #2C2CE2
+    elif is_selected:
+      rl.draw_rectangle_rec(rect, rl.Color(60, 60, 60, 255))
+    else:
+      rl.draw_rectangle_rec(rect, rl.Color(40, 40, 40, 255))
 
-    def get_manufacturer_text():
-      selected = self._params.get("SelectedManufacturer")
-      return selected if selected else tr("Select your Manufacturer")
+    # 테두리
+    rl.draw_rectangle_lines_ex(rect, 1, rl.Color(80, 80, 80, 255))
 
-    self._manufacturer_btn = button_item(
-      title=lambda: tr("Manufacturer"),
-      button_text=get_manufacturer_text,
-      callback=self._on_select_manufacturer,
-    )
+    # 텍스트 중앙 정렬
+    text_width = rl.measure_text(text, FONT_SIZE)
+    text_x = rect.x + (rect.width - text_width) / 2
+    text_y = rect.y + (rect.height - FONT_SIZE) / 2
 
-    def get_car_text():
-      selected = self._params.get("SelectedCar")
-      return selected if selected else tr("Select your car")
+    rl.draw_text(text, int(text_x), int(text_y), FONT_SIZE, rl.WHITE)
 
-    self._car_btn = button_item(
-      title=lambda: tr("Car"),
-      button_text=get_car_text,
-      callback=self._on_select_car,
-    )
-
-    def get_branch_text():
-      selected = self._params.get("SelectedBranch")
-      return selected if selected else tr("Select Branch")
-
-    self._branch_btn = button_item(
-      title=lambda: tr("Branch"),
-      button_text=get_branch_text,
-      callback=self._on_select_branch,
-    )
-
-    self._header_items = [
-      self._manufacturer_btn,
-      self._car_btn,
-      self._branch_btn,
-    ]
-
-  def _build_tab_buttons(self):
-    """Build tab switcher buttons (row 2) - 🌟 FIX: Add visual feedback"""
-
-    def get_button_text(index: int, default_text: str):
-      text = tr(default_text)
-      # 현재 탭이 선택된 경우 대괄호로 강조
-      if self._current_tab == index:
-          return f"[{text}]"
-      return text
-
-    self._toggle_tab_btn = button_item(
-      title=lambda: tr("Tab"), # title을 'Tab'으로 통일
-      button_text=lambda: get_button_text(0, "Toggle"),
-      callback=lambda: self._switch_tab(0),
-    )
-
-    self._func_tab_btn = button_item(
-      title=lambda: tr("Tab"),
-      button_text=lambda: get_button_text(1, "Function"),
-      callback=lambda: self._switch_tab(1),
-    )
-
-    self._log_tab_btn = button_item(
-      title=lambda: tr("Tab"),
-      button_text=lambda: get_button_text(2, "Log"),
-      callback=lambda: self._switch_tab(2),
-    )
-
-    # 탭 버튼을 세로로 나열 (기존 코드 구조 유지)
-    self._tab_items = [
-      self._toggle_tab_btn,
-      self._func_tab_btn,
-      self._log_tab_btn,
-    ]
+  def _is_point_in_rect(self, x, y, rect):
+    """점이 사각형 안에 있는지 확인"""
+    return (rect.x <= x <= rect.x + rect.width and
+            rect.y <= y <= rect.y + rect.height)
 
   def _build_toggle_items(self):
-    """Build main toggle items (shown in Toggle tab)"""
+    """Build main toggle items"""
     is_c3xl = self._params.get_bool("HardwareC3xLite")
 
     self._toggle_items = [
@@ -334,10 +269,8 @@ class CommunityLayout(Widget):
     ])
 
   def _build_function_items(self):
-    """Build function button items (shown in Function tab, 2-column grid)"""
-    # 2열 그리드 구현을 위해 ListItem을 세로로 나열하는 기존 구조 유지
+    """Build function button items"""
     self._function_items = [
-      # Row 1
       button_item(
         title=lambda: tr("Git"),
         button_text=lambda: tr("Git Pull"),
@@ -348,7 +281,6 @@ class CommunityLayout(Widget):
         button_text=lambda: tr("Git Checkout"),
         callback=self._on_git_checkout,
       ),
-      # Row 2
       button_item(
         title=lambda: tr("Git"),
         button_text=lambda: tr("Git Reset -1"),
@@ -359,7 +291,6 @@ class CommunityLayout(Widget):
         button_text=lambda: tr("Scons Rebuild"),
         callback=self._on_scons_rebuild,
       ),
-      # Row 3
       button_item(
         title=lambda: tr("Panda"),
         button_text=lambda: tr("Panda Flash"),
@@ -370,7 +301,6 @@ class CommunityLayout(Widget):
         button_text=lambda: tr("Panda Recover"),
         callback=self._on_panda_recover,
       ),
-      # Row 4
       button_item(
         title=lambda: tr("Camera"),
         button_text=lambda: tr("Camera View"),
@@ -384,10 +314,8 @@ class CommunityLayout(Widget):
     ]
 
   def _build_log_items(self):
-    """Build log view and upload button items (shown in Log tab, 2-column grid)"""
-    # 2열 그리드 구현을 위해 ListItem을 세로로 나열하는 기존 구조 유지
+    """Build log view and upload button items"""
     self._log_items = [
-      # Row 1
       button_item(
         title=lambda: tr("CAN Log"),
         button_text=lambda: tr("can missing log View"),
@@ -398,7 +326,6 @@ class CommunityLayout(Widget):
         button_text=lambda: tr("can timeout log View"),
         callback=lambda: self._view_log("/data/can_timeout.log"),
       ),
-      # Row 2
       button_item(
         title=lambda: tr("Tmux"),
         button_text=lambda: tr("tmux log View"),
@@ -409,7 +336,6 @@ class CommunityLayout(Widget):
         button_text=lambda: tr("tmux log Upload"),
         callback=lambda: self._upload_log("/data/tmux_error.log", "tmux_error.log"),
       ),
-      # Row 3
       button_item(
         title=lambda: tr("Tmux Console"),
         button_text=lambda: tr("tmux console View"),
@@ -420,7 +346,6 @@ class CommunityLayout(Widget):
         button_text=lambda: tr("tmux console Upload"),
         callback=self._on_tmux_console_upload,
       ),
-      # Row 4
       button_item(
         title=lambda: tr("Upload"),
         button_text=lambda: tr("carParams dump Upload"),
@@ -433,38 +358,125 @@ class CommunityLayout(Widget):
       ),
     ]
 
-
-  # --- Tab Logic ---
-  def _update_scroller(self):
-    """Update scroller with current tab's content"""
-    items = self._header_items + self._tab_items
+  def _update_content_scroller(self):
+    """Update content scroller with current tab's items"""
+    items = []
 
     if self._current_tab == 0:
-      items.extend(self._toggle_items)
+      items = self._toggle_items
     elif self._current_tab == 1:
-      items.extend(self._function_items)
+      items = self._function_items
     elif self._current_tab == 2:
-      items.extend(self._log_items)
+      items = self._log_items
 
-    self._scroller = Scroller(items, line_separator=True, spacing=0)
+    self._content_scroller = Scroller(items, line_separator=True, spacing=0)
 
   def _render(self, rect):
-    self._scroller.render(rect)
+    """Render fixed headers (가로 그리드) and scrollable content"""
+    self._rect = rect
+
+    col_width = rect.width / 3
+
+    # === 첫 번째 행: Manufacturer | Car | Branch ===
+    # Manufacturer
+    self._manufacturer_rect = rl.Rectangle(rect.x, rect.y, col_width, HEADER_ROW_HEIGHT)
+    manufacturer_text = self._params.get("SelectedManufacturer")
+    if not manufacturer_text:
+      manufacturer_text = tr("Select your Manufacturer")
+    self._draw_button(self._manufacturer_rect, manufacturer_text, is_header=True)
+
+    # Car
+    self._car_rect = rl.Rectangle(rect.x + col_width, rect.y, col_width, HEADER_ROW_HEIGHT)
+    car_text = self._params.get("SelectedCar")
+    if not car_text:
+      car_text = tr("Select your car")
+    self._draw_button(self._car_rect, car_text, is_header=True)
+
+    # Branch
+    self._branch_rect = rl.Rectangle(rect.x + col_width * 2, rect.y, col_width, HEADER_ROW_HEIGHT)
+    branch_text = self._params.get("SelectedBranch")
+    if not branch_text:
+      branch_text = tr("Select Branch")
+    self._draw_button(self._branch_rect, branch_text, is_header=True)
+
+    # 구분선
+    rl.draw_line(
+      int(rect.x + 40), int(rect.y + HEADER_ROW_HEIGHT),
+      int(rect.x + rect.width - 80), int(rect.y + HEADER_ROW_HEIGHT),
+      rl.GRAY
+    )
+
+    # === 두 번째 행: Toggle | Function | Log ===
+    tab_y = rect.y + HEADER_ROW_HEIGHT
+
+    # Toggle
+    self._toggle_rect = rl.Rectangle(rect.x, tab_y, col_width, HEADER_ROW_HEIGHT)
+    self._draw_button(self._toggle_rect, tr("Toggle"), self._current_tab == 0)
+
+    # Function
+    self._function_rect = rl.Rectangle(rect.x + col_width, tab_y, col_width, HEADER_ROW_HEIGHT)
+    self._draw_button(self._function_rect, tr("Function"), self._current_tab == 1)
+
+    # Log
+    self._log_rect = rl.Rectangle(rect.x + col_width * 2, tab_y, col_width, HEADER_ROW_HEIGHT)
+    self._draw_button(self._log_rect, tr("Log"), self._current_tab == 2)
+
+    # 구분선
+    rl.draw_line(
+      int(rect.x + 40), int(tab_y + HEADER_ROW_HEIGHT),
+      int(rect.x + rect.width - 80), int(tab_y + HEADER_ROW_HEIGHT),
+      rl.GRAY
+    )
+
+    # === 스크롤 가능한 콘텐츠 영역 ===
+    content_rect = rl.Rectangle(
+      rect.x,
+      rect.y + FIXED_HEADER_HEIGHT,
+      rect.width,
+      rect.height - FIXED_HEADER_HEIGHT
+    )
+    self._content_scroller._rect = content_rect
+    self._content_scroller.render(content_rect)
+
+  def _handle_mouse_release(self, pos):
+    """마우스 클릭 처리"""
+    x, y = pos
+
+    # 첫 번째 행 버튼 체크
+    if self._is_point_in_rect(x, y, self._manufacturer_rect):
+      self._on_select_manufacturer()
+      return True
+    elif self._is_point_in_rect(x, y, self._car_rect):
+      self._on_select_car()
+      return True
+    elif self._is_point_in_rect(x, y, self._branch_rect):
+      self._on_select_branch()
+      return True
+
+    # 두 번째 행 탭 버튼 체크
+    elif self._is_point_in_rect(x, y, self._toggle_rect):
+      self._switch_tab(0)
+      return True
+    elif self._is_point_in_rect(x, y, self._function_rect):
+      self._switch_tab(1)
+      return True
+    elif self._is_point_in_rect(x, y, self._log_rect):
+      self._switch_tab(2)
+      return True
+
+    return False
 
   def show_event(self):
-    self._scroller.show_event()
+    if self._content_scroller:
+      self._content_scroller.show_event()
 
   def _switch_tab(self, tab_index: int):
+    """Switch to a different tab"""
     if self._current_tab != tab_index:
       self._current_tab = tab_index
-      # 🌟 탭이 변경되면 버튼 상태를 새로고침하여 시각적 피드백(대괄호)을 업데이트
-      self._build_tab_buttons()
-      # 🌟 스크롤러 내용을 새 탭으로 업데이트
-      self._update_scroller()
-    else:
-      # 이미 선택된 탭을 눌러도 렌더링 꼬임 방지를 위해 업데이트
-      self._update_scroller()
+      self._update_content_scroller()
 
+  # === Function Callbacks ===
   def _on_git_pull(self):
     def confirm_callback(result: int):
       if result == DialogResult.CONFIRM:
@@ -527,7 +539,6 @@ class CommunityLayout(Widget):
     dlg = ConfirmDialog(tr("Clear DTC<br><br>Process?"), tr("Process"), rich=True)
     gui_app.set_modal_overlay(dlg, callback=confirm_callback)
 
-  # Log view/upload callbacks
   def _view_log(self, log_path: str):
     """View log file content"""
     if Path(log_path).exists():
@@ -594,7 +605,6 @@ class CommunityLayout(Widget):
 
   def _on_carparams_dump(self):
     """Upload carParams dump"""
-
     def confirm_callback(result: int):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/dump_upload.sh", "carParams")
@@ -604,7 +614,6 @@ class CommunityLayout(Widget):
 
   def _on_realdata_upload(self):
     """Upload realdata routes"""
-
     target_path = Path("/data/media/0/realdata")
 
     if not target_path.exists():
@@ -654,11 +663,11 @@ class CommunityLayout(Widget):
       formatted_date = dt_object.strftime('%Y-%m-%d %H:%M')
       options.append(f"[{formatted_date}] {route['route_name']} ({route['segment_count']} segments)")
 
-    dialog = SelectDialog(tr("Select Route to Upload"), options)
+    dialog = MultiOptionDialog(tr("Select Route to Upload"), options, current=options[0])
     gui_app.set_modal_overlay(dialog)
-    selected_index = dialog.result
 
-    if selected_index is not DialogResult.CANCEL:
+    if dialog._result is DialogResult.CONFIRM:
+      selected_index = options.index(dialog.selection) if dialog.selection in options else 0
       selected_route_info = recent_routes[selected_index]
       route_name = selected_route_info['route_name']
       segment_paths = selected_route_info['segment_paths']
