@@ -150,17 +150,32 @@ class GuiApplication:
     self._textures: dict[str, rl.Texture] = {}
     self._target_fps: int = _DEFAULT_FPS
     self._last_fps_log_time: float = time.monotonic()
+    self._frame = 0
     self._window_close_requested = False
     self._trace_log_callback = None
     self._modal_overlay = ModalOverlay()
+    self._modal_overlay_shown = False
 
     self._mouse = MouseState(self._scale)
     self._mouse_events: list[MouseEvent] = []
+    self._last_mouse_event: MouseEvent = MouseEvent(MousePos(0, 0), 0, False, False, False, 0.0)
 
     self._should_render = True
 
     # Debug variables
     self._mouse_history: deque[MousePos] = deque(maxlen=MOUSE_THREAD_RATE)
+    self._show_touches = SHOW_TOUCHES
+    self._show_fps = SHOW_FPS
+
+  @property
+  def frame(self):
+    return self._frame
+
+  def set_show_touches(self, show: bool):
+    self._show_touches = show
+
+  def set_show_fps(self, show: bool):
+    self._show_fps = show
 
   @property
   def target_fps(self):
@@ -318,6 +333,10 @@ class GuiApplication:
   def mouse_events(self) -> list[MouseEvent]:
     return self._mouse_events
 
+  @property
+  def last_mouse_event(self) -> MouseEvent:
+    return self._last_mouse_event
+
   def render(self):
     try:
       while not (self._window_close_requested or rl.window_should_close()):
@@ -327,6 +346,8 @@ class GuiApplication:
 
         # Store all mouse events for the current frame
         self._mouse_events = self._mouse.get_events()
+        if len(self._mouse_events) > 0:
+          self._last_mouse_event = self._mouse_events[-1]
 
         # Skip rendering when screen is off
         if not self._should_render:
@@ -350,6 +371,11 @@ class GuiApplication:
           else:
             raise Exception
 
+          # Send show event to Widget
+          if not self._modal_overlay_shown and hasattr(self._modal_overlay.overlay, 'show_event'):
+            self._modal_overlay.overlay.show_event()
+            self._modal_overlay_shown = True
+
           if result >= 0:
             # Clear the overlay and execute the callback
             original_modal = self._modal_overlay
@@ -358,6 +384,7 @@ class GuiApplication:
               original_modal.callback(result)
           yield False
         else:
+          self._modal_overlay_shown = False
           yield True
 
         if self._render_texture:
@@ -368,10 +395,10 @@ class GuiApplication:
           dst_rect = rl.Rectangle(0, 0, float(self._scaled_width), float(self._scaled_height))
           rl.draw_texture_pro(self._render_texture.texture, src_rect, dst_rect, rl.Vector2(0, 0), 0.0, rl.WHITE)
 
-        if SHOW_FPS:
+        if self._show_fps:
           rl.draw_fps(10, 10)
 
-        if SHOW_TOUCHES:
+        if self._show_touches:
           for mouse_event in self._mouse_events:
             if mouse_event.left_pressed:
               self._mouse_history.clear()
@@ -387,6 +414,7 @@ class GuiApplication:
 
         rl.end_drawing()
         self._monitor_fps()
+        self._frame += 1
     except KeyboardInterrupt:
       pass
 
