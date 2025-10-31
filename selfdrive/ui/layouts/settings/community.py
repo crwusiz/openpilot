@@ -102,7 +102,7 @@ class CommunityLayout(Widget):
     manufacturers = ["[ Not Selected ]", "HYUNDAI", "KIA", "GENESIS"]
     current_selection = self._params.get("SelectedManufacturer")
 
-    dialog = MultiOptionDialog(tr("Select your Manufacturer"), manufacturers,
+    dialog = MultiOptionDialog(tr("Manufacturer"), manufacturers,
                                current=(current_selection if current_selection else manufacturers[0]))
     gui_app.set_modal_overlay(dialog)
     dialog_result = dialog._result
@@ -133,7 +133,7 @@ class CommunityLayout(Widget):
     cars = ["[ Not Selected ]"] + get_list("/data/params/crwusiz/CarList")
     current_selection = self._params.get("SelectedCar")
 
-    dialog = MultiOptionDialog(tr("Select your car"), cars,
+    dialog = MultiOptionDialog(tr("Car"), cars,
                                current=(current_selection if current_selection else cars[0]))
     gui_app.set_modal_overlay(dialog)
     dialog_result = dialog._result
@@ -153,7 +153,7 @@ class CommunityLayout(Widget):
     branches = ["[ Not Selected ]"] + get_list("/data/params/crwusiz/GitBranchList")
     current_selection = self._params.get("SelectedBranch")
 
-    dialog = MultiOptionDialog(tr("Select Branch"), branches,
+    dialog = MultiOptionDialog(tr("Branch"), branches,
                                current=(current_selection if current_selection else branches[0]))
     gui_app.set_modal_overlay(dialog)
     dialog_result = dialog._result
