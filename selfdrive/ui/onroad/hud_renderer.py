@@ -5,6 +5,9 @@ from datetime import datetime
 from openpilot.common.constants import CV
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.onroad.exp_button import ExpButton
+from openpilot.selfdrive.ui.onroad.icon_button import (
+  IconButton, RotatableIconButton, ToggleIconButton, IconGroup
+)
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.multilang import tr
@@ -29,7 +32,6 @@ class UIConfig:
   set_speed_height: int = 204
   wheel_icon_size: int = 144
   icon_size: int = 144
-  small_icon_size: int = 77
 
 
 @dataclass(frozen=True)
@@ -138,22 +140,57 @@ class HudRenderer(Widget):
 
     self._exp_button: ExpButton = ExpButton(UI_CONFIG.button_size, UI_CONFIG.wheel_icon_size)
 
-    # Load icons
-    self._load_icons()
+    # Initialize icon buttons
+    self._init_icon_buttons()
 
-  def _load_icons(self) -> None:
-    """Load all icon textures."""
+    # Load static icons (non-interactive)
+    self._load_static_icons()
+
+  def _init_icon_buttons(self) -> None:
+    """Initialize interactive icon buttons."""
     icon_size = UI_CONFIG.icon_size
-    small_icon_size = UI_CONFIG.small_icon_size
+    bg_color = COLORS.black_translucent
 
-    # Main icons
-    self.steer_img = gui_app.texture("icons/steer.png", icon_size, icon_size)
-    self.gaspress_img = gui_app.texture("icons/disengage_on_accelerator.png", icon_size, icon_size)
-    self.brake_img = gui_app.texture("icons/brake_disc.png", icon_size, icon_size)
+    # Upper right icon group
+    self.upper_icons = IconGroup()
 
-    # GPS and connectivity
-    self.gps_img = gui_app.texture("icons/gps.png", icon_size, icon_size)
-    self.direction_img = gui_app.texture("icons/direction.png", icon_size, icon_size)
+    # Direction button (rotatable)
+    self.direction_btn = RotatableIconButton("icons/direction.png", icon_size, bg_color)
+    self.upper_icons.add_button(self.direction_btn)
+
+    # GPS button
+    self.gps_btn = IconButton("icons/gps.png", icon_size, bg_color)
+    self.upper_icons.add_button(self.gps_btn)
+
+    # WiFi button (will change texture based on state)
+    self.wifi_btn = IconButton("icons/wifi_strength_full.png", icon_size, bg_color)
+    self.upper_icons.add_button(self.wifi_btn)
+
+    # Bottom icon group
+    self.bottom_icons = IconGroup()
+
+    # Steering wheel button (rotatable)
+    self.steer_btn = RotatableIconButton("icons/steer.png", icon_size, bg_color)
+    self.bottom_icons.add_button(self.steer_btn)
+
+    # LKA toggle button
+    self.lka_btn = ToggleIconButton("icons/lka_on.png", "icons/lka_off.png", icon_size, bg_color)
+    self.bottom_icons.add_button(self.lka_btn)
+
+    # Gas press button
+    self.gas_btn = IconButton("icons/disengage_on_accelerator.png", icon_size, bg_color)
+    self.bottom_icons.add_button(self.gas_btn)
+
+    # Brake/Autohold button
+    self.brake_btn = IconButton("icons/brake_disc.png", icon_size, bg_color)
+    self.autohold_warning_btn = IconButton("icons/autohold_warning.png", icon_size, bg_color)
+    self.autohold_active_btn = IconButton("icons/autohold_active.png", icon_size, bg_color)
+
+  def _load_static_icons(self) -> None:
+    """Load non-interactive icon textures."""
+    icon_size = UI_CONFIG.icon_size
+
+    # WiFi textures for state switching
     self.wifi_l_img = gui_app.texture("icons/wifi_strength_low.png", icon_size, icon_size)
     self.wifi_m_img = gui_app.texture("icons/wifi_strength_medium.png", icon_size, icon_size)
     self.wifi_h_img = gui_app.texture("icons/wifi_strength_high.png", icon_size, icon_size)
@@ -164,23 +201,15 @@ class HudRenderer(Widget):
     self.turnsignal_r_img = gui_app.texture("icons/turnsignal_r.png", icon_size, icon_size)
 
     # Traffic lights
-    self.traffic_off_img = gui_app.texture("icons/traffic_off.png", small_icon_size, small_icon_size * 2)
-    self.traffic_green_img = gui_app.texture("icons/traffic_green.png", small_icon_size, small_icon_size * 2)
-    self.traffic_red_img = gui_app.texture("icons/traffic_red.png", small_icon_size, small_icon_size * 2)
-
-    # LKA
-    self.lka_on_img = gui_app.texture("icons/lka_on.png", icon_size, icon_size)
-    self.lka_off_img = gui_app.texture("icons/lka_off.png", icon_size, icon_size)
+    self.traffic_off_img = gui_app.texture("icons/traffic_off.png", 77, 154)
+    self.traffic_green_img = gui_app.texture("icons/traffic_green.png", 77, 154)
+    self.traffic_red_img = gui_app.texture("icons/traffic_red.png", 77, 154)
 
     # Distance settings
     self.dist1_img = gui_app.texture("icons/dist1.png", 100, 250)
     self.dist2_img = gui_app.texture("icons/dist2.png", 100, 250)
     self.dist3_img = gui_app.texture("icons/dist3.png", 100, 250)
     self.dist4_img = gui_app.texture("icons/dist4.png", 100, 250)
-
-    # Autohold
-    self.autohold_warning_img = gui_app.texture("icons/autohold_warning.png", icon_size, icon_size)
-    self.autohold_active_img = gui_app.texture("icons/autohold_active.png", icon_size, icon_size)
 
     # Road signs
     self.speed_bump_img = gui_app.texture("icons/speed_bump.png", 150, 150)
@@ -295,6 +324,44 @@ class HudRenderer(Widget):
       alert_size = selfdriveState.alertSize if hasattr(selfdriveState, 'alertSize') else 0
       self.hide_bottom_icons = alert_size != 0
 
+    # Update icon button states
+    self._update_icon_button_states()
+
+  def _update_icon_button_states(self) -> None:
+    """Update states of all icon buttons."""
+    # Upper icons
+    self.direction_btn.set_rotation(self.gps_bearing)
+    self.direction_btn.set_opacity(0.8 if self.gps_satellite_count > 0 else 0.2)
+
+    self.gps_btn.set_opacity(0.8 if self.gps_satellite_count > 0 else 0.2)
+
+    # WiFi button - update texture based on state
+    self.wifi_btn._texture = self._get_wifi_texture()
+    self.wifi_btn.set_opacity(0.8 if self.wifi_state > 0 else 0.2)
+
+    # Bottom icons
+    self.steer_btn.set_rotation(self.steer_angle)
+    self.steer_btn.set_opacity(0.8)
+
+    self.lka_btn.set_active(self.lat_active)
+    self.lka_btn.set_opacity(0.8 if self.lka_state else 0.2)
+
+    self.gas_btn.set_opacity(0.8 if self.gas_press else 0.2)
+
+    self.brake_btn.set_opacity(0.8 if self.brake_press else 0.2)
+    self.autohold_warning_btn.set_opacity(0.8)
+    self.autohold_active_btn.set_opacity(0.8)
+
+  def _get_wifi_texture(self) -> rl.Texture:
+    """Get WiFi texture based on signal strength."""
+    if self.wifi_state == 1:
+      return self.wifi_l_img
+    elif self.wifi_state == 2:
+      return self.wifi_m_img
+    elif self.wifi_state == 3:
+      return self.wifi_h_img
+    return self.wifi_f_img
+
   def _render(self, rect: rl.Rectangle) -> None:
     """Render HUD elements to the screen."""
     # Draw the header background
@@ -313,12 +380,12 @@ class HudRenderer(Widget):
     self._draw_current_speed(rect)
     self._draw_upper_left_info(rect)
     self._draw_upper_right_info(rect)
-    self._draw_upper_icons(rect)
+    self._draw_upper_icons_new(rect)
     self._draw_road_signs(rect)
 
     if not self.hide_bottom_icons:
       self._draw_bottom_info(rect)
-      self._draw_bottom_icons(rect)
+      self._draw_bottom_icons_new(rect)
 
     self._draw_blinkers(rect)
 
@@ -327,7 +394,101 @@ class HudRenderer(Widget):
     self._exp_button.render(rl.Rectangle(button_x, button_y, UI_CONFIG.button_size, UI_CONFIG.button_size))
 
   def user_interacting(self) -> bool:
-    return self._exp_button.is_pressed
+    return self._exp_button.is_pressed or self.upper_icons.is_any_pressed() or self.bottom_icons.is_any_pressed()
+
+  def _draw_upper_icons_new(self, rect: rl.Rectangle) -> None:
+    """Draw upper right icons using IconButton system."""
+    icon_size = UI_CONFIG.icon_size
+    start_x = rect.x + rect.width - (icon_size / 2) - (UI_CONFIG.border_size * 2) - (icon_size * 3.5)
+    y = rect.y + (icon_size / 2) + (UI_CONFIG.border_size * 2)
+
+    self.upper_icons.render_horizontal(start_x, y, 10, from_right=False)
+
+  def _draw_bottom_icons_new(self, rect: rl.Rectangle) -> None:
+    """Draw bottom icons using IconButton system."""
+    icon_size = UI_CONFIG.icon_size
+    y = rect.y + rect.height - (UI_CONFIG.border_size * 3) - icon_size / 2
+
+    # Left side icons (steering, LKA)
+    start_x = rect.x + (icon_size / 2) + (UI_CONFIG.border_size * 1.5) + icon_size
+
+    # Render steering button
+    self.steer_btn.set_rect(rl.Rectangle(
+      start_x - icon_size / 2,
+      y - icon_size / 2,
+      icon_size,
+      icon_size
+    ))
+    self.steer_btn.render(self.steer_btn._rect)
+
+    # Draw steering angle text
+    sa_color = self._get_color_for_angle(self.steer_angle)
+    sat_color = self._get_color_for_angle(self.steer_angle_target)
+    sa_str = f"R {abs(self.steer_angle):.1f} °"
+    sat_str = f"T {abs(self.steer_angle_target):.1f} °"
+    self._draw_text(start_x, y + icon_size / 2 + 20, sa_str, FONT_SIZES.info_text, sa_color, "C")
+    self._draw_text(start_x, y + icon_size / 2 + 50, sat_str, FONT_SIZES.info_text, sat_color, "C")
+
+    # LKA button
+    lka_x = start_x + icon_size
+    self.lka_btn.set_rect(rl.Rectangle(
+      lka_x - icon_size / 2,
+      y - icon_size / 2,
+      icon_size,
+      icon_size
+    ))
+    self.lka_btn.render(self.lka_btn._rect)
+
+    # Right side icons (gas, brake/autohold)
+    gas_x = rect.x + rect.width - (icon_size / 2) - (UI_CONFIG.border_size * 2) - (icon_size * 2)
+
+    self.gas_btn.set_rect(rl.Rectangle(
+      gas_x - icon_size / 2,
+      y - icon_size / 2,
+      icon_size,
+      icon_size
+    ))
+    self.gas_btn.render(self.gas_btn._rect)
+
+    # Brake/Autohold
+    brake_x = rect.x + rect.width - (icon_size / 2) - (UI_CONFIG.border_size * 2) - (icon_size * 1)
+
+    if self.autohold_state >= 1:
+      autohold_btn = self.autohold_warning_btn if self.autohold_state > 1 else self.autohold_active_btn
+      autohold_btn.set_rect(rl.Rectangle(
+        brake_x - icon_size / 2,
+        y - icon_size / 2,
+        icon_size,
+        icon_size
+      ))
+      autohold_btn.render(autohold_btn._rect)
+    else:
+      self.brake_btn.set_rect(rl.Rectangle(
+        brake_x - icon_size / 2,
+        y - icon_size / 2,
+        icon_size,
+        icon_size
+      ))
+      self.brake_btn.render(self.brake_btn._rect)
+
+    # Distance setting (static, not a button)
+    self._draw_distance_setting(rect)
+
+  def _draw_distance_setting(self, rect: rl.Rectangle) -> None:
+    """Draw distance setting indicator."""
+    personality = self.params.get("LongitudinalPersonality") or "1"
+    dist_imgs = [self.dist1_img, self.dist2_img, self.dist3_img, self.dist4_img]
+    dist_idx = min(int(personality), 3)
+
+    x = rect.x + rect.width - (UI_CONFIG.border_size * 2) - 100 * 1.3
+    y = rect.y + rect.height - (UI_CONFIG.border_size * 2) - 250 * 1.8
+
+    rl.draw_texture_pro(
+      dist_imgs[dist_idx],
+      rl.Rectangle(0, 0, 100, 250),
+      rl.Rectangle(x, y, 100, 250),
+      rl.Vector2(0, 0), 0, rl.Color(255, 255, 255, 204)
+    )
 
   def _draw_set_speed(self, rect: rl.Rectangle) -> None:
     """Draw the MAX speed indicator box."""
@@ -529,34 +690,6 @@ class HudRenderer(Widget):
     text_width = measure_text_cached(self._font_medium, gps_text, FONT_SIZES.info_text).x
     self._draw_text(x - text_width, y + 10, gps_text, FONT_SIZES.info_text, COLORS.white_translucent)
 
-  def _draw_upper_icons(self, rect: rl.Rectangle) -> None:
-    """Draw upper right icons (direction, GPS, WiFi)."""
-    icon_size = UI_CONFIG.icon_size
-    icon_bg = COLORS.black_translucent
-
-    # Direction icon
-    x = rect.x + rect.width - (icon_size / 2) - (UI_CONFIG.border_size * 2) - (icon_size * 3)
-    y = rect.y + (icon_size / 2) + (UI_CONFIG.border_size * 2)
-    opacity = 0.8 if self.gps_satellite_count > 0 else 0.2
-    self._draw_icon_rotated(x, y, self.direction_img, icon_bg, opacity, self.gps_bearing)
-
-    # GPS icon
-    x = rect.x + rect.width - (icon_size / 2) - (UI_CONFIG.border_size * 2) - (icon_size * 2)
-    self._draw_icon(x, y, self.gps_img, icon_bg, opacity)
-
-    # WiFi icon
-    wifi_img = self.wifi_f_img
-    if self.wifi_state == 1:
-      wifi_img = self.wifi_l_img
-    elif self.wifi_state == 2:
-      wifi_img = self.wifi_m_img
-    elif self.wifi_state == 3:
-      wifi_img = self.wifi_h_img
-
-    x = rect.x + rect.width - (icon_size / 2) - (UI_CONFIG.border_size * 2) - (icon_size * 1)
-    wifi_opacity = 0.8 if self.wifi_state > 0 else 0.2
-    self._draw_icon(x, y, wifi_img, icon_bg, wifi_opacity)
-
   def _draw_road_signs(self, rect: rl.Rectangle) -> None:
     """Draw road signs (traffic light, school zone, speed camera)."""
     # Traffic light
@@ -627,61 +760,6 @@ class HudRenderer(Widget):
     if self.fl > 0 or self.fr > 0 or self.rl > 0 or self.rr > 0:
       self._draw_tpms(rect)
 
-  def _draw_bottom_icons(self, rect: rl.Rectangle) -> None:
-    """Draw bottom icons (steering, LKA, gas, brake, distance, TPMS)."""
-    icon_size = UI_CONFIG.icon_size
-    icon_bg = COLORS.black_translucent
-    y = rect.y + rect.height - (UI_CONFIG.border_size * 3) - icon_size / 2
-
-    # Steering angle icon with gradient
-    x = rect.x + (icon_size / 2) + (UI_CONFIG.border_size * 1.5) + icon_size
-    steer_opacity = 0.8
-    self._draw_icon_rotated(x, y, self.steer_img, icon_bg, steer_opacity, self.steer_angle)
-
-    # Steering angle text
-    sa_color = self._get_color_for_angle(self.steer_angle)
-    sat_color = self._get_color_for_angle(self.steer_angle_target)
-    sa_str = f"R {abs(self.steer_angle):.1f} °"
-    sat_str = f"T {abs(self.steer_angle_target):.1f} °"
-
-    self._draw_text(x, y + icon_size / 2 + 20, sa_str, FONT_SIZES.info_text, sa_color, "C")
-    self._draw_text(x, y + icon_size / 2 + 50, sat_str, FONT_SIZES.info_text, sat_color, "C")
-
-    # LKA icon
-    x = rect.x + (icon_size / 2) + (UI_CONFIG.border_size * 1.5) + (icon_size * 2)
-    lka_img = self.lka_on_img if self.lat_active else self.lka_off_img
-    lka_opacity = 0.8 if self.lka_state else 0.2
-    self._draw_icon(x, y, lka_img, icon_bg, lka_opacity)
-
-    # Gas press icon
-    x = rect.x + rect.width - (icon_size / 2) - (UI_CONFIG.border_size * 2) - (icon_size * 2)
-    gas_opacity = 0.8 if self.gas_press else 0.2
-    self._draw_icon(x, y, self.gaspress_img, icon_bg, gas_opacity)
-
-    # Brake/Autohold icon
-    x = rect.x + rect.width - (icon_size / 2) - (UI_CONFIG.border_size * 2) - (icon_size * 1)
-    if self.autohold_state >= 1:
-      autohold_img = self.autohold_warning_img if self.autohold_state > 1 else self.autohold_active_img
-      self._draw_icon(x, y, autohold_img, icon_bg, 0.8)
-    else:
-      brake_opacity = 0.8 if self.brake_press else 0.2
-      self._draw_icon(x, y, self.brake_img, icon_bg, brake_opacity)
-
-    # Distance setting
-    personality = self.params.get("LongitudinalPersonality") or "1"
-    dist_imgs = [self.dist1_img, self.dist2_img, self.dist3_img, self.dist4_img]
-    dist_idx = min(int(personality), 3)
-
-    x = rect.x + rect.width - (UI_CONFIG.border_size * 2) - 100 * 1.3
-    y = rect.y + rect.height - (UI_CONFIG.border_size * 2) - 250 * 1.8
-
-    rl.draw_texture_pro(
-      dist_imgs[dist_idx],
-      rl.Rectangle(0, 0, 100, 250),
-      rl.Rectangle(x, y, 100, 250),
-      rl.Vector2(0, 0), 0, rl.Color(255, 255, 255, 204)
-    )
-
   def _draw_tpms(self, rect: rl.Rectangle) -> None:
     """Draw TPMS pressure display."""
     x = rect.x + rect.width - 180
@@ -716,40 +794,6 @@ class HudRenderer(Widget):
     self._draw_text(x + 25, y + 171, get_tpms_text(self.rl), FONT_SIZES.info_text, get_tpms_color(self.rl), "C")
     # RR
     self._draw_text(x + 133, y + 171, get_tpms_text(self.rr), FONT_SIZES.info_text, get_tpms_color(self.rr), "C")
-
-  def _draw_icon(self, x: float, y: float, texture: rl.Texture, bg_color: rl.Color,
-                 opacity: float = 1.0) -> None:
-    """Draw an icon with background circle."""
-    icon_size = UI_CONFIG.icon_size
-
-    # Draw background circle
-    rl.draw_circle(int(x), int(y), icon_size / 2, bg_color)
-
-    # Draw icon with opacity
-    color = rl.Color(255, 255, 255, int(opacity * 255))
-    rl.draw_texture_pro(
-      texture,
-      rl.Rectangle(0, 0, texture.width, texture.height),
-      rl.Rectangle(x - icon_size / 2, y - icon_size / 2, icon_size, icon_size),
-      rl.Vector2(0, 0), 0, color
-    )
-
-  def _draw_icon_rotated(self, x: float, y: float, texture: rl.Texture,
-                         bg_color: rl.Color, opacity: float, rotation: float) -> None:
-    """Draw a rotated icon with background circle."""
-    icon_size = UI_CONFIG.icon_size
-
-    # Draw background circle
-    rl.draw_circle(int(x), int(y), icon_size / 2, bg_color)
-
-    # Draw rotated icon with opacity
-    color = rl.Color(255, 255, 255, int(opacity * 255))
-    rl.draw_texture_pro(
-      texture,
-      rl.Rectangle(0, 0, texture.width, texture.height),
-      rl.Rectangle(x, y, icon_size, icon_size),
-      rl.Vector2(icon_size / 2, icon_size / 2), rotation, color
-    )
 
   def _get_color_for_angle(self, angle: float) -> rl.Color:
     """Get color based on steering angle magnitude."""
@@ -808,15 +852,7 @@ class HudRenderer(Widget):
           rl.Rectangle(0, 0, blinker_img.width, blinker_img.height),
           rl.Rectangle(x_pos, y, blinker_width, blinker_height),
           rl.Vector2(0, 0), 0, color
-        ) #Draw arrow triangle
-        arrow_color = rl.Color(255, 200, 0, int(alpha * 255))
-        self._draw_arrow(x + int(i * blinker_width * 0.6 * direction),
-                        int(y + blinker_height / 2),
-                        direction > 0, arrow_color)
-
-  def _draw_arrow(self, x: int, y: int, pointing_right: bool, color: rl.Color) -> None:
-    """Draw a directional arrow for blinker (deprecated - using images instead)."""
-    pass
+        )
 
   def _draw_text(self, x: float, y: float, text: str, font_size: int,
                  color: rl.Color, alignment: str = "L") -> None:

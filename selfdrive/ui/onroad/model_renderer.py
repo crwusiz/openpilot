@@ -114,7 +114,7 @@ class ModelRenderer(Widget):
     car_state = sm['carState']
     if sm.valid['carState']:
       v_ego = car_state.vEgoCluster if car_state.vEgoCluster != 0.0 else car_state.vEgo
-      self._speed = max(0.0, v_ego * (3.6 if ui_state.scene.is_metric else 2.23694))
+      self._speed = max(0.0, v_ego * (3.6 if ui_state.is_metric else 2.23694))
       self._left_blindspot = car_state.leftBlindspot
       self._right_blindspot = car_state.rightBlindspot
 
@@ -222,11 +222,11 @@ class ModelRenderer(Widget):
 
   def _update_experimental_gradient(self):
     """Pre-calculate experimental mode gradient colors"""
-    if not self._experimental_mode or not ui_state.scene.engaged:
+    if not self._experimental_mode or not ui_state.enabled:
       return
 
     # Check if user is steering
-    if ui_state.scene.steering_pressed:
+    if ui_state.steering_pressed:
       # Use steering pressed color (cyan/deep sky blue)
       steering_color = rl.Color(0, 191, 255, 100)
       mid_color = rl.Color(0, 191, 255, 50)
@@ -335,8 +335,8 @@ class ModelRenderer(Widget):
     if not self._path.projected_points.size:
       return
 
-    if ui_state.scene.engaged:
-      if ui_state.scene.steering_pressed or self._experimental_mode:
+    if ui_state.enabled:
+      if ui_state.steering_pressed or self._experimental_mode:
         # Draw with acceleration coloring or steering pressed color
         if len(self._exp_gradient.colors) > 1:
           draw_polygon(self._rect, self._path.projected_points, gradient=self._exp_gradient)
@@ -403,7 +403,7 @@ class ModelRenderer(Widget):
         if v_rel < 0:
           v_color = rl.RED if v_rel < -4.4704 else rl.Color(255, 149, 0, 255)
 
-        if ui_state.scene.is_metric:
+        if ui_state.is_metric:
           l_speed = f"{self._speed + v_rel * 3.6:.0f} km/h"
         else:
           l_speed = f"{self._speed + v_rel * 2.236936:.0f} mph"

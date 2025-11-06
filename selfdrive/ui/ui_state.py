@@ -11,9 +11,11 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.ui.lib.prime_state import PrimeState
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.hardware import HARDWARE
+from opendbc.car import structs
 
 BACKLIGHT_OFFROAD = 50
 
+GearShifter = structs.CarState.GearShifter
 
 class UIStatus(Enum):
   DISENGAGED = "disengaged"
@@ -85,6 +87,8 @@ class UIState:
 
     #add
     self.satelliteCount: int = 0
+    self.enabled: bool = False
+    self.steeringPressed: bool = False
 
     # Callbacks
     self._offroad_transition_callbacks: list[Callable[[], None]] = []
@@ -157,12 +161,41 @@ class UIState:
   def _update_status(self) -> None:
     if self.started and self.sm.updated["selfdriveState"]:
       ss = self.sm["selfdriveState"]
+      ce = self.sm["carState"]
+      cc = self.sm["carControl"]
       state = ss.state
+      self.enabled = ss.enabled
+      self.steeringPressed = ce.steeringPressed
 
-      if state in (log.SelfdriveState.OpenpilotState.preEnabled, log.SelfdriveState.OpenpilotState.overriding):
+      if state in (log.SelfdriveState.OpenpilotState.preEnabled, log.SelfdriveState.OpenpilotState.overriding) and not self.steeringPressed:
         self.status = UIStatus.OVERRIDE
+      elif ss.enabled and not cc.latActive:
+        if self.steeringPressed:
+          self.status = UIStatus.STEERING
+        elif ce.brakePressed:
+          self.status = UIStatus.RED
+        elif ce.leftBlinker or ce.rightBlinker:
+          self.status = UIStatus.BLINKER
+        else:
+          self.status = UIStatus.ENGAGED
+      elif ss.enabled and cc.latActive:
+        if self.steeringPressed:
+          self.status = UIStatus.STEERING
+        elif ce.brakePressed:
+          self.status = UIStatus.RED
+        elif ce.leftBlinker or ce.rightBlinker:
+          self.status = UIStatus.BLINKER
+        else:
+          self.status = UIStatus.ACTIVE
+      elif ce.gearShifter == GearShifter.reverse:
+        self.status = UIStatus.RED
+      elif ce.cruiseState.available:
+        self.status = UIStatus.READY
       else:
-        self.status = UIStatus.ENGAGED if ss.enabled else UIStatus.DISENGAGED
+        self.status = UIStatus.DISENGAGED
+
+      #else:
+      #  self.status = UIStatus.ENGAGED if ss.enabled else UIStatus.DISENGAGED
 
     # Check for engagement state changes
     if self.engaged != self._engaged_prev:
