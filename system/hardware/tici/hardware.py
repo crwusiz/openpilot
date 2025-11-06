@@ -425,6 +425,8 @@ class Tici(HardwareBase):
 
     # *** GPU config ***
     # https://github.com/commaai/agnos-kernel-sdm845/blob/master/arch/arm64/boot/dts/qcom/sdm845-gpu.dtsi#L216
+    affine_irq(5, "fts_ts")    # touch
+    affine_irq(5, "msm_drm")   # display
     sudo_write("1", "/sys/class/kgsl/kgsl-3d0/min_pwrlevel")
     sudo_write("1", "/sys/class/kgsl/kgsl-3d0/max_pwrlevel")
     sudo_write("1", "/sys/class/kgsl/kgsl-3d0/force_bus_on")
