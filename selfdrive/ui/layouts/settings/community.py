@@ -18,7 +18,6 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
 
-# Description constants
 DESCRIPTIONS = {
   'pcm_cruise': tr_noop(
     "Change the openpilot cruise engagement. use the PcmCruise method"
@@ -52,15 +51,12 @@ DESCRIPTIONS = {
   ),
 }
 
-# 고정 헤더 높이 상수
 HEADER_ROW_HEIGHT = 120
 FIXED_HEADER_HEIGHT = HEADER_ROW_HEIGHT * 2
 FONT_SIZE = 40
 BUTTON_PADDING = 20
 
-
 def get_list(path: str) -> List[str]:
-  """Read lines from file and return as list"""
   try:
     with open(path, 'r', encoding='utf-8') as f:
       return [line.strip() for line in f if line.strip()]
@@ -69,7 +65,6 @@ def get_list(path: str) -> List[str]:
 
 
 def execute_script(script_path: str, *args) -> int:
-  """Execute shell script and return exit code"""
   try:
     cmd = [script_path] + list(args)
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
@@ -86,7 +81,6 @@ class CommunityLayout(Widget):
 
     self._current_tab = 0
 
-    # Content Items
     self._toggle_items = []
     self._function_items = []
     self._log_items = []
@@ -170,8 +164,6 @@ class CommunityLayout(Widget):
         subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
 
   def _draw_button(self, rect, text, is_selected=False, is_header=False):
-    """커스텀 버튼 그리기"""
-    # 배경 (헤더는 파란색, 선택된 탭은 어두운 회색)
     if is_header:
       rl.draw_rectangle_rec(rect, rl.Color(44, 44, 226, 255))  # #2C2CE2
     elif is_selected:
@@ -179,10 +171,8 @@ class CommunityLayout(Widget):
     else:
       rl.draw_rectangle_rec(rect, rl.Color(40, 40, 40, 255))
 
-    # 테두리
     rl.draw_rectangle_lines_ex(rect, 1, rl.Color(80, 80, 80, 255))
 
-    # 텍스트 중앙 정렬
     text_width = rl.measure_text(text, FONT_SIZE)
     text_x = rect.x + (rect.width - text_width) / 2
     text_y = rect.y + (rect.height - FONT_SIZE) / 2
@@ -190,12 +180,10 @@ class CommunityLayout(Widget):
     rl.draw_text(text, int(text_x), int(text_y), FONT_SIZE, rl.WHITE)
 
   def _is_point_in_rect(self, x, y, rect):
-    """점이 사각형 안에 있는지 확인"""
     return (rect.x <= x <= rect.x + rect.width and
             rect.y <= y <= rect.y + rect.height)
 
   def _build_toggle_items(self):
-    """Build main toggle items"""
     is_c3xl = self._params.get_bool("HardwareC3xLite")
 
     self._toggle_items = [
@@ -269,97 +257,94 @@ class CommunityLayout(Widget):
     ])
 
   def _build_function_items(self):
-    """Build function button items"""
     self._function_items = [
       button_item(
-        title=lambda: tr("Git"),
-        button_text=lambda: tr("Git Pull"),
+        title=lambda: tr("Git Fetch & Reset"),
+        button_text=lambda: tr("Run"),
         callback=self._on_git_pull,
       ),
       button_item(
-        title=lambda: tr("Git"),
-        button_text=lambda: tr("Git Checkout"),
+        title=lambda: tr("Git Checkout"),
+        button_text=lambda: tr("Run"),
         callback=self._on_git_checkout,
       ),
       button_item(
-        title=lambda: tr("Git"),
-        button_text=lambda: tr("Git Reset -1"),
+        title=lambda: tr("Git Reset -1"),
+        button_text=lambda: tr("Run"),
         callback=self._on_git_reset,
       ),
       button_item(
-        title=lambda: tr("Build"),
-        button_text=lambda: tr("Scons Rebuild"),
+        title=lambda: tr("Scons Build"),
+        button_text=lambda: tr("Run"),
         callback=self._on_scons_rebuild,
       ),
       button_item(
-        title=lambda: tr("Panda"),
-        button_text=lambda: tr("Panda Flash"),
+        title=lambda: tr("Panda Flash"),
+        button_text=lambda: tr("Run"),
         callback=self._on_panda_flash,
       ),
       button_item(
-        title=lambda: tr("Panda"),
-        button_text=lambda: tr("Panda Recover"),
+        title=lambda: tr("Panda Recover"),
+        button_text=lambda: tr("Run"),
         callback=self._on_panda_recover,
       ),
       button_item(
-        title=lambda: tr("Camera"),
-        button_text=lambda: tr("Camera View"),
+        title=lambda: tr("Camera View"),
+        button_text=lambda: tr("Run"),
         callback=self._on_camera_view,
       ),
       button_item(
-        title=lambda: tr("DTC"),
-        button_text=lambda: tr("Clear DTC"),
+        title=lambda: tr("Clear DTC"),
+        button_text=lambda: tr("Run"),
         callback=self._on_clear_dtc,
       ),
     ]
 
   def _build_log_items(self):
-    """Build log view and upload button items"""
     self._log_items = [
       button_item(
-        title=lambda: tr("CAN Log"),
-        button_text=lambda: tr("can missing log View"),
+        title=lambda: tr("CAN missing Log"),
+        button_text=lambda: tr("View"),
         callback=lambda: self._view_log("/data/can_missing.log"),
       ),
       button_item(
-        title=lambda: tr("CAN Log"),
-        button_text=lambda: tr("can timeout log View"),
+        title=lambda: tr("CAN timeout Log"),
+        button_text=lambda: tr("View"),
         callback=lambda: self._view_log("/data/can_timeout.log"),
       ),
       button_item(
-        title=lambda: tr("Tmux"),
-        button_text=lambda: tr("tmux log View"),
+        title=lambda: tr("Tmux log"),
+        button_text=lambda: tr("View"),
         callback=lambda: self._view_log("/data/tmux_error.log"),
       ),
       button_item(
-        title=lambda: tr("Upload"),
-        button_text=lambda: tr("tmux log Upload"),
+        title=lambda: tr("Tmux log"),
+        button_text=lambda: tr("Upload"),
         callback=lambda: self._upload_log("/data/tmux_error.log", "tmux_error.log"),
       ),
       button_item(
         title=lambda: tr("Tmux Console"),
-        button_text=lambda: tr("tmux console View"),
+        button_text=lambda: tr("View"),
         callback=self._on_tmux_console_view,
       ),
       button_item(
-        title=lambda: tr("Upload"),
-        button_text=lambda: tr("tmux console Upload"),
+        title=lambda: tr("Tmux Console"),
+        button_text=lambda: tr("Upload"),
         callback=self._on_tmux_console_upload,
       ),
       button_item(
-        title=lambda: tr("Upload"),
-        button_text=lambda: tr("carParams dump Upload"),
+        title=lambda: tr("CarParams dump"),
+        button_text=lambda: tr("Upload"),
         callback=self._on_carparams_dump,
       ),
       button_item(
-        title=lambda: tr("Upload"),
-        button_text=lambda: tr("Realdata Routes Upload"),
+        title=lambda: tr("Realdata Route"),
+        button_text=lambda: tr("Upload"),
         callback=self._on_realdata_upload,
       ),
     ]
 
   def _update_content_scroller(self):
-    """Update content scroller with current tab's items"""
     items = []
 
     if self._current_tab == 0:
@@ -372,63 +357,51 @@ class CommunityLayout(Widget):
     self._content_scroller = Scroller(items, line_separator=True, spacing=0)
 
   def _render(self, rect):
-    """Render fixed headers (가로 그리드) and scrollable content"""
     self._rect = rect
 
     col_width = rect.width / 3
 
-    # === 첫 번째 행: Manufacturer | Car | Branch ===
-    # Manufacturer
     self._manufacturer_rect = rl.Rectangle(rect.x, rect.y, col_width, HEADER_ROW_HEIGHT)
     manufacturer_text = self._params.get("SelectedManufacturer")
     if not manufacturer_text:
-      manufacturer_text = tr("Select your Manufacturer")
+      manufacturer_text = tr("Manufacturer")
     self._draw_button(self._manufacturer_rect, manufacturer_text, is_header=True)
 
-    # Car
     self._car_rect = rl.Rectangle(rect.x + col_width, rect.y, col_width, HEADER_ROW_HEIGHT)
     car_text = self._params.get("SelectedCar")
     if not car_text:
-      car_text = tr("Select your car")
+      car_text = tr("Car")
     self._draw_button(self._car_rect, car_text, is_header=True)
 
-    # Branch
     self._branch_rect = rl.Rectangle(rect.x + col_width * 2, rect.y, col_width, HEADER_ROW_HEIGHT)
     branch_text = self._params.get("SelectedBranch")
     if not branch_text:
-      branch_text = tr("Select Branch")
+      branch_text = tr("Branch")
     self._draw_button(self._branch_rect, branch_text, is_header=True)
 
-    # 구분선
     rl.draw_line(
       int(rect.x + 40), int(rect.y + HEADER_ROW_HEIGHT),
       int(rect.x + rect.width - 80), int(rect.y + HEADER_ROW_HEIGHT),
       rl.GRAY
     )
 
-    # === 두 번째 행: Toggle | Function | Log ===
     tab_y = rect.y + HEADER_ROW_HEIGHT
 
-    # Toggle
     self._toggle_rect = rl.Rectangle(rect.x, tab_y, col_width, HEADER_ROW_HEIGHT)
     self._draw_button(self._toggle_rect, tr("Toggle"), self._current_tab == 0)
 
-    # Function
     self._function_rect = rl.Rectangle(rect.x + col_width, tab_y, col_width, HEADER_ROW_HEIGHT)
     self._draw_button(self._function_rect, tr("Function"), self._current_tab == 1)
 
-    # Log
     self._log_rect = rl.Rectangle(rect.x + col_width * 2, tab_y, col_width, HEADER_ROW_HEIGHT)
     self._draw_button(self._log_rect, tr("Log"), self._current_tab == 2)
 
-    # 구분선
     rl.draw_line(
       int(rect.x + 40), int(tab_y + HEADER_ROW_HEIGHT),
       int(rect.x + rect.width - 80), int(tab_y + HEADER_ROW_HEIGHT),
       rl.GRAY
     )
 
-    # === 스크롤 가능한 콘텐츠 영역 ===
     content_rect = rl.Rectangle(
       rect.x,
       rect.y + FIXED_HEADER_HEIGHT,
@@ -439,10 +412,8 @@ class CommunityLayout(Widget):
     self._content_scroller.render(content_rect)
 
   def _handle_mouse_release(self, pos):
-    """마우스 클릭 처리"""
     x, y = pos
 
-    # 첫 번째 행 버튼 체크
     if self._is_point_in_rect(x, y, self._manufacturer_rect):
       self._on_select_manufacturer()
       return True
@@ -453,7 +424,6 @@ class CommunityLayout(Widget):
       self._on_select_branch()
       return True
 
-    # 두 번째 행 탭 버튼 체크
     elif self._is_point_in_rect(x, y, self._toggle_rect):
       self._switch_tab(0)
       return True
@@ -471,12 +441,10 @@ class CommunityLayout(Widget):
       self._content_scroller.show_event()
 
   def _switch_tab(self, tab_index: int):
-    """Switch to a different tab"""
     if self._current_tab != tab_index:
       self._current_tab = tab_index
       self._update_content_scroller()
 
-  # === Function Callbacks ===
   def _on_git_pull(self):
     def confirm_callback(result: int):
       if result == DialogResult.CONFIRM:
@@ -540,7 +508,6 @@ class CommunityLayout(Widget):
     gui_app.set_modal_overlay(dlg, callback=confirm_callback)
 
   def _view_log(self, log_path: str):
-    """View log file content"""
     if Path(log_path).exists():
       try:
         with open(log_path, 'r', encoding='utf-8') as f:
@@ -555,7 +522,6 @@ class CommunityLayout(Widget):
       gui_app.set_modal_overlay(dlg)
 
   def _upload_log(self, log_path: str, log_name: str):
-    """Upload log file"""
     if Path(log_path).exists():
       def confirm_callback(result: int):
         if result == DialogResult.CONFIRM:
@@ -568,7 +534,6 @@ class CommunityLayout(Widget):
       gui_app.set_modal_overlay(dlg)
 
   def _on_tmux_console_view(self):
-    """View tmux console output"""
     try:
       result = subprocess.run(
         ["tmux", "capture-pane", "-p", "-t", "0", "-S", "-250"],
@@ -583,7 +548,6 @@ class CommunityLayout(Widget):
       gui_app.set_modal_overlay(dlg)
 
   def _on_tmux_console_upload(self):
-    """Upload tmux console output"""
     try:
       result = subprocess.run(
         ["sh", "-c", "tmux capture-pane -p -t 0 -S -250 > /data/tmux_console.log"],
@@ -604,7 +568,6 @@ class CommunityLayout(Widget):
       gui_app.set_modal_overlay(dlg)
 
   def _on_carparams_dump(self):
-    """Upload carParams dump"""
     def confirm_callback(result: int):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/dump_upload.sh", "carParams")
@@ -613,7 +576,6 @@ class CommunityLayout(Widget):
     gui_app.set_modal_overlay(dlg, callback=confirm_callback)
 
   def _on_realdata_upload(self):
-    """Upload realdata routes"""
     target_path = Path("/data/media/0/realdata")
 
     if not target_path.exists():
