@@ -389,9 +389,9 @@ class DriverMonitoring:
     if alert is not None:
       self.current_events.add(alert)
 
-    if self.dcam_uncertain_cnt > self.settings._DCAM_UNCERTAIN_ALERT_COUNT and not self.dcam_uncertain_alerted:
-      set_offroad_alert("Offroad_DriverMonitoringUncertain", True)
-      self.dcam_uncertain_alerted = True
+    #if self.dcam_uncertain_cnt > self.settings._DCAM_UNCERTAIN_ALERT_COUNT and not self.dcam_uncertain_alerted:
+      #set_offroad_alert("Offroad_DriverMonitoringUncertain", True)
+      #self.dcam_uncertain_alerted = True
 
 
   def get_state_packet(self, valid=True):
