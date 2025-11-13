@@ -153,7 +153,6 @@ class ModelRenderer(Widget):
       self._draw_lead_indicators(radar_state, rect)
 
   def _update_raw_points(self, model):
-    """Update raw 3D points from model data"""
     self._path.raw_points = np.array([model.position.x, model.position.y, model.position.z], dtype=np.float32).T
 
     for i, lane_line in enumerate(model.laneLines):
@@ -167,7 +166,6 @@ class ModelRenderer(Widget):
     self._acceleration_x = np.array(model.acceleration.x, dtype=np.float32)
 
   def _update_leads(self, radar_state, path_x_array):
-    """Update positions of lead vehicles"""
     self._lead_vehicles = [LeadVehicle(), LeadVehicle()]
     self._lead_info = [LeadInfo(), LeadInfo()]
     leads = [radar_state.leadOne, radar_state.leadTwo]
@@ -185,7 +183,6 @@ class ModelRenderer(Widget):
           self._lead_info[i] = LeadInfo(d_rel=d_rel, v_rel=v_rel, point=point)
 
   def _update_model(self, lead, path_x_array):
-    """Update model visualization data based on model message"""
     max_distance = np.clip(path_x_array[-1], MIN_DRAW_DISTANCE, MAX_DRAW_DISTANCE)
     max_idx = self._get_path_length_idx(self._lane_lines[0].raw_points[:, 0], max_distance)
 
@@ -221,12 +218,11 @@ class ModelRenderer(Widget):
     self._update_experimental_gradient()
 
   def _update_experimental_gradient(self):
-    """Pre-calculate experimental mode gradient colors"""
     if not self._experimental_mode or not ui_state.enabled:
       return
 
     # Check if user is steering
-    if ui_state.steering_pressed:
+    if ui_state.steeringPressed:
       # Use steering pressed color (cyan/deep sky blue)
       steering_color = rl.Color(0, 191, 255, 100)
       mid_color = rl.Color(0, 191, 255, 50)
@@ -304,7 +300,6 @@ class ModelRenderer(Widget):
     return LeadVehicle(glow=glow, chevron=chevron, fill_alpha=int(fill_alpha))
 
   def _draw_lane_lines(self):
-    """Draw lane lines and road edges"""
     for i, lane_line in enumerate(self._lane_lines):
       if lane_line.projected_points.size == 0:
         continue
@@ -331,12 +326,11 @@ class ModelRenderer(Widget):
       draw_polygon(self._rect, road_edge.projected_points, color)
 
   def _draw_path(self, sm):
-    """Draw path with dynamic coloring based on mode and throttle state."""
     if not self._path.projected_points.size:
       return
 
     if ui_state.enabled:
-      if ui_state.steering_pressed or self._experimental_mode:
+      if ui_state.steeringPressed or self._experimental_mode:
         # Draw with acceleration coloring or steering pressed color
         if len(self._exp_gradient.colors) > 1:
           draw_polygon(self._rect, self._path.projected_points, gradient=self._exp_gradient)
@@ -365,7 +359,6 @@ class ModelRenderer(Widget):
       draw_polygon(self._rect, self._path.projected_points, gradient=gradient)
 
   def _draw_lead_indicators(self, radar_state, rect):
-    """Draw lead vehicle indicators with distance and speed information"""
     leads_data = [radar_state.leadOne, radar_state.leadTwo]
 
     for i, (lead_vehicle, lead_info, lead_data) in enumerate(zip(self._lead_vehicles, self._lead_info, leads_data, strict=True)):
@@ -411,20 +404,17 @@ class ModelRenderer(Widget):
         self._draw_text_centered(x, text_y + 120.0, l_speed, 35, v_color)
 
   def _draw_text_centered(self, x: float, y: float, text: str, font_size: int, color: rl.Color):
-    """Draw text centered at the given position"""
     text_width = rl.measure_text(text, font_size)
     rl.draw_text(text, int(x - text_width / 2), int(y - font_size / 2), font_size, color)
 
   @staticmethod
   def _get_path_length_idx(pos_x_array: np.ndarray, path_distance: float) -> int:
-    """Get the index corresponding to the given path distance"""
     if len(pos_x_array) == 0:
       return 0
     indices = np.where(pos_x_array <= path_distance)[0]
     return indices[-1] if indices.size > 0 else 0
 
   def _map_to_screen(self, in_x, in_y, in_z):
-    """Project a point in car space to screen space"""
     input_pt = np.array([in_x, in_y, in_z])
     pt = self._car_space_transform @ input_pt
 
@@ -440,7 +430,6 @@ class ModelRenderer(Widget):
     return (x, y)
 
   def _map_line_to_polygon(self, line: np.ndarray, y_off: float, z_off: float, max_idx: int, max_distance: float, allow_invert: bool = True) -> np.ndarray:
-    """Convert 3D line to 2D polygon for rendering."""
     if line.shape[0] == 0:
       return np.empty((0, 2), dtype=np.float32)
 

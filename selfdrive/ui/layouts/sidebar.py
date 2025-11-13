@@ -115,11 +115,9 @@ class Sidebar(Widget):
     self._open_settings_callback = open_settings
 
   def _is_network_connected(self) -> bool:
-    """Check if network is connected"""
     return self._connect_status.color == Colors.GOOD
 
   def _handle_commit_button_press(self):
-    """Handle commit button click"""
     if self._is_processing:
       print("Script execution already in progress, ignoring click")
       self._commit_status.update(tr_noop("BUSY"), tr_noop("WAIT"), Colors.WARNING)
@@ -136,7 +134,6 @@ class Sidebar(Widget):
       self._start_commit_check()
 
   def _start_git_pull(self):
-    """Start git pull process in background"""
     self._is_processing = True
     self._git_pull_exit_file.unlink(missing_ok=True)
 
@@ -162,7 +159,6 @@ class Sidebar(Widget):
     thread.start()
 
   def _on_git_pull_finished(self):
-    """Handle git pull completion"""
     try:
       exit_code = self._git_pull_exit_file.read_text().strip()
       self._git_pull_exit_file.unlink(missing_ok=True)
@@ -177,13 +173,11 @@ class Sidebar(Widget):
       self._on_git_pull_failed(tr_noop("FILE READ ERROR"))
 
   def _on_git_pull_failed(self, reason: str):
-    """Handle git pull failure"""
     self._is_processing = False
     print(f"Git pull failed: {reason}")
     self._commit_status.update(tr_noop("git pull"), reason, Colors.DANGER)
 
   def _start_commit_check(self):
-    """Start commit check process in background"""
     if self._is_processing:
       return
 
@@ -212,7 +206,6 @@ class Sidebar(Widget):
     thread.start()
 
   def _on_commit_check_finished(self):
-    """Handle commit check completion"""
     try:
       exit_code_str = self._commit_check_exit_file.read_text().strip()
       self._commit_check_exit_file.unlink(missing_ok=True)
@@ -232,14 +225,12 @@ class Sidebar(Widget):
       self._on_commit_check_failed(tr_noop("FILE READ ERROR"))
 
   def _on_commit_check_failed(self, reason: str):
-    """Handle commit check failure"""
     self._is_processing = False
     self._is_update_available = False
     print(f"Commit check failed: {reason}")
     self._commit_status.update(tr_noop("CHECK"), reason, Colors.DANGER)
 
   def _parse_commit_compare_result(self, output: str):
-    """Parse commit comparison result"""
     if not output:
       self._on_commit_check_failed(tr_noop("EMPTY RESULT"))
       return
@@ -271,7 +262,6 @@ class Sidebar(Widget):
       self._is_update_available = True
 
   def _update_progress_indicator(self):
-    """Update progress dots animation"""
     if not self._is_processing:
       return
 
@@ -328,13 +318,13 @@ class Sidebar(Widget):
 
     if thermal_status == ThermalStatus.green:
       #self._temp_status.update(tr_noop("TEMP"), tr_noop("GOOD"), Colors.GOOD)
-      self._temp_status.update(tr_noop("TEMP"), f"{max_temp}°C", Colors.GOOD)
+      self._temp_status.update(tr_noop("TEMP"), f"{max_temp:.1f}°C", Colors.GOOD)
     elif thermal_status == ThermalStatus.yellow:
       #self._temp_status.update(tr_noop("TEMP"), tr_noop("OK"), Colors.WARNING)
-      self._temp_status.update(tr_noop("TEMP"), f"{max_temp}°C", Colors.WARNING)
+      self._temp_status.update(tr_noop("TEMP"), f"{max_temp:.1f}°C", Colors.WARNING)
     else:
       #self._temp_status.update(tr_noop("TEMP"), tr_noop("HIGH"), Colors.DANGER)
-      self._temp_status.update(tr_noop("TEMP"), f"{max_temp}°C", Colors.DANGER)
+      self._temp_status.update(tr_noop("TEMP"), f"{max_temp:.1f}°C", Colors.DANGER)
 
   def _update_connection_status(self, device_state):
     last_ping = device_state.lastAthenaPingTime
@@ -408,7 +398,6 @@ class Sidebar(Widget):
                       int(self._mic_indicator_rect.y + (self._mic_indicator_rect.height - self._mic_img.height) / 2), Colors.WHITE)
 
   def _draw_c3x_position(self, rect: rl.Rectangle):
-    """Draw C3X device position text"""
     c3x_position = self._params.get("DevicePosition")
     if not c3x_position:
       c3x_position = "--"

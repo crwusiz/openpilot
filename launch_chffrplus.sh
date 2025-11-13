@@ -121,7 +121,12 @@ function launch {
   fi
 
   if ! command -v msgfmt &> /dev/null; then
+    sudo apt update
     sudo apt install gettext -y
+  fi
+
+  if ! python3 -c "import jeepney" &> /dev/null; then
+    pip install jeepney
   fi
 
   # init github ssh-keys or username

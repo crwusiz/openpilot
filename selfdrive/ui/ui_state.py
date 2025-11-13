@@ -86,7 +86,6 @@ class UIState:
     self._param_update_time: float = 0.0
 
     #add
-    self.satelliteCount: int = 0
     self.enabled: bool = False
     self.steeringPressed: bool = False
 
@@ -152,11 +151,6 @@ class UIState:
     self.recording_audio = self.params.get_bool("RecordAudio") and self.started
 
     self.is_metric = self.params.get_bool("IsMetric")
-
-    if self.sm.updated["ubloxGnss"] and self.sm.valid["ubloxGnss"]:
-      gnss_data = self.sm["ubloxGnss"]
-      if gnss_data.which() == log.UbloxGnss.measurementReport:
-        self.satelliteCount = gnss_data.measurementReport.numMeas
 
   def _update_status(self) -> None:
     if self.started and self.sm.updated["selfdriveState"]:

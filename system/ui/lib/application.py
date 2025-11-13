@@ -32,6 +32,7 @@ SHOW_TOUCHES = os.getenv("SHOW_TOUCHES") == "1"
 STRICT_MODE = os.getenv("STRICT_MODE") == "1"
 SCALE = float(os.getenv("SCALE", "1.0"))
 PROFILE_RENDER = int(os.getenv("PROFILE_RENDER", "0"))
+PROFILE_STATS = int(os.getenv("PROFILE_STATS", "100"))  # Number of functions to show in profile output
 
 DEFAULT_TEXT_SIZE = 60
 DEFAULT_TEXT_COLOR = rl.WHITE
@@ -51,6 +52,7 @@ class FontWeight(StrEnum):
   MEDIUM = "Inter-Medium.fnt"
   SEMI_BOLD = "Inter-SemiBold.fnt"
   BOLD = "Inter-Bold.fnt"
+  EXTRA_BOLD = "Inter-ExtraBold.fnt"
   UNIFONT = "NotoSansKR-Medium.fnt"
 
 
