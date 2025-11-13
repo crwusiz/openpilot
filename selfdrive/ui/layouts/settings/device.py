@@ -178,7 +178,7 @@ class DeviceLayout(Widget):
           pitch = math.degrees(calib.rpyCalib[1])
           yaw = math.degrees(calib.rpyCalib[2])
 
-          position = f"{abs(pitch):.1f}° {'↓' if pitch > 0 else '↑'} {abs(yaw):.1f}° {'←' if yaw > 0 else '→'}"
+          position = f"{abs(pitch):.1f}° {'v' if pitch > 0 else '^'} {abs(yaw):.1f}° {'<' if yaw > 0 else '>'}"
           self._params.put("DevicePosition", position)
       except Exception:
         cloudlog.exception("invalid CalibrationParams")

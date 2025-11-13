@@ -88,6 +88,8 @@ class UIState:
     #add
     self.enabled: bool = False
     self.steeringPressed: bool = False
+    self.driver_camera: bool = self.params.get_bool("DriverCameraOnReverse")
+    self.show_driver_camera: bool = False
 
     # Callbacks
     self._offroad_transition_callbacks: list[Callable[[], None]] = []
@@ -160,6 +162,7 @@ class UIState:
       state = ss.state
       self.enabled = ss.enabled
       self.steeringPressed = ce.steeringPressed
+      self.show_driver_camera = self.driver_camera and ce.gearShifter == GearShifter.reverse
 
       if state in (log.SelfdriveState.OpenpilotState.preEnabled, log.SelfdriveState.OpenpilotState.overriding) and not self.steeringPressed:
         self.status = UIStatus.OVERRIDE

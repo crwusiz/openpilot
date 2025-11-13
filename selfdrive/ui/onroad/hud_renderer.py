@@ -263,15 +263,19 @@ class HudRenderer(Widget):
     self.steer_angle = car_state.steeringAngleDeg
 
     # Get ex_state if available
-    if hasattr(car_state, 'exState'):
+    if hasattr(car_state, 'exState') and car_state.exState is not None:
       ex_state = car_state.exState
       self.autohold_state = ex_state.autoHold if hasattr(ex_state, 'autoHold') else 0
-      if hasattr(ex_state, 'tpms'):
+
+      if hasattr(ex_state, 'tpms') and ex_state.tpms is not None:
         tpms = ex_state.tpms
-        self.fl = tpms.fl
-        self.fr = tpms.fr
-        self.rl = tpms.rl
-        self.rr = tpms.rr
+        self.fl = tpms.fl if hasattr(tpms, 'fl') else 0
+        self.fr = tpms.fr if hasattr(tpms, 'fr') else 0
+        self.rl = tpms.rl if hasattr(tpms, 'rl') else 0
+        self.rr = tpms.rr if hasattr(tpms, 'rr') else 0
+      else:
+        self.fl = self.fr = self.rl = self.rr = 0
+
       self.nav_limit_speed = ex_state.navLimitSpeed if hasattr(ex_state, 'navLimitSpeed') else 0
       self.road_signs = ex_state.roadSigns if hasattr(ex_state, 'roadSigns') else 0
 
@@ -334,7 +338,7 @@ class HudRenderer(Widget):
     self.wifi_btn.set_opacity(0.8 if self.wifi_state > 0 else 0.2)
 
     # Bottom icons
-    self.steer_btn.set_rotation(self.steer_angle)
+    self.steer_btn.set_rotation(-self.steer_angle)
     self.steer_btn.set_opacity(0.8)
 
     self.lka_btn.set_active(self.lat_active)
@@ -694,7 +698,7 @@ class HudRenderer(Widget):
     speed_pos = rl.Vector2(rect.x + rect.width / 2 - speed_text_size.x / 2, 180 - speed_text_size.y / 2)
     rl.draw_text_ex(self._font_extra_bold, speed_text, speed_pos, FONT_SIZES.current_speed, 0, speed_color)
 
-    unit_text = tr("km/h") if ui_state.is_metric else tr("mph")
+    unit_text = "km/h" if ui_state.is_metric else "mph"
     unit_text_size = measure_text_cached(self._font_medium, unit_text, FONT_SIZES.speed_unit)
     unit_pos = rl.Vector2(rect.x + rect.width / 2 - unit_text_size.x / 2, 290 - unit_text_size.y / 2)
     rl.draw_text_ex(self._font_medium, unit_text, unit_pos, FONT_SIZES.speed_unit, 0, COLORS.light_orange)
@@ -739,7 +743,7 @@ class HudRenderer(Widget):
       x += badge_width + 30
 
   def _draw_upper_right_info(self, rect: rl.Rectangle) -> None:
-    x = rect.x + rect.width - UI_CONFIG.border_size
+    x = rect.x + rect.width - UI_CONFIG.border_size * 2
     y = rect.y + 20
 
     # GPS info
@@ -766,7 +770,7 @@ class HudRenderer(Widget):
     self._draw_text(x, y, steer_info, FONT_SIZES.info_text, COLORS.white_translucent)
 
     # Bottom right - version info
-    x = rect.x + rect.width - UI_CONFIG.border_size
+    x = rect.x + rect.width - UI_CONFIG.border_size * 2
     version = self.params.get("UpdaterCurrentDescription") or ""
     text_width = measure_text_cached(self._font_medium, version, FONT_SIZES.info_text).x
     self._draw_text(x - text_width, y, version, FONT_SIZES.info_text, COLORS.white_translucent)
@@ -856,29 +860,51 @@ class HudRenderer(Widget):
     # Draw blinker images
     center_x = rect.width / 2
     y = (rect.height - 200) / 2
-    direction = -1 if self.left_blinker else 1
-    x = center_x - 200 if self.left_blinker else center_x
-
     blinker_width = 200
     blinker_height = 200
     alpha_base = 0.8
 
-    blinker_img = self.turnsignal_l_img if self.left_blinker else self.turnsignal_r_img
+    # Draw left blinker if active
+    if self.left_blinker:
+      x = center_x - 200
+      direction = -1
+      blinker_img = self.turnsignal_l_img
 
-    for i in range(BLINKER_DRAW_COUNT):
-      distance = abs(self.blink_index - i)
-      alpha = alpha_base if distance == 0 else alpha_base / (distance * 2)
+      for i in range(BLINKER_DRAW_COUNT):
+        distance = abs(self.blink_index - i)
+        alpha = alpha_base if distance == 0 else alpha_base / (distance * 2)
 
-      if alpha > 0.05:
-        x_pos = x + int(i * blinker_width * 0.6 * direction)
-        color = rl.Color(255, 255, 255, int(alpha * 255))
+        if alpha > 0.05:
+          x_pos = x + int(i * blinker_width * 0.6 * direction)
+          color = rl.Color(255, 255, 255, int(alpha * 255))
 
-        rl.draw_texture_pro(
-          blinker_img,
-          rl.Rectangle(0, 0, blinker_img.width, blinker_img.height),
-          rl.Rectangle(x_pos, y, blinker_width, blinker_height),
-          rl.Vector2(0, 0), 0, color
-        )
+          rl.draw_texture_pro(
+            blinker_img,
+            rl.Rectangle(0, 0, blinker_img.width, blinker_img.height),
+            rl.Rectangle(x_pos, y, blinker_width, blinker_height),
+            rl.Vector2(0, 0), 0, color
+          )
+
+    # Draw right blinker if active
+    if self.right_blinker:
+      x = center_x
+      direction = 1
+      blinker_img = self.turnsignal_r_img
+
+      for i in range(BLINKER_DRAW_COUNT):
+        distance = abs(self.blink_index - i)
+        alpha = alpha_base if distance == 0 else alpha_base / (distance * 2)
+
+        if alpha > 0.05:
+          x_pos = x + int(i * blinker_width * 0.6 * direction)
+          color = rl.Color(255, 255, 255, int(alpha * 255))
+
+          rl.draw_texture_pro(
+            blinker_img,
+            rl.Rectangle(0, 0, blinker_img.width, blinker_img.height),
+            rl.Rectangle(x_pos, y, blinker_width, blinker_height),
+            rl.Vector2(0, 0), 0, color
+          )
 
   def _draw_text(self, x: float, y: float, text: str, font_size: int,
                  color: rl.Color, alignment: str = "L") -> None:
@@ -904,7 +930,7 @@ class HudRenderer(Widget):
 
     border_thickness = 10
     radius = icon_size / 2
-    adjusted_radius = radius - border_thickness / 2
+    adjusted_radius = radius + border_thickness / 2
     segments = 60
     abs_angle = abs(angle)
     angle_range = min(abs_angle, 360)
@@ -915,31 +941,21 @@ class HudRenderer(Widget):
       next_segment_angle = (angle_range / segments) * (i + 1)
       progress = segment_angle / 360.0
 
-      if angle > 0:
-        if progress < 0.33:
-          t = progress / 0.33
-          color = rl.Color(int(120 + (255 - 120) * t), int(255 - (255 - 149) * t), int(120 - 120 * t), 200)
-        elif progress < 0.67:
-          t = (progress - 0.33) / 0.34
-          color = rl.Color(255, int(149 - (149 - 34) * t), int(0 + (49 - 0) * t), 200)
-        else:
-          color = rl.Color(201, 34, 49, 200)
+      if progress < 0.33:
+        t = progress / 0.33
+        color = rl.Color(int(120 + (255 - 120) * t), int(255 - (255 - 149) * t), int(120 - 120 * t), 200)
+      elif progress < 0.67:
+        t = (progress - 0.33) / 0.34
+        color = rl.Color(255, int(149 - (149 - 34) * t), int(0 + (49 - 0) * t), 200)
       else:
-        if progress < 0.33:
-          t = progress / 0.33
-          color = rl.Color(255, int(34 + (149 - 34) * t), int(49 - 49 * t), 200)
-        elif progress < 0.67:
-          t = (progress - 0.33) / 0.34
-          color = rl.Color(int(255 - (255 - 120) * t), int(149 + (255 - 149) * t), int(0 + 120 * t), 200)
-        else:
-          color = rl.Color(120, 255, 120, 200)
+        color = rl.Color(201, 34, 49, 200)
 
       if angle > 0:
-        current_angle = start_angle_deg - segment_angle
-        next_angle = start_angle_deg - next_segment_angle
-      else:
         current_angle = start_angle_deg + segment_angle
         next_angle = start_angle_deg + next_segment_angle
+      else:
+        current_angle = start_angle_deg - segment_angle
+        next_angle = start_angle_deg - next_segment_angle
 
       current_rad = math.radians(current_angle)
       next_rad = math.radians(next_angle)
@@ -959,11 +975,11 @@ class HudRenderer(Widget):
         next_segment_angle = 360 + (extra_angle / extra_segments) * (i + 1)
 
         if angle > 0:
-          current_angle = start_angle_deg - segment_angle
-          next_angle = start_angle_deg - next_segment_angle
-        else:
           current_angle = start_angle_deg + segment_angle
           next_angle = start_angle_deg + next_segment_angle
+        else:
+          current_angle = start_angle_deg - segment_angle
+          next_angle = start_angle_deg - next_segment_angle
 
         current_rad = math.radians(current_angle)
         next_rad = math.radians(next_angle)

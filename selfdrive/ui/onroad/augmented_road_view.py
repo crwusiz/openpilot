@@ -18,6 +18,7 @@ OpState = log.SelfdriveState.OpenpilotState
 CALIBRATED = log.LiveCalibrationData.Status.calibrated
 ROAD_CAM = VisionStreamType.VISION_STREAM_ROAD
 WIDE_CAM = VisionStreamType.VISION_STREAM_WIDE_ROAD
+DRIVER_CAM = VisionStreamType.VISION_STREAM_DRIVER
 DEFAULT_DEVICE_CAMERA = DEVICE_CAMERAS["tici", "ar0231"]
 
 BORDER_COLORS = {
@@ -125,20 +126,25 @@ class AugmentedRoadView(CameraView):
     rl.draw_rectangle_rounded_lines_ex(border_rect, border_roundness, 10, UI_BORDER_SIZE, border_color)
 
   def _switch_stream_if_needed(self, sm):
-    if sm['selfdriveState'].experimentalMode and WIDE_CAM in self.available_streams:
-      v_ego = sm['carState'].vEgo
-      if v_ego < WIDE_CAM_MAX_SPEED:
-        target = WIDE_CAM
-      elif v_ego > ROAD_CAM_MIN_SPEED:
-        target = ROAD_CAM
-      else:
-        # Hysteresis zone - keep current stream
-        target = self.stream_type
+    if ui_state.show_driver_camera:
+      target = DRIVER_CAM
     else:
-      target = ROAD_CAM
+      #if sm['selfdriveState'].experimentalMode and WIDE_CAM in self.available_streams:
+      if WIDE_CAM in self.available_streams:
+        v_ego = sm['carState'].vEgo
+        if v_ego < WIDE_CAM_MAX_SPEED:
+          target = WIDE_CAM
+        elif v_ego > ROAD_CAM_MIN_SPEED:
+          target = ROAD_CAM
+        else:
+          # Hysteresis zone - keep current stream
+          target = self.stream_type
+      else:
+        target = ROAD_CAM
 
     if self.stream_type != target:
-      self.switch_stream(target)
+      if not self._switching or self._target_stream_type != target:
+        self.switch_stream(target)
 
   def _update_calibration(self):
     # Update device camera if not already set

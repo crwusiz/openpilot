@@ -8,6 +8,7 @@ from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, F
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
+from openpilot.system.ui.widgets.network import WifiManagerUI, WifiManager
 
 import subprocess
 import threading
@@ -75,6 +76,9 @@ class Sidebar(Widget):
     self._net_type = NETWORK_TYPES.get(NetworkType.none)
     self._net_strength = 0
 
+    self.wifi_manager = WifiManager()
+    self.wifi_manager_ui = WifiManagerUI(self.wifi_manager)
+
     self._temp_status = MetricData(tr_noop("TEMP"), tr_noop("GOOD"), Colors.GOOD)
     self._panda_status = MetricData(tr_noop("VEHICLE"), tr_noop("ONLINE"), Colors.GOOD)
     self._connect_status = MetricData(tr_noop("CONNECT"), tr_noop("OFFLINE"), Colors.WARNING)
@@ -88,7 +92,7 @@ class Sidebar(Widget):
     self._mic_img = gui_app.texture("icons/microphone.png", 30, 30)
     self._mic_indicator_rect = rl.Rectangle(0, 0, 0, 0)
     self._font_regular = gui_app.font(FontWeight.NORMAL)
-    self._font_bold = gui_app.font(FontWeight.SEMI_BOLD)
+    self._font_semi_bold = gui_app.font(FontWeight.SEMI_BOLD)
 
     # Commit check & git pull state
     self._params = Params()
@@ -307,10 +311,21 @@ class Sidebar(Widget):
     # Update progress indicator
     self._update_progress_indicator()
 
+    self.wifi_manager_ui._update_state()
+
   def _update_network_status(self, device_state):
-    self._net_type = NETWORK_TYPES.get(device_state.networkType.raw, tr_noop("Unknown"))
+    ip_address = self.wifi_manager_ui.ip_address
+
     strength = device_state.networkStrength
     self._net_strength = max(0, min(5, strength.raw + 1)) if strength > 0 else 0
+
+    #self._net_type = NETWORK_TYPES.get(device_state.networkType.raw, tr_noop("Unknown"))
+    if self._net_strength > 0 and ip_address:
+      self._net_type = ip_address
+    elif self._net_strength > 0:
+      self._net_type = NETWORK_TYPES.get(NetworkType.wifi)
+    else:
+      self._net_type = NETWORK_TYPES.get(NetworkType.none)
 
   def _update_temperature_status(self, device_state):
     thermal_status = device_state.thermalStatus
@@ -403,13 +418,13 @@ class Sidebar(Widget):
       c3x_position = "--"
 
     # Draw position text below C3X image
-    text_rect = rl.Rectangle(rect.x, rect.y + 1020, rect.width, 40)
-    text_size = measure_text_cached(self._font_bold, c3x_position, 30)
+    text_rect = rl.Rectangle(rect.x, rect.y + 1000, rect.width, 40)
+    text_size = measure_text_cached(self._font_semi_bold, c3x_position, 30)
     text_pos = rl.Vector2(
       text_rect.x + (text_rect.width - text_size.x) / 2,
       text_rect.y + (text_rect.height - text_size.y) / 2
     )
-    rl.draw_text_ex(self._font_bold, c3x_position, text_pos, 30, 0, Colors.WHITE)
+    rl.draw_text_ex(self._font_semi_bold, c3x_position, text_pos, 30, 0, Colors.WHITE)
 
   def _draw_network_indicator(self, rect: rl.Rectangle):
     # Signal strength dots
@@ -425,16 +440,16 @@ class Sidebar(Widget):
       rl.draw_circle(x, y, dot_size // 2, color)
 
     # Network type text
-    text_y = rect.y + 247
+    text_y = rect.y + 230
     text_pos = rl.Vector2(rect.x + 58, text_y)
     rl.draw_text_ex(self._font_regular, tr(self._net_type), text_pos, FONT_SIZE, 0, Colors.WHITE)
 
   def _draw_metrics(self, rect: rl.Rectangle):
     metrics = [
       (self._temp_status, 288),
-      (self._panda_status, 288*1.5),
-      (self._connect_status, 288*2),
-      (self._commit_status, 288*2.5)
+      (self._panda_status, 288 * 1.5),
+      (self._connect_status, 288 * 2),
+      (self._commit_status, 288 * 2.5)
     ]
 
     for metric, y_offset in metrics:
@@ -443,11 +458,6 @@ class Sidebar(Widget):
 
   def _draw_metric(self, rect: rl.Rectangle, metric: MetricData, y: float, is_commit: bool = False):
     metric_rect = rl.Rectangle(rect.x + METRIC_MARGIN, y, METRIC_WIDTH, METRIC_HEIGHT)
-
-    # Apply opacity for commit button press
-    if is_commit and self._commit_pressed:
-      # Draw with reduced opacity
-      pass  # Implement opacity if needed
 
     # Draw colored left edge (clipped rounded rectangle)
     edge_rect = rl.Rectangle(metric_rect.x + 4, metric_rect.y + 4, 100, 118)
@@ -462,10 +472,10 @@ class Sidebar(Widget):
     labels = [tr(metric.label), tr(metric.value)]
     text_y = metric_rect.y + (metric_rect.height / 2 - len(labels) * FONT_SIZE * FONT_SCALE)
     for text in labels:
-      text_size = measure_text_cached(self._font_bold, text, FONT_SIZE)
+      text_size = measure_text_cached(self._font_semi_bold, text, FONT_SIZE)
       text_y += text_size.y
       text_pos = rl.Vector2(
         metric_rect.x + 22 + (metric_rect.width - 22 - text_size.x) / 2,
         text_y
       )
-      rl.draw_text_ex(self._font_bold, text, text_pos, FONT_SIZE, 0, Colors.WHITE)
+      rl.draw_text_ex(self._font_semi_bold, text, text_pos, FONT_SIZE, 0, Colors.WHITE)

@@ -291,6 +291,9 @@ class WifiManagerUI(Widget):
                                      networks_updated=self._on_network_updated,
                                      disconnected=self._on_disconnected)
 
+    #add
+    self.ip_address = self._wifi_manager.ipv4_address
+
   def show_event(self):
     # start/stop scanning when widget is visible
     self._wifi_manager.set_active(True)
@@ -304,6 +307,7 @@ class WifiManagerUI(Widget):
 
   def _update_state(self):
     self._wifi_manager.process_callbacks()
+    self.ip_address = self._wifi_manager.ipv4_address
 
   def _render(self, rect: rl.Rectangle):
     if not self._networks:

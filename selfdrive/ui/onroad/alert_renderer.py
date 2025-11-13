@@ -104,7 +104,7 @@ class AlertRenderer(Widget):
           return ALERT_CRITICAL_REBOOT
 
     # No alert if size is none
-    if ss.alertSize == 0:
+    if ss.alertSize == 0 or ui_state.show_driver_camera:
       return None
 
     # Don't get old alert
