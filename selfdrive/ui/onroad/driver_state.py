@@ -23,8 +23,8 @@ DEFAULT_FACE_KPTS_3D = np.array([
 ], dtype=np.float32)
 
 # UI constants
-BTN_SIZE = 192
-IMG_SIZE = 144
+BTN_SIZE = 192 * 0.8
+IMG_SIZE = 144 * 0.8
 ARC_LENGTH = 133
 ARC_THICKNESS_DEFAULT = 6.7
 ARC_THICKNESS_EXTEND = 12.0
@@ -166,7 +166,7 @@ class DriverStateRenderer(Widget):
     width, height = self._rect.width, self._rect.height
     offset = UI_BORDER_SIZE + BTN_SIZE // 2
     self.position_x = self._rect.x + (width - offset if self.is_rhd else offset) - 10
-    self.position_y = self._rect.y + height - offset - 15
+    self.position_y = self._rect.y + height - offset - 20
 
     # Pre-calculate the face lines positions
     positioned_keypoints = self.face_keypoints_transformed + np.array([self.position_x, self.position_y])

@@ -6,10 +6,11 @@ from openpilot.system.ui.widgets import Widget
 
 
 class IconButton(Widget):
-  def __init__(self, icon_path: str, icon_size: int, bg_color: rl.Color = None):
+  def __init__(self, icon_path: str, button_size: int, icon_size: int, bg_color: rl.Color = None):
     super().__init__()
 
     # Visual properties
+    self._button_size = button_size
     self._icon_size = icon_size
     self._bg_color = bg_color or rl.Color(0, 0, 0, 166)
     self._texture = gui_app.texture(icon_path, icon_size, icon_size)
@@ -59,10 +60,7 @@ class IconButton(Widget):
     # Adjust opacity if pressed (like ExpButton)
     alpha = int(self._opacity * (180 if self.is_pressed else 255))
 
-    # Draw background circle - ExpButton 스타일 (아이콘보다 약간 큼)
-    # ExpButton은 192 크기에 반지름 96 = 비율 0.5
-    # 144 크기면 반지름을 96으로 (비율 0.67) 설정하여 ExpButton과 동일한 크기
-    radius = 96 if self._icon_size == 144 else self._rect.width / 2
+    radius = self._button_size / 2
     rl.draw_circle(center_x, center_y, radius, self._bg_color)
 
     # Draw icon with opacity
@@ -86,9 +84,8 @@ class IconButton(Widget):
 
 
 class RotatableIconButton(IconButton):
-
-  def __init__(self, icon_path: str, icon_size: int, bg_color: rl.Color = None):
-    super().__init__(icon_path, icon_size, bg_color)
+  def __init__(self, icon_path: str, button_size: int, icon_size: int, bg_color: rl.Color = None):
+    super().__init__(icon_path, button_size, icon_size, bg_color)
     self._rotation = 0.0
 
   def set_rotation(self, rotation: float) -> None:
@@ -101,8 +98,7 @@ class RotatableIconButton(IconButton):
     # Adjust opacity if pressed
     alpha = int(self._opacity * (180 if self.is_pressed else 255))
 
-    # Draw background circle - ExpButton 스타일
-    radius = 96 if self._icon_size == 144 else self._rect.width / 2
+    radius = self._button_size / 2
     rl.draw_circle(center_x, center_y, radius, self._bg_color)
 
     # Draw rotated icon with opacity
@@ -118,8 +114,8 @@ class RotatableIconButton(IconButton):
 
 
 class ToggleIconButton(IconButton):
-  def __init__(self, icon_on_path: str, icon_off_path: str, icon_size: int, bg_color: rl.Color = None):
-    super().__init__(icon_on_path, icon_size, bg_color)
+  def __init__(self, icon_on_path: str, icon_off_path: str, button_size: int, icon_size: int, bg_color: rl.Color = None):
+    super().__init__(icon_on_path, button_size, icon_size, bg_color)
     self._texture_on = self._texture
     self._texture_off = gui_app.texture(icon_off_path, icon_size, icon_size)
 
@@ -130,8 +126,7 @@ class ToggleIconButton(IconButton):
     # Adjust opacity if pressed
     alpha = int(self._opacity * (180 if self.is_pressed else 255))
 
-    # Draw background circle - ExpButton 스타일
-    radius = 96 if self._icon_size == 144 else self._rect.width / 2
+    radius = self._button_size / 2
     rl.draw_circle(center_x, center_y, radius, self._bg_color)
 
     # Choose texture based on held or actual state

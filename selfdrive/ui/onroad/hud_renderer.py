@@ -24,12 +24,11 @@ BLINK_PERIOD_MS = 900.0
 class UIConfig:
   header_height: int = 300
   border_size: int = 30
-  button_size: int = 192
+  button_size: int = 192 * 0.8
   set_speed_width_metric: int = 260
   set_speed_width_imperial: int = 172
   set_speed_height: int = 204
-  wheel_icon_size: int = 144
-  icon_size: int = 144
+  icon_size: int = 144 * 0.8
 
 
 @dataclass(frozen=True)
@@ -136,7 +135,7 @@ class HudRenderer(Widget):
     self._font_bold: rl.Font = gui_app.font(FontWeight.BOLD)
     self._font_extra_bold: rl.Font = gui_app.font(FontWeight.EXTRA_BOLD)
 
-    self._exp_button: ExpButton = ExpButton(UI_CONFIG.button_size, UI_CONFIG.wheel_icon_size)
+    self._exp_button: ExpButton = ExpButton(UI_CONFIG.button_size, UI_CONFIG.icon_size)
 
     # Initialize icon buttons
     self._init_icon_buttons()
@@ -146,42 +145,43 @@ class HudRenderer(Widget):
 
   def _init_icon_buttons(self) -> None:
     icon_size = UI_CONFIG.icon_size
+    button_size = UI_CONFIG.button_size
     bg_color = COLORS.black_translucent
 
     # Upper right icon group
     self.upper_icons = IconGroup()
 
     # Direction button (rotatable)
-    self.direction_btn = RotatableIconButton("icons/direction.png", icon_size, bg_color)
+    self.direction_btn = RotatableIconButton("icons/direction.png", button_size, icon_size, bg_color)
     self.upper_icons.add_button(self.direction_btn)
 
     # GPS button
-    self.gps_btn = IconButton("icons/gps.png", icon_size, bg_color)
+    self.gps_btn = IconButton("icons/gps.png", button_size, icon_size, bg_color)
     self.upper_icons.add_button(self.gps_btn)
 
     # WiFi button (will change texture based on state)
-    self.wifi_btn = IconButton("icons/wifi_strength_full.png", icon_size, bg_color)
+    self.wifi_btn = IconButton("icons/wifi_strength_full.png", button_size, icon_size, bg_color)
     self.upper_icons.add_button(self.wifi_btn)
 
     # Bottom icon group
     self.bottom_icons = IconGroup()
 
     # Steering wheel button (rotatable)
-    self.steer_btn = RotatableIconButton("icons/steer.png", icon_size, bg_color)
+    self.steer_btn = RotatableIconButton("icons/steer.png", button_size, icon_size, bg_color)
     self.bottom_icons.add_button(self.steer_btn)
 
     # LKA toggle button
-    self.lka_btn = ToggleIconButton("icons/lka_on.png", "icons/lka_off.png", icon_size, bg_color)
+    self.lka_btn = ToggleIconButton("icons/lka_on.png", "icons/lka_off.png", button_size, icon_size, bg_color)
     self.bottom_icons.add_button(self.lka_btn)
 
     # Gas press button
-    self.gas_btn = IconButton("icons/disengage_on_accelerator.png", icon_size, bg_color)
+    self.gas_btn = IconButton("icons/disengage_on_accelerator.png", button_size, icon_size, bg_color)
     self.bottom_icons.add_button(self.gas_btn)
 
     # Brake/Autohold button
-    self.brake_btn = IconButton("icons/brake_disc.png", icon_size, bg_color)
-    self.autohold_warning_btn = IconButton("icons/autohold_warning.png", icon_size, bg_color)
-    self.autohold_active_btn = IconButton("icons/autohold_active.png", icon_size, bg_color)
+    self.brake_btn = IconButton("icons/brake_disc.png", button_size, icon_size, bg_color)
+    self.autohold_warning_btn = IconButton("icons/autohold_warning.png", button_size, icon_size, bg_color)
+    self.autohold_active_btn = IconButton("icons/autohold_active.png", button_size, icon_size, bg_color)
 
   def _load_static_icons(self) -> None:
     icon_size = UI_CONFIG.icon_size
@@ -390,7 +390,7 @@ class HudRenderer(Widget):
 
   def _draw_upper_icons(self, rect: rl.Rectangle) -> None:
     icon_size = UI_CONFIG.icon_size
-    start_x = rect.x + rect.width - (icon_size / 2) - (UI_CONFIG.border_size * 2) - 560
+    start_x = rect.x + rect.width - (icon_size * 4.85)
     y = rect.y + (icon_size / 2) + (UI_CONFIG.border_size * 2)
 
     self.upper_icons.render_horizontal(start_x, y, UI_CONFIG.button_size - UI_CONFIG.icon_size, from_right=False)
@@ -400,7 +400,7 @@ class HudRenderer(Widget):
     y = rect.y + rect.height - (UI_CONFIG.border_size * 3) - icon_size / 2
 
     # Left side icons (steering, LKA)
-    start_x = rect.x + (icon_size / 2) + (UI_CONFIG.border_size * 3 + 10) + icon_size - 5
+    start_x = rect.x + (icon_size * 2.2)
 
     # Render steering button first
     self.steer_btn.set_rect(rl.Rectangle(
@@ -433,7 +433,7 @@ class HudRenderer(Widget):
     self.lka_btn.render(self.lka_btn._rect)
 
     # Right side icons (gas, brake/autohold)
-    gas_x = rect.x + rect.width - (icon_size / 2) - (UI_CONFIG.border_size * 2) - 350
+    gas_x = rect.x + rect.width - (icon_size * 3.7)
 
     self.gas_btn.set_rect(rl.Rectangle(
       gas_x - icon_size / 2,
