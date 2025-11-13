@@ -29,9 +29,6 @@ ensuring two main safety requirements.
 
 For additional safety implementation details, refer to [panda safety model](https://github.com/commaai/panda#safety-model). For vehicle specific implementation of the safety concept, refer to [opendbc/safety/safety](https://github.com/commaai/opendbc/tree/master/opendbc/safety/safety).
 
-**Extra note**: comma.ai strongly discourages the use of openpilot forks with safety code either missing or
-  not fully meeting the above requirements.
-
 [^1]: For these actuator limits we observe ISO11270 and ISO15622. Lateral limits described there translate to 0.9 seconds of maximum actuation to achieve a 1m lateral deviation.
 
 ---
