@@ -289,22 +289,25 @@ class GuiApplication:
       rl.image_alpha_premultiply(image)
 
     if width is not None and height is not None:
+      same_dimensions = image.width == width and image.height == height
+
       # Resize with aspect ratio preservation if requested
-      if keep_aspect_ratio:
-        orig_width = image.width
-        orig_height = image.height
+      if not same_dimensions:
+        if keep_aspect_ratio:
+          orig_width = image.width
+          orig_height = image.height
 
-        scale_width = width / orig_width
-        scale_height = height / orig_height
+          scale_width = width / orig_width
+          scale_height = height / orig_height
 
-        # Calculate new dimensions
-        scale = min(scale_width, scale_height)
-        new_width = int(orig_width * scale)
-        new_height = int(orig_height * scale)
+          # Calculate new dimensions
+          scale = min(scale_width, scale_height)
+          new_width = int(orig_width * scale)
+          new_height = int(orig_height * scale)
 
-        rl.image_resize(image, new_width, new_height)
-      else:
-        rl.image_resize(image, width, height)
+          rl.image_resize(image, new_width, new_height)
+        else:
+          rl.image_resize(image, width, height)
     else:
       assert keep_aspect_ratio, "Cannot resize without specifying width and height"
     return image
@@ -314,6 +317,8 @@ class GuiApplication:
     texture = rl.load_texture_from_image(image)
     # Set texture filtering to smooth the result
     rl.set_texture_filter(texture, rl.TextureFilter.TEXTURE_FILTER_BILINEAR)
+    # prevent artifacts from wrapping coordinates
+    rl.set_texture_wrap(texture, rl.TextureWrap.TEXTURE_WRAP_CLAMP)
 
     rl.unload_image(image)
     return texture
@@ -558,7 +563,7 @@ class GuiApplication:
     avg_frame_time = elapsed_ms / self._frame if self._frame > 0 else 0
 
     stats_stream = io.StringIO()
-    pstats.Stats(self._render_profiler, stream=stats_stream).sort_stats("cumtime").print_stats(25)
+    pstats.Stats(self._render_profiler, stream=stats_stream).sort_stats("cumtime").print_stats(PROFILE_STATS)
     print("\n=== Render loop profile ===")
     print(stats_stream.getvalue().rstrip())
 

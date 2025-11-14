@@ -15,4 +15,4 @@
 	url = https://github.com/commaai/teleoprtc
 [submodule "tinygrad_repo"]
 	path = tinygrad_repo
-	url = https://github.com/commaai/tinygrad
+	url = https://github.com/tinygrad/tinygrad
