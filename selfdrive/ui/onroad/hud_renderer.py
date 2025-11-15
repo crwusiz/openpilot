@@ -25,9 +25,9 @@ class UIConfig:
   header_height: int = 300
   border_size: int = 30
   button_size: int = 192 * 0.8
-  set_speed_width_metric: int = 260
-  set_speed_width_imperial: int = 172
-  set_speed_height: int = 204
+  #set_speed_width_metric: int = 200
+  #set_speed_width_imperial: int = 172
+  #set_speed_height: int = 204
   icon_size: int = 144 * 0.8
 
 
