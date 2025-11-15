@@ -263,19 +263,15 @@ class HudRenderer(Widget):
     self.steer_angle = car_state.steeringAngleDeg
 
     # Get ex_state if available
-    if hasattr(car_state, 'exState') and car_state.exState is not None:
+    if hasattr(car_state, 'exState'):
       ex_state = car_state.exState
       self.autohold_state = ex_state.autoHold if hasattr(ex_state, 'autoHold') else 0
-
-      if hasattr(ex_state, 'tpms') and ex_state.tpms is not None:
+      if hasattr(ex_state, 'tpms'):
         tpms = ex_state.tpms
-        self.fl = tpms.fl if hasattr(tpms, 'fl') else 0
-        self.fr = tpms.fr if hasattr(tpms, 'fr') else 0
-        self.rl = tpms.rl if hasattr(tpms, 'rl') else 0
-        self.rr = tpms.rr if hasattr(tpms, 'rr') else 0
-      else:
-        self.fl = self.fr = self.rl = self.rr = 0
-
+        self.fl = tpms.fl
+        self.fr = tpms.fr
+        self.rl = tpms.rl
+        self.rr = tpms.rr
       self.nav_limit_speed = ex_state.navLimitSpeed if hasattr(ex_state, 'navLimitSpeed') else 0
       self.road_signs = ex_state.roadSigns if hasattr(ex_state, 'roadSigns') else 0
 
@@ -795,7 +791,7 @@ class HudRenderer(Widget):
         return rl.Color(100, 100, 100, 200)
       if pressure < 31:
         return COLORS.red
-      return COLORS.white
+      return COLORS.dark_grey
 
     def get_tpms_text(pressure):
       if pressure < 5 or pressure > 60:
