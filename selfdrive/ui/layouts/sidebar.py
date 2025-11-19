@@ -317,7 +317,7 @@ class Sidebar(Widget):
     ip_address = self.wifi_manager_ui.ip_address
 
     strength = device_state.networkStrength
-    self._net_strength = max(0, min(5, strength.raw + 1)) if strength > 0 else 0
+    self._net_strength = max(0, min(5, strength.raw + 1)) if strength.raw > 0 else 0
 
     #self._net_type = NETWORK_TYPES.get(device_state.networkType.raw, tr_noop("Unknown"))
     if self._net_strength > 0 and ip_address:

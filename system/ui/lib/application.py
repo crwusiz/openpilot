@@ -27,11 +27,13 @@ MOUSE_THREAD_RATE = 140  # touch controller runs at 140Hz
 MAX_TOUCH_SLOTS = 2
 TOUCH_HISTORY_TIMEOUT = 3.0  # Seconds before touch points fade out
 
+BIG_UI = os.getenv("BIG", "0") == "1"
 ENABLE_VSYNC = os.getenv("ENABLE_VSYNC", "0") == "1"
 SHOW_FPS = os.getenv("SHOW_FPS") == "1"
 SHOW_TOUCHES = os.getenv("SHOW_TOUCHES") == "1"
 STRICT_MODE = os.getenv("STRICT_MODE") == "1"
 SCALE = float(os.getenv("SCALE", "1.0"))
+GRID_SIZE = int(os.getenv("GRID", "0"))
 PROFILE_RENDER = int(os.getenv("PROFILE_RENDER", "0"))
 PROFILE_STATS = int(os.getenv("PROFILE_STATS", "100"))  # Number of functions to show in profile output
 
@@ -86,12 +88,17 @@ FONT_DIR = ASSETS_DIR.joinpath("fonts")
 
 class FontWeight(StrEnum):
   LIGHT = "Inter-Light.fnt"
-  NORMAL = "Inter-Regular.fnt"
+  NORMAL = "Inter-Regular.fnt" if BIG_UI else "Inter-Medium.fnt"
   MEDIUM = "Inter-Medium.fnt"
-  SEMI_BOLD = "Inter-SemiBold.fnt"
   BOLD = "Inter-Bold.fnt"
+  SEMI_BOLD = "Inter-SemiBold.fnt"
   EXTRA_BOLD = "Inter-ExtraBold.fnt"
   UNIFONT = "NotoSansKR-Medium.fnt"
+
+  # Small UI fonts
+  DISPLAY_REGULAR = "Inter-Regular.fnt"
+  ROMAN = "Inter-Regular.fnt"
+  DISPLAY = "Inter-Bold.fnt"
 
 
 def font_fallback(font: rl.Font) -> rl.Font:
@@ -182,10 +189,10 @@ class MouseState:
 
 
 class GuiApplication:
-  def __init__(self, width: int, height: int):
+  def __init__(self, width: int | None = None, height: int | None = None):
     self._fonts: dict[FontWeight, rl.Font] = {}
-    self._width = width
-    self._height = height
+    self._width = width if width is not None else GuiApplication._default_width()
+    self._height = height if height is not None else GuiApplication._default_height()
 
     if PC and os.getenv("SCALE") is None:
       self._scale = self._calculate_auto_scale()
@@ -215,6 +222,7 @@ class GuiApplication:
     self._mouse_history: deque[MousePosWithTime] = deque(maxlen=MOUSE_THREAD_RATE)
     self._show_touches = SHOW_TOUCHES
     self._show_fps = SHOW_FPS
+    self._grid_size = GRID_SIZE
     self._profile_render_frames = PROFILE_RENDER
     self._render_profiler = None
     self._render_profile_start_time = None
@@ -459,6 +467,9 @@ class GuiApplication:
         if self._show_touches:
           self._draw_touch_points()
 
+        if self._grid_size > 0:
+          self._draw_grid()
+
         rl.end_drawing()
         self._monitor_fps()
         self._frame += 1
@@ -608,6 +619,19 @@ class GuiApplication:
         color = rl.Color(min(int(255 * (1.5 - perc)), 255), int(min(255 * (perc + 0.5), 255)), 50, 255)
         rl.draw_circle(int(mouse_pos.x), int(mouse_pos.y), 5, color)
 
+  def _draw_grid(self):
+    grid_color = rl.Color(60, 60, 60, 255)
+    # Draw vertical lines
+    x = 0
+    while x <= self._scaled_width:
+      rl.draw_line(x, 0, x, self._scaled_height, grid_color)
+      x += self._grid_size
+    # Draw horizontal lines
+    y = 0
+    while y <= self._scaled_height:
+      rl.draw_line(0, y, self._scaled_width, y, grid_color)
+      y += self._grid_size
+
   def _output_render_profile(self):
     import io
     import pstats
@@ -639,5 +663,17 @@ class GuiApplication:
     # Apply 0.95 factor for window decorations/taskbar margin
     return max(0.3, min(w / self._width, h / self._height) * 0.95)
 
+  @staticmethod
+  def _default_width() -> int:
+    return 2160 if GuiApplication.big_ui() else 536
 
-gui_app = GuiApplication(2160, 1080)
+  @staticmethod
+  def _default_height() -> int:
+    return 1080 if GuiApplication.big_ui() else 240
+
+  @staticmethod
+  def big_ui() -> bool:
+    return HARDWARE.get_device_type() in ('tici', 'tizi') or BIG_UI or PC
+
+
+gui_app = GuiApplication()

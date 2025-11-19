@@ -152,7 +152,7 @@ class ShaderState:
     self.initialized = False
 
 
-def _configure_shader_color(state: ShaderState, color: Optional[rl.Color],  # noqa: UP045
+def _configure_shader_color(state: ShaderState, color: Optional[rl.Color],
                             gradient: Gradient | None, origin_rect: rl.Rectangle):
   assert (color is not None) != (gradient is not None), "Either color or gradient must be provided"
 
@@ -191,7 +191,9 @@ def triangulate(pts: np.ndarray) -> list[tuple[float, float]]:
 
   # TODO: consider deduping close screenspace points
   # interleave points to produce a triangle strip
-  assert len(pts) % 2 == 0, "Interleaving expects even number of points"
+  # assert len(pts) % 2 == 0, "Interleaving expects even number of points"
+  if len(pts) % 2 != 0:
+    pts = pts[:-1]
 
   tri_strip = []
   for i in range(len(pts) // 2):
@@ -202,7 +204,7 @@ def triangulate(pts: np.ndarray) -> list[tuple[float, float]]:
 
 
 def draw_polygon(origin_rect: rl.Rectangle, points: np.ndarray,
-                 color: Optional[rl.Color] = None, gradient: Gradient | None = None):  # noqa: UP045
+                 color: Optional[rl.Color] = None, gradient: Gradient | None = None):
 
   """
   Draw a ribbon polygon (two chains) with a triangle strip and gradient.

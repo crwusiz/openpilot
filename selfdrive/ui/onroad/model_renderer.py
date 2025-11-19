@@ -327,6 +327,9 @@ class ModelRenderer(Widget):
     if not self._path.projected_points.size:
       return
 
+    allow_throttle = sm['longitudinalPlan'].allowThrottle or not self._longitudinal_control
+    self._blend_filter.update(int(allow_throttle))
+
     if ui_state.enabled:
       if ui_state.steeringPressed or self._experimental_mode:
         # Draw with acceleration coloring or steering pressed color
@@ -341,10 +344,6 @@ class ModelRenderer(Widget):
         else:
           draw_polygon(self._rect, self._path.projected_points, rl.Color(255, 255, 255, 30))
     else:
-      # Not engaged - show throttle/no throttle colors
-      allow_throttle = sm['longitudinalPlan'].allowThrottle
-      self._blend_filter.update(int(allow_throttle))
-
       # Blend throttle/no throttle colors based on transition
       blend_factor = round(self._blend_filter.x * 100) / 100
       blended_colors = self._blend_colors(NO_THROTTLE_COLORS, THROTTLE_COLORS, blend_factor)
