@@ -376,10 +376,10 @@ main() {
 
   local lang=$(cat /data/params/d/LanguageSetting 2>/dev/null || echo "")
   case "$lang" in
-    "main_ko")
+    "ko")
       set_time_settings "Asia/Seoul"
       ;;
-    "main_en")
+    "en")
       set_time_settings "America/New_York"
       ;;
     *)
