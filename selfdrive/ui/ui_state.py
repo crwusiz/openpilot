@@ -57,14 +57,13 @@ class UIState:
         "managerState",
         "selfdriveState",
         "longitudinalPlan",
-        "rawAudioData",
-        "naviData",
-        "ubloxGnss",
         "gpsLocationExternal",
         "carOutput",
         "carControl",
         "liveParameters",
         "rawAudioData",
+        "naviData",
+        "ubloxGnss",
       ]
     )
 
