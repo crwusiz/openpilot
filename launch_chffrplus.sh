@@ -106,13 +106,13 @@ function launch {
 
   # events language init
   LANG=$(cat ${PARAMS_ROOT}/d/LanguageSetting)
-  EVENTSTAT=$(git status)
+  GITSTAT=$(git status)
 
   # events.py 한글로 변경 및 파일이 교체된 상태인지 확인
-  if [ "${LANG}" = "ko" ] && [[ ! "${EVENTSTAT}" == *"modified:   selfdrive/controls/lib/events.py"* ]]; then
+  if [ "${LANG}" = "ko" ] && [[ ! "${GITSTAT}" == *"modified:   selfdrive/selfdrived/events.py"* ]]; then
     cp -f $DIR/selfdrive/selfdrived/events.py $DIR/scripts/add/events_en.py
     cp -f $DIR/scripts/add/events_ko.py $DIR/selfdrive/selfdrived/events.py
-  elif [ "${LANG}" = "en" ] && [[ "${EVENTSTAT}" == *"modified:   selfdrive/controls/lib/events.py"* ]]; then
+  elif [ "${LANG}" = "en" ] && [[ "${GITSTAT}" == *"modified:   selfdrive/selfdrived/events.py"* ]]; then
     cp -f $DIR/scripts/add/events_en.py $DIR/selfdrive/selfdrived/events.py
   fi
 
@@ -152,10 +152,10 @@ function launch {
   # c3xl amplifier file change
   C3XL=$(cat ${PARAMS_ROOT}/d/HardwareC3xLite)
 
-  if [ "${C3XL}" = "1" ] && [[ ! "${EVENTSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
+  if [ "${C3XL}" = "1" ] && [[ ! "${GITSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
     cp -f $DIR/system/hardware/tici/amplifier.py $DIR/scripts/add/amplifier_org.py
     cp -f $DIR/scripts/add/amplifier_c3xl.py $DIR/system/hardware/tici/amplifier.py
-  elif [ "${C3XL}" = "0" ] && [[ "${EVENTSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
+  elif [ "${C3XL}" = "0" ] && [[ "${GITSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
     cp -f $DIR/scripts/add/amplifier_org.py $DIR/system/hardware/tici/amplifier.py
   fi
 

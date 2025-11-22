@@ -33,7 +33,7 @@ class UIConfig:
 
 @dataclass(frozen=True)
 class FontSizes:
-  current_speed: int = 176
+  current_speed: int = 176 + 24
   speed_unit: int = 66
   middle: int = 40
   big: int = 70
@@ -516,7 +516,7 @@ class HudRenderer(Widget):
     rl.draw_text_ex(
       self._font_bold,
       max_speed_text,
-      rl.Vector2(max_speed_box.x + (max_speed_box.width - max_speed_width) / 2, max_speed_y - 30),
+      rl.Vector2(max_speed_box.x + (max_speed_box.width - max_speed_width) / 2, max_speed_y - 25),
       FONT_SIZES.big,
       0,
       speed_color,
@@ -550,7 +550,7 @@ class HudRenderer(Widget):
       rl.draw_text_ex(
         self._font_bold,
         set_speed_text,
-        rl.Vector2(set_speed_box.x + (set_speed_box.width - set_speed_width) / 2, set_speed_y - 30),
+        rl.Vector2(set_speed_box.x + (set_speed_box.width - set_speed_width) / 2, set_speed_y - 25),
         FONT_SIZES.big,
         0,
         speed_color,
@@ -606,12 +606,12 @@ class HudRenderer(Widget):
       rl.draw_circle(int(center_x), int(center_y), radius, COLORS.white)
 
       # Draw speed number
-      speed_text = str(int(limit_speed))
-      speed_text_width = measure_text_cached(self._font_bold, speed_text, FONT_SIZES.big).x
+      limit_speed_text = str(int(limit_speed))
+      limit_speed_text_width = measure_text_cached(self._font_bold, limit_speed_text, FONT_SIZES.big).x
       rl.draw_text_ex(
         self._font_bold,
-        speed_text,
-        rl.Vector2(center_x - speed_text_width / 2 - 5, center_y / 2 + 30),
+        limit_speed_text,
+        rl.Vector2(center_x - limit_speed_text_width / 2, center_y / 2 + 35),
         FONT_SIZES.big,
         0,
         rl.BLACK,
@@ -798,13 +798,13 @@ class HudRenderer(Widget):
         return "--"
       return str(round(pressure))
 
-    self._draw_text(tpms_x + 25, tpms_y + 40, get_tpms_text(self.fl), FONT_SIZES.info_text, get_tpms_color(self.fl),
+    self._draw_text(tpms_x + 28, tpms_y + 43, get_tpms_text(self.fl), FONT_SIZES.info_text, get_tpms_color(self.fl),
                     "C")
-    self._draw_text(tpms_x + 133, tpms_y + 40, get_tpms_text(self.fr), FONT_SIZES.info_text, get_tpms_color(self.fr),
+    self._draw_text(tpms_x + 136, tpms_y + 43, get_tpms_text(self.fr), FONT_SIZES.info_text, get_tpms_color(self.fr),
                     "C")
-    self._draw_text(tpms_x + 25, tpms_y + 155, get_tpms_text(self.rl), FONT_SIZES.info_text, get_tpms_color(self.rl),
+    self._draw_text(tpms_x + 28, tpms_y + 158, get_tpms_text(self.rl), FONT_SIZES.info_text, get_tpms_color(self.rl),
                     "C")
-    self._draw_text(tpms_x + 133, tpms_y + 155, get_tpms_text(self.rr), FONT_SIZES.info_text, get_tpms_color(self.rr),
+    self._draw_text(tpms_x + 136, tpms_y + 158, get_tpms_text(self.rr), FONT_SIZES.info_text, get_tpms_color(self.rr),
                     "C")
 
     personality = self.params.get("LongitudinalPersonality") or "1"
