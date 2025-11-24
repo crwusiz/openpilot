@@ -27,6 +27,11 @@ NO_THROTTLE_COLORS = [
   rl.Color(242, 242, 242, 0),   # HSLF(112/360, 0.0, 0.95, 0.0)
 ]
 
+STEERING_COLORS = [
+  rl.Color(0, 191, 255, 102),
+  rl.Color(0, 191, 255, 89),
+  rl.Color(0, 191, 255, 0),
+]
 
 @dataclass
 class ModelPoints:
@@ -81,6 +86,13 @@ class ModelRenderer(Widget):
       end=(0.0, 0.0),  # Top of path
       colors=[],
       stops=[],
+    )
+
+    self._steering_pressed_gradient = Gradient(
+      start=(0.0, 1.0),
+      end=(0.0, 0.0),
+      colors=STEERING_COLORS,
+      stops=[0.0, 0.5, 1.0],
     )
 
     # Get longitudinal control setting from car parameters
@@ -216,22 +228,8 @@ class ModelRenderer(Widget):
     self._update_experimental_gradient()
 
   def _update_experimental_gradient(self):
-    if not self._experimental_mode or not ui_state.enabled:
-      return
-
-    # Check if user is steering
-    if ui_state.steeringPressed:
-      # Use steering pressed color (cyan/deep sky blue)
-      steering_color = rl.Color(0, 191, 255, 100)
-      mid_color = rl.Color(0, 191, 255, 50)
-      end_color = rl.Color(0, 191, 255, 0)
-      self._exp_gradient = Gradient(
-        start=(0.0, 1.0),
-        end=(0.0, 0.0),
-        colors=[steering_color, mid_color, end_color],
-        stops=[0.0, 0.5, 1.0],
-      )
-      return
+    #if not self._experimental_mode:
+    #  return
 
     max_len = min(len(self._path.projected_points) // 2, len(self._acceleration_x))
 
@@ -308,11 +306,11 @@ class ModelRenderer(Widget):
 
     # Draw blindspot barriers
     if self._left_blindspot and self._lane_barriers[0].projected_points.size > 0:
-      color = rl.Color(255, 0, 0, 51)  # Red with 0.2 alpha
+      color = rl.Color(255, 0, 0, 100)
       draw_polygon(self._rect, self._lane_barriers[0].projected_points, color)
 
     if self._right_blindspot and self._lane_barriers[1].projected_points.size > 0:
-      color = rl.Color(255, 0, 0, 51)  # Red with 0.2 alpha
+      color = rl.Color(255, 0, 0, 100)
       draw_polygon(self._rect, self._lane_barriers[1].projected_points, color)
 
     for i, road_edge in enumerate(self._road_edges):
@@ -331,18 +329,12 @@ class ModelRenderer(Widget):
     self._blend_filter.update(int(allow_throttle))
 
     if ui_state.enabled:
-      if ui_state.steeringPressed or self._experimental_mode:
-        # Draw with acceleration coloring or steering pressed color
-        if len(self._exp_gradient.colors) > 1:
-          draw_polygon(self._rect, self._path.projected_points, gradient=self._exp_gradient)
-        else:
-          draw_polygon(self._rect, self._path.projected_points, rl.Color(255, 255, 255, 30))
+      if ui_state.steeringPressed:
+        draw_polygon(self._rect, self._path.projected_points, gradient=self._steering_pressed_gradient)
+      elif len(self._exp_gradient.colors) > 1:
+        draw_polygon(self._rect, self._path.projected_points, gradient=self._exp_gradient)
       else:
-        # Draw acceleration gradient when engaged but not in experimental mode
-        if len(self._exp_gradient.colors) > 1:
-          draw_polygon(self._rect, self._path.projected_points, gradient=self._exp_gradient)
-        else:
-          draw_polygon(self._rect, self._path.projected_points, rl.Color(255, 255, 255, 30))
+        draw_polygon(self._rect, self._path.projected_points, rl.Color(255, 255, 255, 30))
     else:
       # Blend throttle/no throttle colors based on transition
       blend_factor = round(self._blend_filter.x * 100) / 100
