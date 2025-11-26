@@ -9,6 +9,9 @@ SELFDRIVE_DIR = FONT_DIR.parents[1]
 TRANSLATIONS_DIR = SELFDRIVE_DIR / "ui" / "translations"
 LANGUAGES_FILE = TRANSLATIONS_DIR / "languages.json"
 
+OPENPILOT_DIR = SELFDRIVE_DIR.parent
+EVENTS_KO_PATH = OPENPILOT_DIR / "scripts" / "add" / "events_ko.py"
+
 GLYPH_PADDING = 6
 EXTRA_CHARS = "–‑✓×°§•X⚙✕◀▶✔⌫⇧␣○●↳çêüñ–‑✓×°§•€£¥"
 UNIFONT_LANGUAGES = {"ar", "th", "zh-CHT", "zh-CHS", "ko", "ja"}
@@ -26,13 +29,19 @@ def _char_sets():
   unifont = set(base)
 
   for language, code in _languages().items():
-    unifont.update(language)
+    #unifont.update(language)
     po_path = TRANSLATIONS_DIR / f"app_{code}.po"
     try:
       chars = set(po_path.read_text(encoding="utf-8"))
+      (unifont if code in UNIFONT_LANGUAGES else base).update(chars)
     except FileNotFoundError:
-      continue
-    (unifont if code in UNIFONT_LANGUAGES else base).update(chars)
+      pass
+
+    if code == "ko":
+      events_ko_path = EVENTS_KO_PATH
+      if events_ko_path.exists():
+        event_chars = set(events_ko_path.read_text(encoding="utf-8"))
+        unifont.update(event_chars)
 
   return tuple(sorted(ord(c) for c in base)), tuple(sorted(ord(c) for c in unifont))
 
