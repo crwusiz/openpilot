@@ -14,7 +14,7 @@ from openpilot.system.ui.widgets import Widget, DialogResult
 from openpilot.system.ui.widgets.list_view import toggle_item, button_item, ListItem
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
-from openpilot.system.ui.lib.application import gui_app
+from openpilot.system.ui.lib.application import FontWeight, gui_app
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
 
@@ -85,6 +85,10 @@ class CommunityLayout(Widget):
     self._function_items = []
     self._log_items = []
 
+    self._manufacturer_dialog = None
+    self._car_dialog = None
+    self._branch_dialog = None
+
     self._build_toggle_items()
     self._build_function_items()
     self._build_log_items()
@@ -96,16 +100,16 @@ class CommunityLayout(Widget):
     manufacturers = ["[ Not Selected ]", "HYUNDAI", "KIA", "GENESIS"]
     current_selection = self._params.get("SelectedManufacturer")
 
-    dialog = MultiOptionDialog(tr("Manufacturer"), manufacturers,
-                               current=(current_selection if current_selection else manufacturers[0]))
-    gui_app.set_modal_overlay(dialog)
-    dialog_result = dialog._result
+    def handle_manufacturer_selection(result: int):
+      if result != DialogResult.CONFIRM or not self._manufacturer_dialog:
+        self._manufacturer_dialog = None
+        return
 
-    if dialog_result is DialogResult.CONFIRM:
-      selected_manufacturer = dialog.selection
+      selected_manufacturer = self._manufacturer_dialog.selection
+
       if selected_manufacturer == "[ Not Selected ]":
         self._params.remove("SelectedManufacturer")
-        subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
+        self._params.remove("SelectedCar")
       else:
         car_list_file = ""
         if selected_manufacturer == "HYUNDAI":
@@ -115,53 +119,96 @@ class CommunityLayout(Widget):
         elif selected_manufacturer == "GENESIS":
           car_list_file = "/data/params/crwusiz/CarList_Genesis"
 
-        if car_list_file:
-          execute_script("cp", "-f", car_list_file, "/data/params/crwusiz/CarList")
+        if car_list_file and Path(car_list_file).exists():
+          try:
+            shutil.copy2(car_list_file, "/data/params/crwusiz/CarList")
+            print(f"Copied {car_list_file} to CarList")
+          except Exception as e:
+            print(f"Error copying car list: {e}")
 
-        self._params.put("SelectedManufacturer", selected_manufacturer)
-        dlg = ConfirmDialog(selected_manufacturer, tr("OK"))
-        gui_app.set_modal_overlay(dlg)
-        subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
+        self._params.put("SelectedManufacturer", str(selected_manufacturer))
+        print(f"Saved manufacturer: {selected_manufacturer}")
+
+      self._manufacturer_dialog = None
+
+    self._manufacturer_dialog = MultiOptionDialog(
+        tr("Manufacturer"),
+        manufacturers,
+        current=(current_selection if current_selection else manufacturers[0])
+    )
+    gui_app.set_modal_overlay(self._manufacturer_dialog, callback=handle_manufacturer_selection)
 
   def _on_select_car(self):
     cars = ["[ Not Selected ]"] + get_list("/data/params/crwusiz/CarList")
+
+    if len(cars) == 1:
+      dlg = ConfirmDialog(
+        tr("Please select manufacturer first"),
+        tr("OK")
+      )
+      gui_app.set_modal_overlay(dlg)
+      return
+
     current_selection = self._params.get("SelectedCar")
 
-    dialog = MultiOptionDialog(tr("Car"), cars,
-                               current=(current_selection if current_selection else cars[0]))
-    gui_app.set_modal_overlay(dialog)
-    dialog_result = dialog._result
+    def handle_car_selection(result: int):
+      if result != DialogResult.CONFIRM or not self._car_dialog:
+        self._car_dialog = None
+        return
 
-    if dialog_result is DialogResult.CONFIRM:
-      selected_car = dialog.selection
+      selected_car = self._car_dialog.selection
+
       if selected_car == "[ Not Selected ]":
         self._params.remove("SelectedCar")
-        subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
+        print("Removed car selection")
       else:
-        self._params.put("SelectedCar", selected_car)
-        dlg = ConfirmDialog(selected_car, tr("OK"))
-        gui_app.set_modal_overlay(dlg)
-        subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
+        self._params.put("SelectedCar", str(selected_car))
+        print(f"Saved car: {selected_car}")
+
+      self._car_dialog = None
+
+    self._car_dialog = MultiOptionDialog(
+      tr("Car"),
+      cars,
+      current=(current_selection if current_selection else cars[0])
+    )
+    gui_app.set_modal_overlay(self._car_dialog, callback=handle_car_selection)
 
   def _on_select_branch(self):
     branches = ["[ Not Selected ]"] + get_list("/data/params/crwusiz/GitBranchList")
+
+    if len(branches) == 1:
+      dlg = ConfirmDialog(
+        tr("Branch list not found"),
+        tr("OK")
+      )
+      gui_app.set_modal_overlay(dlg)
+      return
+
     current_selection = self._params.get("SelectedBranch")
 
-    dialog = MultiOptionDialog(tr("Branch"), branches,
-                               current=(current_selection if current_selection else branches[0]))
-    gui_app.set_modal_overlay(dialog)
-    dialog_result = dialog._result
+    def handle_branch_selection(result: int):
+      if result != DialogResult.CONFIRM or not self._branch_dialog:
+        self._branch_dialog = None
+        return
 
-    if dialog_result is DialogResult.CONFIRM:
-      selected_branch = dialog.selection
+      selected_branch = self._branch_dialog.selection
+
       if selected_branch == "[ Not Selected ]":
         self._params.remove("SelectedBranch")
-        subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
+        print("Removed branch selection")
       else:
-        self._params.put("SelectedBranch", selected_branch)
-        dlg = ConfirmDialog(selected_branch, tr("OK"))
-        gui_app.set_modal_overlay(dlg)
-        subprocess.run(["pkill", "-9", "-f", "selfdrive.ui.ui"])
+        self._params.put("SelectedBranch", str(selected_branch))
+        print(f"Saved branch: {selected_branch}")
+
+      self._branch_dialog = None
+
+    self._branch_dialog = MultiOptionDialog(
+      tr("Branch"),
+      branches,
+      current=(current_selection if current_selection else branches[0])
+    )
+    gui_app.set_modal_overlay(self._branch_dialog, callback=handle_branch_selection)
 
   def _draw_button(self, rect, text, is_selected=False, is_header=False):
     if is_header:
@@ -173,11 +220,24 @@ class CommunityLayout(Widget):
 
     rl.draw_rectangle_lines_ex(rect, 1, rl.Color(80, 80, 80, 255))
 
-    text_width = rl.measure_text(text, FONT_SIZE)
-    text_x = rect.x + (rect.width - text_width) / 2
-    text_y = rect.y + (rect.height - FONT_SIZE) / 2
+    font = gui_app.font(FontWeight.NORMAL)
 
-    rl.draw_text(text, int(text_x), int(text_y), FONT_SIZE, rl.WHITE)
+    if '\n' in text:
+      lines = text.split('\n')
+      line_height = FONT_SIZE * 1.2
+      total_height = line_height * len(lines)
+      start_y = rect.y + (rect.height - total_height) / 2
+
+      for i, line in enumerate(lines):
+        text_size = rl.measure_text_ex(font, line, FONT_SIZE, 1)
+        text_x = rect.x + (rect.width - text_size.x) / 2
+        text_y = start_y + (i * line_height)
+        rl.draw_text_ex(font, line, rl.Vector2(text_x, text_y), FONT_SIZE, 1, rl.WHITE)
+    else:
+      text_size = rl.measure_text_ex(font, text, FONT_SIZE, 1)
+      text_x = rect.x + (rect.width - text_size.x) / 2
+      text_y = rect.y + (rect.height - text_size.y) / 2
+      rl.draw_text_ex(font, text, rl.Vector2(text_x, text_y), FONT_SIZE, 1, rl.WHITE)
 
   def _is_point_in_rect(self, x, y, rect):
     return (rect.x <= x <= rect.x + rect.width and
@@ -357,6 +417,7 @@ class CommunityLayout(Widget):
     self._content_scroller = Scroller(items, line_separator=True, spacing=0)
 
   def _render(self, rect):
+    import re
     self._rect = rect
 
     col_width = rect.width / 3
@@ -369,6 +430,16 @@ class CommunityLayout(Widget):
 
     self._car_rect = rl.Rectangle(rect.x + col_width, rect.y, col_width, HEADER_ROW_HEIGHT)
     car_text = self._params.get("SelectedCar")
+
+    if car_text:
+      first_space_index = car_text.find(' ')
+      if first_space_index != -1:
+        car_text = car_text[first_space_index + 1:].strip()
+
+    match = re.match(r'^(.+?)(\s*\([^)]+\))$', car_text)
+    if match:
+      car_text = match.group(1).strip() + "\n" + match.group(2).strip()
+
     if not car_text:
       car_text = tr("Car")
     self._draw_button(self._car_rect, car_text, is_header=True)

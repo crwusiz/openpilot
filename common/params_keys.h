@@ -136,7 +136,6 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"AutoLaneChangeEnable", {PERSISTENT, BOOL}},
     {"PrebuiltEnable", {PERSISTENT, BOOL}},
     {"LoggerEnable", {PERSISTENT, BOOL}},
-    {"SelectedCar", {PERSISTENT, STRING}},
     {"RadarTrackEnable", {PERSISTENT, BOOL}},
     {"IsHda2", {PERSISTENT, BOOL}},
     {"DriverCameraHardwareMissing", {PERSISTENT, BOOL}},
@@ -147,6 +146,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HardwareC3xLite", {PERSISTENT, BOOL}},
 
     {"SelectedManufacturer", {PERSISTENT, STRING}},
+    {"SelectedCar", {PERSISTENT, STRING}},
     {"SelectedBranch", {PERSISTENT, STRING}},
     {"CarName", {CLEAR_ON_MANAGER_START, STRING}},
     {"DevicePosition", {CLEAR_ON_MANAGER_START, STRING}},
