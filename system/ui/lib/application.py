@@ -86,18 +86,18 @@ FONT_DIR = ASSETS_DIR.joinpath("fonts")
 
 
 class FontWeight(StrEnum):
-  LIGHT = "Inter-Light.fnt"
-  NORMAL = "Inter-Regular.fnt" if BIG_UI else "Inter-Medium.fnt"
-  MEDIUM = "Inter-Medium.fnt"
-  BOLD = "Inter-Bold.fnt"
-  SEMI_BOLD = "Inter-SemiBold.fnt"
-  EXTRA_BOLD = "Inter-ExtraBold.fnt"
+  LIGHT = "NotoSansKR-Light.fnt"
+  NORMAL = "NotoSansKR-Regular.fnt" if BIG_UI else "NotoSansKR-Medium.fnt"
+  MEDIUM = "NotoSansKR-Medium.fnt"
+  BOLD = "NotoSansKR-Bold.fnt"
+  SEMI_BOLD = "NotoSansKR-SemiBold.fnt"
+  EXTRA_BOLD = "NotoSansKR-ExtraBold.fnt"
   UNIFONT = "NotoSansKR-Bold.fnt"
 
   # Small UI fonts
-  DISPLAY_REGULAR = "Inter-Regular.fnt"
-  ROMAN = "Inter-Regular.fnt"
-  DISPLAY = "Inter-Bold.fnt"
+  DISPLAY_REGULAR = "NotoSansKR-Regular.fnt"
+  ROMAN = "NotoSansKR-Regular.fnt"
+  DISPLAY = "NotoSansKR-Bold.fnt"
 
 
 def font_fallback(font: rl.Font) -> rl.Font:
