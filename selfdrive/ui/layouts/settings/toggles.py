@@ -95,7 +95,7 @@ class TogglesLayout(Widget):
     self._long_personality_setting = multiple_button_item(
       lambda: tr("Driving Personality"),
       lambda: tr(DESCRIPTIONS["LongitudinalPersonality"]),
-      buttons=[lambda: tr("Aggressive"), lambda: tr("Standard"), lambda: tr("Relaxed")],
+      buttons=[lambda: tr("Aggressive"), lambda: tr("Standard"), lambda: tr("Relaxed"), lambda: tr("More Relaxed")],
       button_width=255,
       callback=self._set_longitudinal_personality,
       selected_index=self._params.get("LongitudinalPersonality", return_default=True),
