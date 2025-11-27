@@ -88,6 +88,8 @@ class HudRenderer(Widget):
     self.autohold_state: int = 0
     self.left_blinker: bool = False
     self.right_blinker: bool = False
+    self.left_blind_spot: bool = False
+    self.right_blind_spot: bool = False
     self.wifi_state: int = 0
     self.gps_bearing: float = 0.0
     self.gps_vertical_accuracy: float = 0.0
@@ -215,6 +217,10 @@ class HudRenderer(Widget):
     # TPMS
     self.tpms_img = gui_app.texture("icons/tpms.png", 160, 208)
 
+    # blind spot detect
+    self.blind_spot_left_img = gui_app.texture("icons/blind_spot_left.png", 184, 200)
+    self.blind_spot_right_img = gui_app.texture("icons/blind_spot_right.png", 184, 200)
+
   def _update_state(self) -> None:
     sm = ui_state.sm
     if sm.recv_frame["carState"] < ui_state.started_frame:
@@ -261,6 +267,8 @@ class HudRenderer(Widget):
     self.left_blinker = car_state.leftBlinker
     self.right_blinker = car_state.rightBlinker
     self.steer_angle = car_state.steeringAngleDeg
+    self.left_blind_spot = car_state.leftBlindspot
+    self.right_blind_spot = car_state.rightBlindspot
 
     # Get ex_state if available
     if hasattr(car_state, 'exState'):
@@ -380,6 +388,7 @@ class HudRenderer(Widget):
       self._draw_tpms_distance(rect)
 
     self._draw_blinkers(rect)
+    self._draw_blind_spot_detect(rect)
 
     button_x = rect.x + rect.width - UI_CONFIG.border_size - UI_CONFIG.button_size + 10
     button_y = rect.y + UI_CONFIG.border_size + 10
@@ -901,6 +910,35 @@ class HudRenderer(Widget):
             rl.Rectangle(x_pos, y, blinker_width, blinker_height),
             rl.Vector2(0, 0), 0, color
           )
+
+  def _draw_blind_spot_detect(self, rect: rl.Rectangle) -> None:
+    blinder_w = 184
+    blinder_h = 200
+
+    center_y = rect.y + rect.height / 2
+    y_pos = center_y - blinder_h / 2
+
+    segment_width = rect.width / 5
+
+    if self.left_blind_spot:
+      x_pos = rect.x + segment_width * 1.5 - blinder_w / 2
+
+      rl.draw_texture_pro(
+        self.blind_spot_left_img,
+        rl.Rectangle(0, 0, blinder_w, blinder_h),
+        rl.Rectangle(x_pos, y_pos, blinder_w, blinder_h),
+        rl.Vector2(0, 0), 0, rl.WHITE
+      )
+
+    if self.right_blind_spot:
+      x_pos = rect.x + segment_width * 3.5 - blinder_w / 2
+
+      rl.draw_texture_pro(
+        self.blind_spot_right_img,
+        rl.Rectangle(0, 0, blinder_w, blinder_h),
+        rl.Rectangle(x_pos, y_pos, blinder_w, blinder_h),
+        rl.Vector2(0, 0), 0, rl.WHITE
+      )
 
   def _draw_text(self, x: float, y: float, text: str, font_size: int,
                  color: rl.Color, alignment: str = "L") -> None:

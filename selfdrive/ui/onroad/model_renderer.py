@@ -7,7 +7,7 @@ from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params
 from openpilot.selfdrive.locationd.calibrationd import HEIGHT_INIT
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.system.ui.lib.application import gui_app
+from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 from openpilot.system.ui.widgets import Widget
 
@@ -68,6 +68,7 @@ class ModelRenderer(Widget):
     self._speed = 0.0
     self._left_blindspot = False
     self._right_blindspot = False
+    self._font_medium: rl.Font = gui_app.font(FontWeight.MEDIUM)
 
     # Initialize ModelPoints objects
     self._path = ModelPoints()
@@ -378,7 +379,7 @@ class ModelRenderer(Widget):
           d_color = rl.RED if d_rel < 5 else rl.Color(255, 149, 0, 255)  # Orange
 
         l_dist = f"{d_rel:.1f} m"
-        self._draw_text_centered(x, text_y + 70.0, l_dist, 35, d_color)
+        self._draw_text_centered(x, text_y + 70.0, l_dist, 35, d_color, self._font_medium)
 
         # Speed text
         v_color = rl.Color(255, 191, 191, 255)  # Pink
@@ -390,11 +391,17 @@ class ModelRenderer(Widget):
         else:
           l_speed = f"{self._speed + v_rel * 2.236936:.0f} mph"
 
-        self._draw_text_centered(x, text_y + 120.0, l_speed, 35, v_color)
+        self._draw_text_centered(x, text_y + 120.0, l_speed, 35, v_color, self._font_medium)
 
-  def _draw_text_centered(self, x: float, y: float, text: str, font_size: int, color: rl.Color):
-    text_width = rl.measure_text(text, font_size)
-    rl.draw_text(text, int(x - text_width / 2), int(y - font_size / 2), font_size, color)
+  def _draw_text_centered(self, x: float, y: float, text: str, font_size: int, color: rl.Color, font: rl.Font):
+    text_size = rl.measure_text_ex(font, text, font_size, 0)
+    text_width = text_size.x
+    text_height = text_size.y
+
+    x_pos = int(x - text_width / 2)
+    y_pos = int(y - text_height / 2)
+
+    rl.draw_text_ex(font, text, rl.Vector2(x_pos, y_pos), font_size, 0, color)
 
   @staticmethod
   def _get_path_length_idx(pos_x_array: np.ndarray, path_distance: float) -> int:
