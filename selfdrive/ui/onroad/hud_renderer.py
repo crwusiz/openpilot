@@ -378,8 +378,7 @@ class HudRenderer(Widget):
       self._draw_set_speed(rect)
 
     self._draw_current_speed(rect)
-    self._draw_upper_left_info(rect)
-    self._draw_upper_right_info(rect)
+    self._draw_upper_info(rect)
     self._draw_upper_icons(rect)
 
     if not self.hide_bottom_icons:
@@ -428,8 +427,8 @@ class HudRenderer(Widget):
     sat_color = self._get_color_for_angle(self.steer_angle_target)
     sa_str = f"R {abs(self.steer_angle):.1f} °"
     sat_str = f"T {abs(self.steer_angle_target):.1f} °"
-    self._draw_text(start_x, y + icon_size / 2 + 50, sa_str, FONT_SIZES.info_text, sa_color, "C")
-    self._draw_text(start_x, y + icon_size / 2 + 75, sat_str, FONT_SIZES.info_text, sat_color, "C")
+    self._draw_text(start_x, y + icon_size / 2 + 50, sa_str, FONT_SIZES.info_text, sa_color)
+    self._draw_text(start_x, y + icon_size / 2 + 75, sat_str, FONT_SIZES.info_text, sat_color)
 
     # LKA button
     lka_x = start_x + UI_CONFIG.button_size
@@ -507,28 +506,22 @@ class HudRenderer(Widget):
 
     # MAX text
     max_text = "MAX"
-    max_text_width = measure_text_cached(self._font_semi_bold, max_text, FONT_SIZES.middle).x
-    max_text_y = max_speed_box.y + 10
-    rl.draw_text_ex(
-      self._font_semi_bold,
+    self._draw_text(
+      max_speed_box.x + max_speed_box.width / 2,
+      max_speed_box.y + 30,
       max_text,
-      rl.Vector2(max_speed_box.x + (max_speed_box.width - max_text_width) / 2, max_text_y),
       FONT_SIZES.middle,
-      0,
-      max_color,
+      max_color
     )
 
     # MAX speed value
     max_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(self.cruise_speed))
-    max_speed_width = measure_text_cached(self._font_bold, max_speed_text, FONT_SIZES.big).x
-    max_speed_y = max_speed_box.y + 70
-    rl.draw_text_ex(
-      self._font_bold,
+    self._draw_text(
+      max_speed_box.x + max_speed_box.width / 2,
+      max_speed_box.y + 85,
       max_speed_text,
-      rl.Vector2(max_speed_box.x + (max_speed_box.width - max_speed_width) / 2, max_speed_y - 25),
       FONT_SIZES.big,
-      0,
-      speed_color,
+      speed_color
     )
 
     # SET speed box (only if NDA or stock limit is active)
@@ -541,27 +534,21 @@ class HudRenderer(Widget):
 
       # SET text
       set_text = "SET"
-      set_text_width = measure_text_cached(self._font_semi_bold, set_text, FONT_SIZES.middle).x
-      set_text_y = set_speed_box.y + 10
-      rl.draw_text_ex(
-        self._font_semi_bold,
+      self._draw_text(
+        set_speed_box.x + set_speed_box.width / 2,
+        set_speed_box.y + 30,
         set_text,
-        rl.Vector2(set_speed_box.x + (set_speed_box.width - set_text_width) / 2, set_text_y),
         FONT_SIZES.middle,
-        0,
-        max_color,
+        max_color
       )
 
       # SET speed value (apply_speed)
       set_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(self.apply_speed))
-      set_speed_width = measure_text_cached(self._font_bold, set_speed_text, FONT_SIZES.big).x
-      set_speed_y = set_speed_box.y + 70
-      rl.draw_text_ex(
-        self._font_bold,
+      self._draw_text(
+        set_speed_box.x + set_speed_box.width / 2,
+        set_speed_box.y + 85,
         set_speed_text,
-        rl.Vector2(set_speed_box.x + (set_speed_box.width - set_speed_width) / 2, set_speed_y - 25),
         FONT_SIZES.big,
-        0,
         speed_color,
       )
 
@@ -616,14 +603,12 @@ class HudRenderer(Widget):
 
       # Draw speed number
       limit_speed_text = str(int(limit_speed))
-      limit_speed_text_width = measure_text_cached(self._font_bold, limit_speed_text, FONT_SIZES.big).x
-      rl.draw_text_ex(
-        self._font_bold,
+      self._draw_text(
+        center_x,
+        center_y,
         limit_speed_text,
-        rl.Vector2(center_x - limit_speed_text_width / 2, center_y / 2 + 35),
         FONT_SIZES.big,
-        0,
-        rl.BLACK,
+        rl.BLACK
       )
 
       # Draw distance if available
@@ -639,14 +624,13 @@ class HudRenderer(Widget):
         else:
           dist_text = f"{int(left_dist)} m"
 
-        dist_width = measure_text_cached(self._font_medium, dist_text, FONT_SIZES.middle).x
-        rl.draw_text_ex(
-          self._font_medium,
-          dist_text,
-          rl.Vector2(center_x - dist_width / 2, center_y + radius + 10),
-          FONT_SIZES.middle,
-          0,
-          COLORS.white_translucent,
+        self._draw_text_with_background(
+          x=center_x,
+          y=center_y + radius + 10,
+          text=dist_text,
+          font_size=FONT_SIZES.middle,
+          text_color=COLORS.white_translucent,
+          bg_color=COLORS.black_translucent,
         )
 
     # Road sign
@@ -699,22 +683,41 @@ class HudRenderer(Widget):
       speed_color = rl.Color(255, alpha, alpha, 200)
 
     speed_text = str(round(self.speed))
-    speed_text_size = measure_text_cached(self._font_extra_bold, speed_text, FONT_SIZES.current_speed)
-    speed_pos = rl.Vector2(rect.x + rect.width / 2 - speed_text_size.x / 2, 180 - speed_text_size.y / 2)
-    rl.draw_text_ex(self._font_extra_bold, speed_text, speed_pos, FONT_SIZES.current_speed, 0, speed_color)
+    center_x = rect.x + rect.width / 2
+
+    self._draw_text(
+      center_x,
+      180,
+      speed_text,
+      FONT_SIZES.current_speed,
+      speed_color
+    )
 
     unit_text = "km/h" if ui_state.is_metric else "mph"
-    unit_text_size = measure_text_cached(self._font_medium, unit_text, FONT_SIZES.speed_unit)
-    unit_pos = rl.Vector2(rect.x + rect.width / 2 - unit_text_size.x / 2, 290 - unit_text_size.y / 2)
-    rl.draw_text_ex(self._font_medium, unit_text, unit_pos, FONT_SIZES.speed_unit, 0, COLORS.light_orange)
+    self._draw_text(
+      center_x,
+      290,
+      unit_text,
+      FONT_SIZES.speed_unit,
+      COLORS.light_orange
+    )
 
-  def _draw_upper_left_info(self, rect: rl.Rectangle) -> None:
-    x = rect.x + UI_CONFIG.border_size
+  def _draw_upper_info(self, rect: rl.Rectangle) -> None:
+    x = rect.x + UI_CONFIG.border_size * 2
     y = rect.y + 20
 
-    # Car name
+    # Upper left - Car name
     car_name = self.params.get("CarName") or "Unknown"
-    self._draw_text(x, y, car_name, FONT_SIZES.info_text, COLORS.white_translucent)
+
+    self._draw_text_with_background(
+      x=x,
+      y=y,
+      text=car_name,
+      font_size=FONT_SIZES.info_text,
+      text_color=COLORS.white_translucent,
+      bg_color=COLORS.black_translucent,
+      alignment="L"
+    )
 
     # Settings badges
     x = rect.x + 400
@@ -738,20 +741,23 @@ class HudRenderer(Widget):
       badges.append("Radar")
 
     for badge in badges:
-      badge_width = measure_text_cached(self._font_medium, badge, FONT_SIZES.info_text).x
-      # Draw badge background
-      rl.draw_rectangle_rounded(
-        rl.Rectangle(x - 10, y - 10, badge_width + 20, 40),
-        0.5, 10, COLORS.black_translucent
+      self._draw_text_with_background(
+        x=x,
+        y=y,
+        text=badge,
+        font_size=FONT_SIZES.info_text,
+        text_color=COLORS.lime,
+        bg_color=COLORS.black_translucent,
+        alignment="L"
       )
-      self._draw_text(x, y + 10, badge, FONT_SIZES.info_text, COLORS.lime)
+
+      badge_width = self._get_text_size(badge, FONT_SIZES.info_text).x
       x += badge_width + 30
 
-  def _draw_upper_right_info(self, rect: rl.Rectangle) -> None:
     x = rect.x + rect.width - UI_CONFIG.border_size * 2
     y = rect.y + 20
 
-    # GPS info
+    # Upper right - GPS info
     if self.gps_satellite_count == 0:
       gps_text = "No GPS Signal"
     else:
@@ -759,26 +765,56 @@ class HudRenderer(Widget):
       acc_str = "--" if self.gps_horizontal_accuracy == 0 or self.gps_horizontal_accuracy > 100 else f"{self.gps_horizontal_accuracy:.1f} m"
       gps_text = f"Alt({alt_str}) Acc({acc_str}) Sat({self.gps_satellite_count})"
 
-    text_width = measure_text_cached(self._font_medium, gps_text, FONT_SIZES.info_text).x
-    self._draw_text(x - text_width, y, gps_text, FONT_SIZES.info_text, COLORS.white_translucent)
+    self._draw_text_with_background(
+      x=x,
+      y=y,
+      text=gps_text,
+      font_size=FONT_SIZES.info_text,
+      text_color=COLORS.white_translucent,
+      bg_color=COLORS.black_translucent,
+      alignment="R"
+    )
 
   def _draw_bottom_info(self, rect: rl.Rectangle) -> None:
     # Bottom left - date
-    x = rect.x + UI_CONFIG.border_size
+    x = rect.x + UI_CONFIG.border_size * 2
     y = rect.y + rect.height - 20
     date_str = datetime.now().strftime("%Y-%m-%d")
-    self._draw_text(x, y, date_str, FONT_SIZES.info_text, COLORS.white_translucent)
+    self._draw_text_with_background(
+      x=x,
+      y=y,
+      text=date_str,
+      font_size=FONT_SIZES.info_text,
+      text_color=COLORS.white_translucent,
+      bg_color=COLORS.black_translucent,
+      alignment="L"
+    )
 
-    # Bottom left - steering info
+    # Steering Angle info
     x = rect.x + 400
     steer_info = f"SteerRatio({self.steer_ratio:.1f}) Torque({abs(self.steer_torque):.1f}) Curvature({abs(self.curvature):.3f})"
-    self._draw_text(x, y, steer_info, FONT_SIZES.info_text, COLORS.white_translucent)
+    self._draw_text_with_background(
+      x=x,
+      y=y,
+      text=steer_info,
+      font_size=FONT_SIZES.info_text,
+      text_color=COLORS.white_translucent,
+      bg_color=COLORS.black_translucent,
+      alignment="L"
+    )
 
     # Bottom right - version info
     x = rect.x + rect.width - UI_CONFIG.border_size * 2
     version = self.params.get("UpdaterCurrentDescription") or ""
-    text_width = measure_text_cached(self._font_medium, version, FONT_SIZES.info_text).x
-    self._draw_text(x - text_width, y, version, FONT_SIZES.info_text, COLORS.white_translucent)
+    self._draw_text_with_background(
+      x=x,
+      y=y,
+      text=version,
+      font_size=FONT_SIZES.info_text,
+      text_color=COLORS.white_translucent,
+      bg_color=COLORS.black_translucent,
+      alignment="R"
+    )
 
   def _draw_tpms_distance(self, rect: rl.Rectangle) -> None:
     tpms_w = 160
@@ -807,14 +843,10 @@ class HudRenderer(Widget):
         return "--"
       return str(round(pressure))
 
-    self._draw_text(tpms_x + 28, tpms_y + 43, get_tpms_text(self.fl), FONT_SIZES.info_text, get_tpms_color(self.fl),
-                    "C")
-    self._draw_text(tpms_x + 136, tpms_y + 43, get_tpms_text(self.fr), FONT_SIZES.info_text, get_tpms_color(self.fr),
-                    "C")
-    self._draw_text(tpms_x + 28, tpms_y + 158, get_tpms_text(self.rl), FONT_SIZES.info_text, get_tpms_color(self.rl),
-                    "C")
-    self._draw_text(tpms_x + 136, tpms_y + 158, get_tpms_text(self.rr), FONT_SIZES.info_text, get_tpms_color(self.rr),
-                    "C")
+    self._draw_text(tpms_x + 28, tpms_y + 43, get_tpms_text(self.fl), FONT_SIZES.info_text, get_tpms_color(self.fl))
+    self._draw_text(tpms_x + 136, tpms_y + 43, get_tpms_text(self.fr), FONT_SIZES.info_text, get_tpms_color(self.fr))
+    self._draw_text(tpms_x + 28, tpms_y + 158, get_tpms_text(self.rl), FONT_SIZES.info_text, get_tpms_color(self.rl))
+    self._draw_text(tpms_x + 136, tpms_y + 158, get_tpms_text(self.rr), FONT_SIZES.info_text, get_tpms_color(self.rr))
 
     personality = self.params.get("LongitudinalPersonality") or "1"
     dist_imgs = [self.dist1_img, self.dist2_img, self.dist3_img, self.dist4_img]
@@ -940,23 +972,63 @@ class HudRenderer(Widget):
         rl.Vector2(0, 0), 0, rl.WHITE
       )
 
+  # ----------------- helper function -----------------
   def _draw_text(self, x: float, y: float, text: str, font_size: int,
-                 color: rl.Color, alignment: str = "L") -> None:
-    text_size = measure_text_cached(self._font_medium, text, font_size)
+                 color: rl.Color, alignment: str = "C") -> None:
+    text_size = measure_text_cached(self._font_bold, text, font_size)
 
-    if alignment == "R":
-      x = x - text_size.x
-    elif alignment == "C":
-      x = x - text_size.x / 2
+    if alignment == "L":
+      draw_x = x
+    elif alignment == "R":
+      draw_x = x - text_size.x
+    else: # alignment == "C":
+      draw_x = x - text_size.x / 2
 
     rl.draw_text_ex(
-      self._font_medium,
+      self._font_bold,
       text,
-      rl.Vector2(x, y - text_size.y / 2),
+      rl.Vector2(draw_x, y - text_size.y / 2),
       font_size,
       0,
       color
     )
+
+  def _get_text_size(self, text, font_size):
+    try:
+      return measure_text_cached(self._font_bold, text, font_size)
+    except NameError:
+      return type('Size', (object,), {'x': len(text) * font_size * 0.5, 'y': font_size})
+
+  def _draw_text_with_background(self, x: float, y: float, text: str, font_size: int, text_color: rl.Color, bg_color: rl.Color, alignment: str = "C") -> None:
+    padding_x: int = 10
+    padding_y: int = 4
+    corner_radius: float = 0.5
+    segments: int = 10
+
+    text_size = self._get_text_size(text, font_size)
+    text_width = text_size.x
+    text_height = text_size.y
+
+    bg_width = text_width + (padding_x * 2)
+    bg_height = text_height + (padding_y * 2)
+
+    if alignment == "L":
+      bg_x = x - padding_x
+    elif alignment == "R":
+      bg_x = x - bg_width + padding_x
+    else: # alignment == "C":
+      bg_x = x - bg_width / 2
+
+    bg_y = y - (bg_height / 2)
+
+    rl.draw_rectangle_rounded(
+      rl.Rectangle(bg_x, bg_y, bg_width, bg_height),
+      corner_radius,
+      segments,
+      bg_color
+    )
+
+    self._draw_text(x, y, text, font_size, text_color, alignment)
 
   def _draw_steer_gradient_border(self, center_x: float, center_y: float, icon_size: float, angle: float) -> None:
     if angle == 0:
