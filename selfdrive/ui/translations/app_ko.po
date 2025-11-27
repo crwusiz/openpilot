@@ -433,11 +433,11 @@ msgstr "설정 완료"
 
 #: selfdrive/ui/layouts/settings/settings.py:66
 msgid "Firehose"
-msgstr "Firehose"
+msgstr "파이어호스"
 
 #: selfdrive/ui/layouts/settings/firehose.py:18
 msgid "Firehose Mode"
-msgstr "Firehose 모드"
+msgstr "파이어호스 모드"
 
 #: selfdrive/ui/layouts/settings/firehose.py:25
 msgid ""
@@ -626,7 +626,7 @@ msgstr "미리보기"
 #: selfdrive/ui/widgets/prime.py:44
 #, python-format
 msgid "PRIME FEATURES:"
-msgstr "prime 기능:"
+msgstr "프라임 기능:"
 
 #: selfdrive/ui/layouts/settings/device.py:48
 #, python-format
@@ -649,7 +649,7 @@ msgid ""
 "Pair your device with comma connect (connect.comma.ai) and claim your comma "
 "prime offer."
 msgstr ""
-"장치를 comma connect(connect.comma.ai)와 페어링하고 comma prime 혜택을 받으세"
+"장치를 comma connect(connect.comma.ai)와 페어링하고 comma 프라임 혜택을 받으세"
 "요."
 
 #: selfdrive/ui/widgets/setup.py:91
@@ -899,7 +899,7 @@ msgstr "제거"
 
 #: selfdrive/ui/layouts/sidebar.py:117
 msgid "Unknown"
-msgstr "알 수 없음"
+msgstr "알수없음"
 
 #: selfdrive/ui/layouts/settings/software.py:48
 #, python-format
@@ -1001,7 +1001,7 @@ msgstr "카메라 시작 중"
 #: selfdrive/ui/widgets/prime.py:63
 #, python-format
 msgid "comma prime"
-msgstr "comma prime"
+msgstr "comma 프라임"
 
 #: system/ui/widgets/network.py:142
 #, python-format
@@ -1194,4 +1194,4 @@ msgstr "✓ 구독됨"
 #: selfdrive/ui/widgets/setup.py:22
 #, python-format
 msgid "🔥 Firehose Mode 🔥"
-msgstr "🔥 Firehose 모드 🔥"
+msgstr "🔥 파이어호스 모드 🔥"
