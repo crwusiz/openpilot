@@ -92,7 +92,7 @@ class FontWeight(StrEnum):
   BOLD = "Inter-Bold.fnt"
   SEMI_BOLD = "Inter-SemiBold.fnt"
   EXTRA_BOLD = "Inter-ExtraBold.fnt"
-  UNIFONT = "NotoSansKR-Medium.fnt"
+  UNIFONT = "NotoSansCJKkr-Bold.fnt"
 
   # Small UI fonts
   DISPLAY_REGULAR = "Inter-Regular.fnt"

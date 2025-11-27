@@ -100,7 +100,7 @@ def _process_font(font_path: Path, codepoints: tuple[int, ...]):
 
   font_size = {
     #"unifont.otf": 16,  # unifont is only 16x8 or 16x16 pixels per glyph
-    "NotoSansKR-Bold.ttf": 80,
+    "NotoSansCJKkr-Bold.otf": 80,
   }.get(font_path.name, 200)
 
   data = font_path.read_bytes()
@@ -133,7 +133,7 @@ def main():
   for font in fonts:
     if "emoji" in font.name.lower():
       continue
-    glyphs = unifont_cp if font.stem.lower().startswith("notosanskr") else base_cp
+    glyphs = unifont_cp if font.stem.lower().startswith("notosans") else base_cp
     _process_font(font, glyphs)
   return 0
 
