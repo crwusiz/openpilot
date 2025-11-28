@@ -431,6 +431,12 @@ class CommunityLayout(Widget):
     self._car_rect = rl.Rectangle(rect.x + col_width, rect.y, col_width, HEADER_ROW_HEIGHT)
     car_text = self._params.get("SelectedCar")
 
+    if car_text is None:
+      car_text = ""
+
+    if isinstance(car_text, bytes):
+      car_text = car_text.decode("utf-8")
+
     if car_text:
       first_space_index = car_text.find(' ')
       if first_space_index != -1:
