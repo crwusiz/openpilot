@@ -675,33 +675,36 @@ class HudRenderer(Widget):
       # Accelerating - green
       alpha = int(255 - (180 * min(self.accel / 3.0, 1.0)))
       alpha = max(80, min(255, alpha))
-      speed_color = rl.Color(alpha, 255, alpha, 200)
+      speed_color = rl.Color(alpha, 255, alpha, 255)
     else:
       # Decelerating - red
       alpha = int(255 - (255 * min(abs(self.accel) / 4.0, 1.0)))
       alpha = max(60, min(255, alpha))
-      speed_color = rl.Color(255, alpha, alpha, 200)
+      speed_color = rl.Color(255, alpha, alpha, 255)
 
     speed_text = str(round(self.speed))
     center_x = rect.x + rect.width / 2
 
-    self._draw_text(
+    self._draw_text_with_outline(
       center_x,
       180,
       speed_text,
       FONT_SIZES.current_speed,
-      speed_color
+      speed_color,
+      outline_color=rl.Color(0, 0, 0, 200),
+      outline_thickness=3
     )
 
     unit_text = "km/h" if ui_state.is_metric else "mph"
-    self._draw_text(
+    self._draw_text_with_outline(
       center_x,
       290,
       unit_text,
       FONT_SIZES.speed_unit,
-      COLORS.light_orange
+      COLORS.light_orange,
+      outline_color=rl.Color(0, 0, 0, 200),
+      outline_thickness=3
     )
-
   def _draw_upper_info(self, rect: rl.Rectangle) -> None:
     x = rect.x + UI_CONFIG.border_size * 2
     y = rect.y + 20
@@ -1029,6 +1032,50 @@ class HudRenderer(Widget):
     )
 
     self._draw_text(x, y, text, font_size, text_color, alignment)
+
+  def _draw_text_with_outline(self, x: float, y: float, text: str, font_size: int,
+                              text_color: rl.Color, outline_color: rl.Color = rl.BLACK,
+                              outline_thickness: int = 4, alignment: str = "C") -> None:
+    text_size = measure_text_cached(self._font_bold, text, font_size)
+
+    if alignment == "L":
+      draw_x = x
+    elif alignment == "R":
+      draw_x = x - text_size.x
+    else:  # alignment == "C":
+      draw_x = x - text_size.x / 2
+
+    draw_y = y - text_size.y / 2
+
+    offsets = [
+      (-outline_thickness, -outline_thickness),
+      (0, -outline_thickness),
+      (outline_thickness, -outline_thickness),
+      (-outline_thickness, 0),
+      (outline_thickness, 0),
+      (-outline_thickness, outline_thickness),
+      (0, outline_thickness),
+      (outline_thickness, outline_thickness),
+    ]
+
+    for offset_x, offset_y in offsets:
+      rl.draw_text_ex(
+        self._font_bold,
+        text,
+        rl.Vector2(draw_x + offset_x, draw_y + offset_y),
+        font_size,
+        0,
+        outline_color
+      )
+
+    rl.draw_text_ex(
+      self._font_bold,
+      text,
+      rl.Vector2(draw_x, draw_y),
+      font_size,
+      0,
+      text_color
+    )
 
   def _draw_steer_gradient_border(self, center_x: float, center_y: float, icon_size: float, angle: float) -> None:
     if angle == 0:
