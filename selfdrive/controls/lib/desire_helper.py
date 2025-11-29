@@ -4,6 +4,8 @@ from openpilot.common.realtime import DT_MDL
 from openpilot.common.params import Params
 
 ALC_START_TIME = 3.
+ROAD_EDGE_CONFIDENCE_THRESHOLD = 0.5
+LANE_LINE_PROB_THRESHOLD = 0.2
 
 LaneChangeState = log.LaneChangeState
 LaneChangeDirection = log.LaneChangeDirection
@@ -52,10 +54,26 @@ class DesireHelper:
   def get_lane_change_direction(CS):
     return LaneChangeDirection.left if CS.leftBlinker else LaneChangeDirection.right
 
-  def update(self, carstate, lateral_active, lane_change_prob):
+  def update(self, carstate, lateral_active, lane_change_prob, model_data=None):
     v_ego = carstate.vEgo
     one_blinker = carstate.leftBlinker != carstate.rightBlinker
     below_lane_change_speed = v_ego < LANE_CHANGE_SPEED_MIN
+
+    invalid_lane_detected = False
+    if model_data is not None:
+      lane_line_probs = model_data.get('laneLineProbs', [0, 0, 0, 0])
+      road_edge_stds = model_data.get('roadEdgeStds', [1.0, 1.0])
+
+      if carstate.leftBlinker:
+        left_edge_prob = max(0.0, min(1.0 - road_edge_stds[0], 1.0))
+        left_close_prob = lane_line_probs[1] if len(lane_line_probs) > 1 else 0
+        invalid_lane_detected = (road_edge_stds[0] < ROAD_EDGE_CONFIDENCE_THRESHOLD) or \
+                                (left_close_prob < LANE_LINE_PROB_THRESHOLD and left_edge_prob > 0.35)
+      elif carstate.rightBlinker:
+        right_edge_prob = max(0.0, min(1.0 - road_edge_stds[1], 1.0))
+        right_close_prob = lane_line_probs[2] if len(lane_line_probs) > 2 else 0
+        invalid_lane_detected = (road_edge_stds[1] < ROAD_EDGE_CONFIDENCE_THRESHOLD) or \
+                                (right_close_prob < LANE_LINE_PROB_THRESHOLD and right_edge_prob > 0.35)
 
     if not lateral_active or self.lane_change_timer > LANE_CHANGE_TIME_MAX or not one_blinker:
       self.lane_change_state = LaneChangeState.off
@@ -63,10 +81,11 @@ class DesireHelper:
     else:
       # LaneChangeState.off
       if self.lane_change_state == LaneChangeState.off and one_blinker and not self.prev_one_blinker and not below_lane_change_speed:
-        self.lane_change_state = LaneChangeState.preLaneChange
-        self.lane_change_ll_prob = 1.0
-        # Initialize lane change direction to prevent UI alert flicker
-        self.lane_change_direction = self.get_lane_change_direction(carstate)
+        if not invalid_lane_detected:
+          self.lane_change_state = LaneChangeState.preLaneChange
+          self.lane_change_ll_prob = 1.0
+          # Initialize lane change direction to prevent UI alert flicker
+          self.lane_change_direction = self.get_lane_change_direction(carstate)
 
       # LaneChangeState.preLaneChange
       elif self.lane_change_state == LaneChangeState.preLaneChange:
@@ -81,7 +100,7 @@ class DesireHelper:
         blindspot_detected = ((carstate.leftBlindspot and self.lane_change_direction == LaneChangeDirection.left) or
                               (carstate.rightBlindspot and self.lane_change_direction == LaneChangeDirection.right))
 
-        if not one_blinker or below_lane_change_speed:
+        if not one_blinker or below_lane_change_speed or invalid_lane_detected:
           self.lane_change_state = LaneChangeState.off
           self.lane_change_direction = LaneChangeDirection.none
         elif (torque_applied or self.lane_change_pulse_timer > 2.) and (not blindspot_detected or self.prev_torque_applied):
@@ -93,12 +112,16 @@ class DesireHelper:
 
       # LaneChangeState.laneChangeStarting
       elif self.lane_change_state == LaneChangeState.laneChangeStarting:
-        # fade out over .5s
-        self.lane_change_ll_prob = max(self.lane_change_ll_prob - 2 * DT_MDL, 0.0)
+        if invalid_lane_detected:
+          self.lane_change_state = LaneChangeState.off
+          self.lane_change_direction = LaneChangeDirection.none
+        else:
+          # fade out over .5s
+          self.lane_change_ll_prob = max(self.lane_change_ll_prob - 2 * DT_MDL, 0.0)
 
-        # 98% certainty
-        if lane_change_prob < 0.02 and self.lane_change_ll_prob < 0.01:
-          self.lane_change_state = LaneChangeState.laneChangeFinishing
+          # 98% certainty
+          if lane_change_prob < 0.02 and self.lane_change_ll_prob < 0.01:
+            self.lane_change_state = LaneChangeState.laneChangeFinishing
 
       # LaneChangeState.laneChangeFinishing
       elif self.lane_change_state == LaneChangeState.laneChangeFinishing:

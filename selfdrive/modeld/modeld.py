@@ -389,7 +389,27 @@ def main(demo=False):
       l_lane_change_prob = desire_state[log.Desire.laneChangeLeft]
       r_lane_change_prob = desire_state[log.Desire.laneChangeRight]
       lane_change_prob = l_lane_change_prob + r_lane_change_prob
-      DH.update(sm['carState'], sm['carControl'].latActive, lane_change_prob)
+      model_lane_data = None
+      if model_output is not None:
+        lane_line_probs_raw = model_output.get('lane_lines_prob', np.zeros((1, 4), dtype=np.float32))
+        road_edges_stds_raw = model_output.get('road_edges_stds', None)
+
+        lane_line_probs = lane_line_probs_raw[0] if lane_line_probs_raw.shape[0] > 0 else np.zeros(4, dtype=np.float32)
+
+        if road_edges_stds_raw is not None and road_edges_stds_raw.shape[0] >= 2:
+          road_edge_stds = np.array([
+            np.mean(road_edges_stds_raw[0, :5]),
+            np.mean(road_edges_stds_raw[1, :5])
+          ], dtype=np.float32)
+        else:
+          road_edge_stds = np.array([1.0, 1.0], dtype=np.float32)
+
+        model_lane_data = {
+          'laneLineProbs': lane_line_probs,
+          'roadEdgeStds': road_edge_stds
+        }
+
+      DH.update(sm['carState'], sm['carControl'].latActive, lane_change_prob, model_lane_data)
       modelv2_send.modelV2.meta.laneChangeState = DH.lane_change_state
       modelv2_send.modelV2.meta.laneChangeDirection = DH.lane_change_direction
       drivingdata_send.drivingModelData.meta.laneChangeState = DH.lane_change_state
