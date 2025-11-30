@@ -225,6 +225,7 @@ class GuiApplication:
     self._profile_render_frames = PROFILE_RENDER
     self._render_profiler = None
     self._render_profile_start_time = None
+    self._last_ui_coords: tuple[float, float] | None = None
 
   @property
   def frame(self):
@@ -605,6 +606,9 @@ class GuiApplication:
         self._mouse_history.clear()
       self._mouse_history.append(MousePosWithTime(mouse_event.pos.x * self._scale, mouse_event.pos.y * self._scale, current_time))
 
+      if mouse_event.left_down:
+        self._last_ui_coords = (mouse_event.pos.x, mouse_event.pos.y)
+
     # Remove old touch points that exceed the timeout
     while self._mouse_history and (current_time - self._mouse_history[0].t) > TOUCH_HISTORY_TIMEOUT:
       self._mouse_history.popleft()
@@ -616,6 +620,27 @@ class GuiApplication:
         perc = idx / len(self._mouse_history)
         color = rl.Color(min(int(255 * (1.5 - perc)), 255), int(min(255 * (perc + 0.5), 255)), 50, 255)
         rl.draw_circle(int(mouse_pos.x), int(mouse_pos.y), 5, color)
+
+    if self._last_ui_coords is not None:
+      x_ui, y_ui = self._last_ui_coords
+
+      x_screen = int(x_ui * self._scale)
+      y_screen = int(y_ui * self._scale)
+
+      coord_text = f"X: {x_ui:.0f}, Y: {y_ui:.0f}"
+      text_color = rl.WHITE
+      text_size = 30
+
+      rl.draw_text_ex(
+        self.font(FontWeight.BOLD),
+        coord_text,
+        rl.Vector2(x_screen - 10, y_screen + 10),
+        text_size,
+        1.0,
+        text_color
+      )
+
+      #rl.draw_circle(x_screen, y_screen, 10, rl.RED)
 
   def _draw_grid(self):
     grid_color = rl.Color(60, 60, 60, 255)
