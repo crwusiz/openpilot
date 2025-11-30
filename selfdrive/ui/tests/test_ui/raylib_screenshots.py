@@ -116,9 +116,21 @@ def setup_settings_developer(click, pm: PubMaster):
   setup_settings(click, pm)
   click(278, 950)
 
-def setup_settings_community(click, pm: PubMaster):
+
+def setup_settings_community_toggle(click, pm: PubMaster):
   setup_settings(click, pm)
   click(278, 1055)
+
+
+def setup_settings_community_function(click, pm: PubMaster):
+  setup_settings_community_toggle(click, pm)
+  click(1330, 210)
+
+
+def setup_settings_community_log(click, pm: PubMaster):
+  setup_settings_community_toggle(click, pm)
+  click(1850, 210)
+
 
 def setup_keyboard(click, pm: PubMaster):
   setup_settings_developer(click, pm)
@@ -231,7 +243,9 @@ CASES = {
   #"settings_software_branch_switcher": setup_settings_software_branch_switcher,
   "settings_firehose": setup_settings_firehose,
   "settings_developer": setup_settings_developer,
-  "settings_community": setup_settings_community,
+  "settings_community_toggle": setup_settings_community_toggle,
+  "settings_community_function": setup_settings_community_function,
+  "settings_community_log": setup_settings_community_log,
   "keyboard": setup_keyboard,
   "pair_device": setup_pair_device,
   #"offroad_alert": setup_offroad_alert,
