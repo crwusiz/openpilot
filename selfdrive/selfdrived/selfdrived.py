@@ -24,6 +24,8 @@ from openpilot.selfdrive.selfdrived.alertmanager import AlertManager, set_offroa
 from openpilot.system.version import get_build_metadata
 from openpilot.system.hardware import HARDWARE
 
+from openpilot.selfdrive.controls.lib.desire_helper import check_invalid_lane
+
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
 TESTING_CLOSET = "TESTING_CLOSET" in os.environ
@@ -268,11 +270,21 @@ class SelfdriveD:
       self.events.add(EventName.excessiveActuation)
     # ******************************************************************************************
 
-    # Handle lane change
+    # ========== Handle lane change with invalid lane detection ==========
     if self.sm['modelV2'].meta.laneChangeState == LaneChangeState.preLaneChange:
       direction = self.sm['modelV2'].meta.laneChangeDirection
-      if (CS.leftBlindspot and direction == LaneChangeDirection.left) or \
-         (CS.rightBlindspot and direction == LaneChangeDirection.right):
+      invalid_lane_detected = False
+      if self.sm.valid['modelV2']:
+        lane_line_probs = self.sm['modelV2'].laneLineProbs
+        road_edge_stds = self.sm['modelV2'].roadEdgeStds
+
+        direction_left = (direction == LaneChangeDirection.left)
+        invalid_lane_detected, _ = check_invalid_lane(lane_line_probs, road_edge_stds, direction_left)
+
+      blindspot_blocked = (CS.leftBlindspot and direction == LaneChangeDirection.left) or \
+                          (CS.rightBlindspot and direction == LaneChangeDirection.right)
+
+      if blindspot_blocked or invalid_lane_detected:
         self.events.add(EventName.laneChangeBlocked)
       elif self.sm['modelV2'].meta.autoLaneChangeEnable and self.sm['modelV2'].meta.autoLaneChangeTimer > 0:
         self.events.add(EventName.autoLaneChange)

@@ -35,6 +35,27 @@ DESIRES = {
 }
 
 
+def check_invalid_lane(lane_line_probs, road_edge_stds, direction_left: bool):
+  if direction_left:
+    left_edge_prob = max(0.0, min(1.0 - road_edge_stds[0], 1.0))
+    left_close_prob = lane_line_probs[1] if len(lane_line_probs) > 1 else 0
+
+    if road_edge_stds[0] < ROAD_EDGE_CONFIDENCE_THRESHOLD:
+      return True
+    elif left_close_prob < LANE_LINE_PROB_THRESHOLD and left_edge_prob > 0.35:
+      return True
+  else:
+    right_edge_prob = max(0.0, min(1.0 - road_edge_stds[1], 1.0))
+    right_close_prob = lane_line_probs[2] if len(lane_line_probs) > 2 else 0
+
+    if road_edge_stds[1] < ROAD_EDGE_CONFIDENCE_THRESHOLD:
+      return True
+    elif right_close_prob < LANE_LINE_PROB_THRESHOLD and right_edge_prob > 0.35:
+      return True
+
+  return False
+
+
 class DesireHelper:
   def __init__(self):
     self.lane_change_state = LaneChangeState.off
@@ -65,15 +86,9 @@ class DesireHelper:
       road_edge_stds = model_data.get('roadEdgeStds', [1.0, 1.0])
 
       if carstate.leftBlinker:
-        left_edge_prob = max(0.0, min(1.0 - road_edge_stds[0], 1.0))
-        left_close_prob = lane_line_probs[1] if len(lane_line_probs) > 1 else 0
-        invalid_lane_detected = (road_edge_stds[0] < ROAD_EDGE_CONFIDENCE_THRESHOLD) or \
-                                (left_close_prob < LANE_LINE_PROB_THRESHOLD and left_edge_prob > 0.35)
+        invalid_lane_detected = check_invalid_lane(lane_line_probs, road_edge_stds, True)
       elif carstate.rightBlinker:
-        right_edge_prob = max(0.0, min(1.0 - road_edge_stds[1], 1.0))
-        right_close_prob = lane_line_probs[2] if len(lane_line_probs) > 2 else 0
-        invalid_lane_detected = (road_edge_stds[1] < ROAD_EDGE_CONFIDENCE_THRESHOLD) or \
-                                (right_close_prob < LANE_LINE_PROB_THRESHOLD and right_edge_prob > 0.35)
+        invalid_lane_detected = check_invalid_lane(lane_line_probs, road_edge_stds, False)
 
     if not lateral_active or self.lane_change_timer > LANE_CHANGE_TIME_MAX or not one_blinker:
       self.lane_change_state = LaneChangeState.off
@@ -144,7 +159,7 @@ class DesireHelper:
     if self.lane_change_state == LaneChangeState.off:
       self.auto_lane_change_timer = 0.0
       self.prev_torque_applied = False
-    elif self.auto_lane_change_timer < (ALC_START_TIME + 0.25): # stop afer 3 sec resume from 10 when torque applied
+    elif self.auto_lane_change_timer < (ALC_START_TIME + 0.25):
       self.auto_lane_change_timer += DT_MDL
 
     self.prev_one_blinker = one_blinker
