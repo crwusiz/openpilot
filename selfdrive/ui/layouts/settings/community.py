@@ -530,7 +530,7 @@ class CommunityLayout(Widget):
           dlg = ConfirmDialog(tr("Please Check Network Connection"), tr("OK"))
           gui_app.set_modal_overlay(dlg)
 
-    dlg = ConfirmDialog(tr("Git Fetch and Reset<br><br>Process?"), tr("Process"), rich=True)
+    dlg = ConfirmDialog(tr("Git Fetch and Reset\n\nProcess?"), tr("Process"))
     gui_app.set_modal_overlay(dlg, callback=confirm_callback)
 
   def _on_git_checkout(self):
@@ -538,7 +538,7 @@ class CommunityLayout(Widget):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/checkout.sh")
 
-    dlg = ConfirmDialog(tr("Git Checkout<br><br>Process?"), tr("Process"), rich=True)
+    dlg = ConfirmDialog(tr("Git Checkout\n\nProcess?"), tr("Process"))
     gui_app.set_modal_overlay(dlg, callback=confirm_callback)
 
   def _on_git_reset(self):
@@ -546,7 +546,7 @@ class CommunityLayout(Widget):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/reset.sh")
 
-    dlg = ConfirmDialog(tr("Git Reset<br><br>Process?"), tr("Process"), rich=True)
+    dlg = ConfirmDialog(tr("Git Reset\n\nProcess?"), tr("Process"))
     gui_app.set_modal_overlay(dlg, callback=confirm_callback)
 
   def _on_scons_rebuild(self):
@@ -554,7 +554,7 @@ class CommunityLayout(Widget):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/scons_rebuild.sh")
 
-    dlg = ConfirmDialog(tr("Scons Rebuild<br><br>Process?"), tr("Process"), rich=True)
+    dlg = ConfirmDialog(tr("Scons Rebuild\n\nProcess?"), tr("Process"))
     gui_app.set_modal_overlay(dlg, callback=confirm_callback)
 
   def _on_panda_flash(self):
@@ -562,7 +562,7 @@ class CommunityLayout(Widget):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/panda/board/flash.py")
 
-    dlg = ConfirmDialog(tr("Panda Flash<br><br>Process?"), tr("Process"), rich=True)
+    dlg = ConfirmDialog(tr("Panda Flash\n\nProcess?"), tr("Process"))
     gui_app.set_modal_overlay(dlg, callback=confirm_callback)
 
   def _on_panda_recover(self):
@@ -570,7 +570,7 @@ class CommunityLayout(Widget):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/panda/board/recover.py")
 
-    dlg = ConfirmDialog(tr("Panda Recover<br><br>Process?"), tr("Process"), rich=True)
+    dlg = ConfirmDialog(tr("Panda Recover\n\nProcess?"), tr("Process"))
     gui_app.set_modal_overlay(dlg, callback=confirm_callback)
 
   def _on_camera_view(self):
@@ -581,7 +581,7 @@ class CommunityLayout(Widget):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/cleardtc.sh")
 
-    dlg = ConfirmDialog(tr("Clear DTC<br><br>Process?"), tr("Process"), rich=True)
+    dlg = ConfirmDialog(tr("Clear DTC\n\nProcess?"), tr("Process"))
     gui_app.set_modal_overlay(dlg, callback=confirm_callback)
 
   def _view_log(self, log_path: str):
@@ -604,7 +604,7 @@ class CommunityLayout(Widget):
         if result == DialogResult.CONFIRM:
           execute_script("/data/openpilot/scripts/log_upload.sh", log_name)
 
-      dlg = ConfirmDialog(tr(f"{log_name} upload<br><br>Process?"), tr("Process"), rich=True)
+      dlg = ConfirmDialog(tr(f"{log_name} upload\n\nProcess?"), tr("Process"))
       gui_app.set_modal_overlay(dlg, callback=confirm_callback)
     else:
       dlg = ConfirmDialog(tr("log file not found"), tr("OK"))
@@ -635,7 +635,7 @@ class CommunityLayout(Widget):
           if result == DialogResult.CONFIRM:
             execute_script("/data/openpilot/scripts/log_upload.sh", "tmux_console.log")
 
-        dlg = ConfirmDialog(tr("tmux console log upload<br><br>Process?"), tr("Process"), rich=True)
+        dlg = ConfirmDialog(tr("tmux console log upload\n\nProcess?"), tr("Process"))
         gui_app.set_modal_overlay(dlg, callback=confirm_callback)
       else:
         dlg = ConfirmDialog(tr("log file not found"), tr("OK"))
@@ -649,7 +649,7 @@ class CommunityLayout(Widget):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/dump_upload.sh", "carParams")
 
-    dlg = ConfirmDialog(tr("carParams dump upload<br><br>Process?"), tr("Process"), rich=True)
+    dlg = ConfirmDialog(tr("carParams dump upload\n\nProcess?"), tr("Process"))
     gui_app.set_modal_overlay(dlg, callback=confirm_callback)
 
   def _on_realdata_upload(self):
