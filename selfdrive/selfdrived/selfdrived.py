@@ -279,7 +279,7 @@ class SelfdriveD:
         road_edge_stds = self.sm['modelV2'].roadEdgeStds
 
         direction_left = (direction == LaneChangeDirection.left)
-        invalid_lane_detected, _ = check_invalid_lane(lane_line_probs, road_edge_stds, direction_left)
+        invalid_lane_detected = check_invalid_lane(lane_line_probs, road_edge_stds, direction_left)
 
       blindspot_blocked = (CS.leftBlindspot and direction == LaneChangeDirection.left) or \
                           (CS.rightBlindspot and direction == LaneChangeDirection.right)

@@ -46,28 +46,9 @@ if TICI:
     in vec2 fragTexCoord;
     uniform samplerExternalOES texture0;
     out vec4 fragColor;
-    uniform int engaged;
-    uniform int enhance_driver;
-
     void main() {
       vec4 color = texture(texture0, fragTexCoord);
-      if (engaged == 1) {
-        float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));  // Luma
-        color.rgb = mix(vec3(gray), color.rgb, 0.2);  // 20% saturation
-        color.rgb = clamp((color.rgb - 0.5) * 1.2 + 0.5, 0.0, 1.0);  // +20% contrast
-        color.rgb = pow(color.rgb, vec3(1.0/1.28));
-        fragColor = vec4(color.rgb, color.a);
-      } else {
-        color.rgb *= 0.85;  // 85% opacity
-      }
-      if (enhance_driver == 1) {
-        float brightness = 1.1;
-        color.rgb = color.rgb + 0.15;
-        color.rgb = clamp((color.rgb - 0.5) * (brightness * 0.8) + 0.5, 0.0, 1.0);
-        color.rgb = color.rgb * color.rgb * (3.0 - 2.0 * color.rgb);
-        color.rgb = pow(color.rgb, vec3(0.8));
-      }
-      fragColor = vec4(color.rgb, color.a);
+      fragColor = vec4(pow(color.rgb, vec3(1.0/1.28)), color.a);
     }
     """
 else:
@@ -76,30 +57,10 @@ else:
     uniform sampler2D texture0;
     uniform sampler2D texture1;
     out vec4 fragColor;
-    uniform int engaged;
-    uniform int enhance_driver;
-
     void main() {
       float y = texture(texture0, fragTexCoord).r;
       vec2 uv = texture(texture1, fragTexCoord).ra - 0.5;
-      vec3 rgb = vec3(y + 1.402*uv.y, y - 0.344*uv.x - 0.714*uv.y, y + 1.772*uv.x);
-      if (engaged == 1) {
-        float gray = dot(rgb, vec3(0.299, 0.587, 0.114));
-        rgb = mix(vec3(gray), rgb, 0.2);  // 20% saturation
-        rgb = clamp((rgb - 0.5) * 1.2 + 0.5, 0.0, 1.0);  // +20% contrast
-      } else {
-        rgb *= 0.85;  // 85% opacity
-      }
-      // TODO: the images out of camerad need some more correction and
-      // the ui should apply a gamma curve for the device display
-      if (enhance_driver == 1) {
-        float brightness = 1.1;
-        rgb = rgb + 0.15;
-        rgb = clamp((rgb - 0.5) * (brightness * 0.8) + 0.5, 0.0, 1.0);
-        rgb = rgb * rgb * (3.0 - 2.0 * rgb);
-        rgb = pow(rgb, vec3(0.8));
-      }
-      fragColor = vec4(rgb, 1.0);
+      fragColor = vec4(y + 1.402*uv.y, y - 0.344*uv.x - 0.714*uv.y, y + 1.772*uv.x, 1.0);
     }
     """
 
