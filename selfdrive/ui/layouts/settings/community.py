@@ -589,7 +589,7 @@ class CommunityLayout(Widget):
       try:
         with open(log_path, 'r', encoding='utf-8') as f:
           content = f.read()
-        dlg = ConfirmDialog(content, tr("OK"), rich=True)
+        dlg = ConfirmDialog(content, tr("OK"), rich=True, center_text=False)
         gui_app.set_modal_overlay(dlg)
       except Exception as e:
         dlg = ConfirmDialog(tr("Error reading log file"), tr("OK"))
@@ -618,7 +618,7 @@ class CommunityLayout(Widget):
         text=True
       )
       if result.returncode == 0:
-        dlg = ConfirmDialog(result.stdout, tr("OK"), rich=True)
+        dlg = ConfirmDialog(result.stdout, tr("OK"), rich=True, center_text=False)
         gui_app.set_modal_overlay(dlg)
     except Exception as e:
       dlg = ConfirmDialog(tr("Error reading tmux console"), tr("OK"))
