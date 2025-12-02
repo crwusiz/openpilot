@@ -69,7 +69,6 @@ class DesireHelper:
 
     self.auto_lane_change_enable = Params().get_bool('AutoLaneChangeEnable')
     self.auto_lane_change_timer = 0.0
-    self.prev_torque_applied = False
 
   @staticmethod
   def get_lane_change_direction(CS):
@@ -104,7 +103,9 @@ class DesireHelper:
 
       # LaneChangeState.preLaneChange
       elif self.lane_change_state == LaneChangeState.preLaneChange:
-        self.lane_change_pulse_timer += DT_MDL
+        if not invalid_lane_detected:
+          self.lane_change_pulse_timer += DT_MDL
+
         # Update lane change direction
         self.lane_change_direction = self.get_lane_change_direction(carstate)
 
@@ -115,15 +116,13 @@ class DesireHelper:
         blindspot_detected = ((carstate.leftBlindspot and self.lane_change_direction == LaneChangeDirection.left) or
                               (carstate.rightBlindspot and self.lane_change_direction == LaneChangeDirection.right))
 
-        if not one_blinker or below_lane_change_speed or invalid_lane_detected:
+        if not one_blinker or below_lane_change_speed:
           self.lane_change_state = LaneChangeState.off
           self.lane_change_direction = LaneChangeDirection.none
-        elif (torque_applied or self.lane_change_pulse_timer > 2.) and (not blindspot_detected or self.prev_torque_applied):
+        elif invalid_lane_detected or blindspot_detected:
+          pass
+        elif (torque_applied or self.lane_change_pulse_timer > 2.) and not blindspot_detected and not invalid_lane_detected:
           self.lane_change_state = LaneChangeState.laneChangeStarting
-        elif torque_applied and blindspot_detected and self.auto_lane_change_timer != 10.0:
-          self.auto_lane_change_timer = 10.0
-        elif not torque_applied and self.auto_lane_change_timer == 10.0 and not self.prev_torque_applied:
-          self.prev_torque_applied = True
 
       # LaneChangeState.laneChangeStarting
       elif self.lane_change_state == LaneChangeState.laneChangeStarting:
@@ -158,9 +157,12 @@ class DesireHelper:
 
     if self.lane_change_state == LaneChangeState.off:
       self.auto_lane_change_timer = 0.0
-      self.prev_torque_applied = False
-    elif self.auto_lane_change_timer < (ALC_START_TIME + 0.25):
-      self.auto_lane_change_timer += DT_MDL
+    elif self.lane_change_state == LaneChangeState.preLaneChange and not invalid_lane_detected:
+      if self.auto_lane_change_timer < (ALC_START_TIME + 0.25):
+        self.auto_lane_change_timer += DT_MDL
+    elif self.lane_change_state != LaneChangeState.preLaneChange:
+      if self.auto_lane_change_timer < (ALC_START_TIME + 0.25):
+        self.auto_lane_change_timer += DT_MDL
 
     self.prev_one_blinker = one_blinker
     self.desire = DESIRES[self.lane_change_direction][self.lane_change_state]
