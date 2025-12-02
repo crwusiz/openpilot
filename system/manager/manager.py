@@ -187,6 +187,10 @@ def manager_thread() -> None:
 
     log_timer += 1
 
+    if 'ui' in managed_processes and managed_processes['ui'].proc is not None and not managed_processes['ui'].proc.is_alive():
+      cloudlog.error(f'Restarting UI (exitcode {managed_processes["ui"].proc.exitcode})')
+      managed_processes['ui'].restart()
+
     # send managerState
     msg = messaging.new_message('managerState', valid=True)
     msg.managerState.processes = [p.get_process_state_msg() for p in managed_processes.values()]

@@ -28,7 +28,7 @@ TEST_OUTPUT_DIR = TEST_DIR / "raylib_report"
 SCREENSHOTS_DIR = TEST_OUTPUT_DIR / "screenshots"
 UI_DELAY = 0.5
 
-BRANCH_NAME = "master_cr"
+BRANCH_NAME = "this-is-a-really-super-mega-ultra-max-extreme-ultimate-long-branch-name"
 VERSION = f"0.10.1 / {BRANCH_NAME} / 7864838 / Oct 03"
 
 # Offroad alerts to test
@@ -115,21 +115,6 @@ def setup_settings_developer(click, pm: PubMaster):
 
   setup_settings(click, pm)
   click(278, 950)
-
-
-def setup_settings_community_toggle(click, pm: PubMaster):
-  setup_settings(click, pm)
-  click(278, 1055)
-
-
-def setup_settings_community_function(click, pm: PubMaster):
-  setup_settings_community_toggle(click, pm)
-  click(1330, 210)
-
-
-def setup_settings_community_log(click, pm: PubMaster):
-  setup_settings_community_toggle(click, pm)
-  click(1850, 210)
 
 
 def setup_keyboard(click, pm: PubMaster):
@@ -232,24 +217,21 @@ CASES = {
   "homescreen_paired": setup_homescreen,
   "homescreen_prime": setup_homescreen,
   "homescreen_update_available": setup_homescreen_update_available,
-  #"homescreen_unifont": setup_homescreen,
+  "homescreen_unifont": setup_homescreen,
   "settings_device": setup_settings,
   "settings_network": setup_settings_network,
   "settings_network_advanced": setup_settings_network_advanced,
   "settings_toggles": setup_settings_toggles,
   "settings_software": setup_settings_software,
-  #"settings_software_download": setup_settings_software_download,
-  #"settings_software_release_notes": setup_settings_software_release_notes,
-  #"settings_software_branch_switcher": setup_settings_software_branch_switcher,
+  "settings_software_download": setup_settings_software_download,
+  "settings_software_release_notes": setup_settings_software_release_notes,
+  "settings_software_branch_switcher": setup_settings_software_branch_switcher,
   "settings_firehose": setup_settings_firehose,
   "settings_developer": setup_settings_developer,
-  "settings_community_toggle": setup_settings_community_toggle,
-  "settings_community_function": setup_settings_community_function,
-  "settings_community_log": setup_settings_community_log,
   "keyboard": setup_keyboard,
   "pair_device": setup_pair_device,
-  #"offroad_alert": setup_offroad_alert,
-  #"confirmation_dialog": setup_confirmation_dialog,
+  "offroad_alert": setup_offroad_alert,
+  "confirmation_dialog": setup_confirmation_dialog,
   "experimental_mode_description": setup_experimental_mode_description,
   "openpilot_long_confirmation_dialog": setup_openpilot_long_confirmation_dialog,
   "onroad": setup_onroad,
@@ -313,8 +295,6 @@ def create_screenshots():
       params = Params()
       params.put("DongleId", "123456789012345")
 
-      params.put("LanguageSetting", "ko")
-
       # Set branch name
       params.put("UpdaterCurrentDescription", VERSION)
       params.put("UpdaterNewDescription", VERSION)
@@ -327,6 +307,8 @@ def create_screenshots():
         params.put("PrimeType", 0)  # NONE
       elif name == "homescreen_prime":
         params.put("PrimeType", 2)  # LITE
+      elif name == "homescreen_unifont":
+        params.put("LanguageSetting", "zh-CHT")  # Traditional Chinese
 
       t.test_ui(name, setup)
 
