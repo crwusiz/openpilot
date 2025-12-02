@@ -518,7 +518,7 @@ class HudRenderer(Widget):
     max_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(self.cruise_speed))
     self._draw_text(
       max_speed_box.x + max_speed_box.width / 2,
-      max_speed_box.y + 85,
+      max_speed_box.y + 100,
       max_speed_text,
       FONT_SIZES.big,
       speed_color
@@ -546,7 +546,7 @@ class HudRenderer(Widget):
       set_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(self.apply_speed))
       self._draw_text(
         set_speed_box.x + set_speed_box.width / 2,
-        set_speed_box.y + 85,
+        set_speed_box.y + 100,
         set_speed_text,
         FONT_SIZES.big,
         speed_color,
@@ -685,32 +685,36 @@ class HudRenderer(Widget):
     speed_text = str(round(self.speed))
     center_x = rect.x + rect.width / 2
 
+    y_center_speed = 130
+
     self._draw_text_with_outline(
       center_x,
-      180,
+      y_center_speed,
       speed_text,
       FONT_SIZES.current_speed,
       speed_color,
-      outline_color=rl.Color(0, 0, 0, 200),
-      outline_thickness=3
+      outline_color=COLORS.black_translucent
     )
+
+    y_bottom_speed = y_center_speed + FONT_SIZES.current_speed / 2
+    y_padding_gap = 10
+    y_center_unit = y_bottom_speed + y_padding_gap
 
     unit_text = "km/h" if ui_state.is_metric else "mph"
     self._draw_text_with_outline(
       center_x,
-      290,
+      y_center_unit,
       unit_text,
       FONT_SIZES.speed_unit,
       COLORS.light_orange,
-      outline_color=rl.Color(0, 0, 0, 200),
-      outline_thickness=3
+      outline_color=COLORS.black_translucent
     )
   def _draw_upper_info(self, rect: rl.Rectangle) -> None:
     x = rect.x + UI_CONFIG.border_size * 2
     y = rect.y + 20
 
     # Upper left - Car name
-    car_name = self.params.get("CarName") or "Unknown"
+    car_name = self.params.get("CarName") or ""
 
     self._draw_text_with_background(
       x=x,
@@ -846,10 +850,39 @@ class HudRenderer(Widget):
         return "--"
       return str(round(pressure))
 
-    self._draw_text(tpms_x + 28, tpms_y + 43, get_tpms_text(self.fl), FONT_SIZES.info_text, get_tpms_color(self.fl))
-    self._draw_text(tpms_x + 136, tpms_y + 43, get_tpms_text(self.fr), FONT_SIZES.info_text, get_tpms_color(self.fr))
-    self._draw_text(tpms_x + 28, tpms_y + 158, get_tpms_text(self.rl), FONT_SIZES.info_text, get_tpms_color(self.rl))
-    self._draw_text(tpms_x + 136, tpms_y + 158, get_tpms_text(self.rr), FONT_SIZES.info_text, get_tpms_color(self.rr))
+
+    self._draw_text_with_outline(
+        tpms_x + 28,
+        tpms_y + 43,
+        get_tpms_text(self.fl),
+        FONT_SIZES.info_text,
+        get_tpms_color(self.fl),
+        outline_color=COLORS.black_translucent
+    )
+    self._draw_text_with_outline(
+        tpms_x + 136,
+        tpms_y + 43,
+        get_tpms_text(self.fr),
+        FONT_SIZES.info_text,
+        get_tpms_color(self.fr),
+        outline_color=COLORS.black_translucent
+    )
+    self._draw_text_with_outline(
+        tpms_x + 28,
+        tpms_y + 158,
+        get_tpms_text(self.rl),
+        FONT_SIZES.info_text,
+        get_tpms_color(self.rl),
+        outline_color=COLORS.black_translucent
+    )
+    self._draw_text_with_outline(
+        tpms_x + 136,
+        tpms_y + 158,
+        get_tpms_text(self.rr),
+        FONT_SIZES.info_text,
+        get_tpms_color(self.rr),
+        outline_color=COLORS.black_translucent
+    )
 
     personality = self.params.get("LongitudinalPersonality") or "1"
     dist_imgs = [self.dist1_img, self.dist2_img, self.dist3_img, self.dist4_img]
@@ -1035,7 +1068,7 @@ class HudRenderer(Widget):
 
   def _draw_text_with_outline(self, x: float, y: float, text: str, font_size: int,
                               text_color: rl.Color, outline_color: rl.Color = rl.BLACK,
-                              outline_thickness: int = 4, alignment: str = "C") -> None:
+                              outline_thickness: int = 2, alignment: str = "C") -> None:
     text_size = measure_text_cached(self._font_bold, text, font_size)
 
     if alignment == "L":
