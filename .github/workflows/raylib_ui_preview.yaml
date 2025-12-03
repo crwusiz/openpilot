@@ -2,14 +2,14 @@ name: "raylib ui preview"
 on:
   push:
     branches:
-      - master_cr
+      - master_c4
   workflow_dispatch:
 
 env:
   UI_JOB_NAME: "Create raylib UI Report"
-  REPORT_NAME: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master_cr' && 'master_cr' || 'default_report' }}
-  SHA: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master_cr' && github.sha || github.sha }}
-  MASTER_UI_BRANCH: ui_preview
+  REPORT_NAME: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master_c4' && 'master_c4' || 'default_report' }}
+  SHA: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master_c4' && github.sha || github.sha }}
+  MASTER_UI_BRANCH: ui_preview_c4
 
 jobs:
   preview:
@@ -56,8 +56,8 @@ jobs:
           path: ${{ github.workspace }}/master_ui_raylib
           ref: ${{ env.MASTER_UI_BRANCH }}
 
-      - name: Save new master_cr ui (Push to ci-artifacts)
-        if: github.ref == 'refs/heads/master_cr' && github.event_name == 'push'
+      - name: Save new master_c4 ui (Push to ci-artifacts)
+        if: github.ref == 'refs/heads/master_c4' && github.event_name == 'push'
         working-directory: ${{ github.workspace }}/master_ui_raylib
         run: |
           MASTER_UI_BRANCH="${{ env.MASTER_UI_BRANCH }}"
@@ -74,7 +74,7 @@ jobs:
           mv ${{ github.workspace }}/pr_ui/*.png .
 
           echo "# Raylib UI Screenshots: ${SHORT_SHA}" > README.md
-          echo "This branch is automatically updated with raylib screenshots from the \`master_cr\` branch of \`crwusiz/openpilot\`." >> README.md
+          echo "This branch is automatically updated with raylib screenshots from the \`master_c4\` branch of \`crwusiz/openpilot\`." >> README.md
           echo "" >> README.md
           echo "## Latest Screenshots" >> README.md
 
@@ -88,17 +88,17 @@ jobs:
           done
 
           git add .
-          git commit -m "raylib screenshots for commit ${SHORT_SHA} on master_cr"
+          git commit -m "raylib screenshots for commit ${SHORT_SHA} on master_c4"
           git push origin ${MASTER_UI_BRANCH} --force
           echo "README.md updated and pushed successfully to ${MASTER_UI_BRANCH}."
 
       - name: 🖼️ Generate Image Preview Summary
-        if: github.ref == 'refs/heads/master_cr' && github.event_name == 'push'
+        if: github.ref == 'refs/heads/master_c4' && github.event_name == 'push'
         run: |
           MASTER_UI_BRANCH="ui_preview"
           REPO="crwusiz/ci-artifacts"
 
-          echo "## ✅ New raylib UI Screenshots (master_cr)" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ New raylib UI Screenshots (master_c4)" >> $GITHUB_STEP_SUMMARY
           echo "Screenshots saved to [ui_preview](https://github.com/${REPO}/tree/${MASTER_UI_BRANCH}/README.md)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 

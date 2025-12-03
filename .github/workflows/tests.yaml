@@ -3,7 +3,7 @@ name: tests
 on:
   push:
     branches:
-      - master_cr
+      - master_c4
   #pull_request:
   workflow_dispatch:
   workflow_call:
@@ -14,7 +14,7 @@ on:
         type: string
 
 concurrency:
-  group: tests-ci-run-${{ inputs.run_number }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/master_cr' && github.run_id || github.head_ref || github.ref }}-${{ github.workflow }}-${{ github.event_name }}
+  group: tests-ci-run-${{ inputs.run_number }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/master_c4' && github.run_id || github.head_ref || github.ref }}-${{ github.workflow }}-${{ github.event_name }}
   cancel-in-progress: true
 
 env:
@@ -48,5 +48,5 @@ jobs:
       - name: Upload Raylib UI Report
         uses: actions/upload-artifact@v4
         with:
-          name: raylib-report-${{ inputs.run_number || '1' }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/master_cr' && 'master_cr' || github.event.number }}
+          name: raylib-report-${{ inputs.run_number || '1' }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/master_c4' && 'master_c4' || github.event.number }}
           path: selfdrive/ui/tests/test_ui/raylib_report/screenshots
