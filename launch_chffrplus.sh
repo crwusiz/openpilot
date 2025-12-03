@@ -149,16 +149,6 @@ function launch {
     echo -n "$SSH_USERNAME_DEFAULT" > "$USERNAME_FILE"
   fi
 
-  # c3xl amplifier file change
-  C3XL=$(cat ${PARAMS_ROOT}/d/HardwareC3xLite)
-
-  if [ "${C3XL}" = "1" ] && [[ ! "${GITSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
-    cp -f $DIR/system/hardware/tici/amplifier.py $DIR/scripts/add/amplifier_org.py
-    cp -f $DIR/scripts/add/amplifier_c3xl.py $DIR/system/hardware/tici/amplifier.py
-  elif [ "${C3XL}" = "0" ] && [[ "${GITSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
-    cp -f $DIR/scripts/add/amplifier_org.py $DIR/system/hardware/tici/amplifier.py
-  fi
-
   # start manager
   cd system/manager
   if [ ! -f $DIR/prebuilt ]; then
