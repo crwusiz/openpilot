@@ -79,20 +79,20 @@ class DesireHelper:
     one_blinker = carstate.leftBlinker != carstate.rightBlinker
     below_lane_change_speed = v_ego < LANE_CHANGE_SPEED_MIN
 
-    invalid_lane_detected = False
-    if model_data is not None:
-      lane_line_probs = model_data.get('laneLineProbs', [0, 0, 0, 0])
-      road_edge_stds = model_data.get('roadEdgeStds', [1.0, 1.0])
-
-      if carstate.leftBlinker:
-        invalid_lane_detected = check_invalid_lane(lane_line_probs, road_edge_stds, True)
-      elif carstate.rightBlinker:
-        invalid_lane_detected = check_invalid_lane(lane_line_probs, road_edge_stds, False)
-
     if not lateral_active or self.lane_change_timer > LANE_CHANGE_TIME_MAX or not one_blinker:
       self.lane_change_state = LaneChangeState.off
       self.lane_change_direction = LaneChangeDirection.none
     else:
+      invalid_lane_detected = False
+      if model_data is not None:
+        lane_line_probs = model_data.get('laneLineProbs', [0, 0, 0, 0])
+        road_edge_stds = model_data.get('roadEdgeStds', [1.0, 1.0])
+
+        if carstate.leftBlinker:
+          invalid_lane_detected = check_invalid_lane(lane_line_probs, road_edge_stds, True)
+        elif carstate.rightBlinker:
+          invalid_lane_detected = check_invalid_lane(lane_line_probs, road_edge_stds, False)
+
       # LaneChangeState.off
       if self.lane_change_state == LaneChangeState.off and one_blinker and not self.prev_one_blinker and not below_lane_change_speed:
         if not invalid_lane_detected:
@@ -103,18 +103,18 @@ class DesireHelper:
 
       # LaneChangeState.preLaneChange
       elif self.lane_change_state == LaneChangeState.preLaneChange:
-        if not invalid_lane_detected:
-          self.lane_change_pulse_timer += DT_MDL
-
-        # Update lane change direction
         self.lane_change_direction = self.get_lane_change_direction(carstate)
+
+        blindspot_detected = ((carstate.leftBlindspot and self.lane_change_direction == LaneChangeDirection.left) or
+                              (carstate.rightBlindspot and self.lane_change_direction == LaneChangeDirection.right))
+
+        if not invalid_lane_detected and not blindspot_detected:
+          self.lane_change_pulse_timer += DT_MDL
 
         torque_applied = carstate.steeringPressed and \
                          ((carstate.steeringTorque > 0 and self.lane_change_direction == LaneChangeDirection.left) or
                           (carstate.steeringTorque < 0 and self.lane_change_direction == LaneChangeDirection.right)) or \
                          self.auto_lane_change_enable and (ALC_START_TIME + 0.25) > self.auto_lane_change_timer > ALC_START_TIME
-        blindspot_detected = ((carstate.leftBlindspot and self.lane_change_direction == LaneChangeDirection.left) or
-                              (carstate.rightBlindspot and self.lane_change_direction == LaneChangeDirection.right))
 
         if not one_blinker or below_lane_change_speed:
           self.lane_change_state = LaneChangeState.off
@@ -155,10 +155,23 @@ class DesireHelper:
     else:
       self.lane_change_timer += DT_MDL
 
+    invalid_lane_for_timer = False
+    if model_data is not None:
+      lane_line_probs = model_data.get('laneLineProbs', [0, 0, 0, 0])
+      road_edge_stds = model_data.get('roadEdgeStds', [1.0, 1.0])
+
+      if carstate.leftBlinker:
+        invalid_lane_for_timer = check_invalid_lane(lane_line_probs, road_edge_stds, True)
+      elif carstate.rightBlinker:
+        invalid_lane_for_timer = check_invalid_lane(lane_line_probs, road_edge_stds, False)
+
+    blindspot_for_timer = ((carstate.leftBlindspot and carstate.leftBlinker) or
+                          (carstate.rightBlindspot and carstate.rightBlinker))
+
     if self.lane_change_state == LaneChangeState.off:
       self.auto_lane_change_timer = 0.0
-    elif self.lane_change_state == LaneChangeState.preLaneChange and not invalid_lane_detected:
-      if self.auto_lane_change_timer < (ALC_START_TIME + 0.25):
+    elif self.lane_change_state == LaneChangeState.preLaneChange:
+      if not invalid_lane_for_timer and not blindspot_for_timer and self.auto_lane_change_timer < (ALC_START_TIME + 0.25):
         self.auto_lane_change_timer += DT_MDL
     elif self.lane_change_state != LaneChangeState.preLaneChange:
       if self.auto_lane_change_timer < (ALC_START_TIME + 0.25):
