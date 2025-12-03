@@ -24,7 +24,4 @@ class GPIO:
   CAM2_RSTN = 12
 
   # Sensor interrupts
-  BMX055_ACCEL_INT = 21
-  BMX055_GYRO_INT = 23
-  BMX055_MAGN_INT = 87
   LSM_INT = 84

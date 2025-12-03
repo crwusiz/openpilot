@@ -96,8 +96,11 @@ def main() -> None:
     (LSM6DS3_Accel(I2C_BUS_IMU), "accelerometer", True),
     (LSM6DS3_Gyro(I2C_BUS_IMU), "gyroscope", True),
     (LSM6DS3_Temp(I2C_BUS_IMU), "temperatureSensor", False),
-    (MMC5603NJ_Magn(I2C_BUS_IMU), "magnetometer", False),
   ]
+  if HARDWARE.get_device_type() == "tizi":
+    sensors_cfg.append(
+      (MMC5603NJ_Magn(I2C_BUS_IMU), "magnetometer", False),
+    )
 
   # Reset sensors
   for sensor, _, _ in sensors_cfg:
