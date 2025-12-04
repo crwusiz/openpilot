@@ -5,9 +5,9 @@ import shutil
 import time
 import pathlib
 from collections import namedtuple
-
 import pyautogui
 import pywinctl
+import datetime
 
 from cereal import car, log
 from cereal import messaging
@@ -19,6 +19,7 @@ from openpilot.selfdrive.test.helpers import with_processes
 from openpilot.selfdrive.selfdrived.alertmanager import set_offroad_alert
 from openpilot.system.updated.updated import parse_release_notes
 from openpilot.system.version import terms_version, training_version
+from openpilot.common.git import get_branch, get_commit, get_commit_date
 
 AlertSize = log.SelfdriveState.AlertSize
 AlertStatus = log.SelfdriveState.AlertStatus
@@ -28,8 +29,37 @@ TEST_OUTPUT_DIR = TEST_DIR / "raylib_report"
 SCREENSHOTS_DIR = TEST_OUTPUT_DIR / "screenshots"
 UI_DELAY = 0.5
 
-BRANCH_NAME = "master_cr"
-VERSION = f"0.10.1 / {BRANCH_NAME} / 7864838 / Oct 03"
+def get_description(basedir: str) -> str:
+  if not os.path.exists(basedir):
+    return ""
+
+  version = ""
+  branch = ""
+  commit = ""
+  commit_date = ""
+  try:
+    full_branch = get_branch(basedir)
+    if full_branch.startswith('origin/'):
+      branch = full_branch.split('/', 1)[1]
+    else:
+      branch = full_branch
+
+    commit = get_commit(basedir)[:7]
+    with open(os.path.join(basedir, "common", "version.h")) as f:
+      version = f.read().split('"')[1]
+
+    raw_date = get_commit_date(cwd=basedir, commit="HEAD")
+    commit_unix_ts = raw_date.strip().split(' ')[0].strip("'")
+    dt = datetime.datetime.fromtimestamp(int(commit_unix_ts))
+    commit_date = dt.strftime("%b %d")
+
+  except Exception:
+    return ""
+
+  return f"{version} / {branch} / {commit} / {commit_date}"
+
+BRANCH_NAME = get_branch(BASEDIR)
+VERSION = get_description(BASEDIR)
 
 # Offroad alerts to test
 OFFROAD_ALERTS = ['Offroad_IsTakingSnapshot']
