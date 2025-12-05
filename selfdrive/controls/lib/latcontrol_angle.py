@@ -17,8 +17,11 @@ class LatControlAngle(LatControl):
     # Initialize the filtered curvature to zero (or an appropriate initial value)
     self.filtered_curvature = 0.0
     # Filter coefficient: adjust between 0 (very smooth) and 1 (no filtering)
-    self.filter_speed_matrox = [0, 2.5, 8.3, 13.8, 22.22]
-    self.filter_alpha_matrix = [0.05, 0.1, 0.3, 0.6, 1]
+    #self.filter_speed_matrix = [0, 2.5, 8.3, 13.8, 22.22]
+    self.filter_speed_matrix = [0., 5., 10., 20., 30.]
+    #self.filter_alpha_matrix = [0.05, 0.1, 0.3, 0.6, 1]
+    self.filter_alpha_matrix = [0.3, 0.5, 0.7, 0.9, 1.0]
+
 
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature, curvature_limited, lat_delay):
     angle_log = log.ControlsState.LateralAngleState.new_message()
@@ -26,10 +29,11 @@ class LatControlAngle(LatControl):
     if not active:
       angle_log.active = False
       angle_steers_des = float(CS.steeringAngleDeg)
+      self.filtered_curvature = desired_curvature
     else:
       angle_log.active = True
       # Apply exponential smoothing to the curvature
-      adjusted_alpha = float(np.interp(CS.vEgo, self.filter_speed_matrox, self.filter_alpha_matrix))
+      adjusted_alpha = float(np.interp(CS.vEgo, self.filter_speed_matrix, self.filter_alpha_matrix))
       self.filtered_curvature = (adjusted_alpha * desired_curvature + (1 - adjusted_alpha) * self.filtered_curvature)
       # Convert the smoothed curvature to a steering angle
       angle_steers_des = math.degrees(VM.get_steer_from_curvature(-self.filtered_curvature, CS.vEgo, params.roll))
