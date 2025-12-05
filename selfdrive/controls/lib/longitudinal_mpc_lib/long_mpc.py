@@ -29,16 +29,10 @@ class XState(Enum):
   e2ePrepare = 4
   e2eStopped = 5
 
-  def __str__(self):
-    return self.name
-
 class TrafficState(Enum):
   off = 0
   red = 1
   green = 2
-
-  def __str__(self):
-    return self.name
 
 MODEL_NAME = 'long'
 LONG_MPC_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -58,12 +52,12 @@ X_EGO_OBSTACLE_COST = 3.
 X_EGO_COST = 0.
 V_EGO_COST = 0.
 A_EGO_COST = 0.
-J_EGO_COST = 5.0
-A_CHANGE_COST = 250.
+J_EGO_COST = 10.0  # 5.0
+A_CHANGE_COST = 300.  # 200.
 A_CHANGE_COST_STARTING = 30.
 DANGER_ZONE_COST = 100.
 CRASH_DISTANCE = .25
-LEAD_DANGER_FACTOR = 0.8 # 0.75
+LEAD_DANGER_FACTOR = 0.8  # 0.75
 LIMIT_COST = 1e6
 ACADOS_SOLVER_TYPE = 'SQP_RTI'
 
@@ -77,8 +71,8 @@ T_IDXS_LST = [index_function(idx, max_val=MAX_T, max_idx=N) for idx in range(N+1
 T_IDXS = np.array(T_IDXS_LST)
 FCW_IDXS = T_IDXS < 5.0
 T_DIFFS = np.diff(T_IDXS, prepend=[0.])
-COMFORT_BRAKE = 2.5
-STOP_DISTANCE = 6.0
+COMFORT_BRAKE = 2.3  # 2.5
+STOP_DISTANCE = 6.5  # 6.0
 CRUISE_MIN_ACCEL = -1.2
 CRUISE_MAX_ACCEL = 1.6
 
@@ -96,11 +90,11 @@ def get_jerk_factor(personality=log.LongitudinalPersonality.standard):
 
 def get_T_FOLLOW(personality=log.LongitudinalPersonality.standard):
   if personality==log.LongitudinalPersonality.morerelaxed:
-    return 2.0
+    return 2.2
   elif personality==log.LongitudinalPersonality.relaxed:
-    return 1.75
+    return 1.9  # 1.75
   elif personality==log.LongitudinalPersonality.standard:
-    return 1.45
+    return 1.6  # 1.45
   elif personality==log.LongitudinalPersonality.aggressive:
     return 1.25
   else:
@@ -109,9 +103,7 @@ def get_T_FOLLOW(personality=log.LongitudinalPersonality.standard):
 def get_stopped_equivalence_factor(v_lead):
   return (v_lead**2) / (2 * COMFORT_BRAKE)
 
-def get_safe_obstacle_distance(v_ego, t_follow=None, comfort_brake=COMFORT_BRAKE, stop_distance=STOP_DISTANCE):
-  if t_follow is None:
-    t_follow = get_T_FOLLOW()
+def get_safe_obstacle_distance(v_ego, t_follow, comfort_brake=COMFORT_BRAKE, stop_distance=STOP_DISTANCE):
   return (v_ego**2) / (2 * comfort_brake) + t_follow * v_ego + stop_distance
 
 def desired_follow_distance(v_ego, v_lead, t_follow=None):
@@ -197,7 +189,7 @@ def gen_long_ocp():
   # from an obstacle at every timestep. This obstacle can be a lead car
   # or other object. In e2e mode we can use x_position targets as a cost
   # instead.
-  costs = [((x_obstacle - x_ego) - (desired_dist_comfort)) / (v_ego + 10.),
+  costs = [((x_obstacle - x_ego) - desired_dist_comfort) / (v_ego + 10.),
            x_ego,
            v_ego,
            a_ego,
@@ -212,7 +204,7 @@ def gen_long_ocp():
   constraints = vertcat(v_ego,
                         (a_ego - a_min),
                         (a_max - a_ego),
-                        ((x_obstacle - x_ego) - lead_danger_factor * (desired_dist_comfort)) / (v_ego + 10.))
+                        ((x_obstacle - x_ego) - lead_danger_factor * desired_dist_comfort) / (v_ego + 10.))
   ocp.model.con_h_expr = constraints
 
   x0 = np.zeros(X_DIM)
@@ -267,6 +259,9 @@ class LongitudinalMpc:
     self.xStop = 0.0
     self.stopping_count = 0
     self.traffic_starting_count = 0
+    self.startSignCount = 0
+    self.stopSignCount = 0
+    self.adjusted_stop_dist = 0.0
 
     self.a_change_cost = A_CHANGE_COST
     self.j_lead = 0.0
@@ -390,7 +385,6 @@ class LongitudinalMpc:
 
   def update(self, sm, v_cruise, x, v, a, j, personality=log.LongitudinalPersonality.standard):
     radarstate = sm['radarState']
-    CS = sm['carState']
     t_follow = get_T_FOLLOW(personality)
     v_ego = self.x0[1]
     self.status = radarstate.leadOne.status or radarstate.leadTwo.status
@@ -410,12 +404,7 @@ class LongitudinalMpc:
     lead_0_obstacle = lead_xv_0[:,0] + get_stopped_equivalence_factor(lead_xv_0[:,1])
     lead_1_obstacle = lead_xv_1[:,0] + get_stopped_equivalence_factor(lead_xv_1[:,1])
 
-    curve_detected = abs(CS.steeringAngleDeg) > 45
-    if curve_detected:
-      comfort_brake = COMFORT_BRAKE * 1.2
-    else:
-      comfort_brake = COMFORT_BRAKE
-
+    comfort_brake = COMFORT_BRAKE
     stop_distance = STOP_DISTANCE
 
     self.params[:,0] = ACCEL_MIN
@@ -449,7 +438,7 @@ class LongitudinalMpc:
       x[:], v[:], a[:], j[:] = 0.0, 0.0, 0.0, 0.0
 
       if radarstate.leadOne.status:
-        self.a_change_cost = np.interp(abs(self.j_lead), [0.3, 2.0], [A_CHANGE_COST, 20])
+        self.a_change_cost = np.interp(abs(self.j_lead), [0.5, 2.5], [A_CHANGE_COST, 50])
       else:
         self.a_change_cost = A_CHANGE_COST
 
@@ -486,7 +475,7 @@ class LongitudinalMpc:
 
     self.run()
     if (np.any(lead_xv_0[FCW_IDXS,0] - self.x_sol[FCW_IDXS,0] < CRASH_DISTANCE) and
-            radarstate.leadOne.modelProb > 0.9):
+      radarstate.leadOne.modelProb > 0.9):
       self.crash_cnt += 1
     else:
       self.crash_cnt = 0
@@ -545,13 +534,13 @@ class LongitudinalMpc:
   def _update_carrot(self, sm):
     CS = sm['carState']
     model = sm['modelV2']
-    radar = sm['radarState']
+    radarstate = sm['radarState']
 
     self.xStop = self._update_stop_dist(model.position.x[31])
     filtered_stop_dist = self.xStop
 
-    lead = radar.leadOne.status
-    d_rel = radar.leadOne.dRel if lead else 1000
+    lead = radarstate.leadOne.status
+    d_rel = radarstate.leadOne.dRel if lead else 1000
 
     self._check_model_stopping(model.velocity.x, CS.vEgo, CS.aEgo, model.position.x[-1], model.position.y, d_rel)
 
@@ -629,9 +618,9 @@ class LongitudinalMpc:
       stop_sign = model_x < 20.0 and model_v < 10.0
     elif self.conv.to_clu(v_ego) < 82.0:
       stop_sign = (model_x < d_rel - 3.0 and
-                  model_x < np.interp(v[0], [60/3.6, 80/3.6], [120.0, 150]) and
+                   model_x < np.interp(v[0], [60 / 3.6, 80 / 3.6], [120.0, 150]) and
                   ((model_v < 3.0) or (model_v < v[0]*0.7)) and
-                  abs(y[-1]) < 5.0)
+                   abs(y[-1]) < 5.0)
       if self.xState == XState.e2eCruise and a_ego < -1.0:
         stop_sign = False
     else:
