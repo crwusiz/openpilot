@@ -133,9 +133,10 @@ class CruiseController:
     road_limit_speed_nda = SpeedLimiter.instance().get_road_limit_speed()
     road_limit_speed_stock = CS.exState.navLimitSpeed
     road_signs = CS.exState.roadSigns
-    gas_pressed = CS.gasPressed
     school_zone = road_signs == 1
     is_limit_zone = False
+    lead = sm['radarState'].leadOne
+    model = sm['modelV2']
 
     # 1. Road limit speed
     road_limit_speed = None
@@ -170,13 +171,11 @@ class CruiseController:
       road_limit_speed_clu = min(road_limit_speed_clu, camera_limit_speed_clu)
 
     # 3. Lead limit speed
-    lead = sm['radarState'].leadOne
     lead_speed = self._cal_lead_speed(lead, cluster_speed_clu)
     lead_limit_speed_clu = lead_speed if self.CP.openpilotLongitudinalControl and lead.status else NO_LIMIT_SPEED
     self.lead_limit_speed_clu = lead_limit_speed_clu
 
     # 4. Curve limit speed
-    model = sm['modelV2']
     curve_limit_speed_clu = self._cal_curve_speed_adaptive(model, current_speed_ms, v_cruise_kph)
     self.curve_speed_clu = curve_limit_speed_clu
 

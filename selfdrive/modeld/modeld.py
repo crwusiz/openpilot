@@ -392,11 +392,10 @@ def main(demo=False):
       model_lane_data = None
       if model_output is not None:
         lane_line_probs_raw = model_output.get('lane_lines_prob', np.zeros((1, 4), dtype=np.float32))
-        road_edges_stds_raw = model_output.get('road_edges_stds', None)
-
         lane_line_probs = lane_line_probs_raw[0] if lane_line_probs_raw.shape[0] > 0 else np.zeros(4, dtype=np.float32)
+        road_edges_stds_raw = model_output.get('road_edges_stds', np.empty((0, 0), dtype=np.float32))
 
-        if road_edges_stds_raw is not None and road_edges_stds_raw.shape[0] >= 2:
+        if road_edges_stds_raw.shape[0] >= 2:
           road_edge_stds = np.array([
             np.mean(road_edges_stds_raw[0, :5]),
             np.mean(road_edges_stds_raw[1, :5])

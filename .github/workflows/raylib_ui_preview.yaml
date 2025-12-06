@@ -73,6 +73,8 @@ jobs:
 
           mv ${{ github.workspace }}/pr_ui/*.png .
 
+          echo "IMAGE_FILES=$(ls *.png | sort | tr '\n' ' ')" >> $GITHUB_ENV
+
           echo "# Raylib UI Screenshots: ${SHORT_SHA}" > README.md
           echo "This branch is automatically updated with raylib screenshots from the \`master_c4\` branch of \`crwusiz/openpilot\`." >> README.md
           echo "" >> README.md
@@ -95,31 +97,39 @@ jobs:
       - name: 🖼️ Generate Image Preview Summary
         if: github.ref == 'refs/heads/master_c4' && github.event_name == 'push'
         run: |
-          MASTER_UI_BRANCH="ui_preview"
+          MASTER_UI_BRANCH="ui_preview_c4"
           REPO="crwusiz/ci-artifacts"
+          IMAGE_FILES="${{ env.IMAGE_FILES }}"
 
           echo "## ✅ New raylib UI Screenshots (master_c4)" >> $GITHUB_STEP_SUMMARY
-          echo "Screenshots saved to [ui_preview](https://github.com/${REPO}/tree/${MASTER_UI_BRANCH}/README.md)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          echo "<table border=\"0\">" >> $GITHUB_STEP_SUMMARY
+          echo "<table border=\"0\" style=\"width: 100%;\">" >> $GITHUB_STEP_SUMMARY
+          echo "<tr>" >> $GITHUB_STEP_SUMMARY
 
-          pushd ${{ github.workspace }}/pr_ui
-
-          for file in $(find . -maxdepth 1 -name "*.png" -print | cut -c 3- | sort); do
+          index=0
+          for file in ${IMAGE_FILES}; do
             filename=$(basename "$file")
             url="https://raw.githubusercontent.com/${REPO}/${MASTER_UI_BRANCH}/${filename}"
 
-            echo "<tr>" >> $GITHUB_STEP_SUMMARY
-            echo "  <td align=\"center\" style=\"padding: 10px;\">" >> $GITHUB_STEP_SUMMARY
+            if (( index % 2 == 0 )) && (( index > 0 )); then
+              echo "</tr>" >> $GITHUB_STEP_SUMMARY
+              echo "<tr>" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "  <td align=\"center\" style=\"padding: 10px; width: 50%;\">" >> $GITHUB_STEP_SUMMARY
             echo "    <h4>${filename}</h4>" >> $GITHUB_STEP_SUMMARY
             echo "    <a href=\"${url}\" target=\"_blank\">" >> $GITHUB_STEP_SUMMARY
-            echo "      <img src=\"${url}\" width=\"250\" alt=\"${filename}\">" >> $GITHUB_STEP_SUMMARY
+            echo "      <img src=\"${url}\" width=\"300\" alt=\"${filename}\">" >> $GITHUB_STEP_SUMMARY
             echo "    </a>" >> $GITHUB_STEP_SUMMARY
             echo "  </td>" >> $GITHUB_STEP_SUMMARY
-            echo "</tr>" >> $GITHUB_STEP_SUMMARY
+
+            index=$((index + 1))
           done
 
-          popd
+          if (( index % 2 != 0 )); then
+            echo "  <td style=\"width: 50%;\"></td>" >> $GITHUB_STEP_SUMMARY
+          fi
 
+          echo "</tr>" >> $GITHUB_STEP_SUMMARY
           echo "</table>" >> $GITHUB_STEP_SUMMARY
