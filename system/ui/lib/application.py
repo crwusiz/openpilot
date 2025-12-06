@@ -753,7 +753,7 @@ class GuiApplication:
 
   @staticmethod
   def big_ui() -> bool:
-    return HARDWARE.get_device_type() in ('tici', 'tizi') or BIG_UI or PC
+    return HARDWARE.get_device_type() in ('tici', 'tizi') or BIG_UI
 
 
 gui_app = GuiApplication()
