@@ -48,8 +48,8 @@ class LeadInfo:
 
 @dataclass
 class LeadVehicle:
-  glow: list[float] = field(default_factory=list)
-  chevron: list[float] = field(default_factory=list)
+  glow: list = field(default_factory=list)
+  chevron: list = field(default_factory=list)
   fill_alpha: int = 0
 
 
@@ -288,11 +288,30 @@ class ModelRenderer(Widget):
     x = np.clip(point[0], 0.0, rect.width - sz / 2)
     y = min(point[1], rect.height - sz * 0.6)
 
+    """
     g_xo = sz / 5
     g_yo = sz / 10
 
     glow = [(x + (sz * 1.35) + g_xo, y + sz + g_yo), (x, y - g_yo), (x - (sz * 1.35) - g_xo, y + sz + g_yo)]
     chevron = [(x + (sz * 1.25), y + sz), (x, y), (x - (sz * 1.25), y + sz)]
+    """
+
+    half_w = sz * 1.6
+    tick_h = sz * 0.15
+
+    glow = [
+        (x - half_w, y - tick_h),
+        (x - half_w, y + tick_h),
+        (x + half_w, y + tick_h),
+        (x + half_w, y - tick_h)
+    ]
+
+    chevron = [
+        (x - half_w, y - tick_h),
+        (x - half_w, y),
+        (x + half_w, y),
+        (x + half_w, y - tick_h)
+    ]
 
     return LeadVehicle(glow=glow, chevron=chevron, fill_alpha=int(fill_alpha))
 
@@ -360,8 +379,17 @@ class ModelRenderer(Widget):
         continue
 
       # Draw glow and chevron
-      rl.draw_triangle_fan(lead_vehicle.glow, len(lead_vehicle.glow), rl.Color(255, 191, 191, 255))
-      rl.draw_triangle_fan(lead_vehicle.chevron, len(lead_vehicle.chevron), rl.Color(201, 34, 49, lead_vehicle.fill_alpha))
+      #rl.draw_triangle_fan(lead_vehicle.glow, len(lead_vehicle.glow), rl.Color(218, 202, 37, 255))
+      #rl.draw_triangle_fan(lead_vehicle.chevron, len(lead_vehicle.chevron), rl.Color(201, 34, 49, lead_vehicle.fill_alpha))
+
+      bracket_color = rl.Color(201, 34, 49, lead_vehicle.fill_alpha)
+      line_thick = 4.0
+      pts = lead_vehicle.chevron
+
+      if len(pts) == 4:
+        rl.draw_line_ex(rl.Vector2(*pts[0]), rl.Vector2(*pts[1]), line_thick, bracket_color)
+        rl.draw_line_ex(rl.Vector2(*pts[1]), rl.Vector2(*pts[2]), line_thick, bracket_color)
+        rl.draw_line_ex(rl.Vector2(*pts[2]), rl.Vector2(*pts[3]), line_thick, bracket_color)
 
       # Draw distance and speed text
       if lead_info.point:
@@ -369,6 +397,40 @@ class ModelRenderer(Widget):
         d_rel = lead_info.d_rel
         v_rel = lead_info.v_rel
 
+        dist_text = f"{d_rel:.0f}m"
+
+        if ui_state.is_metric:
+          spd_val = v_rel * 3.6
+          spd_unit = "km/h"
+        else:
+          spd_val = v_rel * 2.236936
+          spd_unit = "mph"
+        sign = "+" if spd_val > 0 else ""
+        speed_text = f"{sign}{spd_val:.0f}{spd_unit}"
+
+        bracket_w = pts[2][0] - pts[1][0]
+
+        offset_x = bracket_w * 0.35
+
+        x_dist = x - offset_x
+        x_spd = x + offset_x
+
+        text_y = y + 25
+
+        if text_y > rect.height - 50:
+          text_y = y - 50
+
+        d_color = rl.WHITE
+        if d_rel < 10: d_color = rl.Color(255, 100, 100, 255)
+
+        v_color = rl.WHITE
+        if v_rel < -5: v_color = rl.Color(255, 100, 100, 255)
+
+        font_size = 28
+        self._draw_text_centered(x_dist, text_y, dist_text, font_size, d_color, self._font_medium)
+        self._draw_text_centered(x_spd, text_y, speed_text, font_size, v_color, self._font_medium)
+
+        """
         # Calculate size for text positioning
         sz = np.clip((25 * 30) / (d_rel / 3 + 30), 15.0, 30.0) * 2.35
         text_y = y + sz / 1.5
@@ -392,6 +454,7 @@ class ModelRenderer(Widget):
           l_speed = f"{self._speed + v_rel * 2.236936:.0f} mph"
 
         self._draw_text_centered(x, text_y + 120.0, l_speed, 35, v_color, self._font_medium)
+        """
 
   def _draw_text_centered(self, x: float, y: float, text: str, font_size: int, color: rl.Color, font: rl.Font):
     text_size = rl.measure_text_ex(font, text, font_size, 0)
