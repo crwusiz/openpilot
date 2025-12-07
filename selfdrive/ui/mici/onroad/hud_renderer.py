@@ -30,8 +30,8 @@ class FontSizes:
 
 @dataclass(frozen=True)
 class Colors:
-  white: rl.Color = rl.WHITE
-  white_translucent: rl.Color = rl.Color(255, 255, 255, 200)
+  white = rl.WHITE
+  white_translucent = rl.Color(255, 255, 255, 200)
 
 
 FONT_SIZES = FontSizes()

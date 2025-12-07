@@ -15,6 +15,13 @@ CLIP_MARGIN = 500
 MIN_DRAW_DISTANCE = 10.0
 MAX_DRAW_DISTANCE = 100.0
 
+class Colors:
+  WHITE = rl.Color(255, 255, 255, 255) # rl.WHITE
+  WARNING = rl.Color(218, 202, 37, 255)
+  DANGER = rl.Color(201, 34, 49, 255)
+  BLACK = rl.Color(0, 0, 0, 255) # rl.BLACK
+  BLACK_TRANSLUCENT = rl.Color(0, 0, 0, 166)
+
 THROTTLE_COLORS = [
   rl.Color(13, 248, 122, 102),   # HSLF(148/360, 0.94, 0.51, 0.4)
   rl.Color(114, 255, 92, 89),    # HSLF(112/360, 1.0, 0.68, 0.35)
@@ -50,6 +57,7 @@ class LeadInfo:
 class LeadVehicle:
   glow: list = field(default_factory=list)
   chevron: list = field(default_factory=list)
+  fill_poly: list = field(default_factory=list)
   fill_alpha: int = 0
 
 
@@ -69,6 +77,7 @@ class ModelRenderer(Widget):
     self._left_blindspot = False
     self._right_blindspot = False
     self._font_medium: rl.Font = gui_app.font(FontWeight.MEDIUM)
+    self._font_bold: rl.Font = gui_app.font(FontWeight.BOLD)
 
     # Initialize ModelPoints objects
     self._path = ModelPoints()
@@ -297,12 +306,14 @@ class ModelRenderer(Widget):
     """
 
     half_w = sz * 1.6
-    tick_h = sz * 0.15
+    tick_h = sz * 0.25
 
-    glow = [
+    glow = []
+
+    fill_poly = [
         (x - half_w, y - tick_h),
-        (x - half_w, y + tick_h),
-        (x + half_w, y + tick_h),
+        (x - half_w, y),
+        (x + half_w, y),
         (x + half_w, y - tick_h)
     ]
 
@@ -313,7 +324,7 @@ class ModelRenderer(Widget):
         (x + half_w, y - tick_h)
     ]
 
-    return LeadVehicle(glow=glow, chevron=chevron, fill_alpha=int(fill_alpha))
+    return LeadVehicle(glow=glow, chevron=chevron, fill_poly=fill_poly, fill_alpha=int(fill_alpha))
 
   def _draw_lane_lines(self):
     for i, lane_line in enumerate(self._lane_lines):
@@ -371,12 +382,14 @@ class ModelRenderer(Widget):
     leads_data = [radar_state.leadOne, radar_state.leadTwo]
 
     for i, (lead_vehicle, lead_info, lead_data) in enumerate(zip(self._lead_vehicles, self._lead_info, leads_data, strict=True)):
-      # Skip if no lead or if lead two is too close to lead one
-      if not lead_vehicle.glow or not lead_vehicle.chevron:
+      if not lead_vehicle.chevron:
         continue
 
       if i == 1 and abs(leads_data[0].dRel - leads_data[1].dRel) <= 3.0:
         continue
+
+      if lead_vehicle.fill_poly:
+        rl.draw_triangle_fan(lead_vehicle.fill_poly, 4, Colors.BLACK_TRANSLUCENT)
 
       # Draw glow and chevron
       #rl.draw_triangle_fan(lead_vehicle.glow, len(lead_vehicle.glow), rl.Color(218, 202, 37, 255))
@@ -397,7 +410,7 @@ class ModelRenderer(Widget):
         d_rel = lead_info.d_rel
         v_rel = lead_info.v_rel
 
-        dist_text = f"{d_rel:.0f}m"
+        dist_text = f"{d_rel:.0f} m"
 
         if ui_state.is_metric:
           spd_val = v_rel * 3.6
@@ -406,7 +419,10 @@ class ModelRenderer(Widget):
           spd_val = v_rel * 2.236936
           spd_unit = "mph"
         sign = "+" if spd_val > 0 else ""
-        speed_text = f"{sign}{spd_val:.0f}{spd_unit}"
+        speed_text = f"{sign}{spd_val:.0f} {spd_unit}"
+
+        bracket_top_y = pts[0][1]
+        text_y = bracket_top_y - 45
 
         bracket_w = pts[2][0] - pts[1][0]
 
@@ -415,20 +431,15 @@ class ModelRenderer(Widget):
         x_dist = x - offset_x
         x_spd = x + offset_x
 
-        text_y = y + 25
+        d_color = Colors.WHITE
+        if d_rel < 10: d_color = Colors.DANGER
 
-        if text_y > rect.height - 50:
-          text_y = y - 50
-
-        d_color = rl.WHITE
-        if d_rel < 10: d_color = rl.Color(255, 100, 100, 255)
-
-        v_color = rl.WHITE
-        if v_rel < -5: v_color = rl.Color(255, 100, 100, 255)
+        v_color = Colors.WHITE
+        if v_rel < -5: v_color = Colors.DANGER
 
         font_size = 28
-        self._draw_text_centered(x_dist, text_y, dist_text, font_size, d_color, self._font_medium)
-        self._draw_text_centered(x_spd, text_y, speed_text, font_size, v_color, self._font_medium)
+        self._draw_text_centered(x_dist, text_y, dist_text, font_size, d_color, self._font_bold)
+        self._draw_text_centered(x_spd, text_y, speed_text, font_size, v_color, self._font_bold)
 
         """
         # Calculate size for text positioning
