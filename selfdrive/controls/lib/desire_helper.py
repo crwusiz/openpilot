@@ -5,7 +5,7 @@ from openpilot.common.params import Params
 
 ALC_START_TIME = 3.
 ROAD_EDGE_CONFIDENCE_THRESHOLD = 0.5
-LANE_LINE_PROB_THRESHOLD = 0.2
+LANE_LINE_PROB_THRESHOLD = 0.3
 
 LaneChangeState = log.LaneChangeState
 LaneChangeDirection = log.LaneChangeDirection
@@ -42,7 +42,7 @@ def check_invalid_lane(lane_line_probs, road_edge_stds, direction_left: bool):
 
     if road_edge_stds[0] < ROAD_EDGE_CONFIDENCE_THRESHOLD:
       return True
-    elif left_close_prob < LANE_LINE_PROB_THRESHOLD and left_edge_prob > 0.35:
+    elif left_close_prob < LANE_LINE_PROB_THRESHOLD:
       return True
   else:
     right_edge_prob = max(0.0, min(1.0 - road_edge_stds[1], 1.0))
@@ -50,7 +50,7 @@ def check_invalid_lane(lane_line_probs, road_edge_stds, direction_left: bool):
 
     if road_edge_stds[1] < ROAD_EDGE_CONFIDENCE_THRESHOLD:
       return True
-    elif right_close_prob < LANE_LINE_PROB_THRESHOLD and right_edge_prob > 0.35:
+    elif right_close_prob < LANE_LINE_PROB_THRESHOLD:
       return True
 
   return False
