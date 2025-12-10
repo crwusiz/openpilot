@@ -293,28 +293,34 @@ class ModelRenderer(Widget):
       fill_alpha = min(fill_alpha, 255)
 
     # Calculate size and position
-    sz = 30.0 + (600.0 / (d_rel + 10.0))
-    sz = max(sz, 35.0)
+    sz = 50.0 + (500.0 / (d_rel + 10.0))
+    sz = max(sz, 50.0)
     px, py = point
 
-    base_y = min(py + sz * 0.2, rect.height - sz * 0.2)
+    base_y = min(py + sz * 0.3, rect.height - sz * 0.5)
     x = np.clip(px, 0.0, rect.width)
 
-    width_scale = 3.0
+    half_w = sz * 2.2
 
-    half_w_bottom = sz * width_scale
-    half_w_top = sz * (width_scale * 0.85)
+    total_h = sz * 0.8
+    half_h = total_h / 2
 
-    box_height = sz * 0.7
+    p_top_left = (x - half_w, base_y - half_h)
+    p_top_rght = (x + half_w, base_y - half_h)
+    p_btm_rght = (x + half_w, base_y + half_h)
+    p_btm_left = (x - half_w, base_y + half_h)
 
-    p_top_left = (x - half_w_top, base_y - box_height)
-    p_btm_left = (x - half_w_bottom, base_y)
-    p_btm_rght = (x + half_w_bottom, base_y)
-    p_top_rght = (x + half_w_top, base_y - box_height)
+    fill_poly = [p_top_left, p_top_rght, p_btm_rght, p_btm_left]
+
+    tick_h = total_h * 0.15
+    chevron = [
+      (x - half_w, base_y - tick_h),
+      (x - half_w, base_y),
+      (x + half_w, base_y),
+      (x + half_w, base_y - tick_h)
+    ]
 
     glow = []
-    fill_poly = [p_top_left, p_btm_left, p_btm_rght, p_top_rght]
-    chevron = [p_top_left, p_btm_left, p_btm_rght, p_top_rght]
 
     """
     g_xo = sz / 5
@@ -397,8 +403,8 @@ class ModelRenderer(Widget):
 
       bracket_color = rl.Color(201, 34, 49, lead_vehicle.fill_alpha)
 
-      box_h = lead_vehicle.fill_poly[1][1] - lead_vehicle.fill_poly[0][1]
-      line_thick = np.clip(box_h * 0.25, 4.0, 9.0)
+      box_h = lead_vehicle.fill_poly[2][1] - lead_vehicle.fill_poly[0][1]
+      line_thick = np.clip(box_h * 0.1, 4.0, 8.0)
 
       pts = lead_vehicle.chevron
       if len(pts) == 4:
@@ -426,24 +432,21 @@ class ModelRenderer(Widget):
         if d_rel < 10: d_color = Colors.DANGER
         v_color = Colors.WHITE
         if v_rel < -5: v_color = Colors.DANGER
-        font_size = int(np.clip(line_thick * 4.5, 28, 34))
 
-        fill_top_y = lead_vehicle.fill_poly[0][1]
-        fill_bottom_y = lead_vehicle.fill_poly[1][1]
-        text_y = (fill_top_y + fill_bottom_y) / 2
+        font_size = int(np.clip(box_h * 0.4, 24, 32))
 
-        start_x = pts[1][0]
-        full_width = pts[2][0] - pts[1][0]
-        segment_w = full_width / 5.0
+        center_x = (lead_vehicle.fill_poly[0][0] + lead_vehicle.fill_poly[2][0]) / 2
+        top_y = lead_vehicle.fill_poly[0][1]
+        bottom_y = lead_vehicle.fill_poly[2][1]
+        center_y = (top_y + bottom_y) / 2
 
-        dist_measure = rl.measure_text_ex(self._font_bold, dist_text, font_size, 0)
-        pos_dist_x = (start_x + segment_w) + (dist_measure.x / 2) + 5
+        dist_y = (top_y + center_y) / 2
 
-        spd_measure = rl.measure_text_ex(self._font_bold, speed_text, font_size, 0)
-        pos_spd_x = (start_x + 4 * segment_w) - (spd_measure.x / 2) - 5
+        speed_y = (center_y + bottom_y) / 2
 
-        self._draw_text_centered(pos_dist_x, text_y, dist_text, font_size, d_color, self._font_bold)
-        self._draw_text_centered(pos_spd_x, text_y, speed_text, font_size, v_color, self._font_bold)
+        self._draw_text_centered(center_x, dist_y, dist_text, font_size, d_color, self._font_bold)
+        self._draw_text_centered(center_x, speed_y, speed_text, font_size, v_color, self._font_bold)
+
         """
         # Calculate size for text positioning
         sz = np.clip((25 * 30) / (d_rel / 3 + 30), 15.0, 30.0) * 2.35

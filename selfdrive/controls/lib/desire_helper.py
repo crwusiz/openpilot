@@ -40,17 +40,14 @@ def check_invalid_lane(lane_line_probs, road_edge_stds, direction_left: bool):
     left_edge_prob = max(0.0, min(1.0 - road_edge_stds[0], 1.0))
     left_close_prob = lane_line_probs[1] if len(lane_line_probs) > 1 else 0
 
-    if left_edge_prob < ROAD_EDGE_CONFIDENCE_THRESHOLD:
+    if left_close_prob < LANE_LINE_PROB_THRESHOLD:
       return True
-    elif left_close_prob < LANE_LINE_PROB_THRESHOLD:
-      return True
+
   else:
     right_edge_prob = max(0.0, min(1.0 - road_edge_stds[1], 1.0))
     right_close_prob = lane_line_probs[2] if len(lane_line_probs) > 2 else 0
 
-    if right_edge_prob < ROAD_EDGE_CONFIDENCE_THRESHOLD:
-      return True
-    elif right_close_prob < LANE_LINE_PROB_THRESHOLD:
+    if right_close_prob < LANE_LINE_PROB_THRESHOLD:
       return True
 
   return False
