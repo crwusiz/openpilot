@@ -21,6 +21,7 @@ class Colors:
   DANGER = rl.Color(201, 34, 49, 255)
   BLACK = rl.Color(0, 0, 0, 255) # rl.BLACK
   BLACK_TRANSLUCENT = rl.Color(0, 0, 0, 100)
+  LIGHT_RED = rl.Color(255, 100, 100, 150)
 
 THROTTLE_COLORS = [
   rl.Color(13, 248, 122, 102),   # HSLF(148/360, 0.94, 0.51, 0.4)
@@ -293,31 +294,26 @@ class ModelRenderer(Widget):
       fill_alpha = min(fill_alpha, 255)
 
     # Calculate size and position
-    sz = 50.0 + (500.0 / (d_rel + 10.0))
-    sz = max(sz, 50.0)
     px, py = point
-
-    base_y = min(py + sz * 0.3, rect.height - sz * 0.5)
+    base_y = min(py + 20.0, rect.height - 50.0)
     x = np.clip(px, 0.0, rect.width)
 
-    half_w = sz * 2.2
+    scale_factor = 700.0 / (d_rel + 20.0)
+    half_w = 40.0 + (scale_factor * 2.5)
+    half_w = max(half_w, 60.0)
 
-    total_h = sz * 0.8
-    half_h = total_h / 2
+    fixed_half_h = 40.0
 
-    p_top_left = (x - half_w, base_y - half_h)
-    p_top_rght = (x + half_w, base_y - half_h)
-    p_btm_rght = (x + half_w, base_y + half_h)
-    p_btm_left = (x - half_w, base_y + half_h)
+    p_top_left = (x - half_w, base_y - fixed_half_h)
+    p_top_rght = (x + half_w, base_y - fixed_half_h)
+    p_btm_rght = (x + half_w, base_y + fixed_half_h)
+    p_btm_left = (x - half_w, base_y + fixed_half_h)
 
     fill_poly = [p_top_left, p_top_rght, p_btm_rght, p_btm_left]
 
-    tick_h = total_h * 0.15
     chevron = [
-      (x - half_w, base_y - tick_h),
       (x - half_w, base_y),
-      (x + half_w, base_y),
-      (x + half_w, base_y - tick_h)
+      (x + half_w, base_y)
     ]
 
     glow = []
@@ -402,15 +398,17 @@ class ModelRenderer(Widget):
       #rl.draw_triangle_fan(lead_vehicle.chevron, len(lead_vehicle.chevron), rl.Color(201, 34, 49, lead_vehicle.fill_alpha))
 
       bracket_color = rl.Color(201, 34, 49, lead_vehicle.fill_alpha)
-
-      box_h = lead_vehicle.fill_poly[2][1] - lead_vehicle.fill_poly[0][1]
-      line_thick = np.clip(box_h * 0.1, 4.0, 8.0)
-
       pts = lead_vehicle.chevron
-      if len(pts) == 4:
-        rl.draw_line_ex(rl.Vector2(*pts[0]), rl.Vector2(*pts[1]), line_thick, bracket_color)
-        rl.draw_line_ex(rl.Vector2(*pts[1]), rl.Vector2(*pts[2]), line_thick, bracket_color)
-        rl.draw_line_ex(rl.Vector2(*pts[2]), rl.Vector2(*pts[3]), line_thick, bracket_color)
+
+      if len(pts) == 2:
+        start_pt = rl.Vector2(*pts[0])
+        end_pt = rl.Vector2(*pts[1])
+
+        border_thick = 14.0
+        rl.draw_line_ex(start_pt, end_pt, border_thick, Colors.LIGHT_RED)
+
+        main_thick = 6.0
+        rl.draw_line_ex(start_pt, end_pt, main_thick, bracket_color)
 
       # Draw distance and speed text
       if lead_info.point and lead_vehicle.fill_poly:
@@ -433,16 +431,15 @@ class ModelRenderer(Widget):
         v_color = Colors.WHITE
         if v_rel < -5: v_color = Colors.DANGER
 
-        font_size = int(np.clip(box_h * 0.4, 24, 32))
+        font_size = 32
 
         center_x = (lead_vehicle.fill_poly[0][0] + lead_vehicle.fill_poly[2][0]) / 2
-        top_y = lead_vehicle.fill_poly[0][1]
-        bottom_y = lead_vehicle.fill_poly[2][1]
-        center_y = (top_y + bottom_y) / 2
+        center_y = (lead_vehicle.fill_poly[0][1] + lead_vehicle.fill_poly[2][1]) / 2
 
-        dist_y = (top_y + center_y) / 2
+        text_offset = 25
 
-        speed_y = (center_y + bottom_y) / 2
+        dist_y = center_y - text_offset
+        speed_y = center_y + text_offset
 
         self._draw_text_centered(center_x, dist_y, dist_text, font_size, d_color, self._font_bold)
         self._draw_text_centered(center_x, speed_y, speed_text, font_size, v_color, self._font_bold)
