@@ -99,7 +99,7 @@ class DesireHelper:
     else:
       # LaneChangeState.off
       if self.lane_change_state == LaneChangeState.off and one_blinker and not self.prev_one_blinker and not below_lane_change_speed:
-        if not invalid_lane_detected:
+        if not invalid_lane_detected and not blindspot_detected:
           self.lane_change_state = LaneChangeState.preLaneChange
           self.lane_change_ll_prob = 1.0
           # Initialize lane change direction to prevent UI alert flicker
@@ -109,17 +109,21 @@ class DesireHelper:
       elif self.lane_change_state == LaneChangeState.preLaneChange:
         self.lane_change_direction = self.get_lane_change_direction(carstate)
 
+        auto_timer_ready = self.auto_lane_change_enable and \
+                           (ALC_START_TIME + 0.25) > self.auto_lane_change_timer > ALC_START_TIME and \
+                           not invalid_lane_detected and not blindspot_detected
+
         torque_applied = carstate.steeringPressed and \
                          ((carstate.steeringTorque > 0 and self.lane_change_direction == LaneChangeDirection.left) or
                           (carstate.steeringTorque < 0 and self.lane_change_direction == LaneChangeDirection.right)) or \
-                         self.auto_lane_change_enable and (ALC_START_TIME + 0.25) > self.auto_lane_change_timer > ALC_START_TIME
+                         auto_timer_ready
 
         if not one_blinker or below_lane_change_speed:
           self.lane_change_state = LaneChangeState.off
           self.lane_change_direction = LaneChangeDirection.none
         elif invalid_lane_detected or blindspot_detected:
           pass
-        elif (torque_applied or self.lane_change_pulse_timer > 2.) and not blindspot_detected and not invalid_lane_detected:
+        elif torque_applied or self.lane_change_pulse_timer > 2.:
           self.lane_change_state = LaneChangeState.laneChangeStarting
 
       # LaneChangeState.laneChangeStarting
