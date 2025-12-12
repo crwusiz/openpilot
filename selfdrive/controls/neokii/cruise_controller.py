@@ -552,7 +552,7 @@ class CruiseController:
 class CruiseStateManager:
   def __init__(self):
     self.params = Params()
-    self.cruise_state_control = self.params.get_bool('CruiseStateControl')
+    self.cruise_state_control = self.params.get_bool("CruiseStateControl")
 
     self.conv = UnitConverter()
     self.btn_handler = CruiseButtonHandler()

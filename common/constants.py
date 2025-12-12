@@ -28,7 +28,7 @@ ACCELERATION_DUE_TO_GRAVITY = 9.81  # m/s^2
 class UnitConverter:
   def __init__(self):
     self.params = Params()
-    self.is_metric = self.params.get_bool('IsMetric')
+    self.is_metric = self.params.get_bool("IsMetric")
 
   def to_ms(self, speed: float) -> float:
     return speed * CV.KPH_TO_MS if self.is_metric else speed * CV.MPH_TO_MS

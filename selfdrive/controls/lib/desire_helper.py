@@ -68,7 +68,7 @@ class DesireHelper:
     self.prev_one_blinker = False
     self.desire = log.Desire.none
 
-    self.auto_lane_change_enable = Params().get_bool('AutoLaneChangeEnable')
+    self.auto_lane_change_enable = Params().get_bool("AutoLaneChangeEnable")
     self.auto_lane_change_timer = 0.0
 
   @staticmethod
