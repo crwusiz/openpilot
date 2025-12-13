@@ -17,11 +17,11 @@ MAX_DRAW_DISTANCE = 100.0
 
 class Colors:
   WHITE = rl.Color(255, 255, 255, 255) # rl.WHITE
-  WARNING = rl.Color(218, 202, 37, 255)
-  DANGER = rl.Color(201, 34, 49, 255)
   BLACK = rl.Color(0, 0, 0, 255) # rl.BLACK
   BLACK_TRANSLUCENT = rl.Color(0, 0, 0, 100)
+  RED = rl.Color(201, 34, 49, 255)
   LIGHT_RED = rl.Color(255, 100, 100, 150)
+  ORANGE = rl.Color(255, 149, 0, 255)
 
 THROTTLE_COLORS = [
   rl.Color(13, 248, 122, 102),   # HSLF(148/360, 0.94, 0.51, 0.4)
@@ -390,12 +390,12 @@ class ModelRenderer(Widget):
       if i == 1 and abs(leads_data[0].dRel - leads_data[1].dRel) <= 3.0:
         continue
 
-      if lead_vehicle.fill_poly:
-        rl.draw_triangle_fan(lead_vehicle.fill_poly, 4, Colors.BLACK_TRANSLUCENT)
-
       # Draw glow and chevron
       #rl.draw_triangle_fan(lead_vehicle.glow, len(lead_vehicle.glow), rl.Color(218, 202, 37, 255))
       #rl.draw_triangle_fan(lead_vehicle.chevron, len(lead_vehicle.chevron), rl.Color(201, 34, 49, lead_vehicle.fill_alpha))
+
+      if lead_vehicle.fill_poly:
+        rl.draw_triangle_fan(lead_vehicle.fill_poly, 4, Colors.BLACK_TRANSLUCENT)
 
       bracket_color = rl.Color(201, 34, 49, lead_vehicle.fill_alpha)
       pts = lead_vehicle.chevron
@@ -412,10 +412,33 @@ class ModelRenderer(Widget):
 
       # Draw distance and speed text
       if lead_info.point and lead_vehicle.fill_poly:
+        center_x = (lead_vehicle.fill_poly[0][0] + lead_vehicle.fill_poly[2][0]) / 2
+        center_y = (lead_vehicle.fill_poly[0][1] + lead_vehicle.fill_poly[2][1]) / 2
+
+        font_size = 32
+        text_offset = 25
+
         d_rel = lead_info.d_rel
-        v_rel = lead_info.v_rel
+        dist_y = center_y - text_offset + 5
+
+        d_color = Colors.WHITE
+        if d_rel < 5:
+          d_color = Colors.RED
+        elif d_rel < 15:
+          d_color = Colors.ORANGE
 
         dist_text = f"{d_rel:.0f} m"
+
+        self._draw_text_centered(center_x, dist_y, dist_text, font_size, d_color, self._font_bold)
+
+        v_rel = lead_info.v_rel
+        speed_y = center_y + text_offset
+
+        v_color = Colors.WHITE
+        if v_rel < -5:
+          v_color = Colors.RED
+        elif v_rel < 0:
+          v_color = Colors.ORANGE
 
         if ui_state.is_metric:
           spd_val = v_rel * 3.6
@@ -424,51 +447,9 @@ class ModelRenderer(Widget):
           spd_val = v_rel * 2.236936
           spd_unit = "mph"
         sign = "+" if spd_val > 0 else ""
-        speed_text = f"{sign}{spd_val:.0f} {spd_unit}"
+        speed_text = f"{sign} {spd_val:.0f} {spd_unit}"
 
-        d_color = Colors.WHITE
-        if d_rel < 10: d_color = Colors.DANGER
-        v_color = Colors.WHITE
-        if v_rel < -5: v_color = Colors.DANGER
-
-        font_size = 32
-
-        center_x = (lead_vehicle.fill_poly[0][0] + lead_vehicle.fill_poly[2][0]) / 2
-        center_y = (lead_vehicle.fill_poly[0][1] + lead_vehicle.fill_poly[2][1]) / 2
-
-        text_offset = 25
-
-        dist_y = center_y - text_offset
-        speed_y = center_y + text_offset
-
-        self._draw_text_centered(center_x, dist_y, dist_text, font_size, d_color, self._font_bold)
         self._draw_text_centered(center_x, speed_y, speed_text, font_size, v_color, self._font_bold)
-
-        """
-        # Calculate size for text positioning
-        sz = np.clip((25 * 30) / (d_rel / 3 + 30), 15.0, 30.0) * 2.35
-        text_y = y + sz / 1.5
-
-        # Distance text
-        d_color = rl.WHITE
-        if d_rel < 15:
-          d_color = rl.RED if d_rel < 5 else rl.Color(255, 149, 0, 255)  # Orange
-
-        l_dist = f"{d_rel:.1f} m"
-        self._draw_text_centered(x, text_y + 70.0, l_dist, 35, d_color, self._font_medium)
-
-        # Speed text
-        v_color = rl.Color(255, 191, 191, 255)  # Pink
-        if v_rel < 0:
-          v_color = rl.RED if v_rel < -4.4704 else rl.Color(255, 149, 0, 255)
-
-        if ui_state.is_metric:
-          l_speed = f"{self._speed + v_rel * 3.6:.0f} km/h"
-        else:
-          l_speed = f"{self._speed + v_rel * 2.236936:.0f} mph"
-
-        self._draw_text_centered(x, text_y + 120.0, l_speed, 35, v_color, self._font_medium)
-        """
 
   def _draw_text_centered(self, x: float, y: float, text: str, font_size: int, color: rl.Color, font: rl.Font):
     text_size = rl.measure_text_ex(font, text, font_size, 0)
