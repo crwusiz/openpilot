@@ -29,22 +29,21 @@ ThermalStatus = log.DeviceState.ThermalStatus
 NetworkType = log.DeviceState.NetworkType
 
 
-# Color scheme
+def colors_alpha(color, alpha):
+  if isinstance(color, tuple):
+    return rl.Color(color[0], color[1], color[2], alpha)
+  else:
+    return rl.Color(color.r, color.g, color.b, alpha)
+
+
 class Colors:
   WHITE = rl.WHITE
-  WHITE_DIM = rl.Color(255, 255, 255, 85)
+  WHITE_DIM = colors_alpha(WHITE, 85)
   GRAY = rl.Color(84, 84, 84, 255)
-
-  # Status colors
-  GOOD = rl.WHITE
   WARNING = rl.Color(218, 202, 37, 255)
   DANGER = rl.Color(201, 34, 49, 255)
+  BUTTON_PRESSED = colors_alpha(WHITE, 166)
   UP_TO_DATE = rl.Color(128, 216, 166, 255)
-
-  # UI elements
-  METRIC_BORDER = rl.Color(255, 255, 255, 85)
-  BUTTON_NORMAL = rl.WHITE
-  BUTTON_PRESSED = rl.Color(255, 255, 255, 166)
 
 
 NETWORK_TYPES = {
@@ -79,8 +78,8 @@ class Sidebar(Widget):
     self.wifi_manager = WifiManager()
     self.wifi_manager_ui = WifiManagerUI(self.wifi_manager)
 
-    self._temp_status = MetricData(tr_noop("TEMP"), tr_noop("GOOD"), Colors.GOOD)
-    self._panda_status = MetricData(tr_noop("VEHICLE"), tr_noop("ONLINE"), Colors.GOOD)
+    self._temp_status = MetricData(tr_noop("TEMP"), tr_noop("GOOD"), Colors.WHITE)
+    self._panda_status = MetricData(tr_noop("VEHICLE"), tr_noop("ONLINE"), Colors.WHITE)
     self._connect_status = MetricData(tr_noop("CONNECT"), tr_noop("OFFLINE"), Colors.WARNING)
     self._commit_status = MetricData(tr_noop("UPDATE"), tr_noop("CHECK"), Colors.WARNING)
     self._recording_audio = False
@@ -119,7 +118,7 @@ class Sidebar(Widget):
     self._open_settings_callback = open_settings
 
   def _is_network_connected(self) -> bool:
-    return self._connect_status.color == Colors.GOOD
+    return self._connect_status.color == Colors.WHITE
 
   def _handle_commit_button_press(self):
     if self._is_processing:
@@ -170,7 +169,7 @@ class Sidebar(Widget):
       # Regardless of exit code, mark as completed
       # In original code, exit code wasn't actually checked
       self._is_processing = False
-      self._commit_status.update(tr_noop("UPDATE"), tr_noop("COMPLETE"), Colors.GOOD)
+      self._commit_status.update(tr_noop("UPDATE"), tr_noop("COMPLETE"), Colors.WHITE)
 
     except Exception as e:
       print(f"Failed to read git pull exit code: {e}")
@@ -332,8 +331,8 @@ class Sidebar(Widget):
     max_temp = device_state.maxTempC
 
     if thermal_status == ThermalStatus.green:
-      #self._temp_status.update(tr_noop("TEMP"), tr_noop("GOOD"), Colors.GOOD)
-      self._temp_status.update(tr_noop("TEMP"), f"{max_temp:.1f}°C", Colors.GOOD)
+      #self._temp_status.update(tr_noop("TEMP"), tr_noop("GOOD"), Colors.WHITE)
+      self._temp_status.update(tr_noop("TEMP"), f"{max_temp:.1f}°C", Colors.WHITE)
     elif thermal_status == ThermalStatus.yellow:
       #self._temp_status.update(tr_noop("TEMP"), tr_noop("OK"), Colors.WARNING)
       self._temp_status.update(tr_noop("TEMP"), f"{max_temp:.1f}°C", Colors.WARNING)
@@ -346,7 +345,7 @@ class Sidebar(Widget):
     if last_ping == 0:
       self._connect_status.update(tr_noop("CONNECT"), tr_noop("OFFLINE"), Colors.WARNING)
     elif time.monotonic_ns() - last_ping < 80_000_000_000:  # 80 seconds in nanoseconds
-      self._connect_status.update(tr_noop("CONNECT"), tr_noop("ONLINE"), Colors.GOOD)
+      self._connect_status.update(tr_noop("CONNECT"), tr_noop("ONLINE"), Colors.WHITE)
     else:
       self._connect_status.update(tr_noop("CONNECT"), tr_noop("ERROR"), Colors.DANGER)
 
@@ -354,7 +353,7 @@ class Sidebar(Widget):
     if ui_state.panda_type == log.PandaState.PandaType.unknown:
       self._panda_status.update(tr_noop("NO"), tr_noop("PANDA"), Colors.DANGER)
     else:
-      self._panda_status.update(tr_noop("VEHICLE"), tr_noop("ONLINE"), Colors.GOOD)
+      self._panda_status.update(tr_noop("VEHICLE"), tr_noop("ONLINE"), Colors.WHITE)
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     if rl.check_collision_point_rec(mouse_pos, SETTINGS_BTN):
@@ -388,18 +387,18 @@ class Sidebar(Widget):
 
     # Settings button
     settings_down = mouse_down and rl.check_collision_point_rec(mouse_pos, SETTINGS_BTN)
-    tint = Colors.BUTTON_PRESSED if settings_down else Colors.BUTTON_NORMAL
+    tint = Colors.BUTTON_PRESSED if settings_down else Colors.WHITE
     rl.draw_texture(self._settings_img, int(SETTINGS_BTN.x), int(SETTINGS_BTN.y), tint)
 
     # Home/Flag button
     #flag_pressed = mouse_down and rl.check_collision_point_rec(mouse_pos, HOME_BTN)
     #button_img = self._flag_img if ui_state.started else self._home_img
 
-    #tint = Colors.BUTTON_PRESSED if (ui_state.started and flag_pressed) else Colors.BUTTON_NORMAL
+    #tint = Colors.BUTTON_PRESSED if (ui_state.started and flag_pressed) else Colors.WHITE
     #rl.draw_texture(button_img, int(HOME_BTN.x), int(HOME_BTN.y), tint)
 
     # C3X image (always shown, not flag/home toggle)
-    rl.draw_texture(self._c3x_img, int(HOME_BTN.x), int(HOME_BTN.y), Colors.BUTTON_NORMAL)
+    rl.draw_texture(self._c3x_img, int(HOME_BTN.x), int(HOME_BTN.y), Colors.WHITE)
 
     # Microphone button
     if self._recording_audio:
@@ -466,7 +465,7 @@ class Sidebar(Widget):
     rl.end_scissor_mode()
 
     # Draw border
-    rl.draw_rectangle_rounded_lines_ex(metric_rect, 0.3, 10, 2, Colors.METRIC_BORDER)
+    rl.draw_rectangle_rounded_lines_ex(metric_rect, 0.3, 10, 2, Colors.WHITE_DIM)
 
     # Draw label and value
     labels = [tr(metric.label), tr(metric.value)]

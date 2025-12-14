@@ -41,27 +41,34 @@ class FontSizes:
   info_text: int = 30
 
 
+def colors_alpha(color, alpha):
+  if isinstance(color, tuple):
+    return rl.Color(color[0], color[1], color[2], alpha)
+  else:
+    return rl.Color(color.r, color.g, color.b, alpha)
+
+
 @dataclass(frozen=True)
 class Colors:
   WHITE = rl.Color(255, 255, 255, 255) # rl.WHITE
-  DISENGAGED = rl.Color(145, 155, 149, 255)
-  OVERRIDE = rl.Color(145, 155, 149, 255)
-  ENGAGED = rl.Color(128, 216, 166, 255)
-  DISENGAGED_BG = rl.Color(0, 0, 0, 153)
-  OVERRIDE_BG = rl.Color(145, 155, 149, 204)
-  ENGAGED_BG = rl.Color(128, 216, 166, 204)
   GREY = rl.Color(166, 166, 166, 255)
-  DARK_GREY = rl.Color(114, 114, 114, 255)
   BLACK = rl.Color(0, 0, 0, 255) # rl.BLACK
-  BLACK_TRANSLUCENT = rl.Color(0, 0, 0, 166)
-  WHITE_TRANSLUCENT = rl.Color(255, 255, 255, 200)
-  BORDER_TRANSLUCENT = rl.Color(255, 255, 255, 75)
-  HEADER_GRADIENT_START = rl.Color(0, 0, 0, 114)
-  HEADER_GRADIENT_END = rl.Color(0, 0, 0, 0) # rl.BLANK
   RED = rl.Color(201, 34, 49, 255)
+  ORANGE = rl.Color(255, 149, 0, 255)
+  DISENGAGED = rl.Color(145, 155, 149, 255)
+  OVERRIDE = DISENGAGED
+  ENGAGED = rl.Color(128, 216, 166, 255)
+  DISENGAGED_BG = colors_alpha(BLACK, 153)
+  OVERRIDE_BG = colors_alpha(OVERRIDE, 204)
+  ENGAGED_BG = colors_alpha(ENGAGED, 204)
+  BLACK_TRANSLUCENT = colors_alpha(BLACK, 166)
+  WHITE_TRANSLUCENT = colors_alpha(WHITE, 200)
+  BORDER_TRANSLUCENT = colors_alpha(WHITE, 75)
+  HEADER_GRADIENT_START = colors_alpha(BLACK, 114)
+  HEADER_GRADIENT_END = rl.Color(0, 0, 0, 0) # rl.BLANK
+  DARK_GREY = rl.Color(114, 114, 114, 255)
   DARK_RED = rl.Color(139, 0, 0, 255)
   LIME = rl.Color(120, 255, 120, 255)
-  ORANGE = rl.Color(255, 149, 0, 255)
   LIGHT_ORANGE = rl.Color(255, 228, 191, 255)
   AMBER = rl.Color(255, 200, 100, 255)
 
@@ -931,7 +938,7 @@ class HudRenderer(Widget):
 
         if alpha > 0.05:
           x_pos = x + int(i * blinker_width * 0.6 * direction)
-          color = rl.Color(255, 255, 255, int(alpha * 255))
+          color = colors_alpha(Colors.WHITE, int(alpha * 255))
 
           rl.draw_texture_pro(
             blinker_img,
@@ -952,7 +959,7 @@ class HudRenderer(Widget):
 
         if alpha > 0.05:
           x_pos = x + int(i * blinker_width * 0.6 * direction)
-          color = rl.Color(255, 255, 255, int(alpha * 255))
+          color = colors_alpha(Colors.WHITE, int(alpha * 255))
 
           rl.draw_texture_pro(
             blinker_img,
@@ -1110,7 +1117,7 @@ class HudRenderer(Widget):
         t = (progress - 0.33) / 0.34
         color = rl.Color(255, int(149 - (149 - 34) * t), int(0 + (49 - 0) * t), 200)
       else:
-        color = rl.Color(201, 34, 49, 200)
+        color = colors_alpha(Colors.RED, 200)
 
       if angle > 0:
         current_angle = start_angle_deg + segment_angle
@@ -1150,4 +1157,4 @@ class HudRenderer(Widget):
         end_x = center_x + math.cos(next_rad) * adjusted_radius
         end_y = center_y - math.sin(next_rad) * adjusted_radius
 
-        rl.draw_line_ex(rl.Vector2(start_x, start_y), rl.Vector2(end_x, end_y), border_thickness, rl.Color(139, 0, 0, 200))
+        rl.draw_line_ex(rl.Vector2(start_x, start_y), rl.Vector2(end_x, end_y), border_thickness, colors_alpha(Colors.DARK_RED, 200))

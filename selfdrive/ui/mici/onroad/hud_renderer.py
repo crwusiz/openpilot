@@ -27,10 +27,17 @@ class FontSizes:
   set_speed: int = 112
 
 
+def colors_alpha(color, alpha):
+  if isinstance(color, tuple):
+    return rl.Color(color[0], color[1], color[2], alpha)
+  else:
+    return rl.Color(color.r, color.g, color.b, alpha)
+
+
 @dataclass(frozen=True)
 class Colors:
   WHITE = rl.WHITE
-  WHITE_TRANSLUCENT = rl.Color(255, 255, 255, 200)
+  WHITE_TRANSLUCENT = colors_alpha(WHITE, 200)
 
 
 class TurnIntent(Widget):
