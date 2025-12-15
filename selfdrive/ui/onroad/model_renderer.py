@@ -424,10 +424,10 @@ class ModelRenderer(Widget):
         center_y = (lead_vehicle.fill_poly[0][1] + lead_vehicle.fill_poly[2][1]) / 2
 
         font_size = 32
-        text_offset = 25
+        text_offset = 20
 
         d_rel = lead_info.d_rel
-        dist_y = center_y - text_offset + 5
+        dist_y = center_y - (text_offset + 10)
 
         d_color = Colors.WHITE
         if d_rel < 5:
