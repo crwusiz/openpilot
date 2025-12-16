@@ -304,21 +304,21 @@ class ModelRenderer(Widget):
 
     # Calculate size and position
     px, py = point
-    base_y = min(py + 20.0, rect.height - 50.0)
     x = np.clip(px, 0.0, rect.width)
+    base_y = min(py + 10.0, rect.height - 50.0)
 
-    scale_factor = 700.0 / (d_rel + 20.0)
+    scale_factor = 700.0 / (d_rel + 10.0)
     half_w = 40.0 + (scale_factor * 2.5)
     half_w = max(half_w, 60.0)
 
     fixed_half_h = 40.0
 
     p_top_left = (x - half_w, base_y - fixed_half_h)
-    p_top_rght = (x + half_w, base_y - fixed_half_h)
-    p_btm_rght = (x + half_w, base_y + fixed_half_h)
-    p_btm_left = (x - half_w, base_y + fixed_half_h)
+    p_top_right = (x + half_w, base_y - fixed_half_h)
+    p_bottom_right = (x + half_w, base_y + fixed_half_h)
+    p_bottom_left = (x - half_w, base_y + fixed_half_h)
 
-    fill_poly = [p_top_left, p_top_rght, p_btm_rght, p_btm_left]
+    fill_poly = [p_top_left, p_top_right, p_bottom_right, p_bottom_left]
 
     chevron = [
       (x - half_w, base_y),
