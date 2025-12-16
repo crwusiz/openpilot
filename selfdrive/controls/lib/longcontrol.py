@@ -18,7 +18,7 @@ def long_control_state_trans(CP, active, long_control_state, v_ego,
                         not brake_pressed)
 
   if lead.status:
-    starting_condition = starting_condition and lead.vLeadK > 0.5 and lead.dRel > 6.0
+    starting_condition = starting_condition and lead.vLeadK > 1.0 and lead.dRel > 6.0
 
   started_condition = v_ego > CP.vEgoStarting
 
