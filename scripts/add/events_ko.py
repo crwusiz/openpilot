@@ -254,15 +254,6 @@ def below_steer_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.S
     Priority.LOW, VisualAlert.none, AudibleAlert.prompt, 0.4)
 
 
-def steer_saturated_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
-  steer_text2 = "왼쪽으로 조향" if sm['carControl'].actuators.torque > 0 else "오른쪽으로 조향"
-  return Alert(
-    "주의 하세요",
-    steer_text2,
-    AlertStatus.userPrompt, AlertSize.mid,
-    Priority.LOW, VisualAlert.steerRequired, AudibleAlert.promptRepeat, 2.)
-
-
 def calibration_incomplete_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   first_word = '캘리브레이션을 다시' if sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.recalibrating else '캘리브레이션'
   return Alert(
@@ -1158,7 +1149,11 @@ if HARDWARE.get_device_type() == 'mici':
         Priority.LOW, VisualAlert.none, AudibleAlert.prompt, .1),
     },
     EventName.steerSaturated: {
-      ET.WARNING: steer_saturated_alert,
+      ET.WARNING: Alert(
+        "take control",
+        "turn exceeds limit",
+        AlertStatus.userPrompt, AlertSize.mid,
+        Priority.LOW, VisualAlert.steerRequired, AudibleAlert.promptRepeat, 2.),
     },
     EventName.calibrationIncomplete: {
       ET.PERMANENT: calibration_incomplete_alert,
