@@ -102,7 +102,7 @@ class LongControl:
       output_accel = self.CP.startAccel
 
       if lead.status:
-        accel_scale = np.interp(lead.dRel, [4.0, 10.0], [0.0, 1.0])
+        accel_scale = np.interp(lead.dRel, [4.0, 8.0], [0.0, 1.0])
         output_accel *= accel_scale
 
       self.reset()
