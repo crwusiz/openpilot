@@ -19,7 +19,6 @@ from openpilot.selfdrive.test.helpers import with_processes
 from openpilot.selfdrive.selfdrived.alertmanager import set_offroad_alert
 from openpilot.system.updated.updated import parse_release_notes
 from openpilot.system.version import terms_version, training_version
-from openpilot.system.athena.registration import UNREGISTERED_DONGLE_ID
 from openpilot.common.git import get_branch, get_commit, get_commit_date
 
 AlertSize = log.SelfdriveState.AlertSize
@@ -198,7 +197,7 @@ def setup_openpilot_long_confirmation_dialog(click, pm: PubMaster):
   click(2000, 960)  # toggle openpilot longitudinal control
 
 
-def setup_onroad_state(pm: PubMaster):
+def setup_onroad(click, pm: PubMaster):
   ds = messaging.new_message('deviceState')
   ds.deviceState.started = True
 
@@ -219,16 +218,13 @@ def setup_onroad_state(pm: PubMaster):
     time.sleep(0.05)
 
 
-def setup_onroad(click, pm: PubMaster):
-  setup_onroad_state(pm)
-
-
 def setup_onroad_sidebar(click, pm: PubMaster):
   setup_onroad(click, pm)
   click(100, 100)  # open sidebar
 
 
-def setup_onroad_alert_state(pm: PubMaster, size: log.SelfdriveState.AlertSize, text1: str, text2: str, status: log.SelfdriveState.AlertStatus):
+def setup_onroad_alert(click, pm: PubMaster, size: log.SelfdriveState.AlertSize, text1: str, text2: str, status: log.SelfdriveState.AlertStatus):
+  setup_onroad(click, pm)
   alert = messaging.new_message('selfdriveState')
   ss = alert.selfdriveState
   ss.alertSize = size
@@ -239,11 +235,6 @@ def setup_onroad_alert_state(pm: PubMaster, size: log.SelfdriveState.AlertSize, 
     pm.send('selfdriveState', alert)
     alert.clear_write_flag()
     time.sleep(0.05)
-
-
-def setup_onroad_alert(click, pm: PubMaster, size: log.SelfdriveState.AlertSize, text1: str, text2: str, status: log.SelfdriveState.AlertStatus):
-  setup_onroad(click, pm)
-  setup_onroad_alert_state(pm, size, text1, text2, status)
 
 
 def setup_onroad_small_alert(click, pm: PubMaster):
@@ -302,10 +293,9 @@ CASES = {
 
 
 class TestUI:
-  def __init__(self, big_ui: bool = True):
+  def __init__(self):
     os.environ["SCALE"] = os.getenv("SCALE", "1")
-    os.environ["BIG"] = "1" if big_ui else "0"
-    self.big_ui = big_ui
+    os.environ["BIG"] = "1"
     sys.modules["mouseinfo"] = False
 
   def setup(self):
@@ -322,11 +312,7 @@ class TestUI:
       self.ui = pywinctl.getWindowsWithTitle("UI")[0]
     except Exception as e:
       print(f"failed to find ui window, assuming that it's in the top left (for Xvfb) {e}")
-      # Default window size based on UI mode
-      if self.big_ui:
-        self.ui = namedtuple("bb", ["left", "top", "width", "height"])(0, 0, 2160, 1080)
-      else:
-        self.ui = namedtuple("bb", ["left", "top", "width", "height"])(0, 0, 536, 240)
+      self.ui = namedtuple("bb", ["left", "top", "width", "height"])(0, 0, 2160, 1080)
 
   def screenshot(self, name: str):
     full_screenshot = pyautogui.screenshot()
@@ -337,28 +323,25 @@ class TestUI:
     pyautogui.mouseDown(self.ui.left + x, self.ui.top + y, *args, **kwargs)
     time.sleep(0.01)
     pyautogui.mouseUp(self.ui.left + x, self.ui.top + y, *args, **kwargs)
-    if not self.big_ui:
-      time.sleep(0.1)
 
   @with_processes(["ui"])
   def test_ui(self, name, setup_case):
     self.setup()
     time.sleep(UI_DELAY)  # wait for UI to start
     setup_case(self.click, self.pm)
-    # Extra delay for MICI UI animations
-    if not self.big_ui:
-      time.sleep(0.5)
     self.screenshot(name)
 
 
 def create_screenshots():
-  SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+  if TEST_OUTPUT_DIR.exists():
+    shutil.rmtree(TEST_OUTPUT_DIR)
+  SCREENSHOTS_DIR.mkdir(parents=True)
 
-  t = TestUI(big_ui=True)
+  t = TestUI()
   for name, setup in CASES.items():
     with OpenpilotPrefix():
       params = Params()
-      params.put("DongleId", UNREGISTERED_DONGLE_ID)
+      params.put("DongleId", "123456789012345")
 
       params.put("LanguageSetting", "ko")
 

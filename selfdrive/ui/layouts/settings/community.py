@@ -244,6 +244,8 @@ class CommunityLayout(Widget):
             rect.y <= y <= rect.y + rect.height)
 
   def _build_toggle_items(self):
+    is_c3xl = self._params.get_bool("HardwareC3xLite")
+
     self._toggle_items = [
       toggle_item(
         lambda: tr("PcmCruise"),
@@ -275,17 +277,30 @@ class CommunityLayout(Widget):
         initial_state=self._params.get_bool("RadarTrackEnable"),
         callback=lambda state: self._params.put_bool("RadarTrackEnable", state),
       ),
-      toggle_item(
-        lambda: tr("Driver Camera On Reverse"),
-        description=lambda: DESCRIPTIONS["driver_cam_reverse"],
-        initial_state=self._params.get_bool("DriverCameraOnReverse"),
-        callback=lambda state: self._params.put_bool("DriverCameraOnReverse", state),
-      ),
+    ]
+
+    if not is_c3xl:
+      self._toggle_items.append(
+        toggle_item(
+          lambda: tr("Driver Camera On Reverse"),
+          description=lambda: DESCRIPTIONS["driver_cam_reverse"],
+          initial_state=self._params.get_bool("DriverCameraOnReverse"),
+          callback=lambda state: self._params.put_bool("DriverCameraOnReverse", state),
+        )
+      )
+
+    self._toggle_items.extend([
       toggle_item(
         lambda: tr("DriverCamera Hardware Missing"),
         description=lambda: DESCRIPTIONS["driver_cam_missing"],
         initial_state=self._params.get_bool("DriverCameraHardwareMissing"),
         callback=lambda state: self._params.put_bool("DriverCameraHardwareMissing", state),
+      ),
+      toggle_item(
+        lambda: tr("Hardware is C3x Lite"),
+        description=lambda: DESCRIPTIONS["hardware_c3x"],
+        initial_state=self._params.get_bool("HardwareC3xLite"),
+        callback=lambda state: self._params.put_bool("HardwareC3xLite", state),
       ),
       toggle_item(
         lambda: tr("Logger Enable"),
@@ -299,7 +314,7 @@ class CommunityLayout(Widget):
         initial_state=self._params.get_bool("PrebuiltEnable"),
         callback=lambda state: self._params.put_bool("PrebuiltEnable", state),
       ),
-    ]
+    ])
 
   def _build_function_items(self):
     self._function_items = [

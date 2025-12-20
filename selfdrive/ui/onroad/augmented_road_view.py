@@ -22,14 +22,14 @@ DRIVER_CAM = VisionStreamType.VISION_STREAM_DRIVER
 DEFAULT_DEVICE_CAMERA = DEVICE_CAMERAS["tici", "ar0231"]
 
 BORDER_COLORS = {
-  UIStatus.DISENGAGED: rl.Color(0x12, 0x28, 0x39, 0xFF),  # Blue for disengaged state
-  UIStatus.OVERRIDE: rl.Color(0x89, 0x92, 0x8D, 0xFF),  # Gray for override state
-  UIStatus.ENGAGED: rl.Color(0x16, 0x7F, 0x40, 0xFF),  # Green for engaged state
-  UIStatus.RED: rl.Color(0xc9, 0x22, 0x31, 0xFF),
-  UIStatus.STEERING: rl.Color(0x00, 0xbf, 0xff, 0xFF),
-  UIStatus.BLINKER: rl.Color(0xff, 0x95, 0x00, 0xFF),
-  UIStatus.ACTIVE: rl.Color(0x6f, 0xc0, 0xc9, 0xFF),
-  UIStatus.READY: rl.Color(0x8f, 0xc9, 0xc0, 0xFF),
+  UIStatus.DISENGAGED: rl.Color(18, 40, 57, 255),  # Blue for disengaged state
+  UIStatus.OVERRIDE: rl.Color(137, 146, 141, 255),  # Gray for override state
+  UIStatus.ENGAGED: rl.Color(22, 127, 64, 255),  # Green for engaged state
+  UIStatus.RED: rl.Color(201, 34, 49, 255),
+  UIStatus.STEERING: rl.Color(0, 191, 255, 255),
+  UIStatus.BLINKER: rl.Color(255, 149, 0, 255),
+  UIStatus.ACTIVE: rl.Color(111, 192, 201, 255),
+  UIStatus.READY: rl.Color(143, 201, 192, 255),
 }
 
 WIDE_CAM_MAX_SPEED = 10.0  # m/s (22 mph)

@@ -18,7 +18,7 @@ def long_control_state_trans(CP, active, long_control_state, v_ego,
                         not brake_pressed)
 
   if lead.status:
-    starting_condition = starting_condition and lead.vLeadK > 0.5 and lead.dRel > 6.0
+    starting_condition = starting_condition and lead.vLeadK > 1.0 and lead.dRel > 6.0
 
   started_condition = v_ego > CP.vEgoStarting
 
@@ -83,13 +83,14 @@ class LongControl:
       if output_accel > self.CP.stopAccel:
         output_accel = min(output_accel, 0.0)
         self.stopping_accel_weight = 1.0
+
         if self.prev_long_control_state == LongCtrlState.starting:
           output_accel -= self.CP.stoppingDecelRate * 1.5 * DT_CTRL
         else:
-          m_accel = -0.6
+          m_accel = -0.4
           d_accel = np.interp(output_accel,
-                           [m_accel - 0.5, m_accel, m_accel + 0.5],
-                           [self.CP.stoppingDecelRate, 0.05, self.CP.stoppingDecelRate])
+                              [m_accel - 0.5, m_accel, m_accel + 0.5],
+                              [self.CP.stoppingDecelRate, 0.05, self.CP.stoppingDecelRate])
 
           output_accel -= d_accel * DT_CTRL
       else:
@@ -101,7 +102,7 @@ class LongControl:
       output_accel = self.CP.startAccel
 
       if lead.status:
-        accel_scale = np.interp(lead.dRel, [4.0, 6.0], [0.0, 1.0])
+        accel_scale = np.interp(lead.dRel, [4.0, 8.0], [0.0, 1.0])
         output_accel *= accel_scale
 
       self.reset()
@@ -110,8 +111,7 @@ class LongControl:
     else:  # LongCtrlState.pid
       #error = long_plan.a_target - CS.aEgo
       error = long_plan.vTarget - CS.vEgo
-      output_accel = self.pid.update(error, speed=CS.vEgo,
-                                     feedforward=long_plan.aTarget)
+      output_accel = self.pid.update(error, speed=CS.vEgo, feedforward=long_plan.aTarget)
 
       self.stopping_accel_weight = max(self.stopping_accel_weight - 2. * DT_CTRL, 0.)
       output_accel = self.last_output_accel * self.stopping_accel_weight + output_accel * (1. - self.stopping_accel_weight)

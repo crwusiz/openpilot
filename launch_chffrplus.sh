@@ -129,25 +129,14 @@ function launch {
     pip install jeepney
   fi
 
-  # init github ssh-keys or username
-  SSH_KEYS_DEFAULT="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDckQYK31fUOge/qXx0e+uv46CPWgk1F5o07ERzgAnHVlCYz7dibvajpMFC4hfFWU1yTMtl6LlejU/bylMXVcdrkH82VygLzrczQ3ZTWdIwCo1ToeN+zEk6yzhpHTSZlfHSx6Hv1TwrA+MJaKGRCfX9OUHaq9Rv0ere2ZmYSaXMmNn9P7MLt60T36Ncg2A4TrNgADH/Lo4hErLVoRttyM7QFDY8gYVG/Gy1qAxRAEnM26FNEtuWhhi5u8wcU+g8CeB0t9NYtNWw4OcohD9whr+FRzmET1c+qxcuk5L2wv7nNigJ55pGUNFqfPf5ShZdAakVp3IAMtfAtjNLVk5JXfTdWvaaZIKacTaCOcdmAaXwT3HTb+mn9kPESnsmoTliX2DCuYOXe1ekg79KbN4Q7YyBNwrXRbSE/L80NJua//ox14vk3jbwulOWczUG4LekEhFWFQ/5u17V3zd9VH6g+xMkYYM+nOekO8K1TzYGXllaz1FNJ5HdPWuc92CX5mFnY8dWV5Qw2BDXnJYJ97EYl3cqQaQrGBvOqAVSLsfHmEJcUJ+FZ2mcNGtcSvG4j7UxTfRay0DR7aiydbglnq7agrLYEhEkpIFrxV/MT850hPqhHD95c7T2lkVc+NMNlPoP+9N2A+7/L2LWMTJTPVs6dJzkd1GS1MKylBSC2KVIm0lsaw=="
-  SSH_USERNAME_DEFAULT="crwusiz"
-
-  SSH_KEYS_FILE="${PARAMS_ROOT}/d/GithubSshKeys"
-  USERNAME_FILE="${PARAMS_ROOT}/d/GithubUsername"
+  # openpilot ssh key installer
+  if [ ! -f /data/params/d/GithubSshKeys ]; then
+    echo -n openpilot > /data/params/d/GithubUsername
+    cat /usr/comma/setup_keys > /data/params/d/GithubSshKeys
+  fi
 
   echo -n 1 > /data/params/d/SshEnabled
   echo -n 1 > /data/params/d/AdbEnabled
-
-  if [ ! -f "$SSH_KEYS_FILE" ] || [ ! -s "$SSH_KEYS_FILE" ]; then
-    echo "▶️ Github SSH Keys File($SSH_KEYS_FILE) not found or empty."
-    echo -n "$SSH_KEYS_DEFAULT" > "$SSH_KEYS_FILE"
-  fi
-
-  if [ ! -f "$USERNAME_FILE" ] || [ ! -s "$USERNAME_FILE" ]; then
-    echo "▶️ Github Username File($USERNAME_FILE) not found or empty."
-    echo -n "$SSH_USERNAME_DEFAULT" > "$USERNAME_FILE"
-  fi
 
   # start manager
   cd system/manager

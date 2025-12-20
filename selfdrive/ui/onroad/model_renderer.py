@@ -15,6 +15,23 @@ CLIP_MARGIN = 500
 MIN_DRAW_DISTANCE = 10.0
 MAX_DRAW_DISTANCE = 100.0
 
+
+def colors_alpha(color, alpha):
+  if isinstance(color, tuple):
+    return rl.Color(color[0], color[1], color[2], alpha)
+  else:
+    return rl.Color(color.r, color.g, color.b, alpha)
+
+
+class Colors:
+  WHITE = rl.Color(255, 255, 255, 255) # rl.WHITE
+  BLACK = rl.Color(0, 0, 0, 255) # rl.BLACK
+  BLACK_TRANSLUCENT = colors_alpha(BLACK, 100)
+  RED = rl.Color(201, 34, 49, 255)
+  BSD = rl.Color(255, 0, 0, 100)
+  LIGHT_RED = rl.Color(255, 100, 100, 150)
+  ORANGE = rl.Color(255, 149, 0, 255)
+
 THROTTLE_COLORS = [
   rl.Color(13, 248, 122, 102),   # HSLF(148/360, 0.94, 0.51, 0.4)
   rl.Color(114, 255, 92, 89),    # HSLF(112/360, 1.0, 0.68, 0.35)
@@ -48,8 +65,9 @@ class LeadInfo:
 
 @dataclass
 class LeadVehicle:
-  glow: list[float] = field(default_factory=list)
-  chevron: list[float] = field(default_factory=list)
+  glow: list = field(default_factory=list)
+  chevron: list = field(default_factory=list)
+  fill_poly: list = field(default_factory=list)
   fill_alpha: int = 0
 
 
@@ -69,6 +87,7 @@ class ModelRenderer(Widget):
     self._left_blindspot = False
     self._right_blindspot = False
     self._font_medium: rl.Font = gui_app.font(FontWeight.MEDIUM)
+    self._font_bold: rl.Font = gui_app.font(FontWeight.BOLD)
 
     # Initialize ModelPoints objects
     self._path = ModelPoints()
@@ -284,17 +303,39 @@ class ModelRenderer(Widget):
       fill_alpha = min(fill_alpha, 255)
 
     # Calculate size and position
-    sz = np.clip((25 * 30) / (d_rel / 3 + 30), 15.0, 30.0) * 2.35
-    x = np.clip(point[0], 0.0, rect.width - sz / 2)
-    y = min(point[1], rect.height - sz * 0.6)
+    px, py = point
+    x = np.clip(px, 0.0, rect.width)
+    base_y = min(py + 10.0, rect.height - 50.0)
 
+    scale_factor = 700.0 / (d_rel + 10.0)
+    half_w = 40.0 + (scale_factor * 2.5)
+    half_w = max(half_w, 60.0)
+
+    fixed_half_h = 40.0
+
+    p_top_left = (x - half_w, base_y - fixed_half_h)
+    p_top_right = (x + half_w, base_y - fixed_half_h)
+    p_bottom_right = (x + half_w, base_y + fixed_half_h)
+    p_bottom_left = (x - half_w, base_y + fixed_half_h)
+
+    fill_poly = [p_top_left, p_top_right, p_bottom_right, p_bottom_left]
+
+    chevron = [
+      (x - half_w, base_y),
+      (x + half_w, base_y)
+    ]
+
+    glow = []
+
+    """
     g_xo = sz / 5
     g_yo = sz / 10
 
     glow = [(x + (sz * 1.35) + g_xo, y + sz + g_yo), (x, y - g_yo), (x - (sz * 1.35) - g_xo, y + sz + g_yo)]
     chevron = [(x + (sz * 1.25), y + sz), (x, y), (x - (sz * 1.25), y + sz)]
+    """
 
-    return LeadVehicle(glow=glow, chevron=chevron, fill_alpha=int(fill_alpha))
+    return LeadVehicle(glow=glow, chevron=chevron, fill_poly=fill_poly, fill_alpha=int(fill_alpha))
 
   def _draw_lane_lines(self):
     for i, lane_line in enumerate(self._lane_lines):
@@ -302,24 +343,23 @@ class ModelRenderer(Widget):
         continue
 
       alpha = np.clip(self._lane_line_probs[i], 0.0, 0.7)
-      color = rl.Color(255, 255, 255, int(alpha * 255))
+      color = colors_alpha(Colors.WHITE, int(alpha * 255))
+
       draw_polygon(self._rect, lane_line.projected_points, color)
 
     # Draw blindspot barriers
     if self._left_blindspot and self._lane_barriers[0].projected_points.size > 0:
-      color = rl.Color(255, 0, 0, 100)
-      draw_polygon(self._rect, self._lane_barriers[0].projected_points, color)
+      draw_polygon(self._rect, self._lane_barriers[0].projected_points, Colors.BSD)
 
     if self._right_blindspot and self._lane_barriers[1].projected_points.size > 0:
-      color = rl.Color(255, 0, 0, 100)
-      draw_polygon(self._rect, self._lane_barriers[1].projected_points, color)
+      draw_polygon(self._rect, self._lane_barriers[1].projected_points, Colors.BSD)
 
     for i, road_edge in enumerate(self._road_edges):
       if road_edge.projected_points.size == 0:
         continue
 
       alpha = np.clip(1.0 - self._road_edge_stds[i], 0.0, 1.0)
-      color = rl.Color(255, 0, 0, int(alpha * 255))
+      color = colors_alpha(Colors.BSD, int(alpha * 255))
       draw_polygon(self._rect, road_edge.projected_points, color)
 
   def _draw_path(self, sm):
@@ -335,7 +375,7 @@ class ModelRenderer(Widget):
       elif len(self._exp_gradient.colors) > 1:
         draw_polygon(self._rect, self._path.projected_points, gradient=self._exp_gradient)
       else:
-        draw_polygon(self._rect, self._path.projected_points, rl.Color(255, 255, 255, 30))
+        draw_polygon(self._rect, self._path.projected_points, colors_alpha(Colors.WHITE, 30))
     else:
       # Blend throttle/no throttle colors based on transition
       blend_factor = round(self._blend_filter.x * 100) / 100
@@ -352,46 +392,72 @@ class ModelRenderer(Widget):
     leads_data = [radar_state.leadOne, radar_state.leadTwo]
 
     for i, (lead_vehicle, lead_info, lead_data) in enumerate(zip(self._lead_vehicles, self._lead_info, leads_data, strict=True)):
-      # Skip if no lead or if lead two is too close to lead one
-      if not lead_vehicle.glow or not lead_vehicle.chevron:
+      if not lead_vehicle.chevron:
         continue
 
       if i == 1 and abs(leads_data[0].dRel - leads_data[1].dRel) <= 3.0:
         continue
 
       # Draw glow and chevron
-      rl.draw_triangle_fan(lead_vehicle.glow, len(lead_vehicle.glow), rl.Color(255, 191, 191, 255))
-      rl.draw_triangle_fan(lead_vehicle.chevron, len(lead_vehicle.chevron), rl.Color(201, 34, 49, lead_vehicle.fill_alpha))
+      #rl.draw_triangle_fan(lead_vehicle.glow, len(lead_vehicle.glow), rl.Color(218, 202, 37, 255))
+      #rl.draw_triangle_fan(lead_vehicle.chevron, len(lead_vehicle.chevron), rl.Color(201, 34, 49, lead_vehicle.fill_alpha))
+
+      if lead_vehicle.fill_poly:
+        rl.draw_triangle_fan(lead_vehicle.fill_poly, 4, Colors.BLACK_TRANSLUCENT)
+
+      bracket_color = colors_alpha(Colors.RED, lead_vehicle.fill_alpha)
+      pts = lead_vehicle.chevron
+
+      if len(pts) == 2:
+        start_pt = rl.Vector2(*pts[0])
+        end_pt = rl.Vector2(*pts[1])
+
+        border_thick = 14.0
+        rl.draw_line_ex(start_pt, end_pt, border_thick, Colors.LIGHT_RED)
+
+        main_thick = 6.0
+        rl.draw_line_ex(start_pt, end_pt, main_thick, bracket_color)
 
       # Draw distance and speed text
-      if lead_info.point:
-        x, y = lead_info.point
+      if lead_info.point and lead_vehicle.fill_poly:
+        center_x = (lead_vehicle.fill_poly[0][0] + lead_vehicle.fill_poly[2][0]) / 2
+        center_y = (lead_vehicle.fill_poly[0][1] + lead_vehicle.fill_poly[2][1]) / 2
+
+        font_size = 32
+        text_offset = 20
+
         d_rel = lead_info.d_rel
+        dist_y = center_y - (text_offset + 10)
+
+        d_color = Colors.WHITE
+        if d_rel < 5:
+          d_color = Colors.RED
+        elif d_rel < 15:
+          d_color = Colors.ORANGE
+
+        dist_text = f"{d_rel:.0f} m"
+
+        self._draw_text_centered(center_x, dist_y, dist_text, font_size, d_color, self._font_bold)
+
         v_rel = lead_info.v_rel
+        speed_y = center_y + text_offset
 
-        # Calculate size for text positioning
-        sz = np.clip((25 * 30) / (d_rel / 3 + 30), 15.0, 30.0) * 2.35
-        text_y = y + sz / 1.5
-
-        # Distance text
-        d_color = rl.WHITE
-        if d_rel < 15:
-          d_color = rl.RED if d_rel < 5 else rl.Color(255, 149, 0, 255)  # Orange
-
-        l_dist = f"{d_rel:.1f} m"
-        self._draw_text_centered(x, text_y + 70.0, l_dist, 35, d_color, self._font_medium)
-
-        # Speed text
-        v_color = rl.Color(255, 191, 191, 255)  # Pink
-        if v_rel < 0:
-          v_color = rl.RED if v_rel < -4.4704 else rl.Color(255, 149, 0, 255)
+        v_color = Colors.WHITE
+        if v_rel < -5:
+          v_color = Colors.RED
+        elif v_rel < 0:
+          v_color = Colors.ORANGE
 
         if ui_state.is_metric:
-          l_speed = f"{self._speed + v_rel * 3.6:.0f} km/h"
+          spd_val = v_rel * 3.6
+          spd_unit = "km/h"
         else:
-          l_speed = f"{self._speed + v_rel * 2.236936:.0f} mph"
+          spd_val = v_rel * 2.236936
+          spd_unit = "mph"
+        sign = "+" if spd_val > 0 else ""
+        speed_text = f"{sign} {spd_val:.0f} {spd_unit}"
 
-        self._draw_text_centered(x, text_y + 120.0, l_speed, 35, v_color, self._font_medium)
+        self._draw_text_centered(center_x, speed_y, speed_text, font_size, v_color, self._font_bold)
 
   def _draw_text_centered(self, x: float, y: float, text: str, font_size: int, color: rl.Color, font: rl.Font):
     text_size = rl.measure_text_ex(font, text, font_size, 0)

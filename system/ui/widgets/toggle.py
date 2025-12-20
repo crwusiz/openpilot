@@ -4,12 +4,12 @@ from openpilot.system.ui.lib.application import MousePos
 from openpilot.system.ui.widgets import Widget
 
 ON_COLOR = rl.Color(51, 171, 76, 255)
-#OFF_COLOR = rl.Color(0x39, 0x39, 0x39, 255) #0xC92231
-OFF_COLOR = rl.Color(0xC9, 0x22, 0x31, 255)
+#OFF_COLOR = rl.Color(57, 57, 57, 255) #0xC92231
+OFF_COLOR = rl.Color(201, 34, 49, 255)
 KNOB_COLOR = rl.WHITE
-DISABLED_ON_COLOR = rl.Color(0x22, 0x77, 0x22, 255)  # Dark green when disabled + on
-DISABLED_OFF_COLOR = rl.Color(0x39, 0x39, 0x39, 255)
-DISABLED_KNOB_COLOR = rl.Color(0x88, 0x88, 0x88, 255)
+DISABLED_ON_COLOR = rl.Color(34, 119, 34, 255)  # Dark green when disabled + on
+DISABLED_OFF_COLOR = rl.Color(57, 57, 57, 255)
+DISABLED_KNOB_COLOR = rl.Color(136, 136, 136, 255)
 WIDTH, HEIGHT = 160, 80
 BG_HEIGHT = 60
 ANIMATION_SPEED = 8.0
