@@ -193,6 +193,8 @@ class MouseState:
 
 class GuiApplication:
   def __init__(self, width: int | None = None, height: int | None = None):
+    self._set_log_callback()
+
     self._fonts: dict[FontWeight, rl.Font] = {}
     self._width = width if width is not None else GuiApplication._default_width()
     self._height = height if height is not None else GuiApplication._default_height()
@@ -216,7 +218,6 @@ class GuiApplication:
     self._last_fps_log_time: float = time.monotonic()
     self._frame = 0
     self._window_close_requested = False
-    self._trace_log_callback = None
     self._modal_overlay = ModalOverlay()
     self._modal_overlay_shown = False
     self._modal_overlay_tick: Callable[[], None] | None = None
@@ -261,9 +262,6 @@ class GuiApplication:
         sys.exit(0)
       signal.signal(signal.SIGINT, _close)
       atexit.register(self.close)
-
-      self._set_log_callback()
-      rl.set_trace_log_level(rl.TraceLogLevel.LOG_WARNING)
 
       flags = rl.ConfigFlags.FLAG_MSAA_4X_HINT
       if ENABLE_VSYNC:
@@ -641,6 +639,9 @@ class GuiApplication:
         cloudlog.debug(f"raylib: {text_str}")
       else:
         cloudlog.error(f"raylib: Unknown level {log_level}: {text_str}")
+
+    # ensure we get all the logs forwarded to us
+    rl.set_trace_log_level(rl.TraceLogLevel.LOG_DEBUG)
 
     # Store callback reference
     self._trace_log_callback = trace_log_callback

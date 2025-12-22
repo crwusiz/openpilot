@@ -23,14 +23,12 @@ class CarSpecificEvents:
     self.silent_steer_warning = True
 
   def update(self, CS: car.CarState, CS_prev: car.CarState, CC: car.CarControl):
-    extra_gears = interfaces[self.CP.carFingerprint].DRIVABLE_GEARS
-
     if self.CP.brand in ('body', 'mock'):
-      events = Events()
+      return Events()
 
-    elif self.CP.brand == 'chrysler':
-      events = self.create_common_events(CS, CS_prev, extra_gears=extra_gears)
+    events = self.create_common_events(CS, CS_prev)
 
+    if self.CP.brand == 'chrysler':
       # Low speed steer alert hysteresis logic
       if self.CP.minSteerSpeed > 0. and CS.vEgo < (self.CP.minSteerSpeed + 0.5):
         self.low_speed_alert = True
@@ -40,8 +38,6 @@ class CarSpecificEvents:
         events.add(EventName.belowSteerSpeed)
 
     elif self.CP.brand == 'honda':
-      events = self.create_common_events(CS, CS_prev, extra_gears=extra_gears, pcm_enable=False)
-
       if self.CP.pcmCruise and CS.vEgo < self.CP.minEnableSpeed:
         events.add(EventName.belowEngageSpeed)
 
@@ -62,8 +58,6 @@ class CarSpecificEvents:
 
     elif self.CP.brand == 'toyota':
       # TODO: when we check for unexpected disengagement, check gear not S1, S2, S3
-      events = self.create_common_events(CS, CS_prev, extra_gears=extra_gears)
-
       if self.CP.openpilotLongitudinalControl:
         # Only can leave standstill when planner wants to move
         if CS.cruiseState.standstill and not CS.brakePressed and CC.cruiseControl.resume:
@@ -78,8 +72,6 @@ class CarSpecificEvents:
             events.add(EventName.manualRestart)
 
     elif self.CP.brand == 'gm':
-      events = self.create_common_events(CS, CS_prev, extra_gears=extra_gears, pcm_enable=self.CP.pcmCruise)
-
       # Enabling at a standstill with brake is allowed
       # TODO: verify 17 Volt can enable for the first time at a stop and allow for all GMs
       if CS.vEgo < self.CP.minEnableSpeed and not (CS.standstill and CS.brake >= 20 and
@@ -89,8 +81,6 @@ class CarSpecificEvents:
         events.add(EventName.resumeRequired)
 
     elif self.CP.brand == 'volkswagen':
-      events = self.create_common_events(CS, CS_prev, extra_gears=extra_gears, pcm_enable=self.CP.pcmCruise)
-
       if self.CP.openpilotLongitudinalControl:
         if CS.vEgo < self.CP.minEnableSpeed + 0.5:
           events.add(EventName.belowEngageSpeed)
@@ -102,26 +92,27 @@ class CarSpecificEvents:
       #   events.add(EventName.steerTimeLimit)
 
     elif self.CP.brand == 'hyundai':
-      events = self.create_common_events(CS, CS_prev, extra_gears=extra_gears, pcm_enable=self.CP.pcmCruise) #allow_button_cancel=False)
       # turning indicator alert logic
       if any([CS.leftBlinker, CS.rightBlinker, CC.turningSignalTimer]) and CS.vEgo < LANE_CHANGE_SPEED_MIN - 1.2:
         events.add(EventName.turningIndicatorOn)
 
-    else:
-      events = self.create_common_events(CS, CS_prev, extra_gears=extra_gears)
-
     return events
 
-  def create_common_events(self, CS: structs.CarState, CS_prev: car.CarState, extra_gears: tuple = (), pcm_enable=True,
-                           allow_button_cancel=True):
+  def create_common_events(self, CS: structs.CarState, CS_prev: car.CarState):
     events = Events()
+
+    CI = interfaces[self.CP.carFingerprint]
+    # TODO: cleanup the honda-specific logic
+    pcm_enable = self.CP.pcmCruise and self.CP.brand != 'honda'
+    # TODO: on some hyundai cars, the cancel button is also the pause/resume button,
+    # so only use it for cancel when running openpilot longitudinal
+    allow_button_cancel = self.CP.brand != 'hyundai'
 
     if CS.doorOpen:
       events.add(EventName.doorOpen)
     if CS.seatbeltUnlatched and CS.gearShifter != GearShifter.park:
       events.add(EventName.seatbeltNotLatched)
-    if CS.gearShifter != GearShifter.drive and (extra_gears is None or
-       CS.gearShifter not in extra_gears):
+    if CS.gearShifter != GearShifter.drive and CS.gearShifter not in CI.DRIVABLE_GEARS:
       events.add(EventName.wrongGear)
     if CS.gearShifter == GearShifter.reverse:
       events.add(EventName.reverseGear)
