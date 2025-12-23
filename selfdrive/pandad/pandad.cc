@@ -83,7 +83,7 @@ void can_send_thread(std::vector<Panda *> pandas, bool fake_send) {
 
   AlignedBuffer aligned_buf;
   std::unique_ptr<Context> context(Context::create());
-  std::unique_ptr<SubSocket> subscriber(SubSocket::create(context.get(), "sendcan"));
+  std::unique_ptr<SubSocket> subscriber(SubSocket::create(context.get(), "sendcan", "127.0.0.1", false, true, services.at("sendcan").queue_size));
   assert(subscriber != NULL);
   subscriber->setTimeout(100);
 
@@ -421,9 +421,9 @@ void process_peripheral_state(Panda *panda, PubMaster *pm, bool no_fan_control) 
     }
 
     if (ir_pwr != prev_ir_pwr || sm.frame % 100 == 0) {
-      int16_t ir_panda = util::map_val(ir_pwr, 0, 100, 0, MAX_IR_PANDA_VAL);
+      int16_t ir_panda = util::map_val(ir_pwr, 0, 100, 0, MAX_IR_PANDA_VAL); 
       panda->set_ir_pwr(ir_panda);
-      Hardware::set_ir_power(ir_pwr);
+      Hardware::set_ir_power(ir_pwr); 
       prev_ir_pwr = ir_pwr;
     }
   }

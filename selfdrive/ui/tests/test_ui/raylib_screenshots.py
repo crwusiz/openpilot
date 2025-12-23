@@ -293,9 +293,10 @@ CASES = {
 
 
 class TestUI:
-  def __init__(self):
+  def __init__(self, big_ui: bool = True):
     os.environ["SCALE"] = os.getenv("SCALE", "1")
-    os.environ["BIG"] = "1"
+    os.environ["BIG"] = "1" if big_ui else "0"
+    self.big_ui = big_ui
     sys.modules["mouseinfo"] = False
 
   def setup(self):
@@ -312,7 +313,11 @@ class TestUI:
       self.ui = pywinctl.getWindowsWithTitle("UI")[0]
     except Exception as e:
       print(f"failed to find ui window, assuming that it's in the top left (for Xvfb) {e}")
-      self.ui = namedtuple("bb", ["left", "top", "width", "height"])(0, 0, 2160, 1080)
+      # Default window size based on UI mode
+      if self.big_ui:
+        self.ui = namedtuple("bb", ["left", "top", "width", "height"])(0, 0, 2160, 1080)
+      else:
+        self.ui = namedtuple("bb", ["left", "top", "width", "height"])(0, 0, 536, 240)
 
   def screenshot(self, name: str):
     full_screenshot = pyautogui.screenshot()
@@ -323,21 +328,24 @@ class TestUI:
     pyautogui.mouseDown(self.ui.left + x, self.ui.top + y, *args, **kwargs)
     time.sleep(0.01)
     pyautogui.mouseUp(self.ui.left + x, self.ui.top + y, *args, **kwargs)
+    if not self.big_ui:
+      time.sleep(0.1)
 
   @with_processes(["ui"])
   def test_ui(self, name, setup_case):
     self.setup()
     time.sleep(UI_DELAY)  # wait for UI to start
     setup_case(self.click, self.pm)
+    # Extra delay for MICI UI animations
+    if not self.big_ui:
+      time.sleep(0.5)
     self.screenshot(name)
 
 
 def create_screenshots():
-  if TEST_OUTPUT_DIR.exists():
-    shutil.rmtree(TEST_OUTPUT_DIR)
-  SCREENSHOTS_DIR.mkdir(parents=True)
+  SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 
-  t = TestUI()
+  t = TestUI(big_ui=True)
   for name, setup in CASES.items():
     with OpenpilotPrefix():
       params = Params()
