@@ -244,7 +244,7 @@ class HudRenderer(Widget):
     navi_data = sm['naviData']
     longitudinal_plan = sm['longitudinalPlan']
     live_params = sm['liveParameters']
-    selfdriveState = sm['selfdriveState']
+    selfdrive_state = sm['selfdriveState']
 
     # Cruise speed
     v_cruise_cluster = car_state.vCruiseCluster
@@ -329,8 +329,8 @@ class HudRenderer(Widget):
     if live_params:
       self.steer_ratio = live_params.steerRatio if hasattr(live_params, 'steerRatio') else 0
 
-    if selfdriveState:
-      alert_size = selfdriveState.alertSize if hasattr(selfdriveState, 'alertSize') else 0
+    if selfdrive_state:
+      alert_size = selfdrive_state.alertSize if hasattr(selfdrive_state, 'alertSize') else 0
       self.hide_bottom_icons = alert_size != 0
 
     # Update icon button states

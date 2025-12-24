@@ -162,43 +162,45 @@ class UIState:
 
   def _update_status(self) -> None:
     if self.started and self.sm.updated["selfdriveState"]:
-      ss = self.sm["selfdriveState"]
-      ce = self.sm["carState"]
-      cc = self.sm["carControl"]
-      state = ss.state
-      self.enabled = ss.enabled
-      self.steeringPressed = ce.steeringPressed
-      self.show_driver_camera = self.driver_camera and ce.gearShifter == GearShifter.reverse
+      selfdrive_state = self.sm["selfdriveState"]
+      car_state = self.sm["carState"]
+      car_control = self.sm["carControl"]
+      state = selfdrive_state.state
+      self.enabled = selfdrive_state.enabled
+      self.steeringPressed = car_state.steeringPressed
+      self.show_driver_camera = self.driver_camera and car_state.gearShifter == GearShifter.reverse
 
       if state in (log.SelfdriveState.OpenpilotState.preEnabled, log.SelfdriveState.OpenpilotState.overriding) and not self.steeringPressed:
         self.status = UIStatus.OVERRIDE
-      elif ss.enabled and not cc.latActive:
+      elif selfdrive_state.enabled and not car_control.latActive:
         if self.steeringPressed:
           self.status = UIStatus.STEERING
-        elif ce.brakePressed:
+        elif car_state.brakePressed:
           self.status = UIStatus.RED
-        elif ce.leftBlinker or ce.rightBlinker:
+        elif car_state.leftBlinker or car_state.rightBlinker:
           self.status = UIStatus.BLINKER
         else:
           self.status = UIStatus.ENGAGED
-      elif ss.enabled and cc.latActive:
+      elif selfdrive_state.enabled and car_control.latActive:
         if self.steeringPressed:
           self.status = UIStatus.STEERING
-        elif ce.brakePressed:
+        elif car_state.brakePressed:
           self.status = UIStatus.RED
-        elif ce.leftBlinker or ce.rightBlinker:
+        elif car_state.leftBlinker or car_state.rightBlinker:
           self.status = UIStatus.BLINKER
         else:
           self.status = UIStatus.ACTIVE
-      elif ce.gearShifter == GearShifter.reverse:
+      elif car_state.gearShifter == GearShifter.reverse:
         self.status = UIStatus.RED
-      elif ce.cruiseState.available:
+      elif car_state.cruiseState.available and car_control.latActive:
         self.status = UIStatus.READY
+      elif car_state.cruiseState.available and not car_control.latActive and car_state.vEgo > 0.3:
+        self.status = UIStatus.BLINKER
       else:
         self.status = UIStatus.DISENGAGED
 
       #else:
-      #  self.status = UIStatus.ENGAGED if ss.enabled else UIStatus.DISENGAGED
+      #  self.status = UIStatus.ENGAGED if selfdrive_state.enabled else UIStatus.DISENGAGED
 
     # Check for engagement state changes
     if self.engaged != self._engaged_prev:
