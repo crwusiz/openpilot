@@ -2,12 +2,16 @@
 import time
 import numpy as np
 from PIL import Image, ImageChops
+from cereal import messaging, log
 from cereal.messaging import PubMaster
 from openpilot.common.params import Params
 from openpilot.common.prefix import OpenpilotPrefix
 from openpilot.system.athena.registration import UNREGISTERED_DONGLE_ID
 from openpilot.system.version import terms_version, training_version
 from selfdrive.ui.tests.test_ui.raylib_screenshots import TestUI, SCREENSHOTS_DIR, VERSION
+
+AlertSize = log.SelfdriveState.AlertSize
+AlertStatus = log.SelfdriveState.AlertStatus
 
 def click_center(click, t: TestUI):
   click(t.ui.width // 2, t.ui.height // 2)
@@ -61,7 +65,6 @@ def setup_mici_settings_network(click, pm: PubMaster, t: TestUI):
 def setup_mici_settings_wifi(click, pm: PubMaster, t: TestUI):
   setup_mici_settings_network(click, pm, t)
   click_center(click, t)
-
 """
 
 def setup_mici_settings_scrolled(click, pm: PubMaster, t: TestUI):
@@ -107,6 +110,52 @@ def setup_mici_settings_developer_scrolled(click, pm: PubMaster, t: TestUI):
   screenshot_until_end(t, "mici_settings_developer")
   return False
 
+def setup_onroad(click, pm: PubMaster, *args):
+  ds = messaging.new_message('deviceState')
+  ds.deviceState.started = True
+  ps = messaging.new_message('pandaStates', 1)
+  ps.pandaStates[0].pandaType = log.PandaState.PandaType.cuatro
+  ps.pandaStates[0].ignitionLine = True
+  driverState = messaging.new_message('driverStateV2')
+  driverState.driverStateV2.leftDriverData.faceOrientation = [0, 0, 0]
+  for _ in range(5):
+    pm.send('deviceState', ds)
+    pm.send('pandaStates', ps)
+    pm.send('driverStateV2', driverState)
+    ds.clear_write_flag()
+    ps.clear_write_flag()
+    driverState.clear_write_flag()
+    time.sleep(0.05)
+
+def setup_onroad_alert(click, pm: PubMaster, size: log.SelfdriveState.AlertSize, text1: str, text2: str, status: log.SelfdriveState.AlertStatus, *args):
+  setup_onroad(click, pm)
+  alert = messaging.new_message('selfdriveState')
+  ss = alert.selfdriveState
+  ss.alertSize = size
+  ss.alertText1 = text1
+  ss.alertText2 = text2
+  ss.alertStatus = status
+  for _ in range(5):
+    pm.send('selfdriveState', alert)
+    alert.clear_write_flag()
+    time.sleep(0.05)
+
+def setup_onroad_small_alert(click, pm: PubMaster, *args):
+  setup_onroad_alert(click, pm, AlertSize.small, "Small Alert", "This is a small alert", AlertStatus.normal)
+
+def setup_onroad_medium_alert(click, pm: PubMaster, *args):
+  setup_onroad_alert(click, pm, AlertSize.mid, "Medium Alert", "This is a medium alert", AlertStatus.userPrompt)
+
+def setup_onroad_full_alert(click, pm: PubMaster, *args):
+  setup_onroad_alert(click, pm, AlertSize.full, "DISENGAGE IMMEDIATELY", "Driver Distracted", AlertStatus.critical)
+
+def setup_onroad_full_alert_multiline(click, pm: PubMaster, *args):
+  setup_onroad_alert(click, pm, AlertSize.full, "Reverse\nGear", "", AlertStatus.normal)
+
+def setup_onroad_full_alert_long_text(click, pm: PubMaster, *args):
+  setup_onroad_alert(click, pm, AlertSize.full, "TAKE CONTROL IMMEDIATELY", "Calibration Invalid: Remount Device & Recalibrate", AlertStatus.userPrompt)
+
+
 CASES = {
   "homescreen": setup_mici_homescreen,
   #"settings": setup_mici_settings,
@@ -118,6 +167,12 @@ CASES = {
   "settings_network_scrolled": setup_mici_settings_network_scrolled,
   "settings_device_scrolled": setup_mici_settings_device_scrolled,
   "settings_developer_scrolled": setup_mici_settings_developer_scrolled,
+  #"onroad": setup_onroad,
+  #"onroad_small_alert": setup_onroad_small_alert,
+  #"onroad_medium_alert": setup_onroad_medium_alert,
+  #"onroad_full_alert": setup_onroad_full_alert,
+  #"onroad_full_alert_multiline": setup_onroad_full_alert_multiline,
+  #"onroad_full_alert_long_text": setup_onroad_full_alert_long_text,
 }
 
 
