@@ -64,67 +64,55 @@ VERSION = get_description(BASEDIR)
 # Offroad alerts to test
 OFFROAD_ALERTS = ['Offroad_IsTakingSnapshot']
 
-
 def put_update_params(params: Params):
   params.put("UpdaterCurrentReleaseNotes", parse_release_notes(BASEDIR))
   params.put("UpdaterNewReleaseNotes", parse_release_notes(BASEDIR))
   params.put("UpdaterTargetBranch", BRANCH_NAME)
 
-
-def setup_homescreen(click, pm: PubMaster):
+def setup_homescreen(click, pm: PubMaster, *args):
   pass
 
-
-def setup_homescreen_update_available(click, pm: PubMaster):
+def setup_homescreen_update_available(click, pm: PubMaster, *args):
   params = Params()
   params.put_bool("UpdateAvailable", True)
   put_update_params(params)
   setup_offroad_alert(click, pm)
 
-
-def setup_settings(click, pm: PubMaster):
+def setup_settings(click, pm: PubMaster, *args):
   click(100, 100)
 
-
-def close_settings(click, pm: PubMaster):
+def close_settings(click, pm: PubMaster, *args):
   click(240, 216)
 
-
-def setup_settings_network(click, pm: PubMaster):
+def setup_settings_network(click, pm: PubMaster, *args):
   setup_settings(click, pm)
   click(278, 450)
 
-
-def setup_settings_network_advanced(click, pm: PubMaster):
+def setup_settings_network_advanced(click, pm: PubMaster, *args):
   setup_settings_network(click, pm)
   click(1880, 100)
 
-
-def setup_settings_toggles(click, pm: PubMaster):
+def setup_settings_toggles(click, pm: PubMaster, *args):
   setup_settings(click, pm)
   click(278, 600)
 
-
-def setup_settings_software(click, pm: PubMaster):
+def setup_settings_software(click, pm: PubMaster, *args):
   put_update_params(Params())
   setup_settings(click, pm)
   click(278, 720)
 
-
-def setup_settings_software_download(click, pm: PubMaster):
+def setup_settings_software_download(click, pm: PubMaster, *args):
   params = Params()
   # setup_settings_software but with "DOWNLOAD" button to test long text
   params.put("UpdaterState", "idle")
   params.put_bool("UpdaterFetchAvailable", True)
   setup_settings_software(click, pm)
 
-
-def setup_settings_software_release_notes(click, pm: PubMaster):
+def setup_settings_software_release_notes(click, pm: PubMaster, *args):
   setup_settings_software(click, pm)
   click(588, 110)  # expand description for current version
 
-
-def setup_settings_software_branch_switcher(click, pm: PubMaster):
+def setup_settings_software_branch_switcher(click, pm: PubMaster, *args):
   setup_settings_software(click, pm)
   params = Params()
   params.put("UpdaterAvailableBranches", f"master,nightly,release,{BRANCH_NAME}")
@@ -132,82 +120,65 @@ def setup_settings_software_branch_switcher(click, pm: PubMaster):
   params.put("UpdaterTargetBranch", "nightly")  # should be selected
   click(1984, 449)
 
-
-def setup_settings_firehose(click, pm: PubMaster):
+def setup_settings_firehose(click, pm: PubMaster, *args):
   setup_settings(click, pm)
   click(278, 845)
 
-
-def setup_settings_developer(click, pm: PubMaster):
+def setup_settings_developer(click, pm: PubMaster, *args):
   CP = car.CarParams()
   CP.alphaLongitudinalAvailable = True  # show alpha long control toggle
   Params().put("CarParamsPersistent", CP.to_bytes())
-
   setup_settings(click, pm)
   click(278, 950)
 
-
-def setup_settings_community_toggle(click, pm: PubMaster):
+def setup_settings_community_toggle(click, pm: PubMaster, *args):
   setup_settings(click, pm)
   click(278, 1055)
 
-
-def setup_settings_community_function(click, pm: PubMaster):
+def setup_settings_community_function(click, pm: PubMaster, *args):
   setup_settings_community_toggle(click, pm)
   click(1330, 210)
 
-
-def setup_settings_community_log(click, pm: PubMaster):
+def setup_settings_community_log(click, pm: PubMaster, *args):
   setup_settings_community_toggle(click, pm)
   click(1850, 210)
 
-
-def setup_keyboard(click, pm: PubMaster):
+def setup_keyboard(click, pm: PubMaster, *args):
   setup_settings_developer(click, pm)
   click(1930, 470)
 
-
-def setup_pair_device(click, pm: PubMaster):
+def setup_pair_device(click, pm: PubMaster, *args):
   click(1950, 800)
 
-
-def setup_offroad_alert(click, pm: PubMaster):
+def setup_offroad_alert(click, pm: PubMaster, *args):
   put_update_params(Params())
   set_offroad_alert("Offroad_TemperatureTooHigh", True, extra_text='99C')
   set_offroad_alert("Offroad_ExcessiveActuation", True, extra_text='longitudinal')
   for alert in OFFROAD_ALERTS:
     set_offroad_alert(alert, True)
-
   setup_settings(click, pm)
   close_settings(click, pm)
 
-
-def setup_confirmation_dialog(click, pm: PubMaster):
+def setup_confirmation_dialog(click, pm: PubMaster, *args):
   setup_settings(click, pm)
   click(1985, 791)  # reset calibration
 
-
-def setup_experimental_mode_description(click, pm: PubMaster):
+def setup_experimental_mode_description(click, pm: PubMaster, *args):
   setup_settings_toggles(click, pm)
   click(1200, 280)  # expand description for experimental mode
 
-
-def setup_openpilot_long_confirmation_dialog(click, pm: PubMaster):
+def setup_openpilot_long_confirmation_dialog(click, pm: PubMaster, *args):
   setup_settings_developer(click, pm)
   click(2000, 960)  # toggle openpilot longitudinal control
 
-
-def setup_onroad(click, pm: PubMaster):
+def setup_onroad(click, pm: PubMaster, *args):
   ds = messaging.new_message('deviceState')
   ds.deviceState.started = True
-
   ps = messaging.new_message('pandaStates', 1)
   ps.pandaStates[0].pandaType = log.PandaState.PandaType.dos
   ps.pandaStates[0].ignitionLine = True
-
   driverState = messaging.new_message('driverStateV2')
   driverState.driverStateV2.leftDriverData.faceOrientation = [0, 0, 0]
-
   for _ in range(5):
     pm.send('deviceState', ds)
     pm.send('pandaStates', ps)
@@ -218,12 +189,12 @@ def setup_onroad(click, pm: PubMaster):
     time.sleep(0.05)
 
 
-def setup_onroad_sidebar(click, pm: PubMaster):
+def setup_onroad_sidebar(click, pm: PubMaster, *args):
   setup_onroad(click, pm)
   click(100, 100)  # open sidebar
 
 
-def setup_onroad_alert(click, pm: PubMaster, size: log.SelfdriveState.AlertSize, text1: str, text2: str, status: log.SelfdriveState.AlertStatus):
+def setup_onroad_alert(click, pm: PubMaster, size: log.SelfdriveState.AlertSize, text1: str, text2: str, status: log.SelfdriveState.AlertStatus, *args):
   setup_onroad(click, pm)
   alert = messaging.new_message('selfdriveState')
   ss = alert.selfdriveState
@@ -236,24 +207,19 @@ def setup_onroad_alert(click, pm: PubMaster, size: log.SelfdriveState.AlertSize,
     alert.clear_write_flag()
     time.sleep(0.05)
 
-
-def setup_onroad_small_alert(click, pm: PubMaster):
+def setup_onroad_small_alert(click, pm: PubMaster, *args):
   setup_onroad_alert(click, pm, AlertSize.small, "Small Alert", "This is a small alert", AlertStatus.normal)
 
-
-def setup_onroad_medium_alert(click, pm: PubMaster):
+def setup_onroad_medium_alert(click, pm: PubMaster, *args):
   setup_onroad_alert(click, pm, AlertSize.mid, "Medium Alert", "This is a medium alert", AlertStatus.userPrompt)
 
-
-def setup_onroad_full_alert(click, pm: PubMaster):
+def setup_onroad_full_alert(click, pm: PubMaster, *args):
   setup_onroad_alert(click, pm, AlertSize.full, "DISENGAGE IMMEDIATELY", "Driver Distracted", AlertStatus.critical)
 
-
-def setup_onroad_full_alert_multiline(click, pm: PubMaster):
+def setup_onroad_full_alert_multiline(click, pm: PubMaster, *args):
   setup_onroad_alert(click, pm, AlertSize.full, "Reverse\nGear", "", AlertStatus.normal)
 
-
-def setup_onroad_full_alert_long_text(click, pm: PubMaster):
+def setup_onroad_full_alert_long_text(click, pm: PubMaster, *args):
   setup_onroad_alert(click, pm, AlertSize.full, "TAKE CONTROL IMMEDIATELY", "Calibration Invalid: Remount Device & Recalibrate", AlertStatus.userPrompt)
 
 
@@ -299,6 +265,18 @@ class TestUI:
     self.big_ui = big_ui
     sys.modules["mouseinfo"] = False
 
+  def swipe_left(self, duration=0.8):
+    center_y = self.ui.top + int(self.ui.height * 0.5)
+    start_x = self.ui.left + int(self.ui.width * 0.85)
+    end_x = self.ui.left + int(self.ui.width * 0.15)
+
+    print(f"Swiping left from ({start_x}, {center_y}) to ({end_x}, {center_y})")
+
+    pyautogui.moveTo(start_x, center_y)
+    time.sleep(0.2)
+    pyautogui.dragTo(end_x, center_y, duration=duration, button='left')
+    time.sleep(1.5)
+
   def setup(self):
     # Seed minimal offroad state
     self.pm = PubMaster(["deviceState", "pandaStates", "driverStateV2", "selfdriveState"])
@@ -335,12 +313,13 @@ class TestUI:
   def test_ui(self, name, setup_case):
     self.setup()
     time.sleep(UI_DELAY)  # wait for UI to start
-    setup_case(self.click, self.pm)
+    ret = setup_case(self.click, self.pm, self)
     # Extra delay for MICI UI animations
     if not self.big_ui:
       time.sleep(0.5)
-    self.screenshot(name)
 
+    if ret is not False:
+      self.screenshot(name)
 
 def create_screenshots():
   SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -366,7 +345,7 @@ def create_screenshots():
       elif name == "homescreen_prime":
         params.put("PrimeType", 2)  # LITE
 
-      t.test_ui(name, setup)
+      t.test_ui(f"tici_{name}", setup)
 
 
 if __name__ == "__main__":
