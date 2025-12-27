@@ -15,13 +15,13 @@ class CommunityLayoutMici(NavWidget):
     super().__init__()
     self.set_back_callback(back_callback)
 
-    pcm_cruise = BigParamControl("PcmCruise", "PcmCruiseEnable", toggle_callback=restart_needed_callback)
+    pcm_cruise = BigParamControl("Pcm Cruise", "PcmCruiseEnable", toggle_callback=restart_needed_callback)
     cruise_state_control = BigParamControl("Cruise State Controls", "CruiseStateControl", toggle_callback=restart_needed_callback)
     is_hda2 = BigParamControl("CANFD Car HDA2", "IsHda2", toggle_callback=restart_needed_callback)
-    camera_scc = BigParamControl("CameraSCC", "CameraSccEnable", toggle_callback=restart_needed_callback)
-    radar_track = BigParamControl("Enable Radar Track use", "RadarTrackEnable", toggle_callback=restart_needed_callback)
-    driver_cam_reverse = BigParamControl("Driver Camera On Reverse", "DriverCameraOnReverse", toggle_callback=restart_needed_callback)
-    driver_cam_missing = BigParamControl("DriverCamera Hardware Missing", "DriverCameraHardwareMissing", toggle_callback=restart_needed_callback)
+    camera_scc = BigParamControl("CameraSCC (longcontrol)", "CameraSccEnable", toggle_callback=restart_needed_callback)
+    radar_track = BigParamControl("Radar Track", "RadarTrackEnable", toggle_callback=restart_needed_callback)
+    driver_cam_reverse = BigParamControl("Driver Camera On Reverse Gear", "DriverCameraOnReverse", toggle_callback=restart_needed_callback)
+    driver_cam_missing = BigParamControl("Driver Camera Hardware Missing", "DriverCameraHardwareMissing", toggle_callback=restart_needed_callback)
 
     self._scroller = Scroller([
       pcm_cruise,

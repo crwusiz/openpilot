@@ -121,7 +121,7 @@ def setup_mici_settings_community_scrolled(click, pm: PubMaster, t: TestUI):
   screenshot_until_end(t, "mici_settings_community")
   return False
 
-def setup_onroad(click, pm: PubMaster, *args):
+def setup_onroad(click, pm: PubMaster, t: TestUI):
   ds = messaging.new_message('deviceState')
   ds.deviceState.started = True
   ps = messaging.new_message('pandaStates', 1)
@@ -137,9 +137,11 @@ def setup_onroad(click, pm: PubMaster, *args):
     ps.clear_write_flag()
     driverState.clear_write_flag()
     time.sleep(0.05)
+  t.swipe_left()
+  time.sleep(0.5)
 
-def setup_onroad_alert(click, pm: PubMaster, size: log.SelfdriveState.AlertSize, text1: str, text2: str, status: log.SelfdriveState.AlertStatus, *args):
-  setup_onroad(click, pm)
+def setup_onroad_alert(click, pm: PubMaster, size: log.SelfdriveState.AlertSize, text1: str, text2: str, status: log.SelfdriveState.AlertStatus, t: TestUI):
+  setup_onroad(click, pm, t)
   alert = messaging.new_message('selfdriveState')
   ss = alert.selfdriveState
   ss.alertSize = size
@@ -151,20 +153,20 @@ def setup_onroad_alert(click, pm: PubMaster, size: log.SelfdriveState.AlertSize,
     alert.clear_write_flag()
     time.sleep(0.05)
 
-def setup_onroad_small_alert(click, pm: PubMaster, *args):
-  setup_onroad_alert(click, pm, AlertSize.small, "Small Alert", "This is a small alert", AlertStatus.normal)
+def setup_onroad_small_alert(click, pm: PubMaster, t: TestUI):
+  setup_onroad_alert(click, pm, AlertSize.small, "Small Alert", "This is a small alert", AlertStatus.normal, t)
 
-def setup_onroad_medium_alert(click, pm: PubMaster, *args):
-  setup_onroad_alert(click, pm, AlertSize.mid, "Medium Alert", "This is a medium alert", AlertStatus.userPrompt)
+def setup_onroad_medium_alert(click, pm: PubMaster, t: TestUI):
+  setup_onroad_alert(click, pm, AlertSize.mid, "Medium Alert", "This is a medium alert", AlertStatus.userPrompt, t)
 
-def setup_onroad_full_alert(click, pm: PubMaster, *args):
-  setup_onroad_alert(click, pm, AlertSize.full, "DISENGAGE IMMEDIATELY", "Driver Distracted", AlertStatus.critical)
+def setup_onroad_full_alert(click, pm: PubMaster, t: TestUI):
+  setup_onroad_alert(click, pm, AlertSize.full, "DISENGAGE IMMEDIATELY", "Driver Distracted", AlertStatus.critical, t)
 
-def setup_onroad_full_alert_multiline(click, pm: PubMaster, *args):
-  setup_onroad_alert(click, pm, AlertSize.full, "Reverse\nGear", "", AlertStatus.normal)
+def setup_onroad_full_alert_multiline(click, pm: PubMaster, t: TestUI):
+  setup_onroad_alert(click, pm, AlertSize.full, "Reverse\nGear", "", AlertStatus.normal, t)
 
-def setup_onroad_full_alert_long_text(click, pm: PubMaster, *args):
-  setup_onroad_alert(click, pm, AlertSize.full, "TAKE CONTROL IMMEDIATELY", "Calibration Invalid: Remount Device & Recalibrate", AlertStatus.userPrompt)
+def setup_onroad_full_alert_long_text(click, pm: PubMaster, t: TestUI):
+  setup_onroad_alert(click, pm, AlertSize.full, "TAKE CONTROL IMMEDIATELY", "Calibration Invalid: Remount Device & Recalibrate", AlertStatus.userPrompt, t)
 
 
 CASES = {
@@ -179,12 +181,12 @@ CASES = {
   "settings_device_scrolled": setup_mici_settings_device_scrolled,
   "settings_developer_scrolled": setup_mici_settings_developer_scrolled,
   "settings_community_scrolled": setup_mici_settings_community_scrolled,
-  #"onroad": setup_onroad,
-  #"onroad_small_alert": setup_onroad_small_alert,
-  #"onroad_medium_alert": setup_onroad_medium_alert,
-  #"onroad_full_alert": setup_onroad_full_alert,
-  #"onroad_full_alert_multiline": setup_onroad_full_alert_multiline,
-  #"onroad_full_alert_long_text": setup_onroad_full_alert_long_text,
+  "onroad": setup_onroad,
+  "onroad_small_alert": setup_onroad_small_alert,
+  "onroad_medium_alert": setup_onroad_medium_alert,
+  "onroad_full_alert": setup_onroad_full_alert,
+  "onroad_full_alert_multiline": setup_onroad_full_alert_multiline,
+  "onroad_full_alert_long_text": setup_onroad_full_alert_long_text,
 }
 
 
