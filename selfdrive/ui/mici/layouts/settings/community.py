@@ -18,7 +18,7 @@ class CommunityLayoutMici(NavWidget):
     pcm_cruise = BigParamControl("Pcm Cruise", "PcmCruiseEnable", toggle_callback=restart_needed_callback)
     cruise_state_control = BigParamControl("Cruise State Controls", "CruiseStateControl", toggle_callback=restart_needed_callback)
     is_hda2 = BigParamControl("CANFD Car HDA2", "IsHda2", toggle_callback=restart_needed_callback)
-    camera_scc = BigParamControl("CameraSCC (longcontrol)", "CameraSccEnable", toggle_callback=restart_needed_callback)
+    camera_scc = BigParamControl("CameraSCC (LongControl)", "CameraSccEnable", toggle_callback=restart_needed_callback)
     radar_track = BigParamControl("Radar Track", "RadarTrackEnable", toggle_callback=restart_needed_callback)
     driver_cam_reverse = BigParamControl("Driver Camera On Reverse Gear", "DriverCameraOnReverse", toggle_callback=restart_needed_callback)
     driver_cam_missing = BigParamControl("Driver Camera Hardware Missing", "DriverCameraHardwareMissing", toggle_callback=restart_needed_callback)

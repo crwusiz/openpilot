@@ -180,8 +180,8 @@ class AugmentedRoadView(CameraView):
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     # Don't trigger click callback if bookmark was triggered
-    if not self._bookmark_icon.interacting():
-      super()._handle_mouse_release(mouse_pos)
+    #if not self._bookmark_icon.interacting():
+    super()._handle_mouse_release(mouse_pos)
 
   def _render(self, _):
     start_draw = time.monotonic()
@@ -243,7 +243,7 @@ class AugmentedRoadView(CameraView):
     # Use self._content_rect for positioning within camera bounds
     self._confidence_ball.render(self.rect)
 
-    self._bookmark_icon.render(self.rect)
+    #self._bookmark_icon.render(self.rect)
 
     # Draw darkened background and text if not onroad
     if not ui_state.started:
