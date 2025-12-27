@@ -220,7 +220,7 @@ class FirehoseLayoutBase(Widget):
       time.sleep(self.UPDATE_INTERVAL)
 
 
-class FirehoseLayout(FirehoseLayoutBase, NavWidget):
+class FirehoseLayoutMici(FirehoseLayoutBase, NavWidget):
   BACK_TOUCH_AREA_PERCENTAGE = 0.1
 
   def __init__(self, back_callback):

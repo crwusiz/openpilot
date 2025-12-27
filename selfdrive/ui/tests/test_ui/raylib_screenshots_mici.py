@@ -110,6 +110,17 @@ def setup_mici_settings_developer_scrolled(click, pm: PubMaster, t: TestUI):
   screenshot_until_end(t, "mici_settings_developer")
   return False
 
+def setup_mici_settings_community_scrolled(click, pm: PubMaster, t: TestUI):
+  setup_mici_settings(click, pm)
+  for _ in range(6):
+    t.swipe_left()
+    time.sleep(0.3)
+  time.sleep(0.5)
+  click_center(click, t)
+  time.sleep(0.8)
+  screenshot_until_end(t, "mici_settings_community")
+  return False
+
 def setup_onroad(click, pm: PubMaster, *args):
   ds = messaging.new_message('deviceState')
   ds.deviceState.started = True
@@ -167,6 +178,7 @@ CASES = {
   "settings_network_scrolled": setup_mici_settings_network_scrolled,
   "settings_device_scrolled": setup_mici_settings_device_scrolled,
   "settings_developer_scrolled": setup_mici_settings_developer_scrolled,
+  "settings_community_scrolled": setup_mici_settings_community_scrolled,
   #"onroad": setup_onroad,
   #"onroad_small_alert": setup_onroad_small_alert,
   #"onroad_medium_alert": setup_onroad_medium_alert,
