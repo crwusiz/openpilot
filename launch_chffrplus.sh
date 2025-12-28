@@ -129,6 +129,10 @@ function launch {
     pip install jeepney
   fi
 
+  if ! python3 -c "import streamlit" &> /dev/null; then
+    pip install streamlit
+  fi
+
   # openpilot ssh key installer
   if [ ! -f /data/params/d/GithubSshKeys ]; then
     echo -n openpilot > /data/params/d/GithubUsername
