@@ -10,10 +10,11 @@ from openpilot.selfdrive.ui.mici.layouts.settings.toggles import TogglesLayoutMi
 from openpilot.selfdrive.ui.mici.layouts.settings.network import NetworkLayoutMici
 from openpilot.selfdrive.ui.mici.layouts.settings.device import DeviceLayoutMici, PairBigButton
 from openpilot.selfdrive.ui.mici.layouts.settings.developer import DeveloperLayoutMici
-from openpilot.selfdrive.ui.mici.layouts.settings.firehose import FirehoseLayout
+from openpilot.selfdrive.ui.mici.layouts.settings.firehose import FirehoseLayoutMici
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.widgets import Widget, NavWidget
 
+from openpilot.selfdrive.ui.mici.layouts.settings.community import CommunityLayoutMici
 
 class PanelType(IntEnum):
   TOGGLES = 0
@@ -22,6 +23,7 @@ class PanelType(IntEnum):
   DEVELOPER = 3
   USER_MANUAL = 4
   FIREHOSE = 5
+  COMMUNITY = 6
 
 
 @dataclass
@@ -42,11 +44,12 @@ class SettingsLayout(NavWidget):
     network_btn.set_click_callback(lambda: self._set_current_panel(PanelType.NETWORK))
     device_btn = BigButton("device", "", "icons_mici/settings/device_icon.png")
     device_btn.set_click_callback(lambda: self._set_current_panel(PanelType.DEVICE))
-    developer_btn = BigButton("developer", "", "icons_mici/settings/developer_icon.png")
-    developer_btn.set_click_callback(lambda: self._set_current_panel(PanelType.DEVELOPER))
-
     firehose_btn = BigButton("firehose", "", "icons_mici/settings/comma_icon.png")
     firehose_btn.set_click_callback(lambda: self._set_current_panel(PanelType.FIREHOSE))
+    developer_btn = BigButton("developer", "", "icons_mici/settings/developer_icon.png")
+    developer_btn.set_click_callback(lambda: self._set_current_panel(PanelType.DEVELOPER))
+    community_btn = BigButton("community", "", "icons_mici/settings/community_icon.png")
+    community_btn.set_click_callback(lambda: self._set_current_panel(PanelType.COMMUNITY))
 
     self._scroller = Scroller([
       toggles_btn,
@@ -56,6 +59,7 @@ class SettingsLayout(NavWidget):
       #BigDialogButton("manual", "", "icons_mici/settings/manual_icon.png", "Check out the mici user\nmanual at comma.ai/setup"),
       firehose_btn,
       developer_btn,
+      community_btn,
     ], snap_items=False)
 
     # Set up back navigation
@@ -66,8 +70,9 @@ class SettingsLayout(NavWidget):
       PanelType.TOGGLES: PanelInfo("Toggles", TogglesLayoutMici(back_callback=lambda: self._set_current_panel(None))),
       PanelType.NETWORK: PanelInfo("Network", NetworkLayoutMici(back_callback=lambda: self._set_current_panel(None))),
       PanelType.DEVICE: PanelInfo("Device", DeviceLayoutMici(back_callback=lambda: self._set_current_panel(None))),
+      PanelType.FIREHOSE: PanelInfo("Firehose", FirehoseLayoutMici(back_callback=lambda: self._set_current_panel(None))),
       PanelType.DEVELOPER: PanelInfo("Developer", DeveloperLayoutMici(back_callback=lambda: self._set_current_panel(None))),
-      PanelType.FIREHOSE: PanelInfo("Firehose", FirehoseLayout(back_callback=lambda: self._set_current_panel(None))),
+      PanelType.COMMUNITY: PanelInfo("Community", CommunityLayoutMici(back_callback=lambda: self._set_current_panel(None))),
     }
 
     self._font_medium = gui_app.font(FontWeight.MEDIUM)
