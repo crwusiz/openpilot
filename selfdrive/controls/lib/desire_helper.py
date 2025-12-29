@@ -109,20 +109,20 @@ class DesireHelper:
       elif self.lane_change_state == LaneChangeState.preLaneChange:
         self.lane_change_direction = self.get_lane_change_direction(carstate)
 
-        auto_timer_ready = self.auto_lane_change_enable and \
-                           (ALC_START_TIME + 0.25) > self.auto_lane_change_timer > ALC_START_TIME and \
-                           not invalid_lane_detected and not blindspot_detected
+        auto_timer_ready = (self.auto_lane_change_enable and
+                            (ALC_START_TIME + 0.25) > self.auto_lane_change_timer > ALC_START_TIME and
+                            not invalid_lane_detected and not blindspot_detected and lane_change_prob > 0.5)
 
-        torque_applied = carstate.steeringPressed and \
-                         ((carstate.steeringTorque > 0 and self.lane_change_direction == LaneChangeDirection.left) or
-                          (carstate.steeringTorque < 0 and self.lane_change_direction == LaneChangeDirection.right)) or \
-                         auto_timer_ready
+        torque_applied = (carstate.steeringPressed and
+                          ((carstate.steeringTorque > 0 and self.lane_change_direction == LaneChangeDirection.left) or
+                          (carstate.steeringTorque < 0 and self.lane_change_direction == LaneChangeDirection.right)) or
+                          auto_timer_ready)
 
         if not one_blinker or below_lane_change_speed:
           self.lane_change_state = LaneChangeState.off
           self.lane_change_direction = LaneChangeDirection.none
         elif invalid_lane_detected or blindspot_detected:
-          pass
+          self.auto_lane_change_timer = 0.0
         elif torque_applied or self.lane_change_pulse_timer > 2.:
           self.lane_change_state = LaneChangeState.laneChangeStarting
 
@@ -162,7 +162,7 @@ class DesireHelper:
       self.lane_change_pulse_timer = 0.0
     elif self.lane_change_state == LaneChangeState.preLaneChange:
       if invalid_lane_detected or blindspot_detected:
-        pass
+        self.auto_lane_change_timer = 0.0
       else:
         self.lane_change_pulse_timer += DT_MDL
         if self.auto_lane_change_timer < (ALC_START_TIME + 0.25):
