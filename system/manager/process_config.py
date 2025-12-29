@@ -122,6 +122,11 @@ procs = [
 
   # c3x lite
   PythonProcess("beep", "selfdrive.controls.beep", c3x_lite, enabled=TICI),
+
+  NativeProcess("web_dash", "scripts",
+                ["python3", "-m", "streamlit", "run", "/data/openpilot/scripts/web_community.py",
+                 "--server.port", "8080", "--server.address", "0.0.0.0", "--server.headless", "true"],
+                always_run, enabled=not PC),
 ]
 
 managed_processes = {p.name: p for p in procs}
