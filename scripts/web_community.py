@@ -51,16 +51,6 @@ BRANCH_LIST_PATH = f"{BASE_PATH}/GitBranchList"
 SCRIPTS_PATH = "/data/openpilot/scripts"
 REALDATA_PATH = Path("/data/media/0/realdata")
 
-DESCRIPTIONS = {
-  'pcm_cruise': "Change the openpilot cruise engagement. use the PcmCruise method",
-  'cruise_state_control': "Openpilot controls cruise on/off, set speed",
-  'is_hda2': "Highway Drive Assist 2, turn it on",
-  'camera_scc': "HDA1 CameraSCC CAR, HDA2 Connect the ADAS ECAN line to CAMERA modify, turn it on",
-  'radar_track': "Enable Radar Track use (disable AEB)",
-  'driver_cam_reverse': "Displays the driver camera when in reverse",
-  'driver_cam_missing': "If there is a problem with the driver camera hardware, drive without the driver camera",
-}
-
 def get_list_from_file(path: str):
   if Path(path).exists():
     with open(path, 'r', encoding='utf-8') as f:
@@ -124,7 +114,32 @@ def main():
       margin-bottom: 10px;
       font-size: 0.9em;
     }
+    .metric-card-danger {
+      background-color: #161B22;
+      padding: 12px;
+      border-radius: 8px;
+      border-left: 4px solid rgb(201, 34, 49); /* DANGER Color */
+      margin-bottom: 10px;
+      font-size: 0.9em;
+      color: rgb(201, 34, 49);
+    }
+    .metric-card-success {
+      background-color: #161B22;
+      padding: 12px;
+      border-radius: 8px;
+      border-left: 4px solid rgb(128, 216, 166); /* UP_TO_DATE Color */
+      margin-bottom: 10px;
+      font-size: 0.9em;
+      color: rgb(128, 216, 166);
+    }
     [data-testid="stHeader"] { background: rgba(0,0,0,0); }
+    .toggle-description {
+      font-size: 0.8em;
+      color: #888;
+      margin-top: -10px;
+      margin-bottom: 10px;
+      margin-left: 0px;
+    }
     </style>
   """, unsafe_allow_html=True)
 
@@ -189,8 +204,18 @@ def main():
         run_script("Commit Check", f"{SCRIPTS_PATH}/commit_compare.sh")
         st.rerun()
     with row1_col2:
-      commit_info = params.get("CommitCompare") or "Check required"
-      st.markdown(f'<div class="metric-card"><b>Update Status</b><br>{commit_info}</div>', unsafe_allow_html=True)
+      commit_output = params.get("CommitCompare")
+      commit_info = commit_output or "Check required"
+
+      card_class = "metric-card"
+
+      if commit_output:
+        if " == " in commit_output:
+           card_class = "metric-card-success"
+        elif " != " in commit_output:
+           card_class = "metric-card-danger"
+
+      st.markdown(f'<div class="{card_class}"><b>Update Status</b><br>{commit_info}</div>', unsafe_allow_html=True)
 
     row2_col1, row2_col2 = st.columns([1, 2])
     with row2_col1:
@@ -220,20 +245,21 @@ def main():
   with tabs[1]:
     st.subheader("Parameter Configuration")
     toggle_items = [
-      ("PcmCruiseEnable", "PcmCruise", "pcm_cruise"),
-      ("CruiseStateControl", "Cruise State Controls", "cruise_state_control"),
-      ("IsHda2", "CANFD Car HDA2", "is_hda2"),
-      ("CameraSccEnable", "CameraSCC", "camera_scc"),
-      ("RadarTrackEnable", "Enable Radar Track use", "radar_track"),
-      ("DriverCameraOnReverse", "Driver Camera On Reverse", "driver_cam_reverse"),
-      ("DriverCameraHardwareMissing", "Driver Camera Hardware Missing", "driver_cam_missing"),
+      ("PcmCruiseEnable", "PcmCruise", "Change the openpilot cruise engagement. use the PcmCruise method"),
+      ("CruiseStateControl", "Cruise State Controls", "Openpilot controls cruise on/off, set speed"),
+      ("IsHda2", "CANFD Car HDA2", "Highway Drive Assist 2, turn it on"),
+      ("CameraSccEnable", "CameraSCC", "HDA1 CameraSCC CAR, HDA2 Connect the ADAS ECAN line to CAMERA modify, turn it on"),
+      ("RadarTrackEnable", "Enable Radar Track use", "Enable Radar Track use (disable AEB)"),
+      ("DriverCameraOnReverse", "Driver Camera On Reverse", "Displays the driver camera when in reverse"),
+      ("DriverCameraHardwareMissing", "Driver Camera Hardware Missing", "If there is a problem with the driver camera hardware, drive without the driver camera"),
     ]
-    for key, label, desc_key in toggle_items:
+    for key, label, desc in toggle_items:
       curr = params.get_bool(key)
-      new = st.toggle(label, value=curr, help=DESCRIPTIONS[desc_key])
+      new = st.toggle(label, value=curr)
       if new != curr:
         params.put_bool(key, new)
-        st.toast(f"{label} 변경됨")
+        st.toast(f"{label} Changed")
+      st.markdown(f'<div class="toggle-description">{desc}</div>', unsafe_allow_html=True)
 
   with tabs[2]:
     st.subheader("System Logs & Diagnostics")
@@ -244,22 +270,22 @@ def main():
     }
     l_col1, l_col2 = st.columns([1, 2])
     with l_col1:
-      sel_log = st.selectbox("로그 파일 선택", list(log_files.keys()))
+      sel_log = st.selectbox("Select Log File", list(log_files.keys()))
       if st.button("👁️ View Log File", use_container_width=True):
         path = log_files[sel_log]
         if Path(path).exists():
           st.session_state.log_out = Path(path).read_text()
-        else: st.error("파일이 없습니다.")
+        else: st.error("File not found.")
       if st.button("⬆️ Upload This Log", use_container_width=True):
         run_script("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[sel_log])
     with l_col2:
-      content = st.session_state.get("log_out", "확인할 로그를 선택하세요.")
+      content = st.session_state.get("log_out", "Select a log file to view.")
       st.text_area("Output Window", content, height=450)
 
   with tabs[3]:
     st.subheader("Realdata Route Upload")
     if not REALDATA_PATH.exists():
-      st.warning("경로를 찾을 수 없습니다.")
+      st.warning("Path not found: /data/media/0/realdata")
     else:
       route_map = {}
       for item in REALDATA_PATH.iterdir():
@@ -273,11 +299,11 @@ def main():
             route_map[route_name]['mtime'] = max(route_map[route_name]['mtime'], item.stat().st_mtime)
 
       if not route_map:
-        st.info("업로드할 루트가 없습니다.")
+        st.info("No uploadable routes found.")
       else:
         sorted_routes = sorted(route_map.items(), key=lambda x: x[1]['mtime'], reverse=True)[:10]
         options = [f"[{datetime.fromtimestamp(v['mtime']).strftime('%Y-%m-%d %H:%M')}] {k} ({len(v['paths'])} segs)" for k, v in sorted_routes]
-        sel_route = st.selectbox("루트 선택", options)
+        sel_route = st.selectbox("Select Route to Upload", options)
         if st.button("🚀 Selected Route Upload", use_container_width=True):
           idx = options.index(sel_route)
           targets = sorted_routes[idx][1]['paths']
