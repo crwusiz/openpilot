@@ -521,6 +521,15 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("추돌 위험: 차량 AEB 작동"),
   },
 
+  EventName.stockLkas: {
+    ET.PERMANENT: Alert(
+      "핸들을 잡아주세요",
+      "차선 이탈 감지: 차량 LKAS 모드",
+      AlertStatus.critical, AlertSize.full,
+      Priority.HIGH, VisualAlert.fcw, AudibleAlert.none, 2.),
+    ET.NO_ENTRY: NoEntryAlert("차선 이탈 감지: 차량 LKAS 모드"),
+  },
+
   EventName.fcw: {
     ET.PERMANENT: Alert(
       "브레이크!",
