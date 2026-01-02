@@ -82,7 +82,7 @@ class StaticLogModal(Widget):
     super().__init__()
     self._content = HtmlRenderer(text=text)
 
-    self._content.styles[ElementType.P]['size'] = 30
+    self._content.styles[ElementType.P]['size'] = 40
     self._content.styles[ElementType.P]['margin_top'] = 0
     self._content.styles[ElementType.P]['margin_bottom'] = 0
     self._content.styles[ElementType.BR]['margin_bottom'] = 0
@@ -123,7 +123,7 @@ class TmuxLogModal(Widget):
     super().__init__()
     self._content = HtmlRenderer(text="Loading...")
 
-    self._content.styles[ElementType.P]['size'] = 30
+    self._content.styles[ElementType.P]['size'] = 40
     self._content.styles[ElementType.P]['margin_top'] = 0
     self._content.styles[ElementType.P]['margin_bottom'] = 0
     self._content.styles[ElementType.BR]['margin_bottom'] = 0
