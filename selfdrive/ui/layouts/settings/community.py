@@ -17,31 +17,34 @@ from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
 from openpilot.system.ui.lib.application import FontWeight, gui_app
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
+from openpilot.system.ui.widgets.html_render import HtmlModal, HtmlRenderer, ElementType
+from openpilot.system.ui.lib.scroll_panel import GuiScrollPanel
+from openpilot.system.ui.widgets.button import Button, ButtonStyle
 
 DESCRIPTIONS = {
   'pcm_cruise': tr_noop(
-    "Change the openpilot cruise engagement. use the PcmCruise method"
+    "Allow openpilot to engage using the stock PCM cruise buttons."
   ),
   'cruise_state_control': tr_noop(
-    "Openpilot controls cruise on/off, set speed"
+    "Openpilot controls the cruise state (on/off) and set speed."
   ),
   'is_hda2': tr_noop(
-    "Highway Drive Assist 2, turn it on"
+    "Enable this option for Highway Driving Assist 2 (HDA2) vehicles."
   ),
   'camera_scc': tr_noop(
-    "HDA1 CameraSCC CAR, HDA2 Connect the ADAS ECAN line to CAMERA modify, turn it on"
+    "Enable Camera SCC. (For CANFD HDA1 (Connect Camera) or HDA2 (Connect ADAS Module))"
   ),
   'radar_track': tr_noop(
-    "Enable Radar Track use (disable AEB)"
+    "Enable the use of Radar Tracks (Note: This disables AEB)."
   ),
   'driver_cam_reverse': tr_noop(
-    "Displays the driver camera when in reverse"
+    "Switch to the driver camera view when in reverse gear."
   ),
   'driver_cam_missing': tr_noop(
-    "If there is a problem with the driver camera hardware, drive without the driver camera"
+    "Enable driving without the driver monitoring camera (hardware failure)."
   ),
   'hardware_c3x': tr_noop(
-    "Enable mr.one c3x lite hardware use"
+    "Enable support for C3X Lite hardware."
   ),
   'logger_enable': tr_noop(
     "Turn off this option to reduce system load"
@@ -72,6 +75,101 @@ def execute_script(script_path: str, *args) -> int:
   except Exception as e:
     print(f"Error executing script: {e}")
     return 1
+
+
+class StaticLogModal(Widget):
+  def __init__(self, text: str):
+    super().__init__()
+    self._content = HtmlRenderer(text=text)
+
+    self._content.styles[ElementType.P]['size'] = 40
+    self._content.styles[ElementType.P]['margin_top'] = 0
+    self._content.styles[ElementType.P]['margin_bottom'] = 0
+    self._content.styles[ElementType.BR]['margin_bottom'] = 0
+
+    self._scroll_panel = GuiScrollPanel()
+    self._ok_button = Button(tr("OK"), click_callback=lambda: gui_app.set_modal_overlay(None), button_style=ButtonStyle.PRIMARY)
+
+  def _render(self, rect: rl.Rectangle):
+    margin = 50
+    content_rect = rl.Rectangle(rect.x + margin, rect.y + margin, rect.width - (margin * 2), rect.height - (margin * 2))
+
+    button_height = 160
+    button_spacing = 20
+    scrollable_height = content_rect.height - button_height - button_spacing
+
+    scrollable_rect = rl.Rectangle(content_rect.x, content_rect.y, content_rect.width, scrollable_height)
+
+    total_height = self._content.get_total_height(int(scrollable_rect.width))
+    scroll_content_rect = rl.Rectangle(scrollable_rect.x, scrollable_rect.y, scrollable_rect.width, total_height)
+    scroll_offset = self._scroll_panel.update(scrollable_rect, scroll_content_rect)
+    scroll_content_rect.y += scroll_offset
+
+    rl.begin_scissor_mode(int(scrollable_rect.x), int(scrollable_rect.y), int(scrollable_rect.width), int(scrollable_rect.height))
+    self._content.render(scroll_content_rect)
+    rl.end_scissor_mode()
+
+    button_width = (rect.width - 3 * 50) // 3
+    button_x = content_rect.x + content_rect.width - button_width
+    button_y = content_rect.y + content_rect.height - button_height
+    button_rect = rl.Rectangle(button_x, button_y, button_width, button_height)
+    self._ok_button.render(button_rect)
+
+    return -1
+
+
+class TmuxLogModal(Widget):
+  def __init__(self):
+    super().__init__()
+    self._content = HtmlRenderer(text="Loading...")
+
+    self._content.styles[ElementType.P]['size'] = 40
+    self._content.styles[ElementType.P]['margin_top'] = 0
+    self._content.styles[ElementType.P]['margin_bottom'] = 0
+    self._content.styles[ElementType.BR]['margin_bottom'] = 0
+
+    self._scroll_panel = GuiScrollPanel()
+    self._ok_button = Button(tr("OK"), click_callback=lambda: gui_app.set_modal_overlay(None), button_style=ButtonStyle.PRIMARY)
+    self._last_update = 0.0
+
+  def _render(self, rect: rl.Rectangle):
+    t = time.monotonic()
+    if t - self._last_update > 0.5:
+      self._last_update = t
+      try:
+        cmd = ["sh", "-c", "tmux capture-pane -p -t 0 -S -500"]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.returncode == 0:
+          text = result.stdout.replace('\n', '<br>')
+          self._content.parse_html_content(text)
+      except Exception:
+        pass
+
+    margin = 50
+    content_rect = rl.Rectangle(rect.x + margin, rect.y + margin, rect.width - (margin * 2), rect.height - (margin * 2))
+
+    button_height = 160
+    button_spacing = 20
+    scrollable_height = content_rect.height - button_height - button_spacing
+
+    scrollable_rect = rl.Rectangle(content_rect.x, content_rect.y, content_rect.width, scrollable_height)
+
+    total_height = self._content.get_total_height(int(scrollable_rect.width))
+    scroll_content_rect = rl.Rectangle(scrollable_rect.x, scrollable_rect.y, scrollable_rect.width, total_height)
+    scroll_offset = self._scroll_panel.update(scrollable_rect, scroll_content_rect)
+    scroll_content_rect.y += scroll_offset
+
+    rl.begin_scissor_mode(int(scrollable_rect.x), int(scrollable_rect.y), int(scrollable_rect.width), int(scrollable_rect.height))
+    self._content.render(scroll_content_rect)
+    rl.end_scissor_mode()
+
+    button_width = (rect.width - 3 * 50) // 3
+    button_x = content_rect.x + content_rect.width - button_width
+    button_y = content_rect.y + content_rect.height - button_height
+    button_rect = rl.Rectangle(button_x, button_y, button_width, button_height)
+    self._ok_button.render(button_rect)
+
+    return -1
 
 
 class CommunityLayout(Widget):
@@ -270,7 +368,7 @@ class CommunityLayout(Widget):
         callback=lambda state: self._params.put_bool("CameraSccEnable", state),
       ),
       toggle_item(
-        lambda: tr("Enable Radar Track use"),
+        lambda: tr("Enable Radar Track"),
         description=lambda: DESCRIPTIONS["radar_track"],
         initial_state=self._params.get_bool("RadarTrackEnable"),
         callback=lambda state: self._params.put_bool("RadarTrackEnable", state),
@@ -350,17 +448,17 @@ class CommunityLayout(Widget):
       button_item(
         title=lambda: tr("CAN missing Log"),
         button_text=lambda: tr("View"),
-        callback=lambda: self._view_log("/data/can_missing.log"),
+        callback=lambda: self._view_log("/data/can_missing.log", "CAN Missing Log"),
       ),
       button_item(
         title=lambda: tr("CAN timeout Log"),
         button_text=lambda: tr("View"),
-        callback=lambda: self._view_log("/data/can_timeout.log"),
+        callback=lambda: self._view_log("/data/can_timeout.log", "CAN Timeout Log"),
       ),
       button_item(
         title=lambda: tr("Tmux log"),
         button_text=lambda: tr("View"),
-        callback=lambda: self._view_log("/data/tmux_error.log"),
+        callback=lambda: self._view_log("/data/tmux_error.log", "Tmux Error Log"),
       ),
       button_item(
         title=lambda: tr("Tmux log"),
@@ -569,18 +667,20 @@ class CommunityLayout(Widget):
     dlg = ConfirmDialog(tr("Clear DTC\n\nProcess?"), tr("Process"))
     gui_app.set_modal_overlay(dlg, callback=confirm_callback)
 
-  def _view_log(self, log_path: str):
+  def _view_log(self, log_path: str, title: str = "Log View"):
     if Path(log_path).exists():
       try:
         with open(log_path, 'r', encoding='utf-8') as f:
           content = f.read()
-        dlg = ConfirmDialog(f"{content}", tr("OK"), center_text=False)
+        formatted_content = content.replace(chr(10), '<br>')
+
+        dlg = StaticLogModal(text=formatted_content)
         gui_app.set_modal_overlay(dlg)
       except Exception as e:
         dlg = ConfirmDialog(tr("Error reading log file"), tr("OK"))
         gui_app.set_modal_overlay(dlg)
     else:
-      dlg = ConfirmDialog(tr("log file not found"), tr("OK"))
+      dlg = ConfirmDialog(tr("log file not found") + f"\n{log_path}", tr("OK"))
       gui_app.set_modal_overlay(dlg)
 
   def _upload_log(self, log_path: str, log_name: str):
@@ -596,25 +696,14 @@ class CommunityLayout(Widget):
       gui_app.set_modal_overlay(dlg)
 
   def _on_tmux_console_view(self):
-    try:
-      result = subprocess.run(
-        ["tmux", "capture-pane", "-p", "-t", "0", "-S", "-250"],
-        capture_output=True,
-        text=True
-      )
-      if result.returncode == 0:
-        dlg = ConfirmDialog(f"{result.stdout}", tr("OK"), center_text=False)
-        gui_app.set_modal_overlay(dlg)
-    except Exception as e:
-      dlg = ConfirmDialog(tr("Error reading tmux console"), tr("OK"))
-      gui_app.set_modal_overlay(dlg)
+    dlg = TmuxLogModal()
+    gui_app.set_modal_overlay(dlg)
 
   def _on_tmux_console_upload(self):
     try:
-      result = subprocess.run(
-        ["sh", "-c", "tmux capture-pane -p -t 0 -S -250 > /data/tmux_console.log"],
-        capture_output=True
-      )
+      cmd = ["sh", "-c", "tmux capture-pane -p -t 0 -S -500 > /data/tmux_console.log"]
+      result = subprocess.run(cmd, capture_output=True)
+
       if result.returncode == 0:
         def confirm_callback(result: int):
           if result == DialogResult.CONFIRM:

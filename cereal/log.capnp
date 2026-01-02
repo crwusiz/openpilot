@@ -87,6 +87,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     laneChange @50;
     lowMemory @51;
     stockAeb @52;
+    stockLkas @98;
     ldw @53;
     carUnrecognized @54;
     invalidLkasSetting @55;
@@ -131,7 +132,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     excessiveActuation @96;
     audioFeedback @97;
 
-    turningIndicatorOn @98;
+    turningIndicatorOn @103;
     autoLaneChange @99;
 
     ding @100;
@@ -752,6 +753,9 @@ struct RadarState @0x9a185389d6fdd05f {
   leadsCenter @15 : List(LeadData);
   leadsLeft @16 : List(LeadData);
   leadsRight @17 : List(LeadData);
+  leadsLeft2 @19 : List(LeadData);
+  leadsRight2 @20 : List(LeadData);
+  leadsCutIn @21 : List(LeadData);
 
   struct LeadData {
     dRel @0 :Float32;
@@ -772,6 +776,7 @@ struct RadarState @0x9a185389d6fdd05f {
 
     aLead @5 :Float32;
     jLead @16 :Float32;
+    score @17 :Float32;
   }
 
   # deprecated

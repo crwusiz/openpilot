@@ -8,6 +8,7 @@ from pathlib import Path
 
 ACCESS_PASSWORD = "comma"
 
+
 def check_password():
   if st.session_state.get("password_correct", False):
     return True
@@ -32,8 +33,10 @@ def check_password():
       st.error("Incorrect Password")
   return False
 
+
 try:
   from openpilot.common.params import Params
+
   params = Params()
 except ImportError:
   class MockParams:
@@ -43,6 +46,7 @@ except ImportError:
     def put(self, k, v): self.data[k] = v
     def put_bool(self, k, v): self.data[k] = v
     def remove(self, k): self.data.pop(k, None)
+
   params = MockParams()
 
 BASE_PATH = "/data/params/crwusiz"
@@ -51,21 +55,13 @@ BRANCH_LIST_PATH = f"{BASE_PATH}/GitBranchList"
 SCRIPTS_PATH = "/data/openpilot/scripts"
 REALDATA_PATH = Path("/data/media/0/realdata")
 
-DESCRIPTIONS = {
-  'pcm_cruise': "Change the openpilot cruise engagement. use the PcmCruise method",
-  'cruise_state_control': "Openpilot controls cruise on/off, set speed",
-  'is_hda2': "Highway Drive Assist 2, turn it on",
-  'camera_scc': "HDA1 CameraSCC CAR, HDA2 Connect the ADAS ECAN line to CAMERA modify, turn it on",
-  'radar_track': "Enable Radar Track use (disable AEB)",
-  'driver_cam_reverse': "Displays the driver camera when in reverse",
-  'driver_cam_missing': "If there is a problem with the driver camera hardware, drive without the driver camera",
-}
 
 def get_list_from_file(path: str):
   if Path(path).exists():
     with open(path, 'r', encoding='utf-8') as f:
       return [line.strip() for line in f if line.strip()]
   return []
+
 
 def run_script(name, path, args=None):
   with st.status(f"Executing {name}...") as status:
@@ -82,6 +78,7 @@ def run_script(name, path, args=None):
       status.update(label="Failed", state="error")
       return 1
 
+
 def reset_calibration():
   params.remove("CalibrationParams")
   params.remove("LiveTorqueParameters")
@@ -90,6 +87,7 @@ def reset_calibration():
   params.remove("LiveDelay")
   params.put_bool("OnroadCycleRequested", True)
   st.toast("Calibration Reset Requested!")
+
 
 def get_tmux_capture():
   try:
@@ -116,15 +114,50 @@ def main():
       transition: 0.3s;
     }
     .stButton>button:hover { background-color: #2C2CE2; border-color: #ffffff; }
-    .metric-card {
+
+    /* Common style for all metric cards */
+    .metric-card, .metric-card-danger, .metric-card-warning, .metric-card-success {
+      display: flex;
+      align-items: center;
+      height: 3.5em; /* Match button height */
       background-color: #161B22;
-      padding: 12px;
+      padding-left: 15px;
       border-radius: 8px;
-      border-left: 4px solid #2C2CE2;
-      margin-bottom: 10px;
-      font-size: 0.9em;
+      border-left-width: 5px;
+      border-left-style: solid;
+      font-size: 1em; /* Increased font size */
+      font-weight: bold;
     }
+
+    .metric-card {
+      border-left-color: #2C2CE2;
+      color: white;
+    }
+    .metric-card-danger {
+      border-left-color: rgb(201, 34, 49);
+      color: rgb(201, 34, 49);
+    }
+    .metric-card-warning {
+      border-left-color: rgb(218, 202, 37);
+      color: rgb(218, 202, 37);
+    }
+    .metric-card-success {
+      border-left-color: rgb(128, 216, 166);
+      color: rgb(128, 216, 166);
+    }
+
     [data-testid="stHeader"] { background: rgba(0,0,0,0); }
+    .toggle-description {
+      font-size: 0.8em;
+      color: #888;
+      margin-top: -10px;
+      margin-bottom: 10px;
+      margin-left: 0px;
+    }
+    .stTextArea textarea {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 0.85em;
+    }
     </style>
   """, unsafe_allow_html=True)
 
@@ -176,8 +209,6 @@ def main():
         params.put("SelectedBranch", selected_b)
       st.rerun()
 
-  st.divider()
-
   tabs = st.tabs(["🚀 Functions", "⚙️ Toggles", "📋 Logs", "📂 Realdata", "📺 Terminal"])
 
   with tabs[0]:
@@ -189,8 +220,18 @@ def main():
         run_script("Commit Check", f"{SCRIPTS_PATH}/commit_compare.sh")
         st.rerun()
     with row1_col2:
-      commit_info = params.get("CommitCompare") or "Check required"
-      st.markdown(f'<div class="metric-card"><b>Update Status</b><br>{commit_info}</div>', unsafe_allow_html=True)
+      commit_output = params.get("CommitCompare")
+      commit_info = commit_output or "Check required"
+
+      card_class = "metric-card-warning"
+
+      if commit_output:
+        if " == " in commit_output:
+          card_class = "metric-card-success"
+        elif " != " in commit_output:
+          card_class = "metric-card-danger"
+
+      st.markdown(f'<div class="{card_class}">Update Status : &nbsp;{commit_info}</div>', unsafe_allow_html=True)
 
     row2_col1, row2_col2 = st.columns([1, 2])
     with row2_col1:
@@ -199,7 +240,7 @@ def main():
           reset_calibration()
     with row2_col2:
       device_position = params.get("DevicePosition") or "--"
-      st.markdown(f'<div class="metric-card"><b>Device Position</b><br>{device_position}</div>', unsafe_allow_html=True)
+      st.markdown(f'<div class="metric-card">Device Position : &nbsp;{device_position}</div>', unsafe_allow_html=True)
 
     if " == " not in (params.get("CommitCompare") or "") and params.get("CommitCompare"):
       st.warning("New Update Available!")
@@ -212,7 +253,7 @@ def main():
       if st.button("📷 Camera View", use_container_width=True):
         run_script("Camera View", "/data/openpilot/selfdrive/ui/watch3.py")
 
-      if st.button("🔴 REBOOT", type="secondary", use_container_width=True):
+      if st.button("🔴 Reboot", type="secondary", use_container_width=True):
         if st.checkbox("Confirm Reboot"):
           st.error("Rebooting Device...")
           subprocess.run(["sudo", "reboot"])
@@ -220,46 +261,77 @@ def main():
   with tabs[1]:
     st.subheader("Parameter Configuration")
     toggle_items = [
-      ("PcmCruiseEnable", "PcmCruise", "pcm_cruise"),
-      ("CruiseStateControl", "Cruise State Controls", "cruise_state_control"),
-      ("IsHda2", "CANFD Car HDA2", "is_hda2"),
-      ("CameraSccEnable", "CameraSCC", "camera_scc"),
-      ("RadarTrackEnable", "Enable Radar Track use", "radar_track"),
-      ("DriverCameraOnReverse", "Driver Camera On Reverse", "driver_cam_reverse"),
-      ("DriverCameraHardwareMissing", "Driver Camera Hardware Missing", "driver_cam_missing"),
+      ("PcmCruiseEnable", "PcmCruise", "Change the openpilot cruise engagement. use the PcmCruise method"),
+      ("CruiseStateControl", "Cruise State Controls", "Openpilot controls cruise on/off, set speed"),
+      ("IsHda2", "CANFD Car HDA2", "Highway Drive Assist 2, turn it on"),
+      ("CameraSccEnable", "CameraSCC", "HDA1 CameraSCC CAR, HDA2 Connect the ADAS ECAN line to CAMERA modify, turn it on"),
+      ("RadarTrackEnable", "Enable Radar Track use", "Enable Radar Track use (disable AEB)"),
+      ("DriverCameraOnReverse", "Driver Camera On Reverse", "Displays the driver camera when in reverse"),
+      ("DriverCameraHardwareMissing", "Driver Camera Hardware Missing", "If there is a problem with the driver camera hardware, drive without the driver camera"),
     ]
-    for key, label, desc_key in toggle_items:
+    for key, label, desc in toggle_items:
       curr = params.get_bool(key)
-      new = st.toggle(label, value=curr, help=DESCRIPTIONS[desc_key])
+      new = st.toggle(label, value=curr)
       if new != curr:
         params.put_bool(key, new)
-        st.toast(f"{label} 변경됨")
+        st.toast(f"{label} Changed")
+      st.markdown(f'<div class="toggle-description">{desc}</div>', unsafe_allow_html=True)
 
   with tabs[2]:
-    st.subheader("System Logs & Diagnostics")
+    st.subheader("System Logs")
     log_files = {
       "CAN Missing": "/data/can_missing.log",
       "CAN Timeout": "/data/can_timeout.log",
       "Tmux Error": "/data/tmux_error.log",
+      "Tmux Console": "TMUX_CONSOLE"
     }
-    l_col1, l_col2 = st.columns([1, 2])
+
+    l_col1, l_col2, l_col3 = st.columns([3, 1, 1])
+
     with l_col1:
-      sel_log = st.selectbox("로그 파일 선택", list(log_files.keys()))
-      if st.button("👁️ View Log File", use_container_width=True):
-        path = log_files[sel_log]
-        if Path(path).exists():
-          st.session_state.log_out = Path(path).read_text()
-        else: st.error("파일이 없습니다.")
-      if st.button("⬆️ Upload This Log", use_container_width=True):
-        run_script("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[sel_log])
+      sel_log_name = st.selectbox("Select Log File", list(log_files.keys()), label_visibility="visible")
+      sel_log_path = log_files[sel_log_name]
+
     with l_col2:
-      content = st.session_state.get("log_out", "확인할 로그를 선택하세요.")
-      st.text_area("Output Window", content, height=450)
+      st.write("")
+      st.write("")
+      if st.button("👁️ View", key="btn_view_file", use_container_width=True):
+        if sel_log_path == "TMUX_CONSOLE":
+          capture_cmd = "tmux capture-pane -p -t 0 -S -500 > /data/tmux_console.log"
+          subprocess.run(capture_cmd, shell=True)
+
+          console_log_path = Path("/data/tmux_console.log")
+          if console_log_path.exists():
+            st.session_state.log_out = console_log_path.read_text()
+          else:
+            st.error("Failed to capture tmux console.")
+        else:
+          if Path(sel_log_path).exists():
+            st.session_state.log_out = Path(sel_log_path).read_text()
+          else:
+            st.error("File not found.")
+
+    with l_col3:
+      st.write("")
+      st.write("")
+      if st.button("⬆️ Upload", key="btn_upload_file", use_container_width=True):
+        if sel_log_path == "TMUX_CONSOLE":
+          console_log_path = Path("/data/tmux_console.log")
+          if not console_log_path.exists():
+            subprocess.run("tmux capture-pane -p -t 0 -S -500 > /data/tmux_console.log", shell=True)
+
+          run_script("Console Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=["tmux_console.log"])
+        else:
+          run_script("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh",
+                     args=[sel_log_name])
+
+    content = st.session_state.get("log_out", "Select a log file or console to view.")
+    st.text_area("Output Window", content, height=500, key="log_output_window")
 
   with tabs[3]:
     st.subheader("Realdata Route Upload")
     if not REALDATA_PATH.exists():
-      st.warning("경로를 찾을 수 없습니다.")
+      st.warning("Path not found: /data/media/0/realdata")
     else:
       route_map = {}
       for item in REALDATA_PATH.iterdir():
@@ -273,32 +345,27 @@ def main():
             route_map[route_name]['mtime'] = max(route_map[route_name]['mtime'], item.stat().st_mtime)
 
       if not route_map:
-        st.info("업로드할 루트가 없습니다.")
+        st.info("No uploadable routes found.")
       else:
         sorted_routes = sorted(route_map.items(), key=lambda x: x[1]['mtime'], reverse=True)[:10]
-        options = [f"[{datetime.fromtimestamp(v['mtime']).strftime('%Y-%m-%d %H:%M')}] {k} ({len(v['paths'])} segs)" for k, v in sorted_routes]
-        sel_route = st.selectbox("루트 선택", options)
+        options = [f"[{datetime.fromtimestamp(v['mtime']).strftime('%Y-%m-%d %H:%M')}] {k} ({len(v['paths'])} segs)" for
+                   k, v in sorted_routes]
+        sel_route = st.selectbox("Select Route to Upload", options)
         if st.button("🚀 Selected Route Upload", use_container_width=True):
           idx = options.index(sel_route)
           targets = sorted_routes[idx][1]['paths']
           run_script("Realdata Upload", f"{SCRIPTS_PATH}/upload_realdata.sh", args=targets)
 
   with tabs[4]:
-    st.subheader("📺 Real-time Terminal (tmux)")
-    col_t1, col_t2 = st.columns([1, 4])
-    with col_t1:
-      live_view = st.toggle("Live Stream", value=False)
-      if st.button("Manual Refresh", use_container_width=True): st.rerun()
-    with col_t2:
-      terminal_placeholder = st.empty()
-      if live_view:
-        while live_view:
-          content = get_tmux_capture()
-          terminal_placeholder.code(content, language="bash")
-          time.sleep(1)
-      else:
-        content = get_tmux_capture()
-        terminal_placeholder.code(content, language="bash")
+    st.subheader("📺 Real-time Terminal")
+
+    terminal_placeholder = st.empty()
+
+    while True:
+      content = get_tmux_capture()
+      terminal_placeholder.code(content, language="bash")
+      time.sleep(1)
+
 
 if __name__ == "__main__":
   if check_password():
