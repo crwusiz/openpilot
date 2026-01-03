@@ -142,9 +142,6 @@ def manager_thread() -> None:
   if params.get("DriverCameraHardwareMissing"):
     ignore += ["dmonitoringd", "dmonitoringmodeld"]
 
-  if params.get("HardwareC3xLite"):
-    ignore += ["micd", "soundd"]
-
   sm = messaging.SubMaster(['deviceState', 'carParams', 'pandaStates'], poll='deviceState')
   pm = messaging.PubMaster(['managerState'])
 
