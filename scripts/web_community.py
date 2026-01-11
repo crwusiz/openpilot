@@ -242,8 +242,6 @@ def main():
       with pull_col2:
         st.warning("New Update Available! Please pull the latest changes.", icon="⚠️")
 
-    st.divider()
-
     row3_col1, row3_col2 = st.columns([1, 2])
     with row3_col1:
       if st.button("✨ Reset Calibration", use_container_width=True):
@@ -252,8 +250,6 @@ def main():
     with row3_col2:
       device_position = params.get("DevicePosition") or "--"
       st.markdown(f'<div class="metric-card">Device Position : &nbsp;{device_position}</div>', unsafe_allow_html=True)
-
-    st.write("")
 
     sub_col1, sub_col2 = st.columns([1, 2])
     with sub_col1:
@@ -361,7 +357,7 @@ def main():
         if st.button("🚀 Selected Route Upload", use_container_width=True):
           idx = options.index(sel_route)
           targets = sorted_routes[idx][1]['paths']
-          run_script("Realdata Upload", f"{SCRIPTS_PATH}/upload_realdata.sh", args=targets)
+          run_script("Realdata Upload", f"{SCRIPTS_PATH}/realdata_upload.sh", args=targets)
 
   with tabs[4]:
     st.subheader("📺 Real-time Terminal")

@@ -789,17 +789,13 @@ class CommunityLayout(Widget):
       gui_app.set_modal_overlay(upload_dlg)
 
       if upload_dlg.result == DialogResult.CONFIRM:
-        script_path = "/data/openpilot/scripts/upload_realdata.sh"
+        script_path = "/data/openpilot/scripts/realdata_upload.sh"
         cmd = [script_path] + segment_paths
 
         try:
-          result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+          subprocess.Popen(cmd)
 
-          if result.returncode == 0:
-            dlg = ConfirmDialog(tr("Upload completed successfully"), tr("OK"))
-          else:
-            error_msg = tr("Upload failed") + f"\nExit Code: {result.returncode}"
-            dlg = ConfirmDialog(error_msg, tr("OK"))
+          dlg = ConfirmDialog(tr("Upload started in background.\nCheck logs for progress."), tr("OK"))
 
         except Exception as e:
           dlg = ConfirmDialog(tr("Error executing script:") + f"\n{e}", tr("OK"))
