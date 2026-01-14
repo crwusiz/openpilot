@@ -357,7 +357,14 @@ def main():
         if st.button("🚀 Selected Route Upload", use_container_width=True):
           idx = options.index(sel_route)
           targets = sorted_routes[idx][1]['paths']
-          run_script("Realdata Upload", f"{SCRIPTS_PATH}/realdata_upload.sh", args=targets)
+
+          cmd = ["bash", f"{SCRIPTS_PATH}/realdata_upload.sh"] + targets
+
+          try:
+            subprocess.Popen(cmd)
+            st.success(f"Upload started in background! ({len(targets)} segments)\nPlease check the NAS or Tmux logs.")
+          except Exception as e:
+            st.error(f"Failed to start upload: {e}")
 
   with tabs[4]:
     st.subheader("📺 Real-time Terminal")

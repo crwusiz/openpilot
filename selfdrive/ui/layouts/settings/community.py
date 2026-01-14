@@ -776,28 +776,38 @@ class CommunityLayout(Widget):
       formatted_date = dt_object.strftime('%Y-%m-%d %H:%M')
       options.append(f"[{formatted_date}] {route['route_name']} ({route['segment_count']} segments)")
 
-    dialog = MultiOptionDialog(tr("Select Route to Upload"), options, current=options[0])
-    gui_app.set_modal_overlay(dialog)
+    def handle_route_selection(result: int):
+      if result != DialogResult.CONFIRM:
+        return
 
-    if dialog._result is DialogResult.CONFIRM:
-      selected_index = options.index(dialog.selection) if dialog.selection in options else 0
+      selected_text = dialog.selection
+      if selected_text not in options:
+        return
+
+      selected_index = options.index(selected_text)
       selected_route_info = recent_routes[selected_index]
       route_name = selected_route_info['route_name']
       segment_paths = selected_route_info['segment_paths']
 
-      upload_dlg = ConfirmDialog(tr(f"Upload route {route_name}?"), tr("Yes"), tr("No"))
-      gui_app.set_modal_overlay(upload_dlg)
+      def handle_final_confirm(res: int):
+        if res != DialogResult.CONFIRM:
+          return
 
-      if upload_dlg.result == DialogResult.CONFIRM:
         script_path = "/data/openpilot/scripts/realdata_upload.sh"
         cmd = [script_path] + segment_paths
 
         try:
           subprocess.Popen(cmd)
 
-          dlg = ConfirmDialog(tr("Upload started in background.\nCheck logs for progress."), tr("OK"))
+          info_dlg = ConfirmDialog(tr("Upload started in background.\nCheck tmux logs."), tr("OK"))
+          gui_app.set_modal_overlay(info_dlg)
 
         except Exception as e:
-          dlg = ConfirmDialog(tr("Error executing script:") + f"\n{e}", tr("OK"))
+          err_dlg = ConfirmDialog(tr("Error starting script:") + f"\n{e}", tr("OK"))
+          gui_app.set_modal_overlay(err_dlg)
 
-        gui_app.set_modal_overlay(dlg)
+      upload_dlg = ConfirmDialog(tr(f"Upload route {route_name}?"), tr("Yes"), tr("No"))
+      gui_app.set_modal_overlay(upload_dlg, callback=handle_final_confirm)
+
+    dialog = MultiOptionDialog(tr("Select Route to Upload"), options, current=options[0])
+    gui_app.set_modal_overlay(dialog, callback=handle_route_selection)
