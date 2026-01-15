@@ -2,6 +2,7 @@ import subprocess
 import shutil
 import os
 import time
+import threading
 import pyray as rl
 
 from datetime import datetime
@@ -758,6 +759,9 @@ class CommunityLayout(Widget):
           item.stat().st_mtime
         )
 
+    for r_info in route_map.values():
+      r_info['segment_paths'].sort(key=lambda x: int(x.split("--")[-1]))
+
     if not route_map:
       dlg = ConfirmDialog(tr("Routes do not exist"), tr("OK"))
       gui_app.set_modal_overlay(dlg)
@@ -796,15 +800,22 @@ class CommunityLayout(Widget):
         script_path = "/data/openpilot/scripts/realdata_upload.sh"
         cmd = [script_path] + segment_paths
 
-        try:
-          subprocess.Popen(cmd)
+        def upload_thread_task():
+          try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
-          info_dlg = ConfirmDialog(tr("Upload started in background.\nCheck tmux logs."), tr("OK"))
-          gui_app.set_modal_overlay(info_dlg)
+            if result.returncode == 0:
+              dlg = ConfirmDialog(tr("Upload completed successfully"), tr("OK"))
+            else:
+              dlg = ConfirmDialog(tr("Upload failed") + f"\nExit Code: {result.returncode}", tr("OK"))
 
-        except Exception as e:
-          err_dlg = ConfirmDialog(tr("Error starting script:") + f"\n{e}", tr("OK"))
-          gui_app.set_modal_overlay(err_dlg)
+          except Exception as e:
+             dlg = ConfirmDialog(tr("Error executing script:") + f"\n{e}", tr("OK"))
+
+          gui_app.set_modal_overlay(dlg)
+
+        t = threading.Thread(target=upload_thread_task)
+        t.start()
 
       upload_dlg = ConfirmDialog(tr(f"Upload route {route_name}?"), tr("Yes"), tr("No"))
       gui_app.set_modal_overlay(upload_dlg, callback=handle_final_confirm)

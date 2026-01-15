@@ -347,6 +347,9 @@ def main():
             route_map[route_name]['paths'].append(str(item))
             route_map[route_name]['mtime'] = max(route_map[route_name]['mtime'], item.stat().st_mtime)
 
+      for r_data in route_map.values():
+        r_data['paths'].sort(key=lambda x: int(x.split("--")[-1]))
+
       if not route_map:
         st.info("No uploadable routes found.")
       else:
