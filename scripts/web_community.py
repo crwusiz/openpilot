@@ -233,20 +233,23 @@ def main():
 
       st.markdown(f'<div class="{card_class}">Update Status : &nbsp;{commit_info}</div>', unsafe_allow_html=True)
 
-    row2_col1, row2_col2 = st.columns([1, 2])
-    with row2_col1:
+    if " == " not in (params.get("CommitCompare") or "") and params.get("CommitCompare"):
+      pull_col1, pull_col2 = st.columns([1, 2])
+      with pull_col1:
+        if st.button("⬇️ Git Pull Now", type="primary", use_container_width=True):
+          run_script("Git Pull", f"{SCRIPTS_PATH}/gitpull.sh")
+          st.rerun()
+      with pull_col2:
+        st.warning("New Update Available! Please pull the latest changes.", icon="⚠️")
+
+    row3_col1, row3_col2 = st.columns([1, 2])
+    with row3_col1:
       if st.button("✨ Reset Calibration", use_container_width=True):
         if st.checkbox("Confirm Reset"):
           reset_calibration()
-    with row2_col2:
+    with row3_col2:
       device_position = params.get("DevicePosition") or "--"
       st.markdown(f'<div class="metric-card">Device Position : &nbsp;{device_position}</div>', unsafe_allow_html=True)
-
-    if " == " not in (params.get("CommitCompare") or "") and params.get("CommitCompare"):
-      st.warning("New Update Available!")
-      if st.button("⬇️ Git Pull Now", type="primary", use_container_width=True):
-        run_script("Git Pull", f"{SCRIPTS_PATH}/gitpull.sh")
-        st.rerun()
 
     sub_col1, sub_col2 = st.columns([1, 2])
     with sub_col1:
@@ -344,6 +347,9 @@ def main():
             route_map[route_name]['paths'].append(str(item))
             route_map[route_name]['mtime'] = max(route_map[route_name]['mtime'], item.stat().st_mtime)
 
+      for r_data in route_map.values():
+        r_data['paths'].sort(key=lambda x: int(x.split("--")[-1]))
+
       if not route_map:
         st.info("No uploadable routes found.")
       else:
@@ -354,7 +360,14 @@ def main():
         if st.button("🚀 Selected Route Upload", use_container_width=True):
           idx = options.index(sel_route)
           targets = sorted_routes[idx][1]['paths']
-          run_script("Realdata Upload", f"{SCRIPTS_PATH}/upload_realdata.sh", args=targets)
+
+          cmd = ["bash", f"{SCRIPTS_PATH}/realdata_upload.sh"] + targets
+
+          try:
+            subprocess.Popen(cmd)
+            st.success(f"Upload started in background! ({len(targets)} segments)\nPlease check the NAS or Tmux logs.")
+          except Exception as e:
+            st.error(f"Failed to start upload: {e}")
 
   with tabs[4]:
     st.subheader("📺 Real-time Terminal")

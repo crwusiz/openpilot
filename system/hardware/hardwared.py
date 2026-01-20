@@ -329,12 +329,6 @@ def hardware_thread(end_event, hw_queue) -> None:
       # to make a different decision in your software
       startup_conditions["registered_device"] = PC or (params.get("DongleId") != UNREGISTERED_DONGLE_ID)
 
-    # TODO: this should move to TICI.initialize_hardware, but we currently can't import params there
-    if False: #TICI and HARDWARE.get_device_type() == "tici":
-      if not os.path.isfile("/persist/comma/living-in-the-moment"):
-        if not Path("/data/media").is_mount():
-          set_offroad_alert_if_changed("Offroad_StorageMissing", True)
-
     # Handle offroad/onroad transition
     should_start = all(onroad_conditions.values())
     if started_ts is None:

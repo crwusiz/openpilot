@@ -119,7 +119,7 @@ class Car:
       safety_config.safetyModel = structs.CarParams.SafetyModel.noOutput
       self.CP.safetyConfigs = [safety_config]
 
-    if self.CP.secOcRequired and not is_release:
+    if self.CP.secOcRequired:
       # Copy user key if available
       try:
         with open("/cache/params/SecOCKey") as f:
@@ -247,7 +247,8 @@ class Car:
     if self.sm.all_alive(['carControl']):
       # send car controls over can
       now_nanos = self.can_log_mono_time if REPLAY else int(time.monotonic() * 1e9)
-      self.last_actuators_output, can_sends = self.CI.apply(CC, now_nanos)
+      MD = self.sm['modelV2'] if self.sm.valid['modelV2'] else None
+      self.last_actuators_output, can_sends = self.CI.apply(CC, now_nanos, MD)
       self.cruise_controller.spam_message(CS, can_sends)
       self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
 

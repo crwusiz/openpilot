@@ -107,15 +107,13 @@ dev = [
   "av",
   "azure-identity",
   "azure-storage-blob",
-  "dbus-next", # TODO: remove once we moved everything to jeepney
   "dictdiffer",
   "jeepney",
   "matplotlib",
   "opencv-python-headless",
   "parameterized >=0.8, <0.9",
   "pyautogui",
-  "pygame",
-  "pyopencl; platform_machine != 'aarch64'", # broken on arm64
+  "pyopencl",
   "pytools>=2025.1.6; platform_machine != 'aarch64'",
   "pywinctl",
   "pyprof2calltree",
@@ -275,6 +273,6 @@ invalid-argument-type = "ignore"
 call-non-callable = "ignore"
 # Ignore unsupported-operator - false positives from dynamic types
 unsupported-operator = "ignore"
-# Ignore non-subscriptable - false positives from dynamic types
-non-subscriptable = "ignore"
+# Ignore not-subscriptable - false positives from dynamic types
+not-subscriptable = "ignore"
 # not-iterable errors are now fixed

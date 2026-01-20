@@ -2,6 +2,7 @@ import subprocess
 import shutil
 import os
 import time
+import threading
 import pyray as rl
 
 from datetime import datetime
@@ -758,6 +759,9 @@ class CommunityLayout(Widget):
           item.stat().st_mtime
         )
 
+    for r_info in route_map.values():
+      r_info['segment_paths'].sort(key=lambda x: int(x.split("--")[-1]))
+
     if not route_map:
       dlg = ConfirmDialog(tr("Routes do not exist"), tr("OK"))
       gui_app.set_modal_overlay(dlg)
@@ -776,32 +780,45 @@ class CommunityLayout(Widget):
       formatted_date = dt_object.strftime('%Y-%m-%d %H:%M')
       options.append(f"[{formatted_date}] {route['route_name']} ({route['segment_count']} segments)")
 
-    dialog = MultiOptionDialog(tr("Select Route to Upload"), options, current=options[0])
-    gui_app.set_modal_overlay(dialog)
+    def handle_route_selection(result: int):
+      if result != DialogResult.CONFIRM:
+        return
 
-    if dialog._result is DialogResult.CONFIRM:
-      selected_index = options.index(dialog.selection) if dialog.selection in options else 0
+      selected_text = dialog.selection
+      if selected_text not in options:
+        return
+
+      selected_index = options.index(selected_text)
       selected_route_info = recent_routes[selected_index]
       route_name = selected_route_info['route_name']
       segment_paths = selected_route_info['segment_paths']
 
-      upload_dlg = ConfirmDialog(tr(f"Upload route {route_name}?"), tr("Yes"), tr("No"))
-      gui_app.set_modal_overlay(upload_dlg)
+      def handle_final_confirm(res: int):
+        if res != DialogResult.CONFIRM:
+          return
 
-      if upload_dlg.result == DialogResult.CONFIRM:
-        script_path = "/data/openpilot/scripts/upload_realdata.sh"
+        script_path = "/data/openpilot/scripts/realdata_upload.sh"
         cmd = [script_path] + segment_paths
 
-        try:
-          result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        def upload_thread_task():
+          try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
-          if result.returncode == 0:
-            dlg = ConfirmDialog(tr("Upload completed successfully"), tr("OK"))
-          else:
-            error_msg = tr("Upload failed") + f"\nExit Code: {result.returncode}"
-            dlg = ConfirmDialog(error_msg, tr("OK"))
+            if result.returncode == 0:
+              dlg = ConfirmDialog(tr("Upload completed successfully"), tr("OK"))
+            else:
+              dlg = ConfirmDialog(tr("Upload failed") + f"\nExit Code: {result.returncode}", tr("OK"))
 
-        except Exception as e:
-          dlg = ConfirmDialog(tr("Error executing script:") + f"\n{e}", tr("OK"))
+          except Exception as e:
+             dlg = ConfirmDialog(tr("Error executing script:") + f"\n{e}", tr("OK"))
 
-        gui_app.set_modal_overlay(dlg)
+          gui_app.set_modal_overlay(dlg)
+
+        t = threading.Thread(target=upload_thread_task)
+        t.start()
+
+      upload_dlg = ConfirmDialog(tr(f"Upload route {route_name}?"), tr("Yes"), tr("No"))
+      gui_app.set_modal_overlay(upload_dlg, callback=handle_final_confirm)
+
+    dialog = MultiOptionDialog(tr("Select Route to Upload"), options, current=options[0])
+    gui_app.set_modal_overlay(dialog, callback=handle_route_selection)
