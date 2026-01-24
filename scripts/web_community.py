@@ -353,7 +353,7 @@ def main():
       if not route_map:
         st.info("No uploadable routes found.")
       else:
-        sorted_routes = sorted(route_map.items(), key=lambda x: x[1]['mtime'], reverse=True)[:10]
+        sorted_routes = sorted(route_map.items(), key=lambda x: x[1]['mtime'], reverse=True)
         options = [f"[{datetime.fromtimestamp(v['mtime']).strftime('%Y-%m-%d %H:%M')}] {k} ({len(v['paths'])} segs)" for
                    k, v in sorted_routes]
         sel_route = st.selectbox("Select Route to Upload", options)

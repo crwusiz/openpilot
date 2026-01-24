@@ -414,6 +414,7 @@ def main(demo=False):
       drivingdata_send.drivingModelData.meta.laneChangeState = DH.lane_change_state
       drivingdata_send.drivingModelData.meta.laneChangeDirection = DH.lane_change_direction
 
+      modelv2_send.modelV2.meta.desire = DH.desire
       modelv2_send.modelV2.meta.autoLaneChangeEnable = DH.auto_lane_change_enable
       modelv2_send.modelV2.meta.autoLaneChangeTimer = int(ALC_START_TIME) - int(DH.auto_lane_change_timer)
 

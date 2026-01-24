@@ -773,9 +773,8 @@ class CommunityLayout(Widget):
       reverse=True
     )
 
-    recent_routes = sorted_routes[:10]
     options = []
-    for route in recent_routes:
+    for route in sorted_routes:
       dt_object = datetime.fromtimestamp(route['last_modified'])
       formatted_date = dt_object.strftime('%Y-%m-%d %H:%M')
       options.append(f"[{formatted_date}] {route['route_name']} ({route['segment_count']} segments)")
@@ -789,7 +788,7 @@ class CommunityLayout(Widget):
         return
 
       selected_index = options.index(selected_text)
-      selected_route_info = recent_routes[selected_index]
+      selected_route_info = sorted_routes[selected_index]
       route_name = selected_route_info['route_name']
       segment_paths = selected_route_info['segment_paths']
 
