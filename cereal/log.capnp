@@ -1158,6 +1158,7 @@ struct ModelDataV2 {
 
     autoLaneChangeEnable @10 :Bool;
     autoLaneChangeTimer @11 :Int8;
+    desire @12 :Desire;
 
     # deprecated
     brakeDisengageProbDEPRECATED @2 :Float32;
@@ -2253,9 +2254,9 @@ struct DriverMonitoringState @0xb83cda094a1da284 {
   isActiveMode @16 :Bool;
   isRHD @4 :Bool;
   uncertainCount @19 :UInt32;
-  phoneProbOffset @20 :Float32;
-  phoneProbValidCount @21 :UInt32;
 
+  phoneProbOffsetDEPRECATED @20 :Float32;
+  phoneProbValidCountDEPRECATED @21 :UInt32;
   isPreviewDEPRECATED @15 :Bool;
   rhdCheckedDEPRECATED @5 :Bool;
   eventsDEPRECATED @0 :List(Car.OnroadEventDEPRECATED);

@@ -9,6 +9,7 @@ LANE_LINE_PROB_THRESHOLD = 0.3
 
 LaneChangeState = log.LaneChangeState
 LaneChangeDirection = log.LaneChangeDirection
+TurnDirection = log.Desire
 
 LANE_CHANGE_SPEED_MIN = 50 * CV.KPH_TO_MS
 LANE_CHANGE_TIME_MAX = 10.
@@ -34,6 +35,11 @@ DESIRES = {
   },
 }
 
+TURN_DESIRES = {
+  TurnDirection.none: log.Desire.none,
+  TurnDirection.turnLeft: log.Desire.turnLeft,
+  TurnDirection.turnRight: log.Desire.turnRight,
+}
 
 def check_invalid_lane(lane_line_probs, road_edge_stds, direction_left: bool):
   if direction_left:
