@@ -181,9 +181,11 @@ class CruiseController:
       camera_limit_speed_clu = camera_limit_speed_stock
 
     if school_zone:
-      if camera_limit_speed_clu > 0:
-        limit_50 = self.conv.to_current_unit(50.0)
+      limit_50 = self.conv.to_current_unit(50.0)
+      if 0 < camera_limit_speed_clu < NO_LIMIT_SPEED:
         camera_limit_speed_clu = min(camera_limit_speed_clu, limit_50)
+      elif road_limit_speed is not None and road_limit_speed > 0:
+        camera_limit_speed_clu = min(road_limit_speed, limit_50)
       else:
         camera_limit_speed_clu = self.conv.to_current_unit(SCHOOL_ZONE_SPEED)
     self.camera_limit_speed_clu = camera_limit_speed_clu
