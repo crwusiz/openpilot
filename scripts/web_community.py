@@ -5,6 +5,7 @@ import os
 import time
 from datetime import datetime
 from pathlib import Path
+import streamlit.components.v1 as components
 
 ACCESS_PASSWORD = "comma"
 
@@ -209,7 +210,7 @@ def main():
         params.put("SelectedBranch", selected_b)
       st.rerun()
 
-  tabs = st.tabs(["🚀 Functions", "⚙️ Toggles", "📋 Logs", "📂 Realdata", "📺 Terminal"])
+  tabs = st.tabs(["🚀 Functions", "⚙️ Toggles", "📋 Logs", "📂 Realdata", "📺 Terminal", "📷 Camera"])
 
   with tabs[0]:
     st.subheader("System Maintenance")
@@ -369,6 +370,87 @@ def main():
           except Exception as e:
             st.error(f"Failed to start upload: {e}")
 
+  with tabs[5]:
+    st.subheader("📷 WebRTC Streaming")
+
+    col_cam1, col_cam2 = st.columns([1, 3])
+    with col_cam1:
+      cam_type = st.selectbox("Source", ["road", "wide", "driver"], index=0)
+      start_btn = st.button("▶️ Start Stream", type="primary")
+
+    with col_cam2:
+      if start_btn:
+        webrtc_html = f"""
+            <html>
+              <body style="background-color: #000; margin: 0; display: flex; justify-content: center; align-items: center; height: 500px;">
+                <video id="video" autoplay playsinline style="width: 100%; height: 100%; object-fit: contain;"></video>
+                <div id="status" style="position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 5px;">Connecting...</div>
+
+                <script>
+                  async function start() {{
+                    const video = document.getElementById('video');
+                    const status = document.getElementById('status');
+
+                    const ip = window.location.hostname;
+
+                    const port = "5001";
+                    const streamType = "{cam_type}";
+
+                    try {{
+                      const pc = new RTCPeerConnection({{
+                        iceServers: [{{ urls: "stun:stun.l.google.com:19302" }}]
+                      }});
+
+                      pc.addTransceiver('video', {{ direction: 'recvonly' }});
+
+                      pc.ontrack = (event) => {{
+                        status.innerText = "Stream Active (" + streamType + ")";
+                        video.srcObject = event.streams[0];
+                      }};
+
+                      const offer = await pc.createOffer();
+                      await pc.setLocalDescription(offer);
+
+                  const payload = {{
+                    sdp: offer.sdp,
+                    cameras: [streamType],
+                    bridge_services_in: [],
+                    bridge_services_out: []
+                  }};
+
+                  status.innerText = "Handshaking with " + ip + "...";
+
+                  const response = await fetch(`http://${{ip}}:${{port}}/stream`, {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify(payload)
+                  }});
+
+                  if (!response.ok) {{
+                    const errMsg = await response.text();
+                    throw new Error("Server Error: " + response.status + " " + errMsg);
+                  }}
+
+                      const answer = await response.json();
+                      await pc.setRemoteDescription(answer);
+
+                    }} catch (e) {{
+                      console.error(e);
+                      status.innerText = "Error: " + e.message;
+                      status.style.color = "red";
+                    }}
+                  }}
+
+                  start();
+                </script>
+              </body>
+            </html>
+            """
+        components.html(webrtc_html, height=500)
+
+      elif not start_btn:
+        st.info("Click 'Start Stream' to connect automatically.")
+
   with tabs[4]:
     st.subheader("📺 Real-time Terminal")
 
@@ -378,7 +460,6 @@ def main():
       content = get_tmux_capture()
       terminal_placeholder.code(content, language="bash")
       time.sleep(1)
-
 
 if __name__ == "__main__":
   if check_password():
