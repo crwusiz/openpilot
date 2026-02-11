@@ -94,6 +94,7 @@ env = Environment(
 
 # Arch-specific flags and paths
 if arch == "larch64":
+  env.Append(CPPPATH=["#third_party/opencl/include"])
   env.Append(LIBPATH=[
     "/usr/local/lib",
     "/system/vendor/lib64",
@@ -211,7 +212,7 @@ SConscript(['third_party/SConscript'])
 
 SConscript(['selfdrive/SConscript'])
 
-if Dir('#tools/cabana/').exists(): # and GetOption('extras'):
+if Dir('#tools/cabana/').exists() and GetOption('extras'):
   SConscript(['tools/replay/SConscript'])
   if arch != "larch64":
     SConscript(['tools/cabana/SConscript'])
