@@ -254,9 +254,6 @@ def main():
 
     sub_col1, sub_col2 = st.columns([1, 2])
     with sub_col1:
-      if st.button("📷 Camera View", use_container_width=True):
-        run_script("Camera View", "/data/openpilot/selfdrive/ui/watch3.py")
-
       if st.button("🔴 Reboot", type="secondary", use_container_width=True):
         if st.checkbox("Confirm Reboot"):
           st.error("Rebooting Device...")
@@ -375,61 +372,133 @@ def main():
 
     col_cam1, col_cam2 = st.columns([1, 3])
     with col_cam1:
-      cam_type = st.selectbox("Source", ["road", "wide", "driver"], index=0)
-      start_btn = st.button("▶️ Start Stream", type="primary")
+      st.markdown("### Source: Road Camera")
+      st.write("")
+      start_btn = st.button("▶️ Start Stream", type="primary", use_container_width=True)
 
     with col_cam2:
       if start_btn:
         webrtc_html = f"""
             <html>
-              <body style="background-color: #000; margin: 0; display: flex; justify-content: center; align-items: center; height: 500px;">
-                <video id="video" autoplay playsinline style="width: 100%; height: 100%; object-fit: contain;"></video>
-                <div id="status" style="position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 5px;">Connecting...</div>
+              <body style="background-color: #000; margin: 0; display: flex; justify-content: center; align-items: center; height: 500px; font-family: sans-serif; position: relative;">
+                <video id="video" autoplay playsinline muted controls style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"></video>
+                <div id="status" style="position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 4px; font-size: 14px; pointer-events: none;">Initializing...</div>
+                <div id="debug" style="position: absolute; bottom: 10px; left: 10px; color: #00ff00; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 4px; font-size: 12px; pointer-events: none; white-space: pre; display: block; text-align: left;">Waiting for stats...</div>
 
                 <script>
                   async function start() {{
                     const video = document.getElementById('video');
                     const status = document.getElementById('status');
+                    const debug = document.getElementById('debug');
 
-                    const ip = window.location.hostname;
+                    const iceConfig = {{
+                        iceServers: [],
+                        sdpSemantics: "unified-plan",
+                        iceCandidatePoolSize: 1
+                    }};
 
+                    const ip = window.location.hostname || window.parent.location.hostname;
                     const port = "5001";
-                    const streamType = "{cam_type}";
+                    const streamType = "road";
+                    let lastBytes = 0;
+                    let lastTimestamp = 0;
+
+                    // Click to retry play
+                    video.addEventListener('click', () => {{
+                        if (video.paused) {{
+                            video.play().catch(console.error);
+                            status.innerText = "Attempting to play...";
+                        }}
+                    }});
 
                     try {{
-                      const pc = new RTCPeerConnection({{
-                        iceServers: [{{ urls: "stun:stun.l.google.com:19302" }}]
-                      }});
+                      const pc = new RTCPeerConnection(iceConfig);
 
                       pc.addTransceiver('video', {{ direction: 'recvonly' }});
 
                       pc.ontrack = (event) => {{
-                        status.innerText = "Stream Active (" + streamType + ")";
+                        console.log("Track received:", event.track.kind);
+                        status.innerText = "Stream Active (road)";
                         video.srcObject = event.streams[0];
+                        video.play().catch(e => {{
+                            console.error("Autoplay failed:", e);
+                            status.innerText = "Stream Ready (Click Video to Play)";
+                        }});
                       }};
+
+                      // Stats Monitor
+                      setInterval(async () => {{
+                        if(pc.connectionState === 'connected' || pc.iceConnectionState === 'connected') {{
+                            const stats = await pc.getStats();
+                            let foundVideo = false;
+                            stats.forEach(report => {{
+                                if(report.type === 'inbound-rtp' && report.kind === 'video') {{
+                                    foundVideo = true;
+                                    const now = report.timestamp;
+                                    const bytes = report.bytesReceived;
+
+                                    let bitrate = 0;
+                                    if (lastTimestamp > 0) {{
+                                        const duration = (now - lastTimestamp) / 1000; // seconds
+                                        if (duration > 0) {{
+                                            bitrate = ((bytes - lastBytes) * 8 / 1000) / duration; // kbps
+                                        }}
+                                    }}
+
+                                    lastBytes = bytes;
+                                    lastTimestamp = now;
+
+                                    let codecInfo = "";
+                                    if (report.codecId) {{
+                                      codecInfo = "CodecID: " + report.codecId;
+                                    }}
+
+                                    debug.innerText = `ICE: ${{pc.iceConnectionState}}\\nConn: ${{pc.connectionState}}\\nBytes: ${{bytes}}\\nBitrate: ${{bitrate.toFixed(0)}} kbps\\nFrames Decoded: ${{report.framesDecoded}}\\nPackets Lost: ${{report.packetsLost}}\\n${{codecInfo}}`;
+                                }}
+                            }});
+                            if (!foundVideo) debug.innerText = `ICE: ${{pc.iceConnectionState}}\\nConn: ${{pc.connectionState}}\\nWaiting for video data...`;
+                        }} else {{
+                            debug.innerText = `ICE State: ${{pc.iceConnectionState}}\\nConn State: ${{pc.connectionState}}`;
+                        }}
+                      }}, 1000);
 
                       const offer = await pc.createOffer();
                       await pc.setLocalDescription(offer);
 
-                  const payload = {{
-                    sdp: offer.sdp,
-                    cameras: [streamType],
-                    bridge_services_in: [],
-                    bridge_services_out: []
-                  }};
+                      status.innerText = "Gathering ICE candidates...";
+                      await new Promise((resolve) => {{
+                          if (pc.iceGatheringState === 'complete') return resolve();
 
-                  status.innerText = "Handshaking with " + ip + "...";
+                          const checkState = () => {{
+                              if (pc.iceGatheringState === 'complete') {{
+                                  pc.removeEventListener('icegatheringstatechange', checkState);
+                                  resolve();
+                              }}
+                          }};
 
-                  const response = await fetch(`http://${{ip}}:${{port}}/stream`, {{
-                    method: 'POST',
-                    headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify(payload)
-                  }});
+                          pc.addEventListener('icegatheringstatechange', checkState);
+                          setTimeout(resolve, 8000);
+                      }});
 
-                  if (!response.ok) {{
-                    const errMsg = await response.text();
-                    throw new Error("Server Error: " + response.status + " " + errMsg);
-                  }}
+                      const payload = {{
+                        sdp: pc.localDescription.sdp,
+                        cameras: [streamType],
+                        bridge_services_in: [],
+                        bridge_services_out: []
+                      }};
+
+                      status.innerText = "Handshaking with " + ip + "...";
+
+                      const response = await fetch(`http://${{ip}}:${{port}}/stream`, {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify(payload)
+                      }});
+
+                      if (!response.ok) {{
+                        const errMsg = await response.text();
+                        throw new Error("Server Error: " + response.status + " " + errMsg);
+                      }}
 
                       const answer = await response.json();
                       await pc.setRemoteDescription(answer);
