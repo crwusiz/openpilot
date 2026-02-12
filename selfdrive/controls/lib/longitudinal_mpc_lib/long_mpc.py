@@ -39,7 +39,8 @@ LONG_MPC_DIR = os.path.dirname(os.path.abspath(__file__))
 EXPORT_DIR = os.path.join(LONG_MPC_DIR, "c_generated_code")
 JSON_FILE = os.path.join(LONG_MPC_DIR, "acados_ocp_long.json")
 
-SOURCES = ['lead0', 'lead1', 'cruise', 'e2e']
+LongitudinalPlanSource = log.LongitudinalPlan.LongitudinalPlanSource
+MPC_SOURCES = (LongitudinalPlanSource.lead0, LongitudinalPlanSource.lead1, LongitudinalPlanSource.cruise, LongitudinalPlanSource.e2e)
 
 X_DIM = 3
 U_DIM = 1
@@ -131,12 +132,12 @@ def gen_long_model():
   a_min = SX.sym('a_min')
   a_max = SX.sym('a_max')
   x_obstacle = SX.sym('x_obstacle')
-  prev_a = SX.sym('prev_a')
+  a_prev = SX.sym('a_prev')
   lead_t_follow = SX.sym('lead_t_follow')
   lead_danger_factor = SX.sym('lead_danger_factor')
   comfort_brake = SX.sym('comfort_brake')
   stop_distance = SX.sym('stop_distance')
-  model.p = vertcat(a_min, a_max, x_obstacle, prev_a, lead_t_follow, lead_danger_factor, comfort_brake, stop_distance)
+  model.p = vertcat(a_min, a_max, x_obstacle, a_prev, lead_t_follow, lead_danger_factor, comfort_brake, stop_distance)
 
   # dynamics model
   f_expl = vertcat(v_ego, a_ego, j_ego)
@@ -168,7 +169,7 @@ def gen_long_ocp():
 
   a_min, a_max = ocp.model.p[0], ocp.model.p[1]
   x_obstacle = ocp.model.p[2]
-  prev_a = ocp.model.p[3]
+  a_prev = ocp.model.p[3]
   lead_t_follow = ocp.model.p[4]
   lead_danger_factor = ocp.model.p[5]
   comfort_brake = ocp.model.p[6]
@@ -187,7 +188,7 @@ def gen_long_ocp():
            x_ego,
            v_ego,
            a_ego,
-           a_ego - prev_a,
+           a_ego - a_prev,
            j_ego]
   ocp.model.cost_y_expr = vertcat(*costs)
   ocp.model.cost_y_expr_e = vertcat(*costs[:-1])
@@ -262,7 +263,7 @@ class LongitudinalMpc:
 
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
     self.reset()
-    self.source = SOURCES[2]
+    self.source = LongitudinalPlanSource.cruise
 
   def reset(self):
     self.solver.reset()
@@ -272,7 +273,7 @@ class LongitudinalMpc:
     self.v_solution = np.zeros(N+1)
     self.a_solution = np.zeros(N+1)
     self.j_solution = np.zeros(N)
-    self.prev_a = np.array(self.a_solution)
+    self.a_prev = np.array(self.a_solution)
     self.yref = np.zeros((N+1, COST_DIM))
 
     for i in range(N):
@@ -411,7 +412,7 @@ class LongitudinalMpc:
     x2 = stop_dist * np.ones(N+1) + adjust_dist
 
     x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle, x2])
-    self.source = SOURCES[np.argmin(x_obstacles[0])]
+    self.source = MPC_SOURCES[np.argmin(x_obstacles[0])]
 
     if radarstate.leadOne.status:
       self.a_change_cost = np.interp(abs(self.j_lead), [0.5, 2.5], [A_CHANGE_COST, 50])
@@ -426,7 +427,7 @@ class LongitudinalMpc:
     self.params[:,0] = ACCEL_MIN
     self.params[:,1] = ACCEL_MAX
     self.params[:,2] = np.min(x_obstacles, axis=1)
-    self.params[:,3] = np.copy(self.prev_a)
+    self.params[:,3] = np.copy(self.a_prev)
     self.params[:,4] = t_follow
     self.params[:,5] = LEAD_DANGER_FACTOR
     self.params[:,6] = comfort_brake
@@ -459,7 +460,7 @@ class LongitudinalMpc:
     self.a_solution = self.x_sol[:,2]
     self.j_solution = self.u_sol[:,0]
 
-    self.prev_a = np.interp(T_IDXS + self.dt, T_IDXS, self.a_solution)
+    self.a_prev = np.interp(T_IDXS + self.dt, T_IDXS, self.a_solution)
 
     t = time.monotonic()
     if self.solution_status != 0:

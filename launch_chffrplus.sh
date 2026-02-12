@@ -116,10 +116,6 @@ function launch {
     cp -f $DIR/scripts/add/events_en.py $DIR/selfdrive/selfdrived/events.py
   fi
 
-  if ! python3 -c "import kaitaistruct" &> /dev/null; then
-    pip install kaitaistruct
-  fi
-
   if ! command -v msgfmt &> /dev/null; then
     sudo apt update
     sudo apt install gettext -y

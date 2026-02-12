@@ -102,6 +102,7 @@ class CruiseController:
 
     self.gas_pressed_count = 0
     self.ignore_road_limit_temporarily = False
+    self.ignore_limit_timer = 0
 
     self.wait_timer = 0
     self.alive_timer = 0
@@ -132,6 +133,7 @@ class CruiseController:
     self.curve_speed_clu = 0.
     self.gas_pressed_count = 0
     self.ignore_road_limit_temporarily = False
+    self.ignore_limit_timer = 0
 
   def _cal_limit_speed(self, CS, sm, current_speed_ms: float, cluster_speed_clu: float, v_cruise_kph: float):
     nda_active = SpeedLimiter.instance().get_active()
@@ -154,8 +156,12 @@ class CruiseController:
     road_limit_speed_clu = road_limit_speed * ratio if road_limit_speed else NO_LIMIT_SPEED
 
     if self.ignore_road_limit_temporarily:
-      if school_zone or (road_limit_speed_clu != NO_LIMIT_SPEED and road_limit_speed_clu >= v_cruise_kph):
+      self.ignore_limit_timer += 1
+      timeout_ticks = 2000
+
+      if school_zone or (road_limit_speed_clu != NO_LIMIT_SPEED and road_limit_speed_clu >= v_cruise_kph) or self.ignore_limit_timer > timeout_ticks:
         self.ignore_road_limit_temporarily = False
+        self.ignore_limit_timer = 0
       else:
         road_limit_speed_clu = NO_LIMIT_SPEED
 
@@ -175,9 +181,11 @@ class CruiseController:
       camera_limit_speed_clu = camera_limit_speed_stock
 
     if school_zone:
-      if camera_limit_speed_clu > 0:
-        limit_50 = self.conv.to_current_unit(50.0)
+      limit_50 = self.conv.to_current_unit(50.0)
+      if 0 < camera_limit_speed_clu < NO_LIMIT_SPEED:
         camera_limit_speed_clu = min(camera_limit_speed_clu, limit_50)
+      elif road_limit_speed is not None and road_limit_speed > 0:
+        camera_limit_speed_clu = min(road_limit_speed, limit_50)
       else:
         camera_limit_speed_clu = self.conv.to_current_unit(SCHOOL_ZONE_SPEED)
     self.camera_limit_speed_clu = camera_limit_speed_clu
@@ -214,7 +222,10 @@ class CruiseController:
     valid_limits = [s for s in speed_candidates if s >= self.min_set_speed_clu and s != NO_LIMIT_SPEED]
     calculated_max_speed_clu = min(v_cruise_kph, min(valid_limits)) if valid_limits else self.apply_limit_speed_clu
 
-    is_curve_limit = (curve_limit_speed_clu != NO_LIMIT_SPEED and curve_limit_speed_clu == min(valid_limits))
+    if valid_limits:
+      is_curve_limit = (curve_limit_speed_clu != NO_LIMIT_SPEED and curve_limit_speed_clu == min(valid_limits))
+    else:
+      is_curve_limit = False
 
     immediate_apply_conditions = [
       not self.CP.openpilotLongitudinalControl,
@@ -428,6 +439,7 @@ class CruiseController:
         if self.gas_pressed_count > 100:
           v_cruise_kph = int(round(cluster_speed_clu))
           self.ignore_road_limit_temporarily = True
+          self.ignore_limit_timer = 0
 
         if cluster_speed_clu + sync_margin > self.conv.to_current_unit(v_cruise_kph):
           set_speed = np.clip(cluster_speed_clu + sync_margin, self.min_set_speed_clu, self.max_set_speed_clu)

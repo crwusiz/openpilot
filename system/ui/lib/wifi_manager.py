@@ -25,7 +25,7 @@ from openpilot.system.ui.lib.networkmanager import (NM, NM_WIRELESS_IFACE, NM_80
                                                     NM_SETTINGS_IFACE, NM_CONNECTION_IFACE, NM_DEVICE_IFACE,
                                                     NM_DEVICE_TYPE_WIFI, NM_DEVICE_TYPE_MODEM, NM_DEVICE_STATE_REASON_SUPPLICANT_DISCONNECT,
                                                     NM_DEVICE_STATE_REASON_NEW_ACTIVATION, NM_ACTIVE_CONNECTION_IFACE,
-                                                    NM_IP4_CONFIG_IFACE, NMDeviceState)
+                                                    NM_IP4_CONFIG_IFACE, NM_PROPERTIES_IFACE, NMDeviceState)
 
 try:
   from openpilot.common.params import Params
@@ -146,13 +146,14 @@ class WifiManager:
     self._wifi_device: str | None = None
 
     # State
+    self._connections: dict[str, str] = {}  # ssid -> connection path, updated via NM signals
     self._connecting_to_ssid: str = ""
     self._ipv4_address: str = ""
     self._current_network_metered: MeteredType = MeteredType.UNKNOWN
     self._tethering_password: str = ""
     self._ipv4_forward = False
 
-    self._last_network_update: float = 0.0
+    self._last_network_scan: float = 0.0
     self._callback_queue: list[Callable] = []
 
     self._tethering_ssid = "weedle"
@@ -181,7 +182,8 @@ class WifiManager:
       self._scan_thread.start()
       self._state_thread.start()
 
-      if Params is not None and self._tethering_ssid not in self._get_connections():
+      self._init_connections()
+      if Params is not None and self._tethering_ssid not in self._connections:
         self._add_tethering_connection()
 
       self._tethering_password = self._get_tethering_password()
@@ -230,60 +232,88 @@ class WifiManager:
   def set_active(self, active: bool):
     self._active = active
 
-    # Scan immediately if we haven't scanned in a while
-    if active and time.monotonic() - self._last_network_update > SCAN_PERIOD_SECONDS / 2:
-      self._last_network_update = 0.0
-
   def _monitor_state(self):
-    rule = MatchRule(
-      type="signal",
-      interface=NM_DEVICE_IFACE,
-      member="StateChanged",
-      path=self._wifi_device,
+    # Filter for signals
+    rules = (
+      MatchRule(
+        type="signal",
+        interface=NM_DEVICE_IFACE,
+        member="StateChanged",
+        path=self._wifi_device,
+      ),
+      MatchRule(
+        type="signal",
+        interface=NM_SETTINGS_IFACE,
+        member="NewConnection",
+        path=NM_SETTINGS_PATH,
+      ),
+      MatchRule(
+        type="signal",
+        interface=NM_SETTINGS_IFACE,
+        member="ConnectionRemoved",
+        path=NM_SETTINGS_PATH,
+      ),
+      MatchRule(
+        type="signal",
+        interface=NM_PROPERTIES_IFACE,
+        member="PropertiesChanged",
+        path=self._wifi_device,
+      ),
     )
 
-    # Filter for StateChanged signal
-    self._conn_monitor.send_and_get_reply(message_bus.AddMatch(rule))
+    for rule in rules:
+      self._conn_monitor.send_and_get_reply(message_bus.AddMatch(rule))
 
-    with self._conn_monitor.filter(rule, bufsize=SIGNAL_QUEUE_SIZE) as q:
+    with (self._conn_monitor.filter(rules[0], bufsize=SIGNAL_QUEUE_SIZE) as state_q,
+          self._conn_monitor.filter(rules[1], bufsize=SIGNAL_QUEUE_SIZE) as new_conn_q,
+          self._conn_monitor.filter(rules[2], bufsize=SIGNAL_QUEUE_SIZE) as removed_conn_q,
+          self._conn_monitor.filter(rules[3], bufsize=SIGNAL_QUEUE_SIZE) as props_q):
       while not self._exit:
-        if not self._active:
-          time.sleep(1)
-          continue
-
-        # Block until a matching signal arrives
         try:
-          msg = self._conn_monitor.recv_until_filtered(q, timeout=1)
+          self._conn_monitor.recv_messages(timeout=1)
         except TimeoutError:
           continue
 
-        new_state, previous_state, change_reason = msg.body
+        # Connection added/removed
+        while len(removed_conn_q):
+          conn_path = removed_conn_q.popleft().body[0]
+          self._connection_removed(conn_path)
+        while len(new_conn_q):
+          conn_path = new_conn_q.popleft().body[0]
+          self._new_connection(conn_path)
 
-        # BAD PASSWORD
-        if new_state == NMDeviceState.NEED_AUTH and change_reason == NM_DEVICE_STATE_REASON_SUPPLICANT_DISCONNECT and len(self._connecting_to_ssid):
-          self.forget_connection(self._connecting_to_ssid, block=True)
-          self._enqueue_callbacks(self._need_auth, self._connecting_to_ssid)
-          self._connecting_to_ssid = ""
-
-        elif new_state == NMDeviceState.ACTIVATED:
-          if len(self._activated):
+        # PropertiesChanged on wifi device (LastScan = scan complete)
+        while len(props_q):
+          iface, changed, _ = props_q.popleft().body
+          if iface == NM_WIRELESS_IFACE and 'LastScan' in changed:
             self._update_networks()
-          self._enqueue_callbacks(self._activated)
-          self._connecting_to_ssid = ""
 
-        elif new_state == NMDeviceState.DISCONNECTED and change_reason != NM_DEVICE_STATE_REASON_NEW_ACTIVATION:
-          self._connecting_to_ssid = ""
-          self._enqueue_callbacks(self._forgotten)
+        # Device state changes
+        while len(state_q):
+          new_state, previous_state, change_reason = state_q.popleft().body
+
+          # BAD PASSWORD
+          if new_state == NMDeviceState.NEED_AUTH and change_reason == NM_DEVICE_STATE_REASON_SUPPLICANT_DISCONNECT and len(self._connecting_to_ssid):
+            self.forget_connection(self._connecting_to_ssid, block=True)
+            self._enqueue_callbacks(self._need_auth, self._connecting_to_ssid)
+            self._connecting_to_ssid = ""
+
+          elif new_state == NMDeviceState.ACTIVATED:
+            if len(self._activated):
+              self._update_networks()
+            self._enqueue_callbacks(self._activated)
+            self._connecting_to_ssid = ""
+
+          elif new_state == NMDeviceState.DISCONNECTED and change_reason != NM_DEVICE_STATE_REASON_NEW_ACTIVATION:
+            self._connecting_to_ssid = ""
+            self._enqueue_callbacks(self._forgotten)
 
   def _network_scanner(self):
     while not self._exit:
       if self._active:
-        if time.monotonic() - self._last_network_update > SCAN_PERIOD_SECONDS:
-          # Scan for networks every 10 seconds
-          # TODO: should update when scan is complete (PropertiesChanged), but this is more than good enough for now
-          self._update_networks()
+        if time.monotonic() - self._last_network_scan > SCAN_PERIOD_SECONDS:
           self._request_scan()
-          self._last_network_update = time.monotonic()
+          self._last_network_scan = time.monotonic()
       time.sleep(1 / 2.)
 
   def _wait_for_wifi_device(self):
@@ -307,7 +337,7 @@ class WifiManager:
       cloudlog.exception(f"Error getting adapter type {adapter_type}: {e}")
     return None
 
-  def _get_connections(self) -> dict[str, str]:
+  def _init_connections(self) -> None:
     settings_addr = DBusAddress(NM_SETTINGS_PATH, bus_name=NM, interface=NM_SETTINGS_IFACE)
     known_connections = self._router_main.send_and_get_reply(new_method_call(settings_addr, 'ListConnections')).body[0]
 
@@ -323,7 +353,20 @@ class WifiManager:
         ssid = settings['802-11-wireless']['ssid'][1].decode("utf-8", "replace")
         if ssid != "":
           conns[ssid] = conn_path
-    return conns
+    self._connections = conns
+
+  def _new_connection(self, conn_path: str):
+    settings = self._get_connection_settings(conn_path)
+
+    if "802-11-wireless" in settings:
+      ssid = settings['802-11-wireless']['ssid'][1].decode("utf-8", "replace")
+      if ssid != "":
+        self._connections[ssid] = conn_path
+        if ssid != self._tethering_ssid:
+          self.activate_connection(ssid, block=True)
+
+  def _connection_removed(self, conn_path: str):
+    self._connections = {ssid: path for ssid, path in self._connections.items() if path != conn_path}
 
   def _get_active_connections(self):
     return self._router_main.send_and_get_reply(Properties(self._nm).get('ActiveConnections')).body[0][1]
@@ -407,13 +450,12 @@ class WifiManager:
 
       settings_addr = DBusAddress(NM_SETTINGS_PATH, bus_name=NM, interface=NM_SETTINGS_IFACE)
       self._router_main.send_and_get_reply(new_method_call(settings_addr, 'AddConnection', 'a{sa{sv}}', (connection,)))
-      self.activate_connection(ssid, block=True)
 
     threading.Thread(target=worker, daemon=True).start()
 
   def forget_connection(self, ssid: str, block: bool = False):
     def worker():
-      conn_path = self._get_connections().get(ssid, None)
+      conn_path = self._connections.get(ssid, None)
       if conn_path is not None:
         conn_addr = DBusAddress(conn_path, bus_name=NM, interface=NM_CONNECTION_IFACE)
         self._router_main.send_and_get_reply(new_method_call(conn_addr, 'Delete'))
@@ -429,7 +471,7 @@ class WifiManager:
 
   def activate_connection(self, ssid: str, block: bool = False):
     def worker():
-      conn_path = self._get_connections().get(ssid, None)
+      conn_path = self._connections.get(ssid, None)
       if conn_path is not None:
         if self._wifi_device is None:
           cloudlog.warning("No WiFi device found")
@@ -465,7 +507,7 @@ class WifiManager:
 
   def set_tethering_password(self, password: str):
     def worker():
-      conn_path = self._get_connections().get(self._tethering_ssid, None)
+      conn_path = self._connections.get(self._tethering_ssid, None)
       if conn_path is None:
         cloudlog.warning('No tethering connection found')
         return
@@ -490,7 +532,7 @@ class WifiManager:
     threading.Thread(target=worker, daemon=True).start()
 
   def _get_tethering_password(self) -> str:
-    conn_path = self._get_connections().get(self._tethering_ssid, None)
+    conn_path = self._connections.get(self._tethering_ssid, None)
     if conn_path is None:
       cloudlog.warning('No tethering connection found')
       return ''
@@ -527,42 +569,14 @@ class WifiManager:
 
     threading.Thread(target=worker, daemon=True).start()
 
-  def _update_current_network_metered(self) -> None:
-    if self._wifi_device is None:
-      cloudlog.warning("No WiFi device found")
-      return
-
-    self._current_network_metered = MeteredType.UNKNOWN
-    for active_conn in self._get_active_connections():
-      conn_addr = DBusAddress(active_conn, bus_name=NM, interface=NM_ACTIVE_CONNECTION_IFACE)
-      conn_type = self._router_main.send_and_get_reply(Properties(conn_addr).get('Type')).body[0][1]
-
-      if conn_type == '802-11-wireless':
-        conn_path = self._router_main.send_and_get_reply(Properties(conn_addr).get('Connection')).body[0][1]
-        if conn_path == "/":
-          continue
-
-        settings = self._get_connection_settings(conn_path)
-
-        if len(settings) == 0:
-          cloudlog.warning(f'Failed to get connection settings for {conn_path}')
-          continue
-
-        metered_prop = settings['connection'].get('metered', ('i', 0))[1]
-        if metered_prop == MeteredType.YES:
-          self._current_network_metered = MeteredType.YES
-        elif metered_prop == MeteredType.NO:
-          self._current_network_metered = MeteredType.NO
-        return
-
   def set_current_network_metered(self, metered: MeteredType):
     def worker():
       for active_conn in self._get_active_connections():
         conn_addr = DBusAddress(active_conn, bus_name=NM, interface=NM_ACTIVE_CONNECTION_IFACE)
-        conn_type = self._router_main.send_and_get_reply(Properties(conn_addr).get('Type')).body[0][1]
+        props = self._router_main.send_and_get_reply(Properties(conn_addr).get_all()).body[0]
 
-        if conn_type == '802-11-wireless' and not self.is_tethering_active():
-          conn_path = self._router_main.send_and_get_reply(Properties(conn_addr).get('Connection')).body[0][1]
+        if props.get('Type', ('s', ''))[1] == '802-11-wireless' and not self.is_tethering_active():
+          conn_path = props.get('Connection', ('o', '/'))[1]
           if conn_path == "/":
             continue
 
@@ -594,15 +608,19 @@ class WifiManager:
       cloudlog.warning(f"Failed to request scan: {reply}")
 
   def _update_networks(self):
+    if not self._active:
+      return
+
     with self._lock:
       if self._wifi_device is None:
         cloudlog.warning("No WiFi device found")
         return
 
-      # returns '/' if no active AP
+      # NOTE: AccessPoints property may exclude hidden APs (use GetAllAccessPoints method if needed)
       wifi_addr = DBusAddress(self._wifi_device, NM, interface=NM_WIRELESS_IFACE)
-      active_ap_path = self._router_main.send_and_get_reply(Properties(wifi_addr).get('ActiveAccessPoint')).body[0][1]
-      ap_paths = self._router_main.send_and_get_reply(new_method_call(wifi_addr, 'GetAllAccessPoints')).body[0]
+      wifi_props = self._router_main.send_and_get_reply(Properties(wifi_addr).get_all()).body[0]
+      active_ap_path = wifi_props.get('ActiveAccessPoint', ('o', '/'))[1]
+      ap_paths = wifi_props.get('AccessPoints', ('ao', []))[1]
 
       aps: dict[str, list[AccessPoint]] = {}
 
@@ -628,29 +646,32 @@ class WifiManager:
           # catch all for parsing errors
           cloudlog.exception(f"Failed to parse AP properties for {ap_path}")
 
-      known_connections = self._get_connections()
-      networks = [Network.from_dbus(ssid, ap_list, ssid in known_connections) for ssid, ap_list in aps.items()]
+      networks = [Network.from_dbus(ssid, ap_list, ssid in self._connections) for ssid, ap_list in aps.items()]
       # sort with quantized strength to reduce jumping
-      networks.sort(key=lambda n: (-n.is_connected, -round(n.strength / 100 * 2), n.ssid.lower()))
+      networks.sort(key=lambda n: (-n.is_connected, -n.is_saved, -round(n.strength / 100 * 2), n.ssid.lower()))
       self._networks = networks
 
-      self._update_ipv4_address()
-      self._update_current_network_metered()
+      self._update_active_connection_info()
 
       self._enqueue_callbacks(self._networks_updated, self._networks)
 
-  def _update_ipv4_address(self):
-    if self._wifi_device is None:
-      cloudlog.warning("No WiFi device found")
-      return
-
+  def _update_active_connection_info(self):
     self._ipv4_address = ""
+    self._current_network_metered = MeteredType.UNKNOWN
 
-    for conn_path in self._get_active_connections():
-      conn_addr = DBusAddress(conn_path, bus_name=NM, interface=NM_ACTIVE_CONNECTION_IFACE)
-      conn_type = self._router_main.send_and_get_reply(Properties(conn_addr).get('Type')).body[0][1]
-      if conn_type == '802-11-wireless':
-        ip4config_path = self._router_main.send_and_get_reply(Properties(conn_addr).get('Ip4Config')).body[0][1]
+    for active_conn in self._get_active_connections():
+      conn_addr = DBusAddress(active_conn, bus_name=NM, interface=NM_ACTIVE_CONNECTION_IFACE)
+      reply = self._router_main.send_and_get_reply(Properties(conn_addr).get_all())
+
+      if reply.header.message_type == MessageType.error:
+        cloudlog.warning(f"Failed to get active connection properties for {active_conn}: {reply}")
+        continue
+
+      props = reply.body[0]
+
+      if props.get('Type', ('s', ''))[1] == '802-11-wireless':
+        # IPv4 address
+        ip4config_path = props.get('Ip4Config', ('o', '/'))[1]
 
         if ip4config_path != "/":
           ip4config_addr = DBusAddress(ip4config_path, bus_name=NM, interface=NM_IP4_CONFIG_IFACE)
@@ -659,7 +680,21 @@ class WifiManager:
           for entry in address_data:
             if 'address' in entry:
               self._ipv4_address = entry['address'][1]
-              return
+              break
+
+        # Metered status
+        conn_path = props.get('Connection', ('o', '/'))[1]
+        if conn_path != "/":
+          settings = self._get_connection_settings(conn_path)
+
+          if len(settings) > 0:
+            metered_prop = settings['connection'].get('metered', ('i', 0))[1]
+
+            if metered_prop == MeteredType.YES:
+              self._current_network_metered = MeteredType.YES
+            elif metered_prop == MeteredType.NO:
+              self._current_network_metered = MeteredType.NO
+        return
 
   def __del__(self):
     self.stop()
