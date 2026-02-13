@@ -40,17 +40,17 @@ class CruiseButtonHandler:
     self.prev_btn = ButtonType.unknown
     self.btn_long_pressed = False
     self.last_btn = ButtonType.unknown
-    self.double_click_timer = 0
+    self.double_pressed_timer = 0
 
   def update(self, btn_events):
     btn = ButtonType.unknown
-    double_click = False
+    double_pressed = False
 
     if self.btn_count > 0:
       self.btn_count += 1
 
-    if self.double_click_timer > 0:
-      self.double_click_timer -= 1
+    if self.double_pressed_timer > 0:
+      self.double_pressed_timer -= 1
 
     for b in btn_events:
       if b.pressed and self.btn_count == 0 and b.type in [
@@ -66,13 +66,13 @@ class CruiseButtonHandler:
         if not self.btn_long_pressed:
           btn = b.type
 
-          if self.last_btn == btn and self.double_click_timer > 0:
-            double_click = True
+          if self.last_btn == btn and self.double_pressed_timer > 0:
+            double_pressed = True
             self.last_btn = ButtonType.unknown
-            self.double_click_timer = 0
+            self.double_pressed_timer = 0
           else:
             self.last_btn = btn
-            self.double_click_timer = 40
+            self.double_pressed_timer = 40
 
         self.btn_long_pressed = False
         self.btn_count = 0
@@ -83,7 +83,7 @@ class CruiseButtonHandler:
       self.btn_count %= CRUISE_LONG_PRESS
       self.last_btn = ButtonType.unknown
 
-    return btn, self.btn_long_pressed, double_click
+    return btn, self.btn_long_pressed, double_pressed
 
 
 class CruiseController:
@@ -559,10 +559,10 @@ class CruiseController:
     v_cruise_delta = 10 if self.conv.is_metric else IMPERIAL_INCREMENT * 5
 
     if enabled:
-      btn, long_pressed, double_click = self.btn_handler.update(btn_events)
+      btn, long_pressed, double_pressed = self.btn_handler.update(btn_events)
 
       if btn != Buttons.NONE:
-        if double_click and btn == ButtonType.accelCruise:
+        if double_pressed and btn == ButtonType.accelCruise:
           if self.road_limit_speed_clu > 0:
             v_cruise_kph = self.road_limit_speed_clu
         elif not long_pressed:
@@ -662,10 +662,10 @@ class CruiseStateManager:
     self.speed_ms = CS.vEgoCluster
 
   def update(self, CS, main_buttons):
-    btn, long_pressed, double_click = self.btn_handler.update(CS.buttonEvents)
+    btn, long_pressed, double_pressed = self.btn_handler.update(CS.buttonEvents)
 
     if btn != ButtonType.unknown:
-      self._button_press(CS, btn, long_pressed, double_click)
+      self._button_press(CS, btn, long_pressed, double_pressed)
 
     self._main_button_toggle(main_buttons[-1])
 
@@ -689,7 +689,7 @@ class CruiseStateManager:
       self.available = not self.available
     self.prev_main_button = current_main_button
 
-  def _button_press(self, CS, btn, long_pressed, double_click):
+  def _button_press(self, CS, btn, long_pressed, double_pressed):
     nda_active = SpeedLimiter.instance().get_active()
     road_limit_speed_nda = SpeedLimiter.instance().get_road_limit_speed()
     road_limit_speed_stock = CS.exState.navLimitSpeed
@@ -706,7 +706,7 @@ class CruiseStateManager:
 
     if btn == ButtonType.accelCruise:
       if self.enabled:
-        if double_click:
+        if double_pressed:
           if road_limit_speed is not None and road_limit_speed > 0:
             v_cruise_kph = road_limit_speed
         elif not long_pressed:
