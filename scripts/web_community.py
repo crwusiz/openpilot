@@ -65,19 +65,53 @@ def get_list_from_file(path: str):
 
 
 def run_script(name, path, args=None):
-  with st.status(f"Executing {name}...") as status:
-    try:
-      cmd = ["bash", path] if path.endswith('.sh') else ["python3", path]
-      if args: cmd += args
-      res = subprocess.run(cmd, capture_output=True, text=True)
-      if res.stdout: st.code(res.stdout)
-      if res.stderr: st.error(res.stderr)
-      status.update(label=f"{name} Completed", state="complete")
-      return res.returncode
-    except Exception as e:
-      st.error(f"Error: {e}")
-      status.update(label="Failed", state="error")
-      return 1
+  try:
+    cmd = ["bash", path] if path.endswith('.sh') else ["python3", path]
+    if args: cmd += args
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    lines = []
+    if res.stdout: lines.append(res.stdout.strip())
+    if res.stderr: lines.append(f"[STDERR] {res.stderr.strip()}")
+    st.session_state["script_log"] = f"[{name}] " + ("\n".join(lines) if lines else "Completed.")
+    st.session_state["script_ok"] = (res.returncode == 0)
+    return res.returncode
+  except Exception as e:
+    st.session_state["script_log"] = f"[{name}] Error: {e}"
+    st.session_state["script_ok"] = False
+    return 1
+
+
+@st.dialog("Reset Calibration")
+def confirm_reset_calibration():
+  st.write("캘리브레이션 데이터를 초기화할까요?")
+  c1, c2 = st.columns(2)
+  with c1:
+    st.markdown('<div id="btn_marker_dlg_yes"></div>', unsafe_allow_html=True)
+    if st.button("YES", use_container_width=True, key="dlg_cal_yes_final"):
+      reset_calibration()
+      st.session_state["show_dialog_cal"] = False
+      st.rerun()
+  with c2:
+    st.markdown('<div id="btn_marker_dlg_no"></div>', unsafe_allow_html=True)
+    if st.button("NO", use_container_width=True, key="dlg_cal_no_final"):
+      st.session_state["show_dialog_cal"] = False
+      st.rerun()
+
+@st.dialog("Reboot Device")
+def confirm_reboot():
+  st.write("장치를 재부팅할까요?")
+  c1, c2 = st.columns(2)
+  with c1:
+    st.markdown('<div id="btn_marker_dlg_yes"></div>', unsafe_allow_html=True)
+    if st.button("YES", use_container_width=True, key="dlg_reboot_yes_final"):
+      st.session_state["show_dialog_reboot"] = False
+      subprocess.run(["sudo", "reboot"])
+      st.rerun()
+  with c2:
+    st.markdown('<div id="btn_marker_dlg_no"></div>', unsafe_allow_html=True)
+    if st.button("NO", use_container_width=True, key="dlg_reboot_no_final"):
+      st.session_state["show_dialog_reboot"] = False
+      st.rerun()
 
 
 def reset_calibration():
@@ -106,60 +140,333 @@ def main():
   st.markdown("""
     <style>
     .stApp { background-color: #0B0E14; }
-    .stButton>button {
-      border: 1px solid #2C2CE2;
-      background-color: #161B22;
-      color: white;
-      font-weight: bold;
-      height: 3.5em;
-      transition: 0.3s;
-    }
-    .stButton>button:hover { background-color: #2C2CE2; border-color: #ffffff; }
 
-    /* Common style for all metric cards */
-    .metric-card, .metric-card-danger, .metric-card-warning, .metric-card-success {
-      display: flex;
-      align-items: center;
-      height: 3.5em; /* Match button height */
-      background-color: #161B22;
-      padding-left: 15px;
-      border-radius: 8px;
-      border-left-width: 5px;
-      border-left-style: solid;
-      font-size: 1em; /* Increased font size */
-      font-weight: bold;
+    .stButton > button {
+      border-radius: 50px !important;
+      height: 56px !important;
+      padding: 0 24px 0 70px !important;
+      text-align: left !important;
+      font-weight: 900 !important;
+      font-size: 0.88em !important;
+      letter-spacing: 0.08em !important;
+      text-transform: uppercase !important;
+      position: relative !important;
+      overflow: visible !important;
+      background: linear-gradient(90deg, #2A3348 0%, #3A4A6B 100%) !important;
+      border: none !important;
+      color: #E8EEFF !important;
+      box-shadow: 0 5px 22px rgba(0,0,0,0.45), 0 1px 4px rgba(0,0,0,0.3) !important;
+      transition: all 0.22s ease !important;
+      z-index: 1 !important;
     }
-
-    .metric-card {
-      border-left-color: #2C2CE2;
-      color: white;
+    .stButton > button:hover {
+      transform: translateY(-2px) !important;
+      filter: brightness(1.18) !important;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5) !important;
     }
-    .metric-card-danger {
-      border-left-color: rgb(201, 34, 49);
-      color: rgb(201, 34, 49);
-    }
-    .metric-card-warning {
-      border-left-color: rgb(218, 202, 37);
-      color: rgb(218, 202, 37);
-    }
-    .metric-card-success {
-      border-left-color: rgb(128, 216, 166);
-      color: rgb(128, 216, 166);
+    .stButton > button:active {
+      transform: translateY(0) !important;
+      filter: brightness(0.95) !important;
     }
 
+    .stButton > button::before {
+      content: '' !important;
+      position: absolute !important;
+      left: 5px !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      width: 46px !important;
+      height: 46px !important;
+      background: rgba(255,255,255,0.18) !important;
+      border-radius: 50% !important;
+      border: 2px solid rgba(255,255,255,0.35) !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important;
+      font-size: 1.4em !important;
+      line-height: 42px !important;
+      text-align: center !important;
+      display: block !important;
+      pointer-events: none !important;
+      z-index: 2 !important;
+    }
+
+    div:has([id^="btn_marker_blue_check"]) ~ div > div > button,
+    div:has([id^="btn_marker_blue_check"]) + div > div > button {
+      background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%) !important;
+      box-shadow: 0 5px 22px rgba(59,130,246,0.5) !important;
+    }
+    div:has([id^="btn_marker_blue_check"]) ~ div > div > button::before,
+    div:has([id^="btn_marker_blue_check"]) + div > div > button::before {
+      content: '🔍' !important;
+    }
+
+    div:has([id^="btn_marker_blue_pull"]) ~ div > div > button,
+    div:has([id^="btn_marker_blue_pull"]) + div > div > button {
+      background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%) !important;
+      box-shadow: 0 5px 22px rgba(59,130,246,0.5) !important;
+    }
+    div:has([id^="btn_marker_blue_pull"]) ~ div > div > button::before,
+    div:has([id^="btn_marker_blue_pull"]) + div > div > button::before {
+      content: '⬇' !important;
+    }
+
+    div:has([id^="btn_marker_success_upload"]) ~ div > div > button,
+    div:has([id^="btn_marker_success_upload"]) + div > div > button {
+      background: linear-gradient(90deg, #065F46 0%, #10B981 100%) !important;
+      box-shadow: 0 5px 22px rgba(16,185,129,0.45) !important;
+    }
+    div:has([id^="btn_marker_success_upload"]) ~ div > div > button::before,
+    div:has([id^="btn_marker_success_upload"]) + div > div > button::before {
+      content: '⬆' !important;
+    }
+    div:has([id^="btn_marker_success_route"]) ~ div > div > button,
+    div:has([id^="btn_marker_success_route"]) + div > div > button {
+      background: linear-gradient(90deg, #065F46 0%, #10B981 100%) !important;
+      box-shadow: 0 5px 22px rgba(16,185,129,0.45) !important;
+    }
+    div:has([id^="btn_marker_success_route"]) ~ div > div > button::before,
+    div:has([id^="btn_marker_success_route"]) + div > div > button::before {
+      content: '🚀' !important;
+    }
+
+    div:has([id^="btn_marker_success_start"]) ~ div > div > button,
+    div:has([id^="btn_marker_success_start"]) + div > div > button {
+      background: linear-gradient(90deg, #065F46 0%, #10B981 100%) !important;
+      box-shadow: 0 5px 22px rgba(16,185,129,0.45) !important;
+    }
+    div:has([id^="btn_marker_success_start"]) ~ div > div > button::before,
+    div:has([id^="btn_marker_success_start"]) + div > div > button::before {
+      content: '▶' !important;
+    }
+
+    div:has([id^="btn_marker_danger_reboot"]) ~ div > div > button,
+    div:has([id^="btn_marker_danger_reboot"]) + div > div > button {
+      background: linear-gradient(90deg, #7F1D1D 0%, #EF4444 100%) !important;
+      box-shadow: 0 5px 22px rgba(239,68,68,0.5) !important;
+    }
+    div:has([id^="btn_marker_danger_reboot"]) ~ div > div > button::before,
+    div:has([id^="btn_marker_danger_reboot"]) + div > div > button::before {
+      content: '⏻' !important;
+    }
+
+    div:has([id^="btn_marker_dlg_yes"]) ~ div > div > button,
+    div:has([id^="btn_marker_dlg_yes"]) + div > div > button {
+      background: linear-gradient(90deg, #065F46 0%, #10B981 100%) !important;
+      box-shadow: 0 5px 22px rgba(16,185,129,0.45) !important;
+    }
+    div:has([id^="btn_marker_dlg_yes"]) ~ div > div > button::before,
+    div:has([id^="btn_marker_dlg_yes"]) + div > div > button::before {
+      content: '✓' !important;
+      pointer-events: none !important;
+    }
+
+    div:has([id^="btn_marker_dlg_no"]) ~ div > div > button,
+    div:has([id^="btn_marker_dlg_no"]) + div > div > button {
+      background: linear-gradient(90deg, #7F1D1D 0%, #EF4444 100%) !important;
+      box-shadow: 0 5px 22px rgba(239,68,68,0.5) !important;
+    }
+    div:has([id^="btn_marker_dlg_no"]) ~ div > div > button::before,
+    div:has([id^="btn_marker_dlg_no"]) + div > div > button::before {
+      content: '✕' !important;
+      pointer-events: none !important;
+    }
+
+    div:has([id^="btn_marker_danger_stop"]) ~ div > div > button,
+    div:has([id^="btn_marker_danger_stop"]) + div > div > button {
+      background: linear-gradient(90deg, #7F1D1D 0%, #EF4444 100%) !important;
+      box-shadow: 0 5px 22px rgba(239,68,68,0.5) !important;
+    }
+    div:has([id^="btn_marker_danger_stop"]) ~ div > div > button::before,
+    div:has([id^="btn_marker_danger_stop"]) + div > div > button::before {
+      content: '⏹' !important;
+    }
+
+    div:has([id^="btn_marker_warning_cal"]) ~ div > div > button,
+    div:has([id^="btn_marker_warning_cal"]) + div > div > button {
+      background: linear-gradient(90deg, #78350F 0%, #F59E0B 100%) !important;
+      box-shadow: 0 5px 22px rgba(245,158,11,0.45) !important;
+    }
+    div:has([id^="btn_marker_warning_cal"]) ~ div > div > button::before,
+    div:has([id^="btn_marker_warning_cal"]) + div > div > button::before {
+      content: '✦' !important;
+    }
+
+    div:has([id^="btn_marker_default_view"]) ~ div > div > button::before,
+    div:has([id^="btn_marker_default_view"]) + div > div > button::before {
+      content: '👁' !important;
+    }
+
+    div:has([id^="toggle_wrap_"]) ~ div > div > button,
+    div:has([id^="toggle_wrap_"]) + div > div > button {
+      width: 70px !important;
+      border-radius: 16px !important;
+      height: 32px !important;
+      min-height: 32px !important;
+      max-height: 32px !important;
+      padding: 0 !important;
+      text-align: center !important;
+      text-transform: none !important;
+      font-size: 0 !important;
+      letter-spacing: 0 !important;
+      transform: none !important;
+      filter: none !important;
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.35) !important;
+    }
+    div:has([id^="toggle_wrap_"]) ~ div > div > button:hover,
+    div:has([id^="toggle_wrap_"]) + div > div > button:hover {
+      transform: none !important;
+      filter: none !important;
+    }
+    div:has([id^="toggle_wrap_"]) ~ div > div > button::before,
+    div:has([id^="toggle_wrap_"]) + div > div > button::before {
+      content: '' !important;
+      position: absolute !important;
+      width: 24px !important;
+      height: 24px !important;
+      background: white !important;
+      border-radius: 50% !important;
+      border: none !important;
+      top: 4px !important;
+      transform: none !important;
+      font-size: 0 !important;
+      line-height: 0 !important;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.35) !important;
+      transition: left 0.2s ease !important;
+      pointer-events: none !important;
+    }
+    div:has([id^="toggle_wrap_"]) ~ div > div > button::after,
+    div:has([id^="toggle_wrap_"]) + div > div > button::after {
+      display: block !important;
+      position: absolute !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      color: white !important;
+      font-size: 11px !important;
+      font-weight: 800 !important;
+      font-family: sans-serif !important;
+      line-height: 1 !important;
+      pointer-events: none !important;
+    }
+
+    div:has([id^="toggle_wrap_off_"]) ~ div > div > button { background: #E03535 !important; }
+    div:has([id^="toggle_wrap_off_"]) + div > div > button { background: #E03535 !important; }
+    div:has([id^="toggle_wrap_off_"]) ~ div > div > button:hover { background: #E03535 !important; transform: none !important; }
+    div:has([id^="toggle_wrap_off_"]) + div > div > button:hover { background: #E03535 !important; transform: none !important; }
+    div:has([id^="toggle_wrap_off_"]) ~ div > div > button::before,
+    div:has([id^="toggle_wrap_off_"]) + div > div > button::before { left: 4px !important; }
+    div:has([id^="toggle_wrap_off_"]) ~ div > div > button::after,
+    div:has([id^="toggle_wrap_off_"]) + div > div > button::after {
+      content: 'OFF' !important; right: 7px !important; left: auto !important;
+    }
+
+
+    div:has([id^="toggle_wrap_on_"]) ~ div > div > button { background: #10B981 !important; }
+    div:has([id^="toggle_wrap_on_"]) + div > div > button { background: #10B981 !important; }
+    div:has([id^="toggle_wrap_on_"]) ~ div > div > button:hover { background: #10B981 !important; transform: none !important; }
+    div:has([id^="toggle_wrap_on_"]) + div > div > button:hover { background: #10B981 !important; transform: none !important; }
+    div:has([id^="toggle_wrap_on_"]) ~ div > div > button::before,
+    div:has([id^="toggle_wrap_on_"]) + div > div > button::before { left: 42px !important; }
+    div:has([id^="toggle_wrap_on_"]) ~ div > div > button::after,
+    div:has([id^="toggle_wrap_on_"]) + div > div > button::after {
+      content: 'ON' !important; left: 9px !important; right: auto !important;
+    }
+
+    [data-testid="stSelectbox"] label {
+      color: #7B8EC8 !important;
+      font-size: 0.78em !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.06em !important;
+      text-transform: uppercase !important;
+      margin-bottom: 4px !important;
+    }
     div[data-baseweb="select"] > div {
-      min-height: 3.5em !important;
-      background-color: #161B22;
-      border: 1px solid #2C2CE2;
-      color: white;
-      display: flex;
-      align-items: center;
+      min-height: 56px !important;
+      height: 56px !important;
+      background: linear-gradient(90deg, #1A2235 0%, #232E45 100%) !important;
+      border: 1.5px solid #3A4A6B !important;
+      border-radius: 50px !important;
+      color: #E8EEFF !important;
+      display: flex !important;
+      align-items: center !important;
+      padding: 0 20px !important;
+      font-weight: 600 !important;
+      font-size: 0.95em !important;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4) !important;
+      transition: all 0.2s ease !important;
+    }
+    div[data-baseweb="select"] > div:hover {
+      border-color: #5B6EAE !important;
+      background: linear-gradient(90deg, #1E2A40 0%, #2A3652 100%) !important;
+      box-shadow: 0 4px 20px rgba(59,130,246,0.2) !important;
     }
     div[data-baseweb="select"] svg {
-      fill: white !important;
+      fill: #7B8EC8 !important;
+    }
+    [data-baseweb="popover"] ul {
+      background: #1A2235 !important;
+      border: 1px solid #3A4A6B !important;
+      border-radius: 16px !important;
+      overflow: hidden !important;
+    }
+    [data-baseweb="popover"] li {
+      color: #E8EEFF !important;
+      font-weight: 600 !important;
+    }
+    [data-baseweb="popover"] li:hover {
+      background: #2A3652 !important;
     }
 
-    /* 상단 헤더 영역 숨김 */
+    .pill-card {
+      display: flex;
+      align-items: center;
+      height: 56px;
+      border-radius: 50px;
+      box-shadow: 0 5px 22px rgba(0,0,0,0.4);
+      font-weight: 700;
+      font-size: 0.82em;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding-right: 20px;
+      background: linear-gradient(90deg, #1A2235 0%, #232E45 100%);
+      border: 1.5px solid #3A4A6B;
+    }
+    .pill-card-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 46px;
+      height: 46px;
+      margin: 5px 0 5px 5px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 50%;
+      font-size: 1.25em;
+      border: 1.5px solid rgba(255,255,255,0.15);
+      flex-shrink: 0;
+    }
+    .pill-card-text {
+      padding-left: 14px;
+      color: #7B8EC8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.15;
+    }
+    .pill-card-value {
+      font-size: 0.95em;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+      color: #E8EEFF;
+      margin-top: 2px;
+    }
+    .pill-card-warning { border-left: 4px solid #D97706 !important; }
+    .pill-card-success { border-left: 4px solid #10B981 !important; }
+    .pill-card-danger  { border-left: 4px solid #EF4444 !important; }
+    .pill-card-info    { border-left: 4px solid #3B82F6 !important; }
+    .pill-card-warning .pill-card-text { color: #FCD34D; }
+    .pill-card-success .pill-card-text { color: #6EE7B7; }
+    .pill-card-danger  .pill-card-text { color: #FCA5A5; }
+    .pill-card-info    .pill-card-text { color: #93C5FD; }
+
     [data-testid="stHeader"] {
       display: none;
     }
@@ -170,82 +477,6 @@ def main():
     .stTextArea textarea {
         font-family: 'Courier New', Courier, monospace;
         font-size: 0.85em;
-    }
-
-    div:has([id^="toggle_wrap_"]) ~ div > div > button,
-    div:has([id^="toggle_wrap_"]) + div > div > button {
-        width: 70px !important;
-        height: 32px !important;
-        min-height: 32px !important;
-        max-height: 32px !important;
-        padding: 0 !important;
-        border-radius: 16px !important;
-        border: none !important;
-        cursor: pointer !important;
-        position: relative !important;
-        overflow: visible !important;
-        font-size: 0 !important;
-        line-height: 0 !important;
-        box-shadow: inset 0 2px 5px rgba(0,0,0,0.35) !important;
-        transition: background-color 0.2s !important;
-    }
-
-    div:has([id^="toggle_wrap_"]) ~ div > div > button::before,
-    div:has([id^="toggle_wrap_"]) + div > div > button::before {
-        content: '' !important;
-        display: block !important;
-        width: 24px !important;
-        height: 24px !important;
-        background: white !important;
-        border-radius: 50% !important;
-        position: absolute !important;
-        top: 4px !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.35) !important;
-        transition: left 0.2s ease !important;
-    }
-
-    div:has([id^="toggle_wrap_"]) ~ div > div > button::after,
-    div:has([id^="toggle_wrap_"]) + div > div > button::after {
-        display: block !important;
-        position: absolute !important;
-        top: 50% !important;
-        transform: translateY(-50%) !important;
-        color: white !important;
-        font-size: 11px !important;
-        font-weight: 800 !important;
-        font-family: sans-serif !important;
-        line-height: 1 !important;
-        pointer-events: none !important;
-    }
-
-    div:has([id^="toggle_wrap_off_"]) ~ div > div > button,
-    div:has([id^="toggle_wrap_off_"]) + div > div > button {
-        background-color: #E03535 !important;
-    }
-    div:has([id^="toggle_wrap_off_"]) ~ div > div > button::before,
-    div:has([id^="toggle_wrap_off_"]) + div > div > button::before {
-        left: 4px !important;
-    }
-    div:has([id^="toggle_wrap_off_"]) ~ div > div > button::after,
-    div:has([id^="toggle_wrap_off_"]) + div > div > button::after {
-        content: 'OFF' !important;
-        right: 7px !important;
-        left: auto !important;
-    }
-
-    div:has([id^="toggle_wrap_on_"]) ~ div > div > button,
-    div:has([id^="toggle_wrap_on_"]) + div > div > button {
-        background-color: #10B981 !important;
-    }
-    div:has([id^="toggle_wrap_on_"]) ~ div > div > button::before,
-    div:has([id^="toggle_wrap_on_"]) + div > div > button::before {
-        left: 42px !important;
-    }
-    div:has([id^="toggle_wrap_on_"]) ~ div > div > button::after,
-    div:has([id^="toggle_wrap_on_"]) + div > div > button::after {
-        content: 'ON' !important;
-        left: 9px !important;
-        right: auto !important;
     }
 
     .toggle-title {
@@ -317,59 +548,102 @@ def main():
           params.put("SelectedBranch", selected_b)
         st.rerun()
 
-    row1_col1, row1_col2 = st.columns([1, 2])
+    row1_col1, row1_col2 = st.columns([1, 2], vertical_alignment="center")
     with row1_col1:
-      if st.button("🔍 Check Updates", use_container_width=True):
+      st.markdown('<div id="btn_marker_blue_check"></div>', unsafe_allow_html=True)
+      if st.button("Check Updates", use_container_width=True):
+        st.session_state["show_dialog_cal"] = False
+        st.session_state["show_dialog_reboot"] = False
         run_script("Commit Check", f"{SCRIPTS_PATH}/commit_compare.sh")
         st.rerun()
     with row1_col2:
       commit_output = params.get("CommitCompare")
       commit_info = commit_output or "Check required"
-
-      card_class = "metric-card-warning"
-
-      if commit_output:
-        if " == " in commit_output:
-          card_class = "metric-card-success"
-        elif " != " in commit_output:
-          card_class = "metric-card-danger"
-
-      st.markdown(f'<div class="{card_class}">Update Status : &nbsp;{commit_info}</div>', unsafe_allow_html=True)
+      if commit_output and " == " in commit_output:
+        card_type, icon = "pill-card-success", "✅"
+      elif commit_output and " != " in commit_output:
+        card_type, icon = "pill-card-danger", "⚠️"
+      else:
+        card_type, icon = "pill-card-warning", "🔍"
+      st.markdown(f"""
+        <div class="pill-card {card_type}">
+          <div class="pill-card-icon">{icon}</div>
+          <div class="pill-card-text">UPDATE STATUS
+            <div class="pill-card-value">{commit_info}</div>
+          </div>
+        </div>""", unsafe_allow_html=True)
 
     if " == " not in (params.get("CommitCompare") or "") and params.get("CommitCompare"):
-      pull_col1, pull_col2 = st.columns([1, 2])
+      pull_col1, pull_col2 = st.columns([1, 2], vertical_alignment="center")
       with pull_col1:
-        if st.button("⬇️ Git Pull Now", type="primary", use_container_width=True):
+        st.markdown('<div id="btn_marker_blue_pull"></div>', unsafe_allow_html=True)
+        if st.button("Git Pull Now", use_container_width=True):
           run_script("Git Pull", f"{SCRIPTS_PATH}/gitpull.sh")
           st.rerun()
       with pull_col2:
         st.warning("New Update Available! Please pull the latest changes.", icon="⚠️")
 
-    row3_col1, row3_col2 = st.columns([1, 2])
+    row3_col1, row3_col2 = st.columns([1, 2], vertical_alignment="center")
     with row3_col1:
-      if st.button("✨ Reset Calibration", use_container_width=True):
-        if st.checkbox("Confirm Reset"):
-          reset_calibration()
+      st.markdown('<div id="btn_marker_warning_cal"></div>', unsafe_allow_html=True)
+      if st.button("Reset Calibration", use_container_width=True):
+        st.session_state["show_dialog_reboot"] = False
+        st.session_state["show_dialog_cal"] = True
+        st.rerun()
     with row3_col2:
       device_position = params.get("DevicePosition") or "--"
-      st.markdown(f'<div class="metric-card">Device Position : &nbsp;{device_position}</div>', unsafe_allow_html=True)
+      st.markdown(f"""
+        <div class="pill-card pill-card-info">
+          <div class="pill-card-icon">📍</div>
+          <div class="pill-card-text">DEVICE POSITION
+            <div class="pill-card-value">{device_position}</div>
+          </div>
+        </div>""", unsafe_allow_html=True)
 
-    sub_col1, sub_col2 = st.columns([1, 2])
-    with sub_col1:
-      if st.button("🔴 Reboot", type="secondary", use_container_width=True):
-        if st.checkbox("Confirm Reboot"):
-          st.error("Rebooting Device...")
-          subprocess.run(["sudo", "reboot"])
+    reboot_col, _ = st.columns([1, 2])
+    with reboot_col:
+      st.markdown('<div id="btn_marker_danger_reboot"></div>', unsafe_allow_html=True)
+      if st.button("Reboot", use_container_width=True):
+        st.session_state["show_dialog_cal"] = False
+        st.session_state["show_dialog_reboot"] = True
+        st.rerun()
+
+    if st.session_state.get("show_dialog_cal", False):
+      confirm_reset_calibration()
+    elif st.session_state.get("show_dialog_reboot", False):
+      confirm_reboot()
+
+    if "script_log" in st.session_state:
+      ok = st.session_state.get("script_ok", True)
+      color = "#10B981" if ok else "#EF4444"
+      icon = "✅" if ok else "❌"
+      st.markdown(f"""
+        <div style="
+          margin-top: 16px;
+          background: linear-gradient(90deg, #1A2235, #232E45);
+          border: 1.5px solid {color}44;
+          border-left: 4px solid {color};
+          border-radius: 16px;
+          padding: 12px 18px;
+          font-family: 'Courier New', monospace;
+          font-size: 0.82em;
+          color: #BCC4E0;
+          white-space: pre-wrap;
+          word-break: break-all;
+        ">{icon} {st.session_state['script_log']}</div>
+      """, unsafe_allow_html=True)
 
   with tabs[1]:
     toggle_items = [
       ("PcmCruiseEnable", "PcmCruise", "Change the openpilot cruise engagement. use the PcmCruise method"),
       ("CruiseStateControl", "Cruise State Controls", "Openpilot controls cruise on/off, set speed"),
       ("IsHda2", "CANFD Car HDA2", "Highway Drive Assist 2, turn it on"),
-      ("CameraSccEnable", "CameraSCC", "HDA1 CameraSCC CAR, HDA2 Connect the ADAS ECAN line to CAMERA modify, turn it on"),
+      ("CameraSccEnable", "CameraSCC",
+       "HDA1 CameraSCC CAR, HDA2 Connect the ADAS ECAN line to CAMERA modify, turn it on"),
       ("RadarTrackEnable", "Enable Radar Track use", "Enable Radar Track use (disable AEB)"),
       ("DriverCameraOnReverse", "Driver Camera On Reverse", "Displays the driver camera when in reverse"),
-      ("DriverCameraHardwareMissing", "Driver Camera Hardware Missing", "If there is a problem with the driver camera hardware, drive without the driver camera"),
+      ("DriverCameraHardwareMissing", "Driver Camera Hardware Missing",
+       "If there is a problem with the driver camera hardware, drive without the driver camera"),
     ]
 
     for key, _, _ in toggle_items:
@@ -388,6 +662,9 @@ def main():
           unsafe_allow_html=True
         )
         if st.button(" ", key=f"btn_tog_{key}"):
+          st.session_state["show_dialog_cal"] = False
+          st.session_state["show_dialog_reboot"] = False
+
           new_val = not val
           st.session_state[f"tog_{key}"] = new_val
           params.put_bool(key, new_val)
@@ -417,7 +694,11 @@ def main():
       sel_log_path = log_files[sel_log_name]
 
     with l_col2:
-      if st.button("👁️ View", key="btn_view_file", use_container_width=True):
+      st.markdown('<div id="btn_marker_default_view"></div>', unsafe_allow_html=True)
+      if st.button("View", key="btn_view_file", use_container_width=True):
+        st.session_state["log_view_error"] = None
+        st.session_state.log_out = ""
+
         if sel_log_path == "TMUX_CONSOLE":
           capture_cmd = "tmux capture-pane -p -t 0 -S -500 > /data/tmux_console.log"
           subprocess.run(capture_cmd, shell=True)
@@ -426,15 +707,16 @@ def main():
           if console_log_path.exists():
             st.session_state.log_out = console_log_path.read_text()
           else:
-            st.error("Failed to capture tmux console.")
+            st.session_state["log_view_error"] = "Failed to capture tmux console."
         else:
           if Path(sel_log_path).exists():
             st.session_state.log_out = Path(sel_log_path).read_text()
           else:
-            st.error("File not found.")
+            st.session_state["log_view_error"] = "File not found."
 
     with l_col3:
-      if st.button("⬆️ Upload", key="btn_upload_file", use_container_width=True):
+      st.markdown('<div id="btn_marker_success_upload"></div>', unsafe_allow_html=True)
+      if st.button("Upload", key="btn_upload_file", use_container_width=True):
         if sel_log_path == "TMUX_CONSOLE":
           console_log_path = Path("/data/tmux_console.log")
           if not console_log_path.exists():
@@ -447,6 +729,24 @@ def main():
 
     content = st.session_state.get("log_out", "Select a log file or console to view.")
     st.text_area("Output Window", content, height=500, key="log_output_window")
+
+    if st.session_state.get("log_view_error"):
+        err_msg = st.session_state["log_view_error"]
+        st.markdown(f"""
+        <div style="
+          margin-top: 16px;
+          background: linear-gradient(90deg, #1A2235, #232E45);
+          border: 1.5px solid #EF444444;
+          border-left: 4px solid #EF4444;
+          border-radius: 16px;
+          padding: 12px 18px;
+          font-family: 'Courier New', monospace;
+          font-size: 0.82em;
+          color: #BCC4E0;
+          white-space: pre-wrap;
+          word-break: break-all;
+        ">⚠️ {err_msg}</div>
+      """, unsafe_allow_html=True)
 
   with tabs[3]:
     if not REALDATA_PATH.exists():
@@ -473,7 +773,8 @@ def main():
         options = [f"[{datetime.fromtimestamp(v['mtime']).strftime('%Y-%m-%d %H:%M')}] {k} ({len(v['paths'])} segs)" for
                    k, v in sorted_routes]
         sel_route = st.selectbox("Select Route to Upload", options)
-        if st.button("🚀 Selected Route Upload", use_container_width=True):
+        st.markdown('<div id="btn_marker_success_route"></div>', unsafe_allow_html=True)
+        if st.button("Route Upload", use_container_width=True):
           idx = options.index(sel_route)
           targets = sorted_routes[idx][1]['paths']
 
@@ -487,9 +788,9 @@ def main():
 
   with tabs[5]:
     camera_options = {
-        "Road Camera": "road",
-        "Driver Camera": "driver",
-        "Wide Road Camera": "wideRoad"
+      "Road Camera": "road",
+      "Driver Camera": "driver",
+      "Wide Road Camera": "wideRoad"
     }
 
     c_col1, c_col2, c_col3 = st.columns([3, 1, 1], vertical_alignment="bottom")
@@ -499,11 +800,13 @@ def main():
       stream_type = camera_options[selected_cam]
 
     with c_col2:
-      if st.button("▶️ Start", key="btn_cam_start", use_container_width=True):
+      st.markdown('<div id="btn_marker_success_start"></div>', unsafe_allow_html=True)
+      if st.button("Start", key="btn_cam_start", use_container_width=True):
         st.session_state["cam_streaming"] = True
 
     with c_col3:
-      if st.button("⏹️ Stop", key="btn_cam_stop", use_container_width=True):
+      st.markdown('<div id="btn_marker_danger_stop"></div>', unsafe_allow_html=True)
+      if st.button("Stop", key="btn_cam_stop", use_container_width=True):
         st.session_state["cam_streaming"] = False
 
     # Default state
@@ -511,7 +814,7 @@ def main():
       st.session_state["cam_streaming"] = False
 
     if st.session_state["cam_streaming"]:
-        webrtc_html = f"""
+      webrtc_html = f"""
             <html>
               <body style="background-color: #000; margin: 0; display: flex; justify-content: center; align-items: center; height: 500px; font-family: sans-serif; position: relative;">
                 <video id="video" autoplay playsinline muted controls style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"></video>
@@ -646,9 +949,9 @@ def main():
               </body>
             </html>
             """
-        components.html(webrtc_html, height=500)
+      components.html(webrtc_html, height=500)
     else:
-        st.markdown("""
+      st.markdown("""
             <div style="
                 height: 500px;
                 border: 1px solid #333;
@@ -670,6 +973,7 @@ def main():
       content = get_tmux_capture()
       terminal_placeholder.code(content, language="bash")
       time.sleep(1)
+
 
 if __name__ == "__main__":
   if check_password():
