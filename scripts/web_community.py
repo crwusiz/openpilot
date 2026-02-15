@@ -101,7 +101,7 @@ def get_tmux_capture():
 
 
 def main():
-  st.set_page_config(page_title="Openpilot Dashboard by crwusiz", layout="wide", initial_sidebar_state="collapsed")
+  st.set_page_config(page_title="Openpilot Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
   st.markdown("""
     <style>
@@ -147,73 +147,175 @@ def main():
       color: rgb(128, 216, 166);
     }
 
-    [data-testid="stHeader"] { background: rgba(0,0,0,0); }
-    .toggle-description {
-      font-size: 0.8em;
-      color: #888;
-      margin-top: -10px;
-      margin-bottom: 10px;
-      margin-left: 0px;
+    div[data-baseweb="select"] > div {
+      min-height: 3.5em !important;
+      background-color: #161B22;
+      border: 1px solid #2C2CE2;
+      color: white;
+      display: flex;
+      align-items: center;
     }
+    div[data-baseweb="select"] svg {
+      fill: white !important;
+    }
+
+    /* 상단 헤더 영역 숨김 */
+    [data-testid="stHeader"] {
+      display: none;
+    }
+    .block-container {
+      padding-top: 1rem;
+    }
+
     .stTextArea textarea {
         font-family: 'Courier New', Courier, monospace;
         font-size: 0.85em;
     }
+
+    div:has([id^="toggle_wrap_"]) ~ div > div > button,
+    div:has([id^="toggle_wrap_"]) + div > div > button {
+        width: 70px !important;
+        height: 32px !important;
+        min-height: 32px !important;
+        max-height: 32px !important;
+        padding: 0 !important;
+        border-radius: 16px !important;
+        border: none !important;
+        cursor: pointer !important;
+        position: relative !important;
+        overflow: visible !important;
+        font-size: 0 !important;
+        line-height: 0 !important;
+        box-shadow: inset 0 2px 5px rgba(0,0,0,0.35) !important;
+        transition: background-color 0.2s !important;
+    }
+
+    div:has([id^="toggle_wrap_"]) ~ div > div > button::before,
+    div:has([id^="toggle_wrap_"]) + div > div > button::before {
+        content: '' !important;
+        display: block !important;
+        width: 24px !important;
+        height: 24px !important;
+        background: white !important;
+        border-radius: 50% !important;
+        position: absolute !important;
+        top: 4px !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.35) !important;
+        transition: left 0.2s ease !important;
+    }
+
+    div:has([id^="toggle_wrap_"]) ~ div > div > button::after,
+    div:has([id^="toggle_wrap_"]) + div > div > button::after {
+        display: block !important;
+        position: absolute !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        color: white !important;
+        font-size: 11px !important;
+        font-weight: 800 !important;
+        font-family: sans-serif !important;
+        line-height: 1 !important;
+        pointer-events: none !important;
+    }
+
+    div:has([id^="toggle_wrap_off_"]) ~ div > div > button,
+    div:has([id^="toggle_wrap_off_"]) + div > div > button {
+        background-color: #E03535 !important;
+    }
+    div:has([id^="toggle_wrap_off_"]) ~ div > div > button::before,
+    div:has([id^="toggle_wrap_off_"]) + div > div > button::before {
+        left: 4px !important;
+    }
+    div:has([id^="toggle_wrap_off_"]) ~ div > div > button::after,
+    div:has([id^="toggle_wrap_off_"]) + div > div > button::after {
+        content: 'OFF' !important;
+        right: 7px !important;
+        left: auto !important;
+    }
+
+    div:has([id^="toggle_wrap_on_"]) ~ div > div > button,
+    div:has([id^="toggle_wrap_on_"]) + div > div > button {
+        background-color: #10B981 !important;
+    }
+    div:has([id^="toggle_wrap_on_"]) ~ div > div > button::before,
+    div:has([id^="toggle_wrap_on_"]) + div > div > button::before {
+        left: 42px !important;
+    }
+    div:has([id^="toggle_wrap_on_"]) ~ div > div > button::after,
+    div:has([id^="toggle_wrap_on_"]) + div > div > button::after {
+        content: 'ON' !important;
+        left: 9px !important;
+        right: auto !important;
+    }
+
+    .toggle-title {
+        font-size: 1.1em;
+        font-weight: bold;
+        color: white;
+        margin-bottom: 2px;
+    }
+    .toggle-description {
+        font-size: 0.85em;
+        color: #aaa;
+        line-height: 1.2;
+    }
+    .toggle-container {
+        padding: 10px 0;
+        border-bottom: 1px solid #222;
+    }
     </style>
   """, unsafe_allow_html=True)
 
-  st.title("Openpilot Dashboard by crwusiz")
-
-  col_m, col_c, col_b = st.columns(3)
-
-  with col_m:
-    manufacturers = ["[ Not Selected ]", "HYUNDAI", "KIA", "GENESIS"]
-    current_m = params.get("SelectedManufacturer") or manufacturers[0]
-    m_idx = manufacturers.index(current_m) if current_m in manufacturers else 0
-    selected_m = st.selectbox("🌐 Manufacturer", manufacturers, index=m_idx)
-
-    if selected_m != current_m:
-      if selected_m == "[ Not Selected ]":
-        params.remove("SelectedManufacturer")
-        params.remove("SelectedCar")
-      else:
-        params.put("SelectedManufacturer", selected_m)
-        mapping = {"HYUNDAI": "CarList_Hyundai", "KIA": "CarList_Kia", "GENESIS": "CarList_Genesis"}
-        src = f"{BASE_PATH}/{mapping.get(selected_m)}"
-        if Path(src).exists():
-          shutil.copy2(src, CAR_LIST_PATH)
-      st.rerun()
-
-  with col_c:
-    car_list = ["[ Not Selected ]"] + get_list_from_file(CAR_LIST_PATH)
-    current_c = params.get("SelectedCar") or car_list[0]
-    c_idx = car_list.index(current_c) if current_c in car_list else 0
-    selected_c = st.selectbox("🚗 Car Model", car_list, index=c_idx)
-
-    if selected_c != current_c:
-      if selected_c == "[ Not Selected ]":
-        params.remove("SelectedCar")
-      else:
-        params.put("SelectedCar", selected_c)
-      st.rerun()
-
-  with col_b:
-    branch_list = ["[ Not Selected ]"] + get_list_from_file(BRANCH_LIST_PATH)
-    current_b = params.get("SelectedBranch") or branch_list[0]
-    b_idx = branch_list.index(current_b) if current_b in branch_list else 0
-    selected_b = st.selectbox("🌿 Git Branch", branch_list, index=b_idx)
-
-    if selected_b != current_b:
-      if selected_b == "[ Not Selected ]":
-        params.remove("SelectedBranch")
-      else:
-        params.put("SelectedBranch", selected_b)
-      st.rerun()
+  st.title("Openpilot Dashboard")
 
   tabs = st.tabs(["🚀 Functions", "⚙️ Toggles", "📋 Logs", "📂 Realdata", "📺 Terminal", "📷 Camera"])
 
   with tabs[0]:
-    st.subheader("System Maintenance")
+    col_m, col_c, col_b = st.columns(3)
+
+    with col_m:
+      manufacturers = ["[ Not Selected ]", "HYUNDAI", "KIA", "GENESIS"]
+      current_m = params.get("SelectedManufacturer") or manufacturers[0]
+      m_idx = manufacturers.index(current_m) if current_m in manufacturers else 0
+      selected_m = st.selectbox("🌐 Manufacturer", manufacturers, index=m_idx)
+
+      if selected_m != current_m:
+        if selected_m == "[ Not Selected ]":
+          params.remove("SelectedManufacturer")
+          params.remove("SelectedCar")
+        else:
+          params.put("SelectedManufacturer", selected_m)
+          mapping = {"HYUNDAI": "CarList_Hyundai", "KIA": "CarList_Kia", "GENESIS": "CarList_Genesis"}
+          src = f"{BASE_PATH}/{mapping.get(selected_m)}"
+          if Path(src).exists():
+            shutil.copy2(src, CAR_LIST_PATH)
+        st.rerun()
+
+    with col_c:
+      car_list = ["[ Not Selected ]"] + get_list_from_file(CAR_LIST_PATH)
+      current_c = params.get("SelectedCar") or car_list[0]
+      c_idx = car_list.index(current_c) if current_c in car_list else 0
+      selected_c = st.selectbox("🚗 Car Model", car_list, index=c_idx)
+
+      if selected_c != current_c:
+        if selected_c == "[ Not Selected ]":
+          params.remove("SelectedCar")
+        else:
+          params.put("SelectedCar", selected_c)
+        st.rerun()
+
+    with col_b:
+      branch_list = ["[ Not Selected ]"] + get_list_from_file(BRANCH_LIST_PATH)
+      current_b = params.get("SelectedBranch") or branch_list[0]
+      b_idx = branch_list.index(current_b) if current_b in branch_list else 0
+      selected_b = st.selectbox("🌿 Git Branch", branch_list, index=b_idx)
+
+      if selected_b != current_b:
+        if selected_b == "[ Not Selected ]":
+          params.remove("SelectedBranch")
+        else:
+          params.put("SelectedBranch", selected_b)
+        st.rerun()
 
     row1_col1, row1_col2 = st.columns([1, 2])
     with row1_col1:
@@ -260,7 +362,6 @@ def main():
           subprocess.run(["sudo", "reboot"])
 
   with tabs[1]:
-    st.subheader("Parameter Configuration")
     toggle_items = [
       ("PcmCruiseEnable", "PcmCruise", "Change the openpilot cruise engagement. use the PcmCruise method"),
       ("CruiseStateControl", "Cruise State Controls", "Openpilot controls cruise on/off, set speed"),
@@ -270,16 +371,38 @@ def main():
       ("DriverCameraOnReverse", "Driver Camera On Reverse", "Displays the driver camera when in reverse"),
       ("DriverCameraHardwareMissing", "Driver Camera Hardware Missing", "If there is a problem with the driver camera hardware, drive without the driver camera"),
     ]
+
+    for key, _, _ in toggle_items:
+      if f"tog_{key}" not in st.session_state:
+        st.session_state[f"tog_{key}"] = params.get_bool(key)
+
     for key, label, desc in toggle_items:
-      curr = params.get_bool(key)
-      new = st.toggle(label, value=curr)
-      if new != curr:
-        params.put_bool(key, new)
-        st.toast(f"{label} Changed")
-      st.markdown(f'<div class="toggle-description">{desc}</div>', unsafe_allow_html=True)
+      val = st.session_state[f"tog_{key}"]
+      state_str = "on" if val else "off"
+
+      t_col1, t_col2 = st.columns([0.1, 0.9], vertical_alignment="center")
+
+      with t_col1:
+        st.markdown(
+          f'<div id="toggle_wrap_{state_str}_{key}"></div>',
+          unsafe_allow_html=True
+        )
+        if st.button(" ", key=f"btn_tog_{key}"):
+          new_val = not val
+          st.session_state[f"tog_{key}"] = new_val
+          params.put_bool(key, new_val)
+          st.toast(f"{label} {'ON' if new_val else 'OFF'}")
+          st.rerun()
+
+      with t_col2:
+        st.markdown(f"""
+        <div class="toggle-container">
+            <div class="toggle-title">{label}</div>
+            <div class="toggle-description">{desc}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
   with tabs[2]:
-    st.subheader("System Logs")
     log_files = {
       "CAN Missing": "/data/can_missing.log",
       "CAN Timeout": "/data/can_timeout.log",
@@ -287,15 +410,13 @@ def main():
       "Tmux Console": "TMUX_CONSOLE"
     }
 
-    l_col1, l_col2, l_col3 = st.columns([3, 1, 1])
+    l_col1, l_col2, l_col3 = st.columns([3, 1, 1], vertical_alignment="bottom")
 
     with l_col1:
       sel_log_name = st.selectbox("Select Log File", list(log_files.keys()), label_visibility="visible")
       sel_log_path = log_files[sel_log_name]
 
     with l_col2:
-      st.write("")
-      st.write("")
       if st.button("👁️ View", key="btn_view_file", use_container_width=True):
         if sel_log_path == "TMUX_CONSOLE":
           capture_cmd = "tmux capture-pane -p -t 0 -S -500 > /data/tmux_console.log"
@@ -313,8 +434,6 @@ def main():
             st.error("File not found.")
 
     with l_col3:
-      st.write("")
-      st.write("")
       if st.button("⬆️ Upload", key="btn_upload_file", use_container_width=True):
         if sel_log_path == "TMUX_CONSOLE":
           console_log_path = Path("/data/tmux_console.log")
@@ -330,7 +449,6 @@ def main():
     st.text_area("Output Window", content, height=500, key="log_output_window")
 
   with tabs[3]:
-    st.subheader("Realdata Route Upload")
     if not REALDATA_PATH.exists():
       st.warning("Path not found: /data/media/0/realdata")
     else:
@@ -368,16 +486,31 @@ def main():
             st.error(f"Failed to start upload: {e}")
 
   with tabs[5]:
-    st.subheader("📷 WebRTC Streaming")
+    camera_options = {
+        "Road Camera": "road",
+        "Driver Camera": "driver",
+        "Wide Road Camera": "wideRoad"
+    }
 
-    col_cam1, col_cam2 = st.columns([1, 3])
-    with col_cam1:
-      st.markdown("### Source: Road Camera")
-      st.write("")
-      start_btn = st.button("▶️ Start Stream", type="primary", use_container_width=True)
+    c_col1, c_col2, c_col3 = st.columns([3, 1, 1], vertical_alignment="bottom")
 
-    with col_cam2:
-      if start_btn:
+    with c_col1:
+      selected_cam = st.selectbox("Select Camera Source", list(camera_options.keys()), key="cam_source")
+      stream_type = camera_options[selected_cam]
+
+    with c_col2:
+      if st.button("▶️ Start", key="btn_cam_start", use_container_width=True):
+        st.session_state["cam_streaming"] = True
+
+    with c_col3:
+      if st.button("⏹️ Stop", key="btn_cam_stop", use_container_width=True):
+        st.session_state["cam_streaming"] = False
+
+    # Default state
+    if "cam_streaming" not in st.session_state:
+      st.session_state["cam_streaming"] = False
+
+    if st.session_state["cam_streaming"]:
         webrtc_html = f"""
             <html>
               <body style="background-color: #000; margin: 0; display: flex; justify-content: center; align-items: center; height: 500px; font-family: sans-serif; position: relative;">
@@ -399,11 +532,10 @@ def main():
 
                     const ip = window.location.hostname || window.parent.location.hostname;
                     const port = "5001";
-                    const streamType = "road";
+                    const streamType = "{stream_type}";
                     let lastBytes = 0;
                     let lastTimestamp = 0;
 
-                    // Click to retry play
                     video.addEventListener('click', () => {{
                         if (video.paused) {{
                             video.play().catch(console.error);
@@ -418,7 +550,7 @@ def main():
 
                       pc.ontrack = (event) => {{
                         console.log("Track received:", event.track.kind);
-                        status.innerText = "Stream Active (road)";
+                        status.innerText = "Stream Active (" + streamType + ")";
                         video.srcObject = event.streams[0];
                         video.play().catch(e => {{
                             console.error("Autoplay failed:", e);
@@ -426,7 +558,6 @@ def main():
                         }});
                       }};
 
-                      // Stats Monitor
                       setInterval(async () => {{
                         if(pc.connectionState === 'connected' || pc.iceConnectionState === 'connected') {{
                             const stats = await pc.getStats();
@@ -516,13 +647,23 @@ def main():
             </html>
             """
         components.html(webrtc_html, height=500)
-
-      elif not start_btn:
-        st.info("Click 'Start Stream' to connect automatically.")
+    else:
+        st.markdown("""
+            <div style="
+                height: 500px;
+                border: 1px solid #333;
+                border-radius: 8px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                background-color: #0E1117;
+                color: #666;
+            ">
+                Stream Stopped
+            </div>
+        """, unsafe_allow_html=True)
 
   with tabs[4]:
-    st.subheader("📺 Real-time Terminal")
-
     terminal_placeholder = st.empty()
 
     while True:
