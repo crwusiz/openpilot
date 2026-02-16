@@ -81,37 +81,6 @@ def run_script(name, path, args=None):
     return 1
 
 
-@st.dialog("Reset Calibration")
-def confirm_reset_calibration():
-  st.write("캘리브레이션 데이터를 초기화할까요?")
-  c1, c2 = st.columns(2)
-  with c1:
-    st.markdown('<div id="btn_marker_dlg_yes"></div>', unsafe_allow_html=True)
-    if st.button("YES", use_container_width=True, key="dlg_cal_yes_final"):
-      reset_calibration()
-      st.session_state["show_dialog_cal"] = False
-      st.rerun()
-  with c2:
-    st.markdown('<div id="btn_marker_dlg_no"></div>', unsafe_allow_html=True)
-    if st.button("NO", use_container_width=True, key="dlg_cal_no_final"):
-      st.session_state["show_dialog_cal"] = False
-      st.rerun()
-
-@st.dialog("Reboot Device")
-def confirm_reboot():
-  st.write("장치를 재부팅할까요?")
-  c1, c2 = st.columns(2)
-  with c1:
-    st.markdown('<div id="btn_marker_dlg_yes"></div>', unsafe_allow_html=True)
-    if st.button("YES", use_container_width=True, key="dlg_reboot_yes_final"):
-      st.session_state["show_dialog_reboot"] = False
-      subprocess.run(["sudo", "reboot"])
-      st.rerun()
-  with c2:
-    st.markdown('<div id="btn_marker_dlg_no"></div>', unsafe_allow_html=True)
-    if st.button("NO", use_container_width=True, key="dlg_reboot_no_final"):
-      st.session_state["show_dialog_reboot"] = False
-      st.rerun()
 
 
 def reset_calibration():
@@ -552,8 +521,6 @@ def main():
     with row1_col1:
       st.markdown('<div id="btn_marker_blue_check"></div>', unsafe_allow_html=True)
       if st.button("Check Updates", use_container_width=True):
-        st.session_state["show_dialog_cal"] = False
-        st.session_state["show_dialog_reboot"] = False
         run_script("Commit Check", f"{SCRIPTS_PATH}/commit_compare.sh")
         st.rerun()
     with row1_col2:
@@ -581,14 +548,21 @@ def main():
           run_script("Git Pull", f"{SCRIPTS_PATH}/gitpull.sh")
           st.rerun()
       with pull_col2:
-        st.warning("New Update Available! Please pull the latest changes.", icon="⚠️")
+        st.markdown(f"""
+          <div class="pill-card pill-card-warning">
+            <div class="pill-card-icon">⚠️</div>
+            <div class="pill-card-text">NEW UPDATE AVAILABLE
+              <div class="pill-card-value">Please pull the latest changes.</div>
+            </div>
+          </div>""", unsafe_allow_html=True)
 
     row3_col1, row3_col2 = st.columns([1, 2], vertical_alignment="center")
     with row3_col1:
       st.markdown('<div id="btn_marker_warning_cal"></div>', unsafe_allow_html=True)
       if st.button("Reset Calibration", use_container_width=True):
-        st.session_state["show_dialog_reboot"] = False
-        st.session_state["show_dialog_cal"] = True
+        reset_calibration()
+        st.session_state["script_log"] = "[Reset Calibration] Completed."
+        st.session_state["script_ok"] = True
         st.rerun()
     with row3_col2:
       device_position = params.get("DevicePosition") or "--"
@@ -604,14 +578,9 @@ def main():
     with reboot_col:
       st.markdown('<div id="btn_marker_danger_reboot"></div>', unsafe_allow_html=True)
       if st.button("Reboot", use_container_width=True):
-        st.session_state["show_dialog_cal"] = False
-        st.session_state["show_dialog_reboot"] = True
-        st.rerun()
-
-    if st.session_state.get("show_dialog_cal", False):
-      confirm_reset_calibration()
-    elif st.session_state.get("show_dialog_reboot", False):
-      confirm_reboot()
+        st.session_state["script_log"] = "[Reboot] Rebooting device..."
+        st.session_state["script_ok"] = True
+        subprocess.Popen(["sudo", "reboot"])
 
     if "script_log" in st.session_state:
       ok = st.session_state.get("script_ok", True)
@@ -662,9 +631,6 @@ def main():
           unsafe_allow_html=True
         )
         if st.button(" ", key=f"btn_tog_{key}"):
-          st.session_state["show_dialog_cal"] = False
-          st.session_state["show_dialog_reboot"] = False
-
           new_val = not val
           st.session_state[f"tog_{key}"] = new_val
           params.put_bool(key, new_val)
@@ -816,10 +782,33 @@ def main():
     if st.session_state["cam_streaming"]:
       webrtc_html = f"""
             <html>
-              <body style="background-color: #000; margin: 0; display: flex; justify-content: center; align-items: center; height: 500px; font-family: sans-serif; position: relative;">
-                <video id="video" autoplay playsinline muted controls style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"></video>
-                <div id="status" style="position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 4px; font-size: 14px; pointer-events: none;">Initializing...</div>
-                <div id="debug" style="position: absolute; bottom: 10px; left: 10px; color: #00ff00; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 4px; font-size: 12px; pointer-events: none; white-space: pre; display: block; text-align: left;">Waiting for stats...</div>
+              <body style="background-color: #0B0E14; margin: 0; font-family: sans-serif;">
+
+                <div style="position:relative; width:100%; height:430px; background:#000; border-radius:12px; overflow:hidden;">
+                  <video id="video" autoplay playsinline muted controls
+                    style="width:100%; height:100%; object-fit:contain; cursor:pointer;"></video>
+                  <div id="status" style="
+                    position:absolute; top:10px; right:12px;
+                    color:#E8EEFF; background:rgba(0,0,0,0.65);
+                    padding:4px 10px; border-radius:20px;
+                    font-size:12px; font-weight:600; pointer-events:none;">
+                    Initializing...
+                  </div>
+                </div>
+
+                <div id="debug" style="
+                  margin-top:10px;
+                  background: linear-gradient(90deg, #1A2235, #232E45);
+                  border: 1.5px solid #3A4A6B;
+                  border-left: 4px solid #3B82F6;
+                  border-radius:12px;
+                  padding:10px 16px;
+                  color:#93C5FD;
+                  font-size:12px;
+                  font-family:'Courier New', monospace;
+                  white-space:pre;
+                  min-height:40px;
+                ">Waiting for stream stats...</div>
 
                 <script>
                   async function start() {{
@@ -853,11 +842,12 @@ def main():
 
                       pc.ontrack = (event) => {{
                         console.log("Track received:", event.track.kind);
-                        status.innerText = "Stream Active (" + streamType + ")";
+                        status.innerText = "● Stream Active (" + streamType + ")";
+                        status.style.background = "rgba(16,185,129,0.75)";
                         video.srcObject = event.streams[0];
                         video.play().catch(e => {{
                             console.error("Autoplay failed:", e);
-                            status.innerText = "Stream Ready (Click Video to Play)";
+                            status.innerText = "▶ Click to Play";
                         }});
                       }};
 
@@ -870,46 +860,34 @@ def main():
                                     foundVideo = true;
                                     const now = report.timestamp;
                                     const bytes = report.bytesReceived;
-
                                     let bitrate = 0;
                                     if (lastTimestamp > 0) {{
-                                        const duration = (now - lastTimestamp) / 1000; // seconds
-                                        if (duration > 0) {{
-                                            bitrate = ((bytes - lastBytes) * 8 / 1000) / duration; // kbps
-                                        }}
+                                        const duration = (now - lastTimestamp) / 1000;
+                                        if (duration > 0) bitrate = ((bytes - lastBytes) * 8 / 1000) / duration;
                                     }}
-
                                     lastBytes = bytes;
                                     lastTimestamp = now;
-
-                                    let codecInfo = "";
-                                    if (report.codecId) {{
-                                      codecInfo = "CodecID: " + report.codecId;
-                                    }}
-
-                                    debug.innerText = `ICE: ${{pc.iceConnectionState}}\\nConn: ${{pc.connectionState}}\\nBytes: ${{bytes}}\\nBitrate: ${{bitrate.toFixed(0)}} kbps\\nFrames Decoded: ${{report.framesDecoded}}\\nPackets Lost: ${{report.packetsLost}}\\n${{codecInfo}}`;
+                                    let codecInfo = report.codecId ? "CodecID: " + report.codecId : "";
+                                    debug.innerText = `ICE: ${{pc.iceConnectionState}}  |  Conn: ${{pc.connectionState}}  |  Bytes: ${{bytes}}  |  Bitrate: ${{bitrate.toFixed(0)}} kbps  |  Frames: ${{report.framesDecoded}}  |  Lost: ${{report.packetsLost}}\\n${{codecInfo}}`;
                                 }}
                             }});
-                            if (!foundVideo) debug.innerText = `ICE: ${{pc.iceConnectionState}}\\nConn: ${{pc.connectionState}}\\nWaiting for video data...`;
+                            if (!foundVideo) debug.innerText = `ICE: ${{pc.iceConnectionState}}  |  Conn: ${{pc.connectionState}}  |  Waiting for video...`;
                         }} else {{
-                            debug.innerText = `ICE State: ${{pc.iceConnectionState}}\\nConn State: ${{pc.connectionState}}`;
+                            debug.innerText = `ICE: ${{pc.iceConnectionState}}  |  Conn: ${{pc.connectionState}}`;
                         }}
                       }}, 1000);
 
                       const offer = await pc.createOffer();
                       await pc.setLocalDescription(offer);
-
-                      status.innerText = "Gathering ICE candidates...";
+                      status.innerText = "Gathering ICE...";
                       await new Promise((resolve) => {{
                           if (pc.iceGatheringState === 'complete') return resolve();
-
                           const checkState = () => {{
                               if (pc.iceGatheringState === 'complete') {{
                                   pc.removeEventListener('icegatheringstatechange', checkState);
                                   resolve();
                               }}
                           }};
-
                           pc.addEventListener('icegatheringstatechange', checkState);
                           setTimeout(resolve, 8000);
                       }});
@@ -921,8 +899,7 @@ def main():
                         bridge_services_out: []
                       }};
 
-                      status.innerText = "Handshaking with " + ip + "...";
-
+                      status.innerText = "Handshaking...";
                       const response = await fetch(`http://${{ip}}:${{port}}/stream`, {{
                         method: 'POST',
                         headers: {{ 'Content-Type': 'application/json' }},
@@ -940,7 +917,10 @@ def main():
                     }} catch (e) {{
                       console.error(e);
                       status.innerText = "Error: " + e.message;
-                      status.style.color = "red";
+                      status.style.background = "rgba(239,68,68,0.8)";
+                      debug.innerText = "Connection Error: " + e.message;
+                      debug.style.borderLeftColor = "#EF4444";
+                      debug.style.color = "#FCA5A5";
                     }}
                   }}
 
@@ -949,7 +929,7 @@ def main():
               </body>
             </html>
             """
-      components.html(webrtc_html, height=500)
+      components.html(webrtc_html, height=530)
     else:
       st.markdown("""
             <div style="
