@@ -3,6 +3,7 @@ import subprocess
 import shutil
 import os
 import time
+import html as html_lib
 from datetime import datetime
 from pathlib import Path
 import streamlit.components.v1 as components
@@ -79,8 +80,6 @@ def run_script(name, path, args=None):
     st.session_state["script_log"] = f"[{name}] Error: {e}"
     st.session_state["script_ok"] = False
     return 1
-
-
 
 
 def reset_calibration():
@@ -339,6 +338,63 @@ def main():
       content: 'ON' !important; left: 9px !important; right: auto !important;
     }
 
+    div[data-baseweb="select"] input {
+      caret-color: transparent !important;
+      user-select: none !important;
+    }
+    div[data-baseweb="select"] input:focus {
+      outline: none !important;
+      box-shadow: none !important;
+    }
+
+    .log-output-box {
+      background: linear-gradient(90deg, #0D1117 0%, #161B22 100%);
+      border: 1.5px solid #3A4A6B;
+      border-left: 4px solid #3B82F6;
+      border-radius: 16px;
+      padding: 16px 20px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.82em;
+      color: #BCC4E0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      line-height: 1.6;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      margin-top: 8px;
+    }
+    .log-viewer {
+      background: #0D1117;
+      border: 1.5px solid #3A4A6B;
+      border-radius: 12px;
+      padding: 16px 20px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.8em;
+      color: #BCC4E0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      line-height: 1.6;
+      height: 430px;
+      overflow-y: auto;
+      box-shadow: inset 0 2px 12px rgba(0,0,0,0.5);
+      margin-top: 8px;
+      scroll-behavior: smooth;
+    }
+    .log-statusbar {
+      background: linear-gradient(90deg, #1A2235, #232E45);
+      border: 1.5px solid #3A4A6B;
+      border-left: 4px solid #3B82F6;
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.78em;
+      color: #93C5FD;
+      margin-top: 10px;
+      min-height: 40px;
+    }
+    .log-output-box.log-error, .log-statusbar.log-error  { border-left-color: #EF4444; color: #FCA5A5; }
+    .log-output-box.log-success,.log-statusbar.log-success{ border-left-color: #10B981; color: #6EE7B7; }
+    .log-output-box.log-warn,  .log-statusbar.log-warn   { border-left-color: #D97706; color: #FCD34D; }
+
     [data-testid="stSelectbox"] label {
       color: #7B8EC8 !important;
       font-size: 0.78em !important;
@@ -468,6 +524,22 @@ def main():
 
   st.title("Openpilot Dashboard")
 
+  components.html("""
+    <script>
+    (function() {
+      var doc = window.parent.document;
+      function patchSelectInputs() {
+        doc.querySelectorAll('[data-baseweb="select"] input').forEach(function(el) {
+          if (el.getAttribute('inputmode') === 'none') return;
+          el.setAttribute('inputmode', 'none');
+        });
+      }
+      patchSelectInputs();
+      new MutationObserver(patchSelectInputs).observe(doc.body, { childList: true, subtree: true });
+    })();
+    </script>
+  """, height=0)
+
   tabs = st.tabs(["🚀 Functions", "⚙️ Toggles", "📋 Logs", "📂 Realdata", "📺 Terminal", "📷 Camera"])
 
   with tabs[0]:
@@ -584,23 +656,12 @@ def main():
 
     if "script_log" in st.session_state:
       ok = st.session_state.get("script_ok", True)
-      color = "#10B981" if ok else "#EF4444"
       icon = "✅" if ok else "❌"
-      st.markdown(f"""
-        <div style="
-          margin-top: 16px;
-          background: linear-gradient(90deg, #1A2235, #232E45);
-          border: 1.5px solid {color}44;
-          border-left: 4px solid {color};
-          border-radius: 16px;
-          padding: 12px 18px;
-          font-family: 'Courier New', monospace;
-          font-size: 0.82em;
-          color: #BCC4E0;
-          white-space: pre-wrap;
-          word-break: break-all;
-        ">{icon} {st.session_state['script_log']}</div>
-      """, unsafe_allow_html=True)
+      extra_class = "log-success" if ok else "log-error"
+      st.markdown(
+        f'<div class="log-output-box {extra_class}">{icon} {st.session_state["script_log"]}</div>',
+        unsafe_allow_html=True
+      )
 
   with tabs[1]:
     toggle_items = [
@@ -693,30 +754,32 @@ def main():
           run_script("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh",
                      args=[sel_log_name])
 
-    content = st.session_state.get("log_out", "Select a log file or console to view.")
-    st.text_area("Output Window", content, height=500, key="log_output_window")
+    content = st.session_state.get("log_out", "")
+    err_msg = st.session_state.get("log_view_error")
 
-    if st.session_state.get("log_view_error"):
-        err_msg = st.session_state["log_view_error"]
-        st.markdown(f"""
-        <div style="
-          margin-top: 16px;
-          background: linear-gradient(90deg, #1A2235, #232E45);
-          border: 1.5px solid #EF444444;
-          border-left: 4px solid #EF4444;
-          border-radius: 16px;
-          padding: 12px 18px;
-          font-family: 'Courier New', monospace;
-          font-size: 0.82em;
-          color: #BCC4E0;
-          white-space: pre-wrap;
-          word-break: break-all;
-        ">⚠️ {err_msg}</div>
-      """, unsafe_allow_html=True)
+    if err_msg:
+      st.markdown(f'<div class="log-viewer" style="border-left-color:#EF4444; color:#FCA5A5;">❌ {err_msg}</div>', unsafe_allow_html=True)
+      st.markdown('<div class="log-statusbar log-error">⚠️ 파일을 불러오지 못했습니다.</div>', unsafe_allow_html=True)
+    else:
+      display  = html_lib.escape(content) if content else "로그 파일을 선택한 후 View 버튼을 눌러주세요."
+      lines    = len(content.splitlines()) if content else 0
+      chars    = len(content) if content else 0
+      scroll_js = "<script>var v=document.getElementById('logViewer');if(v)v.scrollTop=v.scrollHeight;</script>" if content else ""
+      st.markdown(
+        f'<div class="log-viewer" id="logViewer">{display}</div>{scroll_js}',
+        unsafe_allow_html=True
+      )
+      if content:
+        st.markdown(
+          f'<div class="log-statusbar">📄 {sel_log_name} &nbsp;|&nbsp; {lines} lines &nbsp;|&nbsp; {chars:,} chars</div>',
+          unsafe_allow_html=True
+        )
+      else:
+        st.markdown('<div class="log-statusbar">📂 파일 선택 후 View를 눌러주세요.</div>', unsafe_allow_html=True)
 
   with tabs[3]:
     if not REALDATA_PATH.exists():
-      st.warning("Path not found: /data/media/0/realdata")
+      st.markdown('<div class="log-output-box log-error">❌ Path not found: /data/media/0/realdata</div>', unsafe_allow_html=True)
     else:
       route_map = {}
       for item in REALDATA_PATH.iterdir():
@@ -733,7 +796,7 @@ def main():
         r_data['paths'].sort(key=lambda x: int(x.split("--")[-1]))
 
       if not route_map:
-        st.info("No uploadable routes found.")
+        st.markdown('<div class="log-output-box log-warn">⚠️ No uploadable routes found.</div>', unsafe_allow_html=True)
       else:
         sorted_routes = sorted(route_map.items(), key=lambda x: x[1]['mtime'], reverse=True)
         options = [f"[{datetime.fromtimestamp(v['mtime']).strftime('%Y-%m-%d %H:%M')}] {k} ({len(v['paths'])} segs)" for
@@ -743,14 +806,12 @@ def main():
         if st.button("Route Upload", use_container_width=True):
           idx = options.index(sel_route)
           targets = sorted_routes[idx][1]['paths']
-
           cmd = ["bash", f"{SCRIPTS_PATH}/realdata_upload.sh"] + targets
-
           try:
             subprocess.Popen(cmd)
-            st.success(f"Upload started in background! ({len(targets)} segments)\nPlease check the NAS or Tmux logs.")
+            st.markdown(f'<div class="log-output-box log-success">✅ Upload started in background! ({len(targets)} segments)\nPlease check the NAS or Tmux logs.</div>', unsafe_allow_html=True)
           except Exception as e:
-            st.error(f"Failed to start upload: {e}")
+            st.markdown(f'<div class="log-output-box log-error">❌ Failed to start upload: {e}</div>', unsafe_allow_html=True)
 
   with tabs[5]:
     camera_options = {
@@ -759,7 +820,7 @@ def main():
       "Wide Road Camera": "wideRoad"
     }
 
-    c_col1, c_col2, c_col3 = st.columns([3, 1, 1], vertical_alignment="bottom")
+    c_col1, c_col2, c_col3 = st.columns([3, 1, 1], vertical_alignment="center")
 
     with c_col1:
       selected_cam = st.selectbox("Select Camera Source", list(camera_options.keys()), key="cam_source")
@@ -784,7 +845,12 @@ def main():
             <html>
               <body style="background-color: #0B0E14; margin: 0; font-family: sans-serif;">
 
-                <div style="position:relative; width:100%; height:430px; background:#000; border-radius:12px; overflow:hidden;">
+                <div style="position:relative; width:100%; height:430px;
+                  background:#000;
+                  border-radius:12px;
+                  border: 1.5px solid #3A4A6B;
+                  overflow:hidden;
+                  box-shadow: 0 4px 16px rgba(0,0,0,0.4);">
                   <video id="video" autoplay playsinline muted controls
                     style="width:100%; height:100%; object-fit:contain; cursor:pointer;"></video>
                   <div id="status" style="
@@ -868,12 +934,12 @@ def main():
                                     lastBytes = bytes;
                                     lastTimestamp = now;
                                     let codecInfo = report.codecId ? "CodecID: " + report.codecId : "";
-                                    debug.innerText = `ICE: ${{pc.iceConnectionState}}  |  Conn: ${{pc.connectionState}}  |  Bytes: ${{bytes}}  |  Bitrate: ${{bitrate.toFixed(0)}} kbps  |  Frames: ${{report.framesDecoded}}  |  Lost: ${{report.packetsLost}}\\n${{codecInfo}}`;
+                                    debug.innerText = `ICE: ${{pc.iceConnectionState}}  |  Connection: ${{pc.connectionState}}  |  Bytes: ${{bytes}}  |  Bitrate: ${{bitrate.toFixed(0)}} kbps  |  Frames: ${{report.framesDecoded}}  |  Lost: ${{report.packetsLost}}\\n${{codecInfo}}`;
                                 }}
                             }});
-                            if (!foundVideo) debug.innerText = `ICE: ${{pc.iceConnectionState}}  |  Conn: ${{pc.connectionState}}  |  Waiting for video...`;
+                            if (!foundVideo) debug.innerText = `ICE: ${{pc.iceConnectionState}}  |  Connection: ${{pc.connectionState}}  |  Waiting for video...`;
                         }} else {{
-                            debug.innerText = `ICE: ${{pc.iceConnectionState}}  |  Conn: ${{pc.connectionState}}`;
+                            debug.innerText = `ICE: ${{pc.iceConnectionState}}  |  Connection: ${{pc.connectionState}}`;
                         }}
                       }}, 1000);
 
@@ -932,26 +998,48 @@ def main():
       components.html(webrtc_html, height=530)
     else:
       st.markdown("""
-            <div style="
-                height: 500px;
-                border: 1px solid #333;
-                border-radius: 8px;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                background-color: #0E1117;
-                color: #666;
-            ">
-                Stream Stopped
-            </div>
-        """, unsafe_allow_html=True)
+        <div class="log-viewer" style="
+          display:flex; flex-direction:column;
+          justify-content:center; align-items:center;
+          gap:12px; color:#3A4A6B;
+        ">
+          <div style="font-size:3em; filter:grayscale(1) opacity(0.3);">📷</div>
+          <div style="font-size:0.9em; font-weight:600; letter-spacing:0.08em; text-transform:uppercase;">
+            Select a camera source and press Start
+          </div>
+        </div>
+      """, unsafe_allow_html=True)
+      st.markdown('<div class="log-statusbar">📷 Camera &nbsp;|&nbsp; Stream Stopped</div>', unsafe_allow_html=True)
 
   with tabs[4]:
-    terminal_placeholder = st.empty()
+    term_view   = st.empty()
+    term_status = st.empty()
 
     while True:
       content = get_tmux_capture()
-      terminal_placeholder.code(content, language="bash")
+      escaped = html_lib.escape(content)
+      lines   = len(content.splitlines())
+      is_err  = content.startswith("Error capturing tmux") or content.startswith("Tmux Session not found")
+
+      if is_err:
+        term_view.markdown(
+          f'<div class="log-viewer" style="border-left-color:#EF4444; color:#FCA5A5;">❌ {escaped}</div>',
+          unsafe_allow_html=True
+        )
+        term_status.markdown(
+          '<div class="log-statusbar log-error">⚠️ tmux 세션을 찾을 수 없습니다. openpilot이 실행 중인지 확인하세요.</div>',
+          unsafe_allow_html=True
+        )
+      else:
+        now_str = datetime.now().strftime("%H:%M:%S")
+        term_view.markdown(
+          f'<div class="log-viewer">{escaped}</div>',
+          unsafe_allow_html=True
+        )
+        term_status.markdown(
+          f'<div class="log-statusbar">🖥️ Tmux Session &nbsp;|&nbsp; {lines} lines &nbsp;|&nbsp; 🔄 Last updated: {now_str}</div>',
+          unsafe_allow_html=True
+        )
       time.sleep(1)
 
 
