@@ -119,8 +119,8 @@ procs = [
   # Process add
   PythonProcess("navi_controller", "selfdrive.controls.neokii.navi_controller", always_run, enabled=not PC),
 
-  NativeProcess("web_community", "scripts",
-                ["python3", "-m", "streamlit", "run", "/data/openpilot/scripts/web_community.py",
+  NativeProcess("dashboard", "scripts",
+                ["python3", "-m", "streamlit", "run", "/data/openpilot/scripts/dashboard/main.py",
                  "--server.port", "8080", "--server.address", "0.0.0.0", "--server.headless", "true"],
                 always_run, enabled=not PC),
 ]
