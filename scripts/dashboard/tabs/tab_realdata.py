@@ -5,7 +5,7 @@ import streamlit as st
 
 from utils import SCRIPTS_PATH
 
-REALDATA_PATH    = Path("/data/media/0/realdata")
+REALDATA_PATH = Path("/data/media/0/realdata")
 
 def render():
   if not REALDATA_PATH.exists():
@@ -43,10 +43,16 @@ def render():
     for k, v in sorted_routes
   ]
 
-  sel_route = st.selectbox("Select Route to Upload", options)
-  st.markdown('<div id="btn_marker_success_route"></div>', unsafe_allow_html=True)
+  col_drop, col_btn = st.columns([2, 1], vertical_alignment="bottom")
 
-  if st.button("Route Upload", use_container_width=True):
+  with col_drop:
+    sel_route = st.selectbox("Select Route to Upload", options)
+
+  with col_btn:
+    st.markdown('<div id="btn_marker_success_route"></div>', unsafe_allow_html=True)
+    clicked = st.button("Route Upload", use_container_width=True)
+
+  if clicked:
     idx     = options.index(sel_route)
     targets = sorted_routes[idx][1]['paths']
     cmd     = ["bash", f"{SCRIPTS_PATH}/realdata_upload.sh"] + targets
