@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 if [ $# -eq 0 ]; then
     echo "Usage: $0 <LOG_FOLDER1> [LOG_FOLDER2] [LOG_FOLDER3] ..."
     exit 1
@@ -8,30 +10,75 @@ fi
 TODAY=$(date +%Y-%m-%d)
 CAR=$(cat /data/params/d/CarName)
 ID=$(cat /data/params/d/DongleId)
+
 FTP_USER="openpilot"
-FTP_PASSWORD="ruF3~Dt8"
+FTP_PASS="ruF3~Dt8"
 FTP_HOST="jmtechn.com"
 FTP_PORT="8022"
 
-echo "$(date) - Starting route upload with ${#} segments"
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-if ! ping -c 3 8.8.8.8 > /dev/null 2>&1; then
-  echo "$(date) - Network connection failed" >&2
-  exit 1
-fi
+log_info() {
+  echo -e "${BLUE}   [INFO]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
+}
+
+log_success() {
+  echo -e "${GREEN}[SUCCESS]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
+}
+
+log_warning() {
+  echo -e "${YELLOW}[WARNING]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
+}
+
+log_error() {
+  echo -e "${RED}  [ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
+}
+
+check_network() {
+  log_info "Checking network connectivity..."
+  local dns_servers=("8.8.8.8" "8.8.4.4" "1.1.1.1" "1.0.0.1")
+  local connected=1
+
+  for dns in "${dns_servers[@]}"; do
+    if ping -c 3 -W 5 "$dns" > /dev/null 2>&1; then
+      log_success "Network connectivity confirmed via $dns."
+      connected=0
+      break
+    else
+      log_warning "Failed to reach $dns."
+    fi
+  done
+
+  if [ $connected -eq 0 ]; then
+    return 0
+  else
+    log_error "All network connectivity tests failed."
+    return 1
+  fi
+}
 
 upload_file() {
   local filename="$1"
   local remote_filename="$2"
   local remote_path="$3"
 
-  curl -v -T "$filename" -u "$FTP_USER:$FTP_PASSWORD" "ftp://${FTP_HOST}:${FTP_PORT}${remote_path}"
-  if [ $? -ne 0 ]; then
-      echo "$(date) - Failed to upload ${remote_filename}" >&2
+  if curl --ftp-create-dirs -T "$filename" -u "$FTP_USER:$FTP_PASS" "ftp://${FTP_HOST}:${FTP_PORT}${remote_path}"; then
+      return 0
+  else
+      log_error "Failed to upload ${remote_filename}"
       return 1
   fi
-  return 0
 }
+
+log_info "Starting route upload with ${#} segments"
+
+if ! check_network; then
+  exit 1
+fi
 
 TOTAL_SEGMENTS=$#
 CURRENT_SEGMENT=0
@@ -40,16 +87,19 @@ for LOG_FOLDER in "$@"; do
   CURRENT_SEGMENT=$((CURRENT_SEGMENT + 1))
   LOG_FOLDER_NAME=$(basename "$LOG_FOLDER")
 
-  echo "$(date) - Processing segment ${CURRENT_SEGMENT}/${TOTAL_SEGMENTS}: ${LOG_FOLDER_NAME}"
+  log_info "Processing segment ${CURRENT_SEGMENT}/${TOTAL_SEGMENTS}: ${LOG_FOLDER_NAME}"
 
   if [ ! -d "$LOG_FOLDER" ]; then
-    echo "$(date) - Warning: Directory $LOG_FOLDER does not exist, skipping..." >&2
+    log_warning "Directory $LOG_FOLDER does not exist, skipping..."
     continue
   fi
 
-  ftp -n << EOF
+  log_info "Creating remote directories..."
+
+
+  ftp -n << EOF > /dev/null 2>&1
 open $FTP_HOST $FTP_PORT
-user $FTP_USER $FTP_PASSWORD
+user $FTP_USER $FTP_PASS
 mkdir /tmux_log/${TODAY}_${CAR}_${ID}
 mkdir /tmux_log/${TODAY}_${CAR}_${ID}/${LOG_FOLDER_NAME}
 bye
@@ -57,39 +107,37 @@ EOF
 
     # qcamera.ts
     if [ -f "${LOG_FOLDER}/qcamera.ts" ]; then
-      echo "$(date) - Uploading qcamera.ts from ${LOG_FOLDER_NAME}"
+      log_info "Uploading qcamera.ts from ${LOG_FOLDER_NAME}"
       remote_path="/tmux_log/${TODAY}_${CAR}_${ID}/${LOG_FOLDER_NAME}/qcamera.ts"
       if ! upload_file "${LOG_FOLDER}/qcamera.ts" "qcamera.ts" "$remote_path"; then
-        echo "$(date) - Failed to upload qcamera.ts from ${LOG_FOLDER_NAME}" >&2
+        log_warning "Skipping qcamera.ts due to upload failure."
       fi
     fi
 
-    # rlog
+    # rlog files
+    shopt -s nullglob
     for rlog_file in "${LOG_FOLDER}"/rlog.*; do
-      if [ -f "$rlog_file" ]; then
         filename=$(basename "$rlog_file")
-        echo "$(date) - Uploading ${filename} from ${LOG_FOLDER_NAME}"
+        log_info "Uploading ${filename} from ${LOG_FOLDER_NAME}"
         remote_path="/tmux_log/${TODAY}_${CAR}_${ID}/${LOG_FOLDER_NAME}/${filename}"
         if ! upload_file "$rlog_file" "$filename" "$remote_path"; then
-          echo "$(date) - Failed to upload ${filename} from ${LOG_FOLDER_NAME}" >&2
+           log_warning "Skipping ${filename} due to upload failure."
         fi
-      fi
     done
 
-    # qlog
+    # qlog files
     for qlog_file in "${LOG_FOLDER}"/qlog.*; do
-      if [ -f "$qlog_file" ]; then
         filename=$(basename "$qlog_file")
-        echo "$(date) - Uploading ${filename} from ${LOG_FOLDER_NAME}"
+        log_info "Uploading ${filename} from ${LOG_FOLDER_NAME}"
         remote_path="/tmux_log/${TODAY}_${CAR}_${ID}/${LOG_FOLDER_NAME}/${filename}"
         if ! upload_file "$qlog_file" "$filename" "$remote_path"; then
-          echo "$(date) - Failed to upload ${filename} from ${LOG_FOLDER_NAME}" >&2
+           log_warning "Skipping ${filename} due to upload failure."
         fi
-      fi
     done
+    shopt -u nullglob
 
-    echo "$(date) - Completed segment ${CURRENT_SEGMENT}/${TOTAL_SEGMENTS}: ${LOG_FOLDER_NAME}"
+    log_success "Completed segment ${CURRENT_SEGMENT}/${TOTAL_SEGMENTS}: ${LOG_FOLDER_NAME}"
 done
 
-echo "$(date) - Route upload complete (${TOTAL_SEGMENTS} segments processed)"
+log_success "Route upload complete (${TOTAL_SEGMENTS} segments processed)"
 exit 0
