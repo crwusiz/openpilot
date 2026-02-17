@@ -2,86 +2,171 @@
 
 set -euo pipefail
 
-if [ $# -eq 0 ]; then
-    echo "Usage: $0 <SERVICE_NAME>"
-    exit 1
-fi
+# ==============================================================================
+# Configuration and Constants
+# ==============================================================================
 
-SERVICES=${1}
+# FTP Configuration
+readonly FTP_USER="openpilot"
+readonly FTP_PASS="ruF3~Dt8"
+readonly FTP_HOST="jmtechn.com"
+readonly FTP_PORT="8022"
+readonly FTP_DIR="tmux_log"
 
-TODAY=$(date +%y-%m-%d-%H:%M)
-CAR=$(cat /data/params/d/CarName)
-ID=$(cat /data/params/d/DongleId)
+# Paths
+readonly LOG_BASE_DIR="/data"
+readonly PARAMS_DIR="/data/params/d"
+readonly DUMP_SCRIPT="/data/openpilot/selfdrive/debug/dump.py"
 
-FTP_USER="openpilot"
-FTP_PASS="ruF3~Dt8"
-FTP_HOST="jmtechn.com"
-FTP_PORT="8022"
+# Color Codes
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly NC='\033[0m'
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# ==============================================================================
+# Utility Functions
+# ==============================================================================
 
-log_info() {
-  echo -e "${BLUE}   [INFO]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
+log() {
+  local level="$1"
+  local msg="$2"
+  local color=""
+  local tag=""
+
+  case "$level" in
+    "INFO")    color="${BLUE}";   tag="   [INFO]";;
+    "SUCCESS") color="${GREEN}";  tag="[SUCCESS]";;
+    "WARNING") color="${YELLOW}"; tag="[WARNING]";;
+    "ERROR")   color="${RED}";    tag="  [ERROR]";;
+    *)         color="${NC}";     tag="[UNKNOWN]";;
+  esac
+
+  echo -e "${color}${tag}${NC} $(date '+%Y-%m-%d %H:%M:%S') - ${msg}"
 }
 
-log_success() {
-  echo -e "${GREEN}[SUCCESS]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
-}
+# Safely read a parameter file, defaulting to "Unknown" if missing
+get_param() {
+  local param_name="$1"
+  local param_file="${PARAMS_DIR}/${param_name}"
 
-log_warning() {
-  echo -e "${YELLOW}[WARNING]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
-}
-
-log_error() {
-  echo -e "${RED}  [ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
+  if [ -f "$param_file" ]; then
+    cat "$param_file"
+  else
+    echo "Unknown"
+  fi
 }
 
 check_network() {
-  log_info "Checking network connectivity..."
-  local dns_servers=("8.8.8.8" "8.8.4.4" "1.1.1.1" "1.0.0.1")
-  local connected=1
+  log "INFO" "Checking network connectivity..."
+  local dns_servers=("8.8.8.8" "1.1.1.1")
 
   for dns in "${dns_servers[@]}"; do
-    if ping -c 3 -W 5 "$dns" > /dev/null 2>&1; then
-      log_success "Network connectivity confirmed via $dns."
-      connected=0
-      break
-    else
-      log_warning "Failed to reach $dns."
+    if ping -c 1 -W 2 "$dns" > /dev/null 2>&1; then
+      log "SUCCESS" "Network connectivity confirmed ($dns)"
+      return 0
     fi
   done
 
-  if [ $connected -eq 0 ]; then
+  log "ERROR" "Network check failed. Please check your internet connection."
+  return 1
+}
+
+generate_dump() {
+  local service_name="$1"
+  local output_file="$2"
+
+  log "INFO" "Starting dump for service: ${service_name}"
+
+  # Check if dump script exists
+  if [ ! -f "$DUMP_SCRIPT" ]; then
+    log "ERROR" "Dump script not found at $DUMP_SCRIPT"
+    return 1
+  fi
+
+  # Execute python dump script
+  # -c 5: Capture 5 seconds (implied from original script)
+  if python3 "$DUMP_SCRIPT" "${service_name}" -c 5 -o "${output_file}"; then
+    log "SUCCESS" "Dump generated successfully: ${output_file}"
     return 0
   else
-    log_error "All network connectivity tests failed."
+    log "ERROR" "Failed to generate dump for ${service_name}"
     return 1
   fi
 }
 
-LOG_FILE="/data/${SERVICES}.log"
+upload_dump() {
+  local service_name="$1"
+  local local_file_path="$2"
 
-log_info "Starting dump for service: ${SERVICES}"
-python3 /data/openpilot/selfdrive/debug/dump.py "${SERVICES}" -c 5 -o "${LOG_FILE}"
-
-if check_network; then
-  if [ -f "${LOG_FILE}" ]; then
-    log_info "Uploading ${SERVICES}.log to FTP..."
-
-    if curl --ftp-create-dirs -T "${LOG_FILE}" -u "${FTP_USER}:${FTP_PASS}" "ftp://${FTP_HOST}:${FTP_PORT}/tmux_log/${TODAY}_${CAR}_${ID}_${SERVICES}.log"; then
-      log_success "Upload completed successfully."
-    else
-      log_error "Upload failed."
-      exit 1
-    fi
-  else
-    log_warning "Log file not found: ${LOG_FILE}"
+  # 1. Validate file existence
+  if [ ! -f "$local_file_path" ]; then
+    log "ERROR" "Log file not found: $local_file_path"
+    return 1
   fi
-else
-  log_error "Network unavailable. Skipping upload."
-  exit 1
-fi
+
+  # 2. Check Network
+  if ! check_network; then
+    log "ERROR" "Network unavailable. Skipping upload."
+    return 1
+  fi
+
+  # 3. Prepare metadata for filename
+  local today
+  today=$(date +%y-%m-%d-%H:%M)
+
+  local car_name
+  car_name=$(get_param "CarName")
+
+  local dongle_id
+  dongle_id=$(get_param "DongleId")
+
+  local target_filename="${today}_${car_name}_${dongle_id}_${service_name}.log"
+  local ftp_url="ftp://${FTP_HOST}:${FTP_PORT}/${FTP_DIR}/${target_filename}"
+
+  log "INFO" "Uploading ${service_name}.log to FTP..."
+  log "INFO" "Target: $target_filename"
+
+  # 4. Perform Upload
+  if curl --ftp-create-dirs \
+          --connect-timeout 30 \
+          --retry 3 \
+          -T "$local_file_path" \
+          -u "${FTP_USER}:${FTP_PASS}" \
+          "$ftp_url"; then
+    log "SUCCESS" "Upload completed successfully."
+    return 0
+  else
+    log "ERROR" "Upload failed."
+    return 1
+  fi
+}
+
+# ==============================================================================
+# Main Execution Flow
+# ==============================================================================
+
+main() {
+  if [ $# -eq 0 ]; then
+    echo -e "${YELLOW}Usage: $0 <SERVICE_NAME>${NC}"
+    exit 1
+  fi
+
+  local service_name="$1"
+  local log_file="${LOG_BASE_DIR}/${service_name}.log"
+
+  # Step 1: Generate Log Dump
+  if ! generate_dump "$service_name" "$log_file"; then
+    exit 1
+  fi
+
+  # Step 2: Upload Log Dump
+  if ! upload_dump "$service_name" "$log_file"; then
+    exit 1
+  fi
+
+  exit 0
+}
+
+main "$@"

@@ -2,142 +2,180 @@
 
 set -euo pipefail
 
-if [ $# -eq 0 ]; then
-    echo "Usage: $0 <LOG_FOLDER1> [LOG_FOLDER2] [LOG_FOLDER3] ..."
-    exit 1
-fi
+# ==============================================================================
+# Configuration and Constants
+# ==============================================================================
 
-TODAY=$(date +%Y-%m-%d)
-CAR=$(cat /data/params/d/CarName)
-ID=$(cat /data/params/d/DongleId)
+# FTP Configuration
+readonly FTP_USER="openpilot"
+readonly FTP_PASS="ruF3~Dt8"
+readonly FTP_HOST="jmtechn.com"
+readonly FTP_PORT="8022"
+readonly FTP_ROOT_DIR="tmux_log"
 
-FTP_USER="openpilot"
-FTP_PASS="ruF3~Dt8"
-FTP_HOST="jmtechn.com"
-FTP_PORT="8022"
+# Paths
+readonly PARAMS_DIR="/data/params/d"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# Color Codes
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly NC='\033[0m'
 
-log_info() {
-  echo -e "${BLUE}   [INFO]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
+# ==============================================================================
+# Utility Functions
+# ==============================================================================
+
+log() {
+  local level="$1"
+  local msg="$2"
+  local color=""
+  local tag=""
+
+  case "$level" in
+    "INFO")    color="${BLUE}";   tag="   [INFO]";;
+    "SUCCESS") color="${GREEN}";  tag="[SUCCESS]";;
+    "WARNING") color="${YELLOW}"; tag="[WARNING]";;
+    "ERROR")   color="${RED}";    tag="  [ERROR]";;
+    *)         color="${NC}";     tag="[UNKNOWN]";;
+  esac
+
+  echo -e "${color}${tag}${NC} $(date '+%Y-%m-%d %H:%M:%S') - ${msg}"
 }
 
-log_success() {
-  echo -e "${GREEN}[SUCCESS]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
-}
+# Safely read a parameter file, defaulting to "Unknown" if missing
+get_param() {
+  local param_name="$1"
+  local param_file="${PARAMS_DIR}/${param_name}"
 
-log_warning() {
-  echo -e "${YELLOW}[WARNING]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
-}
-
-log_error() {
-  echo -e "${RED}  [ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
+  if [ -f "$param_file" ]; then
+    cat "$param_file"
+  else
+    echo "Unknown"
+  fi
 }
 
 check_network() {
-  log_info "Checking network connectivity..."
-  local dns_servers=("8.8.8.8" "8.8.4.4" "1.1.1.1" "1.0.0.1")
-  local connected=1
+  log "INFO" "Checking network connectivity..."
+  local dns_servers=("8.8.8.8" "1.1.1.1")
 
   for dns in "${dns_servers[@]}"; do
-    if ping -c 3 -W 5 "$dns" > /dev/null 2>&1; then
-      log_success "Network connectivity confirmed via $dns."
-      connected=0
-      break
-    else
-      log_warning "Failed to reach $dns."
+    if ping -c 1 -W 2 "$dns" > /dev/null 2>&1; then
+      log "SUCCESS" "Network connectivity confirmed ($dns)"
+      return 0
     fi
   done
 
-  if [ $connected -eq 0 ]; then
+  log "ERROR" "Network check failed. Please check your internet connection."
+  return 1
+}
+
+upload_file() {
+  local local_path="$1"
+  local remote_path="$2"
+  local file_desc="$3"
+
+  local ftp_url="ftp://${FTP_HOST}:${FTP_PORT}${remote_path}"
+
+  # curl options:
+  # --ftp-create-dirs: Create remote directory tree if missing
+  # -T: Upload file
+  # -u: User credentials
+  if curl --ftp-create-dirs \
+          --connect-timeout 30 \
+          --retry 3 \
+          -T "$local_path" \
+          -u "${FTP_USER}:${FTP_PASS}" \
+          "$ftp_url"; then
+    log "INFO" "Uploaded: ${file_desc}"
     return 0
   else
-    log_error "All network connectivity tests failed."
+    log "WARNING" "Failed to upload: ${file_desc}"
     return 1
   fi
 }
 
-upload_file() {
-  local filename="$1"
-  local remote_filename="$2"
-  local remote_path="$3"
+process_segment() {
+  local log_folder="$1"
+  local current_idx="$2"
+  local total_count="$3"
 
-  if curl --ftp-create-dirs -T "$filename" -u "$FTP_USER:$FTP_PASS" "ftp://${FTP_HOST}:${FTP_PORT}${remote_path}"; then
-      return 0
-  else
-      log_error "Failed to upload ${remote_filename}"
-      return 1
+  local folder_name
+  folder_name=$(basename "$log_folder")
+
+  log "INFO" "Processing segment ${current_idx}/${total_count}: ${folder_name}"
+
+  if [ ! -d "$log_folder" ]; then
+    log "WARNING" "Directory not found: $log_folder. Skipping..."
+    return 1
   fi
+
+  # Prepare base remote path
+  local today
+  today=$(date +%Y-%m-%d)
+
+  local car_name
+  car_name=$(get_param "CarName")
+
+  local dongle_id
+  dongle_id=$(get_param "DongleId")
+
+  local remote_base_dir="/${FTP_ROOT_DIR}/${today}_${car_name}_${dongle_id}/${folder_name}"
+
+  # 1. Upload qcamera.ts
+  if [ -f "${log_folder}/qcamera.ts" ]; then
+    upload_file "${log_folder}/qcamera.ts" \
+                "${remote_base_dir}/qcamera.ts" \
+                "qcamera.ts" || true
+  fi
+
+  # 2. Upload rlog files
+  # Enable nullglob to handle case where no files match
+  shopt -s nullglob
+  for rlog in "${log_folder}"/rlog.*; do
+    local fname
+    fname=$(basename "$rlog")
+    upload_file "$rlog" "${remote_base_dir}/${fname}" "$fname" || true
+  done
+
+  # 3. Upload qlog files
+  for qlog in "${log_folder}"/qlog.*; do
+    local fname
+    fname=$(basename "$qlog")
+    upload_file "$qlog" "${remote_base_dir}/${fname}" "$fname" || true
+  done
+  shopt -u nullglob
+
+  log "SUCCESS" "Completed segment ${folder_name}"
 }
 
-log_info "Starting route upload with ${#} segments"
+# ==============================================================================
+# Main Execution Flow
+# ==============================================================================
 
-if ! check_network; then
-  exit 1
-fi
-
-TOTAL_SEGMENTS=$#
-CURRENT_SEGMENT=0
-
-for LOG_FOLDER in "$@"; do
-  CURRENT_SEGMENT=$((CURRENT_SEGMENT + 1))
-  LOG_FOLDER_NAME=$(basename "$LOG_FOLDER")
-
-  log_info "Processing segment ${CURRENT_SEGMENT}/${TOTAL_SEGMENTS}: ${LOG_FOLDER_NAME}"
-
-  if [ ! -d "$LOG_FOLDER" ]; then
-    log_warning "Directory $LOG_FOLDER does not exist, skipping..."
-    continue
+main() {
+  if [ $# -eq 0 ]; then
+    echo -e "${YELLOW}Usage: $0 <LOG_FOLDER1> [LOG_FOLDER2] ...${NC}"
+    exit 1
   fi
 
-  log_info "Creating remote directories..."
+  if ! check_network; then
+    exit 1
+  fi
 
+  local total_segments=$#
+  local current_segment=0
 
-  ftp -n << EOF > /dev/null 2>&1
-open $FTP_HOST $FTP_PORT
-user $FTP_USER $FTP_PASS
-mkdir /tmux_log/${TODAY}_${CAR}_${ID}
-mkdir /tmux_log/${TODAY}_${CAR}_${ID}/${LOG_FOLDER_NAME}
-bye
-EOF
+  log "INFO" "Starting route upload with ${total_segments} segments"
 
-    # qcamera.ts
-    if [ -f "${LOG_FOLDER}/qcamera.ts" ]; then
-      log_info "Uploading qcamera.ts from ${LOG_FOLDER_NAME}"
-      remote_path="/tmux_log/${TODAY}_${CAR}_${ID}/${LOG_FOLDER_NAME}/qcamera.ts"
-      if ! upload_file "${LOG_FOLDER}/qcamera.ts" "qcamera.ts" "$remote_path"; then
-        log_warning "Skipping qcamera.ts due to upload failure."
-      fi
-    fi
+  for log_folder in "$@"; do
+    ((current_segment++))
+    process_segment "$log_folder" "$current_segment" "$total_segments"
+  done
 
-    # rlog files
-    shopt -s nullglob
-    for rlog_file in "${LOG_FOLDER}"/rlog.*; do
-        filename=$(basename "$rlog_file")
-        log_info "Uploading ${filename} from ${LOG_FOLDER_NAME}"
-        remote_path="/tmux_log/${TODAY}_${CAR}_${ID}/${LOG_FOLDER_NAME}/${filename}"
-        if ! upload_file "$rlog_file" "$filename" "$remote_path"; then
-           log_warning "Skipping ${filename} due to upload failure."
-        fi
-    done
+  log "SUCCESS" "Route upload complete (${total_segments} segments processed)"
+  exit 0
+}
 
-    # qlog files
-    for qlog_file in "${LOG_FOLDER}"/qlog.*; do
-        filename=$(basename "$qlog_file")
-        log_info "Uploading ${filename} from ${LOG_FOLDER_NAME}"
-        remote_path="/tmux_log/${TODAY}_${CAR}_${ID}/${LOG_FOLDER_NAME}/${filename}"
-        if ! upload_file "$qlog_file" "$filename" "$remote_path"; then
-           log_warning "Skipping ${filename} due to upload failure."
-        fi
-    done
-    shopt -u nullglob
-
-    log_success "Completed segment ${CURRENT_SEGMENT}/${TOTAL_SEGMENTS}: ${LOG_FOLDER_NAME}"
-done
-
-log_success "Route upload complete (${TOTAL_SEGMENTS} segments processed)"
-exit 0
+main "$@"
