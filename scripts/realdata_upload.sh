@@ -78,10 +78,6 @@ upload_file() {
 
   local ftp_url="ftp://${FTP_HOST}:${FTP_PORT}${remote_path}"
 
-  # curl options:
-  # --ftp-create-dirs: Create remote directory tree if missing
-  # -T: Upload file
-  # -u: User credentials
   if curl --ftp-create-dirs \
           --connect-timeout 30 \
           --retry 3 \
@@ -111,7 +107,6 @@ process_segment() {
     return 1
   fi
 
-  # Prepare base remote path
   local today
   today=$(date +%Y-%m-%d)
 
@@ -131,7 +126,6 @@ process_segment() {
   fi
 
   # 2. Upload rlog files
-  # Enable nullglob to handle case where no files match
   shopt -s nullglob
   for rlog in "${log_folder}"/rlog.*; do
     local fname
@@ -170,7 +164,7 @@ main() {
   log "INFO" "Starting route upload with ${total_segments} segments"
 
   for log_folder in "$@"; do
-    ((current_segment++))
+    current_segment=$((current_segment + 1))
     process_segment "$log_folder" "$current_segment" "$total_segments"
   done
 
