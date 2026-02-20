@@ -58,7 +58,7 @@ class CruiseButtonHandler:
           ButtonType.decelCruise,
           ButtonType.gapAdjustCruise,
           ButtonType.cancel,
-          ButtonType.lfaButton
+          #ButtonType.lfaButton
         ]:
         self.btn_count = 1
         self.prev_btn = b.type
@@ -720,7 +720,10 @@ class CruiseStateManager:
 
     if btn == ButtonType.decelCruise:
       if self.enabled:
-        if not long_pressed:
+        if double_pressed:
+          if road_limit_speed is not None and road_limit_speed > 0:
+            v_cruise_kph = road_limit_speed
+        elif not long_pressed:
           v_cruise_kph -= (1 if self.conv.is_metric else IMPERIAL_INCREMENT)
         else:
           v_cruise_kph -= (v_cruise_delta - (-v_cruise_kph) % v_cruise_delta)
@@ -740,6 +743,7 @@ class CruiseStateManager:
         self._reset_available()
         self._reset_speed(CS)
 
+    """
     if btn == ButtonType.lfaButton:
       if not long_pressed:
         if road_limit_speed is not None:
@@ -751,6 +755,7 @@ class CruiseStateManager:
       else:
         self._reset_available()
         self._reset_speed(CS)
+    """
 
     v_cruise_kph = np.clip(round(v_cruise_kph), V_CRUISE_MIN, V_CRUISE_MAX)
     self.speed_ms = self.conv.to_ms(v_cruise_kph)
