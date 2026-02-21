@@ -12,7 +12,6 @@ import subprocess
 from contextlib import contextmanager
 from collections.abc import Callable
 from collections import deque
-from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import NamedTuple
@@ -250,6 +249,10 @@ class GuiApplication:
 
   def set_show_fps(self, show: bool):
     self._show_fps = show
+
+  @property
+  def show_touches(self) -> bool:
+    return self._show_touches
 
   @property
   def target_fps(self):
