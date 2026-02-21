@@ -1,16 +1,18 @@
 import pyray as rl
 import math
+
 from dataclasses import dataclass
-from datetime import datetime
 from openpilot.common.constants import CV
-from openpilot.common.params import Params
 from openpilot.selfdrive.ui.onroad.exp_button import ExpButton
-from openpilot.selfdrive.ui.onroad.icon_button import IconButton, RotatableIconButton, ToggleIconButton, IconGroup
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
+
+from datetime import datetime
+from openpilot.common.params import Params
+from openpilot.selfdrive.ui.onroad.icon_button import IconButton, RotatableIconButton, ToggleIconButton, IconGroup
 
 
 # Constants
