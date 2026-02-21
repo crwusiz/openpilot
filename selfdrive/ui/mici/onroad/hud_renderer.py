@@ -16,6 +16,7 @@ EventName = log.OnroadEvent.EventName
 SET_SPEED_NA = 255
 KM_TO_MILE = 0.621371
 CRUISE_DISABLED_CHAR = '–'
+
 SET_SPEED_PERSISTENCE = 2.5  # seconds
 
 
