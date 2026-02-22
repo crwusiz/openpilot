@@ -363,7 +363,7 @@ class WifiUIMici(BigMultiOptionDialog):
     # Clear scroller items and update from latest scan results
     super().show_event()
     self._wifi_manager.set_active(True)
-    self._scroller._items.clear()
+    self._scroller.items.clear()
     self._update_buttons()
 
   def hide_event(self):
@@ -379,22 +379,22 @@ class WifiUIMici(BigMultiOptionDialog):
     # Only add new buttons to the end. Update existing buttons without re-sorting so user can freely scroll around
 
     for network in self._networks.values():
-      network_button_idx = next((i for i, btn in enumerate(self._scroller._items) if btn.option == network.ssid), None)
+      network_button_idx = next((i for i, btn in enumerate(self._scroller.items) if btn.option == network.ssid), None)
       if network_button_idx is not None:
         # Update network on existing button
-        self._scroller._items[network_button_idx].set_current_network(network)
+        self._scroller.items[network_button_idx].set_current_network(network)
       else:
         network_button = WifiItem(network, lambda: self._wifi_manager.wifi_state)
         self._scroller.add_widget(network_button)
 
     # Move connecting/connected network to the start
-    connected_btn_idx = next((i for i, btn in enumerate(self._scroller._items) if self._wifi_manager.wifi_state.ssid == btn._network.ssid), None)
+    connected_btn_idx = next((i for i, btn in enumerate(self._scroller.items) if self._wifi_manager.wifi_state.ssid == btn._network.ssid), None)
     if connected_btn_idx is not None and connected_btn_idx > 0:
-      self._scroller._items.insert(0, self._scroller._items.pop(connected_btn_idx))
+      self._scroller.items.insert(0, self._scroller.items.pop(connected_btn_idx))
       self._scroller._layout()  # fixes selected style single frame stutter
 
     # Disable networks no longer present
-    for btn in self._scroller._items:
+    for btn in self._scroller.items:
       if btn.option not in self._networks:
         btn.set_enabled(False)
         btn.set_network_missing(True)

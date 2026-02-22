@@ -56,7 +56,7 @@ class SettingsLayout(NavWidget):
       firehose_btn,
       developer_btn,
       community_btn,
-    ], snap_items=False)
+    ])
 
     # Set up back navigation
     self.set_back_callback(gui_app.pop_widget)

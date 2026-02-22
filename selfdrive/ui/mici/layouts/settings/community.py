@@ -31,7 +31,7 @@ class CommunityLayoutMici(NavWidget):
       radar_track,
       driver_cam_reverse,
       driver_cam_missing,
-    ], snap_items=False)
+    ])
 
     # Toggle lists
     self._refresh_toggles = (
