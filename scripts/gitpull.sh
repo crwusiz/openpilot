@@ -3,43 +3,21 @@
 set -euo pipefail
 
 # ==============================================================================
+# Import Common Utilities
+# ==============================================================================
+source "/data/common_utils.sh"
+
+# ==============================================================================
 # Configuration and Constants
 # ==============================================================================
-
 readonly OPENPILOT_DIR="/data/openpilot"
 readonly PARAMS_DIR="/data/params/d"
 readonly LOG_FILE="/data/gitpull_exit_code.log"
 readonly RESTART_SCRIPT="${OPENPILOT_DIR}/scripts/restart.sh"
 
-# Color Codes
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly BOLD='\033[1m'
-readonly NC='\033[0m'
-
 # ==============================================================================
 # Utility Functions
 # ==============================================================================
-
-log() {
-  local level="$1"
-  local msg="$2"
-  local color=""
-  local tag=""
-
-  case "$level" in
-    "INFO")    color="${BLUE}";   tag="   [INFO]";;
-    "SUCCESS") color="${GREEN}";  tag="[SUCCESS]";;
-    "WARNING") color="${YELLOW}"; tag="[WARNING]";;
-    "ERROR")   color="${RED}";    tag="  [ERROR]";;
-    *)         color="${NC}";     tag="[UNKNOWN]";;
-  esac
-
-  echo -e "${color}${tag}${NC} $(date '+%Y-%m-%d %H:%M:%S') - ${msg}"
-}
-
 # Print indented detail info
 log_detail() {
   echo -e "    ${BOLD}$1${NC}"
@@ -58,7 +36,6 @@ trap 'log "ERROR" "User interrupted."; exit 130' INT TERM
 # ==============================================================================
 # Core Functions
 # ==============================================================================
-
 setup_environment() {
   if [ -d "$OPENPILOT_DIR" ]; then
     cd "$OPENPILOT_DIR" || exit 1
@@ -71,21 +48,6 @@ setup_environment() {
     echo -n "0" > "${PARAMS_DIR}/PrebuiltEnable" 2>/dev/null || true
     rm -f prebuilt
   fi
-}
-
-check_network() {
-  log "INFO" "Checking network connectivity..."
-  local dns_servers=("8.8.8.8" "1.1.1.1")
-
-  for dns in "${dns_servers[@]}"; do
-    if ping -c 1 -W 2 "$dns" > /dev/null 2>&1; then
-      log "SUCCESS" "Network confirmed ($dns)"
-      return 0
-    fi
-  done
-
-  log "ERROR" "Network failed."
-  return 1
 }
 
 set_timezone() {
@@ -249,7 +211,6 @@ compare_and_restart() {
 # ==============================================================================
 # Main Execution
 # ==============================================================================
-
 main() {
   log "INFO" "Starting Git Pull process"
 
