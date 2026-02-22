@@ -1,5 +1,4 @@
 import pyray as rl
-from collections.abc import Callable
 
 from openpilot.common.params import Params
 from openpilot.system.ui.widgets.scroller import Scroller
@@ -11,9 +10,9 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 
 
 class CommunityLayoutMici(NavWidget):
-  def __init__(self, back_callback: Callable):
+  def __init__(self):
     super().__init__()
-    self.set_back_callback(back_callback)
+    self.set_back_callback(gui_app.pop_widget)
 
     pcm_cruise = BigParamControl("Pcm Cruise", "PcmCruiseEnable", toggle_callback=restart_needed_callback)
     cruise_state_control = BigParamControl("Cruise State Controls", "CruiseStateControl", toggle_callback=restart_needed_callback)
