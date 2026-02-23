@@ -38,7 +38,8 @@ function install_ubuntu_common_requirements() {
     libjpeg-dev \
     libncurses5-dev \
     libzstd-dev \
-    gettext
+    gettext \
+    libusb-1.0-0-dev
 }
 
 # Install Ubuntu 24.04 LTS packages
