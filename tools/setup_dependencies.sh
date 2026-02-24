@@ -42,7 +42,6 @@ function install_ubuntu_deps() {
     ca-certificates \
     build-essential \
     curl \
-    libssl-dev \
     libcurl4-openssl-dev \
     locales \
     git \

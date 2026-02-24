@@ -29,6 +29,8 @@ dependencies = [
   "capnproto @ git+https://github.com/commaai/dependencies.git@releases#subdirectory=capnproto",
   "eigen @ git+https://github.com/commaai/dependencies.git@releases#subdirectory=eigen",
   "ffmpeg @ git+https://github.com/commaai/dependencies.git@releases#subdirectory=ffmpeg",
+  "libjpeg @ git+https://github.com/commaai/dependencies.git@releases#subdirectory=libjpeg",
+  "openssl3 @ git+https://github.com/commaai/dependencies.git@releases#subdirectory=openssl3",
   "python3-dev @ git+https://github.com/commaai/dependencies.git@releases#subdirectory=python3-dev",
   "zstd @ git+https://github.com/commaai/dependencies.git@releases#subdirectory=zstd",
   "ncurses @ git+https://github.com/commaai/dependencies.git@releases#subdirectory=ncurses",
@@ -43,6 +45,9 @@ dependencies = [
   # panda
   "libusb1",
   "spidev; platform_system == 'Linux'",
+
+  # modeld
+  "onnx >= 1.14.0",
 
   # logging
   "pyzmq",
