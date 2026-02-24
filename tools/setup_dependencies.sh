@@ -47,12 +47,6 @@ function install_ubuntu_deps() {
     locales \
     git \
     xvfb \
-    python3-dev \
-    libgles2-mesa-dev \
-    libjpeg-dev \
-    libncurses5-dev \
-    libzstd-dev \
-    gettext \
     clang \
     libusb-1.0-0-dev
 
