@@ -46,15 +46,16 @@ function install_ubuntu_deps() {
     libcurl4-openssl-dev \
     locales \
     git \
-    xvfb
-
-  $SUDO apt-get install -y --no-install-recommends \
+    xvfb \
     python3-dev \
     libgles2-mesa-dev \
     libjpeg-dev \
     libncurses5-dev \
     libzstd-dev \
-    gettext
+    gettext \
+    clang \
+    libusb-1.0-0-dev
+
 
   if [[ -d "/etc/udev/rules.d/" ]]; then
     # Setup jungle udev rules
