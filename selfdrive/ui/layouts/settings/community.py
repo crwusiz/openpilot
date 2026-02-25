@@ -89,7 +89,7 @@ class StaticLogModal(Widget):
     self._content.styles[ElementType.BR]['margin_bottom'] = 0
 
     self._scroll_panel = GuiScrollPanel()
-    self._ok_button = Button(tr("OK"), click_callback=lambda: gui_app.set_modal_overlay(None), button_style=ButtonStyle.PRIMARY)
+    self._ok_button = Button(tr("OK"), click_callback=lambda: gui_app.pop_widget(), button_style=ButtonStyle.PRIMARY)
 
   def _render(self, rect: rl.Rectangle):
     margin = 50
@@ -130,7 +130,7 @@ class TmuxLogModal(Widget):
     self._content.styles[ElementType.BR]['margin_bottom'] = 0
 
     self._scroll_panel = GuiScrollPanel()
-    self._ok_button = Button(tr("OK"), click_callback=lambda: gui_app.set_modal_overlay(None), button_style=ButtonStyle.PRIMARY)
+    self._ok_button = Button(tr("OK"), click_callback=lambda: gui_app.pop_widget(), button_style=ButtonStyle.PRIMARY)
     self._last_update = 0.0
 
   def _render(self, rect: rl.Rectangle):
@@ -199,7 +199,7 @@ class CommunityLayout(Widget):
     manufacturers = ["[ Not Selected ]", "HYUNDAI", "KIA", "GENESIS"]
     current_selection = self._params.get("SelectedManufacturer")
 
-    def handle_manufacturer_selection(result: int):
+    def handle_manufacturer_selection(result: DialogResult):
       if result != DialogResult.CONFIRM or not self._manufacturer_dialog:
         self._manufacturer_dialog = None
         return
@@ -233,9 +233,10 @@ class CommunityLayout(Widget):
     self._manufacturer_dialog = MultiOptionDialog(
         tr("Manufacturer"),
         manufacturers,
-        current=(current_selection if current_selection else manufacturers[0])
+        current=(current_selection if current_selection else manufacturers[0]),
+        callback=handle_manufacturer_selection
     )
-    gui_app.set_modal_overlay(self._manufacturer_dialog, callback=handle_manufacturer_selection)
+    gui_app.push_widget(self._manufacturer_dialog)
 
   def _on_select_car(self):
     cars = ["[ Not Selected ]"] + get_list("/data/params/crwusiz/CarList")
@@ -245,12 +246,12 @@ class CommunityLayout(Widget):
         tr("Please select manufacturer first"),
         tr("OK")
       )
-      gui_app.set_modal_overlay(dlg)
+      gui_app.push_widget(dlg)
       return
 
     current_selection = self._params.get("SelectedCar")
 
-    def handle_car_selection(result: int):
+    def handle_car_selection(result: DialogResult):
       if result != DialogResult.CONFIRM or not self._car_dialog:
         self._car_dialog = None
         return
@@ -269,9 +270,10 @@ class CommunityLayout(Widget):
     self._car_dialog = MultiOptionDialog(
       tr("Car"),
       cars,
-      current=(current_selection if current_selection else cars[0])
+      current=(current_selection if current_selection else cars[0]),
+      callback=handle_car_selection
     )
-    gui_app.set_modal_overlay(self._car_dialog, callback=handle_car_selection)
+    gui_app.push_widget(self._car_dialog)
 
   def _on_select_branch(self):
     branches = ["[ Not Selected ]"] + get_list("/data/params/crwusiz/GitBranchList")
@@ -281,12 +283,12 @@ class CommunityLayout(Widget):
         tr("Branch list not found"),
         tr("OK")
       )
-      gui_app.set_modal_overlay(dlg)
+      gui_app.push_widget(dlg)
       return
 
     current_selection = self._params.get("SelectedBranch")
 
-    def handle_branch_selection(result: int):
+    def handle_branch_selection(result: DialogResult):
       if result != DialogResult.CONFIRM or not self._branch_dialog:
         self._branch_dialog = None
         return
@@ -305,9 +307,10 @@ class CommunityLayout(Widget):
     self._branch_dialog = MultiOptionDialog(
       tr("Branch"),
       branches,
-      current=(current_selection if current_selection else branches[0])
+      current=(current_selection if current_selection else branches[0]),
+      callback=handle_branch_selection
     )
-    gui_app.set_modal_overlay(self._branch_dialog, callback=handle_branch_selection)
+    gui_app.push_widget(self._branch_dialog)
 
   def _draw_button(self, rect, text, is_selected=False, is_header=False):
     if is_header:
@@ -607,66 +610,66 @@ class CommunityLayout(Widget):
       self._update_content_scroller()
 
   def _on_git_pull(self):
-    def confirm_callback(result: int):
+    def confirm_callback(result: DialogResult):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/gitpull.sh")
         if Path("/data/check_network.log").exists():
           dlg = ConfirmDialog(tr("Please Check Network Connection"), tr("OK"))
-          gui_app.set_modal_overlay(dlg)
+          gui_app.push_widget(dlg)
 
-    dlg = ConfirmDialog(tr("Git Fetch and Reset\n\nProcess?"), tr("Process"))
-    gui_app.set_modal_overlay(dlg, callback=confirm_callback)
+    dlg = ConfirmDialog(tr("Git Fetch and Reset\n\nProcess?"), tr("Process"), callback=confirm_callback)
+    gui_app.push_widget(dlg)
 
   def _on_git_checkout(self):
-    def confirm_callback(result: int):
+    def confirm_callback(result: DialogResult):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/checkout.sh")
 
-    dlg = ConfirmDialog(tr("Git Checkout\n\nProcess?"), tr("Process"))
-    gui_app.set_modal_overlay(dlg, callback=confirm_callback)
+    dlg = ConfirmDialog(tr("Git Checkout\n\nProcess?"), tr("Process"), callback=confirm_callback)
+    gui_app.push_widget(dlg)
 
   def _on_git_reset(self):
-    def confirm_callback(result: int):
+    def confirm_callback(result: DialogResult):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/reset.sh")
 
-    dlg = ConfirmDialog(tr("Git Reset\n\nProcess?"), tr("Process"))
-    gui_app.set_modal_overlay(dlg, callback=confirm_callback)
+    dlg = ConfirmDialog(tr("Git Reset\n\nProcess?"), tr("Process"), callback=confirm_callback)
+    gui_app.push_widget(dlg)
 
   def _on_scons_rebuild(self):
-    def confirm_callback(result: int):
+    def confirm_callback(result: DialogResult):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/scons_rebuild.sh")
 
-    dlg = ConfirmDialog(tr("Scons Rebuild\n\nProcess?"), tr("Process"))
-    gui_app.set_modal_overlay(dlg, callback=confirm_callback)
+    dlg = ConfirmDialog(tr("Scons Rebuild\n\nProcess?"), tr("Process"), callback=confirm_callback)
+    gui_app.push_widget(dlg)
 
   def _on_panda_flash(self):
-    def confirm_callback(result: int):
+    def confirm_callback(result: DialogResult):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/panda/board/flash.py")
 
-    dlg = ConfirmDialog(tr("Panda Flash\n\nProcess?"), tr("Process"))
-    gui_app.set_modal_overlay(dlg, callback=confirm_callback)
+    dlg = ConfirmDialog(tr("Panda Flash\n\nProcess?"), tr("Process"), callback=confirm_callback)
+    gui_app.push_widget(dlg)
 
   def _on_panda_recover(self):
-    def confirm_callback(result: int):
+    def confirm_callback(result: DialogResult):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/panda/board/recover.py")
 
-    dlg = ConfirmDialog(tr("Panda Recover\n\nProcess?"), tr("Process"))
-    gui_app.set_modal_overlay(dlg, callback=confirm_callback)
+    dlg = ConfirmDialog(tr("Panda Recover\n\nProcess?"), tr("Process"), callback=confirm_callback)
+    gui_app.push_widget(dlg)
 
   def _on_camera_view(self):
     execute_script("/data/openpilot/selfdrive/ui/watch3.py")
 
   def _on_clear_dtc(self):
-    def confirm_callback(result: int):
+    def confirm_callback(result: DialogResult):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/cleardtc.sh")
 
-    dlg = ConfirmDialog(tr("Clear DTC\n\nProcess?"), tr("Process"))
-    gui_app.set_modal_overlay(dlg, callback=confirm_callback)
+    dlg = ConfirmDialog(tr("Clear DTC\n\nProcess?"), tr("Process"), callback=confirm_callback)
+    gui_app.push_widget(dlg)
 
   def _view_log(self, log_path: str, title: str = "Log View"):
     if Path(log_path).exists():
@@ -676,29 +679,29 @@ class CommunityLayout(Widget):
         formatted_content = content.replace(chr(10), '<br>')
 
         dlg = StaticLogModal(text=formatted_content)
-        gui_app.set_modal_overlay(dlg)
+        gui_app.push_widget(dlg)
       except Exception as e:
         dlg = ConfirmDialog(tr("Error reading log file"), tr("OK"))
-        gui_app.set_modal_overlay(dlg)
+        gui_app.push_widget(dlg)
     else:
       dlg = ConfirmDialog(tr("log file not found") + f"\n{log_path}", tr("OK"))
-      gui_app.set_modal_overlay(dlg)
+      gui_app.push_widget(dlg)
 
   def _upload_log(self, log_path: str, log_name: str):
     if Path(log_path).exists():
-      def confirm_callback(result: int):
+      def confirm_callback(result: DialogResult):
         if result == DialogResult.CONFIRM:
           execute_script("/data/openpilot/scripts/log_upload.sh", log_name)
 
-      dlg = ConfirmDialog(tr(f"{log_name} upload\n\nProcess?"), tr("Process"))
-      gui_app.set_modal_overlay(dlg, callback=confirm_callback)
+      dlg = ConfirmDialog(tr(f"{log_name} upload\n\nProcess?"), tr("Process"), callback=confirm_callback)
+      gui_app.push_widget(dlg)
     else:
       dlg = ConfirmDialog(tr("log file not found"), tr("OK"))
-      gui_app.set_modal_overlay(dlg)
+      gui_app.push_widget(dlg)
 
   def _on_tmux_console_view(self):
     dlg = TmuxLogModal()
-    gui_app.set_modal_overlay(dlg)
+    gui_app.push_widget(dlg)
 
   def _on_tmux_console_upload(self):
     try:
@@ -706,33 +709,33 @@ class CommunityLayout(Widget):
       result = subprocess.run(cmd, capture_output=True)
 
       if result.returncode == 0:
-        def confirm_callback(result: int):
+        def confirm_callback(result: DialogResult):
           if result == DialogResult.CONFIRM:
             execute_script("/data/openpilot/scripts/log_upload.sh", "tmux_console.log")
 
-        dlg = ConfirmDialog(tr("tmux console log upload\n\nProcess?"), tr("Process"))
-        gui_app.set_modal_overlay(dlg, callback=confirm_callback)
+        dlg = ConfirmDialog(tr("tmux console log upload\n\nProcess?"), tr("Process"), callback=confirm_callback)
+        gui_app.push_widget(dlg)
       else:
         dlg = ConfirmDialog(tr("log file not found"), tr("OK"))
-        gui_app.set_modal_overlay(dlg)
+        gui_app.push_widget(dlg)
     except Exception as e:
       dlg = ConfirmDialog(tr("Error creating console log"), tr("OK"))
-      gui_app.set_modal_overlay(dlg)
+      gui_app.push_widget(dlg)
 
   def _on_carparams_dump(self):
-    def confirm_callback(result: int):
+    def confirm_callback(result: DialogResult):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/dump_upload.sh", "carParams")
 
-    dlg = ConfirmDialog(tr("carParams dump upload\n\nProcess?"), tr("Process"))
-    gui_app.set_modal_overlay(dlg, callback=confirm_callback)
+    dlg = ConfirmDialog(tr("carParams dump upload\n\nProcess?"), tr("Process"), callback=confirm_callback)
+    gui_app.push_widget(dlg)
 
   def _on_realdata_upload(self):
     target_path = Path("/data/media/0/realdata")
 
     if not target_path.exists():
       dlg = ConfirmDialog(tr("Path does not exist"), tr("OK"))
-      gui_app.set_modal_overlay(dlg)
+      gui_app.push_widget(dlg)
       return
 
     route_map = {}
@@ -764,7 +767,7 @@ class CommunityLayout(Widget):
 
     if not route_map:
       dlg = ConfirmDialog(tr("Routes do not exist"), tr("OK"))
-      gui_app.set_modal_overlay(dlg)
+      gui_app.push_widget(dlg)
       return
 
     sorted_routes = sorted(
@@ -779,7 +782,7 @@ class CommunityLayout(Widget):
       formatted_date = dt_object.strftime('%Y-%m-%d %H:%M')
       options.append(f"[{formatted_date}] {route['route_name']} ({route['segment_count']} segments)")
 
-    def handle_route_selection(result: int):
+    def handle_route_selection(result: DialogResult):
       if result != DialogResult.CONFIRM:
         return
 
@@ -792,7 +795,7 @@ class CommunityLayout(Widget):
       route_name = selected_route_info['route_name']
       segment_paths = selected_route_info['segment_paths']
 
-      def handle_final_confirm(res: int):
+      def handle_final_confirm(res: DialogResult):
         if res != DialogResult.CONFIRM:
           return
 
@@ -811,13 +814,13 @@ class CommunityLayout(Widget):
           except Exception as e:
              dlg = ConfirmDialog(tr("Error executing script:") + f"\n{e}", tr("OK"))
 
-          gui_app.set_modal_overlay(dlg)
+          gui_app.push_widget(dlg)
 
         t = threading.Thread(target=upload_thread_task)
         t.start()
 
-      upload_dlg = ConfirmDialog(tr(f"Upload route {route_name}?"), tr("Yes"), tr("No"))
-      gui_app.set_modal_overlay(upload_dlg, callback=handle_final_confirm)
+      upload_dlg = ConfirmDialog(tr(f"Upload route {route_name}?"), tr("Yes"), tr("No"), callback=handle_final_confirm)
+      gui_app.push_widget(upload_dlg)
 
-    dialog = MultiOptionDialog(tr("Select Route to Upload"), options, current=options[0])
-    gui_app.set_modal_overlay(dialog, callback=handle_route_selection)
+    dialog = MultiOptionDialog(tr("Select Route to Upload"), options, current=options[0], callback=handle_route_selection)
+    gui_app.push_widget(dialog)
