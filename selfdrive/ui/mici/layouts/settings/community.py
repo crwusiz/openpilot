@@ -42,18 +42,6 @@ class CommunityLayoutMici(NavWidget):
     btn_git_pull = BigButton("Git Fetch & Reset", "Run")
     btn_git_pull.set_click_callback(self._on_git_pull)
 
-    btn_git_checkout = BigButton("Git Checkout", "Run")
-    btn_git_checkout.set_click_callback(self._on_git_checkout)
-
-    btn_scons = BigButton("Scons Build", "Run")
-    btn_scons.set_click_callback(self._on_scons_rebuild)
-
-    btn_panda_flash = BigButton("Panda Flash", "Run")
-    btn_panda_flash.set_click_callback(self._on_panda_flash)
-
-    btn_clear_dtc = BigButton("Clear DTC", "Run")
-    btn_clear_dtc.set_click_callback(self._on_clear_dtc)
-
     self._scroller = Scroller([
       pcm_cruise,
       cruise_state_control,
@@ -65,10 +53,6 @@ class CommunityLayoutMici(NavWidget):
       logger_enable,
       prebuilt_enable,
       btn_git_pull,
-      btn_git_checkout,
-      btn_scons,
-      btn_panda_flash,
-      btn_clear_dtc,
     ])
 
     # Toggle lists
@@ -117,32 +101,4 @@ class CommunityLayoutMici(NavWidget):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/gitpull.sh")
     dlg = ConfirmDialog(tr("Git Fetch and Reset\n\nProcess?"), tr("Process"), callback=confirm_callback)
-    gui_app.push_widget(dlg)
-
-  def _on_git_checkout(self):
-    def confirm_callback(result: DialogResult):
-      if result == DialogResult.CONFIRM:
-        execute_script("/data/openpilot/scripts/checkout.sh")
-    dlg = ConfirmDialog(tr("Git Checkout\n\nProcess?"), tr("Process"), callback=confirm_callback)
-    gui_app.push_widget(dlg)
-
-  def _on_scons_rebuild(self):
-    def confirm_callback(result: DialogResult):
-      if result == DialogResult.CONFIRM:
-        execute_script("/data/openpilot/scripts/scons_rebuild.sh")
-    dlg = ConfirmDialog(tr("Scons Rebuild\n\nProcess?"), tr("Process"), callback=confirm_callback)
-    gui_app.push_widget(dlg)
-
-  def _on_panda_flash(self):
-    def confirm_callback(result: DialogResult):
-      if result == DialogResult.CONFIRM:
-        execute_script("/data/openpilot/panda/board/flash.py")
-    dlg = ConfirmDialog(tr("Panda Flash\n\nProcess?"), tr("Process"), callback=confirm_callback)
-    gui_app.push_widget(dlg)
-
-  def _on_clear_dtc(self):
-    def confirm_callback(result: DialogResult):
-      if result == DialogResult.CONFIRM:
-        execute_script("/data/openpilot/scripts/cleardtc.sh")
-    dlg = ConfirmDialog(tr("Clear DTC\n\nProcess?"), tr("Process"), callback=confirm_callback)
     gui_app.push_widget(dlg)
