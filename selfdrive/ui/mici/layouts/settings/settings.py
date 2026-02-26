@@ -9,7 +9,7 @@ from openpilot.selfdrive.ui.mici.layouts.settings.device import DeviceLayoutMici
 from openpilot.selfdrive.ui.mici.layouts.settings.developer import DeveloperLayoutMici
 from openpilot.selfdrive.ui.mici.layouts.settings.firehose import FirehoseLayout
 from openpilot.system.ui.lib.application import gui_app, FontWeight
-from openpilot.system.ui.widgets import NavWidget
+from openpilot.system.ui.widgets.nav_widget import NavWidget
 
 from openpilot.selfdrive.ui.mici.layouts.settings.community import CommunityLayoutMici
 
@@ -44,7 +44,7 @@ class SettingsLayout(NavWidget):
     firehose_btn.set_click_callback(lambda: gui_app.push_widget(firehose_panel))
 
     community_panel = CommunityLayoutMici()
-    community_btn = SettingsBigButton("community", "", "icons_mici/settings/community_icon.png", icon_size=(52, 62))
+    community_btn = SettingsBigButton("firehose", "", "icons_mici/settings/firehose.png", icon_size=(52, 62))
     community_btn.set_click_callback(lambda: gui_app.push_widget(community_panel))
 
     self._scroller = Scroller([
@@ -56,7 +56,7 @@ class SettingsLayout(NavWidget):
       firehose_btn,
       developer_btn,
       community_btn,
-    ], snap_items=False)
+    ])
 
     # Set up back navigation
     self.set_back_callback(gui_app.pop_widget)

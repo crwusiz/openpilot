@@ -3,9 +3,13 @@
 set -euo pipefail
 
 # ==============================================================================
+# Import Common Utilities
+# ==============================================================================
+source "/data/openpilot/scripts/common_utils.sh"
+
+# ==============================================================================
 # Configuration and Constants
 # ==============================================================================
-
 # FTP Configuration
 readonly FTP_USER="openpilot"
 readonly FTP_PASS="ruF3~Dt8"
@@ -17,34 +21,9 @@ readonly FTP_DIR="tmux_log"
 readonly LOG_BASE_DIR="/data"
 readonly PARAMS_DIR="/data/params/d"
 
-# Color Codes
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly NC='\033[0m'
-
 # ==============================================================================
 # Utility Functions
 # ==============================================================================
-
-log() {
-  local level="$1"
-  local msg="$2"
-  local color=""
-  local tag=""
-
-  case "$level" in
-    "INFO")    color="${BLUE}";   tag="   [INFO]";;
-    "SUCCESS") color="${GREEN}";  tag="[SUCCESS]";;
-    "WARNING") color="${YELLOW}"; tag="[WARNING]";;
-    "ERROR")   color="${RED}";    tag="  [ERROR]";;
-    *)         color="${NC}";     tag="[UNKNOWN]";;
-  esac
-
-  echo -e "${color}${tag}${NC} $(date '+%Y-%m-%d %H:%M:%S') - ${msg}"
-}
-
 # Safely read a parameter file, defaulting to "Unknown" if missing
 get_param() {
   local param_name="$1"
@@ -55,21 +34,6 @@ get_param() {
   else
     echo "Unknown"
   fi
-}
-
-check_network() {
-  log "INFO" "Checking network connectivity..."
-  local dns_servers=("8.8.8.8" "1.1.1.1")
-
-  for dns in "${dns_servers[@]}"; do
-    if ping -c 1 -W 2 "$dns" > /dev/null 2>&1; then
-      log "SUCCESS" "Network connectivity confirmed ($dns)"
-      return 0
-    fi
-  done
-
-  log "ERROR" "Network check failed. Please check your internet connection."
-  return 1
 }
 
 upload_file() {
@@ -106,11 +70,6 @@ upload_file() {
   log "INFO" "Target: $target_filename"
 
   # 4. Perform Upload
-  # --ftp-create-dirs: Create remote directory if missing
-  # -T: Upload file
-  # -u: User credentials
-  # -s: Silent mode (hide progress bar, handled by exit code)
-  # -S: Show error if it fails
   if curl --ftp-create-dirs \
           --connect-timeout 30 \
           --retry 3 \
@@ -128,7 +87,6 @@ upload_file() {
 # ==============================================================================
 # Main Execution Flow
 # ==============================================================================
-
 main() {
   if [ $# -eq 0 ]; then
     echo -e "${YELLOW}Usage: $0 <LOG_FILENAME>${NC}"
@@ -136,8 +94,6 @@ main() {
   fi
 
   local log_filename="$1"
-
-  # Remove path if user provided full path (e.g., /data/log.txt -> log.txt)
   log_filename=$(basename "$log_filename")
 
   if upload_file "$log_filename"; then
