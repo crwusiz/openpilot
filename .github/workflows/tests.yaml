@@ -22,13 +22,12 @@ env:
 
 jobs:
   build_release:
-    name: build_release
+    name: build release
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - uses: ./.github/workflows/setup-with-retry
-
+      - run: ./tools/op.sh setup
       - name: Build openpilot
         run: scons -j$(nproc)
