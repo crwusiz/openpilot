@@ -1,9 +1,8 @@
 import subprocess
-from collections.abc import Callable
 
 from openpilot.common.params import Params
 from openpilot.system.ui.widgets.scroller import NavScroller
-from openpilot.selfdrive.ui.mici.widgets.button import BigParamControl, BigButton
+from openpilot.selfdrive.ui.mici.widgets.button import BigParamControl
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.layouts.settings.common import restart_needed_callback
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -22,9 +21,9 @@ def execute_script(script_path: str, *args) -> int:
     return 1
 
 class CommunityLayoutMici(NavScroller):
-  def __init__(self, back_callback: Callable):
+  def __init__(self):
     super().__init__()
-    self.set_back_callback(back_callback)
+    self.set_back_callback(gui_app.pop_widget)
 
     pcm_cruise = BigParamControl("Pcm Cruise", "PcmCruiseEnable", toggle_callback=restart_needed_callback)
     cruise_state_control = BigParamControl("Cruise State Controls", "CruiseStateControl", toggle_callback=restart_needed_callback)
@@ -33,12 +32,8 @@ class CommunityLayoutMici(NavScroller):
     radar_track = BigParamControl("Radar Track", "RadarTrackEnable", toggle_callback=restart_needed_callback)
     driver_cam_reverse = BigParamControl("Driver Camera On Reverse Gear", "DriverCameraOnReverse", toggle_callback=restart_needed_callback)
     driver_cam_missing = BigParamControl("Driver Camera Hardware Missing", "DriverCameraHardwareMissing", toggle_callback=restart_needed_callback)
-
     logger_enable = BigParamControl("Logger Enable", "LoggerEnable", toggle_callback=restart_needed_callback)
     prebuilt_enable = BigParamControl("Prebuilt Enable", "PrebuiltEnable", toggle_callback=restart_needed_callback)
-
-    btn_git_pull = BigButton("Git Fetch & Reset", "Run")
-    btn_git_pull.set_click_callback(self._on_git_pull)
 
     self._scroller.add_widgets([
       pcm_cruise,
@@ -50,7 +45,6 @@ class CommunityLayoutMici(NavScroller):
       driver_cam_missing,
       logger_enable,
       prebuilt_enable,
-      btn_git_pull,
     ])
 
     # Toggle lists
@@ -82,10 +76,3 @@ class CommunityLayoutMici(NavScroller):
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
-
-  def _on_git_pull(self):
-    def confirm_callback(result: DialogResult):
-      if result == DialogResult.CONFIRM:
-        execute_script("/data/openpilot/scripts/gitpull.sh")
-    dlg = ConfirmDialog(tr("Git Fetch and Reset\n\nProcess?"), tr("Process"), callback=confirm_callback)
-    gui_app.push_widget(dlg)

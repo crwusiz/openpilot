@@ -41,7 +41,7 @@ class SettingsLayout(NavScroller):
     firehose_btn.set_click_callback(lambda: gui_app.push_widget(firehose_panel))
 
     community_panel = CommunityLayoutMici()
-    community_btn = SettingsBigButton("firehose", "", "icons_mici/settings/firehose.png", icon_size=(52, 62))
+    community_btn = SettingsBigButton("community", "", "icons_mici/settings/community_icon.png", icon_size=(52, 62))
     community_btn.set_click_callback(lambda: gui_app.push_widget(community_panel))
 
     self._scroller.add_widgets([
