@@ -5,7 +5,8 @@ set -euo pipefail
 # ==============================================================================
 # Import Common Utilities
 # ==============================================================================
-source "/data/openpilot/scripts/common_utils.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+source "${SCRIPT_DIR}/common_utils.sh"
 
 # ==============================================================================
 # Configuration and Constants
