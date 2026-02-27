@@ -9,8 +9,7 @@ from openpilot.selfdrive.ui.mici.widgets.dialog import BigInputDialog, BigConfir
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton, LABEL_COLOR
 from openpilot.system.ui.lib.application import gui_app, MousePos, FontWeight
 from openpilot.system.ui.widgets import Widget
-from openpilot.system.ui.widgets.nav_widget import NavWidget
-from openpilot.system.ui.widgets.scroller import Scroller
+from openpilot.system.ui.widgets.scroller import NavScroller
 from openpilot.system.ui.lib.wifi_manager import WifiManager, Network, SecurityType, normalize_ssid
 
 
@@ -271,14 +270,12 @@ class ForgetButton(Widget):
     rl.draw_texture_ex(self._trash_txt, (trash_x, trash_y), 0, 1.0, rl.WHITE)
 
 
-class WifiUIMici(NavWidget):
+class WifiUIMici(NavScroller):
   def __init__(self, wifi_manager: WifiManager):
     super().__init__()
 
     # Set up back navigation
     self.set_back_callback(gui_app.pop_widget)
-
-    self._scroller = Scroller([])
 
     self._loading_animation = LoadingAnimation()
 
@@ -294,16 +291,11 @@ class WifiUIMici(NavWidget):
   def show_event(self):
     # Clear scroller items and update from latest scan results
     super().show_event()
-    self._scroller.show_event()
     self._loading_animation.show_event()
     self._wifi_manager.set_active(True)
     self._scroller.items.clear()
     # trigger button update on latest sorted networks
     self._on_network_updated(self._wifi_manager.networks)
-
-  def hide_event(self):
-    super().hide_event()
-    self._scroller.hide_event()
 
   def _on_network_updated(self, networks: list[Network]):
     self._networks = {network.ssid: network for network in networks}
@@ -389,7 +381,7 @@ class WifiUIMici(NavWidget):
       self._loading_animation.show_event()
 
   def _render(self, _):
-    self._scroller.render(self._rect)
+    super()._render(self._rect)
 
     anim_w = 90
     anim_x = self._rect.x + self._rect.width - anim_w
