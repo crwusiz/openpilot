@@ -1,12 +1,10 @@
 import subprocess
-import pyray as rl
 from collections.abc import Callable
 
 from openpilot.common.params import Params
-from openpilot.system.ui.widgets.scroller import Scroller
-from openpilot.selfdrive.ui.mici.widgets.button import BigParamControl, BigMultiParamToggle, BigButton
-from openpilot.system.ui.lib.application import FontWeight, gui_app
-from openpilot.system.ui.widgets.nav_widget import NavWidget
+from openpilot.system.ui.widgets.scroller import NavScroller
+from openpilot.selfdrive.ui.mici.widgets.button import BigParamControl, BigButton
+from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.layouts.settings.common import restart_needed_callback
 from openpilot.selfdrive.ui.ui_state import ui_state
 
@@ -23,7 +21,7 @@ def execute_script(script_path: str, *args) -> int:
     print(f"Error executing script: {e}")
     return 1
 
-class CommunityLayoutMici(NavWidget):
+class CommunityLayoutMici(NavScroller):
   def __init__(self, back_callback: Callable):
     super().__init__()
     self.set_back_callback(back_callback)
@@ -42,7 +40,7 @@ class CommunityLayoutMici(NavWidget):
     btn_git_pull = BigButton("Git Fetch & Reset", "Run")
     btn_git_pull.set_click_callback(self._on_git_pull)
 
-    self._scroller = Scroller([
+    self._scroller.add_widgets([
       pcm_cruise,
       cruise_state_control,
       is_hda2,
@@ -74,17 +72,9 @@ class CommunityLayoutMici(NavWidget):
 
     ui_state.add_engaged_transition_callback(self._update_toggles)
 
-  def _update_state(self):
-    super()._update_state()
-
   def show_event(self):
     super().show_event()
-    self._scroller.show_event()
     self._update_toggles()
-
-  def hide_event(self):
-    super().hide_event()
-    self._scroller.hide_event()
 
   def _update_toggles(self):
     ui_state.update_params()
@@ -92,9 +82,6 @@ class CommunityLayoutMici(NavWidget):
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
-
-  def _render(self, rect: rl.Rectangle):
-    self._scroller.render(rect)
 
   def _on_git_pull(self):
     def confirm_callback(result: DialogResult):

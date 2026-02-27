@@ -31,16 +31,14 @@ log() {
 }
 
 check_network() {
-  log "INFO" "Checking network connectivity..."
-  local dns_servers=("8.8.8.8" "1.1.1.1")
+  log "INFO" "Checking network connectivity for git operations..."
+  local target_url="https://github.com"
 
-  for dns in "${dns_servers[@]}"; do
-    if ping -c 1 -W 2 "$dns" > /dev/null 2>&1; then
-      log "SUCCESS" "Network connectivity confirmed ($dns)"
-      return 0
-    fi
-  done
-
-  log "ERROR" "Network check failed. Please check your internet connection."
-  return 1
+  if curl -I -s -m 3 "$target_url" > /dev/null 2>&1; then
+    log "SUCCESS" "Network connectivity confirmed ($target_url)"
+    return 0
+  else
+    log "ERROR" "Network check failed. Cannot reach $target_url. Please check your connection."
+    return 1
+  fi
 }
