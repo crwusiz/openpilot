@@ -23,8 +23,6 @@ def execute_script(script_path: str, *args) -> int:
 class CommunityLayoutMici(NavScroller):
   def __init__(self):
     super().__init__()
-    self.set_back_callback(gui_app.pop_widget)
-
     pcm_cruise = BigParamControl("Pcm Cruise", "PcmCruiseEnable", toggle_callback=restart_needed_callback)
     cruise_state_control = BigParamControl("Cruise State Controls", "CruiseStateControl", toggle_callback=restart_needed_callback)
     is_hda2 = BigParamControl("CANFD Car HDA2", "IsHda2", toggle_callback=restart_needed_callback)
