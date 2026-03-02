@@ -129,6 +129,10 @@ function launch {
     pip install streamlit
   fi
 
+  if ! python3 -c "import aiohttp_cors" &> /dev/null; then
+    pip install aiohttp_cors
+  fi
+
   # openpilot ssh key installer
   if [ ! -f /data/params/d/GithubSshKeys ]; then
     echo -n openpilot > /data/params/d/GithubUsername

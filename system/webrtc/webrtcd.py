@@ -7,6 +7,7 @@ import uuid
 import logging
 from dataclasses import dataclass, field
 from typing import Any, TYPE_CHECKING
+import aiohttp_cors
 
 # aiortc and its dependencies have lots of internal warnings :(
 import warnings
@@ -259,6 +260,20 @@ def webrtcd_thread(host: str, port: int, debug: bool):
   app.router.add_post("/stream", get_stream)
   app.router.add_post("/notify", post_notify)
   app.router.add_get("/schema", get_schema)
+
+  # ==== cors
+  cors = aiohttp_cors.setup(app, defaults={
+      "*": aiohttp_cors.ResourceOptions(
+          allow_credentials=True,
+          expose_headers="*",
+          allow_headers="*",
+          allow_methods="*",
+      )
+  })
+
+  for route in list(app.router.routes()):
+      cors.add(route)
+  # ==== cors
 
   web.run_app(app, host=host, port=port)
 

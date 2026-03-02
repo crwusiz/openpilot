@@ -17,7 +17,7 @@ def check_password() -> bool:
   if st.session_state.get("password_correct", False):
     return True
 
-  # URL 파라미터 방식: http://ip:port/?pwd=comma
+  # URL 파라미터 방식: http://ip:port/?pwd=comma or http://hostname/?pwd=comma (hostname ex comma-12345678) 12345678 is comma device serial
   try:
     if st.query_params.get("pwd") == ACCESS_PASSWORD:
       st.session_state["password_correct"] = True
