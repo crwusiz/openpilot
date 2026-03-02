@@ -114,10 +114,16 @@ function install_python_deps() {
   echo "installing python packages..."
   uv sync --frozen --all-extras
   source .venv/bin/activate
+}
 
-  if [[ "$(uname)" == 'Darwin' ]]; then
-    touch "$ROOT"/.env
-    echo "export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES" >> "$ROOT"/.env
+function install_macos_deps() {
+  if ! command -v brew > /dev/null 2>&1; then
+    echo "homebrew not found, skipping macOS system dependency install"
+    return 0
+  fi
+
+  if ! command -v cmake > /dev/null 2>&1; then
+    brew install cmake
   fi
 }
 
@@ -127,6 +133,7 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
   install_ubuntu_deps
   echo "[ ] installed system dependencies t=$SECONDS"
 elif [[ "$OSTYPE" == "darwin"* ]]; then
+  install_macos_deps
   if [[ $SHELL == "/bin/zsh" ]]; then
     RC_FILE="$HOME/.zshrc"
   elif [[ $SHELL == "/bin/bash" ]]; then

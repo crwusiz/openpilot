@@ -8,9 +8,17 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.layouts import HBoxLayout
 from openpilot.system.ui.widgets.icon_widget import IconWidget
 from openpilot.system.ui.widgets.label import MiciLabel, UnifiedLabel
-from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos
+from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, FONT_SCALE
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.version import RELEASE_BRANCHES
+
+import subprocess
+import threading
+from pathlib import Path
+from dataclasses import dataclass
+from openpilot.common.params import Params
+from openpilot.system.ui.lib.text_measure import measure_text_cached
+from openpilot.system.ui.widgets.network import WifiManagerUI, WifiManager
 
 HEAD_BUTTON_FONT_SIZE = 40
 HOME_PADDING = 8
@@ -27,25 +35,51 @@ NETWORK_TYPES = {
   NetworkType.ethernet: "Ethernet",
 }
 
+def colors_alpha(color, alpha):
+  if isinstance(color, tuple):
+    return rl.Color(color[0], color[1], color[2], alpha)
+  else:
+    return rl.Color(color.r, color.g, color.b, alpha)
+
+class Colors:
+  WHITE = rl.WHITE
+  WHITE_DIM = colors_alpha(WHITE, 85)
+  GRAY = rl.Color(84, 84, 84, 255)
+  WARNING = rl.Color(218, 202, 37, 255)
+  DANGER = rl.Color(201, 34, 49, 255)
+  BUTTON_PRESSED = colors_alpha(WHITE, 166)
+  UP_TO_DATE = rl.Color(128, 216, 166, 255)
+
+@dataclass(slots=True)
+class MetricData:
+  label: str
+  value: str
+  color: rl.Color
+
+  def update(self, label: str, value: str, color: rl.Color):
+    self.label = label
+    self.value = value
+    self.color = color
+
 
 class NetworkIcon(Widget):
   def __init__(self):
     super().__init__()
-    self.set_rect(rl.Rectangle(0, 0, 54, 44))  # max size of all icons
+    self.set_rect(rl.Rectangle(0, 0, 64, 52))
     self._net_type = NetworkType.none
     self._net_strength = 0
 
-    self._wifi_slash_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_slash.png", 50, 44)
-    self._wifi_none_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_none.png", 50, 37)
-    self._wifi_low_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_low.png", 50, 37)
-    self._wifi_medium_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_medium.png", 50, 37)
-    self._wifi_full_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_full.png", 50, 37)
+    self._wifi_slash_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_slash.png", 58, 50)
+    self._wifi_none_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_none.png", 58, 42)
+    self._wifi_low_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_low.png", 58, 42)
+    self._wifi_medium_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_medium.png", 58, 42)
+    self._wifi_full_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_full.png", 58, 42)
 
-    self._cell_none_txt = gui_app.texture("icons_mici/settings/network/cell_strength_none.png", 54, 36)
-    self._cell_low_txt = gui_app.texture("icons_mici/settings/network/cell_strength_low.png", 54, 36)
-    self._cell_medium_txt = gui_app.texture("icons_mici/settings/network/cell_strength_medium.png", 54, 36)
-    self._cell_high_txt = gui_app.texture("icons_mici/settings/network/cell_strength_high.png", 54, 36)
-    self._cell_full_txt = gui_app.texture("icons_mici/settings/network/cell_strength_full.png", 54, 36)
+    self._cell_none_txt = gui_app.texture("icons_mici/settings/network/cell_strength_none.png", 64, 42)
+    self._cell_low_txt = gui_app.texture("icons_mici/settings/network/cell_strength_low.png", 64, 42)
+    self._cell_medium_txt = gui_app.texture("icons_mici/settings/network/cell_strength_medium.png", 64, 42)
+    self._cell_high_txt = gui_app.texture("icons_mici/settings/network/cell_strength_high.png", 64, 42)
+    self._cell_full_txt = gui_app.texture("icons_mici/settings/network/cell_strength_full.png", 64, 42)
 
   def _update_state(self):
     device_state = ui_state.sm['deviceState']
@@ -55,7 +89,6 @@ class NetworkIcon(Widget):
 
   def _render(self, _):
     if self._net_type == NetworkType.wifi:
-      # There is no 1
       draw_net_txt = {0: self._wifi_none_txt,
                       2: self._wifi_low_txt,
                       3: self._wifi_medium_txt,
@@ -74,7 +107,6 @@ class NetworkIcon(Widget):
     draw_y = self._rect.y + (self._rect.height - draw_net_txt.height) / 2
 
     if draw_net_txt == self._wifi_slash_txt:
-      # Offset by difference in height between slashless and slash icons to make center align match
       draw_y -= (self._wifi_slash_txt.height - self._wifi_none_txt.height) / 2
 
     rl.draw_texture(draw_net_txt, int(draw_x), int(draw_y), rl.Color(255, 255, 255, int(255 * 0.9)))
@@ -92,32 +124,62 @@ class MiciHomeLayout(Widget):
 
     self._version_text = None
     self._experimental_mode = False
+    self._ip_address = "Offline"
 
-    self._experimental_icon = IconWidget("icons_mici/experimental_mode.png", (48, 48))
-    self._mic_icon = IconWidget("icons_mici/microphone.png", (32, 46))
+    self.wifi_manager = WifiManager()
+    self.wifi_manager_ui = WifiManagerUI(self.wifi_manager)
+
+    self._settings_icon = IconWidget("icons_mici/settings.png", (52, 52), opacity=0.9)
+    self._experimental_icon = IconWidget("icons_mici/experimental_mode.png", (52, 52))
+    self._mic_icon = IconWidget("icons_mici/microphone.png", (36, 52))
 
     self._status_bar_layout = HBoxLayout([
-      IconWidget("icons_mici/settings.png", (48, 48), opacity=0.9),
+      self._settings_icon,
       NetworkIcon(),
       self._experimental_icon,
       self._mic_icon,
-    ], spacing=18)
+    ], spacing=16)
 
     self._openpilot_label = MiciLabel("openpilot", font_size=96, color=rl.Color(255, 255, 255, int(255 * 0.9)), font_weight=FontWeight.DISPLAY)
-    self._version_label = MiciLabel("", font_size=36, font_weight=FontWeight.ROMAN)
-    self._large_version_label = MiciLabel("", font_size=64, color=rl.GRAY, font_weight=FontWeight.ROMAN)
-    self._date_label = MiciLabel("", font_size=36, color=rl.GRAY, font_weight=FontWeight.ROMAN)
-    self._branch_label = UnifiedLabel("", font_size=36, text_color=rl.GRAY, font_weight=FontWeight.ROMAN, scroll=True)
-    self._version_commit_label = MiciLabel("", font_size=36, color=rl.GRAY, font_weight=FontWeight.ROMAN)
+
+    self._font_semi_bold = gui_app.font(FontWeight.SEMI_BOLD)
+    self._font_roman = gui_app.font(FontWeight.ROMAN)
+
+    # --- Git Pull & Commit Check Variables ---
+    self._params = Params()
+    self._is_processing = False
+    self._is_update_available = False
+    self._initial_commit_check_done = False
+    self._progress_dots = 0
+    self._last_progress_update = 0
+
+    self._git_pull_exit_file = Path("/data/gitpull_exit_code.log")
+    self._commit_check_exit_file = Path("/data/commit_check_exit_code.log")
+
+    self._commit_status = MetricData("UPDATE", "CHECK", Colors.WARNING)
+    self._commit_btn_rect = rl.Rectangle(0, 0, 160, 64)
 
   def show_event(self):
     self._version_text = self._get_version_text()
+    ip = self.wifi_manager_ui.ip_address
+    self._ip_address = ip if ip else "Offline"
     self._update_params()
 
   def _update_params(self):
     self._experimental_mode = ui_state.params.get_bool("ExperimentalMode")
 
+  def _is_network_connected(self) -> bool:
+    try:
+      if hasattr(ui_state, 'sm') and ui_state.sm is not None:
+        if 'deviceState' in ui_state.sm.data:
+          return ui_state.sm['deviceState'].networkType != NetworkType.none
+    except Exception:
+      pass
+    return False
+
   def _update_state(self):
+    self.wifi_manager_ui._update_state()
+
     if self.is_pressed and not self._is_pressed_prev:
       self._mouse_down_t = time.monotonic()
     elif not self.is_pressed and self._is_pressed_prev:
@@ -127,7 +189,6 @@ class MiciHomeLayout(Widget):
 
     if self._mouse_down_t is not None:
       if time.monotonic() - self._mouse_down_t > 0.5:
-        # long gating for experimental mode - only allow toggle if longitudinal control is available
         if ui_state.has_longitudinal_control:
           self._experimental_mode = not self._experimental_mode
           ui_state.params.put("ExperimentalMode", self._experimental_mode)
@@ -135,19 +196,175 @@ class MiciHomeLayout(Widget):
         self._did_long_press = True
 
     if rl.get_time() - self._last_refresh > 5.0:
-      # Update version text
       self._version_text = self._get_version_text()
+      ip = self.wifi_manager_ui.ip_address
+      self._ip_address = ip if ip else "Offline"
       self._last_refresh = rl.get_time()
       self._update_params()
+
+    if self._is_network_connected() and not self._initial_commit_check_done and not self._is_processing:
+      print("Network connected, starting initial commit check")
+      self._initial_commit_check_done = True
+      self._start_commit_check()
+
+    self._update_progress_indicator()
 
   def set_callbacks(self, on_settings: Callable | None = None):
     self._on_settings_click = on_settings
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     if not self._did_long_press:
-      if self._on_settings_click:
-        self._on_settings_click()
+      if rl.check_collision_point_rec(mouse_pos, self._settings_icon.rect):
+        if self._on_settings_click:
+          self._on_settings_click()
+      elif rl.check_collision_point_rec(mouse_pos, self._commit_btn_rect):
+        self._handle_commit_button_press()
     self._did_long_press = False
+
+  # --- Git & Commit Logic Methods ---
+  def _handle_commit_button_press(self):
+    if self._is_processing:
+      print("Script execution already in progress, ignoring click")
+      self._commit_status.update("BUSY", "WAIT", Colors.WARNING)
+      return
+
+    if not self._is_network_connected():
+      print("Network not connected, cannot perform git operations")
+      self._commit_status.update("NO NETWORK", "OFFLINE", Colors.DANGER)
+      return
+
+    if self._is_update_available:
+      self._start_git_pull()
+    else:
+      self._start_commit_check()
+
+  def _start_git_pull(self):
+    self._is_processing = True
+    self._git_pull_exit_file.unlink(missing_ok=True)
+
+    def run_git_pull():
+      try:
+        subprocess.Popen(["/bin/sh", "/data/openpilot/scripts/gitpull.sh"])
+        start_time = time.time()
+        while time.time() - start_time < 60:
+          if self._git_pull_exit_file.exists():
+            self._on_git_pull_finished()
+            return
+          time.sleep(1)
+        self._on_git_pull_failed("TIMEOUT")
+      except Exception as e:
+        print(f"Failed to start git pull: {e}")
+        self._on_git_pull_failed("FAILED TO START")
+
+    thread = threading.Thread(target=run_git_pull, daemon=True)
+    thread.start()
+
+  def _on_git_pull_finished(self):
+    try:
+      self._git_pull_exit_file.read_text().strip()
+      self._git_pull_exit_file.unlink(missing_ok=True)
+      self._is_processing = False
+      self._commit_status.update("UPDATE", "COMPLETE", Colors.WHITE)
+    except Exception as e:
+      print(f"Failed to read git pull exit code: {e}")
+      self._on_git_pull_failed("FILE READ ERROR")
+
+  def _on_git_pull_failed(self, reason: str):
+    self._is_processing = False
+    print(f"Git pull failed: {reason}")
+    self._commit_status.update("git pull", reason, Colors.DANGER)
+
+  def _start_commit_check(self):
+    if self._is_processing:
+      return
+
+    self._is_processing = True
+    self._commit_check_exit_file.unlink(missing_ok=True)
+
+    def run_commit_check():
+      try:
+        subprocess.Popen(["/bin/sh", "/data/openpilot/scripts/commit_compare.sh"])
+        start_time = time.time()
+        while time.time() - start_time < 15:
+          if self._commit_check_exit_file.exists():
+            self._on_commit_check_finished()
+            return
+          time.sleep(1)
+        self._on_commit_check_failed("TIMEOUT")
+      except Exception as e:
+        print(f"Failed to start commit check: {e}")
+        self._on_commit_check_failed("FAILED TO START")
+
+    thread = threading.Thread(target=run_commit_check, daemon=True)
+    thread.start()
+
+  def _on_commit_check_finished(self):
+    try:
+      exit_code_str = self._commit_check_exit_file.read_text().strip()
+      self._commit_check_exit_file.unlink(missing_ok=True)
+      exit_code = int(exit_code_str)
+
+      if exit_code == 0:
+        output = self._params.get("CommitCompare")
+        self._parse_commit_compare_result(output)
+      else:
+        self._on_commit_check_failed("CHECK FAILED")
+      self._is_processing = False
+    except Exception as e:
+      print(f"Failed to read commit check exit code: {e}")
+      self._on_commit_check_failed("FILE READ ERROR")
+
+  def _on_commit_check_failed(self, reason: str):
+    self._is_processing = False
+    self._is_update_available = False
+    print(f"Commit check failed: {reason}")
+    self._commit_status.update("CHECK", reason, Colors.DANGER)
+
+  def _parse_commit_compare_result(self, output: str):
+    if not output:
+      self._on_commit_check_failed("EMPTY RESULT")
+      return
+
+    output = output.strip().strip('"')
+
+    if " == " in output:
+      parts = output.split(" == ")
+      operator = "=="
+    elif " != " in output:
+      parts = output.split(" != ")
+      operator = "!="
+    else:
+      self._on_commit_check_failed("PARSE ERROR")
+      return
+
+    if len(parts) != 2:
+      self._on_commit_check_failed("INVALID FORMAT")
+      return
+
+    local_commit = parts[0].strip().strip('"')
+    remote_commit = parts[1].strip().strip('"')
+
+    if operator == "==":
+      self._commit_status.update("UP TO DATE", local_commit, Colors.UP_TO_DATE)
+      self._is_update_available = False
+    else:
+      self._commit_status.update(local_commit, remote_commit, Colors.DANGER)
+      self._is_update_available = True
+
+  def _update_progress_indicator(self):
+    if not self._is_processing:
+      return
+
+    current_time = time.time()
+    if current_time - self._last_progress_update >= 1.0:
+      self._progress_dots = (self._progress_dots + 1) % 4
+      self._last_progress_update = current_time
+
+      dot_str = "." * self._progress_dots
+      if self._is_update_available:
+        self._commit_status.update("git pull", "progress" + dot_str, Colors.WARNING)
+      else:
+        self._commit_status.update("check", "progress" + dot_str, Colors.WARNING)
 
   def _get_version_text(self) -> tuple[str, str, str, str] | None:
     version = ui_state.params.get("Version")
@@ -159,46 +376,79 @@ class MiciHomeLayout(Widget):
 
     commit_date_raw = ui_state.params.get("GitCommitDate")
     try:
-      # GitCommitDate format from get_commit_date(): '%ct %ci' e.g. "'1708012345 2024-02-15 ...'"
       unix_ts = int(commit_date_raw.strip("'").split()[0])
-      date_str = datetime.datetime.fromtimestamp(unix_ts).strftime("%b %d")
+      date_str = datetime.datetime.fromtimestamp(unix_ts).strftime("%Y/%m/%d")
     except (ValueError, IndexError, TypeError, AttributeError):
       date_str = ""
 
     return version, branch, commit[:7], date_str
 
+  def _draw_commit_button(self, start_x: float):
+    btn_height = 64
+
+    self._commit_btn_rect.x = start_x + 30
+
+    right_edge = self.rect.x + self.rect.width - HOME_PADDING
+    self._commit_btn_rect.width = right_edge - self._commit_btn_rect.x
+    self._commit_btn_rect.y = self.rect.y + self.rect.height - btn_height - HOME_PADDING
+
+    if self._commit_btn_rect.width < 120:
+      self._commit_btn_rect.width = 120
+      self._commit_btn_rect.x = right_edge - 120
+
+    edge_rect = rl.Rectangle(self._commit_btn_rect.x + 4, self._commit_btn_rect.y + 4, 100, btn_height - 8)
+    rl.begin_scissor_mode(int(self._commit_btn_rect.x + 4), int(self._commit_btn_rect.y), 18, int(btn_height))
+    rl.draw_rectangle_rounded(edge_rect, 0.3, 10, self._commit_status.color)
+    rl.end_scissor_mode()
+
+    rl.draw_rectangle_rounded_lines_ex(self._commit_btn_rect, 0.3, 10, 2, Colors.WHITE_DIM)
+
+    FONT_SIZE = 20
+    labels = [self._commit_status.label, self._commit_status.value]
+    total_text_height = len(labels) * FONT_SIZE
+    text_y = self._commit_btn_rect.y + (btn_height - total_text_height) / 2
+
+    for text in labels:
+      text_size = measure_text_cached(self._font_semi_bold, text, FONT_SIZE)
+      text_pos = rl.Vector2(
+        self._commit_btn_rect.x + 22 + (self._commit_btn_rect.width - 22 - text_size.x) / 2,
+        text_y
+      )
+      rl.draw_text_ex(self._font_semi_bold, text, text_pos, FONT_SIZE, 0, Colors.WHITE)
+      text_y += FONT_SIZE + 2
+
   def _render(self, _):
-    # TODO: why is there extra space here to get it to be flush?
     text_pos = rl.Vector2(self.rect.x - 2 + HOME_PADDING, self.rect.y - 16)
     self._openpilot_label.set_position(text_pos.x, text_pos.y)
     self._openpilot_label.render()
 
+    openpilot_font = gui_app.font(FontWeight.DISPLAY)
+    openpilot_text_size = measure_text_cached(openpilot_font, "openpilot", 96)
+    openpilot_end_x = text_pos.x + openpilot_text_size.x
+
+    title_end_x = openpilot_end_x
+
     if self._version_text is not None:
-      # release branch
       release_branch = self._version_text[1] in RELEASE_BRANCHES
-      version_pos = rl.Rectangle(text_pos.x, text_pos.y + self._openpilot_label.font_size + 16, 100, 44)
-      self._version_label.set_text(self._version_text[0])
-      self._version_label.set_position(version_pos.x, version_pos.y)
-      self._version_label.render()
+      branch_name = "release" if release_branch else self._version_text[1]
 
-      self._date_label.set_text(" " + self._version_text[3])
-      self._date_label.set_position(version_pos.x + self._version_label.rect.width + 10, version_pos.y)
-      self._date_label.render()
+      version_text = f"v{self._version_text[0]}"
+      version_size = measure_text_cached(self._font_semi_bold, version_text, 48)
+      rl.draw_text_ex(self._font_semi_bold, version_text, rl.Vector2(openpilot_end_x + 15, text_pos.y + 40), 48, 0, Colors.WHITE)
 
-      self._branch_label.set_max_width(gui_app.width - self._version_label.rect.width - self._date_label.rect.width - 32)
-      self._branch_label.set_text(" " + ("release" if release_branch else self._version_text[1]))
-      self._branch_label.set_position(version_pos.x + self._version_label.rect.width + self._date_label.rect.width + 20, version_pos.y)
-      self._branch_label.render()
+      title_end_x = openpilot_end_x + 15 + version_size.x
 
-      if not release_branch:
-        # 2nd line
-        self._version_commit_label.set_text(self._version_text[2])
-        self._version_commit_label.set_position(version_pos.x, version_pos.y + self._date_label.font_size + 7)
-        self._version_commit_label.render()
+      line2_text = f"{self._version_text[3]}   {branch_name}"
+      line2_y = text_pos.y + 105
+      rl.draw_text_ex(self._font_roman, line2_text, rl.Vector2(text_pos.x + 8, line2_y), 36, 0, Colors.GRAY)
 
-    # ***** Center-aligned bottom section icons *****
+      line3_y = line2_y + 45
+      rl.draw_text_ex(self._font_roman, self._ip_address, rl.Vector2(text_pos.x + 8, line3_y), 36, 0, Colors.GRAY)
+
     self._experimental_icon.set_visible(self._experimental_mode)
     self._mic_icon.set_visible(ui_state.recording_audio)
 
-    footer_rect = rl.Rectangle(self.rect.x + HOME_PADDING, self.rect.y + self.rect.height - 48, self.rect.width - HOME_PADDING, 48)
+    footer_rect = rl.Rectangle(self.rect.x + HOME_PADDING, self.rect.y + self.rect.height - 56, self.rect.width - HOME_PADDING, 56)
     self._status_bar_layout.render(footer_rect)
+
+    self._draw_commit_button(title_end_x)
