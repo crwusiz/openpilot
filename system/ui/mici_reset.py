@@ -73,7 +73,7 @@ class Reset(Widget):
     if self._reset_state != self._previous_reset_state:
       self._previous_reset_state = self._reset_state
       self._timeout_st = time.monotonic()
-    elif self._reset_state != ResetState.RESETTING and (time.monotonic() - self._timeout_st) > TIMEOUT:
+    elif self._mode != ResetMode.RECOVER and self._reset_state != ResetState.RESETTING and (time.monotonic() - self._timeout_st) > TIMEOUT:
       exit(0)
 
   def _render(self, rect: rl.Rectangle):
@@ -91,6 +91,7 @@ class Reset(Widget):
 
       if self._mode == ResetMode.RECOVER:
         self._cancel_button.set_text("reboot")
+        self._cancel_button.set_click_callback(self._do_reboot)
         self._cancel_button.render(rl.Rectangle(
           rect.x + 8,
           rect.y + rect.height - self._cancel_button.rect.height,
