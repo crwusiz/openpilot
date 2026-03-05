@@ -189,9 +189,8 @@ class TorqueBar(Widget):
       self._torque_filter.update(-ui_state.sm['carOutput'].actuatorsOutput.torque)
 
   def _render(self, rect: rl.Rectangle) -> None:
-    # adjust y pos with torque
-    torque_line_offset = np.interp(abs(self._torque_filter.x), [0.5, 1], [22, 26])
-    torque_line_height = np.interp(abs(self._torque_filter.x), [0.5, 1], [14, 56])
+    torque_line_offset = np.interp(abs(self._torque_filter.x), [0.5, 1], [150, 170])
+    torque_line_height = np.interp(abs(self._torque_filter.x), [0.5, 1], [24, 80])
 
     # animate alpha and angle span
     if not self._demo:
@@ -213,7 +212,7 @@ class TorqueBar(Widget):
     # centerline radius & center (you already have these values)
     mid_r = torque_line_radius + torque_line_height / 2
 
-    cx = rect.x + rect.width / 2 + 8  # offset 8px to right of camera feed
+    cx = rect.x + rect.width / 2
     cy = rect.y + rect.height + torque_line_radius - torque_line_offset
 
     # draw bg torque indicator line
@@ -261,6 +260,6 @@ class TorqueBar(Widget):
 
     # draw center torque bar dot
     if abs(self._torque_filter.x) < 0.5:
-      dot_y = self._rect.y + self._rect.height - torque_line_offset - torque_line_height / 2
-      rl.draw_circle(int(cx), int(dot_y), 10 // 2,
+      dot_y = rect.y + rect.height - torque_line_offset - torque_line_height / 2
+      rl.draw_circle(int(cx), int(dot_y), 8,
                      rl.Color(182, 182, 182, int(255 * 0.9 * self._torque_line_alpha_filter.x)))

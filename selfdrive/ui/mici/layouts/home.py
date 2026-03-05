@@ -140,10 +140,9 @@ class MiciHomeLayout(Widget):
       self._mic_icon,
     ], spacing=16)
 
-    self._openpilot_label = MiciLabel("openpilot", font_size=96, color=rl.Color(255, 255, 255, int(255 * 0.9)), font_weight=FontWeight.DISPLAY)
+    self._openpilot_label = MiciLabel("openpilot", font_size=76, color=rl.Color(255, 255, 255, int(255 * 0.9)), font_weight=FontWeight.DISPLAY)
 
     self._font_semi_bold = gui_app.font(FontWeight.SEMI_BOLD)
-    self._font_roman = gui_app.font(FontWeight.ROMAN)
 
     # --- Git Pull & Commit Check Variables ---
     self._params = Params()
@@ -158,6 +157,13 @@ class MiciHomeLayout(Widget):
 
     self._commit_status = MetricData("UPDATE", "CHECK", Colors.WARNING)
     self._commit_btn_rect = rl.Rectangle(0, 0, 160, 64)
+
+    serial_val = self._params.get("HardwareSerial")
+    if serial_val:
+      serial = serial_val.decode('utf-8') if isinstance(serial_val, bytes) else str(serial_val)
+    else:
+      serial = "unknown"
+    self._hostname = f"comma-{serial}"
 
   def show_event(self):
     self._version_text = self._get_version_text()
@@ -386,15 +392,16 @@ class MiciHomeLayout(Widget):
   def _draw_commit_button(self, start_x: float):
     btn_height = 64
 
-    self._commit_btn_rect.x = start_x + 30
+    self._commit_btn_rect.x = start_x + 12
 
     right_edge = self.rect.x + self.rect.width - HOME_PADDING
     self._commit_btn_rect.width = right_edge - self._commit_btn_rect.x
-    self._commit_btn_rect.y = self.rect.y + self.rect.height - btn_height - HOME_PADDING
 
-    if self._commit_btn_rect.width < 120:
-      self._commit_btn_rect.width = 120
-      self._commit_btn_rect.x = right_edge - 120
+    if self._commit_btn_rect.width < 140:
+      self._commit_btn_rect.width = 140
+      self._commit_btn_rect.x = right_edge - 140
+
+    self._commit_btn_rect.y = self.rect.y + self.rect.height - btn_height - HOME_PADDING
 
     edge_rect = rl.Rectangle(self._commit_btn_rect.x + 4, self._commit_btn_rect.y + 4, 100, btn_height - 8)
     rl.begin_scissor_mode(int(self._commit_btn_rect.x + 4), int(self._commit_btn_rect.y), 18, int(btn_height))
@@ -403,19 +410,19 @@ class MiciHomeLayout(Widget):
 
     rl.draw_rectangle_rounded_lines_ex(self._commit_btn_rect, 0.3, 10, 2, Colors.WHITE_DIM)
 
-    FONT_SIZE = 20
+    font_size = 20
     labels = [self._commit_status.label, self._commit_status.value]
-    total_text_height = len(labels) * FONT_SIZE
+    total_text_height = len(labels) * font_size
     text_y = self._commit_btn_rect.y + (btn_height - total_text_height) / 2
 
     for text in labels:
-      text_size = measure_text_cached(self._font_semi_bold, text, FONT_SIZE)
+      text_size = measure_text_cached(self._font_semi_bold, text, font_size)
       text_pos = rl.Vector2(
         self._commit_btn_rect.x + 22 + (self._commit_btn_rect.width - 22 - text_size.x) / 2,
         text_y
       )
-      rl.draw_text_ex(self._font_semi_bold, text, text_pos, FONT_SIZE, 0, Colors.WHITE)
-      text_y += FONT_SIZE + 2
+      rl.draw_text_ex(self._font_semi_bold, text, text_pos, font_size, 0, Colors.WHITE)
+      text_y += font_size + 2
 
   def _render(self, _):
     text_pos = rl.Vector2(self.rect.x - 2 + HOME_PADDING, self.rect.y - 16)
@@ -423,27 +430,29 @@ class MiciHomeLayout(Widget):
     self._openpilot_label.render()
 
     openpilot_font = gui_app.font(FontWeight.DISPLAY)
-    openpilot_text_size = measure_text_cached(openpilot_font, "openpilot", 96)
+    openpilot_text_size = measure_text_cached(openpilot_font, "openpilot", 76)
     openpilot_end_x = text_pos.x + openpilot_text_size.x
-
-    title_end_x = openpilot_end_x
 
     if self._version_text is not None:
       release_branch = self._version_text[1] in RELEASE_BRANCHES
       branch_name = "release" if release_branch else self._version_text[1]
 
+      font_size = 30
       version_text = f"v{self._version_text[0]}"
-      version_size = measure_text_cached(self._font_semi_bold, version_text, 48)
-      rl.draw_text_ex(self._font_semi_bold, version_text, rl.Vector2(openpilot_end_x + 15, text_pos.y + 40), 48, 0, Colors.WHITE)
-
-      title_end_x = openpilot_end_x + 15 + version_size.x
+      rl.draw_text_ex(self._font_semi_bold, version_text, rl.Vector2(openpilot_end_x + 12, text_pos.y + 32), font_size + 8, 0, Colors.WHITE)
 
       line2_text = f"{self._version_text[3]}   {branch_name}"
-      line2_y = text_pos.y + 105
-      rl.draw_text_ex(self._font_roman, line2_text, rl.Vector2(text_pos.x + 8, line2_y), 36, 0, Colors.GRAY)
+      line2_size = measure_text_cached(self._font_semi_bold, line2_text, font_size)
+      line2_y = text_pos.y + openpilot_text_size.y + 5
+      rl.draw_text_ex(self._font_semi_bold, line2_text, rl.Vector2(text_pos.x + 8, line2_y), font_size, 0, Colors.GRAY)
 
-      line3_y = line2_y + 45
-      rl.draw_text_ex(self._font_roman, self._ip_address, rl.Vector2(text_pos.x + 8, line3_y), 36, 0, Colors.GRAY)
+      line3_y = line2_y + line2_size.y + 5
+      ip_color = Colors.UP_TO_DATE if self._ip_address != "Offline" else Colors.GRAY
+      rl.draw_text_ex(self._font_semi_bold, self._ip_address, rl.Vector2(text_pos.x + 8, line3_y), font_size, 0, ip_color)
+
+      ip_size = measure_text_cached(self._font_semi_bold, self._ip_address, font_size)
+      hostname_text = f" [{self._hostname}]"
+      rl.draw_text_ex(self._font_semi_bold, hostname_text, rl.Vector2(text_pos.x + 8 + ip_size.x, line3_y), font_size, 0, Colors.WHITE)
 
     self._experimental_icon.set_visible(self._experimental_mode)
     self._mic_icon.set_visible(ui_state.recording_audio)
@@ -451,4 +460,4 @@ class MiciHomeLayout(Widget):
     footer_rect = rl.Rectangle(self.rect.x + HOME_PADDING, self.rect.y + self.rect.height - 56, self.rect.width - HOME_PADDING, 56)
     self._status_bar_layout.render(footer_rect)
 
-    self._draw_commit_button(title_end_x)
+    self._draw_commit_button(openpilot_end_x)
