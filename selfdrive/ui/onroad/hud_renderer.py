@@ -13,6 +13,7 @@ from openpilot.system.ui.widgets import Widget
 from datetime import datetime
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.onroad.icon_button import IconButton, RotatableIconButton, ToggleIconButton, IconGroup
+from openpilot.selfdrive.ui.onroad.torque_bar import TorqueBar
 
 
 # Constants
@@ -152,6 +153,8 @@ class HudRenderer(Widget):
 
     # Load static icons (non-interactive)
     self._load_static_icons()
+
+    self.torque_bar = TorqueBar()
 
   def _init_icon_buttons(self) -> None:
     icon_size = UIConfig.icon_size
@@ -338,6 +341,8 @@ class HudRenderer(Widget):
     # Update icon button states
     self._update_icon_button_states()
 
+    self.torque_bar._update_state()
+
   def _update_icon_button_states(self) -> None:
     # Upper icons
     self.direction_btn.set_rotation(self.gps_bearing)
@@ -400,6 +405,8 @@ class HudRenderer(Widget):
     button_x = rect.x + rect.width - UIConfig.border_size - UIConfig.button_size + 10
     button_y = rect.y + UIConfig.border_size + 10
     self._exp_button.render(rl.Rectangle(button_x, button_y, UIConfig.button_size, UIConfig.button_size))
+
+    self.torque_bar._render(rect)
 
   def user_interacting(self) -> bool:
     return self._exp_button.is_pressed or self.upper_icons.is_any_pressed() or self.bottom_icons.is_any_pressed()
