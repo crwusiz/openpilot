@@ -166,6 +166,7 @@ class MiciHomeLayout(Widget):
     self._hostname = f"comma-{serial}"
 
   def show_event(self):
+    super().show_event()
     self._version_text = self._get_version_text()
     ip = self.wifi_manager_ui.ip_address
     self._ip_address = ip if ip else "Offline"

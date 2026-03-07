@@ -73,6 +73,7 @@ class DeviceLayout(Widget):
     self._update_device_position()
 
   def show_event(self):
+    super().show_event()
     self._scroller.show_event()
 
   def _render(self, rect):
