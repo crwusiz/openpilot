@@ -601,6 +601,7 @@ class CommunityLayout(Widget):
     return False
 
   def show_event(self):
+    super().show_event()
     if self._content_scroller:
       self._content_scroller.show_event()
 
