@@ -7,7 +7,7 @@ from collections.abc import Callable
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.layouts import HBoxLayout
 from openpilot.system.ui.widgets.icon_widget import IconWidget
-from openpilot.system.ui.widgets.label import MiciLabel, UnifiedLabel
+from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, FONT_SCALE
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.version import RELEASE_BRANCHES
@@ -140,7 +140,7 @@ class MiciHomeLayout(Widget):
       self._mic_icon,
     ], spacing=16)
 
-    self._openpilot_label = MiciLabel("openpilot", font_size=76, color=rl.Color(255, 255, 255, int(255 * 0.9)), font_weight=FontWeight.DISPLAY)
+    self._openpilot_label = UnifiedLabel("openpilot", font_size=76, font_weight=FontWeight.DISPLAY, max_width=480, wrap_text=False)
 
     self._font_semi_bold = gui_app.font(FontWeight.SEMI_BOLD)
 
