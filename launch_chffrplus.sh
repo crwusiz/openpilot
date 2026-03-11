@@ -139,8 +139,13 @@ function launch {
     cat /usr/comma/setup_keys > /data/params/d/GithubSshKeys
   fi
 
-  echo -n 1 > /data/params/d/SshEnabled
-  echo -n 1 > /data/params/d/AdbEnabled
+  if [ "$(cat /data/params/d/SshEnabled 2>/dev/null)" = "0" ]; then
+    echo -n 1 > /data/params/d/SshEnabled
+  fi
+
+  if [ "$(cat /data/params/d/AdbEnabled 2>/dev/null)" = "0" ]; then
+    echo -n 1 > /data/params/d/AdbEnabled
+  fi
 
   # start manager
   cd system/manager
