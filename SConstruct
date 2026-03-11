@@ -40,7 +40,18 @@ assert arch in [
 ]
 
 pkg_names = ['bzip2', 'capnproto', 'eigen', 'ffmpeg', 'libjpeg', 'libyuv', 'ncurses', 'zeromq', 'zstd']
-pkgs = [importlib.import_module(name) for name in pkg_names]
+pkgs = []
+
+for name in pkg_names:
+  try:
+    pkgs.append(importlib.import_module(name))
+  except ImportError:
+    pass
+
+try:
+  py_include = importlib.import_module('python3_dev').INCLUDE_DIR
+except ImportError:
+  py_include = sysconfig.get_paths()['include']
 
 env = Environment(
   ENV={
