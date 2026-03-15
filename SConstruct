@@ -59,7 +59,7 @@ except ImportError:
 # vendored in commaai/dependencies.
 allowed_system_libs = {
   "EGL", "GLESv2", "GL", "Qt5Charts", "Qt5Core", "Qt5Gui", "Qt5Widgets",
-  "dl", "drm", "gbm", "m", "pthread",
+  "dl", "drm", "gbm", "m", "pthread", "usb-1.0",
 }
 
 def _resolve_lib(env, name):
