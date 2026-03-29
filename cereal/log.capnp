@@ -88,6 +88,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     lowMemory @51;
     stockAeb @52;
     stockLkas @98;
+    lateralManeuver @99;
     ldw @53;
     carUnrecognized @54;
     invalidLkasSetting @55;
@@ -133,7 +134,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     audioFeedback @97;
 
     turningIndicatorOn @103;
-    autoLaneChange @99;
+    autoLaneChange @104;
 
     ding @100;
     dong @101;
@@ -1261,6 +1262,10 @@ struct DriverAssistance {
   rightLaneDeparture @1 :Bool;
 
   # FCW, AEB, etc. will go here
+}
+
+struct LateralManeuverPlan {
+  desiredCurvature @0 :Float32;  # 1/m
 }
 
 struct LongitudinalPlan @0xe00b5b3eba12876c {
@@ -2637,6 +2642,8 @@ struct Event {
     userBookmark @93 :UserBookmark;
     bookmarkButton @148 :UserBookmark;
     audioFeedback @149 :AudioFeedback;
+
+    lateralManeuverPlan @150 :LateralManeuverPlan;
 
     # *********** debug ***********
     testJoystick @52 :Joystick;
