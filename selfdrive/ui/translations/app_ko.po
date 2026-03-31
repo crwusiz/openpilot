@@ -72,6 +72,10 @@ msgstr "공격적"
 msgid "Agree"
 msgstr "동의"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Allow openpilot to engage using the stock PCM cruise buttons."
+msgstr "PCM 크루즈 방식을 사용합니다"
+
 #: openpilot/selfdrive/ui/layouts/settings/toggles.py
 msgid "Always-On Driver Monitoring"
 msgstr "운전자 모니터링 항상 켜짐"
@@ -92,6 +96,10 @@ msgstr "정말 보정을 재설정하시겠습니까?"
 msgid "Are you sure you want to uninstall?"
 msgstr "정말 제거하시겠습니까?"
 
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "BUSY"
+msgstr "동작중"
+
 #: openpilot/selfdrive/ui/layouts/onboarding.py
 #: system/ui/widgets/network.py
 msgid "Back"
@@ -105,17 +113,46 @@ msgstr "connect.comma.ai에서 comma prime 회원이 되세요"
 msgid "Bookmark connect.comma.ai to your home screen to use it like an app"
 msgstr "connect.comma.ai를 홈 화면에 추가하여 앱처럼 사용하세요"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Branch"
+msgstr "브랜치"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Branch list not found"
+msgstr "브랜치 목록이 없습니다"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "CAN missing Log"
+msgstr "CAN missing 로그"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "CAN timeout Log"
+msgstr "CAN timeout 로그"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "CANFD Car HDA2"
+msgstr "HDA2 차량"
+
 #: openpilot/selfdrive/ui/layouts/settings/device.py
 msgid "CHANGE"
 msgstr "변경"
 
 #: openpilot/selfdrive/ui/layouts/settings/software.py
+#: openpilot/selfdrive/ui/layouts/sidebar.py
 msgid "CHECK"
 msgstr "확인"
+
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "CHECK FAILED"
+msgstr "체크 실패"
 
 #: openpilot/selfdrive/ui/widgets/exp_mode_button.py
 msgid "CHILL MODE ON"
 msgstr "안정적 모드 켜짐"
+
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "COMPLETE"
+msgstr "완료"
 
 #: openpilot/selfdrive/ui/layouts/sidebar.py
 #: system/ui/widgets/network.py
@@ -126,12 +163,28 @@ msgstr "연결"
 msgid "CONNECTING..."
 msgstr "연결 중..."
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Camera View"
+msgstr "카메라 보기"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "CameraSCC"
+msgstr "CameraSCC"
+
 #: system/ui/widgets/confirm_dialog.py
 #: system/ui/widgets/keyboard.py
 #: system/ui/widgets/network.py
 #: system/ui/widgets/option_dialog.py
 msgid "Cancel"
 msgstr "취소"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Car"
+msgstr "Car"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "CarParams dump"
+msgstr "CarParams 덤프"
 
 #: system/ui/widgets/network.py
 msgid "Cellular Metered"
@@ -143,7 +196,18 @@ msgstr "언어 변경"
 
 #: openpilot/selfdrive/ui/layouts/settings/toggles.py
 msgid "Changing this setting will restart openpilot if the car is powered on."
-msgstr "차량 전원이 켜져 있으면 이 설정을 변경할 때 openpilot이 재시작됩니다."
+msgstr "차량 전원이 켜져 있으면 이 설정을 변경할 때 오픈파일럿이 재시작됩니다."
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Clear DTC"
+msgstr "Clear DTC"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid ""
+"Clear DTC\n"
+"\n"
+"Process?"
+msgstr ""
 
 #: openpilot/selfdrive/ui/widgets/pairing_dialog.py
 msgid "Click \"add new device\" and scan the QR code on the right"
@@ -152,6 +216,18 @@ msgstr "\"add new device\"를 눌러 오른쪽의 QR 코드를 스캔하세요"
 #: openpilot/selfdrive/ui/widgets/offroad_alerts.py
 msgid "Close"
 msgstr "닫기"
+
+#: openpilot/selfdrive/ui/layouts/settings/settings.py
+msgid "Community"
+msgstr "커뮤니티"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Create prebuilt file to speed bootup"
+msgstr "Prebuilt 파일을 생성하여 부팅속도를 향상시킵니다"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Cruise State Controls"
+msgstr "크루즈 상태 컨트롤"
 
 #: openpilot/selfdrive/ui/layouts/settings/software.py
 msgid "Current Version"
@@ -167,7 +243,7 @@ msgstr "거부"
 
 #: openpilot/selfdrive/ui/layouts/onboarding.py
 msgid "Decline, uninstall openpilot"
-msgstr "거부하고 openpilot 제거"
+msgstr "거부하고 오픈파일럿 제거"
 
 #: openpilot/selfdrive/ui/layouts/settings/settings.py
 msgid "Developer"
@@ -209,6 +285,14 @@ msgstr "다운로드"
 msgid "Driver Camera"
 msgstr "운전자 카메라"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Driver Camera On Reverse"
+msgstr "후진시 운전자카메라 표시"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "DriverCamera Hardware Missing"
+msgstr "운전자 카메라 미사용"
+
 #: openpilot/selfdrive/ui/layouts/settings/toggles.py
 msgid "Driving Personality"
 msgstr "주행 성향"
@@ -216,6 +300,10 @@ msgstr "주행 성향"
 #: system/ui/widgets/network.py
 msgid "EDIT"
 msgstr "편집"
+
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "EMPTY RESULT"
+msgstr "결과 없음"
 
 #: openpilot/selfdrive/ui/layouts/sidebar.py
 msgid "ERROR"
@@ -238,9 +326,17 @@ msgstr "사용"
 msgid "Enable ADB"
 msgstr "ADB 사용"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Enable Camera SCC. (For CANFD HDA1 (Connect Camera) or HDA2 (Connect ADAS Module))"
+msgstr "Camera SCC 활성화 HDA1(카메라 모듈에 연결), HDA2(ADAS 모듈에 연결)"
+
 #: openpilot/selfdrive/ui/layouts/settings/toggles.py
 msgid "Enable Lane Departure Warnings"
 msgstr "차선 이탈 경고 사용"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Enable Radar Track"
+msgstr "레이더트랙 활성화"
 
 #: system/ui/widgets/network.py
 msgid "Enable Roaming"
@@ -258,6 +354,10 @@ msgstr "테더링 사용"
 msgid "Enable driver monitoring even when openpilot is not engaged."
 msgstr "openpilot이 작동 중이 아닐 때도 운전자 모니터링을 사용합니다."
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Enable driving without the driver monitoring camera (hardware failure)."
+msgstr "오픈파일럿을 운전자 감시 카메라 없이 사용합니다."
+
 #: openpilot/selfdrive/ui/layouts/settings/toggles.py
 msgid "Enable openpilot"
 msgstr "openpilot 사용"
@@ -265,6 +365,14 @@ msgstr "openpilot 사용"
 #: openpilot/selfdrive/ui/layouts/settings/toggles.py
 msgid "Enable the openpilot longitudinal control (alpha) toggle to allow Experimental mode."
 msgstr "실험 모드를 사용하려면 openpilot 롱컨 제어(알파) 토글을 켜세요."
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Enable the use of Radar Tracks (Note: This disables AEB)."
+msgstr "레이더 트랙을 활성화 합니다"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Enable this option for Highway Driving Assist 2 (HDA2) vehicles."
+msgstr "HDA2 차량은 활성화 하세요"
 
 #: system/ui/widgets/network.py
 msgid "Enter APN"
@@ -290,6 +398,18 @@ msgstr "GitHub 사용자 이름 입력"
 msgid "Error"
 msgstr "오류"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Error creating console log"
+msgstr "콘솔 로그 생성 오류"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Error executing script:"
+msgstr "스크립트 실행 오류:"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Error reading log file"
+msgstr "로그 파일 오류"
+
 #: openpilot/selfdrive/ui/layouts/settings/toggles.py
 msgid "Experimental Mode"
 msgstr "실험 모드"
@@ -297,6 +417,14 @@ msgstr "실험 모드"
 #: openpilot/selfdrive/ui/layouts/settings/toggles.py
 msgid "Experimental mode is currently unavailable on this car since the car's stock ACC is used for longitudinal control."
 msgstr "이 차량은 롱컨 제어에 순정 ACC를 사용하므로 현재 실험 모드를 사용할 수 없습니다."
+
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "FAILED TO START"
+msgstr "동작 실패"
+
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "FILE READ ERROR"
+msgstr "파일 읽기 오류"
 
 #: system/ui/widgets/network.py
 msgid "FORGETTING..."
@@ -322,17 +450,50 @@ msgstr "삭제"
 msgid "Forget Wi-Fi Network \"{}\"?"
 msgstr "Wi‑Fi 네트워크 \"{}\"를 삭제하시겠습니까?"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Function"
+msgstr "기능"
+
 #: openpilot/selfdrive/ui/layouts/sidebar.py
 msgid "GOOD"
 msgstr "양호"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Git Checkout"
+msgstr "Git Checkout"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid ""
+"Git Checkout\n"
+"\n"
+"Process?"
+msgstr ""
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Git Fetch & Reset"
+msgstr "Git Fetch & Reset"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid ""
+"Git Fetch and Reset\n"
+"\n"
+"Process?"
+msgstr ""
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid ""
+"Git Reset\n"
+"\n"
+"Process?"
+msgstr ""
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Git Reset -1"
+msgstr "Git Reset -1"
+
 #: openpilot/selfdrive/ui/widgets/pairing_dialog.py
 msgid "Go to https://connect.comma.ai on your phone"
 msgstr "휴대폰에서 https://connect.comma.ai 에 접속하세요"
-
-#: openpilot/selfdrive/ui/layouts/sidebar.py
-msgid "HIGH"
-msgstr "높음"
 
 #: system/ui/widgets/network.py
 msgid "Hidden Network"
@@ -341,6 +502,10 @@ msgstr "숨겨진 네트워크"
 #: openpilot/selfdrive/ui/layouts/settings/software.py
 msgid "INSTALL"
 msgstr "설치"
+
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "INVALID FORMAT"
+msgstr "알수없는 형식"
 
 #: system/ui/widgets/network.py
 msgid "IP Address"
@@ -363,16 +528,32 @@ msgid "LTE"
 msgstr "LTE"
 
 #: openpilot/selfdrive/ui/layouts/settings/developer.py
+msgid "Lateral Maneuver Mode"
+msgstr "조향 제어 모드"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Log"
+msgstr "로그"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Logger Enable"
+msgstr "로그 활성화"
+
+#: openpilot/selfdrive/ui/layouts/settings/developer.py
 msgid "Longitudinal Maneuver Mode"
 msgstr "롱컨 기동 모드"
 
-#: openpilot/selfdrive/ui/onroad/hud_renderer.py
-msgid "MAX"
-msgstr "최대"
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Manufacturer"
+msgstr "제조사"
 
 #: openpilot/selfdrive/ui/widgets/setup.py
 msgid "Maximize your training data uploads to improve openpilot's driving models."
 msgstr "학습 데이터 업로드를 최대화하여 openpilot의 주행 모델을 개선하세요."
+
+#: openpilot/selfdrive/ui/layouts/settings/toggles.py
+msgid "More Relaxed"
+msgstr "좀더 편안한"
 
 #: openpilot/selfdrive/ui/layouts/settings/device.py
 msgid "N/A"
@@ -382,9 +563,17 @@ msgstr "해당 없음"
 msgid "NO"
 msgstr "아니오"
 
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "NO NETWORK"
+msgstr "네트워크 없음"
+
 #: openpilot/selfdrive/ui/layouts/settings/settings.py
 msgid "Network"
 msgstr "네트워크"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "No"
+msgstr "아니오"
 
 #: openpilot/selfdrive/ui/widgets/ssh_key.py
 msgid "No SSH keys found for user '{}'"
@@ -398,7 +587,7 @@ msgstr "릴리스 노트가 없습니다."
 msgid "OFFLINE"
 msgstr "오프라인"
 
-#: openpilot/selfdrive/ui/layouts/sidebar.py
+#: openpilot/selfdrive/ui/layouts/settings/community.py
 #: system/ui/widgets/confirm_dialog.py
 #: system/ui/widgets/html_render.py
 msgid "OK"
@@ -412,6 +601,10 @@ msgstr "온라인"
 msgid "Open"
 msgstr "열기"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Openpilot controls the cruise state (on/off) and set speed."
+msgstr "오픈파일럿이 크루즈 상태를 컨트롤 합니다"
+
 #: openpilot/selfdrive/ui/layouts/settings/device.py
 msgid "PAIR"
 msgstr "페어링"
@@ -419,6 +612,10 @@ msgstr "페어링"
 #: openpilot/selfdrive/ui/layouts/sidebar.py
 msgid "PANDA"
 msgstr "PANDA"
+
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "PARSE ERROR"
+msgstr "구문 분석 오류"
 
 #: openpilot/selfdrive/ui/layouts/settings/device.py
 msgid "PREVIEW"
@@ -445,13 +642,55 @@ msgstr "장치를 귀하의 comma 계정에 페어링하세요"
 msgid "Pair your device with comma connect (connect.comma.ai) and claim your comma prime offer."
 msgstr "장치를 comma connect(connect.comma.ai)와 페어링하고 comma 프라임 혜택을 받으세요."
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Panda Flash"
+msgstr "판다 플래싱"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid ""
+"Panda Flash\n"
+"\n"
+"Process?"
+msgstr ""
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Panda Recover"
+msgstr "판다 복구"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid ""
+"Panda Recover\n"
+"\n"
+"Process?"
+msgstr ""
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Path does not exist"
+msgstr "경로가 존재하지않습니다"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "PcmCruise"
+msgstr "PcmCruise"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Please Check Network Connection"
+msgstr "네트워크 연결을 확인하세요"
+
 #: openpilot/selfdrive/ui/widgets/setup.py
 msgid "Please connect to Wi-Fi to complete initial pairing"
 msgstr "초기 페어링을 완료하려면 Wi‑Fi에 연결하세요"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Please select manufacturer first"
+msgstr "제조사를 먼저 선택하세요"
+
 #: openpilot/selfdrive/ui/layouts/settings/device.py
 msgid "Power Off"
 msgstr "전원 끄기"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Prebuilt Enable"
+msgstr "Prebuilt 활성화"
 
 #: system/ui/widgets/network.py
 msgid "Prevent large data uploads when on a metered Wi-Fi connection"
@@ -464,6 +703,10 @@ msgstr "종량제 셀룰러 연결 시 대용량 업로드 방지"
 #: openpilot/selfdrive/ui/layouts/settings/device.py
 msgid "Preview the driver facing camera to ensure that driver monitoring has good visibility. (vehicle must be off)"
 msgstr "운전자 모니터링의 가시성을 확인하기 위해 운전자 카메라를 미리 봅니다. (차량은 꺼져 있어야 합니다)"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Process"
+msgstr "실행"
 
 #: openpilot/selfdrive/ui/widgets/pairing_dialog.py
 msgid "QR Code Error"
@@ -480,6 +723,10 @@ msgstr "재설정"
 #: openpilot/selfdrive/ui/layouts/settings/device.py
 msgid "REVIEW"
 msgstr "검토"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Realdata Route"
+msgstr "주행데이터 경로"
 
 #: openpilot/selfdrive/ui/layouts/settings/device.py
 msgid "Reboot"
@@ -541,6 +788,14 @@ msgstr "학습 가이드 검토"
 msgid "Review the rules, features, and limitations of openpilot"
 msgstr "openpilot의 규칙, 기능 및 제한을 검토"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Routes do not exist"
+msgstr "경로가 존재하지 않습니다"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Run"
+msgstr "실행"
+
 #: openpilot/selfdrive/ui/layouts/settings/software.py
 msgid "SELECT"
 msgstr "선택"
@@ -553,9 +808,24 @@ msgstr "SSH 키"
 msgid "Scanning Wi-Fi networks..."
 msgstr "Wi‑Fi 네트워크 검색 중..."
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Scons Build"
+msgstr "Scons 재빌드"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid ""
+"Scons Rebuild\n"
+"\n"
+"Process?"
+msgstr ""
+
 #: system/ui/widgets/option_dialog.py
 msgid "Select"
 msgstr "선택"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Select Route to Upload"
+msgstr "선택한 경로를 업로드"
 
 #: openpilot/selfdrive/ui/layouts/settings/software.py
 msgid "Select a branch"
@@ -581,6 +851,10 @@ msgstr "소프트웨어"
 msgid "Standard"
 msgstr "표준"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Switch to the driver camera view when in reverse gear."
+msgstr ""
+
 #: openpilot/selfdrive/ui/onroad/alert_renderer.py
 msgid "System Unresponsive"
 msgstr "시스템 응답 없음"
@@ -593,6 +867,10 @@ msgstr "즉시 수동 조작하세요"
 msgid "TEMP"
 msgstr "온도"
 
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "TIMEOUT"
+msgstr "시간초과"
+
 #: openpilot/selfdrive/ui/layouts/settings/software.py
 msgid "Target Branch"
 msgstr "대상 브랜치"
@@ -601,9 +879,25 @@ msgstr "대상 브랜치"
 msgid "Tethering Password"
 msgstr "테더링 비밀번호"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Tmux Console"
+msgstr "Tmux 콘솔"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Tmux log"
+msgstr "Tmux 로그"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Toggle"
+msgstr "토글"
+
 #: openpilot/selfdrive/ui/layouts/settings/settings.py
 msgid "Toggles"
 msgstr "토글"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Turn off this option to reduce system load"
+msgstr "시스템 부하를 줄이려면 이 옵션을 끄세요."
 
 #: openpilot/selfdrive/ui/layouts/settings/developer.py
 msgid "UI Debug Mode"
@@ -613,7 +907,12 @@ msgstr "UI 디버그 모드"
 msgid "UNINSTALL"
 msgstr "제거"
 
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "UP TO DATE"
+msgstr "최신상태"
+
 #: openpilot/selfdrive/ui/layouts/home.py
+#: openpilot/selfdrive/ui/layouts/sidebar.py
 msgid "UPDATE"
 msgstr "업데이트"
 
@@ -633,9 +932,21 @@ msgstr "업데이트는 차량 전원이 꺼져 있을 때만 다운로드됩니
 msgid "Upgrade Now"
 msgstr "지금 업그레이드"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Upload"
+msgstr "업로드"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Upload completed successfully"
+msgstr "업로드가 성공적으로 완료되었습니다"
+
 #: openpilot/selfdrive/ui/layouts/settings/toggles.py
 msgid "Upload data from the driver facing camera and help improve the driver monitoring algorithm."
 msgstr "운전자 방향 카메라 데이터를 업로드하여 운전자 모니터링 알고리즘 개선에 도움을 주세요."
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Upload failed"
+msgstr "업로드 실패"
 
 #: openpilot/selfdrive/ui/layouts/settings/toggles.py
 msgid "Use Metric System"
@@ -648,6 +959,14 @@ msgstr "차량"
 #: openpilot/selfdrive/ui/layouts/settings/device.py
 msgid "VIEW"
 msgstr "보기"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "View"
+msgstr "보기"
+
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "WAIT"
+msgstr "대기"
 
 #: openpilot/selfdrive/ui/onroad/alert_renderer.py
 msgid "Waiting to start"
@@ -673,6 +992,10 @@ msgstr "Wi‑Fi 네트워크 종량제"
 msgid "Wrong password"
 msgstr "비밀번호가 올바르지 않습니다"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "Yes"
+msgstr "예"
+
 #: openpilot/selfdrive/ui/layouts/onboarding.py
 msgid "You must accept the Terms and Conditions in order to use openpilot."
 msgstr "openpilot을 사용하려면 약관에 동의해야 합니다."
@@ -684,6 +1007,17 @@ msgstr "openpilot을 사용하려면 약관에 동의해야 합니다. 계속하
 #: openpilot/selfdrive/ui/onroad/driver_camera_dialog.py
 msgid "camera starting"
 msgstr "카메라 시작 중"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid ""
+"carParams dump upload\n"
+"\n"
+"Process?"
+msgstr ""
+
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "check"
+msgstr "체크"
 
 #: openpilot/selfdrive/ui/layouts/settings/software.py
 msgid "checking..."
@@ -717,9 +1051,9 @@ msgstr "업데이트 마무리 중..."
 msgid "for \"{}\""
 msgstr "\"{}\"용"
 
-#: openpilot/selfdrive/ui/onroad/hud_renderer.py
-msgid "km/h"
-msgstr "km/h"
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "git pull"
+msgstr "git pull"
 
 #: system/ui/widgets/network.py
 msgid "leave blank for automatic configuration"
@@ -729,13 +1063,13 @@ msgstr "자동 구성을 사용하려면 비워 두세요"
 msgid "left"
 msgstr "왼쪽"
 
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid "log file not found"
+msgstr "로그 파일이 없습니다"
+
 #: system/ui/widgets/network.py
 msgid "metered"
 msgstr "종량제"
-
-#: openpilot/selfdrive/ui/onroad/hud_renderer.py
-msgid "mph"
-msgstr "mph"
 
 #: openpilot/selfdrive/ui/layouts/settings/software.py
 msgid "never"
@@ -761,9 +1095,20 @@ msgstr "openpilot 롱컨 제어는 향후 업데이트에서 제공될 수 있�
 msgid "openpilot requires the device to be mounted within 4° left or right and within 5° up or 9° down."
 msgstr "openpilot은 장치를 좌우 4°, 위쪽 5°, 아래쪽 9° 이내로 장착해야 합니다."
 
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "progress"
+msgstr "진행중"
+
 #: openpilot/selfdrive/ui/layouts/settings/device.py
 msgid "right"
 msgstr "오른쪽"
+
+#: openpilot/selfdrive/ui/layouts/settings/community.py
+msgid ""
+"tmux console log upload\n"
+"\n"
+"Process?"
+msgstr ""
 
 #: system/ui/widgets/network.py
 msgid "unmetered"
