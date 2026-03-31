@@ -453,6 +453,11 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
                                        "전방 도로에 장애물이 없는지 확인하세요"),
   },
 
+  EventName.lateralManeuver: {
+    ET.WARNING: longitudinal_maneuver_alert,
+    ET.PERMANENT: NormalPermanentAlert("조향 제어 모드"),
+  },
+
   EventName.selfdriveInitializing: {
     ET.NO_ENTRY: NoEntryAlert("시스템이 준비중입니다"),
   },
