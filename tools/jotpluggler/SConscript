@@ -2,9 +2,6 @@ import os
 import imgui
 import libusb
 from opendbc import get_generated_dbcs
-from opendbc.car import Bus
-from opendbc.car.fingerprints import MIGRATION
-from opendbc.car.values import PLATFORMS
 from openpilot.common.basedir import BASEDIR
 
 Import('env', 'arch', 'common', 'messaging', 'visionipc', 'cereal', 'replay_lib')
@@ -35,6 +32,10 @@ def materialize_generated_dbcs(target, source, env):
   return None
 
 def write_car_fingerprint_to_dbc_header(target, source, env):
+  from opendbc.car import Bus
+  from opendbc.car.values import PLATFORMS
+  from opendbc.car.fingerprints import MIGRATION
+
   pairs = {}
 
   for name, platform in sorted(PLATFORMS.items()):
