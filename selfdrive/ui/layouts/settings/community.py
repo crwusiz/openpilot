@@ -44,9 +44,6 @@ DESCRIPTIONS = {
   'driver_cam_missing': tr_noop(
     "Enable driving without the driver monitoring camera (hardware failure)."
   ),
-  'hardware_c3x': tr_noop(
-    "Enable support for C3X Lite hardware."
-  ),
   'logger_enable': tr_noop(
     "Turn off this option to reduce system load"
   ),

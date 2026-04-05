@@ -87,7 +87,7 @@ class Sidebar(Widget):
     self._home_img = gui_app.texture("images/button_home.png", HOME_BTN.width, HOME_BTN.height)
     self._flag_img = gui_app.texture("images/button_flag.png", HOME_BTN.width, HOME_BTN.height)
     self._settings_img = gui_app.texture("images/button_settings.png", SETTINGS_BTN.width, SETTINGS_BTN.height)
-    self._c3x_img = gui_app.texture("icons/c3x.png", HOME_BTN.width, HOME_BTN.height)
+    self._c3x_img = gui_app.texture("icons/c3x.png")
     self._mic_img = gui_app.texture("icons/microphone.png", 30, 30)
     self._mic_indicator_rect = rl.Rectangle(0, 0, 0, 0)
     self._font_regular = gui_app.font(FontWeight.NORMAL)
@@ -399,7 +399,10 @@ class Sidebar(Widget):
     #rl.draw_texture_ex(button_img, rl.Vector2(HOME_BTN.x, HOME_BTN.y), 0.0, 1.0, tint)
 
     # C3X image (always shown, not flag/home toggle)
-    rl.draw_texture_ex(self._c3x_img, rl.Vector2(HOME_BTN.x, HOME_BTN.y), 0.0, 1.0, tint)
+    c3x_scale = HOME_BTN.width / self._c3x_img.width if self._c3x_img.width > 0 else 1.0
+    c3x_y = HOME_BTN.y + (HOME_BTN.height - (self._c3x_img.height * c3x_scale)) / 2
+
+    rl.draw_texture_ex(self._c3x_img, rl.Vector2(HOME_BTN.x, c3x_y), 0.0, c3x_scale, Colors.WHITE)
 
     # Microphone button
     if self._recording_audio:
