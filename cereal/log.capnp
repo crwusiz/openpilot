@@ -603,6 +603,7 @@ struct PandaState @0xa7649e2575e4591e {
   harnessStatus @21 :HarnessStatus;
   sbu1Voltage @35 :Float32;
   sbu2Voltage @36 :Float32;
+  # soundOutputLevel @37 :UInt16;
 
   # can health
   canState0 @29 :PandaCanState;
@@ -624,7 +625,7 @@ struct PandaState @0xa7649e2575e4591e {
   # these fields are not used by openpilot, but they're
   # reserved for forks building alternate experiences.
   controlsAllowedRESERVED1 @38 :Bool;
-  controlsAllowedRESERVED2 @39 :Bool;
+  controlsAllowedRESERVED2 @37 :Bool;
 
   enum FaultStatus {
     none @0;
