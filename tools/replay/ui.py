@@ -114,7 +114,7 @@ def ui_thread(addr):
   plot_arr = np.zeros((100, len(name_to_arr_idx.values())))
 
   plot_xlims = [(0, plot_arr.shape[0]), (0, plot_arr.shape[0]), (0, plot_arr.shape[0]), (0, plot_arr.shape[0])]
-  plot_ylims = [(-0.1, 1.1), (-ANGLE_SCALE, ANGLE_SCALE), (0.0, 75.0), (-3.0, 2.0)]
+  plot_ylims = [(-0.1, 1.1), (-ANGLE_SCALE, ANGLE_SCALE), (0.0, 75.0), (-3.5, 2.0)]
   plot_names = [
     ["gas", "computer_gas", "user_brake", "computer_brake"],
     ["angle_steers", "angle_steers_des", "angle_steers_k", "steer_torque"],
@@ -168,7 +168,8 @@ def ui_thread(addr):
     else:
       angle_steers_k = np.inf
 
-    plot_arr[:-1] = plot_arr[1:]
+    if sm.updated['carState']:
+      plot_arr[:-1] = plot_arr[1:]
     plot_arr[-1, name_to_arr_idx['angle_steers']] = sm['carState'].steeringAngleDeg
     plot_arr[-1, name_to_arr_idx['angle_steers_des']] = sm['carControl'].actuators.steeringAngleDeg
     plot_arr[-1, name_to_arr_idx['angle_steers_k']] = angle_steers_k
@@ -183,8 +184,7 @@ def ui_thread(addr):
     plot_arr[-1, name_to_arr_idx['v_cruise']] = sm['carState'].cruiseState.speed
     plot_arr[-1, name_to_arr_idx['a_ego']] = sm['carState'].aEgo
 
-    if len(sm['longitudinalPlan'].accels):
-      plot_arr[-1, name_to_arr_idx['a_target']] = sm['longitudinalPlan'].accels[0]
+    plot_arr[-1, name_to_arr_idx['a_target']] = sm['longitudinalPlan'].aTarget
 
     # Draw model overlays onto img, then blit as transparent overlay
     img[:] = 0
