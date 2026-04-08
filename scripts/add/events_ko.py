@@ -527,11 +527,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventName.stockLkas: {
-    ET.PERMANENT: Alert(
-      "핸들을 잡아주세요",
-      "차선 이탈 감지: 차량 LKAS 모드",
-      AlertStatus.critical, AlertSize.full,
-      Priority.HIGH, VisualAlert.fcw, AudibleAlert.none, 2.),
     ET.NO_ENTRY: NoEntryAlert("차선 이탈 감지: 차량 LKAS 모드"),
   },
 
@@ -561,48 +556,48 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       Priority.LOW, VisualAlert.steerRequired, AudibleAlert.prompt, 1.8),
   },
 
-  EventName.preDriverDistracted: {
-    ET.WARNING: Alert(
+  EventName.driverDistracted1: {
+    ET.PERMANENT: Alert(
       "도로를 주시하세요",
       "",
       AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.none, AudibleAlert.prompt, 5.),
+      Priority.LOW, VisualAlert.none, AudibleAlert.none, .1),
   },
 
-  EventName.promptDriverDistracted: {
-    ET.WARNING: Alert(
+  EventName.driverDistracted2: {
+    ET.PERMANENT: Alert(
       "도로를 주시하세요",
       "운전자 도로주시 불안",
       AlertStatus.userPrompt, AlertSize.mid,
       Priority.MID, VisualAlert.steerRequired, AudibleAlert.promptDistracted, .1),
   },
 
-  EventName.driverDistracted: {
-    ET.WARNING: Alert(
+  EventName.driverDistracted3: {
+    ET.PERMANENT: Alert(
       "조향제어가 해제됩니다",
       "운전자 도로주시 불안",
       AlertStatus.critical, AlertSize.full,
       Priority.HIGH, VisualAlert.steerRequired, AudibleAlert.warningImmediate, .1),
   },
 
-  EventName.preDriverUnresponsive: {
-    ET.WARNING: Alert(
+  EventName.driverUnresponsive1: {
+    ET.PERMANENT: Alert(
       "핸들을 잡아주세요 : 운전자 인식 불가",
       "",
       AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.prompt, .1),
+      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, .1),
   },
 
-  EventName.promptDriverUnresponsive: {
-    ET.WARNING: Alert(
+  EventName.driverUnresponsive2: {
+    ET.PERMANENT: Alert(
       "핸들을 잡아주세요",
       "운전자 응답없음",
       AlertStatus.userPrompt, AlertSize.mid,
       Priority.MID, VisualAlert.steerRequired, AudibleAlert.promptDistracted, .1),
   },
 
-  EventName.driverUnresponsive: {
-    ET.WARNING: Alert(
+  EventName.driverUnresponsive3: {
+    ET.PERMANENT: Alert(
       "조향제어가 해제됩니다",
       "운전자 응답없음",
       AlertStatus.critical, AlertSize.full,
@@ -1120,14 +1115,14 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
 if HARDWARE.get_device_type() == 'mici':
   EVENTS.update({
-    EventName.preDriverDistracted: {
+    EventName.driverDistracted1: {
       ET.PERMANENT: Alert(
         "Pay Attention",
         "",
         AlertStatus.normal, AlertSize.small,
         Priority.LOW, VisualAlert.none, AudibleAlert.none, 2),
     },
-    EventName.promptDriverDistracted: {
+    EventName.driverDistracted2: {
       ET.PERMANENT: Alert(
         "Pay Attention",
         "Driver Distracted",

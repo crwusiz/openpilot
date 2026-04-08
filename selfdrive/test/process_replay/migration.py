@@ -98,6 +98,17 @@ def migration(inputs: list[str], product: str|None=None):
   return decorator
 
 
+def migrate_onroad_event(event: capnp.lib.capnp._DynamicStructReader):
+  event_dict = event.to_dict()
+  try:
+    return log.OnroadEvent(**event_dict)
+  except capnp.lib.capnp.KjException as e:
+    # Ignore legacy events the current schema no longer defines.
+    if "enum has no such enumerant" in str(e):
+      return None
+    raise
+
+
 @migration(inputs=["longitudinalPlan", "carParams"])
 def migrate_longitudinalPlan(msgs):
   ops = []
@@ -292,7 +303,7 @@ def migrate_pandaStates(msgs):
   safety_param_migration = {
     "TOYOTA_PRIUS": EPS_SCALE["TOYOTA_PRIUS"] | ToyotaSafetyFlags.STOCK_LONGITUDINAL,
     "TOYOTA_RAV4": EPS_SCALE["TOYOTA_RAV4"] | ToyotaSafetyFlags.ALT_BRAKE,
-    "KIA_EV6": HyundaiSafetyFlags.EV_GAS | HyundaiSafetyFlags.CANFD_LKA_STEERING,
+    "KIA_EV6": HyundaiSafetyFlags.EV_GAS | HyundaiSafetyFlags.CANFD_LKA_STEER_MSG,
     "CHEVROLET_VOLT": GMSafetyFlags.EV,
     "CHEVROLET_BOLT_EUV": GMSafetyFlags.EV | GMSafetyFlags.HW_CAM,
   }
@@ -456,12 +467,13 @@ def migrate_onroadEvents(msgs):
     for event in msg.onroadEventsDEPRECATED:
       try:
         if not str(event.name).endswith('DEPRECATED'):
-          # dict converts name enum into string representation
-          onroadEvents.append(log.OnroadEvent(**event.to_dict()))
+          migrated_event = migrate_onroad_event(event)
+          if migrated_event is not None:
+            onroadEvents.append(migrated_event)
       except RuntimeError:  # Member was null
         traceback.print_exc()
 
-    new_msg = messaging.new_message('onroadEvents', len(msg.onroadEventsDEPRECATED))
+    new_msg = messaging.new_message('onroadEvents', len(onroadEvents))
     new_msg.valid = msg.valid
     new_msg.logMonoTime = msg.logMonoTime
     new_msg.onroadEvents = onroadEvents
@@ -479,8 +491,9 @@ def migrate_driverMonitoringState(msgs):
     for event in msg.driverMonitoringState.eventsDEPRECATED:
       try:
         if not str(event.name).endswith('DEPRECATED'):
-          # dict converts name enum into string representation
-          events.append(log.OnroadEvent(**event.to_dict()))
+          migrated_event = migrate_onroad_event(event)
+          if migrated_event is not None:
+            events.append(migrated_event)
       except RuntimeError:  # Member was null
         traceback.print_exc()
 
