@@ -253,7 +253,7 @@ class HudRenderer(Widget):
 
     # Cruise speed
     v_cruise_cluster = car_state.vCruiseCluster
-    self.cruise_speed = v_cruise_cluster if v_cruise_cluster > 0 else controls_state.vCruiseDEPRECATED
+    self.cruise_speed = v_cruise_cluster if v_cruise_cluster > 0 else controls_state.deprecated.vCruise
     self.apply_speed = car_state.vCruise
     self.set_speed = self.cruise_speed
     self.is_cruise_set = 0 < self.set_speed < SET_SPEED_NA
