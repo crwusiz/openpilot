@@ -689,7 +689,17 @@ class CommunityLayout(Widget):
     if Path(log_path).exists():
       def confirm_callback(result: DialogResult):
         if result == DialogResult.CONFIRM:
-          execute_script("/data/openpilot/scripts/log_upload.sh", log_name)
+          def upload_task():
+            exit_code = execute_script("/data/openpilot/scripts/log_upload.sh", log_name)
+
+            if exit_code == 0:
+              dlg = ConfirmDialog(tr("Upload completed successfully"), tr("OK"))
+            else:
+              dlg = ConfirmDialog(tr("Upload failed"), tr("OK"))
+            gui_app.push_widget(dlg)
+
+          t = threading.Thread(target=upload_task)
+          t.start()
 
       dlg = ConfirmDialog(tr(f"{log_name} upload\n\nProcess?"), tr("Process"), callback=confirm_callback)
       gui_app.push_widget(dlg)
@@ -709,7 +719,10 @@ class CommunityLayout(Widget):
       if result.returncode == 0:
         def confirm_callback(result: DialogResult):
           if result == DialogResult.CONFIRM:
-            execute_script("/data/openpilot/scripts/log_upload.sh", "tmux_console.log")
+            def upload_task():
+              execute_script("/data/openpilot/scripts/log_upload.sh", "tmux_console.log")
+
+            threading.Thread(target=upload_task).start()
 
         dlg = ConfirmDialog(tr("tmux console log upload\n\nProcess?"), tr("Process"), callback=confirm_callback)
         gui_app.push_widget(dlg)

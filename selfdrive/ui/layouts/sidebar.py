@@ -442,10 +442,13 @@ class Sidebar(Widget):
       y = int(y_pos + dot_size // 2)
       rl.draw_circle(x, y, dot_size // 2, color)
 
-    # Network type text
+    # Network type text (Center Aligned)
     text_y = rect.y + 230
-    text_pos = rl.Vector2(rect.x + 58, text_y)
-    rl.draw_text_ex(self._font_regular, tr(self._net_type), text_pos, FONT_SIZE, 0, Colors.WHITE)
+    text_str = tr(self._net_type)
+    text_size = measure_text_cached(self._font_regular, text_str, FONT_SIZE)
+    text_pos = rl.Vector2(rect.x + (rect.width - text_size.x) / 2, text_y)
+
+    rl.draw_text_ex(self._font_regular, text_str, text_pos, FONT_SIZE, 0, Colors.WHITE)
 
   def _draw_metrics(self, rect: rl.Rectangle):
     metrics = [

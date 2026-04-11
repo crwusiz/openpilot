@@ -359,6 +359,9 @@ class CruiseController:
     orientation_rate = np.array(model.orientationRate.z)
     velocity = np.array(model.velocity.x)
 
+    if len(orientation_rate) == 0 or len(velocity) == 0:
+      return NO_LIMIT_SPEED, 0.0
+
     predicted_lat_acc = float(np.max(np.abs(orientation_rate * velocity)))
     acc_based_curvature = predicted_lat_acc / max(current_speed_ms, 1.0) ** 2
 
