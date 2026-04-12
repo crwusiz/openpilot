@@ -47,8 +47,7 @@ class FontSizes:
 def colors_alpha(color, alpha):
   if isinstance(color, tuple):
     return rl.Color(color[0], color[1], color[2], alpha)
-  else:
-    return rl.Color(color.r, color.g, color.b, alpha)
+  return rl.Color(color.r, color.g, color.b, alpha)
 
 
 @dataclass(frozen=True)

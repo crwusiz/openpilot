@@ -32,8 +32,7 @@ NetworkType = log.DeviceState.NetworkType
 def colors_alpha(color, alpha):
   if isinstance(color, tuple):
     return rl.Color(color[0], color[1], color[2], alpha)
-  else:
-    return rl.Color(color.r, color.g, color.b, alpha)
+  return rl.Color(color.r, color.g, color.b, alpha)
 
 
 class Colors:
@@ -122,12 +121,12 @@ class Sidebar(Widget):
 
   def _handle_commit_button_press(self):
     if self._is_processing:
-      print("Script execution already in progress, ignoring click")
+      print("Script execution in progress. Click ignored.")
       self._commit_status.update(tr_noop("BUSY"), tr_noop("WAIT"), Colors.WARNING)
       return
 
     if not self._is_network_connected():
-      print("Network not connected, cannot perform git operations")
+      print("Network not connected. Cannot perform git operations.")
       self._commit_status.update(tr_noop("NO NETWORK"), tr_noop("OFFLINE"), Colors.DANGER)
       return
 
@@ -142,37 +141,29 @@ class Sidebar(Widget):
 
     def run_git_pull():
       try:
-        subprocess.Popen(["/bin/sh", "/data/openpilot/scripts/gitpull.sh"])
+        subprocess.run(["/bin/sh", "/data/openpilot/scripts/gitpull.sh"], timeout=60)
 
-        # Wait for exit code file with timeout
-        start_time = time.time()
-        while time.time() - start_time < 60:  # 60 second timeout
-          if self._git_pull_exit_file.exists():
-            self._on_git_pull_finished()
-            return
-          time.sleep(1)
-
-        # Timeout
+        if self._git_pull_exit_file.exists():
+          self._on_git_pull_finished()
+        else:
+          self._on_git_pull_failed(tr_noop("NO LOG FILE"))
+      except subprocess.TimeoutExpired:
         self._on_git_pull_failed(tr_noop("TIMEOUT"))
       except Exception as e:
         print(f"Failed to start git pull: {e}")
         self._on_git_pull_failed(tr_noop("FAILED TO START"))
 
-    thread = threading.Thread(target=run_git_pull, daemon=True)
-    thread.start()
+    threading.Thread(target=run_git_pull, daemon=True).start()
 
   def _on_git_pull_finished(self):
     try:
-      exit_code = self._git_pull_exit_file.read_text().strip()
+      self._git_pull_exit_file.read_text().strip()  # Ignore exit code (same as original logic)
       self._git_pull_exit_file.unlink(missing_ok=True)
 
-      # Regardless of exit code, mark as completed
-      # In original code, exit code wasn't actually checked
       self._is_processing = False
       self._commit_status.update(tr_noop("UPDATE"), tr_noop("COMPLETE"), Colors.WHITE)
-
     except Exception as e:
-      print(f"Failed to read git pull exit code: {e}")
+      print(f"Failed to read git pull exit code file: {e}")
       self._on_git_pull_failed(tr_noop("FILE READ ERROR"))
 
   def _on_git_pull_failed(self, reason: str):
@@ -189,42 +180,33 @@ class Sidebar(Widget):
 
     def run_commit_check():
       try:
-        subprocess.Popen(["/bin/sh", "/data/openpilot/scripts/commit_compare.sh"])
+        subprocess.run(["/bin/sh", "/data/openpilot/scripts/commit_compare.sh"], timeout=15)
 
-        # Wait for exit code file with timeout
-        start_time = time.time()
-        while time.time() - start_time < 15:  # 15 second timeout
-          if self._commit_check_exit_file.exists():
-            self._on_commit_check_finished()
-            return
-          time.sleep(1)
-
-        # Timeout
+        if self._commit_check_exit_file.exists():
+          self._on_commit_check_finished()
+        else:
+          self._on_commit_check_failed(tr_noop("NO LOG FILE"))
+      except subprocess.TimeoutExpired:
         self._on_commit_check_failed(tr_noop("TIMEOUT"))
       except Exception as e:
         print(f"Failed to start commit check: {e}")
         self._on_commit_check_failed(tr_noop("FAILED TO START"))
 
-    thread = threading.Thread(target=run_commit_check, daemon=True)
-    thread.start()
+    threading.Thread(target=run_commit_check, daemon=True).start()
 
   def _on_commit_check_finished(self):
     try:
       exit_code_str = self._commit_check_exit_file.read_text().strip()
       self._commit_check_exit_file.unlink(missing_ok=True)
 
-      exit_code = int(exit_code_str)
-
-      if exit_code == 0:
-        output = self._params.get("CommitCompare")
-        self._parse_commit_compare_result(output)
+      if int(exit_code_str) == 0:
+        self._parse_commit_compare_result(self._params.get("CommitCompare"))
       else:
         self._on_commit_check_failed(tr_noop("CHECK FAILED"))
 
       self._is_processing = False
-
     except Exception as e:
-      print(f"Failed to read commit check exit code: {e}")
+      print(f"Failed to read commit check exit code file: {e}")
       self._on_commit_check_failed(tr_noop("FILE READ ERROR"))
 
   def _on_commit_check_failed(self, reason: str):
@@ -233,23 +215,19 @@ class Sidebar(Widget):
     print(f"Commit check failed: {reason}")
     self._commit_status.update(tr_noop("CHECK"), reason, Colors.DANGER)
 
-  def _parse_commit_compare_result(self, output: str):
+  def _parse_commit_compare_result(self, output: str | None):
     if not output:
       self._on_commit_check_failed(tr_noop("EMPTY RESULT"))
       return
 
     output = output.strip().strip('"')
 
-    if " == " in output:
-      parts = output.split(" == ")
-      operator = "=="
-    elif " != " in output:
-      parts = output.split(" != ")
-      operator = "!="
-    else:
+    operator = "==" if " == " in output else "!=" if " != " in output else None
+    if not operator:
       self._on_commit_check_failed(tr_noop("PARSE ERROR"))
       return
 
+    parts = output.split(f" {operator} ")
     if len(parts) != 2:
       self._on_commit_check_failed(tr_noop("INVALID FORMAT"))
       return
@@ -274,15 +252,11 @@ class Sidebar(Widget):
       self._last_progress_update = current_time
 
       dot_str = "." * self._progress_dots
-      if self._is_update_available:
-        self._commit_status.update(tr_noop("git pull"), tr_noop("progress") + dot_str, Colors.WARNING)
-      else:
-        self._commit_status.update(tr_noop("check"), tr_noop("progress") + dot_str, Colors.WARNING)
+      action_text = tr_noop("git pull") if self._is_update_available else tr_noop("check")
+      self._commit_status.update(action_text, tr_noop("progress") + dot_str, Colors.WARNING)
 
   def _render(self, rect: rl.Rectangle):
-    # Background
     rl.draw_rectangle_rec(rect, rl.BLACK)
-
     self._draw_buttons(rect)
     self._draw_c3x_position(rect)
     self._draw_network_indicator(rect)
@@ -301,15 +275,13 @@ class Sidebar(Widget):
     self._update_connection_status(device_state)
     self._update_panda_status()
 
-    # Automatic initial commit check when network connects
+    # Automatic initial commit check on network connection
     if self._is_network_connected() and not self._initial_commit_check_done and not self._is_processing:
-      print("Network connected, starting initial commit check")
+      print("Network connected. Starting initial commit check.")
       self._initial_commit_check_done = True
       self._start_commit_check()
 
-    # Update progress indicator
     self._update_progress_indicator()
-
     self.wifi_manager_ui._update_state()
 
   def _update_network_status(self, device_state):
@@ -319,33 +291,31 @@ class Sidebar(Widget):
     strength = device_state.networkStrength
     self._net_strength = max(0, min(5, strength.raw + 1)) if strength.raw > 0 else 0
 
-    #self._net_type = NETWORK_TYPES.get(device_state.networkType.raw, tr_noop("Unknown"))
-    if self._net_strength > 0 and ip_address:
-      self._net_type = ip_address
-    elif self._net_strength > 0:
-      self._net_type = NETWORK_TYPES.get(NetworkType.wifi)
+    if self._net_strength > 0:
+      self._net_type = ip_address if ip_address else NETWORK_TYPES.get(NetworkType.wifi)
     else:
       self._net_type = NETWORK_TYPES.get(NetworkType.none)
 
   def _update_temperature_status(self, device_state):
     thermal_status = device_state.thermalStatus
     max_temp = device_state.maxTempC
+    temp_str = f"{max_temp:.1f}°C"
 
     if thermal_status == ThermalStatus.green:
       #self._temp_status.update(tr_noop("TEMP"), tr_noop("GOOD"), Colors.WHITE)
-      self._temp_status.update(tr_noop("TEMP"), f"{max_temp:.1f}°C", Colors.WHITE)
+      self._temp_status.update(tr_noop("TEMP"), temp_str, Colors.WHITE)
     elif thermal_status == ThermalStatus.yellow:
       #self._temp_status.update(tr_noop("TEMP"), tr_noop("OK"), Colors.WARNING)
-      self._temp_status.update(tr_noop("TEMP"), f"{max_temp:.1f}°C", Colors.WARNING)
+      self._temp_status.update(tr_noop("TEMP"), temp_str, Colors.WARNING)
     else:
       #self._temp_status.update(tr_noop("TEMP"), tr_noop("HIGH"), Colors.DANGER)
-      self._temp_status.update(tr_noop("TEMP"), f"{max_temp:.1f}°C", Colors.DANGER)
+      self._temp_status.update(tr_noop("TEMP"), temp_str, Colors.DANGER)
 
   def _update_connection_status(self, device_state):
     last_ping = device_state.lastAthenaPingTime
     if last_ping == 0:
       self._connect_status.update(tr_noop("CONNECT"), tr_noop("OFFLINE"), Colors.WARNING)
-    elif time.monotonic_ns() - last_ping < 80_000_000_000:  # 80 seconds in nanoseconds
+    elif time.monotonic_ns() - last_ping < 80_000_000_000:  # 80 seconds (in nanoseconds)
       self._connect_status.update(tr_noop("CONNECT"), tr_noop("ONLINE"), Colors.WHITE)
     else:
       self._connect_status.update(tr_noop("CONNECT"), tr_noop("ERROR"), Colors.DANGER)
@@ -364,11 +334,8 @@ class Sidebar(Widget):
       #if self._on_flag_click:
       #  self._on_flag_click()
       # Home button click - reset calibration and request onroad cycle
-      self._params.remove("CalibrationParams")
-      self._params.remove("LiveTorqueParameters")
-      self._params.remove("LiveParameters")
-      self._params.remove("LiveParametersV2")
-      self._params.remove("LiveDelay")
+      for param in ("CalibrationParams", "LiveTorqueParameters", "LiveParameters", "LiveParametersV2", "LiveDelay"):
+        self._params.remove(param)
       self._params.put_bool("OnroadCycleRequested", True)
     elif self._recording_audio and rl.check_collision_point_rec(mouse_pos, self._mic_indicator_rect):
       if self._open_settings_callback:
@@ -401,26 +368,22 @@ class Sidebar(Widget):
     # C3X image (always shown, not flag/home toggle)
     c3x_scale = HOME_BTN.width / self._c3x_img.width if self._c3x_img.width > 0 else 1.0
     c3x_y = HOME_BTN.y + (HOME_BTN.height - (self._c3x_img.height * c3x_scale)) / 2
-
     rl.draw_texture_ex(self._c3x_img, rl.Vector2(HOME_BTN.x, c3x_y), 0.0, c3x_scale, Colors.WHITE)
 
     # Microphone button
     if self._recording_audio:
       self._mic_indicator_rect = rl.Rectangle(rect.x + rect.width - 130, rect.y + 245, 75, 40)
-
       mic_pressed = mouse_down and rl.check_collision_point_rec(mouse_pos, self._mic_indicator_rect)
       bg_color = rl.Color(Colors.DANGER.r, Colors.DANGER.g, Colors.DANGER.b, int(255 * 0.65)) if mic_pressed else Colors.DANGER
 
       rl.draw_rectangle_rounded(self._mic_indicator_rect, 1, 10, bg_color)
-      rl.draw_texture_ex(self._mic_img, rl.Vector2(self._mic_indicator_rect.x + (self._mic_indicator_rect.width - self._mic_img.width) / 2,
-                         self._mic_indicator_rect.y + (self._mic_indicator_rect.height - self._mic_img.height) / 2), 0.0, 1.0, Colors.WHITE)
+      mic_x = self._mic_indicator_rect.x + (self._mic_indicator_rect.width - self._mic_img.width) / 2
+      mic_y = self._mic_indicator_rect.y + (self._mic_indicator_rect.height - self._mic_img.height) / 2
+      rl.draw_texture_ex(self._mic_img, rl.Vector2(mic_x, mic_y), 0.0, 1.0, Colors.WHITE)
 
   def _draw_c3x_position(self, rect: rl.Rectangle):
-    c3x_position = self._params.get("DevicePosition")
-    if not c3x_position:
-      c3x_position = "--"
+    c3x_position = self._params.get("DevicePosition") or "--"
 
-    # Draw position text below C3X image
     text_rect = rl.Rectangle(rect.x, rect.y + 1000, rect.width, 40)
     text_size = measure_text_cached(self._font_semi_bold, c3x_position, 30)
     text_pos = rl.Vector2(
@@ -442,12 +405,11 @@ class Sidebar(Widget):
       y = int(y_pos + dot_size // 2)
       rl.draw_circle(x, y, dot_size // 2, color)
 
-    # Network type text (Center Aligned)
+    # Network type text
     text_y = rect.y + 230
     text_str = tr(self._net_type)
     text_size = measure_text_cached(self._font_regular, text_str, FONT_SIZE)
     text_pos = rl.Vector2(rect.x + (rect.width - text_size.x) / 2, text_y)
-
     rl.draw_text_ex(self._font_regular, text_str, text_pos, FONT_SIZE, 0, Colors.WHITE)
 
   def _draw_metrics(self, rect: rl.Rectangle):
@@ -459,22 +421,21 @@ class Sidebar(Widget):
     ]
 
     for metric, y_offset in metrics:
-      is_commit_metric = metric is self._commit_status
-      self._draw_metric(rect, metric, rect.y + y_offset, is_commit_metric)
+      self._draw_metric(rect, metric, rect.y + y_offset)
 
-  def _draw_metric(self, rect: rl.Rectangle, metric: MetricData, y: float, is_commit: bool = False):
+  def _draw_metric(self, rect: rl.Rectangle, metric: MetricData, y: float):
     metric_rect = rl.Rectangle(rect.x + METRIC_MARGIN, y, METRIC_WIDTH, METRIC_HEIGHT)
 
-    # Draw colored left edge (clipped rounded rectangle)
+    # Colored edge (clipped rounded rectangle)
     edge_rect = rl.Rectangle(metric_rect.x + 4, metric_rect.y + 4, 100, 118)
     rl.begin_scissor_mode(int(metric_rect.x + 4), int(metric_rect.y), 18, int(metric_rect.height))
     rl.draw_rectangle_rounded(edge_rect, 0.3, 10, metric.color)
     rl.end_scissor_mode()
 
-    # Draw border
+    # Border
     rl.draw_rectangle_rounded_lines_ex(metric_rect, 0.3, 10, 2, Colors.WHITE_DIM)
 
-    # Draw label and value
+    # Text label
     labels = [tr(metric.label), tr(metric.value)]
     text_y = metric_rect.y + (metric_rect.height / 2 - len(labels) * FONT_SIZE * FONT_SCALE)
     for text in labels:
