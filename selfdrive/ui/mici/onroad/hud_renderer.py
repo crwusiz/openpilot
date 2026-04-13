@@ -22,10 +22,12 @@ SET_SPEED_PERSISTENCE = 2.5  # seconds
 
 @dataclass(frozen=True)
 class FontSizes:
-  current_speed: int = 176
-  speed_unit: int = 66
+  current_speed: int = 72
+  speed_unit: int = 24
   max_speed: int = 36
   set_speed: int = 112
+  middle: int = 16
+  big: int = 30
 
 
 def colors_alpha(color, alpha):
@@ -36,8 +38,16 @@ def colors_alpha(color, alpha):
 
 @dataclass(frozen=True)
 class Colors:
+  BLACK = rl.BLACK
   WHITE = rl.WHITE
   WHITE_TRANSLUCENT = colors_alpha(WHITE, 200)
+  BLACK_TRANSLUCENT = colors_alpha(BLACK, 166)
+  BOX_BG = colors_alpha(BLACK, 100)
+  RED = rl.Color(201, 34, 49, 255)
+  ORANGE = rl.Color(255, 149, 0, 255)
+  GREEN = rl.Color(128, 216, 166, 255)
+  DISENGAGED = rl.Color(145, 155, 149, 255)
+  OVERRIDE = DISENGAGED
 
 
 class TurnIntent(Widget):
@@ -104,6 +114,12 @@ class HudRenderer(Widget):
     self.is_cruise_set: bool = False
     self.is_cruise_available: bool = True
     self.set_speed: float = SET_SPEED_NA
+    self.cruise_speed: float = 0.0
+    self.apply_speed: float = 0.0
+    self.nda_state: int = 0
+    self.stock_limit_speed: float = 0.0
+    self.accel: float = 0.0
+
     self._set_speed_changed_time: float = 0
     self.speed: float = 0.0
     self.v_ego_cluster_seen: bool = False
@@ -121,6 +137,8 @@ class HudRenderer(Widget):
     self._torque_bar = TorqueBar()
 
     self._txt_wheel: rl.Texture = gui_app.texture('icons_mici/wheel.png', 50, 50)
+    self._txt_wheel_green: rl.Texture = gui_app.texture('icons_mici/wheel_green.png', 50, 50)
+    self._txt_wheel_blue: rl.Texture = gui_app.texture('icons_mici/wheel_blue.png', 50, 50)
     self._txt_wheel_critical: rl.Texture = gui_app.texture('icons_mici/wheel_critical.png', 50, 50)
     self._txt_exclamation_point: rl.Texture = gui_app.texture('icons_mici/exclamation_point.png', 44, 44)
 
@@ -152,11 +170,13 @@ class HudRenderer(Widget):
 
     controls_state = sm['controlsState']
     car_state = sm['carState']
+    navi_data = sm['naviData']
 
     v_cruise_cluster = car_state.vCruiseCluster
-    set_speed = (
-      controls_state.deprecated.vCruise if v_cruise_cluster == 0.0 else v_cruise_cluster
-    )
+    self.cruise_speed = v_cruise_cluster if v_cruise_cluster > 0 else controls_state.deprecated.vCruise
+    self.apply_speed = car_state.vCruise
+    set_speed = self.cruise_speed
+
     engaged = sm['selfdriveState'].enabled
     if (set_speed != self.set_speed and engaged) or (engaged and not self._engaged):
       self._set_speed_changed_time = rl.get_time()
@@ -165,26 +185,67 @@ class HudRenderer(Widget):
     self.is_cruise_set = 0 < self.set_speed < SET_SPEED_NA
     self.is_cruise_available = self.set_speed != -1
 
+    if self.is_cruise_set and not ui_state.is_metric:
+      self.set_speed *= KM_TO_MILE
+      self.cruise_speed *= KM_TO_MILE
+      self.apply_speed *= KM_TO_MILE
+
+    # Update Current Speed
     v_ego_cluster = car_state.vEgoCluster
     self.v_ego_cluster_seen = self.v_ego_cluster_seen or v_ego_cluster != 0.0
     v_ego = v_ego_cluster if self.v_ego_cluster_seen else car_state.vEgo
     speed_conversion = CV.MS_TO_KPH if ui_state.is_metric else CV.MS_TO_MPH
     self.speed = max(0.0, v_ego * speed_conversion)
+    self.accel = car_state.aEgo
+
+    # Extended State for SET Speed logic
+    self.stock_limit_speed = car_state.speedLimit if hasattr(car_state, 'speedLimit') else 0
+    if navi_data:
+      self.nda_state = navi_data.active if hasattr(navi_data, 'active') else 0
+
+  def _get_wheel_texture(self) -> rl.Texture:
+    """Return the correct wheel texture based on current UI status."""
+    if self._show_wheel_critical or ui_state.status == UIStatus.BLINKER:
+      return self._txt_wheel_critical
+    elif ui_state.status == UIStatus.STEERING:
+      return self._txt_wheel_blue
+    elif ui_state.status == UIStatus.ENGAGED:
+      return self._txt_wheel_green
+    return self._txt_wheel
+
+  def _draw_text(self, x: float, y: float, text: str, font_size: int, text_color: rl.Color, alignment: str = "C") -> None:
+    """Helper method for drawing aligned text."""
+    text_size = measure_text_cached(self._font_bold, text, font_size)
+
+    if alignment == "L":
+      draw_x = x
+    elif alignment == "R":
+      draw_x = x - text_size.x
+    else: # C
+      draw_x = x - text_size.x / 2
+
+    rl.draw_text_ex(
+      self._font_bold,
+      text,
+      rl.Vector2(draw_x, y - text_size.y / 2),
+      font_size,
+      0,
+      text_color
+    )
 
   def _render(self, rect: rl.Rectangle) -> None:
     """Render HUD elements to the screen."""
-
     self._torque_bar.render(rect)
-
-    if self.is_cruise_set:
-      self._draw_set_speed(rect)
-
+    self._draw_current_speed(rect)
+    self._draw_set_speed(rect)
     self._draw_steering_wheel(rect)
+    self._draw_blinkers(rect)
 
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
-    wheel_txt = self._txt_wheel_critical if self._show_wheel_critical else self._txt_wheel
+    wheel_txt = self._get_wheel_texture()
+    is_critical = self._show_wheel_critical or ui_state.status == UIStatus.BLINKER
 
-    if self._show_wheel_critical:
+    if is_critical:
       self._wheel_alpha_filter.update(255)
       self._wheel_y_filter.update(0)
     else:
@@ -216,63 +277,140 @@ class HudRenderer(Widget):
     color = rl.Color(255, 255, 255, int(self._wheel_alpha_filter.x))
     rl.draw_texture_pro(wheel_txt, src_rect, dest_rect, origin, rotation, color)
 
-    if self._show_wheel_critical:
+    if is_critical:
       # Draw exclamation point icon
       EXCLAMATION_POINT_SPACING = 10
       exclamation_pos_x = pos_x - self._txt_exclamation_point.width / 2 + wheel_txt.width / 2 + EXCLAMATION_POINT_SPACING
       exclamation_pos_y = pos_y - self._txt_exclamation_point.height / 2
       rl.draw_texture_ex(self._txt_exclamation_point, rl.Vector2(exclamation_pos_x, exclamation_pos_y), 0.0, 1.0, rl.WHITE)
 
+  def _draw_blinkers(self, rect: rl.Rectangle) -> None:
+    """Draw blinkers and blind spot indicators."""
+    sm = ui_state.sm
+    car_state = sm['carState']
+
+    blink_period = 0.9  # seconds
+    blinking = (rl.get_time() % blink_period) < (blink_period / 2)
+    border_size = 10
+
+    left_blinker = car_state.leftBlinker
+    right_blinker = car_state.rightBlinker
+    left_blindspot = car_state.leftBlindspot
+    right_blindspot = car_state.rightBlindspot
+
+    alpha = 180
+
+    # Left Blinker & Blindspot
+    if left_blinker:
+      base_color = Colors.RED if left_blindspot else Colors.ORANGE
+      color = colors_alpha(base_color, alpha)
+      if blinking or left_blindspot:
+        rl.draw_rectangle(int(rect.x), int(rect.y), border_size, int(rect.height), color)
+
+    # Right Blinker & Blindspot
+    if right_blinker:
+      base_color = Colors.RED if right_blindspot else Colors.ORANGE
+      color = colors_alpha(base_color, alpha)
+      if blinking or right_blindspot:
+        rl.draw_rectangle(int(rect.x + rect.width - border_size), int(rect.y), border_size, int(rect.height), color)
+
   def _draw_set_speed(self, rect: rl.Rectangle) -> None:
-    """Draw the MAX speed indicator box."""
-    alpha = self._set_speed_alpha_filter.update(0 < rl.get_time() - self._set_speed_changed_time < SET_SPEED_PERSISTENCE and
-                                                self._can_draw_top_icons and self._engaged)
-    if alpha < 1e-2:
+    """Draw the MAX and SET speed indicator boxes on the left side."""
+    if not self._can_draw_top_icons:
       return
 
-    x = rect.x
-    y = rect.y
+    max_color = Colors.WHITE_TRANSLUCENT
+    speed_color = Colors.WHITE_TRANSLUCENT
 
-    # draw drop shadow
-    circle_radius = 162 // 2
-    rl.draw_circle_gradient(int(x + circle_radius), int(y + circle_radius), circle_radius,
-                            rl.Color(0, 0, 0, int(255 / 2 * alpha)), rl.BLANK)
+    if self.is_cruise_set:
+      speed_color = Colors.WHITE
+      if ui_state.status == UIStatus.ENGAGED:
+        max_color = Colors.GREEN
+      elif ui_state.status == UIStatus.DISENGAGED:
+        max_color = Colors.DISENGAGED
+      elif ui_state.status == UIStatus.OVERRIDE:
+        max_color = Colors.OVERRIDE
 
-    set_speed_color = rl.Color(255, 255, 255, int(255 * 0.9 * alpha))
-    max_color = rl.Color(255, 255, 255, int(255 * 0.9 * alpha))
+    box_size = 64
+    box_x = rect.x + 10
+    max_y = rect.y + 10
 
-    set_speed = self.set_speed
-    if self.is_cruise_set and not ui_state.is_metric:
-      set_speed *= KM_TO_MILE
+    # Max speed box
+    max_speed_box_bg = rl.Rectangle(box_x, max_y, box_size, box_size)
+    rl.draw_rectangle_rounded(max_speed_box_bg, 0.2, 10, Colors.BOX_BG)
 
-    set_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(set_speed))
-    rl.draw_text_ex(
-      self._font_display,
-      set_speed_text,
-      rl.Vector2(x + 13 + 4, y + 3 - 8 - 3 + 4),
-      FontSizes.set_speed,
-      0,
-      set_speed_color,
+    max_speed_box = rl.Rectangle(max_speed_box_bg.x + 2, max_speed_box_bg.y + 2, box_size - 4, box_size - 4)
+    rl.draw_rectangle_rounded_lines_ex(max_speed_box, 0.2, 10, 1, Colors.WHITE_TRANSLUCENT)
+
+    # MAX text
+    self._draw_text(
+      max_speed_box.x + max_speed_box.width / 2,
+      max_speed_box.y + 18,
+      tr("MAX"),
+      FontSizes.middle,
+      max_color
     )
 
-    max_text = tr("MAX")
-    rl.draw_text_ex(
-      self._font_semi_bold,
-      max_text,
-      rl.Vector2(x + 25, y + FontSizes.set_speed - 7 + 4),
-      FontSizes.max_speed,
-      0,
-      max_color,
+    # MAX speed value
+    max_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(self.cruise_speed))
+    self._draw_text(
+      max_speed_box.x + max_speed_box.width / 2,
+      max_speed_box.y + 42,
+      max_speed_text,
+      FontSizes.big,
+      speed_color
     )
+
+    # SET speed box with background (only if NDA or stock limit is active)
+    if self.nda_state > 0 or self.stock_limit_speed > 0:
+      set_y = max_y + box_size + 8
+      set_speed_box_bg = rl.Rectangle(box_x, set_y, box_size, box_size)
+      rl.draw_rectangle_rounded(set_speed_box_bg, 0.2, 10, Colors.BOX_BG)
+
+      set_speed_box = rl.Rectangle(set_speed_box_bg.x + 2, set_speed_box_bg.y + 2, box_size - 4, box_size - 4)
+      rl.draw_rectangle_rounded_lines_ex(set_speed_box, 0.2, 10, 1, Colors.WHITE_TRANSLUCENT)
+
+      # SET text
+      self._draw_text(
+        set_speed_box.x + set_speed_box.width / 2,
+        set_speed_box.y + 18,
+        tr("SET"),
+        FontSizes.middle,
+        max_color
+      )
+
+      # SET speed value
+      set_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(self.apply_speed))
+      self._draw_text(
+        set_speed_box.x + set_speed_box.width / 2,
+        set_speed_box.y + 42,
+        set_speed_text,
+        FontSizes.big,
+        speed_color,
+      )
 
   def _draw_current_speed(self, rect: rl.Rectangle) -> None:
-    """Draw the current vehicle speed and unit."""
+    """Draw the current vehicle speed and unit at the top center."""
+    # Color based on accel/decel
+    if self.accel > 0:
+      # Accelerating - green
+      alpha = int(255 - (180 * min(self.accel / 3.0, 1.0)))
+      alpha = max(80, min(255, alpha))
+      speed_color = rl.Color(alpha, 255, alpha, 255)
+    else:
+      # Decelerating - red
+      alpha = int(255 - (255 * min(abs(self.accel) / 4.0, 1.0)))
+      alpha = max(60, min(255, alpha))
+      speed_color = rl.Color(255, alpha, alpha, 255)
+
     speed_text = str(round(self.speed))
+    center_x = rect.x + rect.width / 2
+
     speed_text_size = measure_text_cached(self._font_bold, speed_text, FontSizes.current_speed)
-    speed_pos = rl.Vector2(rect.x + rect.width / 2 - speed_text_size.x / 2, 180 - speed_text_size.y / 2)
-    rl.draw_text_ex(self._font_bold, speed_text, speed_pos, FontSizes.current_speed, 0, Colors.WHITE)
+    speed_pos = rl.Vector2(center_x - speed_text_size.x / 2, rect.y - 5)
+    rl.draw_text_ex(self._font_bold, speed_text, speed_pos, FontSizes.current_speed, 0, speed_color)
 
     unit_text = tr("km/h") if ui_state.is_metric else tr("mph")
     unit_text_size = measure_text_cached(self._font_medium, unit_text, FontSizes.speed_unit)
-    unit_pos = rl.Vector2(rect.x + rect.width / 2 - unit_text_size.x / 2, 290 - unit_text_size.y / 2)
+    unit_pos = rl.Vector2(center_x - unit_text_size.x / 2, rect.y + speed_text_size.y - 15)
     rl.draw_text_ex(self._font_medium, unit_text, unit_pos, FontSizes.speed_unit, 0, Colors.WHITE_TRANSLUCENT)

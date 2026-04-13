@@ -356,9 +356,9 @@ class ModelRenderer(Widget):
     x = np.clip(px, 0.0, rect.width)
     base_y = min(py + 10.0, rect.height - 50.0)
 
-    scale_factor = 700.0 / (d_rel + 10.0)
-    half_w = 40.0 + (scale_factor * 2.5)
-    half_w = max(half_w, 60.0)
+    scale_factor = 400.0 / (d_rel + 10.0)
+    half_w = 20.0 + (scale_factor * 1.5)
+    half_w = max(half_w, 25.0)
 
     fixed_half_h = 40.0
 
@@ -474,11 +474,11 @@ class ModelRenderer(Widget):
   def _draw_lead_indicators(self, radar_state, rect):
     leads_data = [radar_state.leadOne, radar_state.leadTwo]
 
-    for i, (lead_vehicle, lead_info, lead_data) in enumerate(zip(self._lead_vehicles, self._lead_info, leads_data, strict=True)):
+    for i, (lead_vehicle, lead_info, lead_data) in reversed(list(enumerate(zip(self._lead_vehicles, self._lead_info, leads_data, strict=True)))):
       if not lead_vehicle.chevron:
         continue
 
-      if i == 1 and abs(leads_data[0].dRel - leads_data[1].dRel) <= 3.0:
+      if i == 1 and abs(leads_data[0].dRel - leads_data[1].dRel) <= 12.0:
         continue
 
       if lead_vehicle.fill_poly:
@@ -502,11 +502,11 @@ class ModelRenderer(Widget):
         center_x = (lead_vehicle.fill_poly[0][0] + lead_vehicle.fill_poly[2][0]) / 2
         center_y = (lead_vehicle.fill_poly[0][1] + lead_vehicle.fill_poly[2][1]) / 2
 
-        font_size = 32
-        text_offset = 20
+        font_size = 22
+        text_offset = 14
 
         d_rel = lead_info.d_rel
-        dist_y = center_y - (text_offset + 10)
+        dist_y = center_y - (text_offset + 5)
 
         d_color = Colors.WHITE
         if d_rel < 5:
