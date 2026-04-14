@@ -7,8 +7,8 @@ from collections.abc import Callable
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.layouts import HBoxLayout
 from openpilot.system.ui.widgets.icon_widget import IconWidget
-from openpilot.system.ui.widgets.label import UnifiedLabel
-from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, FONT_SCALE
+from openpilot.system.ui.widgets.label import UnifiedLabel, gui_label
+from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, DEFAULT_TEXT_COLOR, FONT_SCALE
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.version import RELEASE_BRANCHES
 
@@ -62,6 +62,34 @@ class MetricData:
     self.color = color
 
 
+class AlertsPill(Widget):
+  def __init__(self):
+    super().__init__()
+    self.set_rect(rl.Rectangle(0, 0, 104, 52))
+
+    self._pill_bg_txt = gui_app.texture("icons_mici/alerts_pill.png", 104, 52)
+    self._bell_txt = gui_app.texture("icons_mici/alerts_bell.png", 28, 30)
+    self._alert_count_callback: Callable[[], int] | None = None
+
+  def set_alert_count_callback(self, callback: Callable[[], int] | None):
+    self._alert_count_callback = callback
+
+  def _render(self, _):
+    alert_count = self._alert_count_callback() if self._alert_count_callback else 0
+    if alert_count > 0:
+      pill_w, pill_h = self._pill_bg_txt.width, self._pill_bg_txt.height
+      rl.draw_texture_ex(self._pill_bg_txt, rl.Vector2(self.rect.x, self.rect.y), 0.0, 1.0, rl.WHITE)
+
+      bell_x = self.rect.x + 20
+      bell_y = self.rect.y + (pill_h - self._bell_txt.height) / 2
+      rl.draw_texture_ex(self._bell_txt, rl.Vector2(bell_x, bell_y), 0.0, 1.0, DEFAULT_TEXT_COLOR)
+
+      count_rect = rl.Rectangle(self.rect.x, self.rect.y, pill_w - 20, pill_h)
+      gui_label(count_rect, str(alert_count), font_size=36,
+                alignment=rl.GuiTextAlignment.TEXT_ALIGN_RIGHT,
+                alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
+
+
 class NetworkIcon(Widget):
   def __init__(self):
     super().__init__()
@@ -107,6 +135,7 @@ class NetworkIcon(Widget):
     draw_y = self._rect.y + (self._rect.height - draw_net_txt.height) / 2
 
     if draw_net_txt == self._wifi_slash_txt:
+      # Offset by difference in height between slashless and slash icons to make center align match
       draw_y -= (self._wifi_slash_txt.height - self._wifi_none_txt.height) / 2
 
     rl.draw_texture_ex(draw_net_txt, rl.Vector2(draw_x, draw_y), 0.0, 1.0, rl.Color(255, 255, 255, int(255 * 0.9)))
@@ -116,6 +145,7 @@ class MiciHomeLayout(Widget):
   def __init__(self):
     super().__init__()
     self._on_settings_click: Callable | None = None
+    self._alert_count_callback: Callable[[], int] | None = None
 
     self._last_refresh = 0
     self._mouse_down_t: None | float = None
@@ -132,6 +162,8 @@ class MiciHomeLayout(Widget):
     self._settings_icon = IconWidget("icons_mici/settings.png", (52, 52), opacity=0.9)
     self._experimental_icon = IconWidget("icons_mici/experimental_mode.png", (52, 52))
     self._mic_icon = IconWidget("icons_mici/microphone.png", (36, 52))
+
+    self._alerts_pill = AlertsPill()
 
     self._status_bar_layout = HBoxLayout([
       self._settings_icon,
@@ -216,8 +248,9 @@ class MiciHomeLayout(Widget):
 
     self._update_progress_indicator()
 
-  def set_callbacks(self, on_settings: Callable | None = None):
+  def set_callbacks(self, on_settings: Callable | None = None, alert_count_callback: Callable[[], int] | None = None):
     self._on_settings_click = on_settings
+    self._alerts_pill.set_alert_count_callback(alert_count_callback)
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     if not self._did_long_press:
@@ -462,3 +495,8 @@ class MiciHomeLayout(Widget):
     self._status_bar_layout.render(footer_rect)
 
     self._draw_commit_button(openpilot_end_x)
+
+    # TODO: add alignment to hboxlayout and add to there
+    self._alerts_pill.set_position(self.rect.x + self.rect.width - self._alerts_pill.rect.width - HOME_PADDING,
+                                   self.rect.y + self.rect.height - self._alerts_pill.rect.height)
+    self._alerts_pill.render()
