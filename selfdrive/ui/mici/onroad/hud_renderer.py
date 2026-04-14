@@ -119,7 +119,7 @@ class HudRenderer(Widget):
     self.nda_state: int = 0
     self.stock_limit_speed: float = 0.0
     self.accel: float = 0.0
-
+    self.traffic_state: int = 0
     self._set_speed_changed_time: float = 0
     self.speed: float = 0.0
     self.v_ego_cluster_seen: bool = False
@@ -134,13 +134,17 @@ class HudRenderer(Widget):
     self._font_display: rl.Font = gui_app.font(FontWeight.DISPLAY)
 
     self._turn_intent = TurnIntent()
-    self._torque_bar = TorqueBar()
+    #self._torque_bar = TorqueBar()
 
     self._txt_wheel: rl.Texture = gui_app.texture('icons_mici/wheel.png', 50, 50)
     self._txt_wheel_green: rl.Texture = gui_app.texture('icons_mici/wheel_green.png', 50, 50)
     self._txt_wheel_blue: rl.Texture = gui_app.texture('icons_mici/wheel_blue.png', 50, 50)
     self._txt_wheel_critical: rl.Texture = gui_app.texture('icons_mici/wheel_critical.png', 50, 50)
     self._txt_exclamation_point: rl.Texture = gui_app.texture('icons_mici/exclamation_point.png', 44, 44)
+
+    self._txt_traffic_off = gui_app.texture("icons/traffic_off.png", 77, 154)
+    self._txt_traffic_green = gui_app.texture("icons/traffic_green.png", 77, 154)
+    self._txt_traffic_red = gui_app.texture("icons/traffic_red.png", 77, 154)
 
     self._wheel_alpha_filter = FirstOrderFilter(0, 0.05, 1 / gui_app.target_fps)
     self._wheel_y_filter = FirstOrderFilter(0, 0.1, 1 / gui_app.target_fps)
@@ -171,6 +175,7 @@ class HudRenderer(Widget):
     controls_state = sm['controlsState']
     car_state = sm['carState']
     navi_data = sm['naviData']
+    longitudinal_plan = sm['longitudinalPlan']
 
     v_cruise_cluster = car_state.vCruiseCluster
     self.cruise_speed = v_cruise_cluster if v_cruise_cluster > 0 else controls_state.deprecated.vCruise
@@ -203,13 +208,16 @@ class HudRenderer(Widget):
     if navi_data:
       self.nda_state = navi_data.active if hasattr(navi_data, 'active') else 0
 
+    if longitudinal_plan:
+      self.traffic_state = longitudinal_plan.trafficState if hasattr(longitudinal_plan, 'trafficState') else 0
+
   def _get_wheel_texture(self) -> rl.Texture:
     """Return the correct wheel texture based on current UI status."""
     if self._show_wheel_critical or ui_state.status == UIStatus.BLINKER:
       return self._txt_wheel_critical
     elif ui_state.status == UIStatus.STEERING:
       return self._txt_wheel_blue
-    elif ui_state.status == UIStatus.ENGAGED:
+    elif ui_state.status in (UIStatus.ENGAGED, UIStatus.ACTIVE):
       return self._txt_wheel_green
     return self._txt_wheel
 
@@ -235,11 +243,12 @@ class HudRenderer(Widget):
 
   def _render(self, rect: rl.Rectangle) -> None:
     """Render HUD elements to the screen."""
-    self._torque_bar.render(rect)
+    #self._torque_bar.render(rect)
     self._draw_current_speed(rect)
     self._draw_set_speed(rect)
     self._draw_steering_wheel(rect)
     self._draw_blinkers(rect)
+    self._draw_traffic_light(rect)
 
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
     wheel_txt = self._get_wheel_texture()
@@ -250,8 +259,8 @@ class HudRenderer(Widget):
       self._wheel_y_filter.update(0)
     else:
       if ui_state.status == UIStatus.DISENGAGED:
-        self._wheel_alpha_filter.update(0)
-        self._wheel_y_filter.update(wheel_txt.height / 2)
+        self._wheel_alpha_filter.update(255 * 0.5)
+        self._wheel_y_filter.update(0)
       else:
         self._wheel_alpha_filter.update(255 * 0.9)
         self._wheel_y_filter.update(0)
@@ -297,26 +306,55 @@ class HudRenderer(Widget):
     right_blinker = car_state.rightBlinker
     left_blindspot = car_state.leftBlindspot
     right_blindspot = car_state.rightBlindspot
+    is_braking = (ui_state.status == UIStatus.RED)
+    is_standby = (ui_state.status == UIStatus.BLINKER)
+    is_engaged = (ui_state.status in (UIStatus.ENGAGED, UIStatus.ACTIVE))
 
-    alpha = 180
+    alpha = 100
 
-    # Left Blinker & Blindspot
-    if left_blinker:
-      base_color = Colors.RED if left_blindspot else Colors.ORANGE
-      color = colors_alpha(base_color, alpha)
-      if blinking or left_blindspot:
-        rl.draw_rectangle(int(rect.x), int(rect.y), border_size, int(rect.height), color)
+    # --- Left Border ---
+    left_color = None
+    left_draw = False
 
-    # Right Blinker & Blindspot
-    if right_blinker:
-      base_color = Colors.RED if right_blindspot else Colors.ORANGE
-      color = colors_alpha(base_color, alpha)
-      if blinking or right_blindspot:
-        rl.draw_rectangle(int(rect.x + rect.width - border_size), int(rect.y), border_size, int(rect.height), color)
+    if is_braking or left_blindspot:
+      left_color = colors_alpha(Colors.RED, alpha)
+      left_draw = True
+    elif left_blinker:
+      left_color = colors_alpha(Colors.ORANGE, alpha)
+      left_draw = blinking
+    elif is_standby:
+      left_color = colors_alpha(Colors.ORANGE, alpha)
+      left_draw = True
+    elif is_engaged:
+      left_color = colors_alpha(Colors.GREEN, alpha)
+      left_draw = True
+
+    if left_draw:
+      rl.draw_rectangle(int(rect.x), int(rect.y), border_size, int(rect.height), left_color)
+
+    # --- Right Border ---
+    right_color = None
+    right_draw = False
+
+    if is_braking or right_blindspot:
+      right_color = colors_alpha(Colors.RED, alpha)
+      right_draw = True
+    elif right_blinker:
+      right_color = colors_alpha(Colors.ORANGE, alpha)
+      right_draw = blinking
+    elif is_standby:
+      right_color = colors_alpha(Colors.ORANGE, alpha)
+      right_draw = True
+    elif is_engaged:
+      right_color = colors_alpha(Colors.GREEN, alpha)
+      right_draw = True
+
+    if right_draw:
+      rl.draw_rectangle(int(rect.x + rect.width - border_size), int(rect.y), border_size, int(rect.height), right_color)
 
   def _draw_set_speed(self, rect: rl.Rectangle) -> None:
     """Draw the MAX and SET speed indicator boxes on the left side."""
-    if not self._can_draw_top_icons:
+    if not self._can_draw_top_icons or ui_state.status == UIStatus.DISENGAGED:
       return
 
     max_color = Colors.WHITE_TRANSLUCENT
@@ -324,10 +362,8 @@ class HudRenderer(Widget):
 
     if self.is_cruise_set:
       speed_color = Colors.WHITE
-      if ui_state.status == UIStatus.ENGAGED:
+      if ui_state.status in (UIStatus.ENGAGED, UIStatus.ACTIVE):
         max_color = Colors.GREEN
-      elif ui_state.status == UIStatus.DISENGAGED:
-        max_color = Colors.DISENGAGED
       elif ui_state.status == UIStatus.OVERRIDE:
         max_color = Colors.OVERRIDE
 
@@ -391,6 +427,10 @@ class HudRenderer(Widget):
 
   def _draw_current_speed(self, rect: rl.Rectangle) -> None:
     """Draw the current vehicle speed and unit at the top center."""
+
+    if not self._can_draw_top_icons:
+      return
+
     # Color based on accel/decel
     if self.accel > 0:
       # Accelerating - green
@@ -414,3 +454,26 @@ class HudRenderer(Widget):
     unit_text_size = measure_text_cached(self._font_medium, unit_text, FontSizes.speed_unit)
     unit_pos = rl.Vector2(center_x - unit_text_size.x / 2, rect.y + speed_text_size.y - 15)
     rl.draw_text_ex(self._font_medium, unit_text, unit_pos, FontSizes.speed_unit, 0, Colors.WHITE_TRANSLUCENT)
+
+  def _draw_traffic_light(self, rect: rl.Rectangle) -> None:
+    if not self._can_draw_top_icons or ui_state.status == UIStatus.DISENGAGED:
+      return
+
+    img_w = 38
+    img_h = 76
+    img_x = rect.x + rect.width - img_w - 15
+    img_y = rect.y + 20
+
+    if self.traffic_state == 1:
+      tex = self._txt_traffic_red
+    elif self.traffic_state == 2:
+      tex = self._txt_traffic_green
+    else:
+      tex = self._txt_traffic_off
+
+    rl.draw_texture_pro(
+      tex,
+      rl.Rectangle(0, 0, tex.width, tex.height),
+      rl.Rectangle(img_x, img_y, img_w, img_h),
+      rl.Vector2(0, 0), 0, Colors.WHITE
+    )

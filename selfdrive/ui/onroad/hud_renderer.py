@@ -153,7 +153,7 @@ class HudRenderer(Widget):
     # Load static icons (non-interactive)
     self._load_static_icons()
 
-    self.torque_bar = TorqueBar()
+    #self.torque_bar = TorqueBar()
 
   def _init_icon_buttons(self) -> None:
     icon_size = UIConfig.icon_size
@@ -346,7 +346,7 @@ class HudRenderer(Widget):
     # Update icon button states
     self._update_icon_button_states()
 
-    self.torque_bar._update_state()
+    #self.torque_bar._update_state()
 
   def _update_icon_button_states(self) -> None:
     # Upper icons
@@ -383,12 +383,12 @@ class HudRenderer(Widget):
     return self.wifi_f_img
 
   def _get_wheel_texture(self) -> rl.Texture:
-    if ui_state.status == UIStatus.STEERING:
-      return self.wheel_blue_img
-    elif ui_state.status == UIStatus.ENGAGED:
-      return self.wheel_green_img
-    elif ui_state.status == UIStatus.BLINKER:
+    if ui_state.status == UIStatus.BLINKER:
       return self.wheel_critical_img
+    elif ui_state.status == UIStatus.STEERING:
+      return self.wheel_blue_img
+    elif ui_state.status in (UIStatus.ENGAGED, UIStatus.ACTIVE):
+      return self.wheel_green_img
     return self.wheel_img
 
   def _render(self, rect: rl.Rectangle) -> None:
