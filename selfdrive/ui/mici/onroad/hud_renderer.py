@@ -46,6 +46,7 @@ class Colors:
   RED = rl.Color(201, 34, 49, 255)
   ORANGE = rl.Color(255, 149, 0, 255)
   GREEN = rl.Color(128, 216, 166, 255)
+  STEERING = rl.Color(0, 191, 255, 255)
   DISENGAGED = rl.Color(145, 155, 149, 255)
   OVERRIDE = DISENGAGED
 
@@ -170,6 +171,7 @@ class HudRenderer(Widget):
       self.is_cruise_set = False
       self.set_speed = SET_SPEED_NA
       self.speed = 0.0
+      self.traffic_state = 0
       return
 
     controls_state = sm['controlsState']
@@ -247,7 +249,7 @@ class HudRenderer(Widget):
     self._draw_current_speed(rect)
     self._draw_set_speed(rect)
     self._draw_steering_wheel(rect)
-    self._draw_blinkers(rect)
+    self._draw_borders(rect)
     self._draw_traffic_light(rect)
 
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
@@ -293,8 +295,8 @@ class HudRenderer(Widget):
       exclamation_pos_y = pos_y - self._txt_exclamation_point.height / 2
       rl.draw_texture_ex(self._txt_exclamation_point, rl.Vector2(exclamation_pos_x, exclamation_pos_y), 0.0, 1.0, rl.WHITE)
 
-  def _draw_blinkers(self, rect: rl.Rectangle) -> None:
-    """Draw blinkers and blind spot indicators."""
+  def _draw_borders(self, rect: rl.Rectangle) -> None:
+    """Draw borders for blinkers, blind spot, and system status."""
     sm = ui_state.sm
     car_state = sm['carState']
 
@@ -306,7 +308,10 @@ class HudRenderer(Widget):
     right_blinker = car_state.rightBlinker
     left_blindspot = car_state.leftBlindspot
     right_blindspot = car_state.rightBlindspot
+
     is_braking = (ui_state.status == UIStatus.RED)
+    is_override = (ui_state.status == UIStatus.OVERRIDE)
+    is_steering = (ui_state.status == UIStatus.STEERING)
     is_standby = (ui_state.status == UIStatus.BLINKER)
     is_engaged = (ui_state.status in (UIStatus.ENGAGED, UIStatus.ACTIVE))
 
@@ -322,6 +327,12 @@ class HudRenderer(Widget):
     elif left_blinker:
       left_color = colors_alpha(Colors.ORANGE, alpha)
       left_draw = blinking
+    elif is_steering:
+      left_color = colors_alpha(Colors.STEERING, alpha)
+      left_draw = True
+    elif is_override:
+      left_color = colors_alpha(Colors.OVERRIDE, alpha)
+      left_draw = True
     elif is_standby:
       left_color = colors_alpha(Colors.ORANGE, alpha)
       left_draw = True
@@ -342,6 +353,12 @@ class HudRenderer(Widget):
     elif right_blinker:
       right_color = colors_alpha(Colors.ORANGE, alpha)
       right_draw = blinking
+    elif is_steering:
+      right_color = colors_alpha(Colors.STEERING, alpha)
+      right_draw = True
+    elif is_override:
+      right_color = colors_alpha(Colors.OVERRIDE, alpha)
+      right_draw = True
     elif is_standby:
       right_color = colors_alpha(Colors.ORANGE, alpha)
       right_draw = True
@@ -459,10 +476,11 @@ class HudRenderer(Widget):
     if not self._can_draw_top_icons or ui_state.status == UIStatus.DISENGAGED:
       return
 
-    img_w = 38
-    img_h = 76
-    img_x = rect.x + rect.width - img_w - 15
-    img_y = rect.y + 20
+    img_w = 48
+    img_h = 96
+
+    img_x = rect.x + rect.width - img_w - 10
+    img_y = rect.y + 10
 
     if self.traffic_state == 1:
       tex = self._txt_traffic_red
