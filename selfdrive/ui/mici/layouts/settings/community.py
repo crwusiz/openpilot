@@ -32,6 +32,7 @@ class CommunityLayoutMici(NavScroller):
     driver_cam_missing = BigParamControl("Driver Camera Hardware Missing", "DriverCameraHardwareMissing", toggle_callback=restart_needed_callback)
     logger_enable = BigParamControl("Logger Enable", "LoggerEnable", toggle_callback=restart_needed_callback)
     prebuilt_enable = BigParamControl("Prebuilt Enable", "PrebuiltEnable", toggle_callback=restart_needed_callback)
+    language_toggle = BigParamControl("Language (en/ko)", "LanguageSetting", toggle_callback=self._language_callback)
 
     self._scroller.add_widgets([
       pcm_cruise,
@@ -43,6 +44,7 @@ class CommunityLayoutMici(NavScroller):
       driver_cam_missing,
       logger_enable,
       prebuilt_enable,
+      language_toggle,
     ])
 
     # Toggle lists
@@ -58,6 +60,8 @@ class CommunityLayoutMici(NavScroller):
       ("PrebuiltEnable", prebuilt_enable),
     )
 
+    self._language_toggle = language_toggle
+
     if ui_state.params.get_bool("ShowDebugInfo"):
       gui_app.set_show_touches(True)
       gui_app.set_show_fps(True)
@@ -68,9 +72,40 @@ class CommunityLayoutMici(NavScroller):
     super().show_event()
     self._update_toggles()
 
+  def _language_callback(self, *args, **kwargs):
+    p = Params()
+    val_raw = p.get("LanguageSetting")
+
+    if isinstance(val_raw, bytes):
+      val = val_raw.decode('utf-8')
+    elif isinstance(val_raw, str):
+      val = val_raw
+    else:
+      val = ""
+
+    if val == "1" or val == "ko":
+      p.put("LanguageSetting", "ko")
+    else:
+      p.put("LanguageSetting", "en")
+
+    toggle_state = args[0] if args else None
+    restart_needed_callback(toggle_state)
+
   def _update_toggles(self):
     ui_state.update_params()
 
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
+
+    p = Params()
+    val_raw = p.get("LanguageSetting")
+
+    if isinstance(val_raw, bytes):
+      lang = val_raw.decode('utf-8')
+    elif isinstance(val_raw, str):
+      lang = val_raw
+    else:
+      lang = ""
+
+    self._language_toggle.set_checked(lang == "ko")
