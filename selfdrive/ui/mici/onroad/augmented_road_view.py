@@ -19,6 +19,10 @@ from openpilot.common.transformations.camera import DEVICE_CAMERAS, DeviceCamera
 from openpilot.common.transformations.orientation import rot_from_euler
 from enum import IntEnum
 
+import math
+from openpilot.common.params import Params
+
+
 OpState = log.SelfdriveState.OpenpilotState
 CALIBRATED = log.LiveCalibrationData.Status.calibrated
 ROAD_CAM = VisionStreamType.VISION_STREAM_ROAD
@@ -135,6 +139,9 @@ class AugmentedRoadView(CameraView):
     super().__init__("camerad", stream_type)
     self._bookmark_callback = bookmark_callback
     self._set_placeholder_color(rl.BLACK)
+
+    self.params = Params()
+    self._last_device_position = ""
 
     self.device_camera: DeviceCameraConfig | None = None
     self.view_from_calib = view_frame_from_device_frame.copy()
@@ -296,6 +303,17 @@ class AugmentedRoadView(CameraView):
     calib = sm['liveCalibration']
     if len(calib.rpyCalib) != 3 or calib.calStatus != CALIBRATED:
       return
+
+    # ---------------------------------------------------------
+    pitch = math.degrees(calib.rpyCalib[1])
+    yaw = math.degrees(calib.rpyCalib[2])
+
+    position = f"{abs(pitch):.1f}° {'v' if pitch > 0 else '^'} {abs(yaw):.1f}° {'<' if yaw > 0 else '>'}"
+
+    if position != self._last_device_position:
+      self.params.put("DevicePosition", position)
+      self._last_device_position = position
+    # ---------------------------------------------------------
 
     # Update view_from_calib matrix
     device_from_calib = rot_from_euler(calib.rpyCalib)
