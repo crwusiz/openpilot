@@ -1117,66 +1117,66 @@ if HARDWARE.get_device_type() == 'mici':
   EVENTS.update({
     EventName.driverDistracted1: {
       ET.PERMANENT: Alert(
-        "Pay Attention",
+        "도로를 주시하세요",
         "",
         AlertStatus.normal, AlertSize.small,
         Priority.LOW, VisualAlert.none, AudibleAlert.none, 2),
     },
     EventName.driverDistracted2: {
       ET.PERMANENT: Alert(
-        "Pay Attention",
-        "Driver Distracted",
+        "도로를 주시하세요",
+        "운전자 도로주시 불안",
         AlertStatus.userPrompt, AlertSize.mid,
         Priority.MID, VisualAlert.steerRequired, AudibleAlert.promptDistracted, 1),
     },
     EventName.resumeRequired: {
       ET.WARNING: Alert(
-        "Press Resume",
+        "정지 상태를 종료하려면 RES버튼을 누르세요",
         "",
         AlertStatus.userPrompt, AlertSize.small,
         Priority.LOW, VisualAlert.none, AudibleAlert.none, .2),
     },
     EventName.preLaneChangeLeft: {
       ET.WARNING: Alert(
-        "Steer Left",
-        "Confirm Lane Change",
+        "좌측 차선이 안전한지 확인하세요",
+        "",
         AlertStatus.normal, AlertSize.mid,
         Priority.LOW, VisualAlert.none, AudibleAlert.none, .1),
     },
     EventName.preLaneChangeRight: {
       ET.WARNING: Alert(
-        "Steer Right",
-        "Confirm Lane Change",
+        "우측 차선이 안전한지 확인하세요",
+        "",
         AlertStatus.normal, AlertSize.mid,
         Priority.LOW, VisualAlert.none, AudibleAlert.none, .1),
     },
     EventName.laneChangeBlocked: {
       ET.WARNING: Alert(
-        "Car in Blindspot",
+        "사각지대에 차량이 감지되니 대기하세요",
         "",
         AlertStatus.userPrompt, AlertSize.small,
         Priority.LOW, VisualAlert.none, AudibleAlert.prompt, .1),
     },
     EventName.steerSaturated: {
       ET.WARNING: Alert(
-        "take control",
-        "turn exceeds limit",
+        "핸들을 잡아주세요",
+        "회전이 조향 한도를 초과함",
         AlertStatus.userPrompt, AlertSize.mid,
         Priority.LOW, VisualAlert.steerRequired, AudibleAlert.promptRepeat, 2.),
     },
     EventName.calibrationIncomplete: {
       ET.PERMANENT: calibration_incomplete_alert,
-      ET.SOFT_DISABLE: soft_disable_alert("Calibration Incomplete"),
-      ET.NO_ENTRY: NoEntryAlert("Calibrating"),
+      ET.SOFT_DISABLE: soft_disable_alert("캘리브레이션 미완료"),
+      ET.NO_ENTRY: NoEntryAlert("캘리브레이션중"),
     },
     EventName.reverseGear: {
       ET.PERMANENT: Alert(
-        "Reverse",
+        "기어 [R] 상태",
         "",
         AlertStatus.normal, AlertSize.full,
         Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay=0.5),
-      ET.USER_DISABLE: ImmediateDisableAlert("Reverse"),
-      ET.NO_ENTRY: NoEntryAlert("Reverse"),
+      ET.USER_DISABLE: SoftDisableAlert("기어 [R] 상태"),
+      ET.NO_ENTRY: NoEntryAlert("기어 [R] 상태"),
     },
   })
 

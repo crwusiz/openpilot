@@ -8,7 +8,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.layouts import HBoxLayout
 from openpilot.system.ui.widgets.icon_widget import IconWidget
 from openpilot.system.ui.widgets.label import UnifiedLabel, gui_label
-from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, DEFAULT_TEXT_COLOR, FONT_SCALE
+from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, FONT_SCALE
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.version import RELEASE_BRANCHES
 
@@ -22,6 +22,8 @@ from openpilot.system.ui.widgets.network import WifiManagerUI, WifiManager
 
 HEAD_BUTTON_FONT_SIZE = 40
 HOME_PADDING = 8
+SETTINGS_ZONE_WIDTH = 280
+ALERTS_ZONE_WIDTH = 180
 
 NetworkType = log.DeviceState.NetworkType
 
@@ -63,12 +65,15 @@ class MetricData:
 
 
 class AlertsPill(Widget):
+  ICON_OFFSET = 12
+  COUNT_OFFSET = 40
+
   def __init__(self):
     super().__init__()
     self.set_rect(rl.Rectangle(0, 0, 104, 52))
 
     self._pill_bg_txt = gui_app.texture("icons_mici/alerts_pill.png", 104, 52)
-    self._bell_txt = gui_app.texture("icons_mici/alerts_bell.png", 28, 30)
+    self._warning_txt = gui_app.texture("icons_mici/offroad_alerts/red_warning.png", 36, 36)
     self._alert_count_callback: Callable[[], int] | None = None
 
   def set_alert_count_callback(self, callback: Callable[[], int] | None):
@@ -80,34 +85,34 @@ class AlertsPill(Widget):
       pill_w, pill_h = self._pill_bg_txt.width, self._pill_bg_txt.height
       rl.draw_texture_ex(self._pill_bg_txt, rl.Vector2(self.rect.x, self.rect.y), 0.0, 1.0, rl.WHITE)
 
-      bell_x = self.rect.x + 20
-      bell_y = self.rect.y + (pill_h - self._bell_txt.height) / 2
-      rl.draw_texture_ex(self._bell_txt, rl.Vector2(bell_x, bell_y), 0.0, 1.0, DEFAULT_TEXT_COLOR)
+      warn_x = self.rect.x + self.ICON_OFFSET
+      warn_y = self.rect.y + (pill_h - self._warning_txt.height) / 2
+      rl.draw_texture_ex(self._warning_txt, rl.Vector2(warn_x, warn_y), 0.0, 1.0, rl.WHITE)
 
-      count_rect = rl.Rectangle(self.rect.x, self.rect.y, pill_w - 20, pill_h)
+      count_rect = rl.Rectangle(self.rect.x + self.COUNT_OFFSET, self.rect.y, pill_w - self.COUNT_OFFSET, pill_h)
       gui_label(count_rect, str(alert_count), font_size=36,
-                alignment=rl.GuiTextAlignment.TEXT_ALIGN_RIGHT,
+                alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
                 alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
 
 
 class NetworkIcon(Widget):
   def __init__(self):
     super().__init__()
-    self.set_rect(rl.Rectangle(0, 0, 64, 52))
+    self.set_rect(rl.Rectangle(0, 0, 54, 44))  # max size of all icons
     self._net_type = NetworkType.none
     self._net_strength = 0
 
-    self._wifi_slash_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_slash.png", 58, 50)
-    self._wifi_none_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_none.png", 58, 42)
-    self._wifi_low_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_low.png", 58, 42)
-    self._wifi_medium_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_medium.png", 58, 42)
-    self._wifi_full_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_full.png", 58, 42)
+    self._wifi_slash_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_slash.png", 50, 44)
+    self._wifi_none_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_none.png", 50, 37)
+    self._wifi_low_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_low.png", 50, 37)
+    self._wifi_medium_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_medium.png", 50, 37)
+    self._wifi_full_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_full.png", 50, 37)
 
-    self._cell_none_txt = gui_app.texture("icons_mici/settings/network/cell_strength_none.png", 64, 42)
-    self._cell_low_txt = gui_app.texture("icons_mici/settings/network/cell_strength_low.png", 64, 42)
-    self._cell_medium_txt = gui_app.texture("icons_mici/settings/network/cell_strength_medium.png", 64, 42)
-    self._cell_high_txt = gui_app.texture("icons_mici/settings/network/cell_strength_high.png", 64, 42)
-    self._cell_full_txt = gui_app.texture("icons_mici/settings/network/cell_strength_full.png", 64, 42)
+    self._cell_none_txt = gui_app.texture("icons_mici/settings/network/cell_strength_none.png", 54, 36)
+    self._cell_low_txt = gui_app.texture("icons_mici/settings/network/cell_strength_low.png", 54, 36)
+    self._cell_medium_txt = gui_app.texture("icons_mici/settings/network/cell_strength_medium.png", 54, 36)
+    self._cell_high_txt = gui_app.texture("icons_mici/settings/network/cell_strength_high.png", 54, 36)
+    self._cell_full_txt = gui_app.texture("icons_mici/settings/network/cell_strength_full.png", 54, 36)
 
   def _update_state(self):
     device_state = ui_state.sm['deviceState']
@@ -145,6 +150,7 @@ class MiciHomeLayout(Widget):
   def __init__(self):
     super().__init__()
     self._on_settings_click: Callable | None = None
+    self._on_alerts_click: Callable | None = None
     self._alert_count_callback: Callable[[], int] | None = None
 
     self._last_refresh = 0
@@ -159,9 +165,9 @@ class MiciHomeLayout(Widget):
     self.wifi_manager = WifiManager()
     self.wifi_manager_ui = WifiManagerUI(self.wifi_manager)
 
-    self._settings_icon = IconWidget("icons_mici/settings.png", (52, 52), opacity=0.9)
-    self._experimental_icon = IconWidget("icons_mici/experimental_mode.png", (52, 52))
-    self._mic_icon = IconWidget("icons_mici/microphone.png", (36, 52))
+    self._settings_icon = IconWidget("icons_mici/settings.png", (48, 48), opacity=0.9)
+    self._experimental_icon = IconWidget("icons_mici/experimental_mode.png", (48, 48))
+    self._mic_icon = IconWidget("icons_mici/microphone.png", (32, 46))
 
     self._alerts_pill = AlertsPill()
 
@@ -248,17 +254,26 @@ class MiciHomeLayout(Widget):
 
     self._update_progress_indicator()
 
-  def set_callbacks(self, on_settings: Callable | None = None, alert_count_callback: Callable[[], int] | None = None):
+  def set_callbacks(self, on_settings: Callable | None = None, on_alerts: Callable | None = None,
+                    alert_count_callback: Callable[[], int] | None = None):
     self._on_settings_click = on_settings
+    self._on_alerts_click = on_alerts
+    self._alert_count_callback = alert_count_callback
     self._alerts_pill.set_alert_count_callback(alert_count_callback)
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     if not self._did_long_press:
+      relative_x = mouse_pos.x - self.rect.x
+      has_alerts = self._alert_count_callback and self._alert_count_callback() > 0
+      #if relative_x < SETTINGS_ZONE_WIDTH:
       if rl.check_collision_point_rec(mouse_pos, self._settings_icon.rect):
         if self._on_settings_click:
           self._on_settings_click()
       elif rl.check_collision_point_rec(mouse_pos, self._commit_btn_rect):
         self._handle_commit_button_press()
+      elif has_alerts and relative_x > self.rect.width - ALERTS_ZONE_WIDTH:
+        if self._on_alerts_click:
+          self._on_alerts_click()
     self._did_long_press = False
 
   # --- Git & Commit Logic Methods ---
