@@ -5,6 +5,7 @@ import base64
 import fcntl
 import math
 import os
+import requests
 import serial
 import subprocess
 import sys
@@ -15,8 +16,12 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from typing import Any
 
+from pathlib import Path
+
+from openpilot.common.time_helpers import system_time_valid
 from openpilot.system.hardware.base import LPABase, LPAError, Profile
 
+GSMA_CI_BUNDLE = str(Path(__file__).parent / "gsma_ci_bundle.pem")
 
 DEFAULT_DEVICE = "/dev/modem_at0"
 DEFAULT_BAUD = 9600
@@ -26,6 +31,7 @@ ISDR_AID = "A0000005591010FFFFFFFF8900000100"
 MM = "org.freedesktop.ModemManager1"
 MM_MODEM = MM + ".Modem"
 ES10X_MSS = 120
+HTTP_TIMEOUT = 30
 OPEN_ISDR_RETRIES = 10
 OPEN_ISDR_RETRY_DELAY_S = 0.25
 OPEN_ISDR_RESET_ATTEMPT = 5
@@ -41,6 +47,11 @@ TAG_PROFILE_INFO_LIST = 0xBF2D
 TAG_SET_NICKNAME = 0xBF29
 TAG_ENABLE_PROFILE = 0xBF31
 TAG_DELETE_PROFILE = 0xBF33
+TAG_LIST_NOTIFICATION = 0xBF28
+TAG_RETRIEVE_NOTIFICATION = 0xBF2B
+TAG_NOTIFICATION_METADATA = 0xBF2F
+TAG_NOTIFICATION_SENT = 0xBF30
+TAG_PROFILE_INSTALL_RESULT = 0xBF37
 TAG_OK = 0xA0
 
 PROFILE_OK = 0x00
@@ -52,6 +63,19 @@ PROFILE_ERROR_CODES = {
   0x03: "disallowedByPolicy", 0x04: "wrongProfileReenabling",
   PROFILE_CAT_BUSY: "catBusy", 0x06: "undefinedError",
 }
+
+# SGP.22 §5.2.6 — SM-DP+ reason/subject codes mapped to user-friendly messages
+ES9P_ERROR_MESSAGES: dict[tuple[str, str], str] = {
+  ('3.8', '8.2.6'): "This eSIM profile is already installed on another device. Please use a new QR code.",
+  ('3.8', '8.2.1'): "This eSIM profile has expired. Please request a new QR code.",
+  ('3.8', '8.1'): "The SM-DP+ server refused this request.",
+  ('3.1', '8.2.6'): "This eSIM profile has been revoked by the carrier.",
+  ('3.9', '8.2.6'): "This eSIM profile download has already been completed.",
+  ('2.1', '8.8'): "The device is not compatible with this eSIM profile.",
+  ('1.2', '8.1'): "The SM-DP+ server is temporarily unavailable. Try again later.",
+}
+
+NOTIFICATION_OPERATIONS = {0x80: "install", 0x40: "enable", 0x20: "disable", 0x10: "delete"}
 
 STATE_LABELS = {0: "disabled", 1: "enabled", 255: "unknown"}
 ICON_LABELS = {0: "jpeg", 1: "png", 255: "unknown"}
@@ -345,6 +369,15 @@ def es10x_command(client: AtClient, data: bytes) -> bytes:
 
 # --- Profile operations ---
 
+NOTIFICATION: FieldMap = {
+  TAG_STATUS: ("seqNumber", lambda v: int.from_bytes(v, "big")),
+  0x81: ("profileManagementOperation",
+         lambda v: NOTIFICATION_OPERATIONS.get(next((m for m in NOTIFICATION_OPERATIONS if len(v) >= 2 and v[1] & m), 0), "unknown")),
+  0x0C: ("notificationAddress", lambda v: v.decode("utf-8", errors="ignore")),
+  TAG_ICCID: ("iccid", tbcd_to_string),
+}
+
+
 def decode_profiles(blob: bytes) -> list[dict]:
   root = require_tag(blob, TAG_PROFILE_INFO_LIST, "ProfileInfoList")
   list_ok = find_tag(root, TAG_OK)
@@ -368,6 +401,62 @@ def set_profile_nickname(client: AtClient, iccid: str, nickname: str) -> None:
     raise LPAError(f"profile {iccid} not found")
   if code != 0x00:
     raise RuntimeError(f"SetNickname failed with status 0x{code:02X}")
+
+
+# --- ES9P HTTP ---
+
+def es9p_request(smdp_address: str, endpoint: str, payload: dict, error_prefix: str = "Request", session: requests.Session | None = None) -> dict:
+  url = f"https://{smdp_address}/gsma/rsp2/es9plus/{endpoint}"
+  headers = {"User-Agent": "gsma-rsp-lpad", "X-Admin-Protocol": "gsma/rsp/v2.3.0", "Content-Type": "application/json"}
+  http = session or requests
+  resp = http.post(url, json=payload, headers=headers, timeout=HTTP_TIMEOUT, verify=GSMA_CI_BUNDLE)
+  resp.raise_for_status()
+  if not resp.content:
+    return {}
+  data = resp.json()
+  if "header" in data and "functionExecutionStatus" in data["header"]:
+    status = data["header"]["functionExecutionStatus"]
+    if status.get("status") == "Failed":
+      sd = status.get("statusCodeData", {})
+      reason = sd.get("reasonCode", "unknown")
+      subject = sd.get("subjectCode", "unknown")
+      msg = ES9P_ERROR_MESSAGES.get((reason, subject),
+            f"{error_prefix} failed: {reason}/{subject} - {sd.get('message', 'unknown')}")
+      raise RuntimeError(msg)
+  return data
+
+
+# --- Notifications ---
+
+def list_notifications(client: AtClient) -> list[dict]:
+  response = es10x_command(client, encode_tlv(TAG_LIST_NOTIFICATION, b""))
+  root = require_tag(response, TAG_LIST_NOTIFICATION, "ListNotificationResponse")
+  metadata_list = find_tag(root, TAG_OK)
+  if metadata_list is None:
+    return []
+  return [decode_struct(value, NOTIFICATION) for tag, value in iter_tlv(metadata_list) if tag == TAG_NOTIFICATION_METADATA]
+
+
+def process_notifications(client: AtClient) -> None:
+  for notification in list_notifications(client):
+    seq_number, smdp_address = notification["seqNumber"], notification["notificationAddress"]
+    try:
+      request = encode_tlv(TAG_RETRIEVE_NOTIFICATION, encode_tlv(TAG_OK, encode_tlv(TAG_STATUS, int_bytes(seq_number))))
+      response = es10x_command(client, request)
+      content = require_tag(require_tag(response, TAG_RETRIEVE_NOTIFICATION, "RetrieveNotificationsListResponse"),
+                            TAG_OK, "RetrieveNotificationsListResponse")
+      pending_notif = next((v for t, v in iter_tlv(content) if t in (TAG_PROFILE_INSTALL_RESULT, 0x30)), None)
+      if pending_notif is None:
+        raise RuntimeError("Missing PendingNotification")
+
+      es9p_request(smdp_address, "handleNotification", {"pendingNotification": b64e(pending_notif)}, "HandleNotification")
+
+      response = es10x_command(client, encode_tlv(TAG_NOTIFICATION_SENT, encode_tlv(TAG_STATUS, int_bytes(seq_number))))
+      root = require_tag(response, TAG_NOTIFICATION_SENT, "NotificationSentResponse")
+      if int.from_bytes(require_tag(root, TAG_STATUS, "RemoveNotificationFromList status"), "big") != 0:
+        raise RuntimeError("RemoveNotificationFromList failed")
+    except Exception as e:
+      print(f"notification {seq_number} failed: {e}", file=sys.stderr)
 
 
 class TiciLPA(LPABase):
@@ -408,6 +497,12 @@ class TiciLPA(LPABase):
 
   def get_active_profile(self) -> Profile | None:
     return None
+
+  def process_notifications(self) -> None:
+    if not system_time_valid():
+      raise RuntimeError("System time is not set; TLS certificate validation requires a valid clock")
+    with self._acquire_channel():
+      process_notifications(self._client)
 
   def delete_profile(self, iccid: str) -> None:
     if self.is_comma_profile(iccid):
