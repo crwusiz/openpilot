@@ -20,6 +20,20 @@ def execute_script(script_path: str, *args) -> int:
     print(f"Error executing script: {e}")
     return 1
 
+class LanguageToggleControl(BigParamControl):
+  def render(self, rect):
+    p = Params()
+    val_raw = p.get("LanguageSetting")
+    lang = ""
+
+    if isinstance(val_raw, bytes):
+      lang = val_raw.decode('utf-8').strip()
+    elif isinstance(val_raw, str):
+      lang = val_raw.strip()
+
+    self._checked = (lang == "ko")
+    return super().render(rect)
+
 class CommunityLayoutMici(NavScroller):
   def __init__(self):
     super().__init__()
@@ -32,7 +46,8 @@ class CommunityLayoutMici(NavScroller):
     driver_cam_missing = BigParamControl("Driver Camera Hardware Missing", "DriverCameraHardwareMissing", toggle_callback=restart_needed_callback)
     logger_enable = BigParamControl("Logger Enable", "LoggerEnable", toggle_callback=restart_needed_callback)
     prebuilt_enable = BigParamControl("Prebuilt Enable", "PrebuiltEnable", toggle_callback=restart_needed_callback)
-    language_toggle = BigParamControl("Language (en/ko)", "LanguageSetting", toggle_callback=self._language_callback)
+
+    language_toggle = LanguageToggleControl("Language (en/ko)", "LanguageSetting", toggle_callback=self._language_callback)
 
     self._scroller.add_widgets([
       pcm_cruise,
@@ -74,21 +89,13 @@ class CommunityLayoutMici(NavScroller):
 
   def _language_callback(self, *args, **kwargs):
     p = Params()
-    val_raw = p.get("LanguageSetting")
+    toggle_state = args[0] if args else False
 
-    if isinstance(val_raw, bytes):
-      val = val_raw.decode('utf-8')
-    elif isinstance(val_raw, str):
-      val = val_raw
-    else:
-      val = ""
-
-    if val == "1" or val == "ko":
+    if toggle_state:
       p.put("LanguageSetting", "ko")
     else:
       p.put("LanguageSetting", "en")
 
-    toggle_state = args[0] if args else None
     restart_needed_callback(toggle_state)
 
   def _update_toggles(self):
@@ -102,9 +109,9 @@ class CommunityLayoutMici(NavScroller):
     val_raw = p.get("LanguageSetting")
 
     if isinstance(val_raw, bytes):
-      lang = val_raw.decode('utf-8')
+      lang = val_raw.decode('utf-8').strip()
     elif isinstance(val_raw, str):
-      lang = val_raw
+      lang = val_raw.strip()
     else:
       lang = ""
 
