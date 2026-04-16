@@ -9,6 +9,7 @@ TOGGLE_ITEMS = [
   ("RadarTrackEnable",          "Enable Radar Track use",        "Enable Radar Track use (disable AEB)"),
   ("DriverCameraOnReverse",     "Driver Camera On Reverse",      "Displays the driver camera when in reverse"),
   ("DriverCameraHardwareMissing","Driver Camera Hardware Missing","If there is a problem with the driver camera hardware, drive without the driver camera"),
+  ("LanguageSetting",           "Language (en/ko)",              "Switch language between English and Korean"),
 ]
 
 
@@ -16,7 +17,16 @@ def render():
   # session_state 초기화
   for key, _, _ in TOGGLE_ITEMS:
     if f"tog_{key}" not in st.session_state:
-      st.session_state[f"tog_{key}"] = params.get_bool(key)
+      if key == "LanguageSetting":
+        val_raw = params.get(key)
+        lang = ""
+        if isinstance(val_raw, bytes):
+          lang = val_raw.decode('utf-8').strip()
+        elif isinstance(val_raw, str):
+          lang = val_raw.strip()
+        st.session_state[f"tog_{key}"] = (lang == "ko")
+      else:
+        st.session_state[f"tog_{key}"] = params.get_bool(key)
 
   for key, label, desc in TOGGLE_ITEMS:
     val       = st.session_state[f"tog_{key}"]
@@ -29,7 +39,12 @@ def render():
       if st.button(" ", key=f"btn_tog_{key}"):
         new_val = not val
         st.session_state[f"tog_{key}"] = new_val
-        params.put_bool(key, new_val)
+
+        if key == "LanguageSetting":
+          params.put(key, "ko" if new_val else "en")
+        else:
+          params.put_bool(key, new_val)
+
         st.toast(f"{label} {'ON' if new_val else 'OFF'}")
         st.rerun()
 
