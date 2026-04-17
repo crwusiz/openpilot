@@ -29,7 +29,6 @@ class Colors:
   BLACK = rl.Color(0, 0, 0, 255) # rl.BLACK
   BLACK_TRANSLUCENT = colors_alpha(BLACK, 100)
   RED = rl.Color(201, 34, 49, 255)
-  BSD = rl.Color(255, 0, 0, 100)
   LIGHT_RED = rl.Color(255, 100, 100, 150)
   ORANGE = rl.Color(255, 149, 0, 255)
 
