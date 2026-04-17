@@ -92,9 +92,6 @@ class ModelRenderer(Widget):
     self._lead_vehicles = [LeadVehicle(), LeadVehicle()]
     self._lead_info = [LeadInfo(), LeadInfo()]
     self._path_offset_z = HEIGHT_INIT[0]
-    self._speed = 0.0
-    self._left_blindspot = False
-    self._right_blindspot = False
     self._font_medium: rl.Font = gui_app.font(FontWeight.MEDIUM)
     self._font_bold: rl.Font = gui_app.font(FontWeight.BOLD)
 
@@ -102,7 +99,6 @@ class ModelRenderer(Widget):
     self._path = ModelPoints()
     self._lane_lines = [ModelPoints() for _ in range(4)]
     self._road_edges = [ModelPoints() for _ in range(2)]
-    self._lane_barriers = [ModelPoints(), ModelPoints()]
     self._acceleration_x = np.empty((0,), dtype=np.float32)
 
     self._acceleration_x_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
@@ -156,14 +152,6 @@ class ModelRenderer(Widget):
 
     # Update state
     self._experimental_mode = sm['selfdriveState'].experimentalMode
-
-    # Update speed and blindspot info
-    car_state = sm['carState']
-    if sm.valid['carState']:
-      v_ego = car_state.vEgoCluster if car_state.vEgoCluster != 0.0 else car_state.vEgo
-      self._speed = max(0.0, v_ego * (3.6 if ui_state.is_metric else 2.23694))
-      self._left_blindspot = car_state.leftBlindspot
-      self._right_blindspot = car_state.rightBlindspot
 
     live_calib = sm['liveCalibration']
     self._path_offset_z = live_calib.height[0] if live_calib.height else HEIGHT_INIT[0]
@@ -247,15 +235,6 @@ class ModelRenderer(Widget):
         line_width_factor = 0.16
       lane_line.projected_points = self._map_line_to_polygon(
         lane_line.raw_points, line_width_factor * self._lane_line_probs[i], 0.0, max_idx, max_distance
-      )
-
-    # Update lane barriers for blindspot visualization (using lane lines 1 and 2)
-    if self._left_blindspot or self._right_blindspot:
-      self._lane_barriers[0].projected_points = self._map_line_to_polygon(
-        self._lane_lines[1].raw_points, 0.025, 0.0, max_idx, max_distance
-      )
-      self._lane_barriers[1].projected_points = self._map_line_to_polygon(
-        self._lane_lines[2].raw_points, 0.025, 0.0, max_idx, max_distance
       )
 
     # Update road edges using raw points
@@ -411,13 +390,6 @@ class ModelRenderer(Widget):
 
       color = self._get_ll_color(float(self._lane_line_probs[i]), i in (1, 2), i in (0, 1))
       draw_polygon(self._rect, lane_line.projected_points, color)
-
-    # Draw blindspot barriers
-    if self._left_blindspot and self._lane_barriers[0].projected_points.size > 0:
-      draw_polygon(self._rect, self._lane_barriers[0].projected_points, Colors.BSD)
-
-    if self._right_blindspot and self._lane_barriers[1].projected_points.size > 0:
-      draw_polygon(self._rect, self._lane_barriers[1].projected_points, Colors.BSD)
 
     for i, road_edge in enumerate(self._road_edges):
       if road_edge.projected_points.size == 0:
