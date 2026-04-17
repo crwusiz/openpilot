@@ -21,7 +21,9 @@ def execute_script(script_path: str, *args) -> int:
     return 1
 
 class LanguageToggleControl(BigParamControl):
-  def render(self, rect):
+  def __init__(self, name, param, toggle_callback=None):
+    super().__init__(name, param, toggle_callback=toggle_callback)
+
     p = Params()
     val_raw = p.get("LanguageSetting")
     lang = ""
@@ -31,7 +33,16 @@ class LanguageToggleControl(BigParamControl):
     elif isinstance(val_raw, str):
       lang = val_raw.strip()
 
-    self._checked = (lang == "ko")
+    self.is_ko = (lang == "ko")
+    self._checked = self.is_ko
+
+  def set_checked(self, checked):
+    self.is_ko = checked
+    self._checked = checked
+
+  def render(self, rect):
+
+    self._checked = self.is_ko
     return super().render(rect)
 
 class CommunityLayoutMici(NavScroller):
@@ -95,6 +106,8 @@ class CommunityLayoutMici(NavScroller):
       p.put("LanguageSetting", "ko")
     else:
       p.put("LanguageSetting", "en")
+
+    self._language_toggle.set_checked(toggle_state)
 
     restart_needed_callback(toggle_state)
 
