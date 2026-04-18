@@ -153,9 +153,9 @@ class DriverStateRenderer(Widget):
     sm = ui_state.sm
 
     dm_state = sm["driverMonitoringState"]
-    self._is_active = dm_state.isActiveMode
+    self._is_active = dm_state.activePolicy == log.DriverMonitoringState.MonitoringPolicy.vision
     self._is_rhd = dm_state.isRHD
-    self._face_detected = dm_state.faceDetected
+    self._face_detected = dm_state.visionPolicyState.faceDetected
 
     driverstate = sm["driverStateV2"]
     driver_data = driverstate.rightDriverData if self._is_rhd else driverstate.leftDriverData
