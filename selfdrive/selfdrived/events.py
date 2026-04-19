@@ -1153,8 +1153,8 @@ if HARDWARE.get_device_type() == 'mici':
       ET.WARNING: Alert(
         "take control",
         "turn exceeds limit",
-        AlertStatus.userPrompt, AlertSize.mid,
-        Priority.LOW, VisualAlert.steerRequired, AudibleAlert.promptRepeat, 2.),
+        AlertStatus.userPrompt, AlertSize.small,
+        Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, 3.),
     },
     EventName.calibrationIncomplete: {
       ET.PERMANENT: calibration_incomplete_alert,

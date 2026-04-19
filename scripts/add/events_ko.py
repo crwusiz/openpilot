@@ -1161,8 +1161,8 @@ if HARDWARE.get_device_type() == 'mici':
       ET.WARNING: Alert(
         "핸들을 잡아주세요",
         "회전이 조향 한도를 초과함",
-        AlertStatus.userPrompt, AlertSize.mid,
-        Priority.LOW, VisualAlert.steerRequired, AudibleAlert.promptRepeat, 2.),
+        AlertStatus.userPrompt, AlertSize.small,
+        Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, 3.),
     },
     EventName.calibrationIncomplete: {
       ET.PERMANENT: calibration_incomplete_alert,
