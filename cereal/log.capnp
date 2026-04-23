@@ -281,11 +281,7 @@ struct GPSNMEAData {
   nmea @2 :Text;
 }
 
-# android sensor_event_t
 struct SensorEventData {
-  version @0 :Int32;
-  sensor @1 :Int32;
-  type @2 :Int32;
   timestamp @3 :Int64;
 
   union {
