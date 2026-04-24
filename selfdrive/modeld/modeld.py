@@ -26,7 +26,7 @@ from openpilot.common.transformations.model import get_warp_matrix
 from openpilot.selfdrive.controls.lib.desire_helper import DesireHelper, ALC_START_TIME
 from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan, smooth_value, get_curvature_from_plan
 from openpilot.selfdrive.modeld.parse_model_outputs import Parser
-from openpilot.selfdrive.modeld.compile_modeld import CompileConfig, make_input_queues
+from openpilot.selfdrive.modeld.compile_modeld import make_input_queues
 from openpilot.selfdrive.modeld.fill_model_msg import fill_model_msg, fill_pose_msg, PublishState
 from openpilot.common.file_chunker import read_file_chunked
 from openpilot.selfdrive.modeld.constants import ModelConstants, Plan
