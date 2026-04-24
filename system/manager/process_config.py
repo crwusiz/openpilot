@@ -125,7 +125,7 @@ procs = [
 
   NativeProcess("dashboard", "scripts",
                 ["python3", "-m", "streamlit", "run", "/data/openpilot/scripts/dashboard/main.py",
-                 "--server.port", "8080", "--server.address", "0.0.0.0", "--server.headless", "true"],
+                 "--server.port", "7000", "--server.address", "0.0.0.0", "--server.headless", "true"],
                 always_run, enabled=not PC),
 ]
 
