@@ -1,40 +1,11 @@
 import streamlit as st
 import subprocess
 import shutil
-import os
 import time
 import html as html_lib
 from datetime import datetime
 from pathlib import Path
 import streamlit.components.v1 as components
-
-ACCESS_PASSWORD = "comma"
-
-
-def check_password():
-  if st.session_state.get("password_correct", False):
-    return True
-
-  # ex: http://ip:port/?pwd=comma
-  try:
-    if st.query_params.get("pwd") == ACCESS_PASSWORD:
-      st.session_state["password_correct"] = True
-      return True
-  except Exception:
-    pass
-
-  # ex: http://ip:port/
-  st.title("🔒 Access Restricted")
-  pwd = st.text_input("Enter Dashboard Password", type="password")
-
-  if st.button("Login"):
-    if pwd == ACCESS_PASSWORD:
-      st.session_state["password_correct"] = True
-      st.rerun()
-    else:
-      st.error("Incorrect Password")
-  return False
-
 
 try:
   from openpilot.common.params import Params
@@ -1044,5 +1015,4 @@ def main():
 
 
 if __name__ == "__main__":
-  if check_password():
-    main()
+  main()
