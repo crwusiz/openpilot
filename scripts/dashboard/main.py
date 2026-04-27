@@ -10,33 +10,6 @@ from tabs import (
   tab_camera,
 )
 
-ACCESS_PASSWORD = "comma"
-
-# ── 인증 ──────────────────────────────────────────────────
-def check_password() -> bool:
-  if st.session_state.get("password_correct", False):
-    return True
-
-  # URL 파라미터 방식: http://ip:port/?pwd=comma or http://hostname/?pwd=comma (hostname ex comma-12345678) 12345678 is comma device serial
-  try:
-    if st.query_params.get("pwd") == ACCESS_PASSWORD:
-      st.session_state["password_correct"] = True
-      return True
-  except Exception:
-    pass
-
-  # 입력 폼 방식
-  st.title("🔒 Access Restricted")
-  pwd = st.text_input("Enter Dashboard Password", type="password")
-  if st.button("Login"):
-    if pwd == ACCESS_PASSWORD:
-      st.session_state["password_correct"] = True
-      st.rerun()
-    else:
-      st.error("Incorrect Password")
-  return False
-
-
 # ── 메인 ──────────────────────────────────────────────────
 def main():
   st.set_page_config(
@@ -67,5 +40,4 @@ def main():
 
 
 if __name__ == "__main__":
-  if check_password():
-    main()
+  main()
