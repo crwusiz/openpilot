@@ -107,6 +107,7 @@ procs = [
   PythonProcess("lateral_maneuversd", "tools.lateral_maneuvers.lateral_maneuversd", lat_maneuver),
   PythonProcess("radard", "selfdrive.controls.radard", only_onroad),
   PythonProcess("hardwared", "system.hardware.hardwared", always_run),
+  PythonProcess("modem", "system.hardware.tici.modem", always_run, enabled=False),
   PythonProcess("tombstoned", "system.tombstoned", always_run, enabled=not PC),
   PythonProcess("updated", "system.updated.updated", only_offroad, enabled=not PC),
   PythonProcess("uploader", "system.loggerd.uploader", always_run),
@@ -125,7 +126,7 @@ procs = [
 
   NativeProcess("dashboard", "scripts",
                 ["python3", "-m", "streamlit", "run", "/data/openpilot/scripts/dashboard/main.py",
-                 "--server.port", "8080", "--server.address", "0.0.0.0", "--server.headless", "true"],
+                 "--server.port", "7000", "--server.address", "0.0.0.0", "--server.headless", "true"],
                 always_run, enabled=not PC),
 ]
 

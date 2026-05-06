@@ -153,7 +153,7 @@ class HudRenderer(Widget):
     # Load static icons (non-interactive)
     self._load_static_icons()
 
-    self.torque_bar = TorqueBar()
+    #self.torque_bar = TorqueBar()
 
   def _init_icon_buttons(self) -> None:
     icon_size = UIConfig.icon_size
@@ -179,7 +179,7 @@ class HudRenderer(Widget):
     self.bottom_icons = IconGroup()
 
     # Steering wheel button (rotatable)
-    self.steer_btn = RotatableIconButton("icons/steer.png", button_size, icon_size, bg_color)
+    self.steer_btn = RotatableIconButton("icons/wheel.png", button_size, icon_size, bg_color)
     self.bottom_icons.add_button(self.steer_btn)
 
     # LKA toggle button
@@ -197,6 +197,12 @@ class HudRenderer(Widget):
 
   def _load_static_icons(self) -> None:
     icon_size = UIConfig.icon_size
+
+    # Steering wheel textures
+    self.wheel_img = gui_app.texture("icons/wheel.png", icon_size, icon_size)
+    self.wheel_green_img = gui_app.texture("icons/wheel_green.png", icon_size, icon_size)
+    self.wheel_blue_img = gui_app.texture("icons/wheel_blue.png", icon_size, icon_size)
+    self.wheel_critical_img = gui_app.texture("icons/wheel_critical.png", icon_size, icon_size)
 
     # WiFi textures for state switching
     self.wifi_l_img = gui_app.texture("icons/wifi_strength_low.png", icon_size, icon_size)
@@ -340,7 +346,7 @@ class HudRenderer(Widget):
     # Update icon button states
     self._update_icon_button_states()
 
-    self.torque_bar._update_state()
+    #self.torque_bar._update_state()
 
   def _update_icon_button_states(self) -> None:
     # Upper icons
@@ -354,6 +360,7 @@ class HudRenderer(Widget):
     self.wifi_btn.set_opacity(0.8 if self.wifi_state > 0 else 0.2)
 
     # Bottom icons
+    self.steer_btn._texture = self._get_wheel_texture()
     self.steer_btn.set_rotation(-self.steer_angle)
     self.steer_btn.set_opacity(0.8)
 
@@ -374,6 +381,15 @@ class HudRenderer(Widget):
     elif self.wifi_state == 3:
       return self.wifi_h_img
     return self.wifi_f_img
+
+  def _get_wheel_texture(self) -> rl.Texture:
+    if ui_state.status == UIStatus.BLINKER:
+      return self.wheel_critical_img
+    elif ui_state.status == UIStatus.STEERING:
+      return self.wheel_blue_img
+    elif ui_state.status in (UIStatus.ENGAGED, UIStatus.ACTIVE):
+      return self.wheel_green_img
+    return self.wheel_img
 
   def _render(self, rect: rl.Rectangle) -> None:
     # Draw the header background

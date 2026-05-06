@@ -15,6 +15,7 @@ from openpilot.system.hardware import HARDWARE, PC
 from opendbc.car import structs
 
 BACKLIGHT_OFFROAD = 65 if HARDWARE.get_device_type() == "mici" else 50
+PARAM_UPDATE_TIME = 5.0
 
 GearShifter = structs.CarState.GearShifter
 
@@ -61,6 +62,7 @@ class UIState:
         "carOutput",
         "carControl",
         "liveParameters",
+        "testJoystick",
         "rawAudioData",
         "naviData",
         "ubloxGnss",
@@ -86,9 +88,10 @@ class UIState:
     self.panda_type: log.PandaState.PandaType = log.PandaState.PandaType.unknown
     self.personality: log.LongitudinalPersonality = log.LongitudinalPersonality.standard
     self.has_longitudinal_control: bool = False
+    self.is_body: bool | None = None
     self.CP: car.CarParams | None = None
     self.light_sensor: float = -1.0
-    self._param_update_time: float = 0.0
+    self._param_update_time: float = -PARAM_UPDATE_TIME
 
     #add
     self.enabled: bool = False
@@ -99,6 +102,7 @@ class UIState:
     # Callbacks
     self._offroad_transition_callbacks: list[Callable[[], None]] = []
     self._engaged_transition_callbacks: list[Callable[[], None]] = []
+    self._on_body_changed_callbacks: list[Callable[[], None]] = []
 
     self.update_params()
 
@@ -107,6 +111,9 @@ class UIState:
 
   def add_engaged_transition_callback(self, callback: Callable[[], None]):
     self._engaged_transition_callbacks.append(callback)
+
+  def add_on_body_changed_callbacks(self, callback: Callable[[], None]):
+    self._on_body_changed_callbacks.append(callback)
 
   @property
   def engaged(self) -> bool:
@@ -123,7 +130,7 @@ class UIState:
     self.sm.update(0)
     self._update_state()
     self._update_status()
-    if time.monotonic() - self._param_update_time > 5.0:
+    if time.monotonic() - self._param_update_time >= PARAM_UPDATE_TIME:
       self.update_params()
     device.update()
 
@@ -230,6 +237,12 @@ class UIState:
         self.has_longitudinal_control = self.params.get_bool("AlphaLongitudinalEnabled")
       else:
         self.has_longitudinal_control = self.CP.openpilotLongitudinalControl
+
+      if self.is_body != self.CP.notCar:
+        self.is_body = self.CP.notCar
+        for callback in self._on_body_changed_callbacks:
+          callback()
+
     self._param_update_time = time.monotonic()
 
 

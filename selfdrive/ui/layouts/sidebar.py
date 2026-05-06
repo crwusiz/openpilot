@@ -39,8 +39,15 @@ class Colors:
   WHITE = rl.WHITE
   WHITE_DIM = colors_alpha(WHITE, 85)
   GRAY = rl.Color(84, 84, 84, 255)
+
+  # Status colors
+  GOOD = rl.WHITE
   WARNING = rl.Color(218, 202, 37, 255)
   DANGER = rl.Color(201, 34, 49, 255)
+
+  # UI elements
+  METRIC_BORDER = WHITE_DIM
+  BUTTON_NORMAL = rl.WHITE
   BUTTON_PRESSED = colors_alpha(WHITE, 166)
   UP_TO_DATE = rl.Color(128, 216, 166, 255)
 
@@ -77,8 +84,8 @@ class Sidebar(Widget):
     self.wifi_manager = WifiManager()
     self.wifi_manager_ui = WifiManagerUI(self.wifi_manager)
 
-    self._temp_status = MetricData(tr_noop("TEMP"), tr_noop("GOOD"), Colors.WHITE)
-    self._panda_status = MetricData(tr_noop("VEHICLE"), tr_noop("ONLINE"), Colors.WHITE)
+    self._temp_status = MetricData(tr_noop("TEMP"), tr_noop("GOOD"), Colors.GOOD)
+    self._panda_status = MetricData(tr_noop("VEHICLE"), tr_noop("ONLINE"), Colors.GOOD)
     self._connect_status = MetricData(tr_noop("CONNECT"), tr_noop("OFFLINE"), Colors.WARNING)
     self._commit_status = MetricData(tr_noop("UPDATE"), tr_noop("CHECK"), Colors.WARNING)
     self._recording_audio = False
@@ -301,9 +308,9 @@ class Sidebar(Widget):
     max_temp = device_state.maxTempC
     temp_str = f"{max_temp:.1f}°C"
 
-    if thermal_status == ThermalStatus.green:
-      #self._temp_status.update(tr_noop("TEMP"), tr_noop("GOOD"), Colors.WHITE)
-      self._temp_status.update(tr_noop("TEMP"), temp_str, Colors.WHITE)
+    if thermal_status == ThermalStatus.ok:
+      #self._temp_status.update(tr_noop("TEMP"), tr_noop("GOOD"), Colors.GOOD)
+      self._temp_status.update(tr_noop("TEMP"), temp_str, Colors.GOOD)
     elif thermal_status == ThermalStatus.yellow:
       #self._temp_status.update(tr_noop("TEMP"), tr_noop("OK"), Colors.WARNING)
       self._temp_status.update(tr_noop("TEMP"), temp_str, Colors.WARNING)
@@ -316,7 +323,7 @@ class Sidebar(Widget):
     if last_ping == 0:
       self._connect_status.update(tr_noop("CONNECT"), tr_noop("OFFLINE"), Colors.WARNING)
     elif time.monotonic_ns() - last_ping < 80_000_000_000:  # 80 seconds (in nanoseconds)
-      self._connect_status.update(tr_noop("CONNECT"), tr_noop("ONLINE"), Colors.WHITE)
+      self._connect_status.update(tr_noop("CONNECT"), tr_noop("ONLINE"), Colors.GOOD)
     else:
       self._connect_status.update(tr_noop("CONNECT"), tr_noop("ERROR"), Colors.DANGER)
 
@@ -324,7 +331,7 @@ class Sidebar(Widget):
     if ui_state.panda_type == log.PandaState.PandaType.unknown:
       self._panda_status.update(tr_noop("NO"), tr_noop("PANDA"), Colors.DANGER)
     else:
-      self._panda_status.update(tr_noop("VEHICLE"), tr_noop("ONLINE"), Colors.WHITE)
+      self._panda_status.update(tr_noop("VEHICLE"), tr_noop("ONLINE"), Colors.GOOD)
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     if rl.check_collision_point_rec(mouse_pos, SETTINGS_BTN):
@@ -355,14 +362,14 @@ class Sidebar(Widget):
 
     # Settings button
     settings_down = mouse_down and rl.check_collision_point_rec(mouse_pos, SETTINGS_BTN)
-    tint = Colors.BUTTON_PRESSED if settings_down else Colors.WHITE
+    tint = Colors.BUTTON_PRESSED if settings_down else Colors.BUTTON_NORMAL
     rl.draw_texture_ex(self._settings_img, rl.Vector2(SETTINGS_BTN.x, SETTINGS_BTN.y), 0.0, 1.0, tint)
 
     # Home/Flag button
     #flag_pressed = mouse_down and rl.check_collision_point_rec(mouse_pos, HOME_BTN)
     #button_img = self._flag_img if ui_state.started else self._home_img
 
-    #tint = Colors.BUTTON_PRESSED if (ui_state.started and flag_pressed) else Colors.WHITE
+    #tint = Colors.BUTTON_PRESSED if (ui_state.started and flag_pressed) else Colors.BUTTON_NORMAL
     #rl.draw_texture_ex(button_img, rl.Vector2(HOME_BTN.x, HOME_BTN.y), 0.0, 1.0, tint)
 
     # C3X image (always shown, not flag/home toggle)
@@ -433,7 +440,7 @@ class Sidebar(Widget):
     rl.end_scissor_mode()
 
     # Border
-    rl.draw_rectangle_rounded_lines_ex(metric_rect, 0.3, 10, 2, Colors.WHITE_DIM)
+    rl.draw_rectangle_rounded_lines_ex(metric_rect, 0.3, 10, 2, Colors.METRIC_BORDER)
 
     # Text label
     labels = [tr(metric.label), tr(metric.value)]

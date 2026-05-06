@@ -20,6 +20,31 @@ def execute_script(script_path: str, *args) -> int:
     print(f"Error executing script: {e}")
     return 1
 
+class LanguageToggleControl(BigParamControl):
+  def __init__(self, name, param, toggle_callback=None):
+    super().__init__(name, param, toggle_callback=toggle_callback)
+
+    p = Params()
+    val_raw = p.get("LanguageSetting")
+    lang = ""
+
+    if isinstance(val_raw, bytes):
+      lang = val_raw.decode('utf-8').strip()
+    elif isinstance(val_raw, str):
+      lang = val_raw.strip()
+
+    self.is_ko = (lang == "ko")
+    self._checked = self.is_ko
+
+  def set_checked(self, checked):
+    self.is_ko = checked
+    self._checked = checked
+
+  def render(self, rect):
+
+    self._checked = self.is_ko
+    return super().render(rect)
+
 class CommunityLayoutMici(NavScroller):
   def __init__(self):
     super().__init__()
@@ -33,6 +58,8 @@ class CommunityLayoutMici(NavScroller):
     logger_enable = BigParamControl("Logger Enable", "LoggerEnable", toggle_callback=restart_needed_callback)
     prebuilt_enable = BigParamControl("Prebuilt Enable", "PrebuiltEnable", toggle_callback=restart_needed_callback)
 
+    language_toggle = LanguageToggleControl("Language (en/ko)", "LanguageSetting", toggle_callback=self._language_callback)
+
     self._scroller.add_widgets([
       pcm_cruise,
       cruise_state_control,
@@ -43,6 +70,7 @@ class CommunityLayoutMici(NavScroller):
       driver_cam_missing,
       logger_enable,
       prebuilt_enable,
+      language_toggle,
     ])
 
     # Toggle lists
@@ -58,6 +86,8 @@ class CommunityLayoutMici(NavScroller):
       ("PrebuiltEnable", prebuilt_enable),
     )
 
+    self._language_toggle = language_toggle
+
     if ui_state.params.get_bool("ShowDebugInfo"):
       gui_app.set_show_touches(True)
       gui_app.set_show_fps(True)
@@ -68,9 +98,34 @@ class CommunityLayoutMici(NavScroller):
     super().show_event()
     self._update_toggles()
 
+  def _language_callback(self, *args, **kwargs):
+    p = Params()
+    toggle_state = args[0] if args else False
+
+    if toggle_state:
+      p.put("LanguageSetting", "ko")
+    else:
+      p.put("LanguageSetting", "en")
+
+    self._language_toggle.set_checked(toggle_state)
+
+    restart_needed_callback(toggle_state)
+
   def _update_toggles(self):
     ui_state.update_params()
 
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
+
+    p = Params()
+    val_raw = p.get("LanguageSetting")
+
+    if isinstance(val_raw, bytes):
+      lang = val_raw.decode('utf-8').strip()
+    elif isinstance(val_raw, str):
+      lang = val_raw.strip()
+    else:
+      lang = ""
+
+    self._language_toggle.set_checked(lang == "ko")

@@ -901,6 +901,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.SOFT_DISABLE: soft_disable_alert("Communication Issue Between Processes"),
     ET.NO_ENTRY: comm_issue_alert,
   },
+
   EventName.commIssueAvgFreq: {
     ET.SOFT_DISABLE: soft_disable_alert("Low Communication Rate Between Processes"),
     ET.NO_ENTRY: NoEntryAlert("Low Communication Rate Between Processes"),
@@ -1153,8 +1154,8 @@ if HARDWARE.get_device_type() == 'mici':
       ET.WARNING: Alert(
         "take control",
         "turn exceeds limit",
-        AlertStatus.userPrompt, AlertSize.mid,
-        Priority.LOW, VisualAlert.steerRequired, AudibleAlert.promptRepeat, 2.),
+        AlertStatus.userPrompt, AlertSize.small,
+        Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, 3.),
     },
     EventName.calibrationIncomplete: {
       ET.PERMANENT: calibration_incomplete_alert,
@@ -1167,7 +1168,7 @@ if HARDWARE.get_device_type() == 'mici':
         "",
         AlertStatus.normal, AlertSize.full,
         Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay=0.5),
-      ET.USER_DISABLE: ImmediateDisableAlert("Reverse"),
+      ET.USER_DISABLE: SoftDisableAlert("Reverse"),
       ET.NO_ENTRY: NoEntryAlert("Reverse"),
     },
   })
