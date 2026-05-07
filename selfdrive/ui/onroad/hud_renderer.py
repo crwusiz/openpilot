@@ -421,7 +421,7 @@ class HudRenderer(Widget):
     button_y = rect.y + UIConfig.border_size + 10
     self._exp_button.render(rl.Rectangle(button_x, button_y, UIConfig.button_size, UIConfig.button_size))
 
-    self.torque_bar._render(rect)
+    # self.torque_bar._render(rect)
 
   def user_interacting(self) -> bool:
     return self._exp_button.is_pressed or self.upper_icons.is_any_pressed() or self.bottom_icons.is_any_pressed()
