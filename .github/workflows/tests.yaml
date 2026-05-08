@@ -30,4 +30,4 @@ jobs:
           submodules: true
       - run: ./tools/op.sh setup
       - name: Build openpilot
-        run: scons -j$(nproc)
+        run: scons
