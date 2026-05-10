@@ -46,7 +46,7 @@ git commit -a -m "openpilot v$VERSION release"
 
 # Build
 export PYTHONPATH="$BUILD_DIR"
-op build
+scons
 
 if [ -z "$PANDA_DEBUG_BUILD" ]; then
   # release panda fw
