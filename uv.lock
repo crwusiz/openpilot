@@ -122,6 +122,11 @@ wheels = [
 ]
 
 [[package]]
+name = "bootstrap-icons"
+version = "1.10.5.0"
+source = { git = "https://github.com/commaai/dependencies.git?subdirectory=bootstrap-icons&rev=release-bootstrap-icons#3db70e363cf3471969381bcb8f4ce3ebbab7b369" }
+
+[[package]]
 name = "bzip2"
 version = "1.0.8"
 source = { git = "https://github.com/commaai/dependencies.git?subdirectory=bzip2&rev=release-bzip2#13755b73dbcda1b186641fcccce90d55f815d6bc" }
@@ -542,6 +547,11 @@ wheels = [
 ]
 
 [[package]]
+name = "json11"
+version = "20170411.0"
+source = { git = "https://github.com/commaai/dependencies.git?subdirectory=json11&rev=release-json11#8e7737088f52d10fdea69c28c55e3e40b74af3f3" }
+
+[[package]]
 name = "kiwisolver"
 version = "1.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -745,6 +755,7 @@ dependencies = [
     { name = "aiohttp" },
     { name = "aiortc" },
     { name = "av" },
+    { name = "bootstrap-icons" },
     { name = "bzip2" },
     { name = "capnproto" },
     { name = "catch2" },
@@ -758,6 +769,7 @@ dependencies = [
     { name = "inputs" },
     { name = "jeepney" },
     { name = "json-rpc" },
+    { name = "json11" },
     { name = "libjpeg" },
     { name = "libusb" },
     { name = "libusb1" },
@@ -824,6 +836,7 @@ requires-dist = [
     { name = "aiohttp" },
     { name = "aiortc" },
     { name = "av" },
+    { name = "bootstrap-icons", git = "https://github.com/commaai/dependencies.git?subdirectory=bootstrap-icons&rev=release-bootstrap-icons" },
     { name = "bzip2", git = "https://github.com/commaai/dependencies.git?subdirectory=bzip2&rev=release-bzip2" },
     { name = "capnproto", git = "https://github.com/commaai/dependencies.git?subdirectory=capnproto&rev=release-capnproto" },
     { name = "catch2", git = "https://github.com/commaai/dependencies.git?subdirectory=catch2&rev=release-catch2" },
@@ -842,6 +855,7 @@ requires-dist = [
     { name = "jeepney" },
     { name = "jinja2", marker = "extra == 'docs'" },
     { name = "json-rpc" },
+    { name = "json11", git = "https://github.com/commaai/dependencies.git?subdirectory=json11&rev=release-json11" },
     { name = "libjpeg", git = "https://github.com/commaai/dependencies.git?subdirectory=libjpeg&rev=release-libjpeg" },
     { name = "libusb", git = "https://github.com/commaai/dependencies.git?subdirectory=libusb&rev=release-libusb" },
     { name = "libusb1" },
