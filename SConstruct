@@ -113,7 +113,6 @@ env = Environment(
     "#msgq",
     "#third_party",
     "#third_party/json11",
-    "#third_party/linux/include",
     acados_include_dirs,
     [x.INCLUDE_DIR for x in pkgs],
   ],
