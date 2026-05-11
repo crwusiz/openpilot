@@ -202,7 +202,7 @@ class Modem:
   def _publish_state(self, **kwargs):
     self.S.update(kwargs)
     with tempfile.NamedTemporaryFile(mode="w", dir="/dev/shm", delete=False) as f:
-      json.dump(self.S, f)
+      json.dump(self.S, f, indent=2)
     os.chmod(f.name, 0o644)
     os.replace(f.name, STATE_PATH)
 

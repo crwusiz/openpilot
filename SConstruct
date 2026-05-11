@@ -37,7 +37,7 @@ assert arch in [
   "Darwin",   # macOS arm64 (x86 not supported)
 ]
 
-pkg_names = ['acados', 'bzip2', 'capnproto', 'catch2', 'eigen', 'ffmpeg', 'libjpeg', 'libyuv', 'ncurses', 'zeromq', 'zstd']
+pkg_names = ['acados', 'bzip2', 'capnproto', 'catch2', 'eigen', 'ffmpeg', 'json11', 'libjpeg', 'libyuv', 'ncurses', 'zeromq', 'zstd']
 pkgs = [importlib.import_module(name) for name in pkg_names]
 acados = pkgs[pkg_names.index('acados')]
 acados_include_dirs = [
@@ -111,15 +111,12 @@ env = Environment(
   CPPPATH=[
     "#",
     "#msgq",
-    "#third_party",
-    "#third_party/json11",
     acados_include_dirs,
     [x.INCLUDE_DIR for x in pkgs],
   ],
   LIBPATH=[
     "#common",
     "#msgq_repo",
-    "#third_party",
     "#selfdrive/pandad",
     "#rednose/helpers",
     [x.LIB_DIR for x in pkgs],
@@ -241,9 +238,6 @@ SConscript([
 
 if arch == "larch64":
   SConscript(['system/camerad/SConscript'])
-
-# Build openpilot
-SConscript(['third_party/SConscript'])
 
 # Build selfdrive
 SConscript([

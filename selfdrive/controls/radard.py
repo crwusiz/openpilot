@@ -324,7 +324,10 @@ class VisionTrack:
 class RadarD:
   def __init__(self, delay: float = 0.0):
     self.current_time = 0.0
+
     self.tracks: dict[int, Track] = {}
+    self.lead_prob_filters = [FirstOrderFilter(0.0, 0.2, DT_MDL) for _ in range(2)]
+
     self.v_ego = 0.0
     self.v_ego_hist = deque([0.0], maxlen=int(round(delay / DT_MDL))+1)
     self.last_v_ego_frame = -1
@@ -540,9 +543,16 @@ class RadarD:
       model_v_ego = sm['modelV2'].velocity.x[0]
     else:
       model_v_ego = self.v_ego
-
     leads_v3 = sm['modelV2'].leadsV3
     if len(leads_v3) > 1:
+      for i in range(2):
+        # Asymmetric filter on lead prob to keep lead when uncertain
+        lead_prob = leads_v3[i].prob
+        if lead_prob > self.lead_prob_filters[i].x:
+          self.lead_prob_filters[i].x = lead_prob
+        else:
+          self.lead_prob_filters[i].update(lead_prob)
+
       if model_updated:
         if self.radar_detected:
           self.vision_tracks[0].cnt = 0
@@ -552,6 +562,9 @@ class RadarD:
 
       # Filter tracks like radard_add
       alive_tracks = {tid: trk for tid, trk in self.tracks.items() if trk.cnt > 2}
+
+      #self.radar_state.leadOne = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[0], model_v_ego, self.lead_prob_filters[0].x, low_speed_override=True)
+      #self.radar_state.leadTwo = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[1], model_v_ego, self.lead_prob_filters[1].x, low_speed_override=False)
 
       # Use updated _get_fused_lead_data (passed CS for corner radar)
       self.radar_state.leadOne, self.radar_detected = self._get_fused_lead_data(sm['modelV2'], alive_tracks, 0, leads_v3[0], low_speed_override=False)
