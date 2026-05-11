@@ -124,13 +124,13 @@ def laplacian_pdf(x: float, mu: float, b: float):
   return 0.0 if diff > 50.0 else math.exp(-diff)
 
 
-def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks: dict[int, Track]):
+def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, lead_prob: float, tracks: dict[int, Track]):
   offset_vision_dist = lead.x[0] - RADAR_TO_CAMERA
   max_vision_dist = max(offset_vision_dist * 1.25, 5.0)
   min_vision_dist = max(offset_vision_dist * 0.8, 1.0)
   max_vision_dist2 = max(offset_vision_dist * 1.45, 5.0)
   min_vision_dist2 = 1.5
-  max_offset_vision_vel = max(lead.v[0] * np.interp(lead.prob, [0.8, 0.98], [0.3, 0.5]), 5.0)
+  max_offset_vision_vel = max(lead.v[0] * np.interp(lead_prob, [0.8, 0.98], [0.3, 0.5]), 5.0)
 
   def prob(c):
     prob_d = laplacian_pdf(c.dRel, offset_vision_dist, lead.xStd[0])
@@ -176,11 +176,11 @@ def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks
     best_track = None
     if dist_sane(track) and vel_sane(track):
       if y_sane(track):
-        if lead.prob > 0.5:
+        if lead_prob > 0.5:
           best_track = track
-        elif lead.prob > 0.4 and track.selected_count > 0:
+        elif lead_prob > 0.4 and track.selected_count > 0:
           best_track = track
-      elif lead.prob > 0.6:
+      elif lead_prob > 0.6:
         best_track = track
     elif dist_sane(track) and y_sane(track, True):  # stopped-car
       if score2 > 0.00001 and dist_sane(track2) and y_sane(track2) and vel_sane(track2):
@@ -191,7 +191,7 @@ def match_vision_to_track(v_ego: float, lead: capnp._DynamicStructReader, tracks
         track.is_stopped_car_count += 2
         if track.is_stopped_car_count > int(1.0/DT_MDL):
           best_track = track
-    elif offset_vision_dist < 90 and lead.prob > 0.65:
+    elif offset_vision_dist < 90 and lead_prob > 0.65:
       # wide y detect, for cut-in
       if extra_score > score and dist_sane(extra_track, True) and vel_sane(extra_track) and y_sane(extra_track, True):
         best_track = extra_track
@@ -266,9 +266,9 @@ class VisionTrack:
       "radarTrackId": -1,
     }
 
-  def update(self, lead_msg: capnp._DynamicStructReader, model_v_ego: float, v_ego: float, model: capnp._DynamicStructReader):
+  def update(self, lead_msg: capnp._DynamicStructReader, lead_prob: float, model_v_ego: float, v_ego: float, model: capnp._DynamicStructReader):
     lead_v_rel_pred = lead_msg.v[0] - model_v_ego
-    self.prob = lead_msg.prob
+    self.prob = lead_prob
     self.v_ego = v_ego
 
     if self.prob > 0.5:
@@ -343,7 +343,7 @@ class RadarD:
     self.leadTwo = None
     self.lane_line_available = False
 
-  def _get_fused_lead_data(self, model, tracks: dict[int, Track], index: int, lead_msg: capnp._DynamicStructReader, low_speed_override: bool = True) \
+  def _get_fused_lead_data(self, model, tracks: dict[int, Track], index: int, lead_msg: capnp._DynamicStructReader, lead_prob: float, low_speed_override: bool = True) \
     -> tuple[dict[str, Any], bool]:
     v_ego = self.v_ego
     ready = self.ready
@@ -354,10 +354,10 @@ class RadarD:
       track_scc = tracks.pop(0, None)
 
     track = None
-    if len(tracks) > 0 and ready and lead_msg.prob > .4:
-      track = match_vision_to_track(v_ego, lead_msg, tracks)
+    if len(tracks) > 0 and ready and lead_prob > .4:
+      track = match_vision_to_track(v_ego, lead_msg, lead_prob, tracks)
 
-    if (track is None or lead_msg.prob < .6) and track_scc is not None and track_scc.cnt > 2:
+    if (track is None or lead_prob < .6) and track_scc is not None and track_scc.cnt > 2:
       if not self.radar_track_enable or track_scc.vLead < 5.0:
         track = track_scc
 
@@ -365,9 +365,9 @@ class RadarD:
     radar_detected = False
 
     if track is not None:
-      lead_dict = track.get_RadarState(lead_msg.prob, self.vision_tracks[0].yRel)
+      lead_dict = track.get_RadarState(lead_prob, self.vision_tracks[0].yRel)
       radar_detected = True
-    elif (track is None) and ready and (lead_msg.prob > .5):
+    elif (track is None) and ready and (lead_prob > .5):
       lead_dict = self.vision_tracks[index].get_lead(model)
 
     if low_speed_override:
@@ -376,12 +376,12 @@ class RadarD:
         closest_track = min(low_speed_tracks, key=lambda c: c.dRel)
 
         if (not lead_dict['status']) or (closest_track.dRel < lead_dict['dRel']):
-          lead_dict = closest_track.get_RadarState(lead_msg.prob, self.vision_tracks[0].yRel)
+          lead_dict = closest_track.get_RadarState(lead_prob, self.vision_tracks[0].yRel)
           radar_detected = True
 
     return lead_dict, radar_detected
 
-  def _compute_all_leads(self, tracks: dict[int, Track], model: capnp._DynamicStructReader):
+  def _compute_all_leads(self, tracks: dict[int, Track], model: capnp._DynamicStructReader, lead_prob: float):
     lead_msg = model.leadsV3[0] if (model is not None and len(model.position.x) == 33) else None
     self.leadCutIn = {'status': False}
 
@@ -404,7 +404,7 @@ class RadarD:
       # center
       if c.in_lane_prob > 0.1:
         if c.cnt > 3:
-          ld = c.get_RadarState(lead_msg.prob, float(-lead_msg.y[0]))
+          ld = c.get_RadarState(lead_prob, float(-lead_msg.y[0]))
           ld['modelProb'] = 0.01
           center_list.append(ld)
 
@@ -557,24 +557,21 @@ class RadarD:
         if self.radar_detected:
           self.vision_tracks[0].cnt = 0
           self.vision_tracks[1].cnt = 0
-        self.vision_tracks[0].update(leads_v3[0], model_v_ego, self.v_ego, sm['modelV2'])
-        self.vision_tracks[1].update(leads_v3[1], model_v_ego, self.v_ego, sm['modelV2'])
+        self.vision_tracks[0].update(leads_v3[0], self.lead_prob_filters[0].x, model_v_ego, self.v_ego, sm['modelV2'])
+        self.vision_tracks[1].update(leads_v3[1], self.lead_prob_filters[1].x, model_v_ego, self.v_ego, sm['modelV2'])
 
       # Filter tracks like radard_add
       alive_tracks = {tid: trk for tid, trk in self.tracks.items() if trk.cnt > 2}
 
-      #self.radar_state.leadOne = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[0], model_v_ego, self.lead_prob_filters[0].x, low_speed_override=True)
-      #self.radar_state.leadTwo = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[1], model_v_ego, self.lead_prob_filters[1].x, low_speed_override=False)
-
       # Use updated _get_fused_lead_data (passed CS for corner radar)
-      self.radar_state.leadOne, self.radar_detected = self._get_fused_lead_data(sm['modelV2'], alive_tracks, 0, leads_v3[0], low_speed_override=False)
-      self.radar_state.leadTwo, _ = self._get_fused_lead_data(sm['modelV2'], alive_tracks, 1, leads_v3[1], low_speed_override=False)
+      self.radar_state.leadOne, self.radar_detected = self._get_fused_lead_data(sm['modelV2'], alive_tracks, 0, leads_v3[0], self.lead_prob_filters[0].x, low_speed_override=False)
+      self.radar_state.leadTwo, _ = self._get_fused_lead_data(sm['modelV2'], alive_tracks, 1, leads_v3[1], self.lead_prob_filters[1].x, low_speed_override=False)
 
       # Check lane availability
       self.lane_line_available = sm['modelV2'].laneLineProbs[1] > 0.5 and sm['modelV2'].laneLineProbs[2] > 0.5
 
       # Compute all leads and select final
-      self._compute_all_leads(alive_tracks, sm['modelV2'])
+      self._compute_all_leads(alive_tracks, sm['modelV2'], self.lead_prob_filters[0].x)
 
       if self.leadTwo is not None:
         self.radar_state.leadTwo = self.leadTwo
