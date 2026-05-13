@@ -125,8 +125,13 @@ procs = [
   PythonProcess("navi_controller", "selfdrive.controls.neokii.navi_controller", always_run, enabled=not PC),
 
   NativeProcess("dashboard", "scripts",
-                ["python3", "-m", "streamlit", "run", "/data/openpilot/scripts/dashboard/main.py",
-                 "--server.port", "7000", "--server.address", "0.0.0.0", "--server.headless", "true"],
+                ["bash", "-c",
+                 "if ! python3 -c 'import streamlit' &> /dev/null; then "
+                 "  if ping -c 1 -W 2 8.8.8.8 &> /dev/null; then "
+                 "    pip install streamlit; "
+                 "  fi; "
+                 "fi; "
+                 "python3 -m streamlit run /data/openpilot/scripts/dashboard/main.py --server.port 7000 --server.address 0.0.0.0 --server.headless true"],
                 always_run, enabled=not PC),
 ]
 
