@@ -166,6 +166,7 @@ class MiciHomeLayout(Widget):
     self._on_alerts_click: Callable | None = None
     self._alert_count_callback: Callable[[], int] | None = None
 
+    self._last_refresh = 0
     self._mouse_down_t: None | float = None
     self._did_long_press = False
     self._is_pressed_prev = False
@@ -249,7 +250,6 @@ class MiciHomeLayout(Widget):
       ip = self.wifi_manager_ui.ip_address
       self._ip_address = ip if ip else "Offline"
       self._last_refresh = rl.get_time()
-      self._update_params()
 
     if self._is_network_connected() and not self._initial_commit_check_done and not self._is_processing:
       print("Network connected, starting initial commit check")

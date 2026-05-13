@@ -117,15 +117,6 @@ function launch {
     cp -f $DIR/scripts/add/events_en.py $DIR/selfdrive/selfdrived/events.py
   fi
 
-  if ! command -v msgfmt &> /dev/null; then
-    sudo apt update
-    sudo apt install gettext -y
-  fi
-
-  if ! python3 -c "import jeepney" &> /dev/null; then
-    pip install jeepney
-  fi
-
   if ! python3 -c "import streamlit" &> /dev/null; then
     pip install streamlit
   fi
