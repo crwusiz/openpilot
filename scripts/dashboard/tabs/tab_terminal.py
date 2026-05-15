@@ -1,6 +1,22 @@
+import sys
+import subprocess
+import logging
 import html as html_lib
 from datetime import datetime
 import streamlit as st
+
+try:
+    from ansi2html import Ansi2HTMLConverter
+except ImportError:
+    logging.getLogger("terminal_tab").warning("ansi2html not found. Remounting filesystem to install...")
+    subprocess.check_call(["sudo", "mount", "-o", "remount,rw", "/"])
+    subprocess.check_call(["sudo", sys.executable, "-m", "pip", "install", "ansi2html"])
+    try:
+        subprocess.check_call(["sudo", "mount", "-o", "remount,ro", "/"])
+    except subprocess.CalledProcessError:
+        pass
+
+    from ansi2html import Ansi2HTMLConverter
 
 from utils import get_tmux_capture
 
@@ -8,7 +24,6 @@ from utils import get_tmux_capture
 def _render_content():
   """터미널 내용 1회 렌더"""
   content = get_tmux_capture()
-  escaped = html_lib.escape(content)
   lines   = len(content.splitlines())
   is_err  = (
     content.startswith("Error capturing tmux") or
@@ -16,6 +31,7 @@ def _render_content():
   )
 
   if is_err:
+    escaped = html_lib.escape(content) # 에러 메시지는 단순 이스케이프
     st.markdown(
       f'<div class="log-viewer" style="border-left-color:#EF4444; color:#FCA5A5;">❌ {escaped}</div>',
       unsafe_allow_html=True
@@ -25,9 +41,14 @@ def _render_content():
       unsafe_allow_html=True
     )
   else:
+    # ANSI 코드를 HTML로 변환하는 로직
+    conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
+    # full=False로 설정하여 HTML 뼈대(body, head 등) 없이 내용물만 변환합니다.
+    colored_html = conv.convert(content, full=False)
+
     now_str = datetime.now().strftime("%H:%M:%S")
     st.markdown(
-      f'<div class="log-viewer">{escaped}</div>',
+      f'<div class="log-viewer">{colored_html}</div>',
       unsafe_allow_html=True
     )
     st.markdown(
@@ -35,8 +56,7 @@ def _render_content():
       unsafe_allow_html=True
     )
 
-
-# st.fragment 지원 여부에 따라 자동 갱신 or 수동 갱신
+# 하단 파편화/수동 갱신 로직은 동일하게 유지...
 try:
   @st.fragment(run_every=1)
   def _terminal_fragment():
@@ -46,7 +66,6 @@ try:
     _terminal_fragment()
 
 except AttributeError:
-  # Streamlit < 1.33: st.fragment 미지원 → 수동 Refresh 버튼
   def render():
     _render_content()
     if st.button("🔄 Refresh", key="btn_terminal_refresh"):

@@ -28,7 +28,7 @@ def ublox_available() -> bool:
 def ublox(started: bool, params: Params, CP: car.CarParams) -> bool:
   use_ublox = ublox_available()
   if use_ublox != params.get_bool("UbloxAvailable"):
-    params.put_bool("UbloxAvailable", use_ublox)
+    params.put_bool("UbloxAvailable", use_ublox, block=True)
   return started and use_ublox
 
 def joystick(started: bool, params: Params, CP: car.CarParams) -> bool:
@@ -107,7 +107,7 @@ procs = [
   PythonProcess("lateral_maneuversd", "tools.lateral_maneuvers.lateral_maneuversd", lat_maneuver),
   PythonProcess("radard", "selfdrive.controls.radard", only_onroad),
   PythonProcess("hardwared", "system.hardware.hardwared", always_run),
-  PythonProcess("modem", "system.hardware.tici.modem", always_run, enabled=False),
+  PythonProcess("modem", "system.hardware.tici.modem", always_run, enabled=TICI),
   PythonProcess("tombstoned", "system.tombstoned", always_run, enabled=not PC),
   PythonProcess("updated", "system.updated.updated", only_offroad, enabled=not PC),
   PythonProcess("uploader", "system.loggerd.uploader", always_run),
@@ -125,8 +125,13 @@ procs = [
   PythonProcess("navi_controller", "selfdrive.controls.neokii.navi_controller", always_run, enabled=not PC),
 
   NativeProcess("dashboard", "scripts",
-                ["python3", "-m", "streamlit", "run", "/data/openpilot/scripts/dashboard/main.py",
-                 "--server.port", "7000", "--server.address", "0.0.0.0", "--server.headless", "true"],
+                ["bash", "-c",
+                 "if ! python3 -c 'import streamlit' &> /dev/null; then "
+                 "  if ping -c 1 -W 2 8.8.8.8 &> /dev/null; then "
+                 "    pip install streamlit; "
+                 "  fi; "
+                 "fi; "
+                 "python3 -m streamlit run /data/openpilot/scripts/dashboard/main.py --server.port 7000 --server.address 0.0.0.0 --server.headless true"],
                 always_run, enabled=not PC),
 ]
 

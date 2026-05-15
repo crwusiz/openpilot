@@ -61,7 +61,7 @@ def get_tmux_capture() -> str:
   """tmux 세션 0의 현재 출력 캡처"""
   try:
     res = subprocess.run(
-      ["tmux", "capture-pane", "-p", "-t", "0"],
+      ["tmux", "capture-pane", "-pe", "-t", "0"],
       capture_output=True, text=True
     )
     if res.returncode == 0:

@@ -171,8 +171,8 @@ class MiciHomeLayout(Widget):
     self._did_long_press = False
     self._is_pressed_prev = False
 
-    self._version_text = None
-    self._experimental_mode = False
+    self._version_text = self._get_version_text()
+
     self._ip_address = "Offline"
 
     self.wifi_manager = WifiManager()
@@ -218,16 +218,6 @@ class MiciHomeLayout(Widget):
       serial = "unknown"
     self._hostname = f"comma-{serial}"
 
-  def show_event(self):
-    super().show_event()
-    self._version_text = self._get_version_text()
-    ip = self.wifi_manager_ui.ip_address
-    self._ip_address = ip if ip else "Offline"
-    self._update_params()
-
-  def _update_params(self):
-    self._experimental_mode = ui_state.params.get_bool("ExperimentalMode")
-
   def _is_network_connected(self) -> bool:
     try:
       if hasattr(ui_state, 'sm') and ui_state.sm is not None:
@@ -250,8 +240,8 @@ class MiciHomeLayout(Widget):
     if self._mouse_down_t is not None:
       if time.monotonic() - self._mouse_down_t > 0.5:
         if ui_state.has_longitudinal_control:
-          self._experimental_mode = not self._experimental_mode
-          ui_state.params.put("ExperimentalMode", self._experimental_mode)
+          ui_state.experimental_mode = not ui_state.experimental_mode
+          ui_state.params.put("ExperimentalMode", ui_state.experimental_mode, block=True)
         self._mouse_down_t = None
         self._did_long_press = True
 
@@ -260,7 +250,6 @@ class MiciHomeLayout(Widget):
       ip = self.wifi_manager_ui.ip_address
       self._ip_address = ip if ip else "Offline"
       self._last_refresh = rl.get_time()
-      self._update_params()
 
     if self._is_network_connected() and not self._initial_commit_check_done and not self._is_processing:
       print("Network connected, starting initial commit check")
@@ -520,7 +509,7 @@ class MiciHomeLayout(Widget):
       hostname_text = f" [{self._hostname}]"
       rl.draw_text_ex(self._font_semi_bold, hostname_text, rl.Vector2(text_pos.x + 8 + ip_size.x, line3_y), font_size, 0, Colors.WHITE)
 
-    self._experimental_icon.set_visible(self._experimental_mode)
+    self._experimental_icon.set_visible(ui_state.experimental_mode)
     self._mic_icon.set_visible(ui_state.recording_audio)
     self._body_icon.set_visible(ui_state.is_body)
 

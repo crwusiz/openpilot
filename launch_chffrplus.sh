@@ -117,22 +117,11 @@ function launch {
     cp -f $DIR/scripts/add/events_en.py $DIR/selfdrive/selfdrived/events.py
   fi
 
-  if ! command -v msgfmt &> /dev/null; then
-    sudo apt update
-    sudo apt install gettext -y
-  fi
-
   if ! python3 -c "import jeepney" &> /dev/null; then
     pip install jeepney
   fi
 
-  if ! python3 -c "import streamlit" &> /dev/null; then
-    pip install streamlit
-  fi
-
-  if ! python3 -c "import aiohttp_cors" &> /dev/null; then
-    pip install aiohttp_cors
-  fi
+  cp -f $DIR/scripts/add/visionbuf_ion.cc $DIR/msgq_repo/msgq/visionipc/visionbuf_ion.cc
 
   # openpilot ssh key installer
   if [ ! -f /data/params/d/GithubSshKeys ]; then
