@@ -13,8 +13,13 @@ from typing import Any, TYPE_CHECKING
 try:
   import aiohttp_cors
 except ImportError:
-  logging.getLogger("webrtcd").warning("aiohttp_cors not found. Installing...")
-  subprocess.check_call([sys.executable, "-m", "pip", "install", "aiohttp_cors"])
+  logging.getLogger("webrtcd").warning("aiohttp_cors not found. Remounting filesystem to install...")
+  subprocess.check_call(["sudo", "mount", "-o", "remount,rw", "/"])
+  subprocess.check_call(["sudo", sys.executable, "-m", "pip", "install", "aiohttp_cors"])
+  try:
+      subprocess.check_call(["sudo", "mount", "-o", "remount,ro", "/"])
+  except subprocess.CalledProcessError:
+      pass
   import aiohttp_cors
 
 # aiortc and its dependencies have lots of internal warnings :(

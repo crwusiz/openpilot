@@ -1,7 +1,21 @@
+import sys
 import subprocess
+import logging
 import html as html_lib
 from pathlib import Path
 import streamlit as st
+
+try:
+    from ansi2html import Ansi2HTMLConverter
+except ImportError:
+    logging.getLogger("tab_logs").warning("ansi2html not found. Remounting filesystem to install...")
+    subprocess.check_call(["sudo", "mount", "-o", "remount,rw", "/"])
+    subprocess.check_call(["sudo", sys.executable, "-m", "pip", "install", "ansi2html"])
+    try:
+        subprocess.check_call(["sudo", "mount", "-o", "remount,ro", "/"])
+    except subprocess.CalledProcessError:
+        pass
+    from ansi2html import Ansi2HTMLConverter
 
 from utils import SCRIPTS_PATH, run_script
 
@@ -26,7 +40,7 @@ def render():
       st.session_state["log_out"]        = ""
 
       if sel_log_path == "TMUX_CONSOLE":
-        subprocess.run("tmux capture-pane -p -t 0 -S -500 > /data/tmux_console.log", shell=True)
+        subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
         p = Path("/data/tmux_console.log")
         st.session_state["log_out"] = p.read_text() if p.exists() else ""
         if not p.exists():
@@ -42,7 +56,7 @@ def render():
     if st.button("Upload", key="btn_upload_file", use_container_width=True):
       if sel_log_path == "TMUX_CONSOLE":
         if not Path("/data/tmux_console.log").exists():
-          subprocess.run("tmux capture-pane -p -t 0 -S -500 > /data/tmux_console.log", shell=True)
+          subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
         run_script("Console Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=["tmux_console.log"])
       else:
         run_script("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[sel_log_name])
@@ -58,7 +72,12 @@ def render():
     )
     st.markdown('<div class="log-statusbar log-error">⚠️ 파일을 불러오지 못했습니다.</div>', unsafe_allow_html=True)
   else:
-    display   = html_lib.escape(content) if content else "로그 파일을 선택한 후 View 버튼을 눌러주세요."
+    if content:
+      conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
+      display = conv.convert(content, full=False)
+    else:
+      display = "로그 파일을 선택한 후 View 버튼을 눌러주세요."
+
     lines     = len(content.splitlines()) if content else 0
     chars     = len(content) if content else 0
     scroll_js = "<script>var v=document.getElementById('logViewer');if(v)v.scrollTop=v.scrollHeight;</script>" if content else ""
