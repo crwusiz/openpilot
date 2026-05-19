@@ -59,7 +59,7 @@ def get_list_from_file(path: str) -> list:
   return []
 
 
-# ── 비동기 스크립트 실행 (즉각적인 알림 피드백을 위해 변경) ──
+# ── 비동기 스크립트 실행 (즉각적인 알림 피드백 및 백그라운드 독립 실행 보장) ──
 async def run_script_async(name: str, path: str, args: list = None) -> int:
   ui.notify(f"[{name}] 진행 중...", type='info', position='top')
   await asyncio.sleep(0.1)  # UI 알림이 먼저 렌더링되도록 양보
@@ -70,7 +70,8 @@ async def run_script_async(name: str, path: str, args: list = None) -> int:
     process = await asyncio.create_subprocess_exec(
       *cmd,
       stdout=asyncio.subprocess.PIPE,
-      stderr=asyncio.subprocess.PIPE
+      stderr=asyncio.subprocess.PIPE,
+      start_new_session=True
     )
     stdout, stderr = await process.communicate()
 
@@ -367,8 +368,9 @@ def render_tab_functions():
 
       # 5. 재부팅
       with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
-        ui.button('REBOOT', on_click=lambda: subprocess.Popen(["sudo", "reboot"]), color=None).classes(
-          'custom-btn btn-red w-[40%] sm:w-1/3 shrink-0')
+        # 재부팅 시에도 process detached 처리가 필요할 수 있으나, 일반적으로 Popen 이면 충분합니다.
+        ui.button('REBOOT', on_click=lambda: subprocess.Popen(["sudo", "reboot"], start_new_session=True),
+                  color=None).classes('custom-btn btn-red w-[40%] sm:w-1/3 shrink-0')
 
   # UI 렌더링 시작
   functions_content()
@@ -455,32 +457,33 @@ def render_tab_logs():
           options = [f"[{datetime.fromtimestamp(v['mtime']).strftime('%Y-%m-%d %H:%M')}] {k} ({len(v['paths'])} segs)"
                      for k, v in sorted_routes]
 
-          with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center'):
+          with ui.element('div').classes('w-full grid grid-cols-4 gap-2 items-center'):
             sel_route = ui.select(options, value=options[0], label="Select Route to Upload").classes(
-              'w-[70%] min-w-0 shrink-0')
+              'col-span-3 min-w-0')
 
             def upload_route():
               idx = options.index(sel_route.value)
               targets = sorted_routes[idx][1]['paths']
               cmd = ["bash", f"{SCRIPTS_PATH}/realdata_upload.sh"] + targets
               try:
-                subprocess.Popen(cmd)
+                subprocess.Popen(cmd, start_new_session=True)
                 ui.notify(f"✅ Upload started in background! ({len(targets)} segments)", type='positive', position='top')
               except Exception as e:
                 ui.notify(f"❌ Failed to start upload: {e}", type='negative', position='top')
 
             ui.button('ROUTE UPLOAD', on_click=upload_route, color=None).classes(
-              'custom-btn btn-green-route w-[30%] shrink-0')
+              'custom-btn btn-green-route col-span-1')
 
+    # ── 2. 시스템 로그 섹션 ──
     with ui.column().classes('w-full gap-2'):
       ui.html(
         '<div style="color:#93C5FD; font-size:1.1em; font-weight:800; margin-bottom:4px;"><span style="margin-right:6px;">📄</span>System Logs</div>')
 
-      with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center'):
+      with ui.element('div').classes('w-full grid grid-cols-4 gap-2 items-center'):
         sel_log = ui.select(list(LOG_FILES.keys()), value="CAN Missing", label="Select Log File").classes(
-          'w-[50%] min-w-0 shrink-0')
-        ui.button('VIEW', on_click=lambda: view_log(), color=None).classes('custom-btn btn-default w-[25%] shrink-0')
-        ui.button('UPLOAD', on_click=lambda: upload_log(), color=None).classes('custom-btn btn-green w-[25%] shrink-0')
+          'col-span-2 min-w-0')
+        ui.button('VIEW', on_click=lambda: view_log(), color=None).classes('custom-btn btn-default col-span-1')
+        ui.button('UPLOAD', on_click=lambda: upload_log(), color=None).classes('custom-btn btn-green col-span-1')
 
       viewer_container = ui.html('<div class="log-viewer">파일을 선택한 후 View 버튼을 눌러주세요.</div>').classes('w-full mt-2')
       status_container = ui.html('<div class="log-statusbar">📂 대기 중...</div>').classes('w-full')
