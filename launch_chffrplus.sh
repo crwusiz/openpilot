@@ -117,12 +117,6 @@ function launch {
     cp -f $DIR/scripts/add/events_en.py $DIR/selfdrive/selfdrived/events.py
   fi
 
-  if ! python3 -c "import jeepney" &> /dev/null; then
-    pip install jeepney
-  fi
-
-  cp -f $DIR/scripts/add/visionbuf_ion.cc $DIR/msgq_repo/msgq/visionipc/visionbuf_ion.cc
-
   # openpilot ssh key installer
   if [ ! -f /data/params/d/GithubSshKeys ]; then
     echo -n openpilot > /data/params/d/GithubUsername
@@ -136,6 +130,21 @@ function launch {
   if [ "$(cat /data/params/d/AdbEnabled 2>/dev/null)" = "0" ]; then
     echo -n 1 > /data/params/d/AdbEnabled
   fi
+
+  if ! python3 -c "import jeepney" &> /dev/null; then
+    echo "Waiting for internet connection to install jeepney..."
+
+    while ! ping -c 1 -W 1 8.8.8.8 &> /dev/null; do
+      sleep 1
+    done
+
+    echo "Internet connected! Installing jeepney..."
+    sudo mount -o remount,rw /
+    pip install jeepney
+    sudo mount -o remount,ro /
+  fi
+
+  cp -f $DIR/scripts/add/visionbuf_ion.cc $DIR/msgq_repo/msgq/visionipc/visionbuf_ion.cc
 
   # start manager
   cd system/manager
