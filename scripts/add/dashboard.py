@@ -163,6 +163,12 @@ def apply_styles():
     button.btn-default { background: linear-gradient(90deg, #2A3348 0%, #3A4A6B 100%) !important; }
     button.btn-default::before { content: '👁' !important; }
 
+    /* 새로고침 버튼 전용 스타일 */
+    button.refresh-btn {
+        min-height: 40px !important; padding: 0 12px !important;
+        background: #232E45 !important; color: #60A5FA !important; border: 1px solid #3A4A6B !important;
+    }
+
     /* ── 드롭다운(Selectbox) ── */
     .q-field__control {
         background: linear-gradient(90deg, #1A2235 0%, #232E45 100%) !important;
@@ -275,8 +281,7 @@ def render_tab_functions():
   def functions_content():
     with ui.column().classes('w-full gap-3 mt-4'):
 
-      # 1. 드롭다운
-      with ui.row().classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3'):
+      with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3'):
         m_opts = ["[ Not Selected ]", "HYUNDAI", "KIA", "GENESIS"]
         c_m = params.get("SelectedManufacturer") or m_opts[0]
 
@@ -324,55 +329,46 @@ def render_tab_functions():
         commit_raw) if commit_raw else ""
       commit_info = commit_output if commit_output else "Check required"
 
-      # 2. 업데이트 체크
-      with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
+      with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         async def do_check_updates():
           await run_script_async("Commit Check", f"{SCRIPTS_PATH}/commit_compare.sh")
-          functions_content.refresh()  # 완료 후 UI 새로고침
+          functions_content.refresh()
 
-        ui.button('CHECK UPDATES', on_click=do_check_updates, color=None).classes(
-          'custom-btn btn-blue w-[40%] sm:w-1/3 shrink-0')
+        ui.button('CHECK UPDATES', on_click=do_check_updates, color=None).classes('custom-btn btn-blue w-full')
 
         card_cls, icon = ('card-success', '✅') if " == " in commit_info else ('card-danger',
                                                                               '⚠️') if " != " in commit_info else (
           'card-warning', '🔍')
         ui.html(
           f'<div class="pill-card {card_cls}"><div class="pill-card-icon">{icon}</div><div class="pill-card-text">UPDATE STATUS<div class="pill-card-value">{commit_info}</div></div></div>').classes(
-          'w-[60%] sm:flex-1 shrink-0')
+          'w-full')
 
-      # 3. [복구 완료] Git Pull 버튼 (업데이트가 있을 때만 동적으로 생성됨)
       if commit_output and " != " in commit_output:
-        with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
+        with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
           async def do_git_pull():
             await run_script_async("Git Pull", f"{SCRIPTS_PATH}/gitpull.sh")
             functions_content.refresh()
 
-          ui.button('GIT PULL NOW', on_click=do_git_pull, color=None).classes(
-            'custom-btn btn-blue-pull w-[40%] sm:w-1/3 shrink-0')
+          ui.button('GIT PULL NOW', on_click=do_git_pull, color=None).classes('custom-btn btn-blue-pull w-full')
           ui.html(
             '<div class="pill-card card-warning"><div class="pill-card-icon">⚠️</div><div class="pill-card-text">NEW UPDATE AVAILABLE<div class="pill-card-value">Please pull the latest changes.</div></div></div>').classes(
-            'w-[60%] sm:flex-1 shrink-0')
+            'w-full')
 
-      # 4. 캘리브레이션
-      with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
+      with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         def do_reset_cal():
           reset_calibration()
           functions_content.refresh()
 
-        ui.button('RESET CALIBRATION', on_click=do_reset_cal, color=None).classes(
-          'custom-btn btn-yellow w-[40%] sm:w-1/3 shrink-0')
+        ui.button('RESET CALIBRATION', on_click=do_reset_cal, color=None).classes('custom-btn btn-yellow w-full')
         dev_pos = params.get("DevicePosition") or "--"
         ui.html(
           f'<div class="pill-card card-info"><div class="pill-card-icon">📍</div><div class="pill-card-text">DEVICE POSITION<div class="pill-card-value">{dev_pos}</div></div></div>').classes(
-          'w-[60%] sm:flex-1 shrink-0')
+          'w-full')
 
-      # 5. 재부팅
-      with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
-        # 재부팅 시에도 process detached 처리가 필요할 수 있으나, 일반적으로 Popen 이면 충분합니다.
+      with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         ui.button('REBOOT', on_click=lambda: subprocess.Popen(["sudo", "reboot"], start_new_session=True),
-                  color=None).classes('custom-btn btn-red w-[40%] sm:w-1/3 shrink-0')
+                  color=None).classes('custom-btn btn-red w-full')
 
-  # UI 렌더링 시작
   functions_content()
 
 
@@ -620,9 +616,11 @@ def main_page():
 
   with ui.row().classes(
     'w-full flex-nowrap items-center justify-between px-2 pt-2 pb-1 gap-1 bg-[#0B0E14] sticky top-0 z-50 border-b border-[#1A2235]'):
-    ui.html(
-      '<div style="font-size: 1.0rem; font-weight: 900; line-height: 1.1; color: #E8EEFF; letter-spacing: 0.02em;">Openpilot<br><span style="color:#3B82F6;">Dashboard</span></div>').classes(
-      'shrink-0 px-1')
+    with ui.row().classes('flex-nowrap items-center shrink-0 px-1 gap-2'):
+      ui.html(
+        '<div style="font-size: 1.0rem; font-weight: 900; line-height: 1.1; color: #E8EEFF; letter-spacing: 0.02em;">Openpilot<br><span style="color:#3B82F6;">Dashboard</span></div>')
+      ui.button(icon='refresh', on_click=lambda: ui.run_javascript('window.location.reload()')).classes(
+        'refresh-btn rounded-full')
 
     with ui.tabs().props('align="right" active-color="white" indicator-color="white" inline-label=false').classes(
       'flex-1 overflow-x-auto tabs-custom') as tabs:
