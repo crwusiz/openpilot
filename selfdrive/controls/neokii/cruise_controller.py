@@ -6,7 +6,8 @@ import numpy as np
 from opendbc.car import structs
 from openpilot.common.params import Params
 from openpilot.common.constants import UnitConverter
-from openpilot.selfdrive.car.cruise import (V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_UNSET, V_CRUISE_INITIAL, V_CRUISE_INITIAL_EXPERIMENTAL_MODE,
+from openpilot.selfdrive.car.cruise import (V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_UNSET, V_CRUISE_INITIAL,
+                                            V_CRUISE_INITIAL_EXPERIMENTAL_MODE,
                                             CRUISE_LONG_PRESS, IMPERIAL_INCREMENT)
 from opendbc.car.hyundai.values import Buttons, HyundaiFlags
 from openpilot.selfdrive.controls.neokii.navi_controller import SpeedLimiter
@@ -54,12 +55,12 @@ class CruiseButtonHandler:
 
     for b in btn_events:
       if b.pressed and self.btn_count == 0 and b.type in [
-          ButtonType.accelCruise,
-          ButtonType.decelCruise,
-          ButtonType.gapAdjustCruise,
-          ButtonType.cancel,
-          #ButtonType.lfaButton
-        ]:
+        ButtonType.accelCruise,
+        ButtonType.decelCruise,
+        ButtonType.gapAdjustCruise,
+        ButtonType.cancel,
+        # ButtonType.lfaButton
+      ]:
         self.btn_count = 1
         self.prev_btn = b.type
       elif not b.pressed and self.btn_count > 0:
@@ -96,7 +97,9 @@ class CruiseController:
 
     self.conv = UnitConverter()
     self.btn_handler = CruiseButtonHandler()
-    self.min_set_speed_clu = self.conv.to_current_unit(V_CRUISE_MIN) if CruiseStateManager.instance().cruise_state_control else self.conv.to_current_unit(V_CRUISE_INITIAL)
+    self.min_set_speed_clu = self.conv.to_current_unit(
+      V_CRUISE_MIN) if CruiseStateManager.instance().cruise_state_control else self.conv.to_current_unit(
+      V_CRUISE_INITIAL)
     self.max_set_speed_clu = self.conv.to_current_unit(V_CRUISE_MAX)
 
     self.btn = Buttons.NONE
@@ -151,7 +154,8 @@ class CruiseController:
     self.ignore_road_limit_temporarily = False
     self.ignore_limit_timer = 0
 
-  def _cal_limit_speed(self, CS, sm, current_speed_ms: float, cluster_speed_clu: float, v_cruise_kph: float):
+  def _cal_limit_speed(self, CS, sm, current_speed_ms: float, cluster_speed_clu: float, v_cruise_kph: float,
+                       double_pressed: bool = False):
     nda_active = SpeedLimiter.instance().get_active()
     road_limit_speed_nda = SpeedLimiter.instance().get_road_limit_speed()
     road_limit_speed_stock = CS.exState.navLimitSpeed
@@ -168,7 +172,8 @@ class CruiseController:
     elif road_limit_speed_stock is not None and road_limit_speed_stock > 0:
       road_limit_speed = road_limit_speed_stock
 
-    ratio = np.interp(road_limit_speed, [self.conv.to_current_unit(10.0), self.conv.to_current_unit(100.0)], [1.30, 1.10])
+    ratio = np.interp(road_limit_speed, [self.conv.to_current_unit(10.0), self.conv.to_current_unit(100.0)],
+                      [1.30, 1.10])
     road_limit_speed_clu = road_limit_speed * ratio if road_limit_speed else NO_LIMIT_SPEED
 
     if self.ignore_road_limit_temporarily:
@@ -177,19 +182,19 @@ class CruiseController:
 
       # 1. 스쿨존은 즉시 안전 복귀
       if school_zone:
-          self.ignore_road_limit_temporarily = False
-          self.ignore_limit_timer = 0
+        self.ignore_road_limit_temporarily = False
+        self.ignore_limit_timer = 0
 
       # 2. 1분 타임아웃 발생 시 로직
       elif self.ignore_limit_timer > timeout_ticks:
-          self.ignore_road_limit_temporarily = False
-          self.ignore_limit_timer = 0
+        self.ignore_road_limit_temporarily = False
+        self.ignore_limit_timer = 0
 
-          if road_limit_speed_clu != NO_LIMIT_SPEED and v_cruise_kph < road_limit_speed_clu:
-               self.v_cruise_kph = road_limit_speed_clu
-               self.real_set_speed_kph = road_limit_speed_clu
-               if CruiseStateManager.instance().cruise_state_control:
-                    CruiseStateManager.instance().speed_ms = self.conv.to_ms(road_limit_speed_clu)
+        if road_limit_speed_clu != NO_LIMIT_SPEED and v_cruise_kph < road_limit_speed_clu:
+          self.v_cruise_kph = road_limit_speed_clu
+          self.real_set_speed_kph = road_limit_speed_clu
+          if CruiseStateManager.instance().cruise_state_control:
+            CruiseStateManager.instance().speed_ms = self.conv.to_ms(road_limit_speed_clu)
       else:
         road_limit_speed_clu = NO_LIMIT_SPEED
 
@@ -248,18 +253,20 @@ class CruiseController:
     ]
 
     valid_limits = [s for s in speed_candidates if s >= self.min_set_speed_clu and s != NO_LIMIT_SPEED]
-    calculated_max_speed_clu = min(v_cruise_kph, min(valid_limits)) if valid_limits else self.apply_limit_speed_clu
 
     if valid_limits:
+      calculated_max_speed_clu = min(v_cruise_kph, min(valid_limits))
       is_curve_limit = (curve_limit_speed_clu != NO_LIMIT_SPEED and curve_limit_speed_clu == min(valid_limits))
     else:
+      calculated_max_speed_clu = v_cruise_kph if double_pressed else self.apply_limit_speed_clu
       is_curve_limit = False
 
     immediate_apply_conditions = [
       not self.CP.openpilotLongitudinalControl,
       self.apply_limit_speed_clu <= 0,
       is_limit_zone,
-      is_curve_limit
+      is_curve_limit,
+      double_pressed
     ]
 
     if any(immediate_apply_conditions):
@@ -511,9 +518,11 @@ class CruiseController:
     current_speed_ms = CS.vEgo
     cluster_speed_clu = self.conv.to_clu(CS.vEgoCluster)
 
+    btn, long_pressed, double_pressed = self.btn_handler.update(CS.buttonEvents)
+
     if CS.cruiseState.enabled:
       if not self.CP.openpilotLongitudinalControl or not self.CP.pcmCruise:
-        v_cruise_kph = self._update_cruise_button(v_cruise_kph, CS.buttonEvents, enabled)
+        v_cruise_kph = self._update_cruise_button(v_cruise_kph, btn, long_pressed, double_pressed, enabled)
       else:
         v_cruise_kph = self.conv.to_clu(CS.cruiseState.speed)
         if CS.cruiseState.speed == 0:
@@ -537,17 +546,19 @@ class CruiseController:
 
     self.real_set_speed_kph = v_cruise_kph
     if CS.cruiseState.enabled and 1 < CS.cruiseState.speed < V_CRUISE_UNSET:
-      self._cal_limit_speed(CS, sm, current_speed_ms, cluster_speed_clu, v_cruise_kph)
+      self._cal_limit_speed(CS, sm, current_speed_ms, cluster_speed_clu, v_cruise_kph, double_pressed)
 
       if self.v_cruise_kph != v_cruise_kph:
-          v_cruise_kph = self.v_cruise_kph
+        v_cruise_kph = self.v_cruise_kph
 
-      self.cruise_speed_kph = float(np.clip(v_cruise_kph, V_CRUISE_MIN, self.conv.to_current_unit(self.apply_limit_speed_clu)))
-      v_cruise_kph_from_override = self._override_speed(CS, cluster_speed_clu, self.real_set_speed_kph, self.CI.CS.cruise_buttons[-1] != Buttons.NONE)
+      self.cruise_speed_kph = float(
+        np.clip(v_cruise_kph, V_CRUISE_MIN, self.conv.to_current_unit(self.apply_limit_speed_clu)))
+      v_cruise_kph_from_override = self._override_speed(CS, cluster_speed_clu, self.real_set_speed_kph,
+                                                        self.CI.CS.cruise_buttons[-1] != Buttons.NONE)
 
       if v_cruise_kph_from_override != self.real_set_speed_kph:
-          self.real_set_speed_kph = v_cruise_kph_from_override
-          v_cruise_kph = v_cruise_kph_from_override
+        self.real_set_speed_kph = v_cruise_kph_from_override
+        v_cruise_kph = v_cruise_kph_from_override
 
       if CruiseStateManager.instance().cruise_state_control:
         self.cruise_speed_kph = min(self.cruise_speed_kph, max(self.real_set_speed_kph, V_CRUISE_MIN))
@@ -558,15 +569,18 @@ class CruiseController:
     self.v_cruise_kph = v_cruise_kph
     self._update_message(CS)
 
-  def _update_cruise_button(self, v_cruise_kph, btn_events, enabled):
+  def _update_cruise_button(self, v_cruise_kph, btn, long_pressed, double_pressed, enabled):
     v_cruise_delta = 10 if self.conv.is_metric else IMPERIAL_INCREMENT * 5
 
     if enabled:
-      btn, long_pressed, double_pressed = self.btn_handler.update(btn_events)
-
       if btn != Buttons.NONE:
         if double_pressed and btn == ButtonType.accelCruise:
-          if self.road_limit_speed_clu > 0:
+          if self.road_limit_speed_clu > 0 and self.road_limit_speed_clu != NO_LIMIT_SPEED:
+            ratio = np.interp(self.road_limit_speed_clu,
+                              [self.conv.to_current_unit(10.0), self.conv.to_current_unit(100.0)], [1.30, 1.10])
+            v_cruise_kph = self.road_limit_speed_clu * ratio
+        elif double_pressed and btn == ButtonType.decelCruise:
+          if self.road_limit_speed_clu > 0 and self.road_limit_speed_clu != NO_LIMIT_SPEED:
             v_cruise_kph = self.road_limit_speed_clu
         elif not long_pressed:
           if btn == ButtonType.accelCruise:
@@ -633,6 +647,7 @@ class CruiseController:
     exState.steerSpeed = float(self.steer_limit_speed_clu)
     exState.leadSpeed = float(self.lead_limit_speed_clu)
     exState.applyLimitSpeed = float(self.apply_limit_speed_clu)
+
 
 class CruiseStateManager:
   def __init__(self):
@@ -711,7 +726,9 @@ class CruiseStateManager:
       if self.enabled:
         if double_pressed:
           if road_limit_speed is not None and road_limit_speed > 0:
-            v_cruise_kph = road_limit_speed
+            ratio = np.interp(road_limit_speed, [self.conv.to_current_unit(10.0), self.conv.to_current_unit(100.0)],
+                              [1.30, 1.10])
+            v_cruise_kph = road_limit_speed * ratio
         elif not long_pressed:
           v_cruise_kph += (1 if self.conv.is_metric else IMPERIAL_INCREMENT)
         else:

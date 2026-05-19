@@ -2,6 +2,8 @@ import sys
 import subprocess
 import logging
 import html as html_lib
+import shutil
+import asyncio
 from pathlib import Path
 from datetime import datetime
 
@@ -33,7 +35,7 @@ except ImportError:
 SCRIPTS_PATH = "/data/openpilot/scripts"
 BASE_PATH = "/data/params/crwusiz"
 
-# Mock Params
+# Params (openpilot이 없는 PC 환경 테스트용 Mock 지원)
 try:
   from openpilot.common.params import Params
 
@@ -57,18 +59,29 @@ def get_list_from_file(path: str) -> list:
   return []
 
 
-def run_script(name: str, path: str, args: list = None) -> int:
+# ── 비동기 스크립트 실행 (즉각적인 알림 피드백을 위해 변경) ──
+async def run_script_async(name: str, path: str, args: list = None) -> int:
+  ui.notify(f"[{name}] 진행 중...", type='info', position='top')
+  await asyncio.sleep(0.1)  # UI 알림이 먼저 렌더링되도록 양보
   try:
     cmd = ["bash", path] if path.endswith('.sh') else ["python3", path]
     if args: cmd += args
-    res = subprocess.run(cmd, capture_output=True, text=True)
-    if res.returncode == 0:
-      ui.notify(f"[{name}] 완료", type='positive')
+
+    process = await asyncio.create_subprocess_exec(
+      *cmd,
+      stdout=asyncio.subprocess.PIPE,
+      stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await process.communicate()
+
+    if process.returncode == 0:
+      ui.notify(f"[{name}] 완료", type='positive', position='top')
     else:
-      ui.notify(f"[{name}] 에러: {res.stderr.strip()}", type='negative')
-    return res.returncode
+      err_text = stderr.decode('utf-8').strip() if stderr else "Unknown error"
+      ui.notify(f"[{name}] 에러: {err_text}", type='negative', position='top')
+    return process.returncode
   except Exception as e:
-    ui.notify(f"[{name}] 실행 실패: {e}", type='negative')
+    ui.notify(f"[{name}] 실행 실패: {e}", type='negative', position='top')
     return 1
 
 
@@ -76,7 +89,7 @@ def reset_calibration():
   for p in ["CalibrationParams", "LiveTorqueParameters", "LiveParameters", "LiveParametersV2", "LiveDelay"]:
     params.remove(p)
   params.put_bool("OnroadCycleRequested", True)
-  ui.notify("캘리브레이션 초기화 요청 완료!", type='positive')
+  ui.notify("캘리브레이션 초기화 요청 완료!", type='positive', position='top')
 
 
 def get_tmux_capture() -> str:
@@ -87,7 +100,7 @@ def get_tmux_capture() -> str:
     return f"Error capturing tmux: {e}"
 
 
-# ── 2. 전역 CSS 스타일 정의 ───────
+# ── 2. 전역 CSS 스타일 정의 (모바일 텍스트 랩핑/비율 최적화) ───────
 def apply_styles():
   ui.add_head_html("""
     <style>
@@ -97,7 +110,7 @@ def apply_styles():
     button.custom-btn {
         border-radius: 50px !important;
         height: auto !important; min-height: 56px !important;
-        padding: 6px 16px 6px 60px !important; /* 상하 패딩 추가로 자동 줄바꿈 대비 */
+        padding: 6px 16px 6px 60px !important;
         text-align: left !important;
         font-weight: 900 !important;
         font-size: 0.88em !important;
@@ -132,6 +145,10 @@ def apply_styles():
 
     button.btn-blue { background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%) !important; box-shadow: 0 5px 22px rgba(59,130,246,0.5) !important; }
     button.btn-blue::before { content: '🔍' !important; }
+
+    button.btn-blue-pull { background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%) !important; box-shadow: 0 5px 22px rgba(59,130,246,0.5) !important; }
+    button.btn-blue-pull::before { content: '⬇' !important; }
+
     button.btn-yellow { background: linear-gradient(90deg, #78350F 0%, #F59E0B 100%) !important; box-shadow: 0 5px 22px rgba(245,158,11,0.45) !important;}
     button.btn-yellow::before { content: '✦' !important; }
     button.btn-red { background: linear-gradient(90deg, #7F1D1D 0%, #EF4444 100%) !important; box-shadow: 0 5px 22px rgba(239,68,68,0.5) !important;}
@@ -227,9 +244,8 @@ def apply_styles():
     }
     .log-error { border-left-color: #EF4444 !important; color: #FCA5A5 !important; }
 
-    /* ── 모바일 환경(스마트폰 가로/세로) 강제 최적화 미디어 쿼리 ── */
+    /* ── 모바일 환경 강제 최적화 미디어 쿼리 ── */
     @media (max-width: 768px) {
-        /* 버튼과 상태카드가 한줄에 들어가도록 크기 축소 및 글씨 자동 줄바꿈 강제 허용 */
         button.custom-btn { padding: 6px 8px 6px 44px !important; min-height: 48px !important; }
         button.custom-btn .q-btn__content { font-size: 0.8rem !important; white-space: normal !important; overflow: visible !important; line-height: 1.15 !important; text-overflow: clip !important;}
         button.custom-btn::before { width: 34px !important; height: 34px !important; font-size: 1.1em !important; line-height: 30px !important; left: 4px !important; }
@@ -242,7 +258,6 @@ def apply_styles():
         .q-field__control { height: 48px !important; min-height: 48px !important; padding: 0 14px !important;}
         .q-field__native { font-size: 0.85em !important; }
 
-        /* 탭 메뉴 폰트 및 패딩 축소 (가로 1줄 보장을 위해) */
         .tabs-custom .q-tab { padding: 0 4px !important; min-width: 48px !important; min-height: 48px !important; }
         .tabs-custom .q-tab__icon { font-size: 1.25em !important; }
         .tabs-custom .q-tab__label { font-size: 0.6rem !important; }
@@ -252,52 +267,111 @@ def apply_styles():
 
 
 # ── 3. 탭별 렌더링 함수들 ─────────────────────────────────────
+
 def render_tab_functions():
-  with ui.column().classes('w-full gap-3 mt-4'):
-    with ui.row().classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3'):
-      m_opts = ["[ Not Selected ]", "HYUNDAI", "KIA", "GENESIS"]
-      c_m = params.get("SelectedManufacturer") or m_opts[0]
-      ui.select(m_opts, value=c_m, label='🌐 Manufacturer').classes('w-full text-blue-200') \
-        .on_value_change(
-        lambda e: params.put("SelectedManufacturer", e.value) if e.value != "[ Not Selected ]" else params.remove(
-          "SelectedManufacturer"))
+  # 상태 갱신을 위해 refreshable 데코레이터 적용
+  @ui.refreshable
+  def functions_content():
+    with ui.column().classes('w-full gap-3 mt-4'):
 
-      c_opts = ["[ Not Selected ]"] + get_list_from_file(f"{BASE_PATH}/CarList")
-      c_c = params.get("SelectedCar") or c_opts[0]
-      ui.select(c_opts, value=c_c, label='🚗 Car Model').classes('w-full text-blue-200') \
-        .on_value_change(
-        lambda e: params.put("SelectedCar", e.value) if e.value != "[ Not Selected ]" else params.remove("SelectedCar"))
+      # 1. 드롭다운
+      with ui.row().classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3'):
+        m_opts = ["[ Not Selected ]", "HYUNDAI", "KIA", "GENESIS"]
+        c_m = params.get("SelectedManufacturer") or m_opts[0]
 
-      b_opts = ["[ Not Selected ]"] + get_list_from_file(f"{BASE_PATH}/GitBranchList")
-      c_b = params.get("SelectedBranch") or b_opts[0]
-      ui.select(b_opts, value=c_b, label='🌿 Git Branch').classes('w-full text-blue-200') \
-        .on_value_change(
-        lambda e: params.put("SelectedBranch", e.value) if e.value != "[ Not Selected ]" else params.remove(
-          "SelectedBranch"))
+        def on_m_change(e):
+          if e.value != "[ Not Selected ]":
+            params.put("SelectedManufacturer", e.value)
+            mapping = {"HYUNDAI": "CarList_Hyundai", "KIA": "CarList_Kia", "GENESIS": "CarList_Genesis"}
+            src = f"{BASE_PATH}/{mapping.get(e.value)}"
+            if Path(src).exists():
+              shutil.copy2(src, f"{BASE_PATH}/CarList")
+          else:
+            params.remove("SelectedManufacturer")
+            params.remove("SelectedCar")
+          functions_content.refresh()
 
-    with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
-      ui.button('CHECK UPDATES', on_click=lambda: run_script("Commit Check", f"{SCRIPTS_PATH}/commit_compare.sh"),
-                color=None).classes('custom-btn btn-blue w-[40%] sm:w-1/3 shrink-0')
+        ui.select(m_opts, value=c_m, label='🌐 Manufacturer', on_change=on_m_change).classes('w-full text-blue-200')
 
-      commit_info = params.get("CommitCompare") or "Check required"
-      card_cls, icon = ('card-success', '✅') if " == " in commit_info else ('card-danger',
-                                                                            '⚠️') if " != " in commit_info else (
-        'card-warning', '🔍')
-      ui.html(
-        f'<div class="pill-card {card_cls}"><div class="pill-card-icon">{icon}</div><div class="pill-card-text">UPDATE STATUS<div class="pill-card-value">{commit_info}</div></div></div>').classes(
-        'w-[60%] sm:flex-1 shrink-0')
+        c_opts = ["[ Not Selected ]"] + get_list_from_file(f"{BASE_PATH}/CarList")
+        c_c = params.get("SelectedCar") or c_opts[0]
 
-    with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
-      ui.button('RESET CALIBRATION', on_click=reset_calibration, color=None).classes(
-        'custom-btn btn-yellow w-[40%] sm:w-1/3 shrink-0')
-      dev_pos = params.get("DevicePosition") or "--"
-      ui.html(
-        f'<div class="pill-card card-info"><div class="pill-card-icon">📍</div><div class="pill-card-text">DEVICE POSITION<div class="pill-card-value">{dev_pos}</div></div></div>').classes(
-        'w-[60%] sm:flex-1 shrink-0')
+        def on_c_change(e):
+          if e.value != "[ Not Selected ]":
+            params.put("SelectedCar", e.value)
+          else:
+            params.remove("SelectedCar")
+          functions_content.refresh()
 
-    with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
-      ui.button('REBOOT', on_click=lambda: subprocess.Popen(["sudo", "reboot"]), color=None).classes(
-        'custom-btn btn-red w-[40%] sm:w-1/3 shrink-0')
+        ui.select(c_opts, value=c_c, label='🚗 Car Model', on_change=on_c_change).classes('w-full text-blue-200')
+
+        b_opts = ["[ Not Selected ]"] + get_list_from_file(f"{BASE_PATH}/GitBranchList")
+        c_b = params.get("SelectedBranch") or b_opts[0]
+
+        def on_b_change(e):
+          if e.value != "[ Not Selected ]":
+            params.put("SelectedBranch", e.value)
+          else:
+            params.remove("SelectedBranch")
+          functions_content.refresh()
+
+        ui.select(b_opts, value=c_b, label='🌿 Git Branch', on_change=on_b_change).classes('w-full text-blue-200')
+
+      # 파라미터에서 업데이트 정보 안전하게 읽어오기
+      commit_raw = params.get("CommitCompare")
+      commit_output = commit_raw.decode('utf-8') if isinstance(commit_raw, bytes) else str(
+        commit_raw) if commit_raw else ""
+      commit_info = commit_output if commit_output else "Check required"
+
+      # 2. 업데이트 체크
+      with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
+        async def do_check_updates():
+          await run_script_async("Commit Check", f"{SCRIPTS_PATH}/commit_compare.sh")
+          functions_content.refresh()  # 완료 후 UI 새로고침
+
+        ui.button('CHECK UPDATES', on_click=do_check_updates, color=None).classes(
+          'custom-btn btn-blue w-[40%] sm:w-1/3 shrink-0')
+
+        card_cls, icon = ('card-success', '✅') if " == " in commit_info else ('card-danger',
+                                                                              '⚠️') if " != " in commit_info else (
+          'card-warning', '🔍')
+        ui.html(
+          f'<div class="pill-card {card_cls}"><div class="pill-card-icon">{icon}</div><div class="pill-card-text">UPDATE STATUS<div class="pill-card-value">{commit_info}</div></div></div>').classes(
+          'w-[60%] sm:flex-1 shrink-0')
+
+      # 3. [복구 완료] Git Pull 버튼 (업데이트가 있을 때만 동적으로 생성됨)
+      if commit_output and " != " in commit_output:
+        with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
+          async def do_git_pull():
+            await run_script_async("Git Pull", f"{SCRIPTS_PATH}/gitpull.sh")
+            functions_content.refresh()
+
+          ui.button('GIT PULL NOW', on_click=do_git_pull, color=None).classes(
+            'custom-btn btn-blue-pull w-[40%] sm:w-1/3 shrink-0')
+          ui.html(
+            '<div class="pill-card card-warning"><div class="pill-card-icon">⚠️</div><div class="pill-card-text">NEW UPDATE AVAILABLE<div class="pill-card-value">Please pull the latest changes.</div></div></div>').classes(
+            'w-[60%] sm:flex-1 shrink-0')
+
+      # 4. 캘리브레이션
+      with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
+        def do_reset_cal():
+          reset_calibration()
+          functions_content.refresh()
+
+        ui.button('RESET CALIBRATION', on_click=do_reset_cal, color=None).classes(
+          'custom-btn btn-yellow w-[40%] sm:w-1/3 shrink-0')
+        dev_pos = params.get("DevicePosition") or "--"
+        ui.html(
+          f'<div class="pill-card card-info"><div class="pill-card-icon">📍</div><div class="pill-card-text">DEVICE POSITION<div class="pill-card-value">{dev_pos}</div></div></div>').classes(
+          'w-[60%] sm:flex-1 shrink-0')
+
+      # 5. 재부팅
+      with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
+        ui.button('REBOOT', on_click=lambda: subprocess.Popen(["sudo", "reboot"]), color=None).classes(
+          'custom-btn btn-red w-[40%] sm:w-1/3 shrink-0')
+
+  # UI 렌더링 시작
+  functions_content()
 
 
 def render_tab_toggles():
@@ -327,7 +401,7 @@ def render_tab_toggles():
           params.put(k, "ko" if e.value else "en")
         else:
           params.put_bool(k, e.value)
-        ui.notify(f"{k} {'ON' if e.value else 'OFF'}")
+        ui.notify(f"{k} {'ON' if e.value else 'OFF'}", position='top')
 
       with ui.row().classes('w-full flex-nowrap items-center border-b border-gray-800 pb-3'):
         ui.switch(value=init_val, on_change=on_change).classes('custom-toggle shrink-0')
@@ -347,6 +421,8 @@ def render_tab_logs():
   REALDATA_PATH = Path("/data/media/0/realdata")
 
   with ui.column().classes('w-full mt-2 gap-6'):
+
+    # ── 1. 리얼데이터 섹션 (주행 경로 데이터 업로드) ──
     with ui.column().classes('w-full gap-2'):
       ui.html(
         '<div style="color:#6EE7B7; font-size:1.1em; font-weight:800; margin-bottom:4px;"><span style="margin-right:6px;">📂</span>Route Data Upload</div>')
@@ -389,9 +465,9 @@ def render_tab_logs():
               cmd = ["bash", f"{SCRIPTS_PATH}/realdata_upload.sh"] + targets
               try:
                 subprocess.Popen(cmd)
-                ui.notify(f"✅ Upload started in background! ({len(targets)} segments)", type='positive')
+                ui.notify(f"✅ Upload started in background! ({len(targets)} segments)", type='positive', position='top')
               except Exception as e:
-                ui.notify(f"❌ Failed to start upload: {e}", type='negative')
+                ui.notify(f"❌ Failed to start upload: {e}", type='negative', position='top')
 
             ui.button('ROUTE UPLOAD', on_click=upload_route, color=None).classes(
               'custom-btn btn-green-route w-[30%] shrink-0')
@@ -438,14 +514,14 @@ def render_tab_logs():
           status_container.content = f'<div class="log-statusbar">📄 {sel_log.value} | {len(content.splitlines())} lines | {len(content):,} chars</div>'
           ui.run_javascript('var v=document.getElementById("logViewer");if(v)v.scrollTop=v.scrollHeight;')
 
-      def upload_log():
+      async def upload_log():
         log_path = LOG_FILES[sel_log.value]
         if log_path == "TMUX_CONSOLE":
           if not Path("/data/tmux_console.log").exists():
             subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
-          run_script("Console Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=["tmux_console.log"])
+          await run_script_async("Console Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=["tmux_console.log"])
         else:
-          run_script("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[sel_log.value])
+          await run_script_async("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[sel_log.value])
 
 
 def render_tab_terminal():
