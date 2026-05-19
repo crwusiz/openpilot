@@ -29,9 +29,6 @@ from openpilot.selfdrive.modeld.constants import ModelConstants, Plan
 PROCESS_NAME = "selfdrive.modeld.modeld"
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
 
-VISION_METADATA_PATH = MODELS_DIR / 'driving_vision_metadata.pkl'
-POLICY_METADATA_PATH = MODELS_DIR / 'driving_policy_metadata.pkl'
-
 LAT_SMOOTH_SECONDS = 0.0
 LONG_SMOOTH_SECONDS = 0.3
 MIN_LAT_CONTROL_SPEED = 0.3
@@ -100,8 +97,8 @@ class ModelState:
     self.warp_enqueue = jits[(cam_w,cam_h)]['warp_enqueue']
     self.warp_enqueue(
       **self.input_queues,
-      frame=Tensor.zeros(self.frame_buf_params['img'][3], dtype='uint8', device=self.DEV).contiguous().realize(),
-      big_frame=Tensor.zeros(self.frame_buf_params['big_img'][3], dtype='uint8', device=self.DEV).contiguous().realize())
+      frame=Tensor(np.zeros(self.frame_buf_params['img'][3], dtype=np.uint8), device=self.DEV).contiguous().realize(),
+      big_frame=Tensor(np.zeros(self.frame_buf_params['big_img'][3], dtype=np.uint8), device=self.DEV).contiguous().realize())
 
   def slice_outputs(self, model_outputs: np.ndarray, output_slices: dict[str, slice]) -> dict[str, np.ndarray]:
     parsed_model_outputs = {k: model_outputs[np.newaxis, v] for k,v in output_slices.items()}
