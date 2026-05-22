@@ -4,6 +4,7 @@ import logging
 import html as html_lib
 import shutil
 import asyncio
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -59,7 +60,7 @@ def get_list_from_file(path: str) -> list:
   return []
 
 
-# ── 비동기 스크립트 실행 (즉각적인 알림 피드백 및 백그라운드 독립 실행 보장) ──
+# ── 비동기 스크립트 실행 (tmux 중첩 실행 방지 및 백그라운드 독립 실행 보장) ──
 async def run_script_async(name: str, path: str, args: list = None) -> int:
   ui.notify(f"[{name}] 진행 중...", type='info', position='top')
   await asyncio.sleep(0.1)  # UI 알림이 먼저 렌더링되도록 양보
@@ -67,11 +68,16 @@ async def run_script_async(name: str, path: str, args: list = None) -> int:
     cmd = ["bash", path] if path.endswith('.sh') else ["python3", path]
     if args: cmd += args
 
+    env = os.environ.copy()
+    env.pop('TMUX', None)
+    env.pop('TMUX_PANE', None)
+
     process = await asyncio.create_subprocess_exec(
       *cmd,
       stdout=asyncio.subprocess.PIPE,
       stderr=asyncio.subprocess.PIPE,
-      start_new_session=True
+      start_new_session=True,
+      env=env
     )
     stdout, stderr = await process.communicate()
 
@@ -270,7 +276,7 @@ def apply_styles():
         .tabs-custom .q-tab__label { font-size: 0.6rem !important; }
     }
     </style>
-    """)
+  """)
 
 
 # ── 3. 탭별 렌더링 함수들 ─────────────────────────────────────
@@ -343,6 +349,7 @@ def render_tab_functions():
           f'<div class="pill-card {card_cls}"><div class="pill-card-icon">{icon}</div><div class="pill-card-text">UPDATE STATUS<div class="pill-card-value">{commit_info}</div></div></div>').classes(
           'w-full')
 
+      # 3. Git Pull 버튼 (전체 3분할 중: 버튼 1영역, 알림 1영역)
       if commit_output and " != " in commit_output:
         with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
           async def do_git_pull():
@@ -354,6 +361,7 @@ def render_tab_functions():
             '<div class="pill-card card-warning"><div class="pill-card-icon">⚠️</div><div class="pill-card-text">NEW UPDATE AVAILABLE<div class="pill-card-value">Please pull the latest changes.</div></div></div>').classes(
             'w-full')
 
+      # 4. 캘리브레이션 (전체 3분할 중: 버튼 1영역, 알림 1영역)
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         def do_reset_cal():
           reset_calibration()
@@ -365,6 +373,7 @@ def render_tab_functions():
           f'<div class="pill-card card-info"><div class="pill-card-icon">📍</div><div class="pill-card-text">DEVICE POSITION<div class="pill-card-value">{dev_pos}</div></div></div>').classes(
           'w-full')
 
+      # 5. 재부팅 (전체 3분할 중: 버튼 1영역)
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         ui.button('REBOOT', on_click=lambda: subprocess.Popen(["sudo", "reboot"], start_new_session=True),
                   color=None).classes('custom-btn btn-red w-full')
@@ -462,7 +471,10 @@ def render_tab_logs():
               targets = sorted_routes[idx][1]['paths']
               cmd = ["bash", f"{SCRIPTS_PATH}/realdata_upload.sh"] + targets
               try:
-                subprocess.Popen(cmd, start_new_session=True)
+                env = os.environ.copy()
+                env.pop('TMUX', None)
+                env.pop('TMUX_PANE', None)
+                subprocess.Popen(cmd, start_new_session=True, env=env)
                 ui.notify(f"✅ Upload started in background! ({len(targets)} segments)", type='positive', position='top')
               except Exception as e:
                 ui.notify(f"❌ Failed to start upload: {e}", type='negative', position='top')
@@ -563,47 +575,47 @@ def render_tab_camera():
     def start_stream():
       stream_type = CAMERA_OPTIONS[cam_select.value]
       webrtc_html = f"""
-            <div style="position:relative; width:100%; height:430px; background:#000; border-radius:12px; border:1.5px solid #3A4A6B; overflow:hidden;">
-                <video id="video" autoplay playsinline muted controls style="width:100%; height:100%; object-fit:contain; cursor:pointer;"></video>
-                <div id="status" style="position:absolute; top:10px; right:12px; color:#E8EEFF; background:rgba(0,0,0,0.65); padding:4px 10px; border-radius:20px; font-size:12px;">Initializing...</div>
-            </div>
-            """
-      js_code = f"""
-                async function startWebRTC() {{
-                    const video = document.getElementById('video');
-                    const status = document.getElementById('status');
-                    const ip = window.location.hostname;
-                    try {{
-                        const pc = new RTCPeerConnection({{iceServers: []}});
-                        pc.addTransceiver('video', {{ direction: 'recvonly' }});
-                        pc.ontrack = (event) => {{
-                            status.innerText = "● Stream Active"; status.style.background = "rgba(16,185,129,0.75)";
-                            video.srcObject = event.streams[0]; video.play();
-                        }};
-                        const offer = await pc.createOffer();
-                        await pc.setLocalDescription(offer);
+        <div style="position:relative; width:100%; height:430px; background:#000; border-radius:12px; border:1.5px solid #3A4A6B; overflow:hidden;">
+            <video id="video" autoplay playsinline muted controls style="width:100%; height:100%; object-fit:contain; cursor:pointer;"></video>
+            <div id="status" style="position:absolute; top:10px; right:12px; color:#E8EEFF; background:rgba(0,0,0,0.65); padding:4px 10px; border-radius:20px; font-size:12px;">Initializing...</div>
+        </div>
+        <script>
+            async function startWebRTC() {{
+                const video = document.getElementById('video');
+                const status = document.getElementById('status');
+                const ip = window.location.hostname;
+                try {{
+                    const pc = new RTCPeerConnection({{iceServers: []}});
+                    pc.addTransceiver('video', {{ direction: 'recvonly' }});
+                    pc.ontrack = (event) => {{
+                        status.innerText = "● Stream Active"; status.style.background = "rgba(16,185,129,0.75)";
+                        video.srcObject = event.streams[0]; video.play();
+                    }};
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
 
-                        await new Promise((r) => setTimeout(r, 1000));
+                    await new Promise((r) => setTimeout(r, 1000));
 
-                        const payload = {{ sdp: pc.localDescription.sdp, cameras: ["{stream_type}"], bridge_services_in: [], bridge_services_out: [] }};
-                        const response = await fetch(`http://${{ip}}:5001/stream`, {{ method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(payload) }});
-                        if(response.ok) await pc.setRemoteDescription(await response.json());
-                    }} catch (e) {{
-                        status.innerText = "Error"; status.style.background = "red";
-                    }}
+                    const payload = {{ sdp: pc.localDescription.sdp, cameras: ["{stream_type}"], bridge_services_in: [], bridge_services_out: [] }};
+                    const response = await fetch(`http://${{ip}}:5001/stream`, {{ method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(payload) }});
+                    if(response.ok) await pc.setRemoteDescription(await response.json());
+                }} catch (e) {{
+                    status.innerText = "Error"; status.style.background = "red";
                 }}
-                startWebRTC();
-            """
+            }}
+            startWebRTC();
+        </script>
+      """
       stream_container.content = webrtc_html
-      ui.run_javascript(js_code)
+      ui.run_javascript(webrtc_html)
 
     def stop_stream():
       stream_container.content = """
-            <div class="log-viewer" style="display:flex; flex-direction:column; justify-content:center; align-items:center;">
-                <div style="font-size:3em; filter:grayscale(1) opacity(0.3);">📷</div>
-                <div style="font-size:0.9em; margin-top:10px; text-align:center;">Select a camera source and press Start</div>
-            </div>
-            """
+        <div class="log-viewer" style="display:flex; flex-direction:column; justify-content:center; align-items:center;">
+            <div style="font-size:3em; filter:grayscale(1) opacity(0.3);">📷</div>
+            <div style="font-size:0.9em; margin-top:10px; text-align:center;">Select a camera source and press Start</div>
+        </div>
+      """
 
   stop_stream()
 
