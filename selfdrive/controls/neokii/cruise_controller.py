@@ -123,6 +123,8 @@ class CruiseController:
     self.ignore_road_limit_temporarily = False
     self.ignore_limit_timer = 0
 
+    self.prev_road_limit_speed = 0.
+
     self.wait_timer = 0
     self.alive_timer = 0
     self.alive_index = 0
@@ -175,6 +177,30 @@ class CruiseController:
     ratio = np.interp(road_limit_speed, [self.conv.to_current_unit(10.0), self.conv.to_current_unit(100.0)],
                       [1.30, 1.10])
     road_limit_speed_clu = road_limit_speed * ratio if road_limit_speed else NO_LIMIT_SPEED
+
+    # =========================================================================
+    if road_limit_speed is not None and road_limit_speed > 0:
+      if self.prev_road_limit_speed > 0:
+        target_speed = road_limit_speed_clu
+
+        # 1. 제한속도 상향 시
+        if road_limit_speed > self.prev_road_limit_speed:
+          if v_cruise_kph < target_speed:
+            self.v_cruise_kph = target_speed
+            self.real_set_speed_kph = target_speed
+            if CruiseStateManager.instance().cruise_state_control:
+              CruiseStateManager.instance().speed_ms = self.conv.to_ms(target_speed)
+
+        # 2. 제한속도 하향 시
+        elif road_limit_speed < self.prev_road_limit_speed:
+          if v_cruise_kph > target_speed:
+            self.v_cruise_kph = target_speed
+            self.real_set_speed_kph = target_speed
+            if CruiseStateManager.instance().cruise_state_control:
+              CruiseStateManager.instance().speed_ms = self.conv.to_ms(target_speed)
+
+      self.prev_road_limit_speed = road_limit_speed
+    # =========================================================================
 
     if self.ignore_road_limit_temporarily:
       self.ignore_limit_timer += 1
