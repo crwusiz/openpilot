@@ -183,21 +183,10 @@ class CruiseController:
       if self.prev_road_limit_speed > 0:
         target_speed = road_limit_speed_clu
 
-        # 1. 제한속도 상향 시
-        if road_limit_speed > self.prev_road_limit_speed:
-          if v_cruise_kph < target_speed:
-            self.v_cruise_kph = target_speed
-            self.real_set_speed_kph = target_speed
-            if CruiseStateManager.instance().cruise_state_control:
-              CruiseStateManager.instance().speed_ms = self.conv.to_ms(target_speed)
-
-        # 2. 제한속도 하향 시
-        elif road_limit_speed < self.prev_road_limit_speed:
-          if v_cruise_kph > target_speed:
-            self.v_cruise_kph = target_speed
-            self.real_set_speed_kph = target_speed
-            if CruiseStateManager.instance().cruise_state_control:
-              CruiseStateManager.instance().speed_ms = self.conv.to_ms(target_speed)
+        if road_limit_speed != self.prev_road_limit_speed:
+          if v_cruise_kph != target_speed:
+            self.ignore_road_limit_temporarily = True
+            self.ignore_limit_timer = 0
 
       self.prev_road_limit_speed = road_limit_speed
     # =========================================================================
@@ -207,7 +196,7 @@ class CruiseController:
       timeout_ticks = 2000
 
       # 1. 스쿨존은 즉시 안전 복귀
-      if school_zone:
+      if school_zone or double_pressed:
         self.ignore_road_limit_temporarily = False
         self.ignore_limit_timer = 0
 
@@ -216,7 +205,7 @@ class CruiseController:
         self.ignore_road_limit_temporarily = False
         self.ignore_limit_timer = 0
 
-        if road_limit_speed_clu != NO_LIMIT_SPEED and v_cruise_kph < road_limit_speed_clu:
+        if road_limit_speed_clu != NO_LIMIT_SPEED and v_cruise_kph != road_limit_speed_clu:
           self.v_cruise_kph = road_limit_speed_clu
           self.real_set_speed_kph = road_limit_speed_clu
           if CruiseStateManager.instance().cruise_state_control:
