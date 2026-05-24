@@ -4,6 +4,7 @@ import logging
 import html as html_lib
 import shutil
 import asyncio
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -59,7 +60,7 @@ def get_list_from_file(path: str) -> list:
   return []
 
 
-# ── 비동기 스크립트 실행 (즉각적인 알림 피드백 및 백그라운드 독립 실행 보장) ──
+# ── 비동기 스크립트 실행 (tmux 중첩 실행 방지 및 백그라운드 독립 실행 보장) ──
 async def run_script_async(name: str, path: str, args: list = None) -> int:
   ui.notify(f"[{name}] 진행 중...", type='info', position='top')
   await asyncio.sleep(0.1)  # UI 알림이 먼저 렌더링되도록 양보
@@ -67,11 +68,16 @@ async def run_script_async(name: str, path: str, args: list = None) -> int:
     cmd = ["bash", path] if path.endswith('.sh') else ["python3", path]
     if args: cmd += args
 
+    env = os.environ.copy()
+    env.pop('TMUX', None)
+    env.pop('TMUX_PANE', None)
+
     process = await asyncio.create_subprocess_exec(
       *cmd,
       stdout=asyncio.subprocess.PIPE,
       stderr=asyncio.subprocess.PIPE,
-      start_new_session=True
+      start_new_session=True,
+      env=env
     )
     stdout, stderr = await process.communicate()
 
@@ -162,6 +168,12 @@ def apply_styles():
     button.btn-red-stop::before { content: '⏹' !important; }
     button.btn-default { background: linear-gradient(90deg, #2A3348 0%, #3A4A6B 100%) !important; }
     button.btn-default::before { content: '👁' !important; }
+
+    /* 새로고침 버튼 전용 스타일 */
+    button.refresh-btn {
+        min-height: 40px !important; padding: 0 12px !important;
+        background: #232E45 !important; color: #60A5FA !important; border: 1px solid #3A4A6B !important;
+    }
 
     /* ── 드롭다운(Selectbox) ── */
     .q-field__control {
@@ -264,7 +276,7 @@ def apply_styles():
         .tabs-custom .q-tab__label { font-size: 0.6rem !important; }
     }
     </style>
-    """)
+  """)
 
 
 # ── 3. 탭별 렌더링 함수들 ─────────────────────────────────────
@@ -275,8 +287,7 @@ def render_tab_functions():
   def functions_content():
     with ui.column().classes('w-full gap-3 mt-4'):
 
-      # 1. 드롭다운
-      with ui.row().classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3'):
+      with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3'):
         m_opts = ["[ Not Selected ]", "HYUNDAI", "KIA", "GENESIS"]
         c_m = params.get("SelectedManufacturer") or m_opts[0]
 
@@ -324,55 +335,49 @@ def render_tab_functions():
         commit_raw) if commit_raw else ""
       commit_info = commit_output if commit_output else "Check required"
 
-      # 2. 업데이트 체크
-      with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
+      with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         async def do_check_updates():
           await run_script_async("Commit Check", f"{SCRIPTS_PATH}/commit_compare.sh")
-          functions_content.refresh()  # 완료 후 UI 새로고침
+          functions_content.refresh()
 
-        ui.button('CHECK UPDATES', on_click=do_check_updates, color=None).classes(
-          'custom-btn btn-blue w-[40%] sm:w-1/3 shrink-0')
+        ui.button('CHECK UPDATES', on_click=do_check_updates, color=None).classes('custom-btn btn-blue w-full')
 
         card_cls, icon = ('card-success', '✅') if " == " in commit_info else ('card-danger',
                                                                               '⚠️') if " != " in commit_info else (
           'card-warning', '🔍')
         ui.html(
           f'<div class="pill-card {card_cls}"><div class="pill-card-icon">{icon}</div><div class="pill-card-text">UPDATE STATUS<div class="pill-card-value">{commit_info}</div></div></div>').classes(
-          'w-[60%] sm:flex-1 shrink-0')
+          'w-full')
 
-      # 3. [복구 완료] Git Pull 버튼 (업데이트가 있을 때만 동적으로 생성됨)
+      # 3. Git Pull 버튼 (전체 3분할 중: 버튼 1영역, 알림 1영역)
       if commit_output and " != " in commit_output:
-        with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
+        with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
           async def do_git_pull():
             await run_script_async("Git Pull", f"{SCRIPTS_PATH}/gitpull.sh")
             functions_content.refresh()
 
-          ui.button('GIT PULL NOW', on_click=do_git_pull, color=None).classes(
-            'custom-btn btn-blue-pull w-[40%] sm:w-1/3 shrink-0')
+          ui.button('GIT PULL NOW', on_click=do_git_pull, color=None).classes('custom-btn btn-blue-pull w-full')
           ui.html(
             '<div class="pill-card card-warning"><div class="pill-card-icon">⚠️</div><div class="pill-card-text">NEW UPDATE AVAILABLE<div class="pill-card-value">Please pull the latest changes.</div></div></div>').classes(
-            'w-[60%] sm:flex-1 shrink-0')
+            'w-full')
 
-      # 4. 캘리브레이션
-      with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
+      # 4. 캘리브레이션 (전체 3분할 중: 버튼 1영역, 알림 1영역)
+      with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         def do_reset_cal():
           reset_calibration()
           functions_content.refresh()
 
-        ui.button('RESET CALIBRATION', on_click=do_reset_cal, color=None).classes(
-          'custom-btn btn-yellow w-[40%] sm:w-1/3 shrink-0')
+        ui.button('RESET CALIBRATION', on_click=do_reset_cal, color=None).classes('custom-btn btn-yellow w-full')
         dev_pos = params.get("DevicePosition") or "--"
         ui.html(
           f'<div class="pill-card card-info"><div class="pill-card-icon">📍</div><div class="pill-card-text">DEVICE POSITION<div class="pill-card-value">{dev_pos}</div></div></div>').classes(
-          'w-[60%] sm:flex-1 shrink-0')
+          'w-full')
 
-      # 5. 재부팅
-      with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center mt-2'):
-        # 재부팅 시에도 process detached 처리가 필요할 수 있으나, 일반적으로 Popen 이면 충분합니다.
+      # 5. 재부팅 (전체 3분할 중: 버튼 1영역)
+      with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         ui.button('REBOOT', on_click=lambda: subprocess.Popen(["sudo", "reboot"], start_new_session=True),
-                  color=None).classes('custom-btn btn-red w-[40%] sm:w-1/3 shrink-0')
+                  color=None).classes('custom-btn btn-red w-full')
 
-  # UI 렌더링 시작
   functions_content()
 
 
@@ -466,7 +471,10 @@ def render_tab_logs():
               targets = sorted_routes[idx][1]['paths']
               cmd = ["bash", f"{SCRIPTS_PATH}/realdata_upload.sh"] + targets
               try:
-                subprocess.Popen(cmd, start_new_session=True)
+                env = os.environ.copy()
+                env.pop('TMUX', None)
+                env.pop('TMUX_PANE', None)
+                subprocess.Popen(cmd, start_new_session=True, env=env)
                 ui.notify(f"✅ Upload started in background! ({len(targets)} segments)", type='positive', position='top')
               except Exception as e:
                 ui.notify(f"❌ Failed to start upload: {e}", type='negative', position='top')
@@ -567,47 +575,47 @@ def render_tab_camera():
     def start_stream():
       stream_type = CAMERA_OPTIONS[cam_select.value]
       webrtc_html = f"""
-            <div style="position:relative; width:100%; height:430px; background:#000; border-radius:12px; border:1.5px solid #3A4A6B; overflow:hidden;">
-                <video id="video" autoplay playsinline muted controls style="width:100%; height:100%; object-fit:contain; cursor:pointer;"></video>
-                <div id="status" style="position:absolute; top:10px; right:12px; color:#E8EEFF; background:rgba(0,0,0,0.65); padding:4px 10px; border-radius:20px; font-size:12px;">Initializing...</div>
-            </div>
-            """
-      js_code = f"""
-                async function startWebRTC() {{
-                    const video = document.getElementById('video');
-                    const status = document.getElementById('status');
-                    const ip = window.location.hostname;
-                    try {{
-                        const pc = new RTCPeerConnection({{iceServers: []}});
-                        pc.addTransceiver('video', {{ direction: 'recvonly' }});
-                        pc.ontrack = (event) => {{
-                            status.innerText = "● Stream Active"; status.style.background = "rgba(16,185,129,0.75)";
-                            video.srcObject = event.streams[0]; video.play();
-                        }};
-                        const offer = await pc.createOffer();
-                        await pc.setLocalDescription(offer);
+        <div style="position:relative; width:100%; height:430px; background:#000; border-radius:12px; border:1.5px solid #3A4A6B; overflow:hidden;">
+            <video id="video" autoplay playsinline muted controls style="width:100%; height:100%; object-fit:contain; cursor:pointer;"></video>
+            <div id="status" style="position:absolute; top:10px; right:12px; color:#E8EEFF; background:rgba(0,0,0,0.65); padding:4px 10px; border-radius:20px; font-size:12px;">Initializing...</div>
+        </div>
+        <script>
+            async function startWebRTC() {{
+                const video = document.getElementById('video');
+                const status = document.getElementById('status');
+                const ip = window.location.hostname;
+                try {{
+                    const pc = new RTCPeerConnection({{iceServers: []}});
+                    pc.addTransceiver('video', {{ direction: 'recvonly' }});
+                    pc.ontrack = (event) => {{
+                        status.innerText = "● Stream Active"; status.style.background = "rgba(16,185,129,0.75)";
+                        video.srcObject = event.streams[0]; video.play();
+                    }};
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
 
-                        await new Promise((r) => setTimeout(r, 1000));
+                    await new Promise((r) => setTimeout(r, 1000));
 
-                        const payload = {{ sdp: pc.localDescription.sdp, cameras: ["{stream_type}"], bridge_services_in: [], bridge_services_out: [] }};
-                        const response = await fetch(`http://${{ip}}:5001/stream`, {{ method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(payload) }});
-                        if(response.ok) await pc.setRemoteDescription(await response.json());
-                    }} catch (e) {{
-                        status.innerText = "Error"; status.style.background = "red";
-                    }}
+                    const payload = {{ sdp: pc.localDescription.sdp, cameras: ["{stream_type}"], bridge_services_in: [], bridge_services_out: [] }};
+                    const response = await fetch(`http://${{ip}}:5001/stream`, {{ method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(payload) }});
+                    if(response.ok) await pc.setRemoteDescription(await response.json());
+                }} catch (e) {{
+                    status.innerText = "Error"; status.style.background = "red";
                 }}
-                startWebRTC();
-            """
+            }}
+            startWebRTC();
+        </script>
+      """
       stream_container.content = webrtc_html
-      ui.run_javascript(js_code)
+      ui.run_javascript(webrtc_html)
 
     def stop_stream():
       stream_container.content = """
-            <div class="log-viewer" style="display:flex; flex-direction:column; justify-content:center; align-items:center;">
-                <div style="font-size:3em; filter:grayscale(1) opacity(0.3);">📷</div>
-                <div style="font-size:0.9em; margin-top:10px; text-align:center;">Select a camera source and press Start</div>
-            </div>
-            """
+        <div class="log-viewer" style="display:flex; flex-direction:column; justify-content:center; align-items:center;">
+            <div style="font-size:3em; filter:grayscale(1) opacity(0.3);">📷</div>
+            <div style="font-size:0.9em; margin-top:10px; text-align:center;">Select a camera source and press Start</div>
+        </div>
+      """
 
   stop_stream()
 
@@ -620,9 +628,11 @@ def main_page():
 
   with ui.row().classes(
     'w-full flex-nowrap items-center justify-between px-2 pt-2 pb-1 gap-1 bg-[#0B0E14] sticky top-0 z-50 border-b border-[#1A2235]'):
-    ui.html(
-      '<div style="font-size: 1.0rem; font-weight: 900; line-height: 1.1; color: #E8EEFF; letter-spacing: 0.02em;">Openpilot<br><span style="color:#3B82F6;">Dashboard</span></div>').classes(
-      'shrink-0 px-1')
+    with ui.row().classes('flex-nowrap items-center shrink-0 px-1 gap-2'):
+      ui.html(
+        '<div style="font-size: 1.0rem; font-weight: 900; line-height: 1.1; color: #E8EEFF; letter-spacing: 0.02em;">Openpilot<br><span style="color:#3B82F6;">Dashboard</span></div>')
+      ui.button(icon='refresh', on_click=lambda: ui.run_javascript('window.location.reload()')).classes(
+        'refresh-btn rounded-full')
 
     with ui.tabs().props('align="right" active-color="white" indicator-color="white" inline-label=false').classes(
       'flex-1 overflow-x-auto tabs-custom') as tabs:
