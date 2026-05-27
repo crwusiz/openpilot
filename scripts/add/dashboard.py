@@ -39,7 +39,6 @@ BASE_PATH = "/data/params/crwusiz"
 # Params (openpilot이 없는 PC 환경 테스트용 Mock 지원)
 try:
   from openpilot.common.params import Params
-
   params = Params()
 except ImportError:
   class MockParams:
@@ -49,9 +48,7 @@ except ImportError:
     def put(self, k, v): self.data[k] = v
     def put_bool(self, k, v): self.data[k] = v
     def remove(self, k): self.data.pop(k, None)
-
   params = MockParams()
-
 
 def get_list_from_file(path: str) -> list:
   if Path(path).exists():
@@ -59,12 +56,18 @@ def get_list_from_file(path: str) -> list:
       return [line.strip() for line in f if line.strip()]
   return []
 
-
-# ── 비동기 스크립트 실행 (tmux 중첩 실행 방지 및 백그라운드 독립 실행 보장) ──
 async def run_script_async(name: str, path: str, args: list = None) -> int:
   ui.notify(f"[{name}] 진행 중...", type='info', position='top')
-  await asyncio.sleep(0.1)  # UI 알림이 먼저 렌더링되도록 양보
+  await asyncio.sleep(0.1)
   try:
+    if path.endswith('.sh'):
+      os.system(f"sed -i 's/\\r$//' {path} 2>/dev/null")
+      os.system(f"chmod +x {path} 2>/dev/null")
+    if "gitpull" in path or "restart" in path:
+      os.system(f"sed -i 's/\\r$//' {SCRIPTS_PATH}/restart.sh 2>/dev/null")
+      os.system(f"chmod +x {SCRIPTS_PATH}/restart.sh 2>/dev/null")
+      os.system("tmux kill-session -t tmp 2>/dev/null")
+
     cmd = ["bash", path] if path.endswith('.sh') else ["python3", path]
     if args: cmd += args
 
@@ -72,32 +75,37 @@ async def run_script_async(name: str, path: str, args: list = None) -> int:
     env.pop('TMUX', None)
     env.pop('TMUX_PANE', None)
 
-    process = await asyncio.create_subprocess_exec(
-      *cmd,
-      stdout=asyncio.subprocess.PIPE,
-      stderr=asyncio.subprocess.PIPE,
-      start_new_session=True,
-      env=env
-    )
-    stdout, stderr = await process.communicate()
+    out_path = f"/tmp/{name.replace(' ', '_')}_out.log"
+    err_path = f"/tmp/{name.replace(' ', '_')}_err.log"
+
+    with open(out_path, 'w') as out_f, open(err_path, 'w') as err_f:
+      process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=out_f,
+        stderr=err_f,
+        start_new_session=True,
+        env=env
+      )
+      await process.wait()
+
+    with open(err_path, 'r') as err_f:
+      stderr = err_f.read().strip()
 
     if process.returncode == 0:
       ui.notify(f"[{name}] 완료", type='positive', position='top')
     else:
-      err_text = stderr.decode('utf-8').strip() if stderr else "Unknown error"
+      err_text = stderr[:100] if stderr else "Unknown error"
       ui.notify(f"[{name}] 에러: {err_text}", type='negative', position='top')
     return process.returncode
   except Exception as e:
     ui.notify(f"[{name}] 실행 실패: {e}", type='negative', position='top')
     return 1
 
-
 def reset_calibration():
   for p in ["CalibrationParams", "LiveTorqueParameters", "LiveParameters", "LiveParametersV2", "LiveDelay"]:
     params.remove(p)
   params.put_bool("OnroadCycleRequested", True)
   ui.notify("캘리브레이션 초기화 요청 완료!", type='positive', position='top')
-
 
 def get_tmux_capture() -> str:
   try:
@@ -307,32 +315,27 @@ def render_tab_functions():
 
         c_opts = ["[ Not Selected ]"] + get_list_from_file(f"{BASE_PATH}/CarList")
         c_c = params.get("SelectedCar") or c_opts[0]
-
         def on_c_change(e):
           if e.value != "[ Not Selected ]":
             params.put("SelectedCar", e.value)
           else:
             params.remove("SelectedCar")
           functions_content.refresh()
-
         ui.select(c_opts, value=c_c, label='🚗 Car Model', on_change=on_c_change).classes('w-full text-blue-200')
 
         b_opts = ["[ Not Selected ]"] + get_list_from_file(f"{BASE_PATH}/GitBranchList")
         c_b = params.get("SelectedBranch") or b_opts[0]
-
         def on_b_change(e):
           if e.value != "[ Not Selected ]":
             params.put("SelectedBranch", e.value)
           else:
             params.remove("SelectedBranch")
           functions_content.refresh()
-
         ui.select(b_opts, value=c_b, label='🌿 Git Branch', on_change=on_b_change).classes('w-full text-blue-200')
 
       # 파라미터에서 업데이트 정보 안전하게 읽어오기
       commit_raw = params.get("CommitCompare")
-      commit_output = commit_raw.decode('utf-8') if isinstance(commit_raw, bytes) else str(
-        commit_raw) if commit_raw else ""
+      commit_output = commit_raw.decode('utf-8') if isinstance(commit_raw, bytes) else str(commit_raw) if commit_raw else ""
       commit_info = commit_output if commit_output else "Check required"
 
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
@@ -342,12 +345,8 @@ def render_tab_functions():
 
         ui.button('CHECK UPDATES', on_click=do_check_updates, color=None).classes('custom-btn btn-blue w-full')
 
-        card_cls, icon = ('card-success', '✅') if " == " in commit_info else ('card-danger',
-                                                                              '⚠️') if " != " in commit_info else (
-          'card-warning', '🔍')
-        ui.html(
-          f'<div class="pill-card {card_cls}"><div class="pill-card-icon">{icon}</div><div class="pill-card-text">UPDATE STATUS<div class="pill-card-value">{commit_info}</div></div></div>').classes(
-          'w-full')
+        card_cls, icon = ('card-success', '✅') if " == " in commit_info else ('card-danger', '⚠️') if " != " in commit_info else ('card-warning', '🔍')
+        ui.html(f'<div class="pill-card {card_cls}"><div class="pill-card-icon">{icon}</div><div class="pill-card-text">UPDATE STATUS<div class="pill-card-value">{commit_info}</div></div></div>').classes('w-full')
 
       # 3. Git Pull 버튼 (전체 3분할 중: 버튼 1영역, 알림 1영역)
       if commit_output and " != " in commit_output:
@@ -357,9 +356,7 @@ def render_tab_functions():
             functions_content.refresh()
 
           ui.button('GIT PULL NOW', on_click=do_git_pull, color=None).classes('custom-btn btn-blue-pull w-full')
-          ui.html(
-            '<div class="pill-card card-warning"><div class="pill-card-icon">⚠️</div><div class="pill-card-text">NEW UPDATE AVAILABLE<div class="pill-card-value">Please pull the latest changes.</div></div></div>').classes(
-            'w-full')
+          ui.html('<div class="pill-card card-warning"><div class="pill-card-icon">⚠️</div><div class="pill-card-text">NEW UPDATE AVAILABLE<div class="pill-card-value">Please pull the latest changes.</div></div></div>').classes('w-full')
 
       # 4. 캘리브레이션 (전체 3분할 중: 버튼 1영역, 알림 1영역)
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
@@ -369,14 +366,11 @@ def render_tab_functions():
 
         ui.button('RESET CALIBRATION', on_click=do_reset_cal, color=None).classes('custom-btn btn-yellow w-full')
         dev_pos = params.get("DevicePosition") or "--"
-        ui.html(
-          f'<div class="pill-card card-info"><div class="pill-card-icon">📍</div><div class="pill-card-text">DEVICE POSITION<div class="pill-card-value">{dev_pos}</div></div></div>').classes(
-          'w-full')
+        ui.html(f'<div class="pill-card card-info"><div class="pill-card-icon">📍</div><div class="pill-card-text">DEVICE POSITION<div class="pill-card-value">{dev_pos}</div></div></div>').classes('w-full')
 
       # 5. 재부팅 (전체 3분할 중: 버튼 1영역)
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
-        ui.button('REBOOT', on_click=lambda: subprocess.Popen(["sudo", "reboot"], start_new_session=True),
-                  color=None).classes('custom-btn btn-red w-full')
+        ui.button('REBOOT', on_click=lambda: subprocess.Popen(["sudo", "reboot"], start_new_session=True), color=None).classes('custom-btn btn-red w-full')
 
   functions_content()
 
@@ -386,8 +380,7 @@ def render_tab_toggles():
     ("PcmCruiseEnable", "PcmCruise", "Change the openpilot cruise engagement"),
     ("CruiseStateControl", "Cruise State Controls", "Openpilot controls cruise on/off, set speed"),
     ("IsHda2", "CANFD Car HDA2", "Highway Drive Assist 2, turn it on"),
-    ("CameraSccEnable", "CameraSCC",
-     "HDA1 CameraSCC CAR, HDA2 Connect the ADAS ECAN line to CAMERA modify, turn it on"),
+    ("CameraSccEnable", "CameraSCC", "HDA1 CameraSCC CAR, HDA2 Connect the ADAS ECAN line to CAMERA modify, turn it on"),
     ("RadarTrackEnable", "Enable Radar Track use", "Enable Radar Track use (disable AEB)"),
     ("DriverCameraOnReverse", "Driver Camera On Reverse", "Displays the driver camera when in reverse"),
     ("DriverCameraHardwareMissing", "Driver Camera Hardware Missing", "Drive without the driver camera"),
@@ -413,8 +406,7 @@ def render_tab_toggles():
       with ui.row().classes('w-full flex-nowrap items-center border-b border-gray-800 pb-3'):
         ui.switch(value=init_val, on_change=on_change).classes('custom-toggle shrink-0')
         with ui.column().classes('gap-1 ml-3 flex-1 min-w-0'):
-          ui.label(label).classes(
-            'text-[0.95rem] md:text-lg font-bold text-white leading-tight break-words whitespace-normal')
+          ui.label(label).classes('text-[0.95rem] md:text-lg font-bold text-white leading-tight break-words whitespace-normal')
           ui.label(desc).classes('text-[0.75rem] md:text-sm text-gray-400 leading-snug break-words whitespace-normal')
 
 
@@ -431,13 +423,10 @@ def render_tab_logs():
 
     # ── 1. 리얼데이터 섹션 (주행 경로 데이터 업로드) ──
     with ui.column().classes('w-full gap-2'):
-      ui.html(
-        '<div style="color:#6EE7B7; font-size:1.1em; font-weight:800; margin-bottom:4px;"><span style="margin-right:6px;">📂</span>Route Data Upload</div>')
+      ui.html('<div style="color:#6EE7B7; font-size:1.1em; font-weight:800; margin-bottom:4px;"><span style="margin-right:6px;">📂</span>Route Data Upload</div>')
 
       if not REALDATA_PATH.exists():
-        ui.html(
-          '<div class="log-output-box log-error" style="margin-top:0;">❌ Path not found: /data/media/0/realdata</div>').classes(
-          'w-full')
+        ui.html('<div class="log-output-box log-error" style="margin-top:0;">❌ Path not found: /data/media/0/realdata</div>').classes('w-full')
       else:
         route_map = {}
         for item in REALDATA_PATH.iterdir():
@@ -454,17 +443,13 @@ def render_tab_logs():
           r_data['paths'].sort(key=lambda x: int(x.split("--")[-1]))
 
         if not route_map:
-          ui.html(
-            '<div class="log-output-box log-warn" style="margin-top:0;">⚠️ No uploadable routes found.</div>').classes(
-            'w-full')
+          ui.html('<div class="log-output-box log-warn" style="margin-top:0;">⚠️ No uploadable routes found.</div>').classes('w-full')
         else:
           sorted_routes = sorted(route_map.items(), key=lambda x: x[1]['mtime'], reverse=True)
-          options = [f"[{datetime.fromtimestamp(v['mtime']).strftime('%Y-%m-%d %H:%M')}] {k} ({len(v['paths'])} segs)"
-                     for k, v in sorted_routes]
+          options = [f"[{datetime.fromtimestamp(v['mtime']).strftime('%Y-%m-%d %H:%M')}] {k} ({len(v['paths'])} segs)" for k, v in sorted_routes]
 
           with ui.element('div').classes('w-full grid grid-cols-4 gap-2 items-center'):
-            sel_route = ui.select(options, value=options[0], label="Select Route to Upload").classes(
-              'col-span-3 min-w-0')
+            sel_route = ui.select(options, value=options[0], label="Select Route to Upload").classes('col-span-3 min-w-0')
 
             def upload_route():
               idx = options.index(sel_route.value)
@@ -479,8 +464,7 @@ def render_tab_logs():
               except Exception as e:
                 ui.notify(f"❌ Failed to start upload: {e}", type='negative', position='top')
 
-            ui.button('ROUTE UPLOAD', on_click=upload_route, color=None).classes(
-              'custom-btn btn-green-route col-span-1')
+            ui.button('ROUTE UPLOAD', on_click=upload_route, color=None).classes('custom-btn btn-green-route col-span-1')
 
     # ── 2. 시스템 로그 섹션 ──
     with ui.column().classes('w-full gap-2'):
@@ -564,10 +548,8 @@ def render_tab_camera():
 
   with ui.column().classes('w-full mt-4'):
     with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center'):
-      cam_select = ui.select(list(CAMERA_OPTIONS.keys()), value="Road Camera", label="Select Camera Source").classes(
-        'w-[50%] min-w-0 shrink-0')
-      ui.button('START', on_click=lambda: start_stream(), color=None).classes(
-        'custom-btn btn-green-start w-[25%] shrink-0')
+      cam_select = ui.select(list(CAMERA_OPTIONS.keys()), value="Road Camera", label="Select Camera Source").classes('w-[50%] min-w-0 shrink-0')
+      ui.button('START', on_click=lambda: start_stream(), color=None).classes('custom-btn btn-green-start w-[25%] shrink-0')
       ui.button('STOP', on_click=lambda: stop_stream(), color=None).classes('custom-btn btn-red-stop w-[25%] shrink-0')
 
     stream_container = ui.html().classes('w-full mt-4')
@@ -579,7 +561,8 @@ def render_tab_camera():
             <video id="video" autoplay playsinline muted controls style="width:100%; height:100%; object-fit:contain; cursor:pointer;"></video>
             <div id="status" style="position:absolute; top:10px; right:12px; color:#E8EEFF; background:rgba(0,0,0,0.65); padding:4px 10px; border-radius:20px; font-size:12px;">Initializing...</div>
         </div>
-        <script>
+      """
+      js_code = f"""
             async function startWebRTC() {{
                 const video = document.getElementById('video');
                 const status = document.getElementById('status');
@@ -604,10 +587,9 @@ def render_tab_camera():
                 }}
             }}
             startWebRTC();
-        </script>
       """
       stream_container.content = webrtc_html
-      ui.run_javascript(webrtc_html)
+      ui.run_javascript(js_code)
 
     def stop_stream():
       stream_container.content = """
