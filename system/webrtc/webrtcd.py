@@ -131,42 +131,6 @@ class CerealIncomingMessageProxy:
     self.pm.send(msg_type, msg)
 
 
-class CerealProxyRunner:
-  def __init__(self, proxy: CerealOutgoingMessageProxy):
-    self.proxy = proxy
-    self.is_running = False
-    self.task = None
-    self.logger = logging.getLogger("webrtcd")
-
-  def start(self):
-    assert self.task is None
-    self.task = asyncio.create_task(self.run())
-
-  async def stop(self):
-    if self.task is None:
-      return
-    task = self.task
-    self.task = None
-    if task.done():
-      return
-    task.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-      await task
-
-  async def run(self):
-    from aiortc.exceptions import InvalidStateError
-
-    while True:
-      try:
-        self.proxy.update()
-      except InvalidStateError:
-        self.logger.warning("Cereal outgoing proxy invalid state (connection closed)")
-        break
-      except Exception:
-        self.logger.exception("Cereal outgoing proxy failure")
-      await asyncio.sleep(0.01)
-
-
 class DynamicPubMaster(messaging.PubMaster):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
