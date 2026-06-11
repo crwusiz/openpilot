@@ -86,6 +86,7 @@ class ModelState:
     self.vision_input_shapes = vision_metadata['input_shapes']
     self.vision_input_names = list(self.vision_input_shapes.keys())
     self.vision_output_slices = vision_metadata['output_slices']
+    self.vision_output_len = vision_metadata['output_shapes']['outputs'][1]
 
     policy_metadata = jits['metadata']['on_policy']
     self.policy_input_shapes = policy_metadata['input_shapes']
@@ -131,12 +132,10 @@ class ModelState:
     if prepare_only:
       return None
 
-    vision_output, on_policy_output = self.run_policy(
-      **{k: self.input_queues[k] for k in POLICY_INPUTS}, img=img, big_img=big_img
+    outs, = self.run_policy(
+      **{k: self.input_queues[k] for k in POLICY_INPUTS if k in self.input_queues}, img=img, big_img=big_img
     )
-
-    vision_output = vision_output.numpy().flatten()
-    on_policy_output = on_policy_output.numpy().flatten()
+    vision_output, on_policy_output = np.split(outs.numpy()[0], [self.vision_output_len])
     vision_outputs_dict = self.parser.parse_vision_outputs(self.slice_outputs(vision_output, self.vision_output_slices))
     policy_outputs_dict = self.parser.parse_policy_outputs(self.slice_outputs(on_policy_output, self.policy_output_slices))
     combined_outputs_dict = {**vision_outputs_dict, **policy_outputs_dict}
