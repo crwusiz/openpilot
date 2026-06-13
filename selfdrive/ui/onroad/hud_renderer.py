@@ -107,7 +107,6 @@ class HudRenderer(Widget):
     self.steer_angle: float = 0.0
     self.steer_angle_target: float = 0.0
     self.lat_active: bool = False
-    self.lka_state: bool = False
     self.long_control: bool = False
 
     # TPMS
@@ -181,10 +180,6 @@ class HudRenderer(Widget):
     # Steering wheel button (rotatable)
     self.steer_btn = RotatableIconButton("icons/wheel.png", button_size, icon_size, bg_color)
     self.bottom_icons.add_button(self.steer_btn)
-
-    # LKA toggle button
-    self.lka_btn = ToggleIconButton("icons/lka_on.png", "icons/lka_off.png", button_size, icon_size, bg_color)
-    self.bottom_icons.add_button(self.lka_btn)
 
     # Gas press button
     self.gas_btn = IconButton("icons/disengage_on_accelerator.png", button_size, icon_size, bg_color)
@@ -320,9 +315,6 @@ class HudRenderer(Widget):
     if car_params:
       self.long_control = car_params.openpilotLongitudinalControl
 
-    if hasattr(car_state, 'cruiseState'):
-      self.lka_state = car_state.cruiseState.available
-
     self.steer_torque = car_state.steeringTorque if hasattr(car_state, 'steeringTorque') else 0
 
     if navi_data:
@@ -364,11 +356,7 @@ class HudRenderer(Widget):
     self.steer_btn.set_rotation(-self.steer_angle)
     self.steer_btn.set_opacity(0.8)
 
-    self.lka_btn.set_active(self.lat_active)
-    self.lka_btn.set_opacity(0.8 if self.lka_state else 0.2)
-
     self.gas_btn.set_opacity(0.8 if self.gas_press else 0.2)
-
     self.brake_btn.set_opacity(0.8 if self.brake_press else 0.2)
     self.autohold_warning_btn.set_opacity(0.8)
     self.autohold_active_btn.set_opacity(0.8)
@@ -437,7 +425,7 @@ class HudRenderer(Widget):
     icon_size = UIConfig.icon_size
     y = rect.y + rect.height - (UIConfig.border_size * 3) - icon_size / 2
 
-    # Left side icons (steering, LKA)
+    # Left side icons (steering)
     start_x = rect.x + (icon_size * 2.2)
 
     # Render steering button first
@@ -459,16 +447,6 @@ class HudRenderer(Widget):
     sat_str = f"T {abs(self.steer_angle_target):.1f} °"
     self._draw_text(start_x, y + icon_size / 2 + 50, sa_str, FontSizes.info_text, sa_color)
     self._draw_text(start_x, y + icon_size / 2 + 75, sat_str, FontSizes.info_text, sat_color)
-
-    # LKA button
-    lka_x = start_x + UIConfig.button_size
-    self.lka_btn.set_rect(rl.Rectangle(
-      lka_x - icon_size / 2,
-      y - icon_size / 2 + 20,
-      icon_size,
-      icon_size
-    ))
-    self.lka_btn.render(self.lka_btn._rect)
 
     # Right side icons (gas, brake/autohold)
     gas_x = rect.x + rect.width - (icon_size * 3.7)
