@@ -41,8 +41,28 @@ from openpilot.system.webrtc.schema import generate_field
 from openpilot.common.params import Params
 from cereal import messaging, log
 
-from aiortc import RTCBundlePolicy, RTCConfiguration, RTCPeerConnection
-from aiortc.mediastreams import VideoStreamTrack
+try:
+  from aiortc import RTCBundlePolicy, RTCConfiguration, RTCPeerConnection
+  from aiortc.mediastreams import VideoStreamTrack
+except ImportError:
+  logging.getLogger("webrtcd").warning(
+    "aiortc not found or broken. Remounting filesystem to install locked versions...")
+  subprocess.check_call(["sudo", "mount", "-o", "remount,rw", "/"])
+
+  subprocess.check_call([
+    "sudo", sys.executable, "-m", "pip", "install",
+    "aiortc==1.14.0", "cryptography==48.0.0", "pyopenssl==26.2.0", "cffi==2.0.0", "av==16.1.0"
+  ])
+
+  try:
+    subprocess.check_call(["sudo", "mount", "-o", "remount,ro", "/"])
+  except subprocess.CalledProcessError:
+    pass
+  from aiortc import RTCBundlePolicy, RTCConfiguration, RTCPeerConnection
+  from aiortc.mediastreams import VideoStreamTrack
+
+
+
 from openpilot.system.webrtc.device.video import LiveStreamVideoStreamTrack
 from teleoprtc import WebRTCAnswerBuilder
 
