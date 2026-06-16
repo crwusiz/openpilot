@@ -2,6 +2,7 @@
 
 from abc import abstractmethod
 import os
+import socket
 import time
 import argparse
 import asyncio
@@ -39,6 +40,31 @@ if TYPE_CHECKING:
 from openpilot.system.webrtc.schema import generate_field
 from openpilot.common.params import Params
 from cereal import messaging, log
+
+import aioice.ice
+
+
+# socket trick: route lookup for 8.8.8.8 (nothing is sent or actually connected to)
+# return the source interfaces IP which is the default interface of the device
+def _default_route_ip() -> str | None:
+  s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  try:
+    s.connect(("8.8.8.8", 53))  # selects a route, sends nothing
+    return s.getsockname()[0]
+  except OSError:
+    return None
+  finally:
+    s.close()
+
+# aioice patch: gather ICE candidates only on the default-route interface
+_get_host_addresses = aioice.ice.get_host_addresses
+def _primary_host_addresses(use_ipv4: bool, use_ipv6: bool) -> list[str]:
+  addresses = _get_host_addresses(use_ipv4, use_ipv6)
+  primary = _default_route_ip()
+  if primary not in addresses:
+    return addresses
+  return [a for a in addresses if a == primary]
+aioice.ice.get_host_addresses = _primary_host_addresses
 
 
 class AsyncTaskRunner:
@@ -158,7 +184,8 @@ class LivestreamBitrateController(AsyncTaskRunner):
     self.pc = peer_connection
     self.params = Params()
 
-    self.level = 0
+    self.level = 1
+    self._publish(self.bitrates[self.level])
     self.prev_lost, self.prev_sent = None, None
     self.counter = 0
     self.up_samples = 5 # 1s
@@ -219,7 +246,24 @@ class StreamSession:
   shared_pub_master = DynamicPubMaster([])
 
   def __init__(self, sdp: str, init_camera: str, incoming_services: list[str], outgoing_services: list[str], debug_mode: bool = False):
-    from aiortc.mediastreams import VideoStreamTrack
+    try:
+      from aiortc.mediastreams import VideoStreamTrack
+    except ImportError:
+      logging.getLogger("webrtcd").warning(
+        "aiortc not found or broken. Remounting filesystem to install locked versions...")
+      subprocess.check_call(["sudo", "mount", "-o", "remount,rw", "/"])
+
+      subprocess.check_call([
+        "sudo", sys.executable, "-m", "pip", "install",
+        "aiortc==1.14.0", "cryptography==48.0.0", "pyopenssl==26.2.0", "cffi==2.0.0", "av==16.1.0"
+      ])
+
+      try:
+        subprocess.check_call(["sudo", "mount", "-o", "remount,ro", "/"])
+      except subprocess.CalledProcessError:
+        pass
+      from aiortc.mediastreams import VideoStreamTrack
+
     from openpilot.system.webrtc.device.video import LiveStreamVideoStreamTrack
     from teleoprtc import WebRTCAnswerBuilder
 
@@ -231,6 +275,7 @@ class StreamSession:
     self.stream = builder.stream()
     self.identifier = str(uuid.uuid4())
 
+    self.params = Params()
     self.incoming_bridge: CerealIncomingMessageProxy | None = None
     self.incoming_bridge_services = incoming_services
     self.outgoing_bridge: CerealOutgoingMessageProxy | None = None
@@ -264,6 +309,23 @@ class StreamSession:
   async def get_answer(self):
     return await self.stream.start()
 
+  async def add_ice_candidate(self, candidate_init: dict | None):
+    from aiortc.sdp import candidate_from_sdp
+
+    pc = self.stream.peer_connection
+    if pc.iceConnectionState not in ("new", "checking"):
+      return
+
+    # a null/empty candidate signals end-of-candidates per the WebRTC convention
+    if not candidate_init or not candidate_init.get("candidate"):
+      await pc.addIceCandidate(None)
+      return
+
+    candidate = candidate_from_sdp(candidate_init["candidate"].split(":", 1)[1])
+    candidate.sdpMid = candidate_init.get("sdpMid")
+    candidate.sdpMLineIndex = candidate_init.get("sdpMLineIndex")
+    await pc.addIceCandidate(candidate)
+
   def message_handler(self, message: bytes):
     assert self.incoming_bridge is not None
     try:
@@ -293,6 +355,7 @@ class StreamSession:
 
   async def run(self):
     try:
+      self.params.put("LivestreamRequestKeyframe", True)
       await self.stream.wait_for_connection()
       if self.stream.has_messaging_channel():
         if self.incoming_bridge is not None:
@@ -319,10 +382,13 @@ class StreamSession:
       if self._cleanup_done:
         return
       self._cleanup_done = True
+      self.params.put("LivestreamRequestKeyframe", False)
       if self.bitrate_controller is not None:
         await self.bitrate_controller.stop()
       if self.outgoing_bridge is not None:
         await self.outgoing_bridge.stop()
+      if self.video_track is not None:
+        self.video_track.stop()
       await self.stream.stop()
 
 
@@ -349,7 +415,7 @@ async def get_stream(request: 'web.Request'):
         except Exception:
           pass
       await s.stop()
-      del stream_dict[sid]
+      stream_dict.pop(sid, None)
 
     session = StreamSession(body.sdp, body.initCamera, body.bridge_services_in, body.bridge_services_out, debug_mode)
     try:
@@ -363,9 +429,12 @@ async def get_stream(request: 'web.Request'):
     except Exception:
       await session.stop()
       raise
+    stream_dict[session.identifier] = session
     session.start()
 
-    stream_dict[session.identifier] = session
+    def remove_finished_session(_: asyncio.Task) -> None:
+      stream_dict.pop(session.identifier, None)
+    session.run_task.add_done_callback(remove_finished_session)
 
   return web.json_response({"sdp": answer.sdp, "type": answer.type})
 
