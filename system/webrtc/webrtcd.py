@@ -41,31 +41,6 @@ from openpilot.system.webrtc.schema import generate_field
 from openpilot.common.params import Params
 from cereal import messaging, log
 
-try:
-  from aiortc import RTCBundlePolicy, RTCConfiguration, RTCPeerConnection
-  from aiortc.mediastreams import VideoStreamTrack
-except ImportError:
-  logging.getLogger("webrtcd").warning(
-    "aiortc not found or broken. Remounting filesystem to install locked versions...")
-  subprocess.check_call(["sudo", "mount", "-o", "remount,rw", "/"])
-
-  subprocess.check_call([
-    "sudo", sys.executable, "-m", "pip", "install",
-    "aiortc==1.14.0", "cryptography==48.0.0", "pyopenssl==26.2.0", "cffi==2.0.0", "av==16.1.0"
-  ])
-
-  try:
-    subprocess.check_call(["sudo", "mount", "-o", "remount,ro", "/"])
-  except subprocess.CalledProcessError:
-    pass
-  from aiortc import RTCBundlePolicy, RTCConfiguration, RTCPeerConnection
-  from aiortc.mediastreams import VideoStreamTrack
-
-
-
-from openpilot.system.webrtc.device.video import LiveStreamVideoStreamTrack
-from teleoprtc import WebRTCAnswerBuilder
-
 import aioice.ice
 
 
@@ -271,6 +246,27 @@ class StreamSession:
   shared_pub_master = DynamicPubMaster([])
 
   def __init__(self, sdp: str, init_camera: str, incoming_services: list[str], outgoing_services: list[str], debug_mode: bool = False):
+    try:
+      from aiortc.mediastreams import VideoStreamTrack
+    except ImportError:
+      logging.getLogger("webrtcd").warning(
+        "aiortc not found or broken. Remounting filesystem to install locked versions...")
+      subprocess.check_call(["sudo", "mount", "-o", "remount,rw", "/"])
+
+      subprocess.check_call([
+        "sudo", sys.executable, "-m", "pip", "install",
+        "aiortc==1.14.0", "cryptography==48.0.0", "pyopenssl==26.2.0", "cffi==2.0.0", "av==16.1.0"
+      ])
+
+      try:
+        subprocess.check_call(["sudo", "mount", "-o", "remount,ro", "/"])
+      except subprocess.CalledProcessError:
+        pass
+      from aiortc.mediastreams import VideoStreamTrack
+
+    from openpilot.system.webrtc.device.video import LiveStreamVideoStreamTrack
+    from teleoprtc import WebRTCAnswerBuilder
+
     builder = WebRTCAnswerBuilder(sdp)
 
     self.video_track = LiveStreamVideoStreamTrack(init_camera) if not debug_mode else VideoStreamTrack()
@@ -279,6 +275,7 @@ class StreamSession:
     self.stream = builder.stream()
     self.identifier = str(uuid.uuid4())
 
+    self.params = Params()
     self.incoming_bridge: CerealIncomingMessageProxy | None = None
     self.incoming_bridge_services = incoming_services
     self.outgoing_bridge: CerealOutgoingMessageProxy | None = None
@@ -358,6 +355,7 @@ class StreamSession:
 
   async def run(self):
     try:
+      self.params.put("LivestreamRequestKeyframe", True)
       await self.stream.wait_for_connection()
       if self.stream.has_messaging_channel():
         if self.incoming_bridge is not None:
@@ -384,6 +382,7 @@ class StreamSession:
       if self._cleanup_done:
         return
       self._cleanup_done = True
+      self.params.put("LivestreamRequestKeyframe", False)
       if self.bitrate_controller is not None:
         await self.bitrate_controller.stop()
       if self.outgoing_bridge is not None:
@@ -433,24 +432,11 @@ async def get_stream(request: 'web.Request'):
     stream_dict[session.identifier] = session
     session.start()
 
-    session_id = session.identifier
-
     def remove_finished_session(_: asyncio.Task) -> None:
-      stream_dict.pop(session_id, None)
+      stream_dict.pop(session.identifier, None)
     session.run_task.add_done_callback(remove_finished_session)
 
-  return web.json_response({"sdp": answer.sdp, "type": answer.type, "session_id": session.identifier})
-
-
-async def post_candidate(request: 'web.Request'):
-  body = await request.json()
-  session = request.app.get('streams', {}).get(body.get("session_id"))
-
-  try:
-    await session.add_ice_candidate(body.get("candidate"))
-  except Exception as e:
-    raise web.HTTPBadRequest(text=json.dumps({"error": "invalid_candidate", "message": str(e)}), content_type="application/json") from e
-  return web.Response(status=200, text="OK")
+  return web.json_response({"sdp": answer.sdp, "type": answer.type})
 
 
 async def get_schema(request: 'web.Request'):
@@ -477,26 +463,6 @@ async def post_notify(request: 'web.Request'):
   return web.Response(status=200, text="OK")
 
 
-async def on_startup(app: 'web.Application'):
-  logger = logging.getLogger("webrtcd")
-  start_time = time.monotonic()
-  pc = None
-
-  # warmup imports for webrtc stack
-  try:
-    pc = RTCPeerConnection(RTCConfiguration(bundlePolicy=RTCBundlePolicy.MAX_BUNDLE))
-    pc.addTransceiver("video", direction="recvonly")
-    pc.createDataChannel("data", ordered=True)
-    offer = await pc.createOffer()
-    await asyncio.wait_for(pc.setLocalDescription(offer), timeout=1.5)
-    logger.info("Warmed WebRTC stack in %.1f ms", (time.monotonic() - start_time) * 1000)
-  except Exception:
-    logger.exception("WebRTC stack warmup failed")
-  finally:
-    if pc is not None:
-      await pc.close()
-
-
 async def on_shutdown(app: 'web.Application'):
   for session in app['streams'].values():
     await session.stop()
@@ -514,10 +480,8 @@ def webrtcd_thread(host: str, port: int, debug: bool):
   app['streams'] = dict()
   app['stream_lock'] = asyncio.Lock()
   app['debug'] = debug
-  app.on_startup.append(on_startup)
   app.on_shutdown.append(on_shutdown)
   app.router.add_post("/stream", get_stream)
-  app.router.add_post("/candidate", post_candidate)
   app.router.add_post("/notify", post_notify)
   app.router.add_get("/schema", get_schema)
 
