@@ -259,8 +259,15 @@ class LivestreamBitrateController(AsyncTaskRunner):
 class StreamSession:
   shared_pub_master = DynamicPubMaster([])
 
-  def __init__(self, sdp: str, init_camera: str, incoming_services: list[str], outgoing_services: list[str], debug_mode: bool = False
-               ):
+  def __init__(
+    self,
+    sdp: str,
+    init_camera: str,
+    incoming_services: list[str],
+    outgoing_services: list[str],
+    enabled: bool | None = None,
+    debug_mode: bool = False
+  ):
     try:
       if debug_mode:
         from aiortc.mediastreams import VideoStreamTrack
@@ -288,7 +295,7 @@ class StreamSession:
     self.params = Params()
     builder = WebRTCAnswerBuilder(sdp)
 
-    self.enabled = enabled if enabled else True # default to enabled
+    self.enabled = enabled if enabled is not None else True # default to enabled
     self.video_track = LiveStreamVideoStreamTrack(init_camera, self.enabled) if not debug_mode else VideoStreamTrack()
     builder.add_video_stream(init_camera, self.video_track)
     self.stream = builder.stream()
@@ -407,7 +414,7 @@ async def get_stream(request: 'web.Request'):
       if s.run_task and not s.run_task.done():
         try:
           ch = s.stream.get_messaging_channel()
-          ch.send(json.dumps({"type": "connectionReplaced", "data": "Another device has connected, closing this session."}))
+          ch.send(json.dumps({"type": "disconnect", "data": "Another device has connected, closing this session."}))
         except Exception:
           pass
       await s.stop()
@@ -457,6 +464,11 @@ async def post_notify(request: 'web.Request'):
 
 async def on_shutdown(app: 'web.Application'):
   for session in app['streams'].values():
+    try:
+      ch = session.stream.get_messaging_channel()
+      ch.send(json.dumps({"type": "disconnect", "data": "device stream has been stopped."}))
+    except Exception:
+      pass
     await session.stop()
   del app['streams']
 
