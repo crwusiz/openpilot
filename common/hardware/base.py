@@ -148,6 +148,9 @@ class HardwareBase(ABC):
   def initialize_hardware(self):
     pass
 
+  def has_internal_panda(self) -> bool:
+    return False
+
   def reset_internal_panda(self):
     pass
 
