@@ -12,7 +12,6 @@ import random
 import select
 import socket
 import sys
-import tempfile
 import threading
 import time
 from dataclasses import asdict, dataclass, replace
@@ -35,11 +34,11 @@ from openpilot.common.api import Api, get_key_pair
 from openpilot.common.utils import CallbackReader, get_upload_stream
 from openpilot.common.params import Params
 from openpilot.common.realtime import set_core_affinity
-from openpilot.system.hardware import HARDWARE, PC
+from openpilot.common.hardware import HARDWARE, PC
 from openpilot.system.loggerd.xattr_cache import getxattr, setxattr
 from openpilot.common.swaglog import cloudlog
 from openpilot.system.version import get_build_metadata
-from openpilot.system.hardware.hw import Paths
+from openpilot.common.hardware.hw import Paths
 
 
 ATHENA_HOST = os.getenv('ATHENA_HOST', 'wss://athena.comma.ai')
@@ -186,7 +185,6 @@ def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
     threading.Thread(target=upload_handler, args=(end_event,), name='upload_handler3'),
     threading.Thread(target=upload_handler, args=(end_event,), name='upload_handler4'),
     threading.Thread(target=log_handler, args=(end_event,), name='log_handler'),
-    threading.Thread(target=stat_handler, args=(end_event,), name='stat_handler'),
   ] + [
     threading.Thread(target=jsonrpc_handler, args=(end_event,), name=f'worker_{x}')
     for x in range(HANDLER_THREADS)
@@ -571,11 +569,6 @@ def getNetworkMetered() -> bool:
 
 
 @dispatcher.add_method
-def getNetworks():
-  return HARDWARE.get_networks()
-
-
-@dispatcher.add_method
 def startStream(sdp: str, enabled: bool) -> dict:
   from openpilot.system.webrtc.helpers import StreamRequestBody, post_stream_request, wait_for_webrtcd
   params = Params()
@@ -590,7 +583,7 @@ def startStream(sdp: str, enabled: bool) -> dict:
   else:
       raise Exception("failed to get CarParamsPersistent")
 
-  if not params.get_bool("IsOnroad"):
+  if params.get_bool("IsOffroad"):
     # manager owns camerad/stream_encoderd/webrtcd; flip the param and let it bring them up.
     # webrtcd clears IsLiveStreaming when the session ends
     params.put_bool("IsLiveStreaming", True)
@@ -700,34 +693,6 @@ def log_handler(end_event: threading.Event) -> None:
       cloudlog.exception("athena.log_handler.exception")
 
 
-def stat_handler(end_event: threading.Event) -> None:
-  STATS_DIR = Paths.stats_root()
-  last_scan = 0.0
-
-  while not end_event.is_set():
-    curr_scan = time.monotonic()
-    try:
-      if curr_scan - last_scan > 10:
-        stat_filenames = list(filter(lambda name: not name.startswith(tempfile.gettempprefix()), os.listdir(STATS_DIR)))
-        if len(stat_filenames) > 0:
-          stat_path = os.path.join(STATS_DIR, stat_filenames[0])
-          with open(stat_path) as f:
-            jsonrpc = {
-              "method": "storeStats",
-              "params": {
-                "stats": f.read()
-              },
-              "jsonrpc": "2.0",
-              "id": stat_filenames[0]
-            }
-            send_queue_push(json.dumps(jsonrpc), SEND_PRIORITY_LOW)
-          os.remove(stat_path)
-        last_scan = curr_scan
-    except Exception:
-      cloudlog.exception("athena.stat_handler.exception")
-    time.sleep(0.1)
-
-
 def ws_proxy_recv(ws: WebSocket, local_sock: socket.socket, ssock: socket.socket, end_event: threading.Event, global_end_event: threading.Event) -> None:
   while not (end_event.is_set() or global_end_event.is_set()):
     try:
@@ -821,7 +786,7 @@ def ws_manage(ws: WebSocket, end_event: threading.Event) -> None:
   sock = ws.sock
 
   while True:
-    onroad = params.get_bool("IsOnroad")
+    onroad = not params.get_bool("IsOffroad")
     if onroad != onroad_prev:
       onroad_prev = onroad
 

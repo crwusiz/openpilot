@@ -18,7 +18,7 @@ from openpilot.common.timeout import Timeout
 from openpilot.common.params import Params
 from openpilot.selfdrive.selfdrived.events import EVENTS, ET
 from openpilot.selfdrive.test.helpers import set_params_enabled, release_only
-from openpilot.system.hardware.hw import Paths
+from openpilot.common.hardware.hw import Paths
 from openpilot.tools.lib.logreader import LogReader
 from openpilot.tools.lib.log_time_series import msgs_to_time_series
 
@@ -63,12 +63,11 @@ PROCS = {
   "system.micd": 5.0,
   "system.timed": 0,
   "selfdrive.pandad.pandad": 0,
-  "system.statsd": 1.0,
   "system.loggerd.uploader": 15.0,
   "system.loggerd.deleter": 1.0,
   "./pandad": 19.0,
   "system.qcomgpsd.qcomgpsd": 1.0,
-  "system.hardware.tici.modem": 10.0,
+  "common.hardware.tici.modem": 10.0,
 }
 
 TIMINGS = {
@@ -284,7 +283,7 @@ class TestOnroad:
     print("--------------- Memory Usage -------------------")
     print("------------------------------------------------")
 
-    from openpilot.selfdrive.debug.mem_usage import print_report
+    from openpilot.tools.scripts.mem_usage import print_report
     print_report(self.msgs['procLog'], self.msgs['deviceState'])
 
     offset = int(SERVICE_LIST['deviceState'].frequency * LOG_OFFSET)

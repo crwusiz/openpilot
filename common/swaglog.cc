@@ -13,7 +13,7 @@
 #include <stdarg.h>
 #include "third_party/json11/json11.hpp"
 #include "common/version.h"
-#include "system/hardware/hw.h"
+#include "common/hardware/hw.h"
 
 class SwaglogState {
 public:

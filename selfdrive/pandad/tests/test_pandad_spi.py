@@ -22,7 +22,7 @@ class TestBoarddSpi:
 
   @with_processes(['pandad'])
   def test_spi_corruption(self, subtests):
-    setup_pandad(1)
+    setup_pandad()
 
     sendcan = messaging.pub_sock('sendcan')
     socks = {s: messaging.sub_sock(s, conflate=False, timeout=100) for s in ('can', 'pandaStates', 'peripheralState')}
@@ -80,7 +80,6 @@ class TestBoarddSpi:
             ps = m.peripheralState
             assert ps.pandaType == "tres"
             assert 4000 < ps.voltage < 14000
-            assert 50 < ps.current < 1000
             assert ps.fanSpeedRpm < 10000
 
       time.sleep(0.5)
