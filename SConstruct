@@ -117,6 +117,7 @@ env = Environment(
   CXXFLAGS=["-std=c++1z"],
   CPPPATH=[
     "#",
+    "#openpilot",
     "#msgq",
     "#openpilot/cereal/gen/cpp",
     "#third_party",
