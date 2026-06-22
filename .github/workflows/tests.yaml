@@ -3,7 +3,7 @@ name: tests
 on:
   push:
     branches:
-      - master_c3
+      - master_c3_up
   #pull_request:
   workflow_dispatch:
   workflow_call:
@@ -14,7 +14,7 @@ on:
         type: string
 
 concurrency:
-  group: tests-ci-run-${{ inputs.run_number }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/master_c3' && github.run_id || github.head_ref || github.ref }}-${{ github.workflow }}-${{ github.event_name }}
+  group: tests-ci-run-${{ inputs.run_number }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/master_c3_up' && github.run_id || github.head_ref || github.ref }}-${{ github.workflow }}-${{ github.event_name }}
   cancel-in-progress: true
 
 env:
