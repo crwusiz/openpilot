@@ -14,7 +14,7 @@ import numpy as np
 
 from collections import deque
 from threading import Thread
-from cereal import messaging
+from openpilot.cereal import messaging
 from openpilot.common.realtime import Ratekeeper
 from openpilot.common.constants import UnitConverter
 
