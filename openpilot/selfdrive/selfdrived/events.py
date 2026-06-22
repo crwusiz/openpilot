@@ -1177,7 +1177,7 @@ if HARDWARE.get_device_type() == 'mici':
 
 if __name__ == '__main__':
   # print all alerts by type and priority
-  from cereal.services import SERVICE_LIST
+  from openpilot.cereal.services import SERVICE_LIST
   from collections import defaultdict
 
   event_names = {v: k for k, v in EventName.schema.enumerants.items()}
