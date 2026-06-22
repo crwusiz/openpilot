@@ -5,15 +5,16 @@ import os
 from enum import IntEnum
 from collections.abc import Callable
 
-from cereal import log, car
-import cereal.messaging as messaging
+from openpilot.cereal import log
+from opendbc.car.structs import car
+import openpilot.cereal.messaging as messaging
 from openpilot.common.constants import CV
 from openpilot.common.git import get_short_branch
 from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.locationd.calibrationd import MIN_SPEED_FILTER
 from openpilot.system.micd import SAMPLE_RATE, SAMPLE_BUFFER
 from openpilot.selfdrive.ui.feedback.feedbackd import FEEDBACK_MAX_DURATION
-from openpilot.system.hardware import HARDWARE
+from openpilot.common.hardware import HARDWARE
 
 AlertSize = log.SelfdriveState.AlertSize
 AlertStatus = log.SelfdriveState.AlertStatus
@@ -1184,7 +1185,7 @@ if HARDWARE.get_device_type() == 'mici':
 
 if __name__ == '__main__':
   # print all alerts by type and priority
-  from cereal.services import SERVICE_LIST
+  from openpilot.cereal.services import SERVICE_LIST
   from collections import defaultdict
 
   event_names = {v: k for k, v in EventName.schema.enumerants.items()}
