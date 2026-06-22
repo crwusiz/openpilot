@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-from cereal import log
+from openpilot.cereal import log
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 
 # TODO: This is speed dependent

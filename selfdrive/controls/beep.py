@@ -4,7 +4,8 @@ import time
 import threading
 import argparse
 
-from cereal import car, messaging
+from cereal import messaging
+from opendbc.car.structs import car
 from openpilot.common.realtime import Ratekeeper
 
 AudibleAlert = car.CarControl.HUDControl.AudibleAlert

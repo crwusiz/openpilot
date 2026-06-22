@@ -3,9 +3,10 @@ import os
 import time
 import threading
 
-import cereal.messaging as messaging
+import openpilot.cereal.messaging as messaging
 
-from cereal import car, log
+from openpilot.cereal import log
+from opendbc.car.structs import car
 from msgq.visionipc import VisionIpcClient, VisionStreamType
 
 

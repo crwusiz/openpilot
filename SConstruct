@@ -118,6 +118,7 @@ env = Environment(
   CPPPATH=[
     "#",
     "#msgq",
+    "#openpilot/cereal/gen/cpp",
     "#third_party",
     "#third_party/json11",
     "#third_party/linux/include",
@@ -243,7 +244,7 @@ env_swaglog = env.Clone()
 env_swaglog['CXXFLAGS'].append('-DSWAGLOG="\\"common/swaglog.h\\""')
 SConscript(['msgq_repo/SConscript'], exports={'env': env_swaglog})
 
-SConscript(['cereal/SConscript'])
+SConscript(['openpilot/cereal/SConscript'])
 
 Import('socketmaster', 'msgq')
 messaging = [socketmaster, msgq, 'capnp', 'kj',]

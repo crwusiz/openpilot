@@ -9,9 +9,9 @@ from collections import OrderedDict, namedtuple
 
 import psutil
 
-import cereal.messaging as messaging
-from cereal import log
-from cereal.services import SERVICE_LIST
+import openpilot.cereal.messaging as messaging
+from openpilot.cereal import log
+from openpilot.cereal.services import SERVICE_LIST
 from openpilot.common.utils import strip_deprecated_keys
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params
@@ -22,7 +22,7 @@ from openpilot.system.loggerd.config import get_available_percent
 from openpilot.common.swaglog import cloudlog
 from openpilot.system.hardware.power_monitoring import PowerMonitoring
 from openpilot.system.hardware.fan_controller import FanController
-from openpilot.system.version import terms_version, training_version
+from openpilot.common.version import terms_version, training_version
 from openpilot.system.athena.registration import UNREGISTERED_DONGLE_ID
 
 ThermalStatus = log.DeviceState.ThermalStatus

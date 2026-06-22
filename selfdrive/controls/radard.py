@@ -6,7 +6,8 @@ from typing import Any
 import copy
 
 import capnp
-from cereal import messaging, log, car
+from openpilot.cereal import messaging, log
+from opendbc.car.structs import car
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params
 from openpilot.common.realtime import DT_MDL, Priority, config_realtime_process
