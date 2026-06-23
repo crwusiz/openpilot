@@ -116,7 +116,6 @@ env = Environment(
   CFLAGS=["-std=gnu11"],
   CXXFLAGS=["-std=c++1z"],
   CPPPATH=[
-    "#",
     "#openpilot",
     "#msgq",
     "#openpilot/cereal/gen/cpp",
@@ -128,6 +127,7 @@ env = Environment(
     "#third_party/acados/include/hpipm/include",
     "#third_party/catch2/include",
     [x.INCLUDE_DIR for x in pkgs],
+    "#",
   ],
   LIBPATH=[
     "#openpilot/common",

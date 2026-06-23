@@ -126,7 +126,7 @@ procs = [
   PythonProcess("joystick", "openpilot.tools.joystick.joystick_control", and_(joystick, iscar)),
 
   # Process add
-  PythonProcess("navi_controller", "selfdrive.controls.neokii.navi_controller", always_run, enabled=not PC),
+  PythonProcess("navi_controller", "openpilot.selfdrive.controls.neokii.navi_controller", always_run, enabled=not PC),
   NativeProcess("dashboard", "scripts", ["python3", "/data/openpilot/scripts/add/dashboard.py"], always_run, enabled=not PC),
 
 ]
