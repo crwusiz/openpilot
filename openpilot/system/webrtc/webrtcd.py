@@ -44,14 +44,10 @@ def _default_route_ip() -> str | None:
   finally:
     s.close()
 
-# aioice patch: gather ICE candidates only on the default-route interface
 _get_host_addresses = aioice.ice.get_host_addresses
 def _primary_host_addresses(use_ipv4: bool, use_ipv6: bool) -> list[str]:
   addresses = _get_host_addresses(use_ipv4, use_ipv6)
-  primary = _default_route_ip()
-  if primary not in addresses:
-    return addresses
-  return [primary, ]
+  return addresses
 aioice.ice.get_host_addresses = _primary_host_addresses
 
 

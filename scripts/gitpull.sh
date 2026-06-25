@@ -121,6 +121,8 @@ update_repository() {
 update_submodules() {
   log "INFO" "Processing submodules..."
 
+  git submodule sync > /dev/null 2>&1
+
   # Extract paths from .gitmodules
   local paths
   paths=$(git config --file .gitmodules --get-regexp path | awk '{ print $2 }' || true)
@@ -130,8 +132,11 @@ update_submodules() {
     name=$(basename "$path")
     log "INFO" "Processing submodule: $name"
 
-    # Update submodule (Hide git output, show result log)
+    # Update submodule
     if git submodule update --init --force "$path" > /dev/null 2>&1; then
+
+      git -C "$path" lfs pull > /dev/null 2>&1 || true
+
       local sub_hash
       sub_hash=$(git -C "$path" rev-parse --short HEAD)
       local sub_msg
@@ -146,6 +151,8 @@ update_submodules() {
       log "WARNING" "'$name': Update failed. Retrying with force init..."
       git submodule deinit -f "$path" > /dev/null 2>&1 || true
       if git submodule update --init --force "$path" > /dev/null 2>&1; then
+         git -C "$path" lfs pull > /dev/null 2>&1 || true
+
          local sub_hash_retry
          sub_hash_retry=$(git -C "$path" rev-parse --short HEAD)
          local sub_msg_retry
@@ -193,9 +200,10 @@ compare_and_restart() {
     echo ""
 
     if [ -x "$RESTART_SCRIPT" ]; then
-      log "SUCCESS" "Restarting system..."
+      log "SUCCESS" "Restarting system in background..."
       echo 0 > "$LOG_FILE"
-      exec "$RESTART_SCRIPT"
+      nohup bash "$RESTART_SCRIPT" >/dev/null 2>&1 &
+      exit 0
     else
       log "ERROR" "Restart script not found: $RESTART_SCRIPT"
       echo 1 > "$LOG_FILE"

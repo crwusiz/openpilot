@@ -472,51 +472,54 @@ def render_tab_logs():
         '<div style="color:#93C5FD; font-size:1.1em; font-weight:800; margin-bottom:4px;"><span style="margin-right:6px;">📄</span>System Logs</div>')
 
       with ui.element('div').classes('w-full grid grid-cols-4 gap-2 items-center'):
-        sel_log = ui.select(list(LOG_FILES.keys()), value="CAN Missing", label="Select Log File").classes(
-          'col-span-2 min-w-0')
-        ui.button('VIEW', on_click=lambda: view_log(), color=None).classes('custom-btn btn-default col-span-1')
-        ui.button('UPLOAD', on_click=lambda: upload_log(), color=None).classes('custom-btn btn-green col-span-1')
+        # 1. 컴포넌트(Select) 먼저 정의
+        sel_log = ui.select(list(LOG_FILES.keys()), value="CAN Missing", label="Select Log File").classes('col-span-2 min-w-0')
 
+        # 2. 버튼 클릭 시 동작할 함수를 순서대로 미리 정의
+        def view_log():
+          log_path = LOG_FILES[sel_log.value]
+          content = ""
+          err_msg = ""
+
+          if log_path == "TMUX_CONSOLE":
+            subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
+            p = Path("/data/tmux_console.log")
+            if p.exists():
+              content = p.read_text()
+            else:
+              err_msg = "Failed to capture tmux console."
+          else:
+            p = Path(log_path)
+            if p.exists():
+              content = p.read_text()
+            else:
+              err_msg = "File not found."
+
+          if err_msg:
+            viewer_container.content = f'<div class="log-viewer log-error">❌ {err_msg}</div>'
+            status_container.content = '<div class="log-statusbar log-error">⚠️ 파일을 불러오지 못했습니다.</div>'
+          else:
+            conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
+            display = conv.convert(content, full=False)
+            viewer_container.content = f'<div class="log-viewer" id="logViewer">{display}</div>'
+            status_container.content = f'<div class="log-statusbar">📄 {sel_log.value} | {len(content.splitlines())} lines | {len(content):,} chars</div>'
+            ui.run_javascript('var v=document.getElementById("logViewer");if(v)v.scrollTop=v.scrollHeight;')
+
+        async def upload_log():
+          log_path = LOG_FILES[sel_log.value]
+          if log_path == "TMUX_CONSOLE":
+            subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
+            await run_script_async("Console Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=["/data/tmux_console.log"])
+          else:
+            await run_script_async("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[log_path])
+
+        # 3. 함수 정의 후 버튼 렌더링에 연결
+        ui.button('VIEW', on_click=view_log, color=None).classes('custom-btn btn-default col-span-1')
+        ui.button('UPLOAD', on_click=upload_log, color=None).classes('custom-btn btn-green col-span-1')
+
+      # 4. 로그 뷰어 컨테이너
       viewer_container = ui.html('<div class="log-viewer">파일을 선택한 후 View 버튼을 눌러주세요.</div>').classes('w-full mt-2')
       status_container = ui.html('<div class="log-statusbar">📂 대기 중...</div>').classes('w-full')
-
-      def view_log():
-        log_path = LOG_FILES[sel_log.value]
-        content = ""
-        err_msg = ""
-
-        if log_path == "TMUX_CONSOLE":
-          subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
-          p = Path("/data/tmux_console.log")
-          if p.exists():
-            content = p.read_text()
-          else:
-            err_msg = "Failed to capture tmux console."
-        else:
-          p = Path(log_path)
-          if p.exists():
-            content = p.read_text()
-          else:
-            err_msg = "File not found."
-
-        if err_msg:
-          viewer_container.content = f'<div class="log-viewer log-error">❌ {err_msg}</div>'
-          status_container.content = '<div class="log-statusbar log-error">⚠️ 파일을 불러오지 못했습니다.</div>'
-        else:
-          conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
-          display = conv.convert(content, full=False)
-          viewer_container.content = f'<div class="log-viewer" id="logViewer">{display}</div>'
-          status_container.content = f'<div class="log-statusbar">📄 {sel_log.value} | {len(content.splitlines())} lines | {len(content):,} chars</div>'
-          ui.run_javascript('var v=document.getElementById("logViewer");if(v)v.scrollTop=v.scrollHeight;')
-
-      async def upload_log():
-        log_path = LOG_FILES[sel_log.value]
-        if log_path == "TMUX_CONSOLE":
-          if not Path("/data/tmux_console.log").exists():
-            subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
-          await run_script_async("Console Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=["tmux_console.log"])
-        else:
-          await run_script_async("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[sel_log.value])
 
 
 def render_tab_terminal():
@@ -577,7 +580,23 @@ def render_tab_camera():
                     const offer = await pc.createOffer();
                     await pc.setLocalDescription(offer);
 
-                    await new Promise((r) => setTimeout(r, 1000));
+                    await new Promise((resolve) => {{
+                        if (pc.iceGatheringState === 'complete') {{
+                            resolve();
+                        }} else {{
+                            const checkState = () => {{
+                                if (pc.iceGatheringState === 'complete') {{
+                                    pc.removeEventListener('icegatheringstatechange', checkState);
+                                    resolve();
+                                }}
+                            }};
+                            pc.addEventListener('icegatheringstatechange', checkState);
+                            setTimeout(() => {{
+                                pc.removeEventListener('icegatheringstatechange', checkState);
+                                resolve();
+                            }}, 2000); // 2초 초과시 강제 진행
+                        }}
+                    }});
 
                     const payload = {{ sdp: pc.localDescription.sdp, init_camera: "{stream_type}", enabled: true, bridge_services_in: [], bridge_services_out: [] }};
                     const response = await fetch(`http://${{ip}}:5001/stream`, {{ method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(payload) }});
