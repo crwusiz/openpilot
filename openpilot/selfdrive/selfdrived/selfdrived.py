@@ -136,12 +136,7 @@ class SelfdriveD:
     self.state_machine = StateMachine()
     self.rk = Ratekeeper(100, print_delay_threshold=None)
 
-    # some comma three with NVMe experience NVMe dropouts mid-drive that
-    # cause loggerd to crash on write, so ignore it only on that platform
     self.ignored_processes = set()
-    nvme_expected = os.path.exists('/dev/nvme0n1') or (not os.path.isfile("/persist/comma/living-in-the-moment"))
-    if HARDWARE.get_device_type() == 'tici' and nvme_expected:
-      self.ignored_processes = {'loggerd', }
     if self.dcam_is_missing:
       self.ignored_processes.update({"dmonitoringd", "dmonitoringmodeld"})
 
@@ -206,10 +201,13 @@ class SelfdriveD:
 
     # Handle DM
     if not self.CP.notCar and not self.dcam_is_missing:
-      # Block engaging until ignition cycle after max number or time of distractions
+      # Block engaging until lockout times out or ignition reset
       if self.sm['driverMonitoringState'].lockout and not self.dm_lockout_set:
         self.params.put_bool("DriverTooDistracted", True)
         self.dm_lockout_set = True
+      elif not self.sm['driverMonitoringState'].lockout and self.dm_lockout_set:
+        self.params.remove("DriverTooDistracted")
+        self.dm_lockout_set = False
       # No entry conditions
       if self.sm['driverMonitoringState'].lockout or self.sm['driverMonitoringState'].alwaysOnLockout:
         self.events.add(EventName.tooDistracted)
