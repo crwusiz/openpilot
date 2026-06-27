@@ -121,7 +121,7 @@ class CerealOutgoingMessageProxy(AsyncTaskRunner):
 
     while True:
       if not self._enabled:
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.1)
         continue
       try:
         self.update()
@@ -130,7 +130,7 @@ class CerealOutgoingMessageProxy(AsyncTaskRunner):
         break
       except Exception:
         self.logger.exception("Cereal outgoing proxy failure")
-      await asyncio.sleep(0.01)
+      await asyncio.sleep(0.05)
 
 
 class CerealIncomingMessageProxy:

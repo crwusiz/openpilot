@@ -299,7 +299,7 @@ class AugmentedRoadView(CameraView):
     position = f"{abs(pitch):.1f}° {'v' if pitch > 0 else '^'} {abs(yaw):.1f}° {'<' if yaw > 0 else '>'}"
 
     if position != self._last_device_position:
-      self.params.put("DevicePosition", position)
+      self.params.put("DevicePosition", position, block=False)
       self._last_device_position = position
     # ---------------------------------------------------------
 
