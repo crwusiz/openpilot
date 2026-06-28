@@ -255,13 +255,15 @@ def apply_styles():
     .log-viewer {
         background: #0D1117; border: 1.5px solid #3A4A6B; border-radius: 12px;
         padding: 16px 20px; font-family: 'Courier New', Courier, monospace;
-        font-size: 0.8em; color: #BCC4E0; white-space: pre-wrap; word-break: break-all;
+        font-size: 1.2em;
+        color: #BCC4E0; white-space: pre-wrap; word-break: break-all;
         height: 430px; overflow-y: auto; box-shadow: inset 0 2px 12px rgba(0,0,0,0.5); width: 100%;
     }
     .log-statusbar {
         background: linear-gradient(90deg, #1A2235, #232E45); border: 1.5px solid #3A4A6B; border-left: 4px solid #3B82F6;
         border-radius: 12px; padding: 10px 16px; font-family: 'Courier New', monospace;
-        font-size: 0.78em; color: #93C5FD; width: 100%; margin-top: 8px;
+        font-size: 1.2em;
+        color: #93C5FD; width: 100%; margin-top: 8px;
     }
     .log-error { border-left-color: #EF4444 !important; color: #FCA5A5 !important; }
 
