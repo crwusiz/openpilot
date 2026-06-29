@@ -9,6 +9,11 @@ from pathlib import Path
 from datetime import datetime
 
 try:
+  from openpilot.common.realtime import set_core_affinity
+except ImportError:
+  def set_core_affinity(cores): pass
+
+try:
   from nicegui import ui, app
 except ImportError:
   logging.getLogger("dashboard").warning("nicegui not found. Remounting filesystem to install...")
@@ -292,7 +297,6 @@ def apply_styles():
 # ── 3. 탭별 렌더링 함수들 ─────────────────────────────────────
 
 def render_tab_functions():
-  # 상태 갱신을 위해 refreshable 데코레이터 적용
   @ui.refreshable
   def functions_content():
     with ui.column().classes('w-full gap-3 mt-4'):
@@ -335,7 +339,6 @@ def render_tab_functions():
           functions_content.refresh()
         ui.select(b_opts, value=c_b, label='🌿 Git Branch', on_change=on_b_change).classes('w-full text-blue-200')
 
-      # 파라미터에서 업데이트 정보 안전하게 읽어오기
       commit_raw = params.get("CommitCompare")
       commit_output = commit_raw.decode('utf-8') if isinstance(commit_raw, bytes) else str(commit_raw) if commit_raw else ""
       commit_info = commit_output if commit_output else "Check required"
@@ -350,7 +353,6 @@ def render_tab_functions():
         card_cls, icon = ('card-success', '✅') if " == " in commit_info else ('card-danger', '⚠️') if " != " in commit_info else ('card-warning', '🔍')
         ui.html(f'<div class="pill-card {card_cls}"><div class="pill-card-icon">{icon}</div><div class="pill-card-text">UPDATE STATUS<div class="pill-card-value">{commit_info}</div></div></div>').classes('w-full')
 
-      # 3. Git Pull 버튼 (전체 3분할 중: 버튼 1영역, 알림 1영역)
       if commit_output and " != " in commit_output:
         with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
           async def do_git_pull():
@@ -360,7 +362,6 @@ def render_tab_functions():
           ui.button('GIT PULL NOW', on_click=do_git_pull, color=None).classes('custom-btn btn-blue-pull w-full')
           ui.html('<div class="pill-card card-warning"><div class="pill-card-icon">⚠️</div><div class="pill-card-text">NEW UPDATE AVAILABLE<div class="pill-card-value">Please pull the latest changes.</div></div></div>').classes('w-full')
 
-      # 4. 캘리브레이션 (전체 3분할 중: 버튼 1영역, 알림 1영역)
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         def do_reset_cal():
           reset_calibration()
@@ -370,7 +371,6 @@ def render_tab_functions():
         dev_pos = params.get("DevicePosition") or "--"
         ui.html(f'<div class="pill-card card-info"><div class="pill-card-icon">📍</div><div class="pill-card-text">DEVICE POSITION<div class="pill-card-value">{dev_pos}</div></div></div>').classes('w-full')
 
-      # 5. 재부팅 (전체 3분할 중: 버튼 1영역)
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         ui.button('REBOOT', on_click=lambda: subprocess.Popen(["sudo", "reboot"], start_new_session=True), color=None).classes('custom-btn btn-red w-full')
 
@@ -422,8 +422,6 @@ def render_tab_logs():
   REALDATA_PATH = Path("/data/media/0/realdata")
 
   with ui.column().classes('w-full mt-2 gap-6'):
-
-    # ── 1. 리얼데이터 섹션 (주행 경로 데이터 업로드) ──
     with ui.column().classes('w-full gap-2'):
       ui.html('<div style="color:#6EE7B7; font-size:1.1em; font-weight:800; margin-bottom:4px;"><span style="margin-right:6px;">📂</span>Route Data Upload</div>')
 
@@ -468,16 +466,13 @@ def render_tab_logs():
 
             ui.button('ROUTE UPLOAD', on_click=upload_route, color=None).classes('custom-btn btn-green-route col-span-1')
 
-    # ── 2. 시스템 로그 섹션 ──
     with ui.column().classes('w-full gap-2'):
       ui.html(
         '<div style="color:#93C5FD; font-size:1.1em; font-weight:800; margin-bottom:4px;"><span style="margin-right:6px;">📄</span>System Logs</div>')
 
       with ui.element('div').classes('w-full grid grid-cols-4 gap-2 items-center'):
-        # 1. 컴포넌트(Select) 먼저 정의
         sel_log = ui.select(list(LOG_FILES.keys()), value="CAN Missing", label="Select Log File").classes('col-span-2 min-w-0')
 
-        # 2. 버튼 클릭 시 동작할 함수를 순서대로 미리 정의
         def view_log():
           log_path = LOG_FILES[sel_log.value]
           content = ""
@@ -515,16 +510,14 @@ def render_tab_logs():
           else:
             await run_script_async("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[log_path])
 
-        # 3. 함수 정의 후 버튼 렌더링에 연결
         ui.button('VIEW', on_click=view_log, color=None).classes('custom-btn btn-default col-span-1')
         ui.button('UPLOAD', on_click=upload_log, color=None).classes('custom-btn btn-green col-span-1')
 
-      # 4. 로그 뷰어 컨테이너
       viewer_container = ui.html('<div class="log-viewer">파일을 선택한 후 View 버튼을 눌러주세요.</div>').classes('w-full mt-2')
       status_container = ui.html('<div class="log-statusbar">📂 대기 중...</div>').classes('w-full')
 
 
-def render_tab_terminal():
+def render_tab_terminal(tabs):
   conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
 
   with ui.column().classes('w-full mt-4'):
@@ -532,6 +525,9 @@ def render_tab_terminal():
     statusbar = ui.html('<div class="log-statusbar">Loading...</div>').classes('w-full')
 
   def update_terminal():
+    if tabs.value != 'TERMINAL':
+      return
+
     content = get_tmux_capture()
     lines = len(content.splitlines())
     now_str = datetime.now().strftime("%H:%M:%S")
@@ -650,8 +646,10 @@ def main_page():
     with ui.tab_panel('TOGGLES'): render_tab_toggles()
     with ui.tab_panel('CAMERA'): render_tab_camera()
     with ui.tab_panel('LOGS'): render_tab_logs()
-    with ui.tab_panel('TERMINAL'): render_tab_terminal()
+    with ui.tab_panel('TERMINAL'): render_tab_terminal(tabs)
 
 
 if __name__ in {"__main__", "__mp_main__"}:
+  set_core_affinity([0, 1, 2])
+
   ui.run(host="0.0.0.0", port=7000, title="Openpilot Dashboard", show=False)
