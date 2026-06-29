@@ -258,17 +258,52 @@ def apply_styles():
 
     /* ── 로그 뷰어 ── */
     .log-viewer {
-        background: #0D1117; border: 1.5px solid #3A4A6B; border-radius: 12px;
-        padding: 16px 20px; font-family: 'Courier New', Courier, monospace;
-        font-size: 1.2em;
-        color: #BCC4E0; white-space: pre-wrap; word-break: break-all;
-        height: 430px; overflow-y: auto; box-shadow: inset 0 2px 12px rgba(0,0,0,0.5); width: 100%;
+        background: #0D1117;
+        border: 1.5px solid #3A4A6B;
+        border-radius: 12px;
+        padding: 16px 20px;
+
+        /* 1. 폰트 변경: 가독성이 뛰어난 코딩용 폰트 우선 적용 */
+        font-family: 'Roboto Mono', 'Consolas', 'Menlo', 'Courier New', monospace;
+
+        /* 2. 폰트 크기 및 굵기, 렌더링 최적화 */
+        font-size: 1.15em;
+        font-weight: 500;
+        line-height: 1.5; /* 행간 넓힘 */
+        letter-spacing: 0.02em; /* 자간 조정 */
+        -webkit-font-smoothing: antialiased; /* 안티앨리어싱 강제 적용 (가장자리 부드럽게) */
+        -moz-osx-font-smoothing: grayscale;
+
+        /* 3. 명암비 향상 */
+        color: #E8EEFF; /* 기존 #BCC4E0 보다 밝은 색상으로 변경 */
+
+        white-space: pre-wrap;
+        word-break: break-all;
+        height: 430px;
+        overflow-y: auto;
+        box-shadow: inset 0 2px 12px rgba(0,0,0,0.5);
+        width: 100%;
     }
+
+    /* ansi2html 변환 텍스트들에도 안티앨리어싱 적용 */
+    .log-viewer span {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
     .log-statusbar {
-        background: linear-gradient(90deg, #1A2235, #232E45); border: 1.5px solid #3A4A6B; border-left: 4px solid #3B82F6;
-        border-radius: 12px; padding: 10px 16px; font-family: 'Courier New', monospace;
-        font-size: 1.2em;
-        color: #93C5FD; width: 100%; margin-top: 8px;
+        background: linear-gradient(90deg, #1A2235, #232E45);
+        border: 1.5px solid #3A4A6B;
+        border-left: 4px solid #3B82F6;
+        border-radius: 12px;
+        padding: 10px 16px;
+        font-family: 'Roboto Mono', 'Consolas', 'Menlo', monospace;
+        font-size: 1.15em;
+        font-weight: 600;
+        -webkit-font-smoothing: antialiased;
+        color: #93C5FD;
+        width: 100%;
+        margin-top: 8px;
     }
     .log-error { border-left-color: #EF4444 !important; color: #FCA5A5 !important; }
 
