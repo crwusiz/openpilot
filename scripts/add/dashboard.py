@@ -61,7 +61,73 @@ def get_list_from_file(path: str) -> list:
       return [line.strip() for line in f if line.strip()]
   return []
 
-async def run_script_async(name: str, path: str, args: list = None) -> int:
+async def run_script_async(name: str, path: str, args: list = None, show_modal: bool = False) -> int:
+  if show_modal:
+    with ui.dialog().classes('backdrop-blur-sm') as dialog, ui.card().classes('w-[95vw] max-w-4xl bg-[#0D1117] border border-[#3A4A6B] p-0 shadow-2xl'):
+      with ui.row().classes('w-full px-4 py-3 border-b border-[#3A4A6B] bg-[#1A2235] justify-between items-center'):
+        with ui.row().classes('items-center gap-2'):
+          ui.html('<div style="font-size: 1.2em;">🖥️</div>')
+          ui.label(f'실행 중: {name}').classes('text-white font-bold text-[1.1rem]')
+        close_btn = ui.button(icon='close', on_click=dialog.close).props('flat round dense color=white').classes('hidden')
+
+      log_view = ui.log().classes('w-full h-[60vh] bg-transparent text-[#E8EEFF] p-4 font-mono text-[1.05em] leading-relaxed overflow-y-auto')
+      log_view.style('font-family: "Roboto Mono", "Consolas", monospace; white-space: pre-wrap; word-break: break-all; box-shadow: none;')
+
+      dialog.open()
+      await asyncio.sleep(0.1)
+
+      try:
+        if path.endswith('.sh'):
+          os.system(f"sed -i 's/\\r$//' {path} 2>/dev/null")
+          os.system(f"chmod +x {path} 2>/dev/null")
+        if "gitpull" in path or "restart" in path:
+          os.system(f"sed -i 's/\\r$//' {SCRIPTS_PATH}/restart.sh 2>/dev/null")
+          os.system(f"chmod +x {SCRIPTS_PATH}/restart.sh 2>/dev/null")
+          os.system("tmux kill-session -t tmp 2>/dev/null")
+
+        cmd = ["bash", path] if path.endswith('.sh') else ["python3", path]
+        if args: cmd += args
+
+        env = os.environ.copy()
+        env.pop('TMUX', None)
+        env.pop('TMUX_PANE', None)
+
+        process = await asyncio.create_subprocess_exec(
+          *cmd,
+          stdout=asyncio.subprocess.PIPE,
+          stderr=asyncio.subprocess.STDOUT,
+          start_new_session=True,
+          env=env
+        )
+
+        log_view.push(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] {name} 작업을 시작합니다...\n")
+
+        while True:
+          line = await process.stdout.readline()
+          if not line:
+            break
+          text = line.decode('utf-8', errors='replace').rstrip()
+          log_view.push(text)
+          await asyncio.sleep(0.01)
+
+        await process.wait()
+
+        if process.returncode == 0:
+          log_view.push(f"\n✅ [{datetime.now().strftime('%H:%M:%S')}] 성공적으로 완료되었습니다.")
+        else:
+          log_view.push(f"\n❌ [{datetime.now().strftime('%H:%M:%S')}] 오류가 발생하여 중단되었습니다. (Exit Code: {process.returncode})")
+
+        return_code = process.returncode
+
+      except Exception as e:
+        log_view.push(f"\n❌ 실행 실패: {e}")
+        return_code = 1
+      finally:
+        close_btn.classes(remove='hidden')
+        log_view.push("\n[ 확인을 마쳤으면 우측 상단의 'X' 버튼을 누르거나 창 바깥을 클릭하여 닫아주세요. ]")
+
+      return return_code
+
   ui.notify(f"[{name}] 진행 중...", type='info', position='top')
   await asyncio.sleep(0.1)
   try:
@@ -391,7 +457,7 @@ def render_tab_functions():
       if commit_output and " != " in commit_output:
         with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
           async def do_git_pull():
-            await run_script_async("Git Pull", f"{SCRIPTS_PATH}/gitpull.sh")
+            await run_script_async("Git Pull", f"{SCRIPTS_PATH}/gitpull.sh", show_modal=True)
             functions_content.refresh()
 
           ui.button('GIT PULL NOW', on_click=do_git_pull, color=None).classes('custom-btn btn-blue-pull w-full')
