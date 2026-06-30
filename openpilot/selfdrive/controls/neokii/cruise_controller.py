@@ -1,6 +1,5 @@
 import math
 import random
-import threading
 import numpy as np
 
 from opendbc.car import structs
@@ -125,6 +124,9 @@ class CruiseController:
 
     self.prev_road_limit_speed = 0.
 
+    self.prev_model_mono_time = 0
+    self.cached_curve_speed_clu = NO_LIMIT_SPEED
+
     self.wait_timer = 0
     self.alive_timer = 0
     self.alive_index = 0
@@ -156,6 +158,9 @@ class CruiseController:
     self.ignore_road_limit_temporarily = False
     self.ignore_limit_timer = 0
 
+    self.prev_model_mono_time = 0
+    self.cached_curve_speed_clu = NO_LIMIT_SPEED
+
   def _cal_limit_speed(self, CS, sm, current_speed_ms: float, cluster_speed_clu: float, v_cruise_kph: float,
                        double_pressed: bool = False):
     nda_active = SpeedLimiter.instance().get_active()
@@ -165,7 +170,6 @@ class CruiseController:
     school_zone = road_signs == 1
     is_limit_zone = False
     lead = sm['radarState'].leadOne
-    model = sm['modelV2']
 
     # 1. Road limit speed
     road_limit_speed = None
@@ -252,7 +256,7 @@ class CruiseController:
     self.lead_limit_speed_clu = lead_limit_speed_clu
 
     # 4. Curve limit speed
-    curve_limit_speed_clu = self._cal_curve_speed_adaptive(model, current_speed_ms, v_cruise_kph)
+    curve_limit_speed_clu = self._cal_curve_speed_adaptive(sm, current_speed_ms, v_cruise_kph)
     self.curve_speed_clu = curve_limit_speed_clu
 
     # 5. Steering angle based limit speed
@@ -401,44 +405,50 @@ class CruiseController:
 
     return acc_based_speed, confidence
 
-  def _cal_curve_speed_adaptive(self, model, current_speed_ms: float, v_cruise_kph: float):
-    min_curve_speed_ms = max(self.conv.to_ms(30.0), current_speed_ms * 0.5)
-    model_speed, model_confidence = self._get_model_based_speed(model, current_speed_ms, min_curve_speed_ms)
-    acc_speed, acc_confidence = self._get_acc_based_speed(model, current_speed_ms, min_curve_speed_ms)
+  def _cal_curve_speed_adaptive(self, sm, current_speed_ms: float, v_cruise_kph: float):
+    model_mono_time = sm.logMonoTime['modelV2']
 
-    model_weight = np.interp(current_speed_ms,
-                             [self.conv.to_ms(30.0), self.conv.to_ms(60.0), self.conv.to_ms(100.0)],
-                             [0.3, 0.5, 0.7])
-    acc_weight = 1.0 - model_weight
+    if model_mono_time != getattr(self, 'prev_model_mono_time', 0):
+      model = sm['modelV2']
+      min_curve_speed_ms = max(self.conv.to_ms(30.0), current_speed_ms * 0.5)
+      model_speed, model_confidence = self._get_model_based_speed(model, current_speed_ms, min_curve_speed_ms)
+      acc_speed, acc_confidence = self._get_acc_based_speed(model, current_speed_ms, min_curve_speed_ms)
 
-    total_confidence = model_confidence + acc_confidence
-    if total_confidence > 0:
-      model_weight *= model_confidence
-      acc_weight *= acc_confidence
+      model_weight = np.interp(current_speed_ms,
+                               [self.conv.to_ms(30.0), self.conv.to_ms(60.0), self.conv.to_ms(100.0)],
+                               [0.3, 0.5, 0.7])
+      acc_weight = 1.0 - model_weight
 
-      total_weight = model_weight + acc_weight
-      if total_weight > 0:
-        model_weight /= total_weight
-        acc_weight /= total_weight
+      total_confidence = model_confidence + acc_confidence
+      if total_confidence > 0:
+        model_weight *= model_confidence
+        acc_weight *= acc_confidence
 
-    valid_speeds = [(speed, weight) for speed, weight in
-                    [(model_speed, model_weight), (acc_speed, acc_weight)]
-                    if speed != NO_LIMIT_SPEED]
+        total_weight = model_weight + acc_weight
+        if total_weight > 0:
+          model_weight /= total_weight
+          acc_weight /= total_weight
 
-    calculated_curve_speed_ms = (
-      sum(s * w for s, w in valid_speeds) / sum(w for _, w in valid_speeds)
-      if valid_speeds else NO_LIMIT_SPEED
-    )
+      valid_speeds = [(speed, weight) for speed, weight in
+                      [(model_speed, model_weight), (acc_speed, acc_weight)]
+                      if speed != NO_LIMIT_SPEED]
 
-    if calculated_curve_speed_ms != NO_LIMIT_SPEED:
-      speed_reduction_ratio = current_speed_ms / calculated_curve_speed_ms
-      if speed_reduction_ratio > 1.3:
-        calculated_curve_speed_ms *= 0.9
+      calculated_curve_speed_ms = (
+        sum(s * w for s, w in valid_speeds) / sum(w for _, w in valid_speeds)
+        if valid_speeds else NO_LIMIT_SPEED
+      )
 
-    curve_speed_ms = min(calculated_curve_speed_ms, self.conv.to_ms(v_cruise_kph))
-    curve_speed_clu = self.conv.to_clu(curve_speed_ms)
+      if calculated_curve_speed_ms != NO_LIMIT_SPEED:
+        speed_reduction_ratio = current_speed_ms / calculated_curve_speed_ms
+        if speed_reduction_ratio > 1.3:
+          calculated_curve_speed_ms *= 0.9
 
-    return curve_speed_clu
+      curve_speed_ms = min(calculated_curve_speed_ms, self.conv.to_ms(v_cruise_kph))
+
+      self.cached_curve_speed_clu = self.conv.to_clu(curve_speed_ms)
+      self.prev_model_mono_time = model_mono_time
+
+    return self.cached_curve_speed_clu
 
   def _cal_steer_based_speed(self, current_speed_ms: float, steering_angle_deg: float):
     start_decel_angle = 45.
@@ -679,6 +689,8 @@ class CruiseStateManager:
     self.prev_brake_pressed = False
     self.prev_main_button = False
 
+    self.available_timer = 0
+
   @classmethod
   def instance(cls):
     if not hasattr(cls, "_instance"):
@@ -687,7 +699,7 @@ class CruiseStateManager:
 
   def _reset_available(self):
     self.available = False
-    threading.Timer(3.0, lambda: setattr(self, 'available', True)).start()
+    self.available_timer = 300
 
   def _reset_speed(self, CS):
     self.enabled = False
@@ -695,6 +707,11 @@ class CruiseStateManager:
     self.speed_ms = CS.vEgoCluster
 
   def update(self, CS, main_buttons):
+    if self.available_timer > 0:
+      self.available_timer -= 1
+      if self.available_timer == 0:
+        self.available = True
+
     btn, long_pressed, double_pressed = self.btn_handler.update(CS.buttonEvents)
 
     if btn != ButtonType.unknown:
@@ -769,7 +786,8 @@ class CruiseStateManager:
 
     if btn == ButtonType.gapAdjustCruise:
       if long_pressed:
-        self.params.put_bool("ExperimentalMode", not self.params.get_bool("ExperimentalMode"))
+        current_exp_mode = self.params.get_bool("ExperimentalMode")
+        self.params.put_bool_nonblocking("ExperimentalMode", not current_exp_mode)
 
     if btn == ButtonType.cancel:
       if not long_pressed:
