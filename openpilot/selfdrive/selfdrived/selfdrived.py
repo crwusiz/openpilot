@@ -357,7 +357,7 @@ class SelfdriveD:
           self.events.add(EventName.cameraMalfunction)
           if not self.sm.all_alive(['driverCameraState']) and not self.dcam_is_missing:
             self.dcam_is_missing = True
-            self.params.put_bool_nonblocking("DriverCameraHardwareMissing", True)
+            self.params.put_bool("DriverCameraHardwareMissing", True, block=False)
         elif not self.sm.all_freq_ok(self.camera_packets):
           self.events.add(EventName.cameraFrameRate)
     if not REPLAY and self.rk.lagging:

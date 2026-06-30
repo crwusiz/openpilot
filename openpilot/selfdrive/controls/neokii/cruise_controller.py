@@ -787,7 +787,7 @@ class CruiseStateManager:
     if btn == ButtonType.gapAdjustCruise:
       if long_pressed:
         current_exp_mode = self.params.get_bool("ExperimentalMode")
-        self.params.put_bool_nonblocking("ExperimentalMode", not current_exp_mode)
+        self.params.put_bool("ExperimentalMode", not current_exp_mode, block=False)
 
     if btn == ButtonType.cancel:
       if not long_pressed:
