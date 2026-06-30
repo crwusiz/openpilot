@@ -44,10 +44,14 @@ def _default_route_ip() -> str | None:
   finally:
     s.close()
 
+# aioice patch: gather ICE candidates only on the default-route interface
 _get_host_addresses = aioice.ice.get_host_addresses
 def _primary_host_addresses(use_ipv4: bool, use_ipv6: bool) -> list[str]:
   addresses = _get_host_addresses(use_ipv4, use_ipv6)
-  return addresses
+  primary = _default_route_ip()
+  if primary not in addresses:
+    return addresses
+  return [primary, ]
 aioice.ice.get_host_addresses = _primary_host_addresses
 
 
@@ -121,7 +125,7 @@ class CerealOutgoingMessageProxy(AsyncTaskRunner):
 
     while True:
       if not self._enabled:
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.01)
         continue
       try:
         self.update()
@@ -130,7 +134,7 @@ class CerealOutgoingMessageProxy(AsyncTaskRunner):
         break
       except Exception:
         self.logger.exception("Cereal outgoing proxy failure")
-      await asyncio.sleep(0.05)
+      await asyncio.sleep(0.01)
 
 
 class CerealIncomingMessageProxy:
