@@ -73,14 +73,14 @@ set_timezone() {
 
 configure_git() {
   log "INFO" "Optimizing Git config..."
-  git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
-  git config --global http.sslVerify false
-  git config --global submodule.recurse true
-  git config --global http.postBuffer 524288000
-  git config --global core.preloadindex true
-  git config --global fetch.parallel 4
-  git config --global submodule.fetchJobs 4
-  git config --global diff.ignoreSubmodules untracked
+  git config --local remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+  git config --local http.sslVerify false
+  git config --local submodule.recurse true
+  git config --local http.postBuffer 524288000
+  git config --local core.preloadindex true
+  git config --local fetch.parallel 4
+  git config --local submodule.fetchJobs 4
+  git config --local diff.ignoreSubmodules untracked
 }
 
 update_repository() {
@@ -100,22 +100,30 @@ update_repository() {
   fi
   log "SUCCESS" "Fetch complete."
 
-  # 2. Reset (Hide output, format manually)
-  log "INFO" "Resetting main repo (origin/$branch)..."
-  if git reset --hard "origin/$branch" > /dev/null 2>&1; then
-    local commit_hash
-    commit_hash=$(git rev-parse --short HEAD)
-    local commit_msg
-    commit_msg=$(git log -1 --format=%s)
+  log "INFO" "Cleaning untracked files..."
+  git clean -fd > /dev/null 2>&1
 
-    log "SUCCESS" "Reset complete."
-    log_detail "HEAD is now at $commit_hash $commit_msg"
-  else
-    log "ERROR" "Reset failed."
+  log "INFO" "Resetting main repo (origin/$branch)..."
+  local reset_err
+  if ! reset_err=$(GIT_LFS_SKIP_SMUDGE=1 git reset --hard "origin/$branch" 2>&1); then
+    log "ERROR" "Reset failed. Reason: $reset_err"
     return 1
   fi
 
-  git clean -fd > /dev/null 2>&1
+  log "INFO" "Pulling LFS files..."
+  local lfs_err
+  if ! lfs_err=$(git lfs pull 2>&1); then
+    log "ERROR" "LFS Pull failed. Reason: $lfs_err"
+    return 1
+  fi
+
+  local commit_hash
+  commit_hash=$(git rev-parse --short HEAD)
+  local commit_msg
+  commit_msg=$(git log -1 --format=%s)
+
+  log "SUCCESS" "Reset and LFS Pull complete."
+  log_detail "HEAD is now at $commit_hash $commit_msg"
 }
 
 update_submodules() {
@@ -132,8 +140,7 @@ update_submodules() {
     name=$(basename "$path")
     log "INFO" "Processing submodule: $name"
 
-    # Update submodule
-    if git submodule update --init --force "$path" > /dev/null 2>&1; then
+    if git submodule update --init --force --jobs 4 "$path" > /dev/null 2>&1; then
 
       git -C "$path" lfs pull > /dev/null 2>&1 || true
 
@@ -150,7 +157,7 @@ update_submodules() {
     else
       log "WARNING" "'$name': Update failed. Retrying with force init..."
       git submodule deinit -f "$path" > /dev/null 2>&1 || true
-      if git submodule update --init --force "$path" > /dev/null 2>&1; then
+      if git submodule update --init --force --jobs 4 "$path" > /dev/null 2>&1; then
          git -C "$path" lfs pull > /dev/null 2>&1 || true
 
          local sub_hash_retry
