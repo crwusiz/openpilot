@@ -495,6 +495,10 @@ msgstr "Git Reset -1"
 msgid "Go to https://connect.comma.ai on your phone"
 msgstr "휴대폰에서 https://connect.comma.ai 에 접속하세요"
 
+#: openpilot/selfdrive/ui/layouts/sidebar.py
+msgid "HIGH"
+msgstr "높음"
+
 #: system/ui/widgets/network.py
 msgid "Hidden Network"
 msgstr "숨겨진 네트워크"
@@ -542,6 +546,10 @@ msgstr "로그 활성화"
 #: openpilot/selfdrive/ui/layouts/settings/developer.py
 msgid "Longitudinal Maneuver Mode"
 msgstr "롱컨 기동 모드"
+
+#: openpilot/selfdrive/ui/onroad/hud_renderer.py
+msgid "MAX"
+msgstr "최대"
 
 #: openpilot/selfdrive/ui/layouts/settings/community.py
 msgid "Manufacturer"
@@ -1055,6 +1063,10 @@ msgstr "\"{}\"용"
 msgid "git pull"
 msgstr "git pull"
 
+#: openpilot/selfdrive/ui/onroad/hud_renderer.py
+msgid "km/h"
+msgstr "km/h"
+
 #: system/ui/widgets/network.py
 msgid "leave blank for automatic configuration"
 msgstr "자동 구성을 사용하려면 비워 두세요"
@@ -1070,6 +1082,10 @@ msgstr "로그 파일이 없습니다"
 #: system/ui/widgets/network.py
 msgid "metered"
 msgstr "종량제"
+
+#: openpilot/selfdrive/ui/onroad/hud_renderer.py
+msgid "mph"
+msgstr "mph"
 
 #: openpilot/selfdrive/ui/layouts/settings/software.py
 msgid "never"

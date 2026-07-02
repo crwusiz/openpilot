@@ -206,10 +206,13 @@ class SelfdriveD:
 
     # Handle DM
     if not self.CP.notCar and not self.dcam_is_missing:
-      # Block engaging until ignition cycle after max number or time of distractions
+      # Block engaging until lockout times out or ignition reset
       if self.sm['driverMonitoringState'].lockout and not self.dm_lockout_set:
         self.params.put_bool("DriverTooDistracted", True)
         self.dm_lockout_set = True
+      elif not self.sm['driverMonitoringState'].lockout and self.dm_lockout_set:
+        self.params.remove("DriverTooDistracted")
+        self.dm_lockout_set = False
       # No entry conditions
       if self.sm['driverMonitoringState'].lockout or self.sm['driverMonitoringState'].alwaysOnLockout:
         self.events.add(EventName.tooDistracted)
@@ -359,7 +362,7 @@ class SelfdriveD:
           self.events.add(EventName.cameraMalfunction)
           if not self.sm.all_alive(['driverCameraState']) and not self.dcam_is_missing:
             self.dcam_is_missing = True
-            self.params.put_bool_nonblocking("DriverCameraHardwareMissing", True)
+            self.params.put_bool("DriverCameraHardwareMissing", True, block=False)
         elif not self.sm.all_freq_ok(self.camera_packets):
           self.events.add(EventName.cameraFrameRate)
     if not REPLAY and self.rk.lagging:

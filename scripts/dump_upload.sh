@@ -14,14 +14,14 @@ source "${SCRIPT_DIR}/common_utils.sh"
 # FTP Configuration
 readonly FTP_USER="openpilot"
 readonly FTP_PASS="ruF3~Dt8"
-readonly FTP_HOST="jmtechn.com"
+readonly FTP_HOST="ftp.jmtechn.com"
 readonly FTP_PORT="8022"
 readonly FTP_DIR="tmux_log"
 
 # Paths
 readonly LOG_BASE_DIR="/data"
 readonly PARAMS_DIR="/data/params/d"
-readonly DUMP_SCRIPT="/data/openpilot/selfdrive/debug/dump.py"
+readonly DUMP_SCRIPT="/data/openpilot/tools/script/dump.py"
 
 # ==============================================================================
 # Utility Functions

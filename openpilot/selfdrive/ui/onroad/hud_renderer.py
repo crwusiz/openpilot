@@ -142,7 +142,6 @@ class HudRenderer(Widget):
     self._font_medium: rl.Font = gui_app.font(FontWeight.MEDIUM)
     self._font_semi_bold: rl.Font = gui_app.font(FontWeight.SEMI_BOLD)
     self._font_bold: rl.Font = gui_app.font(FontWeight.BOLD)
-    self._font_extra_bold: rl.Font = gui_app.font(FontWeight.EXTRA_BOLD)
 
     self._exp_button: ExpButton = ExpButton(UIConfig.button_size, UIConfig.icon_size)
 

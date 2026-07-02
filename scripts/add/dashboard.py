@@ -9,6 +9,11 @@ from pathlib import Path
 from datetime import datetime
 
 try:
+  from openpilot.common.realtime import set_core_affinity
+except ImportError:
+  def set_core_affinity(cores): pass
+
+try:
   from nicegui import ui, app
 except ImportError:
   logging.getLogger("dashboard").warning("nicegui not found. Remounting filesystem to install...")
@@ -56,7 +61,73 @@ def get_list_from_file(path: str) -> list:
       return [line.strip() for line in f if line.strip()]
   return []
 
-async def run_script_async(name: str, path: str, args: list = None) -> int:
+async def run_script_async(name: str, path: str, args: list = None, show_modal: bool = False) -> int:
+  if show_modal:
+    with ui.dialog().classes('backdrop-blur-sm') as dialog, ui.card().classes('w-[95vw] max-w-4xl bg-[#0D1117] border border-[#3A4A6B] p-0 shadow-2xl'):
+      with ui.row().classes('w-full px-4 py-3 border-b border-[#3A4A6B] bg-[#1A2235] justify-between items-center'):
+        with ui.row().classes('items-center gap-2'):
+          ui.html('<div style="font-size: 1.2em;">🖥️</div>')
+          ui.label(f'실행 중: {name}').classes('text-white font-bold text-[1.1rem]')
+        close_btn = ui.button(icon='close', on_click=dialog.close).props('flat round dense color=white').classes('hidden')
+
+      log_view = ui.log().classes('w-full h-[60vh] bg-transparent text-[#E8EEFF] p-4 font-mono text-[1.05em] leading-relaxed overflow-y-auto')
+      log_view.style('font-family: "Roboto Mono", "Consolas", monospace; white-space: pre-wrap; word-break: break-all; box-shadow: none;')
+
+      dialog.open()
+      await asyncio.sleep(0.1)
+
+      try:
+        if path.endswith('.sh'):
+          os.system(f"sed -i 's/\\r$//' {path} 2>/dev/null")
+          os.system(f"chmod +x {path} 2>/dev/null")
+        if "gitpull" in path or "restart" in path:
+          os.system(f"sed -i 's/\\r$//' {SCRIPTS_PATH}/restart.sh 2>/dev/null")
+          os.system(f"chmod +x {SCRIPTS_PATH}/restart.sh 2>/dev/null")
+          os.system("tmux kill-session -t tmp 2>/dev/null")
+
+        cmd = ["bash", path] if path.endswith('.sh') else ["python3", path]
+        if args: cmd += args
+
+        env = os.environ.copy()
+        env.pop('TMUX', None)
+        env.pop('TMUX_PANE', None)
+
+        process = await asyncio.create_subprocess_exec(
+          *cmd,
+          stdout=asyncio.subprocess.PIPE,
+          stderr=asyncio.subprocess.STDOUT,
+          start_new_session=True,
+          env=env
+        )
+
+        log_view.push(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] {name} 작업을 시작합니다...\n")
+
+        while True:
+          line = await process.stdout.readline()
+          if not line:
+            break
+          text = line.decode('utf-8', errors='replace').rstrip()
+          log_view.push(text)
+          await asyncio.sleep(0.01)
+
+        await process.wait()
+
+        if process.returncode == 0:
+          log_view.push(f"\n✅ [{datetime.now().strftime('%H:%M:%S')}] 성공적으로 완료되었습니다.")
+        else:
+          log_view.push(f"\n❌ [{datetime.now().strftime('%H:%M:%S')}] 오류가 발생하여 중단되었습니다. (Exit Code: {process.returncode})")
+
+        return_code = process.returncode
+
+      except Exception as e:
+        log_view.push(f"\n❌ 실행 실패: {e}")
+        return_code = 1
+      finally:
+        close_btn.classes(remove='hidden')
+        log_view.push("\n[ 확인을 마쳤으면 우측 상단의 'X' 버튼을 누르거나 창 바깥을 클릭하여 닫아주세요. ]")
+
+      return return_code
+
   ui.notify(f"[{name}] 진행 중...", type='info', position='top')
   await asyncio.sleep(0.1)
   try:
@@ -109,7 +180,9 @@ def reset_calibration():
 
 def get_tmux_capture() -> str:
   try:
-    res = subprocess.run(["tmux", "capture-pane", "-pe", "-t", "0"], capture_output=True, text=True)
+    subprocess.run(["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"], capture_output=True)
+
+    res = subprocess.run(["tmux", "capture-pane", "-pe", "-t", "0", "-S", "-100"], capture_output=True, text=True)
     return res.stdout if res.returncode == 0 else "Tmux Session not found (Wait for openpilot to start...)"
   except Exception as e:
     return f"Error capturing tmux: {e}"
@@ -253,15 +326,50 @@ def apply_styles():
 
     /* ── 로그 뷰어 ── */
     .log-viewer {
-        background: #0D1117; border: 1.5px solid #3A4A6B; border-radius: 12px;
-        padding: 16px 20px; font-family: 'Courier New', Courier, monospace;
-        font-size: 0.8em; color: #BCC4E0; white-space: pre-wrap; word-break: break-all;
-        height: 430px; overflow-y: auto; box-shadow: inset 0 2px 12px rgba(0,0,0,0.5); width: 100%;
+        background: #0D1117;
+        border: 1.5px solid #3A4A6B;
+        border-radius: 12px;
+        padding: 16px 20px;
+
+        /* 폰트 렌더링 최적화 */
+        font-family: 'Roboto Mono', 'Consolas', 'Menlo', 'Courier New', monospace;
+        font-size: 1.15em;
+        font-weight: 500;
+        line-height: 1.5;
+        letter-spacing: 0.02em;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        color: #E8EEFF;
+
+        white-space: pre-wrap;
+        word-break: keep-all;
+        overflow-wrap: break-word;
+
+        height: 60vh;
+        min-height: 430px;
+        overflow-y: auto;
+        box-shadow: inset 0 2px 12px rgba(0,0,0,0.5);
+        width: 100%;
     }
+
+    .log-viewer span {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
     .log-statusbar {
-        background: linear-gradient(90deg, #1A2235, #232E45); border: 1.5px solid #3A4A6B; border-left: 4px solid #3B82F6;
-        border-radius: 12px; padding: 10px 16px; font-family: 'Courier New', monospace;
-        font-size: 0.78em; color: #93C5FD; width: 100%; margin-top: 8px;
+        background: linear-gradient(90deg, #1A2235, #232E45);
+        border: 1.5px solid #3A4A6B;
+        border-left: 4px solid #3B82F6;
+        border-radius: 12px;
+        padding: 10px 16px;
+        font-family: 'Roboto Mono', 'Consolas', 'Menlo', monospace;
+        font-size: 1.15em;
+        font-weight: 600;
+        -webkit-font-smoothing: antialiased;
+        color: #93C5FD;
+        width: 100%;
+        margin-top: 8px;
     }
     .log-error { border-left-color: #EF4444 !important; color: #FCA5A5 !important; }
 
@@ -290,7 +398,6 @@ def apply_styles():
 # ── 3. 탭별 렌더링 함수들 ─────────────────────────────────────
 
 def render_tab_functions():
-  # 상태 갱신을 위해 refreshable 데코레이터 적용
   @ui.refreshable
   def functions_content():
     with ui.column().classes('w-full gap-3 mt-4'):
@@ -333,7 +440,6 @@ def render_tab_functions():
           functions_content.refresh()
         ui.select(b_opts, value=c_b, label='🌿 Git Branch', on_change=on_b_change).classes('w-full text-blue-200')
 
-      # 파라미터에서 업데이트 정보 안전하게 읽어오기
       commit_raw = params.get("CommitCompare")
       commit_output = commit_raw.decode('utf-8') if isinstance(commit_raw, bytes) else str(commit_raw) if commit_raw else ""
       commit_info = commit_output if commit_output else "Check required"
@@ -348,17 +454,15 @@ def render_tab_functions():
         card_cls, icon = ('card-success', '✅') if " == " in commit_info else ('card-danger', '⚠️') if " != " in commit_info else ('card-warning', '🔍')
         ui.html(f'<div class="pill-card {card_cls}"><div class="pill-card-icon">{icon}</div><div class="pill-card-text">UPDATE STATUS<div class="pill-card-value">{commit_info}</div></div></div>').classes('w-full')
 
-      # 3. Git Pull 버튼 (전체 3분할 중: 버튼 1영역, 알림 1영역)
       if commit_output and " != " in commit_output:
         with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
           async def do_git_pull():
-            await run_script_async("Git Pull", f"{SCRIPTS_PATH}/gitpull.sh")
+            await run_script_async("Git Pull", f"{SCRIPTS_PATH}/gitpull.sh", show_modal=True)
             functions_content.refresh()
 
           ui.button('GIT PULL NOW', on_click=do_git_pull, color=None).classes('custom-btn btn-blue-pull w-full')
           ui.html('<div class="pill-card card-warning"><div class="pill-card-icon">⚠️</div><div class="pill-card-text">NEW UPDATE AVAILABLE<div class="pill-card-value">Please pull the latest changes.</div></div></div>').classes('w-full')
 
-      # 4. 캘리브레이션 (전체 3분할 중: 버튼 1영역, 알림 1영역)
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         def do_reset_cal():
           reset_calibration()
@@ -368,7 +472,6 @@ def render_tab_functions():
         dev_pos = params.get("DevicePosition") or "--"
         ui.html(f'<div class="pill-card card-info"><div class="pill-card-icon">📍</div><div class="pill-card-text">DEVICE POSITION<div class="pill-card-value">{dev_pos}</div></div></div>').classes('w-full')
 
-      # 5. 재부팅 (전체 3분할 중: 버튼 1영역)
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         ui.button('REBOOT', on_click=lambda: subprocess.Popen(["sudo", "reboot"], start_new_session=True), color=None).classes('custom-btn btn-red w-full')
 
@@ -420,8 +523,6 @@ def render_tab_logs():
   REALDATA_PATH = Path("/data/media/0/realdata")
 
   with ui.column().classes('w-full mt-2 gap-6'):
-
-    # ── 1. 리얼데이터 섹션 (주행 경로 데이터 업로드) ──
     with ui.column().classes('w-full gap-2'):
       ui.html('<div style="color:#6EE7B7; font-size:1.1em; font-weight:800; margin-bottom:4px;"><span style="margin-right:6px;">📂</span>Route Data Upload</div>')
 
@@ -466,80 +567,113 @@ def render_tab_logs():
 
             ui.button('ROUTE UPLOAD', on_click=upload_route, color=None).classes('custom-btn btn-green-route col-span-1')
 
-    # ── 2. 시스템 로그 섹션 ──
     with ui.column().classes('w-full gap-2'):
       ui.html(
         '<div style="color:#93C5FD; font-size:1.1em; font-weight:800; margin-bottom:4px;"><span style="margin-right:6px;">📄</span>System Logs</div>')
 
       with ui.element('div').classes('w-full grid grid-cols-4 gap-2 items-center'):
-        sel_log = ui.select(list(LOG_FILES.keys()), value="CAN Missing", label="Select Log File").classes(
-          'col-span-2 min-w-0')
-        ui.button('VIEW', on_click=lambda: view_log(), color=None).classes('custom-btn btn-default col-span-1')
-        ui.button('UPLOAD', on_click=lambda: upload_log(), color=None).classes('custom-btn btn-green col-span-1')
+        sel_log = ui.select(list(LOG_FILES.keys()), value="CAN Missing", label="Select Log File").classes('col-span-2 min-w-0')
 
-      viewer_container = ui.html('<div class="log-viewer">파일을 선택한 후 View 버튼을 눌러주세요.</div>').classes('w-full mt-2')
+        def view_log():
+          log_path = LOG_FILES[sel_log.value]
+          content = ""
+          err_msg = ""
+
+          if log_path == "TMUX_CONSOLE":
+            subprocess.run(["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"], capture_output=True)
+            subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
+            p = Path("/data/tmux_console.log")
+            if p.exists():
+              content = p.read_text()
+            else:
+              err_msg = "Failed to capture tmux console."
+          else:
+            p = Path(log_path)
+            if p.exists():
+              content = p.read_text()
+            else:
+              err_msg = "File not found."
+
+          if err_msg:
+            viewer_container.content = f'<div style="color:#FCA5A5; font-weight:bold;">❌ {err_msg}</div>'
+            status_container.content = '<div class="log-statusbar log-error">⚠️ 파일을 불러오지 못했습니다.</div>'
+          else:
+            conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
+            display = conv.convert(content, full=False)
+            viewer_container.content = display
+            status_container.content = f'<div class="log-statusbar">📄 {sel_log.value} | {len(content.splitlines())} lines | {len(content):,} chars</div>'
+            ui.run_javascript('var v=document.getElementById("logContainer");if(v)v.scrollTop=v.scrollHeight;')
+
+        async def upload_log():
+          log_path = LOG_FILES[sel_log.value]
+          if log_path == "TMUX_CONSOLE":
+            subprocess.run(["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"], capture_output=True)
+            subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
+            await run_script_async("Console Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=["/data/tmux_console.log"])
+          else:
+            await run_script_async("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[log_path])
+
+        ui.button('VIEW', on_click=view_log, color=None).classes('custom-btn btn-default col-span-1')
+        ui.button('UPLOAD', on_click=upload_log, color=None).classes('custom-btn btn-green col-span-1')
+
+      with ui.element('div').classes('log-viewer w-full mt-2').props('id="logContainer"'):
+        viewer_container = ui.html('파일을 선택한 후 View 버튼을 눌러주세요.')
+
       status_container = ui.html('<div class="log-statusbar">📂 대기 중...</div>').classes('w-full')
 
-      def view_log():
-        log_path = LOG_FILES[sel_log.value]
-        content = ""
-        err_msg = ""
 
-        if log_path == "TMUX_CONSOLE":
-          subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
-          p = Path("/data/tmux_console.log")
-          if p.exists():
-            content = p.read_text()
-          else:
-            err_msg = "Failed to capture tmux console."
-        else:
-          p = Path(log_path)
-          if p.exists():
-            content = p.read_text()
-          else:
-            err_msg = "File not found."
-
-        if err_msg:
-          viewer_container.content = f'<div class="log-viewer log-error">❌ {err_msg}</div>'
-          status_container.content = '<div class="log-statusbar log-error">⚠️ 파일을 불러오지 못했습니다.</div>'
-        else:
-          conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
-          display = conv.convert(content, full=False)
-          viewer_container.content = f'<div class="log-viewer" id="logViewer">{display}</div>'
-          status_container.content = f'<div class="log-statusbar">📄 {sel_log.value} | {len(content.splitlines())} lines | {len(content):,} chars</div>'
-          ui.run_javascript('var v=document.getElementById("logViewer");if(v)v.scrollTop=v.scrollHeight;')
-
-      async def upload_log():
-        log_path = LOG_FILES[sel_log.value]
-        if log_path == "TMUX_CONSOLE":
-          if not Path("/data/tmux_console.log").exists():
-            subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
-          await run_script_async("Console Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=["tmux_console.log"])
-        else:
-          await run_script_async("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[sel_log.value])
-
-
-def render_tab_terminal():
+def render_tab_terminal(tabs):
   conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
 
   with ui.column().classes('w-full mt-4'):
-    viewer = ui.html('<div class="log-viewer">Loading...</div>').classes('w-full')
+    with ui.element('div').classes('log-viewer').props('id="termContainer"'):
+        viewer = ui.html('Loading...')
     statusbar = ui.html('<div class="log-statusbar">Loading...</div>').classes('w-full')
 
   def update_terminal():
-    content = get_tmux_capture()
-    lines = len(content.splitlines())
-    now_str = datetime.now().strftime("%H:%M:%S")
+    try:
+      if tabs.value != 'TERMINAL':
+        return
 
-    if content.startswith("Error") or content.startswith("Tmux Session not found"):
-      viewer.content = f'<div class="log-viewer log-error">❌ {html_lib.escape(content)}</div>'
-      statusbar.content = '<div class="log-statusbar log-error">⚠️ tmux 세션을 찾을 수 없습니다.</div>'
-    else:
-      colored_html = conv.convert(content, full=False)
-      viewer.content = f'<div class="log-viewer" id="termViewer">{colored_html}</div>'
-      statusbar.content = f'<div class="log-statusbar">🖥️ Tmux Session | {lines} lines | 🔄 Updated: {now_str}</div>'
-      ui.run_javascript('var v=document.getElementById("termViewer");if(v)v.scrollTop=v.scrollHeight;')
+      if getattr(viewer, 'is_deleted', False) or viewer.parent_slot is None:
+        return
 
+      content = get_tmux_capture()
+      lines = len(content.splitlines())
+      now_str = datetime.now().strftime("%H:%M:%S")
+
+      if content.startswith("Error") or content.startswith("Tmux Session not found"):
+        viewer.content = f'<div style="color:#FCA5A5; font-weight:bold;">❌ {html_lib.escape(content)}</div>'
+        statusbar.content = '<div class="log-statusbar log-error">⚠️ tmux 세션을 찾을 수 없습니다.</div>'
+      else:
+        colored_html = conv.convert(content, full=False)
+        viewer.content = colored_html
+        statusbar.content = f'<div class="log-statusbar">🖥️ Tmux Session | {lines} lines | 🔄 Updated: {now_str}</div>'
+
+      js_code = """
+      var container = document.getElementById("termContainer");
+      if (container) {
+          // 사용자가 화면 맨 밑에서 50px 이내 영역에 스크롤을 위치시켰는지 판별
+          var isAtBottom = (container.scrollHeight - container.clientHeight - container.scrollTop) <= 50;
+          var currentScroll = container.scrollTop;
+
+          // 약간의 딜레이(DOM 변경 적용시간) 후 스크롤을 보정
+          setTimeout(function() {
+              if (isAtBottom) {
+                  container.scrollTop = container.scrollHeight;
+              } else if (container.scrollTop !== currentScroll) {
+                  container.scrollTop = currentScroll; // 기존 위치 고정 (튀는 현상 방지)
+              }
+          }, 50);
+      }
+      """
+      ui.run_javascript(js_code)
+
+    except Exception:
+      # 백그라운드 타이머 작동 중 부모 삭제 에러가 발생하면 조용히 무시 (pass)
+      pass
+
+  # 1초마다 터미널 업데이트 실행
   ui.timer(1.0, update_terminal)
 
 
@@ -577,7 +711,23 @@ def render_tab_camera():
                     const offer = await pc.createOffer();
                     await pc.setLocalDescription(offer);
 
-                    await new Promise((r) => setTimeout(r, 1000));
+                    await new Promise((resolve) => {{
+                        if (pc.iceGatheringState === 'complete') {{
+                            resolve();
+                        }} else {{
+                            const checkState = () => {{
+                                if (pc.iceGatheringState === 'complete') {{
+                                    pc.removeEventListener('icegatheringstatechange', checkState);
+                                    resolve();
+                                }}
+                            }};
+                            pc.addEventListener('icegatheringstatechange', checkState);
+                            setTimeout(() => {{
+                                pc.removeEventListener('icegatheringstatechange', checkState);
+                                resolve();
+                            }}, 2000); // 2초 초과시 강제 진행
+                        }}
+                    }});
 
                     const payload = {{ sdp: pc.localDescription.sdp, init_camera: "{stream_type}", enabled: true, bridge_services_in: [], bridge_services_out: [] }};
                     const response = await fetch(`http://${{ip}}:5001/stream`, {{ method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(payload) }});
@@ -629,8 +779,9 @@ def main_page():
     with ui.tab_panel('TOGGLES'): render_tab_toggles()
     with ui.tab_panel('CAMERA'): render_tab_camera()
     with ui.tab_panel('LOGS'): render_tab_logs()
-    with ui.tab_panel('TERMINAL'): render_tab_terminal()
+    with ui.tab_panel('TERMINAL'): render_tab_terminal(tabs)
 
 
 if __name__ in {"__main__", "__mp_main__"}:
+  set_core_affinity([0, 1, 2])
   ui.run(host="0.0.0.0", port=7000, title="Openpilot Dashboard", show=False)

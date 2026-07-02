@@ -1,6 +1,5 @@
 import subprocess
 import shutil
-import os
 import time
 import threading
 import pyray as rl
@@ -10,7 +9,6 @@ from pathlib import Path
 from typing import List, Callable, Union
 
 from openpilot.common.params import Params
-from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.widgets import Widget, DialogResult
 from openpilot.system.ui.widgets.list_view import toggle_item, button_item, ListItem
 from openpilot.system.ui.widgets.scroller_tici import Scroller
@@ -222,7 +220,7 @@ class CommunityLayout(Widget):
           except Exception as e:
             print(f"Error copying car list: {e}")
 
-        self._params.put("SelectedManufacturer", str(selected_manufacturer))
+        self._params.put("SelectedManufacturer", str(selected_manufacturer), block=True)
         print(f"Saved manufacturer: {selected_manufacturer}")
 
       self._manufacturer_dialog = None
@@ -259,7 +257,7 @@ class CommunityLayout(Widget):
         self._params.remove("SelectedCar")
         print("Removed car selection")
       else:
-        self._params.put("SelectedCar", str(selected_car))
+        self._params.put("SelectedCar", str(selected_car), block=True)
         print(f"Saved car: {selected_car}")
 
       self._car_dialog = None
@@ -296,7 +294,7 @@ class CommunityLayout(Widget):
         self._params.remove("SelectedBranch")
         print("Removed branch selection")
       else:
-        self._params.put("SelectedBranch", str(selected_branch))
+        self._params.put("SelectedBranch", str(selected_branch), block=True)
         print(f"Saved branch: {selected_branch}")
 
       self._branch_dialog = None
@@ -348,55 +346,55 @@ class CommunityLayout(Widget):
         lambda: tr("PcmCruise"),
         description=lambda: DESCRIPTIONS["pcm_cruise"],
         initial_state=self._params.get_bool("PcmCruiseEnable"),
-        callback=lambda state: self._params.put_bool("PcmCruiseEnable", state),
+        callback=lambda state: self._params.put_bool("PcmCruiseEnable", state, block=True),
       ),
       toggle_item(
         lambda: tr("Cruise State Controls"),
         description=lambda: DESCRIPTIONS["cruise_state_control"],
         initial_state=self._params.get_bool("CruiseStateControl"),
-        callback=lambda state: self._params.put_bool("CruiseStateControl", state),
+        callback=lambda state: self._params.put_bool("CruiseStateControl", state, block=True),
       ),
       toggle_item(
         lambda: tr("CANFD Car HDA2"),
         description=lambda: DESCRIPTIONS["is_hda2"],
         initial_state=self._params.get_bool("IsHda2"),
-        callback=lambda state: self._params.put_bool("IsHda2", state),
+        callback=lambda state: self._params.put_bool("IsHda2", state, block=True),
       ),
       toggle_item(
         lambda: tr("CameraSCC"),
         description=lambda: DESCRIPTIONS["camera_scc"],
         initial_state=self._params.get_bool("CameraSccEnable"),
-        callback=lambda state: self._params.put_bool("CameraSccEnable", state),
+        callback=lambda state: self._params.put_bool("CameraSccEnable", state, block=True),
       ),
       toggle_item(
         lambda: tr("Enable Radar Track"),
         description=lambda: DESCRIPTIONS["radar_track"],
         initial_state=self._params.get_bool("RadarTrackEnable"),
-        callback=lambda state: self._params.put_bool("RadarTrackEnable", state),
+        callback=lambda state: self._params.put_bool("RadarTrackEnable", state, block=True),
       ),
       toggle_item(
         lambda: tr("Driver Camera On Reverse"),
         description=lambda: DESCRIPTIONS["driver_cam_reverse"],
         initial_state=self._params.get_bool("DriverCameraOnReverse"),
-        callback=lambda state: self._params.put_bool("DriverCameraOnReverse", state),
+        callback=lambda state: self._params.put_bool("DriverCameraOnReverse", state, block=True),
       ),
       toggle_item(
         lambda: tr("DriverCamera Hardware Missing"),
         description=lambda: DESCRIPTIONS["driver_cam_missing"],
         initial_state=self._params.get_bool("DriverCameraHardwareMissing"),
-        callback=lambda state: self._params.put_bool("DriverCameraHardwareMissing", state),
+        callback=lambda state: self._params.put_bool("DriverCameraHardwareMissing", state, block=True),
       ),
       toggle_item(
         lambda: tr("Logger Enable"),
         description=lambda: DESCRIPTIONS["logger_enable"],
         initial_state=self._params.get_bool("LoggerEnable"),
-        callback=lambda state: self._params.put_bool("LoggerEnable", state),
+        callback=lambda state: self._params.put_bool("LoggerEnable", state, block=True),
       ),
       toggle_item(
         lambda: tr("Prebuilt Enable"),
         description=lambda: DESCRIPTIONS["prebuilt_enable"],
         initial_state=self._params.get_bool("PrebuiltEnable"),
-        callback=lambda state: self._params.put_bool("PrebuiltEnable", state),
+        callback=lambda state: self._params.put_bool("PrebuiltEnable", state, block=True),
       ),
     ]
 

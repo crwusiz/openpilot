@@ -13,6 +13,8 @@ from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 from openpilot.system.ui.widgets import Widget
 
+from openpilot.system.ui.lib.text_measure import measure_text_cached
+
 CLIP_MARGIN = 500
 MIN_DRAW_DISTANCE = 10.0
 MAX_DRAW_DISTANCE = 100.0
@@ -516,7 +518,7 @@ class ModelRenderer(Widget):
         self._draw_text_centered(center_x, speed_y, speed_text, font_size, v_color, self._font_bold)
 
   def _draw_text_centered(self, x: float, y: float, text: str, font_size: int, color: rl.Color, font: rl.Font):
-    text_size = rl.measure_text_ex(font, text, font_size, 0)
+    text_size = measure_text_cached(font, text, font_size)
     text_width = text_size.x
     text_height = text_size.y
 

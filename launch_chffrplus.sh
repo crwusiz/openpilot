@@ -21,18 +21,10 @@ function agnos_init {
   if [ $(< /VERSION) != "$AGNOS_VERSION" ]; then
     AGNOS_PY="$DIR/openpilot/common/hardware/tici/agnos.py"
     MANIFEST="$DIR/openpilot/system/hardware/tici/agnos.json"
-    MODEL="$(tr -d '\000\r\n' 2>/dev/null < /sys/firmware/devicetree/base/model | tr '[:upper:]' '[:lower:]')"
-    MODEL="${MODEL#comma }"
-    if [ "$MODEL" = "c3" ] || [ "$MODEL" = "tici" ]; then
-      MANIFEST="$DIR/openpilot/common/hardware/tici/agnos-tici.json"
-    fi
     if $AGNOS_PY --verify $MANIFEST; then
       sudo reboot
     fi
-    if ! python3 $DIR/openpilot/system/ui/updater.py $AGNOS_PY $MANIFEST; then
-      echo "python updater failed, falling back to bundled updater"
-      $DIR/openpilot/common/hardware/tici/updater $AGNOS_PY $MANIFEST
-    fi
+    $DIR/openpilot/common/hardware/tici/updater $AGNOS_PY $MANIFEST
   fi
 }
 
@@ -118,11 +110,11 @@ function launch {
   GITSTAT=$(git status)
 
   # events.py 한글로 변경 및 파일이 교체된 상태인지 확인
-  if [ "${LANG}" = "ko" ] && [[ ! "${GITSTAT}" == *"modified:   selfdrive/selfdrived/events.py"* ]]; then
-    cp -f $DIR/selfdrive/selfdrived/events.py $DIR/scripts/add/events_en.py
-    cp -f $DIR/scripts/add/events_ko.py $DIR/selfdrive/selfdrived/events.py
-  elif [ "${LANG}" = "en" ] && [[ "${GITSTAT}" == *"modified:   selfdrive/selfdrived/events.py"* ]]; then
-    cp -f $DIR/scripts/add/events_en.py $DIR/selfdrive/selfdrived/events.py
+  if [ "${LANG}" = "ko" ] && [[ ! "${GITSTAT}" == *"modified:   openpilot/selfdrive/selfdrived/events.py"* ]]; then
+    cp -f $DIR/openpilot/selfdrive/selfdrived/events.py $DIR/scripts/add/events_en.py
+    cp -f $DIR/scripts/add/events_ko.py $DIR/openpilot/selfdrive/selfdrived/events.py
+  elif [ "${LANG}" = "en" ] && [[ "${GITSTAT}" == *"modified:   openpilot/selfdrive/selfdrived/events.py"* ]]; then
+    cp -f $DIR/scripts/add/events_en.py $DIR/openpilot/selfdrive/selfdrived/events.py
   fi
 
   # openpilot ssh key installer
