@@ -21,7 +21,7 @@ readonly FTP_DIR="tmux_log"
 # Paths
 readonly LOG_BASE_DIR="/data"
 readonly PARAMS_DIR="/data/params/d"
-readonly DUMP_SCRIPT="/data/openpilot/selfdrive/debug/dump.py"
+readonly DUMP_SCRIPT="/data/openpilot/tools/script/dump.py"
 
 # ==============================================================================
 # Utility Functions

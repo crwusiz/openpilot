@@ -3,72 +3,119 @@ import sys
 import argparse
 import json
 import codecs
+import datetime
+import textwrap
 
 from openpilot.cereal import log
 from openpilot.cereal.services import SERVICE_LIST
 from openpilot.tools.lib.live_logreader import raw_live_logreader
 
-
 codecs.register_error("strict", codecs.backslashreplace_errors)
+
 
 def hexdump(msg):
   m = str.upper(msg.hex())
-  m = [m[i:i+2] for i in range(0,len(m),2)]
-  m = [m[i:i+16] for i in range(0,len(m),16)]
-  for row,dump in enumerate(m):
-    addr = '%08X:' % (row*16)
+  m = [m[i:i + 2] for i in range(0, len(m), 2)]
+  m = [m[i:i + 16] for i in range(0, len(m), 16)]
+  lines = []
+  for row, dump in enumerate(m):
+    addr = '%08X:' % (row * 16)
     raw = ' '.join(dump[:8]) + '  ' + ' '.join(dump[8:])
     space = ' ' * (48 - len(raw))
-    asci = ''.join(chr(int(x,16)) if 0x20 <= int(x,16) <= 0x7E else '.' for x in dump)
-    print(f'{addr} {raw} {space} {asci}')
+    asci = ''.join(chr(int(x, 16)) if 0x20 <= int(x, 16) <= 0x7E else '.' for x in dump)
+    lines.append(f"{addr} {raw} {space} {asci}")
+  return "\n".join(lines)
+
+
+def format_current_time():
+  return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 if __name__ == "__main__":
+  parser = argparse.ArgumentParser(description="Dump communication sockets.")
+  parser.add_argument('--pipe', action='store_true', help='Raw byte stream output')
+  parser.add_argument('--raw', action='store_true', help='Hexadecimal dump output')
+  parser.add_argument('--json', action='store_true', help='Output each event as JSON format')
+  parser.add_argument('--addr', default='127.0.0.1', help='Address to listen to (default: 127.0.0.1)')
+  parser.add_argument('-v', '--values', help='Specific variables to monitor, e.g (dump.py carState -v cruiseState)')
+  parser.add_argument('-c', '--count', type=int, help='Number of iterations to run before exiting')
+  parser.add_argument('-o', '--output', help='Output file')
+  parser.add_argument('socket', type=str, nargs='?', help="Socket name to dump (required)")
 
-  parser = argparse.ArgumentParser(description='Dump communication sockets. See openpilot/cereal/services.py for a complete list of available sockets.')
-  parser.add_argument('--pipe', action='store_true')
-  parser.add_argument('--raw', action='store_true')
-  parser.add_argument('--json', action='store_true')
-  parser.add_argument('--dump-json', action='store_true')
-  parser.add_argument('--no-print', action='store_true')
-  parser.add_argument('--addr', default='127.0.0.1')
-  parser.add_argument('--values', help='values to monitor (instead of entire event)')
-  parser.add_argument("socket", type=str, nargs='*', default=list(SERVICE_LIST.keys()), help="socket names to dump. defaults to all services defined in cereal")
+  if len(sys.argv) == 1:
+    parser.print_help()
+    print("\nAvailable sockets:")
+    socket_list = ", ".join(SERVICE_LIST.keys())
+    print(textwrap.fill(f"({socket_list})", width=100))
+    sys.exit(0)
+
   args = parser.parse_args()
 
-  lr = raw_live_logreader(args.socket, args.addr)
+  if args.socket not in SERVICE_LIST:
+    print(f"Error: The socket '{args.socket}' is not a valid service. Available sockets:")
+    socket_list = ", ".join(SERVICE_LIST.keys())
+    print(textwrap.fill(f"({socket_list})", width=100))
+    sys.exit(1)
 
-  values = None
-  if args.values:
-    values = [s.strip().split(".") for s in args.values.split(",")]
+  lr = raw_live_logreader([args.socket], args.addr)
+  values = [f"{args.socket}.{s.strip()}" for s in args.values.split(",")] if args.values else None
+  count = args.count if args.count else sys.maxsize
+  iterations = 0
 
-  for msg in lr:
-    with log.Event.from_bytes(msg) as evt:
-      if not args.no_print:
+  out_stream = open(args.output, 'w', encoding='utf-8') if args.output else sys.stdout
+
+  count_display = f" (Max: {args.count})" if args.count else ""
+  initial_separator = f"{'-' * 80}\n    Dump communication socket: {args.socket}{count_display}\n{'-' * 80}\n"
+
+  out_stream.write(initial_separator)
+  out_stream.flush()
+
+  try:
+    for msg in lr:
+      if iterations >= count:
+        break
+
+      iterations += 1
+      output_lines = []
+
+      try:
         if args.pipe:
-          sys.stdout.write(str(msg))
-          sys.stdout.flush()
+          output_lines.append(msg.decode('utf-8', errors='backslashreplace') + "\n")
         elif args.raw:
-          hexdump(msg)
-        elif args.json:
-          print(json.loads(msg))
-        elif args.dump_json:
-          print(json.dumps(evt.to_dict()))
-        elif values:
-          print(f"logMonotime = {evt.logMonoTime}")
-          for value in values:
-            if hasattr(evt, value[0]):
-              item = evt
-              for key in value:
-                item = getattr(item, key)
-              print(f"{'.'.join(value)} = {item}")
-          print("")
+          output_lines.append(hexdump(msg) + "\n")
+
         else:
-          try:
-            print(evt)
-          except UnicodeDecodeError:
-            w = evt.which()
-            s = f"( logMonoTime {evt.logMonoTime} \n  {w} = "
-            s += str(evt.__getattr__(w))
-            s += f"\n  valid = {evt.valid} )"
-            print(s)
+          with log.Event.from_bytes(msg) as evt:
+            if args.json:
+              try:
+                json_data = json.dumps(evt.to_dict(), default=str)
+                output_lines.append(json_data + "\n")
+              except TypeError as e:
+                print(f"JSON serialization error: {e}, event type: {type(evt)}", file=sys.stderr)
+                continue
+            elif values:
+              for value in values:
+                item = evt
+                for key in value.split("."):
+                  item = getattr(item, key, None)
+                  if item is None:
+                    break
+                if item is not None:
+                  output_lines.append(f"{value} = {item}\n")
+            else:
+              evt_str = str(evt).replace("logMonoTime", f"currentTime ({format_current_time()})")
+              output_lines.append(evt_str + "\n")
+
+        out_stream.writelines(output_lines)
+        out_stream.flush()
+
+      except Exception as e:
+        print(f"Error processing message: {e}", file=sys.stderr)
+        continue
+
+  except KeyboardInterrupt:
+    print("\nExiting...")
+
+  finally:
+    if args.output and out_stream is not sys.stdout:
+      out_stream.close()
