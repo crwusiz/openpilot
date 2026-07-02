@@ -180,7 +180,9 @@ def reset_calibration():
 
 def get_tmux_capture() -> str:
   try:
-    res = subprocess.run(["tmux", "capture-pane", "-pe", "-t", "0"], capture_output=True, text=True)
+    subprocess.run(["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"], capture_output=True)
+
+    res = subprocess.run(["tmux", "capture-pane", "-pe", "-t", "0", "-S", "-100"], capture_output=True, text=True)
     return res.stdout if res.returncode == 0 else "Tmux Session not found (Wait for openpilot to start...)"
   except Exception as e:
     return f"Error capturing tmux: {e}"
@@ -329,29 +331,27 @@ def apply_styles():
         border-radius: 12px;
         padding: 16px 20px;
 
-        /* 1. 폰트 변경: 가독성이 뛰어난 코딩용 폰트 우선 적용 */
+        /* 폰트 렌더링 최적화 */
         font-family: 'Roboto Mono', 'Consolas', 'Menlo', 'Courier New', monospace;
-
-        /* 2. 폰트 크기 및 굵기, 렌더링 최적화 */
         font-size: 1.15em;
         font-weight: 500;
-        line-height: 1.5; /* 행간 넓힘 */
-        letter-spacing: 0.02em; /* 자간 조정 */
-        -webkit-font-smoothing: antialiased; /* 안티앨리어싱 강제 적용 (가장자리 부드럽게) */
+        line-height: 1.5;
+        letter-spacing: 0.02em;
+        -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-
-        /* 3. 명암비 향상 */
-        color: #E8EEFF; /* 기존 #BCC4E0 보다 밝은 색상으로 변경 */
+        color: #E8EEFF;
 
         white-space: pre-wrap;
-        word-break: break-all;
-        height: 430px;
+        word-break: keep-all;
+        overflow-wrap: break-word;
+
+        height: 60vh;
+        min-height: 430px;
         overflow-y: auto;
         box-shadow: inset 0 2px 12px rgba(0,0,0,0.5);
         width: 100%;
     }
 
-    /* ansi2html 변환 텍스트들에도 안티앨리어싱 적용 */
     .log-viewer span {
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
@@ -580,6 +580,7 @@ def render_tab_logs():
           err_msg = ""
 
           if log_path == "TMUX_CONSOLE":
+            subprocess.run(["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"], capture_output=True)
             subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
             p = Path("/data/tmux_console.log")
             if p.exists():
@@ -594,18 +595,19 @@ def render_tab_logs():
               err_msg = "File not found."
 
           if err_msg:
-            viewer_container.content = f'<div class="log-viewer log-error">❌ {err_msg}</div>'
+            viewer_container.content = f'<div style="color:#FCA5A5; font-weight:bold;">❌ {err_msg}</div>'
             status_container.content = '<div class="log-statusbar log-error">⚠️ 파일을 불러오지 못했습니다.</div>'
           else:
             conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
             display = conv.convert(content, full=False)
-            viewer_container.content = f'<div class="log-viewer" id="logViewer">{display}</div>'
+            viewer_container.content = display
             status_container.content = f'<div class="log-statusbar">📄 {sel_log.value} | {len(content.splitlines())} lines | {len(content):,} chars</div>'
-            ui.run_javascript('var v=document.getElementById("logViewer");if(v)v.scrollTop=v.scrollHeight;')
+            ui.run_javascript('var v=document.getElementById("logContainer");if(v)v.scrollTop=v.scrollHeight;')
 
         async def upload_log():
           log_path = LOG_FILES[sel_log.value]
           if log_path == "TMUX_CONSOLE":
+            subprocess.run(["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"], capture_output=True)
             subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
             await run_script_async("Console Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=["/data/tmux_console.log"])
           else:
@@ -614,7 +616,9 @@ def render_tab_logs():
         ui.button('VIEW', on_click=view_log, color=None).classes('custom-btn btn-default col-span-1')
         ui.button('UPLOAD', on_click=upload_log, color=None).classes('custom-btn btn-green col-span-1')
 
-      viewer_container = ui.html('<div class="log-viewer">파일을 선택한 후 View 버튼을 눌러주세요.</div>').classes('w-full mt-2')
+      with ui.element('div').classes('log-viewer w-full mt-2').props('id="logContainer"'):
+        viewer_container = ui.html('파일을 선택한 후 View 버튼을 눌러주세요.')
+
       status_container = ui.html('<div class="log-statusbar">📂 대기 중...</div>').classes('w-full')
 
 
@@ -622,26 +626,54 @@ def render_tab_terminal(tabs):
   conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
 
   with ui.column().classes('w-full mt-4'):
-    viewer = ui.html('<div class="log-viewer">Loading...</div>').classes('w-full')
+    with ui.element('div').classes('log-viewer').props('id="termContainer"'):
+        viewer = ui.html('Loading...')
     statusbar = ui.html('<div class="log-statusbar">Loading...</div>').classes('w-full')
 
   def update_terminal():
-    if tabs.value != 'TERMINAL':
-      return
+    try:
+      if tabs.value != 'TERMINAL':
+        return
 
-    content = get_tmux_capture()
-    lines = len(content.splitlines())
-    now_str = datetime.now().strftime("%H:%M:%S")
+      if getattr(viewer, 'is_deleted', False) or viewer.parent_slot is None:
+        return
 
-    if content.startswith("Error") or content.startswith("Tmux Session not found"):
-      viewer.content = f'<div class="log-viewer log-error">❌ {html_lib.escape(content)}</div>'
-      statusbar.content = '<div class="log-statusbar log-error">⚠️ tmux 세션을 찾을 수 없습니다.</div>'
-    else:
-      colored_html = conv.convert(content, full=False)
-      viewer.content = f'<div class="log-viewer" id="termViewer">{colored_html}</div>'
-      statusbar.content = f'<div class="log-statusbar">🖥️ Tmux Session | {lines} lines | 🔄 Updated: {now_str}</div>'
-      ui.run_javascript('var v=document.getElementById("termViewer");if(v)v.scrollTop=v.scrollHeight;')
+      content = get_tmux_capture()
+      lines = len(content.splitlines())
+      now_str = datetime.now().strftime("%H:%M:%S")
 
+      if content.startswith("Error") or content.startswith("Tmux Session not found"):
+        viewer.content = f'<div style="color:#FCA5A5; font-weight:bold;">❌ {html_lib.escape(content)}</div>'
+        statusbar.content = '<div class="log-statusbar log-error">⚠️ tmux 세션을 찾을 수 없습니다.</div>'
+      else:
+        colored_html = conv.convert(content, full=False)
+        viewer.content = colored_html
+        statusbar.content = f'<div class="log-statusbar">🖥️ Tmux Session | {lines} lines | 🔄 Updated: {now_str}</div>'
+
+      js_code = """
+      var container = document.getElementById("termContainer");
+      if (container) {
+          // 사용자가 화면 맨 밑에서 50px 이내 영역에 스크롤을 위치시켰는지 판별
+          var isAtBottom = (container.scrollHeight - container.clientHeight - container.scrollTop) <= 50;
+          var currentScroll = container.scrollTop;
+
+          // 약간의 딜레이(DOM 변경 적용시간) 후 스크롤을 보정
+          setTimeout(function() {
+              if (isAtBottom) {
+                  container.scrollTop = container.scrollHeight;
+              } else if (container.scrollTop !== currentScroll) {
+                  container.scrollTop = currentScroll; // 기존 위치 고정 (튀는 현상 방지)
+              }
+          }, 50);
+      }
+      """
+      ui.run_javascript(js_code)
+
+    except Exception:
+      # 백그라운드 타이머 작동 중 부모 삭제 에러가 발생하면 조용히 무시 (pass)
+      pass
+
+  # 1초마다 터미널 업데이트 실행
   ui.timer(1.0, update_terminal)
 
 
@@ -752,5 +784,4 @@ def main_page():
 
 if __name__ in {"__main__", "__mp_main__"}:
   set_core_affinity([0, 1, 2])
-
   ui.run(host="0.0.0.0", port=7000, title="Openpilot Dashboard", show=False)

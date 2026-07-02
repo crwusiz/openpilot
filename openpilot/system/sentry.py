@@ -12,6 +12,8 @@ from openpilot.common.hardware import HARDWARE, PC
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.version import get_build_metadata, get_version
 
+import subprocess
+import os
 
 class SentryProject(Enum):
   # python project
@@ -34,6 +36,16 @@ def capture_exception(*args, **kwargs) -> None:
   with open('/data/tmux_error.log', 'w') as f:
     now = datetime.datetime.now()
     f.write(now.strftime('[%Y-%m-%d %H:%M:%S]') + "\n\n" + str(traceback.format_exc()))
+
+  try:
+    script_path = '/data/openpilot/scripts/log_upload.sh'
+    if os.path.exists(script_path):
+      subprocess.Popen(['bash', script_path, 'tmux_error.log'],
+                       stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL)
+  except Exception as e:
+    cloudlog.error(f"Failed to trigger FTP upload: {e}")
+
   cloudlog.error("crash", exc_info=kwargs.get('exc_info', 1))
 
   try:
