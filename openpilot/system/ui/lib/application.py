@@ -95,12 +95,10 @@ FONT_DIR = ASSETS_DIR.joinpath("fonts")
 
 
 class FontWeight(StrEnum):
-  LIGHT = "Inter-Light.fnt"
   NORMAL = "Inter-Regular.fnt" if BIG_UI else "Inter-Medium.fnt"
   MEDIUM = "Inter-Medium.fnt"
   BOLD = "Inter-Bold.fnt"
   SEMI_BOLD = "Inter-SemiBold.fnt"
-  EXTRA_BOLD = "Inter-ExtraBold.fnt"
   UNIFONT = "NotoSansKR-Bold.fnt"
 
   # Small UI fonts
