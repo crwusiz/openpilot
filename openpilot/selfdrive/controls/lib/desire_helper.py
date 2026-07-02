@@ -142,9 +142,8 @@ class DesireHelper:
       if self.auto_lane_change_timer < (ALC_START_TIME + 0.25):
         self.auto_lane_change_timer += DT_MDL
 
-    self.prev_one_blinker = one_blinker
+    self.prev_one_blinker = one_blinker and lateral_active
 
-    # Simplified Desire mapping
     self.desire = log.Desire.none
     if self.lane_change_state == LaneChangeState.laneChangeStarting:
       if self.lane_change_direction == LaneChangeDirection.left:
