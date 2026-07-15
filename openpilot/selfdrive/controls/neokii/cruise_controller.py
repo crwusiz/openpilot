@@ -252,7 +252,7 @@ class CruiseController:
 
     # 3. Lead limit speed
     lead_speed = self._cal_lead_speed(lead, cluster_speed_clu)
-    lead_limit_speed_clu = lead_speed if self.CP.openpilotLongitudinalControl and lead.status else NO_LIMIT_SPEED
+    lead_limit_speed_clu = lead_speed if self.CP.openpilotLongitudinalControl and lead.present else NO_LIMIT_SPEED
     self.lead_limit_speed_clu = lead_limit_speed_clu
 
     # 4. Curve limit speed

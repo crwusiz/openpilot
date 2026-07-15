@@ -116,7 +116,7 @@ EMPTY_LEAD = {
   "vLeadK": 0.0,
   "aLeadK": 0.0,
   "fcw": False,
-  "status": False,
+  "present": False,
   "aLeadTau": 0.0,
   "modelProb": 0.0,
   "radar": False,
@@ -280,7 +280,7 @@ class Track:
       "aLeadTau": float(self.aLeadTau.x),
       "jLead": float(self.jLead),
       "vLat": float(self.yvLead),
-      "status": True,
+      "present": True,
       "fcw": self.is_potential_fcw(model_prob),
       "modelProb": model_prob,
       "radar": True,
@@ -444,7 +444,7 @@ def get_RadarState_from_vision(md_arrays, lead_msg: capnp._DynamicStructReader, 
     "vLat" : 0.0,
     "fcw": False,
     "modelProb": float(lead_prob),
-    "status": True,
+    "present": True,
     "radar": False,
     "radarTrackId": -1,
   }
@@ -583,7 +583,7 @@ class RadarD:
       self.compute_leads(self.v_ego, compute_tracks, md, self.lead_prob_filters[0].x, front_tracks)
       if self.leadTwo is not None:
         self.radar_state.leadTwo = self.leadTwo
-      if self.enable_radar_tracks or (self.cornerLeadStopped and self.cornerLeadStopped.get("status")):
+      if self.enable_radar_tracks or (self.cornerLeadStopped and self.cornerLeadStopped.get("present")):
         self._pick_lead_one_from_state()
 
   def publish(self, pm: messaging.PubMaster):
@@ -745,7 +745,7 @@ class RadarD:
       if len(low_speed_tracks) > 0:
         closest_track = min(low_speed_tracks, key=lambda c: c.dRel)
 
-        if (not lead_dict['status']) or (closest_track.dRel < lead_dict['dRel']):
+        if (not lead_dict['present']) or (closest_track.dRel < lead_dict['dRel']):
           vision_y_rel = float(-lead_msg.y[0]) if ready else 0.0
           lead_dict = closest_track.get_RadarState(lead_prob, vision_y_rel)
           front_radar_vision_match = False
@@ -761,7 +761,7 @@ class RadarD:
       return False
 
     lead_one = self.radar_state.leadOne
-    if not lead_one.status or not lead_one.radar:
+    if not lead_one.present or not lead_one.radar:
       return False
     if int(lead_one.radarTrackId) >= CORNER_235_TRACK_ID_START:
       return False
@@ -819,7 +819,7 @@ class RadarD:
 
   def _cutin_can_replace_lead_one(self, cutin: dict[str, Any]) -> bool:
     lead_one = self.radar_state.leadOne
-    if not lead_one.status:
+    if not lead_one.present:
       return True
     if self._lead_one_has_front_radar_vision_match():
       return False
@@ -828,19 +828,19 @@ class RadarD:
 
   def _track_is_closer_than_lead_one(self, t: Track) -> bool:
     lead_one = self.radar_state.leadOne
-    if not lead_one.status:
+    if not lead_one.present:
       return True
     return t.dRel + CUTIN_PROMOTE_DREL_MARGIN < lead_one.dRel
 
   def _lead_is_closer_than_lead_one(self, lead: dict[str, Any]) -> bool:
     lead_one = self.radar_state.leadOne
-    if not lead_one.status:
+    if not lead_one.present:
       return True
     return lead["dRel"] + CUTIN_PROMOTE_DREL_MARGIN < lead_one.dRel
 
   def _corner_stopped_can_replace_lead_one(self, stopped: dict[str, Any]) -> bool:
     lead_one = self.radar_state.leadOne
-    if not lead_one.status:
+    if not lead_one.present:
       return True
 
     if stopped["dRel"] + self._corner_promote_drel_margin() < lead_one.dRel:
@@ -849,7 +849,7 @@ class RadarD:
     if lead_one.radar:
       return False
 
-    vision_prob = lead_one.modelProb if lead_one.status else 0.0
+    vision_prob = lead_one.modelProb if lead_one.present else 0.0
     same_object = abs(stopped["dRel"] - lead_one.dRel) < CORNER_FRONT_MATCH_DREL
     return same_object and vision_prob < CORNER_VISION_KEEP_PROB
 
@@ -858,13 +858,13 @@ class RadarD:
 
   def _corner_lead_clearly_closer_than_lead_one(self, lead: dict[str, Any]) -> bool:
     lead_one = self.radar_state.leadOne
-    if not lead_one.status:
+    if not lead_one.present:
       return True
     return lead["dRel"] + CORNER_FRONT_MATCH_PROMOTE_DREL_MARGIN < lead_one.dRel
 
   def _lead_one_has_front_radar_vision_match(self) -> bool:
     lead_one = self.radar_state.leadOne
-    if not self.lead_one_front_radar_vision_match or not lead_one.status or not lead_one.radar:
+    if not self.lead_one_front_radar_vision_match or not lead_one.present or not lead_one.radar:
       return False
     if int(lead_one.radarTrackId) >= CORNER_235_TRACK_ID_START:
       return False
@@ -986,7 +986,7 @@ class RadarD:
           key=lambda d: d['dRel'],
           default=None
       )
-      if self.radar_state.leadOne.status and self.radar_state.leadOne.radar:
+      if self.radar_state.leadOne.present and self.radar_state.leadOne.radar:
         self.leadTwo = min(
             (ld for ld in center_list if ld['vLead'] > 5 and ld['radar'] and not self._lead_is_corner_track(ld) and self.radar_state.leadOne.dRel < ld['dRel'] < 80),
             key=lambda d: d['dRel'],
@@ -998,7 +998,7 @@ class RadarD:
     else:
       self.leadCenter = None
 
-    if self.leadCutIn and self.leadCutIn.get("status") and self.detect_cut_in:
+    if self.leadCutIn and self.leadCutIn.get("present") and self.detect_cut_in:
       self.leadTwo = self.leadCutIn.copy()
       self.leadTwo["modelProb"] = 0.03
 
@@ -1026,21 +1026,21 @@ class RadarD:
     chosen = None
     detected = self.radar_detected
 
-    if (self.leadCenter and self.leadCenter["status"] and
+    if (self.leadCenter and self.leadCenter["present"] and
         not self._lead_is_corner_track(self.leadCenter) and
         is_radar_center_promotion_safe(self.leadCenter)):
       lead_one = self.radar_state.leadOne
-      vision_prob = lead_one.modelProb if lead_one.status else 0.0
+      vision_prob = lead_one.modelProb if lead_one.present else 0.0
 
       if self.radar_detected:
-        if lead_one.status and self.leadCenter["dRel"] + self._corner_promote_drel_margin() < lead_one.dRel:
+        if lead_one.present and self.leadCenter["dRel"] + self._corner_promote_drel_margin() < lead_one.dRel:
           chosen = self.leadCenter
           chosen["modelProb"] = 0.01
       else:
-        radar_clearly_closer = lead_one.status and self.leadCenter["dRel"] + self._corner_promote_drel_margin() < lead_one.dRel
-        vision_weak_or_missing = (not lead_one.status) or vision_prob < RADAR_ONLY_FALLBACK_VISION_PROB
+        radar_clearly_closer = lead_one.present and self.leadCenter["dRel"] + self._corner_promote_drel_margin() < lead_one.dRel
+        vision_weak_or_missing = (not lead_one.present) or vision_prob < RADAR_ONLY_FALLBACK_VISION_PROB
 
-        if vision_weak_or_missing and (not lead_one.status or radar_clearly_closer) and self._radar_only_center_ok(self.leadCenter):
+        if vision_weak_or_missing and (not lead_one.present or radar_clearly_closer) and self._radar_only_center_ok(self.leadCenter):
           chosen = self.leadCenter
           chosen["modelProb"] = 0.02
           detected = True

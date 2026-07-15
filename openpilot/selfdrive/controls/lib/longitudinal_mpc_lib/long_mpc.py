@@ -339,7 +339,7 @@ class LongitudinalMpc:
 
   def process_lead(self, lead, j_lead):
     v_ego = self.x0[1]
-    if lead is not None and lead.status:
+    if lead is not None and lead.present:
       x_lead = lead.dRel
       v_lead = lead.vLead
       a_lead = lead.aLeadK
@@ -371,7 +371,7 @@ class LongitudinalMpc:
     t_follow = get_T_FOLLOW(personality)
     v_ego = self.x0[1]
 
-    if radarstate.leadOne.status:
+    if radarstate.leadOne.present:
       j_lead = radarstate.leadOne.jLead
       self.j_lead = j_lead * 0.1 + self.j_lead * 0.9
     else:
@@ -409,7 +409,7 @@ class LongitudinalMpc:
     x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle, x2])
     self.source = MPC_SOURCES[np.argmin(x_obstacles[0])]
 
-    if radarstate.leadOne.status:
+    if radarstate.leadOne.present:
       self.a_change_cost = np.interp(abs(self.j_lead), [0.5, 2.5], [A_CHANGE_COST, 50])
     else:
       self.a_change_cost = A_CHANGE_COST
@@ -469,7 +469,7 @@ class LongitudinalMpc:
     self.xStop = self._update_stop_dist(model.position.x[31])
     filtered_stop_dist = self.xStop
 
-    lead = radarstate.leadOne.status
+    lead = radarstate.leadOne.present
     d_rel = radarstate.leadOne.dRel if lead else 1000
 
     self._check_model_stopping(model.velocity.x, CS.vEgo, CS.aEgo, model.position.x[-1], model.position.y, d_rel)

@@ -179,8 +179,8 @@ class Controls:
 
     radarState = self.sm['radarState']
     leadOne = radarState.leadOne
-    hudControl.leadDistance = leadOne.dRel if leadOne.status else 0
-    hudControl.leadRelSpeed = leadOne.vRel if leadOne.status else 0
+    hudControl.leadDistance = leadOne.dRel if leadOne.present else 0
+    hudControl.leadRelSpeed = leadOne.vRel if leadOne.present else 0
     hudControl.leadRadar = 1 if leadOne.radar else 0
 
     hudControl.rightLaneVisible = True
