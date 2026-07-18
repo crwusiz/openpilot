@@ -37,13 +37,9 @@ dependencies = [
   "comma-deps-git-lfs",
   "comma-deps-gcc-arm-none-eabi",
 
-  # body / webrtcd
-  "av",
-
   # logging
   "pyzmq",
   "sentry-sdk",
-  "xattr",  # used in place of 'os.getxattr' for macOS compatibility
 
   # athena
   "PyJWT[crypto]",
