@@ -257,8 +257,6 @@ class LongitudinalMpc:
     self.stopSignCount = 0
     self.adjusted_stop_dist = 0.0
 
-    self.a_change_cost = A_CHANGE_COST
-    self.j_lead = 0.0
     self.conv = UnitConverter()
 
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
@@ -314,7 +312,7 @@ class LongitudinalMpc:
 
   def set_weights(self, prev_accel_constraint=True, personality=log.LongitudinalPersonality.standard):
     jerk_factor = get_jerk_factor(personality)
-    a_change_cost = self.a_change_cost if prev_accel_constraint else A_CHANGE_COST_STARTING
+    a_change_cost = A_CHANGE_COST if prev_accel_constraint else A_CHANGE_COST_STARTING
     cost_weights = [X_EGO_OBSTACLE_COST, X_EGO_COST, V_EGO_COST, A_EGO_COST, jerk_factor * a_change_cost, jerk_factor * J_EGO_COST]
     constraint_cost_weights = [LIMIT_COST, LIMIT_COST, LIMIT_COST, DANGER_ZONE_COST]
     self.set_cost_weights(cost_weights, constraint_cost_weights)
@@ -328,16 +326,14 @@ class LongitudinalMpc:
         self.solver.set(i, 'x', self.x0)
 
   @staticmethod
-  def extrapolate_lead(x_lead, v_lead, a_lead, a_lead_tau, j_lead):
-    j_lead_tau = np.interp(j_lead, [-2.0, 0.0, 2.0], [0.2, 2.0, 0.1]) # tau: 2: 2sec, 1: 4sec, 0.5: 10sec
-    j_lead_traj = j_lead * np.exp(-j_lead_tau * (T_IDXS**2)/2.)
-    a_lead_traj = a_lead * np.exp(-a_lead_tau * (T_IDXS**2)/2.) + j_lead_traj
+  def extrapolate_lead(x_lead, v_lead, a_lead, a_lead_tau):
+    a_lead_traj = a_lead * np.exp(-a_lead_tau * (T_IDXS**2)/2.)
     v_lead_traj = np.clip(v_lead + np.cumsum(T_DIFFS * a_lead_traj), 0.0, 1e8)
     x_lead_traj = x_lead + np.cumsum(T_DIFFS * v_lead_traj)
     lead_xv = np.column_stack((x_lead_traj, v_lead_traj))
     return lead_xv
 
-  def process_lead(self, lead, j_lead):
+  def process_lead(self, lead):
     v_ego = self.x0[1]
     if lead is not None and lead.present:
       x_lead = lead.dRel
@@ -358,12 +354,7 @@ class LongitudinalMpc:
     v_lead = np.clip(v_lead, 0.0, 1e8)
     a_lead = np.clip(a_lead, -10., 5.)
 
-    if a_lead < -2.0 and j_lead > 0.5:
-      a_lead = a_lead + j_lead
-      a_lead = min(a_lead, -0.5)
-      a_lead_tau = max(a_lead_tau, 1.5)
-
-    lead_xv = self.extrapolate_lead(x_lead, v_lead, a_lead, a_lead_tau, j_lead)
+    lead_xv = self.extrapolate_lead(x_lead, v_lead, a_lead, a_lead_tau)
     return lead_xv, v_lead
 
   def update(self, sm, v_cruise, personality=log.LongitudinalPersonality.standard):
@@ -371,14 +362,8 @@ class LongitudinalMpc:
     t_follow = get_T_FOLLOW(personality)
     v_ego = self.x0[1]
 
-    if radarstate.leadOne.present:
-      j_lead = radarstate.leadOne.jLead
-      self.j_lead = j_lead * 0.1 + self.j_lead * 0.9
-    else:
-      self.j_lead = 0.0
-
-    lead_xv_0, lead_v_0 = self.process_lead(radarstate.leadOne, np.clip(self.j_lead, -2.0, 2.0))
-    lead_xv_1, _ = self.process_lead(radarstate.leadTwo, 0.0)
+    lead_xv_0, lead_v_0 = self.process_lead(radarstate.leadOne)
+    lead_xv_1, _ = self.process_lead(radarstate.leadTwo)
 
     # To estimate a safe distance from a moving lead, we calculate how much stopping
     # distance that lead needs as a minimum. We can add that to the current distance
@@ -408,11 +393,6 @@ class LongitudinalMpc:
 
     x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle, x2])
     self.source = MPC_SOURCES[np.argmin(x_obstacles[0])]
-
-    if radarstate.leadOne.present:
-      self.a_change_cost = np.interp(abs(self.j_lead), [0.5, 2.5], [A_CHANGE_COST, 50])
-    else:
-      self.a_change_cost = A_CHANGE_COST
 
     self.yref[:,:] = 0.0
     for i in range(N):

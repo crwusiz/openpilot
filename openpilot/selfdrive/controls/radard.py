@@ -539,7 +539,6 @@ class RadarD:
 
     self.radar_state.mdMonoTime = sm.logMonoTime['modelV2']
     self.radar_state.radarErrors = rr.errors
-    self.radar_state.carStateMonoTime = sm.logMonoTime['carState']
 
     if len(md.velocity.x) > 0:
       model_v_ego = md.velocity.x[0]
