@@ -503,7 +503,7 @@ class LongitudinalMpc:
     if self.trafficState in [TrafficState.off, TrafficState.green] or self.xState not in [XState.e2eStop, XState.e2eStopped]:
       filtered_stop_dist = 1000.0
 
-    self.adjusted_stop_dist = max(0, self.adjusted_stop_dist - (CS.vEgo * DT_MDL))
+    self.adjusted_stop_dist = max(0, self.adjusted_stop_dist - (max(0, CS.vEgo) * DT_MDL))
 
     if filtered_stop_dist == 1000.0: ##  e2eCruise, lead
       self.adjusted_stop_dist = 0.0
@@ -522,28 +522,31 @@ class LongitudinalMpc:
 
   def _check_model_stopping(self, v, v_ego, a_ego, model_x, y, d_rel):
     model_v = self.vFilter.process(v[-1])
-    start_sign = model_v > 5.0 or model_v > (v[0] + 2)
+    start_sign = model_v > 5.0 or model_v > (v[0] + 2.0)
 
-    if self.conv.to_clu(v_ego) < 1.0:
+    stop_sign = False
+    clu_v_ego = self.conv.to_clu(v_ego)
+
+    if clu_v_ego < 1.0:
       stop_sign = model_x < 20.0 and model_v < 10.0
-    elif self.conv.to_clu(v_ego) < 82.0:
+    elif clu_v_ego < 82.0:
+      # Use dynamic thresholds for smoother stopping decisions
+      stop_distance_threshold = np.interp(v[0], [60 / 3.6, 80 / 3.6], [120.0, 150.0])
       stop_sign = (model_x < d_rel - 3.0 and
-                   model_x < np.interp(v[0], [60 / 3.6, 80 / 3.6], [120.0, 150]) and
-                  ((model_v < 3.0) or (model_v < v[0]*0.7)) and
+                   model_x < stop_distance_threshold and
+                  ((model_v < 3.0) or (model_v < v[0] * 0.7)) and
                    abs(y[-1]) < 5.0)
-      if self.xState == XState.e2eCruise and a_ego < -1.0:
-        stop_sign = False
-    else:
-      stop_sign = False
 
-    self.stopSignCount = self.stopSignCount + 1 if stop_sign else 0
-    self.startSignCount = self.startSignCount + 1 if start_sign and not stop_sign else 0
+    # Increment counters with limits to prevent overflow and add hysteresis
+    self.stopSignCount = min(20, self.stopSignCount + 1) if stop_sign else max(0, self.stopSignCount - 2)
+    self.startSignCount = min(20, self.startSignCount + 1) if start_sign and not stop_sign else max(0, self.startSignCount - 2)
 
-    if self.stopSignCount * DT_MDL > 0.0:
+    # Require a few frames of consistency before switching states (debouncing)
+    if self.stopSignCount > 3:  # approx 0.15s (assuming DT_MDL = 0.05)
       self.trafficState = TrafficState.red
-    elif self.startSignCount * DT_MDL > 0.2:
+    elif self.startSignCount > 5: # approx 0.25s
       self.trafficState = TrafficState.green
-    else:
+    elif self.stopSignCount == 0 and self.startSignCount == 0:
       self.trafficState = TrafficState.off
 
 
