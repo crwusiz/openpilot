@@ -70,8 +70,10 @@ async def run_script_async(name: str, path: str, args: list = None, show_modal: 
           ui.label(f'실행 중: {name}').classes('text-white font-bold text-[1.1rem]')
         close_btn = ui.button(icon='close', on_click=dialog.close).props('flat round dense color=white').classes('hidden')
 
-      log_view = ui.log().classes('w-full h-[60vh] bg-transparent text-[#E8EEFF] p-4 font-mono text-[1.05em] leading-relaxed overflow-y-auto')
-      log_view.style('font-family: "Roboto Mono", "Consolas", monospace; white-space: pre-wrap; word-break: break-all; box-shadow: none;')
+      conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
+      accumulated_text = f"🚀 [{datetime.now().strftime('%H:%M:%S')}] {name} 작업을 시작합니다...\n\n"
+
+      log_container = ui.html(f'<div class="log-viewer" id="modalLogViewer" style="border:none; box-shadow:none; height:60vh;">{conv.convert(accumulated_text, full=False)}</div>').classes('w-full bg-[#0D1117]')
 
       dialog.open()
       await asyncio.sleep(0.1)
@@ -100,31 +102,46 @@ async def run_script_async(name: str, path: str, args: list = None, show_modal: 
           env=env
         )
 
-        log_view.push(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] {name} 작업을 시작합니다...\n")
-
         while True:
           line = await process.stdout.readline()
           if not line:
             break
-          text = line.decode('utf-8', errors='replace').rstrip()
-          log_view.push(text)
+
+          text = line.decode('utf-8', errors='replace')
+          accumulated_text += text
+          log_container.content = f'<div class="log-viewer" id="modalLogViewer" style="border:none; box-shadow:none; height:60vh;">{conv.convert(accumulated_text, full=False)}</div>'
+          ui.run_javascript('var v=document.getElementById("modalLogViewer");if(v)v.scrollTop=v.scrollHeight;')
           await asyncio.sleep(0.01)
 
         await process.wait()
 
         if process.returncode == 0:
-          log_view.push(f"\n✅ [{datetime.now().strftime('%H:%M:%S')}] 성공적으로 완료되었습니다.")
-        else:
-          log_view.push(f"\n❌ [{datetime.now().strftime('%H:%M:%S')}] 오류가 발생하여 중단되었습니다. (Exit Code: {process.returncode})")
+          accumulated_text += f"\n✅ [{datetime.now().strftime('%H:%M:%S')}] 성공적으로 완료되었습니다.\n"
 
+          if "gitpull" in path:
+            accumulated_text += "\n🔄 3초 후 시스템을 자동으로 재부팅합니다..."
+            log_container.content = f'<div class="log-viewer" id="modalLogViewer" style="border:none; box-shadow:none; height:60vh;">{conv.convert(accumulated_text, full=False)}</div>'
+            ui.run_javascript('var v=document.getElementById("modalLogViewer");if(v)v.scrollTop=v.scrollHeight;')
+            await asyncio.sleep(3)
+            subprocess.Popen(["sudo", "reboot"], start_new_session=True)
+            return 0
+
+        else:
+          accumulated_text += f"\n❌ [{datetime.now().strftime('%H:%M:%S')}] 오류가 발생하여 중단되었습니다. (Exit Code: {process.returncode})\n"
+
+        log_container.content = f'<div class="log-viewer" id="modalLogViewer" style="border:none; box-shadow:none; height:60vh;">{conv.convert(accumulated_text, full=False)}</div>'
+        ui.run_javascript('var v=document.getElementById("modalLogViewer");if(v)v.scrollTop=v.scrollHeight;')
         return_code = process.returncode
 
       except Exception as e:
-        log_view.push(f"\n❌ 실행 실패: {e}")
+        accumulated_text += f"\n❌ 실행 실패: {e}\n"
+        log_container.content = f'<div class="log-viewer" id="modalLogViewer" style="border:none; box-shadow:none; height:60vh;">{conv.convert(accumulated_text, full=False)}</div>'
         return_code = 1
       finally:
         close_btn.classes(remove='hidden')
-        log_view.push("\n[ 확인을 마쳤으면 우측 상단의 'X' 버튼을 누르거나 창 바깥을 클릭하여 닫아주세요. ]")
+        accumulated_text += "\n[ 확인을 마쳤으면 우측 상단의 'X' 버튼을 누르거나 창 바깥을 클릭하여 닫아주세요. ]"
+        log_container.content = f'<div class="log-viewer" id="modalLogViewer" style="border:none; box-shadow:none; height:60vh;">{conv.convert(accumulated_text, full=False)}</div>'
+        ui.run_javascript('var v=document.getElementById("modalLogViewer");if(v)v.scrollTop=v.scrollHeight;')
 
       return return_code
 
