@@ -104,11 +104,6 @@ def manager_init() -> None:
   elif not prebuilt_enable and os.path.isfile(prebuiltfile):
     os.remove(prebuiltfile)
 
-  # preimport all processes
-  for p in managed_processes.values():
-    p.prepare()
-
-
 def manager_cleanup() -> None:
   # send signals to kill all procs
   for p in managed_processes.values():

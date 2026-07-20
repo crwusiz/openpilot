@@ -71,10 +71,6 @@ class ManagerProcess(ABC):
   restart_if_crash = False
 
   @abstractmethod
-  def prepare(self) -> None:
-    pass
-
-  @abstractmethod
   def start(self) -> None:
     pass
 

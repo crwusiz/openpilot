@@ -525,7 +525,7 @@ class WebrtcdHandler(BaseHTTPRequestHandler):
     # Respond to CORS preflight requests
     self._send(200, b"", "text/plain")
 
-  def log_message(self, fmt, *args) -> None:
+  def log_message(self, format: str, *args: object) -> None:  # noqa: A002  # stdlib override
     # silence default access logging; errors are logged explicitly in _dispatch_request
     pass
 
@@ -572,13 +572,14 @@ def webrtcd_thread(host: str, port: int, debug: bool):
   http_thread.start()
 
   shutting_down = False
+  shutdown_task = None
 
   def request_shutdown() -> None:
-    nonlocal shutting_down
+    nonlocal shutting_down, shutdown_task
     if shutting_down:
       return
     shutting_down = True
-    loop.create_task(_shutdown(server, state, loop))
+    shutdown_task = loop.create_task(_shutdown(server, state, loop))
 
   for sig in (signal.SIGINT, signal.SIGTERM):
     loop.add_signal_handler(sig, request_shutdown)

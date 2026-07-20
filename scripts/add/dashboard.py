@@ -173,7 +173,7 @@ async def run_script_async(name: str, path: str, args: list = None, show_modal: 
     return 1
 
 def reset_calibration():
-  for p in ["CalibrationParams", "LiveTorqueParameters", "LiveParameters", "LiveParametersV2", "LiveDelay"]:
+  for p in ["CalibrationParams", "LiveTorqueParameters", "LiveParametersV2", "LiveDelay"]:
     params.remove(p)
   params.put_bool("OnroadCycleRequested", True)
   ui.notify("캘리브레이션 초기화 요청 완료!", type='positive', position='top')
