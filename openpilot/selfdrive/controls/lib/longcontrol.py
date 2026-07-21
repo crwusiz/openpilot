@@ -71,12 +71,9 @@ class LongControl:
         self.stopping_accel_weight = 1.0
 
         if self.prev_long_control_state == LongCtrlState.starting:
-          output_accel -= self.CP.stoppingDecelRate * 1.5 * DT_CTRL
+          output_accel -= 1.5 * DT_CTRL
         else:
-          m_accel = -0.3
-          d_accel = np.interp(output_accel,
-                              [m_accel - 0.5, m_accel, m_accel + 0.5],
-                              [self.CP.stoppingDecelRate, 0.05, self.CP.stoppingDecelRate])
+          d_accel = np.interp(output_accel, [-0.8, -0.3, 0.2], [1.0, 0.05, 1.0])
 
           output_accel -= d_accel * DT_CTRL
       else:
