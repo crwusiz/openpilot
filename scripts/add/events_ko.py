@@ -12,8 +12,6 @@ from openpilot.common.constants import CV
 from openpilot.common.git import get_short_branch
 from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.locationd.calibrationd import MIN_SPEED_FILTER
-from openpilot.system.micd import SAMPLE_RATE, SAMPLE_BUFFER
-from openpilot.selfdrive.ui.feedback.feedbackd import FEEDBACK_MAX_DURATION
 from openpilot.common.hardware import HARDWARE
 
 AlertSize = log.SelfdriveState.AlertSize
@@ -272,14 +270,6 @@ def too_distracted_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
   return NoEntryAlert("Pay Attention to Engage", priority=Priority.HIGH)
 
 
-def audio_feedback_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
-  duration = FEEDBACK_MAX_DURATION - ((sm['audioFeedback'].blockNum + 1) * SAMPLE_BUFFER / SAMPLE_RATE)
-  return NormalPermanentAlert(
-    "오디오 피드백 녹음",
-    f"{round(duration)} 초{'s' if round(duration) != 1 else ''} 남음. 일찍 저장하려면 다시 누르세요.",
-    priority=Priority.LOW)
-
-
 # *** debug alerts ***
 
 def out_of_space_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
@@ -446,6 +436,7 @@ def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster
 EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   # ********** events with no alerts **********
 
+  EventName.noGps: {},
   EventName.stockFcw: {},
   EventName.actuatorsApiUnavailable: {},
 
@@ -833,9 +824,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.SOFT_DISABLE: soft_disable_alert("센서 데이터 오류"),
   },
 
-  EventName.noGps: {
-  },
-
   EventName.tooDistracted: {
     ET.NO_ENTRY: too_distracted_alert,
   },
@@ -905,11 +893,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("ESC 해제됨"),
   },
 
-  EventName.lowBattery: {
-    ET.SOFT_DISABLE: soft_disable_alert("배터리 부족"),
-    ET.NO_ENTRY: NoEntryAlert("배터리 부족"),
-  },
-
   # Different openpilot services communicate between each other at a certain
   # interval. If communication does not follow the regular schedule this alert
   # is thrown. This can mean a service crashed, did not broadcast a message for
@@ -964,13 +947,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: posenet_invalid_alert,
   },
 
-  # When the localizer detects an acceleration of more than 40 m/s^2 (~4G) we
-  # alert the driver the device might have fallen from the windshield.
-  EventName.deviceFalling: {
-    ET.SOFT_DISABLE: soft_disable_alert("장치가 마운트에서 떨어짐"),
-    ET.NO_ENTRY: NoEntryAlert("장치가 마운트에서 떨어짐"),
-  },
-
   EventName.lowMemory: {
     ET.SOFT_DISABLE: soft_disable_alert("메모리 부족 : 장치를 다시 시작하세요"),
     ET.PERMANENT: low_memory_alert,
@@ -991,14 +967,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   EventName.controlsMismatch: {
     ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("컨트롤 불일치"),
     ET.NO_ENTRY: NoEntryAlert("컨트롤 불일치"),
-  },
-
-  # Sometimes the USB stack on the device can get into a bad state
-  # causing the connection to the panda to be lost
-  EventName.usbError: {
-    ET.SOFT_DISABLE: soft_disable_alert("USB 오류 : 장치를 다시 시작하세요"),
-    ET.PERMANENT: NormalPermanentAlert("USB 오류 : 장치를 다시 시작하세요"),
-    ET.NO_ENTRY: NoEntryAlert("USB 오류 : 장치를 다시 시작하세요"),
   },
 
   # This alert can be thrown for the following reasons:
@@ -1088,10 +1056,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.userBookmark: {
     ET.PERMANENT: NormalPermanentAlert("북마크 저장됨", duration=1.5),
-  },
-
-  EventName.audioFeedback: {
-    ET.PERMANENT: audio_feedback_alert,
   },
 
   EventName.turningIndicatorOn: {

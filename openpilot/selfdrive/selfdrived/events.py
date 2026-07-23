@@ -893,11 +893,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("Electronic Stability Control Disabled"),
   },
 
-  EventName.lowBattery: {
-    ET.SOFT_DISABLE: soft_disable_alert("Low Battery"),
-    ET.NO_ENTRY: NoEntryAlert("Low Battery"),
-  },
-
   # Different openpilot services communicate between each other at a certain
   # interval. If communication does not follow the regular schedule this alert
   # is thrown. This can mean a service crashed, did not broadcast a message for
@@ -952,13 +947,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: posenet_invalid_alert,
   },
 
-  # When the localizer detects an acceleration of more than 40 m/s^2 (~4G) we
-  # alert the driver the device might have fallen from the windshield.
-  EventName.deviceFalling: {
-    ET.SOFT_DISABLE: soft_disable_alert("Device Fell Off Mount"),
-    ET.NO_ENTRY: NoEntryAlert("Device Fell Off Mount"),
-  },
-
   EventName.lowMemory: {
     ET.SOFT_DISABLE: soft_disable_alert("Low Memory: Reboot Your Device"),
     ET.PERMANENT: low_memory_alert,
@@ -979,14 +967,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   EventName.controlsMismatch: {
     ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("Controls Mismatch"),
     ET.NO_ENTRY: NoEntryAlert("Controls Mismatch"),
-  },
-
-  # Sometimes the USB stack on the device can get into a bad state
-  # causing the connection to the panda to be lost
-  EventName.usbError: {
-    ET.SOFT_DISABLE: soft_disable_alert("USB Error: Reboot Your Device"),
-    ET.PERMANENT: NormalPermanentAlert("USB Error: Reboot Your Device"),
-    ET.NO_ENTRY: NoEntryAlert("USB Error: Reboot Your Device"),
   },
 
   # This alert can be thrown for the following reasons:
@@ -1076,10 +1056,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.userBookmark: {
     ET.PERMANENT: NormalPermanentAlert("Bookmark Saved", duration=1.5),
-  },
-
-  EventName.audioFeedback: {
-    ET.PERMANENT: audio_feedback_alert,
   },
 
   EventName.turningIndicatorOn: {

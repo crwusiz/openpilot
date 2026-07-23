@@ -57,7 +57,11 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
     desired_accel = model_output['action'][0,1]
     desired_curvature = model_output['action'][0,0] / (max(1.0, v_ego))**2
     should_stop = (v_ego < 0.3 and desired_accel < 0.1)
+    desired_velocity = prev_action.desiredVelocity
+
   desired_accel = smooth_value(desired_accel, prev_action.desiredAcceleration, LONG_SMOOTH_SECONDS)
+  desired_velocity = smooth_value(desired_velocity, prev_action.desiredVelocity, LONG_SMOOTH_SECONDS)
+
   if v_ego > MIN_LAT_CONTROL_SPEED:
     desired_curvature = smooth_value(desired_curvature, prev_action.desiredCurvature, LAT_SMOOTH_SECONDS)
   else:
