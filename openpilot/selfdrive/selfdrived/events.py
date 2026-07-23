@@ -428,6 +428,7 @@ def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster
 EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   # ********** events with no alerts **********
 
+  EventName.noGps: {},
   EventName.stockFcw: {},
   EventName.actuatorsApiUnavailable: {},
 
@@ -442,6 +443,14 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.WARNING: longitudinal_maneuver_alert,
     ET.PERMANENT: NormalPermanentAlert("Longitudinal Maneuver Mode",
                                        "Ensure road ahead is clear"),
+  },
+
+  EventName.bigModelLoading: {
+    ET.NO_ENTRY: NoEntryAlert("Big Model Loading"),
+  },
+
+  EventName.bigModelReady: {
+    ET.PERMANENT: EngagementAlert(AudibleAlert.complete),
   },
 
   EventName.lateralManeuver: {

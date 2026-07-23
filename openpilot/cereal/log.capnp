@@ -128,12 +128,14 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     aeb @92;
     userBookmark @95;
     excessiveActuation @96;
+    bigModelLoading @100;
+    bigModelReady @101;
 
     turningIndicatorOn @103;
     autoLaneChange @104;
 
-    ding @100;
-    dong @101;
+    ding @105;
+    dong @106;
     beep @102;
 
     lowBatteryDEPRECATED @40;
