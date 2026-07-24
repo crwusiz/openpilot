@@ -11,7 +11,7 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 from openpilot.selfdrive.controls.lib.longcontrol import LongCtrlState
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import LongitudinalMpc, LongitudinalPlanSource
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import T_IDXS as T_IDXS_MPC
-from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N, get_accel_from_plan
+from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N, get_accel_from_plan, should_stop
 from openpilot.selfdrive.car.cruise import V_CRUISE_MAX, V_CRUISE_UNSET
 from openpilot.common.swaglog import cloudlog
 
@@ -51,8 +51,8 @@ def get_cruise_accel(e2e, v_cruise, v_ego, a_cruise_prev, angle_steers, CP, dt, 
     j_cruise = np.interp(v_ego, A_CRUISE_MAX_BP, J_CRUISE_VALS)
     target_accel = float(np.clip(target_accel, a_cruise_prev - j_cruise * dt, a_cruise_prev + j_cruise * dt))
 
-  cruise_should_stop = v_cruise == 0.0
-  return target_accel, cruise_should_stop
+  return target_accel
+
 
 class LongitudinalPlanner:
   def __init__(self, CP, init_v=0.0, init_a=0.0, dt=DT_MDL):
@@ -66,7 +66,6 @@ class LongitudinalPlanner:
     self.v_desired_filter = FirstOrderFilter(init_v, 2.0, self.dt)
     self.a_cruise = 0.0
     self.output_a_target = 0.0
-    self.output_v_target = 0.0
     self.output_should_stop = False
 
     self.v_desired_trajectory = np.zeros(CONTROL_N)
@@ -84,13 +83,15 @@ class LongitudinalPlanner:
     v_cruise = v_cruise_kph * CV.KPH_TO_MS
     v_cruise_initialized = sm['carState'].vCruise != V_CRUISE_UNSET
 
+    if sm['controlsState'].forceDecel:
+      v_cruise = 0.0
+
     vCluRatio = sm['carState'].exState.vCluRatio
     if vCluRatio > 0.5:
       v_cruise *= vCluRatio
       v_cruise += 0.069444
 
     long_control_off = sm['controlsState'].longControlState == LongCtrlState.off
-    force_slow_decel = sm['controlsState'].forceDecel
 
     # Reset current state when not engaged, or user is controlling the speed
     reset_state = long_control_off if self.CP.openpilotLongitudinalControl else not sm['selfdriveState'].enabled
@@ -113,9 +114,6 @@ class LongitudinalPlanner:
     # No change cost when user is controlling the speed, or when standstill
     prev_accel_constraint = not (reset_state or sm['carState'].standstill)
 
-    if force_slow_decel:
-      v_cruise = 0.0
-
     self.mpc.set_weights(prev_accel_constraint, personality=sm['selfdriveState'].personality)
     self.mpc.set_cur_state(self.v_desired_filter.x, self.a_desired)
     self.mpc.update(sm, personality=sm['selfdriveState'].personality)
@@ -129,31 +127,29 @@ class LongitudinalPlanner:
     if self.fcw:
       cloudlog.info("FCW triggered")
 
-    # Interpolate 0.05 seconds and save as starting point for next iteration
+    # Save starting point for next iteration
     a_prev = self.a_desired
 
     action_t =  self.CP.longitudinalActuatorDelay + DT_MDL
-    output_a_target_mpc, output_should_stop_mpc, output_v_target_mpc = get_accel_from_plan(
-      self.v_desired_trajectory, self.a_desired_trajectory, CONTROL_N_T_IDX, action_t=action_t
-    )
+    output_a_target_mpc = get_accel_from_plan(self.v_desired_trajectory, self.a_desired_trajectory, CONTROL_N_T_IDX,
+                                              action_t=action_t)
+    output_should_stop_mpc = should_stop(v_ego, output_a_target_mpc)
     output_a_target_e2e = sm['modelV2'].action.desiredAcceleration
     output_should_stop_e2e = sm['modelV2'].action.shouldStop
-    output_v_target_e2e = sm['modelV2'].action.desiredVelocity
 
-    self.a_cruise, cruise_should_stop = get_cruise_accel(sm['selfdriveState'].experimentalMode, v_cruise, v_ego,
+    self.a_cruise = get_cruise_accel(sm['selfdriveState'].experimentalMode, v_cruise, v_ego,
                                                           self.a_cruise, steer_angle_without_offset, self.CP, self.dt,
                                                           accel_coast, self.allow_throttle)
+    cruise_should_stop = should_stop(v_ego, self.a_cruise)
 
-    candidates = [(output_a_target_mpc, self.mpc.source, output_should_stop_mpc, output_v_target_mpc),
-                  (self.a_cruise, LongitudinalPlanSource.cruise, cruise_should_stop, v_cruise)]
+    candidates = [(output_a_target_mpc, self.mpc.source, output_should_stop_mpc),
+                  (self.a_cruise, LongitudinalPlanSource.cruise, cruise_should_stop)]
     if sm['selfdriveState'].experimentalMode:
-      candidates.append((output_a_target_e2e, LongitudinalPlanSource.e2e, output_should_stop_e2e, output_v_target_e2e))
+      candidates.append((output_a_target_e2e, LongitudinalPlanSource.e2e, output_should_stop_e2e))
 
-    output_a_target, self.mpc.source, _, output_v_target = min(candidates, key=lambda c: c[0])
-
-    self.output_should_stop = any(should_stop for _, _, should_stop, _ in candidates)
+    output_a_target, self.mpc.source, _ = min(candidates, key=lambda c: c[0])
+    self.output_should_stop = any(should_stop for _, _, should_stop in candidates)
     self.output_a_target = np.clip(output_a_target, ACCEL_MIN, ACCEL_MAX)
-    self.output_v_target = output_v_target
 
     self.a_desired = float(self.output_a_target)
     self.v_desired_filter.x = self.v_desired_filter.x + self.dt * (self.output_a_target + a_prev) / 2.0
@@ -177,7 +173,6 @@ class LongitudinalPlanner:
     longitudinalPlan.fcw = self.fcw
 
     longitudinalPlan.aTarget = float(self.output_a_target)
-    longitudinalPlan.vTarget = float(self.output_v_target)
     longitudinalPlan.shouldStop = bool(self.output_should_stop)
     longitudinalPlan.allowBrake = True
     longitudinalPlan.allowThrottle = bool(self.allow_throttle)
