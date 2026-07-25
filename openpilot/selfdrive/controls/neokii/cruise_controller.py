@@ -164,10 +164,12 @@ class CruiseController:
   def _cal_limit_speed(self, CS, sm, current_speed_ms: float, cluster_speed_clu: float, v_cruise_kph: float,
                        double_pressed: bool = False):
     nda_active = SpeedLimiter.instance().get_active()
+    cam_type = SpeedLimiter.instance().get_cam_type()
+
     road_limit_speed_nda = SpeedLimiter.instance().get_road_limit_speed()
     road_limit_speed_stock = CS.exState.navLimitSpeed
     road_signs = CS.exState.roadSigns
-    school_zone = road_signs == 1
+    is_school_zone = road_signs == 1 or (cam_type == 33)
     is_limit_zone = False
     lead = sm['radarState'].leadOne
 
@@ -200,7 +202,7 @@ class CruiseController:
       timeout_ticks = 2000
 
       # 1. 스쿨존은 즉시 안전 복귀
-      if school_zone or double_pressed:
+      if is_school_zone or double_pressed:
         self.ignore_road_limit_temporarily = False
         self.ignore_limit_timer = 0
 
@@ -232,7 +234,7 @@ class CruiseController:
         SpeedLimiter.instance().get_camera_limit_speed_stock(CS, cluster_speed_clu))
       camera_limit_speed_clu = camera_limit_speed_stock
 
-    if school_zone:
+    if is_school_zone:
       limit_50 = self.conv.to_current_unit(50.0)
       if 0 < camera_limit_speed_clu < NO_LIMIT_SPEED:
         camera_limit_speed_clu = min(camera_limit_speed_clu, limit_50)
@@ -240,9 +242,13 @@ class CruiseController:
         camera_limit_speed_clu = min(road_limit_speed, limit_50)
       else:
         camera_limit_speed_clu = self.conv.to_current_unit(SCHOOL_ZONE_SPEED)
+
+    if cam_type == 22 and camera_limit_speed_clu != NO_LIMIT_SPEED:
+      pass
+
     self.camera_limit_speed_clu = camera_limit_speed_clu
 
-    if school_zone and road_limit_speed_clu == self.conv.to_current_unit(SCHOOL_ZONE_SPEED):
+    if is_school_zone and road_limit_speed_clu == self.conv.to_current_unit(SCHOOL_ZONE_SPEED):
       if camera_limit_speed_clu > road_limit_speed_clu:
         road_limit_speed_clu = camera_limit_speed_clu
       else:
@@ -672,6 +678,7 @@ class CruiseController:
     exState.steerSpeed = float(self.steer_limit_speed_clu)
     exState.leadSpeed = float(self.lead_limit_speed_clu)
     exState.applyLimitSpeed = float(self.apply_limit_speed_clu)
+    exState.ignoreLimitTimer = float(self.ignore_limit_timer)
 
 
 class CruiseStateManager:

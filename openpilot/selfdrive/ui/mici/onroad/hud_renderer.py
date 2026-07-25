@@ -121,6 +121,7 @@ class HudRenderer(Widget):
     self.stock_limit_speed: float = 0.0
     self.accel: float = 0.0
     self.traffic_state: int = 0
+    self.ignore_limit_timer: float = 0.0
     self._set_speed_changed_time: float = 0
     self.speed: float = 0.0
     self.v_ego_cluster_seen: bool = False
@@ -172,6 +173,7 @@ class HudRenderer(Widget):
       self.set_speed = SET_SPEED_NA
       self.speed = 0.0
       self.traffic_state = 0
+      self.ignore_limit_timer = 0.0
       return
 
     controls_state = sm['controlsState']
@@ -213,6 +215,11 @@ class HudRenderer(Widget):
     if longitudinal_plan:
       self.traffic_state = longitudinal_plan.trafficState if hasattr(longitudinal_plan, 'trafficState') else 0
 
+    if hasattr(car_state, 'exState') and hasattr(car_state.exState, 'ignoreLimitTimer'):
+      self.ignore_limit_timer = car_state.exState.ignoreLimitTimer
+    else:
+      self.ignore_limit_timer = 0.0
+
   def _get_wheel_texture(self) -> rl.Texture:
     """Return the correct wheel texture based on current UI status."""
     if self._show_wheel_critical or ui_state.status == UIStatus.BLINKER:
@@ -243,6 +250,25 @@ class HudRenderer(Widget):
       text_color
     )
 
+  def _draw_ignore_limit_timer(self, rect: rl.Rectangle) -> None:
+    """Draw a shrinking progress bar at the top of the screen when speed limit is temporarily ignored."""
+    if self.ignore_limit_timer <= 0 or self.ignore_limit_timer >= 2000:
+      return
+
+    max_ticks = 2000.0
+    # Timer counts UP to 2000, reverse ratio to shrink
+    ratio = max(0.0, min(1.0, (max_ticks - self.ignore_limit_timer) / max_ticks))
+
+    bar_height = 10
+    bar_width = rect.width * ratio
+
+    # Shrink towards center
+    bar_x = rect.x + (rect.width - bar_width) / 2
+    bar_y = rect.y
+
+    bar_color = colors_alpha(Colors.ORANGE, 150)
+    rl.draw_rectangle(int(bar_x), int(bar_y), int(bar_width), bar_height, bar_color)
+
   def _render(self, rect: rl.Rectangle) -> None:
     """Render HUD elements to the screen."""
     #self._torque_bar.render(rect)
@@ -251,6 +277,7 @@ class HudRenderer(Widget):
     self._draw_steering_wheel(rect)
     self._draw_borders(rect)
     self._draw_traffic_light(rect)
+    self._draw_ignore_limit_timer(rect)
 
     if ui_state.usbgpu and ui_state.usbgpu_compiled:
       self._draw_model_source(rect)
@@ -261,12 +288,12 @@ class HudRenderer(Widget):
     small_drives = not ui_state.usbgpu_loading and not ui_state.usbgpu_active and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame
     big_color = rl.GREEN if ui_state.usbgpu_active else rl.RED if small_drives else rl.GRAY
     small_color = rl.GREEN if small_drives else rl.WHITE if ui_state.usbgpu_active else rl.GRAY
-    big_size = measure_text_cached(self._font_semi_bold, "BIG", FONT_SIZES.max_speed)
-    small_size = measure_text_cached(self._font_semi_bold, "SM", FONT_SIZES.max_speed)
-    big_pos = rl.Vector2(rect.x + rect.width - 12 - big_size.x, rect.y + rect.height - 14 - FONT_SIZES.max_speed)
-    small_pos = rl.Vector2(big_pos.x + (big_size.x - small_size.x) / 2, big_pos.y - FONT_SIZES.max_speed - 2)
-    rl.draw_text_ex(self._font_semi_bold, "BIG", big_pos, FONT_SIZES.max_speed, 0, big_color)
-    rl.draw_text_ex(self._font_semi_bold, "SM", small_pos, FONT_SIZES.max_speed, 0, small_color)
+    big_size = measure_text_cached(self._font_semi_bold, "BIG", FontSizes.max_speed)
+    small_size = measure_text_cached(self._font_semi_bold, "SM", FontSizes.max_speed)
+    big_pos = rl.Vector2(rect.x + rect.width - 12 - big_size.x, rect.y + rect.height - 14 - FontSizes.max_speed)
+    small_pos = rl.Vector2(big_pos.x + (big_size.x - small_size.x) / 2, big_pos.y - FontSizes.max_speed - 2)
+    rl.draw_text_ex(self._font_semi_bold, "BIG", big_pos, FontSizes.max_speed, 0, big_color)
+    rl.draw_text_ex(self._font_semi_bold, "SM", small_pos, FontSizes.max_speed, 0, small_color)
 
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
     wheel_txt = self._get_wheel_texture()

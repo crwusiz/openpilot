@@ -288,6 +288,12 @@ class SpeedLimiter:
       return self.naviData.sectionLimitSpeed, self.naviData.sectionLeftDist
     return 0, 0
 
+  def get_cam_type(self):
+    self.recv()
+    if self.naviData is not None:
+      return self.naviData.camType
+    return 0
+
   def get_max_speed(self, cluster_speed_clu):
     self.recv()
     default_return_value = (0, False)
@@ -316,8 +322,8 @@ class SpeedLimiter:
         cluster_speed_ms = self.conv.to_ms(cluster_speed_clu)
         diff_speed = cluster_speed_clu - (cam_limit_speed * cam_speed_factor)
 
-        safe_dist = cluster_speed_ms * 8.
-        starting_dist = cluster_speed_ms * 30.
+        safe_dist = cluster_speed_ms * 3. if cam_type in (22,33) else cluster_speed_ms * 8.
+        starting_dist = cluster_speed_ms * 6. if cam_type in (22,33) else cluster_speed_ms * 30.
 
         if self.decelerating and self.last_limit_speed_left_dist > 0 and \
            cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - (cluster_speed_ms * 6)):
@@ -338,7 +344,14 @@ class SpeedLimiter:
             decel_rate_factor = (remain_decel_dist / total_decel_dist) ** 0.6
 
           self.last_limit_speed_left_dist = cam_limit_speed_left_dist
-          target_speed = cam_limit_speed * cam_speed_factor + int(decel_rate_factor * diff_speed)
+
+          if cam_type == 22:
+            bump_speed = 28.
+            target_speed = bump_speed + int(decel_rate_factor * diff_speed)
+          elif cam_type == 33:
+            target_speed = cam_limit_speed + int(decel_rate_factor * diff_speed)
+          else:
+            target_speed = cam_limit_speed * cam_speed_factor + int(decel_rate_factor * diff_speed)
 
           return target_speed, is_limit_zone
 
