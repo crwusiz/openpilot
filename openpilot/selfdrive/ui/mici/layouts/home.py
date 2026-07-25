@@ -69,7 +69,7 @@ class AlertsPill(Widget):
 
   def __init__(self):
     super().__init__()
-    self.set_rect(rl.Rectangle(0, 0, 104, 52))
+    self.set_rect(rl.Rectangle(0, 0, 104, 70))
 
     self._pill_bg_txt = gui_app.texture("icons_mici/alerts_pill.png", 104, 52)
     self._icon_red = gui_app.texture("icons_mici/offroad_alerts/red_warning.png", 36, 36)
@@ -86,8 +86,7 @@ class AlertsPill(Widget):
   def _render(self, _):
     alert_count = self._alert_count_callback() if self._alert_count_callback else 0
     if alert_count > 0:
-      pill_w, pill_h = self._pill_bg_txt.width, self._pill_bg_txt.height
-      rl.draw_texture_ex(self._pill_bg_txt, rl.Vector2(self.rect.x, self.rect.y), 0.0, 1.0, rl.WHITE)
+      rl.draw_texture_ex(self._pill_bg_txt, rl.Vector2(self.rect.x, self.rect.y + 18), 0.0, 1.0, rl.WHITE)
 
       severity = self._max_severity_callback() if self._max_severity_callback else None
       if severity == -1:
@@ -98,10 +97,10 @@ class AlertsPill(Widget):
         warning_txt = self._icon_orange
 
       warn_x = self.rect.x + self.ICON_OFFSET
-      warn_y = self.rect.y + (pill_h - warning_txt.height) / 2
+      warn_y = self.rect.y
       rl.draw_texture_ex(warning_txt, rl.Vector2(warn_x, warn_y), 0.0, 1.0, rl.WHITE)
 
-      count_rect = rl.Rectangle(self.rect.x + self.COUNT_OFFSET, self.rect.y, pill_w - self.COUNT_OFFSET, pill_h)
+      count_rect = rl.Rectangle(self.rect.x + self.COUNT_OFFSET, self.rect.y + 18, self._pill_bg_txt.width - self.COUNT_OFFSET, self._pill_bg_txt.height)
       gui_label(count_rect, str(alert_count), font_size=36,
                 alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
                 alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
