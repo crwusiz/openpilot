@@ -318,12 +318,21 @@ class SpeedLimiter:
       min_limit = 40 if is_highway else 20
       max_limit = 120 if is_highway else 100
 
+      if cam_type in (22,33):
+        min_limit = 10
+
+      if cam_type == 22:
+        print(f"[DEBUG] speed bump event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
+
+      if cam_type == 33:
+        print(f"[DEBUG] school zone event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
+
       if cam_limit_speed_left_dist is not None and cam_limit_speed is not None and cam_limit_speed_left_dist > 0:
         cluster_speed_ms = self.conv.to_ms(cluster_speed_clu)
         diff_speed = cluster_speed_clu - (cam_limit_speed * cam_speed_factor)
 
-        safe_dist = cluster_speed_ms * 3. if cam_type in (22,33) else cluster_speed_ms * 8.
-        starting_dist = cluster_speed_ms * 6. if cam_type in (22,33) else cluster_speed_ms * 30.
+        safe_dist = cluster_speed_ms * 4. if cam_type in (22,33) else cluster_speed_ms * 8.
+        starting_dist = cluster_speed_ms * 8. if cam_type in (22,33) else cluster_speed_ms * 30.
 
         if self.decelerating and self.last_limit_speed_left_dist > 0 and \
            cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - (cluster_speed_ms * 6)):
@@ -345,13 +354,7 @@ class SpeedLimiter:
 
           self.last_limit_speed_left_dist = cam_limit_speed_left_dist
 
-          if cam_type == 22:
-            bump_speed = 28.
-            target_speed = bump_speed + int(decel_rate_factor * diff_speed)
-          elif cam_type == 33:
-            target_speed = cam_limit_speed + int(decel_rate_factor * diff_speed)
-          else:
-            target_speed = cam_limit_speed * cam_speed_factor + int(decel_rate_factor * diff_speed)
+          target_speed = cam_limit_speed * cam_speed_factor + int(decel_rate_factor * diff_speed)
 
           return target_speed, is_limit_zone
 
