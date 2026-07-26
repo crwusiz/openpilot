@@ -92,7 +92,7 @@ class LongControl:
       self.stopping_accel_weight = 0.0
 
     else:  # LongCtrlState.pid
-      error = long_plan.a_target - CS.aEgo
+      error = long_plan.aTarget - CS.aEgo
       output_accel = self.pid.update(error, speed=CS.vEgo, feedforward=long_plan.aTarget)
 
       self.stopping_accel_weight = max(self.stopping_accel_weight - 1.0 * DT_CTRL, 0.)
