@@ -16,25 +16,21 @@ except ImportError:
 try:
   from nicegui import ui, app
 except ImportError:
-  logging.getLogger("dashboard").warning("nicegui not found. Remounting filesystem to install...")
-  subprocess.check_call(["sudo", "mount", "-o", "remount,rw", "/"])
-  subprocess.check_call(["sudo", sys.executable, "-m", "pip", "install", "nicegui"])
+  logging.getLogger("dashboard").warning("nicegui not found. Installing in user space...")
   try:
-    subprocess.check_call(["sudo", "mount", "-o", "remount,ro", "/"])
-  except subprocess.CalledProcessError:
-    pass
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "nicegui"])
+  except Exception as e:
+    logging.getLogger("dashboard").error(f"Failed to install nicegui: {e}")
   from nicegui import ui, app
 
 try:
   from ansi2html import Ansi2HTMLConverter
 except ImportError:
-  logging.getLogger("terminal_tab").warning("ansi2html not found. Remounting filesystem to install...")
-  subprocess.check_call(["sudo", "mount", "-o", "remount,rw", "/"])
-  subprocess.check_call(["sudo", sys.executable, "-m", "pip", "install", "ansi2html"])
+  logging.getLogger("terminal_tab").warning("ansi2html not found. Installing in user space...")
   try:
-    subprocess.check_call(["sudo", "mount", "-o", "remount,ro", "/"])
-  except subprocess.CalledProcessError:
-    pass
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "ansi2html"])
+  except Exception as e:
+    logging.getLogger("terminal_tab").error(f"Failed to install ansi2html: {e}")
   from ansi2html import Ansi2HTMLConverter
 
 # ── 1. 환경 설정 및 유틸리티 ───────────────────────────────────────
