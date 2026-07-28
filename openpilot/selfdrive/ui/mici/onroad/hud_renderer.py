@@ -1,3 +1,4 @@
+import math
 import pyray as rl
 from dataclasses import dataclass
 from openpilot.common.constants import CV
@@ -285,15 +286,18 @@ class HudRenderer(Widget):
   def _draw_model_source(self, rect: rl.Rectangle) -> None:
     if ui_state.sm.recv_frame['selfdriveState'] < ui_state.started_frame:
       return
-    small_drives = not ui_state.usbgpu_loading and not ui_state.usbgpu_active and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame
-    big_color = rl.GREEN if ui_state.usbgpu_active else rl.RED if small_drives else rl.GRAY
-    small_color = rl.GREEN if small_drives else rl.WHITE if ui_state.usbgpu_active else rl.GRAY
     big_size = measure_text_cached(self._font_semi_bold, "BIG", FontSizes.max_speed)
-    small_size = measure_text_cached(self._font_semi_bold, "SM", FontSizes.max_speed)
     big_pos = rl.Vector2(rect.x + rect.width - 12 - big_size.x, rect.y + rect.height - 14 - FontSizes.max_speed)
-    small_pos = rl.Vector2(big_pos.x + (big_size.x - small_size.x) / 2, big_pos.y - FontSizes.max_speed - 2)
+
+    big_failed = not ui_state.usbgpu_loading and not ui_state.usbgpu_active and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame
+    if ui_state.usbgpu_loading:
+      pulse = 0.5 - 0.5 * math.cos(rl.get_time() * 6.0)
+      big_color = rl.Color(255, 255, 255, int(255 * (0.35 + 0.65 * pulse)))
+    elif big_failed:
+      big_color = rl.Color(255, 115, 0, 255)
+    else:
+      big_color = rl.WHITE
     rl.draw_text_ex(self._font_semi_bold, "BIG", big_pos, FontSizes.max_speed, 0, big_color)
-    rl.draw_text_ex(self._font_semi_bold, "SM", small_pos, FontSizes.max_speed, 0, small_color)
 
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
     wheel_txt = self._get_wheel_texture()
