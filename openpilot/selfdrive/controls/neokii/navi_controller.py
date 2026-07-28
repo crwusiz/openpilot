@@ -11,6 +11,8 @@ import socket
 import fcntl
 import struct
 import numpy as np
+import logging
+import glob
 
 from collections import deque
 from threading import Thread
@@ -19,6 +21,39 @@ from openpilot.common.realtime import Ratekeeper
 from openpilot.common.constants import UnitConverter
 
 terminate_flag = threading.Event()
+
+LOG_DIR = "/data/navi_debug"
+LOG_MAX_FILES = 30
+
+def _setup_logger():
+  logger = logging.getLogger("navi")
+  logger.setLevel(logging.DEBUG)
+
+  try:
+    os.makedirs(LOG_DIR, exist_ok=True)
+
+    existing = sorted(glob.glob(os.path.join(LOG_DIR, "nav_*.log")))
+    for old_file in existing[:-LOG_MAX_FILES] if len(existing) > LOG_MAX_FILES else []:
+      try:
+        os.remove(old_file)
+      except Exception:
+        pass
+
+    log_path = os.path.join(LOG_DIR, time.strftime("nav_%Y%m%d_%H%M%S.log"))
+    handler = logging.FileHandler(log_path)
+    handler.setFormatter(logging.Formatter("%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s", datefmt="%H:%M:%S"))
+    logger.addHandler(handler)
+
+  except PermissionError:
+    pass
+
+  # 터미널 동시 출력
+  stream_handler = logging.StreamHandler()
+  logger.addHandler(stream_handler)
+
+  return logger
+
+log = _setup_logger()
 
 class Port:
   BROADCAST_PORT = 2899
@@ -147,6 +182,7 @@ class NaviServer:
           if 'road_limit' in json_obj:
             self.json_road_limit = json_obj['road_limit']
             self.last_updated = time.monotonic()
+            log.debug(f"[3843 RECV] {json_obj['road_limit']}")
 
         finally:
           self.lock.release()
@@ -322,10 +358,10 @@ class SpeedLimiter:
         min_limit = 10
 
       if cam_type == 22:
-        print(f"[DEBUG] speed bump event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
+        log.debug(f"speed bump event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
 
       if cam_type == 33:
-        print(f"[DEBUG] school zone event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
+        log.debug(f"school zone event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
 
       if cam_limit_speed_left_dist is not None and cam_limit_speed is not None and cam_limit_speed_left_dist > 0:
         cluster_speed_ms = self.conv.to_ms(cluster_speed_clu)
@@ -337,6 +373,12 @@ class SpeedLimiter:
         if self.decelerating and self.last_limit_speed_left_dist > 0 and \
            cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - (cluster_speed_ms * 6)):
           self.decelerating = False
+
+        if cam_type in (22, 33) and not (min_limit <= cam_limit_speed <= max_limit and (self.decelerating or cam_limit_speed_left_dist < starting_dist)):
+          log.debug(
+            f"bump/school gate REJECTED: cam_limit_speed={cam_limit_speed} (min={min_limit},max={max_limit}), "
+            f"dist={cam_limit_speed_left_dist}, starting_dist={starting_dist:.1f}, decelerating={self.decelerating}"
+          )
 
         if min_limit <= cam_limit_speed <= max_limit and (self.decelerating or cam_limit_speed_left_dist < starting_dist):
           is_limit_zone = not self.decelerating
@@ -413,7 +455,7 @@ class SpeedLimiter:
     return target_speed, is_limit_zone
 
 def signal_handler(sig, frame):
-  print('Ctrl+C pressed, exiting.')
+  log.info('Ctrl+C pressed, exiting.')
   terminate_flag.set()
   sys.exit(0)
 
