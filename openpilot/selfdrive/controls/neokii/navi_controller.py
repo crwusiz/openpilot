@@ -285,6 +285,8 @@ class SpeedLimiter:
     self.decelerating = False
     self.started_dist = 0
     self.last_limit_speed_left_dist = 0
+    self.last_road_name = ""
+    self.in_school_zone = False
 
     self.sock = messaging.sub_sock("naviData")
     self.naviData = None
@@ -330,6 +332,10 @@ class SpeedLimiter:
       return self.naviData.camType
     return 0
 
+  def get_in_school_zone(self):
+    self.recv()
+    return self.in_school_zone
+
   def get_max_speed(self, cluster_speed_clu):
     self.recv()
     default_return_value = (0, False)
@@ -354,27 +360,51 @@ class SpeedLimiter:
       min_limit = 40 if is_highway else 20
       max_limit = 120 if is_highway else 100
 
-      if cam_type in (22,33):
+      is_bump = cam_type == 22
+      is_school_zone_start = cam_type == 20
+      is_school_zone_end = cam_type == 21
+
+      if is_school_zone_start and not self.in_school_zone:
+        log.info(f"school zone ENTER: limit={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
+        self.in_school_zone = True
+      elif is_school_zone_end and self.in_school_zone:
+        log.info("school zone EXIT")
+        self.in_school_zone = False
+
+      if is_bump or is_school_zone_start:
         min_limit = 10
 
-      if cam_type == 22:
+      if is_bump:
         log.debug(f"speed bump event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
 
-      if cam_type == 33:
-        log.debug(f"school zone event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
+      if is_school_zone_start:
+        log.debug(f"school zone start event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
+
+      current_road_name = str(getattr(self.naviData, "currentRoadName", "") or "")
 
       if cam_limit_speed_left_dist is not None and cam_limit_speed is not None and cam_limit_speed_left_dist > 0:
         cluster_speed_ms = self.conv.to_ms(cluster_speed_clu)
         diff_speed = cluster_speed_clu - (cam_limit_speed * cam_speed_factor)
 
-        safe_dist = cluster_speed_ms * 4. if cam_type in (22,33) else cluster_speed_ms * 8.
-        starting_dist = cluster_speed_ms * 8. if cam_type in (22,33) else cluster_speed_ms * 30.
+        tight_zone = is_bump or is_school_zone_start
+        safe_dist = cluster_speed_ms * 4. if tight_zone else cluster_speed_ms * 8.
+        starting_dist = cluster_speed_ms * 8. if tight_zone else cluster_speed_ms * 30.
 
         if self.decelerating and self.last_limit_speed_left_dist > 0 and \
            cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - (cluster_speed_ms * 6)):
+          log.debug(f"decel reset (dist jumped closer): {self.last_limit_speed_left_dist:.0f}m -> {cam_limit_speed_left_dist:.0f}m")
           self.decelerating = False
 
-        if cam_type in (22, 33) and not (min_limit <= cam_limit_speed <= max_limit and (self.decelerating or cam_limit_speed_left_dist < starting_dist)):
+        elif self.decelerating and self.last_limit_speed_left_dist > 0 and \
+             cam_limit_speed_left_dist > (self.last_limit_speed_left_dist + max(cluster_speed_ms * 3, 20.)):
+          log.debug(f"decel reset (new distinct event, dist jumped farther): {self.last_limit_speed_left_dist:.0f}m -> {cam_limit_speed_left_dist:.0f}m")
+          self.decelerating = False
+
+        if self.decelerating and self.last_road_name and current_road_name and current_road_name != self.last_road_name:
+          log.debug(f"decel reset (road changed): {self.last_road_name} -> {current_road_name}")
+          self.decelerating = False
+
+        if tight_zone and not (min_limit <= cam_limit_speed <= max_limit and (self.decelerating or cam_limit_speed_left_dist < starting_dist)):
           log.debug(
             f"bump/school gate REJECTED: cam_limit_speed={cam_limit_speed} (min={min_limit},max={max_limit}), "
             f"dist={cam_limit_speed_left_dist}, starting_dist={starting_dist:.1f}, decelerating={self.decelerating}"
@@ -395,12 +425,18 @@ class SpeedLimiter:
             decel_rate_factor = (remain_decel_dist / total_decel_dist) ** 0.6
 
           self.last_limit_speed_left_dist = cam_limit_speed_left_dist
+          self.last_road_name = current_road_name
 
           target_speed = cam_limit_speed * cam_speed_factor + int(decel_rate_factor * diff_speed)
 
+          if tight_zone:
+            log.debug(f"bump/school target_speed={target_speed:.1f}, is_limit_zone={is_limit_zone}, dist={cam_limit_speed_left_dist}")
+
           return target_speed, is_limit_zone
 
-      elif section_left_dist is not None and section_limit_speed is not None and section_left_dist > 0:
+      self.last_road_name = current_road_name
+
+      if section_left_dist is not None and section_limit_speed is not None and section_left_dist > 0:
         if min_limit <= section_limit_speed <= max_limit:
 
           is_limit_zone = not self.decelerating
