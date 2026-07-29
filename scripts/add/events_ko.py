@@ -155,7 +155,7 @@ class NoEntryAlert(Alert):
     if HARDWARE.get_device_type() == 'mici':
       alert_text_1, alert_text_2 = alert_text_2, alert_text_1
     super().__init__(alert_text_1, alert_text_2, AlertStatus.normal,
-                     AlertSize.mid, Priority.LOW, visual_alert,
+                     AlertSize.mid, priority, visual_alert,
                      AudibleAlert.refuse, 3.)
 
 
@@ -451,6 +451,15 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.WARNING: longitudinal_maneuver_alert,
     ET.PERMANENT: NormalPermanentAlert("롱컨 제어 모드",
                                        "전방 도로에 장애물이 없는지 확인하세요"),
+  },
+
+  EventName.bigModelLoading: {
+    ET.NO_ENTRY: NoEntryAlert("Big Model Loading"),
+    ET.PERMANENT: NormalPermanentAlert("Big Model Loading"),
+  },
+
+  EventName.bigModelFailed: {
+    ET.PERMANENT: NormalPermanentAlert("Big Model Failed ", "Restart the car to retry,\nnow driving on small model", duration=30.),
   },
 
   EventName.lateralManeuver: {

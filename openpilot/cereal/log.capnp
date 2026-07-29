@@ -129,20 +129,21 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     userBookmark @95;
     excessiveActuation @96;
     bigModelLoading @100;
-    bigModelReady @101;
+    bigModelFailed @102;
 
     turningIndicatorOn @103;
     autoLaneChange @104;
 
     ding @105;
     dong @106;
-    beep @102;
+    beep @107;
 
     lowBatteryDEPRECATED @40;
     soundsUnavailableDEPRECATED @47;
     deviceFallingDEPRECATED @71;
     usbErrorDEPRECATED @78;
     audioFeedbackDEPRECATED @97;
+    bigModelReadyDEPRECATED @101;
   }
 }
 

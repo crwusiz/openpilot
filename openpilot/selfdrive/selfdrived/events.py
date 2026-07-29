@@ -450,8 +450,8 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.PERMANENT: NormalPermanentAlert("Big Model Loading"),
   },
 
-  EventName.bigModelReady: {
-    ET.PERMANENT: EngagementAlert(AudibleAlert.complete),
+  EventName.bigModelFailed: {
+    ET.PERMANENT: NormalPermanentAlert("Big Model Failed ", "Restart the car to retry,\nnow driving on small model", duration=30.),
   },
 
   EventName.lateralManeuver: {
@@ -661,8 +661,8 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.WARNING: Alert(
       "Take Control",
       "Turn Exceeds Steering Limit",
-      AlertStatus.userPrompt, AlertSize.mid,
-      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.promptRepeat, 2.),
+      AlertStatus.userPrompt, AlertSize.small,
+      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, 2.),
   },
 
   # Thrown when the fan is driven at >50% but is not rotating
@@ -1064,7 +1064,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       "Steer Unavailable while Turning",
       "",
       AlertStatus.userPrompt, AlertSize.small,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, .2),
+      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, .2),
   },
 
   EventName.autoLaneChange: {
