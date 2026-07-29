@@ -47,9 +47,8 @@ def _setup_logger():
   except PermissionError:
     pass
 
-  # 터미널 동시 출력
-  stream_handler = logging.StreamHandler()
-  logger.addHandler(stream_handler)
+  #stream_handler = logging.StreamHandler()
+  #logger.addHandler(stream_handler)
 
   return logger
 
@@ -293,6 +292,10 @@ class SpeedLimiter:
     self.logMonoTime = 0
     self.conv = UnitConverter()
 
+    self._init_time = time.monotonic()
+    self._first_navidata_logged = False
+    log.info("SpeedLimiter initialized, waiting for first naviData...")
+
   @classmethod
   def instance(cls):
     if not hasattr(cls, "_instance"):
@@ -305,6 +308,10 @@ class SpeedLimiter:
       if dat is not None:
         self.logMonoTime = dat.logMonoTime
         self.naviData = dat.naviData
+        if not self._first_navidata_logged:
+          log.info(f"first naviData received ({time.monotonic() - self._init_time:.1f}s after SpeedLimiter init) — "
+                    f"이전까지는 get_max_speed()가 전부 조기 리턴됨 (self.naviData is None)")
+          self._first_navidata_logged = True
     except Exception:
       pass
 
@@ -388,7 +395,11 @@ class SpeedLimiter:
 
         tight_zone = is_bump or is_school_zone_start
         safe_dist = cluster_speed_ms * 4. if tight_zone else cluster_speed_ms * 8.
-        starting_dist = cluster_speed_ms * 8. if tight_zone else cluster_speed_ms * 30.
+
+        MIN_STARTING_DIST_TIGHT = 60.
+        MIN_STARTING_DIST_NORMAL = 100.
+        starting_dist = max(cluster_speed_ms * 8., MIN_STARTING_DIST_TIGHT) if tight_zone \
+                        else max(cluster_speed_ms * 30., MIN_STARTING_DIST_NORMAL)
 
         if self.decelerating and self.last_limit_speed_left_dist > 0 and \
            cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - (cluster_speed_ms * 6)):
@@ -429,8 +440,7 @@ class SpeedLimiter:
 
           target_speed = cam_limit_speed * cam_speed_factor + int(decel_rate_factor * diff_speed)
 
-          if tight_zone:
-            log.debug(f"bump/school target_speed={target_speed:.1f}, is_limit_zone={is_limit_zone}, dist={cam_limit_speed_left_dist}")
+          log.debug(f"cam_type={cam_type} target_speed={target_speed:.1f}, is_limit_zone={is_limit_zone}, dist={cam_limit_speed_left_dist}, starting_dist={starting_dist:.1f}")
 
           return target_speed, is_limit_zone
 
