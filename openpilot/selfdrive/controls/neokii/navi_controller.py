@@ -61,8 +61,6 @@ class Port:
 
 class NaviServer:
   def __init__(self):
-    self.sm = messaging.SubMaster(['carState'])
-
     self.json_road_limit = None
     self.active = 0
     self.last_updated = 0
@@ -72,7 +70,6 @@ class NaviServer:
     self.remote_addr = None
 
     Thread(target=self.broadcast_thread, args=[], daemon=True).start()
-    Thread(target=self.update_thread, args=[self.sm], daemon=True).start()
 
   def get_broadcast_address(self):
     try:
@@ -115,20 +112,6 @@ class NaviServer:
           frame += 1
       except Exception:
         pass
-
-  def update_thread(self, sm):
-    rk = Ratekeeper(10, print_delay_threshold=None)
-
-    while not terminate_flag.is_set():
-      sm.update(0)
-
-      if sm.updated['carState']:
-        v_ego = sm['carState'].vEgo
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-          data_in_bytes = struct.pack('!f', v_ego)
-          sock.sendto(data_in_bytes, ('127.0.0.1', Port.CS_PORT))
-
-      rk.keep_time()
 
   def send_sdp(self, sock):
     try:
@@ -218,10 +201,13 @@ class NaviServer:
     return json_data.get(key, default)
 
 def publish_thread(server):
-  sm = server.sm
+  sm = messaging.SubMaster(['carState'])
   naviData = messaging.pub_sock('naviData')
   rk = Ratekeeper(10, print_delay_threshold=None)
   v_ego_q = deque(maxlen=3)
+
+  last_network_dist = -1
+  dist_frozen_timer = 0.0
 
   while not terminate_flag.is_set():
     sm.update(0)
@@ -248,9 +234,33 @@ def publish_thread(server):
       server.lock.release()
 
     if sm.updated['carState']:
-      v_ego_q.append(sm['carState'].vEgo)
+      current_v_ego = sm['carState'].vEgo
+      v_ego_q.append(current_v_ego)
+
+      try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+          data_in_bytes = struct.pack('!f', current_v_ego)
+          sock.sendto(data_in_bytes, ('127.0.0.1', Port.CS_PORT))
+      except Exception:
+        pass
 
     v_ego = np.mean(v_ego_q) if len(v_ego_q) > 0 else 0.
+
+    # 프리징 차단 로직
+    if navi.camLimitSpeedLeftDist > 0:
+      if navi.camLimitSpeedLeftDist == last_network_dist:
+        if v_ego > 1.0:
+          dist_frozen_timer += 0.1
+      else:
+        last_network_dist = navi.camLimitSpeedLeftDist
+        dist_frozen_timer = 0.0
+
+      if dist_frozen_timer > 3.0:
+        navi.camLimitSpeedLeftDist = 0
+    else:
+      last_network_dist = 0
+      dist_frozen_timer = 0.0
+
     t_since_last_update = (time.monotonic() - server.last_updated)
     s_travelled = t_since_last_update * v_ego
 
@@ -309,8 +319,7 @@ class SpeedLimiter:
         self.logMonoTime = dat.logMonoTime
         self.naviData = dat.naviData
         if not self._first_navidata_logged:
-          log.info(f"first naviData received ({time.monotonic() - self._init_time:.1f}s after SpeedLimiter init) — "
-                    f"이전까지는 get_max_speed()가 전부 조기 리턴됨 (self.naviData is None)")
+          log.info(f"first naviData received ({time.monotonic() - self._init_time:.1f}s after SpeedLimiter init)")
           self._first_navidata_logged = True
     except Exception:
       pass
@@ -367,9 +376,9 @@ class SpeedLimiter:
       min_limit = 40 if is_highway else 20
       max_limit = 120 if is_highway else 100
 
-      is_bump = cam_type == 22
       is_school_zone_start = cam_type == 20
       is_school_zone_end = cam_type == 21
+      is_speed_bump = cam_type == 22
 
       if is_school_zone_start and not self.in_school_zone:
         log.info(f"school zone ENTER: limit={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
@@ -378,28 +387,34 @@ class SpeedLimiter:
         log.info("school zone EXIT")
         self.in_school_zone = False
 
-      if is_bump or is_school_zone_start:
+      current_road_name = str(getattr(self.naviData, "currentRoadName", "") or "")
+
+      if self.in_school_zone:
+        if (self.last_road_name and current_road_name and current_road_name != self.last_road_name) or \
+           (cam_type not in (20, 21) and cam_limit_speed_left_dist > 0):
+          log.info("school zone FORCED EXIT (road changed or new cam detected)")
+          self.in_school_zone = False
+
+      if is_speed_bump or is_school_zone_start:
         min_limit = 10
 
-      if is_bump:
+      if is_speed_bump:
         log.debug(f"speed bump event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
 
       if is_school_zone_start:
         log.debug(f"school zone start event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
 
-      current_road_name = str(getattr(self.naviData, "currentRoadName", "") or "")
-
       if cam_limit_speed_left_dist is not None and cam_limit_speed is not None and cam_limit_speed_left_dist > 0:
         cluster_speed_ms = self.conv.to_ms(cluster_speed_clu)
         diff_speed = cluster_speed_clu - (cam_limit_speed * cam_speed_factor)
 
-        tight_zone = is_bump or is_school_zone_start
+        tight_zone = is_speed_bump or is_school_zone_start
         safe_dist = cluster_speed_ms * 4. if tight_zone else cluster_speed_ms * 8.
 
         MIN_STARTING_DIST_TIGHT = 60.
-        MIN_STARTING_DIST_NORMAL = 100.
-        starting_dist = max(cluster_speed_ms * 8., MIN_STARTING_DIST_TIGHT) if tight_zone \
-                        else max(cluster_speed_ms * 30., MIN_STARTING_DIST_NORMAL)
+        MIN_STARTING_DIST_NORMAL = 150.
+        starting_dist = max(cluster_speed_ms * 10., MIN_STARTING_DIST_TIGHT) if tight_zone \
+                        else max(cluster_speed_ms * 18., MIN_STARTING_DIST_NORMAL)
 
         if self.decelerating and self.last_limit_speed_left_dist > 0 and \
            cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - (cluster_speed_ms * 6)):
