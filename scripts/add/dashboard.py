@@ -57,7 +57,20 @@ def get_list_from_file(path: str) -> list:
       return [line.strip() for line in f if line.strip()]
   return []
 
+def _prepare_script_execution(path: str):
+    if path.endswith('.sh'):
+        subprocess.run(['sed', '-i', 's/\\r$//', path], stderr=subprocess.DEVNULL)
+        if os.path.exists(path): os.chmod(path, 0o755)
+
+    if "gitpull" in path or "restart" in path:
+        restart_script = f"{SCRIPTS_PATH}/restart.sh"
+        subprocess.run(['sed', '-i', 's/\\r$//', restart_script], stderr=subprocess.DEVNULL)
+        if os.path.exists(restart_script): os.chmod(restart_script, 0o755)
+        subprocess.run(['tmux', 'kill-session', '-t', 'tmp'], stderr=subprocess.DEVNULL)
+
 async def run_script_async(name: str, path: str, args: list = None, show_modal: bool = False) -> int:
+  _prepare_script_execution(path)
+
   if show_modal:
     with ui.dialog().classes('backdrop-blur-sm') as dialog, ui.card().classes('w-[95vw] max-w-4xl bg-[#0D1117] border border-[#3A4A6B] p-0 shadow-2xl'):
       with ui.row().classes('w-full px-4 py-3 border-b border-[#3A4A6B] bg-[#1A2235] justify-between items-center'):
@@ -75,14 +88,6 @@ async def run_script_async(name: str, path: str, args: list = None, show_modal: 
       await asyncio.sleep(0.1)
 
       try:
-        if path.endswith('.sh'):
-          os.system(f"sed -i 's/\\r$//' {path} 2>/dev/null")
-          os.system(f"chmod +x {path} 2>/dev/null")
-        if "gitpull" in path or "restart" in path:
-          os.system(f"sed -i 's/\\r$//' {SCRIPTS_PATH}/restart.sh 2>/dev/null")
-          os.system(f"chmod +x {SCRIPTS_PATH}/restart.sh 2>/dev/null")
-          os.system("tmux kill-session -t tmp 2>/dev/null")
-
         cmd = ["bash", path] if path.endswith('.sh') else ["python3", path]
         if args: cmd += args
 
@@ -144,14 +149,6 @@ async def run_script_async(name: str, path: str, args: list = None, show_modal: 
   ui.notify(f"[{name}] 진행 중...", type='info', position='top')
   await asyncio.sleep(0.1)
   try:
-    if path.endswith('.sh'):
-      os.system(f"sed -i 's/\\r$//' {path} 2>/dev/null")
-      os.system(f"chmod +x {path} 2>/dev/null")
-    if "gitpull" in path or "restart" in path:
-      os.system(f"sed -i 's/\\r$//' {SCRIPTS_PATH}/restart.sh 2>/dev/null")
-      os.system(f"chmod +x {SCRIPTS_PATH}/restart.sh 2>/dev/null")
-      os.system("tmux kill-session -t tmp 2>/dev/null")
-
     cmd = ["bash", path] if path.endswith('.sh') else ["python3", path]
     if args: cmd += args
 
@@ -407,7 +404,6 @@ def apply_styles():
     </style>
   """)
 
-
 # ── 3. 탭별 렌더링 함수들 ─────────────────────────────────────
 
 def render_tab_functions():
@@ -490,7 +486,6 @@ def render_tab_functions():
 
   functions_content()
 
-
 def render_tab_toggles():
   TOGGLE_ITEMS = [
     ("PcmCruiseEnable", "PcmCruise", "Change the openpilot cruise engagement"),
@@ -524,7 +519,6 @@ def render_tab_toggles():
         with ui.column().classes('gap-1 ml-3 flex-1 min-w-0'):
           ui.label(label).classes('text-[0.95rem] md:text-lg font-bold text-white leading-tight break-words whitespace-normal')
           ui.label(desc).classes('text-[0.75rem] md:text-sm text-gray-400 leading-snug break-words whitespace-normal')
-
 
 def render_tab_logs():
   LOG_FILES = {
@@ -594,7 +588,8 @@ def render_tab_logs():
 
           if log_path == "TMUX_CONSOLE":
             subprocess.run(["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"], capture_output=True)
-            subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
+            with open("/data/tmux_console.log", "w") as f:
+                subprocess.run(["tmux", "capture-pane", "-pe", "-t", "0", "-S", "-500"], stdout=f)
             p = Path("/data/tmux_console.log")
             if p.exists():
               content = p.read_text()
@@ -621,7 +616,8 @@ def render_tab_logs():
           log_path = LOG_FILES[sel_log.value]
           if log_path == "TMUX_CONSOLE":
             subprocess.run(["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"], capture_output=True)
-            subprocess.run("tmux capture-pane -pe -t 0 -S -500 > /data/tmux_console.log", shell=True)
+            with open("/data/tmux_console.log", "w") as f:
+                subprocess.run(["tmux", "capture-pane", "-pe", "-t", "0", "-S", "-500"], stdout=f)
             await run_script_async("Console Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=["/data/tmux_console.log"])
           else:
             await run_script_async("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[log_path])
@@ -633,7 +629,6 @@ def render_tab_logs():
         viewer_container = ui.html('파일을 선택한 후 View 버튼을 눌러주세요.')
 
       status_container = ui.html('<div class="log-statusbar">📂 대기 중...</div>').classes('w-full')
-
 
 def render_tab_terminal(tabs):
   conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
@@ -688,7 +683,6 @@ def render_tab_terminal(tabs):
 
   # 1초마다 터미널 업데이트 실행
   ui.timer(1.0, update_terminal)
-
 
 def render_tab_camera():
   CAMERA_OPTIONS = {"Road Camera": "road", "Driver Camera": "driver", "Wide Road Camera": "wideRoad"}
@@ -763,7 +757,6 @@ def render_tab_camera():
       """
 
   stop_stream()
-
 
 # ── 4. 메인 앱 구동 (Main) ──────────────────────────────────────
 @ui.page('/')
