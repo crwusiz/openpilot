@@ -116,6 +116,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     canBusMissing @80;
     selfdrivedLagging @81;
     resumeBlocked @82;
+    carNotReady @103;
     steerTimeLimit @83;
     vehicleSensorsInvalid @84;
     locationdTemporaryError @85;
@@ -131,7 +132,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     bigModelLoading @100;
     bigModelFailed @102;
 
-    turningIndicatorOn @103;
+    turningIndicatorOn @108;
     autoLaneChange @104;
 
     ding @105;

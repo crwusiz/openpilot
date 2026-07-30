@@ -447,7 +447,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.bigModelLoading: {
     ET.NO_ENTRY: NoEntryAlert("Big Model Loading"),
-    ET.PERMANENT: NormalPermanentAlert("Big Model Loading"),
   },
 
   EventName.bigModelFailed: {
@@ -789,6 +788,10 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.resumeBlocked: {
     ET.NO_ENTRY: NoEntryAlert("Press Set to Engage"),
+  },
+
+  EventName.carNotReady: {
+    ET.NO_ENTRY: NoEntryAlert("Car Not Ready"),
   },
 
   EventName.wrongCruiseMode: {
