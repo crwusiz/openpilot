@@ -130,7 +130,7 @@ class NaviServer:
 
         if 'cmd' in json_obj:
           try:
-            subprocess.run(json_obj['cmd'], shell=True, check=True)
+            subprocess.run(json_obj['cmd'], shell=True)
             ret = False
           except Exception:
             pass
