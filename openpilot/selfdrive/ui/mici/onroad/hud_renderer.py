@@ -252,18 +252,16 @@ class HudRenderer(Widget):
     )
 
   def _draw_ignore_limit_timer(self, rect: rl.Rectangle) -> None:
-    """Draw a shrinking progress bar at the top of the screen when speed limit is temporarily ignored."""
-    if self.ignore_limit_timer <= 0 or self.ignore_limit_timer >= 2000:
+    max_ticks = 6000.0
+
+    if self.ignore_limit_timer <= 0 or self.ignore_limit_timer >= max_ticks:
       return
 
-    max_ticks = 2000.0
-    # Timer counts UP to 2000, reverse ratio to shrink
     ratio = max(0.0, min(1.0, (max_ticks - self.ignore_limit_timer) / max_ticks))
 
     bar_height = 10
     bar_width = rect.width * ratio
 
-    # Shrink towards center
     bar_x = rect.x + (rect.width - bar_width) / 2
     bar_y = rect.y
 
