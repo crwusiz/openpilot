@@ -81,7 +81,7 @@ _services: dict[str, tuple] = {
   "qRoadEncodeData": (False, 20., None, QueueSize.BIG),
 
   # add
-  "naviData": (False, 0.),
+  "naviData": (False, 10.),
 
   # debug
   "uiDebug": (True, 0., 1),

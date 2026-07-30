@@ -198,14 +198,14 @@ class CruiseController:
 
     if self.ignore_road_limit_temporarily:
       self.ignore_limit_timer += 1
-      timeout_ticks = 6000  # 100Hz 기준 60초
+      timeout_ticks = 3000  # 100Hz 기준 30초
 
       # 1. 스쿨존은 즉시 안전 복귀
       if is_school_zone or double_pressed:
         self.ignore_road_limit_temporarily = False
         self.ignore_limit_timer = 0
 
-      # 2. 1분 타임아웃 발생 시 로직
+      # 2. 30초 타임아웃 발생 시 로직
       elif self.ignore_limit_timer > timeout_ticks:
         self.ignore_road_limit_temporarily = False
         self.ignore_limit_timer = 0

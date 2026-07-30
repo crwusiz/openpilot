@@ -291,8 +291,11 @@ def main():
 
 class SpeedLimiter:
   def __init__(self):
-    self.decelerating = False
+    self.cam_decel = False
+    self.sec_decel = False
+    self.stock_decel = False
     self.started_dist = 0
+    self.started_speed = 0
     self.last_limit_speed_left_dist = 0
     self.last_road_name = ""
     self.in_school_zone = False
@@ -371,7 +374,8 @@ class SpeedLimiter:
     default_return_value = (0, False)
 
     if self.naviData is None:
-      self.decelerating = False
+      self.cam_decel = False
+      self.sec_decel = False
       return default_return_value
 
     try:
@@ -420,7 +424,6 @@ class SpeedLimiter:
 
       if cam_limit_speed_left_dist is not None and cam_limit_speed is not None and cam_limit_speed_left_dist > 0:
         cluster_speed_ms = self.conv.to_ms(cluster_speed_clu)
-        diff_speed = cluster_speed_clu - (cam_limit_speed * cam_speed_factor)
 
         tight_zone = is_speed_bump or is_school_zone_start
         safe_dist = cluster_speed_ms * 4. if tight_zone else cluster_speed_ms * 8.
@@ -430,33 +433,39 @@ class SpeedLimiter:
         starting_dist = max(cluster_speed_ms * 10., MIN_STARTING_DIST_TIGHT) if tight_zone \
                         else max(cluster_speed_ms * 18., MIN_STARTING_DIST_NORMAL)
 
-        if self.decelerating and self.last_limit_speed_left_dist > 0 and \
+        if self.cam_decel and self.last_limit_speed_left_dist > 0 and \
            cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - (cluster_speed_ms * 6)):
           self._log_reset(f"decel reset (dist jumped closer): cam_type={cam_type} {self.last_limit_speed_left_dist:.0f}m -> {cam_limit_speed_left_dist:.0f}m")
-          self.decelerating = False
+          self.cam_decel = False
 
-        elif self.decelerating and self.last_limit_speed_left_dist > 0 and \
+        elif self.cam_decel and self.last_limit_speed_left_dist > 0 and \
              cam_limit_speed_left_dist > (self.last_limit_speed_left_dist + max(cluster_speed_ms * 3, 20.)):
           self._log_reset(f"decel reset (new distinct event, dist jumped farther): cam_type={cam_type} {self.last_limit_speed_left_dist:.0f}m -> {cam_limit_speed_left_dist:.0f}m")
-          self.decelerating = False
+          self.cam_decel = False
 
-        if self.decelerating and self.last_road_name and current_road_name and current_road_name != self.last_road_name:
+        if self.cam_decel and self.last_road_name and current_road_name and current_road_name != self.last_road_name:
           self._log_reset(f"decel reset (road changed): cam_type={cam_type} {self.last_road_name} -> {current_road_name}")
-          self.decelerating = False
+          self.cam_decel = False
 
-        if tight_zone and not (min_limit <= cam_limit_speed <= max_limit and (self.decelerating or cam_limit_speed_left_dist < starting_dist)):
+        if tight_zone and not (min_limit <= cam_limit_speed <= max_limit and (self.cam_decel or cam_limit_speed_left_dist < starting_dist)):
           self._log_throttled(
             "gate_rejected",
             f"bump/school gate REJECTED: cam_limit_speed={cam_limit_speed} (min={min_limit},max={max_limit}), "
-            f"dist={cam_limit_speed_left_dist}, starting_dist={starting_dist:.1f}, decelerating={self.decelerating}"
+            f"dist={cam_limit_speed_left_dist}, starting_dist={starting_dist:.1f}, decel={self.cam_decel}"
           )
 
-        if min_limit <= cam_limit_speed <= max_limit and (self.decelerating or cam_limit_speed_left_dist < starting_dist):
-          is_limit_zone = not self.decelerating
+        self.last_limit_speed_left_dist = cam_limit_speed_left_dist
+        self.last_road_name = current_road_name
 
-          if not self.decelerating:
+        if min_limit <= cam_limit_speed <= max_limit and (self.cam_decel or cam_limit_speed_left_dist < starting_dist):
+          is_limit_zone = not self.cam_decel
+
+          if not self.cam_decel:
             self.started_dist = cam_limit_speed_left_dist
-            self.decelerating = True
+            self.started_speed = cluster_speed_clu
+            self.cam_decel = True
+
+          diff_speed = self.started_speed - (cam_limit_speed * cam_speed_factor)
 
           total_decel_dist = self.started_dist - safe_dist
           remain_decel_dist = cam_limit_speed_left_dist - safe_dist
@@ -464,9 +473,6 @@ class SpeedLimiter:
           decel_rate_factor = 0
           if remain_decel_dist > 0. and total_decel_dist > 0. and diff_speed > 0. and (section_left_dist is None or section_left_dist < 10 or cam_type == 2):
             decel_rate_factor = (remain_decel_dist / total_decel_dist) ** 0.6
-
-          self.last_limit_speed_left_dist = cam_limit_speed_left_dist
-          self.last_road_name = current_road_name
 
           target_speed = cam_limit_speed * cam_speed_factor + int(decel_rate_factor * diff_speed)
 
@@ -479,9 +485,9 @@ class SpeedLimiter:
       if section_left_dist is not None and section_limit_speed is not None and section_left_dist > 0:
         if min_limit <= section_limit_speed <= max_limit:
 
-          is_limit_zone = not self.decelerating
-          if not self.decelerating:
-            self.decelerating = True
+          is_limit_zone = not self.sec_decel
+          if not self.sec_decel:
+            self.sec_decel = True
 
           speed_diff = 0
           if section_adjust_speed is not None and section_adjust_speed:
@@ -495,7 +501,8 @@ class SpeedLimiter:
     except Exception:
       pass
 
-    self.decelerating = False
+    self.cam_decel = False
+    self.sec_decel = False
     return default_return_value
 
   def get_camera_limit_speed_stock(self, CS, cluster_speed_clu):
@@ -505,16 +512,16 @@ class SpeedLimiter:
     speed_limit_ms = self.conv.to_ms(speed_limit)
 
     if speed_limit_distance <= 0 or speed_limit <= 0:
-      self.decelerating = False
+      self.stock_decel = False
       return 0, False
 
     safe_dist = cluster_speed_ms * 8.
     decel_dist = speed_limit_distance - safe_dist
 
-    is_limit_zone = not self.decelerating
+    is_limit_zone = not self.stock_decel
     if decel_dist > 0:
-      if not self.decelerating:
-        self.decelerating = True
+      if not self.stock_decel:
+        self.stock_decel = True
 
     safe_decel_rate = 1.2
     # v_i^2 = v_f^2 + 2ad (physics formula)

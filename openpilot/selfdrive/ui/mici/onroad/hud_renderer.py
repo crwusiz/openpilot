@@ -260,7 +260,7 @@ class HudRenderer(Widget):
     )
 
   def _draw_ignore_limit_timer(self, rect: rl.Rectangle) -> None:
-    max_ticks = 6000.0
+    max_ticks = 3000.0
 
     if self.ignore_limit_timer <= 0 or self.ignore_limit_timer >= max_ticks:
       return
