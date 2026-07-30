@@ -304,6 +304,8 @@ class SpeedLimiter:
 
     self._init_time = time.monotonic()
     self._first_navidata_logged = False
+    self._last_reset_log_msg = None
+    self._last_log_time = {}
     log.info("SpeedLimiter initialized, waiting for first naviData...")
 
   @classmethod
@@ -352,6 +354,18 @@ class SpeedLimiter:
     self.recv()
     return self.in_school_zone
 
+  def _log_reset(self, msg):
+    if msg != self._last_reset_log_msg:
+      log.debug(msg)
+      self._last_reset_log_msg = msg
+
+  def _log_throttled(self, key, msg, min_interval=0.25):
+    now = time.monotonic()
+    last = self._last_log_time.get(key, 0)
+    if now - last >= min_interval:
+      log.debug(msg)
+      self._last_log_time[key] = now
+
   def get_max_speed(self, cluster_speed_clu):
     self.recv()
     default_return_value = (0, False)
@@ -399,10 +413,10 @@ class SpeedLimiter:
         min_limit = 10
 
       if is_speed_bump:
-        log.debug(f"speed bump event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
+        self._log_throttled("bump_event", f"speed bump event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
 
       if is_school_zone_start:
-        log.debug(f"school zone start event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
+        self._log_throttled("school_zone_event", f"school zone start event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
 
       if cam_limit_speed_left_dist is not None and cam_limit_speed is not None and cam_limit_speed_left_dist > 0:
         cluster_speed_ms = self.conv.to_ms(cluster_speed_clu)
@@ -418,20 +432,21 @@ class SpeedLimiter:
 
         if self.decelerating and self.last_limit_speed_left_dist > 0 and \
            cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - (cluster_speed_ms * 6)):
-          log.debug(f"decel reset (dist jumped closer): {self.last_limit_speed_left_dist:.0f}m -> {cam_limit_speed_left_dist:.0f}m")
+          self._log_reset(f"decel reset (dist jumped closer): cam_type={cam_type} {self.last_limit_speed_left_dist:.0f}m -> {cam_limit_speed_left_dist:.0f}m")
           self.decelerating = False
 
         elif self.decelerating and self.last_limit_speed_left_dist > 0 and \
              cam_limit_speed_left_dist > (self.last_limit_speed_left_dist + max(cluster_speed_ms * 3, 20.)):
-          log.debug(f"decel reset (new distinct event, dist jumped farther): {self.last_limit_speed_left_dist:.0f}m -> {cam_limit_speed_left_dist:.0f}m")
+          self._log_reset(f"decel reset (new distinct event, dist jumped farther): cam_type={cam_type} {self.last_limit_speed_left_dist:.0f}m -> {cam_limit_speed_left_dist:.0f}m")
           self.decelerating = False
 
         if self.decelerating and self.last_road_name and current_road_name and current_road_name != self.last_road_name:
-          log.debug(f"decel reset (road changed): {self.last_road_name} -> {current_road_name}")
+          self._log_reset(f"decel reset (road changed): cam_type={cam_type} {self.last_road_name} -> {current_road_name}")
           self.decelerating = False
 
         if tight_zone and not (min_limit <= cam_limit_speed <= max_limit and (self.decelerating or cam_limit_speed_left_dist < starting_dist)):
-          log.debug(
+          self._log_throttled(
+            "gate_rejected",
             f"bump/school gate REJECTED: cam_limit_speed={cam_limit_speed} (min={min_limit},max={max_limit}), "
             f"dist={cam_limit_speed_left_dist}, starting_dist={starting_dist:.1f}, decelerating={self.decelerating}"
           )
@@ -455,7 +470,7 @@ class SpeedLimiter:
 
           target_speed = cam_limit_speed * cam_speed_factor + int(decel_rate_factor * diff_speed)
 
-          log.debug(f"cam_type={cam_type} target_speed={target_speed:.1f}, is_limit_zone={is_limit_zone}, dist={cam_limit_speed_left_dist}, starting_dist={starting_dist:.1f}")
+          self._log_throttled("target_speed", f"cam_type={cam_type} target_speed={target_speed:.1f}, is_limit_zone={is_limit_zone}, dist={cam_limit_speed_left_dist}, starting_dist={starting_dist:.1f}")
 
           return target_speed, is_limit_zone
 
