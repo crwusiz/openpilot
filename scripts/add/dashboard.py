@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 import subprocess
 import logging
@@ -5,8 +6,13 @@ import html as html_lib
 import shutil
 import asyncio
 import os
+import site
 from pathlib import Path
 from datetime import datetime
+
+user_site = site.getusersitepackages()
+if user_site not in sys.path:
+    sys.path.append(user_site)
 
 try:
   from openpilot.common.realtime import set_core_affinity
@@ -16,24 +22,28 @@ except ImportError:
 try:
   from nicegui import ui, app
 except ImportError:
-  logging.getLogger("dashboard").warning("nicegui not found. Installing in user space...")
+  logging.getLogger("dashboard").warning("nicegui not found. Installing via --user...")
   try:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "nicegui"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "nicegui"])
   except Exception as e:
     logging.getLogger("dashboard").error(f"Failed to install nicegui: {e}")
+
+  if user_site not in sys.path: sys.path.append(user_site)
   from nicegui import ui, app
 
 try:
   from ansi2html import Ansi2HTMLConverter
 except ImportError:
-  logging.getLogger("terminal_tab").warning("ansi2html not found. Installing in user space...")
+  logging.getLogger("terminal_tab").warning("ansi2html not found. Installing via --user...")
   try:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "ansi2html"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "ansi2html"])
   except Exception as e:
     logging.getLogger("terminal_tab").error(f"Failed to install ansi2html: {e}")
+
+  if user_site not in sys.path: sys.path.append(user_site)
   from ansi2html import Ansi2HTMLConverter
 
-# ── 1. 환경 설정 및 유틸리티 ───────────────────────────────────────
+# ── 환경 설정 및 유틸리티 ───────────────────────────────────────
 SCRIPTS_PATH = "/data/openpilot/scripts"
 BASE_PATH = "/data/params/crwusiz"
 
@@ -198,7 +208,7 @@ def get_tmux_capture() -> str:
     return f"Error capturing tmux: {e}"
 
 
-# ── 2. 전역 CSS 스타일 정의 (모바일 텍스트 랩핑/비율 최적화) ───────
+# ── 전역 CSS 스타일 정의 (모바일 텍스트 랩핑/비율 최적화) ───────
 def apply_styles():
   ui.add_head_html("""
     <style>
@@ -404,8 +414,7 @@ def apply_styles():
     </style>
   """)
 
-# ── 3. 탭별 렌더링 함수들 ─────────────────────────────────────
-
+# ── 탭별 렌더링 함수들 ─────────────────────────────────────
 def render_tab_functions():
   @ui.refreshable
   def functions_content():
@@ -758,7 +767,7 @@ def render_tab_camera():
 
   stop_stream()
 
-# ── 4. 메인 앱 구동 (Main) ──────────────────────────────────────
+# ── 메인 앱 구동 (Main) ──────────────────────────────────────
 @ui.page('/')
 def main_page():
   ui.dark_mode().enable()
@@ -787,7 +796,10 @@ def main_page():
     with ui.tab_panel('LOGS'): render_tab_logs()
     with ui.tab_panel('TERMINAL'): render_tab_terminal(tabs)
 
-
-if __name__ in {"__main__", "__mp_main__"}:
+def main():
   set_core_affinity([0, 1, 2])
   ui.run(host="0.0.0.0", port=7000, title="Openpilot Dashboard", show=False)
+
+# 단독 실행 모드 호환성 유지
+if __name__ in {"__main__", "__mp_main__"}:
+  main()
