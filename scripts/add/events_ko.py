@@ -454,12 +454,11 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventName.bigModelLoading: {
-    ET.NO_ENTRY: NoEntryAlert("Big Model Loading"),
-    ET.PERMANENT: NormalPermanentAlert("Big Model Loading"),
+    ET.NO_ENTRY: NoEntryAlert("빅모델 로딩중"),
   },
 
   EventName.bigModelFailed: {
-    ET.PERMANENT: NormalPermanentAlert("Big Model Failed ", "Restart the car to retry,\nnow driving on small model", duration=30.),
+    ET.PERMANENT: NormalPermanentAlert("빅모델 실패 ", "다시 시도하려면 차량을 재시동하세요.\n지금은 소형 모델로 운전 중입니다.", duration=20.),
   },
 
   EventName.lateralManeuver: {
@@ -797,6 +796,10 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.resumeBlocked: {
     ET.NO_ENTRY: NoEntryAlert("SET 버튼으로 활성화됩니다"),
+  },
+
+  EventName.carNotReady: {
+    ET.NO_ENTRY: NoEntryAlert("차량이 준비되지 않았습니다"),
   },
 
   EventName.wrongCruiseMode: {
