@@ -29,6 +29,7 @@ CRUISE_LONG_PRESS = 50
 
 NO_LIMIT_SPEED = 255.
 SCHOOL_ZONE_SPEED = 30.0
+IGNORE_LIMIT_TIMEOUT_TICKS = 3000  # 100Hz 기준 30초
 
 ButtonType = structs.CarState.ButtonEvent.Type
 GearShifter = structs.CarState.GearShifter
@@ -113,8 +114,8 @@ class CruiseController:
     self.steer_limit_speed_clu = 0.
     self.lead_limit_speed_clu = 0.
     self.prev_steering_angle = 0.
-    self.prev_cruise_enabled = False
     self.steer_decel_active = False
+    self.prev_cruise_enabled = False
     self.v_cruise_kph = V_CRUISE_UNSET
     self.v_cruise_cluster_kph = V_CRUISE_UNSET
 
@@ -123,7 +124,6 @@ class CruiseController:
     self.ignore_limit_timer = 0
 
     self.prev_road_limit_speed = 0.
-
     self.prev_model_mono_time = 0
     self.cached_curve_speed_clu = NO_LIMIT_SPEED
 
@@ -157,9 +157,9 @@ class CruiseController:
     self.gas_pressed_count = 0
     self.ignore_road_limit_temporarily = False
     self.ignore_limit_timer = 0
-
     self.prev_model_mono_time = 0
     self.cached_curve_speed_clu = NO_LIMIT_SPEED
+    self.steer_decel_active = False
 
   def _cal_limit_speed(self, CS, sm, current_speed_ms: float, cluster_speed_clu: float, v_cruise_kph: float,
                        double_pressed: bool = False):
@@ -187,7 +187,6 @@ class CruiseController:
     if road_limit_speed is not None and road_limit_speed > 0:
       if self.prev_road_limit_speed > 0:
         target_speed = road_limit_speed_clu
-
         if road_limit_speed != self.prev_road_limit_speed:
           if v_cruise_kph != target_speed:
             self.ignore_road_limit_temporarily = True
@@ -198,15 +197,13 @@ class CruiseController:
 
     if self.ignore_road_limit_temporarily:
       self.ignore_limit_timer += 1
-      timeout_ticks = 3000  # 100Hz 기준 30초
 
-      # 1. 스쿨존은 즉시 안전 복귀
+      # 1. 스쿨존이거나 더블클릭 시 즉시 안전 복귀
       if is_school_zone or double_pressed:
         self.ignore_road_limit_temporarily = False
         self.ignore_limit_timer = 0
-
-      # 2. 30초 타임아웃 발생 시 로직
-      elif self.ignore_limit_timer > timeout_ticks:
+      # 2. 타임아웃 발생 시 로직
+      elif self.ignore_limit_timer > IGNORE_LIMIT_TIMEOUT_TICKS:
         self.ignore_road_limit_temporarily = False
         self.ignore_limit_timer = 0
 
@@ -221,8 +218,7 @@ class CruiseController:
     # 2. Camera limit speed
     camera_limit_speed_clu = NO_LIMIT_SPEED
     if nda_active:
-      camera_limit_speed, is_limit_zone = (
-        SpeedLimiter.instance().get_max_speed(cluster_speed_clu))
+      camera_limit_speed, is_limit_zone = SpeedLimiter.instance().get_max_speed(cluster_speed_clu)
       section_limit_speed, section_left_dist = SpeedLimiter.instance().get_section_limit_speed()
       if section_limit_speed > 0 and section_left_dist > 0:
         camera_limit_speed_clu = section_limit_speed
@@ -461,16 +457,13 @@ class CruiseController:
       self.steer_decel_active = False
       return NO_LIMIT_SPEED
 
-    if hasattr(self, 'prev_steering_angle'):
-      angle_change_rate = abs(abs_steer_angle - abs(self.prev_steering_angle))
-      if not getattr(self, 'steer_decel_active', False):
-        if angle_change_rate > 5.0 or abs_steer_angle > 60:
-          self.steer_decel_active = True
-        else:
-          self.prev_steering_angle = abs_steer_angle
-          return NO_LIMIT_SPEED
-    else:
-      self.steer_decel_active = True
+    angle_change_rate = abs(abs_steer_angle - abs(self.prev_steering_angle))
+    if not self.steer_decel_active:
+      if angle_change_rate > 5.0 or abs_steer_angle > 60:
+        self.steer_decel_active = True
+      else:
+        self.prev_steering_angle = abs_steer_angle
+        return NO_LIMIT_SPEED
 
     self.prev_steering_angle = abs_steer_angle
 
@@ -536,7 +529,6 @@ class CruiseController:
       self.v_cruise_kph = int(round(np.clip(self.conv.to_clu(CS.vEgo), initial, V_CRUISE_MAX)))
 
     self.v_cruise_cluster_kph = self.v_cruise_kph
-
     return self.v_cruise_kph
 
   def update_v_cruise(self, CS, sm, enabled: bool):
