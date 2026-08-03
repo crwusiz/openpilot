@@ -693,18 +693,11 @@ class CruiseController:
 
   def _update_message(self, CS):
     exState = CS.exState
-    exState.vCruiseKph = float(self.v_cruise_kph)
     exState.vEgo = float(self.conv.to_clu(CS.vEgo))
     exState.vEgoCluster = float(self.conv.to_clu(CS.vEgoCluster))
+    exState.vCruiseKph = float(self.v_cruise_kph)
     exState.cruiseMaxSpeed = float(self.real_set_speed_kph)
     exState.applyMaxSpeed = float(self.cruise_speed_kph)
-    exState.overrideSpeed = float(self.override_speed_clu)
-    exState.curveSpeed = float(self.curve_speed_clu)
-    exState.roadSpeed = float(self.road_limit_speed_clu)
-    exState.cameraSpeed = float(self.camera_limit_speed_clu)
-    exState.steerSpeed = float(self.steer_limit_speed_clu)
-    exState.leadSpeed = float(self.lead_limit_speed_clu)
-    exState.applyLimitSpeed = float(self.apply_limit_speed_clu)
     exState.ignoreLimitTimer = float(self.ignore_limit_timer)
 
 
