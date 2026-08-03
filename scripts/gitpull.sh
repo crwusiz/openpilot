@@ -88,7 +88,7 @@ update_repository() {
   branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "master")
   log "INFO" "Current branch: $branch - Starting update"
 
-  # 1. Fetch (Quietly, log on failure)
+  # 1. Fetch (Quietly to maintain log format)
   log "INFO" "Fetching changes..."
   if ! git fetch origin --prune --quiet; then
     log "WARNING" "Fetch failed. Retrying..."
@@ -111,9 +111,8 @@ update_repository() {
   fi
 
   log "INFO" "Pulling LFS files..."
-  local lfs_err
-  if ! lfs_err=$(git lfs pull 2>&1); then
-    log "ERROR" "LFS Pull failed. Reason: $lfs_err"
+  if ! GIT_LFS_FORCE_PROGRESS=1 git lfs pull; then
+    log "ERROR" "LFS Pull failed. Please check network connection."
     return 1
   fi
 
@@ -142,7 +141,7 @@ update_submodules() {
 
     if git submodule update --init --force --jobs 4 "$path" > /dev/null 2>&1; then
 
-      git -C "$path" lfs pull > /dev/null 2>&1 || true
+      GIT_LFS_FORCE_PROGRESS=1 git -C "$path" lfs pull || true
 
       local sub_hash
       sub_hash=$(git -C "$path" rev-parse --short HEAD)
@@ -158,7 +157,7 @@ update_submodules() {
       log "WARNING" "'$name': Update failed. Retrying with force init..."
       git submodule deinit -f "$path" > /dev/null 2>&1 || true
       if git submodule update --init --force --jobs 4 "$path" > /dev/null 2>&1; then
-         git -C "$path" lfs pull > /dev/null 2>&1 || true
+         GIT_LFS_FORCE_PROGRESS=1 git -C "$path" lfs pull || true
 
          local sub_hash_retry
          sub_hash_retry=$(git -C "$path" rev-parse --short HEAD)
