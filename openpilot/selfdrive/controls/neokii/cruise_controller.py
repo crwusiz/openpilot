@@ -596,9 +596,12 @@ class CruiseController:
 
     self.real_set_speed_kph = v_cruise_kph
     if CS.cruiseState.enabled and 1 < CS.cruiseState.speed < V_CRUISE_UNSET:
+
+      v_cruise_kph_before_limit = self.v_cruise_kph
+
       self._cal_limit_speed(CS, sm, current_speed_ms, cluster_speed_clu, v_cruise_kph, double_pressed)
 
-      if self.v_cruise_kph != v_cruise_kph:
+      if self.v_cruise_kph != v_cruise_kph_before_limit:
         v_cruise_kph = self.v_cruise_kph
 
       self.cruise_speed_kph = float(
