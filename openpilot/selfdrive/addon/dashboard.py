@@ -796,10 +796,6 @@ def main_page():
     with ui.tab_panel('LOGS'): render_tab_logs()
     with ui.tab_panel('TERMINAL'): render_tab_terminal(tabs)
 
-def main():
+if __name__ in {"__main__", "__mp_main__"}:
   set_core_affinity([0, 1, 2])
   ui.run(host="0.0.0.0", port=7000, title="Openpilot Dashboard", show=False)
-
-# 단독 실행 모드 호환성 유지
-if __name__ in {"__main__", "__mp_main__"}:
-  main()

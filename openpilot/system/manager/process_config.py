@@ -126,7 +126,7 @@ procs = [
 
   # Process add
   PythonProcess("navi_controller", "openpilot.selfdrive.controls.neokii.navi_controller", always_run, enabled=not PC),
-  NativeProcess("dashboard", "scripts/add", ["python3", "dashboard.py"], always_run),
+  NativeProcess("dashboard", "openpilot/selfdrive/addon", ["python3", "dashboard.py"], always_run),
 ]
 
 managed_processes = {p.name: p for p in procs}
