@@ -6,13 +6,14 @@ import html as html_lib
 import shutil
 import asyncio
 import os
-import site
 from pathlib import Path
 from datetime import datetime
 
-user_site = site.getusersitepackages()
-if user_site not in sys.path:
-    sys.path.append(user_site)
+CUSTOM_LIB_PATH = "/data/dashboard_deps"
+os.makedirs(CUSTOM_LIB_PATH, exist_ok=True)
+
+if CUSTOM_LIB_PATH not in sys.path:
+    sys.path.insert(0, CUSTOM_LIB_PATH)
 
 try:
   from openpilot.common.realtime import set_core_affinity
@@ -22,25 +23,23 @@ except ImportError:
 try:
   from nicegui import ui, app
 except ImportError:
-  logging.getLogger("dashboard").warning("nicegui not found. Installing via --user...")
+  logging.getLogger("dashboard").warning(f"nicegui not found. Installing to {CUSTOM_LIB_PATH}...")
   try:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "nicegui"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--target", CUSTOM_LIB_PATH, "nicegui"])
   except Exception as e:
     logging.getLogger("dashboard").error(f"Failed to install nicegui: {e}")
 
-  if user_site not in sys.path: sys.path.append(user_site)
   from nicegui import ui, app
 
 try:
   from ansi2html import Ansi2HTMLConverter
 except ImportError:
-  logging.getLogger("terminal_tab").warning("ansi2html not found. Installing via --user...")
+  logging.getLogger("terminal_tab").warning(f"ansi2html not found. Installing to {CUSTOM_LIB_PATH}...")
   try:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "ansi2html"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--target", CUSTOM_LIB_PATH, "ansi2html"])
   except Exception as e:
     logging.getLogger("terminal_tab").error(f"Failed to install ansi2html: {e}")
 
-  if user_site not in sys.path: sys.path.append(user_site)
   from ansi2html import Ansi2HTMLConverter
 
 # ── 환경 설정 및 유틸리티 ───────────────────────────────────────

@@ -139,6 +139,20 @@ function launch {
     echo -n 1 > /data/params/d/AdbEnabled
   fi
 
+  CUSTOM_DEPS="/data/dashboard_deps"
+  mkdir -p "$CUSTOM_DEPS"
+  export PYTHONPATH="$CUSTOM_DEPS:$PYTHONPATH"
+
+  if ! python3 -c "import nicegui" &> /dev/null; then
+    echo "Installing nicegui to $CUSTOM_DEPS..."
+    python3 -m pip install --target "$CUSTOM_DEPS" nicegui
+  fi
+
+  if ! python3 -c "import ansi2html" &> /dev/null; then
+    echo "Installing ansi2html to $CUSTOM_DEPS..."
+    python3 -m pip install --target "$CUSTOM_DEPS" ansi2html
+  fi
+
   # start manager
   cd openpilot/system/manager
   if [ ! -f $DIR/prebuilt ]; then
