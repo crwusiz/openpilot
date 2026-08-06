@@ -24,7 +24,7 @@ function agnos_init {
     MODEL="$(tr -d '\000\r\n' 2>/dev/null < /sys/firmware/devicetree/base/model | tr '[:upper:]' '[:lower:]')"
     MODEL="${MODEL#comma }"
     if [ "$MODEL" = "c3" ] || [ "$MODEL" = "tici" ]; then
-      MANIFEST="$DIR/openpilot/common/hardware/tici/agnos-tici.json"
+      MANIFEST="$DIR/openpilot/common/hardware/tici/agnos_tici.json"
     fi
     if $AGNOS_PY --verify $MANIFEST; then
       sudo reboot
