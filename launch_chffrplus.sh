@@ -21,10 +21,18 @@ function agnos_init {
   if [ $(< /VERSION) != "$AGNOS_VERSION" ]; then
     AGNOS_PY="$DIR/openpilot/common/hardware/tici/agnos.py"
     MANIFEST="$DIR/openpilot/system/hardware/tici/agnos.json"
+    MODEL="$(tr -d '\000\r\n' 2>/dev/null < /sys/firmware/devicetree/base/model | tr '[:upper:]' '[:lower:]')"
+    MODEL="${MODEL#comma }"
+    if [ "$MODEL" = "c3" ] || [ "$MODEL" = "tici" ]; then
+      MANIFEST="$DIR/openpilot/common/hardware/tici/agnos-tici.json"
+    fi
     if $AGNOS_PY --verify $MANIFEST; then
       sudo reboot
     fi
-    $DIR/openpilot/common/hardware/tici/updater $AGNOS_PY $MANIFEST
+    if ! python3 $DIR/openpilot/system/ui/updater.py $AGNOS_PY $MANIFEST; then
+      echo "python updater failed, falling back to bundled updater"
+      $DIR/openpilot/common/hardware/tici/updater $AGNOS_PY $MANIFEST
+    fi
   fi
 }
 
