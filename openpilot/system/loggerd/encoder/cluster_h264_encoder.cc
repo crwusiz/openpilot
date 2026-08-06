@@ -17,7 +17,7 @@
 #include "common/swaglog.h"
 #include "common/util.h"
 #include "system/camerad/cameras/nv12_info.h"
-#include "third_party/linux/include/v4l2-controls.h"
+#include <linux/v4l2-controls.h>
 #include <linux/videodev2.h>
 
 #define V4L2_QCOM_BUF_FLAG_CODECCONFIG 0x00020000
