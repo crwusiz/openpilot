@@ -147,31 +147,33 @@ function launch {
     echo -n 1 > /data/params/d/AdbEnabled
   fi
 
-  if ! python3 -c "import jeepney" &> /dev/null; then
-    echo "Waiting for internet connection to install jeepney..."
-
-    while ! ping -c 1 -W 1 8.8.8.8 &> /dev/null; do
-      sleep 1
-    done
-
-    echo "Internet connected! Installing jeepney..."
-    sudo mount -o remount,rw /
-    pip install jeepney
-    sudo mount -o remount,ro /
-  fi
-
   CUSTOM_DEPS="/data/dashboard_deps"
   mkdir -p "$CUSTOM_DEPS"
   export PYTHONPATH="$CUSTOM_DEPS:$PYTHONPATH"
 
+  function wait_for_internet {
+    echo "Waiting for internet connection..."
+    for i in {1..20}; do
+      if ping -c 1 -W 1 8.8.8.8 &> /dev/null; then
+        echo "Internet connected!"
+        return 0
+      fi
+      sleep 1
+    done
+    echo "Internet connection timeout."
+    return 1
+  }
+
   if ! python3 -c "import nicegui" &> /dev/null; then
-    echo "Installing nicegui to $CUSTOM_DEPS..."
-    python3 -m pip install --target "$CUSTOM_DEPS" nicegui
+    echo "nicegui not found. Installing..."
+    wait_for_internet
+    pip install --target "$CUSTOM_DEPS" nicegui
   fi
 
   if ! python3 -c "import ansi2html" &> /dev/null; then
-    echo "Installing ansi2html to $CUSTOM_DEPS..."
-    python3 -m pip install --target "$CUSTOM_DEPS" ansi2html
+    echo "ansi2html not found. Installing..."
+    wait_for_internet
+    pip install --target "$CUSTOM_DEPS" ansi2html
   fi
 
   # start manager
