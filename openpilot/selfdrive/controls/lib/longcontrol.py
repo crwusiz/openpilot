@@ -10,17 +10,10 @@ CONTROL_N_T_IDX = ModelConstants.T_IDXS[:CONTROL_N]
 LongCtrlState = car.CarControl.Actuators.LongControlState
 
 
-def long_control_state_trans(CP, active, long_control_state, v_ego,
-                             should_stop, brake_pressed, cruise_standstill, lead):
-  stopping_condition = should_stop or cruise_standstill or brake_pressed
+def long_control_state_trans(active, long_control_state, should_stop, brake_pressed, cruise_standstill):
   starting_condition = (not should_stop and
                         not cruise_standstill and
                         not brake_pressed)
-
-  if lead.status:
-    starting_condition = starting_condition and lead.vLeadK > 1.0 and lead.dRel > 6.0
-
-  started_condition = v_ego > CP.vEgoStarting
 
   if not active:
     long_control_state = LongCtrlState.off
@@ -30,22 +23,16 @@ def long_control_state_trans(CP, active, long_control_state, v_ego,
       if not starting_condition:
         long_control_state = LongCtrlState.stopping
       else:
-        if starting_condition and CP.startingState:
-          long_control_state = LongCtrlState.starting
-        else:
-          long_control_state = LongCtrlState.pid
+        long_control_state = LongCtrlState.pid
 
     elif long_control_state == LongCtrlState.stopping:
-      if starting_condition and CP.startingState:
-        long_control_state = LongCtrlState.starting
-      elif starting_condition:
+      if starting_condition:
         long_control_state = LongCtrlState.pid
 
-    elif long_control_state in [LongCtrlState.starting, LongCtrlState.pid]:
-      if stopping_condition:
+    elif long_control_state == LongCtrlState.pid:
+      if should_stop:
         long_control_state = LongCtrlState.stopping
-      elif started_condition:
-        long_control_state = LongCtrlState.pid
+
   return long_control_state
 
 class LongControl:
@@ -70,9 +57,8 @@ class LongControl:
     lead = sm['radarState'].leadOne
 
     self.prev_long_control_state = self.long_control_state
-    self.long_control_state = long_control_state_trans(self.CP, active, self.long_control_state, CS.vEgo,
-                                                       long_plan.shouldStop, CS.brakePressed,
-                                                       CS.cruiseState.standstill, lead)
+    self.long_control_state = long_control_state_trans(active, self.long_control_state, long_plan.shouldStop,
+                                                       CS.brakePressed, CS.cruiseState.standstill)
     if self.long_control_state == LongCtrlState.off:
       self.reset()
       output_accel = 0.
@@ -85,12 +71,9 @@ class LongControl:
         self.stopping_accel_weight = 1.0
 
         if self.prev_long_control_state == LongCtrlState.starting:
-          output_accel -= self.CP.stoppingDecelRate * 1.5 * DT_CTRL
+          output_accel -= 1.5 * DT_CTRL
         else:
-          m_accel = -0.3
-          d_accel = np.interp(output_accel,
-                              [m_accel - 0.5, m_accel, m_accel + 0.5],
-                              [self.CP.stoppingDecelRate, 0.05, self.CP.stoppingDecelRate])
+          d_accel = np.interp(output_accel, [-0.8, -0.3, 0.2], [1.0, 0.05, 1.0])
 
           output_accel -= d_accel * DT_CTRL
       else:
@@ -101,7 +84,7 @@ class LongControl:
     elif self.long_control_state == LongCtrlState.starting:
       output_accel = self.CP.startAccel
 
-      if lead.status:
+      if lead.present:
         accel_scale = np.interp(lead.dRel, [4.0, 8.0], [0.0, 1.0])
         output_accel *= accel_scale
 
@@ -109,8 +92,7 @@ class LongControl:
       self.stopping_accel_weight = 0.0
 
     else:  # LongCtrlState.pid
-      #error = long_plan.a_target - CS.aEgo
-      error = long_plan.vTarget - CS.vEgo
+      error = long_plan.aTarget - CS.aEgo
       output_accel = self.pid.update(error, speed=CS.vEgo, feedforward=long_plan.aTarget)
 
       self.stopping_accel_weight = max(self.stopping_accel_weight - 1.0 * DT_CTRL, 0.)

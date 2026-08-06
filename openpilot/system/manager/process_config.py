@@ -61,6 +61,9 @@ def only_offroad(started: bool, params: Params, CP: car.CarParams) -> bool:
 def livestream(started: bool, params: Params, CP: car.CarParams) -> bool:
   return params.get_bool("IsLiveStreaming")
 
+def cluster_enable(started: bool, params: Params, CP: car.CarParams) -> bool:
+  return params.get_bool("ClusterEnable")
+
 def or_(*fns):
   return lambda *args: operator.or_(*(fn(*args) for fn in fns))
 
@@ -117,7 +120,6 @@ procs = [
   PythonProcess("tombstoned", "openpilot.system.tombstoned", always_run, enabled=not PC),
   PythonProcess("updated", "openpilot.system.updated.updated", only_offroad, enabled=not PC),
   PythonProcess("uploader", "openpilot.system.loggerd.uploader", always_run),
-  PythonProcess("feedbackd", "openpilot.selfdrive.ui.feedback.feedbackd", only_onroad),
 
   # debug procs
   NativeProcess("bridge", "openpilot/cereal/messaging", ["./bridge"], notcar),
@@ -127,8 +129,9 @@ procs = [
 
   # Process add
   PythonProcess("navi_controller", "openpilot.selfdrive.controls.neokii.navi_controller", always_run, enabled=not PC),
-  NativeProcess("dashboard", "scripts", ["python3", "/data/openpilot/scripts/add/dashboard.py"], always_run, enabled=not PC),
-
+  NativeProcess("dashboard", "openpilot/selfdrive/addon", ["python3", "dashboard.py"], always_run),
+  #PythonProcess("cluster", "openpilot.selfdrive.addon.cluster_run", cluster_enable),
+  PythonProcess("cluster", "openpilot.selfdrive.addon.cluster_run", always_run),
 ]
 
 managed_processes = {p.name: p for p in procs}

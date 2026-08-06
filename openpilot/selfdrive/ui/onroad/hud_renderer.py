@@ -272,7 +272,7 @@ class HudRenderer(Widget):
 
     # Extended state
     self.accel = car_state.aEgo
-    self.brake_press = car_state.brakeLights
+    self.brake_press = car_state.brakePressed
     self.gas_press = car_state.gasPressed
     self.left_blinker = car_state.leftBlinker
     self.right_blinker = car_state.rightBlinker

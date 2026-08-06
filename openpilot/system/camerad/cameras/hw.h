@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common/util.h"
-#include "cereal/gen/cpp/log.capnp.h"
+#include "openpilot/cereal/gen/cpp/log.capnp.h"
 #include "msgq/visionipc/visionipc_server.h"
 
 #include "media/cam_isp_ife.h"
@@ -13,7 +13,7 @@ typedef enum {
   ISP_BPS_PROCESSED,  // fully processed image through the BPS
 } SpectraOutputType;
 
-// For the comma 3/3X three camera platform
+// For the comma 3X three camera platform
 
 struct CameraConfig {
   int camera_num;

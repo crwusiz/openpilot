@@ -62,6 +62,8 @@ class Controls:
     elif self.CP.lateralTuning.which() == 'torque':
       self.LaC = LatControlTorque(self.CP, self.CI, DT_CTRL)
 
+    self.dcam_is_missing = self.params.get_bool("DriverCameraHardwareMissing")
+
   def update(self):
     self.sm.update(15)
     if self.sm.updated["liveCalibration"]:
@@ -177,8 +179,8 @@ class Controls:
 
     radarState = self.sm['radarState']
     leadOne = radarState.leadOne
-    hudControl.leadDistance = leadOne.dRel if leadOne.status else 0
-    hudControl.leadRelSpeed = leadOne.vRel if leadOne.status else 0
+    hudControl.leadDistance = leadOne.dRel if leadOne.present else 0
+    hudControl.leadRelSpeed = leadOne.vRel if leadOne.present else 0
     hudControl.leadRadar = 1 if leadOne.radar else 0
 
     hudControl.rightLaneVisible = True
@@ -211,7 +213,9 @@ class Controls:
     cs.upAccelCmd = float(self.LoC.pid.p)
     cs.uiAccelCmd = float(self.LoC.pid.i)
     cs.ufAccelCmd = float(self.LoC.pid.f)
-    cs.forceDecel = bool(self.sm['driverMonitoringState'].noResponseForceDecel or
+    #cs.forceDecel = bool(self.sm['driverMonitoringState'].noResponseForceDecel or (self.sm['selfdriveState'].state == State.softDisabling))
+
+    cs.forceDecel = bool((not self.dcam_is_missing and self.sm['driverMonitoringState'].noResponseForceDecel) or
                          (self.sm['selfdriveState'].state == State.softDisabling))
 
     # trigger the car's stock driver monitoring escalation

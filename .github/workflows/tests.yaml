@@ -25,9 +25,9 @@ jobs:
     name: build release
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: true
-      - run: ./openpilot/tools/op.sh setup
+      - run: ./tools/op.sh setup
       - name: Build openpilot
         run: scons

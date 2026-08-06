@@ -110,7 +110,7 @@ class AlertsPill(Widget):
 class NetworkIcon(Widget):
   def __init__(self):
     super().__init__()
-    self.set_rect(rl.Rectangle(0, 0, 54, 44))  # max size of all icons
+    self.set_rect(rl.Rectangle(0, 0, 54, 44))
     self._net_type = NetworkType.none
     self._net_strength = 0
 
@@ -134,7 +134,6 @@ class NetworkIcon(Widget):
 
   def _render(self, _):
     if self._net_type == NetworkType.wifi:
-      # There is no 1
       draw_net_txt = {0: self._wifi_none_txt,
                       2: self._wifi_low_txt,
                       3: self._wifi_medium_txt,
@@ -153,7 +152,6 @@ class NetworkIcon(Widget):
     draw_y = self._rect.y + (self._rect.height - draw_net_txt.height) / 2
 
     if draw_net_txt == self._wifi_slash_txt:
-      # Offset by difference in height between slashless and slash icons to make center align match
       draw_y -= (self._wifi_slash_txt.height - self._wifi_none_txt.height) / 2
 
     rl.draw_texture_ex(draw_net_txt, rl.Vector2(draw_x, draw_y), 0.0, 1.0, rl.Color(255, 255, 255, int(255 * 0.9)))
@@ -180,7 +178,7 @@ class MiciHomeLayout(Widget):
 
     self._settings_icon = IconWidget("icons_mici/settings.png", (48, 48), opacity=0.9)
     self._experimental_icon = IconWidget("icons_mici/experimental_mode.png", (48, 48))
-    self._egpu_icon = IconWidget("icons_mici/egpu.png", (50, 37))
+    self._egpu_icon = IconWidget("icons_mici/egpu_green.png", (50, 37))
     self._egpu_icon_gray = IconWidget("icons_mici/egpu_gray.png", (50, 37))
     self._mic_icon = IconWidget("icons_mici/microphone.png", (32, 46))
     self._body_icon = IconWidget("icons_mici/body.png", (54, 37))
@@ -243,7 +241,7 @@ class MiciHomeLayout(Widget):
 
     if self._mouse_down_t is not None:
       if time.monotonic() - self._mouse_down_t > 0.5:
-        if ui_state.has_longitudinal_control:
+        if ui_state.has_longitudinal_control and ui_state.experimental_mode_confirmed:
           ui_state.experimental_mode = not ui_state.experimental_mode
           ui_state.params.put("ExperimentalMode", ui_state.experimental_mode, block=True)
         self._mouse_down_t = None
@@ -286,7 +284,6 @@ class MiciHomeLayout(Widget):
         self._on_settings_click()
     self._did_long_press = False
 
-  # --- Git & Commit Logic Methods ---
   def _handle_commit_button_press(self):
     if self._is_processing:
       print("Script execution already in progress, ignoring click")
@@ -517,14 +514,15 @@ class MiciHomeLayout(Widget):
     self._egpu_icon.set_visible(ui_state.usbgpu and ui_state.usbgpu_compiled)
     self._egpu_icon_gray.set_visible(ui_state.usbgpu and not ui_state.usbgpu_compiled)
     self._mic_icon.set_visible(ui_state.recording_audio)
-    self._body_icon.set_visible(ui_state.is_body)
+    self._body_icon.set_visible(bool(ui_state.is_body))
 
     footer_rect = rl.Rectangle(self.rect.x + HOME_PADDING, self.rect.y + self.rect.height - 56, self.rect.width - HOME_PADDING, 56)
     self._status_bar_layout.render(footer_rect)
 
     self._draw_commit_button(openpilot_end_x)
 
-    # TODO: add alignment to hboxlayout and add to there
-    self._alerts_pill.set_position(self.rect.x + self.rect.width - self._alerts_pill.rect.width - HOME_PADDING,
-                                   self.rect.y + self.rect.height - self._alerts_pill.rect.height)
+    pill_x = self.rect.x + self.rect.width - self._alerts_pill.rect.width - HOME_PADDING
+    pill_y = self._commit_btn_rect.y - self._alerts_pill.rect.height - 8
+
+    self._alerts_pill.set_position(pill_x, pill_y)
     self._alerts_pill.render()

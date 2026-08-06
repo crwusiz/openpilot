@@ -1,4 +1,4 @@
-Import('env', 'common', 'messaging')
+Import('env', 'arch', 'common', 'messaging')
 
 libs = ['usb-1.0', common, messaging, 'pthread']
 panda = env.Library('panda', ['panda.cc', 'panda_comms.cc', 'spi.cc'])

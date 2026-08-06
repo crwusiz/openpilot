@@ -1,5 +1,5 @@
 import pyray as rl
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum
 from collections.abc import Callable
 from openpilot.selfdrive.ui.layouts.settings.developer import DeveloperLayout
@@ -46,7 +46,7 @@ class PanelType(IntEnum):
 class PanelInfo:
   name: str
   instance: Widget
-  button_rect: rl.Rectangle = rl.Rectangle(0, 0, 0, 0)
+  button_rect: rl.Rectangle = field(default_factory=lambda: rl.Rectangle(0, 0, 0, 0))
 
 
 class SettingsLayout(Widget):

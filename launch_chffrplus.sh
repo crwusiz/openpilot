@@ -70,6 +70,14 @@ function launch {
   ln -sfn $(pwd) /data/pythonpath
   export PYTHONPATH="$PWD"
 
+  # submodule package symlinks for PYTHONPATH imports on device.
+  # on PC these come from editable installs via pyproject.toml / uv.
+  ln -sfn msgq_repo/msgq msgq
+  ln -sfn opendbc_repo/opendbc opendbc
+  ln -sfn rednose_repo/rednose rednose
+  ln -sfn teleoprtc_repo/teleoprtc teleoprtc
+  ln -sfn tinygrad_repo/tinygrad tinygrad
+
   # hardware specific init
   if [ -f /AGNOS ]; then
     agnos_init
@@ -144,7 +152,19 @@ function launch {
     sudo mount -o remount,ro /
   fi
 
-  cp -f $DIR/scripts/add/visionbuf_ion.cc $DIR/msgq_repo/msgq/visionipc/visionbuf_ion.cc
+  CUSTOM_DEPS="/data/dashboard_deps"
+  mkdir -p "$CUSTOM_DEPS"
+  export PYTHONPATH="$CUSTOM_DEPS:$PYTHONPATH"
+
+  if ! python3 -c "import nicegui" &> /dev/null; then
+    echo "Installing nicegui to $CUSTOM_DEPS..."
+    python3 -m pip install --target "$CUSTOM_DEPS" nicegui
+  fi
+
+  if ! python3 -c "import ansi2html" &> /dev/null; then
+    echo "Installing ansi2html to $CUSTOM_DEPS..."
+    python3 -m pip install --target "$CUSTOM_DEPS" ansi2html
+  fi
 
   # start manager
   cd openpilot/system/manager

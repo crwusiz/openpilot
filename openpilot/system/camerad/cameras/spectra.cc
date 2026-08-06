@@ -10,7 +10,6 @@
 #include "media/cam_isp.h"
 #include "media/cam_icp.h"
 #include "media/cam_isp_ife.h"
-#include "media/cam_sensor_cmn_header.h"
 #include "media/cam_sync.h"
 
 #include "common/util.h"
@@ -1047,8 +1046,7 @@ bool SpectraCamera::openSensor() {
   };
 
   // Figure out which sensor we have
-  if (!init_sensor_lambda(new AR0231) &&
-      !init_sensor_lambda(new OS04C10) &&
+  if (!init_sensor_lambda(new OS04C10) &&
       !init_sensor_lambda(new OX03C10)) {
     LOGE("** sensor %d FAILED bringup, disabling", cc.camera_num);
     enabled = false;

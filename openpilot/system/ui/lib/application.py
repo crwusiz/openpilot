@@ -18,11 +18,11 @@ from pathlib import Path
 from typing import NamedTuple
 from importlib.resources import as_file, files
 from openpilot.common.swaglog import cloudlog
-from openpilot.common.hardware import HARDWARE, PC, TICI
+from openpilot.common.hardware import HARDWARE, PC
 from openpilot.system.ui.lib.multilang import multilang
 from openpilot.common.realtime import Ratekeeper
 
-_DEFAULT_FPS = int(os.getenv("FPS", 20 if TICI else 60))
+_DEFAULT_FPS = int(os.getenv("FPS", {'tizi': 20}.get(HARDWARE.get_device_type(), 60)))
 FPS_LOG_INTERVAL = 5  # Seconds between logging FPS drops
 FPS_DROP_THRESHOLD = 0.9  # FPS drop threshold for triggering a warning
 FPS_CRITICAL_THRESHOLD = 0.5  # Critical threshold for triggering strict actions
@@ -848,6 +848,7 @@ class GuiApplication:
     import pstats
 
     self._render_profiler.disable()
+    assert self._render_profile_start_time is not None
     elapsed_ms = (time.monotonic() - self._render_profile_start_time) * 1e3
     avg_frame_time = elapsed_ms / self._frame if self._frame > 0 else 0
 

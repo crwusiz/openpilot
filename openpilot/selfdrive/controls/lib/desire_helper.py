@@ -5,7 +5,7 @@ from openpilot.common.params import Params
 
 ALC_START_TIME = 3.
 ROAD_EDGE_CONFIDENCE_THRESHOLD = 0.5
-LANE_LINE_PROB_THRESHOLD = 0.3
+LANE_LINE_PROB_THRESHOLD = 0.5
 
 LaneChangeState = log.LaneChangeState
 LaneChangeDirection = log.LaneChangeDirection
@@ -15,24 +15,22 @@ LANE_CHANGE_SPEED_MIN = 50 * CV.KPH_TO_MS
 LANE_CHANGE_TIME_MAX = 10.
 LANE_CHANGE_START_TIME = 0.5
 
-def check_invalid_lane(lane_line_probs, road_edge_stds, direction_left: bool):
-  if direction_left:
-    left_edge_prob = max(0.0, min(1.0 - road_edge_stds[0], 1.0))
-    left_close_prob = lane_line_probs[1] if len(lane_line_probs) > 1 else 0
+def check_invalid_lane(lane_line_probs, road_edge_stds, direction_left: bool) -> bool:
+  lane_idx = 1 if direction_left else 2
+  edge_idx = 0 if direction_left else 1
 
-    if road_edge_stds[0] < ROAD_EDGE_CONFIDENCE_THRESHOLD:
-      return True
-    elif left_close_prob < LANE_LINE_PROB_THRESHOLD and left_edge_prob > 0.35:
-      return True
+  lane_prob = lane_line_probs[lane_idx] if len(lane_line_probs) > lane_idx else 0.0
+  edge_std = road_edge_stds[edge_idx] if len(road_edge_stds) > edge_idx else 1.0
 
-  else:
-    right_edge_prob = max(0.0, min(1.0 - road_edge_stds[1], 1.0))
-    right_close_prob = lane_line_probs[2] if len(lane_line_probs) > 2 else 0
+  target_lane_visible = lane_prob > LANE_LINE_PROB_THRESHOLD
+  target_edge_visible = edge_std < ROAD_EDGE_CONFIDENCE_THRESHOLD
 
-    if road_edge_stds[1] < ROAD_EDGE_CONFIDENCE_THRESHOLD:
-      return True
-    elif right_close_prob < LANE_LINE_PROB_THRESHOLD and right_edge_prob > 0.35:
-      return True
+  if target_edge_visible:
+    return True
+
+  edge_prob = max(0.0, min(1.0 - edge_std, 1.0))
+  if not target_lane_visible and edge_prob > 0.35:
+    return True
 
   return False
 
@@ -63,10 +61,16 @@ class DesireHelper:
       lane_line_probs = model_data.get('laneLineProbs', [0, 0, 0, 0])
       road_edge_stds = model_data.get('roadEdgeStds', [1.0, 1.0])
 
-      if carstate.leftBlinker:
-        invalid_lane_detected = check_invalid_lane(lane_line_probs, road_edge_stds, True)
-      elif carstate.rightBlinker:
-        invalid_lane_detected = check_invalid_lane(lane_line_probs, road_edge_stds, False)
+      target_dir = self.lane_change_direction
+      if target_dir == LaneChangeDirection.none:
+        if carstate.leftBlinker:
+          target_dir = LaneChangeDirection.left
+        elif carstate.rightBlinker:
+          target_dir = LaneChangeDirection.right
+
+      if target_dir != LaneChangeDirection.none:
+        direction_left = (target_dir == LaneChangeDirection.left)
+        invalid_lane_detected = check_invalid_lane(lane_line_probs, road_edge_stds, direction_left)
 
     if not lateral_active or self.lane_change_timer > LANE_CHANGE_TIME_MAX:
       self.lane_change_state = LaneChangeState.off

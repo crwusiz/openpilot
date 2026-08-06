@@ -11,7 +11,7 @@ from openpilot.selfdrive.modeld.constants import index_function
 from openpilot.selfdrive.controls.radard import _LEAD_ACCEL_TAU
 
 if __name__ == '__main__':  # generating code
-  from openpilot.third_party.acados.acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver
+  from acados.acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver
 else:
   from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.c_generated_code.acados_ocp_solver_pyx import AcadosOcpSolverCython
 
@@ -40,7 +40,7 @@ EXPORT_DIR = os.path.join(LONG_MPC_DIR, "c_generated_code")
 JSON_FILE = os.path.join(LONG_MPC_DIR, "acados_ocp_long.json")
 
 LongitudinalPlanSource = log.LongitudinalPlan.LongitudinalPlanSource
-MPC_SOURCES = (LongitudinalPlanSource.lead0, LongitudinalPlanSource.lead1, LongitudinalPlanSource.cruise, LongitudinalPlanSource.e2e)
+MPC_SOURCES = (LongitudinalPlanSource.lead0, LongitudinalPlanSource.lead1, LongitudinalPlanSource.e2e)
 
 X_DIM = 3
 U_DIM = 1
@@ -74,8 +74,6 @@ FCW_IDXS = T_IDXS < 5.0
 T_DIFFS = np.diff(T_IDXS, prepend=[0.])
 COMFORT_BRAKE = 1.5
 STOP_DISTANCE = 6.5
-CRUISE_MIN_ACCEL = -1.2
-CRUISE_MAX_ACCEL = 1.6
 MIN_X_LEAD_FACTOR = 0.5
 
 def get_jerk_factor(personality=log.LongitudinalPersonality.standard):
@@ -257,8 +255,6 @@ class LongitudinalMpc:
     self.stopSignCount = 0
     self.adjusted_stop_dist = 0.0
 
-    self.a_change_cost = A_CHANGE_COST
-    self.j_lead = 0.0
     self.conv = UnitConverter()
 
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
@@ -289,14 +285,10 @@ class LongitudinalMpc:
     for i in range(N+1):
       self.solver.set(i, 'x', np.zeros(X_DIM))
     self.last_cloudlog_t = 0
-    self.status = False
     self.crash_cnt = 0.0
     self.solution_status = 0
     # timers
     self.solve_time = 0.0
-    self.time_qp_solution = 0.0
-    self.time_linearization = 0.0
-    self.time_integrator = 0.0
     self.x0 = np.zeros(X_DIM)
     self.set_weights()
 
@@ -318,7 +310,7 @@ class LongitudinalMpc:
 
   def set_weights(self, prev_accel_constraint=True, personality=log.LongitudinalPersonality.standard):
     jerk_factor = get_jerk_factor(personality)
-    a_change_cost = self.a_change_cost if prev_accel_constraint else A_CHANGE_COST_STARTING
+    a_change_cost = A_CHANGE_COST if prev_accel_constraint else A_CHANGE_COST_STARTING
     cost_weights = [X_EGO_OBSTACLE_COST, X_EGO_COST, V_EGO_COST, A_EGO_COST, jerk_factor * a_change_cost, jerk_factor * J_EGO_COST]
     constraint_cost_weights = [LIMIT_COST, LIMIT_COST, LIMIT_COST, DANGER_ZONE_COST]
     self.set_cost_weights(cost_weights, constraint_cost_weights)
@@ -332,18 +324,16 @@ class LongitudinalMpc:
         self.solver.set(i, 'x', self.x0)
 
   @staticmethod
-  def extrapolate_lead(x_lead, v_lead, a_lead, a_lead_tau, j_lead):
-    j_lead_tau = np.interp(j_lead, [-2.0, 0.0, 2.0], [0.2, 2.0, 0.1]) # tau: 2: 2sec, 1: 4sec, 0.5: 10sec
-    j_lead_traj = j_lead * np.exp(-j_lead_tau * (T_IDXS**2)/2.)
-    a_lead_traj = a_lead * np.exp(-a_lead_tau * (T_IDXS**2)/2.) + j_lead_traj
+  def extrapolate_lead(x_lead, v_lead, a_lead, a_lead_tau):
+    a_lead_traj = a_lead * np.exp(-a_lead_tau * (T_IDXS**2)/2.)
     v_lead_traj = np.clip(v_lead + np.cumsum(T_DIFFS * a_lead_traj), 0.0, 1e8)
     x_lead_traj = x_lead + np.cumsum(T_DIFFS * v_lead_traj)
     lead_xv = np.column_stack((x_lead_traj, v_lead_traj))
     return lead_xv
 
-  def process_lead(self, lead, j_lead):
+  def process_lead(self, lead):
     v_ego = self.x0[1]
-    if lead is not None and lead.status:
+    if lead is not None and lead.present:
       x_lead = lead.dRel
       v_lead = lead.vLead
       a_lead = lead.aLeadK
@@ -362,28 +352,16 @@ class LongitudinalMpc:
     v_lead = np.clip(v_lead, 0.0, 1e8)
     a_lead = np.clip(a_lead, -10., 5.)
 
-    if a_lead < -2.0 and j_lead > 0.5:
-      a_lead = a_lead + j_lead
-      a_lead = min(a_lead, -0.5)
-      a_lead_tau = max(a_lead_tau, 1.5)
-
-    lead_xv = self.extrapolate_lead(x_lead, v_lead, a_lead, a_lead_tau, j_lead)
+    lead_xv = self.extrapolate_lead(x_lead, v_lead, a_lead, a_lead_tau)
     return lead_xv, v_lead
 
-  def update(self, sm, v_cruise, personality=log.LongitudinalPersonality.standard):
+  def update(self, sm, personality=log.LongitudinalPersonality.standard):
     radarstate = sm['radarState']
     t_follow = get_T_FOLLOW(personality)
     v_ego = self.x0[1]
-    self.status = radarstate.leadOne.status or radarstate.leadTwo.status
 
-    if radarstate.leadOne.status:
-      j_lead = radarstate.leadOne.jLead
-      self.j_lead = j_lead * 0.1 + self.j_lead * 0.9
-    else:
-      self.j_lead = 0.0
-
-    lead_xv_0, lead_v_0 = self.process_lead(radarstate.leadOne, np.clip(self.j_lead, -2.0, 2.0))
-    lead_xv_1, _ = self.process_lead(radarstate.leadTwo, 0.0)
+    lead_xv_0, lead_v_0 = self.process_lead(radarstate.leadOne)
+    lead_xv_1, _ = self.process_lead(radarstate.leadTwo)
 
     # To estimate a safe distance from a moving lead, we calculate how much stopping
     # distance that lead needs as a minimum. We can add that to the current distance
@@ -396,28 +374,11 @@ class LongitudinalMpc:
 
     stop_dist = self._update_carrot(sm)
 
-    # Fake an obstacle for cruise, this ensures smooth acceleration to set speed
-    # when the leads are no factor.
-    v_lower = v_ego + (T_IDXS * CRUISE_MIN_ACCEL * 1.05)
-    # TODO does this make sense when max_a is negative?
-    v_upper = v_ego + (T_IDXS * CRUISE_MAX_ACCEL * 1.05)
-    v_cruise_clipped = np.clip(v_cruise * np.ones(N+1),
-                               v_lower,
-                               v_upper)
-    cruise_obstacle = np.cumsum(T_DIFFS * v_cruise_clipped) + get_safe_obstacle_distance(v_cruise_clipped, t_follow, comfort_brake, stop_distance)
-
     adjust_dist = 1.0 if v_ego > 0.1 else -2.0
-    if 50 < stop_dist + adjust_dist < cruise_obstacle[0]:
-      stop_dist = cruise_obstacle[0] - adjust_dist
     x2 = stop_dist * np.ones(N+1) + adjust_dist
 
-    x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle, x2])
+    x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, x2])
     self.source = MPC_SOURCES[np.argmin(x_obstacles[0])]
-
-    if radarstate.leadOne.status:
-      self.a_change_cost = np.interp(abs(self.j_lead), [0.5, 2.5], [A_CHANGE_COST, 50])
-    else:
-      self.a_change_cost = A_CHANGE_COST
 
     self.yref[:,:] = 0.0
     for i in range(N):
@@ -447,9 +408,6 @@ class LongitudinalMpc:
 
     self.solution_status = self.solver.solve()
     self.solve_time = float(self.solver.get_stats('time_tot')[0])
-    self.time_qp_solution = float(self.solver.get_stats('time_qp')[0])
-    self.time_linearization = float(self.solver.get_stats('time_lin')[0])
-    self.time_integrator = float(self.solver.get_stats('time_sim')[0])
 
     for i in range(N+1):
       self.x_sol[i] = self.solver.get(i, 'x')
@@ -477,7 +435,7 @@ class LongitudinalMpc:
     self.xStop = self._update_stop_dist(model.position.x[31])
     filtered_stop_dist = self.xStop
 
-    lead = radarstate.leadOne.status
+    lead = radarstate.leadOne.present
     d_rel = radarstate.leadOne.dRel if lead else 1000
 
     self._check_model_stopping(model.velocity.x, CS.vEgo, CS.aEgo, model.position.x[-1], model.position.y, d_rel)
@@ -531,7 +489,7 @@ class LongitudinalMpc:
     if self.trafficState in [TrafficState.off, TrafficState.green] or self.xState not in [XState.e2eStop, XState.e2eStopped]:
       filtered_stop_dist = 1000.0
 
-    self.adjusted_stop_dist = max(0, self.adjusted_stop_dist - (CS.vEgo * DT_MDL))
+    self.adjusted_stop_dist = max(0, self.adjusted_stop_dist - (max(0, CS.vEgo) * DT_MDL))
 
     if filtered_stop_dist == 1000.0: ##  e2eCruise, lead
       self.adjusted_stop_dist = 0.0
@@ -550,28 +508,31 @@ class LongitudinalMpc:
 
   def _check_model_stopping(self, v, v_ego, a_ego, model_x, y, d_rel):
     model_v = self.vFilter.process(v[-1])
-    start_sign = model_v > 5.0 or model_v > (v[0] + 2)
+    start_sign = model_v > 5.0 or model_v > (v[0] + 2.0)
 
-    if self.conv.to_clu(v_ego) < 1.0:
+    stop_sign = False
+    clu_v_ego = self.conv.to_clu(v_ego)
+
+    if clu_v_ego < 1.0:
       stop_sign = model_x < 20.0 and model_v < 10.0
-    elif self.conv.to_clu(v_ego) < 82.0:
+    elif clu_v_ego < 82.0:
+      # Use dynamic thresholds for smoother stopping decisions
+      stop_distance_threshold = np.interp(v[0], [60 / 3.6, 80 / 3.6], [120.0, 150.0])
       stop_sign = (model_x < d_rel - 3.0 and
-                   model_x < np.interp(v[0], [60 / 3.6, 80 / 3.6], [120.0, 150]) and
-                  ((model_v < 3.0) or (model_v < v[0]*0.7)) and
+                   model_x < stop_distance_threshold and
+                  ((model_v < 3.0) or (model_v < v[0] * 0.7)) and
                    abs(y[-1]) < 5.0)
-      if self.xState == XState.e2eCruise and a_ego < -1.0:
-        stop_sign = False
-    else:
-      stop_sign = False
 
-    self.stopSignCount = self.stopSignCount + 1 if stop_sign else 0
-    self.startSignCount = self.startSignCount + 1 if start_sign and not stop_sign else 0
+    # Increment counters with limits to prevent overflow and add hysteresis
+    self.stopSignCount = min(20, self.stopSignCount + 1) if stop_sign else max(0, self.stopSignCount - 2)
+    self.startSignCount = min(20, self.startSignCount + 1) if start_sign and not stop_sign else max(0, self.startSignCount - 2)
 
-    if self.stopSignCount * DT_MDL > 0.0:
+    # Require a few frames of consistency before switching states (debouncing)
+    if self.stopSignCount > 3:  # approx 0.15s (assuming DT_MDL = 0.05)
       self.trafficState = TrafficState.red
-    elif self.startSignCount * DT_MDL > 0.2:
+    elif self.startSignCount > 5: # approx 0.25s
       self.trafficState = TrafficState.green
-    else:
+    elif self.stopSignCount == 0 and self.startSignCount == 0:
       self.trafficState = TrafficState.off
 
 
