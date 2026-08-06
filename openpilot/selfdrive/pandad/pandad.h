@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "common/params.h"
-#include "selfdrive/pandad/panda.h"
+#include "openpilot/selfdrive/pandad/panda.h"
 
 void pandad_main_thread(std::vector<std::string> serials);
 

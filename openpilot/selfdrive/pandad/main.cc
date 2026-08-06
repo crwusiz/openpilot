@@ -1,6 +1,6 @@
 #include <cassert>
 
-#include "selfdrive/pandad/pandad.h"
+#include "openpilot/selfdrive/pandad/pandad.h"
 #include "common/swaglog.h"
 #include "common/util.h"
 #include "common/hardware/hw.h"

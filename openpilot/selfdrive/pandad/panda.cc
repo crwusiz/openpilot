@@ -1,4 +1,4 @@
-#include "selfdrive/pandad/panda.h"
+#include "openpilot/selfdrive/pandad/panda.h"
 
 #include <unistd.h>
 

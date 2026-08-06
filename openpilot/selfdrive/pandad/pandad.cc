@@ -1,4 +1,4 @@
-#include "selfdrive/pandad/pandad.h"
+#include "openpilot/selfdrive/pandad/pandad.h"
 
 #include <algorithm>
 #include <array>

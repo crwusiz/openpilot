@@ -2,7 +2,7 @@
 
 #include "common/tests/native_test.h"
 #include "openpilot/cereal/messaging/messaging.h"
-#include "selfdrive/pandad/panda.h"
+#include "openpilot/selfdrive/pandad/panda.h"
 
 struct PandaTest : public Panda {
   PandaTest(int can_list_size, cereal::PandaState::PandaType hw_type);

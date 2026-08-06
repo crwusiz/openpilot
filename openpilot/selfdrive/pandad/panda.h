@@ -13,7 +13,7 @@
 #include "openpilot/cereal/gen/cpp/log.capnp.h"
 #include "panda/board/health.h"
 #include "panda/board/can.h"
-#include "selfdrive/pandad/panda_comms.h"
+#include "openpilot/selfdrive/pandad/panda_comms.h"
 
 #define USB_TX_SOFT_LIMIT   (0x100U)
 #define USBPACKET_MAX_SIZE  (0x40)
