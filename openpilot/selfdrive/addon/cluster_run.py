@@ -4,7 +4,19 @@ import subprocess
 import sys
 import time
 import traceback
+import locale
 from pathlib import Path
+
+try:
+    locale.setlocale(locale.LC_ALL, 'ko_KR.UTF-8')
+except Exception:
+    try:
+        locale.setlocale(locale.LC_ALL, 'C.UTF-8')
+    except Exception:
+        try:
+            locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+        except Exception:
+            pass
 
 BASEDIR = Path(__file__).resolve().parents[3]
 if str(BASEDIR) not in sys.path:

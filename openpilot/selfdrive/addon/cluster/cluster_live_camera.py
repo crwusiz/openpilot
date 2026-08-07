@@ -1,14 +1,8 @@
 import time
 import threading
-
 from openpilot.cereal import messaging
 from openpilot.common.swaglog import cloudlog
-
-try:
-  from openpilot.selfdrive.addon.cluster.cluster_h264_decoder import ClusterH264Decoder
-except ImportError:
-  cloudlog.error("ClusterH264Decoder import failed. Check cluster_h264_decoder.py")
-  ClusterH264Decoder = None
+from openpilot.selfdrive.addon.cluster.cluster_h264_decoder import ClusterH264Decoder
 
 
 class ClusterLiveCamera:
@@ -19,14 +13,10 @@ class ClusterLiveCamera:
     self.thread = None
 
     cloudlog.info("Connecting to roadEncodeData socket...")
-    self.sock = messaging.sub_sock("roadEncodeData", conflate=True)
+    self.sock = messaging.sub_sock('roadEncodeData', conflate=True)
+    self.decoder = ClusterH264Decoder()
 
-    if ClusterH264Decoder is not None:
-      self.decoder = ClusterH264Decoder()
-      self._start_thread()
-      cloudlog.info("ClusterLiveCamera initialized successfully.")
-    else:
-      self.decoder = None
+    self._start_thread()
 
   def _start_thread(self):
     self.running = True
@@ -39,13 +29,14 @@ class ClusterLiveCamera:
 
       if msg is not None:
         encode_data = getattr(msg, msg.which())
-        data = encode_data.data
-        if data:
-          frame = self.decoder.process(data)
-          if frame is not None:
-            self.latest_frame = frame
+        frame_data = encode_data.header + encode_data.data
+
+        if frame_data and self.decoder:
+          rgb_frame = self.decoder.process(frame_data)
+          if rgb_frame is not None:
+            self.latest_frame = rgb_frame
       else:
-        time.sleep(0.01)
+        time.sleep(0.005)
 
   def update(self):
     pass
@@ -57,9 +48,8 @@ class ClusterLiveCamera:
     return self.latest_frame
 
   def close(self):
-    cloudlog.info("Closing ClusterLiveCamera...")
     self.running = False
     if self.thread is not None:
       self.thread.join(timeout=1.0)
-    if hasattr(self.decoder, 'close'):
+    if self.decoder:
       self.decoder.close()

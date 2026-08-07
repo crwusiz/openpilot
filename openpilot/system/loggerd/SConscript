@@ -17,17 +17,3 @@ libs.insert(0, logger_lib)
 env.Program('loggerd', ['loggerd.cc'], LIBS=libs, FRAMEWORKS=frameworks)
 env.Program('encoderd', ['encoderd.cc'], LIBS=libs, FRAMEWORKS=frameworks)
 env.Program('bootlog.cc', LIBS=libs, FRAMEWORKS=frameworks)
-
-if arch in ("aarch64", "larch64"):
-  env.SharedLibrary(
-    'cluster_h264_encoder_bridge',
-    ['encoder/cluster_h264_encoder_bridge.cc', 'encoder/cluster_h264_encoder.cc'],
-    LIBS=[common, messaging, visionipc, 'pthread', 'z', 'm', 'zstd'],
-    FRAMEWORKS=frameworks,
-  )
-  env.SharedLibrary(
-    'cluster_h264_decoder_bridge',
-    ['decoder/cluster_h264_decoder_bridge.cc', 'decoder/cluster_h264_decoder.cc'],
-    LIBS=[common, messaging, visionipc, 'pthread', 'z', 'm', 'zstd'],
-    FRAMEWORKS=frameworks,
-  )

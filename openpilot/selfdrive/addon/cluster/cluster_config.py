@@ -10,7 +10,7 @@ class ClusterConfig:
 
     self.width = 1920
     self.height = 462
-    self.fps = 20
+    self.fps = 15
 
     self.colors = {
       "bg": (0, 0, 0),  # 기본 배경 (검정)
