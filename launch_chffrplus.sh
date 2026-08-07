@@ -176,6 +176,12 @@ function launch {
     pip install --target "$CUSTOM_DEPS" ansi2html
   fi
 
+  if ! python3 -c "import libdatachannel" &> /dev/null; then
+    echo "libdatachannel not found. Installing..."
+    wait_for_internet
+    pip install --target "$CUSTOM_DEPS" libdatachannel-py
+  fi
+
   # start manager
   cd openpilot/system/manager
   if [ ! -f $DIR/prebuilt ]; then
