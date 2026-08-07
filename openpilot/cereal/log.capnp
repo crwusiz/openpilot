@@ -723,6 +723,9 @@ struct ChestnutState {
   gpuUsagePercent @4 :UInt8;
   gpuClockMhz @5 :UInt16;
   fanSpeedRpm @6 :UInt16;
+  pcieLtssm @7 :UInt8;
+  supplyVoltage @8 :UInt16;  # mV
+  supplyCurrent @9 :Int16;  # mA
 }
 
 struct RadarState @0x9a185389d6fdd05f {
@@ -1062,6 +1065,7 @@ struct ModelDataV2 {
   timestampEof @3 :UInt64;
   modelExecutionTime @15 :Float32;
   rawPredictions @16 :Data;
+  big @27 :Bool;
 
   # predicted future position, orientation, etc..
   position @4 :XYZTData;
