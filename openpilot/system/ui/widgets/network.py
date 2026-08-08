@@ -15,16 +15,6 @@ from openpilot.system.ui.widgets.label import gui_label
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets.list_view import ButtonAction, ListItem, MultipleButtonAction, ToggleAction, button_item, text_item
 
-# These are only used for AdvancedNetworkSettings, standalone apps just need WifiManagerUI
-try:
-  from openpilot.common.params import Params
-  from openpilot.selfdrive.ui.ui_state import ui_state
-  from openpilot.selfdrive.ui.lib.prime_state import PrimeType
-except Exception:
-  Params = None
-  ui_state = None
-  PrimeType = None
-
 NM_DEVICE_STATE_NEED_AUTH = 60
 MIN_PASSWORD_LENGTH = 8
 MAX_PASSWORD_LENGTH = 64
