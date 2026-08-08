@@ -1,3 +1,6 @@
+import threading
+import time
+
 from openpilot.cereal import messaging
 from openpilot.common.swaglog import cloudlog
 
@@ -44,7 +47,11 @@ class ClusterModels:
     self.right_lane_x = []
     self.right_lane_y = []
 
-  def update(self):
+    self._running = True
+    self._thread = threading.Thread(target=self._update_loop, daemon=True)
+    self._thread.start()
+
+  def _update_once(self):
     self.sm.update(0)
 
     if self.sm.updated['carState']:
@@ -103,6 +110,24 @@ class ClusterModels:
 
         self.right_lane_x = list(md.laneLines[2].x)
         self.right_lane_y = list(md.laneLines[2].y)
+
+  def _update_loop(self):
+    while self._running:
+      try:
+        self._update_once()
+      except Exception as e:
+        cloudlog.error(f"ClusterModels update error: {e}")
+      # Keep message state fresh without blocking the renderer.
+      time.sleep(0.01)
+
+  def update(self):
+    """Compatibility hook; message polling runs asynchronously."""
+    return
+
+  def close(self):
+    self._running = False
+    if self._thread is not None:
+      self._thread.join(timeout=1.0)
 
   def is_valid(self):
     return self.model_valid

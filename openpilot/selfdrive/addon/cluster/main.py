@@ -89,3 +89,4 @@ def cluster_main():
     if hasattr(pipeline, 'close'): pipeline.close()
     if hasattr(display, 'close'): display.close()
     if hasattr(camera, 'close'): camera.close()
+    if hasattr(models, 'close'): models.close()

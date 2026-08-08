@@ -15,8 +15,8 @@ class ClusterConfig:
     self.width = 1920
     self.height = 462
     self.fps = 10
-    # Rendering remains at 10 FPS; the display receives the latest frame at 8 FPS.
-    self.usb_fps = 8
+    # Match the renderer cadence; the pipeline always keeps only the newest frame.
+    self.usb_fps = 10
     # The tested H.264 playback command uses the same visible refresh path on
     # this firmware and costs substantially more CPU than JPEG.
     self.use_h264_stream = False
