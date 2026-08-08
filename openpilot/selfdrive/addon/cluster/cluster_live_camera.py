@@ -4,6 +4,15 @@ from openpilot.cereal import messaging
 from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.addon.cluster.cluster_h264_decoder import ClusterH264Decoder
 
+LOG_FILE = "/data/openpilot/openpilot/selfdrive/addon/cluster/cluster_debug.log"
+
+def flog(msg):
+    try:
+        with open(LOG_FILE, "a") as f:
+            f.write(f"[{time.strftime('%H:%M:%S')}] {msg}\n")
+    except:
+        pass
+
 
 class ClusterLiveCamera:
   def __init__(self, config):
@@ -12,6 +21,7 @@ class ClusterLiveCamera:
     self.running = False
     self.thread = None
     self.last_frame_time = time.time()
+    self.msg_count = 0
 
     self.sock = None
     self.decoder = None
@@ -21,12 +31,12 @@ class ClusterLiveCamera:
 
   def _init_socket(self):
     try:
-      cloudlog.info("Connecting to roadEncodeData socket...")
+      flog("[CLUSTER_CAM] Connecting to roadEncodeData socket...")
       self.sock = messaging.sub_sock('roadEncodeData', conflate=True)
       if self.decoder is None:
         self.decoder = ClusterH264Decoder()
     except Exception as e:
-      cloudlog.error(f"Failed to initialize camera socket/decoder: {e}")
+      flog(f"[CLUSTER_CAM_ERROR] Failed to initialize camera socket/decoder: {e}")
 
   def _start_thread(self):
     self.running = True
@@ -45,9 +55,19 @@ class ClusterLiveCamera:
         msg = messaging.recv_one_or_none(self.sock)
 
         if msg is not None:
+          self.msg_count += 1
           error_count = 0
-          encode_data = getattr(msg, msg.which())
+
+          which = msg.which()
+          if self.msg_count <= 10:
+            flog(f"[CLUSTER_CAM] Got msg #{self.msg_count} | which={which}")
+
+          encode_data = getattr(msg, which)
           frame_data = encode_data.header + encode_data.data
+
+          if self.msg_count <= 10:
+            flog(f"[CLUSTER_CAM] frame_data len={len(frame_data)} "
+                 f"(header={len(encode_data.header)}, data={len(encode_data.data)})")
 
           if frame_data and self.decoder:
             rgb_frame = self.decoder.process(frame_data)
@@ -57,14 +77,14 @@ class ClusterLiveCamera:
         else:
           # 3초 이상 프레임이 안 들어오면 소켓 재연결 시도
           if time.time() - self.last_frame_time > 3.0:
-            cloudlog.warning("Camera stream timeout, re-initializing socket...")
+            flog("[CLUSTER_CAM_WARN] Camera stream timeout (no msg for 3s), re-initializing socket...")
             self.sock = messaging.sub_sock('roadEncodeData', conflate=True)
             self.last_frame_time = time.time()
           else:
             time.sleep(0.005)
       except Exception as e:
         error_count += 1
-        cloudlog.error(f"Camera thread error ({error_count}): {e}")
+        flog(f"[CLUSTER_CAM_ERROR] Camera thread error ({error_count}): {e}")
         time.sleep(0.5)
         if error_count > 10:
           try:
