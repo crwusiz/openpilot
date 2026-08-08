@@ -19,6 +19,7 @@ class ClusterH264Decoder:
     self.call_count = 0
     self.parse_error_count = 0
     self.decode_error_count = 0
+    self.decode_ok_count = 0
     try:
       self.codec = av.CodecContext.create('h264', 'r')
     except Exception as e:
@@ -30,42 +31,41 @@ class ClusterH264Decoder:
       return None
 
     self.call_count += 1
-    if self.call_count <= 10:
-      flog(f"[CLUSTER_DECODER] process() called #{self.call_count} | data_len={len(data)} bytes")
+    verbose = self.call_count <= 30
 
     try:
       packets = self.codec.parse(data)
       latest_image = None
-
       packet_list = list(packets)
-      if self.call_count <= 10:
-        flog(f"[CLUSTER_DECODER] parse() -> {len(packet_list)} packet(s)")
 
       for packet in packet_list:
         try:
           frames = self.codec.decode(packet)
           frame_list = list(frames)
-          if self.call_count <= 10:
-            flog(f"[CLUSTER_DECODER] decode() -> {len(frame_list)} frame(s)")
 
           for frame in frame_list:
             latest_image = frame.to_ndarray(format='rgb24')
+            self.decode_ok_count += 1
 
             if not self.first_frame_decoded:
               self.first_frame_decoded = True
               flog(f"[CLUSTER_DECODER_SUCCESS] First H264 frame decoded! shape={latest_image.shape}")
 
+          if verbose and not frame_list:
+            flog(f"[CLUSTER_DECODER] call#{self.call_count} decode() -> 0 frames (buffering?)")
+
         except Exception as e:
           self.decode_error_count += 1
-          if self.decode_error_count <= 10:
-            flog(f"[CLUSTER_DECODER_ERROR] decode() failed ({self.decode_error_count}): {e}")
+          if verbose or self.decode_error_count % 30 == 0:
+            flog(f"[CLUSTER_DECODER_ERROR] call#{self.call_count} decode() failed "
+                 f"(total_fail={self.decode_error_count}, total_ok={self.decode_ok_count}): {e}")
 
       return latest_image
 
     except Exception as e:
       self.parse_error_count += 1
-      if self.parse_error_count <= 10:
-        flog(f"[CLUSTER_DECODER_ERROR] parse() failed ({self.parse_error_count}): {e}")
+      if verbose:
+        flog(f"[CLUSTER_DECODER_ERROR] call#{self.call_count} parse() failed ({self.parse_error_count}): {e}")
       return None
 
   def close(self):

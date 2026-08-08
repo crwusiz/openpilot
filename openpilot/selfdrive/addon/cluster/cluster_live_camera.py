@@ -79,7 +79,8 @@ class ClusterLiveCamera:
 
           if self.msg_count <= 20:
             flog(f"[CLUSTER_CAM] Got msg #{self.msg_count} | keyframe={is_keyframe} | "
-                 f"seen_keyframe={self.seen_keyframe}")
+                 f"seen_keyframe={self.seen_keyframe} | header_len={len(encode_data.header)} | "
+                 f"data_len={len(encode_data.data)}")
 
           # 첫 키프레임을 만나기 전까지는 디코딩 시도 자체를 건너뜀
           # (키프레임 없이 델타프레임만 넣으면 디코더가 계속 실패함)
