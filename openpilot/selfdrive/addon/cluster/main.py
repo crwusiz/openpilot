@@ -1,4 +1,6 @@
 import time
+import signal
+import numpy as np
 from openpilot.common.realtime import Ratekeeper
 from openpilot.common.swaglog import cloudlog
 
@@ -45,6 +47,13 @@ def cluster_main():
   fps = getattr(config, 'fps', 20)
   rk = Ratekeeper(fps, print_delay_threshold=None)
 
+  def _stop_signal(signum, _frame):
+    flog(f"[CLUSTER_MAIN] Stop signal received: {signum}")
+    raise KeyboardInterrupt
+
+  signal.signal(signal.SIGTERM, _stop_signal)
+  signal.signal(signal.SIGINT, _stop_signal)
+
   msg = f"[CLUSTER_MAIN] Starting Main Loop at {fps} FPS..."
   print(msg)
   flog(msg)
@@ -70,6 +79,13 @@ def cluster_main():
     flog("[CLUSTER_MAIN] Interrupted by user.")
   finally:
     flog("[CLUSTER_MAIN] Closing resources...")
+    # USB displays retain their last frame when the sender exits. Explicitly
+    # upload a black frame so a restart/crash cannot leave stale camera data.
+    try:
+      if display.connected:
+        display.send_image(np.zeros((config.height, config.width, 3), dtype=np.uint8))
+    except Exception as e:
+      flog(f"[CLUSTER_MAIN] Failed to clear display: {e}")
     if hasattr(pipeline, 'close'): pipeline.close()
     if hasattr(display, 'close'): display.close()
     if hasattr(camera, 'close'): camera.close()

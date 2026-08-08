@@ -107,14 +107,13 @@ class ClusterRenderer:
       centered(x + 44, y + 9, label, self.font_label, muted)
       centered(x + 44, y + 39, value, self.font_unit, color)
 
-    value_box(x0 + 24, 10, "CRUISE", cruise_s, white)
+    value_box(x0 + 40, 10, "CRUISE", cruise_s, white)
     limit = data.get("nav_limit_speed", 0.0)
-    value_box(x0 + 24, 110, "SET", cruise_s, (170, 215, 255))
+    value_box(x0 + 40, 110, "SET", cruise_s, (170, 215, 255))
     # Speed limit uses a circular road-sign style indicator.
-    limit_box = [x0 + 124, 110, x0 + 212, 198]
+    limit_box = [x0 + 140, 110, x0 + 228, 198]
     draw.ellipse(limit_box, fill=(235, 238, 242), outline=(190, 35, 35), width=6)
-    centered(x0 + 168, 122, "LIMIT", self.font_label, (120, 25, 25))
-    centered(x0 + 168, 151, f"{int(limit) if limit else '--'}", self.font_unit, (20, 25, 30))
+    centered(x0 + 184, 138, f"{int(limit) if limit else '--'}", self.font_unit, (20, 25, 30))
     traffic_icon = "traffic_green" if data.get("traffic_state") == 1 else "traffic_red" if data.get("traffic_state") == 2 else "traffic_off"
     icon(traffic_icon, x0 + 305, 14, 38, bool(data.get("traffic_state")))
     if data.get("school_zone"):
@@ -142,9 +141,9 @@ class ClusterRenderer:
     gps_ok = data.get("gps_satellites", 0) > 0
     wifi = data.get("wifi_strength", 0)
     wifi_name = "wifi_strength_full" if wifi >= 4 else "wifi_strength_high" if wifi == 3 else "wifi_strength_medium" if wifi == 2 else "wifi_strength_low"
-    icon("direction", x0 + 690, 28, 64, gps_ok)
-    icon("gps", x0 + 770, 28, 64, gps_ok)
-    icon(wifi_name, x0 + 850, 28, 64, wifi > 0)
+    icon("direction", self.target_w - 270, 28, 64, gps_ok)
+    icon("gps", self.target_w - 180, 28, 64, gps_ok)
+    icon(wifi_name, self.target_w - 85, 28, 64, wifi > 0)
 
     # Bottom-left: wheel, accelerator, brake in the requested order.
     controls = (("wheel_green" if data.get("enabled") else "wheel", "STEER", data.get("enabled"), green),
@@ -158,12 +157,12 @@ class ClusterRenderer:
     # Bottom-right: gap indicator above a larger TPMS icon and 2x2 pressures.
     gap = int(data.get("distance_level", 0) or 0)
     gap_name = f"dist{min(max(gap, 1), 4)}"
-    icon(gap_name, x0 + 750, 165, 78, True)
-    icon("tpms", x0 + 745, 284, 112, True)
+    icon(gap_name, self.target_w - 270, 165, 78, True)
+    icon("tpms", self.target_w - 275, 284, 112, True)
     pressures = data.get("tpms", [0, 0, 0, 0])
     for i, (label, value) in enumerate(zip(("FL", "FR", "RL", "RR"), pressures)):
       # Values are deliberately overlaid on the TPMS vehicle silhouette.
-      px = x0 + 769 + (i % 2) * 64
+      px = self.target_w - 251 + (i % 2) * 64
       py = 298 + (i // 2) * 62
       centered(px, py, label, self.font_label, muted)
       centered(px, py + 20, f"{value:.1f}" if value else "--", self.font_small, white)
