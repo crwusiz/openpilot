@@ -3,6 +3,7 @@ import os
 import time
 import cv2
 import usb.util
+import usb.core
 from openpilot.common.swaglog import cloudlog
 
 LOG_FILE = "/data/openpilot/openpilot/selfdrive/addon/cluster/cluster_debug.log"
@@ -114,7 +115,7 @@ class TuringUsbDisplay:
 
   def _write_image_no_wait(self, jpeg_bytes):
     """
-    이미지 업로드 커맨드는 펌웨어가 ACK를 안 주는 것으로 확인됨 (매 프레임 2초 타임아웃).
+    이미지 업로드 커맨드는 펌웨어가 ACK를 안 주는 것으로 확인됨.
     응답을 기다리지 않고 write만 수행 (fire-and-forget).
     """
     img_size = len(jpeg_bytes)
@@ -125,7 +126,9 @@ class TuringUsbDisplay:
     cmd_packet[11] = img_size & 0xFF
     full_payload = self._encrypt(cmd_packet) + jpeg_bytes
 
-    self._ep_out.write(full_payload, 2000)
+    # timeout은 config에서 읽거나 기본값 2500 설정
+    timeout_ms = getattr(self.config, 'usb_timeout_ms', 2500)
+    self._ep_out.write(full_payload, timeout=timeout_ms)
 
   def send_image(self, frame_image):
     if not self.connected or self.device is None:
@@ -135,12 +138,7 @@ class TuringUsbDisplay:
       if not isinstance(frame_image, np.ndarray):
         frame_image = np.array(frame_image)
 
-      # 패널 네이티브 프레임버퍼는 462x1920 세로(portrait) 고정이고, 장치에는
-      # 회전 명령이 따로 없음. 우리가 렌더링한 1920x462 가로 이미지를 물리적으로
-      # 90도 회전시켜서 보내야 패널 전체에 정상적으로(가로처럼 보이게) 그려짐.
-      # 방향이 뒤집혀 보이면 ROTATE_90_CLOCKWISE <-> ROTATE_90_COUNTERCLOCKWISE로 교체.
       rotated = cv2.rotate(frame_image, cv2.ROTATE_90_CLOCKWISE)
-
       bgr_img = cv2.cvtColor(rotated, cv2.COLOR_RGB2BGR)
 
       encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 70]
@@ -158,6 +156,21 @@ class TuringUsbDisplay:
         if self.frame_count <= 20 or self.frame_count % self.config.fps == 0:
           flog(f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {size_kb} KB | elapsed={elapsed:.3f}s (write-only, no ACK wait)")
 
+    except usb.core.USBError as e:
+      # Errno 110 (Operation timed out) 발생 시 연결을 완전히 끊지 않고 Soft-Recovery 수행
+      if e.errno == 110 or 'timed out' in str(e).lower():
+        flog(f"[CLUSTER_USB_WARN] Write timeout (Errno 110). Clearing halt & skipping frame...")
+        try:
+          if self._ep_out and self.device:
+            self.device.clear_halt(self._ep_out)
+        except Exception as clear_err:
+          flog(f"[CLUSTER_USB_WARN] Failed clear_halt: {clear_err}")
+        # self.connected = False를 호출하지 않아 전체 재연결(3초 대기) 방지
+      else:
+        err_msg = f"Critical USB Error: {e}"
+        flog(f"[CLUSTER_USB_ERROR] {err_msg}")
+        self.connected = False
+        self.device = None
     except Exception as e:
       err_msg = f"Failed to send image to Turing display: {e}"
       flog(f"[CLUSTER_USB_ERROR] {err_msg}")

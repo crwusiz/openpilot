@@ -3,7 +3,6 @@ from pathlib import Path
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 
-
 class ClusterConfig:
   def __init__(self):
     cloudlog.info("Loading Lightweight Cluster Configuration...")

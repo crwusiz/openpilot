@@ -21,6 +21,9 @@ class ClusterUsbPipeline:
     self.queue = queue.Queue(maxsize=1)
     self.running = False
     self.thread = None
+    self.last_tx_time = 0.0
+    fps = getattr(self.display.config, 'fps', 10)
+    self.min_tx_interval = 1.0 / fps if fps > 0 else 0.1
     flog("ClusterUsbPipeline initialized.")
 
   def start(self):
@@ -61,15 +64,22 @@ class ClusterUsbPipeline:
         # 1. 전송할 프레임 대기 (0.1초 타임아웃)
         frame_image = self.queue.get(timeout=0.1)
 
-        # 2. 연결이 끊어져 있다면 자동 재연결 시도
+        # 2. 전송 간격 제어 (버퍼 범람/타임아웃 방지)
+        now = time.time()
+        if now - self.last_tx_time < self.min_tx_interval:
+          # 너무 빨리 큐에 들어오면 미세하게 대기
+          time.sleep(self.min_tx_interval - (now - self.last_tx_time))
+
+        # 3. 연결이 끊어져 있다면 자동 재연결 시도
         if not self.display.connected:
           success = self.display.open()
           if not success:
             time.sleep(1.0)
             continue
 
-        # 3. 이미지 전송 수행
+        # 4. 이미지 전송 수행
         self.display.send_image(frame_image)
+        self.last_tx_time = time.time()
 
       except queue.Empty:
         continue

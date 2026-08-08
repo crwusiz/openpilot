@@ -511,8 +511,7 @@ def read_flush(ep_in, max_attempts=5):
                 # print("Flush read error:", e)
                 break
 
-
-def write_to_device(dev, data, timeout=2000):
+def write_to_device(dev, data, timeout=2500):
     cfg = dev.get_active_configuration()
     intf = usb.util.find_descriptor(cfg, bInterfaceNumber=0)
     if intf is None:
@@ -526,6 +525,12 @@ def write_to_device(dev, data, timeout=2000):
     try:
         ep_out.write(data, timeout)
     except usb.core.USBError as e:
+        # 타임아웃(110) 발생 시 stall(멈춤)을 리셋하여 다음 통신이 가능하도록 복구
+        if e.errno == 110 or 'timed out' in str(e).lower():
+            try:
+                dev.clear_halt(ep_out)
+            except Exception:
+                pass
         print("USB write error:", e)
         return None
 
@@ -534,6 +539,11 @@ def write_to_device(dev, data, timeout=2000):
         read_flush(ep_in)
         return bytes(response)
     except usb.core.USBError as e:
+        if e.errno == 110 or 'timed out' in str(e).lower():
+            try:
+                dev.clear_halt(ep_in)
+            except Exception:
+                pass
         print("USB read error:", e)
         return None
 
