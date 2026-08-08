@@ -116,7 +116,7 @@ class TuringUsbDisplay:
   def _write_image_no_wait(self, jpeg_bytes):
     """
     이미지 업로드 커맨드는 펌웨어가 ACK를 안 주는 것으로 확인됨.
-    응답을 기다리지 않고 write만 수행 (fire-and-forget).
+    화면 멈춤(프리징) 방지를 위해 타임아웃을 아주 짧게(Fast-fail) 가져갑니다.
     """
     img_size = len(jpeg_bytes)
     cmd_packet = self._build_header(self._cmd_upload_jpeg)
@@ -126,8 +126,8 @@ class TuringUsbDisplay:
     cmd_packet[11] = img_size & 0xFF
     full_payload = self._encrypt(cmd_packet) + jpeg_bytes
 
-    # timeout은 config에서 읽거나 기본값 2500 설정
-    timeout_ms = getattr(self.config, 'usb_timeout_ms', 2500)
+    # config에 지정된 짧은 타임아웃(기본 100ms) 적용. 안 들어가면 바로 스킵(버림)
+    timeout_ms = getattr(self.config, 'usb_image_timeout_ms', 100)
     self._ep_out.write(full_payload, timeout=timeout_ms)
 
   def send_image(self, frame_image):
@@ -157,15 +157,16 @@ class TuringUsbDisplay:
           flog(f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {size_kb} KB | elapsed={elapsed:.3f}s (write-only, no ACK wait)")
 
     except usb.core.USBError as e:
-      # Errno 110 (Operation timed out) 발생 시 연결을 완전히 끊지 않고 Soft-Recovery 수행
+      # Errno 110 발생 시 즉시 복구 및 스킵 (2.5초 대기 방지)
       if e.errno == 110 or 'timed out' in str(e).lower():
         flog(f"[CLUSTER_USB_WARN] Write timeout (Errno 110). Clearing halt & skipping frame...")
         try:
           if self._ep_out and self.device:
             self.device.clear_halt(self._ep_out)
         except Exception as clear_err:
-          flog(f"[CLUSTER_USB_WARN] Failed clear_halt: {clear_err}")
-        # self.connected = False를 호출하지 않아 전체 재연결(3초 대기) 방지
+          # Errno None 오류 로그는 무시하여 로그 파일이 지저분해지는 것을 막음
+          if 'Errno None' not in str(clear_err):
+            flog(f"[CLUSTER_USB_WARN] Failed clear_halt: {clear_err}")
       else:
         err_msg = f"Critical USB Error: {e}"
         flog(f"[CLUSTER_USB_ERROR] {err_msg}")

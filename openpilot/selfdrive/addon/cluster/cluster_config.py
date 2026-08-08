@@ -3,6 +3,11 @@ from pathlib import Path
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 
+USB_TIMEOUT_MS = 2500       # 명령어 통신용 넉넉한 타임아웃 (ms)
+USB_IMAGE_TIMEOUT_MS = 100  # 화면 끊김(프리징) 방지를 위한 이미지 전송 전용 Fast-fail 타임아웃 (ms)
+USB_TARGET_FPS = 20
+USB_CLEAR_HALT_ON_TIMEOUT = True
+
 class ClusterConfig:
   def __init__(self):
     cloudlog.info("Loading Lightweight Cluster Configuration...")
@@ -10,6 +15,10 @@ class ClusterConfig:
     self.width = 1920
     self.height = 462
     self.fps = 10
+
+    # USB 전용 설정 값
+    self.usb_timeout_ms = USB_TIMEOUT_MS
+    self.usb_image_timeout_ms = USB_IMAGE_TIMEOUT_MS
 
     self.colors = {
       "bg": (0, 0, 0),  # 기본 배경 (검정)
