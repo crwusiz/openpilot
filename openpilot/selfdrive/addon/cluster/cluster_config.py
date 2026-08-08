@@ -17,9 +17,10 @@ class ClusterConfig:
     self.fps = 10
     # Rendering remains at 10 FPS; the display receives the latest frame at 8 FPS.
     self.usb_fps = 8
-    # A compromise between the full-width crop (too zoomed) and the full-source
-    # fit (too narrow on this 4.16:1 panel).
-    self.camera_view_width = 1500
+    # The left half is a dedicated live-camera viewport. The right half remains
+    # available for cluster information widgets.
+    self.camera_panel_width = self.width // 2
+    self.draw_model_overlay = False
 
     # USB 전용 설정 값
     self.usb_timeout_ms = USB_TIMEOUT_MS

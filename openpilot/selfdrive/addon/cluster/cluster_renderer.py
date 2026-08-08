@@ -36,7 +36,7 @@ class ClusterRenderer:
     else:
       frame = self.blank_canvas.copy()
 
-    if models.is_valid():
+    if self.config.draw_model_overlay and models.is_valid():
       frame = self._draw_model_path(frame, models.get_path_data(), models.get_hud_data())
 
     pil_img = Image.fromarray(frame)
@@ -46,10 +46,10 @@ class ClusterRenderer:
 
   def _crop_and_resize(self, frame):
     h, w = frame.shape[:2]
-    # The 16:10 road camera cannot fill a 4.16:1 panel without a severe crop.
-    # Render it in a 1500px-wide center viewport: it keeps substantially more
-    # vertical road view than a full-width crop while avoiding huge side bars.
-    view_w = min(max(1, self.config.camera_view_width), self.target_w)
+    # Use the left half of the display for the camera and reserve the right half
+    # for cluster data. This 2.08:1 viewport preserves far more vertical view
+    # than filling the entire 4.16:1 display.
+    view_w = min(max(1, self.config.camera_panel_width), self.target_w)
     view_ratio = view_w / self.target_h
     crop_h = min(h, max(1, round(w / view_ratio)))
     crop_y = (h - crop_h) // 2
@@ -57,8 +57,7 @@ class ClusterRenderer:
     resized = cv2.resize(cropped, (view_w, self.target_h), interpolation=cv2.INTER_AREA)
 
     canvas = np.zeros((self.target_h, self.target_w, 3), dtype=np.uint8)
-    offset_x = (self.target_w - view_w) // 2
-    canvas[:, offset_x:offset_x + view_w] = resized
+    canvas[:, :view_w] = resized
     return canvas
 
   def _project_pt(self, x, y, z):
@@ -112,6 +111,9 @@ class ClusterRenderer:
 
     border_color = self.config.colors["engaged"] if hud_data['enabled'] else self.config.colors["disengaged"]
     draw.rectangle([0, 0, self.target_w, self.target_h], outline=border_color, width=25)
+    # Visual boundary between the live-camera and information panes.
+    draw.line([(self.config.camera_panel_width, 0), (self.config.camera_panel_width, self.target_h)],
+              fill=border_color, width=4)
 
     if not has_camera:
       warning_text = "WAITING FOR CAMERA SIGNAL..."
