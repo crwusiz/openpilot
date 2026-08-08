@@ -21,8 +21,11 @@ class ClusterUsbPipeline:
     self.queue = queue.Queue(maxsize=1)
     self.running = False
     self.thread = None
+
+    # 전송 주기 제어(Throttling)를 위한 변수
     self.last_tx_time = 0.0
     fps = getattr(self.display.config, 'fps', 10)
+    # FPS에 맞춰 최소 전송 간격 설정 (예: 10fps면 0.1초 간격)
     self.min_tx_interval = 1.0 / fps if fps > 0 else 0.1
     flog("ClusterUsbPipeline initialized.")
 
@@ -50,8 +53,9 @@ class ClusterUsbPipeline:
         pass
 
     try:
-      except queue.Full:
-        pass
+      self.queue.put_nowait(frame_image)
+    except queue.Full:
+      pass
 
   def _worker_loop(self):
     """
