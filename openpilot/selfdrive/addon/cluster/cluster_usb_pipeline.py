@@ -50,9 +50,8 @@ class ClusterUsbPipeline:
         pass
 
     try:
-      self.queue.put_nowait(frame_image)
-    except queue.Full:
-      pass
+      except queue.Full:
+        pass
 
   def _worker_loop(self):
     """
@@ -64,11 +63,12 @@ class ClusterUsbPipeline:
         # 1. 전송할 프레임 대기 (0.1초 타임아웃)
         frame_image = self.queue.get(timeout=0.1)
 
-        # 2. 전송 간격 제어 (버퍼 범람/타임아웃 방지)
+        # 2. 전송 간격 제어 (버퍼 범람/타임아웃 방지 및 기기 크래시 예방)
         now = time.time()
         if now - self.last_tx_time < self.min_tx_interval:
-          # 너무 빨리 큐에 들어오면 미세하게 대기
+          # 너무 빨리 큐에 들어오면 미세하게 대기하여 디스플레이 장치에 부하를 줄임
           time.sleep(self.min_tx_interval - (now - self.last_tx_time))
+          now = time.time()
 
         # 3. 연결이 끊어져 있다면 자동 재연결 시도
         if not self.display.connected:
@@ -79,7 +79,7 @@ class ClusterUsbPipeline:
 
         # 4. 이미지 전송 수행
         self.display.send_image(frame_image)
-        self.last_tx_time = time.time()
+        self.last_tx_time = now
 
       except queue.Empty:
         continue

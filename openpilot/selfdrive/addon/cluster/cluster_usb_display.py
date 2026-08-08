@@ -82,7 +82,6 @@ class TuringUsbDisplay:
           except Exception as e:
             flog(f"[CLUSTER_USB_WARN] Detach warning: {e}")
 
-          # 이미지 업로드용 OUT 엔드포인트를 미리 찾아서 캐싱 (매 프레임마다 재탐색 방지)
           cfg = self.device.get_active_configuration()
           intf = usb.util.find_descriptor(cfg, bInterfaceNumber=0)
           self._ep_out = usb.util.find_descriptor(
@@ -116,7 +115,7 @@ class TuringUsbDisplay:
   def _write_image_no_wait(self, jpeg_bytes):
     """
     이미지 업로드 커맨드는 펌웨어가 ACK를 안 주는 것으로 확인됨.
-    화면 멈춤(프리징) 방지를 위해 타임아웃을 아주 짧게(Fast-fail) 가져갑니다.
+    화면 멈춤(프리징) 방지를 위해 타임아웃을 설정하되, 너무 짧으면(100ms) MCU가 뻗으므로(Errno 19) 1000ms로 타협.
     """
     img_size = len(jpeg_bytes)
     cmd_packet = self._build_header(self._cmd_upload_jpeg)
@@ -126,8 +125,7 @@ class TuringUsbDisplay:
     cmd_packet[11] = img_size & 0xFF
     full_payload = self._encrypt(cmd_packet) + jpeg_bytes
 
-    # config에 지정된 짧은 타임아웃(기본 100ms) 적용. 안 들어가면 바로 스킵(버림)
-    timeout_ms = getattr(self.config, 'usb_image_timeout_ms', 100)
+    timeout_ms = getattr(self.config, 'usb_image_timeout_ms', 1000)
     self._ep_out.write(full_payload, timeout=timeout_ms)
 
   def send_image(self, frame_image):
