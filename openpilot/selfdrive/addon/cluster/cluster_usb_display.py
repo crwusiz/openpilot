@@ -29,6 +29,8 @@ class TuringUsbDisplay:
 
     self._find_usb_device = None
     self._send_image = None
+    self._send_jpeg = None
+    self._resp_ok = None
     flog("TuringUsbDisplay initialized.")
 
   def open(self):
@@ -42,10 +44,17 @@ class TuringUsbDisplay:
       os.environ['LANG'] = 'C.UTF-8'
       os.environ['LANGUAGE'] = 'C.UTF-8'
 
-      from library.lcd.lcd_comm_turing_usb import find_usb_device, send_image, send_sync_command, send_frame_rate_command
+      from library.lcd.lcd_comm_turing_usb import (
+        find_usb_device, send_image, send_jpeg, send_sync_command,
+        send_frame_rate_command, _resp_ok,
+      )
 
       self._find_usb_device = find_usb_device
       self._send_image = send_image
+      # 인코딩을 JPEG로 하고 있으므로 반드시 CMD_UPLOAD_JPEG(101) 전용 함수를 써야 함
+      # (예전에 send_image=CMD_UPLOAD_PNG(102)로 JPEG 바이트를 보내서 펌웨어가 디코딩 실패 -> 화면 그대로였음)
+      self._send_jpeg = send_jpeg
+      self._resp_ok = _resp_ok
 
       self.device, self.dev_pid = self._find_usb_device()
 
@@ -67,10 +76,12 @@ class TuringUsbDisplay:
 
           for attempt in range(3):
             flog(f"[CLUSTER_USB] Sending sync handshake (Attempt {attempt+1})...")
-            send_sync_command(self.device)
+            resp = send_sync_command(self.device)
+            flog(f"[CLUSTER_USB] Sync response: {resp.hex() if resp else None} | ok={self._resp_ok(resp)}")
             time.sleep(0.3)
 
-          send_frame_rate_command(self.device, self.config.fps)
+          resp = send_frame_rate_command(self.device, self.config.fps)
+          flog(f"[CLUSTER_USB] Frame rate response: {resp.hex() if resp else None} | ok={self._resp_ok(resp)}")
           time.sleep(0.1)
 
           self.connected = True
@@ -103,12 +114,15 @@ class TuringUsbDisplay:
 
       if success:
         jpg_bytes = encoded_img.tobytes()
-        self._send_image(self.device, jpg_bytes)
+        # JPEG 바이트는 반드시 send_jpeg (CMD_UPLOAD_JPEG=101)로 보내야 함
+        resp = self._send_jpeg(self.device, jpg_bytes)
 
         self.frame_count += 1
         if self.frame_count % self.config.fps == 0:
           size_kb = len(jpg_bytes) // 1024
-          flog(f"[CLUSTER_USB_TX] Pushed frame to device | Res: {bgr_img.shape[1]}x{bgr_img.shape[0]} | Size: {size_kb} KB")
+          ok = self._resp_ok(resp) if self._resp_ok else None
+          flog(f"[CLUSTER_USB_TX] Pushed frame to device | Res: {bgr_img.shape[1]}x{bgr_img.shape[0]} | "
+               f"Size: {size_kb} KB | resp={resp.hex() if resp else None} | ok={ok}")
 
     except Exception as e:
       err_msg = f"Failed to send image to Turing display: {e}"
