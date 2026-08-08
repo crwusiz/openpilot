@@ -73,15 +73,9 @@ class ClusterRenderer:
   def _draw_info_panel(self, pil_img, data):
     """Draw the right pane using the same compact icon-first HUD language as onroad."""
     draw = ImageDraw.Draw(pil_img)
-    x0 = self.config.camera_panel_width
-    # Information is an overlay on the camera image, not a separate dark pane.
-    # Keep the backing very subtle so road content remains visible beneath it.
-    overlay = Image.new("RGBA", pil_img.size, (0, 0, 0, 0))
-    overlay_draw = ImageDraw.Draw(overlay)
-    overlay_draw.rectangle([x0, 0, self.target_w, self.target_h], fill=(5, 10, 18, 72))
-    pil_img.paste(overlay, (0, 0), overlay)
+    # Full-screen camera layout: HUD is drawn directly over the image.
+    x0 = 0
     draw = ImageDraw.Draw(pil_img)
-    draw.rectangle([x0 + 5, 5, self.target_w - 5, self.target_h - 5], outline=(55, 65, 80), width=1)
 
     def text(x, y, value, font=None, color=(220, 225, 232), anchor=None):
       draw.text((int(x), int(y)), str(value), font=font or self.font_small, fill=color, anchor=anchor)
@@ -116,7 +110,11 @@ class ClusterRenderer:
     value_box(x0 + 24, 10, "CRUISE", cruise_s, white)
     limit = data.get("nav_limit_speed", 0.0)
     value_box(x0 + 24, 110, "SET", cruise_s, (170, 215, 255))
-    value_box(x0 + 124, 110, "LIMIT", f"{int(limit) if limit else '--'}", muted)
+    # Speed limit uses a circular road-sign style indicator.
+    limit_box = [x0 + 124, 110, x0 + 212, 198]
+    draw.ellipse(limit_box, fill=(235, 238, 242), outline=(190, 35, 35), width=6)
+    centered(x0 + 168, 122, "LIMIT", self.font_label, (120, 25, 25))
+    centered(x0 + 168, 151, f"{int(limit) if limit else '--'}", self.font_unit, (20, 25, 30))
     traffic_icon = "traffic_green" if data.get("traffic_state") == 1 else "traffic_red" if data.get("traffic_state") == 2 else "traffic_off"
     icon(traffic_icon, x0 + 305, 14, 38, bool(data.get("traffic_state")))
     if data.get("school_zone"):
@@ -136,11 +134,9 @@ class ClusterRenderer:
       speed_color = (255, alpha, alpha)
 
     # Vertical speed box, matching the boxed MAX/SET visual language.
-    speed_cx = x0 + 480
-    speed_box = [speed_cx - 92, 8, speed_cx + 92, 137]
-    draw.rounded_rectangle(speed_box, radius=12, fill=(5, 10, 18), outline=(120, 130, 145), width=2)
+    speed_cx = self.target_w // 2
     centered(speed_cx, 13, int(current), self.font_speed, speed_color)
-    centered(speed_cx, 111, self.config.speed_unit, self.font_small, (225, 230, 238))
+    centered(speed_cx, 123, self.config.speed_unit, self.font_small, (225, 230, 238))
 
     # Top-right connectivity: icon-only, dimmed when unavailable.
     gps_ok = data.get("gps_satellites", 0) > 0
