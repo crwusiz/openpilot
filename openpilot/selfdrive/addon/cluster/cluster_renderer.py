@@ -27,6 +27,18 @@ class ClusterRenderer:
     self.blank_canvas = np.zeros((self.target_h, self.target_w, 3), dtype=np.uint8)
     self.camera_height = 1.22
     self.focal_length = 910.0
+    self.icons = {}
+    icon_dir = os.path.join(str(self.config.BASEDIR), "selfdrive", "assets", "icons")
+    for name in (
+      "wheel", "wheel_green", "disengage_on_accelerator", "brake_disc", "tpms",
+      "gps", "direction", "wifi_strength_low", "wifi_strength_medium",
+      "wifi_strength_high", "wifi_strength_full", "traffic_green", "traffic_red",
+      "traffic_off", "speed_bump", "school_zone", "speed_camera",
+    ):
+      try:
+        self.icons[name] = Image.open(os.path.join(icon_dir, f"{name}.png")).convert("RGBA")
+      except Exception:
+        pass
 
   def render(self, camera, models):
     has_camera = camera.has_frame()
@@ -40,7 +52,9 @@ class ClusterRenderer:
       frame = self._draw_model_path(frame, models.get_path_data(), models.get_hud_data())
 
     pil_img = Image.fromarray(frame)
-    self._draw_hud(pil_img, models.get_hud_data(), has_camera)
+    hud_data = models.get_hud_data()
+    self._draw_info_panel(pil_img, hud_data)
+    self._draw_hud(pil_img, hud_data, has_camera)
 
     return np.array(pil_img)
 
@@ -59,6 +73,79 @@ class ClusterRenderer:
     offset_y = (self.target_h - resized_h) // 2
     canvas[offset_y:offset_y + resized_h, offset_x:offset_x + resized_w] = resized
     return canvas
+
+  def _draw_info_panel(self, pil_img, data):
+    """Draw the right-hand 5:5 information pane."""
+    draw = ImageDraw.Draw(pil_img)
+    x0 = self.config.camera_panel_width
+    w = self.target_w - x0
+    draw.rectangle([x0 + 5, 5, self.target_w - 5, self.target_h - 5], fill=(7, 12, 19))
+
+    def text(x, y, value, size=24, color=(220, 225, 232)):
+      draw.text((x, y), str(value), font=self.font_unit if size <= 38 else self.font_speed, fill=color)
+
+    def icon(name, x, y, size=52):
+      source = self.icons.get(name)
+      if source is not None:
+        image = source.resize((size, size), Image.Resampling.LANCZOS)
+        pil_img.paste(image, (int(x), int(y)), image)
+
+    def indicator(x, y, label, active, icon_name, active_color=(80, 220, 130)):
+      color = active_color if active else (75, 82, 92)
+      draw.rounded_rectangle([x, y, x + 142, y + 64], radius=8, fill=(19, 27, 38), outline=color, width=2)
+      icon(icon_name, x + 7, y + 6, 46)
+      text(x + 58, y + 20, label, 20, color)
+
+    # Top row: current/set speed and core pedal/steering status.
+    current = data.get("v_ego", 0.0) * (3.6 if self.config.is_metric else 2.236936)
+    cruise = data.get("cruise_speed", 0.0)
+    if cruise > 100:  # vCruise fields are commonly km/h*100 in some variants
+      cruise /= 100.0
+    text(x0 + 24, 20, f"{int(current)} {self.config.speed_unit}", 34, (255, 255, 255))
+    text(x0 + 260, 20, f"SET {int(cruise) if cruise > 0 else '--'}", 30, (160, 210, 255))
+    text(x0 + 24, 62, f"STEER {data.get('steering_angle', 0.0):+.1f} deg", 24)
+
+    indicator(x0 + 24, 105, "WHEEL", data.get("enabled", False),
+              "wheel_green" if data.get("enabled", False) else "wheel")
+    indicator(x0 + 180, 105, "BRAKE", data.get("brake_pressed", False), "brake_disc", (255, 100, 90))
+    indicator(x0 + 336, 105, "ACCEL", data.get("gas_pressed", False), "disengage_on_accelerator", (255, 190, 80))
+
+    # TPMS grid.
+    draw.rounded_rectangle([x0 + 24, 164, x0 + 470, 292], radius=10, fill=(12, 19, 29), outline=(65, 78, 95), width=2)
+    icon("tpms", x0 + 35, 177, 72)
+    text(x0 + 42, 174, "TPMS  FL       FR       RL       RR", 24, (180, 190, 205))
+    pressures = data.get("tpms", [0, 0, 0, 0])
+    text(x0 + 42, 222, "  ".join(f"{p:.1f}" if p else "--" for p in pressures), 30, (235, 240, 245))
+    text(x0 + 42, 262, "tire pressure", 20, (120, 130, 145))
+
+    # Connectivity/navigation status.
+    gps = data.get("gps_satellites", 0)
+    wifi = data.get("wifi_strength", 0)
+    icon("gps", x0 + 24, 312, 38)
+    icon("direction", x0 + 235, 312, 38)
+    wifi_icon = ("wifi_strength_full" if wifi >= 4 else "wifi_strength_high" if wifi == 3 else
+                 "wifi_strength_medium" if wifi == 2 else "wifi_strength_low")
+    icon(wifi_icon, x0 + 24, 352, 38)
+    text(x0 + 70, 320, f"{'OK' if gps > 0 else 'NO SIGNAL'}  SAT {gps}", 24,
+         (100, 230, 140) if gps > 0 else (255, 120, 100))
+    text(x0 + 280, 320, f"{data.get('gps_bearing', 0.0):.0f} deg", 24, (205, 215, 230))
+    text(x0 + 70, 360, f"{'CONNECTED' if wifi > 0 else 'OFF'} ({wifi})", 24,
+         (100, 210, 255) if wifi > 0 else (130, 140, 150))
+
+    # Road-sign/traffic indicators. Numeric enums are retained until the
+    # vehicle-specific enum mapping is finalized.
+    signs = []
+    if data.get("speed_bump"): signs.append("BUMP")
+    if data.get("school_zone"): signs.append("SCHOOL")
+    if data.get("speed_camera"): signs.append("CAMERA")
+    if data.get("road_signs", 0): signs.append(f"SIGN {data['road_signs']}")
+    if data.get("traffic_state", 0): signs.append(f"TRAFFIC {data['traffic_state']}")
+    sign_icons = [name for name, flag in (("speed_bump", data.get("speed_bump")),
+                  ("school_zone", data.get("school_zone")), ("speed_camera", data.get("speed_camera"))) if flag]
+    for index, name in enumerate(sign_icons[:3]):
+      icon(name, x0 + 24 + index * 58, 400, 44)
+    text(x0 + 205, 410, "  ".join(signs) if signs else "ROAD STATUS  --", 22,
+         (255, 190, 90) if signs else (120, 130, 145))
 
   def _project_pt(self, x, y, z):
     if x < 0.1: x = 0.1

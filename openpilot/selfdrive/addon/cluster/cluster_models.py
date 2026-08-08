@@ -6,12 +6,31 @@ class ClusterModels:
   def __init__(self):
     cloudlog.info("Initializing ClusterModels (Lightweight)...")
 
-    self.sm = messaging.SubMaster(['modelV2', 'carState', 'selfdriveState'])
+    self.sm = messaging.SubMaster([
+      'modelV2', 'carState', 'selfdriveState', 'controlsState', 'carControl',
+      'carParams', 'deviceState', 'gpsLocationExternal', 'naviData',
+      'longitudinalPlan', 'liveParameters',
+    ])
 
     self.v_ego = 0.0  # m/s 단위 속도
     self.enabled = False  # 인게이지 여부
     self.left_blinker = False
     self.right_blinker = False
+    self.brake_pressed = False
+    self.gas_pressed = False
+    self.steering_angle = 0.0
+    self.cruise_speed = 0.0
+    self.gps_bearing = 0.0
+    self.gps_satellites = 0
+    self.wifi_strength = 0
+    self.tpms = [0.0, 0.0, 0.0, 0.0]
+    self.distance_level = 0
+    self.traffic_state = 0
+    self.road_signs = 0
+    self.nav_limit_speed = 0.0
+    self.speed_camera = False
+    self.school_zone = False
+    self.speed_bump = False
 
     self.model_valid = False
     self.path_x = []
@@ -29,10 +48,36 @@ class ClusterModels:
       self.v_ego = cs.vEgo
       self.left_blinker = cs.leftBlinker
       self.right_blinker = cs.rightBlinker
+      self.brake_pressed = cs.brakePressed
+      self.gas_pressed = cs.gasPressed
+      self.steering_angle = cs.steeringAngleDeg
+      self.cruise_speed = getattr(cs, 'vCruiseCluster', getattr(cs, 'vCruise', 0.0))
+      if hasattr(cs, 'exState'):
+        ex = cs.exState
+        if hasattr(ex, 'tpms'):
+          self.tpms = [ex.tpms.fl, ex.tpms.fr, ex.tpms.rl, ex.tpms.rr]
+        self.road_signs = getattr(ex, 'roadSigns', self.road_signs)
 
     if self.sm.updated['selfdriveState']:
       ss = self.sm['selfdriveState']
       self.enabled = ss.enabled
+
+    if self.sm.updated['deviceState']:
+      self.wifi_strength = self.sm['deviceState'].networkStrength
+
+    if self.sm.updated['gpsLocationExternal']:
+      gps = self.sm['gpsLocationExternal']
+      self.gps_bearing = gps.bearingDeg
+      self.gps_satellites = gps.satelliteCount
+
+    if self.sm.updated['naviData']:
+      nav = self.sm['naviData']
+      self.nav_limit_speed = getattr(nav, 'roadLimitSpeed', 0.0)
+      self.speed_camera = getattr(nav, 'camLimitSpeed', 0.0) > 0
+      self.school_zone = getattr(nav, 'sectionLimitSpeed', 0.0) > 0
+
+    if self.sm.updated['longitudinalPlan']:
+      self.traffic_state = getattr(self.sm['longitudinalPlan'], 'trafficState', 0)
 
     if self.sm.updated['modelV2']:
       md = self.sm['modelV2']
@@ -59,7 +104,22 @@ class ClusterModels:
       "v_ego": self.v_ego,
       "enabled": self.enabled,
       "left_blinker": self.left_blinker,
-      "right_blinker": self.right_blinker
+      "right_blinker": self.right_blinker,
+      "brake_pressed": self.brake_pressed,
+      "gas_pressed": self.gas_pressed,
+      "steering_angle": self.steering_angle,
+      "cruise_speed": self.cruise_speed,
+      "gps_bearing": self.gps_bearing,
+      "gps_satellites": self.gps_satellites,
+      "wifi_strength": self.wifi_strength,
+      "tpms": self.tpms,
+      "distance_level": self.distance_level,
+      "traffic_state": self.traffic_state,
+      "road_signs": self.road_signs,
+      "nav_limit_speed": self.nav_limit_speed,
+      "speed_camera": self.speed_camera,
+      "school_zone": self.school_zone,
+      "speed_bump": self.speed_bump,
     }
 
   def get_path_data(self):
