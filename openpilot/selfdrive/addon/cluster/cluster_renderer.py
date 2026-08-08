@@ -46,18 +46,18 @@ class ClusterRenderer:
 
   def _crop_and_resize(self, frame):
     h, w = frame.shape[:2]
-    # Use the left half of the display for the camera and reserve the right half
-    # for cluster data. This 2.08:1 viewport preserves far more vertical view
-    # than filling the entire 4.16:1 display.
+    # Preserve the complete source camera image in the left pane. Cropping to
+    # fill even this 2.08:1 viewport still enlarged the road view noticeably.
     view_w = min(max(1, self.config.camera_panel_width), self.target_w)
-    view_ratio = view_w / self.target_h
-    crop_h = min(h, max(1, round(w / view_ratio)))
-    crop_y = (h - crop_h) // 2
-    cropped = frame[crop_y:crop_y + crop_h, :]
-    resized = cv2.resize(cropped, (view_w, self.target_h), interpolation=cv2.INTER_AREA)
+    scale = min(view_w / w, self.target_h / h)
+    resized_w = max(1, round(w * scale))
+    resized_h = max(1, round(h * scale))
+    resized = cv2.resize(frame, (resized_w, resized_h), interpolation=cv2.INTER_AREA)
 
     canvas = np.zeros((self.target_h, self.target_w, 3), dtype=np.uint8)
-    canvas[:, :view_w] = resized
+    offset_x = (view_w - resized_w) // 2
+    offset_y = (self.target_h - resized_h) // 2
+    canvas[offset_y:offset_y + resized_h, offset_x:offset_x + resized_w] = resized
     return canvas
 
   def _project_pt(self, x, y, z):
