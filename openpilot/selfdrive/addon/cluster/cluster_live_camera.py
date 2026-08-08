@@ -32,7 +32,10 @@ class ClusterLiveCamera:
   def _init_socket(self):
     try:
       flog("[CLUSTER_CAM] Connecting to roadEncodeData socket...")
-      self.sock = messaging.sub_sock('roadEncodeData', conflate=True)
+      # conflate=True는 최신 메시지 1개만 남기고 나머지를 버리는데, 이러면 H264 GOP
+      # 연속성(키프레임 -> 델타프레임 체인)이 깨져서 디코딩이 거의 항상 실패함.
+      # 반드시 conflate=False로 순서대로 다 받아야 함.
+      self.sock = messaging.sub_sock('roadEncodeData', conflate=False)
       if self.decoder is None:
         self.decoder = ClusterH264Decoder()
     except Exception as e:
@@ -52,9 +55,14 @@ class ClusterLiveCamera:
           time.sleep(1.0)
           continue
 
-        msg = messaging.recv_one_or_none(self.sock)
+        # 쌓여있는 프레임을 전부 순서대로 소진 (하나만 받으면 GOP 연속성이 깨짐)
+        got_any = False
+        while True:
+          msg = messaging.recv_one_or_none(self.sock)
+          if msg is None:
+            break
+          got_any = True
 
-        if msg is not None:
           self.msg_count += 1
           error_count = 0
 
@@ -74,11 +82,12 @@ class ClusterLiveCamera:
             if rgb_frame is not None:
               self.latest_frame = rgb_frame
               self.last_frame_time = time.time()
-        else:
+
+        if not got_any:
           # 3초 이상 프레임이 안 들어오면 소켓 재연결 시도
           if time.time() - self.last_frame_time > 3.0:
             flog("[CLUSTER_CAM_WARN] Camera stream timeout (no msg for 3s), re-initializing socket...")
-            self.sock = messaging.sub_sock('roadEncodeData', conflate=True)
+            self.sock = messaging.sub_sock('roadEncodeData', conflate=False)
             self.last_frame_time = time.time()
           else:
             time.sleep(0.005)
