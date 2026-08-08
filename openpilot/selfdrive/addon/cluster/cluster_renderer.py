@@ -33,6 +33,7 @@ class ClusterRenderer:
     self.camera_height = 1.22
     self.focal_length = 910.0
     self.icons = {}
+    self._icon_cache = {}
     icon_dir = os.path.join(str(self.config.BASEDIR), "selfdrive", "assets", "icons")
     for name in (
       "wheel", "wheel_green", "disengage_on_accelerator", "brake_disc", "tpms",
@@ -87,10 +88,15 @@ class ClusterRenderer:
       source = self.icons.get(name)
       if source is None:
         return
-      image = source.resize((size, size), Image.Resampling.LANCZOS)
-      if not active:
-        alpha = image.getchannel("A").point(lambda p: p * 70 // 255)
-        image.putalpha(alpha)
+      cache_key = (name, size, bool(active))
+      image = self._icon_cache.get(cache_key)
+      if image is None:
+        image = source.resize((size, size), Image.Resampling.LANCZOS)
+        image = image.copy()
+        if not active:
+          alpha = image.getchannel("A").point(lambda p: p * 70 // 255)
+          image.putalpha(alpha)
+        self._icon_cache[cache_key] = image
       pil_img.paste(image, (int(x), int(y)), image)
 
     white, muted, green, amber, red = (245, 248, 252), (105, 115, 130), (110, 235, 150), (255, 195, 80), (255, 105, 95)
