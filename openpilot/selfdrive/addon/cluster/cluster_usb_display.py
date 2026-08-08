@@ -82,6 +82,7 @@ class TuringUsbDisplay:
           except Exception as e:
             flog(f"[CLUSTER_USB_WARN] Detach warning: {e}")
 
+          # 이미지 업로드용 OUT 엔드포인트를 미리 찾아서 캐싱
           cfg = self.device.get_active_configuration()
           intf = usb.util.find_descriptor(cfg, bInterfaceNumber=0)
           self._ep_out = usb.util.find_descriptor(
@@ -110,12 +111,13 @@ class TuringUsbDisplay:
 
     except Exception as e:
       flog(f"[CLUSTER_USB_ERROR] Error opening Turing display: {e}")
-    return False
+      return False
 
   def _write_image_no_wait(self, jpeg_bytes):
     """
-    이미지 업로드 커맨드는 펌웨어가 ACK를 안 주는 것으로 확인됨.
     응답을 기다리지 않고 write만 수행 (fire-and-forget).
+    타임아웃은 패킷 잘림을 방지하기 위해 넉넉하게 2500ms(2.5초)로 복구합니다.
+    (속도 제어는 파이프라인에서 담당합니다)
     """
     img_size = len(jpeg_bytes)
     cmd_packet = self._build_header(self._cmd_upload_jpeg)
@@ -125,9 +127,7 @@ class TuringUsbDisplay:
     cmd_packet[11] = img_size & 0xFF
     full_payload = self._encrypt(cmd_packet) + jpeg_bytes
 
-    # 타임아웃을 1000 -> 150으로 대폭 축소 (Fast-Fail)
-    # 버퍼가 찼을 때 1초간 멈추는 프리징(Stuttering) 현상 제거
-    self._ep_out.write(full_payload, 150)
+    self._ep_out.write(full_payload, 2500)
 
   def send_image(self, frame_image):
     if not self.connected or self.device is None:
@@ -140,7 +140,8 @@ class TuringUsbDisplay:
       rotated = cv2.rotate(frame_image, cv2.ROTATE_90_CLOCKWISE)
       bgr_img = cv2.cvtColor(rotated, cv2.COLOR_RGB2BGR)
 
-      encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 70]
+      # MCU 부하 감소를 위해 압축률을 60으로 하향 조정
+      encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 60]
       success, encoded_img = cv2.imencode('.jpg', bgr_img, encode_param)
 
       if success:
@@ -157,14 +158,10 @@ class TuringUsbDisplay:
 
     except usb.core.USBError as e:
       if e.errno == 110 or 'timed out' in str(e).lower():
-        # Errno 110 발생 시 1프레임 버림 (로그는 너무 많이 쌓이지 않도록 주석 처리 또는 유지)
-        flog(f"[CLUSTER_USB_WARN] Buffer full - 1 frame skipped (Fast-Fail)")
-        try:
-          if self._ep_out and self.device:
-            self.device.clear_halt(self._ep_out)
-        except Exception as clear_err:
-          # Errno None 에러가 로그를 덮는 것을 방지
-          pass
+        # 여기서 타임아웃이 발생했다는 것은 장치가 완전히 꼬였다는 뜻이므로
+        # 어설프게 clear_halt 하지 않고 아예 연결을 끊어 다음 루프에서 재시작(Handshake) 되도록 합니다.
+        flog(f"[CLUSTER_USB_WARN] USB Timeout (Stall). Forcing reconnection...")
+        self.connected = False
       else:
         err_msg = f"Critical USB Error: {e}"
         flog(f"[CLUSTER_USB_ERROR] {err_msg}")

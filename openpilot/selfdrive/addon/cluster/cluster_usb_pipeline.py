@@ -17,22 +17,12 @@ def flog(msg):
 class ClusterUsbPipeline:
   def __init__(self, display):
     self.display = display
-    # 큐 사이즈를 1로 제한하여 최신 프레임만 유지하고 지연 방지
     self.queue = queue.Queue(maxsize=1)
     self.running = False
     self.thread = None
-
-    # 전송 주기 제어(Throttling)를 위한 변수
-    self.last_tx_time = 0.0
-    fps = getattr(self.display.config, 'fps', 10)
-    # FPS에 맞춰 최소 전송 간격 설정 (예: 10fps면 0.1초 간격)
-    self.min_tx_interval = 1.0 / fps if fps > 0 else 0.1
     flog("ClusterUsbPipeline initialized.")
 
   def start(self):
-    """
-    백그라운드 전송 스레드를 시작합니다.
-    """
     if not self.running:
       self.running = True
       self.thread = threading.Thread(target=self._worker_loop, daemon=True)
@@ -40,9 +30,6 @@ class ClusterUsbPipeline:
       flog("Turing USB Display Pipeline thread started.")
 
   def push(self, frame_image):
-    """
-    메인 렌더러 루프에서 호출되어 전송할 이미지를 큐에 넣습니다.
-    """
     if not self.running or frame_image is None:
       return
 
@@ -59,31 +46,37 @@ class ClusterUsbPipeline:
 
   def _worker_loop(self):
     """
-    백그라운드에서 큐를 감시하다가 이미지가 들어오면 USB로 전송합니다.
-    스레드 멈춤(Blocking)을 방지하기 위한 안전장치가 포함되어 있습니다.
+    백그라운드에서 큐를 감시하며 이미지를 전송합니다.
+    [가장 중요한 로직]: USB 타임아웃에 의존하지 않고, 전송 후 일정 시간을
+    강제로 쉬어(Breathing room) MCU 버퍼가 넘치는 것을 원천 차단합니다.
     """
+    fps = getattr(self.display.config, 'fps', 10)
+    target_interval = 1.0 / fps if fps > 0 else 0.1
+
     while self.running:
       try:
-        # 1. 전송할 프레임 대기 (0.1초 타임아웃)
         frame_image = self.queue.get(timeout=0.1)
 
-        # 2. 전송 간격 제어 (버퍼 범람/타임아웃 방지 및 기기 크래시 예방)
-        now = time.time()
-        if now - self.last_tx_time < self.min_tx_interval:
-          # 너무 빨리 큐에 들어오면 미세하게 대기하여 디스플레이 장치에 부하를 줄임
-          time.sleep(self.min_tx_interval - (now - self.last_tx_time))
-          now = time.time()
-
-        # 3. 연결이 끊어져 있다면 자동 재연결 시도
         if not self.display.connected:
           success = self.display.open()
           if not success:
             time.sleep(1.0)
             continue
 
-        # 4. 이미지 전송 수행
+        # 전송 소요 시간 측정
+        t0 = time.time()
         self.display.send_image(frame_image)
-        self.last_tx_time = now
+        t1 = time.time()
+
+        elapsed = t1 - t0
+        sleep_time = target_interval - elapsed
+
+        # [핵심] 전송이 아무리 늦게 끝났어도, 최소 30ms(0.03초)는 무조건 휴식하여
+        # 디스플레이 MCU가 받은 데이터를 압축해제 할 시간을 벌어줍니다.
+        if sleep_time < 0.03:
+          sleep_time = 0.03
+
+        time.sleep(sleep_time)
 
       except queue.Empty:
         continue
