@@ -46,19 +46,19 @@ class ClusterRenderer:
 
   def _crop_and_resize(self, frame):
     h, w = frame.shape[:2]
-    # The road camera is 1928x1208 (about 16:10), whereas the 9.2" display is
-    # 1920x462 (about 4.16:1). Cropping to fill discarded most of the camera
-    # vertically and made it appear zoomed in. Preserve the full camera image
-    # and use pillar boxes for the unavoidable aspect-ratio difference.
-    scale = min(self.target_w / w, self.target_h / h)
-    resized_w = max(1, round(w * scale))
-    resized_h = max(1, round(h * scale))
-    resized = cv2.resize(frame, (resized_w, resized_h), interpolation=cv2.INTER_AREA)
+    # The 16:10 road camera cannot fill a 4.16:1 panel without a severe crop.
+    # Render it in a 1500px-wide center viewport: it keeps substantially more
+    # vertical road view than a full-width crop while avoiding huge side bars.
+    view_w = min(max(1, self.config.camera_view_width), self.target_w)
+    view_ratio = view_w / self.target_h
+    crop_h = min(h, max(1, round(w / view_ratio)))
+    crop_y = (h - crop_h) // 2
+    cropped = frame[crop_y:crop_y + crop_h, :]
+    resized = cv2.resize(cropped, (view_w, self.target_h), interpolation=cv2.INTER_AREA)
 
     canvas = np.zeros((self.target_h, self.target_w, 3), dtype=np.uint8)
-    offset_x = (self.target_w - resized_w) // 2
-    offset_y = (self.target_h - resized_h) // 2
-    canvas[offset_y:offset_y + resized_h, offset_x:offset_x + resized_w] = resized
+    offset_x = (self.target_w - view_w) // 2
+    canvas[:, offset_x:offset_x + view_w] = resized
     return canvas
 
   def _project_pt(self, x, y, z):

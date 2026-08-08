@@ -15,9 +15,11 @@ class ClusterConfig:
     self.width = 1920
     self.height = 462
     self.fps = 10
-    # Keep rendering/camera processing responsive, but send fewer complete JPEG
-    # frames to the display MCU. It visibly blanks while decoding at 10 FPS.
-    self.usb_fps = 5
+    # Rendering remains at 10 FPS; the display receives the latest frame at 8 FPS.
+    self.usb_fps = 8
+    # A compromise between the full-width crop (too zoomed) and the full-source
+    # fit (too narrow on this 4.16:1 panel).
+    self.camera_view_width = 1500
 
     # USB 전용 설정 값
     self.usb_timeout_ms = USB_TIMEOUT_MS
