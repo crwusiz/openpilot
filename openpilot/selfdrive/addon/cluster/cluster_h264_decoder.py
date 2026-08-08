@@ -20,11 +20,23 @@ class ClusterH264Decoder:
     self.parse_error_count = 0
     self.decode_error_count = 0
     self.decode_ok_count = 0
+    self.extradata_set = False
     try:
       self.codec = av.CodecContext.create('h264', 'r')
     except Exception as e:
       flog(f"[CLUSTER_DECODER_ERROR] Failed to create H264 codec: {e}")
       self.codec = None
+
+  def set_extradata(self, header_bytes: bytes):
+    """AVCC 스타일 extradata(header)를 코덱에 직접 설정 (Annex-B 스타트코드로 이어붙일 수 없는 경우)."""
+    if self.codec is None:
+      return
+    try:
+      self.codec.extradata = header_bytes
+      self.extradata_set = True
+      flog(f"[CLUSTER_DECODER] extradata set ({len(header_bytes)} bytes)")
+    except Exception as e:
+      flog(f"[CLUSTER_DECODER_ERROR] Failed to set extradata: {e}")
 
   def process(self, data):
     if self.codec is None or not data:

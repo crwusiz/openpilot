@@ -89,16 +89,35 @@ class ClusterLiveCamera:
 
           # 첫 키프레임을 만나기 전까지는 디코딩 시도 자체를 건너뜀
           # (키프레임 없이 델타프레임만 넣으면 디코더가 계속 실패함)
+          use_header_as_extradata = False
           if not self.seen_keyframe:
             if is_keyframe:
               self.seen_keyframe = True
-              head_hex = encode_data.data[:32].hex()
+              head_hex = encode_data.header.hex()  # 전체 header 덤프 (90바이트라 짧음)
+              data_head_hex = encode_data.data[:16].hex()
+
+              header_bytes = bytes(encode_data.header)
+              is_annexb_header = header_bytes[:4] == b'\x00\x00\x00\x01' or header_bytes[:3] == b'\x00\x00\x01'
+
               flog(f"[CLUSTER_CAM_SUCCESS] First keyframe found! header_len={header_len} | "
-                   f"data first 32 bytes (hex)={head_hex}")
+                   f"is_annexb_header={is_annexb_header}\n"
+                   f"    header (hex)={head_hex}\n"
+                   f"    data first 16 bytes (hex)={data_head_hex}")
+
+              if not is_annexb_header and header_bytes:
+                # AVCC(avcC) 스타일 extradata로 판단 -> 이어붙이지 않고 codec.extradata로 별도 설정
+                self.decoder.set_extradata(header_bytes)
+                use_header_as_extradata = True
             else:
               continue  # 키프레임 나올 때까지 계속 버림
+          elif self.decoder.extradata_set:
+            # extradata를 이미 설정했으면, 매 키프레임마다 반복되는 header는 다시 이어붙이지 않음
+            use_header_as_extradata = True
 
-          frame_data = encode_data.header + encode_data.data
+          if use_header_as_extradata:
+            frame_data = encode_data.data
+          else:
+            frame_data = encode_data.header + encode_data.data
 
           if frame_data and self.decoder:
             rgb_frame = self.decoder.process(frame_data)
