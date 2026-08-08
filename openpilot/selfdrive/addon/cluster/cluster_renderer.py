@@ -1,4 +1,5 @@
 import os
+import time
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -64,26 +65,23 @@ class ClusterRenderer:
     return np.array(pil_img)
 
   def _crop_and_resize(self, frame):
-    h, w = frame.shape[:2]
-    # Preserve the complete source camera image in the left pane. Cropping to
-    # fill even this 2.08:1 viewport still enlarged the road view noticeably.
-    view_w = min(max(1, self.config.camera_panel_width), self.target_w)
-    scale = min(view_w / w, self.target_h / h)
-    resized_w = max(1, round(w * scale))
-    resized_h = max(1, round(h * scale))
-    resized = cv2.resize(frame, (resized_w, resized_h), interpolation=cv2.INTER_AREA)
-
-    canvas = np.zeros((self.target_h, self.target_w, 3), dtype=np.uint8)
-    offset_x = (view_w - resized_w) // 2
-    offset_y = (self.target_h - resized_h) // 2
-    canvas[offset_y:offset_y + resized_h, offset_x:offset_x + resized_w] = resized
-    return canvas
+    # The physical cluster uses one continuous onroad surface.  Keep the
+    # complete ROAD frame and map it to the panel resolution; HUD elements are
+    # composited on top instead of reserving a blank information pane.
+    return cv2.resize(frame, (self.target_w, self.target_h), interpolation=cv2.INTER_AREA)
 
   def _draw_info_panel(self, pil_img, data):
     """Draw the right pane using the same compact icon-first HUD language as onroad."""
     draw = ImageDraw.Draw(pil_img)
     x0 = self.config.camera_panel_width
-    draw.rectangle([x0 + 5, 5, self.target_w - 5, self.target_h - 5], fill=(7, 12, 19))
+    # Information is an overlay on the camera image, not a separate dark pane.
+    # Keep the backing very subtle so road content remains visible beneath it.
+    overlay = Image.new("RGBA", pil_img.size, (0, 0, 0, 0))
+    overlay_draw = ImageDraw.Draw(overlay)
+    overlay_draw.rectangle([x0, 0, self.target_w, self.target_h], fill=(5, 10, 18, 72))
+    pil_img.paste(overlay, (0, 0), overlay)
+    draw = ImageDraw.Draw(pil_img)
+    draw.rectangle([x0 + 5, 5, self.target_w - 5, self.target_h - 5], outline=(55, 65, 80), width=1)
 
     def text(x, y, value, font=None, color=(220, 225, 232), anchor=None):
       draw.text((int(x), int(y)), str(value), font=font or self.font_small, fill=color, anchor=anchor)
@@ -108,15 +106,17 @@ class ClusterRenderer:
       cruise /= 100.0
     cruise_s = f"{int(cruise)}" if cruise > 0 else "--"
 
-    # Top-left: boxed cruise/set/limit values, matching the onroad HUD hierarchy.
+    # Top-left: tall, centered boxes like hud_renderer's MAX/SET boxes.
     box_fill, box_outline = (16, 25, 36), (62, 78, 98)
-    draw.rounded_rectangle([x0 + 18, 12, x0 + 190, 49], radius=7, fill=box_fill, outline=box_outline, width=2)
-    draw.rounded_rectangle([x0 + 18, 55, x0 + 190, 92], radius=7, fill=box_fill, outline=box_outline, width=2)
-    draw.rounded_rectangle([x0 + 198, 55, x0 + 370, 92], radius=7, fill=box_fill, outline=box_outline, width=2)
-    text(x0 + 31, 20, f"CRUISE  {cruise_s}", self.font_small, white)
-    text(x0 + 31, 63, f"SET  {cruise_s}", self.font_small, (170, 215, 255))
+    def value_box(x, y, label, value, color):
+      draw.rounded_rectangle([x, y, x + 88, y + 88], radius=9, fill=box_fill, outline=box_outline, width=2)
+      centered(x + 44, y + 9, label, self.font_label, muted)
+      centered(x + 44, y + 39, value, self.font_unit, color)
+
+    value_box(x0 + 24, 10, "CRUISE", cruise_s, white)
     limit = data.get("nav_limit_speed", 0.0)
-    text(x0 + 211, 63, f"LIMIT  {int(limit) if limit else '--'}", self.font_small, muted)
+    value_box(x0 + 24, 110, "SET", cruise_s, (170, 215, 255))
+    value_box(x0 + 124, 110, "LIMIT", f"{int(limit) if limit else '--'}", muted)
     traffic_icon = "traffic_green" if data.get("traffic_state") == 1 else "traffic_red" if data.get("traffic_state") == 2 else "traffic_off"
     icon(traffic_icon, x0 + 305, 14, 38, bool(data.get("traffic_state")))
     if data.get("school_zone"):
@@ -126,18 +126,29 @@ class ClusterRenderer:
     if data.get("speed_camera"):
       icon("speed_camera", x0 + 405, 14, 38)
 
-    # Current speed is centered in the top middle of the information pane.
+    # Mici _draw_current_speed: color follows acceleration/deceleration.
+    accel = float(data.get("accel", 0.0) or 0.0)
+    if accel > 0:
+      alpha = max(80, min(255, int(255 - 180 * min(accel / 3.0, 1.0))))
+      speed_color = (alpha, 255, alpha)
+    else:
+      alpha = max(60, min(255, int(255 - 255 * min(abs(accel) / 4.0, 1.0))))
+      speed_color = (255, alpha, alpha)
+
+    # Vertical speed box, matching the boxed MAX/SET visual language.
     speed_cx = x0 + 480
-    centered(speed_cx, 3, int(current), self.font_speed, white)
-    centered(speed_cx, 91, self.config.speed_unit, self.font_small, white)
+    speed_box = [speed_cx - 92, 8, speed_cx + 92, 137]
+    draw.rounded_rectangle(speed_box, radius=12, fill=(5, 10, 18), outline=(120, 130, 145), width=2)
+    centered(speed_cx, 13, int(current), self.font_speed, speed_color)
+    centered(speed_cx, 111, self.config.speed_unit, self.font_small, (225, 230, 238))
 
     # Top-right connectivity: icon-only, dimmed when unavailable.
     gps_ok = data.get("gps_satellites", 0) > 0
     wifi = data.get("wifi_strength", 0)
     wifi_name = "wifi_strength_full" if wifi >= 4 else "wifi_strength_high" if wifi == 3 else "wifi_strength_medium" if wifi == 2 else "wifi_strength_low"
-    icon("direction", x0 + 690, 11, 64, gps_ok)
-    icon("gps", x0 + 770, 11, 64, gps_ok)
-    icon(wifi_name, x0 + 850, 11, 64, wifi > 0)
+    icon("direction", x0 + 690, 28, 64, gps_ok)
+    icon("gps", x0 + 770, 28, 64, gps_ok)
+    icon(wifi_name, x0 + 850, 28, 64, wifi > 0)
 
     # Bottom-left: wheel, accelerator, brake in the requested order.
     controls = (("wheel_green" if data.get("enabled") else "wheel", "STEER", data.get("enabled"), green),
@@ -151,12 +162,12 @@ class ClusterRenderer:
     # Bottom-right: gap indicator above a larger TPMS icon and 2x2 pressures.
     gap = int(data.get("distance_level", 0) or 0)
     gap_name = f"dist{min(max(gap, 1), 4)}"
-    icon(gap_name, x0 + 665, 165, 78, True)
-    icon("tpms", x0 + 660, 284, 112, True)
+    icon(gap_name, x0 + 750, 165, 78, True)
+    icon("tpms", x0 + 745, 284, 112, True)
     pressures = data.get("tpms", [0, 0, 0, 0])
     for i, (label, value) in enumerate(zip(("FL", "FR", "RL", "RR"), pressures)):
       # Values are deliberately overlaid on the TPMS vehicle silhouette.
-      px = x0 + 684 + (i % 2) * 64
+      px = x0 + 769 + (i % 2) * 64
       py = 298 + (i // 2) * 62
       centered(px, py, label, self.font_label, muted)
       centered(px, py + 20, f"{value:.1f}" if value else "--", self.font_small, white)
@@ -212,9 +223,8 @@ class ClusterRenderer:
 
     border_color = self.config.colors["engaged"] if hud_data['enabled'] else self.config.colors["disengaged"]
     draw.rectangle([0, 0, self.target_w, self.target_h], outline=border_color, width=25)
-    # Visual boundary between the live-camera and information panes.
-    draw.line([(self.config.camera_panel_width, 0), (self.config.camera_panel_width, self.target_h)],
-              fill=border_color, width=4)
+    self._draw_borders(pil_img, hud_data)
+    self._draw_ignore_limit_timer(pil_img, hud_data)
 
     if not has_camera:
       warning_text = "WAITING FOR CAMERA SIGNAL..."
@@ -228,3 +238,40 @@ class ClusterRenderer:
       draw.polygon([(40, 40), (80, 15), (80, 65)], fill=blinker_color)
     if hud_data['right_blinker']:
       draw.polygon([(self.target_w - 40, 40), (self.target_w - 80, 15), (self.target_w - 80, 65)], fill=blinker_color)
+
+  def _draw_borders(self, pil_img, data):
+    """Mici onroad-style status borders for blinkers, blind spots and state."""
+    draw = ImageDraw.Draw(pil_img)
+    border_size = 10
+    blinking = (time.monotonic() % 0.9) < 0.45
+    red, orange, green, steering = (255, 80, 70), (255, 170, 55), (90, 220, 120), (80, 180, 255)
+
+    def side(x, blinker, blindspot):
+      if data.get('brake_pressed') or blindspot:
+        color, visible = red, True
+      elif blinker:
+        color, visible = orange, blinking
+      elif data.get('enabled'):
+        color, visible = green, True
+      else:
+        color, visible = steering, False
+      if visible:
+        draw.rectangle([x, 0, x + border_size - 1, self.target_h - 1], fill=color)
+
+    side(0, data.get('left_blinker', False), data.get('left_blindspot', False))
+    side(self.target_w - border_size, data.get('right_blinker', False), data.get('right_blindspot', False))
+
+  def _draw_ignore_limit_timer(self, pil_img, data):
+    """Mici orange countdown bar, shrinking as ignoreLimitTimer expires."""
+    max_ticks = 3000.0
+    timer = float(data.get('ignore_limit_timer', 0.0) or 0.0)
+    if timer <= 0 or timer >= max_ticks:
+      return
+    ratio = max(0.0, min(1.0, (max_ticks - timer) / max_ticks))
+    bar_width = int(self.target_w * ratio)
+    if bar_width <= 0:
+      return
+    draw = ImageDraw.Draw(pil_img)
+    # Match mici: centered, 10px orange translucent bar at the top edge.
+    draw.rectangle([int((self.target_w - bar_width) / 2), 0,
+                    int((self.target_w + bar_width) / 2), 9], fill=(190, 125, 40))

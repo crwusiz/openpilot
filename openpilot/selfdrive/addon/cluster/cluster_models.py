@@ -13,9 +13,12 @@ class ClusterModels:
     ])
 
     self.v_ego = 0.0  # m/s 단위 속도
+    self.accel = 0.0  # m/s², used for speed color feedback
     self.enabled = False  # 인게이지 여부
     self.left_blinker = False
     self.right_blinker = False
+    self.left_blindspot = False
+    self.right_blindspot = False
     self.brake_pressed = False
     self.gas_pressed = False
     self.steering_angle = 0.0
@@ -31,6 +34,7 @@ class ClusterModels:
     self.speed_camera = False
     self.school_zone = False
     self.speed_bump = False
+    self.ignore_limit_timer = 0.0
 
     self.model_valid = False
     self.path_x = []
@@ -46,8 +50,11 @@ class ClusterModels:
     if self.sm.updated['carState']:
       cs = self.sm['carState']
       self.v_ego = cs.vEgo
+      self.accel = getattr(cs, 'aEgo', 0.0)
       self.left_blinker = cs.leftBlinker
       self.right_blinker = cs.rightBlinker
+      self.left_blindspot = getattr(cs, 'leftBlindspot', False)
+      self.right_blindspot = getattr(cs, 'rightBlindspot', False)
       self.brake_pressed = cs.brakePressed
       self.gas_pressed = cs.gasPressed
       self.steering_angle = cs.steeringAngleDeg
@@ -57,6 +64,7 @@ class ClusterModels:
         if hasattr(ex, 'tpms'):
           self.tpms = [ex.tpms.fl, ex.tpms.fr, ex.tpms.rl, ex.tpms.rr]
         self.road_signs = getattr(ex, 'roadSigns', self.road_signs)
+        self.ignore_limit_timer = getattr(ex, 'ignoreLimitTimer', self.ignore_limit_timer)
 
     if self.sm.updated['selfdriveState']:
       ss = self.sm['selfdriveState']
@@ -102,9 +110,12 @@ class ClusterModels:
   def get_hud_data(self):
     return {
       "v_ego": self.v_ego,
+      "accel": self.accel,
       "enabled": self.enabled,
       "left_blinker": self.left_blinker,
       "right_blinker": self.right_blinker,
+      "left_blindspot": self.left_blindspot,
+      "right_blindspot": self.right_blindspot,
       "brake_pressed": self.brake_pressed,
       "gas_pressed": self.gas_pressed,
       "steering_angle": self.steering_angle,
@@ -120,6 +131,7 @@ class ClusterModels:
       "speed_camera": self.speed_camera,
       "school_zone": self.school_zone,
       "speed_bump": self.speed_bump,
+      "ignore_limit_timer": self.ignore_limit_timer,
     }
 
   def get_path_data(self):
