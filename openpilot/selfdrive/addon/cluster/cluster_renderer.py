@@ -108,11 +108,15 @@ class ClusterRenderer:
       cruise /= 100.0
     cruise_s = f"{int(cruise)}" if cruise > 0 else "--"
 
-    # Top-left: cruise/set/limit and road status (two rows).
-    text(x0 + 24, 17, f"CRUISE  {cruise_s}", self.font_small, white)
-    text(x0 + 24, 53, f"SET  {cruise_s}", self.font_small, (170, 215, 255))
+    # Top-left: boxed cruise/set/limit values, matching the onroad HUD hierarchy.
+    box_fill, box_outline = (16, 25, 36), (62, 78, 98)
+    draw.rounded_rectangle([x0 + 18, 12, x0 + 190, 49], radius=7, fill=box_fill, outline=box_outline, width=2)
+    draw.rounded_rectangle([x0 + 18, 55, x0 + 190, 92], radius=7, fill=box_fill, outline=box_outline, width=2)
+    draw.rounded_rectangle([x0 + 198, 55, x0 + 370, 92], radius=7, fill=box_fill, outline=box_outline, width=2)
+    text(x0 + 31, 20, f"CRUISE  {cruise_s}", self.font_small, white)
+    text(x0 + 31, 63, f"SET  {cruise_s}", self.font_small, (170, 215, 255))
     limit = data.get("nav_limit_speed", 0.0)
-    text(x0 + 170, 53, f"LIMIT  {int(limit) if limit else '--'}", self.font_small, muted)
+    text(x0 + 211, 63, f"LIMIT  {int(limit) if limit else '--'}", self.font_small, muted)
     traffic_icon = "traffic_green" if data.get("traffic_state") == 1 else "traffic_red" if data.get("traffic_state") == 2 else "traffic_off"
     icon(traffic_icon, x0 + 305, 14, 38, bool(data.get("traffic_state")))
     if data.get("school_zone"):
@@ -125,22 +129,22 @@ class ClusterRenderer:
     # Current speed is centered in the top middle of the information pane.
     speed_cx = x0 + 480
     centered(speed_cx, 3, int(current), self.font_speed, white)
-    centered(speed_cx, 69, self.config.speed_unit, self.font_small, muted)
+    centered(speed_cx, 91, self.config.speed_unit, self.font_small, white)
 
     # Top-right connectivity: icon-only, dimmed when unavailable.
     gps_ok = data.get("gps_satellites", 0) > 0
     wifi = data.get("wifi_strength", 0)
     wifi_name = "wifi_strength_full" if wifi >= 4 else "wifi_strength_high" if wifi == 3 else "wifi_strength_medium" if wifi == 2 else "wifi_strength_low"
-    icon("direction", x0 + 700, 17, 48, gps_ok)
-    icon("gps", x0 + 765, 17, 48, gps_ok)
-    icon(wifi_name, x0 + 830, 17, 48, wifi > 0)
+    icon("direction", x0 + 690, 11, 64, gps_ok)
+    icon("gps", x0 + 770, 11, 64, gps_ok)
+    icon(wifi_name, x0 + 850, 11, 64, wifi > 0)
 
     # Bottom-left: wheel, accelerator, brake in the requested order.
     controls = (("wheel_green" if data.get("enabled") else "wheel", "STEER", data.get("enabled"), green),
                 ("disengage_on_accelerator", "ACCEL", data.get("gas_pressed"), amber),
                 ("brake_disc", "BRAKE", data.get("brake_pressed"), red))
     for i, (name, label, active, color) in enumerate(controls):
-      cx = x0 + 62 + i * 145
+      cx = x0 + 58 + i * 122
       icon(name, cx - 32, 344, 64, bool(active))
       centered(cx, 414, label, self.font_label, color if active else muted)
 
@@ -148,12 +152,12 @@ class ClusterRenderer:
     gap = int(data.get("distance_level", 0) or 0)
     gap_name = f"dist{min(max(gap, 1), 4)}"
     icon(gap_name, x0 + 665, 165, 78, True)
-    centered(x0 + 704, 244, "GAP", self.font_label, muted)
     icon("tpms", x0 + 660, 284, 112, True)
     pressures = data.get("tpms", [0, 0, 0, 0])
     for i, (label, value) in enumerate(zip(("FL", "FR", "RL", "RR"), pressures)):
-      px = x0 + 800 + (i % 2) * 58
-      py = 302 + (i // 2) * 62
+      # Values are deliberately overlaid on the TPMS vehicle silhouette.
+      px = x0 + 684 + (i % 2) * 64
+      py = 298 + (i // 2) * 62
       centered(px, py, label, self.font_label, muted)
       centered(px, py + 20, f"{value:.1f}" if value else "--", self.font_small, white)
 
