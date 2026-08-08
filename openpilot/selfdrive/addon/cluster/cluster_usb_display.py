@@ -96,7 +96,7 @@ class TuringUsbDisplay:
             flog(f"[CLUSTER_USB] Sync response: ok={self._resp_ok(resp)}")
             time.sleep(0.3)
 
-          resp = send_frame_rate_command(self.device, self.config.fps)
+          resp = send_frame_rate_command(self.device, self.config.usb_fps)
           flog(f"[CLUSTER_USB] Frame rate response: ok={self._resp_ok(resp)}")
           time.sleep(0.1)
 

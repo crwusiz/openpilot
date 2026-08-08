@@ -46,19 +46,20 @@ class ClusterRenderer:
 
   def _crop_and_resize(self, frame):
     h, w = frame.shape[:2]
-    target_ratio = self.target_w / self.target_h
-    current_ratio = w / h
+    # The road camera is 1928x1208 (about 16:10), whereas the 9.2" display is
+    # 1920x462 (about 4.16:1). Cropping to fill discarded most of the camera
+    # vertically and made it appear zoomed in. Preserve the full camera image
+    # and use pillar boxes for the unavoidable aspect-ratio difference.
+    scale = min(self.target_w / w, self.target_h / h)
+    resized_w = max(1, round(w * scale))
+    resized_h = max(1, round(h * scale))
+    resized = cv2.resize(frame, (resized_w, resized_h), interpolation=cv2.INTER_AREA)
 
-    if current_ratio < target_ratio:
-      new_h = int(w / target_ratio)
-      crop_y = (h - new_h) // 2
-      cropped = frame[crop_y: crop_y + new_h, 0:w]
-    else:
-      new_w = int(h * target_ratio)
-      crop_x = (w - new_w) // 2
-      cropped = frame[0:h, crop_x: crop_x + new_w]
-
-    return cv2.resize(cropped, (self.target_w, self.target_h), interpolation=cv2.INTER_LINEAR)
+    canvas = np.zeros((self.target_h, self.target_w, 3), dtype=np.uint8)
+    offset_x = (self.target_w - resized_w) // 2
+    offset_y = (self.target_h - resized_h) // 2
+    canvas[offset_y:offset_y + resized_h, offset_x:offset_x + resized_w] = resized
+    return canvas
 
   def _project_pt(self, x, y, z):
     if x < 0.1: x = 0.1
