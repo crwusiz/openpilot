@@ -6,6 +6,9 @@ from openpilot.selfdrive.addon.cluster.cluster_h264_decoder import ClusterH264De
 
 LOG_FILE = "/data/openpilot/openpilot/selfdrive/addon/cluster/cluster_debug.log"
 
+# v4l2 버퍼 플래그: 키프레임(IDR) 여부 (linux/videodev2.h)
+V4L2_BUF_FLAG_KEYFRAME = 0x8
+
 def flog(msg):
     try:
         with open(LOG_FILE, "a") as f:
@@ -20,8 +23,9 @@ class ClusterLiveCamera:
     self.latest_frame = None
     self.running = False
     self.thread = None
-    self.last_frame_time = time.time()
+    self.last_msg_time = time.time()   # 메시지가 마지막으로 온 시각 (재연결 판단용)
     self.msg_count = 0
+    self.seen_keyframe = False         # 첫 키프레임을 만났는지 여부
 
     self.sock = None
     self.decoder = None
@@ -38,6 +42,8 @@ class ClusterLiveCamera:
       self.sock = messaging.sub_sock('roadEncodeData', conflate=False)
       if self.decoder is None:
         self.decoder = ClusterH264Decoder()
+      self.seen_keyframe = False
+      self.last_msg_time = time.time()
     except Exception as e:
       flog(f"[CLUSTER_CAM_ERROR] Failed to initialize camera socket/decoder: {e}")
 
@@ -62,33 +68,41 @@ class ClusterLiveCamera:
           if msg is None:
             break
           got_any = True
+          self.last_msg_time = time.time()
 
           self.msg_count += 1
           error_count = 0
 
           which = msg.which()
-          if self.msg_count <= 10:
-            flog(f"[CLUSTER_CAM] Got msg #{self.msg_count} | which={which}")
-
           encode_data = getattr(msg, which)
-          frame_data = encode_data.header + encode_data.data
+          is_keyframe = bool(encode_data.idx.flags & V4L2_BUF_FLAG_KEYFRAME)
 
-          if self.msg_count <= 10:
-            flog(f"[CLUSTER_CAM] frame_data len={len(frame_data)} "
-                 f"(header={len(encode_data.header)}, data={len(encode_data.data)})")
+          if self.msg_count <= 20:
+            flog(f"[CLUSTER_CAM] Got msg #{self.msg_count} | keyframe={is_keyframe} | "
+                 f"seen_keyframe={self.seen_keyframe}")
+
+          # 첫 키프레임을 만나기 전까지는 디코딩 시도 자체를 건너뜀
+          # (키프레임 없이 델타프레임만 넣으면 디코더가 계속 실패함)
+          if not self.seen_keyframe:
+            if is_keyframe:
+              self.seen_keyframe = True
+              flog("[CLUSTER_CAM_SUCCESS] First keyframe found! Starting decode from here.")
+            else:
+              continue  # 키프레임 나올 때까지 계속 버림
+
+          frame_data = encode_data.header + encode_data.data
 
           if frame_data and self.decoder:
             rgb_frame = self.decoder.process(frame_data)
             if rgb_frame is not None:
               self.latest_frame = rgb_frame
-              self.last_frame_time = time.time()
 
         if not got_any:
-          # 3초 이상 프레임이 안 들어오면 소켓 재연결 시도
-          if time.time() - self.last_frame_time > 3.0:
-            flog("[CLUSTER_CAM_WARN] Camera stream timeout (no msg for 3s), re-initializing socket...")
-            self.sock = messaging.sub_sock('roadEncodeData', conflate=False)
-            self.last_frame_time = time.time()
+          # 5초 이상 메시지 자체가 안 들어오면 소켓 재연결 시도
+          # (디코딩 실패와 무관하게 '메시지 수신' 기준으로만 판단)
+          if time.time() - self.last_msg_time > 5.0:
+            flog("[CLUSTER_CAM_WARN] No message for 5s, re-initializing socket...")
+            self._init_socket()
           else:
             time.sleep(0.005)
       except Exception as e:
