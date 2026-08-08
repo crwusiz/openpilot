@@ -17,11 +17,15 @@ class ClusterRenderer:
     try:
       self.font_speed = ImageFont.truetype(self.config.font_bold, 110)
       self.font_unit = ImageFont.truetype(self.config.font_regular, 38)
+      self.font_small = ImageFont.truetype(self.config.font_regular, 22)
+      self.font_label = ImageFont.truetype(self.config.font_bold, 19)
       self.font_warning = ImageFont.truetype(self.config.font_bold, 55)
     except Exception as e:
       cloudlog.error(f"Failed to load fonts: {e}")
       self.font_speed = ImageFont.load_default()
       self.font_unit = ImageFont.load_default()
+      self.font_small = ImageFont.load_default()
+      self.font_label = ImageFont.load_default()
       self.font_warning = ImageFont.load_default()
 
     self.blank_canvas = np.zeros((self.target_h, self.target_w, 3), dtype=np.uint8)
@@ -34,6 +38,7 @@ class ClusterRenderer:
       "gps", "direction", "wifi_strength_low", "wifi_strength_medium",
       "wifi_strength_high", "wifi_strength_full", "traffic_green", "traffic_red",
       "traffic_off", "speed_bump", "school_zone", "speed_camera",
+      "dist1", "dist2", "dist3", "dist4",
     ):
       try:
         self.icons[name] = Image.open(os.path.join(icon_dir, f"{name}.png")).convert("RGBA")
@@ -75,77 +80,82 @@ class ClusterRenderer:
     return canvas
 
   def _draw_info_panel(self, pil_img, data):
-    """Draw the right-hand 5:5 information pane."""
+    """Draw the right pane using the same compact icon-first HUD language as onroad."""
     draw = ImageDraw.Draw(pil_img)
     x0 = self.config.camera_panel_width
-    w = self.target_w - x0
     draw.rectangle([x0 + 5, 5, self.target_w - 5, self.target_h - 5], fill=(7, 12, 19))
 
-    def text(x, y, value, size=24, color=(220, 225, 232)):
-      draw.text((x, y), str(value), font=self.font_unit if size <= 38 else self.font_speed, fill=color)
+    def text(x, y, value, font=None, color=(220, 225, 232), anchor=None):
+      draw.text((int(x), int(y)), str(value), font=font or self.font_small, fill=color, anchor=anchor)
 
-    def icon(name, x, y, size=52):
+    def centered(cx, y, value, font=None, color=(220, 225, 232)):
+      text(cx, y, value, font, color, anchor="ma")
+
+    def icon(name, x, y, size=52, active=True):
       source = self.icons.get(name)
-      if source is not None:
-        image = source.resize((size, size), Image.Resampling.LANCZOS)
-        pil_img.paste(image, (int(x), int(y)), image)
+      if source is None:
+        return
+      image = source.resize((size, size), Image.Resampling.LANCZOS)
+      if not active:
+        alpha = image.getchannel("A").point(lambda p: p * 70 // 255)
+        image.putalpha(alpha)
+      pil_img.paste(image, (int(x), int(y)), image)
 
-    def indicator(x, y, label, active, icon_name, active_color=(80, 220, 130)):
-      color = active_color if active else (75, 82, 92)
-      draw.rounded_rectangle([x, y, x + 142, y + 64], radius=8, fill=(19, 27, 38), outline=color, width=2)
-      icon(icon_name, x + 7, y + 6, 46)
-      text(x + 58, y + 20, label, 20, color)
-
-    # Top row: current/set speed and core pedal/steering status.
+    white, muted, green, amber, red = (245, 248, 252), (105, 115, 130), (110, 235, 150), (255, 195, 80), (255, 105, 95)
     current = data.get("v_ego", 0.0) * (3.6 if self.config.is_metric else 2.236936)
     cruise = data.get("cruise_speed", 0.0)
-    if cruise > 100:  # vCruise fields are commonly km/h*100 in some variants
+    if cruise > 100:
       cruise /= 100.0
-    text(x0 + 24, 20, f"{int(current)} {self.config.speed_unit}", 34, (255, 255, 255))
-    text(x0 + 260, 20, f"SET {int(cruise) if cruise > 0 else '--'}", 30, (160, 210, 255))
-    text(x0 + 24, 62, f"STEER {data.get('steering_angle', 0.0):+.1f} deg", 24)
+    cruise_s = f"{int(cruise)}" if cruise > 0 else "--"
 
-    indicator(x0 + 24, 105, "WHEEL", data.get("enabled", False),
-              "wheel_green" if data.get("enabled", False) else "wheel")
-    indicator(x0 + 180, 105, "BRAKE", data.get("brake_pressed", False), "brake_disc", (255, 100, 90))
-    indicator(x0 + 336, 105, "ACCEL", data.get("gas_pressed", False), "disengage_on_accelerator", (255, 190, 80))
+    # Top-left: cruise/set/limit and road status (two rows).
+    text(x0 + 24, 17, f"CRUISE  {cruise_s}", self.font_small, white)
+    text(x0 + 24, 53, f"SET  {cruise_s}", self.font_small, (170, 215, 255))
+    limit = data.get("nav_limit_speed", 0.0)
+    text(x0 + 170, 53, f"LIMIT  {int(limit) if limit else '--'}", self.font_small, muted)
+    traffic_icon = "traffic_green" if data.get("traffic_state") == 1 else "traffic_red" if data.get("traffic_state") == 2 else "traffic_off"
+    icon(traffic_icon, x0 + 305, 14, 38, bool(data.get("traffic_state")))
+    if data.get("school_zone"):
+      icon("school_zone", x0 + 355, 14, 38)
+    elif data.get("speed_bump"):
+      icon("speed_bump", x0 + 355, 14, 38)
+    if data.get("speed_camera"):
+      icon("speed_camera", x0 + 405, 14, 38)
 
-    # TPMS grid.
-    draw.rounded_rectangle([x0 + 24, 164, x0 + 470, 292], radius=10, fill=(12, 19, 29), outline=(65, 78, 95), width=2)
-    icon("tpms", x0 + 35, 177, 72)
-    text(x0 + 42, 174, "TPMS  FL       FR       RL       RR", 24, (180, 190, 205))
-    pressures = data.get("tpms", [0, 0, 0, 0])
-    text(x0 + 42, 222, "  ".join(f"{p:.1f}" if p else "--" for p in pressures), 30, (235, 240, 245))
-    text(x0 + 42, 262, "tire pressure", 20, (120, 130, 145))
+    # Current speed is centered in the top middle of the information pane.
+    speed_cx = x0 + 480
+    centered(speed_cx, 3, int(current), self.font_speed, white)
+    centered(speed_cx, 69, self.config.speed_unit, self.font_small, muted)
 
-    # Connectivity/navigation status.
-    gps = data.get("gps_satellites", 0)
+    # Top-right connectivity: icon-only, dimmed when unavailable.
+    gps_ok = data.get("gps_satellites", 0) > 0
     wifi = data.get("wifi_strength", 0)
-    icon("gps", x0 + 24, 312, 38)
-    icon("direction", x0 + 235, 312, 38)
-    wifi_icon = ("wifi_strength_full" if wifi >= 4 else "wifi_strength_high" if wifi == 3 else
-                 "wifi_strength_medium" if wifi == 2 else "wifi_strength_low")
-    icon(wifi_icon, x0 + 24, 352, 38)
-    text(x0 + 70, 320, f"{'OK' if gps > 0 else 'NO SIGNAL'}  SAT {gps}", 24,
-         (100, 230, 140) if gps > 0 else (255, 120, 100))
-    text(x0 + 280, 320, f"{data.get('gps_bearing', 0.0):.0f} deg", 24, (205, 215, 230))
-    text(x0 + 70, 360, f"{'CONNECTED' if wifi > 0 else 'OFF'} ({wifi})", 24,
-         (100, 210, 255) if wifi > 0 else (130, 140, 150))
+    wifi_name = "wifi_strength_full" if wifi >= 4 else "wifi_strength_high" if wifi == 3 else "wifi_strength_medium" if wifi == 2 else "wifi_strength_low"
+    icon("direction", x0 + 700, 17, 48, gps_ok)
+    icon("gps", x0 + 765, 17, 48, gps_ok)
+    icon(wifi_name, x0 + 830, 17, 48, wifi > 0)
 
-    # Road-sign/traffic indicators. Numeric enums are retained until the
-    # vehicle-specific enum mapping is finalized.
-    signs = []
-    if data.get("speed_bump"): signs.append("BUMP")
-    if data.get("school_zone"): signs.append("SCHOOL")
-    if data.get("speed_camera"): signs.append("CAMERA")
-    if data.get("road_signs", 0): signs.append(f"SIGN {data['road_signs']}")
-    if data.get("traffic_state", 0): signs.append(f"TRAFFIC {data['traffic_state']}")
-    sign_icons = [name for name, flag in (("speed_bump", data.get("speed_bump")),
-                  ("school_zone", data.get("school_zone")), ("speed_camera", data.get("speed_camera"))) if flag]
-    for index, name in enumerate(sign_icons[:3]):
-      icon(name, x0 + 24 + index * 58, 400, 44)
-    text(x0 + 205, 410, "  ".join(signs) if signs else "ROAD STATUS  --", 22,
-         (255, 190, 90) if signs else (120, 130, 145))
+    # Bottom-left: wheel, accelerator, brake in the requested order.
+    controls = (("wheel_green" if data.get("enabled") else "wheel", "STEER", data.get("enabled"), green),
+                ("disengage_on_accelerator", "ACCEL", data.get("gas_pressed"), amber),
+                ("brake_disc", "BRAKE", data.get("brake_pressed"), red))
+    for i, (name, label, active, color) in enumerate(controls):
+      cx = x0 + 62 + i * 145
+      icon(name, cx - 32, 344, 64, bool(active))
+      centered(cx, 414, label, self.font_label, color if active else muted)
+
+    # Bottom-right: gap indicator above a larger TPMS icon and 2x2 pressures.
+    gap = int(data.get("distance_level", 0) or 0)
+    gap_name = f"dist{min(max(gap, 1), 4)}"
+    icon(gap_name, x0 + 665, 165, 78, True)
+    centered(x0 + 704, 244, "GAP", self.font_label, muted)
+    icon("tpms", x0 + 660, 284, 112, True)
+    pressures = data.get("tpms", [0, 0, 0, 0])
+    for i, (label, value) in enumerate(zip(("FL", "FR", "RL", "RR"), pressures)):
+      px = x0 + 800 + (i % 2) * 58
+      py = 302 + (i // 2) * 62
+      centered(px, py, label, self.font_label, muted)
+      centered(px, py + 20, f"{value:.1f}" if value else "--", self.font_small, white)
 
   def _project_pt(self, x, y, z):
     if x < 0.1: x = 0.1
@@ -214,14 +224,3 @@ class ClusterRenderer:
       draw.polygon([(40, 40), (80, 15), (80, 65)], fill=blinker_color)
     if hud_data['right_blinker']:
       draw.polygon([(self.target_w - 40, 40), (self.target_w - 80, 15), (self.target_w - 80, 65)], fill=blinker_color)
-
-    speed = hud_data['v_ego']
-    speed_val = speed * 3.6 if self.config.is_metric else speed * 2.236936
-    speed_str = f"{int(speed_val)}"
-
-    text_x, text_y = self.target_w - 260, 40
-    draw.text((text_x + 3, text_y + 3), speed_str, font=self.font_speed, fill=(0, 0, 0))
-    draw.text((text_x, text_y), speed_str, font=self.font_speed, fill=(255, 255, 255))
-    unit_x, unit_y = text_x + 115, text_y + 70
-    draw.text((unit_x + 2, unit_y + 2), self.config.speed_unit, font=self.font_unit, fill=(0, 0, 0))
-    draw.text((unit_x, unit_y), self.config.speed_unit, font=self.font_unit, fill=(200, 200, 200))
