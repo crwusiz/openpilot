@@ -536,7 +536,10 @@ def write_to_device(dev, data, timeout=2500):
 
     try:
         response = ep_in.read(512, timeout)
-        read_flush(ep_in)
+        # Each request has exactly one response packet.  Trying to flush an
+        # already empty IN endpoint waits for its 100 ms read timeout, which
+        # caps live image updates below 10 FPS even when the ACK is immediate.
+        # Consume the response above and let the next request read its own ACK.
         return bytes(response)
     except usb.core.USBError as e:
         if e.errno == 110 or 'timed out' in str(e).lower():
