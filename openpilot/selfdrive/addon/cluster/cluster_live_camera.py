@@ -45,11 +45,23 @@ class ClusterLiveCamera:
 
   @staticmethod
   def _rgb_from_vision_buffer(buffer):
-    # VisionIPC road frames are NV12. Keep the stride while converting, then
-    # crop only padding columns; this matches the UI's raw camera source.
+    # VisionIPC NV12 has aligned Y and UV planes; it is not one contiguous
+    # height*1.5*stride image. This is the same plane layout used by camerad's
+    # snapshot utility.
     height, width, stride = buffer.height, buffer.width, buffer.stride
-    nv12 = np.frombuffer(buffer.data, dtype=np.uint8).reshape((height * 3 // 2, stride))
-    return cv2.cvtColor(nv12, cv2.COLOR_YUV2RGB_NV12)[:, :width]
+    uv_height = ((height // 2) + 15) // 16 * 16
+    uv_plane_size = stride * uv_height
+
+    y = np.frombuffer(buffer.data[:buffer.uv_offset], dtype=np.uint8)
+    y = y.reshape((-1, stride))[:height, :width]
+    uv = memoryview(buffer.data)[buffer.uv_offset:buffer.uv_offset + uv_plane_size]
+    u = np.array(uv[::2], dtype=np.uint8).reshape((-1, stride // 2))[:height // 2, :width // 2]
+    v = np.array(uv[1::2], dtype=np.uint8).reshape((-1, stride // 2))[:height // 2, :width // 2]
+
+    # OpenCV accepts planar I420. The original NV12 U/V samples are unpacked
+    # above because their plane is stride-aligned.
+    i420 = np.concatenate((y.reshape(-1), u.reshape(-1), v.reshape(-1)))
+    return cv2.cvtColor(i420.reshape((height * 3 // 2, width)), cv2.COLOR_YUV2RGB_I420)
 
   def _camera_thread(self):
     error_count = 0
