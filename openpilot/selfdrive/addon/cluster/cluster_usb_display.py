@@ -70,17 +70,18 @@ class TuringUsbDisplay:
         self.product_id = getattr(self.device, 'idProduct', self.dev_pid)
         if self.product_id in TURZX_USB_PRODUCT_IDS:
 
+          # find_usb_device() has already configured the device and, on Linux,
+          # detached the kernel driver.  Resetting here forces USB re-enumeration
+          # and invalidates this PyUSB handle (Errno 19 on the first connection).
           try:
-            self.device.reset()
-            for cfg in self.device:
-              for intf in cfg:
-                if self.device.is_kernel_driver_active(intf.bInterfaceNumber):
-                  self.device.detach_kernel_driver(intf.bInterfaceNumber)
-            self.device.set_configuration()
-            flog("[CLUSTER_USB] Detached Linux kernel driver successfully.")
-            time.sleep(1.0)
-          except Exception as e:
-            flog(f"[CLUSTER_USB_WARN] Detach warning: {e}")
+            if self.device.is_kernel_driver_active(0):
+              self.device.detach_kernel_driver(0)
+              self.device.set_configuration()
+              flog("[CLUSTER_USB] Detached Linux kernel driver.")
+          except usb.core.USBError as e:
+            # Errno 2 simply means no kernel driver is bound; it is safe to ignore.
+            if e.errno != 2:
+              flog(f"[CLUSTER_USB_WARN] Driver detach warning: {e}")
 
           # 이미지 업로드용 OUT 엔드포인트를 미리 찾아서 캐싱
           cfg = self.device.get_active_configuration()
@@ -113,22 +114,6 @@ class TuringUsbDisplay:
       flog(f"[CLUSTER_USB_ERROR] Error opening Turing display: {e}")
       return False
 
-  def _write_image_no_wait(self, jpeg_bytes):
-    """
-    응답을 기다리지 않고 write만 수행 (fire-and-forget).
-    타임아웃은 패킷 잘림을 방지하기 위해 넉넉하게 2500ms(2.5초)로 복구합니다.
-    (속도 제어는 파이프라인에서 담당합니다)
-    """
-    img_size = len(jpeg_bytes)
-    cmd_packet = self._build_header(self._cmd_upload_jpeg)
-    cmd_packet[8] = (img_size >> 24) & 0xFF
-    cmd_packet[9] = (img_size >> 16) & 0xFF
-    cmd_packet[10] = (img_size >> 8) & 0xFF
-    cmd_packet[11] = img_size & 0xFF
-    full_payload = self._encrypt(cmd_packet) + jpeg_bytes
-
-    self._ep_out.write(full_payload, 2500)
-
   def send_image(self, frame_image):
     if not self.connected or self.device is None:
       return
@@ -149,12 +134,18 @@ class TuringUsbDisplay:
         size_kb = len(jpg_bytes) // 1024
 
         t0 = time.time()
-        self._write_image_no_wait(jpg_bytes)
+        # The device returns an ACK for every image.  This must be read: leaving
+        # ACKs in the IN endpoint fills the device queue after ~17 frames, then
+        # the following OUT write blocks until its USB timeout.
+        response = self._send_jpeg(self.device, jpg_bytes)
         elapsed = time.time() - t0
+
+        if not self._resp_ok(response):
+          raise usb.core.USBError("JPEG upload was not acknowledged")
 
         self.frame_count += 1
         if self.frame_count <= 20 or self.frame_count % self.config.fps == 0:
-          flog(f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {size_kb} KB | elapsed={elapsed:.3f}s (write-only, no ACK wait)")
+          flog(f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {size_kb} KB | elapsed={elapsed:.3f}s (ACK received)")
 
     except usb.core.USBError as e:
       if e.errno == 110 or 'timed out' in str(e).lower():
