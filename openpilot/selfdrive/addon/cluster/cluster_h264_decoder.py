@@ -22,9 +22,9 @@ class ClusterH264Decoder:
     self.decode_ok_count = 0
     self.extradata_set = False
     try:
-      self.codec = av.CodecContext.create('h264', 'r')
+      self.codec = av.CodecContext.create('hevc', 'r')
     except Exception as e:
-      flog(f"[CLUSTER_DECODER_ERROR] Failed to create H264 codec: {e}")
+      flog(f"[CLUSTER_DECODER_ERROR] Failed to create HEVC codec: {e}")
       self.codec = None
 
   def set_extradata(self, header_bytes: bytes):
