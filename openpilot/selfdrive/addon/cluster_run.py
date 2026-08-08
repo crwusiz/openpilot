@@ -27,9 +27,11 @@ if str(VENDOR_ROOT) not in sys.path:
   sys.path.insert(0, str(VENDOR_ROOT))
 
 from openpilot.common.swaglog import cloudlog
+from openpilot.common.realtime import set_core_affinity
 
 REQUIREMENTS_FILE = Path(__file__).resolve().parent / "requirements.txt"
 REQUIREMENTS_MARKER = Path(__file__).resolve().parent / ".requirements_installed"
+CLUSTER_CORES = [0, 1, 2]
 
 
 def ensure_requirements() -> None:
@@ -56,6 +58,13 @@ def ensure_requirements() -> None:
 
 
 def main():
+  try:
+    # Keep cluster rendering, camera conversion, and USB output off the
+    # cores reserved for driving and model processes.
+    set_core_affinity(CLUSTER_CORES)
+  except OSError as e:
+    cloudlog.warning(f"Failed to set cluster CPU affinity to {CLUSTER_CORES}: {e}")
+
   cloudlog.info("Starting Cluster (Turing 9.2 inch Display) process...")
   ensure_requirements()
   time.sleep(2)
