@@ -155,8 +155,9 @@ class ClusterRenderer:
     controls = (("wheel_green" if data.get("enabled") else "wheel", "STEER", data.get("enabled"), green),
                 ("disengage_on_accelerator", "ACCEL", data.get("gas_pressed"), amber),
                 ("brake_disc", "BRAKE", data.get("brake_pressed"), red))
-    for i, (name, label, active, color) in enumerate(controls):
-      cx = x0 + 58 + i * 122
+    # Align the three lower controls with the upper box centers:
+    # CRUISE/SET center=84, LIMIT center=184, then BRAKE at equal spacing.
+    for cx, (name, label, active, color) in zip((x0 + 84, x0 + 184, x0 + 284), controls):
       icon(name, cx - 32, 344, 64, bool(active))
       centered(cx, 414, label, self.font_label, color if active else muted)
 
