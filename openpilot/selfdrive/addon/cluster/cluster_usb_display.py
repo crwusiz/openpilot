@@ -114,15 +114,19 @@ class TuringUsbDisplay:
 
       if success:
         jpg_bytes = encoded_img.tobytes()
-        # JPEG 바이트는 반드시 send_jpeg (CMD_UPLOAD_JPEG=101)로 보내야 함
+        size_kb = len(jpg_bytes) // 1024
+
+        flog(f"[CLUSTER_USB_TX_BEGIN] About to call send_jpeg | frame#{self.frame_count} | Size: {size_kb} KB")
+        t0 = time.time()
+
         resp = self._send_jpeg(self.device, jpg_bytes)
 
+        elapsed = time.time() - t0
+        ok = self._resp_ok(resp) if self._resp_ok else None
+        flog(f"[CLUSTER_USB_TX_END] send_jpeg returned | frame#{self.frame_count} | elapsed={elapsed:.3f}s | "
+             f"resp={resp.hex() if resp else None} | ok={ok}")
+
         self.frame_count += 1
-        if self.frame_count % self.config.fps == 0:
-          size_kb = len(jpg_bytes) // 1024
-          ok = self._resp_ok(resp) if self._resp_ok else None
-          flog(f"[CLUSTER_USB_TX] Pushed frame to device | Res: {bgr_img.shape[1]}x{bgr_img.shape[0]} | "
-               f"Size: {size_kb} KB | resp={resp.hex() if resp else None} | ok={ok}")
 
     except Exception as e:
       err_msg = f"Failed to send image to Turing display: {e}"
