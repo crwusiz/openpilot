@@ -110,12 +110,12 @@ class TuringUsbDisplay:
 
     except Exception as e:
       flog(f"[CLUSTER_USB_ERROR] Error opening Turing display: {e}")
-      return False
+    return False
 
   def _write_image_no_wait(self, jpeg_bytes):
     """
     이미지 업로드 커맨드는 펌웨어가 ACK를 안 주는 것으로 확인됨.
-    화면 멈춤(프리징) 방지를 위해 타임아웃을 설정하되, 너무 짧으면(100ms) MCU가 뻗으므로(Errno 19) 1000ms로 타협.
+    응답을 기다리지 않고 write만 수행 (fire-and-forget).
     """
     img_size = len(jpeg_bytes)
     cmd_packet = self._build_header(self._cmd_upload_jpeg)
@@ -125,8 +125,9 @@ class TuringUsbDisplay:
     cmd_packet[11] = img_size & 0xFF
     full_payload = self._encrypt(cmd_packet) + jpeg_bytes
 
-    timeout_ms = getattr(self.config, 'usb_image_timeout_ms', 1000)
-    self._ep_out.write(full_payload, timeout=timeout_ms)
+    # 타임아웃을 1000 -> 150으로 대폭 축소 (Fast-Fail)
+    # 버퍼가 찼을 때 1초간 멈추는 프리징(Stuttering) 현상 제거
+    self._ep_out.write(full_payload, 150)
 
   def send_image(self, frame_image):
     if not self.connected or self.device is None:
@@ -155,16 +156,15 @@ class TuringUsbDisplay:
           flog(f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {size_kb} KB | elapsed={elapsed:.3f}s (write-only, no ACK wait)")
 
     except usb.core.USBError as e:
-      # Errno 110 발생 시 즉시 복구 및 스킵 (2.5초 대기 방지)
       if e.errno == 110 or 'timed out' in str(e).lower():
-        flog(f"[CLUSTER_USB_WARN] Write timeout (Errno 110). Clearing halt & skipping frame...")
+        # Errno 110 발생 시 1프레임 버림 (로그는 너무 많이 쌓이지 않도록 주석 처리 또는 유지)
+        flog(f"[CLUSTER_USB_WARN] Buffer full - 1 frame skipped (Fast-Fail)")
         try:
           if self._ep_out and self.device:
             self.device.clear_halt(self._ep_out)
         except Exception as clear_err:
-          # Errno None 오류 로그는 무시하여 로그 파일이 지저분해지는 것을 막음
-          if 'Errno None' not in str(clear_err):
-            flog(f"[CLUSTER_USB_WARN] Failed clear_halt: {clear_err}")
+          # Errno None 에러가 로그를 덮는 것을 방지
+          pass
       else:
         err_msg = f"Critical USB Error: {e}"
         flog(f"[CLUSTER_USB_ERROR] {err_msg}")
