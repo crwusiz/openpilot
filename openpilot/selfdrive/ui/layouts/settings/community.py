@@ -375,14 +375,14 @@ class CommunityLayout(Widget):
       toggle_item(
         lambda: tr("Driver Camera On Reverse"),
         description=lambda: DESCRIPTIONS["driver_cam_reverse"],
-        initial_state=self._params.get_bool("DriverCameraOnReverse"),
-        callback=lambda state: self._params.put_bool("DriverCameraOnReverse", state, block=True),
+        initial_state=self._params.get_bool("CabinCameraOnReverse"),
+        callback=lambda state: self._params.put_bool("CabinCameraOnReverse", state, block=True),
       ),
       toggle_item(
         lambda: tr("DriverCamera Hardware Missing"),
         description=lambda: DESCRIPTIONS["driver_cam_missing"],
-        initial_state=self._params.get_bool("DriverCameraHardwareMissing"),
-        callback=lambda state: self._params.put_bool("DriverCameraHardwareMissing", state, block=True),
+        initial_state=self._params.get_bool("CabinCameraHardwareMissing"),
+        callback=lambda state: self._params.put_bool("CabinCameraHardwareMissing", state, block=True),
       ),
       toggle_item(
         lambda: tr("Logger Enable"),
