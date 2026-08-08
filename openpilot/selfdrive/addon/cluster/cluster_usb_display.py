@@ -158,10 +158,15 @@ class TuringUsbDisplay:
 
     except usb.core.USBError as e:
       if e.errno == 110 or 'timed out' in str(e).lower():
-        # 여기서 타임아웃이 발생했다는 것은 장치가 완전히 꼬였다는 뜻이므로
-        # 어설프게 clear_halt 하지 않고 아예 연결을 끊어 다음 루프에서 재시작(Handshake) 되도록 합니다.
-        flog(f"[CLUSTER_USB_WARN] USB Timeout (Stall). Forcing reconnection...")
-        self.connected = False
+        # [복구] 타임아웃 발생 시 전체 재연결(흰화면/깜빡임)을 막기 위해
+        # 연결을 끊지 않고 파이프라인 락(Stall)만 해제(Soft-Recovery)합니다.
+        flog(f"[CLUSTER_USB_WARN] Write timeout (Errno 110). Clearing halt & skipping frame...")
+        try:
+          if self._ep_out and self.device:
+            self.device.clear_halt(self._ep_out)
+        except Exception as clear_err:
+          flog(f"[CLUSTER_USB_WARN] Failed clear_halt: {clear_err}")
+        # self.connected = False 를 삭제하여 재연결 방지 (매우 중요)
       else:
         err_msg = f"Critical USB Error: {e}"
         flog(f"[CLUSTER_USB_ERROR] {err_msg}")
