@@ -17,6 +17,9 @@ class ClusterConfig:
     self.fps = 10
     # Rendering remains at 10 FPS; the display receives the latest frame at 8 FPS.
     self.usb_fps = 8
+    # JPEG uploads visibly clear the panel between frames. Use the 9.2" model's
+    # H.264 playback stream for live video, with automatic JPEG fallback.
+    self.use_h264_stream = True
     # The left half is a dedicated live-camera viewport. The right half remains
     # available for cluster information widgets.
     self.camera_panel_width = self.width // 2

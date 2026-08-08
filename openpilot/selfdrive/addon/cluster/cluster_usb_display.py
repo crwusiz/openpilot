@@ -1,9 +1,11 @@
 import numpy as np
 import os
 import time
+from fractions import Fraction
 import cv2
 import usb.util
 import usb.core
+import av
 from openpilot.common.swaglog import cloudlog
 
 LOG_FILE = "/data/openpilot/openpilot/selfdrive/addon/cluster/cluster_debug.log"
@@ -38,6 +40,11 @@ class TuringUsbDisplay:
     self._encrypt = None
     self._cmd_upload_jpeg = None
     self._ep_out = None
+    self._write_to_device = None
+    self._h264_streaming = False
+    self._h264_encoder = None
+    self._h264_chunk_size = 202752
+    self._h264_frame_count = 0
     flog("TuringUsbDisplay initialized.")
 
   def open(self):
@@ -54,7 +61,9 @@ class TuringUsbDisplay:
       from library.lcd.lcd_comm_turing_usb import (
         find_usb_device, send_image, send_jpeg, send_sync_command,
         send_frame_rate_command, _resp_ok,
-        build_command_packet_header, encrypt_command_packet, CMD_UPLOAD_JPEG,
+        build_command_packet_header, encrypt_command_packet, write_to_device,
+        CMD_UPLOAD_JPEG, CMD_PLAY_H264_CHUNK, CMD_GET_H264_CHUNK_SIZE,
+        CMD_STOP_STREAM,
       )
 
       self._find_usb_device = find_usb_device
@@ -64,6 +73,10 @@ class TuringUsbDisplay:
       self._build_header = build_command_packet_header
       self._encrypt = encrypt_command_packet
       self._cmd_upload_jpeg = CMD_UPLOAD_JPEG
+      self._write_to_device = write_to_device
+      self._cmd_play_h264_chunk = CMD_PLAY_H264_CHUNK
+      self._cmd_get_h264_chunk_size = CMD_GET_H264_CHUNK_SIZE
+      self._cmd_stop_stream = CMD_STOP_STREAM
 
       self.device, self.dev_pid = self._find_usb_device()
 
@@ -100,6 +113,9 @@ class TuringUsbDisplay:
           flog(f"[CLUSTER_USB] Frame rate response: ok={self._resp_ok(resp)}")
           time.sleep(0.1)
 
+          if getattr(self.config, 'use_h264_stream', False):
+            self._start_h264_stream()
+
           self.connected = True
           self.consecutive_upload_failures = 0
           flog(f"[CLUSTER_USB_SUCCESS] Connected to TURZX 9.2 inch (PID: {hex(self.product_id)}).")
@@ -116,6 +132,66 @@ class TuringUsbDisplay:
       flog(f"[CLUSTER_USB_ERROR] Error opening Turing display: {e}")
       return False
 
+  def _send_command(self, command, payload=b'', last_chunk=False):
+    packet = self._build_header(command)
+    payload_size = len(payload)
+    packet[8] = (payload_size >> 24) & 0xFF
+    packet[9] = (payload_size >> 16) & 0xFF
+    packet[10] = (payload_size >> 8) & 0xFF
+    packet[11] = payload_size & 0xFF
+    if last_chunk:
+      packet[12] = 1
+    return self._write_to_device(self.device, self._encrypt(packet) + payload)
+
+  def _start_h264_stream(self):
+    """Enable the panel's video decoder for flicker-free live updates."""
+    try:
+      # Same playback-mode sequence used by the vendor library's send_video().
+      for command in (111, 112, 13, 41):
+        self._send_command(command)
+
+      response = self._send_command(self._cmd_get_h264_chunk_size)
+      if response and len(response) >= 12:
+        negotiated = int.from_bytes(response[8:12], byteorder='big', signed=False)
+        if 0 < negotiated <= 1024 * 1024:
+          self._h264_chunk_size = negotiated
+
+      width, height = self.config.height, self.config.width
+      encoder = av.CodecContext.create('libx264', 'w')
+      encoder.width = width
+      encoder.height = height
+      encoder.pix_fmt = 'yuv420p'
+      encoder.time_base = Fraction(1, self.config.usb_fps)
+      encoder.framerate = Fraction(self.config.usb_fps, 1)
+      encoder.options = {
+        'preset': 'ultrafast', 'tune': 'zerolatency', 'profile': 'baseline',
+        'g': str(self.config.usb_fps), 'keyint_min': str(self.config.usb_fps),
+        'sc_threshold': '0', 'annexb': '1',
+      }
+      encoder.open()
+      self._h264_encoder = encoder
+      self._h264_frame_count = 0
+      self._h264_streaming = True
+      flog(f"[CLUSTER_USB] H.264 stream enabled (chunk={self._h264_chunk_size}).")
+    except Exception as e:
+      self._h264_streaming = False
+      self._h264_encoder = None
+      flog(f"[CLUSTER_USB_WARN] H.264 stream unavailable; using JPEG fallback: {e}")
+
+  def _send_h264_frame(self, frame_image):
+    rotated = cv2.rotate(frame_image, cv2.ROTATE_90_CLOCKWISE)
+    video_frame = av.VideoFrame.from_ndarray(rotated, format='rgb24')
+    video_frame.pts = self._h264_frame_count
+    self._h264_frame_count += 1
+
+    for encoded_packet in self._h264_encoder.encode(video_frame):
+      encoded = bytes(encoded_packet)
+      for offset in range(0, len(encoded), self._h264_chunk_size):
+        response = self._send_command(
+          self._cmd_play_h264_chunk, encoded[offset:offset + self._h264_chunk_size])
+        if response is None:
+          raise RuntimeError('H.264 chunk was not acknowledged')
+
   def send_image(self, frame_image):
     if not self.connected or self.device is None:
       return
@@ -123,6 +199,22 @@ class TuringUsbDisplay:
     try:
       if not isinstance(frame_image, np.ndarray):
         frame_image = np.array(frame_image)
+
+      if self._h264_streaming:
+        t0 = time.time()
+        try:
+          self._send_h264_frame(frame_image)
+          elapsed = time.time() - t0
+          self.frame_count += 1
+          if self.frame_count <= 20 or self.frame_count % self.config.usb_fps == 0:
+            flog(f"[CLUSTER_USB_TX] H264 frame#{self.frame_count} | elapsed={elapsed:.3f}s")
+          return
+        except Exception as e:
+          # Preserve a working display if this unit's firmware does not accept
+          # the live H.264 variant of the protocol.
+          self._h264_streaming = False
+          self._h264_encoder = None
+          flog(f"[CLUSTER_USB_WARN] H.264 stream failed; switching to JPEG: {e}")
 
       rotated = cv2.rotate(frame_image, cv2.ROTATE_90_CLOCKWISE)
       bgr_img = cv2.cvtColor(rotated, cv2.COLOR_RGB2BGR)
@@ -182,6 +274,13 @@ class TuringUsbDisplay:
 
   def close(self):
     flog("Closing Turing connection.")
+    if self._h264_streaming and self.device is not None:
+      try:
+        self._send_command(self._cmd_stop_stream)
+      except Exception:
+        pass
+    self._h264_streaming = False
+    self._h264_encoder = None
     self.connected = False
     self.device = None
     self.dev_pid = None
