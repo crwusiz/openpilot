@@ -13,6 +13,7 @@ import struct
 import numpy as np
 import logging
 import glob
+import math
 
 from collections import deque
 from threading import Thread
@@ -59,17 +60,31 @@ class Port:
   RECEIVE_PORT = 3843
   CS_PORT = 3847
 
+
+NAVI_INT_FIELDS = frozenset({
+  "road_limit_speed",
+  "cam_type",
+  "cam_limit_speed_left_dist",
+  "cam_limit_speed",
+  "section_limit_speed",
+  "section_left_dist",
+  "section_avg_speed",
+})
+NAVI_BOOL_FIELDS = frozenset({"is_highway", "section_adjust_speed"})
+NAVI_ACTIVE_MIN = 0
+NAVI_ACTIVE_MAX = 32767
+
 class NaviServer:
-  def __init__(self):
+  def __init__(self, start_broadcast=True):
     self.json_road_limit = None
     self.active = 0
     self.last_updated = 0
     self.last_updated_active = 0
-    self.last_exception = None
     self.lock = threading.Lock()
     self.remote_addr = None
 
-    Thread(target=self.broadcast_thread, args=[], daemon=True).start()
+    if start_broadcast:
+      Thread(target=self.broadcast_thread, daemon=True).start()
 
   def get_broadcast_address(self):
     try:
@@ -96,7 +111,9 @@ class NaviServer:
             if broadcast_address is None or frame % 10 == 0:
               broadcast_address = self.get_broadcast_address()
 
-            if broadcast_address is not None and self.remote_addr is None:
+            with self.lock:
+              remote_addr = self.remote_addr
+            if broadcast_address is not None and remote_addr is None:
               log.debug(f"Broadcasting to {broadcast_address}")
               msg = 'EON:ROAD_LIMIT_SERVICE:v1'.encode()
               for i in range(1, 255):
@@ -114,10 +131,39 @@ class NaviServer:
 
   def send_sdp(self, sock):
     try:
-      if self.remote_addr:
-        sock.sendto('EON:ROAD_LIMIT_SERVICE:v1'.encode(), (self.remote_addr[0], Port.BROADCAST_PORT))
+      with self.lock:
+        remote_addr = self.remote_addr
+      if remote_addr:
+        sock.sendto('EON:ROAD_LIMIT_SERVICE:v1'.encode(), (remote_addr[0], Port.BROADCAST_PORT))
     except Exception as e:
       log.debug(f"Failed to send SDP: {e}")
+
+  @staticmethod
+  def _valid_road_limit(road_limit):
+    if not isinstance(road_limit, dict):
+      return False
+
+    for key, value in road_limit.items():
+      if value is None:
+        return False
+      if key in NAVI_BOOL_FIELDS:
+        if not isinstance(value, bool):
+          return False
+      elif key == "current_road_name":
+        if not isinstance(value, str):
+          return False
+      elif key == "cam_speed_factor":
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+          return False
+        if not 0.0 <= value <= 10.0:
+          return False
+      elif key in NAVI_INT_FIELDS:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+          return False
+        if not -32768 <= value <= 32767:
+          return False
+
+    return True
 
   def udp_recv(self, sock):
     ret = False
@@ -125,8 +171,19 @@ class NaviServer:
       ready = select.select([sock], [], [], 1.)
       ret = bool(ready[0])
       if ret:
-        data, self.remote_addr = sock.recvfrom(2048)
+        data, remote_addr = sock.recvfrom(2048)
         json_obj = json.loads(data.decode())
+        if not isinstance(json_obj, dict):
+          raise ValueError("navi command must be a JSON object")
+        if 'active' in json_obj:
+          active = json_obj['active']
+          if isinstance(active, bool) or not isinstance(active, int) or not NAVI_ACTIVE_MIN <= active <= NAVI_ACTIVE_MAX:
+            raise ValueError(f"active must be an integer between {NAVI_ACTIVE_MIN} and {NAVI_ACTIVE_MAX}")
+        if 'road_limit' in json_obj and not self._valid_road_limit(json_obj['road_limit']):
+          raise ValueError("invalid road_limit payload")
+
+        with self.lock:
+          self.remote_addr = remote_addr
 
         if 'cmd' in json_obj:
           try:
@@ -138,7 +195,7 @@ class NaviServer:
         if 'echo' in json_obj:
           try:
             echo = json.dumps(json_obj["echo"])
-            sock.sendto(echo.encode(), (self.remote_addr[0], Port.BROADCAST_PORT))
+            sock.sendto(echo.encode(), (remote_addr[0], Port.BROADCAST_PORT))
             ret = False
           except Exception as e:
             log.debug(f"Echo response failed: {e}")
@@ -147,14 +204,14 @@ class NaviServer:
           try:
             result = subprocess.run(json_obj['echo_cmd'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5)
             echo = json.dumps({"echo_cmd": json_obj['echo_cmd'], "result": result.stdout})
-            sock.sendto(echo.encode(), (self.remote_addr[0], Port.BROADCAST_PORT))
+            sock.sendto(echo.encode(), (remote_addr[0], Port.BROADCAST_PORT))
             ret = False
           except Exception as e:
             log.debug(f"Echo cmd execution failed: {e}")
 
         with self.lock:
           if 'active' in json_obj:
-            self.active = json_obj['active']
+            self.active = int(json_obj['active'])
             self.last_updated_active = time.monotonic()
 
           if 'road_limit' in json_obj:
@@ -164,23 +221,22 @@ class NaviServer:
 
     except Exception as e:
       log.debug(f"Exception in udp_recv: {e}")
-      with self.lock:
-        self.json_road_limit = None
 
     return ret
 
   def check(self):
     now = time.monotonic()
-    if now - self.last_updated > 6.:
-      with self.lock:
+    with self.lock:
+      if now - self.last_updated > 6.:
         self.json_road_limit = None
 
-    if now - self.last_updated_active > 6.:
-      self.active = 0
-      self.remote_addr = None
+      if now - self.last_updated_active > 6.:
+        self.active = 0
+        self.remote_addr = None
 
   def get_limit_val(self, key, default=None):
-    return self.get_json_val(self.json_road_limit, key, default)
+    value = self.get_json_val(self.json_road_limit, key, default)
+    return int(value) if key in NAVI_INT_FIELDS and value is not None else value
 
   def get_json_val(self, json_data, key, default=None):
     if json_data is None:
@@ -193,11 +249,16 @@ def publish_thread(server):
   naviData = messaging.pub_sock('naviData')
   rk = Ratekeeper(10, print_delay_threshold=None)
   v_ego_q = deque(maxlen=3)
+  car_state_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
   last_network_dist = -1
   dist_frozen_timer = 0.0
+  last_loop_time = time.monotonic()
 
   while not terminate_flag.is_set():
+    now = time.monotonic()
+    dt = max(now - last_loop_time, 0.0)
+    last_loop_time = now
     sm.update(0)
     dat = messaging.new_message('naviData', valid=True)
     navi = dat.naviData
@@ -212,19 +273,18 @@ def publish_thread(server):
       navi.sectionLimitSpeed = server.get_limit_val("section_limit_speed", 0)
       navi.sectionLeftDist = server.get_limit_val("section_left_dist", 0)
       navi.sectionAvgSpeed = server.get_limit_val("section_avg_speed", 0)
-      navi.sectionLeftTime = server.get_limit_val("section_left_time", 0)
       navi.sectionAdjustSpeed = server.get_limit_val("section_adjust_speed", False)
       navi.camSpeedFactor = server.get_limit_val("cam_speed_factor", 1.0)
       navi.currentRoadName = server.get_limit_val("current_road_name", "")
+      last_updated = server.last_updated
 
     if sm.updated['carState']:
       current_v_ego = sm['carState'].vEgo
       v_ego_q.append(current_v_ego)
 
       try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-          data_in_bytes = struct.pack('!f', current_v_ego)
-          sock.sendto(data_in_bytes, ('127.0.0.1', Port.CS_PORT))
+        data_in_bytes = struct.pack('!f', current_v_ego)
+        car_state_sock.sendto(data_in_bytes, ('127.0.0.1', Port.CS_PORT))
       except Exception as e:
         log.debug(f"Failed to send carState UDP: {e}")
 
@@ -234,7 +294,7 @@ def publish_thread(server):
     if navi.camLimitSpeedLeftDist > 0:
       if navi.camLimitSpeedLeftDist == last_network_dist:
         if v_ego > 1.0:
-          dist_frozen_timer += 0.1
+          dist_frozen_timer += dt
       else:
         last_network_dist = navi.camLimitSpeedLeftDist
         dist_frozen_timer = 0.0
@@ -245,7 +305,7 @@ def publish_thread(server):
       last_network_dist = 0
       dist_frozen_timer = 0.0
 
-    t_since_last_update = (time.monotonic() - server.last_updated)
+    t_since_last_update = max(now - last_updated, 0.0)
     s_travelled = t_since_last_update * v_ego
 
     if navi.camLimitSpeedLeftDist > 0:
@@ -256,6 +316,8 @@ def publish_thread(server):
     naviData.send(dat.to_bytes())
     server.check()
     rk.keep_time()
+
+  car_state_sock.close()
 
 
 def main():
@@ -270,7 +332,6 @@ def main():
         server.udp_recv(sock)
         server.send_sdp(sock)
     except Exception as e:
-      server.last_exception = e
       log.error(f"UDP Server encountered a critical error: {e}")
 
 
@@ -287,7 +348,6 @@ class SpeedLimiter:
 
     self.sock = messaging.sub_sock("naviData")
     self.naviData = None
-    self.logMonoTime = 0
     self.conv = UnitConverter()
 
     self._init_time = time.monotonic()
@@ -306,8 +366,11 @@ class SpeedLimiter:
     try:
       dat = messaging.recv_sock(self.sock, wait=False)
       if dat is not None:
-        self.logMonoTime = dat.logMonoTime
+        was_active = self.naviData is not None and self.naviData.active > 0
         self.naviData = dat.naviData
+        is_active = self.naviData.active > 0
+        if was_active and not is_active:
+          self._reset_navigation_state()
         if not self._first_navidata_logged:
           log.info(f"first naviData received ({time.monotonic() - self._init_time:.1f}s after SpeedLimiter init)")
           self._first_navidata_logged = True
@@ -315,32 +378,38 @@ class SpeedLimiter:
       log.debug(f"Messaging receive error: {e}")
 
   def get_active(self):
-    self.recv()
     if self.naviData is not None:
       return self.naviData.active
     return 0
 
   def get_road_limit_speed(self):
-    self.recv()
     if self.naviData is not None:
       return self.naviData.roadLimitSpeed
     return 0
 
   def get_section_limit_speed(self):
-    self.recv()
     if self.naviData is not None:
       return self.naviData.sectionLimitSpeed, self.naviData.sectionLeftDist
     return 0, 0
 
-  def get_cam_type(self):
-    self.recv()
-    if self.naviData is not None:
-      return self.naviData.camType
-    return 0
-
   def get_in_school_zone(self):
-    self.recv()
     return self.in_school_zone
+
+  def _reset_camera_decel(self):
+    self.cam_decel = False
+    self.started_dist = 0
+    self.started_speed = 0
+    self.last_limit_speed_left_dist = 0
+
+  def _reset_decel_states(self):
+    self._reset_camera_decel()
+    self.sec_decel = False
+    self.stock_decel = False
+
+  def _reset_navigation_state(self):
+    self._reset_decel_states()
+    self.in_school_zone = False
+    self.last_road_name = ""
 
   def _log_reset(self, msg):
     if msg != self._last_reset_log_msg:
@@ -355,12 +424,11 @@ class SpeedLimiter:
       self._last_log_time[key] = now
 
   def get_max_speed(self, cluster_speed_clu):
-    self.recv()
     default_return_value = (0, False)
+    self.stock_decel = False
 
     if self.naviData is None:
-      self.cam_decel = False
-      self.sec_decel = False
+      self._reset_decel_states()
       return default_return_value
 
     try:
@@ -373,7 +441,6 @@ class SpeedLimiter:
       section_limit_speed = navi_data.sectionLimitSpeed
       section_left_dist = navi_data.sectionLeftDist
       section_avg_speed = navi_data.sectionAvgSpeed
-      section_left_time = navi_data.sectionLeftTime
       section_adjust_speed = navi_data.sectionAdjustSpeed
       cam_speed_factor = np.clip(navi_data.camSpeedFactor, 1.0, 1.1)
 
@@ -408,7 +475,11 @@ class SpeedLimiter:
       if is_school_zone_start:
         self._log_throttled("school_zone_event", f"school zone start event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
 
-      if cam_limit_speed_left_dist is not None and cam_limit_speed is not None and cam_limit_speed_left_dist > 0:
+      has_camera_limit = (
+        cam_limit_speed_left_dist is not None and cam_limit_speed is not None and cam_limit_speed_left_dist > 0
+      )
+      if has_camera_limit:
+        self.sec_decel = False
         cluster_speed_ms = self.conv.to_ms(cluster_speed_clu)
 
         tight_zone = is_speed_bump or is_school_zone_start
@@ -470,6 +541,7 @@ class SpeedLimiter:
 
       if section_left_dist is not None and section_limit_speed is not None and section_left_dist > 0:
         if min_limit <= section_limit_speed <= max_limit:
+          self._reset_camera_decel()
 
           is_limit_zone = not self.sec_decel
           if not self.sec_decel:
@@ -487,8 +559,7 @@ class SpeedLimiter:
     except Exception as e:
       log.error(f"Error calculating max speed: {e}")
 
-    self.cam_decel = False
-    self.sec_decel = False
+    self._reset_decel_states()
     return default_return_value
 
   def get_camera_limit_speed_stock(self, CS, cluster_speed_clu):

@@ -20,7 +20,7 @@ struct NaviData @0x81c2f05a394cf4af {
   sectionLimitSpeed @6 :Int16;
   sectionLeftDist @7 :Int16;
   sectionAvgSpeed @8 :Int16;
-  sectionLeftTime @9 :Int16;
+  sectionLeftTimeDEPRECATED @9 :Int16;
   sectionAdjustSpeed @10 :Bool;
   camSpeedFactor @11 :Float32;
   currentRoadName @12 :Text;
