@@ -76,18 +76,25 @@ class ClusterLiveCamera:
           which = msg.which()
           encode_data = getattr(msg, which)
           is_keyframe = bool(encode_data.idx.flags & V4L2_BUF_FLAG_KEYFRAME)
+          header_len = len(encode_data.header)
 
           if self.msg_count <= 20:
             flog(f"[CLUSTER_CAM] Got msg #{self.msg_count} | keyframe={is_keyframe} | "
-                 f"seen_keyframe={self.seen_keyframe} | header_len={len(encode_data.header)} | "
+                 f"seen_keyframe={self.seen_keyframe} | header_len={header_len} | "
                  f"data_len={len(encode_data.data)}")
+          elif header_len > 0:
+            # 카운트 제한과 무관하게, header가 실린 메시지는 절대 놓치지 않고 로그
+            flog(f"[CLUSTER_CAM_HEADER_FOUND] msg #{self.msg_count} | keyframe={is_keyframe} | "
+                 f"header_len={header_len} | data_len={len(encode_data.data)}")
 
           # 첫 키프레임을 만나기 전까지는 디코딩 시도 자체를 건너뜀
           # (키프레임 없이 델타프레임만 넣으면 디코더가 계속 실패함)
           if not self.seen_keyframe:
             if is_keyframe:
               self.seen_keyframe = True
-              flog("[CLUSTER_CAM_SUCCESS] First keyframe found! Starting decode from here.")
+              head_hex = encode_data.data[:32].hex()
+              flog(f"[CLUSTER_CAM_SUCCESS] First keyframe found! header_len={header_len} | "
+                   f"data first 32 bytes (hex)={head_hex}")
             else:
               continue  # 키프레임 나올 때까지 계속 버림
 
