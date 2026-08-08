@@ -135,7 +135,13 @@ class TuringUsbDisplay:
       if not isinstance(frame_image, np.ndarray):
         frame_image = np.array(frame_image)
 
-      bgr_img = cv2.cvtColor(frame_image, cv2.COLOR_RGB2BGR)
+      # 패널 네이티브 프레임버퍼는 462x1920 세로(portrait) 고정이고, 장치에는
+      # 회전 명령이 따로 없음. 우리가 렌더링한 1920x462 가로 이미지를 물리적으로
+      # 90도 회전시켜서 보내야 패널 전체에 정상적으로(가로처럼 보이게) 그려짐.
+      # 방향이 뒤집혀 보이면 ROTATE_90_CLOCKWISE <-> ROTATE_90_COUNTERCLOCKWISE로 교체.
+      rotated = cv2.rotate(frame_image, cv2.ROTATE_90_CLOCKWISE)
+
+      bgr_img = cv2.cvtColor(rotated, cv2.COLOR_RGB2BGR)
 
       encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 70]
       success, encoded_img = cv2.imencode('.jpg', bgr_img, encode_param)
