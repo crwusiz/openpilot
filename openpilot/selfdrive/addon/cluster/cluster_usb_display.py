@@ -2,6 +2,7 @@ import numpy as np
 import os
 import time
 import cv2
+import usb.util
 from openpilot.common.swaglog import cloudlog
 
 LOG_FILE = "/data/openpilot/openpilot/selfdrive/addon/cluster/cluster_debug.log"
@@ -31,6 +32,10 @@ class TuringUsbDisplay:
     self._send_image = None
     self._send_jpeg = None
     self._resp_ok = None
+    self._build_header = None
+    self._encrypt = None
+    self._cmd_upload_jpeg = None
+    self._ep_out = None
     flog("TuringUsbDisplay initialized.")
 
   def open(self):
@@ -47,14 +52,16 @@ class TuringUsbDisplay:
       from library.lcd.lcd_comm_turing_usb import (
         find_usb_device, send_image, send_jpeg, send_sync_command,
         send_frame_rate_command, _resp_ok,
+        build_command_packet_header, encrypt_command_packet, CMD_UPLOAD_JPEG,
       )
 
       self._find_usb_device = find_usb_device
       self._send_image = send_image
-      # 인코딩을 JPEG로 하고 있으므로 반드시 CMD_UPLOAD_JPEG(101) 전용 함수를 써야 함
-      # (예전에 send_image=CMD_UPLOAD_PNG(102)로 JPEG 바이트를 보내서 펌웨어가 디코딩 실패 -> 화면 그대로였음)
       self._send_jpeg = send_jpeg
       self._resp_ok = _resp_ok
+      self._build_header = build_command_packet_header
+      self._encrypt = encrypt_command_packet
+      self._cmd_upload_jpeg = CMD_UPLOAD_JPEG
 
       self.device, self.dev_pid = self._find_usb_device()
 
@@ -74,14 +81,20 @@ class TuringUsbDisplay:
           except Exception as e:
             flog(f"[CLUSTER_USB_WARN] Detach warning: {e}")
 
+          # 이미지 업로드용 OUT 엔드포인트를 미리 찾아서 캐싱 (매 프레임마다 재탐색 방지)
+          cfg = self.device.get_active_configuration()
+          intf = usb.util.find_descriptor(cfg, bInterfaceNumber=0)
+          self._ep_out = usb.util.find_descriptor(
+            intf, custom_match=lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_OUT)
+
           for attempt in range(3):
             flog(f"[CLUSTER_USB] Sending sync handshake (Attempt {attempt+1})...")
             resp = send_sync_command(self.device)
-            flog(f"[CLUSTER_USB] Sync response: {resp.hex() if resp else None} | ok={self._resp_ok(resp)}")
+            flog(f"[CLUSTER_USB] Sync response: ok={self._resp_ok(resp)}")
             time.sleep(0.3)
 
           resp = send_frame_rate_command(self.device, self.config.fps)
-          flog(f"[CLUSTER_USB] Frame rate response: {resp.hex() if resp else None} | ok={self._resp_ok(resp)}")
+          flog(f"[CLUSTER_USB] Frame rate response: ok={self._resp_ok(resp)}")
           time.sleep(0.1)
 
           self.connected = True
@@ -98,6 +111,21 @@ class TuringUsbDisplay:
     except Exception as e:
       flog(f"[CLUSTER_USB_ERROR] Error opening Turing display: {e}")
       return False
+
+  def _write_image_no_wait(self, jpeg_bytes):
+    """
+    이미지 업로드 커맨드는 펌웨어가 ACK를 안 주는 것으로 확인됨 (매 프레임 2초 타임아웃).
+    응답을 기다리지 않고 write만 수행 (fire-and-forget).
+    """
+    img_size = len(jpeg_bytes)
+    cmd_packet = self._build_header(self._cmd_upload_jpeg)
+    cmd_packet[8] = (img_size >> 24) & 0xFF
+    cmd_packet[9] = (img_size >> 16) & 0xFF
+    cmd_packet[10] = (img_size >> 8) & 0xFF
+    cmd_packet[11] = img_size & 0xFF
+    full_payload = self._encrypt(cmd_packet) + jpeg_bytes
+
+    self._ep_out.write(full_payload, 2000)
 
   def send_image(self, frame_image):
     if not self.connected or self.device is None:
@@ -116,17 +144,13 @@ class TuringUsbDisplay:
         jpg_bytes = encoded_img.tobytes()
         size_kb = len(jpg_bytes) // 1024
 
-        flog(f"[CLUSTER_USB_TX_BEGIN] About to call send_jpeg | frame#{self.frame_count} | Size: {size_kb} KB")
         t0 = time.time()
-
-        resp = self._send_jpeg(self.device, jpg_bytes)
-
+        self._write_image_no_wait(jpg_bytes)
         elapsed = time.time() - t0
-        ok = self._resp_ok(resp) if self._resp_ok else None
-        flog(f"[CLUSTER_USB_TX_END] send_jpeg returned | frame#{self.frame_count} | elapsed={elapsed:.3f}s | "
-             f"resp={resp.hex() if resp else None} | ok={ok}")
 
         self.frame_count += 1
+        if self.frame_count <= 20 or self.frame_count % self.config.fps == 0:
+          flog(f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {size_kb} KB | elapsed={elapsed:.3f}s (write-only, no ACK wait)")
 
     except Exception as e:
       err_msg = f"Failed to send image to Turing display: {e}"

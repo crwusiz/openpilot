@@ -69,9 +69,7 @@ class ClusterUsbPipeline:
             continue
 
         # 3. 이미지 전송 수행
-        flog("[CLUSTER_PIPELINE] Dequeued frame, calling display.send_image()...")
         self.display.send_image(frame_image)
-        flog("[CLUSTER_PIPELINE] display.send_image() returned.")
 
       except queue.Empty:
         continue
