@@ -497,13 +497,13 @@ On Windows, manually copy 'external/libusb-1.0/libusb-1.0.dll' to C:\\Windows\\S
     return dev, dev_pid
 
 
-def read_flush(ep_in, max_attempts=5):
+def read_flush(ep_in, max_attempts=5, timeout_ms=5):
     """
     Flush the USB IN endpoint by reading available data until timeout or max attempts reached.
     """
     for _ in range(max_attempts):
         try:
-            ep_in.read(512, timeout=100)
+            ep_in.read(512, timeout=timeout_ms)
         except usb.core.USBError as e:
             if e.errno == 110 or e.args[0] == 'Operation timed out':
                 break
@@ -536,10 +536,10 @@ def write_to_device(dev, data, timeout=2500):
 
     try:
         response = ep_in.read(512, timeout)
-        # Each request has exactly one response packet.  Trying to flush an
-        # already empty IN endpoint waits for its 100 ms read timeout, which
-        # caps live image updates below 10 FPS even when the ACK is immediate.
-        # Consume the response above and let the next request read its own ACK.
+        # TURZX can emit a delayed extra response. Drain it so that the next
+        # command does not consume a stale response. A 5 ms quiet period is
+        # sufficient and avoids the former fixed 100 ms delay per frame.
+        read_flush(ep_in, timeout_ms=5)
         return bytes(response)
     except usb.core.USBError as e:
         if e.errno == 110 or 'timed out' in str(e).lower():

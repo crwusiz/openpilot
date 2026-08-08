@@ -28,6 +28,7 @@ class TuringUsbDisplay:
     self.connected = False
     self.product_id = None
     self.frame_count = 0
+    self.consecutive_upload_failures = 0
 
     self._find_usb_device = None
     self._send_image = None
@@ -100,6 +101,7 @@ class TuringUsbDisplay:
           time.sleep(0.1)
 
           self.connected = True
+          self.consecutive_upload_failures = 0
           flog(f"[CLUSTER_USB_SUCCESS] Connected to TURZX 9.2 inch (PID: {hex(self.product_id)}).")
           return True
         else:
@@ -141,7 +143,16 @@ class TuringUsbDisplay:
         elapsed = time.time() - t0
 
         if not self._resp_ok(response):
-          raise usb.core.USBError("JPEG upload was not acknowledged")
+          self.consecutive_upload_failures += 1
+          flog(f"[CLUSTER_USB_WARN] JPEG upload was not acknowledged "
+               f"({self.consecutive_upload_failures}/3); skipping frame.")
+          # A single stale/late response is recoverable. Reconnecting on every
+          # miss causes an endless reset loop and makes recovery impossible.
+          if self.consecutive_upload_failures >= 3:
+            raise usb.core.USBError("JPEG upload was not acknowledged 3 times")
+          return
+
+        self.consecutive_upload_failures = 0
 
         self.frame_count += 1
         if self.frame_count <= 20 or self.frame_count % self.config.fps == 0:
