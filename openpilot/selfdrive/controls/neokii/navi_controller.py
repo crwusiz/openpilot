@@ -71,9 +71,11 @@ NAVI_INT_FIELDS = frozenset({
   "section_avg_speed",
 })
 NAVI_BOOL_FIELDS = frozenset({"is_highway", "section_adjust_speed"})
+NAVI_ACTIVE_MIN = 0
+NAVI_ACTIVE_MAX = 32767
 
 class NaviServer:
-  def __init__(self):
+  def __init__(self, start_broadcast=True):
     self.json_road_limit = None
     self.active = 0
     self.last_updated = 0
@@ -81,7 +83,8 @@ class NaviServer:
     self.lock = threading.Lock()
     self.remote_addr = None
 
-    Thread(target=self.broadcast_thread, args=[], daemon=True).start()
+    if start_broadcast:
+      Thread(target=self.broadcast_thread, daemon=True).start()
 
   def get_broadcast_address(self):
     try:
@@ -172,8 +175,10 @@ class NaviServer:
         json_obj = json.loads(data.decode())
         if not isinstance(json_obj, dict):
           raise ValueError("navi command must be a JSON object")
-        if 'active' in json_obj and (isinstance(json_obj['active'], bool) or not isinstance(json_obj['active'], int)):
-          raise ValueError("active must be an integer")
+        if 'active' in json_obj:
+          active = json_obj['active']
+          if isinstance(active, bool) or not isinstance(active, int) or not NAVI_ACTIVE_MIN <= active <= NAVI_ACTIVE_MAX:
+            raise ValueError(f"active must be an integer between {NAVI_ACTIVE_MIN} and {NAVI_ACTIVE_MAX}")
         if 'road_limit' in json_obj and not self._valid_road_limit(json_obj['road_limit']):
           raise ValueError("invalid road_limit payload")
 
@@ -216,8 +221,6 @@ class NaviServer:
 
     except Exception as e:
       log.debug(f"Exception in udp_recv: {e}")
-      with self.lock:
-        self.json_road_limit = None
 
     return ret
 
@@ -363,7 +366,11 @@ class SpeedLimiter:
     try:
       dat = messaging.recv_sock(self.sock, wait=False)
       if dat is not None:
+        was_active = self.naviData is not None and self.naviData.active > 0
         self.naviData = dat.naviData
+        is_active = self.naviData.active > 0
+        if was_active and not is_active:
+          self._reset_navigation_state()
         if not self._first_navidata_logged:
           log.info(f"first naviData received ({time.monotonic() - self._init_time:.1f}s after SpeedLimiter init)")
           self._first_navidata_logged = True
@@ -398,6 +405,11 @@ class SpeedLimiter:
     self._reset_camera_decel()
     self.sec_decel = False
     self.stock_decel = False
+
+  def _reset_navigation_state(self):
+    self._reset_decel_states()
+    self.in_school_zone = False
+    self.last_road_name = ""
 
   def _log_reset(self, msg):
     if msg != self._last_reset_log_msg:
