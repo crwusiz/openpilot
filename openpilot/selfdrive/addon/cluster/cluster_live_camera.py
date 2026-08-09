@@ -3,7 +3,8 @@ import threading
 
 import cv2
 import numpy as np
-from msgq.visionipc import VisionIpcClient, VisionStreamType
+from msgq.visionipc import VisionIpcClient
+from openpilot.cereal.visionipc import VisionStreamType
 
 
 LOG_FILE = "/data/openpilot/openpilot/selfdrive/addon/cluster/cluster_debug.log"
@@ -18,8 +19,6 @@ def flog(msg):
 
 
 class ClusterLiveCamera:
-  """Latest raw road frame, using the same source and conflation policy as UI."""
-
   def __init__(self, config):
     self.config = config
     self.latest_frame = None
@@ -33,7 +32,7 @@ class ClusterLiveCamera:
   def _init_camera(self):
     try:
       flog("[CLUSTER_CAM] Connecting to raw VisionIPC road camera...")
-      self.vipc = VisionIpcClient("camerad", VisionStreamType.VISION_STREAM_ROAD, True)
+      self.vipc = VisionIpcClient("camerad", VisionStreamType.VISION_STREAM_NARROW_ROAD, True)
     except Exception as e:
       self.vipc = None
       flog(f"[CLUSTER_CAM_ERROR] Failed to initialize VisionIPC camera: {e}")
@@ -45,9 +44,6 @@ class ClusterLiveCamera:
 
   @staticmethod
   def _rgb_from_vision_buffer(buffer):
-    # VisionIPC NV12 has aligned Y and UV planes; it is not one contiguous
-    # height*1.5*stride image. This is the same plane layout used by camerad's
-    # snapshot utility.
     height, width, stride = buffer.height, buffer.width, buffer.stride
     uv_height = ((height // 2) + 15) // 16 * 16
     uv_plane_size = stride * uv_height
@@ -58,8 +54,6 @@ class ClusterLiveCamera:
     u = np.array(uv[::2], dtype=np.uint8).reshape((-1, stride // 2))[:height // 2, :width // 2]
     v = np.array(uv[1::2], dtype=np.uint8).reshape((-1, stride // 2))[:height // 2, :width // 2]
 
-    # OpenCV accepts planar I420. The original NV12 U/V samples are unpacked
-    # above because their plane is stride-aligned.
     i420 = np.concatenate((y.reshape(-1), u.reshape(-1), v.reshape(-1)))
     return cv2.cvtColor(i420.reshape((height * 3 // 2, width)), cv2.COLOR_YUV2RGB_I420)
 

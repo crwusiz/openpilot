@@ -8,8 +8,8 @@ from openpilot.selfdrive.ui.onroad.cameraview import CameraView
 
 if __name__ == "__main__":
   gui_app.init_window("watch3")
-  road = CameraView("camerad", VisionStreamType.VISION_STREAM_ROAD)
-  driver = CameraView("camerad", VisionStreamType.VISION_STREAM_DRIVER)
+  road = CameraView("camerad", VisionStreamType.VISION_STREAM_NARROW_ROAD)
+  driver = CameraView("camerad", VisionStreamType.VISION_STREAM_CABIN)
   wide = CameraView("camerad", VisionStreamType.VISION_STREAM_WIDE_ROAD)
 
   font_semi_bold: rl.Font = gui_app.font(FontWeight.SEMI_BOLD)
@@ -56,14 +56,14 @@ if __name__ == "__main__":
     camera_width = gui_app.width // 3
     label_padding = int(gui_app.width * 0.01)
 
-    # VISION_STREAM_ROAD
+    # VISION_STREAM_NARROW_ROAD
     road_rect = rl.Rectangle(0, camera_start_y, camera_width, camera_height)
     road.render(road_rect)
     rl.draw_rectangle_lines(0, int(camera_start_y), int(camera_width), int(camera_height), rl.WHITE)
     rl.draw_text_ex(font_semi_bold, "ROAD", rl.Vector2(label_padding, camera_start_y + label_padding), label_font_size,
                     0, rl.WHITE)
 
-    # VISION_STREAM_DRIVER
+    # VISION_STREAM_CABIN
     driver_rect = rl.Rectangle(camera_width, camera_start_y, camera_width, camera_height)
     driver.render(driver_rect)
     rl.draw_rectangle_lines(int(camera_width), int(camera_start_y), int(camera_width), int(camera_height), rl.WHITE)

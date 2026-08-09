@@ -59,8 +59,6 @@ def ensure_requirements() -> None:
 
 def main():
   try:
-    # Keep cluster rendering, camera conversion, and USB output off the
-    # cores reserved for driving and model processes.
     set_core_affinity(CLUSTER_CORES)
   except OSError as e:
     cloudlog.warning(f"Failed to set cluster CPU affinity to {CLUSTER_CORES}: {e}")

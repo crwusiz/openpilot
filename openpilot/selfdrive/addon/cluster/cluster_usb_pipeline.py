@@ -45,11 +45,6 @@ class ClusterUsbPipeline:
       pass
 
   def _worker_loop(self):
-    """
-    백그라운드에서 큐를 감시하며 이미지를 전송합니다.
-    [가장 중요한 로직]: USB 타임아웃에 의존하지 않고, 전송 후 일정 시간을
-    강제로 쉬어(Breathing room) MCU 버퍼가 넘치는 것을 원천 차단합니다.
-    """
     fps = getattr(self.display.config, 'usb_fps', getattr(self.display.config, 'fps', 10))
     target_interval = 1.0 / fps if fps > 0 else 0.1
 
@@ -63,7 +58,6 @@ class ClusterUsbPipeline:
             time.sleep(1.0)
             continue
 
-        # 전송 소요 시간 측정
         t0 = time.time()
         self.display.send_image(frame_image)
         t1 = time.time()
@@ -71,8 +65,6 @@ class ClusterUsbPipeline:
         elapsed = t1 - t0
         sleep_time = target_interval - elapsed
 
-        # [핵심] 전송이 아무리 늦게 끝났어도, 최소 30ms(0.03초)는 무조건 휴식하여
-        # 디스플레이 MCU가 받은 데이터를 압축해제 할 시간을 벌어줍니다.
         if sleep_time < 0.03:
           sleep_time = 0.03
 

@@ -1,7 +1,7 @@
 import os
-import time
 import cv2
 import numpy as np
+
 from PIL import Image, ImageDraw, ImageFont
 from openpilot.common.swaglog import cloudlog
 
@@ -11,20 +11,30 @@ class ClusterRenderer:
     cloudlog.info("Initializing ClusterRenderer...")
     self.config = config
 
-    # 9.2인치 순정 규격인 1920x462로 도화지 고정
-    self.target_w = 1920
-    self.target_h = 462
+    self.target_w = config.width
+    self.target_h = config.height
+    self.side_w = self.target_w // 10
+    self.camera_x = self.side_w
+    self.camera_w = self.target_w - 2 * self.side_w
+    self.cell_w = self.camera_w / 8.0
+    self.row_h = self.target_h / 3.0
 
     try:
-      self.font_speed = ImageFont.truetype(self.config.font_bold, 110)
-      self.font_unit = ImageFont.truetype(self.config.font_regular, 38)
-      self.font_small = ImageFont.truetype(self.config.font_regular, 22)
-      self.font_label = ImageFont.truetype(self.config.font_bold, 19)
-      self.font_warning = ImageFont.truetype(self.config.font_bold, 55)
+      self.font_speed = ImageFont.truetype(self.config.font_bold, 58)
+      self.font_current_speed = ImageFont.truetype(self.config.font_bold, 92)
+      self.font_value = ImageFont.truetype(self.config.font_bold, 42)
+      self.font_unit = ImageFont.truetype(self.config.font_regular, 20)
+      self.font_current_unit = ImageFont.truetype(self.config.font_regular, 24)
+      self.font_small = ImageFont.truetype(self.config.font_regular, 18)
+      self.font_label = ImageFont.truetype(self.config.font_bold, 18)
+      self.font_warning = ImageFont.truetype(self.config.font_bold, 42)
     except Exception as e:
       cloudlog.error(f"Failed to load fonts: {e}")
       self.font_speed = ImageFont.load_default()
+      self.font_current_speed = ImageFont.load_default()
+      self.font_value = ImageFont.load_default()
       self.font_unit = ImageFont.load_default()
+      self.font_current_unit = ImageFont.load_default()
       self.font_small = ImageFont.load_default()
       self.font_label = ImageFont.load_default()
       self.font_warning = ImageFont.load_default()
@@ -36,11 +46,10 @@ class ClusterRenderer:
     self._icon_cache = {}
     icon_dir = os.path.join(str(self.config.BASEDIR), "selfdrive", "assets", "icons")
     for name in (
-      "wheel", "wheel_green", "disengage_on_accelerator", "brake_disc", "tpms",
-      "gps", "direction", "wifi_strength_low", "wifi_strength_medium",
-      "wifi_strength_high", "wifi_strength_full", "traffic_green", "traffic_red",
-      "traffic_off", "speed_bump", "school_zone", "speed_camera",
-      "dist1", "dist2", "dist3", "dist4",
+      "wheel", "wheel_green", "wheel_blue", "wheel_critical", "disengage_on_accelerator",
+      "brake_disc", "tpms", "gps", "direction", "wifi_strength_low", "wifi_strength_medium",
+      "wifi_strength_high", "wifi_strength_full", "traffic_green", "traffic_red", "traffic_off",
+      "speed_bump", "school_zone", "speed_camera", "dist1", "dist2", "dist3", "dist4",
     ):
       try:
         self.icons[name] = Image.open(os.path.join(icon_dir, f"{name}.png")).convert("RGBA")
@@ -50,86 +59,221 @@ class ClusterRenderer:
   def render(self, camera, models):
     has_camera = camera.has_frame()
     if has_camera:
-      frame = camera.get_frame()
-      frame = self._crop_and_resize(frame)
+      frame = self._crop_and_resize(camera.get_frame())
     else:
       frame = self.blank_canvas.copy()
 
+    hud_data = models.get_hud_data()
     if self.config.draw_model_overlay and models.is_valid():
-      frame = self._draw_model_path(frame, models.get_path_data(), models.get_hud_data())
+      frame = self._draw_model_path(frame, models.get_path_data(), hud_data)
 
     pil_img = Image.fromarray(frame)
-    hud_data = models.get_hud_data()
-    self._draw_info_panel(pil_img, hud_data)
     self._draw_hud(pil_img, hud_data, has_camera)
-
     return np.array(pil_img)
 
   def _crop_and_resize(self, frame):
-    # The physical cluster uses one continuous onroad surface.  Keep the
-    # complete ROAD frame and map it to the panel resolution; HUD elements are
-    # composited on top instead of reserving a blank information pane.
-    return cv2.resize(frame, (self.target_w, self.target_h), interpolation=cv2.INTER_AREA)
+    camera = cv2.resize(frame, (self.camera_w, self.target_h), interpolation=cv2.INTER_AREA)
+    canvas = self.blank_canvas.copy()
+    canvas[:, self.camera_x:self.camera_x + self.camera_w] = camera
+    return canvas
 
-  def _draw_info_panel(self, pil_img, data):
-    """Draw the right pane using the same compact icon-first HUD language as onroad."""
-    draw = ImageDraw.Draw(pil_img)
-    # Full-screen camera layout: HUD is drawn directly over the image.
-    x0 = 0
-    draw = ImageDraw.Draw(pil_img)
+  def _project_pt(self, x, y, z):
+    if x < 0.1:
+      x = 0.1
+    px_y = int((self.target_h / 2) + (self.focal_length * (self.camera_height + z) / x))
+    px_x = int(self.camera_x + self.camera_w / 2 - (self.focal_length * y / x))
+    return px_x, px_y
 
-    def text(x, y, value, font=None, color=(220, 225, 232), anchor=None):
-      draw.text((int(x), int(y)), str(value), font=font or self.font_small, fill=color, anchor=anchor)
+  def _draw_model_path(self, frame, path_data, hud_data):
+    overlay = frame.copy()
+    if not path_data["path_x"]:
+      return frame
 
-    def centered(cx, y, value, font=None, color=(220, 225, 232)):
-      text(cx, y, value, font, color, anchor="ma")
+    if hud_data["enabled"]:
+      pts_left, pts_right = [], []
+      path_width = 1.8
+      for x, y in zip(path_data["path_x"], path_data["path_y"]):
+        if x > 50.0:
+          break
+        pts_left.append(self._project_pt(x, y + path_width / 2, 0))
+        pts_right.append(self._project_pt(x, y - path_width / 2, 0))
+      if pts_left and pts_right:
+        poly_pts = np.array(pts_left + list(reversed(pts_right)), dtype=np.int32)
+        cv2.fillPoly(overlay, [poly_pts], self.config.colors["path_active"])
+        cv2.addWeighted(overlay, 0.3, frame, 0.7, 0, frame)
 
-    def icon(name, x, y, size=52, active=True):
-      source = self.icons.get(name)
-      if source is None:
-        return
-      cache_key = (name, size, bool(active))
-      image = self._icon_cache.get(cache_key)
-      if image is None:
-        image = source.resize((size, size), Image.Resampling.LANCZOS)
-        image = image.copy()
-        if not active:
-          alpha = image.getchannel("A").point(lambda p: p * 70 // 255)
-          image.putalpha(alpha)
-        self._icon_cache[cache_key] = image
-      pil_img.paste(image, (int(x), int(y)), image)
+    lane_color = self.config.colors["lane_line"]
+    for xs, ys in ((path_data["left_lane_x"], path_data["left_lane_y"]),
+                   (path_data["right_lane_x"], path_data["right_lane_y"])):
+      pts = [self._project_pt(x, y, 0) for x, y in zip(xs, ys) if x <= 50.0]
+      if len(pts) > 1:
+        cv2.polylines(frame, [np.array(pts, dtype=np.int32)], False, lane_color, thickness=4)
 
-    white, muted, green, amber, red = (245, 248, 252), (105, 115, 130), (110, 235, 150), (255, 195, 80), (255, 105, 95)
-    current = data.get("v_ego", 0.0) * (3.6 if self.config.is_metric else 2.236936)
-    cruise = data.get("cruise_speed", 0.0)
-    if cruise > 100:
-      cruise /= 100.0
-    cruise_s = f"{int(cruise)}" if cruise > 0 else "--"
+    frame[:, :self.camera_x] = self.blank_canvas[:, :self.camera_x]
+    frame[:, self.camera_x + self.camera_w:] = self.blank_canvas[:, self.camera_x + self.camera_w:]
+    return frame
 
-    # Top-left: tall, centered boxes like hud_renderer's MAX/SET boxes.
-    box_fill, box_outline = (16, 25, 36), (62, 78, 98)
-    def value_box(x, y, label, value, color):
-      draw.rounded_rectangle([x, y, x + 88, y + 88], radius=9, fill=box_fill, outline=box_outline, width=2)
-      centered(x + 44, y + 9, label, self.font_label, muted)
-      centered(x + 44, y + 39, value, self.font_unit, color)
+  def _base_icon(self, name, size, active=True):
+    source = self.icons.get(name)
+    if source is None:
+      return None
+    dimensions = (int(size), int(size)) if isinstance(size, (int, float)) else tuple(map(int, size))
+    key = (name, dimensions, bool(active))
+    image = self._icon_cache.get(key)
+    if image is None:
+      image = source.resize(dimensions, Image.Resampling.LANCZOS)
+      image = image.copy()
+      if not active:
+        alpha = image.getchannel("A").point(lambda p: p * 70 // 255)
+        image.putalpha(alpha)
+      self._icon_cache[key] = image
+    return image
 
-    value_box(x0 + 40, 34, "CRUISE", cruise_s, white)
-    limit = data.get("nav_limit_speed", 0.0)
-    value_box(x0 + 40, 135, "SET", cruise_s, (170, 215, 255))
-    # Speed limit uses a circular road-sign style indicator.
-    limit_box = [x0 + 140, 135, x0 + 228, 223]
-    draw.ellipse(limit_box, fill=(235, 238, 242), outline=(190, 35, 35), width=6)
-    centered(x0 + 184, 163, f"{int(limit) if limit else '--'}", self.font_unit, (20, 25, 30))
-    traffic_icon = "traffic_green" if data.get("traffic_state") == 1 else "traffic_red" if data.get("traffic_state") == 2 else "traffic_off"
-    icon(traffic_icon, x0 + 305, 14, 38, bool(data.get("traffic_state")))
-    if data.get("school_zone"):
-      icon("school_zone", x0 + 355, 14, 38)
+  def _icon(self, image, name, cx, cy, size, active=True, rotation=0.0):
+    icon = self._base_icon(name, size, active)
+    if icon is None:
+      return
+    if rotation:
+      icon = icon.rotate(rotation, resample=Image.Resampling.BICUBIC, expand=False)
+    image.paste(icon, (int(cx - icon.width / 2), int(cy - icon.height / 2)), icon)
+
+  @staticmethod
+  def _centered(draw, cx, cy, value, font, color):
+    draw.text((int(cx), int(cy)), str(value), font=font, fill=color, anchor="mm")
+
+  def _value(self, value, disabled="--"):
+    try:
+      return disabled if value is None or float(value) <= 0 or float(value) >= 255 else str(round(float(value)))
+    except (TypeError, ValueError):
+      return disabled
+
+  def _draw_hud(self, image, data, has_camera):
+    draw = ImageDraw.Draw(image)
+    white = (245, 248, 252)
+    muted = (120, 132, 148)
+    green = (110, 235, 150)
+    blue = (100, 190, 255)
+    amber = (255, 195, 80)
+    red = (255, 105, 95)
+    panel = (7, 12, 18)
+    divider = (42, 54, 68)
+
+    # Opaque 1:8:1 panels and light guides for the 8 x 3 centre grid.
+    draw.rectangle([0, 0, self.side_w - 1, self.target_h], fill=panel)
+    draw.rectangle([self.camera_x + self.camera_w, 0, self.target_w, self.target_h], fill=panel)
+    draw.line((self.camera_x, 0, self.camera_x, self.target_h), fill=divider, width=2)
+    draw.line((self.camera_x + self.camera_w, 0, self.camera_x + self.camera_w, self.target_h), fill=divider, width=2)
+    for row in (1, 2):
+      y = int(row * self.row_h)
+      draw.line((0, y, self.side_w, y), fill=divider, width=1)
+      draw.line((self.camera_x + self.camera_w, y, self.target_w, y), fill=divider, width=1)
+
+    self._draw_left_panel(image, draw, data, white, muted, green, blue)
+    self._draw_right_panel(image, draw, data, white, muted, red)
+    self._draw_camera_overlays(image, draw, data, white, muted, green, amber, red)
+
+    if not has_camera:
+      self._centered(draw, self.camera_x + self.camera_w / 2, self.target_h / 2,
+                     "WAITING FOR CAMERA SIGNAL...", self.font_warning, red)
+
+    status_color = self.config.colors["engaged"] if data["enabled"] else self.config.colors["disengaged"]
+    draw.rectangle([0, 0, self.target_w - 1, self.target_h - 1], outline=status_color, width=6)
+
+  def _draw_left_panel(self, image, draw, data, white, muted, green, blue):
+    cx = self.side_w / 2
+    cruise = self._value(data.get("cruise_speed"))
+    set_speed = self._value(data.get("set_speed", data.get("cruise_speed")))
+
+    self._centered(draw, cx, self.row_h * 0.28, "CRUISE", self.font_label, muted)
+    self._centered(draw, cx, self.row_h * 0.58, cruise, self.font_speed, white)
+    self._centered(draw, cx, self.row_h * 0.79, self.config.speed_unit, self.font_unit, muted)
+
+    self._centered(draw, cx, self.row_h * 1.28, "SET", self.font_label, muted)
+    self._centered(draw, cx, self.row_h * 1.58, set_speed, self.font_speed,
+                   green if data.get("enabled") else blue)
+    self._centered(draw, cx, self.row_h * 1.79, self.config.speed_unit, self.font_unit, muted)
+
+    if data.get("left_blinker") or data.get("right_blinker") or data.get("brake_pressed"):
+      wheel_name, wheel_color = "wheel_critical", (255, 105, 95)
+    elif data.get("enabled"):
+      wheel_name, wheel_color = "wheel_green", green
+    else:
+      wheel_name, wheel_color = "wheel", muted
+    self._icon(image, wheel_name, cx, self.row_h * 2.52, 94, True,
+               rotation=-float(data.get("steering_angle", 0.0) or 0.0))
+    self._centered(draw, cx, self.row_h * 2.91, "STEER", self.font_label, wheel_color)
+
+  def _draw_right_panel(self, image, draw, data, white, muted, red):
+    cx = self.camera_x + self.camera_w + self.side_w / 2
+    traffic_name = {1: "traffic_red", 2: "traffic_green"}.get(data.get("traffic_state"), "traffic_off")
+    self._icon(image, traffic_name, cx, self.row_h * 0.50, (68, 136), True)
+
+    gap = int(data.get("distance_level", 0) or 0)
+    gap_name = f"dist{min(max(gap + 1, 1), 4)}"
+    self._icon(image, gap_name, cx, self.row_h * 1.50, (56, 132), True)
+
+    tpms = self._base_icon("tpms", (102, 132), True)
+    if tpms is not None:
+      image.paste(tpms, (int(cx - tpms.width / 2), int(self.row_h * 2.04)), tpms)
+    raw_pressures = data.get("tpms") or [0, 0, 0, 0]
+    pressures = list(raw_pressures)
+    for i in range(4):
+      pressure = pressures[i] if i < len(pressures) else 0
+      try:
+        pressure = float(pressure)
+      except (TypeError, ValueError):
+        pressure = 0.0
+      px = cx + (-30 if i % 2 == 0 else 30)
+      py = self.row_h * 2.27 + (i // 2) * 65
+      value = "--" if not pressure or pressure < 5 or pressure > 60 else str(round(pressure))
+      color = red if value != "--" and float(pressure) < 31 else white
+      self._centered(draw, px, py, value, self.font_small, color)
+
+  def _draw_camera_overlays(self, image, draw, data, white, muted, green, amber, red):
+    self._draw_current_speed(draw, data, white)
+
+    left_cx = self.camera_x + self.cell_w / 2
+    self._draw_speed_limit(draw, left_cx, self.row_h * 0.48, data, white, red)
+
+    road_sign = None
+    if data.get("road_signs") == 1 or data.get("school_zone"):
+      road_sign = "school_zone"
     elif data.get("speed_bump"):
-      icon("speed_bump", x0 + 355, 14, 38)
-    if data.get("speed_camera"):
-      icon("speed_camera", x0 + 405, 14, 38)
+      road_sign = "speed_bump"
+    elif data.get("speed_camera"):
+      road_sign = "speed_camera"
+    if road_sign:
+      self._icon(image, road_sign, left_cx, self.row_h * 1.50, 92, True)
+      self._centered(draw, left_cx, self.row_h * 1.91, "ROAD SIGN", self.font_label, muted)
 
-    # Mici _draw_current_speed: color follows acceleration/deceleration.
+    accel_cx = self.camera_x + self.cell_w * 0.5
+    brake_cx = self.camera_x + self.cell_w * 1.5
+    self._icon(image, "disengage_on_accelerator", accel_cx, self.row_h * 2.50, 94,
+               bool(data.get("gas_pressed")))
+    self._icon(image, "brake_disc", brake_cx, self.row_h * 2.50, 94,
+               bool(data.get("brake_pressed")))
+    self._centered(draw, accel_cx, self.row_h * 2.91, "ACCEL", self.font_label,
+                   amber if data.get("gas_pressed") else muted)
+    self._centered(draw, brake_cx, self.row_h * 2.91, "BRAKE", self.font_label,
+                   red if data.get("brake_pressed") else muted)
+
+    icon_y = self.row_h * 0.47
+    wifi = data.get("wifi_strength", 0)
+    wifi_name = "wifi_strength_full" if wifi >= 4 else "wifi_strength_high" if wifi == 3 else \
+                "wifi_strength_medium" if wifi == 2 else "wifi_strength_low"
+    compass_cx = self.camera_x + self.cell_w * 6.15
+    gps_cx = self.camera_x + self.cell_w * 6.75
+    wifi_cx = self.camera_x + self.cell_w * 7.35
+    self._icon(image, "direction", compass_cx, icon_y, 88,
+               data.get("gps_satellites", 0) > 0, rotation=float(data.get("gps_bearing", 0.0) or 0.0))
+    self._icon(image, "gps", gps_cx, icon_y, 88,
+               data.get("gps_satellites", 0) > 0)
+    self._icon(image, wifi_name, wifi_cx, icon_y, 88, wifi > 0)
+    self._centered(draw, compass_cx, self.row_h * 0.91, "COMPASS", self.font_label, muted)
+    self._centered(draw, gps_cx, self.row_h * 0.91, "GPS", self.font_label, muted)
+    self._centered(draw, wifi_cx, self.row_h * 0.91, "WIFI", self.font_label, muted)
+
+  def _draw_current_speed(self, draw, data, white):
     accel = float(data.get("accel", 0.0) or 0.0)
     if accel > 0:
       alpha = max(80, min(255, int(255 - 180 * min(accel / 3.0, 1.0))))
@@ -138,144 +282,27 @@ class ClusterRenderer:
       alpha = max(60, min(255, int(255 - 255 * min(abs(accel) / 4.0, 1.0))))
       speed_color = (255, alpha, alpha)
 
-    # Vertical speed box, matching the boxed MAX/SET visual language.
-    speed_cx = self.target_w // 2
-    centered(speed_cx, 13, int(current), self.font_speed, speed_color)
-    centered(speed_cx, 123, self.config.speed_unit, self.font_small, (225, 230, 238))
+    conversion = 3.6 if getattr(self.config, "is_metric", True) else 2.236936
+    speed = round(max(0.0, float(data.get("v_ego", 0.0) or 0.0) * conversion))
+    center_x = self.camera_x + self.camera_w / 2
+    self._centered(draw, center_x, self.row_h * 0.29, speed, self.font_current_speed, speed_color)
+    self._centered(draw, center_x, self.row_h * 0.69, self.config.speed_unit,
+                   self.font_current_unit, white)
 
-    # Top-right connectivity: icon-only, dimmed when unavailable.
-    gps_ok = data.get("gps_satellites", 0) > 0
-    wifi = data.get("wifi_strength", 0)
-    wifi_name = "wifi_strength_full" if wifi >= 4 else "wifi_strength_high" if wifi == 3 else "wifi_strength_medium" if wifi == 2 else "wifi_strength_low"
-    icon("direction", self.target_w - 270, 28, 64, gps_ok)
-    icon("gps", self.target_w - 180, 28, 64, gps_ok)
-    icon(wifi_name, self.target_w - 85, 28, 64, wifi > 0)
-
-    # Bottom-left: wheel, accelerator, brake in the requested order.
-    controls = (("wheel_green" if data.get("enabled") else "wheel", "STEER", data.get("enabled"), green),
-                ("disengage_on_accelerator", "ACCEL", data.get("gas_pressed"), amber),
-                ("brake_disc", "BRAKE", data.get("brake_pressed"), red))
-    # Align the three lower controls with the upper box centers:
-    # CRUISE/SET center=84, LIMIT center=184, then BRAKE at equal spacing.
-    for cx, (name, label, active, color) in zip((x0 + 84, x0 + 184, x0 + 284), controls):
-      icon(name, cx - 32, 344, 64, bool(active))
-      centered(cx, 414, label, self.font_label, color if active else muted)
-
-    # Bottom-right: gap indicator above a larger TPMS icon and 2x2 pressures.
-    gap = int(data.get("distance_level", 0) or 0)
-    gap_name = f"dist{min(max(gap, 1), 4)}"
-    tpms_x = self.target_w - 130
-    tpms_center = tpms_x + 56
-    icon(gap_name, int(tpms_center - 39), 248, 78, True)
-    icon("tpms", tpms_x, self.target_h - 122, 112, True)
-    pressures = data.get("tpms", [0, 0, 0, 0])
-    for i, (label, value) in enumerate(zip(("FL", "FR", "RL", "RR"), pressures)):
-      # Values are deliberately overlaid on the TPMS vehicle silhouette.
-      px = tpms_x + 20 + (i % 2) * 60
-      py = self.target_h - 112 + (i // 2) * 58
-      centered(px, py, label, self.font_label, muted)
-      centered(px, py + 20, f"{value:.1f}" if value else "--", self.font_small, white)
-
-  def _project_pt(self, x, y, z):
-    if x < 0.1: x = 0.1
-    px_y = int((self.target_h / 2) + (self.focal_length * (self.camera_height + z) / x))
-    px_x = int((self.target_w / 2) - (self.focal_length * y / x))
-    return px_x, px_y
-
-  def _draw_model_path(self, frame, path_data, hud_data):
-    overlay = frame.copy()
-    if not path_data['path_x']:
-      return frame
-
-    if hud_data['enabled']:
-      pts_left, pts_right = [], []
-      path_width = 1.8
-
-      for i in range(len(path_data['path_x'])):
-        x = path_data['path_x'][i]
-        y = path_data['path_y'][i]
-        if x > 50.0: break
-
-        lx, ly = self._project_pt(x, y + path_width / 2, 0)
-        rx, ry = self._project_pt(x, y - path_width / 2, 0)
-        pts_left.append([lx, ly])
-        pts_right.append([rx, ry])
-
-      pts_right.reverse()
-      poly_pts = np.array(pts_left + pts_right, dtype=np.int32)
-      cv2.fillPoly(overlay, [poly_pts], self.config.colors["path_active"])
-      cv2.addWeighted(overlay, 0.3, frame, 0.7, 0, frame)
-
-    lane_color = self.config.colors["lane_line"]
-
-    def draw_lane(xs, ys):
-      if not xs: return
-      pts = []
-      for i in range(len(xs)):
-        if xs[i] > 50.0: break
-        px, py = self._project_pt(xs[i], ys[i], 0)
-        pts.append([px, py])
-      if len(pts) > 1:
-        cv2.polylines(frame, [np.array(pts, dtype=np.int32)], False, lane_color, thickness=4)
-
-    draw_lane(path_data['left_lane_x'], path_data['left_lane_y'])
-    draw_lane(path_data['right_lane_x'], path_data['right_lane_y'])
-    return frame
-
-  def _draw_hud(self, pil_img, hud_data, has_camera):
-    draw = ImageDraw.Draw(pil_img)
-
-    border_color = self.config.colors["engaged"] if hud_data['enabled'] else self.config.colors["disengaged"]
-    draw.rectangle([0, 0, self.target_w, self.target_h], outline=border_color, width=25)
-    self._draw_borders(pil_img, hud_data)
-    self._draw_ignore_limit_timer(pil_img, hud_data)
-
-    if not has_camera:
-      warning_text = "WAITING FOR CAMERA SIGNAL..."
-      draw.text((self.target_w // 2 - 380 + 3, self.target_h // 2 - 25 + 3), warning_text, font=self.font_warning,
-                fill=(0, 0, 0))
-      draw.text((self.target_w // 2 - 380, self.target_h // 2 - 25), warning_text, font=self.font_warning,
-                fill=(255, 50, 50))
-
-    blinker_color = (0, 255, 0)
-    if hud_data['left_blinker']:
-      draw.polygon([(40, 40), (80, 15), (80, 65)], fill=blinker_color)
-    if hud_data['right_blinker']:
-      draw.polygon([(self.target_w - 40, 40), (self.target_w - 80, 15), (self.target_w - 80, 65)], fill=blinker_color)
-
-  def _draw_borders(self, pil_img, data):
-    """Mici onroad-style status borders for blinkers, blind spots and state."""
-    draw = ImageDraw.Draw(pil_img)
-    border_size = 10
-    blinking = (time.monotonic() % 0.9) < 0.45
-    red, orange, green, steering = (255, 80, 70), (255, 170, 55), (90, 220, 120), (80, 180, 255)
-
-    def side(x, blinker, blindspot):
-      if data.get('brake_pressed') or blindspot:
-        color, visible = red, True
-      elif blinker:
-        color, visible = orange, blinking
-      elif data.get('enabled'):
-        color, visible = green, True
+  def _draw_speed_limit(self, draw, cx, cy, data, white, red):
+    if data.get("nda_state"):
+      if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
+        limit = float(data.get("cam_limit_speed"))
+      elif data.get("section_limit_speed", 0) > 0 and data.get("section_left_dist", 0) > 0:
+        limit = float(data.get("section_limit_speed"))
       else:
-        color, visible = steering, False
-      if visible:
-        draw.rectangle([x, 0, x + border_size - 1, self.target_h - 1], fill=color)
-
-    side(0, data.get('left_blinker', False), data.get('left_blindspot', False))
-    side(self.target_w - border_size, data.get('right_blinker', False), data.get('right_blindspot', False))
-
-  def _draw_ignore_limit_timer(self, pil_img, data):
-    """Mici orange countdown bar, shrinking as ignoreLimitTimer expires."""
-    max_ticks = 3000.0
-    timer = float(data.get('ignore_limit_timer', 0.0) or 0.0)
-    if timer <= 0 or timer >= max_ticks:
-      return
-    ratio = max(0.0, min(1.0, (max_ticks - timer) / max_ticks))
-    bar_width = int(self.target_w * ratio)
-    if bar_width <= 0:
-      return
-    draw = ImageDraw.Draw(pil_img)
-    # Match mici: centered, 10px orange translucent bar at the top edge.
-    draw.rectangle([int((self.target_w - bar_width) / 2), 0,
-                    int((self.target_w + bar_width) / 2), 9], fill=(190, 125, 40))
+        limit = float(data.get("nav_limit_speed", 0.0) or 0.0)
+    elif data.get("stock_limit_speed", 0) > 0:
+      limit = float(data.get("stock_limit_speed"))
+    else:
+      limit = float(data.get("nav_limit_speed", 0.0) or 0.0)
+    radius = 39
+    draw.ellipse([cx - radius - 8, cy - radius - 8, cx + radius + 8, cy + radius + 8], fill=white)
+    draw.ellipse([cx - radius - 6, cy - radius - 6, cx + radius + 6, cy + radius + 6], outline=red, width=6)
+    draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], fill=white)
+    self._centered(draw, cx, cy, self._value(limit), self.font_value, (20, 25, 30))
