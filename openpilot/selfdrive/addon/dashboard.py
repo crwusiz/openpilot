@@ -504,6 +504,7 @@ def render_tab_toggles():
     ("CabinCameraOnReverse", "Driver Camera On Reverse", "Displays the driver camera when in reverse"),
     ("CabinCameraHardwareMissing", "Driver Camera Hardware Missing", "Drive without the driver camera"),
     ("LoggerEnable", "Logger Enable", "Enable Logger"),
+    ("ClusterEnable", "Cluster Enable", "Enable Turzx 9.2 inch Cluster"),
     ("LanguageSetting", "Language (en/ko)", "Switch language between English and Korean"),
   ]
 
@@ -744,7 +745,7 @@ def render_tab_camera():
                         }}
                     }});
 
-                    const payload = {{ sdp: pc.localDescription.sdp, init_camera: "{stream_type}", enabled: true, bridge_services_in: [], bridge_services_out: [] }};
+                    const payload = {{ sdp: pc.localDescription.sdp, cameras: ["{stream_type}"], enabled: true, bridge_services_in: [], bridge_services_out: [] }};
                     const response = await fetch(`http://${{ip}}:5001/stream`, {{ method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(payload) }});
                     if(response.ok) await pc.setRemoteDescription(await response.json());
                 }} catch (e) {{
