@@ -61,6 +61,9 @@ def only_offroad(started: bool, params: Params, CP: car.CarParams) -> bool:
 def livestream(started: bool, params: Params, CP: car.CarParams) -> bool:
   return params.get_bool("IsLiveStreaming")
 
+def cluster_enable(started: bool, params: Params, CP: car.CarParams) -> bool:
+  return params.get_bool("ClusterEnable")
+
 def or_(*fns):
   return lambda *args: operator.or_(*(fn(*args) for fn in fns))
 
@@ -127,6 +130,7 @@ procs = [
   # Process add
   PythonProcess("navi_controller", "openpilot.selfdrive.controls.neokii.navi_controller", always_run, enabled=not PC),
   NativeProcess("dashboard", "openpilot/selfdrive/addon", ["python3", "dashboard.py"], always_run),
+  PythonProcess("cluster", "openpilot.selfdrive.addon.cluster_run", cluster_enable),
 ]
 
 managed_processes = {p.name: p for p in procs}

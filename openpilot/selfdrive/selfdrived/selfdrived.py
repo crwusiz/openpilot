@@ -73,7 +73,7 @@ class SelfdriveD:
     self.big_model_failed = False
     self.big_model_ready_t = 0.
 
-    self.dcam_is_missing = self.params.get_bool("DriverCameraHardwareMissing")
+    self.dcam_is_missing = self.params.get_bool("CabinCameraHardwareMissing")
 
     # Setup sockets
     self.pm = messaging.PubMaster(['selfdriveState', 'onroadEvents'])
@@ -382,9 +382,9 @@ class SelfdriveD:
       if not SIMULATION and not self.rk.lagging:
         if not self.sm.all_alive(self.camera_packets):
           self.events.add(EventName.cameraMalfunction)
-          if not self.sm.all_alive(['driverCameraState']) and not self.dcam_is_missing:
+          if not self.sm.all_alive(['cabinCameraState']) and not self.dcam_is_missing:
             self.dcam_is_missing = True
-            self.params.put_bool("DriverCameraHardwareMissing", True, block=False)
+            self.params.put_bool("CabinCameraHardwareMissing", True, block=False)
         elif not self.sm.all_freq_ok(self.camera_packets):
           self.events.add(EventName.cameraFrameRate)
     if not REPLAY and self.rk.lagging:

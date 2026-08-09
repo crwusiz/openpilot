@@ -76,10 +76,18 @@ configure_git() {
   git config --local remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
   git config --local http.sslVerify false
   git config --local submodule.recurse true
-  git config --local http.postBuffer 524288000
+  # Keep receive-side allocations small on comma hardware (typically <2 GB RAM).
+  # A 500 MB postBuffer can make git fetch fail before any objects are received.
+  git config --local http.postBuffer 16777216
+  git config --local http.maxRequestBuffer 16777216
+  git config --local pack.windowMemory 16m
+  git config --local pack.packSizeLimit 32m
+  git config --local core.deltaBaseCacheLimit 16m
+  git config --local pack.threads 1
   git config --local core.preloadindex true
-  git config --local fetch.parallel 4
-  git config --local submodule.fetchJobs 4
+  git config --local fetch.parallel 1
+  git config --local submodule.fetchJobs 1
+  git config --local gc.auto 0
   git config --local diff.ignoreSubmodules untracked
 }
 
@@ -90,10 +98,15 @@ update_repository() {
 
   # 1. Fetch (Quietly to maintain log format)
   log "INFO" "Fetching changes..."
-  if ! git fetch origin --prune --quiet; then
+  # Fetch only the active branch. Fetching every remote branch and tags at once
+  # creates a very large pack and can exhaust the device during malloc().
+  local fetch_refspec="+refs/heads/${branch}:refs/remotes/origin/${branch}"
+  if ! git -c pack.threads=1 -c pack.windowMemory=16m -c pack.packSizeLimit=32m \
+      fetch origin "$fetch_refspec" --prune --no-tags --quiet; then
     log "WARNING" "Fetch failed. Retrying..."
     sleep 3
-    if ! git fetch origin --prune --quiet; then
+    if ! git -c pack.threads=1 -c pack.windowMemory=8m -c pack.packSizeLimit=16m \
+        fetch origin "$fetch_refspec" --prune --no-tags --quiet; then
         log "ERROR" "Fetch failed. Check network."
         return 1
     fi
@@ -176,8 +189,8 @@ update_submodules() {
 }
 
 cleanup_gone_branches() {
-  # Quietly process
-  git fetch -p --quiet
+  # update_repository already pruned the active branch; do not issue a second
+  # all-refs fetch here, which defeats the low-memory fetch strategy.
   local gone_branches
   gone_branches=$(git branch -vv | grep ': gone]' | awk '{print $1}' || true)
 

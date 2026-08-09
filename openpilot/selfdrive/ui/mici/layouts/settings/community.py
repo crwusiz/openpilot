@@ -23,8 +23,8 @@ class CommunityLayoutMici(NavScroller):
     is_hda2 = BigParamControl("CANFD Car HDA2", "IsHda2", toggle_callback=restart_needed_callback)
     camera_scc = BigParamControl("CameraSCC (LongControl)", "CameraSccEnable", toggle_callback=restart_needed_callback)
     radar_track = BigParamControl("Radar Track", "RadarTrackEnable", toggle_callback=restart_needed_callback)
-    driver_cam_reverse = BigParamControl("Driver Camera On Reverse Gear", "DriverCameraOnReverse", toggle_callback=restart_needed_callback)
-    driver_cam_missing = BigParamControl("Driver Camera Hardware Missing", "DriverCameraHardwareMissing", toggle_callback=restart_needed_callback)
+    driver_cam_reverse = BigParamControl("Driver Camera On Reverse Gear", "CabinCameraOnReverse", toggle_callback=restart_needed_callback)
+    driver_cam_missing = BigParamControl("Driver Camera Hardware Missing", "CabinCameraHardwareMissing", toggle_callback=restart_needed_callback)
     logger_enable = BigParamControl("Logger Enable", "LoggerEnable", toggle_callback=restart_needed_callback)
     prebuilt_enable = BigParamControl("Prebuilt Enable", "PrebuiltEnable", toggle_callback=restart_needed_callback)
 
@@ -47,8 +47,8 @@ class CommunityLayoutMici(NavScroller):
       ("IsHda2", is_hda2),
       ("CameraSccEnable", camera_scc),
       ("RadarTrackEnable", radar_track),
-      ("DriverCameraOnReverse", driver_cam_reverse),
-      ("DriverCameraHardwareMissing", driver_cam_missing),
+      ("CabinCameraOnReverse", driver_cam_reverse),
+      ("CabinCameraHardwareMissing", driver_cam_missing),
       ("LoggerEnable", logger_enable),
       ("PrebuiltEnable", prebuilt_enable),
     )

@@ -134,7 +134,7 @@ def manager_thread() -> None:
   if not params.get_bool("LoggerEnable"):
     ignore += ["loggerd", "encoderd", "deleter", "logmessaged", "tombstoned", "uploader", "updated", "statsd"]
 
-  if params.get("DriverCameraHardwareMissing"):
+  if params.get("CabinCameraHardwareMissing"):
     ignore += ["dmonitoringd", "dmonitoringmodeld"]
 
   sm = messaging.SubMaster(['deviceState', 'carParams', 'pandaStates'], poll='deviceState')

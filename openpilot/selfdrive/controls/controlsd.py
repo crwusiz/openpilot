@@ -62,7 +62,7 @@ class Controls:
     elif self.CP.lateralTuning.which() == 'torque':
       self.LaC = LatControlTorque(self.CP, self.CI, DT_CTRL)
 
-    self.dcam_is_missing = self.params.get_bool("DriverCameraHardwareMissing")
+    self.dcam_is_missing = self.params.get_bool("CabinCameraHardwareMissing")
 
   def update(self):
     self.sm.update(15)

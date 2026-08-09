@@ -105,7 +105,7 @@ class UIState:
     #add
     self.enabled: bool = False
     self.steeringPressed: bool = False
-    self.driver_camera: bool = self.params.get_bool("DriverCameraOnReverse")
+    self.driver_camera: bool = self.params.get_bool("CabinCameraOnReverse")
     self.show_driver_camera: bool = False
 
     # Callbacks

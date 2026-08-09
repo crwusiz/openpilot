@@ -501,8 +501,8 @@ def render_tab_toggles():
     ("IsHda2", "CANFD Car HDA2", "Highway Drive Assist 2, turn it on"),
     ("CameraSccEnable", "CameraSCC", "HDA1 CameraSCC CAR, HDA2 Connect the ADAS ECAN line to CAMERA modify, turn it on"),
     ("RadarTrackEnable", "Enable Radar Track use", "Enable Radar Track use (disable AEB)"),
-    ("DriverCameraOnReverse", "Driver Camera On Reverse", "Displays the driver camera when in reverse"),
-    ("DriverCameraHardwareMissing", "Driver Camera Hardware Missing", "Drive without the driver camera"),
+    ("CabinCameraOnReverse", "Driver Camera On Reverse", "Displays the driver camera when in reverse"),
+    ("CabinCameraHardwareMissing", "Driver Camera Hardware Missing", "Drive without the driver camera"),
     ("LoggerEnable", "Logger Enable", "Enable Logger"),
     ("LanguageSetting", "Language (en/ko)", "Switch language between English and Korean"),
   ]
