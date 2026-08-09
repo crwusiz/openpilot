@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-import hashlib
-import subprocess
+import locale
+import os
 import sys
 import time
 import traceback
-import locale
 from pathlib import Path
 
 try:
@@ -22,6 +21,10 @@ BASEDIR = Path(__file__).resolve().parents[3]
 if str(BASEDIR) not in sys.path:
   sys.path.insert(0, str(BASEDIR))
 
+ADDON_PYTHONPATH = os.environ.get("ADDON_PYTHONPATH")
+if ADDON_PYTHONPATH and ADDON_PYTHONPATH not in sys.path:
+  sys.path.insert(0, ADDON_PYTHONPATH)
+
 VENDOR_ROOT = Path(__file__).resolve().parent / "cluster" / ".vendor" / "turing-smart-screen-python-main"
 if str(VENDOR_ROOT) not in sys.path:
   sys.path.insert(0, str(VENDOR_ROOT))
@@ -29,32 +32,7 @@ if str(VENDOR_ROOT) not in sys.path:
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.realtime import set_core_affinity
 
-REQUIREMENTS_FILE = Path(__file__).resolve().parent / "requirements.txt"
-REQUIREMENTS_MARKER = Path(__file__).resolve().parent / ".requirements_installed"
 CLUSTER_CORES = [0, 1, 2]
-
-
-def ensure_requirements() -> None:
-  if not REQUIREMENTS_FILE.exists():
-    cloudlog.warning(f"requirements.txt not found at {REQUIREMENTS_FILE}, skipping dependency install.")
-    return
-
-  req_hash = hashlib.sha256(REQUIREMENTS_FILE.read_bytes()).hexdigest()
-  if REQUIREMENTS_MARKER.exists() and REQUIREMENTS_MARKER.read_text().strip() == req_hash:
-    return
-
-  cloudlog.info(f"Installing cluster addon requirements from {REQUIREMENTS_FILE}...")
-  try:
-    subprocess.run(
-      [sys.executable, "-m", "pip", "install", "--break-system-packages", "-r", str(REQUIREMENTS_FILE)],
-      check=True,
-      capture_output=True,
-      text=True,
-    )
-    REQUIREMENTS_MARKER.write_text(req_hash)
-    cloudlog.info("Cluster addon requirements installed successfully.")
-  except subprocess.CalledProcessError as e:
-    cloudlog.error(f"Failed to install cluster addon requirements: {e.stderr}")
 
 
 def main():
@@ -64,7 +42,6 @@ def main():
     cloudlog.warning(f"Failed to set cluster CPU affinity to {CLUSTER_CORES}: {e}")
 
   cloudlog.info("Starting Cluster (Turing 9.2 inch Display) process...")
-  ensure_requirements()
   time.sleep(2)
 
   try:
