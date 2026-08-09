@@ -745,7 +745,7 @@ def render_tab_camera():
                         }}
                     }});
 
-                    const payload = {{ sdp: pc.localDescription.sdp, init_camera: "{stream_type}", enabled: true, bridge_services_in: [], bridge_services_out: [] }};
+                    const payload = {{ sdp: pc.localDescription.sdp, cameras: ["{stream_type}"], enabled: true, bridge_services_in: [], bridge_services_out: [] }};
                     const response = await fetch(`http://${{ip}}:5001/stream`, {{ method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(payload) }});
                     if(response.ok) await pc.setRemoteDescription(await response.json());
                 }} catch (e) {{
