@@ -3,8 +3,8 @@ from pathlib import Path
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 
-USB_TIMEOUT_MS = 2500       # 명령어 통신용 넉넉한 타임아웃 (ms)
-USB_IMAGE_TIMEOUT_MS = 1000 # 기기 크래시(Errno 19)를 방지하기 위해 100ms -> 1000ms로 완화
+USB_TIMEOUT_MS = 2500
+USB_IMAGE_TIMEOUT_MS = 1000
 USB_TARGET_FPS = 20
 USB_CLEAR_HALT_ON_TIMEOUT = True
 
@@ -15,17 +15,11 @@ class ClusterConfig:
     self.width = 1920
     self.height = 462
     self.fps = 10
-    # Match the renderer cadence; the pipeline always keeps only the newest frame.
     self.usb_fps = 10
-    # The tested H.264 playback command uses the same visible refresh path on
-    # this firmware and costs substantially more CPU than JPEG.
     self.use_h264_stream = False
-    # The left half is a dedicated live-camera viewport. The right half remains
-    # available for cluster information widgets.
-    self.camera_panel_width = self.width // 2
+    self.camera_panel_width = self.width * 8 // 10
     self.draw_model_overlay = False
 
-    # USB 전용 설정 값
     self.usb_timeout_ms = USB_TIMEOUT_MS
     self.usb_image_timeout_ms = USB_IMAGE_TIMEOUT_MS
 

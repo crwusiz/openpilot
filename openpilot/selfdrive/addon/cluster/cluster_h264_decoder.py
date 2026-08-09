@@ -28,7 +28,6 @@ class ClusterH264Decoder:
       self.codec = None
 
   def set_extradata(self, header_bytes: bytes):
-    """AVCC 스타일 extradata(header)를 코덱에 직접 설정 (Annex-B 스타트코드로 이어붙일 수 없는 경우)."""
     if self.codec is None:
       return
     try:

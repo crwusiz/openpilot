@@ -23,7 +23,6 @@ def flog(msg):
 
 
 def cluster_main():
-  # 파일 초기화
   try:
     with open(LOG_FILE, "w") as f:
       f.write(f"=== Cluster Session Started at {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
@@ -67,7 +66,6 @@ def cluster_main():
       frame_image = renderer.render(camera, models)
       pipeline.push(frame_image)
 
-      # 1초마다(fps*1 프레임) 터미널 대신 파일에 생존 신고
       loop_count += 1
       if loop_count % fps == 0:
         flog(
@@ -79,8 +77,6 @@ def cluster_main():
     flog("[CLUSTER_MAIN] Interrupted by user.")
   finally:
     flog("[CLUSTER_MAIN] Closing resources...")
-    # USB displays retain their last frame when the sender exits. Explicitly
-    # upload a black frame so a restart/crash cannot leave stale camera data.
     try:
       if display.connected:
         display.send_image(np.zeros((config.height, config.width, 3), dtype=np.uint8))

@@ -219,7 +219,6 @@ class TuringUsbDisplay:
       rotated = cv2.rotate(frame_image, cv2.ROTATE_90_CLOCKWISE)
       bgr_img = cv2.cvtColor(rotated, cv2.COLOR_RGB2BGR)
 
-      # MCU 부하 감소를 위해 압축률을 60으로 하향 조정
       encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 60]
       success, encoded_img = cv2.imencode('.jpg', bgr_img, encode_param)
 
@@ -252,15 +251,12 @@ class TuringUsbDisplay:
 
     except usb.core.USBError as e:
       if e.errno == 110 or 'timed out' in str(e).lower():
-        # [복구] 타임아웃 발생 시 전체 재연결(흰화면/깜빡임)을 막기 위해
-        # 연결을 끊지 않고 파이프라인 락(Stall)만 해제(Soft-Recovery)합니다.
         flog(f"[CLUSTER_USB_WARN] Write timeout (Errno 110). Clearing halt & skipping frame...")
         try:
           if self._ep_out and self.device:
             self.device.clear_halt(self._ep_out)
         except Exception as clear_err:
           flog(f"[CLUSTER_USB_WARN] Failed clear_halt: {clear_err}")
-        # self.connected = False 를 삭제하여 재연결 방지 (매우 중요)
       else:
         err_msg = f"Critical USB Error: {e}"
         flog(f"[CLUSTER_USB_ERROR] {err_msg}")
