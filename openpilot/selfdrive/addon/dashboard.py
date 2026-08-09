@@ -1,46 +1,24 @@
 #!/usr/bin/env python3
-import sys
-import subprocess
-import logging
-import html as html_lib
-import shutil
 import asyncio
-import os
-from pathlib import Path
 from datetime import datetime
+import html as html_lib
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
 
-CUSTOM_LIB_PATH = "/data/dashboard_deps"
-os.makedirs(CUSTOM_LIB_PATH, exist_ok=True)
-
-if CUSTOM_LIB_PATH not in sys.path:
-    sys.path.insert(0, CUSTOM_LIB_PATH)
+ADDON_PYTHONPATH = os.environ.get("ADDON_PYTHONPATH")
+if ADDON_PYTHONPATH and ADDON_PYTHONPATH not in sys.path:
+  sys.path.insert(0, ADDON_PYTHONPATH)
 
 try:
   from openpilot.common.realtime import set_core_affinity
 except ImportError:
   def set_core_affinity(cores): pass
 
-try:
-  from nicegui import ui, app
-except ImportError:
-  logging.getLogger("dashboard").warning(f"nicegui not found. Installing to {CUSTOM_LIB_PATH}...")
-  try:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "--target", CUSTOM_LIB_PATH, "nicegui"])
-  except Exception as e:
-    logging.getLogger("dashboard").error(f"Failed to install nicegui: {e}")
-
-  from nicegui import ui, app
-
-try:
-  from ansi2html import Ansi2HTMLConverter
-except ImportError:
-  logging.getLogger("terminal_tab").warning(f"ansi2html not found. Installing to {CUSTOM_LIB_PATH}...")
-  try:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "--target", CUSTOM_LIB_PATH, "ansi2html"])
-  except Exception as e:
-    logging.getLogger("terminal_tab").error(f"Failed to install ansi2html: {e}")
-
-  from ansi2html import Ansi2HTMLConverter
+from ansi2html import Ansi2HTMLConverter
+from nicegui import app, ui
 
 # ── 환경 설정 및 유틸리티 ───────────────────────────────────────
 SCRIPTS_PATH = "/data/openpilot/scripts"

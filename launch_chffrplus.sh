@@ -147,39 +147,43 @@ function launch {
     echo -n 1 > /data/params/d/AdbEnabled
   fi
 
-  CUSTOM_DEPS="/data/dashboard_deps"
-  mkdir -p "$CUSTOM_DEPS"
-  export PYTHONPATH="$CUSTOM_DEPS:$PYTHONPATH"
+  ADDON_REQUIREMENTS="$DIR/openpilot/selfdrive/addon/requirements.txt"
+  ADDON_REQUIREMENTS_HASH=$(sha256sum "$ADDON_REQUIREMENTS" | awk '{print $1}')
 
-  function wait_for_internet {
-    echo "Waiting for internet connection..."
-    for i in {1..20}; do
-      if ping -c 1 -W 1 8.8.8.8 &> /dev/null; then
-        echo "Internet connected!"
-        return 0
+  if [ -f /AGNOS ]; then
+    ADDON_DEPS="/data/addon_deps"
+    ADDON_INSTALL_TMPDIR="/data/addon_pip_tmp"
+    mkdir -p "$ADDON_DEPS"
+    mkdir -p "$ADDON_INSTALL_TMPDIR"
+    export ADDON_PYTHONPATH="$ADDON_DEPS"
+    ADDON_REQUIREMENTS_MARKER="$ADDON_DEPS/.requirements_installed"
+    ADDON_INSTALLER=(python3 -m pip install --no-cache-dir --upgrade --target "$ADDON_DEPS")
+  else
+    ADDON_SITE_PACKAGES=$(python3 -c 'import sysconfig; print(sysconfig.get_path("purelib"))')
+    ADDON_REQUIREMENTS_MARKER="$ADDON_SITE_PACKAGES/.addon_requirements_installed"
+
+    if python3 -m pip --version &>/dev/null; then
+      ADDON_INSTALLER=(python3 -m pip install --break-system-packages)
+    elif command -v uv &>/dev/null; then
+      ADDON_INSTALLER=(uv pip install --python "$(command -v python3)")
+    else
+      echo "Neither pip nor uv is available for $(command -v python3)"
+      exit 1
+    fi
+  fi
+
+  if [ ! -f "$ADDON_REQUIREMENTS_MARKER" ] || [ "$(cat "$ADDON_REQUIREMENTS_MARKER")" != "$ADDON_REQUIREMENTS_HASH" ]; then
+    echo "Installing addon dependencies from $ADDON_REQUIREMENTS..."
+    (
+      if [ -n "${ADDON_INSTALL_TMPDIR:-}" ]; then
+        export TMPDIR="$ADDON_INSTALL_TMPDIR"
       fi
-      sleep 1
-    done
-    echo "Internet connection timeout."
-    return 1
-  }
-
-  if ! python3 -c "import nicegui" &> /dev/null; then
-    echo "nicegui not found. Installing..."
-    wait_for_internet
-    pip install --target "$CUSTOM_DEPS" nicegui
-  fi
-
-  if ! python3 -c "import ansi2html" &> /dev/null; then
-    echo "ansi2html not found. Installing..."
-    wait_for_internet
-    pip install --target "$CUSTOM_DEPS" ansi2html
-  fi
-
-  if ! python3 -c "import libdatachannel" &> /dev/null; then
-    echo "libdatachannel not found. Installing..."
-    wait_for_internet
-    pip install --target "$CUSTOM_DEPS" libdatachannel-py
+      "${ADDON_INSTALLER[@]}" -r "$ADDON_REQUIREMENTS"
+    ) || {
+      echo "Failed to install addon dependencies"
+      exit 1
+    }
+    echo -n "$ADDON_REQUIREMENTS_HASH" > "$ADDON_REQUIREMENTS_MARKER"
   fi
 
   # start manager
