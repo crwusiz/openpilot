@@ -440,8 +440,6 @@ def get_RadarState_from_vision(md_arrays, lead_msg: capnp._DynamicStructReader, 
 
 class RadarD:
   def __init__(self, delay: float = 0.0):
-    self.current_time = 0.0
-
     self.tracks: dict[int, Track] = {}
 
     self.lead_prob_filters = [FirstOrderFilter(0.0, 0.2, DT_MDL) for _ in range(2)]
@@ -488,7 +486,6 @@ class RadarD:
 
   def update(self, sm: messaging.SubMaster, rr: car.RadarData):
     self.ready = sm.seen['modelV2']
-    self.current_time = 1e-9 * max(sm.logMonoTime.values())
 
     self.enable_radar_tracks = self.params.get_bool("RadarTrackEnable")
     self.enable_corner_radar = self.params.get_bool("IsHda2")

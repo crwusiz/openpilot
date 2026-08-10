@@ -339,11 +339,6 @@ def low_memory_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaste
   return NormalPermanentAlert("메모리 부족", f"{sm['deviceState'].memoryUsagePercent}% 사용됨")
 
 
-def high_cpu_usage_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
-  x = max(sm['deviceState'].cpuUsagePercent, default=0.)
-  return NormalPermanentAlert("CPU 사용량이 높습니다", f"{x}% 사용됨")
-
-
 def modeld_lagging_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   return NormalPermanentAlert("주행 모델 처리 지연", f"{sm['modelV2'].frameDropPerc:.1f}% 프레임 손실")
 
