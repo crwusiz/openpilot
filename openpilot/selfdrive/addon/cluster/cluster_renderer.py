@@ -78,7 +78,7 @@ class ClusterRenderer:
       frame = self.blank_canvas.copy()
 
     hud_data = models.get_hud_data()
-    if has_camera and self.config.draw_model_overlay and models.is_valid():
+    if has_camera and models.is_valid():
       frame = self._draw_model_path(frame, models.get_path_data(), hud_data)
 
     pil_img = Image.fromarray(frame)
@@ -340,17 +340,17 @@ class ClusterRenderer:
   def _draw_left_panel(self, image, draw, data, white, muted, green, blue):
     cx = self.side_w / 2
     cruise = self._value(data.get("cruise_speed"))
-    set_speed = self._value(data.get("set_speed", data.get("cruise_speed")))
+    is_cruise_set = bool(data.get("is_cruise_set"))
+    set_speed = self._value(data.get("set_speed", data.get("cruise_speed"))) if is_cruise_set else "--"
 
     self._centered(draw, cx, self.row_h * 0.28, "MAX", self.font_label, muted)
     self._centered(draw, cx, self.row_h * 0.58, cruise, self.font_speed, white)
     self._centered(draw, cx, self.row_h * 0.79, self.config.speed_unit, self.font_unit, muted)
 
-    if data.get("is_cruise_set"):
-      self._centered(draw, cx, self.row_h * 1.28, "SET", self.font_label, muted)
-      self._centered(draw, cx, self.row_h * 1.58, set_speed, self.font_speed,
-                     green if data.get("enabled") else blue)
-      self._centered(draw, cx, self.row_h * 1.79, self.config.speed_unit, self.font_unit, muted)
+    set_speed_color = green if data.get("enabled") and is_cruise_set else blue if is_cruise_set else muted
+    self._centered(draw, cx, self.row_h * 1.28, "SET", self.font_label, muted)
+    self._centered(draw, cx, self.row_h * 1.58, set_speed, self.font_speed, set_speed_color)
+    self._centered(draw, cx, self.row_h * 1.79, self.config.speed_unit, self.font_unit, muted)
 
     if data.get("left_blinker") or data.get("right_blinker") or data.get("brake_pressed"):
       wheel_name = "wheel_critical"
