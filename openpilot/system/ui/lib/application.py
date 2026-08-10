@@ -17,6 +17,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import NamedTuple
 from importlib.resources import as_file, files
+from openpilot.common.basedir import BASEDIR
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware import HARDWARE, PC
 from openpilot.system.ui.lib.multilang import FONT_FALLBACK_LANGUAGES, TRANSLATIONS_DIR, multilang
@@ -92,10 +93,11 @@ FONT_SCALE = 1.242 if BIG_UI else 1.16
 
 ASSETS_DIR = files("openpilot.selfdrive").joinpath("assets")
 FONT_DIR = ASSETS_DIR.joinpath("fonts")
+EVENTS_KO_PATH = Path(BASEDIR) / "scripts" / "add" / "events_ko.py"
 EXTRA_FONT_CHARS = "–‑✓×°§•X⚙✕◀▶✔⌫⇧␣○●↳çêüñ–‑✓×°§•€£¥"
 NOTO_FONTS = {
   "ja": "NotoSansCJKjp-Regular.otf",
-  "ko": "NotoSansCJKkr-Regular.otf",
+  "ko": "NotoSansKR-Bold.ttf",
   "th": "NotoSansThai-Regular.ttf",
   "zh-CHS": "NotoSansCJKsc-Regular.otf",
   "zh-CHT": "NotoSansCJKtc-Regular.otf",
@@ -692,6 +694,8 @@ class GuiApplication:
     if language not in self._fallback_fonts:
       chars = set(map(chr, range(32, 127))) | set(EXTRA_FONT_CHARS)
       chars.update(TRANSLATIONS_DIR.joinpath(f"app_{language}.po").read_text(encoding="utf-8"))
+      if language == "ko" and EVENTS_KO_PATH.is_file():
+        chars.update(EVENTS_KO_PATH.read_text(encoding="utf-8"))
       codepoints = sorted(map(ord, chars))
       codepoint_buffer = rl.ffi.new("int[]", codepoints)
       with as_file(FONT_DIR) as fspath:
