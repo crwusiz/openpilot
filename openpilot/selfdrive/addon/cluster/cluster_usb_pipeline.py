@@ -58,17 +58,16 @@ class ClusterUsbPipeline:
             time.sleep(1.0)
             continue
 
-        t0 = time.time()
+        t0 = time.monotonic()
         self.display.send_image(frame_image)
-        t1 = time.time()
+        t1 = time.monotonic()
 
         elapsed = t1 - t0
-        sleep_time = target_interval - elapsed
-
-        if sleep_time < 0.03:
-          sleep_time = 0.03
-
-        time.sleep(sleep_time)
+        # Keep a 20 Hz start-to-start cadence. Adding a fixed delay after the
+        # USB transfer reduced the effective frame rate by the transfer time.
+        sleep_time = max(0.0, target_interval - elapsed)
+        if sleep_time:
+          time.sleep(sleep_time)
 
       except queue.Empty:
         continue

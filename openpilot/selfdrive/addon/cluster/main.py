@@ -58,20 +58,35 @@ def cluster_main():
   flog(msg)
 
   loop_count = 0
+  perf_started = time.monotonic()
+  perf_render_time = 0.0
+  perf_frames = 0
   try:
     while True:
       camera.update()
       models.update()
 
+      render_started = time.monotonic()
       frame_image = renderer.render(camera, models)
+      perf_render_time += time.monotonic() - render_started
       pipeline.push(frame_image)
 
       loop_count += 1
+      perf_frames += 1
       if loop_count % fps == 0:
         flog(
           f"[CLUSTER_HEARTBEAT] Loop: {loop_count} | Camera Ready: {camera.has_frame()} | USB Connected: {display.connected}")
 
       rk.keep_time()
+
+      if perf_frames >= fps * 10:
+        now = time.monotonic()
+        elapsed = max(now - perf_started, 1e-6)
+        flog(f"[CLUSTER_MAIN_PERF] fps={perf_frames / elapsed:.2f} | "
+             f"render_avg={perf_render_time * 1000 / perf_frames:.1f}ms")
+        perf_started = now
+        perf_render_time = 0.0
+        perf_frames = 0
 
   except KeyboardInterrupt:
     flog("[CLUSTER_MAIN] Interrupted by user.")

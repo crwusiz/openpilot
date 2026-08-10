@@ -14,11 +14,10 @@ class ClusterConfig:
 
     self.width = 1920
     self.height = 462
-    self.fps = 10
-    self.usb_fps = 10
-    self.use_h264_stream = False
-    self.camera_panel_width = self.width * 8 // 10
-    self.draw_model_overlay = False
+    # Road camera and model data are published at 20 Hz on-device.
+    self.fps = USB_TARGET_FPS
+    self.usb_fps = USB_TARGET_FPS
+    self.camera_panel_width = self.width * 6 // 10
 
     self.usb_timeout_ms = USB_TIMEOUT_MS
     self.usb_image_timeout_ms = USB_IMAGE_TIMEOUT_MS

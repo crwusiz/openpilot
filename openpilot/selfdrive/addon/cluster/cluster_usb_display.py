@@ -1,12 +1,9 @@
 import numpy as np
 import os
 import time
-from fractions import Fraction
 import cv2
 import usb.util
 import usb.core
-import av
-from openpilot.common.swaglog import cloudlog
 
 LOG_FILE = "/data/openpilot/openpilot/selfdrive/addon/cluster/cluster_debug.log"
 
@@ -31,20 +28,17 @@ class TuringUsbDisplay:
     self.product_id = None
     self.frame_count = 0
     self.consecutive_upload_failures = 0
+    self._encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 60]
+    self._perf_started = None
+    self._perf_frames = 0
+    self._perf_prepare_time = 0.0
+    self._perf_usb_time = 0.0
 
     self._find_usb_device = None
-    self._send_image = None
     self._send_jpeg = None
     self._resp_ok = None
-    self._build_header = None
-    self._encrypt = None
-    self._cmd_upload_jpeg = None
     self._ep_out = None
-    self._write_to_device = None
-    self._h264_streaming = False
-    self._h264_encoder = None
-    self._h264_chunk_size = 202752
-    self._h264_frame_count = 0
+    self._ep_in = None
     flog("TuringUsbDisplay initialized.")
 
   def open(self):
@@ -59,24 +53,13 @@ class TuringUsbDisplay:
       os.environ['LANGUAGE'] = 'C.UTF-8'
 
       from library.lcd.lcd_comm_turing_usb import (
-        find_usb_device, send_image, send_jpeg, send_sync_command,
+        find_usb_device, send_jpeg, send_sync_command,
         send_frame_rate_command, _resp_ok,
-        build_command_packet_header, encrypt_command_packet, write_to_device,
-        CMD_UPLOAD_JPEG, CMD_PLAY_H264_CHUNK, CMD_GET_H264_CHUNK_SIZE,
-        CMD_STOP_STREAM,
       )
 
       self._find_usb_device = find_usb_device
-      self._send_image = send_image
       self._send_jpeg = send_jpeg
       self._resp_ok = _resp_ok
-      self._build_header = build_command_packet_header
-      self._encrypt = encrypt_command_packet
-      self._cmd_upload_jpeg = CMD_UPLOAD_JPEG
-      self._write_to_device = write_to_device
-      self._cmd_play_h264_chunk = CMD_PLAY_H264_CHUNK
-      self._cmd_get_h264_chunk_size = CMD_GET_H264_CHUNK_SIZE
-      self._cmd_stop_stream = CMD_STOP_STREAM
 
       self.device, self.dev_pid = self._find_usb_device()
 
@@ -102,6 +85,8 @@ class TuringUsbDisplay:
           intf = usb.util.find_descriptor(cfg, bInterfaceNumber=0)
           self._ep_out = usb.util.find_descriptor(
             intf, custom_match=lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_OUT)
+          self._ep_in = usb.util.find_descriptor(
+            intf, custom_match=lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_IN)
 
           for attempt in range(3):
             flog(f"[CLUSTER_USB] Sending sync handshake (Attempt {attempt+1})...")
@@ -112,9 +97,6 @@ class TuringUsbDisplay:
           resp = send_frame_rate_command(self.device, self.config.usb_fps)
           flog(f"[CLUSTER_USB] Frame rate response: ok={self._resp_ok(resp)}")
           time.sleep(0.1)
-
-          if getattr(self.config, 'use_h264_stream', False):
-            self._start_h264_stream()
 
           self.connected = True
           self.consecutive_upload_failures = 0
@@ -132,106 +114,33 @@ class TuringUsbDisplay:
       flog(f"[CLUSTER_USB_ERROR] Error opening Turing display: {e}")
       return False
 
-  def _send_command(self, command, payload=b'', last_chunk=False):
-    packet = self._build_header(command)
-    payload_size = len(payload)
-    packet[8] = (payload_size >> 24) & 0xFF
-    packet[9] = (payload_size >> 16) & 0xFF
-    packet[10] = (payload_size >> 8) & 0xFF
-    packet[11] = payload_size & 0xFF
-    if last_chunk:
-      packet[12] = 1
-    return self._write_to_device(self.device, self._encrypt(packet) + payload)
-
-  def _start_h264_stream(self):
-    """Enable the panel's video decoder for flicker-free live updates."""
-    try:
-      # Same playback-mode sequence used by the vendor library's send_video().
-      for command in (111, 112, 13, 41):
-        self._send_command(command)
-
-      response = self._send_command(self._cmd_get_h264_chunk_size)
-      if response and len(response) >= 12:
-        negotiated = int.from_bytes(response[8:12], byteorder='big', signed=False)
-        if 0 < negotiated <= 1024 * 1024:
-          self._h264_chunk_size = negotiated
-
-      width, height = self.config.height, self.config.width
-      encoder = av.CodecContext.create('libx264', 'w')
-      encoder.width = width
-      encoder.height = height
-      encoder.pix_fmt = 'yuv420p'
-      encoder.time_base = Fraction(1, self.config.usb_fps)
-      encoder.framerate = Fraction(self.config.usb_fps, 1)
-      encoder.options = {
-        'preset': 'ultrafast', 'tune': 'zerolatency', 'profile': 'baseline',
-        'g': str(self.config.usb_fps), 'keyint_min': str(self.config.usb_fps),
-        'sc_threshold': '0', 'annexb': '1',
-      }
-      encoder.open()
-      self._h264_encoder = encoder
-      self._h264_frame_count = 0
-      self._h264_streaming = True
-      flog(f"[CLUSTER_USB] H.264 stream enabled (chunk={self._h264_chunk_size}).")
-    except Exception as e:
-      self._h264_streaming = False
-      self._h264_encoder = None
-      flog(f"[CLUSTER_USB_WARN] H.264 stream unavailable; using JPEG fallback: {e}")
-
-  def _send_h264_frame(self, frame_image):
-    rotated = cv2.rotate(frame_image, cv2.ROTATE_90_CLOCKWISE)
-    video_frame = av.VideoFrame.from_ndarray(rotated, format='rgb24')
-    video_frame.pts = self._h264_frame_count
-    self._h264_frame_count += 1
-
-    for encoded_packet in self._h264_encoder.encode(video_frame):
-      encoded = bytes(encoded_packet)
-      for offset in range(0, len(encoded), self._h264_chunk_size):
-        response = self._send_command(
-          self._cmd_play_h264_chunk, encoded[offset:offset + self._h264_chunk_size])
-        if response is None:
-          raise RuntimeError('H.264 chunk was not acknowledged')
-
   def send_image(self, frame_image):
     if not self.connected or self.device is None:
       return
 
     try:
+      prepare_started = time.monotonic()
       if not isinstance(frame_image, np.ndarray):
         frame_image = np.array(frame_image)
 
-      if self._h264_streaming:
-        t0 = time.time()
-        try:
-          self._send_h264_frame(frame_image)
-          elapsed = time.time() - t0
-          self.frame_count += 1
-          if self.frame_count <= 20 or self.frame_count % self.config.usb_fps == 0:
-            flog(f"[CLUSTER_USB_TX] H264 frame#{self.frame_count} | elapsed={elapsed:.3f}s")
-          return
-        except Exception as e:
-          # Preserve a working display if this unit's firmware does not accept
-          # the live H.264 variant of the protocol.
-          self._h264_streaming = False
-          self._h264_encoder = None
-          flog(f"[CLUSTER_USB_WARN] H.264 stream failed; switching to JPEG: {e}")
-
       rotated = cv2.rotate(frame_image, cv2.ROTATE_90_CLOCKWISE)
-      bgr_img = cv2.cvtColor(rotated, cv2.COLOR_RGB2BGR)
+      # Reuse the rotation buffer for the channel swap instead of allocating a
+      # second full 462x1920 image on every frame.
+      cv2.cvtColor(rotated, cv2.COLOR_RGB2BGR, dst=rotated)
 
-      encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 60]
-      success, encoded_img = cv2.imencode('.jpg', bgr_img, encode_param)
+      success, encoded_img = cv2.imencode('.jpg', rotated, self._encode_param)
 
       if success:
         jpg_bytes = encoded_img.tobytes()
         size_kb = len(jpg_bytes) // 1024
+        prepare_elapsed = time.monotonic() - prepare_started
 
-        t0 = time.time()
+        t0 = time.monotonic()
         # The device returns an ACK for every image.  This must be read: leaving
         # ACKs in the IN endpoint fills the device queue after ~17 frames, then
         # the following OUT write blocks until its USB timeout.
-        response = self._send_jpeg(self.device, jpg_bytes)
-        elapsed = time.time() - t0
+        response = self._send_jpeg(self.device, jpg_bytes, ep_out=self._ep_out, ep_in=self._ep_in)
+        elapsed = time.monotonic() - t0
 
         if not self._resp_ok(response):
           self.consecutive_upload_failures += 1
@@ -246,8 +155,25 @@ class TuringUsbDisplay:
         self.consecutive_upload_failures = 0
 
         self.frame_count += 1
+        now = time.monotonic()
+        if self._perf_started is None:
+          self._perf_started = prepare_started
+        self._perf_frames += 1
+        self._perf_prepare_time += prepare_elapsed
+        self._perf_usb_time += elapsed
         if self.frame_count <= 20 or self.frame_count % self.config.fps == 0:
-          flog(f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {size_kb} KB | elapsed={elapsed:.3f}s (ACK received)")
+          flog(f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {size_kb} KB | "
+               f"elapsed={elapsed:.3f}s | prep={prepare_elapsed * 1000:.1f}ms (ACK received)")
+
+        if self._perf_frames >= self.config.fps * 10:
+          perf_elapsed = max(now - self._perf_started, 1e-6)
+          flog(f"[CLUSTER_USB_PERF] fps={self._perf_frames / perf_elapsed:.2f} | "
+               f"prep_avg={self._perf_prepare_time * 1000 / self._perf_frames:.1f}ms | "
+               f"usb_avg={self._perf_usb_time * 1000 / self._perf_frames:.1f}ms")
+          self._perf_started = now
+          self._perf_frames = 0
+          self._perf_prepare_time = 0.0
+          self._perf_usb_time = 0.0
 
     except usb.core.USBError as e:
       if e.errno == 110 or 'timed out' in str(e).lower():
@@ -270,13 +196,8 @@ class TuringUsbDisplay:
 
   def close(self):
     flog("Closing Turing connection.")
-    if self._h264_streaming and self.device is not None:
-      try:
-        self._send_command(self._cmd_stop_stream)
-      except Exception:
-        pass
-    self._h264_streaming = False
-    self._h264_encoder = None
     self.connected = False
     self.device = None
     self.dev_pid = None
+    self._ep_out = None
+    self._ep_in = None
