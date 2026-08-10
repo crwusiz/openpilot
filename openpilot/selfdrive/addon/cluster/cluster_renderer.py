@@ -1,9 +1,18 @@
 import os
+import time
 import cv2
 import numpy as np
 
 from PIL import Image, ImageDraw, ImageFont
 from openpilot.common.swaglog import cloudlog
+
+
+DISTANCE_ICONS = {
+  1: "dist1",
+  2: "dist2",
+  3: "dist3",
+  4: "dist4",
+}
 
 
 class ClusterRenderer:
@@ -13,11 +22,16 @@ class ClusterRenderer:
 
     self.target_w = config.width
     self.target_h = config.height
-    self.side_w = self.target_w // 10
-    self.camera_x = self.side_w
-    self.camera_w = self.target_w - 2 * self.side_w
-    self.cell_w = self.camera_w / 8.0
+    # Five horizontal regions: a:b:c:d:e = 1:1:6:1:1.
+    self.panel_w = self.target_w // 10
+    self.side_w = self.panel_w
+    self.left_aux_x = self.panel_w
+    self.camera_x = self.panel_w * 2
+    self.camera_w = self.panel_w * 6
+    self.right_aux_x = self.camera_x + self.camera_w
+    self.right_panel_x = self.right_aux_x + self.panel_w
     self.row_h = self.target_h / 3.0
+    self._source_to_panel = np.eye(3, dtype=np.float32)
 
     try:
       self.font_speed = ImageFont.truetype(self.config.font_bold, 58)
@@ -46,10 +60,10 @@ class ClusterRenderer:
     self._icon_cache = {}
     icon_dir = os.path.join(str(self.config.BASEDIR), "selfdrive", "assets", "icons")
     for name in (
-      "wheel", "wheel_green", "wheel_blue", "wheel_critical", "disengage_on_accelerator",
-      "brake_disc", "tpms", "gps", "direction", "wifi_strength_low", "wifi_strength_medium",
+      "wheel", "wheel_green", "wheel_blue", "wheel_critical", "accel_pressed", "brake_pressed",
+      "tpms", "gps", "direction", "wifi_strength_low", "wifi_strength_medium",
       "wifi_strength_high", "wifi_strength_full", "traffic_green", "traffic_red", "traffic_off",
-      "speed_bump", "school_zone", "speed_camera", "dist1", "dist2", "dist3", "dist4",
+      "speed_bump", "school_zone", "speed_camera", *DISTANCE_ICONS.values(),
     ):
       try:
         self.icons[name] = Image.open(os.path.join(icon_dir, f"{name}.png")).convert("RGBA")
@@ -64,7 +78,7 @@ class ClusterRenderer:
       frame = self.blank_canvas.copy()
 
     hud_data = models.get_hud_data()
-    if self.config.draw_model_overlay and models.is_valid():
+    if has_camera and self.config.draw_model_overlay and models.is_valid():
       frame = self._draw_model_path(frame, models.get_path_data(), hud_data)
 
     pil_img = Image.fromarray(frame)
@@ -72,46 +86,150 @@ class ClusterRenderer:
     return np.array(pil_img)
 
   def _crop_and_resize(self, frame):
-    camera = cv2.resize(frame, (self.camera_w, self.target_h), interpolation=cv2.INTER_AREA)
+    source_h, source_w = frame.shape[:2]
+    scale = max(self.camera_w / source_w, self.target_h / source_h)
+    resized_w = max(self.camera_w, int(round(source_w * scale)))
+    resized_h = max(self.target_h, int(round(source_h * scale)))
+    resized = cv2.resize(frame, (resized_w, resized_h), interpolation=cv2.INTER_AREA)
+    crop_x = (resized_w - self.camera_w) // 2
+    crop_y = (resized_h - self.target_h) // 2
+    camera = resized[crop_y:crop_y + self.target_h, crop_x:crop_x + self.camera_w]
+
+    scale_x = resized_w / source_w
+    scale_y = resized_h / source_h
+    self._source_to_panel = np.array([
+      [scale_x, 0.0, self.camera_x - crop_x],
+      [0.0, scale_y, -crop_y],
+      [0.0, 0.0, 1.0],
+    ], dtype=np.float32)
     canvas = self.blank_canvas.copy()
     canvas[:, self.camera_x:self.camera_x + self.camera_w] = camera
     return canvas
 
-  def _project_pt(self, x, y, z):
-    if x < 0.1:
-      x = 0.1
-    px_y = int((self.target_h / 2) + (self.focal_length * (self.camera_height + z) / x))
-    px_x = int(self.camera_x + self.camera_w / 2 - (self.focal_length * y / x))
-    return px_x, px_y
+  def _project_points(self, points, calib_transform):
+    points = np.asarray(points, dtype=np.float32)
+    if points.size == 0:
+      return np.empty((0, 2), dtype=np.float32), np.empty((0,), dtype=bool)
+    projected = np.asarray(calib_transform, dtype=np.float32) @ points.T
+    valid = projected[2] > 1e-3
+    pixels = np.zeros((len(points), 2), dtype=np.float32)
+    if np.any(valid):
+      normalized = projected[:, valid] / projected[2, valid]
+      panel = self._source_to_panel @ normalized
+      pixels[valid] = panel[:2].T
+      valid &= (
+        (pixels[:, 0] >= self.camera_x) &
+        (pixels[:, 0] < self.camera_x + self.camera_w) &
+        (pixels[:, 1] >= 0) &
+        (pixels[:, 1] < self.target_h)
+      )
+    return pixels, valid
+
+  def _project_ribbon(self, xs, ys, zs, width, z_offset, calib_transform, max_distance=100.0):
+    count = min(len(xs), len(ys), len(zs))
+    if count < 2:
+      return None
+    raw = np.column_stack((xs[:count], ys[:count], zs[:count])).astype(np.float32)
+    raw = raw[(raw[:, 0] >= 0.0) & (raw[:, 0] <= max_distance)]
+    if len(raw) < 2:
+      return None
+    left = raw + np.array([0.0, -width, z_offset], dtype=np.float32)
+    right = raw + np.array([0.0, width, z_offset], dtype=np.float32)
+    left_px, left_valid = self._project_points(left, calib_transform)
+    right_px, right_valid = self._project_points(right, calib_transform)
+    valid = left_valid & right_valid
+    if np.count_nonzero(valid) < 2:
+      return None
+    return np.vstack((left_px[valid], right_px[valid][::-1])).astype(np.int32)
 
   def _draw_model_path(self, frame, path_data, hud_data):
-    overlay = frame.copy()
     if not path_data["path_x"]:
       return frame
+    calib_transform = path_data.get("calib_transform")
+    if calib_transform is None:
+      return frame
 
-    if hud_data["enabled"]:
-      pts_left, pts_right = [], []
-      path_width = 1.8
-      for x, y in zip(path_data["path_x"], path_data["path_y"]):
-        if x > 50.0:
-          break
-        pts_left.append(self._project_pt(x, y + path_width / 2, 0))
-        pts_right.append(self._project_pt(x, y - path_width / 2, 0))
-      if pts_left and pts_right:
-        poly_pts = np.array(pts_left + list(reversed(pts_right)), dtype=np.int32)
-        cv2.fillPoly(overlay, [poly_pts], self.config.colors["path_active"])
-        cv2.addWeighted(overlay, 0.3, frame, 0.7, 0, frame)
+    overlay = frame.copy()
+    camera_height = float(path_data.get("camera_height", self.camera_height) or self.camera_height)
+    path_z = path_data.get("path_z") or [0.0] * len(path_data["path_x"])
+    path_poly = self._project_ribbon(
+      path_data["path_x"], path_data["path_y"], path_z,
+      0.9, camera_height, calib_transform, max_distance=100.0,
+    )
+    if path_poly is not None and hud_data["enabled"]:
+      cv2.fillPoly(overlay, [path_poly], self.config.colors["path_active"])
+      cv2.addWeighted(overlay, 0.35, frame, 0.65, 0, frame)
 
-    lane_color = self.config.colors["lane_line"]
-    for xs, ys in ((path_data["left_lane_x"], path_data["left_lane_y"]),
-                   (path_data["right_lane_x"], path_data["right_lane_y"])):
-      pts = [self._project_pt(x, y, 0) for x, y in zip(xs, ys) if x <= 50.0]
-      if len(pts) > 1:
-        cv2.polylines(frame, [np.array(pts, dtype=np.int32)], False, lane_color, thickness=4)
+    lane_lines = path_data.get("lane_lines") or []
+    lane_probs = path_data.get("lane_line_probs") or []
+    feature_overlay = frame.copy()
+    features_drawn = False
+    for index, line in enumerate(lane_lines):
+      if len(line) != 3:
+        continue
+      probability = float(lane_probs[index]) if index < len(lane_probs) else 0.0
+      if probability < 0.05:
+        continue
+      width = (0.16 if index in (1, 2) else 0.12) * probability
+      polygon = self._project_ribbon(*line, width, 0.0, calib_transform)
+      if polygon is not None:
+        base_color = self.config.colors["path_active"] if hud_data["enabled"] and index in (1, 2) else self.config.colors["lane_line"]
+        color = tuple(int(component * (0.35 + probability * 0.65)) for component in base_color)
+        cv2.fillPoly(feature_overlay, [polygon], color)
+        features_drawn = True
+
+    road_edges = path_data.get("road_edges") or []
+    road_stds = path_data.get("road_edge_stds") or []
+    for index, edge in enumerate(road_edges):
+      if len(edge) != 3:
+        continue
+      confidence = 1.0 - float(road_stds[index]) if index < len(road_stds) else 0.0
+      if confidence < 0.2:
+        continue
+      polygon = self._project_ribbon(*edge, 0.12, 0.0, calib_transform)
+      if polygon is not None:
+        level = int(100 + 115 * min(confidence, 1.0))
+        cv2.fillPoly(feature_overlay, [polygon], (level, level, level))
+        features_drawn = True
+
+    if features_drawn:
+      cv2.addWeighted(feature_overlay, 0.75, frame, 0.25, 0, frame)
+
+    self._draw_leads(frame, path_data, calib_transform, camera_height)
 
     frame[:, :self.camera_x] = self.blank_canvas[:, :self.camera_x]
     frame[:, self.camera_x + self.camera_w:] = self.blank_canvas[:, self.camera_x + self.camera_w:]
     return frame
+
+  def _draw_leads(self, frame, path_data, calib_transform, camera_height):
+    path_x = path_data.get("path_x") or []
+    path_z = path_data.get("path_z") or []
+    drawn_distances = []
+    for lead in path_data.get("leads") or []:
+      if not lead.get("present"):
+        continue
+      distance = float(lead.get("d_rel", 0.0))
+      if any(abs(distance - previous) <= 12.0 for previous in drawn_distances):
+        continue
+      drawn_distances.append(distance)
+      z = 0.0
+      if path_x and path_z:
+        index = int(np.argmin(np.abs(np.asarray(path_x) - distance)))
+        if index < len(path_z):
+          z = float(path_z[index])
+      point, valid = self._project_points(
+        [[distance, -float(lead.get("y_rel", 0.0)), z + camera_height]], calib_transform,
+      )
+      if not valid[0]:
+        continue
+      x, y = map(int, point[0])
+      half_width = max(28, int(20 + 600 / max(distance + 10.0, 10.0)))
+      alpha = int(np.clip(255 * (1.0 - distance / 40.0) + max(0.0, -lead.get("v_rel", 0.0)) * 25, 70, 255))
+      color = (255, max(35, 150 - alpha // 3), max(35, 150 - alpha // 3))
+      cv2.rectangle(frame, (x - half_width, y - 32), (x + half_width, y + 32), (12, 12, 12), -1)
+      cv2.line(frame, (x - half_width, y), (x + half_width, y), color, 6)
+      cv2.putText(frame, f"{distance:.0f}m", (x - 22, y - 9), cv2.FONT_HERSHEY_SIMPLEX,
+                  0.42, (245, 248, 252), 1, cv2.LINE_AA)
 
   def _base_icon(self, name, size, active=True):
     source = self.icons.get(name)
@@ -153,24 +271,23 @@ class ClusterRenderer:
     muted = (120, 132, 148)
     green = (110, 235, 150)
     blue = (100, 190, 255)
-    amber = (255, 195, 80)
     red = (255, 105, 95)
     panel = (7, 12, 18)
     divider = (42, 54, 68)
 
-    # Opaque 1:8:1 panels and light guides for the 8 x 3 centre grid.
-    draw.rectangle([0, 0, self.side_w - 1, self.target_h], fill=panel)
-    draw.rectangle([self.camera_x + self.camera_w, 0, self.target_w, self.target_h], fill=panel)
-    draw.line((self.camera_x, 0, self.camera_x, self.target_h), fill=divider, width=2)
-    draw.line((self.camera_x + self.camera_w, 0, self.camera_x + self.camera_w, self.target_h), fill=divider, width=2)
+    # Opaque a/b and d/e panels around the 6/10-wide camera region.
+    draw.rectangle([0, 0, self.camera_x - 1, self.target_h], fill=panel)
+    draw.rectangle([self.right_aux_x, 0, self.target_w, self.target_h], fill=panel)
+    for x in (self.left_aux_x, self.camera_x, self.right_aux_x, self.right_panel_x):
+      draw.line((x, 0, x, self.target_h), fill=divider, width=2)
     for row in (1, 2):
       y = int(row * self.row_h)
-      draw.line((0, y, self.side_w, y), fill=divider, width=1)
-      draw.line((self.camera_x + self.camera_w, y, self.target_w, y), fill=divider, width=1)
+      draw.line((0, y, self.camera_x, y), fill=divider, width=1)
+      draw.line((self.right_aux_x, y, self.target_w, y), fill=divider, width=1)
 
     self._draw_left_panel(image, draw, data, white, muted, green, blue)
-    self._draw_right_panel(image, draw, data, white, muted, red)
-    self._draw_camera_overlays(image, draw, data, white, muted, green, amber, red)
+    self._draw_right_panel(image, draw, data, red)
+    self._draw_camera_overlays(image, draw, data, white, red)
 
     if not has_camera:
       self._centered(draw, self.camera_x + self.camera_w / 2, self.target_h / 2,
@@ -178,43 +295,86 @@ class ClusterRenderer:
 
     status_color = self.config.colors["engaged"] if data["enabled"] else self.config.colors["disengaged"]
     draw.rectangle([0, 0, self.target_w - 1, self.target_h - 1], outline=status_color, width=6)
+    self._draw_status_borders(draw, data)
+    self._draw_ignore_limit_timer(image, data)
+
+  def _draw_ignore_limit_timer(self, image, data):
+    max_ticks = 3000.0
+    try:
+      timer = float(data.get("ignore_limit_timer", 0.0) or 0.0)
+    except (TypeError, ValueError):
+      return
+    if timer <= 0.0 or timer >= max_ticks:
+      return
+
+    ratio = max(0.0, min(1.0, (max_ticks - timer) / max_ticks))
+    bar_width = int(round(self.target_w * ratio))
+    if bar_width <= 0:
+      return
+    bar_x = (self.target_w - bar_width) // 2
+    bar_draw = ImageDraw.Draw(image, "RGBA")
+    bar_draw.rectangle([bar_x, 0, bar_x + bar_width - 1, 9], fill=(255, 149, 0, 150))
+
+  def _draw_status_borders(self, draw, data):
+    """Match mici's independent blinker/blind-spot side borders."""
+    blinking = (time.monotonic() % 0.9) < 0.45
+    border_size = 10
+    red = (255, 80, 70)
+    orange = (255, 170, 55)
+    green = (90, 220, 120)
+
+    def draw_side(x, blinker, blindspot):
+      if data.get("brake_pressed") or blindspot:
+        color = red
+      elif blinker and blinking:
+        color = orange
+      elif data.get("enabled"):
+        color = green
+      else:
+        return
+      draw.rectangle([x, 0, x + border_size - 1, self.target_h - 1], fill=color)
+
+    draw_side(0, data.get("left_blinker"), data.get("left_blindspot"))
+    draw_side(self.target_w - border_size, data.get("right_blinker"), data.get("right_blindspot"))
 
   def _draw_left_panel(self, image, draw, data, white, muted, green, blue):
     cx = self.side_w / 2
     cruise = self._value(data.get("cruise_speed"))
     set_speed = self._value(data.get("set_speed", data.get("cruise_speed")))
 
-    self._centered(draw, cx, self.row_h * 0.28, "CRUISE", self.font_label, muted)
+    self._centered(draw, cx, self.row_h * 0.28, "MAX", self.font_label, muted)
     self._centered(draw, cx, self.row_h * 0.58, cruise, self.font_speed, white)
     self._centered(draw, cx, self.row_h * 0.79, self.config.speed_unit, self.font_unit, muted)
 
-    self._centered(draw, cx, self.row_h * 1.28, "SET", self.font_label, muted)
-    self._centered(draw, cx, self.row_h * 1.58, set_speed, self.font_speed,
-                   green if data.get("enabled") else blue)
-    self._centered(draw, cx, self.row_h * 1.79, self.config.speed_unit, self.font_unit, muted)
+    if data.get("is_cruise_set"):
+      self._centered(draw, cx, self.row_h * 1.28, "SET", self.font_label, muted)
+      self._centered(draw, cx, self.row_h * 1.58, set_speed, self.font_speed,
+                     green if data.get("enabled") else blue)
+      self._centered(draw, cx, self.row_h * 1.79, self.config.speed_unit, self.font_unit, muted)
 
     if data.get("left_blinker") or data.get("right_blinker") or data.get("brake_pressed"):
-      wheel_name, wheel_color = "wheel_critical", (255, 105, 95)
+      wheel_name = "wheel_critical"
     elif data.get("enabled"):
-      wheel_name, wheel_color = "wheel_green", green
+      wheel_name = "wheel_green"
     else:
-      wheel_name, wheel_color = "wheel", muted
-    self._icon(image, wheel_name, cx, self.row_h * 2.52, 94, True,
-               rotation=-float(data.get("steering_angle", 0.0) or 0.0))
-    self._centered(draw, cx, self.row_h * 2.91, "STEER", self.font_label, wheel_color)
+      wheel_name = "wheel"
+    self._icon(image, wheel_name, cx, self.row_h * 2.50, 94, True,
+               rotation=float(data.get("steering_angle", 0.0) or 0.0))
 
-  def _draw_right_panel(self, image, draw, data, white, muted, red):
-    cx = self.camera_x + self.camera_w + self.side_w / 2
+  def _draw_right_panel(self, image, draw, data, red):
+    cx = self.right_panel_x + self.panel_w / 2
     traffic_name = {1: "traffic_red", 2: "traffic_green"}.get(data.get("traffic_state"), "traffic_off")
     self._icon(image, traffic_name, cx, self.row_h * 0.50, (68, 136), True)
 
-    gap = int(data.get("distance_level", 0) or 0)
-    gap_name = f"dist{min(max(gap + 1, 1), 4)}"
+    gap = min(max(int(data.get("distance_level", 1) or 1), 1), 4)
+    gap_name = DISTANCE_ICONS[gap]
     self._icon(image, gap_name, cx, self.row_h * 1.50, (56, 132), True)
 
-    tpms = self._base_icon("tpms", (102, 132), True)
+    tpms = self._base_icon("tpms", (108, 140), True)
     if tpms is not None:
-      image.paste(tpms, (int(cx - tpms.width / 2), int(self.row_h * 2.04)), tpms)
+      tpms_x = int(cx - tpms.width / 2)
+      tpms_y = int(self.row_h * 2.0 + 7)
+      image.paste(tpms, (tpms_x, tpms_y), tpms)
     raw_pressures = data.get("tpms") or [0, 0, 0, 0]
     pressures = list(raw_pressures)
     for i in range(4):
@@ -223,17 +383,17 @@ class ClusterRenderer:
         pressure = float(pressure)
       except (TypeError, ValueError):
         pressure = 0.0
-      px = cx + (-30 if i % 2 == 0 else 30)
-      py = self.row_h * 2.27 + (i // 2) * 65
+      px = cx + (-36 if i % 2 == 0 else 36)
+      py = self.row_h * 2.0 + (38 if i < 2 else 115)
       value = "--" if not pressure or pressure < 5 or pressure > 60 else str(round(pressure))
-      color = red if value != "--" and float(pressure) < 31 else white
+      color = (230, 150, 45) if value == "--" else red if float(pressure) < 31 else (20, 25, 30)
       self._centered(draw, px, py, value, self.font_small, color)
 
-  def _draw_camera_overlays(self, image, draw, data, white, muted, green, amber, red):
+  def _draw_camera_overlays(self, image, draw, data, white, red):
     self._draw_current_speed(draw, data, white)
 
-    left_cx = self.camera_x + self.cell_w / 2
-    self._draw_speed_limit(draw, left_cx, self.row_h * 0.48, data, white, red)
+    left_cx = self.left_aux_x + self.panel_w / 2
+    self._draw_speed_limit(draw, left_cx, self.row_h * 0.50, data, white, red)
 
     road_sign = None
     if data.get("road_signs") == 1 or data.get("school_zone"):
@@ -244,34 +404,21 @@ class ClusterRenderer:
       road_sign = "speed_camera"
     if road_sign:
       self._icon(image, road_sign, left_cx, self.row_h * 1.50, 92, True)
-      self._centered(draw, left_cx, self.row_h * 1.91, "ROAD SIGN", self.font_label, muted)
 
-    accel_cx = self.camera_x + self.cell_w * 0.5
-    brake_cx = self.camera_x + self.cell_w * 1.5
-    self._icon(image, "disengage_on_accelerator", accel_cx, self.row_h * 2.50, 94,
-               bool(data.get("gas_pressed")))
-    self._icon(image, "brake_disc", brake_cx, self.row_h * 2.50, 94,
-               bool(data.get("brake_pressed")))
-    self._centered(draw, accel_cx, self.row_h * 2.91, "ACCEL", self.font_label,
-                   amber if data.get("gas_pressed") else muted)
-    self._centered(draw, brake_cx, self.row_h * 2.91, "BRAKE", self.font_label,
-                   red if data.get("brake_pressed") else muted)
+    pedal_icon = "brake_pressed" if data.get("brake_pressed") else \
+                 "accel_pressed" if data.get("gas_pressed") else None
+    if pedal_icon is not None:
+      self._icon(image, pedal_icon, left_cx, self.row_h * 2.50, 94, True)
 
-    icon_y = self.row_h * 0.47
     wifi = data.get("wifi_strength", 0)
     wifi_name = "wifi_strength_full" if wifi >= 4 else "wifi_strength_high" if wifi == 3 else \
                 "wifi_strength_medium" if wifi == 2 else "wifi_strength_low"
-    compass_cx = self.camera_x + self.cell_w * 6.15
-    gps_cx = self.camera_x + self.cell_w * 6.75
-    wifi_cx = self.camera_x + self.cell_w * 7.35
-    self._icon(image, "direction", compass_cx, icon_y, 88,
-               data.get("gps_satellites", 0) > 0, rotation=float(data.get("gps_bearing", 0.0) or 0.0))
-    self._icon(image, "gps", gps_cx, icon_y, 88,
+    right_cx = self.right_aux_x + self.panel_w / 2
+    self._icon(image, wifi_name, right_cx, self.row_h * 0.50, 88, wifi > 0)
+    self._icon(image, "gps", right_cx, self.row_h * 1.50, 88,
                data.get("gps_satellites", 0) > 0)
-    self._icon(image, wifi_name, wifi_cx, icon_y, 88, wifi > 0)
-    self._centered(draw, compass_cx, self.row_h * 0.91, "COMPASS", self.font_label, muted)
-    self._centered(draw, gps_cx, self.row_h * 0.91, "GPS", self.font_label, muted)
-    self._centered(draw, wifi_cx, self.row_h * 0.91, "WIFI", self.font_label, muted)
+    self._icon(image, "direction", right_cx, self.row_h * 2.50, 88,
+               data.get("gps_satellites", 0) > 0, rotation=float(data.get("gps_bearing", 0.0) or 0.0))
 
   def _draw_current_speed(self, draw, data, white):
     accel = float(data.get("accel", 0.0) or 0.0)
@@ -301,8 +448,26 @@ class ClusterRenderer:
       limit = float(data.get("stock_limit_speed"))
     else:
       limit = float(data.get("nav_limit_speed", 0.0) or 0.0)
-    radius = 39
-    draw.ellipse([cx - radius - 8, cy - radius - 8, cx + radius + 8, cy + radius + 8], fill=white)
-    draw.ellipse([cx - radius - 6, cy - radius - 6, cx + radius + 6, cy + radius + 6], outline=red, width=6)
-    draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], fill=white)
+    outer_radius = 49
+    inner_radius = 39
+    draw.ellipse([cx - outer_radius, cy - outer_radius, cx + outer_radius, cy + outer_radius], fill=red)
+    draw.ellipse([cx - inner_radius, cy - inner_radius, cx + inner_radius, cy + inner_radius], fill=white)
     self._centered(draw, cx, cy, self._value(limit), self.font_value, (20, 25, 30))
+
+    # Draw distance if available, matching the main HUD's camera/section priority.
+    left_dist = 0.0
+    if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
+      left_dist = float(data.get("cam_limit_speed_left_dist"))
+    elif data.get("section_limit_speed", 0) > 0 and data.get("section_left_dist", 0) > 0:
+      left_dist = float(data.get("section_left_dist"))
+
+    if left_dist > 0:
+      dist_text = f"{left_dist / 1000:.1f} km" if left_dist >= 1000 else f"{int(left_dist)} m"
+      text_y = cy + outer_radius + 10
+      bbox = draw.textbbox((cx, text_y), dist_text, font=self.font_small, anchor="mm")
+      padding_x, padding_y = 7, 3
+      draw.rounded_rectangle(
+        [bbox[0] - padding_x, bbox[1] - padding_y, bbox[2] + padding_x, bbox[3] + padding_y],
+        radius=5, fill=(18, 25, 34),
+      )
+      self._centered(draw, cx, text_y, dist_text, self.font_small, white)
