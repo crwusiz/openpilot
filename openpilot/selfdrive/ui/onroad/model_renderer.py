@@ -129,7 +129,7 @@ class ModelRenderer(Widget):
     sm = ui_state.sm
 
     # Check if data is up-to-date
-    if (sm.recv_frame["liveCalibration"] < ui_state.started_frame or
+    if (sm.recv_frame["extrinsicsCalibration"] < ui_state.started_frame or
         sm.recv_frame["modelV2"] < ui_state.started_frame):
       return
 
@@ -149,8 +149,8 @@ class ModelRenderer(Widget):
       self._left_blindspot = car_state.leftBlindspot
       self._right_blindspot = car_state.rightBlindspot
 
-    live_calib = sm['liveCalibration']
-    self._path_offset_z = live_calib.height[0] if live_calib.height else HEIGHT_INIT[0]
+    extrinsics_calibration = sm['extrinsicsCalibration']
+    self._path_offset_z = extrinsics_calibration.height[0] if extrinsics_calibration.height else HEIGHT_INIT[0]
 
     if sm.updated['carParams']:
       self._longitudinal_control = sm['carParams'].openpilotLongitudinalControl
@@ -184,6 +184,7 @@ class ModelRenderer(Widget):
       self._draw_lead_indicators(radar_state, rect)
 
   def _update_raw_points(self, model):
+    """Update raw 3D points from model data"""
     self._path.raw_points = np.array([model.position.x, model.position.y, model.position.z], dtype=np.float32).T
 
     for i, lane_line in enumerate(model.laneLines):
@@ -197,6 +198,7 @@ class ModelRenderer(Widget):
     self._acceleration_x = np.array(model.acceleration.x, dtype=np.float32)
 
   def _update_leads(self, radar_state, path_x_array):
+    """Update positions of lead vehicles"""
     self._lead_vehicles = [LeadVehicle(), LeadVehicle()]
     self._lead_info = [LeadInfo(), LeadInfo()]
     leads = [radar_state.leadOne, radar_state.leadTwo]
@@ -214,6 +216,7 @@ class ModelRenderer(Widget):
           self._lead_info[i] = LeadInfo(d_rel=d_rel, v_rel=v_rel, point=point)
 
   def _update_model(self, lead, path_x_array):
+    """Update model visualization data based on model message"""
     max_distance = np.clip(path_x_array[-1], MIN_DRAW_DISTANCE, MAX_DRAW_DISTANCE)
     max_idx = self._get_path_length_idx(self._lane_lines[0].raw_points[:, 0], max_distance)
 
@@ -249,6 +252,7 @@ class ModelRenderer(Widget):
     self._update_experimental_gradient()
 
   def _update_experimental_gradient(self):
+    """Pre-calculate experimental mode gradient colors"""
     #if not self._experimental_mode:
     #  return
 
@@ -339,6 +343,7 @@ class ModelRenderer(Widget):
     return LeadVehicle(glow=glow, chevron=chevron, fill_poly=fill_poly, fill_alpha=int(fill_alpha))
 
   def _draw_lane_lines(self):
+    """Draw lane lines and road edges"""
     for i, lane_line in enumerate(self._lane_lines):
       if lane_line.projected_points.size == 0:
         continue
@@ -364,6 +369,7 @@ class ModelRenderer(Widget):
       draw_polygon(self._rect, road_edge.projected_points, color)
 
   def _draw_path(self, sm):
+    """Draw path with dynamic coloring based on mode and throttle state."""
     if not self._path.projected_points.size:
       return
 
@@ -472,12 +478,14 @@ class ModelRenderer(Widget):
 
   @staticmethod
   def _get_path_length_idx(pos_x_array: np.ndarray, path_distance: float) -> int:
+    """Get the index corresponding to the given path distance"""
     if len(pos_x_array) == 0:
       return 0
     indices = np.where(pos_x_array <= path_distance)[0]
     return indices[-1] if indices.size > 0 else 0
 
   def _map_to_screen(self, in_x, in_y, in_z):
+    """Project a point in car space to screen space"""
     input_pt = np.array([in_x, in_y, in_z])
     pt = self._car_space_transform @ input_pt
 
@@ -493,6 +501,7 @@ class ModelRenderer(Widget):
     return (x, y)
 
   def _map_line_to_polygon(self, line: np.ndarray, y_off: float, z_off: float, max_idx: int, max_distance: float, allow_invert: bool = True) -> np.ndarray:
+    """Convert 3D line to 2D polygon for rendering."""
     if line.shape[0] == 0:
       return np.empty((0, 2), dtype=np.float32)
 

@@ -21,7 +21,7 @@ class ClusterModels:
     self.sm = messaging.SubMaster([
       'modelV2', 'carState', 'selfdriveState', 'controlsState', 'carControl',
       'carParams', 'deviceState', 'gpsLocationExternal', 'naviData',
-      'longitudinalPlan', 'liveParameters', 'liveCalibration',
+      'longitudinalPlan', 'vehicleParameters', 'extrinsicsCalibration',
       'narrowRoadCameraState', 'radarState',
     ])
 
@@ -137,8 +137,8 @@ class ClusterModels:
       self.camera_sensor = str(self.sm['narrowRoadCameraState'].sensor)
       self._update_camera_intrinsics()
 
-    if self.sm.updated['liveCalibration']:
-      calib = self.sm['liveCalibration']
+    if self.sm.updated['extrinsicsCalibration']:
+      calib = self.sm['extrinsicsCalibration']
       if len(calib.rpyCalib) == 3:
         self.view_from_calib = view_frame_from_device_frame @ rot_from_euler(calib.rpyCalib)
       if len(calib.height) > 0:

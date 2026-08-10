@@ -24,7 +24,7 @@ from openpilot.common.params import Params
 
 
 OpState = log.SelfdriveState.OpenpilotState
-CALIBRATED = log.LiveCalibrationData.Status.calibrated
+CALIBRATED = log.ExtrinsicsCalibration.Status.calibrated
 NARROW_ROAD_CAM = VisionStreamType.VISION_STREAM_NARROW_ROAD
 WIDE_CAM = VisionStreamType.VISION_STREAM_WIDE_ROAD
 CABIN_CAM = VisionStreamType.VISION_STREAM_CABIN
@@ -284,11 +284,11 @@ class AugmentedRoadView(CameraView):
     if not self.device_camera and sm.seen['narrowRoadCameraState'] and sm.seen['deviceState']:
       self.device_camera = DEVICE_CAMERAS[(str(sm['deviceState'].deviceType), str(sm['narrowRoadCameraState'].sensor))]
 
-    # Check if live calibration data is available and valid
-    if not (sm.updated["liveCalibration"] and sm.valid['liveCalibration']):
+    # Check if camera calibration data is available and valid
+    if not (sm.updated["extrinsicsCalibration"] and sm.valid['extrinsicsCalibration']):
       return
 
-    calib = sm['liveCalibration']
+    calib = sm['extrinsicsCalibration']
     if len(calib.rpyCalib) != 3 or calib.calStatus != CALIBRATED:
       return
 
@@ -314,7 +314,7 @@ class AugmentedRoadView(CameraView):
 
   def _calc_frame_matrix(self, rect: rl.Rectangle) -> np.ndarray:
     cache_key = (
-      ui_state.sm.recv_frame['liveCalibration'],
+      ui_state.sm.recv_frame['extrinsicsCalibration'],
       int(self._content_rect.width),
       int(self._content_rect.height),
       self.stream_type,

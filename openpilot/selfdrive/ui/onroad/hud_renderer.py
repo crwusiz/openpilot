@@ -247,7 +247,7 @@ class HudRenderer(Widget):
     gps_location = sm['gpsLocationExternal']
     navi_data = sm['naviData']
     longitudinal_plan = sm['longitudinalPlan']
-    live_params = sm['liveParameters']
+    live_params = sm['vehicleParameters']
     selfdrive_state = sm['selfdriveState']
 
     # Cruise speed

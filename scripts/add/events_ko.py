@@ -255,9 +255,9 @@ def below_steer_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.S
 
 
 def calibration_incomplete_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
-  first_word = '캘리브레이션을 다시' if sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.recalibrating else '캘리브레이션'
+  first_word = '캘리브레이션을 다시' if sm['extrinsicsCalibration'].calStatus == log.LiveCalibrationData.Status.recalibrating else '캘리브레이션'
   return Alert(
-    f"{first_word} 진행중 : {sm['liveCalibration'].calPerc:.0f}%",
+    f"{first_word} 진행중 : {sm['extrinsicsCalibration'].calPerc:.0f}%",
     f"{get_display_speed(MIN_SPEED_FILTER, metric)} 이상의 속도로 주행하세요",
     AlertStatus.normal, AlertSize.mid,
     Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2)
@@ -303,7 +303,7 @@ def camera_malfunction_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.
 
 
 def calibration_invalid_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
-  rpy = sm['liveCalibration'].rpyCalib
+  rpy = sm['extrinsicsCalibration'].rpyCalib
   yaw = math.degrees(rpy[2] if len(rpy) == 3 else math.nan)
   pitch = math.degrees(rpy[1] if len(rpy) == 3 else math.nan)
   angles = f"장치 재장착 (상하 각도: {pitch:.1f}°, 좌우 각도: {yaw:.1f}°)"
@@ -311,16 +311,16 @@ def calibration_invalid_alert(CP: car.CarParams, CS: car.CarState, sm: messaging
 
 
 def paramsd_invalid_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
-  if not sm['liveParameters'].angleOffsetValid:
-    angle_offset_deg = sm['liveParameters'].angleOffsetDeg
+  if not sm['vehicleParameters'].angleOffsetValid:
+    angle_offset_deg = sm['vehicleParameters'].angleOffsetDeg
     title = "스티어링 오정렬 감지"
     text = f"각도 옵셋이 너무 높음 (옵셋: {angle_offset_deg:.1f}°)"
-  elif not sm['liveParameters'].steerRatioValid:
-    steer_ratio = sm['liveParameters'].steerRatio
+  elif not sm['vehicleParameters'].steerRatioValid:
+    steer_ratio = sm['vehicleParameters'].steerRatio
     title = "조향비 불일치"
     text = f"스티어링 랙 구조가 틀어짐 (비율: {steer_ratio:.1f})"
-  elif not sm['liveParameters'].stiffnessFactorValid:
-    stiffness_factor = sm['liveParameters'].stiffnessFactor
+  elif not sm['vehicleParameters'].stiffnessFactorValid:
+    stiffness_factor = sm['vehicleParameters'].stiffnessFactor
     title = "타이어 강성 이상"
     text = f"타이어, 공기압 또는 얼라인먼트 점검 (인자: {stiffness_factor:.1f})"
   else:

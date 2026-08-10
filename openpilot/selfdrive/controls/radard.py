@@ -1046,14 +1046,17 @@ class RadarD:
       self.radar_detected = detected
 
 
+# fuses camera and radar data for best lead detection
 def main() -> None:
   config_realtime_process(5, Priority.CTRL_LOW)
 
+  # wait for stats about the car to come in from controls
   cloudlog.info("radard is waiting for CarParams")
   CP = messaging.log_from_bytes(Params().get("CarParams", block=True), car.CarParams)
   cloudlog.info("radard got CarParams")
 
-  sm = messaging.SubMaster(['modelV2', 'carState', 'liveTracks'], poll='modelV2')
+  # *** setup messaging
+  sm = messaging.SubMaster(['modelV2', 'carState', 'radarTracks'], poll='modelV2')
   pm = messaging.PubMaster(['radarState'])
 
   RD = RadarD(CP.radarDelay)
@@ -1062,7 +1065,7 @@ def main() -> None:
     sm.update()
 
     if sm.updated['modelV2']:
-      RD.update(sm, sm['liveTracks'])
+      RD.update(sm, sm['radarTracks'])
       RD.publish(pm)
 
 
