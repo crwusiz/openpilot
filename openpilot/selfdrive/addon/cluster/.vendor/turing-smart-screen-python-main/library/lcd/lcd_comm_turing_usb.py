@@ -72,7 +72,7 @@ def _resp_ok(resp: Optional[bytes]) -> bool:
     return (b1 == 0xC8) or (b8 == 0xC8)
 
 
-def send_jpeg(dev, jpeg_data: bytes):
+def send_jpeg(dev, jpeg_data: bytes, ep_out=None, ep_in=None):
     img_size = len(jpeg_data)
     cmd_packet = build_command_packet_header(CMD_UPLOAD_JPEG)
     cmd_packet[8] = (img_size >> 24) & 0xFF
@@ -80,7 +80,7 @@ def send_jpeg(dev, jpeg_data: bytes):
     cmd_packet[10] = (img_size >> 8) & 0xFF
     cmd_packet[11] = img_size & 0xFF
     full_payload = encrypt_command_packet(cmd_packet) + jpeg_data
-    return write_to_device(dev, full_payload)
+    return write_to_device(dev, full_payload, ep_out=ep_out, ep_in=ep_in)
 
 
 def _encode_jpeg_under_limit(image: Image.Image, *, max_bytes: int, quality: int = 95,
@@ -511,15 +511,16 @@ def read_flush(ep_in, max_attempts=5, timeout_ms=5):
                 # print("Flush read error:", e)
                 break
 
-def write_to_device(dev, data, timeout=2500):
-    cfg = dev.get_active_configuration()
-    intf = usb.util.find_descriptor(cfg, bInterfaceNumber=0)
-    if intf is None:
-        raise RuntimeError("USB interface 0 not found")
-    ep_out = usb.util.find_descriptor(intf, custom_match=lambda e: usb.util.endpoint_direction(
-        e.bEndpointAddress) == usb.util.ENDPOINT_OUT)
-    ep_in = usb.util.find_descriptor(intf, custom_match=lambda e: usb.util.endpoint_direction(
-        e.bEndpointAddress) == usb.util.ENDPOINT_IN)
+def write_to_device(dev, data, timeout=2500, ep_out=None, ep_in=None):
+    if ep_out is None or ep_in is None:
+        cfg = dev.get_active_configuration()
+        intf = usb.util.find_descriptor(cfg, bInterfaceNumber=0)
+        if intf is None:
+            raise RuntimeError("USB interface 0 not found")
+        ep_out = usb.util.find_descriptor(intf, custom_match=lambda e: usb.util.endpoint_direction(
+            e.bEndpointAddress) == usb.util.ENDPOINT_OUT)
+        ep_in = usb.util.find_descriptor(intf, custom_match=lambda e: usb.util.endpoint_direction(
+            e.bEndpointAddress) == usb.util.ENDPOINT_IN)
     assert ep_out is not None and ep_in is not None, "Could not find USB endpoints"
 
     try:

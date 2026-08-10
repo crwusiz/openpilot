@@ -28,11 +28,17 @@ class TuringUsbDisplay:
     self.product_id = None
     self.frame_count = 0
     self.consecutive_upload_failures = 0
+    self._encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 60]
+    self._perf_started = None
+    self._perf_frames = 0
+    self._perf_prepare_time = 0.0
+    self._perf_usb_time = 0.0
 
     self._find_usb_device = None
     self._send_jpeg = None
     self._resp_ok = None
     self._ep_out = None
+    self._ep_in = None
     flog("TuringUsbDisplay initialized.")
 
   def open(self):
@@ -79,6 +85,8 @@ class TuringUsbDisplay:
           intf = usb.util.find_descriptor(cfg, bInterfaceNumber=0)
           self._ep_out = usb.util.find_descriptor(
             intf, custom_match=lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_OUT)
+          self._ep_in = usb.util.find_descriptor(
+            intf, custom_match=lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_IN)
 
           for attempt in range(3):
             flog(f"[CLUSTER_USB] Sending sync handshake (Attempt {attempt+1})...")
@@ -111,25 +119,28 @@ class TuringUsbDisplay:
       return
 
     try:
+      prepare_started = time.monotonic()
       if not isinstance(frame_image, np.ndarray):
         frame_image = np.array(frame_image)
 
       rotated = cv2.rotate(frame_image, cv2.ROTATE_90_CLOCKWISE)
-      bgr_img = cv2.cvtColor(rotated, cv2.COLOR_RGB2BGR)
+      # Reuse the rotation buffer for the channel swap instead of allocating a
+      # second full 462x1920 image on every frame.
+      cv2.cvtColor(rotated, cv2.COLOR_RGB2BGR, dst=rotated)
 
-      encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 60]
-      success, encoded_img = cv2.imencode('.jpg', bgr_img, encode_param)
+      success, encoded_img = cv2.imencode('.jpg', rotated, self._encode_param)
 
       if success:
         jpg_bytes = encoded_img.tobytes()
         size_kb = len(jpg_bytes) // 1024
+        prepare_elapsed = time.monotonic() - prepare_started
 
-        t0 = time.time()
+        t0 = time.monotonic()
         # The device returns an ACK for every image.  This must be read: leaving
         # ACKs in the IN endpoint fills the device queue after ~17 frames, then
         # the following OUT write blocks until its USB timeout.
-        response = self._send_jpeg(self.device, jpg_bytes)
-        elapsed = time.time() - t0
+        response = self._send_jpeg(self.device, jpg_bytes, ep_out=self._ep_out, ep_in=self._ep_in)
+        elapsed = time.monotonic() - t0
 
         if not self._resp_ok(response):
           self.consecutive_upload_failures += 1
@@ -144,8 +155,25 @@ class TuringUsbDisplay:
         self.consecutive_upload_failures = 0
 
         self.frame_count += 1
+        now = time.monotonic()
+        if self._perf_started is None:
+          self._perf_started = prepare_started
+        self._perf_frames += 1
+        self._perf_prepare_time += prepare_elapsed
+        self._perf_usb_time += elapsed
         if self.frame_count <= 20 or self.frame_count % self.config.fps == 0:
-          flog(f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {size_kb} KB | elapsed={elapsed:.3f}s (ACK received)")
+          flog(f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {size_kb} KB | "
+               f"elapsed={elapsed:.3f}s | prep={prepare_elapsed * 1000:.1f}ms (ACK received)")
+
+        if self._perf_frames >= self.config.fps * 10:
+          perf_elapsed = max(now - self._perf_started, 1e-6)
+          flog(f"[CLUSTER_USB_PERF] fps={self._perf_frames / perf_elapsed:.2f} | "
+               f"prep_avg={self._perf_prepare_time * 1000 / self._perf_frames:.1f}ms | "
+               f"usb_avg={self._perf_usb_time * 1000 / self._perf_frames:.1f}ms")
+          self._perf_started = now
+          self._perf_frames = 0
+          self._perf_prepare_time = 0.0
+          self._perf_usb_time = 0.0
 
     except usb.core.USBError as e:
       if e.errno == 110 or 'timed out' in str(e).lower():
@@ -171,3 +199,5 @@ class TuringUsbDisplay:
     self.connected = False
     self.device = None
     self.dev_pid = None
+    self._ep_out = None
+    self._ep_in = None

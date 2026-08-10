@@ -73,7 +73,14 @@ class ClusterRenderer:
   def render(self, camera, models):
     has_camera = camera.has_frame()
     if has_camera:
-      frame = self._crop_and_resize(camera.get_frame())
+      camera_frame = camera.get_frame()
+      if camera_frame.shape[:2] == (self.target_h, self.camera_w) and \
+          hasattr(camera, "get_source_to_panel_transform"):
+        frame = self.blank_canvas.copy()
+        frame[:, self.camera_x:self.camera_x + self.camera_w] = camera_frame
+        self._source_to_panel = camera.get_source_to_panel_transform(self.camera_x)
+      else:
+        frame = self._crop_and_resize(camera_frame)
     else:
       frame = self.blank_canvas.copy()
 
@@ -83,23 +90,28 @@ class ClusterRenderer:
 
     pil_img = Image.fromarray(frame)
     self._draw_hud(pil_img, hud_data, has_camera)
-    return np.array(pil_img)
+    return np.asarray(pil_img)
 
   def _crop_and_resize(self, frame):
     source_h, source_w = frame.shape[:2]
-    scale = max(self.camera_w / source_w, self.target_h / source_h)
-    resized_w = max(self.camera_w, int(round(source_w * scale)))
-    resized_h = max(self.target_h, int(round(source_h * scale)))
-    resized = cv2.resize(frame, (resized_w, resized_h), interpolation=cv2.INTER_AREA)
-    crop_x = (resized_w - self.camera_w) // 2
-    crop_y = (resized_h - self.target_h) // 2
-    camera = resized[crop_y:crop_y + self.target_h, crop_x:crop_x + self.camera_w]
+    source_aspect = source_w / source_h
+    target_aspect = self.camera_w / self.target_h
+    if source_aspect < target_aspect:
+      crop_w = source_w
+      crop_h = max(1, int(round(source_w / target_aspect)))
+    else:
+      crop_w = max(1, int(round(source_h * target_aspect)))
+      crop_h = source_h
+    crop_x = (source_w - crop_w) // 2
+    crop_y = (source_h - crop_h) // 2
+    cropped = frame[crop_y:crop_y + crop_h, crop_x:crop_x + crop_w]
+    camera = cv2.resize(cropped, (self.camera_w, self.target_h), interpolation=cv2.INTER_AREA)
 
-    scale_x = resized_w / source_w
-    scale_y = resized_h / source_h
+    scale_x = self.camera_w / crop_w
+    scale_y = self.target_h / crop_h
     self._source_to_panel = np.array([
-      [scale_x, 0.0, self.camera_x - crop_x],
-      [0.0, scale_y, -crop_y],
+      [scale_x, 0.0, self.camera_x - crop_x * scale_x],
+      [0.0, scale_y, -crop_y * scale_y],
       [0.0, 0.0, 1.0],
     ], dtype=np.float32)
     canvas = self.blank_canvas.copy()
@@ -149,7 +161,7 @@ class ClusterRenderer:
     if calib_transform is None:
       return frame
 
-    overlay = frame.copy()
+    camera_region = frame[:, self.camera_x:self.camera_x + self.camera_w]
     camera_height = float(path_data.get("camera_height", self.camera_height) or self.camera_height)
     path_z = path_data.get("path_z") or [0.0] * len(path_data["path_x"])
     path_poly = self._project_ribbon(
@@ -157,12 +169,14 @@ class ClusterRenderer:
       0.9, camera_height, calib_transform, max_distance=100.0,
     )
     if path_poly is not None and hud_data["enabled"]:
-      cv2.fillPoly(overlay, [path_poly], self.config.colors["path_active"])
-      cv2.addWeighted(overlay, 0.35, frame, 0.65, 0, frame)
+      overlay = camera_region.copy()
+      local_path_poly = path_poly - np.array([self.camera_x, 0], dtype=np.int32)
+      cv2.fillPoly(overlay, [local_path_poly], self.config.colors["path_active"])
+      cv2.addWeighted(overlay, 0.35, camera_region, 0.65, 0, camera_region)
 
     lane_lines = path_data.get("lane_lines") or []
     lane_probs = path_data.get("lane_line_probs") or []
-    feature_overlay = frame.copy()
+    feature_overlay = None
     features_drawn = False
     for index, line in enumerate(lane_lines):
       if len(line) != 3:
@@ -173,9 +187,12 @@ class ClusterRenderer:
       width = (0.16 if index in (1, 2) else 0.12) * probability
       polygon = self._project_ribbon(*line, width, 0.0, calib_transform)
       if polygon is not None:
+        if feature_overlay is None:
+          feature_overlay = camera_region.copy()
         base_color = self.config.colors["path_active"] if hud_data["enabled"] and index in (1, 2) else self.config.colors["lane_line"]
         color = tuple(int(component * (0.35 + probability * 0.65)) for component in base_color)
-        cv2.fillPoly(feature_overlay, [polygon], color)
+        local_polygon = polygon - np.array([self.camera_x, 0], dtype=np.int32)
+        cv2.fillPoly(feature_overlay, [local_polygon], color)
         features_drawn = True
 
     road_edges = path_data.get("road_edges") or []
@@ -188,17 +205,18 @@ class ClusterRenderer:
         continue
       polygon = self._project_ribbon(*edge, 0.12, 0.0, calib_transform)
       if polygon is not None:
+        if feature_overlay is None:
+          feature_overlay = camera_region.copy()
         level = int(100 + 115 * min(confidence, 1.0))
-        cv2.fillPoly(feature_overlay, [polygon], (level, level, level))
+        local_polygon = polygon - np.array([self.camera_x, 0], dtype=np.int32)
+        cv2.fillPoly(feature_overlay, [local_polygon], (level, level, level))
         features_drawn = True
 
     if features_drawn:
-      cv2.addWeighted(feature_overlay, 0.75, frame, 0.25, 0, frame)
+      cv2.addWeighted(feature_overlay, 0.75, camera_region, 0.25, 0, camera_region)
 
     self._draw_leads(frame, path_data, calib_transform, camera_height)
 
-    frame[:, :self.camera_x] = self.blank_canvas[:, :self.camera_x]
-    frame[:, self.camera_x + self.camera_w:] = self.blank_canvas[:, self.camera_x + self.camera_w:]
     return frame
 
   def _draw_leads(self, frame, path_data, calib_transform, camera_height):
