@@ -150,13 +150,13 @@ class ClusterModels:
       self.gps_satellites = gps.satelliteCount
 
     if self.sm.updated['naviData']:
-      nav = self.sm['naviData']
-      self.nda_state = getattr(nav, 'active', 0)
-      self.nav_limit_speed = getattr(nav, 'roadLimitSpeed', 0.0)
-      self.cam_limit_speed = getattr(nav, 'camLimitSpeed', 0.0)
-      self.cam_limit_speed_left_dist = getattr(nav, 'camLimitSpeedLeftDist', 0.0)
-      self.section_limit_speed = getattr(nav, 'sectionLimitSpeed', 0.0)
-      self.section_left_dist = getattr(nav, 'sectionLeftDist', 0.0)
+      navi_data = self.sm['naviData']
+      self.nda_state = getattr(navi_data, 'active', 0)
+      self.nav_limit_speed = getattr(navi_data, 'roadLimitSpeed', 0.0)
+      self.cam_limit_speed = getattr(navi_data, 'camLimitSpeed', 0.0)
+      self.cam_limit_speed_left_dist = getattr(navi_data, 'camLimitSpeedLeftDist', 0.0)
+      self.section_limit_speed = getattr(navi_data, 'sectionLimitSpeed', 0.0)
+      self.section_left_dist = getattr(navi_data, 'sectionLeftDist', 0.0)
       in_camera_zone = self.cam_limit_speed > 0 and self.cam_limit_speed_left_dist > 0
       in_section_zone = self.section_limit_speed > 0 and self.section_left_dist > 0
       self.speed_camera = in_camera_zone or in_section_zone
@@ -166,31 +166,31 @@ class ClusterModels:
       self.traffic_state = getattr(self.sm['longitudinalPlan'], 'trafficState', 0)
 
     if self.sm.updated['modelV2']:
-      md = self.sm['modelV2']
+      model = self.sm['modelV2']
 
-      if len(md.position.x) > 0:
-        self.path_x = list(md.position.x)
-        self.path_y = list(md.position.y)
-        self.path_z = list(md.position.z)
+      if len(model.position.x) > 0:
+        self.path_x = list(model.position.x)
+        self.path_y = list(model.position.y)
+        self.path_z = list(model.position.z)
         self.model_valid = True
       else:
         self.model_valid = False
 
-      if len(md.laneLines) == 4:
+      if len(model.laneLines) == 4:
         self.lane_lines = [
-          (list(line.x), list(line.y), list(line.z)) for line in md.laneLines
+          (list(line.x), list(line.y), list(line.z)) for line in model.laneLines
         ]
-        self.lane_line_probs = list(md.laneLineProbs)
-        self.left_lane_x = list(md.laneLines[1].x)
-        self.left_lane_y = list(md.laneLines[1].y)
+        self.lane_line_probs = list(model.laneLineProbs)
+        self.left_lane_x = list(model.laneLines[1].x)
+        self.left_lane_y = list(model.laneLines[1].y)
 
-        self.right_lane_x = list(md.laneLines[2].x)
-        self.right_lane_y = list(md.laneLines[2].y)
+        self.right_lane_x = list(model.laneLines[2].x)
+        self.right_lane_y = list(model.laneLines[2].y)
 
       self.road_edges = [
-        (list(edge.x), list(edge.y), list(edge.z)) for edge in md.roadEdges
+        (list(edge.x), list(edge.y), list(edge.z)) for edge in model.roadEdges
       ]
-      self.road_edge_stds = list(md.roadEdgeStds)
+      self.road_edge_stds = list(model.roadEdgeStds)
 
     if self.sm.updated['radarState']:
       radar_state = self.sm['radarState']
@@ -218,9 +218,6 @@ class ClusterModels:
       except Exception as e:
         cloudlog.error(f"ClusterModels update error: {e}")
       time.sleep(0.01)
-
-  def update(self):
-    return
 
   def close(self):
     self._running = False

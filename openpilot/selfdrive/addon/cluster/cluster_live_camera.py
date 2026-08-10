@@ -177,9 +177,6 @@ class ClusterLiveCamera:
         self.vipc = None
         time.sleep(0.5)
 
-  def update(self):
-    pass
-
   def has_frame(self):
     return self.latest_frame is not None
 

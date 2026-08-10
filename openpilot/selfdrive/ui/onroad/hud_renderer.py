@@ -162,8 +162,8 @@ class HudRenderer(Widget):
     self.upper_icons = IconGroup()
 
     # Direction button (rotatable)
-    self.direction_btn = RotatableIconButton("icons/direction.png", button_size, icon_size, bg_color)
-    self.upper_icons.add_button(self.direction_btn)
+    self.compass_btn = RotatableIconButton("icons/compass.png", button_size, icon_size, bg_color)
+    self.upper_icons.add_button(self.compass_btn)
 
     # GPS button
     self.gps_btn = IconButton("icons/gps.png", button_size, icon_size, bg_color)
@@ -341,8 +341,8 @@ class HudRenderer(Widget):
 
   def _update_icon_button_states(self) -> None:
     # Upper icons
-    self.direction_btn.set_rotation(self.gps_bearing)
-    self.direction_btn.set_opacity(0.8 if self.gps_satellite_count > 0 else 0.2)
+    self.compass_btn.set_rotation(self.gps_bearing)
+    self.compass_btn.set_opacity(0.8 if self.gps_satellite_count > 0 else 0.2)
 
     self.gps_btn.set_opacity(0.8 if self.gps_satellite_count > 0 else 0.2)
 

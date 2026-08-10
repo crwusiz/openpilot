@@ -63,9 +63,6 @@ def cluster_main():
   perf_frames = 0
   try:
     while True:
-      camera.update()
-      models.update()
-
       render_started = time.monotonic()
       frame_image = renderer.render(camera, models)
       perf_render_time += time.monotonic() - render_started

@@ -14,6 +14,26 @@ DISTANCE_ICONS = {
   4: "dist4",
 }
 
+WIFI_ICONS = {
+  1: "wifi_strength_low",
+  2: "wifi_strength_medium",
+  3: "wifi_strength_high",
+  4: "wifi_strength_full",
+}
+
+WHEEL_ICONS = {
+  "default": "wheel",
+  "enabled": "wheel_green",
+  "steering": "wheel_blue",
+  "critical": "wheel_critical",
+}
+
+TRAFFIC_ICONS = {
+  0: "traffic_off",
+  1: "traffic_red",
+  2: "traffic_green",
+}
+
 
 class ClusterRenderer:
   def __init__(self, config):
@@ -60,10 +80,10 @@ class ClusterRenderer:
     self._icon_cache = {}
     icon_dir = os.path.join(str(self.config.BASEDIR), "selfdrive", "assets", "icons")
     for name in (
-      "wheel", "wheel_green", "wheel_blue", "wheel_critical", "accel_pressed", "brake_pressed",
-      "tpms", "gps", "direction", "wifi_strength_low", "wifi_strength_medium",
-      "wifi_strength_high", "wifi_strength_full", "traffic_green", "traffic_red", "traffic_off",
-      "speed_bump", "school_zone", "speed_camera", *DISTANCE_ICONS.values(),
+      *WHEEL_ICONS.values(), *WIFI_ICONS.values(),
+      *TRAFFIC_ICONS.values(), *DISTANCE_ICONS.values(),
+      "accel_pressed", "brake_pressed", "tpms", "gps", "compass",
+      "speed_bump", "school_zone", "speed_camera",
     ):
       try:
         self.icons[name] = Image.open(os.path.join(icon_dir, f"{name}.png")).convert("RGBA")
@@ -287,8 +307,6 @@ class ClusterRenderer:
     draw = ImageDraw.Draw(image)
     white = (245, 248, 252)
     muted = (120, 132, 148)
-    green = (110, 235, 150)
-    blue = (100, 190, 255)
     red = (255, 105, 95)
     panel = (7, 12, 18)
     divider = (42, 54, 68)
@@ -303,9 +321,11 @@ class ClusterRenderer:
       draw.line((0, y, self.camera_x, y), fill=divider, width=1)
       draw.line((self.right_aux_x, y, self.target_w, y), fill=divider, width=1)
 
-    self._draw_left_panel(image, draw, data, white, muted, green, blue)
+    self._draw_left_panel(image, draw, data, muted)
+    self._draw_left_aux_panel(image, draw, data, white, red)
+    self._draw_camera_overlays(draw, data, white)
+    self._draw_right_aux_panel(image, data)
     self._draw_right_panel(image, draw, data, red)
-    self._draw_camera_overlays(image, draw, data, white, red)
 
     if not has_camera:
       self._centered(draw, self.camera_x + self.camera_w / 2, self.target_h / 2,
@@ -336,7 +356,7 @@ class ClusterRenderer:
   def _draw_status_borders(self, draw, data):
     """Match mici's independent blinker/blind-spot side borders."""
     blinking = (time.monotonic() % 0.9) < 0.45
-    border_size = 10
+    border_size = 20
     red = (255, 80, 70)
     orange = (255, 170, 55)
     green = (90, 220, 120)
@@ -355,39 +375,143 @@ class ClusterRenderer:
     draw_side(0, data.get("left_blinker"), data.get("left_blindspot"))
     draw_side(self.target_w - border_size, data.get("right_blinker"), data.get("right_blindspot"))
 
-  def _draw_left_panel(self, image, draw, data, white, muted, green, blue):
+  def _draw_left_panel(self, image, draw, data, muted):
     cx = self.side_w / 2
     cruise = self._value(data.get("cruise_speed"))
     is_cruise_set = bool(data.get("is_cruise_set"))
     set_speed = self._value(data.get("set_speed", data.get("cruise_speed"))) if is_cruise_set else "--"
 
-    self._centered(draw, cx, self.row_h * 0.28, "MAX", self.font_label, muted)
-    self._centered(draw, cx, self.row_h * 0.58, cruise, self.font_speed, white)
+    max_color = (255, 255, 255, 200)
+    speed_color = (255, 255, 255, 200)
+    if is_cruise_set:
+      speed_color = (255, 255, 255, 255)
+      max_color = (128, 216, 166, 255) if data.get("enabled") else (145, 155, 149, 255)
+
+      if data.get("nda_state"):
+        if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
+          limit_speed = float(data.get("cam_limit_speed"))
+        elif data.get("section_limit_speed", 0) > 0 and data.get("section_left_dist", 0) > 0:
+          limit_speed = float(data.get("section_limit_speed"))
+        else:
+          limit_speed = float(data.get("nav_limit_speed", 0.0) or 0.0)
+      elif data.get("stock_limit_speed", 0) > 0:
+        limit_speed = float(data.get("stock_limit_speed"))
+      else:
+        limit_speed = float(data.get("nav_limit_speed", 0.0) or 0.0)
+
+      cruise_speed = float(data.get("cruise_speed", 0.0) or 0.0)
+      if limit_speed > 0 and data.get("enabled"):
+        if cruise_speed > limit_speed + 25:
+          speed_color = (201, 34, 49, 255)
+        elif cruise_speed > limit_speed + 15:
+          speed_color = (255, 149, 0, 255)
+        elif cruise_speed > limit_speed + 5:
+          speed_color = (255, 200, 100, 255)
+
+    speed_draw = ImageDraw.Draw(image, "RGBA")
+
+    # max box
+    self._centered(speed_draw, cx, self.row_h * 0.28, "MAX", self.font_label, max_color)
+    self._centered(speed_draw, cx, self.row_h * 0.58, cruise, self.font_speed, speed_color)
     self._centered(draw, cx, self.row_h * 0.79, self.config.speed_unit, self.font_unit, muted)
 
-    set_speed_color = green if data.get("enabled") and is_cruise_set else blue if is_cruise_set else muted
-    self._centered(draw, cx, self.row_h * 1.28, "SET", self.font_label, muted)
-    self._centered(draw, cx, self.row_h * 1.58, set_speed, self.font_speed, set_speed_color)
+    # set box
+    self._centered(speed_draw, cx, self.row_h * 1.28, "SET", self.font_label, max_color)
+    self._centered(speed_draw, cx, self.row_h * 1.58, set_speed, self.font_speed, speed_color)
     self._centered(draw, cx, self.row_h * 1.79, self.config.speed_unit, self.font_unit, muted)
 
+    # wheel icon
     if data.get("left_blinker") or data.get("right_blinker") or data.get("brake_pressed"):
-      wheel_name = "wheel_critical"
+      wheel_name = WHEEL_ICONS["critical"]
     elif data.get("enabled"):
-      wheel_name = "wheel_green"
+      wheel_name = WHEEL_ICONS["enabled"]
     else:
-      wheel_name = "wheel"
+      wheel_name = WHEEL_ICONS["default"]
     self._icon(image, wheel_name, cx, self.row_h * 2.50, 94, True,
                rotation=float(data.get("steering_angle", 0.0) or 0.0))
 
+  def _draw_left_aux_panel(self, image, draw, data, white, red):
+    left_cx = self.left_aux_x + self.panel_w / 2
+    speed_limit_y = self.row_h * 0.50
+    if data.get("nda_state"):
+      if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
+        limit = float(data.get("cam_limit_speed"))
+      elif data.get("section_limit_speed", 0) > 0 and data.get("section_left_dist", 0) > 0:
+        limit = float(data.get("section_limit_speed"))
+      else:
+        limit = float(data.get("nav_limit_speed", 0.0) or 0.0)
+    elif data.get("stock_limit_speed", 0) > 0:
+      limit = float(data.get("stock_limit_speed"))
+    else:
+      limit = float(data.get("nav_limit_speed", 0.0) or 0.0)
+
+    # speed limit
+    outer_radius = 49
+    inner_radius = 39
+    draw.ellipse([left_cx - outer_radius, speed_limit_y - outer_radius,
+                  left_cx + outer_radius, speed_limit_y + outer_radius], fill=red)
+    draw.ellipse([left_cx - inner_radius, speed_limit_y - inner_radius,
+                  left_cx + inner_radius, speed_limit_y + inner_radius], fill=white)
+    self._centered(draw, left_cx, speed_limit_y, self._value(limit), self.font_value, (20, 25, 30))
+
+    # Draw distance if available, matching the main HUD's camera/section priority.
+    left_dist = 0.0
+    if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
+      left_dist = float(data.get("cam_limit_speed_left_dist"))
+    elif data.get("section_limit_speed", 0) > 0 and data.get("section_left_dist", 0) > 0:
+      left_dist = float(data.get("section_left_dist"))
+
+    if left_dist > 0:
+      dist_text = f"{left_dist / 1000:.1f} km" if left_dist >= 1000 else f"{int(left_dist)} m"
+      text_y = speed_limit_y + outer_radius + 10
+      bbox = draw.textbbox((left_cx, text_y), dist_text, font=self.font_small, anchor="mm")
+      padding_x, padding_y = 7, 3
+      draw.rounded_rectangle(
+        [bbox[0] - padding_x, bbox[1] - padding_y, bbox[2] + padding_x, bbox[3] + padding_y],
+        radius=5, fill=(18, 25, 34),
+      )
+      self._centered(draw, left_cx, text_y, dist_text, self.font_small, white)
+
+    # road_sign
+    road_sign = None
+    if data.get("road_signs") == 1 or data.get("school_zone"):
+      road_sign = "school_zone"
+    elif data.get("speed_bump"):
+      road_sign = "speed_bump"
+    elif data.get("speed_camera"):
+      road_sign = "speed_camera"
+    if road_sign:
+      self._icon(image, road_sign, left_cx, self.row_h * 1.50, 92, True)
+
+    # pedal_icon
+    pedal_icon = "brake_pressed" if data.get("brake_pressed") else \
+                 "accel_pressed" if data.get("gas_pressed") else None
+    if pedal_icon is not None:
+      self._icon(image, pedal_icon, left_cx, self.row_h * 2.50, 94, True)
+
+  def _draw_right_aux_panel(self, image, data):
+    wifi = int(data.get("wifi_strength", 0) or 0)
+    wifi_name = WIFI_ICONS[min(max(wifi, 1), 4)]
+    right_cx = self.right_aux_x + self.panel_w / 2
+    self._icon(image, wifi_name, right_cx, self.row_h * 0.50, 88, wifi > 0)
+    self._icon(image, "gps", right_cx, self.row_h * 1.50, 88,
+               data.get("gps_satellites", 0) > 0)
+    self._icon(image, "compass", right_cx, self.row_h * 2.50, 88,
+               data.get("gps_satellites", 0) > 0, rotation=float(data.get("gps_bearing", 0.0) or 0.0))
+
   def _draw_right_panel(self, image, draw, data, red):
     cx = self.right_panel_x + self.panel_w / 2
-    traffic_name = {1: "traffic_red", 2: "traffic_green"}.get(data.get("traffic_state"), "traffic_off")
+
+    # traffic icon
+    traffic_name = TRAFFIC_ICONS.get(data.get("traffic_state"), TRAFFIC_ICONS[0])
     self._icon(image, traffic_name, cx, self.row_h * 0.50, (68, 136), True)
 
+    # distance icon
     gap = min(max(int(data.get("distance_level", 1) or 1), 1), 4)
     gap_name = DISTANCE_ICONS[gap]
     self._icon(image, gap_name, cx, self.row_h * 1.50, (56, 132), True)
 
+    # tpms icon
     tpms = self._base_icon("tpms", (108, 140), True)
     if tpms is not None:
       tpms_x = int(cx - tpms.width / 2)
@@ -407,38 +531,8 @@ class ClusterRenderer:
       color = (230, 150, 45) if value == "--" else red if float(pressure) < 31 else (20, 25, 30)
       self._centered(draw, px, py, value, self.font_small, color)
 
-  def _draw_camera_overlays(self, image, draw, data, white, red):
-    self._draw_current_speed(draw, data, white)
-
-    left_cx = self.left_aux_x + self.panel_w / 2
-    self._draw_speed_limit(draw, left_cx, self.row_h * 0.50, data, white, red)
-
-    road_sign = None
-    if data.get("road_signs") == 1 or data.get("school_zone"):
-      road_sign = "school_zone"
-    elif data.get("speed_bump"):
-      road_sign = "speed_bump"
-    elif data.get("speed_camera"):
-      road_sign = "speed_camera"
-    if road_sign:
-      self._icon(image, road_sign, left_cx, self.row_h * 1.50, 92, True)
-
-    pedal_icon = "brake_pressed" if data.get("brake_pressed") else \
-                 "accel_pressed" if data.get("gas_pressed") else None
-    if pedal_icon is not None:
-      self._icon(image, pedal_icon, left_cx, self.row_h * 2.50, 94, True)
-
-    wifi = data.get("wifi_strength", 0)
-    wifi_name = "wifi_strength_full" if wifi >= 4 else "wifi_strength_high" if wifi == 3 else \
-                "wifi_strength_medium" if wifi == 2 else "wifi_strength_low"
-    right_cx = self.right_aux_x + self.panel_w / 2
-    self._icon(image, wifi_name, right_cx, self.row_h * 0.50, 88, wifi > 0)
-    self._icon(image, "gps", right_cx, self.row_h * 1.50, 88,
-               data.get("gps_satellites", 0) > 0)
-    self._icon(image, "direction", right_cx, self.row_h * 2.50, 88,
-               data.get("gps_satellites", 0) > 0, rotation=float(data.get("gps_bearing", 0.0) or 0.0))
-
-  def _draw_current_speed(self, draw, data, white):
+  def _draw_camera_overlays(self, draw, data, white):
+    # current speed
     accel = float(data.get("accel", 0.0) or 0.0)
     if accel > 0:
       alpha = max(80, min(255, int(255 - 180 * min(accel / 3.0, 1.0))))
@@ -453,39 +547,3 @@ class ClusterRenderer:
     self._centered(draw, center_x, self.row_h * 0.29, speed, self.font_current_speed, speed_color)
     self._centered(draw, center_x, self.row_h * 0.69, self.config.speed_unit,
                    self.font_current_unit, white)
-
-  def _draw_speed_limit(self, draw, cx, cy, data, white, red):
-    if data.get("nda_state"):
-      if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
-        limit = float(data.get("cam_limit_speed"))
-      elif data.get("section_limit_speed", 0) > 0 and data.get("section_left_dist", 0) > 0:
-        limit = float(data.get("section_limit_speed"))
-      else:
-        limit = float(data.get("nav_limit_speed", 0.0) or 0.0)
-    elif data.get("stock_limit_speed", 0) > 0:
-      limit = float(data.get("stock_limit_speed"))
-    else:
-      limit = float(data.get("nav_limit_speed", 0.0) or 0.0)
-    outer_radius = 49
-    inner_radius = 39
-    draw.ellipse([cx - outer_radius, cy - outer_radius, cx + outer_radius, cy + outer_radius], fill=red)
-    draw.ellipse([cx - inner_radius, cy - inner_radius, cx + inner_radius, cy + inner_radius], fill=white)
-    self._centered(draw, cx, cy, self._value(limit), self.font_value, (20, 25, 30))
-
-    # Draw distance if available, matching the main HUD's camera/section priority.
-    left_dist = 0.0
-    if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
-      left_dist = float(data.get("cam_limit_speed_left_dist"))
-    elif data.get("section_limit_speed", 0) > 0 and data.get("section_left_dist", 0) > 0:
-      left_dist = float(data.get("section_left_dist"))
-
-    if left_dist > 0:
-      dist_text = f"{left_dist / 1000:.1f} km" if left_dist >= 1000 else f"{int(left_dist)} m"
-      text_y = cy + outer_radius + 10
-      bbox = draw.textbbox((cx, text_y), dist_text, font=self.font_small, anchor="mm")
-      padding_x, padding_y = 7, 3
-      draw.rounded_rectangle(
-        [bbox[0] - padding_x, bbox[1] - padding_y, bbox[2] + padding_x, bbox[3] + padding_y],
-        radius=5, fill=(18, 25, 34),
-      )
-      self._centered(draw, cx, text_y, dist_text, self.font_small, white)
