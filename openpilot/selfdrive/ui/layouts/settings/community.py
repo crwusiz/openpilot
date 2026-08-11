@@ -385,12 +385,6 @@ class CommunityLayout(Widget):
         callback=lambda state: self._params.put_bool("CabinCameraHardwareMissing", state, block=True),
       ),
       toggle_item(
-        lambda: tr("Logger Enable"),
-        description=lambda: DESCRIPTIONS["logger_enable"],
-        initial_state=self._params.get_bool("LoggerEnable"),
-        callback=lambda state: self._params.put_bool("LoggerEnable", state, block=True),
-      ),
-      toggle_item(
         lambda: tr("Prebuilt Enable"),
         description=lambda: DESCRIPTIONS["prebuilt_enable"],
         initial_state=self._params.get_bool("PrebuiltEnable"),

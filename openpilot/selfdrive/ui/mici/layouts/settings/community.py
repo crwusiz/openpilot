@@ -25,7 +25,6 @@ class CommunityLayoutMici(NavScroller):
     radar_track = BigParamControl("Radar Track", "RadarTrackEnable", toggle_callback=restart_needed_callback)
     driver_cam_reverse = BigParamControl("Driver Camera On Reverse Gear", "CabinCameraOnReverse", toggle_callback=restart_needed_callback)
     driver_cam_missing = BigParamControl("Driver Camera Hardware Missing", "CabinCameraHardwareMissing", toggle_callback=restart_needed_callback)
-    logger_enable = BigParamControl("Logger Enable", "LoggerEnable", toggle_callback=restart_needed_callback)
     prebuilt_enable = BigParamControl("Prebuilt Enable", "PrebuiltEnable", toggle_callback=restart_needed_callback)
 
     self._scroller.add_widgets([
@@ -36,7 +35,6 @@ class CommunityLayoutMici(NavScroller):
       radar_track,
       driver_cam_reverse,
       driver_cam_missing,
-      logger_enable,
       prebuilt_enable,
     ])
 
@@ -49,7 +47,6 @@ class CommunityLayoutMici(NavScroller):
       ("RadarTrackEnable", radar_track),
       ("CabinCameraOnReverse", driver_cam_reverse),
       ("CabinCameraHardwareMissing", driver_cam_missing),
-      ("LoggerEnable", logger_enable),
       ("PrebuiltEnable", prebuilt_enable),
     )
 

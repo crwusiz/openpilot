@@ -131,9 +131,6 @@ def manager_thread() -> None:
   ignore += [x for x in os.getenv("BLOCK", "").split(",") if len(x) > 0]
 
   # add toggle
-  if not params.get_bool("LoggerEnable"):
-    ignore += ["loggerd", "encoderd", "deleter", "logmessaged", "tombstoned", "uploader", "updated", "statsd"]
-
   if params.get("CabinCameraHardwareMissing"):
     ignore += ["dmonitoringd", "dmonitoringmodeld"]
 
