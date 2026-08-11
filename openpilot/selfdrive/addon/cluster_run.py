@@ -2,20 +2,7 @@
 import locale
 import os
 import sys
-import time
-import traceback
 from pathlib import Path
-
-try:
-    locale.setlocale(locale.LC_ALL, 'ko_KR.UTF-8')
-except Exception:
-    try:
-        locale.setlocale(locale.LC_ALL, 'C.UTF-8')
-    except Exception:
-        try:
-            locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
-        except Exception:
-            pass
 
 BASEDIR = Path(__file__).resolve().parents[3]
 if str(BASEDIR) not in sys.path:
@@ -35,14 +22,28 @@ from openpilot.common.realtime import set_core_affinity
 CLUSTER_CORES = [0, 1, 2]
 
 
-def main():
+def configure_cluster_locale() -> None:
+  """Use a deterministic locale before loading the cluster and USB vendor code."""
+  for candidate in ("C.UTF-8", "C"):
+    try:
+      locale.setlocale(locale.LC_ALL, candidate)
+    except locale.Error:
+      continue
+    os.environ["LC_ALL"] = candidate
+    os.environ["LC_CTYPE"] = candidate
+    os.environ["LANG"] = candidate
+    return
+
+
+def main() -> None:
+  configure_cluster_locale()
+
   try:
     set_core_affinity(CLUSTER_CORES)
-  except OSError as e:
+  except Exception as e:
     cloudlog.warning(f"Failed to set cluster CPU affinity to {CLUSTER_CORES}: {e}")
 
   cloudlog.info("Starting Cluster (Turing 9.2 inch Display) process...")
-  time.sleep(2)
 
   try:
     from openpilot.selfdrive.addon.cluster.main import cluster_main
@@ -52,9 +53,8 @@ def main():
 
   except KeyboardInterrupt:
     cloudlog.info("Cluster process interrupted by user.")
-  except Exception as e:
-    cloudlog.error(f"Cluster crashed: {e}")
-    traceback.print_exc()
+  except Exception:
+    cloudlog.exception("Cluster crashed")
 
 
 if __name__ == "__main__":

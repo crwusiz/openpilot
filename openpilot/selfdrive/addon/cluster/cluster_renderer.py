@@ -91,9 +91,11 @@ class ClusterRenderer:
         pass
 
   def render(self, camera, models):
-    has_camera = camera.has_frame()
+    # Fetch once so a stale-stream reset cannot clear the frame between a
+    # separate has_frame() check and get_frame() call.
+    camera_frame = camera.get_frame()
+    has_camera = camera_frame is not None
     if has_camera:
-      camera_frame = camera.get_frame()
       if camera_frame.shape[:2] == (self.target_h, self.camera_w) and \
           hasattr(camera, "get_source_to_panel_transform"):
         frame = self.blank_canvas.copy()

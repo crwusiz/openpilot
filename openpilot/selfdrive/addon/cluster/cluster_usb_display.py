@@ -1,5 +1,4 @@
 import numpy as np
-import os
 import time
 import cv2
 import usb.util
@@ -18,6 +17,7 @@ TURZX_USB_VENDOR_ID = 0x1CBE
 TURZX_USB_PRODUCT_IDS = {
   0x0092: "TURZX 9.2 inch",
 }
+TURZX_BRIGHTNESS_PERCENT = 100
 
 class TuringUsbDisplay:
   def __init__(self, config):
@@ -28,7 +28,14 @@ class TuringUsbDisplay:
     self.product_id = None
     self.frame_count = 0
     self.consecutive_upload_failures = 0
-    self._encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 60]
+    self.jpeg_quality = min(max(int(getattr(config, "usb_jpeg_quality", 68)), 1), 95)
+    # Baseline, non-optimized JPEG is the fastest path for continuously
+    # changing camera frames. 68 matches carrot-pilot's stable USB default.
+    self._encode_param = [
+      int(cv2.IMWRITE_JPEG_QUALITY), self.jpeg_quality,
+      int(cv2.IMWRITE_JPEG_PROGRESSIVE), 0,
+      int(cv2.IMWRITE_JPEG_OPTIMIZE), 0,
+    ]
     self._perf_started = None
     self._perf_frames = 0
     self._perf_prepare_time = 0.0
@@ -39,7 +46,7 @@ class TuringUsbDisplay:
     self._resp_ok = None
     self._ep_out = None
     self._ep_in = None
-    flog("TuringUsbDisplay initialized.")
+    flog(f"TuringUsbDisplay initialized (JPEG quality={self.jpeg_quality}).")
 
   def open(self):
     if self.connected:
@@ -48,13 +55,9 @@ class TuringUsbDisplay:
     flog("Attempting to connect to Turing USB Display...")
 
     try:
-      os.environ['LC_ALL'] = 'C.UTF-8'
-      os.environ['LANG'] = 'C.UTF-8'
-      os.environ['LANGUAGE'] = 'C.UTF-8'
-
       from library.lcd.lcd_comm_turing_usb import (
         find_usb_device, send_jpeg, send_sync_command,
-        send_frame_rate_command, _resp_ok,
+        send_brightness_command, send_frame_rate_command, _resp_ok,
       )
 
       self._find_usb_device = find_usb_device
@@ -94,6 +97,14 @@ class TuringUsbDisplay:
             flog(f"[CLUSTER_USB] Sync response: ok={self._resp_ok(resp)}")
             time.sleep(0.3)
 
+          # The protocol uses 0..102 for 0..100% backlight brightness. Without
+          # this command the panel keeps its previous/default (often dim) level.
+          brightness = round(TURZX_BRIGHTNESS_PERCENT * 102 / 100)
+          resp = send_brightness_command(self.device, brightness)
+          flog(f"[CLUSTER_USB] Brightness set to {TURZX_BRIGHTNESS_PERCENT}%: "
+               f"ok={self._resp_ok(resp)}")
+          time.sleep(0.1)
+
           resp = send_frame_rate_command(self.device, self.config.usb_fps)
           flog(f"[CLUSTER_USB] Frame rate response: ok={self._resp_ok(resp)}")
           time.sleep(0.1)
@@ -121,7 +132,7 @@ class TuringUsbDisplay:
     try:
       prepare_started = time.monotonic()
       if not isinstance(frame_image, np.ndarray):
-        frame_image = np.array(frame_image)
+        frame_image = np.asarray(frame_image)
 
       # The display protocol expects the 1920x462 canvas in portrait memory
       # order. Reversing this transport rotation turns the visible image 180
@@ -136,15 +147,17 @@ class TuringUsbDisplay:
       success, encoded_img = cv2.imencode('.jpg', rotated, self._encode_param)
 
       if success:
-        jpg_bytes = encoded_img.tobytes()
-        size_kb = len(jpg_bytes) // 1024
+        # Passing a buffer view avoids an extra full JPEG copy. The vendor
+        # helper keeps it alive while it builds and writes the USB payload.
+        jpg_data = memoryview(encoded_img)
+        size_kb = len(jpg_data) // 1024
         prepare_elapsed = time.monotonic() - prepare_started
 
         t0 = time.monotonic()
         # The device returns an ACK for every image.  This must be read: leaving
         # ACKs in the IN endpoint fills the device queue after ~17 frames, then
         # the following OUT write blocks until its USB timeout.
-        response = self._send_jpeg(self.device, jpg_bytes, ep_out=self._ep_out, ep_in=self._ep_in)
+        response = self._send_jpeg(self.device, jpg_data, ep_out=self._ep_out, ep_in=self._ep_in)
         elapsed = time.monotonic() - t0
 
         if not self._resp_ok(response):
@@ -166,7 +179,9 @@ class TuringUsbDisplay:
         self._perf_frames += 1
         self._perf_prepare_time += prepare_elapsed
         self._perf_usb_time += elapsed
-        if self.frame_count <= 20 or self.frame_count % self.config.fps == 0:
+        # Avoid 20 synchronous file opens/writes during startup. Periodic
+        # telemetry remains sufficient for diagnosing throughput and stalls.
+        if self.frame_count == 1 or self.frame_count % self.config.fps == 0:
           flog(f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {size_kb} KB | "
                f"elapsed={elapsed:.3f}s | prep={prepare_elapsed * 1000:.1f}ms (ACK received)")
 

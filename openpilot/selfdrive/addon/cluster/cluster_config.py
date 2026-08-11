@@ -7,6 +7,8 @@ USB_TIMEOUT_MS = 2500
 USB_IMAGE_TIMEOUT_MS = 1000
 USB_TARGET_FPS = 20
 USB_CLEAR_HALT_ON_TIMEOUT = True
+USB_JPEG_QUALITY = 68
+CAMERA_CONTRAST = 1.08
 
 class ClusterConfig:
   def __init__(self):
@@ -17,7 +19,11 @@ class ClusterConfig:
     # Road camera and model data are published at 20 Hz on-device.
     self.fps = USB_TARGET_FPS
     self.usb_fps = USB_TARGET_FPS
+    # carrot-pilot's field-tested JPEG default. This improves camera detail
+    # over quality 60 without materially increasing encode time or USB load.
+    self.usb_jpeg_quality = USB_JPEG_QUALITY
     self.camera_panel_width = self.width * 6 // 10
+    self.camera_contrast = CAMERA_CONTRAST
 
     self.usb_timeout_ms = USB_TIMEOUT_MS
     self.usb_image_timeout_ms = USB_IMAGE_TIMEOUT_MS

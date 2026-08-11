@@ -89,12 +89,17 @@ def cluster_main():
     flog("[CLUSTER_MAIN] Interrupted by user.")
   finally:
     flog("[CLUSTER_MAIN] Closing resources...")
-    try:
-      if display.connected:
-        display.send_image(np.zeros((config.height, config.width, 3), dtype=np.uint8))
-    except Exception as e:
-      flog(f"[CLUSTER_MAIN] Failed to clear display: {e}")
-    if hasattr(pipeline, 'close'): pipeline.close()
-    if hasattr(display, 'close'): display.close()
+    # Stop pending/background USB writes before sending the final black frame.
+    # This prevents an older queued frame from racing with shutdown cleanup.
+    pipeline_stopped = pipeline.close() if hasattr(pipeline, 'close') else True
+    if pipeline_stopped:
+      try:
+        if display.connected:
+          display.send_image(np.zeros((config.height, config.width, 3), dtype=np.uint8))
+      except Exception as e:
+        flog(f"[CLUSTER_MAIN] Failed to clear display: {e}")
+      if hasattr(display, 'close'): display.close()
+    else:
+      flog("[CLUSTER_MAIN] Skipping display cleanup while USB worker is still active.")
     if hasattr(camera, 'close'): camera.close()
     if hasattr(models, 'close'): models.close()
