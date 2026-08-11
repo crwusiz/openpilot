@@ -30,6 +30,7 @@ class ClusterConfig:
       "override": (145, 155, 149),  # 사용자가 핸들을 잡았을 때 (회색)
       "lane_line": (255, 255, 255),  # 인식된 차선
       "path_active": (23, 134, 68),  # 인게이지 시 주행 경로 색상
+      "path_steering": (0, 191, 255),  # 운전자가 핸들을 잡은 상태
     }
 
     self.BASEDIR = Path(__file__).resolve().parents[3]

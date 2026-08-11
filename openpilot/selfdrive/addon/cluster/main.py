@@ -1,7 +1,6 @@
 import time
 import signal
 import numpy as np
-from openpilot.common.realtime import Ratekeeper
 from openpilot.common.swaglog import cloudlog
 
 from openpilot.selfdrive.addon.cluster.cluster_config import ClusterConfig
@@ -44,8 +43,6 @@ def cluster_main():
   renderer = ClusterRenderer(config)
 
   fps = getattr(config, 'fps', 20)
-  rk = Ratekeeper(fps, print_delay_threshold=None)
-
   def _stop_signal(signum, _frame):
     flog(f"[CLUSTER_MAIN] Stop signal received: {signum}")
     raise KeyboardInterrupt
@@ -61,8 +58,12 @@ def cluster_main():
   perf_started = time.monotonic()
   perf_render_time = 0.0
   perf_frames = 0
+  last_camera_frame = -1
   try:
     while True:
+      # Drive rendering from new camera frames. Two independent 20 Hz loops can
+      # otherwise sample the same frame twice and then skip the next one.
+      last_camera_frame = camera.wait_for_frame(last_camera_frame, 1.0 / fps)
       render_started = time.monotonic()
       frame_image = renderer.render(camera, models)
       perf_render_time += time.monotonic() - render_started
@@ -73,8 +74,6 @@ def cluster_main():
       if loop_count % fps == 0:
         flog(
           f"[CLUSTER_HEARTBEAT] Loop: {loop_count} | Camera Ready: {camera.has_frame()} | USB Connected: {display.connected}")
-
-      rk.keep_time()
 
       if perf_frames >= fps * 10:
         now = time.monotonic()

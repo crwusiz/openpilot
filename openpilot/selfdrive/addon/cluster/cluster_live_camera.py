@@ -24,6 +24,7 @@ class ClusterLiveCamera:
     self.panel_width = config.camera_panel_width
     self.panel_height = config.height
     self.latest_frame = None
+    self._frame_condition = threading.Condition()
     self._source_to_panel = np.eye(3, dtype=np.float32)
     self.running = False
     self.thread = None
@@ -110,11 +111,11 @@ class ClusterLiveCamera:
 
         y = cv2.resize(
           y[crop_y:crop_y + crop_h, crop_x:crop_x + crop_w],
-          (target_w, target_h), interpolation=cv2.INTER_AREA,
+          (target_w, target_h), interpolation=cv2.INTER_LINEAR,
         )
         uv = cv2.resize(
           uv[crop_y // 2:(crop_y + crop_h) // 2, crop_x // 2:(crop_x + crop_w) // 2],
-          (target_w // 2, target_h // 2), interpolation=cv2.INTER_AREA,
+          (target_w // 2, target_h // 2), interpolation=cv2.INTER_LINEAR,
         )
         rgb = cv2.cvtColorTwoPlane(y, uv, cv2.COLOR_YUV2RGB_NV12)
         return rgb, source_to_panel
@@ -125,7 +126,7 @@ class ClusterLiveCamera:
     # Compatibility path for OpenCV builds without cvtColorTwoPlane.
     rgb = self._rgb_from_vision_buffer(buffer)
     cropped = rgb[crop_y:crop_y + crop_h, crop_x:crop_x + crop_w]
-    return cv2.resize(cropped, (target_w, target_h), interpolation=cv2.INTER_AREA), source_to_panel
+    return cv2.resize(cropped, (target_w, target_h), interpolation=cv2.INTER_LINEAR), source_to_panel
 
   def _camera_thread(self):
     error_count = 0
@@ -151,9 +152,11 @@ class ClusterLiveCamera:
         frame, source_to_panel = self._panel_rgb_from_vision_buffer(buffer)
         prepare_elapsed = time.monotonic() - prepare_started
 
-        self._source_to_panel = source_to_panel
-        self.latest_frame = frame
-        self.frame_count += 1
+        with self._frame_condition:
+          self._source_to_panel = source_to_panel
+          self.latest_frame = frame
+          self.frame_count += 1
+          self._frame_condition.notify_all()
         now = time.monotonic()
         if self._perf_started is None:
           self._perf_started = prepare_started
@@ -183,13 +186,24 @@ class ClusterLiveCamera:
   def get_frame(self):
     return self.latest_frame
 
+  def wait_for_frame(self, previous_frame_count, timeout):
+    """Wait for a fresh camera frame so the render loop does not resample 20 Hz video out of phase."""
+    with self._frame_condition:
+      self._frame_condition.wait_for(
+        lambda: not self.running or self.frame_count != previous_frame_count,
+        timeout=timeout,
+      )
+      return self.frame_count
+
   def get_source_to_panel_transform(self, panel_x=0):
     transform = self._source_to_panel.copy()
     transform[0, 2] += panel_x
     return transform
 
   def close(self):
-    self.running = False
+    with self._frame_condition:
+      self.running = False
+      self._frame_condition.notify_all()
     if self.thread is not None:
       self.thread.join(timeout=1.0)
     self.vipc = None

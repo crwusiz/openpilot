@@ -35,6 +35,7 @@ class ClusterModels:
     self.right_blindspot = False
     self.brake_pressed = False
     self.gas_pressed = False
+    self.steering_pressed = False
     self.steering_angle = 0.0
     self.cruise_speed = 0.0
     self.set_speed = 0.0
@@ -53,8 +54,11 @@ class ClusterModels:
     self.cam_limit_speed_left_dist = 0.0
     self.section_limit_speed = 0.0
     self.section_left_dist = 0.0
+    self.cam_type = 0
     self.speed_camera = False
     self.school_zone = False
+    self._navi_school_zone = False
+    self._navi_last_road_name = ""
     self.speed_bump = False
     self.ignore_limit_timer = 0.0
 
@@ -102,6 +106,7 @@ class ClusterModels:
       self.right_blindspot = getattr(cs, 'rightBlindspot', False)
       self.brake_pressed = cs.brakePressed
       self.gas_pressed = cs.gasPressed
+      self.steering_pressed = bool(getattr(cs, 'steeringPressed', False))
       self.steering_angle = cs.steeringAngleDeg
       cluster_speed = getattr(cs, 'vCruiseCluster', 0.0)
       fallback_speed = getattr(self.sm['controlsState'].deprecated, 'vCruise', 0.0)
@@ -114,7 +119,7 @@ class ClusterModels:
         if hasattr(ex, 'tpms'):
           self.tpms = [ex.tpms.fl, ex.tpms.fr, ex.tpms.rl, ex.tpms.rr]
         self.road_signs = getattr(ex, 'roadSigns', self.road_signs)
-        self.school_zone = self.road_signs == 1
+        self.school_zone = self.road_signs == 1 or self._navi_school_zone
         self.ignore_limit_timer = getattr(ex, 'ignoreLimitTimer', self.ignore_limit_timer)
 
     if self.sm.updated['selfdriveState']:
@@ -153,14 +158,16 @@ class ClusterModels:
       navi_data = self.sm['naviData']
       self.nda_state = getattr(navi_data, 'active', 0)
       self.nav_limit_speed = getattr(navi_data, 'roadLimitSpeed', 0.0)
+      self.cam_type = int(getattr(navi_data, 'camType', 0) or 0)
       self.cam_limit_speed = getattr(navi_data, 'camLimitSpeed', 0.0)
       self.cam_limit_speed_left_dist = getattr(navi_data, 'camLimitSpeedLeftDist', 0.0)
       self.section_limit_speed = getattr(navi_data, 'sectionLimitSpeed', 0.0)
       self.section_left_dist = getattr(navi_data, 'sectionLeftDist', 0.0)
       in_camera_zone = self.cam_limit_speed > 0 and self.cam_limit_speed_left_dist > 0
       in_section_zone = self.section_limit_speed > 0 and self.section_left_dist > 0
-      self.speed_camera = in_camera_zone or in_section_zone
-      self.school_zone = self.road_signs == 1
+      self.speed_bump = self.cam_type == 22 and in_camera_zone
+      self.speed_camera = (in_camera_zone or in_section_zone) and not self.speed_bump
+      self._update_navi_school_zone(navi_data)
 
     if self.sm.updated['longitudinalPlan']:
       self.traffic_state = getattr(self.sm['longitudinalPlan'], 'trafficState', 0)
@@ -211,6 +218,32 @@ class ClusterModels:
     camera = DEVICE_CAMERAS.get((self.device_type, self.camera_sensor))
     self.camera_intrinsics = camera.narrow_road.intrinsics.copy() if camera is not None else None
 
+  def _update_navi_school_zone(self, navi_data):
+    """Mirror SpeedLimiter's process-local school-zone state from naviData."""
+    if self.nda_state <= 0:
+      self._navi_school_zone = False
+      self._navi_last_road_name = ""
+      self.school_zone = self.road_signs == 1
+      return
+
+    if self.cam_type == 20:
+      self._navi_school_zone = True
+    elif self.cam_type == 21:
+      self._navi_school_zone = False
+
+    current_road_name = str(getattr(navi_data, 'currentRoadName', '') or '')
+    if self._navi_school_zone:
+      road_changed = bool(
+        self._navi_last_road_name and current_road_name and
+        current_road_name != self._navi_last_road_name
+      )
+      new_camera_event = self.cam_type not in (20, 21) and self.cam_limit_speed_left_dist > 0
+      if road_changed or new_camera_event:
+        self._navi_school_zone = False
+
+    self._navi_last_road_name = current_road_name
+    self.school_zone = self.road_signs == 1 or self._navi_school_zone
+
   def _update_loop(self):
     while self._running:
       try:
@@ -238,6 +271,7 @@ class ClusterModels:
       "right_blindspot": self.right_blindspot,
       "brake_pressed": self.brake_pressed,
       "gas_pressed": self.gas_pressed,
+      "steering_pressed": self.steering_pressed,
       "steering_angle": self.steering_angle,
       "cruise_speed": self.cruise_speed,
       "set_speed": self.set_speed,
@@ -256,6 +290,7 @@ class ClusterModels:
       "cam_limit_speed_left_dist": self.cam_limit_speed_left_dist,
       "section_limit_speed": self.section_limit_speed,
       "section_left_dist": self.section_left_dist,
+      "cam_type": self.cam_type,
       "speed_camera": self.speed_camera,
       "school_zone": self.school_zone,
       "speed_bump": self.speed_bump,

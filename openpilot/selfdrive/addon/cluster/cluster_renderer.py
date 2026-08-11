@@ -191,7 +191,9 @@ class ClusterRenderer:
     if path_poly is not None and hud_data["enabled"]:
       overlay = camera_region.copy()
       local_path_poly = path_poly - np.array([self.camera_x, 0], dtype=np.int32)
-      cv2.fillPoly(overlay, [local_path_poly], self.config.colors["path_active"])
+      path_color = self.config.colors["path_steering"] if hud_data.get("steering_pressed") \
+                   else self.config.colors["path_active"]
+      cv2.fillPoly(overlay, [local_path_poly], path_color)
       cv2.addWeighted(overlay, 0.35, camera_region, 0.65, 0, camera_region)
 
     lane_lines = path_data.get("lane_lines") or []
@@ -235,11 +237,11 @@ class ClusterRenderer:
     if features_drawn:
       cv2.addWeighted(feature_overlay, 0.75, camera_region, 0.25, 0, camera_region)
 
-    self._draw_leads(frame, path_data, calib_transform, camera_height)
+    self._draw_leads(frame, path_data, hud_data, calib_transform, camera_height)
 
     return frame
 
-  def _draw_leads(self, frame, path_data, calib_transform, camera_height):
+  def _draw_leads(self, frame, path_data, hud_data, calib_transform, camera_height):
     path_x = path_data.get("path_x") or []
     path_z = path_data.get("path_z") or []
     drawn_distances = []
@@ -264,10 +266,21 @@ class ClusterRenderer:
       half_width = max(28, int(20 + 600 / max(distance + 10.0, 10.0)))
       alpha = int(np.clip(255 * (1.0 - distance / 40.0) + max(0.0, -lead.get("v_rel", 0.0)) * 25, 70, 255))
       color = (255, max(35, 150 - alpha // 3), max(35, 150 - alpha // 3))
-      cv2.rectangle(frame, (x - half_width, y - 32), (x + half_width, y + 32), (12, 12, 12), -1)
       cv2.line(frame, (x - half_width, y), (x + half_width, y), color, 6)
-      cv2.putText(frame, f"{distance:.0f}m", (x - 22, y - 9), cv2.FONT_HERSHEY_SIMPLEX,
-                  0.42, (245, 248, 252), 1, cv2.LINE_AA)
+
+      conversion = 3.6 if getattr(self.config, "is_metric", True) else 2.236936
+      unit = "km/h" if getattr(self.config, "is_metric", True) else "mph"
+      lead_speed = max(0.0, (float(hud_data.get("v_ego", 0.0) or 0.0) +
+                             float(lead.get("v_rel", 0.0) or 0.0)) * conversion)
+      labels = (f"{distance:.0f} m", f"{lead_speed:.0f} {unit}")
+      for label, baseline_y in zip(labels, (y - 13, y + 27), strict=True):
+        text_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.68, 2)
+        origin = (x - text_size[0] // 2, baseline_y)
+        # An outline keeps the text legible while leaving the camera image visible.
+        cv2.putText(frame, label, origin, cv2.FONT_HERSHEY_SIMPLEX,
+                    0.68, (0, 0, 0), 6, cv2.LINE_AA)
+        cv2.putText(frame, label, origin, cv2.FONT_HERSHEY_SIMPLEX,
+                    0.68, (245, 248, 252), 2, cv2.LINE_AA)
 
   def _base_icon(self, name, size, active=True):
     source = self.icons.get(name)
@@ -294,8 +307,9 @@ class ClusterRenderer:
     image.paste(icon, (int(cx - icon.width / 2), int(cy - icon.height / 2)), icon)
 
   @staticmethod
-  def _centered(draw, cx, cy, value, font, color):
-    draw.text((int(cx), int(cy)), str(value), font=font, fill=color, anchor="mm")
+  def _centered(draw, cx, cy, value, font, color, stroke_width=0, stroke_fill=None):
+    draw.text((int(cx), int(cy)), str(value), font=font, fill=color, anchor="mm",
+              stroke_width=stroke_width, stroke_fill=stroke_fill)
 
   def _value(self, value, disabled="--"):
     try:
@@ -421,7 +435,9 @@ class ClusterRenderer:
     self._centered(draw, cx, self.row_h * 1.79, self.config.speed_unit, self.font_unit, muted)
 
     # wheel icon
-    if data.get("left_blinker") or data.get("right_blinker") or data.get("brake_pressed"):
+    if data.get("enabled") and data.get("steering_pressed"):
+      wheel_name = WHEEL_ICONS["steering"]
+    elif data.get("left_blinker") or data.get("right_blinker") or data.get("brake_pressed"):
       wheel_name = WHEEL_ICONS["critical"]
     elif data.get("enabled"):
       wheel_name = WHEEL_ICONS["enabled"]
@@ -544,6 +560,7 @@ class ClusterRenderer:
     conversion = 3.6 if getattr(self.config, "is_metric", True) else 2.236936
     speed = round(max(0.0, float(data.get("v_ego", 0.0) or 0.0) * conversion))
     center_x = self.camera_x + self.camera_w / 2
-    self._centered(draw, center_x, self.row_h * 0.29, speed, self.font_current_speed, speed_color)
+    self._centered(draw, center_x, self.row_h * 0.29, speed, self.font_current_speed, speed_color,
+                   stroke_width=5, stroke_fill=(0, 0, 0))
     self._centered(draw, center_x, self.row_h * 0.69, self.config.speed_unit,
-                   self.font_current_unit, white)
+                   self.font_current_unit, white, stroke_width=2, stroke_fill=(0, 0, 0))
