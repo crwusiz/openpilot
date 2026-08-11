@@ -72,6 +72,7 @@ def cluster_main():
       loop_count += 1
       perf_frames += 1
       if loop_count % fps == 0:
+        config.refresh()
         flog(
           f"[CLUSTER_HEARTBEAT] Loop: {loop_count} | Camera Ready: {camera.has_frame()} | USB Connected: {display.connected}")
 

@@ -123,7 +123,12 @@ class TuringUsbDisplay:
       if not isinstance(frame_image, np.ndarray):
         frame_image = np.array(frame_image)
 
-      rotated = cv2.rotate(frame_image, cv2.ROTATE_90_CLOCKWISE)
+      # The display protocol expects the 1920x462 canvas in portrait memory
+      # order. Reversing this transport rotation turns the visible image 180
+      # degrees without an additional full-frame rotation/copy.
+      rotation = cv2.ROTATE_90_COUNTERCLOCKWISE if getattr(self.config, "rotate_180", False) \
+                 else cv2.ROTATE_90_CLOCKWISE
+      rotated = cv2.rotate(frame_image, rotation)
       # Reuse the rotation buffer for the channel swap instead of allocating a
       # second full 462x1920 image on every frame.
       cv2.cvtColor(rotated, cv2.COLOR_RGB2BGR, dst=rotated)

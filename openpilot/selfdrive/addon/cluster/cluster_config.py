@@ -39,7 +39,15 @@ class ClusterConfig:
 
     self.params = Params()
     self.is_metric = self.params.get_bool("IsMetric")
+    self.rotate_180 = self.params.get_bool("ClusterRotate")
 
     self.speed_unit = "km/h" if self.is_metric else "mph"
 
-    cloudlog.info(f"Cluster Config Loaded: {self.width}x{self.height} @ {self.fps}fps, Unit: {self.speed_unit}")
+    cloudlog.info(f"Cluster Config Loaded: {self.width}x{self.height} @ {self.fps}fps, "
+                  f"Unit: {self.speed_unit}, Rotate 180: {self.rotate_180}")
+
+  def refresh(self):
+    rotate_180 = self.params.get_bool("ClusterRotate")
+    if rotate_180 != self.rotate_180:
+      self.rotate_180 = rotate_180
+      cloudlog.info(f"Cluster rotation changed: 180={self.rotate_180}")
