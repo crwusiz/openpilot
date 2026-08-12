@@ -1,6 +1,9 @@
-import numpy as np
+from io import BytesIO
 import time
+
 import cv2
+import numpy as np
+from PIL import Image
 import usb.util
 import usb.core
 
@@ -131,25 +134,32 @@ class TuringUsbDisplay:
 
     try:
       prepare_started = time.monotonic()
-      if not isinstance(frame_image, np.ndarray):
-        frame_image = np.asarray(frame_image)
+      if isinstance(frame_image, Image.Image):
+        # Renderer output is already RGB/PIL. Keeping it in Pillow removes the
+        # PIL -> NumPy copy plus OpenCV's rotate and RGB -> BGR passes.
+        rotation = Image.Transpose.ROTATE_90 if getattr(self.config, "rotate_180", False) \
+                   else Image.Transpose.ROTATE_270
+        rotated = frame_image.transpose(rotation)
+        encoded_buffer = BytesIO()
+        rotated.save(encoded_buffer, format="JPEG", quality=self.jpeg_quality,
+                     progressive=False, optimize=False, subsampling=2)
+        jpg_data = encoded_buffer.getbuffer()
+        success = True
+      else:
+        if not isinstance(frame_image, np.ndarray):
+          frame_image = np.asarray(frame_image)
 
-      # The display protocol expects the 1920x462 canvas in portrait memory
-      # order. Reversing this transport rotation turns the visible image 180
-      # degrees without an additional full-frame rotation/copy.
-      rotation = cv2.ROTATE_90_COUNTERCLOCKWISE if getattr(self.config, "rotate_180", False) \
-                 else cv2.ROTATE_90_CLOCKWISE
-      rotated = cv2.rotate(frame_image, rotation)
-      # Reuse the rotation buffer for the channel swap instead of allocating a
-      # second full 462x1920 image on every frame.
-      cv2.cvtColor(rotated, cv2.COLOR_RGB2BGR, dst=rotated)
+        # Compatibility path used by shutdown's generated black NumPy frame.
+        rotation = cv2.ROTATE_90_COUNTERCLOCKWISE if getattr(self.config, "rotate_180", False) \
+                   else cv2.ROTATE_90_CLOCKWISE
+        rotated = cv2.rotate(frame_image, rotation)
+        cv2.cvtColor(rotated, cv2.COLOR_RGB2BGR, dst=rotated)
+        success, encoded_img = cv2.imencode('.jpg', rotated, self._encode_param)
+        jpg_data = memoryview(encoded_img) if success else None
 
-      success, encoded_img = cv2.imencode('.jpg', rotated, self._encode_param)
-
-      if success:
+      if success and jpg_data is not None:
         # Passing a buffer view avoids an extra full JPEG copy. The vendor
         # helper keeps it alive while it builds and writes the USB payload.
-        jpg_data = memoryview(encoded_img)
         size_kb = len(jpg_data) // 1024
         prepare_elapsed = time.monotonic() - prepare_started
 

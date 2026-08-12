@@ -1,5 +1,6 @@
 import os
 import time
+from collections import OrderedDict
 import cv2
 import numpy as np
 
@@ -33,6 +34,8 @@ TRAFFIC_ICONS = {
   1: "traffic_red",
   2: "traffic_green",
 }
+
+STATUS_BORDER_SIZE = 20
 
 
 class ClusterRenderer:
@@ -78,6 +81,8 @@ class ClusterRenderer:
     self.focal_length = 910.0
     self.icons = {}
     self._icon_cache = {}
+    self._rotated_icon_cache = OrderedDict()
+    self._text_cache = OrderedDict()
     icon_dir = os.path.join(str(self.config.BASEDIR), "selfdrive", "assets", "icons")
     for name in (
       *WHEEL_ICONS.values(), *WIFI_ICONS.values(),
@@ -112,7 +117,10 @@ class ClusterRenderer:
 
     pil_img = Image.fromarray(frame)
     self._draw_hud(pil_img, hud_data, has_camera)
-    return np.asarray(pil_img)
+    # Keep the composed frame as PIL through the USB worker. Converting the
+    # complete 1920x462 image back to NumPy here only for it to be rotated and
+    # JPEG-encoded in the next thread was a full-frame copy on every update.
+    return pil_img
 
   def _crop_and_resize(self, frame):
     source_h, source_w = frame.shape[:2]
@@ -305,13 +313,65 @@ class ClusterRenderer:
     if icon is None:
       return
     if rotation:
-      icon = icon.rotate(rotation, resample=Image.Resampling.BICUBIC, expand=False)
+      # Steering angle and bearing usually change by fractions of a degree.
+      # Re-running PIL's bicubic transform for both icons on every camera frame
+      # is expensive on-device and has no visible benefit at these icon sizes.
+      rotation_key = int(round(float(rotation) / 2.0) * 2) % 360
+      key = (name, icon.size, bool(active), rotation_key)
+      rotated = self._rotated_icon_cache.get(key)
+      if rotated is None:
+        rotated = icon.rotate(rotation_key, resample=Image.Resampling.BICUBIC, expand=False)
+        self._rotated_icon_cache[key] = rotated
+        if len(self._rotated_icon_cache) > 256:
+          self._rotated_icon_cache.popitem(last=False)
+      else:
+        self._rotated_icon_cache.move_to_end(key)
+      icon = rotated
     image.paste(icon, (int(cx - icon.width / 2), int(cy - icon.height / 2)), icon)
 
-  @staticmethod
-  def _centered(draw, cx, cy, value, font, color, stroke_width=0, stroke_fill=None):
-    draw.text((int(cx), int(cy)), str(value), font=font, fill=color, anchor="mm",
-              stroke_width=stroke_width, stroke_fill=stroke_fill)
+  def _centered(self, draw, cx, cy, value, font, color, stroke_width=0, stroke_fill=None):
+    """Draw centered text from a bounded glyph cache.
+
+    Most HUD strings (units, labels, set speed, TPMS) are identical for many
+    consecutive frames. Caching their rasterized sprites avoids repeatedly
+    invoking FreeType while preserving PIL's existing appearance and anchors.
+    """
+    text = str(value)
+    fill = tuple(color) if isinstance(color, (tuple, list)) else color
+    # ImageDraw text on an RGB target with an RGBA drawing context ignores the
+    # fill alpha (unlike rectangles). Mirror that existing behavior so cached
+    # glyphs are pixel-identical to the former direct draw.text() calls.
+    if getattr(draw, "mode", None) == "RGBA" and isinstance(fill, tuple) and len(fill) == 4:
+      fill = (*fill[:3], 255)
+    stroke = tuple(stroke_fill) if isinstance(stroke_fill, (tuple, list)) else stroke_fill
+    key = (id(font), text, fill, int(stroke_width), stroke)
+    cached = self._text_cache.get(key)
+    if cached is None:
+      probe = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
+      probe_draw = ImageDraw.Draw(probe)
+      bbox = probe_draw.textbbox(
+        (0, 0), text, font=font, anchor="mm", stroke_width=stroke_width,
+      )
+      padding = max(2, int(stroke_width) + 1)
+      width = max(1, bbox[2] - bbox[0] + padding * 2)
+      height = max(1, bbox[3] - bbox[1] + padding * 2)
+      anchor_x = padding - bbox[0]
+      anchor_y = padding - bbox[1]
+      sprite = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+      ImageDraw.Draw(sprite).text(
+        (anchor_x, anchor_y), text, font=font, fill=fill, anchor="mm",
+        stroke_width=stroke_width, stroke_fill=stroke,
+      )
+      cached = (sprite, anchor_x, anchor_y)
+      self._text_cache[key] = cached
+      if len(self._text_cache) > 512:
+        self._text_cache.popitem(last=False)
+    else:
+      self._text_cache.move_to_end(key)
+
+    sprite, anchor_x, anchor_y = cached
+    target = draw._image
+    target.paste(sprite, (int(cx) - anchor_x, int(cy) - anchor_y), sprite)
 
   def _value(self, value, disabled="--"):
     try:
@@ -348,7 +408,7 @@ class ClusterRenderer:
                      "WAITING FOR CAMERA SIGNAL...", self.font_warning, red)
 
     status_color = self.config.colors["engaged"] if data["enabled"] else self.config.colors["disengaged"]
-    draw.rectangle([0, 0, self.target_w - 1, self.target_h - 1], outline=status_color, width=6)
+    draw.rectangle([0, 0, self.target_w - 1, self.target_h - 1], outline=status_color, width=STATUS_BORDER_SIZE)
     self._draw_status_borders(draw, data)
     self._draw_ignore_limit_timer(image, data)
 
@@ -370,9 +430,8 @@ class ClusterRenderer:
     bar_draw.rectangle([bar_x, 0, bar_x + bar_width - 1, 9], fill=(255, 149, 0, 150))
 
   def _draw_status_borders(self, draw, data):
-    """Match mici's independent blinker/blind-spot side borders."""
     blinking = (time.monotonic() % 0.9) < 0.45
-    border_size = 20
+    border_size = STATUS_BORDER_SIZE
     red = (255, 80, 70)
     orange = (255, 170, 55)
     green = (90, 220, 120)
@@ -563,6 +622,6 @@ class ClusterRenderer:
     speed = round(max(0.0, float(data.get("v_ego", 0.0) or 0.0) * conversion))
     center_x = self.camera_x + self.camera_w / 2
     self._centered(draw, center_x, self.row_h * 0.29, speed, self.font_current_speed, speed_color,
-                   stroke_width=5, stroke_fill=(0, 0, 0))
+                   stroke_width=2, stroke_fill=(0, 0, 0))
     self._centered(draw, center_x, self.row_h * 0.69, self.config.speed_unit,
-                   self.font_current_unit, white, stroke_width=2, stroke_fill=(0, 0, 0))
+                   self.font_current_unit, white, stroke_width=1, stroke_fill=(0, 0, 0))

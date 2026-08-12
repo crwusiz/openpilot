@@ -290,7 +290,6 @@ def publish_thread(server):
 
     v_ego = np.mean(v_ego_q) if len(v_ego_q) > 0 else 0.
 
-    # 프리징 차단 로직
     if navi.camLimitSpeedLeftDist > 0:
       if navi.camLimitSpeedLeftDist == last_network_dist:
         if v_ego > 1.0:
@@ -392,6 +391,13 @@ class SpeedLimiter:
       return self.naviData.sectionLimitSpeed, self.naviData.sectionLeftDist
     return 0, 0
 
+  def get_camera_limit_active(self):
+    if self.naviData is None:
+      return False
+    camera_active = self.naviData.camLimitSpeed > 0 and self.naviData.camLimitSpeedLeftDist > 0
+    section_active = self.naviData.sectionLimitSpeed > 0 and self.naviData.sectionLeftDist > 0
+    return camera_active or section_active
+
   def get_in_school_zone(self):
     return self.in_school_zone
 
@@ -485,10 +491,10 @@ class SpeedLimiter:
         tight_zone = is_speed_bump or is_school_zone_start
         safe_dist = cluster_speed_ms * 4. if tight_zone else cluster_speed_ms * 8.
 
-        MIN_STARTING_DIST_TIGHT = 60.
-        MIN_STARTING_DIST_NORMAL = 150.
-        starting_dist = max(cluster_speed_ms * 10., MIN_STARTING_DIST_TIGHT) if tight_zone \
-                        else max(cluster_speed_ms * 18., MIN_STARTING_DIST_NORMAL)
+        min_starting_dist_tight = 60.
+        min_starting_dist_normal = 150.
+        starting_dist = max(cluster_speed_ms * 10., min_starting_dist_tight) if tight_zone \
+                        else max(cluster_speed_ms * 18., min_starting_dist_normal)
 
         if self.cam_decel and self.last_limit_speed_left_dist > 0 and \
            cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - (cluster_speed_ms * 6)):
