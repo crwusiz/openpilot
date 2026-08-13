@@ -1,5 +1,6 @@
 from io import BytesIO
 import time
+from typing import NamedTuple
 
 import cv2
 import numpy as np
@@ -21,6 +22,13 @@ TURZX_USB_PRODUCT_IDS = {
   0x0092: "TURZX 9.2 inch",
 }
 TURZX_BRIGHTNESS_PERCENT = 100
+
+
+class PreparedFrame(NamedTuple):
+  jpeg: memoryview
+  size_kb: int
+  prepare_elapsed: float
+
 
 class TuringUsbDisplay:
   def __init__(self, config):
@@ -51,9 +59,26 @@ class TuringUsbDisplay:
     self._ep_in = None
     flog(f"TuringUsbDisplay initialized (JPEG quality={self.jpeg_quality}).")
 
+  def _disconnect(self):
+    device = self.device
+    self.connected = False
+    self.device = None
+    self.dev_pid = None
+    self.product_id = None
+    self._ep_out = None
+    self._ep_in = None
+    if device is not None:
+      try:
+        usb.util.dispose_resources(device)
+      except Exception:
+        pass
+
   def open(self):
     if self.connected:
       return True
+
+    # Release a partially initialized or failed handle before rediscovery.
+    self._disconnect()
 
     flog("Attempting to connect to Turing USB Display...")
 
@@ -94,11 +119,21 @@ class TuringUsbDisplay:
           self._ep_in = usb.util.find_descriptor(
             intf, custom_match=lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_IN)
 
+          if self._ep_out is None or self._ep_in is None:
+            raise RuntimeError("Turing USB endpoints were not found")
+
+          sync_ok = False
           for attempt in range(3):
             flog(f"[CLUSTER_USB] Sending sync handshake (Attempt {attempt+1})...")
             resp = send_sync_command(self.device)
-            flog(f"[CLUSTER_USB] Sync response: ok={self._resp_ok(resp)}")
+            sync_ok = self._resp_ok(resp)
+            flog(f"[CLUSTER_USB] Sync response: ok={sync_ok}")
+            if sync_ok:
+              break
             time.sleep(0.3)
+          if not sync_ok:
+            raise usb.core.USBError("Turing USB sync handshake failed")
+          time.sleep(0.3)
 
           # The protocol uses 0..102 for 0..100% backlight brightness. Without
           # this command the panel keeps its previous/default (often dim) level.
@@ -118,7 +153,7 @@ class TuringUsbDisplay:
           return True
         else:
           flog(f"[CLUSTER_USB_ERROR] Unsupported PID: {hex(self.product_id)}")
-          self.device = None
+          self._disconnect()
           return False
       else:
         flog("[CLUSTER_USB_ERROR] Turing USB Display not found.")
@@ -126,12 +161,11 @@ class TuringUsbDisplay:
 
     except Exception as e:
       flog(f"[CLUSTER_USB_ERROR] Error opening Turing display: {e}")
+      self._disconnect()
       return False
 
-  def send_image(self, frame_image):
-    if not self.connected or self.device is None:
-      return
-
+  def prepare_image(self, frame_image):
+    """Rotate and encode a frame without touching the USB device."""
     try:
       prepare_started = time.monotonic()
       if isinstance(frame_image, Image.Image):
@@ -157,53 +191,75 @@ class TuringUsbDisplay:
         success, encoded_img = cv2.imencode('.jpg', rotated, self._encode_param)
         jpg_data = memoryview(encoded_img) if success else None
 
-      if success and jpg_data is not None:
-        # Passing a buffer view avoids an extra full JPEG copy. The vendor
-        # helper keeps it alive while it builds and writes the USB payload.
-        size_kb = len(jpg_data) // 1024
-        prepare_elapsed = time.monotonic() - prepare_started
+      if not success or jpg_data is None:
+        flog("[CLUSTER_USB_ERROR] JPEG encoding failed; skipping frame.")
+        return None
 
-        t0 = time.monotonic()
-        # The device returns an ACK for every image.  This must be read: leaving
-        # ACKs in the IN endpoint fills the device queue after ~17 frames, then
-        # the following OUT write blocks until its USB timeout.
-        response = self._send_jpeg(self.device, jpg_data, ep_out=self._ep_out, ep_in=self._ep_in)
-        elapsed = time.monotonic() - t0
+      # The memoryview owns a reference to the Pillow/OpenCV backing buffer,
+      # keeping it valid until the USB sender finishes with this frame.
+      return PreparedFrame(
+        jpeg=jpg_data,
+        size_kb=len(jpg_data) // 1024,
+        prepare_elapsed=time.monotonic() - prepare_started,
+      )
+    except Exception as e:
+      # Encoding failures are independent of the USB connection and must not
+      # force a device reconnect.
+      flog(f"[CLUSTER_USB_ERROR] Failed to encode display frame: {e}")
+      return None
 
-        if not self._resp_ok(response):
-          self.consecutive_upload_failures += 1
-          flog(f"[CLUSTER_USB_WARN] JPEG upload was not acknowledged "
-               f"({self.consecutive_upload_failures}/3); skipping frame.")
-          # A single stale/late response is recoverable. Reconnecting on every
-          # miss causes an endless reset loop and makes recovery impossible.
-          if self.consecutive_upload_failures >= 3:
-            raise usb.core.USBError("JPEG upload was not acknowledged 3 times")
-          return
+  def send_prepared(self, prepared):
+    """Upload an already encoded frame and account for transport performance."""
+    if not self.connected or self.device is None or prepared is None:
+      return False
 
-        self.consecutive_upload_failures = 0
+    try:
+      t0 = time.monotonic()
+      # The device returns an ACK for every image.  This must be read: leaving
+      # ACKs in the IN endpoint fills the device queue after ~17 frames, then
+      # the following OUT write blocks until its USB timeout.
+      response = self._send_jpeg(
+        self.device, prepared.jpeg, ep_out=self._ep_out, ep_in=self._ep_in,
+        timeout=self.config.usb_image_timeout_ms,
+      )
+      elapsed = time.monotonic() - t0
 
-        self.frame_count += 1
-        now = time.monotonic()
-        if self._perf_started is None:
-          self._perf_started = prepare_started
-        self._perf_frames += 1
-        self._perf_prepare_time += prepare_elapsed
-        self._perf_usb_time += elapsed
-        # Avoid 20 synchronous file opens/writes during startup. Periodic
-        # telemetry remains sufficient for diagnosing throughput and stalls.
-        if self.frame_count == 1 or self.frame_count % self.config.fps == 0:
-          flog(f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {size_kb} KB | "
-               f"elapsed={elapsed:.3f}s | prep={prepare_elapsed * 1000:.1f}ms (ACK received)")
+      if not self._resp_ok(response):
+        self.consecutive_upload_failures += 1
+        flog(f"[CLUSTER_USB_WARN] JPEG upload was not acknowledged "
+             f"({self.consecutive_upload_failures}/3); skipping frame.")
+        # A single stale/late response is recoverable. Reconnecting on every
+        # miss causes an endless reset loop and makes recovery impossible.
+        if self.consecutive_upload_failures >= 3:
+          raise usb.core.USBError("JPEG upload was not acknowledged 3 times")
+        return False
 
-        if self._perf_frames >= self.config.fps * 10:
-          perf_elapsed = max(now - self._perf_started, 1e-6)
-          flog(f"[CLUSTER_USB_PERF] fps={self._perf_frames / perf_elapsed:.2f} | "
-               f"prep_avg={self._perf_prepare_time * 1000 / self._perf_frames:.1f}ms | "
-               f"usb_avg={self._perf_usb_time * 1000 / self._perf_frames:.1f}ms")
-          self._perf_started = now
-          self._perf_frames = 0
-          self._perf_prepare_time = 0.0
-          self._perf_usb_time = 0.0
+      self.consecutive_upload_failures = 0
+
+      self.frame_count += 1
+      now = time.monotonic()
+      if self._perf_started is None:
+        self._perf_started = now
+      self._perf_frames += 1
+      self._perf_prepare_time += prepared.prepare_elapsed
+      self._perf_usb_time += elapsed
+      # Avoid 20 synchronous file opens/writes during startup. Periodic
+      # telemetry remains sufficient for diagnosing throughput and stalls.
+      if self.frame_count == 1 or self.frame_count % self.config.fps == 0:
+        flog(f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {prepared.size_kb} KB | "
+             f"elapsed={elapsed:.3f}s | prep={prepared.prepare_elapsed * 1000:.1f}ms (ACK received)")
+
+      if self._perf_frames >= self.config.fps * 10:
+        perf_elapsed = max(now - self._perf_started, 1e-6)
+        flog(f"[CLUSTER_USB_PERF] fps={self._perf_frames / perf_elapsed:.2f} | "
+             f"prep_avg={self._perf_prepare_time * 1000 / self._perf_frames:.1f}ms | "
+             f"usb_avg={self._perf_usb_time * 1000 / self._perf_frames:.1f}ms")
+        self._perf_started = now
+        self._perf_frames = 0
+        self._perf_prepare_time = 0.0
+        self._perf_usb_time = 0.0
+
+      return True
 
     except usb.core.USBError as e:
       if e.errno == 110 or 'timed out' in str(e).lower():
@@ -216,18 +272,19 @@ class TuringUsbDisplay:
       else:
         err_msg = f"Critical USB Error: {e}"
         flog(f"[CLUSTER_USB_ERROR] {err_msg}")
-        self.connected = False
-        self.device = None
+        self._disconnect()
     except Exception as e:
       err_msg = f"Failed to send image to Turing display: {e}"
       flog(f"[CLUSTER_USB_ERROR] {err_msg}")
-      self.connected = False
-      self.device = None
+      self._disconnect()
+    return False
+
+  def send_image(self, frame_image):
+    """Synchronous compatibility path used for display cleanup."""
+    if not self.connected or self.device is None:
+      return False
+    return self.send_prepared(self.prepare_image(frame_image))
 
   def close(self):
     flog("Closing Turing connection.")
-    self.connected = False
-    self.device = None
-    self.dev_pid = None
-    self._ep_out = None
-    self._ep_in = None
+    self._disconnect()

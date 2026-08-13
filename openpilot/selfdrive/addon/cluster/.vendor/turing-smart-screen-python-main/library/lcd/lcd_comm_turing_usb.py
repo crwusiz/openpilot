@@ -72,7 +72,7 @@ def _resp_ok(resp: Optional[bytes]) -> bool:
     return (b1 == 0xC8) or (b8 == 0xC8)
 
 
-def send_jpeg(dev, jpeg_data: bytes, ep_out=None, ep_in=None):
+def send_jpeg(dev, jpeg_data: bytes, ep_out=None, ep_in=None, timeout=2500):
     img_size = len(jpeg_data)
     cmd_packet = build_command_packet_header(CMD_UPLOAD_JPEG)
     cmd_packet[8] = (img_size >> 24) & 0xFF
@@ -80,7 +80,7 @@ def send_jpeg(dev, jpeg_data: bytes, ep_out=None, ep_in=None):
     cmd_packet[10] = (img_size >> 8) & 0xFF
     cmd_packet[11] = img_size & 0xFF
     full_payload = encrypt_command_packet(cmd_packet) + jpeg_data
-    return write_to_device(dev, full_payload, ep_out=ep_out, ep_in=ep_in)
+    return write_to_device(dev, full_payload, timeout=timeout, ep_out=ep_out, ep_in=ep_in)
 
 
 def _encode_jpeg_under_limit(image: Image.Image, *, max_bytes: int, quality: int = 95,
