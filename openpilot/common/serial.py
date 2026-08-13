@@ -155,6 +155,28 @@ class Serial:
       if chunk == b"\n":
         return bytes(buf)
 
+  def read_all(self) -> bytes:
+    """Return all bytes currently available without waiting for more data."""
+    self._ensure_open()
+    buf = bytearray()
+    while self._wait_readable(0.0):
+      try:
+        chunk = os.read(self._fd, 4096)
+      except InterruptedError:
+        continue
+      except OSError as e:
+        if e.errno in (errno.EAGAIN, errno.EWOULDBLOCK):
+          break
+        raise SerialException(e.errno, f"read failed: {e}") from e
+      if not chunk:
+        break
+      buf.extend(chunk)
+    return bytes(buf)
+
+  def readall(self) -> bytes:
+    """Backward-compatible alias used by the cluster display library."""
+    return self.read_all()
+
   def write(self, data: bytes) -> int:
     self._ensure_open()
     if not data:

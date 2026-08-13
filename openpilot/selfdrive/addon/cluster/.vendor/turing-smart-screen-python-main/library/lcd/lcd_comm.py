@@ -30,8 +30,9 @@ from abc import ABC, abstractmethod
 from enum import IntEnum
 from typing import Tuple, List, Optional, Dict
 
-import serial
 from PIL import Image, ImageDraw, ImageFont
+
+from openpilot.common.serial import Serial, SerialException
 
 from library.log import logger
 from library.lcd.color import Color, parse_color
@@ -105,7 +106,7 @@ class LcdComm(ABC):
             logger.debug(f"Static COM port: {self.com_port}")
 
         try:
-            self.lcd_serial = serial.Serial(self.com_port, 115200, timeout=1, rtscts=True)
+            self.lcd_serial = Serial(self.com_port, 115200, timeout=1, rtscts=True)
         except Exception as e:
             logger.error(f"Cannot open COM port {self.com_port}: {e}")
             try:
@@ -151,10 +152,7 @@ class LcdComm(ABC):
                 # macOS needs the serial buffer to be flushed regularly to avoid bitmap corruption on the display
                 # See https://github.com/mathoudebine/turing-smart-screen-python/issues/7
                 self.lcd_serial.flush()
-        except serial.SerialTimeoutException:
-            # We timed-out trying to write to our device, slow things down.
-            logger.warning("(Write line) Too fast! Slow down!")
-        except serial.SerialException:
+        except SerialException:
             # Error writing data to device: close and reopen serial port, try to write again
             logger.error(
                 "SerialException: Failed to send serial data to device. Closing and reopening COM port before retrying once.")
@@ -168,10 +166,7 @@ class LcdComm(ABC):
             response = self.serial_read(readSize)
             # logger.debug("Received: [{}]".format(str(response, 'utf-8')))
             return response
-        except serial.SerialTimeoutException:
-            # We timed-out trying to read from our device, slow things down.
-            logger.warning("(Read data) Too fast! Slow down!")
-        except serial.SerialException:
+        except SerialException:
             # Error writing data to device: close and reopen serial port, try to read again
             logger.error(
                 "SerialException: Failed to read serial data from device. Closing and reopening COM port before retrying once.")
