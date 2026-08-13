@@ -712,6 +712,13 @@ struct UsbState {
     manufacturer @6 :Text;
     product @5 :Text;
     linkErrorCount @7 :UInt16;
+    usb3Lane @8 :Usb3Lane;
+
+    enum Usb3Lane {
+      unknown @0;
+      a @1;
+      b @2;
+    }
   }
 }
 
