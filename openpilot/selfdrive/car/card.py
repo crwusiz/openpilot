@@ -21,7 +21,7 @@ from opendbc.car.interfaces import CarInterfaceBase, RadarInterfaceBase
 from openpilot.selfdrive.pandad import can_capnp_to_list, can_list_to_can_capnp
 from openpilot.selfdrive.car.cruise import VCruiseHelper
 
-from openpilot.selfdrive.controls.neokii.cruise_controller import CruiseController
+from openpilot.selfdrive.addon.cruise_controller import CruiseController
 
 REPLAY = "REPLAY" in os.environ
 

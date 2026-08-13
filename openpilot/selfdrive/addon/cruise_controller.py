@@ -9,7 +9,7 @@ from openpilot.selfdrive.car.cruise import (V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE
                                             V_CRUISE_INITIAL_EXPERIMENTAL_MODE,
                                             CRUISE_LONG_PRESS, IMPERIAL_INCREMENT)
 from opendbc.car.hyundai.values import Buttons, HyundaiFlags
-from openpilot.selfdrive.controls.neokii.navi_controller import SpeedLimiter
+from openpilot.selfdrive.addon.navi_controller import SpeedLimiter
 
 """
 MPH_TO_KPH = 1.609344
