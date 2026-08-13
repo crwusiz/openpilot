@@ -512,7 +512,8 @@ def render_tab_logs():
     "CAN Missing": "/data/can_missing.log",
     "CAN Timeout": "/data/can_timeout.log",
     "Tmux Error": "/data/tmux_error.log",
-    "Tmux Console": "TMUX_CONSOLE"
+    "Tmux Console": "TMUX_CONSOLE",
+    "Cluster Debug": "/data/openpilot/openpilot/selfdrive/addon/cluster/cluster_debug.log",
   }
   REALDATA_PATH = Path("/data/media/0/realdata")
 

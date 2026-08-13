@@ -35,9 +35,6 @@ TRAFFIC_ICONS = {
   2: "traffic_green",
 }
 
-STATUS_BORDER_SIZE = 20
-
-
 class ClusterRenderer:
   def __init__(self, config):
     cloudlog.info("Initializing ClusterRenderer...")
@@ -45,15 +42,25 @@ class ClusterRenderer:
 
     self.target_w = config.width
     self.target_h = config.height
-    # Five horizontal regions: a:b:c:d:e = 1:1:6:1:1.
-    self.panel_w = self.target_w // 10
+    self.border_size = getattr(config, "border_size", 10)
+    self.content_x = self.border_size
+    self.content_y = self.border_size
+    self.content_w = self.target_w - self.border_size * 2
+    self.content_h = self.target_h - self.border_size * 2
+    # a/b/d/e use the three-row height as their width, keeping the side cells
+    # square. The remaining content width belongs to the center camera panel.
+    self.panel_w = getattr(config, "side_panel_width", self.content_h // 3)
     self.side_w = self.panel_w
-    self.left_aux_x = self.panel_w
-    self.camera_x = self.panel_w * 2
-    self.camera_w = self.panel_w * 6
+    self.left_panel_x = self.content_x
+    self.left_aux_x = self.left_panel_x + self.panel_w
+    self.camera_x = self.left_aux_x + self.panel_w
+    self.camera_w = self.content_w - self.panel_w * 4
+    self.camera_y = self.content_y
+    self.camera_h = self.content_h
     self.right_aux_x = self.camera_x + self.camera_w
     self.right_panel_x = self.right_aux_x + self.panel_w
-    self.row_h = self.target_h / 3.0
+    self.row_h = self.content_h / 3.0
+    self.row_centers = tuple(self.content_y + self.row_h * (row + 0.5) for row in range(3))
     self._source_to_panel = np.eye(3, dtype=np.float32)
 
     try:
@@ -76,7 +83,9 @@ class ClusterRenderer:
       self.font_label = ImageFont.load_default()
       self.font_warning = ImageFont.load_default()
 
-    self.blank_canvas = np.zeros((self.target_h, self.target_w, 3), dtype=np.uint8)
+    self.blank_canvas = np.full(
+      (self.target_h, self.target_w, 3), self.config.colors["bg"], dtype=np.uint8,
+    )
     self.camera_height = 1.22
     self.focal_length = 910.0
     self.icons = {}
@@ -101,11 +110,12 @@ class ClusterRenderer:
     camera_frame = camera.get_frame()
     has_camera = camera_frame is not None
     if has_camera:
-      if camera_frame.shape[:2] == (self.target_h, self.camera_w) and \
+      if camera_frame.shape[:2] == (self.camera_h, self.camera_w) and \
           hasattr(camera, "get_source_to_panel_transform"):
         frame = self.blank_canvas.copy()
-        frame[:, self.camera_x:self.camera_x + self.camera_w] = camera_frame
-        self._source_to_panel = camera.get_source_to_panel_transform(self.camera_x)
+        frame[self.camera_y:self.camera_y + self.camera_h,
+              self.camera_x:self.camera_x + self.camera_w] = camera_frame
+        self._source_to_panel = camera.get_source_to_panel_transform(self.camera_x, self.camera_y)
       else:
         frame = self._crop_and_resize(camera_frame)
     else:
@@ -125,7 +135,7 @@ class ClusterRenderer:
   def _crop_and_resize(self, frame):
     source_h, source_w = frame.shape[:2]
     source_aspect = source_w / source_h
-    target_aspect = self.camera_w / self.target_h
+    target_aspect = self.camera_w / self.camera_h
     if source_aspect < target_aspect:
       crop_w = source_w
       crop_h = max(1, int(round(source_w / target_aspect)))
@@ -135,17 +145,18 @@ class ClusterRenderer:
     crop_x = (source_w - crop_w) // 2
     crop_y = (source_h - crop_h) // 2
     cropped = frame[crop_y:crop_y + crop_h, crop_x:crop_x + crop_w]
-    camera = cv2.resize(cropped, (self.camera_w, self.target_h), interpolation=cv2.INTER_AREA)
+    camera = cv2.resize(cropped, (self.camera_w, self.camera_h), interpolation=cv2.INTER_AREA)
 
     scale_x = self.camera_w / crop_w
-    scale_y = self.target_h / crop_h
+    scale_y = self.camera_h / crop_h
     self._source_to_panel = np.array([
       [scale_x, 0.0, self.camera_x - crop_x * scale_x],
-      [0.0, scale_y, -crop_y * scale_y],
+      [0.0, scale_y, self.camera_y - crop_y * scale_y],
       [0.0, 0.0, 1.0],
     ], dtype=np.float32)
     canvas = self.blank_canvas.copy()
-    canvas[:, self.camera_x:self.camera_x + self.camera_w] = camera
+    canvas[self.camera_y:self.camera_y + self.camera_h,
+           self.camera_x:self.camera_x + self.camera_w] = camera
     return canvas
 
   def _project_points(self, points, calib_transform):
@@ -162,8 +173,8 @@ class ClusterRenderer:
       valid &= (
         (pixels[:, 0] >= self.camera_x) &
         (pixels[:, 0] < self.camera_x + self.camera_w) &
-        (pixels[:, 1] >= 0) &
-        (pixels[:, 1] < self.target_h)
+        (pixels[:, 1] >= self.camera_y) &
+        (pixels[:, 1] < self.camera_y + self.camera_h)
       )
     return pixels, valid
 
@@ -191,7 +202,8 @@ class ClusterRenderer:
     if calib_transform is None:
       return frame
 
-    camera_region = frame[:, self.camera_x:self.camera_x + self.camera_w]
+    camera_region = frame[self.camera_y:self.camera_y + self.camera_h,
+                          self.camera_x:self.camera_x + self.camera_w]
     camera_height = float(path_data.get("camera_height", self.camera_height) or self.camera_height)
     path_z = path_data.get("path_z") or [0.0] * len(path_data["path_x"])
     path_poly = self._project_ribbon(
@@ -200,7 +212,7 @@ class ClusterRenderer:
     )
     if path_poly is not None and hud_data["enabled"]:
       overlay = camera_region.copy()
-      local_path_poly = path_poly - np.array([self.camera_x, 0], dtype=np.int32)
+      local_path_poly = path_poly - np.array([self.camera_x, self.camera_y], dtype=np.int32)
       path_color = self.config.colors["path_steering"] if hud_data.get("steering_pressed") \
                    else self.config.colors["path_active"]
       cv2.fillPoly(overlay, [local_path_poly], path_color)
@@ -223,7 +235,7 @@ class ClusterRenderer:
           feature_overlay = camera_region.copy()
         base_color = self.config.colors["path_active"] if hud_data["enabled"] and index in (1, 2) else self.config.colors["lane_line"]
         color = tuple(int(component * (0.35 + probability * 0.65)) for component in base_color)
-        local_polygon = polygon - np.array([self.camera_x, 0], dtype=np.int32)
+        local_polygon = polygon - np.array([self.camera_x, self.camera_y], dtype=np.int32)
         cv2.fillPoly(feature_overlay, [local_polygon], color)
         features_drawn = True
 
@@ -240,7 +252,7 @@ class ClusterRenderer:
         if feature_overlay is None:
           feature_overlay = camera_region.copy()
         level = int(100 + 115 * min(confidence, 1.0))
-        local_polygon = polygon - np.array([self.camera_x, 0], dtype=np.int32)
+        local_polygon = polygon - np.array([self.camera_x, self.camera_y], dtype=np.int32)
         cv2.fillPoly(feature_overlay, [local_polygon], (level, level, level))
         features_drawn = True
 
@@ -288,9 +300,9 @@ class ClusterRenderer:
         origin = (x - text_size[0] // 2, baseline_y)
         # An outline keeps the text legible while leaving the camera image visible.
         cv2.putText(frame, label, origin, cv2.FONT_HERSHEY_SIMPLEX,
-                    0.68, (0, 0, 0), 6, cv2.LINE_AA)
+                    0.68, self.config.colors["outline"], 6, cv2.LINE_AA)
         cv2.putText(frame, label, origin, cv2.FONT_HERSHEY_SIMPLEX,
-                    0.68, (245, 248, 252), 2, cv2.LINE_AA)
+                    0.68, self.config.colors["text"], 2, cv2.LINE_AA)
 
   def _base_icon(self, name, size, active=True):
     source = self.icons.get(name)
@@ -381,21 +393,24 @@ class ClusterRenderer:
 
   def _draw_hud(self, image, data, has_camera):
     draw = ImageDraw.Draw(image)
-    white = (245, 248, 252)
-    muted = (120, 132, 148)
-    red = (255, 105, 95)
-    panel = (7, 12, 18)
-    divider = (42, 54, 68)
+    colors = self.config.colors
+    white = colors["text"]
+    muted = colors["muted_text"]
+    red = colors["sign_red"]
+    panel = colors["panel"]
+    divider = colors["divider"]
+    content_right = self.content_x + self.content_w - 1
+    content_bottom = self.content_y + self.content_h - 1
 
-    # Opaque a/b and d/e panels around the 6/10-wide camera region.
-    draw.rectangle([0, 0, self.camera_x - 1, self.target_h], fill=panel)
-    draw.rectangle([self.right_aux_x, 0, self.target_w, self.target_h], fill=panel)
+    # All HUD content stays inside the dedicated outer-border rectangle.
+    draw.rectangle([self.content_x, self.content_y, self.camera_x - 1, content_bottom], fill=panel)
+    draw.rectangle([self.right_aux_x, self.content_y, content_right, content_bottom], fill=panel)
     for x in (self.left_aux_x, self.camera_x, self.right_aux_x, self.right_panel_x):
-      draw.line((x, 0, x, self.target_h), fill=divider, width=2)
+      draw.line((x, self.content_y, x, content_bottom), fill=divider, width=2)
     for row in (1, 2):
-      y = int(row * self.row_h)
-      draw.line((0, y, self.camera_x, y), fill=divider, width=1)
-      draw.line((self.right_aux_x, y, self.target_w, y), fill=divider, width=1)
+      y = int(round(self.content_y + row * self.row_h))
+      draw.line((self.content_x, y, self.camera_x - 1, y), fill=divider, width=1)
+      draw.line((self.right_aux_x, y, content_right, y), fill=divider, width=1)
 
     self._draw_left_panel(image, draw, data, muted)
     self._draw_left_aux_panel(image, draw, data, white, red)
@@ -404,11 +419,12 @@ class ClusterRenderer:
     self._draw_right_panel(image, draw, data, red)
 
     if not has_camera:
-      self._centered(draw, self.camera_x + self.camera_w / 2, self.target_h / 2,
+      self._centered(draw, self.camera_x + self.camera_w / 2, self.camera_y + self.camera_h / 2,
                      "WAITING FOR CAMERA SIGNAL...", self.font_warning, red)
 
-    status_color = self.config.colors["engaged"] if data["enabled"] else self.config.colors["disengaged"]
-    draw.rectangle([0, 0, self.target_w - 1, self.target_h - 1], outline=status_color, width=STATUS_BORDER_SIZE)
+    status_color = colors["engaged"] if data["enabled"] else colors["disengaged"]
+    draw.rectangle([0, 0, self.target_w - 1, self.target_h - 1],
+                   outline=status_color, width=self.border_size)
     self._draw_status_borders(draw, data)
     self._draw_ignore_limit_timer(image, data)
 
@@ -427,14 +443,17 @@ class ClusterRenderer:
       return
     bar_x = (self.target_w - bar_width) // 2
     bar_draw = ImageDraw.Draw(image, "RGBA")
-    bar_draw.rectangle([bar_x, 0, bar_x + bar_width - 1, 9], fill=(255, 149, 0, 150))
+    bar_draw.rectangle(
+      [bar_x, 0, bar_x + bar_width - 1, self.border_size - 1],
+      fill=self.config.colors["ignore_timer"],
+    )
 
   def _draw_status_borders(self, draw, data):
     blinking = (time.monotonic() % 0.9) < 0.45
-    border_size = STATUS_BORDER_SIZE
-    red = (255, 80, 70)
-    orange = (255, 170, 55)
-    green = (90, 220, 120)
+    border_size = self.border_size
+    red = self.config.colors["status_brake"]
+    orange = self.config.colors["status_blinker"]
+    green = self.config.colors["engaged"]
 
     def draw_side(x, blinker, blindspot):
       if data.get("brake_pressed") or blindspot:
@@ -451,16 +470,17 @@ class ClusterRenderer:
     draw_side(self.target_w - border_size, data.get("right_blinker"), data.get("right_blindspot"))
 
   def _draw_left_panel(self, image, draw, data, muted):
-    cx = self.side_w / 2
+    cx = self.left_panel_x + self.side_w / 2
     cruise = self._value(data.get("cruise_speed"))
     is_cruise_set = bool(data.get("is_cruise_set"))
     set_speed = self._value(data.get("set_speed", data.get("cruise_speed"))) if is_cruise_set else "--"
 
-    max_color = (255, 255, 255, 200)
-    speed_color = (255, 255, 255, 200)
+    max_color = (*self.config.colors["text"], 200)
+    speed_color = (*self.config.colors["text"], 200)
     if is_cruise_set:
-      speed_color = (255, 255, 255, 255)
-      max_color = (128, 216, 166, 255) if data.get("enabled") else (145, 155, 149, 255)
+      speed_color = (*self.config.colors["text"], 255)
+      max_color = self.config.colors["max_active"] if data.get("enabled") \
+                  else (*self.config.colors["override"], 255)
 
       if data.get("nda_state"):
         if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
@@ -477,23 +497,23 @@ class ClusterRenderer:
       cruise_speed = float(data.get("cruise_speed", 0.0) or 0.0)
       if limit_speed > 0 and data.get("enabled"):
         if cruise_speed > limit_speed + 25:
-          speed_color = (201, 34, 49, 255)
+          speed_color = self.config.colors["speed_critical"]
         elif cruise_speed > limit_speed + 15:
-          speed_color = (255, 149, 0, 255)
+          speed_color = self.config.colors["speed_warning"]
         elif cruise_speed > limit_speed + 5:
-          speed_color = (255, 200, 100, 255)
+          speed_color = self.config.colors["speed_caution"]
 
     speed_draw = ImageDraw.Draw(image, "RGBA")
 
     # max box
-    self._centered(speed_draw, cx, self.row_h * 0.28, "MAX", self.font_label, max_color)
-    self._centered(speed_draw, cx, self.row_h * 0.58, cruise, self.font_speed, speed_color)
-    self._centered(draw, cx, self.row_h * 0.79, self.config.speed_unit, self.font_unit, muted)
+    self._centered(speed_draw, cx, self.content_y + self.row_h * 0.28, "MAX", self.font_label, max_color)
+    self._centered(speed_draw, cx, self.content_y + self.row_h * 0.58, cruise, self.font_speed, speed_color)
+    self._centered(draw, cx, self.content_y + self.row_h * 0.79, self.config.speed_unit, self.font_unit, muted)
 
     # set box
-    self._centered(speed_draw, cx, self.row_h * 1.28, "SET", self.font_label, max_color)
-    self._centered(speed_draw, cx, self.row_h * 1.58, set_speed, self.font_speed, speed_color)
-    self._centered(draw, cx, self.row_h * 1.79, self.config.speed_unit, self.font_unit, muted)
+    self._centered(speed_draw, cx, self.content_y + self.row_h * 1.28, "SET", self.font_label, max_color)
+    self._centered(speed_draw, cx, self.content_y + self.row_h * 1.58, set_speed, self.font_speed, speed_color)
+    self._centered(draw, cx, self.content_y + self.row_h * 1.79, self.config.speed_unit, self.font_unit, muted)
 
     # wheel icon
     if data.get("enabled") and data.get("steering_pressed"):
@@ -504,12 +524,12 @@ class ClusterRenderer:
       wheel_name = WHEEL_ICONS["enabled"]
     else:
       wheel_name = WHEEL_ICONS["default"]
-    self._icon(image, wheel_name, cx, self.row_h * 2.50, 94, True,
+    self._icon(image, wheel_name, cx, self.row_centers[2], 94, True,
                rotation=float(data.get("steering_angle", 0.0) or 0.0))
 
   def _draw_left_aux_panel(self, image, draw, data, white, red):
     left_cx = self.left_aux_x + self.panel_w / 2
-    speed_limit_y = self.row_h * 0.50
+    speed_limit_y = self.row_centers[0]
     if data.get("nda_state"):
       if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
         limit = float(data.get("cam_limit_speed"))
@@ -529,7 +549,8 @@ class ClusterRenderer:
                   left_cx + outer_radius, speed_limit_y + outer_radius], fill=red)
     draw.ellipse([left_cx - inner_radius, speed_limit_y - inner_radius,
                   left_cx + inner_radius, speed_limit_y + inner_radius], fill=white)
-    self._centered(draw, left_cx, speed_limit_y, self._value(limit), self.font_value, (20, 25, 30))
+    self._centered(draw, left_cx, speed_limit_y, self._value(limit), self.font_value,
+                   self.config.colors["sign_text"])
 
     # Draw distance if available, matching the main HUD's camera/section priority.
     left_dist = 0.0
@@ -545,7 +566,7 @@ class ClusterRenderer:
       padding_x, padding_y = 7, 3
       draw.rounded_rectangle(
         [bbox[0] - padding_x, bbox[1] - padding_y, bbox[2] + padding_x, bbox[3] + padding_y],
-        radius=5, fill=(18, 25, 34),
+        radius=5, fill=self.config.colors["distance_badge"],
       )
       self._centered(draw, left_cx, text_y, dist_text, self.font_small, white)
 
@@ -558,22 +579,22 @@ class ClusterRenderer:
     elif data.get("speed_camera"):
       road_sign = "speed_camera"
     if road_sign:
-      self._icon(image, road_sign, left_cx, self.row_h * 1.50, 92, True)
+      self._icon(image, road_sign, left_cx, self.row_centers[1], 92, True)
 
     # pedal_icon
     pedal_icon = "brake_pressed" if data.get("brake_pressed") else \
                  "accel_pressed" if data.get("gas_pressed") else None
     if pedal_icon is not None:
-      self._icon(image, pedal_icon, left_cx, self.row_h * 2.50, 94, True)
+      self._icon(image, pedal_icon, left_cx, self.row_centers[2], 94, True)
 
   def _draw_right_aux_panel(self, image, data):
     wifi = int(data.get("wifi_strength", 0) or 0)
     wifi_name = WIFI_ICONS[min(max(wifi, 1), 4)]
     right_cx = self.right_aux_x + self.panel_w / 2
-    self._icon(image, wifi_name, right_cx, self.row_h * 0.50, 88, wifi > 0)
-    self._icon(image, "gps", right_cx, self.row_h * 1.50, 88,
+    self._icon(image, wifi_name, right_cx, self.row_centers[0], 88, wifi > 0)
+    self._icon(image, "gps", right_cx, self.row_centers[1], 88,
                data.get("gps_satellites", 0) > 0)
-    self._icon(image, "compass", right_cx, self.row_h * 2.50, 88,
+    self._icon(image, "compass", right_cx, self.row_centers[2], 88,
                data.get("gps_satellites", 0) > 0, rotation=float(data.get("gps_bearing", 0.0) or 0.0))
 
   def _draw_right_panel(self, image, draw, data, red):
@@ -581,18 +602,18 @@ class ClusterRenderer:
 
     # traffic icon
     traffic_name = TRAFFIC_ICONS.get(data.get("traffic_state"), TRAFFIC_ICONS[0])
-    self._icon(image, traffic_name, cx, self.row_h * 0.50, (68, 136), True)
+    self._icon(image, traffic_name, cx, self.row_centers[0], (68, 136), True)
 
     # distance icon
     gap = min(max(int(data.get("distance_level", 1) or 1), 1), 4)
     gap_name = DISTANCE_ICONS[gap]
-    self._icon(image, gap_name, cx, self.row_h * 1.50, (56, 132), True)
+    self._icon(image, gap_name, cx, self.row_centers[1], (56, 132), True)
 
     # tpms icon
     tpms = self._base_icon("tpms", (108, 140), True)
     if tpms is not None:
       tpms_x = int(cx - tpms.width / 2)
-      tpms_y = int(self.row_h * 2.0 + 7)
+      tpms_y = int(self.content_y + self.row_h * 2.0 + 7)
       image.paste(tpms, (tpms_x, tpms_y), tpms)
     raw_pressures = data.get("tpms") or [0, 0, 0, 0]
     pressures = list(raw_pressures)
@@ -603,9 +624,10 @@ class ClusterRenderer:
       except (TypeError, ValueError):
         pressure = 0.0
       px = cx + (-36 if i % 2 == 0 else 36)
-      py = self.row_h * 2.0 + (38 if i < 2 else 115)
+      py = self.content_y + self.row_h * 2.0 + (38 if i < 2 else 115)
       value = "--" if not pressure or pressure < 5 or pressure > 60 else str(round(pressure))
-      color = (230, 150, 45) if value == "--" else red if float(pressure) < 31 else (20, 25, 30)
+      color = self.config.colors["tpms_unknown"] if value == "--" \
+              else red if float(pressure) < 31 else self.config.colors["sign_text"]
       self._centered(draw, px, py, value, self.font_small, color)
 
   def _draw_camera_overlays(self, draw, data, white):
@@ -621,7 +643,9 @@ class ClusterRenderer:
     conversion = 3.6 if getattr(self.config, "is_metric", True) else 2.236936
     speed = round(max(0.0, float(data.get("v_ego", 0.0) or 0.0) * conversion))
     center_x = self.camera_x + self.camera_w / 2
-    self._centered(draw, center_x, self.row_h * 0.29, speed, self.font_current_speed, speed_color,
-                   stroke_width=2, stroke_fill=(0, 0, 0))
-    self._centered(draw, center_x, self.row_h * 0.69, self.config.speed_unit,
-                   self.font_current_unit, white, stroke_width=1, stroke_fill=(0, 0, 0))
+    # Align the current-speed value with the center of b's speed-limit cell.
+    self._centered(draw, center_x, self.row_centers[0],
+                   speed, self.font_current_speed, speed_color,
+                   stroke_width=2, stroke_fill=self.config.colors["outline"])
+    self._centered(draw, center_x, self.content_y + self.row_h * 0.86, self.config.speed_unit,
+                   self.font_current_unit, white, stroke_width=1, stroke_fill=self.config.colors["outline"])

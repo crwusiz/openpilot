@@ -24,7 +24,7 @@ class ClusterLiveCamera:
   def __init__(self, config):
     self.config = config
     self.panel_width = config.camera_panel_width
-    self.panel_height = config.height
+    self.panel_height = getattr(config, "camera_panel_height", config.height)
     self.latest_frame = None
     self._frame_condition = threading.Condition()
     self._source_to_panel = np.eye(3, dtype=np.float32)
@@ -253,10 +253,11 @@ class ClusterLiveCamera:
       )
       return self.frame_count
 
-  def get_source_to_panel_transform(self, panel_x=0):
+  def get_source_to_panel_transform(self, panel_x=0, panel_y=0):
     with self._frame_condition:
       transform = self._source_to_panel.copy()
       transform[0, 2] += panel_x
+      transform[1, 2] += panel_y
       return transform
 
   def close(self):

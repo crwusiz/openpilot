@@ -9,6 +9,35 @@ USB_TARGET_FPS = 20
 USB_CLEAR_HALT_ON_TIMEOUT = True
 USB_JPEG_QUALITY = 68
 CAMERA_CONTRAST = 1.08
+CLUSTER_BORDER_SIZE = 10
+
+CLUSTER_COLORS = {
+  "bg": (0, 0, 0),
+  "panel": (7, 12, 18),
+  "divider": (42, 54, 68),
+  "text": (245, 248, 252),
+  "muted_text": (120, 132, 148),
+  "outline": (0, 0, 0),
+  "sign_red": (255, 105, 95),
+  "sign_text": (20, 25, 30),
+  "distance_badge": (18, 25, 34),
+  "engaged": (23, 134, 68),
+  "disengaged": (23, 51, 73),
+  "warning": (218, 48, 43),
+  "override": (145, 155, 149),
+  "status_brake": (255, 80, 70),
+  "status_blinker": (255, 170, 55),
+  "ignore_timer": (255, 149, 0, 150),
+  "max_active": (128, 216, 166, 255),
+  "speed_critical": (201, 34, 49, 255),
+  "speed_warning": (255, 149, 0, 255),
+  "speed_caution": (255, 200, 100, 255),
+  "tpms_unknown": (230, 150, 45),
+  "lane_line": (255, 255, 255),
+  "path_active": (23, 134, 68),
+  "path_steering": (0, 191, 255),
+}
+
 
 class ClusterConfig:
   def __init__(self):
@@ -22,22 +51,18 @@ class ClusterConfig:
     # carrot-pilot's field-tested JPEG default. This improves camera detail
     # over quality 60 without materially increasing encode time or USB load.
     self.usb_jpeg_quality = USB_JPEG_QUALITY
-    self.camera_panel_width = self.width * 6 // 10
+    self.border_size = CLUSTER_BORDER_SIZE
+    self.content_width = self.width - self.border_size * 2
+    self.content_height = self.height - self.border_size * 2
+    self.side_panel_width = self.content_height // 3
+    self.camera_panel_width = self.content_width - self.side_panel_width * 4
+    self.camera_panel_height = self.content_height
     self.camera_contrast = CAMERA_CONTRAST
 
     self.usb_timeout_ms = USB_TIMEOUT_MS
     self.usb_image_timeout_ms = USB_IMAGE_TIMEOUT_MS
 
-    self.colors = {
-      "bg": (0, 0, 0),  # 기본 배경 (검정)
-      "engaged": (23, 134, 68),  # 인게이지 상태 (comma 초록색)
-      "disengaged": (23, 51, 73),  # 대기 상태 (어두운 파랑/회색 톤)
-      "warning": (218, 48, 43),  # 경고 상태 (빨강)
-      "override": (145, 155, 149),  # 사용자가 핸들을 잡았을 때 (회색)
-      "lane_line": (255, 255, 255),  # 인식된 차선
-      "path_active": (23, 134, 68),  # 인게이지 시 주행 경로 색상
-      "path_steering": (0, 191, 255),  # 운전자가 핸들을 잡은 상태
-    }
+    self.colors = CLUSTER_COLORS.copy()
 
     self.BASEDIR = Path(__file__).resolve().parents[3]
     self.font_bold = os.path.join(self.BASEDIR, "selfdrive", "assets", "fonts", "Inter-Bold.ttf")
