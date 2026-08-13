@@ -1,5 +1,4 @@
 import os
-import operator
 import platform
 
 from opendbc.car.structs import car
@@ -68,13 +67,13 @@ def cluster_enable(started: bool, params: Params, CP: car.CarParams) -> bool:
   return params.get_bool("ClusterEnable")
 
 def or_(*fns):
-  return lambda *args: operator.or_(*(fn(*args) for fn in fns))
+  return lambda *args: any(fn(*args) for fn in fns)
 
 def and_(*fns):
-  return lambda *args: operator.and_(*(fn(*args) for fn in fns))
+  return lambda *args: all(fn(*args) for fn in fns)
 
-def not_(*fns):
-  return lambda *args: operator.not_(*(fn(*args) for fn in fns))
+def not_(fn):
+  return lambda *args: not fn(*args)
 
 procs = [
   DaemonProcess("manage_athenad", "openpilot.system.athena.manage_athenad", "AthenadPid"),
