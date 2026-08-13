@@ -778,4 +778,4 @@ def main_page():
 
 if __name__ in {"__main__", "__mp_main__"}:
   set_core_affinity([0, 1, 2])
-  ui.run(host="0.0.0.0", port=7000, title="Openpilot Dashboard", show=False)
+  ui.run(host="0.0.0.0", port=7000, title="Openpilot Dashboard", show=False, reload=False)
