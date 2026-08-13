@@ -6,8 +6,8 @@ import numpy as np
 from msgq.visionipc import VisionIpcClient
 from openpilot.cereal.visionipc import VisionStreamType
 
+from openpilot.selfdrive.addon.cluster.cluster_config import LOG_FILE
 
-LOG_FILE = "/data/openpilot/openpilot/selfdrive/addon/cluster/cluster_debug.log"
 CONNECTION_RETRY_SECONDS = 0.5
 FRAME_STALE_SECONDS = 1.2
 

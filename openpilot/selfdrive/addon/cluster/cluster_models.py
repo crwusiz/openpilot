@@ -3,11 +3,14 @@ import time
 
 import numpy as np
 
-from openpilot.cereal import messaging
+from openpilot.cereal import log, messaging
+from opendbc.car import structs
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
 from openpilot.common.transformations.camera import DEVICE_CAMERAS, view_frame_from_device_frame
 from openpilot.common.transformations.orientation import rot_from_euler
+
+GearShifter = structs.CarState.GearShifter
 
 
 def _enum_value(value):
@@ -29,6 +32,10 @@ class ClusterModels:
     self.v_ego_cluster_seen = False
     self.accel = 0.0  # m/s², used for speed color feedback
     self.enabled = False
+    self.pre_enabled_or_overriding = False
+    self.lat_active = False
+    self.cruise_available = False
+    self.reverse = False
     self.left_blinker = False
     self.right_blinker = False
     self.left_blindspot = False
@@ -100,6 +107,8 @@ class ClusterModels:
       self.v_ego_cluster_seen = self.v_ego_cluster_seen or v_ego_cluster != 0.0
       self.v_ego = v_ego_cluster if self.v_ego_cluster_seen else cs.vEgo
       self.accel = getattr(cs, 'aEgo', 0.0)
+      self.cruise_available = bool(cs.cruiseState.available)
+      self.reverse = cs.gearShifter == GearShifter.reverse
       self.left_blinker = cs.leftBlinker
       self.right_blinker = cs.rightBlinker
       self.left_blindspot = getattr(cs, 'leftBlindspot', False)
@@ -125,10 +134,16 @@ class ClusterModels:
     if self.sm.updated['selfdriveState']:
       ss = self.sm['selfdriveState']
       self.enabled = ss.enabled
+      self.pre_enabled_or_overriding = ss.state in (
+        log.SelfdriveState.OpenpilotState.preEnabled,
+        log.SelfdriveState.OpenpilotState.overriding,
+      )
       self.distance_level = min(max(_enum_value(ss.personality) + 1, 1), 4)
 
     if self.sm.updated['carControl']:
-      distance_bars = int(self.sm['carControl'].hudControl.leadDistanceBars)
+      car_control = self.sm['carControl']
+      self.lat_active = bool(car_control.latActive)
+      distance_bars = int(car_control.hudControl.leadDistanceBars)
       if 1 <= distance_bars <= 4:
         self.distance_level = distance_bars
 
@@ -265,6 +280,10 @@ class ClusterModels:
       "v_ego": self.v_ego,
       "accel": self.accel,
       "enabled": self.enabled,
+      "pre_enabled_or_overriding": self.pre_enabled_or_overriding,
+      "lat_active": self.lat_active,
+      "cruise_available": self.cruise_available,
+      "reverse": self.reverse,
       "left_blinker": self.left_blinker,
       "right_blinker": self.right_blinker,
       "left_blindspot": self.left_blindspot,

@@ -1,16 +1,16 @@
-import time
 import signal
+import time
+
 import numpy as np
+
 from openpilot.common.swaglog import cloudlog
 
-from openpilot.selfdrive.addon.cluster.cluster_config import ClusterConfig
+from openpilot.selfdrive.addon.cluster.cluster_config import ClusterConfig, LOG_FILE
 from openpilot.selfdrive.addon.cluster.cluster_usb_display import TuringUsbDisplay
 from openpilot.selfdrive.addon.cluster.cluster_usb_pipeline import ClusterUsbPipeline
 from openpilot.selfdrive.addon.cluster.cluster_live_camera import ClusterLiveCamera
 from openpilot.selfdrive.addon.cluster.cluster_models import ClusterModels
 from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer
-
-LOG_FILE = "/data/openpilot/openpilot/selfdrive/addon/cluster/cluster_debug.log"
 
 
 def flog(msg):

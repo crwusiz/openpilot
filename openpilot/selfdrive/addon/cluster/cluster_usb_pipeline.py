@@ -1,7 +1,7 @@
 import threading
 import time
 
-LOG_FILE = "/data/openpilot/openpilot/selfdrive/addon/cluster/cluster_debug.log"
+from openpilot.selfdrive.addon.cluster.cluster_config import LOG_FILE
 
 
 def flog(msg):

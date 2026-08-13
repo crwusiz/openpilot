@@ -12,7 +12,6 @@ import fcntl
 import struct
 import numpy as np
 import logging
-import glob
 import math
 
 from collections import deque
@@ -23,33 +22,19 @@ from openpilot.common.constants import UnitConverter
 
 terminate_flag = threading.Event()
 
-LOG_DIR = "/data/navi_debug"
-LOG_MAX_FILES = 30
+LOG_FILE = "/data/navi_debug.log"
 
 def _setup_logger():
   logger = logging.getLogger("navi")
   logger.setLevel(logging.DEBUG)
 
   try:
-    os.makedirs(LOG_DIR, exist_ok=True)
-
-    existing = sorted(glob.glob(os.path.join(LOG_DIR, "nav_*.log")))
-    for old_file in existing[:-LOG_MAX_FILES] if len(existing) > LOG_MAX_FILES else []:
-      try:
-        os.remove(old_file)
-      except Exception:
-        pass
-
-    log_path = os.path.join(LOG_DIR, time.strftime("nav_%Y%m%d_%H%M%S.log"))
-    handler = logging.FileHandler(log_path)
+    handler = logging.FileHandler(LOG_FILE, mode="a")
     handler.setFormatter(logging.Formatter("%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s", datefmt="%H:%M:%S"))
     logger.addHandler(handler)
 
-  except PermissionError:
+  except OSError:
     pass
-
-  #stream_handler = logging.StreamHandler()
-  #logger.addHandler(stream_handler)
 
   return logger
 
@@ -320,6 +305,12 @@ def publish_thread(server):
 
 
 def main():
+  try:
+    with open(LOG_FILE, "w") as f:
+      f.write(f"=== Navi Session Started at {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
+  except OSError:
+    pass
+
   server = NaviServer()
   Thread(target=publish_thread, args=[server], daemon=True).start()
 

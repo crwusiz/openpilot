@@ -1,8 +1,10 @@
 import os
 from pathlib import Path
+
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 
+LOG_FILE = "/data/cluster_debug.log"
 USB_TIMEOUT_MS = 2500
 USB_IMAGE_TIMEOUT_MS = 1000
 USB_TARGET_FPS = 20
@@ -11,32 +13,34 @@ USB_JPEG_QUALITY = 68
 CAMERA_CONTRAST = 1.08
 CLUSTER_BORDER_SIZE = 10
 
-CLUSTER_COLORS = {
-  "bg": (0, 0, 0),
-  "panel": (7, 12, 18),
-  "divider": (42, 54, 68),
-  "text": (245, 248, 252),
-  "muted_text": (120, 132, 148),
-  "outline": (0, 0, 0),
-  "sign_red": (255, 105, 95),
-  "sign_text": (20, 25, 30),
-  "distance_badge": (18, 25, 34),
-  "engaged": (23, 134, 68),
-  "disengaged": (23, 51, 73),
-  "warning": (218, 48, 43),
-  "override": (145, 155, 149),
-  "status_brake": (255, 80, 70),
-  "status_blinker": (255, 170, 55),
-  "ignore_timer": (255, 149, 0, 150),
-  "max_active": (128, 216, 166, 255),
-  "speed_critical": (201, 34, 49, 255),
-  "speed_warning": (255, 149, 0, 255),
-  "speed_caution": (255, 200, 100, 255),
-  "tpms_unknown": (230, 150, 45),
-  "lane_line": (255, 255, 255),
-  "path_active": (23, 134, 68),
-  "path_steering": (0, 191, 255),
-}
+RGBColor = tuple[int, int, int]
+RGBAColor = tuple[int, int, int, int]
+
+
+def colors_alpha(color: RGBColor, alpha: int) -> RGBAColor:
+  return (*color, alpha)
+
+
+class Colors:
+  BLACK = (0, 0, 0)
+  PANEL = (7, 12, 18)
+  DIVIDER = (42, 54, 68)
+  MUTED_TEXT = (120, 132, 148)
+  SIGN_TEXT = (20, 25, 30)
+  DISTANCE_BADGE = (18, 25, 34)
+  WHITE = (255, 255, 255)
+
+  DISENGAGED = (18, 40, 57)
+  OVERRIDE = (137, 146, 141)
+  ENGAGED = (22, 127, 64)
+  RED = (201, 34, 49)
+  STEERING = (0, 191, 255)
+  ORANGE = (255, 149, 0)
+  ACTIVE = (111, 192, 201)
+  READY = (143, 201, 192)
+
+  MAX_ACTIVE = (128, 216, 166)
+  CAUTION = (255, 200, 100)
 
 
 class ClusterConfig:
@@ -61,8 +65,6 @@ class ClusterConfig:
 
     self.usb_timeout_ms = USB_TIMEOUT_MS
     self.usb_image_timeout_ms = USB_IMAGE_TIMEOUT_MS
-
-    self.colors = CLUSTER_COLORS.copy()
 
     self.BASEDIR = Path(__file__).resolve().parents[3]
     self.font_bold = os.path.join(self.BASEDIR, "selfdrive", "assets", "fonts", "Inter-Bold.ttf")

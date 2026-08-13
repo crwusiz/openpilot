@@ -6,6 +6,7 @@ import numpy as np
 
 from PIL import Image, ImageDraw, ImageFont
 from openpilot.common.swaglog import cloudlog
+from openpilot.selfdrive.addon.cluster.cluster_config import Colors, colors_alpha
 
 
 DISTANCE_ICONS = {
@@ -47,8 +48,6 @@ class ClusterRenderer:
     self.content_y = self.border_size
     self.content_w = self.target_w - self.border_size * 2
     self.content_h = self.target_h - self.border_size * 2
-    # a/b/d/e use the three-row height as their width, keeping the side cells
-    # square. The remaining content width belongs to the center camera panel.
     self.panel_w = getattr(config, "side_panel_width", self.content_h // 3)
     self.side_w = self.panel_w
     self.left_panel_x = self.content_x
@@ -84,7 +83,7 @@ class ClusterRenderer:
       self.font_warning = ImageFont.load_default()
 
     self.blank_canvas = np.full(
-      (self.target_h, self.target_w, 3), self.config.colors["bg"], dtype=np.uint8,
+      (self.target_h, self.target_w, 3), Colors.BLACK, dtype=np.uint8,
     )
     self.camera_height = 1.22
     self.focal_length = 910.0
@@ -213,8 +212,7 @@ class ClusterRenderer:
     if path_poly is not None and hud_data["enabled"]:
       overlay = camera_region.copy()
       local_path_poly = path_poly - np.array([self.camera_x, self.camera_y], dtype=np.int32)
-      path_color = self.config.colors["path_steering"] if hud_data.get("steering_pressed") \
-                   else self.config.colors["path_active"]
+      path_color = Colors.STEERING if hud_data.get("steering_pressed") else Colors.ENGAGED
       cv2.fillPoly(overlay, [local_path_poly], path_color)
       cv2.addWeighted(overlay, 0.35, camera_region, 0.65, 0, camera_region)
 
@@ -233,7 +231,7 @@ class ClusterRenderer:
       if polygon is not None:
         if feature_overlay is None:
           feature_overlay = camera_region.copy()
-        base_color = self.config.colors["path_active"] if hud_data["enabled"] and index in (1, 2) else self.config.colors["lane_line"]
+        base_color = Colors.ENGAGED if hud_data["enabled"] and index in (1, 2) else Colors.WHITE
         color = tuple(int(component * (0.35 + probability * 0.65)) for component in base_color)
         local_polygon = polygon - np.array([self.camera_x, self.camera_y], dtype=np.int32)
         cv2.fillPoly(feature_overlay, [local_polygon], color)
@@ -300,9 +298,9 @@ class ClusterRenderer:
         origin = (x - text_size[0] // 2, baseline_y)
         # An outline keeps the text legible while leaving the camera image visible.
         cv2.putText(frame, label, origin, cv2.FONT_HERSHEY_SIMPLEX,
-                    0.68, self.config.colors["outline"], 6, cv2.LINE_AA)
+                    0.68, Colors.BLACK, 6, cv2.LINE_AA)
         cv2.putText(frame, label, origin, cv2.FONT_HERSHEY_SIMPLEX,
-                    0.68, self.config.colors["text"], 2, cv2.LINE_AA)
+                    0.68, Colors.WHITE, 2, cv2.LINE_AA)
 
   def _base_icon(self, name, size, active=True):
     source = self.icons.get(name)
@@ -342,12 +340,6 @@ class ClusterRenderer:
     image.paste(icon, (int(cx - icon.width / 2), int(cy - icon.height / 2)), icon)
 
   def _centered(self, draw, cx, cy, value, font, color, stroke_width=0, stroke_fill=None):
-    """Draw centered text from a bounded glyph cache.
-
-    Most HUD strings (units, labels, set speed, TPMS) are identical for many
-    consecutive frames. Caching their rasterized sprites avoids repeatedly
-    invoking FreeType while preserving PIL's existing appearance and anchors.
-    """
     text = str(value)
     fill = tuple(color) if isinstance(color, (tuple, list)) else color
     # ImageDraw text on an RGB target with an RGBA drawing context ignores the
@@ -393,40 +385,66 @@ class ClusterRenderer:
 
   def _draw_hud(self, image, data, has_camera):
     draw = ImageDraw.Draw(image)
-    colors = self.config.colors
-    white = colors["text"]
-    muted = colors["muted_text"]
-    red = colors["sign_red"]
-    panel = colors["panel"]
-    divider = colors["divider"]
     content_right = self.content_x + self.content_w - 1
     content_bottom = self.content_y + self.content_h - 1
 
     # All HUD content stays inside the dedicated outer-border rectangle.
-    draw.rectangle([self.content_x, self.content_y, self.camera_x - 1, content_bottom], fill=panel)
-    draw.rectangle([self.right_aux_x, self.content_y, content_right, content_bottom], fill=panel)
+    draw.rectangle([self.content_x, self.content_y, self.camera_x - 1, content_bottom], fill=Colors.PANEL)
+    draw.rectangle([self.right_aux_x, self.content_y, content_right, content_bottom], fill=Colors.PANEL)
     for x in (self.left_aux_x, self.camera_x, self.right_aux_x, self.right_panel_x):
-      draw.line((x, self.content_y, x, content_bottom), fill=divider, width=2)
+      draw.line((x, self.content_y, x, content_bottom), fill=Colors.DIVIDER, width=2)
     for row in (1, 2):
       y = int(round(self.content_y + row * self.row_h))
-      draw.line((self.content_x, y, self.camera_x - 1, y), fill=divider, width=1)
-      draw.line((self.right_aux_x, y, content_right, y), fill=divider, width=1)
+      draw.line((self.content_x, y, self.camera_x - 1, y), fill=Colors.DIVIDER, width=1)
+      draw.line((self.right_aux_x, y, content_right, y), fill=Colors.DIVIDER, width=1)
 
-    self._draw_left_panel(image, draw, data, muted)
-    self._draw_left_aux_panel(image, draw, data, white, red)
-    self._draw_camera_overlays(draw, data, white)
+    self._draw_left_panel(image, draw, data, Colors.MUTED_TEXT)
+    self._draw_left_aux_panel(image, draw, data, Colors.WHITE, Colors.RED)
+    self._draw_camera_overlays(draw, data, Colors.WHITE)
     self._draw_right_aux_panel(image, data)
-    self._draw_right_panel(image, draw, data, red)
+    self._draw_right_panel(image, draw, data, Colors.RED)
 
     if not has_camera:
       self._centered(draw, self.camera_x + self.camera_w / 2, self.camera_y + self.camera_h / 2,
-                     "WAITING FOR CAMERA SIGNAL...", self.font_warning, red)
+                     "WAITING FOR CAMERA SIGNAL...", self.font_warning, Colors.RED)
 
-    status_color = colors["engaged"] if data["enabled"] else colors["disengaged"]
+    status_color = self._get_border_color(data)
     draw.rectangle([0, 0, self.target_w - 1, self.target_h - 1],
                    outline=status_color, width=self.border_size)
     self._draw_status_borders(draw, data)
     self._draw_ignore_limit_timer(image, data)
+
+  @staticmethod
+  def _get_border_color(data):
+    steering_pressed = bool(data.get("steering_pressed"))
+    enabled = bool(data.get("enabled"))
+    lat_active = bool(data.get("lat_active"))
+
+    if data.get("pre_enabled_or_overriding") and not steering_pressed:
+      return Colors.OVERRIDE
+    elif enabled and not lat_active:
+      if steering_pressed:
+        return Colors.STEERING
+      elif data.get("brake_pressed"):
+        return Colors.RED
+      elif data.get("left_blinker") or data.get("right_blinker"):
+        return Colors.ORANGE
+      return Colors.ENGAGED
+    elif enabled and lat_active:
+      if steering_pressed:
+        return Colors.STEERING
+      elif data.get("brake_pressed"):
+        return Colors.RED
+      elif data.get("left_blinker") or data.get("right_blinker"):
+        return Colors.ORANGE
+      return Colors.ACTIVE
+    elif data.get("reverse"):
+      return Colors.RED
+    elif data.get("cruise_available") and lat_active:
+      return Colors.READY
+    elif data.get("cruise_available") and not lat_active and float(data.get("v_ego", 0.0) or 0.0) > 0.3:
+      return Colors.ORANGE
+    return Colors.DISENGAGED
 
   def _draw_ignore_limit_timer(self, image, data):
     max_ticks = 3000.0
@@ -445,23 +463,20 @@ class ClusterRenderer:
     bar_draw = ImageDraw.Draw(image, "RGBA")
     bar_draw.rectangle(
       [bar_x, 0, bar_x + bar_width - 1, self.border_size - 1],
-      fill=self.config.colors["ignore_timer"],
+      fill=colors_alpha(Colors.ORANGE, 150),
     )
 
   def _draw_status_borders(self, draw, data):
     blinking = (time.monotonic() % 0.9) < 0.45
     border_size = self.border_size
-    red = self.config.colors["status_brake"]
-    orange = self.config.colors["status_blinker"]
-    green = self.config.colors["engaged"]
 
     def draw_side(x, blinker, blindspot):
       if data.get("brake_pressed") or blindspot:
-        color = red
+        color = Colors.RED
       elif blinker and blinking:
-        color = orange
+        color = Colors.ORANGE
       elif data.get("enabled"):
-        color = green
+        color = Colors.ENGAGED
       else:
         return
       draw.rectangle([x, 0, x + border_size - 1, self.target_h - 1], fill=color)
@@ -475,12 +490,11 @@ class ClusterRenderer:
     is_cruise_set = bool(data.get("is_cruise_set"))
     set_speed = self._value(data.get("set_speed", data.get("cruise_speed"))) if is_cruise_set else "--"
 
-    max_color = (*self.config.colors["text"], 200)
-    speed_color = (*self.config.colors["text"], 200)
+    max_color = colors_alpha(Colors.WHITE, 200)
+    speed_color = colors_alpha(Colors.WHITE, 200)
     if is_cruise_set:
-      speed_color = (*self.config.colors["text"], 255)
-      max_color = self.config.colors["max_active"] if data.get("enabled") \
-                  else (*self.config.colors["override"], 255)
+      speed_color = colors_alpha(Colors.WHITE, 255)
+      max_color = Colors.MAX_ACTIVE if data.get("enabled") else colors_alpha(Colors.OVERRIDE, 255)
 
       if data.get("nda_state"):
         if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
@@ -497,11 +511,11 @@ class ClusterRenderer:
       cruise_speed = float(data.get("cruise_speed", 0.0) or 0.0)
       if limit_speed > 0 and data.get("enabled"):
         if cruise_speed > limit_speed + 25:
-          speed_color = self.config.colors["speed_critical"]
+          speed_color = Colors.RED
         elif cruise_speed > limit_speed + 15:
-          speed_color = self.config.colors["speed_warning"]
+          speed_color = Colors.ORANGE
         elif cruise_speed > limit_speed + 5:
-          speed_color = self.config.colors["speed_caution"]
+          speed_color = Colors.CAUTION
 
     speed_draw = ImageDraw.Draw(image, "RGBA")
 
@@ -550,7 +564,7 @@ class ClusterRenderer:
     draw.ellipse([left_cx - inner_radius, speed_limit_y - inner_radius,
                   left_cx + inner_radius, speed_limit_y + inner_radius], fill=white)
     self._centered(draw, left_cx, speed_limit_y, self._value(limit), self.font_value,
-                   self.config.colors["sign_text"])
+                   Colors.SIGN_TEXT)
 
     # Draw distance if available, matching the main HUD's camera/section priority.
     left_dist = 0.0
@@ -566,7 +580,7 @@ class ClusterRenderer:
       padding_x, padding_y = 7, 3
       draw.rounded_rectangle(
         [bbox[0] - padding_x, bbox[1] - padding_y, bbox[2] + padding_x, bbox[3] + padding_y],
-        radius=5, fill=self.config.colors["distance_badge"],
+        radius=5, fill=Colors.DISTANCE_BADGE,
       )
       self._centered(draw, left_cx, text_y, dist_text, self.font_small, white)
 
@@ -626,8 +640,7 @@ class ClusterRenderer:
       px = cx + (-36 if i % 2 == 0 else 36)
       py = self.content_y + self.row_h * 2.0 + (38 if i < 2 else 115)
       value = "--" if not pressure or pressure < 5 or pressure > 60 else str(round(pressure))
-      color = self.config.colors["tpms_unknown"] if value == "--" \
-              else red if float(pressure) < 31 else self.config.colors["sign_text"]
+      color = Colors.ORANGE if value == "--" else red if float(pressure) < 31 else Colors.SIGN_TEXT
       self._centered(draw, px, py, value, self.font_small, color)
 
   def _draw_camera_overlays(self, draw, data, white):
@@ -646,6 +659,6 @@ class ClusterRenderer:
     # Align the current-speed value with the center of b's speed-limit cell.
     self._centered(draw, center_x, self.row_centers[0],
                    speed, self.font_current_speed, speed_color,
-                   stroke_width=2, stroke_fill=self.config.colors["outline"])
+                   stroke_width=2, stroke_fill=Colors.BLACK)
     self._centered(draw, center_x, self.content_y + self.row_h * 0.86, self.config.speed_unit,
-                   self.font_current_unit, white, stroke_width=1, stroke_fill=self.config.colors["outline"])
+                   self.font_current_unit, white, stroke_width=1, stroke_fill=Colors.BLACK)
