@@ -140,6 +140,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"CabinCameraHardwareMissing", {PERSISTENT, BOOL}},
     {"CabinCameraOnReverse", {PERSISTENT, BOOL}},
     {"CameraSccEnable", {PERSISTENT, BOOL}},
+    {"CameraPreview", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION, BOOL}},
     {"CruiseStateControl", {PERSISTENT, BOOL}},
     {"PcmCruiseEnable", {PERSISTENT, BOOL}},
     {"ClusterEnable", {PERSISTENT, BOOL}},

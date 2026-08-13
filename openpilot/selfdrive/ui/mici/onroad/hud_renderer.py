@@ -286,10 +286,12 @@ class HudRenderer(Widget):
     """Render HUD elements to the screen."""
     #self._torque_bar.render(rect)
     self._draw_current_speed(rect)
-    self._draw_set_speed(rect)
-    self._draw_steering_wheel(rect)
     self._draw_borders(rect)
-    self._draw_traffic_light(rect)
+
+    if not ui_state.cluster_enabled:
+      self._draw_set_speed(rect)
+      self._draw_traffic_light(rect)
+      self._draw_steering_wheel(rect)
     self._draw_ignore_limit_timer(rect)
 
     if ui_state.usbgpu and ui_state.usbgpu_compiled:

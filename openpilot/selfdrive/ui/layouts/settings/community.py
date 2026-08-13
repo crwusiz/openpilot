@@ -651,7 +651,7 @@ class CommunityLayout(Widget):
     gui_app.push_widget(dlg)
 
   def _on_camera_view(self):
-    execute_script("/data/openpilot/selfdrive/ui/watch3.py")
+    self._params.put_bool("CameraPreview", True, block=True)
 
   def _on_clear_dtc(self):
     def confirm_callback(result: DialogResult):
