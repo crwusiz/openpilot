@@ -24,10 +24,10 @@ WIFI_ICONS = {
 }
 
 WHEEL_ICONS = {
-  "default": "wheel",
-  "enabled": "wheel_green",
-  "steering": "wheel_blue",
-  "critical": "wheel_critical",
+  "default": "steer",
+  "enabled": "steer_green",
+  "steering": "steer_blue",
+  "critical": "steer_critical",
 }
 
 TRAFFIC_ICONS = {
