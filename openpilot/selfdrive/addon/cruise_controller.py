@@ -47,15 +47,15 @@ def _get_button_limit(speed_limiter, CS):
     if navi_data is None:
       return 0., False
 
-    camera_limit = float(getattr(navi_data, 'camLimitSpeed', 0.) or 0.)
-    camera_left_dist = float(getattr(navi_data, 'camLimitSpeedLeftDist', 0.) or 0.)
-    if camera_limit > 0 and camera_left_dist > 0:
-      return camera_limit, True
-
     section_limit = float(getattr(navi_data, 'sectionLimitSpeed', 0.) or 0.)
     section_left_dist = float(getattr(navi_data, 'sectionLeftDist', 0.) or 0.)
     if section_limit > 0 and section_left_dist > 0:
       return section_limit, True
+
+    camera_limit = float(getattr(navi_data, 'camLimitSpeed', 0.) or 0.)
+    camera_left_dist = float(getattr(navi_data, 'camLimitSpeedLeftDist', 0.) or 0.)
+    if camera_limit > 0 and camera_left_dist > 0:
+      return camera_limit, True
 
     road_limit = float(speed_limiter.get_road_limit_speed() or 0.)
     return (road_limit, False) if road_limit > 0 else (0., False)
@@ -155,6 +155,9 @@ class CruiseController:
     self.prev_road_limit_speed = 0.
     self.pending_road_limit_speed = 0.
     self.limit_change_timer = 0
+    self.prev_section_active = False
+    self.prev_section_limit_speed = 0.
+    self.restore_road_after_section = False
 
     self.prev_model_mono_time = 0
     self.cached_curve_speed_clu = NO_ACTIVE_LIMIT
@@ -196,6 +199,11 @@ class CruiseController:
     self.pending_road_limit_speed = 0.
     self.limit_change_timer = 0
 
+  def _reset_section_state(self):
+    self.prev_section_active = False
+    self.prev_section_limit_speed = 0.
+    self.restore_road_after_section = False
+
   def _road_limit_target(self, road_limit_speed: float) -> float:
     ratio = np.interp(road_limit_speed,
                       [self.conv.to_current_unit(10.0), self.conv.to_current_unit(100.0)],
@@ -214,7 +222,11 @@ class CruiseController:
     speed_limiter.recv()
     nda_active = speed_limiter.get_active()
     section_limit_speed, section_left_dist = speed_limiter.get_section_limit_speed()
-    section_active = section_limit_speed > 0 and section_left_dist > 0
+    section_active = bool(nda_active and section_limit_speed > 0 and section_left_dist > 0)
+    section_started_or_changed = section_active and (
+      not self.prev_section_active or section_limit_speed != self.prev_section_limit_speed
+    )
+    section_ended = self.prev_section_active and not section_active
     nda_camera_active = bool(nda_active and speed_limiter.get_camera_limit_active())
 
     road_limit_speed_nda = speed_limiter.get_road_limit_speed()
@@ -247,12 +259,17 @@ class CruiseController:
 
     self.camera_limit_speed_clu = camera_limit_speed_clu
 
-    # 2. Road limit speed. Camera/section and protection-zone targets own their
+    # 2. Track the observed road limit even while camera/section/protection-zone
+    # targets own the applied speed. This prevents a stale road limit when an
+    # enforcement zone ends.
     road_limit_speed = None
-    if nda_active and not nda_camera_active and not is_school_zone and road_limit_speed_nda > 0:
+    road_limit_applies = False
+    if nda_active and road_limit_speed_nda > 0:
       road_limit_speed = road_limit_speed_nda
-    elif not nda_active and not is_school_zone and road_limit_speed_stock > 0:
+      road_limit_applies = not nda_camera_active and not is_school_zone
+    elif not nda_active and road_limit_speed_stock > 0:
       road_limit_speed = road_limit_speed_stock
+      road_limit_applies = not is_school_zone
 
     road_limit_changed = False
     if road_limit_speed is not None:
@@ -281,12 +298,30 @@ class CruiseController:
       self.pending_road_limit_speed = 0.
       self.limit_change_timer = 0
 
-    road_limit_speed_clu = self._road_limit_target(self.prev_road_limit_speed) \
-      if road_limit_speed is not None and self.prev_road_limit_speed > 0 else NO_ACTIVE_LIMIT
-    restore_limit_speed_clu = section_limit_speed if section_active else road_limit_speed_clu
+    road_limit_ready = road_limit_speed is not None and road_limit_speed == self.prev_road_limit_speed
+    road_limit_target_clu = self._road_limit_target(self.prev_road_limit_speed) \
+      if road_limit_ready and self.prev_road_limit_speed > 0 else NO_ACTIVE_LIMIT
 
-    if road_limit_changed and not self.ignore_road_limit_temporarily:
-      self._set_limit_speed(road_limit_speed_clu)
+    if section_started_or_changed:
+      self._set_limit_speed(section_limit_speed)
+      v_cruise_kph = section_limit_speed
+      self.restore_road_after_section = False
+    elif section_ended:
+      self.restore_road_after_section = True
+
+    self.prev_section_active = section_active
+    self.prev_section_limit_speed = section_limit_speed if section_active else 0.
+
+    if road_limit_changed and road_limit_applies and not self.ignore_road_limit_temporarily:
+      self._set_limit_speed(road_limit_target_clu)
+      self.restore_road_after_section = False
+    elif self.restore_road_after_section and road_limit_applies and \
+         road_limit_target_clu != NO_ACTIVE_LIMIT and not self.ignore_road_limit_temporarily:
+      self._set_limit_speed(road_limit_target_clu)
+      self.restore_road_after_section = False
+
+    road_limit_speed_clu = road_limit_target_clu if road_limit_applies else NO_ACTIVE_LIMIT
+    restore_limit_speed_clu = section_limit_speed if section_active else road_limit_speed_clu
 
     if self.ignore_road_limit_temporarily:
       self.ignore_limit_timer += 1
@@ -300,6 +335,7 @@ class CruiseController:
 
         if restore_limit_speed_clu != NO_ACTIVE_LIMIT and v_cruise_kph != restore_limit_speed_clu:
           self._set_limit_speed(restore_limit_speed_clu)
+          self.restore_road_after_section = False
       else:
         road_limit_speed_clu = NO_ACTIVE_LIMIT
 
@@ -339,6 +375,7 @@ class CruiseController:
       not self.CP.openpilotLongitudinalControl,
       self.apply_limit_speed_clu <= 0,
       is_limit_zone,
+      section_started_or_changed,
       is_curve_limit,
       double_pressed
     ]
@@ -645,6 +682,7 @@ class CruiseController:
     else:
       self.cruise_speed_kph = cluster_speed_clu
       self.reset()
+      self._reset_section_state()
 
     self.v_cruise_kph = v_cruise_kph
     self._update_message(CS)
