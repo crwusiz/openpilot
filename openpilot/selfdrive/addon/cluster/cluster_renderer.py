@@ -36,6 +36,11 @@ TRAFFIC_ICONS = {
   2: "traffic_green",
 }
 
+BLINKER_DRAW_COUNT = 8
+BLINKER_SEQUENCE_MS = 400.0
+BLINKER_PAUSE_MS = 250.0
+CAMERA_OVERLAY_ICON_HEIGHT = 94
+
 class ClusterRenderer:
   def __init__(self, config):
     cloudlog.info("Initializing ClusterRenderer...")
@@ -91,12 +96,14 @@ class ClusterRenderer:
     self._icon_cache = {}
     self._rotated_icon_cache = OrderedDict()
     self._text_cache = OrderedDict()
+    self._blink_started_at = None
     icon_dir = os.path.join(str(self.config.BASEDIR), "selfdrive", "assets", "icons")
     for name in (
       *WHEEL_ICONS.values(), *WIFI_ICONS.values(),
       *TRAFFIC_ICONS.values(), *DISTANCE_ICONS.values(),
       "accel_pressed", "brake_pressed", "tpms", "gps", "compass",
       "speed_bump", "school_zone", "speed_camera",
+      "turnsignal_l", "turnsignal_r", "blind_spot_left", "blind_spot_right",
     ):
       try:
         self.icons[name] = Image.open(os.path.join(icon_dir, f"{name}.png")).convert("RGBA")
@@ -302,24 +309,26 @@ class ClusterRenderer:
         cv2.putText(frame, label, origin, cv2.FONT_HERSHEY_SIMPLEX,
                     0.68, Colors.WHITE, 2, cv2.LINE_AA)
 
-  def _base_icon(self, name, size, active=True):
+  def _base_icon(self, name, size, active=True, opacity=255):
     source = self.icons.get(name)
     if source is None:
       return None
     dimensions = (int(size), int(size)) if isinstance(size, (int, float)) else tuple(map(int, size))
-    key = (name, dimensions, bool(active))
+    opacity = max(0, min(255, int(opacity)))
+    key = (name, dimensions, bool(active), opacity)
     image = self._icon_cache.get(key)
     if image is None:
       image = source.resize(dimensions, Image.Resampling.LANCZOS)
       image = image.copy()
-      if not active:
-        alpha = image.getchannel("A").point(lambda p: p * 70 // 255)
+      alpha_scale = opacity if active else opacity * 70 // 255
+      if alpha_scale < 255:
+        alpha = image.getchannel("A").point(lambda p: p * alpha_scale // 255)
         image.putalpha(alpha)
       self._icon_cache[key] = image
     return image
 
-  def _icon(self, image, name, cx, cy, size, active=True, rotation=0.0):
-    icon = self._base_icon(name, size, active)
+  def _icon(self, image, name, cx, cy, size, active=True, rotation=0.0, opacity=255):
+    icon = self._base_icon(name, size, active, opacity)
     if icon is None:
       return
     if rotation:
@@ -327,7 +336,7 @@ class ClusterRenderer:
       # Re-running PIL's bicubic transform for both icons on every camera frame
       # is expensive on-device and has no visible benefit at these icon sizes.
       rotation_key = int(round(float(rotation) / 2.0) * 2) % 360
-      key = (name, icon.size, bool(active), rotation_key)
+      key = (name, icon.size, bool(active), int(opacity), rotation_key)
       rotated = self._rotated_icon_cache.get(key)
       if rotated is None:
         rotated = icon.rotate(rotation_key, resample=Image.Resampling.BICUBIC, expand=False)
@@ -338,6 +347,12 @@ class ClusterRenderer:
         self._rotated_icon_cache.move_to_end(key)
       icon = rotated
     image.paste(icon, (int(cx - icon.width / 2), int(cy - icon.height / 2)), icon)
+
+  def _icon_size_for_height(self, name, height):
+    source = self.icons.get(name)
+    if source is None or source.height <= 0:
+      return int(height), int(height)
+    return max(1, int(round(height * source.width / source.height))), int(height)
 
   def _centered(self, draw, cx, cy, value, font, color, stroke_width=0, stroke_fill=None):
     text = str(value)
@@ -414,6 +429,8 @@ class ClusterRenderer:
     self._draw_left_panel(image, draw, data, Colors.MUTED_TEXT)
     self._draw_left_aux_panel(image, draw, data, Colors.WHITE, Colors.RED)
     self._draw_camera_overlays(draw, data, Colors.WHITE)
+    self._draw_blinkers(image, data)
+    self._draw_blind_spot_detect(image, data)
     self._draw_right_aux_panel(image, data)
     self._draw_right_panel(image, draw, data, Colors.RED)
 
@@ -424,7 +441,6 @@ class ClusterRenderer:
     status_color = self._get_border_color(data)
     draw.rectangle([0, 0, self.target_w - 1, self.target_h - 1],
                    outline=status_color, width=self.border_size)
-    self._draw_status_borders(draw, data)
     self._draw_ignore_limit_timer(image, data)
 
   @staticmethod
@@ -479,23 +495,64 @@ class ClusterRenderer:
       fill=colors_alpha(Colors.ORANGE, 150),
     )
 
-  def _draw_status_borders(self, draw, data):
-    blinking = (time.monotonic() % 0.9) < 0.45
-    border_size = self.border_size
+  def _draw_blinkers(self, image, data):
+    left_blinker = bool(data.get("left_blinker"))
+    right_blinker = bool(data.get("right_blinker"))
+    if not (left_blinker or right_blinker):
+      self._blink_started_at = None
+      return
 
-    def draw_side(x, blinker, blindspot):
-      if data.get("brake_pressed") or blindspot:
-        color = Colors.RED
-      elif blinker and blinking:
-        color = Colors.ORANGE
-      elif data.get("enabled"):
-        color = Colors.ENGAGED
+    now_ms = time.monotonic() * 1000.0
+    if self._blink_started_at is None:
+      self._blink_started_at = now_ms
+
+    cycle_ms = BLINKER_SEQUENCE_MS + BLINKER_PAUSE_MS
+    phase_ms = (now_ms - self._blink_started_at) % cycle_ms
+    if phase_ms >= BLINKER_SEQUENCE_MS:
+      return
+
+    step_ms = BLINKER_SEQUENCE_MS / BLINKER_DRAW_COUNT
+    blink_index = min(BLINKER_DRAW_COUNT - 1, int(phase_ms / step_ms))
+    center_x = self.camera_x + self.camera_w / 2
+    center_y = self.camera_y + self.camera_h / 2
+    alpha_base = 0.8
+
+    for is_active, direction, name in (
+      (left_blinker, -1, "turnsignal_l"),
+      (right_blinker, 1, "turnsignal_r"),
+    ):
+      if not is_active:
+        continue
+      icon_size = self._icon_size_for_height(name, CAMERA_OVERLAY_ICON_HEIGHT)
+      icon_w = icon_size[0]
+      first_center_x = center_x + direction * icon_w / 2
+      spacing = icon_w * 0.6
+      for index in range(BLINKER_DRAW_COUNT):
+        distance = abs(blink_index - index)
+        alpha = alpha_base if distance == 0 else alpha_base / (distance * 2)
+        if alpha <= 0.05:
+          continue
+        icon_x = first_center_x + direction * index * spacing
+        self._icon(
+          image, name, icon_x, center_y, icon_size, True,
+          opacity=int(alpha * 255),
+        )
+
+  def _draw_blind_spot_detect(self, image, data):
+    center_y = self.camera_y + self.camera_h / 2
+    inset = 16
+    for is_active, side, name in (
+      (bool(data.get("left_blindspot")), -1, "blind_spot_left"),
+      (bool(data.get("right_blindspot")), 1, "blind_spot_right"),
+    ):
+      if not is_active:
+        continue
+      icon_size = self._icon_size_for_height(name, CAMERA_OVERLAY_ICON_HEIGHT)
+      if side < 0:
+        icon_x = self.camera_x + inset + icon_size[0] / 2
       else:
-        return
-      draw.rectangle([x, 0, x + border_size - 1, self.target_h - 1], fill=color)
-
-    draw_side(0, data.get("left_blinker"), data.get("left_blindspot"))
-    draw_side(self.target_w - border_size, data.get("right_blinker"), data.get("right_blindspot"))
+        icon_x = self.camera_x + self.camera_w - inset - icon_size[0] / 2
+      self._icon(image, name, icon_x, center_y, icon_size, True)
 
   def _draw_left_panel(self, image, draw, data, muted):
     cx = self.left_panel_x + self.side_w / 2
