@@ -68,6 +68,7 @@ class ClusterModels:
     self._navi_last_road_name = ""
     self.speed_bump = False
     self.ignore_limit_timer = 0.0
+    self._state_lock = threading.RLock()
 
     try:
       personality = min(max(int(Params().get("LongitudinalPersonality") or 0), 0), 3)
@@ -262,7 +263,10 @@ class ClusterModels:
   def _update_loop(self):
     while self._running:
       try:
-        self._update_once()
+        # Publish related car/model/navigation fields as one coherent state.
+        # The renderer consumes a matching HUD/path snapshot under this lock.
+        with self._state_lock:
+          self._update_once()
       except Exception as e:
         cloudlog.error(f"ClusterModels update error: {e}")
       time.sleep(0.01)
@@ -273,9 +277,14 @@ class ClusterModels:
       self._thread.join(timeout=1.0)
 
   def is_valid(self):
-    return self.model_valid
+    with self._state_lock:
+      return self.model_valid
 
   def get_hud_data(self):
+    with self._state_lock:
+      return self._get_hud_data_unlocked()
+
+  def _get_hud_data_unlocked(self):
     return {
       "v_ego": self.v_ego,
       "accel": self.accel,
@@ -317,6 +326,10 @@ class ClusterModels:
     }
 
   def get_path_data(self):
+    with self._state_lock:
+      return self._get_path_data_unlocked()
+
+  def _get_path_data_unlocked(self):
     calib_transform = None
     if self.camera_intrinsics is not None:
       calib_transform = np.asarray(self.camera_intrinsics @ self.view_from_calib, dtype=np.float32)
@@ -337,3 +350,8 @@ class ClusterModels:
       "camera_height": self.camera_height,
       "calib_transform": calib_transform,
     }
+
+  def get_render_data(self):
+    """Return model validity, HUD state, and path data from one update cycle."""
+    with self._state_lock:
+      return self.model_valid, self._get_hud_data_unlocked(), self._get_path_data_unlocked()

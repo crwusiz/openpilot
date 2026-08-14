@@ -5,28 +5,16 @@ import numpy as np
 
 from openpilot.common.swaglog import cloudlog
 
-from openpilot.selfdrive.addon.cluster.cluster_config import ClusterConfig, LOG_FILE
+from openpilot.selfdrive.addon.cluster.cluster_config import ClusterConfig
+from openpilot.selfdrive.addon.cluster.cluster_logging import flog, initialize_log
 from openpilot.selfdrive.addon.cluster.cluster_usb_display import TuringUsbDisplay
 from openpilot.selfdrive.addon.cluster.cluster_usb_pipeline import ClusterUsbPipeline
 from openpilot.selfdrive.addon.cluster.cluster_live_camera import ClusterLiveCamera
 from openpilot.selfdrive.addon.cluster.cluster_models import ClusterModels
 from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer
 
-
-def flog(msg):
-  try:
-    with open(LOG_FILE, "a") as f:
-      f.write(f"[{time.strftime('%H:%M:%S')}] {msg}\n")
-  except:
-    pass
-
-
 def cluster_main():
-  try:
-    with open(LOG_FILE, "w") as f:
-      f.write(f"=== Cluster Session Started at {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
-  except:
-    pass
+  initialize_log()
 
   cloudlog.info("Initializing Cluster Config...")
   config = ClusterConfig()
@@ -73,8 +61,12 @@ def cluster_main():
       perf_frames += 1
       if loop_count % fps == 0:
         config.refresh()
+        stats = pipeline.get_stats()
         flog(
-          f"[CLUSTER_HEARTBEAT] Loop: {loop_count} | Camera Ready: {camera.has_frame()} | USB Connected: {display.connected}")
+          f"[CLUSTER_HEARTBEAT] Loop: {loop_count} | Camera Ready: {camera.has_frame()} | "
+          f"USB Connected: {display.connected} | Sent: {stats['sent']} | "
+          f"Dropped: raw={stats['dropped_raw']}, encoded={stats['dropped_prepared']} | "
+          f"Send failures: {stats['send_failures']}")
 
       if perf_frames >= fps * 10:
         now = time.monotonic()

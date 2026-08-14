@@ -120,9 +120,9 @@ class ClusterRenderer:
     else:
       frame = self.blank_canvas.copy()
 
-    hud_data = models.get_hud_data()
-    if has_camera and models.is_valid():
-      frame = self._draw_model_path(frame, models.get_path_data(), hud_data)
+    model_valid, hud_data, path_data = models.get_render_data()
+    if has_camera and model_valid:
+      frame = self._draw_model_path(frame, path_data, hud_data)
 
     pil_img = Image.fromarray(frame)
     self._draw_hud(pil_img, hud_data, has_camera)
@@ -383,6 +383,19 @@ class ClusterRenderer:
     except (TypeError, ValueError):
       return disabled
 
+  @staticmethod
+  def _active_speed_limit(data):
+    """Select one coherent speed-limit source for all cluster widgets."""
+    if data.get("nda_state"):
+      if data.get("section_limit_speed", 0) > 0 and data.get("section_left_dist", 0) > 0:
+        return float(data.get("section_limit_speed")), float(data.get("section_left_dist"))
+      if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
+        return float(data.get("cam_limit_speed")), float(data.get("cam_limit_speed_left_dist"))
+      return float(data.get("nav_limit_speed", 0.0) or 0.0), 0.0
+    if data.get("stock_limit_speed", 0) > 0:
+      return float(data.get("stock_limit_speed")), 0.0
+    return float(data.get("nav_limit_speed", 0.0) or 0.0), 0.0
+
   def _draw_hud(self, image, data, has_camera):
     draw = ImageDraw.Draw(image)
     content_right = self.content_x + self.content_w - 1
@@ -496,17 +509,7 @@ class ClusterRenderer:
       speed_color = colors_alpha(Colors.WHITE, 255)
       max_color = Colors.MAX_ACTIVE if data.get("enabled") else colors_alpha(Colors.OVERRIDE, 255)
 
-      if data.get("nda_state"):
-        if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
-          limit_speed = float(data.get("cam_limit_speed"))
-        elif data.get("section_limit_speed", 0) > 0 and data.get("section_left_dist", 0) > 0:
-          limit_speed = float(data.get("section_limit_speed"))
-        else:
-          limit_speed = float(data.get("nav_limit_speed", 0.0) or 0.0)
-      elif data.get("stock_limit_speed", 0) > 0:
-        limit_speed = float(data.get("stock_limit_speed"))
-      else:
-        limit_speed = float(data.get("nav_limit_speed", 0.0) or 0.0)
+      limit_speed, _ = self._active_speed_limit(data)
 
       cruise_speed = float(data.get("cruise_speed", 0.0) or 0.0)
       if limit_speed > 0 and data.get("enabled"):
@@ -544,17 +547,7 @@ class ClusterRenderer:
   def _draw_left_aux_panel(self, image, draw, data, white, red):
     left_cx = self.left_aux_x + self.panel_w / 2
     speed_limit_y = self.row_centers[0]
-    if data.get("nda_state"):
-      if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
-        limit = float(data.get("cam_limit_speed"))
-      elif data.get("section_limit_speed", 0) > 0 and data.get("section_left_dist", 0) > 0:
-        limit = float(data.get("section_limit_speed"))
-      else:
-        limit = float(data.get("nav_limit_speed", 0.0) or 0.0)
-    elif data.get("stock_limit_speed", 0) > 0:
-      limit = float(data.get("stock_limit_speed"))
-    else:
-      limit = float(data.get("nav_limit_speed", 0.0) or 0.0)
+    limit, left_dist = self._active_speed_limit(data)
 
     # speed limit
     outer_radius = 49
@@ -566,13 +559,7 @@ class ClusterRenderer:
     self._centered(draw, left_cx, speed_limit_y, self._value(limit), self.font_value,
                    Colors.SIGN_TEXT)
 
-    # Draw distance if available, matching the main HUD's camera/section priority.
-    left_dist = 0.0
-    if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
-      left_dist = float(data.get("cam_limit_speed_left_dist"))
-    elif data.get("section_limit_speed", 0) > 0 and data.get("section_left_dist", 0) > 0:
-      left_dist = float(data.get("section_left_dist"))
-
+    # Draw distance from the same source used for the displayed limit.
     if left_dist > 0:
       dist_text = f"{left_dist / 1000:.1f} km" if left_dist >= 1000 else f"{int(left_dist)} m"
       text_y = speed_limit_y + outer_radius + 10

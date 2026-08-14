@@ -3,12 +3,13 @@ from pathlib import Path
 
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
+from openpilot.selfdrive.addon.cluster.cluster_logging import LOG_FILE  # re-export for compatibility
 
-LOG_FILE = "/data/cluster_debug.log"
 USB_TIMEOUT_MS = 2500
 USB_IMAGE_TIMEOUT_MS = 1000
 USB_TARGET_FPS = 20
 USB_CLEAR_HALT_ON_TIMEOUT = True
+USB_MAX_CONSECUTIVE_FAILURES = 3
 USB_JPEG_QUALITY = 68
 CAMERA_CONTRAST = 1.08
 CLUSTER_BORDER_SIZE = 10
@@ -65,6 +66,8 @@ class ClusterConfig:
 
     self.usb_timeout_ms = USB_TIMEOUT_MS
     self.usb_image_timeout_ms = USB_IMAGE_TIMEOUT_MS
+    self.usb_clear_halt_on_timeout = USB_CLEAR_HALT_ON_TIMEOUT
+    self.usb_max_consecutive_failures = USB_MAX_CONSECUTIVE_FAILURES
 
     self.BASEDIR = Path(__file__).resolve().parents[3]
     self.font_bold = os.path.join(self.BASEDIR, "selfdrive", "assets", "fonts", "Inter-Bold.ttf")

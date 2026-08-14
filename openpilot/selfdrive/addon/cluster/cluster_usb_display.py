@@ -8,15 +8,7 @@ from PIL import Image
 import usb.util
 import usb.core
 
-from openpilot.selfdrive.addon.cluster.cluster_config import LOG_FILE
-
-
-def flog(msg):
-    try:
-        with open(LOG_FILE, "a") as f:
-            f.write(f"[{time.strftime('%H:%M:%S')}] {msg}\n")
-    except:
-        pass
+from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 
 TURZX_USB_VENDOR_ID = 0x1CBE
 TURZX_USB_PRODUCT_IDS = {
@@ -40,6 +32,9 @@ class TuringUsbDisplay:
     self.product_id = None
     self.frame_count = 0
     self.consecutive_upload_failures = 0
+    self.max_consecutive_upload_failures = max(
+      1, int(getattr(config, "usb_max_consecutive_failures", 3)),
+    )
     self.jpeg_quality = min(max(int(getattr(config, "usb_jpeg_quality", 68)), 1), 95)
     # Baseline, non-optimized JPEG is the fastest path for continuously
     # changing camera frames. 68 matches carrot-pilot's stable USB default.
@@ -228,11 +223,13 @@ class TuringUsbDisplay:
       if not self._resp_ok(response):
         self.consecutive_upload_failures += 1
         flog(f"[CLUSTER_USB_WARN] JPEG upload was not acknowledged "
-             f"({self.consecutive_upload_failures}/3); skipping frame.")
+             f"({self.consecutive_upload_failures}/{self.max_consecutive_upload_failures}); skipping frame.")
         # A single stale/late response is recoverable. Reconnecting on every
         # miss causes an endless reset loop and makes recovery impossible.
-        if self.consecutive_upload_failures >= 3:
-          raise usb.core.USBError("JPEG upload was not acknowledged 3 times")
+        if self.consecutive_upload_failures >= self.max_consecutive_upload_failures:
+          raise usb.core.USBError(
+            f"JPEG upload was not acknowledged {self.max_consecutive_upload_failures} times",
+          )
         return False
 
       self.consecutive_upload_failures = 0
@@ -265,11 +262,12 @@ class TuringUsbDisplay:
     except usb.core.USBError as e:
       if e.errno == 110 or 'timed out' in str(e).lower():
         flog(f"[CLUSTER_USB_WARN] Write timeout (Errno 110). Clearing halt & skipping frame...")
-        try:
-          if self._ep_out and self.device:
-            self.device.clear_halt(self._ep_out)
-        except Exception as clear_err:
-          flog(f"[CLUSTER_USB_WARN] Failed clear_halt: {clear_err}")
+        if getattr(self.config, "usb_clear_halt_on_timeout", True):
+          try:
+            if self._ep_out and self.device:
+              self.device.clear_halt(self._ep_out)
+          except Exception as clear_err:
+            flog(f"[CLUSTER_USB_WARN] Failed clear_halt: {clear_err}")
       else:
         err_msg = f"Critical USB Error: {e}"
         flog(f"[CLUSTER_USB_ERROR] {err_msg}")

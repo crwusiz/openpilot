@@ -6,19 +6,10 @@ import numpy as np
 from msgq.visionipc import VisionIpcClient
 from openpilot.cereal.visionipc import VisionStreamType
 
-from openpilot.selfdrive.addon.cluster.cluster_config import LOG_FILE
+from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 
 CONNECTION_RETRY_SECONDS = 0.5
 FRAME_STALE_SECONDS = 1.2
-
-
-def flog(msg):
-  try:
-    with open(LOG_FILE, "a") as f:
-      f.write(f"[{time.strftime('%H:%M:%S')}] {msg}\n")
-  except Exception:
-    pass
-
 
 class ClusterLiveCamera:
   def __init__(self, config):

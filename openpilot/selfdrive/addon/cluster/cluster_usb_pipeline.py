@@ -1,15 +1,7 @@
 import threading
 import time
 
-from openpilot.selfdrive.addon.cluster.cluster_config import LOG_FILE
-
-
-def flog(msg):
-  try:
-    with open(LOG_FILE, "a") as f:
-      f.write(f"[{time.strftime('%H:%M:%S')}] {msg}\n")
-  except:
-    pass
+from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 
 
 class ClusterUsbPipeline:
@@ -22,7 +14,16 @@ class ClusterUsbPipeline:
     self.running = False
     self.encoder_thread = None
     self.sender_thread = None
+    self._reset_stats()
     flog("ClusterUsbPipeline initialized.")
+
+  def _reset_stats(self):
+    self._input_frames = 0
+    self._encoded_frames = 0
+    self._sent_frames = 0
+    self._dropped_raw_frames = 0
+    self._dropped_prepared_frames = 0
+    self._send_failures = 0
 
   def start(self):
     with self._condition:
@@ -32,6 +33,7 @@ class ClusterUsbPipeline:
       self._closing = False
       self._pending_frame = None
       self._pending_prepared = None
+      self._reset_stats()
       self.encoder_thread = threading.Thread(
         target=self._encoder_loop, name="cluster-jpeg-encoder", daemon=True,
       )
@@ -51,6 +53,9 @@ class ClusterUsbPipeline:
     with self._condition:
       if not self.running or self._closing:
         return
+      self._input_frames += 1
+      if self._pending_frame is not None:
+        self._dropped_raw_frames += 1
       self._pending_frame = frame_image
       self._condition.notify()
 
@@ -69,6 +74,9 @@ class ClusterUsbPipeline:
         return
       # Encoding and USB each have a latest-only slot. This bounds memory and
       # prevents a slow/reconnecting display from replaying stale frames.
+      self._encoded_frames += 1
+      if self._pending_prepared is not None:
+        self._dropped_prepared_frames += 1
       self._pending_prepared = prepared
       self._condition.notify_all()
 
@@ -86,6 +94,7 @@ class ClusterUsbPipeline:
       if self._closing:
         return None
       if self._pending_prepared is not None:
+        self._dropped_prepared_frames += 1
         prepared = self._pending_prepared
         self._pending_prepared = None
       return prepared
@@ -97,7 +106,20 @@ class ClusterUsbPipeline:
       # Never overwrite a frame encoded while reconnection was in progress.
       if self._pending_prepared is None:
         self._pending_prepared = prepared
+      else:
+        self._dropped_prepared_frames += 1
       self._condition.notify_all()
+
+  def get_stats(self):
+    with self._condition:
+      return {
+        "input": self._input_frames,
+        "encoded": self._encoded_frames,
+        "sent": self._sent_frames,
+        "dropped_raw": self._dropped_raw_frames,
+        "dropped_prepared": self._dropped_prepared_frames,
+        "send_failures": self._send_failures,
+      }
 
   def _wait_for_reconnect(self, timeout):
     with self._condition:
@@ -138,12 +160,23 @@ class ClusterUsbPipeline:
         # in progress over the stale image that triggered reconnection.
         prepared = self._replace_with_latest_prepared(prepared)
         if prepared is not None:
-          self.display.send_prepared(prepared)
+          success = self.display.send_prepared(prepared)
+          with self._condition:
+            if success:
+              self._sent_frames += 1
+            else:
+              self._send_failures += 1
       except Exception as e:
+        with self._condition:
+          self._send_failures += 1
         flog(f"[CLUSTER_PIPELINE_ERROR] Sender exception: {e}")
-        if hasattr(self.display, 'close'):
-          self.display.close()
-        else:
+        try:
+          if hasattr(self.display, "close"):
+            self.display.close()
+          else:
+            self.display.connected = False
+        except Exception as close_error:
+          flog(f"[CLUSTER_PIPELINE_ERROR] Display close exception: {close_error}")
           self.display.connected = False
         self._wait_for_reconnect(0.5)
 
