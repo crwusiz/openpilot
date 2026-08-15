@@ -55,6 +55,18 @@ def _prepare_script_execution(path: str):
         if os.path.exists(restart_script): os.chmod(restart_script, 0o755)
         subprocess.run(['tmux', 'kill-session', '-t', 'tmp'], stderr=subprocess.DEVNULL)
 
+def _get_error_summary(stderr: str) -> str:
+  """Return the actual error line, excluding curl's progress meter when possible."""
+  lines = [line.strip() for line in stderr.replace('\r', '\n').splitlines() if line.strip()]
+  if not lines:
+    return "Unknown error"
+
+  # curl writes its progress meter and errors to stderr. Prefer the final
+  # ``curl: (N) ...`` line so the notification does not show the meter header.
+  curl_errors = [line for line in lines if line.lower().startswith('curl:')]
+  error_text = curl_errors[-1] if curl_errors else lines[-1]
+  return error_text[:300]
+
 async def run_script_async(name: str, path: str, args: list = None, show_modal: bool = False) -> int:
   _prepare_script_execution(path)
 
@@ -162,7 +174,7 @@ async def run_script_async(name: str, path: str, args: list = None, show_modal: 
     if process.returncode == 0:
       ui.notify(f"[{name}] 완료", type='positive', position='top')
     else:
-      err_text = stderr[:100] if stderr else "Unknown error"
+      err_text = _get_error_summary(stderr)
       ui.notify(f"[{name}] 에러: {err_text}", type='negative', position='top')
     return process.returncode
   except Exception as e:
@@ -514,6 +526,7 @@ def render_tab_logs():
     "Tmux Error": "/data/tmux_error.log",
     "Tmux Console": "TMUX_CONSOLE",
     "Navi Debug": "/data/navi_debug.log",
+    "Cruise Debug": "/data/cruise_debug.log",
     "Cluster Debug": "/data/cluster_debug.log",
   }
   REALDATA_PATH = Path("/data/media/0/realdata")
@@ -667,7 +680,6 @@ def render_tab_terminal(tabs):
       ui.run_javascript(js_code)
 
     except Exception:
-      # 백그라운드 타이머 작동 중 부모 삭제 에러가 발생하면 조용히 무시 (pass)
       pass
 
   # 1초마다 터미널 업데이트 실행
