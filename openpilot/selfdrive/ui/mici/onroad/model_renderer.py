@@ -8,7 +8,6 @@ from openpilot.common.params import Params
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.locationd.calibrationd import HEIGHT_INIT
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
-from openpilot.selfdrive.ui.mici.onroad import blend_colors
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 from openpilot.system.ui.widgets import Widget
@@ -32,6 +31,7 @@ class Colors:
   BLACK = rl.Color(0, 0, 0, 255) # rl.BLACK
   BLACK_TRANSLUCENT = colors_alpha(BLACK, 100)
   RED = rl.Color(201, 34, 49, 255)
+  ROAD_EDGE = colors_alpha(RED, 100)
   LIGHT_RED = rl.Color(255, 100, 100, 150)
   ORANGE = rl.Color(255, 149, 0, 255)
 
@@ -47,13 +47,6 @@ NO_THROTTLE_COLORS = [
   rl.Color(242, 242, 242, 89),  # HSLF(112/360, 0.0, 0.95, 0.35)
   rl.Color(242, 242, 242, 0),   # HSLF(112/360, 0.0, 0.95, 0.0)
 ]
-
-LANE_LINE_COLORS = {
-  UIStatus.DISENGAGED: rl.Color(200, 200, 200, 255),
-  UIStatus.OVERRIDE: rl.Color(255, 255, 255, 255),
-  UIStatus.ENGAGED: rl.Color(0, 255, 64, 255),
-  UIStatus.ACTIVE: rl.Color(0, 255, 64, 255),
-}
 
 STEERING_COLORS = [
   rl.Color(0, 191, 255, 102),
@@ -106,9 +99,6 @@ class ModelRenderer(Widget):
     self._acceleration_x_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
     self._acceleration_x_filter2 = FirstOrderFilter(0.0, 1, 1 / gui_app.target_fps)
 
-    self._torque_filter = FirstOrderFilter(0, 0.1, 1 / gui_app.target_fps)
-    self._ll_color_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
-
     # 3x3 car space -> rect-origin space (draw methods add rect.x/y)
     self._car_space_transform = np.zeros((3, 3), dtype=np.float32)
     self._transform_dirty = True
@@ -139,8 +129,6 @@ class ModelRenderer(Widget):
 
   def _render(self, rect: rl.Rectangle):
     sm = ui_state.sm
-
-    self._torque_filter.update(-ui_state.sm['carOutput'].actuatorsOutput.torque)
 
     # Check if data is up-to-date
     if (sm.recv_frame["extrinsicsCalibration"] < ui_state.started_frame or
@@ -187,9 +175,6 @@ class ModelRenderer(Widget):
       self._draw_lane_lines()
       self._draw_path(sm)
 
-    # if render_lead_indicator and radar_state:
-    #   self._draw_lead_indicator()
-
     if render_lead_indicator and radar_state:
       self._draw_lead_indicators(radar_state, rect)
 
@@ -231,17 +216,14 @@ class ModelRenderer(Widget):
     max_idx = self._get_path_length_idx(self._lane_lines[0].raw_points[:, 0], max_distance)
 
     # Update lane lines using raw points
-    line_width_factor = 0.12
     for i, lane_line in enumerate(self._lane_lines):
-      if i in (1, 2):
-        line_width_factor = 0.16
       lane_line.projected_points = self._map_line_to_polygon(
-        lane_line.raw_points, line_width_factor * self._lane_line_probs[i], 0.0, max_idx, max_distance
+        lane_line.raw_points, 0.025 * self._lane_line_probs[i], 0.0, max_idx, max_distance
       )
 
     # Update road edges using raw points
     for road_edge in self._road_edges:
-      road_edge.projected_points = self._map_line_to_polygon(road_edge.raw_points, line_width_factor, 0.0, max_idx, max_distance)
+      road_edge.projected_points = self._map_line_to_polygon(road_edge.raw_points, 0.025, 0.0, max_idx, max_distance)
 
     # Update path using raw points
     if lead and lead.present:
@@ -361,46 +343,24 @@ class ModelRenderer(Widget):
 
     return LeadVehicle(glow=glow, chevron=chevron, fill_poly=fill_poly, fill_alpha=int(fill_alpha))
 
-  def _get_ll_color(self, prob: float, adjacent: bool, left: bool):
-    alpha = np.clip(prob, 0.0, 0.7)
-    if adjacent:
-      _base_color = LANE_LINE_COLORS.get(ui_state.status, LANE_LINE_COLORS[UIStatus.DISENGAGED])
-      color = rl.Color(_base_color.r, _base_color.g, _base_color.b, int(alpha * 255))
-
-      # turn adjacent lls orange if torque is high
-      torque = self._torque_filter.x
-      high_torque = abs(torque) > 0.6
-      if high_torque and (left == (torque > 0)):
-        color = blend_colors(
-          color,
-          rl.Color(255, 115, 0, int(alpha * 255)),  # orange
-          np.interp(abs(torque), [0.6, 0.8], [0.0, 1.0])
-        )
-    else:
-      color = rl.Color(255, 255, 255, int(alpha * 255))
-
-    if ui_state.status == UIStatus.DISENGAGED:
-      color = rl.Color(0, 0, 0, int(alpha * 255))
-
-    return color
-
   def _draw_lane_lines(self):
-    """Draw lane lines and road edges. Two closest lines should be green (lane line or road edges)."""
+    """Draw lane lines and road edges using the default renderer colors."""
     offset = np.array([self._rect.x, self._rect.y], dtype=np.float32)
 
     for i, lane_line in enumerate(self._lane_lines):
       if lane_line.projected_points.size == 0:
         continue
 
-      color = self._get_ll_color(float(self._lane_line_probs[i]), i in (1, 2), i in (0, 1))
+      alpha = np.clip(self._lane_line_probs[i], 0.0, 0.7)
+      color = colors_alpha(Colors.WHITE, int(alpha * 255))
       draw_polygon(self._rect, lane_line.projected_points + offset, color)
 
     for i, road_edge in enumerate(self._road_edges):
       if road_edge.projected_points.size == 0:
         continue
 
-      # if closest lane lines are not confident, make road edges green
-      color = self._get_ll_color(float(1.0 - self._road_edge_stds[i]), float(self._lane_line_probs[i + 1]) < 0.25, i == 0)
+      alpha = np.clip(1.0 - self._road_edge_stds[i], 0.0, 1.0)
+      color = colors_alpha(Colors.ROAD_EDGE, int(alpha * 255))
       draw_polygon(self._rect, road_edge.projected_points + offset, color)
 
   def _draw_path(self, sm):

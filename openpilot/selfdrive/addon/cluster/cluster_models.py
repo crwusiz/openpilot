@@ -32,6 +32,8 @@ class ClusterModels:
     self.v_ego_cluster_seen = False
     self.accel = 0.0  # m/s², used for speed color feedback
     self.enabled = False
+    self.allow_throttle = True
+    self.longitudinal_control = False
     self.pre_enabled_or_overriding = False
     self.lat_active = False
     self.cruise_available = False
@@ -141,6 +143,9 @@ class ClusterModels:
       )
       self.distance_level = min(max(_enum_value(ss.personality) + 1, 1), 4)
 
+    if self.sm.updated['carParams']:
+      self.longitudinal_control = bool(self.sm['carParams'].openpilotLongitudinalControl)
+
     if self.sm.updated['carControl']:
       car_control = self.sm['carControl']
       self.lat_active = bool(car_control.latActive)
@@ -186,7 +191,9 @@ class ClusterModels:
       self._update_navi_school_zone(navi_data)
 
     if self.sm.updated['longitudinalPlan']:
-      self.traffic_state = getattr(self.sm['longitudinalPlan'], 'trafficState', 0)
+      longitudinal_plan = self.sm['longitudinalPlan']
+      self.traffic_state = getattr(longitudinal_plan, 'trafficState', 0)
+      self.allow_throttle = bool(longitudinal_plan.allowThrottle)
 
     if self.sm.updated['modelV2']:
       model = self.sm['modelV2']
@@ -215,7 +222,9 @@ class ClusterModels:
       ]
       self.road_edge_stds = list(model.roadEdgeStds)
 
-    if self.sm.updated['radarState']:
+    if not self.sm.valid['radarState']:
+      self.leads = []
+    elif self.sm.updated['radarState']:
       radar_state = self.sm['radarState']
       self.leads = [
         {
@@ -289,6 +298,8 @@ class ClusterModels:
       "v_ego": self.v_ego,
       "accel": self.accel,
       "enabled": self.enabled,
+      "allow_throttle": self.allow_throttle,
+      "longitudinal_control": self.longitudinal_control,
       "pre_enabled_or_overriding": self.pre_enabled_or_overriding,
       "lat_active": self.lat_active,
       "cruise_available": self.cruise_available,

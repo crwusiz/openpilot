@@ -22,6 +22,25 @@ def colors_alpha(color: RGBColor, alpha: int) -> RGBAColor:
   return (*color, alpha)
 
 
+THROTTLE_COLORS = [
+  (13, 248, 122, 102),
+  (114, 255, 92, 89),
+  (114, 255, 92, 0),
+]
+
+NO_THROTTLE_COLORS = [
+  (242, 242, 242, 102),
+  (242, 242, 242, 89),
+  (242, 242, 242, 0),
+]
+
+STEERING_COLORS = [
+  (0, 191, 255, 102),
+  (0, 191, 255, 89),
+  (0, 191, 255, 0),
+]
+
+
 class Colors:
   BLACK = (0, 0, 0)
   PANEL = (7, 12, 18)

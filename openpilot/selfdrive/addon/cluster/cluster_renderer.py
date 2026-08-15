@@ -5,8 +5,9 @@ import cv2
 import numpy as np
 
 from PIL import Image, ImageDraw, ImageFont
+from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.swaglog import cloudlog
-from openpilot.selfdrive.addon.cluster.cluster_config import Colors, colors_alpha
+from openpilot.selfdrive.addon.cluster.cluster_config import Colors, NO_THROTTLE_COLORS, STEERING_COLORS, THROTTLE_COLORS, colors_alpha
 
 
 DISTANCE_ICONS = {
@@ -40,6 +41,7 @@ BLINKER_DRAW_COUNT = 8
 BLINKER_SEQUENCE_MS = 400.0
 BLINKER_PAUSE_MS = 250.0
 CAMERA_OVERLAY_ICON_HEIGHT = 94
+CLIP_MARGIN = 500
 
 class ClusterRenderer:
   def __init__(self, config):
@@ -66,6 +68,7 @@ class ClusterRenderer:
     self.row_h = self.content_h / 3.0
     self.row_centers = tuple(self.content_y + self.row_h * (row + 0.5) for row in range(3))
     self._source_to_panel = np.eye(3, dtype=np.float32)
+    self._blend_filter = FirstOrderFilter(1.0, 0.25, 1.0 / self.config.fps)
 
     try:
       self.font_speed = ImageFont.truetype(self.config.font_bold, 58)
@@ -165,7 +168,7 @@ class ClusterRenderer:
            self.camera_x:self.camera_x + self.camera_w] = camera
     return canvas
 
-  def _project_points(self, points, calib_transform):
+  def _project_points(self, points, calib_transform, clip_margin=0):
     points = np.asarray(points, dtype=np.float32)
     if points.size == 0:
       return np.empty((0, 2), dtype=np.float32), np.empty((0,), dtype=bool)
@@ -177,14 +180,14 @@ class ClusterRenderer:
       panel = self._source_to_panel @ normalized
       pixels[valid] = panel[:2].T
       valid &= (
-        (pixels[:, 0] >= self.camera_x) &
-        (pixels[:, 0] < self.camera_x + self.camera_w) &
-        (pixels[:, 1] >= self.camera_y) &
-        (pixels[:, 1] < self.camera_y + self.camera_h)
+        (pixels[:, 0] >= self.camera_x - clip_margin) &
+        (pixels[:, 0] < self.camera_x + self.camera_w + clip_margin) &
+        (pixels[:, 1] >= self.camera_y - clip_margin) &
+        (pixels[:, 1] < self.camera_y + self.camera_h + clip_margin)
       )
     return pixels, valid
 
-  def _project_ribbon(self, xs, ys, zs, width, z_offset, calib_transform, max_distance=100.0):
+  def _map_line_to_polygon(self, xs, ys, zs, width, z_offset, calib_transform, max_distance=100.0, allow_invert=True):
     count = min(len(xs), len(ys), len(zs))
     if count < 2:
       return None
@@ -194,12 +197,70 @@ class ClusterRenderer:
       return None
     left = raw + np.array([0.0, -width, z_offset], dtype=np.float32)
     right = raw + np.array([0.0, width, z_offset], dtype=np.float32)
-    left_px, left_valid = self._project_points(left, calib_transform)
-    right_px, right_valid = self._project_points(right, calib_transform)
+    left_px, left_valid = self._project_points(left, calib_transform, CLIP_MARGIN)
+    right_px, right_valid = self._project_points(right, calib_transform, CLIP_MARGIN)
     valid = left_valid & right_valid
     if np.count_nonzero(valid) < 2:
       return None
-    return np.vstack((left_px[valid], right_px[valid][::-1])).astype(np.int32)
+
+    left_px = left_px[valid]
+    right_px = right_px[valid]
+
+    # Prevent the path polygon from folding back over itself on hills.
+    if not allow_invert and len(left_px) > 1:
+      keep = left_px[:, 1] == np.minimum.accumulate(left_px[:, 1])
+      left_px = left_px[keep]
+      right_px = right_px[keep]
+      if len(left_px) < 2:
+        return None
+
+    return np.vstack((left_px, right_px[::-1])).astype(np.int32)
+
+  @staticmethod
+  def _fill_polygon_alpha(image, polygon, color, alpha):
+    alpha = float(np.clip(alpha, 0.0, 1.0))
+    if len(color) == 4:
+      alpha *= color[3] / 255.0
+      color = color[:3]
+    if alpha <= 0.0:
+      return
+    overlay = image.copy()
+    cv2.fillPoly(overlay, [polygon], color)
+    cv2.addWeighted(overlay, alpha, image, 1.0 - alpha, 0, image)
+
+  @staticmethod
+  def _blend_colors(begin_colors, end_colors, factor):
+    factor = float(np.clip(factor, 0.0, 1.0))
+    inverse = 1.0 - factor
+    return [
+      tuple(int(inverse * start[channel] + factor * end[channel]) for channel in range(4))
+      for start, end in zip(begin_colors, end_colors, strict=True)
+    ]
+
+  @staticmethod
+  def _fill_polygon_gradient(image, polygon, colors, stops):
+    x, y, width, height = cv2.boundingRect(polygon)
+    x0, y0 = max(x, 0), max(y, 0)
+    x1, y1 = min(x + width, image.shape[1]), min(y + height, image.shape[0])
+    if x0 >= x1 or y0 >= y1:
+      return
+
+    roi = image[y0:y1, x0:x1]
+    local_polygon = polygon - np.array([x0, y0], dtype=np.int32)
+    mask = np.zeros(roi.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(mask, [local_polygon], 255)
+
+    denominator = max(image.shape[0] - 1, 1)
+    gradient_position = 1.0 - np.arange(y0, y1, dtype=np.float32) / denominator
+    color_array = np.asarray(colors, dtype=np.float32)
+    gradient = np.stack([
+      np.interp(gradient_position, stops, color_array[:, channel]) for channel in range(4)
+    ], axis=1)
+
+    source = gradient[:, np.newaxis, :3]
+    alpha = gradient[:, np.newaxis, 3:4] / 255.0
+    alpha = alpha * (mask[:, :, np.newaxis] / 255.0)
+    roi[:] = (source * alpha + roi * (1.0 - alpha)).astype(np.uint8)
 
   def _draw_model_path(self, frame, path_data, hud_data):
     if not path_data["path_x"]:
@@ -211,38 +272,44 @@ class ClusterRenderer:
     camera_region = frame[self.camera_y:self.camera_y + self.camera_h,
                           self.camera_x:self.camera_x + self.camera_w]
     camera_height = float(path_data.get("camera_height", self.camera_height) or self.camera_height)
-    path_z = path_data.get("path_z") or [0.0] * len(path_data["path_x"])
-    path_poly = self._project_ribbon(
-      path_data["path_x"], path_data["path_y"], path_z,
-      0.9, camera_height, calib_transform, max_distance=100.0,
-    )
-    if path_poly is not None and hud_data["enabled"]:
-      overlay = camera_region.copy()
-      local_path_poly = path_poly - np.array([self.camera_x, self.camera_y], dtype=np.int32)
-      path_color = Colors.STEERING if hud_data.get("steering_pressed") else Colors.ENGAGED
-      cv2.fillPoly(overlay, [local_path_poly], path_color)
-      cv2.addWeighted(overlay, 0.35, camera_region, 0.65, 0, camera_region)
 
+    # Equivalent to ui_state.status != UIStatus.DISENGAGED for the cluster process.
+    if self._get_border_color(hud_data) != Colors.DISENGAGED:
+      self._draw_lane_lines(camera_region, path_data, calib_transform)
+      self._draw_path(camera_region, path_data, hud_data, calib_transform, camera_height)
+
+    self._draw_lead_indicators(frame, path_data, hud_data, calib_transform, camera_height)
+
+    return frame
+
+  def _draw_path(self, camera_region, path_data, hud_data, calib_transform, camera_height):
+    path_z = path_data.get("path_z") or [0.0] * len(path_data["path_x"])
+    path_poly = self._map_line_to_polygon(
+      path_data["path_x"], path_data["path_y"], path_z,
+      0.9, camera_height, calib_transform, max_distance=100.0, allow_invert=False,
+    )
+    if path_poly is not None:
+      local_path_poly = path_poly - np.array([self.camera_x, self.camera_y], dtype=np.int32)
+      if hud_data.get("steering_pressed"):
+        self._fill_polygon_gradient(camera_region, local_path_poly, STEERING_COLORS, [0.0, 0.5, 1.0])
+      else:
+        allow_throttle = hud_data.get("allow_throttle", True) or not hud_data.get("longitudinal_control", False)
+        blend_factor = round(self._blend_filter.update(int(allow_throttle)) * 100) / 100
+        colors = self._blend_colors(NO_THROTTLE_COLORS, THROTTLE_COLORS, blend_factor)
+        self._fill_polygon_gradient(camera_region, local_path_poly, colors, [0.0, 0.5, 1.0])
+
+  def _draw_lane_lines(self, camera_region, path_data, calib_transform):
     lane_lines = path_data.get("lane_lines") or []
     lane_probs = path_data.get("lane_line_probs") or []
-    feature_overlay = None
-    features_drawn = False
     for index, line in enumerate(lane_lines):
       if len(line) != 3:
         continue
       probability = float(lane_probs[index]) if index < len(lane_probs) else 0.0
-      if probability < 0.05:
-        continue
-      width = (0.16 if index in (1, 2) else 0.12) * probability
-      polygon = self._project_ribbon(*line, width, 0.0, calib_transform)
+      width = 0.025 * probability
+      polygon = self._map_line_to_polygon(*line, width, 0.0, calib_transform)
       if polygon is not None:
-        if feature_overlay is None:
-          feature_overlay = camera_region.copy()
-        base_color = Colors.ENGAGED if hud_data["enabled"] and index in (1, 2) else Colors.WHITE
-        color = tuple(int(component * (0.35 + probability * 0.65)) for component in base_color)
         local_polygon = polygon - np.array([self.camera_x, self.camera_y], dtype=np.int32)
-        cv2.fillPoly(feature_overlay, [local_polygon], color)
-        features_drawn = True
+        self._fill_polygon_alpha(camera_region, local_polygon, Colors.WHITE, np.clip(probability, 0.0, 0.7))
 
     road_edges = path_data.get("road_edges") or []
     road_stds = path_data.get("road_edge_stds") or []
@@ -250,25 +317,12 @@ class ClusterRenderer:
       if len(edge) != 3:
         continue
       confidence = 1.0 - float(road_stds[index]) if index < len(road_stds) else 0.0
-      if confidence < 0.2:
-        continue
-      polygon = self._project_ribbon(*edge, 0.12, 0.0, calib_transform)
+      polygon = self._map_line_to_polygon(*edge, 0.025, 0.0, calib_transform)
       if polygon is not None:
-        if feature_overlay is None:
-          feature_overlay = camera_region.copy()
-        level = int(100 + 115 * min(confidence, 1.0))
         local_polygon = polygon - np.array([self.camera_x, self.camera_y], dtype=np.int32)
-        cv2.fillPoly(feature_overlay, [local_polygon], (level, level, level))
-        features_drawn = True
+        self._fill_polygon_alpha(camera_region, local_polygon, colors_alpha(Colors.RED, 100), np.clip(confidence, 0.0, 1.0))
 
-    if features_drawn:
-      cv2.addWeighted(feature_overlay, 0.75, camera_region, 0.25, 0, camera_region)
-
-    self._draw_leads(frame, path_data, hud_data, calib_transform, camera_height)
-
-    return frame
-
-  def _draw_leads(self, frame, path_data, hud_data, calib_transform, camera_height):
+  def _draw_lead_indicators(self, frame, path_data, hud_data, calib_transform, camera_height):
     path_x = path_data.get("path_x") or []
     path_z = path_data.get("path_z") or []
     drawn_distances = []
