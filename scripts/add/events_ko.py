@@ -453,6 +453,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventName.bigModelFailed: {
+    ET.SOFT_DISABLE: soft_disable_alert("빅모델 실패"),
     ET.PERMANENT: NormalPermanentAlert("빅모델 실패 ", "다시 시도하려면 차량을 재시동하세요.\n지금은 소형 모델로 운전 중입니다.", duration=20.),
   },
 
