@@ -143,6 +143,23 @@ function launch {
 
   ADDON_REQUIREMENTS="$DIR/openpilot/selfdrive/addon/requirements.txt"
   ADDON_REQUIREMENTS_HASH=$(sha256sum "$ADDON_REQUIREMENTS" | awk '{print $1}')
+  BOOT_SPINNER_PID=""
+
+  start_boot_spinner() {
+    python3 "$DIR/openpilot/system/manager/boot_spinner.py" &
+    BOOT_SPINNER_PID=$!
+  }
+
+  stop_boot_spinner() {
+    if [ -n "$BOOT_SPINNER_PID" ]; then
+      kill "$BOOT_SPINNER_PID" 2>/dev/null || true
+      wait "$BOOT_SPINNER_PID" 2>/dev/null || true
+      BOOT_SPINNER_PID=""
+    fi
+  }
+
+  trap stop_boot_spinner EXIT
+  trap 'stop_boot_spinner; exit 1' INT TERM
 
   if [ -f /AGNOS ]; then
     ADDON_DEPS="/data/addon_deps"
@@ -168,15 +185,18 @@ function launch {
 
   if [ ! -f "$ADDON_REQUIREMENTS_MARKER" ] || [ "$(cat "$ADDON_REQUIREMENTS_MARKER")" != "$ADDON_REQUIREMENTS_HASH" ]; then
     echo "Installing addon dependencies from $ADDON_REQUIREMENTS..."
+    start_boot_spinner
     (
       if [ -n "${ADDON_INSTALL_TMPDIR:-}" ]; then
         export TMPDIR="$ADDON_INSTALL_TMPDIR"
       fi
       "${ADDON_INSTALLER[@]}" -r "$ADDON_REQUIREMENTS"
     ) || {
+      stop_boot_spinner
       echo "Failed to install addon dependencies"
       exit 1
     }
+    stop_boot_spinner
     echo -n "$ADDON_REQUIREMENTS_HASH" > "$ADDON_REQUIREMENTS_MARKER"
   fi
 
