@@ -224,9 +224,23 @@ class ClusterRenderer:
       color = color[:3]
     if alpha <= 0.0:
       return
-    overlay = image.copy()
-    cv2.fillPoly(overlay, [polygon], color)
-    cv2.addWeighted(overlay, alpha, image, 1.0 - alpha, 0, image)
+
+    # Lane and road-edge polygons used to copy and blend the whole camera
+    # panel for every line. Blend only the polygon's bounding ROI instead;
+    # this removes several full-frame allocations per render without changing
+    # pixels outside the polygon.
+    x, y, width, height = cv2.boundingRect(polygon)
+    x0, y0 = max(x, 0), max(y, 0)
+    x1, y1 = min(x + width, image.shape[1]), min(y + height, image.shape[0])
+    if x0 >= x1 or y0 >= y1:
+      return
+
+    roi = image[y0:y1, x0:x1]
+    local_polygon = polygon - np.array([x0, y0], dtype=np.int32)
+    mask = np.zeros(roi.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(mask, [local_polygon], 255)
+    blended = cv2.addWeighted(np.full_like(roi, color), alpha, roi, 1.0 - alpha, 0)
+    roi[mask != 0] = blended[mask != 0]
 
   @staticmethod
   def _blend_colors(begin_colors, end_colors, factor):
@@ -684,10 +698,10 @@ class ClusterRenderer:
 
     # road_sign
     road_sign = None
-    if data.get("road_signs") == 1 or data.get("school_zone"):
-      road_sign = "school_zone"
-    elif data.get("speed_bump"):
+    if data.get("speed_bump"):
       road_sign = "speed_bump"
+    elif data.get("road_signs") == 1 or data.get("school_zone"):
+      road_sign = "school_zone"
     elif data.get("speed_camera"):
       road_sign = "speed_camera"
     if road_sign:
