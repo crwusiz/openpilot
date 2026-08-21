@@ -131,7 +131,7 @@ class ClusterModels:
         if hasattr(ex, 'tpms'):
           self.tpms = [ex.tpms.fl, ex.tpms.fr, ex.tpms.rl, ex.tpms.rr]
         self.road_signs = getattr(ex, 'roadSigns', self.road_signs)
-        self.school_zone = self.road_signs == 1 or self._navi_school_zone
+        self._refresh_school_zone()
         self.ignore_limit_timer = getattr(ex, 'ignoreLimitTimer', self.ignore_limit_timer)
 
     if self.sm.updated['selfdriveState']:
@@ -248,7 +248,7 @@ class ClusterModels:
     if self.nda_state <= 0:
       self._navi_school_zone = False
       self._navi_last_road_name = ""
-      self.school_zone = self.road_signs == 1
+      self._refresh_school_zone()
       return
 
     if self.cam_type == 20:
@@ -267,7 +267,13 @@ class ClusterModels:
         self._navi_school_zone = False
 
     self._navi_last_road_name = current_road_name
-    self.school_zone = self.road_signs == 1 or self._navi_school_zone
+    self._refresh_school_zone()
+
+  def _refresh_school_zone(self):
+    # CruiseController uses NDA state exclusively while NDA is active. Mirror
+    # that precedence here so a stale stock roadSigns value cannot replace a
+    # speed-bump/camera icon with the school-zone icon.
+    self.school_zone = self._navi_school_zone if self.nda_state > 0 else self.road_signs == 1
 
   def _update_loop(self):
     while self._running:

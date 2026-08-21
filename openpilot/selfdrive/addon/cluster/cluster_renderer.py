@@ -42,6 +42,7 @@ BLINKER_SEQUENCE_MS = 400.0
 BLINKER_PAUSE_MS = 250.0
 CAMERA_OVERLAY_ICON_HEIGHT = 94
 CLIP_MARGIN = 500
+GRADIENT_BANDS = 8
 
 class ClusterRenderer:
   def __init__(self, config):
@@ -240,7 +241,7 @@ class ClusterRenderer:
     mask = np.zeros(roi.shape[:2], dtype=np.uint8)
     cv2.fillPoly(mask, [local_polygon], 255)
     blended = cv2.addWeighted(np.full_like(roi, color), alpha, roi, 1.0 - alpha, 0)
-    roi[mask != 0] = blended[mask != 0]
+    cv2.copyTo(blended, mask, roi)
 
   @staticmethod
   def _blend_colors(begin_colors, end_colors, factor):
@@ -261,20 +262,31 @@ class ClusterRenderer:
 
     roi = image[y0:y1, x0:x1]
     local_polygon = polygon - np.array([x0, y0], dtype=np.int32)
-    mask = np.zeros(roi.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(mask, [local_polygon], 255)
-
     denominator = max(image.shape[0] - 1, 1)
-    gradient_position = 1.0 - np.arange(y0, y1, dtype=np.float32) / denominator
     color_array = np.asarray(colors, dtype=np.float32)
-    gradient = np.stack([
-      np.interp(gradient_position, stops, color_array[:, channel]) for channel in range(4)
-    ], axis=1)
 
-    source = gradient[:, np.newaxis, :3]
-    alpha = gradient[:, np.newaxis, 3:4] / 255.0
-    alpha = alpha * (mask[:, :, np.newaxis] / 255.0)
-    roi[:] = (source * alpha + roi * (1.0 - alpha)).astype(np.uint8)
+    # The former full-resolution float alpha buffer allocated several large
+    # arrays for every frame and dominated render time on-device. Eight bands
+    # retain the low-alpha visual gradient while keeping blending in OpenCV and
+    # bounding temporary memory to one small band.
+    band_height = max(1, (roi.shape[0] + GRADIENT_BANDS - 1) // GRADIENT_BANDS)
+    for band_y0 in range(0, roi.shape[0], band_height):
+      band_y1 = min(band_y0 + band_height, roi.shape[0])
+      band = roi[band_y0:band_y1]
+      band_polygon = local_polygon - np.array([0, band_y0], dtype=np.int32)
+      mask = np.zeros(band.shape[:2], dtype=np.uint8)
+      cv2.fillPoly(mask, [band_polygon], 255)
+      if not cv2.countNonZero(mask):
+        continue
+
+      midpoint_y = y0 + (band_y0 + band_y1 - 1) * 0.5
+      gradient_position = 1.0 - midpoint_y / denominator
+      color = tuple(int(np.interp(gradient_position, stops, color_array[:, channel])) for channel in range(4))
+      alpha = color[3] / 255.0
+      if alpha <= 0.0:
+        continue
+      blended = cv2.addWeighted(np.full_like(band, color[:3]), alpha, band, 1.0 - alpha, 0)
+      cv2.copyTo(blended, mask, band)
 
   def _draw_model_path(self, frame, path_data, hud_data):
     if not path_data["path_x"]:
@@ -700,7 +712,7 @@ class ClusterRenderer:
     road_sign = None
     if data.get("speed_bump"):
       road_sign = "speed_bump"
-    elif data.get("road_signs") == 1 or data.get("school_zone"):
+    elif data.get("school_zone"):
       road_sign = "school_zone"
     elif data.get("speed_camera"):
       road_sign = "speed_camera"
