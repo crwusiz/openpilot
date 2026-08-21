@@ -195,8 +195,8 @@ class Car:
 
     # neokii cruise controller
     self.cruise_controller.update_v_cruise(CS, self.sm, self.sm['carControl'].enabled)
-    CS.vCruise = float(self.cruise_controller.apply_max_speed)
-    CS.vCruiseCluster = float(self.cruise_controller.cruise_max_speed)
+    CS.vCruise = float(self.cruise_controller.v_cruise_kph)
+    CS.vCruiseCluster = float(self.cruise_controller.v_cruise_cluster_kph)
 
     return CS, RD
 

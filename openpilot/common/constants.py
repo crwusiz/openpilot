@@ -36,5 +36,8 @@ class UnitConverter:
   def to_clu(self, speed: float) -> float:
     return speed * CV.MS_TO_KPH if self.is_metric else speed * CV.MS_TO_MPH
 
+  def to_kph(self, speed: float) -> float:
+    return speed if self.is_metric else speed * CV.MPH_TO_KPH
+
   def to_current_unit(self, speed_kph: float) -> float:
     return speed_kph if self.is_metric else speed_kph * CV.KPH_TO_MPH
