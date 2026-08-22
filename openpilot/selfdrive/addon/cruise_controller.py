@@ -200,7 +200,7 @@ class CruiseController:
     self.limit_change_timer = 0
     self.prev_section_active = False
     self.prev_section_limit_speed = 0.
-    self.restore_road_after_section = False
+    self.pending_road_restore = False
 
     self.prev_model_mono_time = 0
     self.cached_curve_speed_ms: float | None = None
@@ -251,6 +251,7 @@ class CruiseController:
     self.prev_steering_angle = 0.
     self.pending_road_limit_speed = 0.
     self.limit_change_timer = 0
+    self.pending_road_restore = False
     self.cruise_just_enabled = False
     self.gas_override_active = False
     self.limit_speed_updated = False
@@ -258,7 +259,7 @@ class CruiseController:
   def _reset_section_state(self):
     self.prev_section_active = False
     self.prev_section_limit_speed = 0.
-    self.restore_road_after_section = False
+    self.pending_road_restore = False
 
   def _road_limit_target(self, road_limit_speed: float) -> float:
     ratio = np.interp(road_limit_speed,
@@ -289,14 +290,19 @@ class CruiseController:
       (name, speed) for name, speed in zip(candidate_names, speed_candidates, strict=True)
       if speed >= self.min_set_speed_clu and speed != NO_ACTIVE_LIMIT
     ]
-    active_source = min(valid_candidates, key=lambda item: item[1])[0] if valid_candidates else "NONE"
+    if valid_candidates:
+      limit_source, limit_speed = min(valid_candidates, key=lambda item: item[1])
+      active_source = "REQUESTED" if requested_speed < limit_speed else limit_source
+    else:
+      active_source = "NONE"
 
     event_state = (
       bool(nda_active), bool(section_active), round(float(section_limit_speed), 1),
       bool(nda_camera_active), bool(is_school_zone), bool(is_limit_zone),
       round(float(road_limit_speed or 0.), 1), round(float(self.prev_road_limit_speed), 1),
       round(float(self.pending_road_limit_speed), 1), bool(road_limit_applies),
-      bool(self.ignore_road_limit_temporarily), active_source, tuple(immediate_reasons),
+      bool(self.pending_road_restore), bool(self.ignore_road_limit_temporarily),
+      active_source, tuple(immediate_reasons),
       bool(self.steer_decel_active),
     )
     now = time.monotonic()
@@ -308,7 +314,7 @@ class CruiseController:
     log_format = " ".join((
       "LIMIT source=%s ego=%.1f requested=%.1f calculated=%.1f applied=%.1f prev_output=%.1f",
       "candidates[road=%s camera=%s lead=%s curve=%s steer=%s]",
-      "nav[nda=%d road_nda=%.1f road_stock=%.1f observed=%s accepted=%.1f target=%s pending=%.1f timer=%d/%d applies=%d",
+      "nav[nda=%d road_nda=%.1f road_stock=%.1f observed=%s accepted=%.1f target=%s pending=%.1f timer=%d/%d applies=%d restore=%d",
       "section=%d limit=%.1f left=%.0f camera=%d zone=%d school=%d]",
       "lead[present=%d dRel=%.1f vRel=%.1f] ignore=%d timer=%d/%d steer_angle=%.1f immediate=%s",
     ))
@@ -320,7 +326,7 @@ class CruiseController:
       nda_active, road_limit_speed_nda, road_limit_speed_stock, self._debug_speed(road_limit_speed),
       self.prev_road_limit_speed, self._debug_speed(road_limit_target_clu),
       self.pending_road_limit_speed, self.limit_change_timer,
-      LIMIT_CHANGE_TIMEOUT_TICKS, road_limit_applies,
+      LIMIT_CHANGE_TIMEOUT_TICKS, road_limit_applies, self.pending_road_restore,
       section_active, section_limit_speed, section_left_dist, nda_camera_active,
       is_limit_zone, is_school_zone, lead.present, lead.dRel, lead.vRel,
       self.ignore_road_limit_temporarily, self.ignore_limit_timer, IGNORE_LIMIT_TIMEOUT_TICKS,
@@ -412,16 +418,26 @@ class CruiseController:
     if section_started_or_changed:
       self._set_limit_speed(section_limit_speed)
       requested_speed_clu = section_limit_speed
-      self.restore_road_after_section = False
+      self.pending_road_restore = False
     elif section_ended:
-      self.restore_road_after_section = True
+      self.pending_road_restore = True
 
     self.prev_section_active = section_active
     self.prev_section_limit_speed = section_limit_speed if section_active else 0.
 
+    # A confirmed road limit can be hidden temporarily by an active camera,
+    # section, or school-zone target. Remember it so the road target is
+    # restored once that restriction releases ownership of the requested SET.
+    camera_target_active = 0 < camera_limit_speed_clu < NO_ACTIVE_LIMIT
+    road_target_suspended = section_active or is_school_zone or camera_target_active
+    if road_limit_ready and not road_limit_applies and road_target_suspended:
+      self.pending_road_restore = True
+
     if road_limit_changed and road_limit_applies and not self.ignore_road_limit_temporarily:
       self._set_limit_speed(road_limit_target_clu)
-      self.restore_road_after_section = False
+      self.pending_road_restore = False
+    elif road_limit_changed:
+      self.pending_road_restore = True
     elif self.cruise_just_enabled and road_limit_applies and \
          road_limit_target_clu != NO_ACTIVE_LIMIT and not self.ignore_road_limit_temporarily:
       # A confirmed NDA road limit may have been cached while cruise was off.
@@ -433,11 +449,7 @@ class CruiseController:
       )
       self._set_limit_speed(road_limit_target_clu)
       requested_speed_clu = road_limit_target_clu
-      self.restore_road_after_section = False
-    elif self.restore_road_after_section and road_limit_applies and \
-         road_limit_target_clu != NO_ACTIVE_LIMIT and not self.ignore_road_limit_temporarily:
-      self._set_limit_speed(road_limit_target_clu)
-      self.restore_road_after_section = False
+      self.pending_road_restore = False
 
     road_limit_speed_clu = road_limit_target_clu if road_limit_applies else NO_ACTIVE_LIMIT
     restore_limit_speed_clu = section_limit_speed if section_active else road_limit_speed_clu
@@ -454,9 +466,21 @@ class CruiseController:
 
         if restore_limit_speed_clu != NO_ACTIVE_LIMIT and requested_speed_clu != restore_limit_speed_clu:
           self._set_limit_speed(restore_limit_speed_clu)
-          self.restore_road_after_section = False
+          self.pending_road_restore = False
+        elif road_limit_ready and restore_limit_speed_clu == NO_ACTIVE_LIMIT:
+          self.pending_road_restore = True
       else:
         road_limit_speed_clu = NO_ACTIVE_LIMIT
+
+    if self.pending_road_restore and road_limit_applies and \
+       road_limit_target_clu != NO_ACTIVE_LIMIT and not self.ignore_road_limit_temporarily:
+      if requested_speed_clu != road_limit_target_clu:
+        cruise_log.info(
+          "ROAD_RESTORE road=%.1f target=%.1f requested=%.1f ego=%.1f",
+          road_limit_speed, road_limit_target_clu, requested_speed_clu, cluster_speed_clu,
+        )
+        self._set_limit_speed(road_limit_target_clu)
+      self.pending_road_restore = False
 
     self.road_limit_speed_clu = road_limit_speed_clu
 

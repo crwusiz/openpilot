@@ -91,9 +91,7 @@ class ClusterRenderer:
       self.font_label = ImageFont.load_default()
       self.font_warning = ImageFont.load_default()
 
-    self.blank_canvas = np.full(
-      (self.target_h, self.target_w, 3), Colors.BLACK, dtype=np.uint8,
-    )
+    self.base_canvas = self._create_base_canvas()
     self.camera_height = 1.22
     self.focal_length = 910.0
     self.icons = {}
@@ -114,6 +112,24 @@ class ClusterRenderer:
       except Exception:
         pass
 
+  def _create_base_canvas(self):
+    """Build the invariant panel background once instead of every frame."""
+    image = Image.new("RGB", (self.target_w, self.target_h), Colors.BLACK)
+    draw = ImageDraw.Draw(image)
+    content_right = self.content_x + self.content_w - 1
+    content_bottom = self.content_y + self.content_h - 1
+
+    draw.rectangle([self.content_x, self.content_y, self.camera_x - 1, content_bottom], fill=Colors.PANEL)
+    draw.rectangle([self.right_aux_x, self.content_y, content_right, content_bottom], fill=Colors.PANEL)
+    for x in (self.left_aux_x, self.camera_x, self.right_aux_x, self.right_panel_x):
+      draw.line((x, self.content_y, x, content_bottom), fill=Colors.DIVIDER, width=2)
+    for row in (1, 2):
+      y = int(round(self.content_y + row * self.row_h))
+      draw.line((self.content_x, y, self.camera_x - 1, y), fill=Colors.DIVIDER, width=1)
+      draw.line((self.right_aux_x, y, content_right, y), fill=Colors.DIVIDER, width=1)
+
+    return np.asarray(image, dtype=np.uint8).copy()
+
   def render(self, camera, models):
     # Fetch once so a stale-stream reset cannot clear the frame between a
     # separate has_frame() check and get_frame() call.
@@ -122,14 +138,14 @@ class ClusterRenderer:
     if has_camera:
       if camera_frame.shape[:2] == (self.camera_h, self.camera_w) and \
           hasattr(camera, "get_source_to_panel_transform"):
-        frame = self.blank_canvas.copy()
+        frame = self.base_canvas.copy()
         frame[self.camera_y:self.camera_y + self.camera_h,
               self.camera_x:self.camera_x + self.camera_w] = camera_frame
         self._source_to_panel = camera.get_source_to_panel_transform(self.camera_x, self.camera_y)
       else:
         frame = self._crop_and_resize(camera_frame)
     else:
-      frame = self.blank_canvas.copy()
+      frame = self.base_canvas.copy()
 
     model_valid, hud_data, path_data = models.get_render_data()
     if has_camera and model_valid:
@@ -164,7 +180,7 @@ class ClusterRenderer:
       [0.0, scale_y, self.camera_y - crop_y * scale_y],
       [0.0, 0.0, 1.0],
     ], dtype=np.float32)
-    canvas = self.blank_canvas.copy()
+    canvas = self.base_canvas.copy()
     canvas[self.camera_y:self.camera_y + self.camera_h,
            self.camera_x:self.camera_x + self.camera_w] = camera
     return canvas
@@ -493,18 +509,9 @@ class ClusterRenderer:
 
   def _draw_hud(self, image, data, has_camera):
     draw = ImageDraw.Draw(image)
-    content_right = self.content_x + self.content_w - 1
-    content_bottom = self.content_y + self.content_h - 1
-
-    # All HUD content stays inside the dedicated outer-border rectangle.
-    draw.rectangle([self.content_x, self.content_y, self.camera_x - 1, content_bottom], fill=Colors.PANEL)
-    draw.rectangle([self.right_aux_x, self.content_y, content_right, content_bottom], fill=Colors.PANEL)
-    for x in (self.left_aux_x, self.camera_x, self.right_aux_x, self.right_panel_x):
-      draw.line((x, self.content_y, x, content_bottom), fill=Colors.DIVIDER, width=2)
-    for row in (1, 2):
-      y = int(round(self.content_y + row * self.row_h))
-      draw.line((self.content_x, y, self.camera_x - 1, y), fill=Colors.DIVIDER, width=1)
-      draw.line((self.right_aux_x, y, content_right, y), fill=Colors.DIVIDER, width=1)
+    # The camera copy overwrites its left divider from the cached base canvas.
+    draw.line((self.camera_x, self.content_y, self.camera_x, self.content_y + self.content_h - 1),
+              fill=Colors.DIVIDER, width=2)
 
     self._draw_left_panel(image, draw, data, Colors.MUTED_TEXT)
     self._draw_left_aux_panel(image, draw, data, Colors.WHITE, Colors.RED)
