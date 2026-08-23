@@ -174,7 +174,7 @@ class LongitudinalPlanner:
     longitudinalPlan.allowBrake = True
     longitudinalPlan.allowThrottle = bool(self.allow_throttle)
 
-    longitudinalPlan.trafficState = self.mpc.trafficState.value
-    longitudinalPlan.xState = self.mpc.xState.value
+    longitudinalPlan.trafficState = self.mpc.traffic_controller.traffic_state.value
+    longitudinalPlan.xState = self.mpc.traffic_controller.x_state.value
 
     pm.send('longitudinalPlan', plan_send)

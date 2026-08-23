@@ -17,22 +17,9 @@ else:
 
 from casadi import SX, vertcat
 
-from openpilot.common.constants import UnitConverter
-from openpilot.common.filter_simple import StreamingMovingAverage
-from enum import Enum
-
-class XState(Enum):
-  lead = 0
-  cruise = 1
-  e2eCruise = 2
-  e2eStop = 3
-  e2ePrepare = 4
-  e2eStopped = 5
-
-class TrafficState(Enum):
-  off = 0
-  red = 1
-  green = 2
+from openpilot.selfdrive.addon.traffic_controller import (TrafficStopController, get_traffic_stop_accel_floor,
+                                                          get_traffic_stop_obstacle_distance,
+                                                          should_limit_traffic_stop_accel)
 
 MODEL_NAME = 'long'
 LONG_MPC_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -242,24 +229,10 @@ def gen_long_ocp():
 class LongitudinalMpc:
   def __init__(self, dt=DT_MDL):
     self.dt = dt
-
-    self.trafficState = TrafficState.off
-    self.xStopFilter = StreamingMovingAverage(3)
-    self.xStopFilter2 = StreamingMovingAverage(15)
-    self.vFilter = StreamingMovingAverage(10)
-    self.xState = XState.cruise
-    self.xStop = 0.0
-    self.stopping_count = 0
-    self.traffic_starting_count = 0
-    self.startSignCount = 0
-    self.stopSignCount = 0
-    self.adjusted_stop_dist = 0.0
-
-    self.conv = UnitConverter()
-
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
-    self.reset()
     self.source = LongitudinalPlanSource.cruise
+    self.traffic_controller = TrafficStopController(dt)
+    self.reset()
 
   def reset(self):
     self.solver.reset()
@@ -276,11 +249,7 @@ class LongitudinalMpc:
       self.solver.cost_set(i, "yref", self.yref[i])
     self.solver.cost_set(N, "yref", self.yref[N][:COST_E_DIM])
     self.params = np.zeros((N+1, PARAM_DIM))
-
-    self.xState = XState.cruise
-    self.startSignCount = 0
-    self.stopSignCount = 0
-    self.adjusted_stop_dist = 0.0
+    self.traffic_controller.reset()
 
     for i in range(N+1):
       self.solver.set(i, 'x', np.zeros(X_DIM))
@@ -372,10 +341,12 @@ class LongitudinalMpc:
     comfort_brake = COMFORT_BRAKE
     stop_distance = STOP_DISTANCE
 
-    stop_dist = self._update_carrot(sm)
+    traffic_stop_plan = self.traffic_controller.update(sm['carState'], sm['modelV2'], radarstate, COMFORT_BRAKE)
+    stop_dist = traffic_stop_plan.stop_distance
 
     adjust_dist = 1.0 if v_ego > 0.1 else -2.0
-    x2 = stop_dist * np.ones(N+1) + adjust_dist
+    traffic_stop_obstacle = get_traffic_stop_obstacle_distance(stop_dist, adjust_dist)
+    x2 = traffic_stop_obstacle * np.ones(N+1)
 
     x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, x2])
     self.source = MPC_SOURCES[np.argmin(x_obstacles[0])]
@@ -385,7 +356,11 @@ class LongitudinalMpc:
       self.solver.set(i, "yref", self.yref[i])
     self.solver.set(N, "yref", self.yref[N][:COST_E_DIM])
 
-    self.params[:,0] = ACCEL_MIN
+    accel_min = ACCEL_MIN
+    mpc_source = "e2e" if self.source == LongitudinalPlanSource.e2e else "lead"
+    if should_limit_traffic_stop_accel(traffic_stop_plan.signal_stop_active, mpc_source):
+      accel_min = max(ACCEL_MIN, get_traffic_stop_accel_floor(v_ego, traffic_stop_plan.raw_stop_distance, stop_distance))
+    self.params[:,0] = accel_min
     self.params[:,1] = ACCEL_MAX
     self.params[:,2] = np.min(x_obstacles, axis=1)
     self.params[:,3] = np.copy(self.a_prev)
@@ -426,115 +401,6 @@ class LongitudinalMpc:
         self.last_cloudlog_t = t
         cloudlog.warning(f"Long mpc reset, solution_status: {self.solution_status}")
       self.reset()
-
-  def _update_carrot(self, sm):
-    CS = sm['carState']
-    model = sm['modelV2']
-    radarstate = sm['radarState']
-
-    self.xStop = self._update_stop_dist(model.position.x[31])
-    filtered_stop_dist = self.xStop
-
-    lead = radarstate.leadOne.present
-    d_rel = radarstate.leadOne.dRel if lead else 1000
-
-    self._check_model_stopping(model.velocity.x, CS.vEgo, CS.aEgo, model.position.x[-1], model.position.y, d_rel)
-
-    if self.xState == XState.e2eStopped:
-      self.stopping_count = max(0, int(self.stopping_count) - 1)
-      if CS.gasPressed:
-        self.xState = XState.e2ePrepare
-      elif lead and (d_rel - filtered_stop_dist) < 2.0:
-        self.xState = XState.lead
-      elif self.stopping_count == 0 and self.trafficState == TrafficState.green and not CS.leftBlinker:
-        self.xState = XState.e2ePrepare
-
-    elif self.xState == XState.e2eStop:
-      self.stopping_count = 0
-      if CS.gasPressed:
-        self.xState = XState.e2eCruise
-        self.traffic_starting_count = 10.0 / DT_MDL
-      elif lead and (d_rel - filtered_stop_dist) < 2.0:
-        self.xState = XState.lead
-      elif self.trafficState == TrafficState.green:
-          self.xState = XState.e2eCruise
-      else:
-        self.trafficStopAdjustRatio = np.interp(self.conv.to_clu(CS.vEgo), [0, 100], [1.0, 0.7])
-        stop_dist = self.xStop * np.interp(self.xStop, [0, 100], [1.0, self.trafficStopAdjustRatio])
-        if stop_dist > 10.0:
-          self.adjusted_stop_dist = stop_dist
-        filtered_stop_dist = 0.0
-        if CS.vEgo < 0.3:
-          self.stopping_count = int(0.5 / DT_MDL)
-          self.xState = XState.e2eStopped
-
-    elif self.xState == XState.e2ePrepare:
-      if lead:
-        self.xState = XState.lead
-      elif self.conv.to_clu(CS.vEgo) < 5.0 and self.trafficState != TrafficState.green:
-        self.xState = XState.e2eStop
-        self.adjusted_stop_dist = 5.0
-      elif self.conv.to_clu(CS.vEgo) > 5.0:
-        self.xState = XState.e2eCruise
-    else: # XState.lead, XState.e2eCruise
-      self.traffic_starting_count = max(0, self.traffic_starting_count - 1)
-      if lead:
-        self.xState = XState.lead
-      elif self.trafficState == TrafficState.red and abs(CS.steeringAngleDeg) < 30 and self.traffic_starting_count == 0:
-        self.xState = XState.e2eStop
-        self.adjusted_stop_dist = self.xStop
-      else:
-        self.xState = XState.e2eCruise
-
-    if self.trafficState in [TrafficState.off, TrafficState.green] or self.xState not in [XState.e2eStop, XState.e2eStopped]:
-      filtered_stop_dist = 1000.0
-
-    self.adjusted_stop_dist = max(0, self.adjusted_stop_dist - (max(0, CS.vEgo) * DT_MDL))
-
-    if filtered_stop_dist == 1000.0: ##  e2eCruise, lead
-      self.adjusted_stop_dist = 0.0
-    elif self.adjusted_stop_dist > 0: ## e2eStop, e2eStopped
-      filtered_stop_dist = 0.0
-
-    stop_dist = filtered_stop_dist + self.adjusted_stop_dist
-    stop_dist = max(stop_dist, CS.vEgo ** 2 / (COMFORT_BRAKE * 2))
-
-    return stop_dist
-
-  def _update_stop_dist(self, stop_dist):
-    stop_dist = self.xStopFilter.process(stop_dist, median = True)
-    stop_dist = self.xStopFilter2.process(stop_dist)
-    return stop_dist
-
-  def _check_model_stopping(self, v, v_ego, a_ego, model_x, y, d_rel):
-    model_v = self.vFilter.process(v[-1])
-    start_sign = model_v > 5.0 or model_v > (v[0] + 2.0)
-
-    stop_sign = False
-    clu_v_ego = self.conv.to_clu(v_ego)
-
-    if clu_v_ego < 1.0:
-      stop_sign = model_x < 20.0 and model_v < 10.0
-    elif clu_v_ego < 82.0:
-      # Use dynamic thresholds for smoother stopping decisions
-      stop_distance_threshold = np.interp(v[0], [60 / 3.6, 80 / 3.6], [120.0, 150.0])
-      stop_sign = (model_x < d_rel - 3.0 and
-                   model_x < stop_distance_threshold and
-                  ((model_v < 3.0) or (model_v < v[0] * 0.7)) and
-                   abs(y[-1]) < 5.0)
-
-    # Increment counters with limits to prevent overflow and add hysteresis
-    self.stopSignCount = min(20, self.stopSignCount + 1) if stop_sign else max(0, self.stopSignCount - 2)
-    self.startSignCount = min(20, self.startSignCount + 1) if start_sign and not stop_sign else max(0, self.startSignCount - 2)
-
-    # Require a few frames of consistency before switching states (debouncing)
-    if self.stopSignCount > 3:  # approx 0.15s (assuming DT_MDL = 0.05)
-      self.trafficState = TrafficState.red
-    elif self.startSignCount > 5: # approx 0.25s
-      self.trafficState = TrafficState.green
-    elif self.stopSignCount == 0 and self.startSignCount == 0:
-      self.trafficState = TrafficState.off
-
 
 if __name__ == "__main__":
   ocp = gen_long_ocp()
