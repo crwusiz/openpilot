@@ -34,6 +34,26 @@ handle_error() {
 trap 'handle_error ${LINENO}' ERR
 trap 'log "ERROR" "User interrupted."; exit 130' INT TERM
 
+# progress spinner
+run_with_spinner() {
+  local message="$1"
+  shift
+  local spin='-\|/'
+  local i=0
+
+  "$@" > /dev/null 2>&1 &
+  local pid=$!
+
+  while kill -0 "$pid" 2>/dev/null; do
+    i=$(( (i + 1) % 4 ))
+    printf "\r    %s... %s" "$message" "${spin:$i:1}"
+    sleep 0.1
+  done
+
+  printf "\r\033[K"
+  wait "$pid"
+}
+
 # ==============================================================================
 # Core Functions
 # ==============================================================================
@@ -76,8 +96,6 @@ configure_git() {
   git config --local remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
   git config --local http.sslVerify false
   git config --local submodule.recurse true
-  # Keep receive-side allocations small on comma hardware (typically <2 GB RAM).
-  # A 500 MB postBuffer can make git fetch fail before any objects are received.
   git config --local http.postBuffer 16777216
   git config --local http.maxRequestBuffer 16777216
   git config --local pack.windowMemory 16m
@@ -96,16 +114,14 @@ update_repository() {
   branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "master")
   log "INFO" "Current branch: $branch - Starting update"
 
-  # 1. Fetch (Quietly to maintain log format)
+  # 1. Fetch
   log "INFO" "Fetching changes..."
-  # Fetch only the active branch. Fetching every remote branch and tags at once
-  # creates a very large pack and can exhaust the device during malloc().
   local fetch_refspec="+refs/heads/${branch}:refs/remotes/origin/${branch}"
-  if ! git -c pack.threads=1 -c pack.windowMemory=16m -c pack.packSizeLimit=32m \
+  if ! run_with_spinner "Fetching Git objects" git -c pack.threads=1 -c pack.windowMemory=16m -c pack.packSizeLimit=32m \
       fetch origin "$fetch_refspec" --prune --no-tags --quiet; then
     log "WARNING" "Fetch failed. Retrying..."
     sleep 3
-    if ! git -c pack.threads=1 -c pack.windowMemory=8m -c pack.packSizeLimit=16m \
+    if ! run_with_spinner "Retrying fetch" git -c pack.threads=1 -c pack.windowMemory=8m -c pack.packSizeLimit=16m \
         fetch origin "$fetch_refspec" --prune --no-tags --quiet; then
         log "ERROR" "Fetch failed. Check network."
         return 1
@@ -123,8 +139,9 @@ update_repository() {
     return 1
   fi
 
+  # 2. Main LFS Pull
   log "INFO" "Pulling LFS files..."
-  if ! GIT_LFS_FORCE_PROGRESS=1 git lfs pull; then
+  if ! run_with_spinner "Downloading LFS files" env GIT_LFS_FORCE_PROGRESS=0 git lfs pull; then
     log "ERROR" "LFS Pull failed. Please check network connection."
     return 1
   fi
@@ -152,9 +169,9 @@ update_submodules() {
     name=$(basename "$path")
     log "INFO" "Processing submodule: $name"
 
-    if git submodule update --init --force --jobs 4 "$path" > /dev/null 2>&1; then
+    if run_with_spinner "Updating $name" git submodule update --init --force --jobs 4 "$path"; then
 
-      GIT_LFS_FORCE_PROGRESS=1 git -C "$path" lfs pull || true
+      run_with_spinner "Downloading LFS for $name" env GIT_LFS_FORCE_PROGRESS=0 git -C "$path" lfs pull || true
 
       local sub_hash
       sub_hash=$(git -C "$path" rev-parse --short HEAD)
@@ -169,8 +186,8 @@ update_submodules() {
     else
       log "WARNING" "'$name': Update failed. Retrying with force init..."
       git submodule deinit -f "$path" > /dev/null 2>&1 || true
-      if git submodule update --init --force --jobs 4 "$path" > /dev/null 2>&1; then
-         GIT_LFS_FORCE_PROGRESS=1 git -C "$path" lfs pull || true
+      if run_with_spinner "Force updating $name" git submodule update --init --force --jobs 4 "$path"; then
+         run_with_spinner "Downloading LFS for $name" env GIT_LFS_FORCE_PROGRESS=0 git -C "$path" lfs pull || true
 
          local sub_hash_retry
          sub_hash_retry=$(git -C "$path" rev-parse --short HEAD)
@@ -189,8 +206,6 @@ update_submodules() {
 }
 
 cleanup_gone_branches() {
-  # update_repository already pruned the active branch; do not issue a second
-  # all-refs fetch here, which defeats the low-memory fetch strategy.
   local gone_branches
   gone_branches=$(git branch -vv | grep ': gone]' | awk '{print $1}' || true)
 
@@ -209,14 +224,12 @@ compare_and_restart() {
   local_time=$(date -d @"$(git show -s --format=%ct HEAD)" '+%Y-%m-%d %H:%M:%S')
   remote_time=$(date -d @"$(git show -s --format=%ct "@{u}")" '+%Y-%m-%d %H:%M:%S')
 
-  echo ""
-  echo -e " Local Commit: ($local_time) [ ${GREEN}${BOLD}$local_hash${NC} ]"
-  echo -e "Remote Commit: ($remote_time) [ ${GREEN}${BOLD}$remote_hash${NC} ]"
-  echo ""
+  log "INFO" "Verifying commit synchronization..."
+  log_detail "Local  Commit: ${GREEN}${BOLD}${local_hash}${NC} ($local_time)"
+  log_detail "Remote Commit: ${GREEN}${BOLD}${remote_hash}${NC} ($remote_time)"
 
   if [ "$local_hash" == "$remote_hash" ]; then
-    echo -e "Commit Compare [ ${GREEN}${BOLD}match${NC} ]"
-    echo ""
+    log "SUCCESS" "Commit synchronized: Match ($local_hash)"
 
     if [ -x "$RESTART_SCRIPT" ]; then
       log "SUCCESS" "Restarting system in background..."
@@ -229,8 +242,7 @@ compare_and_restart() {
       exit 1
     fi
   else
-    echo -e "Commit Compare [ ${RED}${BOLD}mismatch${NC} ]"
-    log "ERROR" "Hash mismatch. Update failed."
+    log "ERROR" "Commit mismatch detected (Local: $local_hash vs Remote: $remote_hash)"
     echo 1 > "$LOG_FILE"
     exit 1
   fi
