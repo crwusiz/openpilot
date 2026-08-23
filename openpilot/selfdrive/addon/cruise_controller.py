@@ -1,6 +1,5 @@
 import math
 import logging
-import random
 import time
 import numpy as np
 
@@ -10,7 +9,7 @@ from openpilot.common.constants import UnitConverter
 from openpilot.selfdrive.car.cruise import (V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_UNSET, V_CRUISE_INITIAL,
                                             V_CRUISE_INITIAL_EXPERIMENTAL_MODE,
                                             CRUISE_LONG_PRESS, IMPERIAL_INCREMENT)
-from opendbc.car.hyundai.values import Buttons, HyundaiFlags
+from opendbc.car.hyundai.values import Buttons
 from openpilot.selfdrive.addon.navi_controller import SpeedLimiter
 
 """
@@ -53,6 +52,8 @@ STEER_DECEL_MIN_SPEED_CLU = 20.0
 
 CRUISE_DEBUG_LOG = "/data/cruise_debug.log"
 CRUISE_DEBUG_INTERVAL = 0.5
+
+BUTTON_SPAM_TICKS = 20
 
 
 def _setup_debug_logger():
@@ -205,15 +206,9 @@ class CruiseController:
     self.prev_model_mono_time = 0
     self.cached_curve_speed_ms: float | None = None
 
-    self.wait_timer = 0
-    self.alive_timer = 0
-    self.alive_index = 0
-    self.wait_index = 0
-    self.alive_count = 0
-    self.wait_count_list = [16] if CP.flags & HyundaiFlags.CANFD else [16, 20]
-    self.alive_count_list = [20] if CP.flags & HyundaiFlags.CANFD else [12, 14, 16, 18]
-    random.shuffle(self.wait_count_list)
-    random.shuffle(self.alive_count_list)
+    self.button_spam_wait_timer = 0
+    self.button_spam_count = 0
+    self.button_spam_start_speed_clu: int | None = None
 
     self._debug_last_time = 0.
     self._debug_last_state = None
@@ -224,20 +219,11 @@ class CruiseController:
       self.min_set_speed_clu, self.max_set_speed_clu,
     )
 
-  def _get_alive_count(self):
-    count = self.alive_count_list[self.alive_index]
-    self.alive_index = (self.alive_index + 1) % len(self.alive_count_list)
-    return count
-
-  def _get_wait_count(self):
-    count = self.wait_count_list[self.wait_index]
-    self.wait_index = (self.wait_index + 1) % len(self.wait_count_list)
-    return count
-
   def reset(self):
     self.btn = Buttons.NONE
-    self.wait_timer = 0
-    self.alive_timer = 0
+    self.button_spam_wait_timer = 0
+    self.button_spam_count = 0
+    self.button_spam_start_speed_clu = None
     self.override_speed_clu = 0.
     self.apply_limit_speed_clu = 0.
     self.curve_speed_clu = 0.
@@ -255,6 +241,12 @@ class CruiseController:
     self.cruise_just_enabled = False
     self.gas_override_active = False
     self.limit_speed_updated = False
+
+  def _finish_button_spam(self):
+    self.btn = Buttons.NONE
+    self.button_spam_count = 0
+    self.button_spam_wait_timer = BUTTON_SPAM_TICKS
+    self.button_spam_start_speed_clu = None
 
   def _reset_section_state(self):
     self.prev_section_active = False
@@ -950,24 +942,34 @@ class CruiseController:
     if not self.CP.openpilotLongitudinalControl:
       if not ascc_enabled or btn_pressed:
         self.reset()
-        self.wait_timer = max(self.alive_count_list) + max(self.wait_count_list)
+        self.button_spam_wait_timer = BUTTON_SPAM_TICKS * 2
         return
 
     if not ascc_enabled:
       self.reset()
 
-    if self.wait_timer > 0:
-      self.wait_timer -= 1
+    if self.button_spam_wait_timer > 0:
+      self.button_spam_wait_timer -= 1
     elif ascc_enabled and CS.vEgo > 0.1:
-      if self.alive_timer == 0:
-        current_set_speed_clu = round(self.conv.to_clu(CS.cruiseState.speed))
+      current_set_speed_clu = round(self.conv.to_clu(CS.cruiseState.speed))
+
+      if self.button_spam_count > 0 and current_set_speed_clu != self.button_spam_start_speed_clu:
+        cruise_log.debug(
+          "BUTTON_SPAM_ACK type=%s speed=%d->%d sent=%d wait=%d",
+          getattr(self.btn, 'name', str(self.btn)), self.button_spam_start_speed_clu,
+          current_set_speed_clu, self.button_spam_count, BUTTON_SPAM_TICKS,
+        )
+        self._finish_button_spam()
+        return
+
+      if self.button_spam_count == 0:
         self.btn = self._get_button_to_adjust_speed(current_set_speed_clu)
-        self.alive_count = self._get_alive_count()
         if self.btn != Buttons.NONE:
+          self.button_spam_start_speed_clu = current_set_speed_clu
           cruise_log.debug(
-            "BUTTON_SPAM type=%s current=%.1f target=%.1f alive=%d wait_next=%d",
+            "BUTTON_SPAM type=%s current=%d target=%.1f max=%d wait=%d",
             getattr(self.btn, 'name', str(self.btn)), current_set_speed_clu,
-            self.override_speed_clu, self.alive_count, self.wait_count_list[self.wait_index],
+            self.override_speed_clu, BUTTON_SPAM_TICKS, BUTTON_SPAM_TICKS,
           )
 
       if self.btn != Buttons.NONE:
@@ -975,11 +977,9 @@ class CruiseController:
         if can is not None:
           can_sends.append(can)
 
-        self.alive_timer += 1
-        if self.alive_timer >= self.alive_count:
-          self.alive_timer = 0
-          self.wait_timer = self._get_wait_count()
-          self.btn = Buttons.NONE
+        self.button_spam_count += 1
+        if self.button_spam_count >= BUTTON_SPAM_TICKS:
+          self._finish_button_spam()
       elif self.CP.openpilotLongitudinalControl and self.override_speed_clu >= V_CRUISE_INITIAL:
         self.override_speed_clu = 0.
     elif self.CP.openpilotLongitudinalControl:
