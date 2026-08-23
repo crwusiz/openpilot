@@ -55,7 +55,6 @@ class ClusterModels:
     self.tpms = [0.0, 0.0, 0.0, 0.0]
     self.distance_level = 1
     self.traffic_state = 0
-    self.road_signs = 0
     self.nda_state = 0
     self.stock_limit_speed = 0.0
     self.nav_limit_speed = 0.0
@@ -66,9 +65,12 @@ class ClusterModels:
     self.cam_type = 0
     self.speed_camera = False
     self.school_zone = False
+    self._stock_school_zone = False
     self._navi_school_zone = False
     self._navi_last_road_name = ""
     self.speed_bump = False
+    self._stock_speed_bump = False
+    self._navi_speed_bump = False
     self.ignore_limit_timer = 0.0
     self._state_lock = threading.RLock()
 
@@ -126,12 +128,13 @@ class ClusterModels:
       self.set_speed = getattr(cs, 'vCruise', self.cruise_speed)
       self.is_cruise_set = 0 < self.cruise_speed < 255
       self.stock_limit_speed = getattr(cs, 'speedLimit', 0.0)
+      self._stock_school_zone = bool(cs.schoolZoneActive)
+      self._stock_speed_bump = cs.speedBumpDistance > 0
+      self._refresh_stock_road_events()
       if hasattr(cs, 'exState'):
         ex = cs.exState
         if hasattr(ex, 'tpms'):
           self.tpms = [ex.tpms.fl, ex.tpms.fr, ex.tpms.rl, ex.tpms.rr]
-        self.road_signs = getattr(ex, 'roadSigns', self.road_signs)
-        self._refresh_school_zone()
         self.ignore_limit_timer = getattr(ex, 'ignoreLimitTimer', self.ignore_limit_timer)
 
     if self.sm.updated['selfdriveState']:
@@ -186,9 +189,10 @@ class ClusterModels:
       self.section_left_dist = getattr(navi_data, 'sectionLeftDist', 0.0)
       in_camera_zone = self.cam_limit_speed > 0 and self.cam_limit_speed_left_dist > 0
       in_section_zone = self.section_limit_speed > 0 and self.section_left_dist > 0
-      self.speed_bump = self.cam_type == 22 and in_camera_zone
-      self.speed_camera = (in_camera_zone or in_section_zone) and not self.speed_bump
+      self._navi_speed_bump = self.cam_type == 22 and in_camera_zone
+      self.speed_camera = (in_camera_zone or in_section_zone) and not self._navi_speed_bump
       self._update_navi_school_zone(navi_data)
+      self._refresh_speed_bump()
 
     if self.sm.updated['longitudinalPlan']:
       longitudinal_plan = self.sm['longitudinalPlan']
@@ -271,9 +275,16 @@ class ClusterModels:
 
   def _refresh_school_zone(self):
     # CruiseController uses NDA state exclusively while NDA is active. Mirror
-    # that precedence here so a stale stock roadSigns value cannot replace a
+    # that precedence here so a stale stock value cannot replace a
     # speed-bump/camera icon with the school-zone icon.
-    self.school_zone = self._navi_school_zone if self.nda_state > 0 else self.road_signs == 1
+    self.school_zone = self._navi_school_zone if self.nda_state > 0 else self._stock_school_zone
+
+  def _refresh_speed_bump(self):
+    self.speed_bump = self._navi_speed_bump if self.nda_state > 0 else self._stock_speed_bump
+
+  def _refresh_stock_road_events(self):
+    self._refresh_school_zone()
+    self._refresh_speed_bump()
 
   def _update_loop(self):
     while self._running:
@@ -327,7 +338,6 @@ class ClusterModels:
       "tpms": self.tpms,
       "distance_level": self.distance_level,
       "traffic_state": self.traffic_state,
-      "road_signs": self.road_signs,
       "nda_state": self.nda_state,
       "stock_limit_speed": self.stock_limit_speed,
       "nav_limit_speed": self.nav_limit_speed,

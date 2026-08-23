@@ -340,7 +340,6 @@ class CruiseController:
 
     road_limit_speed_nda = speed_limiter.get_road_limit_speed()
     road_limit_speed_stock = CS.exState.navLimitSpeed
-    road_signs = CS.exState.roadSigns
     is_limit_zone = False
     lead = sm['radarState'].leadOne
 
@@ -351,7 +350,7 @@ class CruiseController:
       is_school_zone = speed_limiter.get_in_school_zone()
       camera_limit_speed_clu = section_limit_speed if section_active else camera_limit_speed
     else:
-      is_school_zone = road_signs == 1
+      is_school_zone = CS.schoolZoneActive
       if CS.speedLimit > 0 and CS.speedLimitDistance > 0:
         camera_limit_speed_clu, is_limit_zone = speed_limiter.get_camera_limit_speed_stock(CS, cluster_speed_clu)
 
@@ -892,7 +891,7 @@ class CruiseController:
     actual_limit = button_limit if enforcement_limit else (
       self.prev_road_limit_speed if button_limit > 0 and button_limit == self.prev_road_limit_speed else 0.
     )
-    is_school_zone = speed_limiter.get_in_school_zone() if nda_active else CS.exState.roadSigns == 1
+    is_school_zone = speed_limiter.get_in_school_zone() if nda_active else CS.schoolZoneActive
 
     if enabled:
       if btn != Buttons.NONE:
@@ -1060,7 +1059,7 @@ class CruiseStateManager:
     speed_limiter.recv()
     nda_active = bool(speed_limiter.get_active())
     button_limit, enforcement_limit = _get_button_limit(speed_limiter, CS)
-    is_school_zone = speed_limiter.get_in_school_zone() if nda_active else CS.exState.roadSigns == 1
+    is_school_zone = speed_limiter.get_in_school_zone() if nda_active else CS.schoolZoneActive
 
     v_cruise_delta = 10 if self.conv.is_metric else IMPERIAL_INCREMENT * 5
     v_cruise_kph = int(round(self.conv.to_clu(self.speed_ms)))

@@ -123,7 +123,8 @@ class HudRenderer(Widget):
     self.cam_limit_speed_left_dist: float = 0.0
     self.section_limit_speed: float = 0.0
     self.section_left_dist: float = 0.0
-    self.road_signs: int = 0
+    self.school_zone_active: bool = False
+    self.speed_bump_distance: float = 0.0
     self.nda_state: int = 0
     self.traffic_state: int = 0
 
@@ -291,9 +292,10 @@ class HudRenderer(Widget):
         self.rl = tpms.rl
         self.rr = tpms.rr
       self.nav_limit_speed = ex_state.navLimitSpeed if hasattr(ex_state, 'navLimitSpeed') else 0
-      self.road_signs = ex_state.roadSigns if hasattr(ex_state, 'roadSigns') else 0
 
     self.stock_limit_speed = car_state.speedLimit if hasattr(car_state, 'speedLimit') else 0
+    self.school_zone_active = bool(car_state.schoolZoneActive)
+    self.speed_bump_distance = car_state.speedBumpDistance
 
     if device_state:
       self.wifi_state = device_state.networkStrength
@@ -643,7 +645,14 @@ class HudRenderer(Widget):
     sign_x = traffic_x + 250
     sign_y = traffic_center_y - sign_h / 2
 
-    if self.road_signs == 1:
+    if self.speed_bump_distance > 0:
+      rl.draw_texture_pro(
+        self.speed_bump_img,
+        rl.Rectangle(0, 0, sign_w, sign_h),
+        rl.Rectangle(sign_x, sign_y, sign_w, sign_h),
+        rl.Vector2(0, 0), 0, Colors.WHITE
+      )
+    elif self.school_zone_active:
       rl.draw_texture_pro(
         self.school_zone_img,
         rl.Rectangle(0, 0, sign_w, sign_h),
