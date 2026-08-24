@@ -280,19 +280,23 @@ class ClusterRenderer:
     local_polygon = polygon - np.array([x0, y0], dtype=np.int32)
     denominator = max(image.shape[0] - 1, 1)
     color_array = np.asarray(colors, dtype=np.float32)
+    mask = np.zeros(roi.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(mask, [local_polygon], 255)
+    if not cv2.countNonZero(mask):
+      return
 
     # The former full-resolution float alpha buffer allocated several large
     # arrays for every frame and dominated render time on-device. Eight bands
     # retain the low-alpha visual gradient while keeping blending in OpenCV and
-    # bounding temporary memory to one small band.
+    # bounding temporary memory to one small band. Build the polygon mask once;
+    # recreating and rasterizing it for every band dominated the engaged render
+    # path on-device.
     band_height = max(1, (roi.shape[0] + GRADIENT_BANDS - 1) // GRADIENT_BANDS)
     for band_y0 in range(0, roi.shape[0], band_height):
       band_y1 = min(band_y0 + band_height, roi.shape[0])
       band = roi[band_y0:band_y1]
-      band_polygon = local_polygon - np.array([0, band_y0], dtype=np.int32)
-      mask = np.zeros(band.shape[:2], dtype=np.uint8)
-      cv2.fillPoly(mask, [band_polygon], 255)
-      if not cv2.countNonZero(mask):
+      band_mask = mask[band_y0:band_y1]
+      if not cv2.countNonZero(band_mask):
         continue
 
       midpoint_y = y0 + (band_y0 + band_y1 - 1) * 0.5
@@ -302,7 +306,7 @@ class ClusterRenderer:
       if alpha <= 0.0:
         continue
       blended = cv2.addWeighted(np.full_like(band, color[:3]), alpha, band, 1.0 - alpha, 0)
-      cv2.copyTo(blended, mask, band)
+      cv2.copyTo(blended, band_mask, band)
 
   def _draw_model_path(self, frame, path_data, hud_data):
     if not path_data["path_x"]:

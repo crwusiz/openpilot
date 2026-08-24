@@ -3,11 +3,11 @@ from pathlib import Path
 
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
-from openpilot.selfdrive.addon.cluster.cluster_logging import LOG_FILE  # re-export for compatibility
 
 USB_TIMEOUT_MS = 2500
 USB_IMAGE_TIMEOUT_MS = 1000
 USB_TARGET_FPS = 20
+CLUSTER_STATUS_INTERVAL_SECONDS = 10
 USB_CLEAR_HALT_ON_TIMEOUT = True
 USB_MAX_CONSECUTIVE_FAILURES = 3
 USB_JPEG_QUALITY = 68
@@ -72,6 +72,7 @@ class ClusterConfig:
     # Road camera and model data are published at 20 Hz on-device.
     self.fps = USB_TARGET_FPS
     self.usb_fps = USB_TARGET_FPS
+    self.status_interval_frames = self.fps * CLUSTER_STATUS_INTERVAL_SECONDS
     # carrot-pilot's field-tested JPEG default. This improves camera detail
     # over quality 60 without materially increasing encode time or USB load.
     self.usb_jpeg_quality = USB_JPEG_QUALITY
@@ -98,8 +99,9 @@ class ClusterConfig:
 
     self.speed_unit = "km/h" if self.is_metric else "mph"
 
-    cloudlog.info(f"Cluster Config Loaded: {self.width}x{self.height} @ {self.fps}fps, "
-                  f"Unit: {self.speed_unit}, Rotate 180: {self.rotate_180}")
+    cloudlog.info(
+      f"Cluster Config Loaded: {self.width}x{self.height} @ {self.fps}fps, Unit: {self.speed_unit}, Rotate 180: {self.rotate_180}",
+    )
 
   def refresh(self):
     rotate_180 = self.params.get_bool("ClusterRotate")

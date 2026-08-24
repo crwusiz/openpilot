@@ -47,6 +47,7 @@ class TuringUsbDisplay:
     self._perf_frames = 0
     self._perf_prepare_time = 0.0
     self._perf_usb_time = 0.0
+    self._perf_size_kb = 0
 
     self._find_usb_device = None
     self._send_jpeg = None
@@ -135,8 +136,7 @@ class TuringUsbDisplay:
           # this command the panel keeps its previous/default (often dim) level.
           brightness = round(TURZX_BRIGHTNESS_PERCENT * 102 / 100)
           resp = send_brightness_command(self.device, brightness)
-          flog(f"[CLUSTER_USB] Brightness set to {TURZX_BRIGHTNESS_PERCENT}%: "
-               f"ok={self._resp_ok(resp)}")
+          flog(f"[CLUSTER_USB] Brightness set to {TURZX_BRIGHTNESS_PERCENT}%: ok={self._resp_ok(resp)}")
           time.sleep(0.1)
 
           resp = send_frame_rate_command(self.device, self.config.usb_fps)
@@ -222,8 +222,10 @@ class TuringUsbDisplay:
 
       if not self._resp_ok(response):
         self.consecutive_upload_failures += 1
-        flog(f"[CLUSTER_USB_WARN] JPEG upload was not acknowledged "
-             f"({self.consecutive_upload_failures}/{self.max_consecutive_upload_failures}); skipping frame.")
+        flog(
+          f"[CLUSTER_USB_WARN] JPEG upload was not acknowledged ({self.consecutive_upload_failures}/"
+          + f"{self.max_consecutive_upload_failures}); skipping frame.",
+        )
         # A single stale/late response is recoverable. Reconnecting on every
         # miss causes an endless reset loop and makes recovery impossible.
         if self.consecutive_upload_failures >= self.max_consecutive_upload_failures:
@@ -241,27 +243,33 @@ class TuringUsbDisplay:
       self._perf_frames += 1
       self._perf_prepare_time += prepared.prepare_elapsed
       self._perf_usb_time += elapsed
-      # Avoid 20 synchronous file opens/writes during startup. Periodic
-      # telemetry remains sufficient for diagnosing throughput and stalls.
-      if self.frame_count == 1 or self.frame_count % self.config.fps == 0:
-        flog(f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {prepared.size_kb} KB | "
-             f"elapsed={elapsed:.3f}s | prep={prepared.prepare_elapsed * 1000:.1f}ms (ACK received)")
+      self._perf_size_kb += prepared.size_kb
+      if self.frame_count == 1:
+        flog(
+          f"[CLUSTER_USB_TX] frame#{self.frame_count} | Size: {prepared.size_kb} KB | elapsed={elapsed:.3f}s | "
+          + f"prep={prepared.prepare_elapsed * 1000:.1f}ms (ACK received)",
+        )
 
-      if self._perf_frames >= self.config.fps * 10:
+      perf_interval_frames = max(1, int(getattr(self.config, "status_interval_frames", self.config.fps * 10)))
+      if self._perf_frames >= perf_interval_frames:
         perf_elapsed = max(now - self._perf_started, 1e-6)
-        flog(f"[CLUSTER_USB_PERF] fps={self._perf_frames / perf_elapsed:.2f} | "
-             f"prep_avg={self._perf_prepare_time * 1000 / self._perf_frames:.1f}ms | "
-             f"usb_avg={self._perf_usb_time * 1000 / self._perf_frames:.1f}ms")
+        flog(
+          f"[CLUSTER_USB_PERF] fps={self._perf_frames / perf_elapsed:.2f} | "
+          + f"size_avg={self._perf_size_kb / self._perf_frames:.1f}KB | "
+          + f"prep_avg={self._perf_prepare_time * 1000 / self._perf_frames:.1f}ms | "
+          + f"usb_avg={self._perf_usb_time * 1000 / self._perf_frames:.1f}ms",
+        )
         self._perf_started = now
         self._perf_frames = 0
         self._perf_prepare_time = 0.0
         self._perf_usb_time = 0.0
+        self._perf_size_kb = 0
 
       return True
 
     except usb.core.USBError as e:
       if e.errno == 110 or 'timed out' in str(e).lower():
-        flog(f"[CLUSTER_USB_WARN] Write timeout (Errno 110). Clearing halt & skipping frame...")
+        flog("[CLUSTER_USB_WARN] Write timeout (Errno 110). Clearing halt & skipping frame...")
         if getattr(self.config, "usb_clear_halt_on_timeout", True):
           try:
             if self._ep_out and self.device:

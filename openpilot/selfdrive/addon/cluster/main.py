@@ -6,7 +6,7 @@ import numpy as np
 from openpilot.common.swaglog import cloudlog
 
 from openpilot.selfdrive.addon.cluster.cluster_config import ClusterConfig
-from openpilot.selfdrive.addon.cluster.cluster_logging import flog, initialize_log
+from openpilot.selfdrive.addon.cluster.cluster_logging import close_log, flog, initialize_log
 from openpilot.selfdrive.addon.cluster.cluster_usb_display import TuringUsbDisplay
 from openpilot.selfdrive.addon.cluster.cluster_usb_pipeline import ClusterUsbPipeline
 from openpilot.selfdrive.addon.cluster.cluster_live_camera import ClusterLiveCamera
@@ -31,6 +31,7 @@ def cluster_main():
   renderer = ClusterRenderer(config)
 
   fps = getattr(config, 'fps', 20)
+  status_interval_frames = max(1, int(getattr(config, 'status_interval_frames', fps * 10)))
   def _stop_signal(signum, _frame):
     flog(f"[CLUSTER_MAIN] Stop signal received: {signum}")
     raise KeyboardInterrupt
@@ -61,18 +62,22 @@ def cluster_main():
       perf_frames += 1
       if loop_count % fps == 0:
         config.refresh()
+
+      if loop_count % status_interval_frames == 0:
         stats = pipeline.get_stats()
         flog(
           f"[CLUSTER_HEARTBEAT] Loop: {loop_count} | Camera Ready: {camera.has_frame()} | "
-          f"USB Connected: {display.connected} | Sent: {stats['sent']} | "
-          f"Dropped: raw={stats['dropped_raw']}, encoded={stats['dropped_prepared']} | "
-          f"Send failures: {stats['send_failures']}")
+          + f"USB Connected: {display.connected} | Sent: {stats['sent']} | "
+          + f"Dropped: raw={stats['dropped_raw']}, encoded={stats['dropped_prepared']} | "
+          + f"Send failures: {stats['send_failures']}",
+        )
 
       if perf_frames >= fps * 10:
         now = time.monotonic()
         elapsed = max(now - perf_started, 1e-6)
-        flog(f"[CLUSTER_MAIN_PERF] fps={perf_frames / elapsed:.2f} | "
-             f"render_avg={perf_render_time * 1000 / perf_frames:.1f}ms")
+        flog(
+          f"[CLUSTER_MAIN_PERF] fps={perf_frames / elapsed:.2f} | render_avg={perf_render_time * 1000 / perf_frames:.1f}ms",
+        )
         perf_started = now
         perf_render_time = 0.0
         perf_frames = 0
@@ -90,8 +95,12 @@ def cluster_main():
           display.send_image(np.zeros((config.height, config.width, 3), dtype=np.uint8))
       except Exception as e:
         flog(f"[CLUSTER_MAIN] Failed to clear display: {e}")
-      if hasattr(display, 'close'): display.close()
+      if hasattr(display, 'close'):
+        display.close()
     else:
       flog("[CLUSTER_MAIN] Skipping display cleanup while USB worker is still active.")
-    if hasattr(camera, 'close'): camera.close()
-    if hasattr(models, 'close'): models.close()
+    if hasattr(camera, 'close'):
+      camera.close()
+    if hasattr(models, 'close'):
+      models.close()
+    close_log()

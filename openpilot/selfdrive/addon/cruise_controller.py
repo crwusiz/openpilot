@@ -51,7 +51,8 @@ STEER_DECEL_ACTIVATION_DELTA_DEG = 5.0
 STEER_DECEL_MIN_SPEED_CLU = 20.0
 
 CRUISE_DEBUG_LOG = "/data/cruise_debug.log"
-CRUISE_DEBUG_INTERVAL = 0.5
+CRUISE_DEBUG_INTERVAL = 2.0
+LIMIT_SPEED_ABS_TOL = 0.05
 
 BUTTON_SPAM_TICKS = 20
 
@@ -259,11 +260,19 @@ class CruiseController:
                       [1.30, 1.10])
     return road_limit_speed * ratio
 
-  def _set_limit_speed(self, target_speed: float):
+  @staticmethod
+  def _same_limit_speed(first: float, second: float) -> bool:
+    return math.isclose(float(first), float(second), rel_tol=0.0, abs_tol=LIMIT_SPEED_ABS_TOL)
+
+  def _set_limit_speed(self, target_speed: float) -> bool:
+    if self._same_limit_speed(self.requested_speed_clu, target_speed):
+      return False
+
     self.requested_speed_clu = target_speed
     self.limit_speed_updated = True
     if CruiseStateManager.instance().cruise_state_control:
       CruiseStateManager.instance().speed_ms = self.conv.to_ms(target_speed)
+    return True
 
   @staticmethod
   def _debug_speed(value) -> str:
@@ -370,14 +379,15 @@ class CruiseController:
     # 2. Track the observed road limit even while camera/section/protection-zone
     # targets own the applied speed. This prevents a stale road limit when an
     # enforcement zone ends.
+    camera_target_active = 0 < camera_limit_speed_clu < NO_ACTIVE_LIMIT
     road_limit_speed = None
     road_limit_applies = False
     if nda_active and road_limit_speed_nda > 0:
       road_limit_speed = road_limit_speed_nda
-      road_limit_applies = not nda_camera_active and not is_school_zone
+      road_limit_applies = not camera_target_active and not is_school_zone
     elif not nda_active and road_limit_speed_stock > 0:
       road_limit_speed = road_limit_speed_stock
-      road_limit_applies = not is_school_zone
+      road_limit_applies = not camera_target_active and not is_school_zone
 
     road_limit_changed = False
     if road_limit_speed is not None:
@@ -419,7 +429,6 @@ class CruiseController:
     # A confirmed road limit can be hidden temporarily by an active camera,
     # section, or school-zone target. Remember it so the road target is
     # restored once that restriction releases ownership of the requested SET.
-    camera_target_active = 0 < camera_limit_speed_clu < NO_ACTIVE_LIMIT
     road_target_suspended = section_active or is_school_zone or camera_target_active
     if road_limit_ready and not road_limit_applies and road_target_suspended:
       self.pending_road_restore = True
@@ -455,7 +464,8 @@ class CruiseController:
         self.ignore_road_limit_temporarily = False
         self.ignore_limit_timer = 0
 
-        if restore_limit_speed_clu != NO_ACTIVE_LIMIT and requested_speed_clu != restore_limit_speed_clu:
+        if restore_limit_speed_clu != NO_ACTIVE_LIMIT and \
+           not self._same_limit_speed(requested_speed_clu, restore_limit_speed_clu):
           self._set_limit_speed(restore_limit_speed_clu)
           self.pending_road_restore = False
         elif road_limit_ready and restore_limit_speed_clu == NO_ACTIVE_LIMIT:
@@ -465,7 +475,7 @@ class CruiseController:
 
     if self.pending_road_restore and road_limit_applies and \
        road_limit_target_clu != NO_ACTIVE_LIMIT and not self.ignore_road_limit_temporarily:
-      if requested_speed_clu != road_limit_target_clu:
+      if not self._same_limit_speed(requested_speed_clu, road_limit_target_clu):
         cruise_log.info(
           "ROAD_RESTORE road=%.1f target=%.1f requested=%.1f ego=%.1f",
           road_limit_speed, road_limit_target_clu, requested_speed_clu, cluster_speed_clu,
