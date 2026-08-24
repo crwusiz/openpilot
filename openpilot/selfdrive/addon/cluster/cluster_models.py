@@ -5,6 +5,7 @@ import numpy as np
 
 from openpilot.cereal import log, messaging
 from opendbc.car import structs
+from openpilot.common.constants import UnitConverter
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
 from openpilot.common.transformations.camera import DEVICE_CAMERAS, view_frame_from_device_frame
@@ -57,6 +58,8 @@ class ClusterModels:
     self.traffic_state = 0
     self.nda_state = 0
     self.stock_limit_speed = 0.0
+    self.stock_limit_speed_left_dist = 0.0
+    self.stock_road_limit_speed = 0.0
     self.nav_limit_speed = 0.0
     self.cam_limit_speed = 0.0
     self.cam_limit_speed_left_dist = 0.0
@@ -64,6 +67,8 @@ class ClusterModels:
     self.section_left_dist = 0.0
     self.cam_type = 0
     self.speed_camera = False
+    self._stock_speed_camera = False
+    self._navi_speed_camera = False
     self.school_zone = False
     self._stock_school_zone = False
     self._navi_school_zone = False
@@ -73,6 +78,7 @@ class ClusterModels:
     self._navi_speed_bump = False
     self.ignore_limit_timer = 0.0
     self._state_lock = threading.RLock()
+    self.conv = UnitConverter()
 
     try:
       personality = min(max(int(Params().get("LongitudinalPersonality") or 0), 0), 3)
@@ -127,14 +133,27 @@ class ClusterModels:
       self.cruise_speed = cluster_speed if cluster_speed > 0 else fallback_speed
       self.set_speed = getattr(cs, 'vCruise', self.cruise_speed)
       self.is_cruise_set = 0 < self.cruise_speed < 255
-      self.stock_limit_speed = getattr(cs, 'speedLimit', 0.0)
+      vehicle_navi_active = bool(getattr(cs, 'vehicleNaviActive', False))
+      vehicle_navi_section_active = bool(getattr(cs, 'vehicleNaviSectionActive', False))
+      vehicle_navi_speed_kph = float(getattr(cs, 'vehicleNaviSpeed', 0.0) or 0.0)
+      vehicle_navi_speed_clu = self.conv.to_current_unit(vehicle_navi_speed_kph) \
+        if vehicle_navi_speed_kph > 0 else 0.0
+      stock_camera_active = bool(cs.speedLimit > 0 and cs.speedLimitDistance > 0)
+      self.stock_limit_speed = vehicle_navi_speed_clu \
+        if vehicle_navi_active and vehicle_navi_speed_clu > 0 else float(cs.speedLimit or 0.0)
+      self.stock_limit_speed_left_dist = float(cs.speedLimitDistance) if stock_camera_active else 0.0
       self._stock_school_zone = bool(cs.schoolZoneActive)
       self._stock_speed_bump = cs.speedBumpDistance > 0
+      self._stock_speed_camera = bool(
+        (stock_camera_active or (vehicle_navi_active and vehicle_navi_section_active)) and
+        not self._stock_school_zone and not self._stock_speed_bump
+      )
       self._refresh_stock_road_events()
       if hasattr(cs, 'exState'):
         ex = cs.exState
         if hasattr(ex, 'tpms'):
           self.tpms = [ex.tpms.fl, ex.tpms.fr, ex.tpms.rl, ex.tpms.rr]
+        self.stock_road_limit_speed = float(getattr(ex, 'navLimitSpeed', 0.0) or 0.0)
         self.ignore_limit_timer = getattr(ex, 'ignoreLimitTimer', self.ignore_limit_timer)
 
     if self.sm.updated['selfdriveState']:
@@ -190,9 +209,9 @@ class ClusterModels:
       in_camera_zone = self.cam_limit_speed > 0 and self.cam_limit_speed_left_dist > 0
       in_section_zone = self.section_limit_speed > 0 and self.section_left_dist > 0
       self._navi_speed_bump = self.cam_type == 22 and in_camera_zone
-      self.speed_camera = (in_camera_zone or in_section_zone) and not self._navi_speed_bump
+      self._navi_speed_camera = (in_camera_zone or in_section_zone) and not self._navi_speed_bump
       self._update_navi_school_zone(navi_data)
-      self._refresh_speed_bump()
+      self._refresh_stock_road_events()
 
     if self.sm.updated['longitudinalPlan']:
       longitudinal_plan = self.sm['longitudinalPlan']
@@ -282,9 +301,13 @@ class ClusterModels:
   def _refresh_speed_bump(self):
     self.speed_bump = self._navi_speed_bump if self.nda_state > 0 else self._stock_speed_bump
 
+  def _refresh_speed_camera(self):
+    self.speed_camera = self._navi_speed_camera if self.nda_state > 0 else self._stock_speed_camera
+
   def _refresh_stock_road_events(self):
     self._refresh_school_zone()
     self._refresh_speed_bump()
+    self._refresh_speed_camera()
 
   def _update_loop(self):
     while self._running:
@@ -340,6 +363,8 @@ class ClusterModels:
       "traffic_state": self.traffic_state,
       "nda_state": self.nda_state,
       "stock_limit_speed": self.stock_limit_speed,
+      "stock_limit_speed_left_dist": self.stock_limit_speed_left_dist,
+      "stock_road_limit_speed": self.stock_road_limit_speed,
       "nav_limit_speed": self.nav_limit_speed,
       "cam_limit_speed": self.cam_limit_speed,
       "cam_limit_speed_left_dist": self.cam_limit_speed_left_dist,

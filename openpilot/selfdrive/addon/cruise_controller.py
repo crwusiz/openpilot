@@ -81,6 +81,26 @@ def _setup_debug_logger():
 cruise_log = _setup_debug_logger()
 
 
+def _get_stock_button_limit(CS, conv):
+  vehicle_navi_active = bool(getattr(CS, 'vehicleNaviActive', False))
+  vehicle_navi_section_active = bool(getattr(CS, 'vehicleNaviSectionActive', False))
+  vehicle_navi_speed_kph = float(getattr(CS, 'vehicleNaviSpeed', 0.) or 0.)
+  vehicle_navi_speed_clu = conv.to_current_unit(vehicle_navi_speed_kph) if vehicle_navi_speed_kph > 0 else 0.
+  camera_active = bool(CS.speedLimit > 0 and CS.speedLimitDistance > 0)
+  school_zone_active = bool(CS.schoolZoneActive)
+
+  enforcement_active = school_zone_active or camera_active or (
+    vehicle_navi_active and vehicle_navi_section_active
+  )
+  if enforcement_active:
+    enforcement_speed = vehicle_navi_speed_clu or float(CS.speedLimit or 0.)
+    if enforcement_speed > 0:
+      return enforcement_speed, True
+
+  stock_road_limit = float(CS.exState.navLimitSpeed or 0.)
+  return (stock_road_limit, False) if stock_road_limit > 0 else (0., False)
+
+
 def _get_button_limit(speed_limiter, CS):
   nda_active = bool(speed_limiter.get_active())
   if nda_active:
@@ -101,8 +121,7 @@ def _get_button_limit(speed_limiter, CS):
     road_limit = float(speed_limiter.get_road_limit_speed() or 0.)
     return (road_limit, False) if road_limit > 0 else (0., False)
 
-  stock_road_limit = float(CS.exState.navLimitSpeed or 0.)
-  return (stock_road_limit, False) if stock_road_limit > 0 else (0., False)
+  return _get_stock_button_limit(CS, speed_limiter.conv)
 
 
 class CruiseButtonHandler:
@@ -282,7 +301,9 @@ class CruiseController:
 
   def _debug_limit_state(self, *, CS, cluster_speed_clu, requested_speed, nda_active,
                          section_active, section_limit_speed, section_left_dist,
-                         nda_camera_active, is_school_zone, is_limit_zone,
+                         camera_event_active, stock_vehicle_navi_active,
+                         stock_vehicle_navi_section_active, stock_vehicle_navi_speed_clu,
+                         is_school_zone, is_limit_zone,
                          road_limit_speed_nda, road_limit_speed_stock, road_limit_speed,
                          road_limit_applies, road_limit_target_clu, lead,
                          speed_candidates, calculated_max_speed_clu, immediate_reasons):
@@ -299,7 +320,9 @@ class CruiseController:
 
     event_state = (
       bool(nda_active), bool(section_active), round(float(section_limit_speed), 1),
-      bool(nda_camera_active), bool(is_school_zone), bool(is_limit_zone),
+      bool(camera_event_active), bool(stock_vehicle_navi_active),
+      bool(stock_vehicle_navi_section_active), round(float(stock_vehicle_navi_speed_clu), 1),
+      bool(is_school_zone), bool(is_limit_zone),
       round(float(road_limit_speed or 0.), 1), round(float(self.prev_road_limit_speed), 1),
       round(float(self.pending_road_limit_speed), 1), bool(road_limit_applies),
       bool(self.pending_road_restore), bool(self.ignore_road_limit_temporarily),
@@ -316,7 +339,7 @@ class CruiseController:
       "LIMIT source=%s ego=%.1f requested=%.1f calculated=%.1f applied=%.1f prev_output=%.1f",
       "candidates[road=%s camera=%s lead=%s curve=%s steer=%s]",
       "nav[nda=%d road_nda=%.1f road_stock=%.1f observed=%s accepted=%.1f target=%s pending=%.1f timer=%d/%d applies=%d restore=%d",
-      "section=%d limit=%.1f left=%.0f camera=%d zone=%d school=%d]",
+      "section=%d limit=%.1f left=%.0f camera=%d stock_event=%d stock_section=%d stock_speed=%.1f zone=%d school=%d]",
       "lead[present=%d dRel=%.1f vRel=%.1f] ignore=%d timer=%d/%d steer_angle=%.1f immediate=%s",
     ))
     cruise_log.debug(
@@ -328,7 +351,8 @@ class CruiseController:
       self.prev_road_limit_speed, self._debug_speed(road_limit_target_clu),
       self.pending_road_limit_speed, self.limit_change_timer,
       LIMIT_CHANGE_TIMEOUT_TICKS, road_limit_applies, self.pending_road_restore,
-      section_active, section_limit_speed, section_left_dist, nda_camera_active,
+      section_active, section_limit_speed, section_left_dist, camera_event_active,
+      stock_vehicle_navi_active, stock_vehicle_navi_section_active, stock_vehicle_navi_speed_clu,
       is_limit_zone, is_school_zone, lead.present, lead.dRel, lead.vRel,
       self.ignore_road_limit_temporarily, self.ignore_limit_timer, IGNORE_LIMIT_TIMEOUT_TICKS,
       CS.steeringAngleDeg, ",".join(immediate_reasons) or "smooth",
@@ -338,14 +362,29 @@ class CruiseController:
                        double_pressed: bool = False):
     speed_limiter = SpeedLimiter.instance()
     speed_limiter.recv()
-    nda_active = speed_limiter.get_active()
-    section_limit_speed, section_left_dist = speed_limiter.get_section_limit_speed()
-    section_active = bool(nda_active and section_limit_speed > 0 and section_left_dist > 0)
+    nda_active = bool(speed_limiter.get_active())
+    stock_vehicle_navi_active = bool(getattr(CS, 'vehicleNaviActive', False))
+    stock_vehicle_navi_section_active = bool(getattr(CS, 'vehicleNaviSectionActive', False))
+    stock_vehicle_navi_speed_kph = float(getattr(CS, 'vehicleNaviSpeed', 0.) or 0.)
+    stock_vehicle_navi_speed_clu = self.conv.to_current_unit(stock_vehicle_navi_speed_kph) \
+      if stock_vehicle_navi_speed_kph > 0 else 0.
+
+    if nda_active:
+      section_limit_speed, section_left_dist = speed_limiter.get_section_limit_speed()
+      section_active = bool(section_limit_speed > 0 and section_left_dist > 0)
+    else:
+      section_limit_speed = stock_vehicle_navi_speed_clu if stock_vehicle_navi_section_active else 0.
+      section_left_dist = 0.
+      section_active = bool(stock_vehicle_navi_active and stock_vehicle_navi_section_active and section_limit_speed > 0)
     section_started_or_changed = section_active and (
-      not self.prev_section_active or section_limit_speed != self.prev_section_limit_speed
+      not self.prev_section_active or not self._same_limit_speed(section_limit_speed, self.prev_section_limit_speed)
     )
     section_ended = self.prev_section_active and not section_active
     nda_camera_active = bool(nda_active and speed_limiter.get_camera_limit_active())
+    stock_camera_active = bool(
+      not nda_active and CS.speedLimit > 0 and CS.speedLimitDistance > 0
+    )
+    camera_event_active = nda_camera_active or stock_camera_active or section_active
 
     road_limit_speed_nda = speed_limiter.get_road_limit_speed()
     road_limit_speed_stock = CS.exState.navLimitSpeed
@@ -360,15 +399,19 @@ class CruiseController:
       camera_limit_speed_clu = section_limit_speed if section_active else camera_limit_speed
     else:
       is_school_zone = CS.schoolZoneActive
-      if CS.speedLimit > 0 and CS.speedLimitDistance > 0:
+      if section_active:
+        camera_limit_speed_clu = section_limit_speed
+      elif CS.speedLimit > 0 and CS.speedLimitDistance > 0:
         camera_limit_speed_clu, is_limit_zone = speed_limiter.get_camera_limit_speed_stock(CS, cluster_speed_clu)
 
-    if is_school_zone and not nda_camera_active:
+    if is_school_zone and not camera_event_active:
       school_zone_max_limit = self.conv.to_current_unit(SCHOOL_ZONE_MAX_SPEED)
       if 0 < camera_limit_speed_clu < NO_ACTIVE_LIMIT:
         camera_limit_speed_clu = min(camera_limit_speed_clu, school_zone_max_limit)
       elif road_limit_speed_nda > 0 and nda_active:
         camera_limit_speed_clu = min(road_limit_speed_nda, school_zone_max_limit)
+      elif stock_vehicle_navi_speed_clu > 0 and not nda_active:
+        camera_limit_speed_clu = min(stock_vehicle_navi_speed_clu, school_zone_max_limit)
       elif road_limit_speed_stock > 0 and not nda_active:
         camera_limit_speed_clu = min(road_limit_speed_stock, school_zone_max_limit)
       else:
@@ -536,7 +579,10 @@ class CruiseController:
     self._debug_limit_state(
       CS=CS, cluster_speed_clu=cluster_speed_clu, requested_speed=requested_speed_clu,
       nda_active=nda_active, section_active=section_active, section_limit_speed=section_limit_speed,
-      section_left_dist=section_left_dist, nda_camera_active=nda_camera_active,
+      section_left_dist=section_left_dist, camera_event_active=camera_event_active,
+      stock_vehicle_navi_active=stock_vehicle_navi_active,
+      stock_vehicle_navi_section_active=stock_vehicle_navi_section_active,
+      stock_vehicle_navi_speed_clu=stock_vehicle_navi_speed_clu,
       is_school_zone=is_school_zone, is_limit_zone=is_limit_zone,
       road_limit_speed_nda=road_limit_speed_nda, road_limit_speed_stock=road_limit_speed_stock,
       road_limit_speed=road_limit_speed, road_limit_applies=road_limit_applies,

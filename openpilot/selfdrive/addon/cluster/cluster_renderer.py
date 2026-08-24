@@ -508,8 +508,11 @@ class ClusterRenderer:
         return float(data.get("cam_limit_speed")), float(data.get("cam_limit_speed_left_dist"))
       return float(data.get("nav_limit_speed", 0.0) or 0.0), 0.0
     if data.get("stock_limit_speed", 0) > 0:
-      return float(data.get("stock_limit_speed")), 0.0
-    return float(data.get("nav_limit_speed", 0.0) or 0.0), 0.0
+      return (
+        float(data.get("stock_limit_speed")),
+        float(data.get("stock_limit_speed_left_dist", 0.0) or 0.0),
+      )
+    return float(data.get("stock_road_limit_speed", 0.0) or 0.0), 0.0
 
   def _draw_hud(self, image, data, has_camera):
     draw = ImageDraw.Draw(image)
