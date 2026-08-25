@@ -59,3 +59,12 @@ def test_accel_floor_and_source_selection():
   assert get_traffic_stop_accel_floor(10.0, 20.0, 6.5) == -4.0
   assert should_limit_traffic_stop_accel(True, "e2e")
   assert not should_limit_traffic_stop_accel(True, "lead0")
+
+
+def test_accel_floor_ignores_normal_model_endpoint_contraction():
+  assert get_traffic_stop_accel_floor(78.23 / 3.6, 96.0, 5.5) == -2.2
+
+
+def test_accel_floor_blends_only_in_safety_critical_range():
+  assert abs(get_traffic_stop_accel_floor(20.0, 67.0116279070, 5.5) + 3.1) < 1e-9
+  assert get_traffic_stop_accel_floor(62.0 / 3.6, 50.0, 5.5) == -4.0
