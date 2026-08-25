@@ -560,9 +560,9 @@ class SpeedLimiter:
     return default_return_value
 
   def get_camera_limit_speed_stock(self, CS, cluster_speed_clu):
-    vehicle_navi_speed_kph = float(getattr(CS, 'vehicleNaviSpeed', 0.) or 0.)
-    speed_limit = self.conv.to_current_unit(vehicle_navi_speed_kph) \
-      if getattr(CS, 'vehicleNaviActive', False) and vehicle_navi_speed_kph > 0 else CS.speedLimit
+    navi_speed_kph = float(getattr(CS, 'naviSpeed', 0.) or 0.)
+    speed_limit = self.conv.to_current_unit(navi_speed_kph) \
+      if getattr(CS, 'naviActive', False) and navi_speed_kph > 0 else CS.speedLimit
     speed_limit_distance = CS.speedLimitDistance
     cluster_speed_ms = self.conv.to_ms(cluster_speed_clu)
     speed_limit_ms = self.conv.to_ms(speed_limit)

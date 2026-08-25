@@ -133,19 +133,17 @@ class ClusterModels:
       self.cruise_speed = cluster_speed if cluster_speed > 0 else fallback_speed
       self.set_speed = getattr(cs, 'vCruise', self.cruise_speed)
       self.is_cruise_set = 0 < self.cruise_speed < 255
-      vehicle_navi_active = bool(getattr(cs, 'vehicleNaviActive', False))
-      vehicle_navi_section_active = bool(getattr(cs, 'vehicleNaviSectionActive', False))
-      vehicle_navi_speed_kph = float(getattr(cs, 'vehicleNaviSpeed', 0.0) or 0.0)
-      vehicle_navi_speed_clu = self.conv.to_current_unit(vehicle_navi_speed_kph) \
-        if vehicle_navi_speed_kph > 0 else 0.0
+      navi_active = bool(getattr(cs, 'naviActive', False))
+      navi_section_active = bool(getattr(cs, 'naviSectionActive', False))
+      navi_speed_kph = float(getattr(cs, 'naviSpeed', 0.0) or 0.0)
+      navi_speed_clu = self.conv.to_current_unit(navi_speed_kph) if navi_speed_kph > 0 else 0.0
       stock_camera_active = bool(cs.speedLimit > 0 and cs.speedLimitDistance > 0)
-      self.stock_limit_speed = vehicle_navi_speed_clu \
-        if vehicle_navi_active and vehicle_navi_speed_clu > 0 else float(cs.speedLimit or 0.0)
+      self.stock_limit_speed = navi_speed_clu if navi_active and navi_speed_clu > 0 else float(cs.speedLimit or 0.0)
       self.stock_limit_speed_left_dist = float(cs.speedLimitDistance) if stock_camera_active else 0.0
       self._stock_school_zone = bool(cs.schoolZoneActive)
       self._stock_speed_bump = cs.speedBumpDistance > 0
       self._stock_speed_camera = bool(
-        (stock_camera_active or (vehicle_navi_active and vehicle_navi_section_active)) and
+        (stock_camera_active or (navi_active and navi_section_active)) and
         not self._stock_school_zone and not self._stock_speed_bump
       )
       self._refresh_stock_road_events()
