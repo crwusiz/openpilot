@@ -142,11 +142,11 @@ class HudRenderer(Widget):
     self._txt_wheel_green: rl.Texture = gui_app.texture('icons_mici/wheel_green.png', 50, 50)
     self._txt_wheel_blue: rl.Texture = gui_app.texture('icons_mici/wheel_blue.png', 50, 50)
 
-    self._txt_exclamation_point: rl.Texture = gui_app.texture('icons_mici/exclamation_point.png', 44, 44)
-    self._txt_egpu: rl.Texture = gui_app.texture('icons_mici/egpu.png', 60, 44)
-    self._txt_egpu_green: rl.Texture = gui_app.texture('icons_mici/egpu_green.png', 60, 44)
-    self._txt_egpu_orange: rl.Texture = gui_app.texture('icons_mici/egpu_orange.png', 60, 44)
-    self._txt_egpu_crossed: rl.Texture = gui_app.texture('icons_mici/egpu_crossed.png', 60, 52)
+    self._txt_exclamation_point: rl.Texture = gui_app.texture('icons_mici/exclamation_point.png', 9, 44)
+    self._txt_chestnut: rl.Texture = gui_app.texture('icons_mici/chestnut.png', 60, 44)
+    self._txt_chestnut_green: rl.Texture = gui_app.texture('icons_mici/chestnut_green.png', 60, 44)
+    self._txt_chestnut_orange: rl.Texture = gui_app.texture('icons_mici/chestnut_orange.png', 75, 44)
+    self._txt_chestnut_crossed: rl.Texture = gui_app.texture('icons_mici/chestnut_crossed.png', 60, 52)
 
     self._txt_traffic_off = gui_app.texture("icons/traffic_off.png", 77, 154)
     self._txt_traffic_green = gui_app.texture("icons/traffic_green.png", 77, 154)
@@ -156,7 +156,7 @@ class HudRenderer(Widget):
     self._wheel_y_filter = FirstOrderFilter(0, 0.1, 1 / gui_app.target_fps)
 
     self._set_speed_alpha_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
-    self._egpu_alpha_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
+    self._chestnut_alpha_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
 
   def set_wheel_critical_icon(self, critical: bool):
     """Set the wheel icon to critical or normal state."""
@@ -192,7 +192,7 @@ class HudRenderer(Widget):
     set_speed = self.cruise_speed
 
     engaged = sm['selfdriveState'].enabled
-    if (engaged and not self._engaged and not ui_state.usbgpu_loading and ui_state.usbgpu_active is not True and
+    if (engaged and not self._engaged and not ui_state.chestnut_loading and ui_state.chestnut_active is not True and
         ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame):
       self._small_model_engaged = True
     if (set_speed != self.set_speed and engaged) or (engaged and not self._engaged):
@@ -287,34 +287,34 @@ class HudRenderer(Widget):
       self._draw_steering_wheel(rect)
     self._draw_ignore_limit_timer(rect)
 
-    if ui_state.usbgpu and ui_state.usbgpu_compiled:
+    if ui_state.chestnut and ui_state.chestnut_compiled:
       self._draw_model_source(rect)
 
   def _draw_model_source(self, rect: rl.Rectangle) -> None:
     if ui_state.sm.recv_frame['selfdriveState'] < ui_state.started_frame:
       return
 
-    big_failed = (ui_state.usbgpu_active is False or not ui_state.sm['deviceState'].chestnutPresent or
-                  (ui_state.usbgpu_active is True and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame and
+    big_failed = (ui_state.chestnut_active is False or not ui_state.sm['deviceState'].chestnutPresent or
+                  (ui_state.chestnut_active is True and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame and
                    not ui_state.sm.alive['modelV2']) or
-                  (ui_state.usbgpu_active is None and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame))
+                  (ui_state.chestnut_active is None and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame))
     self._small_model_engaged &= big_failed
-    loading = ui_state.usbgpu_loading or (ui_state.usbgpu_active is None and not big_failed)
+    loading = ui_state.chestnut_loading or (ui_state.chestnut_active is None and not big_failed)
     if loading:
       pulse = 0.5 - 0.5 * math.cos(rl.get_time() * 6.0)
-      icon = self._txt_egpu
+      icon = self._txt_chestnut
       opacity = 0.35 + 0.65 * pulse
     elif self._small_model_engaged:
-      icon = self._txt_egpu_crossed
+      icon = self._txt_chestnut_crossed
       opacity = 0.65
     elif big_failed:
-      icon = self._txt_egpu_orange
+      icon = self._txt_chestnut_orange
       opacity = 1.0
     else:
-      icon = self._txt_egpu_green
+      icon = self._txt_chestnut_green
       opacity = 1.0
 
-    alpha = self._egpu_alpha_filter.update(self._get_wheel_opacity())
+    alpha = self._chestnut_alpha_filter.update(self._get_wheel_opacity())
     if alpha < 1e-2:
       return
 

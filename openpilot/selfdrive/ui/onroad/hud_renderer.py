@@ -202,12 +202,12 @@ class HudRenderer(Widget):
     self.wheel_blue_img = gui_app.texture("icons/wheel_blue.png", icon_size, icon_size)
     self.wheel_critical_img = gui_app.texture("icons/wheel_critical.png", icon_size, icon_size)
 
-    # eGPU model source
-    egpu_width = icon_size
-    self.egpu_img = gui_app.texture("icons_mici/egpu.png", egpu_width, egpu_width * 44 / 60)
-    self.egpu_green_img = gui_app.texture("icons_mici/egpu_green.png", egpu_width, egpu_width * 44 / 60)
-    self.egpu_orange_img = gui_app.texture("icons_mici/egpu_orange.png", egpu_width, egpu_width * 44 / 60)
-    self.egpu_crossed_img = gui_app.texture("icons_mici/egpu_crossed.png", egpu_width, egpu_width * 52 / 60)
+    # Chestnut model source
+    chestnut_width = icon_size
+    self.chestnut_img = gui_app.texture("icons_mici/chestnut.png", chestnut_width, chestnut_width * 44 / 60)
+    self.chestnut_green_img = gui_app.texture("icons_mici/chestnut_green.png", chestnut_width, chestnut_width * 44 / 60)
+    self.chestnut_orange_img = gui_app.texture("icons_mici/chestnut_orange.png", chestnut_width * 75 / 60, chestnut_width * 44 / 60)
+    self.chestnut_crossed_img = gui_app.texture("icons_mici/chestnut_crossed.png", chestnut_width, chestnut_width * 52 / 60)
 
     # WiFi textures for state switching
     self.wifi_l_img = gui_app.texture("icons/wifi_strength_low.png", icon_size, icon_size)
@@ -270,7 +270,7 @@ class HudRenderer(Widget):
     self.is_cruise_available = self.set_speed != -1
 
     engaged = selfdrive_state.enabled
-    if (engaged and not self._engaged and not ui_state.usbgpu_loading and ui_state.usbgpu_active is not True and
+    if (engaged and not self._engaged and not ui_state.chestnut_loading and ui_state.chestnut_active is not True and
         sm.recv_frame['modelV2'] > ui_state.started_frame):
       self._small_model_engaged = True
     self._engaged = engaged
@@ -427,7 +427,7 @@ class HudRenderer(Widget):
     exp_button_rect = rl.Rectangle(button_x, button_y, UIConfig.button_size, UIConfig.button_size)
     self._exp_button.render(exp_button_rect)
 
-    if ui_state.usbgpu and ui_state.usbgpu_compiled:
+    if ui_state.chestnut and ui_state.chestnut_compiled:
       self._draw_model_source(exp_button_rect)
 
     # self.torque_bar._render(rect)
@@ -439,24 +439,24 @@ class HudRenderer(Widget):
     if ui_state.sm.recv_frame['selfdriveState'] < ui_state.started_frame:
       return
 
-    big_failed = (ui_state.usbgpu_active is False or not ui_state.sm['deviceState'].chestnutPresent or
-                  (ui_state.usbgpu_active is True and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame and
+    big_failed = (ui_state.chestnut_active is False or not ui_state.sm['deviceState'].chestnutPresent or
+                  (ui_state.chestnut_active is True and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame and
                    not ui_state.sm.alive['modelV2']) or
-                  (ui_state.usbgpu_active is None and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame))
+                  (ui_state.chestnut_active is None and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame))
     self._small_model_engaged &= big_failed
-    loading = ui_state.usbgpu_loading or (ui_state.usbgpu_active is None and not big_failed)
+    loading = ui_state.chestnut_loading or (ui_state.chestnut_active is None and not big_failed)
     if loading:
       pulse = 0.5 - 0.5 * math.cos(rl.get_time() * 6.0)
-      icon = self.egpu_img
+      icon = self.chestnut_img
       opacity = 0.35 + 0.65 * pulse
     elif self._small_model_engaged:
-      icon = self.egpu_crossed_img
+      icon = self.chestnut_crossed_img
       opacity = 0.65
     elif big_failed:
-      icon = self.egpu_orange_img
+      icon = self.chestnut_orange_img
       opacity = 1.0
     else:
-      icon = self.egpu_green_img
+      icon = self.chestnut_green_img
       opacity = 1.0
 
     pos = rl.Vector2(exp_button_rect.x + (exp_button_rect.width - icon.width) / 2,

@@ -12,7 +12,7 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.ui.lib.prime_state import PrimeState
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.common.hardware import HARDWARE, PC
-from openpilot.selfdrive.modeld.helpers import usbgpu_compiled
+from openpilot.selfdrive.modeld.helpers import chestnut_compiled
 
 from opendbc.car import structs
 
@@ -86,11 +86,10 @@ class UIState:
     self.always_on_dm: bool = self.params.get_bool("AlwaysOnDM")
     self.experimental_mode: bool = self.params.get_bool("ExperimentalMode")
     self.experimental_mode_confirmed: bool = self.params.get_bool("ExperimentalModeConfirmed")
-    self.cluster_enabled: bool = self.params.get_bool("ClusterEnable")
-    self.usbgpu: bool = False
-    self.usbgpu_compiled: bool = usbgpu_compiled()
-    self.usbgpu_active: bool | None = self.params.get("UsbGpuActive")
-    self.usbgpu_loading: bool = self.params.get_bool("UsbGpuLoading")
+    self.chestnut: bool = False
+    self.chestnut_compiled: bool = chestnut_compiled()
+    self.chestnut_active: bool | None = None
+    self.chestnut_loading: bool = False
     self.started: bool = False
     self.ignition: bool = False
     self.recording_audio: bool = False
@@ -108,6 +107,7 @@ class UIState:
     self.steeringPressed: bool = False
     self.driver_camera: bool = self.params.get_bool("CabinCameraOnReverse")
     self.show_driver_camera: bool = False
+    self.cluster_enabled: bool = self.params.get_bool("ClusterEnable")
 
     # Callbacks
     self._offroad_transition_callbacks: list[Callable[[], None]] = []
@@ -261,13 +261,14 @@ class UIState:
     self.always_on_dm = self.params.get_bool("AlwaysOnDM")
     self.experimental_mode = self.params.get_bool("ExperimentalMode")
     self.experimental_mode_confirmed = self.params.get_bool("ExperimentalModeConfirmed")
+    # keep chestnut UI active until offroad transition when gpu disappears
+    self.chestnut = self.sm["deviceState"].chestnutPresent or (self.chestnut and self.started)
+    if not self.chestnut_compiled:
+      self.chestnut_compiled = chestnut_compiled()
+    self.chestnut_active = self.params.get("ChestnutActive")
+    self.chestnut_loading = self.params.get_bool("ChestnutLoading")
+
     self.cluster_enabled = self.params.get_bool("ClusterEnable")
-    # keep usbgpu UI active until offroad transition when gpu disappears
-    self.usbgpu = self.sm["deviceState"].chestnutPresent or (self.usbgpu and self.started)
-    if not self.usbgpu_compiled:
-      self.usbgpu_compiled = usbgpu_compiled()
-    self.usbgpu_active = self.params.get("UsbGpuActive")
-    self.usbgpu_loading = self.params.get_bool("UsbGpuLoading")
 
 
 class Device:
