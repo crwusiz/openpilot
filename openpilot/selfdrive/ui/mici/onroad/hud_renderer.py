@@ -18,9 +18,6 @@ SET_SPEED_NA = 255
 KM_TO_MILE = 0.621371
 CRUISE_DISABLED_CHAR = '–'
 
-SET_SPEED_PERSISTENCE = 2.5  # seconds
-
-
 @dataclass(frozen=True)
 class FontSizes:
   current_speed: int = 72
@@ -128,7 +125,6 @@ class HudRenderer(Widget):
     self.v_ego_cluster_seen: bool = False
     self._engaged: bool = False
     self._small_model_engaged: bool = False
-    self._egpu_fade_time: float = 0
 
     self._can_draw_top_icons = True
     self._show_wheel_critical = False
@@ -151,7 +147,6 @@ class HudRenderer(Widget):
     self._txt_egpu_green: rl.Texture = gui_app.texture('icons_mici/egpu_green.png', 60, 44)
     self._txt_egpu_orange: rl.Texture = gui_app.texture('icons_mici/egpu_orange.png', 60, 44)
     self._txt_egpu_crossed: rl.Texture = gui_app.texture('icons_mici/egpu_crossed.png', 60, 52)
-    self._egpu_icon: rl.Texture | None = None
 
     self._txt_traffic_off = gui_app.texture("icons/traffic_off.png", 77, 154)
     self._txt_traffic_green = gui_app.texture("icons/traffic_green.png", 77, 154)
@@ -200,8 +195,6 @@ class HudRenderer(Widget):
     if (engaged and not self._engaged and not ui_state.usbgpu_loading and ui_state.usbgpu_active is not True and
         ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame):
       self._small_model_engaged = True
-    if engaged != self._engaged:
-      self._egpu_fade_time = rl.get_time() if engaged else 0
     if (set_speed != self.set_speed and engaged) or (engaged and not self._engaged):
       self._set_speed_changed_time = rl.get_time()
     self._engaged = engaged
@@ -321,10 +314,7 @@ class HudRenderer(Widget):
       icon = self._txt_egpu_green
       opacity = 1.0
 
-    if icon is not self._egpu_icon:
-      self._egpu_fade_time = rl.get_time()
-      self._egpu_icon = icon
-    alpha = self._egpu_alpha_filter.update(loading or 0 < rl.get_time() - self._egpu_fade_time < SET_SPEED_PERSISTENCE)
+    alpha = self._egpu_alpha_filter.update(self._get_wheel_opacity())
     if alpha < 1e-2:
       return
 
@@ -332,20 +322,17 @@ class HudRenderer(Widget):
                      rect.y + rect.height - 14 - (self._txt_wheel.height + icon.height) / 2 + (1 - alpha) * icon.height / 2)
     rl.draw_texture_ex(icon, pos, 0.0, 1.0, rl.Color(255, 255, 255, int(255 * opacity * alpha)))
 
+  def _get_wheel_opacity(self) -> float:
+    if self._show_wheel_critical or ui_state.status == UIStatus.BLINKER:
+      return 1.0
+    return 0.5 if ui_state.status == UIStatus.DISENGAGED else 0.9
+
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
     wheel_txt = self._get_wheel_texture()
     is_critical = self._show_wheel_critical or ui_state.status == UIStatus.BLINKER
 
-    if is_critical:
-      self._wheel_alpha_filter.update(255)
-      self._wheel_y_filter.update(0)
-    else:
-      if ui_state.status == UIStatus.DISENGAGED:
-        self._wheel_alpha_filter.update(255 * 0.5)
-        self._wheel_y_filter.update(0)
-      else:
-        self._wheel_alpha_filter.update(255 * 0.9)
-        self._wheel_y_filter.update(0)
+    self._wheel_alpha_filter.update(255 * self._get_wheel_opacity())
+    self._wheel_y_filter.update(0)
 
     # pos
     pos_x = int(rect.x + 21 + wheel_txt.width / 2)

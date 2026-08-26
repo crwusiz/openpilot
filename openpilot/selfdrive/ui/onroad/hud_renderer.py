@@ -22,6 +22,7 @@ KM_TO_MILE = 0.621371
 CRUISE_DISABLED_CHAR = "--"
 BLINKER_DRAW_COUNT = 8
 BLINK_PERIOD_MS = 900.0
+WHEEL_ICON_OPACITY = 0.8
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,8 @@ class HudRenderer(Widget):
     self.apply_speed: float = 0.0
     self.speed: float = 0.0
     self.v_ego_cluster_seen: bool = False
+    self._engaged: bool = False
+    self._small_model_engaged: bool = False
 
     # Extended state variables
     self.accel: float = 0.0
@@ -199,6 +202,13 @@ class HudRenderer(Widget):
     self.wheel_blue_img = gui_app.texture("icons/wheel_blue.png", icon_size, icon_size)
     self.wheel_critical_img = gui_app.texture("icons/wheel_critical.png", icon_size, icon_size)
 
+    # eGPU model source
+    egpu_width = icon_size
+    self.egpu_img = gui_app.texture("icons_mici/egpu.png", egpu_width, egpu_width * 44 / 60)
+    self.egpu_green_img = gui_app.texture("icons_mici/egpu_green.png", egpu_width, egpu_width * 44 / 60)
+    self.egpu_orange_img = gui_app.texture("icons_mici/egpu_orange.png", egpu_width, egpu_width * 44 / 60)
+    self.egpu_crossed_img = gui_app.texture("icons_mici/egpu_crossed.png", egpu_width, egpu_width * 52 / 60)
+
     # WiFi textures for state switching
     self.wifi_l_img = gui_app.texture("icons/wifi_strength_low.png", icon_size, icon_size)
     self.wifi_m_img = gui_app.texture("icons/wifi_strength_medium.png", icon_size, icon_size)
@@ -258,6 +268,12 @@ class HudRenderer(Widget):
     self.set_speed = self.cruise_speed
     self.is_cruise_set = 0 < self.set_speed < SET_SPEED_NA
     self.is_cruise_available = self.set_speed != -1
+
+    engaged = selfdrive_state.enabled
+    if (engaged and not self._engaged and not ui_state.usbgpu_loading and ui_state.usbgpu_active is not True and
+        sm.recv_frame['modelV2'] > ui_state.started_frame):
+      self._small_model_engaged = True
+    self._engaged = engaged
 
     if self.is_cruise_set and not ui_state.is_metric:
       self.set_speed *= KM_TO_MILE
@@ -355,7 +371,7 @@ class HudRenderer(Widget):
     # Bottom icons
     self.steer_btn._texture = self._get_wheel_texture()
     self.steer_btn.set_rotation(-self.steer_angle)
-    self.steer_btn.set_opacity(0.8)
+    self.steer_btn.set_opacity(WHEEL_ICON_OPACITY)
 
     self.gas_btn.set_opacity(0.8 if self.gas_press else 0.2)
     self.brake_btn.set_opacity(0.8 if self.brake_press else 0.2)
@@ -408,12 +424,44 @@ class HudRenderer(Widget):
 
     button_x = rect.x + rect.width - UIConfig.border_size - UIConfig.button_size + 10
     button_y = rect.y + UIConfig.border_size + 10
-    self._exp_button.render(rl.Rectangle(button_x, button_y, UIConfig.button_size, UIConfig.button_size))
+    exp_button_rect = rl.Rectangle(button_x, button_y, UIConfig.button_size, UIConfig.button_size)
+    self._exp_button.render(exp_button_rect)
+
+    if ui_state.usbgpu and ui_state.usbgpu_compiled:
+      self._draw_model_source(exp_button_rect)
 
     # self.torque_bar._render(rect)
 
   def user_interacting(self) -> bool:
     return self._exp_button.is_pressed or self.upper_icons.is_any_pressed() or self.bottom_icons.is_any_pressed()
+
+  def _draw_model_source(self, exp_button_rect: rl.Rectangle) -> None:
+    if ui_state.sm.recv_frame['selfdriveState'] < ui_state.started_frame:
+      return
+
+    big_failed = (ui_state.usbgpu_active is False or not ui_state.sm['deviceState'].chestnutPresent or
+                  (ui_state.usbgpu_active is True and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame and
+                   not ui_state.sm.alive['modelV2']) or
+                  (ui_state.usbgpu_active is None and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame))
+    self._small_model_engaged &= big_failed
+    loading = ui_state.usbgpu_loading or (ui_state.usbgpu_active is None and not big_failed)
+    if loading:
+      pulse = 0.5 - 0.5 * math.cos(rl.get_time() * 6.0)
+      icon = self.egpu_img
+      opacity = 0.35 + 0.65 * pulse
+    elif self._small_model_engaged:
+      icon = self.egpu_crossed_img
+      opacity = 0.65
+    elif big_failed:
+      icon = self.egpu_orange_img
+      opacity = 1.0
+    else:
+      icon = self.egpu_green_img
+      opacity = 1.0
+
+    pos = rl.Vector2(exp_button_rect.x + (exp_button_rect.width - icon.width) / 2,
+                     exp_button_rect.y + exp_button_rect.height + 20)
+    rl.draw_texture_ex(icon, pos, 0.0, 1.0, rl.Color(255, 255, 255, int(255 * opacity * WHEEL_ICON_OPACITY)))
 
   def _draw_upper_icons(self, rect: rl.Rectangle) -> None:
     icon_size = UIConfig.icon_size
