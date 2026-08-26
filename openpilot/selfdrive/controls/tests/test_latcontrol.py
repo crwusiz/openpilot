@@ -17,6 +17,23 @@ from openpilot.selfdrive.controls.lib.latcontrol_angle import LatControlAngle
 
 class TestLatControl(OpenpilotTestCase):
 
+  def test_angle_control_holds_current_angle_near_standstill(self):
+    car_name = NISSAN.NISSAN_LEAF
+    CarInterface = interfaces[car_name]
+    CP = CarInterface.get_non_essential_params(car_name)
+    CI = CarInterface(CP)
+    VM = VehicleModel(CP)
+    controller = LatControlAngle(CP.as_reader(), CI, DT_CTRL)
+
+    CS = car.CarState.new_message()
+    CS.vEgo = 0.2
+    CS.steeringAngleDeg = 20.0
+    params = log.VehicleParameters.new_message()
+
+    for desired_curvature in (-0.1, 0.1, -0.1, 0.1):
+      _, desired_angle, _ = controller.update(True, CS, VM, params, False, desired_curvature, False, 0.2)
+      assert abs(desired_angle - CS.steeringAngleDeg) < 1e-6
+
   @parameterized.expand([(HONDA.HONDA_CIVIC, LatControlPID), (TOYOTA.TOYOTA_RAV4, LatControlTorque),
                          (NISSAN.NISSAN_LEAF, LatControlAngle), (GM.CHEVROLET_BOLT_EUV, LatControlTorque)])
   def test_saturation(self, car_name, controller):
