@@ -27,6 +27,7 @@ TRAFFIC_STOP_DECEL_URGENCY_BP_MPS2 = (4.0, 5.0)
 TRAFFIC_STOP_DISTANCE_STABILITY_SAMPLES = 8  # 0.4 s at the 20 Hz model rate
 TRAFFIC_STOP_INACTIVE_DISTANCE_M = 1000.0
 TRAFFIC_STOP_LEAD_DISTANCE_MARGIN_M = 2.0
+TRAFFIC_STOP_TARGET_BUFFER_M = 1.0
 TRAFFIC_STOP_PREPARE_SPEED_KPH = 5.0
 TRAFFIC_STOP_PREPARE_DISTANCE_M = 5.0
 
@@ -110,9 +111,10 @@ def get_virtual_traffic_stop_distance(model_distance: float, v_ego_kph: float) -
   return max(0.0, model_distance * applied_ratio)
 
 
-def get_traffic_stop_obstacle_distance(stop_distance: float, distance_adjust: float) -> float:
-  """Apply the configured stop-line correction without placing an obstacle behind the ego."""
-  return max(0.0, float(stop_distance) + float(distance_adjust))
+def get_traffic_stop_obstacle_distance(stop_distance: float, mpc_stop_distance: float) -> float:
+  """Convert an ego stop target to an MPC obstacle while retaining a small stop-line buffer."""
+  obstacle_offset = max(0.0, float(mpc_stop_distance) - TRAFFIC_STOP_TARGET_BUFFER_M)
+  return max(0.0, float(stop_distance) + obstacle_offset)
 
 
 def get_traffic_stop_accel_floor(v_ego: float, raw_stop_distance: float, stop_distance: float) -> float:

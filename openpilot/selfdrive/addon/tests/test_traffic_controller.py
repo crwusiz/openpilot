@@ -1,7 +1,8 @@
 from types import SimpleNamespace
 
 from openpilot.selfdrive.addon.traffic_controller import (TrafficState, TrafficStopController, TrafficStopDistanceTracker, XState,
-                                                          get_traffic_stop_accel_floor, should_limit_traffic_stop_accel)
+                                                          get_traffic_stop_accel_floor, get_traffic_stop_obstacle_distance,
+                                                          should_limit_traffic_stop_accel)
 
 
 def make_inputs(v_ego=10.0, steering_angle_deg=0.0, model_distance=80.0):
@@ -68,3 +69,9 @@ def test_accel_floor_ignores_normal_model_endpoint_contraction():
 def test_accel_floor_blends_only_in_safety_critical_range():
   assert abs(get_traffic_stop_accel_floor(20.0, 67.0116279070, 5.5) + 3.1) < 1e-9
   assert get_traffic_stop_accel_floor(62.0 / 3.6, 50.0, 5.5) == -4.0
+
+
+def test_obstacle_distance_compensates_for_mpc_standstill_gap():
+  # A 40 m ego target becomes a 45.5 m obstacle: the MPC keeps its 6.5 m
+  # standstill gap and therefore stops at 39 m, retaining only the 1 m buffer.
+  assert get_traffic_stop_obstacle_distance(40.0, 6.5) == 45.5

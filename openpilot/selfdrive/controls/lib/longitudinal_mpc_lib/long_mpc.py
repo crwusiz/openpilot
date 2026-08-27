@@ -344,8 +344,7 @@ class LongitudinalMpc:
     traffic_stop_plan = self.traffic_controller.update(sm['carState'], sm['modelV2'], radarstate, COMFORT_BRAKE)
     stop_dist = traffic_stop_plan.stop_distance
 
-    adjust_dist = 1.0 if v_ego > 0.1 else -2.0
-    traffic_stop_obstacle = get_traffic_stop_obstacle_distance(stop_dist, adjust_dist)
+    traffic_stop_obstacle = get_traffic_stop_obstacle_distance(stop_dist, STOP_DISTANCE)
     x2 = traffic_stop_obstacle * np.ones(N+1)
 
     x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, x2])
