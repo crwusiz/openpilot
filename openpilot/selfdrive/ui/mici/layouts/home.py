@@ -511,8 +511,8 @@ class MiciHomeLayout(Widget):
       rl.draw_text_ex(self._font_semi_bold, hostname_text, rl.Vector2(text_pos.x + 8 + ip_size.x, line3_y), font_size, 0, Colors.WHITE)
 
     self._experimental_icon.set_visible(ui_state.experimental_mode)
-    self._chestnut_icon.set_visible(ui_state.sm["deviceState"].chestnutPresent and ui_state.chestnut_compiled)
-    self._chestnut_icon_gray.set_visible(ui_state.sm["deviceState"].chestnutPresent and not ui_state.chestnut_compiled)
+    self._chestnut_icon.set_visible(ui_state.chestnut_state in (ChestnutState.READY, ChestnutState.LOADING, ChestnutState.ACTIVE))
+    self._chestnut_failed_icon.set_visible(ui_state.chestnut_state in (ChestnutState.UNCOMPILED, ChestnutState.FAILED))
     self._mic_icon.set_visible(ui_state.recording_audio)
     self._body_icon.set_visible(bool(ui_state.is_body))
 
