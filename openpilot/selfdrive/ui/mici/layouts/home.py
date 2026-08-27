@@ -9,7 +9,7 @@ from openpilot.system.ui.widgets.layouts import HBoxLayout
 from openpilot.system.ui.widgets.icon_widget import IconWidget
 from openpilot.system.ui.widgets.label import UnifiedLabel, gui_label
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos
-from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.selfdrive.ui.ui_state import ui_state, ChestnutState
 from openpilot.common.version import RELEASE_BRANCHES
 
 import subprocess
@@ -178,8 +178,8 @@ class MiciHomeLayout(Widget):
 
     self._settings_icon = IconWidget("icons_mici/settings.png", (48, 48), opacity=0.9)
     self._experimental_icon = IconWidget("icons_mici/experimental_mode.png", (48, 48))
-    self._chestnut_icon = IconWidget("icons_mici/chestnut_green.png", (50, 37))
-    self._chestnut_icon_gray = IconWidget("icons_mici/chestnut_gray.png", (50, 37))
+    self._chestnut_icon = IconWidget("icons_mici/chestnut_green.png", (68, 40))
+    self._chestnut_failed_icon = IconWidget("icons_mici/chestnut_orange.png", (68, 40))
     self._mic_icon = IconWidget("icons_mici/microphone.png", (32, 46))
     self._body_icon = IconWidget("icons_mici/body.png", (54, 37))
 
@@ -190,7 +190,7 @@ class MiciHomeLayout(Widget):
       NetworkIcon(),
       self._experimental_icon,
       self._chestnut_icon,
-      self._chestnut_icon_gray,
+      self._chestnut_failed_icon,
       self._body_icon,
       self._mic_icon,
     ], spacing=16)

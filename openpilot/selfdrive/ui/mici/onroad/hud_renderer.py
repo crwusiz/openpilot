@@ -3,7 +3,7 @@ import pyray as rl
 from dataclasses import dataclass
 from openpilot.common.constants import CV
 from openpilot.selfdrive.ui.mici.onroad.torque_bar import TorqueBar
-from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
+from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus, ChestnutState
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.lib.text_measure import measure_text_cached
@@ -124,7 +124,6 @@ class HudRenderer(Widget):
     self.speed: float = 0.0
     self.v_ego_cluster_seen: bool = False
     self._engaged: bool = False
-    self._small_model_engaged: bool = False
 
     self._can_draw_top_icons = True
     self._show_wheel_critical = False
@@ -146,7 +145,6 @@ class HudRenderer(Widget):
     self._txt_chestnut: rl.Texture = gui_app.texture('icons_mici/chestnut.png', 60, 44)
     self._txt_chestnut_green: rl.Texture = gui_app.texture('icons_mici/chestnut_green.png', 60, 44)
     self._txt_chestnut_orange: rl.Texture = gui_app.texture('icons_mici/chestnut_orange.png', 75, 44)
-    self._txt_chestnut_crossed: rl.Texture = gui_app.texture('icons_mici/chestnut_crossed.png', 60, 52)
 
     self._txt_traffic_off = gui_app.texture("icons/traffic_off.png", 77, 154)
     self._txt_traffic_green = gui_app.texture("icons/traffic_green.png", 77, 154)
@@ -192,9 +190,6 @@ class HudRenderer(Widget):
     set_speed = self.cruise_speed
 
     engaged = sm['selfdriveState'].enabled
-    if (engaged and not self._engaged and not ui_state.chestnut_loading and ui_state.chestnut_active is not True and
-        ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame):
-      self._small_model_engaged = True
     if (set_speed != self.set_speed and engaged) or (engaged and not self._engaged):
       self._set_speed_changed_time = rl.get_time()
     self._engaged = engaged
@@ -287,32 +282,24 @@ class HudRenderer(Widget):
       self._draw_steering_wheel(rect)
     self._draw_ignore_limit_timer(rect)
 
-    if ui_state.chestnut and ui_state.chestnut_compiled:
-      self._draw_model_source(rect)
+    self._draw_model_source(rect)
 
   def _draw_model_source(self, rect: rl.Rectangle) -> None:
     if ui_state.sm.recv_frame['selfdriveState'] < ui_state.started_frame:
       return
 
-    big_failed = (ui_state.chestnut_active is False or not ui_state.sm['deviceState'].chestnutPresent or
-                  (ui_state.chestnut_active is True and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame and
-                   not ui_state.sm.alive['modelV2']) or
-                  (ui_state.chestnut_active is None and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame))
-    self._small_model_engaged &= big_failed
-    loading = ui_state.chestnut_loading or (ui_state.chestnut_active is None and not big_failed)
+    loading = ui_state.chestnut_state == ChestnutState.LOADING
     if loading:
-      pulse = 0.5 - 0.5 * math.cos(rl.get_time() * 6.0)
       icon = self._txt_chestnut
-      opacity = 0.35 + 0.65 * pulse
-    elif self._small_model_engaged:
-      icon = self._txt_chestnut_crossed
-      opacity = 0.65
-    elif big_failed:
+      opacity = 0.35 + 0.65 * (0.5 - 0.5 * math.cos(rl.get_time() * 6.0))
+    elif ui_state.chestnut_state in (ChestnutState.UNCOMPILED, ChestnutState.FAILED):
       icon = self._txt_chestnut_orange
       opacity = 1.0
-    else:
+    elif ui_state.chestnut_state == ChestnutState.ACTIVE:
       icon = self._txt_chestnut_green
       opacity = 1.0
+    else:
+      return
 
     alpha = self._chestnut_alpha_filter.update(self._get_wheel_opacity())
     if alpha < 1e-2:
