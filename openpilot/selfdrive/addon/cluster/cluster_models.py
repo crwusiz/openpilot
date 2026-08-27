@@ -20,7 +20,7 @@ def _enum_value(value):
 
 class ClusterModels:
   def __init__(self):
-    cloudlog.info("Initializing ClusterModels (Lightweight)...")
+    cloudlog.info("Initializing ClusterModels ...")
 
     self.sm = messaging.SubMaster([
       'modelV2', 'carState', 'selfdriveState', 'controlsState', 'carControl',
@@ -113,52 +113,52 @@ class ClusterModels:
     self.sm.update(0)
 
     if self.sm.updated['carState']:
-      cs = self.sm['carState']
-      v_ego_cluster = getattr(cs, 'vEgoCluster', 0.0)
+      car_state = self.sm['carState']
+      v_ego_cluster = getattr(car_state, 'vEgoCluster', 0.0)
       self.v_ego_cluster_seen = self.v_ego_cluster_seen or v_ego_cluster != 0.0
-      self.v_ego = v_ego_cluster if self.v_ego_cluster_seen else cs.vEgo
-      self.accel = getattr(cs, 'aEgo', 0.0)
-      self.cruise_available = bool(cs.cruiseState.available)
-      self.reverse = cs.gearShifter == GearShifter.reverse
-      self.left_blinker = cs.leftBlinker
-      self.right_blinker = cs.rightBlinker
-      self.left_blindspot = getattr(cs, 'leftBlindspot', False)
-      self.right_blindspot = getattr(cs, 'rightBlindspot', False)
-      self.brake_pressed = cs.brakePressed
-      self.gas_pressed = cs.gasPressed
-      self.steering_pressed = bool(getattr(cs, 'steeringPressed', False))
-      self.steering_angle = cs.steeringAngleDeg
-      cluster_speed = getattr(cs, 'vCruiseCluster', 0.0)
+      self.v_ego = v_ego_cluster if self.v_ego_cluster_seen else car_state.vEgo
+      self.accel = getattr(car_state, 'aEgo', 0.0)
+      self.cruise_available = bool(car_state.cruiseState.available)
+      self.reverse = car_state.gearShifter == GearShifter.reverse
+      self.left_blinker = car_state.leftBlinker
+      self.right_blinker = car_state.rightBlinker
+      self.left_blindspot = getattr(car_state, 'leftBlindspot', False)
+      self.right_blindspot = getattr(car_state, 'rightBlindspot', False)
+      self.brake_pressed = car_state.brakePressed
+      self.gas_pressed = car_state.gasPressed
+      self.steering_pressed = bool(getattr(car_state, 'steeringPressed', False))
+      self.steering_angle = car_state.steeringAngleDeg
+      cluster_speed = getattr(car_state, 'vCruiseCluster', 0.0)
       fallback_speed = getattr(self.sm['controlsState'].deprecated, 'vCruise', 0.0)
       self.cruise_speed = cluster_speed if cluster_speed > 0 else fallback_speed
-      self.set_speed = getattr(cs, 'vCruise', self.cruise_speed)
+      self.set_speed = getattr(car_state, 'vCruise', self.cruise_speed)
       self.is_cruise_set = 0 < self.cruise_speed < 255
-      navi_active = bool(getattr(cs, 'naviActive', False))
-      navi_section_active = bool(getattr(cs, 'naviSectionActive', False))
-      navi_speed_kph = float(getattr(cs, 'naviSpeed', 0.0) or 0.0)
+      navi_active = bool(getattr(car_state, 'naviActive', False))
+      navi_section_active = bool(getattr(car_state, 'naviSectionActive', False))
+      navi_speed_kph = float(getattr(car_state, 'naviSpeed', 0.0) or 0.0)
       navi_speed_clu = self.conv.to_current_unit(navi_speed_kph) if navi_speed_kph > 0 else 0.0
-      stock_camera_active = bool(cs.speedLimit > 0 and cs.speedLimitDistance > 0)
-      self.stock_limit_speed = navi_speed_clu if navi_active and navi_speed_clu > 0 else float(cs.speedLimit or 0.0)
-      self.stock_limit_speed_left_dist = float(cs.speedLimitDistance) if stock_camera_active else 0.0
-      self._stock_school_zone = bool(cs.schoolZoneActive)
-      self._stock_speed_bump = cs.speedBumpDistance > 0
+      stock_camera_active = bool(car_state.speedLimit > 0 and car_state.speedLimitDistance > 0)
+      self.stock_limit_speed = navi_speed_clu if navi_active and navi_speed_clu > 0 else float(car_state.speedLimit or 0.0)
+      self.stock_limit_speed_left_dist = float(car_state.speedLimitDistance) if stock_camera_active else 0.0
+      self._stock_school_zone = bool(car_state.schoolZoneActive)
+      self._stock_speed_bump = car_state.speedBumpDistance > 0
       self._stock_speed_camera = bool(
         (stock_camera_active or (navi_active and navi_section_active)) and
         not self._stock_school_zone and not self._stock_speed_bump
       )
       self._refresh_stock_road_events()
-      self.tpms = [cs.tpms.fl, cs.tpms.fr, cs.tpms.rl, cs.tpms.rr]
-      self.stock_road_limit_speed = float(cs.naviLimitSpeed or 0.0)
-      self.ignore_limit_timer = cs.ignoreLimitTimer
+      self.tpms = [car_state.tpms.fl, car_state.tpms.fr, car_state.tpms.rl, car_state.tpms.rr]
+      self.stock_road_limit_speed = float(car_state.naviLimitSpeed or 0.0)
+      self.ignore_limit_timer = car_state.ignoreLimitTimer
 
     if self.sm.updated['selfdriveState']:
-      ss = self.sm['selfdriveState']
-      self.enabled = ss.enabled
-      self.pre_enabled_or_overriding = ss.state in (
+      selfdrive_state = self.sm['selfdriveState']
+      self.enabled = selfdrive_state.enabled
+      self.pre_enabled_or_overriding = selfdrive_state.state in (
         log.SelfdriveState.OpenpilotState.preEnabled,
         log.SelfdriveState.OpenpilotState.overriding,
       )
-      self.distance_level = min(max(_enum_value(ss.personality) + 1, 1), 4)
+      self.distance_level = min(max(_enum_value(selfdrive_state.personality) + 1, 1), 4)
 
     if self.sm.updated['carParams']:
       self.longitudinal_control = bool(self.sm['carParams'].openpilotLongitudinalControl)

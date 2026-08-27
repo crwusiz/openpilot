@@ -125,8 +125,6 @@ class UIState:
     self._engaged_transition_callbacks: list[Callable[[], None]] = []
     self._on_body_changed_callbacks: list[Callable[[], None]] = []
 
-    self.update_params()
-
   def add_offroad_transition_callback(self, callback: Callable[[], None]):
     self._offroad_transition_callbacks.append(callback)
 
@@ -181,10 +179,7 @@ class UIState:
     # Handle wide road camera state updates
     if self.sm.updated["wideRoadCameraState"]:
       cam_state = self.sm["wideRoadCameraState"]
-
-      # Scale factor based on sensor type
-      scale = 6.0 if cam_state.sensor == 'ar0231' else 1.0
-      self.light_sensor = max(100.0 - scale * cam_state.exposureValPercent, 0.0)
+      self.light_sensor = max(100.0 - cam_state.exposureValPercent, 0.0)
     elif not self.sm.alive["wideRoadCameraState"] or not self.sm.valid["wideRoadCameraState"]:
       self.light_sensor = -1
 
