@@ -97,7 +97,7 @@ def _get_stock_button_limit(CS, conv):
     if enforcement_speed > 0:
       return enforcement_speed, True
 
-  stock_road_limit = float(CS.exState.navLimitSpeed or 0.)
+  stock_road_limit = float(CS.naviLimitSpeed or 0.)
   return (stock_road_limit, False) if stock_road_limit > 0 else (0., False)
 
 
@@ -386,7 +386,7 @@ class CruiseController:
     camera_event_active = nda_camera_active or stock_camera_active or section_active
 
     road_limit_speed_nda = speed_limiter.get_road_limit_speed()
-    road_limit_speed_stock = CS.exState.navLimitSpeed
+    road_limit_speed_stock = CS.naviLimitSpeed
     is_limit_zone = False
     lead = sm['radarState'].leadOne
 
@@ -1040,8 +1040,7 @@ class CruiseController:
       self.override_speed_clu = 0.
 
   def _update_message(self, CS):
-    exState = CS.exState
-    exState.ignoreLimitTimer = float(self.ignore_limit_timer)
+    CS.ignoreLimitTimer = float(self.ignore_limit_timer)
 
 
 class CruiseStateManager:

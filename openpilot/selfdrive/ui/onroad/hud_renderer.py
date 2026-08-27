@@ -297,17 +297,12 @@ class HudRenderer(Widget):
     self.left_blind_spot = car_state.leftBlindspot
     self.right_blind_spot = car_state.rightBlindspot
 
-    # Get ex_state if available
-    if hasattr(car_state, 'exState'):
-      ex_state = car_state.exState
-      self.autohold_state = ex_state.autoHold if hasattr(ex_state, 'autoHold') else 0
-      if hasattr(ex_state, 'tpms'):
-        tpms = ex_state.tpms
-        self.fl = tpms.fl
-        self.fr = tpms.fr
-        self.rl = tpms.rl
-        self.rr = tpms.rr
-      self.nav_limit_speed = ex_state.navLimitSpeed if hasattr(ex_state, 'navLimitSpeed') else 0
+    self.autohold_state = car_state.autoHold
+    self.fl = car_state.tpms.fl
+    self.fr = car_state.tpms.fr
+    self.rl = car_state.tpms.rl
+    self.rr = car_state.tpms.rr
+    self.nav_limit_speed = car_state.naviLimitSpeed
 
     self.stock_limit_speed = car_state.speedLimit if hasattr(car_state, 'speedLimit') else 0
     self.school_zone_active = bool(car_state.schoolZoneActive)

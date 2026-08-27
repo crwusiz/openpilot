@@ -147,12 +147,9 @@ class ClusterModels:
         not self._stock_school_zone and not self._stock_speed_bump
       )
       self._refresh_stock_road_events()
-      if hasattr(cs, 'exState'):
-        ex = cs.exState
-        if hasattr(ex, 'tpms'):
-          self.tpms = [ex.tpms.fl, ex.tpms.fr, ex.tpms.rl, ex.tpms.rr]
-        self.stock_road_limit_speed = float(getattr(ex, 'navLimitSpeed', 0.0) or 0.0)
-        self.ignore_limit_timer = getattr(ex, 'ignoreLimitTimer', self.ignore_limit_timer)
+      self.tpms = [cs.tpms.fl, cs.tpms.fr, cs.tpms.rl, cs.tpms.rr]
+      self.stock_road_limit_speed = float(cs.naviLimitSpeed or 0.0)
+      self.ignore_limit_timer = cs.ignoreLimitTimer
 
     if self.sm.updated['selfdriveState']:
       ss = self.sm['selfdriveState']

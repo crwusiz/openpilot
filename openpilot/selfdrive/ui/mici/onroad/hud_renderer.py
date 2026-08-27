@@ -218,10 +218,7 @@ class HudRenderer(Widget):
     if longitudinal_plan:
       self.traffic_state = longitudinal_plan.trafficState if hasattr(longitudinal_plan, 'trafficState') else 0
 
-    if hasattr(car_state, 'exState') and hasattr(car_state.exState, 'ignoreLimitTimer'):
-      self.ignore_limit_timer = car_state.exState.ignoreLimitTimer
-    else:
-      self.ignore_limit_timer = 0.0
+    self.ignore_limit_timer = car_state.ignoreLimitTimer
 
   def _get_wheel_texture(self) -> rl.Texture:
     """Return the correct wheel texture based on current UI status."""
