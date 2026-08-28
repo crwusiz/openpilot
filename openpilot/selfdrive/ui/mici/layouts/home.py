@@ -1,4 +1,5 @@
 import datetime
+import math
 import time
 
 from openpilot.cereal import log
@@ -179,6 +180,7 @@ class MiciHomeLayout(Widget):
     self._settings_icon = IconWidget("icons_mici/settings.png", (48, 48), opacity=0.9)
     self._experimental_icon = IconWidget("icons_mici/experimental_mode.png", (48, 48))
     self._chestnut_icon = IconWidget("icons_mici/chestnut_green.png", (68, 40))
+    self._chestnut_loading_icon = IconWidget("icons_mici/chestnut.png", (68, 40))
     self._chestnut_failed_icon = IconWidget("icons_mici/chestnut_orange.png", (68, 40))
     self._mic_icon = IconWidget("icons_mici/microphone.png", (32, 46))
     self._body_icon = IconWidget("icons_mici/body.png", (54, 37))
@@ -190,6 +192,7 @@ class MiciHomeLayout(Widget):
       NetworkIcon(),
       self._experimental_icon,
       self._chestnut_icon,
+      self._chestnut_loading_icon,
       self._chestnut_failed_icon,
       self._body_icon,
       self._mic_icon,
@@ -511,7 +514,9 @@ class MiciHomeLayout(Widget):
       rl.draw_text_ex(self._font_semi_bold, hostname_text, rl.Vector2(text_pos.x + 8 + ip_size.x, line3_y), font_size, 0, Colors.WHITE)
 
     self._experimental_icon.set_visible(ui_state.experimental_mode)
-    self._chestnut_icon.set_visible(ui_state.chestnut_state in (ChestnutState.READY, ChestnutState.LOADING, ChestnutState.ACTIVE))
+    self._chestnut_icon.set_visible(ui_state.chestnut_state in (ChestnutState.READY, ChestnutState.ACTIVE))
+    self._chestnut_loading_icon.set_visible(ui_state.chestnut_state == ChestnutState.LOADING)
+    self._chestnut_loading_icon.set_opacity(0.35 + 0.65 * (0.5 - 0.5 * math.cos(rl.get_time() * 6.0)))
     self._chestnut_failed_icon.set_visible(ui_state.chestnut_state in (ChestnutState.UNCOMPILED, ChestnutState.FAILED))
     self._mic_icon.set_visible(ui_state.recording_audio)
     self._body_icon.set_visible(bool(ui_state.is_body))
