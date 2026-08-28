@@ -19,9 +19,11 @@
 
 #include "json11/json11.hpp"
 #include "tools/cabana/commands.h"
+#include "tools/cabana/settingsdialog.h"
 #include "tools/cabana/streamselector.h"
 #include "tools/cabana/tools/findsignal.h"
 #include "tools/cabana/utils/export.h"
+#include "tools/cabana/utils/qtutil.h"
 #include "tools/replay/py_downloader.h"
 #include "tools/replay/util.h"
 
@@ -357,6 +359,9 @@ void MainWindow::startStream(AbstractStream *stream, QString dbc_file) {
   delete video_splitter;
 
   can = stream;  // take ownership
+  stream_connections_.push_back(can->error.connect([this](const std::string &msg) {
+    QMessageBox::warning(this, tr("Error"), QString::fromStdString(msg));
+  }));
   can->start();
 
   loadFile(dbc_file);
@@ -617,7 +622,7 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 }
 
 void MainWindow::setOption() {
-  SettingsDlg dlg(this);
+  SettingsDialog dlg(this);
   dlg.exec();
 }
 

@@ -64,6 +64,7 @@ public:
   Observable<const std::optional<std::pair<double, double>> &> timeRangeChanged;
   Observable<const MessageEventsMap &> eventsMerged;
   Observable<const std::set<MessageId> *, bool> msgsReceived;
+  Observable<const std::string &> error;
 
   SourceSet sources;
 
@@ -99,16 +100,6 @@ private:
   std::set<MessageId> new_msgs_;
   std::unordered_map<MessageId, CanData> messages_;
   std::unordered_map<MessageId, std::vector<uint8_t>> masks_;
-};
-
-class AbstractOpenStreamWidget : public QWidget {
-  Q_OBJECT
-public:
-  AbstractOpenStreamWidget(QWidget *parent = nullptr) : QWidget(parent) {}
-  virtual AbstractStream *open() = 0;
-
-signals:
-  void enableOpenButton(bool);
 };
 
 class DummyStream : public AbstractStream {

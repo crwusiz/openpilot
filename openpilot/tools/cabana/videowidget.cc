@@ -12,6 +12,7 @@
 #include <QVBoxLayout>
 
 #include "tools/cabana/tools/routeinfo.h"
+#include "tools/cabana/utils/qtutil.h"
 
 const int MIN_VIDEO_HEIGHT = 100;
 const int THUMBNAIL_MARGIN = 3;
@@ -204,7 +205,7 @@ void VideoWidget::timeRangeChanged() {
 QString VideoWidget::formatTime(double sec, bool include_milliseconds) {
   if (settings.absolute_time)
     sec += std::chrono::duration<double>(can->beginDateTime().time_since_epoch()).count();
-  return utils::formatSeconds(sec, include_milliseconds, settings.absolute_time);
+  return QString::fromStdString(utils::formatSeconds(sec, include_milliseconds, settings.absolute_time));
 }
 
 void VideoWidget::updateState() {
