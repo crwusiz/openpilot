@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pyray as rl
 
 from openpilot.system.ui.lib.application import gui_app
