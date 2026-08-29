@@ -136,7 +136,7 @@ class ClusterModels:
       navi_active = bool(getattr(car_state, 'naviActive', False))
       navi_section_active = bool(getattr(car_state, 'naviSectionActive', False))
       navi_speed_kph = float(getattr(car_state, 'naviSpeed', 0.0) or 0.0)
-      navi_speed_clu = self.conv.to_current_unit(navi_speed_kph) if navi_speed_kph > 0 else 0.0
+      navi_speed_clu = self.conv.kph_to_clu(navi_speed_kph) if navi_speed_kph > 0 else 0.0
       stock_camera_active = bool(car_state.speedLimit > 0 and car_state.speedLimitDistance > 0)
       self.stock_limit_speed = navi_speed_clu if navi_active and navi_speed_clu > 0 else float(car_state.speedLimit or 0.0)
       self.stock_limit_speed_left_dist = float(car_state.speedLimitDistance) if stock_camera_active else 0.0

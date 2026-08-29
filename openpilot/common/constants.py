@@ -30,14 +30,22 @@ class UnitConverter:
     self.params = Params()
     self.is_metric = self.params.get_bool("IsMetric")
 
-  def to_ms(self, speed: float) -> float:
-    return speed * CV.KPH_TO_MS if self.is_metric else speed * CV.MPH_TO_MS
+  def clu_to_ms(self, speed_clu: float) -> float:
+    return speed_clu * CV.KPH_TO_MS if self.is_metric else speed_clu * CV.MPH_TO_MS
 
-  def to_clu(self, speed: float) -> float:
-    return speed * CV.MS_TO_KPH if self.is_metric else speed * CV.MS_TO_MPH
+  def ms_to_clu(self, speed_ms: float) -> float:
+    return speed_ms * CV.MS_TO_KPH if self.is_metric else speed_ms * CV.MS_TO_MPH
 
-  def to_kph(self, speed: float) -> float:
-    return speed if self.is_metric else speed * CV.MPH_TO_KPH
+  @staticmethod
+  def ms_to_kph(speed_ms: float) -> float:
+    return speed_ms * CV.MS_TO_KPH
 
-  def to_current_unit(self, speed_kph: float) -> float:
+  @staticmethod
+  def kph_to_ms(speed_kph: float) -> float:
+    return speed_kph * CV.KPH_TO_MS
+
+  def clu_to_kph(self, speed_clu: float) -> float:
+    return speed_clu if self.is_metric else speed_clu * CV.MPH_TO_KPH
+
+  def kph_to_clu(self, speed_kph: float) -> float:
     return speed_kph if self.is_metric else speed_kph * CV.KPH_TO_MPH

@@ -185,7 +185,7 @@ class TrafficStopController:
 
   def update(self, car_state, model, radar_state, comfort_brake: float) -> TrafficStopPlan:
     v_ego = max(0.0, float(car_state.vEgo))
-    v_ego_kph = self.conv.to_kph(self.conv.to_clu(v_ego))
+    v_ego_kph = self.conv.ms_to_kph(v_ego)
     ego_distance = v_ego * self.dt
 
     self.x_stop = self.distance_tracker.update(model.position.x[31], ego_distance)

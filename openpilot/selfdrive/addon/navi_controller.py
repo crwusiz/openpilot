@@ -477,7 +477,7 @@ class SpeedLimiter:
       )
       if has_camera_limit:
         self.sec_decel = False
-        cluster_speed_ms = self.conv.to_ms(cluster_speed_clu)
+        cluster_speed_ms = self.conv.clu_to_ms(cluster_speed_clu)
 
         tight_zone = is_speed_bump or is_school_zone_start
         safe_dist = cluster_speed_ms * 4. if tight_zone else cluster_speed_ms * 8.
@@ -561,11 +561,11 @@ class SpeedLimiter:
 
   def get_camera_limit_speed_stock(self, CS, cluster_speed_clu):
     navi_speed_kph = float(getattr(CS, 'naviSpeed', 0.) or 0.)
-    speed_limit = self.conv.to_current_unit(navi_speed_kph) \
+    speed_limit = self.conv.kph_to_clu(navi_speed_kph) \
       if getattr(CS, 'naviActive', False) and navi_speed_kph > 0 else CS.speedLimit
     speed_limit_distance = CS.speedLimitDistance
-    cluster_speed_ms = self.conv.to_ms(cluster_speed_clu)
-    speed_limit_ms = self.conv.to_ms(speed_limit)
+    cluster_speed_ms = self.conv.clu_to_ms(cluster_speed_clu)
+    speed_limit_ms = self.conv.clu_to_ms(speed_limit)
 
     if speed_limit_distance <= 0 or speed_limit <= 0:
       self.stock_decel = False
@@ -588,7 +588,7 @@ class SpeedLimiter:
     else:
       speed_ms = np.sqrt(temp)
 
-    calculated_speed = self.conv.to_clu(speed_ms)
+    calculated_speed = self.conv.ms_to_clu(speed_ms)
     target_speed = max(speed_limit, min(255., calculated_speed))
 
     return target_speed, is_limit_zone
