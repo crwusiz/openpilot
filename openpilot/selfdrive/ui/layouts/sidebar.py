@@ -3,7 +3,7 @@ import time
 from dataclasses import dataclass
 from collections.abc import Callable
 from openpilot.cereal import log
-from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.selfdrive.ui.ui_state import ui_state, ChestnutState
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, FONT_SCALE
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.lib.text_measure import measure_text_cached
@@ -94,6 +94,7 @@ class Sidebar(Widget):
     self._flag_img = gui_app.texture("images/button_flag.png", HOME_BTN.width, HOME_BTN.height)
     self._settings_img = gui_app.texture("images/button_settings.png", SETTINGS_BTN.width, SETTINGS_BTN.height)
     self._c3x_img = gui_app.texture("icons/c3x.png")
+    self._egpu_img = gui_app.texture("icons_mici/chestnut_green.png")
     self._mic_img = gui_app.texture("icons/microphone.png", 30, 30)
     self._mic_indicator_rect = rl.Rectangle(0, 0, 0, 0)
     self._font_regular = gui_app.font(FontWeight.NORMAL)
@@ -372,10 +373,11 @@ class Sidebar(Widget):
     #tint = Colors.BUTTON_PRESSED if (ui_state.started and flag_pressed) else Colors.BUTTON_NORMAL
     #rl.draw_texture_ex(button_img, rl.Vector2(HOME_BTN.x, HOME_BTN.y), 0.0, 1.0, tint)
 
-    # C3X image (always shown, not flag/home toggle)
-    c3x_scale = HOME_BTN.width / self._c3x_img.width if self._c3x_img.width > 0 else 1.0
-    c3x_y = HOME_BTN.y + (HOME_BTN.height - (self._c3x_img.height * c3x_scale)) / 2
-    rl.draw_texture_ex(self._c3x_img, rl.Vector2(HOME_BTN.x, c3x_y), 0.0, c3x_scale, Colors.WHITE)
+    # Show the eGPU icon when Chestnut is connected and ready; otherwise show C3X.
+    device_img = self._egpu_img if ui_state.chestnut_state in (ChestnutState.READY, ChestnutState.ACTIVE) else self._c3x_img
+    device_scale = HOME_BTN.width / device_img.width if device_img.width > 0 else 1.0
+    device_y = HOME_BTN.y + (HOME_BTN.height - (device_img.height * device_scale)) / 2
+    rl.draw_texture_ex(device_img, rl.Vector2(HOME_BTN.x, device_y), 0.0, device_scale, Colors.WHITE)
 
     # Microphone button
     if self._recording_audio:

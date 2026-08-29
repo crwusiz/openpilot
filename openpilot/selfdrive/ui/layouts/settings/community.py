@@ -10,13 +10,13 @@ from typing import List, Callable, Union
 
 from openpilot.common.params import Params
 from openpilot.system.ui.widgets import Widget, DialogResult
-from openpilot.system.ui.widgets.list_view import toggle_item, button_item, ListItem
+from openpilot.system.ui.widgets.list_view import toggle_item, button_item
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
 from openpilot.system.ui.lib.application import FontWeight, gui_app
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
-from openpilot.system.ui.widgets.html_render import HtmlModal, HtmlRenderer, ElementType
+from openpilot.system.ui.widgets.html_render import HtmlRenderer, ElementType
 from openpilot.system.ui.lib.scroll_panel import GuiScrollPanel
 from openpilot.system.ui.widgets.button import Button, ButtonStyle
 

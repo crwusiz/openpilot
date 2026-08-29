@@ -136,10 +136,10 @@ class HudRenderer(Widget):
     self._turn_intent = TurnIntent()
     #self._torque_bar = TorqueBar()
 
-    self._txt_wheel: rl.Texture = gui_app.texture('icons_mici/wheel.png', 50, 50)
-    self._txt_wheel_critical: rl.Texture = gui_app.texture('icons_mici/wheel_critical.png', 50, 50)
-    self._txt_wheel_green: rl.Texture = gui_app.texture('icons_mici/wheel_green.png', 50, 50)
-    self._txt_wheel_blue: rl.Texture = gui_app.texture('icons_mici/wheel_blue.png', 50, 50)
+    self._txt_wheel: rl.Texture = gui_app.texture('icons/steer.png', 50, 50)
+    self._txt_wheel_critical: rl.Texture = gui_app.texture('icons/steer_critical.png', 50, 50)
+    self._txt_wheel_green: rl.Texture = gui_app.texture('icons/steer_green.png', 50, 50)
+    self._txt_wheel_blue: rl.Texture = gui_app.texture('icons/steer_blue.png', 50, 50)
 
     self._txt_exclamation_point: rl.Texture = gui_app.texture('icons_mici/exclamation_point.png', 9, 44)
     self._txt_chestnut: rl.Texture = gui_app.texture('icons_mici/chestnut.png', 60, 44)
