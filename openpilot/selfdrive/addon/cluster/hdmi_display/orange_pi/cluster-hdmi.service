@@ -1,0 +1,23 @@
+[Unit]
+Description=C4 network cluster receiver for Orange Pi HDMI
+After=network-online.target systemd-user-sessions.service
+Wants=network-online.target
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+User=orangepi
+Group=orangepi
+SupplementaryGroups=video render input
+WorkingDirectory=/opt/cluster-receiver
+ExecStart=/opt/cluster-receiver/.venv/bin/python /opt/cluster-receiver/cluster_receiver.py --interface wlan0 --port 9200
+Restart=always
+RestartSec=2
+Environment=PYTHONUNBUFFERED=1
+Environment=PYGAME_HIDE_SUPPORT_PROMPT=1
+Environment=SDL_VIDEODRIVER=kmsdrm
+StandardInput=tty-force
+TTYPath=/dev/tty1
+
+[Install]
+WantedBy=multi-user.target

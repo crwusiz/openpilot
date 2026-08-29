@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 from PIL import Image
 
-from openpilot.selfdrive.addon.cluster.cluster_usb_display import TuringUsbDisplay
-from openpilot.selfdrive.addon.cluster.cluster_usb_pipeline import ClusterUsbPipeline
+from openpilot.selfdrive.addon.cluster.cluster_display_pipeline import ClusterDisplayPipeline
+from openpilot.selfdrive.addon.cluster.usb_display.turing_usb_display import TuringUsbDisplay
 
 
 class OverlapDisplay:
@@ -80,9 +80,9 @@ def _wait_for(predicate, timeout=1.0):
   return predicate()
 
 
-def test_encoding_overlaps_blocked_usb_send():
+def test_encoding_overlaps_blocked_send():
   display = OverlapDisplay()
-  pipeline = ClusterUsbPipeline(display)
+  pipeline = ClusterDisplayPipeline(display)
   pipeline.start()
   try:
     pipeline.push("first")
@@ -97,7 +97,7 @@ def test_encoding_overlaps_blocked_usb_send():
 
 def test_reconnect_sends_latest_prepared_frame():
   display = ReconnectDisplay()
-  pipeline = ClusterUsbPipeline(display)
+  pipeline = ClusterDisplayPipeline(display)
   pipeline.start()
   try:
     pipeline.push("stale")
@@ -120,7 +120,7 @@ def test_reconnect_sends_latest_prepared_frame():
 
 def test_image_timeout_is_forwarded_to_usb_transport():
   config = SimpleNamespace(
-    usb_jpeg_quality=68,
+    jpeg_quality=68,
     rotate_180=False,
     usb_image_timeout_ms=1000,
     fps=20,
@@ -146,7 +146,7 @@ def test_image_timeout_is_forwarded_to_usb_transport():
 
 def test_configurable_non_ack_threshold_disconnects():
   config = SimpleNamespace(
-    usb_jpeg_quality=68,
+    jpeg_quality=68,
     rotate_180=False,
     usb_image_timeout_ms=1000,
     usb_max_consecutive_failures=2,
@@ -169,7 +169,7 @@ def test_configurable_non_ack_threshold_disconnects():
 
 def test_send_failure_is_accounted_for():
   display = FailedSendDisplay()
-  pipeline = ClusterUsbPipeline(display)
+  pipeline = ClusterDisplayPipeline(display)
   pipeline.start()
   try:
     pipeline.push("frame")
@@ -182,7 +182,7 @@ def test_send_failure_is_accounted_for():
 
 def test_sender_exception_is_accounted_for_and_thread_survives():
   display = FailedSendDisplay(raises=True)
-  pipeline = ClusterUsbPipeline(display)
+  pipeline = ClusterDisplayPipeline(display)
   pipeline.start()
   try:
     pipeline.push("frame")

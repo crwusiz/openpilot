@@ -4,7 +4,7 @@ import time
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 
 
-class ClusterUsbPipeline:
+class ClusterDisplayPipeline:
   def __init__(self, display):
     self.display = display
     self._condition = threading.Condition()
@@ -15,7 +15,7 @@ class ClusterUsbPipeline:
     self.encoder_thread = None
     self.sender_thread = None
     self._reset_stats()
-    flog("ClusterUsbPipeline initialized.")
+    flog("ClusterDisplayPipeline initialized.")
 
   def _reset_stats(self):
     self._input_frames = 0
@@ -38,11 +38,11 @@ class ClusterUsbPipeline:
         target=self._encoder_loop, name="cluster-jpeg-encoder", daemon=True,
       )
       self.sender_thread = threading.Thread(
-        target=self._sender_loop, name="cluster-usb-sender", daemon=True,
+        target=self._sender_loop, name="cluster-display-sender", daemon=True,
       )
       self.encoder_thread.start()
       self.sender_thread.start()
-    flog("Turing USB Display Pipeline threads started.")
+    flog("Cluster display pipeline threads started.")
 
   def push(self, frame_image):
     if frame_image is None:
@@ -72,7 +72,7 @@ class ClusterUsbPipeline:
     with self._condition:
       if self._closing:
         return
-      # Encoding and USB each have a latest-only slot. This bounds memory and
+      # Encoding and transport each have a latest-only slot. This bounds memory and
       # prevents a slow/reconnecting display from replaying stale frames.
       self._encoded_frames += 1
       if self._pending_prepared is not None:
@@ -200,5 +200,5 @@ class ClusterUsbPipeline:
       self.encoder_thread = None
       self.sender_thread = None
     if stopped:
-      flog("Turing USB Display Pipeline threads stopped.")
+      flog("Cluster display pipeline threads stopped.")
     return stopped

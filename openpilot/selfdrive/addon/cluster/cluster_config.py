@@ -10,9 +10,22 @@ USB_TARGET_FPS = 20
 CLUSTER_STATUS_INTERVAL_SECONDS = 10
 USB_CLEAR_HALT_ON_TIMEOUT = True
 USB_MAX_CONSECUTIVE_FAILURES = 3
-USB_JPEG_QUALITY = 68
+CLUSTER_JPEG_QUALITY = 68
 CAMERA_CONTRAST = 1.08
 CLUSTER_BORDER_SIZE = 10
+
+# C4 and the Orange Pi join the same phone hotspot. C4 listens on every Wi-Fi
+# address, and the Orange Pi discovers this port in its current IPv4 subnet.
+CLUSTER_DISPLAY_TRANSPORT = "network"  # "network" or "usb"
+CLUSTER_ROTATE_180 = False
+CLUSTER_USB_WIDTH = 1920
+CLUSTER_USB_HEIGHT = 462
+CLUSTER_HDMI_WIDTH = 1920
+CLUSTER_HDMI_HEIGHT = 720
+CLUSTER_NETWORK_BIND_HOST = "0.0.0.0"
+CLUSTER_NETWORK_PORT = 9200
+CLUSTER_NETWORK_ACCEPT_TIMEOUT_SECONDS = 0.25
+CLUSTER_NETWORK_ACK_TIMEOUT_SECONDS = 2.5
 
 RGBColor = tuple[int, int, int]
 RGBAColor = tuple[int, int, int, int]
@@ -67,15 +80,20 @@ class ClusterConfig:
   def __init__(self):
     cloudlog.info("Loading Lightweight Cluster Configuration...")
 
-    self.width = 1920
-    self.height = 462
+    self.display_transport = CLUSTER_DISPLAY_TRANSPORT
+    if self.display_transport not in ("network", "usb"):
+      raise ValueError(f"Unsupported cluster display transport: {self.display_transport}")
+    if self.display_transport == "network":
+      self.width, self.height = CLUSTER_HDMI_WIDTH, CLUSTER_HDMI_HEIGHT
+    else:
+      self.width, self.height = CLUSTER_USB_WIDTH, CLUSTER_USB_HEIGHT
     # Road camera and model data are published at 20 Hz on-device.
     self.fps = USB_TARGET_FPS
     self.usb_fps = USB_TARGET_FPS
     self.status_interval_frames = self.fps * CLUSTER_STATUS_INTERVAL_SECONDS
     # carrot-pilot's field-tested JPEG default. This improves camera detail
-    # over quality 60 without materially increasing encode time or USB load.
-    self.usb_jpeg_quality = USB_JPEG_QUALITY
+    # over quality 60 without materially increasing encode time or link load.
+    self.jpeg_quality = CLUSTER_JPEG_QUALITY
     self.border_size = CLUSTER_BORDER_SIZE
     self.content_width = self.width - self.border_size * 2
     self.content_height = self.height - self.border_size * 2
@@ -89,22 +107,22 @@ class ClusterConfig:
     self.usb_clear_halt_on_timeout = USB_CLEAR_HALT_ON_TIMEOUT
     self.usb_max_consecutive_failures = USB_MAX_CONSECUTIVE_FAILURES
 
+    self.network_bind_host = CLUSTER_NETWORK_BIND_HOST
+    self.network_port = CLUSTER_NETWORK_PORT
+    self.network_accept_timeout = CLUSTER_NETWORK_ACCEPT_TIMEOUT_SECONDS
+    self.network_ack_timeout = CLUSTER_NETWORK_ACK_TIMEOUT_SECONDS
+
     self.BASEDIR = Path(__file__).resolve().parents[3]
     self.font_bold = os.path.join(self.BASEDIR, "selfdrive", "assets", "fonts", "Inter-Bold.ttf")
     self.font_regular = os.path.join(self.BASEDIR, "selfdrive", "assets", "fonts", "Inter-Regular.ttf")
 
     self.params = Params()
     self.is_metric = self.params.get_bool("IsMetric")
-    self.rotate_180 = self.params.get_bool("ClusterRotate")
+    self.rotate_180 = CLUSTER_ROTATE_180
 
     self.speed_unit = "km/h" if self.is_metric else "mph"
 
     cloudlog.info(
-      f"Cluster Config Loaded: {self.width}x{self.height} @ {self.fps}fps, Unit: {self.speed_unit}, Rotate 180: {self.rotate_180}",
+      f"Cluster Config Loaded: {self.width}x{self.height} @ {self.fps}fps, Unit: {self.speed_unit}, "
+      + f"Rotate 180: {self.rotate_180}, Transport: {self.display_transport}",
     )
-
-  def refresh(self):
-    rotate_180 = self.params.get_bool("ClusterRotate")
-    if rotate_180 != self.rotate_180:
-      self.rotate_180 = rotate_180
-      cloudlog.info(f"Cluster rotation changed: 180={self.rotate_180}")

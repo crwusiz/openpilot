@@ -12,7 +12,7 @@ ADDON_PYTHONPATH = os.environ.get("ADDON_PYTHONPATH")
 if ADDON_PYTHONPATH and ADDON_PYTHONPATH not in sys.path:
   sys.path.insert(0, ADDON_PYTHONPATH)
 
-VENDOR_ROOT = Path(__file__).resolve().parent / "cluster" / ".vendor" / "turing-smart-screen-python-main"
+VENDOR_ROOT = Path(__file__).resolve().parent / "cluster" / "usb_display" / ".vendor" / "turing-smart-screen-python-main"
 if str(VENDOR_ROOT) not in sys.path:
   sys.path.insert(0, str(VENDOR_ROOT))
 
@@ -43,7 +43,7 @@ def main() -> None:
   except Exception as e:
     cloudlog.warning(f"Failed to set cluster CPU affinity to {CLUSTER_CORES}: {e}")
 
-  cloudlog.info("Starting Cluster (Turing 9.2 inch Display) process...")
+  cloudlog.info("Starting cluster display process...")
 
   try:
     from openpilot.selfdrive.addon.cluster.main import cluster_main

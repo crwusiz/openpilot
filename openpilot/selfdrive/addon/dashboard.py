@@ -493,8 +493,7 @@ def render_tab_toggles():
     ("RadarTrackEnable", "Enable Radar Track use", "Enable Radar Track use (disable AEB)"),
     ("CabinCameraOnReverse", "Cabin Camera On Reverse", "Displays the Cabin camera when in reverse"),
     ("CabinCameraHardwareMissing", "Cabin Camera Hardware Missing", "Drive without the Cabin camera"),
-    ("ClusterEnable", "Cluster Enable", "Enable Turzx 9.2 inch Cluster"),
-    ("ClusterRotate", "Cluster Rotate 180˚", "Turzx 9.2 inch Cluster Rotate 180˚"),
+    ("ClusterEnable", "Cluster Enable", "Enable Addon Cluster"),
     ("LanguageSetting", "Language (en/ko)", "Switch language between English and Korean"),
   ]
 

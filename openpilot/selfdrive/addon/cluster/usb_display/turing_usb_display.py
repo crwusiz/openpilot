@@ -1,13 +1,9 @@
-from io import BytesIO
 import time
-from typing import NamedTuple
 
-import cv2
-import numpy as np
-from PIL import Image
 import usb.util
 import usb.core
 
+from openpilot.selfdrive.addon.cluster.cluster_jpeg import ClusterJpegEncoder
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 
 TURZX_USB_VENDOR_ID = 0x1CBE
@@ -15,12 +11,6 @@ TURZX_USB_PRODUCT_IDS = {
   0x0092: "TURZX 9.2 inch",
 }
 TURZX_BRIGHTNESS_PERCENT = 100
-
-
-class PreparedFrame(NamedTuple):
-  jpeg: memoryview
-  size_kb: int
-  prepare_elapsed: float
 
 
 class TuringUsbDisplay:
@@ -35,14 +25,8 @@ class TuringUsbDisplay:
     self.max_consecutive_upload_failures = max(
       1, int(getattr(config, "usb_max_consecutive_failures", 3)),
     )
-    self.jpeg_quality = min(max(int(getattr(config, "usb_jpeg_quality", 68)), 1), 95)
-    # Baseline, non-optimized JPEG is the fastest path for continuously
-    # changing camera frames. 68 matches carrot-pilot's stable USB default.
-    self._encode_param = [
-      int(cv2.IMWRITE_JPEG_QUALITY), self.jpeg_quality,
-      int(cv2.IMWRITE_JPEG_PROGRESSIVE), 0,
-      int(cv2.IMWRITE_JPEG_OPTIMIZE), 0,
-    ]
+    self.encoder = ClusterJpegEncoder(config, transport="usb")
+    self.jpeg_quality = self.encoder.jpeg_quality
     self._perf_started = None
     self._perf_frames = 0
     self._perf_prepare_time = 0.0
@@ -161,48 +145,7 @@ class TuringUsbDisplay:
       return False
 
   def prepare_image(self, frame_image):
-    """Rotate and encode a frame without touching the USB device."""
-    try:
-      prepare_started = time.monotonic()
-      if isinstance(frame_image, Image.Image):
-        # Renderer output is already RGB/PIL. Keeping it in Pillow removes the
-        # PIL -> NumPy copy plus OpenCV's rotate and RGB -> BGR passes.
-        rotation = Image.Transpose.ROTATE_90 if getattr(self.config, "rotate_180", False) \
-                   else Image.Transpose.ROTATE_270
-        rotated = frame_image.transpose(rotation)
-        encoded_buffer = BytesIO()
-        rotated.save(encoded_buffer, format="JPEG", quality=self.jpeg_quality,
-                     progressive=False, optimize=False, subsampling=2)
-        jpg_data = encoded_buffer.getbuffer()
-        success = True
-      else:
-        if not isinstance(frame_image, np.ndarray):
-          frame_image = np.asarray(frame_image)
-
-        # Compatibility path used by shutdown's generated black NumPy frame.
-        rotation = cv2.ROTATE_90_COUNTERCLOCKWISE if getattr(self.config, "rotate_180", False) \
-                   else cv2.ROTATE_90_CLOCKWISE
-        rotated = cv2.rotate(frame_image, rotation)
-        cv2.cvtColor(rotated, cv2.COLOR_RGB2BGR, dst=rotated)
-        success, encoded_img = cv2.imencode('.jpg', rotated, self._encode_param)
-        jpg_data = memoryview(encoded_img) if success else None
-
-      if not success or jpg_data is None:
-        flog("[CLUSTER_USB_ERROR] JPEG encoding failed; skipping frame.")
-        return None
-
-      # The memoryview owns a reference to the Pillow/OpenCV backing buffer,
-      # keeping it valid until the USB sender finishes with this frame.
-      return PreparedFrame(
-        jpeg=jpg_data,
-        size_kb=len(jpg_data) // 1024,
-        prepare_elapsed=time.monotonic() - prepare_started,
-      )
-    except Exception as e:
-      # Encoding failures are independent of the USB connection and must not
-      # force a device reconnect.
-      flog(f"[CLUSTER_USB_ERROR] Failed to encode display frame: {e}")
-      return None
+    return self.encoder.prepare_image(frame_image)
 
   def send_prepared(self, prepared):
     """Upload an already encoded frame and account for transport performance."""

@@ -7,11 +7,19 @@ from openpilot.common.swaglog import cloudlog
 
 from openpilot.selfdrive.addon.cluster.cluster_config import ClusterConfig
 from openpilot.selfdrive.addon.cluster.cluster_logging import close_log, flog, initialize_log
-from openpilot.selfdrive.addon.cluster.cluster_usb_display import TuringUsbDisplay
-from openpilot.selfdrive.addon.cluster.cluster_usb_pipeline import ClusterUsbPipeline
+from openpilot.selfdrive.addon.cluster.cluster_display_pipeline import ClusterDisplayPipeline
 from openpilot.selfdrive.addon.cluster.cluster_live_camera import ClusterLiveCamera
 from openpilot.selfdrive.addon.cluster.cluster_models import ClusterModels
 from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer
+
+
+def create_cluster_display(config):
+  if config.display_transport == "network":
+    from openpilot.selfdrive.addon.cluster.hdmi_display.network_display import ClusterNetworkDisplay
+    return ClusterNetworkDisplay(config)
+  from openpilot.selfdrive.addon.cluster.usb_display.turing_usb_display import TuringUsbDisplay
+  return TuringUsbDisplay(config)
+
 
 def cluster_main():
   initialize_log()
@@ -19,11 +27,11 @@ def cluster_main():
   cloudlog.info("Initializing Cluster Config...")
   config = ClusterConfig()
 
-  display = TuringUsbDisplay(config)
+  display = create_cluster_display(config)
   if hasattr(display, 'open'):
     display.open()
 
-  pipeline = ClusterUsbPipeline(display)
+  pipeline = ClusterDisplayPipeline(display)
   pipeline.start()
 
   camera = ClusterLiveCamera(config)
@@ -60,14 +68,11 @@ def cluster_main():
 
       loop_count += 1
       perf_frames += 1
-      if loop_count % fps == 0:
-        config.refresh()
-
       if loop_count % status_interval_frames == 0:
         stats = pipeline.get_stats()
         flog(
           f"[CLUSTER_HEARTBEAT] Loop: {loop_count} | Camera Ready: {camera.has_frame()} | "
-          + f"USB Connected: {display.connected} | Sent: {stats['sent']} | "
+          + f"Transport: {config.display_transport} | Connected: {display.connected} | Sent: {stats['sent']} | "
           + f"Dropped: raw={stats['dropped_raw']}, encoded={stats['dropped_prepared']} | "
           + f"Send failures: {stats['send_failures']}",
         )
@@ -86,7 +91,7 @@ def cluster_main():
     flog("[CLUSTER_MAIN] Interrupted by user.")
   finally:
     flog("[CLUSTER_MAIN] Closing resources...")
-    # Stop pending/background USB writes before sending the final black frame.
+    # Stop pending/background transport writes before sending the final black frame.
     # This prevents an older queued frame from racing with shutdown cleanup.
     pipeline_stopped = pipeline.close() if hasattr(pipeline, 'close') else True
     if pipeline_stopped:
@@ -98,7 +103,7 @@ def cluster_main():
       if hasattr(display, 'close'):
         display.close()
     else:
-      flog("[CLUSTER_MAIN] Skipping display cleanup while USB worker is still active.")
+      flog("[CLUSTER_MAIN] Skipping display cleanup while transport worker is still active.")
     if hasattr(camera, 'close'):
       camera.close()
     if hasattr(models, 'close'):
