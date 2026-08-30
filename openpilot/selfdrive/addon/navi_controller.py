@@ -62,6 +62,7 @@ NAVI_ACTIVE_MAX = 32767
 class NaviServer:
   def __init__(self, start_broadcast=True):
     self.json_road_limit = None
+    self.json_traffic_signal = None
     self.active = 0
     self.last_updated = 0
     self.last_updated_active = 0
@@ -204,6 +205,9 @@ class NaviServer:
             self.last_updated = time.monotonic()
             log.debug(f"[3843 RECV] {json_obj['road_limit']}")
 
+          if 'traffic_signal' in json_obj:
+            self.json_traffic_signal = json_obj['traffic_signal']
+
     except Exception as e:
       log.debug(f"Exception in udp_recv: {e}")
 
@@ -214,6 +218,7 @@ class NaviServer:
     with self.lock:
       if now - self.last_updated > 6.:
         self.json_road_limit = None
+        self.json_traffic_signal = None
 
       if now - self.last_updated_active > 6.:
         self.active = 0
@@ -222,6 +227,9 @@ class NaviServer:
   def get_limit_val(self, key, default=None):
     value = self.get_json_val(self.json_road_limit, key, default)
     return int(value) if key in NAVI_INT_FIELDS and value is not None else value
+
+  def get_ts_val(self, key, default=None):
+    return self.get_json_val(self.json_traffic_signal, key, default)
 
   def get_json_val(self, json_data, key, default=None):
     if json_data is None:
@@ -262,6 +270,17 @@ def publish_thread(server):
       navi.camSpeedFactor = server.get_limit_val("cam_speed_factor", 1.0)
       navi.currentRoadName = server.get_limit_val("current_road_name", "")
       last_updated = server.last_updated
+
+      ts = {
+        'isGreenLightOn': server.get_ts_val("isGreenLightOn", False),
+        'isLeftLightOn': server.get_ts_val("isLeftLightOn", False),
+        'isRedLightOn': server.get_ts_val("isRedLightOn", False),
+        'greenLightRemainTime': server.get_ts_val("greenLightRemainTime", 0),
+        'leftLightRemainTime': server.get_ts_val("leftLightRemainTime", 0),
+        'redLightRemainTime': server.get_ts_val("redLightRemainTime", 0),
+        'distance': server.get_ts_val("distance", 0)
+      }
+      navi.ts = ts
 
     if sm.updated['carState']:
       current_v_ego = sm['carState'].vEgo

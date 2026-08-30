@@ -24,6 +24,17 @@ struct NaviData @0x81c2f05a394cf4af {
   sectionAdjustSpeed @10 :Bool;
   camSpeedFactor @11 :Float32;
   currentRoadName @12 :Text;
+  ts @13 :TrafficSignal;
+
+  struct TrafficSignal {
+    isGreenLightOn @0 :Bool;
+    isLeftLightOn @1 :Bool;
+    isRedLightOn @2 :Bool;
+    greenLightRemainTime @3 :Int16;
+    leftLightRemainTime @4 :Int16;
+    redLightRemainTime @5 :Int16;
+    distance @6 :Int16;
+  }
 }
 
 struct CustomReserved1 @0xaedffd8f31e7b55d {
