@@ -1,7 +1,5 @@
 import numpy as np
 
-from openpilot.common.params import Params
-
 # conversions
 class CV:
   # Speed
@@ -27,6 +25,8 @@ ACCELERATION_DUE_TO_GRAVITY = 9.81  # m/s^2
 
 class UnitConverter:
   def __init__(self):
+    from openpilot.common.params import Params
+
     self.params = Params()
     self.is_metric = self.params.get_bool("IsMetric")
 
