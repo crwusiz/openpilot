@@ -3,11 +3,13 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
+import logging
+from logging.handlers import RotatingFileHandler
+import time
 
 import numpy as np
 
 from openpilot.common.filter_simple import StreamingMovingAverage
-from openpilot.common.constants import UnitConverter
 
 
 # Pull the virtual stop line toward the car at speed so the stationary-obstacle
@@ -30,6 +32,53 @@ TRAFFIC_STOP_LEAD_DISTANCE_MARGIN_M = 2.0
 TRAFFIC_STOP_TARGET_BUFFER_M = 1.0
 TRAFFIC_STOP_PREPARE_SPEED_KPH = 5.0
 TRAFFIC_STOP_PREPARE_DISTANCE_M = 5.0
+TRAFFIC_STOPPED_SPEED_KPH = 1.0
+TRAFFIC_MODEL_STOP_MAX_DISTANCE_M = 20.0
+TRAFFIC_MODEL_STOP_MAX_TERMINAL_SPEED_MPS = 10.0
+TRAFFIC_MODEL_GO_MIN_DISTANCE_M = 20.0
+TRAFFIC_MODEL_GO_MIN_TERMINAL_SPEED_MPS = 5.0
+TRAFFIC_MODEL_GO_SPEED_DELTA_MPS = 2.0
+TRAFFIC_MODEL_MAX_STOP_DETECTION_SPEED_KPH = 82.0
+TRAFFIC_STOP_EVIDENCE_CONFIRM_S = 0.2
+TRAFFIC_GO_EVIDENCE_CONFIRM_S = 1.0
+TRAFFIC_EVIDENCE_DECAY_RATE = 2.0
+TRAFFIC_STOPPED_HOLD_S = 0.5
+TRAFFIC_MANUAL_RELEASE_SUPPRESS_S = 10.0
+TRAFFIC_DEBUG_LOG = "/data/traffic_debug.log"
+TRAFFIC_DEBUG_LOG_INTERVAL_S = 0.5
+TRAFFIC_DEBUG_LOG_MAX_BYTES = 10 * 1024 * 1024
+TRAFFIC_DEBUG_LOG_BACKUP_COUNT = 2
+MS_TO_KPH = 3.6
+
+
+def _setup_traffic_logger() -> logging.Logger:
+  logger = logging.getLogger("traffic")
+  logger.setLevel(logging.DEBUG)
+  logger.propagate = False
+
+  if any(isinstance(handler, RotatingFileHandler) and handler.baseFilename == TRAFFIC_DEBUG_LOG
+         for handler in logger.handlers):
+    return logger
+
+  try:
+    handler = RotatingFileHandler(
+      TRAFFIC_DEBUG_LOG,
+      mode="a",
+      maxBytes=TRAFFIC_DEBUG_LOG_MAX_BYTES,
+      backupCount=TRAFFIC_DEBUG_LOG_BACKUP_COUNT,
+    )
+    handler.setFormatter(logging.Formatter(
+      "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s",
+      datefmt="%H:%M:%S",
+    ))
+    logger.addHandler(handler)
+  except OSError:
+    pass
+
+  return logger
+
+
+traffic_log = _setup_traffic_logger()
 
 
 class XState(Enum):
@@ -42,9 +91,16 @@ class XState(Enum):
 
 
 class TrafficState(Enum):
+  """Compatibility state published to longitudinalPlan; inferred from model motion, not signal color."""
   off = 0
   red = 1
   green = 2
+
+
+class ModelMotion(Enum):
+  unknown = 0
+  stopping = 1
+  starting = 2
 
 
 @dataclass(frozen=True)
@@ -52,6 +108,122 @@ class TrafficStopPlan:
   raw_stop_distance: float
   stop_distance: float
   signal_stop_active: bool
+
+
+@dataclass(frozen=True)
+class TrafficModelObservation:
+  valid: bool
+  initial_velocity: float
+  terminal_velocity: float
+  filtered_terminal_velocity: float
+  terminal_distance: float
+  lateral_offset: float
+  stop_evidence: bool
+  go_evidence: bool
+
+
+class TrafficMotionDetector:
+  """Convert model trajectory endpoints into time-qualified stop/go evidence."""
+
+  def __init__(self, dt: float):
+    self.dt = float(dt)
+    self.v_filter = StreamingMovingAverage(10)
+    self.motion = ModelMotion.unknown
+    self.stop_evidence_time = 0.0
+    self.go_evidence_time = 0.0
+
+  def reset(self) -> None:
+    self.v_filter = StreamingMovingAverage(10)
+    self.motion = ModelMotion.unknown
+    self.stop_evidence_time = 0.0
+    self.go_evidence_time = 0.0
+
+  @staticmethod
+  def _invalid_observation() -> TrafficModelObservation:
+    return TrafficModelObservation(False, np.nan, np.nan, np.nan, np.nan, np.nan, False, False)
+
+  def update(self, velocity, v_ego_kph: float, model_x: float, y, lead_distance: float) -> TrafficModelObservation:
+    try:
+      if len(velocity) == 0 or len(y) == 0:
+        return self._invalid_observation()
+      initial_velocity = float(velocity[0])
+      terminal_velocity = float(velocity[-1])
+      terminal_distance = float(model_x)
+      lateral_offset = float(y[-1])
+      lead_distance = float(lead_distance)
+    except (IndexError, TypeError, ValueError):
+      return self._invalid_observation()
+
+    if not all(np.isfinite(value) for value in
+               (initial_velocity, terminal_velocity, terminal_distance, lateral_offset, lead_distance)):
+      return self._invalid_observation()
+
+    filtered_terminal_velocity = self.v_filter.process(terminal_velocity)
+
+    stop_evidence = False
+    if v_ego_kph < TRAFFIC_STOPPED_SPEED_KPH:
+      stop_evidence = (terminal_distance < TRAFFIC_MODEL_STOP_MAX_DISTANCE_M and
+                       filtered_terminal_velocity < TRAFFIC_MODEL_STOP_MAX_TERMINAL_SPEED_MPS)
+    elif v_ego_kph < TRAFFIC_MODEL_MAX_STOP_DETECTION_SPEED_KPH:
+      stop_distance_threshold = np.interp(
+        initial_velocity,
+        [60.0 / 3.6, 80.0 / 3.6],
+        [120.0, 150.0],
+      )
+      stop_evidence = (terminal_distance < lead_distance - 3.0 and
+                       terminal_distance < stop_distance_threshold and
+                       (filtered_terminal_velocity < 3.0 or
+                        filtered_terminal_velocity < initial_velocity * 0.7) and
+                       abs(lateral_offset) < 5.0)
+
+    if v_ego_kph < TRAFFIC_STOPPED_SPEED_KPH:
+      go_speed_evidence = filtered_terminal_velocity > TRAFFIC_MODEL_GO_MIN_TERMINAL_SPEED_MPS
+    else:
+      go_speed_evidence = (filtered_terminal_velocity > TRAFFIC_MODEL_GO_MIN_TERMINAL_SPEED_MPS or
+                           filtered_terminal_velocity > initial_velocity + TRAFFIC_MODEL_GO_SPEED_DELTA_MPS)
+    go_evidence = (not stop_evidence and
+                   terminal_distance >= TRAFFIC_MODEL_GO_MIN_DISTANCE_M and
+                   go_speed_evidence)
+
+    observation = TrafficModelObservation(
+      True,
+      initial_velocity,
+      terminal_velocity,
+      filtered_terminal_velocity,
+      terminal_distance,
+      lateral_offset,
+      stop_evidence,
+      go_evidence,
+    )
+    self._update_motion(observation)
+    return observation
+
+  def _update_motion(self, observation: TrafficModelObservation) -> None:
+    if not observation.valid:
+      return
+
+    self.stop_evidence_time = self._update_evidence_time(
+      self.stop_evidence_time,
+      observation.stop_evidence,
+      TRAFFIC_STOP_EVIDENCE_CONFIRM_S,
+    )
+    self.go_evidence_time = self._update_evidence_time(
+      self.go_evidence_time,
+      observation.go_evidence,
+      TRAFFIC_GO_EVIDENCE_CONFIRM_S,
+    )
+
+    if self.stop_evidence_time >= TRAFFIC_STOP_EVIDENCE_CONFIRM_S:
+      self.motion = ModelMotion.stopping
+    elif self.go_evidence_time >= TRAFFIC_GO_EVIDENCE_CONFIRM_S:
+      self.motion = ModelMotion.starting
+    elif self.stop_evidence_time == 0.0 and self.go_evidence_time == 0.0:
+      self.motion = ModelMotion.unknown
+
+  def _update_evidence_time(self, current: float, active: bool, maximum: float) -> float:
+    if active:
+      return min(maximum, current + self.dt)
+    return max(0.0, current - self.dt * TRAFFIC_EVIDENCE_DECAY_RATE)
 
 
 class TrafficStopDistanceTracker:
@@ -157,63 +329,95 @@ class TrafficStopController:
   def __init__(self, dt: float):
     self.dt = float(dt)
     self.distance_tracker = TrafficStopDistanceTracker()
-    self.conv = UnitConverter()
-    self.v_filter = StreamingMovingAverage(10)
+    self.motion_detector = TrafficMotionDetector(dt)
     self.traffic_state = TrafficState.off
     self.x_state = XState.cruise
     self.x_stop = 0.0
-    self.stopping_count = 0
-    self.traffic_starting_count = 0
-    self.start_sign_count = 0
-    self.stop_sign_count = 0
+    self.signal_stop_latched = False
+    self.stopped_hold_time = 0.0
+    self.stop_entry_suppression_time = 0.0
     self.adjusted_stop_distance = 0.0
     self.reference_speed_kph: float | None = None
+    self._last_debug_log_time = 0.0
     self.reset()
 
   def reset(self) -> None:
     self.distance_tracker.reset()
-    self.v_filter = StreamingMovingAverage(10)
+    self.motion_detector.reset()
     self.traffic_state = TrafficState.off
     self.x_state = XState.cruise
     self.x_stop = 0.0
-    self.stopping_count = 0
-    self.traffic_starting_count = 0
-    self.start_sign_count = 0
-    self.stop_sign_count = 0
+    self.signal_stop_latched = False
+    self.stopped_hold_time = 0.0
+    self.stop_entry_suppression_time = 0.0
     self.adjusted_stop_distance = 0.0
     self.reference_speed_kph: float | None = None
+    self._last_debug_log_time = 0.0
 
   def update(self, car_state, model, radar_state, comfort_brake: float) -> TrafficStopPlan:
+    previous_state = (self.traffic_state, self.x_state, self.signal_stop_latched, self.motion_detector.motion)
     v_ego = max(0.0, float(car_state.vEgo))
-    v_ego_kph = self.conv.ms_to_kph(v_ego)
+    v_ego_kph = v_ego * MS_TO_KPH
     ego_distance = v_ego * self.dt
 
-    self.x_stop = self.distance_tracker.update(model.position.x[31], ego_distance)
+    self.x_stop = self.distance_tracker.update(self._get_model_stop_distance(model), ego_distance)
     raw_stop_distance = self.x_stop
 
     lead_present = bool(radar_state.leadOne.present)
     lead_distance = float(radar_state.leadOne.dRel) if lead_present else TRAFFIC_STOP_INACTIVE_DISTANCE_M
-    self._check_model_stopping(model.velocity.x, v_ego_kph, model.position.x[-1], model.position.y, lead_distance)
+    if not np.isfinite(lead_distance):
+      lead_present = False
+      lead_distance = TRAFFIC_STOP_INACTIVE_DISTANCE_M
+    observation = self._update_motion_detector(model, v_ego_kph, lead_distance)
+    self.stop_entry_suppression_time = max(0.0, self.stop_entry_suppression_time - self.dt)
+
+    gas_pressed = bool(car_state.gasPressed)
+    left_blinker = bool(car_state.leftBlinker)
+    entry_allowed = is_traffic_stop_entry_allowed(car_state.steeringAngleDeg)
+
+    if gas_pressed:
+      self.signal_stop_latched = False
+      self.stop_entry_suppression_time = TRAFFIC_MANUAL_RELEASE_SUPPRESS_S
+    elif (observation.valid and
+          self.motion_detector.motion == ModelMotion.stopping and
+          self.stop_entry_suppression_time == 0.0 and
+          (self.signal_stop_latched or entry_allowed)):
+      self.signal_stop_latched = True
+    elif (observation.valid and
+          self.signal_stop_latched and
+          self.motion_detector.motion == ModelMotion.starting and
+          not left_blinker):
+      self.signal_stop_latched = False
+
+    if self.signal_stop_latched:
+      self.traffic_state = TrafficState.red
+    elif not observation.valid:
+      self.traffic_state = TrafficState.off
+    elif self.motion_detector.motion == ModelMotion.stopping:
+      self.traffic_state = TrafficState.red
+    elif self.motion_detector.motion == ModelMotion.starting:
+      self.traffic_state = TrafficState.green
+    else:
+      self.traffic_state = TrafficState.off
 
     filtered_stop_distance = self.x_stop
 
     if self.x_state == XState.e2eStopped:
-      self.stopping_count = max(0, int(self.stopping_count) - 1)
-      if car_state.gasPressed:
+      self.stopped_hold_time = max(0.0, self.stopped_hold_time - self.dt)
+      if gas_pressed:
         self.x_state = XState.e2ePrepare
       elif lead_present and (lead_distance - filtered_stop_distance) < TRAFFIC_STOP_LEAD_DISTANCE_MARGIN_M:
         self.x_state = XState.lead
-      elif self.stopping_count == 0 and self.traffic_state == TrafficState.green and not car_state.leftBlinker:
+      elif self.stopped_hold_time == 0.0 and not self.signal_stop_latched:
         self.x_state = XState.e2ePrepare
 
     elif self.x_state == XState.e2eStop:
-      self.stopping_count = 0
-      if car_state.gasPressed:
+      self.stopped_hold_time = 0.0
+      if gas_pressed:
         self.x_state = XState.e2eCruise
-        self.traffic_starting_count = 10.0 / self.dt
       elif lead_present and (lead_distance - filtered_stop_distance) < TRAFFIC_STOP_LEAD_DISTANCE_MARGIN_M:
         self.x_state = XState.lead
-      elif self.traffic_state == TrafficState.green:
+      elif not self.signal_stop_latched:
         self.x_state = XState.e2eCruise
       else:
         reference_speed_kph = get_traffic_stop_reference_speed(v_ego_kph, self.reference_speed_kph)
@@ -223,25 +427,22 @@ class TrafficStopController:
           self.adjusted_stop_distance = stop_distance
         filtered_stop_distance = 0.0
         if v_ego < 0.3:
-          self.stopping_count = int(0.5 / self.dt)
+          self.stopped_hold_time = TRAFFIC_STOPPED_HOLD_S
           self.x_state = XState.e2eStopped
 
     elif self.x_state == XState.e2ePrepare:
       if lead_present:
         self.x_state = XState.lead
-      elif v_ego_kph < TRAFFIC_STOP_PREPARE_SPEED_KPH and self.traffic_state != TrafficState.green:
+      elif v_ego_kph < TRAFFIC_STOP_PREPARE_SPEED_KPH and self.signal_stop_latched:
         self.x_state = XState.e2eStop
         self.adjusted_stop_distance = TRAFFIC_STOP_PREPARE_DISTANCE_M
       elif v_ego_kph > TRAFFIC_STOP_PREPARE_SPEED_KPH:
         self.x_state = XState.e2eCruise
 
     else:  # XState.lead, XState.cruise, XState.e2eCruise
-      self.traffic_starting_count = max(0, self.traffic_starting_count - 1)
       if lead_present:
         self.x_state = XState.lead
-      elif (self.traffic_state == TrafficState.red and
-            is_traffic_stop_entry_allowed(car_state.steeringAngleDeg) and
-            self.traffic_starting_count == 0):
+      elif self.signal_stop_latched:
         self.x_state = XState.e2eStop
         reference_speed_kph = get_traffic_stop_reference_speed(v_ego_kph, None)
         self.reference_speed_kph = reference_speed_kph
@@ -249,13 +450,10 @@ class TrafficStopController:
       else:
         self.x_state = XState.e2eCruise
 
-    signal_stop_active = self.x_state in (XState.e2eStop, XState.e2eStopped)
-    if self.traffic_state in (TrafficState.off, TrafficState.green) or not signal_stop_active:
-      filtered_stop_distance = TRAFFIC_STOP_INACTIVE_DISTANCE_M
-
     self.adjusted_stop_distance = max(0.0, self.adjusted_stop_distance - ego_distance)
-
-    if filtered_stop_distance == TRAFFIC_STOP_INACTIVE_DISTANCE_M:
+    signal_stop_active = self.signal_stop_latched
+    if not signal_stop_active:
+      filtered_stop_distance = TRAFFIC_STOP_INACTIVE_DISTANCE_M
       self.adjusted_stop_distance = 0.0
       self.reference_speed_kph = None
     elif self.adjusted_stop_distance > 0.0:
@@ -263,28 +461,79 @@ class TrafficStopController:
 
     stop_distance = filtered_stop_distance + self.adjusted_stop_distance
     stop_distance = max(stop_distance, v_ego ** 2 / (2.0 * float(comfort_brake)))
-    return TrafficStopPlan(raw_stop_distance, stop_distance, signal_stop_active)
+    plan = TrafficStopPlan(raw_stop_distance, stop_distance, signal_stop_active)
+    self._log_debug(
+      model,
+      car_state,
+      observation,
+      lead_present,
+      lead_distance,
+      plan,
+      previous_state != (self.traffic_state, self.x_state, self.signal_stop_latched, self.motion_detector.motion),
+    )
+    return plan
 
-  def _check_model_stopping(self, velocity, v_ego_kph: float, model_x: float, y, lead_distance: float) -> None:
-    model_v = self.v_filter.process(velocity[-1])
-    start_sign = model_v > 5.0 or model_v > (velocity[0] + 2.0)
+  @staticmethod
+  def _get_model_stop_distance(model) -> float:
+    try:
+      return float(model.position.x[31])
+    except (AttributeError, IndexError, TypeError, ValueError):
+      return np.nan
 
-    stop_sign = False
-    if v_ego_kph < 1.0:
-      stop_sign = model_x < 20.0 and model_v < 10.0
-    elif v_ego_kph < 82.0:
-      stop_distance_threshold = np.interp(velocity[0], [60.0 / 3.6, 80.0 / 3.6], [120.0, 150.0])
-      stop_sign = (model_x < lead_distance - 3.0 and
-                   model_x < stop_distance_threshold and
-                   (model_v < 3.0 or model_v < velocity[0] * 0.7) and
-                   abs(y[-1]) < 5.0)
+  def _update_motion_detector(self, model, v_ego_kph: float, lead_distance: float) -> TrafficModelObservation:
+    try:
+      return self.motion_detector.update(
+        model.velocity.x,
+        v_ego_kph,
+        model.position.x[-1],
+        model.position.y,
+        lead_distance,
+      )
+    except (AttributeError, IndexError, TypeError, ValueError):
+      return self.motion_detector.update([], v_ego_kph, np.nan, [], lead_distance)
 
-    self.stop_sign_count = min(20, self.stop_sign_count + 1) if stop_sign else max(0, self.stop_sign_count - 2)
-    self.start_sign_count = min(20, self.start_sign_count + 1) if start_sign and not stop_sign else max(0, self.start_sign_count - 2)
+  def _log_debug(self, model, car_state, observation: TrafficModelObservation,
+                 lead_present: bool, lead_distance: float, plan: TrafficStopPlan,
+                 state_changed: bool) -> None:
+    now = time.monotonic()
+    should_sample = (plan.signal_stop_active or
+                     self.motion_detector.stop_evidence_time > 0.0 or
+                     self.motion_detector.go_evidence_time > 0.0 or
+                     not observation.valid)
+    if not state_changed and (not should_sample or now - self._last_debug_log_time < TRAFFIC_DEBUG_LOG_INTERVAL_S):
+      return
 
-    if self.stop_sign_count > 3:
-      self.traffic_state = TrafficState.red
-    elif self.start_sign_count > 5:
-      self.traffic_state = TrafficState.green
-    elif self.stop_sign_count == 0 and self.start_sign_count == 0:
-      self.traffic_state = TrafficState.off
+    self._last_debug_log_time = now
+    event = "transition" if state_changed else ("invalid" if not observation.valid else "sample")
+    traffic_log.debug(
+      "event=%s big=%d valid=%d motion=%s traffic=%s x_state=%s latch=%d signal_active=%d "
+      "v_ego=%.2f initial_v=%.2f terminal_v=%.2f filtered_v=%.2f terminal_x=%.2f lateral_y=%.2f "
+      "stop_ev=%d go_ev=%d stop_ev_s=%.2f go_ev_s=%.2f raw_stop=%.2f stop=%.2f adjusted=%.2f "
+      "lead=%d lead_d=%.2f gas=%d left_blinker=%d suppress_s=%.2f",
+      event,
+      int(bool(getattr(model, "big", False))),
+      int(observation.valid),
+      self.motion_detector.motion.name,
+      self.traffic_state.name,
+      self.x_state.name,
+      int(self.signal_stop_latched),
+      int(plan.signal_stop_active),
+      max(0.0, float(car_state.vEgo)),
+      observation.initial_velocity,
+      observation.terminal_velocity,
+      observation.filtered_terminal_velocity,
+      observation.terminal_distance,
+      observation.lateral_offset,
+      int(observation.stop_evidence),
+      int(observation.go_evidence),
+      self.motion_detector.stop_evidence_time,
+      self.motion_detector.go_evidence_time,
+      plan.raw_stop_distance,
+      plan.stop_distance,
+      self.adjusted_stop_distance,
+      int(lead_present),
+      lead_distance,
+      int(bool(car_state.gasPressed)),
+      int(bool(car_state.leftBlinker)),
+      self.stop_entry_suppression_time,
+    )
