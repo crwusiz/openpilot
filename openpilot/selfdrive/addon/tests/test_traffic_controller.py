@@ -98,6 +98,20 @@ def test_sustained_big_model_go_prediction_releases_stop():
   assert not plans[-1].signal_stop_active
 
 
+def test_moving_stop_requires_additional_go_confirmation_before_release():
+  controller = TrafficStopController(dt=0.05)
+  car_state, model, radar_state = make_inputs(v_ego=10.0, model_distance=80.0)
+  plans = [controller.update(car_state, model, radar_state, comfort_brake=1.5) for _ in range(4)]
+  assert plans[-1].signal_stop_active
+
+  set_go_prediction(model)
+  plans = [controller.update(car_state, model, radar_state, comfort_brake=1.5) for _ in range(40)]
+  assert plans[-1].signal_stop_active
+
+  plans = [controller.update(car_state, model, radar_state, comfort_brake=1.5) for _ in range(20)]
+  assert not plans[-1].signal_stop_active
+
+
 def test_invalid_model_output_keeps_latched_stop_and_filter_recovers():
   controller = TrafficStopController(dt=0.05)
   car_state, model, radar_state = enter_stopped_signal_state(controller)

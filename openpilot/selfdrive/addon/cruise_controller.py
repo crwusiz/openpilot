@@ -28,6 +28,9 @@ GAS_PRESSED_OVERRIDE_TICKS = 100   # 100Hz 기준 1초 (가속 페달 오버라�
 CURVE_MIN_SPEED_CLU = 30.0
 CURVE_STRONG_REDUCTION_RATIO = 1.3
 CURVE_STRONG_REDUCTION_FACTOR = 0.9
+CURVE_LIMIT_FALL_RATE_KPH_PER_S = 20.0
+LIMIT_RELEASE_RISE_RATE_KPH_PER_S = 10.0
+CRUISE_CONTROL_DT = 0.01  # update_v_cruise runs at 100 Hz
 
 STEER_DECEL_START_ANGLE_DEG = 45.0
 STEER_DECEL_ACTIVATION_ANGLE_DEG = 60.0
@@ -291,6 +294,25 @@ class CruiseController:
       return "-"
     return f"{float(value):.1f}"
 
+  def _update_applied_limit(self, target_speed_clu: float, *, immediate: bool,
+                            curve_is_binding: bool) -> None:
+    """Move the applied limit without allowing a noisy curve frame to step the target."""
+    target_speed_clu = float(target_speed_clu)
+    if immediate:
+      self.apply_limit_speed_clu = target_speed_clu
+      return
+
+    error = target_speed_clu - self.apply_limit_speed_clu
+    if error > 0.0:
+      max_step = self.conv.kph_to_clu(LIMIT_RELEASE_RISE_RATE_KPH_PER_S) * CRUISE_CONTROL_DT
+      self.apply_limit_speed_clu += min(error, max_step)
+    elif curve_is_binding:
+      max_step = self.conv.kph_to_clu(CURVE_LIMIT_FALL_RATE_KPH_PER_S) * CRUISE_CONTROL_DT
+      self.apply_limit_speed_clu += max(error, -max_step)
+    else:
+      kp = np.interp(abs(error), [0, 2, 5, 10], [0.01, 0.05, 0.10, 0.20])
+      self.apply_limit_speed_clu += error * kp
+
   def _debug_limit_state(self, *, CS, cluster_speed_clu, requested_speed, nda_active,
                          section_active, section_limit_speed, section_left_dist,
                          camera_event_active, stock_navi_active,
@@ -529,7 +551,9 @@ class CruiseController:
     stock_navi_curve_speed_clu = self._cal_stock_navi_curve_speed(CS)
     curve_speeds = [speed for speed in (model_curve_speed_clu, stock_navi_curve_speed_clu)
                     if speed != NO_ACTIVE_LIMIT]
-    curve_limit_speed_clu = min(curve_speeds, default=NO_ACTIVE_LIMIT)
+    curve_limit_speed_clu = max(
+      min(curve_speeds), CURVE_MIN_SPEED_CLU, self.min_set_speed_clu,
+    ) if curve_speeds else NO_ACTIVE_LIMIT
     self.curve_speed_clu = curve_limit_speed_clu
 
     # 5. Steering angle based limit speed
@@ -547,8 +571,13 @@ class CruiseController:
     valid_limits = [s for s in speed_candidates if s >= self.min_set_speed_clu and s != NO_ACTIVE_LIMIT]
 
     if valid_limits:
-      calculated_max_speed_clu = min(requested_speed_clu, min(valid_limits))
-      is_curve_limit = (curve_limit_speed_clu != NO_ACTIVE_LIMIT and curve_limit_speed_clu == min(valid_limits))
+      minimum_limit_clu = min(valid_limits)
+      calculated_max_speed_clu = min(requested_speed_clu, minimum_limit_clu)
+      is_curve_limit = (
+        curve_limit_speed_clu != NO_ACTIVE_LIMIT and
+        curve_limit_speed_clu == minimum_limit_clu and
+        curve_limit_speed_clu < requested_speed_clu
+      )
     else:
       calculated_max_speed_clu = requested_speed_clu
       is_curve_limit = False
@@ -559,17 +588,15 @@ class CruiseController:
       ("limit_zone", is_limit_zone),
       ("section_change", section_started_or_changed),
       ("cruise_enable", self.cruise_just_enabled),
-      ("curve", is_curve_limit),
       ("double_press", double_pressed),
     )
     immediate_reasons = [name for name, active in immediate_conditions if active]
 
-    if immediate_reasons:
-      self.apply_limit_speed_clu = calculated_max_speed_clu
-    else:
-      error = calculated_max_speed_clu - self.apply_limit_speed_clu
-      kp = np.interp(abs(error), [0, 2, 5, 10], [0.01, 0.05, 0.10, 0.20])
-      self.apply_limit_speed_clu += error * kp
+    self._update_applied_limit(
+      calculated_max_speed_clu,
+      immediate=bool(immediate_reasons),
+      curve_is_binding=is_curve_limit,
+    )
 
     self._debug_limit_state(
       CS=CS, cluster_speed_clu=cluster_speed_clu, requested_speed=requested_speed_clu,
@@ -771,7 +798,7 @@ class CruiseController:
         speed_reduction_ratio = current_speed_ms / calculated_curve_speed_ms
         if speed_reduction_ratio > CURVE_STRONG_REDUCTION_RATIO:
           calculated_curve_speed_ms *= CURVE_STRONG_REDUCTION_FACTOR
-        self.cached_curve_speed_ms = calculated_curve_speed_ms
+        self.cached_curve_speed_ms = max(calculated_curve_speed_ms, min_curve_speed_ms)
       else:
         self.cached_curve_speed_ms = None
 

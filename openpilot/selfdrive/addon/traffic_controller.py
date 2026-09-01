@@ -310,6 +310,9 @@ def should_limit_traffic_stop_accel(signal_stop_active: bool, mpc_source: str) -
 class TrafficStopController:
   """Detect traffic-signal stops and produce the virtual MPC stop obstacle."""
 
+  _MOVING_RELEASE_MIN_SPEED_KPH = 5.0
+  _MOVING_RELEASE_CONFIRM_S = 1.0
+
   def __init__(self, dt: float):
     self.dt = float(dt)
     self.distance_tracker = TrafficStopDistanceTracker()
@@ -322,6 +325,7 @@ class TrafficStopController:
     self.stop_entry_suppression_time = 0.0
     self.adjusted_stop_distance = 0.0
     self.reference_speed_kph: float | None = None
+    self.moving_release_confirmation_time = 0.0
     self._last_debug_log_time = 0.0
     self.reset()
 
@@ -336,7 +340,31 @@ class TrafficStopController:
     self.stop_entry_suppression_time = 0.0
     self.adjusted_stop_distance = 0.0
     self.reference_speed_kph: float | None = None
+    self.moving_release_confirmation_time = 0.0
     self._last_debug_log_time = 0.0
+
+  def _is_signal_release_confirmed(self, observation: TrafficModelObservation,
+                                   v_ego_kph: float, left_blinker: bool) -> bool:
+    release_evidence = (
+      self.signal_stop_latched and
+      observation.valid and
+      observation.go_evidence and
+      self.motion_detector.motion == ModelMotion.starting and
+      not left_blinker
+    )
+    if not release_evidence:
+      self.moving_release_confirmation_time = 0.0
+      return False
+
+    if v_ego_kph < self._MOVING_RELEASE_MIN_SPEED_KPH:
+      self.moving_release_confirmation_time = 0.0
+      return True
+
+    self.moving_release_confirmation_time = min(
+      self._MOVING_RELEASE_CONFIRM_S,
+      self.moving_release_confirmation_time + self.dt,
+    )
+    return self.moving_release_confirmation_time >= self._MOVING_RELEASE_CONFIRM_S
 
   def update(self, car_state, model, radar_state, comfort_brake: float) -> TrafficStopPlan:
     previous_state = (self.traffic_state, self.x_state, self.signal_stop_latched, self.motion_detector.motion)
@@ -359,9 +387,11 @@ class TrafficStopController:
     gas_pressed = bool(car_state.gasPressed)
     left_blinker = bool(car_state.leftBlinker)
     entry_allowed = is_traffic_stop_entry_allowed(car_state.steeringAngleDeg)
+    release_confirmed = self._is_signal_release_confirmed(observation, v_ego_kph, left_blinker)
 
     if gas_pressed:
       self.signal_stop_latched = False
+      self.moving_release_confirmation_time = 0.0
       self.stop_entry_suppression_time = 10.0
     elif (observation.valid and
           self.motion_detector.motion == ModelMotion.stopping and
@@ -370,9 +400,9 @@ class TrafficStopController:
       self.signal_stop_latched = True
     elif (observation.valid and
           self.signal_stop_latched and
-          self.motion_detector.motion == ModelMotion.starting and
-          not left_blinker):
+          release_confirmed):
       self.signal_stop_latched = False
+      self.moving_release_confirmation_time = 0.0
 
     if self.signal_stop_latched:
       self.traffic_state = TrafficState.red
@@ -495,7 +525,7 @@ class TrafficStopController:
       "event=%s big=%d valid=%d motion=%s traffic=%s x_state=%s latch=%d signal_active=%d",
       "v_ego=%.2f initial_v=%.2f terminal_v=%.2f filtered_v=%.2f terminal_x=%.2f lateral_y=%.2f",
       "stop_ev=%d go_ev=%d stop_ev_s=%.2f go_ev_s=%.2f raw_stop=%.2f stop=%.2f adjusted=%.2f",
-      "lead=%d lead_d=%.2f gas=%d left_blinker=%d suppress_s=%.2f",
+      "lead=%d lead_d=%.2f gas=%d left_blinker=%d suppress_s=%.2f release_s=%.2f",
     ))
     traffic_log.debug(
       log_format,
@@ -525,4 +555,5 @@ class TrafficStopController:
       int(bool(car_state.gasPressed)),
       int(bool(car_state.leftBlinker)),
       self.stop_entry_suppression_time,
+      self.moving_release_confirmation_time,
     )
