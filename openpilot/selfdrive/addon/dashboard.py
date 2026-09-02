@@ -17,6 +17,11 @@ try:
 except ImportError:
   def set_core_affinity(cores): pass
 
+try:
+  from openpilot.common.hardware.usb import is_chestnut_connected
+except ImportError:
+  def is_chestnut_connected(devices=None, include_bootloader=False): return False
+
 from ansi2html import Ansi2HTMLConverter
 from nicegui import app, ui
 
@@ -33,8 +38,8 @@ except ImportError:
     def __init__(self): self.data = {}
     def get(self, k, encoding='utf-8'): return self.data.get(k)
     def get_bool(self, k): return self.data.get(k, False)
-    def put(self, k, v): self.data[k] = v
-    def put_bool(self, k, v): self.data[k] = v
+    def put(self, k, v, block=False): self.data[k] = v
+    def put_bool(self, k, v, block=False): self.data[k] = v
     def remove(self, k): self.data.pop(k, None)
   params = MockParams()
 
@@ -497,26 +502,66 @@ def render_tab_toggles():
     ("LanguageSetting", "Language (en/ko)", "Switch language between English and Korean"),
   ]
 
-  with ui.column().classes('w-full gap-4 mt-4'):
-    for key, label, desc in TOGGLE_ITEMS:
-      if key == "LanguageSetting":
-        val = params.get(key)
-        init_val = (val.decode('utf-8') if isinstance(val, bytes) else val) == "ko"
-      else:
-        init_val = params.get_bool(key)
-
-      def on_change(e, k=key):
-        if k == "LanguageSetting":
-          params.put(k, "ko" if e.value else "en")
+  @ui.refreshable
+  def toggles_content():
+    with ui.column().classes('w-full gap-4 mt-4'):
+      for key, label, desc in TOGGLE_ITEMS:
+        if key == "LanguageSetting":
+          val = params.get(key)
+          init_val = (val.decode('utf-8') if isinstance(val, bytes) else val) == "ko"
         else:
-          params.put_bool(k, e.value)
-        ui.notify(f"{k} {'ON' if e.value else 'OFF'}", position='top')
+          init_val = params.get_bool(key)
 
-      with ui.row().classes('w-full flex-nowrap items-center border-b border-gray-800 pb-3'):
-        ui.switch(value=init_val, on_change=on_change).classes('custom-toggle shrink-0')
-        with ui.column().classes('gap-1 ml-3 flex-1 min-w-0'):
-          ui.label(label).classes('text-[0.95rem] md:text-lg font-bold text-white leading-tight break-words whitespace-normal')
-          ui.label(desc).classes('text-[0.75rem] md:text-sm text-gray-400 leading-snug break-words whitespace-normal')
+        def on_change(e, k=key):
+          if k == "LanguageSetting":
+            params.put(k, "ko" if e.value else "en")
+          else:
+            params.put_bool(k, e.value, block=k == "ClusterEnable")
+          ui.notify(f"{k} {'ON' if e.value else 'OFF'}", position='top')
+          if k == "ClusterEnable":
+            toggles_content.refresh()
+
+        with ui.row().classes('w-full flex-nowrap items-center border-b border-gray-800 pb-3'):
+          ui.switch(value=init_val, on_change=on_change).classes('custom-toggle shrink-0')
+          with ui.column().classes('gap-1 ml-3 flex-1 min-w-0'):
+            ui.label(label).classes('text-[0.95rem] md:text-lg font-bold text-white leading-tight break-words whitespace-normal')
+            ui.label(desc).classes('text-[0.75rem] md:text-sm text-gray-400 leading-snug break-words whitespace-normal')
+
+        if key == "ClusterEnable" and init_val:
+          transport = params.get("ClusterDisplayTransport") or "network"
+          if isinstance(transport, bytes):
+            transport = transport.decode('utf-8')
+          if transport not in ("network", "usb"):
+            transport = "network"
+          chestnut_connected = is_chestnut_connected(include_bootloader=True)
+          if chestnut_connected and transport != "network":
+            transport = "network"
+            params.put("ClusterDisplayTransport", transport, block=True)
+
+          def on_transport_change(e):
+            if is_chestnut_connected(include_bootloader=True):
+              params.put("ClusterDisplayTransport", "network", block=True)
+              e.sender.value = "network"
+              ui.notify("Chestnut USB is connected; transport is locked to network", type='warning', position='top')
+              return
+            params.put("ClusterDisplayTransport", e.value, block=True)
+            ui.notify(f"Cluster display transport: {e.value} (Cluster restarting)", position='top')
+
+          transport_select = ui.select(
+            {"network": "Network (Orange Pi HDMI)", "usb": "USB (TURZX Display)"},
+            value=transport,
+            label="CLUSTER_DISPLAY_TRANSPORT",
+            on_change=on_transport_change,
+          ).classes('w-full text-blue-200')
+          if chestnut_connected:
+            transport_select.props('disable')
+          transport_help = ('Chestnut USB is connected; transport is locked to network.' if chestnut_connected else
+                            'The Cluster process restarts automatically when the transport changes.')
+          ui.label(transport_help).classes(
+            'text-[0.75rem] md:text-sm text-gray-400 -mt-3 ml-1'
+          )
+
+  toggles_content()
 
 def render_tab_logs():
   LOG_FILES = {

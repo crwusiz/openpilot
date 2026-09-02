@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+from openpilot.common.hardware.usb import is_chestnut_connected
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 
@@ -21,7 +22,7 @@ CLUSTER_ROTATE_180 = False
 CLUSTER_USB_WIDTH = 1920
 CLUSTER_USB_HEIGHT = 462
 CLUSTER_HDMI_WIDTH = 1920
-CLUSTER_HDMI_HEIGHT = 720
+CLUSTER_HDMI_HEIGHT = 480
 CLUSTER_NETWORK_BIND_HOST = "0.0.0.0"
 CLUSTER_NETWORK_PORT = 9200
 CLUSTER_NETWORK_ACCEPT_TIMEOUT_SECONDS = 0.25
@@ -80,7 +81,13 @@ class ClusterConfig:
   def __init__(self):
     cloudlog.info("Loading Lightweight Cluster Configuration...")
 
-    self.display_transport = CLUSTER_DISPLAY_TRANSPORT
+    self.params = Params()
+    self.display_transport = self.params.get("ClusterDisplayTransport") or CLUSTER_DISPLAY_TRANSPORT
+    if is_chestnut_connected(include_bootloader=True):
+      if self.display_transport != "network":
+        cloudlog.warning("Chestnut USB detected; forcing ClusterDisplayTransport to network")
+        self.params.put("ClusterDisplayTransport", "network", block=True)
+      self.display_transport = "network"
     if self.display_transport not in ("network", "usb"):
       raise ValueError(f"Unsupported cluster display transport: {self.display_transport}")
     if self.display_transport == "network":
@@ -116,7 +123,6 @@ class ClusterConfig:
     self.font_bold = os.path.join(self.BASEDIR, "selfdrive", "assets", "fonts", "Inter-Bold.ttf")
     self.font_regular = os.path.join(self.BASEDIR, "selfdrive", "assets", "fonts", "Inter-Regular.ttf")
 
-    self.params = Params()
     self.is_metric = self.params.get_bool("IsMetric")
     self.rotate_180 = CLUSTER_ROTATE_180
 

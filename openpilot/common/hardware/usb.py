@@ -72,6 +72,11 @@ def get_usb_state() -> list[dict]:
   return devices
 
 
+def is_chestnut_connected(devices: list[dict] | None = None, include_bootloader: bool = False) -> bool:
+  devices = get_usb_state() if devices is None else devices
+  return any(is_chestnut_usb_id(d["vendorId"], d["productId"], include_bootloader) for d in devices)
+
+
 def set_usb_state(device_state, devices: list[dict]) -> None:
   entries = device_state.usbState.init('devices', len(devices))
 

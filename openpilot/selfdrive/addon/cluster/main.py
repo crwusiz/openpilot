@@ -58,6 +58,14 @@ def cluster_main():
   last_camera_frame = -1
   try:
     while True:
+      if loop_count % fps == 0:
+        requested_transport = config.params.get("ClusterDisplayTransport") or config.display_transport
+        if requested_transport in ("network", "usb") and requested_transport != config.display_transport:
+          flog(
+            f"[CLUSTER_MAIN] Transport changed: {config.display_transport} -> {requested_transport}; restarting...",
+          )
+          break
+
       # Drive rendering from new camera frames. Two independent 20 Hz loops can
       # otherwise sample the same frame twice and then skip the next one.
       last_camera_frame = camera.wait_for_frame(last_camera_frame, 1.0 / fps)
