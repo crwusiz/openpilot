@@ -165,6 +165,12 @@ def manager_thread() -> None:
     started_prev = started
     ignition_prev = ignition
 
+    if params.get_bool("ModeldRestartRequested"):
+      params.put_bool("ModeldRestartRequested", False, block=True)
+      if started:
+        cloudlog.warning("restarting modeld on request")
+        managed_processes["modeld"].stop(block=False)
+
     ensure_running(managed_processes.values(), started, params=params, CP=sm['carParams'], not_run=ignore)
 
     running = ' '.join("{}{}\u001b[0m".format("\u001b[32m" if p.proc.is_alive() else "\u001b[31m", p.name)

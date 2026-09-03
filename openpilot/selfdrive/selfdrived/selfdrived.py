@@ -27,6 +27,7 @@ from openpilot.common.version import get_build_metadata
 from openpilot.common.hardware import HARDWARE
 
 from openpilot.selfdrive.controls.lib.desire_helper import check_invalid_lane
+from openpilot.selfdrive.modeld.helpers import chestnut_compiled
 
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
@@ -46,6 +47,9 @@ AlertLevel = log.DriverMonitoringState.AlertLevel
 MonitoringPolicy = log.DriverMonitoringState.MonitoringPolicy
 
 IGNORED_SAFETY_MODES = (SafetyModel.silent, SafetyModel.noOutput)
+CHESTNUT_RESTART_STABLE_TIME = 3.0
+CHESTNUT_RESTART_COOLDOWN = 30.0
+CHESTNUT_MAX_RESTARTS = 2
 
 
 class SelfdriveD:
@@ -72,6 +76,9 @@ class SelfdriveD:
     self.big_model_active = False
     self.big_model_failed = False
     self.big_model_ready_t = 0.
+    self.chestnut_present_since: float | None = None
+    self.chestnut_restart_attempts = 0
+    self.last_chestnut_restart_t = -CHESTNUT_RESTART_COOLDOWN
 
     self.dcam_is_missing = self.params.get_bool("CabinCameraHardwareMissing")
 
@@ -186,6 +193,27 @@ class SelfdriveD:
     if big_failed and not self.big_model_failed:
       self.events.add(EventName.bigModelFailed)
     self.big_model_failed = big_failed
+
+    # If Chestnut came up too late for the first modeld initialization, ask the
+    # manager for a targeted restart. Never interrupt model output while moving
+    # or while openpilot is engaged.
+    now = time.monotonic()
+    if chestnut_present:
+      if self.chestnut_present_since is None:
+        self.chestnut_present_since = now
+    else:
+      self.chestnut_present_since = None
+
+    chestnut_stable = (self.chestnut_present_since is not None and
+                       now - self.chestnut_present_since >= CHESTNUT_RESTART_STABLE_TIME)
+    restart_due = now - self.last_chestnut_restart_t >= CHESTNUT_RESTART_COOLDOWN
+    if (big_active is False and not loading and chestnut_stable and restart_due and
+        self.initialized and not self.enabled and abs(CS.vEgo) < 0.1 and
+        self.chestnut_restart_attempts < CHESTNUT_MAX_RESTARTS and chestnut_compiled()):
+      self.chestnut_restart_attempts += 1
+      self.last_chestnut_restart_t = now
+      self.params.put_bool("ModeldRestartRequested", True)
+      cloudlog.warning(f"requesting modeld restart for Chestnut (attempt {self.chestnut_restart_attempts})")
 
     # soft disable if the big model fails
     if big_active:
@@ -478,7 +506,7 @@ class SelfdriveD:
 
     # TODO: fix simulator
     if not SIMULATION or REPLAY:
-      if self.sm['modelV2'].frameDropPerc > 2:
+      if self.sm['modelV2'].frameDropPerc > 1:
         self.events.add(EventName.modeldLagging)
 
     # Decrement personality on distance button press
