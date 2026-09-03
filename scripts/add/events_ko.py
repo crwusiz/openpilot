@@ -255,7 +255,7 @@ def below_steer_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.S
 
 
 def calibration_incomplete_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
-  first_word = '캘리브레이션을 다시' if sm['extrinsicsCalibration'].calStatus == log.LiveCalibrationData.Status.recalibrating else '캘리브레이션'
+  first_word = '캘리브레이션을 다시' if sm['extrinsicsCalibration'].calStatus == log.ExtrinsicsCalibration.Status.recalibrating else '캘리브레이션'
   return Alert(
     f"{first_word} 진행중 : {sm['extrinsicsCalibration'].calPerc:.0f}%",
     f"{get_display_speed(MIN_SPEED_FILTER, metric)} 이상의 속도로 주행하세요",
@@ -665,7 +665,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       "핸들을 잡아주세요",
       "조향 각도 한도 초과",
       AlertStatus.userPrompt, AlertSize.small,
-      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, 3.),
+      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, 2.),
   },
 
   # Thrown when the fan is driven at >50% but is not rotating
