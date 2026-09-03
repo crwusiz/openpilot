@@ -6,6 +6,73 @@ set -euo pipefail
 # Import Common Utilities
 # ==============================================================================
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+
+# Always run the update in a tmux pane so dashboard and SSH launches behave the
+# same way. The child marker prevents the command started by tmux from creating
+# another pane recursively.
+run_in_tmux() {
+  if [[ "${GITPULL_TMUX_CHILD:-0}" == "1" ]]; then
+    return
+  fi
+
+  if ! command -v tmux >/dev/null 2>&1; then
+    echo "WARNING: tmux is not installed. Continuing in the current terminal." >&2
+    return
+  fi
+
+  local script_path="${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")"
+  local child_command
+  local quoted_arg
+  printf -v child_command 'GITPULL_TMUX_CHILD=1 exec bash %q' "$script_path"
+  for arg in "$@"; do
+    printf -v quoted_arg ' %q' "$arg"
+    child_command+="$quoted_arg"
+  done
+
+  # When launched from a pane, split that exact pane into top and bottom.
+  if [[ -n "${TMUX:-}" ]]; then
+    tmux split-window -v -t "${TMUX_PANE:-}" -c "$PWD" "$child_command"
+    exit 0
+  fi
+
+  local target=""
+  local session=""
+  if tmux list-sessions >/dev/null 2>&1; then
+    # Prefer the window currently shown by an attached client (the device
+    # display). If no client is attached, use the first existing session.
+    target=$(tmux list-clients -F '#{session_name}:#{window_index}' 2>/dev/null | head -n 1 || true)
+    if [[ -z "$target" ]]; then
+      session=$(tmux list-sessions -F '#{session_name}' 2>/dev/null | head -n 1 || true)
+      if [[ -z "$session" ]]; then
+        echo "ERROR: tmux reported an existing session but none could be selected." >&2
+        exit 1
+      fi
+      target="$session"
+    else
+      session="${target%%:*}"
+    fi
+
+    tmux split-window -v -t "$target" -c "$PWD" "$child_command"
+
+    # SSH and other tmux-external interactive terminals follow the new pane.
+    if [[ -t 0 && -t 1 ]]; then
+      exec tmux attach-session -t "$session"
+    fi
+    echo "Git pull started in tmux session: $session"
+    exit 0
+  fi
+
+  # No server/session exists yet: create one and run the update in its first pane.
+  if [[ -t 0 && -t 1 ]]; then
+    exec tmux new-session -s gitpull "$child_command"
+  fi
+  tmux new-session -d -s gitpull "$child_command"
+  echo "Git pull started in new tmux session: gitpull"
+  exit 0
+}
+
+run_in_tmux "$@"
+
 source "${SCRIPT_DIR}/common_utils.sh"
 
 # ==============================================================================
@@ -15,6 +82,7 @@ readonly OPENPILOT_DIR="/data/openpilot"
 readonly PARAMS_DIR="/data/params/d"
 readonly LOG_FILE="/data/gitpull_exit_code.log"
 readonly RESTART_SCRIPT="${OPENPILOT_DIR}/scripts/restart.sh"
+readonly RESTART_LOG="/data/restart.log"
 
 # ==============================================================================
 # Utility Functions
@@ -232,10 +300,14 @@ compare_and_restart() {
     log "SUCCESS" "Commit synchronized: Match ($local_hash)"
 
     if [ -x "$RESTART_SCRIPT" ]; then
-      log "SUCCESS" "Restarting system in background..."
+      log "SUCCESS" "Preparing system restart..."
       echo 0 > "$LOG_FILE"
-      nohup bash "$RESTART_SCRIPT" >/dev/null 2>&1 &
-      exit 0
+      if bash "$RESTART_SCRIPT" >"$RESTART_LOG" 2>&1; then
+        exit 0
+      fi
+      log "ERROR" "Restart preparation failed. Check: $RESTART_LOG"
+      echo 1 > "$LOG_FILE"
+      exit 1
     else
       log "ERROR" "Restart script not found: $RESTART_SCRIPT"
       echo 1 > "$LOG_FILE"
