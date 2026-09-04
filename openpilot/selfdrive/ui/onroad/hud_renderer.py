@@ -4,7 +4,7 @@ import math
 from dataclasses import dataclass
 from openpilot.common.constants import CV
 from openpilot.selfdrive.ui.onroad.exp_button import ExpButton
-from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
+from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus, ChestnutState
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
@@ -86,8 +86,6 @@ class HudRenderer(Widget):
     self.apply_speed: float = 0.0
     self.speed: float = 0.0
     self.v_ego_cluster_seen: bool = False
-    self._engaged: bool = False
-    self._small_model_engaged: bool = False
 
     # Extended state variables
     self.accel: float = 0.0
@@ -198,8 +196,6 @@ class HudRenderer(Widget):
     self.chestnut_green_img = gui_app.texture("icons_mici/chestnut_green.png", chestnut_width, chestnut_width * 44 / 60)
     self.chestnut_orange_img = gui_app.texture("icons_mici/chestnut_orange.png", chestnut_width * 75 / 60,
                                                chestnut_width * 44 / 60)
-    self.chestnut_crossed_img = gui_app.texture("icons_mici/chestnut_crossed.png", chestnut_width,
-                                                chestnut_width * 52 / 60)
 
     # WiFi textures for state switching
     self.wifi_l_img = gui_app.texture("icons/wifi_strength_low.png", icon_size, icon_size)
@@ -260,12 +256,6 @@ class HudRenderer(Widget):
     self.set_speed = self.cruise_speed
     self.is_cruise_set = 0 < self.set_speed < SET_SPEED_NA
     self.is_cruise_available = self.set_speed != -1
-
-    engaged = selfdrive_state.enabled
-    if (engaged and not self._engaged and not ui_state.chestnut_loading and ui_state.chestnut_active is not True and
-      sm.recv_frame['modelV2'] > ui_state.started_frame):
-      self._small_model_engaged = True
-    self._engaged = engaged
 
     if self.is_cruise_set and not ui_state.is_metric:
       self.set_speed *= KM_TO_MILE
@@ -413,8 +403,7 @@ class HudRenderer(Widget):
     exp_button_rect = rl.Rectangle(button_x, button_y, UIConfig.button_size, UIConfig.button_size)
     self._exp_button.render(exp_button_rect)
 
-    if ui_state.chestnut and ui_state.chestnut_compiled:
-      self._draw_model_source(exp_button_rect)
+    self._draw_model_source(exp_button_rect)
 
   def user_interacting(self) -> bool:
     return self._exp_button.is_pressed
@@ -423,25 +412,17 @@ class HudRenderer(Widget):
     if ui_state.sm.recv_frame['selfdriveState'] < ui_state.started_frame:
       return
 
-    big_failed = (ui_state.chestnut_active is False or not ui_state.sm['deviceState'].chestnutPresent or
-                  (ui_state.chestnut_active is True and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame and
-                   not ui_state.sm.alive['modelV2']) or
-                  (ui_state.chestnut_active is None and ui_state.sm.recv_frame['modelV2'] > ui_state.started_frame))
-    self._small_model_engaged &= big_failed
-    loading = ui_state.chestnut_loading or (ui_state.chestnut_active is None and not big_failed)
-    if loading:
-      pulse = 0.5 - 0.5 * math.cos(rl.get_time() * 6.0)
+    if ui_state.chestnut_state == ChestnutState.LOADING:
       icon = self.chestnut_img
-      opacity = 0.35 + 0.65 * pulse
-    elif self._small_model_engaged:
-      icon = self.chestnut_crossed_img
-      opacity = 0.65
-    elif big_failed:
+      opacity = 0.35 + 0.65 * (0.5 - 0.5 * math.cos(rl.get_time() * 6.0))
+    elif ui_state.chestnut_state in (ChestnutState.UNCOMPILED, ChestnutState.FAILED):
       icon = self.chestnut_orange_img
       opacity = 1.0
-    else:
+    elif ui_state.chestnut_state == ChestnutState.ACTIVE:
       icon = self.chestnut_green_img
       opacity = 1.0
+    else:
+      return
 
     pos = rl.Vector2(exp_button_rect.x + (exp_button_rect.width - icon.width) / 2,
                      exp_button_rect.y + exp_button_rect.height + 20)
