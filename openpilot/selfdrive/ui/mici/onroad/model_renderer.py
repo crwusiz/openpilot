@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from openpilot.common.params import Params
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.locationd.calibrationd import HEIGHT_INIT
+from openpilot.selfdrive.ui import Colors, NO_THROTTLE_COLORS, STEERING_COLORS, THROTTLE_COLORS, colors_alpha
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
@@ -18,41 +19,6 @@ CLIP_MARGIN = 500
 MIN_DRAW_DISTANCE = 10.0
 MAX_DRAW_DISTANCE = 100.0
 
-
-def colors_alpha(color, alpha):
-  if isinstance(color, tuple):
-    return rl.Color(color[0], color[1], color[2], alpha)
-  else:
-    return rl.Color(color.r, color.g, color.b, alpha)
-
-
-class Colors:
-  WHITE = rl.Color(255, 255, 255, 255) # rl.WHITE
-  BLACK = rl.Color(0, 0, 0, 255) # rl.BLACK
-  BLACK_TRANSLUCENT = colors_alpha(BLACK, 100)
-  RED = rl.Color(201, 34, 49, 255)
-  ROAD_EDGE = colors_alpha(RED, 100)
-  LIGHT_RED = rl.Color(255, 100, 100, 150)
-  ORANGE = rl.Color(255, 149, 0, 255)
-
-
-THROTTLE_COLORS = [
-  rl.Color(13, 248, 122, 102),   # HSLF(148/360, 0.94, 0.51, 0.4)
-  rl.Color(114, 255, 92, 89),    # HSLF(112/360, 1.0, 0.68, 0.35)
-  rl.Color(114, 255, 92, 0),     # HSLF(112/360, 1.0, 0.68, 0.0)
-]
-
-NO_THROTTLE_COLORS = [
-  rl.Color(242, 242, 242, 102), # HSLF(148/360, 0.0, 0.95, 0.4)
-  rl.Color(242, 242, 242, 89),  # HSLF(112/360, 0.0, 0.95, 0.35)
-  rl.Color(242, 242, 242, 0),   # HSLF(112/360, 0.0, 0.95, 0.0)
-]
-
-STEERING_COLORS = [
-  rl.Color(0, 191, 255, 102),
-  rl.Color(0, 191, 255, 89),
-  rl.Color(0, 191, 255, 0),
-]
 
 @dataclass
 class ModelPoints:
@@ -406,8 +372,8 @@ class ModelRenderer(Widget):
       if not lead.glow or not lead.chevron:
         continue
 
-      rl.draw_triangle_fan(lead.glow, len(lead.glow), rl.Color(218, 202, 37, 255))
-      rl.draw_triangle_fan(lead.chevron, len(lead.chevron), rl.Color(201, 34, 49, lead.fill_alpha))
+      rl.draw_triangle_fan(lead.glow, len(lead.glow), Colors.WARNING)
+      rl.draw_triangle_fan(lead.chevron, len(lead.chevron), colors_alpha(Colors.RED, lead.fill_alpha))
   """
 
   def _draw_lead_indicators(self, radar_state, rect):
@@ -421,7 +387,7 @@ class ModelRenderer(Widget):
         continue
 
       if lead_vehicle.fill_poly:
-        rl.draw_triangle_fan(lead_vehicle.fill_poly, 4, Colors.BLACK_TRANSLUCENT)
+        rl.draw_triangle_fan(lead_vehicle.fill_poly, 4, Colors.BOX_BG)
 
       bracket_color = colors_alpha(Colors.RED, lead_vehicle.fill_alpha)
       pts = lead_vehicle.chevron

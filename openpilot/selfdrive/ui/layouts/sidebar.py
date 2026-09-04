@@ -14,6 +14,7 @@ import subprocess
 import threading
 from pathlib import Path
 from openpilot.common.params import Params
+from openpilot.selfdrive.ui import Colors
 
 SIDEBAR_WIDTH = 300
 METRIC_HEIGHT = 126
@@ -27,29 +28,6 @@ COMMIT_BTN = rl.Rectangle(30, 762, 240, 126)
 
 ThermalStatus = log.DeviceState.ThermalStatus
 NetworkType = log.DeviceState.NetworkType
-
-
-def colors_alpha(color, alpha):
-  if isinstance(color, tuple):
-    return rl.Color(color[0], color[1], color[2], alpha)
-  return rl.Color(color.r, color.g, color.b, alpha)
-
-
-class Colors:
-  WHITE = rl.WHITE
-  WHITE_DIM = colors_alpha(WHITE, 85)
-  GRAY = rl.Color(84, 84, 84, 255)
-
-  # Status colors
-  GOOD = rl.WHITE
-  WARNING = rl.Color(218, 202, 37, 255)
-  DANGER = rl.Color(201, 34, 49, 255)
-
-  # UI elements
-  METRIC_BORDER = WHITE_DIM
-  BUTTON_NORMAL = rl.WHITE
-  BUTTON_PRESSED = colors_alpha(WHITE, 166)
-  UP_TO_DATE = rl.Color(128, 216, 166, 255)
 
 
 NETWORK_TYPES = {
@@ -264,7 +242,7 @@ class Sidebar(Widget):
       self._commit_status.update(action_text, tr_noop("progress") + dot_str, Colors.WARNING)
 
   def _render(self, rect: rl.Rectangle):
-    rl.draw_rectangle_rec(rect, rl.BLACK)
+    rl.draw_rectangle_rec(rect, Colors.BLACK)
     self._draw_buttons(rect)
     self._draw_c3x_position(rect)
     self._draw_network_indicator(rect)

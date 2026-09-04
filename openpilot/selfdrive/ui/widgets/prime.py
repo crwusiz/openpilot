@@ -1,5 +1,6 @@
 import pyray as rl
 
+from openpilot.selfdrive.ui import Colors
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.multilang import tr
@@ -12,8 +13,6 @@ from openpilot.system.ui.widgets.label import gui_label
 class PrimeWidget(Widget):
   """Widget for displaying comma prime subscription status"""
 
-  PRIME_BG_COLOR = rl.Color(51, 51, 51, 255)
-
   def _render(self, rect):
     if ui_state.prime_state.is_prime():
       self._render_for_prime_user(rect)
@@ -23,7 +22,7 @@ class PrimeWidget(Widget):
   def _render_for_non_prime_users(self, rect: rl.Rectangle):
     """Renders the advertisement for non-Prime users."""
 
-    rl.draw_rectangle_rounded(rect, 0.025, 10, self.PRIME_BG_COLOR)
+    rl.draw_rectangle_rounded(rect, 0.025, 10, Colors.DARK_PANEL)
 
     # Layout
     x, y = rect.x + 80, rect.y + 90
@@ -37,7 +36,7 @@ class PrimeWidget(Widget):
     font = gui_app.font(FontWeight.NORMAL)
     wrapped_text = "\n".join(wrap_text(font, tr("Become a comma prime member at connect.comma.ai"), 56, int(w)))
     text_size = measure_text_cached(font, wrapped_text, 56)
-    rl.draw_text_ex(font, wrapped_text, rl.Vector2(x, desc_y), 56, 0, rl.WHITE)
+    rl.draw_text_ex(font, wrapped_text, rl.Vector2(x, desc_y), 56, 0, Colors.WHITE)
 
     # Features section
     features_y = desc_y + text_size.y + 50
@@ -47,17 +46,17 @@ class PrimeWidget(Widget):
     features = [tr("Remote access"), tr("24/7 LTE connectivity"), tr("1 year of drive storage"), tr("Remote snapshots")]
     for i, feature in enumerate(features):
       item_y = features_y + 80 + i * 65
-      gui_label(rl.Rectangle(x, item_y, 100, 60), "✓", 50, color=rl.Color(70, 91, 234, 255))
+      gui_label(rl.Rectangle(x, item_y, 100, 60), "✓", 50, color=Colors.PRIMARY_BLUE)
       gui_label(rl.Rectangle(x + 60, item_y, w - 60, 60), feature, 50)
 
   def _render_for_prime_user(self, rect: rl.Rectangle):
     """Renders the prime user widget with subscription status."""
 
-    rl.draw_rectangle_rounded(rl.Rectangle(rect.x, rect.y, rect.width, 230), 0.1, 10, self.PRIME_BG_COLOR)
+    rl.draw_rectangle_rounded(rl.Rectangle(rect.x, rect.y, rect.width, 230), 0.1, 10, Colors.DARK_PANEL)
 
     x = rect.x + 56
     y = rect.y + 40
 
     font = gui_app.font(FontWeight.BOLD)
-    rl.draw_text_ex(font, tr("✓ SUBSCRIBED"), rl.Vector2(x, y), 41, 0, rl.Color(134, 255, 78, 255))
-    rl.draw_text_ex(font, tr("comma prime"), rl.Vector2(x, y + 61), 75, 0, rl.WHITE)
+    rl.draw_text_ex(font, tr("✓ SUBSCRIBED"), rl.Vector2(x, y), 41, 0, Colors.SUBSCRIBED_GREEN)
+    rl.draw_text_ex(font, tr("comma prime"), rl.Vector2(x, y + 61), 75, 0, Colors.WHITE)

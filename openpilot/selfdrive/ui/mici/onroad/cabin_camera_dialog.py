@@ -1,6 +1,7 @@
 import pyray as rl
 from openpilot.cereal import log, messaging
 from openpilot.cereal.visionipc import VisionStreamType
+from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.selfdrive.ui.mici.onroad.cameraview import CameraView
 from openpilot.selfdrive.ui.mici.onroad.driver_state import DriverStateRenderer
 from openpilot.selfdrive.ui.ui_state import ui_state, device
@@ -126,11 +127,11 @@ class BaseCabinCameraDialog(Widget):
               f"Awareness: {awareness_pct:.0f}%", font_size=44, font_weight=FontWeight.MEDIUM,
               alignment=TextAlignment.RIGHT,
               alignment_vertical=TextAlignmentVertical.TOP,
-              color=rl.Color(0, 0, 0, 180))
+              color=colors_alpha(Colors.BLACK, 180))
     gui_label(rect, f"Awareness: {awareness_pct:.0f}%", font_size=44, font_weight=FontWeight.MEDIUM,
               alignment=TextAlignment.RIGHT,
               alignment_vertical=TextAlignmentVertical.TOP,
-              color=rl.Color(255, 255, 255, int(255 * 0.9)))
+              color=colors_alpha(Colors.WHITE, int(255 * 0.9)))
 
     if dm_state.alertLevel == log.DriverMonitoringState.AlertLevel.none:
       return
@@ -143,11 +144,11 @@ class BaseCabinCameraDialog(Widget):
     gui_label(shadow_rect, alert_level_str, font_size=40, font_weight=FontWeight.BOLD,
               alignment=alignment,
               alignment_vertical=TextAlignmentVertical.BOTTOM,
-              color=rl.Color(0, 0, 0, 180))
+              color=colors_alpha(Colors.BLACK, 180))
     gui_label(rect, alert_level_str, font_size=40, font_weight=FontWeight.BOLD,
               alignment=alignment,
               alignment_vertical=TextAlignmentVertical.BOTTOM,
-              color=rl.Color(255, 255, 255, int(255 * 0.9)))
+              color=colors_alpha(Colors.WHITE, int(255 * 0.9)))
 
   def _load_eye_textures(self):
     """Lazy load eye textures"""

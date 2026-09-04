@@ -2,7 +2,7 @@ import numpy as np
 import pyray as rl
 from openpilot.cereal import log
 from dataclasses import dataclass
-from openpilot.selfdrive.ui import UI_BORDER_SIZE
+from openpilot.selfdrive.ui import Colors, UI_BORDER_SIZE, colors_alpha
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
@@ -72,12 +72,6 @@ class DriverStateRenderer(Widget):
     # Load the driver face icon
     self.dm_img = gui_app.texture("icons/driver_face.png", IMG_SIZE, IMG_SIZE)
 
-    # Colors
-    self.white_color = rl.Color(255, 255, 255, 255)
-    self.arc_color = rl.Color(26, 242, 66, 255)
-    self.engaged_color = rl.Color(26, 242, 66, 255)
-    self.disengaged_color = rl.Color(139, 139, 139, 255)
-
     self.set_visible(lambda: (ui_state.sm["selfdriveState"].alertSize == AlertSize.none and
                               ui_state.sm.recv_frame["driverStateV2"] > ui_state.started_frame))
 
@@ -86,25 +80,25 @@ class DriverStateRenderer(Widget):
     opacity = 0.65 if self.is_active else 0.2
 
     # Draw background circle
-    rl.draw_circle(int(self.position_x), int(self.position_y), BTN_SIZE // 2, rl.Color(0, 0, 0, 70))
+    rl.draw_circle(int(self.position_x), int(self.position_y), BTN_SIZE // 2, colors_alpha(Colors.BLACK, 70))
 
     # Draw face icon
     icon_pos = rl.Vector2(self.position_x - self.dm_img.width // 2, self.position_y - self.dm_img.height // 2)
-    rl.draw_texture_v(self.dm_img, icon_pos, rl.Color(255, 255, 255, int(255 * opacity)))
+    rl.draw_texture_v(self.dm_img, icon_pos, colors_alpha(Colors.WHITE, int(255 * opacity)))
 
     # Draw face outline
-    self.white_color.a = int(255 * opacity)
-    rl.draw_spline_linear(self.face_lines, len(self.face_lines), 5.2, self.white_color)
+    white_color = colors_alpha(Colors.WHITE, int(255 * opacity))
+    rl.draw_spline_linear(self.face_lines, len(self.face_lines), 5.2, white_color)
 
     # Set arc color based on engaged state
-    self.arc_color = self.engaged_color if ui_state.engaged else self.disengaged_color
-    self.arc_color.a = int(0.4 * 255 * (1.0 - self.dm_fade_state))  # Fade out when inactive
+    base_arc_color = Colors.DRIVER_ACTIVE if ui_state.engaged else Colors.DRIVER_INACTIVE
+    arc_color = colors_alpha(base_arc_color, int(0.4 * 255 * (1.0 - self.dm_fade_state)))  # Fade out when inactive
 
     # Draw arcs
     if self.h_arc_data:
-      rl.draw_spline_linear(self.h_arc_lines, len(self.h_arc_lines), self.h_arc_data.thickness, self.arc_color)
+      rl.draw_spline_linear(self.h_arc_lines, len(self.h_arc_lines), self.h_arc_data.thickness, arc_color)
     if self.v_arc_data:
-      rl.draw_spline_linear(self.v_arc_lines, len(self.v_arc_lines), self.v_arc_data.thickness, self.arc_color)
+      rl.draw_spline_linear(self.v_arc_lines, len(self.v_arc_lines), self.v_arc_data.thickness, arc_color)
 
   def _update_state(self):
     """Update the driver monitoring state based on model data"""

@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from openpilot.common.params import Params
 from openpilot.common.hardware import HARDWARE
+from openpilot.selfdrive.ui import Colors, OffroadAlertColors as AlertColors
 from openpilot.system.ui.lib.application import gui_app, FontWeight, FONT_SCALE
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.lib.scroll_panel import GuiScrollPanel
@@ -13,18 +14,6 @@ from openpilot.system.ui.lib.wrap_text import wrap_text
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.html_render import HtmlRenderer
 from openpilot.selfdrive.selfdrived.alertmanager import OFFROAD_ALERTS
-
-
-class AlertColors:
-  HIGH_SEVERITY = rl.Color(226, 44, 44, 255)
-  LOW_SEVERITY = rl.Color(41, 41, 41, 255)
-  BACKGROUND = rl.Color(57, 57, 57, 255)
-  BUTTON = rl.WHITE
-  BUTTON_PRESSED = rl.Color(200, 200, 200, 255)
-  BUTTON_TEXT = rl.BLACK
-  SNOOZE_BG = rl.Color(79, 79, 79, 255)
-  SNOOZE_BG_PRESSED = rl.Color(100, 100, 100, 255)
-  TEXT = rl.WHITE
 
 
 class AlertConstants:
@@ -78,7 +67,7 @@ class ActionButton(Widget):
     rl.draw_rectangle_rounded(self._rect, roundness, 10, bg_color)
 
     # center text
-    color = rl.WHITE if self._style == ButtonStyle.DARK else rl.BLACK
+    color = Colors.WHITE if self._style == ButtonStyle.DARK else Colors.BLACK
     text_x = int(self._rect.x + (self._rect.width - text_size.x) // 2)
     text_y = int(self._rect.y + (self._rect.height - text_size.y) // 2)
     rl.draw_text_ex(self._font, self.text, rl.Vector2(text_x, text_y), AlertConstants.FONT_SIZE, 0, color)

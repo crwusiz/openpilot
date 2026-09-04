@@ -5,6 +5,7 @@ from collections.abc import Callable
 from enum import Enum
 
 from openpilot.common.params import Params
+from openpilot.selfdrive.ui import Colors
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.lib.text_measure import measure_text_cached
@@ -112,7 +113,7 @@ class SshKeyAction(ItemAction):
         (rect.x + rect.width - BUTTON_WIDTH - text_size.x - 30, rect.y + (rect.height - text_size.y) / 2),
         VALUE_FONT_SIZE,
         1.0,
-        rl.Color(170, 170, 170, 255),
+        Colors.LIGHT_GRAY,
       )
 
     # Draw button

@@ -1,5 +1,6 @@
 import math
 import pyray as rl
+from openpilot.selfdrive.ui import Colors, ConfidenceBallColors
 from openpilot.selfdrive.ui.mici.onroad import SIDE_PANEL_WIDTH
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.widgets import Widget
@@ -18,7 +19,7 @@ def draw_circle_gradient(center_x: float, center_y: float, radius: int,
   outer_radius = math.ceil(radius * math.sqrt(2)) + 1
   rl.draw_ring(rl.Vector2(int(center_x), int(center_y)), radius, outer_radius,
                0.0, 360.0,
-               20, rl.BLACK)
+               20, Colors.BLACK)
 
 
 class ConfidenceBall(Widget):
@@ -56,22 +57,22 @@ class ConfidenceBall(Widget):
     # confidence zones
     if ui_state.status == UIStatus.ENGAGED or self._demo:
       if self._confidence_filter.x > 0.5:
-        top_dot_color = rl.Color(0, 255, 204, 255)
-        bottom_dot_color = rl.Color(0, 255, 38, 255)
+        top_dot_color = ConfidenceBallColors.ACTIVE_TOP
+        bottom_dot_color = ConfidenceBallColors.ACTIVE_BOTTOM
       elif self._confidence_filter.x > 0.2:
-        top_dot_color = rl.Color(255, 200, 0, 255)
-        bottom_dot_color = rl.Color(255, 115, 0, 255)
+        top_dot_color = ConfidenceBallColors.WARNING_TOP
+        bottom_dot_color = ConfidenceBallColors.WARNING_BOTTOM
       else:
-        top_dot_color = rl.Color(255, 0, 21, 255)
-        bottom_dot_color = rl.Color(255, 0, 89, 255)
+        top_dot_color = ConfidenceBallColors.CRITICAL_TOP
+        bottom_dot_color = ConfidenceBallColors.CRITICAL_BOTTOM
 
     elif ui_state.status == UIStatus.OVERRIDE:
-      top_dot_color = rl.Color(255, 255, 255, 255)
-      bottom_dot_color = rl.Color(82, 82, 82, 255)
+      top_dot_color = ConfidenceBallColors.INACTIVE_TOP
+      bottom_dot_color = ConfidenceBallColors.INACTIVE_BOTTOM
 
     else:
-      top_dot_color = rl.Color(50, 50, 50, 255)
-      bottom_dot_color = rl.Color(13, 13, 13, 255)
+      top_dot_color = ConfidenceBallColors.HIDDEN_TOP
+      bottom_dot_color = ConfidenceBallColors.HIDDEN_BOTTOM
 
     draw_circle_gradient(content_rect.x + content_rect.width - status_dot_radius,
                          dot_height, status_dot_radius,

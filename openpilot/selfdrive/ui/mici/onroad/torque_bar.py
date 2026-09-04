@@ -6,6 +6,7 @@ from collections import OrderedDict
 import numpy as np
 import pyray as rl
 from opendbc.car import ACCELERATION_DUE_TO_GRAVITY
+from openpilot.selfdrive.ui import Colors
 from openpilot.selfdrive.ui.mici.onroad import blend_colors
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app
@@ -60,13 +61,13 @@ def arc_bar_pts(r_mid: float, thickness: float,
 
     mx, my = nx * r_mid, ny * r_mid  # mid-point at a1
     if DEBUG:
-      rl.draw_circle(int(mx), int(my), 4, rl.PURPLE)
+      rl.draw_circle(int(mx), int(my), 4, Colors.DEBUG_PURPLE)
 
     ex = mx + nx * (half - cap_radius)
     ey = my + ny * (half - cap_radius)
 
     if DEBUG:
-      rl.draw_circle(int(ex), int(ey), 2, rl.WHITE)
+      rl.draw_circle(int(ex), int(ey), 2, Colors.WHITE)
 
     # sweep 90° in the local (t,n) frame: from outer edge toward inside
     if not left:
@@ -80,7 +81,7 @@ def arc_bar_pts(r_mid: float, thickness: float,
     ex2 = mx + nx * (-half + cap_radius)
     ey2 = my + ny * (-half + cap_radius)
     if DEBUG:
-      rl.draw_circle(int(ex2), int(ey2), 2, rl.WHITE)
+      rl.draw_circle(int(ex2), int(ey2), 2, Colors.WHITE)
 
     if not left:
       alpha2 = np.deg2rad(np.linspace(0, -90, cap_segs + 1))[:-1]  # include 0 once, exclude -90

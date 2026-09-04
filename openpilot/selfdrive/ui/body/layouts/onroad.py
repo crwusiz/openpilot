@@ -1,6 +1,7 @@
 import time
 import pyray as rl
 
+from openpilot.selfdrive.ui import Colors
 from openpilot.system.ui.lib.application import gui_app, FontWeight, TextAlignment, TextAlignmentVertical
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel
@@ -85,9 +86,9 @@ class BodyLayout(Widget):
     elif self._turning_right and animation.right_turn_remove:
       remove_set = set(animation.right_turn_remove)
       dots = [d for d in dots if d not in remove_set]
-    self.draw_dot_grid(rect, dots, rl.WHITE)
+    self.draw_dot_grid(rect, dots, Colors.WHITE)
 
     if ui_state.is_offroad():
-      rl.draw_rectangle(int(self.rect.x), int(self.rect.y), int(self.rect.width), int(self.rect.height), rl.Color(0, 0, 0, 175))
+      rl.draw_rectangle(int(self.rect.x), int(self.rect.y), int(self.rect.width), int(self.rect.height), Colors.BODY_OVERLAY)
       upper_half = rl.Rectangle(rect.x, rect.y, rect.width, rect.height / 2)
       self._offroad_label.render(upper_half)

@@ -7,6 +7,7 @@ from openpilot.common.api import api_get
 from openpilot.common.params import Params
 from openpilot.common.realtime import drop_realtime
 from openpilot.common.swaglog import cloudlog
+from openpilot.selfdrive.ui import Colors, FirehoseColors
 from openpilot.selfdrive.ui.lib.api_helpers import get_token
 from openpilot.selfdrive.ui.ui_state import ui_state, device
 from openpilot.system.athena.registration import UNREGISTERED_DONGLE_ID
@@ -38,10 +39,6 @@ FAQ_ITEMS = [
 
 class FirehoseLayoutBase(Widget):
   PARAM_KEY = "ApiCache_FirehoseStats"
-  GREEN = rl.Color(46, 204, 113, 255)
-  RED = rl.Color(231, 76, 60, 255)
-  GRAY = rl.Color(68, 68, 68, 255)
-  LIGHT_GRAY = rl.Color(228, 228, 228, 255)
   UPDATE_INTERVAL = 30  # seconds
 
   def __init__(self):
@@ -93,15 +90,15 @@ class FirehoseLayoutBase(Widget):
     title_text = tr(TITLE)
     title_font = gui_app.font(FontWeight.BOLD)
     title_size = 64
-    rl.draw_text_ex(title_font, title_text, rl.Vector2(x, y), title_size, 0, rl.WHITE)
+    rl.draw_text_ex(title_font, title_text, rl.Vector2(x, y), title_size, 0, Colors.WHITE)
     y += int(title_size * FONT_SCALE) + 20
 
     # Description
-    y = self._draw_wrapped_text(x, y, w, tr(DESCRIPTION), gui_app.font(FontWeight.ROMAN), 36, rl.WHITE)
+    y = self._draw_wrapped_text(x, y, w, tr(DESCRIPTION), gui_app.font(FontWeight.ROMAN), 36, Colors.WHITE)
     y += 20
 
     # Separator
-    rl.draw_rectangle_rec(rl.Rectangle(x, y, w, 2), self.GRAY)
+    rl.draw_rectangle_rec(rl.Rectangle(x, y, w, 2), FirehoseColors.GRAY)
     y += 20
 
     # Status
@@ -113,25 +110,25 @@ class FirehoseLayoutBase(Widget):
     if self._segment_count > 0:
       contrib_text = trn("{} segment of your driving is in the training dataset so far.",
                          "{} segments of your driving is in the training dataset so far.", self._segment_count).format(self._segment_count)
-      y = self._draw_wrapped_text(x, y, w, contrib_text, gui_app.font(FontWeight.BOLD), 42, rl.WHITE)
+      y = self._draw_wrapped_text(x, y, w, contrib_text, gui_app.font(FontWeight.BOLD), 42, Colors.WHITE)
       y += 20
 
     # Separator
-    rl.draw_rectangle_rec(rl.Rectangle(x, y, w, 2), self.GRAY)
+    rl.draw_rectangle_rec(rl.Rectangle(x, y, w, 2), FirehoseColors.GRAY)
     y += 20
 
     # Instructions intro
-    y = self._draw_wrapped_text(x, y, w, tr(INSTRUCTIONS_INTRO), gui_app.font(FontWeight.ROMAN), 32, self.LIGHT_GRAY)
+    y = self._draw_wrapped_text(x, y, w, tr(INSTRUCTIONS_INTRO), gui_app.font(FontWeight.ROMAN), 32, FirehoseColors.LIGHT_GRAY)
     y += 20
 
     # FAQ Header
-    y = self._draw_wrapped_text(x, y, w, tr(FAQ_HEADER), gui_app.font(FontWeight.BOLD), 44, rl.WHITE)
+    y = self._draw_wrapped_text(x, y, w, tr(FAQ_HEADER), gui_app.font(FontWeight.BOLD), 44, Colors.WHITE)
     y += 20
 
     # FAQ Items
     for question, answer in FAQ_ITEMS:
-      y = self._draw_wrapped_text(x, y, w, tr(question), gui_app.font(FontWeight.BOLD), 32, self.LIGHT_GRAY)
-      y = self._draw_wrapped_text(x, y, w, tr(answer), gui_app.font(FontWeight.ROMAN), 32, self.LIGHT_GRAY)
+      y = self._draw_wrapped_text(x, y, w, tr(question), gui_app.font(FontWeight.BOLD), 32, FirehoseColors.LIGHT_GRAY)
+      y = self._draw_wrapped_text(x, y, w, tr(answer), gui_app.font(FontWeight.ROMAN), 32, FirehoseColors.LIGHT_GRAY)
       y += 20
 
   def _draw_wrapped_text(self, x, y, width, text, font, font_size, color):
@@ -194,9 +191,9 @@ class FirehoseLayoutBase(Widget):
     network_metered = ui_state.sm["deviceState"].networkMetered
 
     if not network_metered and network_type != 0:  # Not metered and connected
-      return tr("ACTIVE"), self.GREEN
+      return tr("ACTIVE"), FirehoseColors.GREEN
     else:
-      return tr("INACTIVE: connect to an unmetered network"), self.RED
+      return tr("INACTIVE: connect to an unmetered network"), FirehoseColors.RED
 
   def _fetch_firehose_stats(self):
     try:

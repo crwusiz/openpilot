@@ -2,6 +2,7 @@ import math
 import pyray as rl
 from dataclasses import dataclass
 from openpilot.common.constants import CV
+from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.selfdrive.ui.mici.onroad.torque_bar import TorqueBar
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus, ChestnutState
 from openpilot.system.ui.lib.application import gui_app, FontWeight
@@ -26,27 +27,6 @@ class FontSizes:
   set_speed: int = 112
   middle: int = 16
   big: int = 30
-
-
-def colors_alpha(color, alpha):
-  if isinstance(color, tuple):
-    return rl.Color(color[0], color[1], color[2], alpha)
-  return rl.Color(color.r, color.g, color.b, alpha)
-
-
-@dataclass(frozen=True)
-class Colors:
-  BLACK = rl.BLACK
-  WHITE = rl.WHITE
-  WHITE_TRANSLUCENT = colors_alpha(WHITE, 200)
-  BLACK_TRANSLUCENT = colors_alpha(BLACK, 166)
-  BOX_BG = colors_alpha(BLACK, 100)
-  RED = rl.Color(201, 34, 49, 255)
-  ORANGE = rl.Color(255, 149, 0, 255)
-  GREEN = rl.Color(128, 216, 166, 255)
-  STEERING = rl.Color(0, 191, 255, 255)
-  DISENGAGED = rl.Color(145, 155, 149, 255)
-  OVERRIDE = DISENGAGED
 
 
 class TurnIntent(Widget):
@@ -344,7 +324,7 @@ class HudRenderer(Widget):
       EXCLAMATION_POINT_SPACING = 10
       exclamation_pos_x = pos_x - self._txt_exclamation_point.width / 2 + wheel_txt.width / 2 + EXCLAMATION_POINT_SPACING
       exclamation_pos_y = pos_y - self._txt_exclamation_point.height / 2
-      rl.draw_texture_ex(self._txt_exclamation_point, rl.Vector2(exclamation_pos_x, exclamation_pos_y), 0.0, 1.0, rl.WHITE)
+      rl.draw_texture_ex(self._txt_exclamation_point, rl.Vector2(exclamation_pos_x, exclamation_pos_y), 0.0, 1.0, Colors.WHITE)
 
   def _draw_borders(self, rect: rl.Rectangle) -> None:
     """Draw borders for blinkers, blind spot, and system status."""

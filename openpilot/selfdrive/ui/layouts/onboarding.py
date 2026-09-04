@@ -5,6 +5,7 @@ from enum import IntEnum
 
 import pyray as rl
 from openpilot.common.basedir import BASEDIR
+from openpilot.selfdrive.ui import Colors
 from openpilot.system.ui.lib.application import FontWeight, gui_app, TextAlignment
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
@@ -91,17 +92,17 @@ class TrainingGuide(Widget):
   def _render(self, _):
     # Safeguard against fast tapping
     step = min(self._step, len(self._textures) - 1)
-    rl.draw_texture_ex(self._textures[step], rl.Vector2(0, 0), 0.0, 1.0, rl.WHITE)
+    rl.draw_texture_ex(self._textures[step], rl.Vector2(0, 0), 0.0, 1.0, Colors.WHITE)
 
     # progress bar
     if 0 < step < len(STEP_RECTS) - 1:
       h = 20
       w = int((step / (len(STEP_RECTS) - 1)) * self._rect.width)
       rl.draw_rectangle(int(self._rect.x), int(self._rect.y + self._rect.height - h),
-                        w, h, rl.Color(70, 91, 234, 255))
+                        w, h, Colors.PRIMARY_BLUE)
 
     if DEBUG:
-      rl.draw_rectangle_lines_ex(STEP_RECTS[step], 3, rl.RED)
+      rl.draw_rectangle_lines_ex(STEP_RECTS[step], 3, Colors.DEBUG_RED)
 
     return -1
 
@@ -137,8 +138,8 @@ class TermsPage(Widget):
     self._accept_btn.render(rl.Rectangle(self._rect.x + 45 * 2 + btn_width, btn_y, btn_width, 160))
 
     if DEBUG:
-      rl.draw_rectangle_lines_ex(welcome_rect, 3, rl.RED)
-      rl.draw_rectangle_lines_ex(desc_rect, 3, rl.RED)
+      rl.draw_rectangle_lines_ex(welcome_rect, 3, Colors.DEBUG_RED)
+      rl.draw_rectangle_lines_ex(desc_rect, 3, Colors.DEBUG_RED)
 
     return -1
 
@@ -166,7 +167,7 @@ class DeclinePage(Widget):
     text_height = btn_y - (200 + 45)
     text_rect = rl.Rectangle(self._rect.x + 165, self._rect.y + (btn_y - text_height) / 2 + 10, self._rect.width - (165 * 2), text_height)
     if DEBUG:
-      rl.draw_rectangle_lines_ex(text_rect, 3, rl.RED)
+      rl.draw_rectangle_lines_ex(text_rect, 3, Colors.DEBUG_RED)
     self._text.render(text_rect)
 
 

@@ -2,6 +2,7 @@ import pyray as rl
 from dataclasses import dataclass, field
 from enum import IntEnum
 from collections.abc import Callable
+from openpilot.selfdrive.ui import Colors, SettingsColors
 from openpilot.selfdrive.ui.layouts.settings.developer import DeveloperLayout
 from openpilot.selfdrive.ui.layouts.settings.device import DeviceLayout
 from openpilot.selfdrive.ui.layouts.settings.firehose import FirehoseLayout
@@ -22,14 +23,6 @@ CLOSE_BTN_SIZE = 200
 CLOSE_ICON_SIZE = 70
 NAV_BTN_HEIGHT = 110
 PANEL_MARGIN = 50
-
-# Colors
-SIDEBAR_COLOR = rl.BLACK
-PANEL_COLOR = rl.Color(41, 41, 41, 255)
-CLOSE_BTN_COLOR = rl.Color(41, 41, 41, 255)
-CLOSE_BTN_PRESSED = rl.Color(59, 59, 59, 255)
-TEXT_NORMAL = rl.Color(128, 128, 128, 255)
-TEXT_SELECTED = rl.WHITE
 
 
 class PanelType(IntEnum):
@@ -87,7 +80,7 @@ class SettingsLayout(Widget):
     self._draw_current_panel(panel_rect)
 
   def _draw_sidebar(self, rect: rl.Rectangle):
-    rl.draw_rectangle_rec(rect, SIDEBAR_COLOR)
+    rl.draw_rectangle_rec(rect, Colors.BLACK)
 
     # Close button
     close_btn_rect = rl.Rectangle(
@@ -96,10 +89,10 @@ class SettingsLayout(Widget):
 
     pressed = (rl.is_mouse_button_down(rl.MouseButton.MOUSE_BUTTON_LEFT) and
                rl.check_collision_point_rec(rl.get_mouse_position(), close_btn_rect))
-    close_color = CLOSE_BTN_PRESSED if pressed else CLOSE_BTN_COLOR
+    close_color = SettingsColors.CLOSE_BUTTON_PRESSED if pressed else SettingsColors.CLOSE_BUTTON
     rl.draw_rectangle_rounded(close_btn_rect, 1.0, 20, close_color)
 
-    icon_color = rl.Color(255, 255, 255, 255) if not pressed else rl.Color(220, 220, 220, 255)
+    icon_color = Colors.WHITE if not pressed else SettingsColors.ICON_PRESSED
     icon_dest = rl.Rectangle(
       close_btn_rect.x + (close_btn_rect.width - self._close_icon.width) / 2,
       close_btn_rect.y + (close_btn_rect.height - self._close_icon.height) / 2,
@@ -125,7 +118,7 @@ class SettingsLayout(Widget):
 
       # Button styling
       is_selected = panel_type == self._current_panel
-      text_color = TEXT_SELECTED if is_selected else TEXT_NORMAL
+      text_color = Colors.WHITE if is_selected else SettingsColors.TEXT_NORMAL
       # Draw button text (right-aligned)
       panel_name = tr(panel_info.name)
       text_size = measure_text_cached(self._font_medium, panel_name, 65)
@@ -141,10 +134,10 @@ class SettingsLayout(Widget):
 
   def _draw_current_panel(self, rect: rl.Rectangle):
     rl.draw_rectangle_rounded(
-      rl.Rectangle(rect.x + 10, rect.y + 10, rect.width - 20, rect.height - 20), 0.04, 30, PANEL_COLOR
+      rl.Rectangle(rect.x + 10, rect.y + 10, rect.width - 20, rect.height - 20), 0.04, 30, SettingsColors.PANEL
     )
     content_rect = rl.Rectangle(rect.x + PANEL_MARGIN, rect.y + 25, rect.width - (PANEL_MARGIN * 2), rect.height - 50)
-    # rl.draw_rectangle_rounded(content_rect, 0.03, 30, PANEL_COLOR)
+    # rl.draw_rectangle_rounded(content_rect, 0.03, 30, SettingsColors.PANEL)
     panel = self._panels[self._current_panel]
     if panel.instance:
       panel.instance.render(content_rect)

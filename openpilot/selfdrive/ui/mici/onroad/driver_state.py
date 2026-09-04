@@ -3,6 +3,7 @@ import numpy as np
 import math
 from openpilot.cereal import log
 from openpilot.common.filter_simple import FirstOrderFilter
+from openpilot.selfdrive.ui import Colors
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -94,7 +95,7 @@ class DriverStateRenderer(Widget):
 
   def _render(self, _):
     if DEBUG:
-      rl.draw_rectangle_lines_ex(self._rect, 1, rl.RED)
+      rl.draw_rectangle_lines_ex(self._rect, 1, Colors.DEBUG_RED)
 
     rl.draw_texture_ex(self._dm_background,
                        rl.Vector2(self._rect.x, self._rect.y), 0.0, 1.0,
@@ -153,10 +154,10 @@ class DriverStateRenderer(Widget):
     start_y = center_y + (line_offset + line_length) * math.sin(math.radians(angle))
     end_x = start_x + line_length * math.cos(math.radians(angle))
     end_y = start_y + line_length * math.sin(math.radians(angle))
-    color = rl.Color(0, 255, 64, 255)
+    color = Colors.MICI_DRIVER_ACTIVE
 
     if grey:
-      color = rl.Color(166, 166, 166, 255)
+      color = Colors.MICI_DRIVER_INACTIVE
 
     if f.x > 0.01:
       rl.draw_line_ex((start_x, start_y), (end_x, end_y), 12, color)
@@ -193,14 +194,14 @@ class DriverStateRenderer(Widget):
       pitchd = math.degrees(pitch)
       yawd = math.degrees(yaw)
 
-      rl.draw_line_ex((0, 100), (200, 100), 3, rl.RED)
-      rl.draw_line_ex((0, 120), (200, 120), 3, rl.RED)
-      rl.draw_line_ex((0, 140), (200, 140), 3, rl.RED)
+      rl.draw_line_ex((0, 100), (200, 100), 3, Colors.DEBUG_RED)
+      rl.draw_line_ex((0, 120), (200, 120), 3, Colors.DEBUG_RED)
+      rl.draw_line_ex((0, 140), (200, 140), 3, Colors.DEBUG_RED)
 
       pitch_x = 100 + pitchd
       yaw_x = 100 + yawd
-      rl.draw_circle(int(pitch_x), 100, 5, rl.GREEN)
-      rl.draw_circle(int(yaw_x), 120, 5, rl.GREEN)
+      rl.draw_circle(int(pitch_x), 100, 5, Colors.DEBUG_GREEN)
+      rl.draw_circle(int(yaw_x), 120, 5, Colors.DEBUG_GREEN)
 
     # filter head rotation, handling wrap-around
     rotation = math.degrees(math.atan2(pitch * 2, yaw))  # reduce yaw sensitivity

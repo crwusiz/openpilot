@@ -10,6 +10,7 @@ from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos
 from openpilot.system.ui.widgets.slider import RedBigSlider, BigSlider
 from openpilot.common.filter_simple import FirstOrderFilter
+from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.selfdrive.ui.mici.widgets.button import BigCircleButton, GreyBigButton
 
 DEBUG = False
@@ -78,7 +79,7 @@ class BigInputDialog(BigDialogBase):
                confirm_callback: Callable[[str], None] | None = None,
                auto_return_to_letters: str = ""):
     super().__init__()
-    self._hint_label = UnifiedLabel(hint, font_size=35, text_color=rl.Color(255, 255, 255, int(255 * 0.35)),
+    self._hint_label = UnifiedLabel(hint, font_size=35, text_color=colors_alpha(Colors.WHITE, int(255 * 0.35)),
                                     font_weight=FontWeight.MEDIUM)
     self._keyboard = MiciKeyboard(auto_return_to_letters=auto_return_to_letters)
     self._keyboard.set_text(default_text)
@@ -140,21 +141,21 @@ class BigInputDialog(BigDialogBase):
       text_x -= text_size.x - text_field_rect.width
 
     rl.begin_scissor_mode(int(text_field_rect.x), int(text_field_rect.y), int(text_field_rect.width), int(text_field_rect.height))
-    rl.draw_text_ex(gui_app.font(FontWeight.ROMAN), text, rl.Vector2(text_x, text_field_rect.y), self.TEXT_INPUT_SIZE, 0, rl.WHITE)
+    rl.draw_text_ex(gui_app.font(FontWeight.ROMAN), text, rl.Vector2(text_x, text_field_rect.y), self.TEXT_INPUT_SIZE, 0, Colors.WHITE)
 
     # draw grayed out character user is hovering over
     if candidate_char:
       candidate_char_size = measure_text_cached(gui_app.font(FontWeight.ROMAN), candidate_char, self.TEXT_INPUT_SIZE)
       rl.draw_text_ex(gui_app.font(FontWeight.ROMAN), candidate_char,
                       rl.Vector2(min(text_x + text_size.x, text_field_rect.x + text_field_rect.width) - candidate_char_size.x, text_field_rect.y),
-                      self.TEXT_INPUT_SIZE, 0, rl.Color(255, 255, 255, 128))
+                      self.TEXT_INPUT_SIZE, 0, colors_alpha(Colors.WHITE, 128))
 
     rl.end_scissor_mode()
 
     # draw gradient on left side to indicate more text
     if text_size.x > text_field_rect.width:
       rl.draw_rectangle_gradient_ex(rl.Rectangle(text_field_rect.x, text_field_rect.y, 80, text_field_rect.height),
-                                    rl.BLACK, rl.BLANK, rl.BLANK, rl.BLACK)
+                                    Colors.BLACK, Colors.TRANSPARENT, Colors.TRANSPARENT, Colors.BLACK)
 
     # draw cursor
     blink_alpha = (math.sin(rl.get_time() * 6) + 1) / 2
@@ -163,7 +164,7 @@ class BigInputDialog(BigDialogBase):
     else:
       cursor_x = text_field_rect.x - 6
     rl.draw_rectangle_rounded(rl.Rectangle(cursor_x, text_field_rect.y, 4, text_size.y),
-                              1, 4, rl.Color(255, 255, 255, int(255 * blink_alpha)))
+                              1, 4, colors_alpha(Colors.WHITE, int(255 * blink_alpha)))
 
     # draw backspace icon with nice fade
     self._backspace_img_alpha.update(255 * bool(text))
@@ -196,9 +197,9 @@ class BigInputDialog(BigDialogBase):
 
     # draw debugging rect bounds
     if DEBUG:
-      rl.draw_rectangle_lines_ex(text_field_rect, 1, rl.Color(100, 100, 100, 255))
-      rl.draw_rectangle_lines_ex(self._top_right_button_rect, 1, rl.Color(0, 255, 0, 255))
-      rl.draw_rectangle_lines_ex(self._top_left_button_rect, 1, rl.Color(0, 255, 0, 255))
+      rl.draw_rectangle_lines_ex(text_field_rect, 1, Colors.DEBUG_BORDER)
+      rl.draw_rectangle_lines_ex(self._top_right_button_rect, 1, Colors.DEBUG_VALID)
+      rl.draw_rectangle_lines_ex(self._top_left_button_rect, 1, Colors.DEBUG_VALID)
 
   def _handle_mouse_press(self, mouse_pos: MousePos):
     super()._handle_mouse_press(mouse_pos)

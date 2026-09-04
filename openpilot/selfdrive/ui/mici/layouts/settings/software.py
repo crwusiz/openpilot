@@ -5,6 +5,7 @@ from enum import IntEnum
 from collections.abc import Callable
 
 from openpilot.common.time_helpers import system_time_valid
+from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.selfdrive.ui.mici.layouts.settings.device import EngagedConfirmationButton
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigDialog
@@ -39,7 +40,7 @@ class SoftwareInfoLayoutMici(Widget):
 
     self.set_rect(rl.Rectangle(0, 0, 360, 180))
 
-    subheader_color = rl.Color(255, 255, 255, int(255 * 0.9 * 0.65))
+    subheader_color = colors_alpha(Colors.WHITE, int(255 * 0.9 * 0.65))
     max_width = int(self._rect.width - 20)
     self._version_label = UnifiedLabel("version", 48, max_width=max_width, font_weight=FontWeight.DISPLAY, wrap_text=False)
     self._version_text_label = UnifiedLabel("", 32, max_width=max_width, text_color=subheader_color,

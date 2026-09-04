@@ -7,6 +7,7 @@ import string
 from dataclasses import dataclass
 from openpilot.cereal import messaging, log
 from opendbc.car.structs import car
+from openpilot.selfdrive.ui import MiciOnroadAlertColors
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.common.filter_simple import BounceFilter, FirstOrderFilter
 from openpilot.common.hardware import COMMA_HARDWARE
@@ -27,9 +28,9 @@ SELFDRIVE_UNRESPONSIVE_TIMEOUT = 10  # Seconds
 
 # Constants
 ALERT_COLORS = {
-  AlertStatus.normal: rl.Color(0, 0, 0, 100),
-  AlertStatus.userPrompt: rl.Color(255, 115, 0, 100),
-  AlertStatus.critical: rl.Color(255, 0, 21, 100),
+  AlertStatus.normal: MiciOnroadAlertColors.NORMAL,
+  AlertStatus.userPrompt: MiciOnroadAlertColors.USER_PROMPT,
+  AlertStatus.critical: MiciOnroadAlertColors.CRITICAL,
 }
 
 TURN_SIGNAL_BLINK_PERIOD = 1 / (80 / 60)  # Mazda heartbeat turn signal BPM

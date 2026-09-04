@@ -1,4 +1,5 @@
 import pyray as rl
+from openpilot.selfdrive.ui import Colors, PairingColors
 import time
 
 from openpilot.common.api import Api
@@ -56,7 +57,7 @@ class PairingDialog(Widget):
       gui_app.pop_widget()
 
   def _render(self, rect: rl.Rectangle) -> int:
-    rl.clear_background(rl.Color(224, 224, 224, 255))
+    rl.clear_background(PairingColors.BACKGROUND)
 
     self._check_qr_refresh()
 
@@ -78,7 +79,7 @@ class PairingDialog(Widget):
     left_width = int(content_rect.width * 0.5 - 15)
 
     title_wrapped = wrap_text(title_font, title, 75, left_width)
-    rl.draw_text_ex(title_font, "\n".join(title_wrapped), rl.Vector2(content_rect.x, y), 75, 0.0, rl.BLACK)
+    rl.draw_text_ex(title_font, "\n".join(title_wrapped), rl.Vector2(content_rect.x, y), 75, 0.0, Colors.BLACK)
     y += len(title_wrapped) * 75 + 60
 
     # Two columns: instructions and QR code
@@ -117,26 +118,26 @@ class PairingDialog(Widget):
       circle_y = y + text_height // 2
 
       # Circle and number
-      rl.draw_circle(int(circle_x), int(circle_y), circle_radius, rl.Color(70, 70, 70, 255))
+      rl.draw_circle(int(circle_x), int(circle_y), circle_radius, PairingColors.DOT)
       number = str(i + 1)
       number_size = measure_text_cached(font, number, 30)
-      rl.draw_text_ex(font, number, (int(circle_x - number_size.x // 2), int(circle_y - number_size.y // 2)), 30, 0, rl.WHITE)
+      rl.draw_text_ex(font, number, (int(circle_x - number_size.x // 2), int(circle_y - number_size.y // 2)), 30, 0, Colors.WHITE)
 
       # Text
-      rl.draw_text_ex(font, "\n".join(wrapped), rl.Vector2(text_x, y), 47, 0.0, rl.BLACK)
+      rl.draw_text_ex(font, "\n".join(wrapped), rl.Vector2(text_x, y), 47, 0.0, Colors.BLACK)
       y += text_height + 50
 
   def _render_qr_code(self, rect: rl.Rectangle) -> None:
     if not self.qr_texture:
-      rl.draw_rectangle_rounded(rect, 0.1, 20, rl.Color(240, 240, 240, 255))
+      rl.draw_rectangle_rounded(rect, 0.1, 20, PairingColors.CARD)
       error_font = gui_app.font(FontWeight.BOLD)
       rl.draw_text_ex(
-        error_font, tr("QR Code Error"), rl.Vector2(rect.x + 20, rect.y + rect.height // 2 - 15), 30, 0.0, rl.RED
+        error_font, tr("QR Code Error"), rl.Vector2(rect.x + 20, rect.y + rect.height // 2 - 15), 30, 0.0, Colors.ERROR
       )
       return
 
     source = rl.Rectangle(0, 0, self.qr_texture.width, self.qr_texture.height)
-    rl.draw_texture_pro(self.qr_texture, source, rect, rl.Vector2(0, 0), 0, rl.WHITE)
+    rl.draw_texture_pro(self.qr_texture, source, rect, rl.Vector2(0, 0), 0, Colors.WHITE)
 
   def __del__(self):
     if self.qr_texture and self.qr_texture.id != 0:

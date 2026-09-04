@@ -2,6 +2,7 @@ import time
 import pyray as rl
 from dataclasses import dataclass
 from openpilot.cereal import messaging, log
+from openpilot.selfdrive.ui import Colors, OnroadAlertColors
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.common.hardware import COMMA_HARDWARE
 from openpilot.system.ui.lib.application import gui_app, FontWeight, TextAlignment, TextAlignmentVertical
@@ -32,9 +33,9 @@ SELFDRIVE_UNRESPONSIVE_TIMEOUT = 10  # Seconds
 
 # Constants
 ALERT_COLORS = {
-  AlertStatus.normal: rl.Color(21, 21, 21, 100),      # #151515 with alpha 0xF1
-  AlertStatus.userPrompt: rl.Color(218, 111, 37, 100),  # #DA6F25 with alpha 0xF1
-  AlertStatus.critical: rl.Color(201, 34, 49, 100),    # #C92231 with alpha 0xF1
+  AlertStatus.normal: OnroadAlertColors.NORMAL,
+  AlertStatus.userPrompt: OnroadAlertColors.USER_PROMPT,
+  AlertStatus.critical: OnroadAlertColors.CRITICAL,
 }
 
 
@@ -171,7 +172,7 @@ class AlertRenderer(Widget):
       self._full_text2_label.set_text(alert.text2)
       self._full_text2_label.render(subtitle_rect)
 
-  def _draw_centered(self, text, rect, font, font_size, center_y=True, color=rl.WHITE) -> None:
+  def _draw_centered(self, text, rect, font, font_size, center_y=True, color=Colors.WHITE) -> None:
     text_size = measure_text_cached(font, text, font_size)
     x = rect.x + (rect.width - text_size.x) / 2
     y = rect.y + ((rect.height - text_size.y) / 2 if center_y else 0)

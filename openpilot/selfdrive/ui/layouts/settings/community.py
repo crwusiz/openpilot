@@ -3,6 +3,7 @@ import shutil
 import time
 import threading
 import pyray as rl
+from openpilot.selfdrive.ui import Colors, CommunityColors
 
 from datetime import datetime
 from pathlib import Path
@@ -309,13 +310,13 @@ class CommunityLayout(Widget):
 
   def _draw_button(self, rect, text, is_selected=False, is_header=False):
     if is_header:
-      rl.draw_rectangle_rec(rect, rl.Color(44, 44, 226, 255))  # #2C2CE2
+      rl.draw_rectangle_rec(rect, CommunityColors.ENABLED)
     elif is_selected:
-      rl.draw_rectangle_rec(rect, rl.Color(60, 60, 60, 255))
+      rl.draw_rectangle_rec(rect, CommunityColors.DISABLED)
     else:
-      rl.draw_rectangle_rec(rect, rl.Color(40, 40, 40, 255))
+      rl.draw_rectangle_rec(rect, CommunityColors.UNAVAILABLE)
 
-    rl.draw_rectangle_lines_ex(rect, 1, rl.Color(80, 80, 80, 255))
+    rl.draw_rectangle_lines_ex(rect, 1, CommunityColors.BORDER)
 
     font = gui_app.font(FontWeight.NORMAL)
 
@@ -329,12 +330,12 @@ class CommunityLayout(Widget):
         text_size = rl.measure_text_ex(font, line, FONT_SIZE, 1)
         text_x = rect.x + (rect.width - text_size.x) / 2
         text_y = start_y + (i * line_height)
-        rl.draw_text_ex(font, line, rl.Vector2(text_x, text_y), FONT_SIZE, 1, rl.WHITE)
+        rl.draw_text_ex(font, line, rl.Vector2(text_x, text_y), FONT_SIZE, 1, Colors.WHITE)
     else:
       text_size = rl.measure_text_ex(font, text, FONT_SIZE, 1)
       text_x = rect.x + (rect.width - text_size.x) / 2
       text_y = rect.y + (rect.height - text_size.y) / 2
-      rl.draw_text_ex(font, text, rl.Vector2(text_x, text_y), FONT_SIZE, 1, rl.WHITE)
+      rl.draw_text_ex(font, text, rl.Vector2(text_x, text_y), FONT_SIZE, 1, Colors.WHITE)
 
   def _is_point_in_rect(self, x, y, rect):
     return (rect.x <= x <= rect.x + rect.width and
@@ -535,7 +536,7 @@ class CommunityLayout(Widget):
     rl.draw_line(
       int(rect.x + 40), int(rect.y + HEADER_ROW_HEIGHT),
       int(rect.x + rect.width - 80), int(rect.y + HEADER_ROW_HEIGHT),
-      rl.GRAY
+      Colors.MEDIUM_GRAY
     )
 
     tab_y = rect.y + HEADER_ROW_HEIGHT
@@ -552,7 +553,7 @@ class CommunityLayout(Widget):
     rl.draw_line(
       int(rect.x + 40), int(tab_y + HEADER_ROW_HEIGHT),
       int(rect.x + rect.width - 80), int(tab_y + HEADER_ROW_HEIGHT),
-      rl.GRAY
+      Colors.MEDIUM_GRAY
     )
 
     content_rect = rl.Rectangle(

@@ -2,7 +2,7 @@ import numpy as np
 import pyray as rl
 from openpilot.cereal import log
 from openpilot.cereal.visionipc import VisionStreamType
-from openpilot.selfdrive.ui import UI_BORDER_SIZE
+from openpilot.selfdrive.ui import Colors, UI_BORDER_SIZE
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.selfdrive.ui.onroad.alert_renderer import AlertRenderer
 from openpilot.selfdrive.ui.onroad.driver_state import DriverStateRenderer
@@ -21,14 +21,14 @@ CABIN_CAM = VisionStreamType.VISION_STREAM_CABIN
 DEFAULT_DEVICE_CAMERA = DEVICE_CAMERAS["tici", "ar0231"]
 
 BORDER_COLORS = {
-  UIStatus.DISENGAGED: rl.Color(18, 40, 57, 255),  # Blue for disengaged state
-  UIStatus.OVERRIDE: rl.Color(137, 146, 141, 255),  # Gray for override state
-  UIStatus.ENGAGED: rl.Color(22, 127, 64, 255),  # Green for engaged state
-  UIStatus.RED: rl.Color(201, 34, 49, 255),
-  UIStatus.STEERING: rl.Color(0, 191, 255, 255),
-  UIStatus.BLINKER: rl.Color(255, 149, 0, 255),
-  UIStatus.ACTIVE: rl.Color(111, 192, 201, 255),
-  UIStatus.READY: rl.Color(143, 201, 192, 255),
+  UIStatus.DISENGAGED: Colors.BORDER_DISENGAGED,
+  UIStatus.OVERRIDE: Colors.BORDER_OVERRIDE,
+  UIStatus.ENGAGED: Colors.BORDER_ENGAGED,
+  UIStatus.RED: Colors.RED,
+  UIStatus.STEERING: Colors.STEERING,
+  UIStatus.BLINKER: Colors.ORANGE,
+  UIStatus.ACTIVE: Colors.BORDER_ACTIVE,
+  UIStatus.READY: Colors.BORDER_READY,
 }
 
 WIDE_CAM_MAX_SPEED = 10.0  # m/s (22 mph)
@@ -108,7 +108,7 @@ class AugmentedRoadView(CameraView):
     pass
 
   def _draw_border(self, rect: rl.Rectangle):
-    rl.draw_rectangle_lines_ex(rect, UI_BORDER_SIZE, rl.BLACK)
+    rl.draw_rectangle_lines_ex(rect, UI_BORDER_SIZE, Colors.BLACK)
     border_roundness = 0.12
     border_color = BORDER_COLORS.get(ui_state.status, BORDER_COLORS[UIStatus.DISENGAGED])
     border_rect = rl.Rectangle(rect.x + UI_BORDER_SIZE, rect.y + UI_BORDER_SIZE,

@@ -3,6 +3,7 @@ import math
 
 from dataclasses import dataclass
 from openpilot.common.constants import CV
+from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.selfdrive.ui.onroad.exp_button import ExpButton
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus, ChestnutState
 from openpilot.system.ui.lib.application import gui_app, FontWeight
@@ -40,37 +41,6 @@ class FontSizes:
   middle: int = 40
   big: int = 70
   info_text: int = 30
-
-
-def colors_alpha(color, alpha):
-  if isinstance(color, tuple):
-    return rl.Color(color[0], color[1], color[2], alpha)
-  return rl.Color(color.r, color.g, color.b, alpha)
-
-
-@dataclass(frozen=True)
-class Colors:
-  WHITE = rl.Color(255, 255, 255, 255)  # rl.WHITE
-  GREY = rl.Color(166, 166, 166, 255)
-  BLACK = rl.Color(0, 0, 0, 255)  # rl.BLACK
-  RED = rl.Color(201, 34, 49, 255)
-  ORANGE = rl.Color(255, 149, 0, 255)
-  DISENGAGED = rl.Color(145, 155, 149, 255)
-  OVERRIDE = DISENGAGED
-  ENGAGED = rl.Color(128, 216, 166, 255)
-  DISENGAGED_BG = colors_alpha(BLACK, 153)
-  OVERRIDE_BG = colors_alpha(OVERRIDE, 204)
-  ENGAGED_BG = colors_alpha(ENGAGED, 204)
-  BLACK_TRANSLUCENT = colors_alpha(BLACK, 166)
-  WHITE_TRANSLUCENT = colors_alpha(WHITE, 200)
-  BORDER_TRANSLUCENT = colors_alpha(WHITE, 75)
-  HEADER_GRADIENT_START = colors_alpha(BLACK, 114)
-  HEADER_GRADIENT_END = rl.Color(0, 0, 0, 0)  # rl.BLANK
-  DARK_GREY = rl.Color(114, 114, 114, 255)
-  DARK_RED = rl.Color(139, 0, 0, 255)
-  LIME = rl.Color(120, 255, 120, 255)
-  LIGHT_ORANGE = rl.Color(255, 228, 191, 255)
-  AMBER = rl.Color(255, 200, 100, 255)
 
 
 class HudRenderer(Widget):

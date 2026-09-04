@@ -18,6 +18,7 @@ import threading
 from pathlib import Path
 from dataclasses import dataclass
 from openpilot.common.params import Params
+from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets.network import WifiManagerUI, WifiManager
 
@@ -36,21 +37,6 @@ NETWORK_TYPES = {
   NetworkType.cell5G: "5G",
   NetworkType.ethernet: "Ethernet",
 }
-
-def colors_alpha(color, alpha):
-  if isinstance(color, tuple):
-    return rl.Color(color[0], color[1], color[2], alpha)
-  else:
-    return rl.Color(color.r, color.g, color.b, alpha)
-
-class Colors:
-  WHITE = rl.WHITE
-  WHITE_DIM = colors_alpha(WHITE, 85)
-  GRAY = rl.Color(84, 84, 84, 255)
-  WARNING = rl.Color(218, 202, 37, 255)
-  DANGER = rl.Color(201, 34, 49, 255)
-  BUTTON_PRESSED = colors_alpha(WHITE, 166)
-  UP_TO_DATE = rl.Color(128, 216, 166, 255)
 
 @dataclass(slots=True)
 class MetricData:
@@ -88,7 +74,7 @@ class AlertsPill(Widget):
     alert_count = self._alert_count_callback() if self._alert_count_callback else 0
     if alert_count > 0:
       pill_w, pill_h = self._pill_bg_txt.width, self._pill_bg_txt.height
-      rl.draw_texture_ex(self._pill_bg_txt, rl.Vector2(self.rect.x, self.rect.y), 0.0, 1.0, rl.WHITE)
+      rl.draw_texture_ex(self._pill_bg_txt, rl.Vector2(self.rect.x, self.rect.y), 0.0, 1.0, Colors.WHITE)
 
       severity = self._max_severity_callback() if self._max_severity_callback else None
       if severity == -1:
@@ -100,7 +86,7 @@ class AlertsPill(Widget):
 
       warn_x = self.rect.x + self.ICON_OFFSET
       warn_y = self.rect.y + (pill_h - warning_txt.height) / 2
-      rl.draw_texture_ex(warning_txt, rl.Vector2(warn_x, warn_y), 0.0, 1.0, rl.WHITE)
+      rl.draw_texture_ex(warning_txt, rl.Vector2(warn_x, warn_y), 0.0, 1.0, Colors.WHITE)
 
       count_rect = rl.Rectangle(self.rect.x + self.COUNT_OFFSET, self.rect.y, pill_w - self.COUNT_OFFSET, pill_h)
       gui_label(count_rect, str(alert_count), font_size=36,
@@ -155,7 +141,7 @@ class NetworkIcon(Widget):
     if draw_net_txt == self._wifi_slash_txt:
       draw_y -= (self._wifi_slash_txt.height - self._wifi_none_txt.height) / 2
 
-    rl.draw_texture_ex(draw_net_txt, rl.Vector2(draw_x, draw_y), 0.0, 1.0, rl.Color(255, 255, 255, int(255 * 0.9)))
+    rl.draw_texture_ex(draw_net_txt, rl.Vector2(draw_x, draw_y), 0.0, 1.0, colors_alpha(Colors.WHITE, int(255 * 0.9)))
 
 
 class MiciHomeLayout(Widget):

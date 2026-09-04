@@ -1,5 +1,6 @@
 import pyray as rl
 
+from openpilot.selfdrive.ui import Colors
 from openpilot.selfdrive.ui.mici.layouts.settings.network.wifi_ui import WifiIcon
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton
 from openpilot.system.ui.lib.application import gui_app
@@ -57,4 +58,4 @@ class WifiNetworkButton(BigButton):
       icon_y = btn_y + 30
       lock_x = icon_x + self._txt_icon.width - self._lock_txt.width + 7
       lock_y = icon_y + self._txt_icon.height - self._lock_txt.height + 8
-      rl.draw_texture_ex(self._lock_txt, (lock_x, lock_y), 0.0, 1.0, rl.WHITE)
+      rl.draw_texture_ex(self._lock_txt, (lock_x, lock_y), 0.0, 1.0, Colors.WHITE)
