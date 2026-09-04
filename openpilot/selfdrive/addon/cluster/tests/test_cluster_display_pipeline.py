@@ -95,6 +95,34 @@ def test_encoding_overlaps_blocked_send():
     assert pipeline.close()
 
 
+def test_single_push_wakes_encoder_when_sender_is_first_waiter():
+  waiting = {name: threading.Event() for name in ("test-sender", "test-encoder")}
+
+  class ObservedCondition(threading.Condition):
+    def wait_for(self, predicate, timeout=None):
+      waiting[threading.current_thread().name].set()
+      return super().wait_for(predicate, timeout)
+
+  display = OverlapDisplay()
+  display.release_send.set()
+  pipeline = ClusterDisplayPipeline(display)
+  pipeline._condition = ObservedCondition()
+  pipeline.running = True
+  pipeline.sender_thread = threading.Thread(target=pipeline._sender_loop, name="test-sender", daemon=True)
+  pipeline.encoder_thread = threading.Thread(target=pipeline._encoder_loop, name="test-encoder", daemon=True)
+  pipeline.sender_thread.start()
+  try:
+    assert waiting["test-sender"].wait(timeout=1.0)
+    pipeline.encoder_thread.start()
+    assert waiting["test-encoder"].wait(timeout=1.0)
+    pipeline.push("only frame")
+    assert display.send_started.wait(timeout=1.0)
+  finally:
+    if pipeline.encoder_thread.ident is None:
+      pipeline.encoder_thread = None
+    assert pipeline.close()
+
+
 def test_reconnect_sends_latest_prepared_frame():
   display = ReconnectDisplay()
   pipeline = ClusterDisplayPipeline(display)

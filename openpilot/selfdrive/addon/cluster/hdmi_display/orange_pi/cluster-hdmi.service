@@ -10,8 +10,8 @@ User=orangepi
 Group=orangepi
 SupplementaryGroups=video render input
 WorkingDirectory=/opt/cluster-receiver
-ExecStart=/opt/cluster-receiver/.venv/bin/python /opt/cluster-receiver/cluster_receiver.py --interface wlan0 --port 9200
-Restart=always
+ExecStart=/opt/cluster-receiver/.venv/bin/python /opt/cluster-receiver/cluster_receiver.py --interface wlan0 --port 9200 --width 1920 --height 480
+Restart=on-failure
 RestartSec=2
 Environment=PYTHONUNBUFFERED=1
 Environment=PYGAME_HIDE_SUPPORT_PROMPT=1

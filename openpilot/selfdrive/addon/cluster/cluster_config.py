@@ -21,6 +21,7 @@ CLUSTER_DISPLAY_TRANSPORT = "network"  # "network" or "usb"
 CLUSTER_ROTATE_180 = False
 CLUSTER_USB_WIDTH = 1920
 CLUSTER_USB_HEIGHT = 462
+# 8.8-inch HDMI panel; keep the standalone Orange Pi receiver defaults in sync.
 CLUSTER_HDMI_WIDTH = 1920
 CLUSTER_HDMI_HEIGHT = 480
 CLUSTER_NETWORK_BIND_HOST = "0.0.0.0"

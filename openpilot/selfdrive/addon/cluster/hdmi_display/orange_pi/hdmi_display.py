@@ -12,7 +12,7 @@ class HdmiDisplay:
   events remain usable without coupling touch behavior to the frame protocol.
   """
 
-  def __init__(self, width=1920, height=720, display_index=0, fullscreen=True,
+  def __init__(self, width=1920, height=480, display_index=0, fullscreen=True,
                show_cursor=False, touch_handler=None, pygame_module=None):
     self.size = (max(1, int(width)), max(1, int(height)))
     self.display_index = max(0, int(display_index))
@@ -55,7 +55,7 @@ class HdmiDisplay:
       self.close()
       return False
 
-  def _pump_events(self):
+  def pump_events(self):
     pygame = self._pygame
     if pygame is None:
       return False
@@ -82,7 +82,7 @@ class HdmiDisplay:
       return False
     if not self.connected and not self.open():
       return False
-    if not self._pump_events():
+    if not self.pump_events():
       return False
     try:
       frame = self._pygame.image.load(BytesIO(jpeg), "cluster.jpg").convert()
@@ -94,6 +94,12 @@ class HdmiDisplay:
     except Exception as e:
       LOG.warning("Failed to display HDMI frame: %s", e)
       return False
+
+  def clear(self):
+    """Remove the last driving frame when the connection becomes unavailable."""
+    if self.screen is not None:
+      self.screen.fill((0, 0, 0))
+      self._pygame.display.flip()
 
   def close(self):
     self.connected = False

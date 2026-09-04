@@ -1,4 +1,6 @@
+import select
 import struct
+import time
 
 
 PROTOCOL_VERSION = 1
@@ -27,11 +29,21 @@ def pack_ack(sequence: int, status: int = ACK_OK) -> bytes:
   return ACK_PACKET.pack(ACK_MAGIC, PROTOCOL_VERSION, sequence, status)
 
 
-def recv_exact(sock, size: int) -> bytes:
+def recv_exact(sock, size: int, *, deadline: float | None = None, poll_events=None) -> bytes:
   data = bytearray(size)
   view = memoryview(data)
   received = 0
   while received < size:
+    if poll_events is not None:
+      poll_events()
+    if deadline is not None:
+      remaining = deadline - time.monotonic()
+      if remaining <= 0:
+        raise TimeoutError("Timed out waiting for a complete cluster frame")
+      # Preserve partial packets while keeping SDL responsive during a stall.
+      readable, _, _ = select.select([sock], [], [], min(remaining, 0.05))
+      if not readable:
+        continue
     count = sock.recv_into(view[received:])
     if count == 0:
       raise ConnectionError("C4 connection closed while receiving data")

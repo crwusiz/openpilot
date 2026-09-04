@@ -57,7 +57,9 @@ class ClusterDisplayPipeline:
       if self._pending_frame is not None:
         self._dropped_raw_frames += 1
       self._pending_frame = frame_image
-      self._condition.notify()
+      # Encoder and sender wait on different predicates of this condition.
+      # Waking only the sender can leave a raw frame stuck until the next push.
+      self._condition.notify_all()
 
   def _take_pending_frame(self):
     with self._condition:
