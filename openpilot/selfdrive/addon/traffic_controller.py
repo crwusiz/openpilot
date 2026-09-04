@@ -134,17 +134,20 @@ class TrafficMotionDetector:
 
     filtered_terminal_speed_ms = self.v_filter.process(terminal_speed_ms)
     is_stopped = v_ego_kph < 1.0
+    stop_before_lead = terminal_distance < lead_distance - 3.0
 
     stop_evidence = False
     if is_stopped:
-      stop_evidence = terminal_distance < 20.0 and filtered_terminal_speed_ms < 10.0
+      stop_evidence = (stop_before_lead and
+                       terminal_distance < 20.0 and
+                       filtered_terminal_speed_ms < 10.0)
     elif v_ego_kph < 82.0:
       stop_distance_threshold = np.interp(
         initial_speed_ms,
         self._STOP_DISTANCE_SPEED_BP_MS,
         (120.0, 150.0),
       )
-      stop_evidence = (terminal_distance < lead_distance - 3.0 and
+      stop_evidence = (stop_before_lead and
                        terminal_distance < stop_distance_threshold and
                        (filtered_terminal_speed_ms < 3.0 or
                         filtered_terminal_speed_ms < initial_speed_ms * 0.7) and

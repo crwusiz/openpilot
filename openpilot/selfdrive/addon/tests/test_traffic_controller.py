@@ -60,6 +60,19 @@ def test_controller_detects_and_enters_signal_stop():
   assert 0.0 < plan.stop_distance < plan.raw_stop_distance
 
 
+def test_close_lead_blocks_new_stationary_signal_stop():
+  controller = TrafficStopController(dt=0.05)
+  car_state, model, radar_state = make_inputs(v_ego=0.0, model_distance=10.0)
+  radar_state.leadOne.present = True
+  radar_state.leadOne.dRel = 5.0
+
+  plans = [controller.update(car_state, model, radar_state, comfort_brake=1.5) for _ in range(4)]
+
+  assert controller.traffic_state == TrafficState.off
+  assert controller.x_state == XState.lead
+  assert not plans[-1].signal_stop_active
+
+
 def test_steering_angle_blocks_only_signal_stop_entry():
   controller = TrafficStopController(dt=0.05)
   inputs = make_inputs(steering_angle_deg=60.0)
