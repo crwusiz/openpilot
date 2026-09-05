@@ -58,7 +58,7 @@ class FirehoseLayout(FirehoseLayoutBase):
     y += 40 + 20
 
     # Separator
-    rl.draw_rectangle(x, y, w, 2, self.GRAY)
+    rl.draw_rectangle(x, y, w, 2, Colors.GRAY)
     y += 30 + 20
 
     # Status
@@ -75,11 +75,11 @@ class FirehoseLayout(FirehoseLayoutBase):
     #  y += 20 + 20
 
     # Separator
-    rl.draw_rectangle(x, y, w, 2, self.GRAY)
+    rl.draw_rectangle(x, y, w, 2, Colors.GRAY)
     y += 30 + 20
 
     # Instructions
-    y = self._draw_wrapped_text(x, y, w, tr(INSTRUCTIONS), gui_app.font(FontWeight.NORMAL), 40, self.LIGHT_GRAY)
+    y = self._draw_wrapped_text(x, y, w, tr(INSTRUCTIONS), gui_app.font(FontWeight.NORMAL), 40, Colors.LIGHT_GRAY)
 
     # bottom margin + remove effect of scroll offset
     return int(round(y - self._scroll_panel.offset + 40))

@@ -172,8 +172,8 @@ msgid "CameraSCC"
 msgstr "CameraSCC"
 
 #: openpilot/selfdrive/ui/layouts/settings/device.py
-msgid "운전자 카메라"
-msgstr ""
+msgid "Cabin Camera"
+msgstr "운전자 카메라"
 
 #: openpilot/system/ui/widgets/confirm_dialog.py
 #: openpilot/system/ui/widgets/keyboard.py
