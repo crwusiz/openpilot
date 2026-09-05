@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 import asyncio
 from datetime import datetime
+import errno
 import html as html_lib
 import os
 import shutil
+import signal
+import socket
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 ADDON_PYTHONPATH = os.environ.get("ADDON_PYTHONPATH")
@@ -28,6 +32,61 @@ from nicegui import app, ui
 # ── 환경 설정 및 유틸리티 ───────────────────────────────────────
 SCRIPTS_PATH = "/data/openpilot/scripts"
 BASE_PATH = "/data/params/crwusiz"
+DASHBOARD_HOST = "0.0.0.0"
+DASHBOARD_PORT = 7000
+
+def _dashboard_port_available() -> bool:
+  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+      sock.bind((DASHBOARD_HOST, DASHBOARD_PORT))
+    except OSError as e:
+      if e.errno != errno.EADDRINUSE:
+        raise
+      return False
+  return True
+
+def _prepare_dashboard_port():
+  """Reclaim a stale Linux listener before starting NiceGUI."""
+  if _dashboard_port_available():
+    return
+
+  print(f"[dashboard] Port {DASHBOARD_PORT} is already in use; stopping its listener.", flush=True)
+  # Resolve listening socket inodes through /proc without requiring fuser/lsof.
+  inodes = set()
+  for table in (Path('/proc/net/tcp'), Path('/proc/net/tcp6')):
+    if not table.exists():
+      continue
+    for line in table.read_text().splitlines()[1:]:
+      fields = line.split()
+      if fields[3] == '0A' and int(fields[1].rsplit(':', 1)[1], 16) == DASHBOARD_PORT:
+        inodes.add(f'socket:[{fields[9]}]')
+
+  if inodes:
+    for process in Path('/proc').iterdir():
+      if not process.name.isdigit() or int(process.name) == os.getpid():
+        continue
+      try:
+        for fd in (process / 'fd').iterdir():
+          try:
+            owns_port = os.readlink(fd) in inodes
+          except OSError:
+            continue
+          if owns_port:
+            print(f"[dashboard] Killing PID {process.name} on port {DASHBOARD_PORT}.", flush=True)
+            os.kill(int(process.name), signal.SIGKILL)
+            break
+      except (FileNotFoundError, ProcessLookupError, PermissionError):
+        # Processes can exit during inspection; inaccessible listeners are
+        # reported by the final bind check below.
+        continue
+
+  deadline = time.monotonic() + 3.0
+  while not _dashboard_port_available():
+    if time.monotonic() >= deadline:
+      raise RuntimeError(f"[dashboard] Cannot release port {DASHBOARD_PORT}; check the listener's process permissions.")
+    time.sleep(0.1)
+  print(f"[dashboard] Port {DASHBOARD_PORT} released; starting dashboard.", flush=True)
 
 # Params (openpilot이 없는 PC 환경 테스트용 Mock 지원)
 try:
@@ -835,4 +894,5 @@ def main_page():
 
 if __name__ in {"__main__", "__mp_main__"}:
   set_core_affinity([0, 1, 2])
-  ui.run(host="0.0.0.0", port=7000, title="Openpilot Dashboard", show=False, reload=False)
+  _prepare_dashboard_port()
+  ui.run(host=DASHBOARD_HOST, port=DASHBOARD_PORT, title="Openpilot Dashboard", show=False, reload=False)
