@@ -417,7 +417,10 @@ class CruiseController:
       elif CS.speedLimit > 0 and CS.speedLimitDistance > 0:
         camera_limit_speed_clu, is_limit_zone = speed_limiter.get_camera_limit_speed_stock(CS, cluster_speed_clu)
 
-    if is_school_zone and not camera_event_active:
+    # A camera event may be advertised before its deceleration target is available.
+    # Keep the school-zone fallback in that gap, since the road limit is suspended.
+    camera_target_active = 0 < camera_limit_speed_clu < NO_ACTIVE_LIMIT
+    if is_school_zone and (not camera_event_active or not camera_target_active):
       school_zone_max_limit = self.conv.kph_to_clu(SCHOOL_ZONE_MAX_SPEED)
       if 0 < camera_limit_speed_clu < NO_ACTIVE_LIMIT:
         camera_limit_speed_clu = min(camera_limit_speed_clu, school_zone_max_limit)

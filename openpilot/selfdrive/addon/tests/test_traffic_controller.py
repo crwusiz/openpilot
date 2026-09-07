@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from openpilot.selfdrive.addon.traffic_controller import (TrafficState, TrafficStopController, TrafficStopDistanceTracker, XState,
                                                           get_traffic_stop_accel_floor, get_traffic_stop_obstacle_distance,
                                                           should_limit_traffic_stop_accel)
@@ -60,11 +62,17 @@ def test_controller_detects_and_enters_signal_stop():
   assert 0.0 < plan.stop_distance < plan.raw_stop_distance
 
 
-def test_close_lead_blocks_new_stationary_signal_stop():
+@pytest.mark.parametrize("model_distance, terminal_velocity, lead_distance", [
+  (10.0, 0.0, 5.0),
+  (11.02, 3.83, 5.70),  # September 7, 17:45:02: model endpoint beyond close lead.
+  (15.20, 5.49, 4.35),  # September 7, 17:46:59: same stationary-stop evidence case.
+])
+def test_close_lead_blocks_new_stationary_signal_stop(model_distance, terminal_velocity, lead_distance):
   controller = TrafficStopController(dt=0.05)
-  car_state, model, radar_state = make_inputs(v_ego=0.0, model_distance=10.0)
+  car_state, model, radar_state = make_inputs(v_ego=0.0, model_distance=model_distance,
+                                             terminal_velocity=terminal_velocity)
   radar_state.leadOne.present = True
-  radar_state.leadOne.dRel = 5.0
+  radar_state.leadOne.dRel = lead_distance
 
   plans = [controller.update(car_state, model, radar_state, comfort_brake=1.5) for _ in range(4)]
 
