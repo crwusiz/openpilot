@@ -141,7 +141,8 @@ std::string VideoWidget::whatsThis() const {
 static float toolbarHeight() { return TOOLBAR_MARGIN_Y + ImGui::GetFrameHeight(); }
 
 void VideoWidget::drawPlaybackController() {
-  ImGui::SetCursorPosY(ImGui::GetCursorPosY() + TOOLBAR_MARGIN_Y);
+  if (!can->liveStreaming())
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + TOOLBAR_MARGIN_Y);
   const float speed_width = menuButtonWidth("0.05x", true);
 
   const char *play_icon = can->isPaused() ? icon::PLAY : icon::PAUSE;
@@ -151,13 +152,15 @@ void VideoWidget::drawPlaybackController() {
                                         : formatTime(can->currentSec(), true);
   const char *time_tooltip = settings.absolute_time ? "Elapsed time" : "Absolute time";
 
-  std::vector<ToolbarItem> items = {
-    toolbarAction("rewind", icon::REWIND, "Seek backward", []() { can->seekTo(can->currentSec() - 1); }),
-    toolbarAction("play", play_icon, play_tooltip, []() { can->pause(!can->isPaused()); }, true, true),
-    toolbarAction("fast-forward", icon::FAST_FORWARD, "Seek forward", []() { can->seekTo(can->currentSec() + 1); }, true, true),
-  };
+  std::vector<ToolbarItem> items;
+  if (!can->liveStreaming()) {
+    items.push_back(toolbarAction("rewind", icon::REWIND, "Seek backward", []() { can->seekTo(can->currentSec() - 1); }));
+  }
+  items.push_back(toolbarAction("play", play_icon, play_tooltip, []() { can->pause(!can->isPaused()); }, true, true));
   if (can->liveStreaming()) {
-    items.push_back(toolbarAction("skip-end", icon::SKIP_END, "Skip to the end", [this]() { skipToEnd(); }, skip_to_end_enabled_, true));
+    items.push_back(toolbarAction("skip-end", icon::SKIP_END, "Go live", [this]() { skipToEnd(); }, skip_to_end_enabled_, true));
+  } else {
+    items.push_back(toolbarAction("fast-forward", icon::FAST_FORWARD, "Seek forward", []() { can->seekTo(can->currentSec() + 1); }, true, true));
   }
   if (slider_ || msgs_received_) {
     // a mono font: with proportional digits the time changed width as it ticked and the items after it moved
@@ -190,13 +193,11 @@ void VideoWidget::drawPlaybackController() {
     return item;
   };
   const char *aspect_ratio_icon = settings.crop_video ? icon::ASPECT_RATIO_FILL : icon::ASPECT_RATIO;
-  items.push_back(toolbarAction("crop_video", aspect_ratio_icon, "Crop to fill", [this]() { cropVideoClicked(); }));
   if (!can->liveStreaming()) {
+    items.push_back(toolbarAction("crop_video", aspect_ratio_icon, "Crop to fill", [this]() { cropVideoClicked(); }));
     items.push_back(separator());
     items.push_back(toolbarAction("loop", loop_icon, "Loop playback", [this]() { loopPlaybackClicked(); }, true, true));
-  }
-  items.push_back(toolbarMenu("speed_btn", speed_text_, "Speed", [this]() { drawSpeedMenuItems(); }, true, true, speed_width));
-  if (!can->liveStreaming()) {
+    items.push_back(toolbarMenu("speed_btn", speed_text_, "Speed", [this]() { drawSpeedMenuItems(); }, true, true, speed_width));
     items.push_back(separator());
     items.push_back(toolbarAction("route_info", icon::INFO_CIRCLE, "View route details", [this]() { showRouteInfo(); }, true, true));
   }
@@ -261,6 +262,16 @@ void VideoWidget::createCameraWidget() {
     if (index != -1) cam_widget_->setStreamType((VisionStreamType)camera_tab_->tabData(index));
   }));
   connections_.push_back(static_cast<ReplayStream *>(can)->qLogLoaded.connect([this](std::shared_ptr<LogReader> qlog) { cam_widget_->parseQLog(qlog); }));
+
+  if (auto *replay = getReplay(); replay && !replay->hasFlag(REPLAY_FLAG_NO_VIPC)) {
+    std::set<VisionStreamType> streams;
+    for (const auto &[num, segment] : replay->route().segments()) {
+      if (!segment.narrow_road_cam.empty() || !segment.qcamera.empty()) streams.insert(VISION_STREAM_NARROW_ROAD);
+      if (replay->hasFlag(REPLAY_FLAG_CABIN_CAMERA) && !segment.cabin_cam.empty()) streams.insert(VISION_STREAM_CABIN);
+      if (replay->hasFlag(REPLAY_FLAG_WIDE_ROAD) && !segment.wide_road_cam.empty()) streams.insert(VISION_STREAM_WIDE_ROAD);
+    }
+    vipcAvailableStreamsUpdated(streams);
+  }
 }
 
 void VideoWidget::drawCameraWidget() {
@@ -344,10 +355,10 @@ float VideoWidget::sizeHintHeight() const {
   return MIN_VIDEO_HEIGHT + SLIDER_HEIGHT + toolbarHeight();
 }
 
-// the video pane opens with the camera at its natural aspect ratio, filling the width of the dock
+// Keep the pane's default proportions stable as frames arrive or cameras change.
 float VideoWidget::defaultHeight(float width) const {
-  if (!cam_widget_) return toolbarHeight();  // live streams have no camera or slider
-  const float cam_height = std::max((float)MIN_VIDEO_HEIGHT, width / cam_widget_->frameAspectRatio());
+  if (!cam_widget_) return ImGui::GetFrameHeight();  // live streams have no camera or slider
+  const float cam_height = std::max((float)MIN_VIDEO_HEIGHT, width / DEFAULT_CAMERA_ASPECT_RATIO);
   const float tab_height = camera_tab_->count() >= 2 ? ImGui::GetFrameHeight() : 0.0f;
   return cam_height + tab_height + SLIDER_HEIGHT + toolbarHeight();
 }
