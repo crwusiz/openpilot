@@ -8,7 +8,6 @@ import traceback
 
 from openpilot.cereal import log
 import openpilot.cereal.messaging as messaging
-import openpilot.system.sentry as sentry
 from openpilot.common.utils import atomic_write
 from openpilot.common.params import Params, ParamKeyFlag
 from openpilot.common.text_window import TextWindow
@@ -20,6 +19,7 @@ from openpilot.system.athena.registration import register, UNREGISTERED_DONGLE_I
 from openpilot.common.swaglog import cloudlog, add_file_handler
 from openpilot.common.version import get_build_metadata
 from openpilot.common.hardware.hw import Paths
+from openpilot.system.crash import CRASH_LOG_PATH, capture_exception
 
 import glob
 
@@ -79,7 +79,6 @@ def manager_init() -> None:
     os.environ['CLEAN'] = '1'
 
   # init logging
-  sentry.init(sentry.SentryProject.SELFDRIVE)
   cloudlog.bind_global(dongle_id=dongle_id,
                        version=build_metadata.openpilot.version,
                        origin=build_metadata.openpilot.git_normalized_origin,
@@ -92,7 +91,8 @@ def manager_init() -> None:
   log_files = glob.glob('/data/*.log')
 
   for log_file in log_files:
-    if os.path.isfile(log_file):
+    # Keep the last crash available after a manager restart (including failed uploads).
+    if log_file != CRASH_LOG_PATH and os.path.isfile(log_file):
       os.remove(log_file)
 
   # prebuilt
@@ -219,7 +219,7 @@ def main() -> None:
     manager_thread()
   except Exception:
     traceback.print_exc()
-    sentry.capture_exception()
+    capture_exception()
   finally:
     manager_cleanup()
 
@@ -243,6 +243,7 @@ if __name__ == "__main__":
   except KeyboardInterrupt:
     print("got CTRL-C, exiting")
   except Exception:
+    capture_exception()
     add_file_handler(cloudlog)
     cloudlog.exception("Manager failed to start")
 
