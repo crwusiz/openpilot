@@ -632,6 +632,7 @@ def render_tab_logs():
     "Cruise Debug": "/data/cruise_debug.log",
     "Traffic Debug": "/data/traffic_debug.log",
     "Cluster Debug": "/data/cluster_debug.log",
+    "restart Debug": "/data/restart.log",
   }
   REALDATA_PATH = Path("/data/media/0/realdata")
 
