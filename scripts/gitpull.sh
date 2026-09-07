@@ -7,6 +7,24 @@ set -euo pipefail
 # ==============================================================================
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
+start_update_pane() {
+  local target="$1"
+  local child_command="$2"
+  local pane session
+  pane=$(tmux display-message -p -t "$target" '#{pane_id}')
+  session=$(tmux display-message -p -t "$pane" '#{session_id}')
+
+  if [[ "$(tmux display-message -p -t "$pane" '#{window_zoomed_flag}')" == "1" ]]; then
+    tmux resize-pane -Z -t "$pane"
+  fi
+
+  # Split the full window height, even if the active pane is already small.
+  if ! tmux split-window -v -f -p 50 -t "$pane" -c "$PWD" "$child_command"; then
+    echo "WARNING: tmux split failed. Starting Git pull in a new window." >&2
+    tmux new-window -t "$session:" -n gitpull -c "$PWD" "$child_command"
+  fi
+}
+
 # Always run the update in a tmux pane so dashboard and SSH launches behave the
 # same way. The child marker prevents the command started by tmux from creating
 # another pane recursively.
@@ -29,9 +47,9 @@ run_in_tmux() {
     child_command+="$quoted_arg"
   done
 
-  # When launched from a pane, split that exact pane into top and bottom.
+  # When launched from a pane, split its window into top and bottom.
   if [[ -n "${TMUX:-}" ]]; then
-    tmux split-window -v -t "${TMUX_PANE:-}" -c "$PWD" "$child_command"
+    start_update_pane "${TMUX_PANE:-}" "$child_command"
     exit 0
   fi
 
@@ -52,7 +70,7 @@ run_in_tmux() {
       session="${target%%:*}"
     fi
 
-    tmux split-window -v -t "$target" -c "$PWD" "$child_command"
+    start_update_pane "$target" "$child_command"
 
     # SSH and other tmux-external interactive terminals follow the new pane.
     if [[ -t 0 && -t 1 ]]; then
@@ -62,11 +80,12 @@ run_in_tmux() {
     exit 0
   fi
 
-  # No server/session exists yet: create one and run the update in its first pane.
+  # Keep a shell above the update even when SSH starts the first tmux session.
+  tmux new-session -d -s gitpull -x 120 -y 40 -c "$PWD"
+  start_update_pane gitpull "$child_command"
   if [[ -t 0 && -t 1 ]]; then
-    exec tmux new-session -s gitpull "$child_command"
+    exec tmux attach-session -t gitpull
   fi
-  tmux new-session -d -s gitpull "$child_command"
   echo "Git pull started in new tmux session: gitpull"
   exit 0
 }
@@ -284,22 +303,25 @@ cleanup_gone_branches() {
 }
 
 compare_and_restart() {
-  local local_hash remote_hash local_time remote_time
+  local local_hash remote_hash local_time remote_time branch remote_ref
 
-  local_hash=$(git rev-parse --short=7 HEAD)
-  remote_hash=$(git rev-parse --short=7 "@{u}")
+  # Verify the ref actually fetched/reset above, even without an upstream.
+  branch=$(git rev-parse --abbrev-ref HEAD)
+  remote_ref="refs/remotes/origin/${branch}"
+  local_hash=$(git rev-parse HEAD)
+  remote_hash=$(git rev-parse "$remote_ref")
 
   local_time=$(date -d @"$(git show -s --format=%ct HEAD)" '+%Y-%m-%d %H:%M:%S')
-  remote_time=$(date -d @"$(git show -s --format=%ct "@{u}")" '+%Y-%m-%d %H:%M:%S')
+  remote_time=$(date -d @"$(git show -s --format=%ct "$remote_ref")" '+%Y-%m-%d %H:%M:%S')
 
   log "INFO" "Verifying commit synchronization..."
-  log_detail "Local  Commit: ${GREEN}${BOLD}${local_hash}${NC} ($local_time)"
-  log_detail "Remote Commit: ${GREEN}${BOLD}${remote_hash}${NC} ($remote_time)"
+  log_detail "Local  Commit: ${GREEN}${BOLD}${local_hash:0:7}${NC} ($local_time)"
+  log_detail "Remote Commit: ${GREEN}${BOLD}${remote_hash:0:7}${NC} ($remote_time)"
 
   if [ "$local_hash" == "$remote_hash" ]; then
-    log "SUCCESS" "Commit synchronized: Match ($local_hash)"
+    log "SUCCESS" "Commit synchronized: Match (${local_hash:0:7})"
 
-    if [ -x "$RESTART_SCRIPT" ]; then
+    if [ -f "$RESTART_SCRIPT" ] && [ -r "$RESTART_SCRIPT" ]; then
       log "SUCCESS" "Preparing system restart..."
       echo 0 > "$LOG_FILE"
       if bash "$RESTART_SCRIPT" >"$RESTART_LOG" 2>&1; then
@@ -309,7 +331,7 @@ compare_and_restart() {
       echo 1 > "$LOG_FILE"
       exit 1
     else
-      log "ERROR" "Restart script not found: $RESTART_SCRIPT"
+      log "ERROR" "Restart script missing or unreadable: $RESTART_SCRIPT"
       echo 1 > "$LOG_FILE"
       exit 1
     fi
