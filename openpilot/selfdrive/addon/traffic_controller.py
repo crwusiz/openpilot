@@ -475,6 +475,11 @@ class TrafficStopController:
       filtered_stop_distance = inactive_stop_distance
       self.adjusted_stop_distance = 0.0
       self.reference_speed_kph = None
+    elif self.x_state == XState.e2eStopped and not lead_present:
+      # Once stopped, hold the ego position until release is confirmed. Neither
+      # a residual approach distance nor a growing model endpoint permits creep.
+      filtered_stop_distance = 0.0
+      self.adjusted_stop_distance = 0.0
     elif self.adjusted_stop_distance > 0.0:
       filtered_stop_distance = 0.0
 
@@ -529,6 +534,7 @@ class TrafficStopController:
       "v_ego=%.2f initial_v=%.2f terminal_v=%.2f filtered_v=%.2f terminal_x=%.2f lateral_y=%.2f",
       "stop_ev=%d go_ev=%d stop_ev_s=%.2f go_ev_s=%.2f raw_stop=%.2f stop=%.2f adjusted=%.2f",
       "lead=%d lead_d=%.2f gas=%d left_blinker=%d suppress_s=%.2f release_s=%.2f",
+      "cruise_enabled=%d brake=%d",
     ))
     traffic_log.debug(
       log_format,
@@ -559,4 +565,6 @@ class TrafficStopController:
       int(bool(car_state.leftBlinker)),
       self.stop_entry_suppression_time,
       self.moving_release_confirmation_time,
+      int(bool(getattr(getattr(car_state, "cruiseState", None), "enabled", False))),
+      int(bool(getattr(car_state, "brakePressed", False))),
     )

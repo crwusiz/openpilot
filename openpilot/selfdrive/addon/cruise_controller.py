@@ -16,6 +16,9 @@ from openpilot.selfdrive.addon.navi_controller import SpeedLimiter
 ButtonType = structs.CarState.ButtonEvent.Type
 GearShifter = structs.CarState.GearShifter
 
+CRUISE_DEBUG_LOG = "/data/cruise_debug.log"
+CRUISE_DEBUG_INTERVAL = 2.0
+
 NO_ACTIVE_LIMIT = 255.
 SCHOOL_ZONE_SPEED = 30.0
 SCHOOL_ZONE_MAX_SPEED = 50.0
@@ -24,25 +27,23 @@ IGNORE_LIMIT_TIMEOUT_TICKS = 3000  # 100Hz 기준 30초 (무시 타이머)
 LIMIT_CHANGE_TIMEOUT_TICKS = 300   # 100Hz 기준 3초 (제한속도 변경 대기 시간)
 AVAILABLE_TIMEOUT_TICKS = 300      # 100Hz 기준 3초 (크루즈 활성화 대기 시간)
 GAS_PRESSED_OVERRIDE_TICKS = 100   # 100Hz 기준 1초 (가속 페달 오버라이드 대기 시간)
+BUTTON_SPAM_TICKS = 20
+
+CRUISE_CONTROL_DT = 0.01  # update_v_cruise runs at 100 Hz
+
+LIMIT_RELEASE_RISE_RATE_KPH = 10.0
+LIMIT_SPEED_ABS_TOL = 0.05
 
 CURVE_MIN_SPEED_CLU = 30.0
 CURVE_STRONG_REDUCTION_RATIO = 1.3
 CURVE_STRONG_REDUCTION_FACTOR = 0.9
-CURVE_LIMIT_FALL_RATE_KPH_PER_S = 20.0
-LIMIT_RELEASE_RISE_RATE_KPH_PER_S = 10.0
-CRUISE_CONTROL_DT = 0.01  # update_v_cruise runs at 100 Hz
+CURVE_LIMIT_FALL_RATE_KPH = 20.0
 
 STEER_DECEL_START_ANGLE_DEG = 45.0
 STEER_DECEL_ACTIVATION_ANGLE_DEG = 60.0
 STEER_DECEL_END_ANGLE_DEG = 120.0
 STEER_DECEL_ACTIVATION_DELTA_DEG = 5.0
-STEER_DECEL_MIN_SPEED_CLU = 20.0
-
-CRUISE_DEBUG_LOG = "/data/cruise_debug.log"
-CRUISE_DEBUG_INTERVAL = 2.0
-LIMIT_SPEED_ABS_TOL = 0.05
-
-BUTTON_SPAM_TICKS = 20
+STEER_DECEL_MIN_SPEED_CLU = 25.0
 
 VehicleNaviCurveSpeedFactor = 100
 VehicleNaviCurveCtrlEnd = 3
@@ -304,10 +305,10 @@ class CruiseController:
 
     error = target_speed_clu - self.apply_limit_speed_clu
     if error > 0.0:
-      max_step = self.conv.kph_to_clu(LIMIT_RELEASE_RISE_RATE_KPH_PER_S) * CRUISE_CONTROL_DT
+      max_step = self.conv.kph_to_clu(LIMIT_RELEASE_RISE_RATE_KPH) * CRUISE_CONTROL_DT
       self.apply_limit_speed_clu += min(error, max_step)
     elif curve_is_binding:
-      max_step = self.conv.kph_to_clu(CURVE_LIMIT_FALL_RATE_KPH_PER_S) * CRUISE_CONTROL_DT
+      max_step = self.conv.kph_to_clu(CURVE_LIMIT_FALL_RATE_KPH) * CRUISE_CONTROL_DT
       self.apply_limit_speed_clu += max(error, -max_step)
     else:
       kp = np.interp(abs(error), [0, 2, 5, 10], [0.01, 0.05, 0.10, 0.20])
@@ -320,7 +321,8 @@ class CruiseController:
                          is_school_zone, is_limit_zone,
                          road_limit_speed_nda, road_limit_speed_stock, road_limit_speed,
                          road_limit_applies, road_limit_target_clu, lead,
-                         speed_candidates, calculated_max_speed_clu, immediate_reasons):
+                         speed_candidates, calculated_max_speed_clu, immediate_reasons,
+                         model_curve_speed_clu, stock_navi_curve_speed_clu):
     candidate_names = ("ROAD", "CAMERA", "LEAD", "CURVE", "STEER")
     valid_candidates = [
       (name, speed) for name, speed in zip(candidate_names, speed_candidates, strict=True)
@@ -355,6 +357,7 @@ class CruiseController:
       "nav[nda=%d road_nda=%.1f road_stock=%.1f observed=%s accepted=%.1f target=%s pending=%.1f timer=%d/%d applies=%d restore=%d",
       "section=%d limit=%.1f left=%.0f camera=%d stock_event=%d stock_section=%d stock_speed=%.1f zone=%d school=%d]",
       "lead[present=%d dRel=%.1f vRel=%.1f] ignore=%d timer=%d/%d steer_angle=%.1f immediate=%s",
+      "curve_detail[model=%s stock=%s steer_entry=%s]",
     ))
     cruise_log.debug(
       log_format,
@@ -370,6 +373,9 @@ class CruiseController:
       is_limit_zone, is_school_zone, lead.present, lead.dRel, lead.vRel,
       self.ignore_road_limit_temporarily, self.ignore_limit_timer, IGNORE_LIMIT_TIMEOUT_TICKS,
       CS.steeringAngleDeg, ",".join(immediate_reasons) or "smooth",
+      self._debug_speed(model_curve_speed_clu), self._debug_speed(stock_navi_curve_speed_clu),
+      self._debug_speed(self.conv.ms_to_clu(self.steer_decel_entry_speed_ms)
+                        if self.steer_decel_entry_speed_ms is not None else None),
     )
 
   def _cal_limit_speed(self, CS, sm, current_speed_ms: float, cluster_speed_clu: float, requested_speed_clu: float,
@@ -613,6 +619,7 @@ class CruiseController:
       road_limit_speed=road_limit_speed, road_limit_applies=road_limit_applies,
       road_limit_target_clu=road_limit_target_clu, lead=lead, speed_candidates=speed_candidates,
       calculated_max_speed_clu=calculated_max_speed_clu, immediate_reasons=immediate_reasons,
+      model_curve_speed_clu=model_curve_speed_clu, stock_navi_curve_speed_clu=stock_navi_curve_speed_clu,
     )
 
   def _cal_lead_speed(self, lead, cluster_speed_clu: float):
@@ -877,6 +884,12 @@ class CruiseController:
           # control cycle in sync with that target.
           self.apply_limit_speed_clu = float(set_speed)
           self.gas_override_active = True
+          if self.steer_decel_active:
+            # An accepted driver override replaces a stale low-speed entry
+            # reference, without compounding reductions as the car slows.
+            self.steer_decel_entry_speed_ms = max(
+              self.steer_decel_entry_speed_ms or 0.0, self.conv.clu_to_ms(cluster_speed_clu),
+            )
           if self.gas_pressed_count == GAS_PRESSED_OVERRIDE_TICKS + 1:
             cruise_log.info(
               "GAS_OVERRIDE start ego=%.1f previous_set=%.1f new_set=%.1f ignore_timeout=%d",

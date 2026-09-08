@@ -106,6 +106,34 @@ def test_transient_big_model_go_prediction_does_not_release_stop():
   assert plans[-1].signal_stop_active
 
 
+@pytest.mark.parametrize("residual_distance", [0.0, 1.28, 5.43])
+def test_stopped_target_does_not_move_forward_before_release(residual_distance):
+  controller = TrafficStopController(dt=0.05)
+  car_state, model, radar_state = enter_stopped_signal_state(controller)
+  controller.adjusted_stop_distance = residual_distance
+  # September 8, 14:32:38: endpoint grows while the stop is still latched.
+  model.position.x = [19.52] * 32 + [23.56]
+  model.velocity.x = [0.0] * 32 + [7.39]
+
+  for _ in range(12):
+    plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+    assert plan.signal_stop_active
+    assert controller.x_state == XState.e2eStopped
+    assert plan.stop_distance == 0.0
+
+
+def test_invalid_model_does_not_move_stopped_target_forward():
+  controller = TrafficStopController(dt=0.05)
+  car_state, model, radar_state = enter_stopped_signal_state(controller)
+  model.position.x = [float("nan")] * 33
+  model.velocity.x = [float("nan")] * 33
+
+  plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+
+  assert plan.signal_stop_active
+  assert plan.stop_distance == 0.0
+
+
 def test_sustained_big_model_go_prediction_releases_stop():
   controller = TrafficStopController(dt=0.05)
   car_state, model, radar_state = enter_stopped_signal_state(controller)

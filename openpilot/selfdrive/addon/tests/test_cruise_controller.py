@@ -199,3 +199,67 @@ def test_school_zone_missing_camera_target_caps_curve_release(monkeypatch):
 
   assert debug_state["calculated_max_speed_clu"] == 50.0
   assert controller.apply_limit_speed_clu == 50.0
+
+
+def make_steer_controller():
+  controller = make_controller(30.0)
+  controller.conv = SimpleNamespace(kph_to_clu=lambda speed: speed,
+                                    clu_to_ms=lambda speed: speed / 3.6,
+                                    ms_to_clu=lambda speed: speed * 3.6)
+  controller.min_set_speed_clu = 10.0
+  controller.max_set_speed_clu = 145.0
+  controller.steer_decel_active = False
+  controller.steer_decel_entry_speed_ms = None
+  controller.prev_steering_angle = 0.0
+  return controller
+
+
+def test_limit_debug_separates_model_stock_and_steer_reference(monkeypatch):
+  controller, car_state, sm, _ = make_limit_inputs(monkeypatch)
+  controller.conv.ms_to_clu = lambda speed: speed * 3.6
+  controller.steer_decel_active = True
+  controller.steer_decel_entry_speed_ms = 30.0 / 3.6
+  controller.applied_speed_clu = 30.0
+  controller.ignore_limit_timer = 0
+  controller._debug_last_state = None
+  controller._debug_last_time = 0.0
+  controller._cal_curve_speed_adaptive = lambda *args: 40.0
+  controller._cal_stock_navi_curve_speed = lambda *args: 50.0
+  controller._debug_limit_state = CruiseController._debug_limit_state.__get__(controller)
+  sm["radarState"].leadOne.dRel = 0.0
+  sm["radarState"].leadOne.vRel = 0.0
+  messages = []
+  monkeypatch.setitem(CruiseController._debug_limit_state.__globals__, "cruise_log",
+                      SimpleNamespace(debug=lambda fmt, *args: messages.append(fmt % args)))
+
+  controller._cal_limit_speed(car_state, sm, 33.0 / 3.6, 33.0, 60.6)
+
+  assert len(messages) == 1
+  assert "curve_detail[model=40.0 stock=50.0 steer_entry=30.0]" in messages[0]
+
+
+def test_steer_limit_does_not_compound_as_vehicle_slows():
+  controller = make_steer_controller()
+  initial_limit = controller._cal_steer_based_speed(40.0 / 3.6, 90.0)
+  for speed in (35.0, 30.0, 25.0):
+    assert controller._cal_steer_based_speed(speed / 3.6, 90.0) == initial_limit
+  assert controller._cal_steer_based_speed(30.0 / 3.6, 0.0) == 255.0
+  assert controller.steer_decel_entry_speed_ms is None
+
+
+@pytest.mark.parametrize("gas_ticks, expected_reference", [(0, 2.0), (101, 30.0)])
+def test_accepted_gas_override_refreshes_low_speed_steer_reference(monkeypatch, gas_ticks, expected_reference):
+  controller = make_steer_controller()
+  controller.CP = SimpleNamespace(openpilotLongitudinalControl=True)
+  controller.requested_speed_clu = 30.0
+  controller.gas_pressed_count = gas_ticks
+  controller._cal_steer_based_speed(2.0 / 3.6, 60.6)
+  monkeypatch.setitem(CruiseController._override_speed.__globals__, "CruiseStateManager",
+                      SimpleNamespace(instance=lambda: SimpleNamespace(cruise_state_control=False)))
+  car_state = SimpleNamespace(gasPressed=True, cruiseState=SimpleNamespace(enabled=True))
+
+  controller._override_speed(car_state, 30.0, 30.0, False)
+
+  assert controller.steer_decel_entry_speed_ms == pytest.approx(expected_reference / 3.6)
+  target = controller._cal_steer_based_speed(30.0 / 3.6, 60.6)
+  assert target == pytest.approx(max(20.0, expected_reference * 0.9084))
