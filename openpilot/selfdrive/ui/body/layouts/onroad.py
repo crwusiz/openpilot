@@ -1,12 +1,13 @@
 import time
 import pyray as rl
 
-from openpilot.selfdrive.ui import Colors
 from openpilot.system.ui.lib.application import gui_app, FontWeight, TextAlignment, TextAlignmentVertical
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.body.animations import FaceAnimator, ASLEEP, INQUISITIVE, NORMAL, SLEEPY
+
+from openpilot.selfdrive.ui import Colors
 
 GRID_COLS = 16
 GRID_ROWS = 8

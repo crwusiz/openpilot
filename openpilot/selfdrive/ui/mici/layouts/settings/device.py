@@ -5,7 +5,6 @@ from collections.abc import Callable
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.params import Params
 from openpilot.common.time_helpers import system_time_valid
-from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.system.ui.widgets.scroller import NavRawScrollPanel, NavScroller
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigCircleButton
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigDialog, BigConfirmationDialog
@@ -20,6 +19,7 @@ from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.html_render import HtmlRenderer
 from openpilot.system.athena.registration import UNREGISTERED_DONGLE_ID
 
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 class ReviewTermsPage(TermsPage, NavScroller):
   """TermsPage with NavWidget swipe-to-dismiss for reviewing in device settings."""

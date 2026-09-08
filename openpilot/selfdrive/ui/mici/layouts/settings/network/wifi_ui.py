@@ -4,7 +4,6 @@ import pyray as rl
 from collections.abc import Callable
 
 from openpilot.common.swaglog import cloudlog
-from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigInputDialog, BigConfirmationDialog
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton
 from openpilot.system.ui.lib.application import gui_app, MousePos, FontWeight
@@ -12,6 +11,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.scroller import NavScroller
 from openpilot.system.ui.lib.wifi_manager import WifiManager, Network, SecurityType, normalize_ssid
 
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 class LoadingAnimation(Widget):
   RADIUS = 8

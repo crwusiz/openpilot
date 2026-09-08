@@ -1,5 +1,4 @@
 import pyray as rl
-from openpilot.selfdrive.ui import Colors, PairingColors
 import time
 
 from openpilot.common.api import Api
@@ -13,6 +12,8 @@ from openpilot.system.ui.lib.wrap_text import wrap_text
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets.button import IconButton
 from openpilot.selfdrive.ui.ui_state import ui_state
+
+from openpilot.selfdrive.ui import Colors, PairingColors
 
 
 class PairingDialog(Widget):

@@ -2,7 +2,6 @@ import math
 import numpy as np
 import pyray as rl
 from collections.abc import Callable
-from openpilot.selfdrive.ui import Colors
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.qrcode import make_texture
 from openpilot.system.ui.lib.application import FontWeight, gui_app, TextAlignment
@@ -18,6 +17,8 @@ from openpilot.selfdrive.ui.ui_state import ui_state, device
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigConfirmationCircleButton
 from openpilot.selfdrive.ui.mici.onroad.driver_state import DriverStateRenderer
 from openpilot.selfdrive.ui.mici.onroad.cabin_camera_dialog import BaseCabinCameraDialog
+
+from openpilot.selfdrive.ui import Colors
 
 
 class CabinCameraSetupDialog(BaseCabinCameraDialog):

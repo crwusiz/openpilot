@@ -1,10 +1,10 @@
 import pyray as rl
 from openpilot.common.params import Params
-from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.system.ui.lib.application import gui_app, FontWeight, FONT_SCALE
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 class ExperimentalModeButton(Widget):
   def __init__(self):

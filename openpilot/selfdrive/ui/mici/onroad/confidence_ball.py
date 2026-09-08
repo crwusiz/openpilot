@@ -1,11 +1,12 @@
 import math
 import pyray as rl
-from openpilot.selfdrive.ui import Colors, ConfidenceBallColors
 from openpilot.selfdrive.ui.mici.onroad import SIDE_PANEL_WIDTH
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.common.filter_simple import FirstOrderFilter
+
+from openpilot.selfdrive.ui import Colors, ConfidenceBallColors
 
 
 def draw_circle_gradient(center_x: float, center_y: float, radius: int,

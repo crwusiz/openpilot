@@ -3,7 +3,6 @@ import pyray as rl
 from collections.abc import Callable
 from enum import IntEnum
 from openpilot.common.params import Params
-from openpilot.selfdrive.ui import Colors
 from openpilot.selfdrive.ui.widgets.offroad_alerts import UpdateAlert, OffroadAlert
 from openpilot.selfdrive.ui.widgets.exp_mode_button import ExperimentalModeButton
 from openpilot.selfdrive.ui.widgets.prime import PrimeWidget
@@ -13,6 +12,8 @@ from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, T
 from openpilot.system.ui.lib.multilang import tr, trn
 from openpilot.system.ui.widgets.label import gui_label
 from openpilot.system.ui.widgets import Widget
+
+from openpilot.selfdrive.ui import Colors
 
 HEADER_HEIGHT = 80
 HEAD_BUTTON_FONT_SIZE = 40

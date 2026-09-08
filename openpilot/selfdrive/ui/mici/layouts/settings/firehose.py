@@ -7,7 +7,6 @@ from openpilot.common.api import api_get
 from openpilot.common.params import Params
 from openpilot.common.realtime import drop_realtime
 from openpilot.common.swaglog import cloudlog
-from openpilot.selfdrive.ui import Colors, FirehoseColors
 from openpilot.selfdrive.ui.lib.api_helpers import get_token
 from openpilot.selfdrive.ui.ui_state import ui_state, device
 from openpilot.system.athena.registration import UNREGISTERED_DONGLE_ID
@@ -17,6 +16,8 @@ from openpilot.system.ui.lib.scroll_panel2 import GuiScrollPanel2
 from openpilot.system.ui.lib.multilang import tr, trn, tr_noop
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.scroller import NavRawScrollPanel
+
+from openpilot.selfdrive.ui import Colors, FirehoseColors
 
 TITLE = tr_noop("Firehose Mode")
 DESCRIPTION = tr_noop(

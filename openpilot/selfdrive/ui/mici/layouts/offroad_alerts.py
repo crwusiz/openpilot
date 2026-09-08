@@ -8,12 +8,13 @@ from openpilot.common.params import Params
 from openpilot.common.realtime import drop_realtime
 from openpilot.selfdrive.selfdrived.alertmanager import OFFROAD_ALERTS
 from openpilot.common.hardware import HARDWARE
-from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.scroller import Scroller
 from openpilot.system.ui.lib.application import gui_app, FontWeight, TextAlignment, TextAlignmentVertical
 from openpilot.system.ui.lib.multilang import tr
+
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 REFRESH_INTERVAL = 5.0  # seconds
 

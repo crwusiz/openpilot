@@ -5,7 +5,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from openpilot.common.params import Params
 from openpilot.common.hardware import HARDWARE
-from openpilot.selfdrive.ui import Colors, OffroadAlertColors as AlertColors
 from openpilot.system.ui.lib.application import gui_app, FontWeight, FONT_SCALE
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.lib.scroll_panel import GuiScrollPanel
@@ -14,6 +13,8 @@ from openpilot.system.ui.lib.wrap_text import wrap_text
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.html_render import HtmlRenderer
 from openpilot.selfdrive.selfdrived.alertmanager import OFFROAD_ALERTS
+
+from openpilot.selfdrive.ui import Colors, OffroadAlertColors as AlertColors
 
 
 class AlertConstants:

@@ -5,7 +5,6 @@ from collections.abc import Callable
 from enum import Enum
 
 from openpilot.common.params import Params
-from openpilot.selfdrive.ui import Colors
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.lib.text_measure import measure_text_cached
@@ -21,6 +20,7 @@ from openpilot.system.ui.widgets.list_view import (
   BUTTON_FONT_SIZE,
   BUTTON_WIDTH,
 )
+from openpilot.selfdrive.ui import Colors
 
 VALUE_FONT_SIZE = 48
 

@@ -3,7 +3,6 @@ import pyray as rl
 from openpilot.cereal import log
 from opendbc.car.structs import car
 from openpilot.cereal.visionipc import VisionStreamType
-from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.selfdrive.ui.mici.onroad import SIDE_PANEL_WIDTH
 from openpilot.selfdrive.ui.mici.onroad.alert_renderer import AlertRenderer
@@ -22,6 +21,7 @@ from enum import IntEnum
 
 import math
 from openpilot.common.params import Params
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 
 OpState = log.SelfdriveState.OpenpilotState

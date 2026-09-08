@@ -1,6 +1,5 @@
 import pyray as rl
 from openpilot.common.time_helpers import system_time_valid
-from openpilot.selfdrive.ui import Colors
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.widgets.pairing_dialog import PairingDialog
 from openpilot.system.ui.lib.application import gui_app, FontWeight, FONT_SCALE
@@ -10,6 +9,8 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.confirm_dialog import alert_dialog
 from openpilot.system.ui.widgets.button import Button, ButtonStyle
 from openpilot.system.ui.widgets.label import Label
+
+from openpilot.selfdrive.ui import Colors
 
 
 class SetupWidget(Widget):

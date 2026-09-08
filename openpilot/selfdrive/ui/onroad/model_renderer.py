@@ -7,11 +7,12 @@ from dataclasses import dataclass, field
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params
 from openpilot.selfdrive.locationd.calibrationd import HEIGHT_INIT
-from openpilot.selfdrive.ui import Colors, NO_THROTTLE_COLORS, STEERING_COLORS, THROTTLE_COLORS, colors_alpha
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 from openpilot.system.ui.widgets import Widget
+
+from openpilot.selfdrive.ui import Colors, NO_THROTTLE_COLORS, STEERING_COLORS, THROTTLE_COLORS, colors_alpha
 
 CLIP_MARGIN = 500
 MIN_DRAW_DISTANCE = 10.0

@@ -10,8 +10,9 @@ from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos
 from openpilot.system.ui.widgets.slider import RedBigSlider, BigSlider
 from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.selfdrive.ui.mici.widgets.button import BigCircleButton, GreyBigButton
+
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 DEBUG = False
 

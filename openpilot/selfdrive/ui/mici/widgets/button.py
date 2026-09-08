@@ -3,12 +3,13 @@ import pyray as rl
 from typing import TYPE_CHECKING, Union
 from enum import Enum
 from collections.abc import Callable
-from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.scroller import DO_ZOOM
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, TextAlignmentVertical
 from openpilot.common.filter_simple import BounceFilter
+
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 if TYPE_CHECKING:
   from openpilot.common.params import Params

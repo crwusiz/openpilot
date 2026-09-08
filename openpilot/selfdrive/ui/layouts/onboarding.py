@@ -5,7 +5,6 @@ from enum import IntEnum
 
 import pyray as rl
 from openpilot.common.basedir import BASEDIR
-from openpilot.selfdrive.ui import Colors
 from openpilot.system.ui.lib.application import FontWeight, gui_app, TextAlignment
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
@@ -13,6 +12,8 @@ from openpilot.system.ui.widgets.button import Button, ButtonStyle
 from openpilot.system.ui.widgets.label import Label
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.common.version import terms_version, training_version
+
+from openpilot.selfdrive.ui import Colors
 
 DEBUG = False
 

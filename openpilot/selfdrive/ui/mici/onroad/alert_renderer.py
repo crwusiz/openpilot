@@ -7,13 +7,14 @@ import string
 from dataclasses import dataclass
 from openpilot.cereal import messaging, log
 from opendbc.car.structs import car
-from openpilot.selfdrive.ui import MiciOnroadAlertColors
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.common.filter_simple import BounceFilter, FirstOrderFilter
 from openpilot.common.hardware import COMMA_HARDWARE
 from openpilot.system.ui.lib.application import gui_app, FontWeight, TextAlignment
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel
+
+from openpilot.selfdrive.ui import MiciOnroadAlertColors
 
 AlertSize = log.SelfdriveState.AlertSize
 AlertStatus = log.SelfdriveState.AlertStatus

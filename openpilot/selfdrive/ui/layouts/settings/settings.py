@@ -2,7 +2,6 @@ import pyray as rl
 from dataclasses import dataclass, field
 from enum import IntEnum
 from collections.abc import Callable
-from openpilot.selfdrive.ui import Colors, SettingsColors
 from openpilot.selfdrive.ui.layouts.settings.developer import DeveloperLayout
 from openpilot.selfdrive.ui.layouts.settings.device import DeviceLayout
 from openpilot.selfdrive.ui.layouts.settings.firehose import FirehoseLayout
@@ -16,6 +15,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NetworkUI
 
 from openpilot.selfdrive.ui.layouts.settings.community import CommunityLayout
+from openpilot.selfdrive.ui import Colors, SettingsColors
 
 # Constants
 SIDEBAR_WIDTH = 500

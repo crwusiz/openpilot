@@ -5,7 +5,6 @@ from enum import IntEnum
 from collections.abc import Callable
 
 from openpilot.common.time_helpers import system_time_valid
-from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.selfdrive.ui.mici.layouts.settings.device import EngagedConfirmationButton
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigDialog
@@ -15,6 +14,8 @@ from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.scroller import NavScroller
+
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 UPDATER_TIMEOUT = 10.0  # seconds to wait for updater to respond
 

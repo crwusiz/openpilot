@@ -2,7 +2,6 @@ import time
 import pyray as rl
 from dataclasses import dataclass
 from openpilot.cereal import messaging, log
-from openpilot.selfdrive.ui import Colors, OnroadAlertColors
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.common.hardware import COMMA_HARDWARE
 from openpilot.system.ui.lib.application import gui_app, FontWeight, TextAlignment, TextAlignmentVertical
@@ -10,6 +9,8 @@ from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import Label
+
+from openpilot.selfdrive.ui import Colors, OnroadAlertColors
 
 AlertSize = log.SelfdriveState.AlertSize
 AlertStatus = log.SelfdriveState.AlertStatus

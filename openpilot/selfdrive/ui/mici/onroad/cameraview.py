@@ -2,7 +2,6 @@ import platform
 import numpy as np
 import pyray as rl
 
-from openpilot.selfdrive.ui import Colors
 from openpilot.cereal.visionipc import VisionStreamType
 from msgq.visionipc import VisionIpcClient, VisionBuf
 from openpilot.common.swaglog import cloudlog
@@ -11,6 +10,8 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.egl import init_egl, create_egl_image, destroy_egl_image, bind_egl_image_to_texture, EGLImage
 from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
+
+from openpilot.selfdrive.ui import Colors
 
 CONNECTION_RETRY_INTERVAL = 0.2  # seconds between connection attempts
 

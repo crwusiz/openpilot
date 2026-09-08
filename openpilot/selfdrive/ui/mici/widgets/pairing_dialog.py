@@ -1,5 +1,4 @@
 import pyray as rl
-from openpilot.selfdrive.ui import Colors, colors_alpha
 import time
 
 from openpilot.common.api import Api
@@ -10,6 +9,8 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.widgets.nav_widget import NavWidget
 from openpilot.system.ui.lib.application import FontWeight, gui_app
 from openpilot.system.ui.widgets.label import UnifiedLabel
+
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 
 class PairingDialog(NavWidget):

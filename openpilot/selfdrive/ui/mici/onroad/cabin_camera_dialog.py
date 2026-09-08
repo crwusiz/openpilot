@@ -1,7 +1,6 @@
 import pyray as rl
 from openpilot.cereal import log, messaging
 from openpilot.cereal.visionipc import VisionStreamType
-from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.selfdrive.ui.mici.onroad.cameraview import CameraView
 from openpilot.selfdrive.ui.mici.onroad.driver_state import DriverStateRenderer
 from openpilot.selfdrive.ui.ui_state import ui_state, device
@@ -10,6 +9,8 @@ from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.nav_widget import NavWidget
 from openpilot.system.ui.widgets.label import gui_label
+
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 
 class CabinCameraView(CameraView):

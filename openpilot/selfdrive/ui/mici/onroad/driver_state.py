@@ -3,11 +3,11 @@ import numpy as np
 import math
 from openpilot.cereal import log
 from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.selfdrive.ui import Colors
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.ui_state import ui_state
 
+from openpilot.selfdrive.ui import Colors
 
 AlertSize = log.SelfdriveState.AlertSize
 
