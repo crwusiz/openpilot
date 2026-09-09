@@ -8,6 +8,8 @@ from types import ModuleType
 import pytest
 import numpy as np
 
+from openpilot.common.constants import UnitConverter
+
 
 class FakeButtonType(IntEnum):
   unknown = 0
@@ -16,6 +18,8 @@ class FakeButtonType(IntEnum):
   gapAdjustCruise = 3
   cancel = 4
   resumeCruise = 5
+  mainCruise = 6
+  lkas = 7
 
 
 class FakeGearShifter(IntEnum):
@@ -54,7 +58,7 @@ def load_cruise_controller():
   cruise_module.V_CRUISE_INITIAL = 30
   cruise_module.V_CRUISE_INITIAL_EXPERIMENTAL_MODE = 105
   cruise_module.CRUISE_LONG_PRESS = 50
-  cruise_module.IMPERIAL_INCREMENT = 1
+  cruise_module.IMPERIAL_INCREMENT = 1.6
 
   navi_module = ModuleType("openpilot.selfdrive.addon.navi_controller")
   navi_module.SpeedLimiter = type("SpeedLimiter", (), {})
@@ -76,7 +80,7 @@ def load_cruise_controller():
     assert spec is not None and spec.loader is not None
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.CruiseController
+    return module
   finally:
     for name, original in original_modules.items():
       if original is MISSING_MODULE:
@@ -85,7 +89,8 @@ def load_cruise_controller():
         sys.modules[name] = original
 
 
-CruiseController = load_cruise_controller()
+cruise_controller = load_cruise_controller()
+CruiseController = cruise_controller.CruiseController
 
 
 def make_controller(applied_speed_clu: float):
@@ -145,9 +150,10 @@ def make_limit_inputs(monkeypatch, *, nda=True, school=True, camera_event=True,
   controller.limit_change_timer = 0
   controller.pending_road_restore = False
   controller.cruise_just_enabled = False
+  controller.limit_speed_updated = False
   controller.ignore_road_limit_temporarily = False
   controller._road_limit_target = lambda speed: speed
-  controller._set_limit_speed = lambda speed: None
+  controller._set_limit_speed = lambda speed: setattr(controller, 'requested_speed_clu', speed)
   controller._cal_lead_speed = lambda *args: 255.0
   controller._cal_curve_speed_adaptive = lambda *args: 255.0
   controller._cal_stock_navi_curve_speed = lambda *args: 255.0
@@ -413,3 +419,205 @@ def test_double_press_curve_integration_preserves_enforcement(monkeypatch, camer
   controller._cal_stock_navi_curve_speed = lambda *args: 30.0
   controller._cal_limit_speed(car_state, sm, 104.0 / 3.6, 104.0, 121.0, double_pressed=True)
   assert controller.apply_limit_speed_clu == pytest.approx(expected)
+
+
+def make_full_controller(monkeypatch, *, stock_long=False, pcm_cruise=True, state_control=True,
+                         is_metric=True, nda=True, road=0.0, section=0.0, camera=0.0):
+  conv = UnitConverter.__new__(UnitConverter)
+  conv.is_metric = is_metric
+  params = SimpleNamespace(get_bool=lambda key: key == "CruiseStateControl" and state_control)
+  monkeypatch.setattr(cruise_controller, "Params", lambda: params)
+  monkeypatch.setattr(cruise_controller, "UnitConverter", lambda: conv)
+  manager = cruise_controller.CruiseStateManager()
+  monkeypatch.setattr(cruise_controller.CruiseStateManager, "_instance", manager, raising=False)
+
+  navi = SimpleNamespace(roadLimitSpeed=road, sectionLimitSpeed=section, sectionLeftDist=100.0 if section else 0.0,
+                         camLimitSpeed=camera, camLimitSpeedLeftDist=100.0 if camera else 0.0)
+  limiter = SimpleNamespace(
+    conv=conv, naviData=navi, recv=lambda: None, get_active=lambda: nda,
+    get_road_limit_speed=lambda: navi.roadLimitSpeed if nda else 0.0,
+    get_section_limit_speed=lambda: (navi.sectionLimitSpeed, navi.sectionLeftDist),
+    get_camera_limit_active=lambda: camera > 0.0,
+    get_max_speed=lambda speed: (camera, False), get_in_school_zone=lambda: False,
+    get_camera_limit_speed_stock=lambda *args: (camera, False),
+  )
+  monkeypatch.setattr(cruise_controller, "SpeedLimiter", SimpleNamespace(instance=lambda: limiter))
+  cp = SimpleNamespace(openpilotLongitudinalControl=not stock_long, pcmCruise=pcm_cruise)
+  ci = SimpleNamespace(CS=SimpleNamespace(cruise_buttons=[FakeButtons.NONE]), create_buttons=lambda button: button)
+  controller = CruiseController(cp, ci)
+  car_state = SimpleNamespace(
+    vEgo=60.0 / 3.6, vEgoCluster=60.0 / 3.6, gasPressed=False, brakePressed=False,
+    buttonEvents=[], gearShifter=FakeGearShifter.drive, steeringAngleDeg=0.0,
+    cruiseState=SimpleNamespace(enabled=True, available=True, speed=90.0 / 3.6, standstill=False),
+    naviActive=False, naviSectionActive=False, naviSpeed=0.0, naviLimitSpeed=road,
+    speedLimit=camera, speedLimitDistance=100.0 if camera else 0.0, schoolZoneActive=False,
+  )
+  sm = make_model_sm(valid=False)
+  sm['radarState'] = SimpleNamespace(leadOne=SimpleNamespace(present=False, dRel=0.0, vRel=0.0))
+  return controller, car_state, sm, manager, limiter
+
+
+@pytest.mark.parametrize("is_metric", [True, False])
+@pytest.mark.parametrize("source", ['road', 'section'])
+def test_automatic_set_speed_respects_maximum(monkeypatch, is_metric, source):
+  controller, cs, sm, manager, limiter = make_full_controller(monkeypatch, is_metric=is_metric)
+  if source == 'road':
+    limiter.naviData.roadLimitSpeed = controller.conv.kph_to_clu(140.0)
+  else:
+    limiter.naviData.sectionLimitSpeed = controller.conv.kph_to_clu(160.0)
+    limiter.naviData.sectionLeftDist = 100.0
+
+  controller.update_v_cruise(cs, sm, True)
+
+  assert controller.requested_speed_clu == pytest.approx(controller.max_set_speed_clu)
+  assert controller.v_cruise_kph <= 145.0 + 1e-9
+  assert controller.v_cruise_cluster_kph == pytest.approx(145.0)
+  assert manager.speed_ms == pytest.approx(145.0 / 3.6)
+
+
+@pytest.mark.parametrize("road", [253.0, 254.0, 255.0, float('nan'), float('inf')])
+def test_stock_navigation_non_speed_values_do_not_change_set(monkeypatch, road):
+  controller, cs, sm, _, limiter = make_full_controller(monkeypatch, nda=False, road=road)
+
+  for _ in range(305):
+    controller.update_v_cruise(cs, sm, True)
+
+  assert controller.requested_speed_clu == pytest.approx(90.0)
+  assert controller.prev_road_limit_speed == 0.0
+  assert controller.road_limit_speed_clu == 255.0
+  assert cruise_controller._get_button_limit(limiter, cs) == (0.0, False)
+
+
+@pytest.mark.parametrize("camera_kph", [20.0, 30.0, 31.0])
+@pytest.mark.parametrize("is_metric", [True, False])
+def test_stock_cruise_decelerates_to_minimum_supported_speed(monkeypatch, camera_kph, is_metric):
+  camera = camera_kph if is_metric else camera_kph / 1.609344
+  controller, cs, sm, _, _ = make_full_controller(
+    monkeypatch, stock_long=True, state_control=False, nda=False, camera=camera, is_metric=is_metric,
+  )
+
+  controller.update_v_cruise(cs, sm, True)
+  can_sends = []
+  controller.spam_message(cs, can_sends)
+
+  expected_speed = controller.conv.kph_to_clu(max(camera_kph, 30.0))
+  assert controller.override_speed_clu == pytest.approx(expected_speed)
+  assert controller.v_cruise_kph == pytest.approx(max(camera_kph, 30.0))
+  assert can_sends == [FakeButtons.SET_DECEL]
+
+
+@pytest.mark.parametrize("other_button", [FakeButtonType.mainCruise, FakeButtonType.lkas])
+def test_unrelated_button_release_keeps_held_cruise_button(other_button):
+  handler = cruise_controller.CruiseButtonHandler()
+  handler.update([SimpleNamespace(type=FakeButtonType.decelCruise, pressed=True)])
+
+  assert handler.update([SimpleNamespace(type=other_button, pressed=False)]) == (FakeButtonType.unknown, False, False)
+  assert handler.update([SimpleNamespace(type=FakeButtonType.decelCruise, pressed=False)]) == (FakeButtonType.decelCruise, False, False)
+
+
+@pytest.mark.parametrize("new_target", [70.0, 80.0, 0.0])
+def test_button_burst_stops_when_target_changes(monkeypatch, new_target):
+  controller, cs, _, _, _ = make_full_controller(monkeypatch, stock_long=True)
+  cs.cruiseState.speed = 80.0 / 3.6
+  controller.override_speed_clu = 90.0
+  first_sends = []
+  controller.spam_message(cs, first_sends)
+  assert first_sends == [FakeButtons.RES_ACCEL]
+
+  controller.override_speed_clu = new_target
+  next_sends = []
+  controller.spam_message(cs, next_sends)
+
+  assert next_sends == []
+  assert controller.button_spam_count == 0
+  assert controller.button_spam_wait_timer > 0
+
+
+def test_driver_button_interrupts_openpilot_long_button_burst(monkeypatch):
+  controller, cs, _, _, _ = make_full_controller(monkeypatch)
+  controller.override_speed_clu = 100.0
+  controller.spam_message(cs, [])
+  controller.CI.CS.cruise_buttons[-1] = FakeButtons.SET_DECEL
+  can_sends = []
+
+  controller.spam_message(cs, can_sends)
+
+  assert can_sends == []
+  assert controller.button_spam_count == 0
+
+
+@pytest.mark.parametrize("stock_long", [True, False])
+@pytest.mark.parametrize("brake", [True, False])
+def test_brake_or_disengagement_stops_buttons_and_clears_limit(monkeypatch, stock_long, brake):
+  controller, cs, _, _, _ = make_full_controller(monkeypatch, stock_long=stock_long)
+  controller.override_speed_clu = 100.0
+  controller.apply_limit_speed_clu = 70.0
+  controller.spam_message(cs, [])
+  cs.brakePressed = brake
+  cs.cruiseState.enabled = brake
+  can_sends = []
+
+  controller.spam_message(cs, can_sends)
+
+  assert can_sends == []
+  assert controller.button_spam_count == 0
+  assert controller.override_speed_clu == 0.0
+  assert controller.apply_limit_speed_clu == 0.0
+
+
+@pytest.mark.parametrize("button", [FakeButtonType.accelCruise, FakeButtonType.decelCruise])
+def test_held_brake_prevents_cruise_reengagement(monkeypatch, button):
+  _, cs, _, manager, _ = make_full_controller(monkeypatch)
+  manager.available = True
+  manager.prev_brake_pressed = True
+  cs.brakePressed = True
+  for pressed in (True, False):
+    cs.buttonEvents = [SimpleNamespace(type=button, pressed=pressed)]
+    manager.update(cs, [0])
+
+  assert not manager.enabled
+  assert not cs.cruiseState.enabled
+
+
+def test_imperial_state_manager_uses_physical_speed_bounds_and_one_mph_steps(monkeypatch):
+  _, cs, _, manager, _ = make_full_controller(monkeypatch, is_metric=False)
+  assert manager.speed_ms == pytest.approx(30.0 / 3.6)
+  manager.available = True
+  manager.enabled = True
+  manager.speed_ms = manager.conv.clu_to_ms(50.0)
+
+  manager._button_press(cs, FakeButtonType.accelCruise, False, False)
+  assert manager.conv.ms_to_clu(manager.speed_ms) == pytest.approx(51.0)
+
+  manager.speed_ms = 145.0 / 3.6
+  manager._button_press(cs, FakeButtonType.accelCruise, True, False)
+  assert manager.speed_ms == pytest.approx(145.0 / 3.6)
+
+
+def test_non_pcm_cruise_uses_own_set_when_stock_set_is_zero(monkeypatch):
+  controller, cs, sm, _, _ = make_full_controller(monkeypatch, pcm_cruise=False, state_control=False)
+  cs.cruiseState.speed = 0.0
+  controller.update_v_cruise(cs, sm, True)
+  controller.spam_message(cs, [])
+  for pressed in (True, False):
+    cs.buttonEvents = [SimpleNamespace(type=FakeButtonType.accelCruise, pressed=pressed)]
+    controller.update_v_cruise(cs, sm, True)
+    controller.spam_message(cs, [])
+
+  assert controller.requested_speed_clu == pytest.approx(61.0)
+  assert controller.v_cruise_kph == pytest.approx(60.1)
+
+
+def test_non_pcm_resume_retains_previous_set_through_disabled_frames(monkeypatch):
+  controller, cs, sm, _, _ = make_full_controller(monkeypatch, pcm_cruise=False)
+  controller.update_v_cruise(cs, sm, True)
+  controller.requested_speed_clu = 90.0
+  cs.cruiseState.enabled = False
+  for _ in range(10):
+    controller.update_v_cruise(cs, sm, False)
+
+  cs.cruiseState.enabled = True
+  cs.buttonEvents = [SimpleNamespace(type=FakeButtonType.accelCruise, pressed=True)]
+  controller.update_v_cruise(cs, sm, True)
+
+  assert controller.requested_speed_clu == pytest.approx(90.0)
