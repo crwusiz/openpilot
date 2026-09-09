@@ -1,7 +1,7 @@
 import pyray as rl
 from collections.abc import Callable
 
-from openpilot.selfdrive.ui.mici.widgets.button import BigButton, LABEL_COLOR
+from openpilot.selfdrive.ui.mici.widgets.button import BigButton
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigDialog, BigInputDialog, BigConfirmationDialog
 from openpilot.common.esim.base import Profile
 from openpilot.system.ui.lib.application import DEFAULT_TEXT_COLOR, FontWeight, MousePos, TextAlignment, gui_app
@@ -9,6 +9,8 @@ from openpilot.system.ui.lib.cellular_manager import CellularManager
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import gui_label
 from openpilot.system.ui.widgets.scroller import NavScroller
+
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 
 class ProfileActionButton(Widget):
@@ -41,8 +43,8 @@ class ProfileActionButton(Widget):
 
 
 class EsimProfileButton(BigButton):
-  SUB_LABEL_DISABLED = rl.Color(255, 255, 255, int(255 * 0.585))
-  CHECK_ICON_COLOR = rl.Color(255, 255, 255, int(255 * 0.9 * 0.65))
+  SUB_LABEL_DISABLED = colors_alpha(Colors.WHITE, int(255 * 0.585))
+  LABEL_COLOR = colors_alpha(Colors.WHITE, int(255 * 0.9))
   LABEL_PADDING = 98
   LABEL_WIDTH = 402 - 98 - 28
   SUB_LABEL_WIDTH = 402 - BigButton.LABEL_HORIZONTAL_PADDING * 2
@@ -118,7 +120,7 @@ class EsimProfileButton(BigButton):
     return 48
 
   def _draw_content(self, btn_y: float):
-    self._label.set_color(self.SUB_LABEL_DISABLED if self._locked else LABEL_COLOR)
+    self._label.set_color(self.SUB_LABEL_DISABLED if self._locked else self.LABEL_COLOR)
     label_rect = rl.Rectangle(self._rect.x + self.LABEL_PADDING, btn_y + self.LABEL_VERTICAL_PADDING,
                               self.LABEL_WIDTH, self._rect.height - self.LABEL_VERTICAL_PADDING * 2)
     self._label.render(label_rect)
@@ -135,17 +137,17 @@ class EsimProfileButton(BigButton):
 
       if active:
         check_y = int(label_y - sub_label_height + (sub_label_height - self._check_txt.height) / 2)
-        rl.draw_texture_ex(self._check_txt, rl.Vector2(sub_label_x, check_y), 0.0, 1.0, self.CHECK_ICON_COLOR)
+        rl.draw_texture_ex(self._check_txt, rl.Vector2(sub_label_x, check_y), 0.0, 1.0, colors_alpha(Colors.WHITE, int(255 * 0.585)))
         sub_label_x += self._check_txt.width + 14
 
       sub_label_rect = rl.Rectangle(sub_label_x, label_y - sub_label_height, sub_label_w, sub_label_height)
       self._sub_label.render(sub_label_rect)
 
     if self._comma_txt:
-      rl.draw_texture_ex(self._comma_txt, (self._rect.x + 36, btn_y + 38), 0.0, 1.0, rl.WHITE)
+      rl.draw_texture_ex(self._comma_txt, (self._rect.x + 36, btn_y + 38), 0.0, 1.0, Colors.WHITE)
     else:
       cell_icon = self._cell_full_txt if active else self._cell_none_txt
-      rl.draw_texture_ex(cell_icon, (self._rect.x + 30, btn_y + 38), 0.0, 1.0, rl.WHITE)
+      rl.draw_texture_ex(cell_icon, (self._rect.x + 30, btn_y + 38), 0.0, 1.0, Colors.WHITE)
 
     btn_x = self._rect.x + self._rect.width - (ProfileActionButton.MARGIN - ProfileActionButton.HORIZONTAL_MARGIN)
     btn_bottom = btn_y + self._rect.height
