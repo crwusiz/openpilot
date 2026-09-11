@@ -8,7 +8,7 @@ from openpilot.common.params import Params
 from openpilot.common.constants import UnitConverter
 from openpilot.selfdrive.car.cruise import (V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_UNSET, V_CRUISE_INITIAL,
                                             V_CRUISE_INITIAL_EXPERIMENTAL_MODE,
-                                            CRUISE_LONG_PRESS, IMPERIAL_INCREMENT)
+                                            CRUISE_LONG_PRESS)
 from opendbc.car.hyundai.values import Buttons
 from openpilot.selfdrive.addon.navi_controller import SpeedLimiter
 
@@ -34,6 +34,11 @@ CRUISE_CONTROL_DT = 0.01  # update_v_cruise runs at 100 Hz
 
 LIMIT_RELEASE_RISE_RATE_KPH = 10.0
 LIMIT_SPEED_ABS_TOL = 0.05
+
+LEAD_DECEL_ENTRY_RELATIVE_SPEED_MS = -1.0
+LEAD_DECEL_RELEASE_RELATIVE_SPEED_MS = -0.5
+LEAD_DECEL_ENTRY_TTC_S = 22.0
+LEAD_DECEL_RELEASE_TTC_S = 25.0
 
 CURVE_MIN_SPEED_CLU = 30.0
 CURVE_STRONG_REDUCTION_RATIO = 1.3
@@ -205,6 +210,7 @@ class CruiseController:
     self.camera_limit_speed_clu = 0.
     self.steer_limit_speed_clu = 0.
     self.lead_limit_speed_clu = 0.
+    self.lead_decel_active = False
     self.prev_steering_angle = 0.
     self.prev_cruise_enabled = False
     self.cruise_just_enabled = False
@@ -228,6 +234,8 @@ class CruiseController:
 
     self.prev_model_mono_time = 0
     self.cached_curve_speed_ms: float | None = None
+    self.curve_estimates = None
+    self.model_curve_geometry = None
 
     self.button_spam_wait_timer = 0
     self.button_spam_count = 0
@@ -255,6 +263,9 @@ class CruiseController:
     self.ignore_limit_timer = 0
     self.prev_model_mono_time = 0
     self.cached_curve_speed_ms = None
+    self.curve_estimates = None
+    self.model_curve_geometry = None
+    self.lead_decel_active = False
     self.steer_decel_active = False
     self.steer_decel_entry_speed_ms = None
     self.prev_steering_angle = 0.
@@ -367,6 +378,10 @@ class CruiseController:
 
     self._debug_last_state = event_state
     self._debug_last_time = now
+    path_speed, path_confidence, yaw_speed, yaw_confidence = (
+      getattr(self, 'curve_estimates', None) or (NO_ACTIVE_LIMIT, 0.0, NO_ACTIVE_LIMIT, 0.0)
+    )
+    geometry = getattr(self, 'model_curve_geometry', None)
     log_format = " ".join((
       "LIMIT source=%s ego=%.1f requested=%.1f calculated=%.1f applied=%.1f prev_output=%.1f",
       "candidates[road=%s camera=%s lead=%s curve=%s steer=%s]",
@@ -374,6 +389,7 @@ class CruiseController:
       "section=%d limit=%.1f left=%.0f camera=%d stock_event=%d stock_section=%d stock_speed=%.1f zone=%d school=%d]",
       "lead[present=%d dRel=%.1f vRel=%.1f] ignore=%d timer=%d/%d steer_angle=%.1f immediate=%s",
       "curve_detail[model=%s stock=%s steer_entry=%s]",
+      "curve_estimates[path=%s path_conf=%.3f yaw=%s yaw_conf=%.3f tail_k=%s tail_x=%s]",
       "stock_curve[distance=%.1f reference=%.1f curvature=%.6f route=%d model_curvature=%s rejected=%d]",
     ))
     cruise_log.debug(
@@ -393,6 +409,10 @@ class CruiseController:
       self._debug_speed(model_curve_speed_clu), self._debug_speed(stock_navi_curve_speed_clu),
       self._debug_speed(self.conv.ms_to_clu(self.steer_decel_entry_speed_ms)
                         if self.steer_decel_entry_speed_ms is not None else None),
+      self._debug_speed(self.conv.ms_to_clu(path_speed) if path_speed != NO_ACTIVE_LIMIT else None), path_confidence,
+      self._debug_speed(self.conv.ms_to_clu(yaw_speed) if yaw_speed != NO_ACTIVE_LIMIT else None), yaw_confidence,
+      f"{geometry[0]:.6f}" if geometry is not None else "-",
+      f"{geometry[1]:.1f}" if geometry is not None else "-",
       float(getattr(CS, 'naviCurveDistance', 0.0)), float(getattr(CS, 'naviCurveSpeed', 0.0)),
       float(getattr(CS, 'naviCurveCurvature', 0.0)), int(getattr(CS, 'naviCurveRouteState', 3)),
       (f"{self.stock_curve_model_curvature:.6f}"
@@ -662,23 +682,30 @@ class CruiseController:
     )
 
   def _cal_lead_speed(self, lead, cluster_speed_clu: float):
-    lead_distance_buffer = 5.
-    distance = lead.dRel - lead_distance_buffer
-    relative_speed = lead.vRel
-    lead_decay_factor = 22.
-    lead_accel_gain = 1.2
-    min_relative_speed = -1.0
+    if not lead.present or not all(math.isfinite(value) for value in (lead.dRel, lead.vRel)) or lead.dRel <= 0:
+      self.lead_decel_active = False
+      return NO_ACTIVE_LIMIT
 
-    is_valid_deceleration = (
-      0 < distance < -relative_speed * lead_decay_factor and
+    lead_distance_buffer = 5.
+    # Crossing the distance buffer while closing must not remove the limit.
+    distance = max(lead.dRel - lead_distance_buffer, 0.1)
+    relative_speed = lead.vRel
+    lead_accel_gain = 1.2
+    lead_decay_factor = LEAD_DECEL_RELEASE_TTC_S if self.lead_decel_active else LEAD_DECEL_ENTRY_TTC_S
+    min_relative_speed = LEAD_DECEL_RELEASE_RELATIVE_SPEED_MS if self.lead_decel_active else LEAD_DECEL_ENTRY_RELATIVE_SPEED_MS
+
+    # Separate entry/release thresholds prevent radar noise around -1 m/s or
+    # the 22 s boundary from alternating between ego speed and unrestricted SET.
+    self.lead_decel_active = (
+      distance < -relative_speed * lead_decay_factor and
       relative_speed < min_relative_speed
     )
 
-    if not is_valid_deceleration:
+    if not self.lead_decel_active:
       return NO_ACTIVE_LIMIT
 
-    time = distance / relative_speed if abs(relative_speed) > 1e-3 else 0.1
-    deceleration_ms = -relative_speed / time
+    time_to_lead = distance / -relative_speed
+    deceleration_ms = relative_speed / time_to_lead
     speed_delta_clu = self.conv.ms_to_clu(deceleration_ms) * lead_accel_gain
     new_speed_clu = cluster_speed_clu + speed_delta_clu
     lead_limit_speed_clu = max(new_speed_clu, self.min_set_speed_clu)
@@ -767,12 +794,15 @@ class CruiseController:
     return float(np.max(curvatures[visible]))
 
   def _get_model_based_speed(self, model, current_speed_ms: float, min_curve_speed_ms: float):
+    self.model_curve_geometry = None
     path = self._get_model_path(model)
     if path is None:
       return NO_ACTIVE_LIMIT, 0.0
     x_positions, curvatures = path
     y_positions = np.asarray(model.position.y, dtype=float)
     curv_segment = curvatures[-10:]
+    tail_peak_index = len(curvatures) - len(curv_segment) + int(np.argmax(curv_segment))
+    self.model_curve_geometry = (float(curvatures[tail_peak_index]), float(x_positions[tail_peak_index]))
     curv_variance = np.var(curv_segment)
     trajectory_length = np.sum(np.sqrt(np.diff(x_positions) ** 2 + np.diff(y_positions) ** 2))
     confidence = min(1.0, trajectory_length / 100.0) * (1.0 / (1.0 + curv_variance * 1000))
@@ -850,6 +880,8 @@ class CruiseController:
     if not sm.all_checks(['modelV2']):
       self.prev_model_mono_time = 0
       self.cached_curve_speed_ms = None
+      self.curve_estimates = None
+      self.model_curve_geometry = None
       return NO_ACTIVE_LIMIT
 
     model_mono_time = sm.logMonoTime['modelV2']
@@ -859,6 +891,7 @@ class CruiseController:
       min_curve_speed_ms = max(self.conv.clu_to_ms(CURVE_MIN_SPEED_CLU), current_speed_ms * 0.5)
       model_speed, model_confidence = self._get_model_based_speed(model, current_speed_ms, min_curve_speed_ms)
       acc_speed, acc_confidence = self._get_acc_based_speed(model, current_speed_ms, min_curve_speed_ms)
+      self.curve_estimates = (model_speed, model_confidence, acc_speed, acc_confidence)
 
       base_model_weight = float(np.interp(
         current_speed_ms,
@@ -958,11 +991,11 @@ class CruiseController:
           self.ignore_road_limit_temporarily = True
           self.ignore_limit_timer = 0
           set_speed = np.clip(cluster_speed_clu + sync_margin, self.min_set_speed_clu, self.max_set_speed_clu)
-          requested_speed_clu = float(set_speed)
-          self.override_speed_clu = float(set_speed)
-          # The accelerator override establishes a new requested SET speed.
-          # Keep the displayed cruise/set values and the next non-limited
-          # control cycle in sync with that target.
+          requested_speed_clu = float(np.clip(max(requested_speed_clu, set_speed), self.min_set_speed_clu, self.max_set_speed_clu))
+          self.override_speed_clu = requested_speed_clu
+          # Accelerator use may raise SET but must not lower it during a slow
+          # restart. Keep the temporary control target near ego speed so pedal
+          # release ramps back to SET through the normal limit-release filter.
           self.apply_limit_speed_clu = float(set_speed)
           self.gas_override_active = True
           if self.steer_decel_active:
@@ -973,12 +1006,12 @@ class CruiseController:
             )
           if self.gas_pressed_count == GAS_PRESSED_OVERRIDE_TICKS + 1:
             cruise_log.info(
-              "GAS_OVERRIDE start ego=%.1f previous_set=%.1f new_set=%.1f ignore_timeout=%d",
-              cluster_speed_clu, previous_set_speed, requested_speed_clu, IGNORE_LIMIT_TIMEOUT_TICKS,
+              "GAS_OVERRIDE start ego=%.1f previous_set=%.1f new_set=%.1f override=%.1f ignore_timeout=%d",
+              cluster_speed_clu, previous_set_speed, requested_speed_clu, set_speed, IGNORE_LIMIT_TIMEOUT_TICKS,
             )
 
           if CruiseStateManager.instance().cruise_state_control:
-            CruiseStateManager.instance().speed_ms = self.conv.clu_to_ms(set_speed)
+            CruiseStateManager.instance().speed_ms = self.conv.clu_to_ms(requested_speed_clu)
       else:
         if self.gas_pressed_count > GAS_PRESSED_OVERRIDE_TICKS:
           cruise_log.info(
@@ -1077,7 +1110,7 @@ class CruiseController:
       requested_speed_clu = requested_speed_clu_from_override
 
       if self.gas_override_active:
-        self.applied_speed_clu = self.requested_speed_clu
+        self.applied_speed_clu = self.apply_limit_speed_clu
       elif CruiseStateManager.instance().cruise_state_control:
         self.applied_speed_clu = min(self.applied_speed_clu, max(self.requested_speed_clu, min_cruise_speed_clu))
     else:
@@ -1152,6 +1185,14 @@ class CruiseController:
   def spam_message(self, CS, can_sends):
     ascc_enabled = CS.cruiseState.enabled and 1 < CS.cruiseState.speed < V_CRUISE_UNSET and not CS.brakePressed
     btn_pressed = self.CI.CS.cruise_buttons[-1] != Buttons.NONE
+
+    if (self.CP.openpilotLongitudinalControl and CruiseStateManager.instance().cruise_state_control and
+        CS.cruiseState.enabled and not CS.brakePressed):
+      # CruiseStateManager publishes a software SET value, not a stock SCC
+      # acknowledgement. It already received the requested speed directly.
+      self._finish_button_spam()
+      self.override_speed_clu = 0.
+      return
 
     if not self.CP.openpilotLongitudinalControl:
       if not ascc_enabled or btn_pressed:
@@ -1293,7 +1334,7 @@ class CruiseStateManager:
     min_speed_clu = self.conv.kph_to_clu(V_CRUISE_MIN)
     max_speed_clu = self.conv.kph_to_clu(V_CRUISE_MAX)
     initial_speed_clu = self.conv.kph_to_clu(V_CRUISE_INITIAL)
-    v_cruise_delta = 10 if self.conv.is_metric else 5 * IMPERIAL_INCREMENT
+    v_cruise_delta = 10 if self.conv.is_metric else 5
     v_cruise_kph = int(round(self.conv.ms_to_clu(self.speed_ms)))
     cluster_speed_clu = self.conv.ms_to_clu(CS.vEgoCluster)
 
@@ -1308,7 +1349,7 @@ class CruiseStateManager:
                                 [1.30, 1.10])
               v_cruise_kph = button_limit * ratio
         elif not long_pressed:
-          v_cruise_kph += (1 if self.conv.is_metric else IMPERIAL_INCREMENT)
+          v_cruise_kph += 1
         else:
           v_cruise_kph += (v_cruise_delta - v_cruise_kph % v_cruise_delta)
       elif not self.enabled and self.available and not CS.brakePressed and CS.gearShifter != GearShifter.park:
@@ -1322,7 +1363,7 @@ class CruiseStateManager:
           if button_limit > 0:
             v_cruise_kph = button_limit
         elif not long_pressed:
-          v_cruise_kph -= (1 if self.conv.is_metric else IMPERIAL_INCREMENT)
+          v_cruise_kph -= 1
         else:
           v_cruise_kph -= (v_cruise_delta - (-v_cruise_kph) % v_cruise_delta)
       elif not self.enabled and self.available and not CS.brakePressed and CS.gearShifter != GearShifter.park:

@@ -35,7 +35,7 @@ def _setup_traffic_logger() -> logging.Logger:
     )
     handler.setFormatter(logging.Formatter(
       "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s",
-      datefmt="%H:%M:%S",
+      datefmt="%Y-%m-%d %H:%M:%S",
     ))
     logger.addHandler(handler)
   except OSError:

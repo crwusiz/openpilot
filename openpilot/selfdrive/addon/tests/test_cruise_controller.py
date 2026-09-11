@@ -534,7 +534,7 @@ def test_button_burst_stops_when_target_changes(monkeypatch, new_target):
 
 
 def test_driver_button_interrupts_openpilot_long_button_burst(monkeypatch):
-  controller, cs, _, _, _ = make_full_controller(monkeypatch)
+  controller, cs, _, _, _ = make_full_controller(monkeypatch, state_control=False)
   controller.override_speed_clu = 100.0
   controller.spam_message(cs, [])
   controller.CI.CS.cruise_buttons[-1] = FakeButtons.SET_DECEL
@@ -621,3 +621,132 @@ def test_non_pcm_resume_retains_previous_set_through_disabled_frames(monkeypatch
   controller.update_v_cruise(cs, sm, True)
 
   assert controller.requested_speed_clu == pytest.approx(90.0)
+
+
+@pytest.mark.parametrize("previous_set, ego_kph", [
+  (60.6, 3.0), (60.6, 0.0), (47.0, 40.0), (59.0, 27.0),
+  (57.0, 43.0), (50.0, 46.0), (58.0, 43.0), (55.0, 44.0),
+  (60.6, 80.0), (140.0, 150.0),
+])
+def test_logged_gas_overrides_preserve_set_and_use_current_speed_reference(monkeypatch, previous_set, ego_kph):
+  # September 11: eight accelerator entries reduced SET, including 60.6 -> 10.
+  controller, cs, _, manager, _ = make_full_controller(monkeypatch)
+  controller.requested_speed_clu = previous_set
+  controller.gas_pressed_count = 100
+  cs.gasPressed = True
+
+  requested = controller._override_speed(cs, ego_kph, previous_set, False)
+
+  override_reference = min(145.0, max(10.0, ego_kph + 3.0))
+  assert requested == pytest.approx(max(previous_set, override_reference))
+  assert controller.apply_limit_speed_clu == pytest.approx(override_reference)
+  assert manager.speed_ms == pytest.approx(requested / 3.6)
+
+
+def test_restart_gas_release_ramps_back_to_preserved_set(monkeypatch):
+  controller, cs, sm, manager, _ = make_full_controller(monkeypatch, road=50.0)
+  controller.update_v_cruise(cs, sm, True)
+  assert controller.requested_speed_clu == pytest.approx(60.6, abs=0.1)
+  original_set = controller.requested_speed_clu
+  cs.vEgo = cs.vEgoCluster = 0.0
+  cs.gasPressed = True
+  cs.cruiseState.speed = manager.speed_ms
+  controller.gas_pressed_count = 100
+  controller.update_v_cruise(cs, sm, True)
+  controller.spam_message(cs, [])
+  assert controller.requested_speed_clu == pytest.approx(original_set)
+  assert controller.v_cruise_kph == 10.0
+
+  cs.gasPressed = False
+  for tick in range(1, 21):
+    cs.cruiseState.speed = manager.speed_ms
+    controller.update_v_cruise(cs, sm, True)
+    controller.spam_message(cs, [])
+    assert controller.requested_speed_clu == pytest.approx(original_set)
+    assert controller.v_cruise_kph == pytest.approx(10.0 + tick * 0.1)
+
+
+def test_synthetic_cruise_state_does_not_generate_stock_button_feedback(monkeypatch):
+  controller, cs, _, _, _ = make_full_controller(monkeypatch)
+  controller.override_speed_clu = 100.0
+  controller.apply_limit_speed_clu = 40.0
+  can_sends = []
+
+  controller.spam_message(cs, can_sends)
+
+  assert can_sends == []
+  assert controller.button_spam_count == 0
+  assert controller.override_speed_clu == 0.0
+  assert controller.apply_limit_speed_clu == 40.0
+
+
+def test_lead_limit_does_not_toggle_at_logged_relative_speed_boundary(monkeypatch):
+  # September 11, 15:11:09: dRel=19 m, vRel around -1 m/s, SET=60.6, ego=30.
+  controller, _, _, _, _ = make_full_controller(monkeypatch)
+  lead = SimpleNamespace(present=True, dRel=19.0, vRel=-1.05)
+  assert controller._cal_lead_speed(lead, 30.0) < 30.0
+  for v_rel in (-0.99, -1.01, -0.98, -1.02):
+    lead.vRel = v_rel
+    assert controller._cal_lead_speed(lead, 30.0) < 30.0
+
+  lead.vRel = -0.4
+  assert controller._cal_lead_speed(lead, 30.0) == 255.0
+  lead.vRel = -0.99
+  assert controller._cal_lead_speed(lead, 30.0) == 255.0
+
+
+def test_lead_limit_has_separate_distance_entry_and_release_boundaries(monkeypatch):
+  controller, _, _, _, _ = make_full_controller(monkeypatch)
+  lead = SimpleNamespace(present=True, dRel=70.0, vRel=-3.0)
+  assert controller._cal_lead_speed(lead, 40.0) < 40.0
+  lead.dRel = 72.1  # Just beyond the original 22 s boundary.
+  assert controller._cal_lead_speed(lead, 40.0) < 40.0
+  lead.dRel = 83.0
+  assert controller._cal_lead_speed(lead, 40.0) == 255.0
+  lead.dRel = 72.1
+  assert controller._cal_lead_speed(lead, 40.0) == 255.0
+
+
+@pytest.mark.parametrize("distance", [5.0, 4.0, 1.0])
+def test_closing_lead_inside_distance_buffer_keeps_limit(monkeypatch, distance):
+  controller, _, _, _, _ = make_full_controller(monkeypatch)
+  lead = SimpleNamespace(present=True, dRel=distance, vRel=-2.0)
+  assert controller._cal_lead_speed(lead, 30.0) == controller.min_set_speed_clu
+
+
+def test_lost_lead_and_reset_clear_lead_hysteresis(monkeypatch):
+  controller, _, _, _, _ = make_full_controller(monkeypatch)
+  lead = SimpleNamespace(present=True, dRel=19.0, vRel=-1.05)
+  controller._cal_lead_speed(lead, 30.0)
+  lead.present = False
+  assert controller._cal_lead_speed(lead, 30.0) == 255.0
+  assert not controller.lead_decel_active
+
+  lead.present = True
+  controller._cal_lead_speed(lead, 30.0)
+  controller.reset()
+  lead.vRel = -0.99
+  assert controller._cal_lead_speed(lead, 30.0) == 255.0
+
+
+def test_curve_estimates_are_logged_and_cleared_with_invalid_model(monkeypatch):
+  controller, cs, sm, _, _ = make_full_controller(monkeypatch)
+  sm.all_checks = lambda services: True
+  model = sm['modelV2']
+  model.position.y = 0.001 * np.asarray(model.position.x) ** 2
+  model.orientationRate = SimpleNamespace(z=[0.1] * 81)
+  model.velocity = SimpleNamespace(x=[20.0] * 81)
+  messages = []
+  monkeypatch.setattr(cruise_controller, 'cruise_log',
+                      SimpleNamespace(info=lambda *args: None, debug=lambda fmt, *args: messages.append(fmt % args)))
+
+  controller._cal_curve_speed_adaptive(sm, 20.0, 90.0)
+  assert controller.curve_estimates is not None
+  assert controller.model_curve_geometry is not None
+  controller.update_v_cruise(cs, sm, True)
+  assert any('curve_estimates[path=' in message and 'yaw_conf=' in message and 'tail_k=0.00' in message for message in messages)
+
+  sm.all_checks = lambda services: False
+  controller._cal_curve_speed_adaptive(sm, 20.0, 90.0)
+  assert controller.curve_estimates is None
+  assert controller.model_curve_geometry is None
