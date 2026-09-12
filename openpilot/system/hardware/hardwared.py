@@ -20,8 +20,7 @@ from openpilot.selfdrive.selfdrived.alertmanager import set_offroad_alert
 from openpilot.common.hardware import HARDWARE, COMMA_HARDWARE, PC
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.git import get_short_branch
-from openpilot.common.hardware.usb import (CHESTNUT_FW_VERSION, CHESTNUT_USB_PRODUCT, get_usb_state, get_usb_topology,
-                                           is_chestnut_usb_id, set_usb_state)
+from openpilot.common.hardware.usb import CHESTNUT_FW_VERSION, CHESTNUT_USB_PRODUCT, get_usb_state, get_usb_topology, is_chestnut_usb_id, set_usb_state
 from openpilot.common.linux import LinuxSystemStats
 from openpilot.system.loggerd.config import get_available_percent
 from openpilot.common.swaglog import cloudlog
@@ -195,7 +194,7 @@ def hw_state_thread(end_event, hw_queue):
 
 
 def hardware_thread(end_event, hw_queue) -> None:
-  system_stats = LinuxSystemStats()
+  system_stats = LinuxSystemStats() if sys.platform == "linux" else None
   pm = messaging.PubMaster(['deviceState'])
   sm = messaging.SubMaster(["peripheralState", "gpsLocationExternal", "selfdriveState", "pandaStates", "chestnutState"], poll="pandaStates")
 
@@ -288,10 +287,13 @@ def hardware_thread(end_event, hw_queue) -> None:
     except queue.Empty:
       pass
 
+    memory_usage = system_stats.memory_usage_percent() if system_stats is not None else 0.
+    cpu_usage = system_stats.cpu_usage_percent() if system_stats is not None else []
+
     msg.deviceState.freeSpacePercent = get_available_percent(default=100.0)
-    msg.deviceState.memoryUsagePercent = int(round(system_stats.memory_usage_percent()))
+    msg.deviceState.memoryUsagePercent = int(round(memory_usage))
     msg.deviceState.gpuUsagePercent = int(round(HARDWARE.get_gpu_usage_percent()))
-    online_cpu_usage = [int(round(n)) for n in system_stats.cpu_usage_percent()]
+    online_cpu_usage = [int(round(n)) for n in cpu_usage]
     offline_cpu_usage = [0., ] * (len(msg.deviceState.cpuTempC) - len(online_cpu_usage))
     msg.deviceState.cpuUsagePercent = online_cpu_usage + offline_cpu_usage
 
