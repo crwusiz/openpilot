@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 
-from openpilot.common.hardware.usb import is_chestnut_connected
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 
@@ -17,7 +16,7 @@ CLUSTER_BORDER_SIZE = 10
 
 # C4 and the Orange Pi join the same phone hotspot. C4 listens on every Wi-Fi
 # address, and the Orange Pi discovers this port in its current IPv4 subnet.
-CLUSTER_DISPLAY_TRANSPORT = "network"  # "network" or "usb"
+CLUSTER_DISPLAY_TRANSPORT = "usb"  # "usb" or "network"
 CLUSTER_ROTATE_180 = False
 CLUSTER_USB_WIDTH = 1920
 CLUSTER_USB_HEIGHT = 462
@@ -84,11 +83,6 @@ class ClusterConfig:
 
     self.params = Params()
     self.display_transport = self.params.get("ClusterDisplayTransport") or CLUSTER_DISPLAY_TRANSPORT
-    if is_chestnut_connected(include_bootloader=True):
-      if self.display_transport != "network":
-        cloudlog.warning("Chestnut USB detected; forcing ClusterDisplayTransport to network")
-        self.params.put("ClusterDisplayTransport", "network", block=True)
-      self.display_transport = "network"
     if self.display_transport not in ("network", "usb"):
       raise ValueError(f"Unsupported cluster display transport: {self.display_transport}")
     if self.display_transport == "network":

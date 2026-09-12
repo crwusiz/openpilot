@@ -21,11 +21,6 @@ try:
 except ImportError:
   def set_core_affinity(cores): pass
 
-try:
-  from openpilot.common.hardware.usb import is_chestnut_connected
-except ImportError:
-  def is_chestnut_connected(devices=None, include_bootloader=False): return False
-
 from ansi2html import Ansi2HTMLConverter
 from nicegui import app, ui
 
@@ -587,36 +582,23 @@ def render_tab_toggles():
             ui.label(desc).classes('text-[0.75rem] md:text-sm text-gray-400 leading-snug break-words whitespace-normal')
 
         if key == "ClusterEnable" and init_val:
-          transport = params.get("ClusterDisplayTransport") or "network"
+          transport = params.get("ClusterDisplayTransport") or "usb"
           if isinstance(transport, bytes):
             transport = transport.decode('utf-8')
           if transport not in ("network", "usb"):
-            transport = "network"
-          chestnut_connected = is_chestnut_connected(include_bootloader=True)
-          if chestnut_connected and transport != "network":
-            transport = "network"
-            params.put("ClusterDisplayTransport", transport, block=True)
+            transport = "usb"
 
           def on_transport_change(e):
-            if is_chestnut_connected(include_bootloader=True):
-              params.put("ClusterDisplayTransport", "network", block=True)
-              e.sender.value = "network"
-              ui.notify("Chestnut USB is connected; transport is locked to network", type='warning', position='top')
-              return
             params.put("ClusterDisplayTransport", e.value, block=True)
             ui.notify(f"Cluster display transport: {e.value} (Cluster restarting)", position='top')
 
-          transport_select = ui.select(
+          ui.select(
             {"network": "Network (Orange Pi HDMI)", "usb": "USB (TURZX Display)"},
             value=transport,
             label="CLUSTER_DISPLAY_TRANSPORT",
             on_change=on_transport_change,
           ).classes('w-full text-blue-200')
-          if chestnut_connected:
-            transport_select.props('disable')
-          transport_help = ('Chestnut USB is connected; transport is locked to network.' if chestnut_connected else
-                            'The Cluster process restarts automatically when the transport changes.')
-          ui.label(transport_help).classes(
+          ui.label('The Cluster process restarts automatically when the transport changes.').classes(
             'text-[0.75rem] md:text-sm text-gray-400 -mt-3 ml-1'
           )
 

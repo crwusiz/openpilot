@@ -1,3 +1,4 @@
+import sys
 import time
 
 import usb.util
@@ -33,7 +34,6 @@ class TuringUsbDisplay:
     self._perf_usb_time = 0.0
     self._perf_size_kb = 0
 
-    self._find_usb_device = None
     self._send_jpeg = None
     self._resp_ok = None
     self._ep_out = None
@@ -65,41 +65,47 @@ class TuringUsbDisplay:
 
     try:
       from library.lcd.lcd_comm_turing_usb import (
-        find_usb_device, send_jpeg, send_sync_command,
+        send_jpeg, send_sync_command,
         send_brightness_command, send_frame_rate_command, _resp_ok,
       )
 
-      self._find_usb_device = find_usb_device
       self._send_jpeg = send_jpeg
       self._resp_ok = _resp_ok
 
-      self.device, self.dev_pid = self._find_usb_device()
+      # Match only the configured panel, regardless of its port behind a hub.
+      # Keep the handle here so every initialization failure releases it.
+      for product_id in TURZX_USB_PRODUCT_IDS:
+        self.device = usb.core.find(idVendor=TURZX_USB_VENDOR_ID, idProduct=product_id)
+        if self.device is not None:
+          self.dev_pid = product_id
+          break
 
       if self.device is not None:
         self.product_id = getattr(self.device, 'idProduct', self.dev_pid)
         if self.product_id in TURZX_USB_PRODUCT_IDS:
 
-          # find_usb_device() has already configured the device and, on Linux,
-          # detached the kernel driver.  Resetting here forces USB re-enumeration
-          # and invalidates this PyUSB handle (Errno 19 on the first connection).
-          try:
-            if self.device.is_kernel_driver_active(0):
-              self.device.detach_kernel_driver(0)
-              self.device.set_configuration()
-              flog("[CLUSTER_USB] Detached Linux kernel driver.")
-          except usb.core.USBError as e:
-            # Errno 2 simply means no kernel driver is bound; it is safe to ignore.
-            if e.errno != 2:
-              flog(f"[CLUSTER_USB_WARN] Driver detach warning: {e}")
+          # Detach before configuration/claim, as in carrot-wip. Never reset the
+          # display or its shared hub: the eGPU may be loading or running.
+          if sys.platform.startswith("linux"):
+            try:
+              if self.device.is_kernel_driver_active(0):
+                self.device.detach_kernel_driver(0)
+                flog("[CLUSTER_USB] Detached Linux kernel driver.")
+            except usb.core.USBError as e:
+              if e.errno != 2:  # No kernel driver is bound.
+                raise
+          self.device.set_configuration()
+          usb.util.claim_interface(self.device, 0)
 
           # 이미지 업로드용 OUT 엔드포인트를 미리 찾아서 캐싱
           cfg = self.device.get_active_configuration()
           intf = usb.util.find_descriptor(cfg, bInterfaceNumber=0)
+          if intf is None:
+            raise usb.core.USBError("Turing USB interface 0 not found")
           self._ep_out = usb.util.find_descriptor(
             intf, custom_match=lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_OUT)
           self._ep_in = usb.util.find_descriptor(
             intf, custom_match=lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_IN)
-
           if self._ep_out is None or self._ep_in is None:
             raise RuntimeError("Turing USB endpoints were not found")
 
@@ -212,13 +218,17 @@ class TuringUsbDisplay:
 
     except usb.core.USBError as e:
       if e.errno == 110 or 'timed out' in str(e).lower():
+        self.consecutive_upload_failures += 1
         flog("[CLUSTER_USB_WARN] Write timeout (Errno 110). Clearing halt & skipping frame...")
         if getattr(self.config, "usb_clear_halt_on_timeout", True):
           try:
-            if self._ep_out and self.device:
-              self.device.clear_halt(self._ep_out)
+            for endpoint in (self._ep_out, self._ep_in):
+              if endpoint is not None and self.device is not None:
+                self.device.clear_halt(endpoint.bEndpointAddress)
           except Exception as clear_err:
             flog(f"[CLUSTER_USB_WARN] Failed clear_halt: {clear_err}")
+        if self.consecutive_upload_failures >= self.max_consecutive_upload_failures:
+          self._disconnect()
       else:
         err_msg = f"Critical USB Error: {e}"
         flog(f"[CLUSTER_USB_ERROR] {err_msg}")
