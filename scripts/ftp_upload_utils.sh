@@ -28,7 +28,7 @@ get_param() {
 }
 
 # Core FTP upload function
-# Usage: ftp_upload_file <LOCAL_FILE_PATH> <REMOTE_PATH_WITH_LEADING_SLASH>
+# Usage: ftp_upload_file <LOCAL_FILE_PATH> <REMOTE_PATH_WITH_LEADING_SLASH> [CURL_OPTIONS...]
 ftp_upload_file() {
   local local_path="$1"
   local remote_path="$2"
@@ -46,6 +46,7 @@ ftp_upload_file() {
           --retry 3 \
           -T "$local_path" \
           -u "${FTP_USER}:${FTP_PASS}" \
+          "${@:3}" \
           "$ftp_url"; then
     return 0
   else

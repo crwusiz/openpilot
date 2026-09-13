@@ -31,6 +31,11 @@ function agnos_init {
 }
 
 function launch {
+  # Prepare the shared log directory before starting any services.
+  if [ ! -d /data/log ]; then
+    mkdir -p /data/log || return 1
+  fi
+
   # Remove orphaned git lock if it exists on boot
   [ -f "$DIR/.git/index.lock" ] && rm -f "$DIR/.git/index.lock"
 

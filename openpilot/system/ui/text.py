@@ -78,7 +78,7 @@ class TextWindow(Widget):
     self.wifi_manager_ui = WifiManagerUI(self.wifi_manager)
 
     self._is_pulling = False
-    self._git_pull_exit_file = Path("/data/gitpull_exit_code.log")
+    self._git_pull_exit_flag = Path("/data/log/git_pull_exit_flag")
 
   @staticmethod
   def _on_reboot_clicked():
@@ -96,13 +96,13 @@ class TextWindow(Widget):
 
     self._is_pulling = True
     self._update_git_button_text("Pulling...")
-    self._git_pull_exit_file.unlink(missing_ok=True)
+    self._git_pull_exit_flag.unlink(missing_ok=True)
 
     def run_git_pull():
       try:
         subprocess.run(["/bin/sh", "/data/openpilot/scripts/gitpull.sh"], timeout=60)
 
-        if self._git_pull_exit_file.exists():
+        if self._git_pull_exit_flag.exists():
           self._update_git_button_text("Pull Done")
         else:
           self._update_git_button_text("Pull Failed")

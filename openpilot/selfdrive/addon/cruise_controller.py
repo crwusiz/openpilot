@@ -16,7 +16,7 @@ from openpilot.selfdrive.addon.navi_controller import SpeedLimiter
 ButtonType = structs.CarState.ButtonEvent.Type
 GearShifter = structs.CarState.GearShifter
 
-CRUISE_DEBUG_LOG = "/data/cruise_debug.log"
+CRUISE_DEBUG_LOG = "/data/log/cruise_debug.log"
 CRUISE_DEBUG_INTERVAL = 2.0
 
 NO_ACTIVE_LIMIT = 255.

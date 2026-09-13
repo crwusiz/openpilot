@@ -22,7 +22,7 @@ from openpilot.common.constants import UnitConverter
 
 terminate_flag = threading.Event()
 
-LOG_FILE = "/data/navi_debug.log"
+LOG_FILE = "/data/log/navi_debug.log"
 
 def _setup_logger():
   logger = logging.getLogger("navi")

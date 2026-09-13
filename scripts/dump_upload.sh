@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${SCRIPT_DIR}/ftp_upload_utils.sh"
 
-readonly LOG_BASE_DIR="/data"
+readonly LOG_BASE_DIR="/data/log"
 readonly DUMP_SCRIPT="/data/openpilot/tools/script/dump.py"
 
 generate_dump() {

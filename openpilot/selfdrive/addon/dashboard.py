@@ -606,15 +606,14 @@ def render_tab_toggles():
 
 def render_tab_logs():
   LOG_FILES = {
-    "CAN Missing": "/data/can_missing.log",
-    "CAN Timeout": "/data/can_timeout.log",
-    "Tmux Error": "/data/tmux_error.log",
+    "CAN Missing": "/data/log/can_missing.log",
+    "CAN Timeout": "/data/log/can_timeout.log",
+    "Tmux Error": "/data/log/tmux_error.log",
     "Tmux Console": "TMUX_CONSOLE",
-    "Navi Debug": "/data/navi_debug.log",
-    "Cruise Debug": "/data/cruise_debug.log",
-    "Traffic Debug": "/data/traffic_debug.log",
-    "Cluster Debug": "/data/cluster_debug.log",
-    "restart Debug": "/data/restart.log",
+    "Navi Debug": "/data/log/navi_debug.log",
+    "Cruise Debug": "/data/log/cruise_debug.log",
+    "Traffic Debug": "/data/log/traffic_debug.log",
+    "Cluster Debug": "/data/log/cluster_debug.log",
   }
   REALDATA_PATH = Path("/data/media/0/realdata")
 
@@ -677,9 +676,9 @@ def render_tab_logs():
 
           if log_path == "TMUX_CONSOLE":
             subprocess.run(["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"], capture_output=True)
-            with open("/data/tmux_console.log", "w") as f:
+            with open("/data/log/tmux_console.log", "w") as f:
                 subprocess.run(["tmux", "capture-pane", "-pe", "-t", "0", "-S", "-500"], stdout=f)
-            p = Path("/data/tmux_console.log")
+            p = Path("/data/log/tmux_console.log")
             if p.exists():
               content = p.read_text()
             else:
@@ -705,9 +704,9 @@ def render_tab_logs():
           log_path = LOG_FILES[sel_log.value]
           if log_path == "TMUX_CONSOLE":
             subprocess.run(["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"], capture_output=True)
-            with open("/data/tmux_console.log", "w") as f:
+            with open("/data/log/tmux_console.log", "w") as f:
                 subprocess.run(["tmux", "capture-pane", "-pe", "-t", "0", "-S", "-500"], stdout=f)
-            await run_script_async("Console Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=["/data/tmux_console.log"])
+            await run_script_async("Console Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=["/data/log/tmux_console.log"])
           else:
             await run_script_async("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[log_path])
 

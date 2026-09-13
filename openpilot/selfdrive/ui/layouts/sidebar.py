@@ -88,8 +88,8 @@ class Sidebar(Widget):
     self._last_progress_update = 0
 
     # File paths
-    self._git_pull_exit_file = Path("/data/gitpull_exit_code.log")
-    self._commit_check_exit_file = Path("/data/commit_check_exit_code.log")
+    self._git_pull_exit_flag = Path("/data/log/git_pull_exit_flag")
+    self._commit_check_exit_flag = Path("/data/log/commit_check_exit_flag")
 
     # Callbacks
     self._on_settings_click: Callable | None = None
@@ -123,13 +123,13 @@ class Sidebar(Widget):
 
   def _start_git_pull(self):
     self._is_processing = True
-    self._git_pull_exit_file.unlink(missing_ok=True)
+    self._git_pull_exit_flag.unlink(missing_ok=True)
 
     def run_git_pull():
       try:
         subprocess.run(["/bin/sh", "/data/openpilot/scripts/gitpull.sh"], timeout=60)
 
-        if self._git_pull_exit_file.exists():
+        if self._git_pull_exit_flag.exists():
           self._on_git_pull_finished()
         else:
           self._on_git_pull_failed(tr_noop("NO LOG FILE"))
@@ -143,8 +143,8 @@ class Sidebar(Widget):
 
   def _on_git_pull_finished(self):
     try:
-      self._git_pull_exit_file.read_text().strip()  # Ignore exit code (same as original logic)
-      self._git_pull_exit_file.unlink(missing_ok=True)
+      self._git_pull_exit_flag.read_text().strip()  # Ignore exit code (same as original logic)
+      self._git_pull_exit_flag.unlink(missing_ok=True)
 
       self._is_processing = False
       self._commit_status.update(tr_noop("UPDATE"), tr_noop("COMPLETE"), Colors.WHITE)
@@ -162,13 +162,13 @@ class Sidebar(Widget):
       return
 
     self._is_processing = True
-    self._commit_check_exit_file.unlink(missing_ok=True)
+    self._commit_check_exit_flag.unlink(missing_ok=True)
 
     def run_commit_check():
       try:
         subprocess.run(["/bin/sh", "/data/openpilot/scripts/commit_compare.sh"], timeout=15)
 
-        if self._commit_check_exit_file.exists():
+        if self._commit_check_exit_flag.exists():
           self._on_commit_check_finished()
         else:
           self._on_commit_check_failed(tr_noop("NO LOG FILE"))
@@ -182,8 +182,8 @@ class Sidebar(Widget):
 
   def _on_commit_check_finished(self):
     try:
-      exit_code_str = self._commit_check_exit_file.read_text().strip()
-      self._commit_check_exit_file.unlink(missing_ok=True)
+      exit_code_str = self._commit_check_exit_flag.read_text().strip()
+      self._commit_check_exit_flag.unlink(missing_ok=True)
 
       if int(exit_code_str) == 0:
         self._parse_commit_compare_result(self._params.get("CommitCompare"))

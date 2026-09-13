@@ -402,8 +402,8 @@ def auto_lane_change_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.Su
 
 
 def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
-  if os.path.isfile('/data/can_missing.log'):
-    with open('/data/can_missing.log', 'r') as f:
+  if os.path.isfile('/data/log/can_missing.log'):
+    with open('/data/log/can_missing.log', 'r') as f:
       f.readline()
       line = f.readline().strip()
       return Alert(
@@ -411,8 +411,8 @@ def can_error_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster
         "",
         AlertStatus.normal, AlertSize.small,
         Priority.LOW, VisualAlert.none, AudibleAlert.none, .2, creation_delay=1.)
-  elif os.path.isfile('/data/can_timeout.log'):
-    with open('/data/can_timeout.log', 'r') as f:
+  elif os.path.isfile('/data/log/can_timeout.log'):
+    with open('/data/log/can_timeout.log', 'r') as f:
       f.readline()
       line = f.readline().strip()
       return Alert(

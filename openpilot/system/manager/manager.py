@@ -9,6 +9,7 @@ import traceback
 from openpilot.cereal import log
 import openpilot.cereal.messaging as messaging
 from openpilot.common.utils import atomic_write
+from openpilot.common.log_paths import clear_log_files
 from openpilot.common.params import Params, ParamKeyFlag
 from openpilot.common.text_window import TextWindow
 from openpilot.common.hardware import HARDWARE
@@ -19,11 +20,11 @@ from openpilot.system.athena.registration import register, UNREGISTERED_DONGLE_I
 from openpilot.common.swaglog import cloudlog, add_file_handler
 from openpilot.common.version import get_build_metadata
 from openpilot.common.hardware.hw import Paths
-from openpilot.system.crash import CRASH_LOG_PATH, capture_exception
-
-import glob
+from openpilot.system.crash import UPLOAD_RETRY_INTERVAL, capture_exception, start_upload
 
 def manager_init() -> None:
+  # Clear all session log files and upload flags before starting services.
+  clear_log_files()
   save_bootlog()
 
   build_metadata = get_build_metadata()
@@ -87,14 +88,6 @@ def manager_init() -> None:
                        dirty=build_metadata.openpilot.is_dirty,
                        device=HARDWARE.get_device_type())
 
-  # log cleanup
-  log_files = glob.glob('/data/*.log')
-
-  for log_file in log_files:
-    # Keep the last crash available after a manager restart (including failed uploads).
-    if log_file != CRASH_LOG_PATH and os.path.isfile(log_file):
-      os.remove(log_file)
-
   # prebuilt
   prebuiltfile = '/data/openpilot/prebuilt'
   prebuilt_enable = params.get_bool("PrebuiltEnable")
@@ -144,8 +137,13 @@ def manager_thread() -> None:
   ignition_prev = False
 
   log_timer = 0
+  next_crash_upload = 0.0
   while True:
     sm.update(1000)
+
+    if time.monotonic() >= next_crash_upload:
+      start_upload()
+      next_crash_upload = time.monotonic() + UPLOAD_RETRY_INTERVAL
 
     started = sm['deviceState'].started
 

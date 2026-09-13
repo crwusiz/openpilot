@@ -5,11 +5,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${SCRIPT_DIR}/ftp_upload_utils.sh"
 
-readonly LOG_BASE_DIR="/data"
+readonly LOG_BASE_DIR="/data/log"
 
 upload_file() {
-  local file_name="$1"
-  local local_file_path="${LOG_BASE_DIR}/${file_name}"
+  local local_file_path="$1"
+  if [[ "$local_file_path" != /* ]]; then
+    local_file_path="${LOG_BASE_DIR}/$(basename "$local_file_path")"
+  fi
+  local file_name
+  file_name=$(basename "$local_file_path")
 
   if [ ! -f "$local_file_path" ]; then
     log "ERROR" "Log file not found: $local_file_path"
@@ -17,10 +21,6 @@ upload_file() {
   fi
 
   log "INFO" "Log file found: $local_file_path"
-
-  if ! check_network; then
-    return 1
-  fi
 
   local today car_name dongle_id
   today=$(date +%y-%m-%d-%H:%M)
@@ -33,7 +33,7 @@ upload_file() {
   log "INFO" "Starting upload to ${FTP_HOST}..."
   log "INFO" "Target: $target_filename"
 
-  if ftp_upload_file "$local_file_path" "$remote_path"; then
+  if ftp_upload_file "$local_file_path" "$remote_path" --max-time 30 --retry-max-time 60; then
     log "SUCCESS" "Upload completed successfully."
     return 0
   else
@@ -48,10 +48,7 @@ main() {
     exit 1
   fi
 
-  local log_filename
-  log_filename=$(basename "$1")
-
-  if upload_file "$log_filename"; then
+  if upload_file "$1"; then
     exit 0
   else
     exit 1

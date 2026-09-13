@@ -2,7 +2,7 @@ import threading
 import time
 
 
-LOG_FILE = "/data/cluster_debug.log"
+LOG_FILE = "/data/log/cluster_debug.log"
 
 _log_lock = threading.Lock()
 _log_handle = None

@@ -442,22 +442,22 @@ class CommunityLayout(Widget):
       button_item(
         title=lambda: tr("CAN missing Log"),
         button_text=lambda: tr("View"),
-        callback=lambda: self._view_log("/data/can_missing.log", "CAN Missing Log"),
+        callback=lambda: self._view_log("/data/log/can_missing.log", "CAN Missing Log"),
       ),
       button_item(
         title=lambda: tr("CAN timeout Log"),
         button_text=lambda: tr("View"),
-        callback=lambda: self._view_log("/data/can_timeout.log", "CAN Timeout Log"),
+        callback=lambda: self._view_log("/data/log/can_timeout.log", "CAN Timeout Log"),
       ),
       button_item(
         title=lambda: tr("Tmux log"),
         button_text=lambda: tr("View"),
-        callback=lambda: self._view_log("/data/tmux_error.log", "Tmux Error Log"),
+        callback=lambda: self._view_log("/data/log/tmux_error.log", "Tmux Error Log"),
       ),
       button_item(
         title=lambda: tr("Tmux log"),
         button_text=lambda: tr("Upload"),
-        callback=lambda: self._upload_log("/data/tmux_error.log", "tmux_error.log"),
+        callback=lambda: self._upload_log("/data/log/tmux_error.log", "tmux_error.log"),
       ),
       button_item(
         title=lambda: tr("Tmux Console"),
@@ -604,7 +604,7 @@ class CommunityLayout(Widget):
     def confirm_callback(result: DialogResult):
       if result == DialogResult.CONFIRM:
         execute_script("/data/openpilot/scripts/gitpull.sh")
-        if Path("/data/check_network.log").exists():
+        if Path("/data/log/check_network.log").exists():
           dlg = ConfirmDialog(tr("Please Check Network Connection"), tr("OK"))
           gui_app.push_widget(dlg)
 
@@ -706,7 +706,7 @@ class CommunityLayout(Widget):
 
   def _on_tmux_console_upload(self):
     try:
-      cmd = ["sh", "-c", "tmux capture-pane -p -t 0 -S -500 > /data/tmux_console.log"]
+      cmd = ["sh", "-c", "tmux capture-pane -p -t 0 -S -500 > /data/log/tmux_console.log"]
       result = subprocess.run(cmd, capture_output=True)
 
       if result.returncode == 0:

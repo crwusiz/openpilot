@@ -99,9 +99,8 @@ source "${SCRIPT_DIR}/common_utils.sh"
 # ==============================================================================
 readonly OPENPILOT_DIR="/data/openpilot"
 readonly PARAMS_DIR="/data/params/d"
-readonly LOG_FILE="/data/gitpull_exit_code.log"
+readonly FLAG="/data/log/git_pull_exit_flag"
 readonly RESTART_SCRIPT="${OPENPILOT_DIR}/scripts/restart.sh"
-readonly RESTART_LOG="/data/restart.log"
 
 # ==============================================================================
 # Utility Functions
@@ -323,21 +322,21 @@ compare_and_restart() {
 
     if [ -f "$RESTART_SCRIPT" ] && [ -r "$RESTART_SCRIPT" ]; then
       log "SUCCESS" "Preparing system restart..."
-      echo 0 > "$LOG_FILE"
-      if bash "$RESTART_SCRIPT" >"$RESTART_LOG" 2>&1; then
+      echo 0 > "$FLAG"
+      if bash "$RESTART_SCRIPT"; then
         exit 0
       fi
-      log "ERROR" "Restart preparation failed. Check: $RESTART_LOG"
-      echo 1 > "$LOG_FILE"
+      log "ERROR" "Restart preparation failed. See the console output above."
+      echo 1 > "$FLAG"
       exit 1
     else
       log "ERROR" "Restart script missing or unreadable: $RESTART_SCRIPT"
-      echo 1 > "$LOG_FILE"
+      echo 1 > "$FLAG"
       exit 1
     fi
   else
     log "ERROR" "Commit mismatch detected (Local: $local_hash vs Remote: $remote_hash)"
-    echo 1 > "$LOG_FILE"
+    echo 1 > "$FLAG"
     exit 1
   fi
 }
@@ -351,7 +350,7 @@ main() {
   setup_environment
 
   if ! check_network; then
-    touch "/data/check_network.log"
+    touch "/data/log/check_network.log"
     exit 1
   fi
 
@@ -359,7 +358,7 @@ main() {
   configure_git
 
   if ! update_repository; then
-    echo 1 > "$LOG_FILE"
+    echo 1 > "$FLAG"
     exit 1
   fi
 

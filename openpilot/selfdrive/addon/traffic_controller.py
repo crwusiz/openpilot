@@ -13,7 +13,7 @@ from openpilot.common.constants import UnitConverter
 from openpilot.common.filter_simple import StreamingMovingAverage
 
 
-TRAFFIC_DEBUG_LOG = "/data/traffic_debug.log"
+TRAFFIC_DEBUG_LOG = "/data/log/traffic_debug.log"
 TRAFFIC_DEBUG_LOG_INTERVAL_S = 0.5
 
 

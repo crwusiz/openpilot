@@ -198,8 +198,8 @@ class MiciHomeLayout(Widget):
     self._progress_dots = 0
     self._last_progress_update = 0
 
-    self._git_pull_exit_file = Path("/data/gitpull_exit_code.log")
-    self._commit_check_exit_file = Path("/data/commit_check_exit_code.log")
+    self._git_pull_exit_flag = Path("/data/log/git_pull_exit_flag")
+    self._commit_check_exit_flag = Path("/data/log/commit_check_exit_flag")
 
     self._commit_status = MetricData("UPDATE", "CHECK", Colors.WARNING)
     self._commit_btn_rect = rl.Rectangle(0, 0, 160, 64)
@@ -293,14 +293,14 @@ class MiciHomeLayout(Widget):
 
   def _start_git_pull(self):
     self._is_processing = True
-    self._git_pull_exit_file.unlink(missing_ok=True)
+    self._git_pull_exit_flag.unlink(missing_ok=True)
 
     def run_git_pull():
       try:
         subprocess.Popen(["/bin/sh", "/data/openpilot/scripts/gitpull.sh"])
         start_time = time.time()
         while time.time() - start_time < 60:
-          if self._git_pull_exit_file.exists():
+          if self._git_pull_exit_flag.exists():
             self._on_git_pull_finished()
             return
           time.sleep(1)
@@ -314,8 +314,8 @@ class MiciHomeLayout(Widget):
 
   def _on_git_pull_finished(self):
     try:
-      self._git_pull_exit_file.read_text().strip()
-      self._git_pull_exit_file.unlink(missing_ok=True)
+      self._git_pull_exit_flag.read_text().strip()
+      self._git_pull_exit_flag.unlink(missing_ok=True)
       self._is_processing = False
       self._commit_status.update("UPDATE", "COMPLETE", Colors.WHITE)
     except Exception as e:
@@ -332,14 +332,14 @@ class MiciHomeLayout(Widget):
       return
 
     self._is_processing = True
-    self._commit_check_exit_file.unlink(missing_ok=True)
+    self._commit_check_exit_flag.unlink(missing_ok=True)
 
     def run_commit_check():
       try:
         subprocess.Popen(["/bin/sh", "/data/openpilot/scripts/commit_compare.sh"])
         start_time = time.time()
         while time.time() - start_time < 15:
-          if self._commit_check_exit_file.exists():
+          if self._commit_check_exit_flag.exists():
             self._on_commit_check_finished()
             return
           time.sleep(1)
@@ -353,8 +353,8 @@ class MiciHomeLayout(Widget):
 
   def _on_commit_check_finished(self):
     try:
-      exit_code_str = self._commit_check_exit_file.read_text().strip()
-      self._commit_check_exit_file.unlink(missing_ok=True)
+      exit_code_str = self._commit_check_exit_flag.read_text().strip()
+      self._commit_check_exit_flag.unlink(missing_ok=True)
       exit_code = int(exit_code_str)
 
       if exit_code == 0:
