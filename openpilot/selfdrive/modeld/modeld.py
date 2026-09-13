@@ -5,10 +5,10 @@ from functools import cached_property
 import os
 os.environ['GMMU'] = '0' # for chestnut fast loading, noop for qcom
 from tinygrad.device import Device
-import usb1
 import struct
 import threading
 import time
+import usb1
 import numpy as np
 import openpilot.cereal.messaging as messaging
 from openpilot.cereal import log
@@ -37,7 +37,7 @@ from openpilot.selfdrive.modeld.helpers import chestnut_present, chestnut_compil
 
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
 
-LAT_SMOOTH_SECONDS = 0.1
+LAT_SMOOTH_SECONDS = 0.0
 LONG_SMOOTH_SECONDS = 0.3
 MIN_LAT_CONTROL_SPEED = 0.3
 BIG_MODEL_TIMEOUT = 60
@@ -74,53 +74,39 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
                                 shouldStop=bool(stop))
 
 
-class ChestnutState:
-  # only modeld can access chestnut
-  def __init__(self, pm: PubMaster | None, big: bool):
-    self.pm = pm
-    self.big = big
-    self.valid = True
-    self.sends = 0
-    self.metrics = {}
+class ChestnutReadyProbe:
+  # Check live power and enable the PCIe bridge before opening the AMD device.
+  def __init__(self):
+    self._context = None
     self._asm_usb = None
     self._pcie_power_requested = False
 
-  def _close_asm_usb(self) -> None:
-    if self._asm_usb is not None:
-      self._asm_usb.close()
+  def close(self) -> None:
+    try:
+      if self._asm_usb is not None:
+        self._asm_usb.close()
+    finally:
       self._asm_usb = None
       self._pcie_power_requested = False
-
-  def _open_asm_usb(self):
-    context = usb1.USBContext()
-    for vendor_id, product_id in CHESTNUT_USB_IDS:
-      if (handle := context.openByVendorIDAndProductID(vendor_id, product_id, skip_on_error=True)) is not None:
-        return handle
-    context.close()
-
-  def _read_ina(self) -> tuple[int, int, bool]:
-    if "AMD" in Device._opened_devices and self._asm_usb is None:
-      try:
-        raw = Device["AMD"].iface.pci_dev.usb.usb.control_read(0xC0, 5)
-        return struct.unpack('<Hh?', bytes(raw))
-      except Exception:
-        pass
-    if self._asm_usb is None:
-      self._asm_usb = self._open_asm_usb()
-    if self._asm_usb is None:
-      raise usb1.USBErrorNoDevice
-    try:
-      raw = self._asm_usb.controlRead(0xC0, 0xC0, 0, 0, 5, timeout=100)
-    except usb1.USBError:
-      self._close_asm_usb()
-      raise
-    return struct.unpack('<Hh?', bytes(raw))
+      if self._context is not None:
+        self._context.close()
+        self._context = None
 
   def probe_ready(self) -> bool:
-    """Power on the PCIe bridge and check that Chestnut is ready for AMD initialization."""
     try:
-      supply_voltage, _, supply_fault = self._read_ina()
-      if supply_voltage < 5000 or supply_fault or self._asm_usb is None:
+      if self._context is None:
+        self._context = usb1.USBContext()
+      if self._asm_usb is None:
+        for vendor_id, product_id in CHESTNUT_USB_IDS:
+          self._asm_usb = self._context.openByVendorIDAndProductID(vendor_id, product_id, skip_on_error=True)
+          if self._asm_usb is not None:
+            break
+      if self._asm_usb is None:
+        return False
+
+      raw = self._asm_usb.controlRead(0xC0, 0xC0, 0, 0, 5, timeout=100)
+      supply_voltage, _, supply_fault = struct.unpack('<Hh?', bytes(raw))
+      if supply_voltage < 5000 or supply_fault:
         self._pcie_power_requested = False
         return False
 
@@ -129,8 +115,18 @@ class ChestnutState:
         self._pcie_power_requested = True
       return self._asm_usb.controlRead(0xC0, 0xE4, 0xB450, 0, 1, timeout=1000)[0] == 0x78
     except Exception:
-      self._close_asm_usb()
+      self.close()
       return False
+
+
+class ChestnutGpuState:
+  # GPU metrics require modeld's GPU context
+  def __init__(self, pm: PubMaster, big: bool):
+    self.pm = pm
+    self.big = big
+    self.valid = True
+    self.sends = 0
+    self.metrics = {}
 
   @cached_property
   def power_limit(self) -> int:
@@ -138,9 +134,8 @@ class ChestnutState:
     return smu._send_msg(smu.smu_mod.PPSMC_MSG_GetPptLimit, 0, read_back_arg=True, timeout=100)
 
   def send(self) -> None:
-    assert self.pm is not None
-    msg = messaging.new_message('chestnutState')
-    state = msg.chestnutState
+    msg = messaging.new_message('chestnutGpuState')
+    state = msg.chestnutGpuState
     self.sends += 1
     if self.big and "AMD" in Device._opened_devices and self.sends % 100 == 1:
       try:
@@ -166,21 +161,8 @@ class ChestnutState:
       for k, v in self.metrics.items():
         setattr(state, k, v)
 
-    asm_valid = False
-    try:
-      # ASM runs on USB-C power, these still read without a gpu
-      state.supplyVoltage, state.supplyCurrent, state.supplyFault = self._read_ina()
-      asm_valid = True
-    except Exception:
-      pass
-    if "AMD" in Device._opened_devices:
-      try:
-        state.pcieLtssm = Device["AMD"].iface.pci_dev.usb.read(0xB450, 1)[0]
-      except Exception:
-        pass
-
-    msg.valid = asm_valid and (not self.big or self.valid)
-    self.pm.send('chestnutState', msg)
+    msg.valid = not self.big or (self.valid and bool(self.metrics))
+    self.pm.send('chestnutGpuState', msg)
 
 
 class FrameMeta:
@@ -264,8 +246,8 @@ def main(demo=False):
   if chestnut_available:
     # The USB bridge is powered by USB-C, while the GPU's 12 V supply is
     # switched with ACC. Poll the live hardware instead of relying on a stale
-    # chestnutState message left by the previous modeld process.
-    probe = ChestnutState(None, False)
+    # chestnutState telemetry that may predate this modeld process.
+    probe = ChestnutReadyProbe()
     ready_since = None
     deadline = time.monotonic() + CHESTNUT_READY_TIMEOUT
     cloudlog.warning(f"waiting up to {CHESTNUT_READY_TIMEOUT:.0f}s for Chestnut power and PCIe link")
@@ -280,7 +262,7 @@ def main(demo=False):
         if not CHESTNUT:
           time.sleep(CHESTNUT_READY_POLL_INTERVAL)
     finally:
-      probe._close_asm_usb()
+      probe.close()
     if CHESTNUT:
       cloudlog.warning("Chestnut power and PCIe link are stable")
     else:
@@ -345,13 +327,13 @@ def main(demo=False):
   cloudlog.warning(f"models loaded in {time.monotonic() - st:.1f}s, modeld starting")
 
   # messaging
-  pub_socks = ["modelV2", "drivingModelData", "cameraOdometry"] + (["chestnutState"] if CHESTNUT else [])
+  pub_socks = ["modelV2", "drivingModelData", "cameraOdometry"] + (["chestnutGpuState"] if CHESTNUT else [])
   pm = PubMaster(pub_socks)
   sm = SubMaster(["deviceState", "carState", "narrowRoadCameraState", "extrinsicsCalibration", "driverMonitoringState", "carControl", "lateralDelay"])
 
   publish_state = PublishState()
   params = Params()
-  chestnut_state = ChestnutState(pm, model.chestnut) if CHESTNUT else None
+  chestnut_state = ChestnutGpuState(pm, model.chestnut) if CHESTNUT else None
 
   # setup filter to track dropped frames
   frame_dropped_filter = FirstOrderFilter(0., 10., 1. / ModelConstants.MODEL_RUN_FREQ)
@@ -460,7 +442,7 @@ def main(demo=False):
     mt1 = time.perf_counter()
     try:
       send_chestnut = (chestnut_state is not None and
-                       run_count % round(ModelConstants.MODEL_RUN_FREQ / SERVICE_LIST['chestnutState'].frequency) == 0)
+                       run_count % round(ModelConstants.MODEL_RUN_FREQ / SERVICE_LIST['chestnutGpuState'].frequency) == 0)
       model_output = model.run(bufs, transforms, inputs, chestnut_state.send if send_chestnut else None)
     except Exception:
       if not params.get_bool("ChestnutActive"):
