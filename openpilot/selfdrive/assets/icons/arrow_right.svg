@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48">
+  <defs>
+    <marker id="a" markerHeight="3.5" markerUnits="userSpaceOnUse" markerWidth="3.5" orient="auto-start-reverse" preserveAspectRatio="xMidYMid" refX="0" refY="0" style="overflow:visible" viewBox="0 0 1 1">
+      <path d="M3-3 0 0l3 3" style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:butt" transform="rotate(180 .125 0)"/>
+    </marker>
+  </defs>
+  <path d="M8.727 24h27.196" style="fill:none;stroke:#000;stroke-width:3.5;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#a)"/>
+</svg>

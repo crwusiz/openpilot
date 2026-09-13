@@ -1,0 +1,3 @@
+[lfs]
+	url = https://lfs.jmtechn.com/crwusiz/openpilot-lfs.git/info/lfs
+	locksverify = false

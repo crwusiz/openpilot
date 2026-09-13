@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+from PIL import Image
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+SOURCE_IMAGE = SCRIPT_DIR / "bootimage.png"
+VENDOR_DIR = SCRIPT_DIR / ".vendor" / "turing-smart-screen-python-main"
+REMOTE_IMAGE = "/tmp/sdcard/mmcblk0p1/img/bootimage.png"
+
+
+def load_turzx_driver():
+  if not VENDOR_DIR.is_dir():
+    raise FileNotFoundError(f"TURZX driver directory not found: {VENDOR_DIR}")
+
+  sys.path.insert(0, str(VENDOR_DIR))
+  from library.lcd import lcd_comm_turing_usb
+  return lcd_comm_turing_usb
+
+
+def build_centered_boot_image(source_path, output_path, portrait_size):
+  portrait_width, portrait_height = portrait_size
+  landscape_size = (portrait_height, portrait_width)
+
+  with Image.open(source_path) as source:
+    source = source.convert("RGBA")
+    source.thumbnail(landscape_size, Image.Resampling.LANCZOS)
+
+    canvas = Image.new("RGBA", landscape_size, (0, 0, 0, 255))
+    position = (
+      (landscape_size[0] - source.width) // 2,
+      (landscape_size[1] - source.height) // 2,
+    )
+    canvas.alpha_composite(source, position)
+
+  # TURZX USB panels accept portrait image data even when mounted landscape.
+  portrait_image = canvas.transpose(Image.Transpose.ROTATE_270)
+  portrait_image.save(output_path, format="PNG", optimize=True)
+
+
+def require_ok(driver, response, operation):
+  if not driver._resp_ok(response):
+    raise RuntimeError(f"TURZX did not acknowledge: {operation}")
+
+
+def change_boot_image():
+  if not SOURCE_IMAGE.is_file():
+    raise FileNotFoundError(f"Boot image not found: {SOURCE_IMAGE}")
+
+  driver = load_turzx_driver()
+  device = None
+
+  try:
+    device, product_id = driver.find_usb_device()
+    portrait_size = driver.PRODUCT_ID.get(product_id)
+    if portrait_size is None:
+      raise RuntimeError(f"Unsupported TURZX product ID: 0x{product_id:04x}")
+
+    print(f"Connected to TURZX PID 0x{product_id:04x} ({portrait_size[1]}x{portrait_size[0]} landscape)")
+    require_ok(driver, driver.send_sync_command(device), "sync")
+    time.sleep(0.2)
+
+    with tempfile.TemporaryDirectory(prefix="turzx_boot_") as temp_dir:
+      prepared_path = Path(temp_dir) / SOURCE_IMAGE.name
+      build_centered_boot_image(SOURCE_IMAGE, prepared_path, portrait_size)
+
+      if not driver.upload_file(device, str(prepared_path)):
+        raise RuntimeError("Failed to upload bootimage.png to TURZX storage")
+
+    time.sleep(0.2)
+    require_ok(driver, driver._play3_command(device, REMOTE_IMAGE), "select boot image")
+    time.sleep(0.2)
+
+    response = driver.send_save_settings_command(
+      device,
+      brightness=102,
+      startup=1,
+      reserved=0,
+      sleep=0,
+      offline=1,
+    )
+    require_ok(driver, response, "save startup settings")
+    time.sleep(0.2)
+
+    print("Boot image saved. Restarting TURZX display...")
+    driver.send_restart_device_command(device)
+    print("Done. The centered bootimage.png will be shown when the TURZX display powers on.")
+  finally:
+    if device is not None:
+      try:
+        driver.usb.util.dispose_resources(device)
+      except Exception:
+        pass
+
+
+def main():
+  try:
+    change_boot_image()
+  except Exception as error:
+    print(f"Failed to change TURZX boot image: {error}", file=sys.stderr)
+    return 1
+  return 0
+
+
+if __name__ == "__main__":
+  raise SystemExit(main())

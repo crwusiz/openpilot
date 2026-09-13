@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48">
+  <defs>
+    <marker id="b" markerHeight=".5" markerUnits="userSpaceOnUse" markerWidth=".5" orient="auto" preserveAspectRatio="xMidYMid" refX="0" refY="0" style="overflow:visible" viewBox="0 0 1 1">
+      <path d="M-5-5V5H5V-5Z" style="fill:context-stroke;fill-rule:evenodd;stroke:none" transform="scale(.5)"/>
+    </marker>
+    <marker id="a" markerHeight=".5" markerUnits="userSpaceOnUse" markerWidth=".5" orient="auto" preserveAspectRatio="xMidYMid" refX="0" refY="0" style="overflow:visible" viewBox="0 0 1 1">
+      <path d="M-5-5V5H5V-5Z" style="fill:context-stroke;fill-rule:evenodd;stroke:none" transform="scale(.5)"/>
+    </marker>
+  </defs>
+  <path d="M29.263 30.359v-7.305h6.882L24.071 10.858 11.876 23.054h7.003v7.305z" style="fill:none;stroke:#000;stroke-width:2.5;stroke-dasharray:none;stroke-opacity:1;marker-start:url(#a)"/>
+  <path d="M18.879 37.664h10.384" style="fill:none;stroke:#000;stroke-width:2.5;stroke-dasharray:none;stroke-opacity:1;marker-start:url(#a);marker-end:url(#b)"/>
+</svg>
