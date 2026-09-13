@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 import asyncio
+import codecs
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime
 import errno
 import html as html_lib
@@ -22,13 +25,27 @@ except ImportError:
   def set_core_affinity(cores): pass
 
 from ansi2html import Ansi2HTMLConverter
-from nicegui import app, ui
+from nicegui import ui
 
 # ── 환경 설정 및 유틸리티 ───────────────────────────────────────
 SCRIPTS_PATH = "/data/openpilot/scripts"
 BASE_PATH = "/data/params/crwusiz"
 DASHBOARD_HOST = "0.0.0.0"
 DASHBOARD_PORT = 7000
+MAX_COMMAND_OUTPUT = 100_000
+LOG_DIR = Path('/data/log')
+TMUX_LOG_PATH = LOG_DIR / 'tmux_console.log'
+REALDATA_PATH = Path('/data/media/0/realdata')
+LOG_FILES = {
+  "CAN Missing": LOG_DIR / 'can_missing.log',
+  "CAN Timeout": LOG_DIR / 'can_timeout.log',
+  "Tmux Error": LOG_DIR / 'tmux_error.log',
+  "Tmux Console": TMUX_LOG_PATH,
+  "Navi Debug": LOG_DIR / 'navi_debug.log',
+  "Cruise Debug": LOG_DIR / 'cruise_debug.log',
+  "Traffic Debug": LOG_DIR / 'traffic_debug.log',
+  "Cluster Debug": LOG_DIR / 'cluster_debug.log',
+}
 
 def _dashboard_port_available() -> bool:
   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -97,148 +114,126 @@ except ImportError:
     def remove(self, k): self.data.pop(k, None)
   params = MockParams()
 
-def get_list_from_file(path: str) -> list:
-  if Path(path).exists():
-    with open(path, 'r', encoding='utf-8') as f:
-      return [line.strip() for line in f if line.strip()]
-  return []
+def get_list_from_file(path: str) -> list[str]:
+  try:
+    return [line.strip() for line in Path(path).read_text(encoding='utf-8').splitlines() if line.strip()]
+  except FileNotFoundError:
+    return []
 
-def _prepare_script_execution(path: str):
-    if path.endswith('.sh'):
-        subprocess.run(['sed', '-i', 's/\\r$//', path], stderr=subprocess.DEVNULL)
-        if os.path.exists(path): os.chmod(path, 0o755)
 
-    if "gitpull" in path or "restart" in path:
-        restart_script = f"{SCRIPTS_PATH}/restart.sh"
-        subprocess.run(['sed', '-i', 's/\\r$//', restart_script], stderr=subprocess.DEVNULL)
-        if os.path.exists(restart_script): os.chmod(restart_script, 0o755)
-        subprocess.run(['tmux', 'kill-session', '-t', 'tmp'], stderr=subprocess.DEVNULL)
+def get_param_text(key: str, default: str = "") -> str:
+  value = params.get(key)
+  if isinstance(value, bytes):
+    value = value.decode('utf-8', errors='replace')
+  return str(value) if value else default
 
-def _get_error_summary(stderr: str) -> str:
-  """Return the actual error line, excluding curl's progress meter when possible."""
-  lines = [line.strip() for line in stderr.replace('\r', '\n').splitlines() if line.strip()]
-  if not lines:
-    return "Unknown error"
 
-  # curl writes its progress meter and errors to stderr. Prefer the final
-  # ``curl: (N) ...`` line so the notification does not show the meter header.
-  curl_errors = [line for line in lines if line.lower().startswith('curl:')]
-  error_text = curl_errors[-1] if curl_errors else lines[-1]
-  return error_text[:300]
+def _script_command(path: str, args: list[str] | None = None) -> list[str]:
+  interpreter = "bash" if Path(path).suffix == '.sh' else sys.executable
+  return [interpreter, path, *(args or [])]
 
-async def run_script_async(name: str, path: str, args: list = None, show_modal: bool = False) -> int:
-  _prepare_script_execution(path)
 
-  if show_modal:
-    with ui.dialog().classes('backdrop-blur-sm') as dialog, ui.card().classes('w-[95vw] max-w-4xl bg-[#0D1117] border border-[#3A4A6B] p-0 shadow-2xl'):
-      with ui.row().classes('w-full px-4 py-3 border-b border-[#3A4A6B] bg-[#1A2235] justify-between items-center'):
-        with ui.row().classes('items-center gap-2'):
-          ui.html('<div style="font-size: 1.2em;">🖥️</div>')
-          ui.label(f'실행 중: {name}').classes('text-white font-bold text-[1.1rem]')
-        close_btn = ui.button(icon='close', on_click=dialog.close).props('flat round dense color=white').classes('hidden')
+def _subprocess_env() -> dict[str, str]:
+  env = os.environ.copy()
+  env.pop('TMUX', None)
+  env.pop('TMUX_PANE', None)
+  return env
 
-      conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
-      accumulated_text = f"🚀 [{datetime.now().strftime('%H:%M:%S')}] {name} 작업을 시작합니다...\n\n"
 
-      log_container = ui.html(f'<div class="log-viewer" id="modalLogViewer" style="border:none; box-shadow:none; height:60vh;">{conv.convert(accumulated_text, full=False)}</div>').classes('w-full bg-[#0D1117]')
-
-      dialog.open()
-      await asyncio.sleep(0.1)
-
+async def _run_command(command: list[str], on_output: Callable[[str], None] | None = None) -> tuple[int, str]:
+  """Read both output streams without blocking the UI or sharing temporary files."""
+  process = await asyncio.create_subprocess_exec(
+    *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+    start_new_session=True, env=_subprocess_env(),
+  )
+  output = ""
+  decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')
+  try:
+    while chunk := await process.stdout.read(4096):
+      output = (output + decoder.decode(chunk))[-MAX_COMMAND_OUTPUT:]
+      if on_output is not None:
+        on_output(output)
+    output = (output + decoder.decode(b'', final=True))[-MAX_COMMAND_OUTPUT:]
+    return await process.wait(), output
+  finally:
+    if process.returncode is None:
       try:
-        cmd = ["bash", path] if path.endswith('.sh') else ["python3", path]
-        if args: cmd += args
-
-        env = os.environ.copy()
-        env.pop('TMUX', None)
-        env.pop('TMUX_PANE', None)
-
-        process = await asyncio.create_subprocess_exec(
-          *cmd,
-          stdout=asyncio.subprocess.PIPE,
-          stderr=asyncio.subprocess.STDOUT,
-          start_new_session=True,
-          env=env
-        )
-
-        while True:
-          line = await process.stdout.readline()
-          if not line:
-            break
-
-          text = line.decode('utf-8', errors='replace')
-          accumulated_text += text
-          log_container.content = f'<div class="log-viewer" id="modalLogViewer" style="border:none; box-shadow:none; height:60vh;">{conv.convert(accumulated_text, full=False)}</div>'
-          ui.run_javascript('var v=document.getElementById("modalLogViewer");if(v)v.scrollTop=v.scrollHeight;')
-          await asyncio.sleep(0.01)
-
+        process.terminate()
+      except ProcessLookupError:
+        pass
+      try:
+        await asyncio.wait_for(process.wait(), timeout=3)
+      except TimeoutError:
+        try:
+          process.kill()
+        except ProcessLookupError:
+          pass
         await process.wait()
 
-        if process.returncode == 0:
-          accumulated_text += f"\n✅ [{datetime.now().strftime('%H:%M:%S')}] 성공적으로 완료되었습니다.\n"
 
-          if "gitpull" in path:
-            accumulated_text += "\n🔄 3초 후 시스템을 자동으로 재부팅합니다..."
-            log_container.content = f'<div class="log-viewer" id="modalLogViewer" style="border:none; box-shadow:none; height:60vh;">{conv.convert(accumulated_text, full=False)}</div>'
-            ui.run_javascript('var v=document.getElementById("modalLogViewer");if(v)v.scrollTop=v.scrollHeight;')
-            await asyncio.sleep(3)
-            subprocess.Popen(["sudo", "reboot"], start_new_session=True)
-            return 0
+def _get_error_summary(output: str) -> str:
+  """Prefer curl's actual error over its progress meter."""
+  lines = [line.strip() for line in output.replace('\r', '\n').splitlines() if line.strip()]
+  if not lines:
+    return "Unknown error"
+  curl_errors = [line for line in lines if line.lower().startswith('curl:')]
+  return (curl_errors[-1] if curl_errors else lines[-1])[:300]
 
-        else:
-          accumulated_text += f"\n❌ [{datetime.now().strftime('%H:%M:%S')}] 오류가 발생하여 중단되었습니다. (Exit Code: {process.returncode})\n"
 
-        log_container.content = f'<div class="log-viewer" id="modalLogViewer" style="border:none; box-shadow:none; height:60vh;">{conv.convert(accumulated_text, full=False)}</div>'
-        ui.run_javascript('var v=document.getElementById("modalLogViewer");if(v)v.scrollTop=v.scrollHeight;')
-        return_code = process.returncode
-
-      except Exception as e:
-        accumulated_text += f"\n❌ 실행 실패: {e}\n"
-        log_container.content = f'<div class="log-viewer" id="modalLogViewer" style="border:none; box-shadow:none; height:60vh;">{conv.convert(accumulated_text, full=False)}</div>'
-        return_code = 1
-      finally:
-        close_btn.classes(remove='hidden')
-        accumulated_text += "\n[ 확인을 마쳤으면 우측 상단의 'X' 버튼을 누르거나 창 바깥을 클릭하여 닫아주세요. ]"
-        log_container.content = f'<div class="log-viewer" id="modalLogViewer" style="border:none; box-shadow:none; height:60vh;">{conv.convert(accumulated_text, full=False)}</div>'
-        ui.run_javascript('var v=document.getElementById("modalLogViewer");if(v)v.scrollTop=v.scrollHeight;')
-
+async def run_script_async(name: str, path: str, args: list[str] | None = None, show_modal: bool = False) -> int:
+  command = _script_command(path, args)
+  if not show_modal:
+    ui.notify(f"[{name}] 진행 중...", type='info', position='top')
+    try:
+      return_code, output = await _run_command(command)
+      if return_code == 0:
+        ui.notify(f"[{name}] 완료", type='positive', position='top')
+      else:
+        ui.notify(f"[{name}] 에러: {_get_error_summary(output)}", type='negative', position='top')
       return return_code
+    except Exception as e:
+      ui.notify(f"[{name}] 실행 실패: {e}", type='negative', position='top')
+      return 1
 
-  ui.notify(f"[{name}] 진행 중...", type='info', position='top')
-  await asyncio.sleep(0.1)
+  with ui.dialog().classes('backdrop-blur-sm') as dialog, ui.card().classes(
+    'w-[95vw] max-w-4xl bg-[#0D1117] border border-[#3A4A6B] p-0 shadow-2xl'
+  ):
+    with ui.row().classes('w-full px-4 py-3 border-b border-[#3A4A6B] bg-[#1A2235] justify-between items-center'):
+      ui.label(f'실행 중: {name}').classes('text-white font-bold text-[1.1rem]')
+      close_btn = ui.button(icon='close', on_click=dialog.close).props('flat round dense color=white').classes('hidden')
+    log_container = ui.html().classes('w-full bg-[#0D1117]')
+
+  converter = Ansi2HTMLConverter(inline=True, dark_bg=True)
+  viewer_id = f'modalLogViewer-{dialog.id}'
+  header = f"🚀 [{datetime.now().strftime('%H:%M:%S')}] {name} 작업을 시작합니다...\n\n"
+
+  def render_output(text: str):
+    nonlocal output
+    output = text
+    log_container.content = (
+      f'<div class="log-viewer" id="{viewer_id}" style="border:none; box-shadow:none; height:60vh;">'
+      + f'{converter.convert(header + output, full=False)}</div>'
+    )
+    ui.run_javascript(f'var v=document.getElementById("{viewer_id}");if(v)v.scrollTop=v.scrollHeight;')
+
+  output = ""
+  render_output(output)
+  dialog.open()
   try:
-    cmd = ["bash", path] if path.endswith('.sh') else ["python3", path]
-    if args: cmd += args
-
-    env = os.environ.copy()
-    env.pop('TMUX', None)
-    env.pop('TMUX_PANE', None)
-
-    out_path = f"/tmp/{name.replace(' ', '_')}_out.log"
-    err_path = f"/tmp/{name.replace(' ', '_')}_err.log"
-
-    with open(out_path, 'w') as out_f, open(err_path, 'w') as err_f:
-      process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=out_f,
-        stderr=err_f,
-        start_new_session=True,
-        env=env
-      )
-      await process.wait()
-
-    with open(err_path, 'r') as err_f:
-      stderr = err_f.read().strip()
-
-    if process.returncode == 0:
-      ui.notify(f"[{name}] 완료", type='positive', position='top')
+    return_code, output = await _run_command(command, render_output)
+    if return_code == 0:
+      # gitpull.sh starts the update in tmux and owns the restart sequence.
+      message = "tmux에서 업데이트를 시작했습니다." if Path(path).name == "gitpull.sh" else "성공적으로 완료되었습니다."
+      output += f"\n✅ [{datetime.now().strftime('%H:%M:%S')}] {message}\n"
     else:
-      err_text = _get_error_summary(stderr)
-      ui.notify(f"[{name}] 에러: {err_text}", type='negative', position='top')
-    return process.returncode
+      output += f"\n❌ 오류가 발생하여 중단되었습니다. (Exit Code: {return_code})\n"
+    return return_code
   except Exception as e:
-    ui.notify(f"[{name}] 실행 실패: {e}", type='negative', position='top')
+    output += f"\n❌ 실행 실패: {e}\n"
     return 1
+  finally:
+    close_btn.classes(remove='hidden')
+    render_output(output + "\n[ 우측 상단의 'X' 버튼을 누르거나 창 바깥을 클릭하여 닫아주세요. ]")
 
 def reset_calibration():
   for p in ["CalibrationParams", "LiveTorqueParameters", "LiveParametersV2", "LiveDelay"]:
@@ -246,14 +241,51 @@ def reset_calibration():
   params.put_bool("OnroadCycleRequested", True)
   ui.notify("캘리브레이션 초기화 요청 완료!", type='positive', position='top')
 
-def get_tmux_capture() -> str:
-  try:
-    subprocess.run(["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"], capture_output=True)
+async def get_tmux_capture(lines: int = 100) -> str:
+  resize = ["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"]
+  capture = ["tmux", "capture-pane", "-pe", "-t", "0", "-S", f"-{lines}"]
+  for command in (resize, capture):
+    return_code, output = await asyncio.wait_for(_run_command(command), timeout=5)
+    if return_code:
+      raise RuntimeError(_get_error_summary(output))
+  return output
 
-    res = subprocess.run(["tmux", "capture-pane", "-pe", "-t", "0", "-S", "-100"], capture_output=True, text=True)
-    return res.stdout if res.returncode == 0 else "Tmux Session not found (Wait for openpilot to start...)"
-  except Exception as e:
-    return f"Error capturing tmux: {e}"
+
+async def save_tmux_log() -> Path:
+  content = await get_tmux_capture(lines=500)
+  await asyncio.to_thread(TMUX_LOG_PATH.write_text, content, encoding='utf-8')
+  return TMUX_LOG_PATH
+
+
+@dataclass
+class Route:
+  name: str
+  paths: list[Path] = field(default_factory=list)
+  modified: float = 0.0
+
+
+def get_routes(root: Path) -> list[Route]:
+  routes: dict[str, Route] = {}
+  try:
+    entries = list(root.iterdir())
+  except FileNotFoundError:
+    return []
+  for entry in entries:
+    route_name, _, segment = entry.name.rpartition('--')
+    if '--' not in route_name or not segment.isdecimal():
+      continue
+    try:
+      if not entry.is_dir():
+        continue
+      modified = entry.stat().st_mtime
+    except FileNotFoundError:
+      continue  # loggerd/deleter may remove a segment while the page is loading.
+    route = routes.setdefault(route_name, Route(route_name))
+    route.paths.append(entry)
+    route.modified = max(route.modified, modified)
+  for route in routes.values():
+    route.paths.sort(key=lambda path: int(path.name.rsplit('--', 1)[1]))
+  return sorted(routes.values(), key=lambda route: route.modified, reverse=True)
 
 
 # ── 전역 CSS 스타일 정의 (모바일 텍스트 랩핑/비율 최적화) ───────
@@ -295,7 +327,8 @@ def apply_styles():
         content: '' !important; position: absolute !important; left: 5px !important; top: 50% !important; transform: translateY(-50%) !important;
         width: 46px !important; height: 46px !important; background: rgba(255,255,255,0.18) !important; border-radius: 50% !important;
         border: 2px solid rgba(255,255,255,0.35) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important;
-        font-size: 1.4em !important; line-height: 42px !important; text-align: center !important; display: block !important; pointer-events: none !important; z-index: 2 !important;
+        font-size: 1.4em !important; line-height: 42px !important; text-align: center !important;
+        display: block !important; pointer-events: none !important; z-index: 2 !important;
     }
     button.custom-btn .q-focus-helper { display: none !important; }
 
@@ -309,7 +342,10 @@ def apply_styles():
     button.btn-yellow::before { content: '✦' !important; }
     button.btn-red { background: linear-gradient(90deg, #7F1D1D 0%, #EF4444 100%) !important; box-shadow: 0 5px 22px rgba(239,68,68,0.5) !important;}
     button.btn-red::before { content: '⏻' !important; }
-    button.btn-green, button.btn-green-route, button.btn-green-start { background: linear-gradient(90deg, #065F46 0%, #10B981 100%) !important; box-shadow: 0 5px 22px rgba(16,185,129,0.45) !important;}
+    button.btn-green, button.btn-green-route, button.btn-green-start {
+        background: linear-gradient(90deg, #065F46 0%, #10B981 100%) !important;
+        box-shadow: 0 5px 22px rgba(16,185,129,0.45) !important;
+    }
     button.btn-green::before { content: '⬆' !important; }
     button.btn-green-route::before { content: '🚀' !important; }
     button.btn-green-start::before { content: '▶' !important; }
@@ -389,7 +425,9 @@ def apply_styles():
         color: white; font-size: 11px; font-weight: 800; font-family: sans-serif; pointer-events: none; line-height: 1;
     }
     .custom-toggle[aria-checked="true"] .q-toggle__inner, .custom-toggle:has(input:checked) .q-toggle__inner { background: #10B981 !important; }
-    .custom-toggle[aria-checked="true"] .q-toggle__inner::before, .custom-toggle:has(input:checked) .q-toggle__inner::before { content: 'ON'; left: 10px; right: auto; }
+    .custom-toggle[aria-checked="true"] .q-toggle__inner::before, .custom-toggle:has(input:checked) .q-toggle__inner::before {
+        content: 'ON'; left: 10px; right: auto;
+    }
     .custom-toggle[aria-checked="true"] .q-toggle__thumb, .custom-toggle:has(input:checked) .q-toggle__thumb { left: 42px !important; }
 
     /* ── 로그 뷰어 ── */
@@ -444,11 +482,18 @@ def apply_styles():
     /* ── 모바일 환경 강제 최적화 미디어 쿼리 ── */
     @media (max-width: 768px) {
         button.custom-btn { padding: 6px 8px 6px 44px !important; min-height: 48px !important; }
-        button.custom-btn .q-btn__content { font-size: 0.8rem !important; white-space: normal !important; overflow: visible !important; line-height: 1.15 !important; text-overflow: clip !important;}
-        button.custom-btn::before { width: 34px !important; height: 34px !important; font-size: 1.1em !important; line-height: 30px !important; left: 4px !important; }
+        button.custom-btn .q-btn__content {
+            font-size: 0.8rem !important; white-space: normal !important; overflow: visible !important;
+            line-height: 1.15 !important; text-overflow: clip !important;
+        }
+        button.custom-btn::before {
+            width: 34px !important; height: 34px !important; font-size: 1.1em !important; line-height: 30px !important; left: 4px !important;
+        }
 
         .pill-card { min-height: 48px !important; padding-right: 12px !important; }
-        .pill-card-icon { min-width: 34px !important; height: 34px !important; font-size: 1.1em !important; margin-left: 4px !important; margin-right: 8px !important;}
+        .pill-card-icon {
+            min-width: 34px !important; height: 34px !important; font-size: 1.1em !important; margin-left: 4px !important; margin-right: 8px !important;
+        }
         .pill-card-text { font-size: 0.65rem !important; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
         .pill-card-value { font-size: 0.85rem !important; white-space: normal !important; overflow: visible !important; text-overflow: clip !important;}
 
@@ -463,6 +508,13 @@ def apply_styles():
   """)
 
 # ── 탭별 렌더링 함수들 ─────────────────────────────────────
+
+def render_status_card(title: str, value: str, icon: str, card_class: str):
+  ui.html(
+    f'<div class="pill-card {card_class}"><div class="pill-card-icon">{icon}</div>'
+    + f'<div class="pill-card-text">{title}<div class="pill-card-value">{html_lib.escape(value)}</div></div></div>'
+  ).classes('w-full')
+
 def render_tab_functions():
   @ui.refreshable
   def functions_content():
@@ -470,7 +522,9 @@ def render_tab_functions():
 
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3'):
         m_opts = ["[ Not Selected ]", "HYUNDAI", "KIA", "GENESIS"]
-        c_m = params.get("SelectedManufacturer") or m_opts[0]
+        c_m = get_param_text("SelectedManufacturer", m_opts[0])
+        if c_m not in m_opts:
+          c_m = m_opts[0]
 
         def on_m_change(e):
           if e.value != "[ Not Selected ]":
@@ -487,7 +541,9 @@ def render_tab_functions():
         ui.select(m_opts, value=c_m, label='🌐 Manufacturer', on_change=on_m_change).classes('w-full text-blue-200')
 
         c_opts = ["[ Not Selected ]"] + get_list_from_file(f"{BASE_PATH}/CarList")
-        c_c = params.get("SelectedCar") or c_opts[0]
+        c_c = get_param_text("SelectedCar", c_opts[0])
+        if c_c not in c_opts:
+          c_c = c_opts[0]
         def on_c_change(e):
           if e.value != "[ Not Selected ]":
             params.put("SelectedCar", e.value)
@@ -497,7 +553,9 @@ def render_tab_functions():
         ui.select(c_opts, value=c_c, label='🚗 Car Model', on_change=on_c_change).classes('w-full text-blue-200')
 
         b_opts = ["[ Not Selected ]"] + get_list_from_file(f"{BASE_PATH}/GitBranchList")
-        c_b = params.get("SelectedBranch") or b_opts[0]
+        c_b = get_param_text("SelectedBranch", b_opts[0])
+        if c_b not in b_opts:
+          c_b = b_opts[0]
         def on_b_change(e):
           if e.value != "[ Not Selected ]":
             params.put("SelectedBranch", e.value)
@@ -506,9 +564,8 @@ def render_tab_functions():
           functions_content.refresh()
         ui.select(b_opts, value=c_b, label='🌿 Git Branch', on_change=on_b_change).classes('w-full text-blue-200')
 
-      commit_raw = params.get("CommitCompare")
-      commit_output = commit_raw.decode('utf-8') if isinstance(commit_raw, bytes) else str(commit_raw) if commit_raw else ""
-      commit_info = commit_output if commit_output else "Check required"
+      commit_output = get_param_text("CommitCompare")
+      commit_info = commit_output or "Check required"
 
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         async def do_check_updates():
@@ -518,7 +575,7 @@ def render_tab_functions():
         ui.button('CHECK UPDATES', on_click=do_check_updates, color=None).classes('custom-btn btn-blue w-full')
 
         card_cls, icon = ('card-success', '✅') if " == " in commit_info else ('card-danger', '⚠️') if " != " in commit_info else ('card-warning', '🔍')
-        ui.html(f'<div class="pill-card {card_cls}"><div class="pill-card-icon">{icon}</div><div class="pill-card-text">UPDATE STATUS<div class="pill-card-value">{commit_info}</div></div></div>').classes('w-full')
+        render_status_card("UPDATE STATUS", commit_info, icon, card_cls)
 
       if commit_output and " != " in commit_output:
         with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
@@ -527,7 +584,7 @@ def render_tab_functions():
             functions_content.refresh()
 
           ui.button('GIT PULL NOW', on_click=do_git_pull, color=None).classes('custom-btn btn-blue-pull w-full')
-          ui.html('<div class="pill-card card-warning"><div class="pill-card-icon">⚠️</div><div class="pill-card-text">NEW UPDATE AVAILABLE<div class="pill-card-value">Please pull the latest changes.</div></div></div>').classes('w-full')
+          render_status_card("NEW UPDATE AVAILABLE", "Please pull the latest changes.", "⚠️", "card-warning")
 
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         def do_reset_cal():
@@ -535,8 +592,7 @@ def render_tab_functions():
           functions_content.refresh()
 
         ui.button('RESET CALIBRATION', on_click=do_reset_cal, color=None).classes('custom-btn btn-yellow w-full')
-        dev_pos = params.get("DevicePosition") or "--"
-        ui.html(f'<div class="pill-card card-info"><div class="pill-card-icon">📍</div><div class="pill-card-text">DEVICE POSITION<div class="pill-card-value">{dev_pos}</div></div></div>').classes('w-full')
+        render_status_card("DEVICE POSITION", get_param_text("DevicePosition", "--"), "📍", "card-info")
 
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         ui.button('REBOOT', on_click=lambda: subprocess.Popen(["sudo", "reboot"], start_new_session=True), color=None).classes('custom-btn btn-red w-full')
@@ -548,7 +604,7 @@ def render_tab_toggles():
     ("PcmCruiseEnable", "PcmCruise", "Change the openpilot cruise engagement"),
     ("CruiseStateControl", "Cruise State Controls", "Openpilot controls cruise on/off, set speed"),
     ("IsHda2", "CANFD Car HDA2", "Highway Drive Assist 2, turn it on"),
-    ("CameraSccEnable", "CameraSCC", "HDA1 CameraSCC CAR, HDA2 Connect the ADAS ECAN line to CAMERA modify, turn it on"),
+    ("CameraSccEnable", "CameraSCC", "HDA1 CameraSCC CAR, HDA2 type ADAS harness cable, turn it on"),
     ("RadarTrackEnable", "Enable Radar Track use", "Enable Radar Track use (disable AEB)"),
     ("CabinCameraOnReverse", "Cabin Camera On Reverse", "Displays the Cabin camera when in reverse"),
     ("CabinCameraHardwareMissing", "Cabin Camera Hardware Missing", "Drive without the Cabin camera"),
@@ -561,8 +617,7 @@ def render_tab_toggles():
     with ui.column().classes('w-full gap-4 mt-4'):
       for key, label, desc in TOGGLE_ITEMS:
         if key == "LanguageSetting":
-          val = params.get(key)
-          init_val = (val.decode('utf-8') if isinstance(val, bytes) else val) == "ko"
+          init_val = get_param_text(key) == "ko"
         else:
           init_val = params.get_bool(key)
 
@@ -582,9 +637,7 @@ def render_tab_toggles():
             ui.label(desc).classes('text-[0.75rem] md:text-sm text-gray-400 leading-snug break-words whitespace-normal')
 
         if key == "ClusterEnable" and init_val:
-          transport = params.get("ClusterDisplayTransport") or "usb"
-          if isinstance(transport, bytes):
-            transport = transport.decode('utf-8')
+          transport = get_param_text("ClusterDisplayTransport", "usb")
           if transport not in ("network", "usb"):
             transport = "usb"
 
@@ -605,140 +658,110 @@ def render_tab_toggles():
   toggles_content()
 
 def render_tab_logs():
-  LOG_FILES = {
-    "CAN Missing": "/data/log/can_missing.log",
-    "CAN Timeout": "/data/log/can_timeout.log",
-    "Tmux Error": "/data/log/tmux_error.log",
-    "Tmux Console": "TMUX_CONSOLE",
-    "Navi Debug": "/data/log/navi_debug.log",
-    "Cruise Debug": "/data/log/cruise_debug.log",
-    "Traffic Debug": "/data/log/traffic_debug.log",
-    "Cluster Debug": "/data/log/cluster_debug.log",
-  }
-  REALDATA_PATH = Path("/data/media/0/realdata")
-
+  converter = Ansi2HTMLConverter(inline=True, dark_bg=True)
   with ui.column().classes('w-full mt-2 gap-6'):
     with ui.column().classes('w-full gap-2'):
-      ui.html('<div style="color:#6EE7B7; font-size:1.1em; font-weight:800; margin-bottom:4px;"><span style="margin-right:6px;">📂</span>Route Data Upload</div>')
+      ui.label('📂 Route Data Upload').classes('text-green-200 text-lg font-bold')
+      try:
+        routes = get_routes(REALDATA_PATH)
+        route_error = "" if REALDATA_PATH.exists() else f"Path not found: {REALDATA_PATH}"
+      except OSError as e:
+        routes = []
+        route_error = f"Cannot read routes: {e}"
 
-      if not REALDATA_PATH.exists():
-        ui.html('<div class="log-output-box log-error" style="margin-top:0;">❌ Path not found: /data/media/0/realdata</div>').classes('w-full')
+      if route_error:
+        ui.label(route_error).classes('text-red-300')
+      elif not routes:
+        ui.label('⚠️ No uploadable routes found.').classes('text-yellow-200')
       else:
-        route_map = {}
-        for item in REALDATA_PATH.iterdir():
-          if item.is_dir() and "--" in item.name and item.name != "boot":
-            parts = item.name.split("--")
-            if len(parts) >= 2:
-              route_name = f"{parts[0]}--{parts[1]}"
-              if route_name not in route_map:
-                route_map[route_name] = {'paths': [], 'mtime': 0}
-              route_map[route_name]['paths'].append(str(item))
-              route_map[route_name]['mtime'] = max(route_map[route_name]['mtime'], item.stat().st_mtime)
+        route_map = {route.name: route for route in routes}
+        options = {
+          route.name: f"[{datetime.fromtimestamp(route.modified).strftime('%Y-%m-%d %H:%M')}] {route.name} ({len(route.paths)} segs)"
+          for route in routes
+        }
+        with ui.element('div').classes('w-full grid grid-cols-4 gap-2 items-center'):
+          sel_route = ui.select(options, value=routes[0].name, label="Select Route to Upload").classes('col-span-3 min-w-0')
 
-        for r_data in route_map.values():
-          r_data['paths'].sort(key=lambda x: int(x.split("--")[-1]))
+          def upload_route():
+            targets = [str(path) for path in route_map[sel_route.value].paths]
+            try:
+              subprocess.Popen(
+                _script_command(f"{SCRIPTS_PATH}/realdata_upload.sh", targets),
+                start_new_session=True, env=_subprocess_env(),
+              )
+              ui.notify(f"✅ Upload started in background! ({len(targets)} segments)", type='positive', position='top')
+            except OSError as e:
+              ui.notify(f"❌ Failed to start upload: {e}", type='negative', position='top')
 
-        if not route_map:
-          ui.html('<div class="log-output-box log-warn" style="margin-top:0;">⚠️ No uploadable routes found.</div>').classes('w-full')
-        else:
-          sorted_routes = sorted(route_map.items(), key=lambda x: x[1]['mtime'], reverse=True)
-          options = [f"[{datetime.fromtimestamp(v['mtime']).strftime('%Y-%m-%d %H:%M')}] {k} ({len(v['paths'])} segs)" for k, v in sorted_routes]
-
-          with ui.element('div').classes('w-full grid grid-cols-4 gap-2 items-center'):
-            sel_route = ui.select(options, value=options[0], label="Select Route to Upload").classes('col-span-3 min-w-0')
-
-            def upload_route():
-              idx = options.index(sel_route.value)
-              targets = sorted_routes[idx][1]['paths']
-              cmd = ["bash", f"{SCRIPTS_PATH}/realdata_upload.sh"] + targets
-              try:
-                env = os.environ.copy()
-                env.pop('TMUX', None)
-                env.pop('TMUX_PANE', None)
-                subprocess.Popen(cmd, start_new_session=True, env=env)
-                ui.notify(f"✅ Upload started in background! ({len(targets)} segments)", type='positive', position='top')
-              except Exception as e:
-                ui.notify(f"❌ Failed to start upload: {e}", type='negative', position='top')
-
-            ui.button('ROUTE UPLOAD', on_click=upload_route, color=None).classes('custom-btn btn-green-route col-span-1')
+          ui.button('ROUTE UPLOAD', on_click=upload_route, color=None).classes('custom-btn btn-green-route col-span-1')
 
     with ui.column().classes('w-full gap-2'):
-      ui.html(
-        '<div style="color:#93C5FD; font-size:1.1em; font-weight:800; margin-bottom:4px;"><span style="margin-right:6px;">📄</span>System Logs</div>')
-
+      ui.label('📄 System Logs').classes('text-blue-200 text-lg font-bold')
       with ui.element('div').classes('w-full grid grid-cols-4 gap-2 items-center'):
-        sel_log = ui.select(list(LOG_FILES.keys()), value="CAN Missing", label="Select Log File").classes('col-span-2 min-w-0')
+        sel_log = ui.select(list(LOG_FILES), value="CAN Missing", label="Select Log File").classes('col-span-2 min-w-0')
 
-        def view_log():
-          log_path = LOG_FILES[sel_log.value]
-          content = ""
-          err_msg = ""
-
-          if log_path == "TMUX_CONSOLE":
-            subprocess.run(["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"], capture_output=True)
-            with open("/data/log/tmux_console.log", "w") as f:
-                subprocess.run(["tmux", "capture-pane", "-pe", "-t", "0", "-S", "-500"], stdout=f)
-            p = Path("/data/log/tmux_console.log")
-            if p.exists():
-              content = p.read_text()
-            else:
-              err_msg = "Failed to capture tmux console."
-          else:
-            p = Path(log_path)
-            if p.exists():
-              content = p.read_text()
-            else:
-              err_msg = "File not found."
-
-          if err_msg:
-            viewer_container.content = f'<div style="color:#FCA5A5; font-weight:bold;">❌ {err_msg}</div>'
+        async def view_log():
+          name = sel_log.value
+          try:
+            path = LOG_FILES[name]
+            if path == TMUX_LOG_PATH:
+              path = await save_tmux_log()
+            content = await asyncio.to_thread(path.read_text, encoding='utf-8', errors='replace')
+          except (OSError, RuntimeError, TimeoutError) as e:
+            viewer_container.content = f'<div style="color:#FCA5A5; font-weight:bold;">❌ {html_lib.escape(str(e))}</div>'
             status_container.content = '<div class="log-statusbar log-error">⚠️ 파일을 불러오지 못했습니다.</div>'
-          else:
-            conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
-            display = conv.convert(content, full=False)
-            viewer_container.content = display
-            status_container.content = f'<div class="log-statusbar">📄 {sel_log.value} | {len(content.splitlines())} lines | {len(content):,} chars</div>'
-            ui.run_javascript('var v=document.getElementById("logContainer");if(v)v.scrollTop=v.scrollHeight;')
+            return
+          viewer_container.content = converter.convert(content, full=False)
+          status_container.content = f'<div class="log-statusbar">📄 {name} | {len(content.splitlines())} lines | {len(content):,} chars</div>'
+          ui.run_javascript('var v=document.getElementById("logContainer");if(v)v.scrollTop=v.scrollHeight;')
 
         async def upload_log():
-          log_path = LOG_FILES[sel_log.value]
-          if log_path == "TMUX_CONSOLE":
-            subprocess.run(["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"], capture_output=True)
-            with open("/data/log/tmux_console.log", "w") as f:
-                subprocess.run(["tmux", "capture-pane", "-pe", "-t", "0", "-S", "-500"], stdout=f)
-            await run_script_async("Console Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=["/data/log/tmux_console.log"])
-          else:
-            await run_script_async("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[log_path])
+          path = LOG_FILES[sel_log.value]
+          try:
+            if path == TMUX_LOG_PATH:
+              path = await save_tmux_log()
+          except (OSError, RuntimeError, TimeoutError) as e:
+            ui.notify(f"❌ Failed to capture tmux: {e}", type='negative', position='top')
+            return
+          await run_script_async("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[str(path)])
 
         ui.button('VIEW', on_click=view_log, color=None).classes('custom-btn btn-default col-span-1')
         ui.button('UPLOAD', on_click=upload_log, color=None).classes('custom-btn btn-green col-span-1')
 
       with ui.element('div').classes('log-viewer w-full mt-2').props('id="logContainer"'):
         viewer_container = ui.html('파일을 선택한 후 View 버튼을 눌러주세요.')
-
       status_container = ui.html('<div class="log-statusbar">📂 대기 중...</div>').classes('w-full')
 
 def render_tab_terminal(tabs):
   conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
+  updating = False
 
   with ui.column().classes('w-full mt-4'):
     with ui.element('div').classes('log-viewer').props('id="termContainer"'):
         viewer = ui.html('Loading...')
     statusbar = ui.html('<div class="log-statusbar">Loading...</div>').classes('w-full')
 
-  def update_terminal():
+  async def update_terminal():
+    nonlocal updating
+    if updating or tabs.value != 'TERMINAL':
+      return
+    updating = True
     try:
-      if tabs.value != 'TERMINAL':
-        return
-
       if getattr(viewer, 'is_deleted', False) or viewer.parent_slot is None:
         return
 
-      content = get_tmux_capture()
+      error = False
+      try:
+        content = await get_tmux_capture()
+      except (OSError, RuntimeError, TimeoutError) as e:
+        error = True
+        content = str(e) or 'Tmux capture timed out'
+      if tabs.value != 'TERMINAL' or getattr(viewer, 'is_deleted', False) or viewer.parent_slot is None:
+        return
       lines = len(content.splitlines())
       now_str = datetime.now().strftime("%H:%M:%S")
 
-      if content.startswith("Error") or content.startswith("Tmux Session not found"):
+      if error:
         viewer.content = f'<div style="color:#FCA5A5; font-weight:bold;">❌ {html_lib.escape(content)}</div>'
         statusbar.content = '<div class="log-statusbar log-error">⚠️ tmux 세션을 찾을 수 없습니다.</div>'
       else:
@@ -765,8 +788,8 @@ def render_tab_terminal(tabs):
       """
       ui.run_javascript(js_code)
 
-    except Exception:
-      pass
+    finally:
+      updating = False
 
   # 1초마다 터미널 업데이트 실행
   ui.timer(1.0, update_terminal)
@@ -784,10 +807,11 @@ def render_tab_camera():
 
     def start_stream():
       stream_type = CAMERA_OPTIONS[cam_select.value]
-      webrtc_html = f"""
+      webrtc_html = """
         <div style="position:relative; width:100%; height:430px; background:#000; border-radius:12px; border:1.5px solid #3A4A6B; overflow:hidden;">
             <video id="video" autoplay playsinline muted controls style="width:100%; height:100%; object-fit:contain; cursor:pointer;"></video>
-            <div id="status" style="position:absolute; top:10px; right:12px; color:#E8EEFF; background:rgba(0,0,0,0.65); padding:4px 10px; border-radius:20px; font-size:12px;">Initializing...</div>
+            <div id="status" style="position:absolute; top:10px; right:12px; color:#E8EEFF; background:rgba(0,0,0,0.65);
+                padding:4px 10px; border-radius:20px; font-size:12px;">Initializing...</div>
         </div>
       """
       js_code = f"""
@@ -795,8 +819,10 @@ def render_tab_camera():
                 const video = document.getElementById('video');
                 const status = document.getElementById('status');
                 const ip = window.location.hostname;
+                if (window.dashboardPeerConnection) window.dashboardPeerConnection.close();
+                const pc = new RTCPeerConnection({{iceServers: []}});
+                window.dashboardPeerConnection = pc;
                 try {{
-                    const pc = new RTCPeerConnection({{iceServers: []}});
                     pc.addTransceiver('video', {{ direction: 'recvonly' }});
                     pc.ontrack = (event) => {{
                         status.innerText = "● Stream Active"; status.style.background = "rgba(16,185,129,0.75)";
@@ -823,10 +849,21 @@ def render_tab_camera():
                         }}
                     }});
 
-                    const payload = {{ sdp: pc.localDescription.sdp, cameras: ["{stream_type}"], enabled: true, bridge_services_in: [], bridge_services_out: [] }};
-                    const response = await fetch(`http://${{ip}}:5001/stream`, {{ method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(payload) }});
-                    if(response.ok) await pc.setRemoteDescription(await response.json());
+                    if (window.dashboardPeerConnection !== pc) return;
+                    const payload = {{
+                        sdp: pc.localDescription.sdp, cameras: ["{stream_type}"], enabled: true,
+                        bridge_services_in: [], bridge_services_out: []
+                    }};
+                    const response = await fetch(`http://${{ip}}:5001/stream`, {{
+                        method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(payload)
+                    }});
+                    if (window.dashboardPeerConnection !== pc) return;
+                    if (!response.ok) throw new Error(`Stream request failed: ${{response.status}}`);
+                    await pc.setRemoteDescription(await response.json());
                 }} catch (e) {{
+                    pc.close();
+                    if (window.dashboardPeerConnection !== pc) return;
+                    window.dashboardPeerConnection = null;
                     status.innerText = "Error"; status.style.background = "red";
                 }}
             }}
@@ -836,6 +873,17 @@ def render_tab_camera():
       ui.run_javascript(js_code)
 
     def stop_stream():
+      ui.run_javascript('''
+        if (window.dashboardPeerConnection) {
+          window.dashboardPeerConnection.close();
+          window.dashboardPeerConnection = null;
+        }
+        const video = document.getElementById('video');
+        if (video && video.srcObject) {
+          video.srcObject.getTracks().forEach(track => track.stop());
+          video.srcObject = null;
+        }
+      ''')
       stream_container.content = """
         <div class="log-viewer" style="display:flex; flex-direction:column; justify-content:center; align-items:center;">
             <div style="font-size:3em; filter:grayscale(1) opacity(0.3);">📷</div>
@@ -855,7 +903,8 @@ def main_page():
     'w-full flex-nowrap items-center justify-between px-2 pt-2 pb-1 gap-1 bg-[#0B0E14] sticky top-0 z-50 border-b border-[#1A2235]'):
     with ui.row().classes('flex-nowrap items-center shrink-0 px-1 gap-2'):
       ui.html(
-        '<div style="font-size: 1.0rem; font-weight: 900; line-height: 1.1; color: #E8EEFF; letter-spacing: 0.02em;">Openpilot<br><span style="color:#3B82F6;">Dashboard</span></div>')
+        '<div style="font-size: 1.0rem; font-weight: 900; line-height: 1.1; color: #E8EEFF; letter-spacing: 0.02em;">'
+        + 'Openpilot<br><span style="color:#3B82F6;">Dashboard</span></div>')
       ui.button(icon='refresh', on_click=lambda: ui.run_javascript('window.location.reload()')).classes(
         'refresh-btn rounded-full')
 
@@ -868,11 +917,16 @@ def main_page():
       ui.tab('TERMINAL', icon='terminal')
 
   with ui.tab_panels(tabs, value='FUNCTIONS').classes('w-full bg-transparent px-2 md:px-4'):
-    with ui.tab_panel('FUNCTIONS'): render_tab_functions()
-    with ui.tab_panel('TOGGLES'): render_tab_toggles()
-    with ui.tab_panel('CAMERA'): render_tab_camera()
-    with ui.tab_panel('LOGS'): render_tab_logs()
-    with ui.tab_panel('TERMINAL'): render_tab_terminal(tabs)
+    with ui.tab_panel('FUNCTIONS'):
+      render_tab_functions()
+    with ui.tab_panel('TOGGLES'):
+      render_tab_toggles()
+    with ui.tab_panel('CAMERA'):
+      render_tab_camera()
+    with ui.tab_panel('LOGS'):
+      render_tab_logs()
+    with ui.tab_panel('TERMINAL'):
+      render_tab_terminal(tabs)
 
 if __name__ in {"__main__", "__mp_main__"}:
   set_core_affinity([0, 1, 2])
