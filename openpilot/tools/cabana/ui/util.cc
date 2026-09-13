@@ -565,8 +565,7 @@ void drawToolbar(const std::vector<ToolbarItem> &items, size_t spacer_index, flo
         (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && ImGui::IsMouseClicked(ImGuiMouseButton_Left)))) {
       ImGui::OpenPopup("toolbar_extension_menu");
     }
-    // the popup opens inward: its right edge is aligned with the button so it stays inside the window
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y), ImGuiCond_Always, ImVec2(1, 0));
+    dropdown::PositionBelowItem("toolbar_extension_menu", true);
     if (dropdown::BeginPopup("toolbar_extension_menu")) {
       for (size_t i = visible; i < items.size(); ++i) {
         if (!items[i].in_menu) continue;
@@ -624,8 +623,7 @@ bool menuButton(const char *id, const std::string &text, const char *popup_id, b
                                                 ImVec2(x + MENU_ARROW_SIZE * 0.5f, baseline),
                                                 ImGui::GetColorU32(ImGuiCol_TextDisabled));
   if (clicked && !popup_open) ImGui::OpenPopup(popup_id);
-  // the menu drops down from below the button, not at the mouse cursor
-  ImGui::SetNextWindowPos(ImVec2(min.x, ImGui::GetItemRectMax().y), ImGuiCond_Always);
+  dropdown::PositionBelowItem(popup_id);
   return clicked;
 }
 
@@ -658,7 +656,7 @@ bool fusionSliderInt(const char *label, int *v, int min, int max, float width) {
   const float hx = x0 + (x1 - x0) * t;
   ImDrawList *dl = ImGui::GetWindowDrawList();
   const float groove_y0 = cy - groove_h * 0.5f, groove_y1 = cy + groove_h * 0.5f;
-  dl->AddRectFilled(ImVec2(bb_min.x, groove_y0), ImVec2(bb_max.x, groove_y1), u32(palette().separator), groove_h * 0.5f);
+  dl->AddRectFilled(ImVec2(bb_min.x, groove_y0), ImVec2(bb_max.x, groove_y1), u32(palette().slider_track), groove_h * 0.5f);
   dl->AddRectFilled(ImVec2(bb_min.x, groove_y0), ImVec2(hx, groove_y1), u32(palette().accent), groove_h * 0.5f);
   drawSliderHandle(dl, ImRect(ImVec2(hx - SLIDER_LENGTH * 0.5f, cy - handle_h * 0.5f),
                               ImVec2(hx + SLIDER_LENGTH * 0.5f, cy + handle_h * 0.5f)));
