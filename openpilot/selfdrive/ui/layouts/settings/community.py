@@ -3,7 +3,6 @@ import shutil
 import time
 import threading
 import pyray as rl
-from openpilot.selfdrive.ui import Colors, CommunityColors
 
 from datetime import datetime
 from pathlib import Path
@@ -20,6 +19,8 @@ from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
 from openpilot.system.ui.widgets.html_render import HtmlRenderer, ElementType
 from openpilot.system.ui.lib.scroll_panel import GuiScrollPanel
 from openpilot.system.ui.widgets.button import Button, ButtonStyle
+from openpilot.selfdrive.ui import Colors, CommunityColors
+
 
 DESCRIPTIONS = {
   'pcm_cruise': tr_noop(

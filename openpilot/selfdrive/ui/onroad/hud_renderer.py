@@ -1,5 +1,4 @@
 import pyray as rl
-
 from dataclasses import dataclass
 from openpilot.common.constants import CV
 from openpilot.selfdrive.ui.onroad.exp_button import ExpButton
@@ -13,6 +12,7 @@ from openpilot.selfdrive.ui import Colors, colors_alpha
 from datetime import datetime
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.onroad.icon_indicator import IconIndicator, RotatableIconIndicator, IconIndicatorGroup
+
 
 # Constants
 SET_SPEED_NA = 255

@@ -2,7 +2,7 @@ import numpy as np
 import pyray as rl
 from openpilot.cereal import log
 from openpilot.cereal.visionipc import VisionStreamType
-from openpilot.selfdrive.ui import Colors, UI_BORDER_SIZE
+from openpilot.selfdrive.ui import UI_BORDER_SIZE, Colors
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.selfdrive.ui.onroad.alert_renderer import AlertRenderer
 from openpilot.selfdrive.ui.onroad.driver_state import DriverStateRenderer

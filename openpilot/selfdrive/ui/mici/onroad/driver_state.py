@@ -9,6 +9,7 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 
 from openpilot.selfdrive.ui import Colors
 
+
 AlertSize = log.SelfdriveState.AlertSize
 
 DEBUG = False

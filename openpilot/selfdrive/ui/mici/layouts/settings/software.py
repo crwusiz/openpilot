@@ -17,6 +17,7 @@ from openpilot.system.ui.widgets.scroller import NavScroller
 
 from openpilot.selfdrive.ui import Colors, colors_alpha
 
+
 UPDATER_TIMEOUT = 10.0  # seconds to wait for updater to respond
 
 

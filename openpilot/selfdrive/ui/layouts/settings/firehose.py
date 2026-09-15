@@ -9,6 +9,7 @@ from openpilot.selfdrive.ui.mici.layouts.settings.firehose import FirehoseLayout
 
 from openpilot.selfdrive.ui import Colors
 
+
 TITLE = tr_noop("Firehose Mode")
 DESCRIPTION = tr_noop(
   "openpilot learns to drive by watching humans, like you, drive.\n\n"

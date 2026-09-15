@@ -22,6 +22,7 @@ from openpilot.system.athena.registration import UNREGISTERED_DONGLE_ID
 
 from openpilot.selfdrive.ui import Colors, colors_alpha
 
+
 class ReviewTermsPage(TermsPage, NavScroller):
   """TermsPage with NavWidget swipe-to-dismiss for reviewing in device settings."""
   def __init__(self):

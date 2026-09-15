@@ -11,6 +11,7 @@ from openpilot.common.filter_simple import BounceFilter
 
 from openpilot.selfdrive.ui import Colors, colors_alpha
 
+
 if TYPE_CHECKING:
   from openpilot.common.params import Params
 else:

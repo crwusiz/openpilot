@@ -16,6 +16,7 @@ from pathlib import Path
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui import Colors
 
+
 SIDEBAR_WIDTH = 300
 METRIC_HEIGHT = 126
 METRIC_WIDTH = 240

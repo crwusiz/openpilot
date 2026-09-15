@@ -13,7 +13,8 @@ from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 from openpilot.system.ui.widgets import Widget
 
 from openpilot.system.ui.lib.text_measure import measure_text_cached
-from openpilot.selfdrive.ui import Colors, NO_THROTTLE_COLORS, STEERING_COLORS, THROTTLE_COLORS, colors_alpha
+from openpilot.selfdrive.ui import Colors, colors_alpha, NO_THROTTLE_COLORS, STEERING_COLORS, THROTTLE_COLORS
+
 
 CLIP_MARGIN = 500
 MIN_DRAW_DISTANCE = 10.0

@@ -16,6 +16,7 @@ from openpilot.system.ui.widgets.label import UnifiedLabel
 
 from openpilot.selfdrive.ui import MiciOnroadAlertColors
 
+
 AlertSize = log.SelfdriveState.AlertSize
 AlertStatus = log.SelfdriveState.AlertStatus
 

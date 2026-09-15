@@ -6,6 +6,7 @@ from openpilot.system.ui.widgets import Widget
 
 from openpilot.selfdrive.ui import Colors, colors_alpha
 
+
 class ExperimentalModeButton(Widget):
   def __init__(self):
     super().__init__()

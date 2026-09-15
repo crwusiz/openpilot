@@ -15,6 +15,7 @@ from openpilot.common.version import terms_version, training_version
 
 from openpilot.selfdrive.ui import Colors
 
+
 DEBUG = False
 
 STEP_RECTS = [rl.Rectangle(104, 800, 633, 175), rl.Rectangle(1835, 0, 2159, 1080), rl.Rectangle(1835, 0, 2156, 1080),

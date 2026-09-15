@@ -13,6 +13,7 @@ from openpilot.cereal import log
 
 from openpilot.selfdrive.ui import Colors, colors_alpha
 
+
 EventName = log.OnroadEvent.EventName
 
 # Constants

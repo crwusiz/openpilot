@@ -15,6 +15,7 @@ from openpilot.common.filter_simple import FirstOrderFilter
 
 from openpilot.selfdrive.ui import Colors
 
+
 # TODO: arc_bar_pts doesn't consider rounded end caps part of the angle span
 TORQUE_ANGLE_SPAN = 12.7
 

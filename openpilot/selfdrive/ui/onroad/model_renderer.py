@@ -14,6 +14,7 @@ from openpilot.system.ui.widgets import Widget
 
 from openpilot.selfdrive.ui import Colors, NO_THROTTLE_COLORS, STEERING_COLORS, THROTTLE_COLORS, colors_alpha
 
+
 CLIP_MARGIN = 500
 MIN_DRAW_DISTANCE = 10.0
 MAX_DRAW_DISTANCE = 100.0

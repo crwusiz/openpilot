@@ -22,6 +22,7 @@ from openpilot.system.ui.widgets.list_view import (
 )
 from openpilot.selfdrive.ui import Colors
 
+
 VALUE_FONT_SIZE = 48
 
 

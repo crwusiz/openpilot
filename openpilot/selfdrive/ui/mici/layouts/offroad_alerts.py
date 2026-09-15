@@ -18,6 +18,7 @@ from openpilot.system.ui.lib.multilang import tr
 
 from openpilot.selfdrive.ui import Colors, colors_alpha
 
+
 REFRESH_INTERVAL = 5.0  # seconds
 
 

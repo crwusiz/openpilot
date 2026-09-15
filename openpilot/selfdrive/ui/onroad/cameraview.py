@@ -13,6 +13,7 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 
 from openpilot.selfdrive.ui import Colors
 
+
 CONNECTION_RETRY_INTERVAL = 0.2  # seconds between connection attempts
 
 VERSION = """

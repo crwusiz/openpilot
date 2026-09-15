@@ -15,6 +15,7 @@ from openpilot.system.ui.widgets import Widget
 
 from openpilot.selfdrive.ui import Colors
 
+
 HEADER_HEIGHT = 80
 HEAD_BUTTON_FONT_SIZE = 40
 CONTENT_MARGIN = 40

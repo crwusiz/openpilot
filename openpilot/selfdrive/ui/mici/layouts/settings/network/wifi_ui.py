@@ -13,6 +13,7 @@ from openpilot.system.ui.lib.wifi_manager import WifiManager, Network, SecurityT
 
 from openpilot.selfdrive.ui import Colors, colors_alpha
 
+
 class LoadingAnimation(Widget):
   RADIUS = 8
   SPACING = 24  # center-to-center: diameter (16) + gap (8)

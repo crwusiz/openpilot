@@ -17,6 +17,7 @@ from openpilot.system.ui.widgets.network import NetworkUI
 from openpilot.selfdrive.ui.layouts.settings.community import CommunityLayout
 from openpilot.selfdrive.ui import Colors, SettingsColors
 
+
 # Constants
 SIDEBAR_WIDTH = 500
 CLOSE_BTN_SIZE = 200

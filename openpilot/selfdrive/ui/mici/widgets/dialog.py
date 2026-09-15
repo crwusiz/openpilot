@@ -16,6 +16,7 @@ from openpilot.selfdrive.ui.mici.widgets.button import BigCircleButton, GreyBigB
 
 from openpilot.selfdrive.ui import Colors, colors_alpha
 
+
 DEBUG = False
 
 PADDING = 20

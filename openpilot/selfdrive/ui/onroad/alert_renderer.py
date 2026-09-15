@@ -12,6 +12,7 @@ from openpilot.system.ui.widgets.label import Label
 
 from openpilot.selfdrive.ui import Colors, OnroadAlertColors
 
+
 AlertSize = log.SelfdriveState.AlertSize
 AlertStatus = log.SelfdriveState.AlertStatus
 
