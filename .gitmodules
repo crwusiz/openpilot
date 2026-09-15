@@ -1,0 +1,18 @@
+[submodule "panda"]
+	path = panda
+	url = https://github.com/crwusiz/panda
+[submodule "opendbc"]
+	path = opendbc_repo
+	url = https://github.com/crwusiz/opendbc
+[submodule "msgq"]
+	path = msgq_repo
+	url = https://github.com/commaai/msgq
+[submodule "rednose_repo"]
+	path = rednose_repo
+	url = https://github.com/commaai/rednose
+[submodule "teleoprtc_repo"]
+	path = teleoprtc_repo
+	url = https://github.com/commaai/teleoprtc
+[submodule "tinygrad"]
+	path = tinygrad_repo
+	url = https://github.com/tinygrad/tinygrad
