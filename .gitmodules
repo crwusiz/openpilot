@@ -15,4 +15,5 @@
 	url = https://github.com/commaai/teleoprtc
 [submodule "tinygrad"]
 	path = tinygrad_repo
-	url = https://github.com/tinygrad/tinygrad
+  url = https://github.com/commaai/tinygrad.git
+  branch = openpilot-modeld-test
