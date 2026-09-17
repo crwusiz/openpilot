@@ -128,12 +128,13 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     personalityChanged @91;
     aeb @92;
     userBookmark @95;
+    userBookmarkNotPaired @104;
     excessiveActuation @96;
     bigModelLoading @100;
     bigModelFailed @102;
 
     turningIndicatorOn @108;
-    autoLaneChange @104;
+    autoLaneChange @109;
 
     ding @105;
     dong @106;
