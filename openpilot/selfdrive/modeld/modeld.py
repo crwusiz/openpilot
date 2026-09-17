@@ -39,6 +39,7 @@ from openpilot.selfdrive.modeld.constants import ModelConstants, Plan
 from openpilot.selfdrive.modeld.helpers import MODELS_DIR, chestnut_present, chestnut_compiled, modeld_pkl_path, load_oob
 
 import usb1
+import struct
 from openpilot.common.hardware.usb import CHESTNUT_USB_IDS
 
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
@@ -47,6 +48,7 @@ LAT_SMOOTH_SECONDS = 0.0
 LONG_SMOOTH_SECONDS = 0.3
 MIN_LAT_CONTROL_SPEED = 0.3
 BIG_MODEL_TIMEOUT = 60
+
 CHESTNUT_READY_TIMEOUT = 20.0
 CHESTNUT_READY_STABLE_TIME = 1.0
 CHESTNUT_READY_POLL_INTERVAL = 0.25
@@ -86,6 +88,7 @@ class ChestnutReadyProbe:
     self._context = None
     self._asm_usb = None
     self._pcie_power_requested = False
+    self._probe_error_logged = False
 
   def close(self) -> None:
     try:
@@ -119,8 +122,13 @@ class ChestnutReadyProbe:
       if not self._pcie_power_requested:
         self._asm_usb.controlWrite(0x40, 0xF3, 1, 0, b'', timeout=2000)
         self._pcie_power_requested = True
-      return self._asm_usb.controlRead(0xC0, 0xE4, 0xB450, 0, 1, timeout=1000)[0] == 0x78
+      ready = self._asm_usb.controlRead(0xC0, 0xE4, 0xB450, 0, 1, timeout=1000)[0] == 0x78
+      self._probe_error_logged = False
+      return ready
     except Exception:
+      if not self._probe_error_logged:
+        cloudlog.exception("Chestnut readiness probe failed")
+        self._probe_error_logged = True
       self.close()
       return False
 
@@ -275,7 +283,10 @@ class ModelState:
 def main(demo=False):
   cloudlog.warning("modeld init")
 
-  chestnut_available = chestnut_present() and chestnut_compiled()
+  chestnut_detected = chestnut_present()
+  chestnut_available = chestnut_detected and chestnut_compiled()
+  if chestnut_detected and not chestnut_available:
+    cloudlog.warning("Chestnut detected but precompiled model or camera warp files are missing; falling back to the small model")
   CHESTNUT = False
   if chestnut_available:
     # The USB bridge is powered by USB-C, while the GPU's 12 V supply is
@@ -351,6 +362,8 @@ def main(demo=False):
     loader = threading.Thread(target=load_big, daemon=True)
     loader.start()
     loader.join(BIG_MODEL_TIMEOUT)
+    if loader.is_alive():
+      cloudlog.warning(f"big model load timed out after {BIG_MODEL_TIMEOUT}s; falling back to the small model")
     model = big_model
     params.put_bool("ChestnutActive", model is not None)
 
