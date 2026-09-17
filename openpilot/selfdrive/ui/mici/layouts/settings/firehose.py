@@ -17,7 +17,7 @@ from openpilot.system.ui.lib.multilang import tr, trn, tr_noop
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.scroller import NavRawScrollPanel
 
-from openpilot.selfdrive.ui import Colors, FirehoseColors
+from openpilot.selfdrive.ui import FirehoseColors
 
 TITLE = tr_noop("Firehose Mode")
 DESCRIPTION = tr_noop(
@@ -91,11 +91,11 @@ class FirehoseLayoutBase(Widget):
     title_text = tr(TITLE)
     title_font = gui_app.font(FontWeight.BOLD)
     title_size = 64
-    rl.draw_text_ex(title_font, title_text, rl.Vector2(x, y), title_size, 0, Colors.WHITE)
+    rl.draw_text_ex(title_font, title_text, rl.Vector2(x, y), title_size, 0, rl.WHITE)
     y += int(title_size * FONT_SCALE) + 20
 
     # Description
-    y = self._draw_wrapped_text(x, y, w, tr(DESCRIPTION), gui_app.font(FontWeight.ROMAN), 36, Colors.WHITE)
+    y = self._draw_wrapped_text(x, y, w, tr(DESCRIPTION), gui_app.font(FontWeight.ROMAN), 36, rl.WHITE)
     y += 20
 
     # Separator
@@ -111,7 +111,7 @@ class FirehoseLayoutBase(Widget):
     if self._segment_count > 0:
       contrib_text = trn("{} segment of your driving is in the training dataset so far.",
                          "{} segments of your driving is in the training dataset so far.", self._segment_count).format(self._segment_count)
-      y = self._draw_wrapped_text(x, y, w, contrib_text, gui_app.font(FontWeight.BOLD), 42, Colors.WHITE)
+      y = self._draw_wrapped_text(x, y, w, contrib_text, gui_app.font(FontWeight.BOLD), 42, rl.WHITE)
       y += 20
 
     # Separator
@@ -123,7 +123,7 @@ class FirehoseLayoutBase(Widget):
     y += 20
 
     # FAQ Header
-    y = self._draw_wrapped_text(x, y, w, tr(FAQ_HEADER), gui_app.font(FontWeight.BOLD), 44, Colors.WHITE)
+    y = self._draw_wrapped_text(x, y, w, tr(FAQ_HEADER), gui_app.font(FontWeight.BOLD), 44, rl.WHITE)
     y += 20
 
     # FAQ Items

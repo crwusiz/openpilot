@@ -80,14 +80,14 @@ class DriverStateRenderer(Widget):
     opacity = 0.65 if self.is_active else 0.2
 
     # Draw background circle
-    rl.draw_circle(int(self.position_x), int(self.position_y), BTN_SIZE // 2, colors_alpha(Colors.BLACK, 70))
+    rl.draw_circle(int(self.position_x), int(self.position_y), BTN_SIZE // 2, colors_alpha(rl.BLACK, 70))
 
     # Draw face icon
     icon_pos = rl.Vector2(self.position_x - self.dm_img.width // 2, self.position_y - self.dm_img.height // 2)
-    rl.draw_texture_v(self.dm_img, icon_pos, colors_alpha(Colors.WHITE, int(255 * opacity)))
+    rl.draw_texture_v(self.dm_img, icon_pos, colors_alpha(rl.WHITE, int(255 * opacity)))
 
     # Draw face outline
-    white_color = colors_alpha(Colors.WHITE, int(255 * opacity))
+    white_color = colors_alpha(rl.WHITE, int(255 * opacity))
     rl.draw_spline_linear(self.face_lines, len(self.face_lines), 5.2, white_color)
 
     # Set arc color based on engaged state

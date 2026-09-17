@@ -10,7 +10,7 @@ from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import Label
 
-from openpilot.selfdrive.ui import Colors, OnroadAlertColors
+from openpilot.selfdrive.ui import OnroadAlertColors
 
 
 AlertSize = log.SelfdriveState.AlertSize
@@ -174,7 +174,7 @@ class AlertRenderer(Widget):
       self._full_text2_label.set_text(alert.text2)
       self._full_text2_label.render(subtitle_rect)
 
-  def _draw_centered(self, text, rect, font, font_size, center_y=True, color=Colors.WHITE) -> None:
+  def _draw_centered(self, text, rect, font, font_size, center_y=True, color=rl.WHITE) -> None:
     text_size = measure_text_cached(font, text, font_size)
     x = rect.x + (rect.width - text_size.x) / 2
     y = rect.y + ((rect.height - text_size.y) / 2 if center_y else 0)

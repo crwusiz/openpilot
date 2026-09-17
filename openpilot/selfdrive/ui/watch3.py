@@ -67,7 +67,7 @@ def main():
         rl.Vector2((gui_app.width - text_width) / 2, section_height / 2 - title_font_size / 2),
         title_font_size,
         0,
-        Colors.WHITE
+        rl.WHITE
       )
 
       camera_start_y = section_height * 2
@@ -78,27 +78,27 @@ def main():
       # VISION_STREAM_NARROW_ROAD
       road_rect = rl.Rectangle(0, camera_start_y, camera_width, camera_height)
       road.render(road_rect)
-      rl.draw_rectangle_lines(0, int(camera_start_y), int(camera_width), int(camera_height), Colors.WHITE)
+      rl.draw_rectangle_lines(0, int(camera_start_y), int(camera_width), int(camera_height), rl.WHITE)
       rl.draw_text_ex(font_semi_bold, "ROAD", rl.Vector2(label_padding, camera_start_y + label_padding), label_font_size,
-                      0, Colors.WHITE)
+                      0, rl.WHITE)
 
       # VISION_STREAM_CABIN
       driver_rect = rl.Rectangle(camera_width, camera_start_y, camera_width, camera_height)
       driver.render(driver_rect)
-      rl.draw_rectangle_lines(int(camera_width), int(camera_start_y), int(camera_width), int(camera_height), Colors.WHITE)
+      rl.draw_rectangle_lines(int(camera_width), int(camera_start_y), int(camera_width), int(camera_height), rl.WHITE)
       rl.draw_text_ex(font_semi_bold, "DRIVER", rl.Vector2(camera_width + label_padding, camera_start_y + label_padding),
-                      label_font_size, 0, Colors.WHITE)
+                      label_font_size, 0, rl.WHITE)
 
       # VISION_STREAM_WIDE_ROAD
       wide_rect = rl.Rectangle(camera_width * 2, camera_start_y, camera_width, camera_height)
       wide.render(wide_rect)
-      rl.draw_rectangle_lines(int(camera_width * 2), int(camera_start_y), int(camera_width), int(camera_height), Colors.WHITE)
+      rl.draw_rectangle_lines(int(camera_width * 2), int(camera_start_y), int(camera_width), int(camera_height), rl.WHITE)
       rl.draw_text_ex(font_semi_bold, "WIDE",
                       rl.Vector2(camera_width * 2 + label_padding, camera_start_y + label_padding), label_font_size, 0,
-                      Colors.WHITE)
+                      rl.WHITE)
 
-      rl.draw_rectangle_rounded(close_button_rect, 0.3, 10, Colors.WATCH_CLOSE_BUTTON)
-      rl.draw_rectangle_rounded_lines_ex(close_button_rect, 0.3, 10, 2, Colors.WHITE)
+      rl.draw_rectangle_rounded(close_button_rect, 0.3, 10, rl.DARKGRAY)
+      rl.draw_rectangle_rounded_lines_ex(close_button_rect, 0.3, 10, 2, rl.WHITE)
 
       button_center_x = close_button_rect.x + close_button_size / 2
       button_center_y = close_button_rect.y + close_button_size / 2
@@ -107,12 +107,12 @@ def main():
       rl.draw_line_ex(
         rl.Vector2(button_center_x - x_size / 2, button_center_y - x_size / 2),
         rl.Vector2(button_center_x + x_size / 2, button_center_y + x_size / 2),
-        3, Colors.WHITE
+        3, rl.WHITE
       )
       rl.draw_line_ex(
         rl.Vector2(button_center_x + x_size / 2, button_center_y - x_size / 2),
         rl.Vector2(button_center_x - x_size / 2, button_center_y + x_size / 2),
-        3, Colors.WHITE
+        3, rl.WHITE
       )
   finally:
     # Release the display before asking manager to restart the main UI.

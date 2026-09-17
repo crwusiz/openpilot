@@ -41,12 +41,12 @@ class ExperimentalModeButton(Widget):
   def _render(self, rect):
     rl.begin_scissor_mode(int(rect.x), int(rect.y), int(rect.width), int(rect.height))
     self._draw_gradient_background(rect)
-    rl.draw_rectangle_rounded_lines_ex(self._rect, 0.19, 10, 5, Colors.BLACK)
+    rl.draw_rectangle_rounded_lines_ex(self._rect, 0.19, 10, 5, rl.BLACK)
     rl.end_scissor_mode()
 
     # Draw vertical separator line
     line_x = rect.x + rect.width - self.img_width - (2 * self.horizontal_padding)
-    separator_color = colors_alpha(Colors.BLACK, 77)
+    separator_color = colors_alpha(rl.BLACK, 77)
     rl.draw_line_ex(rl.Vector2(line_x, rect.y), rl.Vector2(line_x, rect.y + rect.height), 3, separator_color)
 
     # Draw text label (left aligned)
@@ -54,7 +54,7 @@ class ExperimentalModeButton(Widget):
     text_x = rect.x + self.horizontal_padding
     text_y = rect.y + rect.height / 2 - 45 * FONT_SCALE // 2  # Center vertically
 
-    rl.draw_text_ex(gui_app.font(FontWeight.NORMAL), text, rl.Vector2(int(text_x), int(text_y)), 45, 0, Colors.BLACK)
+    rl.draw_text_ex(gui_app.font(FontWeight.NORMAL), text, rl.Vector2(int(text_x), int(text_y)), 45, 0, rl.BLACK)
 
     # Draw icon (right aligned)
     icon_x = rect.x + rect.width - self.horizontal_padding - self.img_width
@@ -64,4 +64,4 @@ class ExperimentalModeButton(Widget):
     # Draw current mode icon
     current_icon = self.experimental_pixmap if self.experimental_mode else self.chill_pixmap
     source_rect = rl.Rectangle(0, 0, current_icon.width, current_icon.height)
-    rl.draw_texture_pro(current_icon, source_rect, icon_rect, rl.Vector2(0, 0), 0, Colors.WHITE)
+    rl.draw_texture_pro(current_icon, source_rect, icon_rect, rl.Vector2(0, 0), 0, rl.WHITE)

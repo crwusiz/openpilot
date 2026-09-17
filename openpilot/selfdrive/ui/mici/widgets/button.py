@@ -85,7 +85,7 @@ class BigCircleButton(BaseButton):
 
   def _draw_content(self, btn_y: float):
     # draw icon
-    icon_color = colors_alpha(Colors.WHITE, int(255 * 0.9)) if self.enabled else colors_alpha(Colors.WHITE, int(255 * 0.35))
+    icon_color = colors_alpha(rl.WHITE, int(255 * 0.9)) if self.enabled else colors_alpha(rl.WHITE, int(255 * 0.35))
     rl.draw_texture_ex(self._txt_icon, (self._rect.x + (self._rect.width - self._txt_icon.width) / 2 + self._icon_offset[0],
                                         btn_y + (self._rect.height - self._txt_icon.height) / 2 + self._icon_offset[1]), 0, 1.0, icon_color)
 
@@ -100,7 +100,7 @@ class BigCircleButton(BaseButton):
     scale = self._scale_filter.update(PRESSED_SCALE if self.is_pressed else 1.0)
     btn_x = self._rect.x + (self._rect.width * (1 - scale)) / 2
     btn_y = self._rect.y + (self._rect.height * (1 - scale)) / 2
-    rl.draw_texture_ex(txt_bg, (btn_x, btn_y), 0, scale, Colors.WHITE)
+    rl.draw_texture_ex(txt_bg, (btn_x, btn_y), 0, scale, rl.WHITE)
 
     self._draw_content(btn_y)
 
@@ -134,7 +134,7 @@ class BigCircleToggle(BigCircleButton):
     # draw status icon
     rl.draw_texture_ex(self._txt_toggle_enabled if self._checked else self._txt_toggle_disabled,
                        (self._rect.x + (self._rect.width - self._txt_toggle_enabled.width) / 2, btn_y + 5),
-                        0, 1.0, Colors.WHITE)
+                        0, 1.0, rl.WHITE)
 
 
 class BigButton(BaseButton):
@@ -160,7 +160,7 @@ class BigButton(BaseButton):
     self._rotate_icon_t: float | None = None
 
     self._label = UnifiedLabel(text, font_size=self._get_label_font_size(), font_weight=FontWeight.BOLD,
-                               text_color=colors_alpha(Colors.WHITE, int(255 * 0.9)), alignment_vertical=TextAlignmentVertical.BOTTOM, scroll=scroll,
+                               text_color=colors_alpha(rl.WHITE, int(255 * 0.9)), alignment_vertical=TextAlignmentVertical.BOTTOM, scroll=scroll,
                                line_height=0.9)
     self._sub_label = UnifiedLabel(value, font_size=COMPLICATION_SIZE, font_weight=FontWeight.ROMAN,
                                     text_color=Colors.LIGHT_GRAY, alignment_vertical=TextAlignmentVertical.BOTTOM)
@@ -246,7 +246,7 @@ class BigButton(BaseButton):
     # LABEL ------------------------------------------------------------------
     label_x = self._rect.x + self.LABEL_HORIZONTAL_PADDING
 
-    label_color = colors_alpha(Colors.WHITE, int(255 * 0.9)) if self.enabled else colors_alpha(Colors.WHITE, int(255 * 0.35))
+    label_color = colors_alpha(rl.WHITE, int(255 * 0.9)) if self.enabled else colors_alpha(rl.WHITE, int(255 * 0.35))
     self._label.set_color(label_color)
     label_rect = rl.Rectangle(label_x, btn_y + self.LABEL_VERTICAL_PADDING, self._title_width_hint(),
                               self._rect.height - self.LABEL_VERTICAL_PADDING * 2)
@@ -270,7 +270,7 @@ class BigButton(BaseButton):
       source_rec = rl.Rectangle(0, 0, self._txt_icon.width, self._txt_icon.height)
       dest_rec = rl.Rectangle(x, y, self._txt_icon.width, self._txt_icon.height)
       origin = rl.Vector2(self._txt_icon.width / 2, self._txt_icon.height / 2)
-      rl.draw_texture_pro(self._txt_icon, source_rec, dest_rec, origin, rotation, colors_alpha(Colors.WHITE, int(255 * 0.9)))
+      rl.draw_texture_pro(self._txt_icon, source_rec, dest_rec, origin, rotation, colors_alpha(rl.WHITE, int(255 * 0.9)))
 
   def _render(self, _):
     txt_bg, btn_x, btn_y, scale = self._handle_background()
@@ -278,12 +278,12 @@ class BigButton(BaseButton):
     if self._scroll:
       # draw black background since images are transparent
       scaled_rect = rl.Rectangle(btn_x, btn_y, self._rect.width * scale, self._rect.height * scale)
-      rl.draw_rectangle_rounded(scaled_rect, 0.4, 7, colors_alpha(Colors.BLACK, int(255 * 0.5)))
+      rl.draw_rectangle_rounded(scaled_rect, 0.4, 7, colors_alpha(rl.BLACK, int(255 * 0.5)))
 
       self._draw_content(btn_y)
-      rl.draw_texture_ex(txt_bg, (btn_x, btn_y), 0, scale, Colors.WHITE)
+      rl.draw_texture_ex(txt_bg, (btn_x, btn_y), 0, scale, rl.WHITE)
     else:
-      rl.draw_texture_ex(txt_bg, (btn_x, btn_y), 0, scale, Colors.WHITE)
+      rl.draw_texture_ex(txt_bg, (btn_x, btn_y), 0, scale, rl.WHITE)
       self._draw_content(btn_y)
 
 
@@ -312,9 +312,9 @@ class BigToggle(BigButton):
   def _draw_pill(self, x: float, y: float, checked: bool):
     # draw toggle icon top right
     if checked:
-      rl.draw_texture_ex(self._txt_enabled_toggle, (x, y), 0, 1.0, Colors.WHITE)
+      rl.draw_texture_ex(self._txt_enabled_toggle, (x, y), 0, 1.0, rl.WHITE)
     else:
-      rl.draw_texture_ex(self._txt_disabled_toggle, (x, y), 0, 1.0, Colors.WHITE)
+      rl.draw_texture_ex(self._txt_disabled_toggle, (x, y), 0, 1.0, rl.WHITE)
 
   def _draw_content(self, btn_y: float):
     super()._draw_content(btn_y)
@@ -372,7 +372,7 @@ class GreyBigButton(BigButton):
     self._label.set_line_height(1.0)
 
     self._sub_label.set_font_size(36)
-    self._sub_label.set_text_color(colors_alpha(Colors.WHITE, int(255 * 0.9)))
+    self._sub_label.set_text_color(colors_alpha(rl.WHITE, int(255 * 0.9)))
     self._sub_label.set_font_weight(FontWeight.DISPLAY_REGULAR)
     self._sub_label.set_alignment_vertical(TextAlignmentVertical.MIDDLE if not self._label.text else
                                            TextAlignmentVertical.BOTTOM)
@@ -386,7 +386,7 @@ class GreyBigButton(BigButton):
     return 36
 
   def _render(self, _):
-    rl.draw_rectangle_rounded(self._rect, 0.4, 10, colors_alpha(Colors.WHITE, int(255 * 0.15)))
+    rl.draw_rectangle_rounded(self._rect, 0.4, 10, colors_alpha(rl.WHITE, int(255 * 0.15)))
     self._draw_content(self._rect.y)
 
 

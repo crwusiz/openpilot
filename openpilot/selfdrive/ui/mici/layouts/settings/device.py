@@ -20,7 +20,7 @@ from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.html_render import HtmlRenderer
 from openpilot.system.athena.registration import UNREGISTERED_DONGLE_ID
 
-from openpilot.selfdrive.ui import Colors, colors_alpha
+from openpilot.selfdrive.ui import colors_alpha
 
 
 class ReviewTermsPage(TermsPage, NavScroller):
@@ -62,7 +62,7 @@ class MiciFccModal(NavRawScrollPanel):
     scroll_content_rect.y += scroll_offset + self._fcc_logo.height + 20
     self._content.render(scroll_content_rect)
 
-    rl.draw_texture_ex(self._fcc_logo, fcc_pos, 0.0, 1.0, Colors.WHITE)
+    rl.draw_texture_ex(self._fcc_logo, fcc_pos, 0.0, 1.0, rl.WHITE)
 
 
 def _engaged_confirmation_click(callback: Callable, action_text: str, icon: rl.Texture, exit_on_confirm: bool = True, red: bool = False):
@@ -100,7 +100,7 @@ class DeviceInfoLayoutMici(Widget):
     self.set_rect(rl.Rectangle(0, 0, 360, 180))
 
     params = Params()
-    subheader_color = colors_alpha(Colors.WHITE, int(255 * 0.585))
+    subheader_color = colors_alpha(rl.WHITE, int(255 * 0.585))
     max_width = int(self._rect.width - 20)
     self._dongle_id_label = UnifiedLabel("device ID", 48, max_width=max_width, font_weight=FontWeight.DISPLAY, wrap_text=False)
     self._dongle_id_text_label = UnifiedLabel(params.get("DongleId") or 'N/A', 32, max_width=max_width, text_color=subheader_color,

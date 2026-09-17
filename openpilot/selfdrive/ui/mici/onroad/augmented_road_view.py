@@ -21,7 +21,7 @@ from enum import IntEnum
 
 import math
 from openpilot.common.params import Params
-from openpilot.selfdrive.ui import Colors, colors_alpha
+from openpilot.selfdrive.ui import colors_alpha
 
 
 OpState = log.SelfdriveState.OpenpilotState
@@ -132,14 +132,14 @@ class BookmarkIcon(Widget):
     if self._offset_filter.x > 0:
       icon_x = self.rect.x + self.rect.width - round(self._offset_filter.x)
       icon_y = self.rect.y + (self.rect.height - self._icon.height) / 2  # Vertically centered
-      rl.draw_texture_ex(self._icon, rl.Vector2(icon_x, icon_y), 0.0, 1.0, Colors.WHITE)
+      rl.draw_texture_ex(self._icon, rl.Vector2(icon_x, icon_y), 0.0, 1.0, rl.WHITE)
 
 
 class AugmentedRoadView(CameraView):
   def __init__(self, bookmark_callback=None, stream_type: VisionStreamType = VisionStreamType.VISION_STREAM_NARROW_ROAD):
     super().__init__("camerad", stream_type)
     self._bookmark_callback = bookmark_callback
-    self._set_placeholder_color(Colors.BLACK)
+    self._set_placeholder_color(rl.BLACK)
 
     self.params = Params()
     self._last_device_position = ""
@@ -162,7 +162,7 @@ class AugmentedRoadView(CameraView):
     self._driver_state_renderer = DriverStateRenderer()
     self._confidence_ball = ConfidenceBall()
     self._offroad_label = UnifiedLabel("start the car to\nuse openpilot", 54, FontWeight.DISPLAY,
-                                       text_color=colors_alpha(Colors.WHITE, int(255 * 0.9)),
+                                       text_color=colors_alpha(rl.WHITE, int(255 * 0.9)),
                                        alignment=TextAlignment.CENTER,
                                        alignment_vertical=TextAlignmentVertical.MIDDLE)
 
@@ -191,7 +191,7 @@ class AugmentedRoadView(CameraView):
   def _render(self, _):
     # Draw text if not onroad
     if not ui_state.started:
-      rl.draw_rectangle_rec(self.rect, Colors.BLACK)
+      rl.draw_rectangle_rec(self.rect, rl.BLACK)
       self._offroad_label.render(self._rect)
       return
 
@@ -227,9 +227,9 @@ class AugmentedRoadView(CameraView):
     source_rect = rl.Rectangle(0, 0, self._fade_texture.width, self._fade_texture.height)
     dest_rect = rl.Rectangle(self._content_rect.x, self._content_rect.y, self._content_rect.width,
                              self._content_rect.height)
-    rl.draw_texture_pro(self._fade_texture, source_rect, dest_rect, rl.Vector2(0, 0), 0.0, Colors.WHITE)
+    rl.draw_texture_pro(self._fade_texture, source_rect, dest_rect, rl.Vector2(0, 0), 0.0, rl.WHITE)
 
-    #rl.draw_texture_ex(self._fade_texture, rl.Vector2(self._content_rect.x, self._content_rect.y), 0.0, 1.0, Colors.WHITE)
+    #rl.draw_texture_ex(self._fade_texture, rl.Vector2(self._content_rect.x, self._content_rect.y), 0.0, 1.0, rl.WHITE)
 
     alert_to_render, not_animating_out = self._alert_renderer.will_render()
 
@@ -247,7 +247,7 @@ class AugmentedRoadView(CameraView):
     self._hud_renderer.render(self._content_rect)
 
     # Draw fake rounded border
-    rl.draw_rectangle_rounded_lines_ex(self._content_rect, 0.2 * 1.02, 10, 50, Colors.BLACK)
+    rl.draw_rectangle_rounded_lines_ex(self._content_rect, 0.2 * 1.02, 10, 50, rl.BLACK)
 
     # End clipping region
     rl.end_scissor_mode()

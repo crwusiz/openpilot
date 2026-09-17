@@ -156,7 +156,7 @@ class TrainingGuideDMTutorial(NavWidget):
     gradient_y = int(self._rect.y + self._rect.height - 80)
     gradient_h = int(self._rect.y) + int(self._rect.height) - gradient_y
     rl.draw_rectangle_gradient_v(int(self._rect.x), gradient_y,
-                                 int(self._rect.width), gradient_h, Colors.TRANSPARENT, Colors.BLACK)
+                                 int(self._rect.width), gradient_h, Colors.TRANSPARENT, rl.BLACK)
 
     # draw white ring around dm icon to indicate progress
     ring_thickness = 8
@@ -210,7 +210,7 @@ class TrainingGuideDMTutorial(NavWidget):
 
     # rounded border
     rl.begin_scissor_mode(int(self._rect.x), int(self._rect.y), int(self._rect.width), int(self._rect.height))
-    rl.draw_rectangle_rounded_lines_ex(self._rect, 0.2 * 1.02, 10, 50, Colors.BLACK)
+    rl.draw_rectangle_rounded_lines_ex(self._rect, 0.2 * 1.02, 10, 50, rl.BLACK)
     rl.end_scissor_mode()
 
 
@@ -291,7 +291,7 @@ class QRCodeWidget(Widget):
   def _render(self, _):
     if self._qr_texture:
       scale = self._size / self._qr_texture.height
-      rl.draw_texture_ex(self._qr_texture, rl.Vector2(round(self._rect.x), round(self._rect.y)), 0.0, scale, Colors.WHITE)
+      rl.draw_texture_ex(self._qr_texture, rl.Vector2(round(self._rect.x), round(self._rect.y)), 0.0, scale, rl.WHITE)
 
   def __del__(self):
     if self._qr_texture and self._qr_texture.id != 0:
@@ -321,7 +321,7 @@ class TermsPage(Scroller):
     ])
 
   def _render(self, _):
-    rl.draw_rectangle_rec(self._rect, Colors.BLACK)
+    rl.draw_rectangle_rec(self._rect, rl.BLACK)
     super()._render(_)
 
 
@@ -371,5 +371,5 @@ class OnboardingWindow(Widget):
     self.close()
 
   def _render(self, _):
-    rl.draw_rectangle_rec(self._rect, Colors.BLACK)
+    rl.draw_rectangle_rec(self._rect, rl.BLACK)
     self._terms.render(self._rect)

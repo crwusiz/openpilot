@@ -326,7 +326,7 @@ class HudRenderer(Widget):
       EXCLAMATION_POINT_SPACING = 10
       exclamation_pos_x = pos_x - self._txt_exclamation_point.width / 2 + wheel_txt.width / 2 + EXCLAMATION_POINT_SPACING
       exclamation_pos_y = pos_y - self._txt_exclamation_point.height / 2
-      rl.draw_texture_ex(self._txt_exclamation_point, rl.Vector2(exclamation_pos_x, exclamation_pos_y), 0.0, 1.0, Colors.WHITE)
+      rl.draw_texture_ex(self._txt_exclamation_point, rl.Vector2(exclamation_pos_x, exclamation_pos_y), 0.0, 1.0, rl.WHITE)
 
   def _draw_borders(self, rect: rl.Rectangle) -> None:
     """Draw borders for blinkers, blind spot, and system status."""
@@ -370,7 +370,7 @@ class HudRenderer(Widget):
       left_color = colors_alpha(Colors.ORANGE, alpha)
       left_draw = True
     elif is_engaged:
-      left_color = colors_alpha(Colors.GREEN, alpha)
+      left_color = colors_alpha(Colors.ENGAGED, alpha)
       left_draw = True
 
     if left_draw:
@@ -396,7 +396,7 @@ class HudRenderer(Widget):
       right_color = colors_alpha(Colors.ORANGE, alpha)
       right_draw = True
     elif is_engaged:
-      right_color = colors_alpha(Colors.GREEN, alpha)
+      right_color = colors_alpha(Colors.ENGAGED, alpha)
       right_draw = True
 
     if right_draw:
@@ -407,13 +407,13 @@ class HudRenderer(Widget):
     if not self._can_draw_top_icons or ui_state.status == UIStatus.DISENGAGED:
       return
 
-    max_color = Colors.WHITE_TRANSLUCENT
-    speed_color = Colors.WHITE_TRANSLUCENT
+    max_color = colors_alpha(rl.WHITE, 200)
+    speed_color = colors_alpha(rl.WHITE, 200)
 
     if self.is_cruise_set:
-      speed_color = Colors.WHITE
+      speed_color = rl.WHITE
       if ui_state.status in (UIStatus.ENGAGED, UIStatus.ACTIVE):
-        max_color = Colors.GREEN
+        max_color = Colors.ENGAGED
       elif ui_state.status == UIStatus.OVERRIDE:
         max_color = Colors.OVERRIDE
 
@@ -423,10 +423,10 @@ class HudRenderer(Widget):
 
     # Max speed box
     max_speed_box_bg = rl.Rectangle(box_x, max_y, box_size, box_size)
-    rl.draw_rectangle_rounded(max_speed_box_bg, 0.2, 10, Colors.BOX_BG)
+    rl.draw_rectangle_rounded(max_speed_box_bg, 0.2, 10, colors_alpha(rl.BLACK, 100))
 
     max_speed_box = rl.Rectangle(max_speed_box_bg.x + 2, max_speed_box_bg.y + 2, box_size - 4, box_size - 4)
-    rl.draw_rectangle_rounded_lines_ex(max_speed_box, 0.2, 10, 1, Colors.WHITE_TRANSLUCENT)
+    rl.draw_rectangle_rounded_lines_ex(max_speed_box, 0.2, 10, 1, colors_alpha(rl.WHITE, 200))
 
     # MAX text
     self._draw_text(
@@ -451,10 +451,10 @@ class HudRenderer(Widget):
     if self.nda_state > 0 or self.stock_limit_speed > 0:
       set_y = max_y + box_size + 8
       set_speed_box_bg = rl.Rectangle(box_x, set_y, box_size, box_size)
-      rl.draw_rectangle_rounded(set_speed_box_bg, 0.2, 10, Colors.BOX_BG)
+      rl.draw_rectangle_rounded(set_speed_box_bg, 0.2, 10, colors_alpha(rl.BLACK, 100))
 
       set_speed_box = rl.Rectangle(set_speed_box_bg.x + 2, set_speed_box_bg.y + 2, box_size - 4, box_size - 4)
-      rl.draw_rectangle_rounded_lines_ex(set_speed_box, 0.2, 10, 1, Colors.WHITE_TRANSLUCENT)
+      rl.draw_rectangle_rounded_lines_ex(set_speed_box, 0.2, 10, 1, colors_alpha(rl.WHITE, 200))
 
       # SET text
       self._draw_text(
@@ -503,7 +503,7 @@ class HudRenderer(Widget):
     unit_text = tr("km/h") if ui_state.is_metric else tr("mph")
     unit_text_size = measure_text_cached(self._font_medium, unit_text, FontSizes.speed_unit)
     unit_pos = rl.Vector2(center_x - unit_text_size.x / 2, rect.y + speed_text_size.y - 15)
-    rl.draw_text_ex(self._font_medium, unit_text, unit_pos, FontSizes.speed_unit, 0, Colors.WHITE_TRANSLUCENT)
+    rl.draw_text_ex(self._font_medium, unit_text, unit_pos, FontSizes.speed_unit, 0, colors_alpha(rl.WHITE, 200))
 
   def _draw_traffic_light(self, rect: rl.Rectangle) -> None:
     if not self._can_draw_top_icons or ui_state.status == UIStatus.DISENGAGED:
@@ -526,5 +526,5 @@ class HudRenderer(Widget):
       tex,
       rl.Rectangle(0, 0, tex.width, tex.height),
       rl.Rectangle(img_x, img_y, img_w, img_h),
-      rl.Vector2(0, 0), 0, Colors.WHITE
+      rl.Vector2(0, 0), 0, rl.WHITE
     )

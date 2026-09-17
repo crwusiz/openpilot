@@ -52,11 +52,11 @@ class FirehoseLayout(FirehoseLayoutBase):
     title_font = gui_app.font(FontWeight.MEDIUM)
     text_width = measure_text_cached(title_font, title_text, 100).x
     title_x = rect.x + (rect.width - text_width) / 2
-    rl.draw_text_ex(title_font, title_text, rl.Vector2(title_x, y), 100, 0, Colors.WHITE)
+    rl.draw_text_ex(title_font, title_text, rl.Vector2(title_x, y), 100, 0, rl.WHITE)
     y += 200
 
     # Description
-    y = self._draw_wrapped_text(x, y, w, tr(DESCRIPTION), gui_app.font(FontWeight.NORMAL), 45, Colors.WHITE)
+    y = self._draw_wrapped_text(x, y, w, tr(DESCRIPTION), gui_app.font(FontWeight.NORMAL), 45, rl.WHITE)
     y += 40 + 20
 
     # Separator
@@ -73,7 +73,7 @@ class FirehoseLayout(FirehoseLayoutBase):
     #if self._segment_count > 0:
     #  contrib_text = trn("{} segment of your driving is in the training dataset so far.",
     #                     "{} segments of your driving is in the training dataset so far.", self._segment_count).format(self._segment_count)
-    #  y = self._draw_wrapped_text(x, y, w, contrib_text, gui_app.font(FontWeight.BOLD), 52, Colors.WHITE)
+    #  y = self._draw_wrapped_text(x, y, w, contrib_text, gui_app.font(FontWeight.BOLD), 52, rl.WHITE)
     #  y += 20 + 20
 
     # Separator

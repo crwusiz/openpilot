@@ -14,7 +14,7 @@ import subprocess
 import threading
 from pathlib import Path
 from openpilot.common.params import Params
-from openpilot.selfdrive.ui import Colors
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 
 SIDEBAR_WIDTH = 300
@@ -63,8 +63,8 @@ class Sidebar(Widget):
     self.wifi_manager = WifiManager()
     self.wifi_manager_ui = WifiManagerUI(self.wifi_manager)
 
-    self._temp_status = MetricData(tr_noop("TEMP"), tr_noop("GOOD"), Colors.GOOD)
-    self._panda_status = MetricData(tr_noop("VEHICLE"), tr_noop("ONLINE"), Colors.GOOD)
+    self._temp_status = MetricData(tr_noop("TEMP"), tr_noop("GOOD"), rl.WHITE)
+    self._panda_status = MetricData(tr_noop("VEHICLE"), tr_noop("ONLINE"), rl.WHITE)
     self._connect_status = MetricData(tr_noop("CONNECT"), tr_noop("OFFLINE"), Colors.WARNING)
     self._commit_status = MetricData(tr_noop("UPDATE"), tr_noop("CHECK"), Colors.WARNING)
     self._recording_audio = False
@@ -104,7 +104,7 @@ class Sidebar(Widget):
     self._open_settings_callback = open_settings
 
   def _is_network_connected(self) -> bool:
-    return self._connect_status.color == Colors.WHITE
+    return self._connect_status.color == rl.WHITE
 
   def _handle_commit_button_press(self):
     if self._is_processing:
@@ -114,7 +114,7 @@ class Sidebar(Widget):
 
     if not self._is_network_connected():
       print("Network not connected. Cannot perform git operations.")
-      self._commit_status.update(tr_noop("NO NETWORK"), tr_noop("OFFLINE"), Colors.DANGER)
+      self._commit_status.update(tr_noop("NO NETWORK"), tr_noop("OFFLINE"), Colors.RED)
       return
 
     if self._is_update_available:
@@ -148,7 +148,7 @@ class Sidebar(Widget):
       self._git_pull_exit_flag.unlink(missing_ok=True)
 
       self._is_processing = False
-      self._commit_status.update(tr_noop("UPDATE"), tr_noop("COMPLETE"), Colors.WHITE)
+      self._commit_status.update(tr_noop("UPDATE"), tr_noop("COMPLETE"), rl.WHITE)
     except Exception as e:
       print(f"Failed to read git pull exit code file: {e}")
       self._on_git_pull_failed(tr_noop("FILE READ ERROR"))
@@ -156,7 +156,7 @@ class Sidebar(Widget):
   def _on_git_pull_failed(self, reason: str):
     self._is_processing = False
     print(f"Git pull failed: {reason}")
-    self._commit_status.update(tr_noop("git pull"), reason, Colors.DANGER)
+    self._commit_status.update(tr_noop("git pull"), reason, Colors.RED)
 
   def _start_commit_check(self):
     if self._is_processing:
@@ -200,7 +200,7 @@ class Sidebar(Widget):
     self._is_processing = False
     self._is_update_available = False
     print(f"Commit check failed: {reason}")
-    self._commit_status.update(tr_noop("CHECK"), reason, Colors.DANGER)
+    self._commit_status.update(tr_noop("CHECK"), reason, Colors.RED)
 
   def _parse_commit_compare_result(self, output: str | None):
     if not output:
@@ -223,10 +223,10 @@ class Sidebar(Widget):
     remote_commit = parts[1].strip().strip('"')
 
     if operator == "==":
-      self._commit_status.update(tr_noop("UP TO DATE"), local_commit, Colors.UP_TO_DATE)
+      self._commit_status.update(tr_noop("UP TO DATE"), local_commit, Colors.LIME)
       self._is_update_available = False
     else:
-      self._commit_status.update(local_commit, remote_commit, Colors.DANGER)
+      self._commit_status.update(local_commit, remote_commit, Colors.RED)
       self._is_update_available = True
 
   def _update_progress_indicator(self):
@@ -243,7 +243,7 @@ class Sidebar(Widget):
       self._commit_status.update(action_text, tr_noop("progress") + dot_str, Colors.WARNING)
 
   def _render(self, rect: rl.Rectangle):
-    rl.draw_rectangle_rec(rect, Colors.BLACK)
+    rl.draw_rectangle_rec(rect, rl.BLACK)
     self._draw_buttons(rect)
     self._draw_c3x_position(rect)
     self._draw_network_indicator(rect)
@@ -289,26 +289,26 @@ class Sidebar(Widget):
     temp_str = f"{max_temp:.1f}°C"
 
     if thermal_status == ThermalStatus.ok:
-      #self._temp_status.update(tr_noop("TEMP"), tr_noop("GOOD"), Colors.GOOD)
-      self._temp_status.update(tr_noop("TEMP"), temp_str, Colors.GOOD)
+      #self._temp_status.update(tr_noop("TEMP"), tr_noop("GOOD"), rl.WHITE)
+      self._temp_status.update(tr_noop("TEMP"), temp_str, rl.WHITE)
     else:
-      #self._temp_status.update(tr_noop("TEMP"), tr_noop("HIGH"), Colors.DANGER)
-      self._temp_status.update(tr_noop("TEMP"), temp_str, Colors.DANGER)
+      #self._temp_status.update(tr_noop("TEMP"), tr_noop("HIGH"), Colors.RED)
+      self._temp_status.update(tr_noop("TEMP"), temp_str, Colors.RED)
 
   def _update_connection_status(self, device_state):
     last_ping = device_state.lastAthenaPingTime
     if last_ping == 0:
       self._connect_status.update(tr_noop("CONNECT"), tr_noop("OFFLINE"), Colors.WARNING)
     elif time.monotonic_ns() - last_ping < 80_000_000_000:  # 80 seconds (in nanoseconds)
-      self._connect_status.update(tr_noop("CONNECT"), tr_noop("ONLINE"), Colors.GOOD)
+      self._connect_status.update(tr_noop("CONNECT"), tr_noop("ONLINE"), rl.WHITE)
     else:
-      self._connect_status.update(tr_noop("CONNECT"), tr_noop("ERROR"), Colors.DANGER)
+      self._connect_status.update(tr_noop("CONNECT"), tr_noop("ERROR"), Colors.RED)
 
   def _update_panda_status(self):
     if ui_state.panda_type == log.PandaState.PandaType.unknown:
-      self._panda_status.update(tr_noop("NO"), tr_noop("PANDA"), Colors.DANGER)
+      self._panda_status.update(tr_noop("NO"), tr_noop("PANDA"), Colors.RED)
     else:
-      self._panda_status.update(tr_noop("VEHICLE"), tr_noop("ONLINE"), Colors.GOOD)
+      self._panda_status.update(tr_noop("VEHICLE"), tr_noop("ONLINE"), rl.WHITE)
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     if rl.check_collision_point_rec(mouse_pos, SETTINGS_BTN):
@@ -339,32 +339,32 @@ class Sidebar(Widget):
 
     # Settings button
     settings_down = mouse_down and rl.check_collision_point_rec(mouse_pos, SETTINGS_BTN)
-    tint = Colors.BUTTON_PRESSED if settings_down else Colors.BUTTON_NORMAL
+    tint = colors_alpha(rl.WHITE, 166) if settings_down else rl.WHITE
     rl.draw_texture_ex(self._settings_img, rl.Vector2(SETTINGS_BTN.x, SETTINGS_BTN.y), 0.0, 1.0, tint)
 
     # Home/Flag button
     #flag_pressed = mouse_down and rl.check_collision_point_rec(mouse_pos, HOME_BTN)
     #button_img = self._flag_img if ui_state.started else self._home_img
 
-    #tint = Colors.BUTTON_PRESSED if (ui_state.started and flag_pressed) else Colors.BUTTON_NORMAL
+    #tint = colors_alpha(rl.WHITE, 166) if (ui_state.started and flag_pressed) else rl.WHITE
     #rl.draw_texture_ex(button_img, rl.Vector2(HOME_BTN.x, HOME_BTN.y), 0.0, 1.0, tint)
 
     # Show the eGPU icon when Chestnut is connected and ready; otherwise show C3X.
     device_img = self._egpu_img if ui_state.chestnut_state in (ChestnutState.READY, ChestnutState.ACTIVE) else self._c3x_img
     device_scale = HOME_BTN.width / device_img.width if device_img.width > 0 else 1.0
     device_y = HOME_BTN.y + (HOME_BTN.height - (device_img.height * device_scale)) / 2
-    rl.draw_texture_ex(device_img, rl.Vector2(HOME_BTN.x, device_y), 0.0, device_scale, Colors.WHITE)
+    rl.draw_texture_ex(device_img, rl.Vector2(HOME_BTN.x, device_y), 0.0, device_scale, rl.WHITE)
 
     # Microphone button
     if self._recording_audio:
       self._mic_indicator_rect = rl.Rectangle(rect.x + rect.width - 130, rect.y + 245, 75, 40)
       mic_pressed = mouse_down and rl.check_collision_point_rec(mouse_pos, self._mic_indicator_rect)
-      bg_color = rl.Color(Colors.DANGER.r, Colors.DANGER.g, Colors.DANGER.b, int(255 * 0.65)) if mic_pressed else Colors.DANGER
+      bg_color = rl.Color(Colors.RED.r, Colors.RED.g, Colors.RED.b, int(255 * 0.65)) if mic_pressed else Colors.RED
 
       rl.draw_rectangle_rounded(self._mic_indicator_rect, 1, 10, bg_color)
       mic_x = self._mic_indicator_rect.x + (self._mic_indicator_rect.width - self._mic_img.width) / 2
       mic_y = self._mic_indicator_rect.y + (self._mic_indicator_rect.height - self._mic_img.height) / 2
-      rl.draw_texture_ex(self._mic_img, rl.Vector2(mic_x, mic_y), 0.0, 1.0, Colors.WHITE)
+      rl.draw_texture_ex(self._mic_img, rl.Vector2(mic_x, mic_y), 0.0, 1.0, rl.WHITE)
 
   def _draw_c3x_position(self, rect: rl.Rectangle):
     c3x_position = self._params.get("DevicePosition") or "--"
@@ -375,7 +375,7 @@ class Sidebar(Widget):
       text_rect.x + (text_rect.width - text_size.x) / 2,
       text_rect.y + (text_rect.height - text_size.y) / 2
     )
-    rl.draw_text_ex(self._font_semi_bold, c3x_position, text_pos, 30, 0, Colors.WHITE)
+    rl.draw_text_ex(self._font_semi_bold, c3x_position, text_pos, 30, 0, rl.WHITE)
 
   def _draw_network_indicator(self, rect: rl.Rectangle):
     # Signal strength dots
@@ -385,7 +385,7 @@ class Sidebar(Widget):
     dot_spacing = 37
 
     for i in range(5):
-      color = Colors.WHITE if i < self._net_strength else Colors.GRAY
+      color = rl.WHITE if i < self._net_strength else Colors.GRAY
       x = int(x_start + i * dot_spacing + dot_size // 2)
       y = int(y_pos + dot_size // 2)
       rl.draw_circle(x, y, dot_size // 2, color)
@@ -395,7 +395,7 @@ class Sidebar(Widget):
     text_str = tr(self._net_type)
     text_size = measure_text_cached(self._font_regular, text_str, FONT_SIZE)
     text_pos = rl.Vector2(rect.x + (rect.width - text_size.x) / 2, text_y)
-    rl.draw_text_ex(self._font_regular, text_str, text_pos, FONT_SIZE, 0, Colors.WHITE)
+    rl.draw_text_ex(self._font_regular, text_str, text_pos, FONT_SIZE, 0, rl.WHITE)
 
   def _draw_metrics(self, rect: rl.Rectangle):
     metrics = [
@@ -418,7 +418,7 @@ class Sidebar(Widget):
     rl.end_scissor_mode()
 
     # Border
-    rl.draw_rectangle_rounded_lines_ex(metric_rect, 0.3, 10, 2, Colors.METRIC_BORDER)
+    rl.draw_rectangle_rounded_lines_ex(metric_rect, 0.3, 10, 2, colors_alpha(rl.WHITE, 85))
 
     # Text label
     labels = [tr(metric.label), tr(metric.value)]
@@ -430,4 +430,4 @@ class Sidebar(Widget):
         metric_rect.x + 22 + (metric_rect.width - 22 - text_size.x) / 2,
         text_y
       )
-      rl.draw_text_ex(self._font_semi_bold, text, text_pos, FONT_SIZE, 0, Colors.WHITE)
+      rl.draw_text_ex(self._font_semi_bold, text, text_pos, FONT_SIZE, 0, rl.WHITE)

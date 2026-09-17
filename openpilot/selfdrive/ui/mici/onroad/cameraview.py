@@ -11,9 +11,6 @@ from openpilot.system.ui.lib.egl import init_egl, create_egl_image, destroy_egl_
 from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 
-from openpilot.selfdrive.ui import Colors
-
-
 CONNECTION_RETRY_INTERVAL = 0.2  # seconds between connection attempts
 
 VERSION = """
@@ -147,7 +144,7 @@ class CameraView(Widget):
         raise RuntimeError("Failed to initialize EGL")
 
       # Create a 1x1 pixel placeholder texture for EGL image binding
-      temp_image = rl.gen_image_color(1, 1, Colors.BLACK)
+      temp_image = rl.gen_image_color(1, 1, rl.BLACK)
       self.egl_texture = rl.load_texture_from_image(temp_image)
       rl.unload_image(temp_image)
 
@@ -299,7 +296,7 @@ class CameraView(Widget):
     # Render with shader
     rl.begin_shader_mode(self.shader)
     self._update_texture_color_filtering()
-    rl.draw_texture_pro(self.egl_texture, src_rect, dst_rect, rl.Vector2(0, 0), 0.0, Colors.WHITE)
+    rl.draw_texture_pro(self.egl_texture, src_rect, dst_rect, rl.Vector2(0, 0), 0.0, rl.WHITE)
     rl.end_shader_mode()
 
   def _render_textures(self, src_rect: rl.Rectangle, dst_rect: rl.Rectangle) -> None:
@@ -320,7 +317,7 @@ class CameraView(Widget):
     rl.begin_shader_mode(self.shader)
     self._update_texture_color_filtering()
     rl.set_shader_value_texture(self.shader, self._texture1_loc, self.texture_uv)
-    rl.draw_texture_pro(self.texture_y, src_rect, dst_rect, rl.Vector2(0, 0), 0.0, Colors.WHITE)
+    rl.draw_texture_pro(self.texture_y, src_rect, dst_rect, rl.Vector2(0, 0), 0.0, rl.WHITE)
     rl.end_shader_mode()
 
   def _update_texture_color_filtering(self):

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pyray as rl
-from openpilot.selfdrive.ui import Colors
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 from openpilot.system.ui.lib.application import gui_app
 
@@ -10,7 +10,7 @@ class IconIndicator:
   def __init__(self, icon_path: str, background_size: int, icon_size: int, background_color: rl.Color | None = None):
     self._background_size = background_size
     self._icon_size = icon_size
-    self._background_color = background_color or Colors.BLACK_TRANSLUCENT
+    self._background_color = background_color or colors_alpha(rl.BLACK, 166)
     self._texture = gui_app.texture(icon_path, icon_size, icon_size)
     self._rect = rl.Rectangle(0, 0, icon_size, icon_size)
     self._opacity = 1.0

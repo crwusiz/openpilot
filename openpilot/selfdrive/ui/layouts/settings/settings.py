@@ -15,7 +15,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NetworkUI
 
 from openpilot.selfdrive.ui.layouts.settings.community import CommunityLayout
-from openpilot.selfdrive.ui import Colors, SettingsColors
+from openpilot.selfdrive.ui import SettingsColors
 
 
 # Constants
@@ -81,7 +81,7 @@ class SettingsLayout(Widget):
     self._draw_current_panel(panel_rect)
 
   def _draw_sidebar(self, rect: rl.Rectangle):
-    rl.draw_rectangle_rec(rect, Colors.BLACK)
+    rl.draw_rectangle_rec(rect, rl.BLACK)
 
     # Close button
     close_btn_rect = rl.Rectangle(
@@ -93,7 +93,7 @@ class SettingsLayout(Widget):
     close_color = SettingsColors.CLOSE_BUTTON_PRESSED if pressed else SettingsColors.CLOSE_BUTTON
     rl.draw_rectangle_rounded(close_btn_rect, 1.0, 20, close_color)
 
-    icon_color = Colors.WHITE if not pressed else SettingsColors.ICON_PRESSED
+    icon_color = rl.WHITE if not pressed else SettingsColors.ICON_PRESSED
     icon_dest = rl.Rectangle(
       close_btn_rect.x + (close_btn_rect.width - self._close_icon.width) / 2,
       close_btn_rect.y + (close_btn_rect.height - self._close_icon.height) / 2,
@@ -119,7 +119,7 @@ class SettingsLayout(Widget):
 
       # Button styling
       is_selected = panel_type == self._current_panel
-      text_color = Colors.WHITE if is_selected else SettingsColors.TEXT_NORMAL
+      text_color = rl.WHITE if is_selected else SettingsColors.TEXT_NORMAL
       # Draw button text (right-aligned)
       panel_name = tr(panel_info.name)
       text_size = measure_text_cached(self._font_medium, panel_name, 65)

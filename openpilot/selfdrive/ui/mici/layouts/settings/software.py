@@ -15,7 +15,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.scroller import NavScroller
 
-from openpilot.selfdrive.ui import Colors, colors_alpha
+from openpilot.selfdrive.ui import colors_alpha
 
 
 UPDATER_TIMEOUT = 10.0  # seconds to wait for updater to respond
@@ -42,7 +42,7 @@ class SoftwareInfoLayoutMici(Widget):
 
     self.set_rect(rl.Rectangle(0, 0, 360, 180))
 
-    subheader_color = colors_alpha(Colors.WHITE, int(255 * 0.9 * 0.65))
+    subheader_color = colors_alpha(rl.WHITE, int(255 * 0.9 * 0.65))
     max_width = int(self._rect.width - 20)
     self._version_label = UnifiedLabel("version", 48, max_width=max_width, font_weight=FontWeight.DISPLAY, wrap_text=False)
     self._version_text_label = UnifiedLabel("", 32, max_width=max_width, text_color=subheader_color,

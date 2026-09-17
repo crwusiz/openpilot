@@ -47,10 +47,10 @@ class ExpButton(Widget):
     center_x = int(self._rect.x + self._rect.width // 2)
     center_y = int(self._rect.y + self._rect.height // 2)
 
-    white_color = colors_alpha(Colors.WHITE, 180 if self.is_pressed or not self._engageable else 255)
+    white_color = colors_alpha(rl.WHITE, 180 if self.is_pressed or not self._engageable else 255)
 
     texture = self._txt_exp if self._held_or_actual_mode() else self._txt_wheel
-    rl.draw_circle(center_x, center_y, self._rect.width / 2, Colors.BLACK_TRANSLUCENT)
+    rl.draw_circle(center_x, center_y, self._rect.width / 2, colors_alpha(rl.BLACK, 166))
     rl.draw_texture_ex(texture, rl.Vector2(center_x - texture.width / 2, center_y - texture.height / 2), 0.0, 1.0, white_color)
 
   def _held_or_actual_mode(self):

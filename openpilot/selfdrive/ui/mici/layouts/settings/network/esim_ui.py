@@ -23,7 +23,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel, gui_label
 from openpilot.system.ui.widgets.scroller import NavRawScrollPanel, NavScroller
 
-from openpilot.selfdrive.ui import Colors, colors_alpha
+from openpilot.selfdrive.ui import colors_alpha
 
 
 class ProfileActionButton(Widget):
@@ -160,9 +160,9 @@ class InstallingProfileDialog(BigDialog):
 
 
 class EsimProfileButton(BigButton):
-  SUB_LABEL_DISABLED = colors_alpha(Colors.WHITE, int(255 * 0.585))
-  CHECK_ICON_COLOR = colors_alpha(Colors.WHITE, int(255 * 0.585))
-  LABEL_COLOR = colors_alpha(Colors.WHITE, int(255 * 0.9))
+  SUB_LABEL_DISABLED = colors_alpha(rl.WHITE, int(255 * 0.585))
+  CHECK_ICON_COLOR = colors_alpha(rl.WHITE, int(255 * 0.585))
+  LABEL_COLOR = colors_alpha(rl.WHITE, int(255 * 0.9))
   LABEL_PADDING = 98
   LABEL_WIDTH = 402 - 98 - 28
   SUB_LABEL_WIDTH = 402 - BigButton.LABEL_HORIZONTAL_PADDING * 2
@@ -266,10 +266,10 @@ class EsimProfileButton(BigButton):
       self._sub_label.render(sub_label_rect)
 
     if self._comma_txt:
-      rl.draw_texture_ex(self._comma_txt, (self._rect.x + 36, btn_y + 38), 0.0, 1.0, Colors.WHITE)
+      rl.draw_texture_ex(self._comma_txt, (self._rect.x + 36, btn_y + 38), 0.0, 1.0, rl.WHITE)
     else:
       cell_icon = self._cell_full_txt if active else self._cell_none_txt
-      rl.draw_texture_ex(cell_icon, (self._rect.x + 30, btn_y + 38), 0.0, 1.0, Colors.WHITE)
+      rl.draw_texture_ex(cell_icon, (self._rect.x + 30, btn_y + 38), 0.0, 1.0, rl.WHITE)
 
     btn_x = self._rect.x + self._rect.width - (ProfileActionButton.MARGIN - ProfileActionButton.HORIZONTAL_MARGIN)
     btn_bottom = btn_y + self._rect.height

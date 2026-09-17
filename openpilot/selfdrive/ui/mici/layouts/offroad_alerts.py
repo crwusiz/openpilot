@@ -16,7 +16,7 @@ from openpilot.system.ui.widgets.scroller import Scroller
 from openpilot.system.ui.lib.application import gui_app, FontWeight, TextAlignment, TextAlignmentVertical
 from openpilot.system.ui.lib.multilang import tr
 
-from openpilot.selfdrive.ui import Colors, colors_alpha
+from openpilot.selfdrive.ui import colors_alpha
 
 
 REFRESH_INTERVAL = 5.0  # seconds
@@ -47,7 +47,7 @@ class AlertItem(Widget):
   ALERT_PADDING = 28
   ICON_SIZE = 64
   ICON_MARGIN = 12
-  TEXT_COLOR = colors_alpha(Colors.WHITE, int(255 * 0.9))
+  TEXT_COLOR = colors_alpha(rl.WHITE, int(255 * 0.9))
   TITLE_BODY_SPACING = 24
 
   def __init__(self, alert_data: AlertData):
@@ -166,7 +166,7 @@ class AlertItem(Widget):
       bg_texture = self._bg_small_pressed if self.is_pressed else self._bg_small
 
     # Draw background
-    rl.draw_texture_ex(bg_texture, rl.Vector2(self._rect.x, self._rect.y), 0.0, 1.0, Colors.WHITE)
+    rl.draw_texture_ex(bg_texture, rl.Vector2(self._rect.x, self._rect.y), 0.0, 1.0, rl.WHITE)
 
     # Calculate text area (left side, avoiding icon on right)
     title_width = self.ALERT_WIDTH - (self.ALERT_PADDING * 2) - self.ICON_SIZE - self.ICON_MARGIN
@@ -205,7 +205,7 @@ class AlertItem(Widget):
       icon_texture = self._icon_orange
     icon_x = self._rect.x + self.ALERT_WIDTH - self.ALERT_PADDING - self.ICON_SIZE
     icon_y = self._rect.y + self.ALERT_PADDING
-    rl.draw_texture_ex(icon_texture, rl.Vector2(icon_x, icon_y), 0.0, 1.0, Colors.WHITE)
+    rl.draw_texture_ex(icon_texture, rl.Vector2(icon_x, icon_y), 0.0, 1.0, rl.WHITE)
 
 
 class MiciOffroadAlerts(Scroller):
@@ -219,7 +219,7 @@ class MiciOffroadAlerts(Scroller):
     self.alert_items: list[AlertItem] = []
 
     # Create empty state label
-    self._empty_label = UnifiedLabel(tr("no alerts"), 65, FontWeight.DISPLAY, Colors.WHITE,
+    self._empty_label = UnifiedLabel(tr("no alerts"), 65, FontWeight.DISPLAY, rl.WHITE,
                                      alignment=TextAlignment.CENTER,
                                      alignment_vertical=TextAlignmentVertical.MIDDLE)
 

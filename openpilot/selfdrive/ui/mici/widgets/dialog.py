@@ -172,21 +172,21 @@ class BigInputDialog(BigDialogBase):
       text_x -= text_size.x - text_field_rect.width
 
     rl.begin_scissor_mode(int(text_field_rect.x), int(text_field_rect.y), int(text_field_rect.width), int(text_field_rect.height))
-    rl.draw_text_ex(gui_app.font(FontWeight.ROMAN), text, rl.Vector2(text_x, text_field_rect.y), self.TEXT_INPUT_SIZE, 0, Colors.WHITE)
+    rl.draw_text_ex(gui_app.font(FontWeight.ROMAN), text, rl.Vector2(text_x, text_field_rect.y), self.TEXT_INPUT_SIZE, 0, rl.WHITE)
 
     # draw grayed out character user is hovering over
     if candidate_char:
       candidate_char_size = measure_text_cached(gui_app.font(FontWeight.ROMAN), candidate_char, self.TEXT_INPUT_SIZE)
       rl.draw_text_ex(gui_app.font(FontWeight.ROMAN), candidate_char,
                       rl.Vector2(min(text_x + text_size.x, text_field_rect.x + text_field_rect.width) - candidate_char_size.x, text_field_rect.y),
-                      self.TEXT_INPUT_SIZE, 0, colors_alpha(Colors.WHITE, 128))
+                      self.TEXT_INPUT_SIZE, 0, colors_alpha(rl.WHITE, 128))
 
     rl.end_scissor_mode()
 
     # draw gradient on left side to indicate more text
     if text_size.x > text_field_rect.width:
       rl.draw_rectangle_gradient_ex(rl.Rectangle(text_field_rect.x, text_field_rect.y, 80, text_field_rect.height),
-                                    Colors.BLACK, Colors.TRANSPARENT, Colors.TRANSPARENT, Colors.BLACK)
+                                    rl.BLACK, Colors.TRANSPARENT, Colors.TRANSPARENT, rl.BLACK)
 
     # draw cursor
     blink_alpha = (math.sin(rl.get_time() * 6) + 1) / 2
@@ -195,7 +195,7 @@ class BigInputDialog(BigDialogBase):
     else:
       cursor_x = text_field_rect.x - 6
     rl.draw_rectangle_rounded(rl.Rectangle(cursor_x, text_field_rect.y, 4, text_size.y),
-                              1, 4, colors_alpha(Colors.WHITE, int(255 * blink_alpha)))
+                              1, 4, colors_alpha(rl.WHITE, int(255 * blink_alpha)))
 
     # draw backspace icon with nice fade
     self._backspace_img_alpha.update(255 * bool(text))

@@ -73,14 +73,14 @@ class AlertsPill(Widget):
     alert_count = self._alert_count_callback() if self._alert_count_callback else 0
     if alert_count > 0:
       pill_w, pill_h = self._pill_bg_txt.width, self._pill_bg_txt.height
-      rl.draw_texture_ex(self._pill_bg_txt, rl.Vector2(self.rect.x, self.rect.y), 0.0, 1.0, Colors.WHITE)
+      rl.draw_texture_ex(self._pill_bg_txt, rl.Vector2(self.rect.x, self.rect.y), 0.0, 1.0, rl.WHITE)
 
       warning_txt = self._alert_icon_callback() if self._alert_icon_callback else None
       if warning_txt is not None:
         scale = 36 / max(warning_txt.width, warning_txt.height)
         warn_x = self.rect.x + self.ICON_OFFSET
         warn_y = self.rect.y + (pill_h - warning_txt.height * scale) / 2
-        rl.draw_texture_ex(warning_txt, rl.Vector2(warn_x, warn_y), 0.0, scale, Colors.WHITE)
+        rl.draw_texture_ex(warning_txt, rl.Vector2(warn_x, warn_y), 0.0, scale, rl.WHITE)
 
       count_rect = rl.Rectangle(self.rect.x + self.COUNT_OFFSET, self.rect.y, pill_w - self.COUNT_OFFSET, pill_h)
       gui_label(count_rect, str(alert_count), font_size=36,
@@ -135,7 +135,7 @@ class NetworkIcon(Widget):
     if draw_net_txt == self._wifi_slash_txt:
       draw_y -= (self._wifi_slash_txt.height - self._wifi_none_txt.height) / 2
 
-    rl.draw_texture_ex(draw_net_txt, rl.Vector2(draw_x, draw_y), 0.0, 1.0, colors_alpha(Colors.WHITE, int(255 * 0.9)))
+    rl.draw_texture_ex(draw_net_txt, rl.Vector2(draw_x, draw_y), 0.0, 1.0, colors_alpha(rl.WHITE, int(255 * 0.9)))
 
 
 class MiciHomeLayout(Widget):
@@ -277,7 +277,7 @@ class MiciHomeLayout(Widget):
 
     if not self._is_network_connected():
       print("Network not connected, cannot perform git operations")
-      self._commit_status.update("NO NETWORK", "OFFLINE", Colors.DANGER)
+      self._commit_status.update("NO NETWORK", "OFFLINE", Colors.RED)
       return
 
     if self._is_update_available:
@@ -311,7 +311,7 @@ class MiciHomeLayout(Widget):
       self._git_pull_exit_flag.read_text().strip()
       self._git_pull_exit_flag.unlink(missing_ok=True)
       self._is_processing = False
-      self._commit_status.update("UPDATE", "COMPLETE", Colors.WHITE)
+      self._commit_status.update("UPDATE", "COMPLETE", rl.WHITE)
     except Exception as e:
       print(f"Failed to read git pull exit code: {e}")
       self._on_git_pull_failed("FILE READ ERROR")
@@ -319,7 +319,7 @@ class MiciHomeLayout(Widget):
   def _on_git_pull_failed(self, reason: str):
     self._is_processing = False
     print(f"Git pull failed: {reason}")
-    self._commit_status.update("git pull", reason, Colors.DANGER)
+    self._commit_status.update("git pull", reason, Colors.RED)
 
   def _start_commit_check(self):
     if self._is_processing:
@@ -365,7 +365,7 @@ class MiciHomeLayout(Widget):
     self._is_processing = False
     self._is_update_available = False
     print(f"Commit check failed: {reason}")
-    self._commit_status.update("CHECK", reason, Colors.DANGER)
+    self._commit_status.update("CHECK", reason, Colors.RED)
 
   def _parse_commit_compare_result(self, output: str):
     if not output:
@@ -392,10 +392,10 @@ class MiciHomeLayout(Widget):
     remote_commit = parts[1].strip().strip('"')
 
     if operator == "==":
-      self._commit_status.update("UP TO DATE", local_commit, Colors.UP_TO_DATE)
+      self._commit_status.update("UP TO DATE", local_commit, Colors.LIME)
       self._is_update_available = False
     else:
-      self._commit_status.update(local_commit, remote_commit, Colors.DANGER)
+      self._commit_status.update(local_commit, remote_commit, Colors.RED)
       self._is_update_available = True
 
   def _update_progress_indicator(self):
@@ -449,7 +449,7 @@ class MiciHomeLayout(Widget):
     rl.draw_rectangle_rounded(edge_rect, 0.3, 10, self._commit_status.color)
     rl.end_scissor_mode()
 
-    rl.draw_rectangle_rounded_lines_ex(self._commit_btn_rect, 0.3, 10, 2, Colors.WHITE_DIM)
+    rl.draw_rectangle_rounded_lines_ex(self._commit_btn_rect, 0.3, 10, 2, colors_alpha(rl.WHITE, 85))
 
     font_size = 20
     labels = [self._commit_status.label, self._commit_status.value]
@@ -462,7 +462,7 @@ class MiciHomeLayout(Widget):
         self._commit_btn_rect.x + 22 + (self._commit_btn_rect.width - 22 - text_size.x) / 2,
         text_y
       )
-      rl.draw_text_ex(self._font_semi_bold, text, text_pos, font_size, 0, Colors.WHITE)
+      rl.draw_text_ex(self._font_semi_bold, text, text_pos, font_size, 0, rl.WHITE)
       text_y += font_size + 2
 
   def _render(self, _):
@@ -480,7 +480,7 @@ class MiciHomeLayout(Widget):
 
       font_size = 30
       version_text = f"v{self._version_text[0]}"
-      rl.draw_text_ex(self._font_semi_bold, version_text, rl.Vector2(openpilot_end_x + 12, text_pos.y + 32), font_size + 8, 0, Colors.WHITE)
+      rl.draw_text_ex(self._font_semi_bold, version_text, rl.Vector2(openpilot_end_x + 12, text_pos.y + 32), font_size + 8, 0, rl.WHITE)
 
       line2_text = f"{self._version_text[3]}   {branch_name}"
       line2_size = measure_text_cached(self._font_semi_bold, line2_text, font_size)
@@ -488,12 +488,12 @@ class MiciHomeLayout(Widget):
       rl.draw_text_ex(self._font_semi_bold, line2_text, rl.Vector2(text_pos.x + 8, line2_y), font_size, 0, Colors.GRAY)
 
       line3_y = line2_y + line2_size.y + 5
-      ip_color = Colors.UP_TO_DATE if self._ip_address != "Offline" else Colors.GRAY
+      ip_color = Colors.LIME if self._ip_address != "Offline" else Colors.GRAY
       rl.draw_text_ex(self._font_semi_bold, self._ip_address, rl.Vector2(text_pos.x + 8, line3_y), font_size, 0, ip_color)
 
       ip_size = measure_text_cached(self._font_semi_bold, self._ip_address, font_size)
       hostname_text = f" [{self._hostname}]"
-      rl.draw_text_ex(self._font_semi_bold, hostname_text, rl.Vector2(text_pos.x + 8 + ip_size.x, line3_y), font_size, 0, Colors.WHITE)
+      rl.draw_text_ex(self._font_semi_bold, hostname_text, rl.Vector2(text_pos.x + 8 + ip_size.x, line3_y), font_size, 0, rl.WHITE)
 
     # ***** Center-aligned bottom section icons *****
     usb_connected = ui_state.usb_connected

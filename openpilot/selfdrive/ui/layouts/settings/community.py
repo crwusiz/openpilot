@@ -317,7 +317,7 @@ class CommunityLayout(Widget):
     else:
       rl.draw_rectangle_rec(rect, CommunityColors.UNAVAILABLE)
 
-    rl.draw_rectangle_lines_ex(rect, 1, CommunityColors.BORDER)
+    rl.draw_rectangle_lines_ex(rect, 1, rl.DARKGRAY)
 
     font = gui_app.font(FontWeight.NORMAL)
 
@@ -331,12 +331,12 @@ class CommunityLayout(Widget):
         text_size = rl.measure_text_ex(font, line, FONT_SIZE, 1)
         text_x = rect.x + (rect.width - text_size.x) / 2
         text_y = start_y + (i * line_height)
-        rl.draw_text_ex(font, line, rl.Vector2(text_x, text_y), FONT_SIZE, 1, Colors.WHITE)
+        rl.draw_text_ex(font, line, rl.Vector2(text_x, text_y), FONT_SIZE, 1, rl.WHITE)
     else:
       text_size = rl.measure_text_ex(font, text, FONT_SIZE, 1)
       text_x = rect.x + (rect.width - text_size.x) / 2
       text_y = rect.y + (rect.height - text_size.y) / 2
-      rl.draw_text_ex(font, text, rl.Vector2(text_x, text_y), FONT_SIZE, 1, Colors.WHITE)
+      rl.draw_text_ex(font, text, rl.Vector2(text_x, text_y), FONT_SIZE, 1, rl.WHITE)
 
   def _is_point_in_rect(self, x, y, rect):
     return (rect.x <= x <= rect.x + rect.width and

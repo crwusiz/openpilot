@@ -94,7 +94,7 @@ class TrainingGuide(Widget):
   def _render(self, _):
     # Safeguard against fast tapping
     step = min(self._step, len(self._textures) - 1)
-    rl.draw_texture_ex(self._textures[step], rl.Vector2(0, 0), 0.0, 1.0, Colors.WHITE)
+    rl.draw_texture_ex(self._textures[step], rl.Vector2(0, 0), 0.0, 1.0, rl.WHITE)
 
     # progress bar
     if 0 < step < len(STEP_RECTS) - 1:
@@ -104,7 +104,7 @@ class TrainingGuide(Widget):
                         w, h, Colors.PRIMARY_BLUE)
 
     if DEBUG:
-      rl.draw_rectangle_lines_ex(STEP_RECTS[step], 3, Colors.DEBUG_RED)
+      rl.draw_rectangle_lines_ex(STEP_RECTS[step], 3, rl.RED)
 
     return -1
 
@@ -140,8 +140,8 @@ class TermsPage(Widget):
     self._accept_btn.render(rl.Rectangle(self._rect.x + 45 * 2 + btn_width, btn_y, btn_width, 160))
 
     if DEBUG:
-      rl.draw_rectangle_lines_ex(welcome_rect, 3, Colors.DEBUG_RED)
-      rl.draw_rectangle_lines_ex(desc_rect, 3, Colors.DEBUG_RED)
+      rl.draw_rectangle_lines_ex(welcome_rect, 3, rl.RED)
+      rl.draw_rectangle_lines_ex(desc_rect, 3, rl.RED)
 
     return -1
 
@@ -169,7 +169,7 @@ class DeclinePage(Widget):
     text_height = btn_y - (200 + 45)
     text_rect = rl.Rectangle(self._rect.x + 165, self._rect.y + (btn_y - text_height) / 2 + 10, self._rect.width - (165 * 2), text_height)
     if DEBUG:
-      rl.draw_rectangle_lines_ex(text_rect, 3, Colors.DEBUG_RED)
+      rl.draw_rectangle_lines_ex(text_rect, 3, rl.RED)
     self._text.render(text_rect)
 
 

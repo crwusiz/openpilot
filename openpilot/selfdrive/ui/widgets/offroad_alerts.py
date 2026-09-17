@@ -14,7 +14,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.html_render import HtmlRenderer
 from openpilot.selfdrive.selfdrived.alertmanager import OFFROAD_ALERTS
 
-from openpilot.selfdrive.ui import Colors, OffroadAlertColors as AlertColors
+from openpilot.selfdrive.ui import OffroadAlertColors as AlertColors
 
 
 class AlertConstants:
@@ -68,7 +68,7 @@ class ActionButton(Widget):
     rl.draw_rectangle_rounded(self._rect, roundness, 10, bg_color)
 
     # center text
-    color = Colors.WHITE if self._style == ButtonStyle.DARK else Colors.BLACK
+    color = rl.WHITE if self._style == ButtonStyle.DARK else rl.BLACK
     text_x = int(self._rect.x + (self._rect.width - text_size.x) // 2)
     text_y = int(self._rect.y + (self._rect.height - text_size.y) // 2)
     rl.draw_text_ex(self._font, self.text, rl.Vector2(text_x, text_y), AlertConstants.FONT_SIZE, 0, color)

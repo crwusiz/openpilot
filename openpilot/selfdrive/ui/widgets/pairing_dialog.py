@@ -80,7 +80,7 @@ class PairingDialog(Widget):
     left_width = int(content_rect.width * 0.5 - 15)
 
     title_wrapped = wrap_text(title_font, title, 75, left_width)
-    rl.draw_text_ex(title_font, "\n".join(title_wrapped), rl.Vector2(content_rect.x, y), 75, 0.0, Colors.BLACK)
+    rl.draw_text_ex(title_font, "\n".join(title_wrapped), rl.Vector2(content_rect.x, y), 75, 0.0, rl.BLACK)
     y += len(title_wrapped) * 75 + 60
 
     # Two columns: instructions and QR code
@@ -122,10 +122,10 @@ class PairingDialog(Widget):
       rl.draw_circle(int(circle_x), int(circle_y), circle_radius, PairingColors.DOT)
       number = str(i + 1)
       number_size = measure_text_cached(font, number, 30)
-      rl.draw_text_ex(font, number, (int(circle_x - number_size.x // 2), int(circle_y - number_size.y // 2)), 30, 0, Colors.WHITE)
+      rl.draw_text_ex(font, number, (int(circle_x - number_size.x // 2), int(circle_y - number_size.y // 2)), 30, 0, rl.WHITE)
 
       # Text
-      rl.draw_text_ex(font, "\n".join(wrapped), rl.Vector2(text_x, y), 47, 0.0, Colors.BLACK)
+      rl.draw_text_ex(font, "\n".join(wrapped), rl.Vector2(text_x, y), 47, 0.0, rl.BLACK)
       y += text_height + 50
 
   def _render_qr_code(self, rect: rl.Rectangle) -> None:
@@ -133,12 +133,12 @@ class PairingDialog(Widget):
       rl.draw_rectangle_rounded(rect, 0.1, 20, PairingColors.CARD)
       error_font = gui_app.font(FontWeight.BOLD)
       rl.draw_text_ex(
-        error_font, tr("QR Code Error"), rl.Vector2(rect.x + 20, rect.y + rect.height // 2 - 15), 30, 0.0, Colors.ERROR
+        error_font, tr("QR Code Error"), rl.Vector2(rect.x + 20, rect.y + rect.height // 2 - 15), 30, 0.0, rl.RED
       )
       return
 
     source = rl.Rectangle(0, 0, self.qr_texture.width, self.qr_texture.height)
-    rl.draw_texture_pro(self.qr_texture, source, rect, rl.Vector2(0, 0), 0, Colors.WHITE)
+    rl.draw_texture_pro(self.qr_texture, source, rect, rl.Vector2(0, 0), 0, rl.WHITE)
 
   def __del__(self):
     if self.qr_texture and self.qr_texture.id != 0:

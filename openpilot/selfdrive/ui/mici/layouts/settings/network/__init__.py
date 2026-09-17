@@ -8,8 +8,6 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.cellular_manager import CellularManager
 from openpilot.system.ui.lib.wifi_manager import WifiManager, ConnectStatus, SecurityType, normalize_ssid
 
-from openpilot.selfdrive.ui import Colors
-
 NetworkStrength = log.DeviceState.NetworkStrength
 NetworkType = log.DeviceState.NetworkType
 
@@ -106,4 +104,4 @@ class WifiNetworkButton(BigButton):
       icon_y = btn_y + 30
       lock_x = icon_x + self._txt_icon.width - self._lock_txt.width + 7
       lock_y = icon_y + self._txt_icon.height - self._lock_txt.height + 8
-      rl.draw_texture_ex(self._lock_txt, (lock_x, lock_y), 0.0, 1.0, Colors.WHITE)
+      rl.draw_texture_ex(self._lock_txt, (lock_x, lock_y), 0.0, 1.0, rl.WHITE)

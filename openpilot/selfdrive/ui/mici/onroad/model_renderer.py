@@ -319,7 +319,7 @@ class ModelRenderer(Widget):
         continue
 
       alpha = np.clip(self._lane_line_probs[i], 0.0, 0.7)
-      color = colors_alpha(Colors.WHITE, int(alpha * 255))
+      color = colors_alpha(rl.WHITE, int(alpha * 255))
       draw_polygon(self._rect, lane_line.projected_points + offset, color)
 
     for i, road_edge in enumerate(self._road_edges):
@@ -327,7 +327,7 @@ class ModelRenderer(Widget):
         continue
 
       alpha = np.clip(1.0 - self._road_edge_stds[i], 0.0, 1.0)
-      color = colors_alpha(Colors.ROAD_EDGE, int(alpha * 255))
+      color = colors_alpha(Colors.RED, int(alpha * 255))
       draw_polygon(self._rect, road_edge.projected_points + offset, color)
 
   def _draw_path(self, sm):
@@ -345,11 +345,11 @@ class ModelRenderer(Widget):
       if ui_state.steeringPressed:
         draw_polygon(self._rect, path_pts, gradient=self._steering_pressed_gradient)
       if ui_state.status == UIStatus.DISENGAGED:
-        draw_polygon(self._rect, path_pts, colors_alpha(Colors.BLACK, 90))
+        draw_polygon(self._rect, path_pts, colors_alpha(rl.BLACK, 90))
       elif len(self._exp_gradient.colors) > 1:
         draw_polygon(self._rect, path_pts, gradient=self._exp_gradient)
       else:
-        draw_polygon(self._rect, path_pts, colors_alpha(Colors.WHITE, 30))
+        draw_polygon(self._rect, path_pts, colors_alpha(rl.WHITE, 30))
     else:
       # Blend throttle/no throttle colors based on transition
       blend_factor = round(self._blend_filter.x * 100) / 100
@@ -362,7 +362,7 @@ class ModelRenderer(Widget):
       )
 
       if ui_state.status == UIStatus.DISENGAGED:
-        draw_polygon(self._rect, path_pts, colors_alpha(Colors.BLACK, 90))
+        draw_polygon(self._rect, path_pts, colors_alpha(rl.BLACK, 90))
       else:
         draw_polygon(self._rect, path_pts, gradient=gradient)
 
@@ -388,7 +388,7 @@ class ModelRenderer(Widget):
         continue
 
       if lead_vehicle.fill_poly:
-        rl.draw_triangle_fan(lead_vehicle.fill_poly, 4, Colors.BOX_BG)
+        rl.draw_triangle_fan(lead_vehicle.fill_poly, 4, colors_alpha(rl.BLACK, 100))
 
       bracket_color = colors_alpha(Colors.RED, lead_vehicle.fill_alpha)
       pts = lead_vehicle.chevron
@@ -414,7 +414,7 @@ class ModelRenderer(Widget):
         d_rel = lead_info.d_rel
         dist_y = center_y - (text_offset + 5)
 
-        d_color = Colors.WHITE
+        d_color = rl.WHITE
         if d_rel < 5:
           d_color = Colors.RED
         elif d_rel < 15:
@@ -427,7 +427,7 @@ class ModelRenderer(Widget):
         v_rel = lead_info.v_rel
         speed_y = center_y + text_offset
 
-        v_color = Colors.WHITE
+        v_color = rl.WHITE
         if v_rel < -5:
           v_color = Colors.RED
         elif v_rel < 0:

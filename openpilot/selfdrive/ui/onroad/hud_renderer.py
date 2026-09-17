@@ -123,7 +123,7 @@ class HudRenderer(Widget):
   def _init_icon_indicators(self) -> None:
     icon_size = UIConfig.icon_size
     background_size = UIConfig.button_size
-    bg_color = Colors.BLACK_TRANSLUCENT
+    bg_color = colors_alpha(rl.BLACK, 166)
 
     # Upper right indicator group
     self._upper_indicators = IconIndicatorGroup()
@@ -469,11 +469,11 @@ class HudRenderer(Widget):
   def _draw_set_speed(self, rect: rl.Rectangle) -> None:
     # Determine speed color
     limit_speed = self._get_current_limit_speed()
-    max_color = Colors.WHITE_TRANSLUCENT
-    speed_color = Colors.WHITE_TRANSLUCENT
+    max_color = colors_alpha(rl.WHITE, 200)
+    speed_color = colors_alpha(rl.WHITE, 200)
 
     if self.is_cruise_set:
-      speed_color = Colors.WHITE
+      speed_color = rl.WHITE
       if ui_state.status == UIStatus.ENGAGED:
         max_color = Colors.ENGAGED
       elif ui_state.status == UIStatus.DISENGAGED:
@@ -492,10 +492,10 @@ class HudRenderer(Widget):
 
     # Max speed box with background
     max_speed_box_bg = rl.Rectangle(rect.x + 30, rect.y + 45, 170, 170)
-    rl.draw_rectangle_rounded(max_speed_box_bg, 0.186, 10, Colors.BLACK_TRANSLUCENT)
+    rl.draw_rectangle_rounded(max_speed_box_bg, 0.186, 10, colors_alpha(rl.BLACK, 166))
 
     max_speed_box = rl.Rectangle(max_speed_box_bg.x + 5, max_speed_box_bg.y + 5, 160, 160)
-    rl.draw_rectangle_rounded_lines_ex(max_speed_box, 0.186, 10, 2, Colors.WHITE_TRANSLUCENT)
+    rl.draw_rectangle_rounded_lines_ex(max_speed_box, 0.186, 10, 2, colors_alpha(rl.WHITE, 200))
 
     # MAX text
     max_text = "MAX"
@@ -520,10 +520,10 @@ class HudRenderer(Widget):
     # SET speed box with background (only if NDA or stock limit is active)
     if self.nda_state > 0 or self.stock_limit_speed > 0:
       set_speed_box_bg = rl.Rectangle(rect.x + 30, rect.y + 45 + 170, 170, 170)
-      rl.draw_rectangle_rounded(set_speed_box_bg, 0.186, 10, Colors.BLACK_TRANSLUCENT)
+      rl.draw_rectangle_rounded(set_speed_box_bg, 0.186, 10, colors_alpha(rl.BLACK, 166))
 
       set_speed_box = rl.Rectangle(set_speed_box_bg.x + 5, set_speed_box_bg.y + 5, 160, 160)
-      rl.draw_rectangle_rounded_lines_ex(set_speed_box, 0.186, 10, 2, Colors.WHITE_TRANSLUCENT)
+      rl.draw_rectangle_rounded_lines_ex(set_speed_box, 0.186, 10, 2, colors_alpha(rl.WHITE, 200))
 
       # SET text
       set_text = "SET"
@@ -547,10 +547,10 @@ class HudRenderer(Widget):
 
     # Traffic box with background
     traffic_box_bg = rl.Rectangle(rect.x + 200, rect.y + 45, 95, 170)
-    rl.draw_rectangle_rounded(traffic_box_bg, 0.35, 10, Colors.BLACK_TRANSLUCENT)
+    rl.draw_rectangle_rounded(traffic_box_bg, 0.35, 10, colors_alpha(rl.BLACK, 166))
 
     traffic_box = rl.Rectangle(traffic_box_bg.x + 5, traffic_box_bg.y + 5, 85, 160)
-    rl.draw_rectangle_rounded_lines_ex(traffic_box, 0.35, 10, 2, Colors.WHITE_TRANSLUCENT)
+    rl.draw_rectangle_rounded_lines_ex(traffic_box, 0.35, 10, 2, colors_alpha(rl.WHITE, 200))
 
     # Traffic light
     traffic_w = 77
@@ -564,21 +564,21 @@ class HudRenderer(Widget):
         self.traffic_red_img,
         rl.Rectangle(0, 0, traffic_w, traffic_h),
         rl.Rectangle(traffic_x, traffic_y, traffic_w, traffic_h),
-        rl.Vector2(0, 0), 0, Colors.WHITE
+        rl.Vector2(0, 0), 0, rl.WHITE
       )
     elif self.traffic_state == 2:
       rl.draw_texture_pro(
         self.traffic_green_img,
         rl.Rectangle(0, 0, traffic_w, traffic_h),
         rl.Rectangle(traffic_x, traffic_y, traffic_w, traffic_h),
-        rl.Vector2(0, 0), 0, Colors.WHITE
+        rl.Vector2(0, 0), 0, rl.WHITE
       )
     else:
       rl.draw_texture_pro(
         self.traffic_off_img,
         rl.Rectangle(0, 0, traffic_w, traffic_h),
         rl.Rectangle(traffic_x, traffic_y, traffic_w, traffic_h),
-        rl.Vector2(0, 0), 0, Colors.WHITE
+        rl.Vector2(0, 0), 0, rl.WHITE
       )
 
     # Draw speed limit sign
@@ -589,9 +589,9 @@ class HudRenderer(Widget):
       center_y = traffic_y + traffic_h / 2
 
       # Draw circles for sign
-      rl.draw_circle(int(center_x), int(center_y), radius + 15, Colors.WHITE)
+      rl.draw_circle(int(center_x), int(center_y), radius + 15, rl.WHITE)
       rl.draw_circle(int(center_x), int(center_y), radius + 14, Colors.RED)
-      rl.draw_circle(int(center_x), int(center_y), radius, Colors.WHITE)
+      rl.draw_circle(int(center_x), int(center_y), radius, rl.WHITE)
 
       # Draw speed number
       limit_speed_text = str(int(limit_speed))
@@ -600,7 +600,7 @@ class HudRenderer(Widget):
         center_y,
         limit_speed_text,
         FontSizes.big,
-        Colors.BLACK
+        rl.BLACK
       )
 
       # Draw distance if available
@@ -621,7 +621,7 @@ class HudRenderer(Widget):
           y=center_y + radius + 10,
           text=dist_text,
           font_size=FontSizes.middle,
-          text_color=Colors.WHITE_TRANSLUCENT,
+          text_color=colors_alpha(rl.WHITE, 200),
         )
 
     # Road sign
@@ -635,21 +635,21 @@ class HudRenderer(Widget):
         self.speed_bump_img,
         rl.Rectangle(0, 0, sign_w, sign_h),
         rl.Rectangle(sign_x, sign_y, sign_w, sign_h),
-        rl.Vector2(0, 0), 0, Colors.WHITE
+        rl.Vector2(0, 0), 0, rl.WHITE
       )
     elif self.school_zone_active:
       rl.draw_texture_pro(
         self.school_zone_img,
         rl.Rectangle(0, 0, sign_w, sign_h),
         rl.Rectangle(sign_x, sign_y, sign_w, sign_h),
-        rl.Vector2(0, 0), 0, Colors.WHITE
+        rl.Vector2(0, 0), 0, rl.WHITE
       )
     elif self.cam_limit_speed > 0 and self.cam_limit_speed_left_dist > 0:
       rl.draw_texture_pro(
         self.speed_camera_img,
         rl.Rectangle(0, 0, sign_w, sign_h),
         rl.Rectangle(sign_x, sign_y, sign_w, sign_h),
-        rl.Vector2(0, 0), 0, Colors.WHITE
+        rl.Vector2(0, 0), 0, rl.WHITE
       )
 
   def _get_current_limit_speed(self) -> float:
@@ -717,7 +717,7 @@ class HudRenderer(Widget):
       y=y,
       text=car_name,
       font_size=FontSizes.info_text,
-      text_color=Colors.WHITE_TRANSLUCENT,
+      text_color=colors_alpha(rl.WHITE, 200),
       alignment="L"
     )
 
@@ -771,7 +771,7 @@ class HudRenderer(Widget):
       y=y,
       text=gps_text,
       font_size=FontSizes.info_text,
-      text_color=Colors.WHITE_TRANSLUCENT,
+      text_color=colors_alpha(rl.WHITE, 200),
       alignment="R"
     )
 
@@ -785,7 +785,7 @@ class HudRenderer(Widget):
       y=y,
       text=date_str,
       font_size=FontSizes.info_text,
-      text_color=Colors.WHITE_TRANSLUCENT,
+      text_color=colors_alpha(rl.WHITE, 200),
       alignment="L"
     )
 
@@ -797,7 +797,7 @@ class HudRenderer(Widget):
       y=y,
       text=steer_info,
       font_size=FontSizes.info_text,
-      text_color=Colors.WHITE_TRANSLUCENT,
+      text_color=colors_alpha(rl.WHITE, 200),
       alignment="L"
     )
 
@@ -809,7 +809,7 @@ class HudRenderer(Widget):
       y=y,
       text=version,
       font_size=FontSizes.info_text,
-      text_color=Colors.WHITE_TRANSLUCENT,
+      text_color=colors_alpha(rl.WHITE, 200),
       alignment="R"
     )
 
@@ -824,7 +824,7 @@ class HudRenderer(Widget):
       self.tpms_img,
       rl.Rectangle(0, 0, tpms_w, tpms_h),
       rl.Rectangle(tpms_x, tpms_y, tpms_w, tpms_h),
-      rl.Vector2(0, 0), 0, Colors.WHITE_TRANSLUCENT
+      rl.Vector2(0, 0), 0, colors_alpha(rl.WHITE, 200)
     )
 
     def get_tpms_color(pressure):
@@ -832,7 +832,7 @@ class HudRenderer(Widget):
         return Colors.ORANGE
       if pressure < 31:
         return Colors.RED
-      return Colors.BLACK
+      return rl.BLACK
 
     def get_tpms_text(pressure):
       if pressure < 5 or pressure > 60:
@@ -881,7 +881,7 @@ class HudRenderer(Widget):
       dist_imgs[dist_idx],
       rl.Rectangle(0, 0, dist_w, dist_h),
       rl.Rectangle(dist_x, dist_y, dist_w, dist_h),
-      rl.Vector2(0, 0), 0, Colors.WHITE_TRANSLUCENT
+      rl.Vector2(0, 0), 0, colors_alpha(rl.WHITE, 200)
     )
 
   def _get_color_for_angle(self, angle: float) -> rl.Color:
@@ -933,7 +933,7 @@ class HudRenderer(Widget):
 
         if alpha > 0.05:
           x_pos = x + int(i * blinker_width * 0.6 * direction)
-          color = colors_alpha(Colors.WHITE, int(alpha * 255))
+          color = colors_alpha(rl.WHITE, int(alpha * 255))
 
           rl.draw_texture_pro(
             blinker_img,
@@ -954,7 +954,7 @@ class HudRenderer(Widget):
 
         if alpha > 0.05:
           x_pos = x + int(i * blinker_width * 0.6 * direction)
-          color = colors_alpha(Colors.WHITE, int(alpha * 255))
+          color = colors_alpha(rl.WHITE, int(alpha * 255))
 
           rl.draw_texture_pro(
             blinker_img,
@@ -979,7 +979,7 @@ class HudRenderer(Widget):
         self.blind_spot_left_img,
         rl.Rectangle(0, 0, blinder_w, blinder_h),
         rl.Rectangle(x_pos, y_pos, blinder_w, blinder_h),
-        rl.Vector2(0, 0), 0, Colors.WHITE
+        rl.Vector2(0, 0), 0, rl.WHITE
       )
 
     if self.right_blind_spot:
@@ -989,7 +989,7 @@ class HudRenderer(Widget):
         self.blind_spot_right_img,
         rl.Rectangle(0, 0, blinder_w, blinder_h),
         rl.Rectangle(x_pos, y_pos, blinder_w, blinder_h),
-        rl.Vector2(0, 0), 0, Colors.WHITE
+        rl.Vector2(0, 0), 0, rl.WHITE
       )
 
   # ----------------- helper function -----------------
@@ -1036,7 +1036,7 @@ class HudRenderer(Widget):
 
     corner_radius: float = 0.5
     segments: int = 10
-    bg_color = Colors.BLACK_TRANSLUCENT
+    bg_color = colors_alpha(rl.BLACK, 166)
     rl.draw_rectangle_rounded(
       rl.Rectangle(bg_x, bg_y, bg_width, bg_height),
       corner_radius,
@@ -1071,7 +1071,7 @@ class HudRenderer(Widget):
       (outline_thickness, outline_thickness),
     ]
 
-    outline_color = Colors.BLACK_TRANSLUCENT
+    outline_color = colors_alpha(rl.BLACK, 166)
     for offset_x, offset_y in offsets:
       rl.draw_text_ex(
         self._font_bold,

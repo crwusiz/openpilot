@@ -43,7 +43,7 @@ class SetupWidget(Widget):
 
     # Title
     font = gui_app.font(FontWeight.BOLD)
-    rl.draw_text_ex(font, tr("Finish Setup"), rl.Vector2(x, y), 75, 0, Colors.WHITE)
+    rl.draw_text_ex(font, tr("Finish Setup"), rl.Vector2(x, y), 75, 0, rl.WHITE)
     y += 113  # 75 + 38 spacing
 
     # Description
@@ -51,7 +51,7 @@ class SetupWidget(Widget):
     light_font = gui_app.font(FontWeight.NORMAL)
     wrapped = wrap_text(light_font, desc, 50, int(w))
     for line in wrapped:
-      rl.draw_text_ex(light_font, line, rl.Vector2(x, y), 50, 0, Colors.WHITE)
+      rl.draw_text_ex(light_font, line, rl.Vector2(x, y), 50, 0, rl.WHITE)
       y += 50 * FONT_SCALE
 
     button_rect = rl.Rectangle(x, y + 30, w, 200)
@@ -70,8 +70,8 @@ class SetupWidget(Widget):
 
     # Title with fire emojis
     self._firehose_label.render(rl.Rectangle(rect.x, y, rect.width, 64))
-    rl.draw_texture_ex(self._fire_icon, rl.Vector2(x, y), 0.0, 1.0, Colors.WHITE)
-    rl.draw_texture_ex(self._fire_icon, rl.Vector2(x + w - 64, y), 0.0, 1.0, Colors.WHITE)
+    rl.draw_texture_ex(self._fire_icon, rl.Vector2(x, y), 0.0, 1.0, rl.WHITE)
+    rl.draw_texture_ex(self._fire_icon, rl.Vector2(x + w - 64, y), 0.0, 1.0, rl.WHITE)
     y += 64 + spacing
 
     # Description
@@ -80,7 +80,7 @@ class SetupWidget(Widget):
     wrapped_desc = wrap_text(desc_font, desc_text, 40, int(w))
 
     for line in wrapped_desc:
-      rl.draw_text_ex(desc_font, line, rl.Vector2(x, y), 40, 0, Colors.WHITE)
+      rl.draw_text_ex(desc_font, line, rl.Vector2(x, y), 40, 0, rl.WHITE)
       y += 40 * FONT_SCALE
 
     y += spacing
