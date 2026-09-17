@@ -38,8 +38,8 @@ from openpilot.common.file_chunker import open_file_chunked
 from openpilot.selfdrive.modeld.constants import ModelConstants, Plan
 from openpilot.selfdrive.modeld.helpers import MODELS_DIR, chestnut_present, chestnut_compiled, modeld_pkl_path, load_oob
 
-import usb1
 import struct
+from tinygrad.runtime.autogen import libusb
 from openpilot.common.hardware.usb import CHESTNUT_USB_IDS
 
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
@@ -92,37 +92,50 @@ class ChestnutReadyProbe:
 
   def close(self) -> None:
     try:
-      if self._asm_usb is not None:
-        self._asm_usb.close()
+      if self._asm_usb:
+        libusb.libusb_close(self._asm_usb)
     finally:
       self._asm_usb = None
       self._pcie_power_requested = False
       if self._context is not None:
-        self._context.close()
+        libusb.libusb_exit(self._context)
         self._context = None
+
+  def _control_transfer(self, request_type: int, request: int, value: int, length: int, timeout: int) -> bytes:
+    data = (ctypes.c_ubyte * length)()
+    transferred = libusb.libusb_control_transfer(self._asm_usb, request_type, request, value, 0, data, length, timeout)
+    if transferred < 0:
+      raise RuntimeError(f"Chestnut USB request 0x{request:02x} failed: {transferred}")
+    if transferred != length:
+      raise RuntimeError(f"Chestnut USB request 0x{request:02x}: expected {length} bytes, got {transferred}")
+    return bytes(data)
 
   def probe_ready(self) -> bool:
     try:
       if self._context is None:
-        self._context = usb1.USBContext()
-      if self._asm_usb is None:
+        context = ctypes.POINTER(libusb.struct_libusb_context)()
+        result = libusb.libusb_init(ctypes.byref(context))
+        if result < 0:
+          raise RuntimeError(f"Chestnut USB initialization failed: {result}")
+        self._context = context
+      if not self._asm_usb:
         for vendor_id, product_id in CHESTNUT_USB_IDS:
-          self._asm_usb = self._context.openByVendorIDAndProductID(vendor_id, product_id, skip_on_error=True)
-          if self._asm_usb is not None:
+          self._asm_usb = libusb.libusb_open_device_with_vid_pid(self._context, vendor_id, product_id)
+          if self._asm_usb:
             break
-      if self._asm_usb is None:
+      if not self._asm_usb:
         return False
 
-      raw = self._asm_usb.controlRead(0xC0, 0xC0, 0, 0, 5, timeout=100)
-      supply_voltage, _, supply_fault = struct.unpack('<Hh?', bytes(raw))
+      raw = self._control_transfer(0xC0, 0xC0, 0, 5, timeout=100)
+      supply_voltage, _, supply_fault = struct.unpack('<Hh?', raw)
       if supply_voltage < 5000 or supply_fault:
         self._pcie_power_requested = False
         return False
 
       if not self._pcie_power_requested:
-        self._asm_usb.controlWrite(0x40, 0xF3, 1, 0, b'', timeout=2000)
+        self._control_transfer(0x40, 0xF3, 1, 0, timeout=2000)
         self._pcie_power_requested = True
-      ready = self._asm_usb.controlRead(0xC0, 0xE4, 0xB450, 0, 1, timeout=1000)[0] == 0x78
+      ready = self._control_transfer(0xC0, 0xE4, 0xB450, 1, timeout=1000)[0] == 0x78
       self._probe_error_logged = False
       return ready
     except Exception:
