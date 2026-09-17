@@ -291,9 +291,6 @@ class Sidebar(Widget):
     if thermal_status == ThermalStatus.ok:
       #self._temp_status.update(tr_noop("TEMP"), tr_noop("GOOD"), Colors.GOOD)
       self._temp_status.update(tr_noop("TEMP"), temp_str, Colors.GOOD)
-    elif thermal_status == ThermalStatus.yellow:
-      #self._temp_status.update(tr_noop("TEMP"), tr_noop("OK"), Colors.WARNING)
-      self._temp_status.update(tr_noop("TEMP"), temp_str, Colors.WARNING)
     else:
       #self._temp_status.update(tr_noop("TEMP"), tr_noop("HIGH"), Colors.DANGER)
       self._temp_status.update(tr_noop("TEMP"), temp_str, Colors.DANGER)
