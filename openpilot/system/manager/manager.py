@@ -9,7 +9,6 @@ import traceback
 from openpilot.cereal import log
 import openpilot.cereal.messaging as messaging
 from openpilot.common.utils import atomic_write
-from openpilot.common.log_paths import clear_log_files
 from openpilot.common.params import Params, ParamKeyFlag
 from openpilot.common.text_window import TextWindow
 from openpilot.common.hardware import HARDWARE
@@ -20,10 +19,11 @@ from openpilot.system.athena.registration import register, UNREGISTERED_DONGLE_I
 from openpilot.common.swaglog import cloudlog, add_file_handler
 from openpilot.common.version import get_build_metadata
 from openpilot.common.hardware.hw import Paths
+
+from openpilot.common.log_paths import clear_log_files
 from openpilot.system.crash import UPLOAD_RETRY_INTERVAL, capture_exception, start_upload
 
 def manager_init() -> None:
-  # Clear all session log files and upload flags before starting services.
   clear_log_files()
   save_bootlog()
 

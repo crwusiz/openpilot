@@ -11,36 +11,22 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import WifiManager, WifiManagerUI
 
 # Constants
-if gui_app.big_ui():
-  PROGRESS_BAR_WIDTH = 1000
-  PROGRESS_BAR_HEIGHT = 20
-  TEXTURE_SIZE = 360
-  WRAPPED_SPACING = 50
-  CENTERED_SPACING = 150
-  MARGIN_H = 100
-  FONT_SIZE = 96
-  LINE_HEIGHT = 104
-  IP_FONT_SIZE = 72
-  IP_TOP_MARGIN = 36
-  STATUS_FONT_SIZE = 48
-  STATUS_LINE_MARGIN = 14
-else:
-  PROGRESS_BAR_WIDTH = 268
-  PROGRESS_BAR_HEIGHT = 10
-  TEXTURE_SIZE = 140
-  WRAPPED_SPACING = 10
-  CENTERED_SPACING = 20
-  MARGIN_H = 20
-  FONT_SIZE = 28
-  LINE_HEIGHT = 32
-  IP_FONT_SIZE = 36
-  IP_TOP_MARGIN = 12
-  STATUS_FONT_SIZE = 28
-  STATUS_LINE_MARGIN = 4
+_BIG_UI = gui_app.big_ui()
+PROGRESS_BAR_WIDTH = 1000 if _BIG_UI else 268
+PROGRESS_BAR_HEIGHT = 20 if _BIG_UI else 10
+TEXTURE_SIZE = 360 if _BIG_UI else 140
+WRAPPED_SPACING = 50 if _BIG_UI else 10
+CENTERED_SPACING = 150 if _BIG_UI else 20
+MARGIN_H = 100 if _BIG_UI else 20
+FONT_SIZE = 96 if _BIG_UI else 28
+LINE_HEIGHT = 104 if _BIG_UI else 32
+IP_FONT_SIZE = 72 if _BIG_UI else 36
+IP_TOP_MARGIN = 36 if _BIG_UI else 12
+STATUS_FONT_SIZE = 48 if _BIG_UI else 28
+STATUS_LINE_MARGIN = 14 if _BIG_UI else 4
 
 DEGREES_PER_SECOND = 360.0  # one full rotation per second
 DARKGRAY = (55, 55, 55, 255)
-COLOR_UP_TO_DATE = rl.Color(128, 216, 166, 255)
 
 
 def clamp(value: int, min_value: int, max_value: int) -> int:
@@ -99,7 +85,7 @@ class Spinner(Widget):
       self._last_refresh = rl.get_time()
 
     ip_label = self._ip_address
-    ip_color = COLOR_UP_TO_DATE if self._ip_address != "Offline" else rl.WHITE
+    ip_color = rl.Color(128, 216, 166, 255) if self._ip_address != "Offline" else rl.WHITE
 
     ip_font = gui_app.font(FontWeight.SEMI_BOLD)
     ip_scaled_size = IP_FONT_SIZE * FONT_SCALE

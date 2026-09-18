@@ -87,7 +87,6 @@ class TextWindow(Widget):
       HARDWARE.reboot()
 
   def _update_git_button_text(self, text: str):
-    """Git Pull 진행 상태에 따라 버튼 텍스트를 업데이트합니다."""
     self._button_git_pull = Button(text, click_callback=self._on_git_pull_clicked, button_style=ButtonStyle.TRANSPARENT_WHITE_BORDER, font_size=FONT_SIZE)
 
   def _on_git_pull_clicked(self):
