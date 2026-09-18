@@ -14,6 +14,6 @@
 	path = teleoprtc_repo
 	url = https://github.com/commaai/teleoprtc
 [submodule "tinygrad"]
-	path = tinygrad_repo
-  url = https://github.com/commaai/tinygrad.git
-  branch = model-warp-compile
+  path = tinygrad_repo
+  url = https://github.com/tinygrad/tinygrad.git
+  branch = master
