@@ -6,11 +6,11 @@ from typing import Union
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.params import Params
 from openpilot.common.time_helpers import system_time_valid
+from openpilot.selfdrive.ui.mici.layouts.settings.device.prime import PrimeScroller
 from openpilot.system.ui.widgets.scroller import NavRawScrollPanel, NavScroller
 from openpilot.selfdrive.ui.mici.widgets.info import InfoLayoutMici
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigCircleButton
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigDialog, BigConfirmationDialog
-from openpilot.selfdrive.ui.mici.widgets.pairing_dialog import PairingDialog
 from openpilot.selfdrive.ui.mici.onroad.cabin_camera_dialog import CabinCameraDialog
 from openpilot.selfdrive.ui.mici.layouts.onboarding import TrainingGuide, TermsPage
 from openpilot.system.ui.lib.application import gui_app, MousePos
@@ -98,37 +98,48 @@ class DeviceInfoLayoutMici(InfoLayoutMici):
 
 class PairBigButton(BigButton):
   def __init__(self):
-    super().__init__("pair", "connect.comma.ai", gui_app.texture("icons_mici/settings/comma_icon.png", 33, 60))
-
-  def _get_label_font_size(self):
-    return 64
+    self._commacare_badge = gui_app.texture("icons_mici/settings/device/commacare.png", 27, 32)
+    self._show_commacare = False
+    self._comma_icon = gui_app.texture("icons_mici/settings/comma_icon.png", 33, 60)
+    self._provider_icons = {provider: gui_app.texture(f"icons_mici/settings/device/paired_{provider}.png", 64, 64)
+                           for provider in ("github", "google", "apple")}
+    super().__init__("pair to connect", "connect.comma.ai", self._comma_icon)
 
   def _update_state(self):
     super()._update_state()
 
+    self._show_commacare = (ui_state.prime_state.is_paired() and ui_state.prime_state.is_prime()
+                            and ui_state.prime_state.has_commacare())
     if ui_state.prime_state.is_paired():
+      self.set_icon(self._provider_icons.get(ui_state.prime_state.get_pairing_provider(), self._comma_icon))
       self.set_text("paired")
       if ui_state.prime_state.is_prime():
-        self.set_value("subscribed")
+        self.set_value("prime" if ui_state.prime_state.is_full_prime() else "prime lite")
       else:
-        self.set_value("upgrade to prime")
+        self.set_value("claim prime trial" if ui_state.prime_state.can_claim_prime_trial() else "upgrade to prime")
     else:
-      self.set_text("pair")
+      self.set_icon(self._comma_icon)
+      self.set_text("pair to connect")
       self.set_value("connect.comma.ai")
+
+  def _draw_subtitle(self, rect: rl.Rectangle):
+    if self._show_commacare:
+      y = rect.y + rect.height - self._commacare_badge.height
+      rl.draw_texture_v(self._commacare_badge, rl.Vector2(rect.x, y), rl.WHITE)
+      offset = self._commacare_badge.width + 14
+      rect = rl.Rectangle(rect.x + offset, rect.y, rect.width - offset, rect.height)
+    super()._draw_subtitle(rect)
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     super()._handle_mouse_release(mouse_pos)
 
-    # TODO: show ad dialog when clicked if not prime
-    if ui_state.prime_state.is_paired():
-      return
-    dlg: BigDialog | PairingDialog
+    dlg: BigDialog | PrimeScroller
     if not system_time_valid():
       dlg = BigDialog("", tr("Please connect to Wi-Fi to complete initial pairing."))
     elif UNREGISTERED_DONGLE_ID == (ui_state.params.get("DongleId") or UNREGISTERED_DONGLE_ID):
       dlg = BigDialog("", tr("Device must be registered with the comma.ai backend to pair."))
     else:
-      dlg = PairingDialog()
+      dlg = PrimeScroller()
     gui_app.push_widget(dlg)
 
 
