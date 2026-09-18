@@ -4,6 +4,7 @@ import pyray as rl
 import re
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import IntEnum
 from openpilot.common.params import Params
@@ -196,16 +197,9 @@ class AlertItem(Widget):
       self._body_label.render(body_rect)
 
     # Draw warning icon on the right side
-    # Use green icon for update alerts (severity = -1), red for high severity, orange for low severity
-    if self.alert_data.severity == -1:
-      icon_texture = self._icon_green
-    elif self.alert_data.severity > 0:
-      icon_texture = self._icon_red
-    else:
-      icon_texture = self._icon_orange
     icon_x = self._rect.x + self.ALERT_WIDTH - self.ALERT_PADDING - self.ICON_SIZE
     icon_y = self._rect.y + self.ALERT_PADDING
-    rl.draw_texture_ex(icon_texture, rl.Vector2(icon_x, icon_y), 0.0, 1.0, rl.WHITE)
+    rl.draw_texture_ex(self._icon, rl.Vector2(icon_x, icon_y), 0.0, 1.0, rl.WHITE)
 
 
 class MiciOffroadAlerts(Scroller):
@@ -241,6 +235,11 @@ class MiciOffroadAlerts(Scroller):
 
   def scrolling(self):
     return self._scroller.scroll_panel.is_touch_valid()
+
+  def set_pairing_callback(self, callback: Callable[[], None]):
+    for alert_item in self.alert_items:
+      if alert_item.alert_data.key == "Offroad_Pairing":
+        alert_item.set_click_callback(callback)
 
   def _build_alerts(self):
     """Build sorted list of alerts from OFFROAD_ALERTS."""
