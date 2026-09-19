@@ -15,7 +15,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NetworkUI
 
 from openpilot.selfdrive.ui.layouts.settings.community import CommunityLayout
-from openpilot.selfdrive.ui import SettingsColors
+from openpilot.selfdrive.ui import Colors
 
 
 # Constants
@@ -90,10 +90,10 @@ class SettingsLayout(Widget):
 
     pressed = (rl.is_mouse_button_down(rl.MouseButton.MOUSE_BUTTON_LEFT) and
                rl.check_collision_point_rec(rl.get_mouse_position(), close_btn_rect))
-    close_color = SettingsColors.CLOSE_BUTTON_PRESSED if pressed else SettingsColors.CLOSE_BUTTON
+    close_color = Colors.Settings.CLOSE_BUTTON_PRESSED if pressed else Colors.Settings.CLOSE_BUTTON
     rl.draw_rectangle_rounded(close_btn_rect, 1.0, 20, close_color)
 
-    icon_color = rl.WHITE if not pressed else SettingsColors.ICON_PRESSED
+    icon_color = rl.WHITE if not pressed else Colors.Settings.ICON_PRESSED
     icon_dest = rl.Rectangle(
       close_btn_rect.x + (close_btn_rect.width - self._close_icon.width) / 2,
       close_btn_rect.y + (close_btn_rect.height - self._close_icon.height) / 2,
@@ -119,7 +119,7 @@ class SettingsLayout(Widget):
 
       # Button styling
       is_selected = panel_type == self._current_panel
-      text_color = rl.WHITE if is_selected else SettingsColors.TEXT_NORMAL
+      text_color = rl.WHITE if is_selected else Colors.Settings.TEXT_NORMAL
       # Draw button text (right-aligned)
       panel_name = tr(panel_info.name)
       text_size = measure_text_cached(self._font_medium, panel_name, 65)
@@ -135,10 +135,10 @@ class SettingsLayout(Widget):
 
   def _draw_current_panel(self, rect: rl.Rectangle):
     rl.draw_rectangle_rounded(
-      rl.Rectangle(rect.x + 10, rect.y + 10, rect.width - 20, rect.height - 20), 0.04, 30, SettingsColors.PANEL
+      rl.Rectangle(rect.x + 10, rect.y + 10, rect.width - 20, rect.height - 20), 0.04, 30, Colors.Settings.PANEL
     )
     content_rect = rl.Rectangle(rect.x + PANEL_MARGIN, rect.y + 25, rect.width - (PANEL_MARGIN * 2), rect.height - 50)
-    # rl.draw_rectangle_rounded(content_rect, 0.03, 30, SettingsColors.PANEL)
+    # rl.draw_rectangle_rounded(content_rect, 0.03, 30, Colors.Settings.PANEL)
     panel = self._panels[self._current_panel]
     if panel.instance:
       panel.instance.render(content_rect)

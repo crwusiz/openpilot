@@ -14,7 +14,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.html_render import HtmlRenderer
 from openpilot.selfdrive.selfdrived.alertmanager import OFFROAD_ALERTS
 
-from openpilot.selfdrive.ui import OffroadAlertColors as AlertColors
+from openpilot.selfdrive.ui import Colors
 
 
 class AlertConstants:
@@ -61,9 +61,9 @@ class ActionButton(Widget):
     self._rect.height = AlertConstants.BUTTON_HEIGHT
 
     roundness = AlertConstants.BORDER_RADIUS / self._rect.height
-    bg_color = AlertColors.BUTTON if self._style == ButtonStyle.LIGHT else AlertColors.SNOOZE_BG
+    bg_color = Colors.OffroadAlert.BUTTON if self._style == ButtonStyle.LIGHT else Colors.OffroadAlert.SNOOZE_BG
     if self.is_pressed:
-      bg_color = AlertColors.BUTTON_PRESSED if self._style == ButtonStyle.LIGHT else AlertColors.SNOOZE_BG_PRESSED
+      bg_color = Colors.OffroadAlert.BUTTON_PRESSED if self._style == ButtonStyle.LIGHT else Colors.OffroadAlert.SNOOZE_BG_PRESSED
 
     rl.draw_rectangle_rounded(self._rect, roundness, 10, bg_color)
 
@@ -124,7 +124,7 @@ class AbstractAlert(Widget, ABC):
     pass
 
   def _render(self, rect: rl.Rectangle):
-    rl.draw_rectangle_rounded(rect, AlertConstants.BORDER_RADIUS / rect.height, 10, AlertColors.BACKGROUND)
+    rl.draw_rectangle_rounded(rect, AlertConstants.BORDER_RADIUS / rect.height, 10, Colors.OffroadAlert.BACKGROUND)
 
     footer_height = AlertConstants.BUTTON_HEIGHT + AlertConstants.SPACING
     content_height = rect.height - 2 * AlertConstants.MARGIN - footer_height
@@ -265,7 +265,7 @@ class OffroadAlert(AbstractAlert):
       if not alert_data.visible:
         continue
 
-      bg_color = AlertColors.HIGH_SEVERITY if alert_data.severity > 0 else AlertColors.LOW_SEVERITY
+      bg_color = Colors.OffroadAlert.HIGH_SEVERITY if alert_data.severity > 0 else Colors.OffroadAlert.LOW_SEVERITY
       text_width = int(content_rect.width - (AlertConstants.ALERT_INSET * 2))
       wrapped_lines = wrap_text(font, alert_data.text, AlertConstants.FONT_SIZE, text_width)
       line_count = len(wrapped_lines)
@@ -292,7 +292,7 @@ class OffroadAlert(AbstractAlert):
           rl.Vector2(text_x, text_y + i * AlertConstants.FONT_SIZE * FONT_SCALE),
           AlertConstants.FONT_SIZE,
           0,
-          AlertColors.TEXT,
+          Colors.OffroadAlert.TEXT,
         )
 
       y_offset += round(alert_item_height + AlertConstants.ALERT_SPACING)

@@ -152,7 +152,7 @@ class HomeLayout(Widget):
       version_text_width -= self.update_notif_rect.width
 
       # Highlight if currently viewing updates
-      highlight_color = Colors.HOME_UPDATE_ACTIVE if self.current_state == HomeLayoutState.UPDATE else Colors.HOME_UPDATE_INACTIVE
+      highlight_color = Colors.UPDATE_ACTIVE if self.current_state == HomeLayoutState.UPDATE else Colors.UPDATE_INACTIVE
       rl.draw_rectangle_rounded(self.update_notif_rect, 0.3, 10, highlight_color)
 
       text = tr("UPDATE")
@@ -166,7 +166,7 @@ class HomeLayout(Widget):
       version_text_width -= self.alert_notif_rect.width
 
       # Highlight if currently viewing alerts
-      highlight_color = Colors.HOME_ALERT_ACTIVE if self.current_state == HomeLayoutState.ALERTS else Colors.HOME_ALERT_INACTIVE
+      highlight_color = Colors.ALERT_ACTIVE if self.current_state == HomeLayoutState.ALERTS else Colors.ALERT_INACTIVE
       rl.draw_rectangle_rounded(self.alert_notif_rect, 0.3, 10, highlight_color)
 
       alert_text = trn("{} ALERT", "{} ALERTS", self.alert_count).format(self.alert_count)

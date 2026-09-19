@@ -155,10 +155,10 @@ class DriverStateRenderer(Widget):
     start_y = center_y + (line_offset + line_length) * math.sin(math.radians(angle))
     end_x = start_x + line_length * math.cos(math.radians(angle))
     end_y = start_y + line_length * math.sin(math.radians(angle))
-    color = Colors.MICI_DRIVER_ACTIVE
+    color = Colors.DRIVER_ACTIVE
 
     if grey:
-      color = Colors.MICI_DRIVER_INACTIVE
+      color = Colors.DRIVER_INACTIVE
 
     if f.x > 0.01:
       rl.draw_line_ex((start_x, start_y), (end_x, end_y), 12, color)

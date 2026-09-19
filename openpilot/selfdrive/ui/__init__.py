@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pyray as rl
 
 
@@ -58,117 +60,127 @@ class Colors:
   LIME = rl.Color(120, 255, 120, 255)
   LIGHT_ORANGE = rl.Color(255, 228, 191, 255)
   AMBER = rl.Color(255, 200, 100, 255)
-  WARNING = rl.Color(218, 202, 37, 255)
   PRIMARY_BLUE = rl.Color(70, 91, 234, 255)
-  SUBSCRIBED_GREEN = rl.Color(134, 255, 78, 255)
+
+  WARNING = rl.Color(218, 202, 37, 255)
+  SUBSCRIBED = rl.Color(134, 255, 78, 255)
+
   DARK_PANEL = rl.Color(51, 51, 51, 255)
 
   DRIVER_ACTIVE = rl.Color(26, 242, 66, 255)
   DRIVER_INACTIVE = rl.Color(139, 139, 139, 255)
-  MICI_DRIVER_ACTIVE = rl.Color(0, 255, 64, 255)
-  MICI_DRIVER_INACTIVE = rl.Color(166, 166, 166, 255)
 
-  HOME_UPDATE_ACTIVE = rl.Color(75, 95, 255, 255)
-  HOME_UPDATE_INACTIVE = rl.Color(54, 77, 239, 255)
-  HOME_ALERT_ACTIVE = rl.Color(255, 70, 70, 255)
-  HOME_ALERT_INACTIVE = rl.Color(226, 44, 44, 255)
+  UPDATE_ACTIVE = rl.Color(75, 95, 255, 255)
+  UPDATE_INACTIVE = rl.Color(54, 77, 239, 255)
+
+  ALERT_ACTIVE = rl.Color(255, 70, 70, 255)
+  ALERT_INACTIVE = rl.Color(226, 44, 44, 255)
 
   EXPERIMENTAL_START = rl.Color(255, 155, 63, 255)
   EXPERIMENTAL_END = rl.Color(219, 56, 34, 255)
+
   CHILL_START = rl.Color(20, 255, 171, 255)
   CHILL_END = rl.Color(35, 149, 255, 255)
-
-  BORDER_DISENGAGED = rl.Color(18, 40, 57, 255)
-  BORDER_OVERRIDE = rl.Color(137, 146, 141, 255)
-  BORDER_ENGAGED = rl.Color(22, 127, 64, 255)
-  BORDER_ACTIVE = rl.Color(111, 192, 201, 255)
-  BORDER_READY = rl.Color(143, 201, 192, 255)
-
-  HEADER_GRADIENT_START = colors_alpha(rl.BLACK, 114)
-  HEADER_GRADIENT_END = TRANSPARENT
 
   DEBUG_BORDER = rl.Color(100, 100, 100, 255)
   DEBUG_VALID = rl.Color(0, 255, 0, 255)
 
+  Border = SimpleNamespace(
+    DISENGAGED=rl.Color(18, 40, 57, 255),
+    OVERRIDE=rl.Color(137, 146, 141, 255),
+    ENGAGED=rl.Color(22, 127, 64, 255),
+    RED=RED,
+    STEERING=STEERING,
+    BLINKER=ORANGE,
+    ACTIVE=rl.Color(111, 192, 201, 255),
+    READY=rl.Color(143, 201, 192, 255),
+  )
 
-class OnroadAlertColors:
-  NORMAL = rl.Color(21, 21, 21, 100)
-  USER_PROMPT = rl.Color(218, 111, 37, 100)
-  CRITICAL = colors_alpha(Colors.RED, 100)
+  OnroadAlert = SimpleNamespace(
+    NORMAL=rl.Color(21, 21, 21, 100),
+    USER_PROMPT=rl.Color(218, 111, 37, 100),
+    CRITICAL=colors_alpha(RED, 100),
+  )
 
+  MiciOnroadAlert = SimpleNamespace(
+    NORMAL=colors_alpha(rl.BLACK, 100),
+    USER_PROMPT=rl.Color(255, 115, 0, 100),
+    CRITICAL=rl.Color(255, 0, 21, 100),
+  )
 
-class MiciOnroadAlertColors:
-  NORMAL = colors_alpha(rl.BLACK, 100)
-  USER_PROMPT = rl.Color(255, 115, 0, 100)
-  CRITICAL = rl.Color(255, 0, 21, 100)
+  OffroadAlert = SimpleNamespace(
+    HIGH_SEVERITY=ALERT_INACTIVE,
+    LOW_SEVERITY=rl.Color(41, 41, 41, 255),
+    BACKGROUND=rl.Color(57, 57, 57, 255),
+    TEXT=rl.WHITE,
+    BUTTON=rl.WHITE,
+    BUTTON_PRESSED=rl.LIGHTGRAY,
+    BUTTON_TEXT=rl.BLACK,
+    SNOOZE_BG=rl.Color(79, 79, 79, 255),
+    SNOOZE_BG_PRESSED=rl.Color(100, 100, 100, 255),
+  )
 
+  Settings = SimpleNamespace(
+    PANEL=OffroadAlert.LOW_SEVERITY,
+    CLOSE_BUTTON=OffroadAlert.LOW_SEVERITY,
+    CLOSE_BUTTON_PRESSED=rl.Color(59, 59, 59, 255),
+    TEXT_NORMAL=rl.Color(128, 128, 128, 255),
+    ICON_PRESSED=rl.Color(220, 220, 220, 255),
+  )
 
-class OffroadAlertColors:
-  HIGH_SEVERITY = Colors.HOME_ALERT_INACTIVE
-  LOW_SEVERITY = rl.Color(41, 41, 41, 255)
-  BACKGROUND = rl.Color(57, 57, 57, 255)
-  TEXT = rl.WHITE
-  BUTTON = rl.WHITE
-  BUTTON_PRESSED = rl.LIGHTGRAY
-  BUTTON_TEXT = rl.BLACK
-  SNOOZE_BG = rl.Color(79, 79, 79, 255)
-  SNOOZE_BG_PRESSED = rl.Color(100, 100, 100, 255)
+  Esim = SimpleNamespace(
+    SUB_LABEL_DISABLED=colors_alpha(rl.WHITE, int(255 * 0.585)),
+    CHECK_ICON=colors_alpha(rl.WHITE, int(255 * 0.585)),
+    LABEL=colors_alpha(rl.WHITE, int(255 * 0.9)),
+    DELETE=rl.Color(255, 105, 115, 255),
+  )
 
+  Firehose = SimpleNamespace(
+    GREEN=rl.Color(46, 204, 113, 255),
+    RED=rl.Color(231, 76, 60, 255),
+    GRAY=rl.Color(68, 68, 68, 255),
+    LIGHT_GRAY=rl.Color(228, 228, 228, 255),
+  )
 
-class SettingsColors:
-  PANEL = OffroadAlertColors.LOW_SEVERITY
-  CLOSE_BUTTON = PANEL
-  CLOSE_BUTTON_PRESSED = rl.Color(59, 59, 59, 255)
-  TEXT_NORMAL = rl.Color(128, 128, 128, 255)
-  ICON_PRESSED = rl.Color(220, 220, 220, 255)
+  ConfidenceBall = SimpleNamespace(
+    ACTIVE_TOP=rl.Color(0, 255, 204, 255),
+    ACTIVE_BOTTOM=rl.Color(0, 255, 38, 255),
+    WARNING_TOP=rl.Color(255, 200, 0, 255),
+    WARNING_BOTTOM=rl.Color(255, 115, 0, 255),
+    CRITICAL_TOP=rl.Color(255, 0, 21, 255),
+    CRITICAL_BOTTOM=rl.Color(255, 0, 89, 255),
+    INACTIVE_TOP=rl.WHITE,
+    INACTIVE_BOTTOM=rl.Color(82, 82, 82, 255),
+    HIDDEN_TOP=rl.Color(50, 50, 50, 255),
+    HIDDEN_BOTTOM=rl.Color(13, 13, 13, 255),
+  )
 
+  Pairing = SimpleNamespace(
+    BACKGROUND=rl.Color(224, 224, 224, 255),
+    DOT=rl.Color(70, 70, 70, 255),
+    CARD=rl.Color(240, 240, 240, 255),
+  )
 
-class FirehoseColors:
-  GREEN = rl.Color(46, 204, 113, 255)
-  RED = rl.Color(231, 76, 60, 255)
-  GRAY = rl.Color(68, 68, 68, 255)
-  LIGHT_GRAY = rl.Color(228, 228, 228, 255)
+  Community = SimpleNamespace(
+    ENABLED=rl.Color(44, 44, 226, 255),
+    DISABLED=rl.Color(60, 60, 60, 255),
+    UNAVAILABLE=rl.Color(40, 40, 40, 255),
+  )
 
+  THROTTLE = [
+    rl.Color(13, 248, 122, 102),
+    rl.Color(114, 255, 92, 89),
+    rl.Color(114, 255, 92, 0),
+  ]
 
-class ConfidenceBallColors:
-  ACTIVE_TOP = rl.Color(0, 255, 204, 255)
-  ACTIVE_BOTTOM = rl.Color(0, 255, 38, 255)
-  WARNING_TOP = rl.Color(255, 200, 0, 255)
-  WARNING_BOTTOM = rl.Color(255, 115, 0, 255)
-  CRITICAL_TOP = rl.Color(255, 0, 21, 255)
-  CRITICAL_BOTTOM = rl.Color(255, 0, 89, 255)
-  INACTIVE_TOP = rl.WHITE
-  INACTIVE_BOTTOM = rl.Color(82, 82, 82, 255)
-  HIDDEN_TOP = rl.Color(50, 50, 50, 255)
-  HIDDEN_BOTTOM = rl.Color(13, 13, 13, 255)
+  NO_THROTTLE = [
+    rl.Color(242, 242, 242, 102),
+    rl.Color(242, 242, 242, 89),
+    rl.Color(242, 242, 242, 0),
+  ]
 
-
-class PairingColors:
-  BACKGROUND = rl.Color(224, 224, 224, 255)
-  DOT = rl.Color(70, 70, 70, 255)
-  CARD = rl.Color(240, 240, 240, 255)
-
-
-class CommunityColors:
-  ENABLED = rl.Color(44, 44, 226, 255)
-  DISABLED = rl.Color(60, 60, 60, 255)
-  UNAVAILABLE = rl.Color(40, 40, 40, 255)
-
-
-THROTTLE_COLORS = [
-  rl.Color(13, 248, 122, 102),
-  rl.Color(114, 255, 92, 89),
-  rl.Color(114, 255, 92, 0),
-]
-
-NO_THROTTLE_COLORS = [
-  rl.Color(242, 242, 242, 102),
-  rl.Color(242, 242, 242, 89),
-  rl.Color(242, 242, 242, 0),
-]
-
-STEERING_COLORS = [
-  rl.Color(0, 191, 255, 102),
-  rl.Color(0, 191, 255, 89),
-  rl.Color(0, 191, 255, 0),
-]
+  STEERING_PRESSED = [
+    rl.Color(0, 191, 255, 102),
+    rl.Color(0, 191, 255, 89),
+    rl.Color(0, 191, 255, 0),
+  ]

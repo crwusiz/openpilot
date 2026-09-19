@@ -17,7 +17,7 @@ from openpilot.system.ui.lib.multilang import tr, trn, tr_noop
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.scroller import NavRawScrollPanel
 
-from openpilot.selfdrive.ui import FirehoseColors
+from openpilot.selfdrive.ui import Colors
 
 TITLE = tr_noop("Firehose Mode")
 DESCRIPTION = tr_noop(
@@ -99,7 +99,7 @@ class FirehoseLayoutBase(Widget):
     y += 20
 
     # Separator
-    rl.draw_rectangle_rec(rl.Rectangle(x, y, w, 2), FirehoseColors.GRAY)
+    rl.draw_rectangle_rec(rl.Rectangle(x, y, w, 2), Colors.Firehose.GRAY)
     y += 20
 
     # Status
@@ -115,11 +115,11 @@ class FirehoseLayoutBase(Widget):
       y += 20
 
     # Separator
-    rl.draw_rectangle_rec(rl.Rectangle(x, y, w, 2), FirehoseColors.GRAY)
+    rl.draw_rectangle_rec(rl.Rectangle(x, y, w, 2), Colors.Firehose.GRAY)
     y += 20
 
     # Instructions intro
-    y = self._draw_wrapped_text(x, y, w, tr(INSTRUCTIONS_INTRO), gui_app.font(FontWeight.ROMAN), 32, FirehoseColors.LIGHT_GRAY)
+    y = self._draw_wrapped_text(x, y, w, tr(INSTRUCTIONS_INTRO), gui_app.font(FontWeight.ROMAN), 32, Colors.Firehose.LIGHT_GRAY)
     y += 20
 
     # FAQ Header
@@ -128,8 +128,8 @@ class FirehoseLayoutBase(Widget):
 
     # FAQ Items
     for question, answer in FAQ_ITEMS:
-      y = self._draw_wrapped_text(x, y, w, tr(question), gui_app.font(FontWeight.BOLD), 32, FirehoseColors.LIGHT_GRAY)
-      y = self._draw_wrapped_text(x, y, w, tr(answer), gui_app.font(FontWeight.ROMAN), 32, FirehoseColors.LIGHT_GRAY)
+      y = self._draw_wrapped_text(x, y, w, tr(question), gui_app.font(FontWeight.BOLD), 32, Colors.Firehose.LIGHT_GRAY)
+      y = self._draw_wrapped_text(x, y, w, tr(answer), gui_app.font(FontWeight.ROMAN), 32, Colors.Firehose.LIGHT_GRAY)
       y += 20
 
   def _draw_wrapped_text(self, x, y, width, text, font, font_size, color):
@@ -192,9 +192,9 @@ class FirehoseLayoutBase(Widget):
     network_metered = ui_state.sm["deviceState"].networkMetered
 
     if not network_metered and network_type != 0:  # Not metered and connected
-      return tr("ACTIVE"), FirehoseColors.GREEN
+      return tr("ACTIVE"), Colors.Firehose.GREEN
     else:
-      return tr("INACTIVE: connect to an unmetered network"), FirehoseColors.RED
+      return tr("INACTIVE: connect to an unmetered network"), Colors.Firehose.RED
 
   def _fetch_firehose_stats(self):
     try:

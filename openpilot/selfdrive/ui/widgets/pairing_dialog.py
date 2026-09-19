@@ -13,7 +13,7 @@ from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets.button import IconButton
 from openpilot.selfdrive.ui.ui_state import ui_state
 
-from openpilot.selfdrive.ui import PairingColors
+from openpilot.selfdrive.ui import Colors
 
 
 class PairingDialog(Widget):
@@ -58,7 +58,7 @@ class PairingDialog(Widget):
       gui_app.pop_widget()
 
   def _render(self, rect: rl.Rectangle) -> int:
-    rl.clear_background(PairingColors.BACKGROUND)
+    rl.clear_background(Colors.Pairing.BACKGROUND)
 
     self._check_qr_refresh()
 
@@ -119,7 +119,7 @@ class PairingDialog(Widget):
       circle_y = y + text_height // 2
 
       # Circle and number
-      rl.draw_circle(int(circle_x), int(circle_y), circle_radius, PairingColors.DOT)
+      rl.draw_circle(int(circle_x), int(circle_y), circle_radius, Colors.Pairing.DOT)
       number = str(i + 1)
       number_size = measure_text_cached(font, number, 30)
       rl.draw_text_ex(font, number, (int(circle_x - number_size.x // 2), int(circle_y - number_size.y // 2)), 30, 0, rl.WHITE)
@@ -130,7 +130,7 @@ class PairingDialog(Widget):
 
   def _render_qr_code(self, rect: rl.Rectangle) -> None:
     if not self.qr_texture:
-      rl.draw_rectangle_rounded(rect, 0.1, 20, PairingColors.CARD)
+      rl.draw_rectangle_rounded(rect, 0.1, 20, Colors.Pairing.CARD)
       error_font = gui_app.font(FontWeight.BOLD)
       rl.draw_text_ex(
         error_font, tr("QR Code Error"), rl.Vector2(rect.x + 20, rect.y + rect.height // 2 - 15), 30, 0.0, rl.RED

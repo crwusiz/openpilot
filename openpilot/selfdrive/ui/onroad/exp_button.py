@@ -5,7 +5,7 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
 
-from openpilot.selfdrive.ui import Colors, colors_alpha
+from openpilot.selfdrive.ui import colors_alpha
 
 
 class ExpButton(Widget):

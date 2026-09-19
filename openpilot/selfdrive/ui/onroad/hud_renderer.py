@@ -349,8 +349,8 @@ class HudRenderer(Widget):
       int(rect.y),
       int(rect.width),
       UIConfig.header_height,
-      Colors.HEADER_GRADIENT_START,
-      Colors.HEADER_GRADIENT_END,
+      colors_alpha(rl.BLACK, 114),
+      Colors.TRANSPARENT,
     )
 
     if self.is_cruise_available:

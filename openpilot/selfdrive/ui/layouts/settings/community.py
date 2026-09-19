@@ -19,7 +19,7 @@ from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
 from openpilot.system.ui.widgets.html_render import HtmlRenderer, ElementType
 from openpilot.system.ui.lib.scroll_panel import GuiScrollPanel
 from openpilot.system.ui.widgets.button import Button, ButtonStyle
-from openpilot.selfdrive.ui import Colors, CommunityColors
+from openpilot.selfdrive.ui import Colors
 
 
 DESCRIPTIONS = {
@@ -311,11 +311,11 @@ class CommunityLayout(Widget):
 
   def _draw_button(self, rect, text, is_selected=False, is_header=False):
     if is_header:
-      rl.draw_rectangle_rec(rect, CommunityColors.ENABLED)
+      rl.draw_rectangle_rec(rect, Colors.Community.ENABLED)
     elif is_selected:
-      rl.draw_rectangle_rec(rect, CommunityColors.DISABLED)
+      rl.draw_rectangle_rec(rect, Colors.Community.DISABLED)
     else:
-      rl.draw_rectangle_rec(rect, CommunityColors.UNAVAILABLE)
+      rl.draw_rectangle_rec(rect, Colors.Community.UNAVAILABLE)
 
     rl.draw_rectangle_lines_ex(rect, 1, rl.DARKGRAY)
 

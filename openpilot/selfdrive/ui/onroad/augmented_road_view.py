@@ -2,8 +2,8 @@ import numpy as np
 import pyray as rl
 from openpilot.cereal import log
 from openpilot.cereal.visionipc import VisionStreamType
-from openpilot.selfdrive.ui import UI_BORDER_SIZE, Colors
-from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
+from openpilot.selfdrive.ui import Colors, UI_BORDER_SIZE
+from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.onroad.alert_renderer import AlertRenderer
 from openpilot.selfdrive.ui.onroad.driver_state import DriverStateRenderer
 from openpilot.selfdrive.ui.onroad.hud_renderer import HudRenderer
@@ -13,23 +13,11 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.common.transformations.camera import DEVICE_CAMERAS, DeviceCameraConfig, view_frame_from_device_frame
 from openpilot.common.transformations.orientation import rot_from_euler
 
-OpState = log.SelfdriveState.OpenpilotState
 CALIBRATED = log.ExtrinsicsCalibration.Status.calibrated
 NARROW_ROAD_CAM = VisionStreamType.VISION_STREAM_NARROW_ROAD
 WIDE_CAM = VisionStreamType.VISION_STREAM_WIDE_ROAD
 CABIN_CAM = VisionStreamType.VISION_STREAM_CABIN
 DEFAULT_DEVICE_CAMERA = DEVICE_CAMERAS["tici", "ar0231"]
-
-BORDER_COLORS = {
-  UIStatus.DISENGAGED: Colors.BORDER_DISENGAGED,
-  UIStatus.OVERRIDE: Colors.BORDER_OVERRIDE,
-  UIStatus.ENGAGED: Colors.BORDER_ENGAGED,
-  UIStatus.RED: Colors.RED,
-  UIStatus.STEERING: Colors.STEERING,
-  UIStatus.BLINKER: Colors.ORANGE,
-  UIStatus.ACTIVE: Colors.BORDER_ACTIVE,
-  UIStatus.READY: Colors.BORDER_READY,
-}
 
 WIDE_CAM_MAX_SPEED = 10.0  # m/s (22 mph)
 ROAD_CAM_MIN_SPEED = 15.0  # m/s (34 mph)
@@ -39,7 +27,7 @@ INF_POINT = np.array([1000.0, 0.0, 0.0])
 class AugmentedRoadView(CameraView):
   def __init__(self, stream_type: VisionStreamType = VisionStreamType.VISION_STREAM_NARROW_ROAD):
     super().__init__("camerad", stream_type)
-    self._set_placeholder_color(BORDER_COLORS[UIStatus.DISENGAGED])
+    self._set_placeholder_color(Colors.Border.DISENGAGED)
 
     self.device_camera: DeviceCameraConfig | None = None
     self.view_from_calib = view_frame_from_device_frame.copy()
@@ -110,7 +98,8 @@ class AugmentedRoadView(CameraView):
   def _draw_border(self, rect: rl.Rectangle):
     rl.draw_rectangle_lines_ex(rect, UI_BORDER_SIZE, rl.BLACK)
     border_roundness = 0.12
-    border_color = BORDER_COLORS.get(ui_state.status, BORDER_COLORS[UIStatus.DISENGAGED])
+    status_name = getattr(ui_state.status, "name", "")
+    border_color = getattr(Colors.Border, status_name, Colors.Border.DISENGAGED)
     border_rect = rl.Rectangle(rect.x + UI_BORDER_SIZE, rect.y + UI_BORDER_SIZE,
                                rect.width - 2 * UI_BORDER_SIZE, rect.height - 2 * UI_BORDER_SIZE)
     rl.draw_rectangle_rounded_lines_ex(border_rect, border_roundness, 10, UI_BORDER_SIZE, border_color)

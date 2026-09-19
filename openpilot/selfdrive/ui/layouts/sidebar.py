@@ -3,18 +3,19 @@ import time
 from dataclasses import dataclass
 from collections.abc import Callable
 from openpilot.cereal import log
-from openpilot.selfdrive.ui.ui_state import ui_state, ChestnutState
+from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, FONT_SCALE
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
-from openpilot.system.ui.widgets.network import WifiManagerUI, WifiManager
 
 import subprocess
 import threading
 from pathlib import Path
 from openpilot.common.params import Params
+from openpilot.selfdrive.ui.ui_state import ChestnutState
 from openpilot.selfdrive.ui import Colors, colors_alpha
+from openpilot.system.ui.widgets.network import WifiManagerUI, WifiManager
 
 
 SIDEBAR_WIDTH = 300
@@ -359,7 +360,7 @@ class Sidebar(Widget):
     if self._recording_audio:
       self._mic_indicator_rect = rl.Rectangle(rect.x + rect.width - 130, rect.y + 245, 75, 40)
       mic_pressed = mouse_down and rl.check_collision_point_rec(mouse_pos, self._mic_indicator_rect)
-      bg_color = rl.Color(Colors.RED.r, Colors.RED.g, Colors.RED.b, int(255 * 0.65)) if mic_pressed else Colors.RED
+      bg_color = colors_alpha(Colors.RED, int(255 * 0.65)) if mic_pressed else Colors.RED
 
       rl.draw_rectangle_rounded(self._mic_indicator_rect, 1, 10, bg_color)
       mic_x = self._mic_indicator_rect.x + (self._mic_indicator_rect.width - self._mic_img.width) / 2
@@ -417,10 +418,10 @@ class Sidebar(Widget):
     rl.draw_rectangle_rounded(edge_rect, 0.3, 10, metric.color)
     rl.end_scissor_mode()
 
-    # Border
+    # Draw border
     rl.draw_rectangle_rounded_lines_ex(metric_rect, 0.3, 10, 2, colors_alpha(rl.WHITE, 85))
 
-    # Text label
+    # Draw label and value
     labels = [tr(metric.label), tr(metric.value)]
     text_y = metric_rect.y + (metric_rect.height / 2 - len(labels) * FONT_SIZE * FONT_SCALE)
     for text in labels:

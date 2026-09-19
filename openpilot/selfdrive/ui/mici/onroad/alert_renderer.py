@@ -14,7 +14,7 @@ from openpilot.system.ui.lib.application import gui_app, FontWeight, TextAlignme
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel
 
-from openpilot.selfdrive.ui import MiciOnroadAlertColors
+from openpilot.selfdrive.ui import Colors
 
 
 AlertSize = log.SelfdriveState.AlertSize
@@ -30,9 +30,9 @@ SELFDRIVE_UNRESPONSIVE_TIMEOUT = 10  # Seconds
 
 # Constants
 ALERT_COLORS = {
-  AlertStatus.normal: MiciOnroadAlertColors.NORMAL,
-  AlertStatus.userPrompt: MiciOnroadAlertColors.USER_PROMPT,
-  AlertStatus.critical: MiciOnroadAlertColors.CRITICAL,
+  AlertStatus.normal: Colors.MiciOnroadAlert.NORMAL,
+  AlertStatus.userPrompt: Colors.MiciOnroadAlert.USER_PROMPT,
+  AlertStatus.critical: Colors.MiciOnroadAlert.CRITICAL,
 }
 
 TURN_SIGNAL_BLINK_PERIOD = 1 / (80 / 60)  # Mazda heartbeat turn signal BPM

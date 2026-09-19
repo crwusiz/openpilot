@@ -32,8 +32,8 @@ RGBColor = tuple[int, int, int]
 RGBAColor = tuple[int, int, int, int]
 
 
-def colors_alpha(color: RGBColor, alpha: int) -> RGBAColor:
-  return (*color, alpha)
+def colors_alpha(color: RGBColor | RGBAColor, alpha: int = 255) -> RGBAColor:
+  return (*color[:3], alpha)
 
 
 THROTTLE_COLORS = [
@@ -56,25 +56,25 @@ STEERING_COLORS = [
 
 
 class Colors:
-  BLACK = (0, 0, 0)
-  PANEL = (7, 12, 18)
-  DIVIDER = (42, 54, 68)
-  MUTED_TEXT = (120, 132, 148)
-  SIGN_TEXT = (20, 25, 30)
-  DISTANCE_BADGE = (18, 25, 34)
-  WHITE = (255, 255, 255)
+  BLACK = (0, 0, 0, 255)
+  PANEL = (7, 12, 18, 255)
+  DIVIDER = (42, 54, 68, 255)
+  MUTED_TEXT = (120, 132, 148, 255)
+  SIGN_TEXT = (20, 25, 30, 255)
+  DISTANCE_BADGE = (18, 25, 34, 255)
+  WHITE = (255, 255, 255, 255)
 
-  DISENGAGED = (18, 40, 57)
-  OVERRIDE = (137, 146, 141)
-  ENGAGED = (22, 127, 64)
-  RED = (201, 34, 49)
-  STEERING = (0, 191, 255)
-  ORANGE = (255, 149, 0)
-  ACTIVE = (111, 192, 201)
-  READY = (143, 201, 192)
+  DISENGAGED = (18, 40, 57, 255)
+  OVERRIDE = (137, 146, 141, 255)
+  ENGAGED = (22, 127, 64, 255)
+  RED = (201, 34, 49, 255)
+  STEERING = (0, 191, 255, 255)
+  ORANGE = (255, 149, 0, 255)
+  ACTIVE = (111, 192, 201, 255)
+  READY = (143, 201, 192, 255)
 
-  MAX_ACTIVE = (128, 216, 166)
-  CAUTION = (255, 200, 100)
+  MAX_ACTIVE = (128, 216, 166, 255)
+  CAUTION = (255, 200, 100, 255)
 
 
 class ClusterConfig:

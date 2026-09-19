@@ -281,7 +281,6 @@ class WifiManagerUI(Widget):
                                      networks_updated=self._on_network_updated,
                                      disconnected=self._on_disconnected)
 
-    #add
     self.ip_address = self._wifi_manager.ipv4_address
 
   def show_event(self):

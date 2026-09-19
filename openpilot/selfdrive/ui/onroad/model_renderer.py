@@ -12,7 +12,7 @@ from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 from openpilot.system.ui.widgets import Widget
 
-from openpilot.selfdrive.ui import Colors, NO_THROTTLE_COLORS, STEERING_COLORS, THROTTLE_COLORS, colors_alpha
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 
 CLIP_MARGIN = 500
@@ -81,7 +81,7 @@ class ModelRenderer(Widget):
     self._steering_pressed_gradient = Gradient(
       start=(0.0, 1.0),
       end=(0.0, 0.0),
-      colors=STEERING_COLORS,
+      colors=Colors.STEERING_PRESSED,
       stops=[0.0, 0.5, 1.0],
     )
 
@@ -355,7 +355,7 @@ class ModelRenderer(Widget):
     else:
       # Blend throttle/no throttle colors based on transition
       blend_factor = round(self._blend_filter.x * 100) / 100
-      blended_colors = self._blend_colors(NO_THROTTLE_COLORS, THROTTLE_COLORS, blend_factor)
+      blended_colors = self._blend_colors(Colors.NO_THROTTLE, Colors.THROTTLE, blend_factor)
       gradient = Gradient(
         start=(0.0, 1.0),  # Bottom of path
         end=(0.0, 0.0),  # Top of path

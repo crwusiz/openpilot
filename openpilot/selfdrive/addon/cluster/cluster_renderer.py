@@ -657,8 +657,8 @@ class ClusterRenderer:
     max_color = colors_alpha(Colors.WHITE, 200)
     speed_color = colors_alpha(Colors.WHITE, 200)
     if is_cruise_set:
-      speed_color = colors_alpha(Colors.WHITE, 255)
-      max_color = Colors.MAX_ACTIVE if data.get("enabled") else colors_alpha(Colors.OVERRIDE, 255)
+      speed_color = Colors.WHITE
+      max_color = Colors.MAX_ACTIVE if data.get("enabled") else Colors.OVERRIDE
 
       limit_speed, _ = self._active_speed_limit(data)
 

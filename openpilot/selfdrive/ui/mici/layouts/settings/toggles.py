@@ -42,10 +42,10 @@ class TogglesLayoutMici(NavScroller):
     super().__init__()
 
     self._personality_toggle = BigMultiParamToggle("driving personality", "LongitudinalPersonality", ["aggressive", "standard", "relaxed", "more relaxed"],
-                                                   description = "Standard is recommended.\n" +
-                                                                 "Aggressive follows closer, with firmer gas and braking.\n" +
-                                                                 "Relaxed leaves more space.\n" +
-                                                                 "Use the steering wheel distance button on supported cars.")
+                                                   description="Standard is recommended.\n" +
+                                                               "Aggressive follows closer, with firmer gas and braking.\n" +
+                                                               "Relaxed leaves more space.\n" +
+                                                               "Use the steering wheel distance button on supported cars.")
     self._experimental_btn = BigToggle("experimental mode", description_icon=gui_app.texture("icons_mici/experimental_mode.png", 64, 64),
                                        initial_state=ui_state.params.get_bool("ExperimentalMode"), toggle_callback=self._on_experimental_mode,
                                        description="Let the driving model control gas and brakes.\n" +

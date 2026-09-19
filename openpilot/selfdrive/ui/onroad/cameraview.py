@@ -11,8 +11,6 @@ from openpilot.system.ui.lib.egl import init_egl, create_egl_image, destroy_egl_
 from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.ui_state import ui_state
 
-
-
 CONNECTION_RETRY_INTERVAL = 0.2  # seconds between connection attempts
 
 VERSION = """

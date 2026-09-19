@@ -10,7 +10,7 @@ from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import Label
 
-from openpilot.selfdrive.ui import OnroadAlertColors
+from openpilot.selfdrive.ui import Colors
 
 
 AlertSize = log.SelfdriveState.AlertSize
@@ -35,9 +35,9 @@ SELFDRIVE_UNRESPONSIVE_TIMEOUT = 10  # Seconds
 
 # Constants
 ALERT_COLORS = {
-  AlertStatus.normal: OnroadAlertColors.NORMAL,
-  AlertStatus.userPrompt: OnroadAlertColors.USER_PROMPT,
-  AlertStatus.critical: OnroadAlertColors.CRITICAL,
+  AlertStatus.normal: Colors.OnroadAlert.NORMAL,
+  AlertStatus.userPrompt: Colors.OnroadAlert.USER_PROMPT,
+  AlertStatus.critical: Colors.OnroadAlert.CRITICAL,
 }
 
 

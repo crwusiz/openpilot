@@ -6,7 +6,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.common.filter_simple import FirstOrderFilter
 
-from openpilot.selfdrive.ui import ConfidenceBallColors
+from openpilot.selfdrive.ui import Colors
 
 
 def draw_circle_gradient(center_x: float, center_y: float, radius: int,
@@ -58,22 +58,22 @@ class ConfidenceBall(Widget):
     # confidence zones
     if ui_state.status == UIStatus.ENGAGED or self._demo:
       if self._confidence_filter.x > 0.5:
-        top_dot_color = ConfidenceBallColors.ACTIVE_TOP
-        bottom_dot_color = ConfidenceBallColors.ACTIVE_BOTTOM
+        top_dot_color = Colors.ConfidenceBall.ACTIVE_TOP
+        bottom_dot_color = Colors.ConfidenceBall.ACTIVE_BOTTOM
       elif self._confidence_filter.x > 0.2:
-        top_dot_color = ConfidenceBallColors.WARNING_TOP
-        bottom_dot_color = ConfidenceBallColors.WARNING_BOTTOM
+        top_dot_color = Colors.ConfidenceBall.WARNING_TOP
+        bottom_dot_color = Colors.ConfidenceBall.WARNING_BOTTOM
       else:
-        top_dot_color = ConfidenceBallColors.CRITICAL_TOP
-        bottom_dot_color = ConfidenceBallColors.CRITICAL_BOTTOM
+        top_dot_color = Colors.ConfidenceBall.CRITICAL_TOP
+        bottom_dot_color = Colors.ConfidenceBall.CRITICAL_BOTTOM
 
     elif ui_state.status == UIStatus.OVERRIDE:
-      top_dot_color = ConfidenceBallColors.INACTIVE_TOP
-      bottom_dot_color = ConfidenceBallColors.INACTIVE_BOTTOM
+      top_dot_color = Colors.ConfidenceBall.INACTIVE_TOP
+      bottom_dot_color = Colors.ConfidenceBall.INACTIVE_BOTTOM
 
     else:
-      top_dot_color = ConfidenceBallColors.HIDDEN_TOP
-      bottom_dot_color = ConfidenceBallColors.HIDDEN_BOTTOM
+      top_dot_color = Colors.ConfidenceBall.HIDDEN_TOP
+      bottom_dot_color = Colors.ConfidenceBall.HIDDEN_BOTTOM
 
     draw_circle_gradient(content_rect.x + content_rect.width - status_dot_radius,
                          dot_height, status_dot_radius,

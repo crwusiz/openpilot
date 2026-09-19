@@ -23,7 +23,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel, gui_label
 from openpilot.system.ui.widgets.scroller import NavRawScrollPanel, NavScroller
 
-from openpilot.selfdrive.ui import colors_alpha
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 
 class ProfileActionButton(Widget):
@@ -45,9 +45,9 @@ class ProfileActionButton(Widget):
     bg_txt = self._bg_pressed_txt if self.is_pressed else self._bg_txt
     rl.draw_texture_ex(bg_txt, (self._rect.x + (self._rect.width - self._bg_txt.width) / 2,
                                 self._rect.y + (self._rect.height - self._bg_txt.height) / 2), 0, 1.0, rl.WHITE)
-    color = rl.Color(255, 105, 115, 255) if self._delete else DEFAULT_TEXT_COLOR
+    color = Colors.Esim.DELETE if self._delete else DEFAULT_TEXT_COLOR
     if not self.enabled:
-      color = rl.Color(color.r, color.g, color.b, 90)
+      color = colors_alpha(color, 90)
     if self._trash_txt:
       rl.draw_texture_ex(self._trash_txt, (self._rect.x + (self._rect.width - self._trash_txt.width) / 2,
                                           self._rect.y + (self._rect.height - self._trash_txt.height) / 2), 0, 1.0, color)
@@ -132,7 +132,7 @@ class QRScannerDialog(NavWidget):
       text = "not an LPA code" if rl.get_time() < self._invalid_code_until else "hold QR code to camera"
       gui_label(label_rect, text, font_size=32, font_weight=FontWeight.MEDIUM,
                 alignment=TextAlignment.CENTER,
-                color=rl.Color(255, 255, 255, int(255 * 0.9)))
+                color=Colors.Esim.LABEL)
 
     rl.end_scissor_mode()
 
@@ -160,9 +160,6 @@ class InstallingProfileDialog(BigDialog):
 
 
 class EsimProfileButton(BigButton):
-  SUB_LABEL_DISABLED = colors_alpha(rl.WHITE, int(255 * 0.585))
-  CHECK_ICON_COLOR = colors_alpha(rl.WHITE, int(255 * 0.585))
-  LABEL_COLOR = colors_alpha(rl.WHITE, int(255 * 0.9))
   LABEL_PADDING = 98
   LABEL_WIDTH = 402 - 98 - 28
   SUB_LABEL_WIDTH = 402 - BigButton.LABEL_HORIZONTAL_PADDING * 2
@@ -199,7 +196,7 @@ class EsimProfileButton(BigButton):
 
   def _update_state(self):
     super()._update_state()
-    self._sub_label.set_color(DEFAULT_TEXT_COLOR if self.enabled else self.SUB_LABEL_DISABLED)
+    self._sub_label.set_color(DEFAULT_TEXT_COLOR if self.enabled else Colors.Esim.SUB_LABEL_DISABLED)
     self._sub_label.set_font_weight(FontWeight.SEMI_BOLD if self.enabled else FontWeight.ROMAN)
 
   @property
@@ -242,7 +239,7 @@ class EsimProfileButton(BigButton):
     return 48
 
   def _draw_content(self, btn_y: float):
-    self._label.set_color(self.SUB_LABEL_DISABLED if self._locked else self.LABEL_COLOR)
+    self._label.set_color(Colors.Esim.SUB_LABEL_DISABLED if self._locked else Colors.Esim.LABEL)
     label_rect = rl.Rectangle(self._rect.x + self.LABEL_PADDING, btn_y + self.LABEL_VERTICAL_PADDING,
                               self.LABEL_WIDTH, self._rect.height - self.LABEL_VERTICAL_PADDING * 2)
     self._label.render(label_rect)
@@ -259,7 +256,7 @@ class EsimProfileButton(BigButton):
 
       if active:
         check_y = int(label_y - sub_label_height + (sub_label_height - self._check_txt.height) / 2)
-        rl.draw_texture_ex(self._check_txt, rl.Vector2(sub_label_x, check_y), 0.0, 1.0, self.CHECK_ICON_COLOR)
+        rl.draw_texture_ex(self._check_txt, rl.Vector2(sub_label_x, check_y), 0.0, 1.0, Colors.Esim.CHECK_ICON)
         sub_label_x += self._check_txt.width + 14
 
       sub_label_rect = rl.Rectangle(sub_label_x, label_y - sub_label_height, sub_label_w, sub_label_height)
