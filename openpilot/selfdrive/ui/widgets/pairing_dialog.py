@@ -13,7 +13,7 @@ from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets.button import IconButton
 from openpilot.selfdrive.ui.ui_state import ui_state
 
-from openpilot.selfdrive.ui import Colors, PairingColors
+from openpilot.selfdrive.ui import PairingColors
 
 
 class PairingDialog(Widget):
