@@ -1,0 +1,103 @@
+name: Autogen
+env:
+  # increment this when downloads substantially change to avoid the internet
+  CACHE_VERSION: '13'
+  CAPTURE_PROCESS_REPLAY: 1
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  PYTHONPATH: ${{ github.workspace }}
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    paths:
+    - 'tinygrad/runtime/autogen/**/*'
+    - 'tinygrad/runtime/support/autogen.py'
+    - '.github/workflows/autogen.yml'
+  workflow_dispatch:
+    paths:
+    - 'tinygrad/runtime/autogen/**/*'
+    - 'tinygrad/runtime/support/autogen.py'
+    - '.github/workflows/autogen.yml'
+
+jobs:
+  autogen:
+    name: In-tree Autogen
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v6
+    - name: Setup Environment
+      uses: ./.github/actions/setup-tinygrad
+      with:
+        key: 'autogen'
+        amd: 'true'
+        llvm: 'true'
+        autogen: 'true'
+        deps: 'autogen'
+    - name: Regenerate autogen files
+      run: |
+        find tinygrad/runtime/autogen -type f -name "*.py" -not -path "*/amd/*" -not -name "__init__.py" -not -name "metal.py" -not -name "iokit.py" -not -name "corefoundation.py" -not -name "libclang.py" -delete
+        python3 -c "from tinygrad.runtime.autogen import opencl"
+        python3 -c "from tinygrad.runtime.autogen import cuda, nvrtc, nvjitlink, nv_570, nv_580, nv_610, nv"
+        python3 -c "from tinygrad.runtime.autogen import comgr, comgr_3, hsa, hip, amd_gpu, sqtt, rocprof, amdgpu_kd, amdgpu_drm"
+        python3 -c "from tinygrad.runtime.autogen.am import *"
+        python3 -c "from tinygrad.runtime.autogen.nv_regs import *"
+        python3 -c "from tinygrad.runtime.autogen import libc, kfd, io_uring, pci, vfio"
+        python3 -c "from tinygrad.runtime.autogen import llvm"
+        python3 -c "from tinygrad.runtime.autogen import webgpu"
+        python3 -c "from tinygrad.runtime.autogen import kgsl, qcom_dsp"
+        python3 -c "from tinygrad.runtime.autogen import libusb"
+        python3 -c "from tinygrad.runtime.autogen import mesa"
+        python3 -c "from tinygrad.runtime.autogen import avcodec"
+        python3 -c "from tinygrad.runtime.autogen import llvm_qcom"
+        python3 -c "from tinygrad.runtime.autogen import mlx5, bnxt"
+        python3 -c "from tinygrad.runtime.autogen import ggml_common"
+        REGEN=1 python3 -c "from tinygrad.runtime.autogen import libclang"
+    - name: Check for differences
+      run: |
+        if ! git diff --quiet; then
+          git diff
+          git diff > autogen-ubuntu.patch
+          echo "Autogen mismatch detected. Patch available at: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
+          exit 1
+        fi
+    - name: Upload patch artifact
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: autogen-ubuntu-patch
+        path: autogen-ubuntu.patch
+
+  autogen-mac:
+    name: In-tree Autogen (macos)
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v6
+    - name: Setup Environment
+      uses: ./.github/actions/setup-tinygrad
+      with:
+        key: 'autogen-mac'
+        llvm: 'true'
+    - name: Regenerate autogen files
+      run: |
+        rm tinygrad/runtime/autogen/metal.py tinygrad/runtime/autogen/iokit.py tinygrad/runtime/autogen/corefoundation.py
+        python3 -c "from tinygrad.runtime.autogen import metal, iokit, corefoundation"
+    - name: Check for differences
+      run: |
+        if ! git diff --quiet; then
+          git diff
+          git diff > autogen-macos.patch
+          echo "Autogen mismatch detected. Patch available at: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
+          exit 1
+        fi
+    - name: Upload patch artifact
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: autogen-macos-patch
+        path: autogen-macos.patch
