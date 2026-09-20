@@ -167,6 +167,31 @@ class Colors:
     UNAVAILABLE=rl.Color(40, 40, 40, 255),
   )
 
+  Watch3 = SimpleNamespace(
+    BACKGROUND=rl.Color(12, 16, 22, 255),
+    PANEL=rl.Color(22, 28, 36, 255),
+    VIDEO=rl.Color(8, 11, 16, 255),
+    BORDER=rl.Color(43, 53, 65, 255),
+    TEXT=rl.Color(238, 243, 249, 255),
+    TEXT_MUTED=rl.Color(145, 160, 179, 255),
+    ACCENT=rl.Color(113, 195, 225, 255),
+    CLOSE_HOVER=rl.Color(46, 58, 73, 255),
+  )
+
+  Network = SimpleNamespace(
+    NAV_BUTTON=rl.Color(57, 57, 57, 255),
+    NAV_BUTTON_PRESSED=rl.Color(74, 74, 74, 255),
+  )
+
+  Toggle = SimpleNamespace(
+    ON=rl.Color(51, 171, 76, 255),
+    OFF=RED,
+    KNOB=rl.WHITE,
+    DISABLED_ON=rl.Color(34, 119, 34, 255),  # Dark green when disabled + on
+    DISABLED_OFF=rl.Color(57, 57, 57, 255),
+    DISABLED_KNOB=rl.Color(136, 136, 136, 255),
+  )
+
   THROTTLE = [
     rl.Color(13, 248, 122, 102),
     rl.Color(114, 255, 92, 89),

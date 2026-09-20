@@ -3,13 +3,9 @@ from collections.abc import Callable
 from openpilot.system.ui.lib.application import MousePos
 from openpilot.system.ui.widgets import Widget
 
-ON_COLOR = rl.Color(51, 171, 76, 255)
-#OFF_COLOR = rl.Color(57, 57, 57, 255) #0xC92231
-OFF_COLOR = rl.Color(201, 34, 49, 255)
-KNOB_COLOR = rl.WHITE
-DISABLED_ON_COLOR = rl.Color(34, 119, 34, 255)  # Dark green when disabled + on
-DISABLED_OFF_COLOR = rl.Color(57, 57, 57, 255)
-DISABLED_KNOB_COLOR = rl.Color(136, 136, 136, 255)
+from openpilot.selfdrive.ui import Colors
+
+
 WIDTH, HEIGHT = 160, 80
 BG_HEIGHT = 60
 ANIMATION_SPEED = 8.0
@@ -58,11 +54,11 @@ class Toggle(Widget):
     self.update()
 
     if self._enabled:
-      bg_color = self._blend_color(OFF_COLOR, ON_COLOR, self._progress)
-      knob_color = KNOB_COLOR
+      bg_color = self._blend_color(Colors.Toggle.OFF, Colors.Toggle.ON, self._progress)
+      knob_color = Colors.Toggle.KNOB
     else:
-      bg_color = self._blend_color(DISABLED_OFF_COLOR, DISABLED_ON_COLOR, self._progress)
-      knob_color = DISABLED_KNOB_COLOR
+      bg_color = self._blend_color(Colors.Toggle.DISABLED_OFF, Colors.Toggle.DISABLED_ON, self._progress)
+      knob_color = Colors.Toggle.DISABLED_KNOB
 
     # Draw background
     bg_rect = rl.Rectangle(self._rect.x + 5, self._rect.y + 10, WIDTH - 10, BG_HEIGHT)

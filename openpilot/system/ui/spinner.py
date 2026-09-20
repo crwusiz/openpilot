@@ -9,6 +9,8 @@ from openpilot.system.ui.text import wrap_text
 from openpilot.system.ui.widgets import Widget
 
 from openpilot.system.ui.widgets.network import WifiManager, WifiManagerUI
+from openpilot.selfdrive.ui import Colors
+
 
 # Constants
 _BIG_UI = gui_app.big_ui()
@@ -85,7 +87,7 @@ class Spinner(Widget):
       self._last_refresh = rl.get_time()
 
     ip_label = self._ip_address
-    ip_color = rl.Color(128, 216, 166, 255) if self._ip_address != "Offline" else rl.WHITE
+    ip_color = Colors.LIME if self._ip_address != "Offline" else rl.WHITE
 
     ip_font = gui_app.font(FontWeight.SEMI_BOLD)
     ip_scaled_size = IP_FONT_SIZE * FONT_SCALE

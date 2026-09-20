@@ -86,7 +86,7 @@ class Sidebar(Widget):
     self._is_update_available = False
     self._initial_commit_check_done = False
     self._commit_pressed = False
-    self._progress_dots = 0
+    self._progress_frame = 0
     self._last_progress_update = 0
 
     # File paths
@@ -234,14 +234,15 @@ class Sidebar(Widget):
     if not self._is_processing:
       return
 
-    current_time = time.time()
-    if current_time - self._last_progress_update >= 1.0:
-      self._progress_dots = (self._progress_dots + 1) % 4
+    current_time = time.monotonic()
+    if current_time - self._last_progress_update >= 0.1:
+      frames = "-\\|/"
+      spinner = frames[self._progress_frame]
+      self._progress_frame = (self._progress_frame + 1) % len(frames)
       self._last_progress_update = current_time
 
-      dot_str = "." * self._progress_dots
       action_text = tr_noop("git pull") if self._is_update_available else tr_noop("check")
-      self._commit_status.update(action_text, tr_noop("progress") + dot_str, Colors.WARNING)
+      self._commit_status.update(action_text, tr_noop("progress") + " " + spinner, Colors.WARNING)
 
   def _render(self, rect: rl.Rectangle):
     rl.draw_rectangle_rec(rect, rl.BLACK)
@@ -251,6 +252,7 @@ class Sidebar(Widget):
     self._draw_metrics(rect)
 
   def _update_state(self):
+    self._update_progress_indicator()
     sm = ui_state.sm
     if not sm.updated['deviceState']:
       return
@@ -269,7 +271,6 @@ class Sidebar(Widget):
       self._initial_commit_check_done = True
       self._start_commit_check()
 
-    self._update_progress_indicator()
     self.wifi_manager_ui._update_state()
 
   def _update_network_status(self, device_state):

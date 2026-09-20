@@ -14,18 +14,11 @@ import threading
 from pathlib import Path
 from openpilot.system.ui.widgets.network import WifiManager, WifiManagerUI
 
-if BIG_UI:
-  MARGIN = 50
-  SPACING = 40
-  FONT_SIZE = 72
-  LINE_HEIGHT = 80
-  BUTTON_SIZE = rl.Vector2(310, 160)
-else:
-  MARGIN = 20
-  SPACING = 30
-  FONT_SIZE = 25
-  LINE_HEIGHT = 25
-  BUTTON_SIZE = rl.Vector2(150, 80)
+MARGIN = 50 if BIG_UI else 20
+SPACING = 40 if BIG_UI else 30
+FONT_SIZE = 72 if BIG_UI else 25
+LINE_HEIGHT = 80 if BIG_UI else 25
+BUTTON_SIZE = rl.Vector2(310, 160) if BIG_UI else rl.Vector2(150, 80)
 
 DEMO_TEXT = """This is a sample text that will be wrapped and scrolled if necessary.
             The text is long enough to demonstrate scrolling and word wrapping.""" * 30

@@ -189,7 +189,7 @@ class MiciHomeLayout(Widget):
     self._is_processing = False
     self._is_update_available = False
     self._initial_commit_check_done = False
-    self._progress_dots = 0
+    self._progress_frame = 0
     self._last_progress_update = 0
 
     self._git_pull_exit_flag = Path("/data/log/git_pull_exit_flag")
@@ -402,16 +402,15 @@ class MiciHomeLayout(Widget):
     if not self._is_processing:
       return
 
-    current_time = time.time()
-    if current_time - self._last_progress_update >= 1.0:
-      self._progress_dots = (self._progress_dots + 1) % 4
+    current_time = time.monotonic()
+    if current_time - self._last_progress_update >= 0.1:
+      frames = "-\\|/"
+      spinner = frames[self._progress_frame]
+      self._progress_frame = (self._progress_frame + 1) % len(frames)
       self._last_progress_update = current_time
 
-      dot_str = "." * self._progress_dots
-      if self._is_update_available:
-        self._commit_status.update("git pull", "progress" + dot_str, Colors.WARNING)
-      else:
-        self._commit_status.update("check", "progress" + dot_str, Colors.WARNING)
+      action_text = "git pull" if self._is_update_available else "check"
+      self._commit_status.update(action_text, "progress " + spinner, Colors.WARNING)
 
   def _get_version_text(self) -> tuple[str, str, str, str] | None:
     version = ui_state.params.get("Version")
@@ -433,15 +432,9 @@ class MiciHomeLayout(Widget):
   def _draw_commit_button(self, start_x: float):
     btn_height = 64
 
-    self._commit_btn_rect.x = start_x + 12
-
     right_edge = self.rect.x + self.rect.width - HOME_PADDING
-    self._commit_btn_rect.width = right_edge - self._commit_btn_rect.x
-
-    if self._commit_btn_rect.width < 140:
-      self._commit_btn_rect.width = 140
-      self._commit_btn_rect.x = right_edge - 140
-
+    self._commit_btn_rect.width = max(140, min(180, right_edge - start_x - 12))
+    self._commit_btn_rect.x = right_edge - self._commit_btn_rect.width
     self._commit_btn_rect.y = self.rect.y + self.rect.height - btn_height - HOME_PADDING
 
     edge_rect = rl.Rectangle(self._commit_btn_rect.x + 4, self._commit_btn_rect.y + 4, 100, btn_height - 8)

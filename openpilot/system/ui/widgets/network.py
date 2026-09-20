@@ -15,6 +15,9 @@ from openpilot.system.ui.widgets.label import gui_label
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets.list_view import ButtonAction, ListItem, MultipleButtonAction, ToggleAction, button_item, text_item
 
+from openpilot.selfdrive.ui import Colors
+
+
 NM_DEVICE_STATE_NEED_AUTH = 60
 MIN_PASSWORD_LENGTH = 8
 MAX_PASSWORD_LENGTH = 64
@@ -49,7 +52,7 @@ class NavButton(Widget):
     self.set_rect(rl.Rectangle(0, 0, 400, 100))
 
   def _render(self, _):
-    color = rl.Color(74, 74, 74, 255) if self.is_pressed else rl.Color(57, 57, 57, 255)
+    color = Colors.Network.NAV_BUTTON_PRESSED if self.is_pressed else Colors.Network.NAV_BUTTON
     rl.draw_rectangle_rounded(self._rect, 0.6, 10, color)
     gui_label(self.rect, self.text, font_size=60, alignment=TextAlignment.CENTER)
 
