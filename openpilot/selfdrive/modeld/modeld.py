@@ -43,6 +43,9 @@ from tinygrad.runtime.autogen import libusb
 from openpilot.common.hardware.usb import CHESTNUT_USB_IDS
 
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
+# Diagnostic opt-in only: SMU/VRAM reads share the inference USB path and can
+# block well beyond a model frame, even with the SMU's 100 ms polling timeout.
+CHESTNUT_GPU_METRICS = os.getenv('CHESTNUT_GPU_METRICS') == '1'
 
 LAT_SMOOTH_SECONDS = 0.0
 LONG_SMOOTH_SECONDS = 0.3
@@ -388,13 +391,16 @@ def main(demo=False):
   cloudlog.warning(f"models loaded in {time.monotonic() - st:.1f}s, modeld starting")
 
   # messaging
-  pub_socks = ["modelV2", "drivingModelData", "cameraOdometry"] + (["chestnutGpuState"] if CHESTNUT else [])
+  gpu_metrics_enabled = CHESTNUT and CHESTNUT_GPU_METRICS
+  if gpu_metrics_enabled:
+    cloudlog.warning("Chestnut GPU metrics enabled for diagnostics; synchronous USB reads may delay model output")
+  pub_socks = ["modelV2", "drivingModelData", "cameraOdometry"] + (["chestnutGpuState"] if gpu_metrics_enabled else [])
   pm = PubMaster(pub_socks)
   sm = SubMaster(["deviceState", "carState", "narrowRoadCameraState", "extrinsicsCalibration", "driverMonitoringState", "carControl", "lateralDelay"])
 
   publish_state = PublishState()
   params = Params()
-  chestnut_state = ChestnutGpuState(pm, model.chestnut) if CHESTNUT else None
+  chestnut_state = ChestnutGpuState(pm, model.chestnut) if gpu_metrics_enabled else None
 
   # setup filter to track dropped frames
   frame_dropped_filter = FirstOrderFilter(0., 10., 1. / ModelConstants.MODEL_RUN_FREQ)
