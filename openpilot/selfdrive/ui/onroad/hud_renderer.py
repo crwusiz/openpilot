@@ -102,9 +102,8 @@ class HudRenderer(Widget):
     self.steer_ratio: float = 0.0
 
     # Blinker animation
-    self.blink_index: int = 0
-    self.blink_wait: int = 0
-    self.prev_blink_time: float = 0.0
+    self._blinker_state: tuple[bool, bool] = (False, False)
+    self._blink_start_time: float = 0.0
 
     self.hide_bottom_icons: bool = False
 
@@ -895,61 +894,40 @@ class HudRenderer(Widget):
     return Colors.LIME
 
   def _draw_blinkers(self, rect: rl.Rectangle) -> None:
-    if self.blink_wait > 0:
-      self.blink_wait -= 1
-      self.blink_index = 0
-      return
-
-    if not (self.left_blinker or self.right_blinker):
-      self.blink_index = 0
-      return
-
-    # Update blinker animation
+    blinker_state = (self.left_blinker, self.right_blinker)
     current_time = rl.get_time() * 1000  # Convert to ms
-    if current_time - self.prev_blink_time > BLINK_PERIOD_MS / 60:
-      self.prev_blink_time = current_time
-      self.blink_index += 1
+    if blinker_state != self._blinker_state:
+      self._blinker_state = blinker_state
+      self._blink_start_time = current_time
 
-    if self.blink_index >= BLINKER_DRAW_COUNT:
-      self.blink_index = BLINKER_DRAW_COUNT - 1
-      self.blink_wait = 15
+    if not any(blinker_state):
+      return
+
+    # Use one elapsed-time phase so hazards sweep outward in sync at any frame rate.
+    phase = (current_time - self._blink_start_time) % BLINK_PERIOD_MS
+    sweep_duration = BLINK_PERIOD_MS / 2
+    if phase >= sweep_duration:
+      return
+    blink_index = int(phase / sweep_duration * BLINKER_DRAW_COUNT)
 
     # Draw blinker images
-    center_x = rect.width / 2
-    y = (rect.height - 200) / 2
+    center_x = rect.x + rect.width / 2
+    y = rect.y + (rect.height - 200) / 2
     blinker_width = 200
     blinker_height = 200
     alpha_base = 0.8
 
-    # Draw left blinker
-    if self.left_blinker:
-      x = center_x - 200
-      direction = -1
-      blinker_img = self.turnsignal_l_img
+    for active, direction, blinker_img in (
+      (self.left_blinker, -1, self.turnsignal_l_img),
+      (self.right_blinker, 1, self.turnsignal_r_img),
+    ):
+      if not active:
+        continue
+      x = center_x - blinker_width if direction == -1 else center_x
 
-      for i in range(BLINKER_DRAW_COUNT):
-        distance = abs(self.blink_index - i)
-        alpha = alpha_base if distance == 0 else alpha_base / (distance * 2)
-
-        if alpha > 0.05:
-          x_pos = x + int(i * blinker_width * 0.6 * direction)
-          color = colors_alpha(rl.WHITE, int(alpha * 255))
-
-          rl.draw_texture_pro(
-            blinker_img,
-            rl.Rectangle(0, 0, blinker_img.width, blinker_img.height),
-            rl.Rectangle(x_pos, y, blinker_width, blinker_height),
-            rl.Vector2(0, 0), 0, color
-          )
-
-    # Draw right blinker
-    if self.right_blinker:
-      x = center_x
-      direction = 1
-      blinker_img = self.turnsignal_r_img
-
-      for i in range(BLINKER_DRAW_COUNT):
-        distance = abs(self.blink_index - i)
+      # Only draw the moving head and its fading trail, never arrows ahead of it.
+      for i in range(blink_index + 1):
+        distance = blink_index - i
         alpha = alpha_base if distance == 0 else alpha_base / (distance * 2)
 
         if alpha > 0.05:
