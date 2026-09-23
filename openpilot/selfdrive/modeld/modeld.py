@@ -398,7 +398,10 @@ def main(demo=False):
     cloudlog.warning("Chestnut GPU metrics enabled for diagnostics; synchronous USB reads may delay model output")
   pub_socks = ["modelV2", "drivingModelData", "cameraOdometry"] + (["chestnutGpuState"] if gpu_metrics_enabled else [])
   pm = PubMaster(pub_socks)
-  sm = SubMaster(["deviceState", "carState", "narrowRoadCameraState", "extrinsicsCalibration", "driverMonitoringState", "carControl", "lateralDelay"])
+  dcam_is_missing = params.get_bool("CabinCameraHardwareMissing")
+  saved_is_rhd = params.get_bool("IsRhdDetected")
+  dm_packets = [] if dcam_is_missing else ["driverMonitoringState"]
+  sm = SubMaster(["deviceState", "carState", "narrowRoadCameraState", "extrinsicsCalibration", "carControl", "lateralDelay"] + dm_packets)
 
   publish_state = PublishState()
   params = Params()
@@ -465,7 +468,7 @@ def main(demo=False):
 
     sm.update(0)
     desire = DH.desire
-    is_rhd = sm["driverMonitoringState"].isRHD
+    is_rhd = saved_is_rhd if dcam_is_missing else sm["driverMonitoringState"].isRHD
     frame_id = sm["narrowRoadCameraState"].frameId
     v_ego = max(sm["carState"].vEgo, 0.)
     lat_delay = sm["lateralDelay"].lateralDelay + LAT_SMOOTH_SECONDS

@@ -38,9 +38,11 @@ class Controls:
 
     self.CI = interfaces[self.CP.carFingerprint](self.CP)
 
+    self.dcam_is_missing = self.params.get_bool("CabinCameraHardwareMissing")
+    dm_packets = [] if self.dcam_is_missing else ['driverMonitoringState']
     self.sm = messaging.SubMaster(['lateralDelay', 'vehicleParameters', 'lateralTorqueParameters', 'modelV2', 'selfdriveState',
                                    'extrinsicsCalibration', 'deviceMotion', 'longitudinalPlan', 'lateralManeuverPlan', 'carState', 'carOutput',
-                                   'driverMonitoringState', 'onroadEvents', 'driverAssistance', 'radarState'], poll='selfdriveState')
+                                   'onroadEvents', 'driverAssistance', 'radarState'] + dm_packets, poll='selfdriveState')
     self.pm = messaging.PubMaster(['carControl', 'controlsState'])
 
     self.steer_limited_by_safety = False
@@ -61,8 +63,6 @@ class Controls:
       self.LaC = LatControlPID(self.CP, self.CI, DT_CTRL)
     elif self.CP.lateralTuning.which() == 'torque':
       self.LaC = LatControlTorque(self.CP, self.CI, DT_CTRL)
-
-    self.dcam_is_missing = self.params.get_bool("CabinCameraHardwareMissing")
 
   def update(self):
     self.sm.update(15)

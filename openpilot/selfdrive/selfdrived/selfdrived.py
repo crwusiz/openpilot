@@ -102,14 +102,13 @@ class SelfdriveD:
     if REPLAY:
       # no vipc in replay will make them ignored anyways
       ignore += ['narrowRoadCameraState', 'wideRoadCameraState']
-    if self.dcam_is_missing:
-      ignore += ['driverMonitoringState']
+    dm_packets = [] if self.dcam_is_missing else ['driverMonitoringState']
     self.sm = messaging.SubMaster(['deviceState', 'pandaStates', 'peripheralState', 'modelV2', 'extrinsicsCalibration',
-                                   'carOutput', 'driverMonitoringState', 'longitudinalPlan', 'deviceMotion', 'lateralDelay',
+                                   'carOutput', 'longitudinalPlan', 'deviceMotion', 'lateralDelay',
                                    'managerState', 'vehicleParameters', 'radarState', 'lateralTorqueParameters',
                                    'controlsState', 'carControl', 'driverAssistance', 'alertDebug', 'userBookmark',
                                    'lateralManeuverPlan'] + \
-                                   self.camera_packets + self.sensor_packets + self.gps_packets,
+                                   self.camera_packets + self.sensor_packets + self.gps_packets + dm_packets,
                                   ignore_alive=ignore, ignore_avg_freq=ignore,
                                   ignore_valid=ignore, frequency=int(1/DT_CTRL))
 
@@ -412,7 +411,7 @@ class SelfdriveD:
       if not SIMULATION and not self.rk.lagging:
         if not self.sm.all_alive(self.camera_packets):
           self.events.add(EventName.cameraMalfunction)
-          if not self.sm.all_alive(['cabinCameraState']) and not self.dcam_is_missing:
+          if not self.dcam_is_missing and not self.sm.all_alive(['cabinCameraState']):
             self.dcam_is_missing = True
             self.params.put_bool("CabinCameraHardwareMissing", True, block=False)
         elif not self.sm.all_freq_ok(self.camera_packets):
@@ -445,9 +444,9 @@ class SelfdriveD:
         self.events.add(EventName.commIssue)
 
       logs = {
-        'invalid': [s for s, valid in self.sm.valid.items() if not valid],
-        'not_alive': [s for s, alive in self.sm.alive.items() if not alive],
-        'not_freq_ok': [s for s, freq_ok in self.sm.freq_ok.items() if not freq_ok],
+        'invalid': [s for s in self.sm.services if not self.sm.all_valid([s])],
+        'not_alive': [s for s in self.sm.services if not self.sm.all_alive([s])],
+        'not_freq_ok': [s for s in self.sm.services if not self.sm.all_freq_ok([s])],
       }
       if logs != self.logged_comm_issue:
         cloudlog.event("commIssue", error=True, **logs)

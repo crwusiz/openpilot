@@ -280,6 +280,8 @@ def main():
   filter_initialized = False
   critical_services = ["accelerometer", "gyroscope", "cameraOdometry"]
   observation_input_invalid = defaultdict(int)
+  inputs_valid_logged = True
+  last_inputs_log_time = float('-inf')
 
   input_invalid_limit = {s: round(INPUT_INVALID_LIMIT * (SERVICE_LIST[s].frequency / 20.)) for s in critical_services}
   input_invalid_threshold = {s: input_invalid_limit[s] - 0.5 for s in critical_services}
@@ -331,6 +333,19 @@ def main():
       critical_service_inputs_valid = all(observation_input_invalid[s] < input_invalid_threshold[s] for s in critical_services)
       inputs_valid = sm.all_valid() and critical_service_inputs_valid
       sensors_valid = sensor_all_checks(acc_msgs, gyro_msgs, sensor_valid, sensor_recv_time, sensor_alive, SIMULATION)
+
+      # Record which input failed without flooding logs at camera frequency.
+      now = time.monotonic()
+      if (not inputs_valid and now - last_inputs_log_time >= 5.0) or (inputs_valid and not inputs_valid_logged):
+        cloudlog.event("locationd_inputs_status", error=not inputs_valid, inputs_valid=inputs_valid,
+                       invalid_services=[s for s in sm.services if not sm.all_valid([s])],
+                       rejected_observations={s: float(observation_input_invalid[s]) for s in critical_services},
+                       rejected_thresholds=input_invalid_threshold,
+                       sensors_valid=sensors_valid,
+                       camera_frame_id=sm['cameraOdometry'].frameId,
+                       camera_publish_delay_ms=(sm.logMonoTime['cameraOdometry'] - sm['cameraOdometry'].timestampEof) * 1e-6)
+        last_inputs_log_time = now
+        inputs_valid_logged = inputs_valid
 
       msg = estimator.get_msg(sensors_valid, inputs_valid, filter_initialized)
       pm.send("deviceMotion", msg)
