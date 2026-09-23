@@ -353,6 +353,8 @@ def apply_styles():
     button.btn-red-stop::before { content: '⏹' !important; }
     button.btn-default { background: linear-gradient(90deg, #2A3348 0%, #3A4A6B 100%) !important; }
     button.btn-default::before { content: '👁' !important; }
+    button.btn-camera { background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%) !important; box-shadow: 0 5px 22px rgba(59,130,246,0.5) !important; }
+    button.btn-camera::before { content: '📷' !important; }
 
     /* 새로고침 버튼 전용 스타일 */
     button.refresh-btn {
@@ -593,6 +595,13 @@ def render_tab_functions():
 
         ui.button('RESET CALIBRATION', on_click=do_reset_cal, color=None).classes('custom-btn btn-yellow w-full')
         render_status_card("DEVICE POSITION", get_param_text("DevicePosition", "--"), "📍", "card-info")
+
+      with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
+        def do_camera_preview():
+          params.put_bool("CameraPreview", True, block=True)
+          ui.notify("장치 화면에 카메라 미리보기(watch3)를 요청했습니다. 종료하려면 장치의 Close 버튼을 눌러주세요.", type='info', position='top')
+
+        ui.button('CAMERA PREVIEW (WATCH3)', on_click=do_camera_preview, color=None).classes('custom-btn btn-camera w-full')
 
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         ui.button('REBOOT', on_click=lambda: subprocess.Popen(["sudo", "reboot"], start_new_session=True), color=None).classes('custom-btn btn-red w-full')
