@@ -2,6 +2,7 @@
 from collections.abc import Callable
 import base64
 import ctypes
+import gc
 from functools import cached_property
 import os
 os.environ['GMMU'] = '0' # for chestnut fast loading, noop for qcom
@@ -340,7 +341,7 @@ def main(demo=False):
   else:
     params.remove("ChestnutActive")
 
-  config_realtime_process(7, 54)
+  gc.disable()
 
   # visionipc clients
   while True:
@@ -391,6 +392,8 @@ def main(demo=False):
     model = small_model
   params.put_bool("ChestnutLoading", False)
   cloudlog.warning(f"models loaded in {time.monotonic() - st:.1f}s, modeld starting")
+
+  config_realtime_process(7, 54)
 
   # messaging
   gpu_metrics_enabled = CHESTNUT and CHESTNUT_GPU_METRICS
@@ -517,7 +520,7 @@ def main(demo=False):
                        run_count % round(ModelConstants.MODEL_RUN_FREQ / SERVICE_LIST['chestnutGpuState'].frequency) == 0)
       model_output = model.run(bufs, transforms, inputs, chestnut_state.send if send_chestnut else None)
     except Exception:
-      if not params.get_bool("ChestnutActive"):
+      if not model.chestnut:
         raise
       # fallback to small model
       cloudlog.exception("big model failed, fall back to small")
