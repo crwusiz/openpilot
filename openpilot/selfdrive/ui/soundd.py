@@ -49,12 +49,13 @@ sound_list: dict[int, tuple[str, int | None, float]] = {
 
   AudibleAlert.warningSoft: ("critical.wav", None, MAX_VOLUME),
   AudibleAlert.warningImmediate: ("dm_critical.wav", None, MAX_VOLUME),
-  CRITICAL_MAX: ("dm_critical_max.wav", None, MAX_VOLUME),
 
   AudibleAlert.ready: ("ready.wav", 1, MAX_VOLUME),
   AudibleAlert.ding: ("ding.wav", 1, MAX_VOLUME),
   AudibleAlert.dong: ("dong.wav", 1, MAX_VOLUME),
   AudibleAlert.beep: ("beep.wav", 1, MAX_VOLUME),
+
+  CRITICAL_MAX: ("dm_critical_max.wav", None, MAX_VOLUME),
 }
 
 def check_selfdrive_timeout_alert(sm):
@@ -132,7 +133,7 @@ class Soundd:
     data_out[:frames, 0] = self.get_sound_data(frames)
 
   def update_alert(self, new_alert):
-    current_alert_played_once = self.current_alert == AudibleAlert.none or self.current_sound_frame >= len(self.loaded_sounds[self.current_alert])
+    current_alert_played_once = self.current_alert == AudibleAlert.none or self.current_sound_frame >= len(self.loaded_sounds[self.current_sound])
     # let looping sounds finish the current loop instead of cutting off mid tone
     if new_alert == AudibleAlert.none and self.current_alert != AudibleAlert.none and sound_list[self.current_alert][1] is None:
       if current_alert_played_once:
