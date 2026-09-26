@@ -925,9 +925,9 @@ class HudRenderer(Widget):
         continue
       x = center_x - blinker_width if direction == -1 else center_x
 
-      # Only draw the moving head and its fading trail, never arrows ahead of it.
-      for i in range(blink_index + 1):
-        distance = blink_index - i
+      # Fade on both sides of the moving highlight so the arrows sweep instead of filling in.
+      for i in range(BLINKER_DRAW_COUNT):
+        distance = abs(blink_index - i)
         alpha = alpha_base if distance == 0 else alpha_base / (distance * 2)
 
         if alpha > 0.05:
