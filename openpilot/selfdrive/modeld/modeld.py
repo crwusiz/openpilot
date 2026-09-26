@@ -15,7 +15,6 @@ from tinygrad.helpers import round_up
 from tinygrad.uop.ops import UOp
 import math
 import pickle
-import threading
 import time
 import numpy as np
 import openpilot.cereal.messaging as messaging
@@ -30,7 +29,7 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
 from openpilot.common.hardware.usb import cable_connected
 from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.common.realtime import config_realtime_process, DT_MDL
+from openpilot.common.realtime import config_realtime_process, drop_realtime, set_core_affinity, DT_MDL
 from openpilot.common.transformations.camera import DEVICE_CAMERAS
 from openpilot.system.camerad.cameras.nv12_info import get_nv12_info
 from openpilot.common.transformations.model import get_warp_matrix
@@ -40,6 +39,7 @@ from openpilot.selfdrive.modeld.parse_model_outputs import Parser
 from openpilot.selfdrive.modeld.fill_model_msg import fill_model_msg, fill_driving_model_data, fill_pose_msg, PublishState
 from openpilot.selfdrive.modeld.constants import ModelConstants, Plan
 from openpilot.selfdrive.modeld.helpers import MODELS_DIR, chestnut_present, chestnut_compiled, modeld_pkl_path, load_oob, wait_for_chestnut
+from openpilot.selfdrive.modeld.model_loader import FORCE_SMALL_MODEL_ENV, load_big_model, restart_with_small_model
 
 import struct
 from tinygrad.runtime.autogen import libusb
@@ -304,7 +304,8 @@ class ModelState:
 def main(demo=False):
   cloudlog.warning("modeld init")
 
-  chestnut_available = chestnut_compiled() and (chestnut_present() or cable_connected())
+  force_small_model = os.getenv(FORCE_SMALL_MODEL_ENV) == '1'
+  chestnut_available = not force_small_model and chestnut_compiled() and (chestnut_present() or cable_connected())
 
   CHESTNUT = False
   if chestnut_available:
@@ -330,7 +331,7 @@ def main(demo=False):
     AMDDevice.wait_timeout_ms = 5000
   params = Params()
   params.put_bool("ChestnutLoading", CHESTNUT)
-  if chestnut_available and not CHESTNUT:
+  if force_small_model or (chestnut_available and not CHESTNUT):
     params.put_bool("ChestnutActive", False)
   else:
     params.remove("ChestnutActive")
@@ -362,32 +363,20 @@ def main(demo=False):
 
   st = time.monotonic()
   cloudlog.warning("loading model")
-  model = None
   if CHESTNUT:
-    big_model = None
     def load_big():
-      nonlocal big_model
-      try:
-        wait_for_chestnut()
-        m = ModelState(vipc_client_main.width, vipc_client_main.height, True)
-        m.warmup()
-        big_model = m
-      except Exception:
-        cloudlog.exception("big model load failed")
-    loader = threading.Thread(target=load_big, daemon=True)
-    loader.start()
-    loader.join(BIG_MODEL_TIMEOUT)
-    if loader.is_alive():
-      cloudlog.warning(f"big model load timed out after {BIG_MODEL_TIMEOUT}s; falling back to the small model")
-    model = big_model
-    params.put_bool("ChestnutActive", model is not None)
-
-  small_model = ModelState(vipc_client_main.width, vipc_client_main.height, False) if model is None or CHESTNUT else None
-  if model is None:
-    model = small_model
+      wait_for_chestnut()
+      m = ModelState(vipc_client_main.width, vipc_client_main.height, True)
+      m.warmup()
+      return m
+    model = load_big_model(load_big, BIG_MODEL_TIMEOUT, lambda reason: restart_with_small_model(params, reason, demo))
+    params.put_bool("ChestnutActive", True)
+  else:
+    model = ModelState(vipc_client_main.width, vipc_client_main.height, False)
   params.put_bool("ChestnutLoading", False)
   cloudlog.warning(f"models loaded in {time.monotonic() - st:.1f}s, modeld starting")
 
+  startup_cores = list(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else []
   config_realtime_process(7, 54)
 
   # messaging
@@ -517,14 +506,13 @@ def main(demo=False):
     except Exception:
       if not model.chestnut:
         raise
-      # fallback to small model
-      cloudlog.exception("big model failed, fall back to small")
-      params.put_bool("ChestnutActive", False)
-      model = small_model
-      if chestnut_state is not None:
-        chestnut_state.big = False
-      run_count = 0
-      model_output = None
+      cloudlog.exception("big model inference failed")
+      # exec preserves scheduling and affinity. Reload at normal priority,
+      # with the original cores, just like the first model initialization.
+      drop_realtime()
+      if startup_cores:
+        set_core_affinity(startup_cores)
+      restart_with_small_model(params, "big model inference failed", demo)
     mt2 = time.perf_counter()
     model_execution_time = mt2 - mt1
 

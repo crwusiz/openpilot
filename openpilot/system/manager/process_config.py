@@ -1,11 +1,11 @@
 import os
-import operator
 import platform
 
 from opendbc.car.structs import car
 from openpilot.common.params import Params
 from openpilot.common.hardware import PC, COMMA_HARDWARE
 from openpilot.system.manager.process import PythonProcess, NativeProcess, DaemonProcess
+from openpilot.selfdrive.addon.cluster.cluster_policy import enforce_cluster_transport
 
 WEBCAM = os.getenv("USE_WEBCAM") is not None
 
@@ -65,7 +65,7 @@ def livestream(started: bool, params: Params, CP: car.CarParams) -> bool:
   return params.get_bool("IsLiveStreaming")
 
 def cluster_enable(started: bool, params: Params, CP: car.CarParams) -> bool:
-  return params.get_bool("ClusterEnable")
+  return params.get_bool("ClusterEnable") and enforce_cluster_transport(params)
 
 def or_(*fns):
   return lambda *args: any(fn(*args) for fn in fns)

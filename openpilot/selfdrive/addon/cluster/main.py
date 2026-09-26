@@ -10,6 +10,7 @@ from openpilot.selfdrive.addon.cluster.cluster_logging import close_log, flog, i
 from openpilot.selfdrive.addon.cluster.cluster_display_pipeline import ClusterDisplayPipeline
 from openpilot.selfdrive.addon.cluster.cluster_live_camera import ClusterLiveCamera
 from openpilot.selfdrive.addon.cluster.cluster_models import ClusterModels
+from openpilot.selfdrive.addon.cluster.cluster_policy import enforce_cluster_transport
 from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer
 
 
@@ -26,6 +27,10 @@ def cluster_main():
 
   cloudlog.info("Initializing Cluster Config...")
   config = ClusterConfig()
+
+  if not enforce_cluster_transport(config.params, config.display_transport):
+    close_log()
+    return
 
   display = create_cluster_display(config)
   if hasattr(display, 'open'):
@@ -59,6 +64,9 @@ def cluster_main():
   try:
     while True:
       if loop_count % fps == 0:
+        if not enforce_cluster_transport(config.params, config.display_transport):
+          flog("[CLUSTER_MAIN] USB cluster stopped for Chestnut eGPU.")
+          break
         requested_transport = config.params.get("ClusterDisplayTransport") or config.display_transport
         if requested_transport in ("network", "usb") and requested_transport != config.display_transport:
           flog(
@@ -104,7 +112,7 @@ def cluster_main():
     pipeline_stopped = pipeline.close() if hasattr(pipeline, 'close') else True
     if pipeline_stopped:
       try:
-        if display.connected:
+        if display.connected and enforce_cluster_transport(config.params, config.display_transport):
           display.send_image(np.zeros((config.height, config.width, 3), dtype=np.uint8))
       except Exception as e:
         flog(f"[CLUSTER_MAIN] Failed to clear display: {e}")

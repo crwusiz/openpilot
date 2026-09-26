@@ -12,7 +12,7 @@
     └── USB: 모니터 터치 컨트롤러 입력
 ```
 
-C4의 기본 전송 방식은 `CLUSTER_DISPLAY_TRANSPORT = "usb"`입니다. Orange Pi HDMI를 사용하려면 대시보드에서 `Network (Orange Pi HDMI)`를 선택합니다. 저장된 `ClusterDisplayTransport` 설정이 기본값보다 우선합니다. `USB (TURZX Display)`를 선택하면 C4에 직접 또는 USB-C 허브를 통해 연결된 TURZX 9.2 디스플레이를 사용하며, Chestnut eGPU가 연결되어도 선택한 전송 방식이 유지됩니다. 이전 코드가 네트워크로 강제 저장한 장비는 대시보드에서 USB를 한 번 다시 선택해야 합니다.
+C4의 기본 전송 방식은 `CLUSTER_DISPLAY_TRANSPORT = "usb"`입니다. Orange Pi HDMI를 사용하려면 대시보드에서 `Network (Orange Pi HDMI)`를 선택한 뒤 cluster를 켭니다. 저장된 `ClusterDisplayTransport` 설정이 기본값보다 우선합니다. `USB (TURZX Display)` 사용 중 Chestnut eGPU가 감지되면 eGPU 안정성을 우선하여 `ClusterEnable`이 자동으로 꺼지고 USB cluster가 중지됩니다. 부트로더 및 GPU 로딩 상태도 포함하며, eGPU를 분리해도 자동으로 다시 켜지지 않습니다. Network 모드는 eGPU 연결 여부와 관계없이 사용할 수 있습니다.
 
 > 일부 안드로이드 핫스팟은 접속 장치 간 통신을 차단합니다. C4와 Orange Pi가 같은 SSID에 있어도 연결되지 않으면 AP/client isolation 설정을 먼저 확인하십시오.
 
