@@ -15,6 +15,7 @@ from tinygrad.helpers import round_up
 from tinygrad.uop.ops import UOp
 import math
 import pickle
+import threading
 import time
 import numpy as np
 import openpilot.cereal.messaging as messaging
@@ -29,7 +30,7 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
 from openpilot.common.hardware.usb import cable_connected
 from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.common.realtime import config_realtime_process, drop_realtime, set_core_affinity, DT_MDL
+from openpilot.common.realtime import config_realtime_process, DT_MDL
 from openpilot.common.transformations.camera import DEVICE_CAMERAS
 from openpilot.system.camerad.cameras.nv12_info import get_nv12_info
 from openpilot.common.transformations.model import get_warp_matrix
@@ -39,25 +40,13 @@ from openpilot.selfdrive.modeld.parse_model_outputs import Parser
 from openpilot.selfdrive.modeld.fill_model_msg import fill_model_msg, fill_driving_model_data, fill_pose_msg, PublishState
 from openpilot.selfdrive.modeld.constants import ModelConstants, Plan
 from openpilot.selfdrive.modeld.helpers import MODELS_DIR, chestnut_present, chestnut_compiled, modeld_pkl_path, load_oob, wait_for_chestnut
-from openpilot.selfdrive.modeld.model_loader import FORCE_SMALL_MODEL_ENV, load_big_model, restart_with_small_model
-
-import struct
-from tinygrad.runtime.autogen import libusb
-from openpilot.common.hardware.usb import CHESTNUT_USB_IDS
 
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
-# Diagnostic opt-in only: SMU/VRAM reads share the inference USB path and can
-# block well beyond a model frame, even with the SMU's 100 ms polling timeout.
-CHESTNUT_GPU_METRICS = os.getenv('CHESTNUT_GPU_METRICS') == '1'
 
 LAT_SMOOTH_SECONDS = 0.0
 LONG_SMOOTH_SECONDS = 0.3
 MIN_LAT_CONTROL_SPEED = 0.3
 BIG_MODEL_TIMEOUT = 60
-
-CHESTNUT_READY_TIMEOUT = 20.0
-CHESTNUT_READY_STABLE_TIME = 1.0
-CHESTNUT_READY_POLL_INTERVAL = 0.25
 
 
 def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.ModelDataV2.Action,
@@ -86,70 +75,6 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
   return log.ModelDataV2.Action(desiredCurvature=float(desired_curvature),
                                 desiredAcceleration=float(desired_accel),
                                 shouldStop=bool(stop))
-
-
-class ChestnutReadyProbe:
-  # Check live power and enable the PCIe bridge before opening the AMD device.
-  def __init__(self):
-    self._context = None
-    self._asm_usb = None
-    self._pcie_power_requested = False
-    self._probe_error_logged = False
-
-  def close(self) -> None:
-    try:
-      if self._asm_usb:
-        libusb.libusb_close(self._asm_usb)
-    finally:
-      self._asm_usb = None
-      self._pcie_power_requested = False
-      if self._context is not None:
-        libusb.libusb_exit(self._context)
-        self._context = None
-
-  def _control_transfer(self, request_type: int, request: int, value: int, length: int, timeout: int) -> bytes:
-    data = (ctypes.c_ubyte * length)()
-    transferred = libusb.libusb_control_transfer(self._asm_usb, request_type, request, value, 0, data, length, timeout)
-    if transferred < 0:
-      raise RuntimeError(f"Chestnut USB request 0x{request:02x} failed: {transferred}")
-    if transferred != length:
-      raise RuntimeError(f"Chestnut USB request 0x{request:02x}: expected {length} bytes, got {transferred}")
-    return bytes(data)
-
-  def probe_ready(self) -> bool:
-    try:
-      if self._context is None:
-        context = ctypes.POINTER(libusb.struct_libusb_context)()
-        result = libusb.libusb_init(ctypes.byref(context))
-        if result < 0:
-          raise RuntimeError(f"Chestnut USB initialization failed: {result}")
-        self._context = context
-      if not self._asm_usb:
-        for vendor_id, product_id in CHESTNUT_USB_IDS:
-          self._asm_usb = libusb.libusb_open_device_with_vid_pid(self._context, vendor_id, product_id)
-          if self._asm_usb:
-            break
-      if not self._asm_usb:
-        return False
-
-      raw = self._control_transfer(0xC0, 0xC0, 0, 5, timeout=100)
-      supply_voltage, _, supply_fault = struct.unpack('<Hh?', raw)
-      if supply_voltage < 5000 or supply_fault:
-        self._pcie_power_requested = False
-        return False
-
-      if not self._pcie_power_requested:
-        self._control_transfer(0x40, 0xF3, 1, 0, timeout=2000)
-        self._pcie_power_requested = True
-      ready = self._control_transfer(0xC0, 0xE4, 0xB450, 1, timeout=1000)[0] == 0x78
-      self._probe_error_logged = False
-      return ready
-    except Exception:
-      if not self._probe_error_logged:
-        cloudlog.exception("Chestnut readiness probe failed")
-        self._probe_error_logged = True
-      self.close()
-      return False
 
 
 class ChestnutGpuState:
@@ -217,7 +142,11 @@ class ModelState:
   prev_desire: np.ndarray  # for tracking the rising edge of the pulse
 
   def __init__(self, cam_w: int, cam_h: int, chestnut: bool):
+    st = time.monotonic()
+    model_name = 'big' if chestnut else 'small'
+    cloudlog.warning(f'{model_name} model: loading weights')
     jits = load_oob(modeld_pkl_path(chestnut), chestnut)
+    cloudlog.warning(f'{model_name} model: weights loaded in {time.monotonic() - st:.1f}s')
     self.model_device = jits['input_specs']['new_img'][2]
     self.input_shapes = {name: (shape, np.dtype(dtype)) for name, (shape, dtype, _) in jits['input_specs'].items()}
     self.state_pairs = {name: f'next_{name}' for name in self.input_shapes if f'next_{name}' in jits['metadata']['output_shapes']}
@@ -230,16 +159,24 @@ class ModelState:
     stride, y_height, uv_height, _ = get_nv12_info(cam_w, cam_h)
     self.frame_copy_size = stride * (y_height + uv_height)
     self.pack_inputs()
+    cloudlog.warning(f'{model_name} model: inputs ready, compiling warp ({time.monotonic() - st:.1f}s)')
     with open(MODELS_DIR / f'{"big_" if chestnut else ""}driving_warp_{cam_w}x{cam_h}_tinygrad.pkl', 'rb') as f:
       self.run_warp = pickle.load(f)['run']
     self.run_warp.captured._linear = lower_and_compile(self.run_warp.captured._linear)
+    cloudlog.warning(f'{model_name} model: warp ready, compiling model ({time.monotonic() - st:.1f}s)')
     self.run_model = jits['run']
     self.run_model.captured._linear = lower_and_compile(self.run_model.captured._linear)
-    self.outputs = {name: Tensor(np.zeros(shape, dtype=dtype), device=device).realize() for name, (shape, dtype, device) in jits['output_specs'].items()}
-    for name, next_name in self.state_pairs.items():
-      state = self.input_queues[name]
-      self.outputs[next_name] = input_view(state._buffer(), state.shape, state.dtype, 0)
+    # Reuse recurrent state without temporary allocations; JIT requires output_specs order.
+    output_states = {next_name: self.input_queues[name] for name, next_name in self.state_pairs.items()}
+    self.outputs = {}
+    for name, (shape, dtype, device) in jits['output_specs'].items():
+      if name in output_states:
+        state = output_states[name]
+        self.outputs[name] = input_view(state._buffer(), state.shape, state.dtype, 0)
+      else:
+        self.outputs[name] = Tensor(np.zeros(shape, dtype=dtype), device=device).realize()
     self.parser = Parser()
+    cloudlog.warning(f'{model_name} model: initialized in {time.monotonic() - st:.1f}s')
 
   def pack_inputs(self) -> None:
     # Pack host inputs into one upload to reduce USB transfer overhead for the eGPU.
@@ -304,37 +241,13 @@ class ModelState:
 def main(demo=False):
   cloudlog.warning("modeld init")
 
-  force_small_model = os.getenv(FORCE_SMALL_MODEL_ENV) == '1'
-  chestnut_available = not force_small_model and chestnut_compiled() and (chestnut_present() or cable_connected())
-
-  CHESTNUT = False
-  if chestnut_available:
-    probe = ChestnutReadyProbe()
-    ready_since = None
-    deadline = time.monotonic() + CHESTNUT_READY_TIMEOUT
-    cloudlog.warning(f"waiting up to {CHESTNUT_READY_TIMEOUT:.0f}s for Chestnut power and PCIe link")
-    try:
-      while not CHESTNUT and time.monotonic() < deadline:
-        now = time.monotonic()
-        if chestnut_present() and probe.probe_ready():
-          ready_since = now if ready_since is None else ready_since
-          CHESTNUT = now - ready_since >= CHESTNUT_READY_STABLE_TIME
-        else:
-          ready_since = None
-        if not CHESTNUT:
-          time.sleep(CHESTNUT_READY_POLL_INTERVAL)
-    finally:
-      probe.close()
-
+  CHESTNUT = chestnut_compiled() and (chestnut_present() or cable_connected())
   if CHESTNUT:
     from tinygrad.runtime.ops_amd import AMDDevice
-    AMDDevice.wait_timeout_ms = 5000
+    AMDDevice.wait_timeout_ms = 3000
   params = Params()
   params.put_bool("ChestnutLoading", CHESTNUT)
-  if force_small_model or (chestnut_available and not CHESTNUT):
-    params.put_bool("ChestnutActive", False)
-  else:
-    params.remove("ChestnutActive")
+  params.remove("ChestnutActive")
 
   gc.disable()
 
@@ -363,27 +276,42 @@ def main(demo=False):
 
   st = time.monotonic()
   cloudlog.warning("loading model")
+  model = None
   if CHESTNUT:
+    big_model = None
     def load_big():
-      wait_for_chestnut()
-      m = ModelState(vipc_client_main.width, vipc_client_main.height, True)
-      m.warmup()
-      return m
-    model = load_big_model(load_big, BIG_MODEL_TIMEOUT, lambda reason: restart_with_small_model(params, reason, demo))
-    params.put_bool("ChestnutActive", True)
-  else:
-    model = ModelState(vipc_client_main.width, vipc_client_main.height, False)
+      nonlocal big_model
+      try:
+        wait_st = time.monotonic()
+        cloudlog.warning('big model: waiting for Chestnut USB')
+        wait_for_chestnut()
+        cloudlog.warning(f'big model: Chestnut USB ready in {time.monotonic() - wait_st:.1f}s')
+        m = ModelState(vipc_client_main.width, vipc_client_main.height, True)
+        warmup_st = time.monotonic()
+        cloudlog.warning('big model: warming up')
+        m.warmup()
+        cloudlog.warning(f'big model: warmup completed in {time.monotonic() - warmup_st:.1f}s')
+        big_model = m
+      except Exception:
+        cloudlog.exception("big model load failed")
+    loader = threading.Thread(target=load_big, daemon=True)
+    loader.start()
+    loader.join(BIG_MODEL_TIMEOUT)
+    model = big_model
+    if model is None and loader.is_alive():
+      cloudlog.error(f'big model load timed out after {BIG_MODEL_TIMEOUT}s, falling back to small model')
+    params.put_bool("ChestnutActive", model is not None)
+
+  small_model = ModelState(vipc_client_main.width, vipc_client_main.height, False) if model is None or CHESTNUT else None
+  if model is None:
+    model = small_model
   params.put_bool("ChestnutLoading", False)
   cloudlog.warning(f"models loaded in {time.monotonic() - st:.1f}s, modeld starting")
 
-  startup_cores = list(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else []
   config_realtime_process(7, 54)
 
   # messaging
-  gpu_metrics_enabled = CHESTNUT and CHESTNUT_GPU_METRICS
-  if gpu_metrics_enabled:
-    cloudlog.warning("Chestnut GPU metrics enabled for diagnostics; synchronous USB reads may delay model output")
-  pub_socks = ["modelV2", "drivingModelData", "cameraOdometry"] + (["chestnutGpuState"] if gpu_metrics_enabled else [])
+  pub_socks = ["modelV2", "drivingModelData", "cameraOdometry"] + (["chestnutGpuState"] if CHESTNUT else [])
   pm = PubMaster(pub_socks)
   dcam_is_missing = params.get_bool("CabinCameraHardwareMissing")
   saved_is_rhd = params.get_bool("IsRhdDetected")
@@ -392,7 +320,7 @@ def main(demo=False):
 
   publish_state = PublishState()
   params = Params()
-  chestnut_state = ChestnutGpuState(pm, model.chestnut) if gpu_metrics_enabled else None
+  chestnut_state = ChestnutGpuState(pm, model.chestnut) if CHESTNUT else None
 
   # setup filter to track dropped frames
   frame_dropped_filter = FirstOrderFilter(0., 10., 1. / ModelConstants.MODEL_RUN_FREQ)
@@ -506,13 +434,14 @@ def main(demo=False):
     except Exception:
       if not model.chestnut:
         raise
-      cloudlog.exception("big model inference failed")
-      # exec preserves scheduling and affinity. Reload at normal priority,
-      # with the original cores, just like the first model initialization.
-      drop_realtime()
-      if startup_cores:
-        set_core_affinity(startup_cores)
-      restart_with_small_model(params, "big model inference failed", demo)
+      # fallback to small model
+      cloudlog.exception("big model failed, fall back to small")
+      params.put_bool("ChestnutActive", False)
+      model = small_model
+      if chestnut_state is not None:
+        chestnut_state.big = False
+      run_count = 0
+      model_output = None
     mt2 = time.perf_counter()
     model_execution_time = mt2 - mt1
 

@@ -18,10 +18,14 @@ class TestCrash(unittest.TestCase):
     self.log_dir.mkdir()
     self.log_path = self.log_dir / 'tmux_error.log'
     self.flag_path = self.log_dir / 'tmux_error.log.uploaded'
+    self.locationd_path = self.log_dir / 'tmux_locationd.log'
+    self.locationd_flag = self.log_dir / 'tmux_locationd.log.uploaded'
     self.lock_path = Path(self.temp_dir.name) / 'tmux_error.log.lock'
     self.enterContext(patch.object(log_paths, 'LOG_DIR', self.log_dir))
     self.enterContext(patch.object(crash, 'CRASH_LOG_PATH', str(self.log_path)))
     self.enterContext(patch.object(crash, 'CRASH_UPLOAD_FLAG', str(self.flag_path)))
+    self.enterContext(patch.object(crash, 'LOCATIOND_LOG_PATH', str(self.locationd_path)))
+    self.enterContext(patch.object(crash, 'LOCATIOND_UPLOAD_FLAG', str(self.locationd_flag)))
     self.enterContext(patch.object(crash, 'CRASH_UPLOAD_LOCK', str(self.lock_path)))
     self.enterContext(patch.object(crash, '_upload_process', None))
     self.cloudlog = self.enterContext(patch.object(crash, 'cloudlog'))
@@ -206,6 +210,70 @@ class TestCrash(unittest.TestCase):
       except ValueError:
         crash.capture_exception()
         raise
+
+  def test_locationd_capture_runs_in_background(self):
+    with patch.object(crash.threading, 'Thread') as thread:
+      crash.capture_locationd_log()
+    thread.assert_called_once_with(target=crash.save_locationd_log, name='locationd-log', daemon=True)
+    thread.return_value.start.assert_called_once()
+    self.run.assert_not_called()
+
+  def test_locationd_capture_saves_console_without_overwriting_crash(self):
+    self.log_path.write_text('original crash', encoding='utf-8')
+    self.run.return_value = subprocess.CompletedProcess([], 0, 'locationd console output\n', '')
+    crash.save_locationd_log()
+    self.assertIn('locationdTemporaryError\n\nlocationd console output', self.locationd_path.read_text(encoding='utf-8'))
+    self.assertEqual(self.log_path.read_text(encoding='utf-8'), 'original crash')
+    self.assertEqual(self.run.call_args.args[0], ['tmux', 'capture-pane', '-p', '-t', '0', '-S', '-500'])
+    self.popen.assert_called_once()
+
+  def test_locationd_capture_failure_does_not_upload_stale_log(self):
+    self.locationd_path.write_text('old console', encoding='utf-8')
+    for error in (subprocess.TimeoutExpired('tmux', 5), subprocess.CalledProcessError(1, 'tmux'), FileNotFoundError('tmux')):
+      with self.subTest(error=error):
+        self.run.side_effect = error
+        crash.save_locationd_log()
+        self.assertEqual(self.locationd_path.read_text(encoding='utf-8'), 'old console')
+        self.popen.assert_not_called()
+
+  def test_locationd_upload_retries_and_marks_only_its_own_log(self):
+    self.locationd_path.write_text('console snapshot', encoding='utf-8')
+    self.run.return_value = subprocess.CompletedProcess([], 7, '', 'offline')
+    crash.upload_pending_log(str(self.locationd_path), str(self.locationd_flag))
+    self.assertFalse(self.locationd_flag.exists())
+    # The existing manager retry also discovers logs without a Python exception.
+    crash.start_upload()
+    self.popen.assert_called_once()
+
+    def upload(args, **kwargs):
+      self.assertEqual(Path(args[2]).name, 'tmux_locationd.log')
+      self.assertEqual(Path(args[2]).read_text(encoding='utf-8'), 'console snapshot')
+      return subprocess.CompletedProcess(args, 0, '', '')
+
+    self.run.side_effect = upload
+    crash.upload_pending_log(str(self.locationd_path), str(self.locationd_flag))
+    self.assertTrue(crash.is_uploaded(crash.log_version(str(self.locationd_path)), str(self.locationd_flag)))
+    self.assertFalse(self.flag_path.exists())
+    crash.start_upload()
+    self.popen.assert_called_once()
+
+  def test_new_locationd_capture_invalidates_upload_flag(self):
+    self.locationd_path.write_text('old console', encoding='utf-8')
+    crash.upload_pending_log(str(self.locationd_path), str(self.locationd_flag))
+    crash.save_locationd_log()
+    self.assertFalse(self.locationd_flag.exists())
+    self.popen.assert_called_once()
+
+  def test_locationd_log_changed_during_upload_stays_pending(self):
+    self.locationd_path.write_text('old console', encoding='utf-8')
+
+    def upload(args, **kwargs):
+      self.locationd_path.write_text('new console', encoding='utf-8')
+      return subprocess.CompletedProcess(args, 0, '', '')
+
+    self.run.side_effect = upload
+    crash.upload_pending_log(str(self.locationd_path), str(self.locationd_flag))
+    self.assertFalse(self.locationd_flag.exists())
 
 
 if __name__ == '__main__':

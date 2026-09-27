@@ -164,5 +164,4 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"DevicePosition", {CLEAR_ON_MANAGER_START, STRING}},
     {"CommitCompare", {CLEAR_ON_MANAGER_START, STRING}},
     {"FingerPrints", {CLEAR_ON_MANAGER_START, STRING}},
-    {"ModeldRestartRequested", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, BOOL}},
 };
