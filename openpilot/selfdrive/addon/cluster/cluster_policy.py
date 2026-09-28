@@ -1,4 +1,4 @@
-from openpilot.common.hardware.usb import is_chestnut_connected
+
 from openpilot.common.swaglog import cloudlog
 
 
