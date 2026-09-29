@@ -39,6 +39,7 @@ from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan, 
 from openpilot.selfdrive.modeld.parse_model_outputs import Parser
 from openpilot.selfdrive.modeld.fill_model_msg import fill_model_msg, fill_driving_model_data, fill_pose_msg, PublishState
 from openpilot.selfdrive.modeld.constants import ModelConstants, Plan
+from openpilot.selfdrive.modeld.timing import ModeldTiming
 from openpilot.selfdrive.modeld.helpers import MODELS_DIR, chestnut_present, chestnut_compiled, modeld_pkl_path, load_oob, wait_for_chestnut
 
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
@@ -347,8 +348,11 @@ def main(demo=False):
   prev_action = log.ModelDataV2.Action()
 
   DH = DesireHelper()
+  timing = ModeldTiming(DT_MDL)
+  last_publish_time = None
 
   while True:
+    loop_start = time.monotonic()
     # Keep receiving frames until we are at least 1 frame ahead of previous extra frame
     while meta_main.timestamp_sof < meta_extra.timestamp_sof + 25000000:
       buf_main = vipc_client_main.recv()
@@ -381,6 +385,7 @@ def main(demo=False):
       buf_extra = buf_main
       meta_extra = meta_main
 
+    camera_ready = time.monotonic()
     sm.update(0)
     desire = DH.desire
     is_rhd = saved_is_rhd if dcam_is_missing else sm["driverMonitoringState"].isRHD
@@ -426,7 +431,7 @@ def main(demo=False):
       'action_t': np.array([lat_action_t, long_action_t], dtype=np.float32),
     }
 
-    mt1 = time.perf_counter()
+    mt1 = time.monotonic()
     try:
       send_chestnut = (chestnut_state is not None and
                        run_count % round(ModelConstants.MODEL_RUN_FREQ / SERVICE_LIST['chestnutGpuState'].frequency) == 0)
@@ -442,7 +447,7 @@ def main(demo=False):
         chestnut_state.big = False
       run_count = 0
       model_output = None
-    mt2 = time.perf_counter()
+    mt2 = time.monotonic()
     model_execution_time = mt2 - mt1
 
     if model_output is not None:
@@ -461,26 +466,14 @@ def main(demo=False):
       l_lane_change_prob = desire_state[log.Desire.laneChangeLeft]
       r_lane_change_prob = desire_state[log.Desire.laneChangeRight]
       lane_change_prob = l_lane_change_prob + r_lane_change_prob
-      model_lane_data = None
-      if model_output is not None:
-        lane_line_probs_raw = model_output.get('lane_lines_prob', np.zeros((1, 4), dtype=np.float32))
-        lane_line_probs = lane_line_probs_raw[0] if lane_line_probs_raw.shape[0] > 0 else np.zeros(4, dtype=np.float32)
-        road_edges_stds_raw = model_output.get('road_edges_stds', np.empty((0, 0), dtype=np.float32))
-
-        if road_edges_stds_raw.shape[0] >= 2:
-          road_edge_stds = np.array([
-            np.mean(road_edges_stds_raw[0, :5]),
-            np.mean(road_edges_stds_raw[1, :5])
-          ], dtype=np.float32)
-        else:
-          road_edge_stds = np.array([1.0, 1.0], dtype=np.float32)
-
-        model_lane_data = {
-          'laneLineProbs': lane_line_probs,
-          'roadEdgeStds': road_edge_stds
-        }
-
+      lane_data_start = time.monotonic()
+      model_lane_data = {
+        'laneLineProbs': modelv2_send.modelV2.laneLineProbs,
+        'roadEdgeStds': modelv2_send.modelV2.roadEdgeStds,
+      }
+      lane_data_end = time.monotonic()
       DH.update(sm['carState'], sm['carControl'].latActive, lane_change_prob, model_lane_data)
+      desire_update_end = time.monotonic()
       modelv2_send.modelV2.meta.laneChangeState = DH.lane_change_state
       modelv2_send.modelV2.meta.laneChangeDirection = DH.lane_change_direction
       drivingdata_send.drivingModelData.meta.laneChangeState = DH.lane_change_state
@@ -492,9 +485,38 @@ def main(demo=False):
 
       fill_driving_model_data(drivingdata_send, modelv2_send)
       fill_pose_msg(posenet_send, model_output, meta_main.frame_id, vipc_dropped_frames, meta_main.timestamp_eof, extrinsics_calibration_seen)
+      publish_start = time.monotonic()
       pm.send('modelV2', modelv2_send)
       pm.send('drivingModelData', drivingdata_send)
       pm.send('cameraOdometry', posenet_send)
+      publish_end = time.monotonic()
+      # Frame gaps can be caused by the previous iteration. Keep both samples,
+      # including time spent receiving/synchronizing cameras and actual send completion.
+      timing_event = timing.update({
+        'frame_id': meta_main.frame_id,
+        'previous_frame_id': last_vipc_frame_id if last_publish_time is not None else None,
+        'frame_id_delta': meta_main.frame_id - last_vipc_frame_id if last_publish_time is not None else None,
+        'vipc_dropped_frames': vipc_dropped_frames,
+        'frame_drop_percent': frame_drop_ratio * 100,
+        'camera_odometry_valid': bool(posenet_send.valid),
+        'big_model': model.chestnut,
+        'camera_receive_ms': (camera_ready - loop_start) * 1e3,
+        'camera_frame_age_ms': (camera_ready - meta_main.timestamp_eof * 1e-9) * 1e3,
+        'camera_sync_ms': abs(meta_main.timestamp_sof - meta_extra.timestamp_sof) * 1e-6,
+        'preprocess_ms': (mt1 - camera_ready) * 1e3,
+        'model_run_ms': model_execution_time * 1e3,
+        'lane_data_ms': (lane_data_end - lane_data_start) * 1e3,
+        'desire_update_ms': (desire_update_end - lane_data_end) * 1e3,
+        'postprocess_ms': ((lane_data_start - mt2) + (publish_start - desire_update_end)) * 1e3,
+        'publish_ms': (publish_end - publish_start) * 1e3,
+        'processing_ms': (publish_end - camera_ready) * 1e3,
+        'loop_ms': (publish_end - loop_start) * 1e3,
+        'publish_interval_ms': (publish_end - last_publish_time) * 1e3 if last_publish_time is not None else None,
+        'frame_to_publish_ms': (publish_end - meta_main.timestamp_eof * 1e-9) * 1e3,
+      }, publish_end)
+      if timing_event is not None:
+        cloudlog.event('modeld_timing', **timing_event)
+      last_publish_time = publish_end
     last_vipc_frame_id = meta_main.frame_id
 
 if __name__ == "__main__":
