@@ -615,6 +615,8 @@ def render_tab_toggles():
     ("IsHda2", "CANFD Car HDA2", "Highway Drive Assist 2, turn it on"),
     ("CameraSccEnable", "CameraSCC", "HDA1 CameraSCC CAR, HDA2 type ADAS harness cable, turn it on"),
     ("RadarTrackEnable", "Enable Radar Track use", "Enable Radar Track use (disable AEB)"),
+    ("ExperimentalMode", "ExperimentalMode use", "ExperimentalMode"),
+    ("AlphaLongitudinalEnabled", "AlphaLongitudinalEnabled use", "AlphaLongitudinalEnabled"),
     ("CabinCameraOnReverse", "Cabin Camera On Reverse", "Displays the Cabin camera when in reverse"),
     ("CabinCameraHardwareMissing", "Cabin Camera Hardware Missing", "Drive without the Cabin camera"),
     ("ClusterEnable", "Cluster Enable", "Enable Addon Cluster"),

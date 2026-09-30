@@ -39,6 +39,7 @@ from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan, 
 from openpilot.selfdrive.modeld.parse_model_outputs import Parser
 from openpilot.selfdrive.modeld.fill_model_msg import fill_model_msg, fill_driving_model_data, fill_pose_msg, PublishState
 from openpilot.selfdrive.modeld.constants import ModelConstants, Plan
+from openpilot.selfdrive.modeld.camera import CameraFrameReader
 from openpilot.selfdrive.modeld.timing import ModeldTiming
 from openpilot.selfdrive.modeld.helpers import MODELS_DIR, chestnut_present, chestnut_compiled, modeld_pkl_path, load_oob, wait_for_chestnut
 
@@ -122,16 +123,6 @@ class ChestnutGpuState:
 
     msg.valid = not self.big or (self.valid and bool(self.metrics))
     self.pm.send('chestnutGpuState', msg)
-
-
-class FrameMeta:
-  frame_id: int = 0
-  timestamp_sof: int = 0
-  timestamp_eof: int = 0
-
-  def __init__(self, vipc=None):
-    if vipc is not None:
-      self.frame_id, self.timestamp_sof, self.timestamp_eof = vipc.frame_id, vipc.timestamp_sof, vipc.timestamp_eof
 
 
 def input_view(buffer: Buffer, shape: tuple[int, ...], dtype: DType, offset: int) -> Tensor:
@@ -326,15 +317,14 @@ def main(demo=False):
   # setup filter to track dropped frames
   frame_dropped_filter = FirstOrderFilter(0., 10., 1. / ModelConstants.MODEL_RUN_FREQ)
   frame_id = 0
-  last_vipc_frame_id = 0
+  last_vipc_frame_id = None
   run_count = 0
 
   model_transform_main = np.zeros((3, 3), dtype=np.float32)
   model_transform_extra = np.zeros((3, 3), dtype=np.float32)
   extrinsics_calibration_seen = False
-  buf_main, buf_extra = None, None
-  meta_main = FrameMeta()
-  meta_extra = FrameMeta()
+  camera_reader = CameraFrameReader(vipc_client_main, vipc_client_extra if use_extra_client else None)
+  last_camera_error_time = float('-inf')
 
   if demo:
     CP = get_demo_car_params()
@@ -353,39 +343,19 @@ def main(demo=False):
 
   while True:
     loop_start = time.monotonic()
-    # Keep receiving frames until we are at least 1 frame ahead of previous extra frame
-    while meta_main.timestamp_sof < meta_extra.timestamp_sof + 25000000:
-      buf_main = vipc_client_main.recv()
-      meta_main = FrameMeta(vipc_client_main)
-      if buf_main is None:
-        break
-
-    if buf_main is None:
-      cloudlog.debug("vipc_client_main no frame")
-      continue
-
-    if use_extra_client:
-      # Keep receiving extra frames until frame id matches main camera
-      while True:
-        buf_extra = vipc_client_extra.recv()
-        meta_extra = FrameMeta(vipc_client_extra)
-        if buf_extra is None or meta_main.timestamp_sof < meta_extra.timestamp_sof + 25000000:
-          break
-
-      if buf_extra is None:
-        cloudlog.debug("vipc_client_extra no frame")
-        continue
-
-      if abs(meta_main.timestamp_sof - meta_extra.timestamp_sof) > 10000000:
-        cloudlog.error(f"frames out of sync! main: {meta_main.frame_id} ({meta_main.timestamp_sof / 1e9:.5f}),\
-                         extra: {meta_extra.frame_id} ({meta_extra.timestamp_sof / 1e9:.5f})")
-
-    else:
-      # Use single camera
-      buf_extra = buf_main
-      meta_extra = meta_main
-
+    frames = camera_reader.recv()
     camera_ready = time.monotonic()
+    if frames is None:
+      if camera_ready - last_camera_error_time >= 1.0:
+        cloudlog.event('modeld_camera_receive_failed', error=True, failed_stream=camera_reader.failed_stream,
+                       main_frame_id=camera_reader.main_frame.frame_id if camera_reader.main_frame is not None else None,
+                       extra_frame_id=camera_reader.extra_frame.frame_id if camera_reader.extra_frame is not None else None,
+                       **camera_reader.stats)
+        last_camera_error_time = camera_ready
+      continue
+    meta_main, meta_extra = frames
+    buf_main, buf_extra = meta_main.buf, meta_extra.buf
+
     sm.update(0)
     desire = DH.desire
     is_rhd = saved_is_rhd if dcam_is_missing else sm["driverMonitoringState"].isRHD
@@ -410,7 +380,7 @@ def main(demo=False):
       vec_desire[desire] = 1
 
     # tracked dropped frames
-    vipc_dropped_frames = max(0, meta_main.frame_id - last_vipc_frame_id - 1)
+    vipc_dropped_frames = max(0, meta_main.frame_id - last_vipc_frame_id - 1) if last_vipc_frame_id is not None else 0
     frames_dropped = frame_dropped_filter.update(min(vipc_dropped_frames, 10))
     if run_count < 10: # let frame drops warm up
       frame_dropped_filter.x = 0.
@@ -494,6 +464,9 @@ def main(demo=False):
       # including time spent receiving/synchronizing cameras and actual send completion.
       timing_event = timing.update({
         'frame_id': meta_main.frame_id,
+        'extra_frame_id': meta_extra.frame_id,
+        'camera_main_sof_ns': meta_main.timestamp_sof,
+        'camera_extra_sof_ns': meta_extra.timestamp_sof,
         'previous_frame_id': last_vipc_frame_id if last_publish_time is not None else None,
         'frame_id_delta': meta_main.frame_id - last_vipc_frame_id if last_publish_time is not None else None,
         'vipc_dropped_frames': vipc_dropped_frames,
@@ -503,6 +476,7 @@ def main(demo=False):
         'camera_receive_ms': (camera_ready - loop_start) * 1e3,
         'camera_frame_age_ms': (camera_ready - meta_main.timestamp_eof * 1e-9) * 1e3,
         'camera_sync_ms': abs(meta_main.timestamp_sof - meta_extra.timestamp_sof) * 1e-6,
+        **camera_reader.stats,
         'preprocess_ms': (mt1 - camera_ready) * 1e3,
         'model_run_ms': model_execution_time * 1e3,
         'lane_data_ms': (lane_data_end - lane_data_start) * 1e3,
