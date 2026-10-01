@@ -44,19 +44,12 @@ CURVE_MIN_SPEED_CLU = 30.0
 CURVE_STRONG_REDUCTION_RATIO = 1.3
 CURVE_STRONG_REDUCTION_FACTOR = 0.9
 CURVE_LIMIT_FALL_RATE_KPH = 20.0
-STOCK_CURVE_MODEL_WINDOW_M = 15.0
-STOCK_CURVE_MIN_MODEL_RATIO = 0.25
 
 STEER_DECEL_START_ANGLE_DEG = 45.0
 STEER_DECEL_ACTIVATION_ANGLE_DEG = 60.0
 STEER_DECEL_END_ANGLE_DEG = 120.0
 STEER_DECEL_ACTIVATION_DELTA_DEG = 5.0
 STEER_DECEL_MIN_SPEED_CLU = 25.0
-
-VehicleNaviCurveSpeedFactor = 100
-VehicleNaviCurveCtrlEnd = 3
-AutoCurveSpeedLowerLimit = 30
-AutoNaviSpeedDecelRate = 200
 
 
 def _setup_debug_logger():
@@ -189,8 +182,6 @@ class CruiseController:
 
     self.params = Params()
     self.experimental_mode = self.params.get_bool("ExperimentalMode")
-    self.vehicle_navi_params_update_time = 0.0
-    self._update_vehicle_navi_curve_params(force=True)
 
     self.conv = UnitConverter()
     self.btn_handler = CruiseButtonHandler()
@@ -348,7 +339,7 @@ class CruiseController:
                          road_limit_speed_nda, road_limit_speed_stock, road_limit_speed,
                          road_limit_applies, road_limit_target_clu, lead,
                          speed_candidates, calculated_max_speed_clu, immediate_reasons,
-                         model_curve_speed_clu, stock_navi_curve_speed_clu):
+                         model_curve_speed_clu):
     candidate_names = ("ROAD", "CAMERA", "LEAD", "CURVE", "STEER")
     valid_candidates = [
       (name, max(speed, self.min_set_speed_clu)) for name, speed in zip(candidate_names, speed_candidates, strict=True)
@@ -370,7 +361,6 @@ class CruiseController:
       bool(self.pending_road_restore), bool(self.ignore_road_limit_temporarily),
       active_source, tuple(immediate_reasons),
       bool(self.steer_decel_active),
-      bool(getattr(self, 'stock_curve_rejected', False)),
     )
     now = time.monotonic()
     if event_state == self._debug_last_state and now - self._debug_last_time < CRUISE_DEBUG_INTERVAL:
@@ -388,9 +378,8 @@ class CruiseController:
       "nav[nda=%d road_nda=%.1f road_stock=%.1f observed=%s accepted=%.1f target=%s pending=%.1f timer=%d/%d applies=%d restore=%d",
       "section=%d limit=%.1f left=%.0f camera=%d stock_event=%d stock_section=%d stock_speed=%.1f zone=%d school=%d]",
       "lead[present=%d dRel=%.1f vRel=%.1f] ignore=%d timer=%d/%d steer_angle=%.1f immediate=%s",
-      "curve_detail[model=%s stock=%s steer_entry=%s]",
+      "curve_detail[model=%s steer_entry=%s]",
       "curve_estimates[path=%s path_conf=%.3f yaw=%s yaw_conf=%.3f tail_k=%s tail_x=%s]",
-      "stock_curve[distance=%.1f reference=%.1f curvature=%.6f route=%d model_curvature=%s rejected=%d]",
     ))
     cruise_log.debug(
       log_format,
@@ -406,18 +395,13 @@ class CruiseController:
       is_limit_zone, is_school_zone, lead.present, lead.dRel, lead.vRel,
       self.ignore_road_limit_temporarily, self.ignore_limit_timer, IGNORE_LIMIT_TIMEOUT_TICKS,
       CS.steeringAngleDeg, ",".join(immediate_reasons) or "smooth",
-      self._debug_speed(model_curve_speed_clu), self._debug_speed(stock_navi_curve_speed_clu),
+      self._debug_speed(model_curve_speed_clu),
       self._debug_speed(self.conv.ms_to_clu(self.steer_decel_entry_speed_ms)
                         if self.steer_decel_entry_speed_ms is not None else None),
       self._debug_speed(self.conv.ms_to_clu(path_speed) if path_speed != NO_ACTIVE_LIMIT else None), path_confidence,
       self._debug_speed(self.conv.ms_to_clu(yaw_speed) if yaw_speed != NO_ACTIVE_LIMIT else None), yaw_confidence,
       f"{geometry[0]:.6f}" if geometry is not None else "-",
       f"{geometry[1]:.1f}" if geometry is not None else "-",
-      float(getattr(CS, 'naviCurveDistance', 0.0)), float(getattr(CS, 'naviCurveSpeed', 0.0)),
-      float(getattr(CS, 'naviCurveCurvature', 0.0)), int(getattr(CS, 'naviCurveRouteState', 3)),
-      (f"{self.stock_curve_model_curvature:.6f}"
-       if getattr(self, 'stock_curve_model_curvature', None) is not None else "-"),
-      bool(getattr(self, 'stock_curve_rejected', False)),
     )
 
   def _cal_limit_speed(self, CS, sm, current_speed_ms: float, cluster_speed_clu: float, requested_speed_clu: float,
@@ -603,12 +587,9 @@ class CruiseController:
 
     # 4. Curve limit speed
     model_curve_speed_clu = self._cal_curve_speed_adaptive(sm, current_speed_ms, requested_speed_clu)
-    stock_navi_curve_speed_clu = self._cal_stock_navi_curve_speed(CS, sm)
-    curve_speeds = [speed for speed in (model_curve_speed_clu, stock_navi_curve_speed_clu)
-                    if speed != NO_ACTIVE_LIMIT]
     curve_limit_speed_clu = max(
-      min(curve_speeds), CURVE_MIN_SPEED_CLU, self.min_set_speed_clu,
-    ) if curve_speeds else NO_ACTIVE_LIMIT
+      model_curve_speed_clu, CURVE_MIN_SPEED_CLU, self.min_set_speed_clu,
+    ) if model_curve_speed_clu != NO_ACTIVE_LIMIT else NO_ACTIVE_LIMIT
     self.curve_speed_clu = curve_limit_speed_clu
 
     # 5. Steering angle based limit speed
@@ -678,7 +659,7 @@ class CruiseController:
       road_limit_speed=road_limit_speed, road_limit_applies=road_limit_applies,
       road_limit_target_clu=road_limit_target_clu, lead=lead, speed_candidates=speed_candidates,
       calculated_max_speed_clu=calculated_max_speed_clu, immediate_reasons=immediate_reasons,
-      model_curve_speed_clu=model_curve_speed_clu, stock_navi_curve_speed_clu=stock_navi_curve_speed_clu,
+      model_curve_speed_clu=model_curve_speed_clu,
     )
 
   def _cal_lead_speed(self, lead, cluster_speed_clu: float):
@@ -712,55 +693,6 @@ class CruiseController:
 
     return lead_limit_speed_clu
 
-  def _update_vehicle_navi_curve_params(self, force=False):
-    now = time.monotonic()
-    if not force and now - self.vehicle_navi_params_update_time < 1.0:
-      return
-
-    self.vehicle_navi_params_update_time = now
-    self.vehicle_navi_curve_control = True
-    self.vehicle_navi_curve_mpp_control = True
-    self.vehicle_navi_curve_speed_factor = min(
-      2.0, max(0.5, VehicleNaviCurveSpeedFactor * 0.01),
-    )
-    self.vehicle_navi_curve_lower_limit = max(5.0, AutoCurveSpeedLowerLimit)
-    self.vehicle_navi_curve_decel_rate = max(0.01, AutoNaviSpeedDecelRate * 0.01)
-    self.vehicle_navi_curve_control_end = max(0.0, VehicleNaviCurveCtrlEnd)
-
-  def _cal_stock_navi_curve_speed(self, CS, sm):
-    self._update_vehicle_navi_curve_params()
-    self.stock_curve_model_curvature = None
-    self.stock_curve_rejected = False
-
-    distance = float(getattr(CS, "naviCurveDistance", 0.0) or 0.0)
-    reference_speed = float(getattr(CS, "naviCurveSpeed", 0.0) or 0.0)
-    curvature = float(getattr(CS, "naviCurveCurvature", 0.0) or 0.0)
-    route_active = bool(getattr(CS, "naviCurveRouteActive", False))
-    route_state = int(getattr(CS, "naviCurveRouteState", 1 if route_active else 3))
-    route_allowed = route_active or (self.vehicle_navi_curve_mpp_control and route_state == 0)
-    if (not all(math.isfinite(value) for value in (distance, reference_speed, curvature)) or
-        not self.vehicle_navi_curve_control or not route_allowed or distance <= 0.0 or
-        reference_speed <= 0.0 or abs(curvature) < 1e-7):
-      return NO_ACTIVE_LIMIT
-
-    self.stock_curve_model_curvature = self._get_stock_curve_model_curvature(sm, distance)
-    if (self.stock_curve_model_curvature is not None and
-        self.stock_curve_model_curvature < abs(curvature) * STOCK_CURVE_MIN_MODEL_RATIO):
-      # A map spot on another branch or a passed ramp must not impose a tight
-      # curve cap on a visibly straight path. Require coverage beyond the spot;
-      # distant curves and unavailable model data keep navigation preview.
-      self.stock_curve_rejected = True
-      return NO_ACTIVE_LIMIT
-
-    target_speed = max(self.vehicle_navi_curve_lower_limit,
-                       reference_speed * self.vehicle_navi_curve_speed_factor)
-    safe_speed = self.conv.kph_to_ms(target_speed)
-    decel_distance = max(0.0, distance - safe_speed * self.vehicle_navi_curve_control_end)
-    preview_speed = self.conv.ms_to_kph(
-      math.sqrt(safe_speed ** 2 + 2.0 * self.vehicle_navi_curve_decel_rate * decel_distance)
-    )
-    return self.conv.kph_to_clu(max(target_speed, min(250.0, preview_speed)))
-
   def _calculate_curvature(self, x_positions, y_positions):
     dy = np.gradient(y_positions, x_positions)
     d2y = np.gradient(dy, x_positions)
@@ -774,24 +706,6 @@ class CruiseController:
         np.any(np.diff(x_positions) <= 0.01)):
       return None
     return x_positions, np.abs(self._calculate_curvature(x_positions, y_positions))
-
-  def _get_stock_curve_model_curvature(self, sm, distance):
-    if not sm.all_checks(['modelV2']):
-      return None
-    path = self._get_model_path(sm['modelV2'])
-    if path is None:
-      return None
-    x_positions, curvatures = path
-    window_start = max(x_positions[1], distance - STOCK_CURVE_MODEL_WINDOW_M)
-    window_end = distance + STOCK_CURVE_MODEL_WINDOW_M
-    # Exclude gradient endpoints and require the entire map-spot window to
-    # be observable before using the model to reject navigation information.
-    if x_positions[1] > distance or x_positions[-2] < window_end:
-      return None
-    visible = (x_positions >= window_start) & (x_positions <= window_end)
-    if np.count_nonzero(visible) < 3:
-      return None
-    return float(np.max(curvatures[visible]))
 
   def _get_model_based_speed(self, model, current_speed_ms: float, min_curve_speed_ms: float):
     self.model_curve_geometry = None

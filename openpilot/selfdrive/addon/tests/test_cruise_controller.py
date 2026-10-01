@@ -156,7 +156,6 @@ def make_limit_inputs(monkeypatch, *, nda=True, school=True, camera_event=True,
   controller._set_limit_speed = lambda speed: setattr(controller, 'requested_speed_clu', speed)
   controller._cal_lead_speed = lambda *args: 255.0
   controller._cal_curve_speed_adaptive = lambda *args: 255.0
-  controller._cal_stock_navi_curve_speed = lambda *args: 255.0
   controller._cal_steer_based_speed = lambda *args: 255.0
   debug_state = {}
   controller._debug_limit_state = lambda **kwargs: debug_state.update(kwargs)
@@ -235,7 +234,7 @@ def make_steer_controller():
   return controller
 
 
-def test_limit_debug_separates_model_stock_and_steer_reference(monkeypatch):
+def test_limit_debug_separates_model_and_steer_reference(monkeypatch):
   controller, car_state, sm, _ = make_limit_inputs(monkeypatch)
   controller.conv.ms_to_clu = lambda speed: speed * 3.6
   controller.steer_decel_active = True
@@ -245,7 +244,6 @@ def test_limit_debug_separates_model_stock_and_steer_reference(monkeypatch):
   controller._debug_last_state = None
   controller._debug_last_time = 0.0
   controller._cal_curve_speed_adaptive = lambda *args: 40.0
-  controller._cal_stock_navi_curve_speed = lambda *args: 50.0
   controller._debug_limit_state = CruiseController._debug_limit_state.__get__(controller)
   sm["radarState"].leadOne.dRel = 0.0
   sm["radarState"].leadOne.vRel = 0.0
@@ -256,7 +254,7 @@ def test_limit_debug_separates_model_stock_and_steer_reference(monkeypatch):
   controller._cal_limit_speed(car_state, sm, 33.0 / 3.6, 33.0, 60.6)
 
   assert len(messages) == 1
-  assert "curve_detail[model=40.0 stock=50.0 steer_entry=30.0]" in messages[0]
+  assert "curve_detail[model=40.0 steer_entry=30.0]" in messages[0]
 
 
 def test_steer_limit_does_not_compound_as_vehicle_slows():
@@ -300,82 +298,6 @@ def make_model_sm(x=None, y=None, *, valid=True):
   return ModelSM(modelV2=model)
 
 
-def make_stock_curve_controller():
-  controller = make_steer_controller()
-  controller.conv.kph_to_ms = lambda speed: speed / 3.6
-  controller.conv.ms_to_kph = lambda speed: speed * 3.6
-  controller._update_vehicle_navi_curve_params = lambda: None
-  controller.vehicle_navi_curve_control = True
-  controller.vehicle_navi_curve_mpp_control = True
-  controller.vehicle_navi_curve_lower_limit = 30.0
-  controller.vehicle_navi_curve_speed_factor = 1.0
-  controller.vehicle_navi_curve_decel_rate = 2.0
-  controller.vehicle_navi_curve_control_end = 3.0
-  return controller
-
-
-def stock_curve_state(**overrides):
-  values = {'naviCurveDistance': 20.0, 'naviCurveSpeed': 30.0, 'naviCurveCurvature': 0.02736,
-            'naviCurveRouteActive': True, 'naviCurveRouteState': 1}
-  return SimpleNamespace(**(values | overrides))
-
-
-@pytest.mark.parametrize("distance", [4.0, 20.0, 50.0])
-@pytest.mark.parametrize("route_active", [True, False])
-def test_nearby_tight_map_curve_on_straight_model_path_is_rejected(distance, route_active):
-  controller = make_stock_curve_controller()
-  car_state = stock_curve_state(naviCurveDistance=distance, naviCurveRouteActive=route_active,
-                                naviCurveRouteState=1 if route_active else 0)
-  assert controller._cal_stock_navi_curve_speed(car_state, make_model_sm()) == 255.0
-  assert controller.stock_curve_rejected
-
-
-def test_real_upcoming_curve_is_retained_even_before_vehicle_turns():
-  controller = make_stock_curve_controller()
-  x = np.linspace(0.0, 160.0, 81)
-  y = 0.5 * 0.02736 * np.maximum(x - 10.0, 0.0) ** 2
-  target = controller._cal_stock_navi_curve_speed(stock_curve_state(), make_model_sm(x, y))
-  assert target == pytest.approx(30.0)
-  assert not controller.stock_curve_rejected
-
-
-def test_map_limit_releases_when_ramp_path_straightens():
-  controller = make_stock_curve_controller()
-  x = np.linspace(0.0, 160.0, 81)
-  y = 0.5 * 0.02736 * np.maximum(x - 10.0, 0.0) ** 2
-  car_state = stock_curve_state()
-  assert controller._cal_stock_navi_curve_speed(car_state, make_model_sm(x, y)) == pytest.approx(30.0)
-  assert controller._cal_stock_navi_curve_speed(car_state, make_model_sm()) == 255.0
-
-
-@pytest.mark.parametrize("sm", [
-  make_model_sm(valid=False),
-  make_model_sm(x=[0, 1, 2]),
-  make_model_sm(x=np.linspace(0, 25, 20)),
-  make_model_sm(x=np.zeros(20)),
-  make_model_sm(y=[float('nan')] * 81),
-  make_model_sm(y=[0.0] * 10),
-])
-def test_unavailable_or_uncovered_model_keeps_navigation_limit(sm):
-  controller = make_stock_curve_controller()
-  assert controller._cal_stock_navi_curve_speed(stock_curve_state(), sm) == pytest.approx(30.0)
-  assert not controller.stock_curve_rejected
-
-
-def test_distant_curve_keeps_navigation_preview():
-  controller = make_stock_curve_controller()
-  target = controller._cal_stock_navi_curve_speed(stock_curve_state(naviCurveDistance=200.0), make_model_sm())
-  assert 30.0 < target < 255.0
-  assert not controller.stock_curve_rejected
-
-
-@pytest.mark.parametrize("field", ['naviCurveDistance', 'naviCurveSpeed', 'naviCurveCurvature'])
-@pytest.mark.parametrize("value", [float('nan'), float('inf')])
-def test_nonfinite_stock_curve_data_is_ignored(field, value):
-  controller = make_stock_curve_controller()
-  assert controller._cal_stock_navi_curve_speed(stock_curve_state(**{field: value}), make_model_sm()) == 255.0
-
-
 def test_curve_engagement_starts_at_vehicle_speed(monkeypatch):
   controller, car_state, sm, debug = make_limit_inputs(monkeypatch, school=False, camera_event=False,
                                                       camera_target=0.0, road=0.0)
@@ -416,7 +338,7 @@ def test_double_press_curve_integration_preserves_enforcement(monkeypatch, camer
   controller, car_state, sm, _ = make_limit_inputs(monkeypatch, school=False, camera_event=camera_limit > 0,
                                                   camera_target=camera_limit, road=110.0)
   controller.apply_limit_speed_clu = 96.0
-  controller._cal_stock_navi_curve_speed = lambda *args: 30.0
+  controller._cal_curve_speed_adaptive = lambda *args: 30.0
   controller._cal_limit_speed(car_state, sm, 104.0 / 3.6, 104.0, 121.0, double_pressed=True)
   assert controller.apply_limit_speed_clu == pytest.approx(expected)
 
