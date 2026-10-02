@@ -672,3 +672,92 @@ def test_curve_estimates_are_logged_and_cleared_with_invalid_model(monkeypatch):
   controller._cal_curve_speed_adaptive(sm, 20.0, 90.0)
   assert controller.curve_estimates is None
   assert controller.model_curve_geometry is None
+
+
+@pytest.mark.parametrize("is_metric", [True, False])
+@pytest.mark.parametrize("initial_enable", [True, False])
+@pytest.mark.parametrize("stock_speed, expected", [(0.0, 255.0), (-1.0, -1.0)])
+def test_pcm_stock_speed_sentinels_survive_unit_conversion(monkeypatch, is_metric, initial_enable, stock_speed, expected):
+  controller, cs, sm, _, _ = make_full_controller(monkeypatch, is_metric=is_metric)
+  if not initial_enable:
+    controller.update_v_cruise(cs, sm, True)
+  cs.cruiseState.speed = stock_speed
+
+  controller.update_v_cruise(cs, sm, True)
+
+  assert controller.requested_speed_clu == expected
+  assert controller.v_cruise_cluster_kph == expected
+  assert controller.v_cruise_kph == pytest.approx(60.0)
+  assert controller.apply_limit_speed_clu == 0.0
+
+
+@pytest.mark.parametrize("stock_long", [True, False])
+@pytest.mark.parametrize("is_metric", [True, False])
+def test_pcm_enable_edge_uses_stock_set_instead_of_previous_request(monkeypatch, stock_long, is_metric):
+  controller, cs, sm, _, _ = make_full_controller(monkeypatch, stock_long=stock_long, is_metric=is_metric)
+  controller.requested_speed_clu = controller.conv.kph_to_clu(70.0)
+  cs.cruiseState.speed = 85.0 / 3.6
+
+  controller.update_v_cruise(cs, sm, True)
+
+  assert controller.requested_speed_clu == pytest.approx(controller.conv.kph_to_clu(85.0))
+  assert controller.requested_speed_clu_last == pytest.approx(controller.conv.kph_to_clu(70.0))
+  assert controller.v_cruise_cluster_kph == pytest.approx(85.0)
+  assert controller.prev_cruise_enabled
+  assert not controller.cruise_just_enabled
+
+
+def test_long_press_repeats_at_threshold_without_short_press_on_release():
+  handler = cruise_controller.CruiseButtonHandler()
+  button = FakeButtonType.accelCruise
+  assert handler.update([SimpleNamespace(type=button, pressed=True)]) == (FakeButtonType.unknown, False, False)
+  for _ in range(49):
+    assert handler.update([]) == (FakeButtonType.unknown, False, False)
+
+  assert handler.update([]) == (button, True, False)
+  for _ in range(49):
+    assert handler.update([]) == (FakeButtonType.unknown, True, False)
+  assert handler.update([]) == (button, True, False)
+  assert handler.update([SimpleNamespace(type=button, pressed=False)]) == (FakeButtonType.unknown, False, False)
+
+
+@pytest.mark.parametrize("idle_ticks, expected_double", [(37, True), (38, False)])
+def test_double_press_window_counts_press_and_release_frames(idle_ticks, expected_double):
+  handler = cruise_controller.CruiseButtonHandler()
+  button = FakeButtonType.decelCruise
+  handler.update([SimpleNamespace(type=button, pressed=True)])
+  assert handler.update([SimpleNamespace(type=button, pressed=False)]) == (button, False, False)
+  for _ in range(idle_ticks):
+    handler.update([])
+  handler.update([SimpleNamespace(type=button, pressed=True)])
+
+  assert handler.update([SimpleNamespace(type=button, pressed=False)]) == (button, False, expected_double)
+
+
+def test_long_cancel_restores_availability_after_timeout(monkeypatch):
+  _, cs, _, manager, _ = make_full_controller(monkeypatch)
+  manager.available = True
+  manager.enabled = True
+  manager._button_press(cs, FakeButtonType.cancel, True, False)
+  assert not manager.available
+  assert not manager.enabled
+  for _ in range(299):
+    manager.update(cs, [False])
+    assert not cs.cruiseState.available
+    assert not cs.cruiseState.enabled
+
+  manager.update(cs, [False])
+
+  assert cs.cruiseState.available
+  assert not cs.cruiseState.enabled
+  assert manager.available_timer == 0
+
+
+def test_main_button_toggles_availability_only_on_rising_edge(monkeypatch):
+  _, cs, _, manager, _ = make_full_controller(monkeypatch)
+  for pressed, expected_available in [(False, False), (True, True), (True, True),
+                                      (False, True), (True, False), (True, False)]:
+    manager.update(cs, [pressed])
+    assert manager.available is expected_available
+    assert cs.cruiseState.available is expected_available
+    assert not cs.cruiseState.enabled
