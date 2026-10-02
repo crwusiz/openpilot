@@ -10,6 +10,7 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
 from openpilot.common.transformations.camera import DEVICE_CAMERAS, view_frame_from_device_frame
 from openpilot.common.transformations.orientation import rot_from_euler
+from openpilot.selfdrive.controls.radard import RADAR_TO_CAMERA
 
 GearShifter = structs.CarState.GearShifter
 
@@ -33,6 +34,7 @@ class ClusterModels:
     self.v_ego_cluster_seen = False
     self.accel = 0.0  # m/s², used for speed color feedback
     self.enabled = False
+    self.engageable = False
     self.allow_throttle = True
     self.longitudinal_control = False
     self.pre_enabled_or_overriding = False
@@ -154,6 +156,7 @@ class ClusterModels:
     if self.sm.updated['selfdriveState']:
       selfdrive_state = self.sm['selfdriveState']
       self.enabled = selfdrive_state.enabled
+      self.engageable = selfdrive_state.engageable
       self.pre_enabled_or_overriding = selfdrive_state.state in (
         log.SelfdriveState.OpenpilotState.preEnabled,
         log.SelfdriveState.OpenpilotState.overriding,
@@ -242,12 +245,30 @@ class ClusterModels:
 
     if not self.sm.valid['radarState']:
       self.leads = []
-    elif self.sm.updated['radarState']:
+    elif any(self.sm.updated[service] for service in ('modelV2', 'radarState', 'longitudinalPlan')):
+      self._update_leads()
+
+  def _update_leads(self):
+    plan = self.sm['longitudinalPlan']
+    model = self.sm['modelV2']
+    if plan.longitudinalPlanSource == log.LongitudinalPlan.LongitudinalPlanSource.e2e and len(model.leadsV3) > 1:
+      self.leads = [
+        {
+          "present": bool(lead.prob > 0.5),
+          "d_rel": float(lead.x[0]),
+          "d_camera": float(lead.x[0]),
+          "y_rel": float(-lead.y[0]),
+          "v_rel": float(lead.v[0] - self.sm['carState'].vEgo),
+        }
+        for lead in list(model.leadsV3)[:2]
+      ]
+    else:
       radar_state = self.sm['radarState']
       self.leads = [
         {
           "present": bool(lead.present),
           "d_rel": float(lead.dRel),
+          "d_camera": float(lead.dRel + RADAR_TO_CAMERA),
           "y_rel": float(lead.yRel),
           "v_rel": float(lead.vRel),
         }
@@ -333,6 +354,7 @@ class ClusterModels:
       "v_ego": self.v_ego,
       "accel": self.accel,
       "enabled": self.enabled,
+      "engageable": self.engageable,
       "allow_throttle": self.allow_throttle,
       "longitudinal_control": self.longitudinal_control,
       "pre_enabled_or_overriding": self.pre_enabled_or_overriding,

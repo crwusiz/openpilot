@@ -43,6 +43,18 @@ BLINKER_PAUSE_MS = 250.0
 CAMERA_OVERLAY_ICON_HEIGHT = 94
 CLIP_MARGIN = 500
 GRADIENT_BANDS = 8
+MAX_DRAW_DISTANCE = 100.0
+LEAD_BAR_LENGTH = 12.0  # px
+LEAD_BAR_WIDTH = 1.8  # m
+
+
+class LeadVehicle:
+  def __init__(self, fps):
+    self.bar = np.empty((0, 2), dtype=np.float32)
+    self.d_filter = FirstOrderFilter(0.0, 0.2, 1 / fps, initialized=False)
+    self.y_filter = FirstOrderFilter(0.0, 0.2, 1 / fps, initialized=False)
+    self.fade_filter = FirstOrderFilter(0.0, 0.1, 1 / fps)
+
 
 class ClusterRenderer:
   def __init__(self, config):
@@ -70,6 +82,8 @@ class ClusterRenderer:
     self.row_centers = tuple(self.content_y + self.row_h * (row + 0.5) for row in range(3))
     self._source_to_panel = np.eye(3, dtype=np.float32)
     self._blend_filter = FirstOrderFilter(1.0, 0.25, 1.0 / self.config.fps)
+    self._lead_vehicles = [LeadVehicle(self.config.fps), LeadVehicle(self.config.fps)]
+    self._lead_info = [{}, {}]
 
     try:
       self.font_speed = ImageFont.truetype(self.config.font_bold, 58)
@@ -150,6 +164,8 @@ class ClusterRenderer:
     model_valid, hud_data, path_data = models.get_render_data()
     if has_camera and model_valid:
       frame = self._draw_model_path(frame, path_data, hud_data)
+    else:
+      self._reset_leads()
 
     pil_img = Image.fromarray(frame)
     self._draw_hud(pil_img, hud_data, has_camera)
@@ -309,10 +325,9 @@ class ClusterRenderer:
       cv2.copyTo(blended, band_mask, band)
 
   def _draw_model_path(self, frame, path_data, hud_data):
-    if not path_data["path_x"]:
-      return frame
     calib_transform = path_data.get("calib_transform")
-    if calib_transform is None:
+    if not path_data["path_x"] or calib_transform is None:
+      self._reset_leads()
       return frame
 
     camera_region = frame[self.camera_y:self.camera_y + self.camera_h,
@@ -324,7 +339,8 @@ class ClusterRenderer:
       self._draw_lane_lines(camera_region, path_data, calib_transform)
       self._draw_path(camera_region, path_data, hud_data, calib_transform, camera_height)
 
-    self._draw_lead_indicators(frame, path_data, hud_data, calib_transform, camera_height)
+    self._update_leads(path_data, hud_data, calib_transform, camera_height)
+    self._draw_lead_indicator(camera_region, hud_data)
 
     return frame
 
@@ -368,46 +384,95 @@ class ClusterRenderer:
         local_polygon = polygon - np.array([self.camera_x, self.camera_y], dtype=np.int32)
         self._fill_polygon_alpha(camera_region, local_polygon, colors_alpha(Colors.RED, 100), np.clip(confidence, 0.0, 1.0))
 
-  def _draw_lead_indicators(self, frame, path_data, hud_data, calib_transform, camera_height):
+  def _reset_leads(self):
+    self._lead_vehicles = [LeadVehicle(self.config.fps), LeadVehicle(self.config.fps)]
+    self._lead_info = [{}, {}]
+
+  def _update_leads(self, path_data, hud_data, calib_transform, camera_height):
+    lead_info = list(path_data.get("leads") or [])[:2]
+    lead_info += [{} for _ in range(2 - len(lead_info))]
+    leads = [(lead.get("present", False), float(lead.get("d_camera", lead.get("d_rel", 0.0))),
+              float(lead.get("y_rel", 0.0))) for lead in lead_info]
+
+    # both leads can be the same vehicle
+    if leads[0][0] and abs(leads[1][1] - leads[0][1]) < 3.0:
+      leads[1] = (False, 0.0, 0.0)
+
+    lane_lines = path_data.get("lane_lines") or []
+    lane = np.empty((0, 3), dtype=np.float32)
+    if len(lane_lines) > 2:
+      left, right = np.asarray(lane_lines[1], dtype=np.float32).T, np.asarray(lane_lines[2], dtype=np.float32).T
+      if left.shape == right.shape and left.ndim == 2 and left.shape[1] == 3:
+        lane = (left + right) / 2
     path_x = path_data.get("path_x") or []
     path_z = path_data.get("path_z") or []
-    drawn_distances = []
-    for lead in path_data.get("leads") or []:
-      if not lead.get("present"):
+    # braking disengages without making openpilot unavailable
+    available = hud_data.get("enabled") or hud_data.get("engageable") or hud_data.get("brake_pressed")
+    opacity = 0.4 if self._get_border_color(hud_data) == Colors.DISENGAGED else 0.8
+    for i, (lead, (present, d_rel, y_rel)) in enumerate(zip(self._lead_vehicles, leads, strict=True)):
+      visible = available and present and 0.0 < d_rel < MAX_DRAW_DISTANCE and len(lane) > 0 and len(path_x) == len(path_z) > 0
+      visible = visible and np.isfinite(y_rel)
+      # snap to a new vehicle instead of sliding over
+      if not visible or abs(y_rel - lead.y_filter.x) > 3.0:
+        lead.d_filter.initialized = lead.y_filter.initialized = False
+      lead.fade_filter.update(opacity if visible else 0.0)
+      if visible:
+        lead.bar = self._get_lead_bar(lane, lead.d_filter.update(d_rel), lead.y_filter.update(y_rel),
+                                      path_data, calib_transform, camera_height)
+        self._lead_info[i] = lead_info[i]
+
+  def _get_lead_bar(self, lane, d_rel, y_rel, path_data, calib_transform, camera_height):
+    # bar on the road behind the lead, following the lane
+    x = np.array([d_rel, d_rel - min(6.0, 0.25 * d_rel)])
+    y = np.interp(x, lane[:, 0], lane[:, 1]) - np.interp(d_rel, lane[:, 0], lane[:, 1]) - y_rel
+    z = np.interp(x, path_data["path_x"], path_data["path_z"]) + camera_height
+    corners = np.vstack((np.column_stack((x, y + LEAD_BAR_WIDTH / 2, z)), np.column_stack((x, y - LEAD_BAR_WIDTH / 2, z))[::-1]))
+    pts = self._source_to_panel @ np.asarray(calib_transform, dtype=np.float32) @ corners.T
+    if not np.all(np.isfinite(pts)) or np.any(pts[2] <= 1e-6):
+      return np.empty((0, 2), dtype=np.float32)
+    bar = (pts[:2] / pts[2]).T
+
+    far, near = bar[[0, 3]], bar[[1, 2]]
+    length = np.linalg.norm(near.mean(axis=0) - far.mean(axis=0))
+    if length <= 1e-6:
+      return np.empty((0, 2), dtype=np.float32)
+    bar[[1, 2]] = far + (near - far) * np.clip(length, 3.0, LEAD_BAR_LENGTH) / length
+    return bar.astype(np.float32)
+
+  def _draw_lead_indicator(self, camera_region, hud_data):
+    offset = np.array([self.camera_x, self.camera_y], dtype=np.float32)
+    for lead, lead_info in zip(self._lead_vehicles, self._lead_info, strict=True):
+      opacity = lead.fade_filter.x
+      if lead.bar.size == 0 or int(255 * opacity) == 0:
         continue
-      distance = float(lead.get("d_rel", 0.0))
-      if any(abs(distance - previous) <= 12.0 for previous in drawn_distances):
-        continue
-      drawn_distances.append(distance)
-      z = 0.0
-      if path_x and path_z:
-        index = int(np.argmin(np.abs(np.asarray(path_x) - distance)))
-        if index < len(path_z):
-          z = float(path_z[index])
-      point, valid = self._project_points(
-        [[distance, -float(lead.get("y_rel", 0.0)), z + camera_height]], calib_transform,
-      )
-      if not valid[0]:
-        continue
-      x, y = map(int, point[0])
-      half_width = max(28, int(20 + 600 / max(distance + 10.0, 10.0)))
-      alpha = int(np.clip(255 * (1.0 - distance / 40.0) + max(0.0, -lead.get("v_rel", 0.0)) * 25, 70, 255))
-      color = (255, max(35, 150 - alpha // 3), max(35, 150 - alpha // 3))
-      cv2.line(frame, (x - half_width, y), (x + half_width, y), color, 6)
+
+      polygon = (lead.bar - offset).astype(np.int32)
+      self._fill_polygon_alpha(camera_region, polygon, Colors.RED, opacity)
+      x, y = map(int, lead.bar[[0, 3]].mean(axis=0) - offset)
+      distance = float(lead_info.get("d_rel", 0.0))
 
       conversion = 3.6 if getattr(self.config, "is_metric", True) else 2.236936
       unit = "km/h" if getattr(self.config, "is_metric", True) else "mph"
       lead_speed = max(0.0, (float(hud_data.get("v_ego", 0.0) or 0.0) +
-                             float(lead.get("v_rel", 0.0) or 0.0)) * conversion)
+                             float(lead_info.get("v_rel", 0.0) or 0.0)) * conversion)
       labels = (f"{distance:.0f} m", f"{lead_speed:.0f} {unit}")
       for label, baseline_y in zip(labels, (y - 13, y + 27), strict=True):
-        text_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.68, 2)
+        text_size, baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.68, 2)
         origin = (x - text_size[0] // 2, baseline_y)
+        x0, y0 = max(0, origin[0] - 4), max(0, baseline_y - text_size[1] - 4)
+        x1 = min(camera_region.shape[1], origin[0] + text_size[0] + 4)
+        y1 = min(camera_region.shape[0], baseline_y + baseline + 4)
+        if x0 >= x1 or y0 >= y1:
+          continue
+        roi = camera_region[y0:y1, x0:x1]
+        overlay = roi.copy()
+        local_origin = (origin[0] - x0, origin[1] - y0)
         # An outline keeps the text legible while leaving the camera image visible.
-        cv2.putText(frame, label, origin, cv2.FONT_HERSHEY_SIMPLEX,
+        cv2.putText(overlay, label, local_origin, cv2.FONT_HERSHEY_SIMPLEX,
                     0.68, Colors.BLACK, 6, cv2.LINE_AA)
-        cv2.putText(frame, label, origin, cv2.FONT_HERSHEY_SIMPLEX,
+        cv2.putText(overlay, label, local_origin, cv2.FONT_HERSHEY_SIMPLEX,
                     0.68, Colors.WHITE, 2, cv2.LINE_AA)
+        cv2.addWeighted(overlay, opacity, roi, 1.0 - opacity, 0, dst=roi)
 
   def _base_icon(self, name, size, active=True, opacity=255):
     source = self.icons.get(name)
