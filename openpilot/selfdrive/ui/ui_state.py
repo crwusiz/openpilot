@@ -296,12 +296,10 @@ class UIState:
     self.always_on_dm = self.params.get_bool("AlwaysOnDM")
     self.experimental_mode = self.params.get_bool("ExperimentalMode")
     self.experimental_mode_confirmed = self.params.get_bool("ExperimentalModeConfirmed")
-    self.cluster_enabled = self.params.get_bool("ClusterEnable")
-
-    if not self.chestnut_compiled:
-      self.chestnut_compiled = chestnut_compiled()
     self.chestnut_active = self.params.get("ChestnutActive")
     self.chestnut_loading = self.params.get_bool("ChestnutLoading")
+
+    self.cluster_enabled = self.params.get_bool("ClusterEnable")
     now = time.monotonic()
     if cable_connected():
       self.usb_disconnected_ts = None
