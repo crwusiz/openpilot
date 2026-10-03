@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.swaglog import cloudlog
-from openpilot.selfdrive.addon.cluster.cluster_config import Colors, NO_THROTTLE_COLORS, STEERING_COLORS, THROTTLE_COLORS, colors_alpha
+from openpilot.selfdrive.addon.cluster.cluster_config import Colors, colors_alpha
 
 
 DISTANCE_ICONS = {
@@ -335,7 +335,7 @@ class ClusterRenderer:
     camera_height = float(path_data.get("camera_height", self.camera_height) or self.camera_height)
 
     # Equivalent to ui_state.status != UIStatus.DISENGAGED for the cluster process.
-    if self._get_border_color(hud_data) != Colors.DISENGAGED:
+    if self._get_border_color(hud_data) != Colors.Border.DISENGAGED:
       self._draw_lane_lines(camera_region, path_data, calib_transform)
       self._draw_path(camera_region, path_data, hud_data, calib_transform, camera_height)
 
@@ -353,11 +353,11 @@ class ClusterRenderer:
     if path_poly is not None:
       local_path_poly = path_poly - np.array([self.camera_x, self.camera_y], dtype=np.int32)
       if hud_data.get("steering_pressed"):
-        self._fill_polygon_gradient(camera_region, local_path_poly, STEERING_COLORS, [0.0, 0.5, 1.0])
+        self._fill_polygon_gradient(camera_region, local_path_poly, Colors.STEERING_PRESSED, [0.0, 0.5, 1.0])
       else:
         allow_throttle = hud_data.get("allow_throttle", True) or not hud_data.get("longitudinal_control", False)
         blend_factor = round(self._blend_filter.update(int(allow_throttle)) * 100) / 100
-        colors = self._blend_colors(NO_THROTTLE_COLORS, THROTTLE_COLORS, blend_factor)
+        colors = self._blend_colors(Colors.NO_THROTTLE, Colors.THROTTLE, blend_factor)
         self._fill_polygon_gradient(camera_region, local_path_poly, colors, [0.0, 0.5, 1.0])
 
   def _draw_lane_lines(self, camera_region, path_data, calib_transform):
@@ -408,7 +408,7 @@ class ClusterRenderer:
     path_z = path_data.get("path_z") or []
     # braking disengages without making openpilot unavailable
     available = hud_data.get("enabled") or hud_data.get("engageable") or hud_data.get("brake_pressed")
-    opacity = 0.4 if self._get_border_color(hud_data) == Colors.DISENGAGED else 0.8
+    opacity = 0.4 if self._get_border_color(hud_data) == Colors.Border.DISENGAGED else 0.8
     for i, (lead, (present, d_rel, y_rel)) in enumerate(zip(self._lead_vehicles, leads, strict=True)):
       visible = available and present and 0.0 < d_rel < MAX_DRAW_DISTANCE and len(lane) > 0 and len(path_x) == len(path_z) > 0
       visible = visible and np.isfinite(y_rel)
@@ -609,30 +609,30 @@ class ClusterRenderer:
     lat_active = bool(data.get("lat_active"))
 
     if data.get("pre_enabled_or_overriding") and not steering_pressed:
-      return Colors.OVERRIDE
+      return Colors.Border.OVERRIDE
     elif enabled and not lat_active:
       if steering_pressed:
-        return Colors.STEERING
+        return Colors.Border.STEERING
       elif data.get("brake_pressed"):
-        return Colors.RED
+        return Colors.Border.RED
       elif data.get("left_blinker") or data.get("right_blinker"):
-        return Colors.ORANGE
-      return Colors.ENGAGED
+        return Colors.Border.BLINKER
+      return Colors.Border.ENGAGED
     elif enabled and lat_active:
       if steering_pressed:
-        return Colors.STEERING
+        return Colors.Border.STEERING
       elif data.get("brake_pressed"):
-        return Colors.RED
+        return Colors.Border.RED
       elif data.get("left_blinker") or data.get("right_blinker"):
-        return Colors.ORANGE
-      return Colors.ACTIVE
+        return Colors.Border.BLINKER
+      return Colors.Border.ACTIVE
     elif data.get("reverse"):
-      return Colors.RED
+      return Colors.Border.RED
     elif data.get("cruise_available") and lat_active:
-      return Colors.READY
+      return Colors.Border.READY
     elif data.get("cruise_available") and not lat_active and float(data.get("v_ego", 0.0) or 0.0) > 0.3:
-      return Colors.ORANGE
-    return Colors.DISENGAGED
+      return Colors.Border.BLINKER
+    return Colors.Border.DISENGAGED
 
   def _draw_ignore_limit_timer(self, image, data):
     max_ticks = 3000.0
@@ -723,7 +723,7 @@ class ClusterRenderer:
     speed_color = colors_alpha(Colors.WHITE, 200)
     if is_cruise_set:
       speed_color = Colors.WHITE
-      max_color = Colors.MAX_ACTIVE if data.get("enabled") else Colors.OVERRIDE
+      max_color = Colors.MAX_ACTIVE if data.get("enabled") else Colors.Border.OVERRIDE
 
       limit_speed, _ = self._active_speed_limit(data)
 

@@ -659,7 +659,7 @@ def render_tab_toggles():
           ui.select(
             {"network": "Network (Orange Pi HDMI)", "usb": "USB (TURZX Display)"},
             value=transport,
-            label="CLUSTER_DISPLAY_TRANSPORT",
+            label="Cluster display transport",
             on_change=on_transport_change,
           ).classes('w-full text-blue-200')
           ui.label('The Cluster process restarts automatically when the transport changes.').classes(
