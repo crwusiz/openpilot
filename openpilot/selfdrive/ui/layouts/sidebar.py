@@ -105,7 +105,23 @@ class Sidebar(Widget):
     self._open_settings_callback = open_settings
 
   def _is_network_connected(self) -> bool:
-    return self._connect_status.color == rl.WHITE
+    return bool(self.wifi_manager.ipv4_address)
+
+  def _check_github_connection(self) -> bool:
+    if not self._is_network_connected():
+      return False
+
+    try:
+      result = subprocess.run(["ping", "-c", "1", "-W", "2", "github.com"],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3, check=False)
+      return result.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+      return False
+
+  def _on_network_check_failed(self):
+    self._is_processing = False
+    print("Network not connected or GitHub unreachable. Cannot perform git operations.")
+    self._commit_status.update(tr_noop("NO NETWORK"), tr_noop("OFFLINE"), Colors.RED)
 
   def _handle_commit_button_press(self):
     if self._is_processing:
@@ -114,8 +130,7 @@ class Sidebar(Widget):
       return
 
     if not self._is_network_connected():
-      print("Network not connected. Cannot perform git operations.")
-      self._commit_status.update(tr_noop("NO NETWORK"), tr_noop("OFFLINE"), Colors.RED)
+      self._on_network_check_failed()
       return
 
     if self._is_update_available:
@@ -129,6 +144,10 @@ class Sidebar(Widget):
 
     def run_git_pull():
       try:
+        if not self._check_github_connection():
+          self._on_network_check_failed()
+          return
+
         subprocess.run(["/bin/sh", "/data/openpilot/scripts/gitpull.sh"], timeout=60)
 
         if self._git_pull_exit_flag.exists():
@@ -168,6 +187,10 @@ class Sidebar(Widget):
 
     def run_commit_check():
       try:
+        if not self._check_github_connection():
+          self._on_network_check_failed()
+          return
+
         subprocess.run(["/bin/sh", "/data/openpilot/scripts/commit_compare.sh"], timeout=15)
 
         if self._commit_check_exit_flag.exists():
