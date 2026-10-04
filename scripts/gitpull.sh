@@ -18,11 +18,7 @@ start_update_pane() {
     tmux resize-pane -Z -t "$pane"
   fi
 
-  # Split the full window height, even if the active pane is already small.
-  if ! tmux split-window -v -f -p 50 -t "$pane" -c "$PWD" "$child_command"; then
-    echo "WARNING: tmux split failed. Starting Git pull in a new window." >&2
-    tmux new-window -t "$session:" -n gitpull -c "$PWD" "$child_command"
-  fi
+  tmux new-window -t "$session:" -n gitpull -c "$PWD" "$child_command"
 }
 
 # Always run the update in a tmux pane so dashboard and SSH launches behave the
