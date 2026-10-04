@@ -74,8 +74,7 @@ class DriverStateRenderer(Widget):
     # Load the driver face icon
     self.dm_img = gui_app.texture("icons/driver_face.png", IMG_SIZE, IMG_SIZE)
 
-    self.set_visible(lambda: (ui_state.sm["selfdriveState"].alertSize == AlertSize.none and
-                              ui_state.sm.recv_frame["driverStateV2"] > ui_state.started_frame))
+    self.set_visible(lambda: ui_state.sm["selfdriveState"].alertSize == AlertSize.none)
 
   def _render(self, rect):
     # Set opacity based on active state
@@ -118,12 +117,13 @@ class DriverStateRenderer(Widget):
     self.dm_fade_state = np.clip(self.dm_fade_state + 0.2 * (fade_target - self.dm_fade_state), 0.0, 1.0)
 
     # Get driver orientation data from appropriate camera
-    driverstate = sm["driverStateV2"]
-    driver_data = driverstate.rightDriverData if self.is_rhd else driverstate.leftDriverData
-    driver_orient = driver_data.faceOrientation
+    driver_orient = np.zeros(3, dtype=np.float32)
+    if sm.recv_frame["driverStateV2"] > ui_state.started_frame:
+      driverstate = sm["driverStateV2"]
+      driver_data = driverstate.rightDriverData if self.is_rhd else driverstate.leftDriverData
+      driver_orient = np.array(driver_data.faceOrientation)
 
     # Update pose values with scaling and smoothing
-    driver_orient = np.array(driver_orient)
     scales = np.where(driver_orient < 0, SCALES_NEG, SCALES_POS)
     v_this = driver_orient * scales
     self.driver_pose_diff = np.abs(self.driver_pose_vals - v_this)

@@ -410,8 +410,6 @@ class HudRenderer(Widget):
 
     # Left side indicators (driver monitoring, steering wheel)
     wheel_x = rect.x + (icon_size * 2.2)
-    if ui_state.sm.recv_frame["driverStateV2"] <= ui_state.started_frame:
-      wheel_x -= UIConfig.button_size
 
     # Render steering wheel indicator first
     self._wheel_indicator.set_rect(rl.Rectangle(
