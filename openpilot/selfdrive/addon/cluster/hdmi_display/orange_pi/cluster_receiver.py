@@ -171,8 +171,12 @@ def parse_args(argv=None):
   parser.add_argument("--scan-workers", type=_positive_int, default=DEFAULT_SCAN_WORKERS, help="Parallel subnet scan workers")
   parser.add_argument("--reconnect-delay", type=_positive_float, default=DEFAULT_RECONNECT_DELAY)
   parser.add_argument("--frame-timeout", type=_positive_float, default=FRAME_TIMEOUT_SECONDS, help="Seconds without a complete frame before reconnecting")
-  parser.add_argument("--width", type=_positive_int, default=1920)
-  parser.add_argument("--height", type=_positive_int, default=480)
+  parser.add_argument("--width", type=_positive_int, default=1920, help="Physical HDMI output width, after frame rotation")
+  parser.add_argument("--height", type=_positive_int, default=480, help="Physical HDMI output height, after frame rotation")
+  parser.add_argument("--rotation", type=int, choices=(0, 90, 180, 270), default=0, help="Clockwise JPEG rotation in degrees")
+  parser.add_argument("--touch-rotation", type=int, choices=(0, 90, 180, 270),
+                      help="Clockwise correction from raw touch to cluster coordinates (default: inverse of --rotation)")
+  parser.add_argument("--log-touch", action="store_true", help="Log raw and corrected SDL finger coordinates")
   parser.add_argument("--display-index", type=int, default=0)
   parser.add_argument("--windowed", action="store_true", help="Run in a window instead of fullscreen")
   parser.add_argument("--show-cursor", action="store_true", help="Keep the pointer visible for touch debugging")
@@ -202,6 +206,9 @@ def main():
     display_index=args.display_index,
     fullscreen=not args.windowed,
     show_cursor=args.show_cursor,
+    rotation=args.rotation,
+    touch_rotation=args.touch_rotation,
+    log_touch=args.log_touch,
   )
 
   def stop_receiver(_signum, _frame):
@@ -212,6 +219,9 @@ def main():
   try:
     if not display.open():
       raise RuntimeError("Unable to initialize the Orange Pi HDMI display")
+    if not display.show_waiting():
+      raise RuntimeError("Unable to display the Orange Pi connection waiting screen")
+    LOG.info("Cluster receiver ready")
     while True:
       sock = None
       try:
@@ -231,7 +241,7 @@ def main():
             sock.close()
           except OSError:
             pass
-        display.clear()
+        display.show_waiting()
       wait_for_reconnect(display, args.reconnect_delay)
   except KeyboardInterrupt:
     LOG.info("Stopping cluster receiver")

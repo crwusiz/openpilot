@@ -1,6 +1,46 @@
 # Orange Pi 3W HDMI 클러스터 수신기
 
-이 폴더는 C4가 미러링폰 핫스팟을 통해 보내는 클러스터 JPEG 프레임을 받아 Orange Pi 3W의 HDMI에 연결된 8.8인치 1920x480 터치 모니터에 전체 화면으로 표시하는 독립 실행 패키지입니다. openpilot 전체를 Orange Pi에 설치할 필요는 없습니다. Python 3.10 이상이 필요합니다.
+C4가 미러링폰 핫스팟을 통해 보내는 **1920x480 JPEG 프레임**을 HDMI 터치 모니터에 표시하는 독립 실행 패키지입니다. 확인된 HDMI 모드는 **480x1920**이며, 가로로 설치한 모니터에 맞춰 영상을 90도 회전합니다. openpilot 전체를 설치할 필요는 없습니다. Python 3.10 이상과 pygame이 필요합니다.
+
+## 장비 확인 결과와 실행
+
+2026-10-04 장비 점검에서 **KMSDRM + OpenGL ES 2로 HDMI 화면이 정상 출력되는 것을 확인했습니다.** systemd 서비스 실행과 재부팅 후 자동 연결도 확인했습니다. 출력은 `480x1920`, 영상 회전은 `90`, 터치 보정은 `270`이며 C4 `192.168.0.82:9200` 자동 검색·연결도 성공했습니다. 이 IP는 해당 점검 당시 주소이며 고정값으로 사용하지 않습니다.
+
+기존 `Can't window GBM/EGL surfaces on window creation.` 오류는 화면 생성 전에 ES2를 요청하고 SDL 렌더러를 `opengles2`로 맞춘 뒤 재현되지 않았습니다. SDL 터치 누름·뗌 이벤트와 원본·보정 좌표 로그도 확인했습니다. **터치에 따른 UI 동작과 C4로의 터치 전송은 아직 구현되지 않았으므로 화면이 바뀌지 않는 것이 현재 동작입니다.** 터치 기능은 활용 방안이 정해진 뒤 추가합니다. 실제 네 모서리 보정 정확도는 별도 확인이 필요합니다.
+
+시작 중 `Could not restore CRTC` 메시지는 남았지만 이후 `HDMI display ready`와 C4 연결 로그가 기록됐고 화면도 정상 출력됐습니다. 이 점검에서는 초기화 실패로 이어지지 않았습니다.
+
+**수정된 이 폴더 전체를 `/opt/cluster-receiver`에 반영한 뒤** SSH 또는 텍스트 콘솔에서 실행합니다. 이 스크립트는 기존 수신기와 디스플레이 매니저를 중지하므로 현재 데스크톱 로그인 세션이 종료됩니다. 부팅 설정은 바꾸지 않습니다.
+
+```bash
+sudo bash /opt/cluster-receiver/scripts/run_console.sh --log-touch
+```
+
+다른 실행 환경에서 GBM/EGL 오류가 다시 발생하면 진단 파일을 만듭니다. 출력되는 `/tmp/cluster-diagnostics.XXXXXXXX.log`에 EGL 설정 개수, 실패한 함수와 EGL 오류 코드, DRM 점유 및 서비스 로그가 저장됩니다.
+
+```bash
+sudo bash /opt/cluster-receiver/scripts/diagnose.sh --egl
+```
+
+진단은 서비스를 중지하거나 화면 모드를 바꾸지 않습니다. `--egl`은 버퍼·표면·컨텍스트를 잠시 만들었다가 해제합니다. 성공해도 실제 HDMI scanout/page flip까지 확인한 것은 아닙니다. 화면 출력을 먼저 확인하려면 아래 **데스크톱 실행**을 사용합니다.
+
+## 확인된 장치 정보
+
+| 항목 | 실제 출력 / 상태 |
+| --- | --- |
+| HDMI 모드 | `480x1920`, `card0-HDMI-A-1` connected |
+| USB 터치 | `wch.cn USB2IIC_CTP_CONTROL`, ID `1a86:e5e3` |
+| 입력 장치 | 현재 `/dev/input/event1`; 재부팅·USB 연결 순서에 따라 변경 가능 |
+| 터치 입력 / 보정 | libinput touch, identity matrix; SDL 누름·뗌과 좌표 변환 확인, 네 모서리 정확도는 추가 점검 필요 |
+| OS / 커널 | Orange Pi 1.0.2, Ubuntu 26.04 / `6.6.98-sun60iw2` |
+| Python / SDL | OS `/usr/bin/python3` 3.14.4 / SDL 2.32.10 |
+| SDL 비디오 드라이버 | x11, wayland, KMSDRM, offscreen, dummy, evdev |
+| 카드 | HDMI `card0`, GPU `card1` / `renderD128` |
+| DRM 점유 | 이전 Xorg master 점유는 display-manager 중지 후 해제됨 |
+| HDMI 화면 | KMSDRM + GLES2, `480x1920`, 영상 회전 `90`으로 정상 출력 확인 |
+| 터치 UI 동작 | 미구현; 이벤트 기록과 좌표 변환까지 동작 |
+
+`Size: 216x137mm`는 터치 장치 크기이며 HDMI 해상도가 아닙니다. `axp8191-pek`는 보드 전원 키입니다.
 
 ## 연결 구조
 
@@ -8,98 +48,268 @@
 안드로이드 미러링폰 핫스팟
 ├── C4: TCP 0.0.0.0:9200에서 대기, 1920x480 JPEG 송신
 └── Orange Pi 3W: wlan0 대역에서 C4 검색
-    ├── HDMI: 8.8인치 1920x480 영상
+    ├── HDMI: 480x1920 모드에 회전한 영상 출력
     └── USB: 모니터 터치 컨트롤러 입력
 ```
 
-C4의 기본 전송 방식은 `DISPLAY.transport = "usb"`입니다. Orange Pi HDMI를 사용하려면 대시보드에서 `Network (Orange Pi HDMI)`를 선택한 뒤 cluster를 켭니다. 저장된 `ClusterDisplayTransport` 설정이 기본값보다 우선합니다. `USB (TURZX Display)` 사용 중 Chestnut eGPU가 감지되면 eGPU 안정성을 우선하여 `ClusterEnable`이 자동으로 꺼지고 USB cluster가 중지됩니다. 부트로더 및 GPU 로딩 상태도 포함하며, eGPU를 분리해도 자동으로 다시 켜지지 않습니다. Network 모드는 eGPU 연결 여부와 관계없이 사용할 수 있습니다.
+C4의 기본 전송 방식은 `DISPLAY.transport = "usb"`입니다. 대시보드에서 `Network (Orange Pi HDMI)`를 선택한 뒤 cluster를 켭니다. 저장된 `ClusterDisplayTransport`가 기본값보다 우선합니다. `USB (TURZX Display)` 사용 중 Chestnut eGPU가 감지되면 `ClusterEnable`이 꺼지고 USB cluster가 중지됩니다. 부트로더 및 GPU 로딩 상태도 포함하며, eGPU를 분리해도 자동으로 다시 켜지지 않습니다. Network 모드는 eGPU 연결 여부와 관계없이 사용할 수 있습니다.
 
-> 일부 안드로이드 핫스팟은 접속 장치 간 통신을 차단합니다. C4와 Orange Pi가 같은 SSID에 있어도 연결되지 않으면 AP/client isolation 설정을 먼저 확인하십시오.
+일부 핫스팟은 접속 장치 간 통신을 차단합니다. 같은 SSID에서도 연결되지 않으면 AP/client isolation을 확인합니다. 프로토콜에는 인증·암호화가 없으므로 차량 내부의 신뢰할 수 있는 핫스팟에서 사용합니다.
 
-## 설치
+## 스크립트 목록
 
-설치한 Orange Pi용 64-bit OS에서 HDMI 모드가 1920x480으로 인식되는지 먼저 확인합니다. 실제 보드의 OS 이미지와 HDMI/터치 드라이버 호환성은 장비 도착 후 확인해야 합니다.
+Orange Pi에서 실행할 명령은 `scripts/`의 Bash 파일로 제공합니다. `bash`로 실행하므로 실행 권한 설정은 필요하지 않습니다. 파일은 LF 줄바꿈을 사용합니다. `deploy.ps1`은 Windows PC에서 실행합니다.
 
-```bash
-cat /sys/class/drm/card*-HDMI-A-*/modes
-```
+| 파일 | 용도 |
+| --- | --- |
+| [install.sh](scripts/install.sh) | OS pygame·필수 라이브러리 설치, `/opt/cluster-receiver`로 패키지 복사 |
+| [connect_wifi.sh](scripts/connect_wifi.sh) | 핫스팟 연결 및 IP 확인; 비밀번호는 대화형 입력 |
+| [run_console.sh](scripts/run_console.sh) | 데스크톱·수신기 중지, 연결된 HDMI 카드 선택, KMSDRM + GLES2 실행 |
+| [diagnose.sh](scripts/diagnose.sh) | OS·SDL·DRM·서비스 진단 파일 저장; 선택적으로 GBM/EGL 점검 |
+| [run_desktop.sh](scripts/run_desktop.sh) | 로그인한 X11 데스크톱에서 소프트웨어 화면 출력 |
+| [touch.sh](scripts/touch.sh) | libinput 장치 목록 또는 지정 장치의 실제 이벤트 확인 |
+| [service.sh](scripts/service.sh) | 자동 실행 설치·재시작·중지·상태 확인·로그 보기·데스크톱 복구 |
+| [deploy.ps1](scripts/deploy.ps1) | Windows PC에서 SSH/SCP로 수신기 파일 전송·적용 또는 이전 버전 복구 |
+| [update.sh](scripts/update.sh) | Pi에서 전송 파일 검증·백업·교체·실행 확인·실패 시 복구 |
 
-이 폴더의 내용을 Orange Pi의 `/opt/cluster-receiver`로 복사한 뒤 설치합니다.
+## 설치 및 Wi-Fi
 
-```bash
-sudo mkdir -p /opt/cluster-receiver
-sudo cp -a orange_pi/. /opt/cluster-receiver/
-sudo chown -R "$USER":"$USER" /opt/cluster-receiver
-sudo apt update
-sudo apt install -y python3-venv iproute2 libdrm2 libgl1 libgbm1 libinput-tools
-python3 -m venv /opt/cluster-receiver/.venv
-/opt/cluster-receiver/.venv/bin/python -m pip install -r /opt/cluster-receiver/requirements.txt
-```
-
-Wi-Fi 연결과 터치 장치 인식을 확인합니다.
+이 폴더를 파일 전송 도구로 Orange Pi에 복사한 뒤 설치 스크립트를 실행합니다. 이미 `/opt/cluster-receiver`에 복사했다면 다음을 사용합니다. 다른 위치라면 해당 위치의 `scripts/install.sh`를 실행하면 됩니다.
 
 ```bash
-sudo nmcli device wifi connect "핫스팟_SSID" password "핫스팟_비밀번호" ifname wlan0
-ip -4 addr show wlan0
-sudo libinput list-devices
+sudo bash /opt/cluster-receiver/scripts/install.sh
 ```
 
-터치 컨트롤러는 보통 HDMI가 아니라 별도 USB 케이블로 연결됩니다. SDL finger 이벤트는 수신·검색·재연결 대기 중에도 처리되며, 현재는 `last_touch`와 선택적 `touch_handler`로 전달됩니다. C4로 터치 명령을 보내는 기능은 아직 없으며, 실제 버튼 동작은 UI 요구사항이 정해진 뒤 연결하면 됩니다.
+Debian/Ubuntu의 OS `python3-pygame`을 설치하고 `/usr/bin/python3`로 실행합니다. 가상 환경은 필요하지 않습니다. 설치 스크립트는 서비스·데스크톱 설정을 바꾸지 않습니다. 연결 대기 화면의 한국어 문구를 위해 `fonts-noto-cjk`도 설치합니다. 이전 버전을 설치한 장비는 수정된 파일을 반영하고 `install.sh`를 한 번 실행해 이 폰트를 추가합니다.
 
-## 수동 실행
+pip wheel의 SDL은 시스템 SDL과 빌드 기능이 다를 수 있습니다. `libdrm`·`libgbm` 설치만으로 wheel에 KMSDRM이 추가되지는 않습니다. 진단의 `pygame` 경로는 보통 `/usr/lib/python3/dist-packages/pygame/...`입니다. `.local`, `/usr/local`, `.venv`가 나오면 pip 설치나 `PYTHONPATH`가 OS 패키지를 가리는지 확인합니다.
+
+핫스팟 이름이 `Android`인 경우 다음을 실행합니다. 비밀번호는 NetworkManager의 안내에 따라 입력하며 스크립트에 저장하지 않습니다. SSID·인터페이스는 환경에 맞게 바꿉니다.
 
 ```bash
-cd /opt/cluster-receiver
-PYGAME_HIDE_SUPPORT_PROMPT=1 SDL_VIDEODRIVER=kmsdrm ./.venv/bin/python cluster_receiver.py --interface wlan0
+sudo bash /opt/cluster-receiver/scripts/connect_wifi.sh "Android" wlan0
+sudo bash /opt/cluster-receiver/scripts/touch.sh
 ```
 
-기본값은 1920x480 전체 화면입니다. 데스크톱 세션에서 확인할 때는 `--windowed`를 추가하고 `SDL_VIDEODRIVER`를 해당 세션의 드라이버로 설정할 수 있습니다. 포인터를 표시하려면 `--show-cursor`를 사용합니다. 이 옵션이 터치 좌표를 화면에 표시하거나 마우스 입력을 터치 이벤트로 바꾸지는 않습니다.
+USB 터치는 HDMI와 별도 케이블로 연결합니다. 현재 이벤트는 수신기의 `last_touch`에 저장하고 설정된 `touch_handler`가 있으면 전달합니다. 기본 수신기는 핸들러를 연결하지 않으며 C4에서 받은 JPEG 영상만 표시합니다. 따라서 터치를 인식해도 화면 버튼 동작은 발생하지 않습니다. 버튼 판정·UI 동작 연결과 C4로의 터치 전송은 추가 구현이 필요합니다.
 
-C4 IP를 알고 있으면 자동 검색 대신 직접 연결할 수 있습니다. 자동 검색이 제한된 큰 서브넷에서도 사용할 수 있습니다.
+## 콘솔 실행과 회전
+
+시작 직후 C4의 첫 영상이 도착할 때까지 검은 배경에 **`C4 연결 대기 중`**, **`핫스팟과 C4 클러스터를 확인하세요`**를 표시합니다. 핫스팟이 없거나 C4가 꺼져 있어도 대기 문구를 표시하며 주기적으로 연결을 재시도합니다. 첫 정상 프레임이 도착하면 클러스터 영상으로 바뀝니다. 대기 문구에도 영상과 같은 회전을 적용하므로 가로로 설치한 모니터에서 읽을 수 있습니다.
+
+한글 폰트를 찾지 못하면 `Waiting for C4 connection`과 `Check hotspot and C4 cluster`를 pygame 기본 폰트로 표시합니다. 한글 표시에는 위의 `install.sh`를 사용합니다.
 
 ```bash
-./.venv/bin/python cluster_receiver.py --host 192.168.43.10 --windowed
+sudo bash /opt/cluster-receiver/scripts/run_console.sh --log-touch
 ```
 
-위 IP는 실제 C4 IP로 바꿉니다. 같은 패키지와 pygame을 설치한 PC에서도 `--host`와 `--windowed`로 수신을 점검할 수 있습니다. 직접 연결에서는 Linux의 `ip` 명령을 사용하지 않습니다.
-
-연결이 끊기거나 기본 2초 안에 완전한 프레임을 받지 못하면 마지막 화면을 검게 지우고 재연결합니다. 수신 제한 시간은 `--frame-timeout`으로 조절합니다. ESC나 창 닫기는 프로그램을 종료하며, 서비스 중지 시에도 화면을 지우고 종료합니다.
-
-## 자동 실행
-
-서비스 파일은 기본 사용자 이름을 `orangepi`로 가정합니다. 이미지의 실제 사용자 이름이 다르면 `User`와 `Group`을 수정합니다.
+스크립트 기본값은 `wlan0`, 출력 `480x1920`, 회전 `90`입니다. 뒤에 붙이는 수신기 옵션으로 변경할 수 있습니다. 영상이 거꾸로 보이면 다음을 사용합니다. 폭·높이 옵션만으로 OS에 없는 HDMI 모드를 만들 수는 없습니다. 영상은 회전 후 출력 크기에 맞춥니다.
 
 ```bash
-sudo cp /opt/cluster-receiver/cluster-hdmi.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now cluster-hdmi.service
-journalctl -u cluster-hdmi.service -f
+sudo bash /opt/cluster-receiver/scripts/run_console.sh --rotation 270 --log-touch
 ```
 
-서비스는 DRM/KMS와 터치 입력을 위해 `video`, `render`, `input` 그룹을 사용하며 tty1에서 실행됩니다. 데스크톱 로그인 화면과 동시에 실행하지 마십시오.
+C4 IP를 알고 있다면 자동 검색을 생략합니다. 아래 IP는 실제 C4 IP로 바꿉니다.
 
-## 실행 옵션
+```bash
+sudo bash /opt/cluster-receiver/scripts/run_console.sh --host 192.168.43.10
+```
+
+연결이 끊기거나 기본 2초 안에 완전한 프레임을 받지 못하면 마지막 운행 영상을 지우고 연결 대기 화면으로 돌아갑니다. `--frame-timeout`으로 시간을 조절합니다. 재연결 후 새 프레임이 도착하면 정상 영상으로 복구됩니다. ESC, 창 닫기, Ctrl+C는 수동 실행을 종료하며 종료 시 화면을 검게 지웁니다.
+
+### 터치 좌표
+
+`--log-touch`는 검색·연결 대기 중에도 원본 `raw`와 보정된 `cluster` 좌표를 기록합니다. 가로로 설치한 모니터의 네 모서리를 누릅니다. `cluster`는 왼쪽 위 `(0, 0)`, 오른쪽 위 `(1, 0)`, 왼쪽 아래 `(0, 1)`, 오른쪽 아래 `(1, 1)` 부근이어야 합니다.
+
+기본 보정은 영상 회전의 역방향이며 `--rotation 90`에서는 `(raw_y, 1 - raw_x)`입니다. 터치가 이미 가로 좌표를 보고한다면 다음처럼 보정을 끕니다. 다른 방향이면 `--touch-rotation 90`, `180`, `270` 중 맞는 값을 선택합니다.
+
+```bash
+sudo bash /opt/cluster-receiver/scripts/run_console.sh --touch-rotation 0 --log-touch
+```
+
+SDL 로그가 없으면 수신기를 종료한 뒤 실제 입력을 확인합니다. 장치 번호가 바뀌었다면 인자 없는 `touch.sh`로 새 경로를 확인합니다.
+
+```bash
+sudo bash /opt/cluster-receiver/scripts/touch.sh /dev/input/event1
+```
+
+libinput 이벤트는 나오지만 SDL 로그가 없으면 SDL 입력 드라이버와 실행 사용자의 `input` 그룹을 확인합니다. libinput 인식만으로 SDL finger 이벤트까지 확인된 것은 아닙니다.
+
+## GBM/EGL 오류 진단
+
+`kmsdrm not available`은 비디오 초기화 실패입니다. 이전 GBM/EGL 오류는 그 단계를 통과한 뒤 발생했습니다. [SDL 2.32.10 KMSDRM 코드](https://github.com/libsdl-org/SDL/blob/release-2.32.10/src/video/kmsdrm/SDL_kmsdrmvideo.c#L1088)는 GBM 표면, EGL 표면, EGL current 설정의 실패를 최종적으로 같은 화면 생성 오류로 덮어씁니다. `Could not restore CRTC`는 실패한 화면을 정리하는 과정에서도 출력되므로 최초 원인으로 확정하지 않습니다.
+
+KMSDRM은 일반 pygame Surface에도 EGL을 사용합니다. 이번 수정은 ES2 프로파일, depth/stencil 0, `SDL_RENDER_DRIVER=opengles2`를 사용합니다. [SDL EGL 코드](https://github.com/libsdl-org/SDL/blob/release-2.32.10/src/video/SDL_egl.c#L716)와 [렌더러 선택 문서](https://wiki.libsdl.org/SDL2/SDL_HINT_RENDER_DRIVER)를 바탕으로 적용했으며 위 장비에서 정상 화면 출력을 확인했습니다. 다른 OS 이미지·GPU 드라이버의 동작은 각각 확인해야 합니다.
+
+```bash
+sudo bash /opt/cluster-receiver/scripts/diagnose.sh --egl
+```
+
+진단 기본 대상은 연결된 HDMI 카드입니다. 다른 카드와 비교하려면 번호를 지정합니다. 현재 `card1`은 GPU이며 HDMI는 `card0`에 있습니다. GPU 카드의 probe 성공만으로 HDMI 출력이 가능한 것은 아닙니다.
+
+```bash
+sudo bash /opt/cluster-receiver/scripts/diagnose.sh --egl --card 1 --output /tmp/cluster-card1.log
+```
+
+| 진단 결과 | 다음 확인 |
+| --- | --- |
+| SDL 목록에 KMSDRM 없음 | pygame에 연결된 SDL 빌드 기능과 OS pygame 경로 |
+| 라이브러리 `load FAILED` | 표시된 라이브러리의 OS 패키지·링크 경로 |
+| 다른 프로세스의 DRM `master=y` | 해당 세션의 점유 해제 여부; 콘솔 스크립트는 display-manager를 중지함 |
+| `eglInitialize` 실패 | 선택 카드와 GBM/EGL 공급자 호환성 |
+| ARGB8888 window의 OpenGL=0, ES2>0 | 데스크톱 OpenGL 설정 차이가 원인일 가능성; ES2 재시도 결과 |
+| ES2 설정도 없음 | SDL이 요구하는 EGL 창 설정이 없음; X11 경로 점검 |
+| GBM/EGL 표면 생성 실패 | 실패한 함수·오류 코드, 카드·버퍼 형식·GPU 드라이버 연결 |
+| probe 성공, 수신기는 실패 | SDL 화면 생성·모드 설정·page flip은 별도 확인 필요 |
+
+`load OK`는 라이브러리 로드 성공이며 GPU 렌더링 성공이 아닙니다. debugfs `clients`가 없거나 읽히지 않으면 DRM 점유는 미확인입니다. [master 검사 우회](https://wiki.libsdl.org/SDL2/SDL_HINT_KMSDRM_REQUIRE_DRM_MASTER)는 점유된 HDMI를 사용할 수 있게 해주지 않습니다.
+
+이 보드 OS는 [Orange Pi sun60iw2 빌드 설정](https://github.com/orangepi-xunlong/orangepi-build/blob/next/external/config/sources/families/sun60iw2.conf)에 별도 IMG 그래픽 패키지를 사용합니다. 진단 없이 다른 보드용 Mali 라이브러리를 설치하거나 vendor EGL/GBM 파일을 교체하지 않습니다.
+
+## 데스크톱 실행
+
+KMSDRM 경로가 계속 실패하면 기존 X11 데스크톱에서 소프트웨어 출력을 점검합니다. SSH에서는 다음으로 클러스터 서비스를 중지·비활성화하고 display-manager를 시작합니다. 자동 실행 설정 때 저장한 부팅 대상을 복원하며, 저장된 값이 없으면 `graphical.target`을 사용합니다.
+
+```bash
+sudo bash /opt/cluster-receiver/scripts/service.sh desktop
+```
+
+이후 **모니터에 로그인한 사용자의 데스크톱 터미널**에서 실행합니다. `sudo`를 사용하지 않습니다. `SDL_VIDEODRIVER=x11`, `SDL_FRAMEBUFFER_ACCELERATION=0`, `SDL_RENDER_DRIVER=software`로 [Surface의 3D 가속 경로](https://wiki.libsdl.org/SDL2/SDL_HINT_FRAMEBUFFER_ACCELERATION)를 끕니다.
+
+```bash
+bash /opt/cluster-receiver/scripts/run_desktop.sh --log-touch
+```
+
+데스크톱에서 이미 화면을 가로로 회전했다면 다음을 사용합니다. 터치 보정은 실제 모서리 좌표에 맞춥니다.
+
+```bash
+bash /opt/cluster-receiver/scripts/run_desktop.sh --width 1920 --height 480 --rotation 0 --log-touch
+```
+
+창 점검에는 `--windowed`를 추가합니다. 실행 중인 X11/XWayland 세션이 필요합니다. SSH에서 임의로 `DISPLAY=:0`을 지정하거나 접근 권한을 풀어주는 작업은 하지 않습니다. X11 성공은 KMSDRM 성공과 별개입니다.
+
+## 부팅 시 자동 실행
+
+**콘솔 수동 실행에서 HDMI 출력을 확인한 뒤** 전용 클러스터 환경에 적용합니다. X11로만 확인한 경우에는 이 KMSDRM 서비스를 설치하지 않습니다.
+
+수동 실행 중인 수신기를 **Ctrl+C로 먼저 종료**하고 수정된 폴더를 `/opt/cluster-receiver`에 반영합니다. 위 `install.sh`로 한글 폰트를 설치한 뒤 아래를 실행하면 서비스를 즉시 시작하고 다음 부팅에도 자동 실행합니다. 기본 출력과 회전은 수동 확인한 `480x1920`, `90`입니다.
+
+기본 서비스 계정은 `orangepi`입니다. 실제 계정이 다르면 두 번째 인자로 지정합니다. 스크립트는 계정 존재 여부를 검사하고 systemd `account.conf`에 User/Group을 반영합니다. 다른 회전·터치 옵션으로 점검했다면 설치 전에 `cluster-hdmi.service`의 `ExecStart`에도 반영합니다.
+
+```bash
+sudo bash /opt/cluster-receiver/scripts/service.sh enable orangepi
+sudo bash /opt/cluster-receiver/scripts/service.sh status
+sudo bash /opt/cluster-receiver/scripts/service.sh logs
+```
+
+`enable`은 서비스 파일을 설치하고 데스크톱을 중지하며 다음 부팅 대상을 `multi-user.target`으로 바꿉니다. 이전 대상은 `/var/lib/cluster-receiver/previous-target`에 한 번만 저장합니다. 수정한 서비스 파일 적용에도 `enable`을 사용합니다. 다른 drop-in 설정은 유지됩니다.
+
+### `Unit cluster-hdmi.service not loaded`에서 설치가 멈춘 경우
+
+패키지 설치가 완료됐어도 이전 `service.sh`는 `reset-failed`에서 이 오류가 발생하면 자동 실행 등록 전에 중단됐습니다. 이때 `status`는 `disabled`, `inactive (dead)`를 표시합니다. 해당 로그만으로 pygame이나 서비스 실행 계정의 문제라고 판단하지 않습니다.
+
+수정된 `scripts/service.sh`는 이 특정 오류만 건너뛰고 등록·시작을 계속합니다. 다른 초기화 오류와 실제 서비스 시작 오류는 그대로 반환합니다. 부팅 대상 변경도 등록·시작 명령이 성공한 뒤 수행합니다. 기존 `/var/lib/cluster-receiver/previous-target` 값은 유지합니다.
+
+수정된 스크립트를 `/opt/cluster-receiver/scripts/service.sh`에 반영한 뒤 다음을 다시 실행합니다. 패키지와 폰트 설치를 반복할 필요는 없습니다.
+
+```bash
+sudo bash /opt/cluster-receiver/scripts/service.sh enable orangepi
+sudo bash /opt/cluster-receiver/scripts/service.sh status
+```
+
+`enabled`, `active (running)`이 되지 않으면 `service.sh logs`에서 새 시작 시각의 오류를 확인합니다. 과거 실패 로그는 서비스 재등록 후에도 journal에 남습니다.
+
+### 부팅 후 확인과 재시작
+
+서비스는 [systemd의 `network.target`](https://systemd.io/NETWORK_ONLINE/) 기준으로 시작해 핫스팟의 IP 할당 완료를 기다리지 않습니다. 수신기가 먼저 HDMI 대기 문구를 띄우고 Wi-Fi/C4 연결을 재시도합니다. 재부팅 뒤에도 `service.sh status`에서 `enabled`, `active (running)`인지 확인할 수 있습니다.
+
+서비스는 `/usr/bin/python3`, 출력 `480x1920`, 회전 `90`, GLES2 렌더러와 `video`, `render`, `input` 그룹, tty1을 사용합니다. stdout/stderr는 journal에 기록합니다. 초기화 실패는 60초 내 최대 5회 시작 후 중지합니다. 원인을 해결한 뒤 다음으로 실패 상태를 초기화하고 재시작합니다.
+
+```bash
+sudo bash /opt/cluster-receiver/scripts/service.sh restart
+```
+
+`logs`에서 Ctrl+C는 로그 보기만 종료합니다. 서비스 중지는 다음을 사용하며 데스크톱 복구는 `service.sh desktop`을 사용합니다.
+
+```bash
+sudo bash /opt/cluster-receiver/scripts/service.sh stop
+```
+
+## PC에서 SSH로 수동 업데이트
+
+최초 설치와 자동 실행 설정이 완료된 Pi에는 **Windows PC에서 `deploy.ps1`을 수동 실행**합니다. PC와 Pi가 SSH로 통신할 수 있어야 하며 Windows OpenSSH의 `ssh`, `scp`가 필요합니다. `ORANGE_PI_IP`에는 **Orange Pi의 주소**를 넣습니다. C4 주소와 다릅니다. 이름이 해석되는 환경에서는 `orangepizero3w` 또는 SSH 설정의 호스트 별칭도 사용할 수 있습니다.
+
+PC PowerShell에서 실행합니다. 현재 PC의 저장소 위치를 기준으로 작성했으며, 저장소를 옮기면 `cd` 경로를 바꿉니다.
+
+```powershell
+cd C:\Users\crwus\PycharmProjects\crwusiz\openpilot\openpilot\selfdrive\addon\cluster\hdmi_display\orange_pi
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy.ps1 -PiHost "ORANGE_PI_IP"
+```
+
+기본 SSH 계정은 현재 장비에서 사용 중인 `root`, 포트는 `22`입니다. 다른 계정이면 `-User orangepi`, 다른 포트면 `-Port 2222`를 추가합니다. 일반 계정에는 Pi의 `sudo` 권한이 필요하며 적용 단계에서 비밀번호를 요청할 수 있습니다. SSH 비밀번호를 파일에 저장하지 않으며 SSH의 호스트 키 확인을 그대로 사용합니다. 키 인증은 `-IdentityFile "$env:USERPROFILE\.ssh\id_ed25519"`로 지정할 수 있습니다. [OpenSSH SSH 옵션](https://man.openbsd.org/ssh.1), [SCP 옵션](https://man.openbsd.org/scp.1)
+
+전송할 파일 목록만 확인하려면 다음을 사용합니다. SSH에 접속하지 않습니다.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy.ps1 -PiHost "ORANGE_PI_IP" -DryRun
+```
+
+스크립트는 PC의 현재 파일을 전송합니다. Git 커밋 여부와 관계없이 저장된 수정 사항이 포함됩니다. 동작 순서는 다음과 같습니다.
+
+1. 수신기 Python 파일, Bash 스크립트, README, requirements, 서비스 템플릿을 별도 폴더에 모으고 UTF-8/LF와 SHA-256 체크섬으로 준비합니다. openpilot 전체와 `.venv`, 테스트, 캐시는 제외합니다.
+2. Pi의 임시 폴더에 전송한 뒤 체크섬, Bash 문법, OS Python의 컴파일·pygame 및 수신기 모듈 가져오기를 검사합니다. 이 단계가 실패하면 실행 중인 수신기를 중지하지 않습니다.
+3. 기존 수신기 파일을 `/var/lib/cluster-receiver/updates/<시각.식별자>/previous`에 백업하고 서비스를 잠시 중지해 파일을 교체합니다.
+4. 실행 중이거나 실패 상태였던 서비스는 다시 시작합니다. 현재 systemd 실행의 `Cluster receiver ready` 로그와 동일한 실행이 유지되는지 최대 약 20초간 확인합니다. 화면 준비 확인에는 C4 연결이나 Wi-Fi IP 할당이 필요하지 않습니다. 명시적으로 중지되어 있던 서비스는 중지 상태를 유지합니다.
+5. 적용 또는 실행 확인이 실패하면 이전 파일을 복구하고 이전에 실행 중이던 서비스를 다시 시작합니다. 성공 시 `Receiver apply complete`와 백업 위치가 출력됩니다.
+
+**설치된 `/etc/systemd/system/cluster-hdmi.service`와 drop-in, 실행 계정, 해상도·회전·인터페이스 옵션, Wi-Fi, 부팅 대상, 서비스 enable 상태는 유지합니다.** `/opt/cluster-receiver/cluster-hdmi.service` 템플릿만 새 파일이 되며 설치된 unit은 덮어쓰지 않습니다. systemd 설정 변경이 필요한 업데이트에서는 해당 설정을 검토한 뒤 `service.sh enable <계정>`으로 별도 적용합니다. 일반 파일 업데이트에는 `install.sh`나 apt를 다시 실행하지 않습니다.
+
+업데이트 중에는 HDMI 화면과 C4 연결이 잠시 끊겼다가 복구됩니다. 백업은 자동 삭제하지 않으며 실행 결과에 백업 위치를 표시합니다. 파일 교체 전에 복구할 백업과 기존 서비스 실행 상태를 기록합니다. SSH나 전원이 끊겨 최종 결과를 받지 못했다면 재접속 후 `service.sh status`와 `service.sh logs`로 확인합니다. 미완료 업데이트가 남아 있으면 새 업데이트를 중단하므로 아래 `-Rollback`으로 먼저 복구합니다. 중단 과정에서 서비스가 멈췄어도 원래 실행 중이었다면 복구 후 다시 시작합니다.
+
+### 이전 버전으로 복구
+
+가장 최근 성공한 업데이트 직전의 파일로 돌아가려면 PC에서 실행합니다.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy.ps1 -PiHost "ORANGE_PI_IP" -Rollback
+```
+
+Pi SSH 터미널에서 직접 실행할 수도 있습니다. 복구용 스크립트는 수신기 디렉터리 밖에도 보관하므로 첫 업데이트 이전 버전으로 돌아간 뒤에도 사용할 수 있습니다.
+
+```bash
+sudo bash /var/lib/cluster-receiver/updates/update.sh rollback
+sudo bash /opt/cluster-receiver/scripts/service.sh status
+```
+
+복구도 현재 파일을 먼저 백업하므로 다시 `rollback`을 실행하면 복구 직전 버전으로 돌아갑니다. 복구 시 이전 버전의 화면 준비 로그로 실행 상태를 확인합니다. 새 버전에서 추가한 파일도 복구 과정에서 정리하며, 패키지 외의 별도 설정 파일은 유지합니다. 자동 복구까지 실패하면 스크립트는 오류를 반환하고 백업 위치를 출력합니다. 이 경우 다음 `rollback`은 실패한 업데이트 직전의 백업을 우선 사용하며, 복구가 완료되기 전에는 새 업데이트를 적용하지 않습니다.
+
+## 수신기 옵션
+
+스크립트 뒤에 아래 옵션을 붙입니다. 스크립트 기본값은 `480x1920`, 회전 `90`이고 Python 수신기를 직접 실행할 때의 기존 기본값은 `1920x480`, 회전 `0`입니다.
 
 ```text
 --interface wlan0       핫스팟 Wi-Fi 인터페이스
---host 192.168.43.10     C4 IPv4 직접 지정(자동 검색 생략)
+--host 192.168.43.10     C4 IPv4 직접 지정
 --port 9200             C4 검색 포트
 --scan-timeout 0.12     주소별 연결 제한 시간(초)
 --scan-workers 32       병렬 검색 작업 수
 --reconnect-delay 2     재검색 대기 시간(초)
 --frame-timeout 2       프레임 전체 수신 제한 시간(초)
---width 1920            출력 폭
---height 480            출력 높이
---display-index 0       SDL 디스플레이 번호
+--width 480             실제 출력 폭
+--height 1920           실제 출력 높이
+--rotation 90           영상 시계 방향 회전: 0, 90, 180, 270
+--touch-rotation 0      터치 시계 방향 보정(기본: 영상 회전의 역방향)
+--log-touch             원본·보정 SDL 터치 좌표 로그
+--display-index 0       SDL 디스플레이 번호; DRM card 번호와 별개
 --windowed              창 모드
---show-cursor           터치 점검용 포인터 표시
+--show-cursor           포인터 표시; 터치 좌표 표시 기능은 아님
 ```
 
-프로토콜에는 인증이나 암호화가 없습니다. 차량 내부의 신뢰할 수 있는 핫스팟에서만 사용하십시오.
+PC 창 모드 점검에서는 `requirements.txt`를 PC 가상 환경에 설치하고 Python 수신기를 직접 실행합니다. PC pip 설치와 Orange Pi OS pygame 설치는 별개입니다.
 
-## 장비 도착 후 점검
+## 장비 확인 순서
 
-1. HDMI 출력이 1920x480인지, 화면이 잘리거나 늘어나지 않는지 확인합니다. `--width`/`--height`만으로 OS에 없는 HDMI 모드를 추가할 수는 없습니다.
-2. USB 터치 장치가 인식되는지 확인합니다. 현재 터치는 수신기 내부 이벤트까지 지원합니다.
-3. 정차 상태에서 C4와 연결한 뒤 Wi-Fi를 끊어 2초 이내에 화면이 지워지고, 다시 연결하면 최신 화면으로 복구되는지 확인합니다.
-4. C4 로그의 `[CLUSTER_NETWORK_PERF]`에서 실제 FPS와 전송 시간을 확인합니다. 목표값은 20 FPS이며 실제 성능은 보드·디스플레이 드라이버·무선 환경에서 확인해야 합니다.
+1. HDMI 영상이 가로 설치 방향에 맞고 잘리거나 늘어나지 않는지 확인합니다.
+2. `--log-touch`로 SDL 이벤트와 네 모서리 좌표를 확인합니다. 현재는 수신기 내부 이벤트까지 지원합니다.
+3. 정차 상태에서 Wi-Fi를 끊어 2초 이내에 마지막 운행 영상이 연결 대기 화면으로 바뀌고, 재연결하면 최신 화면으로 복구되는지 확인합니다.
+4. C4 `[CLUSTER_NETWORK_PERF]` 로그에서 FPS·전송 시간을 확인합니다. 목표는 20 FPS이며 실제 성능은 장비에서 확인해야 합니다.

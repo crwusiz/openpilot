@@ -1,1 +1,3 @@
+# For PC/windowed pip installs. Orange Pi KMSDRM uses the OS python3-pygame
+# package with /usr/bin/python3 instead; see README.md.
 pygame>=2.5,<3
