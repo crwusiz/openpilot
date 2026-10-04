@@ -90,12 +90,26 @@ def test_interface_network_uses_wifi_prefix(monkeypatch):
 def test_receiver_defaults_match_purchased_panel():
   args = cluster_receiver.parse_args([])
   assert (args.width, args.height) == HdmiDisplay().size == (1920, 480)
+  assert args.rotation == 0
+  assert args.touch_rotation is None
+  assert not args.log_touch
+
+
+def test_receiver_accepts_native_portrait_mode_and_touch_override():
+  args = cluster_receiver.parse_args([
+    "--width", "480", "--height", "1920", "--rotation", "90", "--touch-rotation", "0", "--log-touch",
+  ])
+  assert (args.width, args.height) == (480, 1920)
+  assert args.rotation == 90
+  assert args.touch_rotation == 0
+  assert args.log_touch
 
 
 @pytest.mark.parametrize("argv", [
   ["--port", "65536"], ["--port", "0"], ["--width", "0"], ["--height", "-1"],
   ["--scan-workers", "0"], ["--scan-timeout", "nan"], ["--reconnect-delay", "-1"],
   ["--frame-timeout", "inf"], ["--display-index", "-1"], ["--host", "invalid"],
+  ["--rotation", "45"], ["--rotation", "-90"], ["--touch-rotation", "360"],
 ])
 def test_receiver_rejects_invalid_options(argv):
   with pytest.raises(SystemExit):
@@ -161,14 +175,23 @@ def test_discovery_quit_closes_probe_sockets(monkeypatch):
   assert all(sock.fileno() == -1 for sock in sockets)
 
 
-def test_main_clears_disconnect_before_retry_and_uses_direct_host(monkeypatch):
+def test_main_shows_waiting_at_startup_and_disconnect_before_retry(monkeypatch, caplog):
   events = []
+  display_options = {}
   display = FakeDisplay()
-  monkeypatch.setattr(hdmi_display, "HdmiDisplay", lambda **_kwargs: display)
+
+  def create_display(**kwargs):
+    display_options.update(kwargs)
+    return display
+
+  monkeypatch.setattr(hdmi_display, "HdmiDisplay", create_display)
   monkeypatch.setattr(display, "open", lambda: True, raising=False)
-  monkeypatch.setattr(display, "clear", lambda: events.append("clear"), raising=False)
+  monkeypatch.setattr(display, "show_waiting", lambda: events.append("waiting") or True, raising=False)
   monkeypatch.setattr(display, "close", lambda: events.append("close"), raising=False)
-  args = cluster_receiver.parse_args(["--host", "127.0.0.1"])
+  args = cluster_receiver.parse_args([
+    "--host", "127.0.0.1", "--width", "480", "--height", "1920", "--rotation", "90",
+    "--touch-rotation", "0", "--log-touch", "--interface", "wlan1",
+  ])
   monkeypatch.setattr(cluster_receiver, "parse_args", lambda: args)
   monkeypatch.setattr(cluster_receiver.signal, "signal", lambda *_args: None)
   monkeypatch.setattr(cluster_receiver, "discover_c4", lambda *_args: pytest.fail("should bypass scanning"))
@@ -182,6 +205,7 @@ def test_main_clears_disconnect_before_retry_and_uses_direct_host(monkeypatch):
 
   def probe(address, *_args):
     assert address == "127.0.0.1"
+    events.append("probe")
     return Connection()
 
   def fail_receive(*_args, **_kwargs):
@@ -194,5 +218,57 @@ def test_main_clears_disconnect_before_retry_and_uses_direct_host(monkeypatch):
   monkeypatch.setattr(cluster_receiver, "_probe", probe)
   monkeypatch.setattr(cluster_receiver, "receive_frames", fail_receive)
   monkeypatch.setattr(cluster_receiver, "wait_for_reconnect", retry)
+  with caplog.at_level("INFO"):
+    cluster_receiver.main()
+  assert events == ["waiting", "probe", "disconnect", "waiting", "retry", "close"]
+  assert "Cluster receiver ready" in caplog.text
+  assert display_options["width"] == 480
+  assert display_options["height"] == 1920
+  assert display_options["rotation"] == 90
+  assert display_options["touch_rotation"] == 0
+  assert display_options["log_touch"]
+  assert display_options["network_interface"] == "wlan1"
+
+
+@pytest.mark.parametrize("wifi_available", [False, True])
+def test_main_keeps_waiting_when_wifi_or_c4_is_unavailable(monkeypatch, wifi_available):
+  events = []
+  display = FakeDisplay()
+  monkeypatch.setattr(hdmi_display, "HdmiDisplay", lambda **kwargs: display)
+  monkeypatch.setattr(display, "open", lambda: True, raising=False)
+  monkeypatch.setattr(display, "show_waiting", lambda: events.append("waiting") or True, raising=False)
+  monkeypatch.setattr(display, "close", lambda: events.append("close"), raising=False)
+  args = cluster_receiver.parse_args([])
+  monkeypatch.setattr(cluster_receiver, "parse_args", lambda: args)
+  monkeypatch.setattr(cluster_receiver.signal, "signal", lambda *_args: None)
+
+  def discover(*_args):
+    events.append("discover")
+    if not wifi_available:
+      raise RuntimeError("No IPv4 address assigned to wlan0")
+    return None
+
+  def retry(*_args):
+    events.append("retry")
+    raise KeyboardInterrupt
+
+  monkeypatch.setattr(cluster_receiver, "discover_c4", discover)
+  monkeypatch.setattr(cluster_receiver, "wait_for_reconnect", retry)
   cluster_receiver.main()
-  assert events == ["disconnect", "clear", "retry", "close"]
+  assert events == ["waiting", "discover", "waiting", "retry", "close"]
+
+
+def test_main_does_not_report_ready_when_waiting_screen_fails(monkeypatch, caplog):
+  events = []
+  display = FakeDisplay()
+  monkeypatch.setattr(hdmi_display, "HdmiDisplay", lambda **kwargs: display)
+  monkeypatch.setattr(display, "open", lambda: True, raising=False)
+  monkeypatch.setattr(display, "show_waiting", lambda: False, raising=False)
+  monkeypatch.setattr(display, "close", lambda: events.append("close"), raising=False)
+  args = cluster_receiver.parse_args([])
+  monkeypatch.setattr(cluster_receiver, "parse_args", lambda: args)
+  monkeypatch.setattr(cluster_receiver.signal, "signal", lambda *_args: None)
+  with pytest.raises(RuntimeError, match="connection waiting screen"):
+    cluster_receiver.main()
+  assert events == ["close"]
+  assert "Cluster receiver ready" not in caplog.text

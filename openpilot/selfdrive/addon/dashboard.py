@@ -27,6 +27,8 @@ except ImportError:
 from ansi2html import Ansi2HTMLConverter
 from nicegui import ui
 
+from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import get_connected_pi_ip
+
 # ── 환경 설정 및 유틸리티 ───────────────────────────────────────
 SCRIPTS_PATH = "/data/openpilot/scripts"
 BASE_PATH = "/data/params/crwusiz"
@@ -126,6 +128,13 @@ def get_param_text(key: str, default: str = "") -> str:
   if isinstance(value, bytes):
     value = value.decode('utf-8', errors='replace')
   return str(value) if value else default
+
+
+def get_orange_pi_status_text() -> str:
+  if not params.get_bool("ClusterEnable") or get_param_text("ClusterDisplayTransport", "usb") != "network":
+    return "Orange Pi: Cluster를 켜고 Network 모드를 선택하면 IP를 확인할 수 있습니다."
+  ip = get_connected_pi_ip()
+  return f"Orange Pi 연결됨 · IP: {ip}" if ip else "Orange Pi 연결 대기 중"
 
 
 def _script_command(path: str, args: list[str] | None = None) -> list[str]:
@@ -665,6 +674,10 @@ def render_tab_toggles():
           ui.label('The Cluster process restarts automatically when the transport changes.').classes(
             'text-[0.75rem] md:text-sm text-gray-400 -mt-3 ml-1'
           )
+
+        if key == "ClusterEnable":
+          pi_status = ui.label(get_orange_pi_status_text()).classes('text-sm text-blue-200 break-words w-full')
+          ui.timer(1.0, lambda label=pi_status: label.set_text(get_orange_pi_status_text()))
 
   toggles_content()
 

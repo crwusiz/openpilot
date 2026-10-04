@@ -34,6 +34,37 @@ class TestDashboardHelpers(unittest.TestCase):
     self.assertEqual(dashboard._get_error_summary('starting\nERROR: upload failed'), 'ERROR: upload failed')
     self.assertEqual(dashboard._get_error_summary(''), 'Unknown error')
 
+  def test_orange_pi_ip_only_shows_for_enabled_network_transport(self):
+    params = Mock(get=Mock(return_value=b'network'), get_bool=Mock(return_value=True))
+    with patch.object(dashboard, 'params', params), patch.object(dashboard, 'get_connected_pi_ip', return_value='192.168.0.84') as peer:
+      self.assertEqual(dashboard.get_orange_pi_status_text(), 'Orange Pi 연결됨 · IP: 192.168.0.84')
+      peer.return_value = None
+      self.assertEqual(dashboard.get_orange_pi_status_text(), 'Orange Pi 연결 대기 중')
+      peer.reset_mock()
+      params.get.return_value = 'usb'
+      self.assertIn('Network 모드', dashboard.get_orange_pi_status_text())
+      params.get.return_value = 'network'
+      params.get_bool.return_value = False
+      self.assertIn('Cluster를 켜고', dashboard.get_orange_pi_status_text())
+      peer.assert_not_called()
+
+  def test_orange_pi_label_updates_after_reconnect_and_disconnect(self):
+    client = Client(ui.page('/test-orange-pi-status'))
+    self.addCleanup(client.delete)
+    params = Mock(get=Mock(return_value=b'network'), get_bool=Mock(side_effect=lambda key: key == 'ClusterEnable'))
+    with client, patch.object(dashboard, 'params', params), patch.object(ui, 'timer') as timer, \
+         patch.object(dashboard, 'get_connected_pi_ip', return_value='192.168.0.84') as peer:
+      dashboard.render_tab_toggles()
+      label = next(element for element in client.elements.values() if isinstance(element, ui.label) and 'IP: 192.168.0.84' in element.text)
+      interval, refresh = timer.call_args.args
+      self.assertEqual(interval, 1.0)
+      peer.return_value = '192.168.0.90'
+      refresh()
+      self.assertEqual(label.text, 'Orange Pi 연결됨 · IP: 192.168.0.90')
+      peer.return_value = None
+      refresh()
+      self.assertEqual(label.text, 'Orange Pi 연결 대기 중')
+
   def test_routes_ignore_invalid_names_and_sort_segments_numerically(self):
     with tempfile.TemporaryDirectory() as tmp:
       root = Path(tmp)

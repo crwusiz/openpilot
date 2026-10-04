@@ -6,6 +6,7 @@ from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_protocol import (
   ACK_OK, ACK_PACKET, pack_frame_header, recv_exact, unpack_ack,
 )
+from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import write_network_status
 
 
 class ClusterNetworkDisplay:
@@ -27,16 +28,33 @@ class ClusterNetworkDisplay:
     self._perf_prepare_time = 0.0
     self._perf_network_time = 0.0
     self._perf_size_kb = 0
+    self._status_updated = 0.0
+    self._status_error_logged = False
+    self._publish_status(force=True)
     flog(
       f"ClusterNetworkDisplay initialized ({self.bind_host}:{self.port}, "
       + f"JPEG quality={self.encoder.jpeg_quality}).",
     )
+
+  def _publish_status(self, force=False):
+    now = time.monotonic()
+    if not force and now - self._status_updated < 1.0:
+      return
+    self._status_updated = now
+    try:
+      write_network_status(self.client_address[0] if self.connected else None)
+      self._status_error_logged = False
+    except OSError as e:
+      if not self._status_error_logged:
+        flog(f"[CLUSTER_NETWORK_WARN] Cannot publish Orange Pi connection status: {e}")
+        self._status_error_logged = True
 
   def _disconnect_client(self):
     sock = self.sock
     self.connected = False
     self.sock = None
     self.client_address = None
+    self._publish_status(force=sock is not None)
     if sock is not None:
       try:
         sock.shutdown(socket.SHUT_RDWR)
@@ -95,6 +113,7 @@ class ClusterNetworkDisplay:
       self.sock = sock
       self.client_address = address
       self.connected = True
+      self._publish_status(force=True)
       flog(f"[CLUSTER_NETWORK_SUCCESS] Orange Pi connected from {address[0]}:{address[1]}.")
       return True
     except TimeoutError:
@@ -125,6 +144,7 @@ class ClusterNetworkDisplay:
         flog(f"[CLUSTER_NETWORK_WARN] Orange Pi rejected frame#{sequence}: status={status}")
         return False
 
+      self._publish_status()
       elapsed = time.monotonic() - started
       self.frame_count += 1
       now = time.monotonic()
