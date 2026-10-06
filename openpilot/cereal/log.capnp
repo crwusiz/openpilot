@@ -1265,11 +1265,12 @@ struct LongitudinalPlan @0xe00b5b3eba12876c {
   shouldStop @37: Bool;
   allowThrottle @38: Bool;
   allowBrake @39: Bool;
+  accelBoost @40 :Float32;
 
 
   solverExecutionTime @35 :Float32;
 
-  xState @40: Int32;
+  xState @42: Int32;
   trafficState @41: Int32;
 
   enum LongitudinalPlanSource {
