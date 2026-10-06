@@ -91,6 +91,7 @@ class HdmiDisplay:
     self.connected = False
     self.close_requested = False
     self.last_touch = None
+    self.last_frame_timings = {}
     self._waiting_frame = None
     self._showing_waiting = False
     self.network_interface = network_interface
@@ -202,8 +203,11 @@ class HdmiDisplay:
     if not self.pump_events():
       return False
     try:
+      decode_started = time.monotonic()
       frame = self._pygame.image.load(BytesIO(jpeg), "cluster.jpg").convert()
-      self._present_frame(frame)
+      decode_elapsed = time.monotonic() - decode_started
+      self.last_frame_timings = self._present_frame(frame)
+      self.last_frame_timings["decode"] = decode_elapsed
       return True
     except Exception as e:
       LOG.warning("Failed to display HDMI frame: %s", e)
@@ -212,13 +216,23 @@ class HdmiDisplay:
   def _present_frame(self, frame):
     # Invalidate the status cache before drawing, including a failed page flip.
     self._showing_waiting = False
+    started = time.monotonic()
     if self.rotation:
       # pygame's positive angles are counterclockwise; our option is clockwise.
       frame = self._pygame.transform.rotate(frame, -self.rotation)
+    rotated_at = time.monotonic()
     if frame.get_size() != self.screen.get_size():
       frame = self._pygame.transform.smoothscale(frame, self.screen.get_size())
+    scaled_at = time.monotonic()
     self.screen.blit(frame, (0, 0))
+    blitted_at = time.monotonic()
     self._pygame.display.flip()
+    return {
+      "rotate": rotated_at - started,
+      "scale": scaled_at - rotated_at,
+      "blit": blitted_at - scaled_at,
+      "flip": time.monotonic() - blitted_at,
+    }
 
   def _make_waiting_frame(self):
     pygame = self._pygame

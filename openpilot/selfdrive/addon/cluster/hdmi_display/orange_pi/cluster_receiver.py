@@ -133,18 +133,44 @@ def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=F
     _poll_display(display)
 
   received_frames = 0
+  perf_started = time.monotonic()
+  perf_frames = 0
+  perf_bytes = 0
+  perf_stages = dict.fromkeys(("header_wait", "receive", "display", "ack_send", "decode", "rotate", "scale", "blit", "flip"), 0.0)
   while max_frames is None or received_frames < max_frames:
     # One deadline for the entire frame also bounds slow, partial deliveries.
-    deadline = time.monotonic() + frame_timeout
+    started = time.monotonic()
+    deadline = started + frame_timeout
     sequence, frame_size = unpack_frame_header(recv_exact(sock, FRAME_HEADER.size, deadline=deadline, poll_events=poll_events))
+    header_at = time.monotonic()
     jpeg = recv_exact(sock, frame_size, deadline=deadline, poll_events=poll_events)
+    received_at = time.monotonic()
     display_ok = display.send_jpeg(jpeg)
+    displayed_at = time.monotonic()
     status = ACK_OK if display_ok else ACK_DISPLAY_ERROR
     sock.sendall(pack_ack(sequence, status))
+    acknowledged_at = time.monotonic()
     if not display_ok:
       _poll_display(display)
       raise RuntimeError("Unable to display cluster frame")
     received_frames += 1
+    perf_frames += 1
+    perf_bytes += frame_size
+    perf_stages["header_wait"] += header_at - started
+    perf_stages["receive"] += received_at - header_at
+    perf_stages["display"] += displayed_at - received_at
+    perf_stages["ack_send"] += acknowledged_at - displayed_at
+    for stage, duration in getattr(display, "last_frame_timings", {}).items():
+      if stage in perf_stages:
+        perf_stages[stage] += duration
+    if acknowledged_at - perf_started >= 10.0:
+      stages = " | ".join(f"{stage}_avg={duration * 1000 / perf_frames:.1f}ms" for stage, duration in perf_stages.items())
+      LOG.info("[CLUSTER_RX_PERF] fps=%.2f | size_avg=%.1fKB | %s",
+               perf_frames / (acknowledged_at - perf_started), perf_bytes / (1024 * perf_frames), stages)
+      perf_started = acknowledged_at
+      perf_frames = 0
+      perf_bytes = 0
+      perf_stages = dict.fromkeys(perf_stages, 0.0)
   return received_frames
 
 

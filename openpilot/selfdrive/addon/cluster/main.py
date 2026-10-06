@@ -59,6 +59,7 @@ def cluster_main():
   loop_count = 0
   perf_started = time.monotonic()
   perf_render_time = 0.0
+  perf_render_stages = dict.fromkeys(("camera_copy", "snapshot", "path", "hud"), 0.0)
   perf_frames = 0
   last_camera_frame = -1
   try:
@@ -80,6 +81,8 @@ def cluster_main():
       render_started = time.monotonic()
       frame_image = renderer.render(camera, models)
       perf_render_time += time.monotonic() - render_started
+      for stage in perf_render_stages:
+        perf_render_stages[stage] += renderer.last_frame_timings[stage]
       pipeline.push(frame_image)
 
       loop_count += 1
@@ -96,11 +99,15 @@ def cluster_main():
       if perf_frames >= fps * 10:
         now = time.monotonic()
         elapsed = max(now - perf_started, 1e-6)
+        stages = " | ".join(f"{stage}_avg={duration * 1000 / perf_frames:.1f}ms"
+                            for stage, duration in perf_render_stages.items())
         flog(
-          f"[CLUSTER_MAIN_PERF] fps={perf_frames / elapsed:.2f} | render_avg={perf_render_time * 1000 / perf_frames:.1f}ms",
+          f"[CLUSTER_MAIN_PERF] fps={perf_frames / elapsed:.2f} | "
+          + f"render_avg={perf_render_time * 1000 / perf_frames:.1f}ms | {stages}",
         )
         perf_started = now
         perf_render_time = 0.0
+        perf_render_stages = dict.fromkeys(perf_render_stages, 0.0)
         perf_frames = 0
 
   except KeyboardInterrupt:

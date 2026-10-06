@@ -112,6 +112,7 @@ class ClusterRenderer:
     self._icon_cache = {}
     self._rotated_icon_cache = OrderedDict()
     self._text_cache = OrderedDict()
+    self.last_frame_timings = {}
     self._blink_started_at = None
     icon_dir = os.path.join(str(self.config.BASEDIR), "selfdrive", "assets", "icons")
     for name in (
@@ -145,6 +146,7 @@ class ClusterRenderer:
     return np.asarray(image, dtype=np.uint8).copy()
 
   def render(self, camera, models):
+    started = time.monotonic()
     # Fetch once so a stale-stream reset cannot clear the frame between a
     # separate has_frame() check and get_frame() call.
     camera_frame = camera.get_frame()
@@ -161,14 +163,23 @@ class ClusterRenderer:
     else:
       frame = self.base_canvas.copy()
 
+    camera_copied_at = time.monotonic()
     model_valid, hud_data, path_data = models.get_render_data()
+    snapshot_at = time.monotonic()
     if has_camera and model_valid:
       frame = self._draw_model_path(frame, path_data, hud_data)
     else:
       self._reset_leads()
 
+    path_drawn_at = time.monotonic()
     pil_img = Image.fromarray(frame)
     self._draw_hud(pil_img, hud_data, has_camera)
+    self.last_frame_timings = {
+      "camera_copy": camera_copied_at - started,
+      "snapshot": snapshot_at - camera_copied_at,
+      "path": path_drawn_at - snapshot_at,
+      "hud": time.monotonic() - path_drawn_at,
+    }
     # Keep the composed frame as PIL through the USB worker. Converting the
     # complete 1920x462 image back to NumPy here only for it to be rotated and
     # JPEG-encoded in the next thread was a full-frame copy on every update.

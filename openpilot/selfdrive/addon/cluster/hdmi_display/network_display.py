@@ -27,6 +27,8 @@ class ClusterNetworkDisplay:
     self._perf_frames = 0
     self._perf_prepare_time = 0.0
     self._perf_network_time = 0.0
+    self._perf_send_time = 0.0
+    self._perf_ack_wait_time = 0.0
     self._perf_size_kb = 0
     self._status_updated = 0.0
     self._status_error_logged = False
@@ -135,7 +137,9 @@ class ClusterNetworkDisplay:
       started = time.monotonic()
       self.sock.sendall(pack_frame_header(sequence, len(prepared.jpeg)))
       self.sock.sendall(prepared.jpeg)
+      sent_at = time.monotonic()
       ack_sequence, status = unpack_ack(recv_exact(self.sock, ACK_PACKET.size))
+      acknowledged_at = time.monotonic()
       if ack_sequence != sequence:
         raise ConnectionError(f"Cluster ACK sequence mismatch: sent={sequence}, received={ack_sequence}")
 
@@ -145,14 +149,18 @@ class ClusterNetworkDisplay:
         return False
 
       self._publish_status()
-      elapsed = time.monotonic() - started
+      # ACK follows the Pi's decode/rotate/blit/flip. This is the complete
+      # frame round trip, not a measurement of Wi-Fi transmission alone.
+      elapsed = acknowledged_at - started
       self.frame_count += 1
       now = time.monotonic()
       if self._perf_started is None:
-        self._perf_started = now
+        self._perf_started = started
       self._perf_frames += 1
       self._perf_prepare_time += prepared.prepare_elapsed
       self._perf_network_time += elapsed
+      self._perf_send_time += sent_at - started
+      self._perf_ack_wait_time += acknowledged_at - sent_at
       self._perf_size_kb += prepared.size_kb
 
       if self.frame_count == 1:
@@ -162,18 +170,22 @@ class ClusterNetworkDisplay:
         )
 
       perf_interval_frames = max(1, int(getattr(self.config, "status_interval_frames", self.config.fps * 10)))
-      if self._perf_frames >= perf_interval_frames:
+      if self._perf_frames >= perf_interval_frames or now - self._perf_started >= 10.0:
         perf_elapsed = max(now - self._perf_started, 1e-6)
         flog(
           f"[CLUSTER_NETWORK_PERF] fps={self._perf_frames / perf_elapsed:.2f} | "
           + f"size_avg={self._perf_size_kb / self._perf_frames:.1f}KB | "
           + f"prep_avg={self._perf_prepare_time * 1000 / self._perf_frames:.1f}ms | "
-          + f"network_avg={self._perf_network_time * 1000 / self._perf_frames:.1f}ms",
+          + f"network_avg={self._perf_network_time * 1000 / self._perf_frames:.1f}ms | "
+          + f"send_avg={self._perf_send_time * 1000 / self._perf_frames:.1f}ms | "
+          + f"ack_wait_avg={self._perf_ack_wait_time * 1000 / self._perf_frames:.1f}ms",
         )
         self._perf_started = now
         self._perf_frames = 0
         self._perf_prepare_time = 0.0
         self._perf_network_time = 0.0
+        self._perf_send_time = 0.0
+        self._perf_ack_wait_time = 0.0
         self._perf_size_kb = 0
 
       return True

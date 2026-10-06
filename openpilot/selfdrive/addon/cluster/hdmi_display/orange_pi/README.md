@@ -398,6 +398,30 @@ sudo bash /opt/cluster-receiver/scripts/service.sh status
 
 PC 창 모드 점검에서는 `requirements.txt`를 PC 가상 환경에 설치하고 Python 수신기를 직접 실행합니다. PC pip 설치와 Orange Pi OS pygame 설치는 별개입니다.
 
+## 프레임 성능 확인
+
+현재 C4 클러스터는 카메라와 모델의 20 Hz 업데이트에 맞춰 렌더링합니다. HDMI의 60 Hz 주사율과 새 영상의 FPS는 별개이며, `fps` 설정만 60으로 올리면 카메라 영상이 반복될 수 있습니다.
+
+C4는 한 프레임을 보내고 Pi의 화면 출력 완료 ACK를 받은 다음 프레임을 보냅니다. 따라서 C4 로그의 `network_avg`는 Wi-Fi 전송뿐 아니라 Pi의 JPEG 디코딩·회전·화면 출력과 ACK 왕복 시간을 포함합니다. JPEG 크기/FPS로 계산한 처리량도 Wi-Fi 링크 속도를 직접 측정한 값은 아닙니다.
+
+수정된 수신기를 C4의 `bash scripts/pi_update.sh`로 반영하고 C4 클러스터도 다시 시작합니다. 성능 로그는 다음과 같이 비교합니다.
+
+| 로그 | 항목과 의미 |
+| --- | --- |
+| C4 `[CLUSTER_NETWORK_PERF]` | `prep_avg`: JPEG 준비, `send_avg`: 두 `sendall` 호출, `ack_wait_avg`: 전송 호출 종료부터 표시 완료 ACK까지. 전송 로그는 정상 ACK가 있는 동안 약 10초마다 기록합니다. |
+| C4 `[CLUSTER_MAIN_PERF]` | `camera_copy_avg`: 영상 복사, `snapshot_avg`: 모델/HUD 상태 조회와 잠금 대기, `path_avg`: 경로·차선·리드 표시, `hud_avg`: PIL 변환과 HUD 합성. |
+| Pi `[CLUSTER_RX_PERF]` | `header_wait_avg`: 다음 프레임 헤더 대기, `receive_avg`: JPEG 본문 수신, `display_avg`: 전체 화면 처리, `ack_send_avg`: ACK 전송 호출. `display_avg` 안의 `decode_avg`(화면 포맷 변환 포함)·`rotate_avg`·`scale_avg`·`blit_avg`·`flip_avg`를 따로 기록합니다. |
+
+`send_avg`가 짧아도 커널 송신 버퍼에 들어간 JPEG가 아직 전송 중일 수 있습니다. `ack_wait_avg`만으로 Wi-Fi 병목을 판정하지 않고 Pi의 `receive_avg`와 표시 단계 시간을 함께 봅니다. `header_wait_avg`에는 C4가 다음 프레임을 준비하는 시간도 포함됩니다. 송수신·인코딩 스레드는 겹쳐 동작하므로 모든 단계 시간을 더해서 FPS를 계산하지 않습니다.
+
+Pi 로그는 다음으로 확인합니다.
+
+```bash
+journalctl -u cluster-hdmi.service -b --no-pager | grep CLUSTER_RX_PERF
+```
+
+C4 heartbeat의 `Dropped: encoded`는 전송 중이거나 연결되지 않았을 때 대기 프레임을 최신 프레임으로 교체한 횟수입니다. TCP 패킷 손실 횟수가 아닙니다.
+
 ## 장비 확인 순서
 
 1. HDMI 영상이 가로 설치 방향에 맞고 잘리거나 늘어나지 않는지 확인합니다.
