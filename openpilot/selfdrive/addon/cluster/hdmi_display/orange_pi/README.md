@@ -78,6 +78,7 @@ C4 대시보드의 **Toggles → Cluster Enable** 아래에 `Orange Pi 연결됨
 | [service.sh](scripts/service.sh) | 자동 실행 설치·차량 Wi-Fi 부팅 설정·재시작·중지·상태 확인·로그 보기·데스크톱 복구 |
 | [deploy.sh](scripts/deploy.sh) | C4에서 연결된 Pi IP 자동 확인, SSH/SCP로 파일 전송·적용 또는 이전 버전 복구 |
 | [update.sh](scripts/update.sh) | Pi에서 전송 파일 검증·백업·교체·실행 확인·실패 시 복구 |
+| [ssh_port.sh](scripts/ssh_port.sh) | Pi SSH의 22번 포트를 9122번으로 변경·검증, 실패 시 SSH 설정 복구 |
 
 ## 설치 및 Wi-Fi
 
@@ -327,7 +328,19 @@ Pi가 클러스터에 연결되지 않은 경우에는 주소를 직접 지정�
 bash scripts/pi_update.sh ORANGE_PI_IP
 ```
 
-기본 Pi SSH 계정은 현재 장비에서 사용 중인 **`root`**, 포트는 **`22`**, 비밀번호는 **`orangepi`**입니다. SSH 비밀번호는 자동 입력하며, 처음 접속하는 Pi의 호스트 키도 `StrictHostKeyChecking=accept-new`로 자동 등록합니다. 기존에 저장된 키가 달라지면 접속은 중단됩니다. [OpenSSH 호스트 키 확인](https://man.openbsd.org/ssh_config.5#StrictHostKeyChecking)
+기본 Pi SSH 계정은 현재 장비에서 사용 중인 **`root`**, 우선 접속 포트는 **`9122`**, 비밀번호는 **`orangepi`**입니다. 9122번의 연결 거부·시간 초과 등 연결 실패일 때만 **`22`**번을 시도합니다. 비밀번호·호스트 키 오류에는 포트를 바꾸지 않고 중단합니다. SSH 비밀번호는 자동 입력하며, 처음 접속하는 Pi의 호스트 키도 `StrictHostKeyChecking=accept-new`로 자동 등록합니다. 기존에 저장된 키가 달라지면 접속은 중단됩니다. [OpenSSH 호스트 키 확인](https://man.openbsd.org/ssh_config.5#StrictHostKeyChecking)
+
+**22번으로 접속한 일반 업데이트가 성공하면** 새로 설치한 `scripts/ssh_port.sh`를 실행해 Pi SSH 포트를 **9122번으로 변경**합니다. 이후 22번 포트를 검색하는 SSH 접속 앱이 Pi를 대상으로 잡지 않도록, 변경 완료 시 9122번의 수신 대기와 22번의 종료를 확인합니다. 다음 Pi SSH 접속에는 9122번을 지정합니다. `--dry-run`은 접속·포트 변경을 수행하지 않으며, `--rollback`은 수신기 파일 복구만 수행합니다.
+
+포트 변경만 따로 실행하려면 Pi SSH 터미널에서 다음을 사용합니다.
+
+```bash
+sudo bash /opt/cluster-receiver/scripts/ssh_port.sh
+```
+
+이 명령은 `/etc/ssh/sshd_config`와 `sshd_config.d/*.conf`의 22번 포트 설정을 바꾸며 다른 SSH 포트는 유지합니다. 변경 전 설정은 `/var/lib/cluster-receiver/ssh-port/<시각.식별자>`에 보관하고 `sshd -t`로 검증합니다. 기본 포트가 주석으로만 있는 경우 전역 `Port 9122`를 추가합니다. 이미 9122번 또는 다른 포트만 사용하는 설정은 그대로 둡니다. [OpenSSH Port·Include 설정](https://man.openbsd.org/sshd_config.5#Port), [sshd 설정 검증](https://man.openbsd.org/sshd.8#t)
+
+`ssh.socket` 또는 `sshd.socket`이 활성 상태이면 socket의 `ListenStream`도 실제 SSH 설정에 맞춰 변경합니다. 설정 적용이나 실제 포트 확인이 실패하면 이전 SSH 설정을 복구하고 오류를 반환합니다. 수신기 업데이트 후 포트 변경만 실패한 경우, 수신기 파일은 이미 새 버전입니다. [Ubuntu SSH socket activation](https://discourse.ubuntu.com/t/sshd-now-uses-socket-based-activation-ubuntu-22-10-and-later/30189)
 
 별도 `sshpass` 설치 없이 임시 `SSH_ASKPASS` 도우미와 `setsid`로 처음 한 번 인증한 후 SSH 연결을 재사용합니다. 도우미 파일에 비밀번호를 쓰거나 SSH 명령 인자로 전달하지 않으며, 임시 도우미는 실행 종료 시 정리합니다. 비밀번호가 틀리거나 인증된 연결이 끊기면 입력 대기 없이 오류로 종료합니다. [OpenSSH SSH_ASKPASS](https://man.openbsd.org/ssh.1#ENVIRONMENT), [SSH 연결 재사용](https://man.openbsd.org/ssh_config.5#ControlMaster)
 
@@ -337,7 +350,7 @@ bash scripts/pi_update.sh ORANGE_PI_IP
 bash scripts/pi_update.sh --ask-password
 ```
 
-다른 계정이면 `--user orangepi`, 다른 포트면 `--port 2222`를 추가합니다. 일반 계정에는 Pi의 `sudo` 권한이 필요하며 적용 단계의 sudo 비밀번호는 직접 입력합니다. 키 인증은 **C4에 있는 키 파일**을 `--identity /path/to/id_ed25519`로 지정합니다. 암호가 있는 개인키의 암호를 직접 입력하려면 `--ask-password`를 함께 지정합니다. [OpenSSH SSH 옵션](https://man.openbsd.org/ssh.1), [SCP 옵션](https://man.openbsd.org/scp.1)
+다른 계정이면 `--user orangepi`, 다른 포트면 `--port 2222`를 추가합니다. `--port`를 지정하면 그 포트만 사용하고 자동 재시도는 하지 않습니다. `--port 22`로 실행한 일반 업데이트에도 9122번 변경이 적용됩니다. 일반 계정에는 Pi의 `sudo` 권한이 필요하며 적용 단계의 sudo 비밀번호는 직접 입력합니다. 키 인증은 **C4에 있는 키 파일**을 `--identity /path/to/id_ed25519`로 지정합니다. 암호가 있는 개인키의 암호를 직접 입력하려면 `--ask-password`를 함께 지정합니다. [OpenSSH SSH 옵션](https://man.openbsd.org/ssh.1), [SCP 옵션](https://man.openbsd.org/scp.1)
 
 전송할 파일 목록만 확인하려면 다음을 사용합니다. SSH에 접속하지 않습니다.
 

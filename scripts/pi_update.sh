@@ -12,13 +12,14 @@ Run on C4; upload this checkout's receiver files to the Orange Pi.
 Omit PI_HOST to use the currently connected Orange Pi address.
   --host PI_HOST       Explicit Orange Pi IP, hostname or SSH alias
   --user USER          Pi SSH account (default: root; other accounts need sudo)
-  --port PORT          Pi SSH port (default: 22)
+  --port PORT          Use this SSH port only (default: 9122, then 22 if unavailable)
   --identity FILE      SSH private key on C4
   --ask-password       Enter the SSH password manually instead of using orangepi
   --rollback           Restore the previous receiver version without uploading
   --dry-run            Print the target and file list without using SSH
   -h, --help           Show this help
 Password override: set CLUSTER_PI_PASSWORD in the environment.
+An update over port 22 also migrates the Pi SSH listener to port 9122.
 HELP
   exit 0
 fi

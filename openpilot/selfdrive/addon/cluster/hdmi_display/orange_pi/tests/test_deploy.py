@@ -37,9 +37,21 @@ def deploy_sandbox(tmp_path):
     "ssh": '''printf 'tool=ssh\n' >> "$MOCK_SSH_LOG"
 printf 'arg=%s\n' "$@" >> "$MOCK_SSH_LOG"
 command=${!#}
+port=0
+arguments=("$@")
+for (( i=0; i < $# - 1; i++ )); do
+  [[ ${arguments[i]} != -p ]] || port=${arguments[i+1]}
+done
 case "$command" in
   true)
+    if [[ $port == 9122 && -n ${MOCK_PORT_9122_ERROR:-} ]]; then
+      printf '%s\n' "$MOCK_PORT_9122_ERROR" >&2
+      exit 255
+    fi
+    [[ $port != 22 || ${MOCK_PORT_22_ERROR:-} != 1 ]] || exit 255
     [[ ${MOCK_AUTH_ERROR:-} != 1 ]] || exit 255
+    # Interactive mode authenticates once too, without the automatic helper.
+    [[ ${SSH_ASKPASS_REQUIRE:-} == force ]] || exit 0
     [[ ${SSH_ASKPASS_REQUIRE:-} == force && -n ${DISPLAY:-} && -x ${SSH_ASKPASS:-} ]] || exit 254
     password=$("$SSH_ASKPASS" "root@pi's password:") || exit 253
     [[ "$password" == "${MOCK_EXPECTED_PASSWORD-orangepi}" ]] || exit 252
@@ -55,6 +67,9 @@ case "$command" in
   *' apply '*|*' rollback;'*)
     [[ ${MOCK_APPLY_ERROR:-} != 1 ]] || exit 7
     printf 'Receiver apply complete\n';;
+  *'/scripts/ssh_port.sh;'*)
+    [[ ${MOCK_SSH_PORT_ERROR:-} != 1 ]] || exit 6
+    printf 'Orange Pi SSH port changed: 22 -> 9122.\n';;
   'rm -rf '*) [[ ${MOCK_CLEANUP_ERROR:-} != 1 ]] || exit 9;;
 esac
 ''',
@@ -133,8 +148,9 @@ def test_c4_uses_current_peer_ip_without_a_manual_address(deploy_sandbox):
   network_status.write_network_status("192.168.0.90", deploy_sandbox.parents[1] / "connection.json")
   result = _deploy(deploy_sandbox)
   assert result.returncode == 0, result.stderr
-  assert "root@192.168.0.90:22" in result.stdout
+  assert "root@192.168.0.90:9122" in result.stdout
   assert all("192.168.0.90" in args for tool, args in _calls(deploy_sandbox) if tool == "ssh")
+  assert all(args[args.index("-p") + 1] == "9122" for tool, args in _calls(deploy_sandbox) if tool == "ssh")
 
 
 def test_real_openssh_accepts_control_path_with_spaces(deploy_sandbox):
@@ -181,13 +197,96 @@ def test_authentication_failure_stops_before_upload_and_removes_the_helper(deplo
 
 
 def test_manual_password_mode_uses_the_original_interactive_connection(deploy_sandbox):
-  result = _deploy(deploy_sandbox, "192.168.0.84", "--ask-password", extra_env={"MOCK_AUTH_ERROR": "1"})
+  result = _deploy(deploy_sandbox, "192.168.0.84", "--ask-password")
   assert result.returncode == 0, result.stderr
   calls = _calls(deploy_sandbox)
-  assert calls[0][1][-1].startswith("mktemp")
-  assert not any(args[-1] == "true" for _, args in calls)
+  assert calls[0][1][-1] == "true"
+  assert sum(args[-1] == "true" for _, args in calls) == 1
   assert "StrictHostKeyChecking=accept-new" in calls[0][1]
+  assert all("BatchMode=yes" in args for _, args in calls[1:])
   assert any(tool == "scp" for tool, _ in calls)
+
+
+@pytest.mark.parametrize("error", [
+  "ssh: connect to host 192.168.0.84 port 9122: Connection refused",
+  "ssh: connect to host 192.168.0.84 port 9122: Connection timed out",
+  "ssh: connect to host 192.168.0.84 port 9122: No route to host",
+  "Connection to 192.168.0.84 port 9122 timed out",
+  "Connection reset by 192.168.0.84 port 9122",
+])
+@pytest.mark.parametrize("manual", [False, True])
+def test_unavailable_9122_falls_back_to_22_and_migrates_after_apply(deploy_sandbox, error, manual):
+  args = ("--ask-password",) if manual else ()
+  result = _deploy(deploy_sandbox, "192.168.0.84", *args, extra_env={"MOCK_PORT_9122_ERROR": error})
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert "SSH port 9122 is unavailable" in result.stdout
+  calls = _calls(deploy_sandbox)
+  authentication = [arguments for tool, arguments in calls if tool == "ssh" and arguments[-1] == "true"]
+  assert [arguments[arguments.index("-p") + 1] for arguments in authentication] == ["9122", "22"]
+  scp = next(arguments for tool, arguments in calls if tool == "scp")
+  assert scp[scp.index("-P") + 1] == "22"
+  apply_index = next(i for i, (tool, arguments) in enumerate(calls) if tool == "ssh" and " apply " in arguments[-1])
+  cleanup_index = next(i for i, (tool, arguments) in enumerate(calls) if tool == "ssh" and arguments[-1].startswith("rm -rf"))
+  migration_index = next(i for i, (tool, arguments) in enumerate(calls) if tool == "ssh" and "/scripts/ssh_port.sh;" in arguments[-1])
+  assert apply_index < cleanup_index < migration_index
+  assert not any(arguments[-1].startswith("rm -rf") for tool, arguments in calls[migration_index + 1:])
+  assert list((deploy_sandbox.parents[1] / "temporary files").iterdir()) == []
+
+
+@pytest.mark.parametrize("error", [
+  "root@192.168.0.84: Permission denied (publickey,password).",
+  "Host key verification failed.",
+  "WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!",
+  "Unable to negotiate with 192.168.0.84 port 9122: no matching host key type found.",
+  "ssh: connect to host jump-host port 22: Connection refused",
+])
+def test_reachable_9122_or_proxy_errors_do_not_try_port_22(deploy_sandbox, error):
+  result = _deploy(deploy_sandbox, "192.168.0.84", extra_env={"MOCK_PORT_9122_ERROR": error})
+  assert result.returncode == 255
+  calls = _calls(deploy_sandbox)
+  assert not any(tool == "scp" for tool, _arguments in calls)
+  assert all(arguments[arguments.index("-p") + 1] == "9122" for tool, arguments in calls if tool == "ssh")
+
+
+def test_explicit_port_disables_fallback(deploy_sandbox):
+  result = _deploy(deploy_sandbox, "192.168.0.84", "--port", "9122", extra_env={
+    "MOCK_PORT_9122_ERROR": "ssh: connect to host 192.168.0.84 port 9122: Connection refused",
+  })
+  assert result.returncode == 255
+  assert all(arguments[arguments.index("-p") + 1] == "9122" for tool, arguments in _calls(deploy_sandbox) if tool == "ssh")
+
+
+def test_failed_22_authentication_stops_before_upload(deploy_sandbox):
+  result = _deploy(deploy_sandbox, "192.168.0.84", extra_env={
+    "MOCK_PORT_9122_ERROR": "ssh: connect to host 192.168.0.84 port 9122: Connection refused", "MOCK_PORT_22_ERROR": "1",
+  })
+  assert result.returncode == 255
+  assert not any(tool == "scp" for tool, _arguments in _calls(deploy_sandbox))
+
+
+def test_explicit_22_update_also_migrates_ssh(deploy_sandbox):
+  result = _deploy(deploy_sandbox, "192.168.0.84", "--port", "22")
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert any("/scripts/ssh_port.sh;" in arguments[-1] for tool, arguments in _calls(deploy_sandbox) if tool == "ssh")
+
+
+def test_ssh_port_migration_failure_is_reported_after_successful_update(deploy_sandbox):
+  result = _deploy(deploy_sandbox, "192.168.0.84", "--port", "22", extra_env={"MOCK_SSH_PORT_ERROR": "1"})
+  assert result.returncode == 6
+  assert "Receiver apply complete" in result.stdout
+  assert any("/scripts/ssh_port.sh;" in arguments[-1] for tool, arguments in _calls(deploy_sandbox) if tool == "ssh")
+
+
+def test_9122_update_does_not_change_ssh_configuration(deploy_sandbox):
+  result = _deploy(deploy_sandbox, "192.168.0.84")
+  assert result.returncode == 0, result.stderr
+  assert not any("/scripts/ssh_port.sh;" in arguments[-1] for tool, arguments in _calls(deploy_sandbox) if tool == "ssh")
+
+
+def test_failed_update_on_22_does_not_change_ssh_configuration(deploy_sandbox):
+  result = _deploy(deploy_sandbox, "192.168.0.84", "--port", "22", extra_env={"MOCK_APPLY_ERROR": "1"})
+  assert result.returncode == 7
+  assert not any("/scripts/ssh_port.sh;" in arguments[-1] for tool, arguments in _calls(deploy_sandbox) if tool == "ssh")
 
 
 def test_no_connection_requires_an_explicit_pi_address(deploy_sandbox):

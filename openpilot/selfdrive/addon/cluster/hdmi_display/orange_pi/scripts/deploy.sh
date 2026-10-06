@@ -5,7 +5,8 @@ umask 077
 PACKAGE_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 pi_host=''
 ssh_user=root
-ssh_port=22
+ssh_port=9122
+port_explicit=0
 identity=''
 ask_password=0
 rollback=0
@@ -21,13 +22,14 @@ Run on C4; upload this C4 checkout's receiver files to the Orange Pi.
 Omit PI_HOST to use the currently connected Orange Pi address.
   --host PI_HOST       Explicit Orange Pi IP, hostname or SSH alias
   --user USER          Pi SSH account (default: root; other accounts need sudo)
-  --port PORT          Pi SSH port (default: 22)
+  --port PORT          Use this SSH port only (default: 9122, then 22 if unavailable)
   --identity FILE      SSH private key on C4
   --ask-password       Enter the SSH password manually instead of using orangepi
   --rollback           Restore the previous receiver version without uploading
   --dry-run            Print the target and file list without using SSH
   -h, --help           Show this help
 Password override: set CLUSTER_PI_PASSWORD in the environment.
+An update over port 22 also migrates the Pi SSH listener to port 9122.
 HELP
 }
 while (( $# )); do
@@ -37,7 +39,7 @@ while (( $# )); do
       case "$1" in
         --host) [[ -z "$pi_host" ]] || fail 'Specify only one Pi host.'; pi_host=$2;;
         --user) ssh_user=$2;;
-        --port) ssh_port=$2;;
+        --port) ssh_port=$2; port_explicit=1;;
         --identity) identity=$2;;
       esac
       shift 2;;
@@ -76,7 +78,7 @@ if (( ! rollback )); then
     [[ "$relative" =~ ^([a-zA-Z0-9_]+\.py|README\.md|requirements\.txt|cluster-hdmi\.service|scripts/[a-zA-Z0-9_-]+\.sh)$ ]] || fail "Unexpected package filename: $relative"
     [[ -f "$PACKAGE_DIR/$relative" && ! -L "$PACKAGE_DIR/$relative" ]] || fail "Missing or symlink package file: $relative"
   done
-  for required in cluster_receiver.py hdmi_display.py scripts/common.sh scripts/update.sh; do
+  for required in cluster_receiver.py hdmi_display.py scripts/common.sh scripts/update.sh scripts/ssh_port.sh; do
     [[ " ${files[*]} " == *" $required "* ]] || fail "Package is missing $required."
   done
   printf 'Update %s@%s:%s with %s receiver files from C4.\n' "$ssh_user" "$pi_host" "$ssh_port" "${#files[@]}"
@@ -103,15 +105,22 @@ control_path=${control_path//%/%%}
 options=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3
          -o ControlMaster=auto -o ControlPersist=60 -o "ControlPath=\"$control_path\"")
 if [[ -n "$identity" ]]; then options+=(-i "$identity"); fi
-ssh_options=(-p "$ssh_port" -l "$ssh_user" "${options[@]}")
-scp_options=(-P "$ssh_port" "${options[@]}")
+set_port_options() {
+  ssh_options=(-p "$ssh_port" -l "$ssh_user" "${options[@]}")
+  scp_options=(-P "$ssh_port" "${options[@]}")
+}
+set_port_options
+cleanup_remote() {
+  if [[ "$remote_directory" =~ ^/tmp/cluster-update\.[a-zA-Z0-9]{8}$ ]]; then
+    ssh "${ssh_options[@]}" -o BatchMode=yes "$pi_host" "rm -rf -- '$remote_directory'" || printf 'Remote staging cleanup failed: %s\n' "$remote_directory" >&2
+  fi
+  remote_directory=''
+}
 cleanup() {
   local result=$?
   trap - EXIT
   set +e
-  if [[ "$remote_directory" =~ ^/tmp/cluster-update\.[a-zA-Z0-9]{8}$ ]]; then
-    ssh "${ssh_options[@]}" -o BatchMode=yes "$pi_host" "rm -rf -- '$remote_directory'" || printf 'Remote staging cleanup failed: %s\n' "$remote_directory" >&2
-  fi
+  cleanup_remote
   ssh "${ssh_options[@]}" -o BatchMode=yes -O exit "$pi_host" >/dev/null 2>&1
   if [[ "$local_directory" == "$temp_parent"/cluster-deploy.* && "${local_directory##*/}" =~ ^cluster-deploy\.[a-zA-Z0-9]{8}$ ]]; then
     rm -rf -- "$local_directory"
@@ -136,13 +145,36 @@ ASKPASS
   # Detach only authentication from the terminal for older OpenSSH releases.
   # Subsequent commands keep stdin so a non-root Pi account can still use sudo.
   # The helper reads the password from the environment, never a command argument.
-  CLUSTER_PI_PASSWORD=${CLUSTER_PI_PASSWORD-orangepi} SSH_ASKPASS="$askpass" \
-    SSH_ASKPASS_REQUIRE=force DISPLAY=${DISPLAY:-:0} \
-    setsid --wait ssh "${ssh_options[@]}" -o BatchMode=no -o NumberOfPasswordPrompts=1 -n "$pi_host" true
-  # Reuse the authenticated master; if it is lost, fail without a new prompt.
-  ssh_options+=(-o BatchMode=yes)
-  scp_options+=(-o BatchMode=yes)
 fi
+authenticate() {
+  if (( ask_password )); then
+    LC_ALL=C ssh "${ssh_options[@]}" -o BatchMode=no -o NumberOfPasswordPrompts=1 -n "$pi_host" true
+  else
+    CLUSTER_PI_PASSWORD=${CLUSTER_PI_PASSWORD-orangepi} SSH_ASKPASS="$askpass" \
+      SSH_ASKPASS_REQUIRE=force DISPLAY=${DISPLAY:-:0} LC_ALL=C \
+      setsid --wait ssh "${ssh_options[@]}" -o BatchMode=no -o NumberOfPasswordPrompts=1 -n "$pi_host" true
+  fi
+}
+ssh_error="$local_directory/ssh-error"
+if authenticate 2> "$ssh_error"; then
+  cat -- "$ssh_error" >&2
+else
+  result=$?
+  cat -- "$ssh_error" >&2
+  # An authentication/host-key failure means 9122 is reachable. Retry only
+  # transport failures for that port, including a stalled SSH banner exchange.
+  if (( port_explicit || result != 255 )) || ! grep -Eq \
+    '^ssh: connect to host .* port 9122: (Connection refused|Connection timed out|Operation timed out|No route to host|Network is unreachable)|^Connection to .* port 9122 timed out$|^Connection (closed|reset) by .* port 9122$' "$ssh_error"; then
+    exit "$result"
+  fi
+  printf 'SSH port 9122 is unavailable; retrying %s@%s:22.\n' "$ssh_user" "$pi_host"
+  ssh_port=22
+  set_port_options
+  authenticate
+fi
+# Reuse the authenticated master; if it is lost, fail without a new prompt.
+ssh_options+=(-o BatchMode=yes)
+scp_options+=(-o BatchMode=yes)
 
 if (( rollback )); then
   ssh "${ssh_options[@]}" -tt "$pi_host" 'if [ $(id -u) -eq 0 ]; then bash /var/lib/cluster-receiver/updates/update.sh rollback; else sudo bash /var/lib/cluster-receiver/updates/update.sh rollback; fi'
@@ -164,3 +196,9 @@ scp_host=$pi_host
 if [[ "$scp_host" == *:* ]]; then scp_host="[$scp_host]"; fi
 (cd -- "$local_directory" && scp "${scp_options[@]}" -r payload "$ssh_user@$scp_host:$remote_directory/")
 ssh "${ssh_options[@]}" -tt "$pi_host" "if [ \$(id -u) -eq 0 ]; then bash '$remote_directory/payload/scripts/update.sh' apply '$remote_directory/payload'; else sudo bash '$remote_directory/payload/scripts/update.sh' apply '$remote_directory/payload'; fi"
+if (( ssh_port == 22 )); then
+  # Finish staging cleanup before changing the listener. The existing SSH
+  # session can then complete without opening another connection to port 22.
+  cleanup_remote
+  ssh "${ssh_options[@]}" -tt "$pi_host" 'if [ $(id -u) -eq 0 ]; then bash /opt/cluster-receiver/scripts/ssh_port.sh; else sudo bash /opt/cluster-receiver/scripts/ssh_port.sh; fi'
+fi
