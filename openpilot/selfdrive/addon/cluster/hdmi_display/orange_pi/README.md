@@ -70,7 +70,7 @@ C4 대시보드의 **Toggles → Cluster Enable** 아래에 `Orange Pi 연결됨
 | --- | --- |
 | [install.sh](scripts/install.sh) | OS pygame·필수 라이브러리 설치, `/opt/cluster-receiver`로 패키지 복사 |
 | [connect_wifi.sh](scripts/connect_wifi.sh) | 핫스팟 연결 및 IP 확인; 비밀번호는 대화형 입력 |
-| [ensure_wifi.sh](scripts/ensure_wifi.sh) | 차량 `Android` 프로필 저장·재사용, 로그인 없이 자동 연결 설정 |
+| [ensure_wifi.sh](scripts/ensure_wifi.sh) | 차량 `Android` 프로필 저장·재사용, 자동 연결·Wi-Fi 절전 해제 |
 | [run_console.sh](scripts/run_console.sh) | 데스크톱·수신기 중지, 연결된 HDMI 카드 선택, KMSDRM + GLES2 실행 |
 | [diagnose.sh](scripts/diagnose.sh) | OS·SDL·DRM·서비스 진단 파일 저장; 선택적으로 GBM/EGL 점검 |
 | [run_desktop.sh](scripts/run_desktop.sh) | 로그인한 X11 데스크톱에서 소프트웨어 화면 출력 |
@@ -99,6 +99,14 @@ pip wheel의 SDL은 시스템 SDL과 빌드 기능이 다를 수 있습니다. `
 비밀번호와 `psk-flags=0`, 로그인 사용자 제한 해제를 시스템 프로필에 저장하므로 데스크톱 로그인이나 비밀번호 입력 없이 사용할 수 있습니다. 재사용 시에도 차량용 비밀번호와 자동 연결 옵션을 반영하며 기존 프로필의 IP 등 다른 설정은 유지합니다. 새 프로필은 DHCP를 사용합니다. 비밀번호를 실행 로그에 출력하지 않습니다.
 
 자동 연결을 켜고 우선순위를 `100`, 재시도 횟수를 `0`으로 지정합니다. `0`은 계속 재시도하는 설정입니다. 핫스팟이 꺼져 있어도 프로필을 먼저 저장할 수 있으며, 핫스팟이 나중에 켜지면 NetworkManager가 연결을 시도합니다. 현재 활성 연결을 강제로 바꾸는 명령은 실행하지 않습니다. [NetworkManager 자동 연결 설정](https://networkmanager.dev/docs/api/latest/settings-connection.html)
+
+프레임 송수신 지연을 줄이기 위해 차량 프로필에 `802-11-wireless.powersave=2`(절전 해제)를 저장합니다. `iw`가 있으면 현재 인터페이스에도 `iw dev wlan0 set power_save off`를 적용하며 재접속을 강제하지 않습니다. 드라이버가 현재 설정 변경을 지원하지 않으면 경고를 남기고 계속 진행합니다. `install.sh`에는 `iw` 설치가 포함됩니다. 기존 장비에서 파일만 업데이트했다면 Pi에서 아래 명령으로 현재 연결에도 적용할 수 있습니다. 실제 절전 상태와 신호·링크 속도는 `diagnose.sh`에 기록합니다. [NetworkManager powersave 설정](https://networkmanager.pages.freedesktop.org/NetworkManager/NetworkManager/nm-settings-nmcli.html), [iw 사용법](https://wireless.docs.kernel.org/en/latest/en/users/documentation/iw.html)
+
+```bash
+sudo apt-get install -y iw
+sudo bash /opt/cluster-receiver/scripts/ensure_wifi.sh wlan0
+iw dev wlan0 get power_save
+```
 
 **이미 서비스가 설치된 Pi**에는 아래의 **C4에서 SSH로 수동 업데이트** 방법으로 새 파일을 반영한 뒤, Pi SSH 터미널에서 다음을 한 번 실행합니다. 기존 수신기 unit과 계정·화면 옵션·부팅 대상은 유지합니다.
 
@@ -415,17 +423,21 @@ PC 창 모드 점검에서는 `requirements.txt`를 PC 가상 환경에 설치�
 
 현재 C4 클러스터는 카메라와 모델의 20 Hz 업데이트에 맞춰 렌더링합니다. HDMI의 60 Hz 주사율과 새 영상의 FPS는 별개이며, `fps` 설정만 60으로 올리면 카메라 영상이 반복될 수 있습니다.
 
-C4는 한 프레임을 보내고 Pi의 화면 출력 완료 ACK를 받은 다음 프레임을 보냅니다. 따라서 C4 로그의 `network_avg`는 Wi-Fi 전송뿐 아니라 Pi의 JPEG 디코딩·회전·화면 출력과 ACK 왕복 시간을 포함합니다. JPEG 크기/FPS로 계산한 처리량도 Wi-Fi 링크 속도를 직접 측정한 값은 아닙니다.
+C4와 Pi가 모두 새 버전이면 첫 프레임의 헤더와 ACK에 있는 예약 바이트로 스트리밍 지원을 확인합니다. 첫 프레임은 화면 출력 완료를 기다리고, 이후에는 Pi가 JPEG 본문을 받은 즉시 ACK를 보냅니다. C4는 기본 최대 3장의 ACK를 기다리는 동안 다음 프레임을 보낼 수 있습니다. Pi는 별도 스레드로 수신하고 대기 JPEG 한 장만 유지하며, 출력이 늦어지면 대기 영상을 최신 영상으로 교체합니다. SDL 이벤트와 화면 출력은 수신기 메인 스레드에서 처리합니다. [SDL 화면 출력의 스레드 제약](https://wiki.libsdl.org/SDL2/SDL_RenderPresent)
 
-수정된 수신기를 C4의 `bash scripts/pi_update.sh`로 반영하고 C4 클러스터도 다시 시작합니다. 성능 로그는 다음과 같이 비교합니다.
+패킷 크기와 버전은 유지하므로 한쪽만 업데이트한 경우 기존의 화면 출력 완료 ACK 방식(`legacy`)을 사용합니다. 이 방식의 `network_avg`에는 Wi-Fi 전송뿐 아니라 Pi의 JPEG 디코딩·회전·화면 출력과 ACK 왕복 시간이 포함됩니다. 스트리밍 방식(`stream`)의 ACK는 수신 확인이며 실제 화면 출력 완료를 뜻하지 않습니다. JPEG 크기/FPS로 계산한 처리량도 Wi-Fi 링크 속도를 직접 측정한 값은 아닙니다.
+
+수정된 수신기를 C4의 `bash scripts/pi_update.sh`로 반영하고 C4 클러스터도 다시 시작합니다. C4의 `[CLUSTER_NETWORK_MODE] stream`과 Pi의 `[CLUSTER_RX_MODE] stream`을 확인합니다. `legacy`이면 양쪽 파일 업데이트와 실행 중인 프로세스 재시작 여부를 확인합니다. 성능 로그는 다음과 같이 비교합니다.
 
 | 로그 | 항목과 의미 |
 | --- | --- |
-| C4 `[CLUSTER_NETWORK_PERF]` | `prep_avg`: JPEG 준비, `send_avg`: 두 `sendall` 호출, `ack_wait_avg`: 전송 호출 종료부터 표시 완료 ACK까지. 전송 로그는 정상 ACK가 있는 동안 약 10초마다 기록합니다. |
+| C4 `[CLUSTER_NETWORK_PERF]` | `fps`: 정상 ACK를 받은 프레임 수, `prep_avg`: JPEG 준비, `send_avg`: 두 `sendall` 호출, `ack_wait_avg`: 전송 호출 종료부터 ACK까지. `mode=stream`, `ack=receive`이면 수신 확인이고 `mode=legacy`, `ack=display`이면 출력 완료 확인입니다. 정상 ACK가 있는 동안 약 10초마다 기록합니다. |
 | C4 `[CLUSTER_MAIN_PERF]` | `camera_copy_avg`: 영상 복사, `snapshot_avg`: 모델/HUD 상태 조회와 잠금 대기, `path_avg`: 경로·차선·리드 표시, `hud_avg`: PIL 변환과 HUD 합성. |
-| Pi `[CLUSTER_RX_PERF]` | `header_wait_avg`: 다음 프레임 헤더 대기, `receive_avg`: JPEG 본문 수신, `display_avg`: 전체 화면 처리, `ack_send_avg`: ACK 전송 호출. `display_avg` 안의 `decode_avg`(화면 포맷 변환 포함)·`rotate_avg`·`scale_avg`·`blit_avg`·`flip_avg`를 따로 기록합니다. |
+| Pi `[CLUSTER_RX_PERF]` | `mode=stream`일 때 `fps`: 수신 FPS, `display_fps`: 실제 출력 FPS, `dropped`: 대기 JPEG 교체 횟수입니다. `header_wait_avg`: 다음 헤더 대기, `receive_avg`: JPEG 본문 수신, `display_avg`: 전체 화면 처리, `ack_send_avg`: ACK 전송 호출입니다. 화면 처리 안의 `decode_avg`(화면 포맷 변환 포함)·`rotate_avg`·`scale_avg`·`blit_avg`·`flip_avg`도 기록합니다. |
 
-`send_avg`가 짧아도 커널 송신 버퍼에 들어간 JPEG가 아직 전송 중일 수 있습니다. `ack_wait_avg`만으로 Wi-Fi 병목을 판정하지 않고 Pi의 `receive_avg`와 표시 단계 시간을 함께 봅니다. `header_wait_avg`에는 C4가 다음 프레임을 준비하는 시간도 포함됩니다. 송수신·인코딩 스레드는 겹쳐 동작하므로 모든 단계 시간을 더해서 FPS를 계산하지 않습니다.
+`send_avg`가 짧아도 커널 송신 버퍼에 들어간 JPEG가 아직 전송 중일 수 있습니다. `ack_wait_avg`만으로 Wi-Fi 병목을 판정하지 않고 Pi의 `receive_avg`와 표시 단계 시간을 함께 봅니다. `header_wait_avg`에는 C4가 다음 프레임을 준비하는 시간도 포함됩니다. 스트리밍 로그의 수신 단계 평균은 수신한 프레임 수, 표시 단계 평균은 실제 출력한 프레임 수로 계산합니다. 송수신·인코딩·화면 처리는 겹쳐 동작하므로 모든 단계 시간을 더해서 FPS를 계산하지 않습니다.
+
+수신 `fps`가 20에 가까워도 `display_fps`가 낮으면 Pi 화면 처리 병목이 남아 있는 것입니다. 수신 `fps`도 낮다면 JPEG 수신 시간과 Wi-Fi 상태를 확인합니다. 스트리밍 변경만으로 하드웨어의 출력 FPS가 보장되지는 않습니다.
 
 Pi 로그는 다음으로 확인합니다.
 
@@ -440,4 +452,4 @@ C4 heartbeat의 `Dropped: encoded`는 전송 중이거나 연결되지 않았을
 1. HDMI 영상이 가로 설치 방향에 맞고 잘리거나 늘어나지 않는지 확인합니다.
 2. `--log-touch`로 SDL 이벤트와 네 모서리 좌표를 확인합니다. 현재는 수신기 내부 이벤트까지 지원합니다.
 3. 정차 상태에서 Wi-Fi를 끊어 2초 이내에 마지막 운행 영상이 연결 대기 화면으로 바뀌고, 재연결하면 최신 화면으로 복구되는지 확인합니다.
-4. C4 `[CLUSTER_NETWORK_PERF]` 로그에서 FPS·전송 시간을 확인합니다. 목표는 20 FPS이며 실제 성능은 장비에서 확인해야 합니다.
+4. C4 `[CLUSTER_NETWORK_PERF]`의 모드·전송 시간과 Pi `[CLUSTER_RX_PERF]`의 `display_fps`를 함께 확인합니다. 목표는 실제 출력 20 FPS이며 장비에서 확인해야 합니다.

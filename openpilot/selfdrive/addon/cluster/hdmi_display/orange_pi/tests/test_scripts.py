@@ -33,6 +33,8 @@ run_receiver() {
     "id": "case ${1:-} in -u) printf '0\\n';; -gn) printf 'orangepi\\n';; *) exit 0;; esac",
     "nmcli": "printf 'nmcli argument=%s\\n' \"$@\"",
     "ip": "printf 'ip argument=%s\\n' \"$@\"",
+    "iw": '''printf '%s\\n' "$*" >> "${IW_CALL_LOG:-iw.log}"
+[[ ${MOCK_IW_ERROR:-} != 1 ]]''',
     "systemctl": '''printf '%s\\n' "$*" >> "$SYSTEMCTL_CALL_LOG"
 case "$1" in
   show) printf 'loaded\\n';;
@@ -295,13 +297,25 @@ def test_vehicle_wifi_is_saved_without_an_ap_and_repeated_setup_reuses_it(wifi_s
   uuid = "00000000-0000-0000-0000-000000000099"
   expected = {"ssid": "Android", "interface": "wlan0", "connection.autoconnect": "yes",
               "connection.autoconnect-priority": "100", "connection.autoconnect-retries": "0",
-              "connection.permissions": "", "wifi-sec.key-mgmt": "wpa-psk", "wifi-sec.psk": "12345678", "wifi-sec.psk-flags": "0"}
+              "connection.permissions": "", "802-11-wireless.powersave": "2",
+              "wifi-sec.key-mgmt": "wpa-psk", "wifi-sec.psk": "12345678", "wifi-sec.psk-flags": "0"}
   for key, value in expected.items():
     assert (state / f"{uuid}.{key}").read_text().rstrip("\n") == value
   log = (state.parent / "nmcli.log").read_text()
   assert log.count("connection add ") == 1
   assert log.count("connection modify ") == 1
   assert "connection up" not in log and "device wifi connect" not in log
+  assert (state.parent / "iw.log").read_text().splitlines() == ["dev wlan0 set power_save off"] * 2
+
+
+def test_wifi_power_save_driver_error_preserves_the_profile_without_disconnect(wifi_sandbox):
+  sandbox, state, env = wifi_sandbox
+  result = _run_script(sandbox, "ensure_wifi.sh", extra_env=dict(env, MOCK_IW_ERROR="1"))
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert "saved profile applies on reconnection" in result.stderr
+  uuid = "00000000-0000-0000-0000-000000000099"
+  assert (state / f"{uuid}.802-11-wireless.powersave").read_text() == "2\n"
+  assert "connection up" not in (state.parent / "nmcli.log").read_text()
 
 
 @pytest.mark.parametrize("interface", ["wlan0", "", "--"])

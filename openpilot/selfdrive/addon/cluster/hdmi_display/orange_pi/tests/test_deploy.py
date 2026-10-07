@@ -21,7 +21,7 @@ def deploy_sandbox(tmp_path):
   package = tmp_path / "checkout with spaces" / "orange_pi"
   scripts = package / "scripts"
   shutil.copytree(PACKAGE / "scripts", scripts)
-  for name, content in {"cluster_receiver.py": "# receiver\n", "hdmi_display.py": "# display\n",
+  for name, content in {"cluster_receiver.py": "# receiver\n", "hdmi_display.py": "# display\n", "frame_stream.py": "# stream\n",
                         "README.md": "연결 대기\r\n수신기\r\n", "requirements.txt": "pygame\n",
                         "cluster-hdmi.service": "[Service]\n"}.items():
     (package / name).write_bytes(content.encode("utf-8"))
@@ -131,7 +131,7 @@ def test_c4_update_packages_receiver_only_with_checksums_and_cleans_staging(depl
     assert hashlib.sha256(data).hexdigest() == digest
     assert b"\r\n" not in data
     assert not data.startswith(b"\xef\xbb\xbf")
-  assert files == {"README.md", "requirements.txt", "cluster-hdmi.service", "cluster_receiver.py", "hdmi_display.py",
+  assert files == {"README.md", "requirements.txt", "cluster-hdmi.service", "cluster_receiver.py", "hdmi_display.py", "frame_stream.py",
                    *("scripts/" + path.name for path in (deploy_sandbox / "scripts").glob("*.sh"))}
   assert (captured / "README.md").read_text(encoding="utf-8") == "연결 대기\n수신기\n"
   calls = _calls(deploy_sandbox)

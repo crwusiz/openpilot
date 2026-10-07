@@ -12,9 +12,17 @@ import threading
 import time
 
 try:
-  from .cluster_protocol import ACK_DISPLAY_ERROR, ACK_OK, FRAME_HEADER, pack_ack, recv_exact, unpack_frame_header
+  from .cluster_protocol import (
+    ACK_DISPLAY_ERROR, ACK_OK, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
+    pack_ack, recv_exact, unpack_frame_header_info,
+  )
+  from .frame_stream import ReceivedFrame, receive_stream_frames
 except ImportError:
-  from cluster_protocol import ACK_DISPLAY_ERROR, ACK_OK, FRAME_HEADER, pack_ack, recv_exact, unpack_frame_header
+  from cluster_protocol import (
+    ACK_DISPLAY_ERROR, ACK_OK, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
+    pack_ack, recv_exact, unpack_frame_header_info,
+  )
+  from frame_stream import ReceivedFrame, receive_stream_frames
 
 
 LOG = logging.getLogger("cluster_receiver")
@@ -141,14 +149,19 @@ def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=F
     # One deadline for the entire frame also bounds slow, partial deliveries.
     started = time.monotonic()
     deadline = started + frame_timeout
-    sequence, frame_size = unpack_frame_header(recv_exact(sock, FRAME_HEADER.size, deadline=deadline, poll_events=poll_events))
+    sequence, frame_size, flags = unpack_frame_header_info(recv_exact(sock, FRAME_HEADER.size, deadline=deadline, poll_events=poll_events))
     header_at = time.monotonic()
     jpeg = recv_exact(sock, frame_size, deadline=deadline, poll_events=poll_events)
     received_at = time.monotonic()
+    if flags & FRAME_STREAM:
+      remaining = None if max_frames is None else max_frames - received_frames
+      first_frame = ReceivedFrame(sequence, jpeg, started, header_at, received_at)
+      return received_frames + receive_stream_frames(sock, display, first_frame, frame_timeout, remaining)
     display_ok = display.send_jpeg(jpeg)
     displayed_at = time.monotonic()
     status = ACK_OK if display_ok else ACK_DISPLAY_ERROR
-    sock.sendall(pack_ack(sequence, status))
+    capabilities = ACK_STREAM_SUPPORTED if flags & FRAME_QUERY_STREAM else 0
+    sock.sendall(pack_ack(sequence, status, capabilities))
     acknowledged_at = time.monotonic()
     if not display_ok:
       _poll_display(display)

@@ -37,6 +37,7 @@ settings=(
   connection.autoconnect-priority 100
   connection.autoconnect-retries 0
   connection.permissions ''
+  802-11-wireless.powersave 2
   wifi-sec.key-mgmt wpa-psk
   wifi-sec.psk "$password"
   wifi-sec.psk-flags 0
@@ -53,6 +54,15 @@ else
   printf 'Vehicle Wi-Fi profile saved: SSID=%s, interface=%s.\n' "$ssid" "$interface"
 fi
 nmcli radio wifi on
+# Apply to the current interface too, without dropping the existing SSH link.
+# The saved profile also disables power saving on subsequent connections.
+if command -v iw >/dev/null; then
+  if iw dev "$interface" set power_save off; then
+    printf 'Wi-Fi power saving disabled on %s.\n' "$interface"
+  else
+    printf 'Cannot change live Wi-Fi power saving on %s; saved profile applies on reconnection.\n' "$interface" >&2
+  fi
+fi
 # NetworkManager autoconnects when the hotspot becomes available. Avoid "up"
 # here: it would wait for an AP and could replace the current SSH connection.
 printf 'Automatic connection enabled; waiting for the vehicle hotspot if unavailable.\n'

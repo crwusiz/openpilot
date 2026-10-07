@@ -1,12 +1,14 @@
 import ipaddress
 import socket
+import struct
 import threading
 import time
 
 import pytest
 
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_protocol import (
-  ACK_DISPLAY_ERROR, ACK_OK, ACK_PACKET, pack_ack as pack_c4_ack, pack_frame_header, recv_exact, unpack_ack,
+  ACK_DISPLAY_ERROR, ACK_OK, ACK_PACKET, ACK_STREAM_SUPPORTED, FRAME_QUERY_STREAM, FRAME_STREAM,
+  pack_ack as pack_c4_ack, pack_frame_header, recv_exact, unpack_ack, unpack_ack_info,
 )
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import cluster_receiver, hdmi_display
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.cluster_protocol import (
@@ -30,7 +32,7 @@ class FakeDisplay:
     return self.succeeds
 
 
-def _exchange_frame(display):
+def _exchange_frame(display, flags=0, ack_details=False):
   c4_sock, pi_sock = socket.socketpair()
   c4_sock.settimeout(1.0)
   pi_sock.settimeout(1.0)
@@ -49,8 +51,9 @@ def _exchange_frame(display):
   receiver.start()
   try:
     payload = b"jpeg-frame"
-    c4_sock.sendall(pack_frame_header(7, len(payload)) + payload)
-    ack = unpack_ack(recv_exact(c4_sock, ACK_PACKET.size))
+    c4_sock.sendall(pack_frame_header(7, len(payload), flags) + payload)
+    ack_data = recv_exact(c4_sock, ACK_PACKET.size)
+    ack = unpack_ack_info(ack_data) if ack_details else unpack_ack(ack_data)
     receiver.join(timeout=1.0)
     assert not receiver.is_alive()
     assert errors == ([] if display.succeeds else ["Unable to display cluster frame"])
@@ -65,10 +68,165 @@ def test_orange_pi_protocol_matches_c4_protocol():
   assert pack_orange_pi_ack(123, ACK_OK) == pack_c4_ack(123, ACK_OK)
 
 
+def test_capability_flags_preserve_the_legacy_packet_layout():
+  header = pack_frame_header(123, 456, FRAME_QUERY_STREAM)
+  assert len(header) == 16
+  assert struct.Struct("!4sB3xII").unpack(header) == (b"OPCF", 1, 123, 456)
+  ack = pack_orange_pi_ack(123, ACK_OK, ACK_STREAM_SUPPORTED)
+  assert len(ack) == 16
+  assert struct.Struct("!4sB3xIB3x").unpack(ack) == (b"OPCA", 1, 123, ACK_OK)
+  old_ack = struct.Struct("!4sB3xIB3x").pack(b"OPCA", 1, 123, ACK_OK)
+  assert unpack_ack_info(old_ack) == (123, ACK_OK, 0)
+
+
+class BlockingDisplay(FakeDisplay):
+  def __init__(self):
+    super().__init__()
+    self.started = threading.Event()
+    self.release = threading.Event()
+    self.owner = None
+    self.quit = False
+
+  def pump_events(self):
+    assert threading.get_ident() == self.owner, "SDL events must stay on the display thread"
+    return super().pump_events() and not self.quit
+
+  def send_jpeg(self, jpeg):
+    assert threading.get_ident() == self.owner, "SDL presentation must stay on the display thread"
+    self.frames.append(jpeg)
+    self.started.set()
+    assert self.release.wait(timeout=2.0)
+    return self.succeeds
+
+
+def _start_stream_receiver(display, max_frames=None, frame_timeout=1.0):
+  c4_sock, pi_sock = socket.socketpair()
+  c4_sock.settimeout(1.0)
+  pi_sock.settimeout(1.0)
+  result, errors = [], []
+
+  def receive():
+    display.owner = threading.get_ident()
+    try:
+      result.append(cluster_receiver.receive_frames(pi_sock, display, max_frames, frame_timeout))
+    except BaseException as e:
+      errors.append(e)
+    finally:
+      pi_sock.close()
+
+  thread = threading.Thread(target=receive, daemon=True)
+  thread.start()
+  return c4_sock, thread, result, errors
+
+
+def _send_stream(sock, sequence, payload):
+  sock.sendall(pack_frame_header(sequence, len(payload), FRAME_STREAM) + payload)
+  assert unpack_ack_info(recv_exact(sock, ACK_PACKET.size)) == (sequence, ACK_OK, ACK_STREAM_SUPPORTED)
+
+
+def test_stream_ack_and_next_receive_do_not_wait_for_blocked_display():
+  display = BlockingDisplay()
+  sock, thread, result, errors = _start_stream_receiver(display, max_frames=2)
+  try:
+    _send_stream(sock, 1, b"first")
+    assert display.started.wait(timeout=1.0)
+    # SDL remains blocked, but a second complete frame is already acknowledged.
+    _send_stream(sock, 2, b"second")
+    assert display.frames == [b"first"]
+    display.release.set()
+    thread.join(timeout=1.0)
+    assert not thread.is_alive()
+    assert not errors
+    assert result == [2]
+    assert display.frames == [b"first", b"second"]
+  finally:
+    display.release.set()
+    sock.close()
+    thread.join(timeout=1.0)
+
+
+def test_slow_display_skips_pending_frames_and_presents_the_latest():
+  display = BlockingDisplay()
+  sock, thread, result, errors = _start_stream_receiver(display, max_frames=3)
+  try:
+    _send_stream(sock, 1, b"first")
+    assert display.started.wait(timeout=1.0)
+    _send_stream(sock, 2, b"stale")
+    _send_stream(sock, 3, b"latest")
+    display.release.set()
+    thread.join(timeout=1.0)
+    assert not thread.is_alive()
+    assert not errors
+    assert result == [3]
+    assert display.frames == [b"first", b"latest"]
+  finally:
+    display.release.set()
+    sock.close()
+    thread.join(timeout=1.0)
+
+
+def test_stream_partial_frame_still_times_out_and_closes_connection():
+  display = BlockingDisplay()
+  display.release.set()
+  sock, thread, _result, errors = _start_stream_receiver(display, frame_timeout=0.1)
+  try:
+    _send_stream(sock, 1, b"first")
+    assert display.started.wait(timeout=1.0)
+    sock.sendall(pack_frame_header(2, 10, FRAME_STREAM) + b"partial")
+    thread.join(timeout=1.0)
+    assert not thread.is_alive()
+    assert len(errors) == 1 and isinstance(errors[0], TimeoutError)
+    assert display.frames == [b"first"]
+    assert sock.recv(1) == b""
+  finally:
+    sock.close()
+    thread.join(timeout=1.0)
+
+
+def test_stream_display_error_closes_transport_after_receive_ack():
+  display = BlockingDisplay()
+  display.succeeds = False
+  display.release.set()
+  sock, thread, _result, errors = _start_stream_receiver(display)
+  try:
+    _send_stream(sock, 1, b"invalid-jpeg")
+    thread.join(timeout=1.0)
+    assert not thread.is_alive()
+    assert len(errors) == 1 and isinstance(errors[0], RuntimeError)
+    assert "Unable to display cluster frame" in str(errors[0])
+    assert sock.recv(1) == b""
+  finally:
+    sock.close()
+    thread.join(timeout=1.0)
+
+
+def test_stream_quit_interrupts_idle_receive_without_leaving_io_thread():
+  display = BlockingDisplay()
+  sock, thread, _result, errors = _start_stream_receiver(display)
+  try:
+    _send_stream(sock, 1, b"first")
+    assert display.started.wait(timeout=1.0)
+    display.quit = True
+    display.release.set()
+    thread.join(timeout=1.0)
+    assert not thread.is_alive()
+    assert len(errors) == 1 and isinstance(errors[0], KeyboardInterrupt)
+    assert not any(t.name == "cluster-jpeg-receiver" and t.is_alive() for t in threading.enumerate())
+  finally:
+    display.release.set()
+    sock.close()
+    thread.join(timeout=1.0)
+
+
 def test_receiver_acknowledges_successful_hdmi_frame():
   display = FakeDisplay()
   assert _exchange_frame(display) == (7, ACK_OK)
   assert display.frames == [b"jpeg-frame"]
+
+
+def test_receiver_advertises_streaming_only_when_queried():
+  assert _exchange_frame(FakeDisplay(), flags=FRAME_QUERY_STREAM, ack_details=True) == (7, ACK_OK, ACK_STREAM_SUPPORTED)
+  assert _exchange_frame(FakeDisplay(), ack_details=True) == (7, ACK_OK, 0)
 
 
 def test_receiver_reports_hdmi_failure():

@@ -114,10 +114,12 @@ class ClusterDisplayPipeline:
 
   def get_stats(self):
     with self._condition:
+      confirmed_count = getattr(self.display, "get_confirmed_frame_count", None)
+      sent = confirmed_count() if callable(confirmed_count) else self._sent_frames
       return {
         "input": self._input_frames,
         "encoded": self._encoded_frames,
-        "sent": self._sent_frames,
+        "sent": sent,
         "dropped_raw": self._dropped_raw_frames,
         "dropped_prepared": self._dropped_prepared_frames,
         "send_failures": self._send_failures,

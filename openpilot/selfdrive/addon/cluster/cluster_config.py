@@ -40,6 +40,7 @@ NETWORK = SimpleNamespace(
   port=9200,
   accept_timeout_s=0.25,
   ack_timeout_s=2.5,
+  max_in_flight=3,
 )
 
 RGBColor = tuple[int, int, int]
@@ -133,6 +134,7 @@ class ClusterConfig:
     self.network_port = NETWORK.port
     self.network_accept_timeout = NETWORK.accept_timeout_s
     self.network_ack_timeout = NETWORK.ack_timeout_s
+    self.network_max_in_flight = NETWORK.max_in_flight
 
     self.BASEDIR = Path(__file__).resolve().parents[3]
     self.font_bold = os.path.join(self.BASEDIR, "selfdrive", "assets", "fonts", "Inter-Bold.ttf")

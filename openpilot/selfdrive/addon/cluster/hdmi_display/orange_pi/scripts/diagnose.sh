@@ -27,7 +27,7 @@ if [[ -z "$output" ]]; then
 fi
 
 collect() {
-  local item probe_status=0
+  local item interface probe_status=0
   printf 'Cluster display diagnostics: %s\n' "$(date -Is)"
   printf '\n--- OS and kernel ---\n'
   cat /etc/os-release
@@ -65,6 +65,16 @@ collect() {
   printf '\n--- Network ---\n'
   ip -4 addr
   ip -4 route
+  if command -v iw >/dev/null; then
+    printf '\n--- Wi-Fi power saving, signal and link rate ---\n'
+    for item in /sys/class/net/*/wireless; do
+      [[ -d "$item" ]] || continue
+      interface=${item%/wireless}
+      interface=${interface##*/}
+      iw dev "$interface" get power_save
+      iw dev "$interface" link
+    done
+  fi
   printf '\n--- Display services ---\n'
   systemctl status cluster-hdmi.service display-manager.service --no-pager
   printf '\n--- Receiver journal ---\n'
