@@ -39,8 +39,6 @@ from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan, 
 from openpilot.selfdrive.modeld.parse_model_outputs import Parser
 from openpilot.selfdrive.modeld.fill_model_msg import fill_model_msg, fill_driving_model_data, fill_pose_msg, PublishState
 from openpilot.selfdrive.modeld.constants import ModelConstants, Plan
-from openpilot.selfdrive.modeld.camera import CameraFrameReader
-from openpilot.selfdrive.modeld.timing import ModeldTiming
 from openpilot.selfdrive.modeld.helpers import MODELS_DIR, chestnut_present, chestnut_compiled, modeld_pkl_path, load_oob, wait_for_chestnut
 
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
@@ -77,6 +75,12 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
   return log.ModelDataV2.Action(desiredCurvature=float(desired_curvature),
                                 desiredAcceleration=float(desired_accel),
                                 shouldStop=bool(stop))
+
+
+def drop_chestnut() -> None:
+  if "AMD" in Device._opened_devices:
+    for d in Device._opened_devices:
+      Device[d].pending.pop(Device["AMD"], None)
 
 
 class ChestnutGpuState:
@@ -125,6 +129,16 @@ class ChestnutGpuState:
     self.pm.send('chestnutGpuState', msg)
 
 
+class FrameMeta:
+  frame_id: int = 0
+  timestamp_sof: int = 0
+  timestamp_eof: int = 0
+
+  def __init__(self, vipc=None):
+    if vipc is not None:
+      self.frame_id, self.timestamp_sof, self.timestamp_eof = vipc.frame_id, vipc.timestamp_sof, vipc.timestamp_eof
+
+
 def input_view(buffer: Buffer, shape: tuple[int, ...], dtype: DType, offset: int) -> Tensor:
   view = buffer.view(math.prod(shape), dtype, offset).ensure_allocated()
   return Tensor(UOp.from_buffer(view)).reshape(shape)
@@ -134,11 +148,7 @@ class ModelState:
   prev_desire: np.ndarray  # for tracking the rising edge of the pulse
 
   def __init__(self, cam_w: int, cam_h: int, chestnut: bool):
-    st = time.monotonic()
-    model_name = 'big' if chestnut else 'small'
-    cloudlog.warning(f'{model_name} model: loading weights')
     jits = load_oob(modeld_pkl_path(chestnut), chestnut)
-    cloudlog.warning(f'{model_name} model: weights loaded in {time.monotonic() - st:.1f}s')
     self.model_device = jits['input_specs']['new_img'][2]
     self.input_shapes = {name: (shape, np.dtype(dtype)) for name, (shape, dtype, _) in jits['input_specs'].items()}
     self.state_pairs = {name: f'next_{name}' for name in self.input_shapes if f'next_{name}' in jits['metadata']['output_shapes']}
@@ -151,24 +161,16 @@ class ModelState:
     stride, y_height, uv_height, _ = get_nv12_info(cam_w, cam_h)
     self.frame_copy_size = stride * (y_height + uv_height)
     self.pack_inputs()
-    cloudlog.warning(f'{model_name} model: inputs ready, compiling warp ({time.monotonic() - st:.1f}s)')
     with open(MODELS_DIR / f'{"big_" if chestnut else ""}driving_warp_{cam_w}x{cam_h}_tinygrad.pkl', 'rb') as f:
       self.run_warp = pickle.load(f)['run']
     self.run_warp.captured._linear = lower_and_compile(self.run_warp.captured._linear)
-    cloudlog.warning(f'{model_name} model: warp ready, compiling model ({time.monotonic() - st:.1f}s)')
     self.run_model = jits['run']
     self.run_model.captured._linear = lower_and_compile(self.run_model.captured._linear)
-    # Reuse recurrent state without temporary allocations; JIT requires output_specs order.
-    output_states = {next_name: self.input_queues[name] for name, next_name in self.state_pairs.items()}
-    self.outputs = {}
-    for name, (shape, dtype, device) in jits['output_specs'].items():
-      if name in output_states:
-        state = output_states[name]
-        self.outputs[name] = input_view(state._buffer(), state.shape, state.dtype, 0)
-      else:
-        self.outputs[name] = Tensor(np.zeros(shape, dtype=dtype), device=device).realize()
+    self.outputs = {name: Tensor(np.zeros(shape, dtype=dtype), device=device).realize() for name, (shape, dtype, device) in jits['output_specs'].items()}
+    for name, next_name in self.state_pairs.items():
+      state = self.input_queues[name]
+      self.outputs[next_name] = input_view(state._buffer(), state.shape, state.dtype, 0)
     self.parser = Parser()
-    cloudlog.warning(f'{model_name} model: initialized in {time.monotonic() - st:.1f}s')
 
   def pack_inputs(self) -> None:
     # Pack host inputs into one upload to reduce USB transfer overhead for the eGPU.
@@ -274,15 +276,9 @@ def main(demo=False):
     def load_big():
       nonlocal big_model
       try:
-        wait_st = time.monotonic()
-        cloudlog.warning('big model: waiting for Chestnut USB')
         wait_for_chestnut()
-        cloudlog.warning(f'big model: Chestnut USB ready in {time.monotonic() - wait_st:.1f}s')
         m = ModelState(vipc_client_main.width, vipc_client_main.height, True)
-        warmup_st = time.monotonic()
-        cloudlog.warning('big model: warming up')
         m.warmup()
-        cloudlog.warning(f'big model: warmup completed in {time.monotonic() - warmup_st:.1f}s')
         big_model = m
       except Exception:
         cloudlog.exception("big model load failed")
@@ -290,9 +286,9 @@ def main(demo=False):
     loader.start()
     loader.join(BIG_MODEL_TIMEOUT)
     model = big_model
-    if model is None and loader.is_alive():
-      cloudlog.error(f'big model load timed out after {BIG_MODEL_TIMEOUT}s, falling back to small model')
     params.put_bool("ChestnutActive", model is not None)
+    if model is None:
+      drop_chestnut()
 
   small_model = ModelState(vipc_client_main.width, vipc_client_main.height, False) if model is None or CHESTNUT else None
   if model is None:
@@ -317,14 +313,15 @@ def main(demo=False):
   # setup filter to track dropped frames
   frame_dropped_filter = FirstOrderFilter(0., 10., 1. / ModelConstants.MODEL_RUN_FREQ)
   frame_id = 0
-  last_vipc_frame_id = None
+  last_vipc_frame_id = 0
   run_count = 0
 
   model_transform_main = np.zeros((3, 3), dtype=np.float32)
   model_transform_extra = np.zeros((3, 3), dtype=np.float32)
   extrinsics_calibration_seen = False
-  camera_reader = CameraFrameReader(vipc_client_main, vipc_client_extra if use_extra_client else None)
-  last_camera_error_time = float('-inf')
+  buf_main, buf_extra = None, None
+  meta_main = FrameMeta()
+  meta_extra = FrameMeta()
 
   if demo:
     CP = get_demo_car_params()
@@ -338,23 +335,39 @@ def main(demo=False):
   prev_action = log.ModelDataV2.Action()
 
   DH = DesireHelper()
-  timing = ModeldTiming(DT_MDL)
-  last_publish_time = None
 
   while True:
-    loop_start = time.monotonic()
-    frames = camera_reader.recv()
-    camera_ready = time.monotonic()
-    if frames is None:
-      if camera_ready - last_camera_error_time >= 1.0:
-        cloudlog.event('modeld_camera_receive_failed', error=True, failed_stream=camera_reader.failed_stream,
-                       main_frame_id=camera_reader.main_frame.frame_id if camera_reader.main_frame is not None else None,
-                       extra_frame_id=camera_reader.extra_frame.frame_id if camera_reader.extra_frame is not None else None,
-                       **camera_reader.stats)
-        last_camera_error_time = camera_ready
+    # Keep receiving frames until we are at least 1 frame ahead of previous extra frame
+    while meta_main.timestamp_sof < meta_extra.timestamp_sof + 25000000:
+      buf_main = vipc_client_main.recv()
+      meta_main = FrameMeta(vipc_client_main)
+      if buf_main is None:
+        break
+
+    if buf_main is None:
+      cloudlog.debug("vipc_client_main no frame")
       continue
-    meta_main, meta_extra = frames
-    buf_main, buf_extra = meta_main.buf, meta_extra.buf
+
+    if use_extra_client:
+      # Keep receiving extra frames until frame id matches main camera
+      while True:
+        buf_extra = vipc_client_extra.recv()
+        meta_extra = FrameMeta(vipc_client_extra)
+        if buf_extra is None or meta_main.timestamp_sof < meta_extra.timestamp_sof + 25000000:
+          break
+
+      if buf_extra is None:
+        cloudlog.debug("vipc_client_extra no frame")
+        continue
+
+      if abs(meta_main.timestamp_sof - meta_extra.timestamp_sof) > 10000000:
+        cloudlog.error(f"frames out of sync! main: {meta_main.frame_id} ({meta_main.timestamp_sof / 1e9:.5f}),\
+                         extra: {meta_extra.frame_id} ({meta_extra.timestamp_sof / 1e9:.5f})")
+
+    else:
+      # Use single camera
+      buf_extra = buf_main
+      meta_extra = meta_main
 
     sm.update(0)
     desire = DH.desire
@@ -380,7 +393,7 @@ def main(demo=False):
       vec_desire[desire] = 1
 
     # tracked dropped frames
-    vipc_dropped_frames = max(0, meta_main.frame_id - last_vipc_frame_id - 1) if last_vipc_frame_id is not None else 0
+    vipc_dropped_frames = max(0, meta_main.frame_id - last_vipc_frame_id - 1)
     frames_dropped = frame_dropped_filter.update(min(vipc_dropped_frames, 10))
     if run_count < 10: # let frame drops warm up
       frame_dropped_filter.x = 0.
@@ -401,7 +414,7 @@ def main(demo=False):
       'action_t': np.array([lat_action_t, long_action_t], dtype=np.float32),
     }
 
-    mt1 = time.monotonic()
+    mt1 = time.perf_counter()
     try:
       send_chestnut = (chestnut_state is not None and
                        run_count % round(ModelConstants.MODEL_RUN_FREQ / SERVICE_LIST['chestnutGpuState'].frequency) == 0)
@@ -411,13 +424,14 @@ def main(demo=False):
         raise
       # fallback to small model
       cloudlog.exception("big model failed, fall back to small")
+      drop_chestnut()
       params.put_bool("ChestnutActive", False)
       model = small_model
       if chestnut_state is not None:
         chestnut_state.big = False
       run_count = 0
       model_output = None
-    mt2 = time.monotonic()
+    mt2 = time.perf_counter()
     model_execution_time = mt2 - mt1
 
     if model_output is not None:
@@ -436,14 +450,11 @@ def main(demo=False):
       l_lane_change_prob = desire_state[log.Desire.laneChangeLeft]
       r_lane_change_prob = desire_state[log.Desire.laneChangeRight]
       lane_change_prob = l_lane_change_prob + r_lane_change_prob
-      lane_data_start = time.monotonic()
       model_lane_data = {
         'laneLineProbs': modelv2_send.modelV2.laneLineProbs,
         'roadEdgeStds': modelv2_send.modelV2.roadEdgeStds,
       }
-      lane_data_end = time.monotonic()
       DH.update(sm['carState'], sm['carControl'].latActive, lane_change_prob, model_lane_data)
-      desire_update_end = time.monotonic()
       modelv2_send.modelV2.meta.laneChangeState = DH.lane_change_state
       modelv2_send.modelV2.meta.laneChangeDirection = DH.lane_change_direction
       drivingdata_send.drivingModelData.meta.laneChangeState = DH.lane_change_state
@@ -455,42 +466,9 @@ def main(demo=False):
 
       fill_driving_model_data(drivingdata_send, modelv2_send)
       fill_pose_msg(posenet_send, model_output, meta_main.frame_id, vipc_dropped_frames, meta_main.timestamp_eof, extrinsics_calibration_seen)
-      publish_start = time.monotonic()
       pm.send('modelV2', modelv2_send)
       pm.send('drivingModelData', drivingdata_send)
       pm.send('cameraOdometry', posenet_send)
-      publish_end = time.monotonic()
-      # Frame gaps can be caused by the previous iteration. Keep both samples,
-      # including time spent receiving/synchronizing cameras and actual send completion.
-      timing_event = timing.update({
-        'frame_id': meta_main.frame_id,
-        'extra_frame_id': meta_extra.frame_id,
-        'camera_main_sof_ns': meta_main.timestamp_sof,
-        'camera_extra_sof_ns': meta_extra.timestamp_sof,
-        'previous_frame_id': last_vipc_frame_id if last_publish_time is not None else None,
-        'frame_id_delta': meta_main.frame_id - last_vipc_frame_id if last_publish_time is not None else None,
-        'vipc_dropped_frames': vipc_dropped_frames,
-        'frame_drop_percent': frame_drop_ratio * 100,
-        'camera_odometry_valid': bool(posenet_send.valid),
-        'big_model': model.chestnut,
-        'camera_receive_ms': (camera_ready - loop_start) * 1e3,
-        'camera_frame_age_ms': (camera_ready - meta_main.timestamp_eof * 1e-9) * 1e3,
-        'camera_sync_ms': abs(meta_main.timestamp_sof - meta_extra.timestamp_sof) * 1e-6,
-        **camera_reader.stats,
-        'preprocess_ms': (mt1 - camera_ready) * 1e3,
-        'model_run_ms': model_execution_time * 1e3,
-        'lane_data_ms': (lane_data_end - lane_data_start) * 1e3,
-        'desire_update_ms': (desire_update_end - lane_data_end) * 1e3,
-        'postprocess_ms': ((lane_data_start - mt2) + (publish_start - desire_update_end)) * 1e3,
-        'publish_ms': (publish_end - publish_start) * 1e3,
-        'processing_ms': (publish_end - camera_ready) * 1e3,
-        'loop_ms': (publish_end - loop_start) * 1e3,
-        'publish_interval_ms': (publish_end - last_publish_time) * 1e3 if last_publish_time is not None else None,
-        'frame_to_publish_ms': (publish_end - meta_main.timestamp_eof * 1e-9) * 1e3,
-      }, publish_end)
-      if timing_event is not None:
-        cloudlog.event('modeld_timing', **timing_event)
-      last_publish_time = publish_end
     last_vipc_frame_id = meta_main.frame_id
 
 if __name__ == "__main__":
