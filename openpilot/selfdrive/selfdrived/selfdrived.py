@@ -25,7 +25,6 @@ from openpilot.selfdrive.selfdrived.alertmanager import AlertManager, set_offroa
 
 from openpilot.common.version import get_build_metadata
 from openpilot.common.hardware import HARDWARE
-from openpilot.system.crash import capture_locationd_log
 
 from openpilot.selfdrive.controls.lib.desire_helper import check_invalid_lane
 
@@ -73,7 +72,6 @@ class SelfdriveD:
     self.big_model_active = False
     self.big_model_failed = False
     self.big_model_ready_t = 0.
-    self.locationd_log_requested = False  # capture once per selfdrived session, even if the error persists
 
     self.dcam_is_missing = self.params.get_bool("CabinCameraHardwareMissing")
 
@@ -434,9 +432,6 @@ class SelfdriveD:
         self.events.add(EventName.posenetInvalid)
       if self.sm.seen['deviceMotion'] and not self.sm['deviceMotion'].inputsOK:
         self.events.add(EventName.locationdTemporaryError)
-        if not self.locationd_log_requested and not REPLAY and not SIMULATION:
-          self.locationd_log_requested = True
-          capture_locationd_log()
       if (self.sm.seen['vehicleParameters'] and not self.sm['vehicleParameters'].valid and cal_status == log.ExtrinsicsCalibration.Status.calibrated and
           not TESTING_CLOSET and (not SIMULATION or REPLAY)):
         self.events.add(EventName.paramsdTemporaryError)
