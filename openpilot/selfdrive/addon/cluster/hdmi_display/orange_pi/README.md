@@ -6,7 +6,7 @@ C4가 미러링폰 핫스팟을 통해 보내는 **1920x480 JPEG 프레임**을 
 
 2026-10-04 장비 점검에서 **KMSDRM + OpenGL ES 2로 HDMI 화면이 정상 출력되는 것을 확인했습니다.** systemd 서비스 실행과 재부팅 후 자동 연결도 확인했습니다. 출력은 `480x1920`, 영상 회전은 `90`, 터치 보정은 `270`이며 C4 `192.168.0.82:9200` 자동 검색·연결도 성공했습니다. 이 IP는 해당 점검 당시 주소이며 고정값으로 사용하지 않습니다.
 
-기존 `Can't window GBM/EGL surfaces on window creation.` 오류는 화면 생성 전에 ES2를 요청하고 SDL 렌더러를 `opengles2`로 맞춘 뒤 재현되지 않았습니다. SDL 터치 누름·뗌 이벤트와 원본·보정 좌표 로그도 확인했습니다. **터치에 따른 UI 동작과 C4로의 터치 전송은 아직 구현되지 않았으므로 화면이 바뀌지 않는 것이 현재 동작입니다.** 터치 기능은 활용 방안이 정해진 뒤 추가합니다. 실제 네 모서리 보정 정확도는 별도 확인이 필요합니다.
+기존 `Can't window GBM/EGL surfaces on window creation.` 오류는 화면 생성 전에 ES2를 요청하고 SDL 렌더러를 `opengles2`로 맞춘 뒤 재현되지 않았습니다. SDL 터치 누름·뗌 이벤트와 원본·보정 좌표 로그도 확인했습니다. **2026-10-08 버전부터 터치로 밝기 조절·화면 끄기·다시 켜기를 지원합니다.** 새 UI와 GPU 출력 경로의 실제 장비 동작, 네 모서리 보정 정확도는 업데이트 후 확인해야 합니다.
 
 시작 중 `Could not restore CRTC` 메시지는 남았지만 이후 `HDMI display ready`와 C4 연결 로그가 기록됐고 화면도 정상 출력됐습니다. 이 점검에서는 초기화 실패로 이어지지 않았습니다.
 
@@ -38,7 +38,7 @@ sudo bash /opt/cluster-receiver/scripts/diagnose.sh --egl
 | 카드 | HDMI `card0`, GPU `card1` / `renderD128` |
 | DRM 점유 | 이전 Xorg master 점유는 display-manager 중지 후 해제됨 |
 | HDMI 화면 | KMSDRM + GLES2, `480x1920`, 영상 회전 `90`으로 정상 출력 확인 |
-| 터치 UI 동작 | 미구현; 이벤트 기록과 좌표 변환까지 동작 |
+| 터치 UI 동작 | 밝기·화면 끄기 구현; 새 버전의 실제 장비 점검 필요 |
 
 `Size: 216x137mm`는 터치 장치 크기이며 HDMI 해상도가 아닙니다. `axp8191-pek`는 보드 전원 키입니다.
 
@@ -141,7 +141,13 @@ sudo bash /opt/cluster-receiver/scripts/connect_wifi.sh "Android" wlan0
 sudo bash /opt/cluster-receiver/scripts/touch.sh
 ```
 
-USB 터치는 HDMI와 별도 케이블로 연결합니다. 현재 이벤트는 수신기의 `last_touch`에 저장하고 설정된 `touch_handler`가 있으면 전달합니다. 기본 수신기는 핸들러를 연결하지 않으며 C4에서 받은 JPEG 영상만 표시합니다. 따라서 터치를 인식해도 화면 버튼 동작은 발생하지 않습니다. 버튼 판정·UI 동작 연결과 C4로의 터치 전송은 추가 구현이 필요합니다.
+USB 터치는 HDMI와 별도 케이블로 연결합니다. 밝기·화면 끄기 조작은 Pi에서 처리하며 C4로 터치 이벤트를 전송하지 않습니다. 이벤트 기록과 기존 좌표 보정도 유지합니다.
+
+### 터치로 밝기 조절·화면 끄기
+
+시작 밝기는 **80%**입니다. 화면을 터치하면 밝기 슬라이더와 **화면 끄기** 버튼이 나타납니다. 슬라이더로 **10~100%**를 조절하며, 닫기 버튼이나 메뉴 밖 터치로 닫을 수 있습니다. 조작하지 않으면 약 8초 뒤 메뉴가 닫힙니다. 꺼진 화면을 다시 터치하면 직전 밝기로 복원하고 최신 수신 영상을 표시합니다. 밝기는 현재 실행 동안 유지하며 서비스 재시작 시 기본값으로 돌아갑니다. 시작값은 `--brightness`로 바꿀 수 있습니다.
+
+밝기는 영상 색상을 어둡게 하는 방식이고, 화면 끄기는 검은 화면을 표시합니다. **HDMI 모니터의 물리 백라이트나 전원을 끄지는 않습니다.** 모니터가 검은 화면에서도 빛을 내면 모니터 자체 밝기 설정이 필요합니다. 화면이 꺼져 있는 동안 Pi는 JPEG 디코딩을 생략하고 최신 JPEG만 보관합니다. 양쪽이 새 버전이면 C4도 최대 5 FPS로 줄여 불필요한 렌더링·전송을 줄입니다. 다시 터치하면 보관한 영상으로 즉시 복원하고 다음 ACK에서 정상 프레임 속도로 돌아갑니다.
 
 ## 콘솔 실행과 회전
 
@@ -412,6 +418,8 @@ sudo bash /opt/cluster-receiver/scripts/service.sh status
 --rotation 90           영상 시계 방향 회전: 0, 90, 180, 270
 --touch-rotation 0      터치 시계 방향 보정(기본: 영상 회전의 역방향)
 --log-touch             원본·보정 SDL 터치 좌표 로그
+--brightness 80         시작 밝기: 10~100%
+--renderer auto         auto: SDL2 GPU 출력 시도, surface: 기존 CPU 출력
 --display-index 0       SDL 디스플레이 번호; DRM card 번호와 별개
 --windowed              창 모드
 --show-cursor           포인터 표시; 터치 좌표 표시 기능은 아님
@@ -421,9 +429,13 @@ PC 창 모드 점검에서는 `requirements.txt`를 PC 가상 환경에 설치�
 
 ## 프레임 성능 확인
 
-현재 C4 클러스터는 카메라와 모델의 20 Hz 업데이트에 맞춰 렌더링합니다. HDMI의 60 Hz 주사율과 새 영상의 FPS는 별개이며, `fps` 설정만 60으로 올리면 카메라 영상이 반복될 수 있습니다.
+Network 모드는 **C4 UI와 같은 60 FPS를 목표**로 독립적인 출력 주기를 사용합니다. C4 UI의 `FPS` 환경 변수가 있으면 이를 따르되 최대 60 FPS로 제한합니다. 카메라와 모델은 각자의 원래 업데이트 주기로 들어오며, 새 카메라 영상이 없는 출력 주기에는 최신 영상을 사용합니다. 중간 카메라 프레임을 만들어 내는 보간은 하지 않습니다. USB 모드는 기존 20 FPS와 JPEG 품질 68을 유지하며, **Network JPEG 품질은 82**입니다. 해상도는 기존 USB `1920x462`, Network `1920x480`을 유지합니다.
 
-C4와 Pi가 모두 새 버전이면 첫 프레임의 헤더와 ACK에 있는 예약 바이트로 스트리밍 지원을 확인합니다. 첫 프레임은 화면 출력 완료를 기다리고, 이후에는 Pi가 JPEG 본문을 받은 즉시 ACK를 보냅니다. C4는 기본 최대 3장의 ACK를 기다리는 동안 다음 프레임을 보낼 수 있습니다. Pi는 별도 스레드로 수신하고 대기 JPEG 한 장만 유지하며, 출력이 늦어지면 대기 영상을 최신 영상으로 교체합니다. SDL 이벤트와 화면 출력은 수신기 메인 스레드에서 처리합니다. [SDL 화면 출력의 스레드 제약](https://wiki.libsdl.org/SDL2/SDL_RenderPresent)
+전송·인코딩 대기가 있으면 C4가 새 영상을 계속 렌더링하지 않고 빈 슬롯을 기다립니다. Pi가 연결되지 않았을 때는 연결 시작용 영상을 초당 한 장만 준비합니다. 경로·차선 알파 합성은 색상별 lookup table을 재사용해 매번 단색 배열을 만들던 비용을 줄입니다. Cluster 프로세스의 OpenCV와 BLAS 작업 스레드 수를 1로 제한하고 Linux CPU 우선순위를 낮춥니다. manager가 NumPy를 이미 불러온 상태에서 fork했다면 cluster 자식 프로세스만 같은 PID로 새 Python 인터프리터에서 시작해 스레드 제한을 적용합니다.
+
+C4와 Pi가 모두 새 버전이면 첫 프레임의 헤더와 ACK에 있는 예약 바이트로 스트리밍 지원을 확인합니다. 첫 프레임은 화면 출력 완료를 기다리고, 이후에는 Pi가 JPEG 본문을 받은 즉시 ACK를 보냅니다. C4는 기본 최대 **12장, 합계 2 MiB**의 ACK를 기다리는 동안 다음 프레임을 보낼 수 있습니다. 한 장이 2 MiB보다 크면 대기 프레임이 없을 때만 전송하며 프로토콜의 4 MiB 제한은 유지합니다. Pi는 별도 스레드로 수신하고 대기 JPEG 한 장만 유지하며, 출력이 늦어지면 대기 영상을 최신 영상으로 교체합니다. SDL 이벤트와 화면 출력은 수신기 메인 스레드에서 처리합니다. [SDL 화면 출력의 스레드 제약](https://wiki.libsdl.org/SDL2/SDL_RenderPresent)
+
+Pi는 SDL2 texture를 재사용하며 회전·크기 조절·밝기 조절을 GPU에 맡깁니다. 사용할 수 없으면 기존 Surface 출력으로 자동 전환합니다. `[CLUSTER_HDMI_RENDERER] texture` 또는 `surface` 로그로 선택된 경로를 확인합니다. 새 출력 경로에 문제가 있으면 `run_console.sh --renderer surface --log-touch`로 기존 경로와 비교할 수 있습니다. [pygame SDL2 texture·renderer API](https://www.pygame.org/docs/ref/sdl2_video.html)
 
 패킷 크기와 버전은 유지하므로 한쪽만 업데이트한 경우 기존의 화면 출력 완료 ACK 방식(`legacy`)을 사용합니다. 이 방식의 `network_avg`에는 Wi-Fi 전송뿐 아니라 Pi의 JPEG 디코딩·회전·화면 출력과 ACK 왕복 시간이 포함됩니다. 스트리밍 방식(`stream`)의 ACK는 수신 확인이며 실제 화면 출력 완료를 뜻하지 않습니다. JPEG 크기/FPS로 계산한 처리량도 Wi-Fi 링크 속도를 직접 측정한 값은 아닙니다.
 
@@ -431,18 +443,19 @@ C4와 Pi가 모두 새 버전이면 첫 프레임의 헤더와 ACK에 있는 예
 
 | 로그 | 항목과 의미 |
 | --- | --- |
-| C4 `[CLUSTER_NETWORK_PERF]` | `fps`: 정상 ACK를 받은 프레임 수, `prep_avg`: JPEG 준비, `send_avg`: 두 `sendall` 호출, `ack_wait_avg`: 전송 호출 종료부터 ACK까지. `mode=stream`, `ack=receive`이면 수신 확인이고 `mode=legacy`, `ack=display`이면 출력 완료 확인입니다. 정상 ACK가 있는 동안 약 10초마다 기록합니다. |
-| C4 `[CLUSTER_MAIN_PERF]` | `camera_copy_avg`: 영상 복사, `snapshot_avg`: 모델/HUD 상태 조회와 잠금 대기, `path_avg`: 경로·차선·리드 표시, `hud_avg`: PIL 변환과 HUD 합성. |
-| Pi `[CLUSTER_RX_PERF]` | `mode=stream`일 때 `fps`: 수신 FPS, `display_fps`: 실제 출력 FPS, `dropped`: 대기 JPEG 교체 횟수입니다. `header_wait_avg`: 다음 헤더 대기, `receive_avg`: JPEG 본문 수신, `display_avg`: 전체 화면 처리, `ack_send_avg`: ACK 전송 호출입니다. 화면 처리 안의 `decode_avg`(화면 포맷 변환 포함)·`rotate_avg`·`scale_avg`·`blit_avg`·`flip_avg`도 기록합니다. |
+| C4 `[CLUSTER_NETWORK_PERF]` | `fps`: 정상 ACK를 받은 프레임 수, `prep_avg`: JPEG 준비, `send_avg`: 두 `sendall` 호출, `ack_wait_avg`: 전송 호출 종료부터 ACK까지. `mode=stream`, `ack=receive`이면 수신 확인이고 `mode=legacy`, `ack=display`이면 출력 완료 확인입니다. `screen_off`는 Pi가 알린 화면 끄기 상태입니다. 정상 ACK가 있는 동안 약 10초마다 기록합니다. |
+| C4 `[CLUSTER_MAIN_PERF]` | `target`: 목표 FPS, `transport_skipped`: 대기·화면 끄기 때문에 렌더링을 생략한 주기 수. `camera_copy_avg`: 영상 복사, `snapshot_avg`: 모델/HUD 상태 조회와 잠금 대기, `path_avg`: 경로·차선·리드 표시, `hud_avg`: PIL 변환과 HUD 합성. 약 10초마다 기록합니다. |
+| C4 `[CLUSTER_RESOURCE_PERF]` | Cluster CPU·RSS·스레드 수, 기기 CPU·온도·메모리, 모델 드롭률·실행 시간, deviceMotion의 `inputsOK`·`posenetOK`를 함께 기록합니다. `cpu_pct=100`은 CPU 한 코어를 계속 사용한 값입니다. `model_drop_max`와 해당 구간의 오류 업데이트 수로 잠깐 발생한 문제도 확인합니다. 아직 받지 못한 상태는 `n/a`로 표시합니다. |
+| Pi `[CLUSTER_RX_PERF]` | `mode=stream`일 때 `fps`: 수신 FPS, `display_fps`: 실제 영상 출력 FPS, `dropped`: 대기 JPEG 교체 횟수입니다. 화면 끄기·메뉴 다시 그리기는 영상 출력 수에 포함하지 않습니다. `queue_wait_avg/max`: 수신 후 출력 대기, `display_gap_max`: 영상 출력 사이의 최대 간격, `display_max`: 최악의 화면 처리 시간도 기록합니다. `header_wait_avg`: 다음 헤더 대기, `receive_avg`: JPEG 본문 수신, `display_avg`: 전체 화면 처리, `ack_send_avg`: ACK 전송 호출입니다. 화면 처리 안의 `decode_avg`·`rotate_avg`·`scale_avg`·`blit_avg`·`flip_avg`도 기록합니다. |
 
 `send_avg`가 짧아도 커널 송신 버퍼에 들어간 JPEG가 아직 전송 중일 수 있습니다. `ack_wait_avg`만으로 Wi-Fi 병목을 판정하지 않고 Pi의 `receive_avg`와 표시 단계 시간을 함께 봅니다. `header_wait_avg`에는 C4가 다음 프레임을 준비하는 시간도 포함됩니다. 스트리밍 로그의 수신 단계 평균은 수신한 프레임 수, 표시 단계 평균은 실제 출력한 프레임 수로 계산합니다. 송수신·인코딩·화면 처리는 겹쳐 동작하므로 모든 단계 시간을 더해서 FPS를 계산하지 않습니다.
 
-수신 `fps`가 20에 가까워도 `display_fps`가 낮으면 Pi 화면 처리 병목이 남아 있는 것입니다. 수신 `fps`도 낮다면 JPEG 수신 시간과 Wi-Fi 상태를 확인합니다. 스트리밍 변경만으로 하드웨어의 출력 FPS가 보장되지는 않습니다.
+수신 `fps`가 목표에 가까워도 `display_fps`가 낮으면 Pi 화면 처리 병목이 남아 있는 것입니다. 수신 `fps`도 낮다면 C4 렌더링·인코딩, JPEG 수신 시간과 Wi-Fi 상태를 확인합니다. 실제 60 FPS 출력은 C4·Pi·무선 링크에서 확인해야 합니다. CPU 우선순위·스레드 제한은 자원 경쟁을 줄이는 조치이며, 기존 로그만으로 model lagging이나 locationd 오류의 원인이 cluster라고 단정할 수는 없습니다. 새 자원 로그와 오류 발생 시각을 대조하고 같은 조건에서 cluster를 끈 주행과 비교합니다.
 
 Pi 로그는 다음으로 확인합니다.
 
 ```bash
-journalctl -u cluster-hdmi.service -b --no-pager | grep CLUSTER_RX_PERF
+journalctl -u cluster-hdmi.service -b --no-pager | grep -E 'CLUSTER_HDMI_RENDERER|CLUSTER_RX_MODE|CLUSTER_RX_PERF'
 ```
 
 C4 heartbeat의 `Dropped: encoded`는 전송 중이거나 연결되지 않았을 때 대기 프레임을 최신 프레임으로 교체한 횟수입니다. TCP 패킷 손실 횟수가 아닙니다.
@@ -450,6 +463,7 @@ C4 heartbeat의 `Dropped: encoded`는 전송 중이거나 연결되지 않았을
 ## 장비 확인 순서
 
 1. HDMI 영상이 가로 설치 방향에 맞고 잘리거나 늘어나지 않는지 확인합니다.
-2. `--log-touch`로 SDL 이벤트와 네 모서리 좌표를 확인합니다. 현재는 수신기 내부 이벤트까지 지원합니다.
+2. `--log-touch`로 네 모서리 보정을 확인하고, 밝기 슬라이더·화면 끄기·재터치 복원을 확인합니다. 80% 밝기가 여러 프레임에 걸쳐 더 어두워지지 않는지도 확인합니다.
 3. 정차 상태에서 Wi-Fi를 끊어 2초 이내에 마지막 운행 영상이 연결 대기 화면으로 바뀌고, 재연결하면 최신 화면으로 복구되는지 확인합니다.
-4. C4 `[CLUSTER_NETWORK_PERF]`의 모드·전송 시간과 Pi `[CLUSTER_RX_PERF]`의 `display_fps`를 함께 확인합니다. 목표는 실제 출력 20 FPS이며 장비에서 확인해야 합니다.
+4. C4 `[CLUSTER_NETWORK_PERF]`의 모드·전송 시간과 Pi `[CLUSTER_RX_PERF]`의 `display_fps`·`display_gap_max`를 함께 확인합니다. 목표는 C4 UI와 같은 60 FPS입니다. 화면을 끈 동안 C4 출력이 최대 5 FPS로 줄고 재터치 후 복원되는지도 확인합니다.
+5. model lagging 또는 locationd 오류가 발생하면 같은 시각의 `[CLUSTER_RESOURCE_PERF]`와 openpilot 오류 로그를 함께 보관합니다.

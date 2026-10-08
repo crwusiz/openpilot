@@ -7,6 +7,13 @@ import os
 import subprocess
 import time
 
+try:
+  from .display_controls import DEFAULT_BRIGHTNESS, DisplayControls
+  from .texture_presenter import TexturePresenter
+except ImportError:
+  from display_controls import DEFAULT_BRIGHTNESS, DisplayControls
+  from texture_presenter import TexturePresenter
+
 
 LOG = logging.getLogger("cluster_receiver.hdmi")
 NETWORK_REFRESH_SECONDS = 2.0
@@ -73,7 +80,8 @@ class HdmiDisplay:
 
   def __init__(self, width=1920, height=480, display_index=0, fullscreen=True,
                show_cursor=False, touch_handler=None, pygame_module=None,
-               rotation=0, touch_rotation=None, log_touch=False, network_interface="wlan0"):
+               rotation=0, touch_rotation=None, log_touch=False, network_interface="wlan0",
+               brightness=DEFAULT_BRIGHTNESS, renderer_mode="auto"):
     self.size = (max(1, int(width)), max(1, int(height)))
     self.rotation = int(rotation)
     # Touch coordinates are reported in panel orientation unless overridden for
@@ -87,11 +95,24 @@ class HdmiDisplay:
     self.show_cursor = bool(show_cursor)
     self.touch_handler = touch_handler
     self._pygame = pygame_module
+    if renderer_mode not in ("auto", "surface"):
+      raise ValueError("HDMI renderer mode must be auto or surface")
+    self.renderer_mode = renderer_mode
+    self.brightness = brightness
+    self.controls = None
+    self._presenter = None
     self.screen = None
     self.connected = False
     self.close_requested = False
     self.last_touch = None
     self.last_frame_timings = {}
+    self.last_frame_presented = False
+    self._latest_frame = None
+    self._latest_jpeg = None
+    self._waiting_requested = False
+    self._controls_revision = None
+    self._menu_surface = None
+    self._menu_rotated = None
     self._waiting_frame = None
     self._showing_waiting = False
     self.network_interface = network_interface
@@ -100,6 +121,11 @@ class HdmiDisplay:
     self._network_executor = None
     self._network_future = None
     self._network_next_check = 0.0
+
+  @property
+  def screen_off(self):
+    """Read touch state without calling SDL, including from the ACK thread."""
+    return self.controls is not None and self.controls.screen_off
 
   def open(self):
     if self.connected:
@@ -124,18 +150,25 @@ class HdmiDisplay:
         ):
           pygame.display.gl_set_attribute(attribute, value)
         LOG.info("KMSDRM: requesting OpenGL ES 2, SDL_RENDER_DRIVER=%s", os.environ["SDL_RENDER_DRIVER"])
-      flags = pygame.DOUBLEBUF | (pygame.FULLSCREEN if self.fullscreen else 0)
-      try:
-        self.screen = pygame.display.set_mode(
-          self.size, flags, display=self.display_index, vsync=1,
-        )
-      except TypeError:
-        # Compatibility with older distro pygame builds.
-        self.screen = pygame.display.set_mode(self.size, flags)
-      pygame.display.set_caption("C4 Cluster")
+      if self.renderer_mode == "auto":
+        try:
+          if not hasattr(pygame, "Surface") or not hasattr(pygame, "Rect"):
+            raise RuntimeError("SDL texture presentation requires a complete pygame module")
+          self._presenter = TexturePresenter(pygame, size=self.size, display_index=self.display_index,
+                                             fullscreen=self.fullscreen, rotation=self.rotation)
+          self.screen = self._presenter
+          LOG.info("[CLUSTER_HDMI_RENDERER] texture: GPU rotation, scaling and brightness")
+        except Exception as e:
+          LOG.warning("[CLUSTER_HDMI_RENDERER] accelerated texture unavailable; falling back to Surface: %s", e)
+      if self._presenter is None:
+        self._open_surface()
       pygame.mouse.set_visible(self.show_cursor)
-      self.screen.fill((0, 0, 0))
-      pygame.display.flip()
+      logical_size = self.screen.get_size()[::-1] if self.rotation in (90, 270) else self.screen.get_size()
+      if self.controls is None:
+        self.controls = DisplayControls(pygame, logical_size, brightness=self.brightness)
+      else:
+        self.controls.set_size(logical_size)
+      self._controls_revision = self.controls.revision
       self.close_requested = False
       self.connected = True
       LOG.info("Orange Pi HDMI display ready at %dx%d, frame rotation=%d clockwise, touch correction=%d clockwise",
@@ -161,7 +194,38 @@ class HdmiDisplay:
       self.close()
       return False
 
-  def pump_events(self):
+  def _open_surface(self):
+    pygame = self._pygame
+    flags = pygame.DOUBLEBUF | (pygame.FULLSCREEN if self.fullscreen else 0)
+    try:
+      self.screen = pygame.display.set_mode(self.size, flags, display=self.display_index, vsync=1)
+    except TypeError:
+      # Compatibility with older distro pygame builds.
+      self.screen = pygame.display.set_mode(self.size, flags)
+    pygame.display.set_caption("C4 Cluster")
+    self.screen.fill((0, 0, 0))
+    pygame.display.flip()
+    LOG.info("[CLUSTER_HDMI_RENDERER] surface: CPU rotation and brightness")
+
+  def _fallback_to_surface(self, error):
+    # Called only from SDL's owner thread. Once switched, no GPU operation is
+    # retried on this display connection, including waiting and touch redraws.
+    presenter = self._presenter
+    self._presenter = None
+    self.screen = None
+    reason = str(error)
+    # A failed update's traceback can retain the Texture wrapper. Release
+    # those frames before destroying the renderer and its native window.
+    error.__traceback__ = None
+    presenter.close()
+    LOG.warning("[CLUSTER_HDMI_RENDERER] surface: texture presentation failed; switching to CPU renderer: %s", reason)
+    self._open_surface()
+    logical_size = self.screen.get_size()[::-1] if self.rotation in (90, 270) else self.screen.get_size()
+    self.controls.set_size(logical_size)
+    self._controls_revision = None
+    self._menu_surface = self._menu_rotated = None
+
+  def pump_events(self, redraw=True):
     pygame = self._pygame
     if pygame is None:
       return False
@@ -173,49 +237,132 @@ class HdmiDisplay:
         self.connected = False
         return False
       if event.type in (pygame.FINGERDOWN, pygame.FINGERMOTION, pygame.FINGERUP):
-        x, y = event.x, event.y
-        if self.touch_rotation == 90:
-          x, y = 1 - y, x
-        elif self.touch_rotation == 180:
-          x, y = 1 - x, 1 - y
-        elif self.touch_rotation == 270:
-          x, y = y, 1 - x
-        self.last_touch = {
-          "type": event.type,
-          "finger_id": event.finger_id,
-          "x": x,
-          "y": y,
-        }
-        if self.log_touch:
-          LOG.info("Touch type=%s finger=%s raw=(%.4f, %.4f) cluster=(%.4f, %.4f)",
-                   event.type, event.finger_id, event.x, event.y, x, y)
-        if self.touch_handler is not None:
-          self.touch_handler(self.last_touch)
-    if self._showing_waiting:
-      self.show_waiting()
+        self._handle_touch(event.type, event.finger_id, event.x, event.y)
+      elif event.type in (getattr(pygame, "MOUSEBUTTONDOWN", None), getattr(pygame, "MOUSEBUTTONUP", None),
+                          getattr(pygame, "MOUSEMOTION", None)):
+        # SDL emits mouse events for finger touches as well. Handling both
+        # would turn a single wake gesture into an accidental menu activation.
+        if getattr(event, "touch", False) or self.screen is None:
+          continue
+        mouse_motion = event.type == getattr(pygame, "MOUSEMOTION", None)
+        if mouse_motion and not (getattr(event, "buttons", ()) or (0,))[0]:
+          continue
+        if not mouse_motion and getattr(event, "button", 0) != 1:
+          continue
+        event_type = (pygame.FINGERMOTION if mouse_motion else pygame.FINGERDOWN
+                      if event.type == pygame.MOUSEBUTTONDOWN else pygame.FINGERUP)
+        width, height = self.screen.get_size()
+        self._handle_touch(event_type, -1, event.pos[0] / width, event.pos[1] / height)
+    if self.controls is not None:
+      self.controls.update()
+    if redraw and self.screen is not None:
+      if self._waiting_requested:
+        self.show_waiting()
+      elif self.controls is not None and self._controls_revision != self.controls.revision:
+        self._redraw_local()
     return True
 
+  def _handle_touch(self, event_type, finger_id, raw_x, raw_y):
+    x, y = raw_x, raw_y
+    if self.touch_rotation == 90:
+      x, y = 1 - y, x
+    elif self.touch_rotation == 180:
+      x, y = 1 - x, 1 - y
+    elif self.touch_rotation == 270:
+      x, y = y, 1 - x
+    self.last_touch = {
+      "type": event_type,
+      "finger_id": finger_id,
+      "x": x,
+      "y": y,
+    }
+    if self.log_touch:
+      LOG.info("Touch type=%s finger=%s raw=(%.4f, %.4f) cluster=(%.4f, %.4f)",
+               event_type, finger_id, raw_x, raw_y, x, y)
+    if self.controls is not None:
+      self.controls.handle_touch(self.last_touch)
+    if self.touch_handler is not None:
+      self.touch_handler(self.last_touch)
+
+  def _redraw_local(self):
+    self.last_frame_presented = False
+    if self.controls.screen_off:
+      self._latest_frame = None
+      self._draw_black()
+    elif self._latest_frame is not None:
+      if self._presenter is not None:
+        try:
+          self._presenter.redraw(self.controls)
+          self._controls_revision = self.controls.revision
+        except Exception as e:
+          self._fallback_to_surface(e)
+          self._present_frame(self._latest_frame)
+      else:
+        self._present_frame(self._latest_frame)
+    elif self._latest_jpeg is not None:
+      try:
+        self._decode_and_present(self._latest_jpeg)
+      except Exception as e:
+        LOG.warning("Failed to restore HDMI frame after touch: %s", e)
+        self._draw_black()
+    else:
+      self.show_waiting()
+
+  def _draw_black(self):
+    if self._presenter is not None:
+      try:
+        self._presenter.clear()
+      except Exception as e:
+        self._fallback_to_surface(e)
+    if self._presenter is None:
+      self.screen.fill((0, 0, 0))
+      self._pygame.display.flip()
+    self._controls_revision = self.controls.revision
+
   def send_jpeg(self, jpeg):
+    self.last_frame_presented = False
     if self.close_requested:
       return False
     if not self.connected and not self.open():
       return False
-    if not self.pump_events():
+    self._latest_jpeg = jpeg
+    self._waiting_requested = False
+    if not self.pump_events(redraw=False):
       return False
+    if self.controls.screen_off:
+      self._latest_frame = None
+      if self._controls_revision != self.controls.revision:
+        self._draw_black()
+      self.last_frame_timings = dict.fromkeys(("decode", "rotate", "scale", "blit", "flip"), 0.0)
+      return True
     try:
-      decode_started = time.monotonic()
-      frame = self._pygame.image.load(BytesIO(jpeg), "cluster.jpg").convert()
-      decode_elapsed = time.monotonic() - decode_started
-      self.last_frame_timings = self._present_frame(frame)
-      self.last_frame_timings["decode"] = decode_elapsed
+      self._decode_and_present(jpeg)
+      self.last_frame_presented = True
       return True
     except Exception as e:
       LOG.warning("Failed to display HDMI frame: %s", e)
       return False
 
+  def _decode_and_present(self, jpeg):
+    decode_started = time.monotonic()
+    frame = self._pygame.image.load(BytesIO(jpeg), "cluster.jpg")
+    if self._presenter is None:
+      frame = frame.convert()
+    decode_elapsed = time.monotonic() - decode_started
+    self.last_frame_timings = self._present_frame(frame)
+    self.last_frame_timings["decode"] = decode_elapsed
+    self._latest_frame = frame
+
   def _present_frame(self, frame):
     # Invalidate the status cache before drawing, including a failed page flip.
     self._showing_waiting = False
+    if self._presenter is not None:
+      try:
+        timings = self._presenter.present(frame, self.controls)
+        self._controls_revision = self.controls.revision
+        return timings
+      except Exception as e:
+        self._fallback_to_surface(e)
     started = time.monotonic()
     if self.rotation:
       # pygame's positive angles are counterclockwise; our option is clockwise.
@@ -225,14 +372,37 @@ class HdmiDisplay:
       frame = self._pygame.transform.smoothscale(frame, self.screen.get_size())
     scaled_at = time.monotonic()
     self.screen.blit(frame, (0, 0))
+    self.controls.apply_dimming(self.screen)
+    self._draw_surface_menu()
     blitted_at = time.monotonic()
     self._pygame.display.flip()
+    self._controls_revision = self.controls.revision
     return {
       "rotate": rotated_at - started,
       "scale": scaled_at - rotated_at,
       "blit": blitted_at - scaled_at,
       "flip": time.monotonic() - blitted_at,
     }
+
+  def _draw_surface_menu(self):
+    menu = self.controls.render_menu()
+    if menu is None:
+      return
+    surface, (x, y) = menu
+    width, height = surface.get_size()
+    physical_width, physical_height = self.screen.get_size()
+    if self._menu_surface is not surface:
+      self._menu_surface = surface
+      self._menu_rotated = self._pygame.transform.rotate(surface, -self.rotation) if self.rotation else surface
+    if self.rotation == 90:
+      position = physical_width - y - height, x
+    elif self.rotation == 180:
+      position = physical_width - x - width, physical_height - y - height
+    elif self.rotation == 270:
+      position = y, physical_height - x - width
+    else:
+      position = x, y
+    self.screen.blit(self._menu_rotated, position)
 
   def _make_waiting_frame(self):
     pygame = self._pygame
@@ -293,12 +463,20 @@ class HdmiDisplay:
     """Replace an unavailable C4 image with a local, correctly rotated status."""
     if self.screen is None or self.close_requested:
       return False
+    self.last_frame_presented = False
+    self._waiting_requested = True
+    self._latest_frame = None
+    self._latest_jpeg = None
+    if self.controls.screen_off:
+      if self._controls_revision != self.controls.revision:
+        self._draw_black()
+      return True
     self._refresh_network_status()
     if self._waiting_frame is None or self._waiting_network_status != self._network_status:
       self._waiting_frame = self._make_waiting_frame()
       self._waiting_network_status = self._network_status
       self._showing_waiting = False
-    if not self._showing_waiting:
+    if not self._showing_waiting or self._controls_revision != self.controls.revision:
       self._present_frame(self._waiting_frame)
       self._showing_waiting = True
     return True
@@ -306,9 +484,16 @@ class HdmiDisplay:
   def clear(self):
     """Remove the last driving frame when the connection becomes unavailable."""
     if self.screen is not None:
-      self.screen.fill((0, 0, 0))
-      self._pygame.display.flip()
+      if self._presenter is not None:
+        self._presenter.clear()
+      else:
+        self.screen.fill((0, 0, 0))
+        self._pygame.display.flip()
       self._showing_waiting = False
+    self._latest_frame = None
+    self._latest_jpeg = None
+    self._waiting_requested = False
+    self.last_frame_presented = False
 
   def close(self):
     self.connected = False
@@ -316,6 +501,11 @@ class HdmiDisplay:
     self.screen = None
     self._waiting_frame = None
     self._showing_waiting = False
+    self._latest_frame = None
+    self._latest_jpeg = None
+    self._waiting_requested = False
+    self._menu_surface = self._menu_rotated = None
+    self.last_frame_presented = False
     self._network_status = None
     self._waiting_network_status = None
     self._network_future = None
@@ -326,7 +516,10 @@ class HdmiDisplay:
     if self._pygame is None:
       return
     try:
-      if screen is not None:
+      if self._presenter is not None:
+        self._presenter.close()
+        self._presenter = None
+      elif screen is not None:
         screen.fill((0, 0, 0))
         self._pygame.display.flip()
       self._pygame.display.quit()

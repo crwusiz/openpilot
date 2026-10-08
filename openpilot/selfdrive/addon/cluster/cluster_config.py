@@ -40,7 +40,11 @@ NETWORK = SimpleNamespace(
   port=9200,
   accept_timeout_s=0.25,
   ack_timeout_s=2.5,
-  max_in_flight=3,
+  fps=60,  # C4 UI refresh target; camera/model source updates remain 20 Hz.
+  screen_off_fps=5,
+  jpeg_quality=82,
+  max_in_flight=12,
+  max_in_flight_bytes=2 * 1024 * 1024,
 )
 
 RGBColor = tuple[int, int, int]
@@ -110,13 +114,15 @@ class ClusterConfig:
       self.width, self.height = HDMI.width, HDMI.height
     else:
       self.width, self.height = USB.width, USB.height
-    # Road camera and model data are published at 20 Hz on-device.
-    self.fps = DISPLAY.fps
+    # Match the C4 UI's FPS override without importing/initializing the UI.
+    self.fps = min(max(int(os.getenv("FPS", NETWORK.fps)), 1), 60) if self.display_transport == "network" else DISPLAY.fps
     self.usb_fps = DISPLAY.fps
     self.status_interval_frames = self.fps * DISPLAY.status_interval_s
     # carrot-pilot's field-tested JPEG default. This improves camera detail
     # over quality 60 without materially increasing encode time or link load.
     self.jpeg_quality = IMAGE.jpeg_quality
+    self.network_jpeg_quality = NETWORK.jpeg_quality
+    self.network_screen_off_fps = NETWORK.screen_off_fps
     self.border_size = DISPLAY.border_size
     self.content_width = self.width - self.border_size * 2
     self.content_height = self.height - self.border_size * 2
@@ -135,6 +141,7 @@ class ClusterConfig:
     self.network_accept_timeout = NETWORK.accept_timeout_s
     self.network_ack_timeout = NETWORK.ack_timeout_s
     self.network_max_in_flight = NETWORK.max_in_flight
+    self.network_max_in_flight_bytes = NETWORK.max_in_flight_bytes
 
     self.BASEDIR = Path(__file__).resolve().parents[3]
     self.font_bold = os.path.join(self.BASEDIR, "selfdrive", "assets", "fonts", "Inter-Bold.ttf")

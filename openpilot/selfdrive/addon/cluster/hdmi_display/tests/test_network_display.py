@@ -7,7 +7,7 @@ import pytest
 from openpilot.selfdrive.addon.cluster.cluster_jpeg import PreparedFrame
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_display import ClusterNetworkDisplay
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_protocol import (
-  ACK_OK, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
+  ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
   pack_ack, recv_exact, unpack_frame_header, unpack_frame_header_info,
 )
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.cluster_receiver import receive_frames
@@ -301,4 +301,75 @@ def test_sender_and_receiver_keep_receiving_when_display_is_blocked():
   finally:
     release_display.set()
     sender.close()
+    thread.join(timeout=1.0)
+
+
+def test_stream_byte_budget_blocks_before_exceeding_pending_jpeg_bytes():
+  config = _config("127.0.0.1", _free_port())
+  config.network_max_in_flight = 12
+  config.network_max_in_flight_bytes = 15
+  display = ClusterNetworkDisplay(config)
+  received, release = threading.Event(), threading.Event()
+  send_started, send_finished = threading.Event(), threading.Event()
+  sent = []
+
+  def client(sock):
+    sequence, payload = _read_stream(sock)
+    assert payload == b"1234567890"
+    received.set()
+    assert release.wait(timeout=2.0)
+    sock.sendall(pack_ack(sequence, ACK_OK, ACK_STREAM_SUPPORTED))
+    sequence, _payload = _read_stream(sock)
+    sock.sendall(pack_ack(sequence, ACK_OK, ACK_STREAM_SUPPORTED))
+
+  def second_send():
+    send_started.set()
+    sent.append(display.send_prepared(_prepared(b"abcdefghij")))
+    send_finished.set()
+
+  thread, errors = _stream_client(display, client)
+  sender = threading.Thread(target=second_send, daemon=True)
+  try:
+    assert display.send_prepared(_prepared(b"1234567890"))
+    assert received.wait(timeout=1.0)
+    sender.start()
+    assert send_started.wait(timeout=1.0)
+    assert not send_finished.wait(timeout=0.05)
+    assert display._pending_bytes == 10
+    release.set()
+    assert send_finished.wait(timeout=1.0) and sent == [True]
+    _wait_for(lambda: display.frame_count == 3)
+    assert display._pending_bytes == 0
+    assert not errors
+  finally:
+    release.set()
+    display.close()
+    if sender.ident is not None:
+      sender.join(timeout=1.0)
+    thread.join(timeout=1.0)
+
+
+def test_receive_acks_report_screen_off_and_wake_without_reconnecting():
+  display = ClusterNetworkDisplay(_config("127.0.0.1", _free_port()))
+  release = threading.Event()
+
+  def client(sock):
+    sequence, _payload = _read_stream(sock)
+    sock.sendall(pack_ack(sequence, ACK_OK, ACK_STREAM_SUPPORTED | ACK_SCREEN_OFF))
+    sequence, _payload = _read_stream(sock)
+    sock.sendall(pack_ack(sequence, ACK_OK, ACK_STREAM_SUPPORTED))
+    release.wait(timeout=1.0)
+
+  thread, errors = _stream_client(display, client)
+  try:
+    assert display.send_prepared(_prepared())
+    _wait_for(lambda: display.frame_count == 2)
+    assert display.screen_off
+    assert display.send_prepared(_prepared())
+    _wait_for(lambda: display.frame_count == 3)
+    assert not display.screen_off and display.connected
+    assert not errors
+  finally:
+    release.set()
+    display.close()
     thread.join(timeout=1.0)

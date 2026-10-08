@@ -6,7 +6,7 @@ from collections import deque
 from openpilot.selfdrive.addon.cluster.cluster_jpeg import ClusterJpegEncoder
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_protocol import (
-  ACK_OK, ACK_PACKET, ACK_STREAM_SUPPORTED, FRAME_QUERY_STREAM, FRAME_STREAM,
+  ACK_OK, ACK_PACKET, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_QUERY_STREAM, FRAME_STREAM,
   pack_frame_header, recv_exact, unpack_ack_info,
 )
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import write_network_status
@@ -21,16 +21,20 @@ class ClusterNetworkDisplay:
     self.ack_timeout = config.network_ack_timeout
     self.encoder = ClusterJpegEncoder(config, transport="network")
     self.connected = False
+    self.screen_off = False
     self.listener = None
     self.sock = None
     self.client_address = None
     self.sequence = 0
     self.frame_count = 0
-    self.max_in_flight = min(max(int(getattr(config, "network_max_in_flight", 3)), 1), 8)
+    self.max_in_flight = min(max(int(getattr(config, "network_max_in_flight", 3)), 1), 16)
+    self.max_in_flight_bytes = max(int(getattr(config, "network_max_in_flight_bytes", 2 * 1024 * 1024)), 1)
     self.streaming = False
     self._ack_condition = threading.Condition()
     self._pending_acks = deque()
+    self._pending_bytes = 0
     self._ack_thread = None
+    self._ack_generation = 0
     self._ack_closing = False
     self._ack_error = None
     self._perf_started = None
@@ -63,12 +67,20 @@ class ClusterNetworkDisplay:
         self._status_error_logged = True
 
   def _disconnect_client(self):
-    sock = self.sock
-    self.connected = False
-    self.sock = None
-    self.client_address = None
     with self._ack_condition:
+      sock = self.sock
+      thread = self._ack_thread
+      self.connected = False
+      self.screen_off = False
+      self.sock = None
+      self.client_address = None
+      # A reader can still be in status/log I/O when its bounded join ends.
+      # Invalidate its connection before another client can reuse this queue.
+      self._ack_generation += 1
       self._ack_closing = True
+      self._pending_acks.clear()
+      self._pending_bytes = 0
+      self.streaming = False
       self._ack_condition.notify_all()
     self._publish_status(force=sock is not None)
     if sock is not None:
@@ -80,13 +92,11 @@ class ClusterNetworkDisplay:
         sock.close()
       except OSError:
         pass
-    thread = self._ack_thread
     if thread is not None and thread is not threading.current_thread():
       thread.join(timeout=1.0)
-    self._ack_thread = None
     with self._ack_condition:
-      self._pending_acks.clear()
-      self.streaming = False
+      if self._ack_thread is thread:
+        self._ack_thread = None
 
   def _close_listener(self):
     listener = self.listener
@@ -155,33 +165,50 @@ class ClusterNetworkDisplay:
   def get_confirmed_frame_count(self):
     return self.frame_count
 
-  def _start_streaming(self):
-    self.streaming = True
-    self._ack_thread = threading.Thread(target=self._ack_loop, args=(self.sock,), name="cluster-network-acks", daemon=True)
-    self._ack_thread.start()
-    flog(f"[CLUSTER_NETWORK_MODE] stream: ACK on receive, maximum {self.max_in_flight} frames in flight.")
+  def has_send_capacity(self):
+    with self._ack_condition:
+      return self.connected and not self._ack_closing and self._ack_error is None and (
+        not self.streaming or (len(self._pending_acks) < self.max_in_flight and self._pending_bytes < self.max_in_flight_bytes)
+      )
 
-  def _ack_loop(self, sock):
+  def _start_streaming(self):
+    with self._ack_condition:
+      self.streaming = True
+      thread = threading.Thread(target=self._ack_loop, args=(self.sock, self._ack_generation),
+                                name="cluster-network-acks", daemon=True)
+      self._ack_thread = thread
+      thread.start()
+    flog(f"[CLUSTER_NETWORK_MODE] stream: ACK on receive, maximum {self.max_in_flight} frames / "
+         + f"{self.max_in_flight_bytes / 1024:.0f}KB in flight.")
+
+  def _ack_connection_current(self, sock, generation):
+    # Called with _ack_condition held; generations also reject a late error
+    # from an old reader after a new connection clears _ack_closing.
+    return self.sock is sock and self._ack_generation == generation and self.connected and not self._ack_closing
+
+  def _ack_loop(self, sock, generation):
     try:
       while True:
         with self._ack_condition:
-          self._ack_condition.wait_for(lambda: self._pending_acks or self._ack_closing)
-          if self._ack_closing:
+          self._ack_condition.wait_for(lambda: self._pending_acks or not self._ack_connection_current(sock, generation))
+          if not self._ack_connection_current(sock, generation):
             return
           sequence, prepared, started, sent_at = self._pending_acks[0]
         ack_sequence, status, flags = unpack_ack_info(recv_exact(sock, ACK_PACKET.size))
         acknowledged_at = time.monotonic()
-        if ack_sequence != sequence or status != ACK_OK or not flags & ACK_STREAM_SUPPORTED:
-          raise ConnectionError(f"Invalid stream ACK: expected={sequence}, received={ack_sequence}, status={status}, flags={flags}")
         with self._ack_condition:
-          if self._ack_closing:
+          if not self._ack_connection_current(sock, generation):
             return
+          if ack_sequence != sequence or status != ACK_OK or not flags & ACK_STREAM_SUPPORTED:
+            raise ConnectionError(f"Invalid stream ACK: expected={sequence}, received={ack_sequence}, status={status}, flags={flags}")
+          self.screen_off = bool(flags & ACK_SCREEN_OFF)
           self._pending_acks.popleft()
+          self._pending_bytes -= len(prepared.jpeg)
           self._ack_condition.notify_all()
         self._record_ack(prepared, sequence, started, sent_at, acknowledged_at)
     except (ConnectionError, OSError, ValueError) as e:
       with self._ack_condition:
-        if self._ack_closing:
+        if not self._ack_connection_current(sock, generation):
           return
         self._ack_error = e
         self.connected = False
@@ -198,7 +225,9 @@ class ClusterNetworkDisplay:
   def _send_streamed(self, prepared, sequence):
     with self._ack_condition:
       ready = self._ack_condition.wait_for(
-        lambda: len(self._pending_acks) < self.max_in_flight or self._ack_error is not None or self._ack_closing,
+        lambda: (len(self._pending_acks) < self.max_in_flight and (
+          not self._pending_acks or self._pending_bytes + len(prepared.jpeg) <= self.max_in_flight_bytes
+        )) or self._ack_error is not None or self._ack_closing,
         timeout=self.ack_timeout,
       )
       if self._ack_error is not None:
@@ -216,6 +245,7 @@ class ClusterNetworkDisplay:
         return False
       self.sequence = sequence
       self._pending_acks.append((sequence, prepared, started, sent_at))
+      self._pending_bytes += len(prepared.jpeg)
       self._ack_condition.notify_all()
     return True
 
@@ -241,6 +271,7 @@ class ClusterNetworkDisplay:
         flog(f"[CLUSTER_NETWORK_WARN] Orange Pi rejected frame#{sequence}: status={status}")
         return False
 
+      self.screen_off = bool(flags & ACK_SCREEN_OFF)
       self._record_ack(prepared, sequence, started, sent_at, acknowledged_at)
       if flags & ACK_STREAM_SUPPORTED:
         self._start_streaming()
@@ -282,6 +313,7 @@ class ClusterNetworkDisplay:
         + f"network_avg={self._perf_network_time * 1000 / self._perf_frames:.1f}ms | "
         + f"send_avg={self._perf_send_time * 1000 / self._perf_frames:.1f}ms | "
         + f"ack_wait_avg={self._perf_ack_wait_time * 1000 / self._perf_frames:.1f}ms | "
+        + f"screen_off={int(self.screen_off)} | "
         + f"mode={'stream' if self.streaming else 'legacy'} | ack={'receive' if self.streaming else 'display'}",
       )
       self._perf_started = now

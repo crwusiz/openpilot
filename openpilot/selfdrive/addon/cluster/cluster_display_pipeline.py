@@ -61,6 +61,14 @@ class ClusterDisplayPipeline:
       # Waking only the sender can leave a raw frame stuck until the next push.
       self._condition.notify_all()
 
+  def has_render_capacity(self):
+    """Avoid composing/encoding frames that a blocked transport would discard."""
+    with self._condition:
+      if not self.running or self._closing or self._pending_frame is not None or self._pending_prepared is not None:
+        return False
+    capacity = getattr(self.display, "has_send_capacity", None)
+    return not callable(capacity) or capacity()
+
   def _take_pending_frame(self):
     with self._condition:
       self._condition.wait_for(lambda: self._pending_frame is not None or self._closing)

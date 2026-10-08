@@ -21,7 +21,10 @@ class ClusterJpegEncoder:
     if transport not in ("network", "usb"):
       raise ValueError(f"Unsupported JPEG transport: {transport}")
     self.transport = transport
-    self.jpeg_quality = min(max(int(getattr(config, "jpeg_quality", 68)), 1), 95)
+    quality = getattr(config, "jpeg_quality", 68)
+    if transport == "network":
+      quality = getattr(config, "network_jpeg_quality", quality)
+    self.jpeg_quality = min(max(int(quality), 1), 95)
     self._encode_param = [
       int(cv2.IMWRITE_JPEG_QUALITY), self.jpeg_quality,
       int(cv2.IMWRITE_JPEG_PROGRESSIVE), 0,

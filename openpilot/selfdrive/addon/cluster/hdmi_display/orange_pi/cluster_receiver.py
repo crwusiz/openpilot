@@ -13,13 +13,13 @@ import time
 
 try:
   from .cluster_protocol import (
-    ACK_DISPLAY_ERROR, ACK_OK, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
+    ACK_DISPLAY_ERROR, ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
     pack_ack, recv_exact, unpack_frame_header_info,
   )
   from .frame_stream import ReceivedFrame, receive_stream_frames
 except ImportError:
   from cluster_protocol import (
-    ACK_DISPLAY_ERROR, ACK_OK, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
+    ACK_DISPLAY_ERROR, ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
     pack_ack, recv_exact, unpack_frame_header_info,
   )
   from frame_stream import ReceivedFrame, receive_stream_frames
@@ -143,6 +143,7 @@ def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=F
   received_frames = 0
   perf_started = time.monotonic()
   perf_frames = 0
+  perf_displayed = 0
   perf_bytes = 0
   perf_stages = dict.fromkeys(("header_wait", "receive", "display", "ack_send", "decode", "rotate", "scale", "blit", "flip"), 0.0)
   while max_frames is None or received_frames < max_frames:
@@ -161,6 +162,8 @@ def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=F
     displayed_at = time.monotonic()
     status = ACK_OK if display_ok else ACK_DISPLAY_ERROR
     capabilities = ACK_STREAM_SUPPORTED if flags & FRAME_QUERY_STREAM else 0
+    if capabilities and getattr(display, "screen_off", False):
+      capabilities |= ACK_SCREEN_OFF
     sock.sendall(pack_ack(sequence, status, capabilities))
     acknowledged_at = time.monotonic()
     if not display_ok:
@@ -171,17 +174,24 @@ def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=F
     perf_bytes += frame_size
     perf_stages["header_wait"] += header_at - started
     perf_stages["receive"] += received_at - header_at
-    perf_stages["display"] += displayed_at - received_at
     perf_stages["ack_send"] += acknowledged_at - displayed_at
-    for stage, duration in getattr(display, "last_frame_timings", {}).items():
-      if stage in perf_stages:
-        perf_stages[stage] += duration
+    if getattr(display, "last_frame_presented", True):
+      perf_displayed += 1
+      perf_stages["display"] += displayed_at - received_at
+      for stage, duration in getattr(display, "last_frame_timings", {}).items():
+        if stage in ("decode", "rotate", "scale", "blit", "flip"):
+          perf_stages[stage] += duration
     if acknowledged_at - perf_started >= 10.0:
-      stages = " | ".join(f"{stage}_avg={duration * 1000 / perf_frames:.1f}ms" for stage, duration in perf_stages.items())
-      LOG.info("[CLUSTER_RX_PERF] fps=%.2f | size_avg=%.1fKB | %s",
-               perf_frames / (acknowledged_at - perf_started), perf_bytes / (1024 * perf_frames), stages)
+      stages = " | ".join(
+        f"{stage}_avg={duration * 1000 / max(perf_frames if stage in ('header_wait', 'receive', 'ack_send') else perf_displayed, 1):.1f}ms"
+        for stage, duration in perf_stages.items()
+      )
+      elapsed = acknowledged_at - perf_started
+      LOG.info("[CLUSTER_RX_PERF] fps=%.2f | display_fps=%.2f | size_avg=%.1fKB | %s | mode=legacy",
+               perf_frames / elapsed, perf_displayed / elapsed, perf_bytes / (1024 * perf_frames), stages)
       perf_started = acknowledged_at
       perf_frames = 0
+      perf_displayed = 0
       perf_bytes = 0
       perf_stages = dict.fromkeys(perf_stages, 0.0)
   return received_frames
@@ -217,6 +227,9 @@ def parse_args(argv=None):
                       help="Clockwise correction from raw touch to cluster coordinates (default: inverse of --rotation)")
   parser.add_argument("--log-touch", action="store_true", help="Log raw and corrected SDL finger coordinates")
   parser.add_argument("--display-index", type=int, default=0)
+  parser.add_argument("--brightness", type=int, default=80, help="Initial screen brightness from 10 to 100 percent")
+  parser.add_argument("--renderer", choices=("auto", "surface"), default="auto",
+                      help="Try accelerated textures automatically or use the CPU surface renderer")
   parser.add_argument("--windowed", action="store_true", help="Run in a window instead of fullscreen")
   parser.add_argument("--show-cursor", action="store_true", help="Keep the pointer visible for touch debugging")
   args = parser.parse_args(argv)
@@ -224,6 +237,8 @@ def parse_args(argv=None):
     parser.error("--port must be between 1 and 65535")
   if args.display_index < 0:
     parser.error("--display-index must be zero or greater")
+  if not 10 <= args.brightness <= 100:
+    parser.error("--brightness must be between 10 and 100")
   return args
 
 
@@ -249,6 +264,8 @@ def main():
     touch_rotation=args.touch_rotation,
     log_touch=args.log_touch,
     network_interface=args.interface,
+    brightness=args.brightness,
+    renderer_mode=args.renderer,
   )
 
   def stop_receiver(_signum, _frame):

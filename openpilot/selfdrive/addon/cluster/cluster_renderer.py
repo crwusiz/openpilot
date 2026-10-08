@@ -1,6 +1,7 @@
 import os
 import time
 from collections import OrderedDict
+from functools import lru_cache
 import cv2
 import numpy as np
 
@@ -46,6 +47,24 @@ GRADIENT_BANDS = 8
 MAX_DRAW_DISTANCE = 100.0
 LEAD_BAR_LENGTH = 12.0  # px
 LEAD_BAR_WIDTH = 1.8  # m
+
+
+@lru_cache(maxsize=128)
+def _alpha_blend_lut(color, alpha):
+  """Precompute the same uint8 blend without allocating a solid-color image."""
+  values = np.arange(256, dtype=np.uint8).reshape(256, 1)
+  if color[0] == color[1] == color[2]:
+    # Lane lines and a disengaged path use one lookup for all RGB channels.
+    # OpenCV has a faster single-channel lookup for these common colors.
+    solid_color = np.full_like(values, color[0])
+  else:
+    values = values[:, :, None].repeat(3, axis=2)
+    solid_color = np.full_like(values, color)
+  # Let OpenCV round the lookup exactly as it rounds addWeighted on camera
+  # pixels. Colored tables keep the RGB channels independent.
+  table = cv2.addWeighted(solid_color, alpha, values, 1.0 - alpha, 0)
+  table.setflags(write=False)
+  return table
 
 
 class LeadVehicle:
@@ -283,7 +302,7 @@ class ClusterRenderer:
     local_polygon = polygon - np.array([x0, y0], dtype=np.int32)
     mask = np.zeros(roi.shape[:2], dtype=np.uint8)
     cv2.fillPoly(mask, [local_polygon], 255)
-    blended = cv2.addWeighted(np.full_like(roi, color), alpha, roi, 1.0 - alpha, 0)
+    blended = cv2.LUT(roi, _alpha_blend_lut(tuple(color), alpha))
     cv2.copyTo(blended, mask, roi)
 
   @staticmethod
@@ -332,7 +351,7 @@ class ClusterRenderer:
       alpha = color[3] / 255.0
       if alpha <= 0.0:
         continue
-      blended = cv2.addWeighted(np.full_like(band, color[:3]), alpha, band, 1.0 - alpha, 0)
+      blended = cv2.LUT(band, _alpha_blend_lut(color[:3], alpha))
       cv2.copyTo(blended, band_mask, band)
 
   def _draw_model_path(self, frame, path_data, hud_data):

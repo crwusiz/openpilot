@@ -1,3 +1,4 @@
+import math
 import threading
 import time
 
@@ -19,6 +20,34 @@ def _enum_value(value):
   return int(getattr(value, "raw", value))
 
 
+def _finite_number(value):
+  try:
+    number = float(value)
+    return number if math.isfinite(number) else None
+  except (TypeError, ValueError):
+    return None
+
+
+def _initial_health_data():
+  return {
+    "model_seen": False,
+    "model_drop_perc": None,
+    "model_drop_peak_perc": None,
+    "model_exec_ms": None,
+    "model_lagging_update_total": 0,
+    "device_motion_seen": False,
+    "device_motion_inputs_ok": None,
+    "device_motion_posenet_ok": None,
+    "device_motion_input_error_total": 0,
+    "device_motion_posenet_error_total": 0,
+    "device_state_seen": False,
+    "device_cpu_max_pct": None,
+    "cpu_temp_max_c": None,
+    "thermal_status": None,
+    "device_memory_pct": None,
+  }
+
+
 class ClusterModels:
   def __init__(self):
     cloudlog.info("Initializing ClusterModels ...")
@@ -27,7 +56,7 @@ class ClusterModels:
       'modelV2', 'carState', 'selfdriveState', 'controlsState', 'carControl',
       'carParams', 'deviceState', 'gpsLocationExternal', 'naviData',
       'longitudinalPlan', 'vehicleParameters', 'extrinsicsCalibration',
-      'narrowRoadCameraState', 'radarState',
+      'narrowRoadCameraState', 'radarState', 'deviceMotion',
     ])
 
     self.v_ego = 0.0  # m/s 단위 속도
@@ -80,6 +109,7 @@ class ClusterModels:
     self._navi_speed_bump = False
     self.ignore_limit_timer = 0.0
     self._state_lock = threading.RLock()
+    self._health_data = _initial_health_data()
     self.conv = UnitConverter()
 
     try:
@@ -113,6 +143,7 @@ class ClusterModels:
 
   def _update_once(self):
     self.sm.update(0)
+    self._update_health_data()
 
     if self.sm.updated['carState']:
       car_state = self.sm['carState']
@@ -247,6 +278,53 @@ class ClusterModels:
       self.leads = []
     elif any(self.sm.updated[service] for service in ('modelV2', 'radarState', 'longitudinalPlan')):
       self._update_leads()
+
+  def _update_health_data(self):
+    # Observe the same inputs used by selfdrived without publishing events or
+    # changing source messages. Count distinct updates so a stalled renderer
+    # cannot miss a short locationd error followed by a healthy message.
+    health = self._health_data
+    if self.sm.updated.get('modelV2', False):
+      model = self.sm['modelV2']
+      health["model_seen"] = True
+      dropped = _finite_number(getattr(model, 'frameDropPerc', None))
+      executed = _finite_number(getattr(model, 'modelExecutionTime', None))
+      health["model_drop_perc"] = dropped
+      health["model_exec_ms"] = executed * 1000 if executed is not None else None
+      if dropped is not None:
+        previous_peak = health["model_drop_peak_perc"]
+        health["model_drop_peak_perc"] = max(previous_peak, dropped) if previous_peak is not None else dropped
+        if dropped > 2:
+          health["model_lagging_update_total"] += 1
+
+    if self.sm.updated.get('deviceMotion', False):
+      motion = self.sm['deviceMotion']
+      health["device_motion_seen"] = True
+      for source, field, counter in (
+        ('inputsOK', 'device_motion_inputs_ok', 'device_motion_input_error_total'),
+        ('posenetOK', 'device_motion_posenet_ok', 'device_motion_posenet_error_total'),
+      ):
+        value = getattr(motion, source, None)
+        health[field] = bool(value) if value is not None else None
+        if health[field] is False:
+          health[counter] += 1
+
+    if self.sm.updated.get('deviceState', False):
+      device = self.sm['deviceState']
+      health["device_state_seen"] = True
+      for source, field in (('cpuUsagePercent', 'device_cpu_max_pct'), ('cpuTempC', 'cpu_temp_max_c')):
+        values = (_finite_number(value) for value in getattr(device, source, ()))
+        health[field] = max((value for value in values if value is not None), default=None)
+      health["device_memory_pct"] = _finite_number(getattr(device, 'memoryUsagePercent', None))
+      thermal = getattr(device, 'thermalStatus', None)
+      health["thermal_status"] = str(thermal) if thermal is not None else None
+
+  def get_health_data(self):
+    """Snapshot health and consume only the diagnostic model-drop peak."""
+    with self._state_lock:
+      snapshot = self._health_data.copy()
+      self._health_data["model_drop_peak_perc"] = self._health_data["model_drop_perc"]
+      return snapshot
 
   def _update_leads(self):
     plan = self.sm['longitudinalPlan']

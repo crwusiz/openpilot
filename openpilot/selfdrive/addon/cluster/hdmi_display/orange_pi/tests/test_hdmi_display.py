@@ -2,6 +2,7 @@ import ctypes
 import subprocess
 import threading
 from types import SimpleNamespace
+import weakref
 
 import pytest
 
@@ -278,7 +279,7 @@ def test_frame_rotation_preserves_pixels_and_touch_positions(raster_pygame, monk
   width, height = len(expected_rows[0]), len(expected_rows)
   touches = []
   display = HdmiDisplay(width=width, height=height, rotation=rotation, fullscreen=False,
-                        pygame_module=pygame, touch_handler=touches.append)
+                        pygame_module=pygame, touch_handler=touches.append, brightness=100, renderer_mode="surface")
   try:
     assert display.open()
     assert display.send_jpeg(b"decoded-frame-fixture")
@@ -351,7 +352,7 @@ def test_waiting_screen_is_replaced_by_live_frame_and_returns_on_disconnect(rast
   pygame = raster_pygame
   monkeypatch.setattr(hdmi_display.os.path, "isfile", lambda path: False)
   monkeypatch.setattr(pygame.font, "match_font", lambda name: None)
-  display = HdmiDisplay(384, 96, pygame_module=pygame, fullscreen=False)
+  display = HdmiDisplay(384, 96, pygame_module=pygame, fullscreen=False, brightness=100, renderer_mode="surface")
   flips = []
   monkeypatch.setattr(pygame.display, "flip", lambda: flips.append(True))
   live_frame = pygame.Surface((384, 96))
@@ -523,5 +524,414 @@ def test_failed_live_frame_flip_restores_waiting_instead_of_skipping_redraw(rast
     monkeypatch.setattr(pygame.display, "flip", original_flip)
     assert display.show_waiting()
     assert pygame.image.tobytes(display.screen, "RGB") == waiting_pixels
+  finally:
+    display.close()
+
+
+def _control_target(display, name, fraction=0.5):
+  left, top, width, height = display.controls.layout[name]
+  logical_width, logical_height = display.controls.logical_size
+  return (left + width * fraction) / logical_width, (top + height / 2) / logical_height
+
+
+def _post_touch(display, event_type, point=(0.5, 0.5), finger_id=7):
+  x, y = point
+  # Convert a logical cluster position to the panel's default raw coordinates.
+  if display.rotation == 90:
+    x, y = 1 - y, x
+  elif display.rotation == 180:
+    x, y = 1 - x, 1 - y
+  elif display.rotation == 270:
+    x, y = y, 1 - x
+  pygame = display._pygame
+  pygame.event.post(pygame.event.Event(event_type, finger_id=finger_id, x=x, y=y))
+
+
+def _tap_display(display, point=(0.5, 0.5)):
+  _post_touch(display, display._pygame.FINGERDOWN, point)
+  _post_touch(display, display._pygame.FINGERUP, point)
+  assert display.pump_events()
+
+
+def _raster_display(pygame, rotation=0, renderer_mode="surface"):
+  size = (96, 384) if rotation in (90, 270) else (384, 96)
+  display = HdmiDisplay(*size, rotation=rotation, pygame_module=pygame, fullscreen=False, renderer_mode=renderer_mode)
+  assert display.open()
+  return display
+
+
+def test_default_brightness_dims_received_frame_once(raster_pygame, monkeypatch):
+  pygame = raster_pygame
+  frame = pygame.Surface((384, 96))
+  frame.fill((255, 100, 50))
+  monkeypatch.setattr(pygame.image, "load", lambda *_args: frame)
+  display = _raster_display(pygame)
+  try:
+    assert display.send_jpeg(b"first")
+    assert display.last_frame_presented
+    assert display.screen.get_at((0, 0))[:3] == (204, 80, 40)
+    _tap_display(display)
+    assert display.controls.menu_visible
+    assert not display.last_frame_presented, "local menu redraw is not another received frame"
+    _tap_display(display, _control_target(display, "slider", 0.5))
+    assert display.controls.brightness == 55
+    _tap_display(display, _control_target(display, "close"))
+    assert display.screen.get_at((0, 0))[:3] == (140, 55, 28)
+    for _ in range(3):
+      assert display.pump_events()
+    assert display.screen.get_at((0, 0))[:3] == (140, 55, 28)
+    assert frame.get_at((0, 0))[:3] == (255, 100, 50)
+  finally:
+    display.close()
+
+
+def test_screen_off_state_is_readable_from_receiver_thread_without_sdl(raster_pygame):
+  display = _raster_display(raster_pygame)
+  state = []
+  try:
+    display.controls.turn_off()
+    thread = threading.Thread(target=lambda: state.append(display.screen_off))
+    thread.start()
+    thread.join(timeout=1)
+    assert state == [True]
+  finally:
+    display.close()
+
+
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+def test_off_skips_decoding_and_transforms_then_wakes_newest_jpeg_without_menu(raster_pygame, monkeypatch, rotation):
+  pygame = raster_pygame
+  decoded = []
+  transforms = []
+  original_rotate = pygame.transform.rotate
+
+  def load(stream, _name):
+    jpeg = stream.getvalue()
+    decoded.append(jpeg)
+    frame = pygame.Surface((384, 96))
+    frame.fill((0, 0, 255) if jpeg == b"latest" else (255, 0, 0))
+    return frame
+
+  def rotate(frame, angle):
+    transforms.append(angle)
+    return original_rotate(frame, angle)
+
+  monkeypatch.setattr(pygame.image, "load", load)
+  monkeypatch.setattr(pygame.transform, "rotate", rotate)
+  display = _raster_display(pygame, rotation)
+  try:
+    assert display.send_jpeg(b"visible")
+    _tap_display(display)
+    _tap_display(display, _control_target(display, "slider", 0.5))
+    _tap_display(display, _control_target(display, "off"))
+    assert display.controls.screen_off
+    assert not any(pygame.image.tobytes(display.screen, "RGB"))
+    assert display._latest_frame is None
+    decoded.clear()
+    transforms.clear()
+    assert display.send_jpeg(b"old")
+    assert display.send_jpeg(b"latest")
+    assert not display.last_frame_presented
+    assert not decoded
+    assert not transforms
+    assert not any(display.last_frame_timings.values())
+
+    _post_touch(display, pygame.FINGERDOWN)
+    _post_touch(display, pygame.FINGERMOTION, _control_target(display, "off"))
+    _post_touch(display, pygame.FINGERUP)
+    assert display.pump_events()
+    assert decoded == [b"latest"]
+    assert not display.controls.screen_off
+    assert display.controls.brightness == 55
+    assert not display.controls.menu_visible
+    assert not display.last_frame_presented
+    assert display.screen.get_at((0, 0))[:3] == (0, 0, 140)
+  finally:
+    display.close()
+
+
+def test_controls_open_and_auto_hide_without_incoming_frames(raster_pygame, monkeypatch):
+  pygame = raster_pygame
+  display = _raster_display(pygame)
+  now = [0.0]
+  display.controls.clock = lambda: now[0]
+  frame = pygame.Surface((384, 96))
+  frame.fill((255, 0, 0))
+  monkeypatch.setattr(pygame.image, "load", lambda *_args: frame)
+  try:
+    assert display.send_jpeg(b"visible")
+    initial = pygame.image.tobytes(display.screen, "RGB")
+    _tap_display(display)
+    assert pygame.image.tobytes(display.screen, "RGB") != initial
+    now[0] += display.controls.menu_timeout
+    assert display.pump_events()
+    assert not display.controls.menu_visible
+    assert pygame.image.tobytes(display.screen, "RGB") == initial
+  finally:
+    display.close()
+
+
+def test_waiting_screen_controls_wake_without_any_network_frame(raster_pygame):
+  pygame = raster_pygame
+  display = _raster_display(pygame)
+  try:
+    assert display.show_waiting()
+    _tap_display(display)
+    assert display.controls.menu_visible
+    _tap_display(display, _control_target(display, "off"))
+    assert not any(pygame.image.tobytes(display.screen, "RGB"))
+    assert display.show_waiting()
+    assert not any(pygame.image.tobytes(display.screen, "RGB"))
+    _tap_display(display)
+    assert not display.controls.screen_off
+    assert not display.controls.menu_visible
+    assert display._showing_waiting
+    assert any(pygame.image.tobytes(display.screen, "RGB"))
+  finally:
+    display.close()
+
+
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+def test_desktop_mouse_uses_touch_rotation_and_synthetic_mouse_is_ignored(raster_pygame, rotation):
+  pygame = raster_pygame
+  display = _raster_display(pygame, rotation)
+
+  def click(point, synthetic=False):
+    x, y = point
+    if rotation == 90:
+      x, y = 1 - y, x
+    elif rotation == 180:
+      x, y = 1 - x, 1 - y
+    elif rotation == 270:
+      x, y = y, 1 - x
+    width, height = display.screen.get_size()
+    pos = round(x * width), round(y * height)
+    for event_type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
+      pygame.event.post(pygame.event.Event(event_type, button=1, pos=pos, touch=synthetic))
+    assert display.pump_events()
+
+  try:
+    assert display.show_waiting()
+    click((0.5, 0.5), synthetic=True)
+    assert not display.controls.menu_visible
+    click((0.5, 0.5))
+    assert display.controls.menu_visible
+    assert display.last_touch["finger_id"] == -1
+    click(_control_target(display, "off"))
+    assert display.controls.screen_off
+    click((0.5, 0.5), synthetic=True)
+    assert display.controls.screen_off
+    click((0.5, 0.5))
+    assert not display.controls.screen_off
+    assert not display.controls.menu_visible
+  finally:
+    display.close()
+
+
+def test_auto_gpu_failure_logs_and_uses_usable_surface(raster_pygame, monkeypatch, caplog):
+  def unavailable(*_args, **_kwargs):
+    raise ImportError("old distro pygame lacks _sdl2.video")
+
+  monkeypatch.setattr(hdmi_display, "TexturePresenter", unavailable)
+  display = _raster_display(raster_pygame, renderer_mode="auto")
+  try:
+    assert display._presenter is None
+    assert isinstance(display.screen, raster_pygame.Surface)
+    assert "falling back to Surface" in caplog.text
+    assert "old distro pygame" in caplog.text
+    assert display.show_waiting()
+    _tap_display(display)
+    assert display.controls.menu_visible
+  finally:
+    display.close()
+
+
+def test_gpu_path_avoids_surface_conversion_and_cpu_rotation(raster_pygame, monkeypatch):
+  pygame = raster_pygame
+  video = pytest.importorskip("pygame._sdl2.video")
+  original_presenter = hdmi_display.TexturePresenter
+
+  def software_texture(pygame_module, **kwargs):
+    return original_presenter(pygame_module, **kwargs, video_module=video, accelerated=False, vsync=False, hidden=True)
+
+  frame = pygame.Surface((384, 96))
+  frame.fill((255, 0, 0))
+  monkeypatch.setattr(hdmi_display, "TexturePresenter", software_texture)
+  monkeypatch.setattr(pygame.image, "load", lambda *_args: frame)
+  monkeypatch.setattr(pygame.transform, "rotate", lambda *_args: pytest.fail("GPU must not CPU rotate"))
+  monkeypatch.setattr(pygame.transform, "smoothscale", lambda *_args: pytest.fail("GPU must not CPU scale"))
+  display = _raster_display(pygame, rotation=90, renderer_mode="auto")
+  try:
+    assert display._presenter is not None
+    assert pygame.display.get_surface() is None, "standalone SDL window must not own another pygame renderer"
+    assert display.send_jpeg(b"gpu-frame")
+    assert display.last_frame_presented
+    assert display.last_frame_timings["rotate"] == display.last_frame_timings["scale"] == 0
+    output = display._presenter.renderer.to_surface()
+    assert output.get_at((0, 0))[:3] == (204, 0, 0)
+    _tap_display(display)
+    assert display.controls.menu_visible
+    _tap_display(display, _control_target(display, "off"))
+    assert not any(pygame.image.tobytes(display._presenter.renderer.to_surface(), "RGB"))
+    assert display.send_jpeg(b"off-frame")
+    assert not display.last_frame_presented
+    _tap_display(display)
+    assert not display.controls.menu_visible
+    assert display._presenter.renderer.to_surface().get_at((0, 0))[:3] == (204, 0, 0)
+  finally:
+    display.close()
+
+
+def _failing_texture_factory(pygame, monkeypatch):
+  video = pytest.importorskip("pygame._sdl2.video")
+  original_presenter = hdmi_display.TexturePresenter
+  failure = [None]
+  presenters = []
+
+  class Texture:
+    def __init__(self, *args, **kwargs):
+      if failure[0] == "create":
+        raise pygame.error("GPU texture allocation failed")
+      self._texture = video.Texture(*args, **kwargs)
+
+    def update(self, frame):
+      if failure[0] == "update":
+        raise pygame.error("GPU texture upload failed")
+      self._texture.update(frame)
+
+    def draw(self, **kwargs):
+      self._texture.draw(**kwargs)
+
+    @property
+    def color(self):
+      return self._texture.color
+
+    @color.setter
+    def color(self, value):
+      self._texture.color = value
+
+    from_surface = staticmethod(video.Texture.from_surface)
+
+  module = SimpleNamespace(Window=video.Window, Renderer=video.Renderer, Texture=Texture,
+                           WINDOWPOS_CENTERED=video.WINDOWPOS_CENTERED)
+
+  def factory(pygame_module, **kwargs):
+    presenter = original_presenter(pygame_module, **kwargs, video_module=module, accelerated=False, vsync=False, hidden=True)
+    presenters.append(presenter)
+    return presenter
+
+  monkeypatch.setattr(hdmi_display, "TexturePresenter", factory)
+  return failure, presenters
+
+
+@pytest.mark.parametrize("stage", ["create", "update"])
+def test_initial_waiting_texture_failure_releases_gpu_and_displays_surface(raster_pygame, monkeypatch, caplog, stage):
+  pygame = raster_pygame
+  failure, presenters = _failing_texture_factory(pygame, monkeypatch)
+  display = _raster_display(pygame, rotation=90, renderer_mode="auto")
+  try:
+    controls = display.controls
+    controls.set_brightness(35)
+    failure[0] = stage
+    assert display.show_waiting()
+    assert display._presenter is None
+    assert isinstance(display.screen, pygame.Surface)
+    assert presenters[0].window is None
+    assert presenters[0].renderer is None
+    assert display.controls is controls
+    assert controls.brightness == 35
+    assert display.rotation == 90
+    assert display._showing_waiting
+    assert any(pygame.image.tobytes(display.screen, "RGB"))
+    assert "surface: texture presentation failed" in caplog.text
+    assert "GPU texture" in caplog.text
+    assert display.show_waiting()
+    assert len(presenters) == 1, "failed GPU backend must not be retried per frame"
+  finally:
+    display.close()
+
+
+@pytest.mark.parametrize("stage", ["create", "update"])
+def test_live_texture_failure_preserves_rotation_menu_brightness_and_off_wake(raster_pygame, monkeypatch, stage):
+  pygame = raster_pygame
+  failure, presenters = _failing_texture_factory(pygame, monkeypatch)
+  original_load = pygame.image.load
+
+  def load(stream, _name=None):
+    if _name is None:
+      return original_load(stream)
+    # Resizing the input causes another texture creation, allowing either the
+    # new allocation or its upload to fail after the renderer initially works.
+    jpeg = stream.getvalue()
+    frame = pygame.Surface((192, 48) if jpeg == b"new" else (384, 96))
+    frame.fill((0, 0, 255) if jpeg == b"off-latest" else (255, 0, 0))
+    return frame
+
+  monkeypatch.setattr(pygame.image, "load", load)
+  display = _raster_display(pygame, rotation=90, renderer_mode="auto")
+  try:
+    assert display.send_jpeg(b"initial")
+    controls = display.controls
+    controls.set_brightness(35)
+    _tap_display(display)
+    assert controls.menu_visible
+    failure[0] = stage
+    assert display.send_jpeg(b"new")
+    assert display.last_frame_presented
+    assert display._presenter is None
+    assert presenters[0].window is None
+    assert presenters[0].renderer is None
+    assert display.controls is controls
+    assert controls.menu_visible
+    assert controls.brightness == 35
+    assert display.screen.get_size() == (96, 384)
+    assert display.screen.get_at((0, 0))[:3] == (89, 0, 0)
+    _tap_display(display, _control_target(display, "off"))
+    assert display.screen_off
+    assert not any(pygame.image.tobytes(display.screen, "RGB"))
+    assert display.send_jpeg(b"off-latest")
+    _tap_display(display)
+    assert not display.screen_off
+    assert not controls.menu_visible
+    assert controls.brightness == 35
+    assert display.screen.get_at((0, 0))[:3] == (0, 0, 89)
+    assert len(presenters) == 1
+  finally:
+    display.close()
+
+
+def test_fallback_releases_failed_texture_traceback_before_destroying_backend(raster_pygame, monkeypatch):
+  textures = []
+  closed = []
+
+  class Texture:
+    def update(self):
+      raise RuntimeError("texture update failed")
+
+  class Presenter:
+    def __init__(self, _pygame, size, **_kwargs):
+      self.size = size
+      self.texture = None
+
+    def get_size(self):
+      return self.size
+
+    def present(self, _frame, _controls):
+      texture = Texture()
+      textures.append(weakref.ref(texture))
+      self.texture = texture
+      texture.update()
+
+    def close(self):
+      self.texture = None
+      assert textures[0]() is None, "failed update frames must not retain native textures when closing renderer"
+      closed.append(True)
+
+  monkeypatch.setattr(hdmi_display, "TexturePresenter", Presenter)
+  display = _raster_display(raster_pygame, renderer_mode="auto")
+  try:
+    assert display.show_waiting()
+    assert display._presenter is None
+    assert closed == [True]
   finally:
     display.close()

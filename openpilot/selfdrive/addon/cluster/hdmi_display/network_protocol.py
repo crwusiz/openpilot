@@ -12,6 +12,7 @@ ACK_PROTOCOL_ERROR = 2
 FRAME_QUERY_STREAM = 1
 FRAME_STREAM = 2
 ACK_STREAM_SUPPORTED = 1
+ACK_SCREEN_OFF = 2
 
 # Use one formerly reserved byte for capability flags. Packet sizes, sequence
 # offsets and statuses remain compatible with version-1 receivers/senders.

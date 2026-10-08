@@ -180,8 +180,8 @@ class ClusterLiveCamera:
           self._connected_at = time.monotonic()
           self._last_frame_at = 0.0
           self._connection_wait_logged = False
-          flog(f"[CLUSTER_CAM_SUCCESS] VisionIPC connected: "
-               f"{self.vipc.width}x{self.vipc.height}, stride={self.vipc.stride}")
+          flog("[CLUSTER_CAM_SUCCESS] VisionIPC connected: "
+               + f"{self.vipc.width}x{self.vipc.height}, stride={self.vipc.stride}")
 
         buffer = self.vipc.recv(timeout_ms=50)
         if buffer is None:
@@ -211,12 +211,12 @@ class ClusterLiveCamera:
         error_count = 0
         if self.frame_count == 1:
           flog(f"[CLUSTER_CAM_SUCCESS] First optimized road frame: source={buffer.width}x{buffer.height}, "
-               f"panel={self.latest_frame.shape[1]}x{self.latest_frame.shape[0]}, "
-               f"contrast={self.camera_contrast:.2f}")
-        if self._perf_frames >= self.config.fps * 10:
+               + f"panel={self.latest_frame.shape[1]}x{self.latest_frame.shape[0]}, "
+               + f"contrast={self.camera_contrast:.2f}")
+        if now - self._perf_started >= 10.0:
           elapsed = max(now - self._perf_started, 1e-6)
           flog(f"[CLUSTER_CAM_PERF] fps={self._perf_frames / elapsed:.2f} | "
-               f"prepare_avg={self._perf_prepare_time * 1000 / self._perf_frames:.1f}ms")
+               + f"prepare_avg={self._perf_prepare_time * 1000 / self._perf_frames:.1f}ms")
           self._perf_started = now
           self._perf_frames = 0
           self._perf_prepare_time = 0.0

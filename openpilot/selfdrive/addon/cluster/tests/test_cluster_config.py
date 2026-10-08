@@ -9,6 +9,7 @@ import pytest
 
 @pytest.mark.parametrize("transport,size", [(None, (1920, 462)), ("usb", (1920, 462)), ("network", (1920, 480))])
 def test_transport_selection_is_preserved_with_egpu(monkeypatch, transport, size):
+  monkeypatch.delenv("FPS", raising=False)
   params = Mock()
   params.get.return_value = transport
   params.get_bool.return_value = True
@@ -24,5 +25,8 @@ def test_transport_selection_is_preserved_with_egpu(monkeypatch, transport, size
 
   assert config.display_transport == (transport or "usb")
   assert (config.width, config.height) == size
+  assert config.fps == (60 if transport == "network" else 20)
+  assert config.jpeg_quality == 68
+  assert config.network_jpeg_quality == 82
+  assert config.network_max_in_flight == 12
   params.put.assert_not_called()
-

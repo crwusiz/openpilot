@@ -1,6 +1,7 @@
 import signal
 import time
 
+import cv2
 import numpy as np
 
 from openpilot.common.swaglog import cloudlog
@@ -8,10 +9,12 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.addon.cluster.cluster_config import ClusterConfig
 from openpilot.selfdrive.addon.cluster.cluster_logging import close_log, flog, initialize_log
 from openpilot.selfdrive.addon.cluster.cluster_display_pipeline import ClusterDisplayPipeline
+from openpilot.selfdrive.addon.cluster.cluster_frame_clock import ClusterFrameClock
 from openpilot.selfdrive.addon.cluster.cluster_live_camera import ClusterLiveCamera
 from openpilot.selfdrive.addon.cluster.cluster_models import ClusterModels
 from openpilot.selfdrive.addon.cluster.cluster_policy import enforce_cluster_transport
 from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer
+from openpilot.selfdrive.addon.cluster.cluster_runtime_metrics import ClusterRuntimeMetrics
 
 
 def create_cluster_display(config):
@@ -24,6 +27,10 @@ def create_cluster_display(config):
 
 def cluster_main():
   initialize_log()
+  # Camera preprocessing, path drawing and encoding already overlap. Native
+  # OpenCV pools would add more workers on the same three auxiliary CPU cores.
+  cv2.setNumThreads(1)
+  cv2.ocl.setUseOpenCL(False)
 
   cloudlog.info("Initializing Cluster Config...")
   config = ClusterConfig()
@@ -62,9 +69,22 @@ def cluster_main():
   perf_render_stages = dict.fromkeys(("camera_copy", "snapshot", "path", "hud"), 0.0)
   perf_frames = 0
   last_camera_frame = -1
+  frame_clock = ClusterFrameClock(fps)
+  runtime_metrics = ClusterRuntimeMetrics()
+  next_policy_check = 0.0
+  next_offline_frame = 0.0
+  next_screen_off_frame = 0.0
+  last_status_at = perf_started
+  blocked_frames = 0
   try:
     while True:
-      if loop_count % fps == 0:
+      if config.display_transport == "network":
+        frame_clock.wait()
+      else:
+        last_camera_frame = camera.wait_for_frame(last_camera_frame, 1.0 / fps)
+      now = time.monotonic()
+      if now >= next_policy_check:
+        next_policy_check = now + 1.0
         if not enforce_cluster_transport(config.params, config.display_transport):
           flog("[CLUSTER_MAIN] USB cluster stopped for Chestnut eGPU.")
           break
@@ -75,19 +95,37 @@ def cluster_main():
           )
           break
 
-      # Drive rendering from new camera frames. Two independent 20 Hz loops can
-      # otherwise sample the same frame twice and then skip the next one.
-      last_camera_frame = camera.wait_for_frame(last_camera_frame, 1.0 / fps)
-      render_started = time.monotonic()
-      frame_image = renderer.render(camera, models)
-      perf_render_time += time.monotonic() - render_started
-      for stage in perf_render_stages:
-        perf_render_stages[stage] += renderer.last_frame_timings[stage]
-      pipeline.push(frame_image)
-
-      loop_count += 1
-      perf_frames += 1
-      if loop_count % status_interval_frames == 0:
+      health = models.get_health_data()
+      resource_log = runtime_metrics.sample(health)
+      if resource_log is not None:
+        flog(resource_log)
+      # A missing Pi needs only an occasional fresh connection bootstrap image.
+      # When connected, leave rendering/encoding idle while transport is full.
+      render_ready = True
+      if config.display_transport == "network":
+        if not display.connected:
+          render_ready = now >= next_offline_frame
+          if render_ready:
+            next_offline_frame = now + 1.0
+        elif getattr(display, "screen_off", False):
+          render_ready = now >= next_screen_off_frame and pipeline.has_render_capacity()
+          if render_ready:
+            next_screen_off_frame = now + 1.0 / getattr(config, "network_screen_off_fps", 5)
+        else:
+          render_ready = pipeline.has_render_capacity()
+      if render_ready:
+        render_started = time.monotonic()
+        frame_image = renderer.render(camera, models)
+        perf_render_time += time.monotonic() - render_started
+        for stage in perf_render_stages:
+          perf_render_stages[stage] += renderer.last_frame_timings[stage]
+        pipeline.push(frame_image)
+        loop_count += 1
+        perf_frames += 1
+      else:
+        blocked_frames += 1
+      now = time.monotonic()
+      if now - last_status_at >= status_interval_frames / fps:
         stats = pipeline.get_stats()
         flog(
           f"[CLUSTER_HEARTBEAT] Loop: {loop_count} | Camera Ready: {camera.has_frame()} | "
@@ -95,20 +133,22 @@ def cluster_main():
           + f"Dropped: raw={stats['dropped_raw']}, encoded={stats['dropped_prepared']} | "
           + f"Send failures: {stats['send_failures']}",
         )
+        last_status_at = now
 
-      if perf_frames >= fps * 10:
-        now = time.monotonic()
+      if now - perf_started >= 10.0:
         elapsed = max(now - perf_started, 1e-6)
-        stages = " | ".join(f"{stage}_avg={duration * 1000 / perf_frames:.1f}ms"
+        stages = " | ".join(f"{stage}_avg={duration * 1000 / max(perf_frames, 1):.1f}ms"
                             for stage, duration in perf_render_stages.items())
         flog(
           f"[CLUSTER_MAIN_PERF] fps={perf_frames / elapsed:.2f} | "
-          + f"render_avg={perf_render_time * 1000 / perf_frames:.1f}ms | {stages}",
+          + f"render_avg={perf_render_time * 1000 / max(perf_frames, 1):.1f}ms | {stages} | "
+          + f"target={fps} | transport_skipped={blocked_frames}",
         )
         perf_started = now
         perf_render_time = 0.0
         perf_render_stages = dict.fromkeys(perf_render_stages, 0.0)
         perf_frames = 0
+        blocked_frames = 0
 
   except KeyboardInterrupt:
     flog("[CLUSTER_MAIN] Interrupted by user.")

@@ -1,6 +1,7 @@
 from io import BytesIO
 from types import SimpleNamespace
 
+import numpy as np
 from PIL import Image
 
 from openpilot.selfdrive.addon.cluster.cluster_jpeg import ClusterJpegEncoder
@@ -24,3 +25,21 @@ def test_network_frames_keep_hdmi_landscape_orientation():
 def test_usb_frames_keep_turzx_portrait_protocol_orientation():
   assert _encoded_size("usb", (1920, 462)) == (462, 1920)
   assert _encoded_size("usb", (1920, 462), rotate_180=True) == (462, 1920)
+
+
+def test_network_quality_improves_image_detail_without_changing_usb_quality():
+  config = SimpleNamespace(jpeg_quality=68, network_jpeg_quality=82, rotate_180=False)
+  image = np.random.default_rng(7).integers(0, 256, (120, 240, 3), dtype=np.uint8)
+  # Grayscale detail isolates JPEG quality from unavoidable chroma subsampling.
+  image[:] = image[:, :, :1]
+  frame = Image.fromarray(image)
+  errors = {}
+  for transport in ("network", "usb"):
+    encoder = ClusterJpegEncoder(config, transport)
+    prepared = encoder.prepare_image(frame)
+    assert encoder.jpeg_quality == (82 if transport == "network" else 68)
+    with Image.open(BytesIO(prepared.jpeg)) as decoded:
+      if transport == "usb":
+        decoded = decoded.transpose(Image.Transpose.ROTATE_90)
+      errors[transport] = np.mean((np.asarray(decoded, dtype=np.float32) - image) ** 2)
+  assert errors["network"] < errors["usb"]

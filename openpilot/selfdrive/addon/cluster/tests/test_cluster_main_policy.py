@@ -61,3 +61,27 @@ def test_network_shutdown_still_clears_display(cluster):
   cluster.module.cluster_main()
   cluster.display.send_image.assert_called_once()
   cluster.display.close.assert_called_once()
+
+
+def test_network_display_clock_skips_heavy_work_when_transport_has_no_capacity(cluster, monkeypatch):
+  cluster.config.display_transport = "network"
+  cluster.config.fps = 60
+  cluster.config.params.get.return_value = "network"
+  cluster.display.screen_off = False
+  cluster.policy.side_effect = [True, True, False, False]
+  cluster.pipeline.has_render_capacity.side_effect = [False] * 58 + [True, True]
+  now = [0.0]
+
+  def wait():
+    now[0] += 1 / 60
+
+  monkeypatch.setattr(cluster.module.time, "monotonic", lambda: now[0])
+  monkeypatch.setattr(cluster.module, "ClusterFrameClock", lambda fps: SimpleNamespace(wait=wait))
+  monkeypatch.setattr(cluster.module, "ClusterRuntimeMetrics", lambda: SimpleNamespace(sample=lambda _health: None))
+  renderer = cluster.module.ClusterRenderer(cluster.config)
+  renderer.last_frame_timings = dict.fromkeys(("camera_copy", "snapshot", "path", "hud"), 0.0)
+  cluster.module.cluster_main()
+  cluster.camera.wait_for_frame.assert_not_called()
+  assert renderer.render.call_count == 2
+  assert cluster.pipeline.push.call_count == 2
+  assert cluster.models.get_health_data.call_count == 60
