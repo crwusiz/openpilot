@@ -690,7 +690,8 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.locationdTemporaryError: {
     ET.NO_ENTRY: NoEntryAlert("locationd 일시적 오류"),
-    ET.SOFT_DISABLE: soft_disable_alert("locationd 일시적 오류"),
+    #ET.SOFT_DISABLE: soft_disable_alert("locationd 일시적 오류"),
+    ET.PERMANENT: NormalPermanentAlert("locationd 일시적 오류"),
   },
 
   EventName.locationdPermanentError: {
