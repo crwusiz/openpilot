@@ -1,0 +1,29 @@
+[Unit]
+Description=C4 network cluster receiver for Orange Pi HDMI
+# Start the waiting screen without waiting for a hotspot/IP address.
+# scripts/service.sh installs wifi.conf to prepare the vehicle hotspot profile.
+After=network.target systemd-user-sessions.service getty@tty1.service
+Conflicts=getty@tty1.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=orangepi
+Group=orangepi
+SupplementaryGroups=video render input
+WorkingDirectory=/opt/cluster-receiver
+ExecStart=/usr/bin/python3 /opt/cluster-receiver/cluster_receiver.py --interface wlan0 --port 9200 --width 480 --height 1920 --rotation 90
+Restart=on-failure
+RestartSec=2
+Environment=PYTHONUNBUFFERED=1
+Environment=PYGAME_HIDE_SUPPORT_PROMPT=1
+Environment=SDL_VIDEODRIVER=kmsdrm
+Environment=SDL_RENDER_DRIVER=opengles2
+StandardInput=tty-force
+StandardOutput=journal
+StandardError=journal
+TTYPath=/dev/tty1
+
+[Install]
+WantedBy=multi-user.target
