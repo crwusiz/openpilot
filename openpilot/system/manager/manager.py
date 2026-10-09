@@ -15,6 +15,8 @@ from openpilot.common.hardware import HARDWARE
 from openpilot.system.manager.helpers import unblock_stdout, save_bootlog
 from openpilot.system.manager.process import ensure_running
 from openpilot.system.manager.process_config import managed_processes
+from openpilot.system.manager.modeld_recovery import ChestnutModeldRecovery
+from openpilot.selfdrive.modeld.helpers import chestnut_compiled
 from openpilot.system.athena.registration import register, UNREGISTERED_DONGLE_ID
 from openpilot.common.swaglog import cloudlog, add_file_handler
 from openpilot.common.version import get_build_metadata
@@ -127,8 +129,9 @@ def manager_thread() -> None:
   if params.get("CabinCameraHardwareMissing"):
     ignore += ["dmonitoringd", "dmonitoringmodeld"]
 
-  sm = messaging.SubMaster(['deviceState', 'carParams', 'pandaStates'], poll='deviceState')
+  sm = messaging.SubMaster(['deviceState', 'carParams', 'pandaStates', 'carState', 'selfdriveState', 'modelV2'], poll='deviceState')
   pm = messaging.PubMaster(['managerState'])
+  modeld_recovery = ChestnutModeldRecovery(chestnut_compiled)
 
   params.put_bool("IsOffroad", True, block=True)
   ensure_running(managed_processes.values(), False, params=params, CP=sm['carParams'], not_run=ignore)
@@ -155,6 +158,7 @@ def manager_thread() -> None:
     ignition = any(ps.ignitionLine or ps.ignitionCan for ps in sm['pandaStates'] if ps.pandaType != log.PandaState.PandaType.unknown)
     if ignition and not ignition_prev:
       params.clear_all(ParamKeyFlag.CLEAR_ON_IGNITION_ON)
+      modeld_recovery.reset()
 
     # update offroad state for services that don't subscribe to deviceState
     if started != started_prev:
@@ -164,6 +168,11 @@ def manager_thread() -> None:
     ignition_prev = ignition
 
     ensure_running(managed_processes.values(), started, params=params, CP=sm['carParams'], not_run=ignore)
+
+    modeld = managed_processes['modeld']
+    if modeld.name not in ignore and modeld_recovery.update(started, params, sm, modeld):
+      cloudlog.warning(f"restarting modeld after Chestnut power recovery (attempt {modeld_recovery.attempts})")
+      modeld.stop(block=False)
 
     running = ' '.join("{}{}\u001b[0m".format("\u001b[32m" if p.proc.is_alive() else "\u001b[31m", p.name)
                        for p in managed_processes.values() if p.proc)
