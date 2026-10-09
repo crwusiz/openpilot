@@ -2,6 +2,7 @@ import threading
 import time
 
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
+from openpilot.selfdrive.addon.cluster.cluster_jpeg import PreparedFrame
 
 
 class ClusterDisplayPipeline:
@@ -23,6 +24,7 @@ class ClusterDisplayPipeline:
     self._sent_frames = 0
     self._dropped_raw_frames = 0
     self._dropped_prepared_frames = 0
+    self._dropped_stale_frames = 0
     self._send_failures = 0
 
   def start(self):
@@ -44,7 +46,7 @@ class ClusterDisplayPipeline:
       self.sender_thread.start()
     flog("Cluster display pipeline threads started.")
 
-  def push(self, frame_image):
+  def push(self, frame_image, created_at=None):
     if frame_image is None:
       return
 
@@ -56,7 +58,7 @@ class ClusterDisplayPipeline:
       self._input_frames += 1
       if self._pending_frame is not None:
         self._dropped_raw_frames += 1
-      self._pending_frame = frame_image
+      self._pending_frame = (frame_image, time.monotonic() if created_at is None else created_at)
       # Encoder and sender wait on different predicates of this condition.
       # Waking only the sender can leave a raw frame stuck until the next push.
       self._condition.notify_all()
@@ -130,6 +132,7 @@ class ClusterDisplayPipeline:
         "sent": sent,
         "dropped_raw": self._dropped_raw_frames,
         "dropped_prepared": self._dropped_prepared_frames,
+        "dropped_stale": self._dropped_stale_frames,
         "send_failures": self._send_failures,
       }
 
@@ -143,11 +146,14 @@ class ClusterDisplayPipeline:
 
   def _encoder_loop(self):
     while True:
-      frame_image = self._take_pending_frame()
-      if frame_image is None:
+      queued_frame = self._take_pending_frame()
+      if queued_frame is None:
         return
+      frame_image, created_at = queued_frame
       try:
         prepared = self.display.prepare_image(frame_image)
+        if isinstance(prepared, PreparedFrame):
+          prepared = prepared._replace(created_at=created_at)
         if prepared is not None:
           self._publish_prepared(prepared)
       except Exception as e:
@@ -168,13 +174,34 @@ class ClusterDisplayPipeline:
 
         if self._is_closing():
           return
-        # Reconnection can take seconds. Prefer an image encoded while it was
-        # in progress over the stale image that triggered reconnection.
+        # Keep untransmitted JPEGs replaceable while TCP credits are exhausted.
+        # Waiting inside send_prepared would pin an old image before a newer
+        # one can be selected when the next receive ACK releases the window.
+        wait_capacity = getattr(self.display, "wait_for_send_capacity", None)
+        if callable(wait_capacity) and not wait_capacity():
+          self._requeue_prepared_if_empty(prepared)
+          continue
+        if self._is_closing():
+          return
+        # Reconnection and credit waits can take seconds. Select latest after
+        # either wait; an expired frame is an intentional drop, not a failure.
         prepared = self._replace_with_latest_prepared(prepared)
         if prepared is not None:
+          is_stale = getattr(self.display, "is_prepared_stale", None)
+          if callable(is_stale) and is_stale(prepared):
+            record_drop = getattr(self.display, "record_stale_drop", None)
+            if callable(record_drop):
+              record_drop()
+            with self._condition:
+              self._dropped_prepared_frames += 1
+              self._dropped_stale_frames += 1
+            continue
           success = self.display.send_prepared(prepared)
           with self._condition:
-            if success:
+            if success is None:
+              self._dropped_prepared_frames += 1
+              self._dropped_stale_frames += 1
+            elif success:
               self._sent_frames += 1
             else:
               self._send_failures += 1

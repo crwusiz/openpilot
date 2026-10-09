@@ -119,7 +119,7 @@ def cluster_main():
         perf_render_time += time.monotonic() - render_started
         for stage in perf_render_stages:
           perf_render_stages[stage] += renderer.last_frame_timings[stage]
-        pipeline.push(frame_image)
+        pipeline.push(frame_image, created_at=render_started)
         loop_count += 1
         perf_frames += 1
       else:
@@ -131,6 +131,7 @@ def cluster_main():
           f"[CLUSTER_HEARTBEAT] Loop: {loop_count} | Camera Ready: {camera.has_frame()} | "
           + f"Transport: {config.display_transport} | Connected: {display.connected} | Sent: {stats['sent']} | "
           + f"Dropped: raw={stats['dropped_raw']}, encoded={stats['dropped_prepared']} | "
+          + f"Stale drops: {stats['dropped_stale']} | "
           + f"Send failures: {stats['send_failures']}",
         )
         last_status_at = now

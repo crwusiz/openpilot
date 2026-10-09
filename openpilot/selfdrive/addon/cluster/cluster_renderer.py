@@ -44,6 +44,7 @@ BLINKER_PAUSE_MS = 250.0
 CAMERA_OVERLAY_ICON_HEIGHT = 94
 CLIP_MARGIN = 500
 GRADIENT_BANDS = 8
+ALPHA_BLEND_STRIP_HEIGHT = 64
 MAX_DRAW_DISTANCE = 100.0
 LEAD_BAR_LENGTH = 12.0  # px
 LEAD_BAR_WIDTH = 1.8  # m
@@ -288,10 +289,9 @@ class ClusterRenderer:
     if alpha <= 0.0:
       return
 
-    # Lane and road-edge polygons used to copy and blend the whole camera
-    # panel for every line. Blend only the polygon's bounding ROI instead;
-    # this removes several full-frame allocations per render without changing
-    # pixels outside the polygon.
+    # Rasterize once in the original clipped ROI, then crop each strip to its
+    # occupied pixels. A thin diagonal lane can have a nearly full-panel bbox;
+    # looking up that entire rectangle wastes most of the memory traffic.
     x, y, width, height = cv2.boundingRect(polygon)
     x0, y0 = max(x, 0), max(y, 0)
     x1, y1 = min(x + width, image.shape[1]), min(y + height, image.shape[0])
@@ -302,8 +302,16 @@ class ClusterRenderer:
     local_polygon = polygon - np.array([x0, y0], dtype=np.int32)
     mask = np.zeros(roi.shape[:2], dtype=np.uint8)
     cv2.fillPoly(mask, [local_polygon], 255)
-    blended = cv2.LUT(roi, _alpha_blend_lut(tuple(color), alpha))
-    cv2.copyTo(blended, mask, roi)
+    table = _alpha_blend_lut(tuple(color), alpha)
+    for strip_y in range(0, roi.shape[0], ALPHA_BLEND_STRIP_HEIGHT):
+      strip_mask = mask[strip_y:strip_y + ALPHA_BLEND_STRIP_HEIGHT]
+      strip_x, mask_y, strip_w, strip_h = cv2.boundingRect(strip_mask)
+      if strip_w == 0 or strip_h == 0:
+        continue
+      strip = roi[strip_y + mask_y:strip_y + mask_y + strip_h, strip_x:strip_x + strip_w]
+      strip_mask = strip_mask[mask_y:mask_y + strip_h, strip_x:strip_x + strip_w]
+      blended = cv2.LUT(strip, table)
+      cv2.copyTo(blended, strip_mask, strip)
 
   @staticmethod
   def _blend_colors(begin_colors, end_colors, factor):
@@ -328,9 +336,6 @@ class ClusterRenderer:
     color_array = np.asarray(colors, dtype=np.float32)
     mask = np.zeros(roi.shape[:2], dtype=np.uint8)
     cv2.fillPoly(mask, [local_polygon], 255)
-    if not cv2.countNonZero(mask):
-      return
-
     # The former full-resolution float alpha buffer allocated several large
     # arrays for every frame and dominated render time on-device. Eight bands
     # retain the low-alpha visual gradient while keeping blending in OpenCV and
@@ -340,17 +345,21 @@ class ClusterRenderer:
     band_height = max(1, (roi.shape[0] + GRADIENT_BANDS - 1) // GRADIENT_BANDS)
     for band_y0 in range(0, roi.shape[0], band_height):
       band_y1 = min(band_y0 + band_height, roi.shape[0])
-      band = roi[band_y0:band_y1]
       band_mask = mask[band_y0:band_y1]
-      if not cv2.countNonZero(band_mask):
+      band_x, mask_y, band_w, band_h = cv2.boundingRect(band_mask)
+      if band_w == 0 or band_h == 0:
         continue
 
+      # Keep the original band midpoint even when its occupied rows are cropped;
+      # moving it would change the gradient color at the polygon's edges.
       midpoint_y = y0 + (band_y0 + band_y1 - 1) * 0.5
       gradient_position = 1.0 - midpoint_y / denominator
       color = tuple(int(np.interp(gradient_position, stops, color_array[:, channel])) for channel in range(4))
       alpha = color[3] / 255.0
       if alpha <= 0.0:
         continue
+      band = roi[band_y0 + mask_y:band_y0 + mask_y + band_h, band_x:band_x + band_w]
+      band_mask = band_mask[mask_y:mask_y + band_h, band_x:band_x + band_w]
       blended = cv2.LUT(band, _alpha_blend_lut(color[:3], alpha))
       cv2.copyTo(blended, band_mask, band)
 

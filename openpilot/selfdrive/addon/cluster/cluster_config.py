@@ -43,8 +43,10 @@ NETWORK = SimpleNamespace(
   fps=60,  # C4 UI refresh target; camera/model source updates remain 20 Hz.
   screen_off_fps=5,
   jpeg_quality=82,
-  max_in_flight=12,
-  max_in_flight_bytes=2 * 1024 * 1024,
+  max_in_flight=2,
+  max_in_flight_bytes=512 * 1024,
+  max_frame_age_s=0.25,
+  max_ack_age_s=0.25,
 )
 
 RGBColor = tuple[int, int, int]
@@ -142,6 +144,8 @@ class ClusterConfig:
     self.network_ack_timeout = NETWORK.ack_timeout_s
     self.network_max_in_flight = NETWORK.max_in_flight
     self.network_max_in_flight_bytes = NETWORK.max_in_flight_bytes
+    self.network_max_frame_age = NETWORK.max_frame_age_s
+    self.network_max_ack_age = NETWORK.max_ack_age_s
 
     self.BASEDIR = Path(__file__).resolve().parents[3]
     self.font_bold = os.path.join(self.BASEDIR, "selfdrive", "assets", "fonts", "Inter-Bold.ttf")

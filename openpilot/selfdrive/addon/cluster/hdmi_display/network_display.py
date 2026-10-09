@@ -27,8 +27,10 @@ class ClusterNetworkDisplay:
     self.client_address = None
     self.sequence = 0
     self.frame_count = 0
-    self.max_in_flight = min(max(int(getattr(config, "network_max_in_flight", 3)), 1), 16)
-    self.max_in_flight_bytes = max(int(getattr(config, "network_max_in_flight_bytes", 2 * 1024 * 1024)), 1)
+    self.max_in_flight = min(max(int(getattr(config, "network_max_in_flight", 2)), 1), 16)
+    self.max_in_flight_bytes = max(int(getattr(config, "network_max_in_flight_bytes", 512 * 1024)), 1)
+    self.max_frame_age = max(float(getattr(config, "network_max_frame_age", 0.25)), 0.01)
+    self.max_ack_age = max(float(getattr(config, "network_max_ack_age", 0.25)), 0.01)
     self.streaming = False
     self._ack_condition = threading.Condition()
     self._pending_acks = deque()
@@ -38,12 +40,8 @@ class ClusterNetworkDisplay:
     self._ack_closing = False
     self._ack_error = None
     self._perf_started = None
-    self._perf_frames = 0
-    self._perf_prepare_time = 0.0
-    self._perf_network_time = 0.0
-    self._perf_send_time = 0.0
-    self._perf_ack_wait_time = 0.0
-    self._perf_size_kb = 0
+    self._last_ack_at = None
+    self._reset_perf_totals()
     self._status_updated = 0.0
     self._status_error_logged = False
     self._publish_status(force=True)
@@ -51,6 +49,25 @@ class ClusterNetworkDisplay:
       f"ClusterNetworkDisplay initialized ({self.bind_host}:{self.port}, "
       + f"JPEG quality={self.encoder.jpeg_quality}).",
     )
+
+  def _reset_perf_totals(self):
+    self._perf_frames = 0
+    self._perf_prepare_time = 0.0
+    self._perf_network_time = 0.0
+    self._perf_send_time = 0.0
+    self._perf_ack_wait_time = 0.0
+    self._perf_size_kb = 0
+    self._perf_age_frames = 0
+    self._perf_frame_age = self._perf_frame_age_max = 0.0
+    self._perf_send_age = self._perf_send_age_max = 0.0
+    self._perf_encode_age_frames = 0
+    self._perf_encode_age = self._perf_encoded_wait = 0.0
+    self._perf_ack_age_max = 0.0
+    self._perf_ack_gap_max = 0.0
+    self._perf_window_wait = self._perf_window_wait_max = 0.0
+    self._perf_window_checks = 0
+    self._perf_pending_frames_max = self._perf_pending_bytes_max = 0
+    self._perf_stale_frames = 0
 
   def _publish_status(self, force=False):
     now = time.monotonic()
@@ -80,6 +97,7 @@ class ClusterNetworkDisplay:
       self._ack_closing = True
       self._pending_acks.clear()
       self._pending_bytes = 0
+      self._last_ack_at = None
       self.streaming = False
       self._ack_condition.notify_all()
     self._publish_status(force=sock is not None)
@@ -165,11 +183,53 @@ class ClusterNetworkDisplay:
   def get_confirmed_frame_count(self):
     return self.frame_count
 
+  def _oldest_ack_age_locked(self, now=None):
+    if not self._pending_acks:
+      return 0.0
+    return max(0.0, (time.monotonic() if now is None else now) - self._pending_acks[0][2])
+
+  def _has_send_capacity_locked(self, frame_size=None):
+    if not self.connected or self._ack_closing or self._ack_error is not None:
+      return False
+    if not self.streaming:
+      return True
+    byte_capacity = self._pending_bytes < self.max_in_flight_bytes if frame_size is None else (
+      not self._pending_acks or self._pending_bytes + frame_size <= self.max_in_flight_bytes
+    )
+    return (len(self._pending_acks) < self.max_in_flight and byte_capacity
+            and self._oldest_ack_age_locked() <= self.max_ack_age)
+
   def has_send_capacity(self):
     with self._ack_condition:
-      return self.connected and not self._ack_closing and self._ack_error is None and (
-        not self.streaming or (len(self._pending_acks) < self.max_in_flight and self._pending_bytes < self.max_in_flight_bytes)
+      return self._has_send_capacity_locked()
+
+  def wait_for_send_capacity(self, frame_size=None):
+    """Wait before selecting latest JPEG; a slow old ACK blocks admission."""
+    started = time.monotonic()
+    with self._ack_condition:
+      ready = self._ack_condition.wait_for(
+        lambda: self._has_send_capacity_locked(frame_size) or self._ack_error is not None
+        or self._ack_closing or not self.connected, timeout=self.ack_timeout,
       )
+      elapsed = time.monotonic() - started
+      self._perf_window_checks += 1
+      self._perf_window_wait += elapsed
+      self._perf_window_wait_max = max(self._perf_window_wait_max, elapsed)
+      if self._ack_error is not None:
+        raise ConnectionError(f"Stream ACK failed: {self._ack_error}")
+      if self._ack_closing or not self.connected:
+        return False
+      if not ready:
+        raise TimeoutError("Timed out waiting for a stream ACK window slot")
+      return True
+
+  def is_prepared_stale(self, prepared):
+    created_at = getattr(prepared, "created_at", None)
+    return created_at is not None and time.monotonic() - created_at > self.max_frame_age
+
+  def record_stale_drop(self):
+    with self._ack_condition:
+      self._perf_stale_frames += 1
 
   def _start_streaming(self):
     with self._ack_condition:
@@ -204,8 +264,12 @@ class ClusterNetworkDisplay:
           self.screen_off = bool(flags & ACK_SCREEN_OFF)
           self._pending_acks.popleft()
           self._pending_bytes -= len(prepared.jpeg)
+          # Count the validated receive ACK before log/status I/O can stall.
+          # A later generation guard can discard old statistics without losing
+          # a successfully acknowledged frame from the cumulative total.
+          self.frame_count += 1
           self._ack_condition.notify_all()
-        self._record_ack(prepared, sequence, started, sent_at, acknowledged_at)
+        self._record_ack(prepared, sequence, started, sent_at, acknowledged_at, generation)
     except (ConnectionError, OSError, ValueError) as e:
       with self._ack_condition:
         if not self._ack_connection_current(sock, generation):
@@ -224,18 +288,14 @@ class ClusterNetworkDisplay:
 
   def _send_streamed(self, prepared, sequence):
     with self._ack_condition:
-      ready = self._ack_condition.wait_for(
-        lambda: (len(self._pending_acks) < self.max_in_flight and (
-          not self._pending_acks or self._pending_bytes + len(prepared.jpeg) <= self.max_in_flight_bytes
-        )) or self._ack_error is not None or self._ack_closing,
-        timeout=self.ack_timeout,
-      )
-      if self._ack_error is not None:
-        raise ConnectionError(f"Stream ACK failed: {self._ack_error}")
-      if self._ack_closing or not self.connected:
-        return False
-      if not ready:
-        raise TimeoutError("Timed out waiting for a stream ACK window slot")
+      ready = self._has_send_capacity_locked(len(prepared.jpeg))
+    if not ready and not self.wait_for_send_capacity(len(prepared.jpeg)):
+      return False
+    # Byte capacity may have required a second wait after the pipeline chose
+    # its newest JPEG. Expire it before writing any header or sequence number.
+    if self.is_prepared_stale(prepared):
+      self.record_stale_drop()
+      return None
     started = time.monotonic()
     self.sock.sendall(pack_frame_header(sequence, len(prepared.jpeg), FRAME_STREAM))
     self.sock.sendall(prepared.jpeg)
@@ -246,12 +306,18 @@ class ClusterNetworkDisplay:
       self.sequence = sequence
       self._pending_acks.append((sequence, prepared, started, sent_at))
       self._pending_bytes += len(prepared.jpeg)
+      self._perf_pending_frames_max = max(self._perf_pending_frames_max, len(self._pending_acks))
+      self._perf_pending_bytes_max = max(self._perf_pending_bytes_max, self._pending_bytes)
       self._ack_condition.notify_all()
     return True
 
   def send_prepared(self, prepared):
     if not self.connected or self.sock is None or prepared is None:
       return False
+    # None denotes an intentional stale drop, distinct from a transport error.
+    if self.is_prepared_stale(prepared):
+      self.record_stale_drop()
+      return None
 
     sequence = (self.sequence + 1) & 0xFFFFFFFF
     try:
@@ -283,46 +349,79 @@ class ClusterNetworkDisplay:
       self._disconnect_client()
       return False
 
-  def _record_ack(self, prepared, sequence, started, sent_at, acknowledged_at):
-    self._publish_status()
+  def _record_ack(self, prepared, sequence, started, sent_at, acknowledged_at, generation=None):
+    first_message = perf_message = None
     elapsed = acknowledged_at - started
-    self.frame_count += 1
-    now = time.monotonic()
-    if self._perf_started is None:
-      self._perf_started = started
-    self._perf_frames += 1
-    self._perf_prepare_time += prepared.prepare_elapsed
-    self._perf_network_time += elapsed
-    self._perf_send_time += sent_at - started
-    self._perf_ack_wait_time += acknowledged_at - sent_at
-    self._perf_size_kb += prepared.size_kb
+    with self._ack_condition:
+      if generation is not None and generation != self._ack_generation:
+        return
+      if generation is None:
+        self.frame_count += 1
+      now = time.monotonic()
+      if self._perf_started is None:
+        self._perf_started = started
+      self._perf_frames += 1
+      self._perf_prepare_time += prepared.prepare_elapsed
+      self._perf_network_time += elapsed
+      self._perf_send_time += sent_at - started
+      self._perf_ack_wait_time += acknowledged_at - sent_at
+      self._perf_ack_age_max = max(self._perf_ack_age_max, acknowledged_at - sent_at)
+      self._perf_size_kb += prepared.size_kb
+      if self._last_ack_at is not None:
+        self._perf_ack_gap_max = max(self._perf_ack_gap_max, acknowledged_at - self._last_ack_at)
+      self._last_ack_at = acknowledged_at
+      created_at, encoded_at = getattr(prepared, "created_at", None), getattr(prepared, "encoded_at", None)
+      if created_at is not None:
+        frame_age = max(0.0, acknowledged_at - created_at)
+        send_age = max(0.0, started - created_at)
+        self._perf_age_frames += 1
+        self._perf_frame_age += frame_age
+        self._perf_frame_age_max = max(self._perf_frame_age_max, frame_age)
+        self._perf_send_age += send_age
+        self._perf_send_age_max = max(self._perf_send_age_max, send_age)
+        if encoded_at is not None:
+          self._perf_encode_age_frames += 1
+          self._perf_encode_age += max(0.0, encoded_at - created_at)
+          self._perf_encoded_wait += max(0.0, started - encoded_at)
 
-    if self.frame_count == 1:
-      flog(
-        f"[CLUSTER_NETWORK_TX] frame#{sequence} | Size: {prepared.size_kb} KB | "
-        + f"elapsed={elapsed:.3f}s | prep={prepared.prepare_elapsed * 1000:.1f}ms (ACK received)",
-      )
+      if self.frame_count == 1:
+        first_message = (f"[CLUSTER_NETWORK_TX] frame#{sequence} | Size: {prepared.size_kb} KB | "
+                         + f"elapsed={elapsed:.3f}s | prep={prepared.prepare_elapsed * 1000:.1f}ms (ACK received)")
 
-    perf_interval_frames = max(1, int(getattr(self.config, "status_interval_frames", self.config.fps * 10)))
-    if self._perf_frames >= perf_interval_frames or now - self._perf_started >= 10.0:
-      perf_elapsed = max(now - self._perf_started, 1e-6)
-      flog(
-        f"[CLUSTER_NETWORK_PERF] fps={self._perf_frames / perf_elapsed:.2f} | "
-        + f"size_avg={self._perf_size_kb / self._perf_frames:.1f}KB | "
-        + f"prep_avg={self._perf_prepare_time * 1000 / self._perf_frames:.1f}ms | "
-        + f"network_avg={self._perf_network_time * 1000 / self._perf_frames:.1f}ms | "
-        + f"send_avg={self._perf_send_time * 1000 / self._perf_frames:.1f}ms | "
-        + f"ack_wait_avg={self._perf_ack_wait_time * 1000 / self._perf_frames:.1f}ms | "
-        + f"screen_off={int(self.screen_off)} | "
-        + f"mode={'stream' if self.streaming else 'legacy'} | ack={'receive' if self.streaming else 'display'}",
-      )
-      self._perf_started = now
-      self._perf_frames = 0
-      self._perf_prepare_time = 0.0
-      self._perf_network_time = 0.0
-      self._perf_send_time = 0.0
-      self._perf_ack_wait_time = 0.0
-      self._perf_size_kb = 0
+      perf_interval_frames = max(1, int(getattr(self.config, "status_interval_frames", self.config.fps * 10)))
+      if self._perf_frames >= perf_interval_frames or now - self._perf_started >= 10.0:
+        perf_elapsed = max(now - self._perf_started, 1e-6)
+
+        def average_ms(total, count):
+          return f"{total * 1000 / count:.1f}ms" if count else "n/a"
+
+        perf_message = (
+          f"[CLUSTER_NETWORK_PERF] fps={self._perf_frames / perf_elapsed:.2f} | "
+          + f"size_avg={self._perf_size_kb / self._perf_frames:.1f}KB | "
+          + f"prep_avg={self._perf_prepare_time * 1000 / self._perf_frames:.1f}ms | "
+          + f"network_avg={self._perf_network_time * 1000 / self._perf_frames:.1f}ms | "
+          + f"send_avg={self._perf_send_time * 1000 / self._perf_frames:.1f}ms | "
+          + f"ack_wait_avg={self._perf_ack_wait_time * 1000 / self._perf_frames:.1f}ms | "
+          + f"ack_wait_max={self._perf_ack_age_max * 1000:.1f}ms | ack_gap_max={self._perf_ack_gap_max * 1000:.1f}ms | "
+          + f"encode_age_avg={average_ms(self._perf_encode_age, self._perf_encode_age_frames)} | "
+          + f"encoded_wait_avg={average_ms(self._perf_encoded_wait, self._perf_encode_age_frames)} | "
+          + f"send_age_avg={average_ms(self._perf_send_age, self._perf_age_frames)} | send_age_max={self._perf_send_age_max * 1000:.1f}ms | "
+          + f"frame_age_avg={average_ms(self._perf_frame_age, self._perf_age_frames)} | frame_age_max={self._perf_frame_age_max * 1000:.1f}ms | "
+          + f"window_wait_avg={average_ms(self._perf_window_wait, self._perf_window_checks)} | window_wait_max={self._perf_window_wait_max * 1000:.1f}ms | "
+          + f"pending_frames={len(self._pending_acks)} | pending_kb={self._pending_bytes / 1024:.1f} | "
+          + f"oldest_ack_age={self._oldest_ack_age_locked(now) * 1000:.1f}ms | "
+          + f"pending_frames_max={self._perf_pending_frames_max} | pending_kb_max={self._perf_pending_bytes_max / 1024:.1f} | "
+          + f"stale_drops={self._perf_stale_frames} | screen_off={int(self.screen_off)} | "
+          + f"mode={'stream' if self.streaming else 'legacy'} | ack={'receive' if self.streaming else 'display'}"
+        )
+        self._perf_started = now
+        self._reset_perf_totals()
+    # Status files/log sinks can block: never hold queue credits while writing.
+    self._publish_status()
+    if first_message is not None:
+      flog(first_message)
+    if perf_message is not None:
+      flog(perf_message)
 
   def send_image(self, frame_image):
     if not self.connected:

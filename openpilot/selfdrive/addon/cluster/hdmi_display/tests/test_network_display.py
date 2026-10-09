@@ -3,8 +3,11 @@ import threading
 import time
 from types import SimpleNamespace
 import pytest
+import numpy as np
 
+from openpilot.selfdrive.addon.cluster import cluster_jpeg
 from openpilot.selfdrive.addon.cluster.cluster_jpeg import PreparedFrame
+from openpilot.selfdrive.addon.cluster.hdmi_display import network_display
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_display import ClusterNetworkDisplay
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_protocol import (
   ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
@@ -147,7 +150,9 @@ def _read_stream(sock):
 
 
 def test_stream_window_bounds_in_flight_frames_and_releases_on_ack():
-  display = ClusterNetworkDisplay(_config("127.0.0.1", _free_port()))
+  config = _config("127.0.0.1", _free_port())
+  config.network_max_in_flight = 3
+  display = ClusterNetworkDisplay(config)
   window_received = threading.Event()
   release = threading.Event()
   sender_started, sender_finished = threading.Event(), threading.Event()
@@ -373,3 +378,160 @@ def test_receive_acks_report_screen_off_and_wake_without_reconnecting():
     release.set()
     display.close()
     thread.join(timeout=1.0)
+
+
+def test_default_transport_budget_limits_backlog_without_reducing_quality_or_target():
+  config = _config("127.0.0.1", _free_port())
+  config.network_jpeg_quality, config.fps = 82, 60
+  display = ClusterNetworkDisplay(config)
+  try:
+    assert display.max_in_flight == 2
+    assert display.max_in_flight_bytes == 512 * 1024
+    assert display.max_ack_age == display.max_frame_age == 0.25
+    assert display.encoder.jpeg_quality == 82
+    assert display.config.fps == 60
+  finally:
+    display.close()
+
+
+def test_old_ack_age_blocks_admission_even_when_a_frame_slot_is_free(monkeypatch):
+  now = [100.0]
+  monkeypatch.setattr(network_display, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  display = ClusterNetworkDisplay(_config("127.0.0.1", _free_port()))
+  received, release = threading.Event(), threading.Event()
+  sender_started, sender_finished = threading.Event(), threading.Event()
+  results = []
+
+  def client(sock):
+    sequence, _payload = _read_stream(sock)
+    received.set()
+    assert release.wait(timeout=2.0)
+    sock.sendall(pack_ack(sequence, ACK_OK, ACK_STREAM_SUPPORTED))
+    sequence, payload = _read_stream(sock)
+    assert payload == b"new"
+    sock.sendall(pack_ack(sequence, ACK_OK, ACK_STREAM_SUPPORTED))
+
+  def send_next():
+    sender_started.set()
+    results.append(display.send_prepared(_prepared(b"new")))
+    sender_finished.set()
+
+  thread, errors = _stream_client(display, client)
+  sender = threading.Thread(target=send_next, daemon=True)
+  try:
+    assert display.send_prepared(_prepared())
+    assert received.wait(timeout=1.0)
+    assert display.has_send_capacity()
+    now[0] += 0.3
+    assert len(display._pending_acks) == 1 < display.max_in_flight
+    assert not display.has_send_capacity()
+    sender.start()
+    assert sender_started.wait(timeout=1.0)
+    assert not sender_finished.wait(timeout=0.05)
+    release.set()
+    assert sender_finished.wait(timeout=1.0) and results == [True]
+    _wait_for(lambda: display.frame_count == 3)
+    assert not errors
+  finally:
+    release.set()
+    display.close()
+    if sender.ident is not None:
+      sender.join(timeout=1.0)
+    thread.join(timeout=1.0)
+
+
+def test_frame_expired_during_credit_wait_is_not_written_and_fresh_clear_still_sends(monkeypatch):
+  now = [100.0]
+  monkeypatch.setattr(network_display, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(cluster_jpeg, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  config = _config("127.0.0.1", _free_port())
+  config.network_max_in_flight = 1
+  display = ClusterNetworkDisplay(config)
+  received, release = threading.Event(), threading.Event()
+  sender_started, sender_finished, no_stale_bytes = threading.Event(), threading.Event(), threading.Event()
+  results = []
+
+  def client(sock):
+    sequence, _payload = _read_stream(sock)
+    assert sequence == 2
+    received.set()
+    assert release.wait(timeout=2.0)
+    sock.sendall(pack_ack(sequence, ACK_OK, ACK_STREAM_SUPPORTED))
+    assert sender_finished.wait(timeout=1.0)
+    sock.settimeout(0.05)
+    with pytest.raises(socket.timeout):
+      sock.recv(FRAME_HEADER.size)
+    no_stale_bytes.set()
+    sock.settimeout(1.0)
+    sequence, payload = _read_stream(sock)
+    assert sequence == 3  # Expiration did not consume a protocol sequence.
+    assert payload.startswith(b"\xff\xd8")
+    sock.sendall(pack_ack(sequence, ACK_OK, ACK_STREAM_SUPPORTED))
+
+  def send_old():
+    sender_started.set()
+    old = _prepared(b"expired")._replace(created_at=100.0, encoded_at=100.0)
+    results.append(display.send_prepared(old))
+    sender_finished.set()
+
+  thread, errors = _stream_client(display, client)
+  sender = threading.Thread(target=send_old, daemon=True)
+  try:
+    assert display.send_prepared(_prepared())
+    assert received.wait(timeout=1.0)
+    sender.start()
+    assert sender_started.wait(timeout=1.0)
+    assert not sender_finished.wait(timeout=0.05)
+    now[0] += 0.3
+    release.set()
+    assert sender_finished.wait(timeout=1.0) and results == [None]
+    assert no_stale_bytes.wait(timeout=1.0)
+    assert display.sequence == 2 and display.connected
+    assert display._perf_stale_frames == 1
+    assert display.send_image(np.zeros((8, 8, 3), dtype=np.uint8))
+    _wait_for(lambda: display.frame_count == 3)
+    assert not errors
+  finally:
+    release.set()
+    display.close()
+    if sender.ident is not None:
+      sender.join(timeout=1.0)
+    thread.join(timeout=1.0)
+
+
+def test_network_log_distinguishes_creation_to_send_and_receive_ack_age(monkeypatch):
+  now = [10.15]
+  messages = []
+  monkeypatch.setattr(network_display, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(network_display, "flog", messages.append)
+  config = _config("127.0.0.1", _free_port())
+  config.status_interval_frames = 2
+  display = ClusterNetworkDisplay(config)
+  display.connected = display.streaming = True
+  first = _prepared()._replace(created_at=10.0, encoded_at=10.02)
+  second = _prepared()._replace(created_at=10.2, encoded_at=10.22)
+  display._record_ack(first, 1, 10.05, 10.055, 10.15)
+  now[0] = 10.35
+  display._pending_acks.append((3, _prepared(), 10.3, 10.305))
+  display._pending_bytes = 1024
+  display._record_ack(second, 2, 10.25, 10.255, 10.35)
+  perf = next(message for message in messages if "[CLUSTER_NETWORK_PERF]" in message)
+  assert "encode_age_avg=20.0ms" in perf
+  assert "encoded_wait_avg=30.0ms" in perf
+  assert "send_age_avg=50.0ms" in perf and "send_age_max=50.0ms" in perf
+  assert "frame_age_avg=150.0ms" in perf and "frame_age_max=150.0ms" in perf
+  assert "ack_gap_max=200.0ms" in perf
+  assert "pending_frames=1" in perf and "pending_kb=1.0" in perf
+  assert "oldest_ack_age=50.0ms" in perf
+  assert "mode=stream | ack=receive" in perf
+
+
+def test_old_connection_cannot_publish_late_ack_statistics(monkeypatch):
+  display = ClusterNetworkDisplay(_config("127.0.0.1", _free_port()))
+  messages = []
+  monkeypatch.setattr(network_display, "flog", messages.append)
+  old_generation = display._ack_generation
+  display._disconnect_client()
+  display._record_ack(_prepared(), 1, 1.0, 1.01, 1.1, generation=old_generation)
+  assert display.frame_count == 0
+  assert not messages

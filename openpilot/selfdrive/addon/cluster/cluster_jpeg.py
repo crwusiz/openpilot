@@ -13,6 +13,8 @@ class PreparedFrame(NamedTuple):
   jpeg: memoryview
   size_kb: int
   prepare_elapsed: float
+  created_at: float | None = None
+  encoded_at: float | None = None
 
 
 class ClusterJpegEncoder:
@@ -70,10 +72,13 @@ class ClusterJpegEncoder:
         flog("[CLUSTER_ENCODE_ERROR] JPEG encoding failed; skipping frame.")
         return None
 
+      encoded_at = time.monotonic()
       return PreparedFrame(
         jpeg=jpg_data,
         size_kb=len(jpg_data) // 1024,
-        prepare_elapsed=time.monotonic() - prepare_started,
+        prepare_elapsed=encoded_at - prepare_started,
+        created_at=prepare_started,
+        encoded_at=encoded_at,
       )
     except Exception as e:
       flog(f"[CLUSTER_ENCODE_ERROR] Failed to encode display frame: {e}")

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from PIL import Image
 
 from openpilot.selfdrive.addon.cluster.cluster_display_pipeline import ClusterDisplayPipeline
+from openpilot.selfdrive.addon.cluster.cluster_jpeg import PreparedFrame
 from openpilot.selfdrive.addon.cluster.usb_display.turing_usb_display import TuringUsbDisplay
 
 
@@ -217,5 +218,99 @@ def test_sender_exception_is_accounted_for_and_thread_survives():
     assert display.send_attempted.wait(timeout=1.0)
     assert _wait_for(lambda: pipeline.get_stats()["send_failures"] == 1)
     assert pipeline.sender_thread.is_alive()
+  finally:
+    assert pipeline.close()
+
+
+class CreditDisplay:
+  def __init__(self):
+    self.connected = True
+    self.now = 10.0
+    self.wait_started, self.release_credit = threading.Event(), threading.Event()
+    self.latest_prepared, self.stale_dropped = threading.Event(), threading.Event()
+    self.sent = []
+
+  def prepare_image(self, frame):
+    prepared = PreparedFrame(memoryview(frame.encode()), 1, 0.01, self.now, self.now)
+    if frame == "latest":
+      self.latest_prepared.set()
+    return prepared
+
+  def has_send_capacity(self):
+    return self.release_credit.is_set()
+
+  def wait_for_send_capacity(self):
+    self.wait_started.set()
+    return self.release_credit.wait(timeout=2.0)
+
+  def is_prepared_stale(self, prepared):
+    return self.now - prepared.created_at > 0.25
+
+  def record_stale_drop(self):
+    self.stale_dropped.set()
+
+  def send_prepared(self, prepared):
+    self.sent.append(prepared)
+    return True
+
+
+def test_credit_release_selects_latest_frame_encoded_during_window_wait():
+  display = CreditDisplay()
+  pipeline = ClusterDisplayPipeline(display)
+  pipeline.start()
+  try:
+    pipeline.push("old", created_at=10.0)
+    assert display.wait_started.wait(timeout=1.0)
+    display.now = 10.5
+    pipeline.push("latest", created_at=10.5)
+    assert display.latest_prepared.wait(timeout=1.0)
+    # Wait until the replacement has reached the pending JPEG slot.
+    assert _wait_for(lambda: pipeline.get_stats()["encoded"] == 2)
+    display.release_credit.set()
+    assert _wait_for(lambda: pipeline.get_stats()["sent"] == 1)
+    assert bytes(display.sent[0].jpeg) == b"latest"
+    assert display.sent[0].created_at == 10.5
+    assert pipeline.get_stats()["dropped_prepared"] == 1
+    assert pipeline.get_stats()["dropped_stale"] == pipeline.get_stats()["send_failures"] == 0
+  finally:
+    display.release_credit.set()
+    assert pipeline.close()
+
+
+def test_credit_wait_expires_old_frame_without_failure_and_allows_fresh_render():
+  display = CreditDisplay()
+  pipeline = ClusterDisplayPipeline(display)
+  pipeline.start()
+  try:
+    pipeline.push("old", created_at=10.0)
+    assert display.wait_started.wait(timeout=1.0)
+    display.now = 10.5
+    display.release_credit.set()
+    assert display.stale_dropped.wait(timeout=1.0)
+    assert _wait_for(lambda: pipeline.get_stats()["dropped_stale"] == 1)
+    assert not display.sent
+    assert pipeline.has_render_capacity()
+    pipeline.push("fresh", created_at=10.5)
+    assert _wait_for(lambda: pipeline.get_stats()["sent"] == 1)
+    assert bytes(display.sent[0].jpeg) == b"fresh"
+    stats = pipeline.get_stats()
+    assert stats["dropped_stale"] == stats["dropped_prepared"] == 1
+    assert stats["send_failures"] == 0
+  finally:
+    display.release_credit.set()
+    assert pipeline.close()
+
+
+def test_transport_expiration_result_counts_as_drop_instead_of_send_failure():
+  display = FailedSendDisplay()
+  display.send_prepared = lambda _prepared: None
+  pipeline = ClusterDisplayPipeline(display)
+  pipeline.start()
+  try:
+    pipeline.push("frame")
+    assert _wait_for(lambda: pipeline.get_stats()["dropped_stale"] == 1)
+    stats = pipeline.get_stats()
+    assert stats["sent"] == stats["send_failures"] == 0
+    assert stats["dropped_prepared"] == 1
   finally:
     assert pipeline.close()

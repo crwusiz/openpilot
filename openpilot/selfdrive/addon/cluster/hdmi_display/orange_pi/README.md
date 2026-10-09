@@ -433,7 +433,9 @@ Network 모드는 **C4 UI와 같은 60 FPS를 목표**로 독립적인 출력 �
 
 전송·인코딩 대기가 있으면 C4가 새 영상을 계속 렌더링하지 않고 빈 슬롯을 기다립니다. Pi가 연결되지 않았을 때는 연결 시작용 영상을 초당 한 장만 준비합니다. 경로·차선 알파 합성은 색상별 lookup table을 재사용해 매번 단색 배열을 만들던 비용을 줄입니다. Cluster 프로세스의 OpenCV와 BLAS 작업 스레드 수를 1로 제한하고 Linux CPU 우선순위를 낮춥니다. manager가 NumPy를 이미 불러온 상태에서 fork했다면 cluster 자식 프로세스만 같은 PID로 새 Python 인터프리터에서 시작해 스레드 제한을 적용합니다.
 
-C4와 Pi가 모두 새 버전이면 첫 프레임의 헤더와 ACK에 있는 예약 바이트로 스트리밍 지원을 확인합니다. 첫 프레임은 화면 출력 완료를 기다리고, 이후에는 Pi가 JPEG 본문을 받은 즉시 ACK를 보냅니다. C4는 기본 최대 **12장, 합계 2 MiB**의 ACK를 기다리는 동안 다음 프레임을 보낼 수 있습니다. 한 장이 2 MiB보다 크면 대기 프레임이 없을 때만 전송하며 프로토콜의 4 MiB 제한은 유지합니다. Pi는 별도 스레드로 수신하고 대기 JPEG 한 장만 유지하며, 출력이 늦어지면 대기 영상을 최신 영상으로 교체합니다. SDL 이벤트와 화면 출력은 수신기 메인 스레드에서 처리합니다. [SDL 화면 출력의 스레드 제약](https://wiki.libsdl.org/SDL2/SDL_RenderPresent)
+C4와 Pi가 모두 새 버전이면 첫 프레임의 헤더와 ACK에 있는 예약 바이트로 스트리밍 지원을 확인합니다. 첫 프레임은 화면 출력 완료를 기다리고, 이후에는 Pi가 JPEG 본문을 받은 즉시 ACK를 보냅니다. C4는 기본 최대 **2장, 합계 512 KiB**의 ACK를 기다리는 동안 다음 프레임을 보낼 수 있습니다. 한 장이 512 KiB보다 크면 대기 프레임이 없을 때만 전송하며 프로토콜의 4 MiB 제한은 유지합니다. 오래된 ACK가 250ms 이상 대기 중이면 새 프레임 준비·전송을 기다립니다. 보내지 않은 영상도 생성 후 250ms가 지나면 버리고 최신 상태에서 다시 준비합니다. 이 값은 실제 출력 지연의 보장치가 아니라, 과거 영상을 더 쌓지 않기 위한 제한입니다.
+
+2026-10-09 로그에서는 평균 수신 확인이 약 6.3 FPS이고 ACK 대기가 약 1.78초였습니다. 이전 12장 창은 느린 링크에서 약 2초 분량의 영상을 TCP에 쌓을 수 있었습니다. Pi가 대기 JPEG 한 장만 유지해도 TCP에 이미 들어간 과거 영상은 건너뛸 수 없으므로 전송 대기량을 줄였습니다. Pi는 별도 스레드로 수신하고 대기 JPEG 한 장만 유지하며, 출력이 늦어지면 대기 영상을 최신 영상으로 교체합니다. SDL 이벤트와 화면 출력은 수신기 메인 스레드에서 처리합니다. [SDL 화면 출력의 스레드 제약](https://wiki.libsdl.org/SDL2/SDL_RenderPresent)
 
 Pi는 SDL2 texture를 재사용하며 회전·크기 조절·밝기 조절을 GPU에 맡깁니다. 사용할 수 없으면 기존 Surface 출력으로 자동 전환합니다. `[CLUSTER_HDMI_RENDERER] texture` 또는 `surface` 로그로 선택된 경로를 확인합니다. 새 출력 경로에 문제가 있으면 `run_console.sh --renderer surface --log-touch`로 기존 경로와 비교할 수 있습니다. [pygame SDL2 texture·renderer API](https://www.pygame.org/docs/ref/sdl2_video.html)
 
@@ -443,7 +445,7 @@ Pi는 SDL2 texture를 재사용하며 회전·크기 조절·밝기 조절을 GP
 
 | 로그 | 항목과 의미 |
 | --- | --- |
-| C4 `[CLUSTER_NETWORK_PERF]` | `fps`: 정상 ACK를 받은 프레임 수, `prep_avg`: JPEG 준비, `send_avg`: 두 `sendall` 호출, `ack_wait_avg`: 전송 호출 종료부터 ACK까지. `mode=stream`, `ack=receive`이면 수신 확인이고 `mode=legacy`, `ack=display`이면 출력 완료 확인입니다. `screen_off`는 Pi가 알린 화면 끄기 상태입니다. 정상 ACK가 있는 동안 약 10초마다 기록합니다. |
+| C4 `[CLUSTER_NETWORK_PERF]` | `fps`: 정상 ACK를 받은 프레임 수, `prep_avg`: JPEG 준비, `send_avg`: 두 `sendall` 호출, `ack_wait_avg/max`: 전송 호출 종료부터 ACK까지. `send_age_avg/max`: 생성부터 전송 시작까지, `frame_age_avg/max`: 생성부터 ACK까지이며 실제 화면 표시까지의 나이는 아닙니다. `encode_age_avg`·`encoded_wait_avg`는 생성→인코딩 완료·인코딩 완료→전송 시작, `window_wait_avg/max`는 전송 창 대기 시간입니다. `ack_gap_max`는 ACK 사이 최장 간격, `pending_frames/kb`·`oldest_ack_age`는 현재 전송 대기량·가장 오래된 ACK의 나이, `stale_drops`는 만료로 폐기한 영상입니다. `mode=stream`, `ack=receive`이면 수신 확인이고 `mode=legacy`, `ack=display`이면 출력 완료 확인입니다. `screen_off`는 Pi가 알린 화면 끄기 상태입니다. 정상 ACK가 있는 동안 약 10초마다 기록합니다. |
 | C4 `[CLUSTER_MAIN_PERF]` | `target`: 목표 FPS, `transport_skipped`: 대기·화면 끄기 때문에 렌더링을 생략한 주기 수. `camera_copy_avg`: 영상 복사, `snapshot_avg`: 모델/HUD 상태 조회와 잠금 대기, `path_avg`: 경로·차선·리드 표시, `hud_avg`: PIL 변환과 HUD 합성. 약 10초마다 기록합니다. |
 | C4 `[CLUSTER_RESOURCE_PERF]` | Cluster CPU·RSS·스레드 수, 기기 CPU·온도·메모리, 모델 드롭률·실행 시간, deviceMotion의 `inputsOK`·`posenetOK`를 함께 기록합니다. `cpu_pct=100`은 CPU 한 코어를 계속 사용한 값입니다. `model_drop_max`와 해당 구간의 오류 업데이트 수로 잠깐 발생한 문제도 확인합니다. 아직 받지 못한 상태는 `n/a`로 표시합니다. |
 | Pi `[CLUSTER_RX_PERF]` | `mode=stream`일 때 `fps`: 수신 FPS, `display_fps`: 실제 영상 출력 FPS, `dropped`: 대기 JPEG 교체 횟수입니다. 화면 끄기·메뉴 다시 그리기는 영상 출력 수에 포함하지 않습니다. `queue_wait_avg/max`: 수신 후 출력 대기, `display_gap_max`: 영상 출력 사이의 최대 간격, `display_max`: 최악의 화면 처리 시간도 기록합니다. `header_wait_avg`: 다음 헤더 대기, `receive_avg`: JPEG 본문 수신, `display_avg`: 전체 화면 처리, `ack_send_avg`: ACK 전송 호출입니다. 화면 처리 안의 `decode_avg`·`rotate_avg`·`scale_avg`·`blit_avg`·`flip_avg`도 기록합니다. |
@@ -458,7 +460,27 @@ Pi 로그는 다음으로 확인합니다.
 journalctl -u cluster-hdmi.service -b --no-pager | grep -E 'CLUSTER_HDMI_RENDERER|CLUSTER_RX_MODE|CLUSTER_RX_PERF'
 ```
 
-C4 heartbeat의 `Dropped: encoded`는 전송 중이거나 연결되지 않았을 때 대기 프레임을 최신 프레임으로 교체한 횟수입니다. TCP 패킷 손실 횟수가 아닙니다.
+C4 heartbeat의 `Dropped: encoded`는 대기 영상을 교체하거나 만료로 폐기한 횟수입니다. 그중 `Stale drops`는 생성 후 250ms를 넘겨 보내지 않은 영상입니다. TCP 패킷 손실 횟수가 아닙니다. 생성·대기 시간은 C4 벽시계가 보정되어도 영향을 받지 않도록 monotonic 시계를 사용합니다.
+
+### Cluster 로그와 Pi 로그 함께 업로드
+
+대시보드 **System Logs → Cluster Debug → UPLOAD**를 사용하면 C4 로그를 업로드한 뒤 Pi에 SSH로 접속해 로그를 수집하고 함께 업로드합니다. 두 파일의 시각·차량·기기 접두사는 같습니다.
+
+```text
+..._cluster_debug.log       C4 렌더링·전송·자원 상태
+..._cluster_pi_debug.log    Pi 서비스 journal·출력 성능·수집 상태
+```
+
+Pi 파일에는 최근 `cluster-hdmi.service` 로그 최대 2500줄, 수집 시각·부팅 정보, 서비스 상태, Wi-Fi 절전·현재 링크 상태를 담습니다. UTC 시각과 최신 순서로 journal을 기록하며, 저장된 이전 부팅의 로그도 포함합니다. 전체 파일은 최대 512 KiB입니다. Wi-Fi 비밀번호나 전체 연결 프로필은 수집하지 않습니다. SSH 포트는 **9122를 먼저 시도**하고 연결 자체가 실패한 경우에만 22로 재시도합니다. 인증 실패나 Pi 명령 실패에는 다른 포트로 재시도하지 않으며 SSH 설정도 바꾸지 않습니다.
+
+Pi는 수집할 때 켜져 있고 C4와 같은 핫스팟에 연결되어 있어야 합니다. 현재 연결된 IP가 없으면 C4 주행 로그의 마지막 Pi 연결 주소를 사용합니다. 다른 주소·계정을 쓰면 `CLUSTER_PI_HOST`, `CLUSTER_PI_USER`, `CLUSTER_PI_IDENTITY`, `CLUSTER_PI_PASSWORD` 환경 변수로 지정할 수 있습니다. 수집은 25초 제한을 공유하며 주소 검색도 로그 뒤에서 최대 32 MiB만 읽습니다. Pi 수집에 실패해도 C4 로그 업로드는 유지하고, Pi 파일에 실패 상태를 기록하며 대시보드에는 경고를 표시합니다. 명확한 USB 전용 로그는 SSH를 시도하지 않고 수집 생략 상태를 기록합니다. Pi journal이 재부팅 후 남아 있지 않으면 이전 주행 로그를 복구할 수는 없습니다.
+
+C4 SSH에서 직접 업로드할 수도 있습니다. 이 명령도 두 로그를 함께 처리합니다.
+
+```bash
+cd /data/openpilot
+bash scripts/log_upload.sh /data/log/cluster_debug.log
+```
 
 ## 장비 확인 순서
 

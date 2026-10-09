@@ -28,5 +28,7 @@ def test_transport_selection_is_preserved_with_egpu(monkeypatch, transport, size
   assert config.fps == (60 if transport == "network" else 20)
   assert config.jpeg_quality == 68
   assert config.network_jpeg_quality == 82
-  assert config.network_max_in_flight == 12
+  assert config.network_max_in_flight == 2
+  assert config.network_max_in_flight_bytes == 512 * 1024
+  assert config.network_max_frame_age == config.network_max_ack_age == 0.25
   params.put.assert_not_called()

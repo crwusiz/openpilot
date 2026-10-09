@@ -65,34 +65,61 @@ def test_alpha_lookup_matches_all_rgb_values(renderer_module):
       np.testing.assert_array_equal(actual, expected)
 
 
-@pytest.mark.parametrize("polygon", [
-  [[25, 0], [41, 0], [65, 62], [0, 62]],
-  [[-10, 2], [35, 15], [90, 80], [-15, 50]],
-])
-def test_gradient_preserves_previous_bands_and_pixels(renderer_module, polygon):
-  actual = np.random.default_rng(13).integers(0, 256, (64, 72, 3), dtype=np.uint8)
-  expected = actual.copy()
-  polygon = np.array(polygon, dtype=np.int32)
-  colors = [(255, 0, 0, 0), (20, 180, 99, 180), (70, 210, 110, 220)]
-  stops = [0.0, 0.5, 1.0]
+def _old_gradient_blend(expected, polygon, colors, stops, gradient_bands):
   x, y, width, height = cv2.boundingRect(polygon)
   x0, y0 = max(x, 0), max(y, 0)
   x1, y1 = min(x + width, expected.shape[1]), min(y + height, expected.shape[0])
+  if x0 >= x1 or y0 >= y1:
+    return
   roi = expected[y0:y1, x0:x1]
   mask = np.zeros(roi.shape[:2], dtype=np.uint8)
   cv2.fillPoly(mask, [polygon - np.array([x0, y0], dtype=np.int32)], 255)
-  band_height = max(1, (roi.shape[0] + renderer_module.GRADIENT_BANDS - 1) // renderer_module.GRADIENT_BANDS)
+  band_height = max(1, (roi.shape[0] + gradient_bands - 1) // gradient_bands)
   color_array = np.asarray(colors, dtype=np.float32)
   for band_y0 in range(0, roi.shape[0], band_height):
     band_y1 = min(band_y0 + band_height, roi.shape[0])
     midpoint_y = y0 + (band_y0 + band_y1 - 1) * 0.5
-    gradient_position = 1.0 - midpoint_y / (expected.shape[0] - 1)
+    gradient_position = 1.0 - midpoint_y / max(expected.shape[0] - 1, 1)
     color = tuple(int(np.interp(gradient_position, stops, color_array[:, channel])) for channel in range(4))
     alpha = color[3] / 255.0
     band = roi[band_y0:band_y1]
     blended = cv2.addWeighted(np.full_like(band, color[:3]), alpha, band, 1 - alpha, 0)
     cv2.copyTo(blended, mask[band_y0:band_y1], band)
+
+
+@pytest.mark.parametrize("shape,polygon", [
+  ((64, 72), [[25, 0], [41, 0], [65, 62], [0, 62]]),
+  ((64, 72), [[-10, 2], [35, 15], [90, 80], [-15, 50]]),
+  ((460, 1288), [[620, 0], [667, 0], [1138, 459], [150, 459]]),
+  ((460, 1288), [[70, 0], [79, 0], [1159, 459], [1150, 459]]),
+  ((460, 1288), [[-400, 0], [200, -200], [500, 420], [-200, 510]]),
+  ((460, 1288), [[-300, 10], [10, -300], [-300, -300]]),
+  ((1, 72), [[-10, -5], [60, -5], [60, 5], [-10, 5]]),
+])
+def test_gradient_preserves_previous_bands_and_pixels(renderer_module, shape, polygon):
+  actual = np.random.default_rng(13).integers(0, 256, (*shape, 3), dtype=np.uint8)
+  expected = actual.copy()
+  polygon = np.array(polygon, dtype=np.int32)
+  colors = [(255, 0, 0, 0), (20, 180, 99, 180), (70, 210, 110, 220)]
+  stops = [0.0, 0.5, 1.0]
+  _old_gradient_blend(expected, polygon, colors, stops, renderer_module.GRADIENT_BANDS)
   renderer_module.ClusterRenderer._fill_polygon_gradient(actual, polygon, colors, stops)
+  np.testing.assert_array_equal(actual, expected)
+
+
+@pytest.mark.parametrize("color", [(255, 255, 255), (10, 221, 101, 100)])
+@pytest.mark.parametrize("polygon", [
+  [[70, 0], [79, 0], [1159, 459], [1150, 459]],
+  [[620, 0], [628, 0], [719, 459], [711, 459]],
+  [[-400, 0], [200, -200], [500, 420], [-200, 510]],
+  [[-300, 10], [10, -300], [-300, -300]],
+])
+def test_large_clipped_alpha_strips_match_previous_pixels(renderer_module, color, polygon):
+  original = np.random.default_rng(17).integers(0, 256, (460, 1288, 3), dtype=np.uint8)
+  polygon = np.array(polygon, dtype=np.int32)
+  expected, actual = original.copy(), original.copy()
+  _old_alpha_blend(expected, polygon, color, 0.7)
+  renderer_module.ClusterRenderer._fill_polygon_alpha(actual, polygon, color, 0.7)
   np.testing.assert_array_equal(actual, expected)
 
 

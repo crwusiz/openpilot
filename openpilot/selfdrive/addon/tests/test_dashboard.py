@@ -151,6 +151,26 @@ class TestDashboardAsync(unittest.IsolatedAsyncioTestCase):
       self.assertEqual(await dashboard.run_script_async('Upload', '/tmp/test.sh'), 1)
       self.assertIn('ERROR: file not found', notify.call_args.args[0])
 
+  async def test_partial_cluster_upload_reports_warning_without_failing_c4_upload(self):
+    warning = 'C4 로그 업로드 완료. Pi 로그 수집에 실패했습니다.'
+    with patch.object(dashboard, '_run_command', AsyncMock(return_value=(0, f'uploaded\nCLUSTER_PI_LOG_WARNING: {warning}\n'))), \
+         patch.object(ui, 'notify') as notify:
+      self.assertEqual(await dashboard.run_script_async('Log Upload', '/data/openpilot/scripts/log_upload.sh'), 0)
+      self.assertIn(warning, notify.call_args.args[0])
+      self.assertEqual(notify.call_args.kwargs['type'], 'warning')
+
+  async def test_complete_cluster_upload_reports_success(self):
+    with patch.object(dashboard, '_run_command', AsyncMock(return_value=(0, 'C4 and Pi logs uploaded'))), \
+         patch.object(ui, 'notify') as notify:
+      self.assertEqual(await dashboard.run_script_async('Log Upload', '/data/openpilot/scripts/log_upload.sh'), 0)
+      self.assertEqual(notify.call_args.kwargs['type'], 'positive')
+
+  async def test_pi_warning_marker_does_not_change_other_scripts(self):
+    with patch.object(dashboard, '_run_command', AsyncMock(return_value=(0, 'CLUSTER_PI_LOG_WARNING: unrelated output'))), \
+         patch.object(ui, 'notify') as notify:
+      self.assertEqual(await dashboard.run_script_async('Other', '/tmp/other.sh'), 0)
+      self.assertEqual(notify.call_args.kwargs['type'], 'positive')
+
   async def test_git_pull_modal_does_not_reboot(self):
     client = Client(ui.page('/test-dashboard-modal'))
     self.addCleanup(client.delete)

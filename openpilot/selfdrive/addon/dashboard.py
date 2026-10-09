@@ -189,6 +189,14 @@ def _get_error_summary(output: str) -> str:
   return (curl_errors[-1] if curl_errors else lines[-1])[:300]
 
 
+def _get_log_upload_warning(path: str, output: str) -> str | None:
+  if Path(path).name != 'log_upload.sh':
+    return None
+  prefix = 'CLUSTER_PI_LOG_WARNING:'
+  warnings = [line.strip()[len(prefix):].strip() for line in output.splitlines() if line.strip().startswith(prefix)]
+  return warnings[-1][:300] if warnings else None
+
+
 async def run_script_async(name: str, path: str, args: list[str] | None = None, show_modal: bool = False) -> int:
   command = _script_command(path, args)
   if not show_modal:
@@ -196,7 +204,11 @@ async def run_script_async(name: str, path: str, args: list[str] | None = None, 
     try:
       return_code, output = await _run_command(command)
       if return_code == 0:
-        ui.notify(f"[{name}] 완료", type='positive', position='top')
+        warning = _get_log_upload_warning(path, output)
+        if warning:
+          ui.notify(f"[{name}] {warning}", type='warning', position='top')
+        else:
+          ui.notify(f"[{name}] 완료", type='positive', position='top')
       else:
         ui.notify(f"[{name}] 에러: {_get_error_summary(output)}", type='negative', position='top')
       return return_code
@@ -231,9 +243,13 @@ async def run_script_async(name: str, path: str, args: list[str] | None = None, 
   try:
     return_code, output = await _run_command(command, render_output)
     if return_code == 0:
-      # gitpull.sh starts the update in tmux and owns the restart sequence.
-      message = "tmux에서 업데이트를 시작했습니다." if Path(path).name == "gitpull.sh" else "성공적으로 완료되었습니다."
-      output += f"\n✅ [{datetime.now().strftime('%H:%M:%S')}] {message}\n"
+      warning = _get_log_upload_warning(path, output)
+      if warning:
+        output += f"\n⚠️ [{datetime.now().strftime('%H:%M:%S')}] {warning}\n"
+      else:
+        # gitpull.sh starts the update in tmux and owns the restart sequence.
+        message = "tmux에서 업데이트를 시작했습니다." if Path(path).name == "gitpull.sh" else "성공적으로 완료되었습니다."
+        output += f"\n✅ [{datetime.now().strftime('%H:%M:%S')}] {message}\n"
     else:
       output += f"\n❌ 오류가 발생하여 중단되었습니다. (Exit Code: {return_code})\n"
     return return_code
