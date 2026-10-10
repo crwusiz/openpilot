@@ -71,6 +71,8 @@ C4 대시보드의 **Toggles → Cluster Enable** 아래에 `Orange Pi 연결됨
 | [install.sh](scripts/install.sh) | OS pygame·필수 라이브러리 설치, `/opt/cluster-receiver`로 패키지 복사 |
 | [connect_wifi.sh](scripts/connect_wifi.sh) | 핫스팟 연결 및 IP 확인; 비밀번호는 대화형 입력 |
 | [ensure_wifi.sh](scripts/ensure_wifi.sh) | 차량 `Android` 프로필 저장·재사용, 자동 연결·Wi-Fi 절전 해제 |
+| [wifi_power_save.sh](scripts/wifi_power_save.sh) | 활성 Wi-Fi 프로필의 절전 설정만 변경하고 실제 인터페이스의 `off` 확인 |
+| [wifi_boot_setup.sh](scripts/wifi_boot_setup.sh) | 수신기 시작·Wi-Fi 재연결 시 절전 해제 실행 설정 설치 |
 | [run_console.sh](scripts/run_console.sh) | 데스크톱·수신기 중지, 연결된 HDMI 카드 선택, KMSDRM + GLES2 실행 |
 | [diagnose.sh](scripts/diagnose.sh) | OS·SDL·DRM·서비스 진단 파일 저장; 선택적으로 GBM/EGL 점검 |
 | [run_desktop.sh](scripts/run_desktop.sh) | 로그인한 X11 데스크톱에서 소프트웨어 화면 출력 |
@@ -88,34 +90,36 @@ C4 대시보드의 **Toggles → Cluster Enable** 아래에 `Orange Pi 연결됨
 sudo bash /opt/cluster-receiver/scripts/install.sh
 ```
 
-Debian/Ubuntu의 OS `python3-pygame`을 설치하고 `/usr/bin/python3`로 실행합니다. 가상 환경은 필요하지 않습니다. 설치 스크립트는 서비스·데스크톱 설정을 바꾸지 않습니다. 연결 대기 화면의 한국어 문구를 위해 `fonts-noto-cjk`도 설치합니다. 이전 버전을 설치한 장비는 수정된 파일을 반영하고 `install.sh`를 한 번 실행해 이 폰트를 추가합니다.
+Debian/Ubuntu의 OS `python3-pygame`을 설치하고 `/usr/bin/python3`로 실행합니다. 가상 환경은 필요하지 않습니다. 이미 수신기가 설치된 장비에는 Wi-Fi 절전 해제 실행 설정을 보완하며, 서비스 실행 계정·화면 옵션·데스크톱 부팅 대상은 유지합니다. 연결 대기 화면의 한국어 문구를 위해 `fonts-noto-cjk`도 설치합니다. 이전 버전을 설치한 장비는 수정된 파일을 반영하고 `install.sh`를 한 번 실행해 이 폰트를 추가합니다.
 
 pip wheel의 SDL은 시스템 SDL과 빌드 기능이 다를 수 있습니다. `libdrm`·`libgbm` 설치만으로 wheel에 KMSDRM이 추가되지는 않습니다. 진단의 `pygame` 경로는 보통 `/usr/lib/python3/dist-packages/pygame/...`입니다. `.local`, `/usr/local`, `.venv`가 나오면 pip 설치나 `PYTHONPATH`가 OS 패키지를 가리는지 확인합니다.
 
 ### 차량 테더링 자동 연결
 
-차량 환경의 기본 정보는 **SSID `Android`, 비밀번호 `12345678`, 인터페이스 `wlan0`**입니다. [ensure_wifi.sh](scripts/ensure_wifi.sh)가 같은 SSID의 기존 Wi-Fi 프로필을 찾아 재사용하고, 없으면 `cluster-vehicle-wlan0` 이름으로 생성합니다. 프로필 이름이 바뀌었더라도 SSID가 같으면 재사용하며, 다른 인터페이스에 묶인 프로필은 수정하지 않습니다.
+차량 환경의 기본 정보는 **SSID `Android`, 비밀번호 `12345678`, 인터페이스 `wlan0`**입니다. [ensure_wifi.sh](scripts/ensure_wifi.sh)가 같은 SSID의 기존 Wi-Fi 프로필을 찾아 재사용하고, 없으면 `cluster-vehicle-wlan0` 이름으로 생성합니다. 중복 프로필이 있으면 해당 인터페이스에서 실제 사용 중인 같은 SSID의 UUID를 우선합니다. 프로필 이름이 바뀌었더라도 SSID가 같으면 재사용하며, 다른 인터페이스에 묶인 프로필은 수정하지 않습니다.
 
-비밀번호와 `psk-flags=0`, 로그인 사용자 제한 해제를 시스템 프로필에 저장하므로 데스크톱 로그인이나 비밀번호 입력 없이 사용할 수 있습니다. 재사용 시에도 차량용 비밀번호와 자동 연결 옵션을 반영하며 기존 프로필의 IP 등 다른 설정은 유지합니다. 새 프로필은 DHCP를 사용합니다. 비밀번호를 실행 로그에 출력하지 않습니다.
+새 프로필은 기본 비밀번호와 `psk-flags=0`, 로그인 사용자 제한 해제를 시스템 프로필에 저장하고 DHCP를 사용합니다. 기존 프로필은 비밀번호·보안 방식·`psk-flags`·사용자 제한·우선순위·IP 설정을 보존합니다. 비밀번호를 바꾸려면 `CLUSTER_WIFI_PASSWORD`를 명시해야 하며, 이때도 다른 보안·사용자 설정은 유지합니다. 기존 프로필이 로그인 사용자의 비밀번호 에이전트를 요구하는 경우 그 정책도 유지됩니다. 비밀번호를 실행 로그에 출력하지 않습니다.
 
-자동 연결을 켜고 우선순위를 `100`, 재시도 횟수를 `0`으로 지정합니다. `0`은 계속 재시도하는 설정입니다. 핫스팟이 꺼져 있어도 프로필을 먼저 저장할 수 있으며, 핫스팟이 나중에 켜지면 NetworkManager가 연결을 시도합니다. 현재 활성 연결을 강제로 바꾸는 명령은 실행하지 않습니다. [NetworkManager 자동 연결 설정](https://networkmanager.dev/docs/api/latest/settings-connection.html)
+차량 프로필의 자동 연결을 켜고 재시도 횟수를 `0`으로 지정합니다. `0`은 계속 재시도하는 설정입니다. 새 프로필의 우선순위는 `100`이며 기존 프로필의 우선순위는 유지합니다. 핫스팟이 꺼져 있어도 프로필을 먼저 저장할 수 있으며, 핫스팟이 나중에 켜지면 NetworkManager가 연결을 시도합니다. 현재 활성 연결을 강제로 바꾸는 명령은 실행하지 않습니다. [NetworkManager 자동 연결 설정](https://networkmanager.dev/docs/api/latest/settings-connection.html)
 
-프레임 송수신 지연을 줄이기 위해 차량 프로필에 `802-11-wireless.powersave=2`(절전 해제)를 저장합니다. `iw`가 있으면 현재 인터페이스에도 `iw dev wlan0 set power_save off`를 적용하며 재접속을 강제하지 않습니다. 드라이버가 현재 설정 변경을 지원하지 않으면 경고를 남기고 계속 진행합니다. `install.sh`에는 `iw` 설치가 포함됩니다. 기존 장비에서 파일만 업데이트했다면 Pi에서 아래 명령으로 현재 연결에도 적용할 수 있습니다. 실제 절전 상태와 신호·링크 속도는 `diagnose.sh`에 기록합니다. [NetworkManager powersave 설정](https://networkmanager.pages.freedesktop.org/NetworkManager/NetworkManager/nm-settings-nmcli.html), [iw 사용법](https://wireless.docs.kernel.org/en/latest/en/users/documentation/iw.html)
+프레임 송수신 지연을 줄이기 위해 차량 프로필에 `802-11-wireless.powersave=2`(절전 해제)를 저장합니다. [wifi_power_save.sh](scripts/wifi_power_save.sh)는 실제 활성 Wi-Fi 프로필의 절전 속성만 변경하고, `iw set power_save off` 뒤 `get power_save`로 결과를 확인합니다. 다른 SSID를 사용 중이면 그 프로필의 비밀번호·IP·자동 연결 정책은 유지합니다. 인터페이스를 생략하면 NetworkManager에서 Wi-Fi 장치를 찾아 적용하므로 `wlan1`도 지원합니다. 재접속이나 NetworkManager·SSH 재시작은 하지 않습니다. 드라이버가 요청을 지원하지 않거나 계속 `on`을 반환하면 경고와 실제 상태를 남깁니다. `install.sh`에는 `iw` 설치가 포함됩니다. [NetworkManager powersave 설정](https://networkmanager.pages.freedesktop.org/NetworkManager/NetworkManager/nm-settings-nmcli.html), [iw 사용법](https://wireless.docs.kernel.org/en/latest/en/users/documentation/iw.html)
 
 ```bash
 sudo apt-get install -y iw
-sudo bash /opt/cluster-receiver/scripts/ensure_wifi.sh wlan0
+sudo bash /opt/cluster-receiver/scripts/wifi_power_save.sh wlan0
 iw dev wlan0 get power_save
 ```
 
-**이미 서비스가 설치된 Pi**에는 아래의 **C4에서 SSH로 수동 업데이트** 방법으로 새 파일을 반영한 뒤, Pi SSH 터미널에서 다음을 한 번 실행합니다. 기존 수신기 unit과 계정·화면 옵션·부팅 대상은 유지합니다.
+**2026-10-10 버전부터 `pi_update.sh`가 기존 Pi의 누락된 절전 해제 실행 설정도 자동 보완합니다.** 수신기 시작 전 검사와 NetworkManager의 연결 완료·재적용 이벤트에서 절전을 해제합니다. Wi-Fi 연결 후 드라이버가 다시 `on`으로 설정하는 경우를 처리하기 위해 `/etc/NetworkManager/dispatcher.d/90-cluster-wifi-power`를 설치합니다. 실행 시간은 8초로 제한합니다. 기존 수신기 계정·화면 옵션·부팅 대상과 다른 drop-in은 유지합니다. [NetworkManager dispatcher](https://networkmanager.pages.freedesktop.org/NetworkManager/NetworkManager/NetworkManager-dispatcher.html)
+
+파일을 직접 복사한 장비에서 실행 설정을 설치하려면 다음을 사용합니다.
 
 ```bash
 sudo bash /opt/cluster-receiver/scripts/service.sh wifi
 sudo bash /opt/cluster-receiver/scripts/service.sh status
 ```
 
-`wifi`는 NetworkManager를 시작하고 프로필을 즉시 저장하며 `/etc/systemd/system/cluster-hdmi.service.d/wifi.conf`를 설치합니다. 이후 수신기가 시작할 때마다 다음 준비 명령이 실행되므로 프로필을 삭제한 경우에도 다시 생성합니다. 처음 설치할 때는 `service.sh enable <계정>`에 이 부팅 설정이 포함되므로 별도로 `wifi`를 실행할 필요가 없습니다.
+`wifi`는 NetworkManager를 시작하고 프로필을 즉시 저장하며 `wifi.conf`와 dispatcher를 설치합니다. 기존 `wifi.conf` 내용은 보존하고 절전 확인 명령을 추가합니다. 이후 수신기가 시작할 때마다 다음 준비 명령이 실행되므로 프로필을 삭제한 경우에도 다시 생성합니다. 처음 설치할 때는 `service.sh enable <계정>`에 이 설정이 포함됩니다.
 
 ```ini
 [Unit]
@@ -124,9 +128,10 @@ After=NetworkManager.service
 
 [Service]
 ExecStartPre=-+/usr/bin/timeout --kill-after=2s 10s /bin/bash /opt/cluster-receiver/scripts/ensure_wifi.sh wlan0
+ExecStartPre=-+/usr/bin/timeout --kill-after=2s 8s /bin/bash /opt/cluster-receiver/scripts/wifi_power_save.sh
 ```
 
-Wi-Fi 준비만 root 권한으로 실행하고 수신기는 기존 서비스 계정으로 실행합니다. 준비 단계는 10초 제한과 종료 유예 2초를 두며 실패·시간 초과를 journal에 남기고 HDMI 초기화를 계속합니다. Wi-Fi 연결이나 DHCP 완료를 기다리는 단계는 없습니다. HDMI 연결 대기 화면을 띄운 뒤 수신기가 C4를 계속 검색합니다. [systemd 실행 접두사 설명](https://raw.githubusercontent.com/systemd/systemd/main/man/systemd.service.xml)
+Wi-Fi 준비만 root 권한으로 실행하고 수신기는 기존 서비스 계정으로 실행합니다. 프로필 준비는 10초, 절전 확인은 8초 제한과 종료 유예 2초를 두며 실패·시간 초과를 journal에 남기고 HDMI 초기화를 계속합니다. Wi-Fi 연결이나 DHCP 완료를 기다리는 단계는 없습니다. HDMI 연결 대기 화면을 띄운 뒤 수신기가 C4를 계속 검색합니다. `[CLUSTER_WIFI_POWER] ... desired=off actual=off`와 수집 파일의 `Power save: off`를 확인합니다. [systemd 실행 접두사 설명](https://raw.githubusercontent.com/systemd/systemd/main/man/systemd.service.xml)
 
 부팅 설정 없이 프로필만 미리 저장하려면 다음을 실행합니다. 핫스팟이 보이지 않아도 사용할 수 있습니다.
 
@@ -145,7 +150,7 @@ USB 터치는 HDMI와 별도 케이블로 연결합니다. 밝기·화면 끄기
 
 ### 터치로 밝기 조절·화면 끄기
 
-시작 밝기는 **80%**입니다. 화면을 터치하면 밝기 슬라이더와 **화면 끄기** 버튼이 나타납니다. 슬라이더로 **10~100%**를 조절하며, 닫기 버튼이나 메뉴 밖 터치로 닫을 수 있습니다. 조작하지 않으면 약 8초 뒤 메뉴가 닫힙니다. 꺼진 화면을 다시 터치하면 직전 밝기로 복원하고 최신 수신 영상을 표시합니다. 밝기는 현재 실행 동안 유지하며 서비스 재시작 시 기본값으로 돌아갑니다. 시작값은 `--brightness`로 바꿀 수 있습니다.
+시작 밝기는 **8단계(80%)**입니다. 화면을 터치하면 밝기 슬라이더와 **화면 끄기** 버튼이 나타납니다. 슬라이더는 **1~10단계(10%, 20%, …, 100%)**로 조절하며, 현재 단계와 밝기를 함께 표시합니다. 닫기 버튼이나 메뉴 밖 터치로 닫을 수 있습니다. 조작하지 않으면 약 8초 뒤 메뉴가 닫힙니다. 꺼진 화면을 다시 터치하면 직전 밝기로 복원하고 최신 수신 영상을 표시합니다. 밝기는 현재 실행 동안 유지하며 서비스 재시작 시 기본값으로 돌아갑니다. 시작값은 `--brightness`에 퍼센트로 지정하며, 10% 단위로 반올림합니다.
 
 밝기는 영상 색상을 어둡게 하는 방식이고, 화면 끄기는 검은 화면을 표시합니다. **HDMI 모니터의 물리 백라이트나 전원을 끄지는 않습니다.** 모니터가 검은 화면에서도 빛을 내면 모니터 자체 밝기 설정이 필요합니다. 화면이 꺼져 있는 동안 Pi는 JPEG 디코딩을 생략하고 최신 JPEG만 보관합니다. 양쪽이 새 버전이면 C4도 최대 5 FPS로 줄여 불필요한 렌더링·전송을 줄입니다. 다시 터치하면 보관한 영상으로 즉시 복원하고 다음 ACK에서 정상 프레임 속도로 돌아갑니다.
 
@@ -380,7 +385,7 @@ Git 커밋 여부와 관계없이 C4에 저장된 수정 사항이 포함됩니�
 4. 실행 중이거나 실패 상태였던 서비스는 다시 시작합니다. 현재 systemd 실행의 `Cluster receiver ready` 로그와 동일한 실행이 유지되는지 최대 약 20초간 확인합니다. 화면 준비 확인에는 C4 연결이나 Wi-Fi IP 할당이 필요하지 않습니다. 명시적으로 중지되어 있던 서비스는 중지 상태를 유지합니다.
 5. 적용 또는 실행 확인이 실패하면 이전 파일을 복구하고 이전에 실행 중이던 서비스를 다시 시작합니다. 성공 시 `Receiver apply complete`와 백업 위치가 출력됩니다.
 
-**설치된 `/etc/systemd/system/cluster-hdmi.service`와 drop-in, 실행 계정, 해상도·회전·인터페이스 옵션, Wi-Fi, 부팅 대상, 서비스 enable 상태는 유지합니다.** `/opt/cluster-receiver/cluster-hdmi.service` 템플릿만 새 파일이 되며 설치된 unit은 덮어쓰지 않습니다. 이번 차량 Wi-Fi 준비 기능은 첫 파일 업데이트 후 `service.sh wifi`로 한 번 적용합니다. 이후에는 저장된 프로필과 `wifi.conf`가 유지됩니다. 다른 systemd 설정 변경이 필요한 업데이트에서는 해당 설정을 검토한 뒤 `service.sh enable <계정>`으로 별도 적용합니다. 일반 파일 업데이트에는 `install.sh`나 apt를 다시 실행하지 않습니다.
+**실행 계정, 해상도·회전·인터페이스 옵션, 부팅 대상, 서비스 enable 상태는 유지합니다.** `/opt/cluster-receiver/cluster-hdmi.service` 템플릿만 새 파일이 되며 설치된 unit은 덮어쓰지 않습니다. 업데이트가 기존 `wifi.conf`를 보존하면서 절전 확인 명령을 추가하고 재연결용 dispatcher를 설치합니다. 현재 활성 Wi-Fi의 절전 속성만 적용하며 SSH 연결을 재시작하지 않습니다. 두 실행 설정 파일의 이전 내용·존재 여부도 백업하고 실패 복구·수동 rollback에서 복원합니다. 다른 systemd 설정 변경이 필요한 업데이트에서는 해당 설정을 검토한 뒤 `service.sh enable <계정>`으로 별도 적용합니다. 일반 파일 업데이트에는 `install.sh`나 apt를 다시 실행하지 않습니다.
 
 업데이트 중에는 HDMI 화면과 C4 연결이 잠시 끊겼다가 복구됩니다. 백업은 자동 삭제하지 않으며 실행 결과에 백업 위치를 표시합니다. 파일 교체 전에 복구할 백업과 기존 서비스 실행 상태를 기록합니다. SSH나 전원이 끊겨 최종 결과를 받지 못했다면 Pi에 재접속해 `service.sh status`와 `service.sh logs`로 확인합니다. 미완료 업데이트가 남아 있으면 새 업데이트를 중단하므로 아래 `--rollback`으로 먼저 복구합니다. 중단 과정에서 서비스가 멈췄어도 원래 실행 중이었다면 복구 후 다시 시작합니다.
 
@@ -418,7 +423,7 @@ sudo bash /opt/cluster-receiver/scripts/service.sh status
 --rotation 90           영상 시계 방향 회전: 0, 90, 180, 270
 --touch-rotation 0      터치 시계 방향 보정(기본: 영상 회전의 역방향)
 --log-touch             원본·보정 SDL 터치 좌표 로그
---brightness 80         시작 밝기: 10~100%
+--brightness 80         시작 밝기: 10~100%, 10% 단위 (기본 8단계/80%)
 --renderer auto         auto: SDL2 GPU 출력 시도, surface: 기존 CPU 출력
 --display-index 0       SDL 디스플레이 번호; DRM card 번호와 별개
 --windowed              창 모드
@@ -437,7 +442,7 @@ C4와 Pi가 모두 새 버전이면 첫 프레임의 헤더와 ACK에 있는 예
 
 2026-10-09 로그에서는 평균 수신 확인이 약 6.3 FPS이고 ACK 대기가 약 1.78초였습니다. 이전 12장 창은 느린 링크에서 약 2초 분량의 영상을 TCP에 쌓을 수 있었습니다. Pi가 대기 JPEG 한 장만 유지해도 TCP에 이미 들어간 과거 영상은 건너뛸 수 없으므로 전송 대기량을 줄였습니다. Pi는 별도 스레드로 수신하고 대기 JPEG 한 장만 유지하며, 출력이 늦어지면 대기 영상을 최신 영상으로 교체합니다. SDL 이벤트와 화면 출력은 수신기 메인 스레드에서 처리합니다. [SDL 화면 출력의 스레드 제약](https://wiki.libsdl.org/SDL2/SDL_RenderPresent)
 
-Pi는 SDL2 texture를 재사용하며 회전·크기 조절·밝기 조절을 GPU에 맡깁니다. 사용할 수 없으면 기존 Surface 출력으로 자동 전환합니다. `[CLUSTER_HDMI_RENDERER] texture` 또는 `surface` 로그로 선택된 경로를 확인합니다. 새 출력 경로에 문제가 있으면 `run_console.sh --renderer surface --log-touch`로 기존 경로와 비교할 수 있습니다. [pygame SDL2 texture·renderer API](https://www.pygame.org/docs/ref/sdl2_video.html)
+Pi는 SDL2 texture를 재사용하며 회전·크기 조절·밝기 조절을 GPU에 맡깁니다. JPEG RGB24 영상을 같은 32bit ARGB Surface에 변환하고 같은 형식의 texture로 업로드해 매 프레임 전체 변환 버퍼를 새로 할당하던 비용을 줄입니다. `[CLUSTER_HDMI_UPLOAD] ... staging=reused_argb8888`로 새 경로를 확인합니다. 사용할 수 없으면 기존 Surface 출력으로 자동 전환합니다. `[CLUSTER_HDMI_RENDERER] texture` 또는 `surface` 로그로 선택된 경로를 확인합니다. 새 출력 경로에 문제가 있으면 `run_console.sh --renderer surface --log-touch`로 기존 경로와 비교할 수 있습니다. [pygame SDL2 texture·renderer API](https://www.pygame.org/docs/ref/sdl2_video.html), [Texture.update 형식 변환 구현](https://github.com/pygame/pygame/blob/2.6.1/src_c/cython/pygame/_sdl2/video.pyx#L721)
 
 패킷 크기와 버전은 유지하므로 한쪽만 업데이트한 경우 기존의 화면 출력 완료 ACK 방식(`legacy`)을 사용합니다. 이 방식의 `network_avg`에는 Wi-Fi 전송뿐 아니라 Pi의 JPEG 디코딩·회전·화면 출력과 ACK 왕복 시간이 포함됩니다. 스트리밍 방식(`stream`)의 ACK는 수신 확인이며 실제 화면 출력 완료를 뜻하지 않습니다. JPEG 크기/FPS로 계산한 처리량도 Wi-Fi 링크 속도를 직접 측정한 값은 아닙니다.
 
@@ -447,10 +452,10 @@ Pi는 SDL2 texture를 재사용하며 회전·크기 조절·밝기 조절을 GP
 | --- | --- |
 | C4 `[CLUSTER_NETWORK_PERF]` | `fps`: 정상 ACK를 받은 프레임 수, `prep_avg`: JPEG 준비, `send_avg`: 두 `sendall` 호출, `ack_wait_avg/max`: 전송 호출 종료부터 ACK까지. `send_age_avg/max`: 생성부터 전송 시작까지, `frame_age_avg/max`: 생성부터 ACK까지이며 실제 화면 표시까지의 나이는 아닙니다. `encode_age_avg`·`encoded_wait_avg`는 생성→인코딩 완료·인코딩 완료→전송 시작, `window_wait_avg/max`는 전송 창 대기 시간입니다. `ack_gap_max`는 ACK 사이 최장 간격, `pending_frames/kb`·`oldest_ack_age`는 현재 전송 대기량·가장 오래된 ACK의 나이, `stale_drops`는 만료로 폐기한 영상입니다. `mode=stream`, `ack=receive`이면 수신 확인이고 `mode=legacy`, `ack=display`이면 출력 완료 확인입니다. `screen_off`는 Pi가 알린 화면 끄기 상태입니다. 정상 ACK가 있는 동안 약 10초마다 기록합니다. |
 | C4 `[CLUSTER_MAIN_PERF]` | `target`: 목표 FPS, `transport_skipped`: 대기·화면 끄기 때문에 렌더링을 생략한 주기 수. `camera_copy_avg`: 영상 복사, `snapshot_avg`: 모델/HUD 상태 조회와 잠금 대기, `path_avg`: 경로·차선·리드 표시, `hud_avg`: PIL 변환과 HUD 합성. 약 10초마다 기록합니다. |
-| C4 `[CLUSTER_RESOURCE_PERF]` | Cluster CPU·RSS·스레드 수, 기기 CPU·온도·메모리, 모델 드롭률·실행 시간, deviceMotion의 `inputsOK`·`posenetOK`를 함께 기록합니다. `cpu_pct=100`은 CPU 한 코어를 계속 사용한 값입니다. `model_drop_max`와 해당 구간의 오류 업데이트 수로 잠깐 발생한 문제도 확인합니다. 아직 받지 못한 상태는 `n/a`로 표시합니다. |
-| Pi `[CLUSTER_RX_PERF]` | `mode=stream`일 때 `fps`: 수신 FPS, `display_fps`: 실제 영상 출력 FPS, `dropped`: 대기 JPEG 교체 횟수입니다. 화면 끄기·메뉴 다시 그리기는 영상 출력 수에 포함하지 않습니다. `queue_wait_avg/max`: 수신 후 출력 대기, `display_gap_max`: 영상 출력 사이의 최대 간격, `display_max`: 최악의 화면 처리 시간도 기록합니다. `header_wait_avg`: 다음 헤더 대기, `receive_avg`: JPEG 본문 수신, `display_avg`: 전체 화면 처리, `ack_send_avg`: ACK 전송 호출입니다. 화면 처리 안의 `decode_avg`·`rotate_avg`·`scale_avg`·`blit_avg`·`flip_avg`도 기록합니다. |
+| C4 `[CLUSTER_RESOURCE_PERF]` | Cluster CPU·RSS·스레드 수, 기기 CPU·온도·메모리, 모델 드롭률·실행 시간, deviceMotion의 `inputsOK`·`posenetOK`를 함께 기록합니다. `onroad_started`는 deviceState의 주행 상태, `car_state_seen`은 차량 데이터 수신 여부, `model_age_ms`·`device_motion_age_ms`·`car_state_age_ms`는 마지막 수신 후 경과 시간입니다. `cpu_pct=100`은 CPU 한 코어를 계속 사용한 값입니다. `model_drop_max`와 해당 구간의 오류 업데이트 수로 잠깐 발생한 문제도 확인합니다. 아직 받지 못한 상태는 `n/a`로 표시하며, 미수신 중 오류 카운터 0은 건강 확인을 뜻하지 않습니다. |
+| Pi `[CLUSTER_RX_PERF]` | `mode=stream`일 때 `fps`: 수신 FPS, `display_fps`: 실제 영상 출력 FPS, `dropped`: 대기 JPEG 교체 횟수입니다. 화면 끄기·메뉴 다시 그리기는 영상 출력 수에 포함하지 않습니다. `queue_wait_avg/max`: 수신 후 출력 대기, `display_gap_max`: 영상 출력 사이의 최대 간격, `display_max`: 최악의 화면 처리 시간도 기록합니다. `header_wait_avg`: 다음 헤더 대기, `receive_avg`: JPEG 본문 수신, `display_avg`: 전체 화면 처리, `ack_send_avg`: ACK 전송 호출입니다. `payload_wait_avg/max`·`payload_read_calls_avg`·`payload_read_max`는 JPEG 수신 중 readiness 대기와 읽기 호출을 구분합니다. `decode/rotate/scale/blit/flip`의 평균·최대값, `convert/upload/draw`의 평균·최대값도 기록합니다. `blit`에는 색상 변환·texture 업로드·draw가 포함되므로 이 세 값을 다시 더하지 않습니다. |
 
-`send_avg`가 짧아도 커널 송신 버퍼에 들어간 JPEG가 아직 전송 중일 수 있습니다. `ack_wait_avg`만으로 Wi-Fi 병목을 판정하지 않고 Pi의 `receive_avg`와 표시 단계 시간을 함께 봅니다. `header_wait_avg`에는 C4가 다음 프레임을 준비하는 시간도 포함됩니다. 스트리밍 로그의 수신 단계 평균은 수신한 프레임 수, 표시 단계 평균은 실제 출력한 프레임 수로 계산합니다. 송수신·인코딩·화면 처리는 겹쳐 동작하므로 모든 단계 시간을 더해서 FPS를 계산하지 않습니다.
+`send_avg`가 짧아도 커널 송신 버퍼에 들어간 JPEG가 아직 전송 중일 수 있습니다. `ack_wait_avg`만으로 Wi-Fi 병목을 판정하지 않고 Pi의 `receive_avg`와 표시 단계 시간을 함께 봅니다. `header_wait_avg`에는 C4가 다음 프레임을 준비하는 시간도 포함됩니다. readiness·소켓 읽기 호출의 시간에는 OS 대기·수신 스레드 스케줄·GIL 재획득도 포함되므로 무선 전송 시간만의 측정값으로 해석하지 않습니다. 스트리밍 로그의 수신 단계 평균은 수신한 프레임 수, 표시 단계 평균은 실제 출력한 프레임 수로 계산합니다. 송수신·인코딩·화면 처리는 겹쳐 동작하므로 모든 단계 시간을 더해서 FPS를 계산하지 않습니다. `[CLUSTER_RX_RUNTIME]`의 pygame·SDL·SDL_image 버전과 `[CLUSTER_RX_SOCKET]`의 실제 소켓 버퍼도 연결 환경 비교에 사용합니다.
 
 수신 `fps`가 목표에 가까워도 `display_fps`가 낮으면 Pi 화면 처리 병목이 남아 있는 것입니다. 수신 `fps`도 낮다면 C4 렌더링·인코딩, JPEG 수신 시간과 Wi-Fi 상태를 확인합니다. 실제 60 FPS 출력은 C4·Pi·무선 링크에서 확인해야 합니다. CPU 우선순위·스레드 제한은 자원 경쟁을 줄이는 조치이며, 기존 로그만으로 model lagging이나 locationd 오류의 원인이 cluster라고 단정할 수는 없습니다. 새 자원 로그와 오류 발생 시각을 대조하고 같은 조건에서 cluster를 끈 주행과 비교합니다.
 

@@ -16,6 +16,14 @@ if [[ "$PACKAGE_DIR" != "$(cd /opt/cluster-receiver && pwd -P)" ]]; then
   install -d /opt/cluster-receiver/scripts
   install -m 644 "$PACKAGE_DIR"/scripts/*.sh /opt/cluster-receiver/scripts/
 fi
+if [[ -f /etc/systemd/system/cluster-hdmi.service ]]; then
+  # Repair a previously installed receiver without rewriting its custom unit,
+  # account, HDMI options or boot target, and without restarting its connection.
+  bash /opt/cluster-receiver/scripts/wifi_boot_setup.sh install
+  systemctl daemon-reload
+  timeout --kill-after=2s 8s bash /opt/cluster-receiver/scripts/wifi_power_save.sh || \
+    printf '[CLUSTER_WIFI_POWER] Live power-save preparation failed or timed out.\n' >&2
+fi
 printf '\nInstalled in /opt/cluster-receiver using the OS /usr/bin/python3.\n'
-printf 'No service or desktop settings were changed.\n'
+printf 'Receiver account, HDMI options, service state and desktop boot target were preserved.\n'
 PYGAME_HIDE_SUPPORT_PROMPT=1 /usr/bin/python3 /opt/cluster-receiver/diagnose_display.py

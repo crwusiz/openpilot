@@ -377,3 +377,12 @@ def test_unsafe_package_filename_is_rejected_before_ssh(deploy_sandbox):
   assert result.returncode != 0
   assert "Unexpected package filename" in result.stderr
   assert _calls(deploy_sandbox) == []
+
+
+@pytest.mark.parametrize("helper", ["ensure_wifi.sh", "wifi_boot_setup.sh", "wifi_power_save.sh"])
+def test_incomplete_wifi_payload_is_rejected_before_ssh(deploy_sandbox, helper):
+  (deploy_sandbox / "scripts" / helper).unlink()
+  result = _deploy(deploy_sandbox, "192.168.0.84")
+  assert result.returncode != 0
+  assert "Package is missing scripts/" + helper in result.stderr
+  assert _calls(deploy_sandbox) == []

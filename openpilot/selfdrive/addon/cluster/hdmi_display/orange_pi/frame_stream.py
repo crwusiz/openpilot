@@ -6,11 +6,11 @@ from typing import NamedTuple
 
 try:
   from .cluster_protocol import (
-    ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_STREAM, pack_ack, recv_exact, unpack_frame_header_info,
+    ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_STREAM, ReceiveStats, pack_ack, recv_exact, unpack_frame_header_info,
   )
 except ImportError:
   from cluster_protocol import (
-    ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_STREAM, pack_ack, recv_exact, unpack_frame_header_info,
+    ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_STREAM, ReceiveStats, pack_ack, recv_exact, unpack_frame_header_info,
   )
 
 
@@ -23,6 +23,7 @@ class ReceivedFrame(NamedTuple):
   started: float
   header_at: float
   received_at: float
+  receive_stats: ReceiveStats | None = None
 
 
 class LatestFrameReceiver:
@@ -49,7 +50,10 @@ class LatestFrameReceiver:
   def _reset_perf(self):
     self._perf_received = self._perf_displayed = self._perf_dropped = self._perf_bytes = 0
     self._perf_rx = dict.fromkeys(("header_wait", "receive", "ack_send"), 0.0)
-    self._perf_display = dict.fromkeys(("display", "decode", "rotate", "scale", "blit", "flip"), 0.0)
+    self._perf_display = dict.fromkeys(("display", "decode", "rotate", "scale", "blit", "flip", "convert", "upload", "draw"), 0.0)
+    self._perf_display_stage_max = dict.fromkeys(("decode", "rotate", "scale", "blit", "flip", "convert", "upload", "draw"), 0.0)
+    self._perf_rx_stats_frames = self._perf_read_calls = self._perf_select_timeouts = 0
+    self._perf_payload_wait = self._perf_payload_wait_max = self._perf_payload_read_max = 0.0
     self._perf_queue_wait = self._perf_queue_wait_max = self._perf_display_max = 0.0
     self._perf_display_gap_max = self._perf_receive_max = self._perf_ack_send_max = 0.0
 
@@ -90,6 +94,14 @@ class LatestFrameReceiver:
           self._perf_rx["ack_send"] += acknowledged_at - ack_started
           self._perf_receive_max = max(self._perf_receive_max, frame.received_at - frame.header_at)
           self._perf_ack_send_max = max(self._perf_ack_send_max, acknowledged_at - ack_started)
+          if frame.receive_stats is not None:
+            stats = frame.receive_stats
+            self._perf_rx_stats_frames += 1
+            self._perf_read_calls += stats.read_calls
+            self._perf_select_timeouts += stats.select_timeouts
+            self._perf_payload_wait += stats.wait_time
+            self._perf_payload_wait_max = max(self._perf_payload_wait_max, stats.wait_max)
+            self._perf_payload_read_max = max(self._perf_payload_read_max, stats.read_max)
           self.condition.notify_all()
         self._log_perf()
         if self.max_frames is not None and self.received_frames >= self.max_frames:
@@ -102,8 +114,9 @@ class LatestFrameReceiver:
         header_at = time.monotonic()
         if not flags & FRAME_STREAM:
           raise ValueError("Expected a streaming cluster frame")
-        jpeg = recv_exact(self.sock, size, deadline=deadline, poll_events=self._check_stopping)
-        frame = ReceivedFrame(sequence, jpeg, started, header_at, time.monotonic())
+        stats = ReceiveStats()
+        jpeg = recv_exact(self.sock, size, deadline=deadline, poll_events=self._check_stopping, stats=stats)
+        frame = ReceivedFrame(sequence, jpeg, started, header_at, time.monotonic(), stats)
     except Exception as e:
       with self.condition:
         if not self.closing:
@@ -140,7 +153,9 @@ class LatestFrameReceiver:
       self._last_displayed_at = displayed_at
       for stage in self._perf_display:
         if stage != "display":
-          self._perf_display[stage] += timings.get(stage, 0.0)
+          duration = timings.get(stage, 0.0)
+          self._perf_display[stage] += duration
+          self._perf_display_stage_max[stage] = max(self._perf_display_stage_max[stage], duration)
     self._log_perf()
 
   def pause_display(self):
@@ -162,11 +177,18 @@ class LatestFrameReceiver:
         "receive": self._perf_receive_max, "ack_send": self._perf_ack_send_max,
         "display": self._perf_display_max, "queue_wait": self._perf_queue_wait_max,
         "display_gap": self._perf_display_gap_max,
+        "payload_wait": self._perf_payload_wait_max, "payload_read": self._perf_payload_read_max,
       }
+      maxima.update(self._perf_display_stage_max)
+      payload_wait = self._perf_payload_wait / max(self._perf_rx_stats_frames, 1)
+      read_calls = self._perf_read_calls / max(self._perf_rx_stats_frames, 1)
+      select_timeouts = self._perf_select_timeouts
       self._perf_started = now
       self._reset_perf()
     detail = " | ".join(f"{stage}_avg={duration * 1000:.1f}ms" for stage, duration in stages)
     detail += " | " + " | ".join(f"{stage}_max={duration * 1000:.1f}ms" for stage, duration in maxima.items())
+    detail += (f" | payload_wait_avg={payload_wait * 1000:.1f}ms | payload_read_calls_avg={read_calls:.1f}"
+               + f" | payload_select_timeouts={select_timeouts}")
     LOG.info("[CLUSTER_RX_PERF] fps=%.2f | display_fps=%.2f | dropped=%d | size_avg=%.1fKB | %s | mode=stream",
              received / elapsed, displayed / elapsed, dropped, size, detail)
 

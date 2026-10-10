@@ -14,13 +14,13 @@ import time
 try:
   from .cluster_protocol import (
     ACK_DISPLAY_ERROR, ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
-    pack_ack, recv_exact, unpack_frame_header_info,
+    ReceiveStats, pack_ack, recv_exact, unpack_frame_header_info,
   )
   from .frame_stream import ReceivedFrame, receive_stream_frames
 except ImportError:
   from cluster_protocol import (
     ACK_DISPLAY_ERROR, ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
-    pack_ack, recv_exact, unpack_frame_header_info,
+    ReceiveStats, pack_ack, recv_exact, unpack_frame_header_info,
   )
   from frame_stream import ReceivedFrame, receive_stream_frames
 
@@ -33,6 +33,32 @@ DEFAULT_SCAN_WORKERS = 32
 DEFAULT_RECONNECT_DELAY = 2.0
 FRAME_TIMEOUT_SECONDS = 2.0
 MAX_SCAN_HOSTS = 512
+
+
+def log_runtime_versions(pygame_module):
+  # Called once by the SDL owner, never by the socket worker.
+  pygame_version = getattr(getattr(pygame_module, "version", None), "ver", "unknown")
+
+  def get_version(module, function):
+    try:
+      return ".".join(str(part) for part in getattr(module, function)())
+    except (AttributeError, TypeError, RuntimeError):
+      return "unknown"
+
+  LOG.info("[CLUSTER_RX_RUNTIME] pygame=%s | SDL=%s | SDL_image=%s", pygame_version,
+           get_version(pygame_module, "get_sdl_version"), get_version(getattr(pygame_module, "image", None), "get_sdl_image_version"))
+
+
+def log_socket_buffers(sock):
+  def buffer_size(option):
+    try:
+      return sock.getsockopt(socket.SOL_SOCKET, option)
+    except (AttributeError, OSError):
+      return "unknown"
+
+  # Report the effective kernel values; socket buffer sizes remain unchanged.
+  LOG.info("[CLUSTER_RX_SOCKET] recv_buffer=%sB | send_buffer=%sB",
+           buffer_size(socket.SO_RCVBUF), buffer_size(socket.SO_SNDBUF))
 
 
 def _run_ip_json(*args):
@@ -137,6 +163,8 @@ def wait_for_reconnect(display, delay):
 
 
 def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=FRAME_TIMEOUT_SECONDS) -> int:
+  log_socket_buffers(sock)
+
   def poll_events():
     _poll_display(display)
 
@@ -145,18 +173,20 @@ def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=F
   perf_frames = 0
   perf_displayed = 0
   perf_bytes = 0
-  perf_stages = dict.fromkeys(("header_wait", "receive", "display", "ack_send", "decode", "rotate", "scale", "blit", "flip"), 0.0)
+  perf_stages = dict.fromkeys(("header_wait", "receive", "display", "ack_send", "decode", "rotate", "scale", "blit", "flip",
+                             "convert", "upload", "draw"), 0.0)
   while max_frames is None or received_frames < max_frames:
     # One deadline for the entire frame also bounds slow, partial deliveries.
     started = time.monotonic()
     deadline = started + frame_timeout
     sequence, frame_size, flags = unpack_frame_header_info(recv_exact(sock, FRAME_HEADER.size, deadline=deadline, poll_events=poll_events))
     header_at = time.monotonic()
-    jpeg = recv_exact(sock, frame_size, deadline=deadline, poll_events=poll_events)
+    receive_stats = ReceiveStats() if flags & FRAME_STREAM else None
+    jpeg = recv_exact(sock, frame_size, deadline=deadline, poll_events=poll_events, stats=receive_stats)
     received_at = time.monotonic()
     if flags & FRAME_STREAM:
       remaining = None if max_frames is None else max_frames - received_frames
-      first_frame = ReceivedFrame(sequence, jpeg, started, header_at, received_at)
+      first_frame = ReceivedFrame(sequence, jpeg, started, header_at, received_at, receive_stats)
       return received_frames + receive_stream_frames(sock, display, first_frame, frame_timeout, remaining)
     display_ok = display.send_jpeg(jpeg)
     displayed_at = time.monotonic()
@@ -179,7 +209,7 @@ def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=F
       perf_displayed += 1
       perf_stages["display"] += displayed_at - received_at
       for stage, duration in getattr(display, "last_frame_timings", {}).items():
-        if stage in ("decode", "rotate", "scale", "blit", "flip"):
+        if stage in ("decode", "rotate", "scale", "blit", "flip", "convert", "upload", "draw"):
           perf_stages[stage] += duration
     if acknowledged_at - perf_started >= 10.0:
       stages = " | ".join(
@@ -227,7 +257,8 @@ def parse_args(argv=None):
                       help="Clockwise correction from raw touch to cluster coordinates (default: inverse of --rotation)")
   parser.add_argument("--log-touch", action="store_true", help="Log raw and corrected SDL finger coordinates")
   parser.add_argument("--display-index", type=int, default=0)
-  parser.add_argument("--brightness", type=int, default=80, help="Initial screen brightness from 10 to 100 percent")
+  parser.add_argument("--brightness", type=int, default=80,
+                      help="Initial brightness percent from 10 to 100, rounded to the nearest 10 percent")
   parser.add_argument("--renderer", choices=("auto", "surface"), default="auto",
                       help="Try accelerated textures automatically or use the CPU surface renderer")
   parser.add_argument("--windowed", action="store_true", help="Run in a window instead of fullscreen")
@@ -278,6 +309,7 @@ def main():
       raise RuntimeError("Unable to initialize the Orange Pi HDMI display")
     if not display.show_waiting():
       raise RuntimeError("Unable to display the Orange Pi connection waiting screen")
+    log_runtime_versions(getattr(display, "_pygame", None))
     LOG.info("Cluster receiver ready")
     while True:
       sock = None

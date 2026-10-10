@@ -41,8 +41,10 @@ def cluster_models(monkeypatch):
   spec.loader.exec_module(module)
   # Exercise real initialization/subscriptions without starting target polling.
   module.threading = SimpleNamespace(RLock=threading.RLock, Thread=lambda **_kwargs: Mock())
+  clock = SimpleNamespace(now=100.0)
+  module.time = SimpleNamespace(monotonic=lambda: clock.now)
   models = module.ClusterModels()
-  return SimpleNamespace(models=models, messages=messages, updated=updated)
+  return SimpleNamespace(models=models, messages=messages, updated=updated, clock=clock)
 
 
 def test_health_does_not_report_unseen_locationd_defaults_as_errors(cluster_models):
@@ -54,6 +56,9 @@ def test_health_does_not_report_unseen_locationd_defaults_as_errors(cluster_mode
   assert snapshot['device_motion_inputs_ok'] is None
   assert snapshot['device_motion_input_error_total'] == 0
   assert snapshot['model_drop_perc'] is None
+  assert snapshot['onroad_started'] is None
+  assert not snapshot['car_state_seen']
+  assert snapshot['model_age_ms'] is snapshot['device_motion_age_ms'] is snapshot['car_state_age_ms'] is None
   snapshot['device_motion_input_error_total'] = 100
   assert models.get_health_data()['device_motion_input_error_total'] == 0
 
@@ -125,6 +130,52 @@ def test_health_missing_and_nonfinite_model_values_remain_unknown(cluster_models
   assert snapshot['model_drop_perc'] is None
   assert snapshot['model_exec_ms'] is None
   assert snapshot['model_lagging_update_total'] == 0
+
+
+@pytest.mark.parametrize('started', [True, False, None])
+def test_health_observes_onroad_and_car_state_with_missing_model_inputs(cluster_models, started):
+  state = cluster_models
+  state.updated.update(deviceState=True, carState=True)
+  state.messages['deviceState'] = SimpleNamespace() if started is None else SimpleNamespace(started=started)
+  state.models._update_health_data()
+  state.updated.update(deviceState=False, carState=False)
+  state.clock.now += 2.5
+  state.models._update_health_data()
+  snapshot = state.models.get_health_data()
+  assert snapshot['onroad_started'] is started
+  assert snapshot['car_state_seen']
+  assert snapshot['car_state_age_ms'] == 2500.0
+  assert not snapshot['model_seen']
+  assert not snapshot['device_motion_seen']
+  assert snapshot['model_age_ms'] is snapshot['device_motion_age_ms'] is None
+  assert snapshot['model_lagging_update_total'] == snapshot['device_motion_input_error_total'] == 0
+
+
+def test_health_receive_ages_grow_when_stale_and_refresh_only_updated_service(cluster_models):
+  state = cluster_models
+  state.updated.update(modelV2=True, deviceMotion=True, carState=True)
+  state.messages['modelV2'] = SimpleNamespace(frameDropPerc=0.0, modelExecutionTime=0.030)
+  state.messages['deviceMotion'] = SimpleNamespace(inputsOK=True, posenetOK=True)
+  state.models._update_health_data()
+  snapshot = state.models.get_health_data()
+  for field in ('model_age_ms', 'device_motion_age_ms', 'car_state_age_ms'):
+    assert snapshot[field] == 0.0
+
+  state.updated.update(modelV2=False, deviceMotion=False, carState=False)
+  state.clock.now += 2.25
+  state.models._update_health_data()
+  snapshot = state.models.get_health_data()
+  for field in ('model_age_ms', 'device_motion_age_ms', 'car_state_age_ms'):
+    assert snapshot[field] == 2250.0
+  state.clock.now += 0.75
+  assert state.models.get_health_data()['model_age_ms'] == 3000.0
+
+  state.updated['modelV2'] = True
+  state.models._update_health_data()
+  snapshot = state.models.get_health_data()
+  assert snapshot['model_age_ms'] == 0.0
+  assert snapshot['device_motion_age_ms'] == snapshot['car_state_age_ms'] == 3000.0
+  assert snapshot['model_seen'] and snapshot['device_motion_seen'] and snapshot['car_state_seen']
 
 
 def test_process_resources_reads_current_rss_and_native_threads(tmp_path):
@@ -200,4 +251,41 @@ def test_metrics_unknown_platform_and_unseen_health_do_not_imply_faults(metrics_
   assert 'threads=n/a' in line
   assert 'device_motion_seen=0' in line
   assert 'inputs_ok=n/a' in line
+  assert 'locationd_input_error_updates=0' in line
+  assert 'onroad_started=n/a' in line
+  assert 'car_state_seen=n/a' in line
+  assert 'model_age_ms=n/a' in line
+  assert 'device_motion_age_ms=n/a' in line
+  assert 'car_state_age_ms=n/a' in line
+
+
+def test_metrics_reports_onroad_missing_inputs_and_later_stale_ages(cluster_models, metrics_state):
+  state = cluster_models
+  state.updated.update(deviceState=True, carState=True)
+  state.messages['deviceState'] = SimpleNamespace(started=True)
+  state.models._update_health_data()
+  metrics_state.clock.wall = 10.0
+  line = metrics_state.metrics.sample(state.models.get_health_data())
+  assert 'onroad_started=1' in line
+  assert 'car_state_seen=1' in line
+  assert 'car_state_age_ms=0.0' in line
+  assert 'model_seen=0' in line
+  assert 'model_age_ms=n/a' in line
+  assert 'device_motion_seen=0' in line
+  assert 'device_motion_age_ms=n/a' in line
+
+  state.updated.update(deviceState=True, modelV2=True, deviceMotion=True, carState=False)
+  state.messages['deviceState'] = SimpleNamespace(started=False)
+  state.messages['modelV2'] = SimpleNamespace(frameDropPerc=0.0, modelExecutionTime=0.028)
+  state.messages['deviceMotion'] = SimpleNamespace(inputsOK=True, posenetOK=True)
+  state.models._update_health_data()
+  state.clock.now += 3.5
+  metrics_state.clock.wall = 20.0
+  line = metrics_state.metrics.sample(state.models.get_health_data())
+  assert 'onroad_started=0' in line
+  assert 'model_seen=1' in line
+  assert 'device_motion_seen=1' in line
+  for field in ('car_state_age_ms', 'model_age_ms', 'device_motion_age_ms'):
+    assert f'{field}=3500.0' in line
+  assert 'model_lagging_updates=0' in line
   assert 'locationd_input_error_updates=0' in line

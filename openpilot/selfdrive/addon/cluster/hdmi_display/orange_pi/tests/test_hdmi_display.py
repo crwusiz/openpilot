@@ -574,12 +574,12 @@ def test_default_brightness_dims_received_frame_once(raster_pygame, monkeypatch)
     assert display.controls.menu_visible
     assert not display.last_frame_presented, "local menu redraw is not another received frame"
     _tap_display(display, _control_target(display, "slider", 0.5))
-    assert display.controls.brightness == 55
+    assert display.controls.brightness == 60
     _tap_display(display, _control_target(display, "close"))
-    assert display.screen.get_at((0, 0))[:3] == (140, 55, 28)
+    assert display.screen.get_at((0, 0))[:3] == (153, 60, 30)
     for _ in range(3):
       assert display.pump_events()
-    assert display.screen.get_at((0, 0))[:3] == (140, 55, 28)
+    assert display.screen.get_at((0, 0))[:3] == (153, 60, 30)
     assert frame.get_at((0, 0))[:3] == (255, 100, 50)
   finally:
     display.close()
@@ -642,10 +642,10 @@ def test_off_skips_decoding_and_transforms_then_wakes_newest_jpeg_without_menu(r
     assert display.pump_events()
     assert decoded == [b"latest"]
     assert not display.controls.screen_off
-    assert display.controls.brightness == 55
+    assert display.controls.brightness == 60
     assert not display.controls.menu_visible
     assert not display.last_frame_presented
-    assert display.screen.get_at((0, 0))[:3] == (0, 0, 140)
+    assert display.screen.get_at((0, 0))[:3] == (0, 0, 153)
   finally:
     display.close()
 
@@ -839,7 +839,7 @@ def test_initial_waiting_texture_failure_releases_gpu_and_displays_surface(raste
     assert presenters[0].window is None
     assert presenters[0].renderer is None
     assert display.controls is controls
-    assert controls.brightness == 35
+    assert controls.brightness == 40
     assert display.rotation == 90
     assert display._showing_waiting
     assert any(pygame.image.tobytes(display.screen, "RGB"))
@@ -883,9 +883,9 @@ def test_live_texture_failure_preserves_rotation_menu_brightness_and_off_wake(ra
     assert presenters[0].renderer is None
     assert display.controls is controls
     assert controls.menu_visible
-    assert controls.brightness == 35
+    assert controls.brightness == 40
     assert display.screen.get_size() == (96, 384)
-    assert display.screen.get_at((0, 0))[:3] == (89, 0, 0)
+    assert display.screen.get_at((0, 0))[:3] == (102, 0, 0)
     _tap_display(display, _control_target(display, "off"))
     assert display.screen_off
     assert not any(pygame.image.tobytes(display.screen, "RGB"))
@@ -893,8 +893,8 @@ def test_live_texture_failure_preserves_rotation_menu_brightness_and_off_wake(ra
     _tap_display(display)
     assert not display.screen_off
     assert not controls.menu_visible
-    assert controls.brightness == 35
-    assert display.screen.get_at((0, 0))[:3] == (0, 0, 89)
+    assert controls.brightness == 40
+    assert display.screen.get_at((0, 0))[:3] == (0, 0, 102)
     assert len(presenters) == 1
   finally:
     display.close()

@@ -62,11 +62,11 @@ def test_waking_touch_restores_previous_brightness_without_opening_menu(controls
 
   assert _touch(state, pygame.FINGERDOWN, _target(state, "off"))
   assert not state.screen_off
-  assert state.brightness == 35
+  assert state.brightness == 40
   assert not state.menu_visible
   assert not _touch(state, pygame.FINGERMOTION, _target(state, "slider", 0))
   assert not _touch(state, pygame.FINGERUP)
-  assert state.brightness == 35
+  assert state.brightness == 40
   assert not state.menu_visible
   assert _tap(state)
   assert state.menu_visible
@@ -102,7 +102,7 @@ def test_controller_reconnect_after_off_can_wake_with_reused_or_new_finger_id(co
   assert _touch(state, pygame.FINGERDOWN, _target(state, "off"), finger_id=next_finger)
   assert not state.screen_off
   assert not state.menu_visible
-  assert state.brightness == 35
+  assert state.brightness == 40
   _touch(state, pygame.FINGERUP, finger_id=next_finger)
   assert _tap(state, finger_id=next_finger)
   assert state.menu_visible
@@ -117,7 +117,7 @@ def test_screen_off_gesture_motion_and_release_do_not_restore_screen(controls):
   assert state.screen_off
 
 
-@pytest.mark.parametrize("fraction, expected", [(0, 10), (0.5, 55), (1, 100)])
+@pytest.mark.parametrize("fraction, expected", [(0, 10), (0.5, 60), (1, 100)])
 def test_slider_tap_changes_brightness(controls, fraction, expected):
   state, _, _ = controls
   _tap(state)
@@ -145,7 +145,7 @@ def test_only_active_slider_finger_changes_brightness(controls):
   _touch(state, pygame.FINGERDOWN, _target(state, "slider", 0.5), finger_id=7)
   assert not _touch(state, pygame.FINGERMOTION, (1, 0), finger_id=9)
   assert not _touch(state, pygame.FINGERDOWN, _target(state, "off"), finger_id=9)
-  assert state.brightness == 55
+  assert state.brightness == 60
   assert not state.screen_off
 
 
@@ -179,7 +179,7 @@ def test_nonfinite_slider_coordinates_are_ignored(controls, point):
   _tap(state)
   _touch(state, pygame.FINGERDOWN, _target(state, "slider", 0.5))
   assert not _touch(state, pygame.FINGERMOTION, point)
-  assert state.brightness == 55
+  assert state.brightness == 60
 
 
 def test_motion_and_unknown_events_cannot_open_menu(controls):
@@ -200,7 +200,7 @@ def test_menu_and_touch_targets_fit_logical_screen(size):
     assert 0 <= top < top + height <= size[1]
   _tap(state)
   _tap(state, _target(state, "slider", 0.5))
-  assert state.brightness == 55
+  assert state.brightness == 60
 
 
 def test_resize_invalidates_menu_and_preserves_brightness(controls):

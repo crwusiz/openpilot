@@ -5,7 +5,13 @@ import time
 
 DEFAULT_BRIGHTNESS = 80
 MIN_BRIGHTNESS = 10
+BRIGHTNESS_STEP = 10
 MENU_TIMEOUT_SECONDS = 8.0
+
+
+def _quantize_brightness(value):
+  value = BRIGHTNESS_STEP * math.floor(float(value) / BRIGHTNESS_STEP + 0.5)
+  return max(MIN_BRIGHTNESS, min(100, value))
 
 
 class DisplayControls:
@@ -22,7 +28,7 @@ class DisplayControls:
     self.clock = clock
     self.menu_timeout = max(0.1, float(menu_timeout))
     self.logical_size = tuple(max(1, int(value)) for value in logical_size)
-    self.brightness = max(MIN_BRIGHTNESS, min(100, int(brightness)))
+    self.brightness = _quantize_brightness(brightness)
     self.screen_off = False
     self.menu_visible = False
     self.revision = 0
@@ -88,7 +94,7 @@ class DisplayControls:
     return True
 
   def set_brightness(self, value):
-    value = max(MIN_BRIGHTNESS, min(100, round(float(value))))
+    value = _quantize_brightness(value)
     if self.brightness == value:
       return False
     self.brightness = value
@@ -208,7 +214,8 @@ class DisplayControls:
     surface.fill((18, 22, 28))
     self._font(36 * scale)
     korean = self._font_path is not None
-    title = f"화면 밝기 {self.brightness}%" if korean else f"Brightness {self.brightness}%"
+    step = self.brightness // BRIGHTNESS_STEP
+    title = f"화면 밝기 {step}단계 ({self.brightness}%)" if korean else f"Brightness {step}/10 ({self.brightness}%)"
     self._label(surface, title, 36 * scale, (width // 2, round(54 * scale)), (225, 232, 240))
 
     slider = self._local_rect(self._layout["slider"], left, top)
@@ -219,6 +226,9 @@ class DisplayControls:
     selected_width = round(slider[2] * fraction)
     if selected_width:
       pygame.draw.rect(surface, (100, 180, 220), (slider[0], center_y - track_height // 2, selected_width, track_height))
+    for value in range(MIN_BRIGHTNESS, 101, BRIGHTNESS_STEP):
+      tick_x = slider[0] + round(slider[2] * (value - MIN_BRIGHTNESS) / (100 - MIN_BRIGHTNESS))
+      pygame.draw.circle(surface, (150, 162, 175), (tick_x, center_y), max(3, round(7 * scale)))
     pygame.draw.circle(surface, (195, 220, 235), (slider[0] + selected_width, center_y), max(8, round(22 * scale)))
     self._label(surface, "10%", 22 * scale, (slider[0], round(204 * scale)), (150, 162, 175))
     self._label(surface, "100%", 22 * scale, (slider[0] + slider[2], round(204 * scale)), (150, 162, 175))

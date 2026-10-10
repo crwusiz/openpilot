@@ -11,9 +11,9 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.network_protocol import (
   ACK_DISPLAY_ERROR, ACK_OK, ACK_PACKET, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_QUERY_STREAM, FRAME_STREAM,
   pack_ack as pack_c4_ack, pack_frame_header, recv_exact, unpack_ack, unpack_ack_info,
 )
-from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import cluster_receiver, frame_stream, hdmi_display
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import cluster_protocol, cluster_receiver, frame_stream, hdmi_display
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.cluster_protocol import (
-  ACK_SCREEN_OFF as PI_ACK_SCREEN_OFF, pack_ack as pack_orange_pi_ack, recv_exact as pi_recv_exact, unpack_frame_header,
+  ACK_SCREEN_OFF as PI_ACK_SCREEN_OFF, ReceiveStats, pack_ack as pack_orange_pi_ack, recv_exact as pi_recv_exact, unpack_frame_header,
 )
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_display import HdmiDisplay
 
@@ -350,6 +350,8 @@ def test_stream_intentional_blanking_counts_receipts_without_display_fps(monkeyp
     assert result == [1]
     assert receiver_instances[0]._perf_received == 1
     assert receiver_instances[0]._perf_displayed == 0
+    assert receiver_instances[0]._perf_rx_stats_frames == 1
+    assert receiver_instances[0]._perf_read_calls >= 1
   finally:
     sock.close()
     thread.join(timeout=1.0)
@@ -360,9 +362,9 @@ def test_stream_performance_log_exposes_queue_age_and_display_stalls(monkeypatch
   monkeypatch.setattr(frame_stream.time, "monotonic", lambda: now[0])
   first = frame_stream.ReceivedFrame(1, b"jpeg", 0.0, 0.005, 0.02)
   receiver = frame_stream.LatestFrameReceiver(None, first, 1.0)
-  receiver.record_display(first, 0.03, 0.05, {"decode": 0.01})
+  receiver.record_display(first, 0.03, 0.05, {"decode": 0.01, "blit": 0.005, "flip": 0.001, "convert": 0.001, "upload": 0.003, "draw": 0.001})
   second = frame_stream.ReceivedFrame(2, b"jpeg", 0.07, 0.08, 0.10)
-  receiver.record_display(second, 0.15, 0.30, {"decode": 0.02})
+  receiver.record_display(second, 0.15, 0.30, {"decode": 0.02, "blit": 0.007, "flip": 0.002, "convert": 0.001, "upload": 0.004, "draw": 0.002})
   now[0] = 10.0
   with caplog.at_level("INFO", logger="cluster_receiver"):
     receiver._log_perf()
@@ -371,6 +373,43 @@ def test_stream_performance_log_exposes_queue_age_and_display_stalls(monkeypatch
   assert "queue_wait_max=50.0ms" in caplog.text
   assert "display_max=150.0ms" in caplog.text
   assert "display_gap_max=250.0ms" in caplog.text
+  assert "decode_max=20.0ms" in caplog.text
+  assert "blit_max=7.0ms" in caplog.text
+  assert "flip_max=2.0ms" in caplog.text
+  assert "convert_avg=1.0ms" in caplog.text
+  assert "upload_avg=3.5ms" in caplog.text
+  assert "draw_avg=1.5ms" in caplog.text
+  assert "convert_max=1.0ms" in caplog.text
+  assert "upload_max=4.0ms" in caplog.text
+  assert "draw_max=2.0ms" in caplog.text
+
+
+def test_stream_receive_diagnostics_are_reported_and_reset_per_window(monkeypatch, caplog):
+  now = [0.03]
+  monkeypatch.setattr(frame_stream, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  stats = ReceiveStats(wait_time=0.017, wait_max=0.012, read_calls=3, read_max=0.002, select_timeouts=1)
+  first = frame_stream.ReceivedFrame(1, b"jpeg", 0.0, 0.005, 0.025, stats)
+  acks = []
+  receiver = frame_stream.LatestFrameReceiver(SimpleNamespace(sendall=acks.append), first, 1.0, max_frames=1)
+  receiver._receive_loop()
+  assert len(acks) == 1
+  assert receiver.take_frame() == first
+  now[0] = 10.03
+  with caplog.at_level("INFO", logger="cluster_receiver"):
+    receiver._log_perf()
+  assert "receive_avg=20.0ms" in caplog.text
+  assert "payload_wait_avg=17.0ms" in caplog.text
+  assert "payload_wait_max=12.0ms" in caplog.text
+  assert "payload_read_calls_avg=3.0" in caplog.text
+  assert "payload_read_max=2.0ms" in caplog.text
+  assert "payload_select_timeouts=1" in caplog.text
+  caplog.clear()
+  now[0] = 20.03
+  with caplog.at_level("INFO", logger="cluster_receiver"):
+    receiver._log_perf()
+  assert "payload_wait_avg=0.0ms" in caplog.text
+  assert "payload_read_calls_avg=0.0" in caplog.text
+  assert "payload_select_timeouts=0" in caplog.text
 
 
 def test_receiver_acknowledges_successful_hdmi_frame():
@@ -476,13 +515,88 @@ def test_partial_frame_times_out_while_pumping_events():
 def test_fragmented_packet_keeps_received_bytes():
   c4_sock, pi_sock = socket.socketpair()
   chunks = iter([b"ab", b"cd", b"ef"])
+  stats = ReceiveStats()
   try:
     data = pi_recv_exact(pi_sock, 6, deadline=time.monotonic() + 1.0,
-                         poll_events=lambda: c4_sock.sendall(next(chunks)))
+                         poll_events=lambda: c4_sock.sendall(next(chunks)), stats=stats)
     assert data == b"abcdef"
+    assert stats.read_calls == 3
+    assert stats.select_timeouts == 0
   finally:
     c4_sock.close()
     pi_sock.close()
+
+
+def test_receive_diagnostics_distinguish_readiness_waits_from_partial_reads(monkeypatch):
+  now = [0.0]
+  waits = iter([(0.05, False), (0.003, True), (0.004, True)])
+  chunks = iter([(b"ab", 0.002), (b"cdef", 0.001)])
+  requested_sizes = []
+
+  def select_readable(readers, _writers, _errors, _timeout):
+    duration, ready = next(waits)
+    now[0] += duration
+    return (readers if ready else []), [], []
+
+  class FragmentedSocket:
+    def recv_into(self, view):
+      requested_sizes.append(len(view))
+      chunk, elapsed = next(chunks)
+      now[0] += elapsed
+      view[:len(chunk)] = chunk
+      return len(chunk)
+
+  monkeypatch.setattr(cluster_protocol, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(cluster_protocol.select, "select", select_readable)
+  stats = ReceiveStats()
+  assert pi_recv_exact(FragmentedSocket(), 6, deadline=1.0, stats=stats) == b"abcdef"
+  assert requested_sizes == [6, 4]
+  assert stats.read_calls == 2
+  assert stats.wait_time == pytest.approx(0.057)
+  assert stats.wait_max == pytest.approx(0.05)
+  assert stats.read_max == pytest.approx(0.002)
+  assert stats.select_timeouts == 1
+
+
+def test_receive_without_diagnostics_does_not_add_timing_calls(monkeypatch):
+  class CompleteSocket:
+    def recv_into(self, view):
+      view[:] = b"jpeg"
+      return len(view)
+
+  monkeypatch.setattr(cluster_protocol, "time", SimpleNamespace(monotonic=lambda: pytest.fail("unnecessary timing call")))
+  assert pi_recv_exact(CompleteSocket(), 4) == b"jpeg"
+
+
+def test_runtime_versions_log_on_the_calling_thread_and_allow_missing_apis(caplog):
+  caller = threading.get_ident()
+
+  def sdl_version():
+    assert threading.get_ident() == caller
+    return (2, 28, 4)
+
+  pygame_stub = SimpleNamespace(version=SimpleNamespace(ver="2.6.1"), get_sdl_version=sdl_version,
+                                image=SimpleNamespace(get_sdl_image_version=lambda: (2, 8, 2)))
+  with caplog.at_level("INFO", logger="cluster_receiver"):
+    cluster_receiver.log_runtime_versions(pygame_stub)
+    cluster_receiver.log_runtime_versions(None)
+  assert "pygame=2.6.1 | SDL=2.28.4 | SDL_image=2.8.2" in caplog.text
+  assert "pygame=unknown | SDL=unknown | SDL_image=unknown" in caplog.text
+
+
+def test_socket_buffer_diagnostics_report_effective_sizes_without_changing_them(caplog):
+  sock = socket.socket()
+  try:
+    before = [sock.getsockopt(socket.SOL_SOCKET, option) for option in (socket.SO_RCVBUF, socket.SO_SNDBUF)]
+    with caplog.at_level("INFO", logger="cluster_receiver"):
+      cluster_receiver.log_socket_buffers(sock)
+      cluster_receiver.log_socket_buffers(None)
+    after = [sock.getsockopt(socket.SOL_SOCKET, option) for option in (socket.SO_RCVBUF, socket.SO_SNDBUF)]
+    assert after == before
+    assert f"recv_buffer={before[0]}B | send_buffer={before[1]}B" in caplog.text
+    assert "recv_buffer=unknownB | send_buffer=unknownB" in caplog.text
+  finally:
+    sock.close()
 
 
 def test_quit_interrupts_idle_receive(monkeypatch):

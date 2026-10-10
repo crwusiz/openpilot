@@ -78,7 +78,8 @@ if (( ! rollback )); then
     [[ "$relative" =~ ^([a-zA-Z0-9_]+\.py|README\.md|requirements\.txt|cluster-hdmi\.service|scripts/[a-zA-Z0-9_-]+\.sh)$ ]] || fail "Unexpected package filename: $relative"
     [[ -f "$PACKAGE_DIR/$relative" && ! -L "$PACKAGE_DIR/$relative" ]] || fail "Missing or symlink package file: $relative"
   done
-  for required in cluster_receiver.py hdmi_display.py frame_stream.py display_controls.py texture_presenter.py scripts/common.sh scripts/update.sh scripts/ssh_port.sh; do
+  for required in cluster_receiver.py hdmi_display.py frame_stream.py display_controls.py texture_presenter.py scripts/common.sh \
+    scripts/update.sh scripts/ssh_port.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh; do
     [[ " ${files[*]} " == *" $required "* ]] || fail "Package is missing $required."
   done
   printf 'Update %s@%s:%s with %s receiver files from C4.\n' "$ssh_user" "$pi_host" "$ssh_port" "${#files[@]}"

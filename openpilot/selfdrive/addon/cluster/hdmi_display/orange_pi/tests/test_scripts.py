@@ -31,10 +31,16 @@ run_receiver() {
   bin_dir.mkdir()
   for command, contents in {
     "id": "case ${1:-} in -u) printf '0\\n';; -gn) printf 'orangepi\\n';; *) exit 0;; esac",
-    "nmcli": "printf 'nmcli argument=%s\\n' \"$@\"",
+    "nmcli": '''case "$*" in
+  *GENERAL.TYPE*) printf 'wifi\\n';;
+  *GENERAL.CON-UUID*) printf '%s\\n' "${MOCK_ACTIVE_UUID:---}";;
+  *DEVICE,TYPE*) printf 'wlan0:wifi\\n';;
+  *) printf 'nmcli argument=%s\\n' "$@";;
+esac''',
     "ip": "printf 'ip argument=%s\\n' \"$@\"",
     "iw": '''printf '%s\\n' "$*" >> "${IW_CALL_LOG:-iw.log}"
-[[ ${MOCK_IW_ERROR:-} != 1 ]]''',
+[[ ${MOCK_IW_ERROR:-} != 1 ]] || exit 1
+[[ "$*" != *'get power_save' ]] || printf 'Power save: %s\\n' "${MOCK_IW_POWER:-off}"''',
     "systemctl": '''printf '%s\\n' "$*" >> "$SYSTEMCTL_CALL_LOG"
 case "$1" in
   show) printf 'loaded\\n';;
@@ -123,9 +129,17 @@ def _service_environment(script_sandbox):
                      .replace("/opt/cluster-receiver", '"$PACKAGE_DIR"')
                      .replace("/var/lib/cluster-receiver", '"$TEST_STATE_DIR"')
                      .replace("/etc/systemd/system", '"$TEST_UNIT_DIR"'), encoding="utf-8", newline="\n")
+  helper = scripts / "wifi_boot_setup.sh"
+  helper.write_text(helper.read_text(encoding="utf-8")
+                    .replace("TARGET=/opt/cluster-receiver", 'TARGET="$PACKAGE_DIR"')
+                    .replace("WIFI_CONF=/etc/systemd/system/cluster-hdmi.service.d/wifi.conf",
+                             'WIFI_CONF="$TEST_UNIT_DIR/cluster-hdmi.service.d/wifi.conf"')
+                    .replace("WIFI_DISPATCHER=/etc/NetworkManager/dispatcher.d/90-cluster-wifi-power",
+                             'WIFI_DISPATCHER="$TEST_DISPATCHER_DIR/90-cluster-wifi-power"'), encoding="utf-8", newline="\n")
   (scripts.parent / "cluster_receiver.py").touch()
   shutil.copyfile(SCRIPTS.parent / "cluster-hdmi.service", scripts.parent / "cluster-hdmi.service")
-  return {"TEST_STATE_DIR": "state with spaces", "TEST_UNIT_DIR": "units with spaces", "SYSTEMCTL_CALL_LOG": "systemctl.log"}
+  return {"TEST_STATE_DIR": "state with spaces", "TEST_UNIT_DIR": "units with spaces",
+          "TEST_DISPATCHER_DIR": "NM dispatcher", "SYSTEMCTL_CALL_LOG": "systemctl.log"}
 
 
 def test_service_enable_preserves_target_and_desktop_restores_it(script_sandbox):
@@ -200,7 +214,7 @@ def test_service_status_only_queries_enabled_and_running_state(script_sandbox):
   ]
 
 
-@pytest.mark.parametrize("name", ["run_console.sh", "run_desktop.sh", "service.sh", "diagnose.sh", "ensure_wifi.sh"])
+@pytest.mark.parametrize("name", ["run_console.sh", "run_desktop.sh", "service.sh", "diagnose.sh", "ensure_wifi.sh", "wifi_power_save.sh"])
 def test_help_needs_no_desktop_or_service_changes(script_sandbox, name):
   result = _run_script(script_sandbox, name, "--help")
   assert result.returncode == 0, result.stderr
@@ -236,6 +250,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 case "$1 $2" in
+  'device status') printf '%s\\n' "${MOCK_DEVICES:-wlan0:wifi}";;
+  'device show')
+    case "$field" in
+      GENERAL.TYPE)
+        if [[ "$3" == eth* ]]; then printf 'ethernet\\n'; else printf 'wifi\\n'; fi;;
+      GENERAL.CON-UUID)
+        if [[ -f "$NM_STATE/$3.active" ]]; then cat "$NM_STATE/$3.active"; else printf -- '--\\n'; fi;;
+    esac;;
   'connection show')
     if [[ ${MOCK_NM_LIST_ERROR:-} == 1 ]]; then printf 'NetworkManager unavailable\\n' >&2; exit 10; fi
     if [[ $# == 2 ]]; then
@@ -280,8 +302,7 @@ esac''',
   return script_sandbox, state, {"NM_STATE": state.name, "NMCLI_CALL_LOG": "nmcli.log", "TEST_WIFI_LOCK": "wifi.lock"}
 
 
-def _wifi_profile(state, ssid="Android", interface="wlan0", kind="wifi"):
-  uuid = "00000000-0000-0000-0000-000000000001"
+def _wifi_profile(state, ssid="Android", interface="wlan0", kind="wifi", uuid="00000000-0000-0000-0000-000000000001"):
   for key, value in {"ssid": ssid, "interface": interface, "type": kind, "con-name": "Renamed hotspot"}.items():
     (state / f"{uuid}.{key}").write_text(value + "\n", encoding="utf-8")
   return uuid
@@ -305,7 +326,7 @@ def test_vehicle_wifi_is_saved_without_an_ap_and_repeated_setup_reuses_it(wifi_s
   assert log.count("connection add ") == 1
   assert log.count("connection modify ") == 1
   assert "connection up" not in log and "device wifi connect" not in log
-  assert (state.parent / "iw.log").read_text().splitlines() == ["dev wlan0 set power_save off"] * 2
+  assert (state.parent / "iw.log").read_text().splitlines() == ["dev wlan0 set power_save off", "dev wlan0 get power_save"] * 2
 
 
 def test_wifi_power_save_driver_error_preserves_the_profile_without_disconnect(wifi_sandbox):
@@ -324,13 +345,14 @@ def test_existing_wifi_profile_is_matched_by_ssid_and_keeps_other_settings(wifi_
   sandbox, state, env = wifi_sandbox
   uuid = _wifi_profile(state, interface=interface, kind=kind)
   (state / f"{uuid}.ipv4.method").write_text("manual\n", encoding="utf-8")
+  (state / f"{uuid}.wifi-sec.psk-flags").write_text("1\n", encoding="utf-8")
   result = _run_script(sandbox, "ensure_wifi.sh", extra_env=env)
   assert result.returncode == 0, result.stdout + result.stderr
   assert "profile reused" in result.stdout
   assert len(list(state.glob("*.ssid"))) == 1
   assert (state / f"{uuid}.con-name").read_text() == "Renamed hotspot\n"
   assert (state / f"{uuid}.ipv4.method").read_text() == "manual\n"
-  assert (state / f"{uuid}.wifi-sec.psk-flags").read_text() == "0\n"
+  assert (state / f"{uuid}.wifi-sec.psk-flags").read_text() == "1\n"
 
 
 @pytest.mark.parametrize("ssid, interface, kind", [("Guest", "wlan0", "wifi"), ("Android", "wlan1", "wifi"), ("Android", "wlan0", "802-3-ethernet")])
@@ -389,6 +411,7 @@ def test_wifi_boot_setup_preserves_existing_receiver_and_account(wifi_sandbox, n
   assert "After=NetworkManager.service" in settings
   assert "ExecStartPre=-+/usr/bin/timeout --kill-after=2s 10s /bin/bash " in settings
   assert "ensure_wifi.sh wlan0" in settings
+  assert "wifi_power_save.sh" in settings
   assert "12345678" not in settings
   assert (root / "systemctl.log").read_text().splitlines() == ["daemon-reload", "start NetworkManager.service"]
 
@@ -408,6 +431,9 @@ def update_sandbox(script_sandbox):
   updater.write_text(updater.read_text(encoding="utf-8")
                      .replace("TARGET=/opt/cluster-receiver", 'TARGET="$TEST_TARGET_DIR"')
                      .replace("STATE=/var/lib/cluster-receiver/updates", 'STATE="$TEST_UPDATE_STATE_DIR"')
+                     .replace("WIFI_CONF=/etc/systemd/system/cluster-hdmi.service.d/wifi.conf", 'WIFI_CONF="$TEST_WIFI_CONF"')
+                     .replace("WIFI_DISPATCHER=/etc/NetworkManager/dispatcher.d/90-cluster-wifi-power",
+                              'WIFI_DISPATCHER="$TEST_WIFI_DISPATCHER"')
                      .replace("/etc/systemd/system/cluster-hdmi.service", '"$TEST_UNIT_FILE"')
                      .replace("/usr/bin/python3", "preflight-python"), encoding="utf-8", newline="\n")
   environment = {
@@ -415,6 +441,7 @@ def update_sandbox(script_sandbox):
     "TEST_UNIT_FILE": "installed.service", "SYSTEMCTL_CALL_LOG": "systemctl.log",
     "MOCK_START_COUNT_FILE": "start-count", "MOCK_INVOCATION_COUNT_FILE": "invocation-count",
     "MOCK_WINDOWS_MODES": "1" if os.name == "nt" else "0",
+    "TEST_WIFI_CONF": "unit dropins/wifi.conf", "TEST_WIFI_DISPATCHER": "NM dispatcher/90-cluster-wifi-power",
   }
   target = root / environment["TEST_TARGET_DIR"]
   incoming = root / "incoming with spaces"
@@ -428,6 +455,14 @@ def update_sandbox(script_sandbox):
   # The first update must work when the previously installed release has no
   # updater, and recovery must keep working after that release is restored.
   shutil.copyfile(updater, incoming / "scripts" / "update.sh")
+  for name in ("ensure_wifi.sh", "wifi_boot_setup.sh", "wifi_power_save.sh"):
+    shutil.copyfile(scripts / name, incoming / "scripts" / name)
+  helper = incoming / "scripts" / "wifi_boot_setup.sh"
+  helper.write_text(helper.read_text(encoding="utf-8")
+                    .replace("TARGET=/opt/cluster-receiver", 'TARGET="$TEST_TARGET_DIR"')
+                    .replace("WIFI_CONF=/etc/systemd/system/cluster-hdmi.service.d/wifi.conf", 'WIFI_CONF="$TEST_WIFI_CONF"')
+                    .replace("WIFI_DISPATCHER=/etc/NetworkManager/dispatcher.d/90-cluster-wifi-power",
+                             'WIFI_DISPATCHER="$TEST_WIFI_DISPATCHER"'), encoding="utf-8", newline="\n")
   (incoming / "new_module.py").write_text("# added in new release\n", encoding="utf-8")
   _write_checksums(incoming)
   (target / "local-settings.json").write_text('{"rotation":270}\n', encoding="utf-8")
@@ -524,7 +559,8 @@ def test_remote_update_and_manual_rollback_preserve_configuration(update_sandbox
   assert result.returncode == 0, result.stdout + result.stderr
   assert (target / "cluster_receiver.py").read_text() == "# new\n"
   calls = (root / "systemctl.log").read_text().splitlines()
-  assert not any(line.startswith(("enable", "disable", "set-default", "daemon-reload")) or "display-manager" in line for line in calls)
+  assert "daemon-reload" in calls
+  assert not any(line.startswith(("enable", "disable", "set-default")) or "display-manager" in line for line in calls)
   assert all("_SYSTEMD_INVOCATION_ID=" in line for line in calls if line.startswith("journal "))
 
 

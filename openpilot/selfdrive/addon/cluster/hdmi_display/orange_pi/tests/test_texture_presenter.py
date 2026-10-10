@@ -1,5 +1,7 @@
 import threading
+from io import BytesIO
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -52,6 +54,11 @@ def _frame(size=(1920, 480)):
   return SimpleNamespace(get_size=lambda: size)
 
 
+def _pygame():
+  return SimpleNamespace(Rect=lambda *args: args,
+                         Surface=Mock(side_effect=lambda size, **kwargs: SimpleNamespace(blit=Mock(), set_alpha=Mock())))
+
+
 def _controls(brightness=80, screen_off=False, menu=None):
   value = 0 if screen_off else round(brightness * 255 / 100)
   return SimpleNamespace(screen_off=screen_off, tint_color=(value,) * 3, logical_size=(1920, 480), render_menu=lambda: menu)
@@ -59,7 +66,7 @@ def _controls(brightness=80, screen_off=False, menu=None):
 
 def test_standalone_window_selects_display_and_accelerated_renderer():
   video, calls = _fake_video()
-  pygame = SimpleNamespace(Rect=lambda *args: args)
+  pygame = _pygame()
   presenter = TexturePresenter(pygame, size=(480, 1920), display_index=2, rotation=90, video_module=video)
   assert calls[:2] == [
     ("window", "C4 Cluster", {"size": (480, 1920), "position": (0x2FFF0002, 0x2FFF0002), "fullscreen": True, "hidden": False}),
@@ -80,7 +87,8 @@ def test_failed_gpu_initialization_releases_its_window_for_surface_fallback():
 
 def test_live_frames_reuse_one_streaming_texture_and_touch_redraw_does_not_upload():
   video, calls = _fake_video()
-  presenter = TexturePresenter(SimpleNamespace(Rect=lambda *args: args), video_module=video)
+  pygame = _pygame()
+  presenter = TexturePresenter(pygame, video_module=video)
   frame = _frame()
   presenter.present(frame, _controls())
   presenter.present(frame, _controls(brightness=35))
@@ -88,9 +96,14 @@ def test_live_frames_reuse_one_streaming_texture_and_touch_redraw_does_not_uploa
   assert len([call for call in calls if call[0] == "texture"]) == 1
   assert len([call for call in calls if call[0] == "update"]) == 2
   assert [call[1] for call in calls if call[0] == "draw"] == [(204,) * 3, (89,) * 3, (51,) * 3]
-  assert next(call for call in calls if call[0] == "texture") == ("texture", (1920, 480), {"streaming": True})
+  assert next(call for call in calls if call[0] == "texture") == ("texture", (1920, 480), {"depth": 32, "streaming": True})
+  assert pygame.Surface.call_count == 1
+  staging = presenter._upload_surface
+  assert [call[1] for call in calls if call[0] == "update"] == [staging, staging]
+  assert staging.blit.call_count == 2
   presenter.present(_frame((960, 240)))
   assert len([call for call in calls if call[0] == "texture"]) == 2
+  assert pygame.Surface.call_count == 2
   presenter.close()
 
 
@@ -102,7 +115,7 @@ def test_live_frames_reuse_one_streaming_texture_and_touch_redraw_does_not_uploa
 ])
 def test_rotation_and_scaling_are_delegated_to_sdl(rotation, size, expected):
   video, calls = _fake_video()
-  presenter = TexturePresenter(SimpleNamespace(Rect=lambda *args: args), size=size, rotation=rotation, video_module=video)
+  presenter = TexturePresenter(_pygame(), size=size, rotation=rotation, video_module=video)
   timings = presenter.present(_frame())
   draw = next(call for call in calls if call[0] == "draw")
   assert draw[2] == {"dstrect": expected, "angle": rotation}
@@ -113,7 +126,7 @@ def test_rotation_and_scaling_are_delegated_to_sdl(rotation, size, expected):
 
 def test_screen_off_skips_frame_upload_and_clears_renderer():
   video, calls = _fake_video()
-  presenter = TexturePresenter(SimpleNamespace(Rect=lambda *args: args), video_module=video)
+  presenter = TexturePresenter(_pygame(), video_module=video)
   presenter.present(_frame())
   calls.clear()
   presenter.present(_frame(), _controls(screen_off=True))
@@ -129,7 +142,7 @@ def test_screen_off_skips_frame_upload_and_clears_renderer():
 
 def test_cached_small_menu_uploads_only_when_surface_changes():
   video, calls = _fake_video()
-  presenter = TexturePresenter(SimpleNamespace(Rect=lambda *args: args), size=(480, 1920), rotation=90, video_module=video)
+  presenter = TexturePresenter(_pygame(), size=(480, 1920), rotation=90, video_module=video)
   surface = _frame((400, 120))
   controls = _controls(menu=(surface, (20, 30)))
   presenter.present(_frame(), controls)
@@ -145,7 +158,7 @@ def test_cached_small_menu_uploads_only_when_surface_changes():
 
 def test_rendering_from_a_different_thread_fails_before_any_sdl_call():
   video, calls = _fake_video()
-  presenter = TexturePresenter(SimpleNamespace(Rect=lambda *args: args), video_module=video)
+  presenter = TexturePresenter(_pygame(), video_module=video)
   calls.clear()
   errors = []
 
@@ -174,17 +187,18 @@ def raster_pygame(monkeypatch):
   pygame.display.quit()
 
 
+@pytest.mark.parametrize("depth", [24, 32])
 @pytest.mark.parametrize("rotation, expected_rows", [
   (0, [[0, 1, 2, 3], [4, 5, 6, 7]]),
   (90, [[4, 0], [5, 1], [6, 2], [7, 3]]),
   (180, [[7, 6, 5, 4], [3, 2, 1, 0]]),
   (270, [[3, 7], [2, 6], [1, 5], [0, 4]]),
 ])
-def test_sdl_pixel_rotation_matches_touch_coordinate_system(raster_pygame, rotation, expected_rows):
+def test_sdl_pixel_rotation_matches_touch_coordinate_system(raster_pygame, rotation, expected_rows, depth):
   pygame, video = raster_pygame
   colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0),
             (255, 0, 255), (0, 255, 255), (255, 255, 255), (64, 64, 64)]
-  frame = pygame.Surface((4, 2))
+  frame = pygame.Surface((4, 2), depth=depth)
   for index, color in enumerate(colors):
     frame.set_at((index % 4, index // 4), color)
   size = len(expected_rows[0]), len(expected_rows)
@@ -197,6 +211,37 @@ def test_sdl_pixel_rotation_matches_touch_coordinate_system(raster_pygame, rotat
     assert actual == [[colors[index] for index in row] for row in expected_rows]
   finally:
     presenter.close()
+
+
+def test_jpeg_frames_reuse_argb_buffer_without_stale_pixels_or_source_mutation(raster_pygame):
+  from PIL import Image
+  pygame, video = raster_pygame
+  presenter = TexturePresenter(pygame, size=(8, 4), fullscreen=False,
+                               accelerated=False, vsync=False, hidden=True, video_module=video)
+  staging = None
+  try:
+    for color in ((210, 60, 15), (30, 90, 220), (0, 0, 0)):
+      jpeg = BytesIO()
+      Image.new("RGB", (8, 4), color).save(jpeg, format="JPEG", quality=90)
+      jpeg.seek(0)
+      frame = pygame.image.load(jpeg, "cluster.jpg")
+      assert frame.get_bitsize() == 24
+      before = pygame.image.tostring(frame, "RGB")
+      presenter.present(frame)
+      current = presenter._upload_surface
+      assert current.get_masks() == (0xFF0000, 0xFF00, 0xFF, 0xFF000000)
+      assert current.get_alpha() is None
+      if staging is None:
+        staging = current
+      assert current is staging
+      output = presenter.renderer.to_surface()
+      assert pygame.image.tostring(output, "RGB") == before
+      assert pygame.image.tostring(frame, "RGB") == before
+    presenter.redraw()
+    assert presenter._upload_surface is staging
+  finally:
+    presenter.close()
+  assert presenter._upload_surface is None
 
 
 @pytest.mark.parametrize("rotation, expected", [(0, (0, 0)), (90, (1, 0)), (180, (3, 1)), (270, (0, 3))])

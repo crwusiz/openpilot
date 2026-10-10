@@ -14,6 +14,11 @@ from openpilot.common.transformations.orientation import rot_from_euler
 from openpilot.selfdrive.controls.radard import RADAR_TO_CAMERA
 
 GearShifter = structs.CarState.GearShifter
+HEALTH_AGE_SERVICES = {
+  'modelV2': 'model_age_ms',
+  'deviceMotion': 'device_motion_age_ms',
+  'carState': 'car_state_age_ms',
+}
 
 
 def _enum_value(value):
@@ -41,6 +46,8 @@ def _initial_health_data():
     "device_motion_input_error_total": 0,
     "device_motion_posenet_error_total": 0,
     "device_state_seen": False,
+    "onroad_started": None,
+    "car_state_seen": False,
     "device_cpu_max_pct": None,
     "cpu_temp_max_c": None,
     "thermal_status": None,
@@ -110,6 +117,7 @@ class ClusterModels:
     self.ignore_limit_timer = 0.0
     self._state_lock = threading.RLock()
     self._health_data = _initial_health_data()
+    self._health_received_at = dict.fromkeys(HEALTH_AGE_SERVICES)
     self.conv = UnitConverter()
 
     try:
@@ -284,6 +292,13 @@ class ClusterModels:
     # changing source messages. Count distinct updates so a stalled renderer
     # cannot miss a short locationd error followed by a healthy message.
     health = self._health_data
+    received_at = time.monotonic()
+    for service in HEALTH_AGE_SERVICES:
+      if self.sm.updated.get(service, False):
+        self._health_received_at[service] = received_at
+    if self.sm.updated.get('carState', False):
+      health["car_state_seen"] = True
+
     if self.sm.updated.get('modelV2', False):
       model = self.sm['modelV2']
       health["model_seen"] = True
@@ -312,6 +327,8 @@ class ClusterModels:
     if self.sm.updated.get('deviceState', False):
       device = self.sm['deviceState']
       health["device_state_seen"] = True
+      started = getattr(device, 'started', None)
+      health["onroad_started"] = bool(started) if started is not None else None
       for source, field in (('cpuUsagePercent', 'device_cpu_max_pct'), ('cpuTempC', 'cpu_temp_max_c')):
         values = (_finite_number(value) for value in getattr(device, source, ()))
         health[field] = max((value for value in values if value is not None), default=None)
@@ -323,6 +340,12 @@ class ClusterModels:
     """Snapshot health and consume only the diagnostic model-drop peak."""
     with self._state_lock:
       snapshot = self._health_data.copy()
+      # Local receive age remains unknown until the service updates. Reading a
+      # stale snapshot must not refresh its age or imply the source is healthy.
+      now = time.monotonic()
+      for service, label in HEALTH_AGE_SERVICES.items():
+        received_at = self._health_received_at[service]
+        snapshot[label] = max(0.0, (now - received_at) * 1000) if received_at is not None else None
       self._health_data["model_drop_peak_perc"] = self._health_data["model_drop_perc"]
       return snapshot
 

@@ -5,6 +5,8 @@ umask 077
 TARGET=/opt/cluster-receiver
 STATE=/var/lib/cluster-receiver/updates
 UNIT=cluster-hdmi.service
+WIFI_CONF=/etc/systemd/system/cluster-hdmi.service.d/wifi.conf
+WIFI_DISPATCHER=/etc/NetworkManager/dispatcher.d/90-cluster-wifi-power
 FILES=()
 REMOVE=()
 pending=0
@@ -12,6 +14,7 @@ resume=0
 recovering=0
 recovery_goal=''
 backup=''
+wifi_rollback_snapshot=''
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 valid_file() {
@@ -57,6 +60,38 @@ clear_bytecode() {
     rm -f -- "$cache" || return 1
   done
 }
+snapshot_wifi_state() {
+  local directory=$1 path name
+  install -d -m 700 -- "$directory" || return 1
+  for name in wifi.conf dispatcher; do
+    if [[ "$name" == wifi.conf ]]; then path=$WIFI_CONF; else path=$WIFI_DISPATCHER; fi
+    [[ ! -L "$path" ]] || return 1
+    if [[ -e "$path" ]]; then
+      [[ -f "$path" ]] || return 1
+      cp -p -- "$path" "$directory/$name" || return 1
+    fi
+  done
+  printf 'complete\n' > "$directory/state"
+}
+restore_wifi_state() {
+  local directory=$1 path name
+  # Older saved updates have no external Wi-Fi snapshot. Do not infer or erase
+  # their original configuration; new updates always record presence/absence.
+  [[ -f "$directory/state" ]] || return 0
+  [[ $(< "$directory/state") == complete ]] || return 1
+  for name in wifi.conf dispatcher; do
+    if [[ "$name" == wifi.conf ]]; then path=$WIFI_CONF; else path=$WIFI_DISPATCHER; fi
+    [[ ! -L "$path" ]] || return 1
+    if [[ -f "$directory/$name" ]]; then
+      [[ ! -L "$directory/$name" ]] || return 1
+      install -d -m 755 -- "${path%/*}" || return 1
+      cp -p -- "$directory/$name" "$path" || return 1
+    else
+      rm -f -- "$path" || return 1
+    fi
+  done
+  systemctl daemon-reload
+}
 check_ready() {
   local marker=$1 invocation current journal successes=0 attempt
   invocation=$(systemctl show --property=InvocationID --value "$UNIT") || return 1
@@ -96,6 +131,7 @@ restore_backup() {
     copy_file "$backup/previous/$name" "$TARGET/$name" || return 1
   done < "$backup/previous-files"
   clear_bytecode || return 1
+  restore_wifi_state "$backup/wifi-system" || return 1
   if [[ $resume == 1 ]]; then
     start_receiver || return 1
     check_ready 'Orange Pi HDMI display ready' || return 1
@@ -146,6 +182,7 @@ if [[ $1 == rollback ]]; then
   fi
   [[ "$latest" =~ ^[0-9]{8}T[0-9]{6}Z\.[a-zA-Z0-9]{8}$ ]] || fail 'Invalid saved backup identifier.'
   source_dir="$STATE/$latest/previous"
+  wifi_rollback_snapshot="$STATE/$latest/wifi-system"
   while IFS= read -r name; do
     valid_file "$name" || fail 'Invalid saved payload path.'
     [[ -f "$source_dir/$name" ]] || REMOVE+=("$name")
@@ -154,7 +191,9 @@ fi
 [[ "$source_dir" != "$TARGET" ]] || fail 'Use a separate staging directory.'
 read_manifest "$source_dir"
 if [[ $1 == apply ]]; then
-  [[ " ${FILES[*]} " == *' scripts/update.sh '* ]] || fail 'Payload is missing scripts/update.sh.'
+  for name in scripts/update.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh; do
+    [[ " ${FILES[*]} " == *" $name "* ]] || fail "Payload is missing $name."
+  done
 fi
 for name in "${FILES[@]}"; do
   [[ "$name" != scripts/*.sh ]] || bash -n "$source_dir/$name"
@@ -186,6 +225,7 @@ install -m 700 -- "${BASH_SOURCE[0]}" "$STATE/update.sh.tmp"
 mv -f -- "$STATE/update.sh.tmp" "$STATE/update.sh"
 backup=$(mktemp -d "$STATE/$(date -u +%Y%m%dT%H%M%SZ).XXXXXXXX")
 printf '%s\n' "$resume" > "$backup/resume"
+snapshot_wifi_state "$backup/wifi-system" || fail 'Cannot safely back up receiver Wi-Fi setup.'
 install -d -m 700 -- "$backup/previous/scripts"
 shopt -s nullglob
 for path in "$TARGET"/*.py "$TARGET"/scripts/*.sh "$TARGET/README.md" "$TARGET/requirements.txt" "$TARGET/cluster-hdmi.service"; do
@@ -221,6 +261,17 @@ done
 # Same-sized files copied within one second can otherwise reuse a stale .pyc,
 # including when a failed update is immediately rolled back.
 clear_bytecode
+if [[ $1 == apply ]]; then
+  bash "$TARGET/scripts/wifi_boot_setup.sh" install
+  systemctl daemon-reload
+  # A running SSH/receiver connection is preserved: change only powersave,
+  # never reapply/reconnect the profile or restart NetworkManager.
+  if ! timeout --kill-after=2s 8s bash "$TARGET/scripts/wifi_power_save.sh"; then
+    printf '[CLUSTER_WIFI_POWER] Live power-save preparation failed or timed out.\n' >&2
+  fi
+else
+  restore_wifi_state "$wifi_rollback_snapshot"
+fi
 if [[ $resume == 1 ]]; then
   start_receiver
   check_ready "$marker" || fail 'Receiver did not become ready in the current service invocation.'
@@ -232,4 +283,4 @@ printf '%s\n' "${backup##*/}" > "$STATE/latest.tmp"
 mv -f -- "$STATE/latest.tmp" "$STATE/latest"
 rm -f -- "$STATE/recovery-needed"
 pending=0
-printf 'Receiver %s complete. Installed unit and boot settings preserved.\n' "$1"
+printf 'Receiver %s complete. Receiver account, HDMI options and boot target preserved.\n' "$1"

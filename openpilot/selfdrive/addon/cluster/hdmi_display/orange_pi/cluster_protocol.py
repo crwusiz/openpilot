@@ -1,6 +1,7 @@
 import select
 import struct
 import time
+from dataclasses import dataclass
 
 
 PROTOCOL_VERSION = 1
@@ -18,6 +19,16 @@ ACK_SCREEN_OFF = 2
 
 FRAME_HEADER = struct.Struct("!4sBB2xII")
 ACK_PACKET = struct.Struct("!4sBB2xIB3x")
+
+
+@dataclass
+class ReceiveStats:
+  # Wall durations include thread scheduling/GIL reacquisition, not just I/O.
+  wait_time: float = 0.0
+  wait_max: float = 0.0
+  read_calls: int = 0
+  read_max: float = 0.0
+  select_timeouts: int = 0
 
 
 def unpack_frame_header(data: bytes) -> tuple[int, int]:
@@ -38,7 +49,7 @@ def pack_ack(sequence: int, status: int = ACK_OK, flags: int = 0) -> bytes:
   return ACK_PACKET.pack(ACK_MAGIC, PROTOCOL_VERSION, flags, sequence, status)
 
 
-def recv_exact(sock, size: int, *, deadline: float | None = None, poll_events=None) -> bytes:
+def recv_exact(sock, size: int, *, deadline: float | None = None, poll_events=None, stats: ReceiveStats | None = None) -> bytes:
   data = bytearray(size)
   view = memoryview(data)
   received = 0
@@ -50,10 +61,20 @@ def recv_exact(sock, size: int, *, deadline: float | None = None, poll_events=No
       if remaining <= 0:
         raise TimeoutError("Timed out waiting for a complete cluster frame")
       # Preserve partial packets while keeping SDL responsive during a stall.
+      wait_started = time.monotonic() if stats is not None else 0.0
       readable, _, _ = select.select([sock], [], [], min(remaining, 0.05))
+      if stats is not None:
+        wait_elapsed = time.monotonic() - wait_started
+        stats.wait_time += wait_elapsed
+        stats.wait_max = max(stats.wait_max, wait_elapsed)
+        stats.select_timeouts += not readable
       if not readable:
         continue
+    read_started = time.monotonic() if stats is not None else 0.0
     count = sock.recv_into(view[received:])
+    if stats is not None:
+      stats.read_calls += 1
+      stats.read_max = max(stats.read_max, time.monotonic() - read_started)
     if count == 0:
       raise ConnectionError("C4 connection closed while receiving data")
     received += count

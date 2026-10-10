@@ -1,5 +1,10 @@
+import logging
 import threading
 import time
+
+
+ARGB_MASKS = (0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000)
+LOG = logging.getLogger("cluster_receiver.hdmi")
 
 
 class TexturePresenter:
@@ -25,6 +30,7 @@ class TexturePresenter:
     self.renderer = None
     self._texture = None
     self._texture_size = None
+    self._upload_surface = None
     self._has_frame = False
     self._menu_texture = None
     self._menu_surface = None
@@ -78,18 +84,31 @@ class TexturePresenter:
     """Upload an unrotated frame and present it; return stage timings."""
     self._check_thread()
     started = time.monotonic()
+    converted_at = started
     if controls is None or not controls.screen_off:
       size = tuple(frame.get_size())
       if self._texture is None or self._texture_size != size:
-        self._texture = self._video.Texture(self.renderer, size, streaming=True)
+        self._texture = self._video.Texture(self.renderer, size, depth=32, streaming=True)
         self._texture_size = size
-      self._texture.update(frame)
+        # Match the texture's explicit ARGB8888 format. pygame Texture.update
+        # otherwise allocates/converts an entire RGB24 JPEG Surface every frame.
+        # Keep one conversion destination and upload it without that allocation.
+        self._upload_surface = self.pygame.Surface(size, depth=32, masks=ARGB_MASKS)
+        self._upload_surface.set_alpha(None)
+        depth = getattr(frame, "get_bitsize", lambda: "n/a")()
+        LOG.info("[CLUSTER_HDMI_UPLOAD] source_depth=%s | texture_depth=32 | staging=reused_argb8888 | size=%sx%s",
+                 depth, *size)
+      self._upload_surface.blit(frame, (0, 0))
+      converted_at = time.monotonic()
+      self._texture.update(self._upload_surface)
       self._frame_size = size
       self._has_frame = True
     uploaded_at = time.monotonic()
     result = self.redraw(controls)
-    result["upload"] = uploaded_at - started
-    result["blit"] += result["upload"]
+    result["convert"] = converted_at - started
+    result["upload"] = uploaded_at - converted_at
+    result["draw"] = result["blit"]
+    result["blit"] += uploaded_at - started
     return result
 
   def redraw(self, controls=None):
@@ -128,6 +147,7 @@ class TexturePresenter:
     self._check_thread()
     # Texture objects retain their renderer. Release them before the window.
     self._texture = None
+    self._upload_surface = None
     self._menu_texture = None
     self._menu_surface = None
     self.renderer = None

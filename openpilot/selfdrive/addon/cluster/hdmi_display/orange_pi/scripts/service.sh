@@ -9,18 +9,7 @@ usage() {
 }
 
 install_wifi_boot_setup() {
-  [[ -f /opt/cluster-receiver/scripts/ensure_wifi.sh ]] || fail 'Update the package first; scripts/ensure_wifi.sh is missing.'
-  install -d /etc/systemd/system/cluster-hdmi.service.d
-  # A drop-in also works with a previously installed/customized receiver unit.
-  cat > /etc/systemd/system/cluster-hdmi.service.d/wifi.conf <<'UNIT'
-[Unit]
-Wants=NetworkManager.service
-After=NetworkManager.service
-
-[Service]
-# + runs only this preparation as root; - lets HDMI start after Wi-Fi errors.
-ExecStartPre=-+/usr/bin/timeout --kill-after=2s 10s /bin/bash /opt/cluster-receiver/scripts/ensure_wifi.sh wlan0
-UNIT
+  bash /opt/cluster-receiver/scripts/wifi_boot_setup.sh install
 }
 
 reset_receiver_failed_state() {
