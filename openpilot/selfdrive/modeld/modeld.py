@@ -15,7 +15,6 @@ from tinygrad.helpers import round_up
 from tinygrad.uop.ops import UOp
 import math
 import pickle
-import threading
 import time
 import numpy as np
 import openpilot.cereal.messaging as messaging
@@ -266,20 +265,19 @@ def main(demo=False):
   cloudlog.warning("loading model")
   model = None
   if CHESTNUT:
-    big_model = None
-    def load_big():
-      nonlocal big_model
-      try:
-        wait_for_chestnut()
-        m = ModelState(vipc_client_main.width, vipc_client_main.height, True)
-        m.warmup()
-        big_model = m
-      except Exception:
-        cloudlog.exception("big model load failed")
-    loader = threading.Thread(target=load_big, daemon=True)
-    loader.start()
-    loader.join(BIG_MODEL_TIMEOUT)
-    model = big_model
+    # tinygrad Context values are process-global. Finish each stage before checking
+    # the deadline so fallback cannot overlap compilation or interrupt Context cleanup.
+    try:
+      wait_for_chestnut()
+      model = ModelState(vipc_client_main.width, vipc_client_main.height, True)
+      if time.monotonic() - st > BIG_MODEL_TIMEOUT:
+        raise TimeoutError("big model initialization timed out")
+      model.warmup()
+      if time.monotonic() - st > BIG_MODEL_TIMEOUT:
+        raise TimeoutError("big model warmup timed out")
+    except Exception:
+      model = None
+      cloudlog.exception("big model load failed, fall back to small")
     params.put_bool("ChestnutActive", model is not None)
 
   small_model = ModelState(vipc_client_main.width, vipc_client_main.height, False) if model is None or CHESTNUT else None
