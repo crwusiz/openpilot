@@ -28,11 +28,12 @@ class DriverStateRenderer(Widget):
   LINES_STALE_ANGLES = 3.0  # seconds
   AWARENESS_UNFULL_PERCENT = 95  # ~0.5s
 
-  def __init__(self, lines: bool = False, inset: bool = False):
+  def __init__(self, lines: bool = False, inset: bool = False, size: int = BASE_SIZE, always_visible: bool = False):
     super().__init__()
-    self.set_rect(rl.Rectangle(0, 0, self.BASE_SIZE, self.BASE_SIZE))
+    self.set_rect(rl.Rectangle(0, 0, size, size))
     self._lines = lines
     self._inset = inset
+    self._always_visible = always_visible
 
     # In line mode, track smoothed angles
     assert 360 % self.LINES_ANGLE_INCREMENT == 0
@@ -78,8 +79,9 @@ class DriverStateRenderer(Widget):
 
   @property
   def should_draw(self):
-    return (self._should_draw and ui_state.sm["selfdriveState"].alertSize == AlertSize.none and
-            ui_state.sm.recv_frame["driverStateV2"] > ui_state.started_frame)
+    return self._should_draw and (self._always_visible or
+                                 (ui_state.sm["selfdriveState"].alertSize == AlertSize.none and
+                                  ui_state.sm.recv_frame["driverStateV2"] > ui_state.started_frame))
 
   def set_force_active(self, force_active: bool):
     """Force the dmoji to always appear active (green) regardless of actual state"""
@@ -165,6 +167,16 @@ class DriverStateRenderer(Widget):
 
   def get_driver_data(self):
     sm = ui_state.sm
+
+    if self._always_visible and not all(sm.alive[service] and sm.recv_frame[service] > ui_state.started_frame
+                                       for service in ("driverMonitoringState", "driverStateV2")):
+      self._is_active = False
+      self._is_rhd = False
+      self._face_detected = False
+      self._awareness_unfull = False
+      self._face_pitch = 0.0
+      self._face_yaw = 0.0
+      return None
 
     dm_state = sm["driverMonitoringState"]
     self._is_active = dm_state.activePolicy == log.DriverMonitoringState.MonitoringPolicy.vision

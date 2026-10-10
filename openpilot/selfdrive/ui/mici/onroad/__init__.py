@@ -1,6 +1,16 @@
 import pyray as rl
 
 SIDE_PANEL_WIDTH = 60
+RIGHT_ICON_CENTER_OFFSET = 46
+LEFT_COLUMN_SIZES = (52, 52, 44, 44)  # cruise, set, driver monitoring, steering wheel
+
+
+def left_column_rect(rect: rl.Rectangle, row: int) -> rl.Rectangle:
+  top_padding, bottom_padding = 10, 14
+  gap = (rect.height - top_padding - bottom_padding - sum(LEFT_COLUMN_SIZES)) / (len(LEFT_COLUMN_SIZES) - 1)
+  size = LEFT_COLUMN_SIZES[row]
+  return rl.Rectangle(rect.x + 46 - size / 2,
+                      rect.y + top_padding + sum(LEFT_COLUMN_SIZES[:row]) + row * gap, size, size)
 
 
 def blend_colors(a: rl.Color, b: rl.Color, f: float) -> rl.Color:

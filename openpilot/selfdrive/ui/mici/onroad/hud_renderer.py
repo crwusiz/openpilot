@@ -2,6 +2,7 @@ import math
 import pyray as rl
 from dataclasses import dataclass
 from openpilot.common.constants import CV
+from openpilot.selfdrive.ui.mici.onroad import RIGHT_ICON_CENTER_OFFSET, left_column_rect
 from openpilot.selfdrive.ui.mici.onroad.torque_bar import TorqueBar
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus, ChestnutState
 from openpilot.system.ui.lib.application import gui_app, FontWeight
@@ -27,8 +28,8 @@ class FontSizes:
   speed_unit: int = 24
   max_speed: int = 36
   set_speed: int = 112
-  middle: int = 16
-  big: int = 30
+  middle: int = 14
+  big: int = 26
 
 
 class TurnIntent(Widget):
@@ -49,10 +50,10 @@ class TurnIntent(Widget):
     if self._turn_intent_alpha_filter.x > 1e-2:
       turn_intent_texture = self._txt_turn_intent_right if self._turn_intent_direction == 1 else self._txt_turn_intent_left
       src_rect = rl.Rectangle(0, 0, turn_intent_texture.width, turn_intent_texture.height)
-      dest_rect = rl.Rectangle(self._rect.x + self._rect.width / 2, self._rect.y + self._rect.height / 2,
+      dest_rect = rl.Rectangle(self._rect.x + self._rect.width, self._rect.y + self._rect.height / 2,
                                turn_intent_texture.width, turn_intent_texture.height)
 
-      origin = (turn_intent_texture.width / 2, self._rect.height / 2)
+      origin = (turn_intent_texture.width / 2, turn_intent_texture.height / 2)
       color = rl.Color(255, 255, 255, int(255 * self._turn_intent_alpha_filter.x))
       rl.draw_texture_pro(turn_intent_texture, src_rect, dest_rect, origin, self._turn_intent_rotation_filter.x, color)
 
@@ -281,7 +282,7 @@ class HudRenderer(Widget):
     if alpha < 1e-2:
       return
 
-    pos = rl.Vector2(rect.x + rect.width - 10 - icon.width,
+    pos = rl.Vector2(rect.x + rect.width - RIGHT_ICON_CENTER_OFFSET - icon.width / 2,
                      rect.y + rect.height - 14 - (self._txt_wheel.height + icon.height) / 2 + (1 - alpha) * icon.height / 2)
     rl.draw_texture_ex(icon, pos, 0.0, 1.0, rl.Color(255, 255, 255, int(255 * opacity * alpha)))
 
@@ -297,22 +298,22 @@ class HudRenderer(Widget):
     self._wheel_alpha_filter.update(255 * self._get_wheel_opacity())
     self._wheel_y_filter.update(0)
 
-    # pos
-    pos_x = int(rect.x + 21 + wheel_txt.width / 2)
-    pos_y = int(rect.y + rect.height - 14 - wheel_txt.height / 2 + self._wheel_y_filter.x)
+    wheel_rect = left_column_rect(rect, 3)
+    pos_x = int(wheel_rect.x + wheel_rect.width / 2)
+    pos_y = int(wheel_rect.y + wheel_rect.height / 2 + self._wheel_y_filter.x)
     rotation = -ui_state.sm['carState'].steeringAngleDeg
 
     turn_intent_margin = 25
     self._turn_intent.render(rl.Rectangle(
-      pos_x - wheel_txt.width / 2 - turn_intent_margin,
-      pos_y - wheel_txt.height / 2 - turn_intent_margin,
-      wheel_txt.width + turn_intent_margin * 2,
-      wheel_txt.height + turn_intent_margin * 2,
+      pos_x - wheel_rect.width / 2 - turn_intent_margin,
+      pos_y - wheel_rect.height / 2 - turn_intent_margin,
+      wheel_rect.width + turn_intent_margin * 2,
+      wheel_rect.height + turn_intent_margin * 2,
     ))
 
     src_rect = rl.Rectangle(0, 0, wheel_txt.width, wheel_txt.height)
-    dest_rect = rl.Rectangle(pos_x, pos_y, wheel_txt.width, wheel_txt.height)
-    origin = (wheel_txt.width / 2, wheel_txt.height / 2)
+    dest_rect = rl.Rectangle(pos_x, pos_y, wheel_rect.width, wheel_rect.height)
+    origin = (wheel_rect.width / 2, wheel_rect.height / 2)
 
     # color and draw
     color = rl.Color(255, 255, 255, int(self._wheel_alpha_filter.x))
@@ -321,7 +322,7 @@ class HudRenderer(Widget):
     if is_critical:
       # Draw exclamation point icon
       EXCLAMATION_POINT_SPACING = 10
-      exclamation_pos_x = pos_x - self._txt_exclamation_point.width / 2 + wheel_txt.width / 2 + EXCLAMATION_POINT_SPACING
+      exclamation_pos_x = pos_x - self._txt_exclamation_point.width / 2 + wheel_rect.width / 2 + EXCLAMATION_POINT_SPACING
       exclamation_pos_y = pos_y - self._txt_exclamation_point.height / 2
       rl.draw_texture_ex(self._txt_exclamation_point, rl.Vector2(exclamation_pos_x, exclamation_pos_y), 0.0, 1.0, rl.WHITE)
 
@@ -414,21 +415,18 @@ class HudRenderer(Widget):
       elif ui_state.status == UIStatus.OVERRIDE:
         max_color = Colors.OVERRIDE
 
-    box_size = 64
-    box_x = rect.x + 10
-    max_y = rect.y + 10
-
     # Max speed box
-    max_speed_box_bg = rl.Rectangle(box_x, max_y, box_size, box_size)
+    max_speed_box_bg = left_column_rect(rect, 0)
     rl.draw_rectangle_rounded(max_speed_box_bg, 0.2, 10, colors_alpha(rl.BLACK, 100))
 
-    max_speed_box = rl.Rectangle(max_speed_box_bg.x + 2, max_speed_box_bg.y + 2, box_size - 4, box_size - 4)
+    max_speed_box = rl.Rectangle(max_speed_box_bg.x + 2, max_speed_box_bg.y + 2,
+                                 max_speed_box_bg.width - 4, max_speed_box_bg.height - 4)
     rl.draw_rectangle_rounded_lines_ex(max_speed_box, 0.2, 10, 1, colors_alpha(rl.WHITE, 200))
 
     # MAX text
     self._draw_text(
       max_speed_box.x + max_speed_box.width / 2,
-      max_speed_box.y + 18,
+      max_speed_box.y + 14,
       tr("MAX"),
       FontSizes.middle,
       max_color
@@ -438,7 +436,7 @@ class HudRenderer(Widget):
     max_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(self.cruise_speed))
     self._draw_text(
       max_speed_box.x + max_speed_box.width / 2,
-      max_speed_box.y + 42,
+      max_speed_box.y + 34,
       max_speed_text,
       FontSizes.big,
       speed_color
@@ -446,17 +444,17 @@ class HudRenderer(Widget):
 
     # SET speed box with background (only if NDA or stock limit is active)
     if self.nda_state > 0 or self.stock_limit_speed > 0:
-      set_y = max_y + box_size + 8
-      set_speed_box_bg = rl.Rectangle(box_x, set_y, box_size, box_size)
+      set_speed_box_bg = left_column_rect(rect, 1)
       rl.draw_rectangle_rounded(set_speed_box_bg, 0.2, 10, colors_alpha(rl.BLACK, 100))
 
-      set_speed_box = rl.Rectangle(set_speed_box_bg.x + 2, set_speed_box_bg.y + 2, box_size - 4, box_size - 4)
+      set_speed_box = rl.Rectangle(set_speed_box_bg.x + 2, set_speed_box_bg.y + 2,
+                                   set_speed_box_bg.width - 4, set_speed_box_bg.height - 4)
       rl.draw_rectangle_rounded_lines_ex(set_speed_box, 0.2, 10, 1, colors_alpha(rl.WHITE, 200))
 
       # SET text
       self._draw_text(
         set_speed_box.x + set_speed_box.width / 2,
-        set_speed_box.y + 18,
+        set_speed_box.y + 14,
         tr("SET"),
         FontSizes.middle,
         max_color
@@ -466,7 +464,7 @@ class HudRenderer(Widget):
       set_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(self.apply_speed))
       self._draw_text(
         set_speed_box.x + set_speed_box.width / 2,
-        set_speed_box.y + 42,
+        set_speed_box.y + 34,
         set_speed_text,
         FontSizes.big,
         speed_color,
@@ -506,10 +504,10 @@ class HudRenderer(Widget):
     if not self._can_draw_top_icons or ui_state.status == UIStatus.DISENGAGED:
       return
 
-    img_w = 48
-    img_h = 96
+    img_w = 32
+    img_h = 64
 
-    img_x = rect.x + rect.width - img_w - 10
+    img_x = rect.x + rect.width - RIGHT_ICON_CENTER_OFFSET - img_w / 2
     img_y = rect.y + 10
 
     if self.traffic_state == 1:

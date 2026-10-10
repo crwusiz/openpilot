@@ -1,6 +1,7 @@
 import pyray as rl
 from openpilot.cereal import log
 from openpilot.common.filter_simple import FirstOrderFilter
+from openpilot.selfdrive.ui.mici.onroad import RIGHT_ICON_CENTER_OFFSET
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
@@ -56,8 +57,8 @@ class LongIndicator(Widget):
     green_alpha = green_f.update(float(e2e))
 
     white, green = self._txt_lead_car
-    self._draw_centered(white, rect, 100, white_alpha * alpha)
-    self._draw_centered(green, rect, 100, green_alpha * alpha)
+    self._draw_centered(white, rect, -20, white_alpha * alpha)
+    self._draw_centered(green, rect, -20, green_alpha * alpha)
 
   def _draw_distance_bars(self, rect: rl.Rectangle, alpha: float, visible: bool) -> None:
     sm = ui_state.sm
@@ -76,7 +77,7 @@ class LongIndicator(Widget):
     blink = 0.35 / 0.9 if overriding and now % 0.375 > 0.1875 else 1.0
 
     count = personality + 1
-    for i, ((white, green), y, (active_f, green_f)) in enumerate(zip(self._txt_distance, (122, 136, 152), self._distance_filters, strict=True)):
+    for i, ((white, green), y, (active_f, green_f)) in enumerate(zip(self._txt_distance, (2, 16, 32), self._distance_filters, strict=True)):
       active = active_f.update(float(i < count))
       green_alpha = green_f.update(float(highlight and i == count - 1))
       # only lit bars blink on override
@@ -84,6 +85,8 @@ class LongIndicator(Widget):
       self._draw_centered(green, rect, y, green_alpha * blink * alpha)
 
   @staticmethod
-  def _draw_centered(texture: rl.Texture, rect: rl.Rectangle, y: float, alpha: float) -> None:
-    pos = rl.Vector2(rect.x + 46 - texture.width / 2, rect.y + y - texture.height / 2)
+  def _draw_centered(texture: rl.Texture, rect: rl.Rectangle, y_offset: float, alpha: float) -> None:
+    # Stack the indicator between the traffic light and chestnut status.
+    pos = rl.Vector2(rect.x + rect.width - RIGHT_ICON_CENTER_OFFSET - texture.width / 2,
+                     rect.y + rect.height / 2 + y_offset - texture.height / 2)
     rl.draw_texture_ex(texture, pos, 0.0, 1.0, rl.Color(255, 255, 255, round(255 * alpha)))
