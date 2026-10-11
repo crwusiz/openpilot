@@ -3,13 +3,14 @@ import pyray as rl
 from openpilot.cereal import log
 from opendbc.car.structs import car
 from openpilot.cereal.visionipc import VisionStreamType
-from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.selfdrive.ui.mici.onroad import SIDE_PANEL_WIDTH, LEFT_COLUMN_SIZES, left_column_rect
 from openpilot.selfdrive.ui.mici.onroad.alert_renderer import AlertRenderer
 from openpilot.selfdrive.ui.mici.onroad.driver_state import DriverStateRenderer
 from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.mici.onroad.long_indicator import LongIndicator
 from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer
+from openpilot.selfdrive.ui.mici.onroad.navigation import NavigationPanel, PANEL_WIDTH
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
 from openpilot.selfdrive.ui.mici.onroad.cameraview import CameraView
 from openpilot.system.ui.lib.application import FontWeight, gui_app, MousePos, MouseEvent, TextAlignment, TextAlignmentVertical
@@ -178,6 +179,7 @@ class AugmentedRoadView(CameraView):
     # Bookmark icon with swipe gesture
     self._bookmark_icon = BookmarkIcon(bookmark_callback)
 
+    self._navigation = NavigationPanel()
     self._model_renderer = ModelRenderer()
     self._hud_renderer = HudRenderer()
     self._long_indicator = LongIndicator()
@@ -222,6 +224,10 @@ class AugmentedRoadView(CameraView):
 
     # Update calibration before rendering
     self._update_calibration()
+
+    self._navigation.update()
+    alert_to_render, not_animating_out = self._alert_renderer.will_render()
+    show_navigation = self._navigation.active and alert_to_render is None
 
     # Create inner content area with border padding
     self._content_rect = rl.Rectangle(
@@ -274,11 +280,18 @@ class AugmentedRoadView(CameraView):
     # End clipping region
     rl.end_scissor_mode()
 
+    if show_navigation:
+      self._navigation.render(rl.Rectangle(self._content_rect.x + self._content_rect.width, self.rect.y, PANEL_WIDTH, self.rect.height))
+
     # Custom UI extension point - add custom overlays here
     # Use self._content_rect for positioning within camera bounds
     #self._confidence_ball.render(self.rect)
 
     #self._bookmark_icon.render(self.rect)
+
+  def close(self):
+    self._navigation.close()
+    super().close()
 
   def _switch_stream_if_needed(self, sm):
     if ui_state.show_driver_camera:
