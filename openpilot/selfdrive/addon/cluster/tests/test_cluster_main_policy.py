@@ -22,7 +22,7 @@ def cluster(monkeypatch):
     prefix + "cluster_config": SimpleNamespace(ClusterConfig=lambda: config),
     prefix + "cluster_logging": SimpleNamespace(close_log=Mock(), flog=Mock(), initialize_log=Mock()),
     prefix + "cluster_display_pipeline": SimpleNamespace(ClusterDisplayPipeline=lambda d: pipeline),
-    prefix + "cluster_live_camera": SimpleNamespace(ClusterLiveCamera=lambda c: camera),
+    prefix + "cluster_live_camera": SimpleNamespace(ClusterLiveCamera=lambda c, **kwargs: camera),
     prefix + "cluster_models": SimpleNamespace(ClusterModels=lambda: models),
     prefix + "cluster_renderer": SimpleNamespace(ClusterRenderer=lambda c: renderer),
     prefix + "cluster_policy": SimpleNamespace(enforce_cluster_transport=policy),

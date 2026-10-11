@@ -42,6 +42,7 @@ class LatestFrameReceiver:
     self.done = False
     self.error = None
     self.received_frames = 0
+    self.last_received_at = first_frame.received_at
     self.thread = threading.Thread(target=self._receive_loop, name="cluster-jpeg-receiver", daemon=True)
     self._perf_started = time.monotonic()
     self._last_displayed_at = None
@@ -87,6 +88,7 @@ class LatestFrameReceiver:
             self._perf_dropped += 1
           self._pending_acknowledged = True
           self.received_frames += 1
+          self.last_received_at = frame.received_at
           self._perf_received += 1
           self._perf_bytes += len(frame.jpeg)
           self._perf_rx["header_wait"] += frame.header_at - frame.started
@@ -107,15 +109,17 @@ class LatestFrameReceiver:
         if self.max_frames is not None and self.received_frames >= self.max_frames:
           return
         started = time.monotonic()
-        deadline = started + self.frame_timeout
+        header_stats = ReceiveStats()
         sequence, size, flags = unpack_frame_header_info(
-          recv_exact(self.sock, FRAME_HEADER.size, deadline=deadline, poll_events=self._check_stopping),
+          recv_exact(self.sock, FRAME_HEADER.size, deadline=started + self.frame_timeout, poll_events=self._check_stopping,
+                     stats=header_stats, timeout_from_first_byte=self.frame_timeout, phase="header"),
         )
         header_at = time.monotonic()
+        deadline = header_stats.first_byte_at + self.frame_timeout
         if not flags & FRAME_STREAM:
           raise ValueError("Expected a streaming cluster frame")
         stats = ReceiveStats()
-        jpeg = recv_exact(self.sock, size, deadline=deadline, poll_events=self._check_stopping, stats=stats)
+        jpeg = recv_exact(self.sock, size, deadline=deadline, poll_events=self._check_stopping, stats=stats, phase="payload")
         frame = ReceivedFrame(sequence, jpeg, started, header_at, time.monotonic(), stats)
     except Exception as e:
       with self.condition:
@@ -161,6 +165,10 @@ class LatestFrameReceiver:
   def pause_display(self):
     # Intentional blanking must not appear as a multi-second frame stutter.
     self._last_displayed_at = None
+
+  def display_stale(self):
+    with self.condition:
+      return time.monotonic() - self.last_received_at >= self.frame_timeout
 
   def _log_perf(self):
     with self.condition:
@@ -213,6 +221,7 @@ def receive_stream_frames(sock, display, first_frame, frame_timeout, max_frames=
                                  screen_off=lambda: bool(getattr(display, "screen_off", False)))
   LOG.info("[CLUSTER_RX_MODE] stream: ACK on receive, display latest JPEG")
   receiver.thread.start()
+  waiting_shown = False
   try:
     while True:
       # SDL event processing, JPEG decode and presentation stay on this thread.
@@ -222,6 +231,14 @@ def receive_stream_frames(sock, display, first_frame, frame_timeout, max_frames=
       if frame is None:
         if receiver.done:
           return receiver.received_frames
+        if not waiting_shown and receiver.display_stale():
+          show_waiting = getattr(display, "show_waiting", None)
+          if show_waiting is not None:
+            if not show_waiting():
+              raise RuntimeError("Unable to display the Orange Pi connection waiting screen")
+            waiting_shown = True
+            LOG.warning("[CLUSTER_RX_STALE] No complete JPEG within %.1fs; waiting screen, connection=open, mode=stream",
+                        frame_timeout)
         continue
       started = time.monotonic()
       if not display.send_jpeg(frame.jpeg):
@@ -229,6 +246,9 @@ def receive_stream_frames(sock, display, first_frame, frame_timeout, max_frames=
           raise KeyboardInterrupt
         raise RuntimeError("Unable to display cluster frame")
       displayed_at = time.monotonic()
+      if waiting_shown:
+        LOG.info("[CLUSTER_RX_RESUMED] Complete JPEG received; connection=open, mode=stream")
+      waiting_shown = False
       if getattr(display, "last_frame_presented", True):
         receiver.record_display(frame, started, displayed_at, getattr(display, "last_frame_timings", {}))
       else:

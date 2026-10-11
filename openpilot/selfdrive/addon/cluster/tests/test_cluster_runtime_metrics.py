@@ -19,7 +19,14 @@ def cluster_models(monkeypatch):
   class SubMaster:
     def __init__(self, services):
       self.services = services
+      updated.update(dict.fromkeys(services, False))
       self.updated = updated
+      self.valid = dict.fromkeys(services, False)
+      self.alive = dict.fromkeys(services, False)
+
+    def update(self, _timeout):
+      # Tests choose which queued services update and the SubMaster health flags.
+      pass
 
     def __getitem__(self, service):
       return messages[service]
@@ -59,6 +66,8 @@ def test_health_does_not_report_unseen_locationd_defaults_as_errors(cluster_mode
   assert snapshot['onroad_started'] is None
   assert not snapshot['car_state_seen']
   assert snapshot['model_age_ms'] is snapshot['device_motion_age_ms'] is snapshot['car_state_age_ms'] is None
+  assert not models.is_valid()
+  assert not models.get_render_data()[0]
   snapshot['device_motion_input_error_total'] = 100
   assert models.get_health_data()['device_motion_input_error_total'] == 0
 
@@ -176,6 +185,88 @@ def test_health_receive_ages_grow_when_stale_and_refresh_only_updated_service(cl
   assert snapshot['model_age_ms'] == 0.0
   assert snapshot['device_motion_age_ms'] == snapshot['car_state_age_ms'] == 3000.0
   assert snapshot['model_seen'] and snapshot['device_motion_seen'] and snapshot['car_state_seen']
+
+
+def _model_message(path_x):
+  return SimpleNamespace(
+    position=SimpleNamespace(x=path_x, y=[0.0] * len(path_x), z=[0.0] * len(path_x)),
+    laneLines=[], roadEdges=[], roadEdgeStds=[], frameDropPerc=0.0, modelExecutionTime=0.030,
+  )
+
+
+def _car_message(speed, steering):
+  return SimpleNamespace(
+    vEgo=speed, cruiseState=SimpleNamespace(available=True), gearShifter=0,
+    leftBlinker=False, rightBlinker=False, brakePressed=False, gasPressed=False,
+    steeringAngleDeg=steering, speedLimit=0.0, speedLimitDistance=0.0,
+    schoolZoneActive=False, speedBumpDistance=0.0,
+    tpms=SimpleNamespace(fl=35.0, fr=35.0, rl=35.0, rr=35.0), naviLimitSpeed=0.0, ignoreLimitTimer=0.0,
+  )
+
+
+def test_render_hides_stale_path_keeps_fresh_car_hud_and_restores_new_model(cluster_models):
+  state = cluster_models
+  state.messages['modelV2'] = _model_message([0.0, 10.0, 20.0])
+  state.messages['carState'] = _car_message(10.0, 5.0)
+  state.messages['controlsState'] = SimpleNamespace(deprecated=SimpleNamespace(vCruise=0.0))
+  state.updated.update(modelV2=True, carState=True)
+  state.models.sm.valid['modelV2'] = state.models.sm.alive['modelV2'] = True
+  state.models._update_once()
+  assert state.models.is_valid()
+  assert state.models.get_render_data()[0]
+
+  state.clock.now += 1.0
+  state.updated['modelV2'] = False
+  # SubMaster expires alive while valid still describes the last good message.
+  state.models.sm.alive['modelV2'] = False
+  state.messages['carState'] = _car_message(12.0, 20.0)
+  state.models._update_once()
+  assert state.models.model_valid
+  assert state.models.sm.valid['modelV2']
+  assert not state.models.is_valid()
+  valid, hud, path = state.models.get_render_data()
+  assert not valid
+  assert hud['v_ego'] == 12.0 and hud['steering_angle'] == 20.0
+  assert path['path_x'] == [0.0, 10.0, 20.0]
+  assert state.models.get_health_data()['car_state_age_ms'] == 0.0
+  assert state.models.get_health_data()['model_age_ms'] == 1000.0
+
+  state.clock.now += 50.0
+  state.models._update_once()
+  assert not state.models.get_render_data()[0]
+  assert state.models.get_health_data()['model_age_ms'] == 51000.0
+
+  state.updated['modelV2'] = True
+  state.models.sm.alive['modelV2'] = True
+  state.messages['modelV2'] = _model_message([0.0, 15.0, 30.0])
+  state.models._update_once()
+  valid, hud, path = state.models.get_render_data()
+  assert valid and state.models.is_valid()
+  assert path['path_x'] == [0.0, 15.0, 30.0]
+  assert hud['v_ego'] == 12.0 and hud['steering_angle'] == 20.0
+  assert state.models.get_health_data()['model_age_ms'] == 0.0
+
+
+@pytest.mark.parametrize('alive,valid,path_x', [
+  (False, True, [0.0, 10.0]),
+  (True, False, [0.0, 10.0]),
+  (True, True, []),
+])
+def test_render_requires_live_valid_nonempty_model_and_recovers(cluster_models, alive, valid, path_x):
+  state = cluster_models
+  state.updated['modelV2'] = True
+  state.messages['modelV2'] = _model_message(path_x)
+  state.models.sm.alive['modelV2'] = alive
+  state.models.sm.valid['modelV2'] = valid
+  state.models._update_once()
+  assert not state.models.is_valid()
+  assert not state.models.get_render_data()[0]
+
+  state.messages['modelV2'] = _model_message([0.0, 20.0])
+  state.models.sm.alive['modelV2'] = state.models.sm.valid['modelV2'] = True
+  state.models._update_once()
+  assert state.models.is_valid()
+  assert state.models.get_render_data()[0]
 
 
 def test_process_resources_reads_current_rss_and_native_threads(tmp_path):

@@ -444,7 +444,13 @@ class ClusterModels:
 
   def is_valid(self):
     with self._state_lock:
-      return self.model_valid
+      return self._model_render_valid_unlocked()
+
+  def _model_render_valid_unlocked(self):
+    # valid describes the last message; alive expires after 10 expected model
+    # periods (0.5s at 20Hz). Keep the cached path/HUD data, but do not display
+    # that path during a publisher outage. A fresh valid message restores it.
+    return self.model_valid and self.sm.valid['modelV2'] and self.sm.alive['modelV2']
 
   def get_hud_data(self):
     with self._state_lock:
@@ -524,4 +530,4 @@ class ClusterModels:
   def get_render_data(self):
     """Return model validity, HUD state, and path data from one update cycle."""
     with self._state_lock:
-      return self.model_valid, self._get_hud_data_unlocked(), self._get_path_data_unlocked()
+      return self._model_render_valid_unlocked(), self._get_hud_data_unlocked(), self._get_path_data_unlocked()

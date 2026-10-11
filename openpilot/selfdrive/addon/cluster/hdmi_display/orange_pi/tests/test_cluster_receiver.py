@@ -13,7 +13,8 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.network_protocol import (
 )
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import cluster_protocol, cluster_receiver, frame_stream, hdmi_display
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.cluster_protocol import (
-  ACK_SCREEN_OFF as PI_ACK_SCREEN_OFF, ReceiveStats, pack_ack as pack_orange_pi_ack, recv_exact as pi_recv_exact, unpack_frame_header,
+  ACK_SCREEN_OFF as PI_ACK_SCREEN_OFF, ReceiveStats, ReceiveTimeout, pack_ack as pack_orange_pi_ack,
+  recv_exact as pi_recv_exact, unpack_frame_header,
 )
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_display import HdmiDisplay
 
@@ -233,6 +234,8 @@ def test_stream_partial_frame_still_times_out_and_closes_connection():
     thread.join(timeout=1.0)
     assert not thread.is_alive()
     assert len(errors) == 1 and isinstance(errors[0], TimeoutError)
+    assert errors[0].phase == "partial_payload"
+    assert (errors[0].received, errors[0].expected) == (7, 10)
     assert display.frames == [b"first"]
     assert sock.recv(1) == b""
   finally:
@@ -525,6 +528,129 @@ def test_fragmented_packet_keeps_received_bytes():
   finally:
     c4_sock.close()
     pi_sock.close()
+
+
+def _scheduled_receive_socket(monkeypatch, packets):
+  """Socket readiness follows a monotonic schedule, including partial reads."""
+  now = [0.0]
+  queued = list(packets)
+
+  class ScheduledSocket:
+    def __init__(self):
+      self.acks = []
+
+    def recv_into(self, view):
+      available_at, data = queued.pop(0)
+      assert available_at <= now[0] + 1e-9
+      count = min(len(data), len(view))
+      view[:count] = data[:count]
+      if data[count:]:
+        queued.insert(0, (available_at, data[count:]))
+      return count
+
+    def sendall(self, packet):
+      self.acks.append(packet)
+
+  sock = ScheduledSocket()
+
+  def readable(readers, _writers, _errors, timeout):
+    available_at = queued[0][0] if queued else float("inf")
+    if available_at <= now[0] + timeout:
+      now[0] = max(now[0], available_at)
+      return readers, [], []
+    now[0] += timeout
+    return [], [], []
+
+  clock = SimpleNamespace(monotonic=lambda: now[0])
+  for module in (cluster_protocol, cluster_receiver, frame_stream):
+    monkeypatch.setattr(module, "time", clock)
+  monkeypatch.setattr(cluster_protocol.select, "select", readable)
+  return sock, now
+
+
+@pytest.mark.parametrize("flags", [0, FRAME_STREAM])
+@pytest.mark.parametrize("fragment_header", [False, True])
+def test_idle_wait_does_not_consume_the_new_frame_completion_budget(monkeypatch, flags, fragment_header):
+  header = pack_frame_header(7, 4, flags)
+  packets = ([(1.9, header[:3]), (2.2, header[3:]), (2.4, b"jpeg")] if fragment_header
+             else [(1.9, header), (2.1, b"jpeg")])
+  sock, _now = _scheduled_receive_socket(monkeypatch, packets)
+  display = FakeDisplay()
+  assert cluster_receiver.receive_frames(sock, display, max_frames=1, frame_timeout=2.0) == 1
+  assert display.frames == [b"jpeg"]
+  assert [unpack_ack(packet) for packet in sock.acks] == [(7, ACK_OK)]
+
+
+@pytest.mark.parametrize("phase,packets,received,expected", [
+  ("idle_header", [], 0, 16),
+  ("partial_header", [(0.1, pack_frame_header(7, 10)[:3])], 3, 16),
+  ("partial_payload", [(0.1, pack_frame_header(7, 10)), (0.7, b"abc"), (1.5, b"def"), (2.2, b"ghij")], 6, 10),
+  # Header progress consumes the same first-byte budget as the JPEG.
+  ("partial_payload", [(0.1, pack_frame_header(7, 10)[:3]), (1.8, pack_frame_header(7, 10)[3:]), (2.2, b"0123456789")], 0, 10),
+])
+def test_idle_and_partial_timeouts_are_distinct_and_progress_never_extends_the_frame(monkeypatch, phase, packets, received, expected):
+  sock, now = _scheduled_receive_socket(monkeypatch, packets)
+  display = FakeDisplay()
+  with pytest.raises(ReceiveTimeout) as raised:
+    cluster_receiver.receive_frames(sock, display, max_frames=1, frame_timeout=2.0)
+  assert raised.value.phase == phase
+  assert (raised.value.received, raised.value.expected) == (received, expected)
+  assert f"phase={phase} bytes={received}/{expected}" in str(raised.value)
+  assert now[0] == pytest.approx(2.0 if phase == "idle_header" else 2.1)
+  assert display.frames == []
+  assert sock.acks == []
+
+
+def test_partial_payload_peer_close_reports_eof_and_never_acknowledges(monkeypatch):
+  sock, _now = _scheduled_receive_socket(monkeypatch, [(0.1, pack_frame_header(7, 10)), (0.2, b"part"), (0.3, b"")])
+  display = FakeDisplay()
+  with pytest.raises(ConnectionError, match="closed while receiving data: phase=payload bytes=4/10"):
+    cluster_receiver.receive_frames(sock, display, max_frames=1, frame_timeout=2.0)
+  assert display.frames == []
+  assert sock.acks == []
+
+
+def test_stale_display_shows_waiting_while_a_progressing_frame_keeps_the_same_stream_connection(caplog):
+  caplog.set_level("INFO", logger="cluster_receiver")
+  class WaitingDisplay(BlockingDisplay):
+    def __init__(self):
+      super().__init__()
+      self.waiting = threading.Event()
+      self.waiting_count = 0
+      self.release.set()
+
+    def show_waiting(self):
+      assert threading.get_ident() == self.owner
+      self.waiting_count += 1
+      self.waiting.set()
+      return True
+
+  display = WaitingDisplay()
+  sock, thread, result, errors = _start_stream_receiver(display, max_frames=2, frame_timeout=0.6)
+  try:
+    _send_stream(sock, 1, b"first")
+    assert display.started.wait(timeout=1.0)
+    time.sleep(0.35)
+    sock.sendall(pack_frame_header(2, 6, FRAME_STREAM))
+    assert display.waiting.wait(timeout=1.0)
+    # A partial JPEG has no ACK; the stale driving image has already been hidden.
+    sock.settimeout(0.05)
+    with pytest.raises(socket.timeout):
+      sock.recv(ACK_PACKET.size)
+    sock.settimeout(1.0)
+    sock.sendall(b"second")
+    assert unpack_ack_info(recv_exact(sock, ACK_PACKET.size)) == (2, ACK_OK, ACK_STREAM_SUPPORTED)
+    thread.join(timeout=1.0)
+    assert not thread.is_alive()
+    assert not errors
+    assert result == [2]
+    assert display.frames == [b"first", b"second"]
+    assert display.waiting_count == 1
+    assert "[CLUSTER_RX_STALE]" in caplog.text
+    assert "[CLUSTER_RX_RESUMED] Complete JPEG received; connection=open, mode=stream" in caplog.text
+  finally:
+    sock.close()
+    thread.join(timeout=1.0)
 
 
 def test_receive_diagnostics_distinguish_readiness_waits_from_partial_reads(monkeypatch):

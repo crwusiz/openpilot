@@ -75,6 +75,17 @@ def execute_script(script_path: str, *args) -> int:
     return 1
 
 
+def execute_log_upload(log_name: str) -> tuple[int, str | None]:
+  try:
+    result = subprocess.run(["/data/openpilot/scripts/log_upload.sh", log_name], capture_output=True,
+                            text=True, encoding="utf-8", errors="replace", check=False)
+  except Exception:
+    return 1, None
+  prefix = "CLUSTER_PI_LOG_WARNING:"
+  warnings = [line.strip()[len(prefix):].strip() for line in result.stdout.splitlines() if line.strip().startswith(prefix)]
+  return result.returncode, warnings[-1][:300] if warnings else None
+
+
 class StaticLogModal(Widget):
   def __init__(self, text: str):
     super().__init__()
@@ -684,9 +695,11 @@ class CommunityLayout(Widget):
       def confirm_callback(result: DialogResult):
         if result == DialogResult.CONFIRM:
           def upload_task():
-            exit_code = execute_script("/data/openpilot/scripts/log_upload.sh", log_name)
+            exit_code, warning = execute_log_upload(log_name)
 
-            if exit_code == 0:
+            if exit_code == 0 and warning:
+              dlg = ConfirmDialog(warning, tr("OK"))
+            elif exit_code == 0:
               dlg = ConfirmDialog(tr("Upload completed successfully"), tr("OK"))
             else:
               dlg = ConfirmDialog(tr("Upload failed"), tr("OK"))

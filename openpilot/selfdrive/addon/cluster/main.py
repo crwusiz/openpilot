@@ -46,7 +46,8 @@ def cluster_main():
   pipeline = ClusterDisplayPipeline(display)
   pipeline.start()
 
-  camera = ClusterLiveCamera(config)
+  camera_capacity = pipeline.has_render_capacity if config.display_transport == "network" else None
+  camera = ClusterLiveCamera(config, frame_needed=camera_capacity)
   models = ClusterModels()
   renderer = ClusterRenderer(config)
 

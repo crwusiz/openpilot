@@ -164,9 +164,20 @@ def wait_for_reconnect(display, delay):
 
 def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=FRAME_TIMEOUT_SECONDS) -> int:
   log_socket_buffers(sock)
+  last_received_at = None
+  waiting_shown = False
 
   def poll_events():
+    nonlocal waiting_shown
     _poll_display(display)
+    if last_received_at is not None and not waiting_shown and time.monotonic() - last_received_at >= frame_timeout:
+      show_waiting = getattr(display, "show_waiting", None)
+      if show_waiting is not None:
+        if not show_waiting():
+          raise RuntimeError("Unable to display the Orange Pi connection waiting screen")
+        waiting_shown = True
+        LOG.warning("[CLUSTER_RX_STALE] No complete JPEG within %.1fs; waiting screen, connection=open, mode=legacy",
+                    frame_timeout)
 
   received_frames = 0
   perf_started = time.monotonic()
@@ -176,14 +187,23 @@ def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=F
   perf_stages = dict.fromkeys(("header_wait", "receive", "display", "ack_send", "decode", "rotate", "scale", "blit", "flip",
                              "convert", "upload", "draw"), 0.0)
   while max_frames is None or received_frames < max_frames:
-    # One deadline for the entire frame also bounds slow, partial deliveries.
+    # Idle waiting gets its own limit; once any header byte arrives, one strict
+    # deadline covers the partial header and entire JPEG, without progress resets.
     started = time.monotonic()
-    deadline = started + frame_timeout
-    sequence, frame_size, flags = unpack_frame_header_info(recv_exact(sock, FRAME_HEADER.size, deadline=deadline, poll_events=poll_events))
+    header_stats = ReceiveStats()
+    sequence, frame_size, flags = unpack_frame_header_info(
+      recv_exact(sock, FRAME_HEADER.size, deadline=started + frame_timeout, poll_events=poll_events,
+                 stats=header_stats, timeout_from_first_byte=frame_timeout, phase="header"),
+    )
     header_at = time.monotonic()
+    deadline = header_stats.first_byte_at + frame_timeout
     receive_stats = ReceiveStats() if flags & FRAME_STREAM else None
-    jpeg = recv_exact(sock, frame_size, deadline=deadline, poll_events=poll_events, stats=receive_stats)
+    jpeg = recv_exact(sock, frame_size, deadline=deadline, poll_events=poll_events, stats=receive_stats, phase="payload")
     received_at = time.monotonic()
+    last_received_at = received_at
+    if waiting_shown:
+      LOG.info("[CLUSTER_RX_RESUMED] Complete JPEG received; connection=open, mode=legacy")
+    waiting_shown = False
     if flags & FRAME_STREAM:
       remaining = None if max_frames is None else max_frames - received_frames
       first_frame = ReceivedFrame(sequence, jpeg, started, header_at, received_at, receive_stats)
@@ -249,7 +269,8 @@ def parse_args(argv=None):
   parser.add_argument("--scan-timeout", type=_positive_float, default=DEFAULT_SCAN_TIMEOUT, help="Per-address TCP timeout in seconds")
   parser.add_argument("--scan-workers", type=_positive_int, default=DEFAULT_SCAN_WORKERS, help="Parallel subnet scan workers")
   parser.add_argument("--reconnect-delay", type=_positive_float, default=DEFAULT_RECONNECT_DELAY)
-  parser.add_argument("--frame-timeout", type=_positive_float, default=FRAME_TIMEOUT_SECONDS, help="Seconds without a complete frame before reconnecting")
+  parser.add_argument("--frame-timeout", type=_positive_float, default=FRAME_TIMEOUT_SECONDS,
+                      help="Idle timeout and maximum seconds from the first header byte to a complete JPEG")
   parser.add_argument("--width", type=_positive_int, default=1920, help="Physical HDMI output width, after frame rotation")
   parser.add_argument("--height", type=_positive_int, default=480, help="Physical HDMI output height, after frame rotation")
   parser.add_argument("--rotation", type=int, choices=(0, 90, 180, 270), default=0, help="Clockwise JPEG rotation in degrees")

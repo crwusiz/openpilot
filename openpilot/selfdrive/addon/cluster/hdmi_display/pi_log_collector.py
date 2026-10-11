@@ -190,6 +190,15 @@ def collect_pi_log(c4_log, output, environ=None, runner=None):
             "C4 monotonic uptime: " + f"{started:.3f}s",
             "C4 log: " + Path(c4_log).name]
   password = environ.get("CLUSTER_PI_PASSWORD", "orangepi")
+  def save_progress():
+    content = "\n".join(report + ["Collection status: collecting",
+                                     "Failure: collection did not complete if this status remains."]) + "\n"
+    if password:
+      content = content.replace(password, "<redacted>")
+    _write_report(output, content)
+
+  # Atomic progress survives UI/process termination; final output replaces it.
+  save_progress()
   result = None
   success = False
   skipped = False
@@ -197,6 +206,7 @@ def collect_pi_log(c4_log, output, environ=None, runner=None):
   try:
     host, source = resolve_host(c4_log, environ, deadline=deadline)
     report += ["Pi address: " + host, "Address source: " + source]
+    save_progress()
     user = environ.get("CLUSTER_PI_USER", "root")
     if re.fullmatch(r"[a-z_][a-z0-9_-]*\$?", user) is None:
       raise ValueError("Invalid CLUSTER_PI_USER")

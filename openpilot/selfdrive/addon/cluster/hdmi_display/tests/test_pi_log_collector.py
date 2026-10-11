@@ -209,6 +209,20 @@ def test_report_redacts_password_and_bounds_actual_utf8_file_size(state):
   assert not list(output.parent.glob(".cluster_pi_debug.log.*"))
 
 
+def test_collection_writes_progress_report_before_ssh_so_interruption_leaves_context(state):
+  log, output = state
+
+  def interrupted_runner(_command, _env, _timeout):
+    content = output.read_text(encoding="utf-8")
+    assert "Collection status: collecting" in content
+    assert "Pi address: 192.168.0.84" in content
+    raise KeyboardInterrupt
+
+  with pytest.raises(KeyboardInterrupt):
+    collector.collect_pi_log(log, output, {}, interrupted_runner)
+  assert "Collection status: collecting" in output.read_text(encoding="utf-8")
+
+
 def test_capture_drops_over_limit_data_but_drains_stdout():
   stream = BytesIO(b"abcdefghij")
   capture = collector._Capture(5)

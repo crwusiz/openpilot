@@ -10,9 +10,10 @@ from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 
 CONNECTION_RETRY_SECONDS = 0.5
 FRAME_STALE_SECONDS = 1.2
+BLOCKED_PREPARE_INTERVAL_SECONDS = 0.2
 
 class ClusterLiveCamera:
-  def __init__(self, config):
+  def __init__(self, config, frame_needed=None):
     self.config = config
     self.panel_width = config.camera_panel_width
     self.panel_height = getattr(config, "camera_panel_height", config.height)
@@ -37,6 +38,9 @@ class ClusterLiveCamera:
     self._perf_started = None
     self._perf_frames = 0
     self._perf_prepare_time = 0.0
+    self._perf_received = self._perf_skipped = 0
+    self._frame_needed = frame_needed
+    self._last_prepare_started = None
     self._init_camera()
     self._start_thread()
 
@@ -67,6 +71,7 @@ class ClusterLiveCamera:
     self.vipc = None
     self._connected_at = 0.0
     self._last_frame_at = 0.0
+    self._last_prepare_started = None
     self._last_connection_attempt = 0.0
     self._connection_wait_logged = False
     with self._frame_condition:
@@ -193,7 +198,24 @@ class ClusterLiveCamera:
             self._reset_camera("Camera stream stale for 1.2 seconds")
           continue
 
-        prepare_started = time.monotonic()
+        received_at = time.monotonic()
+        # Always drain VisionIPC and track raw reception. A blocked network
+        # needs only occasional prepared frames, rather than 20 conversions/s.
+        self._last_frame_at = received_at
+        if self._perf_started is None:
+          self._perf_started = received_at
+        self._perf_received += 1
+        error_count = 0
+        if self._frame_needed is not None and not self._frame_needed() and self._last_prepare_started is not None \
+            and received_at - self._last_prepare_started < BLOCKED_PREPARE_INTERVAL_SECONDS:
+          self._perf_skipped += 1
+          self._log_perf(received_at)
+          continue
+
+        # Keep a minimum refresh while blocked so a short-lived transport
+        # credit cannot starve preprocessing and leave a frozen camera image.
+        prepare_started = received_at
+        self._last_prepare_started = prepare_started
         frame, source_to_panel = self._panel_rgb_from_vision_buffer(buffer)
         prepare_elapsed = time.monotonic() - prepare_started
 
@@ -201,31 +223,31 @@ class ClusterLiveCamera:
           self._source_to_panel = source_to_panel
           self.latest_frame = frame
           self.frame_count += 1
-          self._last_frame_at = time.monotonic()
           self._frame_condition.notify_all()
         now = time.monotonic()
-        if self._perf_started is None:
-          self._perf_started = prepare_started
         self._perf_frames += 1
         self._perf_prepare_time += prepare_elapsed
-        error_count = 0
         if self.frame_count == 1:
           flog(f"[CLUSTER_CAM_SUCCESS] First optimized road frame: source={buffer.width}x{buffer.height}, "
                + f"panel={self.latest_frame.shape[1]}x{self.latest_frame.shape[0]}, "
                + f"contrast={self.camera_contrast:.2f}")
-        if now - self._perf_started >= 10.0:
-          elapsed = max(now - self._perf_started, 1e-6)
-          flog(f"[CLUSTER_CAM_PERF] fps={self._perf_frames / elapsed:.2f} | "
-               + f"prepare_avg={self._perf_prepare_time * 1000 / self._perf_frames:.1f}ms")
-          self._perf_started = now
-          self._perf_frames = 0
-          self._perf_prepare_time = 0.0
+        self._log_perf(now)
 
       except Exception as e:
         error_count += 1
         flog(f"[CLUSTER_CAM_ERROR] VisionIPC camera error ({error_count}): {e}")
         self._reset_camera()
         self._wait_or_stopping(CONNECTION_RETRY_SECONDS)
+
+  def _log_perf(self, now):
+    if self._perf_started is not None and now - self._perf_started >= 10.0:
+      elapsed = max(now - self._perf_started, 1e-6)
+      flog(f"[CLUSTER_CAM_PERF] fps={self._perf_frames / elapsed:.2f} | "
+           + f"prepare_avg={self._perf_prepare_time * 1000 / max(self._perf_frames, 1):.1f}ms | "
+           + f"receive_fps={self._perf_received / elapsed:.2f} | skipped={self._perf_skipped}")
+      self._perf_started = now
+      self._perf_frames = self._perf_received = self._perf_skipped = 0
+      self._perf_prepare_time = 0.0
 
   def has_frame(self):
     with self._frame_condition:
