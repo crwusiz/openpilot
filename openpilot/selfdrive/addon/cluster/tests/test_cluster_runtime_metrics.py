@@ -32,7 +32,10 @@ def cluster_models(monkeypatch):
       return messages[service]
 
   dependencies = {
-    "openpilot.cereal": SimpleNamespace(log=SimpleNamespace(), messaging=SimpleNamespace(SubMaster=SubMaster)),
+    "openpilot.cereal": SimpleNamespace(
+      log=SimpleNamespace(LongitudinalPlan=SimpleNamespace(LongitudinalPlanSource=SimpleNamespace(e2e=1))),
+      messaging=SimpleNamespace(SubMaster=SubMaster),
+    ),
     "opendbc.car": SimpleNamespace(structs=SimpleNamespace(CarState=SimpleNamespace(GearShifter=SimpleNamespace(reverse=1)))),
     "openpilot.common.constants": SimpleNamespace(UnitConverter=lambda: SimpleNamespace()),
     "openpilot.common.swaglog": SimpleNamespace(cloudlog=Mock()),
@@ -202,6 +205,47 @@ def _car_message(speed, steering):
     schoolZoneActive=False, speedBumpDistance=0.0,
     tpms=SimpleNamespace(fl=35.0, fr=35.0, rl=35.0, rr=35.0), naviLimitSpeed=0.0, ignoreLimitTimer=0.0,
   )
+
+
+@pytest.mark.parametrize("valid, alive", [(True, False), (False, True)])
+def test_render_clears_stale_or_invalid_radar_leads_and_restores_new_radar(cluster_models, valid, alive):
+  state = cluster_models
+  state.messages['modelV2'] = _model_message([0.0, 10.0, 20.0])
+  state.messages['longitudinalPlan'] = SimpleNamespace(longitudinalPlanSource=0)
+
+  def radar_message(distance):
+    return SimpleNamespace(
+      leadOne=SimpleNamespace(present=True, dRel=distance, yRel=0.2, vRel=-1.0),
+      leadTwo=SimpleNamespace(present=False, dRel=0.0, yRel=0.0, vRel=0.0),
+    )
+
+  state.messages['radarState'] = radar_message(20.0)
+  state.models.sm.valid.update(modelV2=True, radarState=True)
+  state.models.sm.alive.update(modelV2=True, radarState=True)
+  state.updated.update(modelV2=True, radarState=True)
+  state.models._update_once()
+  model_valid, _hud, path = state.models.get_render_data()
+  assert model_valid and path['leads'][0]['d_rel'] == 20.0
+
+  # valid still describes the last message after its publisher stops. Fresh
+  # model updates must not resurrect that cached radar lead during the outage.
+  state.updated['radarState'] = False
+  state.models.sm.valid['radarState'] = valid
+  state.models.sm.alive['radarState'] = alive
+  for _ in range(3):
+    state.clock.now += 1.0
+    state.models._update_once()
+    model_valid, _hud, path = state.models.get_render_data()
+    assert model_valid
+    assert path['leads'] == []
+
+  state.messages['radarState'] = radar_message(35.0)
+  state.models.sm.valid['radarState'] = state.models.sm.alive['radarState'] = True
+  state.updated['radarState'] = True
+  state.models._update_once()
+  model_valid, _hud, path = state.models.get_render_data()
+  assert model_valid and path['leads'][0]['d_rel'] == 35.0
+  assert path['leads'][0]['present']
 
 
 def test_render_hides_stale_path_keeps_fresh_car_hud_and_restores_new_model(cluster_models):

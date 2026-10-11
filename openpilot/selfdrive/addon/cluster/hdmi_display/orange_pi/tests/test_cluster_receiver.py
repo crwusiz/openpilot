@@ -694,6 +694,48 @@ def test_receive_without_diagnostics_does_not_add_timing_calls(monkeypatch):
   assert pi_recv_exact(CompleteSocket(), 4) == b"jpeg"
 
 
+def test_late_readiness_cannot_restart_an_expired_idle_header_deadline(monkeypatch):
+  now = [0.0]
+
+  def late_readiness(readers, _writers, _errors, _timeout):
+    # The syscall became ready, but the Python thread resumed after its limit.
+    now[0] = 2.01
+    return readers, [], []
+
+  class ReadySocket:
+    def recv_into(self, _view):
+      pytest.fail("expired idle must not read a header and restart the frame budget")
+
+  monkeypatch.setattr(cluster_protocol, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(cluster_protocol.select, "select", late_readiness)
+  with pytest.raises(ReceiveTimeout) as raised:
+    pi_recv_exact(ReadySocket(), 16, deadline=2.0, timeout_from_first_byte=2.0, phase="header", stats=ReceiveStats())
+  assert raised.value.phase == "idle_header"
+  assert raised.value.received == 0
+
+
+def test_first_header_read_returning_late_cannot_renew_the_idle_deadline(monkeypatch):
+  now = [0.0]
+
+  def on_time_readiness(readers, _writers, _errors, _timeout):
+    now[0] = 1.99
+    return readers, [], []
+
+  class LateReadSocket:
+    def recv_into(self, view):
+      now[0] = 2.01
+      view[:] = pack_frame_header(1, 4)
+      return len(view)
+
+  monkeypatch.setattr(cluster_protocol, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(cluster_protocol.select, "select", on_time_readiness)
+  stats = ReceiveStats()
+  with pytest.raises(ReceiveTimeout) as raised:
+    pi_recv_exact(LateReadSocket(), 16, deadline=2.0, timeout_from_first_byte=2.0, phase="header", stats=stats)
+  assert raised.value.phase == "idle_header"
+  assert stats.first_byte_at is None
+
+
 def test_runtime_versions_log_on_the_calling_thread_and_allow_missing_apis(caplog):
   caller = threading.get_ident()
 

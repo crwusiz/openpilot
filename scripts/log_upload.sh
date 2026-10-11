@@ -65,9 +65,15 @@ trace_upload() {
 }
 
 remove_job() {
-  local outbox="$1" job="$2"
+  local outbox="$1" job="$2" temporary
   # Only remove known files in a directory created under this upload outbox.
   [[ $job == "$outbox"/pending.* && -d $job && ! -L $job ]] || return 1
+  # SIGKILL can leave the collector's atomic-write temporary behind. Remove
+  # only its known file pattern, so rmdir does not strand a completed job.
+  for temporary in "$job"/.cluster_pi_debug.log.*; do
+    [[ -f $temporary || -L $temporary ]] || continue
+    rm -f -- "$temporary" || return 1
+  done
   rm -f -- "$job/prefix" "$job/cluster_debug.log" "$job/cluster_pi_debug.log" \
     "$job/c4_uploaded" "$job/collection_done" "$job/collection_status" "$job/lock"
   rmdir -- "$job"
@@ -119,8 +125,11 @@ retry_pending() (
     (( count < 2 && SECONDS < deadline )) || break
     [[ -d $job && ! -L $job && -s $job/prefix && -s $job/cluster_pi_debug.log ]] || continue
     # A still running collector/uploader keeps this lock across UI cancellation.
-    exec 9> "$job/lock" 2>/dev/null || continue
+    # Never recreate a lock unlinked by a finishing uploader. If we opened its
+    # old inode just before cleanup, recheck the files after acquiring the lock.
+    { exec 9< "$job/lock"; } 2>/dev/null || continue
     if command -v flock >/dev/null 2>&1; then flock -n 9 || continue; fi
+    [[ -s $job/prefix && -s $job/cluster_pi_debug.log ]] || continue
     prefix=$(cat "$job/prefix")
     [[ $prefix != */* && $prefix != *$'\n'* && -n $prefix ]] || continue
     count=$((count + 1))

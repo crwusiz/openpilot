@@ -282,7 +282,7 @@ class ClusterModels:
       ]
       self.road_edge_stds = list(model.roadEdgeStds)
 
-    if not self.sm.valid['radarState']:
+    if not self.sm.valid['radarState'] or not self.sm.alive['radarState']:
       self.leads = []
     elif any(self.sm.updated[service] for service in ('modelV2', 'radarState', 'longitudinalPlan')):
       self._update_leads()

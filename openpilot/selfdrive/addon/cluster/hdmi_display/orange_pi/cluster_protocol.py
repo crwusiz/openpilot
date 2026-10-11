@@ -89,6 +89,11 @@ def recv_exact(sock, size: int, *, deadline: float | None = None, poll_events=No
         stats.select_timeouts += not readable
       if not readable:
         continue
+      # select may release the GIL until after the deadline. A late header
+      # must not turn an expired idle wait into a fresh completion budget.
+      now = time.monotonic()
+      if now >= deadline:
+        raise timed_out(now)
     read_started = time.monotonic() if stats is not None else 0.0
     count = sock.recv_into(view[received:])
     read_ended = time.monotonic() if stats is not None or deadline is not None or timeout_from_first_byte is not None else 0.0
@@ -97,6 +102,10 @@ def recv_exact(sock, size: int, *, deadline: float | None = None, poll_events=No
       stats.read_max = max(stats.read_max, read_ended - read_started)
     if count == 0:
       raise ConnectionError(f"C4 connection closed while receiving data: phase={phase} bytes={received}/{size}")
+    # recv_into can also return after its idle budget due thread scheduling.
+    # Check the original deadline before the first byte can reset that budget.
+    if first_byte_at is None and timeout_from_first_byte is not None and deadline is not None and read_ended >= deadline:
+      raise timed_out(read_ended)
     received += count
     last_progress_at = read_ended
     if first_byte_at is None:

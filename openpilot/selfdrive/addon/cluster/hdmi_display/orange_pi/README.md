@@ -460,9 +460,11 @@ Pi는 SDL2 texture를 재사용하며 회전·크기 조절·밝기 조절을 GP
 
 수신 `fps`가 목표에 가까워도 `display_fps`가 낮으면 Pi 화면 처리 병목이 남아 있는 것입니다. 수신 `fps`도 낮다면 C4 렌더링·인코딩, JPEG 수신 시간과 Wi-Fi 상태를 확인합니다. 실제 60 FPS 출력은 C4·Pi·무선 링크에서 확인해야 합니다. CPU 우선순위·스레드 제한은 자원 경쟁을 줄이는 조치이며, 기존 로그만으로 model lagging이나 locationd 오류의 원인이 cluster라고 단정할 수는 없습니다. 새 자원 로그와 오류 발생 시각을 대조하고 같은 조건에서 cluster를 끈 주행과 비교합니다.
 
-모델 메시지가 멈추면 `model_lagging_updates=0`이어도 마지막 `model_drop_perc`만 남아 있을 수 있습니다. `model_age_ms`·`device_motion_age_ms`와 차량 데이터의 `car_state_age_ms`를 함께 확인합니다. 표시용 경로는 기존 SubMaster의 `valid`·`alive`를 확인하며, modelV2가 약 0.5초 이상 갱신되지 않으면 옛 경로를 숨깁니다. 차량 HUD는 계속 갱신하고 신선한 유효 모델이 돌아오면 경로를 복구합니다. 이 동작은 모델 발행 중단 자체의 원인을 고치는 조치는 아닙니다.
+모델 메시지가 멈추면 `model_lagging_updates=0`이어도 마지막 `model_drop_perc`만 남아 있을 수 있습니다. `model_age_ms`·`device_motion_age_ms`와 차량 데이터의 `car_state_age_ms`를 함께 확인합니다. 표시용 경로는 기존 SubMaster의 `valid`·`alive`를 확인하며, modelV2가 약 0.5초 이상 갱신되지 않으면 옛 경로를 숨깁니다. 선행 차량 표시도 radarState의 `valid`·`alive`를 확인해 갱신이 멈춘 위치·거리를 계속 표시하지 않습니다. 차량 HUD는 계속 갱신하고 신선한 유효 메시지가 돌아오면 해당 표시를 복구합니다. 이 동작은 메시지 발행 중단 자체의 원인을 고치는 조치는 아닙니다.
 
 Pi의 `--frame-timeout` 기본값은 2초입니다. 다음 헤더를 기다리는 idle 시간과 첫 헤더 바이트부터 헤더·JPEG 전체를 완료할 시간을 각각 제한합니다. 부분 데이터가 조금씩 와도 완료 제한 시간은 연장하지 않습니다. 마지막 완성 JPEG 이후 2초가 지나면 오래된 주행 영상을 대기 화면으로 바꾸며, 진행 중인 JPEG가 제시간에 완료되면 같은 TCP 연결에서 복구합니다. `[CLUSTER_RX_STALE]`·`[CLUSTER_RX_RESUMED]`는 이 표시 전환을 기록합니다. 실제 수신 실패는 `phase=idle_header/partial_header/partial_payload`, 수신 바이트 수와 경과 시간을 기록하므로 대기 표시와 소켓 종료를 구분할 수 있습니다.
+
+C4도 ACK 패킷 전체를 기다리는 시간을 `network_ack_timeout`(기본 2.5초)으로 제한합니다. ACK가 조각나 도착해도 대기 예산을 다시 시작하지 않으며, 시간 초과·연결 종료 때 `bytes=수신량/전체크기`를 기록합니다. ACK 수신 제한은 동시에 진행 중인 JPEG 전송의 소켓 제한 시간을 바꾸지 않습니다.
 
 Pi 로그는 다음으로 확인합니다.
 

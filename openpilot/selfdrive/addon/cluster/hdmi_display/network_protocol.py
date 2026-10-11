@@ -1,4 +1,6 @@
+import select
 import struct
+import time
 
 
 PROTOCOL_VERSION = 1
@@ -56,13 +58,30 @@ def unpack_ack_info(data: bytes) -> tuple[int, int, int]:
   return sequence, status, flags
 
 
-def recv_exact(sock, size: int) -> bytes:
+def recv_exact(sock, size: int, *, timeout: float | None = None) -> bytes:
+  """Read one packet within a fixed budget, without changing socket timeouts."""
   data = bytearray(size)
   view = memoryview(data)
   received = 0
+  deadline = None if timeout is None else time.monotonic() + timeout
+
+  def timed_out():
+    return TimeoutError(f"Cluster packet timeout: bytes={received}/{size}")
+
   while received < size:
+    if deadline is not None:
+      remaining = deadline - time.monotonic()
+      if remaining <= 0:
+        raise timed_out()
+      # The stream ACK reader shares its socket with sendall. Shrinking the
+      # socket timeout here would also shorten the concurrent JPEG write.
+      readable, _, _ = select.select([sock], [], [], remaining)
+      if not readable or time.monotonic() >= deadline:
+        raise timed_out()
     count = sock.recv_into(view[received:])
     if count == 0:
-      raise ConnectionError("Cluster connection closed while receiving data")
+      raise ConnectionError(f"Cluster connection closed while receiving data: bytes={received}/{size}")
     received += count
+    if deadline is not None and time.monotonic() >= deadline:
+      raise timed_out()
   return bytes(data)

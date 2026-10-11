@@ -44,6 +44,10 @@ ftp_upload_file() {
   chmod u+w "$MOCK_UPLOADED_DIR/${archive_name//:/_}"
   if [[ $(basename "$1") == cluster_debug.log && ${MOCK_INTERRUPT_C4:-} == 1 ]]; then exit 143; fi
   if [[ $(basename "$1") == cluster_pi_debug.log && ${MOCK_INTERRUPT_PI:-} == 1 ]]; then exit 143; fi
+  if [[ $(basename "$1") == cluster_pi_debug.log && ${MOCK_FAIL_RETRY_ONLY:-} == 1 && ${*:3} == *'--max-time 10'* ]]; then
+    printf 'mock FTP retry error\\n' >&2
+    return 1
+  fi
   if [[ $(basename "$1") == cluster_debug.log && ${MOCK_C4_UPLOAD_FAIL:-} == 1 ]]; then return 1; fi
   if [[ $(basename "$1") == cluster_pi_debug.log && ${MOCK_PI_UPLOAD_FAIL:-} == 1 ]]; then return 1; fi
 }
@@ -180,6 +184,58 @@ def test_retry_preserves_completed_report_if_interrupted_before_shell_completion
   assert retry.returncode == 0
   assert (sandbox.parent / "uploaded" / f"{prefix}_cluster_pi_debug.log".replace(":", "_")).read_text() == original
   assert "CLUSTER_PI_LOG_WARNING:" not in retry.stdout
+
+
+def test_interrupted_atomic_report_temp_does_not_block_retry_or_consume_outbox_slot(sandbox):
+  assert _upload(sandbox, MOCK_PI_UPLOAD_FAIL="1").returncode == 0
+  job = next((sandbox.parent / ".cluster-pi-pending").glob("pending.*"))
+  # SIGKILL between NamedTemporaryFile.write and os.replace skips its finally.
+  job.joinpath(".cluster_pi_debug.log.aborted").write_text("unfinished atomic report\n")
+  retry = _upload(sandbox)
+  assert retry.returncode == 0, retry.stderr
+  assert not list((sandbox.parent / ".cluster-pi-pending").glob("pending.*"))
+  assert len((sandbox.parent / "upload-names.txt").read_text().splitlines()) == 5
+
+
+def test_retry_lock_open_does_not_hide_ftp_stderr(sandbox):
+  assert _upload(sandbox, MOCK_PI_UPLOAD_FAIL="1").returncode == 0
+  retry = _upload(sandbox, MOCK_FAIL_RETRY_ONLY="1")
+  assert retry.returncode == 0, retry.stderr
+  assert "mock FTP retry error" in retry.stderr
+  assert "CLUSTER_PI_LOG_WARNING:" in retry.stdout
+
+
+def test_retry_does_not_recreate_lock_removed_during_other_uploader_cleanup(sandbox):
+  assert _upload(sandbox, MOCK_PI_UPLOAD_FAIL="1").returncode == 0
+  job = next((sandbox.parent / ".cluster-pi-pending").glob("pending.*"))
+  report = job.joinpath("cluster_pi_debug.log").read_text()
+  job.joinpath("lock").unlink()
+  retry = _upload(sandbox)
+  assert retry.returncode == 0, retry.stderr
+  assert not job.joinpath("lock").exists()
+  assert job.joinpath("cluster_pi_debug.log").read_text() == report
+  # Retry must skip the disappearing job, then upload only the new C4/Pi pair.
+  assert len((sandbox.parent / "upload-names.txt").read_text().splitlines()) == 4
+
+
+def test_retry_rechecks_job_removed_by_other_uploader_after_lock_open(sandbox):
+  assert _upload(sandbox, MOCK_PI_UPLOAD_FAIL="1").returncode == 0
+  job = next((sandbox.parent / ".cluster-pi-pending").glob("pending.*"))
+  mocks = sandbox.parent / "mock native commands"
+  mocks.mkdir()
+  flock = mocks / "flock"
+  flock.write_text('''#!/usr/bin/env bash
+if [[ ${1:-} == -n && -d "$MOCK_REMOVE_JOB" ]]; then
+  rm -f -- "$MOCK_REMOVE_JOB"/*
+  rmdir -- "$MOCK_REMOVE_JOB"
+fi
+exit 0
+''', encoding="utf-8", newline="\n")
+  flock.chmod(0o700)
+  retry = _upload(sandbox, PATH=f"{_bash_path(mocks)}:/usr/bin:/bin", MOCK_REMOVE_JOB=_bash_path(job))
+  assert retry.returncode == 0, retry.stderr
+  assert not list((sandbox.parent / ".cluster-pi-pending").glob("pending.*"))
+  assert len((sandbox.parent / "upload-names.txt").read_text().splitlines()) == 4
 
 
 def test_outbox_job_limit_keeps_previous_reports_and_uploads_new_c4_with_warning(sandbox):

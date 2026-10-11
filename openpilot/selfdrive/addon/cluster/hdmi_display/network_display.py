@@ -254,7 +254,7 @@ class ClusterNetworkDisplay:
           if not self._ack_connection_current(sock, generation):
             return
           sequence, prepared, started, sent_at = self._pending_acks[0]
-        ack_sequence, status, flags = unpack_ack_info(recv_exact(sock, ACK_PACKET.size))
+        ack_sequence, status, flags = unpack_ack_info(recv_exact(sock, ACK_PACKET.size, timeout=self.ack_timeout))
         acknowledged_at = time.monotonic()
         with self._ack_condition:
           if not self._ack_connection_current(sock, generation):
@@ -327,7 +327,7 @@ class ClusterNetworkDisplay:
       self.sock.sendall(pack_frame_header(sequence, len(prepared.jpeg), FRAME_QUERY_STREAM))
       self.sock.sendall(prepared.jpeg)
       sent_at = time.monotonic()
-      ack_sequence, status, flags = unpack_ack_info(recv_exact(self.sock, ACK_PACKET.size))
+      ack_sequence, status, flags = unpack_ack_info(recv_exact(self.sock, ACK_PACKET.size, timeout=self.ack_timeout))
       acknowledged_at = time.monotonic()
       if ack_sequence != sequence:
         raise ConnectionError(f"Cluster ACK sequence mismatch: sent={sequence}, received={ack_sequence}")

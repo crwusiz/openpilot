@@ -8,6 +8,7 @@ import numpy as np
 from openpilot.selfdrive.addon.cluster import cluster_jpeg
 from openpilot.selfdrive.addon.cluster.cluster_jpeg import PreparedFrame
 from openpilot.selfdrive.addon.cluster.hdmi_display import network_display
+from openpilot.selfdrive.addon.cluster.hdmi_display import network_protocol
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_display import ClusterNetworkDisplay
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_protocol import (
   ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
@@ -104,6 +105,49 @@ def test_network_display_disconnects_on_wrong_ack_sequence():
   finally:
     display.close()
     thread.join(timeout=1.0)
+
+
+@pytest.mark.parametrize("read_delay, success", [(0.02, True), (0.1, False)])
+def test_fragmented_ack_must_complete_within_the_total_ack_timeout(monkeypatch, read_delay, success):
+  now = [10.0]
+  config = _config("127.0.0.1", 0)
+  monkeypatch.setattr(network_display, "write_network_status", lambda _address: None)
+  display = ClusterNetworkDisplay(config)
+  ack = bytearray(pack_ack(1))
+
+  class FragmentedAckSocket:
+    def sendall(self, _data):
+      pass
+
+    def recv_into(self, view):
+      # Each read is quicker than the one-second socket timeout, but the
+      # complete ACK takes longer. Partial progress must not renew its budget.
+      now[0] += read_delay
+      view[0] = ack.pop(0)
+      return 1
+
+    def shutdown(self, _how):
+      pass
+
+    def close(self):
+      pass
+
+  monkeypatch.setattr(network_protocol, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(network_protocol, "select", SimpleNamespace(select=lambda reads, *_args: (reads, [], [])))
+  messages = []
+  monkeypatch.setattr(network_display, "flog", messages.append)
+  display.sock = FragmentedAckSocket()
+  display.connected = True
+  try:
+    assert display.send_prepared(_prepared()) is success
+    assert display.connected is success and display.frame_count == int(success)
+    if success:
+      assert not ack
+    else:
+      assert any("packet timeout" in message and "bytes=" in message for message in messages)
+      assert ack  # The slow tail was rejected before the entire packet arrived.
+  finally:
+    display.close()
 
 
 def _prepared(payload=b"jpeg-frame"):

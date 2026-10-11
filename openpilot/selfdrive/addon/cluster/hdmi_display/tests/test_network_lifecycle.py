@@ -141,8 +141,8 @@ def test_stale_ack_or_read_error_cannot_mutate_new_connection(display, monkeypat
   original_recv = network_display.recv_exact
   peers = [old_peer]
 
-  def receive(sock, size):
-    data = original_recv(sock, size)
+  def receive(sock, size, **kwargs):
+    data = original_recv(sock, size, **kwargs)
     if sock is old_sock:
       blocked.set()
       assert release.wait(timeout=4.0)
