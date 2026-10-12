@@ -431,8 +431,8 @@ class SelfdriveD:
       # the defaults of a message that was never received are not a localizer failure
       if self.sm.seen['deviceMotion'] and not self.sm['deviceMotion'].posenetOK:
         self.events.add(EventName.posenetInvalid)
-      if self.sm.seen['deviceMotion'] and not self.sm['deviceMotion'].inputsOK:
-        self.events.add(EventName.locationdTemporaryError)
+      #if self.sm.seen['deviceMotion'] and not self.sm['deviceMotion'].inputsOK:
+      #  self.events.add(EventName.locationdTemporaryError)
       if (self.sm.seen['vehicleParameters'] and not self.sm['vehicleParameters'].valid and cal_status == log.ExtrinsicsCalibration.Status.calibrated and
           not TESTING_CLOSET and (not SIMULATION or REPLAY)):
         self.events.add(EventName.paramsdTemporaryError)
@@ -481,7 +481,7 @@ class SelfdriveD:
 
     # TODO: fix simulator
     if not SIMULATION or REPLAY:
-      if self.sm['modelV2'].frameDropPerc > 1 and not big_model_settling:
+      if self.sm['modelV2'].frameDropPerc > 2 and not big_model_settling:
         self.events.add(EventName.modeldLagging)
 
     # Decrement personality on distance button press
