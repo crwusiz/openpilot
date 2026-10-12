@@ -455,6 +455,8 @@ def update_sandbox(script_sandbox):
   # The first update must work when the previously installed release has no
   # updater, and recovery must keep working after that release is restored.
   shutil.copyfile(updater, incoming / "scripts" / "update.sh")
+  for name in ("cluster_protocol.py", "frame_stream.py", "display_controls.py", "texture_presenter.py", "tcp_diagnostics.py", "receiver_build.py"):
+    (incoming / name).write_text("# current runtime dependency\n", encoding="utf-8", newline="\n")
   for name in ("ensure_wifi.sh", "wifi_boot_setup.sh", "wifi_power_save.sh"):
     shutil.copyfile(scripts / name, incoming / "scripts" / name)
   helper = incoming / "scripts" / "wifi_boot_setup.sh"
@@ -630,6 +632,22 @@ def test_invalid_update_does_not_stop_running_receiver(update_sandbox, failure):
     extra_env[failure] = "1"
   result = _update(update_sandbox, extra_env=extra_env)
   assert result.returncode != 0
+  assert (target / "cluster_receiver.py").read_text() == "# old\n"
+  log = sandbox[1].parent / "systemctl.log"
+  assert not log.exists() or not any(line.startswith(("stop ", "start ")) for line in log.read_text().splitlines())
+
+
+@pytest.mark.parametrize("helper", [
+  "cluster_protocol.py", "frame_stream.py", "display_controls.py", "texture_presenter.py", "tcp_diagnostics.py", "receiver_build.py",
+])
+def test_incomplete_runtime_update_does_not_stop_running_receiver(update_sandbox, helper):
+  sandbox, _environment, target, incoming = update_sandbox
+  (incoming / helper).unlink()
+  # A consistent manifest still cannot make an incomplete receiver installable.
+  _write_checksums(incoming)
+  result = _update(update_sandbox)
+  assert result.returncode != 0
+  assert "Payload is missing " + helper in result.stderr
   assert (target / "cluster_receiver.py").read_text() == "# old\n"
   log = sandbox[1].parent / "systemctl.log"
   assert not log.exists() or not any(line.startswith(("stop ", "start ")) for line in log.read_text().splitlines())

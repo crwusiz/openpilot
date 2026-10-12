@@ -191,7 +191,10 @@ fi
 [[ "$source_dir" != "$TARGET" ]] || fail 'Use a separate staging directory.'
 read_manifest "$source_dir"
 if [[ $1 == apply ]]; then
-  for name in scripts/update.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh; do
+  # Rollback manifests may belong to releases predating these helpers. Require
+  # the current receiver dependencies only for a newly uploaded package.
+  for name in cluster_protocol.py frame_stream.py display_controls.py texture_presenter.py tcp_diagnostics.py receiver_build.py \
+    scripts/update.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh; do
     [[ " ${FILES[*]} " == *" $name "* ]] || fail "Payload is missing $name."
   done
 fi

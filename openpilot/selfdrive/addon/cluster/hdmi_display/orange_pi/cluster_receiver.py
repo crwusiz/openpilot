@@ -17,6 +17,7 @@ try:
     ReceiveStats, pack_ack, recv_exact, unpack_frame_header_info,
   )
   from .frame_stream import ReceivedFrame, receive_stream_frames
+  from .receiver_build import source_fingerprint
   from .tcp_diagnostics import TcpDiagnostics
 except ImportError:
   from cluster_protocol import (
@@ -24,6 +25,7 @@ except ImportError:
     ReceiveStats, pack_ack, recv_exact, unpack_frame_header_info,
   )
   from frame_stream import ReceivedFrame, receive_stream_frames
+  from receiver_build import source_fingerprint
   from tcp_diagnostics import TcpDiagnostics
 
 
@@ -311,6 +313,10 @@ def main():
     from .hdmi_display import HdmiDisplay
   except ImportError:
     from hdmi_display import HdmiDisplay
+
+  # Capture once, before the receive loop. A later deployment can change disk
+  # files while this process keeps executing its already imported sources.
+  LOG.info("[CLUSTER_RX_BUILD] startup_%s", source_fingerprint())
 
   display = HdmiDisplay(
     width=args.width,

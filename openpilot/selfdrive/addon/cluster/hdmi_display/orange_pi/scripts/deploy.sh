@@ -11,6 +11,7 @@ identity=''
 ask_password=0
 rollback=0
 dry_run=0
+reboot_after_update=0
 local_directory=''
 remote_directory=''
 
@@ -26,6 +27,7 @@ Omit PI_HOST to use the currently connected Orange Pi address.
   --identity FILE      SSH private key on C4
   --ask-password       Enter the SSH password manually instead of using orangepi
   --rollback           Restore the previous receiver version without uploading
+  --reboot             Reboot the Pi 5 seconds after a successful update
   --dry-run            Print the target and file list without using SSH
   -h, --help           Show this help
 Password override: set CLUSTER_PI_PASSWORD in the environment.
@@ -46,6 +48,7 @@ while (( $# )); do
     --rollback) rollback=1; shift;;
     --ask-password) ask_password=1; shift;;
     --dry-run) dry_run=1; shift;;
+    --reboot) reboot_after_update=1; shift;;
     -h|--help) usage; exit 0;;
     -*) fail "Unknown option: $1";;
     *) [[ -z "$pi_host" ]] || fail 'Specify only one Pi host.'; pi_host=$1; shift;;
@@ -78,7 +81,7 @@ if (( ! rollback )); then
     [[ "$relative" =~ ^([a-zA-Z0-9_]+\.py|README\.md|requirements\.txt|cluster-hdmi\.service|scripts/[a-zA-Z0-9_-]+\.sh)$ ]] || fail "Unexpected package filename: $relative"
     [[ -f "$PACKAGE_DIR/$relative" && ! -L "$PACKAGE_DIR/$relative" ]] || fail "Missing or symlink package file: $relative"
   done
-  for required in cluster_receiver.py hdmi_display.py frame_stream.py display_controls.py texture_presenter.py scripts/common.sh \
+  for required in cluster_receiver.py cluster_protocol.py hdmi_display.py frame_stream.py display_controls.py texture_presenter.py tcp_diagnostics.py receiver_build.py scripts/common.sh \
     scripts/update.sh scripts/ssh_port.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh; do
     [[ " ${files[*]} " == *" $required "* ]] || fail "Package is missing $required."
   done
@@ -88,6 +91,7 @@ else
 fi
 if (( dry_run )); then
   if (( ! rollback )); then printf '  %s\n' "${files[@]}"; fi
+  if (( reboot_after_update && ! rollback )); then printf 'After a successful update: reboot Orange Pi in about 5 seconds.\n'; fi
   printf 'Dry run: no SSH connection or file changes.\n'
   exit 0
 fi
@@ -113,9 +117,25 @@ set_port_options() {
 set_port_options
 cleanup_remote() {
   if [[ "$remote_directory" =~ ^/tmp/cluster-update\.[a-zA-Z0-9]{8}$ ]]; then
-    ssh "${ssh_options[@]}" -o BatchMode=yes "$pi_host" "rm -rf -- '$remote_directory'" || printf 'Remote staging cleanup failed: %s\n' "$remote_directory" >&2
+    if ! ssh "${ssh_options[@]}" -o BatchMode=yes "$pi_host" "rm -rf -- '$remote_directory'"; then
+      printf 'Remote staging cleanup failed: %s\n' "$remote_directory" >&2
+      [[ ${1:-} != --strict ]] || return 1
+    fi
   fi
   remote_directory=''
+}
+request_reboot() {
+  # Clean up while SSH is still available, and let the remote systemd timer
+  # survive this connection. A successful SSH reply confirms scheduling only.
+  cleanup_remote --strict
+  printf 'Receiver update complete; scheduling Orange Pi reboot.\n'
+  if ssh "${ssh_options[@]}" -tt "$pi_host" 'if [ $(id -u) -eq 0 ]; then systemd-run --quiet --collect --on-active=5s --timer-property=AccuracySec=1s /usr/bin/systemctl reboot; else sudo systemd-run --quiet --collect --on-active=5s --timer-property=AccuracySec=1s /usr/bin/systemctl reboot; fi'; then
+    printf 'Orange Pi reboot scheduled in about 5 seconds; HDMI/Wi-Fi will reconnect after boot.\n'
+  else
+    local result=$?
+    printf 'ERROR: Receiver update succeeded, but Orange Pi reboot scheduling failed.\n' >&2
+    return "$result"
+  fi
 }
 cleanup() {
   local result=$?
@@ -200,6 +220,7 @@ ssh "${ssh_options[@]}" -tt "$pi_host" "if [ \$(id -u) -eq 0 ]; then bash '$remo
 if (( ssh_port == 22 )); then
   # Finish staging cleanup before changing the listener. The existing SSH
   # session can then complete without opening another connection to port 22.
-  cleanup_remote
+  if (( reboot_after_update )); then cleanup_remote --strict; else cleanup_remote; fi
   ssh "${ssh_options[@]}" -tt "$pi_host" 'if [ $(id -u) -eq 0 ]; then bash /opt/cluster-receiver/scripts/ssh_port.sh; else sudo bash /opt/cluster-receiver/scripts/ssh_port.sh; fi'
 fi
+if (( reboot_after_update )); then request_reboot; fi

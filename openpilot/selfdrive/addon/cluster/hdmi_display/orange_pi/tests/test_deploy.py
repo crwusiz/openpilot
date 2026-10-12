@@ -23,6 +23,7 @@ def deploy_sandbox(tmp_path):
   shutil.copytree(PACKAGE / "scripts", scripts)
   for name, content in {"cluster_receiver.py": "# receiver\n", "hdmi_display.py": "# display\n", "frame_stream.py": "# stream\n",
                         "display_controls.py": "# controls\n", "texture_presenter.py": "# presenter\n",
+                        "tcp_diagnostics.py": "# TCP diagnostics\n", "receiver_build.py": "# receiver build\n", "cluster_protocol.py": "# protocol\n",
                         "README.md": "연결 대기\r\n수신기\r\n", "requirements.txt": "pygame\n",
                         "cluster-hdmi.service": "[Service]\n"}.items():
     (package / name).write_bytes(content.encode("utf-8"))
@@ -71,6 +72,8 @@ case "$command" in
   *'/scripts/ssh_port.sh;'*)
     [[ ${MOCK_SSH_PORT_ERROR:-} != 1 ]] || exit 6
     printf 'Orange Pi SSH port changed: 22 -> 9122.\n';;
+  *'systemd-run '*)
+    [[ ${MOCK_REBOOT_ERROR:-} != 1 ]] || exit 11;;
   'rm -rf '*) [[ ${MOCK_CLEANUP_ERROR:-} != 1 ]] || exit 9;;
 esac
 ''',
@@ -93,16 +96,28 @@ exec "$@"
   return package
 
 
-def _deploy(package, *args, extra_env=None):
+def _deploy(package, *args, extra_env=None, entrypoint=None):
   root = package.parents[1]
   env = dict(os.environ, MOCK_SSH_LOG=(root / "ssh.log").as_posix(),
              MOCK_CAPTURE_PAYLOAD=(root / "captured payload").as_posix(), TMPDIR="temporary files",
              CLUSTER_NETWORK_STATUS_FILE=str(root / "connection.json"), CLUSTER_PYTHON=Path(sys.executable).as_posix())
   env.pop("CLUSTER_PI_PASSWORD", None)
   env.update(extra_env or {})
+  entrypoint = entrypoint or package / "scripts" / "deploy.sh"
   return subprocess.run([BASH, "-c", 'export PATH="$PWD/bin:/usr/bin:/bin"; exec bash "$@"', "deploy-test",
-                         (package.relative_to(root) / "scripts" / "deploy.sh").as_posix(), *args],
+                         entrypoint.relative_to(root).as_posix(), *args],
                         cwd=root, env=env, capture_output=True, text=True, encoding="utf-8", timeout=20, check=False)
+
+
+def _pi_update(package, *args, extra_env=None):
+  repository = package.parents[1] / "C4 checkout with spaces"
+  entrypoint = repository / "scripts" / "pi_update.sh"
+  entrypoint.parent.mkdir(parents=True)
+  shutil.copyfile(PACKAGE.parents[5] / "scripts" / "pi_update.sh", entrypoint)
+  receiver = repository / "openpilot" / "selfdrive" / "addon" / "cluster" / "hdmi_display" / "orange_pi"
+  shutil.copytree(package, receiver)
+  shutil.copyfile(package.parent / "network_status.py", receiver.parent / "network_status.py")
+  return _deploy(package, *args, extra_env=extra_env, entrypoint=entrypoint)
 
 
 def _calls(package):
@@ -133,7 +148,7 @@ def test_c4_update_packages_receiver_only_with_checksums_and_cleans_staging(depl
     assert b"\r\n" not in data
     assert not data.startswith(b"\xef\xbb\xbf")
   assert files == {"README.md", "requirements.txt", "cluster-hdmi.service", "cluster_receiver.py", "hdmi_display.py", "frame_stream.py",
-                   "display_controls.py", "texture_presenter.py",
+                   "display_controls.py", "texture_presenter.py", "tcp_diagnostics.py", "receiver_build.py", "cluster_protocol.py",
                    *("scripts/" + path.name for path in (deploy_sandbox / "scripts").glob("*.sh"))}
   assert (captured / "README.md").read_text(encoding="utf-8") == "연결 대기\n수신기\n"
   calls = _calls(deploy_sandbox)
@@ -144,6 +159,7 @@ def test_c4_update_packages_receiver_only_with_checksums_and_cleans_staging(depl
   assert list((deploy_sandbox.parents[1] / "temporary files").iterdir()) == []
   control_paths = {arg for _, args in calls for arg in args if arg.startswith("ControlPath=")}
   assert len(control_paths) == 1
+  assert not any("systemd-run " in args[-1] for tool, args in calls if tool == "ssh")
 
 
 def test_c4_uses_current_peer_ip_without_a_manual_address(deploy_sandbox):
@@ -386,3 +402,66 @@ def test_incomplete_wifi_payload_is_rejected_before_ssh(deploy_sandbox, helper):
   assert result.returncode != 0
   assert "Package is missing scripts/" + helper in result.stderr
   assert _calls(deploy_sandbox) == []
+
+
+@pytest.mark.parametrize("helper", [
+  "cluster_protocol.py", "frame_stream.py", "display_controls.py", "texture_presenter.py", "tcp_diagnostics.py", "receiver_build.py",
+])
+def test_incomplete_runtime_payload_is_rejected_before_ssh(deploy_sandbox, helper):
+  (deploy_sandbox / helper).unlink()
+  result = _deploy(deploy_sandbox, "192.168.0.84")
+  assert result.returncode != 0
+  assert "Package is missing " + helper in result.stderr
+  assert _calls(deploy_sandbox) == []
+
+
+@pytest.mark.parametrize("port_mode", ["9122", "22", "fallback"])
+def test_pi_update_schedules_reboot_after_apply_cleanup_and_port_migration(deploy_sandbox, port_mode):
+  arguments = ("--port", "22") if port_mode == "22" else ()
+  environment = {"MOCK_PORT_9122_ERROR": "ssh: connect to host 192.168.0.84 port 9122: Connection refused"} if port_mode == "fallback" else {}
+  result = _pi_update(deploy_sandbox, "192.168.0.84", "--user", "orangepi", *arguments, extra_env=environment)
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert "Orange Pi reboot scheduled in about 5 seconds" in result.stdout
+  calls = _calls(deploy_sandbox)
+  reboot_calls = [(i, args) for i, (tool, args) in enumerate(calls) if tool == "ssh" and "systemd-run " in args[-1]]
+  assert len(reboot_calls) == 1
+  reboot_index, reboot = reboot_calls[0]
+  apply_index = next(i for i, (tool, args) in enumerate(calls) if tool == "ssh" and " apply " in args[-1])
+  cleanup_index = next(i for i, (tool, args) in enumerate(calls) if tool == "ssh" and args[-1].startswith("rm -rf"))
+  assert apply_index < cleanup_index < reboot_index
+  assert "-tt" in reboot and reboot[reboot.index("-l") + 1] == "orangepi"
+  assert "sudo systemd-run" in reboot[-1]
+  assert "--collect --on-active=5s --timer-property=AccuracySec=1s /usr/bin/systemctl reboot" in reboot[-1]
+  assert reboot[reboot.index("-p") + 1] == ("9122" if port_mode == "9122" else "22")
+  if port_mode != "9122":
+    migration_index = next(i for i, (tool, args) in enumerate(calls) if tool == "ssh" and "/scripts/ssh_port.sh;" in args[-1])
+    assert cleanup_index < migration_index < reboot_index
+  assert not any(args[-1].startswith("rm -rf") for tool, args in calls[reboot_index + 1:] if tool == "ssh")
+  assert list((deploy_sandbox.parents[1] / "temporary files").iterdir()) == []
+
+
+@pytest.mark.parametrize("error, expected_exit", [
+  ("MOCK_AUTH_ERROR", 255), ("MOCK_TRANSFER_ERROR", 8), ("MOCK_APPLY_ERROR", 7),
+  ("MOCK_SSH_PORT_ERROR", 6), ("MOCK_CLEANUP_ERROR", 1), ("MOCK_REBOOT_ERROR", 11),
+])
+def test_pi_update_failure_does_not_report_a_scheduled_reboot(deploy_sandbox, error, expected_exit):
+  result = _pi_update(deploy_sandbox, "192.168.0.84", "--port", "22", extra_env={error: "1"})
+  assert result.returncode == expected_exit, result.stdout + result.stderr
+  assert "Orange Pi reboot scheduled" not in result.stdout
+  calls = _calls(deploy_sandbox)
+  requested = any("systemd-run " in args[-1] for tool, args in calls if tool == "ssh")
+  assert requested == (error == "MOCK_REBOOT_ERROR")
+  if error == "MOCK_REBOOT_ERROR":
+    assert "update succeeded, but Orange Pi reboot scheduling failed" in result.stderr
+  assert list((deploy_sandbox.parents[1] / "temporary files").iterdir()) == []
+
+
+@pytest.mark.parametrize("option", ["--dry-run", "--help", "--rollback"])
+def test_pi_update_preview_help_and_rollback_do_not_reboot(deploy_sandbox, option):
+  result = _pi_update(deploy_sandbox, "192.168.0.84", option)
+  assert result.returncode == 0, result.stdout + result.stderr
+  calls = _calls(deploy_sandbox)
+  assert not any("systemd-run " in args[-1] for tool, args in calls if tool == "ssh")
+  assert "Orange Pi reboot scheduled" not in result.stdout
+  if option != "--rollback":
+    assert calls == []

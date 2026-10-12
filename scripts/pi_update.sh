@@ -9,6 +9,7 @@ if [[ ${1:-} == --help || ${1:-} == -h ]]; then
   cat <<'HELP'
 Usage: bash scripts/pi_update.sh [PI_HOST] [options]
 Run on C4; upload this checkout's receiver files to the Orange Pi.
+After a successful update, reboot the Orange Pi in about 5 seconds.
 Omit PI_HOST to use the currently connected Orange Pi address.
   --host PI_HOST       Explicit Orange Pi IP, hostname or SSH alias
   --user USER          Pi SSH account (default: root; other accounts need sudo)
@@ -29,4 +30,4 @@ if [[ ! -f "$DEPLOY_SCRIPT" ]]; then
   exit 1
 fi
 
-exec bash "$DEPLOY_SCRIPT" "$@"
+exec bash "$DEPLOY_SCRIPT" --reboot "$@"

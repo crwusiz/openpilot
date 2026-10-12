@@ -47,8 +47,16 @@ printf '\n--- Pi monotonic uptime ---\n'
 cat /proc/uptime
 printf '\n--- Pi current boot ID ---\n'
 cat /proc/sys/kernel/random/boot_id
+printf '\n--- Pi kernel ---\n'
+uname -sr
 printf '\n--- Receiver service state ---\n'
-systemctl show cluster-hdmi.service --property=ActiveState,SubState,ExecMainStartTimestamp,ExecMainStatus
+systemctl show cluster-hdmi.service --property=ActiveState,SubState,MainPID,ExecMainStartTimestamp,ExecMainStartTimestampMonotonic,ExecMainStatus,NRestarts
+printf '\n--- Installed receiver source (compare with CLUSTER_RX_BUILD startup snapshot) ---\n'
+if [ -r /opt/cluster-receiver/receiver_build.py ] && command -v python3 >/dev/null 2>&1; then
+  python3 /opt/cluster-receiver/receiver_build.py
+else
+  printf '%s\n' 'Receiver build helper unavailable; Pi update/restart cannot be verified from this snapshot.'
+fi
 printf '\n--- Receiver SDL renderer settings ---\n'
 pid=$(systemctl show cluster-hdmi.service --property=MainPID --value)
 case "$pid" in
@@ -65,7 +73,19 @@ ip -4 -o address show dev wlan0
 if command -v iw >/dev/null 2>&1; then
   iw dev wlan0 get power_save
   iw dev wlan0 link | sed -n -E '/^[[:space:]]*(freq:|signal:|rx bitrate:|tx bitrate:)/p'
+  printf '\n--- Wi-Fi station counters (since association; no peer address) ---\n'
+  iw dev wlan0 station dump | sed -n -E \
+    -e '/^[[:space:]]*(inactive time:|rx bytes:|rx packets:|tx bytes:|tx packets:)/p' \
+    -e '/^[[:space:]]*(tx retries:|tx failed:|beacon loss:|beacon rx:|rx drop misc:)/p' \
+    -e '/^[[:space:]]*(signal:|signal avg:|rx bitrate:|tx bitrate:|expected throughput:)/p'
 fi
+printf '\n--- Wi-Fi interface counters (since interface creation) ---\n'
+for counter in rx_bytes rx_packets rx_errors rx_dropped tx_bytes tx_packets tx_errors tx_dropped; do
+  if [ -r "/sys/class/net/wlan0/statistics/$counter" ]; then
+    printf '%s=' "$counter"
+    cat "/sys/class/net/wlan0/statistics/$counter"
+  fi
+done
 printf '\n--- Receiver journal (available boots, UTC, latest 2500 lines, newest first) ---\n'
 journalctl -u cluster-hdmi.service --utc --no-pager --output=short-iso -n 2500 --reverse
 """
