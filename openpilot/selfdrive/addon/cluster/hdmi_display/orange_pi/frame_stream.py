@@ -8,10 +8,12 @@ try:
   from .cluster_protocol import (
     ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_STREAM, ReceiveStats, pack_ack, recv_exact, unpack_frame_header_info,
   )
+  from .tcp_diagnostics import TcpDiagnostics
 except ImportError:
   from cluster_protocol import (
     ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_STREAM, ReceiveStats, pack_ack, recv_exact, unpack_frame_header_info,
   )
+  from tcp_diagnostics import TcpDiagnostics
 
 
 LOG = logging.getLogger("cluster_receiver")
@@ -46,6 +48,7 @@ class LatestFrameReceiver:
     self.thread = threading.Thread(target=self._receive_loop, name="cluster-jpeg-receiver", daemon=True)
     self._perf_started = time.monotonic()
     self._last_displayed_at = None
+    self._tcp_diagnostics = TcpDiagnostics()
     self._reset_perf()
 
   def _reset_perf(self):
@@ -197,6 +200,9 @@ class LatestFrameReceiver:
     detail += " | " + " | ".join(f"{stage}_max={duration * 1000:.1f}ms" for stage, duration in maxima.items())
     detail += (f" | payload_wait_avg={payload_wait * 1000:.1f}ms | payload_read_calls_avg={read_calls:.1f}"
                + f" | payload_select_timeouts={select_timeouts}")
+    tcp_sample = self._tcp_diagnostics.sample(self.sock)
+    if tcp_sample:
+      detail += f" | {tcp_sample}"
     LOG.info("[CLUSTER_RX_PERF] fps=%.2f | display_fps=%.2f | dropped=%d | size_avg=%.1fKB | %s | mode=stream",
              received / elapsed, displayed / elapsed, dropped, size, detail)
 

@@ -390,6 +390,13 @@ def test_stream_performance_log_exposes_queue_age_and_display_stalls(monkeypatch
 def test_stream_receive_diagnostics_are_reported_and_reset_per_window(monkeypatch, caplog):
   now = [0.03]
   monkeypatch.setattr(frame_stream, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  tcp_samples = []
+
+  def sample_tcp(sock):
+    tcp_samples.append(sock)
+    return "tcp_rtt_ms=12.3 | tcp_total_retrans=7 | tcp_retrans_delta=0"
+
+  monkeypatch.setattr(frame_stream, "TcpDiagnostics", lambda: SimpleNamespace(sample=sample_tcp))
   stats = ReceiveStats(wait_time=0.017, wait_max=0.012, read_calls=3, read_max=0.002, select_timeouts=1)
   first = frame_stream.ReceivedFrame(1, b"jpeg", 0.0, 0.005, 0.025, stats)
   acks = []
@@ -406,6 +413,7 @@ def test_stream_receive_diagnostics_are_reported_and_reset_per_window(monkeypatc
   assert "payload_read_calls_avg=3.0" in caplog.text
   assert "payload_read_max=2.0ms" in caplog.text
   assert "payload_select_timeouts=1" in caplog.text
+  assert "tcp_rtt_ms=12.3 | tcp_total_retrans=7 | tcp_retrans_delta=0" in caplog.text
   caplog.clear()
   now[0] = 20.03
   with caplog.at_level("INFO", logger="cluster_receiver"):
@@ -413,6 +421,8 @@ def test_stream_receive_diagnostics_are_reported_and_reset_per_window(monkeypatc
   assert "payload_wait_avg=0.0ms" in caplog.text
   assert "payload_read_calls_avg=0.0" in caplog.text
   assert "payload_select_timeouts=0" in caplog.text
+  assert "tcp_rtt_ms=12.3" in caplog.text
+  assert tcp_samples == [receiver.sock, receiver.sock]
 
 
 def test_receiver_acknowledges_successful_hdmi_frame():
@@ -884,6 +894,68 @@ def test_main_keeps_waiting_when_wifi_or_c4_is_unavailable(monkeypatch, wifi_ava
   monkeypatch.setattr(cluster_receiver, "wait_for_reconnect", retry)
   cluster_receiver.main()
   assert events == ["waiting", "discover", "waiting", "retry", "close"]
+
+
+@pytest.mark.parametrize("cached_available", [False, True])
+@pytest.mark.parametrize("connection_duration", [0.1, 3.0])
+def test_main_retries_last_c4_before_scanning_and_backs_off_only_short_sessions(monkeypatch, cached_available, connection_duration):
+  events = []
+  now = [0.0]
+  display = FakeDisplay()
+  monkeypatch.setattr(hdmi_display, "HdmiDisplay", lambda **kwargs: display)
+  monkeypatch.setattr(display, "open", lambda: True, raising=False)
+  monkeypatch.setattr(display, "show_waiting", lambda: True, raising=False)
+  monkeypatch.setattr(display, "close", lambda: events.append("close"), raising=False)
+  args = cluster_receiver.parse_args([])
+  monkeypatch.setattr(cluster_receiver, "parse_args", lambda: args)
+  monkeypatch.setattr(cluster_receiver.signal, "signal", lambda *_args: None)
+  monkeypatch.setattr(cluster_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(cluster_receiver, "wait_for_reconnect", lambda _display, delay: events.append(("retry", delay)))
+
+  class Connection:
+    def __init__(self, address):
+      self.address = address
+
+    def getpeername(self):
+      return self.address, args.port
+
+    def settimeout(self, timeout):
+      assert timeout == args.frame_timeout
+
+    def close(self):
+      events.append(("disconnect", self.address))
+
+  discoveries = iter(["192.168.77.40", "192.168.77.41"])
+
+  def discover(*_args):
+    address = next(discoveries)
+    events.append(("discover", address))
+    return Connection(address)
+
+  def probe(address, *_args):
+    events.append(("probe", address))
+    assert address == "192.168.77.40"
+    return Connection(address) if cached_available else None
+
+  def receive(sock, *_args, **_kwargs):
+    events.append(("receive", sock.address))
+    if len([event for event in events if event[0] == "receive"]) == 1:
+      now[0] += connection_duration
+      raise TimeoutError("stalled JPEG")
+    raise KeyboardInterrupt
+
+  monkeypatch.setattr(cluster_receiver, "discover_c4", discover)
+  monkeypatch.setattr(cluster_receiver, "_probe", probe)
+  monkeypatch.setattr(cluster_receiver, "receive_frames", receive)
+  cluster_receiver.main()
+  recovered_address = "192.168.77.40" if cached_available else "192.168.77.41"
+  expected = [("discover", "192.168.77.40"), ("receive", "192.168.77.40"), ("disconnect", "192.168.77.40")]
+  if connection_duration < args.reconnect_delay:
+    expected.append(("retry", args.reconnect_delay))
+  expected.append(("probe", "192.168.77.40"))
+  if not cached_available:
+    expected.append(("discover", recovered_address))
+  assert events == expected + [("receive", recovered_address), ("disconnect", recovered_address), "close"]
 
 
 def test_main_does_not_report_ready_when_waiting_screen_fails(monkeypatch, caplog):

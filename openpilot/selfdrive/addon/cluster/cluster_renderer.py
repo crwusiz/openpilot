@@ -104,6 +104,7 @@ class ClusterRenderer:
     self._blend_filter = FirstOrderFilter(1.0, 0.25, 1.0 / self.config.fps)
     self._lead_vehicles = [LeadVehicle(self.config.fps), LeadVehicle(self.config.fps)]
     self._lead_info = [{}, {}]
+    self._last_render_at = None
 
     try:
       self.font_speed = ImageFont.truetype(self.config.font_bold, 58)
@@ -167,6 +168,7 @@ class ClusterRenderer:
 
   def render(self, camera, models):
     started = time.monotonic()
+    self._update_filter_intervals(started)
     # Fetch once so a stale-stream reset cannot clear the frame between a
     # separate has_frame() check and get_frame() call.
     camera_frame = camera.get_frame()
@@ -204,6 +206,20 @@ class ClusterRenderer:
     # complete 1920x462 image back to NumPy here only for it to be rotated and
     # JPEG-encoded in the next thread was a full-frame copy on every update.
     return pil_img
+
+  def _update_filter_intervals(self, now):
+    # Transport backpressure can reduce actual rendering far below the target.
+    # Keep fades and lead smoothing in real time rather than slowing them down
+    # by using the configured frame interval for every delayed frame.
+    previous = self._last_render_at
+    self._last_render_at = now
+    dt = 1.0 / self.config.fps if previous is None else max(now - previous, 0.001)
+    self._blend_filter.dt = dt
+    self._blend_filter.update_alpha(0.25)
+    for lead in self._lead_vehicles:
+      for filter_, rc in ((lead.d_filter, 0.2), (lead.y_filter, 0.2), (lead.fade_filter, 0.1)):
+        filter_.dt = dt
+        filter_.update_alpha(rc)
 
   def _crop_and_resize(self, frame):
     source_h, source_w = frame.shape[:2]

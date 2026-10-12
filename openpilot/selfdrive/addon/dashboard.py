@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import errno
 import html as html_lib
+import json
 import os
 import shutil
 import signal
@@ -25,7 +26,10 @@ except ImportError:
   def set_core_affinity(cores): pass
 
 from ansi2html import Ansi2HTMLConverter
-from nicegui import ui
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from nicegui import app, ui
+import requests
 
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import get_connected_pi_ip
 
@@ -34,6 +38,12 @@ SCRIPTS_PATH = "/data/openpilot/scripts"
 BASE_PATH = "/data/params/crwusiz"
 DASHBOARD_HOST = "0.0.0.0"
 DASHBOARD_PORT = 7000
+CAMERA_OPTIONS = {"Road Camera": "road", "Driver Camera": "driver", "Wide Road Camera": "wideRoad"}
+CAMERA_STREAM_PATH = '/api/camera/stream'
+WEBRTCD_URL = 'http://127.0.0.1:5001'
+CAMERA_START_TIMEOUT = 10.0
+MAX_CAMERA_SDP = 128 * 1024
+CAMERA_STREAM_LOCK = asyncio.Lock()
 MAX_COMMAND_OUTPUT = 100_000
 LOG_DIR = Path('/data/log')
 TMUX_LOG_PATH = LOG_DIR / 'tmux_console.log'
@@ -48,6 +58,60 @@ LOG_FILES = {
   "Traffic Debug": LOG_DIR / 'traffic_debug.log',
   "Cluster Debug": LOG_DIR / 'cluster_debug.log',
 }
+
+
+def _request_camera_stream(camera: str, sdp: str) -> tuple[int, dict]:
+  """Signal through loopback; manager owns the offroad camera processes."""
+  if params.get_bool('IsOffroad'):
+    params.put_bool('IsLiveStreaming', True)
+  deadline = time.monotonic() + CAMERA_START_TIMEOUT
+  # Loopback signaling must not be sent through an HTTP_PROXY from the environment.
+  with requests.Session() as session:
+    session.trust_env = False
+    while True:
+      try:
+        if session.get(f'{WEBRTCD_URL}/schema', timeout=1).ok:
+          break
+      except (requests.ConnectionError, requests.Timeout):
+        pass
+      if time.monotonic() >= deadline:
+        return 503, {'error': 'Camera streaming service did not start. Try again after checking device status.'}
+      time.sleep(0.1)
+    try:
+      response = session.post(f'{WEBRTCD_URL}/stream', json={
+        'sdp': sdp, 'cameras': [camera], 'enabled': True,
+        'bridge_services_in': [], 'bridge_services_out': [],
+      }, timeout=(2, 35))  # webrtcd bounds answer creation at 30 seconds.
+      if not response.ok:
+        return 502, {'error': f'Camera stream negotiation failed (service HTTP {response.status_code}).'}
+      answer = response.json()
+      if not isinstance(answer, dict) or answer.get('type') != 'answer' or not isinstance(answer.get('sdp'), str) or not answer['sdp']:
+        return 502, {'error': 'Camera streaming service returned an invalid answer.'}
+      return 200, {'sdp': answer['sdp'], 'type': 'answer'}
+    except requests.Timeout:
+      return 504, {'error': 'Camera stream negotiation timed out.'}
+    except (requests.ConnectionError, ValueError):
+      return 502, {'error': 'Camera streaming service could not complete negotiation.'}
+
+
+@app.post(CAMERA_STREAM_PATH)
+async def camera_stream(request: Request):
+  """Same-origin video-only proxy; never expose webrtcd's control bridge."""
+  raw = await request.body()
+  if len(raw) > MAX_CAMERA_SDP + 1024:
+    return JSONResponse({'error': 'Camera request is too large.'}, status_code=413)
+  try:
+    body = json.loads(raw)
+  except (ValueError, UnicodeDecodeError):
+    return JSONResponse({'error': 'Invalid camera request.'}, status_code=400)
+  if (not isinstance(body, dict) or body.get('camera') not in CAMERA_OPTIONS.values()
+      or not isinstance(body.get('sdp'), str) or not body['sdp'].startswith('v=0')
+      or len(body['sdp']) > MAX_CAMERA_SDP):
+    return JSONResponse({'error': 'Choose a valid camera and provide a video offer.'}, status_code=400)
+  # Serialize restarts so an earlier slow startup cannot replace the new session.
+  async with CAMERA_STREAM_LOCK:
+    status, answer = await asyncio.to_thread(_request_camera_stream, body['camera'], body['sdp'])
+  return JSONResponse(answer, status_code=status)
 
 def _dashboard_port_available() -> bool:
   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -834,8 +898,114 @@ def render_tab_terminal(tabs):
   # 1초마다 터미널 업데이트 실행
   ui.timer(1.0, update_terminal)
 
+def _camera_start_javascript(camera: str) -> str:
+  return r'''
+    (async () => {
+      if (window.dashboardCameraSession) window.dashboardCameraSession.stop();
+      const session = {pc: null, stopped: false, controller: new AbortController()};
+      window.dashboardCameraSession = session;
+      const current = () => window.dashboardCameraSession === session && !session.stopped;
+      let video, status;
+      const update = (message, color = 'rgba(0,0,0,0.65)') => {
+        if (!current() || !status) return;
+        status.innerText = message;
+        status.style.background = color;
+      };
+      session.stop = () => {
+        session.stopped = true;
+        session.controller.abort();
+        if (session.pc) session.pc.close();
+        if (window.dashboardCameraSession === session && video && video.srcObject) {
+          video.srcObject.getTracks().forEach(track => track.stop());
+          video.srcObject = null;
+        }
+      };
+      try {
+        // NiceGUI updates the HTML and executes this code in the same batch.
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        if (!current()) return;
+        video = document.getElementById('dashboard-camera-video');
+        status = document.getElementById('dashboard-camera-status');
+        if (!video || !status) throw new Error('Camera panel did not initialize.');
+        if (typeof RTCPeerConnection === 'undefined') throw new Error('This browser does not support WebRTC.');
+        const pc = new RTCPeerConnection({iceServers: []});
+        session.pc = pc;
+        pc.addTransceiver('video', {direction: 'recvonly'});
+        video.onplaying = () => update('● Stream Active', 'rgba(16,185,129,0.75)');
+        video.onwaiting = () => update('Waiting for video...');
+        pc.ontrack = event => {
+          if (!current()) return;
+          video.srcObject = event.streams[0] || new MediaStream([event.track]);
+          update('Waiting for video...');
+          video.play().catch(() => update('Tap Play to view the camera.'));
+        };
+        pc.onconnectionstatechange = () => {
+          if (!current()) return;
+          if (pc.connectionState === 'failed') {
+            update('Connection failed. Check the network and press Start again.', 'red');
+            session.stop();
+          } else if (pc.connectionState === 'disconnected') {
+            update('Connection interrupted. Waiting to reconnect...', 'orange');
+          } else if (pc.connectionState === 'closed') {
+            update('Stream ended. Press Start to reconnect.');
+          }
+        };
+        const offer = await pc.createOffer();
+        if (!/a=rtpmap:\d+ H264\/90000/i.test(offer.sdp)) throw new Error('This browser does not offer H.264 video.');
+        await pc.setLocalDescription(offer);
+        await new Promise((resolve, reject) => {
+          let timer;
+          const cleanup = () => {
+            clearTimeout(timer);
+            pc.removeEventListener('icegatheringstatechange', changed);
+            session.controller.signal.removeEventListener('abort', aborted);
+          };
+          const changed = () => {
+            if (pc.iceGatheringState === 'complete') { cleanup(); resolve(); }
+          };
+          const aborted = () => { cleanup(); reject(new Error('Stream stopped.')); };
+          pc.addEventListener('icegatheringstatechange', changed);
+          session.controller.signal.addEventListener('abort', aborted);
+          timer = setTimeout(() => { cleanup(); reject(new Error('Network candidate discovery timed out. Try again.')); }, 10000);
+          if (session.controller.signal.aborted) aborted();
+          else changed();
+        });
+        if (!current()) return;
+        update('Starting camera...');
+        const timer = setTimeout(() => session.controller.abort(), 50000);
+        let response;
+        try {
+          response = await fetch('__STREAM_PATH__', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({sdp: pc.localDescription.sdp, camera: __CAMERA__}),
+            signal: session.controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+        if (!current()) return;
+        const answer = await response.json();
+        if (!response.ok) throw new Error(answer.error || `Stream request failed: ${response.status}`);
+        update('Connecting...');
+        await pc.setRemoteDescription(answer);
+      } catch (error) {
+        if (!current()) return;
+        update(error.name === 'AbortError' ? 'Camera request timed out. Press Start to retry.' : error.message, 'red');
+        session.stop();
+      }
+    })();
+  '''.replace('__CAMERA__', json.dumps(camera)).replace('__STREAM_PATH__', CAMERA_STREAM_PATH)
+
+
+CAMERA_STOP_JAVASCRIPT = '''
+  if (window.dashboardCameraSession) {
+    window.dashboardCameraSession.stop();
+    window.dashboardCameraSession = null;
+  }
+'''
+
+
 def render_tab_camera():
-  CAMERA_OPTIONS = {"Road Camera": "road", "Driver Camera": "driver", "Wide Road Camera": "wideRoad"}
 
   with ui.column().classes('w-full mt-4'):
     with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center'):
@@ -847,83 +1017,17 @@ def render_tab_camera():
 
     def start_stream():
       stream_type = CAMERA_OPTIONS[cam_select.value]
-      webrtc_html = """
+      stream_container.content = """
         <div style="position:relative; width:100%; height:430px; background:#000; border-radius:12px; border:1.5px solid #3A4A6B; overflow:hidden;">
-            <video id="video" autoplay playsinline muted controls style="width:100%; height:100%; object-fit:contain; cursor:pointer;"></video>
-            <div id="status" style="position:absolute; top:10px; right:12px; color:#E8EEFF; background:rgba(0,0,0,0.65);
+            <video id="dashboard-camera-video" autoplay playsinline muted controls style="width:100%; height:100%; object-fit:contain; cursor:pointer;"></video>
+            <div id="dashboard-camera-status" style="position:absolute; top:10px; right:12px; color:#E8EEFF; background:rgba(0,0,0,0.65);
                 padding:4px 10px; border-radius:20px; font-size:12px;">Initializing...</div>
         </div>
       """
-      js_code = f"""
-            async function startWebRTC() {{
-                const video = document.getElementById('video');
-                const status = document.getElementById('status');
-                const ip = window.location.hostname;
-                if (window.dashboardPeerConnection) window.dashboardPeerConnection.close();
-                const pc = new RTCPeerConnection({{iceServers: []}});
-                window.dashboardPeerConnection = pc;
-                try {{
-                    pc.addTransceiver('video', {{ direction: 'recvonly' }});
-                    pc.ontrack = (event) => {{
-                        status.innerText = "● Stream Active"; status.style.background = "rgba(16,185,129,0.75)";
-                        video.srcObject = event.streams[0]; video.play();
-                    }};
-                    const offer = await pc.createOffer();
-                    await pc.setLocalDescription(offer);
-
-                    await new Promise((resolve) => {{
-                        if (pc.iceGatheringState === 'complete') {{
-                            resolve();
-                        }} else {{
-                            const checkState = () => {{
-                                if (pc.iceGatheringState === 'complete') {{
-                                    pc.removeEventListener('icegatheringstatechange', checkState);
-                                    resolve();
-                                }}
-                            }};
-                            pc.addEventListener('icegatheringstatechange', checkState);
-                            setTimeout(() => {{
-                                pc.removeEventListener('icegatheringstatechange', checkState);
-                                resolve();
-                            }}, 2000); // 2초 초과시 강제 진행
-                        }}
-                    }});
-
-                    if (window.dashboardPeerConnection !== pc) return;
-                    const payload = {{
-                        sdp: pc.localDescription.sdp, cameras: ["{stream_type}"], enabled: true,
-                        bridge_services_in: [], bridge_services_out: []
-                    }};
-                    const response = await fetch(`http://${{ip}}:5001/stream`, {{
-                        method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(payload)
-                    }});
-                    if (window.dashboardPeerConnection !== pc) return;
-                    if (!response.ok) throw new Error(`Stream request failed: ${{response.status}}`);
-                    await pc.setRemoteDescription(await response.json());
-                }} catch (e) {{
-                    pc.close();
-                    if (window.dashboardPeerConnection !== pc) return;
-                    window.dashboardPeerConnection = null;
-                    status.innerText = "Error"; status.style.background = "red";
-                }}
-            }}
-            startWebRTC();
-      """
-      stream_container.content = webrtc_html
-      ui.run_javascript(js_code)
+      ui.run_javascript(_camera_start_javascript(stream_type))
 
     def stop_stream():
-      ui.run_javascript('''
-        if (window.dashboardPeerConnection) {
-          window.dashboardPeerConnection.close();
-          window.dashboardPeerConnection = null;
-        }
-        const video = document.getElementById('video');
-        if (video && video.srcObject) {
-          video.srcObject.getTracks().forEach(track => track.stop());
-          video.srcObject = null;
-        }
-      ''')
+      ui.run_javascript(CAMERA_STOP_JAVASCRIPT)
       stream_container.content = """
         <div class="log-viewer" style="display:flex; flex-direction:column; justify-content:center; align-items:center;">
             <div style="font-size:3em; filter:grayscale(1) opacity(0.3);">📷</div>

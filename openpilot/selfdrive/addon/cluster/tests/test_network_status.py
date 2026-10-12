@@ -60,7 +60,7 @@ def test_failed_atomic_write_preserves_previous_state_and_removes_temporary_file
   assert list(path.parent.glob(f".{path.name}.*")) == []
 
 
-def test_sender_publishes_peer_refreshes_on_ack_and_clears_on_send_error(status_file):
+def test_sender_publishes_peer_refreshes_on_ack_and_clears_on_send_error(status_file, monkeypatch):
   _, clock = status_file
   config = SimpleNamespace(network_bind_host="0.0.0.0", network_port=9200,
                            network_accept_timeout=0.25, network_ack_timeout=2.5, fps=20)
@@ -71,12 +71,9 @@ def test_sender_publishes_peer_refreshes_on_ack_and_clears_on_send_error(status_
   assert display.open()
   assert network_status.get_connected_pi_ip() == "192.168.0.84"
 
-  def receive_ack(buffer):
-    ack = pack_ack(display.sequence + 1)
-    buffer[:] = ack
-    return len(ack)
-
-  peer.recv_into.side_effect = receive_ack
+  # Packet deadlines use OS select; this state-file test mocks that boundary.
+  # Real socket readiness and fragmented ACKs are covered by transport tests.
+  monkeypatch.setattr(network_display, "recv_exact", lambda _sock, _size, **_kwargs: pack_ack(display.sequence + 1))
   clock.monotonic.return_value = 111.0
   assert network_status.get_connected_pi_ip() is None
   frame = SimpleNamespace(jpeg=b"JPEG", prepare_elapsed=0.0, size_kb=1)

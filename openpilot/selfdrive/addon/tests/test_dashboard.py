@@ -1,12 +1,17 @@
 import asyncio
+import json
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
+import httpx
 from nicegui import Client, ui
+from starlette.requests import Request
 
 from openpilot.selfdrive.addon import dashboard
 
@@ -78,6 +83,229 @@ class TestDashboardHelpers(unittest.TestCase):
       self.assertEqual([route.name for route in routes], ['new--route', 'old--route'])
       self.assertEqual([path.name for path in routes[1].paths], ['old--route--2', 'old--route--10'])
       self.assertEqual(dashboard.get_routes(root / 'missing'), [])
+
+
+class TestDashboardCameraSignaling(unittest.TestCase):
+  def setUp(self):
+    self.session = Mock()
+    self.session.get.return_value.ok = True
+    self.session.post.return_value.ok = True
+    self.session.post.return_value.json.return_value = {'sdp': 'answer-sdp', 'type': 'answer'}
+    self.session.__enter__ = Mock(return_value=self.session)
+    self.session.__exit__ = Mock(return_value=False)
+    self.params = Mock()
+    self.params.get_bool.return_value = True
+    self.session_patch = patch.object(dashboard.requests, 'Session', return_value=self.session)
+    self.params_patch = patch.object(dashboard, 'params', self.params)
+    self.session_patch.start()
+    self.params_patch.start()
+    self.addCleanup(self.session_patch.stop)
+    self.addCleanup(self.params_patch.stop)
+
+  def test_offroad_start_uses_loopback_and_video_only_payload(self):
+    self.assertEqual(dashboard._request_camera_stream('wideRoad', 'v=0\r\n'), (200, {'sdp': 'answer-sdp', 'type': 'answer'}))
+    self.params.put_bool.assert_called_once_with('IsLiveStreaming', True)
+    self.assertFalse(self.session.trust_env)
+    self.session.get.assert_called_once_with('http://127.0.0.1:5001/schema', timeout=1)
+    self.session.post.assert_called_once_with('http://127.0.0.1:5001/stream', json={
+      'sdp': 'v=0\r\n', 'cameras': ['wideRoad'], 'enabled': True, 'bridge_services_in': [], 'bridge_services_out': [],
+    }, timeout=(2, 35))
+
+  def test_onroad_start_does_not_change_livestream_parameter(self):
+    self.params.get_bool.return_value = False
+    dashboard._request_camera_stream('road', 'v=0\r\n')
+    self.params.put_bool.assert_not_called()
+
+  def test_waits_for_manager_start_then_posts_offer(self):
+    self.session.get.side_effect = [dashboard.requests.ConnectionError(), dashboard.requests.Timeout(), Mock(ok=True)]
+    with patch.object(dashboard.time, 'sleep') as sleep:
+      self.assertEqual(dashboard._request_camera_stream('driver', 'v=0')[0], 200)
+    self.assertEqual(sleep.call_count, 2)
+    self.assertEqual(self.session.post.call_count, 1)
+
+  def test_service_start_has_bounded_failure(self):
+    self.session.get.side_effect = dashboard.requests.ConnectionError('private transport detail')
+    with patch.object(dashboard.time, 'monotonic', side_effect=[0, 11]):
+      status, result = dashboard._request_camera_stream('road', 'v=0')
+    self.assertEqual(status, 503)
+    self.assertNotIn('private transport detail', result['error'])
+    self.session.post.assert_not_called()
+
+  def test_negotiation_errors_are_reported_and_invalid_answer_is_rejected(self):
+    for error, expected in ((dashboard.requests.Timeout(), 504), (dashboard.requests.ConnectionError(), 502), (ValueError(), 502)):
+      with self.subTest(error=error):
+        self.session.post.side_effect = error
+        self.assertEqual(dashboard._request_camera_stream('road', 'v=0')[0], expected)
+    self.session.post.side_effect = None
+    self.session.post.return_value.ok = False
+    self.session.post.return_value.status_code = 500
+    self.assertEqual(dashboard._request_camera_stream('road', 'v=0')[0], 502)
+    self.session.post.return_value.ok = True
+    self.session.post.return_value.json.return_value = {'error': 'busy'}
+    self.assertEqual(dashboard._request_camera_stream('road', 'v=0')[0], 502)
+
+
+class TestDashboardCameraProxy(unittest.IsolatedAsyncioTestCase):
+  async def request(self, body):
+    raw = body if isinstance(body, bytes) else json.dumps(body).encode()
+    request = Request({'type': 'http', 'method': 'POST', 'path': dashboard.CAMERA_STREAM_PATH},
+                      AsyncMock(return_value={'type': 'http.request', 'body': raw, 'more_body': False}))
+    return await dashboard.camera_stream(request)
+
+  async def test_proxy_forwards_only_camera_and_sdp(self):
+    with patch.object(dashboard, '_request_camera_stream', return_value=(200, {'type': 'answer', 'sdp': 'answer'})) as relay:
+      response = await self.request({'camera': 'driver', 'sdp': 'v=0', 'bridge_services_in': ['testJoystick'], 'enabled': False})
+    self.assertEqual(response.status_code, 200)
+    relay.assert_called_once_with('driver', 'v=0')
+    self.assertEqual(json.loads(response.body), {'type': 'answer', 'sdp': 'answer'})
+
+  async def test_http_route_is_available_at_browser_same_origin(self):
+    with patch.object(dashboard, '_request_camera_stream', return_value=(200, {'type': 'answer', 'sdp': 'answer'})) as relay:
+      async with httpx.AsyncClient(transport=httpx.ASGITransport(app=dashboard.app), base_url='http://dashboard:7000') as client:
+        response = await client.post('/api/camera/stream', json={'camera': 'wideRoad', 'sdp': 'v=0'})
+    self.assertEqual(response.status_code, 200)
+    self.assertEqual(response.json(), {'type': 'answer', 'sdp': 'answer'})
+    relay.assert_called_once_with('wideRoad', 'v=0')
+
+  async def test_proxy_rejects_invalid_requests_before_starting_camera(self):
+    for body, status in ((b'not json', 400), ([], 400), ({'camera': 'cluster', 'sdp': 'v=0'}, 400),
+                         ({'camera': 'road', 'sdp': 123}, 400), ({'camera': 'road', 'sdp': 'bad'}, 400),
+                         (b'x' * (dashboard.MAX_CAMERA_SDP + 1025), 413)):
+      with self.subTest(body=str(body)[:50]), patch.object(dashboard, '_request_camera_stream') as relay:
+        self.assertEqual((await self.request(body)).status_code, status)
+        relay.assert_not_called()
+
+  async def test_proxy_preserves_service_failure_status(self):
+    with patch.object(dashboard, '_request_camera_stream', return_value=(503, {'error': 'service did not start'})):
+      response = await self.request({'camera': 'road', 'sdp': 'v=0'})
+    self.assertEqual(response.status_code, 503)
+
+  async def test_concurrent_start_requests_are_serialized(self):
+    first_started, release_first = asyncio.Event(), asyncio.Event()
+    calls = []
+
+    async def relay(_function, camera, _sdp):
+      calls.append(camera)
+      if camera == 'road':
+        first_started.set()
+        await release_first.wait()
+      return 200, {'type': 'answer', 'sdp': camera}
+
+    with patch.object(dashboard, 'CAMERA_STREAM_LOCK', asyncio.Lock()), patch.object(dashboard.asyncio, 'to_thread', relay):
+      first = asyncio.create_task(self.request({'camera': 'road', 'sdp': 'v=0'}))
+      await first_started.wait()
+      second = asyncio.create_task(self.request({'camera': 'driver', 'sdp': 'v=0'}))
+      await asyncio.sleep(0)
+      self.assertEqual(calls, ['road'])
+      release_first.set()
+      await asyncio.gather(first, second)
+    self.assertEqual(calls, ['road', 'driver'])
+
+
+@unittest.skipUnless(shutil.which('node'), 'Node is needed for the mocked browser regression tests')
+class TestDashboardCameraJavascript(unittest.TestCase):
+  def run_browser(self, scenario):
+    # Execute the actual UI code with mocked browser APIs. No sockets or camera.
+    harness = r'''
+      const assert = require('node:assert/strict');
+      const scenario = process.argv[1];
+      const timers = new Map(); let nextTimer = 0;
+      global.setTimeout = (fn, ms) => {timers.set(++nextTimer, {fn, ms}); return nextTimer;};
+      global.clearTimeout = id => timers.delete(id);
+      global.requestAnimationFrame = fn => fn();
+      global.window = {};
+      const status = {innerText: '', style: {}};
+      const video = {srcObject: null, play: async () => {if (scenario === 'playing') video.onplaying();}};
+      global.document = {getElementById: id => id.endsWith('-video') ? video : status};
+      let pc, fetches = 0, body, url;
+      global.MediaStream = class {constructor(tracks) {this.tracks = tracks;} getTracks() {return this.tracks;}};
+      global.RTCPeerConnection = class {
+        constructor() {
+          if (scenario === 'constructor_fail') throw new Error('WebRTC initialization failed');
+          pc = this; this.listeners = {}; this.iceGatheringState = 'new'; this.connectionState = 'new';
+        }
+        addTransceiver() {}
+        async createOffer() {return {type:'offer', sdp: scenario === 'no_h264' ? 'v=0\r\na=rtpmap:96 VP8/90000' : 'v=0\r\na=rtpmap:96 H264/90000'};}
+        async setLocalDescription(offer) {
+          this.localDescription = offer;
+          this.iceGatheringState = ['late_ice', 'ice_timeout', 'stop'].includes(scenario) ? 'gathering' : 'complete';
+        }
+        addEventListener(name, callback) {this.listeners[name] = callback;}
+        removeEventListener(name, callback) {if (this.listeners[name] === callback) delete this.listeners[name];}
+        async setRemoteDescription(answer) {
+          this.answer = answer;
+          if (scenario === 'playing') this.ontrack({streams: [], track: {stop() {}}});
+        }
+        close() {this.closed = true;}
+      };
+      global.fetch = async (requestUrl, options) => {
+        fetches++; url = requestUrl; body = JSON.parse(options.body);
+        return {ok: scenario !== 'service_fail', status:503, json:async () => scenario === 'service_fail'
+          ? {error:'Camera streaming service did not start.'} : {type:'answer', sdp:'answer'}};
+      };
+    '''
+    checks = r'''
+      (async () => {
+        const started = eval(SCRIPT);
+        for (let i=0; i<10; i++) await Promise.resolve();
+        if (scenario === 'late_ice') {
+          assert.equal(fetches, 0);
+          assert.equal([...timers.values()].some(t => t.ms === 2000), false);
+          pc.localDescription.sdp += '\r\na=candidate:late-host';
+          pc.iceGatheringState = 'complete'; pc.listeners.icegatheringstatechange();
+        } else if (scenario === 'ice_timeout') {
+          [...timers.values()].find(t => t.ms === 10000).fn();
+        } else if (scenario === 'stop') {
+          eval(STOP);
+        }
+        await started;
+        assert.equal(timers.size, 0);
+        if (['late_ice','playing','failed','service_fail'].includes(scenario)) {
+          assert.equal(url, '/api/camera/stream');
+          assert.equal(body.camera, 'wideRoad');
+        }
+        if (scenario === 'late_ice') assert.match(body.sdp, /late-host/);
+        if (scenario === 'playing') {
+          assert.equal(status.innerText, '● Stream Active');
+          assert.equal(video.srcObject.getTracks().length, 1);
+        }
+        if (scenario === 'failed') {
+          pc.connectionState = 'failed'; pc.onconnectionstatechange();
+          assert.match(status.innerText, /Connection failed/); assert.equal(pc.closed, true);
+        }
+        if (scenario === 'stop') {assert.equal(fetches, 0); assert.equal(pc.closed, true);}
+        if (scenario === 'ice_timeout') {assert.equal(fetches, 0); assert.match(status.innerText, /discovery timed out/);}
+        if (scenario === 'no_h264') {assert.equal(fetches, 0); assert.match(status.innerText, /H.264/);}
+        if (scenario === 'constructor_fail') assert.match(status.innerText, /initialization failed/);
+        if (scenario === 'service_fail') assert.match(status.innerText, /did not start/);
+      })().catch(error => {console.error(error); process.exitCode = 1;});
+    '''
+    code = harness + '\nconst SCRIPT = ' + json.dumps(dashboard._camera_start_javascript('wideRoad')) + ';\n'
+    code += 'const STOP = ' + json.dumps(dashboard.CAMERA_STOP_JAVASCRIPT) + ';\n' + checks
+    result = subprocess.run([shutil.which('node'), '-e', code, scenario], capture_output=True, text=True, timeout=10)
+    self.assertEqual(result.returncode, 0, result.stderr)
+
+  def test_late_ice_candidates_are_included_in_offer(self):
+    self.run_browser('late_ice')
+
+  def test_ice_timeout_does_not_post_incomplete_offer(self):
+    self.run_browser('ice_timeout')
+
+  def test_actual_playback_marks_active_and_streamless_track_is_supported(self):
+    self.run_browser('playing')
+
+  def test_connection_failure_clears_active_state_and_closes_peer(self):
+    self.run_browser('failed')
+
+  def test_stop_during_ice_gathering_cancels_pending_start(self):
+    self.run_browser('stop')
+
+  def test_missing_codec_and_constructor_errors_are_visible(self):
+    self.run_browser('no_h264')
+    self.run_browser('constructor_fail')
+
+  def test_proxy_error_is_visible(self):
+    self.run_browser('service_fail')
 
 
 class TestDashboardAsync(unittest.IsolatedAsyncioTestCase):

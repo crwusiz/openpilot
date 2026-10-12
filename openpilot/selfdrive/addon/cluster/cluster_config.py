@@ -40,9 +40,9 @@ NETWORK = SimpleNamespace(
   port=9200,
   accept_timeout_s=0.25,
   ack_timeout_s=2.5,
-  fps=60,  # C4 UI refresh target; camera/model source updates remain 20 Hz.
+  fps=20,  # Full-frame JPEG baseline; camera/model source updates are 20 Hz.
   screen_off_fps=5,
-  jpeg_quality=82,
+  jpeg_quality=68,
   max_in_flight=2,
   max_in_flight_bytes=512 * 1024,
   max_frame_age_s=0.25,
@@ -116,8 +116,8 @@ class ClusterConfig:
       self.width, self.height = HDMI.width, HDMI.height
     else:
       self.width, self.height = USB.width, USB.height
-    # Match the C4 UI's FPS override without importing/initializing the UI.
-    self.fps = min(max(int(os.getenv("FPS", NETWORK.fps)), 1), 60) if self.display_transport == "network" else DISPLAY.fps
+    # The UI's FPS override must not raise the full-frame JPEG workload.
+    self.fps = min(max(int(os.getenv("CLUSTER_FPS", NETWORK.fps)), 1), 60) if self.display_transport == "network" else DISPLAY.fps
     self.usb_fps = DISPLAY.fps
     self.status_interval_frames = self.fps * DISPLAY.status_interval_s
     # carrot-pilot's field-tested JPEG default. This improves camera detail

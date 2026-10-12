@@ -17,12 +17,14 @@ try:
     ReceiveStats, pack_ack, recv_exact, unpack_frame_header_info,
   )
   from .frame_stream import ReceivedFrame, receive_stream_frames
+  from .tcp_diagnostics import TcpDiagnostics
 except ImportError:
   from cluster_protocol import (
     ACK_DISPLAY_ERROR, ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
     ReceiveStats, pack_ack, recv_exact, unpack_frame_header_info,
   )
   from frame_stream import ReceivedFrame, receive_stream_frames
+  from tcp_diagnostics import TcpDiagnostics
 
 
 LOG = logging.getLogger("cluster_receiver")
@@ -186,6 +188,7 @@ def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=F
   perf_bytes = 0
   perf_stages = dict.fromkeys(("header_wait", "receive", "display", "ack_send", "decode", "rotate", "scale", "blit", "flip",
                              "convert", "upload", "draw"), 0.0)
+  tcp_diagnostics = TcpDiagnostics()
   while max_frames is None or received_frames < max_frames:
     # Idle waiting gets its own limit; once any header byte arrives, one strict
     # deadline covers the partial header and entire JPEG, without progress resets.
@@ -237,6 +240,9 @@ def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=F
         for stage, duration in perf_stages.items()
       )
       elapsed = acknowledged_at - perf_started
+      tcp_sample = tcp_diagnostics.sample(sock)
+      if tcp_sample:
+        stages += f" | {tcp_sample}"
       LOG.info("[CLUSTER_RX_PERF] fps=%.2f | display_fps=%.2f | size_avg=%.1fKB | %s | mode=legacy",
                perf_frames / elapsed, perf_displayed / elapsed, perf_bytes / (1024 * perf_frames), stages)
       perf_started = acknowledged_at
@@ -332,16 +338,26 @@ def main():
       raise RuntimeError("Unable to display the Orange Pi connection waiting screen")
     log_runtime_versions(getattr(display, "_pygame", None))
     LOG.info("Cluster receiver ready")
+    last_c4_address = None
     while True:
       sock = None
+      connected_at = None
       try:
         _poll_display(display)
         if args.host is not None:
           sock = _probe(str(args.host), args.port, args.scan_timeout, threading.Event())
         else:
-          sock = discover_c4(args.interface, args.port, args.scan_timeout, args.scan_workers, lambda: _poll_display(display))
+          if last_c4_address is not None:
+            sock = _probe(last_c4_address, args.port, args.scan_timeout, threading.Event())
+            if sock is not None:
+              LOG.info("[CLUSTER_RX_RECONNECT] Connected to last C4 at %s:%d", last_c4_address, args.port)
+          if sock is None:
+            sock = discover_c4(args.interface, args.port, args.scan_timeout, args.scan_workers, lambda: _poll_display(display))
+          if sock is not None:
+            last_c4_address = sock.getpeername()[0]
         if sock is not None:
           sock.settimeout(args.frame_timeout)
+          connected_at = time.monotonic()
           receive_frames(sock, display, frame_timeout=args.frame_timeout)
       except (ConnectionError, OSError, RuntimeError, subprocess.SubprocessError, ValueError) as e:
         LOG.warning("Cluster connection unavailable: %s", e)
@@ -352,7 +368,10 @@ def main():
           except OSError:
             pass
         display.show_waiting()
-      wait_for_reconnect(display, args.reconnect_delay)
+      # Keep the existing backoff for failed/short connections. A live session
+      # has already spaced attempts apart and can retry the cached C4 at once.
+      if connected_at is None or time.monotonic() - connected_at < args.reconnect_delay:
+        wait_for_reconnect(display, args.reconnect_delay)
   except KeyboardInterrupt:
     LOG.info("Stopping cluster receiver")
   finally:

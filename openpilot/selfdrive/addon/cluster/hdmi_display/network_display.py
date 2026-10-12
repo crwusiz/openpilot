@@ -10,6 +10,7 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.network_protocol import (
   pack_frame_header, recv_exact, unpack_ack_info,
 )
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import write_network_status
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.tcp_diagnostics import TcpDiagnostics
 
 
 class ClusterNetworkDisplay:
@@ -41,6 +42,7 @@ class ClusterNetworkDisplay:
     self._ack_error = None
     self._perf_started = None
     self._last_ack_at = None
+    self._tcp_diagnostics = TcpDiagnostics()
     self._reset_perf_totals()
     self._status_updated = 0.0
     self._status_error_logged = False
@@ -162,6 +164,8 @@ class ClusterNetworkDisplay:
       sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
       sock.settimeout(self.ack_timeout)
       self.sock = sock
+      self._tcp_diagnostics = TcpDiagnostics()
+      self._tcp_diagnostics.sample(sock)
       self.client_address = address
       self.connected = True
       with self._ack_condition:
@@ -274,10 +278,11 @@ class ClusterNetworkDisplay:
       with self._ack_condition:
         if not self._ack_connection_current(sock, generation):
           return
+        tcp_details = self._tcp_diagnostics.sample(sock)
         self._ack_error = e
         self.connected = False
         self._ack_condition.notify_all()
-      flog(f"[CLUSTER_NETWORK_ERROR] Stream ACK failed: {e}")
+      flog(f"[CLUSTER_NETWORK_ERROR] Stream ACK failed: {e}" + (f" | {tcp_details}" if tcp_details else ""))
       # Unblock a sender that might be in sendall. The sender/open/close path
       # owns cleanup and joins this reader before accepting another connection.
       try:
@@ -345,7 +350,8 @@ class ClusterNetworkDisplay:
         flog("[CLUSTER_NETWORK_MODE] legacy: Pi update required for ACK on receive.")
       return True
     except (ConnectionError, OSError, ValueError) as e:
-      flog(f"[CLUSTER_NETWORK_ERROR] Failed to send frame: {e}")
+      tcp_details = self._tcp_diagnostics.sample(self.sock)
+      flog(f"[CLUSTER_NETWORK_ERROR] Failed to send frame: {e}" + (f" | {tcp_details}" if tcp_details else ""))
       self._disconnect_client()
       return False
 
@@ -414,6 +420,9 @@ class ClusterNetworkDisplay:
           + f"stale_drops={self._perf_stale_frames} | screen_off={int(self.screen_off)} | "
           + f"mode={'stream' if self.streaming else 'legacy'} | ack={'receive' if self.streaming else 'display'}"
         )
+        tcp_details = self._tcp_diagnostics.sample(self.sock)
+        if tcp_details:
+          perf_message += f" | {tcp_details}"
         self._perf_started = now
         self._reset_perf_totals()
     # Status files/log sinks can block: never hold queue credits while writing.
