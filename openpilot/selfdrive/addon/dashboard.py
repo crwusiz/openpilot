@@ -427,8 +427,9 @@ def apply_styles():
     button.btn-blue-pull { background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%) !important; box-shadow: 0 5px 22px rgba(59,130,246,0.5) !important; }
     button.btn-blue-pull::before { content: '⬇' !important; }
 
-    button.btn-yellow { background: linear-gradient(90deg, #78350F 0%, #F59E0B 100%) !important; box-shadow: 0 5px 22px rgba(245,158,11,0.45) !important;}
+    button.btn-yellow, button.btn-restart { background: linear-gradient(90deg, #78350F 0%, #F59E0B 100%) !important; box-shadow: 0 5px 22px rgba(245,158,11,0.45) !important;}
     button.btn-yellow::before { content: '✦' !important; }
+    button.btn-restart::before { content: '↻' !important; }
     button.btn-red { background: linear-gradient(90deg, #7F1D1D 0%, #EF4444 100%) !important; box-shadow: 0 5px 22px rgba(239,68,68,0.5) !important;}
     button.btn-red::before { content: '⏻' !important; }
     button.btn-green, button.btn-green-route, button.btn-green-start {
@@ -685,15 +686,12 @@ def render_tab_functions():
         ui.button('RESET CALIBRATION', on_click=do_reset_cal, color=None).classes('custom-btn btn-yellow w-full')
         render_status_card("DEVICE POSITION", get_param_text("DevicePosition", "--"), "📍", "card-info")
 
-      with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
-        def do_camera_preview():
-          params.put_bool("CameraPreview", True, block=True)
-          ui.notify("장치 화면에 카메라 미리보기(watch3)를 요청했습니다. 종료하려면 장치의 Close 버튼을 눌러주세요.", type='info', position='top')
+      with ui.element('div').classes('w-full grid grid-cols-2 sm:grid-cols-3 gap-3 items-center mt-2'):
+        async def do_restart():
+          await run_script_async("Restart", f"{SCRIPTS_PATH}/restart.sh")
 
-        ui.button('CAMERA PREVIEW (WATCH3)', on_click=do_camera_preview, color=None).classes('custom-btn btn-camera w-full')
-
-      with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         ui.button('REBOOT', on_click=lambda: subprocess.Popen(["sudo", "reboot"], start_new_session=True), color=None).classes('custom-btn btn-red w-full')
+        ui.button('RESTART', on_click=do_restart, color=None).classes('custom-btn btn-restart w-full')
 
   functions_content()
 
@@ -1008,6 +1006,13 @@ CAMERA_STOP_JAVASCRIPT = '''
 def render_tab_camera():
 
   with ui.column().classes('w-full mt-4'):
+    with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center'):
+      def do_camera_preview():
+        params.put_bool("CameraPreview", True, block=True)
+        ui.notify("장치 화면에 카메라 미리보기(watch3)를 요청했습니다. 종료하려면 장치의 Close 버튼을 눌러주세요.", type='info', position='top')
+
+      ui.button('CAMERA PREVIEW (WATCH3)', on_click=do_camera_preview, color=None).classes('custom-btn btn-camera w-full')
+
     with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center'):
       cam_select = ui.select(list(CAMERA_OPTIONS.keys()), value="Road Camera", label="Select Camera Source").classes('w-[50%] min-w-0 shrink-0')
       ui.button('START', on_click=lambda: start_stream(), color=None).classes('custom-btn btn-green-start w-[25%] shrink-0')
