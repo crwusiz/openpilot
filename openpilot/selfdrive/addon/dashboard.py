@@ -38,7 +38,7 @@ SCRIPTS_PATH = "/data/openpilot/scripts"
 BASE_PATH = "/data/params/crwusiz"
 DASHBOARD_HOST = "0.0.0.0"
 DASHBOARD_PORT = 7000
-CAMERA_OPTIONS = {"Road Camera": "road", "Driver Camera": "driver", "Wide Road Camera": "wideRoad"}
+CAMERA_OPTIONS = {"ROAD": "road", "DRIVER": "driver", "WIDE": "wideRoad"}
 CAMERA_STREAM_PATH = '/api/camera/stream'
 WEBRTCD_URL = 'http://127.0.0.1:5001'
 CAMERA_START_TIMEOUT = 10.0
@@ -60,7 +60,7 @@ LOG_FILES = {
 }
 
 
-def _request_camera_stream(camera: str, sdp: str) -> tuple[int, dict]:
+def _request_camera_stream(cameras: list[str], sdp: str) -> tuple[int, dict]:
   """Signal through loopback; manager owns the offroad camera processes."""
   if params.get_bool('IsOffroad'):
     params.put_bool('IsLiveStreaming', True)
@@ -79,7 +79,7 @@ def _request_camera_stream(camera: str, sdp: str) -> tuple[int, dict]:
       time.sleep(0.1)
     try:
       response = session.post(f'{WEBRTCD_URL}/stream', json={
-        'sdp': sdp, 'cameras': [camera], 'enabled': True,
+        'sdp': sdp, 'cameras': cameras, 'enabled': True,
         'bridge_services_in': [], 'bridge_services_out': [],
       }, timeout=(2, 35))  # webrtcd bounds answer creation at 30 seconds.
       if not response.ok:
@@ -104,13 +104,16 @@ async def camera_stream(request: Request):
     body = json.loads(raw)
   except (ValueError, UnicodeDecodeError):
     return JSONResponse({'error': 'Invalid camera request.'}, status_code=400)
-  if (not isinstance(body, dict) or body.get('camera') not in CAMERA_OPTIONS.values()
+  cameras = body.get('cameras') if isinstance(body, dict) else None
+  if (not isinstance(cameras, list) or not 1 <= len(cameras) <= len(CAMERA_OPTIONS)
+      or any(camera not in CAMERA_OPTIONS.values() for camera in cameras)
+      or len(set(cameras)) != len(cameras)
       or not isinstance(body.get('sdp'), str) or not body['sdp'].startswith('v=0')
       or len(body['sdp']) > MAX_CAMERA_SDP):
-    return JSONResponse({'error': 'Choose a valid camera and provide a video offer.'}, status_code=400)
+    return JSONResponse({'error': 'Provide valid cameras and a video offer.'}, status_code=400)
   # Serialize restarts so an earlier slow startup cannot replace the new session.
   async with CAMERA_STREAM_LOCK:
-    status, answer = await asyncio.to_thread(_request_camera_stream, body['camera'], body['sdp'])
+    status, answer = await asyncio.to_thread(_request_camera_stream, cameras, body['sdp'])
   return JSONResponse(answer, status_code=status)
 
 def _dashboard_port_available() -> bool:
@@ -427,7 +430,10 @@ def apply_styles():
     button.btn-blue-pull { background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%) !important; box-shadow: 0 5px 22px rgba(59,130,246,0.5) !important; }
     button.btn-blue-pull::before { content: '⬇' !important; }
 
-    button.btn-yellow, button.btn-restart { background: linear-gradient(90deg, #78350F 0%, #F59E0B 100%) !important; box-shadow: 0 5px 22px rgba(245,158,11,0.45) !important;}
+    button.btn-yellow, button.btn-restart {
+        background: linear-gradient(90deg, #78350F 0%, #F59E0B 100%) !important;
+        box-shadow: 0 5px 22px rgba(245,158,11,0.45) !important;
+    }
     button.btn-yellow::before { content: '✦' !important; }
     button.btn-restart::before { content: '↻' !important; }
     button.btn-red { background: linear-gradient(90deg, #7F1D1D 0%, #EF4444 100%) !important; box-shadow: 0 5px 22px rgba(239,68,68,0.5) !important;}
@@ -445,6 +451,26 @@ def apply_styles():
     button.btn-default::before { content: '👁' !important; }
     button.btn-camera { background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%) !important; box-shadow: 0 5px 22px rgba(59,130,246,0.5) !important; }
     button.btn-camera::before { content: '📷' !important; }
+
+    .camera-grid {
+        display: grid; grid-template-columns: minmax(0, 62fr) minmax(0, 38fr);
+        grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 12px;
+        width: 100%; height: clamp(360px, 60vh, 640px);
+    }
+    .camera-card {
+        display: flex; flex-direction: column; min-width: 0; min-height: 0;
+        padding: 12px; background: #111827; border: 1.5px solid #3A4A6B; border-radius: 12px;
+    }
+    .camera-card-road { grid-row: span 2; }
+    .camera-card-title { color: #E8EEFF; font-weight: 700; margin-bottom: 8px; }
+    .camera-card-index { color: #60A5FA; margin-right: 12px; }
+    .camera-video-wrap { position: relative; flex: 1; min-height: 0; background: #000; border-radius: 8px; overflow: hidden; }
+    .camera-video-wrap video { display: block; width: 100%; height: 100%; object-fit: contain; }
+    .camera-status {
+        position: absolute; top: 8px; right: 8px; max-width: calc(100% - 16px);
+        padding: 4px 8px; border-radius: 12px; color: #E8EEFF; background: rgba(0,0,0,0.65);
+        font-size: 12px; pointer-events: none;
+    }
 
     /* 새로고침 버튼 전용 스타일 */
     button.refresh-btn {
@@ -573,6 +599,9 @@ def apply_styles():
 
     /* ── 모바일 환경 강제 최적화 미디어 쿼리 ── */
     @media (max-width: 768px) {
+        .camera-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 3fr) minmax(0, 2fr); }
+        .camera-card-road { grid-column: span 2; grid-row: auto; }
+        .camera-card { padding: 8px; }
         button.custom-btn { padding: 6px 8px 6px 44px !important; min-height: 48px !important; }
         button.custom-btn .q-btn__content {
             font-size: 0.8rem !important; white-space: normal !important; overflow: visible !important;
@@ -581,6 +610,9 @@ def apply_styles():
         button.custom-btn::before {
             width: 34px !important; height: 34px !important; font-size: 1.1em !important; line-height: 30px !important; left: 4px !important;
         }
+        .camera-controls button.custom-btn { padding: 38px 8px 8px !important; }
+        .camera-controls button.custom-btn::before { top: 4px !important; left: 50% !important; transform: translateX(-50%) !important; }
+        .camera-controls button.custom-btn .q-btn__content { justify-content: center !important; text-align: center !important; font-size: 0.75rem !important; }
 
         .pill-card { min-height: 48px !important; padding-right: 12px !important; }
         .pill-card-icon {
@@ -896,61 +928,89 @@ def render_tab_terminal(tabs):
   # 1초마다 터미널 업데이트 실행
   ui.timer(1.0, update_terminal)
 
-def _camera_start_javascript(camera: str) -> str:
+def _camera_start_javascript() -> str:
   return r'''
     (async () => {
       if (window.dashboardCameraSession) window.dashboardCameraSession.stop();
-      const session = {pc: null, stopped: false, controller: new AbortController()};
+      const cameras = __CAMERAS__;
+      const session = {pc: null, stopped: false, controller: new AbortController(), panels: new Map(), tracks: new Set()};
       window.dashboardCameraSession = session;
       const current = () => window.dashboardCameraSession === session && !session.stopped;
-      let video, status;
-      const update = (message, color = 'rgba(0,0,0,0.65)') => {
-        if (!current() || !status) return;
-        status.innerText = message;
-        status.style.background = color;
+      const update = (camera, message, color = 'rgba(0,0,0,0.65)') => {
+        const panel = session.panels.get(camera);
+        if (!current() || !panel) return;
+        panel.status.innerText = message;
+        panel.status.style.background = color;
       };
-      session.stop = () => {
+      const updateAll = (message, color) => cameras.forEach(camera => update(camera, message, color));
+      session.stop = (message = 'Stopped') => {
+        if (session.stopped) return;
         session.stopped = true;
         session.controller.abort();
         if (session.pc) session.pc.close();
-        if (window.dashboardCameraSession === session && video && video.srcObject) {
-          video.srcObject.getTracks().forEach(track => track.stop());
-          video.srcObject = null;
+        session.tracks.forEach(track => track.stop());
+        session.tracks.clear();
+        for (const panel of session.panels.values()) {
+          if (panel.video.srcObject === panel.stream) panel.video.srcObject = null;
+          if (panel.video.onplaying === panel.onplaying) panel.video.onplaying = null;
+          if (panel.video.onwaiting === panel.onwaiting) panel.video.onwaiting = null;
+          if (window.dashboardCameraSession === session && message !== null) {
+            panel.status.innerText = message;
+            panel.status.style.background = 'rgba(0,0,0,0.65)';
+          }
         }
       };
       try {
         // NiceGUI updates the HTML and executes this code in the same batch.
         await new Promise(resolve => requestAnimationFrame(resolve));
         if (!current()) return;
-        video = document.getElementById('dashboard-camera-video');
-        status = document.getElementById('dashboard-camera-status');
-        if (!video || !status) throw new Error('Camera panel did not initialize.');
+        for (const camera of cameras) {
+          const video = document.getElementById(`dashboard-camera-${camera}-video`);
+          const status = document.getElementById(`dashboard-camera-${camera}-status`);
+          if (!video || !status) throw new Error('Camera panels did not initialize.');
+          const panel = {video, status, stream: null};
+          panel.onplaying = () => update(camera, '● Stream Active', 'rgba(16,185,129,0.75)');
+          panel.onwaiting = () => update(camera, 'Waiting for video...');
+          video.onplaying = panel.onplaying;
+          video.onwaiting = panel.onwaiting;
+          session.panels.set(camera, panel);
+        }
+        updateAll('Initializing...');
         if (typeof RTCPeerConnection === 'undefined') throw new Error('This browser does not support WebRTC.');
         const pc = new RTCPeerConnection({iceServers: []});
         session.pc = pc;
-        pc.addTransceiver('video', {direction: 'recvonly'});
-        video.onplaying = () => update('● Stream Active', 'rgba(16,185,129,0.75)');
-        video.onwaiting = () => update('Waiting for video...');
+        const transceiverCameras = new Map();
+        cameras.forEach(camera => transceiverCameras.set(pc.addTransceiver('video', {direction: 'recvonly'}), camera));
         pc.ontrack = event => {
-          if (!current()) return;
-          video.srcObject = event.streams[0] || new MediaStream([event.track]);
-          update('Waiting for video...');
-          video.play().catch(() => update('Tap Play to view the camera.'));
+          if (!current()) { event.track.stop(); return; }
+          const cameraPrefix = event.track.id.split(':')[0];
+          const camera = cameras.includes(cameraPrefix) ? cameraPrefix : transceiverCameras.get(event.transceiver);
+          const panel = session.panels.get(camera);
+          if (!panel || event.track.kind !== 'video') { event.track.stop(); return; }
+          if (panel.stream) panel.stream.getTracks().forEach(track => track.stop());
+          session.tracks.add(event.track);
+          // Each panel must contain only its own track even if the remote stream groups cameras.
+          panel.stream = new MediaStream([event.track]);
+          panel.video.srcObject = panel.stream;
+          update(camera, 'Waiting for video...');
+          panel.video.play().catch(() => update(camera, 'Tap Play to view the camera.'));
         };
         pc.onconnectionstatechange = () => {
           if (!current()) return;
           if (pc.connectionState === 'failed') {
-            update('Connection failed. Check the network and press Start again.', 'red');
-            session.stop();
+            updateAll('Connection failed. Check the network and press CAMERA VIEW (WEB) again.', 'red');
+            session.stop(null);
           } else if (pc.connectionState === 'disconnected') {
-            update('Connection interrupted. Waiting to reconnect...', 'orange');
+            updateAll('Connection interrupted. Waiting to reconnect...', 'orange');
           } else if (pc.connectionState === 'closed') {
-            update('Stream ended. Press Start to reconnect.');
+            updateAll('Stream ended. Press CAMERA VIEW (WEB) to reconnect.');
           }
         };
         const offer = await pc.createOffer();
+        if (!current()) return;
         if (!/a=rtpmap:\d+ H264\/90000/i.test(offer.sdp)) throw new Error('This browser does not offer H.264 video.');
         await pc.setLocalDescription(offer);
+        if (!current()) return;
         await new Promise((resolve, reject) => {
           let timer;
           const cleanup = () => {
@@ -969,13 +1029,13 @@ def _camera_start_javascript(camera: str) -> str:
           else changed();
         });
         if (!current()) return;
-        update('Starting camera...');
+        updateAll('Starting cameras...');
         const timer = setTimeout(() => session.controller.abort(), 50000);
         let response;
         try {
           response = await fetch('__STREAM_PATH__', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({sdp: pc.localDescription.sdp, camera: __CAMERA__}),
+            body: JSON.stringify({sdp: pc.localDescription.sdp, cameras}),
             signal: session.controller.signal,
           });
         } finally {
@@ -983,16 +1043,17 @@ def _camera_start_javascript(camera: str) -> str:
         }
         if (!current()) return;
         const answer = await response.json();
+        if (!current()) return;
         if (!response.ok) throw new Error(answer.error || `Stream request failed: ${response.status}`);
-        update('Connecting...');
+        updateAll('Connecting...');
         await pc.setRemoteDescription(answer);
       } catch (error) {
         if (!current()) return;
-        update(error.name === 'AbortError' ? 'Camera request timed out. Press Start to retry.' : error.message, 'red');
-        session.stop();
+        updateAll(error.name === 'AbortError' ? 'Camera request timed out. Press CAMERA VIEW (WEB) to retry.' : error.message, 'red');
+        session.stop(null);
       }
     })();
-  '''.replace('__CAMERA__', json.dumps(camera)).replace('__STREAM_PATH__', CAMERA_STREAM_PATH)
+  '''.replace('__CAMERAS__', json.dumps(list(CAMERA_OPTIONS.values()))).replace('__STREAM_PATH__', CAMERA_STREAM_PATH)
 
 
 CAMERA_STOP_JAVASCRIPT = '''
@@ -1000,47 +1061,42 @@ CAMERA_STOP_JAVASCRIPT = '''
     window.dashboardCameraSession.stop();
     window.dashboardCameraSession = null;
   }
+  document.querySelectorAll('[id^="dashboard-camera-"][id$="-status"]').forEach(status => {
+    status.innerText = 'Stopped';
+    status.style.background = 'rgba(0,0,0,0.65)';
+  });
 '''
 
 
 def render_tab_camera():
 
   with ui.column().classes('w-full mt-4'):
-    with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center'):
-      def do_camera_preview():
-        params.put_bool("CameraPreview", True, block=True)
-        ui.notify("장치 화면에 카메라 미리보기(watch3)를 요청했습니다. 종료하려면 장치의 Close 버튼을 눌러주세요.", type='info', position='top')
-
-      ui.button('CAMERA PREVIEW (WATCH3)', on_click=do_camera_preview, color=None).classes('custom-btn btn-camera w-full')
-
-    with ui.row().classes('w-full flex flex-row flex-nowrap gap-2 items-center'):
-      cam_select = ui.select(list(CAMERA_OPTIONS.keys()), value="Road Camera", label="Select Camera Source").classes('w-[50%] min-w-0 shrink-0')
-      ui.button('START', on_click=lambda: start_stream(), color=None).classes('custom-btn btn-green-start w-[25%] shrink-0')
-      ui.button('STOP', on_click=lambda: stop_stream(), color=None).classes('custom-btn btn-red-stop w-[25%] shrink-0')
-
-    stream_container = ui.html().classes('w-full mt-4')
-
     def start_stream():
-      stream_type = CAMERA_OPTIONS[cam_select.value]
-      stream_container.content = """
-        <div style="position:relative; width:100%; height:430px; background:#000; border-radius:12px; border:1.5px solid #3A4A6B; overflow:hidden;">
-            <video id="dashboard-camera-video" autoplay playsinline muted controls style="width:100%; height:100%; object-fit:contain; cursor:pointer;"></video>
-            <div id="dashboard-camera-status" style="position:absolute; top:10px; right:12px; color:#E8EEFF; background:rgba(0,0,0,0.65);
-                padding:4px 10px; border-radius:20px; font-size:12px;">Initializing...</div>
-        </div>
-      """
-      ui.run_javascript(_camera_start_javascript(stream_type))
+      ui.run_javascript(_camera_start_javascript())
+
+    def show_device():
+      params.put_bool("CameraPreview", True, block=True)
+      ui.notify("장치 화면에 카메라 보기(watch3)를 요청했습니다. STOP 또는 장치의 Close 버튼으로 종료할 수 있습니다.", type='info', position='top')
 
     def stop_stream():
       ui.run_javascript(CAMERA_STOP_JAVASCRIPT)
-      stream_container.content = """
-        <div class="log-viewer" style="display:flex; flex-direction:column; justify-content:center; align-items:center;">
-            <div style="font-size:3em; filter:grayscale(1) opacity(0.3);">📷</div>
-            <div style="font-size:0.9em; margin-top:10px; text-align:center;">Select a camera source and press Start</div>
-        </div>
-      """
+      params.put_bool("CameraPreview", False, block=True)
 
-  stop_stream()
+    with ui.element('div').classes('camera-controls w-full grid grid-cols-3 gap-2 items-stretch'):
+      ui.button('CAMERA VIEW (WEB)', on_click=start_stream, color=None).classes('custom-btn btn-camera w-full')
+      ui.button('CAMERA VIEW (DEVICE)', on_click=show_device, color=None).classes('custom-btn btn-camera w-full')
+      ui.button('STOP', on_click=stop_stream, color=None).classes('custom-btn btn-red-stop w-full')
+
+    cards = ''.join(
+      f'<div class="camera-card camera-card-{camera}">'
+      + f'<div class="camera-card-title"><span class="camera-card-index">{index:02d}</span>{title}</div>'
+      + '<div class="camera-video-wrap">'
+      + f'<video id="dashboard-camera-{camera}-video" autoplay playsinline muted controls></video>'
+      + f'<div id="dashboard-camera-{camera}-status" class="camera-status">Ready</div>'
+      + '</div></div>'
+      for index, (title, camera) in enumerate(CAMERA_OPTIONS.items(), start=1)
+    )
+    ui.html(f'<div class="camera-grid">{cards}</div>').classes('w-full mt-4')
 
 # ── 메인 앱 구동 (Main) ──────────────────────────────────────
 @ui.page('/')
