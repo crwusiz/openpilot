@@ -1,4 +1,5 @@
 import math
+from collections import deque
 import threading
 import time
 
@@ -12,12 +13,15 @@ from openpilot.common.params import Params
 from openpilot.common.transformations.camera import DEVICE_CAMERAS, view_frame_from_device_frame
 from openpilot.common.transformations.orientation import rot_from_euler
 from openpilot.selfdrive.controls.radard import RADAR_TO_CAMERA
+from openpilot.selfdrive.addon.cluster.cluster_health_guard import DRIVING_FAULT_ALERTS, parse_comm_issue
 
 GearShifter = structs.CarState.GearShifter
 HEALTH_AGE_SERVICES = {
   'modelV2': 'model_age_ms',
   'deviceMotion': 'device_motion_age_ms',
   'carState': 'car_state_age_ms',
+  'selfdriveState': 'selfdrive_state_age_ms',
+  'managerState': 'manager_age_ms',
 }
 
 
@@ -52,6 +56,11 @@ def _initial_health_data():
     "cpu_temp_max_c": None,
     "thermal_status": None,
     "device_memory_pct": None,
+    "drive_fault_alert": "",
+    "comm_issue_log_total": 0,
+    "modeld_pid": None,
+    "locationd_pid": None,
+    "selfdrived_pid": None,
   }
 
 
@@ -64,6 +73,7 @@ class ClusterModels:
       'carParams', 'deviceState', 'gpsLocationExternal', 'naviData',
       'longitudinalPlan', 'vehicleParameters', 'extrinsicsCalibration',
       'narrowRoadCameraState', 'radarState', 'deviceMotion',
+      'managerState', 'errorLogMessage',
     ])
 
     self.v_ego = 0.0  # m/s 단위 속도
@@ -118,6 +128,8 @@ class ClusterModels:
     self._state_lock = threading.RLock()
     self._health_data = _initial_health_data()
     self._health_received_at = dict.fromkeys(HEALTH_AGE_SERVICES)
+    self._diagnostic_events = deque(maxlen=16)
+    self._manager_snapshot = None
     self.conv = UnitConverter()
 
     try:
@@ -299,6 +311,38 @@ class ClusterModels:
     if self.sm.updated.get('carState', False):
       health["car_state_seen"] = True
 
+    if self.sm.updated.get('selfdriveState', False):
+      state = self.sm['selfdriveState']
+      alert = str(getattr(state, 'alertType', ''))
+      fault = alert if alert.split('/', 1)[0] in DRIVING_FAULT_ALERTS else ''
+      if fault != health['drive_fault_alert']:
+        health['drive_fault_alert'] = fault
+        self._diagnostic_events.append({
+          'event': 'drivingAlert', 'alert_type': fault, 'mono': received_at,
+          'text1': str(getattr(state, 'alertText1', ''))[:160],
+          'text2': str(getattr(state, 'alertText2', ''))[:160],
+        })
+
+    if self.sm.updated.get('errorLogMessage', False):
+      event = parse_comm_issue(self.sm['errorLogMessage'])
+      if event is not None:
+        health['comm_issue_log_total'] += 1
+        event['mono'] = received_at
+        self._diagnostic_events.append(event)
+
+    if self.sm.updated.get('managerState', False):
+      selected = []
+      for process in self.sm['managerState'].processes:
+        name = str(process.name)
+        if name in ('modeld', 'locationd', 'selfdrived', 'controlsd', 'camerad', 'plannerd', 'radard'):
+          selected.append((name, int(process.pid), bool(process.running), bool(process.shouldBeRunning), int(process.exitCode)))
+          if name in ('modeld', 'locationd', 'selfdrived'):
+            health[name + '_pid'] = int(process.pid)
+      snapshot = tuple(sorted(selected))
+      if snapshot != self._manager_snapshot:
+        self._manager_snapshot = snapshot
+        self._diagnostic_events.append({'event': 'managerProcesses', 'processes': snapshot, 'mono': received_at})
+
     if self.sm.updated.get('modelV2', False):
       model = self.sm['modelV2']
       health["model_seen"] = True
@@ -337,7 +381,7 @@ class ClusterModels:
       health["thermal_status"] = str(thermal) if thermal is not None else None
 
   def get_health_data(self):
-    """Snapshot health and consume only the diagnostic model-drop peak."""
+    """Snapshot health and consume latched diagnostics without changing inputs."""
     with self._state_lock:
       snapshot = self._health_data.copy()
       # Local receive age remains unknown until the service updates. Reading a
@@ -347,6 +391,8 @@ class ClusterModels:
         received_at = self._health_received_at[service]
         snapshot[label] = max(0.0, (now - received_at) * 1000) if received_at is not None else None
       self._health_data["model_drop_peak_perc"] = self._health_data["model_drop_perc"]
+      snapshot['diagnostic_events'] = tuple(self._diagnostic_events)
+      self._diagnostic_events.clear()
       return snapshot
 
   def _update_leads(self):

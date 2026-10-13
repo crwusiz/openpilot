@@ -24,6 +24,7 @@ class ClusterLiveCamera:
     self.thread = None
     self.vipc = None
     self.frame_count = 0
+    self._consumed_frame_count = 0
     self._use_fast_yuv = hasattr(cv2, "cvtColorTwoPlane")
     contrast = min(max(float(getattr(config, "camera_contrast", 1.08)), 0.5), 2.0)
     self.camera_contrast = contrast
@@ -40,6 +41,7 @@ class ClusterLiveCamera:
     self._perf_prepare_time = 0.0
     self._perf_received = self._perf_skipped = 0
     self._frame_needed = frame_needed
+    self._last_frame_needed = False
     self._last_prepare_started = None
     self._init_camera()
     self._start_thread()
@@ -206,11 +208,17 @@ class ClusterLiveCamera:
           self._perf_started = received_at
         self._perf_received += 1
         error_count = 0
-        if self._frame_needed is not None and not self._frame_needed() and self._last_prepare_started is not None \
-            and received_at - self._last_prepare_started < BLOCKED_PREPARE_INTERVAL_SECONDS:
-          self._perf_skipped += 1
-          self._log_perf(received_at)
-          continue
+        if self._frame_needed is not None:
+          needed = bool(self._frame_needed())
+          demand_released = needed and not self._last_frame_needed
+          self._last_frame_needed = needed
+          with self._frame_condition:
+            unconsumed = self.frame_count != self._consumed_frame_count
+          if (not needed or (unconsumed and not demand_released)) and self._last_prepare_started is not None \
+              and received_at - self._last_prepare_started < BLOCKED_PREPARE_INTERVAL_SECONDS:
+            self._perf_skipped += 1
+            self._log_perf(received_at)
+            continue
 
         # Keep a minimum refresh while blocked so a short-lived transport
         # credit cannot starve preprocessing and leave a frozen camera image.
@@ -255,6 +263,7 @@ class ClusterLiveCamera:
 
   def get_frame(self):
     with self._frame_condition:
+      self._consumed_frame_count = self.frame_count
       return self.latest_frame
 
   def wait_for_frame(self, previous_frame_count, timeout):

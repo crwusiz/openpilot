@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import sys
 import threading
@@ -73,6 +74,49 @@ def test_health_does_not_report_unseen_locationd_defaults_as_errors(cluster_mode
   assert not models.get_render_data()[0]
   snapshot['device_motion_input_error_total'] = 100
   assert models.get_health_data()['device_motion_input_error_total'] == 0
+
+
+def test_health_latches_actual_comm_issue_and_alert_before_render_samples(cluster_models):
+  state = cluster_models
+  state.updated.update(errorLogMessage=True, selfdriveState=True)
+  state.messages['errorLogMessage'] = json.dumps({'msg': {
+    'event': 'commIssue', 'invalid': [], 'not_alive': ['modelV2', 'deviceMotion'], 'not_freq_ok': [],
+  }, 'process': 1200})
+  state.messages['selfdriveState'] = SimpleNamespace(alertType='commIssue/noEntry', alertText1='Communication Issue', alertText2='modelV2')
+  state.models._update_health_data()
+  state.updated['errorLogMessage'] = False
+  state.messages['selfdriveState'] = SimpleNamespace(alertType='', alertText1='', alertText2='')
+  state.clock.now += 0.1
+  state.models._update_health_data()
+  health = state.models.get_health_data()
+  assert health['drive_fault_alert'] == '' and health['comm_issue_log_total'] == 1
+  events = health['diagnostic_events']
+  assert [event['event'] for event in events] == ['drivingAlert', 'commIssue', 'drivingAlert']
+  assert events[0]['alert_type'] == 'commIssue/noEntry'
+  assert events[1]['not_alive'] == ['modelV2', 'deviceMotion'] and events[1]['process'] == 1200
+  assert events[2]['alert_type'] == ''
+  assert state.models.get_health_data()['diagnostic_events'] == ()
+
+
+def test_manager_pid_changes_are_recorded_once_and_comm_issue_queue_is_bounded(cluster_models):
+  state = cluster_models
+  state.updated['managerState'] = True
+  process = SimpleNamespace(name='modeld', pid=1200, running=True, shouldBeRunning=True, exitCode=0)
+  state.messages['managerState'] = SimpleNamespace(processes=[process])
+  state.models._update_health_data()
+  state.models._update_health_data()
+  health = state.models.get_health_data()
+  assert health['modeld_pid'] == 1200 and len(health['diagnostic_events']) == 1
+  process.pid = 1400
+  state.models._update_health_data()
+  assert state.models.get_health_data()['modeld_pid'] == 1400
+  state.updated['managerState'] = False
+  state.updated['errorLogMessage'] = True
+  state.messages['errorLogMessage'] = json.dumps({'msg': {'event': 'commIssue', 'not_alive': ['modelV2']}})
+  for _ in range(40):
+    state.models._update_health_data()
+  health = state.models.get_health_data()
+  assert len(health['diagnostic_events']) == 16 and health['comm_issue_log_total'] == 40
 
 
 def test_health_latches_transient_model_drop_and_locationd_errors(cluster_models):

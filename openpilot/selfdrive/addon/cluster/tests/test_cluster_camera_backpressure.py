@@ -23,7 +23,7 @@ def camera_module(monkeypatch):
   return module
 
 
-def _run_camera(module, monkeypatch, events, demand=None):
+def _run_camera(module, monkeypatch, events, demand=None, consume=True):
   now = [10.0]
   ready = [False]
   monkeypatch.setattr(module, "time", SimpleNamespace(monotonic=lambda: now[0]))
@@ -47,6 +47,8 @@ def _run_camera(module, monkeypatch, events, demand=None):
         camera.running = False
         return None
       now[0], ready[0] = when, capacity
+      if consume and camera.has_frame() and capacity:
+        camera.get_frame()
       consumed[0] += 1
       if consumed[0] == len(events):
         camera.running = False
@@ -87,6 +89,16 @@ def test_camera_without_capacity_callback_processes_all_frames(camera_module, mo
   camera, received, converted, _ = _run_camera(camera_module, monkeypatch, events)
   assert len(converted) == len(received) == 40
   assert camera.frame_count == 40
+
+
+def test_available_transport_does_not_reconvert_unconsumed_camera_frames(camera_module, monkeypatch):
+  events = [(10.0 + index * 0.05, index, True) for index in range(60)]
+  camera, received, converted, now = _run_camera(camera_module, monkeypatch, events, demand=True, consume=False)
+  assert len(received) == 60
+  assert 12 <= len(converted) <= 16
+  assert camera._perf_skipped == len(received) - len(converted)
+  assert now - converted[-1][0] <= 0.25
+  assert int(camera.get_frame()[0, 0, 0]) == converted[-1][1]
 
 
 def test_released_transport_capacity_prepares_current_buffer_immediately(camera_module, monkeypatch):

@@ -123,6 +123,22 @@ def test_usb_skips_render_and_encode_while_transport_is_full(cluster, monkeypatc
   assert frame_needed()
 
 
+def test_driving_input_fault_limits_rendering_and_camera_preprocessing(cluster, monkeypatch):
+  cluster.config.display_transport = 'network'
+  cluster.config.params.get.return_value = 'network'
+  cluster.display.screen_off = False
+  renderer = _set_frame_clock(cluster, monkeypatch)
+  cluster.policy.side_effect = [True, True, True, False, False]
+  cluster.models.get_health_data.return_value = {
+    'onroad_started': True, 'model_seen': True, 'model_age_ms': 1200.0, 'diagnostic_events': (),
+  }
+  cluster.module.cluster_main()
+  assert 0 < renderer.render.call_count <= 10
+  assert cluster.pipeline.push.call_count == renderer.render.call_count
+  assert cluster.models.get_health_data.call_count == 40
+  assert not cluster.camera_factory.call_args.kwargs['frame_needed']()
+
+
 @pytest.mark.parametrize("transport", ["usb", "network"])
 def test_disconnected_display_prepares_only_one_bootstrap_image_per_second(cluster, monkeypatch, transport):
   cluster.config.display_transport = transport

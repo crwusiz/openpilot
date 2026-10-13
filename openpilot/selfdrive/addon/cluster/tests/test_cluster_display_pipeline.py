@@ -147,6 +147,11 @@ def test_render_can_overlap_encoding_without_a_blocked_upload(result):
     release.wait(timeout=2.0)
     if result == "exception":
       raise RuntimeError("test encoding failure")
+    if result == "success" and frame == "next":
+      # Otherwise both encodes can win the scheduling race before the sender
+      # takes the first slot; replacing that slot is intentional latest-only
+      # behavior, independent of the render/encode overlap checked here.
+      assert display.send_started.wait(timeout=1.0)
     return None if result == "none" else frame
 
   display.prepare_image = prepare

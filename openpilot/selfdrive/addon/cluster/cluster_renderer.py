@@ -68,6 +68,35 @@ def _alpha_blend_lut(color, alpha):
   return table
 
 
+class ColorBlendWorkspace:
+  """Bounded constant-color strips and one output buffer, owned by a renderer."""
+
+  def __init__(self, width):
+    self._shape = (ALPHA_BLEND_STRIP_HEIGHT, width, 3)
+    self._output = np.empty(self._shape, dtype=np.uint8)
+    self._colors = OrderedDict()
+
+  def blend(self, image, color, alpha):
+    height, width = image.shape[:2]
+    if height > self._shape[0] or width > self._shape[1]:
+      return cv2.LUT(image, _alpha_blend_lut(tuple(color), alpha))
+    key = tuple(color)
+    solid = self._colors.get(key)
+    if solid is None:
+      solid = np.empty(self._shape, dtype=np.uint8)
+      cv2.rectangle(solid, (0, 0), (self._shape[1] - 1, self._shape[0] - 1), key, -1)
+      self._colors[key] = solid
+      if len(self._colors) > GRADIENT_BANDS + 4:
+        self._colors.popitem(last=False)
+    else:
+      self._colors.move_to_end(key)
+    # addWeighted processes RGB channels together; the colored lookup path
+    # performs independent byte lookups. Reuse strips without per-band fills.
+    output = self._output[:height, :width]
+    cv2.addWeighted(solid[:height, :width], alpha, image, 1.0 - alpha, 0, dst=output)
+    return output
+
+
 class LeadVehicle:
   def __init__(self, fps):
     self.bar = np.empty((0, 2), dtype=np.float32)
@@ -130,6 +159,7 @@ class ClusterRenderer:
     # Only the camera region changes before PIL takes its own RGB snapshot.
     # Keep the NumPy background instead of allocating/copying a full frame at 20 Hz.
     self._frame = self.base_canvas.copy()
+    self._color_blender = ColorBlendWorkspace(self.camera_w)
     self.camera_height = 1.22
     self.focal_length = 910.0
     self.icons = {}
@@ -305,7 +335,7 @@ class ClusterRenderer:
     return np.vstack((left_px, right_px[::-1])).astype(np.int32)
 
   @staticmethod
-  def _fill_polygon_alpha(image, polygon, color, alpha):
+  def _fill_polygon_alpha(image, polygon, color, alpha, blender=None):
     alpha = float(np.clip(alpha, 0.0, 1.0))
     if len(color) == 4:
       alpha *= color[3] / 255.0
@@ -326,7 +356,7 @@ class ClusterRenderer:
     local_polygon = polygon - np.array([x0, y0], dtype=np.int32)
     mask = np.zeros(roi.shape[:2], dtype=np.uint8)
     cv2.fillPoly(mask, [local_polygon], 255)
-    table = _alpha_blend_lut(tuple(color), alpha)
+    table = _alpha_blend_lut(tuple(color), alpha) if blender is None else None
     for strip_y in range(0, roi.shape[0], ALPHA_BLEND_STRIP_HEIGHT):
       strip_mask = mask[strip_y:strip_y + ALPHA_BLEND_STRIP_HEIGHT]
       strip_x, mask_y, strip_w, strip_h = cv2.boundingRect(strip_mask)
@@ -334,7 +364,7 @@ class ClusterRenderer:
         continue
       strip = roi[strip_y + mask_y:strip_y + mask_y + strip_h, strip_x:strip_x + strip_w]
       strip_mask = strip_mask[mask_y:mask_y + strip_h, strip_x:strip_x + strip_w]
-      blended = cv2.LUT(strip, table)
+      blended = blender.blend(strip, color, alpha) if blender is not None else cv2.LUT(strip, table)
       cv2.copyTo(blended, strip_mask, strip)
 
   @staticmethod
@@ -347,7 +377,7 @@ class ClusterRenderer:
     ]
 
   @staticmethod
-  def _fill_polygon_gradient(image, polygon, colors, stops):
+  def _fill_polygon_gradient(image, polygon, colors, stops, blender=None):
     x, y, width, height = cv2.boundingRect(polygon)
     x0, y0 = max(x, 0), max(y, 0)
     x1, y1 = min(x + width, image.shape[1]), min(y + height, image.shape[0])
@@ -384,7 +414,7 @@ class ClusterRenderer:
         continue
       band = roi[band_y0 + mask_y:band_y0 + mask_y + band_h, band_x:band_x + band_w]
       band_mask = band_mask[mask_y:mask_y + band_h, band_x:band_x + band_w]
-      blended = cv2.LUT(band, _alpha_blend_lut(color[:3], alpha))
+      blended = blender.blend(band, color[:3], alpha) if blender is not None else cv2.LUT(band, _alpha_blend_lut(color[:3], alpha))
       cv2.copyTo(blended, band_mask, band)
 
   def _draw_model_path(self, frame, path_data, hud_data):
@@ -416,12 +446,13 @@ class ClusterRenderer:
     if path_poly is not None:
       local_path_poly = path_poly - np.array([self.camera_x, self.camera_y], dtype=np.int32)
       if hud_data.get("steering_pressed"):
-        self._fill_polygon_gradient(camera_region, local_path_poly, Colors.STEERING_PRESSED, [0.0, 0.5, 1.0])
+        self._fill_polygon_gradient(camera_region, local_path_poly, Colors.STEERING_PRESSED, [0.0, 0.5, 1.0],
+                                    blender=getattr(self, "_color_blender", None))
       else:
         allow_throttle = hud_data.get("allow_throttle", True) or not hud_data.get("longitudinal_control", False)
         blend_factor = round(self._blend_filter.update(int(allow_throttle)) * 100) / 100
         colors = self._blend_colors(Colors.NO_THROTTLE, Colors.THROTTLE, blend_factor)
-        self._fill_polygon_gradient(camera_region, local_path_poly, colors, [0.0, 0.5, 1.0])
+        self._fill_polygon_gradient(camera_region, local_path_poly, colors, [0.0, 0.5, 1.0], blender=getattr(self, "_color_blender", None))
 
   def _draw_lane_lines(self, camera_region, path_data, calib_transform):
     lane_lines = path_data.get("lane_lines") or []
@@ -434,7 +465,8 @@ class ClusterRenderer:
       polygon = self._map_line_to_polygon(*line, width, 0.0, calib_transform)
       if polygon is not None:
         local_polygon = polygon - np.array([self.camera_x, self.camera_y], dtype=np.int32)
-        self._fill_polygon_alpha(camera_region, local_polygon, Colors.WHITE, np.clip(probability, 0.0, 0.7))
+        self._fill_polygon_alpha(camera_region, local_polygon, Colors.WHITE, np.clip(probability, 0.0, 0.7),
+                                 blender=getattr(self, "_color_blender", None))
 
     road_edges = path_data.get("road_edges") or []
     road_stds = path_data.get("road_edge_stds") or []
@@ -445,7 +477,8 @@ class ClusterRenderer:
       polygon = self._map_line_to_polygon(*edge, 0.025, 0.0, calib_transform)
       if polygon is not None:
         local_polygon = polygon - np.array([self.camera_x, self.camera_y], dtype=np.int32)
-        self._fill_polygon_alpha(camera_region, local_polygon, colors_alpha(Colors.RED, 100), np.clip(confidence, 0.0, 1.0))
+        self._fill_polygon_alpha(camera_region, local_polygon, colors_alpha(Colors.RED, 100), np.clip(confidence, 0.0, 1.0),
+                                 blender=getattr(self, "_color_blender", None))
 
   def _reset_leads(self):
     self._lead_vehicles = [LeadVehicle(self.config.fps), LeadVehicle(self.config.fps)]

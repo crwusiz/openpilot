@@ -1,5 +1,7 @@
 import signal
 import time
+import json
+from collections.abc import Mapping
 
 import cv2
 import numpy as np
@@ -10,6 +12,7 @@ from openpilot.selfdrive.addon.cluster.cluster_config import ClusterConfig
 from openpilot.selfdrive.addon.cluster.cluster_logging import close_log, flog, initialize_log
 from openpilot.selfdrive.addon.cluster.cluster_display_pipeline import ClusterDisplayPipeline
 from openpilot.selfdrive.addon.cluster.cluster_frame_clock import ClusterFrameClock
+from openpilot.selfdrive.addon.cluster.cluster_health_guard import ClusterHealthGuard
 from openpilot.selfdrive.addon.cluster.cluster_live_camera import ClusterLiveCamera
 from openpilot.selfdrive.addon.cluster.cluster_models import ClusterModels
 from openpilot.selfdrive.addon.cluster.cluster_policy import enforce_cluster_transport
@@ -46,7 +49,8 @@ def cluster_main():
   pipeline = ClusterDisplayPipeline(display)
   pipeline.start()
 
-  camera = ClusterLiveCamera(config, frame_needed=lambda: display.connected and pipeline.has_render_capacity())
+  health_guard = ClusterHealthGuard()
+  camera = ClusterLiveCamera(config, frame_needed=lambda: not health_guard.degraded and display.connected and pipeline.has_render_capacity())
   models = ClusterModels()
   renderer = ClusterRenderer(config)
 
@@ -76,6 +80,7 @@ def cluster_main():
   next_screen_off_frame = 0.0
   last_status_at = perf_started
   blocked_frames = 0
+  health_skipped = 0
   try:
     while True:
       if config.display_transport == "network":
@@ -96,6 +101,12 @@ def cluster_main():
           break
 
       health = models.get_health_data()
+      guard_log = health_guard.update(health, now)
+      if guard_log is not None:
+        flog(guard_log)
+      if isinstance(health, Mapping):
+        for event in health.get('diagnostic_events', ()):
+          flog('[CLUSTER_INPUT_DIAG] ' + json.dumps(event, ensure_ascii=True, separators=(',', ':')))
       resource_log = runtime_metrics.sample(health)
       if resource_log is not None:
         flog(resource_log)
@@ -112,6 +123,9 @@ def cluster_main():
           next_screen_off_frame = now + 1.0 / getattr(config, "network_screen_off_fps", 5)
       else:
         render_ready = pipeline.has_render_capacity()
+      if render_ready and not health_guard.allow_render(now):
+        health_skipped += 1
+        render_ready = False
       if render_ready:
         render_started = time.monotonic()
         frame_image = renderer.render(camera, models)
@@ -142,13 +156,14 @@ def cluster_main():
         flog(
           f"[CLUSTER_MAIN_PERF] fps={perf_frames / elapsed:.2f} | "
           + f"render_avg={perf_render_time * 1000 / max(perf_frames, 1):.1f}ms | {stages} | "
-          + f"target={fps} | transport_skipped={blocked_frames}",
+          + f"target={fps} | transport_skipped={blocked_frames - health_skipped} | health_skipped={health_skipped}",
         )
         perf_started = now
         perf_render_time = 0.0
         perf_render_stages = dict.fromkeys(perf_render_stages, 0.0)
         perf_frames = 0
         blocked_frames = 0
+        health_skipped = 0
 
   except KeyboardInterrupt:
     flog("[CLUSTER_MAIN] Interrupted by user.")

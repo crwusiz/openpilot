@@ -81,12 +81,14 @@ def _old_alpha_blend(image, polygon, color, alpha):
   [[-5, -10], [32, 10], [90, 90], [20, 40]],
   [[100, 100], [110, 100], [110, 110]],
 ])
-def test_polygon_alpha_matches_previous_pixels(renderer_module, color, alpha, polygon):
+@pytest.mark.parametrize("reuse", [False, True])
+def test_polygon_alpha_matches_previous_pixels(renderer_module, color, alpha, polygon, reuse):
   original = np.random.default_rng(10).integers(0, 256, (64, 72, 3), dtype=np.uint8)
   polygon = np.array(polygon, dtype=np.int32)
   expected, actual = original.copy(), original.copy()
   _old_alpha_blend(expected, polygon, color, alpha)
-  renderer_module.ClusterRenderer._fill_polygon_alpha(actual, polygon, color, alpha)
+  blender = renderer_module.ColorBlendWorkspace(72) if reuse else None
+  renderer_module.ClusterRenderer._fill_polygon_alpha(actual, polygon, color, alpha, blender=blender)
   np.testing.assert_array_equal(actual, expected)
 
 
@@ -130,14 +132,16 @@ def _old_gradient_blend(expected, polygon, colors, stops, gradient_bands):
   ((460, 1288), [[-300, 10], [10, -300], [-300, -300]]),
   ((1, 72), [[-10, -5], [60, -5], [60, 5], [-10, 5]]),
 ])
-def test_gradient_preserves_previous_bands_and_pixels(renderer_module, shape, polygon):
+@pytest.mark.parametrize("reuse", [False, True])
+def test_gradient_preserves_previous_bands_and_pixels(renderer_module, shape, polygon, reuse):
   actual = np.random.default_rng(13).integers(0, 256, (*shape, 3), dtype=np.uint8)
   expected = actual.copy()
   polygon = np.array(polygon, dtype=np.int32)
   colors = [(255, 0, 0, 0), (20, 180, 99, 180), (70, 210, 110, 220)]
   stops = [0.0, 0.5, 1.0]
   _old_gradient_blend(expected, polygon, colors, stops, renderer_module.GRADIENT_BANDS)
-  renderer_module.ClusterRenderer._fill_polygon_gradient(actual, polygon, colors, stops)
+  blender = renderer_module.ColorBlendWorkspace(shape[1]) if reuse else None
+  renderer_module.ClusterRenderer._fill_polygon_gradient(actual, polygon, colors, stops, blender=blender)
   np.testing.assert_array_equal(actual, expected)
 
 
@@ -148,12 +152,14 @@ def test_gradient_preserves_previous_bands_and_pixels(renderer_module, shape, po
   [[-400, 0], [200, -200], [500, 420], [-200, 510]],
   [[-300, 10], [10, -300], [-300, -300]],
 ])
-def test_large_clipped_alpha_strips_match_previous_pixels(renderer_module, color, polygon):
+@pytest.mark.parametrize("reuse", [False, True])
+def test_large_clipped_alpha_strips_match_previous_pixels(renderer_module, color, polygon, reuse):
   original = np.random.default_rng(17).integers(0, 256, (460, 1288, 3), dtype=np.uint8)
   polygon = np.array(polygon, dtype=np.int32)
   expected, actual = original.copy(), original.copy()
   _old_alpha_blend(expected, polygon, color, 0.7)
-  renderer_module.ClusterRenderer._fill_polygon_alpha(actual, polygon, color, 0.7)
+  blender = renderer_module.ColorBlendWorkspace(1288) if reuse else None
+  renderer_module.ClusterRenderer._fill_polygon_alpha(actual, polygon, color, 0.7, blender=blender)
   np.testing.assert_array_equal(actual, expected)
 
 
@@ -162,6 +168,23 @@ def test_lookup_cache_is_bounded_and_immutable(renderer_module):
     table = renderer_module._alpha_blend_lut((20, 180, 99), value / 511)
     assert not table.flags.writeable
   assert renderer_module._alpha_blend_lut.cache_info().currsize == 128
+
+
+def test_color_blend_workspace_reuses_output_and_bounds_color_memory(renderer_module):
+  blender = renderer_module.ColorBlendWorkspace(72)
+  image = np.random.default_rng(19).integers(0, 256, (37, 63, 3), dtype=np.uint8)
+  original = image.copy()
+  output = blender.blend(image, (20, 180, 99), 0.5)
+  saved = output.copy()
+  assert np.shares_memory(output, blender._output)
+  for value in range(32):
+    output = blender.blend(image, (value, 180, 99), 0.317)
+    assert np.shares_memory(output, blender._output)
+    expected = cv2.addWeighted(np.full_like(image, (value, 180, 99)), 0.317, image, 0.683, 0)
+    np.testing.assert_array_equal(output, expected)
+  np.testing.assert_array_equal(image, original)
+  np.testing.assert_array_equal(saved, cv2.addWeighted(np.full_like(image, (20, 180, 99)), 0.5, image, 0.5, 0))
+  assert len(blender._colors) == renderer_module.GRADIENT_BANDS + 4
 
 
 @pytest.mark.parametrize("preprocessed", [False, True])

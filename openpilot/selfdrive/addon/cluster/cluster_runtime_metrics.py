@@ -47,6 +47,7 @@ class ClusterRuntimeMetrics:
     "model_lagging_updates": "model_lagging_update_total",
     "locationd_input_error_updates": "device_motion_input_error_total",
     "posenet_error_updates": "device_motion_posenet_error_total",
+    "comm_issue_logs": "comm_issue_log_total",
   }
   _PEAKS = {
     "model_drop_max": ("model_drop_perc", "model_drop_peak_perc"),
@@ -103,6 +104,11 @@ class ClusterRuntimeMetrics:
       f"inputs_ok={_format_bool(self._latest.get('device_motion_inputs_ok'))}",
       f"posenet_ok={_format_bool(self._latest.get('device_motion_posenet_ok'))}",
       f"thermal_status={self._latest.get('thermal_status') or 'n/a'}",
+      f"drive_fault_alert={self._latest.get('drive_fault_alert') or 'none'}",
+      f"selfdrive_state_age_ms={_format_number(self._latest.get('selfdrive_state_age_ms'))}",
+      f"manager_age_ms={_format_number(self._latest.get('manager_age_ms'))}",
+      *(f"{name}_pid={self._latest.get(name + '_pid') if self._latest.get(name + '_pid') is not None else 'n/a'}"
+        for name in ('modeld', 'locationd', 'selfdrived')),
     ]
     detail += [f"{label}={_format_number(value)}" for label, value in self._peaks.items()]
     detail += [f"{label}={count}" for label, count in counts.items()]
