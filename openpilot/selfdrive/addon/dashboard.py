@@ -57,6 +57,7 @@ LOG_FILES = {
   "Cruise Debug": LOG_DIR / 'cruise_debug.log',
   "Traffic Debug": LOG_DIR / 'traffic_debug.log',
   "Cluster Debug": LOG_DIR / 'cluster_debug.log',
+  "Model Debug": LOG_DIR / 'model_debug.log',
 }
 
 

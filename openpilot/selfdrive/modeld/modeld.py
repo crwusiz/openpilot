@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from collections.abc import Callable
+from contextlib import nullcontext
 import base64
 import ctypes
 import gc
@@ -11,10 +12,11 @@ from tinygrad.device import Buffer, Device
 from tinygrad.dtype import DType, dtypes, _from_np_dtype
 from tinygrad.engine.realize import lower_and_compile
 from tinygrad.tensor import Tensor
-from tinygrad.helpers import round_up
+from tinygrad.helpers import ALLOW_DEVICE_USAGE, DEV, round_up
 from tinygrad.uop.ops import UOp
 import math
 import pickle
+import sys
 import threading
 import time
 import numpy as np
@@ -28,7 +30,7 @@ from msgq.visionipc import VisionIpcClient, VisionBuf
 from opendbc.car.car_helpers import get_demo_car_params
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
-from openpilot.common.hardware.usb import cable_connected
+from openpilot.common.hardware.usb import CHESTNUT_USB_PRODUCT, cable_connected, get_usb_state
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.realtime import config_realtime_process, DT_MDL
 from openpilot.common.transformations.camera import DEVICE_CAMERAS
@@ -41,6 +43,7 @@ from openpilot.selfdrive.modeld.parse_model_outputs import Parser
 from openpilot.selfdrive.modeld.fill_model_msg import fill_model_msg, fill_driving_model_data, fill_pose_msg, PublishState
 from openpilot.selfdrive.modeld.constants import ModelConstants, Plan
 from openpilot.selfdrive.modeld.helpers import MODELS_DIR, chestnut_present, chestnut_compiled, modeld_pkl_path, load_oob, wait_for_chestnut
+from openpilot.selfdrive.modeld.model_log import ModelLoadLogger
 
 from openpilot.selfdrive.controls.lib.desire_helper import ALC_START_TIME
 
@@ -50,6 +53,29 @@ LAT_SMOOTH_SECONDS = 0.0
 LONG_SMOOTH_SECONDS = 0.3
 MIN_LAT_CONTROL_SPEED = 0.3
 BIG_MODEL_TIMEOUT = 60
+
+
+def log_model_environment(model_log: ModelLoadLogger, event: str) -> None:
+  # Inspect files/sysfs only: diagnostics must not open or initialize a GPU.
+  try:
+    paths = [modeld_pkl_path(big) for big in (False, True)] + [
+      MODELS_DIR / f'{prefix}driving_warp_{size}_tinygrad.pkl'
+      for prefix in ('', 'big_') for size in ('1344x760', '1928x1208')
+    ]
+    files = {}
+    for path in paths:
+      try:
+        stat = path.stat()
+        files[path.name] = {'path': str(path), 'bytes': stat.st_size, 'mtime_ns': stat.st_mtime_ns}
+      except OSError as error:
+        files[path.name] = {'path': str(path), 'error': str(error)}
+    model_log.event(event, compiled=chestnut_compiled(), present=chestnut_present(), cable=cable_connected(),
+                    expected_usb_product=CHESTNUT_USB_PRODUCT, usb_devices=get_usb_state(), model_files=files,
+                    python_version=sys.version, tinygrad_path=getattr(sys.modules.get('tinygrad'), '__file__', None),
+                    context={'DEV': str(DEV), 'ALLOW_DEVICE_USAGE': ALLOW_DEVICE_USAGE.value},
+                    environment={key: os.getenv(key) for key in ('GMMU', 'AM_POWER_LIMIT', 'DEV', 'AMD', 'USB', 'QCOM')})
+  except Exception:
+    model_log.event('environment_snapshot_failed', exc_info=True, snapshot_event=event)
 
 
 def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.ModelDataV2.Action,
@@ -144,29 +170,42 @@ def input_view(buffer: Buffer, shape: tuple[int, ...], dtype: DType, offset: int
 class ModelState:
   prev_desire: np.ndarray  # for tracking the rising edge of the pulse
 
-  def __init__(self, cam_w: int, cam_h: int, chestnut: bool):
-    jits = load_oob(modeld_pkl_path(chestnut), chestnut)
-    self.model_device = jits['input_specs']['new_img'][2]
-    self.input_shapes = {name: (shape, np.dtype(dtype)) for name, (shape, dtype, _) in jits['input_specs'].items()}
-    self.state_pairs = {name: f'next_{name}' for name in self.input_shapes if f'next_{name}' in jits['metadata']['output_shapes']}
-    self.vision_input_names = ('img', 'big_img')
-    self.output_slices = pickle.loads(base64.b64decode(jits['metadata']['metadata']['output_slices']))
+  def __init__(self, cam_w: int, cam_h: int, chestnut: bool, model_log: ModelLoadLogger | None = None):
+    stage = model_log.stage if model_log is not None else lambda *args, **kwargs: nullcontext()
+    model_name = 'big' if chestnut else 'small'
+    with stage('load_oob', model=model_name, path=str(modeld_pkl_path(chestnut)),
+               context={'DEV': str(DEV), 'ALLOW_DEVICE_USAGE': ALLOW_DEVICE_USAGE.value}):
+      jits = load_oob(modeld_pkl_path(chestnut), chestnut)
+    with stage('parse_metadata', model=model_name):
+      self.model_device = jits['input_specs']['new_img'][2]
+      self.input_shapes = {name: (shape, np.dtype(dtype)) for name, (shape, dtype, _) in jits['input_specs'].items()}
+      self.state_pairs = {name: f'next_{name}' for name in self.input_shapes if f'next_{name}' in jits['metadata']['output_shapes']}
+      self.vision_input_names = ('img', 'big_img')
+      self.output_slices = pickle.loads(base64.b64decode(jits['metadata']['metadata']['output_slices']))
+    if model_log is not None:
+      model_log.event('model_metadata', model=model_name, device=self.model_device, camera=[cam_w, cam_h],
+                      inputs={name: {'shape': shape, 'dtype': str(dtype)} for name, (shape, dtype) in self.input_shapes.items()})
 
     self.prev_desire = np.zeros(ModelConstants.DESIRE_LEN, dtype=np.float32)
     self.chestnut = chestnut
 
     stride, y_height, uv_height, _ = get_nv12_info(cam_w, cam_h)
     self.frame_copy_size = stride * (y_height + uv_height)
-    self.pack_inputs()
-    with open(MODELS_DIR / f'{"big_" if chestnut else ""}driving_warp_{cam_w}x{cam_h}_tinygrad.pkl', 'rb') as f:
+    with stage('allocate_inputs', model=model_name, device=self.model_device):
+      self.pack_inputs()
+    warp_path = MODELS_DIR / f'{"big_" if chestnut else ""}driving_warp_{cam_w}x{cam_h}_tinygrad.pkl'
+    with stage('load_warp_pickle', model=model_name, path=str(warp_path)), open(warp_path, 'rb') as f:
       self.run_warp = pickle.load(f)['run']
-    self.run_warp.captured._linear = lower_and_compile(self.run_warp.captured._linear)
+    with stage('compile_warp', model=model_name, device=self.model_device):
+      self.run_warp.captured._linear = lower_and_compile(self.run_warp.captured._linear)
     self.run_model = jits['run']
-    self.run_model.captured._linear = lower_and_compile(self.run_model.captured._linear)
-    self.outputs = {name: Tensor(np.zeros(shape, dtype=dtype), device=device).realize() for name, (shape, dtype, device) in jits['output_specs'].items()}
-    for name, next_name in self.state_pairs.items():
-      state = self.input_queues[name]
-      self.outputs[next_name] = input_view(state._buffer(), state.shape, state.dtype, 0)
+    with stage('compile_model', model=model_name, device=self.model_device):
+      self.run_model.captured._linear = lower_and_compile(self.run_model.captured._linear)
+    with stage('allocate_outputs', model=model_name, device=self.model_device):
+      self.outputs = {name: Tensor(np.zeros(shape, dtype=dtype), device=device).realize() for name, (shape, dtype, device) in jits['output_specs'].items()}
+      for name, next_name in self.state_pairs.items():
+        state = self.input_queues[name]
+        self.outputs[next_name] = input_view(state._buffer(), state.shape, state.dtype, 0)
     self.parser = Parser()
 
   def pack_inputs(self) -> None:
@@ -234,11 +273,17 @@ class ModelState:
 
 def main(demo=False):
   cloudlog.warning("modeld init")
+  model_log = ModelLoadLogger()
+  model_log.event('modeld_start', demo=demo, timeout_s=BIG_MODEL_TIMEOUT)
 
-  CHESTNUT = chestnut_compiled() and (chestnut_present() or cable_connected())
+  with model_log.stage('model_selection_check'):
+    CHESTNUT = chestnut_compiled() and (chestnut_present() or cable_connected())
+  model_log.event('big_model_enabled', enabled=CHESTNUT)
+  log_model_environment(model_log, 'startup_environment')
   if CHESTNUT:
-    from tinygrad.runtime.ops_amd import AMDDevice
-    AMDDevice.wait_timeout_ms = 5000
+    with model_log.stage('amd_runtime_setup'):
+      from tinygrad.runtime.ops_amd import AMDDevice
+      AMDDevice.wait_timeout_ms = 5000
   params = Params()
   params.put_bool("ChestnutLoading", CHESTNUT)
   params.remove("ChestnutActive")
@@ -246,13 +291,14 @@ def main(demo=False):
   gc.disable()
 
   # visionipc clients
-  while True:
-    available_streams = VisionIpcClient.available_streams("camerad", block=False)
-    if available_streams:
-      use_extra_client = VisionStreamType.VISION_STREAM_WIDE_ROAD in available_streams and VisionStreamType.VISION_STREAM_NARROW_ROAD in available_streams
-      main_wide_camera = VisionStreamType.VISION_STREAM_NARROW_ROAD not in available_streams
-      break
-    time.sleep(.1)
+  with model_log.stage('camera_stream_wait'):
+    while True:
+      available_streams = VisionIpcClient.available_streams("camerad", block=False)
+      if available_streams:
+        use_extra_client = VisionStreamType.VISION_STREAM_WIDE_ROAD in available_streams and VisionStreamType.VISION_STREAM_NARROW_ROAD in available_streams
+        main_wide_camera = VisionStreamType.VISION_STREAM_NARROW_ROAD not in available_streams
+        break
+      time.sleep(.1)
 
   vipc_client_main_stream = VisionStreamType.VISION_STREAM_WIDE_ROAD if main_wide_camera else VisionStreamType.VISION_STREAM_NARROW_ROAD
   vipc_client_main = VisionIpcClient("camerad", vipc_client_main_stream, True)
@@ -260,10 +306,13 @@ def main(demo=False):
   vipc_client_map = VisionIpcClient("mapsd", VisionStreamType.VISION_STREAM_MAP, True)
   cloudlog.warning(f"vision stream set up, main_wide_camera: {main_wide_camera}, use_extra_client: {use_extra_client}")
 
-  while not vipc_client_main.connect(False):
-    time.sleep(0.1)
-  while use_extra_client and not vipc_client_extra.connect(False):
-    time.sleep(0.1)
+  with model_log.stage('camera_connect'):
+    while not vipc_client_main.connect(False):
+      time.sleep(0.1)
+    while use_extra_client and not vipc_client_extra.connect(False):
+      time.sleep(0.1)
+  model_log.event('camera_connected', width=vipc_client_main.width, height=vipc_client_main.height,
+                  main_wide_camera=main_wide_camera, use_extra_client=use_extra_client)
 
   cloudlog.warning(f"connected main cam with buffer size: {vipc_client_main.buffer_len} ({vipc_client_main.width} x {vipc_client_main.height})")
   if use_extra_client:
@@ -273,25 +322,50 @@ def main(demo=False):
   cloudlog.warning("loading model")
   model = None
   if CHESTNUT:
-    # tinygrad Context values are process-global. Finish each stage before checking
-    # the deadline so fallback cannot overlap compilation or interrupt Context cleanup.
-    try:
-      wait_for_chestnut()
-      model = ModelState(vipc_client_main.width, vipc_client_main.height, True)
-      if time.monotonic() - st > BIG_MODEL_TIMEOUT:
-        raise TimeoutError("big model initialization timed out")
-      model.warmup()
-      if time.monotonic() - st > BIG_MODEL_TIMEOUT:
-        raise TimeoutError("big model warmup timed out")
-    except Exception:
-      model = None
-      cloudlog.exception("big model load failed, fall back to small")
+    big_model = None
+    selection_done = threading.Event()
+    selection_lock = threading.Lock()
+    def load_big():
+      nonlocal big_model
+      try:
+        with model_log.stage('chestnut_wait', timeout_s=10.0):
+          wait_for_chestnut()
+        log_model_environment(model_log, 'chestnut_enumerated')
+        with model_log.stage('big_model_init'):
+          m = ModelState(vipc_client_main.width, vipc_client_main.height, True, model_log)
+        with model_log.stage('big_model_warmup'):
+          m.warmup()
+        with selection_lock:
+          big_model = m
+          completed_after_selection = selection_done.is_set()
+        model_log.event('big_model_loaded', completed_after_selection=completed_after_selection)
+      except Exception:
+        model_log.event('big_model_load_failed', exc_info=True)
+        cloudlog.exception("big model load failed")
+    loader = threading.Thread(target=load_big, name='big-model-loader', daemon=True)
+    loader.start()
+    loader.join(BIG_MODEL_TIMEOUT)
+    with selection_lock:
+      model = big_model
+      selection_done.set()
+    loader_alive = loader.is_alive()
+    model_log.event('big_model_selection', selected_model='big' if model is not None else 'small',
+                    reason='ready' if model is not None else 'timeout' if loader_alive else 'load_failed',
+                    loader_alive=loader_alive, timeout_s=BIG_MODEL_TIMEOUT, **model_log.status(loader.name))
+    if model is None:
+      log_model_environment(model_log, 'load_fallback_environment')
+      if loader_alive:
+        cloudlog.warning('big model loader still running after timeout, fall back to small')
     params.put_bool("ChestnutActive", model is not None)
 
-  small_model = ModelState(vipc_client_main.width, vipc_client_main.height, False) if model is None or CHESTNUT else None
+  small_model = None
+  if model is None or CHESTNUT:
+    with model_log.stage('small_model_init'):
+      small_model = ModelState(vipc_client_main.width, vipc_client_main.height, False, model_log)
   if model is None:
     model = small_model
   params.put_bool("ChestnutLoading", False)
+  model_log.event('models_ready', selected_model='big' if model.chestnut else 'small', elapsed_load_s=time.monotonic() - st)
   cloudlog.warning(f"models loaded in {time.monotonic() - st:.1f}s, modeld starting")
 
   config_realtime_process(7, 54)
@@ -313,6 +387,7 @@ def main(demo=False):
   frame_id = 0
   last_vipc_frame_id = 0
   run_count = 0
+  first_inference_logged = False
 
   model_transform_main = np.zeros((3, 3), dtype=np.float32)
   model_transform_extra = np.zeros((3, 3), dtype=np.float32)
@@ -430,20 +505,30 @@ def main(demo=False):
                        run_count % round(ModelConstants.MODEL_RUN_FREQ / SERVICE_LIST['chestnutGpuState'].frequency) == 0)
       model_output = model.run(bufs, transforms, inputs, chestnut_state.send if send_chestnut else None)
     except Exception:
+      model_log.event('inference_failed', exc_info=True, model='big' if model.chestnut else 'small',
+                      frame_id=meta_main.frame_id, run_count=run_count,
+                      context={'DEV': str(DEV), 'ALLOW_DEVICE_USAGE': ALLOW_DEVICE_USAGE.value})
       if not model.chestnut:
         raise
       # fallback to small model
       cloudlog.exception("big model failed, fall back to small")
+      model_log.event('runtime_fallback', selected_model='small', frame_id=meta_main.frame_id)
+      log_model_environment(model_log, 'runtime_fallback_environment')
       params.put_bool("ChestnutActive", False)
       model = small_model
       if chestnut_state is not None:
         chestnut_state.big = False
       run_count = 0
+      first_inference_logged = False
       model_output = None
     mt2 = time.perf_counter()
     model_execution_time = mt2 - mt1
 
     if model_output is not None:
+      if not first_inference_logged:
+        model_log.event('first_inference', model='big' if model.chestnut else 'small',
+                        frame_id=meta_main.frame_id, execution_s=model_execution_time)
+        first_inference_logged = True
       modelv2_send = messaging.new_message('modelV2')
       drivingdata_send = messaging.new_message('drivingModelData')
       posenet_send = messaging.new_message('cameraOdometry')
