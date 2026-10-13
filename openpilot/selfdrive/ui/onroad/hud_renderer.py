@@ -11,6 +11,7 @@ import math
 from openpilot.selfdrive.ui import Colors, colors_alpha
 from datetime import datetime
 from openpilot.common.params import Params
+from openpilot.selfdrive.addon.navi_helpers import camera_limit_active, camera_limit_distance
 from openpilot.selfdrive.ui.onroad.icon_indicator import IconIndicator, RotatableIconIndicator, IconIndicatorGroup
 
 
@@ -89,6 +90,7 @@ class HudRenderer(Widget):
     self.road_limit_speed: float = 0.0
     self.cam_limit_speed: float = 0.0
     self.cam_limit_speed_left_dist: float = 0.0
+    self.cam_limit_active: bool = False
     self.section_limit_speed: float = 0.0
     self.section_left_dist: float = 0.0
     self.school_zone_active: bool = False
@@ -280,12 +282,13 @@ class HudRenderer(Widget):
 
     self.steer_torque = car_state.steeringTorque if hasattr(car_state, 'steeringTorque') else 0
 
+    self.cam_limit_active = False
     if navi_data:
       self.nda_state = navi_data.active if hasattr(navi_data, 'active') else 0
       self.road_limit_speed = navi_data.roadLimitSpeed if hasattr(navi_data, 'roadLimitSpeed') else 0
       self.cam_limit_speed = navi_data.camLimitSpeed if hasattr(navi_data, 'camLimitSpeed') else 0
-      self.cam_limit_speed_left_dist = navi_data.camLimitSpeedLeftDist if hasattr(navi_data,
-                                                                                  'camLimitSpeedLeftDist') else 0
+      self.cam_limit_speed_left_dist = camera_limit_distance(navi_data)
+      self.cam_limit_active = camera_limit_active(navi_data)
       self.section_limit_speed = navi_data.sectionLimitSpeed if hasattr(navi_data, 'sectionLimitSpeed') else 0
       self.section_left_dist = navi_data.sectionLeftDist if hasattr(navi_data, 'sectionLeftDist') else 0
 
@@ -602,7 +605,7 @@ class HudRenderer(Widget):
 
       # Draw distance if available
       left_dist = 0
-      if self.cam_limit_speed > 0 and self.cam_limit_speed_left_dist > 0:
+      if self.cam_limit_active:
         left_dist = self.cam_limit_speed_left_dist
       elif self.section_limit_speed > 0 and self.section_left_dist > 0:
         left_dist = self.section_left_dist
@@ -641,7 +644,7 @@ class HudRenderer(Widget):
         rl.Rectangle(sign_x, sign_y, sign_w, sign_h),
         rl.Vector2(0, 0), 0, rl.WHITE
       )
-    elif self.cam_limit_speed > 0 and self.cam_limit_speed_left_dist > 0:
+    elif self.cam_limit_active:
       rl.draw_texture_pro(
         self.speed_camera_img,
         rl.Rectangle(0, 0, sign_w, sign_h),
@@ -651,7 +654,7 @@ class HudRenderer(Widget):
 
   def _get_current_limit_speed(self) -> float:
     if self.nda_state > 0:
-      if self.cam_limit_speed > 0 and self.cam_limit_speed_left_dist > 0:
+      if self.cam_limit_active:
         return self.cam_limit_speed
       elif self.section_limit_speed > 0 and self.section_left_dist > 0:
         return self.section_limit_speed

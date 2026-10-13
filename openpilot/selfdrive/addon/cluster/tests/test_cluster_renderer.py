@@ -21,6 +21,41 @@ def renderer_module(monkeypatch):
   return module
 
 
+@pytest.mark.parametrize("distance", [0.0, -10.0, -87.5])
+def test_speed_limit_selector_keeps_rear_camera_during_hold(renderer_module, distance):
+  data = {
+    "nda_state": 1, "nav_limit_speed": 110.0,
+    "cam_limit_speed": 70.0, "cam_limit_speed_left_dist": distance, "cam_limit_active": True,
+  }
+
+  assert renderer_module.ClusterRenderer._active_speed_limit(data) == (70.0, distance)
+
+
+def test_speed_limit_selector_honors_camera_expiry_with_positive_distance(renderer_module):
+  data = {
+    "nda_state": 1, "nav_limit_speed": 110.0,
+    "cam_limit_speed": 70.0, "cam_limit_speed_left_dist": 200.0, "cam_limit_active": False,
+  }
+
+  assert renderer_module.ClusterRenderer._active_speed_limit(data) == (110.0, 0.0)
+
+
+def test_speed_limit_selector_keeps_section_priority_during_rear_hold(renderer_module):
+  data = {
+    "nda_state": 1, "nav_limit_speed": 110.0,
+    "cam_limit_speed": 70.0, "cam_limit_speed_left_dist": -10.0, "cam_limit_active": True,
+    "section_limit_speed": 60.0, "section_left_dist": 1000.0,
+  }
+
+  assert renderer_module.ClusterRenderer._active_speed_limit(data) == (60.0, 1000.0)
+
+
+def test_speed_limit_selector_supports_legacy_camera_snapshot(renderer_module):
+  data = {"nda_state": 1, "cam_limit_speed": 70.0, "cam_limit_speed_left_dist": 200.0}
+
+  assert renderer_module.ClusterRenderer._active_speed_limit(data) == (70.0, 200.0)
+
+
 def test_smoothing_advances_during_transport_backpressure(renderer_module):
   renderer = renderer_module.ClusterRenderer.__new__(renderer_module.ClusterRenderer)
   renderer.config = SimpleNamespace(fps=60)

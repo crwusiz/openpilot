@@ -516,6 +516,61 @@ def test_imperial_state_manager_uses_physical_speed_bounds_and_one_mph_steps(mon
   assert manager.speed_ms == pytest.approx(145.0 / 3.6)
 
 
+@pytest.mark.parametrize("cam_type", [75, 76, 86, 87, 88, 89])
+@pytest.mark.parametrize("distance", [0.0, -10.0, -87.5])
+def test_button_limit_keeps_rear_camera_enforcement_after_passing(monkeypatch, cam_type, distance):
+  _, cs, _, _, limiter = make_full_controller(monkeypatch, road=110.0, camera=70.0)
+  navi = limiter.naviData
+  navi.camType = cam_type
+  navi.camRearHoldDist = 87.5
+  navi.camDistanceAge = 0.5
+  navi.camDistanceId = 2**40
+  navi.camLimitSpeedLeftDist = int(distance)
+  navi.camLimitSpeedLeftDistPrecise = distance
+
+  assert cruise_controller._get_button_limit(limiter, cs) == (70.0, True)
+
+
+@pytest.mark.parametrize("distance, age", [(-87.6, 0.5), (-10.0, 3.0), (200.0, 3.0)])
+def test_button_limit_releases_expired_rear_camera(monkeypatch, distance, age):
+  _, cs, _, _, limiter = make_full_controller(monkeypatch, road=110.0, camera=70.0)
+  navi = limiter.naviData
+  navi.camType = 75
+  navi.camRearHoldDist = 87.5
+  navi.camDistanceAge = age
+  navi.camDistanceId = 100
+  navi.camLimitSpeedLeftDist = int(distance)
+  navi.camLimitSpeedLeftDistPrecise = distance
+
+  assert cruise_controller._get_button_limit(limiter, cs) == (110.0, False)
+
+
+@pytest.mark.parametrize("is_metric", [True, False])
+@pytest.mark.parametrize("button", [FakeButtonType.accelCruise, FakeButtonType.decelCruise])
+def test_double_press_uses_rear_camera_limit_during_hold(monkeypatch, is_metric, button):
+  controller, cs, _, manager, limiter = make_full_controller(monkeypatch, road=110.0, is_metric=is_metric)
+  limit_clu = controller.conv.kph_to_clu(70.0)
+  navi = limiter.naviData
+  navi.camType = 76
+  navi.camLimitSpeed = limit_clu
+  navi.camRearHoldDist = 87.5
+  navi.camDistanceAge = 0.5
+  navi.camDistanceId = 100
+  navi.camLimitSpeedLeftDist = -10
+  navi.camLimitSpeedLeftDistPrecise = -10.0
+  # Exercise both button paths with a mocked SpeedLimiter reporting no camera.
+  limiter.get_camera_limit_active = lambda: False
+  manager.enabled = True
+  manager.speed_ms = 90.0 / 3.6
+
+  requested = controller._update_cruise_button(cs, controller.conv.kph_to_clu(90.0), button,
+                                               long_pressed=False, double_pressed=True, enabled=True)
+  manager._button_press(cs, button, long_pressed=False, double_pressed=True)
+
+  assert requested == pytest.approx(round(limit_clu))
+  assert manager.conv.ms_to_clu(manager.speed_ms) == pytest.approx(round(limit_clu))
+
+
 def test_non_pcm_cruise_uses_own_set_when_stock_set_is_zero(monkeypatch):
   controller, cs, sm, _, _ = make_full_controller(monkeypatch, pcm_cruise=False, state_control=False)
   cs.cruiseState.speed = 0.0

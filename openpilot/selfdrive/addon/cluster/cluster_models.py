@@ -14,6 +14,7 @@ from openpilot.common.transformations.camera import DEVICE_CAMERAS, view_frame_f
 from openpilot.common.transformations.orientation import rot_from_euler
 from openpilot.selfdrive.controls.radard import RADAR_TO_CAMERA
 from openpilot.selfdrive.addon.cluster.cluster_health_guard import DRIVING_FAULT_ALERTS, parse_comm_issue
+from openpilot.selfdrive.addon.navi_helpers import camera_limit_active, camera_limit_distance
 
 GearShifter = structs.CarState.GearShifter
 HEALTH_AGE_SERVICES = {
@@ -111,6 +112,7 @@ class ClusterModels:
     self.nav_limit_speed = 0.0
     self.cam_limit_speed = 0.0
     self.cam_limit_speed_left_dist = 0.0
+    self.cam_limit_active = False
     self.section_limit_speed = 0.0
     self.section_left_dist = 0.0
     self.cam_type = 0
@@ -252,10 +254,11 @@ class ClusterModels:
       self.nav_limit_speed = getattr(navi_data, 'roadLimitSpeed', 0.0)
       self.cam_type = int(getattr(navi_data, 'camType', 0) or 0)
       self.cam_limit_speed = getattr(navi_data, 'camLimitSpeed', 0.0)
-      self.cam_limit_speed_left_dist = getattr(navi_data, 'camLimitSpeedLeftDist', 0.0)
+      self.cam_limit_speed_left_dist = camera_limit_distance(navi_data)
+      self.cam_limit_active = camera_limit_active(navi_data)
       self.section_limit_speed = getattr(navi_data, 'sectionLimitSpeed', 0.0)
       self.section_left_dist = getattr(navi_data, 'sectionLeftDist', 0.0)
-      in_camera_zone = self.cam_limit_speed > 0 and self.cam_limit_speed_left_dist > 0
+      in_camera_zone = self.cam_limit_active
       in_section_zone = self.section_limit_speed > 0 and self.section_left_dist > 0
       self._navi_speed_bump = self.cam_type == 22 and in_camera_zone
       self._navi_speed_camera = (in_camera_zone or in_section_zone) and not self._navi_speed_bump
@@ -448,7 +451,7 @@ class ClusterModels:
         self._navi_last_road_name and current_road_name and
         current_road_name != self._navi_last_road_name
       )
-      new_camera_event = self.cam_type not in (20, 21) and self.cam_limit_speed_left_dist > 0
+      new_camera_event = self.cam_type not in (20, 21) and self.cam_limit_active
       if road_changed or new_camera_event:
         self._navi_school_zone = False
 
@@ -538,6 +541,7 @@ class ClusterModels:
       "nav_limit_speed": self.nav_limit_speed,
       "cam_limit_speed": self.cam_limit_speed,
       "cam_limit_speed_left_dist": self.cam_limit_speed_left_dist,
+      "cam_limit_active": self.cam_limit_active,
       "section_limit_speed": self.section_limit_speed,
       "section_left_dist": self.section_left_dist,
       "cam_type": self.cam_type,

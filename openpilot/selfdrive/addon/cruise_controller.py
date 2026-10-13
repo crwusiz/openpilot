@@ -12,6 +12,7 @@ from openpilot.selfdrive.car.cruise import (V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE
                                             CRUISE_LONG_PRESS)
 from opendbc.car.hyundai.values import Buttons
 from openpilot.selfdrive.addon.navi_controller import SpeedLimiter
+from openpilot.selfdrive.addon.navi_helpers import camera_limit_active
 
 
 ButtonType = structs.CarState.ButtonEvent.Type
@@ -163,8 +164,7 @@ def _get_button_limit(speed_limiter, CS):
       return section_limit, True
 
     camera_limit = float(getattr(navi_data, 'camLimitSpeed', 0.) or 0.)
-    camera_left_dist = float(getattr(navi_data, 'camLimitSpeedLeftDist', 0.) or 0.)
-    if 0 < camera_limit < SPEED_LIMIT.no_active and camera_left_dist > 0:
+    if 0 < camera_limit < SPEED_LIMIT.no_active and camera_limit_active(navi_data):
       return camera_limit, True
 
     road_limit = float(speed_limiter.get_road_limit_speed() or 0.)

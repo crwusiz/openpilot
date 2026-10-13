@@ -665,7 +665,9 @@ class ClusterRenderer:
     if data.get("nda_state"):
       if data.get("section_limit_speed", 0) > 0 and data.get("section_left_dist", 0) > 0:
         return float(data.get("section_limit_speed")), float(data.get("section_left_dist"))
-      if data.get("cam_limit_speed", 0) > 0 and data.get("cam_limit_speed_left_dist", 0) > 0:
+      camera_active = data.get("cam_limit_active", data.get("cam_limit_speed", 0) > 0 and
+                               data.get("cam_limit_speed_left_dist", 0) > 0)
+      if camera_active:
         return float(data.get("cam_limit_speed")), float(data.get("cam_limit_speed_left_dist"))
       return float(data.get("nav_limit_speed", 0.0) or 0.0), 0.0
     if data.get("stock_limit_speed", 0) > 0:

@@ -25,6 +25,10 @@ struct NaviData @0x81c2f05a394cf4af {
   camSpeedFactor @11 :Float32;
   currentRoadName @12 :Text;
   ts @13 :TrafficSignal;
+  camRearHoldDist @14 :Float32;
+  camDistanceAge @15 :Float32;
+  camDistanceId @16 :Int64;
+  camLimitSpeedLeftDistPrecise @17 :Float32;
 
   struct TrafficSignal {
     isGreenLightOn @0 :Bool;
