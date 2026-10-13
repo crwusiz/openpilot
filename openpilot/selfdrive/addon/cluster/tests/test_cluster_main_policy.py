@@ -15,6 +15,7 @@ def cluster(monkeypatch):
   pipeline = Mock()
   pipeline.close.return_value = True
   camera, models, renderer = Mock(), Mock(), Mock()
+  camera_factory = Mock(return_value=camera)
   policy = Mock(return_value=True)
   prefix = "openpilot.selfdrive.addon.cluster."
   modules = {
@@ -22,7 +23,7 @@ def cluster(monkeypatch):
     prefix + "cluster_config": SimpleNamespace(ClusterConfig=lambda: config),
     prefix + "cluster_logging": SimpleNamespace(close_log=Mock(), flog=Mock(), initialize_log=Mock()),
     prefix + "cluster_display_pipeline": SimpleNamespace(ClusterDisplayPipeline=lambda d: pipeline),
-    prefix + "cluster_live_camera": SimpleNamespace(ClusterLiveCamera=lambda c, **kwargs: camera),
+    prefix + "cluster_live_camera": SimpleNamespace(ClusterLiveCamera=camera_factory),
     prefix + "cluster_models": SimpleNamespace(ClusterModels=lambda: models),
     prefix + "cluster_renderer": SimpleNamespace(ClusterRenderer=lambda c: renderer),
     prefix + "cluster_policy": SimpleNamespace(enforce_cluster_transport=policy),
@@ -34,7 +35,8 @@ def cluster(monkeypatch):
   spec.loader.exec_module(module)
   module.create_cluster_display = Mock(return_value=display)
   monkeypatch.setattr(module.signal, "signal", Mock())
-  return SimpleNamespace(module=module, config=config, display=display, pipeline=pipeline, policy=policy, camera=camera, models=models)
+  return SimpleNamespace(module=module, config=config, display=display, pipeline=pipeline, policy=policy,
+                         camera=camera, camera_factory=camera_factory, models=models)
 
 
 def test_existing_egpu_prevents_opening_usb_display(cluster):
@@ -85,3 +87,53 @@ def test_network_display_clock_skips_heavy_work_when_transport_has_no_capacity(c
   assert renderer.render.call_count == 2
   assert cluster.pipeline.push.call_count == 2
   assert cluster.models.get_health_data.call_count == 60
+
+
+def _set_frame_clock(cluster, monkeypatch):
+  ticks = [0]
+  fps = cluster.config.fps
+
+  def wait(*_args):
+    ticks[0] += 1
+    return ticks[0]
+
+  monkeypatch.setattr(cluster.module, "time", SimpleNamespace(monotonic=lambda: ticks[0] / fps))
+  monkeypatch.setattr(cluster.module, "ClusterFrameClock", lambda _fps: SimpleNamespace(wait=wait))
+  monkeypatch.setattr(cluster.module, "ClusterRuntimeMetrics", lambda: SimpleNamespace(sample=lambda _health: None))
+  cluster.camera.wait_for_frame.side_effect = wait
+  renderer = cluster.module.ClusterRenderer(cluster.config)
+  renderer.last_frame_timings = dict.fromkeys(("camera_copy", "snapshot", "path", "hud"), 0.0)
+  return renderer
+
+
+def test_usb_skips_render_and_encode_while_transport_is_full(cluster, monkeypatch):
+  renderer = _set_frame_clock(cluster, monkeypatch)
+  cluster.policy.side_effect = [True, True, False, False]
+  cluster.pipeline.has_render_capacity.side_effect = [False] * 18 + [True, True]
+
+  cluster.module.cluster_main()
+
+  assert renderer.render.call_count == cluster.pipeline.push.call_count == 2
+  assert cluster.models.get_health_data.call_count == 20
+  cluster.pipeline.has_render_capacity.side_effect = None
+  cluster.pipeline.has_render_capacity.return_value = False
+  frame_needed = cluster.camera_factory.call_args.kwargs["frame_needed"]
+  assert not frame_needed()
+  cluster.pipeline.has_render_capacity.return_value = True
+  assert frame_needed()
+
+
+@pytest.mark.parametrize("transport", ["usb", "network"])
+def test_disconnected_display_prepares_only_one_bootstrap_image_per_second(cluster, monkeypatch, transport):
+  cluster.config.display_transport = transport
+  cluster.config.params.get.return_value = transport
+  cluster.display.connected = False
+  renderer = _set_frame_clock(cluster, monkeypatch)
+  cluster.policy.side_effect = [True, True, True, False, False]
+
+  cluster.module.cluster_main()
+
+  assert renderer.render.call_count == cluster.pipeline.push.call_count == 2
+  assert cluster.models.get_health_data.call_count == 40
+  frame_needed = cluster.camera_factory.call_args.kwargs["frame_needed"]
+  assert not frame_needed()

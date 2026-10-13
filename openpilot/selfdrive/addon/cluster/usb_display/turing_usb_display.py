@@ -28,6 +28,7 @@ class TuringUsbDisplay:
     )
     self.encoder = ClusterJpegEncoder(config, transport="usb")
     self.jpeg_quality = self.encoder.jpeg_quality
+    self.max_frame_age = max(0.05, float(getattr(config, "usb_max_frame_age", 0.25)))
     self._perf_started = None
     self._perf_frames = 0
     self._perf_prepare_time = 0.0
@@ -153,10 +154,17 @@ class TuringUsbDisplay:
   def prepare_image(self, frame_image):
     return self.encoder.prepare_image(frame_image)
 
+  def is_prepared_stale(self, prepared):
+    # Backpressure can leave one JPEG waiting through a slow upload/reconnect.
+    # Resume with a fresh render instead of briefly displaying that old image.
+    return prepared.created_at is not None and time.monotonic() - prepared.created_at > self.max_frame_age
+
   def send_prepared(self, prepared):
     """Upload an already encoded frame and account for transport performance."""
     if not self.connected or self.device is None or prepared is None:
       return False
+    if self.is_prepared_stale(prepared):
+      return None
 
     try:
       t0 = time.monotonic()

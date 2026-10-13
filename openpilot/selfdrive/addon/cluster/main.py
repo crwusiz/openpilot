@@ -46,8 +46,7 @@ def cluster_main():
   pipeline = ClusterDisplayPipeline(display)
   pipeline.start()
 
-  camera_capacity = pipeline.has_render_capacity if config.display_transport == "network" else None
-  camera = ClusterLiveCamera(config, frame_needed=camera_capacity)
+  camera = ClusterLiveCamera(config, frame_needed=lambda: display.connected and pipeline.has_render_capacity())
   models = ClusterModels()
   renderer = ClusterRenderer(config)
 
@@ -100,20 +99,19 @@ def cluster_main():
       resource_log = runtime_metrics.sample(health)
       if resource_log is not None:
         flog(resource_log)
-      # A missing Pi needs only an occasional fresh connection bootstrap image.
-      # When connected, leave rendering/encoding idle while transport is full.
-      render_ready = True
-      if config.display_transport == "network":
-        if not display.connected:
-          render_ready = now >= next_offline_frame
-          if render_ready:
-            next_offline_frame = now + 1.0
-        elif getattr(display, "screen_off", False):
-          render_ready = now >= next_screen_off_frame and pipeline.has_render_capacity()
-          if render_ready:
-            next_screen_off_frame = now + 1.0 / getattr(config, "network_screen_off_fps", 5)
-        else:
-          render_ready = pipeline.has_render_capacity()
+      # Both transports need only occasional bootstrap images when disconnected.
+      # Pause USB rendering/preprocessing too when the lookahead frame is full;
+      # sending one frame may still overlap preparation of the next.
+      if not display.connected:
+        render_ready = now >= next_offline_frame
+        if render_ready:
+          next_offline_frame = now + 1.0
+      elif config.display_transport == "network" and getattr(display, "screen_off", False):
+        render_ready = now >= next_screen_off_frame and pipeline.has_render_capacity()
+        if render_ready:
+          next_screen_off_frame = now + 1.0 / getattr(config, "network_screen_off_fps", 5)
+      else:
+        render_ready = pipeline.has_render_capacity()
       if render_ready:
         render_started = time.monotonic()
         frame_image = renderer.render(camera, models)

@@ -11,6 +11,8 @@ class ClusterDisplayPipeline:
     self._condition = threading.Condition()
     self._pending_frame = None
     self._pending_prepared = None
+    self._encoding = False
+    self._sending = False
     self._closing = False
     self.running = False
     self.encoder_thread = None
@@ -35,6 +37,8 @@ class ClusterDisplayPipeline:
       self._closing = False
       self._pending_frame = None
       self._pending_prepared = None
+      self._encoding = False
+      self._sending = False
       self._reset_stats()
       self.encoder_thread = threading.Thread(
         target=self._encoder_loop, name="cluster-jpeg-encoder", daemon=True,
@@ -68,6 +72,10 @@ class ClusterDisplayPipeline:
     with self._condition:
       if not self.running or self._closing or self._pending_frame is not None or self._pending_prepared is not None:
         return False
+      # Keep render/encode overlap when the sender is idle. Once an upload is
+      # active, the encoder already owns the one allowed lookahead frame.
+      if self._encoding and self._sending:
+        return False
     capacity = getattr(self.display, "has_send_capacity", None)
     return not callable(capacity) or capacity()
 
@@ -78,6 +86,7 @@ class ClusterDisplayPipeline:
         return None
       frame_image = self._pending_frame
       self._pending_frame = None
+      self._encoding = True
       return frame_image
 
   def _publish_prepared(self, prepared):
@@ -99,6 +108,7 @@ class ClusterDisplayPipeline:
         return None
       prepared = self._pending_prepared
       self._pending_prepared = None
+      self._sending = True
       return prepared
 
   def _replace_with_latest_prepared(self, prepared):
@@ -158,6 +168,9 @@ class ClusterDisplayPipeline:
           self._publish_prepared(prepared)
       except Exception as e:
         flog(f"[CLUSTER_PIPELINE_ERROR] Encoder exception: {e}")
+      finally:
+        with self._condition:
+          self._encoding = False
 
   def _sender_loop(self):
     while True:
@@ -218,6 +231,9 @@ class ClusterDisplayPipeline:
           flog(f"[CLUSTER_PIPELINE_ERROR] Display close exception: {close_error}")
           self.display.connected = False
         self._wait_for_reconnect(0.5)
+      finally:
+        with self._condition:
+          self._sending = False
 
   def close(self):
     with self._condition:

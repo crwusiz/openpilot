@@ -127,3 +127,17 @@ def test_reconnect_rediscovers_display_after_hub_reenumeration(usb_display):
   assert state.display.consecutive_upload_failures == 0
   state.dispose.assert_called_once_with(state.device)
   replacement.reset.assert_not_called()
+
+
+def test_expired_frame_is_dropped_without_usb_io_or_failure_count(usb_display, monkeypatch):
+  state = usb_display
+  assert state.display.open()
+  monkeypatch.setattr(display_module, "time", SimpleNamespace(monotonic=lambda: 10.0))
+
+  assert state.display.send_prepared(PreparedFrame(memoryview(b"old"), 1, 0.001, created_at=9.0)) is None
+  state.vendor.send_jpeg.assert_not_called()
+  assert state.display.connected
+  assert state.display.consecutive_upload_failures == 0
+
+  assert state.display.send_prepared(PreparedFrame(memoryview(b"fresh"), 1, 0.001, created_at=9.9))
+  state.vendor.send_jpeg.assert_called_once()

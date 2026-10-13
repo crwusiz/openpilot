@@ -3,6 +3,7 @@ import time
 from types import SimpleNamespace
 
 from PIL import Image
+import pytest
 
 from openpilot.selfdrive.addon.cluster.cluster_display_pipeline import ClusterDisplayPipeline
 from openpilot.selfdrive.addon.cluster.cluster_jpeg import PreparedFrame
@@ -93,6 +94,80 @@ def test_encoding_overlaps_blocked_send():
     assert display.second_prepared.wait(timeout=1.0)
   finally:
     display.release_send.set()
+    assert pipeline.close()
+
+
+def test_backpressure_bounds_preparation_while_usb_upload_is_blocked():
+  display = OverlapDisplay()
+  encoding, release_encode = threading.Event(), threading.Event()
+  original_prepare = display.prepare_image
+
+  def prepare(frame):
+    if frame == "second":
+      encoding.set()
+      release_encode.wait(timeout=2.0)
+    return original_prepare(frame)
+
+  display.prepare_image = prepare
+  pipeline = ClusterDisplayPipeline(display)
+  pipeline.start()
+  try:
+    pipeline.push("first")
+    assert display.send_started.wait(timeout=1.0)
+    assert _wait_for(pipeline.has_render_capacity)
+    pipeline.push("second")
+    assert encoding.wait(timeout=1.0)
+    assert not pipeline.has_render_capacity()
+    release_encode.set()
+    assert _wait_for(lambda: pipeline.get_stats()["encoded"] == 2)
+
+    # The main loop must stop composing once the one-frame lookahead is full,
+    # even though the encoder has removed the raw frame from its input slot.
+    assert not pipeline.has_render_capacity()
+    assert display.prepare_count == 2
+    display.release_send.set()
+    assert _wait_for(lambda: pipeline.get_stats()["sent"] == 2)
+    assert _wait_for(pipeline.has_render_capacity)
+    pipeline.push("third")
+    assert _wait_for(lambda: pipeline.get_stats()["sent"] == 3)
+  finally:
+    release_encode.set()
+    display.release_send.set()
+    assert pipeline.close()
+
+
+@pytest.mark.parametrize("result", ["success", "none", "exception"])
+def test_render_can_overlap_encoding_without_a_blocked_upload(result):
+  entered, release = threading.Event(), threading.Event()
+  display = OverlapDisplay()
+  display.release_send.set()
+
+  def prepare(frame):
+    entered.set()
+    release.wait(timeout=2.0)
+    if result == "exception":
+      raise RuntimeError("test encoding failure")
+    return None if result == "none" else frame
+
+  display.prepare_image = prepare
+  pipeline = ClusterDisplayPipeline(display)
+  pipeline.start()
+  try:
+    pipeline.push("frame")
+    assert entered.wait(timeout=1.0)
+    # Rendering can run ahead of the encoder when no upload is holding a frame.
+    # That allowance ends as soon as the pending raw slot has been filled.
+    assert pipeline.has_render_capacity()
+    pipeline.push("next")
+    assert not pipeline.has_render_capacity()
+    release.set()
+    assert _wait_for(pipeline.has_render_capacity)
+    if result == "success":
+      assert _wait_for(lambda: pipeline.get_stats()["sent"] == 2)
+    else:
+      assert pipeline.get_stats()["encoded"] == pipeline.get_stats()["sent"] == 0
+  finally:
+    release.set()
     assert pipeline.close()
 
 
@@ -313,4 +388,47 @@ def test_transport_expiration_result_counts_as_drop_instead_of_send_failure():
     assert stats["sent"] == stats["send_failures"] == 0
     assert stats["dropped_prepared"] == 1
   finally:
+    assert pipeline.close()
+
+
+def test_usb_reconnect_discards_expired_bootstrap_and_accepts_fresh_frame(monkeypatch):
+  from openpilot.selfdrive.addon.cluster.usb_display import turing_usb_display
+
+  now = [10.0]
+  monkeypatch.setattr(turing_usb_display, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  display = TuringUsbDisplay(SimpleNamespace(fps=20, usb_image_timeout_ms=1000))
+  opened, release_open = threading.Event(), threading.Event()
+  uploads = []
+
+  def open_display():
+    opened.set()
+    release_open.wait(timeout=2.0)
+    display.device = object()
+    display.connected = True
+    return True
+
+  def upload(_device, jpeg, **_kwargs):
+    uploads.append(bytes(jpeg))
+    return b"ok"
+
+  display.open = open_display
+  display._send_jpeg = upload
+  display._resp_ok = lambda response: response == b"ok"
+  pipeline = ClusterDisplayPipeline(display)
+  pipeline.start()
+  try:
+    pipeline.push(Image.new("RGB", (32, 32), "red"), created_at=10.0)
+    assert opened.wait(timeout=1.0)
+    now[0] = 11.0
+    release_open.set()
+    assert _wait_for(lambda: pipeline.get_stats()["dropped_stale"] == 1)
+    assert not uploads
+    assert pipeline.has_render_capacity()
+
+    pipeline.push(Image.new("RGB", (32, 32), "green"), created_at=11.0)
+    assert _wait_for(lambda: pipeline.get_stats()["sent"] == 1)
+    assert len(uploads) == 1
+    assert pipeline.get_stats()["send_failures"] == 0
+  finally:
+    release_open.set()
     assert pipeline.close()

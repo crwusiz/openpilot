@@ -127,6 +127,9 @@ class ClusterRenderer:
       self.font_warning = ImageFont.load_default()
 
     self.base_canvas = self._create_base_canvas()
+    # Only the camera region changes before PIL takes its own RGB snapshot.
+    # Keep the NumPy background instead of allocating/copying a full frame at 20 Hz.
+    self._frame = self.base_canvas.copy()
     self.camera_height = 1.22
     self.focal_length = 910.0
     self.icons = {}
@@ -173,17 +176,19 @@ class ClusterRenderer:
     # separate has_frame() check and get_frame() call.
     camera_frame = camera.get_frame()
     has_camera = camera_frame is not None
+    frame = self._frame
+    camera_region = frame[self.camera_y:self.camera_y + self.camera_h,
+                          self.camera_x:self.camera_x + self.camera_w]
     if has_camera:
       if camera_frame.shape[:2] == (self.camera_h, self.camera_w) and \
           hasattr(camera, "get_source_to_panel_transform"):
-        frame = self.base_canvas.copy()
-        frame[self.camera_y:self.camera_y + self.camera_h,
-              self.camera_x:self.camera_x + self.camera_w] = camera_frame
+        camera_region[:] = camera_frame
         self._source_to_panel = camera.get_source_to_panel_transform(self.camera_x, self.camera_y)
       else:
-        frame = self._crop_and_resize(camera_frame)
+        self._crop_and_resize(camera_frame, canvas=frame)
     else:
-      frame = self.base_canvas.copy()
+      camera_region[:] = self.base_canvas[self.camera_y:self.camera_y + self.camera_h,
+                                         self.camera_x:self.camera_x + self.camera_w]
 
     camera_copied_at = time.monotonic()
     model_valid, hud_data, path_data = models.get_render_data()
@@ -194,6 +199,8 @@ class ClusterRenderer:
       self._reset_leads()
 
     path_drawn_at = time.monotonic()
+    # RGB fromarray owns its pixels, so the encoder can retain this image while
+    # the next render reuses the NumPy buffer. HUD drawing stays on that snapshot.
     pil_img = Image.fromarray(frame)
     self._draw_hud(pil_img, hud_data, has_camera)
     self.last_frame_timings = {
@@ -221,7 +228,7 @@ class ClusterRenderer:
         filter_.dt = dt
         filter_.update_alpha(rc)
 
-  def _crop_and_resize(self, frame):
+  def _crop_and_resize(self, frame, canvas=None):
     source_h, source_w = frame.shape[:2]
     source_aspect = source_w / source_h
     target_aspect = self.camera_w / self.camera_h
@@ -243,7 +250,8 @@ class ClusterRenderer:
       [0.0, scale_y, self.camera_y - crop_y * scale_y],
       [0.0, 0.0, 1.0],
     ], dtype=np.float32)
-    canvas = self.base_canvas.copy()
+    if canvas is None:
+      canvas = self.base_canvas.copy()
     canvas[self.camera_y:self.camera_y + self.camera_h,
            self.camera_x:self.camera_x + self.camera_w] = camera
     return canvas

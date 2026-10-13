@@ -23,6 +23,7 @@ USB = SimpleNamespace(
   height=462,
   timeout_ms=2500,
   image_timeout_ms=1000,
+  max_frame_age_s=0.25,
   clear_halt_on_timeout=True,
   max_consecutive_failures=3,
 )
@@ -135,6 +136,7 @@ class ClusterConfig:
 
     self.usb_timeout_ms = USB.timeout_ms
     self.usb_image_timeout_ms = USB.image_timeout_ms
+    self.usb_max_frame_age = USB.max_frame_age_s
     self.usb_clear_halt_on_timeout = USB.clear_halt_on_timeout
     self.usb_max_consecutive_failures = USB.max_consecutive_failures
 

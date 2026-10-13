@@ -82,14 +82,14 @@ def test_backpressure_drains_every_raw_frame_and_keeps_camera_fresh(camera_modul
     assert camera._perf_skipped == 0
 
 
-def test_usb_camera_without_capacity_callback_processes_all_frames(camera_module, monkeypatch):
+def test_camera_without_capacity_callback_processes_all_frames(camera_module, monkeypatch):
   events = [(10.0 + index * 0.05, index, False) for index in range(40)]
   camera, received, converted, _ = _run_camera(camera_module, monkeypatch, events)
   assert len(converted) == len(received) == 40
   assert camera.frame_count == 40
 
 
-def test_released_network_credit_prepares_current_buffer_immediately(camera_module, monkeypatch):
+def test_released_transport_capacity_prepares_current_buffer_immediately(camera_module, monkeypatch):
   events = [(10.0, 1, False), (10.05, 2, False), (10.1, 3, True)]
   camera, received, converted, _ = _run_camera(camera_module, monkeypatch, events, demand=True)
   assert received == [1, 2, 3]

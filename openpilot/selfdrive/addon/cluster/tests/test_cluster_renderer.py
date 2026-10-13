@@ -162,3 +162,49 @@ def test_lookup_cache_is_bounded_and_immutable(renderer_module):
     table = renderer_module._alpha_blend_lut((20, 180, 99), value / 511)
     assert not table.flags.writeable
   assert renderer_module._alpha_blend_lut.cache_info().currsize == 128
+
+
+@pytest.mark.parametrize("preprocessed", [False, True])
+def test_retained_render_frames_survive_camera_changes_and_stalls(renderer_module, preprocessed):
+  renderer = renderer_module.ClusterRenderer.__new__(renderer_module.ClusterRenderer)
+  renderer.base_canvas = np.random.default_rng(19).integers(0, 256, (10, 16, 3), dtype=np.uint8)
+  renderer._frame = renderer.base_canvas.copy()
+  renderer.camera_x, renderer.camera_y, renderer.camera_w, renderer.camera_h = 4, 2, 8, 6
+  renderer._update_filter_intervals = Mock()
+  renderer._reset_leads = Mock()
+  region = np.s_[2:8, 4:12]
+
+  def draw_path(frame, _path, _hud):
+    frame[2, 4] = (255, 0, 0)
+    return frame
+
+  def draw_hud(image, hud, _has_camera):
+    image.putpixel((0, 0), (hud["value"], 100, 200))
+
+  renderer._draw_model_path = draw_path
+  renderer._draw_hud = draw_hud
+  models = Mock()
+  camera = Mock()
+  camera.get_source_to_panel_transform.return_value = np.eye(3)
+  retained = []
+  for value, model_valid in ((10, True), (20, False), (None, False), (30, True)):
+    # Full-size inputs exercise the compatibility crop path as well as the
+    # usual preprocessed camera. Holding every result simulates a slow encoder.
+    shape = (6, 8, 3) if preprocessed else (12, 24, 3)
+    source = None if value is None else np.full(shape, value, dtype=np.uint8)
+    camera.get_frame.return_value = source
+    models.get_render_data.return_value = (model_valid, {"value": value or 0}, {})
+    expected = renderer.base_canvas.copy()
+    if source is not None:
+      expected[region] = value
+      if model_valid:
+        expected[2, 4] = (255, 0, 0)
+    expected[0, 0] = (value or 0, 100, 200)
+    retained.append((renderer.render(camera, models), expected))
+    if source is not None:
+      assert np.all(source == value)
+
+  for image, expected in retained:
+    np.testing.assert_array_equal(np.asarray(image), expected)
+  # Neither the path nor the HUD may leak into the cached panel background.
+  np.testing.assert_array_equal(renderer.base_canvas, np.random.default_rng(19).integers(0, 256, (10, 16, 3), dtype=np.uint8))
