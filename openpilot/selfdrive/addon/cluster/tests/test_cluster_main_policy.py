@@ -123,6 +123,35 @@ def test_usb_skips_render_and_encode_while_transport_is_full(cluster, monkeypatc
   assert frame_needed()
 
 
+def test_render_cpu_statistics_exclude_waiting_and_reset_each_window(cluster, monkeypatch):
+  cluster.config.display_transport = "network"
+  cluster.config.params.get.return_value = "network"
+  cluster.display.screen_off = False
+  renderer = _set_frame_clock(cluster, monkeypatch)
+  now, cpu = [0.0], [0.0]
+  monkeypatch.setattr(cluster.module, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(cluster.module, "thread_time", lambda: cpu[0])
+
+  def wait():
+    now[0] += 0.05
+
+  monkeypatch.setattr(cluster.module, "ClusterFrameClock", lambda _fps: SimpleNamespace(wait=wait))
+  cluster.policy.side_effect = lambda *_args: now[0] < 21.0
+  cluster.models.get_health_data.return_value = {}
+  cluster.pipeline.get_stats.return_value = dict.fromkeys(("sent", "dropped_raw", "dropped_prepared", "dropped_stale", "send_failures"), 0)
+
+  def render(*_args):
+    now[0] += 0.04  # Rendering includes time when the thread is not running.
+    cpu[0] += 0.01
+    return object()
+
+  renderer.render.side_effect = render
+  cluster.module.cluster_main()
+  logs = [call.args[0] for call in cluster.module.flog.call_args_list if "[CLUSTER_MAIN_PERF]" in call.args[0]]
+  assert len(logs) == 2
+  assert all("render_avg=40.0ms" in log and "render_cpu_avg=10.0ms" in log for log in logs)
+
+
 def test_driving_input_fault_limits_rendering_and_camera_preprocessing(cluster, monkeypatch):
   cluster.config.display_transport = 'network'
   cluster.config.params.get.return_value = 'network'

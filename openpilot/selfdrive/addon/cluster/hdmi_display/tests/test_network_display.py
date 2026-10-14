@@ -154,6 +154,108 @@ def _prepared(payload=b"jpeg-frame"):
   return PreparedFrame(memoryview(payload), 1, 0.005)
 
 
+@pytest.mark.parametrize("full_budget", ["frames", "bytes", "both"])
+def test_healthy_stream_can_prepare_a_latest_frame_while_send_budget_is_full(monkeypatch, full_budget):
+  monkeypatch.setattr(network_display, "time", SimpleNamespace(monotonic=lambda: 100.0))
+  monkeypatch.setattr(network_display, "write_network_status", lambda _address: None)
+  display = ClusterNetworkDisplay(_config("127.0.0.1", 0))
+  display.connected = display.streaming = True
+  prepared = _prepared(b"x" * 1024)
+  frame_count = display.max_in_flight if full_budget != "bytes" else 1
+  for sequence in range(1, frame_count + 1):
+    display._pending_acks.append((sequence, prepared, 99.9, 99.91))
+  display._pending_bytes = frame_count * len(prepared.jpeg)
+  if full_budget != "frames":
+    display.max_in_flight_bytes = display._pending_bytes
+
+  assert not display.has_send_capacity()
+  assert display.has_prepare_capacity()
+  # Preparing a replacement JPEG does not consume or expand network credits.
+  assert len(display._pending_acks) == frame_count
+  assert display._pending_bytes == frame_count * len(prepared.jpeg)
+
+
+@pytest.mark.parametrize("connected,streaming,closing,ack_error,ack_age,allowed", [
+  (True, True, False, None, None, True),
+  (True, True, False, None, 0.1, True),
+  (True, True, False, None, 0.25, True),
+  (True, True, False, None, 0.3, False),
+  (False, True, False, None, None, False),
+  (True, False, False, None, None, False),
+  (True, True, True, None, None, False),
+  (True, True, False, ConnectionError("lost receive ACK"), None, False),
+])
+def test_prefetch_stops_for_unhealthy_stream_and_legacy_mode(monkeypatch, connected, streaming, closing, ack_error, ack_age, allowed):
+  monkeypatch.setattr(network_display, "time", SimpleNamespace(monotonic=lambda: 100.0))
+  monkeypatch.setattr(network_display, "write_network_status", lambda _address: None)
+  display = ClusterNetworkDisplay(_config("127.0.0.1", 0))
+  display.connected, display.streaming = connected, streaming
+  display._ack_closing, display._ack_error = closing, ack_error
+  if ack_age is not None:
+    display._pending_acks.append((1, _prepared(), 100.0 - ack_age, 100.0 - ack_age))
+  assert display.has_prepare_capacity() is allowed
+
+
+class _RecordingSendSocket:
+  def __init__(self, error=None):
+    self.writes = []
+    self.error = error
+    self.closed = False
+
+  def sendall(self, data):
+    self.writes.append(bytes(data))
+    if self.error is not None:
+      raise self.error
+
+  def shutdown(self, _how):
+    pass
+
+  def close(self):
+    self.closed = True
+
+
+@pytest.mark.parametrize("streaming", [False, True])
+def test_header_and_jpeg_use_one_socket_write_with_identical_wire_format(monkeypatch, streaming):
+  monkeypatch.setattr(network_display, "write_network_status", lambda _address: None)
+  monkeypatch.setattr(network_display, "recv_exact", lambda _sock, _size, **_kwargs: pack_ack(1))
+  display = ClusterNetworkDisplay(_config("127.0.0.1", 0))
+  sock = _RecordingSendSocket()
+  display.sock, display.connected, display.streaming = sock, True, streaming
+  payload = b"\xff\xd8jpeg\x00\xff\xd9"
+  try:
+    assert display.send_prepared(_prepared(payload))
+    assert len(sock.writes) == 1
+    packet = sock.writes[0]
+    assert unpack_frame_header_info(packet[:FRAME_HEADER.size]) == (
+      1, len(payload), FRAME_STREAM if streaming else FRAME_QUERY_STREAM,
+    )
+    assert packet[FRAME_HEADER.size:] == payload
+    assert display.sequence == 1
+    if streaming:
+      assert len(display._pending_acks) == 1
+      assert display._pending_bytes == len(payload)
+    else:
+      assert display.frame_count == 1
+  finally:
+    display.close()
+
+
+@pytest.mark.parametrize("streaming", [False, True])
+@pytest.mark.parametrize("error", [TimeoutError("write deadline expired"), ConnectionError("peer closed")])
+def test_coalesced_write_failure_disconnects_without_ack_or_consuming_sequence(monkeypatch, streaming, error):
+  monkeypatch.setattr(network_display, "write_network_status", lambda _address: None)
+  ack_reads = []
+  monkeypatch.setattr(network_display, "recv_exact", lambda *_args, **_kwargs: ack_reads.append(True))
+  display = ClusterNetworkDisplay(_config("127.0.0.1", 0))
+  sock = _RecordingSendSocket(error)
+  display.sock, display.connected, display.streaming = sock, True, streaming
+  assert not display.send_prepared(_prepared())
+  assert len(sock.writes) == 1 and not ack_reads
+  assert not display.connected and sock.closed and display.sock is None
+  assert not display._pending_acks and display._pending_bytes == 0
+  assert display.sequence == display.frame_count == 0
+
+
 def _wait_for(predicate, timeout=1.0):
   deadline = time.monotonic() + timeout
   while not predicate() and time.monotonic() < deadline:

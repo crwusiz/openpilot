@@ -334,6 +334,76 @@ class CreditDisplay:
     return True
 
 
+class PrefetchDisplay(CreditDisplay):
+  def __init__(self):
+    super().__init__()
+    self.healthy = True
+    self.prepare_started, self.release_prepare = threading.Event(), threading.Event()
+
+  def has_prepare_capacity(self):
+    return self.healthy
+
+  def prepare_image(self, frame):
+    self.prepare_started.set()
+    self.release_prepare.wait(timeout=2.0)
+    return super().prepare_image(frame)
+
+
+@pytest.mark.parametrize("frame_age,expected_sent", [(0.2, 1), (0.251, 0)])
+def test_full_stream_prefetches_only_one_frame_and_sends_it_on_credit_release(frame_age, expected_sent):
+  display = PrefetchDisplay()
+  pipeline = ClusterDisplayPipeline(display)
+  pipeline.start()
+  try:
+    # Both remote transmission slots are occupied, but their ACKs are healthy.
+    # The next rendered frame can be encoded before a slot becomes available.
+    assert not display.has_send_capacity()
+    assert pipeline.has_render_capacity()
+    pipeline.push("prefetched", created_at=10.0)
+    assert not pipeline.has_render_capacity()
+    assert display.prepare_started.wait(timeout=1.0)
+    assert not pipeline.has_render_capacity()
+
+    display.release_prepare.set()
+    assert display.wait_started.wait(timeout=1.0)
+    # The sender now owns the one prefetched JPEG and is waiting for an ACK.
+    # A second lookahead must not be composed or encoded behind it.
+    assert not pipeline.has_render_capacity()
+    assert pipeline.get_stats()["input"] == pipeline.get_stats()["encoded"] == 1
+    display.now = 10.0 + frame_age
+    display.release_credit.set()
+    assert _wait_for(lambda: pipeline.get_stats()["sent"] + pipeline.get_stats()["dropped_stale"] == 1)
+
+    # Sending does not depend on another main-loop render after the ACK.
+    assert pipeline.get_stats()["sent"] == expected_sent
+    assert pipeline.get_stats()["input"] == pipeline.get_stats()["encoded"] == 1
+    assert pipeline.get_stats()["dropped_stale"] == 1 - expected_sent
+    assert pipeline.get_stats()["send_failures"] == 0
+    if expected_sent:
+      assert bytes(display.sent[0].jpeg) == b"prefetched"
+    else:
+      assert not display.sent
+    assert pipeline.has_render_capacity()
+  finally:
+    display.release_prepare.set()
+    display.release_credit.set()
+    assert pipeline.close()
+
+
+def test_full_stream_does_not_prefetch_during_fault_or_after_close():
+  display = PrefetchDisplay()
+  pipeline = ClusterDisplayPipeline(display)
+  pipeline.start()
+  try:
+    display.healthy = False
+    assert not pipeline.has_render_capacity()
+    display.healthy = True
+    assert pipeline.has_render_capacity()
+  finally:
+    assert pipeline.close()
+  assert not pipeline.has_render_capacity()
+
+
 def test_credit_release_selects_latest_frame_encoded_during_window_wait():
   display = CreditDisplay()
   pipeline = ClusterDisplayPipeline(display)

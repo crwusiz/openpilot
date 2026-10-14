@@ -77,7 +77,18 @@ class ClusterDisplayPipeline:
       if self._encoding and self._sending:
         return False
     capacity = getattr(self.display, "has_send_capacity", None)
-    return not callable(capacity) or capacity()
+    if not callable(capacity) or capacity():
+      return True
+    prepare_capacity = getattr(self.display, "has_prepare_capacity", None)
+    if not callable(prepare_capacity) or not prepare_capacity():
+      return False
+    # A healthy stream may have both transmission slots occupied. Prepare one
+    # next frame now so releasing an ACK does not first require another render
+    # and JPEG encode. Do not add another lookahead behind an encoder or a
+    # sender already holding that frame while it waits for transmission credit.
+    with self._condition:
+      return (self.running and not self._closing and self._pending_frame is None
+              and self._pending_prepared is None and not self._encoding and not self._sending)
 
   def _take_pending_frame(self):
     with self._condition:

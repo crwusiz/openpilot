@@ -1,4 +1,5 @@
 import importlib.util
+from collections import OrderedDict
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -7,6 +8,7 @@ from unittest.mock import Mock
 import cv2
 import numpy as np
 import pytest
+from PIL import Image, ImageDraw, ImageFont
 
 
 @pytest.fixture
@@ -266,3 +268,103 @@ def test_retained_render_frames_survive_camera_changes_and_stalls(renderer_modul
     np.testing.assert_array_equal(np.asarray(image), expected)
   # Neither the path nor the HUD may leak into the cached panel background.
   np.testing.assert_array_equal(renderer.base_canvas, np.random.default_rng(19).integers(0, 256, (10, 16, 3), dtype=np.uint8))
+
+
+def _previous_centered(draw, cx, cy, value, font, color, stroke_width, stroke_fill):
+  fill = tuple(color) if isinstance(color, (tuple, list)) else color
+  if draw.mode == "RGBA" and isinstance(fill, tuple) and len(fill) == 4:
+    fill = (*fill[:3], 255)
+  stroke = tuple(stroke_fill) if isinstance(stroke_fill, (tuple, list)) else stroke_fill
+  probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+  bbox = probe.textbbox((0, 0), str(value), font=font, anchor="mm", stroke_width=stroke_width)
+  padding = max(2, int(stroke_width) + 1)
+  size = (max(1, bbox[2] - bbox[0] + padding * 2), max(1, bbox[3] - bbox[1] + padding * 2))
+  anchor_x, anchor_y = padding - bbox[0], padding - bbox[1]
+  sprite = Image.new("RGBA", size)
+  ImageDraw.Draw(sprite).text((anchor_x, anchor_y), str(value), font=font, fill=fill, anchor="mm",
+                              stroke_width=stroke_width, stroke_fill=stroke)
+  draw._image.paste(sprite, (int(cx) - anchor_x, int(cy) - anchor_y), sprite)
+
+
+@pytest.fixture(params=["large_bold", "regular", "cjk", "default", "bitmap"])
+def text_font(request):
+  if request.param == "default":
+    return ImageFont.load_default()
+  if request.param == "bitmap":
+    if not hasattr(ImageFont, "load_default_imagefont"):
+      pytest.skip("Pillow has no standalone bitmap fallback font")
+    return ImageFont.load_default_imagefont()
+  name, size = {
+    "large_bold": ("Inter-Bold.ttf", 92), "regular": ("Inter-Regular.ttf", 24),
+    "cjk": ("NotoSansKR-Bold.ttf", 42),
+  }[request.param]
+  return ImageFont.truetype(str(Path(__file__).parents[3] / "assets" / "fonts" / name), size)
+
+
+def _text_renderer(module):
+  renderer = module.ClusterRenderer.__new__(module.ClusterRenderer)
+  renderer._text_cache = OrderedDict()
+  renderer._text_cache_bytes = 0
+  return renderer
+
+
+@pytest.mark.parametrize("mode,draw_mode", [("RGB", "RGB"), ("RGB", "RGBA"), ("RGBA", "RGBA")])
+@pytest.mark.parametrize("fill,stroke,width", [
+  ((100, 240, 135), None, 0), ((100, 240, 135), (0, 0, 0), 2),
+  ((200, 100, 30, 60), (20, 200, 120, 170), 3),
+  ((0, 0, 0, 70), (0, 0, 0, 70), 2), ("white", "#ffffff", 1),
+  ([50, 70, 80, 105], [20, 70, 40, 10], 2),
+])
+@pytest.mark.parametrize("position", [(210.7, 95.4), (8.9, 1.3)])
+def test_recolored_text_keeps_previous_pixels(renderer_module, text_font, mode, draw_mode, fill, stroke, width, position):
+  renderer = _text_renderer(renderer_module)
+  # Nonuniform backgrounds expose blending differences, including RGBA alpha.
+  channels = 4 if mode == "RGBA" else 3
+  pixels = np.random.default_rng(17).integers(0, 256, (190, 420, channels), dtype=np.uint8)
+  texts = ("128", "jÁg", "--", "주행", "") if isinstance(text_font, ImageFont.FreeTypeFont) else ("128", "jÁg", "--", "")
+  for text in texts:
+    expected, actual = Image.fromarray(pixels), Image.fromarray(pixels)
+    _previous_centered(ImageDraw.Draw(expected, draw_mode), *position, text, text_font, fill, width, stroke)
+    renderer._centered(ImageDraw.Draw(actual, draw_mode), *position, text, text_font, fill, width, stroke)
+    np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected))
+
+
+def test_color_changes_reuse_glyph_masks(renderer_module, monkeypatch):
+  renderer = _text_renderer(renderer_module)
+  font_path = str(Path(__file__).parents[3] / "assets" / "fonts" / "Inter-Bold.ttf")
+  font, reference_font = ImageFont.truetype(font_path, 92), ImageFont.truetype(font_path, 92)
+  colors = [(255, value, value) for value in range(60, 256)]
+  image = Image.new("RGB", (420, 190))
+  expected = image.copy()
+  draw = ImageDraw.Draw(image)
+  renderer._centered(draw, 210, 95, 128, font, colors[0], 2, (0, 0, 0))
+  _previous_centered(ImageDraw.Draw(expected), 210, 95, 128, reference_font, colors[0], 2, (0, 0, 0))
+  glyph = next(iter(renderer._text_cache.values()))
+  initial_masks = (glyph.fill_mask, glyph.stroke_mask, glyph.sprite)
+  raster = Mock(side_effect=AssertionError("cached glyph must not be rasterized again"))
+  monkeypatch.setattr(font, "getmask2", raster)
+  for color in colors[1:]:
+    renderer._centered(draw, 210, 95, 128, font, color, 2, (0, 0, 0))
+    _previous_centered(ImageDraw.Draw(expected), 210, 95, 128, reference_font, color, 2, (0, 0, 0))
+    np.testing.assert_array_equal(np.asarray(image), np.asarray(expected))
+  assert len(renderer._text_cache) == 1
+  assert (glyph.fill_mask, glyph.stroke_mask, glyph.sprite) == initial_masks
+  raster.assert_not_called()
+
+
+def test_text_cache_bounds_bytes_and_retains_recent_glyphs(renderer_module, monkeypatch):
+  renderer = _text_renderer(renderer_module)
+  monkeypatch.setattr(renderer_module, "TEXT_CACHE_MAX_BYTES", 2048)
+  monkeypatch.setattr(renderer_module, "TEXT_CACHE_MAX_ENTRIES", 4)
+  font = ImageFont.load_default()
+  draw = ImageDraw.Draw(Image.new("RGB", (320, 160)))
+  for value in range(30):
+    renderer._centered(draw, 160, 80, value, font, (255, 255, 255))
+    assert renderer._text_cache_bytes == sum(g.byte_size for g in renderer._text_cache.values())
+    assert renderer._text_cache_bytes <= 2048
+    assert len(renderer._text_cache) <= 4
+  assert next(reversed(renderer._text_cache)) == (id(font), "29", 0)
+  # An unusually wide string is drawn transiently without evicting everything.
+  keys = tuple(renderer._text_cache)
+  renderer._centered(draw, 160, 80, "W" * 300, font, (0, 255, 0))
+  assert tuple(renderer._text_cache) == keys

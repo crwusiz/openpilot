@@ -48,6 +48,8 @@ ALPHA_BLEND_STRIP_HEIGHT = 64
 MAX_DRAW_DISTANCE = 100.0
 LEAD_BAR_LENGTH = 12.0  # px
 LEAD_BAR_WIDTH = 1.8  # m
+TEXT_CACHE_MAX_ENTRIES = 256
+TEXT_CACHE_MAX_BYTES = 8 * 1024 * 1024
 
 
 @lru_cache(maxsize=128)
@@ -95,6 +97,48 @@ class ColorBlendWorkspace:
     output = self._output[:height, :width]
     cv2.addWeighted(solid[:height, :width], alpha, image, 1.0 - alpha, 0, dst=output)
     return output
+
+
+class TextGlyph:
+  """Rasterize a glyph once, then recolor its reusable sprite with PIL masks."""
+
+  def __init__(self, text, font, stroke_width):
+    # Retain the font while its identity is used by the renderer cache.
+    self.font = font
+    probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    bbox = probe.textbbox((0, 0), text, font=font, anchor="mm", stroke_width=stroke_width)
+    padding = max(2, int(stroke_width) + 1)
+    width = max(1, bbox[2] - bbox[0] + padding * 2)
+    height = max(1, bbox[3] - bbox[1] + padding * 2)
+    self.anchor_x, self.anchor_y = padding - bbox[0], padding - bbox[1]
+    position = (self.anchor_x, self.anchor_y)
+    self.fill_mask = Image.new("L", (width, height))
+    ImageDraw.Draw(self.fill_mask).text(position, text, font=font, fill=255, anchor="mm")
+    self.stroke_mask = None
+    if stroke_width:
+      self.stroke_mask = Image.new("L", (width, height))
+      # Equal stroke/fill inks make PIL draw only the full stroked mask.
+      ImageDraw.Draw(self.stroke_mask).text(position, text, font=font, fill=255, anchor="mm",
+                                            stroke_width=stroke_width, stroke_fill=255)
+    self.sprite = Image.new("RGBA", (width, height))
+    self.draw = ImageDraw.Draw(self.sprite)
+    self.bounds = (0, 0, width, height)
+    self.byte_size = width * height * (5 + int(self.stroke_mask is not None))
+    self._inks = None
+
+  def colored(self, fill, stroke):
+    ink = self.draw._getink(fill)[0]
+    stroke_ink = self.draw._getink(stroke)[0] if stroke is not None else ink
+    inks = (ink, stroke_ink)
+    if self._inks != inks:
+      self.sprite.paste((0, 0, 0, 0), self.bounds)
+      if self.stroke_mask is not None:
+        self.sprite.paste(stroke_ink, self.bounds, self.stroke_mask)
+      # Mirror ImageDraw.text's rounding, alpha and equal-ink behavior.
+      if self.stroke_mask is None or ink != stroke_ink:
+        self.sprite.paste(ink, self.bounds, self.fill_mask)
+      self._inks = inks
+    return self.sprite
 
 
 class LeadVehicle:
@@ -166,6 +210,7 @@ class ClusterRenderer:
     self._icon_cache = {}
     self._rotated_icon_cache = OrderedDict()
     self._text_cache = OrderedDict()
+    self._text_cache_bytes = 0
     self.last_frame_timings = {}
     self._blink_started_at = None
     icon_dir = os.path.join(str(self.config.BASEDIR), "selfdrive", "assets", "icons")
@@ -624,34 +669,22 @@ class ClusterRenderer:
     if getattr(draw, "mode", None) == "RGBA" and isinstance(fill, tuple) and len(fill) == 4:
       fill = (*fill[:3], 255)
     stroke = tuple(stroke_fill) if isinstance(stroke_fill, (tuple, list)) else stroke_fill
-    key = (id(font), text, fill, int(stroke_width), stroke)
+    key = (id(font), text, stroke_width)
     cached = self._text_cache.get(key)
     if cached is None:
-      probe = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
-      probe_draw = ImageDraw.Draw(probe)
-      bbox = probe_draw.textbbox(
-        (0, 0), text, font=font, anchor="mm", stroke_width=stroke_width,
-      )
-      padding = max(2, int(stroke_width) + 1)
-      width = max(1, bbox[2] - bbox[0] + padding * 2)
-      height = max(1, bbox[3] - bbox[1] + padding * 2)
-      anchor_x = padding - bbox[0]
-      anchor_y = padding - bbox[1]
-      sprite = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-      ImageDraw.Draw(sprite).text(
-        (anchor_x, anchor_y), text, font=font, fill=fill, anchor="mm",
-        stroke_width=stroke_width, stroke_fill=stroke,
-      )
-      cached = (sprite, anchor_x, anchor_y)
-      self._text_cache[key] = cached
-      if len(self._text_cache) > 512:
-        self._text_cache.popitem(last=False)
+      cached = TextGlyph(text, font, stroke_width)
+      if cached.byte_size <= TEXT_CACHE_MAX_BYTES:
+        self._text_cache[key] = cached
+        self._text_cache_bytes += cached.byte_size
+        while len(self._text_cache) > TEXT_CACHE_MAX_ENTRIES or self._text_cache_bytes > TEXT_CACHE_MAX_BYTES:
+          _, evicted = self._text_cache.popitem(last=False)
+          self._text_cache_bytes -= evicted.byte_size
     else:
       self._text_cache.move_to_end(key)
 
-    sprite, anchor_x, anchor_y = cached
+    sprite = cached.colored(fill, stroke)
     target = draw._image
-    target.paste(sprite, (int(cx) - anchor_x, int(cy) - anchor_y), sprite)
+    target.paste(sprite, (int(cx) - cached.anchor_x, int(cy) - cached.anchor_y), sprite)
 
   def _value(self, value, disabled="--"):
     try:

@@ -2,6 +2,7 @@ import signal
 import time
 import json
 from collections.abc import Mapping
+from time import thread_time
 
 import cv2
 import numpy as np
@@ -70,6 +71,7 @@ def cluster_main():
   loop_count = 0
   perf_started = time.monotonic()
   perf_render_time = 0.0
+  perf_render_cpu_time = 0.0
   perf_render_stages = dict.fromkeys(("camera_copy", "snapshot", "path", "hud"), 0.0)
   perf_frames = 0
   last_camera_frame = -1
@@ -128,7 +130,9 @@ def cluster_main():
         render_ready = False
       if render_ready:
         render_started = time.monotonic()
+        render_cpu_started = thread_time()
         frame_image = renderer.render(camera, models)
+        perf_render_cpu_time += thread_time() - render_cpu_started
         perf_render_time += time.monotonic() - render_started
         for stage in perf_render_stages:
           perf_render_stages[stage] += renderer.last_frame_timings[stage]
@@ -155,11 +159,13 @@ def cluster_main():
                             for stage, duration in perf_render_stages.items())
         flog(
           f"[CLUSTER_MAIN_PERF] fps={perf_frames / elapsed:.2f} | "
-          + f"render_avg={perf_render_time * 1000 / max(perf_frames, 1):.1f}ms | {stages} | "
+          + f"render_avg={perf_render_time * 1000 / max(perf_frames, 1):.1f}ms | "
+          + f"render_cpu_avg={perf_render_cpu_time * 1000 / max(perf_frames, 1):.1f}ms | {stages} | "
           + f"target={fps} | transport_skipped={blocked_frames - health_skipped} | health_skipped={health_skipped}",
         )
         perf_started = now
         perf_render_time = 0.0
+        perf_render_cpu_time = 0.0
         perf_render_stages = dict.fromkeys(perf_render_stages, 0.0)
         perf_frames = 0
         blocked_frames = 0

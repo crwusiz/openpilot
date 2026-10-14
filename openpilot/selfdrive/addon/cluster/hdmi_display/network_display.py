@@ -207,6 +207,16 @@ class ClusterNetworkDisplay:
     with self._ack_condition:
       return self._has_send_capacity_locked()
 
+  def has_prepare_capacity(self):
+    """A healthy stream may prepare one JPEG before a send credit is released.
+
+    The pipeline bounds this lookahead; byte/frame send admission stays strict.
+    Never prepare speculatively during an old ACK or a broken connection.
+    """
+    with self._ack_condition:
+      return (self.connected and self.streaming and not self._ack_closing and self._ack_error is None
+              and self._oldest_ack_age_locked() <= self.max_ack_age)
+
   def wait_for_send_capacity(self, frame_size=None):
     """Wait before selecting latest JPEG; a slow old ACK blocks admission."""
     started = time.monotonic()
@@ -302,8 +312,7 @@ class ClusterNetworkDisplay:
       self.record_stale_drop()
       return None
     started = time.monotonic()
-    self.sock.sendall(pack_frame_header(sequence, len(prepared.jpeg), FRAME_STREAM))
-    self.sock.sendall(prepared.jpeg)
+    self.sock.sendall(b"".join((pack_frame_header(sequence, len(prepared.jpeg), FRAME_STREAM), prepared.jpeg)))
     sent_at = time.monotonic()
     with self._ack_condition:
       if self._ack_closing or not self.connected:
@@ -329,8 +338,7 @@ class ClusterNetworkDisplay:
       if self.streaming:
         return self._send_streamed(prepared, sequence)
       started = time.monotonic()
-      self.sock.sendall(pack_frame_header(sequence, len(prepared.jpeg), FRAME_QUERY_STREAM))
-      self.sock.sendall(prepared.jpeg)
+      self.sock.sendall(b"".join((pack_frame_header(sequence, len(prepared.jpeg), FRAME_QUERY_STREAM), prepared.jpeg)))
       sent_at = time.monotonic()
       ack_sequence, status, flags = unpack_ack_info(recv_exact(self.sock, ACK_PACKET.size, timeout=self.ack_timeout))
       acknowledged_at = time.monotonic()
