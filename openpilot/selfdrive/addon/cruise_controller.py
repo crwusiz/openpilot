@@ -7,9 +7,7 @@ from types import SimpleNamespace
 from opendbc.car import structs
 from openpilot.common.params import Params
 from openpilot.common.constants import UnitConverter
-from openpilot.selfdrive.car.cruise import (V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_UNSET, V_CRUISE_INITIAL,
-                                            V_CRUISE_INITIAL_EXPERIMENTAL_MODE,
-                                            CRUISE_LONG_PRESS)
+from openpilot.selfdrive.car.cruise import V_CRUISE_MIN, V_CRUISE_MAX, V_CRUISE_UNSET, V_CRUISE_INITIAL,CRUISE_LONG_PRESS
 from opendbc.car.hyundai.values import Buttons
 from openpilot.selfdrive.addon.navi_controller import SpeedLimiter
 from openpilot.selfdrive.addon.navi_helpers import camera_limit_active
@@ -990,8 +988,7 @@ class CruiseController:
     return Buttons.RES_ACCEL if error > 0 else Buttons.SET_DECEL
 
   def _initialize_v_cruise(self, CS):
-    initial_kph = V_CRUISE_INITIAL_EXPERIMENTAL_MODE if self.experimental_mode else V_CRUISE_INITIAL
-    initial_speed_clu = self.conv.kph_to_clu(initial_kph)
+    initial_speed_clu = self.conv.kph_to_clu(V_CRUISE_INITIAL)
 
     if any(b.type in (ButtonType.accelCruise, ButtonType.resumeCruise) for b in CS.buttonEvents) and \
        self.conv.kph_to_clu(V_CRUISE_MIN) <= self.requested_speed_clu_last <= self.max_set_speed_clu:

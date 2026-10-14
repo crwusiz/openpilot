@@ -56,7 +56,6 @@ def load_cruise_controller():
   cruise_module.V_CRUISE_MAX = 145
   cruise_module.V_CRUISE_UNSET = 255
   cruise_module.V_CRUISE_INITIAL = 30
-  cruise_module.V_CRUISE_INITIAL_EXPERIMENTAL_MODE = 105
   cruise_module.CRUISE_LONG_PRESS = 50
   cruise_module.IMPERIAL_INCREMENT = 1.6
 
