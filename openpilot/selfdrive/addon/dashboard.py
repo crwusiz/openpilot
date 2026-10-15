@@ -16,9 +16,9 @@ import sys
 import time
 from pathlib import Path
 
-ADDON_PYTHONPATH = os.environ.get("ADDON_PYTHONPATH")
-if ADDON_PYTHONPATH and ADDON_PYTHONPATH not in sys.path:
-  sys.path.insert(0, ADDON_PYTHONPATH)
+from openpilot.selfdrive.addon.dependencies import activate_groups
+
+activate_groups(("dashboard",))
 
 try:
   from openpilot.common.realtime import set_core_affinity
@@ -783,7 +783,7 @@ def render_tab_toggles():
             label="Cluster display transport",
             on_change=on_transport_change,
           ).classes('w-full text-blue-200')
-          ui.label('The Cluster process restarts automatically when the transport changes.').classes(
+          ui.label('The Cluster process restarts automatically. A new display mode may need preparation while offroad.').classes(
             'text-[0.75rem] md:text-sm text-gray-400 -mt-3 ml-1'
           )
           if transport == "network":

@@ -1,0 +1,3 @@
+# C4 native WebRTC backend, matching teleoprtc_repo and uv.lock.
+# aiortc/PyAV are used on the Orange Pi, not by this sender.
+libdatachannel-py==2026.1.0.dev2

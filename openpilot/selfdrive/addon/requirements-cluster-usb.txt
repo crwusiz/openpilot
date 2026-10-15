@@ -1,0 +1,2 @@
+# USB-specific addition to requirements-cluster-jpeg.txt.
+pyusb==1.3.1

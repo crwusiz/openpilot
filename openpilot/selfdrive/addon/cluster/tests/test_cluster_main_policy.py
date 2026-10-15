@@ -6,6 +6,8 @@ from unittest.mock import Mock
 
 import pytest
 
+from openpilot.selfdrive.addon.cluster.cluster_frame_clock import ClusterFrameClock
+
 
 @pytest.fixture
 def cluster(monkeypatch):
@@ -16,6 +18,7 @@ def cluster(monkeypatch):
   pipeline.close.return_value = True
   camera, models, renderer = Mock(), Mock(), Mock()
   camera_factory = Mock(return_value=camera)
+  display_factory = Mock(return_value=display)
   policy = Mock(return_value=True)
   prefix = "openpilot.selfdrive.addon.cluster."
   modules = {
@@ -27,22 +30,56 @@ def cluster(monkeypatch):
     prefix + "cluster_models": SimpleNamespace(ClusterModels=lambda: models),
     prefix + "cluster_renderer": SimpleNamespace(ClusterRenderer=lambda c: renderer),
     prefix + "cluster_policy": SimpleNamespace(enforce_cluster_transport=policy),
+    prefix + "dependencies": SimpleNamespace(ensure_cluster_dependencies=Mock(return_value=True)),
+    prefix + "usb_display.turing_usb_display": SimpleNamespace(TuringUsbDisplay=display_factory),
+    prefix + "hdmi_display.network_display": SimpleNamespace(ClusterNetworkDisplay=display_factory),
+    prefix + "cluster_frame_clock": SimpleNamespace(ClusterFrameClock=lambda fps: module.ClusterFrameClock(fps)),
   }
   for name, module in modules.items():
     monkeypatch.setitem(sys.modules, name, module)
-  spec = importlib.util.spec_from_file_location("cluster_main_under_test", Path(__file__).parents[1] / "main.py")
+  spec = importlib.util.spec_from_file_location("cluster_runtime_under_test", Path(__file__).parents[1] / "cluster_jpeg_runtime.py")
   module = importlib.util.module_from_spec(spec)
   spec.loader.exec_module(module)
-  module.create_cluster_display = Mock(return_value=display)
+  module.ClusterFrameClock = ClusterFrameClock
+  monkeypatch.setitem(sys.modules, prefix + "cluster_jpeg_runtime", module)
+  for backend in ("usb_display", "hdmi_display"):
+    spec = importlib.util.spec_from_file_location(prefix + backend + ".main", Path(__file__).parents[1] / backend / "main.py")
+    backend_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(backend_module)
+    if backend == "usb_display":
+      monkeypatch.setattr(backend_module, "configure_usb_runtime", Mock())
+    monkeypatch.setitem(sys.modules, prefix + backend + ".main", backend_module)
+  spec = importlib.util.spec_from_file_location("cluster_main_under_test", Path(__file__).parents[1] / "main.py")
+  entrypoint = importlib.util.module_from_spec(spec)
+  spec.loader.exec_module(entrypoint)
+  module.cluster_main = entrypoint.cluster_main
+  module.close_log = entrypoint.close_log
   monkeypatch.setattr(module.signal, "signal", Mock())
   return SimpleNamespace(module=module, config=config, display=display, pipeline=pipeline, policy=policy,
-                         camera=camera, camera_factory=camera_factory, models=models)
+                         camera=camera, camera_factory=camera_factory, display_factory=display_factory, models=models,
+                         entrypoint=entrypoint)
 
 
 def test_existing_egpu_prevents_opening_usb_display(cluster):
   cluster.policy.return_value = False
   cluster.module.cluster_main()
-  cluster.module.create_cluster_display.assert_not_called()
+  cluster.display_factory.assert_not_called()
+  cluster.module.close_log.assert_called_once()
+
+
+def test_configuration_error_still_closes_session_log(cluster, monkeypatch):
+  monkeypatch.setattr(cluster.entrypoint, "ClusterConfig", Mock(side_effect=ValueError("bad transport")))
+  with pytest.raises(ValueError, match="bad transport"):
+    cluster.module.cluster_main()
+  cluster.display_factory.assert_not_called()
+  cluster.module.close_log.assert_called_once()
+
+
+def test_backend_error_still_closes_session_log(cluster, monkeypatch):
+  backend = sys.modules["openpilot.selfdrive.addon.cluster.usb_display.main"]
+  monkeypatch.setattr(backend, "run_usb_cluster", Mock(side_effect=RuntimeError("backend startup failed")))
+  with pytest.raises(RuntimeError, match="backend startup failed"):
+    cluster.module.cluster_main()
   cluster.module.close_log.assert_called_once()
 
 
@@ -72,7 +109,7 @@ def test_h264_dispatch_does_not_start_jpeg_pipeline_or_raw_rgb_camera(cluster, m
   monkeypatch.setitem(sys.modules, "openpilot.selfdrive.addon.cluster.hdmi_display.network_h264", SimpleNamespace(run_h264_cluster=runner))
   cluster.module.cluster_main()
   runner.assert_called_once_with(cluster.config)
-  cluster.module.create_cluster_display.assert_not_called()
+  cluster.display_factory.assert_not_called()
   cluster.pipeline.start.assert_not_called()
   cluster.camera_factory.assert_not_called()
   cluster.module.close_log.assert_called_once()

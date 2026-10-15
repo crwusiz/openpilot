@@ -1,4 +1,6 @@
-nicegui==3.12.0
-ansi2html==1.9.2
-pyusb==1.3.1
-opencv-python-headless==5.0.0.93
+# All optional addon features for manual development installs.
+# Device startup selects only enabled groups; see DEPENDENCIES.md.
+-r requirements-dashboard.txt
+-r requirements-cluster-jpeg.txt
+-r requirements-cluster-usb.txt
+-r requirements-cluster-h264.txt

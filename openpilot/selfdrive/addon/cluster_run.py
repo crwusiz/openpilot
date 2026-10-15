@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import json
-import locale
 import os
 import sys
 from pathlib import Path
@@ -8,14 +7,6 @@ from pathlib import Path
 BASEDIR = Path(__file__).resolve().parents[3]
 if str(BASEDIR) not in sys.path:
   sys.path.insert(0, str(BASEDIR))
-
-ADDON_PYTHONPATH = os.environ.get("ADDON_PYTHONPATH")
-if ADDON_PYTHONPATH and ADDON_PYTHONPATH not in sys.path:
-  sys.path.insert(0, ADDON_PYTHONPATH)
-
-VENDOR_ROOT = Path(__file__).resolve().parent / "cluster" / "usb_display" / ".vendor" / "turing-smart-screen-python-main"
-if str(VENDOR_ROOT) not in sys.path:
-  sys.path.insert(0, str(VENDOR_ROOT))
 
 CLUSTER_CORES = [0, 1, 2]
 
@@ -55,21 +46,7 @@ def configure_cluster_runtime() -> None:
       cloudlog.warning(f"Failed to lower cluster scheduling priority: {e}")
 
 
-def configure_cluster_locale() -> None:
-  """Use a deterministic locale before loading the cluster and USB vendor code."""
-  for candidate in ("C.UTF-8", "C"):
-    try:
-      locale.setlocale(locale.LC_ALL, candidate)
-    except locale.Error:
-      continue
-    os.environ["LC_ALL"] = candidate
-    os.environ["LC_CTYPE"] = candidate
-    os.environ["LANG"] = candidate
-    return
-
-
 def main() -> None:
-  configure_cluster_locale()
   configure_cluster_runtime()
   from openpilot.common.realtime import set_core_affinity
   from openpilot.common.swaglog import cloudlog

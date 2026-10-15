@@ -4,6 +4,25 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 source "$DIR/launch_env.sh"
 
+function install_addon_dependencies {
+  local helper="$DIR/openpilot/selfdrive/addon/dependencies.py"
+  local -a selection=(selected --params-root "$PARAMS_ROOT/d")
+  if [ -f /AGNOS ]; then
+    export ADDON_DEPS_ROOT="${ADDON_DEPS_ROOT:-/data/addon_deps}"
+  fi
+  if python3 "$helper" "${selection[@]}" --check; then
+    return 0
+  fi
+  echo "Preparing enabled addon dependency groups..."
+  start_boot_spinner
+  if ! python3 "$helper" "${selection[@]}"; then
+    stop_boot_spinner
+    echo "Failed to prepare enabled addon dependencies"
+    return 1
+  fi
+  stop_boot_spinner
+}
+
 function agnos_init {
   # TODO: move this to agnos
   sudo rm -f /data/etc/NetworkManager/system-connections/*.nmmeta
@@ -148,8 +167,6 @@ function launch {
     echo -n 1 > /data/params/d/AdbEnabled
   fi
 
-  ADDON_REQUIREMENTS="$DIR/openpilot/selfdrive/addon/requirements.txt"
-  ADDON_REQUIREMENTS_HASH=$(sha256sum "$ADDON_REQUIREMENTS" | awk '{print $1}')
   BOOT_SPINNER_PID=""
 
   start_boot_spinner() {
@@ -168,44 +185,7 @@ function launch {
   trap stop_boot_spinner EXIT
   trap 'stop_boot_spinner; exit 1' INT TERM
 
-  if [ -f /AGNOS ]; then
-    ADDON_DEPS="/data/addon_deps"
-    ADDON_INSTALL_TMPDIR="/data/addon_pip_tmp"
-    mkdir -p "$ADDON_DEPS"
-    mkdir -p "$ADDON_INSTALL_TMPDIR"
-    export ADDON_PYTHONPATH="$ADDON_DEPS"
-    ADDON_REQUIREMENTS_MARKER="$ADDON_DEPS/.requirements_installed"
-    ADDON_INSTALLER=(python3 -m pip install --no-cache-dir --upgrade --target "$ADDON_DEPS")
-  else
-    ADDON_SITE_PACKAGES=$(python3 -c 'import sysconfig; print(sysconfig.get_path("purelib"))')
-    ADDON_REQUIREMENTS_MARKER="$ADDON_SITE_PACKAGES/.addon_requirements_installed"
-
-    if python3 -m pip --version &>/dev/null; then
-      ADDON_INSTALLER=(python3 -m pip install --break-system-packages)
-    elif command -v uv &>/dev/null; then
-      ADDON_INSTALLER=(uv pip install --python "$(command -v python3)")
-    else
-      echo "Neither pip nor uv is available for $(command -v python3)"
-      exit 1
-    fi
-  fi
-
-  if [ ! -f "$ADDON_REQUIREMENTS_MARKER" ] || [ "$(cat "$ADDON_REQUIREMENTS_MARKER")" != "$ADDON_REQUIREMENTS_HASH" ]; then
-    echo "Installing addon dependencies from $ADDON_REQUIREMENTS..."
-    start_boot_spinner
-    (
-      if [ -n "${ADDON_INSTALL_TMPDIR:-}" ]; then
-        export TMPDIR="$ADDON_INSTALL_TMPDIR"
-      fi
-      "${ADDON_INSTALLER[@]}" -r "$ADDON_REQUIREMENTS"
-    ) || {
-      stop_boot_spinner
-      echo "Failed to install addon dependencies"
-      exit 1
-    }
-    stop_boot_spinner
-    echo -n "$ADDON_REQUIREMENTS_HASH" > "$ADDON_REQUIREMENTS_MARKER"
-  fi
+  install_addon_dependencies || exit 1
 
   # start manager
   cd openpilot/system/manager

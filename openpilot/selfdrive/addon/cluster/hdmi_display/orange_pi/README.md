@@ -58,6 +58,8 @@ sudo bash /opt/cluster-receiver/scripts/diagnose.sh --egl
 
 ### Network 코덱 선택: JPEG / H.264
 
+C4의 `cluster_run.py`는 스레드·스케줄링·로그 설정을 준비하고 `cluster/main.py`를 실행합니다. 이곳에서 선택한 출력에 따라 `usb_display/main.py` 또는 `hdmi_display/main.py`를 불러옵니다. USB 벤더 경로·로케일 준비는 USB 실행에서만 수행하며, HDMI 실행은 JPEG/H.264를 선택합니다. JPEG의 카메라·계기 합성과 전송 파이프라인은 `cluster_jpeg_runtime.py`를 공유하고, H.264는 별도 실행 경로를 사용합니다.
+
 C4 대시보드의 **Toggles → Cluster Enable → Network → Cluster network codec**에서 선택합니다. `ClusterNetworkCodec`의 기본값은 `jpeg`이며, 저장된 값이 없거나 지원하지 않는 값이면 JPEG를 사용합니다. 이 선택은 Network에만 적용하며 USB 출력 방식은 유지합니다. 전송 방식이나 코덱을 바꾸면 C4 cluster 프로세스가 자동으로 재시작됩니다.
 
 | 선택 | C4 작업 | Pi 작업 |
