@@ -48,7 +48,6 @@ class ModelRenderer(Widget):
   def __init__(self):
     super().__init__()
     self._longitudinal_control = False
-    self._experimental_mode = False
     self._blend_filter = FirstOrderFilter(1.0, 0.25, 1 / gui_app.target_fps)
     self._prev_allow_throttle = True
     self._lane_line_probs = np.zeros(4, dtype=np.float32)
@@ -64,9 +63,6 @@ class ModelRenderer(Widget):
     self._lane_lines = [ModelPoints() for _ in range(4)]
     self._road_edges = [ModelPoints() for _ in range(2)]
     self._acceleration_x = np.empty((0,), dtype=np.float32)
-
-    self._acceleration_x_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
-    self._acceleration_x_filter2 = FirstOrderFilter(0.0, 1, 1 / gui_app.target_fps)
 
     # 3x3 car space -> rect-origin space (draw methods add rect.x/y)
     self._car_space_transform = np.zeros((3, 3), dtype=np.float32)
@@ -108,9 +104,6 @@ class ModelRenderer(Widget):
     self._clip_region = rl.Rectangle(
       rect.x - CLIP_MARGIN, rect.y - CLIP_MARGIN, rect.width + 2 * CLIP_MARGIN, rect.height + 2 * CLIP_MARGIN
     )
-
-    # Update state
-    self._experimental_mode = sm['selfdriveState'].experimentalMode
 
     extrinsics_calibration = sm['extrinsicsCalibration']
     self._path_offset_z = extrinsics_calibration.height[0] if extrinsics_calibration.height else HEIGHT_INIT[0]
@@ -232,29 +225,15 @@ class ModelRenderer(Widget):
       lead_d = lead.dRel * 2.0
       max_distance = np.clip(lead_d - min(lead_d * 0.35, 10.0), 0.0, max_distance)
 
-    soon_acceleration = self._acceleration_x[len(self._acceleration_x) // 4] if len(self._acceleration_x) > 0 else 0
-    self._acceleration_x_filter.update(soon_acceleration)
-    self._acceleration_x_filter2.update(soon_acceleration)
-
-    # make path width wider/thinner when initially braking/accelerating
-    if self._experimental_mode and False:
-      high_pass_acceleration = self._acceleration_x_filter.x - self._acceleration_x_filter2.x
-      y_off = np.interp(high_pass_acceleration, [-1, 0, 1], [0.9 * 2, 0.9, 0.9 / 2])
-    else:
-      y_off = 0.9
-
     max_idx = self._get_path_length_idx(path_x_array, max_distance)
     self._path.projected_points = self._map_line_to_polygon(
-      self._path.raw_points, y_off, self._path_offset_z, max_idx, allow_invert=False
+      self._path.raw_points, 0.9, self._path_offset_z, max_idx, allow_invert=False
     )
 
     self._update_experimental_gradient()
 
   def _update_experimental_gradient(self):
     """Pre-calculate experimental mode gradient colors"""
-    #if not self._experimental_mode:
-    #  return
-
     path_pts = self._path.projected_points + np.array([self._rect.x, self._rect.y], dtype=np.float32)
     max_len = min(len(path_pts) // 2, len(self._acceleration_x))
 

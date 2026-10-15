@@ -76,9 +76,6 @@ class Colors:
   ALERT_ACTIVE = rl.Color(255, 70, 70, 255)
   ALERT_INACTIVE = rl.Color(226, 44, 44, 255)
 
-  EXPERIMENTAL_START = rl.Color(255, 155, 63, 255)
-  EXPERIMENTAL_END = rl.Color(219, 56, 34, 255)
-
   CHILL_START = rl.Color(20, 255, 171, 255)
   CHILL_END = rl.Color(35, 149, 255, 255)
 

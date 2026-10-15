@@ -229,7 +229,6 @@ class CruiseController:
     self.CI = CI
 
     self.params = Params()
-    self.experimental_mode = self.params.get_bool("ExperimentalMode")
 
     self.conv = UnitConverter()
     self.btn_handler = CruiseButtonHandler()
@@ -1311,11 +1310,6 @@ class CruiseStateManager:
       elif self.available and not CS.brakePressed and CS.gearShifter != GearShifter.park:
         self.enabled = True
         v_cruise_kph = max(np.clip(round(cluster_speed_clu), min_speed_clu, max_speed_clu), initial_speed_clu)
-
-    elif btn == ButtonType.gapAdjustCruise:
-      if long_pressed:
-        current_exp_mode = self.params.get_bool("ExperimentalMode")
-        self.params.put_bool("ExperimentalMode", not current_exp_mode, block=False)
 
     elif btn == ButtonType.cancel:
       if long_pressed:

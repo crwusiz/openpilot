@@ -1,8 +1,7 @@
 import pyray as rl
 from dataclasses import dataclass
 from openpilot.common.constants import CV
-from openpilot.selfdrive.ui.onroad.exp_button import ExpButton
-from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus, ChestnutState
+from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
@@ -113,8 +112,6 @@ class HudRenderer(Widget):
     self._font_semi_bold: rl.Font = gui_app.font(FontWeight.SEMI_BOLD)
     self._font_bold: rl.Font = gui_app.font(FontWeight.BOLD)
 
-    self._exp_button: ExpButton = ExpButton(UIConfig.button_size, UIConfig.icon_size)
-
     # Initialize icon indicators
     self._init_icon_indicators()
 
@@ -160,13 +157,6 @@ class HudRenderer(Widget):
     self.wheel_green_img = gui_app.texture("icons/steer_green.png", icon_size, icon_size)
     self.wheel_blue_img = gui_app.texture("icons/steer_blue.png", icon_size, icon_size)
     self.wheel_critical_img = gui_app.texture("icons/steer_critical.png", icon_size, icon_size)
-
-    # Chestnut model source
-    chestnut_width = icon_size
-    self.chestnut_img = gui_app.texture("icons_mici/chestnut.png", chestnut_width, chestnut_width * 44 / 60)
-    self.chestnut_green_img = gui_app.texture("icons_mici/chestnut_green.png", chestnut_width, chestnut_width * 44 / 60)
-    self.chestnut_orange_img = gui_app.texture("icons_mici/chestnut_orange.png", chestnut_width * 75 / 60,
-                                               chestnut_width * 44 / 60)
 
     # WiFi textures for state switching
     self.wifi_l_img = gui_app.texture("icons/wifi_strength_low.png", icon_size, icon_size)
@@ -369,36 +359,6 @@ class HudRenderer(Widget):
 
     self._draw_blinkers(rect)
     self._draw_blind_spot_detect(rect)
-
-    button_x = rect.x + rect.width - UIConfig.border_size - UIConfig.button_size + 10
-    button_y = rect.y + UIConfig.border_size + 10
-    exp_button_rect = rl.Rectangle(button_x, button_y, UIConfig.button_size, UIConfig.button_size)
-    self._exp_button.render(exp_button_rect)
-
-    self._draw_model_source(exp_button_rect)
-
-  def user_interacting(self) -> bool:
-    return self._exp_button.is_pressed
-
-  def _draw_model_source(self, exp_button_rect: rl.Rectangle) -> None:
-    if ui_state.sm.recv_frame['selfdriveState'] < ui_state.started_frame:
-      return
-
-    if ui_state.chestnut_state == ChestnutState.LOADING:
-      icon = self.chestnut_img
-      opacity = 0.35 + 0.65 * (0.5 - 0.5 * math.cos(rl.get_time() * 6.0))
-    elif ui_state.chestnut_state in (ChestnutState.UNCOMPILED, ChestnutState.FAILED):
-      icon = self.chestnut_orange_img
-      opacity = 1.0
-    elif ui_state.chestnut_state == ChestnutState.ACTIVE:
-      icon = self.chestnut_green_img
-      opacity = 1.0
-    else:
-      return
-
-    pos = rl.Vector2(exp_button_rect.x + (exp_button_rect.width - icon.width) / 2,
-                     exp_button_rect.y + exp_button_rect.height + 20)
-    rl.draw_texture_ex(icon, pos, 0.0, 1.0, rl.Color(255, 255, 255, int(255 * opacity * WHEEL_ICON_OPACITY)))
 
   def _draw_upper_icons(self, rect: rl.Rectangle) -> None:
     icon_size = UIConfig.icon_size

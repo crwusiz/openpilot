@@ -225,9 +225,8 @@ class AugmentedRoadView(CameraView):
     # Update calibration before rendering
     self._update_calibration()
 
-    self._navigation.update()
     alert_to_render, not_animating_out = self._alert_renderer.will_render()
-    show_navigation = self._navigation.active and alert_to_render is None
+    show_navigation = ui_state.navigation_enabled and ui_state.nav_destination_set and alert_to_render is None
 
     # Create inner content area with border padding
     self._content_rect = rl.Rectangle(
@@ -280,12 +279,12 @@ class AugmentedRoadView(CameraView):
     # End clipping region
     rl.end_scissor_mode()
 
-    if show_navigation:
-      self._navigation.render(rl.Rectangle(self._content_rect.x + self._content_rect.width, self.rect.y, PANEL_WIDTH, self.rect.height))
-
     # Custom UI extension point - add custom overlays here
     # Use self._content_rect for positioning within camera bounds
-    #self._confidence_ball.render(self.rect)
+    if show_navigation:
+      self._navigation.render(rl.Rectangle(self._content_rect.x + self._content_rect.width, self.rect.y, PANEL_WIDTH, self.rect.height))
+    else:
+      self._confidence_ball.render(self.rect)
 
     #self._bookmark_icon.render(self.rect)
 
@@ -297,7 +296,6 @@ class AugmentedRoadView(CameraView):
     if ui_state.show_driver_camera:
       target = CABIN_CAM
     else:
-      #if sm['selfdriveState'].experimentalMode and WIDE_CAM in self.available_streams:
       if WIDE_CAM in self.available_streams:
         v_ego = sm['carState'].vEgo
         if v_ego < WIDE_CAM_MAX_SPEED:

@@ -48,7 +48,6 @@ class ModelRenderer(Widget):
   def __init__(self):
     super().__init__()
     self._longitudinal_control = False
-    self._experimental_mode = False
     self._blend_filter = FirstOrderFilter(1.0, 0.25, 1 / gui_app.target_fps)
     self._prev_allow_throttle = True
     self._lane_line_probs = np.zeros(4, dtype=np.float32)
@@ -109,9 +108,6 @@ class ModelRenderer(Widget):
     self._clip_region = rl.Rectangle(
       rect.x - CLIP_MARGIN, rect.y - CLIP_MARGIN, rect.width + 2 * CLIP_MARGIN, rect.height + 2 * CLIP_MARGIN
     )
-
-    # Update state
-    self._experimental_mode = sm['selfdriveState'].experimentalMode
 
     # Update speed and blindspot info
     car_state = sm['carState']
@@ -258,9 +254,6 @@ class ModelRenderer(Widget):
 
   def _update_experimental_gradient(self):
     """Pre-calculate experimental mode gradient colors"""
-    #if not self._experimental_mode:
-    #  return
-
     max_len = min(len(self._path.projected_points) // 2, len(self._acceleration_x))
 
     segment_colors = []

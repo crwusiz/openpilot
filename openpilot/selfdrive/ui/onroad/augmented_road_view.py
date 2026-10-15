@@ -3,7 +3,7 @@ import pyray as rl
 from openpilot.cereal import log
 from openpilot.cereal.visionipc import VisionStreamType
 from openpilot.selfdrive.ui import Colors, UI_BORDER_SIZE
-from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.selfdrive.ui.onroad.alert_renderer import AlertRenderer
 from openpilot.selfdrive.ui.onroad.driver_state import DriverStateRenderer
 from openpilot.selfdrive.ui.onroad.hud_renderer import HudRenderer
@@ -13,6 +13,7 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.common.transformations.camera import DEVICE_CAMERAS, DeviceCameraConfig, view_frame_from_device_frame
 from openpilot.common.transformations.orientation import rot_from_euler
 
+OpState = log.SelfdriveState.OpenpilotState
 CALIBRATED = log.ExtrinsicsCalibration.Status.calibrated
 NARROW_ROAD_CAM = VisionStreamType.VISION_STREAM_NARROW_ROAD
 WIDE_CAM = VisionStreamType.VISION_STREAM_WIDE_ROAD
@@ -88,11 +89,11 @@ class AugmentedRoadView(CameraView):
     self._draw_border(rect)
 
   def _handle_mouse_press(self, _):
-    if not self._hud_renderer.user_interacting() and self._click_callback is not None:
+    if self._click_callback is not None:
       self._click_callback()
 
   def _handle_mouse_release(self, _):
-    # We only call click callback on press if not interacting with HUD
+    # We only call click callback on press
     pass
 
   def _draw_border(self, rect: rl.Rectangle):
@@ -108,7 +109,6 @@ class AugmentedRoadView(CameraView):
     if ui_state.show_driver_camera:
       target = CABIN_CAM
     else:
-      #if sm['selfdriveState'].experimentalMode and WIDE_CAM in self.available_streams:
       if WIDE_CAM in self.available_streams:
         v_ego = sm['carState'].vEgo
         if v_ego < WIDE_CAM_MAX_SPEED:
