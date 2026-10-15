@@ -65,6 +65,28 @@ def test_network_shutdown_still_clears_display(cluster):
   cluster.display.close.assert_called_once()
 
 
+def test_h264_dispatch_does_not_start_jpeg_pipeline_or_raw_rgb_camera(cluster, monkeypatch):
+  cluster.config.display_transport = "network"
+  cluster.config.network_codec = "h264"
+  runner = Mock()
+  monkeypatch.setitem(sys.modules, "openpilot.selfdrive.addon.cluster.hdmi_display.network_h264", SimpleNamespace(run_h264_cluster=runner))
+  cluster.module.cluster_main()
+  runner.assert_called_once_with(cluster.config)
+  cluster.module.create_cluster_display.assert_not_called()
+  cluster.pipeline.start.assert_not_called()
+  cluster.camera_factory.assert_not_called()
+  cluster.module.close_log.assert_called_once()
+
+
+def test_jpeg_restarts_when_network_codec_is_changed(cluster, monkeypatch):
+  cluster.config.display_transport = "network"
+  cluster.config.network_codec = "jpeg"
+  cluster.config.params.get.side_effect = {"ClusterDisplayTransport": "network", "ClusterNetworkCodec": "h264"}.get
+  cluster.module.cluster_main()
+  cluster.pipeline.push.assert_not_called()
+  cluster.pipeline.close.assert_called_once()
+
+
 def test_network_display_clock_skips_heavy_work_when_transport_has_no_capacity(cluster, monkeypatch):
   cluster.config.display_transport = "network"
   cluster.config.fps = 60

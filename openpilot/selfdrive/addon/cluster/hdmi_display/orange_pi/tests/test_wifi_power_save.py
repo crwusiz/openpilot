@@ -258,6 +258,7 @@ def test_install_repairs_existing_wifi_without_changing_receiver_or_desktop(scri
     path = bin_dir / command
     path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8", newline="\n")
     path.chmod(0o755)
+  env["CLUSTER_OS_PYTHON"] = "mock-python"
   result = _run_script(script_sandbox, "install.sh", extra_env=env)
   assert result.returncode == 0, result.stdout + result.stderr
   dispatcher = root / env["TEST_DISPATCHER_DIR"] / "90-cluster-wifi-power"

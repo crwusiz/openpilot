@@ -442,6 +442,7 @@ def update_sandbox(script_sandbox):
     "MOCK_START_COUNT_FILE": "start-count", "MOCK_INVOCATION_COUNT_FILE": "invocation-count",
     "MOCK_WINDOWS_MODES": "1" if os.name == "nt" else "0",
     "TEST_WIFI_CONF": "unit dropins/wifi.conf", "TEST_WIFI_DISPATCHER": "NM dispatcher/90-cluster-wifi-power",
+    "CLUSTER_OS_PYTHON": "preflight-python",
   }
   target = root / environment["TEST_TARGET_DIR"]
   incoming = root / "incoming with spaces"
@@ -455,10 +456,16 @@ def update_sandbox(script_sandbox):
   # The first update must work when the previously installed release has no
   # updater, and recovery must keep working after that release is restored.
   shutil.copyfile(updater, incoming / "scripts" / "update.sh")
-  for name in ("cluster_protocol.py", "frame_stream.py", "display_controls.py", "texture_presenter.py", "tcp_diagnostics.py", "receiver_build.py"):
+  for name in ("cluster_protocol.py", "frame_stream.py", "display_controls.py", "texture_presenter.py", "tcp_diagnostics.py", "receiver_build.py",
+               "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "cluster_renderer.py", "cluster_render_support.py"):
     (incoming / name).write_text("# current runtime dependency\n", encoding="utf-8", newline="\n")
-  for name in ("ensure_wifi.sh", "wifi_boot_setup.sh", "wifi_power_save.sh"):
+  for name in ("ensure_wifi.sh", "wifi_boot_setup.sh", "wifi_power_save.sh", "prepare_h264.sh", "package_sources.sh"):
     shutil.copyfile(scripts / name, incoming / "scripts" / name)
+  (incoming / "receiver_assets.txt").write_text("assets/fonts/Inter-Bold.ttf\nassets/fonts/Inter-Regular.ttf\nassets/icons/steer.png\n")
+  for name in (incoming / "receiver_assets.txt").read_text().splitlines():
+    path = incoming / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"new asset\x00\r\n")
   helper = incoming / "scripts" / "wifi_boot_setup.sh"
   helper.write_text(helper.read_text(encoding="utf-8")
                     .replace("TARGET=/opt/cluster-receiver", 'TARGET="$TEST_TARGET_DIR"')
@@ -499,6 +506,7 @@ if [[ ${MOCK_MISSING_READY:-} == 1 && $count == 1 ]]; then
 else printf 'Cluster receiver ready\\nOrange Pi HDMI display ready\\n'; fi''',
     "preflight-python": '''cat > /dev/null
 if [[ ${MOCK_PREFLIGHT_ERROR:-} == 1 ]]; then printf 'Python preflight failed\\n' >&2; exit 1; fi''',
+    "apt-get": "printf 'optional apt %s\\n' \"$*\" >> \"$SYSTEMCTL_CALL_LOG\"; exit 1",
     "sleep": "exit 0",
     "flock": "[[ ${MOCK_LOCK_ERROR:-} != 1 ]]",
     "install": '''if [[ ${MOCK_COPY_ERROR:-} == 1 && "$*" == *"incoming with spaces/hdmi_display.py"* && "$*" == *".cluster-file."* ]]; then
@@ -557,7 +565,7 @@ def test_remote_update_and_manual_rollback_preserve_configuration(update_sandbox
   assert not (target / "scripts" / "update.sh").exists()
   assert (state / "update.sh").exists()
   # Recovery always has a standalone script outside the runtime directory.
-  result = _run_script(sandbox, f"../../{environment['TEST_UPDATE_STATE_DIR']}/update.sh", "rollback", extra_env=environment)
+  result = _run_script(sandbox, f"../../{environment['TEST_UPDATE_STATE_DIR']}/update.sh", "rollback", extra_env=environment, timeout=30)
   assert result.returncode == 0, result.stdout + result.stderr
   assert (target / "cluster_receiver.py").read_text() == "# new\n"
   calls = (root / "systemctl.log").read_text().splitlines()
@@ -661,3 +669,78 @@ def test_update_keeps_explicitly_stopped_service_stopped(update_sandbox):
   assert (target / "cluster_receiver.py").read_text() == "# new\n"
   calls = (sandbox[1].parent / "systemctl.log").read_text().splitlines()
   assert not any(line.startswith("start ") for line in calls)
+
+
+def test_update_and_rollback_restore_binary_assets_with_runtime(update_sandbox):
+  _sandbox, _environment, target, incoming = update_sandbox
+  old_font = target / "assets/fonts/Inter-Bold.ttf"
+  old_font.parent.mkdir(parents=True)
+  old_font.write_bytes(b"old font\x00\r\n")
+  (target / "receiver_assets.txt").write_text("assets/fonts/Inter-Bold.ttf\n")
+  result = _update(update_sandbox)
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert old_font.read_bytes() == (incoming / "assets/fonts/Inter-Bold.ttf").read_bytes()
+  assert (target / "assets/icons/steer.png").exists()
+  result = _update(update_sandbox, "rollback")
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert old_font.read_bytes() == b"old font\x00\r\n"
+  assert (target / "receiver_assets.txt").read_text() == "assets/fonts/Inter-Bold.ttf\n"
+  assert not (target / "assets/fonts/Inter-Regular.ttf").exists()
+  assert not (target / "assets/icons/steer.png").exists()
+
+
+@pytest.mark.parametrize("destination", [False, True])
+def test_asset_directory_symlinks_are_rejected_before_service_stop(update_sandbox, destination):
+  sandbox, _environment, target, incoming = update_sandbox
+  outside = sandbox[1].parent / "outside fonts"
+  if destination:
+    outside.mkdir()
+    (outside / "unchanged").write_text("keep")
+    assets = target / "assets"
+    assets.mkdir()
+    fonts = assets / "fonts"
+  else:
+    fonts = incoming / "assets/fonts"
+    fonts.rename(outside)
+  try:
+    fonts.symlink_to(outside, target_is_directory=True)
+  except OSError:
+    pytest.skip("Directory symlink creation is unavailable")
+  result = _update(update_sandbox)
+  assert result.returncode != 0
+  assert "Unsafe" in result.stderr or "symlink" in result.stderr
+  log = sandbox[1].parent / "systemctl.log"
+  assert not log.exists() or "stop cluster-hdmi.service" not in log.read_text()
+  if destination:
+    assert (outside / "unchanged").read_text() == "keep"
+
+
+def test_optional_dependency_failure_keeps_update_available_and_precedes_stop(update_sandbox):
+  sandbox, _environment, target, incoming = update_sandbox
+  (incoming / "scripts/prepare_h264.sh").write_text(
+    '#!/bin/bash\nprintf "optional_prepare\\n" >> "$SYSTEMCTL_CALL_LOG"\nexit 1\n', encoding="utf-8", newline="\n",
+  )
+  _write_checksums(incoming)
+  result = _update(update_sandbox)
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert "Optional preparation failed; JPEG remains available" in result.stderr
+  assert (target / "cluster_receiver.py").read_text() == "# new\n"
+  calls = (sandbox[1].parent / "systemctl.log").read_text().splitlines()
+  assert calls.index("optional_prepare") < calls.index("stop cluster-hdmi.service")
+
+
+def test_optional_dependency_installer_warns_without_mutating_service(script_sandbox):
+  scripts, bin_dir = script_sandbox
+  for name, body in {
+    "missing-deps-python": "exit 1",
+    "apt-get": 'printf "%s\\n" "$*" >> deps.log; exit 1',
+  }.items():
+    path = bin_dir / name
+    path.write_text("#!/bin/bash\n" + body + "\n", encoding="utf-8", newline="\n")
+    path.chmod(0o755)
+  result = _run_script(script_sandbox, "prepare_h264.sh", extra_env={"CLUSTER_OS_PYTHON": "missing-deps-python"})
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert "H.264 dependencies are unavailable. JPEG remains available" in result.stderr
+  calls = (bin_dir.parent / "deps.log").read_text()
+  assert "python3-aiortc python3-av python3-numpy python3-pil python3-opencv" in calls
+  assert not (bin_dir.parent / "systemctl.log").exists()

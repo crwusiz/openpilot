@@ -71,20 +71,9 @@ fi
 
 files=()
 if (( ! rollback )); then
-  [[ ! -L "$PACKAGE_DIR/scripts" ]] || fail 'Package scripts must not be a symlink.'
-  files=(README.md requirements.txt cluster-hdmi.service)
-  for source in "$PACKAGE_DIR"/*.py "$PACKAGE_DIR"/scripts/*.sh; do
-    [[ -f "$source" ]] || continue
-    files+=("${source#"$PACKAGE_DIR/"}")
-  done
-  for relative in "${files[@]}"; do
-    [[ "$relative" =~ ^([a-zA-Z0-9_]+\.py|README\.md|requirements\.txt|cluster-hdmi\.service|scripts/[a-zA-Z0-9_-]+\.sh)$ ]] || fail "Unexpected package filename: $relative"
-    [[ -f "$PACKAGE_DIR/$relative" && ! -L "$PACKAGE_DIR/$relative" ]] || fail "Missing or symlink package file: $relative"
-  done
-  for required in cluster_receiver.py cluster_protocol.py hdmi_display.py frame_stream.py display_controls.py texture_presenter.py tcp_diagnostics.py receiver_build.py scripts/common.sh \
-    scripts/update.sh scripts/ssh_port.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh; do
-    [[ " ${files[*]} " == *" $required "* ]] || fail "Package is missing $required."
-  done
+  [[ ! -L "$PACKAGE_DIR/scripts" && ! -L "$PACKAGE_DIR/scripts/package_sources.sh" ]] || fail 'Unsafe package source helper.'
+  source "$PACKAGE_DIR/scripts/package_sources.sh"
+  package_collect_files
   printf 'Update %s@%s:%s with %s receiver files from C4.\n' "$ssh_user" "$pi_host" "$ssh_port" "${#files[@]}"
 else
   printf 'Restore the previous receiver files on %s@%s:%s.\n' "$ssh_user" "$pi_host" "$ssh_port"
@@ -203,9 +192,15 @@ if (( rollback )); then
 fi
 payload="$local_directory/payload"
 mkdir -p -- "$payload/scripts"
-for relative in "${files[@]}"; do
-  # Normalize a checkout made with CRLF; the package is UTF-8 text.
-  sed 's/\r$//' "$PACKAGE_DIR/$relative" > "$payload/$relative"
+for index in "${!files[@]}"; do
+  relative=${files[index]}
+  if [[ "$relative" == */* ]]; then mkdir -p -- "$payload/${relative%/*}"; fi
+  if [[ "$relative" == assets/* ]]; then
+    cp -- "${file_sources[index]}" "$payload/$relative"
+  else
+    # Normalize only text. PNG/font bytes must retain their original checksums.
+    sed 's/\r$//' "${file_sources[index]}" > "$payload/$relative"
+  fi
 done
 (cd -- "$payload" && sha256sum -- "${files[@]}" > SHA256SUMS)
 remote_directory=$(ssh "${ssh_options[@]}" "$pi_host" 'mktemp -d /tmp/cluster-update.XXXXXXXX')

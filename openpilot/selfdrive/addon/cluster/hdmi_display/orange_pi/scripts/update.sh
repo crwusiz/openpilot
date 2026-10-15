@@ -18,7 +18,16 @@ wifi_rollback_snapshot=''
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 valid_file() {
-  [[ "$1" =~ ^([a-zA-Z0-9_]+\.py|README\.md|requirements\.txt|cluster-hdmi\.service|scripts/[a-zA-Z0-9_-]+\.sh)$ ]]
+  [[ "$1" =~ ^([a-zA-Z0-9_]+\.py|README\.md|requirements\.txt|receiver_assets\.txt|cluster-hdmi\.service|scripts/[a-zA-Z0-9_-]+\.sh|assets/fonts/[a-zA-Z0-9_-]+\.ttf|assets/icons/[a-zA-Z0-9_-]+\.png)$ ]]
+}
+safe_parents() {
+  local directory=$1 name=$2 parent=$2
+  [[ ! -L "$directory/$name" ]] || return 1
+  while [[ "$parent" == */* ]]; do
+    parent=${parent%/*}
+    [[ ! -L "$directory/$parent" ]] || return 1
+    [[ ! -e "$directory/$parent" || -d "$directory/$parent" ]] || return 1
+  done
 }
 read_manifest() {
   local directory=$1 line name hash required
@@ -29,6 +38,7 @@ read_manifest() {
     name=${line:66}
     [[ "$hash" =~ ^[a-f0-9]{64}$ && ( "${line:64:2}" == '  ' || "${line:64:2}" == ' *' ) ]] || fail 'Invalid checksum entry.'
     valid_file "$name" || fail "Unexpected payload path: $name"
+    safe_parents "$directory" "$name" || fail "Unsafe payload directory: $name"
     [[ -f "$directory/$name" && ! -L "$directory/$name" ]] || fail "Missing or symlink payload file: $name"
     [[ " ${FILES[*]} " != *" $name "* ]] || fail "Duplicate payload path: $name"
     FILES+=("$name")
@@ -40,6 +50,7 @@ read_manifest() {
 }
 copy_file() {
   local source=$1 destination=$2 temporary
+  safe_parents "$TARGET" "${destination#"$TARGET/"}" || return 1
   install -d -m 755 -- "${destination%/*}" || return 1
   temporary=$(mktemp "${destination%/*}/.cluster-file.XXXXXXXX") || return 1
   if ! install -m 644 -- "$source" "$temporary"; then
@@ -123,6 +134,7 @@ restore_backup() {
   systemctl stop "$UNIT" || return 1
   while IFS= read -r name; do
     valid_file "$name" || return 1
+    safe_parents "$TARGET" "$name" || return 1
     if [[ ! -f "$backup/previous/$name" ]]; then
       rm -f -- "$TARGET/$name" || return 1
     fi
@@ -194,13 +206,24 @@ if [[ $1 == apply ]]; then
   # Rollback manifests may belong to releases predating these helpers. Require
   # the current receiver dependencies only for a newly uploaded package.
   for name in cluster_protocol.py frame_stream.py display_controls.py texture_presenter.py tcp_diagnostics.py receiver_build.py \
+    h264_receiver.py h264_protocol.py h264_scene.py cluster_renderer.py cluster_render_support.py receiver_assets.txt \
+    assets/fonts/Inter-Bold.ttf assets/fonts/Inter-Regular.ttf scripts/prepare_h264.sh scripts/package_sources.sh \
     scripts/update.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh; do
     [[ " ${FILES[*]} " == *" $name "* ]] || fail "Payload is missing $name."
   done
+  while IFS= read -r name || [[ -n "$name" ]]; do
+    name=${name%$'\r'}
+    [[ "$name" =~ ^assets/(fonts/[a-zA-Z0-9_-]+\.ttf|icons/[a-zA-Z0-9_-]+\.png)$ ]] || fail 'Invalid receiver asset path.'
+    [[ " ${FILES[*]} " == *" $name "* ]] || fail "Payload is missing $name."
+  done < "$source_dir/receiver_assets.txt"
 fi
 for name in "${FILES[@]}"; do
   [[ "$name" != scripts/*.sh ]] || bash -n "$source_dir/$name"
 done
+if [[ $1 == apply ]]; then
+  # Keep the live JPEG receiver running while optional packages are prepared.
+  bash "$source_dir/scripts/prepare_h264.sh" || printf '[CLUSTER_H264_DEPS] Optional preparation failed; JPEG remains available.\n' >&2
+fi
 # Compile and import without initializing HDMI or writing bytecode. Run this
 # before stopping the old receiver, using the same OS Python as the service.
 PYGAME_HIDE_SUPPORT_PROMPT=1 PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 - "$source_dir" <<'PY'
@@ -231,12 +254,18 @@ printf '%s\n' "$resume" > "$backup/resume"
 snapshot_wifi_state "$backup/wifi-system" || fail 'Cannot safely back up receiver Wi-Fi setup.'
 install -d -m 700 -- "$backup/previous/scripts"
 shopt -s nullglob
-for path in "$TARGET"/*.py "$TARGET"/scripts/*.sh "$TARGET/README.md" "$TARGET/requirements.txt" "$TARGET/cluster-hdmi.service"; do
+previous_paths=("$TARGET"/*.py "$TARGET"/scripts/*.sh "$TARGET/README.md" "$TARGET/requirements.txt" "$TARGET/receiver_assets.txt" "$TARGET/cluster-hdmi.service")
+[[ ! -L "$TARGET/assets" ]] || fail 'Unsafe installed assets directory.'
+if [[ -d "$TARGET/assets" ]]; then
+  [[ -z $(find "$TARGET/assets" -type l -print -quit) ]] || fail 'Installed assets contain symlinks.'
+  while IFS= read -r -d '' path; do previous_paths+=("$path"); done < <(find "$TARGET/assets" -type f -print0)
+fi
+for path in "${previous_paths[@]}"; do
   [[ -e "$path" || -L "$path" ]] || continue
   [[ ! -L "$path" && -f "$path" ]] || fail "Unsafe installed file: $path"
   name=${path#"$TARGET/"}
   valid_file "$name" || fail "Unexpected installed filename: $name"
-  install -m 644 -- "$path" "$backup/previous/$name"
+  install -D -m 644 -- "$path" "$backup/previous/$name"
   printf '%s\n' "$name" >> "$backup/previous-files"
   (cd -- "$backup/previous" && sha256sum --binary -- "$name") >> "$backup/previous/SHA256SUMS"
 done
@@ -259,6 +288,7 @@ for name in "${FILES[@]}"; do
   copy_file "$source_dir/$name" "$TARGET/$name"
 done
 for name in "${REMOVE[@]}"; do
+  safe_parents "$TARGET" "$name" || fail "Unsafe installed removal path: $name"
   rm -f -- "$TARGET/$name"
 done
 # Same-sized files copied within one second can otherwise reuse a stale .pyc,

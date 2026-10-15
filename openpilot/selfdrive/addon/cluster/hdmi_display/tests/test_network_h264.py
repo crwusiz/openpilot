@@ -1,0 +1,360 @@
+import asyncio
+from functools import wraps
+from fractions import Fraction
+import socket
+import sys
+import time
+from types import SimpleNamespace
+from unittest.mock import Mock
+
+import numpy as np
+import pytest
+
+from openpilot.selfdrive.addon.cluster.hdmi_display import network_h264 as network
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_protocol as wire
+
+
+def asyncio_test(function):
+  @wraps(function)
+  def run(*args, **kwargs):
+    return asyncio.run(function(*args, **kwargs))
+  return run
+
+
+def config():
+  return SimpleNamespace(network_bind_host="127.0.0.1", network_port=0, width=1920, height=480, fps=20,
+                         is_metric=True, rotate_180=False, camera_contrast=1.08)
+
+
+def models():
+  result = Mock()
+  path = {"path_x": [1.0, 2.0], "path_y": [0.0, 0.0], "path_z": [0.0, 0.0],
+          "calib_transform": np.eye(3, dtype=np.float32), "left_lane_x": [1234]}
+  result.get_render_data.return_value = True, {"v_ego": 12.5, "enabled": True, "tpms": [34.0] * 4}, path
+  result.get_camera_source_size.return_value = [1344, 760]
+  return result
+
+
+class Stream:
+  def __init__(self):
+    self.stopped = False
+    self.disconnected = asyncio.Event()
+
+  async def start(self):
+    return SimpleNamespace(sdp="v=0\r\nanswer", type="answer")
+
+  async def wait_for_connection(self):
+    pass
+
+  async def wait_for_disconnection(self):
+    await self.disconnected.wait()
+
+  async def stop(self):
+    self.stopped = True
+    self.disconnected.set()
+
+
+def factory():
+  stream = Stream()
+  track = SimpleNamespace(video_frame_id=10, video_timestamp_eof=None, video_frames=20, video_bytes=1024,
+                          last_video_at=None, resyncs=0, stop=Mock())
+  return stream, track
+
+
+def test_scene_snapshot_keeps_geometry_but_excludes_unused_duplicate_lines():
+  data = models()
+  result = network.scene_snapshot(config(), data, {"model_age_ms": 10.0})
+  assert result["path"]["calib_transform"] == [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+  assert "left_lane_x" not in result["path"]
+  assert result["model_valid"] and result["hud"]["v_ego"] == 12.5
+  assert not network.scene_snapshot(config(), data, {}, degraded=True)["model_valid"]
+  data.get_camera_source_size.return_value = None
+  assert not network.scene_snapshot(config(), data, {})["model_valid"]
+
+
+def test_camera_age_uses_the_native_boot_clock_including_suspend(monkeypatch):
+  get_boot = Mock(return_value=12_000_000_000)
+  monkeypatch.setattr(network, "time", SimpleNamespace(CLOCK_BOOTTIME=7, clock_gettime_ns=get_boot, monotonic_ns=lambda: 9))
+  assert network.camera_clock_ns() == 12_000_000_000
+  get_boot.assert_called_once_with(7)
+  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic_ns=lambda: 9))
+  assert network.camera_clock_ns() == 9
+
+
+@pytest.mark.parametrize("stored,expected", [(None, "jpeg"), (" JPEG ", "jpeg"), (b"H264", "h264"), ("vp9", "jpeg"), (b"\xff", "jpeg")])
+def test_codec_watcher_matches_config_normalization(stored, expected):
+  assert network.requested_codec(SimpleNamespace(get=lambda _key: stored)) == expected
+
+
+@asyncio_test
+async def test_real_control_socket_negotiates_video_separately_and_streams_state_without_frame_acks(monkeypatch):
+  messages, statuses = [], []
+  monkeypatch.setattr(network, "flog", messages.append)
+  monkeypatch.setattr(network, "write_network_status", statuses.append)
+  stream, track = factory()
+  server = network.H264NetworkServer(config(), models(), lambda _sdp: (stream, track))
+  await server.start()
+  reader, writer = await asyncio.open_connection(*server.server.sockets[0].getsockname())
+  try:
+    kind, _, hello = await network.read_control(reader)
+    assert kind == wire.HELLO and hello["codec"] == "h264" and hello["transport"] == "webrtc"
+    await network.write_control(writer, wire.OFFER, {"type": "offer", "sdp": "v=0\r\noffer"})
+    assert (await network.read_control(reader))[0] == wire.ANSWER
+    for _ in range(3):
+      kind, sequence, state = await network.read_control(reader)
+      assert kind == wire.STATE and wire.validate_scene(state)
+      assert state["state_seq"] == sequence
+    server.status_updated = time.monotonic() - 2
+    await network.read_control(reader)
+    assert statuses.count("127.0.0.1") >= 2  # Connection status expires after 10s unless renewed.
+    # A feedback packet reports telemetry only; state sends did not wait for it.
+    await network.write_control(writer, wire.FEEDBACK, {"screen_off": True, "display_fps": 19.5})
+    for _ in range(20):
+      if server.screen_off:
+        break
+      await asyncio.sleep(0.005)
+    assert server.screen_off
+    assert any("compose=pi" in message for message in messages)
+  finally:
+    writer.close()
+    await writer.wait_closed()
+    await server.close()
+  assert stream.stopped and track.stop.called and statuses[-1] is None
+  assert not server.clients and server.active is None
+
+
+@asyncio_test
+async def test_second_peer_cannot_replace_active_cluster_and_shutdown_cancels_negotiation(monkeypatch):
+  monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
+  server = network.H264NetworkServer(config(), models())
+  await server.start()
+  address = server.server.sockets[0].getsockname()
+  r1, w1 = await asyncio.open_connection(*address)
+  r2 = w2 = None
+  try:
+    assert (await network.read_control(r1))[0] == wire.HELLO
+    owner = server.active
+    r2, w2 = await asyncio.open_connection(*address)
+    kind, _, error = await network.read_control(r2)
+    assert kind == wire.ERROR and error["error"] == "h264_cluster_busy"
+    assert server.active is owner
+    await server.close()
+    assert await r1.read() == b"" and not server.clients
+  finally:
+    w1.close()
+    await w1.wait_closed()
+    if w2 is not None:
+      w2.close()
+      await w2.wait_closed()
+    await server.close()
+
+
+@asyncio_test
+async def test_missing_webrtc_is_explicit_and_does_not_silently_send_jpeg(monkeypatch):
+  monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
+
+  def unavailable(_offer):
+    raise ImportError("optional WebRTC backend unavailable")
+
+  server = network.H264NetworkServer(config(), models(), unavailable)
+  await server.start()
+  reader, writer = await asyncio.open_connection(*server.server.sockets[0].getsockname())
+  try:
+    assert (await network.read_control(reader))[0] == wire.HELLO
+    await network.write_control(writer, wire.OFFER, {"type": "offer", "sdp": "v=0\r\noffer"})
+    kind, _, error = await network.read_control(reader)
+    assert kind == wire.ERROR and error["error"] == "ImportError"
+    assert await reader.read() == b""
+  finally:
+    writer.close()
+    await writer.wait_closed()
+    await server.close()
+
+
+@asyncio_test
+async def test_receiver_dependency_error_is_preserved_in_c4_log(monkeypatch):
+  messages = []
+  monkeypatch.setattr(network, "flog", messages.append)
+  monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
+  server = network.H264NetworkServer(config(), models())
+  await server.start()
+  reader, writer = await asyncio.open_connection(*server.server.sockets[0].getsockname())
+  try:
+    assert (await network.read_control(reader))[0] == wire.HELLO
+    await network.write_control(writer, wire.ERROR, {"error": "ImportError", "detail": "aiortc unavailable; run pi_update.sh"})
+    kind, _, error = await network.read_control(reader)
+    assert kind == wire.ERROR and "aiortc unavailable" in error["detail"]
+    assert any("Pi H.264 unavailable: ImportError" in message and "pi_update.sh" in message for message in messages)
+  finally:
+    writer.close()
+    await writer.wait_closed()
+    await server.close()
+
+
+@asyncio_test
+async def test_native_camera_waits_for_idr_and_resynchronizes_after_encoded_reference_gap(monkeypatch):
+  socket_options, requests = [], []
+  packets = []
+
+  class Packet(bytes):
+    pts = 0
+
+  class BaseTrack:
+    camera_to_sock_mapping = {"road": "livestreamNarrowRoadEncodeData"}
+
+    def __init__(self, camera_type):
+      self._sock = self._make_sock(camera_type)
+      self.params = SimpleNamespace(put=Mock())
+
+    async def recv(self):
+      return Packet(self._build_frame_data(packets.pop(0)))
+
+    def request_keyframe(self):
+      requests.append(True)
+
+    def stop(self):
+      pass
+
+  class Builder:
+    def __init__(self, _offer):
+      pass
+
+    def add_video_stream(self, _name, track):
+      self.track = track
+
+    def stream(self):
+      return self
+
+  monkeypatch.setitem(sys.modules, "teleoprtc.builder", SimpleNamespace(WebRTCAnswerBuilder=Builder))
+  monkeypatch.setitem(sys.modules, "openpilot.system.webrtc.device.video", SimpleNamespace(LiveStreamVideoStreamTrack=BaseTrack))
+  monkeypatch.setitem(sys.modules, "openpilot.cereal", SimpleNamespace(messaging=SimpleNamespace(
+    sub_sock=lambda *args, **kwargs: socket_options.append(kwargs),
+  )))
+
+  def packet(index, key=False, header=b"", old=False):
+    data = SimpleNamespace(idx=SimpleNamespace(frameId=index, encodeId=index, flags=8 if key else 0,
+                                               timestampEof=time.monotonic_ns() - (1_000_000_000 if old else 0)),
+                           header=header, data=b"encoded")
+    return SimpleNamespace(which=lambda: "frame", frame=data)
+
+  _stream, track = network.create_camera_stream("v=0")
+  packets.extend([packet(10), packet(11, key=True, header=b"sps-pps")])
+  assert bytes(await track.recv()) == b"sps-ppsencoded"
+  assert track.video_frame_id == 11 and track.video_frames == 1
+  assert socket_options == [{"conflate": False}] and requests
+  packets.extend([packet(13), packet(14, key=True)])
+  assert bytes(await track.recv()) == b"sps-ppsencoded"
+  assert track.resyncs == 1 and track.video_frame_id == 14
+  packets.extend([packet(15, old=True), packet(16, key=True)])
+  assert bytes(await track.recv()) == b"sps-ppsencoded"
+  assert track.resyncs == 2 and track.video_frames == 3
+  assert not track._keyframe_requested
+  track.params.put.assert_called_with("LivestreamRequestKeyframe", False, block=False)
+  clear_count = track.params.put.call_count
+  track.request_keyframe()  # Receiver PLI while the reference chain is healthy.
+  packets.append(packet(17, key=True))
+  await track.recv()
+  assert not track._keyframe_requested
+  assert track.params.put.call_count == clear_count + 1
+  track.request_keyframe()
+  track.stop()  # Disconnect before the requested IDR arrives.
+  assert not track._keyframe_requested
+  assert track.params.put.call_count == clear_count + 2
+  track.params.put.assert_called_with("LivestreamRequestKeyframe", False, block=False)
+  track.stop()
+  assert track.params.put.call_count == clear_count + 2
+
+
+@asyncio_test
+async def test_real_webrtc_h264_reaches_pi_decoder_with_independent_scene_control(monkeypatch):
+  rtc = pytest.importorskip("aiortc")
+  av = pytest.importorskip("av")
+  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.cluster_protocol import recv_exact
+  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_receiver import H264Receiver
+
+  monkeypatch.setattr(network, "write_network_status", lambda _address: None)
+  backends = []
+
+  class Video(rtc.VideoStreamTrack):
+    def __init__(self):
+      super().__init__()
+      self.video_frame_id = self.video_timestamp_eof = None
+      self.video_frames = self.video_bytes = self.resyncs = 0
+      self.last_video_at = None
+
+    async def recv(self):
+      await asyncio.sleep(0.05)
+      pixels = np.zeros((96, 160, 3), dtype=np.uint8)
+      pixels[:, :, 1] = 160
+      frame = av.VideoFrame.from_ndarray(pixels, format="rgb24")
+      frame.pts, frame.time_base = self.video_frames * 4500, Fraction(1, 90000)
+      self.video_frames += 1
+      self.video_frame_id, self.video_timestamp_eof = self.video_frames, time.monotonic_ns()
+      self.last_video_at = time.monotonic()
+      return frame
+
+  class Backend:
+    def __init__(self, offer):
+      self.offer, self.track = offer, Video()
+      self.peer = rtc.RTCPeerConnection(rtc.RTCConfiguration(iceServers=[]))
+      self.connected, self.disconnected = asyncio.Event(), asyncio.Event()
+
+      @self.peer.on("connectionstatechange")
+      async def state_changed():
+        if self.peer.connectionState == "connected":
+          self.connected.set()
+        if self.peer.connectionState in ("closed", "failed"):
+          self.disconnected.set()
+
+    async def start(self):
+      await self.peer.setRemoteDescription(rtc.RTCSessionDescription(sdp=self.offer, type="offer"))
+      self.peer.addTrack(self.track)
+      for transceiver in self.peer.getTransceivers():
+        codecs = [codec for codec in rtc.RTCRtpSender.getCapabilities("video").codecs if codec.mimeType.lower() == "video/h264"]
+        transceiver.setCodecPreferences(codecs)
+      await self.peer.setLocalDescription(await self.peer.createAnswer())
+      return self.peer.localDescription
+
+    async def wait_for_connection(self):
+      await self.connected.wait()
+
+    async def wait_for_disconnection(self):
+      await self.disconnected.wait()
+
+    async def stop(self):
+      await self.peer.close()
+
+  def build(offer):
+    backend = Backend(offer)
+    backends.append(backend)
+    return backend, backend.track
+
+  server = network.H264NetworkServer(config(), models(), build)
+  await server.start()
+  address = server.server.sockets[0].getsockname()
+
+  def connect():
+    sock = socket.create_connection(address, timeout=3)
+    kind, _, size = wire.unpack_control_header(recv_exact(sock, 16))
+    assert kind == wire.HELLO
+    return sock, wire.decode_payload(recv_exact(sock, size))
+
+  sock, hello = await asyncio.to_thread(connect)
+  receiver = H264Receiver(sock, hello)
+  receiver.start()
+  try:
+    deadline = time.monotonic() + 12
+    while receiver.received_frames < 4 and time.monotonic() < deadline:
+      if receiver.error is not None:
+        raise receiver.error
+      await asyncio.sleep(0.02)
+    assert receiver.received_frames >= 4 and receiver.error is None
+    rgb, state = receiver.take_updates(timeout=0)
+    assert rgb[0].shape == (96, 160, 3) and rgb[0][:, :, 1].mean() > 140
+    assert state is not None and state[0]["hud"]["v_ego"] == 12.5
+    assert backends[0].peer.connectionState == "connected"
+  finally:
+    await asyncio.to_thread(receiver.close)
+    sock.close()
+    await server.close()
+  assert not receiver.thread.is_alive() and not server.clients

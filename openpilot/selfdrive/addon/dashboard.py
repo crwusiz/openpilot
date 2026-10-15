@@ -57,7 +57,6 @@ LOG_FILES = {
   "Cruise Debug": LOG_DIR / 'cruise_debug.log',
   "Traffic Debug": LOG_DIR / 'traffic_debug.log',
   "Cluster Debug": LOG_DIR / 'cluster_debug.log',
-  "Model Debug": LOG_DIR / 'model_debug.log',
 }
 
 
@@ -772,8 +771,11 @@ def render_tab_toggles():
             transport = "usb"
 
           def on_transport_change(e):
+            if e.value not in ("network", "usb"):
+              return
             params.put("ClusterDisplayTransport", e.value, block=True)
             ui.notify(f"Cluster display transport: {e.value} (Cluster restarting)", position='top')
+            toggles_content.refresh()
 
           ui.select(
             {"network": "Network (Orange Pi HDMI)", "usb": "USB (TURZX Display)"},
@@ -784,6 +786,22 @@ def render_tab_toggles():
           ui.label('The Cluster process restarts automatically when the transport changes.').classes(
             'text-[0.75rem] md:text-sm text-gray-400 -mt-3 ml-1'
           )
+          if transport == "network":
+            codec_options = {"jpeg": "JPEG", "h264": "H.264"}
+            codec = get_param_text("ClusterNetworkCodec", "jpeg").strip().lower()
+            if codec not in codec_options:
+              codec = "jpeg"
+
+            def on_codec_change(e):
+              if e.value not in ("jpeg", "h264"):
+                return
+              params.put("ClusterNetworkCodec", e.value, block=True)
+              ui.notify(f"Cluster network codec: {e.value} (Cluster restarting)", position='top')
+
+            ui.select(codec_options, value=codec, label="Cluster network codec", on_change=on_codec_change).classes('w-full text-blue-200')
+            ui.label('The Cluster process restarts automatically when the codec changes.').classes(
+              'text-[0.75rem] md:text-sm text-gray-400 -mt-3 ml-1'
+            )
 
         if key == "ClusterEnable":
           pi_status = ui.label(get_orange_pi_status_text()).classes('text-sm text-blue-200 break-words w-full')

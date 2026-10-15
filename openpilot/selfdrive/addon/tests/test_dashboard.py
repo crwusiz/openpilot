@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
-from nicegui import Client, ui
+from nicegui import Client, core, ui
 from starlette.requests import Request
 
 from openpilot.selfdrive.addon import dashboard
@@ -69,6 +69,67 @@ class TestDashboardHelpers(unittest.TestCase):
       peer.return_value = None
       refresh()
       self.assertEqual(label.text, 'Orange Pi 연결 대기 중')
+
+  def test_network_codec_selector_is_hidden_for_usb_and_disabled_cluster(self):
+    for enabled, transport in ((True, 'usb'), (False, 'network')):
+      with self.subTest(enabled=enabled, transport=transport):
+        client = Client(ui.page(f'/test-codec-hidden-{enabled}-{transport}'))
+        self.addCleanup(client.delete)
+        values = {'ClusterDisplayTransport': transport, 'ClusterNetworkCodec': 'h264'}
+        params = Mock(get=Mock(side_effect=values.get), get_bool=Mock(side_effect=lambda key, on=enabled: on and key == 'ClusterEnable'))
+        with client, patch.object(dashboard, 'params', params), patch.object(ui, 'timer'), \
+             patch.object(dashboard, 'get_connected_pi_ip', return_value=None):
+          dashboard.render_tab_toggles()
+        self.assertFalse(any(isinstance(element, ui.select) and element.label == 'Cluster network codec'
+                             for element in client.elements.values()))
+        params.put.assert_not_called()
+
+  def test_network_codec_defaults_and_changes_are_persisted_with_restart_notice(self):
+    for stored, expected in ((None, 'jpeg'), ('vp9', 'jpeg'), (b' H264 ', 'h264')):
+      with self.subTest(stored=stored):
+        client = Client(ui.page('/test-codec-selection-' + expected))
+        self.addCleanup(client.delete)
+        values = {'ClusterDisplayTransport': 'network', 'ClusterNetworkCodec': stored}
+        params = Mock(get=Mock(side_effect=values.get), get_bool=Mock(side_effect=lambda key: key == 'ClusterEnable'))
+        with client, patch.object(dashboard, 'params', params), patch.object(ui, 'timer'), patch.object(ui, 'notify') as notify, \
+             patch.object(dashboard, 'get_connected_pi_ip', return_value=None):
+          dashboard.render_tab_toggles()
+          select = next(element for element in client.elements.values()
+                        if isinstance(element, ui.select) and element.label == 'Cluster network codec')
+          self.assertEqual(select.value, expected)
+          self.assertEqual(select.options, {'jpeg': 'JPEG', 'h264': 'H.264'})
+          params.put.assert_not_called()
+          selected = 'h264' if expected == 'jpeg' else 'jpeg'
+          select.set_value(selected)
+          params.put.assert_called_once_with('ClusterNetworkCodec', selected, block=True)
+          self.assertIn('Cluster restarting', notify.call_args.args[0])
+
+  def test_switching_transport_refreshes_network_codec_controls(self):
+    async def exercise_changes():
+      client = Client(ui.page('/test-codec-transport-refresh'))
+      self.addCleanup(client.delete)
+      values = {'ClusterDisplayTransport': 'usb', 'ClusterNetworkCodec': 'h264'}
+      params = Mock(get=Mock(side_effect=values.get), get_bool=Mock(side_effect=lambda key: key == 'ClusterEnable'))
+      params.put.side_effect = lambda key, value, **_kwargs: values.__setitem__(key, value)
+      with client, patch.object(core, 'loop', asyncio.get_running_loop()), patch.object(dashboard, 'params', params), \
+           patch.object(ui, 'timer'), patch.object(ui, 'notify'), patch.object(dashboard, 'get_connected_pi_ip', return_value=None):
+        dashboard.render_tab_toggles()
+        transport = next(element for element in client.elements.values()
+                         if isinstance(element, ui.select) and element.label == 'Cluster display transport')
+        transport.set_value('network')
+        await asyncio.sleep(0)
+        params.put.assert_called_once_with('ClusterDisplayTransport', 'network', block=True)
+        codec = next(element for element in client.elements.values()
+                     if isinstance(element, ui.select) and element.label == 'Cluster network codec')
+        self.assertEqual(codec.value, 'h264')
+        transport = next(element for element in client.elements.values()
+                         if isinstance(element, ui.select) and element.label == 'Cluster display transport')
+        transport.set_value('usb')
+        await asyncio.sleep(0)
+        self.assertFalse(any(isinstance(element, ui.select) and element.label == 'Cluster network codec'
+                             for element in client.elements.values()))
+
+    asyncio.run(exercise_changes())
 
   def test_routes_ignore_invalid_names_and_sort_segments_numerically(self):
     with tempfile.TemporaryDirectory() as tmp:

@@ -1,6 +1,6 @@
 # Orange Pi 3W HDMI 클러스터 수신기
 
-C4가 미러링폰 핫스팟을 통해 보내는 **1920x480 JPEG 프레임**을 HDMI 터치 모니터에 표시하는 독립 실행 패키지입니다. 확인된 HDMI 모드는 **480x1920**이며, 가로로 설치한 모니터에 맞춰 영상을 90도 회전합니다. openpilot 전체를 설치할 필요는 없습니다. Python 3.10 이상과 pygame이 필요합니다.
+C4와 같은 미러링폰 핫스팟에 연결해 **1920x480 클러스터 화면**을 HDMI 터치 모니터에 표시하는 독립 실행 패키지입니다. 기본은 C4가 합성한 전체 화면을 받는 **JPEG**이며, 실험용 **H.264/WebRTC 영상 + Pi 화면 합성**도 선택할 수 있습니다. 확인된 HDMI 모드는 **480x1920**이며, 가로로 설치한 모니터에 맞춰 영상을 90도 회전합니다. openpilot 전체를 설치할 필요는 없습니다. JPEG는 Python 3.10 이상과 pygame을 사용하고 H.264는 아래의 추가 의존성이 필요합니다.
 
 ## 장비 확인 결과와 실행
 
@@ -46,13 +46,51 @@ sudo bash /opt/cluster-receiver/scripts/diagnose.sh --egl
 
 ```text
 안드로이드 미러링폰 핫스팟
-├── C4: TCP 0.0.0.0:9200에서 대기, 1920x480 JPEG 송신
+├── C4: TCP 0.0.0.0:9200에서 대기
+│   ├── JPEG: C4가 합성한 전체 클러스터 영상 전송
+│   └── H.264: 기존 도로 카메라 영상을 WebRTC로 전송, TCP로 접속 협상·HUD·경로 상태 전송
 └── Orange Pi 3W: wlan0 대역에서 C4 검색
     ├── HDMI: 480x1920 모드에 회전한 영상 출력
     └── USB: 모니터 터치 컨트롤러 입력
 ```
 
-C4의 기본 전송 방식은 `DISPLAY.transport = "usb"`입니다. 대시보드에서 `Network (Orange Pi HDMI)`를 선택한 뒤 cluster를 켭니다. 저장된 `ClusterDisplayTransport`가 기본값보다 우선합니다. `USB (TURZX Display)` 사용 중 Chestnut eGPU가 감지되면 `ClusterEnable`이 꺼지고 USB cluster가 중지됩니다. 부트로더 및 GPU 로딩 상태도 포함하며, eGPU를 분리해도 자동으로 다시 켜지지 않습니다. Network 모드는 eGPU 연결 여부와 관계없이 사용할 수 있습니다.
+대시보드에서 `Network (Orange Pi HDMI)`를 선택한 뒤 cluster를 켭니다. 저장된 `ClusterDisplayTransport`가 구성 기본값보다 우선합니다. `USB (TURZX Display)` 사용 중 Chestnut eGPU가 감지되면 `ClusterEnable`이 꺼지고 USB cluster가 중지됩니다. 부트로더 및 GPU 로딩 상태도 포함하며, eGPU를 분리해도 자동으로 다시 켜지지 않습니다. Network 모드는 eGPU 연결 여부와 관계없이 사용할 수 있습니다.
+
+### Network 코덱 선택: JPEG / H.264
+
+C4 대시보드의 **Toggles → Cluster Enable → Network → Cluster network codec**에서 선택합니다. `ClusterNetworkCodec`의 기본값은 `jpeg`이며, 저장된 값이 없거나 지원하지 않는 값이면 JPEG를 사용합니다. 이 선택은 Network에만 적용하며 USB 출력 방식은 유지합니다. 전송 방식이나 코덱을 바꾸면 C4 cluster 프로세스가 자동으로 재시작됩니다.
+
+| 선택 | C4 작업 | Pi 작업 |
+| --- | --- | --- |
+| JPEG — 기본 | 카메라·HUD·경로를 전체 화면으로 합성하고 JPEG 전송 | JPEG 디코딩·HDMI 출력 |
+| H.264 — 실험용 | 기존 하드웨어 livestream 인코더의 도로 카메라를 WebRTC로 전송하고 HUD·경로 상태를 TCP 9200으로 전송 | 영상 디코딩, 같은 렌더러·폰트·아이콘으로 HUD·경로 합성 후 HDMI 출력 |
+
+H.264는 완성된 클러스터 화면을 C4에서 다시 H.264로 인코딩하는 방식이 아닙니다. 이 모드의 C4 cluster는 카메라 RGB 전처리·화면 합성·JPEG 인코딩을 수행하지 않습니다. Pi의 현재 디코더는 `aiortc_pyav_software`이며 하드웨어 디코딩이 아닙니다. Pi 합성·디코딩 비용이 늘어나는 설계이므로 **실제 C4·Pi 장비에서 유지되는 FPS와 지연은 아직 검증하지 않았습니다.** 카메라와 모델의 약20Hz 갱신보다 높은 영상 FPS나 60FPS 출력도 보장하지 않습니다.
+
+새 모드를 사용하기 전에 C4 코드를 갱신하고 cluster 프로세스를 재시작합니다. 이어서 **C4에서** 다음을 실행해 Pi 수신기·공유 렌더러·폰트·아이콘과 선택 의존성을 갱신합니다. 정상 완료하면 Pi는 약5초 뒤 자동 재부팅됩니다.
+
+```bash
+bash scripts/pi_update.sh
+```
+
+`install.sh`와 `pi_update.sh`는 OS의 `python3-aiortc`, `python3-av`, `python3-numpy`, `python3-pil`, `python3-opencv` 준비를 시도합니다. 업데이트에서는 기존 수신기를 중지하기 전에 실행합니다. 패키지를 준비하지 못하면 `[CLUSTER_H264_DEPS]` 경고를 남기며 기본 JPEG 수신기 갱신을 계속합니다. 이 경우 H.264를 선택하면 누락 의존성 오류가 명시되고 연결이 종료됩니다. 자동 전환은 하지 않으므로 **대시보드에서 JPEG를 다시 선택**해 복귀합니다. JPEG 실행에는 이 추가 모듈을 요구하지 않습니다.
+
+화면 끄기·터치로 다시 켜기·밝기 조절은 두 모드에서 같습니다. 다만 H.264 화면을 끄면 Pi 합성·표시는 쉬고 C4 상태 전송은 최대5Hz로 줄지만 **WebRTC 수신·디코딩·RGB 변환은 계속합니다.** 압축 영상의 참조 프레임과 최신 영상을 유지해야 하므로 JPEG의 저속 프레임 전송처럼 영상 처리 부하 전체가 줄어드는 것은 아닙니다.
+
+### 두 모드의 로그 비교
+
+같은 해상도·밝기·주행 조건에서 C4 로그와 Pi 로그를 함께 비교합니다. 연결 직후와 화면 OFF 구간을 구분하며, 단순 목표 FPS보다 표시 FPS·순간 중단·주행 입력 상태를 함께 확인합니다.
+
+| 모드 / 로그 | 확인할 항목 |
+| --- | --- |
+| JPEG: C4 `[CLUSTER_NETWORK_PERF]`, Pi `[CLUSTER_RX_PERF]` | ACK FPS·대기, JPEG 수신·디코딩, `display_fps`, 표시 큐와 `display_gap_max` — 아래 JPEG 성능 절의 정의 사용 |
+| H.264: C4 `[CLUSTER_H264_PERF]` | `video_fps`, `state_fps`, 영상·상태 처리량, `state_avg`·`state_cpu_avg`, `video_source_age_ms`, `guard`, 수신 보고가 있을 때 `rtcp_loss_pct`·`rtcp_packets_lost`·`rtcp_jitter_ms` |
+| H.264: Pi `[CLUSTER_H264_RX_PERF]`, C4 `[CLUSTER_H264_PI_PERF]` | 디코딩 후 `rx_fps`/`video_fps`와 `display_fps`, `rgb_convert_avg`·`render_avg`·`display_avg`·`queue_wait_avg`, `display_gap_max`, 대기 영상 교체, `video_stale`·`state_stale`. C4에 전달된 Pi 피드백에는 대응 항목의 `_ms` 접미사와 `video_age_ms`·`state_age_ms`도 있음 |
+| 두 모드: `[CLUSTER_RESOURCE_PERF]`, `[CLUSTER_LOAD_GUARD]`, `[CLUSTER_INPUT_DIAG]` | C4 cluster CPU·메모리, 모델·위치 입력 receive age, 통신 경고·실패 서비스, 부하 보호의 활성 이유와 복구 |
+
+H.264의 `rgb_convert_avg`는 디코딩된 프레임을 RGB로 바꾸는 시간이며 H.264 디코더 내부 실행 시간을 별도로 측정한 값은 아닙니다. `render_avg`는 Pi 화면 합성, `display_avg`는 그 뒤의 화면 출력 처리입니다. 각 단계는 다른 스레드·다른 주기로 겹쳐 실행되므로 단계를 더해 FPS를 계산하지 않습니다. 영상 수신 FPS가 높아져도 Pi의 표시 FPS나 큐 대기가 나빠지면 개선으로 판단하지 않습니다.
+
+지연 항목의 기준도 다릅니다. C4 `video_source_age_ms`는 C4의 카메라 EOF 시각을 같은 C4 시계와 비교한 값입니다. Pi `video_age_ms`는 마지막 디코딩·RGB 변환 영상이 Pi에 준비된 뒤의 로컬 경과 시간, `state_age_ms`는 마지막 상태 메시지를 Pi가 받은 뒤의 경과 시간입니다. **어느 값도 카메라 촬영부터 실제 HDMI 표시까지의 종단 지연 측정값이 아닙니다.** 영상과 상태의 시계·수신 시점이 다르므로 이를 합산하거나 정확한 프레임 동기화를 확인한 값으로 해석하지 않습니다.
 
 ### 대시보드에서 Orange Pi IP 확인
 
@@ -69,6 +107,7 @@ C4 대시보드의 **Toggles → Cluster Enable** 아래에 `Orange Pi 연결됨
 | 파일 | 용도 |
 | --- | --- |
 | [install.sh](scripts/install.sh) | OS pygame·필수 라이브러리 설치, `/opt/cluster-receiver`로 패키지 복사 |
+| [prepare_h264.sh](scripts/prepare_h264.sh) | 선택 H.264 의존성 준비; 실패하면 경고를 남기며 JPEG는 유지 |
 | [connect_wifi.sh](scripts/connect_wifi.sh) | 핫스팟 연결 및 IP 확인; 비밀번호는 대화형 입력 |
 | [ensure_wifi.sh](scripts/ensure_wifi.sh) | 차량 `Android` 프로필 저장·재사용, 자동 연결·Wi-Fi 절전 해제 |
 | [wifi_power_save.sh](scripts/wifi_power_save.sh) | 활성 Wi-Fi 프로필의 절전 설정만 변경하고 실제 인터페이스의 `off` 확인 |
@@ -85,6 +124,8 @@ C4 대시보드의 **Toggles → Cluster Enable** 아래에 `Orange Pi 연결됨
 ## 설치 및 Wi-Fi
 
 이 폴더를 파일 전송 도구로 Orange Pi에 복사한 뒤 설치 스크립트를 실행합니다. 이미 `/opt/cluster-receiver`에 복사했다면 다음을 사용합니다. 다른 위치라면 해당 위치의 `scripts/install.sh`를 실행하면 됩니다.
+
+H.264를 포함한 수동 배포본에는 공유 `cluster_renderer.py`·`cluster_render_support.py`와 `receiver_assets.txt`에 나열된 `assets/` 파일도 함께 있어야 합니다. 전체 저장소에서 설치하면 스크립트가 공유 파일을 찾아 복사합니다. C4의 `pi_update.sh`는 이 파일들을 자동으로 동봉하므로 기존 Pi 업데이트에 권장합니다.
 
 ```bash
 sudo bash /opt/cluster-receiver/scripts/install.sh
@@ -434,7 +475,9 @@ sudo bash /opt/cluster-receiver/scripts/service.sh status
 
 PC 창 모드 점검에서는 `requirements.txt`를 PC 가상 환경에 설치하고 Python 수신기를 직접 실행합니다. PC pip 설치와 Orange Pi OS pygame 설치는 별개입니다.
 
-## 프레임 성능 확인
+## JPEG 프레임 성능 확인
+
+이하 JPEG 인코딩·ACK·프레임 전체 수신 제한의 설명은 JPEG 모드 기준입니다. H.264는 위의 영상·상태 분리 지표를 사용합니다.
 
 Network 모드는 전체 화면 JPEG 전송의 **20 FPS·JPEG 품질 68**을 기본값으로 사용합니다. 2026-10-12 주행에서는 Pi의 JPEG 본문 도착 대기가 표시 처리보다 길어 전송량을 줄이는 기준으로 변경했습니다. C4 UI의 `FPS` 환경 변수는 클러스터에 적용하지 않습니다. 별도 비교가 필요하면 `CLUSTER_FPS`로 클러스터 목표만 1~60 FPS 범위에서 조절합니다. 카메라와 모델은 약 20 Hz로 들어오며, 같은 카메라 위의 계기·애니메이션을 더 자주 그려도 새로운 카메라 영상이 생기는 것은 아닙니다. USB도 기존 20 FPS·품질 68을 유지하며 해상도는 USB `1920x462`, Network `1920x480`입니다. 20 FPS 설정은 실제 20 FPS 달성이나 지연 상한의 보장치가 아닙니다.
 

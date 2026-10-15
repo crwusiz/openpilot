@@ -24,9 +24,16 @@ def deploy_sandbox(tmp_path):
   for name, content in {"cluster_receiver.py": "# receiver\n", "hdmi_display.py": "# display\n", "frame_stream.py": "# stream\n",
                         "display_controls.py": "# controls\n", "texture_presenter.py": "# presenter\n",
                         "tcp_diagnostics.py": "# TCP diagnostics\n", "receiver_build.py": "# receiver build\n", "cluster_protocol.py": "# protocol\n",
+                        "h264_receiver.py": "# H264 receiver\n", "h264_protocol.py": "# H264 protocol\n", "h264_scene.py": "# H264 scene\n",
+                        "cluster_renderer.py": "# shared renderer\n", "cluster_render_support.py": "# shared support\n",
                         "README.md": "연결 대기\r\n수신기\r\n", "requirements.txt": "pygame\n",
                         "cluster-hdmi.service": "[Service]\n"}.items():
     (package / name).write_bytes(content.encode("utf-8"))
+  shutil.copyfile(PACKAGE / "receiver_assets.txt", package / "receiver_assets.txt")
+  for name in (package / "receiver_assets.txt").read_text().splitlines():
+    asset = package / name
+    asset.parent.mkdir(parents=True, exist_ok=True)
+    asset.write_bytes(b"binary asset\x00\r\n\x89")
   (package / "tests").mkdir()
   (package / "tests" / "test_excluded.py").write_text("# test\n")
   (package / ".venv").mkdir()
@@ -145,12 +152,16 @@ def test_c4_update_packages_receiver_only_with_checksums_and_cleans_staging(depl
     files.add(relative)
     data = (captured / relative).read_bytes()
     assert hashlib.sha256(data).hexdigest() == digest
-    assert b"\r\n" not in data
+    if not relative.startswith("assets/"):
+      assert b"\r\n" not in data
     assert not data.startswith(b"\xef\xbb\xbf")
   assert files == {"README.md", "requirements.txt", "cluster-hdmi.service", "cluster_receiver.py", "hdmi_display.py", "frame_stream.py",
                    "display_controls.py", "texture_presenter.py", "tcp_diagnostics.py", "receiver_build.py", "cluster_protocol.py",
+                   "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "cluster_renderer.py", "cluster_render_support.py", "receiver_assets.txt",
+                   *(deploy_sandbox / "receiver_assets.txt").read_text().splitlines(),
                    *("scripts/" + path.name for path in (deploy_sandbox / "scripts").glob("*.sh"))}
   assert (captured / "README.md").read_text(encoding="utf-8") == "연결 대기\n수신기\n"
+  assert (captured / "assets/icons/steer.png").read_bytes() == b"binary asset\x00\r\n\x89"
   calls = _calls(deploy_sandbox)
   apply = next(args for tool, args in calls if tool == "ssh" and " apply " in args[-1])
   assert "-tt" in apply
@@ -392,6 +403,33 @@ def test_unsafe_package_filename_is_rejected_before_ssh(deploy_sandbox):
   result = _deploy(deploy_sandbox, "192.168.0.84")
   assert result.returncode != 0
   assert "Unexpected package filename" in result.stderr
+  assert _calls(deploy_sandbox) == []
+
+
+def test_missing_manifest_font_is_rejected_before_ssh(deploy_sandbox):
+  (deploy_sandbox / "assets/fonts/Inter-Bold.ttf").unlink()
+  result = _deploy(deploy_sandbox, "192.168.0.84", "--dry-run")
+  assert result.returncode != 0
+  assert "Package is missing assets/fonts/Inter-Bold.ttf" in result.stderr
+  assert _calls(deploy_sandbox) == []
+
+
+def test_shared_renderer_and_assets_are_mapped_from_full_checkout(deploy_sandbox):
+  root = deploy_sandbox.parents[1]
+  nested = root / "repo/selfdrive/addon/cluster/hdmi_display/orange_pi"
+  shutil.copytree(deploy_sandbox, nested)
+  cluster_dir, selfdrive_dir = nested.parents[1], nested.parents[3]
+  for name in ("cluster_renderer.py", "cluster_render_support.py"):
+    (nested / name).rename(cluster_dir / name)
+  (nested / "assets").rename(selfdrive_dir / "assets")
+  script = ('set -euo pipefail; PACKAGE_DIR=$(cd -- "$1" && pwd -P); '
+            + 'fail() { printf "%s\\n" "$*" >&2; exit 1; }; '
+            + 'source "$PACKAGE_DIR/scripts/package_sources.sh"; package_collect_files; printf "%s\\n" "${file_sources[@]}"')
+  result = subprocess.run([BASH, "-c", script, "source-map-test", nested.relative_to(root).as_posix()],
+                          cwd=root, capture_output=True, text=True, timeout=10, check=False)
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert "/repo/selfdrive/addon/cluster/cluster_renderer.py" in result.stdout
+  assert "/repo/selfdrive/assets/fonts/Inter-Bold.ttf" in result.stdout
   assert _calls(deploy_sandbox) == []
 
 

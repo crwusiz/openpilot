@@ -259,6 +259,51 @@ def raster_pygame(monkeypatch):
   pygame.display.quit()
 
 
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+def test_rgb_scene_preserves_rotation_pixels_and_owns_the_retained_frame(raster_pygame, monkeypatch, rotation):
+  from PIL import Image
+
+  pygame = raster_pygame
+  source = Image.new("RGB", (4, 2))
+  colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0),
+            (255, 0, 255), (0, 255, 255), (255, 255, 255), (64, 64, 64)]
+  source.putdata(colors)
+  expected = source.rotate(-rotation, expand=True)
+  display = HdmiDisplay(*expected.size, rotation=rotation, fullscreen=False, pygame_module=pygame,
+                        brightness=100, renderer_mode="surface")
+  monkeypatch.setattr(pygame.image, "load", lambda *_args: pytest.fail("RGB must bypass JPEG decoding"))
+  try:
+    display._latest_jpeg = b"old JPEG must not be restored"
+    assert display.send_rgb(source) and display.last_frame_presented
+    assert display._latest_jpeg is None and display.last_frame_timings["decode"] == 0
+    assert pygame.image.tobytes(display.screen, "RGB") == expected.tobytes()
+    source.paste((0, 0, 0), (0, 0, *source.size))
+    display._redraw_local()
+    assert pygame.image.tobytes(display.screen, "RGB") == expected.tobytes()
+  finally:
+    display.close()
+
+
+def test_screen_off_skips_rgb_conversion_and_waits_for_new_live_frame_after_wake(raster_pygame):
+  from PIL import Image
+
+  display = _raster_display(raster_pygame)
+  try:
+    assert display.send_rgb(Image.new("RGB", (384, 96), (255, 0, 0)))
+    _tap_display(display)
+    _tap_display(display, _control_target(display, "off"))
+    assert display.screen_off
+    skipped = SimpleNamespace(tobytes=lambda: pytest.fail("screen off must skip pixel conversion"))
+    assert display.send_rgb(skipped) and not display.last_frame_presented
+    assert display._latest_jpeg is None and display._latest_frame is None
+    _tap_display(display)
+    assert not display.screen_off
+    assert display.send_rgb(Image.new("RGB", (384, 96), (0, 255, 0)))
+    assert display.last_frame_presented
+  finally:
+    display.close()
+
+
 @pytest.mark.parametrize("rotation, expected_rows", [
   (0, [[0, 1, 2, 3], [4, 5, 6, 7]]),
   (90, [[4, 0], [5, 1], [6, 2], [7, 3]]),

@@ -581,3 +581,9 @@ class ClusterModels:
     """Return model validity, HUD state, and path data from one update cycle."""
     with self._state_lock:
       return self._model_render_valid_unlocked(), self._get_hud_data_unlocked(), self._get_path_data_unlocked()
+
+  def get_camera_source_size(self):
+    """Use the same sensor geometry as calibration without another RGB consumer."""
+    with self._state_lock:
+      camera = DEVICE_CAMERAS.get((self.device_type, self.camera_sensor))
+      return list(camera.narrow_road.size) if camera is not None else None

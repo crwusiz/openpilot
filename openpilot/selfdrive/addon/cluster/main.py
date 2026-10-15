@@ -43,6 +43,15 @@ def cluster_main():
     close_log()
     return
 
+  if config.display_transport == "network" and getattr(config, "network_codec", "jpeg") == "h264":
+    from openpilot.selfdrive.addon.cluster.hdmi_display.network_h264 import run_h264_cluster
+    try:
+      run_h264_cluster(config)
+    finally:
+      close_log()
+    return
+
+  flog(f"[CLUSTER_MODE] codec=jpeg | transport={config.display_transport} | compose=c4")
   display = create_cluster_display(config)
   if hasattr(display, 'open'):
     display.open()
@@ -101,6 +110,11 @@ def cluster_main():
             f"[CLUSTER_MAIN] Transport changed: {config.display_transport} -> {requested_transport}; restarting...",
           )
           break
+        if config.display_transport == "network":
+          from openpilot.selfdrive.addon.cluster.hdmi_display.network_h264 import requested_codec
+          if requested_codec(config.params) != getattr(config, "network_codec", "jpeg"):
+            flog("[CLUSTER_MAIN] Network codec changed; restarting cluster.")
+            break
 
       health = models.get_health_data()
       guard_log = health_guard.update(health, now)

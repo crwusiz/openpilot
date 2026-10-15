@@ -258,10 +258,26 @@ def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=F
     # deadline covers the partial header and entire JPEG, without progress resets.
     started = time.monotonic()
     header_stats = ReceiveStats()
-    sequence, frame_size, flags = unpack_frame_header_info(
-      recv_exact(sock, FRAME_HEADER.size, deadline=started + frame_timeout, poll_events=poll_events,
-                 stats=header_stats, timeout_from_first_byte=frame_timeout, phase="header"),
-    )
+    header = recv_exact(sock, FRAME_HEADER.size, deadline=started + frame_timeout, poll_events=poll_events,
+                        stats=header_stats, timeout_from_first_byte=frame_timeout, phase="header")
+    if header[:4] == b"OPCH":
+      # JPEG receivers do not import WebRTC/PyAV/Pillow unless the C4 explicitly
+      # selects the alternate transport in its first packet.
+      try:
+        from .h264_protocol import HELLO, decode_payload, unpack_control_header
+        from .h264_receiver import receive_h264_session
+      except ImportError:
+        from h264_protocol import HELLO, decode_payload, unpack_control_header
+        from h264_receiver import receive_h264_session
+      kind, _sequence, size = unpack_control_header(header)
+      if kind != HELLO:
+        raise ValueError("Expected H.264 session hello")
+      payload = recv_exact(sock, size, deadline=header_stats.first_byte_at + frame_timeout,
+                           poll_events=poll_events, phase="h264_hello")
+      hello = decode_payload(payload)
+      remaining = None if max_frames is None else max_frames - received_frames
+      return received_frames + receive_h264_session(sock, display, hello, frame_timeout, remaining)
+    sequence, frame_size, flags = unpack_frame_header_info(header)
     header_at = time.monotonic()
     deadline = header_stats.first_byte_at + frame_timeout
     receive_stats = ReceiveStats() if flags & FRAME_STREAM else None

@@ -1,0 +1,408 @@
+"""Optional WebRTC video receiver; SDL remains on the caller's thread."""
+
+import asyncio
+import contextlib
+import logging
+from pathlib import Path
+import socket
+import threading
+import time
+
+try:
+  from .h264_protocol import ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, STATE, decode_payload, pack_control, unpack_control_header
+except ImportError:
+  from h264_protocol import ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, STATE, decode_payload, pack_control, unpack_control_header
+
+
+LOG = logging.getLogger("cluster_receiver")
+NEGOTIATION_TIMEOUT = 15.0
+STREAM_TIMEOUT = 8.0
+FEEDBACK_INTERVAL = 1.0
+
+
+def validate_hello(hello):
+  if hello.get("codec") != "h264" or hello.get("transport") != "webrtc":
+    raise ValueError("Unsupported cluster video transport")
+  if hello.get("camera") not in ("road", "wideRoad", "driver"):
+    raise ValueError("Unsupported cluster video camera")
+  for name, maximum in (("width", 4096), ("height", 2160), ("fps", 60)):
+    value = hello.get(name)
+    if type(value) is not int or not 1 <= value <= maximum:
+      raise ValueError(f"Invalid H.264 {name}")
+  if hello["width"] * hello["height"] > 4 * 1024 * 1024:
+    raise ValueError("H.264 scene exceeds pixel budget")
+
+
+class H264Receiver:
+  """WebRTC decodes reference frames; only already decoded RGB may be replaced."""
+
+  def __init__(self, sock, hello):
+    validate_hello(hello)
+    self.sock, self.hello = sock, hello
+    self.condition = threading.Condition()
+    self.latest_rgb = None
+    self.latest_state = None
+    self.state_revision = self.consumed_state_revision = 0
+    self.received_frames = self.displayed_frames = self.dropped_frames = 0
+    self.last_video_at = self.last_state_at = None
+    self.screen_off = False
+    self.error = None
+    self.done = self.closing = False
+    self.loop = self.stop_event = None
+    self._main_task = None
+    self._async_error = None
+    self._send_lock = None
+    self._sequence = 0
+    self._stats = self._empty_stats()
+    self._last_display_at = None
+    self.thread = threading.Thread(target=self._run_thread, name="cluster-webrtc-receiver", daemon=True)
+
+  def start(self):
+    self.thread.start()
+
+  @staticmethod
+  def _empty_stats():
+    return dict.fromkeys(("render_count", "render", "display", "queue_count", "queue", "convert_count", "convert", "gap"), 0.0)
+
+  def _run_thread(self):
+    try:
+      asyncio.run(self._run())
+    except asyncio.CancelledError:
+      pass
+    except Exception as error:
+      with self.condition:
+        if not self.closing:
+          self.error = error
+    finally:
+      with self.condition:
+        self.done = True
+        self.condition.notify_all()
+
+  def publish_rgb(self, rgb, received_at=None, convert_elapsed=0.0):
+    received_at = time.monotonic() if received_at is None else received_at
+    with self.condition:
+      if self.closing:
+        return
+      self.dropped_frames += self.latest_rgb is not None
+      self.latest_rgb = (rgb, received_at)
+      self.received_frames += 1
+      self.last_video_at = received_at
+      self._stats["convert_count"] += 1
+      self._stats["convert"] += convert_elapsed
+      self.condition.notify_all()
+
+  def record_display(self, render_started, rendered_at, displayed_at, video_received_at=None, presented=True):
+    with self.condition:
+      self._stats["render_count"] += 1
+      self._stats["render"] += max(0.0, rendered_at - render_started)
+      self._stats["display"] += max(0.0, displayed_at - rendered_at)
+      if video_received_at is not None:
+        self._stats["queue_count"] += 1
+        self._stats["queue"] += max(0.0, render_started - video_received_at)
+      if presented:
+        self.displayed_frames += 1
+        if self._last_display_at is not None:
+          self._stats["gap"] = max(self._stats["gap"], displayed_at - self._last_display_at)
+        self._last_display_at = displayed_at
+
+  def publish_state(self, state, received_at=None):
+    received_at = time.monotonic() if received_at is None else received_at
+    with self.condition:
+      if self.closing:
+        return
+      self.latest_state = (state, received_at)
+      self.state_revision += 1
+      self.last_state_at = received_at
+      self.condition.notify_all()
+
+  def take_updates(self, timeout=0.02):
+    with self.condition:
+      self.condition.wait_for(lambda: self.latest_rgb is not None or self.state_revision != self.consumed_state_revision
+                              or self.error is not None or self.done, timeout=timeout)
+      if self.error is not None:
+        raise self.error
+      rgb, self.latest_rgb = self.latest_rgb, None
+      state = self.latest_state if self.state_revision != self.consumed_state_revision else None
+      self.consumed_state_revision = self.state_revision
+      return rgb, state
+
+  async def _send_control(self, kind, payload):
+    async with self._send_lock:
+      self._sequence = (self._sequence + 1) & 0xFFFFFFFF
+      packet = pack_control(kind, payload, self._sequence)
+      await asyncio.wait_for(self.loop.sock_sendall(self.sock, packet), timeout=STREAM_TIMEOUT)
+
+  async def _read_control(self, budget_s=STREAM_TIMEOUT):
+    async def read_exact(size):
+      data = bytearray()
+      while len(data) < size:
+        chunk = await self.loop.sock_recv(self.sock, size - len(data))
+        if not chunk:
+          raise ConnectionError("C4 closed H.264 control connection")
+        data.extend(chunk)
+      return bytes(data)
+
+    async def read_packet():
+      kind, _sequence, size = unpack_control_header(await read_exact(CONTROL_HEADER.size))
+      return kind, decode_payload(await read_exact(size))
+
+    return await asyncio.wait_for(read_packet(), timeout=budget_s)
+
+  def _fail_async(self, error):
+    if not self.closing and self._async_error is None:
+      self._async_error = error
+      self.stop_event.set()
+
+  async def _consume_video(self, track):
+    try:
+      while not self.closing:
+        frame = await track.recv()
+        if (not 2 <= frame.width <= 4096 or not 2 <= frame.height <= 4096
+            or frame.width * frame.height > 4 * 1024 * 1024):
+          raise ValueError("Decoded H.264 frame exceeds pixel budget")
+        # aiortc/PyAV has already decoded all dependent pictures. Replacing
+        # this RGB slot never drops an H.264 reference packet before decoding.
+        started = time.monotonic()
+        rgb = frame.to_ndarray(format="rgb24")
+        self.publish_rgb(rgb, convert_elapsed=time.monotonic() - started)
+    except asyncio.CancelledError:
+      raise
+    except Exception as error:
+      self._fail_async(ConnectionError(f"WebRTC video stopped: {error}"))
+
+  async def _read_states(self):
+    while True:
+      kind, payload = await self._read_control()
+      if kind == STATE:
+        self.publish_state(payload)
+      elif kind == ERROR:
+        raise RuntimeError(f"C4 H.264 error: {str(payload.get('error', payload))[:300]}")
+      else:
+        raise ValueError(f"Unexpected H.264 control message: {kind}")
+
+  async def _feedback(self):
+    previous_at = time.monotonic()
+    previous_rx = previous_display = 0
+    logged_at, logged_rx, logged_display, logged_dropped = previous_at, 0, 0, 0
+    logged_stats = self._empty_stats()
+    while True:
+      await asyncio.sleep(FEEDBACK_INTERVAL)
+      now = time.monotonic()
+      with self.condition:
+        rx, displayed = self.received_frames, self.displayed_frames
+        stats, self._stats = self._stats, self._empty_stats()
+        payload = {
+          "screen_off": self.screen_off,
+          "video_fps": (rx - previous_rx) / max(now - previous_at, 0.001),
+          "display_fps": (displayed - previous_display) / max(now - previous_at, 0.001),
+          "decoder_backend": "aiortc_pyav_software",
+          "dropped_display": self.dropped_frames,
+          "render_avg_ms": stats["render"] * 1000 / max(stats["render_count"], 1),
+          "display_avg_ms": stats["display"] * 1000 / max(stats["render_count"], 1),
+          "queue_wait_avg_ms": stats["queue"] * 1000 / max(stats["queue_count"], 1),
+          "rgb_convert_avg_ms": stats["convert"] * 1000 / max(stats["convert_count"], 1),
+          "display_gap_max_ms": stats["gap"] * 1000,
+          "video_age_ms": None if self.last_video_at is None else max(0, now - self.last_video_at) * 1000,
+          "state_age_ms": None if self.last_state_at is None else max(0, now - self.last_state_at) * 1000,
+          "video_stale": self.last_video_at is None or now - self.last_video_at >= 0.5,
+          "state_stale": self.last_state_at is None or now - self.last_state_at >= 0.5,
+        }
+      await self._send_control(FEEDBACK, payload)
+      for key in stats:
+        logged_stats[key] = max(logged_stats[key], stats[key]) if key == "gap" else logged_stats[key] + stats[key]
+      if now - logged_at >= 10.0:
+        elapsed = now - logged_at
+        LOG.info("[CLUSTER_H264_RX_PERF] rx_fps=%.2f | display_fps=%.2f | dropped_display=%d | "
+                 + "render_avg=%.1fms | display_avg=%.1fms | queue_wait_avg=%.1fms | rgb_convert_avg=%.1fms | "
+                 + "display_gap_max=%.1fms | video_stale=%d | state_stale=%d | "
+                 + "decoder=aiortc_pyav_software | screen_off=%d | mode=webrtc",
+                 (rx - logged_rx) / elapsed, (displayed - logged_display) / elapsed,
+                 payload["dropped_display"] - logged_dropped,
+                 logged_stats["render"] * 1000 / max(logged_stats["render_count"], 1),
+                 logged_stats["display"] * 1000 / max(logged_stats["render_count"], 1),
+                 logged_stats["queue"] * 1000 / max(logged_stats["queue_count"], 1),
+                 logged_stats["convert"] * 1000 / max(logged_stats["convert_count"], 1),
+                 logged_stats["gap"] * 1000, payload["video_stale"], payload["state_stale"], payload["screen_off"])
+        logged_at, logged_rx, logged_display, logged_dropped = now, rx, displayed, payload["dropped_display"]
+        logged_stats = self._empty_stats()
+      previous_at, previous_rx, previous_display = now, rx, displayed
+
+  async def _watchdog(self, started):
+    while True:
+      await asyncio.sleep(0.1)
+      now = time.monotonic()
+      with self.condition:
+        video_at, state_at = self.last_video_at, self.last_state_at
+      if video_at is None:
+        if now - started >= NEGOTIATION_TIMEOUT:
+          raise TimeoutError("No decoded WebRTC video within 15 seconds")
+      elif now - video_at >= STREAM_TIMEOUT:
+        raise TimeoutError("WebRTC video stalled for eight seconds")
+      if state_at is not None and now - state_at >= STREAM_TIMEOUT:
+        raise TimeoutError("H.264 metadata stalled for eight seconds")
+
+  async def _run(self):
+    self.loop = asyncio.get_running_loop()
+    self._main_task = asyncio.current_task()
+    self.stop_event = asyncio.Event()
+    self._send_lock = asyncio.Lock()
+    if self.closing:
+      return
+    self.sock.setblocking(False)
+    try:
+      from aiortc import RTCConfiguration, RTCPeerConnection, RTCRtpSender, RTCSessionDescription
+    except ImportError as error:
+      detail = "H.264 mode requires Orange Pi aiortc/PyAV dependencies; run the updated Pi installation/update script"
+      await self._send_control(ERROR, {"error": detail})
+      raise RuntimeError(detail) from error
+
+    peer = RTCPeerConnection(RTCConfiguration(iceServers=[]))
+    tasks = []
+    video_tasks = []
+
+    @peer.on("track")
+    def on_track(track):
+      if track.kind == "video":
+        video_tasks.append(asyncio.create_task(self._consume_video(track)))
+
+    @peer.on("connectionstatechange")
+    async def on_connection_state():
+      LOG.info("[CLUSTER_H264_PEER] state=%s", peer.connectionState)
+      if peer.connectionState in ("failed", "closed"):
+        self._fail_async(ConnectionError(f"WebRTC connection {peer.connectionState}"))
+
+    try:
+      transceiver = peer.addTransceiver("video", direction="recvonly")
+      h264 = [codec for codec in RTCRtpSender.getCapabilities("video").codecs if codec.mimeType.lower() == "video/h264"]
+      if not h264:
+        raise RuntimeError("Pi WebRTC stack has no H.264 decoder")
+      transceiver.setCodecPreferences(h264)
+
+      async def negotiate():
+        await peer.setLocalDescription(await peer.createOffer())
+        await self._send_control(OFFER, {"type": "offer", "sdp": peer.localDescription.sdp})
+        while True:
+          kind, payload = await self._read_control(NEGOTIATION_TIMEOUT)
+          if kind == ANSWER:
+            if payload.get("type") != "answer" or not isinstance(payload.get("sdp"), str):
+              raise ValueError("Invalid C4 WebRTC answer")
+            await peer.setRemoteDescription(RTCSessionDescription(sdp=payload["sdp"], type="answer"))
+            return
+          if kind == STATE:
+            self.publish_state(payload)
+          elif kind == ERROR:
+            raise RuntimeError(f"C4 H.264 error: {str(payload.get('error', payload))[:300]}")
+          else:
+            raise ValueError(f"Expected C4 WebRTC answer, got {kind}")
+
+      await asyncio.wait_for(negotiate(), timeout=NEGOTIATION_TIMEOUT)
+      LOG.info("[CLUSTER_H264_MODE] WebRTC H.264, decoder=aiortc_pyav_software, TCP=metadata only")
+      started = time.monotonic()
+      tasks = [asyncio.create_task(self._read_states()), asyncio.create_task(self._feedback()),
+               asyncio.create_task(self._watchdog(started)), asyncio.create_task(self.stop_event.wait())]
+      done, _pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+      for task in done:
+        task.result()
+      if self._async_error is not None and not self.closing:
+        raise self._async_error
+    finally:
+      for task in tasks + video_tasks:
+        task.cancel()
+      await asyncio.gather(*(tasks + video_tasks), return_exceptions=True)
+      try:
+        await asyncio.wait_for(peer.close(), timeout=3.0)
+      except TimeoutError:
+        LOG.warning("WebRTC peer did not close within three seconds")
+
+  def close(self):
+    with self.condition:
+      self.closing = True
+      self.latest_rgb = None
+      self.condition.notify_all()
+    loop, main_task = self.loop, self._main_task
+    if loop is not None and main_task is not None:
+      try:
+        loop.call_soon_threadsafe(main_task.cancel)
+      except RuntimeError:
+        pass
+    try:
+      self.sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+      pass
+    if self.thread.ident is None:
+      return
+    self.thread.join(timeout=4.0)
+    if self.thread.is_alive():
+      LOG.warning("WebRTC receiver thread did not stop within four seconds")
+
+
+def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=None):
+  validate_hello(hello)
+  try:
+    if __package__:
+      from .h264_scene import H264Scene
+    else:
+      from h264_scene import H264Scene
+  except ImportError as error:
+    detail = "H.264 scene requires Orange Pi Pillow, NumPy and OpenCV dependencies; run pi_update.sh"
+    with contextlib.suppress(OSError):
+      sock.settimeout(0.25)
+      sock.sendall(pack_control(ERROR, {"error": "h264_scene_dependencies_unavailable", "detail": detail}))
+    raise RuntimeError(detail) from error
+  scene = H264Scene(Path(__file__).resolve().parent / "assets", hello["width"], hello["height"], hello["fps"])
+  receiver = H264Receiver(sock, hello)
+  receiver.start()
+  waiting_shown = False
+  last_rendered = 0.0
+  render_interval = 1.0 / hello["fps"]
+  pending_render = False
+  pending_video_at = None
+  freshness = None
+  try:
+    while True:
+      if not display.pump_events():
+        raise KeyboardInterrupt
+      with receiver.condition:
+        receiver.screen_off = bool(getattr(display, "screen_off", False))
+      rgb, state = receiver.take_updates()
+      if state is not None:
+        scene.update(state[0], received_at=state[1])
+        pending_render = True
+      if rgb is not None:
+        scene.set_video(rgb[0], received_at=rgb[1])
+        pending_video_at = rgb[1]
+        pending_render = True
+      now = time.monotonic()
+      current_freshness = (receiver.last_video_at is not None and now - receiver.last_video_at < 0.5,
+                           receiver.last_state_at is not None and now - receiver.last_state_at < 0.5)
+      if current_freshness != freshness:
+        # Clear expired HUD/path even if both incoming streams stop together.
+        pending_render = True
+        freshness = current_freshness
+      if receiver.last_video_at is not None and now - receiver.last_video_at >= frame_timeout:
+        if not waiting_shown:
+          if not display.show_waiting():
+            raise RuntimeError("Unable to display WebRTC waiting screen")
+          LOG.warning("[CLUSTER_H264_STALE] No decoded video within %.1fs; waiting for live video", frame_timeout)
+          waiting_shown = True
+        pending_render = False
+      elif pending_render and now - last_rendered >= render_interval and not receiver.screen_off:
+        render_started = time.monotonic()
+        image = scene.render()
+        rendered_at = time.monotonic()
+        if not display.send_rgb(image):
+          raise RuntimeError("Unable to display H.264 cluster frame")
+        receiver.record_display(render_started, rendered_at, time.monotonic(), pending_video_at,
+                                bool(getattr(display, "last_frame_presented", True)))
+        if waiting_shown:
+          LOG.info("[CLUSTER_H264_RESUMED] Live WebRTC video received")
+        waiting_shown = False
+        pending_render = False
+        pending_video_at = None
+        last_rendered = now
+      if max_frames is not None and receiver.received_frames >= max_frames:
+        return receiver.received_frames
+      if receiver.done:
+        return receiver.received_frames
+  finally:
+    receiver.close()

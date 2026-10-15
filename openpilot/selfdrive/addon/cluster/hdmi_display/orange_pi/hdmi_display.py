@@ -353,6 +353,43 @@ class HdmiDisplay:
     self.last_frame_timings["decode"] = decode_elapsed
     self._latest_frame = frame
 
+  def send_rgb(self, image):
+    """Present a composed PIL RGB image without JPEG encode/decode."""
+    self.last_frame_presented = False
+    if self.close_requested:
+      return False
+    if not self.connected and not self.open():
+      return False
+    self._latest_jpeg = None
+    self._waiting_requested = False
+    if not self.pump_events(redraw=False):
+      return False
+    if self.controls.screen_off:
+      self._latest_frame = None
+      if self._controls_revision != self.controls.revision:
+        self._draw_black()
+      self.last_frame_timings = dict.fromkeys(("decode", "rotate", "scale", "blit", "flip"), 0.0)
+      return True
+    try:
+      started = time.monotonic()
+      if image.mode not in ("RGB", "RGBA"):
+        image = image.convert("RGB")
+      # Own the pixel bytes through the Surface. The next WebRTC frame and PIL
+      # scene may reuse their source storage after this synchronous handoff.
+      frame = self._pygame.image.frombytes(image.tobytes(), image.size, image.mode)
+      converted_at = time.monotonic()
+      if self._presenter is None:
+        frame = frame.convert()
+      self.last_frame_timings = self._present_frame(frame)
+      self.last_frame_timings["rgb_surface"] = converted_at - started
+      self.last_frame_timings["decode"] = 0.0
+      self._latest_frame = frame
+      self.last_frame_presented = True
+      return True
+    except Exception as error:
+      LOG.warning("Failed to display H.264 RGB frame: %s", error)
+      return False
+
   def _present_frame(self, frame):
     # Invalidate the status cache before drawing, including a failed page flip.
     self._showing_waiting = False

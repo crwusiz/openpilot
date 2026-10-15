@@ -7,9 +7,20 @@ import cv2
 import numpy as np
 
 from PIL import Image, ImageDraw, ImageFont
-from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.common.swaglog import cloudlog
-from openpilot.selfdrive.addon.cluster.cluster_config import Colors, colors_alpha
+
+try:
+  from openpilot.common.filter_simple import FirstOrderFilter
+  from openpilot.common.swaglog import cloudlog
+  from openpilot.selfdrive.addon.cluster.cluster_config import Colors, colors_alpha
+except ImportError:
+  # deploy.sh copies this exact renderer alongside the portable support file.
+  # The Pi does not need Params, cereal or an openpilot installation.
+  import logging
+  try:
+    from .cluster_render_support import Colors, FirstOrderFilter, colors_alpha
+  except ImportError:
+    from cluster_render_support import Colors, FirstOrderFilter, colors_alpha
+  cloudlog = logging.getLogger("cluster_renderer")
 
 
 DISTANCE_ICONS = {
@@ -214,7 +225,8 @@ class ClusterRenderer:
     self._text_cache_bytes = 0
     self.last_frame_timings = {}
     self._blink_started_at = None
-    icon_dir = os.path.join(str(self.config.BASEDIR), "selfdrive", "assets", "icons")
+    asset_dir = getattr(self.config, "asset_dir", os.path.join(str(self.config.BASEDIR), "selfdrive", "assets"))
+    icon_dir = os.path.join(str(asset_dir), "icons")
     for name in (
       *WHEEL_ICONS.values(), *WIFI_ICONS.values(),
       *TRAFFIC_ICONS.values(), *DISTANCE_ICONS.values(),
@@ -998,7 +1010,7 @@ class ClusterRenderer:
       speed_color = (255, alpha, alpha)
 
     conversion = 3.6 if getattr(self.config, "is_metric", True) else 2.236936
-    speed = round(max(0.0, float(data.get("v_ego", 0.0) or 0.0) * conversion))
+    speed = "--" if data.get("_state_stale") else round(max(0.0, float(data.get("v_ego", 0.0) or 0.0) * conversion))
     center_x = self.camera_x + self.camera_w / 2
     # Align the current-speed value with the center of b's speed-limit cell.
     self._centered(draw, center_x, self.row_centers[0],
