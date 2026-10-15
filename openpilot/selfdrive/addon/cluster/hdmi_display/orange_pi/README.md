@@ -442,7 +442,7 @@ Network 모드는 전체 화면 JPEG 전송의 **20 FPS·JPEG 품질 68**을 기
 
 USB도 같은 대기 제어를 사용합니다. 업로드 중에는 다음 프레임 한 장까지 준비하며, 이 프레임이 인코딩 중이거나 대기 중이면 추가 합성을 쉬게 합니다. 전송이 막히지 않을 때는 렌더링과 인코딩을 겹쳐 처리합니다. 연결이 끊기면 USB도 연결 시작용 영상을 초당 한 장만 합성합니다. 카메라 원본은 계속 수신하되 전송 여유가 없으면 전처리를 약 5Hz로 줄입니다. USB는 렌더 시작 후 250ms를 넘긴 대기 JPEG를 버리고 새 프레임으로 재개합니다. 이 기준은 전송 완료나 실제 표시 지연의 상한은 아닙니다. 렌더러는 NumPy 배경 버퍼를 재사용하고 카메라 영역만 갱신하며, 인코더에 넘긴 PIL 화면은 다음 렌더링과 독립된 픽셀을 유지합니다.
 
-경로 색상 전환과 선행 차량 위치·투명도 필터는 목표 FPS가 아니라 실제 렌더 사이의 경과 시간을 사용합니다. 느린 전송 때문에 출력이 줄어들어도 해당 필터의 전환 시간이 같은 비율로 늘어나지 않습니다.
+경로 색상 전환과 선행 차량 위치·투명도 필터는 목표 FPS가 아니라 실제 렌더 사이의 경과 시간을 사용합니다. 느린 전송 때문에 출력이 줄어들어도 해당 필터의 전환 시간이 같은 비율로 늘어나지 않습니다. 완전히 투명한 차선·도로 경계는 좌표 투영 전에 생략해 화면에 영향을 주지 않는 계산을 줄입니다.
 
 카메라 원본을 계속 받아 비우면서, 아직 렌더러가 사용하지 않은 전처리 영상이 있으면 반복 변환을 줄입니다. 대기 중에도 약 5Hz로 최신 영상을 유지하며, 전송 여유가 다시 생기거나 렌더러가 기존 영상을 소비하면 새 원본을 바로 준비합니다. 이 제어는 화면 렌더링이 약 7FPS인데 카메라 전처리는 약 12FPS로 수행되던 중복 작업을 줄이기 위한 것입니다.
 
@@ -463,7 +463,7 @@ Pi는 SDL2 texture를 재사용하며 회전·크기 조절·밝기 조절을 GP
 | 로그 | 항목과 의미 |
 | --- | --- |
 | C4 `[CLUSTER_NETWORK_PERF]` | `fps`: 정상 ACK를 받은 프레임 수, `prep_avg`: JPEG 준비, `send_avg`: 헤더와 JPEG를 합친 `sendall` 호출, `ack_wait_avg/max`: 전송 호출 종료부터 ACK까지. `send_age_avg/max`: 생성부터 전송 시작까지, `frame_age_avg/max`: 생성부터 ACK까지이며 실제 화면 표시까지의 나이는 아닙니다. `encode_age_avg`·`encoded_wait_avg`는 생성→인코딩 완료·인코딩 완료→전송 시작, `window_wait_avg/max`는 전송 창 대기 시간입니다. `ack_gap_max`는 ACK 사이 최장 간격, `pending_frames/kb`·`oldest_ack_age`는 현재 전송 대기량·가장 오래된 ACK의 나이, `stale_drops`는 만료로 폐기한 영상입니다. `mode=stream`, `ack=receive`이면 수신 확인이고 `mode=legacy`, `ack=display`이면 출력 완료 확인입니다. `screen_off`는 Pi가 알린 화면 끄기 상태입니다. 정상 ACK가 있는 동안 약 10초마다 기록합니다. |
-| C4 `[CLUSTER_MAIN_PERF]` | `target`: 목표 FPS, `transport_skipped`: 대기·화면 끄기 때문에 렌더링을 생략한 주기 수. `render_avg`는 대기를 포함한 합성 경과 시간, `render_cpu_avg`는 렌더 메인 스레드의 실제 CPU 실행 시간입니다. `camera_copy_avg`: 영상 복사, `snapshot_avg`: 모델/HUD 상태 조회와 잠금 대기, `path_avg`: 경로·차선·리드 표시, `hud_avg`: PIL 변환과 HUD 합성. 약 10초마다 기록합니다. |
+| C4 `[CLUSTER_MAIN_PERF]` | `target`: 목표 FPS, `transport_skipped`: 대기·화면 끄기 때문에 렌더링을 생략한 주기 수. `render_avg`는 대기를 포함한 합성 경과 시간, `render_cpu_avg`는 렌더 메인 스레드의 실제 CPU 실행 시간입니다. `camera_copy_avg`: 영상 복사, `snapshot_avg`: 모델/HUD 상태 조회와 잠금 대기, `path_avg`: 경로·차선·리드 표시의 경과 시간, `path_cpu_avg`: 같은 경로 단계의 스레드 CPU 시간, `hud_avg`: PIL 변환과 HUD 합성. CPU와 경과 시간은 같은 단계를 다른 시계로 측정한 값이므로 더하지 않습니다. 약 10초마다 기록합니다. |
 | C4 `[CLUSTER_CAM_PERF]` | `receive_fps`는 VisionIPC 원본 수신 속도, `fps`는 전처리 완료 속도, `skipped`는 전송 여유가 없어 전처리를 생략한 원본 수입니다. 네트워크 전송이 막힌 동안에도 원본을 계속 받아 비우되 전처리는 최대 약 5회/초로 줄입니다. 전송 여유가 생기면 현재 원본을 즉시 전처리합니다. USB는 기존 처리 속도를 유지합니다. |
 | C4 `[CLUSTER_RESOURCE_PERF]` | Cluster CPU·RSS·스레드 수, 기기 CPU·온도·메모리, 모델 드롭률·실행 시간, deviceMotion의 `inputsOK`·`posenetOK`를 함께 기록합니다. `onroad_started`는 deviceState의 주행 상태, `car_state_seen`은 차량 데이터 수신 여부, `model_age_ms`·`device_motion_age_ms`·`car_state_age_ms`는 마지막 수신 후 경과 시간입니다. `cpu_pct=100`은 CPU 한 코어를 계속 사용한 값입니다. `model_drop_max`와 해당 구간의 오류 업데이트 수로 잠깐 발생한 문제도 확인합니다. 아직 받지 못한 상태는 `n/a`로 표시하며, 미수신 중 오류 카운터 0은 건강 확인을 뜻하지 않습니다. |
 | Pi `[CLUSTER_RX_PERF]` | `mode=stream`일 때 `fps`: 수신 FPS, `display_fps`: 실제 영상 출력 FPS, `dropped`: 대기 JPEG 교체 횟수입니다. 화면 끄기·메뉴 다시 그리기는 영상 출력 수에 포함하지 않습니다. `queue_wait_avg/max`: 수신 후 출력 대기, `display_gap_max`: 영상 출력 사이의 최대 간격, `display_max`: 최악의 화면 처리 시간도 기록합니다. `header_wait_avg`: 다음 헤더 대기, `receive_avg`: JPEG 본문 수신, `display_avg`: 전체 화면 처리, `ack_send_avg`: ACK 전송 호출입니다. `payload_wait_avg/max`·`payload_read_calls_avg`·`payload_read_max`는 JPEG 수신 중 readiness 대기와 읽기 호출을 구분합니다. `decode/rotate/scale/blit/flip`의 평균·최대값, `convert/upload/draw`의 평균·최대값도 기록합니다. `blit`에는 색상 변환·texture 업로드·draw가 포함되므로 이 세 값을 다시 더하지 않습니다. |
@@ -476,11 +476,13 @@ Pi는 SDL2 texture를 재사용하며 회전·크기 조절·밝기 조절을 GP
 
 Pi의 `--frame-timeout` 기본값은 2초입니다. 다음 헤더를 기다리는 idle 시간과 첫 헤더 바이트부터 헤더·JPEG 전체를 완료할 시간을 각각 제한합니다. 부분 데이터가 조금씩 와도 완료 제한 시간은 연장하지 않습니다. 마지막 완성 JPEG 이후 2초가 지나면 오래된 주행 영상을 대기 화면으로 바꾸며, 진행 중인 JPEG가 제시간에 완료되면 같은 TCP 연결에서 복구합니다. `[CLUSTER_RX_STALE]`·`[CLUSTER_RX_RESUMED]`는 이 표시 전환을 기록합니다. 실제 수신 실패는 `phase=idle_header/partial_header/partial_payload`, 수신 바이트 수와 경과 시간을 기록하므로 대기 표시와 소켓 종료를 구분할 수 있습니다.
 
-자동 검색으로 연결한 C4 주소는 기억해 두고 연결이 끊기면 그 주소로 먼저 재접속합니다. 실패할 때만 서브넷을 다시 검색합니다. `--host`를 지정하면 해당 주소만 사용합니다. `--reconnect-delay`보다 오래 유지된 연결에는 종료 후 추가 대기를 넣지 않습니다. 연결하지 못했거나 짧게 끝난 경우 기존 지연만큼 대기해 반복 접속을 제한합니다.
+자동 검색으로 연결한 C4 주소는 기억해 두고 연결이 끊기면 그 주소로 먼저 재접속합니다. 알려진 주소와 명시적 `--host`에는 회당 최대1초·최대2회, 중간150ms를 포함한 전체2초 접속 예산을 사용하고 대기 중 SDL 이벤트를 처리합니다. `[CLUSTER_RX_CONNECT]`로 시도와 제한 시간을 확인합니다. 모두 실패한 경우만 서브넷을 다시 검색하며, 탐색용 `--scan-timeout`은 계속 별도로 적용합니다. `--host`를 지정하면 해당 주소만 사용합니다. C4도 연결 복구 중에는 listener를 유지해 accept 대기 중인 재접속을 함께 끊지 않습니다. 최종 종료 때는 포트를 닫습니다. `--reconnect-delay`보다 오래 유지된 연결에는 종료 후 추가 대기를 넣지 않습니다. 연결하지 못했거나 짧게 끝난 경우 기존 지연만큼 대기해 반복 접속을 제한합니다. 접속 시도의2초 예산은 전체 화면 복구 시간의 보장치가 아닙니다.
 
 Pi 수신기는 시작할 때 `[CLUSTER_RX_BUILD] startup_source_sha256=...`에 실행 시작 시 읽은 수신기 소스의 SHA-256 지문을 한 번 남깁니다. 업로드 보고서의 `Installed receiver source`에는 수집 시 설치 파일의 `source_sha256`를 기록합니다. 두 값이 다르면 설치 파일이 바뀐 뒤에도 이전 프로세스가 실행 중일 수 있으므로 `pi_update`의 서비스 재시작 결과를 확인합니다. 시작 로그가 없는 오래된 수신기는 새 버전 적용 여부를 확정할 수 없습니다. 이 지문은 소스 파일 비교용이며 메모리의 실행 코드를 직접 측정한 값은 아닙니다. `missing`·`unreadable`도 함께 확인합니다. 배포와 업데이트는 현재 수신기의 필수 Python 파일이 빠지면 업로드 또는 서비스 중지 전에 실패하도록 검사합니다.
 
 Linux에서 지원되는 경우 C4 `[CLUSTER_NETWORK_PERF]`와 Pi `[CLUSTER_RX_PERF]`에 읽기 전용 `TCP_INFO`도 기록합니다. `tcp_rtt_ms`·`tcp_rttvar_ms`·`tcp_rto_ms`는 커널의 RTT·변동·재전송 제한 시간, `tcp_unacked`·`tcp_lost`·`tcp_cwnd`는 송신 측 미확인·손실·혼잡 창의 패킷 수입니다. `tcp_rcv_space`는 수신 공간의 커널 추정값이며 현재 광고한 수신 창이나 소켓 버퍼 크기와 같지 않습니다. `tcp_total_retrans`는 해당 연결이 보낸 TCP 세그먼트의 재전송 누계, `tcp_retrans_delta`는 이전 표본 이후 증가량입니다. 첫 표본은 증가량 0이며 새 연결에서 초기화합니다. 커널이 제공하면 `tcp_snd_wnd`도 기록하며 이는 상대가 광고한 송신 가능 창의 바이트 수입니다. Pi의 송신 재전송 수만으로 C4→Pi JPEG 손실을 판정하지 않고 C4의 같은 표본과 함께 비교합니다. 소켓 옵션은 변경하지 않으며 미지원 환경에서는 이 항목들을 생략합니다.
+
+업로드하는 Pi 보고서에는 C4의 무선 상태도 앞쪽에 함께 수집합니다. Pi 주소로 향하는 route의 실제 인터페이스를 선택하고 절전·주파수·신호·PHY 속도와 station/인터페이스 카운터를 읽습니다. SSID·MAC·프로필이나 원본 명령 출력은 저장하지 않으며 AP의 station은 익명 최대2개만 기록합니다. 어느 station이 Pi인지는 단정하지 않습니다. 기존25초 수집 제한 안에서 C4 snapshot은 최대2초·정제 결과4 KiB로 제한하고 전체 보고서512 KiB 상한을 유지합니다. C4 항목을 지원하지 않아도 Pi 수집은 계속합니다. 수집 시점의 snapshot이므로 주행 중 오류 시각의 상태와 구분합니다.
 
 C4도 ACK 패킷 전체를 기다리는 시간을 `network_ack_timeout`(기본 2.5초)으로 제한합니다. ACK가 조각나 도착해도 대기 예산을 다시 시작하지 않으며, 시간 초과·연결 종료 때 `bytes=수신량/전체크기`를 기록합니다. ACK 수신 제한은 동시에 진행 중인 JPEG 전송의 소켓 제한 시간을 바꾸지 않습니다.
 

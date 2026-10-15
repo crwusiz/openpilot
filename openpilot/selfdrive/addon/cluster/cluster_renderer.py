@@ -2,6 +2,7 @@ import os
 import time
 from collections import OrderedDict
 from functools import lru_cache
+from time import thread_time
 import cv2
 import numpy as np
 
@@ -268,10 +269,12 @@ class ClusterRenderer:
     camera_copied_at = time.monotonic()
     model_valid, hud_data, path_data = models.get_render_data()
     snapshot_at = time.monotonic()
+    path_cpu_started = thread_time()
     if has_camera and model_valid:
       frame = self._draw_model_path(frame, path_data, hud_data)
     else:
       self._reset_leads()
+    path_cpu_elapsed = thread_time() - path_cpu_started
 
     path_drawn_at = time.monotonic()
     # RGB fromarray owns its pixels, so the encoder can retain this image while
@@ -282,6 +285,7 @@ class ClusterRenderer:
       "camera_copy": camera_copied_at - started,
       "snapshot": snapshot_at - camera_copied_at,
       "path": path_drawn_at - snapshot_at,
+      "path_cpu": path_cpu_elapsed,
       "hud": time.monotonic() - path_drawn_at,
     }
     # Keep the composed frame as PIL through the USB worker. Converting the
@@ -506,6 +510,10 @@ class ClusterRenderer:
       if len(line) != 3:
         continue
       probability = float(lane_probs[index]) if index < len(lane_probs) else 0.0
+      # A fully transparent line never changes camera pixels. Avoid creating
+      # and projecting both 3D boundaries before the alpha fill rejects it.
+      if probability <= 0.0:
+        continue
       width = 0.025 * probability
       polygon = self._map_line_to_polygon(*line, width, 0.0, calib_transform)
       if polygon is not None:
@@ -519,6 +527,8 @@ class ClusterRenderer:
       if len(edge) != 3:
         continue
       confidence = 1.0 - float(road_stds[index]) if index < len(road_stds) else 0.0
+      if confidence <= 0.0:
+        continue
       polygon = self._map_line_to_polygon(*edge, 0.025, 0.0, calib_transform)
       if polygon is not None:
         local_polygon = polygon - np.array([self.camera_x, self.camera_y], dtype=np.int32)

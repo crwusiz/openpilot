@@ -302,6 +302,36 @@ def test_sender_exception_is_accounted_for_and_thread_survives():
     assert pipeline.close()
 
 
+def test_sender_failure_resets_only_client_when_transport_supports_recovery(monkeypatch):
+  display = FailedSendDisplay(raises=True)
+  reset = threading.Event()
+
+  def reset_connection():
+    display.connected = False
+    reset.set()
+
+  def close():
+    raise AssertionError("recoverable send failure must preserve the listener")
+
+  display.reset_connection, display.close = reset_connection, close
+  pipeline = ClusterDisplayPipeline(display)
+  monkeypatch.setattr(pipeline, "_wait_for_reconnect", lambda _timeout: None)
+  pipeline.start()
+  try:
+    pipeline.push("failed")
+    assert reset.wait(timeout=1.0)
+    assert not display.connected
+    assert pipeline.get_stats()["send_failures"] == 1
+    assert pipeline.sender_thread.is_alive()
+    display.raises = False
+    display.send_prepared = lambda _frame: True
+    display.connected = True
+    pipeline.push("fresh")
+    assert _wait_for(lambda: pipeline.get_stats()["sent"] == 1)
+  finally:
+    assert pipeline.close()
+
+
 class CreditDisplay:
   def __init__(self):
     self.connected = True

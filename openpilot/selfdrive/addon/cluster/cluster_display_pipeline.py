@@ -234,7 +234,10 @@ class ClusterDisplayPipeline:
           self._send_failures += 1
         flog(f"[CLUSTER_PIPELINE_ERROR] Sender exception: {e}")
         try:
-          if hasattr(self.display, "close"):
+          reset_connection = getattr(self.display, "reset_connection", None)
+          if callable(reset_connection):
+            reset_connection()
+          elif hasattr(self.display, "close"):
             self.display.close()
           else:
             self.display.connected = False

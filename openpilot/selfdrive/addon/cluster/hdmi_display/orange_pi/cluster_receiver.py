@@ -35,6 +35,10 @@ DEFAULT_INTERFACE = "wlan0"
 DEFAULT_SCAN_TIMEOUT = 0.12
 DEFAULT_SCAN_WORKERS = 32
 DEFAULT_RECONNECT_DELAY = 2.0
+KNOWN_CONNECT_TIMEOUT = 1.0
+KNOWN_CONNECT_ATTEMPTS = 2
+KNOWN_CONNECT_RETRY_DELAY = 0.15
+KNOWN_CONNECT_BUDGET = 2.0
 FRAME_TIMEOUT_SECONDS = 2.0
 MAX_SCAN_HOSTS = 512
 
@@ -109,6 +113,64 @@ def _probe(address: str, port: int, timeout: float, stop) -> socket.socket | Non
   except OSError:
     sock.close()
     return None
+
+
+def connect_known_c4(address: str, port: int, poll_events=None):
+  """Give a known peer a bounded retry before scanning the entire subnet."""
+  deadline = time.monotonic() + KNOWN_CONNECT_BUDGET
+  stop = threading.Event()
+  futures = []
+  winner = None
+  completed = False
+  try:
+    with ThreadPoolExecutor(max_workers=1) as executor:
+      try:
+        for attempt in range(KNOWN_CONNECT_ATTEMPTS):
+          if poll_events is not None:
+            poll_events()
+          remaining = deadline - time.monotonic()
+          if remaining <= 0:
+            break
+          timeout = min(KNOWN_CONNECT_TIMEOUT, remaining)
+          LOG.info("[CLUSTER_RX_CONNECT] Known C4 %s:%d, attempt=%d/%d, timeout=%.2fs",
+                   address, port, attempt + 1, KNOWN_CONNECT_ATTEMPTS, timeout)
+          future = executor.submit(_probe, address, port, timeout, stop)
+          futures.append(future)
+          while not future.done():
+            if poll_events is not None:
+              poll_events()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+              break
+            wait([future], timeout=min(remaining, 0.05))
+          if not future.done():
+            break
+          candidate = future.result()
+          if time.monotonic() > deadline:
+            break
+          if candidate is not None:
+            winner = candidate
+            break
+          if attempt + 1 < KNOWN_CONNECT_ATTEMPTS:
+            retry_at = min(deadline, time.monotonic() + KNOWN_CONNECT_RETRY_DELAY)
+            while True:
+              if poll_events is not None:
+                poll_events()
+              remaining = retry_at - time.monotonic()
+              if remaining <= 0:
+                break
+              time.sleep(min(remaining, 0.05))
+      finally:
+        stop.set()
+    completed = True
+  finally:
+    # A probe may connect while SDL requests shutdown or its budget expires.
+    for future in futures:
+      if not future.cancelled() and future.exception() is None:
+        sock = future.result()
+        if sock is not None and (not completed or sock is not winner):
+          sock.close()
+  return winner
 
 
 def discover_c4(interface: str, port: int, timeout: float, workers: int, poll_events=None):
@@ -351,10 +413,10 @@ def main():
       try:
         _poll_display(display)
         if args.host is not None:
-          sock = _probe(str(args.host), args.port, args.scan_timeout, threading.Event())
+          sock = connect_known_c4(str(args.host), args.port, lambda: _poll_display(display))
         else:
           if last_c4_address is not None:
-            sock = _probe(last_c4_address, args.port, args.scan_timeout, threading.Event())
+            sock = connect_known_c4(last_c4_address, args.port, lambda: _poll_display(display))
             if sock is not None:
               LOG.info("[CLUSTER_RX_RECONNECT] Connected to last C4 at %s:%d", last_c4_address, args.port)
           if sock is None:

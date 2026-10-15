@@ -200,6 +200,68 @@ def test_large_clipped_alpha_strips_match_previous_pixels(renderer_module, color
   np.testing.assert_array_equal(actual, expected)
 
 
+def _previous_lane_lines(renderer, region, data, calib):
+  lane_probs = data.get("lane_line_probs") or []
+  for index, line in enumerate(data.get("lane_lines") or []):
+    if len(line) != 3:
+      continue
+    probability = float(lane_probs[index]) if index < len(lane_probs) else 0.0
+    polygon = renderer._map_line_to_polygon(*line, 0.025 * probability, 0.0, calib)
+    if polygon is not None:
+      renderer._fill_polygon_alpha(region, polygon, (255, 255, 255, 255), np.clip(probability, 0.0, 0.7),
+                                   blender=renderer._color_blender)
+  road_stds = data.get("road_edge_stds") or []
+  for index, edge in enumerate(data.get("road_edges") or []):
+    if len(edge) != 3:
+      continue
+    confidence = 1.0 - float(road_stds[index]) if index < len(road_stds) else 0.0
+    polygon = renderer._map_line_to_polygon(*edge, 0.025, 0.0, calib)
+    if polygon is not None:
+      renderer._fill_polygon_alpha(region, polygon, (201, 34, 49, 100), np.clip(confidence, 0.0, 1.0),
+                                   blender=renderer._color_blender)
+
+
+@pytest.mark.parametrize("probabilities,edge_stds,visible_count", [
+  ([0.8, 0.5, 0.2, 0.9], [0.1, 0.5], 6),
+  (None, None, 0),
+  ([], [], 0),
+  ([-0.5, 0.0, 0.0, -1.0], [1.0, 1.1], 0),
+  ([1.8, 0.3, -0.2, 0.0], [-0.1, 1.5], 3),
+  ([0.6], [0.2], 2),
+])
+def test_transparent_lane_geometry_is_skipped_without_changing_pixels(renderer_module, probabilities, edge_stds, visible_count):
+  renderer_module.Colors.WHITE = (255, 255, 255, 255)
+  renderer_module.Colors.RED = (201, 34, 49, 255)
+  renderer_module.colors_alpha = lambda color, alpha: (*color[:3], alpha)
+  renderer = renderer_module.ClusterRenderer.__new__(renderer_module.ClusterRenderer)
+  renderer.camera_x = renderer.camera_y = 0
+  renderer.camera_w, renderer.camera_h = 72, 64
+  renderer._source_to_panel = np.eye(3, dtype=np.float32)
+  renderer._color_blender = renderer_module.ColorBlendWorkspace(72)
+  distances = np.linspace(3.0, 40.0, 33)
+  heights = np.linspace(1.5, 0.4, 33)
+  def line(offset):
+    return [distances.tolist(), np.full_like(distances, offset).tolist(), heights.tolist()]
+
+  data = {
+    "lane_lines": [line(offset) for offset in (-3.6, -1.2, 1.2, 3.6)] + [[[], []]],
+    "lane_line_probs": probabilities,
+    "road_edges": [line(-4.5), line(4.5), [[], []]],
+    "road_edge_stds": edge_stds,
+  }
+  calibration = np.array([[36, -40, 0], [20, 0, 40], [1, 0, 0]], dtype=np.float32)
+  original = np.random.default_rng(29).integers(0, 256, (64, 72, 3), dtype=np.uint8)
+  expected, actual = original.copy(), original.copy()
+  _previous_lane_lines(renderer, expected, data, calibration)
+  renderer._map_line_to_polygon = Mock(wraps=renderer._map_line_to_polygon)
+
+  renderer._draw_lane_lines(actual, data, calibration)
+
+  np.testing.assert_array_equal(actual, expected)
+  assert renderer._map_line_to_polygon.call_count == visible_count
+  assert bool(np.any(actual != original)) == bool(visible_count)
+
+
 def test_lookup_cache_is_bounded_and_immutable(renderer_module):
   for value in range(512):
     table = renderer_module._alpha_blend_lut((20, 180, 99), value / 511)
@@ -268,6 +330,38 @@ def test_retained_render_frames_survive_camera_changes_and_stalls(renderer_modul
     np.testing.assert_array_equal(np.asarray(image), expected)
   # Neither the path nor the HUD may leak into the cached panel background.
   np.testing.assert_array_equal(renderer.base_canvas, np.random.default_rng(19).integers(0, 256, (10, 16, 3), dtype=np.uint8))
+
+
+def test_render_reports_path_cpu_separately_from_waits_and_hud(renderer_module, monkeypatch):
+  renderer = renderer_module.ClusterRenderer.__new__(renderer_module.ClusterRenderer)
+  renderer.base_canvas = np.zeros((10, 16, 3), dtype=np.uint8)
+  renderer._frame = renderer.base_canvas.copy()
+  renderer.camera_x, renderer.camera_y, renderer.camera_w, renderer.camera_h = 4, 2, 8, 6
+  renderer._update_filter_intervals = Mock()
+  clock = {"wall": 10.0, "cpu": 1.0}
+  monkeypatch.setattr(renderer_module, "time", SimpleNamespace(monotonic=lambda: clock["wall"]))
+  monkeypatch.setattr(renderer_module, "thread_time", lambda: clock["cpu"])
+  def draw_path(frame, _path, _hud):
+    clock["wall"] += 0.020
+    clock["cpu"] += 0.003
+    return frame
+  def draw_hud(_image, _hud, _has_camera):
+    clock["wall"] += 0.010
+    clock["cpu"] += 0.005
+
+  renderer._draw_model_path = draw_path
+  renderer._draw_hud = draw_hud
+  camera = Mock()
+  camera.get_frame.return_value = np.ones((6, 8, 3), dtype=np.uint8)
+  camera.get_source_to_panel_transform.return_value = np.eye(3)
+  models = Mock()
+  models.get_render_data.return_value = (True, {}, {})
+
+  renderer.render(camera, models)
+
+  assert renderer.last_frame_timings["path"] == pytest.approx(0.020)
+  assert renderer.last_frame_timings["path_cpu"] == pytest.approx(0.003)
+  assert renderer.last_frame_timings["hud"] == pytest.approx(0.010)
 
 
 def _previous_centered(draw, cx, cy, value, font, color, stroke_width, stroke_fill):

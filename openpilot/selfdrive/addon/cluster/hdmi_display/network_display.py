@@ -445,6 +445,12 @@ class ClusterNetworkDisplay:
       return False
     return self.send_prepared(self.prepare_image(frame_image))
 
+  def reset_connection(self):
+    # A reconnect can already be queued while the old client's ACK reader
+    # reports its error. Keep the listener so cleanup cannot reset that peer.
+    flog("[CLUSTER_NETWORK_RECONNECT] Resetting client; listener retained.")
+    self._disconnect_client()
+
   def close(self):
     flog("Closing cluster network connection.")
     self._disconnect_client()

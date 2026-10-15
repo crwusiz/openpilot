@@ -2,6 +2,7 @@
 import argparse
 from datetime import UTC, datetime
 import ipaddress
+import json
 import os
 from pathlib import Path
 import re
@@ -9,6 +10,7 @@ import shlex
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -23,6 +25,9 @@ except ImportError:
 COLLECTION_TIMEOUT = 25.0
 MAX_OUTPUT_BYTES = 512 * 1024
 MAX_STDERR_BYTES = 16 * 1024
+LOCAL_WIFI_TIMEOUT = 2.0
+MAX_LOCAL_WIFI_BYTES = 4 * 1024
+MAX_LOCAL_COMMAND_BYTES = 16 * 1024
 MAX_C4_LOG_BYTES = 32 * 1024 * 1024
 C4_LOG_CHUNK_BYTES = 64 * 1024
 C4_LOG_OVERLAP_BYTES = 256
@@ -159,10 +164,10 @@ class _Capture:
     return self.data.decode("utf-8", errors="replace")
 
 
-def _run_ssh(command, environ, timeout):
+def _run_ssh(command, environ, timeout, *, stdout_limit=MAX_OUTPUT_BYTES, stderr_limit=MAX_STDERR_BYTES):
   process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                              env=environ, start_new_session=True)
-  stdout, stderr = _Capture(MAX_OUTPUT_BYTES), _Capture(MAX_STDERR_BYTES)
+  stdout, stderr = _Capture(stdout_limit), _Capture(stderr_limit)
   readers = [threading.Thread(target=capture.read, args=(stream,), daemon=True)
              for capture, stream in ((stdout, process.stdout), (stderr, process.stderr))]
   for reader in readers:
@@ -183,6 +188,125 @@ def _run_ssh(command, environ, timeout):
   for reader in readers:
     reader.join(timeout=0.5)
   return SSHResult(process.returncode, stdout.text(), stderr.text(), stdout.truncated or stderr.truncated, timed_out)
+
+
+def _run_local(command, environ, timeout):
+  return _run_ssh(command, environ, timeout, stdout_limit=MAX_LOCAL_COMMAND_BYTES, stderr_limit=1024)
+
+
+def _wifi_values(text, prefix=""):
+  """Rebuild numeric fields only; never copy raw iw lines or peer identifiers."""
+  patterns = [
+    ("freq_mhz", r"freq:\s*(\d+(?:\.\d+)?)\s*$"),
+    ("signal_dbm", r"signal:\s*(-?\d+)\s*(?:\[[^]]*\]\s*)?dBm\b"),
+    ("signal_avg_dbm", r"signal avg:\s*(-?\d+)\s*(?:\[[^]]*\]\s*)?dBm\b"),
+    ("rx_bitrate_mbps", r"rx bitrate:\s*(\d+(?:\.\d+)?)\s*MBit/s\b"),
+    ("tx_bitrate_mbps", r"tx bitrate:\s*(\d+(?:\.\d+)?)\s*MBit/s\b"),
+    ("expected_throughput_mbps", r"expected throughput:\s*(\d+(?:\.\d+)?)\s*Mbps\b"),
+    ("inactive_ms", r"inactive time:\s*(\d+)\s*ms\b"),
+  ]
+  patterns += [(name.replace(" ", "_"), re.escape(name) + r":\s*(\d+)\s*$") for name in (
+    "rx bytes", "rx packets", "tx bytes", "tx packets", "tx retries", "tx failed", "beacon loss", "beacon rx", "rx drop misc",
+  )]
+  values = {}
+  for line in text.splitlines():
+    for key, pattern in patterns:
+      match = re.match(r"\s*" + pattern, line)
+      if match:
+        # Restrict numeric lengths as well as total output, even with bad drivers.
+        value = match.group(1)
+        if len(value) <= 24:
+          values[prefix + key] = value
+        break
+  return [key + "=" + value for key, value in values.items()]
+
+
+def collect_c4_wifi(host, environ, deadline, runner=None, sysfs_root=Path("/sys/class/net")):
+  """Take a bounded local snapshot without SSID, MAC, IP or command stderr."""
+  if sys.platform != "linux":
+    return "status=unsupported_platform"
+  runner = runner or _run_local
+  local_deadline = min(deadline, time.monotonic() + LOCAL_WIFI_TIMEOUT)
+  local_env = {"LC_ALL": "C", "PATH": environ.get("PATH", os.defpath)}
+  rows = ["scope=collection_time; station peers are anonymous and may not be the Pi"]
+
+  def run(command):
+    remaining = local_deadline - time.monotonic()
+    if remaining <= 0:
+      rows.append("command_status=local_deadline")
+      return None
+    try:
+      result = runner(command, local_env, min(0.4, remaining))
+    except (OSError, ValueError, subprocess.SubprocessError):
+      rows.append("command_status=unavailable")
+      return None
+    if result.timed_out:
+      rows.append("command_status=timeout")
+    elif result.returncode != 0:
+      rows.append("command_status=unavailable")
+    else:
+      return result.stdout[:MAX_LOCAL_COMMAND_BYTES]
+    return None
+
+  def finish():
+    return "\n".join(rows).encode("utf-8")[:MAX_LOCAL_WIFI_BYTES].decode("utf-8", errors="ignore")
+
+  ip = shutil.which("ip", path=local_env["PATH"])
+  if ip is None:
+    rows.append("status=route_tool_unavailable")
+    return finish()
+  route_text = run([ip, "-j", "route", "get", _ipv4(host)])
+  try:
+    routes = json.loads(route_text) if route_text else []
+    interface = routes[0]["dev"]
+    if not isinstance(interface, str) or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}", interface) is None:
+      raise ValueError("invalid route interface")
+  except (ValueError, KeyError, IndexError, TypeError):
+    rows.append("status=route_interface_unavailable")
+    return finish()
+  rows.append("route_interface=" + interface)
+  iw = shutil.which("iw", path=local_env["PATH"])
+  if iw is None:
+    rows.append("iw_status=unavailable")
+  else:
+    power = run([iw, "dev", interface, "get", "power_save"])
+    if power:
+      match = re.fullmatch(r"\s*Power save:\s*(on|off)\s*", power)
+      if match:
+        rows.append("power_save=" + match.group(1))
+    link = run([iw, "dev", interface, "link"])
+    if link:
+      rows += _wifi_values(link)
+    info = run([iw, "dev", interface, "info"])
+    if info:
+      for line in info.splitlines():
+        match = re.fullmatch(r"\s*type (managed|AP|P2P-client|P2P-GO|monitor|mesh point)\s*", line)
+        if match:
+          rows.append("interface_type=" + match.group(1))
+        match = re.match(r"\s*channel \d+ \((\d{3,5}) MHz\)", line)
+        if match:
+          rows.append("channel_freq_mhz=" + match.group(1))
+    stations = run([iw, "dev", interface, "station", "dump"])
+    if stations:
+      peers = re.split(r"(?m)^Station [^\n]*\n", stations)[1:]
+      rows.append("anonymous_stations_observed=" + str(len(peers)))
+      for index, peer in enumerate(peers[:2], 1):
+        rows += _wifi_values(peer, prefix=f"station_{index}_")
+      if len(peers) > 2:
+        rows.append("additional_stations_omitted=1")
+  # Fixed counter paths and validated interface names prevent path traversal.
+  for counter in ("rx_bytes", "rx_packets", "rx_errors", "rx_dropped", "tx_bytes", "tx_packets", "tx_errors", "tx_dropped"):
+    if time.monotonic() >= local_deadline:
+      rows.append("counter_status=local_deadline")
+      break
+    try:
+      with (Path(sysfs_root) / interface / "statistics" / counter).open("r", encoding="ascii") as file:
+        value = file.read(32).strip()
+      if re.fullmatch(r"[0-9]{1,24}", value):
+        rows.append("interface_" + counter + "=" + value)
+    except (OSError, UnicodeError):
+      pass
+  return finish()
 
 
 def _write_report(output, content):
@@ -226,6 +350,7 @@ def collect_pi_log(c4_log, output, environ=None, runner=None):
   try:
     host, source = resolve_host(c4_log, environ, deadline=deadline)
     report += ["Pi address: " + host, "Address source: " + source]
+    report += ["\n--- C4 Wi-Fi snapshot (no SSID/profile/MAC) ---", collect_c4_wifi(host, environ, deadline)]
     save_progress()
     user = environ.get("CLUSTER_PI_USER", "root")
     if re.fullmatch(r"[a-z_][a-z0-9_-]*\$?", user) is None:

@@ -810,6 +810,87 @@ def test_discovery_quit_closes_probe_sockets(monkeypatch):
   assert all(sock.fileno() == -1 for sock in sockets)
 
 
+def test_known_c4_allows_handshake_longer_than_subnet_scan_timeout(monkeypatch):
+  sock = SimpleNamespace(close=lambda: pytest.fail("successful socket must stay open"))
+  attempts, polls = [], []
+
+  def probe(address, port, timeout, stop):
+    attempts.append((address, port, timeout))
+    assert not stop.is_set()
+    return sock if timeout >= 0.3 else None
+
+  monkeypatch.setattr(cluster_receiver, "_probe", probe)
+  assert cluster_receiver.connect_known_c4("192.168.77.40", 9200, lambda: polls.append(True)) is sock
+  assert attempts == [("192.168.77.40", 9200, cluster_receiver.KNOWN_CONNECT_TIMEOUT)]
+  assert cluster_receiver.DEFAULT_SCAN_TIMEOUT < 0.3 and polls
+
+
+def test_known_c4_retries_transient_refusal_and_pumps_events_between_attempts(monkeypatch):
+  now, polls, attempts = [0.0], [], []
+  sock = SimpleNamespace(close=lambda: pytest.fail("successful socket must stay open"))
+  monkeypatch.setattr(cluster_receiver, "time", SimpleNamespace(
+    monotonic=lambda: now[0], sleep=lambda delay: now.__setitem__(0, now[0] + delay),
+  ))
+
+  def probe(address, port, timeout, _stop):
+    attempts.append((address, port, timeout))
+    return None if len(attempts) == 1 else sock
+
+  monkeypatch.setattr(cluster_receiver, "_probe", probe)
+  assert cluster_receiver.connect_known_c4("192.168.77.40", 9200, lambda: polls.append(now[0])) is sock
+  assert len(attempts) == 2 and all(attempt[2] == 1.0 for attempt in attempts)
+  assert now[0] == pytest.approx(cluster_receiver.KNOWN_CONNECT_RETRY_DELAY)
+  assert len(polls) >= 3
+
+
+def test_known_c4_failed_handshakes_share_a_bounded_total_budget(monkeypatch):
+  now, timeouts = [0.0], []
+  monkeypatch.setattr(cluster_receiver, "time", SimpleNamespace(
+    monotonic=lambda: now[0], sleep=lambda delay: now.__setitem__(0, now[0] + delay),
+  ))
+
+  def probe(_address, _port, timeout, _stop):
+    timeouts.append(timeout)
+    now[0] += timeout
+    return None
+
+  monkeypatch.setattr(cluster_receiver, "_probe", probe)
+  assert cluster_receiver.connect_known_c4("192.168.77.40", 9200) is None
+  assert timeouts == pytest.approx([1.0, 0.85])
+  assert now[0] == pytest.approx(cluster_receiver.KNOWN_CONNECT_BUDGET)
+
+
+def test_known_c4_closes_a_connection_returned_after_total_budget(monkeypatch):
+  now, closed = [0.0], []
+  monkeypatch.setattr(cluster_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+
+  def probe(*_args):
+    now[0] = cluster_receiver.KNOWN_CONNECT_BUDGET + 0.01
+    return SimpleNamespace(close=lambda: closed.append(True))
+
+  monkeypatch.setattr(cluster_receiver, "_probe", probe)
+  assert cluster_receiver.connect_known_c4("192.168.77.40", 9200) is None
+  assert closed == [True]
+
+
+def test_known_c4_quit_cancels_probe_and_closes_a_racing_socket(monkeypatch):
+  started, closed = threading.Event(), []
+
+  def probe(_address, _port, _timeout, stop):
+    started.set()
+    assert stop.wait(timeout=1.0)
+    return SimpleNamespace(close=lambda: closed.append(True))
+
+  def poll_events():
+    if started.is_set():
+      raise KeyboardInterrupt
+
+  monkeypatch.setattr(cluster_receiver, "_probe", probe)
+  with pytest.raises(KeyboardInterrupt):
+    cluster_receiver.connect_known_c4("192.168.77.40", 9200, poll_events)
+  assert started.is_set() and closed == [True]
+
+
 def test_main_shows_waiting_at_startup_and_disconnect_before_retry(monkeypatch, caplog):
   events = []
   display_options = {}
@@ -896,6 +977,27 @@ def test_main_keeps_waiting_when_wifi_or_c4_is_unavailable(monkeypatch, wifi_ava
   assert events == ["waiting", "discover", "waiting", "retry", "close"]
 
 
+def test_main_explicit_host_does_not_scan_after_known_peer_retries_fail(monkeypatch):
+  events = []
+  display = FakeDisplay()
+  args = cluster_receiver.parse_args(["--host", "192.168.77.40"])
+  monkeypatch.setattr(hdmi_display, "HdmiDisplay", lambda **kwargs: display)
+  monkeypatch.setattr(display, "open", lambda: True, raising=False)
+  monkeypatch.setattr(display, "show_waiting", lambda: True, raising=False)
+  monkeypatch.setattr(display, "close", lambda: events.append("close"), raising=False)
+  monkeypatch.setattr(cluster_receiver, "parse_args", lambda: args)
+  monkeypatch.setattr(cluster_receiver.signal, "signal", lambda *_args: None)
+  monkeypatch.setattr(cluster_receiver, "discover_c4", lambda *_args: pytest.fail("explicit host must never scan"))
+  monkeypatch.setattr(cluster_receiver, "connect_known_c4", lambda address, port, _poll: events.append((address, port)))
+
+  def retry(*_args):
+    raise KeyboardInterrupt
+
+  monkeypatch.setattr(cluster_receiver, "wait_for_reconnect", retry)
+  cluster_receiver.main()
+  assert events == [("192.168.77.40", 9200), "close"]
+
+
 @pytest.mark.parametrize("cached_available", [False, True])
 @pytest.mark.parametrize("connection_duration", [0.1, 3.0])
 def test_main_retries_last_c4_before_scanning_and_backs_off_only_short_sessions(monkeypatch, cached_available, connection_duration):
@@ -909,7 +1011,9 @@ def test_main_retries_last_c4_before_scanning_and_backs_off_only_short_sessions(
   args = cluster_receiver.parse_args([])
   monkeypatch.setattr(cluster_receiver, "parse_args", lambda: args)
   monkeypatch.setattr(cluster_receiver.signal, "signal", lambda *_args: None)
-  monkeypatch.setattr(cluster_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(cluster_receiver, "time", SimpleNamespace(
+    monotonic=lambda: now[0], sleep=lambda delay: now.__setitem__(0, now[0] + delay),
+  ))
   monkeypatch.setattr(cluster_receiver, "wait_for_reconnect", lambda _display, delay: events.append(("retry", delay)))
 
   class Connection:
@@ -954,6 +1058,7 @@ def test_main_retries_last_c4_before_scanning_and_backs_off_only_short_sessions(
     expected.append(("retry", args.reconnect_delay))
   expected.append(("probe", "192.168.77.40"))
   if not cached_available:
+    expected.append(("probe", "192.168.77.40"))
     expected.append(("discover", recovered_address))
   assert events == expected + [("receive", recovered_address), ("disconnect", recovered_address), "close"]
 

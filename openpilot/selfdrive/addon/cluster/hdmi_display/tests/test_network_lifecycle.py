@@ -86,6 +86,43 @@ def display(monkeypatch):
 
 
 @pytest.mark.parametrize("new_streaming", [False, True])
+def test_recovery_keeps_reconnect_queued_on_listener_while_old_client_is_cleaned(display, new_streaming):
+  old_peer = Peer(display)
+  listener = display.listener
+  reconnect = socket.create_connection(listener.getsockname(), timeout=1.0)
+  errors = []
+
+  def receive():
+    try:
+      sequence, size, flags = unpack_frame_header_info(recv_exact(reconnect, FRAME_HEADER.size))
+      assert flags == FRAME_QUERY_STREAM
+      assert recv_exact(reconnect, size) == b"fresh"
+      reconnect.sendall(pack_ack(sequence, ACK_OK, ACK_STREAM_SUPPORTED if new_streaming else 0))
+    except Exception as e:
+      errors.append(e)
+
+  reader = threading.Thread(target=receive, daemon=True)
+  reader.start()
+  try:
+    display.reset_connection()
+    assert display.listener is listener and listener.fileno() >= 0
+    assert display.sock is None and not display.connected
+    assert not display._pending_acks and display._pending_bytes == 0
+    assert display.open()
+    assert display.listener is listener
+    assert display.send_prepared(_prepared(b"fresh"))
+    assert display.streaming == new_streaming
+    reader.join(timeout=1.0)
+    assert not reader.is_alive() and not errors
+    display.close()
+    assert listener.fileno() == -1  # A final shutdown still releases the port.
+  finally:
+    old_peer.close()
+    reconnect.close()
+    reader.join(timeout=1.0)
+
+
+@pytest.mark.parametrize("new_streaming", [False, True])
 def test_stalled_ack_record_cannot_follow_a_reconnected_client(display, monkeypatch, new_streaming):
   old_peer = Peer(display)
   old_reader = display._ack_thread

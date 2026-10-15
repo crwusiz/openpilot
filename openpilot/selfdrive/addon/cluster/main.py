@@ -72,7 +72,7 @@ def cluster_main():
   perf_started = time.monotonic()
   perf_render_time = 0.0
   perf_render_cpu_time = 0.0
-  perf_render_stages = dict.fromkeys(("camera_copy", "snapshot", "path", "hud"), 0.0)
+  perf_render_stages = dict.fromkeys(("camera_copy", "snapshot", "path", "path_cpu", "hud"), 0.0)
   perf_frames = 0
   last_camera_frame = -1
   frame_clock = ClusterFrameClock(fps)
@@ -135,7 +135,7 @@ def cluster_main():
         perf_render_cpu_time += thread_time() - render_cpu_started
         perf_render_time += time.monotonic() - render_started
         for stage in perf_render_stages:
-          perf_render_stages[stage] += renderer.last_frame_timings[stage]
+          perf_render_stages[stage] += renderer.last_frame_timings.get(stage, 0.0)
         pipeline.push(frame_image, created_at=render_started)
         loop_count += 1
         perf_frames += 1

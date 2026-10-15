@@ -139,6 +139,7 @@ def test_render_cpu_statistics_exclude_waiting_and_reset_each_window(cluster, mo
   cluster.policy.side_effect = lambda *_args: now[0] < 21.0
   cluster.models.get_health_data.return_value = {}
   cluster.pipeline.get_stats.return_value = dict.fromkeys(("sent", "dropped_raw", "dropped_prepared", "dropped_stale", "send_failures"), 0)
+  renderer.last_frame_timings.update(path=0.020, path_cpu=0.003, hud=0.010)
 
   def render(*_args):
     now[0] += 0.04  # Rendering includes time when the thread is not running.
@@ -150,6 +151,7 @@ def test_render_cpu_statistics_exclude_waiting_and_reset_each_window(cluster, mo
   logs = [call.args[0] for call in cluster.module.flog.call_args_list if "[CLUSTER_MAIN_PERF]" in call.args[0]]
   assert len(logs) == 2
   assert all("render_avg=40.0ms" in log and "render_cpu_avg=10.0ms" in log for log in logs)
+  assert all("path_avg=20.0ms" in log and "path_cpu_avg=3.0ms" in log for log in logs)
 
 
 def test_driving_input_fault_limits_rendering_and_camera_preprocessing(cluster, monkeypatch):
