@@ -2,14 +2,15 @@ import pyray as rl
 
 SIDE_PANEL_WIDTH = 60
 RIGHT_ICON_CENTER_OFFSET = 46
-LEFT_COLUMN_SIZES = (52, 52, 44, 44)  # cruise, set, driver monitoring, steering wheel
+LEFT_ICON_SIZE = 50
+LEFT_COLUMN_SIZES = (LEFT_ICON_SIZE,) * 3  # cruise, set, driver monitoring + steering wheel
 
 
-def left_column_rect(rect: rl.Rectangle, row: int) -> rl.Rectangle:
+def left_column_rect(rect: rl.Rectangle, row: int, column: int = 0) -> rl.Rectangle:
   top_padding, bottom_padding = 10, 14
   gap = (rect.height - top_padding - bottom_padding - sum(LEFT_COLUMN_SIZES)) / (len(LEFT_COLUMN_SIZES) - 1)
   size = LEFT_COLUMN_SIZES[row]
-  return rl.Rectangle(rect.x + 46 - size / 2,
+  return rl.Rectangle(rect.x + 46 + column * (size + 8) - size / 2,
                       rect.y + top_padding + sum(LEFT_COLUMN_SIZES[:row]) + row * gap, size, size)
 
 

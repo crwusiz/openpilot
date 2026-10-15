@@ -125,9 +125,9 @@ class HudRenderer(Widget):
     self._txt_wheel_blue: rl.Texture = gui_app.texture('icons/steer_blue.png', 50, 50)
 
     self._txt_exclamation_point: rl.Texture = gui_app.texture('icons_mici/exclamation_point.png', 9, 44)
-    self._txt_chestnut: rl.Texture = gui_app.texture('icons_mici/chestnut.png', 60, 44)
-    self._txt_chestnut_green: rl.Texture = gui_app.texture('icons_mici/chestnut_green.png', 60, 44)
-    self._txt_chestnut_orange: rl.Texture = gui_app.texture('icons_mici/chestnut_orange.png', 75, 44)
+    self._txt_chestnut: rl.Texture = gui_app.texture('icons_mici/chestnut.png', 48, 35)
+    self._txt_chestnut_green: rl.Texture = gui_app.texture('icons_mici/chestnut_green.png', 48, 35)
+    self._txt_chestnut_orange: rl.Texture = gui_app.texture('icons_mici/chestnut_orange.png', 60, 35)
 
     self._txt_traffic_off = gui_app.texture("icons/traffic_off.png", 77, 154)
     self._txt_traffic_green = gui_app.texture("icons/traffic_green.png", 77, 154)
@@ -298,7 +298,7 @@ class HudRenderer(Widget):
     self._wheel_alpha_filter.update(255 * self._get_wheel_opacity())
     self._wheel_y_filter.update(0)
 
-    wheel_rect = left_column_rect(rect, 3)
+    wheel_rect = left_column_rect(rect, 2, column=1)
     pos_x = int(wheel_rect.x + wheel_rect.width / 2)
     pos_y = int(wheel_rect.y + wheel_rect.height / 2 + self._wheel_y_filter.x)
     rotation = -ui_state.sm['carState'].steeringAngleDeg
@@ -436,7 +436,7 @@ class HudRenderer(Widget):
     max_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(self.cruise_speed))
     self._draw_text(
       max_speed_box.x + max_speed_box.width / 2,
-      max_speed_box.y + 34,
+      max_speed_box.y + 32,
       max_speed_text,
       FontSizes.big,
       speed_color
@@ -464,7 +464,7 @@ class HudRenderer(Widget):
       set_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(self.apply_speed))
       self._draw_text(
         set_speed_box.x + set_speed_box.width / 2,
-        set_speed_box.y + 34,
+        set_speed_box.y + 32,
         set_speed_text,
         FontSizes.big,
         speed_color,
