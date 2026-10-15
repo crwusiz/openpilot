@@ -15,7 +15,6 @@ from tinygrad.helpers import round_up
 from tinygrad.uop.ops import UOp
 import math
 import pickle
-import threading
 import time
 import numpy as np
 import openpilot.cereal.messaging as messaging
@@ -48,7 +47,7 @@ SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
 LAT_SMOOTH_SECONDS = 0.0
 LONG_SMOOTH_SECONDS = 0.3
 MIN_LAT_CONTROL_SPEED = 0.3
-BIG_MODEL_TIMEOUT = 60
+BIG_MODEL_TIMEOUT = 100
 
 
 def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.ModelDataV2.Action,
@@ -270,20 +269,22 @@ def main(demo=False):
   cloudlog.warning("loading model")
   model = None
   if CHESTNUT:
-    big_model = None
-    def load_big():
-      nonlocal big_model
-      try:
-        wait_for_chestnut()
-        m = ModelState(vipc_client_main.width, vipc_client_main.height, True)
-        m.warmup()
-        big_model = m
-      except Exception:
-        cloudlog.exception("big model load failed")
-    loader = threading.Thread(target=load_big, daemon=True)
-    loader.start()
-    loader.join(BIG_MODEL_TIMEOUT)
-    model = big_model
+    # tinygrad Context settings are process-global. Check the deadline only after
+    # each stage returns, so its Context is restored before loading the small model.
+    stage = "USB enumeration"
+    try:
+      wait_for_chestnut()
+      stage = "initialization"
+      model = ModelState(vipc_client_main.width, vipc_client_main.height, True)
+      if time.monotonic() - st > BIG_MODEL_TIMEOUT:
+        raise TimeoutError("big model initialization timed out")
+      stage = "warmup"
+      model.warmup()
+      if time.monotonic() - st > BIG_MODEL_TIMEOUT:
+        raise TimeoutError("big model warmup timed out")
+    except Exception:
+      model = None
+      cloudlog.exception(f"big model {stage} failed, fall back to small")
     if model is None and not params.get_bool("ChestnutRetry"):
       # a crank can cut the chestnut power during the load, retry once with an onroad cycle
       cloudlog.error("big model load failed, cycling onroad to retry")
