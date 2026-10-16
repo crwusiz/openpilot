@@ -21,6 +21,7 @@ else:
     Params = None
 
 COMPLICATION_SIZE    = 36
+LABEL_COLOR          = colors_alpha(rl.WHITE, int(255 * 0.9))
 PRESSED_SCALE = 1.15 if DO_ZOOM else 1.07
 
 
