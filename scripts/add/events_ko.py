@@ -378,7 +378,7 @@ def personality_changed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging
     "Morerelaxed": "더욱편안한",
   }
   personality_kr = personality_map.get(personality)
-  return NormalPermanentAlert(f"운전 성향: {personality_kr}", duration=1.5)
+  return NormalPermanentAlert(f"차간 거리: {personality_kr}", duration=1.5)
 
 
 def invalid_lkas_setting_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:

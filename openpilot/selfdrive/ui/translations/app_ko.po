@@ -447,6 +447,10 @@ msgstr "파이어호스"
 msgid "Firehose Mode"
 msgstr "파이어호스 모드"
 
+#: openpilot/selfdrive/ui/layouts/settings/toggles.py
+msgid "Following Distance"
+msgstr ""
+
 #: openpilot/system/ui/widgets/network.py
 msgid "Forget"
 msgstr "삭제"
@@ -519,6 +523,10 @@ msgstr "알수없는 형식"
 #: openpilot/system/ui/widgets/network.py
 msgid "IP Address"
 msgstr "IP 주소"
+
+#: openpilot/selfdrive/ui/layouts/settings/toggles.py
+msgid "Initial Max Speed"
+msgstr ""
 
 #: openpilot/selfdrive/ui/layouts/settings/software.py
 msgid "Install Update"
@@ -1088,6 +1096,7 @@ msgstr "로그 파일이 없습니다"
 msgid "metered"
 msgstr "종량제"
 
+#: openpilot/selfdrive/ui/layouts/settings/initial_cruise_speed.py
 #: openpilot/selfdrive/ui/onroad/hud_renderer.py
 msgid "mph"
 msgstr "mph"
