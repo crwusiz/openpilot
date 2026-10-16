@@ -3,7 +3,6 @@ import pyray as rl
 from dataclasses import dataclass
 from openpilot.common.constants import CV
 from openpilot.selfdrive.ui.mici.onroad import RIGHT_ICON_CENTER_OFFSET, left_column_rect
-from openpilot.selfdrive.ui.mici.onroad.torque_bar import TorqueBar
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus, ChestnutState
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.multilang import tr
@@ -117,7 +116,6 @@ class HudRenderer(Widget):
     self._font_display: rl.Font = gui_app.font(FontWeight.DISPLAY)
 
     self._turn_intent = TurnIntent()
-    #self._torque_bar = TorqueBar()
 
     self._txt_wheel: rl.Texture = gui_app.texture('icons/steer.png', 50, 50)
     self._txt_wheel_critical: rl.Texture = gui_app.texture('icons/steer_critical.png', 50, 50)

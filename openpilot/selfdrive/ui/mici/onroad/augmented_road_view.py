@@ -185,7 +185,7 @@ class AugmentedRoadView(CameraView):
     self._long_indicator = LongIndicator()
     self._alert_renderer = AlertRenderer()
     self._driver_state_renderer = DriverStateRenderer(size=LEFT_COLUMN_SIZES[2], always_visible=True)
-    self._confidence_ball = ConfidenceBall()
+    #self._confidence_ball = ConfidenceBall()
     self._offroad_label = UnifiedLabel("start the car to\nuse openpilot", 54, FontWeight.DISPLAY,
                                        text_color=colors_alpha(rl.WHITE, int(255 * 0.9)),
                                        alignment=TextAlignment.CENTER,
@@ -283,8 +283,8 @@ class AugmentedRoadView(CameraView):
     # Use self._content_rect for positioning within camera bounds
     if show_navigation:
       self._navigation.render(rl.Rectangle(self._content_rect.x + self._content_rect.width, self.rect.y, PANEL_WIDTH, self.rect.height))
-    else:
-      self._confidence_ball.render(self.rect)
+    #else:
+    #  self._confidence_ball.render(self.rect)
 
     #self._bookmark_icon.render(self.rect)
 
