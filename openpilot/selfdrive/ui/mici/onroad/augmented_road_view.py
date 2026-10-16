@@ -295,6 +295,7 @@ class AugmentedRoadView(CameraView):
     super().close()
 
   def _switch_stream_if_needed(self, sm):
+    #if sm['carParams'].openpilotLongitudinalControl and WIDE_CAM in self.available_streams:
     if ui_state.show_driver_camera:
       target = CABIN_CAM
     else:

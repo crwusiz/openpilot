@@ -206,3 +206,4 @@ class Colors:
     rl.Color(0, 191, 255, 89),
     rl.Color(0, 191, 255, 0),
   ]
+
