@@ -5,8 +5,8 @@ import time
 from openpilot.selfdrive.addon.dependencies import (
   DependencyError, DependencyInstallCancelled, activate_groups, groups_for_cluster, groups_ready, prepare_groups,
 )
+from openpilot.selfdrive.addon.cluster.cluster_config import requested_codec
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
-from openpilot.selfdrive.addon.cluster.hdmi_display.network_codec import requested_codec
 
 
 def _still_selected(config):

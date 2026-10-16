@@ -8,7 +8,7 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.receiver_build imp
 def _populate_sources(directory):
   for name in BUILD_FILES:
     (directory / name).write_bytes(f"# {name}\n".encode())
-  assets = ["assets/fonts/Inter-Bold.ttf", "assets/icons/steer.png"]
+  assets = ["assets/fonts/NotoSansKR-Bold.ttf", "assets/icons/steer.png"]
   (directory / "receiver_assets.txt").write_text("\n".join(assets) + "\n", encoding="utf-8")
   for name in assets:
     path = directory / name
@@ -93,8 +93,8 @@ def test_asset_fingerprint_changes_and_reports_missing_font(tmp_path):
   assert changed != startup
   # Runtime source hashes stay stable while the asset aggregate changes.
   assert changed.split(" | assets_sha256=")[0] == startup.split(" | assets_sha256=")[0]
-  (tmp_path / "assets/fonts/Inter-Bold.ttf").unlink()
-  assert "missing_assets=assets/fonts/Inter-Bold.ttf" in source_fingerprint(tmp_path)
+  (tmp_path / "assets/fonts/NotoSansKR-Bold.ttf").unlink()
+  assert "missing_assets=assets/fonts/NotoSansKR-Bold.ttf" in source_fingerprint(tmp_path)
 
 
 def test_asset_manifest_cannot_escape_the_receiver_directory(tmp_path):

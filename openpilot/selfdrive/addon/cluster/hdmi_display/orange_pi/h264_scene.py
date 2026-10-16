@@ -102,8 +102,8 @@ class H264Scene:
     self.config = SimpleNamespace(
       width=width, height=height, fps=min(max(float(fps), 1.0), 60.0), border_size=10,
       side_panel_width=side_panel_width, BASEDIR=asset_root.parent, asset_dir=asset_root,
-      font_bold=str(asset_root / "fonts" / "Inter-Bold.ttf"),
-      font_regular=str(asset_root / "fonts" / "Inter-Regular.ttf"),
+      font_bold=str(asset_root / "fonts" / "NotoSansKR-Bold.ttf"),
+      font_regular=str(asset_root / "fonts" / "NotoSansKR-Bold.ttf"),
       is_metric=True, speed_unit="km/h", rotate_180=False, require_assets=True,
     )
     self.renderer = ClusterRenderer(self.config)

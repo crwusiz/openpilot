@@ -2,7 +2,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import display_controls
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.display_controls import DisplayControls
 
 
@@ -277,7 +276,6 @@ def raster_pygame(monkeypatch):
   pygame = pytest.importorskip("pygame")
   pygame.display.init()
   pygame.display.set_mode((100, 100))
-  monkeypatch.setattr(display_controls.os.path, "isfile", lambda _path: False)
   monkeypatch.setattr(pygame.font, "match_font", lambda _name: None)
   yield pygame
   pygame.display.quit()

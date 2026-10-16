@@ -1,5 +1,4 @@
-assets/fonts/Inter-Bold.ttf
-assets/fonts/Inter-Regular.ttf
+assets/fonts/NotoSansKR-Bold.ttf
 assets/icons/dist1.png
 assets/icons/dist2.png
 assets/icons/dist3.png

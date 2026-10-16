@@ -39,19 +39,21 @@ def test_required_assets_keep_original_font_sizes_and_all_hud_icons(scene):
   assert scene.renderer.font_speed.size == 58
   assert scene.renderer.font_value.size == 42
   assert scene.renderer.font_unit.size == 20
+  for name in ("speed", "current_speed", "value", "unit", "current_unit", "small", "label", "warning"):
+    assert Path(getattr(scene.renderer, f"font_{name}").path).name == "NotoSansKR-Bold.ttf"
   assert set(scene.renderer.icons) == set(REQUIRED_ICON_NAMES)
   manifest = Path(__file__).resolve().parents[1] / "receiver_assets.txt"
   assert set(manifest.read_text().splitlines()) == {
-    "assets/fonts/Inter-Bold.ttf", "assets/fonts/Inter-Regular.ttf",
+    "assets/fonts/NotoSansKR-Bold.ttf",
     *(f"assets/icons/{name}.png" for name in REQUIRED_ICON_NAMES),
   }
 
 
-@pytest.mark.parametrize("relative", ["fonts/Inter-Bold.ttf", "fonts/Inter-Regular.ttf", "icons/steer_green.png", "icons/wifi_strength_full.png"])
+@pytest.mark.parametrize("relative", ["fonts/NotoSansKR-Bold.ttf", "icons/steer_green.png", "icons/wifi_strength_full.png"])
 @pytest.mark.parametrize("corrupt", [False, True])
 def test_incomplete_assets_reject_h264_instead_of_showing_tiny_fonts_or_missing_icons(tmp_path, relative, corrupt):
   assets = tmp_path / "assets"
-  for name in ("fonts/Inter-Bold.ttf", "fonts/Inter-Regular.ttf", *(f"icons/{name}.png" for name in REQUIRED_ICON_NAMES)):
+  for name in ("fonts/NotoSansKR-Bold.ttf", *(f"icons/{name}.png" for name in REQUIRED_ICON_NAMES)):
     destination = assets / name
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(ASSETS / name, destination)

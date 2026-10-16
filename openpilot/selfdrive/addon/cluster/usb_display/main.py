@@ -1,5 +1,3 @@
-"""USB display startup and vendor-specific runtime preparation."""
-
 import locale
 import os
 import sys
@@ -25,8 +23,8 @@ def configure_usb_runtime() -> None:
 
 def run_usb_cluster(config):
   configure_usb_runtime()
-  from openpilot.selfdrive.addon.cluster.usb_display.turing_usb_display import TuringUsbDisplay
   from openpilot.selfdrive.addon.cluster.cluster_jpeg_runtime import run_jpeg_cluster
+  from openpilot.selfdrive.addon.cluster.usb_display.turing_usb_display import TuringUsbDisplay
 
   def wait_for_frame(camera, last_frame):
     return camera.wait_for_frame(last_frame, 1.0 / config.fps)

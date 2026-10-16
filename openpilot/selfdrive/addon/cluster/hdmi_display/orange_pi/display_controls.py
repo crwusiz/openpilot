@@ -1,12 +1,20 @@
 import math
-import os
 import time
+from pathlib import Path
 
 
 DEFAULT_BRIGHTNESS = 80
 MIN_BRIGHTNESS = 10
 BRIGHTNESS_STEP = 10
 MENU_TIMEOUT_SECONDS = 8.0
+
+
+def cluster_font_path():
+  for directory in Path(__file__).resolve().parents:
+    path = directory / "assets" / "fonts" / "NotoSansKR-Bold.ttf"
+    if path.is_file():
+      return str(path)
+  raise FileNotFoundError("Required cluster font missing: assets/fonts/NotoSansKR-Bold.ttf")
 
 
 def _quantize_brightness(value):
@@ -240,12 +248,7 @@ class DisplayControls:
     pygame = self.pygame
     if not self._font_checked:
       pygame.font.init()
-      self._font_path = next((path for path in (
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
-      ) if os.path.isfile(path)), None)
-      if self._font_path is None:
-        self._font_path = pygame.font.match_font("notosanscjkkr,nanumgothic,malgungothic,applegothic")
+      self._font_path = cluster_font_path()
       self._font_checked = True
     size = max(10, round(size))
     if size not in self._fonts:

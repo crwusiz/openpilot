@@ -9,11 +9,11 @@ import subprocess
 import time
 
 try:
-  from .display_controls import DEFAULT_BRIGHTNESS, DisplayControls
+  from .display_controls import DEFAULT_BRIGHTNESS, DisplayControls, cluster_font_path
   from .texture_presenter import TexturePresenter
   from .touch_status import TouchWorker
 except ImportError:
-  from display_controls import DEFAULT_BRIGHTNESS, DisplayControls
+  from display_controls import DEFAULT_BRIGHTNESS, DisplayControls, cluster_font_path
   from texture_presenter import TexturePresenter
   from touch_status import TouchWorker
 
@@ -503,21 +503,9 @@ class HdmiDisplay:
   def _make_waiting_frame(self):
     pygame = self._pygame
     pygame.font.init()
-    font_path = next((path for path in (
-      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-      "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
-    ) if os.path.isfile(path)), None)
-    if font_path is None:
-      font_path = pygame.font.match_font("notosanscjkkr,nanumgothic,malgungothic,applegothic")
-    if font_path:
-      title = "COMMA 연결 대기 중"
-      subtitle = "네트워크와 클러스터 옵션을 확인하세요"
-    else:
-      # pygame's bundled font has no Korean glyphs. Keep the screen readable
-      # until scripts/install.sh installs the OS fonts-noto-cjk package.
-      title = "Waiting for COMMA connection"
-      subtitle = "Check Network and COMMA cluster option"
-      LOG.info("Korean font unavailable; using English on the waiting screen")
+    font_path = cluster_font_path()
+    title = "COMMA 연결 대기 중"
+    subtitle = "네트워크와 클러스터 옵션을 확인하세요"
     width, height = self.screen.get_size()
     if self.rotation in (90, 270):
       width, height = height, width

@@ -440,10 +440,10 @@ def test_unsafe_package_filename_is_rejected_before_ssh(deploy_sandbox):
 
 
 def test_missing_manifest_font_is_rejected_before_ssh(deploy_sandbox):
-  (deploy_sandbox / "assets/fonts/Inter-Bold.ttf").unlink()
+  (deploy_sandbox / "assets/fonts/NotoSansKR-Bold.ttf").unlink()
   result = _deploy(deploy_sandbox, "192.168.0.84", "--dry-run")
   assert result.returncode != 0
-  assert "Package is missing assets/fonts/Inter-Bold.ttf" in result.stderr
+  assert "Package is missing assets/fonts/NotoSansKR-Bold.ttf" in result.stderr
   assert _calls(deploy_sandbox) == []
 
 
@@ -462,7 +462,7 @@ def test_shared_renderer_and_assets_are_mapped_from_full_checkout(deploy_sandbox
                           cwd=root, capture_output=True, text=True, timeout=10, check=False)
   assert result.returncode == 0, result.stdout + result.stderr
   assert "/repo/selfdrive/addon/cluster/cluster_renderer.py" in result.stdout
-  assert "/repo/selfdrive/assets/fonts/Inter-Bold.ttf" in result.stdout
+  assert "/repo/selfdrive/assets/fonts/NotoSansKR-Bold.ttf" in result.stdout
   assert _calls(deploy_sandbox) == []
 
 

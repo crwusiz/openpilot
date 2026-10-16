@@ -8,8 +8,6 @@ BASEDIR = Path(__file__).resolve().parents[3]
 if str(BASEDIR) not in sys.path:
   sys.path.insert(0, str(BASEDIR))
 
-CLUSTER_CORES = [0, 1, 2]
-
 
 def configure_cluster_runtime() -> None:
   # These libraries are loaded by cluster.main after this function. Limit only
@@ -21,6 +19,7 @@ def configure_cluster_runtime() -> None:
     # the same PID, so inherited native pools see the limits before loading.
     from openpilot.common.logging_extra import json_robust_dumps
     from openpilot.common.swaglog import cloudlog
+
     environment = dict(os.environ, CLUSTER_NATIVE_BOOTSTRAP="1",
                        CLUSTER_LOG_CONTEXT=json_robust_dumps(cloudlog.get_ctx()))
     os.execve(sys.executable, [sys.executable, str(Path(__file__).resolve())], environment)
@@ -29,6 +28,7 @@ def configure_cluster_runtime() -> None:
   # modules must wait until after the process-local environment is prepared.
   from openpilot.common.realtime import drop_realtime
   from openpilot.common.swaglog import cloudlog
+
   if serialized_context is not None:
     try:
       context = json.loads(serialized_context)
@@ -47,7 +47,13 @@ def configure_cluster_runtime() -> None:
 
 
 def main() -> None:
-  from openpilot.selfdrive.addon.cluster.cluster_logging import close_crash_log, close_log, initialize_crash_log, record_crash
+  # Keep startup diagnostics available before imports that load native libraries.
+  from openpilot.selfdrive.addon.cluster.cluster_logging import (
+    close_crash_log,
+    close_log,
+    initialize_crash_log,
+    record_crash,
+  )
 
   initialize_crash_log()
   cloudlog = None
@@ -55,16 +61,14 @@ def main() -> None:
   try:
     configure_cluster_runtime()
     stage = "core imports"
+    from setproctitle import setproctitle
+
     from openpilot.common.realtime import set_core_affinity
     from openpilot.common.swaglog import cloudlog
-    from setproctitle import setproctitle
 
     setproctitle("openpilot.selfdrive.addon.cluster_run")
     cloudlog.bind(daemon="cluster")
-    try:
-      set_core_affinity(CLUSTER_CORES)
-    except Exception as e:
-      cloudlog.warning(f"Failed to set cluster CPU affinity to {CLUSTER_CORES}: {e}")
+    set_core_affinity([0, 1, 2])
 
     cloudlog.info("Starting cluster display process...")
     stage = "cluster imports"

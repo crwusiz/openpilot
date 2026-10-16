@@ -130,7 +130,7 @@ def test_network_jpeg_runs_without_usb_or_h264_dependencies(monkeypatch, codec, 
   modules = {
     PREFIX + "cluster_frame_clock": SimpleNamespace(ClusterFrameClock=clock_factory),
     PREFIX + "cluster_jpeg_runtime": SimpleNamespace(run_jpeg_cluster=runner),
-    PREFIX + "hdmi_display.network_codec": SimpleNamespace(requested_codec=requested_codec),
+    PREFIX + "cluster_config": SimpleNamespace(requested_codec=requested_codec),
     PREFIX + "hdmi_display.network_display": SimpleNamespace(ClusterNetworkDisplay=display_factory),
   }
   for name, module in modules.items():

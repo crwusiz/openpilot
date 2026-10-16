@@ -9,10 +9,10 @@ import json
 import signal
 import time
 
+from openpilot.selfdrive.addon.cluster.cluster_config import requested_codec
 from openpilot.selfdrive.addon.cluster.cluster_health_guard import ClusterHealthGuard
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 from openpilot.selfdrive.addon.cluster.cluster_runtime_metrics import ClusterRuntimeMetrics
-from openpilot.selfdrive.addon.cluster.hdmi_display.network_codec import requested_codec as requested_codec
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import write_network_status
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol import (
   ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, PATH_KEYS, STATE,

@@ -364,6 +364,36 @@ def test_render_reports_path_cpu_separately_from_waits_and_hud(renderer_module, 
   assert renderer.last_frame_timings["hud"] == pytest.approx(0.010)
 
 
+@pytest.mark.parametrize("x", [4, 80, 156])
+def test_lead_labels_use_cluster_font_and_preserve_fading_at_camera_edges(renderer_module, monkeypatch, x):
+  renderer = renderer_module.ClusterRenderer.__new__(renderer_module.ClusterRenderer)
+  renderer.config = SimpleNamespace(is_metric=True)
+  renderer.camera_x = renderer.camera_y = 0
+  renderer.font_unit = ImageFont.truetype(str(Path(__file__).parents[3] / "assets/fonts/NotoSansKR-Bold.ttf"), 20)
+  renderer._lead_vehicles = [SimpleNamespace(
+    bar=np.array([[x - 10, 45], [x - 10, 55], [x + 10, 55], [x + 10, 45]]),
+    fade_filter=SimpleNamespace(x=0.5),
+  )]
+  renderer._lead_info = [{"d_rel": 23, "v_rel": -2}]
+  renderer._fill_polygon_alpha = Mock()
+  monkeypatch.setattr(renderer_module, "Colors", SimpleNamespace(RED=(255, 0, 0), WHITE=(255, 255, 255), BLACK=(0, 0, 0)))
+  labels = []
+  original_text = ImageDraw.ImageDraw.text
+
+  def draw_text(draw, position, label, **kwargs):
+    assert kwargs["font"] is renderer.font_unit
+    labels.append(label)
+    return original_text(draw, position, label, **kwargs)
+
+  monkeypatch.setattr(ImageDraw.ImageDraw, "text", draw_text)
+  camera = np.full((100, 160, 3), 40, dtype=np.uint8)
+
+  renderer._draw_lead_indicator(camera, {"v_ego": 10})
+
+  assert labels == ["23 m", "29 km/h"]
+  assert camera.min() < 40 < camera.max() <= 148
+
+
 def _previous_centered(draw, cx, cy, value, font, color, stroke_width, stroke_fill):
   fill = tuple(color) if isinstance(color, (tuple, list)) else color
   if draw.mode == "RGBA" and isinstance(fill, tuple) and len(fill) == 4:
@@ -389,7 +419,7 @@ def text_font(request):
       pytest.skip("Pillow has no standalone bitmap fallback font")
     return ImageFont.load_default_imagefont()
   name, size = {
-    "large_bold": ("Inter-Bold.ttf", 92), "regular": ("Inter-Regular.ttf", 24),
+    "large_bold": ("NotoSansKR-Bold.ttf", 92), "regular": ("NotoSansKR-Bold.ttf", 24),
     "cjk": ("NotoSansKR-Bold.ttf", 42),
   }[request.param]
   return ImageFont.truetype(str(Path(__file__).parents[3] / "assets" / "fonts" / name), size)
@@ -425,7 +455,7 @@ def test_recolored_text_keeps_previous_pixels(renderer_module, text_font, mode, 
 
 def test_color_changes_reuse_glyph_masks(renderer_module, monkeypatch):
   renderer = _text_renderer(renderer_module)
-  font_path = str(Path(__file__).parents[3] / "assets" / "fonts" / "Inter-Bold.ttf")
+  font_path = str(Path(__file__).parents[3] / "assets" / "fonts" / "NotoSansKR-Bold.ttf")
   font, reference_font = ImageFont.truetype(font_path, 92), ImageFont.truetype(font_path, 92)
   colors = [(255, value, value) for value in range(60, 256)]
   image = Image.new("RGB", (420, 190))

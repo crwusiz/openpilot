@@ -53,7 +53,7 @@ package_collect_files() {
   done < "$PACKAGE_DIR/receiver_assets.txt"
   for required in cluster_receiver.py cluster_protocol.py hdmi_display.py frame_stream.py display_controls.py texture_presenter.py touch_status.py tcp_diagnostics.py \
     receiver_build.py h264_receiver.py h264_protocol.py h264_scene.py cluster_renderer.py cluster_render_support.py \
-    assets/fonts/Inter-Bold.ttf assets/fonts/Inter-Regular.ttf scripts/common.sh scripts/package_sources.sh scripts/prepare_h264.sh \
+    assets/fonts/NotoSansKR-Bold.ttf scripts/common.sh scripts/package_sources.sh scripts/prepare_h264.sh \
     scripts/update.sh scripts/ssh_port.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh scripts/fan_setup.sh; do
     [[ " ${files[*]} " == *" $required "* ]] || fail "Package is missing $required."
   done

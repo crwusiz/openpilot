@@ -163,7 +163,7 @@ H.264를 포함한 수동 배포본에는 공유 `cluster_renderer.py`·`cluster
 sudo bash /opt/cluster-receiver/scripts/install.sh
 ```
 
-Debian/Ubuntu의 OS `python3-pygame`을 설치하고 `/usr/bin/python3`로 실행합니다. 가상 환경은 필요하지 않습니다. 이미 수신기가 설치된 장비에는 Wi-Fi 절전 해제 실행 설정을 보완하며, 서비스 실행 계정·화면 옵션·데스크톱 부팅 대상은 유지합니다. 연결 대기 화면의 한국어 문구를 위해 `fonts-noto-cjk`도 설치합니다. 이전 버전을 설치한 장비는 수정된 파일을 반영하고 `install.sh`를 한 번 실행해 이 폰트를 추가합니다.
+Debian/Ubuntu의 OS `python3-pygame`을 설치하고 `/usr/bin/python3`로 실행합니다. 가상 환경은 필요하지 않습니다. 이미 수신기가 설치된 장비에는 Wi-Fi 절전 해제 실행 설정을 보완하며, 서비스 실행 계정·화면 옵션·데스크톱 부팅 대상은 유지합니다. 계기판·연결 대기 화면·터치 메뉴는 패키지에 포함된 `assets/fonts/NotoSansKR-Bold.ttf`를 공통으로 사용합니다. 기존 장비에도 새 폰트 자산이 포함되도록 수신기 패키지를 업데이트합니다.
 
 pip wheel의 SDL은 시스템 SDL과 빌드 기능이 다를 수 있습니다. `libdrm`·`libgbm` 설치만으로 wheel에 KMSDRM이 추가되지는 않습니다. 진단의 `pygame` 경로는 보통 `/usr/lib/python3/dist-packages/pygame/...`입니다. `.local`, `/usr/local`, `.venv`가 나오면 pip 설치나 `PYTHONPATH`가 OS 패키지를 가리는지 확인합니다.
 

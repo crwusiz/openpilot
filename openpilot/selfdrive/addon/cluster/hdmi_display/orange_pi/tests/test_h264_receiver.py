@@ -194,7 +194,7 @@ def test_missing_scene_dependency_reports_error_and_uses_normal_reconnect_except
 def test_scene_asset_failure_reports_detail_before_starting_webrtc(monkeypatch):
   from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
 
-  monkeypatch.setattr(h264_scene, "H264Scene", Mock(side_effect=RuntimeError("Required cluster fonts missing: Inter-Regular.ttf")))
+  monkeypatch.setattr(h264_scene, "H264Scene", Mock(side_effect=RuntimeError("Required cluster fonts missing: NotoSansKR-Bold.ttf")))
   receiver = Mock()
   monkeypatch.setattr(h264_receiver, "H264Receiver", receiver)
   c4_sock, pi_sock = socket.socketpair()
@@ -204,7 +204,7 @@ def test_scene_asset_failure_reports_detail_before_starting_webrtc(monkeypatch):
       h264_receiver.receive_h264_session(pi_sock, None, HELLO_DATA)
     kind, _, payload = read_control(c4_sock)
     assert kind == ERROR and payload == {
-      "error": "h264_scene_unavailable", "detail": "Required cluster fonts missing: Inter-Regular.ttf",
+      "error": "h264_scene_unavailable", "detail": "Required cluster fonts missing: NotoSansKR-Bold.ttf",
     }
     receiver.assert_not_called()
     assert pi_sock.gettimeout() == 0.25

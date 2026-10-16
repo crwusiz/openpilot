@@ -94,7 +94,7 @@ fi
 printf '\n--- Receiver asset directory permissions ---\n'
 stat -c '%A %a %U:%G %n' /opt/cluster-receiver /opt/cluster-receiver/assets \
   /opt/cluster-receiver/assets/fonts /opt/cluster-receiver/assets/icons \
-  /opt/cluster-receiver/assets/fonts/Inter-Bold.ttf /opt/cluster-receiver/assets/fonts/Inter-Regular.ttf
+  /opt/cluster-receiver/assets/fonts/NotoSansKR-Bold.ttf
 printf '\n--- Receiver assets as the service account (compare with root snapshot) ---\n'
 receiver_user=$(systemctl show cluster-hdmi.service --property=User --value)
 receiver_user=${receiver_user:-root}

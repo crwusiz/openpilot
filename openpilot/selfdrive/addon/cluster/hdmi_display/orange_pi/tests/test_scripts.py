@@ -486,7 +486,7 @@ case "$1" in
   *) exit 1;;
 esac
 ''', encoding="utf-8", newline="\n")
-  (incoming / "receiver_assets.txt").write_text("assets/fonts/Inter-Bold.ttf\nassets/fonts/Inter-Regular.ttf\nassets/icons/steer.png\n")
+  (incoming / "receiver_assets.txt").write_text("assets/fonts/NotoSansKR-Bold.ttf\nassets/icons/steer.png\n")
   for name in (incoming / "receiver_assets.txt").read_text().splitlines():
     path = incoming / name
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -730,13 +730,15 @@ def test_update_and_rollback_restore_binary_assets_with_runtime(update_sandbox):
   (target / "receiver_assets.txt").write_text("assets/fonts/Inter-Bold.ttf\n")
   result = _update(update_sandbox)
   assert result.returncode == 0, result.stdout + result.stderr
-  assert old_font.read_bytes() == (incoming / "assets/fonts/Inter-Bold.ttf").read_bytes()
+  new_font = target / "assets/fonts/NotoSansKR-Bold.ttf"
+  assert new_font.read_bytes() == (incoming / "assets/fonts/NotoSansKR-Bold.ttf").read_bytes()
+  assert (target / "receiver_assets.txt").read_text() == (incoming / "receiver_assets.txt").read_text()
   assert (target / "assets/icons/steer.png").exists()
   result = _update(update_sandbox, "rollback")
   assert result.returncode == 0, result.stdout + result.stderr
   assert old_font.read_bytes() == b"old font\x00\r\n"
   assert (target / "receiver_assets.txt").read_text() == "assets/fonts/Inter-Bold.ttf\n"
-  assert not (target / "assets/fonts/Inter-Regular.ttf").exists()
+  assert not new_font.exists()
   assert not (target / "assets/icons/steer.png").exists()
 
 
@@ -756,7 +758,7 @@ def test_update_repairs_root_only_asset_ancestors_for_the_service_account(update
     if os.name != "nt":
       assert directory.stat().st_mode & 0o777 == 0o755
   if os.name != "nt":
-    assert (target / "assets/fonts/Inter-Bold.ttf").stat().st_mode & 0o777 == 0o644
+    assert (target / "assets/fonts/NotoSansKR-Bold.ttf").stat().st_mode & 0o777 == 0o644
 
 
 @pytest.mark.parametrize("destination", [False, True])

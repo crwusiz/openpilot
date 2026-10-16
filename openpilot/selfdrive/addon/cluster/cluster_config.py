@@ -2,8 +2,6 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 
-from openpilot.common.params import Params
-from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.addon.cluster.cluster_render_support import Colors as Colors, colors_alpha as colors_alpha
 
 DISPLAY = SimpleNamespace(
@@ -51,22 +49,34 @@ NETWORK = SimpleNamespace(
   max_ack_age_s=0.25,
 )
 
+
+def requested_codec(params, *, warn_invalid=False):
+  """Read the configured codec without loading a video runtime."""
+  value = params.get("ClusterNetworkCodec") or "jpeg"
+  if isinstance(value, bytes):
+    value = value.decode("utf-8", errors="replace")
+  codec = str(value).strip().lower()
+  if codec in ("jpeg", "h264"):
+    return codec
+  if warn_invalid:
+    from openpilot.common.swaglog import cloudlog
+
+    cloudlog.warning(f"Unsupported cluster network codec: {value!r}; using JPEG")
+  return "jpeg"
+
+
 class ClusterConfig:
   def __init__(self):
+    from openpilot.common.params import Params
+    from openpilot.common.swaglog import cloudlog
+
     cloudlog.info("Loading Lightweight Cluster Configuration...")
 
     self.params = Params()
     self.display_transport = self.params.get("ClusterDisplayTransport") or DISPLAY.transport
     if self.display_transport not in ("network", "usb"):
       raise ValueError(f"Unsupported cluster display transport: {self.display_transport}")
-    network_codec = self.params.get("ClusterNetworkCodec") or "jpeg"
-    if isinstance(network_codec, bytes):
-      network_codec = network_codec.decode("utf-8", errors="replace")
-    self.network_codec = str(network_codec).strip().lower()
-    if self.network_codec not in ("jpeg", "h264"):
-      if self.display_transport == "network":
-        cloudlog.warning(f"Unsupported cluster network codec: {network_codec!r}; using JPEG")
-      self.network_codec = "jpeg"
+    self.network_codec = requested_codec(self.params, warn_invalid=self.display_transport == "network")
     if self.display_transport == "network":
       self.width, self.height = HDMI.width, HDMI.height
     else:
@@ -104,8 +114,8 @@ class ClusterConfig:
     self.network_max_ack_age = NETWORK.max_ack_age_s
 
     self.BASEDIR = Path(__file__).resolve().parents[3]
-    self.font_bold = os.path.join(self.BASEDIR, "selfdrive", "assets", "fonts", "Inter-Bold.ttf")
-    self.font_regular = os.path.join(self.BASEDIR, "selfdrive", "assets", "fonts", "Inter-Regular.ttf")
+    self.font_bold = os.path.join(self.BASEDIR, "selfdrive", "assets", "fonts", "NotoSansKR-Bold.ttf")
+    self.font_regular = self.font_bold
 
     self.is_metric = self.params.get_bool("IsMetric")
     self.rotate_180 = DISPLAY.rotate_180

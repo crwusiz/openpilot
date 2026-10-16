@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 import asyncio
 import codecs
-from collections.abc import Callable
-from dataclasses import dataclass, field
-from datetime import datetime
 import errno
 import html as html_lib
 import json
@@ -14,25 +11,23 @@ import socket
 import subprocess
 import sys
 import time
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 from openpilot.selfdrive.addon.dependencies import activate_groups
 
 activate_groups(("dashboard",))
 
-try:
-  from openpilot.common.realtime import set_core_affinity
-except ImportError:
-  def set_core_affinity(cores): pass
-
+import requests
 from ansi2html import Ansi2HTMLConverter
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from nicegui import app, ui
-import requests
 
-from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import get_connected_pi_ip
 from openpilot.selfdrive.addon.cluster.hdmi_display.maintenance import ACTION_PATH, ClusterActions
+from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import get_connected_pi_ip
 
 # ── 환경 설정 및 유틸리티 ───────────────────────────────────────
 SCRIPTS_PATH = "/data/openpilot/scripts"
@@ -1185,6 +1180,8 @@ def main_page():
       render_tab_terminal(tabs)
 
 if __name__ in {"__main__", "__mp_main__"}:
+  from openpilot.common.realtime import set_core_affinity
+
   set_core_affinity([0, 1, 2])
   _prepare_dashboard_port()
   ui.run(host=DASHBOARD_HOST, port=DASHBOARD_PORT, title="Openpilot Dashboard", show=False, reload=False)

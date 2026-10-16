@@ -632,22 +632,18 @@ class ClusterRenderer:
                              float(lead_info.get("v_rel", 0.0) or 0.0)) * conversion)
       labels = (f"{distance:.0f} m", f"{lead_speed:.0f} {unit}")
       for label, baseline_y in zip(labels, (y - 13, y + 27), strict=True):
-        text_size, baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.68, 2)
-        origin = (x - text_size[0] // 2, baseline_y)
-        x0, y0 = max(0, origin[0] - 4), max(0, baseline_y - text_size[1] - 4)
-        x1 = min(camera_region.shape[1], origin[0] + text_size[0] + 4)
-        y1 = min(camera_region.shape[0], baseline_y + baseline + 4)
+        left, top, right, bottom = self.font_unit.getbbox(label, anchor="ms", stroke_width=2)
+        x0, y0 = max(0, x + left), max(0, baseline_y + top)
+        x1 = min(camera_region.shape[1], x + right)
+        y1 = min(camera_region.shape[0], baseline_y + bottom)
         if x0 >= x1 or y0 >= y1:
           continue
         roi = camera_region[y0:y1, x0:x1]
-        overlay = roi.copy()
-        local_origin = (origin[0] - x0, origin[1] - y0)
+        overlay = Image.fromarray(roi)
         # An outline keeps the text legible while leaving the camera image visible.
-        cv2.putText(overlay, label, local_origin, cv2.FONT_HERSHEY_SIMPLEX,
-                    0.68, Colors.BLACK, 6, cv2.LINE_AA)
-        cv2.putText(overlay, label, local_origin, cv2.FONT_HERSHEY_SIMPLEX,
-                    0.68, Colors.WHITE, 2, cv2.LINE_AA)
-        cv2.addWeighted(overlay, opacity, roi, 1.0 - opacity, 0, dst=roi)
+        ImageDraw.Draw(overlay).text((x - x0, baseline_y - y0), label, font=self.font_unit,
+                                     fill=Colors.WHITE[:3], anchor="ms", stroke_width=2, stroke_fill=Colors.BLACK[:3])
+        cv2.addWeighted(np.asarray(overlay), opacity, roi, 1.0 - opacity, 0, dst=roi)
 
   def _base_icon(self, name, size, active=True, opacity=255):
     source = self.icons.get(name)
