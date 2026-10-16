@@ -2,7 +2,7 @@
 
 from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.addon.cluster.cluster_config import ClusterConfig
-from openpilot.selfdrive.addon.cluster.cluster_logging import close_log, initialize_log
+from openpilot.selfdrive.addon.cluster.cluster_logging import close_log, flog, initialize_log
 from openpilot.selfdrive.addon.cluster.cluster_policy import enforce_cluster_transport
 
 
@@ -11,10 +11,13 @@ def cluster_main():
   try:
     cloudlog.info("Initializing Cluster Config...")
     config = ClusterConfig()
+    flog(f"[CLUSTER_START] transport={config.display_transport} codec={getattr(config, 'network_codec', 'jpeg')}")
     if not enforce_cluster_transport(config.params, config.display_transport):
+      flog("[CLUSTER_EXIT] Selected transport is blocked by the cluster policy.")
       return
     from openpilot.selfdrive.addon.cluster.dependencies import ensure_cluster_dependencies
     if not ensure_cluster_dependencies(config):
+      flog("[CLUSTER_EXIT] Cluster selection changed while preparing dependencies.")
       return
 
     if config.display_transport == "usb":

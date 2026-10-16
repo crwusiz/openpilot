@@ -42,6 +42,33 @@ sudo bash /opt/cluster-receiver/scripts/diagnose.sh --egl
 
 `Size: 216x137mm`는 터치 장치 크기이며 HDMI 해상도가 아닙니다. `axp8191-pek`는 보드 전원 키입니다.
 
+### 팬 상시 동작
+
+`sun60iw2`의 PWM 팬은 **기본 출력 60%로 계속 동작**하고, 온도가 오르면 기존 커널 제어에 따라 속도를 높입니다. 실제 장치의 `cooling-levels`를 읽어 153/255(60%) 미만 값만 올립니다. 공식 보드의 `0 50 102 170 255`는 `153 153 153 170 255`가 되어, 낮은 온도에서는 60%, 고온에서는 약 67~100% 출력을 사용합니다. 60%는 PWM 출력 기준이며 회전수 측정값은 아닙니다. 기존 55°C 팬 제어 기준과 CPU 과열 보호를 유지합니다. 근거는 [공식 보드 설정](https://github.com/orangepi-xunlong/linux-orangepi/blob/orange-pi-6.6-sun60iw2/arch/arm64/boot/dts/allwinner/sun60i-a733-orangepi-zero3w.dts)과 [팬 드라이버](https://github.com/orangepi-xunlong/linux-orangepi/blob/orange-pi-6.6-sun60iw2/drivers/hwmon/pwm-fan.c)입니다.
+
+설치·서비스 활성화·`pi_update.sh` 실행 시 부팅 overlay를 자동으로 설정합니다. **재부팅 후 적용**되며 C4의 `bash scripts/pi_update.sh`는 업데이트 성공 후 Pi를 재부팅합니다. 별도 팬 제어 프로세스는 필요 없고 클러스터가 꺼져 있어도 동작합니다. `dtc`가 없으면 Pi에서 `device-tree-compiler`만 추가 설치합니다. 기존 부팅 옵션과 다른 overlay는 보존하며, 업데이트 실패·rollback 시 팬 부팅 설정도 복구합니다. rollback으로 복구된 부팅 설정은 다음 재부팅에 반영됩니다.
+
+Pi에서 팬 설정만 적용할 때는 아래 명령을 사용합니다.
+
+```bash
+sudo bash /opt/cluster-receiver/scripts/fan_setup.sh install
+sudo reboot
+```
+
+지원하는 PWM 팬 노드를 찾지 못하면 `[CLUSTER_FAN] Unsupported board/fan device tree` 경고를 남깁니다. 다음 `cluster_pi_debug.log`에는 부팅 overlay 설정, 실제 적용된 냉각 단계, 현재 `pwm1`, 온도와 thermal governor를 함께 수집합니다. 재부팅 후 `cooling-levels`가 모두 153 이상인지 확인하면 부팅 설정 적용 여부를 구분할 수 있습니다.
+
+### 터치 하단 패널
+
+화면을 터치하면 하단에 **Pi 전체 CPU 사용률·CPU 온도·팬 출력/회전수·JPEG/H.264 모드·실제 표시 FPS**가 나타납니다. 온도는 CPU 온도 영역 중 가장 높은 값을 사용하고, 회전수 센서가 없는 팬은 `60% PWM`처럼 출력 비율을 표시합니다. 읽을 수 없는 값은 `--`로 표시합니다. FPS는 새 영상/합성 화면의 실제 표시 횟수이며 대기 화면이나 메뉴만 다시 그리는 횟수는 포함하지 않습니다.
+
+밝기는 기존 10~100%의 10단계를 유지하며 **주간 80% / 야간 40%** 바로가기 버튼을 제공합니다. 화면 끄기·터치로 다시 켜기도 유지합니다. 패널은 마지막 조작 후 8초에 닫힙니다. 업데이트·전송 중에는 진행 상태를 계속 표시하며, 닫기를 누르면 작업은 배경에서 계속됩니다.
+
+**Pi 업데이트**는 현재 C4에 설치된 저장소의 `scripts/pi_update.sh`를 실행합니다. Pi 배포와 확인이 성공하면 자동 재부팅하고 다시 연결됩니다. **로그 전송**은 대시보드의 Cluster 로그 업로드와 동일한 `scripts/log_upload.sh /data/log/cluster_debug.log`를 사용해 C4·Pi 로그를 NAS로 전송합니다. Pi 파일만 수집·전송하지 못한 경우 부분 완료로 표시하고 기존 보관·재시도 정책을 사용합니다. 두 작업은 동시에 실행하지 않으며 중복 터치나 HTTP 응답 유실로 같은 작업을 두 번 시작하지 않습니다.
+
+요청은 현재 연결된 C4의 대시보드(7000번 포트)로 보내며, 새 작업은 현재 C4 클러스터에 연결된 Pi에서만 허용합니다. Pi 배포 중 영상 연결이 끊겨도 접수된 작업 상태는 계속 조회할 수 있습니다. 상태 수집과 HTTP 요청은 별도 스레드에서 수행하고, 패널이 닫혀 있고 진행 중인 작업이 없으면 요청을 멈춥니다. Pi에 추가 Python 패키지는 필요 없습니다.
+
+처음 이 기능을 적용할 때는 **C4 코드 업데이트·대시보드 재시작(또는 C4 재부팅) 후 `bash scripts/pi_update.sh`를 한 번 실행**합니다. 이후에는 터치 패널에서 사용할 수 있습니다. Pi 업데이트는 C4 저장소를 새로 내려받는 작업이 아니므로, 새 버전 배포 전 C4 코드를 먼저 갱신합니다.
+
 ## 연결 구조
 
 ```text
@@ -81,6 +108,8 @@ bash scripts/pi_update.sh
 
 ### 두 모드의 로그 비교
 
+2026-10-16 주행 비교에서는 H.264 표시가 약15FPS, JPEG가 약7FPS였으므로 H.264를 우선 개선하며 JPEG는 복구·비교용으로 유지합니다. [측정 구간과 보완 내용](../../NETWORK_COMPARISON.md)을 참고하세요. Pi 자산 접근 오류를 고친 뒤의 실제 폰트·아이콘과 표시 FPS는 업데이트 후 다시 확인해야 합니다.
+
 같은 해상도·밝기·주행 조건에서 C4 로그와 Pi 로그를 함께 비교합니다. 연결 직후와 화면 OFF 구간을 구분하며, 단순 목표 FPS보다 표시 FPS·순간 중단·주행 입력 상태를 함께 확인합니다.
 
 | 모드 / 로그 | 확인할 항목 |
@@ -114,6 +143,7 @@ C4 대시보드의 **Toggles → Cluster Enable** 아래에 `Orange Pi 연결됨
 | [ensure_wifi.sh](scripts/ensure_wifi.sh) | 차량 `Android` 프로필 저장·재사용, 자동 연결·Wi-Fi 절전 해제 |
 | [wifi_power_save.sh](scripts/wifi_power_save.sh) | 활성 Wi-Fi 프로필의 절전 설정만 변경하고 실제 인터페이스의 `off` 확인 |
 | [wifi_boot_setup.sh](scripts/wifi_boot_setup.sh) | 수신기 시작·Wi-Fi 재연결 시 절전 해제 실행 설정 설치 |
+| [fan_setup.sh](scripts/fan_setup.sh) | 부팅 시 팬 최저 출력 60% 설정, 기존 온도 제어·CPU 과열 보호 유지 |
 | [run_console.sh](scripts/run_console.sh) | 데스크톱·수신기 중지, 연결된 HDMI 카드 선택, KMSDRM + GLES2 실행 |
 | [diagnose.sh](scripts/diagnose.sh) | OS·SDL·DRM·서비스 진단 파일 저장; 선택적으로 GBM/EGL 점검 |
 | [run_desktop.sh](scripts/run_desktop.sh) | 로그인한 X11 데스크톱에서 소프트웨어 화면 출력 |

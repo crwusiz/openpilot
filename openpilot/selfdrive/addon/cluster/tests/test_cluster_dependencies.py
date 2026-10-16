@@ -78,3 +78,26 @@ def test_failed_install_is_not_repeated_on_every_poll(bootstrap):
   assert not item.module.ensure_cluster_dependencies(item.config)
   item.module.prepare_groups.assert_called_once()
   item.module.activate_groups.assert_not_called()
+
+
+def test_failed_activation_is_an_error_instead_of_a_successful_exit(bootstrap):
+  item = bootstrap
+  item.module.groups_ready.return_value = True
+  item.module.activate_groups.side_effect = item.module.DependencyError("native import failed")
+  with pytest.raises(item.module.DependencyError, match="native import failed"):
+    item.module.ensure_cluster_dependencies(item.config)
+  item.module.prepare_groups.assert_not_called()
+
+
+def test_onroad_wait_emits_periodic_liveness_without_installing(bootstrap):
+  item = bootstrap
+  def sleep(seconds):
+    item.clock[0] += seconds
+    if item.clock[0] > 65:
+      item.values["ClusterEnable"] = False
+  item.module.time.sleep = sleep
+  assert not item.module.ensure_cluster_dependencies(item.config)
+  item.module.prepare_groups.assert_not_called()
+  messages = [call.args[0] for call in item.module.flog.call_args_list if "Still waiting" in call.args[0]]
+  assert len(messages) == 2
+  assert all("offroad=False" in message and "cluster-jpeg" in message for message in messages)

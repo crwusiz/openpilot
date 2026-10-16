@@ -27,11 +27,16 @@ def ensure_cluster_dependencies(config):
       return True
   except DependencyError as error:
     flog(f"[CLUSTER_DEPS_ERROR] {error}")
-    return False
+    raise
 
   flog(f"[CLUSTER_DEPS_WAIT] Required groups: {','.join(groups)}; preparation waits for offroad.")
   retry_at = 0.0
+  next_wait_log = time.monotonic() + 30.0
   while _still_selected(config):
+    now = time.monotonic()
+    if now >= next_wait_log:
+      flog(f"[CLUSTER_DEPS_WAIT] Still waiting; offroad={config.params.get_bool('IsOffroad')} groups={','.join(groups)}")
+      next_wait_log = now + 30.0
     if config.params.get_bool("IsOffroad") and time.monotonic() >= retry_at:
       try:
         prepare_groups(groups, cancel_check=lambda: not config.params.get_bool("IsOffroad") or not _still_selected(config))

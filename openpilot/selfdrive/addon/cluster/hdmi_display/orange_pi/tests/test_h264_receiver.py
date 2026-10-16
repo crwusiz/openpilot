@@ -1,5 +1,6 @@
 import asyncio
 import builtins
+import logging
 import socket
 import sys
 import threading
@@ -190,6 +191,107 @@ def test_missing_scene_dependency_reports_error_and_uses_normal_reconnect_except
     pi_sock.close()
 
 
+def test_scene_asset_failure_reports_detail_before_starting_webrtc(monkeypatch):
+  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
+
+  monkeypatch.setattr(h264_scene, "H264Scene", Mock(side_effect=RuntimeError("Required cluster fonts missing: Inter-Regular.ttf")))
+  receiver = Mock()
+  monkeypatch.setattr(h264_receiver, "H264Receiver", receiver)
+  c4_sock, pi_sock = socket.socketpair()
+  c4_sock.settimeout(1.0)
+  try:
+    with pytest.raises(RuntimeError, match="Required cluster fonts missing"):
+      h264_receiver.receive_h264_session(pi_sock, None, HELLO_DATA)
+    kind, _, payload = read_control(c4_sock)
+    assert kind == ERROR and payload == {
+      "error": "h264_scene_unavailable", "detail": "Required cluster fonts missing: Inter-Regular.ttf",
+    }
+    receiver.assert_not_called()
+    assert pi_sock.gettimeout() == 0.25
+  finally:
+    c4_sock.close()
+    pi_sock.close()
+
+
+def test_decoder_warning_counter_is_scoped_to_running_receiver(fake_aiortc):
+  decoder_log = logging.getLogger("aiortc.codecs.h264")
+  original_handlers = decoder_log.handlers[:]
+  c4_sock, pi_sock = socket.socketpair()
+  c4_sock.settimeout(2.0)
+  receiver = h264_receiver.H264Receiver(pi_sock, HELLO_DATA)
+  try:
+    receiver.start()
+    assert read_control(c4_sock)[0] == OFFER
+    decoder_log.warning("H264Decoder() failed to decode, skipping package: %s", "avcodec_send_packet()")
+    decoder_log.warning("Unrelated H.264 warning")
+    decoder_log.info("H264Decoder() failed to decode")
+    logging.getLogger("unrelated").warning("failed to decode")
+    assert receiver.decoder_errors == 1
+  finally:
+    receiver.close()
+    c4_sock.close()
+    pi_sock.close()
+  assert decoder_log.handlers == original_handlers
+  decoder_log.warning("H264Decoder() failed to decode, skipping package")
+  assert receiver.decoder_errors == 1
+
+
+def run_feedback_ticks(monkeypatch, receiver, tick_count, update):
+  now, feedbacks = [0.0], []
+
+  async def sleep(interval):
+    assert interval == h264_receiver.FEEDBACK_INTERVAL
+    now[0] += interval
+    if len(feedbacks) >= tick_count:
+      raise asyncio.CancelledError
+    update(len(feedbacks) + 1, now[0])
+
+  async def send(kind, payload):
+    assert kind == FEEDBACK
+    feedbacks.append(payload)
+
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(h264_receiver, "asyncio", SimpleNamespace(sleep=sleep))
+  monkeypatch.setattr(receiver, "_send_control", send)
+  with pytest.raises(asyncio.CancelledError):
+    asyncio.run(receiver._feedback())
+  return feedbacks
+
+
+def test_keyframe_feedback_only_requests_new_decode_errors_or_existing_video_staleness(monkeypatch):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+
+  def update(tick, now):
+    if tick == 2:
+      receiver.decoder_errors = 1
+    if tick >= 4:
+      receiver.publish_rgb("decoded", received_at=now - (0.5 if tick == 5 else 0.49))
+    if tick == 7:
+      receiver.decoder_errors = 3
+
+  feedbacks = run_feedback_ticks(monkeypatch, receiver, 8, update)
+  assert [item["keyframe_request"] for item in feedbacks] == [False, True, False, False, True, False, True, False]
+  assert [item["decoder_errors"] for item in feedbacks] == [0, 1, 1, 1, 1, 1, 3, 3]
+  assert feedbacks[0]["video_stale"] and feedbacks[0]["video_age_ms"] is None
+  assert feedbacks[4]["video_age_ms"] == pytest.approx(500.0)
+  assert all(type(item["keyframe_request"]) is bool for item in feedbacks)
+
+
+def test_receiver_perf_logs_decode_error_delta_over_each_ten_seconds(monkeypatch, caplog):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+
+  def update(tick, _now):
+    if tick in (2, 11):
+      receiver.decoder_errors += 1 if tick == 2 else 2
+
+  with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+    feedbacks = run_feedback_ticks(monkeypatch, receiver, 20, update)
+  messages = [record.getMessage() for record in caplog.records if "CLUSTER_H264_RX_PERF" in record.getMessage()]
+  assert len(messages) == 2
+  assert "decoder_errors=1 |" in messages[0] and "decoder_errors=2 |" in messages[1]
+  assert feedbacks[-1]["decoder_errors"] == 3
+
+
 @pytest.mark.parametrize("width,height", [(8192, 480), (4096, 2160)])
 def test_decoder_checks_dimensions_before_allocating_rgb(width, height):
   convert = Mock()
@@ -308,7 +410,7 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
     def start(self):
       pass
 
-    def take_updates(self):
+    def take_updates(self, timeout=0.02):
       self.step += 1
       if self.step == 1:
         self.received_frames = 1
@@ -350,3 +452,100 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
   assert presented == (["scene 1", "scene 1", "scene 2"] if stall else ["scene 1", "scene 2"])
   assert waiting == ([True] if stall else [])
   assert receivers[0].closed and receivers[0].displayed_frames == (3 if stall else 2)
+
+
+@pytest.mark.parametrize("render_cost,display_cost,screen_off", [
+  (0.025, 0.014, False), (0.08, 0.014, False), (0.025, 0.014, True),
+])
+def test_render_deadlines_preserve_twenty_hz_phase_and_skip_overloaded_slots(monkeypatch, render_cost, display_cost, screen_off):
+  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
+
+  clock, starts, waits, receivers = [1.0], [], [], []
+  jitter = (0.0, -0.003, 0.004, -0.001, 0.002)
+  arrivals = [1.0 + index * 0.05 + jitter[index % len(jitter)] for index in range(100)]
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+
+  class Scene:
+    def __init__(self, *_args):
+      pass
+
+    def update(self, *_args, **_kwargs):
+      pass
+
+    def set_video(self, *_args, **_kwargs):
+      pass
+
+    def render(self):
+      starts.append(clock[0])
+      clock[0] += render_cost
+      return "composed RGB"
+
+  class Receiver:
+    def __init__(self, *_args):
+      self.condition = threading.Condition()
+      self.received_frames = 0
+      self.last_video_at = self.last_state_at = None
+      self.screen_off = self.done = self.closed = False
+      receivers.append(self)
+
+    def start(self):
+      pass
+
+    def take_updates(self, timeout=0.02):
+      waits.append(timeout)
+      assert 0.0 <= timeout <= 0.02
+      assert len(waits) < 2000, "A receiver with no pending updates must block, not spin"
+      wake_at = clock[0] + timeout
+      if self.received_frames < len(arrivals) and arrivals[self.received_frames] <= wake_at:
+        clock[0] = max(clock[0], arrivals[self.received_frames])
+        while self.received_frames < len(arrivals) and arrivals[self.received_frames] <= clock[0]:
+          self.last_video_at = self.last_state_at = arrivals[self.received_frames]
+          self.received_frames += 1
+        return ("decoded RGB", self.last_video_at), None
+      assert timeout > 0.0, "A due pending render must run before another empty poll"
+      clock[0] = wake_at
+      return None, None
+
+    def record_display(self, *_args):
+      pass
+
+    def close(self):
+      self.closed = True
+
+  def present(_image):
+    clock[0] += display_cost
+    return True
+
+  monkeypatch.setattr(h264_scene, "H264Scene", Scene)
+  monkeypatch.setattr(h264_receiver, "H264Receiver", Receiver)
+  display = SimpleNamespace(pump_events=lambda: True, screen_off=screen_off, send_rgb=present, last_frame_presented=True)
+  assert h264_receiver.receive_h264_session(None, display, HELLO_DATA, max_frames=100) == 100
+  assert receivers[0].closed
+  if screen_off:
+    assert not starts
+    assert all(timeout == 0.02 for timeout in waits)
+  elif render_cost < 0.05:
+    # Replay the previous fixed-poll/reset-to-now policy with the same
+    # arrivals and work. A pending picture can miss the next 50ms slot.
+    legacy_now, legacy_last, legacy_index, legacy_frames = 1.0, 0.0, 0, 0
+    legacy_pending = False
+    while legacy_index < len(arrivals):
+      if arrivals[legacy_index] <= legacy_now + 0.02:
+        legacy_now = max(legacy_now, arrivals[legacy_index])
+        while legacy_index < len(arrivals) and arrivals[legacy_index] <= legacy_now:
+          legacy_index += 1
+          legacy_pending = True
+      else:
+        legacy_now += 0.02
+      if legacy_pending and legacy_now - legacy_last >= 0.05:
+        legacy_last = legacy_now
+        legacy_now += render_cost + display_cost
+        legacy_frames += 1
+        legacy_pending = False
+    assert legacy_frames <= 86
+    assert len(starts) >= 96
+    assert (len(starts) - 1) / (starts[-1] - starts[0]) >= 19.5
+    assert any(0.0 < timeout < 0.015 for timeout in waits)
+  else:
+    assert 45 <= len(starts) <= 51
+    assert all(second - first >= 0.099 for first, second in zip(starts, starts[1:], strict=False))

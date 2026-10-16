@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer
+from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer, REQUIRED_ICON_NAMES
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_scene import H264Scene, source_panel_geometry
 
 
@@ -32,6 +32,45 @@ def snapshot(source_size=(1344, 760), **overrides):
 @pytest.fixture
 def scene():
   return H264Scene(ASSETS, clock=lambda: 10.0)
+
+
+def test_required_assets_keep_original_font_sizes_and_all_hud_icons(scene):
+  assert scene.renderer.font_current_speed.size == 92
+  assert scene.renderer.font_speed.size == 58
+  assert scene.renderer.font_value.size == 42
+  assert scene.renderer.font_unit.size == 20
+  assert set(scene.renderer.icons) == set(REQUIRED_ICON_NAMES)
+  manifest = Path(__file__).resolve().parents[1] / "receiver_assets.txt"
+  assert set(manifest.read_text().splitlines()) == {
+    "assets/fonts/Inter-Bold.ttf", "assets/fonts/Inter-Regular.ttf",
+    *(f"assets/icons/{name}.png" for name in REQUIRED_ICON_NAMES),
+  }
+
+
+@pytest.mark.parametrize("relative", ["fonts/Inter-Bold.ttf", "fonts/Inter-Regular.ttf", "icons/steer_green.png", "icons/wifi_strength_full.png"])
+@pytest.mark.parametrize("corrupt", [False, True])
+def test_incomplete_assets_reject_h264_instead_of_showing_tiny_fonts_or_missing_icons(tmp_path, relative, corrupt):
+  assets = tmp_path / "assets"
+  for name in ("fonts/Inter-Bold.ttf", "fonts/Inter-Regular.ttf", *(f"icons/{name}.png" for name in REQUIRED_ICON_NAMES)):
+    destination = assets / name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(ASSETS / name, destination)
+  path = assets / relative
+  if corrupt:
+    path.write_bytes(b"broken asset")
+  else:
+    path.unlink()
+  with pytest.raises(RuntimeError, match="Failed to load cluster") as error:
+    H264Scene(assets)
+  assert path.name in str(error.value)
+  assert str(assets) in str(error.value)
+  assert "service-account directory permissions" in str(error.value)
+
+  # Once a deployment repairs the bundle, the next connection loads real assets.
+  shutil.copyfile(ASSETS / relative, path)
+  repaired = H264Scene(assets)
+  assert repaired.renderer.font_current_speed.size == 92
+  assert set(repaired.renderer.icons) == set(REQUIRED_ICON_NAMES)
 
 
 def test_raw_sensor_crop_matches_existing_even_nv12_geometry():

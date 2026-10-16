@@ -305,6 +305,53 @@ class TestDashboardCameraProxy(unittest.IsolatedAsyncioTestCase):
     self.assertEqual(calls, [['road'], ['driver']])
 
 
+class TestDashboardClusterActions(unittest.IsolatedAsyncioTestCase):
+  async def test_touch_job_runs_after_the_http_reply_and_survives_video_disconnect(self):
+    started, finish = asyncio.Event(), asyncio.Event()
+
+    async def runner(_command, _timeout):
+      started.set()
+      await finish.wait()
+      return 0, 'CLUSTER_PI_LOG_WARNING: Pi file retained for retry'
+
+    with tempfile.TemporaryDirectory() as directory:
+      root = Path(directory)
+      (root / 'log_upload.sh').touch()
+      (root / 'cluster_debug.log').touch()
+      actions = dashboard.ClusterActions(root, root / 'cluster_debug.log', runner=runner)
+      with patch.object(dashboard, 'CLUSTER_ACTIONS', actions), \
+           patch.object(dashboard, 'get_connected_pi_ip', return_value='192.168.0.84') as peer:
+        transport = httpx.ASGITransport(app=dashboard.app, client=('192.168.0.84', 1234))
+        async with httpx.AsyncClient(transport=transport, base_url='http://c4:7000') as client:
+          payload = {'action': 'upload_logs', 'request_id': 'c' * 32}
+          response = await client.post('/api/cluster/actions', json=payload)
+          self.assertEqual(response.status_code, 202)
+          self.assertEqual(response.json()['state'], 'running')
+          await started.wait()
+          peer.return_value = None
+          repeated = await client.post('/api/cluster/actions', json=payload)
+          self.assertEqual(repeated.json()['job_id'], response.json()['job_id'])
+          self.assertEqual((await client.get('/api/cluster/actions')).json()['state'], 'running')
+          finish.set()
+          await asyncio.gather(*actions.tasks)
+          result = (await client.get('/api/cluster/actions')).json()
+          self.assertEqual(result['state'], 'warning')
+
+  async def test_touch_endpoint_rejects_other_clients_and_arbitrary_targets(self):
+    actions = dashboard.ClusterActions(runner=AsyncMock())
+    with patch.object(dashboard, 'CLUSTER_ACTIONS', actions), \
+         patch.object(dashboard, 'get_connected_pi_ip', return_value='192.168.0.84'):
+      transport = httpx.ASGITransport(app=dashboard.app, client=('192.168.0.99', 1234))
+      async with httpx.AsyncClient(transport=transport, base_url='http://c4:7000') as client:
+        self.assertEqual((await client.get('/api/cluster/actions')).status_code, 403)
+        payload = {'action': 'pi_update', 'request_id': 'd' * 32}
+        self.assertEqual((await client.post('/api/cluster/actions', json=payload)).status_code, 403)
+        payload['host'] = '192.168.0.84'
+        self.assertEqual((await client.post('/api/cluster/actions', json=payload)).status_code, 400)
+        self.assertEqual((await client.post('/api/cluster/actions', content=b'x' * 1025)).status_code, 413)
+    actions.runner.assert_not_called()
+
+
 @unittest.skipUnless(shutil.which('node'), 'Node is needed for the mocked browser regression tests')
 class TestDashboardCameraJavascript(unittest.TestCase):
   def run_browser(self, scenario):

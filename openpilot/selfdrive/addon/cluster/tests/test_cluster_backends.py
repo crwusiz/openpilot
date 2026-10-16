@@ -40,7 +40,7 @@ def test_dispatcher_import_does_not_load_display_backends_or_jpeg_pipeline(monke
   for name, module in {
     "openpilot.common.swaglog": SimpleNamespace(cloudlog=Mock()),
     PREFIX + "cluster_config": SimpleNamespace(ClusterConfig=Mock()),
-    PREFIX + "cluster_logging": SimpleNamespace(close_log=Mock(), initialize_log=Mock()),
+    PREFIX + "cluster_logging": SimpleNamespace(close_log=Mock(), flog=Mock(), initialize_log=Mock()),
     PREFIX + "cluster_policy": SimpleNamespace(enforce_cluster_transport=Mock()),
   }.items():
     monkeypatch.setitem(sys.modules, name, module)

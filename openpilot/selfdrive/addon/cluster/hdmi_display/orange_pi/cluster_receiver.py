@@ -275,9 +275,13 @@ def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=F
       payload = recv_exact(sock, size, deadline=header_stats.first_byte_at + frame_timeout,
                            poll_events=poll_events, phase="h264_hello")
       hello = decode_payload(payload)
+      if hasattr(display, "set_stream_mode"):
+        display.set_stream_mode("H.264")
       remaining = None if max_frames is None else max_frames - received_frames
       return received_frames + receive_h264_session(sock, display, hello, frame_timeout, remaining)
     sequence, frame_size, flags = unpack_frame_header_info(header)
+    if hasattr(display, "set_stream_mode"):
+      display.set_stream_mode("JPEG")
     header_at = time.monotonic()
     deadline = header_stats.first_byte_at + frame_timeout
     receive_stats = ReceiveStats() if flags & FRAME_STREAM else None
@@ -426,6 +430,7 @@ def main():
     while True:
       sock = None
       connected_at = None
+      configuration_delay = 0.0
       try:
         _poll_display(display)
         if args.host is not None:
@@ -441,11 +446,16 @@ def main():
             last_c4_address = sock.getpeername()[0]
         if sock is not None:
           sock.settimeout(args.frame_timeout)
+          if hasattr(display, "set_c4_peer"):
+            display.set_c4_peer(str(args.host) if args.host is not None else last_c4_address)
           connected_at = time.monotonic()
           receive_frames(sock, display, frame_timeout=args.frame_timeout)
       except (ConnectionError, OSError, RuntimeError, subprocess.SubprocessError, ValueError) as e:
         LOG.warning("Cluster connection unavailable: %s", e)
+        configuration_delay = min(5.0, max(0.0, float(getattr(e, "retry_delay_s", 0.0))))
       finally:
+        if hasattr(display, "set_c4_peer"):
+          display.set_c4_peer(None)
         if sock is not None:
           try:
             sock.close()
@@ -454,7 +464,11 @@ def main():
         display.show_waiting()
       # Keep the existing backoff for failed/short connections. A live session
       # has already spaced attempts apart and can retry the cached C4 at once.
-      if connected_at is None or time.monotonic() - connected_at < args.reconnect_delay:
+      if configuration_delay:
+        # Missing assets/dependencies need an update, not a tight reconnect
+        # loop that repeats the same setup failure and fills both logs.
+        wait_for_reconnect(display, max(configuration_delay, args.reconnect_delay))
+      elif connected_at is None or time.monotonic() - connected_at < args.reconnect_delay:
         wait_for_reconnect(display, args.reconnect_delay)
   except KeyboardInterrupt:
     LOG.info("Stopping cluster receiver")

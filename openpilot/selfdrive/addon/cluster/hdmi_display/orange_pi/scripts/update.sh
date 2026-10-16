@@ -7,6 +7,7 @@ STATE=/var/lib/cluster-receiver/updates
 UNIT=cluster-hdmi.service
 WIFI_CONF=/etc/systemd/system/cluster-hdmi.service.d/wifi.conf
 WIFI_DISPATCHER=/etc/NetworkManager/dispatcher.d/90-cluster-wifi-power
+FAN_HELPER="$STATE/fan_setup.sh"
 FILES=()
 REMOVE=()
 pending=0
@@ -15,6 +16,7 @@ recovering=0
 recovery_goal=''
 backup=''
 wifi_rollback_snapshot=''
+fan_rollback_snapshot=''
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 valid_file() {
@@ -49,9 +51,17 @@ read_manifest() {
   (cd -- "$directory" && sha256sum --check --strict SHA256SUMS) || fail 'Payload checksum verification failed.'
 }
 copy_file() {
-  local source=$1 destination=$2 temporary
+  local source=$1 destination=$2 temporary relative directory=$TARGET
   safe_parents "$TARGET" "${destination#"$TARGET/"}" || return 1
-  install -d -m 755 -- "${destination%/*}" || return 1
+  # Repair every ancestor, including an existing assets/ directory left at 700
+  # by an older root-owned upload. Fixing fonts/ and icons/ alone is not enough
+  # for the unprivileged receiver account to traverse assets/.
+  relative=${destination#"$TARGET/"}
+  while [[ "$relative" == */* ]]; do
+    directory="$directory/${relative%%/*}"
+    install -d -m 755 -- "$directory" || return 1
+    relative=${relative#*/}
+  done
   temporary=$(mktemp "${destination%/*}/.cluster-file.XXXXXXXX") || return 1
   if ! install -m 644 -- "$source" "$temporary"; then
     rm -f -- "$temporary"
@@ -103,6 +113,19 @@ restore_wifi_state() {
   done
   systemctl daemon-reload
 }
+snapshot_fan_state() {
+  local directory=$1
+  # Saved updates from before fan support may have no helper or fan snapshot.
+  [[ -e "$FAN_HELPER" || -L "$FAN_HELPER" ]] || return 0
+  [[ -f "$FAN_HELPER" && ! -L "$FAN_HELPER" ]] || return 1
+  bash "$FAN_HELPER" snapshot "$directory"
+}
+restore_fan_state() {
+  local directory=$1
+  [[ -d "$directory" ]] || return 0
+  [[ -f "$FAN_HELPER" && ! -L "$FAN_HELPER" ]] || return 1
+  bash "$FAN_HELPER" restore "$directory"
+}
 check_ready() {
   local marker=$1 invocation current journal successes=0 attempt
   invocation=$(systemctl show --property=InvocationID --value "$UNIT") || return 1
@@ -144,6 +167,7 @@ restore_backup() {
   done < "$backup/previous-files"
   clear_bytecode || return 1
   restore_wifi_state "$backup/wifi-system" || return 1
+  restore_fan_state "$backup/fan-system" || return 1
   if [[ $resume == 1 ]]; then
     start_receiver || return 1
     check_ready 'Orange Pi HDMI display ready' || return 1
@@ -195,6 +219,7 @@ if [[ $1 == rollback ]]; then
   [[ "$latest" =~ ^[0-9]{8}T[0-9]{6}Z\.[a-zA-Z0-9]{8}$ ]] || fail 'Invalid saved backup identifier.'
   source_dir="$STATE/$latest/previous"
   wifi_rollback_snapshot="$STATE/$latest/wifi-system"
+  fan_rollback_snapshot="$STATE/$latest/fan-system"
   while IFS= read -r name; do
     valid_file "$name" || fail 'Invalid saved payload path.'
     [[ -f "$source_dir/$name" ]] || REMOVE+=("$name")
@@ -205,10 +230,10 @@ read_manifest "$source_dir"
 if [[ $1 == apply ]]; then
   # Rollback manifests may belong to releases predating these helpers. Require
   # the current receiver dependencies only for a newly uploaded package.
-  for name in cluster_protocol.py frame_stream.py display_controls.py texture_presenter.py tcp_diagnostics.py receiver_build.py \
+  for name in cluster_protocol.py frame_stream.py display_controls.py texture_presenter.py touch_status.py tcp_diagnostics.py receiver_build.py \
     h264_receiver.py h264_protocol.py h264_scene.py cluster_renderer.py cluster_render_support.py receiver_assets.txt \
     assets/fonts/Inter-Bold.ttf assets/fonts/Inter-Regular.ttf scripts/prepare_h264.sh scripts/package_sources.sh \
-    scripts/update.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh; do
+    scripts/update.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh scripts/fan_setup.sh; do
     [[ " ${FILES[*]} " == *" $name "* ]] || fail "Payload is missing $name."
   done
   while IFS= read -r name || [[ -n "$name" ]]; do
@@ -249,9 +274,18 @@ fi
 # contain update.sh. It also works after rollback removes that new runtime file.
 install -m 700 -- "${BASH_SOURCE[0]}" "$STATE/update.sh.tmp"
 mv -f -- "$STATE/update.sh.tmp" "$STATE/update.sh"
+if [[ $1 == apply ]]; then
+  # Keep boot-configuration recovery usable after rollback removes the newly
+  # added helper from an older standalone receiver package.
+  install -m 700 -- "$source_dir/scripts/fan_setup.sh" "$STATE/fan_setup.sh.tmp"
+  mv -f -- "$STATE/fan_setup.sh.tmp" "$FAN_HELPER"
+elif [[ ! -e "$FAN_HELPER" && -f "$(dirname -- "${BASH_SOURCE[0]}")/fan_setup.sh" ]]; then
+  install -m 700 -- "$(dirname -- "${BASH_SOURCE[0]}")/fan_setup.sh" "$FAN_HELPER"
+fi
 backup=$(mktemp -d "$STATE/$(date -u +%Y%m%dT%H%M%SZ).XXXXXXXX")
 printf '%s\n' "$resume" > "$backup/resume"
 snapshot_wifi_state "$backup/wifi-system" || fail 'Cannot safely back up receiver Wi-Fi setup.'
+snapshot_fan_state "$backup/fan-system" || fail 'Cannot safely back up Orange Pi fan boot setup.'
 install -d -m 700 -- "$backup/previous/scripts"
 shopt -s nullglob
 previous_paths=("$TARGET"/*.py "$TARGET"/scripts/*.sh "$TARGET/README.md" "$TARGET/requirements.txt" "$TARGET/receiver_assets.txt" "$TARGET/cluster-hdmi.service")
@@ -283,6 +317,11 @@ trap 'exit 129' HUP
 printf '%s\n' "$recovery_goal" > "$STATE/recovery-needed.tmp"
 mv -f -- "$STATE/recovery-needed.tmp" "$STATE/recovery-needed"
 pending=1
+if [[ $1 == apply ]]; then
+  # Boot-only preparation can install dtc without interrupting the current
+  # receiver. The saved snapshot already covers any resulting boot changes.
+  bash "$FAN_HELPER" install
+fi
 systemctl stop "$UNIT"
 for name in "${FILES[@]}"; do
   copy_file "$source_dir/$name" "$TARGET/$name"
@@ -304,6 +343,7 @@ if [[ $1 == apply ]]; then
   fi
 else
   restore_wifi_state "$wifi_rollback_snapshot"
+  restore_fan_state "$fan_rollback_snapshot"
 fi
 if [[ $resume == 1 ]]; then
   start_receiver

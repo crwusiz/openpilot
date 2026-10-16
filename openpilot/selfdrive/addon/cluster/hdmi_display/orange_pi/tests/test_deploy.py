@@ -22,7 +22,7 @@ def deploy_sandbox(tmp_path):
   scripts = package / "scripts"
   shutil.copytree(PACKAGE / "scripts", scripts)
   for name, content in {"cluster_receiver.py": "# receiver\n", "hdmi_display.py": "# display\n", "frame_stream.py": "# stream\n",
-                        "display_controls.py": "# controls\n", "texture_presenter.py": "# presenter\n",
+                        "display_controls.py": "# controls\n", "texture_presenter.py": "# presenter\n", "touch_status.py": "# touch status\n",
                         "tcp_diagnostics.py": "# TCP diagnostics\n", "receiver_build.py": "# receiver build\n", "cluster_protocol.py": "# protocol\n",
                         "h264_receiver.py": "# H264 receiver\n", "h264_protocol.py": "# H264 protocol\n", "h264_scene.py": "# H264 scene\n",
                         "cluster_renderer.py": "# shared renderer\n", "cluster_render_support.py": "# shared support\n",
@@ -156,7 +156,7 @@ def test_c4_update_packages_receiver_only_with_checksums_and_cleans_staging(depl
       assert b"\r\n" not in data
     assert not data.startswith(b"\xef\xbb\xbf")
   assert files == {"README.md", "requirements.txt", "cluster-hdmi.service", "cluster_receiver.py", "hdmi_display.py", "frame_stream.py",
-                   "display_controls.py", "texture_presenter.py", "tcp_diagnostics.py", "receiver_build.py", "cluster_protocol.py",
+                   "display_controls.py", "texture_presenter.py", "touch_status.py", "tcp_diagnostics.py", "receiver_build.py", "cluster_protocol.py",
                    "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "cluster_renderer.py", "cluster_render_support.py", "receiver_assets.txt",
                    *(deploy_sandbox / "receiver_assets.txt").read_text().splitlines(),
                    *("scripts/" + path.name for path in (deploy_sandbox / "scripts").glob("*.sh"))}
@@ -171,6 +171,39 @@ def test_c4_update_packages_receiver_only_with_checksums_and_cleans_staging(depl
   control_paths = {arg for _, args in calls for arg in args if arg.startswith("ControlPath=")}
   assert len(control_paths) == 1
   assert not any("systemd-run " in args[-1] for tool, args in calls if tool == "ssh")
+
+
+def test_standalone_installer_repairs_asset_permissions_in_place(deploy_sandbox):
+  package = deploy_sandbox
+  root = package.parents[1]
+  installer = package / "scripts/install.sh"
+  installer.write_text(installer.read_text(encoding="utf-8")
+                       .replace('"/opt/cluster-receiver/', '"${PACKAGE_DIR}/')
+                       .replace("/opt/cluster-receiver", '"$PACKAGE_DIR"')
+                       .replace("/etc/systemd/system/cluster-hdmi.service", "not-installed.service")
+                       .replace("/usr/bin/python3", "true"), encoding="utf-8", newline="\n")
+  (package / "scripts/prepare_h264.sh").write_text("exit 0\n", encoding="utf-8", newline="\n")
+  (package / "scripts/fan_setup.sh").write_text('printf "%s\\n" "$*" > fan-install.log\n', encoding="utf-8", newline="\n")
+  for name, body in {
+    "id": "printf '0\\n'",
+    "apt-get": "exit 0",
+    "install": 'printf "%s\\n" "$*" >> "$MOCK_INSTALL_LOG"; exec /usr/bin/install "$@"',
+  }.items():
+    path = root / "bin" / name
+    path.write_text("#!/usr/bin/env bash\n" + body + "\n", encoding="utf-8", newline="\n")
+    path.chmod(0o755)
+  directories = [package / "assets", package / "assets/fonts", package / "assets/icons"]
+  for directory in directories:
+    directory.chmod(0o700)
+  result = _deploy(package, entrypoint=installer, extra_env={"MOCK_INSTALL_LOG": (root / "install.log").as_posix()})
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert (root / "fan-install.log").read_text() == "install\n"
+  calls = (root / "install.log").read_text().splitlines()
+  for relative, directory in zip(("assets", "assets/fonts", "assets/icons"), directories, strict=True):
+    assert any(call.startswith("-d -m 755 -- ") and call.endswith("/" + relative) for call in calls)
+    if os.name != "nt":
+      assert directory.stat().st_mode & 0o777 == 0o755
+  assert (package / "assets/icons/steer.png").read_bytes() == b"binary asset\x00\r\n\x89"
 
 
 def test_c4_uses_current_peer_ip_without_a_manual_address(deploy_sandbox):
@@ -433,8 +466,8 @@ def test_shared_renderer_and_assets_are_mapped_from_full_checkout(deploy_sandbox
   assert _calls(deploy_sandbox) == []
 
 
-@pytest.mark.parametrize("helper", ["ensure_wifi.sh", "wifi_boot_setup.sh", "wifi_power_save.sh"])
-def test_incomplete_wifi_payload_is_rejected_before_ssh(deploy_sandbox, helper):
+@pytest.mark.parametrize("helper", ["ensure_wifi.sh", "wifi_boot_setup.sh", "wifi_power_save.sh", "fan_setup.sh"])
+def test_incomplete_boot_setup_payload_is_rejected_before_ssh(deploy_sandbox, helper):
   (deploy_sandbox / "scripts" / helper).unlink()
   result = _deploy(deploy_sandbox, "192.168.0.84")
   assert result.returncode != 0

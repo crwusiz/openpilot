@@ -1,4 +1,5 @@
 import ctypes
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 import ipaddress
@@ -10,9 +11,11 @@ import time
 try:
   from .display_controls import DEFAULT_BRIGHTNESS, DisplayControls
   from .texture_presenter import TexturePresenter
+  from .touch_status import TouchWorker
 except ImportError:
   from display_controls import DEFAULT_BRIGHTNESS, DisplayControls
   from texture_presenter import TexturePresenter
+  from touch_status import TouchWorker
 
 
 LOG = logging.getLogger("cluster_receiver.hdmi")
@@ -121,6 +124,59 @@ class HdmiDisplay:
     self._network_executor = None
     self._network_future = None
     self._network_next_check = 0.0
+    self._frame_times = deque(maxlen=128)
+    self._stream_mode = "--"
+    self._c4_host = None
+    self._panel_worker = TouchWorker()
+    self._panel_executor = None
+    self._panel_future = None
+    self._panel_next_check = 0.0
+    self._last_panel_job = None
+
+  def set_c4_peer(self, host):
+    if host is not None:
+      self._c4_host = str(ipaddress.IPv4Address(host))
+    if self.controls is not None:
+      self.controls.set_actions_available(host is not None)
+
+  def set_stream_mode(self, mode):
+    self._stream_mode = mode
+
+  def _display_fps(self, now):
+    while self._frame_times and self._frame_times[0] < now - 2.0:
+      self._frame_times.popleft()
+    if len(self._frame_times) < 2 or now - self._frame_times[-1] >= 0.5:
+      return 0.0
+    return (len(self._frame_times) - 1) / max(self._frame_times[-1] - self._frame_times[0], 0.001)
+
+  def _refresh_panel(self):
+    controls = self.controls
+    if controls is None:
+      return
+    now = time.monotonic()
+    if self._panel_future is not None and self._panel_future.done():
+      try:
+        stats, job = self._panel_future.result()
+        controls.set_status({**stats, "mode": self._stream_mode, "fps": self._display_fps(now)})
+        # A touch may have queued a new action while this older GET was in
+        # flight. Its idle/completed reply must not unlock the new action.
+        if controls.pending_action is None:
+          controls.set_action_status(job)
+          identity = (job.get("action"), job.get("state")) if job is not None else None
+          if job is not None and identity != self._last_panel_job:
+            LOG.info("[CLUSTER_TOUCH_ACTION] action=%s state=%s reason=%s", job.get("action"), job.get("state"), job.get("reason", ""))
+            self._last_panel_job = identity
+      except Exception:
+        LOG.warning("Touch panel status refresh failed", exc_info=True)
+        if controls.pending_action is None:
+          controls.set_action_status({"state": "failed", "reason": "connection"})
+      self._panel_future = None
+    if (self._panel_future is None and (controls.menu_visible or controls.action_busy)
+        and (now >= self._panel_next_check or controls.pending_action is not None)):
+      if self._panel_executor is None:
+        self._panel_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="cluster-panel")
+      self._panel_future = self._panel_executor.submit(self._panel_worker.exchange, self._c4_host, controls.take_action())
+      self._panel_next_check = now + 1.0
 
   @property
   def screen_off(self):
@@ -255,6 +311,7 @@ class HdmiDisplay:
         self._handle_touch(event_type, -1, event.pos[0] / width, event.pos[1] / height)
     if self.controls is not None:
       self.controls.update()
+      self._refresh_panel()
     if redraw and self.screen is not None:
       if self._waiting_requested:
         self.show_waiting()
@@ -338,6 +395,7 @@ class HdmiDisplay:
     try:
       self._decode_and_present(jpeg)
       self.last_frame_presented = True
+      self._frame_times.append(time.monotonic())
       return True
     except Exception as e:
       LOG.warning("Failed to display HDMI frame: %s", e)
@@ -385,6 +443,7 @@ class HdmiDisplay:
       self.last_frame_timings["decode"] = 0.0
       self._latest_frame = frame
       self.last_frame_presented = True
+      self._frame_times.append(time.monotonic())
       return True
     except Exception as error:
       LOG.warning("Failed to display H.264 RGB frame: %s", error)
@@ -547,6 +606,12 @@ class HdmiDisplay:
     self._waiting_network_status = None
     self._network_future = None
     self._network_next_check = 0.0
+    self._frame_times.clear()
+    self._panel_future = None
+    self._panel_next_check = 0.0
+    if self._panel_executor is not None:
+      self._panel_executor.shutdown(wait=False, cancel_futures=True)
+      self._panel_executor = None
     if self._network_executor is not None:
       self._network_executor.shutdown(wait=False, cancel_futures=True)
       self._network_executor = None

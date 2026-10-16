@@ -40,6 +40,11 @@ class DisplayControls:
     self._fonts = {}
     self._font_path = None
     self._font_checked = False
+    self.status = {}
+    self.actions_available = False
+    self.action_busy = False
+    self.action_status = {"state": "idle"}
+    self._pending_action = None
     self._layout = self._make_layout()
 
   @property
@@ -68,9 +73,9 @@ class DisplayControls:
 
   def _make_layout(self):
     width, height = self.logical_size
-    scale = min(width / 1200, height / 430)
-    panel_width, panel_height = max(1, round(1000 * scale)), max(1, round(340 * scale))
-    left, top = (width - panel_width) // 2, (height - panel_height) // 2
+    scale = min(width / 1920, height / 480)
+    panel_width, panel_height = max(1, round(1760 * scale)), max(1, round(240 * scale))
+    left, top = (width - panel_width) // 2, height - panel_height - round(12 * scale)
 
     def rect(x, y, w, h):
       return (left + round(x * scale), top + round(y * scale),
@@ -78,9 +83,13 @@ class DisplayControls:
 
     return {
       "panel": (left, top, panel_width, panel_height),
-      "slider": rect(64, 116, 872, 72),
-      "off": rect(64, 224, 392, 82),
-      "close": rect(544, 224, 392, 82),
+      "slider": rect(260, 62, 1040, 56),
+      "day": rect(1340, 66, 180, 52),
+      "night": rect(1540, 66, 180, 52),
+      "off": rect(40, 134, 390, 60),
+      "update": rect(470, 134, 390, 60),
+      "upload": rect(900, 134, 390, 60),
+      "close": rect(1330, 134, 390, 60),
       "scale": scale,
     }
 
@@ -92,6 +101,47 @@ class DisplayControls:
   def _changed(self):
     self.revision += 1
     return True
+
+  def _panel_changed(self):
+    # Telemetry updates must not redraw live video while controls are hidden.
+    if self.menu_visible:
+      self._changed()
+
+  def set_status(self, status):
+    if status != self.status:
+      self.status = dict(status)
+      self._panel_changed()
+
+  def set_actions_available(self, available):
+    if self.actions_available != bool(available):
+      self.actions_available = bool(available)
+      self._panel_changed()
+
+  def set_action_status(self, status):
+    if status is None or status == self.action_status:
+      return
+    was_busy = self.action_busy
+    self.action_status = dict(status)
+    self.action_busy = status.get("state") in ("running", "checking")
+    if was_busy and not self.action_busy:
+      self._last_interaction = self.clock()
+    self._panel_changed()
+
+  @property
+  def pending_action(self):
+    return self._pending_action
+
+  def take_action(self):
+    action, self._pending_action = self._pending_action, None
+    return action
+
+  def _request_action(self, action):
+    if self.action_busy or not self.actions_available:
+      return False
+    self._pending_action = action
+    self.action_busy = True
+    self.action_status = {"action": action, "state": "checking"}
+    return self._changed()
 
   def set_brightness(self, value):
     value = _quantize_brightness(value)
@@ -159,6 +209,12 @@ class DisplayControls:
     if self._contains(self._layout["slider"], point):
       self._dragging_slider = True
       return self._set_slider(point[0])
+    for name, brightness in (("day", 80), ("night", 40)):
+      if self._contains(self._layout[name], point):
+        return self.set_brightness(brightness)
+    for name, action in (("update", "pi_update"), ("upload", "upload_logs")):
+      if self._contains(self._layout[name], point):
+        return self._request_action(action)
     if self._contains(self._layout["off"], point):
       return self.turn_off()
     if self._contains(self._layout["close"], point) or not self._contains(self._layout["panel"], point):
@@ -168,7 +224,7 @@ class DisplayControls:
 
   def update(self):
     """Hide idle controls, without dismissing a slider held by a finger."""
-    if self.menu_visible and self._active_finger is None and self.clock() - self._last_interaction >= self.menu_timeout:
+    if self.menu_visible and not self.action_busy and self._active_finger is None and self.clock() - self._last_interaction >= self.menu_timeout:
       self.menu_visible = False
       return self._changed()
     return False
@@ -212,11 +268,13 @@ class DisplayControls:
     scale = self._layout["scale"]
     surface = pygame.Surface((width, height))
     surface.fill((18, 22, 28))
-    self._font(36 * scale)
+    self._font(28 * scale)
     korean = self._font_path is not None
+    for index, text in enumerate(self.status_labels(korean)):
+      self._label(surface, text, 28 * scale, (round((176 + 352 * index) * scale), round(28 * scale)), (175, 201, 217))
     step = self.brightness // BRIGHTNESS_STEP
-    title = f"화면 밝기 {step}단계 ({self.brightness}%)" if korean else f"Brightness {step}/10 ({self.brightness}%)"
-    self._label(surface, title, 36 * scale, (width // 2, round(54 * scale)), (225, 232, 240))
+    title = f"밝기 {step}/10 · {self.brightness}%" if korean else f"Light {step}/10 · {self.brightness}%"
+    self._label(surface, title, 28 * scale, (round(140 * scale), round(90 * scale)), (225, 232, 240))
 
     slider = self._local_rect(self._layout["slider"], left, top)
     center_y = slider[1] + slider[3] // 2
@@ -230,16 +288,55 @@ class DisplayControls:
       tick_x = slider[0] + round(slider[2] * (value - MIN_BRIGHTNESS) / (100 - MIN_BRIGHTNESS))
       pygame.draw.circle(surface, (150, 162, 175), (tick_x, center_y), max(3, round(7 * scale)))
     pygame.draw.circle(surface, (195, 220, 235), (slider[0] + selected_width, center_y), max(8, round(22 * scale)))
-    self._label(surface, "10%", 22 * scale, (slider[0], round(204 * scale)), (150, 162, 175))
-    self._label(surface, "100%", 22 * scale, (slider[0] + slider[2], round(204 * scale)), (150, 162, 175))
-    for name, title in (("off", "화면 끄기" if korean else "Screen off"), ("close", "닫기" if korean else "Close")):
+    buttons = (("day", "주간 80%", "Day 80%"), ("night", "야간 40%", "Night 40%"),
+               ("off", "화면 끄기", "Screen off"), ("update", "Pi 업데이트", "Pi update"),
+               ("upload", "로그 전송", "Upload logs"), ("close", "닫기", "Close"))
+    for name, korean_title, english_title in buttons:
       rect = self._local_rect(self._layout[name], left, top)
-      pygame.draw.rect(surface, (38, 46, 58), rect, border_radius=max(1, round(12 * scale)))
-      self._label(surface, title, 30 * scale, (rect[0] + rect[2] // 2, rect[1] + rect[3] // 2), (220, 229, 239))
+      enabled = name not in ("update", "upload") or (self.actions_available and not self.action_busy)
+      selected = (name == "day" and self.brightness == 80) or (name == "night" and self.brightness == 40)
+      color = (47, 82, 105) if selected else (38, 46, 58) if enabled else (27, 31, 37)
+      pygame.draw.rect(surface, color, rect, border_radius=max(1, round(10 * scale)))
+      self._label(surface, korean_title if korean else english_title, (26 if name in ("day", "night") else 30) * scale,
+                  (rect[0] + rect[2] // 2, rect[1] + rect[3] // 2), (220, 229, 239) if enabled else (100, 109, 119))
+    self._label(surface, self.action_label(korean), 23 * scale, (width // 2, round(218 * scale)), (175, 195, 210))
     self.apply_dimming(surface)
     self._menu_surface = surface
     self._menu_revision = self.revision
     return surface, (left, top)
+
+  def status_labels(self, korean=False):
+    def number(key, suffix, precision=0):
+      value = self.status.get(key)
+      return "--" if value is None else f"{value:.{precision}f}{suffix}"
+    fan = number("fan_rpm", " RPM") if self.status.get("fan_rpm") is not None else number("fan_pwm", "% PWM")
+    return ("CPU " + number("cpu", "%"), "CPU " + number("temperature", "°C", 1), "FAN " + fan,
+            ("모드 " if korean else "Mode ") + self.status.get("mode", "--"), "FPS " + number("fps", "", 1))
+
+  def action_label(self, korean=False):
+    state, action = self.action_status.get("state"), self.action_status.get("action")
+    if state == "running":
+      return (("Pi 업데이트 중 · 완료 후 자동 재부팅" if action == "pi_update" else "C4·Pi 로그 수집·전송 중") if korean
+              else ("Updating Pi · automatic reboot on completion" if action == "pi_update" else "Collecting and uploading C4 + Pi logs"))
+    if state == "checking":
+      return "C4 응답 확인 중…" if korean else "Waiting for C4 response…"
+    if state == "succeeded":
+      return (("Pi 업데이트 완료 · 재부팅 예정" if action == "pi_update" else "C4·Pi 로그 전송 완료") if korean
+              else ("Pi updated · reboot scheduled" if action == "pi_update" else "C4 + Pi logs uploaded"))
+    if state == "warning":
+      return "C4 로그 전송 완료 · Pi 로그 재시도 필요" if korean else "C4 log uploaded · Pi log retry needed"
+    reason = self.action_status.get("reason")
+    if reason == "update_c4":
+      return "C4 코드를 업데이트하고 대시보드를 재시작하세요" if korean else "Update C4 code and restart its dashboard"
+    if reason == "busy":
+      return "다른 작업이 진행 중입니다" if korean else "Another maintenance job is running"
+    if state == "failed":
+      if self.action_status.get("message"):
+        return ("작업 실패 · " if korean else "Failed · ") + self.action_status["message"][:120]
+      return "작업 실패 · C4 연결과 대시보드 로그를 확인하세요" if korean else "Action failed · check C4 connection and dashboard logs"
+    if not self.actions_available or state == "unavailable":
+      return "C4 연결 후 업데이트·로그 전송을 사용할 수 있습니다" if korean else "Connect C4 to use update and log upload"
+    return ""
 
   @staticmethod
   def _local_rect(rect, left, top):

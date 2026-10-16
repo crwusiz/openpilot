@@ -891,7 +891,8 @@ def test_known_c4_quit_cancels_probe_and_closes_a_racing_socket(monkeypatch):
   assert started.is_set() and closed == [True]
 
 
-def test_main_shows_waiting_at_startup_and_disconnect_before_retry(monkeypatch, caplog):
+@pytest.mark.parametrize("setup_error", [False, True])
+def test_main_shows_waiting_at_startup_and_disconnect_before_retry(monkeypatch, caplog, setup_error):
   events = []
   display_options = {}
   display = FakeDisplay()
@@ -926,9 +927,14 @@ def test_main_shows_waiting_at_startup_and_disconnect_before_retry(monkeypatch, 
     return Connection()
 
   def fail_receive(*_args, **_kwargs):
+    if setup_error:
+      from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_receiver import H264ConfigurationError
+      raise H264ConfigurationError("H.264 assets unavailable")
     raise ConnectionError("lost Wi-Fi")
 
+  delays = []
   def retry(*_args):
+    delays.append(_args[1])
     events.append("retry")
     raise KeyboardInterrupt
 
@@ -938,6 +944,7 @@ def test_main_shows_waiting_at_startup_and_disconnect_before_retry(monkeypatch, 
   with caplog.at_level("INFO"):
     cluster_receiver.main()
   assert events == ["waiting", "probe", "disconnect", "waiting", "retry", "close"]
+  assert delays == [5.0 if setup_error else args.reconnect_delay]
   assert "Cluster receiver ready" in caplog.text
   assert display_options["width"] == 480
   assert display_options["height"] == 1920

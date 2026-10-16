@@ -1,11 +1,12 @@
 import asyncio
+from copy import deepcopy
 from functools import wraps
 from fractions import Fraction
 import socket
 import sys
 import time
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import numpy as np
 import pytest
@@ -70,6 +71,46 @@ def test_scene_snapshot_keeps_geometry_but_excludes_unused_duplicate_lines():
   assert not network.scene_snapshot(config(), data, {}, degraded=True)["model_valid"]
   data.get_camera_source_size.return_value = None
   assert not network.scene_snapshot(config(), data, {})["model_valid"]
+
+
+def test_scene_rounding_reduces_payload_without_visible_projection_error():
+  source = models()
+  xs = np.linspace(1.0, 120.0, 33)
+  ys, zs = np.sin(xs / 17.0), np.cos(xs / 43.0) * 0.1
+  matrix = np.array([[672.0135914, -909.8192581, 0.0014511], [379.1273948, -0.3193511, -909.1235519],
+                     [0.99999791, 0.00020914, 0.00130571]])
+  path = {"path_x": xs.tolist(), "path_y": ys.tolist(), "path_z": zs.tolist(), "calib_transform": matrix,
+          "lane_lines": [[xs.tolist(), (ys + offset).tolist(), zs.tolist()] for offset in (-4.8, -1.6, 1.6, 4.8)]}
+  hud = {"v_ego": 23.764358121, "steering_angle": -11.3896473, "enabled": True, "tpms": [34.0123412] * 4}
+  source.get_render_data.return_value = True, hud, path
+  compact = network.scene_snapshot(config(), source, {})
+  full = deepcopy(compact)
+  full.update(hud=hud, path={**path, "calib_transform": matrix.tolist()})
+  assert len(wire.pack_control(wire.STATE, compact)) < len(wire.pack_control(wire.STATE, full)) * 0.6
+  before = matrix @ np.stack((xs, ys, zs))
+  after = np.array(compact["path"]["calib_transform"]) @ np.array([compact["path"][key] for key in ("path_x", "path_y", "path_z")])
+  np.testing.assert_allclose(before[:2] / before[2], after[:2] / after[2], atol=0.75, rtol=0)
+  assert abs(compact["hud"]["v_ego"] - hud["v_ego"]) < 0.001
+  assert path["path_y"] == ys.tolist()  # Snapshot packing never mutates model inputs.
+
+
+@asyncio_test
+async def test_receiver_recovery_requests_are_rate_limited_and_decoder_errors_are_logged(monkeypatch):
+  messages = []
+  monkeypatch.setattr(network, "flog", messages.append)
+  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=Mock(side_effect=[10.0, 10.4, 11.9, 12.2])))
+  monkeypatch.setattr(network, "read_control", AsyncMock(side_effect=[
+    (wire.FEEDBACK, 0, {"keyframe_request": True, "decoder_errors": 2}),
+    (wire.FEEDBACK, 1, {"keyframe_request": True}), (wire.FEEDBACK, 2, {"keyframe_request": True}),
+    (wire.FEEDBACK, 3, {"keyframe_request": True}), EOFError(),
+  ]))
+  track = SimpleNamespace(request_resync=Mock())
+  server = network.H264NetworkServer(config(), models())
+  with pytest.raises(EOFError):
+    await server._feedback(None, track)
+  assert track.request_resync.call_count == 2
+  assert sum("[CLUSTER_H264_RECOVERY]" in message for message in messages) == 2
+  assert any("decoder_errors=2.00" in message for message in messages)
 
 
 def test_camera_age_uses_the_native_boot_clock_including_suspend(monkeypatch):
@@ -250,9 +291,13 @@ async def test_native_camera_waits_for_idr_and_resynchronizes_after_encoded_refe
   assert track.resyncs == 2 and track.video_frames == 3
   assert not track._keyframe_requested
   track.params.put.assert_called_with("LivestreamRequestKeyframe", False, block=False)
+  track.request_resync()
+  packets.extend([packet(17), packet(18, key=True)])
+  assert bytes(await track.recv()) == b"sps-ppsencoded"
+  assert track.video_frame_id == 18 and track.resyncs == 3
   clear_count = track.params.put.call_count
   track.request_keyframe()  # Receiver PLI while the reference chain is healthy.
-  packets.append(packet(17, key=True))
+  packets.append(packet(19, key=True))
   await track.recv()
   assert not track._keyframe_requested
   assert track.params.put.call_count == clear_count + 1

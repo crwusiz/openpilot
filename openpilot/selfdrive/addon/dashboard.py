@@ -32,6 +32,7 @@ from nicegui import app, ui
 import requests
 
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import get_connected_pi_ip
+from openpilot.selfdrive.addon.cluster.hdmi_display.maintenance import ACTION_PATH, ClusterActions
 
 # ── 환경 설정 및 유틸리티 ───────────────────────────────────────
 SCRIPTS_PATH = "/data/openpilot/scripts"
@@ -58,6 +59,38 @@ LOG_FILES = {
   "Traffic Debug": LOG_DIR / 'traffic_debug.log',
   "Cluster Debug": LOG_DIR / 'cluster_debug.log',
 }
+CLUSTER_ACTIONS = ClusterActions()
+
+
+@app.get(ACTION_PATH)
+async def cluster_action_status(request: Request):
+  peer = request.client.host if request.client is not None else None
+  try:
+    return JSONResponse(CLUSTER_ACTIONS.status(peer, get_connected_pi_ip()))
+  except PermissionError:
+    return JSONResponse({'error': 'connected_pi_required'}, status_code=403)
+
+
+@app.post(ACTION_PATH)
+async def cluster_action_submit(request: Request):
+  peer = request.client.host if request.client is not None else None
+  try:
+    body = bytearray()
+    async for chunk in request.stream():
+      body.extend(chunk)
+      if len(body) > 1024:
+        return JSONResponse({'error': 'request_too_large'}, status_code=413)
+    payload = json.loads(body)
+    if not isinstance(payload, dict) or set(payload) != {'action', 'request_id'}:
+      raise ValueError('Invalid action request')
+    result = CLUSTER_ACTIONS.submit(payload['action'], peer, payload['request_id'], get_connected_pi_ip())
+    return JSONResponse(result, status_code=202)
+  except PermissionError:
+    return JSONResponse({'error': 'connected_pi_required'}, status_code=403)
+  except (ValueError, TypeError, UnicodeError):
+    return JSONResponse({'error': 'invalid_action'}, status_code=400)
+  except RuntimeError:
+    return JSONResponse({'error': 'busy'}, status_code=409)
 
 
 def _request_camera_stream(cameras: list[str], sdp: str) -> tuple[int, dict]:

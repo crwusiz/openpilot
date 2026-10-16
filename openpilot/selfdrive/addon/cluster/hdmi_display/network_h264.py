@@ -34,13 +34,17 @@ def camera_clock_ns():
   return time.monotonic_ns()
 
 
-def _plain(value):
+def _plain(value, precision=3):
+  # Metres at millimetre precision and HUD values at 0.001 are below visible
+  # resolution. Avoid transmitting full float64 decimal strings at 20 Hz.
   if isinstance(value, dict):
-    return {key: _plain(item) for key, item in value.items()}
+    return {key: _plain(item, precision) for key, item in value.items()}
   if isinstance(value, (list, tuple)):
-    return [_plain(item) for item in value]
+    return [_plain(item, precision) for item in value]
   if hasattr(value, "tolist"):
-    return value.tolist()
+    return _plain(value.tolist(), precision)
+  if isinstance(value, float):
+    return round(value, precision)
   return value
 
 
@@ -49,7 +53,7 @@ def scene_snapshot(config, models, health, degraded=False):
   source_size = models.get_camera_source_size()
   scene = {
     "model_valid": bool(valid and not degraded and source_size is not None),
-    "hud": _plain(hud), "path": _plain({key: path[key] for key in PATH_KEYS if key in path}),
+    "hud": _plain(hud), "path": {key: _plain(path[key], 6 if key == "calib_transform" else 3) for key in PATH_KEYS if key in path},
     "source_size": source_size, "is_metric": bool(config.is_metric),
     "rotate_180": bool(config.rotate_180), "camera_contrast": float(config.camera_contrast),
     "model_age_ms": health.get("model_age_ms"), "car_state_age_ms": health.get("car_state_age_ms"),
@@ -92,6 +96,12 @@ def create_camera_stream(offer_sdp):
       self._keyframe_requested = True
       self._seen_keyframe = False
       super().request_keyframe()
+
+    def request_resync(self):
+      self._ready = False
+      self.resyncs += 1
+      self.request_keyframe()
+      self._keyframe_at = time.monotonic()
 
     def stop(self):
       super().stop()
@@ -187,17 +197,26 @@ class H264NetworkServer:
       await server.wait_closed()
     publish_status(None)
 
-  async def _feedback(self, reader):
+  async def _feedback(self, reader, track):
+    last_keyframe_request = None
     while True:
       kind, _sequence, payload = await read_control(reader)
       if kind != FEEDBACK:
         raise ValueError("Expected H.264 receiver feedback")
       self.screen_off = payload.get("screen_off") is True
+      if payload.get("keyframe_request") is True:
+        now = time.monotonic()
+        if last_keyframe_request is None or now - last_keyframe_request >= 2.0:
+          resync = getattr(track, "request_resync", None)
+          if callable(resync):
+            resync()
+            last_keyframe_request = now
+            flog("[CLUSTER_H264_RECOVERY] Pi requested a fresh IDR; waiting for a complete reference frame.")
       # Only bounded scalar telemetry is accepted; no vehicle messages/params
       # are published from a receiver's input.
       fields = []
       for key in ("video_fps", "display_fps", "rgb_convert_avg_ms", "render_avg_ms", "display_avg_ms", "queue_wait_avg_ms",
-                  "video_age_ms", "state_age_ms", "display_gap_max_ms", "dropped_display"):
+                  "video_age_ms", "state_age_ms", "display_gap_max_ms", "dropped_display", "decoder_errors"):
         value = payload.get(key)
         if type(value) in (float, int) and 0 <= value <= 1e9:
           fields.append(f"{key}={value:.2f}")
@@ -283,7 +302,7 @@ class H264NetworkServer:
       await write_control(writer, ANSWER, {"sdp": answer.sdp, "type": answer.type}, budget_s=2)
       await asyncio.wait_for(stream.wait_for_connection(), 15)
       flog("[CLUSTER_H264_CONNECTED] codec=h264 | transport=webrtc | camera=road | compose=pi | ack=telemetry_only")
-      workers = [asyncio.create_task(self._states(writer, track, stream)), asyncio.create_task(self._feedback(reader)),
+      workers = [asyncio.create_task(self._states(writer, track, stream)), asyncio.create_task(self._feedback(reader, track)),
                  asyncio.create_task(stream.wait_for_disconnection())]
       done, _pending = await asyncio.wait(workers, return_when=asyncio.FIRST_COMPLETED)
       for completed in done:

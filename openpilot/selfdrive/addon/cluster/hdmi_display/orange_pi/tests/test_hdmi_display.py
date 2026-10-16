@@ -1,13 +1,16 @@
 import ctypes
+from concurrent.futures import Future
 import subprocess
 import threading
 from types import SimpleNamespace
 import weakref
+from unittest.mock import Mock
 
 import pytest
 
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import hdmi_display
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_display import HdmiDisplay
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.display_controls import DisplayControls
 
 
 def _fake_pygame(events):
@@ -35,6 +38,36 @@ def test_touch_events_are_forwarded_to_handler():
     "y": 0.75,
   }
   assert touches == [display.last_touch]
+
+
+def test_status_fps_counts_live_presentations_and_expires_after_a_stall():
+  display = HdmiDisplay()
+  display._frame_times.extend([10 + index / 20 for index in range(21)])
+  assert display._display_fps(11.0) == pytest.approx(20.0)
+  assert display._display_fps(11.5) == 0
+  assert display._display_fps(14.0) == 0
+  assert not display._frame_times
+
+
+def test_an_older_status_reply_cannot_unlock_a_newly_queued_touch_action():
+  display = HdmiDisplay()
+  display.controls = DisplayControls(_fake_pygame([]))
+  controls = display.controls
+  controls.menu_visible = True
+  controls.set_actions_available(True)
+  controls._request_action("pi_update")
+  old_reply = Future()
+  old_reply.set_result(({}, {"state": "idle"}))
+  display._panel_future = old_reply
+  next_reply = Future()
+  display._panel_executor = Mock(submit=Mock(return_value=next_reply))
+  display._c4_host = "192.168.0.82"
+
+  display._refresh_panel()
+
+  assert controls.action_busy and controls.action_status["state"] == "checking"
+  assert controls.pending_action is None
+  display._panel_executor.submit.assert_called_once_with(display._panel_worker.exchange, "192.168.0.82", "pi_update")
 
 
 @pytest.mark.parametrize("rotation, expected", [

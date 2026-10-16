@@ -47,31 +47,43 @@ def configure_cluster_runtime() -> None:
 
 
 def main() -> None:
-  configure_cluster_runtime()
-  from openpilot.common.realtime import set_core_affinity
-  from openpilot.common.swaglog import cloudlog
-  from setproctitle import setproctitle
+  from openpilot.selfdrive.addon.cluster.cluster_logging import close_crash_log, close_log, initialize_crash_log, record_crash
 
-  setproctitle("openpilot.selfdrive.addon.cluster_run")
-  cloudlog.bind(daemon="cluster")
-
+  initialize_crash_log()
+  cloudlog = None
+  stage = "runtime bootstrap"
   try:
-    set_core_affinity(CLUSTER_CORES)
-  except Exception as e:
-    cloudlog.warning(f"Failed to set cluster CPU affinity to {CLUSTER_CORES}: {e}")
+    configure_cluster_runtime()
+    stage = "core imports"
+    from openpilot.common.realtime import set_core_affinity
+    from openpilot.common.swaglog import cloudlog
+    from setproctitle import setproctitle
 
-  cloudlog.info("Starting cluster display process...")
+    setproctitle("openpilot.selfdrive.addon.cluster_run")
+    cloudlog.bind(daemon="cluster")
+    try:
+      set_core_affinity(CLUSTER_CORES)
+    except Exception as e:
+      cloudlog.warning(f"Failed to set cluster CPU affinity to {CLUSTER_CORES}: {e}")
 
-  try:
+    cloudlog.info("Starting cluster display process...")
+    stage = "cluster imports"
     from openpilot.selfdrive.addon.cluster.main import cluster_main
 
-    cloudlog.info("Cluster main loop initialized and running.")
+    stage = "cluster startup or main loop"
+    cloudlog.info("Initializing cluster main loop.")
     cluster_main()
-
   except KeyboardInterrupt:
-    cloudlog.info("Cluster process interrupted by user.")
-  except Exception:
-    cloudlog.exception("Cluster crashed")
+    if cloudlog is not None:
+      cloudlog.info("Cluster process interrupted by user.")
+  except Exception as error:
+    record_crash(error, stage)
+    if cloudlog is not None:
+      cloudlog.exception("Cluster crashed")
+    raise
+  finally:
+    close_log()
+    close_crash_log()
 
 
 if __name__ == "__main__":

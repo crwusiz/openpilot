@@ -104,7 +104,7 @@ class H264Scene:
       side_panel_width=side_panel_width, BASEDIR=asset_root.parent, asset_dir=asset_root,
       font_bold=str(asset_root / "fonts" / "Inter-Bold.ttf"),
       font_regular=str(asset_root / "fonts" / "Inter-Regular.ttf"),
-      is_metric=True, speed_unit="km/h", rotate_180=False,
+      is_metric=True, speed_unit="km/h", rotate_180=False, require_assets=True,
     )
     self.renderer = ClusterRenderer(self.config)
     self._lock = threading.Lock()

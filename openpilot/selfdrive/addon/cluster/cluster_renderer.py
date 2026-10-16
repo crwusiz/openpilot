@@ -50,6 +50,14 @@ TRAFFIC_ICONS = {
   2: "traffic_green",
 }
 
+REQUIRED_ICON_NAMES = (
+  *WHEEL_ICONS.values(), *WIFI_ICONS.values(),
+  *TRAFFIC_ICONS.values(), *DISTANCE_ICONS.values(),
+  "accel_pressed", "brake_pressed", "tpms", "gps", "compass",
+  "speed_bump", "school_zone", "speed_camera",
+  "turnsignal_l", "turnsignal_r", "blind_spot_left", "blind_spot_right",
+)
+
 BLINKER_DRAW_COUNT = 10
 BLINKER_SEQUENCE_MS = 400.0
 BLINKER_PAUSE_MS = 250.0
@@ -201,7 +209,10 @@ class ClusterRenderer:
       self.font_label = ImageFont.truetype(self.config.font_bold, 18)
       self.font_warning = ImageFont.truetype(self.config.font_bold, 42)
     except Exception as e:
-      cloudlog.error(f"Failed to load fonts: {e}")
+      message = f"Failed to load cluster fonts: bold={self.config.font_bold}, regular={self.config.font_regular}: {e}"
+      if getattr(config, "require_assets", False):
+        raise RuntimeError(message + "; reinstall the receiver assets and check service-account directory permissions") from e
+      cloudlog.error(message)
       self.font_speed = ImageFont.load_default()
       self.font_current_speed = ImageFont.load_default()
       self.font_value = ImageFont.load_default()
@@ -227,17 +238,18 @@ class ClusterRenderer:
     self._blink_started_at = None
     asset_dir = getattr(self.config, "asset_dir", os.path.join(str(self.config.BASEDIR), "selfdrive", "assets"))
     icon_dir = os.path.join(str(asset_dir), "icons")
-    for name in (
-      *WHEEL_ICONS.values(), *WIFI_ICONS.values(),
-      *TRAFFIC_ICONS.values(), *DISTANCE_ICONS.values(),
-      "accel_pressed", "brake_pressed", "tpms", "gps", "compass",
-      "speed_bump", "school_zone", "speed_camera",
-      "turnsignal_l", "turnsignal_r", "blind_spot_left", "blind_spot_right",
-    ):
+    icon_errors = []
+    for name in REQUIRED_ICON_NAMES:
       try:
-        self.icons[name] = Image.open(os.path.join(icon_dir, f"{name}.png")).convert("RGBA")
-      except Exception:
-        pass
+        with Image.open(os.path.join(icon_dir, f"{name}.png")) as icon:
+          self.icons[name] = icon.convert("RGBA")
+      except Exception as e:
+        icon_errors.append(f"{name}.png: {e}")
+    if icon_errors:
+      message = f"Failed to load cluster icons from {icon_dir}: {'; '.join(icon_errors)}"
+      if getattr(config, "require_assets", False):
+        raise RuntimeError(message + "; reinstall the receiver assets and check service-account directory permissions")
+      cloudlog.error(message)
 
   def _create_base_canvas(self):
     """Build the invariant panel background once instead of every frame."""

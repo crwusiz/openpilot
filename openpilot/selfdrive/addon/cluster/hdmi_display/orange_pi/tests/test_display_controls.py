@@ -39,6 +39,62 @@ def test_default_brightness_is_eighty_percent_and_menu_is_hidden(controls):
   assert state.render_menu() is None
 
 
+def test_day_and_night_presets_keep_the_existing_ten_brightness_steps(controls):
+  state, _, _ = controls
+  _tap(state)
+  assert _tap(state, _target(state, "night"))
+  assert state.brightness == 40 and state.menu_visible
+  assert _tap(state, _target(state, "day"))
+  assert state.brightness == 80
+
+
+def test_action_requires_a_peer_and_only_one_down_gesture_can_start_it(controls):
+  state, pygame, _ = controls
+  _tap(state)
+  assert not _tap(state, _target(state, "update"))
+  assert state.pending_action is None
+  state.set_actions_available(True)
+  assert _touch(state, pygame.FINGERDOWN, _target(state, "update"))
+  assert state.take_action() == "pi_update"
+  assert state.action_busy and state.take_action() is None
+  assert not _touch(state, pygame.FINGERMOTION, _target(state, "upload"))
+  _touch(state, pygame.FINGERUP, _target(state, "upload"))
+  assert not _tap(state, _target(state, "upload"))
+  state.set_action_status({"state": "succeeded", "action": "pi_update"})
+  assert _tap(state, _target(state, "upload"))
+  assert state.take_action() == "upload_logs"
+
+
+def test_running_action_can_be_hidden_and_completion_remains_visible_for_the_timeout(controls):
+  state, _, now = controls
+  state.set_actions_available(True)
+  _tap(state)
+  _tap(state, _target(state, "upload"))
+  now[0] = 100.0
+  assert not state.update() and state.menu_visible
+  _tap(state, _target(state, "close"))
+  assert not state.menu_visible and state.action_busy
+  _tap(state)
+  state.set_action_status({"state": "warning", "action": "upload_logs"})
+  assert "Pi log retry" in state.action_label()
+  now[0] += state.menu_timeout - 0.01
+  assert not state.update()
+  now[0] += 0.02
+  assert state.update() and not state.menu_visible
+
+
+def test_status_updates_do_not_redraw_hidden_video_and_fan_output_is_not_labelled_rpm(controls):
+  state, _, _ = controls
+  revision = state.revision
+  state.set_status({"cpu": 25.0, "temperature": 54.2, "fan_pwm": 60, "fan_rpm": None, "mode": "H.264", "fps": 17.5})
+  assert state.revision == revision
+  assert state.status_labels() == ("CPU 25%", "CPU 54.2°C", "FAN 60% PWM", "Mode H.264", "FPS 17.5")
+  _tap(state)
+  revision = state.revision
+  state.set_status({**state.status, "fan_rpm": 3200})
+  assert state.revision > revision and state.status_labels()[2] == "FAN 3200 RPM"
+
+
 def test_tap_opens_controls_and_close_or_outside_tap_dismisses_them(controls):
   state, _, _ = controls
   assert _tap(state)
@@ -194,10 +250,11 @@ def test_motion_and_unknown_events_cannot_open_menu(controls):
 def test_menu_and_touch_targets_fit_logical_screen(size):
   pygame = SimpleNamespace(FINGERDOWN=1, FINGERMOTION=2, FINGERUP=3)
   state = DisplayControls(pygame, logical_size=size)
-  for name in ("panel", "slider", "off", "close"):
+  for name in ("panel", "slider", "off", "close", "day", "night", "update", "upload"):
     left, top, width, height = state.layout[name]
     assert 0 <= left < left + width <= size[0]
     assert 0 <= top < top + height <= size[1]
+  assert state.layout["panel"][1] >= size[1] / 2 - 12
   _tap(state)
   _tap(state, _target(state, "slider", 0.5))
   assert state.brightness == 60

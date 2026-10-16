@@ -29,6 +29,8 @@ LOCAL_WIFI_TIMEOUT = 2.0
 MAX_LOCAL_WIFI_BYTES = 4 * 1024
 MAX_LOCAL_COMMAND_BYTES = 16 * 1024
 MAX_C4_LOG_BYTES = 32 * 1024 * 1024
+C4_CRASH_LOG_DIRECTORY = Path("/data/log")
+MAX_C4_CRASH_BYTES = 16 * 1024
 C4_LOG_CHUNK_BYTES = 64 * 1024
 C4_LOG_OVERLAP_BYTES = 256
 PEER_PATTERN = re.compile(r"\[CLUSTER_NETWORK_SUCCESS\] Orange Pi connected from ([0-9.]+):[0-9]+\.")
@@ -54,14 +56,58 @@ printf '\n--- Pi current boot ID ---\n'
 cat /proc/sys/kernel/random/boot_id
 printf '\n--- Pi kernel ---\n'
 uname -sr
+printf '\n--- Pi fan boot configuration and active cooling levels ---\n'
+if [ -r /boot/orangepiEnv.txt ]; then
+  sed -n '/^user_overlays=/p' /boot/orangepiEnv.txt
+fi
+for levels in /sys/firmware/devicetree/base/soc*/pwm-fan/cooling-levels; do
+  if [ -r "$levels" ]; then
+    printf 'active_fan_cooling_levels[%s]=' "$levels"
+    od -An -v --endian=big -tu4 "$levels"
+  fi
+done
+for hwmon in /sys/class/hwmon/hwmon*; do
+  [ -r "$hwmon/name" ] && [ "$(cat "$hwmon/name")" = pwmfan ] || continue
+  printf 'fan_device=%s\n' "$hwmon"
+  for field in pwm1 pwm1_enable fan1_input; do
+    if [ -r "$hwmon/$field" ]; then printf '%s=' "$field"; cat "$hwmon/$field"; fi
+  done
+done
+printf '\n--- Pi temperatures and thermal governors ---\n'
+for zone in /sys/class/thermal/thermal_zone*; do
+  [ -r "$zone/temp" ] || continue
+  printf 'zone=%s ' "$zone"
+  for field in type temp policy; do
+    if [ -r "$zone/$field" ]; then printf '%s=' "$field"; tr '\n' ' ' < "$zone/$field"; fi
+  done
+  printf '\n'
+done
 printf '\n--- Receiver service state ---\n'
-systemctl show cluster-hdmi.service --property=ActiveState,SubState,MainPID,ExecMainStartTimestamp,ExecMainStartTimestampMonotonic,ExecMainStatus,NRestarts
+systemctl show cluster-hdmi.service \
+  --property=ActiveState,SubState,MainPID,ExecMainStartTimestamp,ExecMainStartTimestampMonotonic,ExecMainStatus,NRestarts,User,Group
 printf '\n--- Installed receiver source (compare with CLUSTER_RX_BUILD startup snapshot) ---\n'
 if [ -r /opt/cluster-receiver/receiver_build.py ] && command -v python3 >/dev/null 2>&1; then
   python3 /opt/cluster-receiver/receiver_build.py
 else
   printf '%s\n' 'Receiver build helper unavailable; Pi update/restart cannot be verified from this snapshot.'
 fi
+printf '\n--- Receiver asset directory permissions ---\n'
+stat -c '%A %a %U:%G %n' /opt/cluster-receiver /opt/cluster-receiver/assets \
+  /opt/cluster-receiver/assets/fonts /opt/cluster-receiver/assets/icons \
+  /opt/cluster-receiver/assets/fonts/Inter-Bold.ttf /opt/cluster-receiver/assets/fonts/Inter-Regular.ttf
+printf '\n--- Receiver assets as the service account (compare with root snapshot) ---\n'
+receiver_user=$(systemctl show cluster-hdmi.service --property=User --value)
+receiver_user=${receiver_user:-root}
+case "$receiver_user" in
+  *[!a-zA-Z0-9_-]*) printf '%s\n' 'Unsupported receiver account name; service-account snapshot skipped.';;
+  *) if [ "$(id -u)" = 0 ] && command -v runuser >/dev/null 2>&1; then
+       runuser -u "$receiver_user" -- /usr/bin/python3 /opt/cluster-receiver/receiver_build.py
+     elif [ "$(id -un)" = "$receiver_user" ]; then
+       /usr/bin/python3 /opt/cluster-receiver/receiver_build.py
+     else
+       printf '%s\n' 'Service-account snapshot unavailable from this SSH account.'
+     fi;;
+esac
 printf '\n--- Receiver SDL renderer settings ---\n'
 pid=$(systemctl show cluster-hdmi.service --property=MainPID --value)
 case "$pid" in
@@ -323,6 +369,24 @@ def _write_report(output, content):
       temporary.unlink(missing_ok=True)
 
 
+def collect_c4_crashes():
+  rows = []
+  for name in ("cluster_crash.log", "cluster_crash.log.1"):
+    try:
+      with (C4_CRASH_LOG_DIRECTORY / name).open("rb") as file:
+        size = os.fstat(file.fileno()).st_size
+        if size > MAX_C4_CRASH_BYTES:
+          head = file.read(512)
+          file.seek(size - (MAX_C4_CRASH_BYTES - 512))
+          data = head + b"\n[Crash history truncated; latest tail follows]\n" + file.read(MAX_C4_CRASH_BYTES - 512)
+        else:
+          data = file.read(MAX_C4_CRASH_BYTES)
+    except OSError:
+      continue
+    rows += [f"--- {name} ---", data.decode("utf-8", errors="replace")]
+  return "\n".join(rows) if rows else "No retained C4 cluster crash log is available."
+
+
 def collect_pi_log(c4_log, output, environ=None, runner=None):
   """Always write a sidecar, including connection/permission failure details."""
   environ = dict(os.environ if environ is None else environ)
@@ -332,7 +396,8 @@ def collect_pi_log(c4_log, output, environ=None, runner=None):
   report = ["=== Orange Pi cluster diagnostics ===",
             "C4 collection UTC: " + datetime.now(UTC).isoformat(),
             "C4 monotonic uptime: " + f"{started:.3f}s",
-            "C4 log: " + Path(c4_log).name]
+            "C4 log: " + Path(c4_log).name,
+            "\n--- Retained C4 cluster failures (bounded history, may predate this session) ---", collect_c4_crashes()]
   password = environ.get("CLUSTER_PI_PASSWORD", "orangepi")
   def save_progress():
     content = "\n".join(report + ["Collection status: collecting",

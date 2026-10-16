@@ -10,14 +10,25 @@ apt-get install -y python3 python3-pygame iproute2 iw network-manager \
 bash "$PACKAGE_DIR/scripts/prepare_h264.sh"
 
 install -d /opt/cluster-receiver
-if [[ "$PACKAGE_DIR" != "$(cd /opt/cluster-receiver && pwd -P)" ]]; then
-  source "$PACKAGE_DIR/scripts/package_sources.sh"
-  package_collect_files
-  for index in "${!files[@]}"; do
-    package_safe_parents /opt/cluster-receiver "${files[index]}" || fail 'Unsafe installed package path.'
-    install -D -m 644 -- "${file_sources[index]}" "/opt/cluster-receiver/${files[index]}"
+source "$PACKAGE_DIR/scripts/package_sources.sh"
+package_collect_files
+for index in "${!files[@]}"; do
+  package_safe_parents /opt/cluster-receiver "${files[index]}" || fail 'Unsafe installed package path.'
+  relative=${files[index]}
+  directory=/opt/cluster-receiver
+  while [[ "$relative" == */* ]]; do
+    directory="$directory/${relative%%/*}"
+    install -d -m 755 -- "$directory"
+    relative=${relative#*/}
   done
-fi
+  if [[ "$PACKAGE_DIR" != "$(cd /opt/cluster-receiver && pwd -P)" ]]; then
+    install -D -m 644 -- "${file_sources[index]}" "/opt/cluster-receiver/${files[index]}"
+  else
+    # Repair an unpacked standalone bundle in place as well as copied installs.
+    chmod 644 -- "/opt/cluster-receiver/${files[index]}"
+  fi
+done
+bash /opt/cluster-receiver/scripts/fan_setup.sh install
 if [[ -f /etc/systemd/system/cluster-hdmi.service ]]; then
   # Repair a previously installed receiver without rewriting its custom unit,
   # account, HDMI options or boot target, and without restarting its connection.

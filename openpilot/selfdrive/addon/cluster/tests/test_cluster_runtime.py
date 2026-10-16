@@ -1,4 +1,5 @@
 import ast
+import importlib.util
 import json
 from pathlib import Path
 import sys
@@ -94,3 +95,58 @@ def test_invalid_inherited_context_is_removed_without_logging_contents(runtime, 
   runtime.logger.warning.assert_called_once_with("Cannot restore cluster log context: invalid metadata")
   assert "CLUSTER_LOG_CONTEXT" not in runtime.process.environ
   runtime.drop.assert_called_once()
+
+
+@pytest.fixture
+def launcher(monkeypatch):
+  path = Path(__file__).parents[2] / "cluster_run.py"
+  spec = importlib.util.spec_from_file_location("cluster_launcher_under_test", path)
+  module = importlib.util.module_from_spec(spec)
+  spec.loader.exec_module(module)
+  logger = Mock()
+  diagnostics = SimpleNamespace(close_crash_log=Mock(), close_log=Mock(), initialize_crash_log=Mock(), record_crash=Mock())
+  runner = Mock()
+  monkeypatch.setattr(module, "configure_cluster_runtime", Mock())
+  monkeypatch.setitem(sys.modules, "openpilot.selfdrive.addon.cluster.cluster_logging", diagnostics)
+  monkeypatch.setitem(sys.modules, "openpilot.common.realtime", SimpleNamespace(set_core_affinity=Mock()))
+  monkeypatch.setitem(sys.modules, "openpilot.common.swaglog", SimpleNamespace(cloudlog=logger))
+  monkeypatch.setitem(sys.modules, "setproctitle", SimpleNamespace(setproctitle=Mock()))
+  monkeypatch.setitem(sys.modules, "openpilot.selfdrive.addon.cluster.main", SimpleNamespace(cluster_main=runner))
+  return SimpleNamespace(module=module, diagnostics=diagnostics, logger=logger, runner=runner)
+
+
+def test_launcher_captures_bootstrap_failure_before_cloudlog_is_available(launcher):
+  error = RuntimeError("bootstrap failed")
+  launcher.module.configure_cluster_runtime.side_effect = error
+  with pytest.raises(RuntimeError, match="bootstrap failed"):
+    launcher.module.main()
+  launcher.diagnostics.initialize_crash_log.assert_called_once()
+  launcher.diagnostics.record_crash.assert_called_once_with(error, "runtime bootstrap")
+  launcher.diagnostics.close_crash_log.assert_called_once()
+  launcher.diagnostics.close_log.assert_called_once()
+  launcher.runner.assert_not_called()
+
+
+def test_launcher_preserves_cluster_import_failure_and_nonzero_exit(launcher, monkeypatch):
+  monkeypatch.setitem(sys.modules, "openpilot.selfdrive.addon.cluster.main", None)
+  with pytest.raises(ModuleNotFoundError):
+    launcher.module.main()
+  error, stage = launcher.diagnostics.record_crash.call_args.args
+  assert isinstance(error, ModuleNotFoundError)
+  assert stage == "cluster imports"
+  launcher.logger.exception.assert_called_once_with("Cluster crashed")
+
+
+def test_launcher_preserves_runtime_failure_after_backend_cleanup(launcher):
+  error = RuntimeError("backend failed")
+  launcher.runner.side_effect = error
+  with pytest.raises(RuntimeError, match="backend failed"):
+    launcher.module.main()
+  launcher.diagnostics.record_crash.assert_called_once_with(error, "cluster startup or main loop")
+  launcher.diagnostics.close_crash_log.assert_called_once()
+
+
+def test_launcher_normal_exit_does_not_record_a_crash(launcher):
+  launcher.module.main()
+  launcher.diagnostics.record_crash.assert_not_called()
+  launcher.diagnostics.close_crash_log.assert_called_once()

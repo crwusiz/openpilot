@@ -7,7 +7,7 @@ import re
 
 BUILD_FILES = (
   "cluster_protocol.py", "cluster_receiver.py", "display_controls.py", "frame_stream.py",
-  "hdmi_display.py", "receiver_build.py", "tcp_diagnostics.py", "texture_presenter.py",
+  "hdmi_display.py", "receiver_build.py", "tcp_diagnostics.py", "texture_presenter.py", "touch_status.py",
   "h264_protocol.py", "h264_receiver.py", "h264_scene.py", "cluster_renderer.py", "cluster_render_support.py", "receiver_assets.txt",
 )
 

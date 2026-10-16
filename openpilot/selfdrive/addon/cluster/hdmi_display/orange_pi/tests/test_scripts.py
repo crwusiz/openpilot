@@ -136,6 +136,7 @@ def _service_environment(script_sandbox):
                              'WIFI_CONF="$TEST_UNIT_DIR/cluster-hdmi.service.d/wifi.conf"')
                     .replace("WIFI_DISPATCHER=/etc/NetworkManager/dispatcher.d/90-cluster-wifi-power",
                              'WIFI_DISPATCHER="$TEST_DISPATCHER_DIR/90-cluster-wifi-power"'), encoding="utf-8", newline="\n")
+  (scripts / "fan_setup.sh").write_text('printf "%s\\n" "$*" >> fan-setup.log\n', encoding="utf-8", newline="\n")
   (scripts.parent / "cluster_receiver.py").touch()
   shutil.copyfile(SCRIPTS.parent / "cluster-hdmi.service", scripts.parent / "cluster-hdmi.service")
   return {"TEST_STATE_DIR": "state with spaces", "TEST_UNIT_DIR": "units with spaces",
@@ -159,11 +160,13 @@ def test_service_enable_preserves_target_and_desktop_restores_it(script_sandbox)
   assert actions.count("get-default") == 1
   assert actions.index("stop display-manager.service") < actions.index("enable --now cluster-hdmi.service")
   assert "set-default multi-user.target" in actions
+  assert (bin_dir.parent / "fan-setup.log").read_text().splitlines() == ["install", "install"]
 
   result = _run_script(script_sandbox, "service.sh", "desktop", extra_env=environment)
   assert result.returncode == 0, result.stderr
   actions = log.read_text().splitlines()
   assert actions[-3:] == ["disable cluster-hdmi.service", "set-default graphical.target", "start display-manager.service"]
+  assert (bin_dir.parent / "fan-setup.log").read_text().splitlines() == ["install", "install"]
 
 
 @pytest.mark.parametrize("action", ["enable", "restart"])
@@ -442,6 +445,7 @@ def update_sandbox(script_sandbox):
     "MOCK_START_COUNT_FILE": "start-count", "MOCK_INVOCATION_COUNT_FILE": "invocation-count",
     "MOCK_WINDOWS_MODES": "1" if os.name == "nt" else "0",
     "TEST_WIFI_CONF": "unit dropins/wifi.conf", "TEST_WIFI_DISPATCHER": "NM dispatcher/90-cluster-wifi-power",
+    "TEST_FAN_BOOT_FILE": "fan boot environment",
     "CLUSTER_OS_PYTHON": "preflight-python",
   }
   target = root / environment["TEST_TARGET_DIR"]
@@ -456,11 +460,32 @@ def update_sandbox(script_sandbox):
   # The first update must work when the previously installed release has no
   # updater, and recovery must keep working after that release is restored.
   shutil.copyfile(updater, incoming / "scripts" / "update.sh")
-  for name in ("cluster_protocol.py", "frame_stream.py", "display_controls.py", "texture_presenter.py", "tcp_diagnostics.py", "receiver_build.py",
+  for name in ("cluster_protocol.py", "frame_stream.py", "display_controls.py", "texture_presenter.py", "touch_status.py",
+               "tcp_diagnostics.py", "receiver_build.py",
                "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "cluster_renderer.py", "cluster_render_support.py"):
     (incoming / name).write_text("# current runtime dependency\n", encoding="utf-8", newline="\n")
   for name in ("ensure_wifi.sh", "wifi_boot_setup.sh", "wifi_power_save.sh", "prepare_h264.sh", "package_sources.sh"):
     shutil.copyfile(scripts / name, incoming / "scripts" / name)
+  # Exercise the real updater transaction without changing host boot files.
+  # The helper's own sysfs/device-tree behavior is tested separately.
+  (incoming / "scripts" / "fan_setup.sh").write_text('''#!/usr/bin/env bash
+set -euo pipefail
+printf 'fan %s\\n' "$*" >> "$SYSTEMCTL_CALL_LOG"
+case "$1" in
+  snapshot)
+    install -d -- "$2"
+    [[ ! -f "$TEST_FAN_BOOT_FILE" ]] || cp -- "$TEST_FAN_BOOT_FILE" "$2/env"
+    printf 'complete\\n' > "$2/state";;
+  restore)
+    [[ -f "$2/state" ]] || exit 0
+    if [[ -f "$2/env" ]]; then cp -- "$2/env" "$TEST_FAN_BOOT_FILE"
+    else rm -f -- "$TEST_FAN_BOOT_FILE"; fi;;
+  install)
+    printf 'fan minimum 60%%\\n' > "$TEST_FAN_BOOT_FILE"
+    [[ ${MOCK_FAN_INSTALL_ERROR:-} != 1 ]];;
+  *) exit 1;;
+esac
+''', encoding="utf-8", newline="\n")
   (incoming / "receiver_assets.txt").write_text("assets/fonts/Inter-Bold.ttf\nassets/fonts/Inter-Regular.ttf\nassets/icons/steer.png\n")
   for name in (incoming / "receiver_assets.txt").read_text().splitlines():
     path = incoming / name
@@ -509,7 +534,10 @@ if [[ ${MOCK_PREFLIGHT_ERROR:-} == 1 ]]; then printf 'Python preflight failed\\n
     "apt-get": "printf 'optional apt %s\\n' \"$*\" >> \"$SYSTEMCTL_CALL_LOG\"; exit 1",
     "sleep": "exit 0",
     "flock": "[[ ${MOCK_LOCK_ERROR:-} != 1 ]]",
-    "install": '''if [[ ${MOCK_COPY_ERROR:-} == 1 && "$*" == *"incoming with spaces/hdmi_display.py"* && "$*" == *".cluster-file."* ]]; then
+    "install": '''if [[ -n ${MOCK_DIRECTORY_LOG:-} && ${1:-} == -d && ${3:-} == 755 ]]; then
+  printf '%s\\n' "${!#}" >> "$MOCK_DIRECTORY_LOG"
+fi
+if [[ ${MOCK_COPY_ERROR:-} == 1 && "$*" == *"incoming with spaces/hdmi_display.py"* && "$*" == *".cluster-file."* ]]; then
   printf 'Simulated file copy failure\\n' >&2; exit 1
 fi
 if [[ ${MOCK_INTERRUPTED:-} == 1 && "$*" == *"incoming with spaces/hdmi_display.py"* && "$*" == *".cluster-file."* ]]; then
@@ -553,21 +581,26 @@ def test_remote_update_and_manual_rollback_preserve_configuration(update_sandbox
   assert (target / "local-settings.json").read_text() == '{"rotation":270}\n'
   assert (root / "installed.service").read_text() == "keep custom ExecStart, User and Group\n"
   assert (root / "account.conf").read_text() == "keep account drop-in\n"
+  assert (root / environment["TEST_FAN_BOOT_FILE"]).read_text() == "fan minimum 60%\n"
   state = root / environment["TEST_UPDATE_STATE_DIR"]
   backup = state / (state / "latest").read_text().strip()
   assert (backup / "previous" / "cluster_receiver.py").read_text() == "# old\n"
   assert (state / "update.sh").exists()
+  assert (state / "fan_setup.sh").exists()
 
   result = _update(update_sandbox, "rollback")
   assert result.returncode == 0, result.stdout + result.stderr
   assert (target / "cluster_receiver.py").read_text() == "# old\n"
   assert not (target / "new_module.py").exists()
   assert not (target / "scripts" / "update.sh").exists()
+  assert not (target / "scripts" / "fan_setup.sh").exists()
+  assert not (root / environment["TEST_FAN_BOOT_FILE"]).exists()
   assert (state / "update.sh").exists()
   # Recovery always has a standalone script outside the runtime directory.
   result = _run_script(sandbox, f"../../{environment['TEST_UPDATE_STATE_DIR']}/update.sh", "rollback", extra_env=environment, timeout=30)
   assert result.returncode == 0, result.stdout + result.stderr
   assert (target / "cluster_receiver.py").read_text() == "# new\n"
+  assert (root / environment["TEST_FAN_BOOT_FILE"]).read_text() == "fan minimum 60%\n"
   calls = (root / "systemctl.log").read_text().splitlines()
   assert "daemon-reload" in calls
   assert not any(line.startswith(("enable", "disable", "set-default")) or "display-manager" in line for line in calls)
@@ -609,7 +642,9 @@ def test_interrupted_update_can_restore_files_and_running_service(update_sandbox
   assert "start cluster-hdmi.service" in (sandbox[1].parent / "systemctl.log").read_text()
 
 
-@pytest.mark.parametrize("failure", ["MOCK_NEW_START_ERROR", "MOCK_NEW_RUNTIME_ERROR", "MOCK_MISSING_READY", "MOCK_UNSTABLE_INVOCATION", "MOCK_COPY_ERROR"])
+@pytest.mark.parametrize("failure", [
+  "MOCK_NEW_START_ERROR", "MOCK_NEW_RUNTIME_ERROR", "MOCK_MISSING_READY", "MOCK_UNSTABLE_INVOCATION", "MOCK_COPY_ERROR", "MOCK_FAN_INSTALL_ERROR",
+])
 def test_failed_update_restores_previous_files_and_service(update_sandbox, failure):
   sandbox, environment, target, _incoming = update_sandbox
   result = _update(update_sandbox, extra_env={failure: "1"})
@@ -622,6 +657,21 @@ def test_failed_update_restores_previous_files_and_service(update_sandbox, failu
   assert not (state / "latest").exists()
   assert not (state / "recovery-needed").exists()
   assert (state / "update.sh").exists()
+  assert not (sandbox[1].parent / environment["TEST_FAN_BOOT_FILE"]).exists()
+  if failure == "MOCK_FAN_INSTALL_ERROR":
+    calls = (sandbox[1].parent / "systemctl.log").read_text().splitlines()
+    assert calls.index("fan install") < calls.index("stop cluster-hdmi.service")
+    assert calls.count("start cluster-hdmi.service") == 1
+
+
+def test_failed_update_preserves_existing_fan_boot_settings(update_sandbox):
+  sandbox, environment, _target, _incoming = update_sandbox
+  boot = sandbox[1].parent / environment["TEST_FAN_BOOT_FILE"]
+  boot.write_text("custom user overlays and boot settings\n", encoding="utf-8")
+  result = _update(update_sandbox, extra_env={"MOCK_FAN_INSTALL_ERROR": "1"})
+  assert result.returncode != 0
+  assert "Previous receiver files restored" in result.stderr, result.stdout + result.stderr
+  assert boot.read_text() == "custom user overlays and boot settings\n"
 
 
 @pytest.mark.parametrize("failure", ["checksum", "path", "syntax", "MOCK_PREFLIGHT_ERROR", "MOCK_LOCK_ERROR"])
@@ -647,6 +697,7 @@ def test_invalid_update_does_not_stop_running_receiver(update_sandbox, failure):
 
 @pytest.mark.parametrize("helper", [
   "cluster_protocol.py", "frame_stream.py", "display_controls.py", "texture_presenter.py", "tcp_diagnostics.py", "receiver_build.py",
+  "scripts/fan_setup.sh",
 ])
 def test_incomplete_runtime_update_does_not_stop_running_receiver(update_sandbox, helper):
   sandbox, _environment, target, incoming = update_sandbox
@@ -689,6 +740,25 @@ def test_update_and_rollback_restore_binary_assets_with_runtime(update_sandbox):
   assert not (target / "assets/icons/steer.png").exists()
 
 
+def test_update_repairs_root_only_asset_ancestors_for_the_service_account(update_sandbox):
+  sandbox, _environment, target, _incoming = update_sandbox
+  directories = [target / "assets", target / "assets/fonts", target / "assets/icons"]
+  for directory in directories:
+    directory.mkdir(exist_ok=True)
+    directory.chmod(0o700)
+  result = _update(update_sandbox, extra_env={"MOCK_DIRECTORY_LOG": "directory-modes.log"})
+  assert result.returncode == 0, result.stdout + result.stderr
+  repaired = (sandbox[1].parent / "directory-modes.log").read_text().splitlines()
+  # Check the actual installer boundary on Windows too, where chmod cannot
+  # represent Linux directory traversal permissions.
+  for directory in directories:
+    assert directory.relative_to(sandbox[1].parent).as_posix() in repaired
+    if os.name != "nt":
+      assert directory.stat().st_mode & 0o777 == 0o755
+  if os.name != "nt":
+    assert (target / "assets/fonts/Inter-Bold.ttf").stat().st_mode & 0o777 == 0o644
+
+
 @pytest.mark.parametrize("destination", [False, True])
 def test_asset_directory_symlinks_are_rejected_before_service_stop(update_sandbox, destination):
   sandbox, _environment, target, incoming = update_sandbox
@@ -727,6 +797,15 @@ def test_optional_dependency_failure_keeps_update_available_and_precedes_stop(up
   assert (target / "cluster_receiver.py").read_text() == "# new\n"
   calls = (sandbox[1].parent / "systemctl.log").read_text().splitlines()
   assert calls.index("optional_prepare") < calls.index("stop cluster-hdmi.service")
+
+
+def test_fan_boot_preparation_keeps_current_receiver_running(update_sandbox):
+  sandbox, _environment, _target, _incoming = update_sandbox
+  result = _update(update_sandbox)
+  assert result.returncode == 0, result.stdout + result.stderr
+  calls = (sandbox[1].parent / "systemctl.log").read_text().splitlines()
+  assert calls.index("fan install") < calls.index("stop cluster-hdmi.service")
+  assert calls.count("fan install") == 1
 
 
 def test_optional_dependency_installer_warns_without_mutating_service(script_sandbox):
