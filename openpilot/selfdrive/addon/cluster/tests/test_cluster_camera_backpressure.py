@@ -137,3 +137,54 @@ def test_camera_diagnostics_distinguish_received_and_preprocessed_rates(camera_m
   perf = next(message for message in messages if "[CLUSTER_CAM_PERF]" in message)
   assert "receive_fps=20.10" in perf
   assert "skipped=0" not in perf
+
+
+def test_frame_wait_uses_actual_consumption_instead_of_the_previous_loop_snapshot(camera_module, monkeypatch):
+  config = SimpleNamespace(camera_panel_width=4, height=2, camera_contrast=1.0)
+  camera = camera_module.ClusterLiveCamera(config)
+  camera.latest_frame = np.zeros((2, 4, 3), dtype=np.uint8)
+  camera.frame_count = 2  # A second image arrived between the previous wait and render.
+  camera.get_frame()
+
+  def publish(predicate, timeout):
+    assert timeout == 0.05
+    assert not predicate()  # The renderer has already used image 2.
+    camera.frame_count = 3
+    assert predicate()
+    return True
+
+  monkeypatch.setattr(camera._frame_condition, "wait_for", publish)
+  assert camera.wait_for_frame(timeout=0.05) == 3
+
+
+def test_frame_wait_accepts_an_unconsumed_image_or_camera_shutdown_immediately(camera_module):
+  config = SimpleNamespace(camera_panel_width=4, height=2, camera_contrast=1.0)
+  camera = camera_module.ClusterLiveCamera(config)
+  camera.latest_frame = np.zeros((2, 4, 3), dtype=np.uint8)
+  camera.frame_count = 1
+  assert camera.wait_for_frame(timeout=0.0) == 1
+  camera.get_frame()
+  camera.running = False
+  assert camera.wait_for_frame(timeout=0.0) == 1
+
+
+def test_camera_diagnostics_count_new_and_reused_render_images_separately(camera_module):
+  config = SimpleNamespace(camera_panel_width=4, height=2, camera_contrast=1.0)
+  camera = camera_module.ClusterLiveCamera(config)
+  camera._perf_started = 10.0
+  camera.latest_frame = np.zeros((2, 4, 3), dtype=np.uint8)
+  camera.frame_count = 1
+  camera.get_frame()
+  camera.get_frame()
+  camera.frame_count = 2
+  camera.get_frame()
+  camera.get_frame()
+  camera._log_perf(20.0)
+  message = camera_module.flog.call_args.args[0]
+  assert "consumed_fps=0.20" in message
+  assert "reused=2" in message
+  camera.get_frame()
+  camera._log_perf(30.0)
+  message = camera_module.flog.call_args.args[0]
+  assert "consumed_fps=0.00" in message
+  assert "reused=1" in message

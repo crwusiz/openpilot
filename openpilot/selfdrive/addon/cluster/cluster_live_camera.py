@@ -40,6 +40,7 @@ class ClusterLiveCamera:
     self._perf_frames = 0
     self._perf_prepare_time = 0.0
     self._perf_received = self._perf_skipped = 0
+    self._perf_consumed = self._perf_reused = 0
     self._frame_needed = frame_needed
     self._last_frame_needed = False
     self._last_prepare_started = None
@@ -250,9 +251,13 @@ class ClusterLiveCamera:
   def _log_perf(self, now):
     if self._perf_started is not None and now - self._perf_started >= 10.0:
       elapsed = max(now - self._perf_started, 1e-6)
+      with self._frame_condition:
+        consumed, reused = self._perf_consumed, self._perf_reused
+        self._perf_consumed = self._perf_reused = 0
       flog(f"[CLUSTER_CAM_PERF] fps={self._perf_frames / elapsed:.2f} | "
            + f"prepare_avg={self._perf_prepare_time * 1000 / max(self._perf_frames, 1):.1f}ms | "
-           + f"receive_fps={self._perf_received / elapsed:.2f} | skipped={self._perf_skipped}")
+           + f"receive_fps={self._perf_received / elapsed:.2f} | skipped={self._perf_skipped} | "
+           + f"consumed_fps={consumed / elapsed:.2f} | reused={reused}")
       self._perf_started = now
       self._perf_frames = self._perf_received = self._perf_skipped = 0
       self._perf_prepare_time = 0.0
@@ -263,14 +268,19 @@ class ClusterLiveCamera:
 
   def get_frame(self):
     with self._frame_condition:
+      if self.latest_frame is not None:
+        if self.frame_count != self._consumed_frame_count:
+          self._perf_consumed += 1
+        else:
+          self._perf_reused += 1
       self._consumed_frame_count = self.frame_count
       return self.latest_frame
 
-  def wait_for_frame(self, previous_frame_count, timeout):
-    """Wait for a fresh camera frame so the render loop does not resample 20 Hz video out of phase."""
+  def wait_for_frame(self, timeout):
+    """Wait for an image the renderer has not used yet, with a bounded timeout."""
     with self._frame_condition:
       self._frame_condition.wait_for(
-        lambda: not self.running or self.frame_count != previous_frame_count,
+        lambda: not self.running or (self.latest_frame is not None and self.frame_count != self._consumed_frame_count),
         timeout=timeout,
       )
       return self.frame_count
