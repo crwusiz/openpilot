@@ -71,6 +71,8 @@ LEAD_BAR_WIDTH = 1.8  # m
 TEXT_CACHE_MAX_ENTRIES = 256
 TEXT_CACHE_MAX_BYTES = 8 * 1024 * 1024
 
+STOCK_PATH_GRADIENT = [(13, 248, 122, 102), (114, 255, 92, 89), (114, 255, 92, 0)]
+
 
 @lru_cache(maxsize=128)
 def _alpha_blend_lut(color, alpha):
@@ -194,7 +196,6 @@ class ClusterRenderer:
     self.row_h = self.content_h / 3.0
     self.row_centers = tuple(self.content_y + self.row_h * (row + 0.5) for row in range(3))
     self._source_to_panel = np.eye(3, dtype=np.float32)
-    self._blend_filter = FirstOrderFilter(1.0, 0.25, 1.0 / self.config.fps)
     self._lead_vehicles = [LeadVehicle(self.config.fps), LeadVehicle(self.config.fps)]
     self._lead_info = [{}, {}]
     self._last_render_at = None
@@ -324,8 +325,6 @@ class ClusterRenderer:
     previous = self._last_render_at
     self._last_render_at = now
     dt = 1.0 / self.config.fps if previous is None else max(now - previous, 0.001)
-    self._blend_filter.dt = dt
-    self._blend_filter.update_alpha(0.25)
     for lead in self._lead_vehicles:
       for filter_, rc in ((lead.d_filter, 0.2), (lead.y_filter, 0.2), (lead.fade_filter, 0.1)):
         filter_.dt = dt
@@ -441,15 +440,6 @@ class ClusterRenderer:
       cv2.copyTo(blended, strip_mask, strip)
 
   @staticmethod
-  def _blend_colors(begin_colors, end_colors, factor):
-    factor = float(np.clip(factor, 0.0, 1.0))
-    inverse = 1.0 - factor
-    return [
-      tuple(int(inverse * start[channel] + factor * end[channel]) for channel in range(4))
-      for start, end in zip(begin_colors, end_colors, strict=True)
-    ]
-
-  @staticmethod
   def _fill_polygon_gradient(image, polygon, colors, stops, blender=None):
     x, y, width, height = cv2.boundingRect(polygon)
     x0, y0 = max(x, 0), max(y, 0)
@@ -522,10 +512,8 @@ class ClusterRenderer:
         self._fill_polygon_gradient(camera_region, local_path_poly, Colors.STEERING_PRESSED, [0.0, 0.5, 1.0],
                                     blender=getattr(self, "_color_blender", None))
       else:
-        allow_throttle = hud_data.get("allow_throttle", True) or not hud_data.get("longitudinal_control", False)
-        blend_factor = round(self._blend_filter.update(int(allow_throttle)) * 100) / 100
-        colors = self._blend_colors(Colors.NO_THROTTLE, Colors.THROTTLE, blend_factor)
-        self._fill_polygon_gradient(camera_region, local_path_poly, colors, [0.0, 0.5, 1.0], blender=getattr(self, "_color_blender", None))
+        self._fill_polygon_gradient(camera_region, local_path_poly, STOCK_PATH_GRADIENT, [0.0, 0.5, 1.0],
+                                    blender=getattr(self, "_color_blender", None))
 
   def _draw_lane_lines(self, camera_region, path_data, calib_transform):
     lane_lines = path_data.get("lane_lines") or []

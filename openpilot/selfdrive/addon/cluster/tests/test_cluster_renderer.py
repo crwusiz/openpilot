@@ -62,7 +62,6 @@ def test_smoothing_advances_during_transport_backpressure(renderer_module):
   renderer = renderer_module.ClusterRenderer.__new__(renderer_module.ClusterRenderer)
   renderer.config = SimpleNamespace(fps=60)
   renderer._last_render_at = None
-  renderer._blend_filter = renderer_module.FirstOrderFilter(0.0, 0.25, 1 / 60)
   renderer._lead_vehicles = [renderer_module.LeadVehicle(60)]
   lead = renderer._lead_vehicles[0]
   renderer._update_filter_intervals(10.0)
@@ -73,14 +72,12 @@ def test_smoothing_advances_during_transport_backpressure(renderer_module):
 
   assert lead.d_filter.update(20.0) == pytest.approx(15.0)
   assert lead.fade_filter.update(1.0) == pytest.approx(2 / 3)
-  assert renderer._blend_filter.update(1.0) == pytest.approx(0.2 / 0.45)
 
 
 def test_smoothing_recovers_to_normal_frame_interval(renderer_module):
   renderer = renderer_module.ClusterRenderer.__new__(renderer_module.ClusterRenderer)
   renderer.config = SimpleNamespace(fps=20)
   renderer._last_render_at = None
-  renderer._blend_filter = renderer_module.FirstOrderFilter(0.0, 0.25, 1 / 20)
   renderer._lead_vehicles = [renderer_module.LeadVehicle(20)]
   renderer._update_filter_intervals(0.0)
   renderer._update_filter_intervals(2.0)
@@ -89,7 +86,6 @@ def test_smoothing_recovers_to_normal_frame_interval(renderer_module):
   renderer._update_filter_intervals(2.05)
 
   assert renderer._lead_vehicles[0].d_filter.alpha == pytest.approx(0.2)
-  assert renderer._blend_filter.alpha == pytest.approx(1 / 6)
 
 
 def _old_alpha_blend(image, polygon, color, alpha):
