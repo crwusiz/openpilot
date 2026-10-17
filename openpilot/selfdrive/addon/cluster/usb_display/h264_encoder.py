@@ -112,6 +112,7 @@ class HardwareH264Encoder:
     if self.handle is not None:
       return
     device = getattr(self.config, "usb_h264_device", "/dev/v4l/by-path/platform-aa00000.qcom_vidc-video-index1")
+    flog(f"[CLUSTER_USB_H264_STAGE] Opening hardware encoder device={device} coded={self.encoder_width}x{self.encoder_height}...")
     self.handle = self._fn("create")(self.encoder_width, self.encoder_height, self.fps, self.bitrate, 1,
                                      str(device).encode("utf-8"), 2, 0, 0)
     if not self.handle:

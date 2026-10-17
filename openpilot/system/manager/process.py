@@ -17,6 +17,7 @@ from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 
 from openpilot.system.crash import capture_exception
+from openpilot.system.manager.cluster_process import observe_cluster_exit, prepare_cluster_start
 
 
 def launcher(proc: str, name: str) -> None:
@@ -97,6 +98,7 @@ class ManagerProcess(ABC):
         self.proc.join()
 
     ret = self.proc.exitcode
+    observe_cluster_exit(self)
     cloudlog.info(f"{self.name} is dead with {ret}")
 
     if self.proc.exitcode is not None:
@@ -121,6 +123,7 @@ class ManagerProcess(ABC):
     os.kill(self.proc.pid, sig)
 
   def get_process_state_msg(self):
+    observe_cluster_exit(self)
     state = log.ManagerState.ProcessState.new_message()
     state.name = self.name
     if self.proc:
@@ -235,6 +238,7 @@ def ensure_running(procs: ValuesView[ManagerProcess], started: bool, params: Par
       p.stop(block=False)
 
   for p in running:
+    prepare_cluster_start(p, params)
     p.start()
 
   return running

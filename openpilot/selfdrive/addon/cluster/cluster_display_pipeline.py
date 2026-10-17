@@ -184,7 +184,7 @@ class ClusterDisplayPipeline:
         if prepared is not None:
           self._publish_prepared(prepared)
       except Exception as e:
-        flog(f"[CLUSTER_PIPELINE_ERROR] Encoder exception: {e}")
+        flog(f"[CLUSTER_PIPELINE_ERROR] Encoder exception: {type(e).__name__}: {e}")
       finally:
         with self._condition:
           self._encoding = False
@@ -238,7 +238,7 @@ class ClusterDisplayPipeline:
       except Exception as e:
         with self._condition:
           self._send_failures += 1
-        flog(f"[CLUSTER_PIPELINE_ERROR] Sender exception: {e}")
+        flog(f"[CLUSTER_PIPELINE_ERROR] Sender exception: {type(e).__name__}: {e}")
         try:
           reset_connection = getattr(self.display, "reset_connection", None)
           if callable(reset_connection):
@@ -248,7 +248,7 @@ class ClusterDisplayPipeline:
           else:
             self.display.connected = False
         except Exception as close_error:
-          flog(f"[CLUSTER_PIPELINE_ERROR] Display close exception: {close_error}")
+          flog(f"[CLUSTER_PIPELINE_ERROR] Display close exception: {type(close_error).__name__}: {close_error}")
           self.display.connected = False
         self._wait_for_reconnect(0.5)
       finally:

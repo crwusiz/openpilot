@@ -1,4 +1,5 @@
 import faulthandler
+import signal
 
 import pytest
 
@@ -97,3 +98,63 @@ def test_unwritable_crash_path_does_not_mask_original_failure(crash_logs, monkey
   cluster_logging.initialize_crash_log()
   cluster_logging.record_crash(RuntimeError("original failure"), "test")
   assert "original failure" in (crash_logs / "cluster_debug.log").read_text()
+
+
+def test_crash_prints_original_chained_error_to_terminal_even_when_both_logs_unwritable(crash_logs, monkeypatch, capsys):
+  monkeypatch.setattr(cluster_logging, "LOG_FILE", str(crash_logs / "missing/cluster_debug.log"))
+  monkeypatch.setattr(cluster_logging, "CRASH_LOG_FILE", str(crash_logs / "missing/cluster_crash.log"))
+  try:
+    try:
+      raise OSError("encoder device unavailable")
+    except OSError as cause:
+      raise RuntimeError("USB H.264 initialization failed") from cause
+  except RuntimeError as error:
+    cluster_logging.record_crash(error, "cluster startup or main loop")
+  output = capsys.readouterr().err
+  assert "[CLUSTER_CRASH] stage=cluster startup or main loop" in output
+  assert "OSError: encoder device unavailable" in output
+  assert "RuntimeError: USB H.264 initialization failed" in output
+
+
+def test_important_events_flush_to_terminal_but_frame_performance_stays_in_file(crash_logs, capsys):
+  cluster_logging.flog("[CLUSTER_START] transport=usb codec=h264")
+  cluster_logging.flog("[CLUSTER_USB_H264_ERROR] hardware open failed")
+  cluster_logging.flog("[CLUSTER_MAIN] Display mode changed; restarting cluster.")
+  cluster_logging.flog("[CLUSTER_MAIN_PERF] fps=20")
+  output = capsys.readouterr().err
+  assert "transport=usb codec=h264" in output
+  assert "hardware open failed" in output
+  assert "restarting cluster" in output
+  assert "CLUSTER_MAIN_PERF" not in output
+  assert "CLUSTER_MAIN_PERF" in (crash_logs / "cluster_debug.log").read_text()
+
+
+def test_parent_reports_native_signal_and_only_matching_pid_fatal_stack(crash_logs, capsys):
+  (crash_logs / "cluster_crash.log").write_text(
+    "[CLUSTER_PROCESS_START] pid=11 native_bootstrap=1\nFatal Python error: Aborted\nold native stack\n"
+    + "[CLUSTER_PROCESS_START] pid=22 native_bootstrap=1\nFatal Python error: Aborted\ncurrent native stack\n")
+  enabled = faulthandler.is_enabled()
+  cluster_logging.record_process_exit(22, -signal.SIGABRT)
+  output = capsys.readouterr().err
+  assert "[CLUSTER_PROCESS_EXIT] pid=22" in output
+  assert "reason=SIGABRT" in output
+  assert "current native stack" in output
+  assert "old native stack" not in output
+  assert faulthandler.is_enabled() is enabled
+  assert "stage=process exit" in (crash_logs / "cluster_crash.log").read_text()
+
+
+@pytest.mark.parametrize("code,expected_stop,crash", [(0, False, False), (-signal.SIGINT, True, False),
+                                                  (1, False, True), (-signal.SIGSEGV, False, True), (-9, True, True)])
+def test_parent_reports_exit_without_needing_child_traceback(crash_logs, capsys, code, expected_stop, crash):
+  cluster_logging.record_process_exit(123, code, expected_stop)
+  output = capsys.readouterr().err
+  assert "[CLUSTER_PROCESS_EXIT] pid=123" in output
+  assert f"exit_code={code}" in output
+  assert ("[CLUSTER_CRASH]" in (crash_logs / "cluster_crash.log").read_text()) is crash
+
+
+def test_parent_exit_is_visible_even_if_crash_log_cannot_be_written(crash_logs, monkeypatch, capsys):
+  monkeypatch.setattr(cluster_logging, "CRASH_LOG_FILE", str(crash_logs / "missing/cluster_crash.log"))
+  cluster_logging.record_process_exit(123, 1)
+  assert "exit_code=1 reason=error_exit" in capsys.readouterr().err

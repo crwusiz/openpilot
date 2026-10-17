@@ -29,12 +29,14 @@ def run_composed_cluster(config, display, *, wait_for_frame, mode_changed=None, 
 
   flog(f"[CLUSTER_MODE] codec={codec} | transport={config.display_transport} | compose=c4")
   if hasattr(display, 'open'):
+    flog(f"[CLUSTER_MAIN] Opening {config.display_transport}/{codec} display...")
     display.open()
 
   pipeline = ClusterDisplayPipeline(display) if prepare_frame is None else ClusterDisplayPipeline(display, prepare_frame=prepare_frame)
   pipeline.start()
 
   health_guard = ClusterHealthGuard()
+  flog("[CLUSTER_MAIN] Preparing camera, vehicle inputs and renderer...")
   camera = ClusterLiveCamera(config, frame_needed=lambda: not health_guard.degraded and display.connected and pipeline.has_render_capacity())
   models = ClusterModels()
   renderer = ClusterRenderer(config)
@@ -49,7 +51,6 @@ def run_composed_cluster(config, display, *, wait_for_frame, mode_changed=None, 
   signal.signal(signal.SIGINT, _stop_signal)
 
   msg = f"[CLUSTER_MAIN] Starting Main Loop at {fps} FPS..."
-  print(msg)
   flog(msg)
 
   loop_count = 0

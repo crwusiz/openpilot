@@ -40,5 +40,8 @@ def test_h264_composition_keeps_usb_codec_watcher_clock_and_shared_guards(monkey
   assert options["mode_changed"]()
   requested.assert_called_with(config.params)
   display.check_encoder.side_effect = RuntimeError("hardware failed")
+  # A failed H264 encoder must not prevent the user returning to JPEG.
+  assert options["mode_changed"]()
+  requested.return_value = "h264"
   with pytest.raises(RuntimeError, match="hardware failed"):
     options["mode_changed"]()
