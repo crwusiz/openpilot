@@ -230,7 +230,7 @@ read_manifest "$source_dir"
 if [[ $1 == apply ]]; then
   # Rollback manifests may belong to releases predating these helpers. Require
   # the current receiver dependencies only for a newly uploaded package.
-  for name in cluster_protocol.py frame_stream.py display_controls.py texture_presenter.py touch_status.py tcp_diagnostics.py receiver_build.py \
+  for name in cluster_protocol.py frame_stream.py display_controls.py texture_presenter.py touch_status.py tcp_diagnostics.py receiver_build.py receiver_resources.py \
     h264_receiver.py h264_protocol.py h264_scene.py cluster_renderer.py cluster_render_support.py receiver_assets.txt \
     assets/fonts/NotoSansKR-Bold.ttf scripts/prepare_h264.sh scripts/package_sources.sh \
     scripts/update.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh scripts/fan_setup.sh; do

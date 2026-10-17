@@ -236,6 +236,60 @@ def test_decoder_warning_counter_is_scoped_to_running_receiver(fake_aiortc):
   assert receiver.decoder_errors == 1
 
 
+def test_decoder_warning_requests_idr_before_the_periodic_fps_report(monkeypatch, fake_aiortc):
+  monkeypatch.setattr(h264_receiver, "FEEDBACK_INTERVAL", 30.0)
+  c4_sock, pi_sock = socket.socketpair()
+  c4_sock.settimeout(1.0)
+  receiver = h264_receiver.H264Receiver(pi_sock, HELLO_DATA)
+  try:
+    receiver.start()
+    assert read_control(c4_sock)[0] == OFFER
+    c4_sock.sendall(pack_control(ANSWER, {"type": "answer", "sdp": "v=0\r\n"}))
+    wait_until(lambda: receiver.received_frames == 1)
+    logging.getLogger("aiortc.codecs.h264").warning("H264Decoder() failed to decode, skipping package")
+    kind, _, feedback = read_control(c4_sock)
+    assert kind == FEEDBACK and feedback["keyframe_request"] is True
+    assert feedback["decoder_errors"] == 1 and feedback["recovery_reason"] == "decoder_error"
+    assert "display_fps" not in feedback  # Immediate recovery never resets FPS accounting.
+  finally:
+    receiver.close()
+    c4_sock.close()
+    pi_sock.close()
+
+
+def test_decoder_recovery_coalesces_warning_bursts_and_limits_idr_requests(monkeypatch):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  now, sent, delays = [10.0], [], []
+
+  async def pause(delay):
+    delays.append(delay)
+    now[0] += delay
+
+  async def send(kind, payload):
+    assert kind == FEEDBACK
+    sent.append((now[0], payload))
+    if len(sent) == 1:
+      receiver.decoder_errors += 5
+      receiver._recovery_event.set()
+    else:
+      raise asyncio.CancelledError
+
+  async def run():
+    receiver._recovery_event = asyncio.Event()
+    receiver._recovery_event.set()
+    receiver.decoder_errors = 1
+    with pytest.raises(asyncio.CancelledError):
+      await receiver._recover_video()
+
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(h264_receiver, "asyncio", SimpleNamespace(sleep=pause))
+  monkeypatch.setattr(receiver, "_send_control", send)
+  asyncio.run(run())
+  assert delays == [h264_receiver.RECOVERY_INTERVAL]
+  assert [payload["decoder_errors"] for _, payload in sent] == [1, 6]
+  assert sent[1][0] - sent[0][0] == pytest.approx(h264_receiver.RECOVERY_INTERVAL)
+
+
 def run_feedback_ticks(monkeypatch, receiver, tick_count, update):
   now, feedbacks = [0.0], []
 
@@ -292,6 +346,22 @@ def test_receiver_perf_logs_decode_error_delta_over_each_ten_seconds(monkeypatch
   assert feedbacks[-1]["decoder_errors"] == 3
 
 
+def test_receiver_stage_timings_average_only_present_valid_samples(monkeypatch, caplog):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+
+  def update(tick, _now):
+    receiver.record_display(0.0, 0.02, 0.03, scene_timings={"path": 0.01, "hud": float("nan"), "prepare": -1},
+                            display_timings={"rgb_surface": 0.002, "upload": True})
+    if tick % 2 == 0:
+      receiver.record_display(0.0, 0.02, 0.03, scene_timings={"path": 0.02}, display_timings={})
+
+  with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+    run_feedback_ticks(monkeypatch, receiver, 10, update)
+  message = next(record.getMessage() for record in caplog.records if "CLUSTER_H264_RX_PERF" in record.getMessage())
+  assert "scene_path_avg=13.3ms" in message and "hdmi_rgb_surface_avg=2.0ms" in message
+  assert "scene_hud_avg=" not in message and "scene_prepare_avg=" not in message and "hdmi_upload_avg=" not in message
+
+
 @pytest.mark.parametrize("width,height", [(8192, 480), (4096, 2160)])
 def test_decoder_checks_dimensions_before_allocating_rgb(width, height):
   convert = Mock()
@@ -306,6 +376,58 @@ def test_decoder_checks_dimensions_before_allocating_rgb(width, height):
   asyncio.run(consume())
   convert.assert_not_called()
   assert isinstance(receiver._async_error, ConnectionError) and "pixel budget" in str(receiver._async_error)
+
+
+@pytest.mark.parametrize("cancel_during_conversion", [False, True])
+def test_rgb_conversion_leaves_signaling_loop_responsive_and_has_only_one_frame_in_flight(cancel_during_conversion):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  started, release = threading.Event(), threading.Event()
+  owner, conversion_threads, received = threading.get_ident(), [], []
+
+  def convert(**kwargs):
+    assert kwargs == {"format": "rgb24"}
+    conversion_threads.append(threading.get_ident())
+    started.set()
+    assert release.wait(timeout=2.0)
+    return "decoded RGB"
+
+  async def recv():
+    received.append(True)
+    if len(received) > 1:
+      await asyncio.Event().wait()
+    return SimpleNamespace(width=2, height=2, to_ndarray=convert)
+
+  async def run():
+    receiver.stop_event = asyncio.Event()
+    task = asyncio.create_task(receiver._consume_video(SimpleNamespace(recv=recv)))
+    try:
+      for _ in range(200):
+        if started.is_set():
+          break
+        await asyncio.sleep(0.001)
+      assert started.is_set() and conversion_threads == [conversion_threads[0]]
+      assert conversion_threads[0] != owner and len(received) == 1
+      # A control callback still runs while RGB is deliberately blocked.
+      receiver.publish_state({"state_seq": 7})
+      assert receiver.state_revision == 1 and receiver.received_frames == 0
+      if cancel_during_conversion:
+        receiver.closing = True
+        task.cancel()
+      release.set()
+      if not cancel_during_conversion:
+        for _ in range(200):
+          if receiver.received_frames:
+            break
+          await asyncio.sleep(0.001)
+        assert receiver.received_frames == 1 and receiver.latest_rgb[0] == "decoded RGB"
+    finally:
+      release.set()
+      task.cancel()
+      with pytest.raises(asyncio.CancelledError):
+        await task
+    if cancel_during_conversion:
+      assert receiver.received_frames == 0 and receiver.latest_rgb is None
+  asyncio.run(run())
 
 
 def test_decoded_rgb_replacement_preserves_latest_state_arrival_time():
@@ -390,7 +512,8 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
     def update(self, state, received_at):
       self.states.append((state, received_at))
 
-    def set_video(self, rgb, received_at):
+    def set_video(self, rgb, received_at, take_ownership=False):
+      assert take_ownership
       self.videos.append((rgb, received_at))
 
     def render(self):
@@ -433,7 +556,7 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
     def close(self):
       self.closed = True
 
-    def record_display(self, _started, _rendered, _displayed, _video_at, presented):
+    def record_display(self, _started, _rendered, _displayed, _video_at, presented, **_kwargs):
       self.displayed_frames += int(presented)
 
   def present(image):
@@ -455,9 +578,10 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
 
 
 @pytest.mark.parametrize("render_cost,display_cost,screen_off", [
-  (0.025, 0.014, False), (0.08, 0.014, False), (0.025, 0.014, True),
+  (0.025, 0.014, False), (0.037, 0.014, False), (0.045, 0.014, False),
+  (0.08, 0.014, False), (0.025, 0.014, True),
 ])
-def test_render_deadlines_preserve_twenty_hz_phase_and_skip_overloaded_slots(monkeypatch, render_cost, display_cost, screen_off):
+def test_render_deadlines_preserve_phase_without_discarding_a_slot_after_overrun(monkeypatch, render_cost, display_cost, screen_off):
   from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
 
   clock, starts, waits, receivers = [1.0], [], [], []
@@ -506,7 +630,7 @@ def test_render_deadlines_preserve_twenty_hz_phase_and_skip_overloaded_slots(mon
       clock[0] = wake_at
       return None, None
 
-    def record_display(self, *_args):
+    def record_display(self, *_args, **_kwargs):
       pass
 
     def close(self):
@@ -524,7 +648,7 @@ def test_render_deadlines_preserve_twenty_hz_phase_and_skip_overloaded_slots(mon
   if screen_off:
     assert not starts
     assert all(timeout == 0.02 for timeout in waits)
-  elif render_cost < 0.05:
+  elif render_cost + display_cost < 0.05:
     # Replay the previous fixed-poll/reset-to-now policy with the same
     # arrivals and work. A pending picture can miss the next 50ms slot.
     legacy_now, legacy_last, legacy_index, legacy_frames = 1.0, 0.0, 0, 0
@@ -547,5 +671,10 @@ def test_render_deadlines_preserve_twenty_hz_phase_and_skip_overloaded_slots(mon
     assert (len(starts) - 1) / (starts[-1] - starts[0]) >= 19.5
     assert any(0.0 < timeout < 0.015 for timeout in waits)
   else:
-    assert 45 <= len(starts) <= 51
-    assert all(second - first >= 0.099 for first, second in zip(starts, starts[1:], strict=False))
+    work = render_cost + display_cost
+    # Work that just exceeds 50 ms must run near its actual throughput,
+    # instead of alternating between two 50 ms deadlines (~10 FPS).
+    expected_fps = 1.0 / work
+    actual_fps = (len(starts) - 1) / (starts[-1] - starts[0])
+    assert actual_fps >= expected_fps * 0.97
+    assert all(second - first >= work - 1e-6 for first, second in zip(starts, starts[1:], strict=False))

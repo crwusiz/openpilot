@@ -98,17 +98,17 @@ def test_scene_rounding_reduces_payload_without_visible_projection_error():
 async def test_receiver_recovery_requests_are_rate_limited_and_decoder_errors_are_logged(monkeypatch):
   messages = []
   monkeypatch.setattr(network, "flog", messages.append)
-  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=Mock(side_effect=[10.0, 10.4, 11.9, 12.2])))
+  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=Mock(side_effect=[10.0, 10.1, 10.49, 10.5])))
   monkeypatch.setattr(network, "read_control", AsyncMock(side_effect=[
     (wire.FEEDBACK, 0, {"keyframe_request": True, "decoder_errors": 2}),
     (wire.FEEDBACK, 1, {"keyframe_request": True}), (wire.FEEDBACK, 2, {"keyframe_request": True}),
     (wire.FEEDBACK, 3, {"keyframe_request": True}), EOFError(),
   ]))
-  track = SimpleNamespace(request_resync=Mock())
+  track = SimpleNamespace(request_recovery=Mock())
   server = network.H264NetworkServer(config(), models())
   with pytest.raises(EOFError):
     await server._feedback(None, track)
-  assert track.request_resync.call_count == 2
+  assert track.request_recovery.call_count == 2
   assert sum("[CLUSTER_H264_RECOVERY]" in message for message in messages) == 2
   assert any("decoder_errors=2.00" in message for message in messages)
 
@@ -291,8 +291,12 @@ async def test_native_camera_waits_for_idr_and_resynchronizes_after_encoded_refe
   assert track.resyncs == 2 and track.video_frames == 3
   assert not track._keyframe_requested
   track.params.put.assert_called_with("LivestreamRequestKeyframe", False, block=False)
-  track.request_resync()
+  track.request_recovery()
   packets.extend([packet(17), packet(18, key=True)])
+  # Requesting an IDR after a receiver decode error must not discard the
+  # healthy C4 source's P frames and manufacture an additional freeze.
+  assert bytes(await track.recv()) == b"encoded"
+  assert track.video_frame_id == 17 and track.resyncs == 3
   assert bytes(await track.recv()) == b"sps-ppsencoded"
   assert track.video_frame_id == 18 and track.resyncs == 3
   clear_count = track.params.put.call_count

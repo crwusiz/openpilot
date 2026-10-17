@@ -271,6 +271,24 @@ def test_scene_owns_input_pixels_and_state_and_caches_only_current_video(scene, 
   assert not np.array_equal(np.asarray(first), np.asarray(second))
 
 
+@pytest.mark.parametrize("contiguous", [False, True])
+def test_scene_can_receive_exclusive_rgb_ownership_without_a_second_frame_copy(scene, contiguous):
+  video = np.full((720, 1280, 3), 50, np.uint8)
+  if not contiguous:
+    video = video[:, ::-1]
+  scene.update(snapshot())
+  scene.set_video(video, received_at=10.0, take_ownership=True)
+  assert scene._video.flags.c_contiguous
+  assert np.shares_memory(scene._video, video) is contiguous
+  first = scene.render()
+  retained = np.asarray(first).copy()
+  scene.set_video(np.full((720, 1280, 3), 150, np.uint8), received_at=10.1, take_ownership=True)
+  scene.render(now=10.1)
+  np.testing.assert_array_equal(np.asarray(first), retained)
+  assert scene._video_received_at == 10.1
+  assert scene.last_frame_timings["camera_panel"] >= 0
+
+
 def test_units_and_sender_rotation_match_the_jpeg_contract(scene, monkeypatch):
   speeds = _speed_values(scene, monkeypatch)
   scene.set_video(np.full((720, 1280, 3), 80, np.uint8))

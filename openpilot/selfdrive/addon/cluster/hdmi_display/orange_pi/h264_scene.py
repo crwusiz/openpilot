@@ -144,7 +144,13 @@ class H264Scene:
     with self._lock:
       self._snapshot, self._state_received_at = snapshot, arrival
 
-  def set_video(self, rgb, received_at=None):
+  def set_video(self, rgb, received_at=None, *, take_ownership=False):
+    """Retain RGB pixels, copying unless the caller transfers a private buffer.
+
+    The receiver's RGB conversion returns a distinct buffer for each decoded
+    picture. It can transfer that buffer without copying it a second time;
+    callers that retain or reuse their pixels keep the defensive default.
+    """
     if hasattr(rgb, "to_ndarray"):
       rgb = rgb.to_ndarray(format="rgb24")
     rgb = np.asarray(rgb)
@@ -152,9 +158,10 @@ class H264Scene:
       not 2 <= dimension <= 4096 for dimension in rgb.shape[:2]
     ):
       raise ValueError("Decoded video must be a bounded RGB24 frame")
-    # Decode libraries can reuse their own storage. Retain one owned frame so
-    # metadata updates and subsequent decodes cannot change an active render.
-    rgb = np.array(rgb, copy=True, order="C")
+    if take_ownership:
+      rgb = np.ascontiguousarray(rgb)
+    else:
+      rgb = np.array(rgb, copy=True, order="C")
     arrival = _arrival_time(received_at, self.clock)
     with self._lock:
       self._video, self._video_received_at = rgb, arrival
@@ -224,11 +231,13 @@ class H264Scene:
     path = snapshot.get("path", {"path_x": [], "path_y": [], "path_z": [], "calib_transform": None})
     model_valid = (state_fresh and video_fresh and snapshot.get("model_valid") is True
                    and self._source_input_fresh(snapshot, "model_age_ms", elapsed_ms))
+    panel_started = time.monotonic()
     if video_fresh and snapshot.get("source_size") is not None:
       panel, transform = self._camera_panel(rgb, snapshot["source_size"], video_generation)
     else:
       panel, transform = None, np.eye(3, dtype=np.float32)
       model_valid = False
+    panel_elapsed = time.monotonic() - panel_started
     image = self.renderer.render(_SceneCamera(panel, transform), _SceneModels(model_valid, hud, path))
     if not state_fresh and panel is not None:
       self.renderer._centered(ImageDraw.Draw(image), self.renderer.camera_x + self.renderer.camera_w / 2,
@@ -236,5 +245,6 @@ class H264Scene:
                               "WAITING FOR LIVE DATA...", self.renderer.font_warning, Colors.RED,
                               stroke_width=2, stroke_fill=Colors.BLACK)
     self.last_frame_timings = dict(self.renderer.last_frame_timings)
+    self.last_frame_timings["camera_panel"] = panel_elapsed
     self.last_status = {"state_fresh": state_fresh, "video_fresh": video_fresh, "model_valid": bool(model_valid)}
     return image.transpose(Image.Transpose.ROTATE_180) if self.config.rotate_180 else image

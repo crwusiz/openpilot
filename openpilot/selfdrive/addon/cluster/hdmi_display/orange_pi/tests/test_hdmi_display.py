@@ -1,5 +1,6 @@
 import ctypes
 from concurrent.futures import Future
+import gc
 import subprocess
 import threading
 from types import SimpleNamespace
@@ -333,6 +334,29 @@ def test_screen_off_skips_rgb_conversion_and_waits_for_new_live_frame_after_wake
     assert not display.screen_off
     assert display.send_rgb(Image.new("RGB", (384, 96), (0, 255, 0)))
     assert display.last_frame_presented
+  finally:
+    display.close()
+
+
+@pytest.mark.parametrize("mode", ["RGB", "RGBA"])
+def test_rgb_texture_surface_retains_owned_export_without_copying_it_again(raster_pygame, monkeypatch, mode):
+  from PIL import Image
+
+  pygame = raster_pygame
+  display = HdmiDisplay(32, 16, fullscreen=False, pygame_module=pygame, renderer_mode="surface", brightness=100)
+  assert display.open()
+  # Keep the accelerated branch's unconverted source Surface; fake only SDL
+  # presentation so the bytes/surface lifetime is exercised on every platform.
+  display._presenter = SimpleNamespace(present=Mock(return_value={"flip": 0.0}), close=Mock())
+  monkeypatch.setattr(pygame.image, "frombytes", lambda *_args: pytest.fail("H.264 should not copy exported pixels again"))
+  source = Image.new(mode, (32, 16), (40, 120, 210) if mode == "RGB" else (40, 120, 210, 255))
+  expected = source.tobytes()
+  try:
+    assert display.send_rgb(source)
+    source.paste((0, 0, 0), (0, 0, *source.size))
+    del source
+    gc.collect()
+    assert pygame.image.tobytes(display._latest_frame, mode) == expected
   finally:
     display.close()
 

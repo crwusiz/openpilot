@@ -432,9 +432,10 @@ class HdmiDisplay:
       started = time.monotonic()
       if image.mode not in ("RGB", "RGBA"):
         image = image.convert("RGB")
-      # Own the pixel bytes through the Surface. The next WebRTC frame and PIL
-      # scene may reuse their source storage after this synchronous handoff.
-      frame = self._pygame.image.frombytes(image.tobytes(), image.size, image.mode)
+      # PIL exports owned immutable bytes. The Surface retains that buffer;
+      # frombuffer avoids frombytes' second full-frame allocation and copy.
+      # Subsequent PIL/decoder updates cannot mutate this retained snapshot.
+      frame = self._pygame.image.frombuffer(image.tobytes(), image.size, image.mode)
       converted_at = time.monotonic()
       if self._presenter is None:
         frame = frame.convert()

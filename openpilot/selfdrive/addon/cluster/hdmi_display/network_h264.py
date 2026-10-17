@@ -97,8 +97,10 @@ def create_camera_stream(offer_sdp):
       self._seen_keyframe = False
       super().request_keyframe()
 
-    def request_resync(self):
-      self._ready = False
+    def request_recovery(self):
+      # A decoder/network error at the receiver does not invalidate the
+      # encoder's local reference chain. Keep sending until the fresh IDR
+      # arrives; only an actual source gap/stale frame gates _ready below.
       self.resyncs += 1
       self.request_keyframe()
       self._keyframe_at = time.monotonic()
@@ -206,12 +208,12 @@ class H264NetworkServer:
       self.screen_off = payload.get("screen_off") is True
       if payload.get("keyframe_request") is True:
         now = time.monotonic()
-        if last_keyframe_request is None or now - last_keyframe_request >= 2.0:
-          resync = getattr(track, "request_resync", None)
+        if last_keyframe_request is None or now - last_keyframe_request >= 0.5:
+          resync = getattr(track, "request_recovery", None)
           if callable(resync):
             resync()
             last_keyframe_request = now
-            flog("[CLUSTER_H264_RECOVERY] Pi requested a fresh IDR; waiting for a complete reference frame.")
+            flog("[CLUSTER_H264_RECOVERY] Pi requested a fresh IDR; preserving the live source reference chain.")
       # Only bounded scalar telemetry is accepted; no vehicle messages/params
       # are published from a receiver's input.
       fields = []

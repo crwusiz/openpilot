@@ -11,14 +11,19 @@ import time
 
 try:
   from .h264_protocol import ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, STATE, decode_payload, pack_control, unpack_control_header
+  from .receiver_resources import ReceiverResourceSampler, format_receiver_resources
 except ImportError:
   from h264_protocol import ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, STATE, decode_payload, pack_control, unpack_control_header
+  from receiver_resources import ReceiverResourceSampler, format_receiver_resources
 
 
 LOG = logging.getLogger("cluster_receiver")
 NEGOTIATION_TIMEOUT = 15.0
 STREAM_TIMEOUT = 8.0
 FEEDBACK_INTERVAL = 1.0
+RECOVERY_INTERVAL = 0.5
+STAGE_NAMES = {"scene": ("camera_copy", "camera_panel", "snapshot", "path", "path_cpu", "hud"),
+               "hdmi": ("rgb_surface", "convert", "upload", "draw", "flip")}
 
 
 class H264ConfigurationError(RuntimeError):
@@ -36,6 +41,12 @@ class _DecoderErrorHandler(logging.Handler):
     if "failed to decode" in record.getMessage().lower():
       with self.receiver.condition:
         self.receiver.decoder_errors += 1
+      # Decoder warnings originate on aiortc's decode worker. Wake the
+      # signaling loop without waiting for the next one-second FPS report.
+      loop, event = self.receiver.loop, self.receiver._recovery_event
+      if loop is not None and event is not None:
+        with contextlib.suppress(RuntimeError):
+          loop.call_soon_threadsafe(event.set)
 
 
 def validate_hello(hello):
@@ -71,9 +82,12 @@ class H264Receiver:
     self._main_task = None
     self._async_error = None
     self._send_lock = None
+    self._recovery_event = None
+    self._recovered_decoder_errors = 0
     self._sequence = 0
     self._stats = self._empty_stats()
     self._last_display_at = None
+    self._resources = ReceiverResourceSampler()
     self.thread = threading.Thread(target=self._run_thread, name="cluster-webrtc-receiver", daemon=True)
 
   def start(self):
@@ -81,7 +95,11 @@ class H264Receiver:
 
   @staticmethod
   def _empty_stats():
-    return dict.fromkeys(("render_count", "render", "display", "queue_count", "queue", "convert_count", "convert", "gap"), 0.0)
+    keys = ["render_count", "render", "display", "queue_count", "queue", "convert_count", "convert", "gap"]
+    for prefix, names in STAGE_NAMES.items():
+      for name in names:
+        keys.extend((f"{prefix}_{name}", f"{prefix}_{name}_count"))
+    return dict.fromkeys(keys, 0.0)
 
   def _run_thread(self):
     decoder_log = logging.getLogger("aiortc.codecs.h264")
@@ -115,11 +133,18 @@ class H264Receiver:
       self._stats["convert"] += convert_elapsed
       self.condition.notify_all()
 
-  def record_display(self, render_started, rendered_at, displayed_at, video_received_at=None, presented=True):
+  def record_display(self, render_started, rendered_at, displayed_at, video_received_at=None, presented=True,
+                     scene_timings=None, display_timings=None):
     with self.condition:
       self._stats["render_count"] += 1
       self._stats["render"] += max(0.0, rendered_at - render_started)
       self._stats["display"] += max(0.0, displayed_at - rendered_at)
+      for prefix, timings in (("scene", scene_timings), ("hdmi", display_timings)):
+        for name in STAGE_NAMES[prefix]:
+          value = timings.get(name) if isinstance(timings, dict) else None
+          if type(value) in (int, float) and math.isfinite(value) and 0 <= value <= 10:
+            self._stats[f"{prefix}_{name}"] += value
+            self._stats[f"{prefix}_{name}_count"] += 1
       if video_received_at is not None:
         self._stats["queue_count"] += 1
         self._stats["queue"] += max(0.0, render_started - video_received_at)
@@ -187,7 +212,10 @@ class H264Receiver:
         # aiortc/PyAV has already decoded all dependent pictures. Replacing
         # this RGB slot never drops an H.264 reference packet before decoding.
         started = time.monotonic()
-        rgb = frame.to_ndarray(format="rgb24")
+        # Keep UDP/RTCP and metadata reads responsive while libswscale builds
+        # RGB. Await each conversion before receiving the next decoded frame:
+        # there is only one conversion in flight, in reference-decoded order.
+        rgb = await asyncio.to_thread(frame.to_ndarray, format="rgb24")
         self.publish_rgb(rgb, convert_elapsed=time.monotonic() - started)
     except asyncio.CancelledError:
       raise
@@ -203,6 +231,24 @@ class H264Receiver:
         raise RuntimeError(f"C4 H.264 error: {str(payload.get('error', payload))[:300]}")
       else:
         raise ValueError(f"Unexpected H.264 control message: {kind}")
+
+  async def _recover_video(self):
+    last_request_at = None
+    while True:
+      await self._recovery_event.wait()
+      self._recovery_event.clear()
+      if last_request_at is not None:
+        delay = last_request_at + RECOVERY_INTERVAL - time.monotonic()
+        if delay > 0:
+          await asyncio.sleep(delay)
+      with self.condition:
+        errors = self.decoder_errors
+      if errors <= self._recovered_decoder_errors:
+        continue
+      await self._send_control(FEEDBACK, {"screen_off": self.screen_off, "keyframe_request": True,
+                                          "decoder_errors": errors, "recovery_reason": "decoder_error"})
+      self._recovered_decoder_errors = errors
+      last_request_at = time.monotonic()
 
   async def _feedback(self):
     previous_at = time.monotonic()
@@ -225,7 +271,7 @@ class H264Receiver:
           "display_fps": (displayed - previous_display) / max(now - previous_at, 0.001),
           "decoder_backend": "aiortc_pyav_software",
           "decoder_errors": decoder_errors,
-          "keyframe_request": (decoder_errors > previous_decoder_errors
+          "keyframe_request": (decoder_errors > max(previous_decoder_errors, self._recovered_decoder_errors)
                                or (self.last_video_at is not None and video_stale)),
           "dropped_display": self.dropped_frames,
           "render_avg_ms": stats["render"] * 1000 / max(stats["render_count"], 1),
@@ -243,10 +289,13 @@ class H264Receiver:
         logged_stats[key] = max(logged_stats[key], stats[key]) if key == "gap" else logged_stats[key] + stats[key]
       if now - logged_at >= 10.0:
         elapsed = now - logged_at
+        stages = "".join(f" | {prefix}_{name}_avg={logged_stats[f'{prefix}_{name}'] * 1000 / count:.1f}ms"
+                         for prefix, names in STAGE_NAMES.items() for name in names
+                         if (count := logged_stats[f"{prefix}_{name}_count"]) > 0)
         LOG.info("[CLUSTER_H264_RX_PERF] rx_fps=%.2f | display_fps=%.2f | dropped_display=%d | "
                  + "render_avg=%.1fms | display_avg=%.1fms | queue_wait_avg=%.1fms | rgb_convert_avg=%.1fms | "
                  + "display_gap_max=%.1fms | video_stale=%d | state_stale=%d | "
-                 + "decoder_errors=%d | decoder=aiortc_pyav_software | screen_off=%d | mode=webrtc",
+                 + "decoder_errors=%d | decoder=aiortc_pyav_software | screen_off=%d | mode=webrtc%s",
                  (rx - logged_rx) / elapsed, (displayed - logged_display) / elapsed,
                  payload["dropped_display"] - logged_dropped,
                  logged_stats["render"] * 1000 / max(logged_stats["render_count"], 1),
@@ -254,7 +303,8 @@ class H264Receiver:
                  logged_stats["queue"] * 1000 / max(logged_stats["queue_count"], 1),
                  logged_stats["convert"] * 1000 / max(logged_stats["convert_count"], 1),
                  logged_stats["gap"] * 1000, payload["video_stale"], payload["state_stale"],
-                 decoder_errors - logged_decoder_errors, payload["screen_off"])
+                 decoder_errors - logged_decoder_errors, payload["screen_off"], stages)
+        LOG.info("[CLUSTER_PI_RESOURCE_PERF] %s", format_receiver_resources(self._resources.sample()))
         logged_at, logged_rx, logged_display, logged_dropped = now, rx, displayed, payload["dropped_display"]
         logged_decoder_errors = decoder_errors
         logged_stats = self._empty_stats()
@@ -280,6 +330,9 @@ class H264Receiver:
     self._main_task = asyncio.current_task()
     self.stop_event = asyncio.Event()
     self._send_lock = asyncio.Lock()
+    self._recovery_event = asyncio.Event()
+    if self.decoder_errors:
+      self._recovery_event.set()
     if self.closing:
       return
     self.sock.setblocking(False)
@@ -333,6 +386,7 @@ class H264Receiver:
       LOG.info("[CLUSTER_H264_MODE] WebRTC H.264, decoder=aiortc_pyav_software, TCP=metadata only")
       started = time.monotonic()
       tasks = [asyncio.create_task(self._read_states()), asyncio.create_task(self._feedback()),
+               asyncio.create_task(self._recover_video()),
                asyncio.create_task(self._watchdog(started)), asyncio.create_task(self.stop_event.wait())]
       done, _pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
       for task in done:
@@ -412,7 +466,7 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         scene.update(state[0], received_at=state[1])
         pending_render = True
       if rgb is not None:
-        scene.set_video(rgb[0], received_at=rgb[1])
+        scene.set_video(rgb[0], received_at=rgb[1], take_ownership=True)
         pending_video_at = rgb[1]
         pending_render = True
       now = time.monotonic()
@@ -437,19 +491,22 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
           raise RuntimeError("Unable to display H.264 cluster frame")
         displayed_at = time.monotonic()
         receiver.record_display(render_started, rendered_at, displayed_at, pending_video_at,
-                                bool(getattr(display, "last_frame_presented", True)))
+                                bool(getattr(display, "last_frame_presented", True)),
+                                scene_timings=getattr(scene, "last_frame_timings", None),
+                                display_timings=getattr(display, "last_frame_timings", None))
         if waiting_shown:
           LOG.info("[CLUSTER_H264_RESUMED] Live WebRTC video received")
         waiting_shown = False
         pending_render = False
         pending_video_at = None
-        # Keep the original render phase when event arrivals vary. Skip missed
-        # slots after slow renders rather than submitting a catch-up burst.
+        # Preserve the phase while work fits the frame budget. If a frame
+        # overruns it, the newest pending decoded picture is immediately due:
+        # rounding to the following slot throws away another whole 50 ms.
+        # There is still one render at a time and no encoded frame dropping.
         if next_render_at is None:
           next_render_at = render_started
         next_render_at += render_interval
-        if next_render_at <= displayed_at:
-          next_render_at += (math.floor((displayed_at - next_render_at) / render_interval) + 1) * render_interval
+        next_render_at = max(next_render_at, displayed_at)
       if max_frames is not None and receiver.received_frames >= max_frames:
         return receiver.received_frames
       if receiver.done:

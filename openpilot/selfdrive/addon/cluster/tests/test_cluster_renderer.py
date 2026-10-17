@@ -360,19 +360,36 @@ def test_render_reports_path_cpu_separately_from_waits_and_hud(renderer_module, 
   assert renderer.last_frame_timings["hud"] == pytest.approx(0.010)
 
 
-@pytest.mark.parametrize("x", [4, 80, 156])
-def test_lead_labels_use_cluster_font_and_preserve_fading_at_camera_edges(renderer_module, monkeypatch, x):
+@pytest.mark.parametrize("x", [-30, 4, 80, 156, 195])
+@pytest.mark.parametrize("opacity", [0.1, 0.5, 1.0])
+@pytest.mark.parametrize("metric", [False, True])
+def test_lead_labels_use_cluster_font_and_preserve_fading_at_camera_edges(renderer_module, monkeypatch, x, opacity, metric):
   renderer = renderer_module.ClusterRenderer.__new__(renderer_module.ClusterRenderer)
-  renderer.config = SimpleNamespace(is_metric=True)
+  renderer.config = SimpleNamespace(is_metric=metric)
   renderer.camera_x = renderer.camera_y = 0
   renderer.font_unit = ImageFont.truetype(str(Path(__file__).parents[3] / "assets/fonts/NotoSansKR-Bold.ttf"), 20)
+  renderer._text_cache, renderer._text_cache_bytes = OrderedDict(), 0
   renderer._lead_vehicles = [SimpleNamespace(
     bar=np.array([[x - 10, 45], [x - 10, 55], [x + 10, 55], [x + 10, 45]]),
-    fade_filter=SimpleNamespace(x=0.5),
+    fade_filter=SimpleNamespace(x=opacity),
   )]
   renderer._lead_info = [{"d_rel": 23, "v_rel": -2}]
   renderer._fill_polygon_alpha = Mock()
   monkeypatch.setattr(renderer_module, "Colors", SimpleNamespace(RED=(255, 0, 0), WHITE=(255, 255, 255), BLACK=(0, 0, 0)))
+  camera = np.random.default_rng(42).integers(0, 256, (100, 160, 3), dtype=np.uint8)
+  expected = camera.copy()
+  speed_label = "29 km/h" if metric else "18 mph"
+  for label, baseline_y in (("23 m", 32), (speed_label, 72)):
+    left, top, right, bottom = renderer.font_unit.getbbox(label, anchor="ms", stroke_width=2)
+    x0, y0 = max(0, x + left), max(0, baseline_y + top)
+    x1, y1 = min(160, x + right), min(100, baseline_y + bottom)
+    if x0 >= x1 or y0 >= y1:
+      continue
+    roi = expected[y0:y1, x0:x1]
+    overlay = Image.fromarray(roi)
+    ImageDraw.Draw(overlay).text((x - x0, baseline_y - y0), label, font=renderer.font_unit,
+                                fill=(255, 255, 255), anchor="ms", stroke_width=2, stroke_fill=(0, 0, 0))
+    cv2.addWeighted(np.asarray(overlay), opacity, roi, 1.0 - opacity, 0, dst=roi)
   labels = []
   original_text = ImageDraw.ImageDraw.text
 
@@ -382,12 +399,11 @@ def test_lead_labels_use_cluster_font_and_preserve_fading_at_camera_edges(render
     return original_text(draw, position, label, **kwargs)
 
   monkeypatch.setattr(ImageDraw.ImageDraw, "text", draw_text)
-  camera = np.full((100, 160, 3), 40, dtype=np.uint8)
-
   renderer._draw_lead_indicator(camera, {"v_ego": 10})
-
-  assert labels == ["23 m", "29 km/h"]
-  assert camera.min() < 40 < camera.max() <= 148
+  np.testing.assert_array_equal(camera, expected)
+  assert labels == ["23 m", "23 m", speed_label, speed_label]
+  renderer._draw_lead_indicator(camera, {"v_ego": 10})
+  assert labels == ["23 m", "23 m", speed_label, speed_label]
 
 
 def _previous_centered(draw, cx, cy, value, font, color, stroke_width, stroke_fill):

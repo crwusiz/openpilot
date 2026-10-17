@@ -124,23 +124,24 @@ class ColorBlendWorkspace:
 class TextGlyph:
   """Rasterize a glyph once, then recolor its reusable sprite with PIL masks."""
 
-  def __init__(self, text, font, stroke_width):
+  def __init__(self, text, font, stroke_width, anchor="mm"):
     # Retain the font while its identity is used by the renderer cache.
     self.font = font
     probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
-    bbox = probe.textbbox((0, 0), text, font=font, anchor="mm", stroke_width=stroke_width)
+    bbox = probe.textbbox((0, 0), text, font=font, anchor=anchor, stroke_width=stroke_width)
+    self.bbox = bbox
     padding = max(2, int(stroke_width) + 1)
     width = max(1, bbox[2] - bbox[0] + padding * 2)
     height = max(1, bbox[3] - bbox[1] + padding * 2)
     self.anchor_x, self.anchor_y = padding - bbox[0], padding - bbox[1]
     position = (self.anchor_x, self.anchor_y)
     self.fill_mask = Image.new("L", (width, height))
-    ImageDraw.Draw(self.fill_mask).text(position, text, font=font, fill=255, anchor="mm")
+    ImageDraw.Draw(self.fill_mask).text(position, text, font=font, fill=255, anchor=anchor)
     self.stroke_mask = None
     if stroke_width:
       self.stroke_mask = Image.new("L", (width, height))
       # Equal stroke/fill inks make PIL draw only the full stroked mask.
-      ImageDraw.Draw(self.stroke_mask).text(position, text, font=font, fill=255, anchor="mm",
+      ImageDraw.Draw(self.stroke_mask).text(position, text, font=font, fill=255, anchor=anchor,
                                             stroke_width=stroke_width, stroke_fill=255)
     self.sprite = Image.new("RGBA", (width, height))
     self.draw = ImageDraw.Draw(self.sprite)
@@ -620,7 +621,8 @@ class ClusterRenderer:
                              float(lead_info.get("v_rel", 0.0) or 0.0)) * conversion)
       labels = (f"{distance:.0f} m", f"{lead_speed:.0f} {unit}")
       for label, baseline_y in zip(labels, (y - 13, y + 27), strict=True):
-        left, top, right, bottom = self.font_unit.getbbox(label, anchor="ms", stroke_width=2)
+        glyph = self._text_glyph(label, self.font_unit, 2, anchor="ms")
+        left, top, right, bottom = glyph.bbox
         x0, y0 = max(0, x + left), max(0, baseline_y + top)
         x1 = min(camera_region.shape[1], x + right)
         y1 = min(camera_region.shape[0], baseline_y + bottom)
@@ -628,9 +630,11 @@ class ClusterRenderer:
           continue
         roi = camera_region[y0:y1, x0:x1]
         overlay = Image.fromarray(roi)
-        # An outline keeps the text legible while leaving the camera image visible.
-        ImageDraw.Draw(overlay).text((x - x0, baseline_y - y0), label, font=self.font_unit,
-                                     fill=Colors.WHITE[:3], anchor="ms", stroke_width=2, stroke_fill=Colors.BLACK[:3])
+        # Keep the original two-pass PIL stroke/fill rounding. Reusing masks
+        # avoids rasterizing the same distance/speed labels for every frame.
+        position = x - x0 - glyph.anchor_x, baseline_y - y0 - glyph.anchor_y
+        overlay.paste(Colors.BLACK[:3], position, glyph.stroke_mask)
+        overlay.paste(Colors.WHITE[:3], position, glyph.fill_mask)
         cv2.addWeighted(np.asarray(overlay), opacity, roi, 1.0 - opacity, 0, dst=roi)
 
   def _base_icon(self, name, size, active=True, opacity=255):
@@ -678,6 +682,21 @@ class ClusterRenderer:
       return int(height), int(height)
     return max(1, int(round(height * source.width / source.height))), int(height)
 
+  def _text_glyph(self, text, font, stroke_width, anchor="mm"):
+    key = (id(font), text, stroke_width) if anchor == "mm" else (id(font), text, stroke_width, anchor)
+    cached = self._text_cache.get(key)
+    if cached is None:
+      cached = TextGlyph(text, font, stroke_width, anchor)
+      if cached.byte_size <= TEXT_CACHE_MAX_BYTES:
+        self._text_cache[key] = cached
+        self._text_cache_bytes += cached.byte_size
+        while len(self._text_cache) > TEXT_CACHE_MAX_ENTRIES or self._text_cache_bytes > TEXT_CACHE_MAX_BYTES:
+          _, evicted = self._text_cache.popitem(last=False)
+          self._text_cache_bytes -= evicted.byte_size
+    else:
+      self._text_cache.move_to_end(key)
+    return cached
+
   def _centered(self, draw, cx, cy, value, font, color, stroke_width=0, stroke_fill=None):
     text = str(value)
     fill = tuple(color) if isinstance(color, (tuple, list)) else color
@@ -687,18 +706,7 @@ class ClusterRenderer:
     if getattr(draw, "mode", None) == "RGBA" and isinstance(fill, tuple) and len(fill) == 4:
       fill = (*fill[:3], 255)
     stroke = tuple(stroke_fill) if isinstance(stroke_fill, (tuple, list)) else stroke_fill
-    key = (id(font), text, stroke_width)
-    cached = self._text_cache.get(key)
-    if cached is None:
-      cached = TextGlyph(text, font, stroke_width)
-      if cached.byte_size <= TEXT_CACHE_MAX_BYTES:
-        self._text_cache[key] = cached
-        self._text_cache_bytes += cached.byte_size
-        while len(self._text_cache) > TEXT_CACHE_MAX_ENTRIES or self._text_cache_bytes > TEXT_CACHE_MAX_BYTES:
-          _, evicted = self._text_cache.popitem(last=False)
-          self._text_cache_bytes -= evicted.byte_size
-    else:
-      self._text_cache.move_to_end(key)
+    cached = self._text_glyph(text, font, stroke_width)
 
     sprite = cached.colored(fill, stroke)
     target = draw._image
