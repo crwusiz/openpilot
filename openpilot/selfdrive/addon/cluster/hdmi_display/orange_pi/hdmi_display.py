@@ -1,7 +1,6 @@
 import ctypes
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from io import BytesIO
 import ipaddress
 import logging
 import os
@@ -111,7 +110,6 @@ class HdmiDisplay:
     self.last_frame_timings = {}
     self.last_frame_presented = False
     self._latest_frame = None
-    self._latest_jpeg = None
     self._waiting_requested = False
     self._controls_revision = None
     self._menu_surface = None
@@ -180,7 +178,7 @@ class HdmiDisplay:
 
   @property
   def screen_off(self):
-    """Read touch state without calling SDL, including from the ACK thread."""
+    """Read touch state without calling SDL, including from signaling feedback."""
     return self.controls is not None and self.controls.screen_off
 
   def open(self):
@@ -356,12 +354,6 @@ class HdmiDisplay:
           self._present_frame(self._latest_frame)
       else:
         self._present_frame(self._latest_frame)
-    elif self._latest_jpeg is not None:
-      try:
-        self._decode_and_present(self._latest_jpeg)
-      except Exception as e:
-        LOG.warning("Failed to restore HDMI frame after touch: %s", e)
-        self._draw_black()
     else:
       self.show_waiting()
 
@@ -376,49 +368,13 @@ class HdmiDisplay:
       self._pygame.display.flip()
     self._controls_revision = self.controls.revision
 
-  def send_jpeg(self, jpeg):
-    self.last_frame_presented = False
-    if self.close_requested:
-      return False
-    if not self.connected and not self.open():
-      return False
-    self._latest_jpeg = jpeg
-    self._waiting_requested = False
-    if not self.pump_events(redraw=False):
-      return False
-    if self.controls.screen_off:
-      self._latest_frame = None
-      if self._controls_revision != self.controls.revision:
-        self._draw_black()
-      self.last_frame_timings = dict.fromkeys(("decode", "rotate", "scale", "blit", "flip"), 0.0)
-      return True
-    try:
-      self._decode_and_present(jpeg)
-      self.last_frame_presented = True
-      self._frame_times.append(time.monotonic())
-      return True
-    except Exception as e:
-      LOG.warning("Failed to display HDMI frame: %s", e)
-      return False
-
-  def _decode_and_present(self, jpeg):
-    decode_started = time.monotonic()
-    frame = self._pygame.image.load(BytesIO(jpeg), "cluster.jpg")
-    if self._presenter is None:
-      frame = frame.convert()
-    decode_elapsed = time.monotonic() - decode_started
-    self.last_frame_timings = self._present_frame(frame)
-    self.last_frame_timings["decode"] = decode_elapsed
-    self._latest_frame = frame
-
   def send_rgb(self, image):
-    """Present a composed PIL RGB image without JPEG encode/decode."""
+    """Present the locally composed H.264 camera and HUD image."""
     self.last_frame_presented = False
     if self.close_requested:
       return False
     if not self.connected and not self.open():
       return False
-    self._latest_jpeg = None
     self._waiting_requested = False
     if not self.pump_events(redraw=False):
       return False
@@ -551,7 +507,6 @@ class HdmiDisplay:
     self.last_frame_presented = False
     self._waiting_requested = True
     self._latest_frame = None
-    self._latest_jpeg = None
     if self.controls.screen_off:
       if self._controls_revision != self.controls.revision:
         self._draw_black()
@@ -576,7 +531,6 @@ class HdmiDisplay:
         self._pygame.display.flip()
       self._showing_waiting = False
     self._latest_frame = None
-    self._latest_jpeg = None
     self._waiting_requested = False
     self.last_frame_presented = False
 
@@ -587,7 +541,6 @@ class HdmiDisplay:
     self._waiting_frame = None
     self._showing_waiting = False
     self._latest_frame = None
-    self._latest_jpeg = None
     self._waiting_requested = False
     self._menu_surface = self._menu_rotated = None
     self.last_frame_presented = False

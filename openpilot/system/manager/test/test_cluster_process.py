@@ -22,7 +22,7 @@ def manager(monkeypatch):
   report, messages = Mock(), Mock()
   monkeypatch.setattr(cluster_process, "record_process_exit", report)
   monkeypatch.setattr(cluster_process, "flog", messages)
-  values = {"ClusterDisplayTransport": "usb", "ClusterUsbCodec": "h264", "ClusterNetworkCodec": "jpeg"}
+  values = {"ClusterDisplayTransport": "usb"}
   params = SimpleNamespace(get=values.get)
 
   class Managed:
@@ -57,7 +57,7 @@ def manager(monkeypatch):
 def test_normal_mode_exit_restarts_cluster_instead_of_leaving_dead_process_reference(manager):
   manager.tick()
   manager.process.proc.exitcode = 0
-  manager.values["ClusterUsbCodec"] = "jpeg"
+  manager.values["ClusterDisplayTransport"] = "network"
   manager.tick()
   assert manager.process.starts == 2
   assert manager.process.proc.exitcode is None
@@ -78,25 +78,17 @@ def test_unexpected_exit_is_reported_once_without_a_hardware_crash_restart_loop(
   assert manager.process.proc.exitcode == exit_code
 
 
-def test_selecting_jpeg_after_failed_h264_restarts_and_allows_another_pid_report(manager):
+def test_selecting_network_after_failed_usb_restarts_and_allows_another_pid_report(manager):
   manager.tick()
   manager.process.proc.exitcode = 1
   manager.tick()
-  manager.values["ClusterUsbCodec"] = "jpeg"
+  manager.values["ClusterDisplayTransport"] = "network"
   manager.tick()
   assert manager.process.starts == 2
   manager.process.proc.exitcode = -6
   manager.tick()
   assert manager.report.call_count == 2
   manager.report.assert_called_with(102, -6, False)
-
-
-def test_changing_inactive_network_codec_does_not_restart_failed_usb_process(manager):
-  manager.tick()
-  manager.process.proc.exitcode = 1
-  manager.values["ClusterNetworkCodec"] = "h264"
-  manager.tick()
-  assert manager.process.starts == 1
 
 
 def test_normal_exit_can_restart_same_selection_but_disabled_cluster_stays_stopped(manager):
@@ -122,7 +114,7 @@ def test_other_process_death_behavior_is_unchanged(manager):
 def test_switch_during_async_stop_records_the_new_child_selection(manager):
   manager.tick()
   manager.process.shutting_down = True
-  manager.values["ClusterUsbCodec"] = "jpeg"
+  manager.values["ClusterDisplayTransport"] = "network"
   manager.tick()
   assert manager.process.starts == 2
   manager.process.proc.exitcode = 1

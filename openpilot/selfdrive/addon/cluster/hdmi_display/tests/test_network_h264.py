@@ -122,11 +122,6 @@ def test_camera_age_uses_the_native_boot_clock_including_suspend(monkeypatch):
   assert network.camera_clock_ns() == 9
 
 
-@pytest.mark.parametrize("stored,expected", [(None, "jpeg"), (" JPEG ", "jpeg"), (b"H264", "h264"), ("vp9", "jpeg"), (b"\xff", "jpeg")])
-def test_codec_watcher_matches_config_normalization(stored, expected):
-  assert network.requested_codec(SimpleNamespace(get=lambda _key: stored)) == expected
-
-
 @asyncio_test
 async def test_real_control_socket_negotiates_video_separately_and_streams_state_without_frame_acks(monkeypatch):
   messages, statuses = [], []
@@ -191,7 +186,7 @@ async def test_second_peer_cannot_replace_active_cluster_and_shutdown_cancels_ne
 
 
 @asyncio_test
-async def test_missing_webrtc_is_explicit_and_does_not_silently_send_jpeg(monkeypatch):
+async def test_missing_webrtc_is_explicit(monkeypatch):
   monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
 
   def unavailable(_offer):
@@ -318,7 +313,7 @@ async def test_native_camera_waits_for_idr_and_resynchronizes_after_encoded_refe
 async def test_real_webrtc_h264_reaches_pi_decoder_with_independent_scene_control(monkeypatch):
   rtc = pytest.importorskip("aiortc")
   av = pytest.importorskip("av")
-  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.cluster_protocol import recv_exact
+  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.control_socket import recv_exact
   from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_receiver import H264Receiver
 
   monkeypatch.setattr(network, "write_network_status", lambda _address: None)

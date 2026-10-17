@@ -28,6 +28,10 @@ for index in "${!files[@]}"; do
     chmod 644 -- "/opt/cluster-receiver/${files[index]}"
   fi
 done
+for retired in cluster_protocol.py frame_stream.py tcp_diagnostics.py; do
+  package_safe_parents /opt/cluster-receiver "$retired" || fail 'Unsafe retired module path.'
+  rm -f -- "/opt/cluster-receiver/$retired"
+done
 bash /opt/cluster-receiver/scripts/fan_setup.sh install
 if [[ -f /etc/systemd/system/cluster-hdmi.service ]]; then
   # Repair a previously installed receiver without rewriting its custom unit,

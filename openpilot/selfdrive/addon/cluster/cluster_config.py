@@ -7,24 +7,19 @@ from openpilot.selfdrive.addon.cluster.cluster_render_support import Colors as C
 DISPLAY = SimpleNamespace(
   transport="usb",  # "usb" or "network"
   rotate_180=False,
-  fps=20,
   status_interval_s=10,
   border_size=10,
 )
 
 IMAGE = SimpleNamespace(
-  jpeg_quality=68,
   camera_contrast=1.08,
 )
 
 USB = SimpleNamespace(
   width=1920,
   height=462,
-  timeout_ms=2500,
-  image_timeout_ms=1000,
+  write_timeout_ms=1000,
   max_frame_age_s=0.25,
-  clear_halt_on_timeout=True,
-  max_consecutive_failures=3,
   h264_fps=20,
   h264_bitrate=4_666_667,  # Match the tested 7 Mbps / 30 Hz USB encoder budget per frame.
   h264_gop=1,  # Independent frames avoid persistent USB display decoder artifacts.
@@ -43,40 +38,8 @@ HDMI = SimpleNamespace(
 NETWORK = SimpleNamespace(
   bind_host="0.0.0.0",
   port=9200,
-  accept_timeout_s=0.25,
-  ack_timeout_s=2.5,
-  fps=20,  # Full-frame JPEG baseline; camera/model source updates are 20 Hz.
-  screen_off_fps=5,
-  jpeg_quality=68,
-  max_in_flight=2,
-  max_in_flight_bytes=512 * 1024,
-  max_frame_age_s=0.25,
-  max_ack_age_s=0.25,
+  fps=20,  # Reuse the hardware camera stream; compose the HUD on the Pi.
 )
-
-
-def _requested_codec(params, key, transport, *, warn_invalid=False):
-  value = params.get(key) or "jpeg"
-  if isinstance(value, bytes):
-    value = value.decode("utf-8", errors="replace")
-  codec = str(value).strip().lower()
-  if codec in ("jpeg", "h264"):
-    return codec
-  if warn_invalid:
-    from openpilot.common.swaglog import cloudlog
-
-    cloudlog.warning(f"Unsupported cluster {transport} codec: {value!r}; using JPEG")
-  return "jpeg"
-
-
-def requested_codec(params, *, warn_invalid=False):
-  """Read the Network codec without loading a video runtime."""
-  return _requested_codec(params, "ClusterNetworkCodec", "network", warn_invalid=warn_invalid)
-
-
-def requested_usb_codec(params, *, warn_invalid=False):
-  """Read the independent USB codec without loading the hardware encoder."""
-  return _requested_codec(params, "ClusterUsbCodec", "USB", warn_invalid=warn_invalid)
 
 
 class ClusterConfig:
@@ -90,21 +53,13 @@ class ClusterConfig:
     self.display_transport = self.params.get("ClusterDisplayTransport") or DISPLAY.transport
     if self.display_transport not in ("network", "usb"):
       raise ValueError(f"Unsupported cluster display transport: {self.display_transport}")
-    self.network_codec = requested_codec(self.params, warn_invalid=self.display_transport == "network")
-    self.usb_codec = requested_usb_codec(self.params, warn_invalid=self.display_transport == "usb")
     if self.display_transport == "network":
       self.width, self.height = HDMI.width, HDMI.height
     else:
       self.width, self.height = USB.width, USB.height
-    # The UI's FPS override must not raise the full-frame JPEG workload.
-    self.fps = min(max(int(os.getenv("CLUSTER_FPS", NETWORK.fps)), 1), 60) if self.display_transport == "network" else DISPLAY.fps
-    self.usb_fps = DISPLAY.fps
+    # Keep the cluster cadence independent of the C4 UI's FPS override.
+    self.fps = min(max(int(os.getenv("CLUSTER_FPS", NETWORK.fps)), 1), 60) if self.display_transport == "network" else USB.h264_fps
     self.status_interval_frames = self.fps * DISPLAY.status_interval_s
-    # carrot-pilot's field-tested JPEG default. This improves camera detail
-    # over quality 60 without materially increasing encode time or link load.
-    self.jpeg_quality = IMAGE.jpeg_quality
-    self.network_jpeg_quality = NETWORK.jpeg_quality
-    self.network_screen_off_fps = NETWORK.screen_off_fps
     self.border_size = DISPLAY.border_size
     self.content_width = self.width - self.border_size * 2
     self.content_height = self.height - self.border_size * 2
@@ -113,11 +68,8 @@ class ClusterConfig:
     self.camera_panel_height = self.content_height
     self.camera_contrast = IMAGE.camera_contrast
 
-    self.usb_timeout_ms = USB.timeout_ms
-    self.usb_image_timeout_ms = USB.image_timeout_ms
+    self.usb_write_timeout_ms = USB.write_timeout_ms
     self.usb_max_frame_age = USB.max_frame_age_s
-    self.usb_clear_halt_on_timeout = USB.clear_halt_on_timeout
-    self.usb_max_consecutive_failures = USB.max_consecutive_failures
     self.usb_h264_fps = USB.h264_fps
     self.usb_h264_bitrate = USB.h264_bitrate
     self.usb_h264_gop = USB.h264_gop
@@ -126,12 +78,6 @@ class ClusterConfig:
 
     self.network_bind_host = NETWORK.bind_host
     self.network_port = NETWORK.port
-    self.network_accept_timeout = NETWORK.accept_timeout_s
-    self.network_ack_timeout = NETWORK.ack_timeout_s
-    self.network_max_in_flight = NETWORK.max_in_flight
-    self.network_max_in_flight_bytes = NETWORK.max_in_flight_bytes
-    self.network_max_frame_age = NETWORK.max_frame_age_s
-    self.network_max_ack_age = NETWORK.max_ack_age_s
 
     self.BASEDIR = Path(__file__).resolve().parents[3]
     self.font_bold = os.path.join(self.BASEDIR, "selfdrive", "assets", "fonts", "NotoSansKR-Bold.ttf")
@@ -144,6 +90,5 @@ class ClusterConfig:
 
     cloudlog.info(
       f"Cluster Config Loaded: {self.width}x{self.height} @ {self.fps}fps, Unit: {self.speed_unit}, "
-      + f"Rotate 180: {self.rotate_180}, Transport: {self.display_transport}"
-      + (f", Network Codec: {self.network_codec}" if self.display_transport == "network" else f", USB Codec: {self.usb_codec}"),
+      + f"Rotate 180: {self.rotate_180}, Transport: {self.display_transport}, Codec: H.264",
     )

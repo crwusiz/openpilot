@@ -1,5 +1,6 @@
 import ctypes
 from concurrent.futures import Future
+from PIL import Image
 import gc
 import subprocess
 import threading
@@ -160,7 +161,7 @@ def test_kmsdrm_requests_es2_before_creating_a_blittable_surface(monkeypatch, dr
     ("gl_attribute", pygame.GL_STENCIL_SIZE, 0),
     ("set_mode", (480, 1920), pygame.DOUBLEBUF | pygame.FULLSCREEN, {"display": 0, "vsync": 1}),
   ]
-  # OPENGL would change pygame's Surface API and prevent the JPEG blit path.
+  # OPENGL would change pygame's Surface API and prevent the RGB blit path.
   assert not calls[-1][2] & pygame.OPENGL
   assert hdmi_display.os.environ["SDL_RENDER_DRIVER"] == "opengles2"
   display.close()
@@ -305,11 +306,10 @@ def test_rgb_scene_preserves_rotation_pixels_and_owns_the_retained_frame(raster_
   expected = source.rotate(-rotation, expand=True)
   display = HdmiDisplay(*expected.size, rotation=rotation, fullscreen=False, pygame_module=pygame,
                         brightness=100, renderer_mode="surface")
-  monkeypatch.setattr(pygame.image, "load", lambda *_args: pytest.fail("RGB must bypass JPEG decoding"))
+  monkeypatch.setattr(pygame.image, "load", lambda *_args: pytest.fail("RGB must bypass image-file decoding"))
   try:
-    display._latest_jpeg = b"old JPEG must not be restored"
     assert display.send_rgb(source) and display.last_frame_presented
-    assert display._latest_jpeg is None and display.last_frame_timings["decode"] == 0
+    assert display.last_frame_timings["decode"] == 0
     assert pygame.image.tobytes(display.screen, "RGB") == expected.tobytes()
     source.paste((0, 0, 0), (0, 0, *source.size))
     display._redraw_local()
@@ -329,7 +329,7 @@ def test_screen_off_skips_rgb_conversion_and_waits_for_new_live_frame_after_wake
     assert display.screen_off
     skipped = SimpleNamespace(tobytes=lambda: pytest.fail("screen off must skip pixel conversion"))
     assert display.send_rgb(skipped) and not display.last_frame_presented
-    assert display._latest_jpeg is None and display._latest_frame is None
+    assert display._latest_frame is None
     _tap_display(display)
     assert not display.screen_off
     assert display.send_rgb(Image.new("RGB", (384, 96), (0, 255, 0)))
@@ -384,7 +384,7 @@ def test_frame_rotation_preserves_pixels_and_touch_positions(raster_pygame, monk
                         pygame_module=pygame, touch_handler=touches.append, brightness=100, renderer_mode="surface")
   try:
     assert display.open()
-    assert display.send_jpeg(b"decoded-frame-fixture")
+    assert display.send_rgb(Image.frombytes("RGB", frame.get_size(), pygame.image.tobytes(frame, "RGB")))
     actual = [[tuple(display.screen.get_at((x, y)))[:3] for x in range(width)] for y in range(height)]
     assert actual == [[colors[index] for index in row] for row in expected_rows]
 
@@ -468,7 +468,7 @@ def test_waiting_screen_is_replaced_by_live_frame_and_returns_on_disconnect(rast
     assert display.show_waiting()
     assert len(flips) == flip_count, "an unchanged waiting screen should not redraw on every retry"
 
-    assert display.send_jpeg(b"live-frame")
+    assert display.send_rgb(Image.new("RGB", (384, 96), (255, 0, 0)))
     assert display.screen.get_at((0, 0))[:3] == (255, 0, 0)
     assert display.show_waiting()
     assert pygame.image.tobytes(display.screen, "RGB") == waiting_pixels
@@ -622,7 +622,7 @@ def test_failed_live_frame_flip_restores_waiting_instead_of_skipping_redraw(rast
       raise pygame.error("page flip failed")
 
     monkeypatch.setattr(pygame.display, "flip", fail_flip)
-    assert not display.send_jpeg(b"live-frame")
+    assert not display.send_rgb(Image.new("RGB", (384, 96), (255, 0, 0)))
     monkeypatch.setattr(pygame.display, "flip", original_flip)
     assert display.show_waiting()
     assert pygame.image.tobytes(display.screen, "RGB") == waiting_pixels
@@ -669,7 +669,7 @@ def test_default_brightness_dims_received_frame_once(raster_pygame, monkeypatch)
   monkeypatch.setattr(pygame.image, "load", lambda *_args: frame)
   display = _raster_display(pygame)
   try:
-    assert display.send_jpeg(b"first")
+    assert display.send_rgb(Image.new("RGB", (384, 96), (255, 100, 50)))
     assert display.last_frame_presented
     assert display.screen.get_at((0, 0))[:3] == (204, 80, 40)
     _tap_display(display)
@@ -700,58 +700,6 @@ def test_screen_off_state_is_readable_from_receiver_thread_without_sdl(raster_py
     display.close()
 
 
-@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
-def test_off_skips_decoding_and_transforms_then_wakes_newest_jpeg_without_menu(raster_pygame, monkeypatch, rotation):
-  pygame = raster_pygame
-  decoded = []
-  transforms = []
-  original_rotate = pygame.transform.rotate
-
-  def load(stream, _name):
-    jpeg = stream.getvalue()
-    decoded.append(jpeg)
-    frame = pygame.Surface((384, 96))
-    frame.fill((0, 0, 255) if jpeg == b"latest" else (255, 0, 0))
-    return frame
-
-  def rotate(frame, angle):
-    transforms.append(angle)
-    return original_rotate(frame, angle)
-
-  monkeypatch.setattr(pygame.image, "load", load)
-  monkeypatch.setattr(pygame.transform, "rotate", rotate)
-  display = _raster_display(pygame, rotation)
-  try:
-    assert display.send_jpeg(b"visible")
-    _tap_display(display)
-    _tap_display(display, _control_target(display, "slider", 0.5))
-    _tap_display(display, _control_target(display, "off"))
-    assert display.controls.screen_off
-    assert not any(pygame.image.tobytes(display.screen, "RGB"))
-    assert display._latest_frame is None
-    decoded.clear()
-    transforms.clear()
-    assert display.send_jpeg(b"old")
-    assert display.send_jpeg(b"latest")
-    assert not display.last_frame_presented
-    assert not decoded
-    assert not transforms
-    assert not any(display.last_frame_timings.values())
-
-    _post_touch(display, pygame.FINGERDOWN)
-    _post_touch(display, pygame.FINGERMOTION, _control_target(display, "off"))
-    _post_touch(display, pygame.FINGERUP)
-    assert display.pump_events()
-    assert decoded == [b"latest"]
-    assert not display.controls.screen_off
-    assert display.controls.brightness == 60
-    assert not display.controls.menu_visible
-    assert not display.last_frame_presented
-    assert display.screen.get_at((0, 0))[:3] == (0, 0, 153)
-  finally:
-    display.close()
-
-
 def test_controls_open_and_auto_hide_without_incoming_frames(raster_pygame, monkeypatch):
   pygame = raster_pygame
   display = _raster_display(pygame)
@@ -761,7 +709,7 @@ def test_controls_open_and_auto_hide_without_incoming_frames(raster_pygame, monk
   frame.fill((255, 0, 0))
   monkeypatch.setattr(pygame.image, "load", lambda *_args: frame)
   try:
-    assert display.send_jpeg(b"visible")
+    assert display.send_rgb(Image.new("RGB", (384, 96), (255, 0, 0)))
     initial = pygame.image.tobytes(display.screen, "RGB")
     _tap_display(display)
     assert pygame.image.tobytes(display.screen, "RGB") != initial
@@ -866,7 +814,7 @@ def test_gpu_path_avoids_surface_conversion_and_cpu_rotation(raster_pygame, monk
   try:
     assert display._presenter is not None
     assert pygame.display.get_surface() is None, "standalone SDL window must not own another pygame renderer"
-    assert display.send_jpeg(b"gpu-frame")
+    assert display.send_rgb(Image.new("RGB", (384, 96), (255, 0, 0)))
     assert display.last_frame_presented
     assert display.last_frame_timings["rotate"] == display.last_frame_timings["scale"] == 0
     output = display._presenter.renderer.to_surface()
@@ -875,10 +823,11 @@ def test_gpu_path_avoids_surface_conversion_and_cpu_rotation(raster_pygame, monk
     assert display.controls.menu_visible
     _tap_display(display, _control_target(display, "off"))
     assert not any(pygame.image.tobytes(display._presenter.renderer.to_surface(), "RGB"))
-    assert display.send_jpeg(b"off-frame")
+    assert display.send_rgb(Image.new("RGB", (384, 96), (255, 0, 0)))
     assert not display.last_frame_presented
     _tap_display(display)
     assert not display.controls.menu_visible
+    assert display.send_rgb(Image.new("RGB", (384, 96), (255, 0, 0)))
     assert display._presenter.renderer.to_surface().get_at((0, 0))[:3] == (204, 0, 0)
   finally:
     display.close()
@@ -957,28 +906,15 @@ def test_initial_waiting_texture_failure_releases_gpu_and_displays_surface(raste
 def test_live_texture_failure_preserves_rotation_menu_brightness_and_off_wake(raster_pygame, monkeypatch, stage):
   pygame = raster_pygame
   failure, presenters = _failing_texture_factory(pygame, monkeypatch)
-  original_load = pygame.image.load
-
-  def load(stream, _name=None):
-    if _name is None:
-      return original_load(stream)
-    # Resizing the input causes another texture creation, allowing either the
-    # new allocation or its upload to fail after the renderer initially works.
-    jpeg = stream.getvalue()
-    frame = pygame.Surface((192, 48) if jpeg == b"new" else (384, 96))
-    frame.fill((0, 0, 255) if jpeg == b"off-latest" else (255, 0, 0))
-    return frame
-
-  monkeypatch.setattr(pygame.image, "load", load)
   display = _raster_display(pygame, rotation=90, renderer_mode="auto")
   try:
-    assert display.send_jpeg(b"initial")
+    assert display.send_rgb(Image.new("RGB", (384, 96), (255, 0, 0)))
     controls = display.controls
     controls.set_brightness(35)
     _tap_display(display)
     assert controls.menu_visible
     failure[0] = stage
-    assert display.send_jpeg(b"new")
+    assert display.send_rgb(Image.new("RGB", (192, 48), (255, 0, 0)))
     assert display.last_frame_presented
     assert display._presenter is None
     assert presenters[0].window is None
@@ -991,11 +927,12 @@ def test_live_texture_failure_preserves_rotation_menu_brightness_and_off_wake(ra
     _tap_display(display, _control_target(display, "off"))
     assert display.screen_off
     assert not any(pygame.image.tobytes(display.screen, "RGB"))
-    assert display.send_jpeg(b"off-latest")
+    assert display.send_rgb(Image.new("RGB", (384, 96), (0, 0, 255)))
     _tap_display(display)
     assert not display.screen_off
     assert not controls.menu_visible
     assert controls.brightness == 40
+    assert display.send_rgb(Image.new("RGB", (384, 96), (0, 0, 255)))
     assert display.screen.get_at((0, 0))[:3] == (0, 0, 102)
     assert len(presenters) == 1
   finally:

@@ -289,7 +289,7 @@ def test_scene_can_receive_exclusive_rgb_ownership_without_a_second_frame_copy(s
   assert scene.last_frame_timings["camera_panel"] >= 0
 
 
-def test_units_and_sender_rotation_match_the_jpeg_contract(scene, monkeypatch):
+def test_units_and_sender_rotation_match_the_shared_renderer(scene, monkeypatch):
   speeds = _speed_values(scene, monkeypatch)
   scene.set_video(np.full((720, 1280, 3), 80, np.uint8))
   state = snapshot(model_valid=False, is_metric=False)

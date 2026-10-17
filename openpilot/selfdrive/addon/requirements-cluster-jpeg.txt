@@ -1,3 +1,0 @@
-# Shared by USB and Network JPEG composition on C4.
-opencv-python-headless==5.0.0.93
-Pillow==12.3.0

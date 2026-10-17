@@ -811,24 +811,7 @@ def render_tab_toggles():
             label="Cluster display transport",
             on_change=on_transport_change,
           ).classes('w-full text-blue-200')
-          ui.label('The Cluster process restarts automatically. A new display mode may need preparation while offroad.').classes(
-            'text-[0.75rem] md:text-sm text-gray-400 -mt-3 ml-1'
-          )
-          codec_key = "ClusterUsbCodec" if transport == "usb" else "ClusterNetworkCodec"
-          codec_label = "Cluster USB codec" if transport == "usb" else "Cluster network codec"
-          codec_options = {"jpeg": "JPEG", "h264": "H.264"}
-          codec = get_param_text(codec_key, "jpeg").strip().lower()
-          if codec not in codec_options:
-            codec = "jpeg"
-
-          def on_codec_change(e, key=codec_key, label=codec_label):
-            if e.value not in ("jpeg", "h264"):
-              return
-            params.put(key, e.value, block=True)
-            ui.notify(f"{label}: {e.value} (Cluster restarting)", position='top')
-
-          ui.select(codec_options, value=codec, label=codec_label, on_change=on_codec_change).classes('w-full text-blue-200')
-          ui.label('The Cluster process restarts automatically when the codec changes.').classes(
+          ui.label('H.264 video. Changing the display transport restarts Cluster; new dependencies are prepared while offroad.').classes(
             'text-[0.75rem] md:text-sm text-gray-400 -mt-3 ml-1'
           )
 

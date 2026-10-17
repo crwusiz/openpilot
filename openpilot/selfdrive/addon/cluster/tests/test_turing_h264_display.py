@@ -63,15 +63,15 @@ def panel(monkeypatch):
   state.vendor = SimpleNamespace(
     build_command_packet_header=header,
     encrypt_command_packet=lambda packet: packet + bytes(12),
-    _resp_ok=lambda payload: bool(payload) and (payload[1] == 0xC8 or payload[8] == 0xC8),
+    response_ok=lambda payload: bool(payload) and (payload[1] == 0xC8 or payload[8] == 0xC8),
   )
-  monkeypatch.setitem(sys.modules, "library.lcd.lcd_comm_turing_usb", state.vendor)
-  state.config = SimpleNamespace(usb_fps=20, usb_h264_fps=20, usb_image_timeout_ms=1000, usb_max_frame_age=0.25)
+  monkeypatch.setitem(sys.modules, "openpilot.selfdrive.addon.cluster.usb_display.turing_protocol", state.vendor)
+  state.config = SimpleNamespace(usb_fps=20, usb_h264_fps=20, usb_write_timeout_ms=1000, usb_max_frame_age=0.25)
   state.display = display_module.TuringH264Display(state.config)
   return state
 
 
-def test_open_uses_captured_h264_setup_and_clears_jpeg_overlay(panel, monkeypatch):
+def test_open_uses_captured_h264_setup_and_clears_overlay(panel, monkeypatch):
   monkeypatch.setattr(display_module.sys, "platform", "linux")
   operations = Mock()
   operations.attach_mock(panel.device.detach_kernel_driver, "detach")

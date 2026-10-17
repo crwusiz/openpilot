@@ -12,21 +12,15 @@ import threading
 import time
 
 try:
-  from .cluster_protocol import (
-    ACK_DISPLAY_ERROR, ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
-    ReceiveStats, pack_ack, recv_exact, unpack_frame_header_info,
-  )
-  from .frame_stream import ReceivedFrame, receive_stream_frames
+  from .control_socket import ReceiveStats, recv_exact
+  from .h264_protocol import CONTROL_HEADER, HELLO, decode_payload, unpack_control_header
+  from .h264_receiver import receive_h264_session
   from .receiver_build import source_fingerprint
-  from .tcp_diagnostics import TcpDiagnostics
 except ImportError:
-  from cluster_protocol import (
-    ACK_DISPLAY_ERROR, ACK_OK, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_HEADER, FRAME_QUERY_STREAM, FRAME_STREAM,
-    ReceiveStats, pack_ack, recv_exact, unpack_frame_header_info,
-  )
-  from frame_stream import ReceivedFrame, receive_stream_frames
+  from control_socket import ReceiveStats, recv_exact
+  from h264_protocol import CONTROL_HEADER, HELLO, decode_payload, unpack_control_header
+  from h264_receiver import receive_h264_session
   from receiver_build import source_fingerprint
-  from tcp_diagnostics import TcpDiagnostics
 
 
 LOG = logging.getLogger("cluster_receiver")
@@ -229,112 +223,23 @@ def wait_for_reconnect(display, delay):
 
 
 def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=FRAME_TIMEOUT_SECONDS) -> int:
+  """Validate the H.264 hello before starting WebRTC and local composition."""
+  if max_frames == 0:
+    return 0
   log_socket_buffers(sock)
-  last_received_at = None
-  waiting_shown = False
-
   def poll_events():
-    nonlocal waiting_shown
     _poll_display(display)
-    if last_received_at is not None and not waiting_shown and time.monotonic() - last_received_at >= frame_timeout:
-      show_waiting = getattr(display, "show_waiting", None)
-      if show_waiting is not None:
-        if not show_waiting():
-          raise RuntimeError("Unable to display the Orange Pi connection waiting screen")
-        waiting_shown = True
-        LOG.warning("[CLUSTER_RX_STALE] No complete JPEG within %.1fs; waiting screen, connection=open, mode=legacy",
-                    frame_timeout)
-
-  received_frames = 0
-  perf_started = time.monotonic()
-  perf_frames = 0
-  perf_displayed = 0
-  perf_bytes = 0
-  perf_stages = dict.fromkeys(("header_wait", "receive", "display", "ack_send", "decode", "rotate", "scale", "blit", "flip",
-                             "convert", "upload", "draw"), 0.0)
-  tcp_diagnostics = TcpDiagnostics()
-  while max_frames is None or received_frames < max_frames:
-    # Idle waiting gets its own limit; once any header byte arrives, one strict
-    # deadline covers the partial header and entire JPEG, without progress resets.
-    started = time.monotonic()
-    header_stats = ReceiveStats()
-    header = recv_exact(sock, FRAME_HEADER.size, deadline=started + frame_timeout, poll_events=poll_events,
-                        stats=header_stats, timeout_from_first_byte=frame_timeout, phase="header")
-    if header[:4] == b"OPCH":
-      # JPEG receivers do not import WebRTC/PyAV/Pillow unless the C4 explicitly
-      # selects the alternate transport in its first packet.
-      try:
-        from .h264_protocol import HELLO, decode_payload, unpack_control_header
-        from .h264_receiver import receive_h264_session
-      except ImportError:
-        from h264_protocol import HELLO, decode_payload, unpack_control_header
-        from h264_receiver import receive_h264_session
-      kind, _sequence, size = unpack_control_header(header)
-      if kind != HELLO:
-        raise ValueError("Expected H.264 session hello")
-      payload = recv_exact(sock, size, deadline=header_stats.first_byte_at + frame_timeout,
-                           poll_events=poll_events, phase="h264_hello")
-      hello = decode_payload(payload)
-      if hasattr(display, "set_stream_mode"):
-        display.set_stream_mode("H.264")
-      remaining = None if max_frames is None else max_frames - received_frames
-      return received_frames + receive_h264_session(sock, display, hello, frame_timeout, remaining)
-    sequence, frame_size, flags = unpack_frame_header_info(header)
-    if hasattr(display, "set_stream_mode"):
-      display.set_stream_mode("JPEG")
-    header_at = time.monotonic()
-    deadline = header_stats.first_byte_at + frame_timeout
-    receive_stats = ReceiveStats() if flags & FRAME_STREAM else None
-    jpeg = recv_exact(sock, frame_size, deadline=deadline, poll_events=poll_events, stats=receive_stats, phase="payload")
-    received_at = time.monotonic()
-    last_received_at = received_at
-    if waiting_shown:
-      LOG.info("[CLUSTER_RX_RESUMED] Complete JPEG received; connection=open, mode=legacy")
-    waiting_shown = False
-    if flags & FRAME_STREAM:
-      remaining = None if max_frames is None else max_frames - received_frames
-      first_frame = ReceivedFrame(sequence, jpeg, started, header_at, received_at, receive_stats)
-      return received_frames + receive_stream_frames(sock, display, first_frame, frame_timeout, remaining)
-    display_ok = display.send_jpeg(jpeg)
-    displayed_at = time.monotonic()
-    status = ACK_OK if display_ok else ACK_DISPLAY_ERROR
-    capabilities = ACK_STREAM_SUPPORTED if flags & FRAME_QUERY_STREAM else 0
-    if capabilities and getattr(display, "screen_off", False):
-      capabilities |= ACK_SCREEN_OFF
-    sock.sendall(pack_ack(sequence, status, capabilities))
-    acknowledged_at = time.monotonic()
-    if not display_ok:
-      _poll_display(display)
-      raise RuntimeError("Unable to display cluster frame")
-    received_frames += 1
-    perf_frames += 1
-    perf_bytes += frame_size
-    perf_stages["header_wait"] += header_at - started
-    perf_stages["receive"] += received_at - header_at
-    perf_stages["ack_send"] += acknowledged_at - displayed_at
-    if getattr(display, "last_frame_presented", True):
-      perf_displayed += 1
-      perf_stages["display"] += displayed_at - received_at
-      for stage, duration in getattr(display, "last_frame_timings", {}).items():
-        if stage in ("decode", "rotate", "scale", "blit", "flip", "convert", "upload", "draw"):
-          perf_stages[stage] += duration
-    if acknowledged_at - perf_started >= 10.0:
-      stages = " | ".join(
-        f"{stage}_avg={duration * 1000 / max(perf_frames if stage in ('header_wait', 'receive', 'ack_send') else perf_displayed, 1):.1f}ms"
-        for stage, duration in perf_stages.items()
-      )
-      elapsed = acknowledged_at - perf_started
-      tcp_sample = tcp_diagnostics.sample(sock)
-      if tcp_sample:
-        stages += f" | {tcp_sample}"
-      LOG.info("[CLUSTER_RX_PERF] fps=%.2f | display_fps=%.2f | size_avg=%.1fKB | %s | mode=legacy",
-               perf_frames / elapsed, perf_displayed / elapsed, perf_bytes / (1024 * perf_frames), stages)
-      perf_started = acknowledged_at
-      perf_frames = 0
-      perf_displayed = 0
-      perf_bytes = 0
-      perf_stages = dict.fromkeys(perf_stages, 0.0)
-  return received_frames
+  header_stats = ReceiveStats()
+  header = recv_exact(sock, CONTROL_HEADER.size, deadline=time.monotonic() + frame_timeout,
+                      poll_events=poll_events, stats=header_stats, timeout_from_first_byte=frame_timeout, phase="header")
+  kind, _sequence, size = unpack_control_header(header)
+  if kind != HELLO:
+    raise ValueError("Expected H.264 session hello")
+  payload = recv_exact(sock, size, deadline=header_stats.first_byte_at + frame_timeout,
+                       poll_events=poll_events, phase="h264_hello")
+  hello = decode_payload(payload)
+  display.set_stream_mode("H.264")
+  return receive_h264_session(sock, display, hello, frame_timeout, max_frames)
 
 
 def _positive_float(value):
@@ -360,10 +265,10 @@ def parse_args(argv=None):
   parser.add_argument("--scan-workers", type=_positive_int, default=DEFAULT_SCAN_WORKERS, help="Parallel subnet scan workers")
   parser.add_argument("--reconnect-delay", type=_positive_float, default=DEFAULT_RECONNECT_DELAY)
   parser.add_argument("--frame-timeout", type=_positive_float, default=FRAME_TIMEOUT_SECONDS,
-                      help="Idle timeout and maximum seconds from the first header byte to a complete JPEG")
+                      help="Video freshness timeout and H.264 signaling handshake deadline in seconds")
   parser.add_argument("--width", type=_positive_int, default=1920, help="Physical HDMI output width, after frame rotation")
   parser.add_argument("--height", type=_positive_int, default=480, help="Physical HDMI output height, after frame rotation")
-  parser.add_argument("--rotation", type=int, choices=(0, 90, 180, 270), default=0, help="Clockwise JPEG rotation in degrees")
+  parser.add_argument("--rotation", type=int, choices=(0, 90, 180, 270), default=0, help="Clockwise display rotation in degrees")
   parser.add_argument("--touch-rotation", type=int, choices=(0, 90, 180, 270),
                       help="Clockwise correction from raw touch to cluster coordinates (default: inverse of --rotation)")
   parser.add_argument("--log-touch", action="store_true", help="Log raw and corrected SDL finger coordinates")

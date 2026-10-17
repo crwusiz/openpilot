@@ -11,8 +11,7 @@ def cluster_main():
   try:
     cloudlog.info("Initializing Cluster Config...")
     config = ClusterConfig()
-    codec = getattr(config, "usb_codec" if config.display_transport == "usb" else "network_codec", "jpeg")
-    flog(f"[CLUSTER_START] transport={config.display_transport} codec={codec}")
+    flog(f"[CLUSTER_START] transport={config.display_transport} codec=h264")
     if not enforce_cluster_transport(config.params, config.display_transport):
       flog("[CLUSTER_EXIT] Selected transport is blocked by the cluster policy.")
       return

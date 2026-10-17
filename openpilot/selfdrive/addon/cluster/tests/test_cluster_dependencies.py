@@ -12,8 +12,8 @@ def bootstrap(monkeypatch):
   spec = importlib.util.spec_from_file_location("cluster_dependencies_under_test", path)
   module = importlib.util.module_from_spec(spec)
   spec.loader.exec_module(module)
-  values = {"ClusterEnable": True, "ClusterDisplayTransport": "network", "ClusterNetworkCodec": "jpeg", "IsOffroad": False}
-  config = SimpleNamespace(display_transport="network", network_codec="jpeg",
+  values = {"ClusterEnable": True, "ClusterDisplayTransport": "network", "IsOffroad": False}
+  config = SimpleNamespace(display_transport="network",
                            params=SimpleNamespace(get=values.get, get_bool=lambda key: bool(values.get(key))))
   clock = [0.0]
   def sleep(seconds):
@@ -31,7 +31,7 @@ def test_ready_mode_activates_without_installing_even_while_onroad(bootstrap):
   item.module.groups_ready.return_value = True
   assert item.module.ensure_cluster_dependencies(item.config)
   item.module.prepare_groups.assert_not_called()
-  item.module.activate_groups.assert_called_once_with(("cluster-jpeg",))
+  item.module.activate_groups.assert_called_once_with(("cluster-h264",))
 
 
 def test_missing_mode_waits_onroad_and_stops_when_disabled(bootstrap):
@@ -46,64 +46,29 @@ def test_first_use_prepares_only_selected_groups_while_offroad(bootstrap):
   item = bootstrap
   item.values["IsOffroad"] = True
   def prepare(groups, *, cancel_check):
-    assert groups == ("cluster-jpeg",) and not cancel_check()
+    assert groups == ("cluster-h264",) and not cancel_check()
   item.module.prepare_groups.side_effect = prepare
   assert item.module.ensure_cluster_dependencies(item.config)
-  item.module.activate_groups.assert_called_once_with(("cluster-jpeg",))
+  item.module.activate_groups.assert_called_once_with(("cluster-h264",))
 
 
-@pytest.mark.parametrize("codec", ["jpeg", "h264"])
-def test_usb_codec_prepares_composition_and_usb_without_network_runtime(bootstrap, codec):
+def test_usb_prepares_composition_and_transport_without_network_runtime(bootstrap):
   item = bootstrap
   item.config.display_transport = "usb"
-  item.config.usb_codec = codec
-  item.values.update(ClusterDisplayTransport="usb", ClusterUsbCodec=codec, ClusterNetworkCodec="h264", IsOffroad=True)
+  item.values.update(ClusterDisplayTransport="usb", IsOffroad=True)
 
   assert item.module.ensure_cluster_dependencies(item.config)
 
-  assert item.module.prepare_groups.call_args.args == (("cluster-jpeg", "cluster-usb"),)
-  item.module.activate_groups.assert_called_once_with(("cluster-jpeg", "cluster-usb"))
+  assert item.module.prepare_groups.call_args.args == (("cluster-render", "cluster-usb"),)
+  item.module.activate_groups.assert_called_once_with(("cluster-render", "cluster-usb"))
 
 
-def test_usb_codec_change_cancels_preparation_without_activation(bootstrap):
-  item = bootstrap
-  item.config.display_transport = "usb"
-  item.config.usb_codec = "jpeg"
-  item.values.update(ClusterDisplayTransport="usb", ClusterUsbCodec="jpeg", IsOffroad=True)
-
-  def prepare(_groups, *, cancel_check):
-    item.values["ClusterUsbCodec"] = "h264"
-    assert cancel_check()
-    raise item.module.DependencyInstallCancelled("USB selection changed")
-
-  item.module.prepare_groups.side_effect = prepare
-  assert not item.module.ensure_cluster_dependencies(item.config)
-  item.module.prepare_groups.assert_called_once()
-  item.module.activate_groups.assert_not_called()
-
-
-@pytest.mark.parametrize("transport", ["usb", "network"])
-def test_inactive_transport_codec_change_does_not_cancel_preparation(bootstrap, transport):
-  item = bootstrap
-  item.config.display_transport = transport
-  item.config.usb_codec = "jpeg"
-  item.values.update(ClusterDisplayTransport=transport, ClusterUsbCodec="jpeg", IsOffroad=True)
-
-  def prepare(_groups, *, cancel_check):
-    item.values["ClusterNetworkCodec" if transport == "usb" else "ClusterUsbCodec"] = "h264"
-    assert not cancel_check()
-
-  item.module.prepare_groups.side_effect = prepare
-  assert item.module.ensure_cluster_dependencies(item.config)
-  item.module.activate_groups.assert_called_once()
-
-
-@pytest.mark.parametrize("changed", ["IsOffroad", "ClusterNetworkCodec"])
+@pytest.mark.parametrize("changed", ["IsOffroad", "ClusterDisplayTransport"])
 def test_driving_or_mode_change_cancels_preparation_without_activation(bootstrap, changed):
   item = bootstrap
   item.values["IsOffroad"] = True
   def prepare(_groups, *, cancel_check):
-    item.values[changed] = False if changed == "IsOffroad" else "h264"
+    item.values[changed] = False if changed == "IsOffroad" else "usb"
     assert cancel_check()
     raise item.module.DependencyInstallCancelled("selection changed")
   item.module.prepare_groups.side_effect = prepare
@@ -146,4 +111,4 @@ def test_onroad_wait_emits_periodic_liveness_without_installing(bootstrap):
   item.module.prepare_groups.assert_not_called()
   messages = [call.args[0] for call in item.module.flog.call_args_list if "Still waiting" in call.args[0]]
   assert len(messages) == 2
-  assert all("offroad=False" in message and "cluster-jpeg" in message for message in messages)
+  assert all("offroad=False" in message and "cluster-h264" in message for message in messages)

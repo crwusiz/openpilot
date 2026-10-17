@@ -21,10 +21,10 @@ def deploy_sandbox(tmp_path):
   package = tmp_path / "checkout with spaces" / "orange_pi"
   scripts = package / "scripts"
   shutil.copytree(PACKAGE / "scripts", scripts)
-  for name, content in {"cluster_receiver.py": "# receiver\n", "hdmi_display.py": "# display\n", "frame_stream.py": "# stream\n",
+  for name, content in {"cluster_receiver.py": "# receiver\n", "hdmi_display.py": "# display\n",
                         "display_controls.py": "# controls\n", "texture_presenter.py": "# presenter\n", "touch_status.py": "# touch status\n",
-                        "tcp_diagnostics.py": "# TCP diagnostics\n", "receiver_build.py": "# receiver build\n",
-                        "receiver_resources.py": "# receiver resources\n", "cluster_protocol.py": "# protocol\n",
+                         "receiver_build.py": "# receiver build\n",
+                        "receiver_resources.py": "# receiver resources\n", "control_socket.py": "# control socket\n",
                         "h264_receiver.py": "# H264 receiver\n", "h264_protocol.py": "# H264 protocol\n", "h264_scene.py": "# H264 scene\n",
                         "cluster_renderer.py": "# shared renderer\n", "cluster_render_support.py": "# shared support\n",
                         "README.md": "연결 대기\r\n수신기\r\n", "requirements.txt": "pygame\n",
@@ -156,9 +156,9 @@ def test_c4_update_packages_receiver_only_with_checksums_and_cleans_staging(depl
     if not relative.startswith("assets/"):
       assert b"\r\n" not in data
     assert not data.startswith(b"\xef\xbb\xbf")
-  assert files == {"README.md", "requirements.txt", "cluster-hdmi.service", "cluster_receiver.py", "hdmi_display.py", "frame_stream.py",
-                   "display_controls.py", "texture_presenter.py", "touch_status.py", "tcp_diagnostics.py", "receiver_build.py", "receiver_resources.py",
-                   "cluster_protocol.py",
+  assert files == {"README.md", "requirements.txt", "cluster-hdmi.service", "cluster_receiver.py", "hdmi_display.py",
+                   "display_controls.py", "texture_presenter.py", "touch_status.py",  "receiver_build.py", "receiver_resources.py",
+                   "control_socket.py",
                    "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "cluster_renderer.py", "cluster_render_support.py", "receiver_assets.txt",
                    *(deploy_sandbox / "receiver_assets.txt").read_text().splitlines(),
                    *("scripts/" + path.name for path in (deploy_sandbox / "scripts").glob("*.sh"))}
@@ -478,7 +478,7 @@ def test_incomplete_boot_setup_payload_is_rejected_before_ssh(deploy_sandbox, he
 
 
 @pytest.mark.parametrize("helper", [
-  "cluster_protocol.py", "frame_stream.py", "display_controls.py", "texture_presenter.py", "tcp_diagnostics.py", "receiver_build.py", "receiver_resources.py",
+  "control_socket.py",  "display_controls.py", "texture_presenter.py",  "receiver_build.py", "receiver_resources.py",
 ])
 def test_incomplete_runtime_payload_is_rejected_before_ssh(deploy_sandbox, helper):
   (deploy_sandbox / helper).unlink()

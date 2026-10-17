@@ -46,7 +46,7 @@ class H264DisplayAdapter:
 
   def check_encoder(self):
     if self.encoder_error is not None:
-      raise RuntimeError("USB H.264 encoder failed; select USB JPEG in Dashboard or inspect CLUSTER_USB_H264 logs") from self.encoder_error
+      raise RuntimeError("USB H.264 encoder failed; inspect CLUSTER_USB_H264 logs and restart Cluster after correcting the error") from self.encoder_error
 
   def is_prepared_stale(self, frame):
     return time.monotonic() - frame.created_at > self.max_frame_age

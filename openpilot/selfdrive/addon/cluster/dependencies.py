@@ -5,7 +5,6 @@ import time
 from openpilot.selfdrive.addon.dependencies import (
   DependencyError, DependencyInstallCancelled, activate_groups, groups_for_cluster, groups_ready, prepare_groups,
 )
-from openpilot.selfdrive.addon.cluster.cluster_config import requested_codec, requested_usb_codec
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 
 
@@ -14,16 +13,11 @@ def _still_selected(config):
   if not params.get_bool("ClusterEnable"):
     return False
   transport = params.get("ClusterDisplayTransport") or config.display_transport
-  if transport != config.display_transport:
-    return False
-  if transport == "usb":
-    return requested_usb_codec(params) == getattr(config, "usb_codec", "jpeg")
-  return requested_codec(params) == getattr(config, "network_codec", "jpeg")
+  return transport == config.display_transport
 
 
 def ensure_cluster_dependencies(config):
-  codec = getattr(config, "usb_codec" if config.display_transport == "usb" else "network_codec", "jpeg")
-  groups = groups_for_cluster(config.display_transport, codec)
+  groups = groups_for_cluster(config.display_transport)
   try:
     if groups_ready(groups):
       activate_groups(groups)

@@ -1,5 +1,4 @@
 import threading
-from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -213,7 +212,7 @@ def test_sdl_pixel_rotation_matches_touch_coordinate_system(raster_pygame, rotat
     presenter.close()
 
 
-def test_jpeg_frames_reuse_argb_buffer_without_stale_pixels_or_source_mutation(raster_pygame):
+def test_rgb_frames_reuse_argb_buffer_without_stale_pixels_or_source_mutation(raster_pygame):
   from PIL import Image
   pygame, video = raster_pygame
   presenter = TexturePresenter(pygame, size=(8, 4), fullscreen=False,
@@ -221,10 +220,8 @@ def test_jpeg_frames_reuse_argb_buffer_without_stale_pixels_or_source_mutation(r
   staging = None
   try:
     for color in ((210, 60, 15), (30, 90, 220), (0, 0, 0)):
-      jpeg = BytesIO()
-      Image.new("RGB", (8, 4), color).save(jpeg, format="JPEG", quality=90)
-      jpeg.seek(0)
-      frame = pygame.image.load(jpeg, "cluster.jpg")
+      image = Image.new("RGB", (8, 4), color)
+      frame = pygame.image.frombuffer(image.tobytes(), image.size, image.mode)
       assert frame.get_bitsize() == 24
       before = pygame.image.tostring(frame, "RGB")
       presenter.present(frame)

@@ -31,6 +31,8 @@ package_collect_files() {
   done
   for source in "$PACKAGE_DIR"/*.py "$PACKAGE_DIR"/scripts/*.sh; do
     [[ -e "$source" || -L "$source" ]] || continue
+    # In-place installations may still contain modules from the old receiver.
+    case "${source##*/}" in cluster_protocol.py|frame_stream.py|tcp_diagnostics.py) continue;; esac
     package_add_file "${source#"$PACKAGE_DIR/"}" "$PACKAGE_DIR"
   done
   for relative in cluster_renderer.py cluster_render_support.py; do
@@ -51,7 +53,7 @@ package_collect_files() {
     [[ "$relative" =~ ^assets/(fonts/[a-zA-Z0-9_-]+\.ttf|icons/[a-zA-Z0-9_-]+\.png)$ ]] || fail 'Invalid receiver asset path.'
     package_add_file "$relative" "$asset_root"
   done < "$PACKAGE_DIR/receiver_assets.txt"
-  for required in cluster_receiver.py cluster_protocol.py hdmi_display.py frame_stream.py display_controls.py texture_presenter.py touch_status.py tcp_diagnostics.py \
+  for required in cluster_receiver.py control_socket.py hdmi_display.py display_controls.py texture_presenter.py touch_status.py \
     receiver_build.py receiver_resources.py h264_receiver.py h264_protocol.py h264_scene.py cluster_renderer.py cluster_render_support.py \
     assets/fonts/NotoSansKR-Bold.ttf scripts/common.sh scripts/package_sources.sh scripts/prepare_h264.sh \
     scripts/update.sh scripts/ssh_port.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh scripts/fan_setup.sh; do

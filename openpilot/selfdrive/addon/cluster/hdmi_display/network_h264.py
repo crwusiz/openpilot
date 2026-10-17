@@ -1,7 +1,7 @@
-"""Optional H.264/WebRTC camera plus bounded TCP scene state.
+"""H.264/WebRTC camera plus bounded TCP scene state.
 
-No camera RGB conversion, cluster composition, JPEG encode or per-frame ACK
-window runs on C4 in this mode. The existing hardware livestream is reused.
+The existing hardware livestream is reused without C4 camera RGB conversion
+or cluster composition. The Pi renders the HUD locally.
 """
 import asyncio
 import contextlib
@@ -9,7 +9,6 @@ import json
 import signal
 import time
 
-from openpilot.selfdrive.addon.cluster.cluster_config import requested_codec
 from openpilot.selfdrive.addon.cluster.cluster_health_guard import ClusterHealthGuard
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 from openpilot.selfdrive.addon.cluster.cluster_runtime_metrics import ClusterRuntimeMetrics
@@ -75,7 +74,7 @@ async def write_control(writer, kind, payload, sequence=0, budget_s=0.25):
 
 
 def create_camera_stream(offer_sdp):
-  # Lazy imports leave the JPEG path independent of WebRTC dependencies.
+  # Load the native WebRTC binding only when constructing a stream.
   from teleoprtc.builder import WebRTCAnswerBuilder
   from openpilot.cereal import messaging
   from openpilot.system.webrtc.device.video import LiveStreamVideoStreamTrack
@@ -268,7 +267,7 @@ class H264NetworkServer:
              + f" | state_avg={state_wall * 1000 / state_frames:.1f}ms | state_cpu_avg={state_cpu * 1000 / state_frames:.1f}ms"
              + f" | video_source_age_ms={video_age} | resyncs={track.resyncs} | guard={int(self.degraded)}"
              + f" | encoder_bitrate_setting={bitrate}" + report_details
-             + " | encoder=existing_livestream | camera_rgb=0 | cluster_render=0 | jpeg_encode=0")
+             + " | encoder=existing_livestream | camera_rgb=0 | cluster_render=0")
         started, last_frames, last_video_bytes = now, track.video_frames, track.video_bytes
         total_bytes = state_frames = 0
         state_cpu = state_wall = 0.0
@@ -350,8 +349,8 @@ async def serve_h264(config, models):
     while True:
       if not enforce_cluster_transport(config.params, config.display_transport):
         break
-      if config.params.get("ClusterDisplayTransport") != "network" or requested_codec(config.params) != "h264":
-        flog("[CLUSTER_H264_RESTART] Transport/codec changed; restarting cluster.")
+      if config.params.get("ClusterDisplayTransport") != "network":
+        flog("[CLUSTER_H264_RESTART] Transport changed; restarting cluster.")
         break
       health = models.get_health_data()
       server.health = health

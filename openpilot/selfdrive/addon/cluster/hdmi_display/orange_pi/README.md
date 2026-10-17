@@ -1,6 +1,6 @@
 # Orange Pi 3W HDMI 클러스터 수신기
 
-C4와 같은 미러링폰 핫스팟에 연결해 **1920x480 클러스터 화면**을 HDMI 터치 모니터에 표시하는 독립 실행 패키지입니다. 기본은 C4가 합성한 전체 화면을 받는 **JPEG**이며, 실험용 **H.264/WebRTC 영상 + Pi 화면 합성**도 선택할 수 있습니다. 확인된 HDMI 모드는 **480x1920**이며, 가로로 설치한 모니터에 맞춰 영상을 90도 회전합니다. openpilot 전체를 설치할 필요는 없습니다. JPEG는 Python 3.10 이상과 pygame을 사용하고 H.264는 아래의 추가 의존성이 필요합니다.
+C4와 같은 미러링폰 핫스팟에 연결해 **H.264/WebRTC 카메라 영상과 TCP 상태 데이터**를 수신하고, Pi에서 **1920×480 클러스터 화면**을 합성해 HDMI 터치 모니터에 표시합니다. 확인된 HDMI 모드는 **480×1920**이며 가로 설치에 맞춰 90도 회전합니다. Python 3.10 이상, pygame, aiortc/PyAV, NumPy, Pillow, OpenCV가 필요합니다. openpilot 전체를 설치할 필요는 없습니다.
 
 ## 장비 확인 결과와 실행
 
@@ -59,7 +59,7 @@ sudo reboot
 
 ### 터치 하단 패널
 
-화면을 터치하면 하단에 **Pi 전체 CPU 사용률·CPU 온도·팬 출력/회전수·JPEG/H.264 모드·실제 표시 FPS**가 나타납니다. 온도는 CPU 온도 영역 중 가장 높은 값을 사용하고, 회전수 센서가 없는 팬은 `60% PWM`처럼 출력 비율을 표시합니다. 읽을 수 없는 값은 `--`로 표시합니다. FPS는 새 영상/합성 화면의 실제 표시 횟수이며 대기 화면이나 메뉴만 다시 그리는 횟수는 포함하지 않습니다.
+화면을 터치하면 하단에 **Pi 전체 CPU 사용률·CPU 온도·팬 출력/회전수·H.264 모드·실제 표시 FPS**가 나타납니다. 온도는 CPU 온도 영역 중 가장 높은 값을 사용하고, 회전수 센서가 없는 팬은 `60% PWM`처럼 출력 비율을 표시합니다. 읽을 수 없는 값은 `--`로 표시합니다. FPS는 새 영상/합성 화면의 실제 표시 횟수이며 대기 화면이나 메뉴만 다시 그리는 횟수는 포함하지 않습니다.
 
 밝기는 기존 10~100%의 10단계를 유지하며 **주간 80% / 야간 40%** 바로가기 버튼을 제공합니다. 화면 끄기·터치로 다시 켜기도 유지합니다. 패널은 마지막 조작 후 8초에 닫힙니다. 업데이트·전송 중에는 진행 상태를 계속 표시하며, 닫기를 누르면 작업은 배경에서 계속됩니다.
 
@@ -76,7 +76,6 @@ Pi 로그 수집·NAS 업로드는 **Cluster 활성화 + Network 디스플레이
 ```text
 안드로이드 미러링폰 핫스팟
 ├── C4: TCP 0.0.0.0:9200에서 대기
-│   ├── JPEG: C4가 합성한 전체 클러스터 영상 전송
 │   └── H.264: 기존 도로 카메라 영상을 WebRTC로 전송, TCP로 접속 협상·HUD·경로 상태 전송
 └── Orange Pi 3W: wlan0 대역에서 C4 검색
     ├── HDMI: 480x1920 모드에 회전한 영상 출력
@@ -85,45 +84,34 @@ Pi 로그 수집·NAS 업로드는 **Cluster 활성화 + Network 디스플레이
 
 대시보드에서 `Network (Orange Pi HDMI)`를 선택한 뒤 cluster를 켭니다. 저장된 `ClusterDisplayTransport`가 구성 기본값보다 우선합니다. `USB (TURZX Display)` 사용 중 Chestnut eGPU가 감지되면 `ClusterEnable`이 꺼지고 USB cluster가 중지됩니다. 부트로더 및 GPU 로딩 상태도 포함하며, eGPU를 분리해도 자동으로 다시 켜지지 않습니다. Network 모드는 eGPU 연결 여부와 관계없이 사용할 수 있습니다.
 
-### Network 코덱 선택: JPEG / H.264
+### H.264 전용 실행
 
-C4의 `cluster_run.py`는 스레드·스케줄링·로그 설정을 준비하고 `cluster/main.py`를 실행합니다. 이곳에서 선택한 출력에 따라 `usb_display/main.py` 또는 `hdmi_display/main.py`를 불러옵니다. USB 벤더 경로·로케일 준비는 USB 실행에서만 수행하며, HDMI 실행은 JPEG/H.264를 선택합니다. JPEG의 카메라·계기 합성과 전송 파이프라인은 `cluster_jpeg_runtime.py`를 공유하고, H.264는 별도 실행 경로를 사용합니다.
+대시보드의 **Toggles → Cluster Enable → Network (Orange Pi HDMI)**를 선택합니다. USB와 Network 모두 H.264 전용이므로 코덱 선택은 없습니다. 출력 방식을 바꾸면 Cluster가 정리 후 재시작합니다. 제거된 코덱 파라미터 파일은 새 Params 빌드 이후 manager 시작 시 미등록 키 정리로 삭제됩니다.
 
-C4 대시보드의 **Toggles → Cluster Enable → Network → Cluster network codec**에서 선택합니다. `ClusterNetworkCodec`의 기본값은 `jpeg`이며, 저장된 값이 없거나 지원하지 않는 값이면 JPEG를 사용합니다. 이 선택은 Network에만 적용하며 USB 출력 방식은 유지합니다. 전송 방식이나 코덱을 바꾸면 C4 cluster 프로세스가 자동으로 재시작됩니다.
+`cluster_run.py`가 스케줄링·스레드 제한·오류 로그를 준비하고 `cluster/main.py`가 선택한 출력만 불러옵니다. Network는 기존 C4 하드웨어 livestream 영상을 재사용하며 Pi가 카메라·HUD·경로를 합성합니다. USB는 C4에서 전체 화면을 합성해 별도 하드웨어 인코더로 보냅니다. Pi 디코더는 `aiortc_pyav_software`입니다. 카메라·모델 약20Hz에 맞춘 안정적인 표시가 목표이며 60FPS 영상 출력을 뜻하지 않습니다.
 
-| 선택 | C4 작업 | Pi 작업 |
-| --- | --- | --- |
-| JPEG — 기본 | 카메라·HUD·경로를 전체 화면으로 합성하고 JPEG 전송 | JPEG 디코딩·HDMI 출력 |
-| H.264 — 실험용 | 기존 하드웨어 livestream 인코더의 도로 카메라를 WebRTC로 전송하고 HUD·경로 상태를 TCP 9200으로 전송 | 영상 디코딩, 같은 렌더러·폰트·아이콘으로 HUD·경로 합성 후 HDMI 출력 |
-
-H.264는 완성된 클러스터 화면을 C4에서 다시 H.264로 인코딩하는 방식이 아닙니다. 이 모드의 C4 cluster는 카메라 RGB 전처리·화면 합성·JPEG 인코딩을 수행하지 않습니다. Pi의 현재 디코더는 `aiortc_pyav_software`이며 하드웨어 디코딩이 아닙니다. 2026-10-17 주행 로그에서 C4 송신은 약20FPS, Pi 표시는 약15FPS였으며 아래 개선 후 실제 표시 FPS는 다음 주행 로그로 확인합니다. 카메라와 모델의 약20Hz 갱신을 기준으로 안정적인 표시를 목표로 하며, 60FPS 영상 출력을 뜻하지 않습니다.
-
-새 모드를 사용하기 전에 C4 코드를 갱신하고 cluster 프로세스를 재시작합니다. 이어서 **C4에서** 다음을 실행해 Pi 수신기·공유 렌더러·폰트·아이콘과 선택 의존성을 갱신합니다. 정상 완료하면 Pi는 약5초 뒤 자동 재부팅됩니다.
+C4 코드를 업데이트하고 정상 빌드·재시작한 뒤 **C4에서** 다음 명령으로 Pi 수신기·공유 렌더러·폰트·아이콘도 갱신합니다. 터치 패널의 Pi 업데이트 버튼도 같은 작업을 실행합니다. 성공하면 Pi가 약5초 후 재부팅됩니다.
 
 ```bash
 bash scripts/pi_update.sh
 ```
 
-`install.sh`와 `pi_update.sh`는 OS의 `python3-aiortc`, `python3-av`, `python3-numpy`, `python3-pil`, `python3-opencv` 준비를 시도합니다. 업데이트에서는 기존 수신기를 중지하기 전에 실행합니다. 패키지를 준비하지 못하면 `[CLUSTER_H264_DEPS]` 경고를 남기며 기본 JPEG 수신기 갱신을 계속합니다. 이 경우 H.264를 선택하면 누락 의존성 오류가 명시되고 연결이 종료됩니다. 자동 전환은 하지 않으므로 **대시보드에서 JPEG를 다시 선택**해 복귀합니다. JPEG 실행에는 이 추가 모듈을 요구하지 않습니다.
+`install.sh`와 `pi_update.sh`는 OS의 `python3-aiortc`, `python3-av`, `python3-numpy`, `python3-pil`, `python3-opencv`를 필수로 확인·준비합니다. 업데이트는 **실행 중인 수신기를 중지하기 전에** 이를 검사하며, 준비에 실패하면 교체를 취소하고 기존 수신기를 유지합니다. 파일 교체 후 기동 실패 시 기존 백업·복구 절차를 사용합니다. 사용하지 않는 이전 수신 모듈은 적용 과정에서 제거하며 복구용 백업에는 보존합니다.
 
-화면 끄기·터치로 다시 켜기·밝기 조절은 두 모드에서 같습니다. 다만 H.264 화면을 끄면 Pi 합성·표시는 쉬고 C4 상태 전송은 최대5Hz로 줄지만 **WebRTC 수신·디코딩·RGB 변환은 계속합니다.** 압축 영상의 참조 프레임과 최신 영상을 유지해야 하므로 JPEG의 저속 프레임 전송처럼 영상 처리 부하 전체가 줄어드는 것은 아닙니다.
+화면을 끄면 Pi 합성·표시는 쉬고 C4 상태 전송은 최대5Hz로 줄지만 **WebRTC 수신·디코딩·RGB 변환은 계속합니다.** 다시 터치하면 최신 수신 영상으로 표시를 재개합니다.
 
-### 두 모드의 로그 비교
+### 프레임과 안정성 로그
 
-2026-10-16 주행 비교에서는 H.264 표시가 약15FPS, JPEG가 약7FPS였으므로 H.264를 우선 개선하며 JPEG는 복구·비교용으로 유지합니다. [측정 구간과 보완 내용](../../NETWORK_COMPARISON.md)을 참고하세요. 10월17일 사용자가 H.264 폰트·아이콘, 팬, 터치 Pi 업데이트·로그 전송의 실제 동작을 확인했습니다. 이후 개선의 확인 대상은 표시 FPS와 순간 끊김입니다.
+같은 주행의 C4·Pi 로그를 함께 확인하고 연결 직후·화면 OFF 구간을 구분합니다. 10월17일 사용자가 폰트·아이콘·팬·터치 업데이트·로그 전송 동작을 확인했습니다. 이후에는 실제 표시 FPS와 순간 중단, C4 주행 입력 상태를 확인합니다.
 
-같은 해상도·밝기·주행 조건에서 C4 로그와 Pi 로그를 함께 비교합니다. 연결 직후와 화면 OFF 구간을 구분하며, 단순 목표 FPS보다 표시 FPS·순간 중단·주행 입력 상태를 함께 확인합니다.
-
-| 모드 / 로그 | 확인할 항목 |
+| 로그 | 확인할 항목 |
 | --- | --- |
-| JPEG: C4 `[CLUSTER_NETWORK_PERF]`, Pi `[CLUSTER_RX_PERF]` | ACK FPS·대기, JPEG 수신·디코딩, `display_fps`, 표시 큐와 `display_gap_max` — 아래 JPEG 성능 절의 정의 사용 |
-| H.264: C4 `[CLUSTER_H264_PERF]` | `video_fps`, `state_fps`, 영상·상태 처리량, `state_avg`·`state_cpu_avg`, `video_source_age_ms`, `guard`, 수신 보고가 있을 때 `rtcp_loss_pct`·`rtcp_packets_lost`·`rtcp_jitter_ms` |
-| H.264: Pi `[CLUSTER_H264_RX_PERF]`, C4 `[CLUSTER_H264_PI_PERF]` | 디코딩 후 `rx_fps`/`video_fps`와 `display_fps`, `rgb_convert_avg`·`render_avg`·`display_avg`·`queue_wait_avg`, `display_gap_max`, 대기 영상 교체, `video_stale`·`state_stale`. C4에 전달된 Pi 피드백에는 대응 항목의 `_ms` 접미사와 `video_age_ms`·`state_age_ms`도 있음 |
-| 두 모드: `[CLUSTER_RESOURCE_PERF]`, `[CLUSTER_LOAD_GUARD]`, `[CLUSTER_INPUT_DIAG]` | C4 cluster CPU·메모리, 모델·위치 입력 receive age, 통신 경고·실패 서비스, 부하 보호의 활성 이유와 복구 |
+| C4 `[CLUSTER_H264_PERF]` | `video_fps`, `state_fps`, 소스 영상 age, 처리량, RTCP 손실·지터 |
+| Pi `[CLUSTER_H264_RX_PERF]`, C4 `[CLUSTER_H264_PI_PERF]` | `display_fps`, RGB 변환·합성·출력 시간, 큐 대기·최대 표시 간격, 영상·상태 stale |
+| C4 `[CLUSTER_RESOURCE_PERF]`, `[CLUSTER_LOAD_GUARD]`, `[CLUSTER_INPUT_DIAG]` | CPU·RSS, 모델·위치 입력 age, 통신 경고, 부하 보호와 복구 |
+| Pi `[CLUSTER_PI_RESOURCE_PERF]` | CPU·RSS·스레드·온도·주파수·팬 PWM |
 
-H.264의 `rgb_convert_avg`는 디코딩된 프레임을 RGB로 바꾸는 시간이며 H.264 디코더 내부 실행 시간을 별도로 측정한 값은 아닙니다. `render_avg`는 Pi 화면 합성, `display_avg`는 그 뒤의 화면 출력 처리입니다. 각 단계는 다른 스레드·다른 주기로 겹쳐 실행되므로 단계를 더해 FPS를 계산하지 않습니다. 영상 수신 FPS가 높아져도 Pi의 표시 FPS나 큐 대기가 나빠지면 개선으로 판단하지 않습니다.
-
-지연 항목의 기준도 다릅니다. C4 `video_source_age_ms`는 C4의 카메라 EOF 시각을 같은 C4 시계와 비교한 값입니다. Pi `video_age_ms`는 마지막 디코딩·RGB 변환 영상이 Pi에 준비된 뒤의 로컬 경과 시간, `state_age_ms`는 마지막 상태 메시지를 Pi가 받은 뒤의 경과 시간입니다. **어느 값도 카메라 촬영부터 실제 HDMI 표시까지의 종단 지연 측정값이 아닙니다.** 영상과 상태의 시계·수신 시점이 다르므로 이를 합산하거나 정확한 프레임 동기화를 확인한 값으로 해석하지 않습니다.
+각 단계는 겹쳐 실행되므로 소요 시간을 단순 합산해 FPS를 계산하지 않습니다. C4 소스 age와 Pi 수신 후 age는 각 기기의 로컬 시계 기준이며 촬영부터 HDMI 표시까지의 종단 지연 측정값이 아닙니다.
 
 ### 2026-10-17 H.264 프레임·복구 보완
 
@@ -146,7 +134,7 @@ C4 대시보드의 **Toggles → Cluster Enable** 아래에 `Orange Pi 연결됨
 
 연결이 끊기면 `Orange Pi 연결 대기 중`으로 바뀝니다. C4 송신 프로세스가 비정상 종료해 상태를 지우지 못해도 마지막 갱신으로부터 10초가 지나면 연결된 것으로 표시하지 않습니다. Cluster가 꺼져 있거나 USB 모드이면 Network 모드를 켜라는 안내가 표시됩니다.
 
-일부 핫스팟은 접속 장치 간 통신을 차단합니다. 같은 SSID에서도 연결되지 않으면 AP/client isolation을 확인합니다. 프로토콜에는 인증·암호화가 없으므로 차량 내부의 신뢰할 수 있는 핫스팟에서 사용합니다.
+일부 핫스팟은 접속 장치 간 통신을 차단합니다. 같은 SSID에서도 연결되지 않으면 AP/client isolation을 확인합니다. TCP 접속 협상·상태 채널에는 별도 인증·암호화가 없으므로 차량 내부의 신뢰할 수 있는 핫스팟에서 사용합니다.
 
 ## 스크립트 목록
 
@@ -155,7 +143,7 @@ C4 대시보드의 **Toggles → Cluster Enable** 아래에 `Orange Pi 연결됨
 | 파일 | 용도 |
 | --- | --- |
 | [install.sh](scripts/install.sh) | OS pygame·필수 라이브러리 설치, `/opt/cluster-receiver`로 패키지 복사 |
-| [prepare_h264.sh](scripts/prepare_h264.sh) | 선택 H.264 의존성 준비; 실패하면 경고를 남기며 JPEG는 유지 |
+| [prepare_h264.sh](scripts/prepare_h264.sh) | 필수 H.264 의존성 준비; 실패하면 기존 수신기 교체 취소 |
 | [connect_wifi.sh](scripts/connect_wifi.sh) | 핫스팟 연결 및 IP 확인; 비밀번호는 대화형 입력 |
 | [ensure_wifi.sh](scripts/ensure_wifi.sh) | 차량 `Android` 프로필 저장·재사용, 자동 연결·Wi-Fi 절전 해제 |
 | [wifi_power_save.sh](scripts/wifi_power_save.sh) | 활성 Wi-Fi 프로필의 절전 설정만 변경하고 실제 인터페이스의 `off` 확인 |
@@ -242,7 +230,7 @@ USB 터치는 HDMI와 별도 케이블로 연결합니다. 밝기·화면 끄기
 
 시작 밝기는 **8단계(80%)**입니다. 화면을 터치하면 밝기 슬라이더와 **화면 끄기** 버튼이 나타납니다. 슬라이더는 **1~10단계(10%, 20%, …, 100%)**로 조절하며, 현재 단계와 밝기를 함께 표시합니다. 닫기 버튼이나 메뉴 밖 터치로 닫을 수 있습니다. 조작하지 않으면 약 8초 뒤 메뉴가 닫힙니다. 꺼진 화면을 다시 터치하면 직전 밝기로 복원하고 최신 수신 영상을 표시합니다. 밝기는 현재 실행 동안 유지하며 서비스 재시작 시 기본값으로 돌아갑니다. 시작값은 `--brightness`에 퍼센트로 지정하며, 10% 단위로 반올림합니다.
 
-밝기는 영상 색상을 어둡게 하는 방식이고, 화면 끄기는 검은 화면을 표시합니다. **HDMI 모니터의 물리 백라이트나 전원을 끄지는 않습니다.** 모니터가 검은 화면에서도 빛을 내면 모니터 자체 밝기 설정이 필요합니다. 화면이 꺼져 있는 동안 Pi는 JPEG 디코딩을 생략하고 최신 JPEG만 보관합니다. 양쪽이 새 버전이면 C4도 최대 5 FPS로 줄여 불필요한 렌더링·전송을 줄입니다. 다시 터치하면 보관한 영상으로 즉시 복원하고 다음 ACK에서 정상 프레임 속도로 돌아갑니다.
+밝기는 영상 색상을 어둡게 하는 방식이고, 화면 끄기는 검은 화면을 표시합니다. **HDMI 모니터의 물리 백라이트나 전원을 끄지는 않습니다.** 모니터가 검은 화면에서도 빛을 내면 모니터 자체 밝기 설정이 필요합니다. 화면이 꺼져 있는 동안 Pi 합성·출력은 쉬지만 WebRTC 참조 프레임 유지를 위해 영상 수신·디코딩은 계속합니다. 다시 터치하면 최신 수신 영상으로 표시를 재개합니다.
 
 ## 콘솔 실행과 회전
 
@@ -509,7 +497,7 @@ sudo bash /opt/cluster-receiver/scripts/service.sh status
 --scan-timeout 0.12     주소별 연결 제한 시간(초)
 --scan-workers 32       병렬 검색 작업 수
 --reconnect-delay 2     재검색 대기 시간(초)
---frame-timeout 2       프레임 전체 수신 제한 시간(초)
+--frame-timeout 2       영상 최신성 제한·초기 협상 메시지 수신 제한(초)
 --width 480             실제 출력 폭
 --height 1920           실제 출력 높이
 --rotation 90           영상 시계 방향 회전: 0, 90, 180, 270
@@ -524,67 +512,7 @@ sudo bash /opt/cluster-receiver/scripts/service.sh status
 
 PC 창 모드 점검에서는 `requirements.txt`를 PC 가상 환경에 설치하고 Python 수신기를 직접 실행합니다. PC pip 설치와 Orange Pi OS pygame 설치는 별개입니다.
 
-## JPEG 프레임 성능 확인
-
-이하 JPEG 인코딩·ACK·프레임 전체 수신 제한의 설명은 JPEG 모드 기준입니다. H.264는 위의 영상·상태 분리 지표를 사용합니다.
-
-Network 모드는 전체 화면 JPEG 전송의 **20 FPS·JPEG 품질 68**을 기본값으로 사용합니다. 2026-10-12 주행에서는 Pi의 JPEG 본문 도착 대기가 표시 처리보다 길어 전송량을 줄이는 기준으로 변경했습니다. C4 UI의 `FPS` 환경 변수는 클러스터에 적용하지 않습니다. 별도 비교가 필요하면 `CLUSTER_FPS`로 클러스터 목표만 1~60 FPS 범위에서 조절합니다. 카메라와 모델은 약 20 Hz로 들어오며, 같은 카메라 위의 계기·애니메이션을 더 자주 그려도 새로운 카메라 영상이 생기는 것은 아닙니다. USB도 기존 20 FPS·품질 68을 유지하며 해상도는 USB `1920x462`, Network `1920x480`입니다. 20 FPS 설정은 실제 20 FPS 달성이나 지연 상한의 보장치가 아닙니다.
-
-전송·인코딩 대기가 있으면 C4는 다음 화면 한 장까지 준비하고 추가 합성을 쉽니다. 정상 Network 스트리밍에서는 전송 슬롯이 가득 차도 다음 JPEG 한 장을 준비해 ACK 해제 후 바로 보낼 수 있습니다. 오래된 ACK·연결 오류 때는 미리 준비하지 않으며, Pi가 연결되지 않았을 때는 연결 시작용 영상을 초당 한 장만 준비합니다. 경로·차선 알파 합성은 렌더러별 단색 띠와 출력 버퍼를 재사용하고 OpenCV `addWeighted`로 처리합니다. 같은 색의 픽셀 띠를 매번 만들지 않으며 기존 그라데이션 단계와 픽셀 결과를 유지합니다. 캐시는 최대 12색, 띠 높이는 64픽셀로 제한합니다. 기본 Network 해상도에서 출력 버퍼까지 약 3 MiB가 상한이며, 큰 입력은 기존 lookup 경로를 사용합니다. HUD의 글자 마스크도 색과 분리해 재사용하므로 가감속 색이 변할 때 같은 숫자를 다시 래스터화하지 않습니다. 글자 캐시는 최대 256개 / 8 MiB로 제한합니다. Cluster 프로세스의 OpenCV와 BLAS 작업 스레드 수를 1로 제한하고 Linux CPU 우선순위를 낮춥니다. manager가 NumPy를 이미 불러온 상태에서 fork했다면 cluster 자식 프로세스만 같은 PID로 새 Python 인터프리터에서 시작해 스레드 제한을 적용합니다.
-
-USB도 같은 대기 제어를 사용합니다. 업로드 중에는 다음 프레임 한 장까지 준비하며, 이 프레임이 인코딩 중이거나 대기 중이면 추가 합성을 쉬게 합니다. 전송이 막히지 않을 때는 렌더링과 인코딩을 겹쳐 처리합니다. 연결이 끊기면 USB도 연결 시작용 영상을 초당 한 장만 합성합니다. 카메라 원본은 계속 수신하되 전송 여유가 없으면 전처리를 약 5Hz로 줄입니다. USB는 렌더 시작 후 250ms를 넘긴 대기 JPEG를 버리고 새 프레임으로 재개합니다. 이 기준은 전송 완료나 실제 표시 지연의 상한은 아닙니다. 렌더러는 NumPy 배경 버퍼를 재사용하고 카메라 영역만 갱신하며, 인코더에 넘긴 PIL 화면은 다음 렌더링과 독립된 픽셀을 유지합니다.
-
-경로 색상 전환과 선행 차량 위치·투명도 필터는 목표 FPS가 아니라 실제 렌더 사이의 경과 시간을 사용합니다. 느린 전송 때문에 출력이 줄어들어도 해당 필터의 전환 시간이 같은 비율로 늘어나지 않습니다. 완전히 투명한 차선·도로 경계는 좌표 투영 전에 생략해 화면에 영향을 주지 않는 계산을 줄입니다.
-
-카메라 원본을 계속 받아 비우면서, 아직 렌더러가 사용하지 않은 전처리 영상이 있으면 반복 변환을 줄입니다. 대기 중에도 약 5Hz로 최신 영상을 유지하며, 전송 여유가 다시 생기거나 렌더러가 기존 영상을 소비하면 새 원본을 바로 준비합니다. 이 제어는 화면 렌더링이 약 7FPS인데 카메라 전처리는 약 12FPS로 수행되던 중복 작업을 줄이기 위한 것입니다.
-
-주행 중 modelV2·deviceMotion의 마지막 수신이 500ms를 넘거나 deviceMotion `inputsOK`가 false이면 보조 화면의 합성·인코딩을 최대 5FPS로 제한합니다. selfdriveState가 알리는 commIssue·commIssueAvgFreq·modeldLagging·selfdrivedLagging·processNotRunning·cameraMalfunction·cameraFrameRate에도 같은 제한을 적용합니다. 1초 동안 정상 입력 상태가 유지되면 설정된 목표로 복원합니다. 원본 카메라 수신과 상태 갱신은 계속하며, 주행 프로세스나 경고 판정은 변경하지 않습니다. `[CLUSTER_LOAD_GUARD]`가 활성 이유와 복구를 기록하고 `CLUSTER_MAIN_PERF health_skipped`가 이 제한으로 생략한 렌더 주기를 표시합니다. USB도 같은 입력 장애 시 부하 제한을 적용합니다.
-
-`[CLUSTER_INPUT_DIAG]`에는 실제 selfdriveState의 주행 통신·프로세스 경고와 해제, errorLogMessage로 받은 selfdrived의 구조화된 `commIssue` 진단 목록(`invalid`, `not_alive`, `not_freq_ok`), 주요 manager 프로세스의 PID·실행 상태·종료 코드를 기록합니다. 이 목록은 selfdrived의 raw 상태이며 검사 제외 서비스도 포함합니다. `alertDebug`·`lateralManeuverPlan`·센서·활성 GPS 서비스 등의 이름이 보인다는 이유만으로 실제 통신 경고 원인으로 판단하지 않습니다. 실행 중인 selfdrived의 `ignore_alive/ignore_avg_freq/ignore_valid`와 함께 해석해야 합니다. manager 항목의 순서는 `이름, PID, running, shouldBeRunning, exitCode`입니다. 새 구독은 읽기 전용이며, 진단 이벤트는 최대 16개만 대기시키고 수신 잠금 밖에서 파일에 기록합니다. errorLogMessage는 최신 메시지만 받아 사용하는 방식이므로 모든 오류 원로그를 완전히 보존하는 기능은 아닙니다. RESOURCE의 `comm_issue_logs`는 관측한 오류 기록 수, `drive_fault_alert`는 마지막 수신한 주행 경고, PID 항목은 마지막 manager 상태이며 각 상태의 receive age도 함께 봅니다.
-
-C4와 Pi가 모두 새 버전이면 첫 프레임의 헤더와 ACK에 있는 예약 바이트로 스트리밍 지원을 확인합니다. 첫 프레임은 화면 출력 완료를 기다리고, 이후에는 Pi가 JPEG 본문을 받은 즉시 ACK를 보냅니다. C4는 기본 최대 **2장, 합계 512 KiB**의 ACK를 기다리는 동안 다음 프레임을 보낼 수 있습니다. 한 장이 512 KiB보다 크면 대기 프레임이 없을 때만 전송하며 프로토콜의 4 MiB 제한은 유지합니다. 오래된 ACK가 250ms 이상 대기 중이면 새 프레임 준비·전송을 기다립니다. 보내지 않은 영상도 생성 후 250ms가 지나면 버리고 최신 상태에서 다시 준비합니다. 이 값은 실제 출력 지연의 보장치가 아니라, 과거 영상을 더 쌓지 않기 위한 제한입니다.
-
-2026-10-09 로그에서는 평균 수신 확인이 약 6.3 FPS이고 ACK 대기가 약 1.78초였습니다. 이전 12장 창은 느린 링크에서 약 2초 분량의 영상을 TCP에 쌓을 수 있었습니다. Pi가 대기 JPEG 한 장만 유지해도 TCP에 이미 들어간 과거 영상은 건너뛸 수 없으므로 전송 대기량을 줄였습니다. Pi는 별도 스레드로 수신하고 대기 JPEG 한 장만 유지하며, 출력이 늦어지면 대기 영상을 최신 영상으로 교체합니다. SDL 이벤트와 화면 출력은 수신기 메인 스레드에서 처리합니다. [SDL 화면 출력의 스레드 제약](https://wiki.libsdl.org/SDL2/SDL_RenderPresent)
-
-Pi는 SDL2 texture를 재사용하며 회전·크기 조절·밝기 조절을 GPU에 맡깁니다. JPEG RGB24 영상을 같은 32bit ARGB Surface에 변환하고 같은 형식의 texture로 업로드해 매 프레임 전체 변환 버퍼를 새로 할당하던 비용을 줄입니다. `[CLUSTER_HDMI_UPLOAD] ... staging=reused_argb8888`로 새 경로를 확인합니다. 사용할 수 없으면 기존 Surface 출력으로 자동 전환합니다. `[CLUSTER_HDMI_RENDERER] texture` 또는 `surface` 로그로 선택된 경로를 확인합니다. 새 출력 경로에 문제가 있으면 `run_console.sh --renderer surface --log-touch`로 기존 경로와 비교할 수 있습니다. [pygame SDL2 texture·renderer API](https://www.pygame.org/docs/ref/sdl2_video.html), [Texture.update 형식 변환 구현](https://github.com/pygame/pygame/blob/2.6.1/src_c/cython/pygame/_sdl2/video.pyx#L721)
-
-패킷 크기와 버전은 유지하므로 한쪽만 업데이트한 경우 기존의 화면 출력 완료 ACK 방식(`legacy`)을 사용합니다. 이 방식의 `network_avg`에는 Wi-Fi 전송뿐 아니라 Pi의 JPEG 디코딩·회전·화면 출력과 ACK 왕복 시간이 포함됩니다. 스트리밍 방식(`stream`)의 ACK는 수신 확인이며 실제 화면 출력 완료를 뜻하지 않습니다. JPEG 크기/FPS로 계산한 처리량도 Wi-Fi 링크 속도를 직접 측정한 값은 아닙니다.
-
-수정된 수신기를 C4의 `bash scripts/pi_update.sh`로 반영하고 C4 클러스터도 다시 시작합니다. C4의 `[CLUSTER_NETWORK_MODE] stream`과 Pi의 `[CLUSTER_RX_MODE] stream`을 확인합니다. `legacy`이면 양쪽 파일 업데이트와 실행 중인 프로세스 재시작 여부를 확인합니다. 성능 로그는 다음과 같이 비교합니다.
-
-| 로그 | 항목과 의미 |
-| --- | --- |
-| C4 `[CLUSTER_NETWORK_PERF]` | `fps`: 정상 ACK를 받은 프레임 수, `prep_avg`: JPEG 준비, `send_avg`: 헤더와 JPEG를 합친 `sendall` 호출, `ack_wait_avg/max`: 전송 호출 종료부터 ACK까지. `send_age_avg/max`: 생성부터 전송 시작까지, `frame_age_avg/max`: 생성부터 ACK까지이며 실제 화면 표시까지의 나이는 아닙니다. `encode_age_avg`·`encoded_wait_avg`는 생성→인코딩 완료·인코딩 완료→전송 시작, `window_wait_avg/max`는 전송 창 대기 시간입니다. `ack_gap_max`는 ACK 사이 최장 간격, `pending_frames/kb`·`oldest_ack_age`는 현재 전송 대기량·가장 오래된 ACK의 나이, `stale_drops`는 만료로 폐기한 영상입니다. `mode=stream`, `ack=receive`이면 수신 확인이고 `mode=legacy`, `ack=display`이면 출력 완료 확인입니다. `screen_off`는 Pi가 알린 화면 끄기 상태입니다. 정상 ACK가 있는 동안 약 10초마다 기록합니다. |
-| C4 `[CLUSTER_MAIN_PERF]` | `target`: 목표 FPS, `transport_skipped`: 대기·화면 끄기 때문에 렌더링을 생략한 주기 수. `render_avg`는 대기를 포함한 합성 경과 시간, `render_cpu_avg`는 렌더 메인 스레드의 실제 CPU 실행 시간입니다. `camera_copy_avg`: 영상 복사, `snapshot_avg`: 모델/HUD 상태 조회와 잠금 대기, `path_avg`: 경로·차선·리드 표시의 경과 시간, `path_cpu_avg`: 같은 경로 단계의 스레드 CPU 시간, `hud_avg`: PIL 변환과 HUD 합성. CPU와 경과 시간은 같은 단계를 다른 시계로 측정한 값이므로 더하지 않습니다. 약 10초마다 기록합니다. |
-| C4 `[CLUSTER_CAM_PERF]` | `receive_fps`는 VisionIPC 원본 수신 속도, `fps`는 전처리 완료 속도, `skipped`는 전송 여유가 없어 전처리를 생략한 원본 수입니다. 네트워크 전송이 막힌 동안에도 원본을 계속 받아 비우되 전처리는 최대 약 5회/초로 줄입니다. 전송 여유가 생기면 현재 원본을 즉시 전처리합니다. USB는 기존 처리 속도를 유지합니다. |
-| C4 `[CLUSTER_RESOURCE_PERF]` | Cluster CPU·RSS·스레드 수, 기기 CPU·온도·메모리, 모델 드롭률·실행 시간, deviceMotion의 `inputsOK`·`posenetOK`를 함께 기록합니다. `onroad_started`는 deviceState의 주행 상태, `car_state_seen`은 차량 데이터 수신 여부, `model_age_ms`·`device_motion_age_ms`·`car_state_age_ms`는 마지막 수신 후 경과 시간입니다. `cpu_pct=100`은 CPU 한 코어를 계속 사용한 값입니다. `model_drop_max`와 해당 구간의 오류 업데이트 수로 잠깐 발생한 문제도 확인합니다. 아직 받지 못한 상태는 `n/a`로 표시하며, 미수신 중 오류 카운터 0은 건강 확인을 뜻하지 않습니다. |
-| Pi `[CLUSTER_RX_PERF]` | `mode=stream`일 때 `fps`: 수신 FPS, `display_fps`: 실제 영상 출력 FPS, `dropped`: 대기 JPEG 교체 횟수입니다. 화면 끄기·메뉴 다시 그리기는 영상 출력 수에 포함하지 않습니다. `queue_wait_avg/max`: 수신 후 출력 대기, `display_gap_max`: 영상 출력 사이의 최대 간격, `display_max`: 최악의 화면 처리 시간도 기록합니다. `header_wait_avg`: 다음 헤더 대기, `receive_avg`: JPEG 본문 수신, `display_avg`: 전체 화면 처리, `ack_send_avg`: ACK 전송 호출입니다. `payload_wait_avg/max`·`payload_read_calls_avg`·`payload_read_max`는 JPEG 수신 중 readiness 대기와 읽기 호출을 구분합니다. `decode/rotate/scale/blit/flip`의 평균·최대값, `convert/upload/draw`의 평균·최대값도 기록합니다. `blit`에는 색상 변환·texture 업로드·draw가 포함되므로 이 세 값을 다시 더하지 않습니다. |
-
-`send_avg`가 짧아도 커널 송신 버퍼에 들어간 JPEG가 아직 전송 중일 수 있습니다. `ack_wait_avg`만으로 Wi-Fi 병목을 판정하지 않고 Pi의 `receive_avg`와 표시 단계 시간을 함께 봅니다. `header_wait_avg`에는 C4가 다음 프레임을 준비하는 시간도 포함됩니다. readiness·소켓 읽기 호출의 시간에는 OS 대기·수신 스레드 스케줄·GIL 재획득도 포함되므로 무선 전송 시간만의 측정값으로 해석하지 않습니다. 스트리밍 로그의 수신 단계 평균은 수신한 프레임 수, 표시 단계 평균은 실제 출력한 프레임 수로 계산합니다. 송수신·인코딩·화면 처리는 겹쳐 동작하므로 모든 단계 시간을 더해서 FPS를 계산하지 않습니다. `[CLUSTER_RX_RUNTIME]`의 pygame·SDL·SDL_image 버전과 `[CLUSTER_RX_SOCKET]`의 실제 소켓 버퍼도 연결 환경 비교에 사용합니다.
-
-수신 `fps`가 목표에 가까워도 `display_fps`가 낮으면 Pi 화면 처리 병목이 남아 있는 것입니다. 수신 `fps`도 낮다면 C4 렌더링·인코딩, JPEG 수신 시간과 Wi-Fi 상태를 확인합니다. 기본 20 FPS의 유지 여부와 순간 표시 중단·조향 표시 지연을 함께 확인합니다. CPU 우선순위·스레드 제한은 자원 경쟁을 줄이는 조치이며, 기존 로그만으로 model lagging이나 locationd 오류의 원인이 cluster라고 단정할 수는 없습니다. 새 자원 로그와 오류 발생 시각을 대조하고 같은 조건에서 cluster를 끈 주행과 비교합니다.
-
-모델 메시지가 멈추면 `model_lagging_updates=0`이어도 마지막 `model_drop_perc`만 남아 있을 수 있습니다. `model_age_ms`·`device_motion_age_ms`와 차량 데이터의 `car_state_age_ms`를 함께 확인합니다. 표시용 경로는 기존 SubMaster의 `valid`·`alive`를 확인하며, modelV2가 약 0.5초 이상 갱신되지 않으면 옛 경로를 숨깁니다. 선행 차량 표시도 radarState의 `valid`·`alive`를 확인해 갱신이 멈춘 위치·거리를 계속 표시하지 않습니다. 차량 HUD는 계속 갱신하고 신선한 유효 메시지가 돌아오면 해당 표시를 복구합니다. 이 동작은 메시지 발행 중단 자체의 원인을 고치는 조치는 아닙니다.
-
-Pi의 `--frame-timeout` 기본값은 2초입니다. 다음 헤더를 기다리는 idle 시간과 첫 헤더 바이트부터 헤더·JPEG 전체를 완료할 시간을 각각 제한합니다. 부분 데이터가 조금씩 와도 완료 제한 시간은 연장하지 않습니다. 마지막 완성 JPEG 이후 2초가 지나면 오래된 주행 영상을 대기 화면으로 바꾸며, 진행 중인 JPEG가 제시간에 완료되면 같은 TCP 연결에서 복구합니다. `[CLUSTER_RX_STALE]`·`[CLUSTER_RX_RESUMED]`는 이 표시 전환을 기록합니다. 실제 수신 실패는 `phase=idle_header/partial_header/partial_payload`, 수신 바이트 수와 경과 시간을 기록하므로 대기 표시와 소켓 종료를 구분할 수 있습니다.
-
-자동 검색으로 연결한 C4 주소는 기억해 두고 연결이 끊기면 그 주소로 먼저 재접속합니다. 알려진 주소와 명시적 `--host`에는 회당 최대1초·최대2회, 중간150ms를 포함한 전체2초 접속 예산을 사용하고 대기 중 SDL 이벤트를 처리합니다. `[CLUSTER_RX_CONNECT]`로 시도와 제한 시간을 확인합니다. 모두 실패한 경우만 서브넷을 다시 검색하며, 탐색용 `--scan-timeout`은 계속 별도로 적용합니다. `--host`를 지정하면 해당 주소만 사용합니다. C4도 연결 복구 중에는 listener를 유지해 accept 대기 중인 재접속을 함께 끊지 않습니다. 최종 종료 때는 포트를 닫습니다. `--reconnect-delay`보다 오래 유지된 연결에는 종료 후 추가 대기를 넣지 않습니다. 연결하지 못했거나 짧게 끝난 경우 기존 지연만큼 대기해 반복 접속을 제한합니다. 접속 시도의2초 예산은 전체 화면 복구 시간의 보장치가 아닙니다.
-
-Pi 수신기는 시작할 때 `[CLUSTER_RX_BUILD] startup_source_sha256=...`에 실행 시작 시 읽은 수신기 소스의 SHA-256 지문을 한 번 남깁니다. 업로드 보고서의 `Installed receiver source`에는 수집 시 설치 파일의 `source_sha256`를 기록합니다. 두 값이 다르면 설치 파일이 바뀐 뒤에도 이전 프로세스가 실행 중일 수 있으므로 `pi_update`의 서비스 재시작 결과를 확인합니다. 시작 로그가 없는 오래된 수신기는 새 버전 적용 여부를 확정할 수 없습니다. 이 지문은 소스 파일 비교용이며 메모리의 실행 코드를 직접 측정한 값은 아닙니다. `missing`·`unreadable`도 함께 확인합니다. 배포와 업데이트는 현재 수신기의 필수 Python 파일이 빠지면 업로드 또는 서비스 중지 전에 실패하도록 검사합니다.
-
-Linux에서 지원되는 경우 C4 `[CLUSTER_NETWORK_PERF]`와 Pi `[CLUSTER_RX_PERF]`에 읽기 전용 `TCP_INFO`도 기록합니다. `tcp_rtt_ms`·`tcp_rttvar_ms`·`tcp_rto_ms`는 커널의 RTT·변동·재전송 제한 시간, `tcp_unacked`·`tcp_lost`·`tcp_cwnd`는 송신 측 미확인·손실·혼잡 창의 패킷 수입니다. `tcp_rcv_space`는 수신 공간의 커널 추정값이며 현재 광고한 수신 창이나 소켓 버퍼 크기와 같지 않습니다. `tcp_total_retrans`는 해당 연결이 보낸 TCP 세그먼트의 재전송 누계, `tcp_retrans_delta`는 이전 표본 이후 증가량입니다. 첫 표본은 증가량 0이며 새 연결에서 초기화합니다. 커널이 제공하면 `tcp_snd_wnd`도 기록하며 이는 상대가 광고한 송신 가능 창의 바이트 수입니다. Pi의 송신 재전송 수만으로 C4→Pi JPEG 손실을 판정하지 않고 C4의 같은 표본과 함께 비교합니다. 소켓 옵션은 변경하지 않으며 미지원 환경에서는 이 항목들을 생략합니다.
-
-업로드하는 Pi 보고서에는 C4의 무선 상태도 앞쪽에 함께 수집합니다. Pi 주소로 향하는 route의 실제 인터페이스를 선택하고 절전·주파수·신호·PHY 속도와 station/인터페이스 카운터를 읽습니다. SSID·MAC·프로필이나 원본 명령 출력은 저장하지 않으며 AP의 station은 익명 최대2개만 기록합니다. 어느 station이 Pi인지는 단정하지 않습니다. 기존25초 수집 제한 안에서 C4 snapshot은 최대2초·정제 결과4 KiB로 제한하고 전체 보고서512 KiB 상한을 유지합니다. C4 항목을 지원하지 않아도 Pi 수집은 계속합니다. 수집 시점의 snapshot이므로 주행 중 오류 시각의 상태와 구분합니다.
-
-C4도 ACK 패킷 전체를 기다리는 시간을 `network_ack_timeout`(기본 2.5초)으로 제한합니다. ACK가 조각나 도착해도 대기 예산을 다시 시작하지 않으며, 시간 초과·연결 종료 때 `bytes=수신량/전체크기`를 기록합니다. ACK 수신 제한은 동시에 진행 중인 JPEG 전송의 소켓 제한 시간을 바꾸지 않습니다.
-
-Pi 로그는 다음으로 확인합니다.
-
-```bash
-journalctl -u cluster-hdmi.service -b --no-pager | grep -E 'CLUSTER_HDMI_RENDERER|CLUSTER_RX_|phase=|CLUSTER_WIFI_POWER'
-```
-
-C4 heartbeat의 `Dropped: encoded`는 대기 영상을 교체하거나 만료로 폐기한 횟수입니다. 그중 `Stale drops`는 생성 후 250ms를 넘겨 보내지 않은 영상입니다. TCP 패킷 손실 횟수가 아닙니다. 생성·대기 시간은 C4 벽시계가 보정되어도 영향을 받지 않도록 monotonic 시계를 사용합니다.
+## 로그 수집
 
 ### Cluster 로그와 Pi 로그 함께 업로드
 
@@ -615,5 +543,5 @@ bash scripts/log_upload.sh /data/log/cluster_debug.log
 1. HDMI 영상이 가로 설치 방향에 맞고 잘리거나 늘어나지 않는지 확인합니다.
 2. `--log-touch`로 네 모서리 보정을 확인하고, 밝기 슬라이더·화면 끄기·재터치 복원을 확인합니다. 80% 밝기가 여러 프레임에 걸쳐 더 어두워지지 않는지도 확인합니다.
 3. 정차 상태에서 Wi-Fi를 끊어 2초 이내에 마지막 운행 영상이 연결 대기 화면으로 바뀌고, 재연결하면 최신 화면으로 복구되는지 확인합니다.
-4. C4 `[CLUSTER_NETWORK_PERF]`의 모드·전송 시간과 Pi `[CLUSTER_RX_PERF]`의 `display_fps`·`display_gap_max`를 함께 확인합니다. 이번 JPEG 기준은 20 FPS·품질 68이며, `ClusterNetworkDisplay initialized`의 품질과 `CLUSTER_MAIN_PERF target`으로 실행 중인 설정을 확인합니다. 화면을 끈 동안 C4 출력이 최대 5 FPS로 줄고 재터치 후 복원되는지도 확인합니다.
+4. C4 `[CLUSTER_H264_PERF]`와 Pi `[CLUSTER_H264_RX_PERF]`의 영상 수신·표시 FPS와 최대 표시 간격을 확인합니다. 화면 OFF·재터치 후 복원, 네트워크 재연결도 확인합니다.
 5. model lagging 또는 locationd 오류가 발생하면 같은 시각의 `[CLUSTER_RESOURCE_PERF]`와 openpilot 오류 로그를 함께 보관합니다.

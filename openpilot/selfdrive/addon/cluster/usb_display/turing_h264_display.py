@@ -56,7 +56,7 @@ class TuringH264Display:
     # No-ACK matches carrot-wip's tested live H264 path. Some firmware only
     # acknowledges status commands; waiting for every 121 chunk would stall it.
     self.wait_ack = bool(getattr(config, "usb_h264_wait_ack", False))
-    self.timeout_ms = min(1000, max(1, int(getattr(config, "usb_image_timeout_ms", 1000))))
+    self.timeout_ms = min(1000, max(1, int(getattr(config, "usb_write_timeout_ms", 1000))))
     self._queue_depth = None
     self._next_status_at = 0.0
     self._status_misses = 0
@@ -113,7 +113,7 @@ class TuringH264Display:
       raise usb.core.USBError(f"Incomplete H264 USB write: {written}/{len(payload)} bytes")
 
   def _setup(self):
-    # Stop any prior JPEG/video session without resetting the device or hub.
+    # Stop any prior stream without resetting the device or hub.
     self._write(self._payload(123), self.timeout_ms)
     self._drain_input()
     setup = ((10, None), (111, None), (112, None), (13, {8: 0}), (14, {8: 102}), (52, None))
@@ -135,9 +135,9 @@ class TuringH264Display:
         return True
       self._disconnect()
       try:
-        from library.lcd.lcd_comm_turing_usb import build_command_packet_header, encrypt_command_packet, _resp_ok
+        from openpilot.selfdrive.addon.cluster.usb_display.turing_protocol import build_command_packet_header, encrypt_command_packet, response_ok
 
-        self._build_header, self._encrypt, self._resp_ok = build_command_packet_header, encrypt_command_packet, _resp_ok
+        self._build_header, self._encrypt, self._resp_ok = build_command_packet_header, encrypt_command_packet, response_ok
         self.device = usb.core.find(idVendor=VENDOR_ID, idProduct=PRODUCT_ID)
         if self.device is None:
           flog("[CLUSTER_USB_H264_ERROR] TURZX 9.2 inch display not found.")
@@ -282,7 +282,7 @@ class TuringH264Display:
       if self.connected and self.device is not None:
         # The controller may retain its final video frame after stop. Cover
         # the image layer with opaque black; a transparent overlay would expose
-        # that old frame. This needs neither JPEG nor the encoder at shutdown.
+        # that old frame. This does not need a running encoder at shutdown.
         black = black_overlay_png()
         deadline = time.monotonic() + min(100, self.timeout_ms) / 1000.0
         for command, data in ((123, b""), (102, black)):

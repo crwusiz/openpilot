@@ -91,7 +91,7 @@ class TexturePresenter:
         self._texture = self._video.Texture(self.renderer, size, depth=32, streaming=True)
         self._texture_size = size
         # Match the texture's explicit ARGB8888 format. pygame Texture.update
-        # otherwise allocates/converts an entire RGB24 JPEG Surface every frame.
+        # otherwise allocates/converts an entire RGB24 Surface every frame.
         # Keep one conversion destination and upload it without that allocation.
         self._upload_surface = self.pygame.Surface(size, depth=32, masks=ARGB_MASKS)
         self._upload_surface.set_alpha(None)
@@ -112,7 +112,7 @@ class TexturePresenter:
     return result
 
   def redraw(self, controls=None):
-    """Redraw a retained texture on touch changes, with no JPEG decode/upload."""
+    """Redraw a retained texture on touch changes, with no frame conversion/upload."""
     self._check_thread()
     started = time.monotonic()
     self.renderer.clear()

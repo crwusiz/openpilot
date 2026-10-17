@@ -13,7 +13,7 @@ from openpilot.selfdrive.addon.cluster.usb_display.h264_encoder import HardwareH
 
 @pytest.mark.parametrize("rotate", [False, True])
 @pytest.mark.parametrize("width,height", [(16, 8), (1920, 462)])
-def test_portrait_nv12_matches_jpeg_orientation_and_pads_only_outside_visible_crop(rotate, width, height):
+def test_portrait_nv12_matches_panel_orientation_and_pads_only_outside_visible_crop(rotate, width, height):
   rgb = np.zeros((height, width, 3), dtype=np.uint8)
   rgb[:height // 2, :width // 2] = (255, 0, 0)
   rgb[height // 2:, :width // 2] = (0, 255, 0)

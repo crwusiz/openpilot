@@ -1,3 +1,3 @@
-# USB-specific addition to requirements-cluster-jpeg.txt.
+# USB transport addition to requirements-cluster-render.txt.
 pyusb==1.3.1
 pycryptodome==3.23.0

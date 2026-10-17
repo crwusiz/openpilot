@@ -13,29 +13,26 @@ from openpilot.selfdrive.addon import dependencies as deps
 
 class TestDependencySelection(unittest.TestCase):
   def test_cluster_combinations(self):
-    for transport, codec, expected in (
-      ("usb", "jpeg", ("cluster-jpeg", "cluster-usb")),
-      ("usb", "h264", ("cluster-jpeg", "cluster-usb")),
-      ("network", "jpeg", ("cluster-jpeg",)),
-      ("network", "h264", ("cluster-h264",)),
-      ("network", "invalid", ("cluster-jpeg",)),
-      (None, None, ("cluster-jpeg",)),
+    for transport, expected in (
+      ("usb", ("cluster-render", "cluster-usb")),
+      ("network", ("cluster-h264",)),
+      (None, ("cluster-h264",)),
     ):
-      with self.subTest(transport=transport, codec=codec):
-        self.assertEqual(deps.groups_for_cluster(transport, codec), expected)
+      with self.subTest(transport=transport):
+        self.assertEqual(deps.groups_for_cluster(transport), expected)
 
   def test_raw_params_defaults_and_block(self):
     with tempfile.TemporaryDirectory() as directory:
       root = Path(directory)
       self.assertEqual(deps.select_groups(root, blocked=""), ("dashboard",))
       (root / "ClusterEnable").write_text("1")
-      self.assertEqual(deps.select_groups(root, blocked=""), ("dashboard", "cluster-jpeg"))
-      (root / "ClusterNetworkCodec").write_text("h264\n")
+      self.assertEqual(deps.select_groups(root, blocked=""), ("dashboard", "cluster-h264"))
+
       self.assertEqual(deps.select_groups(root, blocked="dashboard"), ("cluster-h264",))
       (root / "ClusterDisplayTransport").write_text("usb")
-      self.assertEqual(deps.select_groups(root, blocked=" dashboard , other "), ("cluster-jpeg", "cluster-usb"))
-      (root / "ClusterUsbCodec").write_text("h264\n")
-      self.assertEqual(deps.select_groups(root, blocked="dashboard"), ("cluster-jpeg", "cluster-usb"))
+      self.assertEqual(deps.select_groups(root, blocked=" dashboard , other "), ("cluster-render", "cluster-usb"))
+
+      self.assertEqual(deps.select_groups(root, blocked="dashboard"), ("cluster-render", "cluster-usb"))
       self.assertEqual(deps.select_groups(root, blocked="cluster"), ("dashboard",))
       self.assertEqual(deps.select_groups(root, blocked="dashboard,cluster"), ())
       with patch.dict(os.environ, {"BLOCK": "dashboard,cluster"}):
@@ -85,8 +82,8 @@ class TestDependencyPreparation(unittest.TestCase):
 
   def test_system_exact_versions_and_imports_need_no_writable_cache(self):
     with patch.object(deps, "_probe", return_value=True), patch.object(deps, "_run_installer") as installer:
-      self.assertTrue(deps.prepare_groups(("cluster-jpeg",), deps_root=self.overlay))
-      self.assertTrue(deps.groups_ready(("cluster-jpeg",), deps_root=self.overlay))
+      self.assertTrue(deps.prepare_groups(("cluster-render",), deps_root=self.overlay))
+      self.assertTrue(deps.groups_ready(("cluster-render",), deps_root=self.overlay))
     installer.assert_not_called()
     self.assertFalse(self.overlay.exists())
 
@@ -95,42 +92,42 @@ class TestDependencyPreparation(unittest.TestCase):
       (stage / "payload").write_text("new")
 
     with patch.object(deps, "_probe", side_effect=self.overlay_imports), patch.object(deps, "_run_installer", side_effect=install) as installer:
-      self.assertTrue(deps.prepare_groups(deps.groups_for_cluster("network", "jpeg"), deps_root=self.overlay))
-      self.assertTrue(deps.groups_ready(("cluster-jpeg",), deps_root=self.overlay))
-      deps.prepare_groups(("cluster-jpeg",), deps_root=self.overlay)
+      self.assertTrue(deps.prepare_groups(("cluster-render",), deps_root=self.overlay))
+      self.assertTrue(deps.groups_ready(("cluster-render",), deps_root=self.overlay))
+      deps.prepare_groups(("cluster-render",), deps_root=self.overlay)
     self.assertEqual(installer.call_count, 1)
-    self.assertEqual((self.overlay / "cluster-jpeg" / "payload").read_text(), "new")
+    self.assertEqual((self.overlay / "cluster-render" / "payload").read_text(), "new")
     self.assertFalse((self.overlay / "cluster-usb").exists())
     self.assertFalse((self.overlay / "cluster-h264").exists())
     self.assertFalse(list(self.overlay.glob("*.staging-*")))
 
   def test_changed_requirements_and_python_abi_invalidate_marker(self):
-    self.installed("cluster-jpeg")
+    self.installed("cluster-render")
     with patch.object(deps, "_probe", side_effect=self.overlay_imports):
-      self.assertTrue(deps.groups_ready(("cluster-jpeg",), deps_root=self.overlay))
-      (self.requirements / "requirements-cluster-jpeg.txt").write_bytes(self.content + b"# changed\n")
-      self.assertFalse(deps.groups_ready(("cluster-jpeg",), deps_root=self.overlay))
-      (self.requirements / "requirements-cluster-jpeg.txt").write_bytes(self.content)
+      self.assertTrue(deps.groups_ready(("cluster-render",), deps_root=self.overlay))
+      (self.requirements / "requirements-cluster-render.txt").write_bytes(self.content + b"# changed\n")
+      self.assertFalse(deps.groups_ready(("cluster-render",), deps_root=self.overlay))
+      (self.requirements / "requirements-cluster-render.txt").write_bytes(self.content)
       with patch.object(deps, "_python_abi", return_value="other-python-abi"):
-        self.assertFalse(deps.groups_ready(("cluster-jpeg",), deps_root=self.overlay))
+        self.assertFalse(deps.groups_ready(("cluster-render",), deps_root=self.overlay))
 
   def test_marker_does_not_hide_failed_native_import(self):
-    self.installed("cluster-jpeg")
+    self.installed("cluster-render")
     with patch.object(deps, "_probe", return_value=False):
-      self.assertFalse(deps.groups_ready(("cluster-jpeg",), deps_root=self.overlay))
+      self.assertFalse(deps.groups_ready(("cluster-render",), deps_root=self.overlay))
 
   def test_onroad_preparation_never_calls_installer(self):
     with patch.object(deps, "_probe", return_value=False), patch.object(deps, "_run_installer") as installer:
       with self.assertRaisesRegex(deps.DependencyError, "while offroad"):
-        deps.prepare_groups(("cluster-jpeg",), deps_root=self.overlay, allow_install=False)
+        deps.prepare_groups(("cluster-render",), deps_root=self.overlay, allow_install=False)
     installer.assert_not_called()
     self.assertFalse(self.overlay.exists())
 
   def test_installer_failure_keeps_previous_group_and_cleans_stage(self):
-    target = self.installed("cluster-jpeg", b"old-requirement==1\n")
+    target = self.installed("cluster-render", b"old-requirement==1\n")
     with patch.object(deps, "_probe", return_value=False), patch.object(deps, "_run_installer", side_effect=deps.DependencyError("offline")):
       with self.assertRaisesRegex(deps.DependencyError, "offline"):
-        deps.prepare_groups(("cluster-jpeg",), deps_root=self.overlay)
+        deps.prepare_groups(("cluster-render",), deps_root=self.overlay)
     self.assertEqual((target / "payload").read_text(), "old")
     self.assertFalse(list(self.overlay.glob("*.staging-*")))
 
@@ -142,7 +139,7 @@ class TestDependencyPreparation(unittest.TestCase):
     self.assertEqual((target / "payload").read_text(), "old")
 
   def test_atomic_publication_failure_restores_previous_group(self):
-    target = self.installed("cluster-jpeg")
+    target = self.installed("cluster-render")
     stage = self.overlay / ".staging"
     stage.mkdir()
     (stage / "payload").write_text("new")
@@ -156,17 +153,17 @@ class TestDependencyPreparation(unittest.TestCase):
     with patch.object(Path, "replace", replace), self.assertRaisesRegex(OSError, "simulated"):
       deps._publish(stage, target)
     self.assertEqual((target / "payload").read_text(), "old")
-    self.assertFalse((self.overlay / ".cluster-jpeg.previous").exists())
+    self.assertFalse((self.overlay / ".cluster-render.previous").exists())
 
   def test_activation_exposes_only_selected_groups(self):
-    jpeg = self.installed("cluster-jpeg")
+    render = self.installed("cluster-render")
     usb = self.installed("cluster-usb")
     original = list(sys.path)
     self.addCleanup(lambda: sys.path.__setitem__(slice(None), original))
     sys.path.insert(0, str(usb))
     with patch.object(deps, "_probe", side_effect=self.overlay_imports):
-      deps.activate_groups(("cluster-jpeg",), deps_root=self.overlay)
-    self.assertEqual(sys.path[0], str(jpeg))
+      deps.activate_groups(("cluster-render",), deps_root=self.overlay)
+    self.assertEqual(sys.path[0], str(render))
     self.assertNotIn(str(usb), sys.path)
 
   def test_cli_check_does_not_install_and_install_errors_are_reported(self):
@@ -202,12 +199,12 @@ class TestDependencyPreparation(unittest.TestCase):
     def contender():
       started.set()
       try:
-        with deps._group_lock(self.overlay, "cluster-jpeg"):
+        with deps._group_lock(self.overlay, "cluster-render"):
           entered.set()
       except BaseException as error:
         errors.append(error)
 
-    with deps._group_lock(self.overlay, "cluster-jpeg"):
+    with deps._group_lock(self.overlay, "cluster-render"):
       worker = threading.Thread(target=contender)
       worker.start()
       self.assertTrue(started.wait(timeout=2))

@@ -6,7 +6,6 @@ from unittest.mock import Mock
 
 import pytest
 
-from openpilot.selfdrive.addon.cluster.cluster_config import requested_codec, requested_usb_codec
 from openpilot.selfdrive.addon.cluster.cluster_frame_clock import ClusterFrameClock
 
 
@@ -24,8 +23,7 @@ def cluster(monkeypatch):
   prefix = "openpilot.selfdrive.addon.cluster."
   modules = {
     "openpilot.common.swaglog": SimpleNamespace(cloudlog=Mock()),
-    prefix + "cluster_config": SimpleNamespace(ClusterConfig=lambda: config, requested_codec=requested_codec,
-                                               requested_usb_codec=requested_usb_codec),
+    prefix + "cluster_config": SimpleNamespace(ClusterConfig=lambda: config),
     prefix + "cluster_logging": SimpleNamespace(close_log=Mock(), flog=Mock(), initialize_log=Mock()),
     prefix + "cluster_display_pipeline": SimpleNamespace(ClusterDisplayPipeline=lambda d: pipeline),
     prefix + "cluster_live_camera": SimpleNamespace(ClusterLiveCamera=camera_factory),
@@ -33,24 +31,28 @@ def cluster(monkeypatch):
     prefix + "cluster_renderer": SimpleNamespace(ClusterRenderer=lambda c: renderer),
     prefix + "cluster_policy": SimpleNamespace(enforce_cluster_transport=policy),
     prefix + "dependencies": SimpleNamespace(ensure_cluster_dependencies=Mock(return_value=True)),
-    prefix + "usb_display.turing_usb_display": SimpleNamespace(TuringUsbDisplay=display_factory),
-    prefix + "hdmi_display.network_display": SimpleNamespace(ClusterNetworkDisplay=display_factory),
     prefix + "cluster_frame_clock": SimpleNamespace(ClusterFrameClock=lambda fps: module.ClusterFrameClock(fps)),
   }
   for name, module in modules.items():
     monkeypatch.setitem(sys.modules, name, module)
-  spec = importlib.util.spec_from_file_location("cluster_runtime_under_test", Path(__file__).parents[1] / "cluster_jpeg_runtime.py")
+  spec = importlib.util.spec_from_file_location("cluster_runtime_under_test", Path(__file__).parents[1] / "usb_display/runtime.py")
   module = importlib.util.module_from_spec(spec)
   spec.loader.exec_module(module)
   module.ClusterFrameClock = ClusterFrameClock
-  monkeypatch.setitem(sys.modules, prefix + "cluster_jpeg_runtime", module)
+  monkeypatch.setitem(sys.modules, prefix + "usb_display.runtime", module)
   for backend in ("usb_display", "hdmi_display"):
     spec = importlib.util.spec_from_file_location(prefix + backend + ".main", Path(__file__).parents[1] / backend / "main.py")
     backend_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(backend_module)
-    if backend == "usb_display":
-      monkeypatch.setattr(backend_module, "configure_usb_runtime", Mock())
     monkeypatch.setitem(sys.modules, prefix + backend + ".main", backend_module)
+  def run_usb(config):
+    display = display_factory(config)
+    clock = module.ClusterFrameClock(config.fps)
+    def wait_for_frame(_camera, previous):
+      clock.wait()
+      return previous
+    return module.run_composed_cluster(config, display, wait_for_frame=wait_for_frame, check_runtime=display.check_encoder)
+  monkeypatch.setattr(sys.modules[prefix + "usb_display.main"], "run_usb_cluster", run_usb)
   spec = importlib.util.spec_from_file_location("cluster_main_under_test", Path(__file__).parents[1] / "main.py")
   entrypoint = importlib.util.module_from_spec(spec)
   spec.loader.exec_module(entrypoint)
@@ -96,17 +98,8 @@ def test_hotplug_stops_workers_without_sending_clear_frame(cluster):
   cluster.models.close.assert_called_once()
 
 
-def test_network_shutdown_still_clears_display(cluster):
+def test_network_dispatch_does_not_start_composition_pipeline_or_raw_rgb_camera(cluster, monkeypatch):
   cluster.config.display_transport = "network"
-  # A transport change exits the loop normally.
-  cluster.module.cluster_main()
-  cluster.display.send_image.assert_called_once()
-  cluster.display.close.assert_called_once()
-
-
-def test_h264_dispatch_does_not_start_jpeg_pipeline_or_raw_rgb_camera(cluster, monkeypatch):
-  cluster.config.display_transport = "network"
-  cluster.config.network_codec = "h264"
   runner = Mock()
   monkeypatch.setitem(sys.modules, "openpilot.selfdrive.addon.cluster.hdmi_display.network_h264", SimpleNamespace(run_h264_cluster=runner))
   cluster.module.cluster_main()
@@ -115,39 +108,6 @@ def test_h264_dispatch_does_not_start_jpeg_pipeline_or_raw_rgb_camera(cluster, m
   cluster.pipeline.start.assert_not_called()
   cluster.camera_factory.assert_not_called()
   cluster.module.close_log.assert_called_once()
-
-
-def test_jpeg_restarts_when_network_codec_is_changed(cluster, monkeypatch):
-  cluster.config.display_transport = "network"
-  cluster.config.network_codec = "jpeg"
-  cluster.config.params.get.side_effect = {"ClusterDisplayTransport": "network", "ClusterNetworkCodec": "h264"}.get
-  cluster.module.cluster_main()
-  cluster.pipeline.push.assert_not_called()
-  cluster.pipeline.close.assert_called_once()
-
-
-def test_network_display_clock_skips_heavy_work_when_transport_has_no_capacity(cluster, monkeypatch):
-  cluster.config.display_transport = "network"
-  cluster.config.fps = 60
-  cluster.config.params.get.return_value = "network"
-  cluster.display.screen_off = False
-  cluster.policy.side_effect = [True, True, False, False]
-  cluster.pipeline.has_render_capacity.side_effect = [False] * 58 + [True, True]
-  now = [0.0]
-
-  def wait():
-    now[0] += 1 / 60
-
-  monkeypatch.setattr(cluster.module.time, "monotonic", lambda: now[0])
-  monkeypatch.setattr(cluster.module, "ClusterFrameClock", lambda fps: SimpleNamespace(wait=wait))
-  monkeypatch.setattr(cluster.module, "ClusterRuntimeMetrics", lambda: SimpleNamespace(sample=lambda _health: None))
-  renderer = cluster.module.ClusterRenderer(cluster.config)
-  renderer.last_frame_timings = dict.fromkeys(("camera_copy", "snapshot", "path", "hud"), 0.0)
-  cluster.module.cluster_main()
-  cluster.camera.wait_for_frame.assert_not_called()
-  assert renderer.render.call_count == 2
-  assert cluster.pipeline.push.call_count == 2
-  assert cluster.models.get_health_data.call_count == 60
 
 
 def _set_frame_clock(cluster, monkeypatch):
@@ -185,9 +145,6 @@ def test_usb_skips_render_and_encode_while_transport_is_full(cluster, monkeypatc
 
 
 def test_render_cpu_statistics_exclude_waiting_and_reset_each_window(cluster, monkeypatch):
-  cluster.config.display_transport = "network"
-  cluster.config.params.get.return_value = "network"
-  cluster.display.screen_off = False
   renderer = _set_frame_clock(cluster, monkeypatch)
   now, cpu = [0.0], [0.0]
   monkeypatch.setattr(cluster.module, "time", SimpleNamespace(monotonic=lambda: now[0]))
@@ -216,9 +173,6 @@ def test_render_cpu_statistics_exclude_waiting_and_reset_each_window(cluster, mo
 
 
 def test_driving_input_fault_limits_rendering_and_camera_preprocessing(cluster, monkeypatch):
-  cluster.config.display_transport = 'network'
-  cluster.config.params.get.return_value = 'network'
-  cluster.display.screen_off = False
   renderer = _set_frame_clock(cluster, monkeypatch)
   cluster.policy.side_effect = [True, True, True, False, False]
   cluster.models.get_health_data.return_value = {
@@ -231,7 +185,7 @@ def test_driving_input_fault_limits_rendering_and_camera_preprocessing(cluster, 
   assert not cluster.camera_factory.call_args.kwargs['frame_needed']()
 
 
-@pytest.mark.parametrize("transport", ["usb", "network"])
+@pytest.mark.parametrize("transport", ["usb"])
 def test_disconnected_display_prepares_only_one_bootstrap_image_per_second(cluster, monkeypatch, transport):
   cluster.config.display_transport = transport
   cluster.config.params.get.return_value = transport

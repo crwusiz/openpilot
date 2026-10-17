@@ -2,7 +2,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 
@@ -27,45 +27,14 @@ def test_transport_selection_is_preserved_with_egpu(monkeypatch, transport, size
   assert config.display_transport == (transport or "usb")
   assert (config.width, config.height) == size
   assert config.fps == 20
-  assert config.jpeg_quality == 68
-  assert config.network_jpeg_quality == 68
-  assert config.network_codec == "jpeg"
-  assert config.usb_codec == "jpeg"
   assert Path(config.font_bold).name == "NotoSansKR-Bold.ttf"
   assert config.font_regular == config.font_bold
-  assert config.network_max_in_flight == 2
-  assert config.network_max_in_flight_bytes == 512 * 1024
-  assert config.network_max_frame_age == config.network_max_ack_age == 0.25
   assert config.usb_h264_fps == 20
   assert config.usb_h264_bitrate == 4_666_667
   assert config.usb_h264_gop == 1
   assert config.usb_h264_slice_max_bytes == 4096
   assert config.usb_h264_device.endswith("qcom_vidc-video-index1")
-  params.put.assert_not_called()
-
-
-@pytest.mark.parametrize("transport", ["network", "usb"])
-@pytest.mark.parametrize("stored,expected,invalid", [
-  (None, "jpeg", False), ("", "jpeg", False), ("jpeg", "jpeg", False),
-  ("h264", "h264", False), (b"h264", "h264", False), (" H264 ", "h264", False),
-  (" JPEG ", "jpeg", False), ("vp9", "jpeg", True), (b"\xff", "jpeg", True),
-])
-def test_usb_codec_is_independent_and_uses_hardware_encoder_defaults(monkeypatch, transport, stored, expected, invalid):
-  params = Mock()
-  params.get.side_effect = {"ClusterDisplayTransport": transport, "ClusterUsbCodec": stored, "ClusterNetworkCodec": "h264"}.get
-  log = Mock()
-  monkeypatch.setitem(sys.modules, "openpilot.common.params", SimpleNamespace(Params=lambda: params))
-  monkeypatch.setitem(sys.modules, "openpilot.common.swaglog", SimpleNamespace(cloudlog=log))
-  spec = importlib.util.spec_from_file_location("cluster_config_usb_codec_under_test", Path(__file__).parents[1] / "cluster_config.py")
-  module = importlib.util.module_from_spec(spec)
-  spec.loader.exec_module(module)
-
-  config = module.ClusterConfig()
-
-  assert config.usb_codec == expected
-  assert config.network_codec == "h264"
-  assert config.usb_fps == config.usb_h264_fps == 20
-  assert log.warning.call_count == int(transport == "usb" and invalid)
+  assert params.get.call_args_list == [call("ClusterDisplayTransport")]
   params.put.assert_not_called()
 
 
@@ -84,32 +53,3 @@ def test_network_fps_is_independent_of_the_main_ui(monkeypatch, cluster_fps, exp
   spec.loader.exec_module(module)
 
   assert module.ClusterConfig().fps == expected
-
-
-@pytest.mark.parametrize("transport", ["network", "usb"])
-@pytest.mark.parametrize("stored,expected,invalid", [
-  (None, "jpeg", False), ("", "jpeg", False), ("jpeg", "jpeg", False),
-  ("h264", "h264", False), (b"h264", "h264", False), (" H264 ", "h264", False),
-  (" JPEG ", "jpeg", False), ("vp9", "jpeg", True), (b"\xff", "jpeg", True),
-])
-def test_network_codec_normalizes_saved_value_without_changing_usb(monkeypatch, transport, stored, expected, invalid):
-  monkeypatch.delenv("CLUSTER_FPS", raising=False)
-  params = Mock()
-  params.get.side_effect = {"ClusterDisplayTransport": transport, "ClusterNetworkCodec": stored}.get
-  params.get_bool.return_value = True
-  log = Mock()
-  monkeypatch.setitem(sys.modules, "openpilot.common.params", SimpleNamespace(Params=lambda: params))
-  monkeypatch.setitem(sys.modules, "openpilot.common.swaglog", SimpleNamespace(cloudlog=log))
-  spec = importlib.util.spec_from_file_location("cluster_config_codec_under_test", Path(__file__).parents[1] / "cluster_config.py")
-  module = importlib.util.module_from_spec(spec)
-  spec.loader.exec_module(module)
-
-  config = module.ClusterConfig()
-
-  assert config.network_codec == expected
-  assert config.display_transport == transport
-  assert (config.width, config.height) == ((1920, 480) if transport == "network" else (1920, 462))
-  assert config.fps == config.usb_fps == 20
-  assert config.jpeg_quality == config.network_jpeg_quality == 68
-  assert log.warning.call_count == int(transport == "network" and invalid)
-  params.put.assert_not_called()

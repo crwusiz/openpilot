@@ -315,8 +315,8 @@ class ClusterRenderer:
       "hud": time.monotonic() - path_drawn_at,
     }
     # Keep the composed frame as PIL through the USB worker. Converting the
-    # complete 1920x462 image back to NumPy here only for it to be rotated and
-    # JPEG-encoded in the next thread was a full-frame copy on every update.
+    # complete 1920x462 image back to NumPy here only for it to be converted to
+    # NV12 in the encoder thread was a full-frame copy on every update.
     return pil_img
 
   def _update_filter_intervals(self, now):

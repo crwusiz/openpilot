@@ -1,466 +1,26 @@
 import ipaddress
 import socket
-import struct
 import threading
 import time
 from types import SimpleNamespace
 
 import pytest
 
-from openpilot.selfdrive.addon.cluster.hdmi_display.network_protocol import (
-  ACK_DISPLAY_ERROR, ACK_OK, ACK_PACKET, ACK_SCREEN_OFF, ACK_STREAM_SUPPORTED, FRAME_QUERY_STREAM, FRAME_STREAM,
-  pack_ack as pack_c4_ack, pack_frame_header, recv_exact, unpack_ack, unpack_ack_info,
-)
-from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import cluster_protocol, cluster_receiver, frame_stream, hdmi_display
-from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.cluster_protocol import (
-  ACK_SCREEN_OFF as PI_ACK_SCREEN_OFF, ReceiveStats, ReceiveTimeout, pack_ack as pack_orange_pi_ack,
-  recv_exact as pi_recv_exact, unpack_frame_header,
-)
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import control_socket, cluster_receiver, hdmi_display
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.control_socket import ReceiveStats, ReceiveTimeout, recv_exact as pi_recv_exact
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol import HELLO, pack_control
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_display import HdmiDisplay
 
 
 class FakeDisplay:
-  def __init__(self, succeeds=True):
-    self.succeeds = succeeds
+  def __init__(self):
     self.frames = []
     self.poll_count = 0
+    self.set_stream_mode = lambda _mode: None
 
   def pump_events(self):
     self.poll_count += 1
     return True
-
-  def send_jpeg(self, jpeg):
-    self.frames.append(jpeg)
-    return self.succeeds
-
-
-def _exchange_frame(display, flags=0, ack_details=False):
-  c4_sock, pi_sock = socket.socketpair()
-  c4_sock.settimeout(1.0)
-  pi_sock.settimeout(1.0)
-  errors = []
-
-  def receive():
-    try:
-      cluster_receiver.receive_frames(pi_sock, display, 1)
-    except RuntimeError as e:
-      errors.append(str(e))
-
-  receiver = threading.Thread(
-    target=receive,
-    daemon=True,
-  )
-  receiver.start()
-  try:
-    payload = b"jpeg-frame"
-    c4_sock.sendall(pack_frame_header(7, len(payload), flags) + payload)
-    ack_data = recv_exact(c4_sock, ACK_PACKET.size)
-    ack = unpack_ack_info(ack_data) if ack_details else unpack_ack(ack_data)
-    receiver.join(timeout=1.0)
-    assert not receiver.is_alive()
-    assert errors == ([] if display.succeeds else ["Unable to display cluster frame"])
-    return ack
-  finally:
-    c4_sock.close()
-    pi_sock.close()
-
-
-def test_orange_pi_protocol_matches_c4_protocol():
-  assert unpack_frame_header(pack_frame_header(123, 456)) == (123, 456)
-  assert pack_orange_pi_ack(123, ACK_OK) == pack_c4_ack(123, ACK_OK)
-  assert ACK_SCREEN_OFF == PI_ACK_SCREEN_OFF == 2
-
-
-def test_capability_flags_preserve_the_legacy_packet_layout():
-  header = pack_frame_header(123, 456, FRAME_QUERY_STREAM)
-  assert len(header) == 16
-  assert struct.Struct("!4sB3xII").unpack(header) == (b"OPCF", 1, 123, 456)
-  ack = pack_orange_pi_ack(123, ACK_OK, ACK_STREAM_SUPPORTED)
-  assert len(ack) == 16
-  assert struct.Struct("!4sB3xIB3x").unpack(ack) == (b"OPCA", 1, 123, ACK_OK)
-  old_ack = struct.Struct("!4sB3xIB3x").pack(b"OPCA", 1, 123, ACK_OK)
-  assert unpack_ack_info(old_ack) == (123, ACK_OK, 0)
-
-
-class BlockingDisplay(FakeDisplay):
-  def __init__(self):
-    super().__init__()
-    self.started = threading.Event()
-    self.release = threading.Event()
-    self.owner = None
-    self.quit = False
-
-  def pump_events(self):
-    assert threading.get_ident() == self.owner, "SDL events must stay on the display thread"
-    return super().pump_events() and not self.quit
-
-  def send_jpeg(self, jpeg):
-    assert threading.get_ident() == self.owner, "SDL presentation must stay on the display thread"
-    self.frames.append(jpeg)
-    self.started.set()
-    assert self.release.wait(timeout=2.0)
-    return self.succeeds
-
-
-def _start_stream_receiver(display, max_frames=None, frame_timeout=1.0):
-  c4_sock, pi_sock = socket.socketpair()
-  c4_sock.settimeout(1.0)
-  pi_sock.settimeout(1.0)
-  result, errors = [], []
-
-  def receive():
-    display.owner = threading.get_ident()
-    try:
-      result.append(cluster_receiver.receive_frames(pi_sock, display, max_frames, frame_timeout))
-    except BaseException as e:
-      errors.append(e)
-    finally:
-      pi_sock.close()
-
-  thread = threading.Thread(target=receive, daemon=True)
-  thread.start()
-  return c4_sock, thread, result, errors
-
-
-def _send_stream(sock, sequence, payload, flags=ACK_STREAM_SUPPORTED):
-  sock.sendall(pack_frame_header(sequence, len(payload), FRAME_STREAM) + payload)
-  assert unpack_ack_info(recv_exact(sock, ACK_PACKET.size)) == (sequence, ACK_OK, flags)
-
-
-def test_stream_ack_and_next_receive_do_not_wait_for_blocked_display():
-  display = BlockingDisplay()
-  sock, thread, result, errors = _start_stream_receiver(display, max_frames=2)
-  try:
-    _send_stream(sock, 1, b"first")
-    assert display.started.wait(timeout=1.0)
-    # SDL remains blocked, but a second complete frame is already acknowledged.
-    _send_stream(sock, 2, b"second")
-    assert display.frames == [b"first"]
-    display.release.set()
-    thread.join(timeout=1.0)
-    assert not thread.is_alive()
-    assert not errors
-    assert result == [2]
-    assert display.frames == [b"first", b"second"]
-  finally:
-    display.release.set()
-    sock.close()
-    thread.join(timeout=1.0)
-
-
-def test_slow_display_skips_pending_frames_and_presents_the_latest():
-  display = BlockingDisplay()
-  sock, thread, result, errors = _start_stream_receiver(display, max_frames=3)
-  try:
-    _send_stream(sock, 1, b"first")
-    assert display.started.wait(timeout=1.0)
-    _send_stream(sock, 2, b"stale")
-    _send_stream(sock, 3, b"latest")
-    display.release.set()
-    thread.join(timeout=1.0)
-    assert not thread.is_alive()
-    assert not errors
-    assert result == [3]
-    assert display.frames == [b"first", b"latest"]
-  finally:
-    display.release.set()
-    sock.close()
-    thread.join(timeout=1.0)
-
-
-def test_screen_off_and_wake_are_reported_on_receipt_ack_without_reconnect():
-  display = BlockingDisplay()
-  display.screen_off = False
-  sock, thread, result, errors = _start_stream_receiver(display, max_frames=3)
-  try:
-    _send_stream(sock, 1, b"first")
-    assert display.started.wait(timeout=1.0)
-    display.screen_off = True
-    # Changing local touch state emits no unsolicited packet.
-    sock.settimeout(0.05)
-    with pytest.raises(socket.timeout):
-      sock.recv(ACK_PACKET.size)
-    sock.settimeout(1.0)
-    # Screen status piggybacks on normal ACKs while SDL remains blocked.
-    _send_stream(sock, 2, b"off", ACK_STREAM_SUPPORTED | ACK_SCREEN_OFF)
-    display.screen_off = False
-    _send_stream(sock, 3, b"awake")
-    display.release.set()
-    thread.join(timeout=1.0)
-    assert not thread.is_alive()
-    assert not errors
-    assert result == [3]
-    assert display.frames == [b"first", b"awake"]
-  finally:
-    display.release.set()
-    sock.close()
-    thread.join(timeout=1.0)
-
-
-def test_stream_screen_state_callback_reads_property_without_calling_sdl():
-  class ScreenOffDisplay(BlockingDisplay):
-    def __init__(self):
-      super().__init__()
-      self.property_readers = []
-
-    @property
-    def screen_off(self):
-      self.property_readers.append(threading.current_thread().name)
-      return True
-
-  display = ScreenOffDisplay()
-  display.release.set()
-  sock, thread, result, errors = _start_stream_receiver(display, max_frames=1)
-  try:
-    _send_stream(sock, 1, b"off", ACK_STREAM_SUPPORTED | ACK_SCREEN_OFF)
-    thread.join(timeout=1.0)
-    assert not thread.is_alive()
-    assert not errors
-    assert result == [1]
-    assert display.property_readers == ["cluster-jpeg-receiver"]
-  finally:
-    sock.close()
-    thread.join(timeout=1.0)
-
-
-def test_stream_partial_frame_still_times_out_and_closes_connection():
-  display = BlockingDisplay()
-  display.release.set()
-  sock, thread, _result, errors = _start_stream_receiver(display, frame_timeout=0.1)
-  try:
-    _send_stream(sock, 1, b"first")
-    assert display.started.wait(timeout=1.0)
-    sock.sendall(pack_frame_header(2, 10, FRAME_STREAM) + b"partial")
-    thread.join(timeout=1.0)
-    assert not thread.is_alive()
-    assert len(errors) == 1 and isinstance(errors[0], TimeoutError)
-    assert errors[0].phase == "partial_payload"
-    assert (errors[0].received, errors[0].expected) == (7, 10)
-    assert display.frames == [b"first"]
-    assert sock.recv(1) == b""
-  finally:
-    sock.close()
-    thread.join(timeout=1.0)
-
-
-def test_stream_display_error_closes_transport_after_receive_ack():
-  display = BlockingDisplay()
-  display.succeeds = False
-  display.release.set()
-  sock, thread, _result, errors = _start_stream_receiver(display)
-  try:
-    _send_stream(sock, 1, b"invalid-jpeg")
-    thread.join(timeout=1.0)
-    assert not thread.is_alive()
-    assert len(errors) == 1 and isinstance(errors[0], RuntimeError)
-    assert "Unable to display cluster frame" in str(errors[0])
-    assert sock.recv(1) == b""
-  finally:
-    sock.close()
-    thread.join(timeout=1.0)
-
-
-def test_stream_quit_interrupts_idle_receive_without_leaving_io_thread():
-  display = BlockingDisplay()
-  sock, thread, _result, errors = _start_stream_receiver(display)
-  try:
-    _send_stream(sock, 1, b"first")
-    assert display.started.wait(timeout=1.0)
-    display.quit = True
-    display.release.set()
-    thread.join(timeout=1.0)
-    assert not thread.is_alive()
-    assert len(errors) == 1 and isinstance(errors[0], KeyboardInterrupt)
-    assert not any(t.name == "cluster-jpeg-receiver" and t.is_alive() for t in threading.enumerate())
-  finally:
-    display.release.set()
-    sock.close()
-    thread.join(timeout=1.0)
-
-
-def test_slow_ack_keeps_display_polling_and_does_not_publish_unacknowledged_jpeg():
-  class SlowAckSocket:
-    def __init__(self):
-      self.started = threading.Event()
-      self.release = threading.Event()
-
-    def sendall(self, _packet):
-      self.started.set()
-      assert self.release.wait(timeout=2.0)
-
-    def shutdown(self, _how):
-      self.release.set()
-
-  sock = SlowAckSocket()
-  frame = frame_stream.ReceivedFrame(1, b"jpeg", 0.0, 0.0, 0.0)
-  receiver = frame_stream.LatestFrameReceiver(sock, frame, 1.0, max_frames=1)
-  receiver.thread.start()
-  result = []
-  returned = threading.Event()
-
-  def take_pending():
-    result.append(receiver.take_frame())
-    returned.set()
-
-  poller = threading.Thread(target=take_pending, daemon=True)
-  try:
-    assert sock.started.wait(timeout=1.0)
-    poller.start()
-    # SDL can return to event polling while the transport ACK is congested.
-    assert returned.wait(timeout=0.5)
-    assert result == [None]
-    assert receiver.received_frames == 0
-    receiver.close()
-    assert not receiver.thread.is_alive()
-    assert receiver.pending is None
-    assert receiver.error is None
-  finally:
-    receiver.close()
-    if poller.ident is not None:
-      poller.join(timeout=1.0)
-
-
-def test_receive_ack_failure_never_presents_that_jpeg():
-  class FailedAckSocket:
-    def sendall(self, _packet):
-      raise ConnectionError("ACK connection closed")
-
-  display = FakeDisplay()
-  frame = frame_stream.ReceivedFrame(1, b"jpeg", 0.0, 0.0, 0.0)
-  with pytest.raises(ConnectionError, match="ACK connection closed"):
-    frame_stream.receive_stream_frames(FailedAckSocket(), display, frame, 1.0, max_frames=1)
-  assert not display.frames
-
-
-def test_stream_intentional_blanking_counts_receipts_without_display_fps(monkeypatch):
-  receiver_instances = []
-  original_receiver = frame_stream.LatestFrameReceiver
-
-  def capture_receiver(*args, **kwargs):
-    receiver = original_receiver(*args, **kwargs)
-    receiver_instances.append(receiver)
-    return receiver
-
-  monkeypatch.setattr(frame_stream, "LatestFrameReceiver", capture_receiver)
-  display = FakeDisplay()
-  display.last_frame_presented = False
-  sock, thread, result, errors = _start_stream_receiver(display, max_frames=1)
-  try:
-    _send_stream(sock, 1, b"off-screen-jpeg")
-    thread.join(timeout=1.0)
-    assert not thread.is_alive()
-    assert not errors
-    assert result == [1]
-    assert receiver_instances[0]._perf_received == 1
-    assert receiver_instances[0]._perf_displayed == 0
-    assert receiver_instances[0]._perf_rx_stats_frames == 1
-    assert receiver_instances[0]._perf_read_calls >= 1
-  finally:
-    sock.close()
-    thread.join(timeout=1.0)
-
-
-def test_stream_performance_log_exposes_queue_age_and_display_stalls(monkeypatch, caplog):
-  now = [0.0]
-  monkeypatch.setattr(frame_stream.time, "monotonic", lambda: now[0])
-  first = frame_stream.ReceivedFrame(1, b"jpeg", 0.0, 0.005, 0.02)
-  receiver = frame_stream.LatestFrameReceiver(None, first, 1.0)
-  receiver.record_display(first, 0.03, 0.05, {"decode": 0.01, "blit": 0.005, "flip": 0.001, "convert": 0.001, "upload": 0.003, "draw": 0.001})
-  second = frame_stream.ReceivedFrame(2, b"jpeg", 0.07, 0.08, 0.10)
-  receiver.record_display(second, 0.15, 0.30, {"decode": 0.02, "blit": 0.007, "flip": 0.002, "convert": 0.001, "upload": 0.004, "draw": 0.002})
-  now[0] = 10.0
-  with caplog.at_level("INFO", logger="cluster_receiver"):
-    receiver._log_perf()
-  assert "display_fps=0.20" in caplog.text
-  assert "queue_wait_avg=30.0ms" in caplog.text
-  assert "queue_wait_max=50.0ms" in caplog.text
-  assert "display_max=150.0ms" in caplog.text
-  assert "display_gap_max=250.0ms" in caplog.text
-  assert "decode_max=20.0ms" in caplog.text
-  assert "blit_max=7.0ms" in caplog.text
-  assert "flip_max=2.0ms" in caplog.text
-  assert "convert_avg=1.0ms" in caplog.text
-  assert "upload_avg=3.5ms" in caplog.text
-  assert "draw_avg=1.5ms" in caplog.text
-  assert "convert_max=1.0ms" in caplog.text
-  assert "upload_max=4.0ms" in caplog.text
-  assert "draw_max=2.0ms" in caplog.text
-
-
-def test_stream_receive_diagnostics_are_reported_and_reset_per_window(monkeypatch, caplog):
-  now = [0.03]
-  monkeypatch.setattr(frame_stream, "time", SimpleNamespace(monotonic=lambda: now[0]))
-  tcp_samples = []
-
-  def sample_tcp(sock):
-    tcp_samples.append(sock)
-    return "tcp_rtt_ms=12.3 | tcp_total_retrans=7 | tcp_retrans_delta=0"
-
-  monkeypatch.setattr(frame_stream, "TcpDiagnostics", lambda: SimpleNamespace(sample=sample_tcp))
-  stats = ReceiveStats(wait_time=0.017, wait_max=0.012, read_calls=3, read_max=0.002, select_timeouts=1)
-  first = frame_stream.ReceivedFrame(1, b"jpeg", 0.0, 0.005, 0.025, stats)
-  acks = []
-  receiver = frame_stream.LatestFrameReceiver(SimpleNamespace(sendall=acks.append), first, 1.0, max_frames=1)
-  receiver._receive_loop()
-  assert len(acks) == 1
-  assert receiver.take_frame() == first
-  now[0] = 10.03
-  with caplog.at_level("INFO", logger="cluster_receiver"):
-    receiver._log_perf()
-  assert "receive_avg=20.0ms" in caplog.text
-  assert "payload_wait_avg=17.0ms" in caplog.text
-  assert "payload_wait_max=12.0ms" in caplog.text
-  assert "payload_read_calls_avg=3.0" in caplog.text
-  assert "payload_read_max=2.0ms" in caplog.text
-  assert "payload_select_timeouts=1" in caplog.text
-  assert "tcp_rtt_ms=12.3 | tcp_total_retrans=7 | tcp_retrans_delta=0" in caplog.text
-  caplog.clear()
-  now[0] = 20.03
-  with caplog.at_level("INFO", logger="cluster_receiver"):
-    receiver._log_perf()
-  assert "payload_wait_avg=0.0ms" in caplog.text
-  assert "payload_read_calls_avg=0.0" in caplog.text
-  assert "payload_select_timeouts=0" in caplog.text
-  assert "tcp_rtt_ms=12.3" in caplog.text
-  assert tcp_samples == [receiver.sock, receiver.sock]
-
-
-def test_receiver_acknowledges_successful_hdmi_frame():
-  display = FakeDisplay()
-  assert _exchange_frame(display) == (7, ACK_OK)
-  assert display.frames == [b"jpeg-frame"]
-
-
-def test_legacy_performance_log_does_not_count_blanking_as_display(monkeypatch, caplog):
-  start = time.monotonic()
-  timestamps = iter(start + elapsed for elapsed in (0.0, 0.0, 0.001, 0.002, 0.003, 10.0))
-  monkeypatch.setattr(cluster_receiver, "time", SimpleNamespace(monotonic=lambda: next(timestamps)))
-  display = FakeDisplay()
-  display.last_frame_presented = False
-  with caplog.at_level("INFO", logger="cluster_receiver"):
-    assert _exchange_frame(display) == (7, ACK_OK)
-  assert "fps=0.10 | display_fps=0.00" in caplog.text
-  assert "display_avg=0.0ms" in caplog.text
-  assert "mode=legacy" in caplog.text
-
-
-def test_receiver_advertises_streaming_only_when_queried():
-  assert _exchange_frame(FakeDisplay(), flags=FRAME_QUERY_STREAM, ack_details=True) == (7, ACK_OK, ACK_STREAM_SUPPORTED)
-  assert _exchange_frame(FakeDisplay(), ack_details=True) == (7, ACK_OK, 0)
-
-
-def test_query_ack_reports_screen_off_while_legacy_ack_flags_stay_empty():
-  display = FakeDisplay()
-  display.screen_off = True
-  assert _exchange_frame(display, flags=FRAME_QUERY_STREAM, ack_details=True) == (
-    7, ACK_OK, ACK_STREAM_SUPPORTED | ACK_SCREEN_OFF,
-  )
-  assert _exchange_frame(display, ack_details=True) == (7, ACK_OK, 0)
-
-
-def test_receiver_reports_hdmi_failure():
-  display = FakeDisplay(succeeds=False)
-  assert _exchange_frame(display) == (7, ACK_DISPLAY_ERROR)
 
 
 def test_interface_network_uses_wifi_prefix(monkeypatch):
@@ -511,20 +71,6 @@ def test_receiver_rejects_invalid_options(argv):
     cluster_receiver.parse_args(argv)
 
 
-def test_partial_frame_times_out_while_pumping_events():
-  c4_sock, pi_sock = socket.socketpair()
-  display = FakeDisplay()
-  try:
-    c4_sock.sendall(pack_frame_header(1, 10) + b"partial")
-    with pytest.raises(TimeoutError):
-      cluster_receiver.receive_frames(pi_sock, display, 1, frame_timeout=0.1)
-    assert display.frames == []
-    assert display.poll_count >= 2
-  finally:
-    c4_sock.close()
-    pi_sock.close()
-
-
 def test_fragmented_packet_keeps_received_bytes():
   c4_sock, pi_sock = socket.socketpair()
   chunks = iter([b"ab", b"cd", b"ef"])
@@ -572,95 +118,47 @@ def _scheduled_receive_socket(monkeypatch, packets):
     return [], [], []
 
   clock = SimpleNamespace(monotonic=lambda: now[0])
-  for module in (cluster_protocol, cluster_receiver, frame_stream):
+  for module in (control_socket, cluster_receiver):
     monkeypatch.setattr(module, "time", clock)
-  monkeypatch.setattr(cluster_protocol.select, "select", readable)
+  monkeypatch.setattr(control_socket.select, "select", readable)
   return sock, now
 
 
-@pytest.mark.parametrize("flags", [0, FRAME_STREAM])
 @pytest.mark.parametrize("fragment_header", [False, True])
-def test_idle_wait_does_not_consume_the_new_frame_completion_budget(monkeypatch, flags, fragment_header):
-  header = pack_frame_header(7, 4, flags)
-  packets = ([(1.9, header[:3]), (2.2, header[3:]), (2.4, b"jpeg")] if fragment_header
-             else [(1.9, header), (2.1, b"jpeg")])
+def test_h264_handshake_has_a_separate_bounded_budget_after_idle(monkeypatch, fragment_header):
+  packet = pack_control(HELLO, {"codec": "h264", "transport": "webrtc"})
+  header, payload = packet[:16], packet[16:]
+  packets = ([(1.9, header[:3]), (2.2, header[3:]), (2.4, payload)] if fragment_header
+             else [(1.9, header), (2.1, payload)])
   sock, _now = _scheduled_receive_socket(monkeypatch, packets)
+  calls = []
+  monkeypatch.setattr(cluster_receiver, "receive_h264_session", lambda *args: calls.append(args) or 1)
   display = FakeDisplay()
   assert cluster_receiver.receive_frames(sock, display, max_frames=1, frame_timeout=2.0) == 1
-  assert display.frames == [b"jpeg"]
-  assert [unpack_ack(packet) for packet in sock.acks] == [(7, ACK_OK)]
+  assert calls[0][2] == {"codec": "h264", "transport": "webrtc"}
+  assert display.poll_count > 0
 
 
 @pytest.mark.parametrize("phase,packets,received,expected", [
   ("idle_header", [], 0, 16),
-  ("partial_header", [(0.1, pack_frame_header(7, 10)[:3])], 3, 16),
-  ("partial_payload", [(0.1, pack_frame_header(7, 10)), (0.7, b"abc"), (1.5, b"def"), (2.2, b"ghij")], 6, 10),
-  # Header progress consumes the same first-byte budget as the JPEG.
-  ("partial_payload", [(0.1, pack_frame_header(7, 10)[:3]), (1.8, pack_frame_header(7, 10)[3:]), (2.2, b"0123456789")], 0, 10),
+  ("partial_header", [(0.1, pack_control(HELLO, {})[:3])], 3, 16),
+  ("partial_h264_hello", [(0.1, pack_control(HELLO, {})[:16]), (0.7, b"{"), (2.2, b"}")], 1, 2),
 ])
-def test_idle_and_partial_timeouts_are_distinct_and_progress_never_extends_the_frame(monkeypatch, phase, packets, received, expected):
+def test_h264_handshake_progress_never_extends_a_partial_message(monkeypatch, phase, packets, received, expected):
   sock, now = _scheduled_receive_socket(monkeypatch, packets)
-  display = FakeDisplay()
-  with pytest.raises(ReceiveTimeout) as raised:
-    cluster_receiver.receive_frames(sock, display, max_frames=1, frame_timeout=2.0)
-  assert raised.value.phase == phase
-  assert (raised.value.received, raised.value.expected) == (received, expected)
-  assert f"phase={phase} bytes={received}/{expected}" in str(raised.value)
+  with pytest.raises(ReceiveTimeout) as error:
+    cluster_receiver.receive_frames(sock, FakeDisplay(), frame_timeout=2.0)
+  assert error.value.phase == phase
+  assert (error.value.received, error.value.expected) == (received, expected)
   assert now[0] == pytest.approx(2.0 if phase == "idle_header" else 2.1)
-  assert display.frames == []
-  assert sock.acks == []
 
 
-def test_partial_payload_peer_close_reports_eof_and_never_acknowledges(monkeypatch):
-  sock, _now = _scheduled_receive_socket(monkeypatch, [(0.1, pack_frame_header(7, 10)), (0.2, b"part"), (0.3, b"")])
-  display = FakeDisplay()
-  with pytest.raises(ConnectionError, match="closed while receiving data: phase=payload bytes=4/10"):
-    cluster_receiver.receive_frames(sock, display, max_frames=1, frame_timeout=2.0)
-  assert display.frames == []
-  assert sock.acks == []
-
-
-def test_stale_display_shows_waiting_while_a_progressing_frame_keeps_the_same_stream_connection(caplog):
-  caplog.set_level("INFO", logger="cluster_receiver")
-  class WaitingDisplay(BlockingDisplay):
-    def __init__(self):
-      super().__init__()
-      self.waiting = threading.Event()
-      self.waiting_count = 0
-      self.release.set()
-
-    def show_waiting(self):
-      assert threading.get_ident() == self.owner
-      self.waiting_count += 1
-      self.waiting.set()
-      return True
-
-  display = WaitingDisplay()
-  sock, thread, result, errors = _start_stream_receiver(display, max_frames=2, frame_timeout=0.6)
-  try:
-    _send_stream(sock, 1, b"first")
-    assert display.started.wait(timeout=1.0)
-    time.sleep(0.35)
-    sock.sendall(pack_frame_header(2, 6, FRAME_STREAM))
-    assert display.waiting.wait(timeout=1.0)
-    # A partial JPEG has no ACK; the stale driving image has already been hidden.
-    sock.settimeout(0.05)
-    with pytest.raises(socket.timeout):
-      sock.recv(ACK_PACKET.size)
-    sock.settimeout(1.0)
-    sock.sendall(b"second")
-    assert unpack_ack_info(recv_exact(sock, ACK_PACKET.size)) == (2, ACK_OK, ACK_STREAM_SUPPORTED)
-    thread.join(timeout=1.0)
-    assert not thread.is_alive()
-    assert not errors
-    assert result == [2]
-    assert display.frames == [b"first", b"second"]
-    assert display.waiting_count == 1
-    assert "[CLUSTER_RX_STALE]" in caplog.text
-    assert "[CLUSTER_RX_RESUMED] Complete JPEG received; connection=open, mode=stream" in caplog.text
-  finally:
-    sock.close()
-    thread.join(timeout=1.0)
+def test_unknown_wire_protocol_never_starts_a_video_session(monkeypatch):
+  header = b"NONE" + pack_control(HELLO, {})[4:16]
+  sock, _now = _scheduled_receive_socket(monkeypatch, [(0.1, header)])
+  monkeypatch.setattr(cluster_receiver, "receive_h264_session", lambda *_args: pytest.fail("unsupported protocol"))
+  with pytest.raises(ValueError, match="Unsupported H.264 cluster protocol"):
+    cluster_receiver.receive_frames(sock, FakeDisplay(), frame_timeout=2.0)
 
 
 def test_receive_diagnostics_distinguish_readiness_waits_from_partial_reads(monkeypatch):
@@ -682,8 +180,8 @@ def test_receive_diagnostics_distinguish_readiness_waits_from_partial_reads(monk
       view[:len(chunk)] = chunk
       return len(chunk)
 
-  monkeypatch.setattr(cluster_protocol, "time", SimpleNamespace(monotonic=lambda: now[0]))
-  monkeypatch.setattr(cluster_protocol.select, "select", select_readable)
+  monkeypatch.setattr(control_socket, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(control_socket.select, "select", select_readable)
   stats = ReceiveStats()
   assert pi_recv_exact(FragmentedSocket(), 6, deadline=1.0, stats=stats) == b"abcdef"
   assert requested_sizes == [6, 4]
@@ -697,11 +195,11 @@ def test_receive_diagnostics_distinguish_readiness_waits_from_partial_reads(monk
 def test_receive_without_diagnostics_does_not_add_timing_calls(monkeypatch):
   class CompleteSocket:
     def recv_into(self, view):
-      view[:] = b"jpeg"
+      view[:] = b"data"
       return len(view)
 
-  monkeypatch.setattr(cluster_protocol, "time", SimpleNamespace(monotonic=lambda: pytest.fail("unnecessary timing call")))
-  assert pi_recv_exact(CompleteSocket(), 4) == b"jpeg"
+  monkeypatch.setattr(control_socket, "time", SimpleNamespace(monotonic=lambda: pytest.fail("unnecessary timing call")))
+  assert pi_recv_exact(CompleteSocket(), 4) == b"data"
 
 
 def test_late_readiness_cannot_restart_an_expired_idle_header_deadline(monkeypatch):
@@ -716,8 +214,8 @@ def test_late_readiness_cannot_restart_an_expired_idle_header_deadline(monkeypat
     def recv_into(self, _view):
       pytest.fail("expired idle must not read a header and restart the frame budget")
 
-  monkeypatch.setattr(cluster_protocol, "time", SimpleNamespace(monotonic=lambda: now[0]))
-  monkeypatch.setattr(cluster_protocol.select, "select", late_readiness)
+  monkeypatch.setattr(control_socket, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(control_socket.select, "select", late_readiness)
   with pytest.raises(ReceiveTimeout) as raised:
     pi_recv_exact(ReadySocket(), 16, deadline=2.0, timeout_from_first_byte=2.0, phase="header", stats=ReceiveStats())
   assert raised.value.phase == "idle_header"
@@ -734,11 +232,11 @@ def test_first_header_read_returning_late_cannot_renew_the_idle_deadline(monkeyp
   class LateReadSocket:
     def recv_into(self, view):
       now[0] = 2.01
-      view[:] = pack_frame_header(1, 4)
+      view[:] = pack_control(HELLO, {})[:16]
       return len(view)
 
-  monkeypatch.setattr(cluster_protocol, "time", SimpleNamespace(monotonic=lambda: now[0]))
-  monkeypatch.setattr(cluster_protocol.select, "select", on_time_readiness)
+  monkeypatch.setattr(control_socket, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(control_socket.select, "select", on_time_readiness)
   stats = ReceiveStats()
   with pytest.raises(ReceiveTimeout) as raised:
     pi_recv_exact(LateReadSocket(), 16, deadline=2.0, timeout_from_first_byte=2.0, phase="header", stats=stats)
@@ -1052,7 +550,7 @@ def test_main_retries_last_c4_before_scanning_and_backs_off_only_short_sessions(
     events.append(("receive", sock.address))
     if len([event for event in events if event[0] == "receive"]) == 1:
       now[0] += connection_duration
-      raise TimeoutError("stalled JPEG")
+      raise TimeoutError("stalled H.264 video")
     raise KeyboardInterrupt
 
   monkeypatch.setattr(cluster_receiver, "discover_c4", discover)

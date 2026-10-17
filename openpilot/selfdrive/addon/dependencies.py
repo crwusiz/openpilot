@@ -31,7 +31,7 @@ class DependencyInstallCancelled(DependencyError):
 REQUIREMENTS_DIR = Path(__file__).resolve().parent
 GROUP_MODULES = {
   "dashboard": ("nicegui", "ansi2html"),
-  "cluster-jpeg": ("cv2", "PIL"),
+  "cluster-render": ("cv2", "PIL"),
   "cluster-usb": ("usb.core", "usb.util", "Crypto.Cipher.DES"),
   "cluster-h264": ("libdatachannel",),
 }
@@ -51,13 +51,13 @@ def default_deps_root():
   return cache / "openpilot" / "addon_deps" / (sys.implementation.cache_tag or "python")
 
 
-def groups_for_cluster(transport, codec="jpeg"):
+def groups_for_cluster(transport):
   transport = str(transport or "network").strip().lower()
   if transport == "usb":
-    return ("cluster-jpeg", "cluster-usb")
+    return ("cluster-render", "cluster-usb")
   if transport != "network":
     raise DependencyError(f"Unsupported cluster display transport: {transport!r}")
-  return ("cluster-h264",) if str(codec).strip().lower() == "h264" else ("cluster-jpeg",)
+  return ("cluster-h264",)
 
 
 def select_groups(params_root="/data/params/d", blocked=None):
@@ -77,8 +77,7 @@ def select_groups(params_root="/data/params/d", blocked=None):
   groups = [] if "dashboard" in blocked else ["dashboard"]
   if "cluster" not in blocked and read("ClusterEnable") == "1":
     transport = read("ClusterDisplayTransport", "network")
-    codec_key = "ClusterUsbCodec" if transport == "usb" else "ClusterNetworkCodec"
-    groups.extend(groups_for_cluster(transport, read(codec_key, "jpeg")))
+    groups.extend(groups_for_cluster(transport))
   return tuple(groups)
 
 

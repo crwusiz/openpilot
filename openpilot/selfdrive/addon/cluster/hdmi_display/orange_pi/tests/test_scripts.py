@@ -460,8 +460,7 @@ def update_sandbox(script_sandbox):
   # The first update must work when the previously installed release has no
   # updater, and recovery must keep working after that release is restored.
   shutil.copyfile(updater, incoming / "scripts" / "update.sh")
-  for name in ("cluster_protocol.py", "frame_stream.py", "display_controls.py", "texture_presenter.py", "touch_status.py",
-               "tcp_diagnostics.py", "receiver_build.py", "receiver_resources.py",
+  for name in ("control_socket.py", "display_controls.py", "texture_presenter.py", "touch_status.py", "receiver_build.py", "receiver_resources.py",
                "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "cluster_renderer.py", "cluster_render_support.py"):
     (incoming / name).write_text("# current runtime dependency\n", encoding="utf-8", newline="\n")
   for name in ("ensure_wifi.sh", "wifi_boot_setup.sh", "wifi_power_save.sh", "prepare_h264.sh", "package_sources.sh"):
@@ -696,7 +695,8 @@ def test_invalid_update_does_not_stop_running_receiver(update_sandbox, failure):
 
 
 @pytest.mark.parametrize("helper", [
-  "cluster_protocol.py", "frame_stream.py", "display_controls.py", "texture_presenter.py", "tcp_diagnostics.py", "receiver_build.py", "receiver_resources.py",
+  "control_socket.py", "display_controls.py", "texture_presenter.py", "receiver_build.py", "receiver_resources.py",
+  "h264_receiver.py", "h264_protocol.py", "h264_scene.py",
   "scripts/fan_setup.sh",
 ])
 def test_incomplete_runtime_update_does_not_stop_running_receiver(update_sandbox, helper):
@@ -787,18 +787,19 @@ def test_asset_directory_symlinks_are_rejected_before_service_stop(update_sandbo
     assert (outside / "unchanged").read_text() == "keep"
 
 
-def test_optional_dependency_failure_keeps_update_available_and_precedes_stop(update_sandbox):
+def test_missing_h264_dependencies_preserve_running_receiver_without_stop(update_sandbox):
   sandbox, _environment, target, incoming = update_sandbox
   (incoming / "scripts/prepare_h264.sh").write_text(
-    '#!/bin/bash\nprintf "optional_prepare\\n" >> "$SYSTEMCTL_CALL_LOG"\nexit 1\n', encoding="utf-8", newline="\n",
+    '#!/bin/bash\nprintf "required_prepare\\n" >> "$SYSTEMCTL_CALL_LOG"\nexit 1\n', encoding="utf-8", newline="\n",
   )
   _write_checksums(incoming)
   result = _update(update_sandbox)
-  assert result.returncode == 0, result.stdout + result.stderr
-  assert "Optional preparation failed; JPEG remains available" in result.stderr
-  assert (target / "cluster_receiver.py").read_text() == "# new\n"
+  assert result.returncode != 0
+  assert "running receiver was preserved" in result.stderr
+  assert (target / "cluster_receiver.py").read_text() == "# old\n"
   calls = (sandbox[1].parent / "systemctl.log").read_text().splitlines()
-  assert calls.index("optional_prepare") < calls.index("stop cluster-hdmi.service")
+  assert "required_prepare" in calls
+  assert "stop cluster-hdmi.service" not in calls
 
 
 def test_fan_boot_preparation_keeps_current_receiver_running(update_sandbox):
@@ -810,7 +811,7 @@ def test_fan_boot_preparation_keeps_current_receiver_running(update_sandbox):
   assert calls.count("fan install") == 1
 
 
-def test_optional_dependency_installer_warns_without_mutating_service(script_sandbox):
+def test_required_dependency_installer_fails_without_mutating_service(script_sandbox):
   scripts, bin_dir = script_sandbox
   for name, body in {
     "missing-deps-python": "exit 1",
@@ -820,8 +821,23 @@ def test_optional_dependency_installer_warns_without_mutating_service(script_san
     path.write_text("#!/bin/bash\n" + body + "\n", encoding="utf-8", newline="\n")
     path.chmod(0o755)
   result = _run_script(script_sandbox, "prepare_h264.sh", extra_env={"CLUSTER_OS_PYTHON": "missing-deps-python"})
-  assert result.returncode == 0, result.stdout + result.stderr
-  assert "H.264 dependencies are unavailable. JPEG remains available" in result.stderr
+  assert result.returncode != 0
+  assert "Required H.264 dependencies are unavailable" in result.stderr
   calls = (bin_dir.parent / "deps.log").read_text()
   assert "python3-aiortc python3-av python3-numpy python3-pil python3-opencv" in calls
   assert not (bin_dir.parent / "systemctl.log").exists()
+
+
+def test_update_retires_old_modules_and_rollback_restores_the_previous_runtime(update_sandbox):
+  _sandbox, _environment, target, _incoming = update_sandbox
+  retired = ("cluster_protocol.py", "frame_stream.py", "tcp_diagnostics.py")
+  for name in retired:
+    (target / name).write_text(f"# previous {name}\n", encoding="utf-8")
+  result = _update(update_sandbox)
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert all(not (target / name).exists() for name in retired)
+  assert (target / "control_socket.py").exists()
+  result = _update(update_sandbox, "rollback")
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert all((target / name).read_text() == f"# previous {name}\n" for name in retired)
+  assert not (target / "control_socket.py").exists()

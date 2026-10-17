@@ -1,4 +1,4 @@
-"""Shared full-frame composition loop; Network H.264 composes on the Pi."""
+"""Compose the USB cluster and feed a bounded hardware H.264 pipeline."""
 
 import signal
 import time
@@ -7,7 +7,6 @@ from collections.abc import Mapping
 from time import thread_time
 
 import cv2
-import numpy as np
 
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 from openpilot.selfdrive.addon.cluster.cluster_display_pipeline import ClusterDisplayPipeline
@@ -19,20 +18,19 @@ from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer
 from openpilot.selfdrive.addon.cluster.cluster_runtime_metrics import ClusterRuntimeMetrics
 
 
-def run_composed_cluster(config, display, *, wait_for_frame, mode_changed=None, screen_off_fps=5,
-                         codec="jpeg", prepare_frame=None, clear_on_close=True):
+def run_composed_cluster(config, display, *, wait_for_frame, check_runtime):
   """Compose frames with a backend-owned clock and bounded delivery pipeline."""
   # Camera preprocessing, path drawing and encoding already overlap. Native
   # OpenCV pools would add more workers on the same three auxiliary CPU cores.
   cv2.setNumThreads(1)
   cv2.ocl.setUseOpenCL(False)
 
-  flog(f"[CLUSTER_MODE] codec={codec} | transport={config.display_transport} | compose=c4")
+  flog(f"[CLUSTER_MODE] codec=h264 | transport={config.display_transport} | compose=c4")
   if hasattr(display, 'open'):
-    flog(f"[CLUSTER_MAIN] Opening {config.display_transport}/{codec} display...")
+    flog(f"[CLUSTER_MAIN] Opening {config.display_transport}/h264 display...")
     display.open()
 
-  pipeline = ClusterDisplayPipeline(display) if prepare_frame is None else ClusterDisplayPipeline(display, prepare_frame=prepare_frame)
+  pipeline = ClusterDisplayPipeline(display)
   pipeline.start()
 
   health_guard = ClusterHealthGuard()
@@ -63,7 +61,6 @@ def run_composed_cluster(config, display, *, wait_for_frame, mode_changed=None, 
   runtime_metrics = ClusterRuntimeMetrics()
   next_policy_check = 0.0
   next_offline_frame = 0.0
-  next_screen_off_frame = 0.0
   last_status_at = perf_started
   blocked_frames = 0
   health_skipped = 0
@@ -82,9 +79,8 @@ def run_composed_cluster(config, display, *, wait_for_frame, mode_changed=None, 
             f"[CLUSTER_MAIN] Transport changed: {config.display_transport} -> {requested_transport}; restarting...",
           )
           break
-        if mode_changed is not None and mode_changed():
-          flog("[CLUSTER_MAIN] Display mode changed; restarting cluster.")
-          break
+        # Surface fatal encoder errors even when backpressure pauses rendering.
+        check_runtime()
 
       health = models.get_health_data()
       guard_log = health_guard.update(health, now)
@@ -96,17 +92,13 @@ def run_composed_cluster(config, display, *, wait_for_frame, mode_changed=None, 
       resource_log = runtime_metrics.sample(health)
       if resource_log is not None:
         flog(resource_log)
-      # Both transports need only occasional bootstrap images when disconnected.
-      # Pause USB rendering/preprocessing too when the lookahead frame is full;
+      # Use occasional bootstrap images when disconnected.
+      # Pause rendering/preprocessing when the lookahead frame is full;
       # sending one frame may still overlap preparation of the next.
       if not display.connected:
         render_ready = now >= next_offline_frame
         if render_ready:
           next_offline_frame = now + 1.0
-      elif getattr(display, "screen_off", False) is True:
-        render_ready = now >= next_screen_off_frame and pipeline.has_render_capacity()
-        if render_ready:
-          next_screen_off_frame = now + 1.0 / max(screen_off_fps, 1)
       else:
         render_ready = pipeline.has_render_capacity()
       if render_ready and not health_guard.allow_render(now):
@@ -159,15 +151,9 @@ def run_composed_cluster(config, display, *, wait_for_frame, mode_changed=None, 
     flog("[CLUSTER_MAIN] Interrupted by user.")
   finally:
     flog("[CLUSTER_MAIN] Closing resources...")
-    # Stop pending/background transport writes before sending the final black frame.
-    # This prevents an older queued frame from racing with shutdown cleanup.
+    # Join workers before closing the hardware encoder and clearing the panel.
     pipeline_stopped = pipeline.close() if hasattr(pipeline, 'close') else True
     if pipeline_stopped:
-      try:
-        if clear_on_close and display.connected and enforce_cluster_transport(config.params, config.display_transport):
-          display.send_image(np.zeros((config.height, config.width, 3), dtype=np.uint8))
-      except Exception as e:
-        flog(f"[CLUSTER_MAIN] Failed to clear display: {e}")
       if hasattr(display, 'close'):
         display.close()
     else:
@@ -176,8 +162,3 @@ def run_composed_cluster(config, display, *, wait_for_frame, mode_changed=None, 
       camera.close()
     if hasattr(models, 'close'):
       models.close()
-
-
-def run_jpeg_cluster(config, display, *, wait_for_frame, mode_changed=None, screen_off_fps=5):
-  return run_composed_cluster(config, display, wait_for_frame=wait_for_frame, mode_changed=mode_changed,
-                              screen_off_fps=screen_off_fps)

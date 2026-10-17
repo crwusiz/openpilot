@@ -1,14 +1,16 @@
 # TURZX USB 클러스터
 
-Dashboard의 **Toggles → Cluster Enable → USB (TURZX Display) → Cluster USB codec**에서 JPEG / H.264를 선택합니다. `ClusterUsbCodec`는 Network 코덱과 별도로 저장하며 기본은 기존 JPEG입니다. 코덱을 바꾸면 실행 중인 클러스터가 정리 후 재시작합니다. Pi 로그는 USB 모드에서 수집·업로드하지 않습니다.
+[2026-10-17 USB 기기 로그 분석](PERFORMANCE_2026-10-17.md): USB 제출은 평균 약13.3~13.6FPS이며 RGB→NV12 변환이 평균 약56~58ms입니다. 다음 성능 개선은 이 변환 경로를 우선 점검합니다.
 
-H.264는 **C4에서 기존 카메라·계기·아이콘·경로를 합성한 전체 화면을 하드웨어 인코딩**해 TURZX 9.2인치 모니터로 보냅니다. Network H.264의 원본 카메라 전송/Pi 합성과 처리 위치가 다릅니다. 기존 JPEG 화면 배치와 `rotate_180` 설정을 유지합니다. 실제 디코딩·출력은 USB 모니터에서 수행하며 Orange Pi는 필요 없습니다.
+Dashboard의 **Toggles → Cluster Enable → USB (TURZX Display)**를 선택합니다. USB는 H.264 전용이며 코덱 선택 옵션은 없습니다. Pi 로그는 USB 모드에서 수집·업로드하지 않습니다.
+
+H.264는 **C4에서 기존 카메라·계기·아이콘·경로를 합성한 전체 화면을 하드웨어 인코딩**해 TURZX 9.2인치 모니터로 보냅니다. Network H.264의 원본 카메라 전송/Pi 합성과 처리 위치가 다릅니다. 화면 배치와 `rotate_180` 설정을 유지합니다. 실제 디코딩·출력은 USB 모니터에서 수행하며 Orange Pi는 필요 없습니다.
 
 ## 빌드와 적용
 
-새 Params 키와 네이티브 공유 라이브러리가 포함되어 있으므로 **C4 코드를 업데이트하고 정상 openpilot 빌드·재시작을 완료한 후** USB H.264를 선택합니다. C4용 `comma_arm64` SCons 빌드에 `openpilot/system/loggerd/libcluster_h264_encoder_bridge.so`가 자동 포함됩니다. PC나 Orange Pi용 H.264 인코더는 설치하지 않습니다.
+Params 정리와 네이티브 공유 라이브러리가 포함되어 있으므로 **C4 코드를 업데이트하고 정상 openpilot 빌드·재시작을 완료한 후** USB 출력을 사용합니다. C4용 `comma_arm64` SCons 빌드에 `openpilot/system/loggerd/libcluster_h264_encoder_bridge.so`가 자동 포함됩니다. PC나 Orange Pi용 H.264 인코더는 설치하지 않습니다.
 
-하드웨어 브리지가 없거나 V4L2 인코더를 열지 못하면 `cluster_debug.log`에 오류를 기록합니다. 자동 소프트웨어 인코딩이나 코덱 전환을 하지 않으며 Dashboard에서 USB JPEG를 선택해 복귀할 수 있습니다. USB 모드는 기존 `cluster-jpeg`·`cluster-usb` 의존성 그룹을 사용하고, Network의 aiortc 의존성을 요구하지 않습니다. 기존 USB/eGPU 실행 정책도 유지합니다.
+하드웨어 브리지가 없거나 V4L2 인코더를 열지 못하면 `cluster_debug.log`에 오류를 기록합니다. 자동 소프트웨어 인코딩은 실행하지 않습니다. 빌드·기기 문제를 수정한 뒤 Cluster를 껐다 켜서 다시 시도합니다. USB 모드는 기존 `cluster-render`·`cluster-usb` 의존성 그룹을 사용하고, Network의 aiortc 의존성을 요구하지 않습니다. 기존 USB/eGPU 실행 정책도 유지합니다.
 
 USB 케이블만 연결한 부팅에서는 Cluster 활성화 설정을 유지합니다. `ChestnutLoading`은 일반 Type-C 케이블에서도 잠시 켜질 수 있으므로, 로딩 중 USB 차단은 실제 Chestnut의 VID/PID(ROM 부트로더 포함)가 확인될 때만 적용합니다. `ChestnutActive`가 켜진 실제 eGPU 사용 중에는 기존 차단을 유지합니다. 실제 Chestnut 충돌로 OFF가 저장된 경우에는 분리 후 사용자가 Cluster를 다시 켭니다.
 
@@ -32,7 +34,7 @@ USB 케이블만 연결한 부팅에서는 Cluster 활성화 설정을 유지합
 
 시작 단계·연결 오류·종료 이유는 C4 터미널에도 즉시 출력합니다. Python 예외는 `[CLUSTER_CRASH] stage=...`와 원인 traceback을 표시하고, 관리자에서 `[CLUSTER_PROCESS_EXIT] pid=... exit_code=... reason=...`를 한 번 출력합니다. 네이티브 오류는 `SIGABRT`·`SIGSEGV` 등 종료 신호와 해당 PID의 저장된 fatal stack을 확인할 수 있습니다. `SIGKILL`처럼 traceback을 남길 수 없는 종료도 신호는 표시하지만, 신호만으로 OOM 등 근본 원인을 단정하지 않습니다.
 
-코덱·디스플레이 변경으로 정상 종료하면 `[CLUSTER_RESTART]`와 함께 다시 실행합니다. 오류 종료는 반복 재시작하지 않으며, 다른 코덱을 선택하거나 Cluster를 껐다 켜면 다시 시도합니다. H.264 인코더가 실패한 상태에서도 JPEG 선택을 우선 처리합니다. 상세 기록은 `/data/log/cluster_debug.log`·`/data/log/cluster_crash.log`에 보관합니다.
+디스플레이 변경으로 정상 종료하면 `[CLUSTER_RESTART]`와 함께 다시 실행합니다. 오류 종료는 반복 재시작하지 않으며, 출력을 변경하거나 Cluster를 껐다 켜면 다시 시도합니다. 상세 기록은 `/data/log/cluster_debug.log`·`/data/log/cluster_crash.log`에 보관합니다.
 
 - `[CLUSTER_START]`, `[CLUSTER_MODE]`: `transport=usb`, `codec=h264`, `compose=c4` 확인
 - `[CLUSTER_USB_H264_ENCODER]`: 실제 하드웨어·해상도·인코딩 설정
@@ -43,4 +45,4 @@ USB 케이블만 연결한 부팅에서는 Cluster 활성화 설정을 유지합
 
 `submitted_fps`는 USB로 완전히 보낸 횟수이며 모니터가 실제 표시한 FPS나 촬영부터 표시까지의 지연 측정값이 아닙니다. 카메라 준비 FPS, 입력 수신 여부, 조향 표시 반응과 함께 확인합니다. 차량·모델 입력이 없는 책상 테스트만으로 주행 부하를 비교하지 않습니다.
 
-현재 검증은 모의 USB·네이티브 ABI와 실제 H.264 스트림의 SPS crop·디코딩 테스트입니다. C4 네이티브 빌드, 실제 패널의 영상 깨짐·지연·재연결과 주행 성능은 기기에서 확인해야 합니다. JPEG는 비교·복구용으로 유지합니다.
+현재 검증은 모의 USB·네이티브 ABI와 실제 H.264 스트림의 SPS crop·디코딩 테스트입니다. C4 네이티브 빌드, 실제 패널의 영상 깨짐·지연·재연결과 주행 성능은 기기에서 확인해야 합니다. 2026-10-17 USB 기기 테스트에서 영상 출력을 확인했으며, 이후 검증은 H.264 프레임과 지연에 집중합니다.

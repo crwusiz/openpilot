@@ -2,13 +2,11 @@ import threading
 import time
 
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
-from openpilot.selfdrive.addon.cluster.cluster_jpeg import PreparedFrame
 
 
 class ClusterDisplayPipeline:
-  def __init__(self, display, *, prepare_frame=None):
+  def __init__(self, display):
     self.display = display
-    self._prepare_frame = prepare_frame
     self._condition = threading.Condition()
     self._pending_frame = None
     self._pending_prepared = None
@@ -77,19 +75,7 @@ class ClusterDisplayPipeline:
       # active, the encoder already owns the one allowed lookahead frame.
       if self._encoding and self._sending:
         return False
-    capacity = getattr(self.display, "has_send_capacity", None)
-    if not callable(capacity) or capacity():
       return True
-    prepare_capacity = getattr(self.display, "has_prepare_capacity", None)
-    if not callable(prepare_capacity) or not prepare_capacity():
-      return False
-    # A healthy stream may have both transmission slots occupied. Prepare one
-    # next frame now so releasing an ACK does not first require another render
-    # and JPEG encode. Do not add another lookahead behind an encoder or a
-    # sender already holding that frame while it waits for transmission credit.
-    with self._condition:
-      return (self.running and not self._closing and self._pending_frame is None
-              and self._pending_prepared is None and not self._encoding and not self._sending)
 
   def _take_pending_frame(self):
     with self._condition:
@@ -146,12 +132,10 @@ class ClusterDisplayPipeline:
 
   def get_stats(self):
     with self._condition:
-      confirmed_count = getattr(self.display, "get_confirmed_frame_count", None)
-      sent = confirmed_count() if callable(confirmed_count) else self._sent_frames
       return {
         "input": self._input_frames,
         "encoded": self._encoded_frames,
-        "sent": sent,
+        "sent": self._sent_frames,
         "dropped_raw": self._dropped_raw_frames,
         "dropped_prepared": self._dropped_prepared_frames,
         "dropped_stale": self._dropped_stale_frames,
@@ -173,14 +157,9 @@ class ClusterDisplayPipeline:
         return
       frame_image, created_at = queued_frame
       try:
-        if self._prepare_frame is None:
-          prepared = self.display.prepare_image(frame_image)
-          if isinstance(prepared, PreparedFrame):
-            prepared = prepared._replace(created_at=created_at)
-        else:
-          # Asynchronous hardware output can belong to an earlier submission.
-          # Its callback PTS retains the matching render time, not this input's.
-          prepared = self._prepare_frame(frame_image, created_at)
+        # Asynchronous hardware output can belong to an earlier submission.
+        # Its callback PTS retains the matching render time, not this input's.
+        prepared = self.display.prepare_frame(frame_image, created_at)
         if prepared is not None:
           self._publish_prepared(prepared)
       except Exception as e:
@@ -204,17 +183,8 @@ class ClusterDisplayPipeline:
 
         if self._is_closing():
           return
-        # Keep untransmitted JPEGs replaceable while TCP credits are exhausted.
-        # Waiting inside send_prepared would pin an old image before a newer
-        # one can be selected when the next receive ACK releases the window.
-        wait_capacity = getattr(self.display, "wait_for_send_capacity", None)
-        if callable(wait_capacity) and not wait_capacity():
-          self._requeue_prepared_if_empty(prepared)
-          continue
-        if self._is_closing():
-          return
-        # Reconnection and credit waits can take seconds. Select latest after
-        # either wait; an expired frame is an intentional drop, not a failure.
+        # Reconnection can take seconds. Select latest after that wait;
+        # an expired frame is an intentional drop, not a failure.
         prepared = self._replace_with_latest_prepared(prepared)
         if prepared is not None:
           is_stale = getattr(self.display, "is_prepared_stale", None)

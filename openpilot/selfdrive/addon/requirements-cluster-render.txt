@@ -1,0 +1,3 @@
+# C4 frame composition for the USB H.264 display.
+opencv-python-headless==5.0.0.93
+Pillow==12.3.0

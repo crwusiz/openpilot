@@ -1,6 +1,6 @@
 # All optional addon features for manual development installs.
 # Device startup selects only enabled groups; see DEPENDENCIES.md.
 -r requirements-dashboard.txt
--r requirements-cluster-jpeg.txt
+-r requirements-cluster-render.txt
 -r requirements-cluster-usb.txt
 -r requirements-cluster-h264.txt

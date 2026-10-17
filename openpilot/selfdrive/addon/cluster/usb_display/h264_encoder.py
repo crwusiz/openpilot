@@ -31,7 +31,7 @@ class PreparedH264Frame:
 
 
 def portrait_nv12(frame, width, height, rotate_180=False):
-  """Match JPEG panel orientation, padding only the encoder's right edge."""
+  """Match the USB panel orientation, padding only the encoder's right edge."""
   rgb = np.asarray(frame)
   if rgb.dtype != np.uint8 or rgb.shape != (height, width, 3):
     raise ValueError("USB H.264 input must be the configured RGB cluster image")
@@ -79,8 +79,7 @@ class HardwareH264Encoder:
       self.lib = library if library is not None else ctypes.CDLL(str(LIBRARY))
       self._configure_abi()
     except (OSError, AttributeError) as error:
-      raise RuntimeError("USB H.264 hardware bridge is unavailable; rebuild openpilot on C4, "
-                         + "or select USB JPEG in Dashboard") from error
+      raise RuntimeError("USB H.264 hardware bridge is unavailable; rebuild openpilot on C4") from error
 
   def _fn(self, suffix):
     return getattr(self.lib, "cluster_h264_encoder_bridge_" + suffix)

@@ -230,7 +230,7 @@ read_manifest "$source_dir"
 if [[ $1 == apply ]]; then
   # Rollback manifests may belong to releases predating these helpers. Require
   # the current receiver dependencies only for a newly uploaded package.
-  for name in cluster_protocol.py frame_stream.py display_controls.py texture_presenter.py touch_status.py tcp_diagnostics.py receiver_build.py receiver_resources.py \
+  for name in control_socket.py display_controls.py texture_presenter.py touch_status.py receiver_build.py receiver_resources.py \
     h264_receiver.py h264_protocol.py h264_scene.py cluster_renderer.py cluster_render_support.py receiver_assets.txt \
     assets/fonts/NotoSansKR-Bold.ttf scripts/prepare_h264.sh scripts/package_sources.sh \
     scripts/update.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh scripts/fan_setup.sh; do
@@ -246,8 +246,8 @@ for name in "${FILES[@]}"; do
   [[ "$name" != scripts/*.sh ]] || bash -n "$source_dir/$name"
 done
 if [[ $1 == apply ]]; then
-  # Keep the live JPEG receiver running while optional packages are prepared.
-  bash "$source_dir/scripts/prepare_h264.sh" || printf '[CLUSTER_H264_DEPS] Optional preparation failed; JPEG remains available.\n' >&2
+  # Keep the live receiver running until all mandatory H.264 dependencies are ready.
+  bash "$source_dir/scripts/prepare_h264.sh" || fail 'H.264 dependencies are unavailable; the running receiver was preserved.'
 fi
 # Compile and import without initializing HDMI or writing bytecode. Run this
 # before stopping the old receiver, using the same OS Python as the service.
@@ -321,6 +321,13 @@ if [[ $1 == apply ]]; then
   # Boot-only preparation can install dtc without interrupting the current
   # receiver. The saved snapshot already covers any resulting boot changes.
   bash "$FAN_HELPER" install
+fi
+# Retire obsolete receiver modules; the complete previous version is backed up
+# above and remains available to the existing rollback/recovery mechanism.
+if [[ $1 == apply ]]; then
+  for name in cluster_protocol.py frame_stream.py tcp_diagnostics.py; do
+    [[ " ${FILES[*]} " == *" $name "* ]] || REMOVE+=("$name")
+  done
 fi
 systemctl stop "$UNIT"
 for name in "${FILES[@]}"; do

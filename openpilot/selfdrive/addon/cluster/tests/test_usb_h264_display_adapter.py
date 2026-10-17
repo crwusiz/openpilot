@@ -49,11 +49,11 @@ def test_encoder_failure_is_latched_and_preserves_original_cause(state):
     state.adapter.prepare_frame("frame", 10.0)
   assert original.value is failure
 
-  with pytest.raises(RuntimeError, match="select USB JPEG") as check:
+  with pytest.raises(RuntimeError, match="inspect CLUSTER_USB_H264 logs") as check:
     state.adapter.check_encoder()
   assert check.value.__cause__ is failure
 
-  with pytest.raises(RuntimeError, match="select USB JPEG") as retry:
+  with pytest.raises(RuntimeError, match="inspect CLUSTER_USB_H264 logs") as retry:
     state.adapter.prepare_frame("next frame", 10.05)
   assert retry.value.__cause__ is failure
   state.encoder.encode.assert_called_once_with("frame", 10.0)
@@ -137,7 +137,7 @@ def test_sender_exception_recovery_does_not_close_an_encoder_busy_on_next_frame(
   state.encoder.encode.side_effect = encode
   state.transport.send_access_unit.side_effect = fail_send
   state.transport.close.side_effect = reset_transport
-  pipeline = ClusterDisplayPipeline(state.adapter, prepare_frame=state.adapter.prepare_frame)
+  pipeline = ClusterDisplayPipeline(state.adapter)
   pipeline.start()
   try:
     pipeline.push("first", created_at=10.0)

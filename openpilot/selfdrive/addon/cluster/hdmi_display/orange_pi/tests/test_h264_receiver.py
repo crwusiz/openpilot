@@ -12,8 +12,7 @@ import numpy as np
 import pytest
 
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import cluster_receiver, h264_receiver
-from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.cluster_protocol import recv_exact
-from openpilot.selfdrive.addon.cluster.hdmi_display.network_protocol import pack_frame_header
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.control_socket import recv_exact
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol import (
   ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, STATE, decode_payload, pack_control, unpack_control_header,
 )
@@ -443,7 +442,7 @@ def test_decoded_rgb_replacement_preserves_latest_state_arrival_time():
 
 
 @pytest.mark.parametrize("changes", [
-  {"codec": "jpeg"}, {"transport": "tcp"}, {"camera": "unknown"}, {"width": 100000},
+  {"codec": "unsupported"}, {"transport": "tcp"}, {"camera": "unknown"}, {"width": 100000},
   {"width": True}, {"fps": 0}, {"width": 4096, "height": 2160},
 ])
 def test_invalid_hello_cannot_start_decoder_or_allocate_a_huge_scene(changes):
@@ -451,11 +450,11 @@ def test_invalid_hello_cannot_start_decoder_or_allocate_a_huge_scene(changes):
     h264_receiver.H264Receiver(None, {**HELLO_DATA, **changes})
 
 
-def test_receiver_detects_h264_hello_before_jpeg_header_decoding(monkeypatch):
+def test_receiver_validates_h264_hello_before_starting_video(monkeypatch):
   c4_sock, pi_sock = socket.socketpair()
-  display = SimpleNamespace(pump_events=lambda: True)
+  display = SimpleNamespace(pump_events=lambda: True, set_stream_mode=Mock())
   called = []
-  monkeypatch.setattr(h264_receiver, "receive_h264_session", lambda sock, screen, hello, timeout, maximum:
+  monkeypatch.setattr(cluster_receiver, "receive_h264_session", lambda sock, screen, hello, timeout, maximum:
                       called.append((sock, screen, hello, timeout, maximum)) or 5)
   try:
     c4_sock.sendall(pack_control(HELLO, HELLO_DATA))
@@ -472,25 +471,6 @@ def test_receiver_rejects_non_hello_h264_packet_without_entering_video_mode():
     c4_sock.sendall(pack_control(STATE, {}))
     with pytest.raises(ValueError, match="Expected H.264 session hello"):
       cluster_receiver.receive_frames(pi_sock, SimpleNamespace(pump_events=lambda: True), frame_timeout=0.5)
-  finally:
-    c4_sock.close()
-    pi_sock.close()
-
-
-def test_jpeg_stream_does_not_import_optional_h264_runtime(monkeypatch):
-  original_import = builtins.__import__
-
-  def guarded_import(name, *args, **kwargs):
-    if name.split(".")[-1] in ("aiortc", "av", "h264_receiver", "h264_scene"):
-      pytest.fail(f"JPEG unexpectedly imported {name}")
-    return original_import(name, *args, **kwargs)
-
-  c4_sock, pi_sock = socket.socketpair()
-  display = SimpleNamespace(pump_events=lambda: True, send_jpeg=lambda _jpeg: True)
-  try:
-    c4_sock.sendall(pack_frame_header(1, 4) + b"jpeg")
-    monkeypatch.setattr(builtins, "__import__", guarded_import)
-    assert cluster_receiver.receive_frames(pi_sock, display, max_frames=1) == 1
   finally:
     c4_sock.close()
     pi_sock.close()

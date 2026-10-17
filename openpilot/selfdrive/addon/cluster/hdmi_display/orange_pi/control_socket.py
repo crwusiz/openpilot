@@ -1,24 +1,8 @@
+"""Deadline-bounded signaling reads that keep SDL touch events responsive."""
+
 import select
-import struct
 import time
 from dataclasses import dataclass
-
-
-PROTOCOL_VERSION = 1
-FRAME_MAGIC = b"OPCF"
-ACK_MAGIC = b"OPCA"
-MAX_FRAME_SIZE = 4 * 1024 * 1024
-
-ACK_OK = 0
-ACK_DISPLAY_ERROR = 1
-ACK_PROTOCOL_ERROR = 2
-FRAME_QUERY_STREAM = 1
-FRAME_STREAM = 2
-ACK_STREAM_SUPPORTED = 1
-ACK_SCREEN_OFF = 2
-
-FRAME_HEADER = struct.Struct("!4sBB2xII")
-ACK_PACKET = struct.Struct("!4sBB2xIB3x")
 
 
 @dataclass
@@ -39,24 +23,6 @@ class ReceiveTimeout(TimeoutError):
     self.expected = expected
     super().__init__(f"Timed out waiting for cluster frame: phase={phase} bytes={received}/{expected} "
                      + f"elapsed={elapsed * 1000:.1f}ms progress_age={progress_age * 1000:.1f}ms")
-
-
-def unpack_frame_header(data: bytes) -> tuple[int, int]:
-  sequence, frame_size, _flags = unpack_frame_header_info(data)
-  return sequence, frame_size
-
-
-def unpack_frame_header_info(data: bytes) -> tuple[int, int, int]:
-  magic, version, flags, sequence, frame_size = FRAME_HEADER.unpack(data)
-  if magic != FRAME_MAGIC or version != PROTOCOL_VERSION:
-    raise ValueError("Unsupported cluster frame protocol")
-  if not 0 < frame_size <= MAX_FRAME_SIZE:
-    raise ValueError(f"Invalid cluster frame size: {frame_size}")
-  return sequence, frame_size, flags
-
-
-def pack_ack(sequence: int, status: int = ACK_OK, flags: int = 0) -> bytes:
-  return ACK_PACKET.pack(ACK_MAGIC, PROTOCOL_VERSION, flags, sequence, status)
 
 
 def recv_exact(sock, size: int, *, deadline: float | None = None, poll_events=None, stats: ReceiveStats | None = None,
@@ -113,7 +79,7 @@ def recv_exact(sock, size: int, *, deadline: float | None = None, poll_events=No
       if stats is not None:
         stats.first_byte_at = first_byte_at
       if timeout_from_first_byte is not None:
-        # Idle waiting is separate from the header+JPEG completion budget.
+        # Idle waiting is separate from the signaling message completion budget.
         # Reset exactly once; progress must never extend a partial frame forever.
         deadline = first_byte_at + timeout_from_first_byte
     if deadline is not None and read_ended > deadline:

@@ -27,7 +27,7 @@ def test_source_snapshot_matches_disk_until_a_dependency_changes(tmp_path):
   assert "missing=none | unreadable=none" in startup
   assert source_fingerprint(tmp_path) == startup
 
-  (tmp_path / "frame_stream.py").write_bytes(b"# updated socket receiver\n")
+  (tmp_path / "control_socket.py").write_bytes(b"# updated socket receiver\n")
   assert source_fingerprint(tmp_path) != startup
 
 
@@ -43,7 +43,7 @@ def test_receiver_logs_a_single_startup_snapshot_before_display_opens(tmp_path, 
 
   class Display:
     def open(self):
-      (tmp_path / "frame_stream.py").write_bytes(b"# changed after process startup\n")
+      (tmp_path / "control_socket.py").write_bytes(b"# changed after process startup\n")
       return True
 
     def show_waiting(self):
@@ -69,7 +69,7 @@ def test_receiver_logs_a_single_startup_snapshot_before_display_opens(tmp_path, 
 
 def test_missing_and_unreadable_sources_are_reported_without_preventing_startup(tmp_path, monkeypatch):
   _populate_sources(tmp_path)
-  (tmp_path / "tcp_diagnostics.py").unlink()
+  (tmp_path / "h264_protocol.py").unlink()
   original_read = Path.read_bytes
 
   def read_bytes(path):
@@ -79,9 +79,9 @@ def test_missing_and_unreadable_sources_are_reported_without_preventing_startup(
 
   monkeypatch.setattr(Path, "read_bytes", read_bytes)
   snapshot = source_fingerprint(tmp_path)
-  assert "tcp_diagnostics.py:missing" in snapshot
+  assert "h264_protocol.py:missing" in snapshot
   assert "texture_presenter.py:unreadable" in snapshot
-  assert "missing=tcp_diagnostics.py | unreadable=texture_presenter.py" in snapshot
+  assert "missing=h264_protocol.py | unreadable=texture_presenter.py" in snapshot
 
 
 def test_asset_fingerprint_changes_and_reports_missing_font(tmp_path):

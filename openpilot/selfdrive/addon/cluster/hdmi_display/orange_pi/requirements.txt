@@ -1,8 +1,8 @@
 # For PC/windowed pip installs. Orange Pi KMSDRM uses the OS python3-pygame
 # package with /usr/bin/python3 instead; see README.md.
 pygame>=2.5,<3
-# Optional H.264/WebRTC mode on a PC. Pi install/update uses OS apt packages;
-# preparation failure leaves the default pygame-only JPEG receiver available.
+# Required H.264/WebRTC receiver modules. Pi install/update uses OS apt packages
+# and stops before replacement if these modules cannot be prepared.
 aiortc>=1.9,<2
 av>=12,<17
 numpy>=1.24

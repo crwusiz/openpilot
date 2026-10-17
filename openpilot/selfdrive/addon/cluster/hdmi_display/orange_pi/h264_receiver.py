@@ -1,4 +1,4 @@
-"""Optional WebRTC video receiver; SDL remains on the caller's thread."""
+"""WebRTC video receiver; SDL remains on the caller's thread."""
 
 import asyncio
 import contextlib

@@ -20,8 +20,7 @@ def _selection(params):
       value = value.decode("utf-8", errors="replace")
     return str(value or default).strip().lower()
 
-  transport = text("ClusterDisplayTransport", "usb")
-  return transport, text("ClusterUsbCodec" if transport == "usb" else "ClusterNetworkCodec", "jpeg")
+  return text("ClusterDisplayTransport", "usb")
 
 
 def prepare_cluster_start(process, params):
@@ -32,12 +31,12 @@ def prepare_cluster_start(process, params):
   if child is not None and child.exitcode is not None:
     observe_cluster_exit(process)
     changed = selection != getattr(process, "_cluster_selection", selection)
-    # A normal codec/transport exit is an explicit restart request. A crash is
-    # left visible until the user changes mode or toggles Cluster, avoiding a
+    # A normal transport exit is an explicit restart request. A crash is
+    # left visible until the user changes transport or toggles Cluster, avoiding a
     # tight loop around a failing hardware encoder.
     if child.exitcode == 0 or changed:
       reason = "selection_changed" if changed else "normal_exit"
-      flog(f"[CLUSTER_RESTART] reason={reason} transport={selection[0]} codec={selection[1]}")
+      flog(f"[CLUSTER_RESTART] reason={reason} transport={selection} codec=h264")
       process.stop()
   # start() also completes an earlier asynchronous stop before launching a new
   # child. Its configuration snapshot must describe that new child as well.
