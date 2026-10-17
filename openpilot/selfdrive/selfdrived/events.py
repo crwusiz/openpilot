@@ -241,6 +241,17 @@ def startup_master_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
 
   return StartupAlert("WARNING: This branch is not tested", branch, alert_status=AlertStatus.userPrompt)
 
+
+def big_model_loading_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
+  spin = '-\\|/'
+  spinner = spin[(sm.frame // round(0.1 / DT_CTRL)) % len(spin)]
+  return Alert(
+    f"Chestnut Initialize {spinner}",
+    "",
+    AlertStatus.normal, AlertSize.full,
+    Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay=0.5)
+
+
 def below_engage_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   return NoEntryAlert(f"Drive above {get_display_speed(CP.minEnableSpeed, metric)} to engage")
 
@@ -442,6 +453,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.bigModelLoading: {
     ET.NO_ENTRY: NoEntryAlert("Big Model Loading"),
+    ET.PERMANENT: big_model_loading_alert,
   },
 
   EventName.bigModelFailed: {

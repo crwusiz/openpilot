@@ -13,7 +13,6 @@ from openpilot.system.ui.widgets.icon_widget import IconWidget
 from openpilot.system.ui.widgets.label import UnifiedLabel, gui_label
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, TextAlignment, TextAlignmentVertical
 from openpilot.selfdrive.ui.ui_state import ui_state, ChestnutState
-from openpilot.selfdrive.ui.mici.widgets.chestnut import draw_chestnut_loading
 from openpilot.common.version import RELEASE_BRANCHES
 
 import subprocess
@@ -491,5 +490,3 @@ class MiciHomeLayout(Widget):
 
     self._alerts_pill.set_position(pill_x, pill_y)
     self._alerts_pill.render()
-
-    draw_chestnut_loading(self.rect)
