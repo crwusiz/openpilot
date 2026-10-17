@@ -18,6 +18,10 @@ upload_prefix() {
   printf '%s_%s_%s' "$(date +%y-%m-%d-%H:%M)" "$(get_param "CarName")" "$(get_param "DongleId")"
 }
 
+pi_log_upload_enabled() {
+  [[ $(get_param "ClusterEnable") == 1 && $(get_param "ClusterDisplayTransport") == network ]]
+}
+
 upload_file() {
   local local_file_path="$1"
   local_file_path=$(resolve_log_path "$local_file_path")
@@ -248,8 +252,12 @@ main() {
   local log_path prefix
   log_path=$(resolve_log_path "$1")
   prefix=$(upload_prefix)
-  if [[ "$(basename "$log_path")" == cluster_debug.log ]]; then
+  if [[ "$(basename "$log_path")" == cluster_debug.log ]] && pi_log_upload_enabled; then
+    # Gate the whole paired upload, including saved Pi reports. Keep the
+    # outbox intact until Network cluster is enabled again.
     upload_cluster "$log_path" "$prefix"
+  elif [[ "$(basename "$log_path")" == cluster_pi_debug.log ]] && ! pi_log_upload_enabled; then
+    log "INFO" "Skipping Orange Pi log upload: Network cluster is not enabled."
   else
     upload_file "$log_path" "$prefix"
   fi

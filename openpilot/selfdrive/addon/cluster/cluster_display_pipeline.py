@@ -6,8 +6,9 @@ from openpilot.selfdrive.addon.cluster.cluster_jpeg import PreparedFrame
 
 
 class ClusterDisplayPipeline:
-  def __init__(self, display):
+  def __init__(self, display, *, prepare_frame=None):
     self.display = display
+    self._prepare_frame = prepare_frame
     self._condition = threading.Condition()
     self._pending_frame = None
     self._pending_prepared = None
@@ -41,7 +42,7 @@ class ClusterDisplayPipeline:
       self._sending = False
       self._reset_stats()
       self.encoder_thread = threading.Thread(
-        target=self._encoder_loop, name="cluster-jpeg-encoder", daemon=True,
+        target=self._encoder_loop, name="cluster-frame-encoder", daemon=True,
       )
       self.sender_thread = threading.Thread(
         target=self._sender_loop, name="cluster-display-sender", daemon=True,
@@ -172,9 +173,14 @@ class ClusterDisplayPipeline:
         return
       frame_image, created_at = queued_frame
       try:
-        prepared = self.display.prepare_image(frame_image)
-        if isinstance(prepared, PreparedFrame):
-          prepared = prepared._replace(created_at=created_at)
+        if self._prepare_frame is None:
+          prepared = self.display.prepare_image(frame_image)
+          if isinstance(prepared, PreparedFrame):
+            prepared = prepared._replace(created_at=created_at)
+        else:
+          # Asynchronous hardware output can belong to an earlier submission.
+          # Its callback PTS retains the matching render time, not this input's.
+          prepared = self._prepare_frame(frame_image, created_at)
         if prepared is not None:
           self._publish_prepared(prepared)
       except Exception as e:

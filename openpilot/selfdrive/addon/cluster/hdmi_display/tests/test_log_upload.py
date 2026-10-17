@@ -32,7 +32,15 @@ def sandbox(tmp_path):
 FTP_DEFAULT_DIR=logs
 YELLOW='' NC=''
 log() { printf '%s: %s\\n' "$1" "$2"; }
-get_param() { if [[ $1 == CarName ]]; then printf 'TEST_CAR'; else printf 'test-dongle'; fi; }
+get_param() {
+  case "$1" in
+    CarName) printf 'TEST_CAR' ;;
+    DongleId) printf 'test-dongle' ;;
+    ClusterEnable) printf '%s' "${MOCK_CLUSTER_ENABLE-1}" ;;
+    ClusterDisplayTransport) printf '%s' "${MOCK_CLUSTER_TRANSPORT-network}" ;;
+    *) printf 'Unknown' ;;
+  esac
+}
 ftp_upload_file() {
   printf '%s\\n' "$2" >> "$MOCK_UPLOAD_NAMES"
   printf '%s\\n' "${*:3}" >> "$MOCK_UPLOAD_OPTIONS"
@@ -99,6 +107,46 @@ def test_cluster_uploads_two_files_with_identical_prefix_and_cleans_private_temp
   assert "display_fps=20" in (sandbox.parent / "uploaded/cluster_pi_debug.log").read_text()
   assert "CLUSTER_PI_LOG_WARNING:" not in result.stdout
   assert not list((sandbox.parent / "temporary files").iterdir())
+
+
+@pytest.mark.parametrize("enabled,transport", [("0", "network"), ("1", "usb"), ("0", "usb"),
+                                             ("", "network"), ("1", ""), ("Unknown", "network"), ("1", "invalid")])
+def test_disabled_or_non_network_cluster_uploads_only_c4_without_collecting_pi(sandbox, enabled, transport):
+  result = _upload(sandbox, MOCK_CLUSTER_ENABLE=enabled, MOCK_CLUSTER_TRANSPORT=transport)
+  assert result.returncode == 0, result.stderr
+  names = (sandbox.parent / "upload-names.txt").read_text().splitlines()
+  assert len(names) == 1 and names[0].endswith("_cluster_debug.log")
+  assert not (sandbox.parent / "collector-call.txt").exists()
+  assert not (sandbox.parent / ".cluster-pi-pending").exists()
+  assert "CLUSTER_PI_LOG_WARNING:" not in result.stdout
+
+
+@pytest.mark.parametrize("disabled", [{"MOCK_CLUSTER_ENABLE": "0"}, {"MOCK_CLUSTER_TRANSPORT": "usb"}])
+def test_pi_pending_report_is_preserved_while_disabled_and_retried_when_network_enabled(sandbox, disabled):
+  assert _upload(sandbox, MOCK_PI_UPLOAD_FAIL="1").returncode == 0
+  job = next((sandbox.parent / ".cluster-pi-pending").glob("pending.*"))
+  original = job.joinpath("cluster_pi_debug.log").read_bytes()
+  prefix = job.joinpath("prefix").read_text().strip()
+  history = (job.parent / "history.log").read_bytes()
+  assert _upload(sandbox, **disabled).returncode == 0
+  names = (sandbox.parent / "upload-names.txt").read_text().splitlines()
+  assert len(names) == 3 and names[-1].endswith("_cluster_debug.log")
+  assert job.joinpath("cluster_pi_debug.log").read_bytes() == original
+  assert (job.parent / "history.log").read_bytes() == history
+  assert len((sandbox.parent / "collector-call.txt").read_text().splitlines()) == 1
+  assert _upload(sandbox).returncode == 0
+  names = (sandbox.parent / "upload-names.txt").read_text().splitlines()
+  assert names[3] == f"/logs/{prefix}_cluster_pi_debug.log"
+  assert not list(job.parent.glob("pending.*"))
+
+
+@pytest.mark.parametrize("enabled,transport,uploads", [("1", "network", True), ("0", "network", False), ("1", "usb", False)])
+def test_direct_pi_log_upload_also_requires_enabled_network_cluster(sandbox, enabled, transport, uploads):
+  (sandbox.parent / "cluster_pi_debug.log").write_text("Pi diagnostics\n")
+  result = _upload(sandbox, filename="cluster_pi_debug.log", MOCK_CLUSTER_ENABLE=enabled, MOCK_CLUSTER_TRANSPORT=transport)
+  assert result.returncode == 0, result.stderr
+  assert (sandbox.parent / "upload-names.txt").exists() is uploads
+  assert not (sandbox.parent / "collector-call.txt").exists()
 
 
 def test_pi_collection_failure_uploads_failure_report_and_preserves_c4_success(sandbox):

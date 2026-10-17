@@ -105,7 +105,9 @@ def test_usb_prepares_vendor_before_imports_and_preserves_camera_cadence(monkeyp
     return original_import(name, *args, **kwargs)
 
   monkeypatch.setattr(builtins, "__import__", guarded_import)
-  config = SimpleNamespace(fps=20)
+  config = SimpleNamespace(fps=20, params=object())
+  requested_usb_codec = Mock(return_value="jpeg")
+  monkeypatch.setitem(sys.modules, PREFIX + "cluster_config", SimpleNamespace(requested_usb_codec=requested_usb_codec))
 
   backend.run_usb_cluster(config)
 
@@ -114,6 +116,20 @@ def test_usb_prepares_vendor_before_imports_and_preserves_camera_cadence(monkeyp
   camera = SimpleNamespace(wait_for_frame=Mock(return_value=8))
   assert runner.call_args.kwargs["wait_for_frame"](camera, 7) == 8
   camera.wait_for_frame.assert_called_once_with(7, 0.05)
+  assert not runner.call_args.kwargs["mode_changed"]()
+  requested_usb_codec.return_value = "h264"
+  assert runner.call_args.kwargs["mode_changed"]()
+
+
+def test_usb_h264_dispatch_does_not_load_jpeg_backend(monkeypatch):
+  backend = load_backend("usb_display")
+  monkeypatch.setattr(backend, "configure_usb_runtime", Mock())
+  block_imports(monkeypatch, PREFIX + "usb_display.turing_usb_display", PREFIX + "cluster_jpeg_runtime")
+  runner = Mock()
+  monkeypatch.setitem(sys.modules, PREFIX + "usb_display.h264_runtime", SimpleNamespace(run_h264_usb_cluster=runner))
+  config = SimpleNamespace(usb_codec="h264")
+  backend.run_usb_cluster(config)
+  runner.assert_called_once_with(config)
 
 
 @pytest.mark.parametrize("codec", ["jpeg", None])

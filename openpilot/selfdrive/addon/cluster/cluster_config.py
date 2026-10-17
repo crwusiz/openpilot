@@ -25,6 +25,11 @@ USB = SimpleNamespace(
   max_frame_age_s=0.25,
   clear_halt_on_timeout=True,
   max_consecutive_failures=3,
+  h264_fps=20,
+  h264_bitrate=4_666_667,  # Match the tested 7 Mbps / 30 Hz USB encoder budget per frame.
+  h264_gop=1,  # Independent frames avoid persistent USB display decoder artifacts.
+  h264_slice_max_bytes=4096,
+  h264_device="/dev/v4l/by-path/platform-aa00000.qcom_vidc-video-index1",
 )
 
 # 8.8-inch HDMI panel; keep the standalone Orange Pi receiver defaults in sync.
@@ -50,9 +55,8 @@ NETWORK = SimpleNamespace(
 )
 
 
-def requested_codec(params, *, warn_invalid=False):
-  """Read the configured codec without loading a video runtime."""
-  value = params.get("ClusterNetworkCodec") or "jpeg"
+def _requested_codec(params, key, transport, *, warn_invalid=False):
+  value = params.get(key) or "jpeg"
   if isinstance(value, bytes):
     value = value.decode("utf-8", errors="replace")
   codec = str(value).strip().lower()
@@ -61,8 +65,18 @@ def requested_codec(params, *, warn_invalid=False):
   if warn_invalid:
     from openpilot.common.swaglog import cloudlog
 
-    cloudlog.warning(f"Unsupported cluster network codec: {value!r}; using JPEG")
+    cloudlog.warning(f"Unsupported cluster {transport} codec: {value!r}; using JPEG")
   return "jpeg"
+
+
+def requested_codec(params, *, warn_invalid=False):
+  """Read the Network codec without loading a video runtime."""
+  return _requested_codec(params, "ClusterNetworkCodec", "network", warn_invalid=warn_invalid)
+
+
+def requested_usb_codec(params, *, warn_invalid=False):
+  """Read the independent USB codec without loading the hardware encoder."""
+  return _requested_codec(params, "ClusterUsbCodec", "USB", warn_invalid=warn_invalid)
 
 
 class ClusterConfig:
@@ -77,6 +91,7 @@ class ClusterConfig:
     if self.display_transport not in ("network", "usb"):
       raise ValueError(f"Unsupported cluster display transport: {self.display_transport}")
     self.network_codec = requested_codec(self.params, warn_invalid=self.display_transport == "network")
+    self.usb_codec = requested_usb_codec(self.params, warn_invalid=self.display_transport == "usb")
     if self.display_transport == "network":
       self.width, self.height = HDMI.width, HDMI.height
     else:
@@ -103,6 +118,11 @@ class ClusterConfig:
     self.usb_max_frame_age = USB.max_frame_age_s
     self.usb_clear_halt_on_timeout = USB.clear_halt_on_timeout
     self.usb_max_consecutive_failures = USB.max_consecutive_failures
+    self.usb_h264_fps = USB.h264_fps
+    self.usb_h264_bitrate = USB.h264_bitrate
+    self.usb_h264_gop = USB.h264_gop
+    self.usb_h264_slice_max_bytes = USB.h264_slice_max_bytes
+    self.usb_h264_device = USB.h264_device
 
     self.network_bind_host = NETWORK.bind_host
     self.network_port = NETWORK.port
@@ -125,5 +145,5 @@ class ClusterConfig:
     cloudlog.info(
       f"Cluster Config Loaded: {self.width}x{self.height} @ {self.fps}fps, Unit: {self.speed_unit}, "
       + f"Rotate 180: {self.rotate_180}, Transport: {self.display_transport}"
-      + (f", Network Codec: {self.network_codec}" if self.display_transport == "network" else ""),
+      + (f", Network Codec: {self.network_codec}" if self.display_transport == "network" else f", USB Codec: {self.usb_codec}"),
     )

@@ -23,10 +23,17 @@ def configure_usb_runtime() -> None:
 
 def run_usb_cluster(config):
   configure_usb_runtime()
+  if getattr(config, "usb_codec", "jpeg") == "h264":
+    from openpilot.selfdrive.addon.cluster.usb_display.h264_runtime import run_h264_usb_cluster
+    run_h264_usb_cluster(config)
+    return
+
+  from openpilot.selfdrive.addon.cluster.cluster_config import requested_usb_codec
   from openpilot.selfdrive.addon.cluster.cluster_jpeg_runtime import run_jpeg_cluster
   from openpilot.selfdrive.addon.cluster.usb_display.turing_usb_display import TuringUsbDisplay
 
   def wait_for_frame(camera, last_frame):
     return camera.wait_for_frame(last_frame, 1.0 / config.fps)
 
-  run_jpeg_cluster(config, TuringUsbDisplay(config), wait_for_frame=wait_for_frame)
+  run_jpeg_cluster(config, TuringUsbDisplay(config), wait_for_frame=wait_for_frame,
+                   mode_changed=lambda: requested_usb_codec(config.params) != "jpeg")

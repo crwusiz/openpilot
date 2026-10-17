@@ -32,7 +32,7 @@ REQUIREMENTS_DIR = Path(__file__).resolve().parent
 GROUP_MODULES = {
   "dashboard": ("nicegui", "ansi2html"),
   "cluster-jpeg": ("cv2", "PIL"),
-  "cluster-usb": ("usb.core", "usb.util"),
+  "cluster-usb": ("usb.core", "usb.util", "Crypto.Cipher.DES"),
   "cluster-h264": ("libdatachannel",),
 }
 INSTALL_TIMEOUT = 180
@@ -76,7 +76,9 @@ def select_groups(params_root="/data/params/d", blocked=None):
 
   groups = [] if "dashboard" in blocked else ["dashboard"]
   if "cluster" not in blocked and read("ClusterEnable") == "1":
-    groups.extend(groups_for_cluster(read("ClusterDisplayTransport", "network"), read("ClusterNetworkCodec", "jpeg")))
+    transport = read("ClusterDisplayTransport", "network")
+    codec_key = "ClusterUsbCodec" if transport == "usb" else "ClusterNetworkCodec"
+    groups.extend(groups_for_cluster(transport, read(codec_key, "jpeg")))
   return tuple(groups)
 
 

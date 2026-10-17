@@ -34,6 +34,8 @@ class TestDependencySelection(unittest.TestCase):
       self.assertEqual(deps.select_groups(root, blocked="dashboard"), ("cluster-h264",))
       (root / "ClusterDisplayTransport").write_text("usb")
       self.assertEqual(deps.select_groups(root, blocked=" dashboard , other "), ("cluster-jpeg", "cluster-usb"))
+      (root / "ClusterUsbCodec").write_text("h264\n")
+      self.assertEqual(deps.select_groups(root, blocked="dashboard"), ("cluster-jpeg", "cluster-usb"))
       self.assertEqual(deps.select_groups(root, blocked="cluster"), ("dashboard",))
       self.assertEqual(deps.select_groups(root, blocked="dashboard,cluster"), ())
       with patch.dict(os.environ, {"BLOCK": "dashboard,cluster"}):
@@ -44,6 +46,11 @@ class TestDependencySelection(unittest.TestCase):
       deps.groups_for_cluster("typo")
     with self.assertRaisesRegex(deps.DependencyError, "Unknown addon"):
       deps.groups_ready(("typo",))
+
+  def test_usb_group_checks_the_vendor_des_cipher(self):
+    self.assertIn("Crypto.Cipher.DES", deps.GROUP_MODULES["cluster-usb"])
+    _path, _content, pins = deps._requirements("cluster-usb")
+    self.assertIn(("pycryptodome", "3.23.0"), pins)
 
   def test_cache_root_can_be_overridden(self):
     with patch.dict(os.environ, {"ADDON_DEPS_ROOT": "a-local-cache"}):

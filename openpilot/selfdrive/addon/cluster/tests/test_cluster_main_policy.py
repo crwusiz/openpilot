@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from openpilot.selfdrive.addon.cluster.cluster_config import requested_codec
+from openpilot.selfdrive.addon.cluster.cluster_config import requested_codec, requested_usb_codec
 from openpilot.selfdrive.addon.cluster.cluster_frame_clock import ClusterFrameClock
 
 
@@ -24,7 +24,8 @@ def cluster(monkeypatch):
   prefix = "openpilot.selfdrive.addon.cluster."
   modules = {
     "openpilot.common.swaglog": SimpleNamespace(cloudlog=Mock()),
-    prefix + "cluster_config": SimpleNamespace(ClusterConfig=lambda: config, requested_codec=requested_codec),
+    prefix + "cluster_config": SimpleNamespace(ClusterConfig=lambda: config, requested_codec=requested_codec,
+                                               requested_usb_codec=requested_usb_codec),
     prefix + "cluster_logging": SimpleNamespace(close_log=Mock(), flog=Mock(), initialize_log=Mock()),
     prefix + "cluster_display_pipeline": SimpleNamespace(ClusterDisplayPipeline=lambda d: pipeline),
     prefix + "cluster_live_camera": SimpleNamespace(ClusterLiveCamera=camera_factory),

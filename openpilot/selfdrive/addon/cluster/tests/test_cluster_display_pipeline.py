@@ -82,6 +82,28 @@ def _wait_for(predicate, timeout=1.0):
   return predicate()
 
 
+def test_async_encoder_hook_preserves_the_output_render_time_instead_of_current_submission():
+  sent = []
+  output = SimpleNamespace(created_at=7.0, data=b"independent hardware frame")
+  prepare = []
+  display = SimpleNamespace(connected=True, send_prepared=lambda frame: sent.append(frame) or True)
+
+  def prepare_frame(image, created_at):
+    prepare.append((image, created_at))
+    return output
+
+  pipeline = ClusterDisplayPipeline(display, prepare_frame=prepare_frame)
+  pipeline.start()
+  try:
+    pipeline.push("new input", created_at=42.0)
+    assert _wait_for(lambda: bool(sent))
+    assert sent == [output]
+    assert sent[0].created_at == 7.0
+    assert prepare == [("new input", 42.0)]
+  finally:
+    assert pipeline.close()
+
+
 def test_encoding_overlaps_blocked_send():
   display = OverlapDisplay()
   pipeline = ClusterDisplayPipeline(display)

@@ -104,11 +104,42 @@ class TestDashboardHelpers(unittest.TestCase):
           params.put.assert_called_once_with('ClusterNetworkCodec', selected, block=True)
           self.assertIn('Cluster restarting', notify.call_args.args[0])
 
+  def test_usb_codec_defaults_and_changes_preserve_the_network_codec(self):
+    for stored, expected in ((None, 'jpeg'), ('vp9', 'jpeg'), (b' H264 ', 'h264')):
+      with self.subTest(stored=stored):
+        client = Client(ui.page('/test-usb-codec-selection-' + expected))
+        self.addCleanup(client.delete)
+        values = {'ClusterDisplayTransport': 'usb', 'ClusterUsbCodec': stored, 'ClusterNetworkCodec': 'h264'}
+        params = Mock(get=Mock(side_effect=values.get), get_bool=Mock(side_effect=lambda key: key == 'ClusterEnable'))
+        with client, patch.object(dashboard, 'params', params), patch.object(ui, 'timer'), patch.object(ui, 'notify') as notify:
+          dashboard.render_tab_toggles()
+          select = next(element for element in client.elements.values()
+                        if isinstance(element, ui.select) and element.label == 'Cluster USB codec')
+          self.assertEqual(select.value, expected)
+          self.assertEqual(select.options, {'jpeg': 'JPEG', 'h264': 'H.264'})
+          params.put.assert_not_called()
+          selected = 'h264' if expected == 'jpeg' else 'jpeg'
+          select.set_value(selected)
+          params.put.assert_called_once_with('ClusterUsbCodec', selected, block=True)
+          self.assertEqual(values['ClusterNetworkCodec'], 'h264')
+          self.assertIn('Cluster restarting', notify.call_args.args[0])
+
+  def test_usb_codec_selector_is_hidden_while_cluster_is_disabled(self):
+    client = Client(ui.page('/test-usb-codec-disabled'))
+    self.addCleanup(client.delete)
+    values = {'ClusterDisplayTransport': 'usb', 'ClusterUsbCodec': 'h264'}
+    params = Mock(get=Mock(side_effect=values.get), get_bool=Mock(return_value=False))
+    with client, patch.object(dashboard, 'params', params), patch.object(ui, 'timer'):
+      dashboard.render_tab_toggles()
+    self.assertFalse(any(isinstance(element, ui.select) and element.label == 'Cluster USB codec'
+                         for element in client.elements.values()))
+    params.put.assert_not_called()
+
   def test_switching_transport_refreshes_network_codec_controls(self):
     async def exercise_changes():
       client = Client(ui.page('/test-codec-transport-refresh'))
       self.addCleanup(client.delete)
-      values = {'ClusterDisplayTransport': 'usb', 'ClusterNetworkCodec': 'h264'}
+      values = {'ClusterDisplayTransport': 'usb', 'ClusterUsbCodec': 'jpeg', 'ClusterNetworkCodec': 'h264'}
       params = Mock(get=Mock(side_effect=values.get), get_bool=Mock(side_effect=lambda key: key == 'ClusterEnable'))
       params.put.side_effect = lambda key, value, **_kwargs: values.__setitem__(key, value)
       with client, patch.object(core, 'loop', asyncio.get_running_loop()), patch.object(dashboard, 'params', params), \
@@ -128,6 +159,13 @@ class TestDashboardHelpers(unittest.TestCase):
         await asyncio.sleep(0)
         self.assertFalse(any(isinstance(element, ui.select) and element.label == 'Cluster network codec'
                              for element in client.elements.values()))
+        usb_codec = next(element for element in client.elements.values()
+                         if isinstance(element, ui.select) and element.label == 'Cluster USB codec')
+        self.assertEqual(usb_codec.value, 'jpeg')
+        usb_codec.set_value('h264')
+        self.assertEqual(values['ClusterUsbCodec'], 'h264')
+        self.assertEqual(values['ClusterNetworkCodec'], 'h264')
+        params.put.assert_called_with('ClusterUsbCodec', 'h264', block=True)
 
     asyncio.run(exercise_changes())
 

@@ -5,12 +5,14 @@
 | 사용 기능 | 설치 그룹 | 추가 Python 패키지 |
 | --- | --- | --- |
 | 대시보드 | dashboard | NiceGUI, ansi2html |
-| USB cluster | cluster-jpeg + cluster-usb | OpenCV, Pillow, PyUSB |
+| USB JPEG / USB H.264 | cluster-jpeg + cluster-usb | OpenCV, Pillow, PyUSB, PyCryptodome |
 | Network JPEG | cluster-jpeg | OpenCV, Pillow |
 | Network H.264의 C4 송신기 | cluster-h264 | libdatachannel-py; 저장소의 teleoprtc 사용 |
 | cluster 꺼짐 | 없음 | cluster 그룹을 설치하지 않음 |
 
-OpenCV는 USB 전용이 아닙니다. C4에서 JPEG 화면을 합성하는 두 모드가 함께 사용합니다. NumPy와 USB 벤더가 사용하는 Crypto는 기존 openpilot/opendbc 환경에서 제공됩니다. USB의 네이티브 libusb도 기기 환경에 필요합니다.
+`cluster-jpeg` 그룹의 OpenCV·Pillow는 C4에서 화면을 합성하는 USB JPEG·USB H.264·Network JPEG가 함께 사용합니다. NumPy는 기존 openpilot 환경을 사용합니다. USB 벤더의 DES 암호화에 사용하는 PyCryptodome은 `cluster-usb`에서 버전과 import를 확인하며, 기존 openpilot/opendbc 환경의 버전이 일치하면 추가 설치를 생략합니다. USB의 네이티브 libusb도 기기 환경에 필요합니다.
+
+USB H.264는 C4의 V4L2 하드웨어 인코더와 저장소 빌드에서 생성한 전용 네이티브 라이브러리를 사용합니다. USB H.264 선택 때문에 Network 전용 `cluster-h264`나 Pi의 aiortc/PyAV를 설치하지 않습니다. 지원되지 않는 기기나 빌드에서는 인코더 오류를 표시하며, 대시보드에서 USB JPEG로 돌아갈 수 있습니다. USB와 Network의 코덱은 각각 `ClusterUsbCodec`와 `ClusterNetworkCodec`에 저장됩니다.
 
 대시보드는 현재 manager에서 항상 실행하므로 기본적으로 dashboard 그룹을 준비합니다. 기존 manager 옵션인 환경변수 `BLOCK=dashboard`를 설정하면 실행과 설치를 모두 제외합니다. 예를 들어 `launch_env.sh`에 `export BLOCK=dashboard`를 설정할 수 있습니다. 다른 프로세스도 제외 중이라면 쉼표 목록을 유지합니다. 이 설정을 제거한 뒤 다시 시작하면 대시보드를 사용할 수 있습니다.
 

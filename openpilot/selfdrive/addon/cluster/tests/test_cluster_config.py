@@ -30,11 +30,42 @@ def test_transport_selection_is_preserved_with_egpu(monkeypatch, transport, size
   assert config.jpeg_quality == 68
   assert config.network_jpeg_quality == 68
   assert config.network_codec == "jpeg"
+  assert config.usb_codec == "jpeg"
   assert Path(config.font_bold).name == "NotoSansKR-Bold.ttf"
   assert config.font_regular == config.font_bold
   assert config.network_max_in_flight == 2
   assert config.network_max_in_flight_bytes == 512 * 1024
   assert config.network_max_frame_age == config.network_max_ack_age == 0.25
+  assert config.usb_h264_fps == 20
+  assert config.usb_h264_bitrate == 4_666_667
+  assert config.usb_h264_gop == 1
+  assert config.usb_h264_slice_max_bytes == 4096
+  assert config.usb_h264_device.endswith("qcom_vidc-video-index1")
+  params.put.assert_not_called()
+
+
+@pytest.mark.parametrize("transport", ["network", "usb"])
+@pytest.mark.parametrize("stored,expected,invalid", [
+  (None, "jpeg", False), ("", "jpeg", False), ("jpeg", "jpeg", False),
+  ("h264", "h264", False), (b"h264", "h264", False), (" H264 ", "h264", False),
+  (" JPEG ", "jpeg", False), ("vp9", "jpeg", True), (b"\xff", "jpeg", True),
+])
+def test_usb_codec_is_independent_and_uses_hardware_encoder_defaults(monkeypatch, transport, stored, expected, invalid):
+  params = Mock()
+  params.get.side_effect = {"ClusterDisplayTransport": transport, "ClusterUsbCodec": stored, "ClusterNetworkCodec": "h264"}.get
+  log = Mock()
+  monkeypatch.setitem(sys.modules, "openpilot.common.params", SimpleNamespace(Params=lambda: params))
+  monkeypatch.setitem(sys.modules, "openpilot.common.swaglog", SimpleNamespace(cloudlog=log))
+  spec = importlib.util.spec_from_file_location("cluster_config_usb_codec_under_test", Path(__file__).parents[1] / "cluster_config.py")
+  module = importlib.util.module_from_spec(spec)
+  spec.loader.exec_module(module)
+
+  config = module.ClusterConfig()
+
+  assert config.usb_codec == expected
+  assert config.network_codec == "h264"
+  assert config.usb_fps == config.usb_h264_fps == 20
+  assert log.warning.call_count == int(transport == "usb" and invalid)
   params.put.assert_not_called()
 
 
