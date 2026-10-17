@@ -10,6 +10,8 @@ H.264는 **C4에서 기존 카메라·계기·아이콘·경로를 합성한 전
 
 하드웨어 브리지가 없거나 V4L2 인코더를 열지 못하면 `cluster_debug.log`에 오류를 기록합니다. 자동 소프트웨어 인코딩이나 코덱 전환을 하지 않으며 Dashboard에서 USB JPEG를 선택해 복귀할 수 있습니다. USB 모드는 기존 `cluster-jpeg`·`cluster-usb` 의존성 그룹을 사용하고, Network의 aiortc 의존성을 요구하지 않습니다. 기존 USB/eGPU 실행 정책도 유지합니다.
 
+USB 케이블만 연결한 부팅에서는 Cluster 활성화 설정을 유지합니다. `ChestnutLoading`은 일반 Type-C 케이블에서도 잠시 켜질 수 있으므로, 로딩 중 USB 차단은 실제 Chestnut의 VID/PID(ROM 부트로더 포함)가 확인될 때만 적용합니다. `ChestnutActive`가 켜진 실제 eGPU 사용 중에는 기존 차단을 유지합니다. 실제 Chestnut 충돌로 OFF가 저장된 경우에는 분리 후 사용자가 Cluster를 다시 켭니다.
+
 ## 초기 설정
 
 | 항목 | 값 |
