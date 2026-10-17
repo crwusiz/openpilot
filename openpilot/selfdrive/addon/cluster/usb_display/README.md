@@ -1,6 +1,6 @@
 # TURZX USB 클러스터
 
-[2026-10-17 USB 기기 로그 분석](PERFORMANCE_2026-10-17.md): USB 제출은 평균 약13.3~13.6FPS이며 RGB→NV12 변환이 평균 약56~58ms입니다. 다음 성능 개선은 이 변환 경로를 우선 점검합니다.
+[2026-10-17 USB 기기 로그 분석과 개선](PERFORMANCE_2026-10-17.md): RGB→NV12 변환을 네이티브에서 합치고 출력 버퍼를 재사용합니다. 카메라는 소비한 영상의 다음 한 장을 USB 준비 시점과 독립적으로 준비합니다.
 
 Dashboard의 **Toggles → Cluster Enable → USB (TURZX Display)**를 선택합니다. USB는 H.264 전용이며 코덱 선택 옵션은 없습니다. Pi 로그는 USB 모드에서 수집·업로드하지 않습니다.
 
@@ -9,6 +9,8 @@ H.264는 **C4에서 기존 카메라·계기·아이콘·경로를 합성한 전
 ## 빌드와 적용
 
 Params 정리와 네이티브 공유 라이브러리가 포함되어 있으므로 **C4 코드를 업데이트하고 정상 openpilot 빌드·재시작을 완료한 후** USB 출력을 사용합니다. C4용 `comma_arm64` SCons 빌드에 `openpilot/system/loggerd/libcluster_h264_encoder_bridge.so`가 자동 포함됩니다. PC나 Orange Pi용 H.264 인코더는 설치하지 않습니다.
+
+새 변환 경로가 적용되면 `[CLUSTER_USB_H264_ENCODER]`와 10초 성능 로그에 `converter=native_tiled`가 표시됩니다. 라이브러리가 이전 빌드이면 `Native RGB converter unavailable` 경고와 `converter=opencv`를 남기고 기존 색상 변환을 사용하므로 C4 재빌드 여부를 확인합니다.
 
 하드웨어 브리지가 없거나 V4L2 인코더를 열지 못하면 `cluster_debug.log`에 오류를 기록합니다. 자동 소프트웨어 인코딩은 실행하지 않습니다. 빌드·기기 문제를 수정한 뒤 Cluster를 껐다 켜서 다시 시도합니다. USB 모드는 기존 `cluster-render`·`cluster-usb` 의존성 그룹을 사용하고, Network의 aiortc 의존성을 요구하지 않습니다. 기존 USB/eGPU 실행 정책도 유지합니다.
 
@@ -38,7 +40,7 @@ USB 케이블만 연결한 부팅에서는 Cluster 활성화 설정을 유지합
 
 - `[CLUSTER_START]`, `[CLUSTER_MODE]`: `transport=usb`, `codec=h264`, `compose=c4` 확인
 - `[CLUSTER_USB_H264_ENCODER]`: 실제 하드웨어·해상도·인코딩 설정
-- `[CLUSTER_USB_H264_ENCODE_PERF]`: 인코딩 완료 FPS, RGB 변환 시간, 입력부터 출력 준비까지 시간
+- `[CLUSTER_USB_H264_ENCODE_PERF]`: 완료 FPS, 전체 변환·스레드 CPU 시간, RGB 내보내기·픽셀 변환 시간, 입력부터 출력 준비까지 시간
 - `[CLUSTER_USB_H264_PERF]`: USB 제출 FPS·바이트·시간·모니터 큐 상태·생략 수·ACK 배출 수
 - `[CLUSTER_MAIN_PERF]`, `[CLUSTER_CAM_PERF]`: 합성 속도와 새 카메라 영상 준비 속도
 - `[CLUSTER_RESOURCE_PERF]`, `[CLUSTER_INPUT_DIAG]`, `[CLUSTER_LOAD_GUARD]`: C4 CPU·RSS, modeld/locationd·통신 입력 상태와 부하 보호

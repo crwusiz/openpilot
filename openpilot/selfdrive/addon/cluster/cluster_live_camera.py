@@ -130,7 +130,7 @@ class ClusterLiveCamera:
     ], dtype=np.float32)
 
     # VisionIPC provides NV12 with padded rows. Resize its luma and interleaved
-    # chroma planes independently, then convert only the final 1152x462 image.
+    # chroma planes independently, then convert only the final panel-sized image.
     # This replaces a full 1928x1208 RGB conversion and its temporary I420 copy.
     if self._use_fast_yuv:
       try:
@@ -201,8 +201,8 @@ class ClusterLiveCamera:
           continue
 
         received_at = time.monotonic()
-        # Always drain VisionIPC and track raw reception. A blocked network
-        # needs only occasional prepared frames, rather than 20 conversions/s.
+        # Always drain VisionIPC and track raw reception. After a render consumes
+        # the RGB image, prepare one replacement independently of USB readiness.
         self._last_frame_at = received_at
         if self._perf_started is None:
           self._perf_started = received_at
@@ -220,8 +220,8 @@ class ClusterLiveCamera:
             self._log_perf(received_at)
             continue
 
-        # Keep a minimum refresh while blocked so a short-lived transport
-        # credit cannot starve preprocessing and leave a frozen camera image.
+        # Retain only one unconsumed image, with a minimum 5 Hz refresh while
+        # paused. A consumer that has used the image can request a new one now.
         prepare_started = received_at
         self._last_prepare_started = prepare_started
         frame, source_to_panel = self._panel_rgb_from_vision_buffer(buffer)

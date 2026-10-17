@@ -82,6 +82,44 @@ def test_delayed_native_output_retains_original_render_timestamp_and_owned_bytes
   native.functions["destroy"].assert_called_once_with(42)
 
 
+def test_async_output_keeps_conversion_metrics_for_its_own_input(native, monkeypatch):
+  conversions = iter([
+    module.ConversionTimings(0.030, 0.010, 0.005, 0.025, "native_tiled"),
+    module.ConversionTimings(0.020, 0.015, 0.004, 0.016, "native_tiled"),
+  ])
+  monkeypatch.setattr(native.encoder, "_to_nv12", lambda _frame: (np.zeros(384, dtype=np.uint8), next(conversions)))
+  waiting = []
+
+  def submit(_handle, _data, _size, timestamp, callback, _opaque):
+    if waiting:
+      _packet(callback, waiting.pop(0))
+    waiting.append(timestamp)
+    return 0
+
+  native.functions["encode_nv12_packed"].side_effect = submit
+  assert native.encoder.encode(None, 99.98) is None
+  native.now[0] = 100.05
+  result = native.encoder.encode(None, 100.04)
+  assert result.created_at == 99.98
+  assert result.convert_elapsed == 0.030
+  assert result.convert_cpu_elapsed == 0.010
+  assert result.rgb_export_elapsed == 0.005
+  assert result.pixels_elapsed == 0.025
+  assert result.converter == "native_tiled"
+
+
+def test_older_bridge_uses_the_existing_color_conversion_and_reports_rebuild(native, monkeypatch):
+  assert native.encoder._convert_rgb is None
+  assert any("Native RGB converter unavailable" in call.args[0] for call in module.flog.call_args_list)
+  expected = np.zeros(384, dtype=np.uint8)
+  convert = Mock(return_value=expected)
+  monkeypatch.setattr(module, "portrait_nv12", convert)
+  result, metrics = native.encoder._to_nv12(Image.new("RGB", (16, 8)))
+  assert result is expected
+  assert metrics.backend == "opencv"
+  assert convert.call_count == 1
+
+
 def test_drain_can_finish_current_frame_without_waiting_for_next_input(native):
   submitted = []
   native.functions["encode_nv12_packed"].side_effect = lambda _h, _d, _s, timestamp, _c, _o: submitted.append(timestamp) or 0

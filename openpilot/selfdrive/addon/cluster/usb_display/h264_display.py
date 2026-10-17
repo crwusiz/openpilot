@@ -16,6 +16,8 @@ class H264DisplayAdapter:
     self._perf_started = time.monotonic()
     self._encoded = 0
     self._prepare_time = self._convert_time = 0.0
+    self._convert_cpu_time = self._rgb_export_time = self._pixels_time = 0.0
+    self._converter = "pending"
 
   @property
   def connected(self):
@@ -35,13 +37,22 @@ class H264DisplayAdapter:
       self._encoded += 1
       self._prepare_time += frame.prepare_elapsed
       self._convert_time += frame.convert_elapsed
+      self._convert_cpu_time += frame.convert_cpu_elapsed
+      self._rgb_export_time += frame.rgb_export_elapsed
+      self._pixels_time += frame.pixels_elapsed
+      self._converter = frame.converter
     now = time.monotonic()
     if now - self._perf_started >= 10.0:
       flog(f"[CLUSTER_USB_H264_ENCODE_PERF] fps={self._encoded / (now - self._perf_started):.2f} | "
            + f"prepare_avg={self._prepare_time * 1000 / max(self._encoded, 1):.1f}ms | "
-           + f"convert_avg={self._convert_time * 1000 / max(self._encoded, 1):.1f}ms | backend=qcom_v4l2")
+           + f"convert_avg={self._convert_time * 1000 / max(self._encoded, 1):.1f}ms | "
+           + f"convert_cpu_avg={self._convert_cpu_time * 1000 / max(self._encoded, 1):.1f}ms | "
+           + f"rgb_export_avg={self._rgb_export_time * 1000 / max(self._encoded, 1):.1f}ms | "
+           + f"pixels_avg={self._pixels_time * 1000 / max(self._encoded, 1):.1f}ms | "
+           + f"converter={self._converter} | backend=qcom_v4l2")
       self._perf_started, self._encoded = now, 0
       self._prepare_time = self._convert_time = 0.0
+      self._convert_cpu_time = self._rgb_export_time = self._pixels_time = 0.0
     return frame
 
   def check_encoder(self):

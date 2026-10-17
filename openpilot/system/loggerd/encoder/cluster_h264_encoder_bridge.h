@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "system/loggerd/encoder/cluster_h264_rgb.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -35,7 +35,11 @@ def run_composed_cluster(config, display, *, wait_for_frame, check_runtime):
 
   health_guard = ClusterHealthGuard()
   flog("[CLUSTER_MAIN] Preparing camera, vehicle inputs and renderer...")
-  camera = ClusterLiveCamera(config, frame_needed=lambda: not health_guard.degraded and display.connected and pipeline.has_render_capacity())
+  # The camera already retains at most one unconsumed RGB image. Allow its
+  # replacement after a render consumes it, even while the encoder is busy.
+  # A short USB-capacity window can fall between 20 Hz camera arrivals and
+  # otherwise leave the visible camera at its 5 Hz blocked refresh rate.
+  camera = ClusterLiveCamera(config, frame_needed=lambda: not health_guard.degraded and display.connected)
   models = ClusterModels()
   renderer = ClusterRenderer(config)
 

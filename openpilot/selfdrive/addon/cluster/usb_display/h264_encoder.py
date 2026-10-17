@@ -8,6 +8,7 @@ import time
 
 import cv2
 import numpy as np
+from PIL import Image
 
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 from openpilot.selfdrive.addon.cluster.usb_display.h264_bitstream import H264AccessUnitFormatter
@@ -28,6 +29,19 @@ class PreparedH264Frame:
   convert_elapsed: float
   encoded_at: float
   timestamp_us: int
+  convert_cpu_elapsed: float = 0.0
+  rgb_export_elapsed: float = 0.0
+  pixels_elapsed: float = 0.0
+  converter: str = "opencv"
+
+
+@dataclass(frozen=True)
+class ConversionTimings:
+  elapsed: float
+  cpu_elapsed: float
+  rgb_export_elapsed: float
+  pixels_elapsed: float
+  backend: str
 
 
 def portrait_nv12(frame, width, height, rotate_180=False):
@@ -80,6 +94,9 @@ class HardwareH264Encoder:
       self._configure_abi()
     except (OSError, AttributeError) as error:
       raise RuntimeError("USB H.264 hardware bridge is unavailable; rebuild openpilot on C4") from error
+    self._packed = np.empty(self.encoder_width * self.encoder_height * 3 // 2, dtype=np.uint8)
+    if self._convert_rgb is None:
+      flog("[CLUSTER_USB_H264_WARN] Native RGB converter unavailable; rebuild openpilot on C4. Using OpenCV color conversion.")
 
   def _fn(self, suffix):
     return getattr(self.lib, "cluster_h264_encoder_bridge_" + suffix)
@@ -100,6 +117,44 @@ class HardwareH264Encoder:
     for name, (arguments, result) in signatures.items():
       function = self._fn(name)
       function.argtypes, function.restype = arguments, result
+    # A previously built bridge remains usable until the C4 rebuild finishes.
+    # This changes color conversion only; both paths use hardware H.264.
+    self._convert_rgb = getattr(self.lib, "cluster_h264_encoder_bridge_convert_rgb", None)
+    if self._convert_rgb is not None:
+      self._convert_rgb.argtypes = [pointer, ctypes.c_size_t, ctypes.c_int, ctypes.c_int, ctypes.c_size_t,
+                                   ctypes.c_int, pointer, ctypes.c_size_t]
+      self._convert_rgb.restype = ctypes.c_int
+
+  def _to_nv12(self, frame):
+    started, cpu_started = self.clock(), time.thread_time()
+    if isinstance(frame, Image.Image):
+      if frame.mode != "RGB" or frame.size != (self.width, self.height):
+        raise ValueError("USB H.264 input must be the configured RGB cluster image")
+      # Export once. The immutable bytes keep the input alive across a native
+      # call that releases the GIL, without a second ctypes/NumPy RGB copy.
+      rgb_bytes = frame.tobytes()
+      rgb = np.frombuffer(rgb_bytes, dtype=np.uint8).reshape(self.height, self.width, 3)
+    else:
+      rgb = np.asarray(frame)
+      if rgb.dtype != np.uint8 or rgb.shape != (self.height, self.width, 3):
+        raise ValueError("USB H.264 input must be the configured RGB cluster image")
+      rgb = np.ascontiguousarray(rgb)
+    exported = self.clock()
+    if self._convert_rgb is None:
+      packed = portrait_nv12(rgb, self.width, self.height, getattr(self.config, "rotate_180", False))
+      backend = "opencv"
+    else:
+      # The converter and V4L2 submission each consume their input synchronously.
+      # The one encoder worker can safely reuse this packed NV12 buffer.
+      packed = self._packed
+      status = self._convert_rgb(rgb.ctypes.data, rgb.nbytes, self.width, self.height, rgb.strides[0],
+                                 int(bool(getattr(self.config, "rotate_180", False))), packed.ctypes.data, packed.nbytes)
+      if status != 0:
+        raise RuntimeError("USB H.264 native RGB conversion rejected its input buffers")
+      backend = "native_tiled"
+    ended = self.clock()
+    return packed, ConversionTimings(ended - started, time.thread_time() - cpu_started,
+                                     exported - started, ended - exported, backend)
 
   def _check(self, status, action):
     if status != 0:
@@ -126,7 +181,8 @@ class HardwareH264Encoder:
       raise
     flog(f"[CLUSTER_USB_H264_ENCODER] backend=qcom_v4l2 | display={self.height}x{self.width} | "
          + f"coded={self.encoder_width}x{self.encoder_height} | fps={self.fps} | bitrate={self.bitrate} | "
-         + "gop=1 | rate_control=vbr-cfr | realtime_priority=0")
+         + "gop=1 | rate_control=vbr-cfr | realtime_priority=0 | "
+         + f"converter={'native_tiled' if self._convert_rgb is not None else 'opencv'}")
 
   def _on_packet(self, data, size, _flags, timestamp_us, _codec_config, _keyframe, _opaque):
     # Never raise through a ctypes callback: propagate on the worker instead.
@@ -150,11 +206,10 @@ class HardwareH264Encoder:
       previous = self._take_output()
     if len(self._pending) >= MAX_PENDING_FRAMES or (self._pending and started - next(iter(self._pending.values()))[1] > 0.5):
       raise RuntimeError("USB H.264 hardware output stalled; no software fallback is started")
-    packed = portrait_nv12(frame, self.width, self.height, getattr(self.config, "rotate_180", False))
-    converted = self.clock()
+    packed, conversion = self._to_nv12(frame)
     timestamp = max(self._last_timestamp + 1, int(started * 1_000_000))
     self._last_timestamp = timestamp
-    self._pending[timestamp] = (created_at, started, converted - started)
+    self._pending[timestamp] = (created_at, started, conversion)
     self._check(self._fn("encode_nv12_packed")(self.handle, packed.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
                                                packed.nbytes, timestamp, self._callback, None), "submit")
     # A short poll can complete this frame without blocking the render or USB
@@ -173,9 +228,10 @@ class HardwareH264Encoder:
       metadata = self._pending.pop(packet_timestamp, None)
       if metadata is None:
         raise RuntimeError("USB H.264 hardware returned an unknown frame timestamp")
-      rendered_at, submitted_at, convert_elapsed = metadata
+      rendered_at, submitted_at, conversion = metadata
       encoded_at = self.clock()
-      newest = PreparedH264Frame(data, rendered_at, encoded_at - submitted_at, convert_elapsed, encoded_at, packet_timestamp)
+      newest = PreparedH264Frame(data, rendered_at, encoded_at - submitted_at, conversion.elapsed, encoded_at, packet_timestamp,
+                                 conversion.cpu_elapsed, conversion.rgb_export_elapsed, conversion.pixels_elapsed, conversion.backend)
     self._packets = []
     return newest
 

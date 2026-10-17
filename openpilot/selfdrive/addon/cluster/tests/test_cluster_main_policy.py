@@ -139,9 +139,12 @@ def test_usb_skips_render_and_encode_while_transport_is_full(cluster, monkeypatc
   cluster.pipeline.has_render_capacity.side_effect = None
   cluster.pipeline.has_render_capacity.return_value = False
   frame_needed = cluster.camera_factory.call_args.kwargs["frame_needed"]
-  assert not frame_needed()
-  cluster.pipeline.has_render_capacity.return_value = True
+  # Keep one replacement camera image ready even when a short encoder/USB
+  # capacity window falls between camera arrivals. The camera itself stops
+  # preparing unconsumed images; composition still obeys pipeline capacity.
   assert frame_needed()
+  cluster.display.connected = False
+  assert not frame_needed()
 
 
 def test_render_cpu_statistics_exclude_waiting_and_reset_each_window(cluster, monkeypatch):

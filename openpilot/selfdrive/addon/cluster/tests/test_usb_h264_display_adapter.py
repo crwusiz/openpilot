@@ -1,6 +1,7 @@
 import threading
 from types import SimpleNamespace
 from unittest.mock import Mock
+from dataclasses import replace
 
 import pytest
 
@@ -66,6 +67,23 @@ def test_pending_hardware_output_produces_no_placeholder_frame(state):
   state.encoder.encode.assert_called_once_with("image", 9.99)
   state.transport.send_access_unit.assert_not_called()
   state.adapter.check_encoder()
+
+
+def test_performance_log_retains_converter_and_separate_cpu_stages_when_latest_output_is_pending(state):
+  frame = replace(prepared_frame(), convert_elapsed=0.030, convert_cpu_elapsed=0.010,
+                  rgb_export_elapsed=0.005, pixels_elapsed=0.025, converter="native_tiled")
+  state.encoder.encode.return_value = frame
+  state.adapter.prepare_frame("image", 10.0)
+  state.clock.now = 20.0
+  state.encoder.encode.return_value = None
+  state.adapter.prepare_frame("next image", 20.0)
+  message = next(message for message in state.logs if "[CLUSTER_USB_H264_ENCODE_PERF]" in message)
+  assert "convert_avg=30.0ms" in message
+  assert "convert_cpu_avg=10.0ms" in message
+  assert "rgb_export_avg=5.0ms" in message
+  assert "pixels_avg=25.0ms" in message
+  assert "converter=native_tiled" in message
+  assert state.adapter._convert_cpu_time == state.adapter._pixels_time == state.adapter._rgb_export_time == 0
 
 
 def test_delayed_hardware_output_keeps_its_original_render_timestamp(state):

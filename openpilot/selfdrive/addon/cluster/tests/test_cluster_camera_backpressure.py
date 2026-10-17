@@ -47,7 +47,8 @@ def _run_camera(module, monkeypatch, events, demand=None, consume=True):
         camera.running = False
         return None
       now[0], ready[0] = when, capacity
-      if consume and camera.has_frame() and capacity:
+      should_consume = consume(consumed[0], capacity) if callable(consume) else consume and capacity
+      if should_consume and camera.has_frame():
         camera.get_frame()
       consumed[0] += 1
       if consumed[0] == len(events):
@@ -99,6 +100,17 @@ def test_available_transport_does_not_reconvert_unconsumed_camera_frames(camera_
   assert camera._perf_skipped == len(received) - len(converted)
   assert now - converted[-1][0] <= 0.25
   assert int(camera.get_frame()[0, 0, 0]) == converted[-1][1]
+
+
+def test_consumer_prepares_one_replacement_per_used_image_without_20hz_unconsumed_work(camera_module, monkeypatch):
+  # The renderer consumes at 10 Hz, independently of encoder-ready instants.
+  # Camera preparation follows those consumes and retains one fresh image.
+  events = [(10.0 + index * 0.05, index, True) for index in range(60)]
+  camera, received, converted, _ = _run_camera(camera_module, monkeypatch, events, demand=True,
+                                             consume=lambda index, _capacity: index % 2 == 0)
+  assert received == list(range(60))
+  assert [identity for _when, identity in converted] == list(range(0, 60, 2))
+  assert camera.frame_count == 30
 
 
 def test_released_transport_capacity_prepares_current_buffer_immediately(camera_module, monkeypatch):

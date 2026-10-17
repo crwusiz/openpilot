@@ -19,10 +19,10 @@ env.Program('encoderd', ['encoderd.cc'], LIBS=libs, FRAMEWORKS=frameworks)
 env.Program('bootlog.cc', LIBS=libs, FRAMEWORKS=frameworks)
 
 # Optional USB cluster encoder: its own V4L2 session, loaded lazily by ctypes.
-# Do not link the bridge into encoderd or initialize it for JPEG/network mode.
+# Do not link the bridge into encoderd or initialize it for Network mode.
 if arch == "comma_arm64":
   env.SharedLibrary(
     'cluster_h264_encoder_bridge',
-    ['encoder/cluster_h264_encoder_bridge.cc', 'encoder/cluster_h264_encoder.cc'],
+    ['encoder/cluster_h264_encoder_bridge.cc', 'encoder/cluster_h264_encoder.cc', 'encoder/cluster_h264_rgb.cc'],
     LIBS=[common, messaging, visionipc, 'pthread', 'm', 'zstd'],
   )
