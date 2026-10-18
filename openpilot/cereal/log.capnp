@@ -1147,6 +1147,8 @@ struct ModelDataV2 {
     autoLaneChangeEnable @10 :Bool;
     autoLaneChangeTimer @11 :Int8;
     desire @12 :Desire;
+    laneChangeAvailableLeft @13 :Bool;
+    laneChangeAvailableRight @14 :Bool;
 
     deprecated :group {
       brakeDisengageProb @2 :Float32;

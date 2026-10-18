@@ -147,6 +147,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
 
     // add
     {"AutoLaneChangeEnable", {PERSISTENT, BOOL}},
+    {"LaneLineCheck", {PERSISTENT, INT, "0"}},
     {"PrebuiltEnable", {PERSISTENT, BOOL}},
     {"RadarTrackEnable", {PERSISTENT, BOOL}},
     {"IsHda2", {PERSISTENT, BOOL}},

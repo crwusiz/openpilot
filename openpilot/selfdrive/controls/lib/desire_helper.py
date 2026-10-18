@@ -1,3 +1,5 @@
+from math import isfinite
+
 from openpilot.cereal import log
 from openpilot.common.constants import CV
 from openpilot.common.realtime import DT_MDL
@@ -44,14 +46,47 @@ class DesireHelper:
     self.prev_one_blinker = False
     self.desire = log.Desire.none
 
-    self.auto_lane_change_enable = Params().get_bool("AutoLaneChangeEnable")
+    self.params = Params()
+    self.frame = 0
+    self.lane_line_check = 0
+    self.lane_change_available_left = False
+    self.lane_change_available_right = False
+
+    self.auto_lane_change_enable = self.params.get_bool("AutoLaneChangeEnable")
     self.auto_lane_change_timer = 0.0
+
+  def _update_lane_change_availability(self, carstate, model_data):
+    # Publish both sides for the cluster independently of the selected blinker.
+    self.lane_change_available_left = False
+    self.lane_change_available_right = False
+    if model_data is None:
+      return
+
+    lane_line_probs = model_data.get('laneLineProbs', ())
+    road_edge_stds = model_data.get('roadEdgeStds', ())
+    for side, lane_idx, edge_idx in (('left', 1, 0), ('right', 2, 1)):
+      if len(lane_line_probs) <= lane_idx or len(road_edge_stds) <= edge_idx:
+        continue
+      lane_prob = lane_line_probs[lane_idx]
+      if not isfinite(lane_prob) or lane_prob <= LANE_LINE_PROB_THRESHOLD or not isfinite(road_edge_stds[edge_idx]):
+        continue
+
+      lane_line_info = getattr(carstate, f'{side}LaneLine')
+      line_allowed = lane_line_info % 10 in (0, 5) if self.lane_line_check >= 1 else lane_line_info // 10 != 2
+      available = (line_allowed and not getattr(carstate, f'{side}Blindspot')
+                   and not check_invalid_lane(lane_line_probs, road_edge_stds, side == 'left'))
+      setattr(self, f'lane_change_available_{side}', available)
 
   @staticmethod
   def get_lane_change_direction(CS):
     return LaneChangeDirection.left if CS.leftBlinker else LaneChangeDirection.right
 
   def update(self, carstate, lateral_active, lane_change_prob, model_data=None):
+    if self.frame % round(1.0 / DT_MDL) == 0:
+      self.lane_line_check = self.params.get("LaneLineCheck", return_default=True) or 0
+    self.frame += 1
+    self._update_lane_change_availability(carstate, model_data)
+
     v_ego = carstate.vEgo
     one_blinker = carstate.leftBlinker != carstate.rightBlinker
     below_lane_change_speed = v_ego < LANE_CHANGE_SPEED_MIN
