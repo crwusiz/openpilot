@@ -1,9 +1,8 @@
-from math import isfinite
-
 from openpilot.cereal import log
 from openpilot.common.constants import CV
 from openpilot.common.realtime import DT_MDL
 from openpilot.common.params import Params
+from openpilot.selfdrive.controls.lib.lane_change_availability import LaneChangeAvailability
 
 ALC_START_TIME = 3.
 ROAD_EDGE_CONFIDENCE_THRESHOLD = 0.5
@@ -51,41 +50,33 @@ class DesireHelper:
     self.lane_line_check = 0
     self.lane_change_available_left = False
     self.lane_change_available_right = False
+    self.lane_change_availability = {side: LaneChangeAvailability(side) for side in ('left', 'right')}
 
     self.auto_lane_change_enable = self.params.get_bool("AutoLaneChangeEnable")
     self.auto_lane_change_timer = 0.0
 
-  def _update_lane_change_availability(self, carstate, model_data):
+  def _update_lane_change_availability(self, carstate, model_data, radar_state):
     # Publish both sides for the cluster independently of the selected blinker.
     self.lane_change_available_left = False
     self.lane_change_available_right = False
-    if model_data is None:
-      return
-
-    lane_line_probs = model_data.get('laneLineProbs', ())
-    road_edge_stds = model_data.get('roadEdgeStds', ())
-    for side, lane_idx, edge_idx in (('left', 1, 0), ('right', 2, 1)):
-      if len(lane_line_probs) <= lane_idx or len(road_edge_stds) <= edge_idx:
-        continue
-      lane_prob = lane_line_probs[lane_idx]
-      if not isfinite(lane_prob) or lane_prob <= LANE_LINE_PROB_THRESHOLD or not isfinite(road_edge_stds[edge_idx]):
-        continue
-
+    for side in ('left', 'right'):
       lane_line_info = getattr(carstate, f'{side}LaneLine')
-      line_allowed = lane_line_info % 10 in (0, 5) if self.lane_line_check >= 1 else lane_line_info // 10 != 2
-      available = (line_allowed and not getattr(carstate, f'{side}Blindspot')
-                   and not check_invalid_lane(lane_line_probs, road_edge_stds, side == 'left'))
+      line_allowed = lane_line_info > 0 and (lane_line_info % 10 in (0, 5) if self.lane_line_check >= 1 else lane_line_info // 10 != 2)
+      if model_data is not None:
+        line_allowed = line_allowed and not check_invalid_lane(model_data.get('laneLineProbs', ()),
+                                                               model_data.get('roadEdgeStds', ()), side == 'left')
+      available = self.lane_change_availability[side].update(carstate, model_data, radar_state, line_allowed)
       setattr(self, f'lane_change_available_{side}', available)
 
   @staticmethod
   def get_lane_change_direction(CS):
     return LaneChangeDirection.left if CS.leftBlinker else LaneChangeDirection.right
 
-  def update(self, carstate, lateral_active, lane_change_prob, model_data=None):
+  def update(self, carstate, lateral_active, lane_change_prob, model_data=None, radar_state=None):
     if self.frame % round(1.0 / DT_MDL) == 0:
       self.lane_line_check = self.params.get("LaneLineCheck", return_default=True) or 0
     self.frame += 1
-    self._update_lane_change_availability(carstate, model_data)
+    self._update_lane_change_availability(carstate, model_data, radar_state)
 
     v_ego = carstate.vEgo
     one_blinker = carstate.leftBlinker != carstate.rightBlinker

@@ -308,7 +308,7 @@ def main(demo=False):
   saved_is_rhd = params.get_bool("IsRhdDetected")
   dm_packets = [] if dcam_is_missing else ["driverMonitoringState"]
   sm = SubMaster(["deviceState", "carState", "narrowRoadCameraState", "extrinsicsCalibration",
-                  "carControl", "controlsState", "lateralDelay"] + dm_packets)
+                  "carControl", "controlsState", "lateralDelay", "radarState"] + dm_packets)
 
   publish_state = PublishState()
   params = Params()
@@ -458,8 +458,11 @@ def main(demo=False):
       model_lane_data = {
         'laneLineProbs': modelv2_send.modelV2.laneLineProbs,
         'roadEdgeStds': modelv2_send.modelV2.roadEdgeStds,
+        'laneLines': modelv2_send.modelV2.laneLines,
+        'roadEdges': modelv2_send.modelV2.roadEdges,
       }
-      DH.update(sm['carState'], sm['carControl'].latActive, lane_change_prob, model_lane_data)
+      radar_state = sm['radarState'] if sm.all_checks(['radarState']) else None
+      DH.update(sm['carState'], sm['carControl'].latActive, lane_change_prob, model_lane_data, radar_state)
       modelv2_send.modelV2.meta.laneChangeState = DH.lane_change_state
       modelv2_send.modelV2.meta.laneChangeDirection = DH.lane_change_direction
       modelv2_send.modelV2.meta.laneChangeAvailableLeft = DH.lane_change_available_left
