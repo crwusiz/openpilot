@@ -59,6 +59,9 @@ def factory():
   stream = Stream()
   track = SimpleNamespace(video_frame_id=10, video_timestamp_eof=None, video_frames=20, video_bytes=1024,
                           last_video_at=None, resyncs=0, stop=Mock())
+  def stop_track():
+    assert stream.stopped, "Native senders must stop before their producer is released"
+  track.stop.side_effect = stop_track
   return stream, track
 
 
@@ -251,17 +254,12 @@ async def test_native_camera_waits_for_idr_and_resynchronizes_after_encoded_refe
     def stop(self):
       pass
 
-  class Builder:
-    def __init__(self, _offer):
-      pass
-
-    def add_video_stream(self, _name, track):
+  class Stream:
+    def __init__(self, _offer, track):
       self.track = track
 
-    def stream(self):
-      return self
-
-  monkeypatch.setitem(sys.modules, "teleoprtc.builder", SimpleNamespace(WebRTCAnswerBuilder=Builder))
+  monkeypatch.setitem(sys.modules, "openpilot.selfdrive.addon.cluster.hdmi_display.network_h264_stream",
+                      SimpleNamespace(ClusterH264Stream=Stream))
   monkeypatch.setitem(sys.modules, "openpilot.system.webrtc.device.video", SimpleNamespace(LiveStreamVideoStreamTrack=BaseTrack))
   monkeypatch.setitem(sys.modules, "openpilot.cereal", SimpleNamespace(messaging=SimpleNamespace(
     sub_sock=lambda *args, **kwargs: socket_options.append(kwargs),

@@ -107,6 +107,7 @@ bash scripts/pi_update.sh
 | 로그 | 확인할 항목 |
 | --- | --- |
 | C4 `[CLUSTER_H264_PERF]` | `video_fps`, `state_fps`, 소스 영상 age, 처리량, RTCP 손실·지터 |
+| C4 `[CLUSTER_H264_SENDER]`, `[CLUSTER_H264_SEND_PERF]` | `api=track_send`, `framing=validated_annexb4`, 촬영 EOF 기준 RTP 시각, 실제 제출 FPS·잘못된 프레임·IDR 대기 수 |
 | Pi `[CLUSTER_H264_RX_PERF]`, C4 `[CLUSTER_H264_PI_PERF]` | `display_fps`, RGB 변환·합성·출력 시간, 큐 대기·최대 표시 간격, 영상·상태 stale |
 | C4 `[CLUSTER_RESOURCE_PERF]`, `[CLUSTER_LOAD_GUARD]`, `[CLUSTER_INPUT_DIAG]` | CPU·RSS, 모델·위치 입력 age, 통신 경고, 부하 보호와 복구 |
 | Pi `[CLUSTER_PI_RESOURCE_PERF]` | CPU·RSS·스레드·온도·주파수·팬 PWM |
@@ -127,6 +128,42 @@ bash scripts/pi_update.sh
 Pi의 10초 `[CLUSTER_H264_RX_PERF]` 로그에는 `scene_camera_panel_avg`, `scene_path_avg`, `scene_hud_avg`와 `hdmi_rgb_surface_avg`, `hdmi_upload_avg`, `hdmi_draw_avg`, `hdmi_flip_avg` 등 합성·출력 단계 시간이 추가됩니다. 소프트웨어 출력에서는 해당하지 않는 GPU 단계가 생략됩니다. 새 `[CLUSTER_PI_RESOURCE_PERF]`에는 수신기 프로세스 CPU·RSS·스레드 수, CPU 온도·현재 주파수 범위, 팬 PWM·OpenCV 스레드 수를 기록합니다. 여기서 CPU 100%는 코어 하나를 모두 사용하는 기준으로, 터치 패널의 Pi 전체 CPU 비율과 기준이 다릅니다. 읽을 수 없는 값은 `n/a`입니다. 이 기록은 기존 온도·팬·CPU 주파수 정책을 변경하지 않습니다.
 
 표시 주기·복구 동작과 화면 픽셀 보존은 자동 테스트로 확인했으며, 개선 후 실제 Pi FPS와 순간 중단은 다음 C4·Pi 로그로 확인해야 합니다.
+
+### 2026-10-18 전송 경계·Pi 작업 스레드 보완
+
+`20_31_28-338425xl`의 C4 송신은 시작 이후 약20FPS를 유지했습니다. Pi는 원본을
+약19~20FPS로 받고도 경로 합성이 활성화되면 표시는 약17FPS, 합성은 약27~30ms로
+느려졌습니다. 시작 이후에도 최대 표시 간격이 약300ms인 구간이 있고 디코더 오류가
+반복됐습니다. Pi의 `opencv_threads=8`, 프로세스 CPU 약180~197%(한 코어100% 기준),
+실제 경로 처리의 CPU 시간보다 긴 경과 시간이 함께 관측됐습니다.
+
+첨부 사진은 PID12312가 `teleoprtc/stream.py`의 `send_frame(..., FrameInfo(...))` 호출
+지점에서 SIGSEGV로 종료된 기록입니다. 첨부 C4 로그는 PID16960으로 사진과 다른 세션이며,
+해당 종료의 네이티브 backtrace는 들어 있지 않습니다. 따라서 사진만으로 원인을
+특정하거나 모든 깜빡임이 같은 오류라고 판단하지 않습니다.
+
+- 클러스터 전용 송신 클래스에서 Annex B의3/4바이트 시작 코드를 검사하고4바이트로
+  통일합니다. 빈 NAL·잘못된 헤더·크기/개수 초과 입력은 네이티브로 전달하지 않고 IDR을
+  요청합니다. 이때 누락된 참조에 의존하는 P 프레임은 다음 IDR까지 보류합니다. 정상
+  소스의 수신측 디코더 오류 복구에서는 기존처럼 전송을 계속합니다.
+- RTP 시각은 전송 루프가 깨어난 시각 대신 카메라 EOF 간격을 사용합니다. 네이티브
+  `FrameInfo` 호출을 우회해 RTP 설정의 시각을 명시하고 `Track.send()`로 기존 H.264
+  packetizer·SR·PLI·NACK 체인을 사용합니다. 카메라 대기 후 연결 상태도 다시 확인합니다.
+  [사용 중인 바인딩의 전송 API](https://github.com/shiguredo/libdatachannel-py/blob/2026.1.0.dev2/src/bind_libdatachannel.cpp),
+  [네이티브 Track 구현](https://github.com/paullouisageneau/libdatachannel/blob/v0.24.0/src/track.cpp)
+- 연결 종료 시 송신 작업·네이티브 콜백을 먼저 중지하고 그 뒤 카메라 소켓을 해제합니다.
+  미디어 체인의 Python 래퍼도 스트림 종료까지 유지합니다.
+- Pi 수신기는 합성을 시작하기 전에 OpenCV 작업 스레드를1개로 제한하고 OpenCL을
+  끕니다. NumPy/OpenCV를 불러오기 전에 BLAS/OpenMP 작업 수도1개로 제한하므로 기존
+  서비스 설정을 유지한 Pi Update에도 적용됩니다. WebRTC 디코딩과 RGB 변환
+  작업은 유지하며 영상 해상도·목표 FPS·비트레이트는 이 변경에서 조절하지 않습니다.
+
+C4 업데이트 후 **Pi Update도 실행**해야 Pi의 스레드 제한과 서비스 설정이 적용됩니다.
+다음 기기 로그에서 `[CLUSTER_H264_SENDER] api=track_send`,
+`[CLUSTER_RX_NATIVE] opencv_threads=1 | opencl=0`을 확인합니다. Python 예외와 입력
+거부·연결 종료 경합을 자동 검증하고, 실제 IDR/P 프레임12장의 정규화 전후 디코딩 픽셀이
+동일한 것도 확인했습니다. SIGSEGV 재발 방지와 실제 표시 FPS 개선 여부는 C4·Pi 기기
+로그로 확인해야 합니다.
 
 ### 대시보드에서 Orange Pi IP 확인
 

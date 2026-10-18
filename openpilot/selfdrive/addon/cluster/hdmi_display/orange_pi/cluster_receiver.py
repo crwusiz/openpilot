@@ -5,6 +5,7 @@ import ipaddress
 import json
 import logging
 import math
+import os
 import signal
 import socket
 import subprocess
@@ -49,6 +50,19 @@ def log_runtime_versions(pygame_module):
 
   LOG.info("[CLUSTER_RX_RUNTIME] pygame=%s | SDL=%s | SDL_image=%s", pygame_version,
            get_version(pygame_module, "get_sdl_version"), get_version(getattr(pygame_module, "image", None), "get_sdl_image_version"))
+
+
+def configure_native_runtime():
+  # Decoding, RGB conversion and SDL already overlap. Eight OpenCV workers for
+  # each short path/resize operation compete with those workers and add jitter.
+  # Existing installations keep their custom systemd unit during pi_update;
+  # apply the limits here too, before importing NumPy/OpenCV for the first time.
+  for name in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+    os.environ[name] = "1"
+  import cv2
+  cv2.setNumThreads(1)
+  cv2.ocl.setUseOpenCL(False)
+  LOG.info("[CLUSTER_RX_NATIVE] opencv_threads=%d | opencl=%d", cv2.getNumThreads(), int(cv2.ocl.useOpenCL()))
 
 
 def log_socket_buffers(sock):
@@ -295,6 +309,7 @@ def main():
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
   )
+  configure_native_runtime()
 
   try:
     from .hdmi_display import HdmiDisplay

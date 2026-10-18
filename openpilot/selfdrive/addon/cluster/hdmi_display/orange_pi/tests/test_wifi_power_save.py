@@ -1,4 +1,6 @@
 import os
+from pathlib import Path
+import shutil
 
 import pytest
 
@@ -246,12 +248,24 @@ def test_install_repairs_existing_wifi_without_changing_receiver_or_desktop(scri
   env = _service_environment(script_sandbox)
   scripts, bin_dir = script_sandbox
   root = bin_dir.parent
+  # The installer validates the full receiver bundle before repairing Wi-Fi.
+  # Supply that bundle; a scripts-only sandbox never reaches the behavior
+  # this test intends to exercise.
+  package = scripts.parent
+  for source in Path(__file__).resolve().parents[1].glob("*.py"):
+    shutil.copyfile(source, package / source.name)
+  for name in ("README.md", "requirements.txt", "cluster_renderer.py", "cluster_render_support.py"):
+    (package / name).touch()
+  (package / "receiver_assets.txt").write_text("assets/fonts/NotoSansKR-Bold.ttf\n", encoding="utf-8")
+  font = package / "assets/fonts/NotoSansKR-Bold.ttf"
+  font.parent.mkdir(parents=True)
+  font.write_bytes(b"font fixture")
   unit = root / env["TEST_UNIT_DIR"] / "cluster-hdmi.service"
   if installed_service:
     unit.parent.mkdir()
     unit.write_text("custom receiver unit\n")
   installer = scripts / "install.sh"
-  installer.write_text(installer.read_text().replace("/opt/cluster-receiver", '"$PACKAGE_DIR"')
+  installer.write_text(installer.read_text().replace("TARGET=/opt/cluster-receiver", 'TARGET="$PACKAGE_DIR"')
                        .replace("/etc/systemd/system/cluster-hdmi.service", '"$TEST_UNIT_DIR/cluster-hdmi.service"')
                        .replace("/usr/bin/python3", "mock-python"), encoding="utf-8", newline="\n")
   for command in ("apt-get", "mock-python"):

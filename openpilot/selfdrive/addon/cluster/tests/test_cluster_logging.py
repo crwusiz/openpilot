@@ -142,6 +142,39 @@ def test_parent_reports_native_signal_and_only_matching_pid_fatal_stack(crash_lo
   assert "old native stack" not in output
   assert faulthandler.is_enabled() is enabled
   assert "stage=process exit" in (crash_logs / "cluster_crash.log").read_text()
+  collected = (crash_logs / "cluster_debug.log").read_text()
+  assert "[CLUSTER_PROCESS_EXIT] pid=22" in collected and "reason=SIGABRT" in collected
+  assert "current native stack" in collected and "old native stack" not in collected
+
+
+def test_native_crash_is_in_the_existing_upload_log_without_a_cluster_restart(crash_logs):
+  cluster_logging.initialize_log()
+  cluster_logging.flog("last live cluster frame")
+  cluster_logging.close_log()
+  (crash_logs / "cluster_crash.log").write_text(
+    "[CLUSTER_PROCESS_START] pid=321 native_bootstrap=1\n"
+    + "Fatal Python error: Segmentation fault\nCurrent thread: native send_frame\n")
+  cluster_logging.record_process_exit(321, -signal.SIGSEGV)
+  collected = (crash_logs / "cluster_debug.log").read_text()
+  assert collected.index("last live cluster frame") < collected.index("[CLUSTER_PROCESS_EXIT]")
+  assert "pid=321" in collected and "reason=SIGSEGV" in collected
+  assert "Fatal Python error: Segmentation fault" in collected and "native send_frame" in collected
+
+
+def test_full_native_trace_survives_exit_and_restart_but_terminal_output_stays_bounded(crash_logs, capsys):
+  trace = ("Fatal Python error: Segmentation fault\nimportant early native frame\n"
+           + "native worker frame\n" * 1100 + "last native frame\n")
+  (crash_logs / "cluster_crash.log").write_text("[CLUSTER_PROCESS_START] pid=42 native_bootstrap=1\n" + trace)
+  cluster_logging.record_process_exit(42, -signal.SIGSEGV)
+  collected = (crash_logs / "cluster_debug.log").read_text()
+  assert "important early native frame" in collected and "last native frame" in collected
+  terminal = capsys.readouterr().err
+  assert "Fatal Python error: Segmentation fault" in terminal
+  assert len(terminal.encode()) < cluster_logging.MAX_CONSOLE_CRASH_BYTES + 1024
+  cluster_logging.initialize_log()
+  cluster_logging.close_log()
+  next_session = (crash_logs / "cluster_debug.log").read_text()
+  assert "important early native frame" in next_session and "last native frame" in next_session
 
 
 @pytest.mark.parametrize("code,expected_stop,crash", [(0, False, False), (-signal.SIGINT, True, False),
@@ -152,9 +185,20 @@ def test_parent_reports_exit_without_needing_child_traceback(crash_logs, capsys,
   assert "[CLUSTER_PROCESS_EXIT] pid=123" in output
   assert f"exit_code={code}" in output
   assert ("[CLUSTER_CRASH]" in (crash_logs / "cluster_crash.log").read_text()) is crash
+  collected = (crash_logs / "cluster_debug.log").read_text()
+  assert "[CLUSTER_PROCESS_EXIT] pid=123" in collected
+  assert ("[CLUSTER_CRASH]" in collected) is crash
 
 
 def test_parent_exit_is_visible_even_if_crash_log_cannot_be_written(crash_logs, monkeypatch, capsys):
   monkeypatch.setattr(cluster_logging, "CRASH_LOG_FILE", str(crash_logs / "missing/cluster_crash.log"))
   cluster_logging.record_process_exit(123, 1)
   assert "exit_code=1 reason=error_exit" in capsys.readouterr().err
+  assert "exit_code=1 reason=error_exit" in (crash_logs / "cluster_debug.log").read_text()
+
+
+def test_unwritable_upload_log_does_not_prevent_persistent_crash_record(crash_logs, monkeypatch, capsys):
+  monkeypatch.setattr(cluster_logging, "LOG_FILE", str(crash_logs / "missing/cluster_debug.log"))
+  cluster_logging.record_process_exit(123, -signal.SIGSEGV)
+  assert "reason=SIGSEGV" in capsys.readouterr().err
+  assert "reason=SIGSEGV" in (crash_logs / "cluster_crash.log").read_text()

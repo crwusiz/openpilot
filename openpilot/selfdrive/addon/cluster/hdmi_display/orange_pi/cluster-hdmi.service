@@ -18,6 +18,10 @@ Restart=on-failure
 RestartSec=2
 Environment=PYTHONUNBUFFERED=1
 Environment=PYGAME_HIDE_SUPPORT_PROMPT=1
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=OMP_NUM_THREADS=1
+Environment=MKL_NUM_THREADS=1
+Environment=NUMEXPR_NUM_THREADS=1
 Environment=SDL_VIDEODRIVER=kmsdrm
 Environment=SDL_RENDER_DRIVER=opengles2
 StandardInput=tty-force

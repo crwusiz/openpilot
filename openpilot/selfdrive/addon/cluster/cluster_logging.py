@@ -12,7 +12,8 @@ LOG_FILE = "/data/log/cluster_debug.log"
 CRASH_LOG_FILE = "/data/log/cluster_crash.log"
 MAX_CRASH_LOG_BYTES = 256 * 1024
 MAX_CRASH_RECORD_BYTES = 64 * 1024
-MAX_PREVIOUS_CRASH_BYTES = 8 * 1024
+MAX_PREVIOUS_CRASH_BYTES = MAX_CRASH_RECORD_BYTES
+MAX_CONSOLE_CRASH_BYTES = 8 * 1024
 
 _log_lock = threading.Lock()
 _log_handle = None
@@ -135,24 +136,29 @@ def record_process_exit(pid, exit_code, expected_stop=False):
   abnormal = exit_code != 0 and not (expected_stop and exit_code in (-signal.SIGINT, -signal.SIGTERM))
   record = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {summary}\n"
   if abnormal:
-    failure = _failure_for_pid(pid)
+    record += f"[CLUSTER_CRASH] stage=process exit | pid={pid} exit_code={exit_code} reason={reason}\n"
+    # Leave room for the exit metadata without truncating the fatal heading.
+    failure = _bounded_text(_failure_for_pid(pid), max(1024, MAX_CRASH_RECORD_BYTES - len(record.encode("utf-8")) - 1))
     # Python exceptions were already printed by the child. Native fatal stacks
     # went directly to its persistent faulthandler descriptor; mirror them now.
     if "Fatal Python error:" in failure:
-      console_log(failure)
-    record += f"[CLUSTER_CRASH] stage=process exit | pid={pid} exit_code={exit_code} reason={reason}\n{failure}\n"
+      console_log(_bounded_text(failure, MAX_CONSOLE_CRASH_BYTES))
+    record += f"{failure}\n"
   # Do not call _write_crash_record in the manager: that installs faulthandler
   # for the *current* process. Its persistent handler belongs only to the child.
-  try:
-    payload = _bounded_text(record, MAX_CRASH_RECORD_BYTES).encode("utf-8", errors="replace")
-    path = Path(CRASH_LOG_FILE)
-    with _crash_lock:
-      if path.exists() and path.stat().st_size + len(payload) > MAX_CRASH_LOG_BYTES:
-        path.replace(path.with_name(path.name + ".1"))
-      with path.open("ab", buffering=0) as handle:
-        handle.write(payload)
-  except OSError:
-    pass
+  # Append to the upload log immediately, even if the child is never restarted.
+  # Keep failures independent so an unwritable path does not lose both copies.
+  payload = _bounded_text(record, MAX_CRASH_RECORD_BYTES).encode("utf-8", errors="replace")
+  for filename, lock in ((CRASH_LOG_FILE, _crash_lock), (LOG_FILE, _log_lock)):
+    try:
+      path = Path(filename)
+      with lock:
+        if filename == CRASH_LOG_FILE and path.exists() and path.stat().st_size + len(payload) > MAX_CRASH_LOG_BYTES:
+          path.replace(path.with_name(path.name + ".1"))
+        with path.open("ab", buffering=0) as handle:
+          handle.write(payload)
+    except OSError:
+      pass
 
 
 def close_crash_log():

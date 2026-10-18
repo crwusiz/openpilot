@@ -75,7 +75,7 @@ async def write_control(writer, kind, payload, sequence=0, budget_s=0.25):
 
 def create_camera_stream(offer_sdp):
   # Load the native WebRTC binding only when constructing a stream.
-  from teleoprtc.builder import WebRTCAnswerBuilder
+  from openpilot.selfdrive.addon.cluster.hdmi_display.network_h264_stream import ClusterH264Stream
   from openpilot.cereal import messaging
   from openpilot.system.webrtc.device.video import LiveStreamVideoStreamTrack
 
@@ -157,9 +157,7 @@ def create_camera_stream(offer_sdp):
 
   track = CameraTrack()
   try:
-    builder = WebRTCAnswerBuilder(offer_sdp)
-    builder.add_video_stream("road", track)
-    stream = builder.stream()
+    stream = ClusterH264Stream(offer_sdp, track)
   except BaseException:
     track.stop()
     raise
@@ -320,11 +318,15 @@ class H264NetworkServer:
       if workers:
         await asyncio.gather(*workers, return_exceptions=True)
       try:
-        if track is not None:
-          track.stop()
-        if stream is not None:
-          with contextlib.suppress(Exception, asyncio.CancelledError):
-            await asyncio.wait_for(stream.stop(), 3)
+        try:
+          # Stop/join the native send loop and PLI callbacks before releasing
+          # their producer socket or clearing its pending keyframe request.
+          if stream is not None:
+            with contextlib.suppress(Exception, asyncio.CancelledError):
+              await asyncio.wait_for(stream.stop(), 3)
+        finally:
+          if track is not None:
+            track.stop()
       finally:
         writer.close()
         try:

@@ -38,7 +38,7 @@ USB 케이블만 연결한 부팅에서는 Cluster 활성화 설정을 유지합
 
 시작 단계·연결 오류·종료 이유는 C4 터미널에도 즉시 출력합니다. Python 예외는 `[CLUSTER_CRASH] stage=...`와 원인 traceback을 표시하고, 관리자에서 `[CLUSTER_PROCESS_EXIT] pid=... exit_code=... reason=...`를 한 번 출력합니다. 네이티브 오류는 `SIGABRT`·`SIGSEGV` 등 종료 신호와 해당 PID의 저장된 fatal stack을 확인할 수 있습니다. `SIGKILL`처럼 traceback을 남길 수 없는 종료도 신호는 표시하지만, 신호만으로 OOM 등 근본 원인을 단정하지 않습니다.
 
-디스플레이 변경으로 정상 종료하면 `[CLUSTER_RESTART]`와 함께 다시 실행합니다. 오류 종료는 반복 재시작하지 않으며, 출력을 변경하거나 Cluster를 껐다 켜면 다시 시도합니다. 상세 기록은 `/data/log/cluster_debug.log`·`/data/log/cluster_crash.log`에 보관합니다.
+디스플레이 변경으로 정상 종료하면 `[CLUSTER_RESTART]`와 함께 다시 실행합니다. 오류 종료는 반복 재시작하지 않으며, 출력을 변경하거나 Cluster를 껐다 켜면 다시 시도합니다. 관리자가 종료 이유와 해당 PID의 저장된 traceback을 `/data/log/cluster_debug.log`에도 즉시 추가하므로, 재시작 없이 기존 로그 업로드로 오류를 전송할 수 있습니다. `/data/log/cluster_crash.log`는 별도 보관하며, 새 세션을 시작할 때도 최근 오류를 최대 64 KiB까지 `cluster_debug.log`에 복원합니다.
 
 - `[CLUSTER_START]`, `[CLUSTER_MODE]`: `transport=usb`, `codec=h264`, `compose=c4` 확인
 - `[CLUSTER_USB_H264_ENCODER]`: 실제 하드웨어·해상도·인코딩 설정

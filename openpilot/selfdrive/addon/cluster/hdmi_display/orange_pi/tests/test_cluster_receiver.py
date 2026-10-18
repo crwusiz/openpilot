@@ -1,8 +1,11 @@
 import ipaddress
+import os
 import socket
+import sys
 import threading
 import time
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -258,6 +261,21 @@ def test_runtime_versions_log_on_the_calling_thread_and_allow_missing_apis(caplo
     cluster_receiver.log_runtime_versions(None)
   assert "pygame=2.6.1 | SDL=2.28.4 | SDL_image=2.8.2" in caplog.text
   assert "pygame=unknown | SDL=unknown | SDL_image=unknown" in caplog.text
+
+
+def test_native_runtime_bounds_opencv_workers_before_scene_rendering(monkeypatch, caplog):
+  names = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS")
+  for name in names:
+    monkeypatch.setenv(name, "8")
+  cv2 = SimpleNamespace(setNumThreads=Mock(), getNumThreads=lambda: 1,
+                        ocl=SimpleNamespace(setUseOpenCL=Mock(), useOpenCL=lambda: False))
+  monkeypatch.setitem(sys.modules, "cv2", cv2)
+  with caplog.at_level("INFO", logger="cluster_receiver"):
+    cluster_receiver.configure_native_runtime()
+  cv2.setNumThreads.assert_called_once_with(1)
+  cv2.ocl.setUseOpenCL.assert_called_once_with(False)
+  assert all(os.environ[name] == "1" for name in names)
+  assert "[CLUSTER_RX_NATIVE] opencv_threads=1 | opencl=0" in caplog.text
 
 
 def test_socket_buffer_diagnostics_report_effective_sizes_without_changing_them(caplog):
