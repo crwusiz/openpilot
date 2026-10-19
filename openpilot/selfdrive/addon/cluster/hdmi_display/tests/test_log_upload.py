@@ -52,12 +52,15 @@ ftp_upload_file() {
   chmod u+w "$MOCK_UPLOADED_DIR/${archive_name//:/_}"
   if [[ $(basename "$1") == cluster_debug.log && ${MOCK_INTERRUPT_C4:-} == 1 ]]; then exit 143; fi
   if [[ $(basename "$1") == cluster_pi_debug.log && ${MOCK_INTERRUPT_PI:-} == 1 ]]; then exit 143; fi
+  if [[ $(basename "$1") == cluster_crash.log && ${MOCK_INTERRUPT_CRASH:-} == 1 ]]; then exit 143; fi
   if [[ $(basename "$1") == cluster_pi_debug.log && ${MOCK_FAIL_RETRY_ONLY:-} == 1 && ${*:3} == *'--max-time 10'* ]]; then
     printf 'mock FTP retry error\\n' >&2
     return 1
   fi
   if [[ $(basename "$1") == cluster_debug.log && ${MOCK_C4_UPLOAD_FAIL:-} == 1 ]]; then return 1; fi
   if [[ $(basename "$1") == cluster_pi_debug.log && ${MOCK_PI_UPLOAD_FAIL:-} == 1 ]]; then return 1; fi
+  if [[ $(basename "$1") == cluster_crash.log && ${MOCK_CRASH_UPLOAD_FAIL:-} == 1 ]]; then return 1; fi
+  if [[ $(basename "$1") == cluster_crash.log.1 && ${MOCK_ROTATED_CRASH_UPLOAD_FAIL:-} == 1 ]]; then return 1; fi
 }
 ''', encoding="utf-8", newline="\n")
   collector = root / "openpilot/selfdrive/addon/cluster/hdmi_display/pi_log_collector.py"
@@ -107,6 +110,209 @@ def test_cluster_uploads_two_files_with_identical_prefix_and_cleans_private_temp
   assert "display_fps=20" in (sandbox.parent / "uploaded/cluster_pi_debug.log").read_text()
   assert "CLUSTER_PI_LOG_WARNING:" not in result.stdout
   assert not list((sandbox.parent / "temporary files").iterdir())
+
+
+@pytest.mark.parametrize("enabled,transport", [("1", "network"), ("1", "usb"), ("0", "network"), ("0", "usb")])
+def test_cluster_uploads_current_and_rotated_crash_as_unchanged_raw_companions(sandbox, enabled, transport):
+  current, previous = b"Fatal Python error:\x00native\xff\n  File", b"older crash\r\n\x00\x80"
+  sandbox.parent.joinpath("cluster_crash.log").write_bytes(current)
+  sandbox.parent.joinpath("cluster_crash.log.1").write_bytes(previous)
+  result = _upload(sandbox, MOCK_CLUSTER_ENABLE=enabled, MOCK_CLUSTER_TRANSPORT=transport)
+  assert result.returncode == 0, result.stderr
+  names = sandbox.parent.joinpath("upload-names.txt").read_text().splitlines()
+  prefix = names[0].removesuffix("cluster_debug.log")
+  assert names[1:3] == [prefix + "cluster_crash.log", prefix + "cluster_crash.log.1"]
+  assert sandbox.parent.joinpath("uploaded/cluster_crash.log").read_bytes() == current
+  assert sandbox.parent.joinpath("uploaded/cluster_crash.log.1").read_bytes() == previous
+  pi_enabled = enabled == "1" and transport == "network"
+  assert len(names) == (4 if pi_enabled else 3)
+  assert sandbox.parent.joinpath("collector-call.txt").exists() is pi_enabled
+  assert not list(sandbox.parent.joinpath(".cluster-pi-pending").glob("pending.*"))
+  assert "CLUSTER_LOG_WARNING:" not in result.stdout
+
+
+def test_rotated_crash_without_current_crash_is_uploaded_and_empty_raw_file_is_preserved(sandbox):
+  sandbox.parent.joinpath("cluster_crash.log.1").write_bytes(b"")
+  result = _upload(sandbox, MOCK_CLUSTER_TRANSPORT="usb")
+  assert result.returncode == 0, result.stderr
+  names = sandbox.parent.joinpath("upload-names.txt").read_text().splitlines()
+  assert len(names) == 2 and names[1].endswith("_cluster_crash.log.1")
+  assert sandbox.parent.joinpath("uploaded/cluster_crash.log.1").read_bytes() == b""
+
+
+def test_crash_failure_keeps_snapshot_after_pi_success_and_retries_only_the_failed_file(sandbox):
+  original = b"original native crash\x00\xff"
+  sandbox.parent.joinpath("cluster_crash.log").write_bytes(original)
+  sandbox.parent.joinpath("cluster_crash.log.1").write_bytes(b"older crash")
+  result = _upload(sandbox, MOCK_CRASH_UPLOAD_FAIL="1")
+  assert result.returncode == 0
+  assert "CLUSTER_LOG_WARNING:" in result.stdout
+  job = next(sandbox.parent.joinpath(".cluster-pi-pending").glob("pending.*"))
+  prefix = job.joinpath("prefix").read_text().strip()
+  assert job.joinpath("cluster_crash.log").read_bytes() == original
+  assert job.joinpath("pi_uploaded").is_file()
+  assert job.joinpath("cluster_crash.log.1.uploaded").is_file()
+  sandbox.parent.joinpath("cluster_crash.log").write_bytes(b"a later crash")
+  assert _upload(sandbox).returncode == 0
+  names = sandbox.parent.joinpath("upload-names.txt").read_text().splitlines()
+  assert names[4] == f"/logs/{prefix}_cluster_crash.log"
+  assert names.count(f"/logs/{prefix}_cluster_pi_debug.log") == 1
+  assert names.count(f"/logs/{prefix}_cluster_crash.log.1") == 1
+  assert sandbox.parent.joinpath("uploaded", f"{prefix}_cluster_crash.log".replace(":", "_")).read_bytes() == original
+  assert not job.exists()
+
+
+@pytest.mark.parametrize("interrupt", ["MOCK_INTERRUPT_C4", "MOCK_INTERRUPT_CRASH", "MOCK_INTERRUPT_PI"])
+def test_interrupted_upload_retries_the_original_raw_crash_with_original_prefix(sandbox, interrupt):
+  original = b"native crash before cancellation\x00\xff"
+  sandbox.parent.joinpath("cluster_crash.log").write_bytes(original)
+  assert _upload(sandbox, **{interrupt: "1"}).returncode != 0
+  job = next(sandbox.parent.joinpath(".cluster-pi-pending").glob("pending.*"))
+  prefix = job.joinpath("prefix").read_text().strip()
+  sandbox.parent.joinpath("cluster_crash.log").write_bytes(b"replacement crash")
+  result = _upload(sandbox)
+  assert result.returncode == 0, result.stderr
+  assert sandbox.parent.joinpath("uploaded", f"{prefix}_cluster_crash.log".replace(":", "_")).read_bytes() == original
+  assert not job.exists()
+
+
+def test_disabled_cluster_retries_saved_crash_without_collecting_or_retrying_saved_pi(sandbox):
+  original = b"saved native failure\xff"
+  sandbox.parent.joinpath("cluster_crash.log").write_bytes(original)
+  assert _upload(sandbox, MOCK_CRASH_UPLOAD_FAIL="1", MOCK_PI_UPLOAD_FAIL="1").returncode == 0
+  job = next(sandbox.parent.joinpath(".cluster-pi-pending").glob("pending.*"))
+  prefix = job.joinpath("prefix").read_text().strip()
+  pi_report = job.joinpath("cluster_pi_debug.log").read_bytes()
+  sandbox.parent.joinpath("cluster_crash.log").unlink()
+  result = _upload(sandbox, MOCK_CLUSTER_ENABLE="0")
+  assert result.returncode == 0, result.stderr
+  names = sandbox.parent.joinpath("upload-names.txt").read_text().splitlines()
+  assert names[3] == f"/logs/{prefix}_cluster_crash.log"
+  assert len(names) == 5 and names[4].endswith("_cluster_debug.log")
+  assert job.joinpath("cluster_pi_debug.log").read_bytes() == pi_report
+  assert not job.joinpath("pi_uploaded").exists()
+  assert len(sandbox.parent.joinpath("collector-call.txt").read_text().splitlines()) == 1
+  assert _upload(sandbox).returncode == 0
+  assert not job.exists()
+
+
+def test_completed_crash_job_left_after_cancellation_is_removed_under_its_lock(sandbox):
+  sandbox.parent.joinpath("cluster_crash.log").write_bytes(b"raw crash")
+  assert _upload(sandbox, MOCK_CRASH_UPLOAD_FAIL="1").returncode == 0
+  job = next(sandbox.parent.joinpath(".cluster-pi-pending").glob("pending.*"))
+  # The last FTP call succeeded and its marker was saved, then the process
+  # stopped before remove_job. No upload is necessary to finish this job.
+  job.joinpath("cluster_crash.log.uploaded").touch()
+  sandbox.parent.joinpath("cluster_crash.log").unlink()
+  assert _upload(sandbox, MOCK_CLUSTER_TRANSPORT="usb").returncode == 0
+  assert not job.exists()
+  names = sandbox.parent.joinpath("upload-names.txt").read_text().splitlines()
+  assert len(names) == 4 and names[-1].endswith("_cluster_debug.log")
+
+
+def test_usb_job_interrupted_before_raw_snapshot_retries_saved_c4_after_crash_source_disappeared(sandbox):
+  job = sandbox.parent / ".cluster-pi-pending/pending.interrupted"
+  job.mkdir(parents=True)
+  job.joinpath("prefix").write_text("original_saved_prefix\n")
+  job.joinpath("lock").touch()
+  job.joinpath("cluster_debug.log").write_bytes(b"original saved C4 bytes\x00\xff")
+  result = _upload(sandbox, MOCK_CLUSTER_TRANSPORT="usb")
+  assert result.returncode == 0, result.stderr
+  names = sandbox.parent.joinpath("upload-names.txt").read_text().splitlines()
+  assert len(names) == 2 and names[0] == "/logs/original_saved_prefix_cluster_debug.log"
+  assert sandbox.parent.joinpath("uploaded/original_saved_prefix_cluster_debug.log").read_bytes() == b"original saved C4 bytes\x00\xff"
+  assert not job.exists()
+  assert not sandbox.parent.joinpath("collector-call.txt").exists()
+
+
+def test_interrupted_raw_snapshot_cannot_be_retried_as_a_complete_crash_log(sandbox):
+  complete = b"full native traceback\x00\xff\nlast frame\n"
+  sandbox.parent.joinpath("cluster_crash.log").write_bytes(complete)
+  startup = sandbox.parent / "interrupt-raw-copy.sh"
+  startup.write_text('''cp() {
+  if [[ "$*" == *".cluster_crash.log.snapshot"* ]]; then
+    printf 'partial' > "${!#}"
+    exit 143
+  fi
+  command cp "$@"
+}
+export -f cp
+''', encoding="utf-8", newline="\n")
+  result = _upload(sandbox, MOCK_CLUSTER_TRANSPORT="usb", BASH_ENV=startup.as_posix())
+  assert result.returncode != 0
+  job = next(sandbox.parent.joinpath(".cluster-pi-pending").glob("pending.*"))
+  prefix = job.joinpath("prefix").read_text().strip()
+  assert job.joinpath(".cluster_crash.log.snapshot").read_bytes() == b"partial"
+  assert not job.joinpath("cluster_crash.log").exists()
+  retry = _upload(sandbox, MOCK_CLUSTER_TRANSPORT="usb")
+  assert retry.returncode == 0, retry.stderr
+  assert not job.exists()
+  assert sandbox.parent.joinpath("uploaded/cluster_crash.log").read_bytes() == complete
+  names = sandbox.parent.joinpath("upload-names.txt").read_text().splitlines()
+  assert f"/logs/{prefix}_cluster_crash.log" not in names
+
+
+@pytest.mark.parametrize("fallback", ["outbox_unusable", "outbox_full", "reservation_busy", "job_creation_failed"])
+def test_every_outbox_fallback_still_attempts_raw_crashes_with_matching_unique_prefix(sandbox, fallback):
+  sandbox.parent.joinpath("cluster_crash.log").write_bytes(b"raw crash\x00\xff")
+  sandbox.parent.joinpath("cluster_crash.log.1").write_bytes(b"previous raw crash")
+  outbox = sandbox.parent / ".cluster-pi-pending"
+  env = {}
+  if fallback == "outbox_unusable":
+    outbox.write_text("not a directory\n")
+  elif fallback == "outbox_full":
+    for index in range(16):
+      job = outbox / f"pending.saved{index}"
+      job.mkdir(parents=True)
+      job.joinpath("cluster_pi_debug.log").write_text("retained old report\n")
+  else:
+    mocks = sandbox.parent / "mock commands"
+    mocks.mkdir()
+    command = mocks / ("flock" if fallback == "reservation_busy" else "mktemp")
+    if fallback == "reservation_busy":
+      content = '#!/usr/bin/env bash\n[[ ${1:-} != -w ]]\n'
+    else:
+      content = '#!/usr/bin/env bash\nif [[ "$*" == *".cluster-pi-pending/pending."* ]]; then exit 1; fi\nexec /usr/bin/mktemp "$@"\n'
+    command.write_text(content, encoding="utf-8", newline="\n")
+    command.chmod(0o700)
+    # Git Bash prepends its own executable directories to Windows PATH.
+    # Prepend mocks after startup so an installed mktemp.exe is overridden too.
+    startup = sandbox.parent / "mock-command-startup.sh"
+    startup.write_text('export PATH="$MOCK_COMMAND_DIR:$PATH"\n', encoding="utf-8", newline="\n")
+    env.update(BASH_ENV=startup.as_posix(), MOCK_COMMAND_DIR=_bash_path(mocks))
+  result = _upload(sandbox, **env)
+  assert result.returncode == 0, result.stderr
+  names = sandbox.parent.joinpath("upload-names.txt").read_text().splitlines()
+  prefix = names[0].removesuffix("cluster_debug.log")
+  assert names == [prefix + filename for filename in ("cluster_debug.log", "cluster_crash.log", "cluster_crash.log.1")]
+  assert "-" in prefix.rsplit("_TEST_CAR_test-dongle_", 1)[0]
+  assert sandbox.parent.joinpath("uploaded/cluster_crash.log").read_bytes() == b"raw crash\x00\xff"
+  assert not sandbox.parent.joinpath("collector-call.txt").exists()
+  assert "CLUSTER_LOG_WARNING:" in result.stdout
+  assert not list(sandbox.parent.joinpath("temporary files").iterdir())
+
+
+def test_fallback_c4_failure_is_not_reported_as_optional_companion_success(sandbox):
+  sandbox.parent.joinpath(".cluster-pi-pending").write_text("unusable outbox")
+  sandbox.parent.joinpath("cluster_crash.log").write_bytes(b"native crash")
+  result = _upload(sandbox, MOCK_C4_UPLOAD_FAIL="1")
+  assert result.returncode == 1
+  assert not sandbox.parent.joinpath("collector-call.txt").exists()
+  assert not list(sandbox.parent.joinpath("temporary files").iterdir())
+
+
+def test_quick_fallback_uploads_use_different_names_and_warn_if_raw_retry_cannot_be_retained(sandbox):
+  sandbox.parent.joinpath(".cluster-pi-pending").write_text("unusable outbox")
+  sandbox.parent.joinpath("cluster_crash.log").write_bytes(b"native crash")
+  first = _upload(sandbox, MOCK_CRASH_UPLOAD_FAIL="1")
+  second = _upload(sandbox)
+  assert first.returncode == second.returncode == 0
+  assert "자동 재전송 사본은 남기지 못했습니다" in first.stdout
+  names = sandbox.parent.joinpath("upload-names.txt").read_text().splitlines()
+  assert names[0] != names[2]
+  assert names[1] == names[0].removesuffix("cluster_debug.log") + "cluster_crash.log"
+  assert names[3] == names[2].removesuffix("cluster_debug.log") + "cluster_crash.log"
+  assert not list(sandbox.parent.joinpath("temporary files").iterdir())
 
 
 @pytest.mark.parametrize("enabled,transport", [("0", "network"), ("1", "usb"), ("0", "usb"),

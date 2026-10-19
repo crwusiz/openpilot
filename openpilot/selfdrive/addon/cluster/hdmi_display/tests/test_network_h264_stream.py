@@ -180,14 +180,78 @@ def test_connection_closed_during_camera_wait_cannot_enter_native_send(sender):
   assert stream.connection_stopped_event.is_set()
 
 
-def test_native_send_failure_disconnects_the_session_and_surfaces_an_error(sender):
+def test_native_send_exception_disconnects_the_session_and_surfaces_an_error(sender):
   producer, native, config, _sent = make_tracks([(START + IDR, 1_000_000_000)], 1)
-  native.send.return_value = False
-  native.send.side_effect = None
+  native.send.side_effect = RuntimeError("Track is not open")
   stream = sender.ClusterH264Stream("v=0", producer)
   asyncio.run(stream._send_track_loop(native, producer, config))
   assert stream.connection_stopped_event.is_set()
   assert any("[CLUSTER_H264_SEND_ERROR]" in call.args[0] for call in sender.flog.call_args_list)
+
+
+def test_transient_native_send_false_keeps_the_session_and_live_dependent_pictures(sender):
+  producer, native, config, sent = make_tracks([(START + IDR, 1_000_000_000),
+                                               (START + PFRAME, 1_050_000_000), (START + PFRAME, 1_100_000_000)], 3)
+  send = native.send.side_effect
+
+  def intermittent(data):
+    send(data)
+    return len(sent) != 1
+
+  native.send.side_effect = intermittent
+  stream = sender.ClusterH264Stream("v=0", producer)
+  asyncio.run(stream._send_track_loop(native, producer, config))
+  assert [data for data, _pts in sent] == [START + IDR, START + PFRAME, START + PFRAME]
+  producer.request_keyframe.assert_called_once()
+  logs = [call.args[0] for call in sender.flog.call_args_list]
+  assert any("[CLUSTER_H264_SEND_BACKPRESSURE]" in line for line in logs)
+  assert any("[CLUSTER_H264_SEND_RECOVERED]" in line for line in logs)
+  assert not any("[CLUSTER_H264_SEND_ERROR]" in line for line in logs)
+
+
+def test_persistent_native_send_false_is_bounded_and_idr_requests_are_limited(sender, monkeypatch):
+  producer, native, config, _sent = make_tracks([(START + PFRAME, index * 50_000_000) for index in range(1, 6)], 5)
+  native.send.side_effect = None
+  native.send.return_value = False
+  monkeypatch.setattr(sender, "time", SimpleNamespace(monotonic=Mock(side_effect=[0.0, 0.0, 0.9, 1.1, 2.1])))
+  stream = sender.ClusterH264Stream("v=0", producer)
+  asyncio.run(stream._send_track_loop(native, producer, config))
+  assert native.send.call_count == 4
+  assert producer.request_keyframe.call_count == 2
+  assert stream.connection_stopped_event.is_set()
+  assert any("transport remained unready for 2.10s" in call.args[0] for call in sender.flog.call_args_list)
+
+
+def test_successful_transport_write_resets_the_failure_window(sender, monkeypatch):
+  producer, native, config, sent = make_tracks([(START + PFRAME, index * 50_000_000) for index in range(1, 7)], 6)
+  send = native.send.side_effect
+
+  def intermittent(data):
+    send(data)
+    return len(sent) in (3, 6)
+
+  native.send.side_effect = intermittent
+  monkeypatch.setattr(sender, "time", SimpleNamespace(monotonic=Mock(side_effect=[0.0, 0.1, 0.9, 1.2, 2.5, 2.8, 3.1])))
+  stream = sender.ClusterH264Stream("v=0", producer)
+  asyncio.run(stream._send_track_loop(native, producer, config))
+  assert len(sent) == 6
+  assert not any("[CLUSTER_H264_SEND_ERROR]" in call.args[0] for call in sender.flog.call_args_list)
+
+
+def test_native_track_closing_during_a_false_write_exits_without_an_idr_request(sender):
+  producer, native, config, sent = make_tracks([(START + IDR, 1_000_000_000)], 1)
+  send = native.send.side_effect
+
+  def closed(data):
+    send(data)
+    return False
+
+  native.send.side_effect = closed
+  stream = sender.ClusterH264Stream("v=0", producer)
+  asyncio.run(stream._send_track_loop(native, producer, config))
+  assert len(sent) == 1
+  producer.request_keyframe.assert_not_called()
+  assert stream.connection_stopped_event.is_set()
 
 
 def test_native_chain_wrappers_are_released_only_after_stream_stop(sender):

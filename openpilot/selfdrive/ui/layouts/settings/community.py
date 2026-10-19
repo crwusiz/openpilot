@@ -81,9 +81,9 @@ def execute_log_upload(log_name: str) -> tuple[int, str | None]:
                             text=True, encoding="utf-8", errors="replace", check=False)
   except Exception:
     return 1, None
-  prefix = "CLUSTER_PI_LOG_WARNING:"
-  warnings = [line.strip()[len(prefix):].strip() for line in result.stdout.splitlines() if line.strip().startswith(prefix)]
-  return result.returncode, warnings[-1][:300] if warnings else None
+  prefixes = ("CLUSTER_PI_LOG_WARNING:", "CLUSTER_LOG_WARNING:")
+  warnings = [line.strip().split(":", 1)[1].strip() for line in result.stdout.splitlines() if line.strip().startswith(prefixes)]
+  return result.returncode, "; ".join(dict.fromkeys(warnings))[:600] if warnings else None
 
 
 class StaticLogModal(Widget):

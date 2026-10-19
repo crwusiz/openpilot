@@ -1,10 +1,13 @@
 import asyncio
 import builtins
+import gc
 import logging
+from pathlib import Path
 import socket
 import sys
 import threading
 import time
+import weakref
 from types import ModuleType, SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
@@ -148,6 +151,35 @@ def test_close_cancels_pending_answer_and_closes_peer_without_waiting_for_negoti
   finally:
     c4_sock.close()
     pi_sock.close()
+
+
+def test_control_timeout_names_the_failed_stage():
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+
+  # A pending read must yield to wait_for's deadline rather than return data.
+  async def pending_read(*_args):
+    await asyncio.Event().wait()
+
+  async def run_pending():
+    receiver.loop = SimpleNamespace(sock_recv=pending_read)
+    with pytest.raises(TimeoutError, match="H.264 control packet timed out after 0.01 seconds"):
+      await receiver._read_control(0.01)
+
+  asyncio.run(run_pending())
+
+
+def test_worker_failure_records_reason_and_stream_ages_without_a_traceback(caplog):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  receiver.last_video_at = receiver.last_state_at = time.monotonic() - 2
+  receiver.received_frames, receiver.decoder_errors = 123, 4
+  receiver._run = AsyncMock(side_effect=ConnectionError("C4 closed H.264 control connection"))
+  with caplog.at_level(logging.WARNING, logger="cluster_receiver"):
+    receiver._run_thread()
+  assert receiver.done and isinstance(receiver.error, ConnectionError)
+  message = next(record.getMessage() for record in caplog.records if "CLUSTER_H264_STOP" in record.getMessage())
+  assert "reason=ConnectionError" in message and "C4 closed H.264 control connection" in message
+  assert "video_age_ms=" in message and "state_age_ms=" in message
+  assert "rx_frames=123" in message and "decoder_errors=4" in message
 
 
 def test_missing_optional_webrtc_dependency_reports_error_to_c4(monkeypatch):
@@ -476,6 +508,63 @@ def test_receiver_rejects_non_hello_h264_packet_without_entering_video_mode():
     pi_sock.close()
 
 
+def test_failure_after_taking_updates_is_not_mistaken_for_normal_session_completion(monkeypatch):
+  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
+
+  scene = SimpleNamespace(close=Mock())
+  error = ConnectionError("receiver failed between the update and completion checks")
+  receiver = SimpleNamespace(condition=threading.Condition(), last_video_at=None, last_state_at=None,
+                             screen_off=False, done=False, received_frames=0, start=Mock(), close=Mock())
+
+  def take_updates(timeout=0.02):
+    if receiver.done:
+      raise error
+    receiver.done = True
+    return None, None
+
+  receiver.take_updates = take_updates
+  monkeypatch.setattr(h264_scene, "H264Scene", lambda *_args: scene)
+  monkeypatch.setattr(h264_receiver, "H264Receiver", lambda *_args: receiver)
+  display = SimpleNamespace(pump_events=lambda: True, screen_off=True)
+  with pytest.raises(ConnectionError, match="between the update and completion checks"):
+    h264_receiver.receive_h264_session(None, display, HELLO_DATA)
+  receiver.close.assert_called_once()
+  scene.close.assert_called_once()
+
+
+def test_failed_session_releases_renderer_without_waiting_for_cyclic_gc(monkeypatch):
+  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
+
+  scene_class = h264_scene.H264Scene
+  renderers = []
+
+  def create_scene(*_args):
+    scene = scene_class(Path(__file__).resolve().parents[5] / "assets")
+    renderers.append(weakref.ref(scene.renderer))
+    return scene
+
+  receiver = SimpleNamespace(condition=threading.Condition(), start=Mock(), close=Mock(),
+                             take_updates=Mock(side_effect=ConnectionError("C4 reset connection")))
+  monkeypatch.setattr(h264_scene, "H264Scene", create_scene)
+  monkeypatch.setattr(h264_receiver, "H264Receiver", lambda *_args: receiver)
+  retained_error = None
+  was_enabled = gc.isenabled()
+  gc.disable()
+  try:
+    try:
+      h264_receiver.receive_h264_session(None, SimpleNamespace(pump_events=lambda: True), HELLO_DATA)
+    except ConnectionError as error:
+      # Keep the traceback and its receive_h264_session frame alive, as the
+      # worker's saved exception can do across a rapid reconnect.
+      retained_error = error
+    assert retained_error is not None and retained_error.__traceback__ is not None
+    assert renderers[0]() is None
+  finally:
+    retained_error = None
+    if was_enabled:
+      gc.enable()
+
+
 @pytest.mark.parametrize("stall", [False, True])
 def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(monkeypatch, stall):
   from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
@@ -499,6 +588,9 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
     def render(self):
       assert threading.get_ident() == owner
       return f"scene {len(self.videos)}"
+
+    def close(self):
+      pass
 
   class Receiver:
     def __init__(self, *_args):
@@ -583,6 +675,9 @@ def test_render_deadlines_preserve_phase_without_discarding_a_slot_after_overrun
       starts.append(clock[0])
       clock[0] += render_cost
       return "composed RGB"
+
+    def close(self):
+      pass
 
   class Receiver:
     def __init__(self, *_args):

@@ -16,30 +16,26 @@ def state(tmp_path, monkeypatch):
   log.write_text("[14:02:03] [CLUSTER_NETWORK_SUCCESS] Orange Pi connected from 192.168.0.84:59123.\n", encoding="utf-8")
   output = tmp_path / "cluster_pi_debug.log"
   monkeypatch.setattr(collector, "get_connected_pi_ip", lambda: None)
-  monkeypatch.setattr(collector, "C4_CRASH_LOG_DIRECTORY", tmp_path)
   monkeypatch.setattr(collector.shutil, "which", lambda _command: "/mock/ssh")
   monkeypatch.setattr(collector, "collect_c4_wifi", lambda _host, _env, _deadline: "status=mock_local_wifi")
   return log, output
 
 
-def test_report_keeps_c4_crash_history_even_if_pi_cannot_be_reached(state):
+def test_pi_report_does_not_duplicate_c4_crash_files_uploaded_separately(state, monkeypatch):
   log, output = state
   crash = log.parent / "cluster_crash.log"
   crash.write_text("[CLUSTER_CRASH] stage=bootstrap\nImportError: native backend unavailable\n", encoding="utf-8")
+  original_open = Path.open
+
+  def open_report_file(path, *args, **kwargs):
+    assert path.name not in ("cluster_crash.log", "cluster_crash.log.1"), "C4 crash files are uploaded independently"
+    return original_open(path, *args, **kwargs)
+
+  monkeypatch.setattr(Path, "open", open_report_file)
   assert not collector.collect_pi_log(log, output, {"CLUSTER_PI_HOST": "bad-host"}, Mock())
   text = output.read_text(encoding="utf-8")
-  assert "stage=bootstrap" in text and "native backend unavailable" in text
+  assert "stage=bootstrap" not in text and "native backend unavailable" not in text
   assert "Collection status: failed" in text
-
-
-def test_crash_history_bounds_each_file_and_preserves_its_recent_tail(state):
-  log, _ = state
-  for suffix in ("", ".1"):
-    (log.parent / ("cluster_crash.log" + suffix)).write_bytes(b"HEAD\n" + b"old history\n" * 20000 + b"LATEST FAILURE\n")
-  text = collector.collect_c4_crashes()
-  assert text.count("LATEST FAILURE") == 2 and text.count("HEAD") == 2
-  assert len(text.encode()) < 2 * collector.MAX_C4_CRASH_BYTES + 1024
-  assert "truncated" in text
 
 
 def test_remote_snapshot_checks_asset_access_as_receiver_user():

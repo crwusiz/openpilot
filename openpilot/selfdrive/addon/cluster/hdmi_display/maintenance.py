@@ -117,10 +117,12 @@ class ClusterActions:
       if code != 0:
         job.update(state="failed", message=f"Command failed (exit {code}); check C4 dashboard logs")
         LOG.warning("[CLUSTER_TOUCH_ACTION] action=%s job=%s exit=%s output_tail=%s", action, job["job_id"], code, output[-4096:])
+      elif action == "upload_logs" and "CLUSTER_LOG_WARNING:" in output:
+        job.update(state="warning", message="Cluster log uploaded; some diagnostic logs need collection/upload retry")
       elif action == "upload_logs" and "CLUSTER_PI_LOG_WARNING:" in output:
         job.update(state="warning", message="C4 log uploaded; Pi log needs collection/upload retry")
       else:
-        job.update(state="succeeded", message="Pi reboot scheduled" if action == "pi_update" else "C4 and Pi log upload completed")
+        job.update(state="succeeded", message="Pi reboot scheduled" if action == "pi_update" else "Cluster log upload completed")
     except TimeoutError:
       job.update(state="failed", message="Operation timed out")
     except asyncio.CancelledError:

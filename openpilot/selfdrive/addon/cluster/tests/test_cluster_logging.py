@@ -38,7 +38,7 @@ def crash_logs(tmp_path, monkeypatch):
     cluster_logging.close_crash_log()
 
 
-def test_crash_survives_fresh_session_and_restores_traceback_to_collected_log(crash_logs):
+def test_python_crash_is_separate_from_debug_and_survives_fresh_sessions(crash_logs, capsys):
   cluster_logging.initialize_crash_log()
   cluster_logging.initialize_log()
   cluster_logging.close_log()  # cluster_main closes before the launcher catches.
@@ -47,6 +47,12 @@ def test_crash_survives_fresh_session_and_restores_traceback_to_collected_log(cr
   except ImportError as error:
     cluster_logging.record_crash(error, "cluster imports")
   cluster_logging.close_crash_log()
+  summary = (crash_logs / "cluster_debug.log").read_text()
+  assert "stage=cluster imports" in summary and "pid=" in summary
+  assert "ImportError: native module unavailable" in summary
+  assert f"crash_log={cluster_logging.CRASH_LOG_FILE}" in summary
+  assert "Traceback (most recent call last)" not in summary
+  assert "Traceback (most recent call last)" in capsys.readouterr().err
 
   for _ in range(3):
     cluster_logging.initialize_crash_log()
@@ -55,11 +61,14 @@ def test_crash_survives_fresh_session_and_restores_traceback_to_collected_log(cr
     cluster_logging.close_crash_log()
 
   session = (crash_logs / "cluster_debug.log").read_text()
-  assert session.count("Most recent previous cluster failure") == 1
-  assert "stage=cluster imports" in session
-  assert "Traceback (most recent call last)" in session
-  assert "ImportError: native module unavailable" in session
+  assert "Most recent previous cluster failure" not in session
+  assert "stage=cluster imports" not in session
+  assert "Traceback (most recent call last)" not in session
+  assert "ImportError: native module unavailable" not in session
   assert "CLUSTER_PROCESS_START" not in session
+  persistent = (crash_logs / "cluster_crash.log").read_text()
+  assert persistent.count("ImportError: native module unavailable") == 1
+  assert "Traceback (most recent call last)" in persistent
 
 
 def test_crash_file_rotation_keeps_only_one_previous_bounded_file(crash_logs, monkeypatch):
@@ -82,15 +91,17 @@ def test_fault_handler_has_live_persistent_descriptor(crash_logs):
   assert "test_cluster_logging.py" in (crash_logs / "cluster_crash.log").read_text()
 
 
-def test_native_failure_excerpt_is_bounded_and_carried_into_next_session(crash_logs):
-  (crash_logs / "cluster_crash.log").write_text("Fatal Python error: Aborted\n" + "native frame\n" * 2000)
+def test_native_failure_is_preserved_without_copying_into_next_debug_session(crash_logs):
+  trace = "Fatal Python error: Aborted\n" + "native frame\n" * 2000
+  (crash_logs / "cluster_crash.log").write_text(trace)
   cluster_logging.initialize_crash_log()
   cluster_logging.initialize_log()
   cluster_logging.close_log()
   session = (crash_logs / "cluster_debug.log").read_text()
-  assert "Most recent previous cluster failure" in session
-  assert "Fatal Python error: Aborted" in session
-  assert len(session.encode()) < cluster_logging.MAX_PREVIOUS_CRASH_BYTES + 300
+  assert "Most recent previous cluster failure" not in session
+  assert "Fatal Python error: Aborted" not in session
+  assert "native frame" not in session
+  assert (crash_logs / "cluster_crash.log").read_text().startswith(trace)
 
 
 def test_unwritable_crash_path_does_not_mask_original_failure(crash_logs, monkeypatch):
@@ -141,13 +152,17 @@ def test_parent_reports_native_signal_and_only_matching_pid_fatal_stack(crash_lo
   assert "current native stack" in output
   assert "old native stack" not in output
   assert faulthandler.is_enabled() is enabled
-  assert "stage=process exit" in (crash_logs / "cluster_crash.log").read_text()
+  persistent = (crash_logs / "cluster_crash.log").read_text()
+  assert "stage=process exit" in persistent
+  assert persistent.count("current native stack") == 1
   collected = (crash_logs / "cluster_debug.log").read_text()
   assert "[CLUSTER_PROCESS_EXIT] pid=22" in collected and "reason=SIGABRT" in collected
-  assert "current native stack" in collected and "old native stack" not in collected
+  assert "current native stack" not in collected and "old native stack" not in collected
+  assert "Fatal Python error" not in collected
+  assert cluster_logging.CRASH_LOG_FILE in collected
 
 
-def test_native_crash_is_in_the_existing_upload_log_without_a_cluster_restart(crash_logs):
+def test_native_exit_summary_is_in_debug_without_a_cluster_restart(crash_logs):
   cluster_logging.initialize_log()
   cluster_logging.flog("last live cluster frame")
   cluster_logging.close_log()
@@ -158,7 +173,9 @@ def test_native_crash_is_in_the_existing_upload_log_without_a_cluster_restart(cr
   collected = (crash_logs / "cluster_debug.log").read_text()
   assert collected.index("last live cluster frame") < collected.index("[CLUSTER_PROCESS_EXIT]")
   assert "pid=321" in collected and "reason=SIGSEGV" in collected
-  assert "Fatal Python error: Segmentation fault" in collected and "native send_frame" in collected
+  assert "Fatal Python error: Segmentation fault" not in collected and "native send_frame" not in collected
+  assert cluster_logging.CRASH_LOG_FILE in collected
+  assert "native send_frame" in (crash_logs / "cluster_crash.log").read_text()
 
 
 def test_full_native_trace_survives_exit_and_restart_but_terminal_output_stays_bounded(crash_logs, capsys):
@@ -167,14 +184,46 @@ def test_full_native_trace_survives_exit_and_restart_but_terminal_output_stays_b
   (crash_logs / "cluster_crash.log").write_text("[CLUSTER_PROCESS_START] pid=42 native_bootstrap=1\n" + trace)
   cluster_logging.record_process_exit(42, -signal.SIGSEGV)
   collected = (crash_logs / "cluster_debug.log").read_text()
-  assert "important early native frame" in collected and "last native frame" in collected
+  assert "important early native frame" not in collected and "last native frame" not in collected
+  persistent = (crash_logs / "cluster_crash.log").read_text()
+  assert "important early native frame" in persistent and "last native frame" in persistent
+  assert persistent.count("Fatal Python error") == 1
   terminal = capsys.readouterr().err
   assert "Fatal Python error: Segmentation fault" in terminal
   assert len(terminal.encode()) < cluster_logging.MAX_CONSOLE_CRASH_BYTES + 1024
   cluster_logging.initialize_log()
   cluster_logging.close_log()
   next_session = (crash_logs / "cluster_debug.log").read_text()
-  assert "important early native frame" in next_session and "last native frame" in next_session
+  assert "important early native frame" not in next_session and "last native frame" not in next_session
+  assert (crash_logs / "cluster_crash.log").read_text() == persistent
+
+
+def test_parent_exit_metadata_starts_on_a_new_line_after_an_incomplete_native_stack(crash_logs):
+  trace = "[CLUSTER_PROCESS_START] pid=4595 native_bootstrap=1\nFatal Python error: Segmentation fault\n  File "
+  (crash_logs / "cluster_crash.log").write_text(trace)
+  cluster_logging.record_process_exit(4595, -signal.SIGSEGV)
+  persistent = (crash_logs / "cluster_crash.log").read_text()
+  assert persistent.startswith(trace + "\n[")
+  assert persistent.count("Fatal Python error") == 1
+  assert "pid=4595 exit_code=-11 reason=SIGSEGV" in persistent
+
+
+def test_python_summary_stays_on_one_line_without_large_or_chained_tracebacks(crash_logs, capsys):
+  try:
+    try:
+      raise OSError("original native dependency error")
+    except OSError as cause:
+      raise RuntimeError("multiline failure\n" + "long detail " * 2000 + " end of error") from cause
+  except RuntimeError as error:
+    cluster_logging.record_crash(error, "test")
+  summary = (crash_logs / "cluster_debug.log").read_text()
+  assert len(summary.splitlines()) == 1
+  assert len(summary.encode()) < 2048
+  assert "RuntimeError: multiline failure" in summary
+  assert "end of error" in summary
+  assert "original native dependency error" not in summary
+  assert "original native dependency error" in (crash_logs / "cluster_crash.log").read_text()
+  assert "original native dependency error" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("code,expected_stop,crash", [(0, False, False), (-signal.SIGINT, True, False),
@@ -202,3 +251,15 @@ def test_unwritable_upload_log_does_not_prevent_persistent_crash_record(crash_lo
   cluster_logging.record_process_exit(123, -signal.SIGSEGV)
   assert "reason=SIGSEGV" in capsys.readouterr().err
   assert "reason=SIGSEGV" in (crash_logs / "cluster_crash.log").read_text()
+
+
+def test_unwritable_debug_log_does_not_prevent_python_crash_trace(crash_logs, monkeypatch, capsys):
+  monkeypatch.setattr(cluster_logging, "LOG_FILE", str(crash_logs / "missing/cluster_debug.log"))
+  try:
+    raise ValueError("original Python failure")
+  except ValueError as error:
+    cluster_logging.record_crash(error, "test")
+  persistent = (crash_logs / "cluster_crash.log").read_text()
+  assert "Traceback (most recent call last)" in persistent
+  assert "ValueError: original Python failure" in persistent
+  assert "ValueError: original Python failure" in capsys.readouterr().err

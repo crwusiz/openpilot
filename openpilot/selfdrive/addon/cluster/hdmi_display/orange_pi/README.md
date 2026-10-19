@@ -63,7 +63,7 @@ sudo reboot
 
 밝기는 기존 10~100%의 10단계를 유지하며 **주간 80% / 야간 40%** 바로가기 버튼을 제공합니다. 화면 끄기·터치로 다시 켜기도 유지합니다. 패널은 마지막 조작 후 8초에 닫힙니다. 업데이트·전송 중에는 진행 상태를 계속 표시하며, 닫기를 누르면 작업은 배경에서 계속됩니다.
 
-**Pi 업데이트**는 현재 C4에 설치된 저장소의 `scripts/pi_update.sh`를 실행합니다. Pi 배포와 확인이 성공하면 자동 재부팅하고 다시 연결됩니다. **로그 전송**은 대시보드의 Cluster 로그 업로드와 동일한 `scripts/log_upload.sh /data/log/cluster_debug.log`를 사용해 C4·Pi 로그를 NAS로 전송합니다. Pi 파일만 수집·전송하지 못한 경우 부분 완료로 표시하고 기존 보관·재시도 정책을 사용합니다. 두 작업은 동시에 실행하지 않으며 중복 터치나 HTTP 응답 유실로 같은 작업을 두 번 시작하지 않습니다.
+**Pi 업데이트**는 현재 C4에 설치된 저장소의 `scripts/pi_update.sh`를 실행합니다. Pi 배포와 확인이 성공하면 자동 재부팅하고 다시 연결됩니다. **로그 전송**은 대시보드의 Cluster 로그 업로드와 동일한 `scripts/log_upload.sh /data/log/cluster_debug.log`를 사용해 C4 로그와 존재하는 crash 원본, Pi 로그를 NAS로 전송합니다. crash·Pi 파일의 일부 수집·전송에 실패하면 부분 완료로 표시하고 보관·재시도 정책을 사용합니다. 두 작업은 동시에 실행하지 않으며 중복 터치나 HTTP 응답 유실로 같은 작업을 두 번 시작하지 않습니다.
 
 Pi 로그 수집·NAS 업로드는 **Cluster 활성화 + Network 디스플레이 선택**일 때만 수행합니다. Cluster가 꺼져 있거나 USB 모드이면 C4 로그만 전송하며, 보관된 Pi 로그 재전송도 건너뜁니다. 기존 보관 파일은 유지하고 다음 Network Cluster 활성 상태의 업로드에서 다시 전송합니다.
 
@@ -107,7 +107,8 @@ bash scripts/pi_update.sh
 | 로그 | 확인할 항목 |
 | --- | --- |
 | C4 `[CLUSTER_H264_PERF]` | `video_fps`, `state_fps`, 소스 영상 age, 처리량, RTCP 손실·지터 |
-| C4 `[CLUSTER_H264_SENDER]`, `[CLUSTER_H264_SEND_PERF]` | `api=track_send`, `framing=validated_annexb4`, 촬영 EOF 기준 RTP 시각, 실제 제출 FPS·잘못된 프레임·IDR 대기 수 |
+| C4 `[CLUSTER_H264_SENDER]`, `[CLUSTER_H264_SEND_PERF]` | `api=track_send`, `framing=validated_annexb4`, 촬영 EOF 기준 RTP 시각, 실제 제출 FPS·잘못된 프레임·IDR 대기·`send_not_ready` 수 |
+| C4 `[CLUSTER_H264_SEND_BACKPRESSURE]`, `[CLUSTER_H264_SEND_RECOVERED]`, `[CLUSTER_H264_ERROR]`; Pi `[CLUSTER_H264_STOP]` | 일시적 송신 실패·회복, 종료한 제어/영상 단계, 수신 종료 이유와 마지막 영상·상태 age |
 | Pi `[CLUSTER_H264_RX_PERF]`, C4 `[CLUSTER_H264_PI_PERF]` | `display_fps`, RGB 변환·합성·출력 시간, 큐 대기·최대 표시 간격, 영상·상태 stale |
 | C4 `[CLUSTER_RESOURCE_PERF]`, `[CLUSTER_LOAD_GUARD]`, `[CLUSTER_INPUT_DIAG]` | CPU·RSS, 모델·위치 입력 age, 통신 경고, 부하 보호와 복구 |
 | Pi `[CLUSTER_PI_RESOURCE_PERF]` | CPU·RSS·스레드·온도·주파수·팬 PWM |
@@ -164,6 +165,38 @@ C4 업데이트 후 **Pi Update도 실행**해야 Pi의 스레드 제한과 서�
 거부·연결 종료 경합을 자동 검증하고, 실제 IDR/P 프레임12장의 정규화 전후 디코딩 픽셀이
 동일한 것도 확인했습니다. SIGSEGV 재발 방지와 실제 표시 FPS 개선 여부는 C4·Pi 기기
 로그로 확인해야 합니다.
+
+### 2026-10-19 크래시·연결 복구와 Pi 세션 정리
+
+C4에서 14:15:17(PID6830), 15:06:44(PID4595)에 SIGSEGV 종료가 기록됐습니다.
+첫 번째는 `Params.put → request_keyframe → request_recovery → _feedback` 스택이며,
+두 번째는 traceback 자체가 잘려 같은 원인인지 판단할 수 없습니다. 네이티브 PLI 콜백과
+asyncio 루프가 같은 Params 객체에 동시에 비동기 쓰기를 요청할 수 있던 경로를 수정해,
+키프레임 요청·IDR 확인·종료 처리를 소유한 루프에서 순서대로 실행합니다. 반복 PLI는
+합치고, 종료 후 예약된 콜백은 무시하며, IDR 하나의 확인을 중복 기록하지 않습니다.
+
+별도로 `Native WebRTC track rejected the H.264 frame` 직후 연결이 닫힌 경우가 8회
+있었습니다. 열려 있는 영상 트랙의 `send(False)` 한 번을 세션 종료로 처리하던 동작을
+수정했습니다. 이제 일시적 실패에는 연결과 정상 소스 전송을 유지하고 IDR 요청은 초당
+1회로 제한합니다. 실패가 연속 2초 이상이거나 실제 트랙 종료·네이티브 예외가 발생하면
+기존 재접속 경로를 사용합니다. `False`는 마지막 RTP 전송 결과이며 그 자체로 ICE 연결
+종료를 의미하지 않습니다. [사용 중인 네이티브 전송 구현](https://github.com/paullouisageneau/libdatachannel/blob/v0.24.0/src/impl/track.cpp)
+
+주행 중 Pi는 영상을 약19FPS로 받아도 실제 표시는 평균 약16~17FPS였고, 일부 재접속 뒤
+RSS가 약80MB씩 늘었습니다. 오류 traceback이 종료된 세션을 붙잡아 큰 폰트·렌더러·영상
+버퍼의 해제가 지연되는 경로를 자동 테스트로 재현했습니다. 이제 세션 종료 시 이 자원을
+즉시 해제하고, 종료한 asyncio 루프·작업 참조도 정리합니다. 실제 장비에서의 메모리 증가가
+모두 같은 원인인지는 다음 로그에서 확인합니다.
+
+수신 작업이 마지막 오류 검사 직후 종료되면 오류가 정상 반환처럼 처리되던 경합도
+보완했습니다. `[CLUSTER_H264_STOP]`에는 종료 이유, 수신 프레임 수, 디코더 오류 수,
+마지막 영상·상태 수신 이후 시간이 남고, 제어 패킷 시간 초과에도 구체적인 메시지를
+기록합니다. 이 Pi 변경은 C4 업데이트 후 **Pi Update**를 실행해야 적용됩니다.
+
+C4 영상 송신은 약20FPS였지만 Pi 표시는 약16~17FPS로, 연결 복구와 합성 처리 시간은
+구분해서 확인해야 합니다. 모델 지연·통신 경고도 일부 실제 기록됐으며, 해당 로그만으로
+클러스터가 원인이라고 확정하지 않습니다. 다음 주행에서 크래시·재접속 횟수, Pi RSS와
+표시 FPS를 함께 확인합니다.
 
 ### 대시보드에서 Orange Pi IP 확인
 
@@ -551,14 +584,20 @@ PC 창 모드 점검에서는 `requirements.txt`를 PC 가상 환경에 설치�
 
 ## 로그 수집
 
-### Cluster 로그와 Pi 로그 함께 업로드
+### Cluster·crash·Pi 로그 함께 업로드
 
-대시보드 **System Logs → Cluster Debug → UPLOAD** 또는 C4 설정의 **커뮤니티 → Cluster 로그 업로드**를 사용하면 C4 로그를 업로드한 뒤 Pi에 SSH로 접속해 로그를 수집하고 함께 업로드합니다. C4 파일은 먼저 사본을 만들어 업로드하므로 주행 중 원본이 바뀌어도 같은 수집 작업의 내용을 유지합니다. 두 파일의 시각·작업 ID·차량·기기 접두사는 같습니다. 같은 분에 다시 업로드해도 새 작업 ID로 이전 쌍을 덮어쓰지 않습니다.
+대시보드 **System Logs → Cluster Debug → UPLOAD**, C4 설정의 **커뮤니티 → Cluster 로그 업로드**, Pi 터치 패널의 **로그 전송**은 같은 업로드 경로를 사용합니다. C4 `cluster_debug.log`를 전송하고, 같은 디렉터리에 `cluster_crash.log` 또는 회전 보관본 `cluster_crash.log.1`이 있으면 각 파일을 별도로 함께 전송합니다. crash 파일이 없으면 생략하며 USB·Network 모두 적용됩니다. **Pi SSH 수집과 보관된 Pi 파일의 재전송은 Cluster Enable이 켜져 있고 Network 디스플레이일 때만 수행합니다.**
+
+보관 경로를 사용할 수 있으면 작업별로 C4·crash 파일의 사본을 먼저 만들어 원본이 바뀌어도 재전송에는 당시 내용을 사용합니다. 같은 작업의 모든 파일은 시각·작업 ID·차량·기기 접두사가 같으며, 같은 분에 다시 업로드해도 새 작업 ID로 이전 파일을 덮어쓰지 않습니다.
 
 ```text
 ..._cluster_debug.log       C4 렌더링·전송·자원 상태
+..._cluster_crash.log       C4 크래시 원본 (존재할 때)
+..._cluster_crash.log.1     C4 이전 크래시 원본 (존재할 때)
 ..._cluster_pi_debug.log    Pi 서비스 journal·출력 성능·수집 상태
 ```
+
+`cluster_debug.log`에는 현재 오류의 간단한 내용·PID·종료 신호·crash 경로를 남깁니다. 전체 Python traceback과 네이티브 fatal stack은 crash 원본에 보관하며, 새 세션의 debug 로그나 Pi 보고서에 다시 복사하지 않습니다. crash 파일은 텍스트를 요약하거나 자르지 않고 수집한 사본 그대로 전송하므로 긴 스택은 별도 파일에서 확인합니다. 원본 크래시 기록 자체가 불완전한 경우 업로드가 누락된 스택을 복원할 수는 없습니다.
 
 Pi 파일에는 최근 `cluster-hdmi.service` 로그 최대 2500줄, 수집 시각·부팅 정보, 서비스 상태, Wi-Fi 절전·현재 링크 상태를 담습니다. UTC 시각과 최신 순서로 journal을 기록하며, 저장된 이전 부팅의 로그도 포함합니다. 전체 파일은 최대 512 KiB입니다. Wi-Fi 비밀번호나 전체 연결 프로필은 수집하지 않습니다. SSH 포트는 **9122를 먼저 시도**하고 연결 자체가 실패한 경우에만 22로 재시도합니다. 인증 실패나 Pi 명령 실패에는 다른 포트로 재시도하지 않으며 SSH 설정도 바꾸지 않습니다.
 
@@ -566,9 +605,11 @@ Pi 파일에는 최근 `cluster-hdmi.service` 로그 최대 2500줄, 수집 시�
 
 Pi는 수집할 때 켜져 있고 C4와 같은 핫스팟에 연결되어 있어야 합니다. 현재 연결된 IP가 없으면 C4 주행 로그의 마지막 Pi 연결 주소를 사용합니다. 다른 주소·계정을 쓰면 `CLUSTER_PI_HOST`, `CLUSTER_PI_USER`, `CLUSTER_PI_IDENTITY`, `CLUSTER_PI_PASSWORD` 환경 변수로 지정할 수 있습니다. 수집은 25초 제한을 공유하며 주소 검색도 로그 뒤에서 최대 32 MiB만 읽습니다. 수집 시작부터 보고서를 원자적으로 저장해 프로세스가 중단돼도 `collecting` 상태와 당시 수집 정보를 남깁니다. Pi 수집에 실패해도 C4 로그 업로드는 유지하고, Pi 파일에 실패 상태를 기록하며 대시보드와 커뮤니티 화면에는 경고를 표시합니다. 명확한 USB 전용 로그는 SSH를 시도하지 않고 수집 생략 상태를 기록합니다. Pi journal이 재부팅 후 남아 있지 않으면 이전 주행 로그를 복구할 수는 없습니다.
 
-Pi 파일의 NAS 전송에 실패하면 `/data/log/.cluster-pi-pending/pending.<작업 ID>/`에 사본과 접두사를 보관합니다. 다음 명시적 Cluster 업로드에서 이전 작업을 최대 2개, 총 20초 범위로 재전송합니다. 이미 수집한 Pi 파일은 다시 수집하거나 덮어쓰지 않고 원래 C4 파일의 접두사를 사용합니다. 중단된 수집은 당시 실패 보고서로 전송하며 나중의 Pi 상태를 이전 주행 로그로 붙이지 않습니다. 보관 예산은 최대 64 MiB 또는 16개 작업이며 진행 중인 보고서 공간도 예약합니다. 한도에 도달하면 이전 파일을 보존하고 신규 C4 파일만 업로드하며 경고를 표시합니다. 전송에 성공한 작업의 사본은 정리합니다. `/data/log/.cluster-pi-pending/history.log`에는 수집·전송·재시도 단계 요약을 최대 약 64 KiB로 기록합니다. `CLUSTER_LOG_UPLOAD` 출력과 이 파일로 SSH 수집 실패와 NAS 전송 실패를 구분할 수 있습니다.
+crash·Pi 파일의 NAS 전송에 실패하면 `/data/log/.cluster-pi-pending/pending.<작업 ID>/`에 사본과 접두사를 보관합니다. 다음 명시적 Cluster 업로드에서 이전 작업을 최대 2개, 총 20초 범위로 재전송합니다. 이미 수집한 파일은 다시 수집하거나 덮어쓰지 않고 원래 C4 파일의 접두사를 사용하며, 성공한 파일은 표시해 실패한 파일만 재시도합니다. 중단된 Pi 수집은 당시 실패 보고서로 전송하며 나중의 Pi 상태를 이전 주행 로그로 붙이지 않습니다. 모든 파일의 전송이 끝나야 해당 작업의 사본을 정리합니다.
 
-C4 SSH에서 직접 업로드할 수도 있습니다. 이 명령도 두 로그를 함께 처리합니다.
+보관 예산은 최대 64 MiB 또는 16개 작업이며 crash 사본과 진행 중인 Pi 보고서 공간도 계산합니다. 한도에 도달하면 이전 파일을 보존하고 신규 C4 파일과 crash 파일의 별도 전송을 시도하며 새 Pi 수집은 생략합니다. 보관 경로를 사용할 수 없어 crash 전송 실패의 재시도 사본을 남기지 못한 경우에도 명시적으로 경고합니다. `/data/log/.cluster-pi-pending/history.log`에는 수집·전송·재시도 단계 요약을 최대 약 64 KiB로 기록합니다. `CLUSTER_LOG_UPLOAD` 출력과 이 파일로 SSH 수집 실패와 NAS 전송 실패를 구분할 수 있습니다. Dashboard·C4 설정·Pi 터치 패널은 `CLUSTER_LOG_WARNING`과 기존 `CLUSTER_PI_LOG_WARNING`을 부분 완료로 표시합니다.
+
+C4 SSH에서 직접 업로드할 수도 있습니다. 이 명령도 해당하는 로그를 함께 처리합니다.
 
 ```bash
 cd /data/openpilot

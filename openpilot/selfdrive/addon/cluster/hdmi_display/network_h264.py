@@ -7,6 +7,7 @@ import asyncio
 import contextlib
 import json
 import signal
+import threading
 import time
 
 from openpilot.selfdrive.addon.cluster.cluster_health_guard import ClusterHealthGuard
@@ -89,11 +90,40 @@ def create_camera_stream(offer_sdp):
       self._header = b""
       self._keyframe_at = 0.0
       self._keyframe_requested = False
+      self._loop = asyncio.get_running_loop()
+      self._loop_thread = threading.get_ident()
+      self._request_lock = threading.Lock()
+      self._request_scheduled = False
+      self._stopped = False
       super().__init__("road")
 
     def request_keyframe(self):
+      # Native PLI callbacks run outside asyncio. Params.put(block=False)
+      # releases the GIL and updates a shared C++ future, so it must not race
+      # the loop's feedback, IDR acknowledgement or shutdown writes.
+      if threading.get_ident() == self._loop_thread:
+        self._request_keyframe_on_loop()
+        return
+      with self._request_lock:
+        if self._stopped or self._request_scheduled:
+          return
+        self._request_scheduled = True
+      try:
+        self._loop.call_soon_threadsafe(self._request_keyframe_on_loop)
+      except RuntimeError:  # A late native callback after the loop closed.
+        with self._request_lock:
+          self._request_scheduled = False
+
+    def _request_keyframe_on_loop(self):
+      with self._request_lock:
+        self._request_scheduled = False
+        if self._stopped:
+          return
+      now = time.monotonic()
+      if self._keyframe_requested and now - self._keyframe_at < 1.0:
+        return
       self._keyframe_requested = True
-      self._seen_keyframe = False
+      self._keyframe_at = now
       super().request_keyframe()
 
     def request_recovery(self):
@@ -102,9 +132,10 @@ def create_camera_stream(offer_sdp):
       # arrives; only an actual source gap/stale frame gates _ready below.
       self.resyncs += 1
       self.request_keyframe()
-      self._keyframe_at = time.monotonic()
 
     def stop(self):
+      with self._request_lock:
+        self._stopped = True
       super().stop()
       if self._keyframe_requested:
         # The encoder reads this shared flag on every frame. Disconnecting
@@ -129,6 +160,7 @@ def create_camera_stream(offer_sdp):
 
     async def recv(self):
       while True:
+        base_ack_pending = not self._seen_keyframe
         packet = await super().recv()
         now = time.monotonic()
         gap = self._encode_id is not None and self._current_encode_id != self._encode_id + 1
@@ -138,17 +170,18 @@ def create_camera_stream(offer_sdp):
           self._ready = False
           self.resyncs += 1
         if not self._ready:
-          if now - self._keyframe_at >= 1.0:
-            self.request_keyframe()
-            self._keyframe_at = now
           if not self._current_keyframe or not self._header or stale:
+            if now - self._keyframe_at >= 1.0:
+              self.request_keyframe()
             await asyncio.sleep(0)
             continue
           self._ready = True
         if self._current_keyframe and self._keyframe_requested:
           # Fulfill both local resync and RTCP PLI requests. The initial-IDR
-          # handling in the base track alone cannot track later requests.
-          self.params.put("LivestreamRequestKeyframe", False, block=False)
+          # acknowledgement is already written by the base recv(). Later
+          # requests are owned here; never enqueue two writes for one IDR.
+          if not base_ack_pending:
+            self.params.put("LivestreamRequestKeyframe", False, block=False)
           self._keyframe_requested = False
         self.video_frames += 1
         self.video_bytes += len(bytes(packet))
@@ -278,6 +311,7 @@ class H264NetworkServer:
     stream = track = None
     workers = []
     owns = self.active is None
+    phase = "hello"
     try:
       if not owns:
         await write_control(writer, ERROR, {"error": "h264_cluster_busy"})
@@ -291,25 +325,32 @@ class H264NetworkServer:
       await write_control(writer, HELLO, {"protocol": 1, "codec": "h264", "transport": "webrtc", "camera": "road",
                                         "width": self.config.width, "height": self.config.height, "fps": min(self.config.fps, 20),
                                         "state_hz": 20}, budget_s=2)
+      phase = "offer"
       kind, _sequence, offer = await read_control(reader, budget_s=15)
       if kind == ERROR:
         raise RuntimeError(f"Pi H.264 unavailable: {offer.get('error', 'unknown')} | {str(offer.get('detail', ''))[:512]}")
       if kind != OFFER or offer.get("type") != "offer" or not isinstance(offer.get("sdp"), str) or not offer["sdp"].startswith("v=0"):
         raise ValueError("Expected a WebRTC H.264 offer")
+      phase = "start_stream"
       stream, track = self.stream_factory(offer["sdp"])
       answer = await asyncio.wait_for(stream.start(), 15)
+      phase = "answer"
       await write_control(writer, ANSWER, {"sdp": answer.sdp, "type": answer.type}, budget_s=2)
+      phase = "connect"
       await asyncio.wait_for(stream.wait_for_connection(), 15)
       flog("[CLUSTER_H264_CONNECTED] codec=h264 | transport=webrtc | camera=road | compose=pi | ack=telemetry_only")
-      workers = [asyncio.create_task(self._states(writer, track, stream)), asyncio.create_task(self._feedback(reader, track)),
-                 asyncio.create_task(stream.wait_for_disconnection())]
+      workers = [asyncio.create_task(self._states(writer, track, stream), name="scene_state"),
+                 asyncio.create_task(self._feedback(reader, track), name="receiver_feedback"),
+                 asyncio.create_task(stream.wait_for_disconnection(), name="video_transport")]
       done, _pending = await asyncio.wait(workers, return_when=asyncio.FIRST_COMPLETED)
       for completed in done:
+        phase = completed.get_name()
         completed.result()
+        flog(f"[CLUSTER_H264_DISCONNECTED] codec=h264 | phase={phase}")
     except asyncio.CancelledError:
       raise
     except Exception as e:
-      flog(f"[CLUSTER_H264_ERROR] codec=h264 | {type(e).__name__}: {e}")
+      flog(f"[CLUSTER_H264_ERROR] codec=h264 | phase={phase} | {type(e).__name__}: {e}")
       with contextlib.suppress(Exception):
         await write_control(writer, ERROR, {"error": type(e).__name__, "detail": str(e)[:512]}, budget_s=0.25)
     finally:

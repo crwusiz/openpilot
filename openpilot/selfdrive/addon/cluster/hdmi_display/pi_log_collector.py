@@ -29,8 +29,6 @@ LOCAL_WIFI_TIMEOUT = 2.0
 MAX_LOCAL_WIFI_BYTES = 4 * 1024
 MAX_LOCAL_COMMAND_BYTES = 16 * 1024
 MAX_C4_LOG_BYTES = 32 * 1024 * 1024
-C4_CRASH_LOG_DIRECTORY = Path("/data/log")
-MAX_C4_CRASH_BYTES = 16 * 1024
 C4_LOG_CHUNK_BYTES = 64 * 1024
 C4_LOG_OVERLAP_BYTES = 256
 PEER_PATTERN = re.compile(r"\[CLUSTER_NETWORK_SUCCESS\] Orange Pi connected from ([0-9.]+):[0-9]+\.")
@@ -369,24 +367,6 @@ def _write_report(output, content):
       temporary.unlink(missing_ok=True)
 
 
-def collect_c4_crashes():
-  rows = []
-  for name in ("cluster_crash.log", "cluster_crash.log.1"):
-    try:
-      with (C4_CRASH_LOG_DIRECTORY / name).open("rb") as file:
-        size = os.fstat(file.fileno()).st_size
-        if size > MAX_C4_CRASH_BYTES:
-          head = file.read(512)
-          file.seek(size - (MAX_C4_CRASH_BYTES - 512))
-          data = head + b"\n[Crash history truncated; latest tail follows]\n" + file.read(MAX_C4_CRASH_BYTES - 512)
-        else:
-          data = file.read(MAX_C4_CRASH_BYTES)
-    except OSError:
-      continue
-    rows += [f"--- {name} ---", data.decode("utf-8", errors="replace")]
-  return "\n".join(rows) if rows else "No retained C4 cluster crash log is available."
-
-
 def collect_pi_log(c4_log, output, environ=None, runner=None):
   """Always write a sidecar, including connection/permission failure details."""
   environ = dict(os.environ if environ is None else environ)
@@ -396,8 +376,7 @@ def collect_pi_log(c4_log, output, environ=None, runner=None):
   report = ["=== Orange Pi cluster diagnostics ===",
             "C4 collection UTC: " + datetime.now(UTC).isoformat(),
             "C4 monotonic uptime: " + f"{started:.3f}s",
-            "C4 log: " + Path(c4_log).name,
-            "\n--- Retained C4 cluster failures (bounded history, may predate this session) ---", collect_c4_crashes()]
+            "C4 log: " + Path(c4_log).name]
   password = environ.get("CLUSTER_PI_PASSWORD", "orangepi")
   def save_progress():
     content = "\n".join(report + ["Collection status: collecting",

@@ -118,6 +118,15 @@ class H264Scene:
     self.last_frame_timings = {}
     self.last_status = {"state_fresh": False, "video_fresh": False, "model_valid": False}
 
+  def close(self):
+    # A saved receive exception can retain this scene through its traceback
+    # until Python collects the cycle. Release the large fonts, renderer
+    # caches and camera buffers immediately at the session boundary instead.
+    with self._lock:
+      self.renderer = None
+      self._snapshot = self._video = self._panel = self._panel_transform = None
+      self._panel_key = self._contrast_lut = None
+
   def update(self, snapshot, received_at=None):
     if not isinstance(snapshot, dict):
       raise ValueError("Cluster scene metadata must be a dictionary")

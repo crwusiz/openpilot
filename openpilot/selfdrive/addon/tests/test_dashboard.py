@@ -592,12 +592,19 @@ class TestDashboardAsync(unittest.IsolatedAsyncioTestCase):
       self.assertIn('ERROR: file not found', notify.call_args.args[0])
 
   async def test_partial_cluster_upload_reports_warning_without_failing_c4_upload(self):
-    warning = 'C4 로그 업로드 완료. Pi 로그 수집에 실패했습니다.'
-    with patch.object(dashboard, '_run_command', AsyncMock(return_value=(0, f'uploaded\nCLUSTER_PI_LOG_WARNING: {warning}\n'))), \
-         patch.object(ui, 'notify') as notify:
-      self.assertEqual(await dashboard.run_script_async('Log Upload', '/data/openpilot/scripts/log_upload.sh'), 0)
-      self.assertIn(warning, notify.call_args.args[0])
-      self.assertEqual(notify.call_args.kwargs['type'], 'warning')
+    pi_warning = 'C4 로그 업로드 완료. Pi 로그 수집에 실패했습니다.'
+    crash_warning = 'Crash 로그는 다음 업로드에서 재시도합니다.'
+    for output, expected in (
+      (f'CLUSTER_PI_LOG_WARNING: {pi_warning}\n', [pi_warning]),
+      (f'CLUSTER_LOG_WARNING: {crash_warning}\n', [crash_warning]),
+      (f'CLUSTER_LOG_WARNING: {crash_warning}\nCLUSTER_PI_LOG_WARNING: {pi_warning}\n', [crash_warning, pi_warning]),
+    ):
+      with self.subTest(output=output), \
+           patch.object(dashboard, '_run_command', AsyncMock(return_value=(0, output))), patch.object(ui, 'notify') as notify:
+        self.assertEqual(await dashboard.run_script_async('Log Upload', '/data/openpilot/scripts/log_upload.sh'), 0)
+        for warning in expected:
+          self.assertIn(warning, notify.call_args.args[0])
+        self.assertEqual(notify.call_args.kwargs['type'], 'warning')
 
   async def test_complete_cluster_upload_reports_success(self):
     with patch.object(dashboard, '_run_command', AsyncMock(return_value=(0, 'C4 and Pi logs uploaded'))), \

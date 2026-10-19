@@ -117,6 +117,13 @@ class H264Receiver:
       decoder_log.removeHandler(decoder_handler)
       decoder_handler.close()
       with self.condition:
+        if self.error is not None and not self.closing:
+          now = time.monotonic()
+          video_age = "none" if self.last_video_at is None else f"{max(0.0, now - self.last_video_at) * 1000:.1f}"
+          state_age = "none" if self.last_state_at is None else f"{max(0.0, now - self.last_state_at) * 1000:.1f}"
+          LOG.warning("[CLUSTER_H264_STOP] reason=%s | detail=%r | rx_frames=%d | decoder_errors=%d | "
+                      + "video_age_ms=%s | state_age_ms=%s", type(self.error).__name__, str(self.error)[:300],
+                      self.received_frames, self.decoder_errors, video_age, state_age)
         self.done = True
         self.condition.notify_all()
 
@@ -195,7 +202,10 @@ class H264Receiver:
       kind, _sequence, size = unpack_control_header(await read_exact(CONTROL_HEADER.size))
       return kind, decode_payload(await read_exact(size))
 
-    return await asyncio.wait_for(read_packet(), timeout=budget_s)
+    try:
+      return await asyncio.wait_for(read_packet(), timeout=budget_s)
+    except TimeoutError as error:
+      raise TimeoutError(f"H.264 control packet timed out after {budget_s:g} seconds") from error
 
   def _fail_async(self, error):
     if not self.closing and self._async_error is None:
@@ -422,6 +432,14 @@ class H264Receiver:
     self.thread.join(timeout=4.0)
     if self.thread.is_alive():
       LOG.warning("WebRTC receiver thread did not stop within four seconds")
+    else:
+      # A saved exception may keep the receiver reachable until cyclic GC.
+      # A completed asyncio task/loop no longer needs to retain its media
+      # callbacks, conversion executor or a second copy of that exception.
+      self.loop = self._main_task = self.stop_event = None
+      self._send_lock = self._recovery_event = self._async_error = None
+      with self.condition:
+        self.latest_state = None
 
 
 def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=None):
@@ -445,7 +463,6 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
       sock.sendall(pack_control(ERROR, {"error": "h264_scene_unavailable", "detail": str(error)[:1000]}))
     raise H264ConfigurationError(str(error)) from error
   receiver = H264Receiver(sock, hello)
-  receiver.start()
   waiting_shown = False
   next_render_at = None
   render_interval = 1.0 / hello["fps"]
@@ -453,6 +470,7 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
   pending_video_at = None
   freshness = None
   try:
+    receiver.start()
     while True:
       if not display.pump_events():
         raise KeyboardInterrupt
@@ -510,6 +528,13 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
       if max_frames is not None and receiver.received_frames >= max_frames:
         return receiver.received_frames
       if receiver.done:
+        # The worker can fail after take_updates() has checked its error.
+        # Recheck after observing completion so that a reconnect never hides
+        # the final control/video error as a successful session return.
+        receiver.take_updates(timeout=0)
         return receiver.received_frames
   finally:
-    receiver.close()
+    try:
+      receiver.close()
+    finally:
+      scene.close()

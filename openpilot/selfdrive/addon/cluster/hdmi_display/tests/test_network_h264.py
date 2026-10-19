@@ -4,6 +4,7 @@ from functools import wraps
 from fractions import Fraction
 import socket
 import sys
+import threading
 import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -230,8 +231,8 @@ async def test_receiver_dependency_error_is_preserved_in_c4_log(monkeypatch):
     await server.close()
 
 
-@asyncio_test
-async def test_native_camera_waits_for_idr_and_resynchronizes_after_encoded_reference_gap(monkeypatch):
+@pytest.fixture
+def camera_backend(monkeypatch):
   socket_options, requests = [], []
   packets = []
 
@@ -244,12 +245,17 @@ async def test_native_camera_waits_for_idr_and_resynchronizes_after_encoded_refe
     def __init__(self, camera_type):
       self._sock = self._make_sock(camera_type)
       self.params = SimpleNamespace(put=Mock())
+      self._seen_keyframe = False
 
     async def recv(self):
-      return Packet(self._build_frame_data(packets.pop(0)))
+      msg = packets.pop(0)
+      if not self._seen_keyframe and msg.frame.idx.flags & 8:
+        self._seen_keyframe = True
+        self.params.put("LivestreamRequestKeyframe", False, block=False)
+      return Packet(self._build_frame_data(msg))
 
     def request_keyframe(self):
-      requests.append(True)
+      requests.append(threading.get_ident())
 
     def stop(self):
       pass
@@ -271,11 +277,17 @@ async def test_native_camera_waits_for_idr_and_resynchronizes_after_encoded_refe
                            header=header, data=b"encoded")
     return SimpleNamespace(which=lambda: "frame", frame=data)
 
+  return SimpleNamespace(packets=packets, packet=packet, requests=requests, socket_options=socket_options)
+
+
+@asyncio_test
+async def test_native_camera_waits_for_idr_and_resynchronizes_after_encoded_reference_gap(camera_backend):
+  packets, packet = camera_backend.packets, camera_backend.packet
   _stream, track = network.create_camera_stream("v=0")
   packets.extend([packet(10), packet(11, key=True, header=b"sps-pps")])
   assert bytes(await track.recv()) == b"sps-ppsencoded"
   assert track.video_frame_id == 11 and track.video_frames == 1
-  assert socket_options == [{"conflate": False}] and requests
+  assert camera_backend.socket_options == [{"conflate": False}] and camera_backend.requests
   packets.extend([packet(13), packet(14, key=True)])
   assert bytes(await track.recv()) == b"sps-ppsencoded"
   assert track.resyncs == 1 and track.video_frame_id == 14
@@ -305,6 +317,79 @@ async def test_native_camera_waits_for_idr_and_resynchronizes_after_encoded_refe
   track.params.put.assert_called_with("LivestreamRequestKeyframe", False, block=False)
   track.stop()
   assert track.params.put.call_count == clear_count + 2
+
+
+@asyncio_test
+async def test_native_pli_burst_and_loop_feedback_use_one_owner_thread_and_one_pending_write(camera_backend):
+  owner = threading.get_ident()
+  _stream, track = network.create_camera_stream("v=0")
+
+  def native_pli_burst():
+    for _ in range(100):
+      track.request_keyframe()
+
+  callbacks = [threading.Thread(target=native_pli_burst) for _ in range(4)]
+  for callback in callbacks:
+    callback.start()
+  for callback in callbacks:
+    callback.join(timeout=2)
+    assert not callback.is_alive()
+  assert not camera_backend.requests  # Native callbacks never enter Params.
+  track.request_recovery()  # TCP feedback can arrive before the queued PLI.
+  await asyncio.sleep(0)
+  assert camera_backend.requests == [owner]
+  assert track._keyframe_requested
+  camera_backend.packets.append(camera_backend.packet(1, key=True, header=b"sps-pps"))
+  await track.recv()
+  assert not track._keyframe_requested
+  track.params.put.assert_called_once_with("LivestreamRequestKeyframe", False, block=False)
+  track.stop()
+
+
+@asyncio_test
+async def test_queued_or_late_native_pli_cannot_write_params_after_camera_stop(camera_backend):
+  _stream, track = network.create_camera_stream("v=0")
+  callback = threading.Thread(target=track.request_keyframe)
+  callback.start()
+  callback.join(timeout=2)
+  assert not callback.is_alive()
+  track.stop()
+  await asyncio.sleep(0)
+  track.request_keyframe()
+  late_callback = threading.Thread(target=track.request_keyframe)
+  late_callback.start()
+  late_callback.join(timeout=2)
+  assert not late_callback.is_alive()
+  await asyncio.sleep(0)
+  assert not camera_backend.requests
+  track.params.put.assert_not_called()
+
+
+@asyncio_test
+async def test_recovery_feedback_cannot_postpone_an_unfulfilled_keyframe_retry(camera_backend, monkeypatch):
+  clock = [10.0]
+  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+  _stream, track = network.create_camera_stream("v=0")
+  for now in (10.0, 10.5, 11.0):
+    clock[0] = now
+    track.request_recovery()
+  assert len(camera_backend.requests) == 2
+  track.stop()
+
+
+@asyncio_test
+async def test_initial_idr_and_later_requested_idr_each_acknowledge_once(camera_backend):
+  _stream, track = network.create_camera_stream("v=0")
+  camera_backend.packets.append(camera_backend.packet(1, key=True, header=b"sps-pps"))
+  await track.recv()
+  assert not camera_backend.requests  # An available IDR needs no new request.
+  assert track.params.put.call_count == 1
+  track.request_keyframe()
+  camera_backend.packets.append(camera_backend.packet(2, key=True))
+  await track.recv()
+  assert track.params.put.call_count == 2
+  assert not track._keyframe_requested
+  track.stop()
 
 
 @asyncio_test

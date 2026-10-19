@@ -12,7 +12,6 @@ LOG_FILE = "/data/log/cluster_debug.log"
 CRASH_LOG_FILE = "/data/log/cluster_crash.log"
 MAX_CRASH_LOG_BYTES = 256 * 1024
 MAX_CRASH_RECORD_BYTES = 64 * 1024
-MAX_PREVIOUS_CRASH_BYTES = MAX_CRASH_RECORD_BYTES
 MAX_CONSOLE_CRASH_BYTES = 8 * 1024
 
 _log_lock = threading.Lock()
@@ -96,11 +95,14 @@ def initialize_crash_log():
 
 def record_crash(error, stage):
   detail = "".join(traceback.format_exception(type(error), error, error.__traceback__))
-  record = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [CLUSTER_CRASH] stage={stage}\n{detail}"
+  record = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [CLUSTER_CRASH] stage={stage} pid={os.getpid()}\n{detail}"
   console_log(_bounded_text(record, MAX_CRASH_RECORD_BYTES))
   _write_crash_record(record)
   # cluster_main may already have closed the session log in its finally block.
-  flog(_bounded_text(record, MAX_CRASH_RECORD_BYTES).rstrip())
+  # Keep performance logs compact; the separate crash upload retains the stack.
+  description = " ".join(_bounded_text(str(error), 1024).splitlines())
+  flog(f"[CLUSTER_CRASH] stage={stage} pid={os.getpid()} | {type(error).__name__}: {description}"
+       + f" | crash_log={CRASH_LOG_FILE}")
 
 
 def _failure_for_pid(pid):
@@ -118,7 +120,7 @@ def _failure_for_pid(pid):
     return ""
   session = history[start + len(marker):].split("[CLUSTER_PROCESS_START]", 1)[0]
   failure = max(session.rfind("[CLUSTER_CRASH]"), session.rfind("Fatal Python error:"))
-  return _bounded_text(session[failure:].rstrip(), MAX_PREVIOUS_CRASH_BYTES) if failure >= 0 else ""
+  return _bounded_text(session[failure:].rstrip(), MAX_CONSOLE_CRASH_BYTES) if failure >= 0 else ""
 
 
 def record_process_exit(pid, exit_code, expected_stop=False):
@@ -137,21 +139,20 @@ def record_process_exit(pid, exit_code, expected_stop=False):
   record = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {summary}\n"
   if abnormal:
     record += f"[CLUSTER_CRASH] stage=process exit | pid={pid} exit_code={exit_code} reason={reason}\n"
-    # Leave room for the exit metadata without truncating the fatal heading.
-    failure = _bounded_text(_failure_for_pid(pid), max(1024, MAX_CRASH_RECORD_BYTES - len(record.encode("utf-8")) - 1))
+    failure = _failure_for_pid(pid)
     # Python exceptions were already printed by the child. Native fatal stacks
-    # went directly to its persistent faulthandler descriptor; mirror them now.
+    # went directly to its persistent faulthandler descriptor; print them now.
     if "Fatal Python error:" in failure:
-      console_log(_bounded_text(failure, MAX_CONSOLE_CRASH_BYTES))
-    record += f"{failure}\n"
+      console_log(failure)
   # Do not call _write_crash_record in the manager: that installs faulthandler
   # for the *current* process. Its persistent handler belongs only to the child.
-  # Append to the upload log immediately, even if the child is never restarted.
-  # Keep failures independent so an unwritable path does not lose both copies.
-  payload = _bounded_text(record, MAX_CRASH_RECORD_BYTES).encode("utf-8", errors="replace")
+  # The stack is already in the crash file. Append only exit metadata to each
+  # log, independently, so a missing path does not hide the reason elsewhere.
   for filename, lock in ((CRASH_LOG_FILE, _crash_lock), (LOG_FILE, _log_lock)):
     try:
       path = Path(filename)
+      # Native stack output can end mid-line; separate the manager's record.
+      payload = (("\n" if filename == CRASH_LOG_FILE else "") + record).encode("utf-8", errors="replace")
       with lock:
         if filename == CRASH_LOG_FILE and path.exists() and path.stat().st_size + len(payload) > MAX_CRASH_LOG_BYTES:
           path.replace(path.with_name(path.name + ".1"))
@@ -166,26 +167,6 @@ def close_crash_log():
     _close_crash_log_unlocked()
 
 
-def _previous_crash_excerpt():
-  records = []
-  for filename in (CRASH_LOG_FILE + ".1", CRASH_LOG_FILE):
-    try:
-      with open(filename, "rb") as handle:
-        handle.seek(max(0, os.fstat(handle.fileno()).st_size - MAX_CRASH_LOG_BYTES))
-        records.append(handle.read(MAX_CRASH_LOG_BYTES).decode("utf-8", errors="replace"))
-    except OSError:
-      continue
-  history = "".join(records)
-  crash_at = max(history.rfind("[CLUSTER_CRASH]"), history.rfind("Fatal Python error:"))
-  if crash_at < 0:
-    return ""
-  crash_at = history.rfind("\n", 0, crash_at) + 1
-  next_session = history.find("[CLUSTER_PROCESS_START]", crash_at)
-  if next_session >= 0:
-    next_session = history.rfind("\n", crash_at, next_session)
-  return _bounded_text(history[crash_at:next_session if next_session >= 0 else None].rstrip(), MAX_PREVIOUS_CRASH_BYTES)
-
-
 def _close_log_unlocked():
   global _log_handle
   if _log_handle is not None:
@@ -198,14 +179,11 @@ def _close_log_unlocked():
 
 def initialize_log():
   global _log_handle
-  previous_crash = _previous_crash_excerpt()
   try:
     with _log_lock:
       _close_log_unlocked()
       _log_handle = open(LOG_FILE, "w", buffering=1)
       _log_handle.write(f"=== Cluster Session Started at {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
-      if previous_crash:
-        _log_handle.write(f"=== Most recent previous cluster failure ===\n{previous_crash}\n=== End previous failure ===\n")
   except OSError:
     _log_handle = None
 

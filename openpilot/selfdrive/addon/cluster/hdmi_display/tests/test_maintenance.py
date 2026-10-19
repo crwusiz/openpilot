@@ -37,7 +37,11 @@ def test_update_targets_only_the_connected_pi_and_retries_do_not_deploy_twice(ac
   asyncio.run(run())
 
 
-@pytest.mark.parametrize("output, state", [("upload done", "succeeded"), ("CLUSTER_PI_LOG_WARNING: Pi upload failed", "warning")])
+@pytest.mark.parametrize("output, state", [
+  ("upload done", "succeeded"), ("CLUSTER_PI_LOG_WARNING: Pi upload failed", "warning"),
+  ("CLUSTER_LOG_WARNING: Crash log upload failed", "warning"),
+  ("CLUSTER_LOG_WARNING: Crash log upload failed\nCLUSTER_PI_LOG_WARNING: Pi collection failed", "warning"),
+])
 def test_log_button_uses_existing_paired_log_upload_and_reports_partial_failure(actions, output, state):
   async def run():
     actions.runner.return_value = 0, output
@@ -45,6 +49,13 @@ def test_log_button_uses_existing_paired_log_upload_and_reports_partial_failure(
     await asyncio.gather(*actions.tasks)
     actions.runner.assert_awaited_once_with(["bash", str(actions.scripts / "log_upload.sh"), str(actions.log_file)], 240.0)
     assert actions.status(PEER, PEER)["state"] == state
+    message = actions.status(PEER, PEER)["message"]
+    if "CLUSTER_LOG_WARNING:" in output:
+      assert "diagnostic logs" in message and "retry" in message
+    elif state == "warning":
+      assert "Pi log" in message and "retry" in message
+    else:
+      assert message == "Cluster log upload completed"
   asyncio.run(run())
 
 

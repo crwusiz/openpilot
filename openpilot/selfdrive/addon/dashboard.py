@@ -287,9 +287,9 @@ def _get_error_summary(output: str) -> str:
 def _get_log_upload_warning(path: str, output: str) -> str | None:
   if Path(path).name != 'log_upload.sh':
     return None
-  prefix = 'CLUSTER_PI_LOG_WARNING:'
-  warnings = [line.strip()[len(prefix):].strip() for line in output.splitlines() if line.strip().startswith(prefix)]
-  return warnings[-1][:300] if warnings else None
+  prefixes = ('CLUSTER_PI_LOG_WARNING:', 'CLUSTER_LOG_WARNING:')
+  warnings = [line.strip().split(':', 1)[1].strip() for line in output.splitlines() if line.strip().startswith(prefixes)]
+  return '; '.join(dict.fromkeys(warnings))[:600] if warnings else None
 
 
 async def run_script_async(name: str, path: str, args: list[str] | None = None, show_modal: bool = False) -> int:
