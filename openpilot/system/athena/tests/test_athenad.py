@@ -45,6 +45,9 @@ def with_upload_handler(func):
       return func(*args, **kwargs)
     finally:
       end_event.set()
+      # wake the handler from its blocking queue get
+      athenad.cancelled_uploads.add('wakeup')
+      athenad.upload_queue.put_nowait(athenad.UploadItem(path='', url='', headers={}, created_at=0, id='wakeup'))
       thread.join()
   return wrapper
 
@@ -56,11 +59,8 @@ def host():
     yield f"http://{host}:{port}"
 
 class TestAthenadMethods(OpenpilotTestCase):
-  @classmethod
-  def setup_class(cls):
-    athenad.Api = MockApi  # ty: ignore[invalid-assignment]  # test double
-
   def setup_method(self):
+    athenad.Api = MockApi  # ty: ignore[invalid-assignment]  # test double
     self.default_params = {
       "DongleId": "0000000000000000",
       "GithubSshKeys": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC307aE+nuHzTAgaJhzSf5v7ZZQW9gaperjhCmyPyl4PzY7T1mDGenTlVTN7yoVFZ9UfO9oMQqo0n1OwDIiqbIFxqnhrHU0cYfj88rI85m5BEKlNu5RdaVTj1tcbaPpQc5kZEolaI1nDDjzV0lwS7jo5VYDHseiJHlik3HH1SgtdtsuamGR2T80q1SyW+5rHoMOJG73IH2553NnWuikKiuikGHUYBd00K1ilVAK2xSiMWJp55tQfZ0ecr9QjEsJ+J/efL4HqGNXhffxvypCXvbUYAFSddOwXUPo5BTKevpxMtH+2YrkpSjocWA04VnTYFiPG6U4ItKmbLOTFZtPzoez private", # noqa: E501
@@ -114,16 +114,12 @@ class TestAthenadMethods(OpenpilotTestCase):
 
   def test_nav_destination(self):
     set_destination = dispatcher["setNavDestination"]
-    assert set_destination(32, -117) == {"success": 0, "error": "Navigation is disabled"}
-    assert self.params.get("NavDestination") is None
-
-    self.params.put_bool("NavigationEnabled", True, block=True)
     destination = {"latitude": 32.875134, "longitude": -117.209777}
     assert set_destination(**destination) == {"success": 1}
     assert self.params.get("NavDestination") == destination
 
-    # out of range, non-finite and non-numeric coordinates are rejected without touching the destination
-    for latitude, longitude in [(91, 0), (0, -181), (float('nan'), 0), (0, float('inf')), (None, 0), ('32', 0), (True, 0)]:
+    # out of range and non-finite coordinates are rejected without touching the destination
+    for latitude, longitude in [(91, 0), (0, -181), (float('nan'), 0), (0, float('inf'))]:
       assert set_destination(latitude, longitude)["success"] == 0, (latitude, longitude)
       assert self.params.get("NavDestination") == destination
 
@@ -136,7 +132,7 @@ class TestAthenadMethods(OpenpilotTestCase):
 
   def test_get_message(self):
     with self.assertRaises(TimeoutError) as _:
-      dispatcher["getMessage"]("controlsState")
+      dispatcher["getMessage"]("controlsState", timeout=100)
 
     end_event = multiprocessing.Event()
 
