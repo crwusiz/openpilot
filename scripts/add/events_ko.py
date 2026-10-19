@@ -244,10 +244,10 @@ def startup_master_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
 
 
 def big_model_loading_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
-  spin = '-\\|/'
-  spinner = spin[(sm.frame // round(0.1 / DT_CTRL)) % len(spin)]
+  dot_count = (sm.frame // round(0.4 / DT_CTRL)) % 5 + 1
+  dots = ' '.join(['.'] * dot_count)
   return Alert(
-    f"Chestnut Initialize {spinner}",
+    f"빅모델 로딩중 {dots}",
     "",
     AlertStatus.normal, AlertSize.full,
     Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay=0.5)
