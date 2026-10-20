@@ -137,7 +137,8 @@ procs = [
   # Process add
   PythonProcess("navi_controller", "openpilot.selfdrive.addon.navi_controller", always_run, enabled=not PC),
   NativeProcess("dashboard", "openpilot/selfdrive/addon", ["python3", "dashboard.py"], always_run),
-  PythonProcess("cluster", "openpilot.selfdrive.addon.cluster_run", cluster_enable),
+  PythonProcess("cluster", "openpilot.selfdrive.addon.cluster_run", and_(cluster_enable, only_onroad),
+  ),
 ]
 
 managed_processes = {p.name: p for p in procs}
