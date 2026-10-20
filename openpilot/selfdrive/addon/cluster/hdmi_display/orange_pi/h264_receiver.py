@@ -73,6 +73,7 @@ class H264Receiver:
     self.latest_state = None
     self.state_revision = self.consumed_state_revision = 0
     self.received_frames = self.displayed_frames = self.dropped_frames = 0
+    self.decoded_frames = self.skipped_rgb = 0
     self.decoder_errors = 0
     self.last_video_at = self.last_state_at = None
     self.screen_off = False
@@ -213,24 +214,53 @@ class H264Receiver:
       self.stop_event.set()
 
   async def _consume_video(self, track):
-    try:
+    ready = asyncio.Event()
+    pending = None
+
+    async def receive_decoded():
+      nonlocal pending
       while not self.closing:
         frame = await track.recv()
         if (not 2 <= frame.width <= 4096 or not 2 <= frame.height <= 4096
             or frame.width * frame.height > 4 * 1024 * 1024):
           raise ValueError("Decoded H.264 frame exceeds pixel budget")
-        # aiortc/PyAV has already decoded all dependent pictures. Replacing
-        # this RGB slot never drops an H.264 reference packet before decoding.
+        # These are already decoded reference pictures. Keep only one waiting
+        # for RGB conversion instead of spending CPU converting an old burst.
+        with self.condition:
+          self.decoded_frames += 1
+          self.skipped_rgb += pending is not None
+        pending = frame, time.monotonic()
+        ready.set()
+        if self.decoded_frames % 32 == 0:
+          await asyncio.sleep(0)
+
+    async def convert_latest():
+      nonlocal pending
+      while not self.closing:
+        await ready.wait()
+        ready.clear()
+        frame, decoded_at = pending
+        pending = None
         started = time.monotonic()
-        # Keep UDP/RTCP and metadata reads responsive while libswscale builds
-        # RGB. Await each conversion before receiving the next decoded frame:
-        # there is only one conversion in flight, in reference-decoded order.
         rgb = await asyncio.to_thread(frame.to_ndarray, format="rgb24")
-        self.publish_rgb(rgb, convert_elapsed=time.monotonic() - started)
+        # One conversion is in flight, and the replacement slot stays bounded.
+        # Include conversion time in video age instead of refreshing its clock.
+        self.publish_rgb(rgb, received_at=decoded_at, convert_elapsed=time.monotonic() - started)
+
+    tasks = [asyncio.create_task(receive_decoded()), asyncio.create_task(convert_latest())]
+    try:
+      done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+      for task in done:
+        task.result()
     except asyncio.CancelledError:
       raise
     except Exception as error:
       self._fail_async(ConnectionError(f"WebRTC video stopped: {error}"))
+    finally:
+      for task in tasks:
+        task.cancel()
+      await asyncio.gather(*tasks, return_exceptions=True)
+      pending = None
 
   async def _read_states(self):
     while True:
@@ -263,21 +293,26 @@ class H264Receiver:
   async def _feedback(self):
     previous_at = time.monotonic()
     previous_rx = previous_display = 0
+    previous_decoded = 0
     previous_decoder_errors = 0
     logged_at, logged_rx, logged_display, logged_dropped = previous_at, 0, 0, 0
     logged_decoder_errors = 0
+    logged_decoded = logged_skipped = 0
     logged_stats = self._empty_stats()
     while True:
       await asyncio.sleep(FEEDBACK_INTERVAL)
       now = time.monotonic()
       with self.condition:
         rx, displayed = self.received_frames, self.displayed_frames
+        decoded, skipped = self.decoded_frames, self.skipped_rgb
         decoder_errors = self.decoder_errors
         video_stale = self.last_video_at is None or now - self.last_video_at >= 0.5
         stats, self._stats = self._stats, self._empty_stats()
         payload = {
           "screen_off": self.screen_off,
           "video_fps": (rx - previous_rx) / max(now - previous_at, 0.001),
+          "decoded_fps": (decoded - previous_decoded) / max(now - previous_at, 0.001),
+          "skipped_rgb": skipped,
           "display_fps": (displayed - previous_display) / max(now - previous_at, 0.001),
           "decoder_backend": "aiortc_pyav_software",
           "decoder_errors": decoder_errors,
@@ -305,7 +340,7 @@ class H264Receiver:
         LOG.info("[CLUSTER_H264_RX_PERF] rx_fps=%.2f | display_fps=%.2f | dropped_display=%d | "
                  + "render_avg=%.1fms | display_avg=%.1fms | queue_wait_avg=%.1fms | rgb_convert_avg=%.1fms | "
                  + "display_gap_max=%.1fms | video_stale=%d | state_stale=%d | "
-                 + "decoder_errors=%d | decoder=aiortc_pyav_software | screen_off=%d | mode=webrtc%s",
+                 + "decoder_errors=%d | decoded_fps=%.2f | skipped_rgb=%d | decoder=aiortc_pyav_software | screen_off=%d | mode=webrtc%s",
                  (rx - logged_rx) / elapsed, (displayed - logged_display) / elapsed,
                  payload["dropped_display"] - logged_dropped,
                  logged_stats["render"] * 1000 / max(logged_stats["render_count"], 1),
@@ -313,12 +348,15 @@ class H264Receiver:
                  logged_stats["queue"] * 1000 / max(logged_stats["queue_count"], 1),
                  logged_stats["convert"] * 1000 / max(logged_stats["convert_count"], 1),
                  logged_stats["gap"] * 1000, payload["video_stale"], payload["state_stale"],
-                 decoder_errors - logged_decoder_errors, payload["screen_off"], stages)
+                 decoder_errors - logged_decoder_errors, (decoded - logged_decoded) / elapsed,
+                 skipped - logged_skipped, payload["screen_off"], stages)
         LOG.info("[CLUSTER_PI_RESOURCE_PERF] %s", format_receiver_resources(self._resources.sample()))
         logged_at, logged_rx, logged_display, logged_dropped = now, rx, displayed, payload["dropped_display"]
         logged_decoder_errors = decoder_errors
+        logged_decoded, logged_skipped = decoded, skipped
         logged_stats = self._empty_stats()
       previous_at, previous_rx, previous_display = now, rx, displayed
+      previous_decoded = decoded
       previous_decoder_errors = decoder_errors
 
   async def _watchdog(self, started):

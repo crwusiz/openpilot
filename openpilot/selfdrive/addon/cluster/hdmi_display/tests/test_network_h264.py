@@ -164,6 +164,107 @@ async def test_real_control_socket_negotiates_video_separately_and_streams_state
 
 
 @asyncio_test
+async def test_short_state_pause_keeps_video_session_and_resumes_with_latest_models(monkeypatch):
+  monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
+  messages = []
+  monkeypatch.setattr(network, "flog", messages.append)
+  stream, track = factory()
+  source = models()
+  server = network.H264NetworkServer(config(), source, lambda _sdp: (stream, track))
+  resumed = asyncio.Event()
+  states = server._states
+
+  class PausedWriter:
+    def __init__(self, writer):
+      self.writer, self.transport = writer, writer.transport
+      self.first = True
+
+    def write(self, data):
+      self.writer.write(data)
+
+    async def drain(self):
+      if self.first:
+        self.first = False
+        await resumed.wait()
+      await self.writer.drain()
+
+  async def paused_states(writer, camera, rtc_stream):
+    await states(PausedWriter(writer), camera, rtc_stream)
+
+  monkeypatch.setattr(server, "_states", paused_states)
+  await server.start()
+  reader, writer = await asyncio.open_connection(*server.server.sockets[0].getsockname())
+  try:
+    assert (await network.read_control(reader))[0] == wire.HELLO
+    await network.write_control(writer, wire.OFFER, {"type": "offer", "sdp": "v=0\r\noffer"})
+    assert (await network.read_control(reader))[0] == wire.ANSWER
+    assert (await network.read_control(reader))[0] == wire.STATE
+    await asyncio.sleep(0.35)  # Exceeds the former 250 ms reconnect threshold.
+    assert server.active is not None and not stream.stopped
+    assert source.get_render_data.call_count == 1  # No pending snapshots accumulate.
+    valid, hud, path = source.get_render_data.return_value
+    source.get_render_data.return_value = valid, {**hud, "v_ego": 31.0}, path
+    resumed.set()
+    kind, sequence, snapshot = await network.read_control(reader, budget_s=1)
+    assert kind == wire.STATE and sequence == 1 and snapshot["hud"]["v_ego"] == 31.0
+    assert sum("[CLUSTER_H264_CONNECTED]" in line for line in messages) == 1
+    assert any("STATE_BACKPRESSURE" in line for line in messages)
+    assert any("STATE_RECOVERED" in line for line in messages)
+    assert not stream.stopped
+  finally:
+    writer.close()
+    await writer.wait_closed()
+    await server.close()
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+@asyncio_test
+async def test_state_write_stall_has_a_hard_deadline_and_cleans_pending_drain(monkeypatch, cancel):
+  monkeypatch.setattr(network, "STATE_DRAIN_WARN_S", 0.01)
+  monkeypatch.setattr(network, "STATE_DRAIN_TIMEOUT_S", 0.05)
+  started, finished = asyncio.Event(), asyncio.Event()
+
+  async def stalled():
+    started.set()
+    try:
+      await asyncio.Event().wait()
+    finally:
+      finished.set()
+
+  writer = SimpleNamespace(drain=stalled, transport=SimpleNamespace(get_write_buffer_size=lambda: 4096))
+  task = asyncio.create_task(network.drain_state(writer))
+  await started.wait()
+  if cancel:
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+      await task
+  else:
+    with pytest.raises(TimeoutError, match="Scene TCP write stalled for 0.05 seconds"):
+      await asyncio.wait_for(task, 0.5)
+  assert finished.is_set()
+
+
+@asyncio_test
+async def test_failed_connection_aborts_a_transport_that_cannot_finish_closing(monkeypatch):
+  monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
+  monkeypatch.setattr(network, "read_control", AsyncMock(return_value=(wire.OFFER, 0, {"type": "offer", "sdp": "v=0\r\noffer"})))
+  stream, track = factory()
+  server = network.H264NetworkServer(config(), models(), lambda _sdp: (stream, track))
+
+  async def stalled():
+    await asyncio.Event().wait()
+
+  monkeypatch.setattr(server, "_states", AsyncMock(side_effect=ConnectionError("control socket failed")))
+  monkeypatch.setattr(server, "_feedback", lambda *_args: stalled())
+  transport = Mock()
+  writer = SimpleNamespace(write=Mock(), drain=AsyncMock(), close=Mock(), transport=transport, wait_closed=stalled,
+                           get_extra_info=lambda key: ("127.0.0.1", 1) if key == "peername" else None)
+  await asyncio.wait_for(server._client(None, writer), 2)
+  transport.abort.assert_called_once()
+  assert stream.stopped and track.stop.called and server.active is None and not server.clients
+
+
+@asyncio_test
 async def test_second_peer_cannot_replace_active_cluster_and_shutdown_cancels_negotiation(monkeypatch):
   monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
   server = network.H264NetworkServer(config(), models())

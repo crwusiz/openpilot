@@ -7,6 +7,7 @@ import asyncio
 import contextlib
 import json
 import signal
+import socket
 import threading
 import time
 
@@ -18,6 +19,44 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol impo
   ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, PATH_KEYS, STATE,
   decode_payload, pack_control, unpack_control_header, validate_scene,
 )
+
+STATE_DRAIN_WARN_S = 0.25
+STATE_DRAIN_TIMEOUT_S = 5.0
+STATE_SEND_BUFFER_BYTES = 16 * 1024
+
+
+def configure_state_transport(writer):
+  # Keep at most one partially written state in asyncio. Large default TCP
+  # buffers otherwise turn a short Wi-Fi pause into a queue of old HUD data.
+  writer.transport.set_write_buffer_limits(high=0, low=0)
+  sock = writer.get_extra_info("socket")
+  if sock is not None:
+    try:
+      sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, STATE_SEND_BUFFER_BYTES)
+    except OSError as error:
+      flog(f"[CLUSTER_H264_STATE_WARN] Cannot bound TCP send buffer: {error}")
+
+
+async def drain_state(writer):
+  """Wait on one write without queuing obsolete states or resetting video."""
+  started = time.monotonic()
+  pending = asyncio.create_task(writer.drain())
+  try:
+    done, _ = await asyncio.wait({pending}, timeout=STATE_DRAIN_WARN_S)
+    if not done:
+      flog(f"[CLUSTER_H264_STATE_BACKPRESSURE] action=keep_video | queued_bytes={writer.transport.get_write_buffer_size()}")
+      try:
+        await asyncio.wait_for(pending, max(0.001, STATE_DRAIN_TIMEOUT_S - (time.monotonic() - started)))
+      except TimeoutError as error:
+        raise TimeoutError(f"Scene TCP write stalled for {STATE_DRAIN_TIMEOUT_S:g} seconds") from error
+      flog(f"[CLUSTER_H264_STATE_RECOVERED] wait_ms={(time.monotonic() - started) * 1000:.1f} | next=latest_state")
+    else:
+      pending.result()  # Propagate an actual socket failure immediately.
+    return time.monotonic() - started
+  finally:
+    if not pending.done():
+      pending.cancel()
+    await asyncio.gather(pending, return_exceptions=True)
 
 
 def publish_status(address):
@@ -247,7 +286,7 @@ class H264NetworkServer:
       # Only bounded scalar telemetry is accepted; no vehicle messages/params
       # are published from a receiver's input.
       fields = []
-      for key in ("video_fps", "display_fps", "rgb_convert_avg_ms", "render_avg_ms", "display_avg_ms", "queue_wait_avg_ms",
+      for key in ("video_fps", "decoded_fps", "skipped_rgb", "display_fps", "rgb_convert_avg_ms", "render_avg_ms", "display_avg_ms", "queue_wait_avg_ms",
                   "video_age_ms", "state_age_ms", "display_gap_max_ms", "dropped_display", "decoder_errors"):
         value = payload.get(key)
         if type(value) in (float, int) and 0 <= value <= 1e9:
@@ -268,7 +307,7 @@ class H264NetworkServer:
       packet = pack_control(STATE, scene, sequence)
       state_cpu += time.thread_time() - cpu_before
       writer.write(packet)
-      await asyncio.wait_for(writer.drain(), 0.25)
+      await drain_state(writer)
       sequence = (sequence + 1) & 0xFFFFFFFF
       state_frames += 1
       total_bytes += len(packet)
@@ -318,6 +357,7 @@ class H264NetworkServer:
         return
       self.active = task
       self.screen_off = False
+      configure_state_transport(writer)
       peer = writer.get_extra_info("peername")
       self.peer_ip, self.status_updated = peer[0], time.monotonic()
       publish_status(peer[0])
@@ -371,8 +411,12 @@ class H264NetworkServer:
       finally:
         writer.close()
         try:
-          with contextlib.suppress(Exception, asyncio.CancelledError):
+          try:
             await asyncio.wait_for(writer.wait_closed(), 1)
+          except (Exception, asyncio.CancelledError):
+            # close() can keep a congested transport alive while it flushes.
+            # Do not strand it (or Server.wait_closed) after our close budget.
+            writer.transport.abort()
         finally:
           if owns:
             self.active = None

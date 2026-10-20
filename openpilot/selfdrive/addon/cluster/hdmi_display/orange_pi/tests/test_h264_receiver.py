@@ -410,7 +410,7 @@ def test_decoder_checks_dimensions_before_allocating_rgb(width, height):
 
 
 @pytest.mark.parametrize("cancel_during_conversion", [False, True])
-def test_rgb_conversion_leaves_signaling_loop_responsive_and_has_only_one_frame_in_flight(cancel_during_conversion):
+def test_rgb_conversion_leaves_signaling_loop_responsive_and_has_only_one_conversion_in_flight(cancel_during_conversion):
   receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
   started, release = threading.Event(), threading.Event()
   owner, conversion_threads, received = threading.get_ident(), [], []
@@ -437,7 +437,7 @@ def test_rgb_conversion_leaves_signaling_loop_responsive_and_has_only_one_frame_
           break
         await asyncio.sleep(0.001)
       assert started.is_set() and conversion_threads == [conversion_threads[0]]
-      assert conversion_threads[0] != owner and len(received) == 1
+      assert conversion_threads[0] != owner
       # A control callback still runs while RGB is deliberately blocked.
       receiver.publish_state({"state_seq": 7})
       assert receiver.state_revision == 1 and receiver.received_frames == 0
@@ -471,6 +471,96 @@ def test_decoded_rgb_replacement_preserves_latest_state_arrival_time():
   receiver.publish_rgb("next picture", received_at=10.3)
   assert receiver.take_updates(timeout=0) == (("next picture", 10.3), None)
   assert receiver.last_state_at == 10.0
+
+
+def test_decoded_burst_converts_only_the_latest_pending_picture_and_keeps_control_responsive():
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  started, release = threading.Event(), threading.Event()
+  converted, decoded = [], []
+
+  def frame(index):
+    def convert(**_kwargs):
+      converted.append(index)
+      if index == 0:
+        started.set()
+        assert release.wait(timeout=2)
+      return index
+    return SimpleNamespace(width=2, height=2, to_ndarray=convert)
+
+  async def run():
+    queued = asyncio.Queue()
+    receiver.stop_event = asyncio.Event()
+
+    async def recv():
+      index = await queued.get()
+      decoded.append(index)
+      return frame(index)
+
+    task = asyncio.create_task(receiver._consume_video(SimpleNamespace(recv=recv)))
+    try:
+      queued.put_nowait(0)
+      for _ in range(200):
+        if started.is_set():
+          break
+        await asyncio.sleep(0.001)
+      assert started.is_set()
+      queued.put_nowait(1)
+      queued.put_nowait(2)
+      await asyncio.sleep(0.02)
+      receiver.publish_state({"state_seq": 9})
+      assert receiver.state_revision == 1
+      release.set()
+      for _ in range(200):
+        if receiver.latest_rgb is not None and receiver.latest_rgb[0] == 2:
+          break
+        await asyncio.sleep(0.001)
+      assert decoded == [0, 1, 2]  # All reference pictures were decoded first.
+      assert converted == [0, 2]
+      assert receiver.latest_rgb[0] == 2
+      assert receiver.decoded_frames == 3 and receiver.skipped_rgb == 1
+    finally:
+      release.set()
+      task.cancel()
+      with pytest.raises(asyncio.CancelledError):
+        await task
+
+  asyncio.run(run())
+
+
+def test_video_freshness_includes_rgb_conversion_time(monkeypatch):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  clock = [10.0]
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+
+  def convert(**_kwargs):
+    clock[0] = 10.05
+    return "RGB pixels"
+
+  async def run():
+    receiver.stop_event = asyncio.Event()
+    first = True
+
+    async def recv():
+      nonlocal first
+      if not first:
+        await asyncio.Event().wait()
+      first = False
+      return SimpleNamespace(width=2, height=2, to_ndarray=convert)
+
+    task = asyncio.create_task(receiver._consume_video(SimpleNamespace(recv=recv)))
+    try:
+      for _ in range(200):
+        if receiver.latest_rgb is not None:
+          break
+        await asyncio.sleep(0.001)
+      assert receiver.latest_rgb == ("RGB pixels", 10.0)
+      assert receiver._stats["convert"] == pytest.approx(0.05)
+    finally:
+      task.cancel()
+      with pytest.raises(asyncio.CancelledError):
+        await task
+
+  asyncio.run(run())
 
 
 @pytest.mark.parametrize("changes", [
