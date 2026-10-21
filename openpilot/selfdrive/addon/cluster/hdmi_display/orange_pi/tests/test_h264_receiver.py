@@ -168,6 +168,54 @@ def test_control_timeout_names_the_failed_stage():
   asyncio.run(run_pending())
 
 
+@pytest.mark.parametrize("stalled, expected_seconds, message", [
+  ("video", 8, "WebRTC video stalled for eight seconds"),
+  ("state", 8, "H.264 metadata stalled for eight seconds"),
+  ("startup", 15, "No decoded WebRTC video within 15 seconds"),
+])
+def test_receive_watchdog_detects_actual_stalls_even_when_the_other_stream_keeps_arriving(
+  monkeypatch, stalled, expected_seconds, message,
+):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  now = [10.0]
+  receiver.last_video_at = None if stalled == "startup" else now[0]
+  receiver.last_state_at = now[0]
+
+  async def tick(_interval):
+    now[0] += 1.0
+    if stalled == "state":
+      receiver.publish_rgb("live pixels", received_at=now[0])
+    else:
+      receiver.publish_state({"state_seq": int(now[0])}, received_at=now[0])
+
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(h264_receiver, "asyncio", SimpleNamespace(sleep=tick))
+  with pytest.raises(TimeoutError, match=message):
+    asyncio.run(receiver._watchdog(started=10.0))
+  assert now[0] == 10.0 + expected_seconds
+
+
+def test_receive_watchdog_keeps_video_that_recovers_after_more_than_two_seconds(monkeypatch):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  now = [10.0]
+  receiver.last_video_at = receiver.last_state_at = now[0]
+
+  async def tick(_interval):
+    now[0] += 1.0
+    receiver.publish_state({"state_seq": int(now[0])}, received_at=now[0])
+    # A slow but progressing stream must not be reset by a 2s sender hint.
+    if int(now[0] - 10.0) % 3 == 0:
+      receiver.publish_rgb("new pixels", received_at=now[0])
+    if now[0] == 40.0:
+      raise asyncio.CancelledError
+
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(h264_receiver, "asyncio", SimpleNamespace(sleep=tick))
+  with pytest.raises(asyncio.CancelledError):
+    asyncio.run(receiver._watchdog(started=10.0))
+  assert receiver.received_frames == 10
+
+
 def test_worker_failure_records_reason_and_stream_ages_without_a_traceback(caplog):
   receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
   receiver.last_video_at = receiver.last_state_at = time.monotonic() - 2
@@ -574,7 +622,7 @@ def test_invalid_hello_cannot_start_decoder_or_allocate_a_huge_scene(changes):
 
 def test_receiver_validates_h264_hello_before_starting_video(monkeypatch):
   c4_sock, pi_sock = socket.socketpair()
-  display = SimpleNamespace(pump_events=lambda: True, set_stream_mode=Mock())
+  display = SimpleNamespace(pump_events=lambda: True)
   called = []
   monkeypatch.setattr(cluster_receiver, "receive_h264_session", lambda sock, screen, hello, timeout, maximum:
                       called.append((sock, screen, hello, timeout, maximum)) or 5)

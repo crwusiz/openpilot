@@ -123,7 +123,6 @@ class HdmiDisplay:
     self._network_future = None
     self._network_next_check = 0.0
     self._frame_times = deque(maxlen=128)
-    self._stream_mode = "--"
     self._c4_host = None
     self._panel_worker = TouchWorker()
     self._panel_executor = None
@@ -136,9 +135,6 @@ class HdmiDisplay:
       self._c4_host = str(ipaddress.IPv4Address(host))
     if self.controls is not None:
       self.controls.set_actions_available(host is not None)
-
-  def set_stream_mode(self, mode):
-    self._stream_mode = mode
 
   def _display_fps(self, now):
     while self._frame_times and self._frame_times[0] < now - 2.0:
@@ -155,7 +151,7 @@ class HdmiDisplay:
     if self._panel_future is not None and self._panel_future.done():
       try:
         stats, job = self._panel_future.result()
-        controls.set_status({**stats, "mode": self._stream_mode, "fps": self._display_fps(now)})
+        controls.set_status({**stats, "fps": self._display_fps(now)})
         # A touch may have queued a new action while this older GET was in
         # flight. Its idle/completed reply must not unlock the new action.
         if controls.pending_action is None:

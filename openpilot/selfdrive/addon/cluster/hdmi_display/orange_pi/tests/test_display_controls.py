@@ -38,15 +38,6 @@ def test_default_brightness_is_eighty_percent_and_menu_is_hidden(controls):
   assert state.render_menu() is None
 
 
-def test_day_and_night_presets_keep_the_existing_ten_brightness_steps(controls):
-  state, _, _ = controls
-  _tap(state)
-  assert _tap(state, _target(state, "night"))
-  assert state.brightness == 40 and state.menu_visible
-  assert _tap(state, _target(state, "day"))
-  assert state.brightness == 80
-
-
 def test_action_requires_a_peer_and_only_one_down_gesture_can_start_it(controls):
   state, pygame, _ = controls
   _tap(state)
@@ -85,9 +76,10 @@ def test_running_action_can_be_hidden_and_completion_remains_visible_for_the_tim
 def test_status_updates_do_not_redraw_hidden_video_and_fan_output_is_not_labelled_rpm(controls):
   state, _, _ = controls
   revision = state.revision
-  state.set_status({"cpu": 25.0, "temperature": 54.2, "fan_pwm": 60, "fan_rpm": None, "mode": "H.264", "fps": 17.5})
+  state.set_status({"cpu": 25.0, "temperature": 54.2, "fan_pwm": 60, "fan_rpm": None, "fps": 17.5})
   assert state.revision == revision
-  assert state.status_labels() == ("CPU 25%", "CPU 54.2°C", "FAN 60% PWM", "Mode H.264", "FPS 17.5")
+  assert state.status_labels() == ("CPU usage 25%", "CPU temp 54.2°C", "FAN 60% PWM", "FPS 17.5")
+  assert state.status_labels(korean=True) == ("CPU 사용률 25%", "CPU 온도 54.2°C", "FAN 60% PWM", "FPS 17.5")
   _tap(state)
   revision = state.revision
   state.set_status({**state.status, "fan_rpm": 3200})
@@ -249,11 +241,10 @@ def test_motion_and_unknown_events_cannot_open_menu(controls):
 def test_menu_and_touch_targets_fit_logical_screen(size):
   pygame = SimpleNamespace(FINGERDOWN=1, FINGERMOTION=2, FINGERUP=3)
   state = DisplayControls(pygame, logical_size=size)
-  for name in ("panel", "slider", "off", "close", "day", "night", "update", "upload"):
+  for name in ("panel", "slider", "off", "close", "update", "upload"):
     left, top, width, height = state.layout[name]
     assert 0 <= left < left + width <= size[0]
     assert 0 <= top < top + height <= size[1]
-  assert state.layout["panel"][1] >= size[1] / 2 - 12
   _tap(state)
   _tap(state, _target(state, "slider", 0.5))
   assert state.brightness == 60
@@ -316,3 +307,40 @@ def test_menu_surface_is_cached_and_only_changed_state_redraws(raster_pygame):
   assert state.render_menu()[0] is darker
   state.turn_off()
   assert state.render_menu() is None
+
+
+@pytest.mark.parametrize("korean", [False, True])
+@pytest.mark.parametrize("temperature, color", [
+  (None, (175, 201, 217)), (float("nan"), (175, 201, 217)),
+  (59.9, (108, 211, 145)), (60, (238, 211, 105)), (69.9, (238, 211, 105)),
+  (70, (246, 164, 80)), (79.9, (246, 164, 80)), (80, (241, 101, 101)),
+])
+def test_expanded_menu_renders_distinct_fitting_labels_and_temperature_colors(raster_pygame, monkeypatch, korean, temperature, color):
+  state = DisplayControls(raster_pygame, brightness=100)
+  state.set_status({"cpu": 100.0, "temperature": temperature, "fan_rpm": 99999, "fps": 60.0})
+  state.set_actions_available(True)
+  _tap(state)
+  state._font(34)
+  if not korean:
+    state._font_path = None
+  original_label = state._label
+  labels = []
+
+  def draw_label(surface, text, size, center, foreground):
+    if text:
+      bounds = state._font(size).render(text, True, foreground).get_rect(center=center)
+      assert surface.get_rect().contains(bounds), text
+      labels.append((text, bounds, foreground))
+    original_label(surface, text, size, center, foreground)
+
+  monkeypatch.setattr(state, "_label", draw_label)
+  surface, _ = state.render_menu()
+  assert surface.get_size() == (1840, 340)
+  assert len(labels[:4]) == 4
+  assert labels[0][0].startswith("CPU 사용률 " if korean else "CPU usage ")
+  assert labels[1][0].startswith("CPU 온도 " if korean else "CPU temp ")
+  assert labels[1][2] == color
+  for earlier, later in zip(labels[:3], labels[1:4], strict=True):
+    assert earlier[1].right < later[1].left
+  assert labels[4][1].right < state.layout["slider"][0] - state.layout["panel"][0]
+  assert "day" not in state.layout and "night" not in state.layout

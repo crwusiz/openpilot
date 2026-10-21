@@ -24,8 +24,6 @@ class TestCrash(unittest.TestCase):
     self.enterContext(patch.object(log_paths, 'LOG_DIR', self.log_dir))
     self.enterContext(patch.object(crash, 'CRASH_LOG_PATH', str(self.log_path)))
     self.enterContext(patch.object(crash, 'CRASH_UPLOAD_FLAG', str(self.flag_path)))
-    self.enterContext(patch.object(crash, 'LOCATIOND_LOG_PATH', str(self.locationd_path)))
-    self.enterContext(patch.object(crash, 'LOCATIOND_UPLOAD_FLAG', str(self.locationd_flag)))
     self.enterContext(patch.object(crash, 'CRASH_UPLOAD_LOCK', str(self.lock_path)))
     self.enterContext(patch.object(crash, '_upload_process', None))
     self.cloudlog = self.enterContext(patch.object(crash, 'cloudlog'))
@@ -123,11 +121,11 @@ class TestCrash(unittest.TestCase):
         self.assertTrue(self.log_path.exists())
     self.assertEqual(self.cloudlog.exception.call_count, 2)
 
-  def test_new_crash_resets_success_flag(self):
+  def test_new_crash_is_not_suppressed_by_previous_success_flag(self):
     self.log_path.write_text('old crash', encoding='utf-8')
     crash.upload_pending_log()
     self.capture()
-    self.assertFalse(self.flag_path.exists())
+    self.assertFalse(crash.is_uploaded(crash.log_version()))
     self.popen.assert_called_once()
 
   def test_new_crash_during_upload_is_not_marked_as_uploaded(self):
@@ -210,6 +208,75 @@ class TestCrash(unittest.TestCase):
       except ValueError:
         crash.capture_exception()
         raise
+
+  def test_empty_log_does_not_upload(self):
+    self.log_path.touch()
+    crash.start_upload()
+    crash.upload_pending_log()
+    self.popen.assert_not_called()
+    self.run.assert_not_called()
+
+  def test_unchanged_contents_stay_uploaded_after_touch_and_atomic_replacement(self):
+    self.log_path.write_text('same crash', encoding='utf-8')
+    crash.upload_pending_log()
+    version = crash.log_version()
+    os.utime(self.log_path, ns=(1_000_000_000, 1_000_000_000))
+    crash.start_upload()
+    replacement = self.log_dir / 'replacement'
+    replacement.write_text('same crash', encoding='utf-8')
+    os.replace(replacement, self.log_path)
+    crash.start_upload()
+    crash.upload_pending_log()
+    self.assertEqual(crash.log_version(), version)
+    self.popen.assert_not_called()
+    self.run.assert_called_once()
+
+  def test_changed_contents_upload_even_when_size_and_timestamp_match(self):
+    self.log_path.write_text('old crash', encoding='utf-8')
+    crash.upload_pending_log()
+    previous_stat = self.log_path.stat()
+    self.log_path.write_text('new crash', encoding='utf-8')
+    os.utime(self.log_path, ns=(previous_stat.st_atime_ns, previous_stat.st_mtime_ns))
+    crash.start_upload()
+    self.popen.assert_called_once()
+    crash.upload_pending_log()
+    self.assertEqual(self.run.call_count, 2)
+
+  def test_missing_success_flag_retries_same_remote_name(self):
+    self.log_path.write_text('[2026-10-21 03:57:30]\n\noriginal traceback', encoding='utf-8')
+    crash.upload_pending_log()
+    first_token = self.run.call_args.kwargs['env']['LOG_UPLOAD_PREFIX']
+    self.assertRegex(first_token, r'^26-10-21-03:57:30-[0-9a-f]{16}$')
+    self.flag_path.unlink()
+    # A restarted uploader after a lost acknowledgement must overwrite the same
+    # remote file, not create a new file for each manager's 60-second retry.
+    crash.upload_pending_log()
+    self.assertEqual(self.run.call_args.kwargs['env']['LOG_UPLOAD_PREFIX'], first_token)
+    self.log_path.write_text('[2026-10-21 03:57:30]\n\nnew traceback', encoding='utf-8')
+    crash.upload_pending_log()
+    self.assertNotEqual(self.run.call_args.kwargs['env']['LOG_UPLOAD_PREFIX'], first_token)
+
+  def test_flag_write_failure_keeps_stable_retry_name(self):
+    self.log_path.write_text('pending crash', encoding='utf-8')
+    with patch.object(crash, 'mark_uploaded', side_effect=PermissionError('read only')):
+      crash.upload_pending_log()
+    self.assertFalse(self.flag_path.exists())
+    self.cloudlog.exception.assert_called_once_with(
+      'Crash log uploaded but success marker could not be saved; retry reuses the same remote name',
+    )
+    token = self.run.call_args.kwargs['env']['LOG_UPLOAD_PREFIX']
+    crash.upload_pending_log()
+    self.assertEqual(self.run.call_args.kwargs['env']['LOG_UPLOAD_PREFIX'], token)
+    self.assertTrue(crash.is_uploaded(crash.log_version()))
+
+  def test_changed_snapshot_is_not_uploaded(self):
+    self.log_path.write_text('pending crash', encoding='utf-8')
+    def inconsistent_snapshot(source, destination):
+      Path(destination).write_text('different contents', encoding='utf-8')
+    with patch.object(crash.shutil, 'copyfile', side_effect=inconsistent_snapshot):
+      crash.upload_pending_log()
+    self.run.assert_not_called()
+    self.assertFalse(self.flag_path.exists())
 
   def test_locationd_capture_runs_in_background(self):
     with patch.object(crash.threading, 'Thread') as thread:

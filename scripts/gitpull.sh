@@ -319,7 +319,7 @@ compare_and_restart() {
     if [ -f "$RESTART_SCRIPT" ] && [ -r "$RESTART_SCRIPT" ]; then
       log "SUCCESS" "Preparing system restart..."
       echo 0 > "$FLAG"
-      if bash "$RESTART_SCRIPT"; then
+      if bash "$RESTART_SCRIPT" --clear-logs; then
         exit 0
       fi
       log "ERROR" "Restart preparation failed. See the console output above."

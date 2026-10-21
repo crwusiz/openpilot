@@ -22,10 +22,29 @@ pi_log_upload_enabled() {
   [[ $(get_param "ClusterEnable") == 1 && $(get_param "ClusterDisplayTransport") == network ]]
 }
 
+crash_log_has_diagnostics() {
+  local filename="$1" timestamp normal_records status=0
+  [[ -f $filename ]] || return 1
+  timestamp='\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]'
+  # Ignore only complete, known benign records. Do not require an exception
+  # marker: native stacks can be binary, truncated, or start in a rotated file.
+  normal_records="^([[:blank:]]*|$timestamp \\[CLUSTER_PROCESS_START\\] pid=[0-9]+ native_bootstrap=[01]"
+  normal_records+="|$timestamp \\[CLUSTER_PROCESS_EXIT\\] pid=[0-9]+ (exit_code=0 reason=normal_exit manager_stop=[01]"
+  normal_records+="|exit_code=-2 reason=SIGINT manager_stop=1|exit_code=-15 reason=SIGTERM manager_stop=1)"
+  normal_records+=" logs=/data/log/cluster_debug\\.log,/data/log/cluster_crash\\.log)"$'\r?'"$"
+  LC_ALL=C grep -aEvq -- "$normal_records" "$filename" || status=$?
+  if (( status == 1 )); then return 1; fi
+  # Inspection errors must not silently discard a potentially useful crash.
+  return 0
+}
+
 has_crash_logs() {
-  local directory
+  local directory filename
   directory=$(dirname "$1")
-  [[ -f $directory/cluster_crash.log || -f $directory/cluster_crash.log.1 ]]
+  for filename in cluster_crash.log cluster_crash.log.1; do
+    if crash_log_has_diagnostics "$directory/$filename"; then return 0; fi
+  done
+  return 1
 }
 
 has_pending_crash_logs() {
@@ -48,13 +67,20 @@ snapshot_crash_logs() {
     # Publish only complete copies. A cancelled copy must never look like an
     # uploadable raw traceback on the next invocation.
     temporary="$directory/.$filename.snapshot"
-    if cp -- "$source" "$temporary" && chmod 400 "$temporary" && mv -- "$temporary" "$directory/$filename"; then
-      :
-    else
-      rm -f -- "$temporary"
+    if cp -- "$source" "$temporary" && chmod 400 "$temporary"; then
+      # Inspect the stable copy, never edit or truncate the live descriptor.
+      if crash_log_has_diagnostics "$temporary"; then
+        if mv -- "$temporary" "$directory/$filename"; then continue; fi
+      else
+        rm -f -- "$temporary"
+        continue
+      fi
       status=1
-      printf 'CLUSTER_LOG_WARNING: %s 원본을 보관하지 못했습니다. 다른 로그 전송은 계속합니다.\n' "$filename"
+    else
+      status=1
     fi
+    rm -f -- "$temporary"
+    printf 'CLUSTER_LOG_WARNING: %s 원본을 보관하지 못했습니다. 다른 로그 전송은 계속합니다.\n' "$filename"
   done
   return "$status"
 }
@@ -137,6 +163,10 @@ upload_crash_logs() {
   local filename remaining phase status=0
   for filename in cluster_crash.log cluster_crash.log.1; do
     [[ -f $directory/$filename && ! -f $directory/$filename.uploaded ]] || continue
+    if ! crash_log_has_diagnostics "$directory/$filename"; then
+      touch "$directory/$filename.uploaded"
+      continue
+    fi
     remaining=10
     if [[ $mode == retry ]]; then
       remaining=$((deadline - SECONDS))
@@ -175,7 +205,7 @@ upload_cluster_fallback() (
     fi
   else
     for filename in cluster_crash.log cluster_crash.log.1; do
-      [[ -f $(dirname "$log_path")/$filename ]] || continue
+      crash_log_has_diagnostics "$(dirname "$log_path")/$filename" || continue
       upload_file "$(dirname "$log_path")/$filename" "$prefix" pi || \
         printf 'CLUSTER_LOG_WARNING: %s 전송 및 임시 사본 보관에 실패했습니다.\n' "$filename"
     done
@@ -244,6 +274,13 @@ retry_pending() (
     { exec 9< "$job/lock"; } 2>/dev/null || continue
     if command -v flock >/dev/null 2>&1; then flock -n 9 || continue; fi
     [[ -d $job && -s $job/prefix ]] || continue
+    # Older versions saved startup-only files too. Finish these snapshots
+    # locally under their job lock; never manufacture a crash upload for them.
+    for filename in cluster_crash.log cluster_crash.log.1; do
+      if [[ -f $job/$filename && ! -f $job/$filename.uploaded ]] && ! crash_log_has_diagnostics "$job/$filename"; then
+        touch "$job/$filename.uploaded"
+      fi
+    done
     # A process can stop after writing the last success marker but before
     # cleanup. Such completed jobs still need their lock before removal.
     if job_complete "$job"; then remove_job "$outbox" "$job"; continue; fi
@@ -388,6 +425,16 @@ upload_cluster() (
 )
 
 main() {
+  # Shared for the entire snapshot/collection/upload lifecycle. The successful
+  # Git Pull reset takes the exclusive lock before clearing pending directories.
+  # Keep the lock outside /data/log so a reset never replaces its inode.
+  if command -v flock >/dev/null 2>&1; then
+    exec 7> "${TMPDIR:-/tmp}/openpilot_log_upload.lock"
+    if ! flock -s -w 5 7; then
+      log "ERROR" "Log reset is in progress. Retry log upload after restart."
+      return 1
+    fi
+  fi
   if [ $# -eq 0 ]; then
     echo -e "${YELLOW}Usage: $0 <LOG_FILENAME>${NC}"
     exit 1
@@ -396,6 +443,11 @@ main() {
   local log_path prefix
   log_path=$(resolve_log_path "$1")
   prefix=$(upload_prefix)
+  if [[ "$(basename "$log_path")" == tmux_error.log && ${LOG_UPLOAD_PREFIX:-} =~ ^[A-Za-z0-9:_-]+$ ]]; then
+    # Automatic crash retries use the capture identity, not a new minute each
+    # attempt. Keep the normal car/device grouping in the remote filename.
+    prefix="${LOG_UPLOAD_PREFIX}_${prefix#*_}"
+  fi
   if [[ "$(basename "$log_path")" == cluster_debug.log ]]; then
     # Native C4 crash files apply to every cluster transport. Only Pi work is
     # gated; its saved reports remain untouched while Network is disabled.
@@ -406,6 +458,8 @@ main() {
     fi
   elif [[ "$(basename "$log_path")" == cluster_pi_debug.log ]] && ! pi_log_upload_enabled; then
     log "INFO" "Skipping Orange Pi log upload: Network cluster is not enabled."
+  elif [[ "$(basename "$log_path")" == cluster_crash.log || "$(basename "$log_path")" == cluster_crash.log.1 ]] && [[ -f $log_path ]] && ! crash_log_has_diagnostics "$log_path"; then
+    log "INFO" "Skipping cluster crash upload: no crash diagnostics."
   else
     upload_file "$log_path" "$prefix"
   fi

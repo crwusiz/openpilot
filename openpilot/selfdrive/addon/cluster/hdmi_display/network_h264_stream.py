@@ -17,7 +17,6 @@ from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 START_CODE = re.compile(b"\x00\x00\x00\x01|\x00\x00\x01")
 MAX_ACCESS_UNIT_BYTES = 4 * 1024 * 1024
 MAX_NAL_UNITS = 256
-MAX_SEND_NOT_READY_S = 2.0
 
 
 def normalize_access_unit(data):
@@ -142,17 +141,17 @@ class ClusterH264Stream(WebRTCAnswerStream):
         # with the explicit timestamp, without the native FrameInfo overload.
         if rtc_track.send(data) is False:
           # The bool is the last RTP transport write's status, not the peer's
-          # connection state. Short socket/ICE pressure can return False while
-          # the track remains open. Recreating ICE here turns one lost packet
-          # into a multi-second display interruption.
+          # connection state. Even a sustained False streak can coexist with
+          # live decoded video on the Pi. Recreating ICE from this bool turns
+          # transport pressure into a multi-second display interruption. Real
+          # failures still terminate through native closure/errors and the
+          # receiver's decoded-video/control and C4 feedback timeouts.
           send_not_ready += 1
           if not rtc_track.is_open():
             break
           if send_not_ready_at is None:
             send_not_ready_at = now
             flog("[CLUSTER_H264_SEND_BACKPRESSURE] track_send=0 | action=keep_session")
-          elif now - send_not_ready_at >= MAX_SEND_NOT_READY_S:
-            raise ConnectionError(f"Native WebRTC transport remained unready for {now - send_not_ready_at:.2f}s")
           if last_request is None or now - last_request >= 1.0:
             producer_track.request_keyframe()
             last_request = now

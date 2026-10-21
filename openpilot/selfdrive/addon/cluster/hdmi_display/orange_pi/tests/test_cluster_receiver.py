@@ -19,7 +19,6 @@ class FakeDisplay:
   def __init__(self):
     self.frames = []
     self.poll_count = 0
-    self.set_stream_mode = lambda _mode: None
 
   def pump_events(self):
     self.poll_count += 1

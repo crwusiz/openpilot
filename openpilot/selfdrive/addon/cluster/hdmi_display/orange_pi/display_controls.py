@@ -82,7 +82,7 @@ class DisplayControls:
   def _make_layout(self):
     width, height = self.logical_size
     scale = min(width / 1920, height / 480)
-    panel_width, panel_height = max(1, round(1760 * scale)), max(1, round(240 * scale))
+    panel_width, panel_height = max(1, round(1840 * scale)), max(1, round(340 * scale))
     left, top = (width - panel_width) // 2, height - panel_height - round(12 * scale)
 
     def rect(x, y, w, h):
@@ -91,13 +91,11 @@ class DisplayControls:
 
     return {
       "panel": (left, top, panel_width, panel_height),
-      "slider": rect(260, 62, 1040, 56),
-      "day": rect(1340, 66, 180, 52),
-      "night": rect(1540, 66, 180, 52),
-      "off": rect(40, 134, 390, 60),
-      "update": rect(470, 134, 390, 60),
-      "upload": rect(900, 134, 390, 60),
-      "close": rect(1330, 134, 390, 60),
+      "slider": rect(390, 108, 1400, 64),
+      "off": rect(40, 200, 420, 78),
+      "update": rect(480, 200, 420, 78),
+      "upload": rect(920, 200, 420, 78),
+      "close": rect(1360, 200, 420, 78),
       "scale": scale,
     }
 
@@ -217,9 +215,6 @@ class DisplayControls:
     if self._contains(self._layout["slider"], point):
       self._dragging_slider = True
       return self._set_slider(point[0])
-    for name, brightness in (("day", 80), ("night", 40)):
-      if self._contains(self._layout[name], point):
-        return self.set_brightness(brightness)
     for name, action in (("update", "pi_update"), ("upload", "upload_logs")):
       if self._contains(self._layout[name], point):
         return self._request_action(action)
@@ -271,13 +266,13 @@ class DisplayControls:
     scale = self._layout["scale"]
     surface = pygame.Surface((width, height))
     surface.fill((18, 22, 28))
-    self._font(28 * scale)
+    self._font(34 * scale)
     korean = self._font_path is not None
-    for index, text in enumerate(self.status_labels(korean)):
-      self._label(surface, text, 28 * scale, (round((176 + 352 * index) * scale), round(28 * scale)), (175, 201, 217))
+    for index, (text, color) in enumerate(zip(self.status_labels(korean), self.status_colors(), strict=True)):
+      self._label(surface, text, 34 * scale, (round((260 + 440 * index) * scale), round(48 * scale)), color)
     step = self.brightness // BRIGHTNESS_STEP
     title = f"밝기 {step}/10 · {self.brightness}%" if korean else f"Light {step}/10 · {self.brightness}%"
-    self._label(surface, title, 28 * scale, (round(140 * scale), round(90 * scale)), (225, 232, 240))
+    self._label(surface, title, 34 * scale, (round(200 * scale), round(140 * scale)), (225, 232, 240))
 
     slider = self._local_rect(self._layout["slider"], left, top)
     center_y = slider[1] + slider[3] // 2
@@ -291,18 +286,16 @@ class DisplayControls:
       tick_x = slider[0] + round(slider[2] * (value - MIN_BRIGHTNESS) / (100 - MIN_BRIGHTNESS))
       pygame.draw.circle(surface, (150, 162, 175), (tick_x, center_y), max(3, round(7 * scale)))
     pygame.draw.circle(surface, (195, 220, 235), (slider[0] + selected_width, center_y), max(8, round(22 * scale)))
-    buttons = (("day", "주간 80%", "Day 80%"), ("night", "야간 40%", "Night 40%"),
-               ("off", "화면 끄기", "Screen off"), ("update", "Pi 업데이트", "Pi update"),
+    buttons = (("off", "화면 끄기", "Screen off"), ("update", "Pi 업데이트", "Pi update"),
                ("upload", "로그 전송", "Upload logs"), ("close", "닫기", "Close"))
     for name, korean_title, english_title in buttons:
       rect = self._local_rect(self._layout[name], left, top)
       enabled = name not in ("update", "upload") or (self.actions_available and not self.action_busy)
-      selected = (name == "day" and self.brightness == 80) or (name == "night" and self.brightness == 40)
-      color = (47, 82, 105) if selected else (38, 46, 58) if enabled else (27, 31, 37)
+      color = (38, 46, 58) if enabled else (27, 31, 37)
       pygame.draw.rect(surface, color, rect, border_radius=max(1, round(10 * scale)))
-      self._label(surface, korean_title if korean else english_title, (26 if name in ("day", "night") else 30) * scale,
+      self._label(surface, korean_title if korean else english_title, 36 * scale,
                   (rect[0] + rect[2] // 2, rect[1] + rect[3] // 2), (220, 229, 239) if enabled else (100, 109, 119))
-    self._label(surface, self.action_label(korean), 23 * scale, (width // 2, round(218 * scale)), (175, 195, 210))
+    self._label(surface, self.action_label(korean), 25 * scale, (width // 2, round(310 * scale)), (175, 195, 210))
     self.apply_dimming(surface)
     self._menu_surface = surface
     self._menu_revision = self.revision
@@ -311,10 +304,21 @@ class DisplayControls:
   def status_labels(self, korean=False):
     def number(key, suffix, precision=0):
       value = self.status.get(key)
-      return "--" if value is None else f"{value:.{precision}f}{suffix}"
+      return "--" if value is None or not math.isfinite(value) else f"{value:.{precision}f}{suffix}"
     fan = number("fan_rpm", " RPM") if self.status.get("fan_rpm") is not None else number("fan_pwm", "% PWM")
-    return ("CPU " + number("cpu", "%"), "CPU " + number("temperature", "°C", 1), "FAN " + fan,
-            ("모드 " if korean else "Mode ") + self.status.get("mode", "--"), "FPS " + number("fps", "", 1))
+    return (("CPU 사용률 " if korean else "CPU usage ") + number("cpu", "%"),
+            ("CPU 온도 " if korean else "CPU temp ") + number("temperature", "°C", 1),
+            "FAN " + fan, "FPS " + number("fps", "", 1))
+
+  def status_colors(self):
+    neutral = (175, 201, 217)
+    temperature = self.status.get("temperature")
+    temperature_color = neutral
+    if temperature is not None and math.isfinite(temperature):
+      # Display thresholds only; fan and thermal policies are unchanged.
+      temperature_color = ((108, 211, 145) if temperature < 60 else (238, 211, 105) if temperature < 70
+                           else (246, 164, 80) if temperature < 80 else (241, 101, 101))
+    return neutral, temperature_color, neutral, neutral
 
   def action_label(self, korean=False):
     state, action = self.action_status.get("state"), self.action_status.get("action")

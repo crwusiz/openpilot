@@ -252,7 +252,6 @@ def receive_frames(sock, display, max_frames: int | None = None, frame_timeout=F
   payload = recv_exact(sock, size, deadline=header_stats.first_byte_at + frame_timeout,
                        poll_events=poll_events, phase="h264_hello")
   hello = decode_payload(payload)
-  display.set_stream_mode("H.264")
   return receive_h264_session(sock, display, hello, frame_timeout, max_frames)
 
 

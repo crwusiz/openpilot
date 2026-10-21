@@ -1,5 +1,6 @@
 """Save Python crash tracebacks and trigger the community log uploader."""
 import datetime
+import hashlib
 import os
 import shutil
 import subprocess
@@ -9,22 +10,26 @@ import traceback
 from pathlib import Path
 
 from openpilot.common.basedir import BASEDIR
-from openpilot.common.log_paths import LOG_DIR
+from openpilot.common.log_paths import CRASH_UPLOAD_LOCK as _CRASH_UPLOAD_LOCK, LOG_DIR
 from openpilot.common.swaglog import cloudlog
 
 CRASH_LOG_PATH = str(LOG_DIR / 'tmux_error.log')
 CRASH_UPLOAD_FLAG = str(LOG_DIR / 'tmux_error.log.uploaded')
 # Keep the lock outside the directory cleared on restart, so a detached uploader
 # and the new manager continue to lock the same inode.
-CRASH_UPLOAD_LOCK = os.path.join(tempfile.gettempdir(), 'openpilot_crash_upload.lock')
+CRASH_UPLOAD_LOCK = str(_CRASH_UPLOAD_LOCK)
 UPLOAD_RETRY_INTERVAL = 60
 _upload_process: subprocess.Popen | None = None
 
 
-def log_version() -> str | None:
+def log_version(path: str | None = None) -> str | None:
+  """Identify contents, so touching or replacing an unchanged log cannot resend it."""
   try:
-    st = os.stat(CRASH_LOG_PATH)
-    return f'{st.st_dev}:{st.st_ino}:{st.st_mtime_ns}:{st.st_size}'
+    with open(CRASH_LOG_PATH if path is None else path, 'rb') as log_file:
+      if not log_file.read(1):
+        return None
+      log_file.seek(0)
+      return f'sha256:{hashlib.file_digest(log_file, "sha256").hexdigest()}'
   except FileNotFoundError:
     return None
 
@@ -34,6 +39,25 @@ def is_uploaded(version: str) -> bool:
     return Path(CRASH_UPLOAD_FLAG).read_text(encoding='utf-8') == version
   except FileNotFoundError:
     return False
+
+
+def upload_token(snapshot: str, version: str) -> str:
+  """Retry the same NAS name even if FTP succeeded but its acknowledgement was lost."""
+  with open(snapshot, encoding='utf-8', errors='replace') as log_file:
+    first_line = log_file.readline().strip()
+  try:
+    captured_at = datetime.datetime.strptime(first_line, '[%Y-%m-%d %H:%M:%S]').strftime('%y-%m-%d-%H:%M:%S')
+  except ValueError:
+    captured_at = 'crash'
+  return f'{captured_at}-{version.removeprefix("sha256:")[:16]}'
+
+
+def mark_uploaded(version: str) -> None:
+  # A failed/interrupted flag write must not leave a partial success marker.
+  with tempfile.TemporaryDirectory(dir=os.path.dirname(CRASH_UPLOAD_FLAG), prefix='crash-sent-') as tmp:
+    flag = Path(tmp) / 'uploaded'
+    flag.write_text(version, encoding='utf-8')
+    os.replace(flag, CRASH_UPLOAD_FLAG)
 
 
 def start_upload() -> None:
@@ -63,18 +87,23 @@ def upload_pending_log() -> None:
     with tempfile.TemporaryDirectory(prefix='crash-upload-') as tmp:
       snapshot = os.path.join(tmp, os.path.basename(CRASH_LOG_PATH))
       shutil.copyfile(CRASH_LOG_PATH, snapshot)
-      if log_version() != version:
+      if log_version(snapshot) != version or log_version() != version:
         return
       result = subprocess.run(
         ['bash', os.path.join(BASEDIR, 'scripts', 'log_upload.sh'), snapshot],
         stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120,
+        env={**os.environ, 'LOG_UPLOAD_PREFIX': upload_token(snapshot, version)},
       )
     if result.returncode != 0:
       cloudlog.error(f'Crash log upload failed ({result.returncode}): {result.stdout}\n{result.stderr}')
       return
     # The version in the flag prevents an old upload from marking a new crash as sent.
     if log_version() == version:
-      Path(CRASH_UPLOAD_FLAG).write_text(version, encoding='utf-8')
+      try:
+        mark_uploaded(version)
+      except Exception:
+        cloudlog.exception('Crash log uploaded but success marker could not be saved; retry reuses the same remote name')
+        return
     cloudlog.info('Crash log upload completed')
   except Exception:
     cloudlog.exception('Failed to upload crash log')
@@ -90,7 +119,6 @@ def capture_exception() -> None:
       tmp_path = Path(tmp) / 'tmux_error.log'
       now = datetime.datetime.now()
       tmp_path.write_text(now.strftime('[%Y-%m-%d %H:%M:%S]') + "\n\n" + traceback.format_exc(), encoding='utf-8')
-      Path(CRASH_UPLOAD_FLAG).unlink(missing_ok=True)
       os.replace(tmp_path, CRASH_LOG_PATH)
   except Exception:
     cloudlog.exception("Failed to save crash log")

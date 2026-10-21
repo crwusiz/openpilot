@@ -209,20 +209,71 @@ def test_transient_native_send_false_keeps_the_session_and_live_dependent_pictur
   assert not any("[CLUSTER_H264_SEND_ERROR]" in line for line in logs)
 
 
-def test_persistent_native_send_false_is_bounded_and_idr_requests_are_limited(sender, monkeypatch):
-  producer, native, config, _sent = make_tracks([(START + PFRAME, index * 50_000_000) for index in range(1, 6)], 5)
-  native.send.side_effect = None
-  native.send.return_value = False
-  monkeypatch.setattr(sender, "time", SimpleNamespace(monotonic=Mock(side_effect=[0.0, 0.0, 0.9, 1.1, 2.1])))
+def test_sustained_native_send_false_does_not_reset_an_open_session_and_limits_idr_requests(sender, monkeypatch):
+  producer, native, config, sent = make_tracks([(START + PFRAME, index * 50_000_000) for index in range(1, 7)], 6)
+  clock = [0.0]
+  monkeypatch.setattr(sender, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+  receive, send = producer.recv, native.send.side_effect
+  arrivals = iter([0.0, 0.9, 1.1, 2.1, 3.2, 3.3])
+
+  async def receive_live():
+    clock[0] = next(arrivals)
+    # Yield just as a live camera does so signaling/feedback can keep running.
+    await asyncio.sleep(0)
+    return await receive()
+
+  def intermittent(data):
+    # The native bool reports a transport write, not delivery of the whole
+    # access unit. Pi can still receive pictures throughout this interval.
+    send(data)
+    return len(sent) == 6
+
+  producer.recv, native.send.side_effect = receive_live, intermittent
   stream = sender.ClusterH264Stream("v=0", producer)
   asyncio.run(stream._send_track_loop(native, producer, config))
-  assert native.send.call_count == 4
-  assert producer.request_keyframe.call_count == 2
+  assert len(sent) == 6
+  assert all(data == START + PFRAME for data, _pts in sent)
+  assert producer.request_keyframe.call_count == 4
   assert stream.connection_stopped_event.is_set()
-  assert any("transport remained unready for 2.10s" in call.args[0] for call in sender.flog.call_args_list)
+  logs = [call.args[0] for call in sender.flog.call_args_list]
+  assert sum("[CLUSTER_H264_SEND_BACKPRESSURE]" in line for line in logs) == 1
+  assert sum("[CLUSTER_H264_SEND_RECOVERED]" in line for line in logs) == 1
+  assert any("pause_ms=3300.0" in line for line in logs)
+  assert not any("[CLUSTER_H264_SEND_ERROR]" in line for line in logs)
 
 
-def test_successful_transport_write_resets_the_failure_window(sender, monkeypatch):
+def test_sender_cancellation_while_native_writes_are_false_stops_cleanly(sender):
+  async def scenario():
+    producer, native, config, _sent = make_tracks([], 1)
+    native.send.side_effect = None
+    native.send.return_value = False
+    waiting = asyncio.Event()
+    received = False
+
+    async def receive():
+      nonlocal received
+      if received:
+        waiting.set()
+        await asyncio.Event().wait()
+      received = True
+      return Packet(START + IDR)
+
+    producer.recv = receive
+    stream = sender.ClusterH264Stream("v=0", producer)
+    task = asyncio.create_task(stream._send_track_loop(native, producer, config))
+    await asyncio.wait_for(waiting.wait(), 1)
+    assert not stream.connection_stopped_event.is_set()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+      await task
+    assert native.send.call_count == 1
+    assert stream.connection_stopped_event.is_set()
+    assert not any("[CLUSTER_H264_SEND_ERROR]" in call.args[0] for call in sender.flog.call_args_list)
+
+  asyncio.run(scenario())
+
+
+def test_successful_transport_write_reports_separate_backpressure_recoveries(sender, monkeypatch):
   producer, native, config, sent = make_tracks([(START + PFRAME, index * 50_000_000) for index in range(1, 7)], 6)
   send = native.send.side_effect
 
@@ -235,7 +286,10 @@ def test_successful_transport_write_resets_the_failure_window(sender, monkeypatc
   stream = sender.ClusterH264Stream("v=0", producer)
   asyncio.run(stream._send_track_loop(native, producer, config))
   assert len(sent) == 6
-  assert not any("[CLUSTER_H264_SEND_ERROR]" in call.args[0] for call in sender.flog.call_args_list)
+  logs = [call.args[0] for call in sender.flog.call_args_list]
+  assert sum("[CLUSTER_H264_SEND_BACKPRESSURE]" in line for line in logs) == 2
+  assert sum("[CLUSTER_H264_SEND_RECOVERED]" in line for line in logs) == 2
+  assert not any("[CLUSTER_H264_SEND_ERROR]" in line for line in logs)
 
 
 def test_native_track_closing_during_a_false_write_exits_without_an_idr_request(sender):
