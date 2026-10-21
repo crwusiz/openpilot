@@ -243,16 +243,6 @@ def startup_master_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
   return StartupAlert("경고: 이 브랜치는 테스트되지 않았습니다", branch, alert_status=AlertStatus.userPrompt)
 
 
-def big_model_loading_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
-  dot_count = (sm.frame // round(0.4 / DT_CTRL)) % 10 + 1
-  dots = ' '.join(['.'] * dot_count)
-  return Alert(
-    "빅모델 로딩중",
-    f"{dots}",
-    AlertStatus.normal, AlertSize.full,
-    Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay=0.5)
-
-
 def below_engage_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
   return NoEntryAlert(f"{get_display_speed(CP.minEnableSpeed, metric)} 이상의 속도에서 활성됩니다")
 
@@ -461,7 +451,11 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.bigModelLoading: {
     ET.NO_ENTRY: NoEntryAlert("빅모델 로딩중"),
-    ET.PERMANENT: big_model_loading_alert,
+    ET.PERMANENT:  Alert(
+      "빅모델 로딩중",
+      "",
+      AlertStatus.normal, AlertSize.full,
+      Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay=0.5)
   },
 
   EventName.bigModelFailed: {
@@ -906,7 +900,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       "",
       AlertStatus.normal, AlertSize.full,
       Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay=0.5),
-  },
+},
 
   EventName.espDisabled: {
     ET.SOFT_DISABLE: soft_disable_alert("ESC 해제됨"),
