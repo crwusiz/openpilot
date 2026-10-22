@@ -20,6 +20,47 @@ def test_scene_wire_is_bounded_json_with_explicit_codec_magic():
   assert wire.validate_scene(wire.decode_payload(packet[16:])) == state
 
 
+def test_scene_packing_preserves_wire_bytes_and_checks_numeric_tree_once(monkeypatch):
+  state = scene()
+  expected = wire.pack_control(wire.STATE, state, 2**32 + 3)
+  check_value = wire._check_value
+  roots = []
+
+  def checked(value, depth=0):
+    if depth == 0:
+      roots.append(value)
+    return check_value(value, depth)
+
+  monkeypatch.setattr(wire, "_check_value", checked)
+  assert wire.pack_scene(state, 2**32 + 3) == expected
+  assert roots == [state]
+
+
+@pytest.mark.parametrize("state", [None, [], {"model_valid": True, "hud": {}, "path": None}])
+def test_local_scene_packer_rejects_non_scene_objects(state):
+  with pytest.raises(ValueError):
+    wire.pack_scene(state)
+
+
+@pytest.mark.parametrize("mutation", [
+  lambda s: s["hud"].update(v_ego=math.nan),
+  lambda s: s["path"].update(path_x=[math.inf, 2]),
+  lambda s: s["path"].update(calib_transform=[[math.inf, 0, 0]] * 3),
+  lambda s: s.update(counter=10**400),
+  lambda s: s.update(extra=[0] * 129),
+  lambda s: s.update(extra={str(i): 0 for i in range(97)}),
+  lambda s: s.update(extra=[[[[[[[[0]]]]]]]]),
+  lambda s: s.update({"x" * 97: 0}),
+  lambda s: s.update(extra="x" * wire.MAX_CONTROL_SIZE),
+  lambda s: s.update(extra="한" * 11000),
+])
+def test_local_scene_packer_retains_recursive_and_encoded_byte_budgets(mutation):
+  state = scene()
+  mutation(state)
+  with pytest.raises(ValueError):
+    wire.pack_scene(state)
+
+
 @pytest.mark.parametrize("payload", [
   b"[]", b"null", b"{}\xff", b'{"x":NaN}', b'{"x":Infinity}', b'{"x":1e999}', b'{"x":' + b'[' * 140 + b'0' + b']' * 140 + b'}',
 ])
@@ -53,6 +94,8 @@ def test_remote_geometry_cannot_expand_drawing_allocations(mutation):
   mutation(state)
   with pytest.raises(ValueError):
     wire.validate_scene(state)
+  with pytest.raises(ValueError):
+    wire.pack_scene(state)
 
 
 def test_unknown_source_geometry_is_explicit_and_valid_for_bootstrap():

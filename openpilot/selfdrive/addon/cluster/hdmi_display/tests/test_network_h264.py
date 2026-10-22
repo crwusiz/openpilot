@@ -98,13 +98,29 @@ def test_scene_rounding_reduces_payload_without_visible_projection_error():
   assert path["path_y"] == ys.tolist()  # Snapshot packing never mutates model inputs.
 
 
+def test_plain_rounding_keeps_mixed_and_numpy_values_and_boolean_types():
+  source = [1.2345678, True, 3, None, np.float32(4.567891), np.array([1.2345678, 9.8765432])]
+  assert network._plain(source) == [1.235, True, 3, None, 4.568, [1.235, 9.877]]
+  assert type(network._plain(source)[1]) is bool
+  assert type(network._plain(source)[2]) is int
+  assert network._plain((1.2345678, 9.8765432), precision=6) == [1.234568, 9.876543]
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), -float("inf")])
+def test_fast_float_list_rounding_cannot_bypass_wire_numeric_checks(bad):
+  source = models()
+  source.get_render_data.return_value[2]["path_y"] = [bad, 0.0]
+  with pytest.raises(ValueError):
+    wire.pack_scene(network.scene_snapshot(config(), source, {}))
+
+
 @asyncio_test
 async def test_receiver_recovery_requests_are_rate_limited_and_decoder_errors_are_logged(monkeypatch):
   messages = []
   monkeypatch.setattr(network, "flog", messages.append)
   monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=Mock(side_effect=[10.0, 10.1, 10.49, 10.5])))
   monkeypatch.setattr(network, "read_control", AsyncMock(side_effect=[
-    (wire.FEEDBACK, 0, {"keyframe_request": True, "decoder_errors": 2}),
+    (wire.FEEDBACK, 0, {"keyframe_request": True, "decoder_errors": 2, "camera_display_fps": 14.75}),
     (wire.FEEDBACK, 1, {"keyframe_request": True}), (wire.FEEDBACK, 2, {"keyframe_request": True}),
     (wire.FEEDBACK, 3, {"keyframe_request": True}), EOFError(),
   ]))
@@ -115,6 +131,7 @@ async def test_receiver_recovery_requests_are_rate_limited_and_decoder_errors_ar
   assert track.request_recovery.call_count == 2
   assert sum("[CLUSTER_H264_RECOVERY]" in message for message in messages) == 2
   assert any("decoder_errors=2.00" in message for message in messages)
+  assert any("camera_display_fps=14.75" in message for message in messages)
 
 
 def test_camera_age_uses_the_native_boot_clock_including_suspend(monkeypatch):

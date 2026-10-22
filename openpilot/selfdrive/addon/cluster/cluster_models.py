@@ -24,6 +24,11 @@ HEALTH_AGE_SERVICES = {
   'selfdriveState': 'selfdrive_state_age_ms',
   'managerState': 'manager_age_ms',
 }
+RENDER_SERVICES = frozenset({
+  'carState', 'selfdriveState', 'carParams', 'carControl', 'deviceState',
+  'narrowRoadCameraState', 'extrinsicsCalibration', 'gpsLocationExternal',
+  'naviData', 'longitudinalPlan', 'modelV2', 'radarState',
+})
 
 
 def _enum_value(value):
@@ -66,7 +71,7 @@ def _initial_health_data():
 
 
 class ClusterModels:
-  def __init__(self):
+  def __init__(self, defer_render_updates=False):
     cloudlog.info("Initializing ClusterModels ...")
 
     self.sm = messaging.SubMaster([
@@ -128,6 +133,8 @@ class ClusterModels:
     self._navi_speed_bump = False
     self.ignore_limit_timer = 0.0
     self._state_lock = threading.RLock()
+    self._defer_render_updates = defer_render_updates
+    self._pending_render_services = set()
     self._health_data = _initial_health_data()
     self._health_received_at = dict.fromkeys(HEALTH_AGE_SERVICES)
     self._diagnostic_events = deque(maxlen=16)
@@ -166,8 +173,37 @@ class ClusterModels:
   def _update_once(self):
     self.sm.update(0)
     self._update_health_data()
+    updated = {service for service in RENDER_SERVICES if self.sm.updated[service]}
+    if self._defer_render_updates:
+      # Keep polling/diagnostics at the input rate, but derive display state
+      # only when requested. Each service has one latest SubMaster message;
+      # this bounded set retains even infrequent calibration/params updates.
+      self._pending_render_services.update(updated)
+      if 'carState' in updated:
+        self.v_ego_cluster_seen |= getattr(self.sm['carState'], 'vEgoCluster', 0.0) != 0.0
+      if 'naviData' in updated:
+        # Zone enter/exit markers can disappear before the next render.
+        self._update_navi_school_zone(self.sm['naviData'])
+      self._update_distance_level(updated)
+      if 'extrinsicsCalibration' in updated:
+        self._update_calibration(self.sm['extrinsicsCalibration'])
+    else:
+      self._update_render_data(updated)
 
-    if self.sm.updated['carState']:
+  def _flush_render_updates(self):
+    # The caller holds _state_lock, so HUD/path/calibration use one coherent
+    # latest input snapshot without queuing old messages or adding a timer.
+    if self._pending_render_services:
+      self._update_render_data(self._pending_render_services)
+      self._pending_render_services.clear()
+    elif not self.sm.valid['radarState'] or not self.sm.alive['radarState']:
+      self.leads = []
+
+  def _update_render_data(self, updated):
+    if not self._defer_render_updates:
+      self._update_distance_level(updated)
+
+    if 'carState' in updated:
       car_state = self.sm['carState']
       v_ego_cluster = getattr(car_state, 'vEgoCluster', 0.0)
       self.v_ego_cluster_seen = self.v_ego_cluster_seen or v_ego_cluster != 0.0
@@ -206,7 +242,7 @@ class ClusterModels:
       self.stock_road_limit_speed = float(car_state.naviLimitSpeed or 0.0)
       self.ignore_limit_timer = car_state.ignoreLimitTimer
 
-    if self.sm.updated['selfdriveState']:
+    if 'selfdriveState' in updated:
       selfdrive_state = self.sm['selfdriveState']
       self.enabled = selfdrive_state.enabled
       self.engageable = selfdrive_state.engageable
@@ -214,41 +250,33 @@ class ClusterModels:
         log.SelfdriveState.OpenpilotState.preEnabled,
         log.SelfdriveState.OpenpilotState.overriding,
       )
-      self.distance_level = min(max(_enum_value(selfdrive_state.personality) + 1, 1), 4)
 
-    if self.sm.updated['carParams']:
+    if 'carParams' in updated:
       self.longitudinal_control = bool(self.sm['carParams'].openpilotLongitudinalControl)
 
-    if self.sm.updated['carControl']:
+    if 'carControl' in updated:
       car_control = self.sm['carControl']
       self.lat_active = bool(car_control.latActive)
-      distance_bars = int(car_control.hudControl.leadDistanceBars)
-      if 1 <= distance_bars <= 4:
-        self.distance_level = distance_bars
 
-    if self.sm.updated['deviceState']:
+    if 'deviceState' in updated:
       device_state = self.sm['deviceState']
       self.wifi_strength = _enum_value(device_state.networkStrength)
       self.device_type = str(device_state.deviceType)
       self._update_camera_intrinsics()
 
-    if self.sm.updated['narrowRoadCameraState']:
+    if 'narrowRoadCameraState' in updated:
       self.camera_sensor = str(self.sm['narrowRoadCameraState'].sensor)
       self._update_camera_intrinsics()
 
-    if self.sm.updated['extrinsicsCalibration']:
-      calib = self.sm['extrinsicsCalibration']
-      if len(calib.rpyCalib) == 3:
-        self.view_from_calib = view_frame_from_device_frame @ rot_from_euler(calib.rpyCalib)
-      if len(calib.height) > 0:
-        self.camera_height = float(calib.height[0])
+    if 'extrinsicsCalibration' in updated and not self._defer_render_updates:
+      self._update_calibration(self.sm['extrinsicsCalibration'])
 
-    if self.sm.updated['gpsLocationExternal']:
+    if 'gpsLocationExternal' in updated:
       gps = self.sm['gpsLocationExternal']
       self.gps_bearing = gps.bearingDeg
       self.gps_satellites = gps.satelliteCount
 
-    if self.sm.updated['naviData']:
+    if 'naviData' in updated:
       navi_data = self.sm['naviData']
       self.nda_state = getattr(navi_data, 'active', 0)
       self.nav_limit_speed = getattr(navi_data, 'roadLimitSpeed', 0.0)
@@ -265,12 +293,12 @@ class ClusterModels:
       self._update_navi_school_zone(navi_data)
       self._refresh_stock_road_events()
 
-    if self.sm.updated['longitudinalPlan']:
+    if 'longitudinalPlan' in updated:
       longitudinal_plan = self.sm['longitudinalPlan']
       self.traffic_state = getattr(longitudinal_plan, 'trafficState', 0)
       self.allow_throttle = bool(longitudinal_plan.allowThrottle)
 
-    if self.sm.updated['modelV2']:
+    if 'modelV2' in updated:
       model = self.sm['modelV2']
 
       if len(model.position.x) > 0:
@@ -299,8 +327,26 @@ class ClusterModels:
 
     if not self.sm.valid['radarState'] or not self.sm.alive['radarState']:
       self.leads = []
-    elif any(self.sm.updated[service] for service in ('modelV2', 'radarState', 'longitudinalPlan')):
+    elif updated.intersection(('modelV2', 'radarState', 'longitudinalPlan')):
       self._update_leads()
+
+  def _update_distance_level(self, updated):
+    # Preserve valid bars even if a later message has zero bars. Process each
+    # input cycle's personality first, then its valid HUD override, as before.
+    if 'selfdriveState' in updated:
+      self.distance_level = min(max(_enum_value(self.sm['selfdriveState'].personality) + 1, 1), 4)
+    if 'carControl' in updated:
+      distance_bars = int(self.sm['carControl'].hudControl.leadDistanceBars)
+      if 1 <= distance_bars <= 4:
+        self.distance_level = distance_bars
+
+  def _update_calibration(self, calib):
+    # Partial calibration messages retain their last usable fields, including
+    # when several input updates arrive between display requests.
+    if len(calib.rpyCalib) == 3:
+      self.view_from_calib = view_frame_from_device_frame @ rot_from_euler(calib.rpyCalib)
+    if len(calib.height) > 0:
+      self.camera_height = float(calib.height[0])
 
   def _update_health_data(self):
     # Observe the same inputs used by selfdrived without publishing events or
@@ -434,15 +480,16 @@ class ClusterModels:
 
   def _update_navi_school_zone(self, navi_data):
     """Mirror SpeedLimiter's process-local school-zone state from naviData."""
-    if self.nda_state <= 0:
+    if getattr(navi_data, 'active', 0) <= 0:
       self._navi_school_zone = False
       self._navi_last_road_name = ""
       self._refresh_school_zone()
       return
 
-    if self.cam_type == 20:
+    cam_type = int(getattr(navi_data, 'camType', 0) or 0)
+    if cam_type == 20:
       self._navi_school_zone = True
-    elif self.cam_type == 21:
+    elif cam_type == 21:
       self._navi_school_zone = False
 
     current_road_name = str(getattr(navi_data, 'currentRoadName', '') or '')
@@ -451,7 +498,7 @@ class ClusterModels:
         self._navi_last_road_name and current_road_name and
         current_road_name != self._navi_last_road_name
       )
-      new_camera_event = self.cam_type not in (20, 21) and self.cam_limit_active
+      new_camera_event = cam_type not in (20, 21) and camera_limit_active(navi_data)
       if road_changed or new_camera_event:
         self._navi_school_zone = False
 
@@ -493,6 +540,7 @@ class ClusterModels:
 
   def is_valid(self):
     with self._state_lock:
+      self._flush_render_updates()
       return self._model_render_valid_unlocked()
 
   def _model_render_valid_unlocked(self):
@@ -503,6 +551,7 @@ class ClusterModels:
 
   def get_hud_data(self):
     with self._state_lock:
+      self._flush_render_updates()
       return self._get_hud_data_unlocked()
 
   def _get_hud_data_unlocked(self):
@@ -553,6 +602,7 @@ class ClusterModels:
 
   def get_path_data(self):
     with self._state_lock:
+      self._flush_render_updates()
       return self._get_path_data_unlocked()
 
   def _get_path_data_unlocked(self):
@@ -580,10 +630,12 @@ class ClusterModels:
   def get_render_data(self):
     """Return model validity, HUD state, and path data from one update cycle."""
     with self._state_lock:
+      self._flush_render_updates()
       return self._model_render_valid_unlocked(), self._get_hud_data_unlocked(), self._get_path_data_unlocked()
 
   def get_camera_source_size(self):
     """Use the same sensor geometry as calibration without another RGB consumer."""
     with self._state_lock:
+      self._flush_render_updates()
       camera = DEVICE_CAMERAS.get((self.device_type, self.camera_sensor))
       return list(camera.narrow_road.size) if camera is not None else None

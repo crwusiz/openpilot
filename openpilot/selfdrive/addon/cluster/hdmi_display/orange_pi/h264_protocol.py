@@ -59,10 +59,23 @@ def pack_control(kind, payload, sequence=0):
   _check_value(payload)
   if not isinstance(payload, dict):
     raise ValueError("Cluster control must be an object")
+  return _pack_validated_control(kind, payload, sequence)
+
+
+def _pack_validated_control(kind, payload, sequence):
+  # Callers must validate the whole payload before entering this private
+  # encoder. Keep the JSON and encoded-byte limits here for both send paths.
   data = json.dumps(payload, ensure_ascii=True, allow_nan=False, separators=(",", ":")).encode()
   if not 0 < len(data) <= MAX_CONTROL_SIZE:
     raise ValueError("Cluster control exceeds byte limit")
   return CONTROL_HEADER.pack(H264_MAGIC, PROTOCOL_VERSION, kind, sequence & 0xFFFFFFFF, len(data)) + data
+
+
+def pack_scene(state, sequence=0):
+  # validate_scene includes the same recursive numeric/nesting checks as
+  # pack_control, plus geometry limits. Avoid walking every coordinate twice
+  # on the C4's 20 Hz path while retaining the full checks before encoding.
+  return _pack_validated_control(STATE, validate_scene(state), sequence)
 
 
 def unpack_control_header(data):
@@ -76,7 +89,8 @@ def unpack_control_header(data):
 
 def validate_scene(state):
   """Validate geometry before a remote state can allocate drawing buffers."""
-  if not isinstance(state.get("model_valid"), bool) or not isinstance(state.get("hud"), dict) or not isinstance(state.get("path"), dict):
+  if (not isinstance(state, dict) or not isinstance(state.get("model_valid"), bool) or
+      not isinstance(state.get("hud"), dict) or not isinstance(state.get("path"), dict)):
     raise ValueError("Invalid cluster scene")
   size = state.get("source_size")
   if size is not None and (not isinstance(size, list) or len(size) != 2 or

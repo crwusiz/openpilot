@@ -125,6 +125,7 @@ def test_webrtc_signaling_metadata_and_feedback_share_control_socket_without_fra
     assert feedback["display_avg_ms"] == pytest.approx(10.0)
     assert feedback["queue_wait_avg_ms"] == pytest.approx(40.0)
     assert feedback["rgb_convert_avg_ms"] >= 0
+    assert feedback["camera_display_fps"] > 0
     assert not feedback["video_stale"] and not feedback["state_stale"]
     assert feedback["decoder_backend"] == "aiortc_pyav_software"
     assert feedback["screen_off"] is False
@@ -134,6 +135,21 @@ def test_webrtc_signaling_metadata_and_feedback_share_control_socket_without_fra
     c4_sock.close()
     pi_sock.close()
   assert fake_aiortc[0].closed and not receiver.thread.is_alive()
+
+
+def test_camera_display_count_excludes_metadata_only_stale_and_unpresented_frames():
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  receiver.record_display(1.0, 1.02, 1.03, video_received_at=0.99)
+  receiver.record_display(1.1, 1.12, 1.13)
+  receiver.record_display(1.2, 1.22, 1.23, video_received_at=1.19, presented=False)
+  receiver.record_display(1.3, 1.32, 1.33, video_received_at=1.29)
+  receiver.record_display(2.0, 2.02, 2.03, video_received_at=1.4, camera_visible=False)
+  assert receiver.displayed_frames == 4
+  assert receiver.displayed_video_frames == 2
+  # Keeping the arrival timestamp preserves queue-age evidence even when the
+  # scene hides an expired picture instead of showing it as fresh video.
+  assert receiver._stats["queue_count"] == 4
+  assert receiver._stats["queue"] == pytest.approx(0.63)
 
 
 def test_close_cancels_pending_answer_and_closes_peer_without_waiting_for_negotiation_timeout(fake_aiortc):
@@ -708,7 +724,7 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
   from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
 
   owner = threading.get_ident()
-  now, scenes, receivers, presented, waiting = [10.0], [], [], [], []
+  now, scenes, receivers, presented, waiting, camera_visibility = [10.0], [], [], [], [], []
   monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
 
   class Scene:
@@ -725,6 +741,7 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
 
     def render(self):
       assert threading.get_ident() == owner
+      self.last_status = {"video_fresh": now[0] - self.videos[-1][1] <= 0.5}
       return f"scene {len(self.videos)}"
 
     def close(self):
@@ -767,6 +784,7 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
       self.closed = True
 
     def record_display(self, _started, _rendered, _displayed, _video_at, presented, **_kwargs):
+      camera_visibility.append(_kwargs["camera_visible"])
       self.displayed_frames += int(presented)
 
   def present(image):
@@ -784,6 +802,7 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
   assert scenes[0].videos == [("first RGB", 9.99), ("second RGB", 12.1 if stall else 10.1)]
   assert presented == (["scene 1", "scene 1", "scene 2"] if stall else ["scene 1", "scene 2"])
   assert waiting == ([True] if stall else [])
+  assert camera_visibility == ([True, False, True] if stall else [True, True])
   assert receivers[0].closed and receivers[0].displayed_frames == (3 if stall else 2)
 
 
@@ -891,3 +910,101 @@ def test_render_deadlines_preserve_phase_without_discarding_a_slot_after_overrun
     actual_fps = (len(starts) - 1) / (starts[-1] - starts[0])
     assert actual_fps >= expected_fps * 0.97
     assert all(second - first >= work - 1e-6 for first, second in zip(starts, starts[1:], strict=False))
+
+
+@pytest.mark.parametrize("camera_stalls", [False, True])
+def test_metadata_waits_for_new_camera_picture_with_bounded_hud_fallback(monkeypatch, camera_stalls):
+  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
+
+  clock, rendered, scenes, receivers = [1.0], [], [], []
+  events = [(1.0, "state", 0), (1.0, "video", 0)]
+  if camera_stalls:
+    events.extend((1.047 + index * 0.05, "state", index + 1) for index in range(10))
+  else:
+    for index in range(20):
+      # Metadata is ready just before the next render slot, while the camera
+      # arrives just after it. Rendering on metadata would repeat old pictures.
+      events.extend(((1.047 + index * 0.05, "state", index + 1),
+                     (1.055 + index * 0.05, "video", index + 1)))
+  events.sort()
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+
+  class Scene:
+    def __init__(self, *_args):
+      self.state = self.video = None
+      scenes.append(self)
+
+    def update(self, state, received_at):
+      self.state = state, received_at
+
+    def set_video(self, video, received_at, **_kwargs):
+      self.video = video
+
+    def render(self):
+      rendered.append((clock[0], self.video, self.state))
+      clock[0] += 0.025
+      return "composed RGB"
+
+    def close(self):
+      pass
+
+  class Receiver:
+    def __init__(self, *_args):
+      self.condition = threading.Condition()
+      self.received_frames = 0
+      self.last_video_at = self.last_state_at = None
+      self.screen_off = self.done = self.closed = False
+      self.index = 0
+      self.polls = 0
+      receivers.append(self)
+
+    def start(self):
+      pass
+
+    def take_updates(self, timeout=0.02):
+      self.polls += 1
+      assert self.polls < 300, "Metadata coalescing must wait without busy polling"
+      wake_at = clock[0] + timeout
+      if self.index < len(events):
+        wake_at = min(wake_at, max(clock[0], events[self.index][0]))
+      clock[0] = wake_at
+      rgb = state = None
+      while self.index < len(events) and events[self.index][0] <= wake_at + 1e-9:
+        arrival, kind, value = events[self.index]
+        self.index += 1
+        if kind == "video":
+          rgb = value, arrival
+          self.received_frames += 1
+          self.last_video_at = arrival
+        else:
+          state = value, arrival
+          self.last_state_at = arrival
+      self.done = self.index == len(events) and clock[0] >= events[-1][0] + 0.12
+      return rgb, state
+
+    def record_display(self, *_args, **_kwargs):
+      pass
+
+    def close(self):
+      self.closed = True
+
+  def present(_image):
+    clock[0] += 0.014
+    return True
+
+  monkeypatch.setattr(h264_scene, "H264Scene", Scene)
+  monkeypatch.setattr(h264_receiver, "H264Receiver", Receiver)
+  display = SimpleNamespace(pump_events=lambda: True, screen_off=False, send_rgb=present, last_frame_presented=True)
+  assert h264_receiver.receive_h264_session(None, display, HELLO_DATA) == (1 if camera_stalls else 21)
+  assert receivers[0].closed
+  if camera_stalls:
+    # HUD updates remain visible with a stopped camera, at most 100ms after
+    # the preceding render; camera expiry still triggers its own redraw.
+    assert len(rendered) >= 6
+    assert rendered[1][0] == pytest.approx(1.1)
+    assert rendered[1][2] == pytest.approx((2, 1.097))
+    assert any(1.5 <= at < 1.53 for at, *_rest in rendered)
+    assert rendered[-1][2][0] == 10
+  else:
+    assert [video for _at, video, _state in rendered] == list(range(21))
+    assert all(video == state[0] for _at, video, state in rendered)

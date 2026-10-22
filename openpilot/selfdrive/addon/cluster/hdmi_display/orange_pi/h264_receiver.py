@@ -22,6 +22,7 @@ NEGOTIATION_TIMEOUT = 15.0
 STREAM_TIMEOUT = 8.0
 FEEDBACK_INTERVAL = 1.0
 RECOVERY_INTERVAL = 0.5
+HUD_REFRESH_INTERVAL = 0.1
 STAGE_NAMES = {"scene": ("camera_copy", "camera_panel", "snapshot", "path", "path_cpu", "hud"),
                "hdmi": ("rgb_surface", "convert", "upload", "draw", "flip")}
 
@@ -73,6 +74,7 @@ class H264Receiver:
     self.latest_state = None
     self.state_revision = self.consumed_state_revision = 0
     self.received_frames = self.displayed_frames = self.dropped_frames = 0
+    self.displayed_video_frames = 0
     self.decoded_frames = self.skipped_rgb = 0
     self.decoder_errors = 0
     self.last_video_at = self.last_state_at = None
@@ -142,7 +144,7 @@ class H264Receiver:
       self.condition.notify_all()
 
   def record_display(self, render_started, rendered_at, displayed_at, video_received_at=None, presented=True,
-                     scene_timings=None, display_timings=None):
+                     scene_timings=None, display_timings=None, camera_visible=True):
     with self.condition:
       self._stats["render_count"] += 1
       self._stats["render"] += max(0.0, rendered_at - render_started)
@@ -158,6 +160,7 @@ class H264Receiver:
         self._stats["queue"] += max(0.0, render_started - video_received_at)
       if presented:
         self.displayed_frames += 1
+        self.displayed_video_frames += video_received_at is not None and camera_visible
         if self._last_display_at is not None:
           self._stats["gap"] = max(self._stats["gap"], displayed_at - self._last_display_at)
         self._last_display_at = displayed_at
@@ -293,9 +296,11 @@ class H264Receiver:
   async def _feedback(self):
     previous_at = time.monotonic()
     previous_rx = previous_display = 0
+    previous_camera_display = 0
     previous_decoded = 0
     previous_decoder_errors = 0
     logged_at, logged_rx, logged_display, logged_dropped = previous_at, 0, 0, 0
+    logged_camera_display = 0
     logged_decoder_errors = 0
     logged_decoded = logged_skipped = 0
     logged_stats = self._empty_stats()
@@ -304,6 +309,7 @@ class H264Receiver:
       now = time.monotonic()
       with self.condition:
         rx, displayed = self.received_frames, self.displayed_frames
+        camera_displayed = self.displayed_video_frames
         decoded, skipped = self.decoded_frames, self.skipped_rgb
         decoder_errors = self.decoder_errors
         video_stale = self.last_video_at is None or now - self.last_video_at >= 0.5
@@ -314,6 +320,7 @@ class H264Receiver:
           "decoded_fps": (decoded - previous_decoded) / max(now - previous_at, 0.001),
           "skipped_rgb": skipped,
           "display_fps": (displayed - previous_display) / max(now - previous_at, 0.001),
+          "camera_display_fps": (camera_displayed - previous_camera_display) / max(now - previous_at, 0.001),
           "decoder_backend": "aiortc_pyav_software",
           "decoder_errors": decoder_errors,
           "keyframe_request": (decoder_errors > max(previous_decoder_errors, self._recovered_decoder_errors)
@@ -340,7 +347,8 @@ class H264Receiver:
         LOG.info("[CLUSTER_H264_RX_PERF] rx_fps=%.2f | display_fps=%.2f | dropped_display=%d | "
                  + "render_avg=%.1fms | display_avg=%.1fms | queue_wait_avg=%.1fms | rgb_convert_avg=%.1fms | "
                  + "display_gap_max=%.1fms | video_stale=%d | state_stale=%d | "
-                 + "decoder_errors=%d | decoded_fps=%.2f | skipped_rgb=%d | decoder=aiortc_pyav_software | screen_off=%d | mode=webrtc%s",
+                 + "decoder_errors=%d | decoded_fps=%.2f | skipped_rgb=%d | camera_display_fps=%.2f | "
+                 + "decoder=aiortc_pyav_software | screen_off=%d | mode=webrtc%s",
                  (rx - logged_rx) / elapsed, (displayed - logged_display) / elapsed,
                  payload["dropped_display"] - logged_dropped,
                  logged_stats["render"] * 1000 / max(logged_stats["render_count"], 1),
@@ -349,13 +357,15 @@ class H264Receiver:
                  logged_stats["convert"] * 1000 / max(logged_stats["convert_count"], 1),
                  logged_stats["gap"] * 1000, payload["video_stale"], payload["state_stale"],
                  decoder_errors - logged_decoder_errors, (decoded - logged_decoded) / elapsed,
-                 skipped - logged_skipped, payload["screen_off"], stages)
+                 skipped - logged_skipped, (camera_displayed - logged_camera_display) / elapsed, payload["screen_off"], stages)
         LOG.info("[CLUSTER_PI_RESOURCE_PERF] %s", format_receiver_resources(self._resources.sample()))
         logged_at, logged_rx, logged_display, logged_dropped = now, rx, displayed, payload["dropped_display"]
+        logged_camera_display = camera_displayed
         logged_decoder_errors = decoder_errors
         logged_decoded, logged_skipped = decoded, skipped
         logged_stats = self._empty_stats()
       previous_at, previous_rx, previous_display = now, rx, displayed
+      previous_camera_display = camera_displayed
       previous_decoded = decoded
       previous_decoder_errors = decoder_errors
 
@@ -505,6 +515,8 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
   next_render_at = None
   render_interval = 1.0 / hello["fps"]
   pending_render = False
+  pending_state = False
+  last_render_started = None
   pending_video_at = None
   freshness = None
   try:
@@ -515,12 +527,15 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
       with receiver.condition:
         receiver.screen_off = bool(getattr(display, "screen_off", False))
       timeout = 0.02
-      if pending_render and next_render_at is not None and not receiver.screen_off:
-        timeout = min(timeout, max(0.0, next_render_at - time.monotonic()))
+      if (pending_render or pending_state) and next_render_at is not None and not receiver.screen_off:
+        due_at = next_render_at
+        if not pending_render and last_render_started is not None:
+          due_at = max(due_at, last_render_started + HUD_REFRESH_INTERVAL)
+        timeout = min(timeout, max(0.0, due_at - time.monotonic()))
       rgb, state = receiver.take_updates(timeout=timeout)
       if state is not None:
         scene.update(state[0], received_at=state[1])
-        pending_render = True
+        pending_state = True
       if rgb is not None:
         scene.set_video(rgb[0], received_at=rgb[1], take_ownership=True)
         pending_video_at = rgb[1]
@@ -539,7 +554,15 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
           LOG.warning("[CLUSTER_H264_STALE] No decoded video within %.1fs; waiting for live video", frame_timeout)
           waiting_shown = True
         pending_render = False
-      elif pending_render and (next_render_at is None or now >= next_render_at) and not receiver.screen_off:
+        pending_state = False
+      elif (pending_render or (pending_state and (last_render_started is None
+                                                  or now >= last_render_started + HUD_REFRESH_INTERVAL))) \
+          and (next_render_at is None or now >= next_render_at) and not receiver.screen_off:
+        # Metadata and decoded camera pictures arrive on different clocks.
+        # Compose healthy video once per new picture, using the newest HUD.
+        # Otherwise a metadata-only render can occupy the next camera's slot
+        # and repeatedly present its predecessor. A stopped camera still gets
+        # HUD refreshes at 100ms intervals; freshness changes bypass that wait.
         render_started = time.monotonic()
         image = scene.render()
         rendered_at = time.monotonic()
@@ -549,11 +572,14 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         receiver.record_display(render_started, rendered_at, displayed_at, pending_video_at,
                                 bool(getattr(display, "last_frame_presented", True)),
                                 scene_timings=getattr(scene, "last_frame_timings", None),
-                                display_timings=getattr(display, "last_frame_timings", None))
+                                display_timings=getattr(display, "last_frame_timings", None),
+                                camera_visible=getattr(scene, "last_status", {}).get("video_fresh", True))
         if waiting_shown:
           LOG.info("[CLUSTER_H264_RESUMED] Live WebRTC video received")
         waiting_shown = False
         pending_render = False
+        pending_state = False
+        last_render_started = render_started
         pending_video_at = None
         # Preserve the phase while work fits the frame budget. If a frame
         # overruns it, the newest pending decoded picture is immediately due:

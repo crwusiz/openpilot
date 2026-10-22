@@ -13,7 +13,7 @@ from openpilot.selfdrive.addon.cluster.cluster_runtime_metrics import ClusterRun
 
 
 @pytest.fixture
-def cluster_models(monkeypatch):
+def cluster_models(monkeypatch, request):
   messages = {}
   updated = {}
 
@@ -54,8 +54,8 @@ def cluster_models(monkeypatch):
   module.threading = SimpleNamespace(RLock=threading.RLock, Thread=lambda **_kwargs: Mock())
   clock = SimpleNamespace(now=100.0)
   module.time = SimpleNamespace(monotonic=lambda: clock.now)
-  models = module.ClusterModels()
-  return SimpleNamespace(models=models, messages=messages, updated=updated, clock=clock)
+  models = module.ClusterModels(defer_render_updates=True) if getattr(request, 'param', False) else module.ClusterModels()
+  return SimpleNamespace(models=models, messages=messages, updated=updated, clock=clock, module=module)
 
 
 def test_health_does_not_report_unseen_locationd_defaults_as_errors(cluster_models):
@@ -252,6 +252,7 @@ def _car_message(speed, steering):
 
 
 @pytest.mark.parametrize("valid, alive", [(True, False), (False, True)])
+@pytest.mark.parametrize('cluster_models', [False, True], indirect=True)
 def test_render_clears_stale_or_invalid_radar_leads_and_restores_new_radar(cluster_models, valid, alive):
   state = cluster_models
   state.messages['modelV2'] = _model_message([0.0, 10.0, 20.0])
@@ -292,6 +293,7 @@ def test_render_clears_stale_or_invalid_radar_leads_and_restores_new_radar(clust
   assert path['leads'][0]['present']
 
 
+@pytest.mark.parametrize('cluster_models', [False, True], indirect=True)
 def test_render_hides_stale_path_keeps_fresh_car_hud_and_restores_new_model(cluster_models):
   state = cluster_models
   state.messages['modelV2'] = _model_message([0.0, 10.0, 20.0])
@@ -340,6 +342,7 @@ def test_render_hides_stale_path_keeps_fresh_car_hud_and_restores_new_model(clus
   (True, False, [0.0, 10.0]),
   (True, True, []),
 ])
+@pytest.mark.parametrize('cluster_models', [False, True], indirect=True)
 def test_render_requires_live_valid_nonempty_model_and_recovers(cluster_models, alive, valid, path_x):
   state = cluster_models
   state.updated['modelV2'] = True
@@ -355,6 +358,189 @@ def test_render_requires_live_valid_nonempty_model_and_recovers(cluster_models, 
   state.models._update_once()
   assert state.models.is_valid()
   assert state.models.get_render_data()[0]
+
+
+@pytest.mark.parametrize('cluster_models', [True], indirect=True)
+def test_deferred_render_coalesces_car_updates_and_reads_latest_without_a_timer(cluster_models):
+  state = cluster_models
+  derive = Mock(wraps=state.models._update_render_data)
+  state.models._update_render_data = derive
+  state.messages['controlsState'] = SimpleNamespace(deprecated=SimpleNamespace(vCruise=0.0))
+  state.updated['carState'] = True
+  for speed in range(10, 15):
+    state.messages['carState'] = _car_message(float(speed), float(speed * 2))
+    state.models._update_once()
+  derive.assert_not_called()
+  assert state.models.v_ego == 0.0
+  assert state.models.get_health_data()['car_state_seen']
+  assert state.models._pending_render_services == {'carState'}
+
+  _valid, hud, _path = state.models.get_render_data()
+  assert hud['v_ego'] == 14.0 and hud['steering_angle'] == 28.0
+  derive.assert_called_once()
+  state.models.get_hud_data()
+  state.models.get_path_data()
+  state.models.is_valid()
+  state.models.get_camera_source_size()
+  derive.assert_called_once()
+  assert not state.models._pending_render_services
+
+
+def test_default_render_derives_each_input_update_for_usb(cluster_models):
+  state = cluster_models
+  assert not state.models._defer_render_updates
+  derive = Mock(wraps=state.models._update_render_data)
+  state.models._update_render_data = derive
+  state.messages['controlsState'] = SimpleNamespace(deprecated=SimpleNamespace(vCruise=0.0))
+  state.updated['carState'] = True
+  for speed in range(10, 15):
+    state.messages['carState'] = _car_message(float(speed), 0.0)
+    state.models._update_once()
+    assert state.models.v_ego == float(speed)
+  assert derive.call_count == 5
+  assert not state.models._pending_render_services
+
+
+@pytest.mark.parametrize('cluster_models', [True], indirect=True)
+@pytest.mark.parametrize('getter', ['get_render_data', 'get_hud_data', 'get_path_data', 'is_valid', 'get_camera_source_size'])
+def test_each_render_getter_flushes_infrequent_calibration_params_and_navigation(cluster_models, getter):
+  state = cluster_models
+  state.module.rot_from_euler.return_value = np.eye(3)
+  state.messages['extrinsicsCalibration'] = SimpleNamespace(rpyCalib=[0.0, 0.0, 0.0], height=[1.5])
+  state.messages['carParams'] = SimpleNamespace(openpilotLongitudinalControl=True)
+  state.messages['naviData'] = SimpleNamespace(active=1, roadLimitSpeed=80.0, camType=20, currentRoadName='School Road')
+  state.updated.update(extrinsicsCalibration=True, carParams=True, naviData=True)
+  state.models._update_once()
+  state.updated.update(dict.fromkeys(state.updated, False))
+  for _ in range(5):
+    state.models._update_once()
+  assert not state.models.longitudinal_control
+
+  getattr(state.models, getter)()
+  assert state.models.camera_height == 1.5 and state.models.longitudinal_control
+  assert state.models.nav_limit_speed == 80.0 and state.models.school_zone
+  assert not state.models._pending_render_services
+
+
+@pytest.mark.parametrize('cluster_models', [True], indirect=True)
+def test_deferred_navigation_retains_transient_zone_markers_between_renders(cluster_models):
+  state = cluster_models
+  state.updated['naviData'] = True
+  for marker, expected in ((20, True), (21, False)):
+    state.messages['naviData'] = SimpleNamespace(active=1, camType=marker, currentRoadName='School Road')
+    state.models._update_once()
+    state.messages['naviData'] = SimpleNamespace(active=1, camType=0, currentRoadName='School Road')
+    state.models._update_once()
+    assert state.models.get_hud_data()['school_zone'] is expected
+
+
+@pytest.mark.parametrize('cluster_models', [True], indirect=True)
+def test_deferred_car_speed_retains_cluster_speed_seen_before_zero(cluster_models):
+  state = cluster_models
+  state.messages['controlsState'] = SimpleNamespace(deprecated=SimpleNamespace(vCruise=0.0))
+  state.updated['carState'] = True
+  state.messages['carState'] = _car_message(10.0, 0.0)
+  state.messages['carState'].vEgoCluster = 11.0
+  state.models._update_once()
+  state.messages['carState'] = _car_message(0.1, 0.0)
+  state.messages['carState'].vEgoCluster = 0.0
+  state.models._update_once()
+  assert state.models.get_hud_data()['v_ego'] == 0.0
+
+
+@pytest.mark.parametrize('cluster_models', [True], indirect=True)
+def test_deferred_health_captures_short_faults_without_any_render_request(cluster_models):
+  state = cluster_models
+  derive = Mock(wraps=state.models._update_render_data)
+  state.models._update_render_data = derive
+  state.updated.update(modelV2=True, deviceMotion=True, selfdriveState=True)
+  for fault in (True, False):
+    state.messages['modelV2'] = SimpleNamespace(frameDropPerc=5.4 if fault else 0.0, modelExecutionTime=0.04)
+    state.messages['deviceMotion'] = SimpleNamespace(inputsOK=not fault, posenetOK=True)
+    state.messages['selfdriveState'] = SimpleNamespace(alertType='modeldLagging/softDisable' if fault else '', personality=0)
+    state.models._update_once()
+  health = state.models.get_health_data()
+  assert health['model_drop_peak_perc'] == 5.4 and health['model_drop_perc'] == 0.0
+  assert health['model_lagging_update_total'] == 1
+  assert health['device_motion_input_error_total'] == 1
+  assert [event['alert_type'] for event in health['diagnostic_events']] == ['modeldLagging/softDisable', '']
+  derive.assert_not_called()
+
+
+@pytest.mark.parametrize('cluster_models', [False, True], indirect=True)
+def test_render_retains_last_usable_fields_from_partial_calibration_messages(cluster_models):
+  state = cluster_models
+  state.module.rot_from_euler.return_value = np.diag([1.0, 2.0, 3.0])
+  state.updated['extrinsicsCalibration'] = True
+  state.messages['extrinsicsCalibration'] = SimpleNamespace(rpyCalib=[0.0, 0.1, 0.0], height=[1.7])
+  state.models._update_once()
+  state.messages['extrinsicsCalibration'] = SimpleNamespace(rpyCalib=[], height=[])
+  state.models._update_once()
+  assert state.models.get_path_data()['camera_height'] == 1.7
+  np.testing.assert_array_equal(state.models.view_from_calib, np.diag([1.0, 2.0, 3.0]))
+
+
+@pytest.mark.parametrize('cluster_models', [False, True], indirect=True)
+def test_render_retains_valid_distance_bars_and_later_personality_order(cluster_models):
+  state = cluster_models
+  state.module.log.SelfdriveState = SimpleNamespace(OpenpilotState=SimpleNamespace(preEnabled=1, overriding=2))
+  state.updated['selfdriveState'] = True
+  state.messages['selfdriveState'] = SimpleNamespace(enabled=True, engageable=True, state=0, personality=0)
+  state.models._update_once()
+  state.updated.update(selfdriveState=False, carControl=True)
+  state.messages['carControl'] = SimpleNamespace(latActive=True, hudControl=SimpleNamespace(leadDistanceBars=4))
+  state.models._update_once()
+  state.messages['carControl'] = SimpleNamespace(latActive=True, hudControl=SimpleNamespace(leadDistanceBars=0))
+  state.models._update_once()
+  assert state.models.get_hud_data()['distance_level'] == 4
+  state.updated.update(selfdriveState=True, carControl=False)
+  state.messages['selfdriveState'].personality = 1
+  state.models._update_once()
+  assert state.models.get_hud_data()['distance_level'] == 2
+
+
+@pytest.mark.parametrize('cluster_models', [True], indirect=True)
+def test_deferred_render_flush_and_input_poll_share_one_snapshot_lock(cluster_models):
+  state = cluster_models
+  state.messages['controlsState'] = SimpleNamespace(deprecated=SimpleNamespace(vCruise=0.0))
+  state.models.sm.alive['modelV2'] = state.models.sm.valid['modelV2'] = True
+  state.updated.update(carState=True, modelV2=True)
+  state.messages.update(carState=_car_message(10.0, 10.0), modelV2=_model_message([10.0]))
+  state.models._update_once()
+  deriving, release, polling, polled = (threading.Event() for _ in range(4))
+  original = state.models._update_render_data
+  snapshots = []
+
+  def derive(updated):
+    deriving.set()
+    assert release.wait(2.0)
+    original(updated)
+
+  def poll():
+    polling.set()
+    with state.models._state_lock:
+      state.messages.update(carState=_car_message(20.0, 20.0), modelV2=_model_message([20.0]))
+      state.models._update_once()
+    polled.set()
+
+  state.models._update_render_data = derive
+  renderer = threading.Thread(target=lambda: snapshots.append(state.models.get_render_data()))
+  updater = threading.Thread(target=poll)
+  renderer.start()
+  try:
+    assert deriving.wait(2.0)
+    updater.start()
+    assert polling.wait(2.0)
+    assert not polled.wait(0.05)
+  finally:
+    release.set()
+    renderer.join(timeout=2.0)
+    if updater.ident is not None:
+      updater.join(timeout=2.0)
+  assert not renderer.is_alive() and not updater.is_alive() and polled.is_set()
+  first, latest = snapshots[0], state.models.get_render_data()
+  assert first[1]['v_ego'] == first[2]['path_x'][0] == 10.0
+  assert latest[1]['v_ego'] == latest[2]['path_x'][0] == 20.0
 
 
 def test_process_resources_reads_current_rss_and_native_threads(tmp_path):

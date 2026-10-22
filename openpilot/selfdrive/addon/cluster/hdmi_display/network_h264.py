@@ -16,8 +16,8 @@ from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 from openpilot.selfdrive.addon.cluster.cluster_runtime_metrics import ClusterRuntimeMetrics
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import write_network_status
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol import (
-  ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, PATH_KEYS, STATE,
-  decode_payload, pack_control, unpack_control_header, validate_scene,
+  ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, PATH_KEYS,
+  decode_payload, pack_control, pack_scene, unpack_control_header,
 )
 
 STATE_DRAIN_WARN_S = 0.25
@@ -79,6 +79,10 @@ def _plain(value, precision=3):
   if isinstance(value, dict):
     return {key: _plain(item, precision) for key, item in value.items()}
   if isinstance(value, (list, tuple)):
+    # Model coordinates are homogeneous Python float lists. Round these
+    # without repeating all recursive type checks for every point.
+    if value and all(type(item) is float for item in value):
+      return [round(item, precision) for item in value]
     return [_plain(item, precision) for item in value]
   if hasattr(value, "tolist"):
     return _plain(value.tolist(), precision)
@@ -88,6 +92,7 @@ def _plain(value, precision=3):
 
 
 def scene_snapshot(config, models, health, degraded=False):
+  """Build plain scene data; pack_scene validates it once before transmission."""
   valid, hud, path = models.get_render_data()
   source_size = models.get_camera_source_size()
   scene = {
@@ -98,7 +103,7 @@ def scene_snapshot(config, models, health, degraded=False):
     "model_age_ms": health.get("model_age_ms"), "car_state_age_ms": health.get("car_state_age_ms"),
     "state_created_mono_ns": time.monotonic_ns(),
   }
-  return validate_scene(scene)
+  return scene
 
 
 async def read_control(reader, budget_s=8.0):
@@ -286,8 +291,9 @@ class H264NetworkServer:
       # Only bounded scalar telemetry is accepted; no vehicle messages/params
       # are published from a receiver's input.
       fields = []
-      for key in ("video_fps", "decoded_fps", "skipped_rgb", "display_fps", "rgb_convert_avg_ms", "render_avg_ms", "display_avg_ms", "queue_wait_avg_ms",
-                  "video_age_ms", "state_age_ms", "display_gap_max_ms", "dropped_display", "decoder_errors"):
+      for key in ("video_fps", "decoded_fps", "skipped_rgb", "display_fps", "camera_display_fps", "rgb_convert_avg_ms",
+                  "render_avg_ms", "display_avg_ms", "queue_wait_avg_ms", "video_age_ms", "state_age_ms", "display_gap_max_ms",
+                  "dropped_display", "decoder_errors"):
         value = payload.get(key)
         if type(value) in (float, int) and 0 <= value <= 1e9:
           fields.append(f"{key}={value:.2f}")
@@ -304,7 +310,7 @@ class H264NetworkServer:
       before, cpu_before = time.monotonic(), time.thread_time()
       scene = scene_snapshot(self.config, self.models, self.health, self.degraded)
       scene.update(video_frame_id=track.video_frame_id, video_timestamp_eof=track.video_timestamp_eof, state_seq=sequence)
-      packet = pack_control(STATE, scene, sequence)
+      packet = pack_scene(scene, sequence)
       state_cpu += time.thread_time() - cpu_before
       writer.write(packet)
       await drain_state(writer)
@@ -461,7 +467,7 @@ def run_h264_cluster(config):
     flog(f"[CLUSTER_MAIN] H.264 stop signal received: {signum}")
     raise KeyboardInterrupt
   signal.signal(signal.SIGTERM, stop)
-  models = ClusterModels()
+  models = ClusterModels(defer_render_updates=True)
   try:
     asyncio.run(serve_h264(config, models))
   except KeyboardInterrupt:
