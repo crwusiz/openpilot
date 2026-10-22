@@ -28,6 +28,8 @@ from nicegui import app, ui
 
 from openpilot.selfdrive.addon.cluster.hdmi_display.maintenance import ACTION_PATH, ClusterActions
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import get_connected_pi_ip
+from openpilot.selfdrive.addon.dashboard_drives import render_tab_drives
+from openpilot.selfdrive.addon.drive_video import DriveVideoLibrary, create_drive_video_router
 
 # ── 환경 설정 및 유틸리티 ───────────────────────────────────────
 SCRIPTS_PATH = "/data/openpilot/scripts"
@@ -44,6 +46,8 @@ MAX_COMMAND_OUTPUT = 100_000
 LOG_DIR = Path('/data/log')
 TMUX_LOG_PATH = LOG_DIR / 'tmux_console.log'
 REALDATA_PATH = Path('/data/media/0/realdata')
+DRIVE_VIDEOS = DriveVideoLibrary(REALDATA_PATH, Path('/data/dashboard/cache/drive-video'))
+app.include_router(create_drive_video_router(DRIVE_VIDEOS))
 LOG_FILES = {
   "CAN Missing": LOG_DIR / 'can_missing.log',
   "CAN Timeout": LOG_DIR / 'can_timeout.log',
@@ -1148,6 +1152,7 @@ def main_page():
       ui.tab('FUNCTIONS', icon='rocket')
       ui.tab('TOGGLES', icon='settings')
       ui.tab('CAMERA', icon='photo_camera')
+      ui.tab('DRIVES', icon='video_library')
       ui.tab('LOGS', icon='list_alt')
       ui.tab('TERMINAL', icon='terminal')
 
@@ -1158,6 +1163,8 @@ def main_page():
       render_tab_toggles()
     with ui.tab_panel('CAMERA'):
       render_tab_camera()
+    with ui.tab_panel('DRIVES'):
+      render_tab_drives(tabs)
     with ui.tab_panel('LOGS'):
       render_tab_logs()
     with ui.tab_panel('TERMINAL'):
