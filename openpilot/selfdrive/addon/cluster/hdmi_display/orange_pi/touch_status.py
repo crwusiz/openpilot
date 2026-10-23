@@ -2,19 +2,84 @@
 import http.client
 import ipaddress
 import json
+from itertools import islice
 from pathlib import Path
+import re
+import subprocess
 import time
 import uuid
 
 
 ACTION_PATH = "/api/cluster/actions"
 DASHBOARD_PORT = 7000
+MAX_SENSOR_BYTES = 4096
 
 
 def _integer(path):
   try:
     return int(path.read_text(encoding="ascii").strip())
   except (OSError, UnicodeError, ValueError):
+    return None
+
+
+def _read_sensor(path):
+  try:
+    with path.open("rb") as source:
+      value = source.read(MAX_SENSOR_BYTES + 1)
+    return value.decode("ascii").strip() if len(value) <= MAX_SENSOR_BYTES else None
+  except (OSError, UnicodeError):
+    return None
+
+
+def _gpu_usage(sysfs):
+  # Only GPU devfreq devices qualify: a DDR/NPU load is not GPU utilisation.
+  try:
+    devices = list(islice((sysfs / "class/devfreq").glob("*"), 32))
+  except OSError:
+    devices = []
+  for device in devices:
+    try:
+      name = str(device.resolve().relative_to(sysfs.resolve())).lower()
+    except ValueError:
+      name = device.name.lower()
+    except OSError:
+      continue
+    if not any(token in name for token in ("gpu", "mali", "pvr", "g3d")):
+      continue
+    for filename in ("load", "utilisation", "utilization", "gpu_load"):
+      text = _read_sensor(device / filename)
+      match = re.fullmatch(r"(\d+(?:\.\d+)?)\s*%?(?:\s*@\s*\d+\s*Hz)?", text or "")
+      if match and 0 <= (value := float(match[1])) <= 100:
+        return value
+
+  # The A733's PowerVR driver publishes the whole GPU figure in debugfs.
+  # Do not mistake a 2D/3D engine percentage or a clock value for GPU usage.
+  status = sysfs / "kernel/debug/pvr/status"
+  try:
+    with status.open("rb") as source:
+      raw = source.read(MAX_SENSOR_BYTES + 1)
+  except PermissionError:
+    raw = b""
+    if status == Path("/sys/kernel/debug/pvr/status"):
+      # Receiver services normally run as orangepi. Read this fixed file only
+      # if the OS already allows passwordless sudo; never prompt or change
+      # debugfs permissions. Sampling stays on the existing touch worker.
+      try:
+        result = subprocess.run(["/usr/bin/sudo", "-n", "--", "/usr/bin/head", "-c", str(MAX_SENSOR_BYTES + 1), "--", str(status)],
+                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=0.5, check=False)
+        if result.returncode == 0:
+          raw = result.stdout
+      except (OSError, subprocess.SubprocessError):
+        pass
+  except OSError:
+    raw = b""
+  if len(raw) > MAX_SENSOR_BYTES:
+    return None
+  try:
+    values = re.findall(r"^\s*GPU Utili[sz]ation\s*:\s*(\d+(?:\.\d+)?)\s*%\s*$",
+                        raw.decode("ascii"), re.MULTILINE | re.IGNORECASE)
+    return max((float(value) for value in values if 0 <= float(value) <= 100), default=None)
+  except UnicodeError:
     return None
 
 
@@ -46,14 +111,16 @@ class PiStatus:
     except (OSError, UnicodeError, ValueError, IndexError):
       self.previous_cpu = None
 
-    temperatures = []
+    temperatures, gpu_temperatures = [], []
     for zone in (self.sysfs / "class/thermal").glob("thermal_zone*"):
       temperature = _integer(zone / "temp")
       if temperature is None or not -40000 <= temperature <= 150000:
         continue
       try:
         kind = (zone / "type").read_text(encoding="ascii").lower()
-        if "cpu" in kind or "soc" in kind:
+        if "gpu" in kind:
+          gpu_temperatures.append(temperature / 1000)
+        elif "cpu" in kind or "soc" in kind:
           temperatures.append(temperature / 1000)
       except (OSError, UnicodeError):
         pass
@@ -72,7 +139,8 @@ class PiStatus:
       if value is not None and 0 <= value <= 100000:
         rpm = value
       break
-    return {"cpu": cpu, "temperature": max(temperatures, default=None), "fan_pwm": pwm, "fan_rpm": rpm}
+    return {"cpu": cpu, "temperature": max(temperatures, default=None), "gpu": _gpu_usage(self.sysfs),
+            "gpu_temperature": max(gpu_temperatures, default=None), "fan_pwm": pwm, "fan_rpm": rpm}
 
 
 class ActionHTTPError(RuntimeError):

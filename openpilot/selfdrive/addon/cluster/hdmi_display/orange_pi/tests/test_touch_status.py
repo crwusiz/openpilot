@@ -1,8 +1,12 @@
 from unittest.mock import Mock
+from pathlib import Path
+from types import SimpleNamespace
+import subprocess
 
 import pytest
 
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.touch_status import ActionHTTPError, PiStatus, TouchWorker
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import touch_status
 
 
 def _write(path, value):
@@ -22,7 +26,7 @@ def test_cpu_usage_uses_counter_deltas_and_temperature_uses_the_hottest_cpu(tmp_
   _write(fan / "pwm1", 153)
   sampler = PiStatus(proc, sysfs)
   first = sampler.sample()
-  assert first == {"cpu": None, "temperature": 61.0, "fan_pwm": 60, "fan_rpm": None}
+  assert first == {"cpu": None, "temperature": 61.0, "gpu": None, "gpu_temperature": None, "fan_pwm": 60, "fan_rpm": None}
   # The extra guest counter must not be counted a second time.
   _write(proc / "stat", "cpu 120 0 0 180 20 0 0 0 70 0\n")
   _write(fan / "fan1_input", 3200)
@@ -40,6 +44,60 @@ def test_missing_or_invalid_sensors_are_unknown_rather_than_zero(tmp_path):
   _write(zone / "type", "cpu")
   _write(zone / "temp", 999999)
   assert sampler.sample()["temperature"] is None
+
+
+@pytest.mark.parametrize("usage", [0, 28.5, 100])
+def test_gpu_uses_powervr_total_load_and_dedicated_temperature(tmp_path, usage):
+  sampler = PiStatus(tmp_path / "proc", tmp_path / "sys")
+  _write(sampler.sysfs / "kernel/debug/pvr/status", f"Driver Status: OK\nGPU Utilisation: {usage}%\n3D Utilisation: 98%\n")
+  for index, (kind, temp) in enumerate((("cpub_thermal_zone", 61000), ("gpu_thermal_zone", 64500),
+                                       ("gpu_soc", 62000), ("npu_thermal_zone", 90000), ("ddr_thermal_zone", 80000))):
+    zone = sampler.sysfs / f"class/thermal/thermal_zone{index}"
+    _write(zone / "type", kind)
+    _write(zone / "temp", temp)
+  stats = sampler.sample()
+  assert stats["gpu"] == usage
+  assert stats["gpu_temperature"] == 64.5
+  assert stats["temperature"] == 61
+
+
+@pytest.mark.parametrize("text", ["Driver Status: OK\n3D Utilisation: 50%\n", "GPU Utilisation: -1%", "GPU Utilisation: 101%",
+                                 "GPU Utilisation: nan%", "GPU Utilisation: 30%\n" + "a" * 4097])
+def test_invalid_or_unavailable_gpu_load_never_becomes_zero_or_cpu_usage(tmp_path, text):
+  sampler = PiStatus(tmp_path / "proc", tmp_path / "sys")
+  _write(sampler.sysfs / "kernel/debug/pvr/status", text)
+  assert sampler.sample()["gpu"] is None
+  assert sampler.sample()["gpu_temperature"] is None
+
+
+@pytest.mark.parametrize("value", ["43", "43%", "43@600000000Hz"])
+def test_gpu_devfreq_load_ignores_other_accelerators_and_does_not_parse_frequency(tmp_path, value):
+  sampler = PiStatus(tmp_path / "proc", tmp_path / "sys")
+  _write(sampler.sysfs / "class/devfreq/100.ddr/load", "98")
+  _write(sampler.sysfs / "class/devfreq/200.npu/load", "99")
+  _write(sampler.sysfs / "class/devfreq/1800000.gpu/load", value)
+  _write(sampler.sysfs / "class/devfreq/1800000.gpu/cur_freq", "600000000")
+  assert sampler.sample()["gpu"] == 43
+  _write(sampler.sysfs / "class/devfreq/1800000.gpu/load", "600000000")
+  assert sampler.sample()["gpu"] is None
+
+
+@pytest.mark.parametrize("result", [SimpleNamespace(returncode=0, stdout=b"GPU Utilisation: 34%\n"),
+                                   SimpleNamespace(returncode=1, stdout=b""), subprocess.TimeoutExpired("sudo", 0.5)])
+def test_powervr_permission_fallback_is_fixed_bounded_and_noninteractive(monkeypatch, result):
+  original = Path.open
+  def denied_status(path, *args, **kwargs):
+    if path == Path("/sys/kernel/debug/pvr/status"):
+      raise PermissionError("root-only debugfs")
+    return original(path, *args, **kwargs)
+  monkeypatch.setattr(Path, "open", denied_status)
+  monkeypatch.setattr(Path, "glob", lambda *_args: iter(()))
+  run = Mock(side_effect=result) if isinstance(result, Exception) else Mock(return_value=result)
+  monkeypatch.setattr(touch_status.subprocess, "run", run)
+  assert touch_status._gpu_usage(Path("/sys")) == (34 if getattr(result, "returncode", None) == 0 else None)
+  args, kwargs = run.call_args
+  assert args[0] == ["/usr/bin/sudo", "-n", "--", "/usr/bin/head", "-c", "4097", "--", str(Path("/sys/kernel/debug/pvr/status"))]
+  assert kwargs["timeout"] == 0.5 and kwargs["stderr"] == subprocess.DEVNULL
 
 
 def _worker(request, clock=lambda: 0):

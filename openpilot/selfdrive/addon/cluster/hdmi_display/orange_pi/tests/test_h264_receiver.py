@@ -144,6 +144,8 @@ def test_camera_display_count_excludes_metadata_only_stale_and_unpresented_frame
   receiver.record_display(1.2, 1.22, 1.23, video_received_at=1.19, presented=False)
   receiver.record_display(1.3, 1.32, 1.33, video_received_at=1.29)
   receiver.record_display(2.0, 2.02, 2.03, video_received_at=1.4, camera_visible=False)
+  assert receiver.metadata_displayed_frames == 1
+  assert receiver.hidden_video_frames == 1
   assert receiver.displayed_frames == 4
   assert receiver.displayed_video_frames == 2
   # Keeping the arrival timestamp preserves queue-age evidence even when the
@@ -720,7 +722,8 @@ def test_failed_session_releases_renderer_without_waiting_for_cyclic_gc(monkeypa
 
 
 @pytest.mark.parametrize("stall", [False, True])
-def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(monkeypatch, stall):
+@pytest.mark.parametrize("layered", [False, True])
+def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(monkeypatch, stall, layered):
   from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
 
   owner = threading.get_ident()
@@ -739,10 +742,18 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
       assert take_ownership
       self.videos.append((rgb, received_at))
 
-    def render(self):
+    def _make_image(self):
       assert threading.get_ident() == owner
       self.last_status = {"video_fresh": now[0] - self.videos[-1][1] <= 0.5}
       return f"scene {len(self.videos)}"
+
+    def render(self):
+      assert not layered
+      return self._make_image()
+
+    def render_layers(self):
+      assert layered
+      return self._make_image()
 
     def close(self):
       pass
@@ -794,7 +805,8 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
 
   display = SimpleNamespace(pump_events=lambda: threading.get_ident() == owner, screen_off=False,
                             send_rgb=present, show_waiting=lambda: waiting.append(True) or True,
-                            last_frame_presented=True)
+                            last_frame_presented=True, can_present_layers=layered, send_layers=present,
+                            compositor_backend="pi_gpu_camera" if layered else "cpu_scene")
   monkeypatch.setattr(h264_scene, "H264Scene", Scene)
   monkeypatch.setattr(h264_receiver, "H264Receiver", Receiver)
   assert h264_receiver.receive_h264_session(None, display, HELLO_DATA, max_frames=2) == 2
@@ -804,6 +816,7 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
   assert waiting == ([True] if stall else [])
   assert camera_visibility == ([True, False, True] if stall else [True, True])
   assert receivers[0].closed and receivers[0].displayed_frames == (3 if stall else 2)
+  assert receivers[0].gpu_camera == layered
 
 
 @pytest.mark.parametrize("render_cost,display_cost,screen_off", [

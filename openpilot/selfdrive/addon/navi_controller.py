@@ -535,8 +535,11 @@ class SpeedLimiter:
         starting_dist = max(cluster_speed_ms * 10., min_starting_dist_tight) if tight_zone \
                         else max(cluster_speed_ms * 18., min_starting_dist_normal)
 
+        # Legacy camera distance is published in whole metres; its rounding
+        # must not restart the approach when the speed-based threshold is tiny.
+        closer_jump_threshold = max(cluster_speed_ms * 6., 1.)
         if self.cam_decel and self.last_limit_speed_left_dist > 0 and \
-           not rear_camera_hold_active(navi_data) and cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - (cluster_speed_ms * 6)):
+           not rear_camera_hold_active(navi_data) and cam_limit_speed_left_dist < (self.last_limit_speed_left_dist - closer_jump_threshold):
           self._log_reset(f"decel reset (dist jumped closer): cam_type={cam_type} {self.last_limit_speed_left_dist:.0f}m -> {cam_limit_speed_left_dist:.0f}m")
           self.cam_decel = False
 

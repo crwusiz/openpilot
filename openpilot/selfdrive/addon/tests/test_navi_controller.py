@@ -220,6 +220,35 @@ def test_section_start_camera_keeps_approach_deceleration(limiter, cam_type):
   assert limiter.cam_decel
 
 
+@pytest.mark.parametrize("distance", [27, 60])
+@pytest.mark.parametrize("cluster_speed", [0.0, 0.1])
+def test_stopped_camera_distance_rounding_keeps_existing_approach(limiter, distance, cluster_speed):
+  # The 10/23 log toggles 27/26 m and 60/59 m while the vehicle stops.
+  limiter.naviData = make_navi_data(1, distance=399)
+  limiter.naviData.camLimitSpeed = 60
+  assert limiter.get_max_speed(80)[1]
+  for approach_distance in (300, 200, 100, distance):
+    limiter.naviData.camLimitSpeedLeftDist = approach_distance
+    assert not limiter.get_max_speed(80)[1]
+  started_dist, started_speed = limiter.started_dist, limiter.started_speed
+
+  for rounded_distance in (distance, distance - 1, distance, distance - 1):
+    limiter.naviData.camLimitSpeedLeftDist = rounded_distance
+    assert not limiter.get_max_speed(cluster_speed)[1]
+    assert limiter.cam_decel
+    assert (limiter.started_dist, limiter.started_speed) == (started_dist, started_speed)
+
+
+def test_stopped_camera_larger_distance_jump_starts_new_approach(limiter):
+  limiter.naviData = make_navi_data(1, distance=27)
+  assert limiter.get_max_speed(80)[1]
+
+  limiter.naviData.camLimitSpeedLeftDist = 25
+  assert limiter.get_max_speed(0) == (70, True)
+  assert limiter.started_dist == 25
+  assert limiter.started_speed == 0
+
+
 def test_rear_udp_preserves_fractional_distance_and_large_sample_id(monkeypatch):
   road_limit = {
     "road_limit_speed": 70,

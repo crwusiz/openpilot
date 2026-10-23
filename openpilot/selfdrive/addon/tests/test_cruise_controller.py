@@ -328,6 +328,8 @@ def test_nearby_tight_map_curve_on_straight_model_path_is_rejected(distance, rou
                                 naviCurveRouteState=1 if route_active else 0)
   assert controller._cal_stock_navi_curve_speed(car_state, make_model_sm()) == 255.0
   assert controller.stock_curve_rejected
+  assert controller.stock_curve_validation == 'rejected_model'
+  assert controller.stock_curve_model_window == (2.0, 158.0)
 
 
 def test_real_upcoming_curve_is_retained_even_before_vehicle_turns():
@@ -337,6 +339,7 @@ def test_real_upcoming_curve_is_retained_even_before_vehicle_turns():
   target = controller._cal_stock_navi_curve_speed(stock_curve_state(), make_model_sm(x, y))
   assert target == pytest.approx(30.0)
   assert not controller.stock_curve_rejected
+  assert controller.stock_curve_validation == 'matched_model'
 
 
 def test_map_limit_releases_when_ramp_path_straightens():
@@ -366,6 +369,39 @@ def test_distant_curve_keeps_navigation_preview():
   controller = make_stock_curve_controller()
   target = controller._cal_stock_navi_curve_speed(stock_curve_state(naviCurveDistance=200.0), make_model_sm())
   assert 30.0 < target < 255.0
+  assert not controller.stock_curve_rejected
+
+
+@pytest.mark.parametrize("distance, sm, validation, model_window", [
+  (20.0, make_model_sm(valid=False), 'model_unavailable', None),
+  (20.0, make_model_sm(x=np.zeros(20)), 'path_invalid', None),
+  (0.3, make_model_sm(), 'spot_before_model', (2.0, 158.0)),
+  (150.0, make_model_sm(), 'window_beyond_model', (2.0, 158.0)),
+  (250.0, make_model_sm(x=np.linspace(0.0, 900.0, 10)), 'window_sparse', (100.0, 800.0)),
+])
+def test_stock_curve_preview_reports_why_model_cannot_validate(distance, sm, validation, model_window):
+  # October 23, 03:06:29: rejection at 7.1 m changed to preview at 0.3 m.
+  # A missing model comparison must be distinguishable from corroboration.
+  controller = make_stock_curve_controller()
+  target = controller._cal_stock_navi_curve_speed(stock_curve_state(naviCurveDistance=distance), sm)
+
+  assert 0.0 < target < 255.0
+  assert not controller.stock_curve_rejected
+  assert controller.stock_curve_model_curvature is None
+  assert controller.stock_curve_validation == validation
+  assert controller.stock_curve_model_window == model_window
+
+
+def test_inactive_stock_curve_clears_previous_validation():
+  controller = make_stock_curve_controller()
+  assert controller._cal_stock_navi_curve_speed(stock_curve_state(), make_model_sm()) == 255.0
+  assert controller.stock_curve_validation == 'rejected_model'
+
+  controller._cal_stock_navi_curve_speed(stock_curve_state(naviCurveDistance=0.0), make_model_sm())
+
+  assert controller.stock_curve_validation == 'inactive'
+  assert controller.stock_curve_model_window is None
+  assert controller.stock_curve_model_curvature is None
   assert not controller.stock_curve_rejected
 
 
@@ -851,6 +887,26 @@ def test_curve_estimates_are_logged_and_cleared_with_invalid_model(monkeypatch):
   controller._cal_curve_speed_adaptive(sm, 20.0, 90.0)
   assert controller.curve_estimates is None
   assert controller.model_curve_geometry is None
+
+
+def test_stock_curve_validation_changes_are_logged_with_model_coverage(monkeypatch):
+  controller, cs, sm, _, _ = make_full_controller(monkeypatch)
+  vars(cs).update(vars(stock_curve_state(naviCurveDistance=200.0)))
+  controller.apply_limit_speed_clu = 90.0
+  controller._cal_curve_speed_adaptive = lambda *args: 255.0
+  messages = []
+  monkeypatch.setattr(cruise_controller.time, 'monotonic', lambda: 10.0)
+  monkeypatch.setattr(cruise_controller, 'cruise_log',
+                      SimpleNamespace(debug=lambda fmt, *args: messages.append(fmt % args)))
+
+  controller._cal_limit_speed(cs, sm, cs.vEgo, 60.0, 90.0)
+  sm.all_checks = lambda services: True
+  controller._cal_limit_speed(cs, sm, cs.vEgo, 60.0, 90.0)
+  controller._cal_limit_speed(cs, sm, cs.vEgo, 60.0, 90.0)
+
+  assert len(messages) == 2
+  assert 'validation=model_unavailable model_start=- model_end=-' in messages[0]
+  assert 'validation=window_beyond_model model_start=2.0 model_end=158.0' in messages[1]
 
 
 @pytest.mark.parametrize("is_metric", [True, False])

@@ -44,6 +44,23 @@ get_param() {
 ftp_upload_file() {
   printf '%s\\n' "$2" >> "$MOCK_UPLOAD_NAMES"
   printf '%s\\n' "${*:3}" >> "$MOCK_UPLOAD_OPTIONS"
+  if [[ -n ${MOCK_LIVE_LOG:-} ]]; then
+    local initial_bytes
+    initial_bytes=$(wc -c < "$1")
+    case "${MOCK_LIVE_CHANGE:-append}" in
+      append) printf 'new driving records\\n' >> "$MOCK_LIVE_LOG" ;;
+      truncate) printf 'reset\\n' > "$MOCK_LIVE_LOG" ;;
+      rotate) mv -- "$MOCK_LIVE_LOG" "$MOCK_LIVE_LOG.1"; printf 'rotated\\n' > "$MOCK_LIVE_LOG" ;;
+    esac
+    if [[ $(wc -c < "$1") != "$initial_bytes" ]]; then
+      printf 'curl: (18) Uploaded unaligned file size\\n' >&2
+      return 1
+    fi
+  fi
+  if [[ ${MOCK_UPLOAD_FAIL:-} == 1 ]]; then
+    printf 'curl: (7) Failed to connect\\n' >&2
+    return 1
+  fi
   cp -- "$1" "$MOCK_UPLOADED_DIR/$(basename "$1")"
   chmod u+w "$MOCK_UPLOADED_DIR/$(basename "$1")"
   local archive_name
@@ -716,6 +733,48 @@ def test_unrelated_log_upload_keeps_single_file_behavior(sandbox):
   assert result.returncode == 0
   assert not (sandbox.parent / "collector-call.txt").exists()
   assert len((sandbox.parent / "upload-names.txt").read_text().splitlines()) == 1
+
+
+@pytest.mark.parametrize("filename", ["traffic_debug.log", "navi_debug.log", "cruise_debug.log"])
+@pytest.mark.parametrize("change", ["append", "truncate", "rotate"])
+def test_live_log_changes_do_not_change_ftp_snapshot(sandbox, filename, change):
+  original = b"original driving records\r\n\x00\xff\n"
+  live = sandbox.parent / filename
+  live.write_bytes(original)
+  result = _upload(sandbox, filename, MOCK_LIVE_LOG=_bash_path(live), MOCK_LIVE_CHANGE=change)
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert (sandbox.parent / "uploaded" / filename).read_bytes() == original
+  names = (sandbox.parent / "upload-names.txt").read_text().splitlines()
+  assert len(names) == 1 and names[0].endswith(f"_TEST_CAR_test-dongle_{filename}")
+  expected = {"append": original + b"new driving records\n", "truncate": b"reset\n", "rotate": b"rotated\n"}
+  assert live.read_bytes() == expected[change]
+  if change == "rotate":
+    assert live.with_name(filename + ".1").read_bytes() == original
+  assert not _temporary_work_files(sandbox)
+
+
+def test_live_log_ftp_failure_keeps_original_and_cleans_snapshot(sandbox):
+  live = sandbox.parent / "traffic_debug.log"
+  live.write_bytes(b"retained driving records\n")
+  result = _upload(sandbox, live.name, MOCK_UPLOAD_FAIL="1")
+  assert result.returncode != 0
+  assert "curl: (7) Failed to connect" in result.stderr
+  assert live.read_bytes() == b"retained driving records\n"
+  assert not _temporary_work_files(sandbox)
+
+
+@pytest.mark.parametrize("command", ["mktemp", "cp", "chmod"])
+def test_live_log_snapshot_failure_prevents_ftp_and_cleans_temp(sandbox, command):
+  live = sandbox.parent / "navi_debug.log"
+  live.write_bytes(b"navigation records\n")
+  startup = sandbox.parent / "snapshot-failure.sh"
+  startup.write_text(f'{command}() {{ printf "mock snapshot failure\\n" >&2; return 1; }}\n', encoding="utf-8", newline="\n")
+  result = _upload(sandbox, live.name, BASH_ENV=_bash_path(startup))
+  assert result.returncode != 0
+  assert "snapshot" in result.stdout
+  assert not (sandbox.parent / "upload-names.txt").exists()
+  assert live.read_bytes() == b"navigation records\n"
+  assert not _temporary_work_files(sandbox)
 
 
 def test_missing_collector_uploads_explanatory_sidecar_instead_of_blocking_c4(sandbox):

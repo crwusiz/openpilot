@@ -138,6 +138,53 @@ def test_read_failures_and_loaded_opencv_failures_do_not_interrupt_stream(tmp_pa
 def test_format_includes_stable_units_and_unknowns():
   assert format_receiver_resources({"cpu_pct": 250.04, "rss_mb": 64.0, "threads": 17,
                                     "cpu_temp_max_c": 61.25, "fan_pwm_pct": 60,
-                                    "cpu_freq_min_mhz": 1200.0, "cpu_freq_max_mhz": 1800.0}) == (
+                                    "cpu_freq_min_mhz": 1200.0, "cpu_freq_max_mhz": 1800.0,
+                                    "system_cpu_pct": 50.0, "cpu_cores_pct": {"cpu0": 90.0, "cpu1": 10.0}}) == (
     "cpu_pct=250.0 | rss_mb=64.0 | threads=17 | cpu_temp_max_c=61.2 | fan_pwm_pct=60 | "
-    + "cpu_freq_min_mhz=1200.0 | cpu_freq_max_mhz=1800.0 | opencv_threads=n/a")
+    + "cpu_freq_min_mhz=1200.0 | cpu_freq_max_mhz=1800.0 | opencv_threads=n/a | system_cpu_pct=50.0 | "
+    + "cpu_cores_pct=cpu0:90.0,cpu1:10.0")
+
+
+def test_system_and_per_core_cpu_distinguish_hot_core_and_do_not_double_count_guest(tmp_path):
+  sampler = _sampler(tmp_path)
+  _write(sampler.proc / "stat", "cpu 100 10 20 700 50 5 5 0 20 0\n"
+         + "cpu0 20 0 10 300 10 0 0 0 5 0\ncpu1 80 10 10 400 40 5 5 0 15 0\n"
+         + "intr " + "1 " * 100000)
+  first = sampler.sample()
+  assert first["system_cpu_pct"] is None
+  assert first["cpu_cores_pct"] is None
+  _write(sampler.proc / "stat", "cpu 180 10 40 780 70 5 5 0 50 0\n"
+         + "cpu0 100 0 20 310 10 0 0 0 35 0\ncpu1 80 10 20 470 60 5 5 0 15 0\n")
+  result = sampler.sample()
+  assert result["system_cpu_pct"] == pytest.approx(50)
+  assert result["cpu_cores_pct"] == {"cpu0": 90.0, "cpu1": 10.0}
+
+
+def test_cpu_counter_reset_hotplug_and_missing_samples_rebase_cleanly(tmp_path):
+  sampler = _sampler(tmp_path)
+  _write(sampler.proc / "stat", "cpu 100 0 0 100\ncpu0 100 0 0 100\n")
+  sampler.sample()
+  # CPU0 reset and CPU1 is newly online: neither has a usable interval yet.
+  _write(sampler.proc / "stat", "cpu 20 0 0 20\ncpu0 10 0 0 10\ncpu1 10 0 0 10\n")
+  result = sampler.sample()
+  assert result["system_cpu_pct"] is None
+  assert result["cpu_cores_pct"] is None
+  _write(sampler.proc / "stat", "cpu 40 0 0 40\ncpu0 30 0 0 10\ncpu1 10 0 0 30\n")
+  assert sampler.sample()["cpu_cores_pct"] == {"cpu0": 100.0, "cpu1": 0.0}
+  (sampler.proc / "stat").unlink()
+  assert sampler.sample()["cpu_cores_pct"] is None
+  _write(sampler.proc / "stat", "cpu 60 0 0 60\ncpu0 50 0 0 10\n")
+  assert sampler.sample()["cpu_cores_pct"] is None
+
+
+def test_cpu_stat_read_stops_at_bounded_cpu_prefix_and_rejects_invalid_counters(tmp_path):
+  sampler = _sampler(tmp_path)
+  _write(sampler.proc / "stat", "cpu 0 0 0 0\n" + "".join(f"cpu{index} 0 0 0 0\n" for index in range(100)))
+  sampler.sample()
+  _write(sampler.proc / "stat", "cpu 100 0 0 100\n" + "".join(f"cpu{index} 10 0 0 10\n" for index in range(100)))
+  result = sampler.sample()
+  assert len(result["cpu_cores_pct"]) == MAX_SENSOR_ENTRIES
+  _write(sampler.proc / "stat", "cpu -1 0 0 100\ncpu0 invalid 0 0 10\ncpu1 0 0 0 10\n")
+  result = sampler.sample()
+  assert result["system_cpu_pct"] is None
+  assert result["cpu_cores_pct"] is None

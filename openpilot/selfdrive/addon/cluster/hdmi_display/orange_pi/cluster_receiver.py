@@ -53,16 +53,29 @@ def log_runtime_versions(pygame_module):
 
 
 def configure_native_runtime():
-  # Decoding, RGB conversion and SDL already overlap. Eight OpenCV workers for
-  # each short path/resize operation compete with those workers and add jitter.
+  # Share camera resize/warp work across two cores, leaving capacity for decode,
+  # RGB conversion and SDL. Unbounded native pools caused jitter on older builds.
   # Existing installations keep their custom systemd unit during pi_update;
   # apply the limits here too, before importing NumPy/OpenCV for the first time.
   for name in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
     os.environ[name] = "1"
+  try:
+    available_cpus = len(os.sched_getaffinity(0))
+  except (AttributeError, OSError):
+    available_cpus = os.cpu_count() or 1
+  available_cpus = max(1, available_cpus)
+  default_threads = 2 if available_cpus >= 4 else 1
+  try:
+    requested_threads = int(os.environ.get("CLUSTER_OPENCV_THREADS", default_threads))
+  except ValueError:
+    LOG.warning("[CLUSTER_RX_NATIVE] invalid CLUSTER_OPENCV_THREADS; using %d", default_threads)
+    requested_threads = default_threads
+  opencv_threads = max(1, min(requested_threads, 4, available_cpus))
   import cv2
-  cv2.setNumThreads(1)
+  cv2.setNumThreads(opencv_threads)
   cv2.ocl.setUseOpenCL(False)
-  LOG.info("[CLUSTER_RX_NATIVE] opencv_threads=%d | opencl=%d", cv2.getNumThreads(), int(cv2.ocl.useOpenCL()))
+  LOG.info("[CLUSTER_RX_NATIVE] opencv_threads=%d | opencl=%d | available_cpu_cores=%d",
+           cv2.getNumThreads(), int(cv2.ocl.useOpenCL()), available_cpus)
 
 
 def log_socket_buffers(sock):

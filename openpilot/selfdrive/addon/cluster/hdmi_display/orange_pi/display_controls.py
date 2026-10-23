@@ -268,8 +268,11 @@ class DisplayControls:
     surface.fill((18, 22, 28))
     self._font(34 * scale)
     korean = self._font_path is not None
-    for index, (text, color) in enumerate(zip(self.status_labels(korean), self.status_colors(), strict=True)):
-      self._label(surface, text, 34 * scale, (round((260 + 440 * index) * scale), round(48 * scale)), color)
+    labels = self.status_labels(korean)
+    column_width = (width - 80 * scale) / len(labels)
+    for index, (text, color) in enumerate(zip(labels, self.status_colors(), strict=True)):
+      center_x = round(40 * scale + column_width * (index + 0.5))
+      self._label(surface, text, 34 * scale, (center_x, round(48 * scale)), color)
     step = self.brightness // BRIGHTNESS_STEP
     title = f"밝기 {step}/10 · {self.brightness}%" if korean else f"Light {step}/10 · {self.brightness}%"
     self._label(surface, title, 34 * scale, (round(200 * scale), round(140 * scale)), (225, 232, 240))
@@ -308,17 +311,20 @@ class DisplayControls:
     fan = number("fan_rpm", " RPM") if self.status.get("fan_rpm") is not None else number("fan_pwm", "% PWM")
     return (("CPU 사용률 " if korean else "CPU usage ") + number("cpu", "%"),
             ("CPU 온도 " if korean else "CPU temp ") + number("temperature", "°C", 1),
+            ("GPU 사용률 " if korean else "GPU usage ") + number("gpu", "%"),
+            ("GPU 온도 " if korean else "GPU temp ") + number("gpu_temperature", "°C", 1),
             "FAN " + fan, "FPS " + number("fps", "", 1))
 
   def status_colors(self):
     neutral = (175, 201, 217)
-    temperature = self.status.get("temperature")
-    temperature_color = neutral
-    if temperature is not None and math.isfinite(temperature):
+    def temperature_color(key):
+      temperature = self.status.get(key)
+      if temperature is None or not math.isfinite(temperature):
+        return neutral
       # Display thresholds only; fan and thermal policies are unchanged.
-      temperature_color = ((108, 211, 145) if temperature < 60 else (238, 211, 105) if temperature < 70
-                           else (246, 164, 80) if temperature < 80 else (241, 101, 101))
-    return neutral, temperature_color, neutral, neutral
+      return ((108, 211, 145) if temperature < 60 else (238, 211, 105) if temperature < 70
+              else (246, 164, 80) if temperature < 80 else (241, 101, 101))
+    return neutral, temperature_color("temperature"), neutral, temperature_color("gpu_temperature"), neutral, neutral
 
   def action_label(self, korean=False):
     state, action = self.action_status.get("state"), self.action_status.get("action")

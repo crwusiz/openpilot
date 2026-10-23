@@ -85,6 +85,29 @@ snapshot_crash_logs() {
   return "$status"
 }
 
+upload_live_log() (
+  umask 077
+  local log_path directory snapshot
+  log_path=$(resolve_log_path "$1")
+  if [[ ! -f $log_path ]]; then
+    log "ERROR" "Log file not found: $log_path"
+    return 1
+  fi
+  directory=$(mktemp -d "${TMPDIR:-/tmp}/log-upload.XXXXXXXX") || {
+    log "ERROR" "Could not create a temporary log snapshot."
+    return 1
+  }
+  snapshot="$directory/$(basename "$log_path")"
+  trap 'rm -f -- "$snapshot"; rmdir -- "$directory"' EXIT
+  # curl sizes its input before transfer. Keep ongoing writes and rotation out
+  # of the FTP request and its retries (otherwise curl can fail with error 18).
+  if ! cp -- "$log_path" "$snapshot" || ! chmod 400 "$snapshot"; then
+    log "ERROR" "Could not snapshot log file: $log_path"
+    return 1
+  fi
+  upload_file "$snapshot" "${@:2}"
+)
+
 upload_file() {
   local local_file_path="$1"
   local_file_path=$(resolve_log_path "$local_file_path")
@@ -198,7 +221,7 @@ upload_cluster_fallback() (
     trap 'rm -f -- "$directory/cluster_crash.log" "$directory/cluster_crash.log.1" "$directory/.cluster_crash.log.snapshot" "$directory/.cluster_crash.log.1.snapshot" "$directory/cluster_crash.log.uploaded" "$directory/cluster_crash.log.1.uploaded"; rmdir -- "$directory"' EXIT
     snapshot_crash_logs "$log_path" "$directory" || true
   fi
-  upload_file "$log_path" "$prefix" || return 1
+  upload_live_log "$log_path" "$prefix" || return 1
   if [[ -n $directory ]]; then
     if ! upload_crash_logs "$directory" "$prefix" ""; then
       printf '%s\n' 'CLUSTER_LOG_WARNING: 보관 공간을 사용할 수 없어 실패한 crash 파일의 자동 재전송 사본은 남기지 못했습니다.'
@@ -206,7 +229,7 @@ upload_cluster_fallback() (
   else
     for filename in cluster_crash.log cluster_crash.log.1; do
       crash_log_has_diagnostics "$(dirname "$log_path")/$filename" || continue
-      upload_file "$(dirname "$log_path")/$filename" "$prefix" pi || \
+      upload_live_log "$(dirname "$log_path")/$filename" "$prefix" pi || \
         printf 'CLUSTER_LOG_WARNING: %s 전송 및 임시 사본 보관에 실패했습니다.\n' "$filename"
     done
   fi
@@ -454,14 +477,14 @@ main() {
     if pi_log_upload_enabled || has_crash_logs "$log_path" || has_pending_crash_logs "$log_path"; then
       upload_cluster "$log_path" "$prefix"
     else
-      upload_file "$log_path" "$prefix"
+      upload_live_log "$log_path" "$prefix"
     fi
   elif [[ "$(basename "$log_path")" == cluster_pi_debug.log ]] && ! pi_log_upload_enabled; then
     log "INFO" "Skipping Orange Pi log upload: Network cluster is not enabled."
   elif [[ "$(basename "$log_path")" == cluster_crash.log || "$(basename "$log_path")" == cluster_crash.log.1 ]] && [[ -f $log_path ]] && ! crash_log_has_diagnostics "$log_path"; then
     log "INFO" "Skipping cluster crash upload: no crash diagnostics."
   else
-    upload_file "$log_path" "$prefix"
+    upload_live_log "$log_path" "$prefix"
   fi
 }
 

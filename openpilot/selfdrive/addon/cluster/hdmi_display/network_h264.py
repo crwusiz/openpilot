@@ -23,6 +23,7 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol impo
 STATE_DRAIN_WARN_S = 0.25
 STATE_DRAIN_TIMEOUT_S = 5.0
 STATE_SEND_BUFFER_BYTES = 16 * 1024
+KEYFRAME_REQUEST_INTERVAL = 1.0
 
 
 def configure_state_transport(writer):
@@ -132,8 +133,10 @@ def create_camera_stream(offer_sdp):
       self._encode_id = None
       self._ready = False
       self._header = b""
-      self._keyframe_at = 0.0
+      self._keyframe_at = None
       self._keyframe_requested = False
+      self._keyframe_deferred = False
+      self.keyframe_requests = self.keyframe_coalesced = self.keyframe_deferred = 0
       self._loop = asyncio.get_running_loop()
       self._loop_thread = threading.get_ident()
       self._request_lock = threading.Lock()
@@ -164,10 +167,19 @@ def create_camera_stream(offer_sdp):
         if self._stopped:
           return
       now = time.monotonic()
-      if self._keyframe_requested and now - self._keyframe_at < 1.0:
+      if self._keyframe_at is not None and now - self._keyframe_at < KEYFRAME_REQUEST_INTERVAL:
+        self.keyframe_coalesced += 1
+        # An IDR already pending fulfills overlapping requests. A new request
+        # after its acknowledgement must survive the cooldown and be retried
+        # on a later source frame, without holding back healthy P pictures.
+        if not self._keyframe_requested and not self._keyframe_deferred:
+          self._keyframe_deferred = True
+          self.keyframe_deferred += 1
         return
+      self._keyframe_deferred = False
       self._keyframe_requested = True
       self._keyframe_at = now
+      self.keyframe_requests += 1
       super().request_keyframe()
 
     def request_recovery(self):
@@ -180,6 +192,7 @@ def create_camera_stream(offer_sdp):
     def stop(self):
       with self._request_lock:
         self._stopped = True
+      self._keyframe_deferred = False
       super().stop()
       if self._keyframe_requested:
         # The encoder reads this shared flag on every frame. Disconnecting
@@ -215,7 +228,7 @@ def create_camera_stream(offer_sdp):
           self.resyncs += 1
         if not self._ready:
           if not self._current_keyframe or not self._header or stale:
-            if now - self._keyframe_at >= 1.0:
+            if self._keyframe_at is None or now - self._keyframe_at >= KEYFRAME_REQUEST_INTERVAL:
               self.request_keyframe()
             await asyncio.sleep(0)
             continue
@@ -227,6 +240,10 @@ def create_camera_stream(offer_sdp):
           if not base_ack_pending:
             self.params.put("LivestreamRequestKeyframe", False, block=False)
           self._keyframe_requested = False
+        if self._keyframe_deferred and now - self._keyframe_at >= KEYFRAME_REQUEST_INTERVAL:
+          # Run after the current frame's acknowledgement: an IDR captured
+          # before this retry must not acknowledge the new encoder request.
+          self._request_keyframe_on_loop()
         self.video_frames += 1
         self.video_bytes += len(bytes(packet))
         self.last_video_at = now
@@ -291,7 +308,8 @@ class H264NetworkServer:
       # Only bounded scalar telemetry is accepted; no vehicle messages/params
       # are published from a receiver's input.
       fields = []
-      for key in ("video_fps", "decoded_fps", "skipped_rgb", "display_fps", "camera_display_fps", "rgb_convert_avg_ms",
+      for key in ("video_fps", "decoded_fps", "skipped_rgb", "display_fps", "camera_display_fps", "metadata_display_fps",
+                  "hidden_camera_fps", "gpu_camera", "rgb_convert_avg_ms",
                   "render_avg_ms", "display_avg_ms", "queue_wait_avg_ms", "video_age_ms", "state_age_ms", "display_gap_max_ms",
                   "dropped_display", "decoder_errors"):
         value = payload.get(key)

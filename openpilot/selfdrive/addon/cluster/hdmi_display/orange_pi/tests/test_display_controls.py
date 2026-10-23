@@ -76,14 +76,16 @@ def test_running_action_can_be_hidden_and_completion_remains_visible_for_the_tim
 def test_status_updates_do_not_redraw_hidden_video_and_fan_output_is_not_labelled_rpm(controls):
   state, _, _ = controls
   revision = state.revision
-  state.set_status({"cpu": 25.0, "temperature": 54.2, "fan_pwm": 60, "fan_rpm": None, "fps": 17.5})
+  state.set_status({"cpu": 25.0, "temperature": 54.2, "gpu": 40.0, "gpu_temperature": 58.7,
+                    "fan_pwm": 60, "fan_rpm": None, "fps": 17.5})
   assert state.revision == revision
-  assert state.status_labels() == ("CPU usage 25%", "CPU temp 54.2°C", "FAN 60% PWM", "FPS 17.5")
-  assert state.status_labels(korean=True) == ("CPU 사용률 25%", "CPU 온도 54.2°C", "FAN 60% PWM", "FPS 17.5")
+  assert state.status_labels() == ("CPU usage 25%", "CPU temp 54.2°C", "GPU usage 40%", "GPU temp 58.7°C", "FAN 60% PWM", "FPS 17.5")
+  assert state.status_labels(korean=True) == ("CPU 사용률 25%", "CPU 온도 54.2°C", "GPU 사용률 40%", "GPU 온도 58.7°C",
+                                             "FAN 60% PWM", "FPS 17.5")
   _tap(state)
   revision = state.revision
   state.set_status({**state.status, "fan_rpm": 3200})
-  assert state.revision > revision and state.status_labels()[2] == "FAN 3200 RPM"
+  assert state.revision > revision and state.status_labels()[4] == "FAN 3200 RPM"
 
 
 def test_tap_opens_controls_and_close_or_outside_tap_dismisses_them(controls):
@@ -317,7 +319,8 @@ def test_menu_surface_is_cached_and_only_changed_state_redraws(raster_pygame):
 ])
 def test_expanded_menu_renders_distinct_fitting_labels_and_temperature_colors(raster_pygame, monkeypatch, korean, temperature, color):
   state = DisplayControls(raster_pygame, brightness=100)
-  state.set_status({"cpu": 100.0, "temperature": temperature, "fan_rpm": 99999, "fps": 60.0})
+  state.set_status({"cpu": 100.0, "temperature": temperature, "gpu": 100.0, "gpu_temperature": 75,
+                    "fan_rpm": 99999, "fps": 60.0})
   state.set_actions_available(True)
   _tap(state)
   state._font(34)
@@ -336,11 +339,14 @@ def test_expanded_menu_renders_distinct_fitting_labels_and_temperature_colors(ra
   monkeypatch.setattr(state, "_label", draw_label)
   surface, _ = state.render_menu()
   assert surface.get_size() == (1840, 340)
-  assert len(labels[:4]) == 4
+  assert len(labels[:6]) == 6
   assert labels[0][0].startswith("CPU 사용률 " if korean else "CPU usage ")
   assert labels[1][0].startswith("CPU 온도 " if korean else "CPU temp ")
   assert labels[1][2] == color
-  for earlier, later in zip(labels[:3], labels[1:4], strict=True):
+  assert labels[2][0].startswith("GPU 사용률 " if korean else "GPU usage ")
+  assert labels[3][0].startswith("GPU 온도 " if korean else "GPU temp ")
+  assert labels[3][2] == (246, 164, 80)
+  for earlier, later in zip(labels[:5], labels[1:6], strict=True):
     assert earlier[1].right < later[1].left
-  assert labels[4][1].right < state.layout["slider"][0] - state.layout["panel"][0]
+  assert labels[6][1].right < state.layout["slider"][0] - state.layout["panel"][0]
   assert "day" not in state.layout and "night" not in state.layout

@@ -9,6 +9,7 @@ import time
 MAX_SENSOR_ENTRIES = 32
 MAX_STATUS_BYTES = 16384
 MAX_SENSOR_BYTES = 128
+MAX_CPU_LINE_BYTES = 512
 
 
 def _read(path, limit=MAX_SENSOR_BYTES):
@@ -34,6 +35,39 @@ def _paths(root, pattern):
     return []
 
 
+def _cpu_times(proc):
+  """Read only the bounded CPU prefix; /proc/stat's IRQ tail can be very large."""
+  counters = {}
+  try:
+    with (proc / "stat").open("rb") as source:
+      for _ in range(MAX_SENSOR_ENTRIES + 1):
+        line = source.readline(MAX_CPU_LINE_BYTES + 1)
+        if len(line) > MAX_CPU_LINE_BYTES:
+          break
+        fields = line.decode("ascii").split()
+        if not fields or not (fields[0] == "cpu" or fields[0].startswith("cpu") and fields[0][3:].isdigit()):
+          break
+        try:
+          # guest/guest_nice (fields 9/10) are already included in user/nice.
+          values = [int(value) for value in fields[1:9]]
+          if len(values) >= 4 and all(value >= 0 for value in values):
+            counters[fields[0]] = sum(values), values[3] + (values[4] if len(values) > 4 else 0)
+        except ValueError:
+          continue
+  except (OSError, UnicodeError):
+    pass
+  return counters
+
+
+def _cpu_percent(current, previous):
+  if previous is None:
+    return None
+  total, idle = current[0] - previous[0], current[1] - previous[1]
+  if total <= 0 or not 0 <= idle <= total:
+    return None
+  return 100 * (total - idle) / total
+
+
 class ReceiverResourceSampler:
   """CPU percent includes native threads; 100% represents one fully used core."""
   def __init__(self, proc=Path("/proc"), sysfs=Path("/sys"), clock=time.monotonic, cpu_clock=time.process_time, modules=None):
@@ -41,6 +75,7 @@ class ReceiverResourceSampler:
     self.clock, self.cpu_clock = clock, cpu_clock
     self.modules = sys.modules if modules is None else modules
     self.previous = None
+    self.previous_cpu_times = {}
 
   def sample(self):
     now, cpu_now = self.clock(), self.cpu_clock()
@@ -50,6 +85,11 @@ class ReceiverResourceSampler:
       if elapsed > 0 and cpu_elapsed >= 0 and math.isfinite(elapsed) and math.isfinite(cpu_elapsed):
         cpu_pct = 100 * cpu_elapsed / elapsed
     self.previous = (now, cpu_now) if math.isfinite(now) and math.isfinite(cpu_now) else None
+
+    cpu_times = _cpu_times(self.proc)
+    cpu_usage = {name: _cpu_percent(counters, self.previous_cpu_times.get(name)) for name, counters in cpu_times.items()}
+    self.previous_cpu_times = cpu_times
+    core_usage = {name: value for name, value in cpu_usage.items() if name != "cpu" and value is not None}
 
     rss_mb, threads = None, None
     for line in (_read(self.proc / "self/status", MAX_STATUS_BYTES) or "").splitlines():
@@ -110,14 +150,19 @@ class ReceiverResourceSampler:
       "cpu_freq_min_mhz": min(frequencies, default=None),
       "cpu_freq_max_mhz": max(frequencies, default=None),
       "opencv_threads": opencv_threads,
+      "system_cpu_pct": cpu_usage.get("cpu"),
+      "cpu_cores_pct": core_usage or None,
     }
 
 
 def format_receiver_resources(snapshot):
   fields = []
   for key in ("cpu_pct", "rss_mb", "threads", "cpu_temp_max_c", "fan_pwm_pct",
-              "cpu_freq_min_mhz", "cpu_freq_max_mhz", "opencv_threads"):
+              "cpu_freq_min_mhz", "cpu_freq_max_mhz", "opencv_threads", "system_cpu_pct", "cpu_cores_pct"):
     value = snapshot.get(key)
-    formatted = "n/a" if value is None else f"{value:.1f}" if isinstance(value, float) else str(value)
+    if key == "cpu_cores_pct" and value is not None:
+      formatted = ",".join(f"{name}:{percent:.1f}" for name, percent in value.items())
+    else:
+      formatted = "n/a" if value is None else f"{value:.1f}" if isinstance(value, float) else str(value)
     fields.append(f"{key}={formatted}")
   return " | ".join(fields)

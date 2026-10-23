@@ -102,6 +102,8 @@ class ClusterH264Stream(WebRTCAnswerStream):
     clock = CaptureClock()
     waiting_for_idr = False
     sent = invalid = gated = send_not_ready = 0
+    access_units = idr_frames = max_access_unit_bytes = max_idr_bytes = 0
+    last_keyframe_stats = (0, 0, 0)
     send_not_ready_at = None
     last_request = None
     report_at = time.monotonic()
@@ -135,6 +137,11 @@ class ClusterH264Stream(WebRTCAnswerStream):
             last_request = now
           continue
         waiting_for_idr = False
+        access_units += 1
+        max_access_unit_bytes = max(max_access_unit_bytes, len(data))
+        if keyframe:
+          idr_frames += 1
+          max_idr_bytes = max(max_idr_bytes, len(data))
         pts = clock.pts(getattr(producer_track, "video_timestamp_eof", None), packet.pts)
         rtp_config.timestamp = (rtp_config.start_timestamp + pts) & 0xFFFFFFFF
         # Track.send() runs the same media chain (packetization/SR/PLI/NACK)
@@ -152,23 +159,29 @@ class ClusterH264Stream(WebRTCAnswerStream):
           if send_not_ready_at is None:
             send_not_ready_at = now
             flog("[CLUSTER_H264_SEND_BACKPRESSURE] track_send=0 | action=keep_session")
-          if last_request is None or now - last_request >= 1.0:
-            producer_track.request_keyframe()
-            last_request = now
           # Keep the live reference chain flowing, including P pictures. The
-          # receiver can request another IDR if a packet was actually lost.
+          # receiver requests an IDR if a packet was actually lost. A False
+          # transport write alone must not create another burst of keyframes.
           await asyncio.sleep(0)
-          continue
-        if send_not_ready_at is not None:
-          flog(f"[CLUSTER_H264_SEND_RECOVERED] pause_ms={(now - send_not_ready_at) * 1000:.1f} | "
-               + f"send_not_ready={send_not_ready}")
-          send_not_ready_at = None
-        sent += 1
+        else:
+          if send_not_ready_at is not None:
+            flog(f"[CLUSTER_H264_SEND_RECOVERED] pause_ms={(now - send_not_ready_at) * 1000:.1f} | "
+                 + f"send_not_ready={send_not_ready}")
+            send_not_ready_at = None
+          sent += 1
         if now - report_at >= 10.0:
+          keyframe_stats = tuple(getattr(producer_track, name, 0) for name in
+                                 ("keyframe_requests", "keyframe_coalesced", "keyframe_deferred"))
           flog(f"[CLUSTER_H264_SEND_PERF] submitted_fps={sent / (now - report_at):.2f} | "
                + f"invalid={invalid} | idr_gated={gated} | send_not_ready={send_not_ready} | "
-               + f"last_bytes={len(data)} | last_pts={pts} | clock=camera_eof")
+               + f"last_bytes={len(data)} | max_access_unit_bytes={max_access_unit_bytes} | "
+               + f"access_units={access_units} | idr_frames={idr_frames} | max_idr_bytes={max_idr_bytes} | "
+               + f"idr_requests={keyframe_stats[0] - last_keyframe_stats[0]} | "
+               + f"idr_coalesced={keyframe_stats[1] - last_keyframe_stats[1]} | "
+               + f"idr_deferred={keyframe_stats[2] - last_keyframe_stats[2]} | last_pts={pts} | clock=camera_eof")
           report_at, sent = now, 0
+          access_units = idr_frames = max_access_unit_bytes = max_idr_bytes = 0
+          last_keyframe_stats = keyframe_stats
     except asyncio.CancelledError:
       raise
     except Exception as error:

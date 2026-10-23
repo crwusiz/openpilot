@@ -1,10 +1,121 @@
+import ctypes
 import logging
+import math
+from pathlib import Path
 import threading
 import time
 
 
 ARGB_MASKS = (0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000)
 LOG = logging.getLogger("cluster_receiver.hdmi")
+
+
+class _Point(ctypes.Structure):
+  _fields_ = [("x", ctypes.c_float), ("y", ctypes.c_float)]
+
+
+class _Color(ctypes.Structure):
+  _fields_ = [(name, ctypes.c_uint8) for name in ("r", "g", "b", "a")]
+
+
+class _Vertex(ctypes.Structure):
+  _fields_ = [("position", _Point), ("color", _Color), ("tex_coord", _Point)]
+
+
+class _LayerTextures:
+  """Use public SDL APIs for floating-point UVs absent from pygame Texture.draw.
+
+  The window ID resolves the renderer owned by pygame; no Python extension
+  object layouts or pointers are inspected. All calls share pygame's linked
+  SDL, renderer queue and owner thread. SDL 2.0.18 introduced RenderGeometry.
+  """
+
+  def __init__(self, pygame_module, window):
+    library = ctypes.CDLL(pygame_module.base.__file__)
+    if not hasattr(library, "SDL_GetWindowFromID"):
+      # Windows extension DLLs do not re-export their dependencies' symbols.
+      library = ctypes.CDLL(str(Path(pygame_module.base.__file__).with_name("SDL2.dll")))
+    self.sdl = library
+    signatures = {
+      "SDL_GetWindowFromID": ([ctypes.c_uint32], ctypes.c_void_p),
+      "SDL_GetRenderer": ([ctypes.c_void_p], ctypes.c_void_p),
+      "SDL_CreateTexture": ([ctypes.c_void_p, ctypes.c_uint32, ctypes.c_int, ctypes.c_int, ctypes.c_int], ctypes.c_void_p),
+      "SDL_DestroyTexture": ([ctypes.c_void_p], None),
+      "SDL_SetTextureBlendMode": ([ctypes.c_void_p, ctypes.c_int], ctypes.c_int),
+      "SDL_ComposeCustomBlendMode": ([ctypes.c_int] * 6, ctypes.c_int),
+      "SDL_SetTextureScaleMode": ([ctypes.c_void_p, ctypes.c_int], ctypes.c_int),
+      "SDL_MasksToPixelFormatEnum": ([ctypes.c_int] + [ctypes.c_uint32] * 4, ctypes.c_uint32),
+      "SDL_UpdateTexture": ([ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int], ctypes.c_int),
+      "SDL_RenderGeometry": ([ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(_Vertex), ctypes.c_int,
+                               ctypes.POINTER(ctypes.c_int), ctypes.c_int], ctypes.c_int),
+      "SDL_RenderFlush": ([ctypes.c_void_p], ctypes.c_int),
+      "SDL_GetError": ([], ctypes.c_char_p),
+    }
+    for name, (arguments, result) in signatures.items():
+      function = getattr(library, name)
+      function.argtypes, function.restype = arguments, result
+    native_window = library.SDL_GetWindowFromID(window.id)
+    self.renderer = library.SDL_GetRenderer(native_window) if native_window else None
+    if not self.renderer:
+      raise RuntimeError("SDL could not resolve the texture presenter's renderer")
+    self.textures = {}
+    # Premultiplied path RGB already includes alpha. Applying straight alpha
+    # here would darken its edges and make overlapping paths too faint.
+    self._premultiplied_blend = library.SDL_ComposeCustomBlendMode(2, 6, 1, 2, 6, 1)
+    self._vertices = (_Vertex * 4)()
+    self._triangles = ((ctypes.c_int * 3)(0, 1, 2), (ctypes.c_int * 3)(0, 2, 3))
+
+  def _check(self, result):
+    if result < 0:
+      message = self.sdl.SDL_GetError()
+      raise RuntimeError(message.decode("utf-8", errors="replace") if message else "SDL layer operation failed")
+
+  def upload(self, name, surface, alpha=False, premultiplied=False):
+    size = tuple(surface.get_size())
+    format_key = surface.get_bitsize(), *surface.get_masks()
+    blend = self._premultiplied_blend if premultiplied else int(bool(alpha))
+    key = size, format_key, blend
+    current = self.textures.get(name)
+    if current is None or current[0] != key:
+      if current is not None:
+        self.sdl.SDL_DestroyTexture(current[1])
+        del self.textures[name]
+      pixel_format = self.sdl.SDL_MasksToPixelFormatEnum(*format_key)
+      if not pixel_format:
+        raise RuntimeError("SDL does not support the camera/overlay pixel format")
+      texture = self.sdl.SDL_CreateTexture(self.renderer, pixel_format, 1, *size)  # SDL_TEXTUREACCESS_STREAMING
+      if not texture:
+        self._check(-1)
+      self.textures[name] = key, texture
+      self._check(self.sdl.SDL_SetTextureBlendMode(texture, blend))
+      self._check(self.sdl.SDL_SetTextureScaleMode(texture, 1))  # SDL_ScaleModeLinear
+    else:
+      texture = current[1]
+    # Keep the exported pixel buffer alive through the synchronous texture
+    # upload. This locks the Surface without copying its RGB/RGBA pixels.
+    pixels = surface.get_buffer()
+    buffer = (ctypes.c_uint8 * pixels.length).from_buffer(pixels)
+    self._check(self.sdl.SDL_UpdateTexture(texture, None, ctypes.addressof(buffer), surface.get_pitch()))
+
+  def draw(self, name, positions, uv, color):
+    texture = self.textures[name][1]
+    u0, v0, u1, v1 = uv
+    for vertex, position, tex_coord in zip(self._vertices, positions, ((u0, v0), (u1, v0), (u1, v1), (u0, v1)), strict=True):
+      vertex.position = _Point(*position)
+      vertex.color = _Color(*color, 255)
+      vertex.tex_coord = _Point(*tex_coord)
+    # Separate triangles also avoid SDL's software rotated-quad shortcut,
+    # which drops the UV rotation. The accelerated renderer still batches them.
+    for indices in self._triangles:
+      self._check(self.sdl.SDL_RenderGeometry(self.renderer, texture, self._vertices, 4, indices, 3))
+
+  def flush(self):
+    self._check(self.sdl.SDL_RenderFlush(self.renderer))
+
+  def close(self):
+    for _, texture in self.textures.values():
+      self.sdl.SDL_DestroyTexture(texture)
+    self.textures.clear()
 
 
 class TexturePresenter:
@@ -35,6 +146,9 @@ class TexturePresenter:
     self._menu_texture = None
     self._menu_surface = None
     self._frame_size = None
+    self._layers = None
+    self._layers_disabled = False
+    self._layered_frame = None
     size = tuple(max(1, int(value)) for value in size)
     display_index = max(0, int(display_index))
     # SDL_WINDOWPOS_CENTERED_DISPLAY encodes the display in its low bits.
@@ -59,6 +173,51 @@ class TexturePresenter:
 
   def get_size(self):
     return tuple(self.window.size)
+
+  @property
+  def can_present_layers(self):
+    """Probe optional floating-point GPU camera composition once, on SDL's thread."""
+    self._check_thread()
+    if self._layers is None and not self._layers_disabled:
+      try:
+        self._layers = _LayerTextures(self.pygame, self.window)
+        LOG.info("[CLUSTER_HDMI_LAYERS] enabled: SDL GPU camera crop, scaling and alpha composition")
+      except Exception as error:
+        self._layers_disabled = True
+        LOG.warning("[CLUSTER_HDMI_LAYERS] unavailable; retaining composed-frame presentation: %s", error)
+    return self._layers is not None
+
+  def disable_layers(self):
+    """Drop optional camera layers while retaining the normal SDL texture path."""
+    self._check_thread()
+    layers, self._layers = self._layers, None
+    self._layers_disabled = True
+    if self._layered_frame is not None:
+      self._has_frame = False
+    self._layered_frame = None
+    if layers is not None:
+      layers.close()
+
+  def _positions(self, rect, logical_size, rotate_180=False):
+    physical_width, physical_height = self.get_size()
+    target_width, target_height = ((physical_height, physical_width) if self.rotation in (90, 270)
+                                   else (physical_width, physical_height))
+    scale_x, scale_y = target_width / logical_size[0], target_height / logical_size[1]
+    x, y, width, height = rect
+    positions = []
+    for corner_x, corner_y in ((x, y), (x + width, y), (x + width, y + height), (x, y + height)):
+      center_x = (corner_x - logical_size[0] / 2) * scale_x
+      center_y = (corner_y - logical_size[1] / 2) * scale_y
+      if rotate_180:
+        center_x, center_y = -center_x, -center_y
+      if self.rotation == 90:
+        center_x, center_y = -center_y, center_x
+      elif self.rotation == 180:
+        center_x, center_y = -center_x, -center_y
+      elif self.rotation == 270:
+        center_x, center_y = center_y, -center_x
+      positions.append((physical_width / 2 + center_x, physical_height / 2 + center_y))
+    return positions
 
   def _destination(self, rect, logical_size):
     """Return the destination before SDL rotates around its own center."""
@@ -103,11 +262,47 @@ class TexturePresenter:
       self._texture.update(self._upload_surface)
       self._frame_size = size
       self._has_frame = True
+      self._layered_frame = None
     uploaded_at = time.monotonic()
     result = self.redraw(controls)
     result["convert"] = converted_at - started
     result["upload"] = uploaded_at - converted_at
     result["draw"] = result["blit"]
+    result["blit"] += uploaded_at - started
+    return result
+
+  def present_layers(self, overlay_surface, camera_surface=None, camera_rect=None,
+                     camera_uv=(0.0, 0.0, 1.0, 1.0), controls=None, rotate_180=False, *, path_surface=None):
+    """Upload raw camera and RGBA HUD separately; let SDL's GPU compose them.
+
+    UV bounds retain the original sensor's fractional crop in the scaled H264
+    frame. The transparent camera hole and path/HUD come from the unchanged
+    projection; no rounded source rectangle or CPU camera resize is needed.
+    """
+    self._check_thread()
+    if not self.can_present_layers:
+      raise RuntimeError("SDL GPU camera layers are unavailable")
+    started = time.monotonic()
+    if controls is None or not controls.screen_off:
+      size = tuple(overlay_surface.get_size())
+      if camera_surface is not None or path_surface is not None:
+        if (camera_rect is None or len(camera_rect) != 4 or any(not math.isfinite(value) for value in camera_rect)
+            or camera_rect[2] <= 0 or camera_rect[3] <= 0):
+          raise ValueError("GPU camera rectangle must have finite positive dimensions")
+      if camera_surface is not None:
+        if (len(camera_uv) != 4 or any(not math.isfinite(value) or not 0 <= value <= 1 for value in camera_uv)
+            or camera_uv[0] >= camera_uv[2] or camera_uv[1] >= camera_uv[3]):
+          raise ValueError("GPU camera UV bounds must be a nonempty normalized crop")
+        self._layers.upload("camera", camera_surface)
+      if path_surface is not None:
+        self._layers.upload("path", path_surface, premultiplied=True)
+      self._layers.upload("overlay", overlay_surface, alpha=True)
+      self._frame_size = size
+      self._layered_frame = (camera_surface is not None, camera_rect, tuple(camera_uv), bool(rotate_180), path_surface is not None)
+      self._has_frame = True
+    uploaded_at = time.monotonic()
+    result = self.redraw(controls)
+    result.update(convert=0.0, upload=uploaded_at - started, draw=result["blit"])
     result["blit"] += uploaded_at - started
     return result
 
@@ -117,8 +312,22 @@ class TexturePresenter:
     started = time.monotonic()
     self.renderer.clear()
     if self._has_frame and (controls is None or not controls.screen_off):
-      self._texture.color = (255, 255, 255) if controls is None else controls.tint_color
-      self._texture.draw(dstrect=self._destination((0, 0, *self._frame_size), self._frame_size), angle=self.rotation)
+      tint = (255, 255, 255) if controls is None else controls.tint_color
+      if self._layered_frame is not None:
+        camera_present, camera_rect, uv, rotate_180, path_present = self._layered_frame
+        # Flush queued pygame commands before/after the native layer calls.
+        # Both APIs use this renderer, with no separate GL context or state.
+        self._layers.flush()
+        if camera_present:
+          self._layers.draw("camera", self._positions(camera_rect, self._frame_size, rotate_180), uv, tint)
+        if path_present:
+          self._layers.draw("path", self._positions(camera_rect, self._frame_size, rotate_180), (0, 0, 1, 1), tint)
+        positions = self._positions((0, 0, *self._frame_size), self._frame_size, rotate_180)
+        self._layers.draw("overlay", positions, (0, 0, 1, 1), tint)
+        self._layers.flush()
+      else:
+        self._texture.color = tint
+        self._texture.draw(dstrect=self._destination((0, 0, *self._frame_size), self._frame_size), angle=self.rotation)
     if controls is not None:
       menu = controls.render_menu()
       if menu is not None:
@@ -139,12 +348,14 @@ class TexturePresenter:
   def clear(self):
     self._check_thread()
     self._has_frame = False
+    self._layered_frame = None
     if self.renderer is not None:
       self.renderer.clear()
       self.renderer.present()
 
   def close(self):
     self._check_thread()
+    self.disable_layers()
     # Texture objects retain their renderer. Release them before the window.
     self._texture = None
     self._upload_surface = None

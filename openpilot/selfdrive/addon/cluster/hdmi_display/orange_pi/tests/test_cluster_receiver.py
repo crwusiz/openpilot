@@ -266,15 +266,46 @@ def test_native_runtime_bounds_opencv_workers_before_scene_rendering(monkeypatch
   names = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS")
   for name in names:
     monkeypatch.setenv(name, "8")
-  cv2 = SimpleNamespace(setNumThreads=Mock(), getNumThreads=lambda: 1,
+  monkeypatch.delenv("CLUSTER_OPENCV_THREADS", raising=False)
+  monkeypatch.setattr(os, "sched_getaffinity", lambda pid: set(range(8)), raising=False)
+  cv2 = SimpleNamespace(setNumThreads=Mock(), getNumThreads=lambda: 2,
                         ocl=SimpleNamespace(setUseOpenCL=Mock(), useOpenCL=lambda: False))
   monkeypatch.setitem(sys.modules, "cv2", cv2)
   with caplog.at_level("INFO", logger="cluster_receiver"):
     cluster_receiver.configure_native_runtime()
-  cv2.setNumThreads.assert_called_once_with(1)
+  cv2.setNumThreads.assert_called_once_with(2)
   cv2.ocl.setUseOpenCL.assert_called_once_with(False)
   assert all(os.environ[name] == "1" for name in names)
-  assert "[CLUSTER_RX_NATIVE] opencv_threads=1 | opencl=0" in caplog.text
+  assert "[CLUSTER_RX_NATIVE] opencv_threads=2 | opencl=0 | available_cpu_cores=8" in caplog.text
+
+
+@pytest.mark.parametrize("available,override,expected", [
+  (8, None, 2), (2, None, 1), (1, None, 1), (8, "1", 1), (8, "4", 4),
+  (8, "99", 4), (8, "0", 1), (8, "-2", 1), (8, "invalid", 2), (2, "4", 2),
+])
+def test_native_runtime_thread_overrides_preserve_decode_headroom_and_stay_bounded(monkeypatch, available, override, expected):
+  monkeypatch.setattr(os, "sched_getaffinity", lambda pid: set(range(available)), raising=False)
+  if override is None:
+    monkeypatch.delenv("CLUSTER_OPENCV_THREADS", raising=False)
+  else:
+    monkeypatch.setenv("CLUSTER_OPENCV_THREADS", override)
+  cv2 = SimpleNamespace(setNumThreads=Mock(), getNumThreads=lambda: expected,
+                        ocl=SimpleNamespace(setUseOpenCL=Mock(), useOpenCL=lambda: False))
+  monkeypatch.setitem(sys.modules, "cv2", cv2)
+  cluster_receiver.configure_native_runtime()
+  cv2.setNumThreads.assert_called_once_with(expected)
+
+
+@pytest.mark.parametrize("cpu_count,expected", [(8, 2), (2, 1), (None, 1)])
+def test_native_runtime_handles_platforms_without_affinity_api(monkeypatch, cpu_count, expected):
+  monkeypatch.delattr(os, "sched_getaffinity", raising=False)
+  monkeypatch.setattr(os, "cpu_count", lambda: cpu_count)
+  monkeypatch.delenv("CLUSTER_OPENCV_THREADS", raising=False)
+  cv2 = SimpleNamespace(setNumThreads=Mock(), getNumThreads=lambda: expected,
+                        ocl=SimpleNamespace(setUseOpenCL=Mock(), useOpenCL=lambda: False))
+  monkeypatch.setitem(sys.modules, "cv2", cv2)
+  cluster_receiver.configure_native_runtime()
+  cv2.setNumThreads.assert_called_once_with(expected)
 
 
 def test_socket_buffer_diagnostics_report_effective_sizes_without_changing_them(caplog):

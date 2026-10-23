@@ -288,6 +288,59 @@ modeld·locationd·selfdrived PID는 유지됐고 모델 실행시간은 약40ms
 상태 생성 경로로 이동하므로 `state_cpu_avg`만으로 부하 증감을 판단하지 않고 전체
 `CLUSTER_RESOURCE_PERF cpu_pct`와 함께 비교합니다.
 
+### 2026-10-23 Pi CPU 병렬 처리와 GPU 카메라 합성
+
+10/23 업로드 7쌍은 누적 부분을 제외하면 3개 주행 세션입니다. C4 영상은 평균20FPS,
+Pi 디코딩은17.7~18.2FPS, 전체 화면 표시는13.7~14.6FPS, 새 카메라 영상 표시는
+11.1~11.9FPS였습니다. C4 cluster CPU는 전날 약41~42%에서 약37%로 줄었고
+이번에는 modeldLagging·commIssue가 기록되지 않았습니다. Pi는 카메라 변환17~19ms,
+경로 약15ms, HUD 약7ms, 출력 약8ms로 영상1장당50ms 예산에 근접했습니다.
+Pi의 CPU 약132%는 전체가 아닌 코어1.3개 분량이며, 터치 패널의 전체 평균20%와
+기준이 다릅니다. 최고 CPU 온도는69.7도였습니다.
+
+- Pi의 SDL GPU에서 원본 센서 비율의 소수점 UV로 카메라를 잘라 확대합니다.
+  CPU는 카메라 대비 LUT를 적용하고, 작업1개를 경로·HUD 준비와 병렬 실행합니다.
+  프레임마다 이 작업을 완료한 뒤 표시하므로 작업 큐나 지연 영상이 누적되지 않습니다.
+- CPU 경로·차선 raster는 기존 OpenCV strip 방식으로 색상과 coverage를 함께 만들고,
+  Pi GPU가 카메라 → 경로 → HUD → 터치 메뉴 순서로 합성합니다. 경로의 알파를 RGB에
+  미리 곱한 레이어와 일반 HUD 레이어를 구분해 색이 겹쳐도 올바르게 표시합니다.
+  카메라의 확대·잘라내기는 CPU에서 반복하지 않으며 회전·밝기도 GPU에서 처리합니다.
+- SDL의 geometry API나 blend mode를 지원하지 않거나 업로드에 실패하면 그 프레임부터
+  CPU 장면 합성으로 전환합니다. 기존 전체 화면 GPU 표시는 가능하면 유지하고,
+  그것도 실패하면 surface 방식으로 전환합니다. 영상 연결을 재시작하지 않습니다.
+- OpenCV 기본 작업 스레드는 가용 CPU가4개 이상이면2개, 그보다 적으면1개입니다.
+  `CLUSTER_OPENCV_THREADS`로1~4개를 지정할 수 있으며 가용 코어 수로 제한합니다.
+  BLAS/OMP는1개를 유지하고 주행 프로세스 우선순위·CPU affinity는 변경하지 않습니다.
+- IDR을 받은 직후에도 복구 요청의 최소1초 간격을 유지합니다. 그 사이의 새 복구 요청은
+  보관했다가 후속 프레임에서 재시도하고 정상 P 프레임은 계속 전송합니다.
+  native `send=False`만으로 IDR을 반복 요청하던 동작은 제거했습니다.
+
+디코더의 `Invalid data` 오류와 RTP 순간 손실도 반복됐습니다. GPU 가속만으로
+압축 데이터 손실이 복구되지는 않으므로 aiortc 내부 버퍼를 추측으로 바꾸지는 않습니다.
+`CLUSTER_H264_SEND_PERF`에10초 구간의 실제 최대 access unit/IDR 크기와 IDR 횟수,
+복구 요청·병합·지연 횟수를 추가했습니다. `CLUSTER_PI_RESOURCE_PERF`에는 전체 평균
+`system_cpu_pct`와 코어별 `cpu_cores_pct`가 추가됩니다. `cpu_pct`의100%는 계속 코어1개입니다.
+`gpu_camera=1`이면 새 GPU 카메라 합성이 실제 사용 중이며, `metadata_display_fps`는
+HUD만 갱신한 표시율, `hidden_camera_fps`는 새 RGB를 받았지만 카메라가 만료된 표시율입니다.
+
+**C4 업데이트 후 Pi Update도 실행**합니다. 기존 해상도·비트레이트·폰트·아이콘을 유지합니다.
+데스크톱의 실제 SDL 합성 테스트에서 소수점 crop·회전·알파·밝기를 확인했지만 Pi 실측은
+별도입니다. 다음 로그의 `camera_display_fps`, render+display 시간, 최대 표시 간격과
+디코더 오류를 함께 비교합니다. GPU 업로드 비용도 포함해 판단하며 FPS 상승을 보장하지 않습니다.
+[SDL geometry](https://wiki.libsdl.org/SDL2/SDL_RenderGeometry),
+[SDL blend mode 지원](https://wiki.libsdl.org/SDL2/SDL_ComposeCustomBlendMode)
+
+### 터치 팝업의 CPU·GPU 상태
+
+터치 팝업의 상태 행에는 **CPU 사용률 / CPU 온도 / GPU 사용률 / GPU 온도 / FAN / FPS**를
+표시합니다. CPU·GPU 온도는 각각의 센서에서 읽고 동일한 온도별 색상으로 구분합니다.
+PowerVR GPU 사용률은 `/sys/kernel/debug/pvr/status`의 GPU 전체 사용률을 읽으며,
+GPU devfreq가 제공하는 사용률도 지원합니다. root 전용 debugfs인 경우 이미 허용된
+비대화형 sudo로 해당 파일만 최대4096바이트 읽고0.5초 안에 응답하지 않으면 중단합니다.
+권한이나 센서가 없으면 `--`로 표시하고 CPU 온도나 GPU 클럭으로 대체하지 않습니다.
+표본 수집은 팝업이 열려 있을 때 기존 작업 스레드에서 약1초 간격으로 수행합니다.
+[PowerVR 상태 항목](https://doc.kickpi.com/products/linux_customization/linux_core/)
+
 ### 대시보드에서 Orange Pi IP 확인
 
 C4 대시보드의 **Toggles → Cluster Enable** 아래에 `Orange Pi 연결됨 · IP: ...`가 표시됩니다. 연결된 TCP 수신기의 실제 IPv4 주소를 1초마다 확인하므로 핫스팟에서 새 IP를 받아도 다시 연결되면 표시가 바뀝니다. 이 주소가 SSH 업데이트 대상이며 C4 주소와 다릅니다.

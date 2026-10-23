@@ -409,7 +409,9 @@ class TrafficStopController:
     elif (observation.valid and
           self.motion_detector.motion == ModelMotion.stopping and
           self.stop_entry_suppression_time == 0.0 and
-          (self.signal_stop_latched or entry_allowed)):
+          (self.signal_stop_latched or (entry_allowed and observation.stop_evidence))):
+      # Motion retains its previous classification while evidence decays. When
+      # an entry guard clears, that retained state alone must not start a stop.
       self.signal_stop_latched = True
     elif (observation.valid and
           self.signal_stop_latched and

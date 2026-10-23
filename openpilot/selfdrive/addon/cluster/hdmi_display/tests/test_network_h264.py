@@ -399,21 +399,26 @@ def camera_backend(monkeypatch):
 
 
 @asyncio_test
-async def test_native_camera_waits_for_idr_and_resynchronizes_after_encoded_reference_gap(camera_backend):
+async def test_native_camera_waits_for_idr_and_resynchronizes_after_encoded_reference_gap(camera_backend, monkeypatch):
+  clock = [10.0]
+  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=lambda: clock[0], monotonic_ns=time.monotonic_ns))
   packets, packet = camera_backend.packets, camera_backend.packet
   _stream, track = network.create_camera_stream("v=0")
   packets.extend([packet(10), packet(11, key=True, header=b"sps-pps")])
   assert bytes(await track.recv()) == b"sps-ppsencoded"
   assert track.video_frame_id == 11 and track.video_frames == 1
   assert camera_backend.socket_options == [{"conflate": False}] and camera_backend.requests
+  clock[0] += 1
   packets.extend([packet(13), packet(14, key=True)])
   assert bytes(await track.recv()) == b"sps-ppsencoded"
   assert track.resyncs == 1 and track.video_frame_id == 14
+  clock[0] += 1
   packets.extend([packet(15, old=True), packet(16, key=True)])
   assert bytes(await track.recv()) == b"sps-ppsencoded"
   assert track.resyncs == 2 and track.video_frames == 3
   assert not track._keyframe_requested
   track.params.put.assert_called_with("LivestreamRequestKeyframe", False, block=False)
+  clock[0] += 1
   track.request_recovery()
   packets.extend([packet(17), packet(18, key=True)])
   # Requesting an IDR after a receiver decode error must not discard the
@@ -422,12 +427,14 @@ async def test_native_camera_waits_for_idr_and_resynchronizes_after_encoded_refe
   assert track.video_frame_id == 17 and track.resyncs == 3
   assert bytes(await track.recv()) == b"sps-ppsencoded"
   assert track.video_frame_id == 18 and track.resyncs == 3
+  clock[0] += 1
   clear_count = track.params.put.call_count
   track.request_keyframe()  # Receiver PLI while the reference chain is healthy.
   packets.append(packet(19, key=True))
   await track.recv()
   assert not track._keyframe_requested
   assert track.params.put.call_count == clear_count + 1
+  clock[0] += 1
   track.request_keyframe()
   track.stop()  # Disconnect before the requested IDR arrives.
   assert not track._keyframe_requested
@@ -492,6 +499,64 @@ async def test_recovery_feedback_cannot_postpone_an_unfulfilled_keyframe_retry(c
     clock[0] = now
     track.request_recovery()
   assert len(camera_backend.requests) == 2
+  track.stop()
+
+
+@asyncio_test
+async def test_recovery_after_idr_ack_is_deferred_without_gating_healthy_video_or_losing_request(camera_backend, monkeypatch):
+  clock = [0.0]
+  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=lambda: clock[0], monotonic_ns=time.monotonic_ns))
+  _stream, track = network.create_camera_stream("v=0")
+  track.request_keyframe()
+  camera_backend.packets.append(camera_backend.packet(1, key=True, header=b"sps-pps"))
+  clock[0] = 0.1
+  await track.recv()
+  assert not track._keyframe_requested
+  for now in (0.2, 0.3, 0.4):
+    clock[0] = now
+    track.request_recovery()
+  assert len(camera_backend.requests) == 1
+  assert track._keyframe_deferred
+  camera_backend.packets.append(camera_backend.packet(2))
+  assert bytes(await track.recv()) == b"encoded"
+  assert len(camera_backend.requests) == 1
+  clock[0] = 1.0
+  camera_backend.packets.append(camera_backend.packet(3))
+  assert bytes(await track.recv()) == b"encoded"
+  assert len(camera_backend.requests) == 2
+  assert track._keyframe_requested and not track._keyframe_deferred
+  assert track.keyframe_requests == 2 and track.keyframe_coalesced == 3 and track.keyframe_deferred == 1
+  clock[0] = 1.1
+  camera_backend.packets.append(camera_backend.packet(4, key=True))
+  await track.recv()
+  assert not track._keyframe_requested
+  # Stopping with only deferred intent must not issue a real request or leave
+  # one scheduled for a late native callback to resurrect.
+  track.request_recovery()
+  assert track._keyframe_deferred
+  writes = track.params.put.call_count
+  track.stop()
+  track.request_keyframe()
+  assert not track._keyframe_deferred
+  assert len(camera_backend.requests) == 2 and track.params.put.call_count == writes
+
+
+@asyncio_test
+async def test_current_idr_cannot_acknowledge_a_deferred_request_issued_after_its_capture(camera_backend, monkeypatch):
+  clock = [10.0]
+  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=lambda: clock[0], monotonic_ns=time.monotonic_ns))
+  _stream, track = network.create_camera_stream("v=0")
+  track.request_keyframe()
+  camera_backend.packets.append(camera_backend.packet(1, key=True, header=b"sps-pps"))
+  await track.recv()
+  clock[0] = 10.1
+  track.request_recovery()
+  clock[0] = 11.0
+  camera_backend.packets.append(camera_backend.packet(2, key=True))
+  await track.recv()
+  assert len(camera_backend.requests) == 2
+  assert track._keyframe_requested
+  assert track.params.put.call_count == 1
   track.stop()
 
 

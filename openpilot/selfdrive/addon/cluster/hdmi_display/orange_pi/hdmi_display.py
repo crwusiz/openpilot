@@ -110,6 +110,7 @@ class HdmiDisplay:
     self.last_frame_timings = {}
     self.last_frame_presented = False
     self._latest_frame = None
+    self._latest_layers = None
     self._waiting_requested = False
     self._controls_revision = None
     self._menu_surface = None
@@ -176,6 +177,14 @@ class HdmiDisplay:
   def screen_off(self):
     """Read touch state without calling SDL, including from signaling feedback."""
     return self.controls is not None and self.controls.screen_off
+
+  @property
+  def can_present_layers(self):
+    return self._presenter is not None and self._presenter.can_present_layers
+
+  @property
+  def compositor_backend(self):
+    return "pi_gpu_camera" if self._latest_layers is not None else "cpu_scene"
 
   def open(self):
     if self.connected:
@@ -339,17 +348,18 @@ class HdmiDisplay:
     self.last_frame_presented = False
     if self.controls.screen_off:
       self._latest_frame = None
+      self._latest_layers = None
       self._draw_black()
-    elif self._latest_frame is not None:
+    elif self._latest_frame is not None or self._latest_layers is not None:
       if self._presenter is not None:
         try:
           self._presenter.redraw(self.controls)
           self._controls_revision = self.controls.revision
         except Exception as e:
           self._fallback_to_surface(e)
-          self._present_frame(self._latest_frame)
+          self._present_retained_frame()
       else:
-        self._present_frame(self._latest_frame)
+        self._present_retained_frame()
     else:
       self.show_waiting()
 
@@ -376,6 +386,7 @@ class HdmiDisplay:
       return False
     if self.controls.screen_off:
       self._latest_frame = None
+      self._latest_layers = None
       if self._controls_revision != self.controls.revision:
         self._draw_black()
       self.last_frame_timings = dict.fromkeys(("decode", "rotate", "scale", "blit", "flip"), 0.0)
@@ -395,12 +406,72 @@ class HdmiDisplay:
       self.last_frame_timings["rgb_surface"] = converted_at - started
       self.last_frame_timings["decode"] = 0.0
       self._latest_frame = frame
+      self._latest_layers = None
       self.last_frame_presented = True
       self._frame_times.append(time.monotonic())
       return True
     except Exception as error:
       LOG.warning("Failed to display H.264 RGB frame: %s", error)
       return False
+
+  def send_layers(self, layers):
+    """GPU camera crop/scale and alpha composition on SDL's owning thread."""
+    self.last_frame_presented = False
+    if self.close_requested:
+      return False
+    if not self.connected and not self.open():
+      return False
+    if not self.pump_events(redraw=False):
+      return False
+    self._waiting_requested = False
+    if self.controls.screen_off:
+      self._latest_frame = self._latest_layers = None
+      if self._controls_revision != self.controls.revision:
+        self._draw_black()
+      self.last_frame_timings = dict.fromkeys(("decode", "rgb_surface", "convert", "upload", "draw", "flip"), 0.0)
+      return True
+    try:
+      if not self.can_present_layers:
+        return self.send_rgb(layers.to_image())
+      started = time.monotonic()
+      overlay = self._pygame.image.frombuffer(layers.overlay.tobytes(), layers.overlay.size, "RGBA")
+      camera = None
+      path = None
+      if layers.camera is not None:
+        height, width = layers.camera.shape[:2]
+        camera = self._pygame.image.frombuffer(layers.camera, (width, height), "RGB")
+      if layers.path is not None:
+        height, width = layers.path.shape[:2]
+        path = self._pygame.image.frombuffer(layers.path, (width, height), "RGBA")
+      converted_at = time.monotonic()
+      timings = self._presenter.present_layers(overlay, camera, layers.camera_rect, layers.camera_uv,
+                                               self.controls, rotate_180=layers.rotate_180, path_surface=path)
+      timings["rgb_surface"] = converted_at - started
+      timings["decode"] = 0.0
+      self.last_frame_timings = timings
+      if self._latest_layers is None:
+        LOG.info("[CLUSTER_H264_COMPOSITOR] camera=pi_gpu | composition=pi_gpu | path_hud_raster=pi_cpu | contrast=cpu_lut")
+      self._latest_layers, self._latest_frame = layers, None
+      self._showing_waiting = False
+      self._controls_revision = self.controls.revision
+      self.last_frame_presented = True
+      self._frame_times.append(time.monotonic())
+      return True
+    except Exception as error:
+      # A missing geometry API or failed layered upload must not blank the
+      # display or repeatedly reconnect WebRTC. Retain the existing full-frame
+      # presenter and render this very frame in software before proceeding.
+      LOG.warning("[CLUSTER_H264_COMPOSITOR] camera=pi_cpu | layered GPU unavailable: %s", error)
+      if self._presenter is not None:
+        self._presenter.disable_layers()
+      return self.send_rgb(layers.to_image())
+
+  def _present_retained_frame(self):
+    if self._latest_layers is not None:
+      image = self._latest_layers.to_image()
+      self._latest_layers = None
+      self._latest_frame = self._pygame.image.frombuffer(image.tobytes(), image.size, image.mode)
+    return self._present_frame(self._latest_frame)
 
   def _present_frame(self, frame):
     # Invalidate the status cache before drawing, including a failed page flip.
@@ -503,6 +574,7 @@ class HdmiDisplay:
     self.last_frame_presented = False
     self._waiting_requested = True
     self._latest_frame = None
+    self._latest_layers = None
     if self.controls.screen_off:
       if self._controls_revision != self.controls.revision:
         self._draw_black()
@@ -527,6 +599,7 @@ class HdmiDisplay:
         self._pygame.display.flip()
       self._showing_waiting = False
     self._latest_frame = None
+    self._latest_layers = None
     self._waiting_requested = False
     self.last_frame_presented = False
 
@@ -537,6 +610,7 @@ class HdmiDisplay:
     self._waiting_frame = None
     self._showing_waiting = False
     self._latest_frame = None
+    self._latest_layers = None
     self._waiting_requested = False
     self._menu_surface = self._menu_rotated = None
     self.last_frame_presented = False

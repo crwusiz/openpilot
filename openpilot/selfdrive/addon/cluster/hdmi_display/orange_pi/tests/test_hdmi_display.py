@@ -9,10 +9,12 @@ import weakref
 from unittest.mock import Mock
 
 import pytest
+import numpy as np
 
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import hdmi_display
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_display import HdmiDisplay
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.display_controls import DisplayControls
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.scene_layers import SceneLayers
 
 
 def _fake_pygame(events):
@@ -660,6 +662,88 @@ def _raster_display(pygame, rotation=0, renderer_mode="surface"):
   display = HdmiDisplay(*size, rotation=rotation, pygame_module=pygame, fullscreen=False, renderer_mode=renderer_mode)
   assert display.open()
   return display
+
+
+def _layered_display(pygame, monkeypatch, rotation=0):
+  video = pytest.importorskip("pygame._sdl2.video")
+  original = hdmi_display.TexturePresenter
+  monkeypatch.setattr(hdmi_display, "TexturePresenter", lambda module, **kwargs:
+                      original(module, **kwargs, video_module=video, accelerated=False, vsync=False, hidden=True))
+  display = _raster_display(pygame, rotation=rotation, renderer_mode="auto")
+  assert display.can_present_layers
+  return display
+
+
+def _layers(color=(255, 0, 0)):
+  pixels = np.empty((8, 8, 3), dtype=np.uint8)
+  pixels[:] = color
+  return SceneLayers(Image.new("RGBA", (384, 96)), pixels, (0, 0, 384, 96), (0, 0, 1, 1))
+
+
+def test_layered_camera_keeps_touch_brightness_and_does_not_cpu_scale(raster_pygame, monkeypatch):
+  pygame = raster_pygame
+  display = _layered_display(pygame, monkeypatch, rotation=90)
+  layers = _layers()
+  monkeypatch.setattr(layers, "to_image", lambda: pytest.fail("healthy GPU must not compose camera on CPU"))
+  monkeypatch.setattr(pygame.transform, "rotate", lambda *_args: pytest.fail("GPU must rotate layers"))
+  monkeypatch.setattr(pygame.transform, "smoothscale", lambda *_args: pytest.fail("GPU must scale camera"))
+  try:
+    assert display.send_layers(layers) and display.last_frame_presented
+    assert display.compositor_backend == "pi_gpu_camera"
+    assert display._presenter.renderer.to_surface().get_at((0, 0))[:3] == (204, 0, 0)
+    _tap_display(display)
+    assert display.controls.menu_visible
+    _tap_display(display, _control_target(display, "slider", 0.5))
+    _tap_display(display, _control_target(display, "close"))
+    assert display._presenter.renderer.to_surface().get_at((0, 0))[:3] == (153, 0, 0)
+    assert display._latest_layers is layers
+  finally:
+    display.close()
+
+
+def test_layer_upload_failure_preserves_same_camera_and_fullframe_gpu(raster_pygame, monkeypatch):
+  display = _layered_display(raster_pygame, monkeypatch)
+  presenter = display._presenter
+  try:
+    assert display.send_layers(_layers())
+    monkeypatch.setattr(presenter, "present_layers", Mock(side_effect=RuntimeError("geometry not supported")))
+    assert display.send_layers(_layers((0, 0, 255)))
+    assert display._presenter is presenter and not display.can_present_layers
+    assert display.compositor_backend == "cpu_scene" and display.last_frame_presented
+    assert presenter.renderer.to_surface().get_at((0, 0))[:3] == (0, 0, 204)
+    assert display.send_rgb(Image.new("RGB", (384, 96), (0, 255, 0)))
+    assert presenter.renderer.to_surface().get_at((0, 0))[:3] == (0, 204, 0)
+  finally:
+    display.close()
+
+
+def test_touch_redraw_gpu_failure_restores_retained_camera_in_surface_fallback(raster_pygame, monkeypatch):
+  display = _layered_display(raster_pygame, monkeypatch, rotation=90)
+  try:
+    assert display.send_layers(_layers())
+    monkeypatch.setattr(display._presenter, "redraw", Mock(side_effect=RuntimeError("page flip failed")))
+    _tap_display(display)
+    assert display._presenter is None
+    assert display.screen.get_at((0, 0))[:3] == (204, 0, 0)
+    assert display._latest_layers is None and display._latest_frame is not None
+  finally:
+    display.close()
+
+
+def test_expired_camera_layer_does_not_redraw_the_last_gpu_camera(raster_pygame, monkeypatch):
+  display = _layered_display(raster_pygame, monkeypatch)
+  try:
+    assert display.send_layers(_layers())
+    stale = _layers()
+    stale.camera = None
+    stale.overlay = Image.new("RGBA", (384, 96), (0, 0, 0, 255))
+    assert display.send_layers(stale)
+    assert display._presenter.renderer.to_surface().get_at((0, 0))[:3] == (0, 0, 0)
+    _tap_display(display)
+    _tap_display(display, _control_target(display, "close"))
+    assert display._presenter.renderer.to_surface().get_at((0, 0))[:3] == (0, 0, 0)
+  finally:
+    display.close()
 
 
 def test_default_brightness_dims_received_frame_once(raster_pygame, monkeypatch):

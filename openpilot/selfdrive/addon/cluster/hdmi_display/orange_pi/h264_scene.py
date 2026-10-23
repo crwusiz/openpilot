@@ -1,6 +1,7 @@
 """Compose the existing cluster HUD over locally decoded WebRTC camera frames."""
 
 from copy import deepcopy
+from concurrent.futures import ThreadPoolExecutor
 import math
 from pathlib import Path
 import threading
@@ -12,16 +13,16 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 try:
-  from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer
   from openpilot.selfdrive.addon.cluster.cluster_render_support import Colors
 except ImportError:
-  from cluster_renderer import ClusterRenderer
   from cluster_render_support import Colors
 
 try:
   from .h264_protocol import validate_scene
+  from .scene_layers import LayeredRenderer, SceneLayers
 except ImportError:
   from h264_protocol import validate_scene
+  from scene_layers import LayeredRenderer, SceneLayers
 
 
 DEFAULT_FRESHNESS_SECONDS = 0.5
@@ -106,13 +107,15 @@ class H264Scene:
       font_regular=str(asset_root / "fonts" / "NotoSansKR-Bold.ttf"),
       is_metric=True, speed_unit="km/h", rotate_180=False, require_assets=True,
     )
-    self.renderer = ClusterRenderer(self.config)
+    self.renderer = LayeredRenderer(self.config)
     self._lock = threading.Lock()
     self._snapshot = None
     self._state_received_at = self._video_received_at = None
     self._video = None
     self._video_generation = 0
     self._panel_key = self._panel = self._panel_transform = None
+    self._layer_key = self._layer_pixels = self._layer_uv = None
+    self._camera_executor = None
     self._contrast = self._contrast_lut = None
     self._update_contrast(1.08)
     self.last_frame_timings = {}
@@ -122,10 +125,14 @@ class H264Scene:
     # A saved receive exception can retain this scene through its traceback
     # until Python collects the cycle. Release the large fonts, renderer
     # caches and camera buffers immediately at the session boundary instead.
+    executor, self._camera_executor = self._camera_executor, None
+    if executor is not None:
+      executor.shutdown(wait=True, cancel_futures=True)
     with self._lock:
       self.renderer = None
       self._snapshot = self._video = self._panel = self._panel_transform = None
       self._panel_key = self._contrast_lut = None
+      self._layer_key = self._layer_pixels = self._layer_uv = None
 
   def update(self, snapshot, received_at=None):
     if not isinstance(snapshot, dict):
@@ -221,7 +228,37 @@ class H264Scene:
       self._panel_key = key
     return self._panel, self._panel_transform
 
+  def _camera_layer(self, rgb, source_size, generation):
+    key = generation, source_size, self._contrast
+    panel_size = self.renderer.camera_w, self.renderer.camera_h
+    (x, y, width, height), transform = source_panel_geometry(source_size, panel_size)
+    if key != self._layer_key:
+      decoded_h, decoded_w = rgb.shape[:2]
+      left, top = x * decoded_w / source_size[0], y * decoded_h / source_size[1]
+      right = (x + width) * decoded_w / source_size[0]
+      bottom = (y + height) * decoded_h / source_size[1]
+      # Keep one extra sampling pixel at the crop edges. SDL's linear filter
+      # must see the same neighbouring pixels as warpAffine, not an artificial
+      # clamp at a fractional crop boundary. No CPU camera scaling is needed.
+      x0, y0 = max(0, math.floor(left) - 1), max(0, math.floor(top) - 1)
+      x1, y1 = min(decoded_w, math.ceil(right) + 1), min(decoded_h, math.ceil(bottom) + 1)
+      self._layer_pixels = cv2.LUT(rgb[y0:y1, x0:x1], self._contrast_lut)
+      self._layer_uv = ((left - x0) / (x1 - x0), (top - y0) / (y1 - y0),
+                        (right - x0) / (x1 - x0), (bottom - y0) / (y1 - y0))
+      self._layer_key = key
+    return self._layer_pixels, self._layer_uv, transform
+
+  def _prepare_camera_layer(self, rgb, source_size, generation):
+    started = time.monotonic()
+    return self._camera_layer(rgb, source_size, generation), time.monotonic() - started
+
   def render(self, now=None):
+    return self._render(now, layered=False)
+
+  def render_layers(self, now=None):
+    return self._render(now, layered=True)
+
+  def _render(self, now, layered):
     now = _arrival_time(now, self.clock)
     with self._lock:
       snapshot, state_at = self._snapshot, self._state_received_at
@@ -241,13 +278,36 @@ class H264Scene:
     model_valid = (state_fresh and video_fresh and snapshot.get("model_valid") is True
                    and self._source_input_fresh(snapshot, "model_age_ms", elapsed_ms))
     panel_started = time.monotonic()
+    pixels, uv = None, (0, 0, 1, 1)
+    camera_future = None
     if video_fresh and snapshot.get("source_size") is not None:
-      panel, transform = self._camera_panel(rgb, snapshot["source_size"], video_generation)
+      if layered:
+        source_size = snapshot["source_size"]
+        transform = source_panel_geometry(source_size, (self.renderer.camera_w, self.renderer.camera_h))[1]
+        if self._layer_key != (video_generation, source_size, self._contrast):
+          # One CPU-only preparation job overlaps contrast/crop-buffer work
+          # with path/HUD rasterization. Every frame joins its job: there is
+          # never a queue of camera work or SDL work on this worker.
+          if self._camera_executor is None:
+            self._camera_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="cluster-camera-layer")
+          camera_future = self._camera_executor.submit(self._prepare_camera_layer, rgb, source_size, video_generation)
+        else:
+          pixels, uv, transform = self._camera_layer(rgb, source_size, video_generation)
+        panel = True
+      else:
+        panel, transform = self._camera_panel(rgb, snapshot["source_size"], video_generation)
     else:
       panel, transform = None, np.eye(3, dtype=np.float32)
       model_valid = False
     panel_elapsed = time.monotonic() - panel_started
-    image = self.renderer.render(_SceneCamera(panel, transform), _SceneModels(model_valid, hud, path))
+    models = _SceneModels(model_valid, hud, path)
+    path_pixels = None
+    if layered:
+      image, path_pixels = self.renderer.render_overlay(transform, models, panel is not None)
+      if camera_future is not None:
+        (pixels, uv, _), panel_elapsed = camera_future.result()
+    else:
+      image = self.renderer.render(_SceneCamera(panel, transform), models)
     if not state_fresh and panel is not None:
       self.renderer._centered(ImageDraw.Draw(image), self.renderer.camera_x + self.renderer.camera_w / 2,
                               self.renderer.camera_y + self.renderer.camera_h * 0.60,
@@ -256,4 +316,7 @@ class H264Scene:
     self.last_frame_timings = dict(self.renderer.last_frame_timings)
     self.last_frame_timings["camera_panel"] = panel_elapsed
     self.last_status = {"state_fresh": state_fresh, "video_fresh": video_fresh, "model_valid": bool(model_valid)}
+    if layered:
+      return SceneLayers(image, pixels, (self.renderer.camera_x, self.renderer.camera_y,
+                                        self.renderer.camera_w, self.renderer.camera_h), uv, self.config.rotate_180, path_pixels)
     return image.transpose(Image.Transpose.ROTATE_180) if self.config.rotate_180 else image

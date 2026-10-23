@@ -93,6 +93,40 @@ def test_steering_angle_blocks_only_signal_stop_entry():
   assert not plan.signal_stop_active
 
 
+@pytest.mark.parametrize("entry_guard", ["steering", "gas_suppression"])
+def test_cleared_entry_guard_does_not_latch_decaying_stop_evidence(entry_guard):
+  controller = TrafficStopController(dt=0.05)
+  car_state, model, radar_state = make_inputs(v_ego=0.0, model_distance=0.20, terminal_velocity=0.45)
+  if entry_guard == "steering":
+    car_state.steeringAngleDeg = 60.0
+  else:
+    controller.stop_entry_suppression_time = 1.0
+
+  for _ in range(4):
+    plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+  assert controller.traffic_state == TrafficState.red
+  assert not plan.signal_stop_active
+
+  car_state.steeringAngleDeg = 0.0
+  controller.stop_entry_suppression_time = controller.dt
+  # October 23, 02:36:11.186: suppression expires after the model endpoint
+  # moves beyond the stationary stop threshold, while motion still says stop.
+  model.position.x = [31.30] * 32 + [35.03]
+  model.velocity.x[-1] = 8.28
+  plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+
+  assert controller.motion_detector.stop_evidence_time > 0.0
+  assert controller.traffic_state == TrafficState.red
+  assert not plan.signal_stop_active
+  assert controller.x_state == XState.e2eCruise
+
+  model.position.x = [10.0] * 33
+  model.velocity.x[-1] = 0.0
+  for _ in range(4):
+    plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+  assert plan.signal_stop_active
+
+
 def test_transient_big_model_go_prediction_does_not_release_stop():
   controller = TrafficStopController(dt=0.05)
   car_state, model, radar_state = enter_stopped_signal_state(controller)

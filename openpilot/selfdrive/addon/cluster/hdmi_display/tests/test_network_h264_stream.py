@@ -202,14 +202,14 @@ def test_transient_native_send_false_keeps_the_session_and_live_dependent_pictur
   stream = sender.ClusterH264Stream("v=0", producer)
   asyncio.run(stream._send_track_loop(native, producer, config))
   assert [data for data, _pts in sent] == [START + IDR, START + PFRAME, START + PFRAME]
-  producer.request_keyframe.assert_called_once()
+  producer.request_keyframe.assert_not_called()
   logs = [call.args[0] for call in sender.flog.call_args_list]
   assert any("[CLUSTER_H264_SEND_BACKPRESSURE]" in line for line in logs)
   assert any("[CLUSTER_H264_SEND_RECOVERED]" in line for line in logs)
   assert not any("[CLUSTER_H264_SEND_ERROR]" in line for line in logs)
 
 
-def test_sustained_native_send_false_does_not_reset_an_open_session_and_limits_idr_requests(sender, monkeypatch):
+def test_sustained_native_send_false_does_not_reset_an_open_session_or_force_keyframes(sender, monkeypatch):
   producer, native, config, sent = make_tracks([(START + PFRAME, index * 50_000_000) for index in range(1, 7)], 6)
   clock = [0.0]
   monkeypatch.setattr(sender, "time", SimpleNamespace(monotonic=lambda: clock[0]))
@@ -233,13 +233,45 @@ def test_sustained_native_send_false_does_not_reset_an_open_session_and_limits_i
   asyncio.run(stream._send_track_loop(native, producer, config))
   assert len(sent) == 6
   assert all(data == START + PFRAME for data, _pts in sent)
-  assert producer.request_keyframe.call_count == 4
+  producer.request_keyframe.assert_not_called()
   assert stream.connection_stopped_event.is_set()
   logs = [call.args[0] for call in sender.flog.call_args_list]
   assert sum("[CLUSTER_H264_SEND_BACKPRESSURE]" in line for line in logs) == 1
   assert sum("[CLUSTER_H264_SEND_RECOVERED]" in line for line in logs) == 1
   assert any("pause_ms=3300.0" in line for line in logs)
   assert not any("[CLUSTER_H264_SEND_ERROR]" in line for line in logs)
+
+
+def test_sender_reports_actual_frame_peaks_idrs_and_request_deltas_even_during_false_writes(sender, monkeypatch):
+  idr, large_p, small_p = START + IDR + b"\x11" * 1000, START + PFRAME + b"\x11" * 2000, START + PFRAME
+  producer, native, config, sent = make_tracks([(idr, 1_000_000_000), (large_p, 1_050_000_000),
+                                               (small_p, 1_100_000_000)], 3)
+  clock = [0.0]
+  monkeypatch.setattr(sender, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+  receive, send = producer.recv, native.send.side_effect
+  arrivals = iter(((0.1, (1, 4, 1)), (10.1, (2, 6, 1)), (20.2, (3, 8, 2))))
+
+  async def receive_live():
+    clock[0], stats = next(arrivals)
+    producer.keyframe_requests, producer.keyframe_coalesced, producer.keyframe_deferred = stats
+    return await receive()
+
+  def intermittent(data):
+    send(data)
+    return len(sent) != 2
+
+  producer.recv, native.send.side_effect = receive_live, intermittent
+  stream = sender.ClusterH264Stream("v=0", producer)
+  asyncio.run(stream._send_track_loop(native, producer, config))
+  logs = [call.args[0] for call in sender.flog.call_args_list if "[CLUSTER_H264_SEND_PERF]" in call.args[0]]
+  assert len(logs) == 2
+  assert f"max_access_unit_bytes={len(large_p)}" in logs[0]
+  assert f"access_units=2 | idr_frames=1 | max_idr_bytes={len(idr)}" in logs[0]
+  assert "idr_requests=2 | idr_coalesced=6 | idr_deferred=1" in logs[0]
+  assert f"max_access_unit_bytes={len(small_p)}" in logs[1]
+  assert "access_units=1 | idr_frames=0 | max_idr_bytes=0" in logs[1]
+  assert "idr_requests=1 | idr_coalesced=2 | idr_deferred=1" in logs[1]
+  producer.request_keyframe.assert_not_called()
 
 
 def test_sender_cancellation_while_native_writes_are_false_stops_cleanly(sender):

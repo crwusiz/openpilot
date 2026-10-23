@@ -326,6 +326,10 @@ class CruiseController:
     self.cached_curve_speed_ms: float | None = None
     self.curve_estimates = None
     self.model_curve_geometry = None
+    self.stock_curve_model_curvature = None
+    self.stock_curve_rejected = False
+    self.stock_curve_validation = "inactive"
+    self.stock_curve_model_window = None
 
   def _finish_button_spam(self):
     self.btn = Buttons.NONE
@@ -441,6 +445,7 @@ class CruiseController:
       active_source, tuple(immediate_reasons),
       bool(self.steer_decel_active),
       bool(getattr(self, 'stock_curve_rejected', False)),
+      getattr(self, 'stock_curve_validation', 'inactive'),
     )
     now = time.monotonic()
     if event_state == self._debug_last_state and now - self._debug_last_time < DEBUG.interval_s:
@@ -460,7 +465,7 @@ class CruiseController:
       "lead[present=%d dRel=%.1f vRel=%.1f] ignore=%d timer=%d/%d steer_angle=%.1f immediate=%s",
       "curve_detail[model=%s stock=%s steer_entry=%s]",
       "curve_estimates[path=%s path_conf=%.3f yaw=%s yaw_conf=%.3f tail_k=%s tail_x=%s]",
-      "stock_curve[distance=%.1f reference=%.1f curvature=%.6f route=%d model_curvature=%s rejected=%d]",
+      "stock_curve[distance=%.1f reference=%.1f curvature=%.6f route=%d model_curvature=%s rejected=%d validation=%s model_start=%s model_end=%s]",
     ))
     cruise_log.debug(
       log_format,
@@ -488,6 +493,9 @@ class CruiseController:
       (f"{self.stock_curve_model_curvature:.6f}"
        if getattr(self, 'stock_curve_model_curvature', None) is not None else "-"),
       bool(getattr(self, 'stock_curve_rejected', False)),
+      getattr(self, 'stock_curve_validation', 'inactive'),
+      *(f"{value:.1f}" if value is not None else "-"
+        for value in (getattr(self, 'stock_curve_model_window', None) or (None, None))),
     )
 
   def _cal_limit_speed(self, CS, sm, current_speed_ms: float, cluster_speed_clu: float, requested_speed_clu: float,
@@ -778,6 +786,8 @@ class CruiseController:
     self._update_vehicle_navi_curve_params()
     self.stock_curve_model_curvature = None
     self.stock_curve_rejected = False
+    self.stock_curve_validation = "inactive"
+    self.stock_curve_model_window = None
 
     distance = float(getattr(CS, "naviCurveDistance", 0.0) or 0.0)
     reference_speed = float(getattr(CS, "naviCurveSpeed", 0.0) or 0.0)
@@ -797,6 +807,7 @@ class CruiseController:
       # curve cap on a visibly straight path. Require coverage beyond the spot;
       # distant curves and unavailable model data keep navigation preview.
       self.stock_curve_rejected = True
+      self.stock_curve_validation = "rejected_model"
       return SPEED_LIMIT.no_active
 
     target_speed = max(self.vehicle_navi_curve_lower_limit,
@@ -825,20 +836,29 @@ class CruiseController:
 
   def _get_stock_curve_model_curvature(self, sm, distance):
     if not sm.all_checks(['modelV2']):
+      self.stock_curve_validation = "model_unavailable"
       return None
     path = self._get_model_path(sm['modelV2'])
     if path is None:
+      self.stock_curve_validation = "path_invalid"
       return None
     x_positions, curvatures = path
+    self.stock_curve_model_window = (float(x_positions[1]), float(x_positions[-2]))
     window_start = max(x_positions[1], distance - STOCK_CURVE.model_window_m)
     window_end = distance + STOCK_CURVE.model_window_m
     # Exclude gradient endpoints and require the entire map-spot window to
     # be observable before using the model to reject navigation information.
-    if x_positions[1] > distance or x_positions[-2] < window_end:
+    if x_positions[1] > distance:
+      self.stock_curve_validation = "spot_before_model"
+      return None
+    if x_positions[-2] < window_end:
+      self.stock_curve_validation = "window_beyond_model"
       return None
     visible = (x_positions >= window_start) & (x_positions <= window_end)
     if np.count_nonzero(visible) < 3:
+      self.stock_curve_validation = "window_sparse"
       return None
+    self.stock_curve_validation = "matched_model"
     return float(np.max(curvatures[visible]))
 
   def _get_model_based_speed(self, model, current_speed_ms: float, min_curve_speed_ms: float):

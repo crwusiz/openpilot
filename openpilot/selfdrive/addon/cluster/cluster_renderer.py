@@ -95,14 +95,22 @@ def _alpha_blend_lut(color, alpha):
 class ColorBlendWorkspace:
   """Bounded constant-color strips and one output buffer, owned by a renderer."""
 
-  def __init__(self, width):
-    self._shape = (ALPHA_BLEND_STRIP_HEIGHT, width, 3)
+  def __init__(self, width, channels=3):
+    self._shape = (ALPHA_BLEND_STRIP_HEIGHT, width, channels)
     self._output = np.empty(self._shape, dtype=np.uint8)
     self._colors = OrderedDict()
 
   def blend(self, image, color, alpha):
+    if self._shape[2] == 4:
+      # Premultiplied path layer: blend RGB and coverage together against the
+      # previous layer, using opaque source colors. USB retains RGB defaults.
+      color = (*color[:3], 255)
     height, width = image.shape[:2]
     if height > self._shape[0] or width > self._shape[1]:
+      if self._shape[2] == 4:
+        solid = np.empty_like(image)
+        solid[:] = color
+        return cv2.addWeighted(solid, alpha, image, 1.0 - alpha, 0)
       return cv2.LUT(image, _alpha_blend_lut(tuple(color), alpha))
     key = tuple(color)
     solid = self._colors.get(key)
@@ -674,7 +682,11 @@ class ClusterRenderer:
       else:
         self._rotated_icon_cache.move_to_end(key)
       icon = rotated
-    image.paste(icon, (int(cx - icon.width / 2), int(cy - icon.height / 2)), icon)
+    position = (int(cx - icon.width / 2), int(cy - icon.height / 2))
+    if image.mode == "RGBA" and getattr(self, "_straight_alpha_hud", False):
+      image.alpha_composite(icon, position)
+    else:
+      image.paste(icon, position, icon)
 
   def _icon_size_for_height(self, name, height):
     source = self.icons.get(name)
@@ -710,7 +722,11 @@ class ClusterRenderer:
 
     sprite = cached.colored(fill, stroke)
     target = draw._image
-    target.paste(sprite, (int(cx) - cached.anchor_x, int(cy) - cached.anchor_y), sprite)
+    position = (int(cx) - cached.anchor_x, int(cy) - cached.anchor_y)
+    if target.mode == "RGBA" and getattr(self, "_straight_alpha_hud", False):
+      target.alpha_composite(sprite, position)
+    else:
+      target.paste(sprite, position, sprite)
 
   def _value(self, value, disabled="--"):
     try:
@@ -988,7 +1004,10 @@ class ClusterRenderer:
     if tpms is not None:
       tpms_x = int(cx - tpms.width / 2)
       tpms_y = int(self.content_y + self.row_h * 2.0 + 7)
-      image.paste(tpms, (tpms_x, tpms_y), tpms)
+      if image.mode == "RGBA" and getattr(self, "_straight_alpha_hud", False):
+        image.alpha_composite(tpms, (tpms_x, tpms_y))
+      else:
+        image.paste(tpms, (tpms_x, tpms_y), tpms)
     raw_pressures = data.get("tpms") or [0, 0, 0, 0]
     pressures = list(raw_pressures)
     for i in range(4):

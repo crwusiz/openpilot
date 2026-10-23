@@ -461,7 +461,7 @@ def update_sandbox(script_sandbox):
   # updater, and recovery must keep working after that release is restored.
   shutil.copyfile(updater, incoming / "scripts" / "update.sh")
   for name in ("control_socket.py", "display_controls.py", "texture_presenter.py", "touch_status.py", "receiver_build.py", "receiver_resources.py",
-               "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "cluster_renderer.py", "cluster_render_support.py"):
+               "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "scene_layers.py", "cluster_renderer.py", "cluster_render_support.py"):
     (incoming / name).write_text("# current runtime dependency\n", encoding="utf-8", newline="\n")
   for name in ("ensure_wifi.sh", "wifi_boot_setup.sh", "wifi_power_save.sh", "prepare_h264.sh", "package_sources.sh"):
     shutil.copyfile(scripts / name, incoming / "scripts" / name)
@@ -696,7 +696,7 @@ def test_invalid_update_does_not_stop_running_receiver(update_sandbox, failure):
 
 @pytest.mark.parametrize("helper", [
   "control_socket.py", "display_controls.py", "texture_presenter.py", "receiver_build.py", "receiver_resources.py",
-  "h264_receiver.py", "h264_protocol.py", "h264_scene.py",
+  "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "scene_layers.py",
   "scripts/fan_setup.sh",
 ])
 def test_incomplete_runtime_update_does_not_stop_running_receiver(update_sandbox, helper):
