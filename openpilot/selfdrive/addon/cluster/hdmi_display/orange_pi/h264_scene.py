@@ -129,6 +129,8 @@ class H264Scene:
     if executor is not None:
       executor.shutdown(wait=True, cancel_futures=True)
     with self._lock:
+      if self.renderer is not None:
+        self.renderer.close()
       self.renderer = None
       self._snapshot = self._video = self._panel = self._panel_transform = None
       self._panel_key = self._contrast_lut = None
@@ -303,9 +305,11 @@ class H264Scene:
     models = _SceneModels(model_valid, hud, path)
     path_pixels = None
     if layered:
-      image, path_pixels = self.renderer.render_overlay(transform, models, panel is not None)
-      if camera_future is not None:
-        (pixels, uv, _), panel_elapsed = camera_future.result()
+      try:
+        image, path_pixels = self.renderer.render_overlay(transform, models, panel is not None)
+      finally:
+        if camera_future is not None:
+          (pixels, uv, _), panel_elapsed = camera_future.result()
     else:
       image = self.renderer.render(_SceneCamera(panel, transform), models)
     if not state_fresh and panel is not None:

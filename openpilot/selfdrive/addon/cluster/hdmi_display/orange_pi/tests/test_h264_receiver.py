@@ -447,7 +447,7 @@ def test_receiver_stage_timings_average_only_present_valid_samples(monkeypatch, 
   receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
 
   def update(tick, _now):
-    receiver.record_display(0.0, 0.02, 0.03, scene_timings={"path": 0.01, "hud": float("nan"), "prepare": -1},
+    receiver.record_display(0.0, 0.02, 0.03, scene_timings={"path": 0.01, "path_wait": 0.003, "hud": float("nan"), "prepare": -1},
                             display_timings={"rgb_surface": 0.002, "upload": True})
     if tick % 2 == 0:
       receiver.record_display(0.0, 0.02, 0.03, scene_timings={"path": 0.02}, display_timings={})
@@ -456,6 +456,7 @@ def test_receiver_stage_timings_average_only_present_valid_samples(monkeypatch, 
     run_feedback_ticks(monkeypatch, receiver, 10, update)
   message = next(record.getMessage() for record in caplog.records if "CLUSTER_H264_RX_PERF" in record.getMessage())
   assert "scene_path_avg=13.3ms" in message and "hdmi_rgb_surface_avg=2.0ms" in message
+  assert "scene_path_wait_avg=3.0ms" in message
   assert "scene_hud_avg=" not in message and "scene_prepare_avg=" not in message and "hdmi_upload_avg=" not in message
 
 

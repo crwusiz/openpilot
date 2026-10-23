@@ -1,6 +1,10 @@
 """CPU HUD rasterization and camera layers for the Pi's SDL GPU compositor."""
 
 from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
+import logging
+import os
+import threading
 import time
 from time import thread_time
 
@@ -52,6 +56,50 @@ class LayeredRenderer(ClusterRenderer):
   def __init__(self, config):
     super().__init__(config)
     self._straight_alpha_hud = True
+    self._text_lock = threading.RLock()
+    self._path_executor = None
+    self._path_frame = None
+    try:
+      cores = len(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+      cores = os.cpu_count() or 1
+    self._parallel_path = cores >= 4 and os.environ.get("CLUSTER_PARALLEL_PATH", "1") != "0"
+    logging.getLogger("cluster_receiver").info(
+      "[CLUSTER_SCENE_WORKERS] camera_workers=1 | path_workers=%d | hud=owner | gpu=owner | queue=join_each_frame",
+      int(self._parallel_path))
+
+  def close(self):
+    executor, self._path_executor = self._path_executor, None
+    if executor is not None:
+      executor.shutdown(wait=True, cancel_futures=True)
+    self._path_frame = None
+
+  def _centered(self, *args, **kwargs):
+    # Lead labels and HUD share a bounded glyph cache and FreeType font. A
+    # glyph owns a mutable colored sprite: protect lookup through consumption,
+    # not just the cache dictionary. Geometry/raster work remains concurrent.
+    with self._text_lock:
+      return super()._centered(*args, **kwargs)
+
+  def _render_path_layer(self, path, hud):
+    started, cpu_started = time.monotonic(), thread_time()
+    if not path.get("path_x") or path.get("calib_transform") is None:
+      self._reset_leads()
+      return None, time.monotonic() - started, thread_time() - cpu_started
+    if self._path_frame is None:
+      self._path_frame = np.zeros((*self.base_canvas.shape[:2], 4), dtype=np.uint8)
+      self._path_blender = ColorBlendWorkspace(self.camera_w, channels=4)
+    region = self._path_frame[self.camera_y:self.camera_y + self.camera_h, self.camera_x:self.camera_x + self.camera_w]
+    region[:] = 0
+    rgb_blender, self._color_blender = self._color_blender, self._path_blender
+    try:
+      self._draw_model_path(self._path_frame, path, hud)
+    finally:
+      self._color_blender = rgb_blender
+    # The worker reuses its canvas next frame. Retained GPU/software fallback
+    # layers must own their pixels until presentation has finished with them.
+    pixels = region.copy() if cv2.countNonZero(cv2.extractChannel(region, 3)) else None
+    return pixels, time.monotonic() - started, thread_time() - cpu_started
 
   def render_overlay(self, transform, models, has_camera):
     started = time.monotonic()
@@ -69,28 +117,32 @@ class LayeredRenderer(ClusterRenderer):
     copied_at = time.monotonic()
     model_valid, hud, path = models.get_render_data()
     snapshot_at = time.monotonic()
-    path_started = thread_time()
     path_pixels = None
+    path_future = None
+    path_elapsed = path_cpu = 0.0
     if has_camera and model_valid:
-      if not hasattr(self, "_path_blender"):
-        self._path_blender = ColorBlendWorkspace(self.camera_w, channels=4)
-      rgb_blender, self._color_blender = self._color_blender, self._path_blender
-      try:
-        self._draw_model_path(frame, path, hud)
-      finally:
-        self._color_blender = rgb_blender
-      region = frame[self.camera_y:self.camera_y + self.camera_h, self.camera_x:self.camera_x + self.camera_w]
-      if cv2.countNonZero(cv2.extractChannel(region, 3)):
-        path_pixels = region.copy()
-      region[:] = 0
+      if self._parallel_path and path.get("path_x") and path.get("calib_transform") is not None:
+        if self._path_executor is None:
+          self._path_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="cluster-path-layer")
+        path_future = self._path_executor.submit(self._render_path_layer, path, hud)
+      else:
+        path_pixels, path_elapsed, path_cpu = self._render_path_layer(path, hud)
     else:
       self._reset_leads()
-    path_cpu = thread_time() - path_started
-    path_at = time.monotonic()
-    image = Image.fromarray(frame)
-    self._draw_hud(image, hud, has_camera)
+    hud_started = time.monotonic()
+    try:
+      image = Image.fromarray(frame)
+      self._draw_hud(image, hud, has_camera)
+    finally:
+      hud_elapsed = time.monotonic() - hud_started
+      wait_started = time.monotonic()
+      # Even a HUD exception must join the path worker before the next frame
+      # or session cleanup can change filters, fonts, configuration or buffers.
+      if path_future is not None:
+        path_pixels, path_elapsed, path_cpu = path_future.result()
+      path_wait = time.monotonic() - wait_started if path_future is not None else 0.0
     self.last_frame_timings = {"camera_copy": copied_at - started, "snapshot": snapshot_at - copied_at,
-                               "path": path_at - snapshot_at, "path_cpu": path_cpu, "hud": time.monotonic() - path_at}
+                               "path": path_elapsed, "path_cpu": path_cpu, "hud": hud_elapsed, "path_wait": path_wait}
     return image, path_pixels
 
   @staticmethod
@@ -119,8 +171,9 @@ class LayeredRenderer(ClusterRenderer):
       metric = getattr(self.config, "is_metric", True)
       labels = (f"{float(info.get('d_rel', 0)):.0f} m", f"{speed * (3.6 if metric else 2.236936):.0f} {'km/h' if metric else 'mph'}")
       for label, baseline in zip(labels, (y - 13, y + 27), strict=True):
-        glyph = self._text_glyph(label, self.font_unit, 2, anchor="ms")
-        sprite = glyph.colored(Colors.WHITE, Colors.BLACK).copy()
+        with self._text_lock:
+          glyph = self._text_glyph(label, self.font_unit, 2, anchor="ms")
+          sprite = glyph.colored(Colors.WHITE, Colors.BLACK).copy()
         sprite.putalpha(sprite.getchannel("A").point(lambda value, opacity=opacity: round(value * opacity)))
         left, top = x - glyph.anchor_x, baseline - glyph.anchor_y
         x0, y0 = max(0, left), max(0, top)
