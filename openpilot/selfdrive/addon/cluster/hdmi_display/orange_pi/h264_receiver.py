@@ -23,6 +23,8 @@ STREAM_TIMEOUT = 8.0
 FEEDBACK_INTERVAL = 1.0
 RECOVERY_INTERVAL = 0.5
 HUD_REFRESH_INTERVAL = 0.1
+GPU_BURST_FPS = 60
+GPU_CAMERA_GRACE_SECONDS = 0.2
 STAGE_NAMES = {"scene": ("camera_copy", "camera_panel", "snapshot", "path", "path_cpu", "hud"),
                "hdmi": ("rgb_surface", "convert", "upload", "draw", "flip")}
 
@@ -530,6 +532,15 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
   last_render_started = None
   pending_video_at = None
   freshness = None
+  gpu_policy_logged = False
+
+  def hud_deadline():
+    due = 0 if last_render_started is None else last_render_started + HUD_REFRESH_INTERVAL
+    if getattr(receiver, "gpu_camera", False) and receiver.last_video_at is not None:
+      # A short Wi-Fi delivery gap is not a stopped camera. Do not spend its
+      # next slot re-composing the previous picture just before the burst.
+      due = max(due, receiver.last_video_at + GPU_CAMERA_GRACE_SECONDS)
+    return due
   try:
     receiver.start()
     while True:
@@ -540,8 +551,8 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
       timeout = 0.02
       if (pending_render or pending_state) and next_render_at is not None and not receiver.screen_off:
         due_at = next_render_at
-        if not pending_render and last_render_started is not None:
-          due_at = max(due_at, last_render_started + HUD_REFRESH_INTERVAL)
+        if not pending_render:
+          due_at = max(due_at, hud_deadline())
         timeout = min(timeout, max(0.0, due_at - time.monotonic()))
       rgb, state = receiver.take_updates(timeout=timeout)
       if state is not None:
@@ -566,8 +577,7 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
           waiting_shown = True
         pending_render = False
         pending_state = False
-      elif (pending_render or (pending_state and (last_render_started is None
-                                                  or now >= last_render_started + HUD_REFRESH_INTERVAL))) \
+      elif (pending_render or (pending_state and now >= hud_deadline())) \
           and (next_render_at is None or now >= next_render_at) and not receiver.screen_off:
         # Metadata and decoded camera pictures arrive on different clocks.
         # Compose healthy video once per new picture, using the newest HUD.
@@ -595,14 +605,22 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         pending_state = False
         last_render_started = render_started
         pending_video_at = None
-        # Preserve the phase while work fits the frame budget. If a frame
-        # overruns it, the newest pending decoded picture is immediately due:
-        # rounding to the following slot throws away another whole 50 ms.
-        # There is still one render at a time and no encoded frame dropping.
-        if next_render_at is None:
-          next_render_at = render_started
-        next_render_at += render_interval
-        next_render_at = max(next_render_at, displayed_at)
+        if receiver.gpu_camera:
+          # Wi-Fi can deliver several already decoded pictures close together.
+          # A 50ms timer discards those pictures even when GPU composition takes
+          # only 25ms. Follow real arrivals, bounded by one render at a time and
+          # a 60Hz burst ceiling; no repeated camera frames or extra C4 traffic.
+          next_render_at = max(render_started + 1.0 / GPU_BURST_FPS, displayed_at)
+          if not gpu_policy_logged:
+            LOG.info("[CLUSTER_H264_PRESENT_POLICY] video=decoded_arrival | burst_ceiling_fps=%d | source_target_fps=%d | hud_grace_ms=%.0f",
+                     GPU_BURST_FPS, hello["fps"], GPU_CAMERA_GRACE_SECONDS * 1000)
+            gpu_policy_logged = True
+        else:
+          # Retain the existing budget for the CPU fallback. An overrun must
+          # not throw away another entire source frame interval.
+          if next_render_at is None:
+            next_render_at = render_started
+          next_render_at = max(next_render_at + render_interval, displayed_at)
       if max_frames is not None and receiver.received_frames >= max_frames:
         return receiver.received_frames
       if receiver.done:

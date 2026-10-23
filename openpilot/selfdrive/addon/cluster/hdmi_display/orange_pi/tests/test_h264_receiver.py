@@ -925,8 +925,81 @@ def test_render_deadlines_preserve_phase_without_discarding_a_slot_after_overrun
     assert all(second - first >= work - 1e-6 for first, second in zip(starts, starts[1:], strict=False))
 
 
+def test_gpu_displays_decoded_bursts_without_the_extra_source_timer(monkeypatch):
+  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
+
+  def run(gpu):
+    now, rendered = [1.0], []
+    arrivals = [1 + index // 3 / 6 + (index % 3) * 0.015 for index in range(99)]
+    monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+
+    class Scene:
+      def __init__(self, *_args):
+        self.video = None
+
+      def set_video(self, rgb, **_kwargs):
+        self.video = rgb
+
+      update = staticmethod(lambda *_args, **_kwargs: None)
+
+      def render(self):
+        rendered.append(self.video)
+        now[0] += 0.013
+        return self.video
+
+      render_layers = render
+      close = staticmethod(lambda: None)
+
+    class Receiver:
+      def __init__(self, *_args):
+        self.condition = threading.Condition()
+        self.received_frames = self.polls = self.states = 0
+        self.last_video_at = self.last_state_at = None
+        self.done = False
+
+      def take_updates(self, timeout):
+        self.polls += 1
+        assert self.polls < 1000, "Camera delivery must wait instead of busy polling"
+        wake_at = min(now[0] + timeout, max(now[0], arrivals[self.received_frames]),
+                      max(now[0], 1 + self.states * 0.05))
+        now[0] = wake_at
+        rgb = None
+        while self.received_frames < len(arrivals) and arrivals[self.received_frames] <= wake_at + 1e-9:
+          self.last_video_at = arrivals[self.received_frames]
+          rgb = (self.received_frames, self.last_video_at)
+          self.received_frames += 1
+        state = None
+        while 1 + self.states * 0.05 <= wake_at + 1e-9:
+          self.last_state_at = 1 + self.states * 0.05
+          self.states += 1
+          state = ({"sequence": self.states}, self.last_state_at)
+        return rgb, state
+
+      start = close = staticmethod(lambda: None)
+      record_display = staticmethod(lambda *_args, **_kwargs: None)
+
+    def present(_image):
+      now[0] += 0.012
+      return True
+
+    monkeypatch.setattr(h264_scene, "H264Scene", Scene)
+    monkeypatch.setattr(h264_receiver, "H264Receiver", Receiver)
+    display = SimpleNamespace(pump_events=lambda: True, screen_off=False, can_present_layers=gpu,
+                              compositor_backend="pi_gpu_camera" if gpu else "cpu_scene",
+                              send_layers=present, send_rgb=present, last_frame_presented=True)
+    assert h264_receiver.receive_h264_session(None, display, HELLO_DATA, max_frames=99) == 99
+    return rendered
+
+  # Same 18fps camera, 20Hz metadata and 25ms composition: a 50ms timer and
+  # metadata-only redraw replace burst pictures; GPU delivery keeps each one.
+  previous, accelerated = run(False), run(True)
+  assert len(set(previous)) < len(set(accelerated))
+  assert accelerated == list(range(99))
+
+
 @pytest.mark.parametrize("camera_stalls", [False, True])
-def test_metadata_waits_for_new_camera_picture_with_bounded_hud_fallback(monkeypatch, camera_stalls):
+@pytest.mark.parametrize("gpu", [False, True])
+def test_metadata_waits_for_new_camera_picture_with_bounded_hud_fallback(monkeypatch, camera_stalls, gpu):
   from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
 
   clock, rendered, scenes, receivers = [1.0], [], [], []
@@ -957,6 +1030,8 @@ def test_metadata_waits_for_new_camera_picture_with_bounded_hud_fallback(monkeyp
       rendered.append((clock[0], self.video, self.state))
       clock[0] += 0.025
       return "composed RGB"
+
+    render_layers = render
 
     def close(self):
       pass
@@ -1007,15 +1082,17 @@ def test_metadata_waits_for_new_camera_picture_with_bounded_hud_fallback(monkeyp
 
   monkeypatch.setattr(h264_scene, "H264Scene", Scene)
   monkeypatch.setattr(h264_receiver, "H264Receiver", Receiver)
-  display = SimpleNamespace(pump_events=lambda: True, screen_off=False, send_rgb=present, last_frame_presented=True)
+  display = SimpleNamespace(pump_events=lambda: True, screen_off=False, send_rgb=present, send_layers=present,
+                            can_present_layers=gpu, compositor_backend="pi_gpu_camera" if gpu else "cpu_scene",
+                            last_frame_presented=True)
   assert h264_receiver.receive_h264_session(None, display, HELLO_DATA) == (1 if camera_stalls else 21)
   assert receivers[0].closed
   if camera_stalls:
-    # HUD updates remain visible with a stopped camera, at most 100ms after
-    # the preceding render; camera expiry still triggers its own redraw.
-    assert len(rendered) >= 6
-    assert rendered[1][0] == pytest.approx(1.1)
-    assert rendered[1][2] == pytest.approx((2, 1.097))
+    # GPU presentation gives short Wi-Fi gaps 200ms before metadata-only
+    # redraws; then HUD remains at 10Hz and expiry still clears the camera.
+    assert len(rendered) >= (4 if gpu else 6)
+    assert rendered[1][0] == pytest.approx(1.2 if gpu else 1.1)
+    assert rendered[1][2] == pytest.approx((4, 1.197) if gpu else (2, 1.097))
     assert any(1.5 <= at < 1.53 for at, *_rest in rendered)
     assert rendered[-1][2][0] == 10
   else:

@@ -3,9 +3,13 @@ import http.client
 import ipaddress
 import json
 from itertools import islice
+import logging
+import os
 from pathlib import Path
 import re
 import subprocess
+import sys
+import tempfile
 import time
 import uuid
 
@@ -13,6 +17,9 @@ import uuid
 ACTION_PATH = "/api/cluster/actions"
 DASHBOARD_PORT = 7000
 MAX_SENSOR_BYTES = 4096
+GPU_PERMISSION_RETRY_SECONDS = 60
+GPU_RULE_MARKER = "# Managed by cluster receiver GPU telemetry.\n"
+LOG = logging.getLogger("cluster_receiver.touch")
 
 
 def _integer(path):
@@ -31,7 +38,17 @@ def _read_sensor(path):
     return None
 
 
-def _gpu_usage(sysfs):
+def _privileged_gpu_read():
+  try:
+    result = subprocess.run(["/usr/bin/sudo", "-n", "--", "/usr/bin/head", "-c", str(MAX_SENSOR_BYTES + 1), "--",
+                             "/sys/kernel/debug/pvr/status"],
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=0.5, check=False)
+    return result.stdout if result.returncode == 0 else None
+  except (OSError, subprocess.SubprocessError):
+    return None
+
+
+def _gpu_usage(sysfs, privileged_read=None):
   # Only GPU devfreq devices qualify: a DDR/NPU load is not GPU utilisation.
   try:
     devices = list(islice((sysfs / "class/devfreq").glob("*"), 32))
@@ -61,16 +78,9 @@ def _gpu_usage(sysfs):
   except PermissionError:
     raw = b""
     if status == Path("/sys/kernel/debug/pvr/status"):
-      # Receiver services normally run as orangepi. Read this fixed file only
-      # if the OS already allows passwordless sudo; never prompt or change
-      # debugfs permissions. Sampling stays on the existing touch worker.
-      try:
-        result = subprocess.run(["/usr/bin/sudo", "-n", "--", "/usr/bin/head", "-c", str(MAX_SENSOR_BYTES + 1), "--", str(status)],
-                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=0.5, check=False)
-        if result.returncode == 0:
-          raw = result.stdout
-      except (OSError, subprocess.SubprocessError):
-        pass
+      # Pi Update permits this exact read command only. Never prompt or change
+      # debugfs permissions while sampling on the existing touch worker.
+      raw = (privileged_read or _privileged_gpu_read)() or b""
   except OSError:
     raw = b""
   if len(raw) > MAX_SENSOR_BYTES:
@@ -89,6 +99,18 @@ class PiStatus:
     self.clock = clock
     self.previous_cpu = None
     self.sampled_at = None
+    self._gpu_retry_at = 0.0
+
+  def _privileged_gpu_status(self):
+    now = self.clock()
+    if now < self._gpu_retry_at:
+      return None
+    value = _privileged_gpu_read()
+    if value is None:
+      self._gpu_retry_at = now + GPU_PERMISSION_RETRY_SECONDS
+      LOG.warning("GPU load read unavailable; retrying in %ds. Pi Update installs the scoped GPU reader permission.",
+                  GPU_PERMISSION_RETRY_SECONDS)
+    return value
 
   def sample(self):
     cpu = None
@@ -139,7 +161,7 @@ class PiStatus:
       if value is not None and 0 <= value <= 100000:
         rpm = value
       break
-    return {"cpu": cpu, "temperature": max(temperatures, default=None), "gpu": _gpu_usage(self.sysfs),
+    return {"cpu": cpu, "temperature": max(temperatures, default=None), "gpu": _gpu_usage(self.sysfs, self._privileged_gpu_status),
             "gpu_temperature": max(gpu_temperatures, default=None), "fan_pwm": pwm, "fan_rpm": rpm}
 
 
@@ -223,3 +245,60 @@ class TouchWorker:
         self.job = {"state": "unavailable", "reason": "connection"}
       # Keep a previously accepted running job busy until it can be queried.
     return stats, self.job
+
+
+def install_gpu_access(account=None, directory=Path("/etc/sudoers.d"), run=subprocess.run):
+  """Root-only deployment step; allow one bounded read, not arbitrary commands."""
+  if not hasattr(os, "geteuid") or os.geteuid() != 0:
+    raise PermissionError("GPU reader setup requires root")
+  if account is None:
+    result = run(["/usr/bin/systemctl", "show", "--property=User", "--value", "cluster-hdmi.service"],
+                 capture_output=True, text=True, timeout=5, check=True)
+    account = result.stdout.strip()
+  if not account or account == "root":
+    return
+  if re.fullmatch(r"[a-z_][a-z0-9_-]*\$?", account) is None:
+    raise ValueError("Invalid receiver service account")
+  directory = Path(directory)
+  if directory.is_symlink() or not directory.is_dir():
+    raise OSError("GPU reader sudoers directory is unavailable or unsafe")
+  info = directory.stat()
+  if os.name == "posix" and (info.st_uid != 0 or info.st_mode & 0o022):
+    raise PermissionError("GPU reader sudoers directory must be root-owned and protected")
+  target = directory / "cluster-gpu-status"
+  if target.is_symlink() or target.exists() and not target.is_file():
+    raise OSError("GPU reader rule path is unsafe")
+  if target.exists() and not target.read_text(encoding="ascii").startswith(GPU_RULE_MARKER):
+    raise OSError("GPU reader rule is not managed by cluster; keeping the existing file")
+  rule = (GPU_RULE_MARKER + f"{account} ALL=(root) NOPASSWD: "
+          + "/usr/bin/head -c 4097 -- /sys/kernel/debug/pvr/status\n")
+  temporary = None
+  try:
+    # Dotted files are ignored by sudo's includedir. Validate before publishing
+    # an atomic, root-owned 0440 rule in the same protected directory.
+    with tempfile.NamedTemporaryFile(mode="w", encoding="ascii", newline="\n", prefix=".cluster-gpu-",
+                                     dir=directory, delete=False) as stream:
+      temporary = Path(stream.name)
+      stream.write(rule)
+    if os.name == "posix":
+      os.chown(temporary, 0, 0)
+      os.chmod(temporary, 0o440)
+    result = run(["/usr/sbin/visudo", "-c", "-f", str(temporary)], capture_output=True, text=True, timeout=5, check=False)
+    if result.returncode != 0:
+      raise RuntimeError("visudo rejected the GPU reader rule")
+    os.replace(temporary, target)
+    print(f"[CLUSTER_GPU_ACCESS] Installed a bounded, read-only GPU statistics rule for {account}.")
+  finally:
+    if temporary is not None and temporary.exists():
+      temporary.unlink()
+
+
+if __name__ == "__main__":
+  args = sys.argv[1:]
+  if not args or args[0] != "--install-gpu-access" or len(args) > 2:
+    raise SystemExit("Usage: sudo python3 touch_status.py --install-gpu-access [service-account]")
+  try:
+    install_gpu_access(args[1] if len(args) == 2 else None)
+  except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+    print(f"[CLUSTER_GPU_ACCESS] GPU usage will be unavailable: {error}", file=sys.stderr)
+    raise SystemExit(1) from None

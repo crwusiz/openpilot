@@ -363,4 +363,11 @@ printf '%s\n' "${backup##*/}" > "$STATE/latest.tmp"
 mv -f -- "$STATE/latest.tmp" "$STATE/latest"
 rm -f -- "$STATE/recovery-needed"
 pending=0
+if [[ $1 == apply ]]; then
+  # Optional telemetry setup runs only after a successful receiver transaction.
+  # It grants one exact read command without changing the service account.
+  if ! /usr/bin/python3 "$TARGET/touch_status.py" --install-gpu-access </dev/null; then
+    printf '[CLUSTER_GPU_ACCESS] GPU reader setup unavailable; receiver update remains complete.\n' >&2
+  fi
+fi
 printf 'Receiver %s complete. Receiver account, HDMI options and boot target preserved.\n' "$1"

@@ -330,13 +330,39 @@ HUD만 갱신한 표시율, `hidden_camera_fps`는 새 RGB를 받았지만 카�
 [SDL geometry](https://wiki.libsdl.org/SDL2/SDL_RenderGeometry),
 [SDL blend mode 지원](https://wiki.libsdl.org/SDL2/SDL_ComposeCustomBlendMode)
 
+### 2026-10-23 19:53 업데이트 후 로그 보완
+
+이번 로그의 업데이트 전후 표본에서 Pi 수신은 평균18.6~18.7FPS로 비슷했고,
+새 카메라 표시는12.9→13.6FPS, 합성 시간은27.2→16.9ms로 개선됐습니다.
+후반에는 합성 약13ms, 카메라 준비 약3ms이며 `gpu_camera=1`로 GPU 적용이 확인됩니다.
+업데이트 뒤 수신기 재시작은0회입니다. RTP 손실·디코딩 오류는 남아 있고,
+짧은 가동 로그이므로 장시간 주행 성능이나 경고 재발 여부를 확정하지 않습니다.
+
+- GPU 표시에서는 새 RGB를 받는 시점에 맞춰 처리하고 순간 표시율은60Hz로 제한합니다.
+  원본 카메라의20Hz나 C4 송신량은 늘리지 않습니다. Wi-Fi 지연 뒤 영상이 몰려올 때
+  기존50ms 타이머 때문에 다음 RGB로 덮이는 구간을 줄입니다. CPU fallback의 기존
+  표시 주기는 유지하고 영상은 계속 디코딩한 후 최신 RGB만 보관합니다.
+- GPU에서 짧은 카메라 수신 공백은200ms까지 기다린 뒤 HUD만 갱신합니다. 이후 HUD는
+ 100ms 간격을 유지하며 데이터 만료는 이 대기와 별도로 즉시 처리합니다.
+- GPU 통계 조회의 `a password is required`가37회 반복됐습니다. Pi Update 성공 후
+  실제 서비스 계정에 `/usr/bin/head -c 4097 -- /sys/kernel/debug/pvr/status`만 허용하는
+  전용 sudoers 파일을 `visudo` 검사 뒤 원자적으로 설치합니다. 다른 명령이나 파일의
+  권한은 부여하지 않으며 기존 서비스 계정과 사용자 설정은 유지합니다.
+  통계 설정 실패는 이미 성공한 수신기 업데이트를 취소하지 않습니다.
+- GPU 통계를 읽지 못하면60초 뒤 재시도해 매초 sudo 오류와 프로세스를 반복하지 않습니다.
+
+**C4 업데이트 후 Pi Update를 실행**합니다. 새 표시 정책은
+`CLUSTER_H264_PRESENT_POLICY video=decoded_arrival`로 확인합니다. 실제 FPS 상승 폭은
+다음 로그의 `camera_display_fps`·수신 FPS·표시 간격·디코딩 오류로 판단합니다.
+
 ### 터치 팝업의 CPU·GPU 상태
 
 터치 팝업의 상태 행에는 **CPU 사용률 / CPU 온도 / GPU 사용률 / GPU 온도 / FAN / FPS**를
 표시합니다. CPU·GPU 온도는 각각의 센서에서 읽고 동일한 온도별 색상으로 구분합니다.
 PowerVR GPU 사용률은 `/sys/kernel/debug/pvr/status`의 GPU 전체 사용률을 읽으며,
-GPU devfreq가 제공하는 사용률도 지원합니다. root 전용 debugfs인 경우 이미 허용된
-비대화형 sudo로 해당 파일만 최대4096바이트 읽고0.5초 안에 응답하지 않으면 중단합니다.
+GPU devfreq가 제공하는 사용률도 지원합니다. root 전용 debugfs는 Pi Update가 설정한
+전용 읽기 명령으로 조회하고0.5초 안에 응답하지 않으면 중단합니다. 실패 시60초 뒤
+재시도합니다. 서비스 초기 설정과 재설치에서도 동일한 읽기 권한을 준비합니다.
 권한이나 센서가 없으면 `--`로 표시하고 CPU 온도나 GPU 클럭으로 대체하지 않습니다.
 표본 수집은 팝업이 열려 있을 때 기존 작업 스레드에서 약1초 간격으로 수행합니다.
 [PowerVR 상태 항목](https://doc.kickpi.com/products/linux_customization/linux_core/)

@@ -2,6 +2,7 @@ from unittest.mock import Mock
 from pathlib import Path
 from types import SimpleNamespace
 import subprocess
+import os
 
 import pytest
 
@@ -96,8 +97,84 @@ def test_powervr_permission_fallback_is_fixed_bounded_and_noninteractive(monkeyp
   monkeypatch.setattr(touch_status.subprocess, "run", run)
   assert touch_status._gpu_usage(Path("/sys")) == (34 if getattr(result, "returncode", None) == 0 else None)
   args, kwargs = run.call_args
-  assert args[0] == ["/usr/bin/sudo", "-n", "--", "/usr/bin/head", "-c", "4097", "--", str(Path("/sys/kernel/debug/pvr/status"))]
+  assert args[0] == ["/usr/bin/sudo", "-n", "--", "/usr/bin/head", "-c", "4097", "--", "/sys/kernel/debug/pvr/status"]
   assert kwargs["timeout"] == 0.5 and kwargs["stderr"] == subprocess.DEVNULL
+
+
+def test_gpu_permission_failure_has_a_cooldown_instead_of_a_sudo_attempt_every_second(monkeypatch, tmp_path):
+  now = [10.0]
+  sampler = PiStatus(tmp_path / "proc", tmp_path / "sys", clock=lambda: now[0])
+  read = Mock(side_effect=[None, b"GPU Utilisation: 24%\n"])
+  monkeypatch.setattr(touch_status, "_privileged_gpu_read", read)
+  assert sampler._privileged_gpu_status() is None
+  for second in range(11, 70):
+    now[0] = second
+    assert sampler._privileged_gpu_status() is None
+  assert read.call_count == 1
+  now[0] = 70
+  assert sampler._privileged_gpu_status() == b"GPU Utilisation: 24%\n"
+  assert read.call_count == 2
+
+
+def test_gpu_access_setup_validates_and_publishes_only_the_exact_read_command(monkeypatch, tmp_path):
+  monkeypatch.setattr(touch_status.os, "geteuid", lambda: 0, raising=False)
+  calls = []
+
+  def run(args, **kwargs):
+    calls.append((args, kwargs))
+    if args[0] == "/usr/bin/systemctl":
+      return SimpleNamespace(stdout="receiver\n", returncode=0)
+    path = Path(args[-1])
+    assert path.name.startswith(".cluster-gpu-")
+    assert path.read_text().endswith("receiver ALL=(root) NOPASSWD: /usr/bin/head -c 4097 -- /sys/kernel/debug/pvr/status\n")
+    assert not (tmp_path / "cluster-gpu-status").exists()
+    return SimpleNamespace(returncode=0)
+
+  touch_status.install_gpu_access(directory=tmp_path, run=run)
+  target = tmp_path / "cluster-gpu-status"
+  text = target.read_text()
+  assert text == (touch_status.GPU_RULE_MARKER
+                  + "receiver ALL=(root) NOPASSWD: /usr/bin/head -c 4097 -- /sys/kernel/debug/pvr/status\n")
+  assert "*" not in text and "NOPASSWD: ALL" not in text
+  assert len(calls) == 2 and calls[1][0][:3] == ["/usr/sbin/visudo", "-c", "-f"]
+  assert list(tmp_path.iterdir()) == [target]
+  if os.name == "posix":
+    assert target.stat().st_mode & 0o777 == 0o440
+
+
+@pytest.mark.parametrize("failure", ["validation", "command"])
+def test_gpu_access_setup_failure_keeps_the_existing_rule(monkeypatch, tmp_path, failure):
+  monkeypatch.setattr(touch_status.os, "geteuid", lambda: 0, raising=False)
+  target = tmp_path / "cluster-gpu-status"
+  previous = touch_status.GPU_RULE_MARKER + "previous GPU reader rule\n"
+  target.write_text(previous)
+  run = Mock(return_value=SimpleNamespace(returncode=1)) if failure == "validation" else Mock(side_effect=OSError("visudo missing"))
+  with pytest.raises((RuntimeError, OSError)):
+    touch_status.install_gpu_access("receiver", tmp_path, run)
+  assert target.read_text() == previous
+  assert list(tmp_path.iterdir()) == [target]
+
+
+@pytest.mark.parametrize("account", ["bad user", "user ALL=(ALL) ALL", "user\nroot", "user; echo bad"])
+def test_gpu_access_setup_rejects_accounts_that_could_change_rule_scope(monkeypatch, tmp_path, account):
+  monkeypatch.setattr(touch_status.os, "geteuid", lambda: 0, raising=False)
+  run = Mock()
+  with pytest.raises(ValueError):
+    touch_status.install_gpu_access(account, tmp_path, run)
+  assert not list(tmp_path.iterdir())
+  run.assert_not_called()
+
+
+def test_gpu_access_setup_never_overwrites_an_unmanaged_rule_or_runs_without_root(monkeypatch, tmp_path):
+  monkeypatch.setattr(touch_status.os, "geteuid", lambda: 1000, raising=False)
+  with pytest.raises(PermissionError):
+    touch_status.install_gpu_access("receiver", tmp_path)
+  monkeypatch.setattr(touch_status.os, "geteuid", lambda: 0)
+  target = tmp_path / "cluster-gpu-status"
+  target.write_text("administrator rule\n")
+  with pytest.raises(OSError, match="not managed"):
+    touch_status.install_gpu_access("receiver", tmp_path)
+  assert target.read_text() == "administrator rule\n"
 
 
 def _worker(request, clock=lambda: 0):

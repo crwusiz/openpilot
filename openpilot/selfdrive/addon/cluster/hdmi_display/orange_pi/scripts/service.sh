@@ -66,6 +66,10 @@ case "$action" in
     stop_if_installed cluster-hdmi.service
     stop_if_installed display-manager.service
     systemctl daemon-reload
+    if [[ -f /opt/cluster-receiver/touch_status.py ]] && \
+       ! /usr/bin/python3 /opt/cluster-receiver/touch_status.py --install-gpu-access "$account" </dev/null; then
+      printf '[CLUSTER_GPU_ACCESS] GPU reader setup unavailable; continuing receiver startup.\n' >&2
+    fi
     reset_receiver_failed_state
     systemctl enable --now cluster-hdmi.service
     systemctl set-default multi-user.target

@@ -39,6 +39,9 @@ if [[ -f /etc/systemd/system/cluster-hdmi.service ]]; then
   # account, HDMI options or boot target, and without restarting its connection.
   bash "$TARGET/scripts/wifi_boot_setup.sh" install
   systemctl daemon-reload
+  if ! /usr/bin/python3 "$TARGET/touch_status.py" --install-gpu-access </dev/null; then
+    printf '[CLUSTER_GPU_ACCESS] GPU reader setup unavailable; continuing receiver installation.\n' >&2
+  fi
   timeout --kill-after=2s 8s bash "$TARGET/scripts/wifi_power_save.sh" || \
     printf '[CLUSTER_WIFI_POWER] Live power-save preparation failed or timed out.\n' >&2
 fi

@@ -566,6 +566,26 @@ def _update(update_sandbox, action="apply", extra_env=None):
   return _run_script(sandbox, "update.sh", *args, extra_env=environment, timeout=30)
 
 
+@pytest.mark.parametrize("setup_error", [0, 1])
+def test_gpu_reader_setup_runs_after_commit_and_cannot_undo_a_successful_update(update_sandbox, setup_error):
+  sandbox, environment, target, _incoming = update_sandbox
+  interpreter = sandbox[1] / "preflight-python"
+  interpreter.write_text(interpreter.read_text().replace("cat > /dev/null", '''
+if [[ ${2:-} == --install-gpu-access ]]; then
+  if [[ -s "$TEST_UPDATE_STATE_DIR/latest" && ! -e "$TEST_UPDATE_STATE_DIR/recovery-needed" ]]; then
+    printf 'gpu_setup_after_commit\\n' >> "$SYSTEMCTL_CALL_LOG"
+  else printf 'gpu_setup_before_commit\\n' >> "$SYSTEMCTL_CALL_LOG"; exit 42; fi
+  exit "${MOCK_GPU_SETUP_ERROR:-0}"
+fi
+cat > /dev/null'''), encoding="utf-8", newline="\n")
+  result = _update(update_sandbox, extra_env={"MOCK_GPU_SETUP_ERROR": str(setup_error)})
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert (target / "cluster_receiver.py").read_text() == "# new\n"
+  calls = (sandbox[1].parent / environment["SYSTEMCTL_CALL_LOG"]).read_text().splitlines()
+  assert calls[-1] == "gpu_setup_after_commit"
+  assert ("GPU reader setup unavailable" in result.stderr) == bool(setup_error)
+
+
 def test_remote_update_and_manual_rollback_preserve_configuration(update_sandbox):
   sandbox, environment, target, _incoming = update_sandbox
   root = sandbox[1].parent
