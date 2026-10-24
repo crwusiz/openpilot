@@ -56,10 +56,14 @@ class AsyncTaskRunner:
 
 
 class CerealOutgoingMessageProxy(AsyncTaskRunner):
-  def __init__(self, services: list[str], enabled: bool = True):
+  def __init__(self, services: list[str], enabled: bool = True, raw: bool = False):
     super().__init__()
     self.services = list(services)
-    self.sm = messaging.SubMaster(self.services)
+    self.raw = raw
+    if raw:
+      self.socks = [messaging.sub_sock(s) for s in self.services]
+    else:
+      self.sm = messaging.SubMaster(self.services)
     self.channels = []
     self._enabled = enabled
 
@@ -81,7 +85,18 @@ class CerealOutgoingMessageProxy(AsyncTaskRunner):
 
     return msg_dict
 
+  def update_raw(self):
+    for sock in self.socks:
+      for dat in messaging.drain_sock_raw(sock):
+        for channel in self.channels:
+          if channel.is_open() and len(dat) <= channel.max_message_size():
+            channel.send(dat)
+
   def update(self):
+    if self.raw:
+      self.update_raw()
+      return
+
     # this is blocking in async context...
     self.sm.update(0)
     for service, updated in self.sm.updated.items():
@@ -220,9 +235,7 @@ class StreamSession:
 
     self.identifier = str(uuid.uuid4())
     self.params = Params()
-    # ICE must consider the Wi-Fi interface even when cellular is the default
-    # route. Binding to that route's address makes LAN dashboard peers fail.
-    builder = WebRTCAnswerBuilder(body.sdp)
+    builder = WebRTCAnswerBuilder(body.sdp, bind_address=_default_route_ip())
 
     self.enabled = body.enabled
     self.video_tracks = []
@@ -233,6 +246,7 @@ class StreamSession:
     self.stream = builder.stream()
 
     self.is_body = "testJoystick" in body.bridge_services_in
+    self.raw = body.raw
 
     self.incoming_bridge: CerealIncomingMessageProxy | None = None
     self.incoming_bridge_services = body.bridge_services_in
@@ -241,7 +255,7 @@ class StreamSession:
     if len(body.bridge_services_in) > 0:
       self.incoming_bridge = CerealIncomingMessageProxy(self.shared_pub_master)
     if len(body.bridge_services_out) > 0:
-      self.outgoing_bridge = CerealOutgoingMessageProxy(body.bridge_services_out, self.enabled)
+      self.outgoing_bridge = CerealOutgoingMessageProxy(body.bridge_services_out, self.enabled, self.raw)
     self.bitrate_controller = LivestreamBitrateController(self.stream.get_receiver_report_stats, self.params, self.enabled)
 
     self.run_task: asyncio.Task | None = None
@@ -249,8 +263,8 @@ class StreamSession:
     self._cleanup_done = False
     self.logger = logging.getLogger("webrtcd")
     cloudlog.warning(
-      "New stream session (%s), video cameras %s, video enabled %s, incoming services %s, outgoing services %s",
-      self.identifier, [t.id for t in self.video_tracks], body.enabled, body.bridge_services_in, body.bridge_services_out,
+      "New stream session (%s), video cameras %s, video enabled %s, incoming services %s, outgoing services %s, raw %s",
+      self.identifier, [t.id for t in self.video_tracks], body.enabled, body.bridge_services_in, body.bridge_services_out, body.raw,
     )
 
   def start(self):
@@ -269,6 +283,12 @@ class StreamSession:
 
   def message_handler(self, message: bytes):
     try:
+      if self.raw and isinstance(message, bytes):
+        service = messaging.log_from_bytes(message).which()
+        if service in self.incoming_bridge_services:
+          self.shared_pub_master.send(service, message)
+        return
+
       payload = json.loads(message) if isinstance(message, (bytes, str)) else None
       if isinstance(payload, dict):
         msg_type = payload.get("type")
@@ -341,7 +361,7 @@ class StreamSession:
 
       with cloudlog.ctx(session_id=self.identifier):
         cloudlog.warning("webrtcd.session.connected")
-      if self.is_body:
+      if self.is_body or self.raw:
         await self.run_body_session()
       else:
         await self.run_normal_session()
@@ -378,22 +398,12 @@ class ServerState:
 
 
 # if nothing connects for 5 seconds, tear down livestreaming processes
-def cancel_teardown(state: ServerState):
+def schedule_teardown(state: ServerState):
   if state.teardown is not None:
     state.teardown.cancel()
-    state.teardown = None
-
-
-def schedule_teardown(state: ServerState):
-  cancel_teardown(state)
 
   def clear():
-    state.teardown = None
-    # Replacing an old session may await its cleanup before the new session is
-    # inserted. An old completion callback must not stop the encoder then.
-    if state.stream_lock.locked():
-      schedule_teardown(state)
-    elif not state.streams:
+    if not state.streams:
       Params().put_bool("IsLiveStreaming", False)
 
   state.teardown = asyncio.get_running_loop().call_later(5.0, clear)
@@ -420,61 +430,47 @@ async def handle_get_stream(state: ServerState, raw_body: bytes, content_type: s
     if enabled and not body.enabled:
       return _json_response({"error": "busy", "message": "someone else is connected."})
 
-    cancel_teardown(state)
-    session = None
+    for sid, s in list(stream_dict.items()):
+      if s.run_task and not s.run_task.done():
+        try:
+          ch = s.stream.get_messaging_channel()
+          ch.send(json.dumps({"type": "disconnect", "data": "Another device has connected, closing this session."}))
+        except Exception:
+          pass
+      await s.stop()
+      stream_dict.pop(sid, None)
+
+    session = StreamSession(body)
+    stream_dict[session.identifier] = session
     try:
-      for sid, s in list(stream_dict.items()):
-        if s.run_task and not s.run_task.done():
-          try:
-            ch = s.stream.get_messaging_channel()
-            ch.send(json.dumps({"type": "disconnect", "data": "Another device has connected, closing this session."}))
-          except Exception:
-            pass
-        try:
-          await s.stop()
-        finally:
-          stream_dict.pop(sid, None)
-
-      session = StreamSession(body)
-      stream_dict[session.identifier] = session
-      try:
-        answer = await asyncio.wait_for(session.get_answer(), timeout=30)
-        cloudlog.event(
-          "webrtcd.session.ice_candidates",
-          session_id=session.identifier,
-          offer_candidates=_ice_candidates(body.sdp),
-          answer_candidates=_ice_candidates(answer.sdp),
-        )
-      except TimeoutError:
-        logging.getLogger("webrtcd").exception("Timed out creating stream answer")
-        with cloudlog.ctx(session_id=session.identifier):
-          cloudlog.warning("webrtcd.session.answer_timeout")
-        raise
-      except Exception:
-        logging.getLogger("webrtcd").exception("Failed to create stream answer")
-        with cloudlog.ctx(session_id=session.identifier):
-          cloudlog.exception("webrtcd.session.answer_exception")
-        raise
-      session.start()
-
-      def remove_finished_session(_: asyncio.Task) -> None:
-        stream_dict.pop(session.identifier, None)
-        schedule_teardown(state)
-
-      session.run_task.add_done_callback(remove_finished_session)
-    except BaseException:
-      # Cancelled HTTP negotiation also owns a partially initialized session.
-      if session is not None:
-        try:
-          await session.stop()
-        finally:
-          stream_dict.pop(session.identifier, None)
+      answer = await asyncio.wait_for(session.get_answer(), timeout=30)
+      cloudlog.event(
+        "webrtcd.session.ice_candidates",
+        session_id=session.identifier,
+        offer_candidates=_ice_candidates(body.sdp),
+        answer_candidates=_ice_candidates(answer.sdp),
+      )
+    except TimeoutError:
+      await session.stop()
+      stream_dict.pop(session.identifier, None)
+      logging.getLogger("webrtcd").exception("Timed out creating stream answer")
+      with cloudlog.ctx(session_id=session.identifier):
+        cloudlog.warning("webrtcd.session.answer_timeout")
       raise
-    finally:
-      if stream_dict:
-        cancel_teardown(state)
-      else:
-        schedule_teardown(state)
+    except Exception:
+      await session.stop()
+      stream_dict.pop(session.identifier, None)
+      logging.getLogger("webrtcd").exception("Failed to create stream answer")
+      with cloudlog.ctx(session_id=session.identifier):
+        cloudlog.exception("webrtcd.session.answer_exception")
+      raise
+    session.start()
+
+    def remove_finished_session(_: asyncio.Task) -> None:
+      stream_dict.pop(session.identifier, None)
+      schedule_teardown(state)
+
+    session.run_task.add_done_callback(remove_finished_session)
 
   return _json_response({"sdp": answer.sdp, "type": answer.type})
 
@@ -499,7 +495,6 @@ async def handle_post_notify(state: ServerState, payload: Any) -> tuple[int, byt
 
 
 async def on_shutdown(state: ServerState):
-  cancel_teardown(state)
   for session in list(state.streams.values()):
     try:
       ch = session.stream.get_messaging_channel()
@@ -508,8 +503,6 @@ async def on_shutdown(state: ServerState):
       pass
     await session.stop()
   state.streams.clear()
-  # A stopped run_task can re-arm teardown through its completion callback.
-  cancel_teardown(state)
 
 
 class WebrtcdHandler(BaseHTTPRequestHandler):
@@ -531,7 +524,7 @@ class WebrtcdHandler(BaseHTTPRequestHandler):
     self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
     self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
     self.end_headers()
-    if self.command not in ("HEAD", "OPTIONS"):
+    if self.command != "HEAD":
       self.wfile.write(body)
 
   def _read_body(self) -> bytes:
@@ -632,7 +625,6 @@ def webrtcd_thread(host: str, port: int):
   server = WebrtcdHTTPServer((host, port), WebrtcdHandler)
   server.state = state
   server.loop = loop
-  loop.call_soon(schedule_teardown, state)
 
   # serve HTTP on a daemon thread so the asyncio loop can own the main thread
   http_thread = threading.Thread(target=server.serve_forever, name="webrtcd-http", daemon=True)
