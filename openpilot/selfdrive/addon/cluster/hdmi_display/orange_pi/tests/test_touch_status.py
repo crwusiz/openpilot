@@ -178,7 +178,8 @@ def test_gpu_access_setup_never_overwrites_an_unmanaged_rule_or_runs_without_roo
 
 
 def _worker(request, clock=lambda: 0):
-  return TouchWorker(sampler=Mock(sample=Mock(return_value={"cpu": 20.0})), request=request, clock=clock)
+  return TouchWorker(sampler=Mock(sample=Mock(return_value={"cpu": 20.0})), request=request, clock=clock,
+                     versions=Mock(sample=Mock(return_value={})), check_interval=None)
 
 
 def test_lost_post_reply_retries_the_same_id_and_then_polls_instead_of_redeploying():
@@ -233,3 +234,55 @@ def test_lost_server_job_is_reported_instead_of_leaving_the_panel_busy_forever()
   worker = _worker(request)
   worker.exchange("192.168.0.82")
   assert worker.exchange("192.168.0.82")[1]["state"] == "failed"
+
+
+@pytest.mark.parametrize("desired, available", [("a" * 64, False), ("b" * 64, True), (None, False)])
+def test_pi_update_is_available_only_when_package_versions_are_known_and_different(desired, available):
+  request = Mock(return_value={"state": "idle", "c4_pi_sha256": desired})
+  worker = _worker(request)
+  worker.versions.sample.return_value = {"pi_version": "20261024123000", "pi_package_sha256": "a" * 64}
+  result = worker.exchange("192.168.0.82")[1]
+  assert result["pi_update_available"] is available
+  assert result["pi_version"] == "20261024123000"
+
+
+def test_commit_check_is_automatic_periodic_and_waits_for_other_jobs():
+  now = [0.0]
+  jobs = []
+  current = {"state": "idle"}
+
+  def request(_host, payload):
+    nonlocal current
+    if payload:
+      jobs.append(payload)
+      current = {**payload, "state": "running", "commit_state": "checking"}
+    return dict(current)
+
+  worker = _worker(request, clock=lambda: now[0])
+  worker.check_interval = 60.0
+  first = worker.exchange("192.168.0.82")[1]
+  assert first["state"] == "running" and jobs[0]["action"] == "commit_check"
+  now[0] = 61.0
+  worker.exchange("192.168.0.82")
+  assert len(jobs) == 1
+  current["state"] = "succeeded"
+  worker.exchange("192.168.0.82")
+  assert len(jobs) == 2 and jobs[0]["request_id"] != jobs[1]["request_id"]
+
+
+def test_lost_automatic_check_reply_retries_the_same_request_id():
+  calls = []
+
+  def request(_host, payload):
+    if payload is None:
+      return {"state": "idle"}
+    calls.append(dict(payload))
+    if len(calls) == 1:
+      raise OSError("lost response")
+    return {**payload, "state": "running"}
+
+  worker = _worker(request)
+  worker.check_interval = 60.0
+  assert worker.exchange("192.168.0.82")[1]["state"] == "checking"
+  assert worker.exchange("192.168.0.82")[1]["state"] == "running"
+  assert calls[0] == calls[1]

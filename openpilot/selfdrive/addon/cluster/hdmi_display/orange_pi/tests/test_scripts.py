@@ -861,3 +861,37 @@ def test_update_retires_old_modules_and_rollback_restores_the_previous_runtime(u
   assert result.returncode == 0, result.stdout + result.stderr
   assert all((target / name).read_text() == f"# previous {name}\n" for name in retired)
   assert not (target / "control_socket.py").exists()
+
+
+def test_repeated_update_skips_restart_and_preserves_version_and_backup(update_sandbox):
+  sandbox, environment, target, incoming = update_sandbox
+  first = _update(update_sandbox)
+  assert first.returncode == 0, first.stdout + first.stderr
+  state = sandbox[1].parent / environment["TEST_UPDATE_STATE_DIR"]
+  version = (state / "version").read_text()
+  timestamp, digest = version.split()
+  assert len(timestamp) == 14 and timestamp.isdigit()
+  assert digest == hashlib.sha256(b"".join(sorted((incoming / "SHA256SUMS").read_bytes().splitlines(keepends=True)))).hexdigest()
+  assert (target / "receiver-version").read_text() == version
+  backup = (state / "latest").read_text()
+  calls = (sandbox[1].parent / "systemctl.log").read_text()
+  before = (target / "cluster_receiver.py").stat().st_mtime_ns
+  second = _update(update_sandbox)
+  assert second.returncode == 0, second.stdout + second.stderr
+  assert "CLUSTER_PI_UNCHANGED" in second.stdout
+  assert (state / "version").read_text() == version
+  assert (state / "latest").read_text() == backup
+  assert (sandbox[1].parent / "systemctl.log").read_text() == calls
+  assert (target / "cluster_receiver.py").stat().st_mtime_ns == before
+
+
+def test_unchanged_installed_file_is_not_rewritten_when_other_files_change(update_sandbox):
+  _sandbox, _environment, target, incoming = update_sandbox
+  same = target / "hdmi_display.py"
+  same.write_bytes((incoming / "hdmi_display.py").read_bytes())
+  os.utime(same, (1000000000, 1000000000))
+  before = same.stat().st_mtime_ns
+  result = _update(update_sandbox)
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert same.stat().st_mtime_ns == before
+  assert (target / "cluster_receiver.py").read_text() == "# new\n"

@@ -2,7 +2,7 @@ import hashlib
 from pathlib import Path
 
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import cluster_receiver, hdmi_display
-from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.receiver_build import BUILD_FILES, source_fingerprint
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.receiver_build import BUILD_FILES, ReceiverVersion, package_digest, source_fingerprint
 
 
 def _populate_sources(directory):
@@ -101,3 +101,42 @@ def test_asset_manifest_cannot_escape_the_receiver_directory(tmp_path):
   _populate_sources(tmp_path)
   (tmp_path / "receiver_assets.txt").write_text("../../private\n", encoding="utf-8")
   assert "assets_sha256=unavailable | missing_assets=invalid_manifest" in source_fingerprint(tmp_path)
+
+
+def _populate_package(directory):
+  _populate_sources(directory)
+  for name in ("README.md", "requirements.txt", "cluster-hdmi.service"):
+    (directory / name).write_bytes(b"package text\r\n")
+  (directory / "scripts").mkdir()
+  (directory / "scripts/common.sh").write_bytes(b"#!/bin/bash\r\n")
+
+
+def test_package_version_normalizes_text_but_includes_binary_assets_and_scripts(tmp_path):
+  _populate_package(tmp_path)
+  initial = package_digest(tmp_path)
+  (tmp_path / "README.md").write_bytes(b"package text\n")
+  assert package_digest(tmp_path) == initial
+  (tmp_path / "scripts/common.sh").write_bytes(b"# new setup\n")
+  assert package_digest(tmp_path) != initial
+  changed = package_digest(tmp_path)
+  (tmp_path / "assets/icons/steer.png").write_bytes(b"updated icon")
+  assert package_digest(tmp_path) != changed
+
+
+def test_pi_version_reads_the_public_flag_and_tracks_a_successful_update(tmp_path):
+  reader = ReceiverVersion(tmp_path)
+  (tmp_path / "receiver-version").write_text("20261024123456 " + "a" * 64 + "\n")
+  assert reader.sample() == {"pi_version": "20261024123456", "pi_package_sha256": "a" * 64}
+  (tmp_path / "receiver-version").write_text("20261025120000 " + "b" * 64 + "\n")
+  assert reader.sample() == {"pi_version": "20261025120000", "pi_package_sha256": "b" * 64}
+
+
+def test_pi_version_uses_a_source_hash_without_a_public_flag(tmp_path):
+  _populate_package(tmp_path)
+  digest = package_digest(tmp_path)
+  reader = ReceiverVersion(tmp_path)
+  assert reader.sample() == {"pi_version": digest[:12], "pi_package_sha256": digest}
+
+
+def test_unreadable_pi_version_is_unknown_and_does_not_break_sensor_sampling(tmp_path):
+  assert ReceiverVersion(tmp_path).sample() == {}

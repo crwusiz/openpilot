@@ -59,6 +59,7 @@ def test_an_older_status_reply_cannot_unlock_a_newly_queued_touch_action():
   controls = display.controls
   controls.menu_visible = True
   controls.set_actions_available(True)
+  controls.set_action_status({"state": "idle", "pi_update_available": True})
   controls._request_action("pi_update")
   old_reply = Future()
   old_reply.set_result(({}, {"state": "idle"}))

@@ -8,6 +8,7 @@ import sys
 import pytest
 
 from openpilot.selfdrive.addon.cluster.hdmi_display import network_status
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.receiver_build import package_digest
 
 
 PACKAGE = Path(__file__).resolve().parents[1]
@@ -77,7 +78,11 @@ case "$command" in
     [[ ${MOCK_STDERR:-} != 1 ]] || printf 'SSH diagnostic\n' >&2;;
   *' apply '*|*' rollback;'*)
     [[ ${MOCK_APPLY_ERROR:-} != 1 ]] || exit 7
+    if [[ ${MOCK_UNCHANGED:-} == 1 ]]; then printf 'CLUSTER_PI_UNCHANGED: already current\\n'; exit 0; fi
     printf 'Receiver apply complete\n';;
+  *' plan '*)
+    [[ -z ${MOCK_REUSED:-} ]] || printf '%s\\n' "$MOCK_REUSED";;
+  *' hydrate '*) [[ ${MOCK_HYDRATE_ERROR:-} != 1 ]] || exit 12;;
   *'/scripts/ssh_port.sh;'*)
     [[ ${MOCK_SSH_PORT_ERROR:-} != 1 ]] || exit 6
     printf 'Orange Pi SSH port changed: 22 -> 9122.\n';;
@@ -90,7 +95,7 @@ esac
 printf 'arg=%s\n' "$@" >> "$MOCK_SSH_LOG"
 [[ ${MOCK_TRANSFER_ERROR:-} != 1 ]] || exit 8
 mkdir -p "$MOCK_CAPTURE_PAYLOAD"
-cp -R payload/. "$MOCK_CAPTURE_PAYLOAD/"
+if [[ " $* " == *' -r '* ]]; then cp -R payload/. "$MOCK_CAPTURE_PAYLOAD/"; fi
 ''',
     # Git Bash lacks setsid; keep the actual SSH/askpass boundary under test.
     "setsid": '''[[ ${1:-} == --wait ]] || exit 1
@@ -147,6 +152,7 @@ def test_c4_update_packages_receiver_only_with_checksums_and_cleans_staging(depl
   assert result.returncode == 0, result.stdout + result.stderr
   captured = deploy_sandbox.parents[1] / "captured payload"
   manifest = (captured / "SHA256SUMS").read_text().splitlines()
+  assert package_digest(deploy_sandbox) == hashlib.sha256((captured / "SHA256SUMS").read_bytes()).hexdigest()
   files = set()
   for entry in manifest:
     digest, relative = entry[:64], entry[66:]
@@ -467,6 +473,7 @@ def test_shared_renderer_and_assets_are_mapped_from_full_checkout(deploy_sandbox
   assert result.returncode == 0, result.stdout + result.stderr
   assert "/repo/selfdrive/addon/cluster/cluster_renderer.py" in result.stdout
   assert "/repo/selfdrive/assets/fonts/NotoSansKR-Bold.ttf" in result.stdout
+  assert package_digest(nested) == package_digest(deploy_sandbox)
   assert _calls(deploy_sandbox) == []
 
 
@@ -540,3 +547,33 @@ def test_pi_update_preview_help_and_rollback_do_not_reboot(deploy_sandbox, optio
   assert "Orange Pi reboot scheduled" not in result.stdout
   if option != "--rollback":
     assert calls == []
+
+
+def test_incremental_upload_omits_reusable_assets_but_keeps_full_manifest(deploy_sandbox):
+  result = _deploy(deploy_sandbox, "192.168.0.84", extra_env={"MOCK_REUSED": "assets/fonts/NotoSansKR-Bold.ttf\nhdmi_display.py"})
+  assert result.returncode == 0, result.stdout + result.stderr
+  captured = deploy_sandbox.parents[1] / "captured payload"
+  assert not (captured / "assets/fonts/NotoSansKR-Bold.ttf").exists()
+  assert not (captured / "hdmi_display.py").exists()
+  assert (captured / "cluster_receiver.py").exists()
+  assert "hdmi_display.py" in (captured / "SHA256SUMS").read_text()
+  assert "2 unchanged files" in result.stdout
+
+
+def test_full_upload_bypasses_incremental_comparison(deploy_sandbox):
+  result = _deploy(deploy_sandbox, "192.168.0.84", "--full")
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert not any(" plan " in args[-1] or " hydrate " in args[-1] for tool, args in _calls(deploy_sandbox) if tool == "ssh")
+  assert (deploy_sandbox.parents[1] / "captured payload/assets/fonts/NotoSansKR-Bold.ttf").exists()
+
+
+def test_unchanged_pi_update_does_not_reboot(deploy_sandbox):
+  result = _pi_update(deploy_sandbox, "192.168.0.84", extra_env={"MOCK_UNCHANGED": "1"})
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert not any("systemd-run " in args[-1] for tool, args in _calls(deploy_sandbox) if tool == "ssh")
+
+
+def test_changed_installed_file_during_staging_never_applies(deploy_sandbox):
+  result = _deploy(deploy_sandbox, "192.168.0.84", extra_env={"MOCK_HYDRATE_ERROR": "1"})
+  assert result.returncode == 12
+  assert not any(" apply " in args[-1] for tool, args in _calls(deploy_sandbox) if tool == "ssh")

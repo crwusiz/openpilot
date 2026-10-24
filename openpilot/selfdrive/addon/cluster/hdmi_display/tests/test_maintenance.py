@@ -15,9 +15,10 @@ PEER = "192.168.0.84"
 
 @pytest.fixture
 def actions(tmp_path):
-  for name in ("pi_update.sh", "log_upload.sh", "cluster_debug.log"):
+  for name in ("pi_update.sh", "log_upload.sh", "commit_compare.sh", "gitpull.sh", "cluster_debug.log"):
     (tmp_path / name).touch()
-  return ClusterActions(tmp_path, tmp_path / "cluster_debug.log", runner=AsyncMock(return_value=(0, "done")))
+  return ClusterActions(tmp_path, tmp_path / "cluster_debug.log", runner=AsyncMock(return_value=(0, "done")),
+                        commit_file=tmp_path / "CommitCompare", package_reader=lambda: "a" * 64)
 
 
 def test_update_targets_only_the_connected_pi_and_retries_do_not_deploy_twice(actions):
@@ -133,4 +134,55 @@ def test_command_output_is_bounded_while_the_pipe_is_fully_drained(monkeypatch):
     assert code == 0 and len(output) == maintenance.MAX_OUTPUT
     assert output.endswith("latest error")
     assert process.stdout.read.await_count == len(chunks)
+  asyncio.run(run())
+
+
+@pytest.mark.parametrize("comparison, available, state", [
+  ('"1234567" != "abcdef0"', True, "succeeded"), ('"1234567" == "1234567"', False, "succeeded"),
+  ('"ERROR" != "ERROR"', False, "failed"), ('"1234567" != "1234567"', False, "failed"),
+])
+def test_git_pull_requires_successful_commit_check_with_different_commits(actions, comparison, available, state):
+  async def run():
+    with pytest.raises(ValueError, match="Check commits"):
+      actions.submit("git_pull", PEER, "a" * 32, PEER)
+    actions.commit_file.write_text(comparison)
+    actions.submit("commit_check", PEER, "b" * 32, PEER)
+    await asyncio.gather(*actions.tasks)
+    result = actions.status(PEER, PEER)
+    assert result["state"] == state and result["update_available"] is available
+    assert result["c4_pi_sha256"] == "a" * 64
+    assert result["commit_state"] == ("available" if available else "current" if state == "succeeded" else "failed")
+    if available:
+      first = actions.submit("git_pull", PEER, "c" * 32, PEER)
+      assert actions.submit("git_pull", PEER, "c" * 32, None) == first
+      await asyncio.gather(*actions.tasks)
+      actions.runner.assert_awaited_with(["bash", str(actions.scripts / "gitpull.sh")], 240.0)
+      result = actions.status(PEER, PEER)
+      assert "started in tmux" in result["message"] and not result["update_available"]
+    else:
+      with pytest.raises(ValueError, match="Check commits"):
+        actions.submit("git_pull", PEER, "c" * 32, PEER)
+  asyncio.run(run())
+
+
+def test_failed_recheck_clears_previously_available_update(actions):
+  async def run():
+    actions.commit_file.write_text('"1234567" != "abcdef0"')
+    actions.submit("commit_check", PEER, "a" * 32, PEER)
+    await asyncio.gather(*actions.tasks)
+    actions.runner.return_value = 1, "network failed"
+    actions.submit("commit_check", PEER, "b" * 32, PEER)
+    await asyncio.gather(*actions.tasks)
+    result = actions.status(PEER, PEER)
+    assert result["state"] == "failed" and not result["update_available"]
+  asyncio.run(run())
+
+
+def test_unchanged_update_does_not_claim_a_reboot(actions):
+  async def run():
+    actions.runner.return_value = 0, "CLUSTER_PI_UNCHANGED: already current"
+    actions.submit("pi_update", PEER, "a" * 32, PEER)
+    await asyncio.gather(*actions.tasks)
+    result = actions.status(PEER, PEER)
+    assert result["unchanged"] and result["message"] == "Pi already up to date"
   asyncio.run(run())

@@ -17,9 +17,11 @@ Omit PI_HOST to use the currently connected Orange Pi address.
   --identity FILE      SSH private key on C4
   --ask-password       Enter the SSH password manually instead of using orangepi
   --rollback           Restore the previous receiver version without uploading
+  --full               Upload every file (default: transfer changed files only)
   --dry-run            Print the target and file list without using SSH
   -h, --help           Show this help
 Password override: set CLUSTER_PI_PASSWORD in the environment.
+Unchanged receiver versions are not restarted or rebooted.
 An update over port 22 also migrates the Pi SSH listener to port 9122.
 HELP
   exit 0

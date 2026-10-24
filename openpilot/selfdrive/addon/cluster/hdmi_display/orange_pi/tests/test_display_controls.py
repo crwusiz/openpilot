@@ -44,6 +44,7 @@ def test_action_requires_a_peer_and_only_one_down_gesture_can_start_it(controls)
   assert not _tap(state, _target(state, "update"))
   assert state.pending_action is None
   state.set_actions_available(True)
+  state.set_action_status({"state": "idle", "pi_update_available": True})
   assert _touch(state, pygame.FINGERDOWN, _target(state, "update"))
   assert state.take_action() == "pi_update"
   assert state.action_busy and state.take_action() is None
@@ -79,13 +80,12 @@ def test_status_updates_do_not_redraw_hidden_video_and_fan_output_is_not_labelle
   state.set_status({"cpu": 25.0, "temperature": 54.2, "gpu": 40.0, "gpu_temperature": 58.7,
                     "fan_pwm": 60, "fan_rpm": None, "fps": 17.5})
   assert state.revision == revision
-  assert state.status_labels() == ("CPU usage 25%", "CPU temp 54.2°C", "GPU usage 40%", "GPU temp 58.7°C", "FAN 60% PWM", "FPS 17.5")
-  assert state.status_labels(korean=True) == ("CPU 사용률 25%", "CPU 온도 54.2°C", "GPU 사용률 40%", "GPU 온도 58.7°C",
-                                             "FAN 60% PWM", "FPS 17.5")
+  assert state.status_labels() == ("CPU [ 25% | 54.2°C ]", "GPU [ 40% | 58.7°C ]", "FAN 60%", "FPS 17.5")
+  assert state.status_labels(korean=True) == state.status_labels()
   _tap(state)
   revision = state.revision
   state.set_status({**state.status, "fan_rpm": 3200})
-  assert state.revision > revision and state.status_labels()[4] == "FAN 3200 RPM"
+  assert state.revision > revision and state.status_labels()[2] == "FAN 3200 RPM"
 
 
 def test_tap_opens_controls_and_close_or_outside_tap_dismisses_them(controls):
@@ -243,7 +243,7 @@ def test_motion_and_unknown_events_cannot_open_menu(controls):
 def test_menu_and_touch_targets_fit_logical_screen(size):
   pygame = SimpleNamespace(FINGERDOWN=1, FINGERMOTION=2, FINGERUP=3)
   state = DisplayControls(pygame, logical_size=size)
-  for name in ("panel", "slider", "off", "close", "update", "upload"):
+  for name in ("panel", "slider", "off", "close", "update", "upload", "pull"):
     left, top, width, height = state.layout[name]
     assert 0 <= left < left + width <= size[0]
     assert 0 <= top < top + height <= size[1]
@@ -339,14 +339,49 @@ def test_expanded_menu_renders_distinct_fitting_labels_and_temperature_colors(ra
   monkeypatch.setattr(state, "_label", draw_label)
   surface, _ = state.render_menu()
   assert surface.get_size() == (1840, 340)
-  assert len(labels[:6]) == 6
-  assert labels[0][0].startswith("CPU 사용률 " if korean else "CPU usage ")
-  assert labels[1][0].startswith("CPU 온도 " if korean else "CPU temp ")
-  assert labels[1][2] == color
-  assert labels[2][0].startswith("GPU 사용률 " if korean else "GPU usage ")
-  assert labels[3][0].startswith("GPU 온도 " if korean else "GPU temp ")
-  assert labels[3][2] == (246, 164, 80)
-  for earlier, later in zip(labels[:5], labels[1:6], strict=True):
+  assert labels[0][0].startswith("CPU [ 100% | ")
+  assert labels[0][2] == color
+  assert labels[1][0] == "GPU [ 100% | 75.0°C ]"
+  assert labels[1][2] == (246, 164, 80)
+  for earlier, later in zip(labels[:3], labels[1:4], strict=True):
     assert earlier[1].right < later[1].left
-  assert labels[6][1].right < state.layout["slider"][0] - state.layout["panel"][0]
+  assert labels[4][0] == ("밝기 100%" if korean else "Light 100%")
+  assert labels[4][1].right < state.layout["slider"][0] - state.layout["panel"][0]
   assert "day" not in state.layout and "night" not in state.layout
+
+
+def test_git_pull_touch_requires_commit_check_and_is_disabled_while_busy(controls):
+  state, _, _ = controls
+  state.set_actions_available(True)
+  _tap(state)
+  assert not _tap(state, _target(state, "pull"))
+  assert "check" not in state.layout
+  state.set_action_status({"action": "commit_check", "state": "succeeded", "update_available": True,
+                           "commit_compare": '"1234567" != "abcdef0"'})
+  assert _tap(state, _target(state, "pull"))
+  assert state.take_action() == "git_pull"
+  state.set_action_status({"action": "git_pull", "state": "succeeded", "update_available": False})
+  assert "started in tmux" in state.action_label()
+  assert not _tap(state, _target(state, "pull"))
+
+
+@pytest.mark.parametrize("available", [False, True])
+def test_pi_button_uses_its_own_package_difference(controls, available):
+  state, _, _ = controls
+  state.set_actions_available(True)
+  state.set_action_status({"state": "idle", "update_available": False, "pi_update_available": available,
+                           "pi_version_state": "available" if available else "current"})
+  _tap(state)
+  assert state.button_enabled("update") is available
+  assert state.button_enabled("pull") is False
+  assert _tap(state, _target(state, "update")) is available
+  assert state.take_action() == ("pi_update" if available else None)
+
+
+def test_update_buttons_show_current_available_and_checking_colors(controls):
+  state, _, _ = controls
+  state.set_action_status({"state": "idle", "commit_state": "current", "pi_version_state": "available"})
+  assert state.button_color("pull") == (30, 85, 53)
+  assert state.button_color("update") == (112, 39, 44)
+  state.set_action_status({"state": "running", "action": "commit_check"})
+  assert state.button_color("pull") == state.button_color("update") == (108, 87, 34)

@@ -92,10 +92,11 @@ class DisplayControls:
     return {
       "panel": (left, top, panel_width, panel_height),
       "slider": rect(390, 108, 1400, 64),
-      "off": rect(40, 200, 420, 78),
-      "update": rect(480, 200, 420, 78),
-      "upload": rect(920, 200, 420, 78),
-      "close": rect(1360, 200, 420, 78),
+      "off": rect(40, 200, 336, 78),
+      "pull": rect(396, 200, 336, 78),
+      "update": rect(752, 200, 336, 78),
+      "upload": rect(1108, 200, 336, 78),
+      "close": rect(1464, 200, 336, 78),
       "scale": scale,
     }
 
@@ -144,10 +145,31 @@ class DisplayControls:
   def _request_action(self, action):
     if self.action_busy or not self.actions_available:
       return False
+    if action == "git_pull" and not self.action_status.get("update_available"):
+      return False
+    if action == "pi_update" and not self.action_status.get("pi_update_available"):
+      return False
     self._pending_action = action
     self.action_busy = True
-    self.action_status = {"action": action, "state": "checking"}
+    self.action_status = {**self.action_status, "action": action, "state": "checking"}
     return self._changed()
+
+  def button_enabled(self, name):
+    if name not in ("pull", "update", "upload"):
+      return True
+    if not self.actions_available or self.action_busy:
+      return False
+    key = {"pull": "update_available", "update": "pi_update_available"}.get(name)
+    return key is None or self.action_status.get(key, False)
+
+  def button_color(self, name):
+    if name not in ("pull", "update"):
+      return (38, 46, 58) if self.button_enabled(name) else (27, 31, 37)
+    key = "commit_state" if name == "pull" else "pi_version_state"
+    state = self.action_status.get(key, "unknown")
+    if self.action_busy:
+      return 108, 87, 34
+    return {"current": (30, 85, 53), "available": (112, 39, 44), "failed": (82, 40, 44)}.get(state, (87, 74, 36))
 
   def set_brightness(self, value):
     value = _quantize_brightness(value)
@@ -215,7 +237,7 @@ class DisplayControls:
     if self._contains(self._layout["slider"], point):
       self._dragging_slider = True
       return self._set_slider(point[0])
-    for name, action in (("update", "pi_update"), ("upload", "upload_logs")):
+    for name, action in (("update", "pi_update"), ("upload", "upload_logs"), ("pull", "git_pull")):
       if self._contains(self._layout[name], point):
         return self._request_action(action)
     if self._contains(self._layout["off"], point):
@@ -269,12 +291,12 @@ class DisplayControls:
     self._font(34 * scale)
     korean = self._font_path is not None
     labels = self.status_labels(korean)
+    # Small telemetry strip in the panel header, leaving the controls prominent.
     column_width = (width - 80 * scale) / len(labels)
     for index, (text, color) in enumerate(zip(labels, self.status_colors(), strict=True)):
       center_x = round(40 * scale + column_width * (index + 0.5))
-      self._label(surface, text, 34 * scale, (center_x, round(48 * scale)), color)
-    step = self.brightness // BRIGHTNESS_STEP
-    title = f"밝기 {step}/10 · {self.brightness}%" if korean else f"Light {step}/10 · {self.brightness}%"
+      self._label(surface, text, 23 * scale, (center_x, round(30 * scale)), color)
+    title = f"밝기 {self.brightness}%" if korean else f"Light {self.brightness}%"
     self._label(surface, title, 34 * scale, (round(200 * scale), round(140 * scale)), (225, 232, 240))
 
     slider = self._local_rect(self._layout["slider"], left, top)
@@ -289,16 +311,22 @@ class DisplayControls:
       tick_x = slider[0] + round(slider[2] * (value - MIN_BRIGHTNESS) / (100 - MIN_BRIGHTNESS))
       pygame.draw.circle(surface, (150, 162, 175), (tick_x, center_y), max(3, round(7 * scale)))
     pygame.draw.circle(surface, (195, 220, 235), (slider[0] + selected_width, center_y), max(8, round(22 * scale)))
-    buttons = (("off", "화면 끄기", "Screen off"), ("update", "Pi 업데이트", "Pi update"),
+    buttons = (("off", "화면 끄기", "Screen off"), ("pull", "Git Pull", "Git Pull"),
+               ("update", "Pi 업데이트", "Pi update"),
                ("upload", "로그 전송", "Upload logs"), ("close", "닫기", "Close"))
     for name, korean_title, english_title in buttons:
       rect = self._local_rect(self._layout[name], left, top)
-      enabled = name not in ("update", "upload") or (self.actions_available and not self.action_busy)
-      color = (38, 46, 58) if enabled else (27, 31, 37)
-      pygame.draw.rect(surface, color, rect, border_radius=max(1, round(10 * scale)))
-      self._label(surface, korean_title if korean else english_title, 36 * scale,
-                  (rect[0] + rect[2] // 2, rect[1] + rect[3] // 2), (220, 229, 239) if enabled else (100, 109, 119))
-    self._label(surface, self.action_label(korean), 25 * scale, (width // 2, round(310 * scale)), (175, 195, 210))
+      enabled = self.button_enabled(name)
+      pygame.draw.rect(surface, self.button_color(name), rect, border_radius=max(1, round(10 * scale)))
+      self._label(surface, korean_title if korean else english_title, 30 * scale,
+                  (rect[0] + rect[2] // 2, rect[1] + rect[3] // 2), (220, 229, 239) if enabled else (145, 154, 164))
+    footer_y = round(310 * scale)
+    comparison = self.action_status.get("commit_compare", "").replace('"', "") or "--"
+    self._bounded_label(surface, "C4 COMMIT " + comparison, 21 * scale, (round(40 * scale), footer_y),
+                        round(470 * scale), align="midleft")
+    self._bounded_label(surface, self.action_label(korean), 23 * scale, (width // 2, footer_y), round(780 * scale))
+    self._bounded_label(surface, "Pi " + self.action_status.get("pi_version", "--"), 21 * scale,
+                        (width - round(40 * scale), footer_y), round(470 * scale), align="midright")
     self.apply_dimming(surface)
     self._menu_surface = surface
     self._menu_revision = self.revision
@@ -308,11 +336,9 @@ class DisplayControls:
     def number(key, suffix, precision=0):
       value = self.status.get(key)
       return "--" if value is None or not math.isfinite(value) else f"{value:.{precision}f}{suffix}"
-    fan = number("fan_rpm", " RPM") if self.status.get("fan_rpm") is not None else number("fan_pwm", "% PWM")
-    return (("CPU 사용률 " if korean else "CPU usage ") + number("cpu", "%"),
-            ("CPU 온도 " if korean else "CPU temp ") + number("temperature", "°C", 1),
-            ("GPU 사용률 " if korean else "GPU usage ") + number("gpu", "%"),
-            ("GPU 온도 " if korean else "GPU temp ") + number("gpu_temperature", "°C", 1),
+    fan = number("fan_rpm", " RPM") if self.status.get("fan_rpm") is not None else number("fan_pwm", "%")
+    return (f"CPU [ {number('cpu', '%')} | {number('temperature', '°C', 1)} ]",
+            f"GPU [ {number('gpu', '%')} | {number('gpu_temperature', '°C', 1)} ]",
             "FAN " + fan, "FPS " + number("fps", "", 1))
 
   def status_colors(self):
@@ -324,10 +350,20 @@ class DisplayControls:
       # Display thresholds only; fan and thermal policies are unchanged.
       return ((108, 211, 145) if temperature < 60 else (238, 211, 105) if temperature < 70
               else (246, 164, 80) if temperature < 80 else (241, 101, 101))
-    return neutral, temperature_color("temperature"), neutral, temperature_color("gpu_temperature"), neutral, neutral
+    return temperature_color("temperature"), temperature_color("gpu_temperature"), neutral, neutral
 
   def action_label(self, korean=False):
     state, action = self.action_status.get("state"), self.action_status.get("action")
+    if action in ("commit_check", "git_pull") and state in ("running", "succeeded"):
+      if action == "git_pull":
+        return ("C4 Git Pull 시작 중…" if state == "running" else "C4 tmux 업데이트 시작 · 완료 후 C4 재시작") if korean else (
+          "Starting C4 Git Pull…" if state == "running" else "C4 update started in tmux · C4 restarts after updating")
+      if state == "running":
+        return "C4 커밋 확인 중…" if korean else "Checking C4 commits…"
+      return (("새 커밋 있음 · Git Pull을 눌러 업데이트" if self.action_status.get("update_available") else "C4 최신 버전입니다") if korean
+              else ("Update available · tap Git Pull" if self.action_status.get("update_available") else "C4 is up to date"))
+    if state == "succeeded" and action == "pi_update" and self.action_status.get("unchanged"):
+      return "Pi 변경 사항 없음 · 최신 버전입니다" if korean else "Pi is up to date · no changes"
     if state == "running":
       return (("Pi 업데이트 중 · 완료 후 자동 재부팅" if action == "pi_update" else "C4·Pi 로그 수집·전송 중") if korean
               else ("Updating Pi · automatic reboot on completion" if action == "pi_update" else "Collecting and uploading C4 + Pi logs"))
@@ -358,3 +394,12 @@ class DisplayControls:
   def _label(self, surface, text, size, center, color):
     label = self._font(size).render(text, True, color)
     surface.blit(label, label.get_rect(center=center))
+
+  def _bounded_label(self, surface, text, size, position, max_width, align="center"):
+    font = self._font(size)
+    if font.size(text)[0] > max_width:
+      while text and font.size(text + "…")[0] > max_width:
+        text = text[:-1]
+      text += "…"
+    label = font.render(text, True, (175, 195, 210))
+    surface.blit(label, label.get_rect(**{align: position}))

@@ -12,6 +12,7 @@ ask_password=0
 rollback=0
 dry_run=0
 reboot_after_update=0
+full_upload=0
 local_directory=''
 remote_directory=''
 
@@ -28,6 +29,7 @@ Omit PI_HOST to use the currently connected Orange Pi address.
   --ask-password       Enter the SSH password manually instead of using orangepi
   --rollback           Restore the previous receiver version without uploading
   --reboot             Reboot the Pi 5 seconds after a successful update
+  --full               Upload every file (default: transfer changed files only)
   --dry-run            Print the target and file list without using SSH
   -h, --help           Show this help
 Password override: set CLUSTER_PI_PASSWORD in the environment.
@@ -49,6 +51,7 @@ while (( $# )); do
     --ask-password) ask_password=1; shift;;
     --dry-run) dry_run=1; shift;;
     --reboot) reboot_after_update=1; shift;;
+    --full) full_upload=1; shift;;
     -h|--help) usage; exit 0;;
     -*) fail "Unknown option: $1";;
     *) [[ -z "$pi_host" ]] || fail 'Specify only one Pi host.'; pi_host=$1; shift;;
@@ -192,17 +195,21 @@ if (( rollback )); then
 fi
 payload="$local_directory/payload"
 mkdir -p -- "$payload/scripts"
+: > "$payload/SHA256SUMS"
 for index in "${!files[@]}"; do
   relative=${files[index]}
   if [[ "$relative" == */* ]]; then mkdir -p -- "$payload/${relative%/*}"; fi
   if [[ "$relative" == assets/* ]]; then
-    cp -- "${file_sources[index]}" "$payload/$relative"
+    # Hash large binary assets in place; copy only those selected for upload.
+    digest=$(sha256sum -- "${file_sources[index]}")
   else
     # Normalize only text. PNG/font bytes must retain their original checksums.
     sed 's/\r$//' "${file_sources[index]}" > "$payload/$relative"
+    digest=$(sha256sum -- "$payload/$relative")
   fi
+  printf '%s  %s\n' "${digest:0:64}" "$relative" >> "$payload/SHA256SUMS"
 done
-(cd -- "$payload" && sha256sum -- "${files[@]}" > SHA256SUMS)
+LC_ALL=C sort -o "$payload/SHA256SUMS" "$payload/SHA256SUMS"
 remote_directory=$(ssh "${ssh_options[@]}" "$pi_host" 'mktemp -d /tmp/cluster-update.XXXXXXXX')
 if [[ ! "$remote_directory" =~ ^/tmp/cluster-update\.[a-zA-Z0-9]{8}$ ]]; then
   remote_directory=''
@@ -210,8 +217,33 @@ if [[ ! "$remote_directory" =~ ^/tmp/cluster-update\.[a-zA-Z0-9]{8}$ ]]; then
 fi
 scp_host=$pi_host
 if [[ "$scp_host" == *:* ]]; then scp_host="[$scp_host]"; fi
+reused_files=()
+if (( ! full_upload )); then
+  # Bootstrap from this checkout, including when the installed updater is old.
+  scp "${scp_options[@]}" "$payload/SHA256SUMS" "$payload/scripts/incremental.sh" "$ssh_user@$scp_host:$remote_directory/"
+  ssh "${ssh_options[@]}" "$pi_host" "mkdir '$remote_directory/payload'; mv '$remote_directory/SHA256SUMS' '$remote_directory/payload/SHA256SUMS'; bash '$remote_directory/incremental.sh' plan '$remote_directory/payload' /opt/cluster-receiver" > "$local_directory/reused"
+  reused=0
+  while IFS= read -r relative; do
+    package_valid_file "$relative" && [[ " ${files[*]} " == *" $relative "* ]] || fail 'Invalid incremental response.'
+    [[ " ${reused_files[*]} " != *" $relative "* ]] || fail 'Duplicate incremental response.'
+    reused_files+=("$relative")
+    if [[ -f "$payload/$relative" ]]; then rm -- "$payload/$relative"; fi
+    reused=$((reused + 1))
+  done < "$local_directory/reused"
+  printf 'Incremental upload: %s changed, %s unchanged files.\n' "$(( ${#files[@]} - reused ))" "$reused"
+fi
+for index in "${!files[@]}"; do
+  relative=${files[index]}
+  if [[ "$relative" == assets/* && " ${reused_files[*]} " != *" $relative "* ]]; then
+    cp -- "${file_sources[index]}" "$payload/$relative"
+  fi
+done
 (cd -- "$local_directory" && scp "${scp_options[@]}" -r payload "$ssh_user@$scp_host:$remote_directory/")
-ssh "${ssh_options[@]}" -tt "$pi_host" "if [ \$(id -u) -eq 0 ]; then bash '$remote_directory/payload/scripts/update.sh' apply '$remote_directory/payload'; else sudo bash '$remote_directory/payload/scripts/update.sh' apply '$remote_directory/payload'; fi"
+if (( ! full_upload )); then
+  ssh "${ssh_options[@]}" "$pi_host" "bash '$remote_directory/incremental.sh' hydrate '$remote_directory/payload' /opt/cluster-receiver"
+fi
+ssh "${ssh_options[@]}" -tt "$pi_host" "if [ \$(id -u) -eq 0 ]; then bash '$remote_directory/payload/scripts/update.sh' apply '$remote_directory/payload'; else sudo bash '$remote_directory/payload/scripts/update.sh' apply '$remote_directory/payload'; fi" | tee "$local_directory/apply.log"
+if grep -q '^CLUSTER_PI_UNCHANGED' "$local_directory/apply.log"; then reboot_after_update=0; fi
 if (( ssh_port == 22 )); then
   # Finish staging cleanup before changing the listener. The existing SSH
   # session can then complete without opening another connection to port 22.

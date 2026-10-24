@@ -56,7 +56,7 @@ package_collect_files() {
   for required in cluster_receiver.py control_socket.py hdmi_display.py display_controls.py texture_presenter.py touch_status.py \
     receiver_build.py receiver_resources.py h264_receiver.py h264_protocol.py h264_scene.py scene_layers.py cluster_renderer.py cluster_render_support.py \
     assets/fonts/NotoSansKR-Bold.ttf scripts/common.sh scripts/package_sources.sh scripts/prepare_h264.sh \
-    scripts/update.sh scripts/ssh_port.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh scripts/fan_setup.sh; do
+    scripts/update.sh scripts/incremental.sh scripts/ssh_port.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh scripts/fan_setup.sh; do
     [[ " ${files[*]} " == *" $required "* ]] || fail "Package is missing $required."
   done
 }

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." || exit 1
+
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "master")
 
 remote_commit=$(git ls-remote origin "$branch" | awk '{print substr($1,1,7)}' 2>/dev/null || echo "")

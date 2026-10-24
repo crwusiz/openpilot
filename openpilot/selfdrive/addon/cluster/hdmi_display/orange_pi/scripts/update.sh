@@ -62,6 +62,11 @@ copy_file() {
     install -d -m 755 -- "$directory" || return 1
     relative=${relative#*/}
   done
+  if [[ -f "$destination" ]] && cmp -s -- "$source" "$destination"; then
+    chmod 644 -- "$destination" || return 1
+    # Explicit success is required when called from the failed-update EXIT trap.
+    return 0
+  fi
   temporary=$(mktemp "${destination%/*}/.cluster-file.XXXXXXXX") || return 1
   if ! install -m 644 -- "$source" "$temporary"; then
     rm -f -- "$temporary"
@@ -241,6 +246,20 @@ if [[ $1 == apply ]]; then
     [[ "$name" =~ ^assets/(fonts/[a-zA-Z0-9_-]+\.ttf|icons/[a-zA-Z0-9_-]+\.png)$ ]] || fail 'Invalid receiver asset path.'
     [[ " ${FILES[*]} " == *" $name "* ]] || fail "Payload is missing $name."
   done < "$source_dir/receiver_assets.txt"
+  # Only skip a previously completed installation. Legacy installs still run
+  # setup once, even if their runtime files happen to match this package.
+  unchanged=1
+  for name in "${FILES[@]}"; do
+    safe_parents "$TARGET" "$name" || fail "Unsafe installed path: $name"
+    if ! cmp -s -- "$source_dir/$name" "$TARGET/$name"; then unchanged=0; fi
+  done
+  for name in cluster_protocol.py frame_stream.py tcp_diagnostics.py; do
+    if [[ -e "$TARGET/$name" ]]; then unchanged=0; fi
+  done
+  if [[ $unchanged == 1 && -s "$STATE/version" ]]; then
+    printf 'CLUSTER_PI_UNCHANGED: Receiver already up to date; no restart or reboot needed.\n'
+    exit 0
+  fi
 fi
 for name in "${FILES[@]}"; do
   [[ "$name" != scripts/*.sh ]] || bash -n "$source_dir/$name"
@@ -363,6 +382,12 @@ printf '%s\n' "${backup##*/}" > "$STATE/latest.tmp"
 mv -f -- "$STATE/latest.tmp" "$STATE/latest"
 rm -f -- "$STATE/recovery-needed"
 pending=0
+# A human-readable UTC apply timestamp plus the exact package identity. The
+# timestamp is informational; incremental decisions always compare file hashes.
+package_hash=$(sed 's/^\([a-f0-9]\{64\}\) \*/\1  /' "$source_dir/SHA256SUMS" | LC_ALL=C sort | sha256sum | cut -d ' ' -f 1)
+printf '%s %s\n' "$(date -u +%Y%m%d%H%M%S)" "$package_hash" > "$STATE/version.tmp"
+mv -f -- "$STATE/version.tmp" "$STATE/version"
+copy_file "$STATE/version" "$TARGET/receiver-version"
 if [[ $1 == apply ]]; then
   # Optional telemetry setup runs only after a successful receiver transaction.
   # It grants one exact read command without changing the service account.

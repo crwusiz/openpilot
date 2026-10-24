@@ -13,6 +13,10 @@ import tempfile
 import time
 import uuid
 
+try:
+  from .receiver_build import ReceiverVersion
+except ImportError:
+  from receiver_build import ReceiverVersion
 
 ACTION_PATH = "/api/cluster/actions"
 DASHBOARD_PORT = 7000
@@ -187,7 +191,7 @@ def request_action(host, payload=None):
     result = json.loads(data)
     if not isinstance(result, dict) or result.get("state") not in ("idle", "running", "succeeded", "warning", "failed"):
       raise ValueError("Invalid C4 action response")
-    if result["state"] != "idle" and (result.get("action") not in ("pi_update", "upload_logs")
+    if result["state"] != "idle" and (result.get("action") not in ("pi_update", "upload_logs", "commit_check", "git_pull")
                                        or not isinstance(result.get("request_id"), str)):
       raise ValueError("Invalid C4 action identity")
     if payload is not None and (result.get("request_id") != payload["request_id"] or result.get("action") != payload["action"]):
@@ -198,27 +202,49 @@ def request_action(host, payload=None):
 
 
 class TouchWorker:
-  def __init__(self, sampler=None, request=request_action, clock=time.monotonic):
+  def __init__(self, sampler=None, request=request_action, clock=time.monotonic, versions=None, check_interval=60.0):
     self.sampler = sampler or PiStatus()
     self.request, self.clock = request, clock
     self.host = None
     self.pending = None
     self.pending_at = None
     self.job = None
+    self.versions = versions or ReceiverVersion()
+    self.check_interval = check_interval
+    self._next_check = 0.0
+
+  def _version_status(self, job, version):
+    result = {**(job or {}), **version}
+    current, desired = result.get("pi_package_sha256"), result.get("c4_pi_sha256")
+    known = all(isinstance(value, str) and re.fullmatch(r"[a-f0-9]{64}", value) for value in (current, desired))
+    result["pi_update_available"] = known and current != desired
+    result["pi_version_state"] = "available" if result["pi_update_available"] else "current" if known else "unknown"
+    return result
 
   def exchange(self, host, action=None):
     """One serialized worker call; no pygame objects cross this boundary."""
     stats = self.sampler.sample()
+    version = self.versions.sample()
     if host != self.host:
       self.host, self.pending, self.job = host, None, None
+      self._next_check = 0.0
     if action is not None:
       self.pending = {"action": action, "request_id": uuid.uuid4().hex}
       self.pending_at = self.clock()
       self.job = {**self.pending, "state": "checking"}
     if host is None:
-      return stats, {"state": "unavailable"}
+      return stats, self._version_status({"state": "unavailable"}, version)
     try:
       job = self.request(host, self.pending)
+      # The single Git Pull button reflects an automatic, periodically refreshed
+      # commit check. Poll existing jobs before starting a new background check.
+      if (self.pending is None and action is None and job["state"] != "running"
+          and self.check_interval is not None and self.clock() >= self._next_check):
+        self.pending = {"action": "commit_check", "request_id": uuid.uuid4().hex}
+        self.pending_at = self.clock()
+        self._next_check = self.clock() + self.check_interval
+        self.job = {**job, **self.pending, "state": "checking", "commit_state": "checking", "update_available": False}
+        job = self.request(host, self.pending)
       self.pending = None
       if job["state"] == "idle" and self.job is not None and self.job.get("state") in ("running", "checking"):
         self.job = {**self.job, "state": "failed", "reason": "interrupted"}
@@ -244,7 +270,7 @@ class TouchWorker:
       elif self.job is None:
         self.job = {"state": "unavailable", "reason": "connection"}
       # Keep a previously accepted running job busy until it can be queried.
-    return stats, self.job
+    return stats, self._version_status(self.job, version)
 
 
 def install_gpu_access(account=None, directory=Path("/etc/sudoers.d"), run=subprocess.run):
