@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer
+from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer, ColorBlendWorkspace, TextGlyph
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_scene import H264Scene, source_panel_geometry
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.scene_layers import LayeredRenderer
 
@@ -260,6 +260,96 @@ def test_empty_path_skips_large_transparent_canvas_and_worker():
     scene.set_video(np.zeros((720, 1280, 3), np.uint8))
     assert scene.render_layers().path is None
     assert scene.renderer._path_executor is None and scene.renderer._path_frame is None
+  finally:
+    scene.close()
+
+
+def test_path_text_uses_an_independent_font_and_cache_while_hud_draws(monkeypatch):
+  scene = H264Scene(ASSETS, clock=lambda: 10)
+  renderer = scene.renderer
+  renderer._parallel_path = True
+  scene.update(_driving_state())
+  scene.set_video(np.zeros((720, 1280, 3), np.uint8))
+  hud_entered, labels_done = threading.Event(), threading.Event()
+  owner = threading.get_ident()
+  draw_hud, draw_leads = renderer._draw_hud, renderer._draw_lead_indicator
+
+  def hud(*args):
+    assert threading.get_ident() == owner
+    hud_entered.set()
+    assert labels_done.wait(3), "path labels must not need the HUD cache or font"
+    return draw_hud(*args)
+
+  def leads(*args):
+    assert threading.get_ident() != owner
+    assert hud_entered.wait(3)
+    result = draw_leads(*args)
+    assert renderer._lead_font is not renderer.font_unit
+    assert renderer._lead_font.font is not renderer.font_unit.font
+    assert renderer._lead_text_cache and not renderer._text_cache
+    labels_done.set()
+    return result
+
+  monkeypatch.setattr(renderer, "_draw_hud", hud)
+  monkeypatch.setattr(renderer, "_draw_lead_indicator", leads)
+  try:
+    layers = scene.render_layers()
+    assert layers.path is not None
+    assert scene.last_frame_timings["path_labels"] >= 0
+    assert scene.last_frame_timings["hud_cpu"] >= 0
+  finally:
+    scene.close()
+  assert renderer._lead_font is None and not renderer._lead_text_cache
+
+
+def test_independent_lead_glyphs_keep_existing_pixels_and_bounded_memory():
+  scene = H264Scene(ASSETS)
+  renderer = scene.renderer
+  try:
+    for i in range(100):
+      label = f"{i} km/h"
+      expected = TextGlyph(label, renderer.font_unit, 2, anchor="ms")
+      actual = renderer._lead_glyph(label)
+      assert (actual.anchor_x, actual.anchor_y) == (expected.anchor_x, expected.anchor_y)
+      np.testing.assert_array_equal(np.asarray(actual.colored((255, 255, 255), (0, 0, 0))),
+                                    np.asarray(expected.colored((255, 255, 255), (0, 0, 0))))
+    assert len(renderer._lead_text_cache) <= 64 and renderer._lead_text_bytes <= 2 * 1024 * 1024
+    assert renderer._lead_text_bytes == sum(glyph.byte_size for glyph in renderer._lead_text_cache.values())
+    assert not renderer._text_cache
+  finally:
+    scene.close()
+
+
+@pytest.mark.parametrize("seed", range(12))
+@pytest.mark.parametrize("channels", [3, 4])
+def test_batched_lane_projection_keeps_original_clipping_order_and_pixels(monkeypatch, seed, channels):
+  scene = H264Scene(ASSETS)
+  renderer = scene.renderer
+  rng = np.random.default_rng(seed)
+  state = _driving_state()
+  path = state["path"]
+  # Different line lengths, near/behind-camera points and off-screen geometry
+  # exercise clipping independently for every boundary in the batch.
+  xs = [-5, 0, 0.001, *range(1, 131, 4)]
+  lines = []
+  for i in range(6):
+    count = len(xs) - i
+    lines.append([xs[:count], (rng.normal(0, 0.2, count) + (i - 3) * 1.8).tolist(),
+                  rng.normal(0, 0.12, count).tolist()])
+  path.update(lane_lines=[*lines[:4], [[], [], []]], lane_line_probs=[0.5, 0.9, 0, 0.7],
+              road_edges=lines[4:], road_edge_stds=[0.1, 1.2])
+  renderer._source_to_panel = np.array([[0.95, 0, renderer.camera_x],
+                                        [0, 0.96, renderer.camera_y - 140], [0, 0, 1]], np.float32)
+  expected = np.zeros((renderer.camera_h, renderer.camera_w, channels), np.uint8)
+  actual = expected.copy()
+  renderer._color_blender = ColorBlendWorkspace(renderer.camera_w, channels=channels)
+  try:
+    ClusterRenderer._draw_lane_lines(renderer, expected, path, path["calib_transform"])
+    project = Mock(wraps=renderer._project_points)
+    monkeypatch.setattr(renderer, "_project_points", project)
+    renderer._draw_lane_lines(actual, path, path["calib_transform"])
+    np.testing.assert_array_equal(actual, expected)
+    assert project.call_count == 1
   finally:
     scene.close()
 

@@ -25,7 +25,7 @@ RECOVERY_INTERVAL = 0.5
 HUD_REFRESH_INTERVAL = 0.1
 GPU_BURST_FPS = 60
 GPU_CAMERA_GRACE_SECONDS = 0.2
-STAGE_NAMES = {"scene": ("camera_copy", "camera_panel", "snapshot", "path", "path_cpu", "hud", "path_wait"),
+STAGE_NAMES = {"scene": ("camera_copy", "camera_panel", "snapshot", "path", "path_cpu", "hud", "hud_cpu", "path_wait", "path_labels"),
                "hdmi": ("rgb_surface", "convert", "upload", "draw", "flip")}
 
 

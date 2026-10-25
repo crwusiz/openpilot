@@ -1,10 +1,10 @@
 """CPU HUD rasterization and camera layers for the Pi's SDL GPU compositor."""
 
 from dataclasses import dataclass
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import os
-import threading
 import time
 from time import thread_time
 
@@ -13,11 +13,11 @@ import numpy as np
 from PIL import Image
 
 try:
-  from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer, ColorBlendWorkspace
-  from openpilot.selfdrive.addon.cluster.cluster_render_support import Colors
+  from openpilot.selfdrive.addon.cluster.cluster_renderer import CLIP_MARGIN, ClusterRenderer, ColorBlendWorkspace, TextGlyph
+  from openpilot.selfdrive.addon.cluster.cluster_render_support import Colors, colors_alpha
 except ImportError:
-  from cluster_renderer import ClusterRenderer, ColorBlendWorkspace
-  from cluster_render_support import Colors
+  from cluster_renderer import CLIP_MARGIN, ClusterRenderer, ColorBlendWorkspace, TextGlyph
+  from cluster_render_support import Colors, colors_alpha
 
 
 @dataclass
@@ -56,7 +56,12 @@ class LayeredRenderer(ClusterRenderer):
   def __init__(self, config):
     super().__init__(config)
     self._straight_alpha_hud = True
-    self._text_lock = threading.RLock()
+    # Only the path worker uses these glyphs/font. A separate FreeType face is
+    # important: a separate dictionary alone still races on the shared font.
+    self._lead_font = None
+    self._lead_text_cache = OrderedDict()
+    self._lead_text_bytes = 0
+    self._lead_elapsed = 0.0
     self._path_executor = None
     self._path_frame = None
     try:
@@ -65,7 +70,8 @@ class LayeredRenderer(ClusterRenderer):
       cores = os.cpu_count() or 1
     self._parallel_path = cores >= 4 and os.environ.get("CLUSTER_PARALLEL_PATH", "1") != "0"
     logging.getLogger("cluster_receiver").info(
-      "[CLUSTER_SCENE_WORKERS] camera_workers=1 | path_workers=%d | hud=owner | gpu=owner | queue=join_each_frame",
+      "[CLUSTER_SCENE_WORKERS] camera_workers=1 | path_workers=%d | hud=owner | gpu=owner | queue=join_each_frame | "
+      + "text_cache=isolated | lane_projection=batched",
       int(self._parallel_path))
 
   def close(self):
@@ -73,16 +79,29 @@ class LayeredRenderer(ClusterRenderer):
     if executor is not None:
       executor.shutdown(wait=True, cancel_futures=True)
     self._path_frame = None
+    self._lead_text_cache.clear()
+    self._lead_text_bytes = 0
+    self._lead_font = None
 
-  def _centered(self, *args, **kwargs):
-    # Lead labels and HUD share a bounded glyph cache and FreeType font. A
-    # glyph owns a mutable colored sprite: protect lookup through consumption,
-    # not just the cache dictionary. Geometry/raster work remains concurrent.
-    with self._text_lock:
-      return super()._centered(*args, **kwargs)
+  def _lead_glyph(self, label):
+    glyph = self._lead_text_cache.get(label)
+    if glyph is None:
+      if self._lead_font is None:
+        self._lead_font = self.font_unit.font_variant()
+      glyph = TextGlyph(label, self._lead_font, 2, anchor="ms")
+      if glyph.byte_size <= 2 * 1024 * 1024:
+        self._lead_text_cache[label] = glyph
+        self._lead_text_bytes += glyph.byte_size
+        while len(self._lead_text_cache) > 64 or self._lead_text_bytes > 2 * 1024 * 1024:
+          _, old = self._lead_text_cache.popitem(last=False)
+          self._lead_text_bytes -= old.byte_size
+    else:
+      self._lead_text_cache.move_to_end(label)
+    return glyph
 
   def _render_path_layer(self, path, hud):
     started, cpu_started = time.monotonic(), thread_time()
+    self._lead_elapsed = 0.0
     if not path.get("path_x") or path.get("calib_transform") is None:
       self._reset_leads()
       return None, time.monotonic() - started, thread_time() - cpu_started
@@ -101,6 +120,43 @@ class LayeredRenderer(ClusterRenderer):
     pixels = region.copy() if cv2.countNonZero(cv2.extractChannel(region, 3)) else None
     return pixels, time.monotonic() - started, thread_time() - cpu_started
 
+  def _draw_lane_lines(self, camera_region, path_data, calib_transform):
+    # Project all lane/edge boundaries together instead of entering NumPy's
+    # small matrix/validation operations twice per line. Keep their original
+    # order, clipping, colors and integer raster coordinates.
+    points, draws = [], []
+    groups = ((path_data.get("lane_lines") or [], path_data.get("lane_line_probs") or [], False),
+              (path_data.get("road_edges") or [], path_data.get("road_edge_stds") or [], True))
+    for lines, confidence, edge in groups:
+      for index, line in enumerate(lines):
+        if len(line) != 3:
+          continue
+        alpha = (1.0 - float(confidence[index]) if edge else float(confidence[index])) if index < len(confidence) else 0.0
+        count = min(map(len, line))
+        if alpha <= 0.0 or count < 2:
+          continue
+        raw = np.column_stack([values[:count] for values in line]).astype(np.float32)
+        raw = raw[(raw[:, 0] >= 0.0) & (raw[:, 0] <= 100.0)]
+        if len(raw) < 2:
+          continue
+        width = 0.025 if edge else 0.025 * alpha
+        points.extend((raw + np.array([0.0, -width, 0.0], dtype=np.float32),
+                       raw + np.array([0.0, width, 0.0], dtype=np.float32)))
+        draws.append((len(raw), colors_alpha(Colors.RED, 100) if edge else Colors.WHITE,
+                      float(np.clip(alpha, 0.0, 1.0 if edge else 0.7))))
+    if not points:
+      return
+    pixels, visible = self._project_points(np.concatenate(points), calib_transform, CLIP_MARGIN)
+    offset = np.array([self.camera_x, self.camera_y], dtype=np.int32)
+    start = 0
+    for count, color, alpha in draws:
+      middle, end = start + count, start + 2 * count
+      valid = visible[start:middle] & visible[middle:end]
+      if np.count_nonzero(valid) >= 2:
+        polygon = np.vstack((pixels[start:middle][valid], pixels[middle:end][valid][::-1])).astype(np.int32)
+        self._fill_polygon_alpha(camera_region, polygon - offset, color, alpha, blender=self._color_blender)
+      start = end
+
   def render_overlay(self, transform, models, has_camera):
     started = time.monotonic()
     self._update_filter_intervals(started)
@@ -111,9 +167,9 @@ class LayeredRenderer(ClusterRenderer):
       self._overlay_base = np.empty((*self.base_canvas.shape[:2], 4), dtype=np.uint8)
       self._overlay_base[:, :, :3] = self.base_canvas
       self._overlay_base[:, :, 3] = 255
-    frame = self._overlay_base.copy()
-    if has_camera:
-      frame[self.camera_y:self.camera_y + self.camera_h, self.camera_x:self.camera_x + self.camera_w] = 0
+      self._overlay_camera_base = self._overlay_base.copy()
+      self._overlay_camera_base[self.camera_y:self.camera_y + self.camera_h, self.camera_x:self.camera_x + self.camera_w] = 0
+    frame = (self._overlay_camera_base if has_camera else self._overlay_base).copy()
     copied_at = time.monotonic()
     model_valid, hud, path = models.get_render_data()
     snapshot_at = time.monotonic()
@@ -129,12 +185,15 @@ class LayeredRenderer(ClusterRenderer):
         path_pixels, path_elapsed, path_cpu = self._render_path_layer(path, hud)
     else:
       self._reset_leads()
+      self._lead_elapsed = 0.0
     hud_started = time.monotonic()
+    hud_cpu_started = thread_time()
     try:
       image = Image.fromarray(frame)
       self._draw_hud(image, hud, has_camera)
     finally:
       hud_elapsed = time.monotonic() - hud_started
+      hud_cpu = thread_time() - hud_cpu_started
       wait_started = time.monotonic()
       # Even a HUD exception must join the path worker before the next frame
       # or session cleanup can change filters, fonts, configuration or buffers.
@@ -142,7 +201,8 @@ class LayeredRenderer(ClusterRenderer):
         path_pixels, path_elapsed, path_cpu = path_future.result()
       path_wait = time.monotonic() - wait_started if path_future is not None else 0.0
     self.last_frame_timings = {"camera_copy": copied_at - started, "snapshot": snapshot_at - copied_at,
-                               "path": path_elapsed, "path_cpu": path_cpu, "hud": hud_elapsed, "path_wait": path_wait}
+                               "path": path_elapsed, "path_cpu": path_cpu, "hud": hud_elapsed, "hud_cpu": hud_cpu,
+                               "path_wait": path_wait, "path_labels": self._lead_elapsed}
     return image, path_pixels
 
   @staticmethod
@@ -160,6 +220,7 @@ class LayeredRenderer(ClusterRenderer):
   def _draw_lead_indicator(self, camera_region, hud_data):
     if camera_region.shape[2] != 4:
       return super()._draw_lead_indicator(camera_region, hud_data)
+    started = time.monotonic()
     offset = np.array([self.camera_x, self.camera_y], dtype=np.float32)
     for lead, info in zip(self._lead_vehicles, self._lead_info, strict=True):
       opacity = lead.fade_filter.x
@@ -171,9 +232,8 @@ class LayeredRenderer(ClusterRenderer):
       metric = getattr(self.config, "is_metric", True)
       labels = (f"{float(info.get('d_rel', 0)):.0f} m", f"{speed * (3.6 if metric else 2.236936):.0f} {'km/h' if metric else 'mph'}")
       for label, baseline in zip(labels, (y - 13, y + 27), strict=True):
-        with self._text_lock:
-          glyph = self._text_glyph(label, self.font_unit, 2, anchor="ms")
-          sprite = glyph.colored(Colors.WHITE, Colors.BLACK).copy()
+        glyph = self._lead_glyph(label)
+        sprite = glyph.colored(Colors.WHITE, Colors.BLACK).copy()
         sprite.putalpha(sprite.getchannel("A").point(lambda value, opacity=opacity: round(value * opacity)))
         left, top = x - glyph.anchor_x, baseline - glyph.anchor_y
         x0, y0 = max(0, left), max(0, top)
@@ -186,3 +246,4 @@ class LayeredRenderer(ClusterRenderer):
           image = Image.fromarray(roi)
           image.paste(sprite, (0, 0), mask)
           roi[:] = np.asarray(image)
+    self._lead_elapsed = time.monotonic() - started
