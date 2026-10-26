@@ -490,7 +490,8 @@ def test_unsupported_premultiplied_blend_can_disable_layers_and_keep_fullframe(r
 
 
 @pytest.mark.parametrize("scene_rotation", [False, True])
-def test_accelerated_real_scene_layers_match_retained_software_fallback(accelerated_pygame, scene_rotation):
+@pytest.mark.parametrize("async_path", [False, True])
+def test_accelerated_real_scene_layers_match_retained_software_fallback(accelerated_pygame, scene_rotation, async_path):
   from pathlib import Path
   import numpy as np
   from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_scene import H264Scene
@@ -525,6 +526,9 @@ def test_accelerated_real_scene_layers_match_retained_software_fallback(accelera
     pixels[:, :, 2] = 80
     scene.set_video(pixels)
     layers = scene.render_layers()
+    if async_path:
+      scene.set_gpu_camera(True)
+      layers = scene.render_layers()
     assert layers.path is not None and np.count_nonzero(layers.path[:, :, 3]) > 1000
     overlay = pygame.image.frombuffer(layers.overlay.tobytes(), layers.overlay.size, "RGBA")
     camera = pygame.image.frombuffer(layers.camera, layers.camera.shape[1::-1], "RGB")

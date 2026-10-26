@@ -27,7 +27,7 @@ def deploy_sandbox(tmp_path):
                          "receiver_build.py": "# receiver build\n",
                         "receiver_resources.py": "# receiver resources\n", "control_socket.py": "# control socket\n",
                         "h264_receiver.py": "# H264 receiver\n", "h264_protocol.py": "# H264 protocol\n", "h264_scene.py": "# H264 scene\n",
-                        "scene_layers.py": "# GPU scene layers\n",
+                        "scene_layers.py": "# GPU scene layers\n", "path_worker.py": "# latest completed path\n",
                         "cluster_renderer.py": "# shared renderer\n", "cluster_render_support.py": "# shared support\n",
                         "README.md": "연결 대기\r\n수신기\r\n", "requirements.txt": "pygame\n",
                         "cluster-hdmi.service": "[Service]\n"}.items():
@@ -166,7 +166,7 @@ def test_c4_update_packages_receiver_only_with_checksums_and_cleans_staging(depl
   assert files == {"README.md", "requirements.txt", "cluster-hdmi.service", "cluster_receiver.py", "hdmi_display.py",
                    "display_controls.py", "texture_presenter.py", "touch_status.py",  "receiver_build.py", "receiver_resources.py",
                    "control_socket.py",
-                   "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "scene_layers.py",
+                   "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "scene_layers.py", "path_worker.py",
                    "cluster_renderer.py", "cluster_render_support.py", "receiver_assets.txt",
                    *(deploy_sandbox / "receiver_assets.txt").read_text().splitlines(),
                    *("scripts/" + path.name for path in (deploy_sandbox / "scripts").glob("*.sh"))}
@@ -487,7 +487,7 @@ def test_incomplete_boot_setup_payload_is_rejected_before_ssh(deploy_sandbox, he
 
 
 @pytest.mark.parametrize("helper", [
-  "control_socket.py",  "display_controls.py", "texture_presenter.py",  "receiver_build.py", "receiver_resources.py",
+  "control_socket.py",  "display_controls.py", "texture_presenter.py",  "receiver_build.py", "receiver_resources.py", "path_worker.py",
 ])
 def test_incomplete_runtime_payload_is_rejected_before_ssh(deploy_sandbox, helper):
   (deploy_sandbox / helper).unlink()

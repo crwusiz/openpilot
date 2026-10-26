@@ -45,6 +45,143 @@ case ${1:-} in
   *) exit 1;;
 esac
 """
+# Run before SSH's byte cap: a long drive's successful GPU-stat reads and
+# identical decoder warnings must not displace the receiver's startup snapshot.
+# This standalone program uses only Python's standard library on the Pi.
+REMOTE_JOURNAL_SCRIPT = r"""import re
+import subprocess
+import sys
+
+LIFECYCLE_PATTERN = r'\[CLUSTER_(?![A-Z0-9_]*PERF\])'
+STARTUP_PATTERN = r'\[CLUSTER_(RX_(BUILD|NATIVE|RUNTIME)|HDMI_RENDERER|H264_COMPOSITOR|H264_PRESENT_POLICY|PATH_PIPELINE|SCENE_WORKERS)\]'
+RECORD = re.compile(r'^(\S+) (\S+) ([^\[\]:]+)(?:\[(\d+)\])?: (.*)$')
+GPU_COMMAND = re.compile(
+    r'^[a-z_][a-z0-9_-]*\$? : (?:TTY=[^;\n]* ; )?PWD=/opt/cluster-receiver ; '
+    r'USER=root ; COMMAND=/usr/bin/head -c 4097 -- /sys/kernel/debug/pvr/status$')
+GPU_OPEN = re.compile(
+    r'^pam_unix\(sudo:session\): session opened for user root\(uid=0\) '
+    r'by (?:[a-z_][a-z0-9_-]*)?\(uid=[0-9]+\)$')
+GPU_CLOSE = 'pam_unix(sudo:session): session closed for user root'
+DECODER = re.compile(
+    r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} )?WARNING aiortc\.codecs\.h264: '
+    r"H264Decoder\(\) failed to decode, skipping package: \[Errno 1094995529\] "
+    r"Invalid data found when processing input: 'avcodec_send_packet\(\)'$")
+BASE = ['journalctl', '-u', 'cluster-hdmi.service', '--utc', '--no-pager', '--output=short-iso', '--reverse']
+
+
+def read_journal(arguments, limit):
+    process = subprocess.Popen(BASE + arguments, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+    data = bytearray()
+    limited = False
+    try:
+        while True:
+            chunk = process.stdout.read(min(4096, limit + 1 - len(data)))
+            if not chunk:
+                break
+            data.extend(chunk)
+            if len(data) > limit:
+                limited = True
+                break
+    finally:
+        process.stdout.close()
+        if limited:
+            process.terminate()
+        try:
+            status = process.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            status = process.wait(timeout=1)
+    if limited:
+        # Drop an incomplete last record, retaining the newest complete lines.
+        data = data[:limit].rsplit(b'\n', 1)[0]
+    return data.decode('utf-8', errors='replace').splitlines(), status, limited
+
+
+def compact_journal(lines):
+    records = [RECORD.fullmatch(line) for line in lines]
+    sudo = {}
+    for index, record in enumerate(records):
+        if record and record[3] == 'sudo' and record[4]:
+            sudo.setdefault((record[2], record[4]), []).append(index)
+    omitted = set()
+    for indexes in sudo.values():
+        messages = [records[index][5] for index in indexes]
+        # Only a complete successful transaction for this exact read is noise.
+        # Missing session records, auth failures and extra/unknown messages stay.
+        if (len(messages) == 3 and sum(bool(GPU_COMMAND.fullmatch(msg)) for msg in messages) == 1
+                and sum(bool(GPU_OPEN.fullmatch(msg)) for msg in messages) == 1
+                and messages.count(GPU_CLOSE) == 1):
+            omitted.update(indexes)
+    output = []
+    pending = []
+
+    def flush():
+        if not pending:
+            return
+        output.append(pending[0][0])
+        if len(pending) > 1:
+            newest, oldest = pending[0][1], pending[-1][1]
+            prefix = pending[-1][0][:-len(oldest[5])]
+            output.append(prefix + '[CLUSTER_JOURNAL_REPEAT] decoder_warning_total=' + str(len(pending))
+                          + ' | newest=' + newest[1] + ' | oldest=' + oldest[1]
+                          + ' | identical decoder warning; first message retained above')
+        pending.clear()
+
+    for index, (line, record) in enumerate(zip(lines, records)):
+        if index in omitted:
+            continue
+        if record and DECODER.fullmatch(record[5]):
+            if pending and any(pending[-1][1][group] != record[group] for group in (2, 3, 4)):
+                flush()
+            pending.append((line, record))
+        else:
+            flush()
+            output.append(line)
+    flush()
+    return output, len(omitted)
+
+
+def emit_section(title, lines, byte_limit, raw_limited=False, suppressed=0):
+    print('\n--- ' + title + ' (UTC, newest first) ---')
+    print('scope=bounded available journal boots; successful_gpu_sudo_lines_omitted=' + str(suppressed))
+    used = 0
+    for line in lines:
+        size = len((line + '\n').encode('utf-8'))
+        if used + size > byte_limit:
+            print('[JOURNAL SECTION LIMITED: older records omitted]')
+            break
+        print(line)
+        used += size
+    if raw_limited:
+        print('[JOURNAL SCAN LIMITED: newest complete records retained]')
+
+
+def main():
+    startup, startup_status, startup_limited = read_journal(
+        ['--grep=' + STARTUP_PATTERN, '-n', '40'], 128 * 1024)
+    lifecycle, lifecycle_status, lifecycle_limited = read_journal(
+        ['--grep=' + LIFECYCLE_PATTERN, '-n', '160'], 256 * 1024)
+    # Older journalctl versions may lack --grep/PCRE. The recent pass remains
+    # useful and supplies a bounded fallback without changing boot selection.
+    recent, recent_status, recent_limited = read_journal(['-n', '20000'], 8 * 1024 * 1024)
+    if startup_status != 0:
+        startup = [line for line in recent if re.search(STARTUP_PATTERN, line)][:40]
+        startup_limited = recent_limited
+    if lifecycle_status != 0:
+        lifecycle = [line for line in recent if '[CLUSTER_' in line and 'PERF]' not in line][:160]
+        lifecycle_limited = recent_limited
+        print('[CLUSTER_JOURNAL_FILTER] lifecycle query unavailable or empty; bounded recent fallback used')
+    lifecycle, lifecycle_sudo = compact_journal(lifecycle)
+    recent, recent_sudo = compact_journal(recent)
+    emit_section('Receiver startup and renderer', startup, 48 * 1024, startup_limited)
+    emit_section('Receiver lifecycle events', lifecycle, 64 * 1024, lifecycle_limited, lifecycle_sudo)
+    emit_section('Receiver recent performance and errors', recent, 320 * 1024, recent_limited, recent_sudo)
+    return 0 if recent_status == 0 or recent_limited else recent_status
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
+"""
 REMOTE_SCRIPT = r"""export LC_ALL=C SYSTEMD_COLORS=0
 printf '%s\n' '--- Pi UTC wall clock ---'
 date -u '+%Y-%m-%dT%H:%M:%SZ'
@@ -135,9 +272,7 @@ for counter in rx_bytes rx_packets rx_errors rx_dropped tx_bytes tx_packets tx_e
     cat "/sys/class/net/wlan0/statistics/$counter"
   fi
 done
-printf '\n--- Receiver journal (available boots, UTC, latest 2500 lines, newest first) ---\n'
-journalctl -u cluster-hdmi.service --utc --no-pager --output=short-iso -n 2500 --reverse
-"""
+""" + "python3 -c " + shlex.quote(REMOTE_JOURNAL_SCRIPT) + "\n"
 REMOTE_COMMAND = "sh -c " + shlex.quote(REMOTE_SCRIPT)
 
 

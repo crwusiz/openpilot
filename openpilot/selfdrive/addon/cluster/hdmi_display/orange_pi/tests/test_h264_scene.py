@@ -320,7 +320,7 @@ def test_invalid_scene_is_rejected_before_replacing_valid_state(scene, bad_state
 def test_renderer_and_scene_run_from_standalone_pi_bundle_without_openpilot(tmp_path):
   for source in (CLUSTER / "cluster_renderer.py", CLUSTER / "cluster_render_support.py",
                  CLUSTER / "hdmi_display/orange_pi/h264_scene.py", CLUSTER / "hdmi_display/orange_pi/h264_protocol.py",
-                 CLUSTER / "hdmi_display/orange_pi/scene_layers.py"):
+                 CLUSTER / "hdmi_display/orange_pi/scene_layers.py", CLUSTER / "hdmi_display/orange_pi/path_worker.py"):
     shutil.copyfile(source, tmp_path / source.name)
   code = """
 import sys

@@ -116,6 +116,7 @@ class H264Scene:
     self._panel_key = self._panel = self._panel_transform = None
     self._layer_key = self._layer_pixels = self._layer_uv = None
     self._camera_executor = None
+    self._gpu_camera = False
     self._contrast = self._contrast_lut = None
     self._update_contrast(1.08)
     self.last_frame_timings = {}
@@ -135,6 +136,11 @@ class H264Scene:
       self._snapshot = self._video = self._panel = self._panel_transform = None
       self._panel_key = self._contrast_lut = None
       self._layer_key = self._layer_pixels = self._layer_uv = None
+
+  def set_gpu_camera(self, enabled):
+    # Activated only after successful real GPU presentation, not by a request
+    # for acceleration or an untested SDL renderer setting.
+    self._gpu_camera = bool(enabled)
 
   def update(self, snapshot, received_at=None):
     if not isinstance(snapshot, dict):
@@ -279,6 +285,14 @@ class H264Scene:
     path = snapshot.get("path", {"path_x": [], "path_y": [], "path_z": [], "calib_transform": None})
     model_valid = (state_fresh and video_fresh and snapshot.get("model_valid") is True
                    and self._source_input_fresh(snapshot, "model_age_ms", elapsed_ms))
+    path_deadline = now if state_at is None else state_at + min(self.state_timeout, 0.15)
+    health = snapshot.get("health", {})
+    for field in ("car_state_age_ms", "model_age_ms"):
+      age = snapshot.get(field, health.get(field) if isinstance(health, dict) else None)
+      if type(age) in (int, float) and math.isfinite(age):
+        path_deadline = min(path_deadline, state_at + 0.5 - age / 1000)
+    self.renderer.configure_path_pipeline(layered and self._gpu_camera, now if state_at is None else state_at,
+                                          path_deadline, self.clock)
     panel_started = time.monotonic()
     pixels, uv = None, (0, 0, 1, 1)
     camera_future = None

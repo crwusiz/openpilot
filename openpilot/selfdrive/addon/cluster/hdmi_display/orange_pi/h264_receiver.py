@@ -25,7 +25,7 @@ RECOVERY_INTERVAL = 0.5
 HUD_REFRESH_INTERVAL = 0.1
 GPU_BURST_FPS = 60
 GPU_CAMERA_GRACE_SECONDS = 0.2
-STAGE_NAMES = {"scene": ("camera_copy", "camera_panel", "snapshot", "path", "path_cpu", "hud", "hud_cpu", "path_wait", "path_labels"),
+STAGE_NAMES = {"scene": ("camera_copy", "camera_panel", "snapshot", "path", "path_cpu", "hud", "hud_cpu", "path_wait", "path_labels", "path_age"),
                "hdmi": ("rgb_surface", "convert", "upload", "draw", "flip")}
 
 
@@ -586,6 +586,9 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         # HUD refreshes at 100ms intervals; freshness changes bypass that wait.
         render_started = time.monotonic()
         layered = bool(getattr(display, "can_present_layers", False))
+        configure_gpu = getattr(scene, "set_gpu_camera", None)
+        if callable(configure_gpu):
+          configure_gpu(layered and receiver.gpu_camera)
         image = scene.render_layers() if layered else scene.render()
         rendered_at = time.monotonic()
         if not (display.send_layers(image) if layered else display.send_rgb(image)):

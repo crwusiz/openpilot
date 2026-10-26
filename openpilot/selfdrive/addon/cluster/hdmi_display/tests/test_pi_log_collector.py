@@ -1,6 +1,8 @@
 from io import BytesIO
 import os
 from pathlib import Path
+import re
+import shlex
 import subprocess
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -259,7 +261,8 @@ def test_capture_drops_over_limit_data_but_drains_stdout():
 
 def test_readonly_command_collects_journal_clock_renderer_and_filtered_wifi():
   command = collector.REMOTE_SCRIPT
-  assert "journalctl -u cluster-hdmi.service --utc --no-pager --output=short-iso -n 2500 --reverse" in command
+  assert collector.REMOTE_JOURNAL_SCRIPT == shlex.split(command)[-1]
+  assert "'--utc', '--no-pager', '--output=short-iso', '--reverse'" in collector.REMOTE_JOURNAL_SCRIPT
   assert "cat /proc/sys/kernel/random/boot_id" in command
   assert " -b " not in command and "--since" not in command
   assert "date -u" in command and "cat /proc/uptime" in command
@@ -270,6 +273,136 @@ def test_readonly_command_collects_journal_clock_renderer_and_filtered_wifi():
   assert "--show-secrets" not in command
   assert "systemctl restart" not in command
   assert "set power_save" not in command
+
+
+@pytest.fixture
+def remote_journal():
+  # Exercise the exact standalone program sent to the Pi, without SSH or a
+  # separate implementation of its filters in the tests.
+  namespace = {"__name__": "remote_journal_test"}
+  exec(collector.REMOTE_JOURNAL_SCRIPT, namespace)
+  return SimpleNamespace(**namespace)
+
+
+def journal_line(message, *, second=0, pid=123, source="python3"):
+  return f"2026-10-26T09:02:{second:02d}+00:00 pi {source}[{pid}]: {message}"
+
+
+def gpu_sudo_transaction(pid=123):
+  return [journal_line(message, source="sudo", pid=pid) for message in (
+    "pam_unix(sudo:session): session closed for user root",
+    "pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)",
+    "orangepi : TTY=tty1 ; PWD=/opt/cluster-receiver ; USER=root ; "
+    + "COMMAND=/usr/bin/head -c 4097 -- /sys/kernel/debug/pvr/status",
+  )]
+
+
+def decoder_warning(second=0, pid=123):
+  return journal_line("2026-10-26 09:02:00,123 WARNING aiortc.codecs.h264: H264Decoder() failed to decode, "
+                      + "skipping package: [Errno 1094995529] Invalid data found when processing input: "
+                      + "'avcodec_send_packet()'", second=second, pid=pid)
+
+
+@pytest.mark.parametrize("message", [
+  "[CLUSTER_PATH_PIPELINE] mode=latest_completed",
+  "[CLUSTER_SCENE_WORKERS] text_cache=isolated",
+  "[CLUSTER_PATH_PIPELINE] worker failed; fallback",
+])
+def test_remote_journal_reserves_active_path_pipeline_and_worker_fallback(remote_journal, message):
+  line = journal_line(message)
+  assert re.search(remote_journal.STARTUP_PATTERN, line)
+  assert re.search(remote_journal.LIFECYCLE_PATTERN, line)
+  assert remote_journal.compact_journal([line]) == ([line], 0)
+
+
+def test_remote_journal_only_suppresses_complete_known_successful_gpu_reads(remote_journal):
+  known = gpu_sudo_transaction()
+  performance = journal_line("[CLUSTER_H264_RX_PERF] camera_display_fps=17")
+  output, suppressed = remote_journal.compact_journal([known[0], performance, *known[1:]])
+  assert output == [performance]
+  assert suppressed == 3
+
+
+@pytest.mark.parametrize("change", ["auth_failure", "other_command", "extra_error", "incomplete", "other_process"])
+def test_remote_journal_keeps_auth_failures_unknown_errors_and_incomplete_reads(remote_journal, change):
+  lines = gpu_sudo_transaction()
+  if change == "auth_failure":
+    lines[1] = journal_line("sudo: a password is required", source="sudo")
+  elif change == "other_command":
+    lines[2] = lines[2].replace("/usr/bin/head -c 4097 --", "/usr/bin/cat")
+  elif change == "extra_error":
+    lines.insert(1, journal_line("unexpected GPU reader failure", source="sudo"))
+  elif change == "incomplete":
+    lines.pop(0)
+  else:
+    lines = [line.replace("sudo[", "unknown[") for line in lines]
+  assert remote_journal.compact_journal(lines) == (lines, 0)
+
+
+def test_remote_journal_compacts_exact_decoder_runs_with_time_ranges_and_order(remote_journal):
+  performance = journal_line("[CLUSTER_H264_RX_PERF] decoder_errors=3", second=4)
+  unknown = journal_line("WARNING aiortc.codecs.h264: unexpected decoder error", second=2)
+  lines = [decoder_warning(9), *gpu_sudo_transaction(), decoder_warning(8), decoder_warning(7),
+           performance, decoder_warning(3), unknown, decoder_warning(1, pid=124), decoder_warning(0)]
+  output, suppressed = remote_journal.compact_journal(lines)
+  assert output[0] == lines[0]
+  assert "decoder_warning_total=3" in output[1]
+  assert "newest=2026-10-26T09:02:09" in output[1] and "oldest=2026-10-26T09:02:07" in output[1]
+  assert output[2:] == [performance, decoder_warning(3), unknown, decoder_warning(1, pid=124), decoder_warning(0)]
+  assert suppressed == 3
+
+
+def test_remote_journal_section_cap_keeps_complete_utf8_records_and_explicit_limits(remote_journal, capsys):
+  remote_journal.emit_section("test", ["가나다", "last record"], 10, raw_limited=True, suppressed=3)
+  output = capsys.readouterr().out
+  assert "가나다\n" in output and "last record" not in output
+  assert "SECTION LIMITED" in output and "SCAN LIMITED" in output
+  assert "successful_gpu_sudo_lines_omitted=3" in output
+
+
+def test_remote_journal_reads_are_byte_bounded_and_kill_only_its_journal_child(remote_journal, monkeypatch):
+  process = SimpleNamespace(stdout=BytesIO(b"new\nold\n" + b"x" * 100), terminate=Mock(), kill=Mock(),
+                            wait=Mock(return_value=-15))
+  spawn = Mock(return_value=process)
+  monkeypatch.setattr(remote_journal.subprocess, "Popen", spawn)
+  lines, status, limited = remote_journal.read_journal(["-n", "20000"], 10)
+  assert lines == ["new", "old"] and status == -15 and limited
+  assert spawn.call_args.args[0] == remote_journal.BASE + ["-n", "20000"]
+  assert spawn.call_args.kwargs["stdin"] == subprocess.DEVNULL
+  assert process.stdout.closed
+  process.terminate.assert_called_once()
+  process.kill.assert_not_called()
+
+
+@pytest.mark.parametrize("filter_status", [0, 1])
+def test_remote_journal_reserves_startup_before_long_performance_tail(remote_journal, capsys, filter_status):
+  startup = journal_line("[CLUSTER_RX_BUILD] source_sha256=installed-build", second=0)
+  performance = journal_line("[CLUSTER_H264_RX_PERF] " + "camera_display_fps=17 " * 30, second=1)
+  failures = [decoder_warning(3)] * 1000
+  raw = [*gpu_sudo_transaction(), performance, *failures, *([performance] * 1000)]
+  if filter_status:
+    raw.append(startup)
+  calls = []
+
+  def read_journal(arguments, limit):
+    calls.append((arguments, limit))
+    if arguments[0] == "--grep=" + remote_journal.STARTUP_PATTERN:
+      return ([startup] if filter_status == 0 else []), filter_status, False
+    if arguments[0].startswith("--grep="):
+      return [journal_line("[CLUSTER_RX_CONNECT] C4 retry") for _ in range(160)], filter_status, False
+    return raw, 0, False
+
+  remote_journal.main.__globals__["read_journal"] = read_journal
+  assert remote_journal.main() == 0
+  output = capsys.readouterr().out
+  assert output.index("source_sha256=installed-build") < output.index("Receiver recent performance")
+  assert "camera_display_fps=17" in output and "decoder_warning_total=1000" in output
+  assert "session opened" not in output and "COMMAND=/usr/bin/head" not in output
+  assert "JOURNAL SECTION LIMITED" in output
+  assert len(output.encode()) < collector.MAX_OUTPUT_BYTES - 48 * 1024
+  assert calls == [(["--grep=" + remote_journal.STARTUP_PATTERN, "-n", "40"], 128 * 1024),
+                   (["--grep=" + remote_journal.LIFECYCLE_PATTERN, "-n", "160"], 256 * 1024),
+                   (["-n", "20000"], 8 * 1024 * 1024)]
 
 
 def test_subprocess_timeout_kills_detached_session_and_preserves_bounded_partial_output(monkeypatch):
