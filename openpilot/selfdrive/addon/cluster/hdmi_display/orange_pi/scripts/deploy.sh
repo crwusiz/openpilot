@@ -33,6 +33,7 @@ Omit PI_HOST to use the currently connected Orange Pi address.
   --dry-run            Print the target and file list without using SSH
   -h, --help           Show this help
 Password override: set CLUSTER_PI_PASSWORD in the environment.
+Interrupted or failed updates are automatically recovered and retried once.
 An update over port 22 also migrates the Pi SSH listener to port 9122.
 HELP
 }
@@ -242,7 +243,34 @@ done
 if (( ! full_upload )); then
   ssh "${ssh_options[@]}" "$pi_host" "bash '$remote_directory/incremental.sh' hydrate '$remote_directory/payload' /opt/cluster-receiver"
 fi
-ssh "${ssh_options[@]}" -tt "$pi_host" "if [ \$(id -u) -eq 0 ]; then bash '$remote_directory/payload/scripts/update.sh' apply '$remote_directory/payload'; else sudo bash '$remote_directory/payload/scripts/update.sh' apply '$remote_directory/payload'; fi" | tee "$local_directory/apply.log"
+apply_update() {
+  ssh "${ssh_options[@]}" -tt "$pi_host" "if [ \$(id -u) -eq 0 ]; then bash '$remote_directory/payload/scripts/update.sh' apply '$remote_directory/payload'; else sudo bash '$remote_directory/payload/scripts/update.sh' apply '$remote_directory/payload'; fi" | tee "$local_directory/apply.log"
+}
+if apply_update; then
+  :
+else
+  result=$?
+  # Only the updater's explicit recovery status permits another attempt.
+  # Authentication, upload, validation and cancellation failures stay failures.
+  (( result == 75 )) || exit "$result"
+  printf 'Receiver update needs recovery; automatically restoring the previous version.\n'
+  # The first updater has exited and released its flock. Use this checkout's
+  # staged updater, and never call an unconditional manual rollback here.
+  if ssh "${ssh_options[@]}" -tt "$pi_host" "if [ \$(id -u) -eq 0 ]; then bash '$remote_directory/payload/scripts/update.sh' recover; else sudo bash '$remote_directory/payload/scripts/update.sh' recover; fi"; then
+    printf 'Receiver recovery confirmed; retrying the update once.\n'
+  else
+    result=$?
+    printf 'ERROR: Automatic receiver recovery failed; update stopped and backups retained.\n' >&2
+    exit "$result"
+  fi
+  if apply_update; then
+    :
+  else
+    result=$?
+    printf 'ERROR: Receiver update retry failed; no further retries. Backups retained.\n' >&2
+    exit "$result"
+  fi
+fi
 if grep -q '^CLUSTER_PI_UNCHANGED' "$local_directory/apply.log"; then reboot_after_update=0; fi
 if (( ssh_port == 22 )); then
   # Finish staging cleanup before changing the listener. The existing SSH

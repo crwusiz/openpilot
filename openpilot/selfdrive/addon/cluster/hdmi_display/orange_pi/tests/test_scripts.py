@@ -544,6 +544,10 @@ if [[ ${MOCK_INTERRUPTED:-} == 1 && "$*" == *"incoming with spaces/hdmi_display.
   kill -KILL "$PPID"
   exit 1
 fi
+if [[ -n ${MOCK_UPDATE_SIGNAL:-} && "$*" == *"incoming with spaces/hdmi_display.py"* && "$*" == *".cluster-file."* ]]; then
+  kill -s "$MOCK_UPDATE_SIGNAL" "$PPID"
+  exit 1
+fi
 if [[ ${MOCK_WINDOWS_MODES:-} == 1 ]]; then
   # Git Bash cannot represent owner-only Linux modes on all Windows ACLs.
   arguments=()
@@ -631,15 +635,15 @@ def test_failed_automatic_recovery_remembers_the_correct_backup(update_sandbox):
   sandbox, environment, target, _incoming = update_sandbox
   state = sandbox[1].parent / environment["TEST_UPDATE_STATE_DIR"]
   result = _update(update_sandbox, extra_env={"MOCK_ALL_RUNTIME_ERROR": "1"})
-  assert result.returncode != 0
+  assert result.returncode == 75
   assert "Automatic recovery failed" in result.stderr
   assert (state / "recovery-needed").exists()
   assert not (state / "latest").exists()
   assert (target / "cluster_receiver.py").read_text() == "# old\n"
   result = _update(update_sandbox)
-  assert result.returncode != 0
-  assert "Run rollback before another update" in result.stderr
-  result = _update(update_sandbox, "rollback")
+  assert result.returncode == 75
+  assert "An earlier receiver update needs recovery" in result.stderr
+  result = _update(update_sandbox, "recover")
   assert result.returncode == 0, result.stdout + result.stderr
   assert not (state / "recovery-needed").exists()
   assert (state / "latest").exists()
@@ -662,13 +666,107 @@ def test_interrupted_update_can_restore_files_and_running_service(update_sandbox
   assert "start cluster-hdmi.service" in (sandbox[1].parent / "systemctl.log").read_text()
 
 
+def test_interrupted_update_recovers_before_a_fresh_apply(update_sandbox):
+  sandbox, environment, target, _incoming = update_sandbox
+  state = sandbox[1].parent / environment["TEST_UPDATE_STATE_DIR"]
+  result = _update(update_sandbox, extra_env={"MOCK_INTERRUPTED": "1"})
+  assert result.returncode != 0
+  recovery_id = (state / "recovery-needed").read_text()
+  result = _update(update_sandbox)
+  assert result.returncode == 75
+  assert (state / "recovery-needed").read_text() == recovery_id
+
+  result = _update(update_sandbox, "recover", extra_env={"MOCK_ACTIVE_STATE": "inactive"})
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert (target / "cluster_receiver.py").read_text() == "# old\n"
+  assert not (state / "recovery-needed").exists()
+  result = _update(update_sandbox)
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert (target / "cluster_receiver.py").read_text() == "# new\n"
+
+
+def test_recover_without_pending_update_preserves_the_successful_install(update_sandbox):
+  sandbox, environment, target, _incoming = update_sandbox
+  root = sandbox[1].parent
+  state = root / environment["TEST_UPDATE_STATE_DIR"]
+  result = _update(update_sandbox)
+  assert result.returncode == 0, result.stdout + result.stderr
+  latest = (state / "latest").read_bytes()
+  version = (state / "version").read_bytes()
+  published_version = (target / "receiver-version").read_bytes()
+  calls = (root / "systemctl.log").read_text()
+  backups = {path.name for path in state.iterdir() if path.is_dir()}
+
+  result = _update(update_sandbox, "recover")
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert "No interrupted receiver update needs recovery" in result.stdout
+  assert (target / "cluster_receiver.py").read_text() == "# new\n"
+  assert (state / "latest").read_bytes() == latest
+  assert (state / "version").read_bytes() == version
+  assert (target / "receiver-version").read_bytes() == published_version
+  assert (root / "systemctl.log").read_text() == calls
+  assert {path.name for path in state.iterdir() if path.is_dir()} == backups
+
+
+def test_recovery_failure_keeps_original_recovery_target(update_sandbox):
+  sandbox, environment, target, _incoming = update_sandbox
+  state = sandbox[1].parent / environment["TEST_UPDATE_STATE_DIR"]
+  result = _update(update_sandbox, extra_env={"MOCK_ALL_RUNTIME_ERROR": "1"})
+  assert result.returncode == 75
+  recovery_id = (state / "recovery-needed").read_text()
+  result = _update(update_sandbox, "recover", extra_env={"MOCK_ALL_RUNTIME_ERROR": "1"})
+  assert result.returncode != 0
+  assert (state / "recovery-needed").read_text() == recovery_id
+  assert (target / "cluster_receiver.py").read_text() == "# old\n"
+  assert not (state / "latest").exists()
+
+
+def test_recover_respects_the_update_lock(update_sandbox):
+  sandbox, environment, _target, _incoming = update_sandbox
+  state = sandbox[1].parent / environment["TEST_UPDATE_STATE_DIR"]
+  result = _update(update_sandbox, extra_env={"MOCK_ALL_RUNTIME_ERROR": "1"})
+  assert result.returncode == 75
+  recovery_id = (state / "recovery-needed").read_text()
+  calls = (sandbox[1].parent / "systemctl.log").read_text()
+  result = _update(update_sandbox, "recover", extra_env={"MOCK_LOCK_ERROR": "1"})
+  assert result.returncode != 0
+  assert "Another receiver update is in progress" in result.stderr
+  assert (state / "recovery-needed").read_text() == recovery_id
+  assert (sandbox[1].parent / "systemctl.log").read_text() == calls
+
+
+def test_recover_after_successful_automatic_restore_does_not_rollback_again(update_sandbox):
+  sandbox, environment, target, _incoming = update_sandbox
+  state = sandbox[1].parent / environment["TEST_UPDATE_STATE_DIR"]
+  result = _update(update_sandbox, extra_env={"MOCK_NEW_START_ERROR": "1"})
+  assert result.returncode == 75
+  assert not (state / "recovery-needed").exists()
+  assert (target / "cluster_receiver.py").read_text() == "# old\n"
+  calls = (sandbox[1].parent / "systemctl.log").read_text()
+  result = _update(update_sandbox, "recover")
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert (sandbox[1].parent / "systemctl.log").read_text() == calls
+  result = _update(update_sandbox)
+  assert result.returncode == 0, result.stdout + result.stderr
+  assert (target / "cluster_receiver.py").read_text() == "# new\n"
+
+
+@pytest.mark.parametrize("signal, expected_exit", [("HUP", 129), ("INT", 130), ("TERM", 143)])
+def test_signal_interruption_keeps_exit_code_after_automatic_restore(update_sandbox, signal, expected_exit):
+  _sandbox, _environment, target, _incoming = update_sandbox
+  result = _update(update_sandbox, extra_env={"MOCK_UPDATE_SIGNAL": signal})
+  assert result.returncode == expected_exit, result.stdout + result.stderr
+  assert "Previous receiver files restored" in result.stderr
+  assert (target / "cluster_receiver.py").read_text() == "# old\n"
+
+
 @pytest.mark.parametrize("failure", [
   "MOCK_NEW_START_ERROR", "MOCK_NEW_RUNTIME_ERROR", "MOCK_MISSING_READY", "MOCK_UNSTABLE_INVOCATION", "MOCK_COPY_ERROR", "MOCK_FAN_INSTALL_ERROR",
 ])
 def test_failed_update_restores_previous_files_and_service(update_sandbox, failure):
   sandbox, environment, target, _incoming = update_sandbox
   result = _update(update_sandbox, extra_env={failure: "1"})
-  assert result.returncode != 0
+  assert result.returncode == 75
   assert "Previous receiver files restored" in result.stderr, result.stdout + result.stderr
   assert (target / "cluster_receiver.py").read_text() == "# old\n"
   assert not (target / "new_module.py").exists()

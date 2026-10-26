@@ -17,6 +17,9 @@ recovery_goal=''
 backup=''
 wifi_rollback_snapshot=''
 fan_rollback_snapshot=''
+update_action=''
+# Reserved for deploy.sh: recover any pending transaction, then retry once.
+RETRY_AFTER_RECOVERY=75
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 valid_file() {
@@ -190,17 +193,21 @@ finish() {
       printf 'Automatic recovery failed. Backup retained at %s; run rollback after inspecting service.sh logs.\n' "$STATE/$recovery_goal" >&2
     fi
     [[ $result != 0 ]] || result=1
+    # Cancellation must remain cancellation, even if the EXIT trap recovered.
+    if [[ $update_action == apply && $result != 129 && $result != 130 && $result != 143 ]]; then
+      result=$RETRY_AFTER_RECOVERY
+    fi
   fi
   exit "$result"
 }
 
 case ${1:-} in
   --help|-h|'')
-    printf 'Usage: sudo bash scripts/update.sh {apply <staged-payload>|rollback}\n'
+    printf 'Usage: sudo bash scripts/update.sh {apply <staged-payload>|recover|rollback}\n'
     printf 'From C4: bash scripts/deploy.sh [ORANGE_PI_IP]\n'
     exit 0;;
   apply) [[ $# == 2 ]] || fail 'apply requires the staged payload directory.'; source_dir=$(cd -- "$2" && pwd -P); marker='Cluster receiver ready';;
-  rollback) [[ $# == 1 ]] || fail 'rollback takes no arguments.'; marker='Orange Pi HDMI display ready';;
+  recover|rollback) [[ $# == 1 ]] || fail "$1 takes no arguments."; marker='Orange Pi HDMI display ready';;
   *) fail 'Unknown update action.';;
 esac
 [[ $(id -u) == 0 ]] || fail 'Run with sudo or from a root shell.'
@@ -209,8 +216,18 @@ esac
 install -d -m 700 -- "$STATE"
 exec 9> "$STATE/lock"
 flock -n 9 || fail 'Another receiver update is in progress.'
+if [[ $1 == recover ]]; then
+  # Unlike manual rollback, recovery must never undo a completed update.
+  if [[ ! -s "$STATE/recovery-needed" ]]; then
+    printf 'No interrupted receiver update needs recovery.\n'
+    exit 0
+  fi
+  set -- rollback
+fi
+update_action=$1
 if [[ $1 == apply && -s "$STATE/recovery-needed" ]]; then
-  fail 'An earlier update needs recovery. Run rollback before another update.'
+  printf 'An earlier receiver update needs recovery before applying this package.\n' >&2
+  exit "$RETRY_AFTER_RECOVERY"
 fi
 if [[ $1 == rollback ]]; then
   if [[ -s "$STATE/recovery-needed" ]]; then

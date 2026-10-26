@@ -76,8 +76,22 @@ case "$command" in
     elif [[ ${MOCK_NOISY_DIRECTORY:-} == 1 ]]; then printf 'login noise\n/tmp/cluster-update.Abc12345\n'
     else printf '/tmp/cluster-update.Abc12345\n'; fi
     [[ ${MOCK_STDERR:-} != 1 ]] || printf 'SSH diagnostic\n' >&2;;
+  *' recover;'*)
+    [[ ${MOCK_RECOVERY_ERROR:-} != 1 ]] || exit 13
+    printf 'Receiver recovery complete\n';;
   *' apply '*|*' rollback;'*)
     [[ ${MOCK_APPLY_ERROR:-} != 1 ]] || exit 7
+    if [[ "$command" == *' apply '* && -n ${MOCK_RETRYABLE_APPLY:-} ]]; then
+      count=0
+      [[ ! -s "$MOCK_APPLY_COUNT_FILE" ]] || read -r count < "$MOCK_APPLY_COUNT_FILE"
+      count=$((count + 1))
+      printf '%s\\n' "$count" > "$MOCK_APPLY_COUNT_FILE"
+      if [[ $count == 1 || $MOCK_RETRYABLE_APPLY == always ]]; then
+        printf 'ERROR: Receiver update needs recovery or a retry.\\n' >&2
+        exit 75
+      fi
+      [[ ${MOCK_RETRY_APPLY_ERROR:-0} == 0 ]] || exit "$MOCK_RETRY_APPLY_ERROR"
+    fi
     if [[ ${MOCK_UNCHANGED:-} == 1 ]]; then printf 'CLUSTER_PI_UNCHANGED: already current\\n'; exit 0; fi
     printf 'Receiver apply complete\n';;
   *' plan '*)
@@ -113,6 +127,7 @@ exec "$@"
 def _deploy(package, *args, extra_env=None, entrypoint=None):
   root = package.parents[1]
   env = dict(os.environ, MOCK_SSH_LOG=(root / "ssh.log").as_posix(),
+             MOCK_APPLY_COUNT_FILE=(root / "apply-count").as_posix(),
              MOCK_CAPTURE_PAYLOAD=(root / "captured payload").as_posix(), TMPDIR="temporary files",
              CLUSTER_NETWORK_STATUS_FILE=str(root / "connection.json"), CLUSTER_PYTHON=Path(sys.executable).as_posix())
   env.pop("CLUSTER_PI_PASSWORD", None)
@@ -404,7 +419,63 @@ def test_transfer_errors_never_apply_files(deploy_sandbox, error):
 def test_remote_apply_failure_is_returned_and_staging_is_cleaned(deploy_sandbox):
   result = _deploy(deploy_sandbox, "192.168.0.84", extra_env={"MOCK_APPLY_ERROR": "1"})
   assert result.returncode == 7
-  assert any(args[-1].startswith("rm -rf") for tool, args in _calls(deploy_sandbox) if tool == "ssh")
+  calls = _calls(deploy_sandbox)
+  assert any(args[-1].startswith("rm -rf") for tool, args in calls if tool == "ssh")
+  assert not any(" recover;" in args[-1] or " rollback;" in args[-1] for tool, args in calls if tool == "ssh")
+  assert sum(" apply " in args[-1] for tool, args in calls if tool == "ssh") == 1
+
+
+def test_pi_update_recovers_then_retries_the_staged_payload_before_reboot(deploy_sandbox):
+  result = _pi_update(deploy_sandbox, "192.168.0.84", extra_env={"MOCK_RETRYABLE_APPLY": "once"})
+  assert result.returncode == 0, result.stdout + result.stderr
+  calls = _calls(deploy_sandbox)
+  applies = [(i, args) for i, (tool, args) in enumerate(calls) if tool == "ssh" and " apply " in args[-1]]
+  recoveries = [(i, args) for i, (tool, args) in enumerate(calls) if tool == "ssh" and " recover;" in args[-1]]
+  assert len(applies) == 2
+  assert len(recoveries) == 1
+  recovery_index, recovery = recoveries[0]
+  assert applies[0][0] < recovery_index < applies[1][0]
+  assert applies[0][1][-1] == applies[1][1][-1]
+  assert "-tt" in recovery
+  assert "sudo bash '/tmp/cluster-update.Abc12345/payload/scripts/update.sh' recover" in recovery[-1]
+  assert not any(" rollback;" in args[-1] for tool, args in calls if tool == "ssh")
+  reboots = [i for i, (tool, args) in enumerate(calls) if tool == "ssh" and "systemd-run " in args[-1]]
+  assert len(reboots) == 1 and reboots[0] > applies[1][0]
+  assert list((deploy_sandbox.parents[1] / "temporary files").iterdir()) == []
+
+
+@pytest.mark.parametrize("retry_exit", [7, 75])
+def test_pi_update_retries_only_once_and_returns_the_second_failure(deploy_sandbox, retry_exit):
+  result = _pi_update(deploy_sandbox, "192.168.0.84", extra_env={
+    "MOCK_RETRYABLE_APPLY": "once", "MOCK_RETRY_APPLY_ERROR": str(retry_exit),
+  })
+  assert result.returncode == retry_exit, result.stdout + result.stderr
+  calls = _calls(deploy_sandbox)
+  assert sum(" apply " in args[-1] for tool, args in calls if tool == "ssh") == 2
+  assert sum(" recover;" in args[-1] for tool, args in calls if tool == "ssh") == 1
+  assert not any("systemd-run " in args[-1] for tool, args in calls if tool == "ssh")
+  assert any(args[-1].startswith("rm -rf") for tool, args in calls if tool == "ssh")
+
+
+def test_pi_update_stops_when_recovery_fails(deploy_sandbox):
+  result = _pi_update(deploy_sandbox, "192.168.0.84", extra_env={
+    "MOCK_RETRYABLE_APPLY": "once", "MOCK_RECOVERY_ERROR": "1",
+  })
+  assert result.returncode == 13, result.stdout + result.stderr
+  calls = _calls(deploy_sandbox)
+  assert sum(" apply " in args[-1] for tool, args in calls if tool == "ssh") == 1
+  assert sum(" recover;" in args[-1] for tool, args in calls if tool == "ssh") == 1
+  assert not any("systemd-run " in args[-1] for tool, args in calls if tool == "ssh")
+
+
+def test_retry_that_finds_the_same_version_does_not_reboot(deploy_sandbox):
+  result = _pi_update(deploy_sandbox, "192.168.0.84", extra_env={
+    "MOCK_RETRYABLE_APPLY": "once", "MOCK_UNCHANGED": "1",
+  })
+  assert result.returncode == 0, result.stdout + result.stderr
+  calls = _calls(deploy_sandbox)
+  assert sum(" apply " in args[-1] for tool, args in calls if tool == "ssh") == 2
+  assert not any("systemd-run " in args[-1] for tool, args in calls if tool == "ssh")
 
 
 def test_cleanup_failure_does_not_change_successful_apply_result(deploy_sandbox):
@@ -531,6 +602,7 @@ def test_pi_update_failure_does_not_report_a_scheduled_reboot(deploy_sandbox, er
   assert result.returncode == expected_exit, result.stdout + result.stderr
   assert "Orange Pi reboot scheduled" not in result.stdout
   calls = _calls(deploy_sandbox)
+  assert not any(" recover;" in args[-1] or " rollback;" in args[-1] for tool, args in calls if tool == "ssh")
   requested = any("systemd-run " in args[-1] for tool, args in calls if tool == "ssh")
   assert requested == (error == "MOCK_REBOOT_ERROR")
   if error == "MOCK_REBOOT_ERROR":

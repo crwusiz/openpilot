@@ -21,6 +21,7 @@ Omit PI_HOST to use the currently connected Orange Pi address.
   --dry-run            Print the target and file list without using SSH
   -h, --help           Show this help
 Password override: set CLUSTER_PI_PASSWORD in the environment.
+Interrupted or failed updates are automatically recovered and retried once.
 Unchanged receiver versions are not restarted or rebooted.
 An update over port 22 also migrates the Pi SSH listener to port 9122.
 HELP
