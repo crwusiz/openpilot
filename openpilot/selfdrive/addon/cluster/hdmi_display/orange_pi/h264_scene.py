@@ -19,10 +19,10 @@ except ImportError:
 
 try:
   from .h264_protocol import validate_scene
-  from .scene_layers import LayeredRenderer, SceneLayers
+  from .scene_layers import PATH_MAX_AGE_SECONDS, LayeredRenderer, SceneLayers
 except ImportError:
   from h264_protocol import validate_scene
-  from scene_layers import LayeredRenderer, SceneLayers
+  from scene_layers import PATH_MAX_AGE_SECONDS, LayeredRenderer, SceneLayers
 
 
 DEFAULT_FRESHNESS_SECONDS = 0.5
@@ -285,7 +285,7 @@ class H264Scene:
     path = snapshot.get("path", {"path_x": [], "path_y": [], "path_z": [], "calib_transform": None})
     model_valid = (state_fresh and video_fresh and snapshot.get("model_valid") is True
                    and self._source_input_fresh(snapshot, "model_age_ms", elapsed_ms))
-    path_deadline = now if state_at is None else state_at + min(self.state_timeout, 0.15)
+    path_deadline = now if state_at is None else state_at + min(self.state_timeout, PATH_MAX_AGE_SECONDS)
     health = snapshot.get("health", {})
     for field in ("car_state_age_ms", "model_age_ms"):
       age = snapshot.get(field, health.get(field) if isinstance(health, dict) else None)

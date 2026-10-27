@@ -28,6 +28,9 @@ except ImportError:
   from path_worker import LatestPathWorker, PathRequest
 
 
+PATH_MAX_AGE_SECONDS = 0.5
+
+
 @lru_cache(maxsize=128)
 def _gradient_palette(y0, height, image_height, colors, stops):
   """Cache only the eight band positions and inks, never image-sized buffers."""
@@ -154,7 +157,8 @@ class LayeredRenderer(ClusterRenderer):
       self._path_executor.shutdown(wait=True, cancel_futures=True)
       self._path_executor = None
     logging.getLogger("cluster_receiver").info(
-      "[CLUSTER_PATH_PIPELINE] mode=latest_completed | max_age_ms=150 | workers=1 | queued_frames=0 | sdl=owner")
+      "[CLUSTER_PATH_PIPELINE] mode=latest_completed | max_age_ms=%.0f | expiry=source_deadline | "
+      + "style=retain_until_ready | workers=1 | queued_frames=0 | sdl=owner", PATH_MAX_AGE_SECONDS * 1000)
 
   def _paint_path_request(self, request):
     if request.epoch != self._painter_epoch:
@@ -266,20 +270,26 @@ class LayeredRenderer(ClusterRenderer):
     asynchronous, received_at, valid_until, clock = self._path_context
     if not asynchronous and self._path_worker is not None:
       self._stop_path_pipeline()
-    key = (tuple(self._source_to_panel.ravel()), bool(self.config.is_metric),
-           tuple(self._get_border_color(hud)), bool(hud.get("steering_pressed")))
+    road_visible = self._get_border_color(hud) != Colors.Border.DISENGAGED
+    # Brake/blinker/steering colors do not change lane geometry. Keep the
+    # compatible layer until the next style is ready instead of blanking all
+    # lanes on every transient input change. Real visibility changes still
+    # invalidate immediately, as do units, projection and input freshness.
+    key = tuple(self._source_to_panel.ravel()), bool(self.config.is_metric), road_visible
     eligible = bool(has_camera and model_valid)
     signature = eligible, key
-    if signature != self._path_signature:
+    invalidated = signature != self._path_signature
+    if invalidated:
       self._path_epoch += 1
       self._path_signature = signature
       self._sync_path = None
       if self._path_worker is not None:
         self._path_worker.invalidate()
     received_at = clock() if received_at is None else received_at
-    deadline = received_at + 0.15 if valid_until is None else min(valid_until, received_at + 0.15)
+    deadline = received_at + PATH_MAX_AGE_SECONDS if valid_until is None else min(valid_until, received_at + PATH_MAX_AGE_SECONDS)
     request = PathRequest(path, hud, self._source_to_panel.copy(), bool(self.config.is_metric), key,
                           self._path_epoch, deadline, received_at)
+    path_reason = "invalid"
     if asynchronous and eligible:
       if self._path_worker is None:
         self._start_path_pipeline()
@@ -311,9 +321,9 @@ class LayeredRenderer(ClusterRenderer):
       # Collect after HUD work so a path that completed during it is usable
       # immediately. Poll never joins: GPU presentation and the next camera
       # are free to proceed while the next path is being painted.
-      completed = self._path_worker.completed
       try:
         result = self._path_worker.poll(request, clock())
+        path_reason = self._path_worker.last_reason
       except Exception:
         logging.getLogger("cluster_receiver").exception("[CLUSTER_PATH_PIPELINE] worker failed; fallback=synchronous")
         self._stop_path_pipeline()
@@ -323,7 +333,7 @@ class LayeredRenderer(ClusterRenderer):
       if result is not None:
         path_pixels, timings = result.value
         path_age = max(0.0, clock() - result.request.received_at)
-        if self._path_worker.completed != completed:
+        if path_reason == "ready":
           path_elapsed, path_cpu, lead_elapsed = (timings[name] for name in ("path", "path_cpu", "path_labels"))
     elif not asynchronous:
       lead_elapsed = self._lead_elapsed
@@ -331,7 +341,13 @@ class LayeredRenderer(ClusterRenderer):
         self._sync_path = request, (path_pixels, {"path": path_elapsed, "path_cpu": path_cpu, "path_labels": lead_elapsed})
     self.last_frame_timings = {"camera_copy": copied_at - started, "snapshot": snapshot_at - copied_at,
                                "path": path_elapsed, "path_cpu": path_cpu, "hud": hud_elapsed, "hud_cpu": hud_cpu,
-                               "path_wait": path_wait, "path_labels": lead_elapsed, "path_age": path_age}
+                               "path_wait": path_wait, "path_labels": lead_elapsed, "path_age": path_age,
+                               "path_async": int(asynchronous), "path_visible": int(path_pixels is not None),
+                               "path_ready": int(path_reason in ("ready", "retained")),
+                               "path_expected": int(eligible and road_visible and bool(path.get("path_x"))),
+                               "path_pending": int(path_reason == "pending"), "path_expired": int(path_reason == "expired"),
+                               "path_incompatible": int(path_reason == "incompatible"),
+                               "path_invalid": int(not eligible), "path_reset": int(invalidated)}
     return image, path_pixels
 
   @staticmethod

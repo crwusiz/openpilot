@@ -154,6 +154,91 @@ def test_expired_completion_is_not_reused_or_resubmitted():
     worker.close()
 
 
+def test_expired_completion_keeps_a_still_valid_retained_path_until_fresh_replacement():
+  started, release = threading.Event(), threading.Event()
+
+  def render(job):
+    if job.path["sequence"] == 2:
+      started.set()
+      assert release.wait(3)
+    return job.path["sequence"]
+
+  worker = LatestPathWorker(render)
+  try:
+    retained = worker.seed(request(valid_until=10.5), "retained")
+    short_lived = request(2, received_at=10.1, valid_until=10.12)
+    assert worker.poll(short_lived, 10.1) is retained
+    assert started.wait(3)
+    release.set()
+    deadline = time.monotonic() + 3
+    while not worker._future.done() and time.monotonic() < deadline:
+      time.sleep(0.001)
+    assert worker._future.done()
+    fresh = request(3, received_at=10.15, valid_until=10.65)
+    assert worker.poll(fresh, 10.15) is retained
+    assert worker.last_reason == "retained"
+    assert retained.request.valid_until == 10.5
+    assert poll_until(worker, fresh, lambda result: result is not None and result.value == 3, 10.16).value == 3
+    assert worker.last_reason == "ready"
+  finally:
+    release.set()
+    worker.close()
+
+
+def test_unchanged_immutable_metadata_is_rendered_once_across_new_request_wrappers():
+  calls = []
+  current = request(valid_until=10.5)
+  worker = LatestPathWorker(lambda job: calls.append(job) or "painted")
+  try:
+    first = poll_until(worker, current, lambda result: result is not None)
+    assert worker.last_reason == "ready"
+    for tick in range(1, 10):
+      # The scene creates a new request object per camera frame, but retains
+      # the same owned path/HUD snapshot until new metadata arrives.
+      assert worker.poll(replace(current), 10.01 + tick * 0.01) is first
+      assert worker.last_reason == "retained"
+    assert worker.submitted == worker.completed == len(calls) == 1
+    assert worker._future is None
+    newer = request(2, received_at=10.2, valid_until=10.7)
+    assert poll_until(worker, newer, lambda result: result is not None and result.request is newer, 10.2).request is newer
+    assert worker.submitted == worker.completed == len(calls) == 2
+  finally:
+    worker.close()
+
+
+def test_invalidation_repaints_even_the_same_immutable_snapshot():
+  current = request()
+  worker = LatestPathWorker(lambda job: "painted")
+  try:
+    assert poll_until(worker, current, lambda result: result is not None).value == "painted"
+    assert worker.submitted == worker.completed == 1
+    worker.invalidate()
+    assert worker.last_reason == "incompatible"
+    assert poll_until(worker, current, lambda result: result is not None).value == "painted"
+    assert worker.submitted == worker.completed == 2
+  finally:
+    worker.close()
+
+
+def test_failed_snapshot_can_be_retried_without_replacing_its_metadata():
+  calls = []
+  def render(job):
+    calls.append(job)
+    if len(calls) == 1:
+      raise ValueError("transient raster failure")
+    return "recovered"
+
+  current = request()
+  worker = LatestPathWorker(render)
+  try:
+    with pytest.raises(ValueError, match="transient raster failure"):
+      poll_until(worker, current, lambda result: result is not None)
+    assert poll_until(worker, current, lambda result: result is not None).value == "recovered"
+    assert worker.submitted == worker.completed == len(calls) == 2
+  finally:
+    worker.close()
+
+
 def test_callback_exception_is_reported_on_poll_and_worker_can_accept_a_new_request():
   def render(job):
     if job.path["sequence"] == 1:

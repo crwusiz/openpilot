@@ -110,7 +110,7 @@ def test_fresh_metadata_never_extends_a_completed_paths_original_expiry(scene, m
     value.set_gpu_camera(True)
     assert value.render_layers().path is not None
     assert entered.wait(3)
-    now[0] += 0.03 if source_age_ms else 0.16
+    now[0] += 0.03 if source_age_ms else 0.51
     value.update(state())
     video(value, 70)
     result = value.render_layers()
@@ -121,7 +121,7 @@ def test_fresh_metadata_never_extends_a_completed_paths_original_expiry(scene, m
     release.set()
 
 
-@pytest.mark.parametrize("change", ["model", "video", "units", "geometry", "steering"])
+@pytest.mark.parametrize("change", ["model", "video", "units", "geometry", "engagement"])
 def test_incompatible_or_stale_inputs_hide_old_paths_immediately(scene, monkeypatch, change):
   value, now = scene
   assert value.render_layers().path is not None
@@ -141,8 +141,8 @@ def test_incompatible_or_stale_inputs_hide_old_paths_immediately(scene, monkeypa
       update["is_metric"] = False
     elif change == "geometry":
       update["source_size"] = [1600, 1200]
-    elif change == "steering":
-      update["hud"]["steering_pressed"] = True
+    elif change == "engagement":
+      update["hud"].update(enabled=False, lat_active=False)
     value.update(update)
     assert value.render_layers().path is None
     assert not value.renderer._async_path_failed
@@ -150,6 +150,75 @@ def test_incompatible_or_stale_inputs_hide_old_paths_immediately(scene, monkeypa
     wait_done(value.renderer._path_worker)
     # A late completion from the old epoch must also stay hidden.
     assert value.render_layers().path is None
+  finally:
+    release.set()
+
+
+@pytest.mark.parametrize("changes", [{"brake_pressed": True}, {"left_blinker": True},
+                                      {"steering_pressed": True}, {"pre_enabled_or_overriding": True}])
+def test_style_changes_keep_lanes_visible_while_a_new_style_is_pending(scene, monkeypatch, changes):
+  value, now = scene
+  initial = state()
+  initial["hud"]["lat_active"] = False
+  value.update(initial)
+  first = value.render_layers()
+  assert first.path is not None
+  entered, release, _ = block_path(monkeypatch)
+  try:
+    value.set_gpu_camera(True)
+    now[0] += 0.01
+    value.render_layers()
+    assert entered.wait(3)
+    previous_key = value.renderer._path_signature
+    for elapsed in (0.04, 0.12, 0.20, 0.28):
+      now[0] = 10 + elapsed
+      update = state()
+      update["hud"].update(lat_active=False, **changes)
+      value.update(update)
+      video(value, 60)
+      current = value.render_layers()
+      np.testing.assert_array_equal(current.path, first.path)
+      assert value.renderer._path_signature == previous_key
+      assert value.last_frame_timings["path_visible"] == 1
+      assert value.last_frame_timings["path_ready"] == 1
+      assert current.overlay.getpixel((0, 0)) == tuple(value.renderer._get_border_color(update["hud"]))
+      assert value.last_frame_timings["path_reset"] == 0
+      assert value.last_frame_timings["path_wait"] == 0
+    # The completed old-style job remains usable until the new style is ready.
+    release.set()
+    wait_done(value.renderer._path_worker)
+    assert value.render_layers().path is not None
+    wait_done(value.renderer._path_worker)
+    assert value.render_layers().path is not None
+  finally:
+    release.set()
+
+
+def test_normal_delivery_gaps_do_not_blank_lanes_before_the_original_source_expiry(scene, monkeypatch):
+  value, now = scene
+  first = value.render_layers()
+  entered, release, _ = block_path(monkeypatch)
+  try:
+    value.set_gpu_camera(True)
+    now[0] += 0.01
+    value.render_layers()
+    assert entered.wait(3)
+    for elapsed in (0.08, 0.16, 0.24, 0.32, 0.48):
+      now[0] = 10 + elapsed
+      value.update(state())
+      video(value, 75)
+      current = value.render_layers()
+      np.testing.assert_array_equal(current.path, first.path)
+      assert value.last_status["model_valid"]
+      assert value.last_frame_timings["path_age"] == pytest.approx(elapsed)
+    now[0] = 10.51
+    value.update(state())
+    video(value, 80)
+    expired = value.render_layers()
+    assert expired.camera is not None and expired.path is None
+    assert value.last_status["model_valid"]
+    assert value.last_frame_timings["path_expired"] == 1
+    assert value.last_frame_timings["path_visible"] == 0
   finally:
     release.set()
 

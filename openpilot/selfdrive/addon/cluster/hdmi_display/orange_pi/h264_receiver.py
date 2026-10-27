@@ -27,6 +27,7 @@ GPU_BURST_FPS = 60
 GPU_CAMERA_GRACE_SECONDS = 0.2
 STAGE_NAMES = {"scene": ("camera_copy", "camera_panel", "snapshot", "path", "path_cpu", "hud", "hud_cpu", "path_wait", "path_labels", "path_age"),
                "hdmi": ("rgb_surface", "convert", "upload", "draw", "flip")}
+PATH_COUNTER_NAMES = ("path_expected", "path_ready", "path_visible", "path_pending", "path_expired", "path_incompatible", "path_invalid", "path_reset")
 
 
 class H264ConfigurationError(RuntimeError):
@@ -103,6 +104,7 @@ class H264Receiver:
   @staticmethod
   def _empty_stats():
     keys = ["render_count", "render", "display", "queue_count", "queue", "convert_count", "convert", "gap"]
+    keys.extend(("path_async_frames", *PATH_COUNTER_NAMES))
     for prefix, names in STAGE_NAMES.items():
       for name in names:
         keys.extend((f"{prefix}_{name}", f"{prefix}_{name}_count"))
@@ -163,6 +165,10 @@ class H264Receiver:
         self._stats["queue_count"] += 1
         self._stats["queue"] += max(0.0, render_started - video_received_at)
       if presented:
+        if isinstance(scene_timings, dict) and scene_timings.get("path_async") == 1:
+          self._stats["path_async_frames"] += 1
+          for name in PATH_COUNTER_NAMES:
+            self._stats[name] += scene_timings.get(name) == 1
         self.displayed_frames += 1
         self.displayed_video_frames += video_received_at is not None and camera_visible
         self.metadata_displayed_frames += video_received_at is None
@@ -355,6 +361,9 @@ class H264Receiver:
         stages = "".join(f" | {prefix}_{name}_avg={logged_stats[f'{prefix}_{name}'] * 1000 / count:.1f}ms"
                          for prefix, names in STAGE_NAMES.items() for name in names
                          if (count := logged_stats[f"{prefix}_{name}_count"]) > 0)
+        if logged_stats["path_async_frames"]:
+          stages += " | path_async_frames=" + str(int(logged_stats["path_async_frames"]))
+          stages += "".join(f" | {name}={int(logged_stats[name])}" for name in PATH_COUNTER_NAMES)
         LOG.info("[CLUSTER_H264_RX_PERF] rx_fps=%.2f | display_fps=%.2f | dropped_display=%d | "
                  + "render_avg=%.1fms | display_avg=%.1fms | queue_wait_avg=%.1fms | rgb_convert_avg=%.1fms | "
                  + "display_gap_max=%.1fms | video_stale=%d | state_stale=%d | "

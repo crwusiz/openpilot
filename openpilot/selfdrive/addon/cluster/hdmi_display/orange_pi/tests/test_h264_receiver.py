@@ -463,6 +463,28 @@ def test_receiver_stage_timings_average_only_present_valid_samples(monkeypatch, 
   assert "scene_hud_avg=" not in message and "scene_prepare_avg=" not in message and "hdmi_upload_avg=" not in message
 
 
+def test_path_visibility_diagnostics_count_presented_async_frames_and_reset_each_window(monkeypatch, caplog):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+
+  def update(tick, _now):
+    reason = "path_visible" if tick <= 5 else "path_pending" if tick <= 7 else "path_expired"
+    receiver.record_display(0, 0.01, 0.02, scene_timings={"path_async": 1, "path_expected": 1, reason: 1,
+                                                        "path_reset": int(tick == 1)})
+    receiver.record_display(0, 0.01, 0.02, presented=False,
+                            scene_timings={"path_async": 1, "path_expired": 1})
+    receiver.record_display(0, 0.01, 0.02, scene_timings={"path_async": 0, "path_expired": 1})
+
+  with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+    run_feedback_ticks(monkeypatch, receiver, 20, update)
+  messages = [record.getMessage() for record in caplog.records if "CLUSTER_H264_RX_PERF" in record.getMessage()]
+  assert len(messages) == 2
+  assert "path_async_frames=10" in messages[0] and "path_expected=10" in messages[0]
+  assert "path_visible=5" in messages[0] and "path_pending=2" in messages[0] and "path_expired=3" in messages[0]
+  assert "path_reset=1" in messages[0]
+  assert "path_async_frames=10" in messages[1] and "path_visible=0" in messages[1]
+  assert "path_expired=10" in messages[1] and "path_reset=0" in messages[1]
+
+
 @pytest.mark.parametrize("width,height", [(8192, 480), (4096, 2160)])
 def test_decoder_checks_dimensions_before_allocating_rgb(width, height):
   convert = Mock()
