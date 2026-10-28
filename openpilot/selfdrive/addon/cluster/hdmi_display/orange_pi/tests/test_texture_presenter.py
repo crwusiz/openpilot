@@ -1,4 +1,5 @@
 import threading
+import weakref
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -542,4 +543,173 @@ def test_accelerated_real_scene_layers_match_retained_software_fallback(accelera
     assert difference.mean() <= 0.6
   finally:
     scene.close()
+    presenter.close()
+
+
+def _record_layer_uploads(monkeypatch, presenter):
+  assert presenter.can_present_layers
+  calls = []
+  native = presenter._layers
+  update = native.sdl.SDL_UpdateTexture
+  def record(texture, rect, pixels, pitch):
+    name = next(name for name, (_key, current) in native.textures.items() if current == texture)
+    calls.append(name)
+    return update(texture, rect, pixels, pitch)
+  monkeypatch.setattr(native.sdl, "SDL_UpdateTexture", record)
+  return calls
+
+
+@pytest.mark.parametrize("rotation", [0, 90])
+def test_immutable_path_reuses_gpu_pixels_with_new_camera_and_current_brightness(accelerated_pygame, monkeypatch, rotation):
+  import numpy as np
+  pygame, video = accelerated_pygame
+  size = (16, 32) if rotation == 90 else (32, 16)
+  presenter = TexturePresenter(pygame, size=size, rotation=rotation, fullscreen=False,
+                               accelerated=True, vsync=False, hidden=True, video_module=video)
+  camera_pixels = np.full((16, 32, 3), (0, 0, 200), np.uint8)
+  path_pixels = np.zeros((16, 32, 4), np.uint8)
+  path_pixels[4:12, 8:24] = (100, 0, 0, 128)
+  overlay = pygame.Surface((32, 16), pygame.SRCALPHA)
+  overlay.fill((0, 0, 0, 0))
+  def surface(pixels, mode):
+    return pygame.image.frombuffer(pixels, pixels.shape[1::-1], mode)
+  try:
+    calls = _record_layer_uploads(monkeypatch, presenter)
+    first = presenter.present_layers(overlay, surface(camera_pixels, "RGB"), (0, 0, 32, 16),
+                                      path_surface=surface(path_pixels, "RGBA"), camera_token=camera_pixels, path_token=path_pixels)
+    new_camera = np.full((16, 32, 3), (0, 200, 0), np.uint8)
+    second = presenter.present_layers(overlay, surface(new_camera, "RGB"), (0, 0, 32, 16), controls=_controls(brightness=50),
+                                       path_surface=surface(path_pixels, "RGBA"), camera_token=new_camera, path_token=path_pixels)
+    assert calls == ["camera", "path", "overlay", "camera", "overlay"]
+    assert first["camera_upload_skipped"] == first["path_upload_skipped"] == 0
+    assert second["camera_upload_skipped"] == 0 and second["path_upload_skipped"] == 1
+    assert first["upload_bytes"] - second["upload_bytes"] == path_pixels.nbytes
+    output = pygame.surfarray.array3d(presenter.renderer.to_surface())
+    # Quarter brightness cannot be applied twice when pixels stay on the GPU.
+    presenter.redraw(_controls(brightness=25))
+    dimmed = pygame.surfarray.array3d(presenter.renderer.to_surface())
+    assert np.abs(dimmed.astype(int) * 2 - output.astype(int)).max() <= 2
+    assert calls == ["camera", "path", "overlay", "camera", "overlay"]
+    # A new path buffer always uploads even when its shape and content match.
+    new_path = path_pixels.copy()
+    third = presenter.present_layers(overlay, surface(new_camera, "RGB"), (0, 0, 32, 16),
+                                      path_surface=surface(new_path, "RGBA"), camera_token=new_camera, path_token=new_path)
+    assert third["camera_upload_skipped"] == 1 and third["path_upload_skipped"] == 0
+    assert calls[-2:] == ["path", "overlay"]
+  finally:
+    presenter.close()
+
+
+def test_missing_or_cleared_path_cannot_reappear_from_cached_gpu_pixels(accelerated_pygame, monkeypatch):
+  import numpy as np
+  pygame, video = accelerated_pygame
+  presenter = TexturePresenter(pygame, size=(8, 4), fullscreen=False, accelerated=True, vsync=False, hidden=True, video_module=video)
+  camera = pygame.Surface((8, 4), depth=24)
+  camera.fill((0, 0, 200))
+  overlay = pygame.Surface((8, 4), pygame.SRCALPHA)
+  overlay.fill((0, 0, 0, 0))
+  path = pygame.Surface((8, 4), pygame.SRCALPHA)
+  path.fill((200, 0, 0, 255))
+  camera_token, path_token = object(), object()
+  try:
+    calls = _record_layer_uploads(monkeypatch, presenter)
+    presenter.present_layers(overlay, camera, (0, 0, 8, 4), path_surface=path,
+                               camera_token=camera_token, path_token=path_token)
+    presenter.present_layers(overlay, camera, (0, 0, 8, 4), camera_token=camera_token)
+    assert "path" not in presenter._layers.sources
+    presenter.redraw(_controls(brightness=50))
+    pixels = pygame.surfarray.array3d(presenter.renderer.to_surface())
+    assert np.all(pixels[:, :, 0] == 0) and np.all(pixels[:, :, 2] == 100)
+    presenter.present_layers(overlay, camera, (0, 0, 8, 4), path_surface=path,
+                               camera_token=camera_token, path_token=path_token)
+    assert calls.count("path") == 2
+    presenter.clear()
+    assert not presenter._layers.sources
+    presenter.redraw()
+    assert np.count_nonzero(pygame.surfarray.array3d(presenter.renderer.to_surface())) == 0
+    presenter.present_layers(overlay, camera, (0, 0, 8, 4), path_surface=path,
+                               camera_token=camera_token, path_token=path_token)
+    assert calls.count("camera") == 2 and calls.count("path") == 3
+  finally:
+    presenter.close()
+
+
+def test_default_mutable_surfaces_and_changed_format_always_upload(raster_pygame, monkeypatch):
+  pygame, video = raster_pygame
+  presenter = TexturePresenter(pygame, size=(8, 4), fullscreen=False, accelerated=False, vsync=False, hidden=True, video_module=video)
+  overlay = pygame.Surface((8, 4), pygame.SRCALPHA)
+  overlay.fill((0, 0, 0, 0))
+  camera = pygame.Surface((8, 4), depth=24)
+  try:
+    calls = _record_layer_uploads(monkeypatch, presenter)
+    camera.fill((200, 0, 0))
+    presenter.present_layers(overlay, camera, (0, 0, 8, 4))
+    camera.fill((0, 200, 0))
+    presenter.present_layers(overlay, camera, (0, 0, 8, 4))
+    assert presenter.renderer.to_surface().get_at((0, 0))[:3] == (0, 200, 0)
+    assert calls.count("camera") == 2
+    token = object()
+    presenter.present_layers(overlay, camera, (0, 0, 8, 4), camera_token=token)
+    converted = pygame.Surface((8, 4), depth=32)
+    converted.fill((0, 0, 200))
+    changed = presenter.present_layers(overlay, converted, (0, 0, 8, 4), camera_token=token)
+    assert changed["camera_upload_skipped"] == 0
+    assert presenter.renderer.to_surface().get_at((0, 0))[:3] == (0, 0, 200)
+    resized = pygame.Surface((4, 2), depth=32)
+    resized.fill((200, 0, 200))
+    changed = presenter.present_layers(overlay, resized, (0, 0, 8, 4), camera_token=token)
+    assert changed["camera_upload_skipped"] == 0
+    assert calls.count("camera") == 5
+  finally:
+    presenter.close()
+
+
+def test_layer_tokens_release_on_hide_screen_off_and_disable(raster_pygame):
+  pygame, video = raster_pygame
+  presenter = TexturePresenter(pygame, size=(8, 4), fullscreen=False, accelerated=False, vsync=False, hidden=True, video_module=video)
+  overlay = pygame.Surface((8, 4), pygame.SRCALPHA)
+  camera = pygame.Surface((8, 4), depth=24)
+  class Token:
+    pass
+  def upload():
+    token = Token()
+    presenter.present_layers(overlay, camera, (0, 0, 8, 4), camera_token=token)
+    return weakref.ref(token)
+  try:
+    source = upload()
+    assert source() is not None
+    presenter.present_layers(overlay)
+    assert source() is None
+    source = upload()
+    presenter.present_layers(overlay, controls=_controls(screen_off=True))
+    assert source() is None
+    source = upload()
+    presenter.disable_layers()
+    assert source() is None
+    assert not presenter.can_present_layers
+  finally:
+    presenter.close()
+
+
+def test_failed_native_upload_does_not_cache_the_failed_source(raster_pygame, monkeypatch):
+  pygame, video = raster_pygame
+  presenter = TexturePresenter(pygame, size=(8, 4), fullscreen=False, accelerated=False, vsync=False, hidden=True, video_module=video)
+  overlay = pygame.Surface((8, 4), pygame.SRCALPHA)
+  camera = pygame.Surface((8, 4), depth=24)
+  token = object()
+  try:
+    assert presenter.can_present_layers
+    native = presenter._layers
+    update = native.sdl.SDL_UpdateTexture
+    monkeypatch.setattr(native.sdl, "SDL_UpdateTexture", lambda *_args: -1)
+    with pytest.raises(RuntimeError):
+      presenter.present_layers(overlay, camera, (0, 0, 8, 4), camera_token=token)
+    assert "camera" not in native.sources
+    monkeypatch.setattr(native.sdl, "SDL_UpdateTexture", update)
+    calls = _record_layer_uploads(monkeypatch, presenter)
+    result = presenter.present_layers(overlay, camera, (0, 0, 8, 4), camera_token=token)
+    assert result["camera_upload_skipped"] == 0
+    assert calls == ["camera", "overlay"]
+    assert native.sources["camera"] is token
+  finally:
     presenter.close()

@@ -2,13 +2,14 @@
 import json
 import math
 import struct
+import zlib
 
 H264_MAGIC = b"OPCH"
 CONTROL_HEADER = struct.Struct("!4sBB2xII")
 PROTOCOL_VERSION = 1
 MAX_CONTROL_SIZE = 64 * 1024
-HELLO, OFFER, ANSWER, STATE, FEEDBACK, ERROR = range(1, 7)
-KINDS = frozenset((HELLO, OFFER, ANSWER, STATE, FEEDBACK, ERROR))
+HELLO, OFFER, ANSWER, STATE, FEEDBACK, ERROR, STATE_ZLIB = range(1, 8)
+KINDS = frozenset((HELLO, OFFER, ANSWER, STATE, FEEDBACK, ERROR, STATE_ZLIB))
 PATH_KEYS = ("path_x", "path_y", "path_z", "lane_lines", "lane_line_probs", "road_edges", "road_edge_stds",
              "leads", "camera_height", "calib_transform")
 
@@ -56,26 +57,63 @@ def decode_payload(data):
 def pack_control(kind, payload, sequence=0):
   if kind not in KINDS:
     raise ValueError("Unknown cluster control kind")
+  if kind == STATE_ZLIB:
+    raise ValueError("Compressed cluster state must use pack_scene")
   _check_value(payload)
   if not isinstance(payload, dict):
     raise ValueError("Cluster control must be an object")
   return _pack_validated_control(kind, payload, sequence)
 
 
-def _pack_validated_control(kind, payload, sequence):
+def _encode_validated_payload(payload):
   # Callers must validate the whole payload before entering this private
   # encoder. Keep the JSON and encoded-byte limits here for both send paths.
   data = json.dumps(payload, ensure_ascii=True, allow_nan=False, separators=(",", ":")).encode()
   if not 0 < len(data) <= MAX_CONTROL_SIZE:
     raise ValueError("Cluster control exceeds byte limit")
+  return data
+
+
+def _pack_encoded_control(kind, data, sequence):
   return CONTROL_HEADER.pack(H264_MAGIC, PROTOCOL_VERSION, kind, sequence & 0xFFFFFFFF, len(data)) + data
 
 
-def pack_scene(state, sequence=0):
+def _pack_validated_control(kind, payload, sequence):
+  return _pack_encoded_control(kind, _encode_validated_payload(payload), sequence)
+
+
+def pack_scene(state, sequence=0, *, compression=None):
   # validate_scene includes the same recursive numeric/nesting checks as
   # pack_control, plus geometry limits. Avoid walking every coordinate twice
   # on the C4's 20 Hz path while retaining the full checks before encoding.
-  return _pack_validated_control(STATE, validate_scene(state), sequence)
+  if compression not in (None, "zlib"):
+    raise ValueError("Unsupported cluster state compression")
+  data = _encode_validated_payload(validate_scene(state))
+  if compression == "zlib":
+    compressed = zlib.compress(data, level=1)
+    if len(compressed) < len(data):
+      return _pack_encoded_control(STATE_ZLIB, compressed, sequence)
+  return _pack_encoded_control(STATE, data, sequence)
+
+
+def decode_state_payload(kind, data):
+  """Decode one bounded state; compressed input never lifts the JSON limit."""
+  if kind == STATE:
+    return decode_payload(data)
+  if kind != STATE_ZLIB:
+    raise ValueError("Expected cluster scene state")
+  if not 0 < len(data) <= MAX_CONTROL_SIZE:
+    raise ValueError("Invalid compressed cluster state size")
+  try:
+    decoder = zlib.decompressobj()
+    payload = decoder.decompress(data, MAX_CONTROL_SIZE + 1)
+  except zlib.error as error:
+    raise ValueError("Invalid compressed cluster state") from error
+  # No flush(): even malicious input may produce at most one byte beyond the
+  # uncompressed budget. Reject unfinished, concatenated or trailing streams.
+  if (len(payload) > MAX_CONTROL_SIZE or not decoder.eof or decoder.unconsumed_tail or decoder.unused_data):
+    raise ValueError("Invalid or oversized compressed cluster state")
+  return decode_payload(payload)
 
 
 def unpack_control_header(data):

@@ -17,7 +17,8 @@ import pytest
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import cluster_receiver, h264_receiver
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.control_socket import recv_exact
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol import (
-  ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, STATE, decode_payload, pack_control, unpack_control_header,
+  ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, STATE, STATE_ZLIB, decode_payload, pack_control, pack_scene,
+  unpack_control_header,
 )
 
 
@@ -152,6 +153,69 @@ def test_camera_display_count_excludes_metadata_only_stale_and_unpresented_frame
   # scene hides an expired picture instead of showing it as fresh video.
   assert receiver._stats["queue_count"] == 4
   assert receiver._stats["queue"] == pytest.approx(0.63)
+
+
+@pytest.mark.parametrize("acknowledged", [False, True])
+def test_compressed_scene_requires_capability_offer_and_answer(fake_aiortc, acknowledged):
+  c4_sock, pi_sock = socket.socketpair()
+  c4_sock.settimeout(2)
+  receiver = h264_receiver.H264Receiver(pi_sock, {**HELLO_DATA, "state_compression": "zlib"})
+  snapshot = {"model_valid": True, "source_size": [1344, 760], "hud": {"v_ego": 25},
+              "path": {"path_x": [1.0, 2.0], "path_y": [0.0, 0.0], "path_z": [0.0, 0.0]}}
+  try:
+    receiver.start()
+    kind, _, offer = read_control(c4_sock)
+    assert kind == OFFER and offer["state_compression"] == "zlib"
+    answer = {"type": "answer", "sdp": "v=0\r\n"}
+    if acknowledged:
+      answer["state_compression"] = "zlib"
+    c4_sock.sendall(pack_control(ANSWER, answer))
+    packet = pack_scene(snapshot, compression="zlib")
+    assert unpack_control_header(packet[:CONTROL_HEADER.size])[0] == STATE_ZLIB
+    c4_sock.sendall(packet)
+    if acknowledged:
+      wait_until(lambda: receiver.state_revision == 1)
+      assert receiver.state_compression == "zlib"
+      assert receiver.take_updates(timeout=0)[1][0] == snapshot
+    else:
+      wait_until(lambda: receiver.done)
+      with pytest.raises(ValueError, match="was not negotiated"):
+        receiver.take_updates(timeout=0)
+  finally:
+    receiver.close()
+    c4_sock.close()
+    pi_sock.close()
+
+
+def test_camera_gap_excludes_intervening_hud_refreshes_and_ignores_hidden_or_unpresented_video():
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  receiver.record_display(1, 1.01, 1.02, video_received_at=1)
+  for index in range(1, 21):
+    shown = 1.02 + index * 0.1
+    receiver.record_display(shown - 0.02, shown - 0.01, shown)
+  receiver.record_display(3.1, 3.11, 3.12, video_received_at=3.1)
+  assert receiver._stats["camera_gap"] == pytest.approx(2.1)
+  assert receiver._stats["gap"] == pytest.approx(0.1)
+  receiver.record_display(3.2, 3.21, 3.22, video_received_at=3.2, camera_visible=False)
+  receiver.record_display(3.3, 3.31, 3.32, video_received_at=3.3, presented=False)
+  assert receiver._last_camera_display_at == pytest.approx(3.12)
+
+
+def test_camera_gap_and_gpu_upload_savings_are_logged_per_window(monkeypatch, caplog):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+
+  def update(tick, now):
+    receiver.record_display(now - 0.02, now - 0.01, now, video_received_at=now - 0.03 if tick % 3 == 0 else None,
+                            display_timings={"upload_bytes": 1000, "path_upload_skipped": 1, "camera_upload_skipped": 0})
+
+  with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+    feedbacks = run_feedback_ticks(monkeypatch, receiver, 20, update)
+  assert max(item["camera_display_gap_max_ms"] for item in feedbacks) == pytest.approx(3000)
+  messages = [record.getMessage() for record in caplog.records if "CLUSTER_H264_RX_PERF" in record.getMessage()]
+  assert len(messages) == 2
+  assert all("camera_display_gap_max=3000.0ms" in message for message in messages)
+  assert all("hdmi_upload_kbps=8.0" in message and "hdmi_path_reused=10" in message for message in messages)
+  assert all("hdmi_camera_reused=0" in message for message in messages)
 
 
 def test_close_cancels_pending_answer_and_closes_peer_without_waiting_for_negotiation_timeout(fake_aiortc):

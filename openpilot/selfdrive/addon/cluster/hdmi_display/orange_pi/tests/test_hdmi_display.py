@@ -702,6 +702,27 @@ def test_layered_camera_keeps_touch_brightness_and_does_not_cpu_scale(raster_pyg
     display.close()
 
 
+def test_retained_camera_pixels_are_explicit_immutable_upload_tokens(raster_pygame, monkeypatch):
+  display = _layered_display(raster_pygame, monkeypatch)
+  layers = _layers()
+  try:
+    assert display.send_layers(layers)
+    assert display.send_layers(layers)
+    assert display.last_frame_timings["camera_upload_skipped"] == 1
+    assert display._presenter._layers.sources["camera"] is layers.camera
+    updated = _layers((0, 0, 255))
+    assert display.send_layers(updated)
+    assert display.last_frame_timings["camera_upload_skipped"] == 0
+    assert display._presenter.renderer.to_surface().get_at((0, 0))[:3] == (0, 0, 204)
+    expired = _layers()
+    expired.camera = None
+    expired.overlay = Image.new("RGBA", (384, 96), (0, 0, 0, 255))
+    assert display.send_layers(expired)
+    assert "camera" not in display._presenter._layers.sources
+  finally:
+    display.close()
+
+
 def test_layer_upload_failure_preserves_same_camera_and_fullframe_gpu(raster_pygame, monkeypatch):
   display = _layered_display(raster_pygame, monkeypatch)
   presenter = display._presenter

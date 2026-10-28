@@ -246,6 +246,16 @@ class LayeredRenderer(ClusterRenderer):
         self._fill_polygon_alpha(camera_region, polygon - offset, color, alpha, blender=self._color_blender)
       start = end
 
+  def _poll_path(self, request, now):
+    try:
+      result = self._path_worker.poll(request, now)
+      return result, self._path_worker.last_reason
+    except Exception:
+      logging.getLogger("cluster_receiver").exception("[CLUSTER_PATH_PIPELINE] worker failed; fallback=synchronous")
+      self._stop_path_pipeline()
+      self._async_path_failed = True
+      return None, "failed"
+
   def render_overlay(self, transform, models, has_camera):
     started = time.monotonic()
     self._update_filter_intervals(started)
@@ -290,9 +300,18 @@ class LayeredRenderer(ClusterRenderer):
     request = PathRequest(path, hud, self._source_to_panel.copy(), bool(self.config.is_metric), key,
                           self._path_epoch, deadline, received_at)
     path_reason = "invalid"
+    early_reason = None
+    result = new_result = None
     if asynchronous and eligible:
       if self._path_worker is None:
         self._start_path_pipeline()
+      # Start the latest path before HUD rasterization. The independent CPU
+      # painter can overlap this frame instead of losing the entire HUD time.
+      result, path_reason = self._poll_path(request, clock())
+      early_reason = path_reason
+      if path_reason == "ready":
+        new_result = result
+      path_elapsed = path_cpu = lead_elapsed = None
     elif eligible:
       if self._parallel_path and path.get("path_x") and path.get("calib_transform") is not None:
         if self._path_executor is None:
@@ -319,21 +338,22 @@ class LayeredRenderer(ClusterRenderer):
       path_wait = time.monotonic() - wait_started if path_future is not None else 0.0
     if asynchronous and eligible:
       # Collect after HUD work so a path that completed during it is usable
-      # immediately. Poll never joins: GPU presentation and the next camera
-      # are free to proceed while the next path is being painted.
-      try:
-        result = self._path_worker.poll(request, clock())
-        path_reason = self._path_worker.last_reason
-      except Exception:
-        logging.getLogger("cluster_receiver").exception("[CLUSTER_PATH_PIPELINE] worker failed; fallback=synchronous")
-        self._stop_path_pipeline()
-        self._async_path_failed = True
-        result = None
-      path_elapsed = path_cpu = lead_elapsed = None
+      # immediately. The duplicate-input guard prevents this second poll from
+      # scheduling the same immutable snapshot again. Neither poll joins.
+      if self._path_worker is not None:
+        result, path_reason = self._poll_path(request, clock())
+        if path_reason == "ready":
+          new_result = result
+        elif path_reason == "pending" and early_reason in ("expired", "incompatible"):
+          # The second poll must not erase why this frame lost its retained
+          # path merely because the replacement is now waiting to finish.
+          path_reason = early_reason
       if result is not None:
         path_pixels, timings = result.value
         path_age = max(0.0, clock() - result.request.received_at)
-        if path_reason == "ready":
+        # An early completion becomes "retained" at the second poll. Count
+        # its work once in this frame by identity, not only the final reason.
+        if result is new_result:
           path_elapsed, path_cpu, lead_elapsed = (timings[name] for name in ("path", "path_cpu", "path_labels"))
     elif not asynchronous:
       lead_elapsed = self._lead_elapsed

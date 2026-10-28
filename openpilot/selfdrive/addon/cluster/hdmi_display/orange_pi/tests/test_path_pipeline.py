@@ -34,7 +34,10 @@ def wait_done(worker):
   deadline = time.monotonic() + 3
   while worker._future is not None and not worker._future.done() and time.monotonic() < deadline:
     time.sleep(0.002)
-  assert worker._future is not None and worker._future.done()
+  if worker._future is not None:
+    assert worker._future.done()
+  else:
+    assert worker.completed > 0
 
 
 @pytest.fixture
@@ -223,21 +226,130 @@ def test_normal_delivery_gaps_do_not_blank_lanes_before_the_original_source_expi
     release.set()
 
 
-def test_worker_failure_keeps_camera_live_and_restores_synchronous_paths(scene, monkeypatch, caplog):
+@pytest.mark.parametrize("phase", ["early", "late"])
+def test_worker_failure_keeps_camera_live_and_restores_synchronous_paths(scene, monkeypatch, caplog, phase):
   value, now = scene
   value.render_layers()
+  entered, release = threading.Event(), threading.Event()
   def fail(_self, _request):
+    entered.set()
+    assert release.wait(3)
     raise RuntimeError("path painting failed")
   monkeypatch.setattr(LayeredRenderer, "_paint_path_request", fail)
-  value.set_gpu_camera(True)
+  draw_hud = value.renderer._draw_hud
+  if phase == "late":
+    def hud(*args):
+      assert entered.wait(3)
+      release.set()
+      wait_done(value.renderer._path_worker)
+      return draw_hud(*args)
+    monkeypatch.setattr(value.renderer, "_draw_hud", hud)
+  try:
+    value.set_gpu_camera(True)
+    result = value.render_layers()
+    if phase == "early":
+      assert entered.wait(3)
+      release.set()
+      wait_done(value.renderer._path_worker)
+      now[0] += 0.02
+      result = value.render_layers()
+    assert result.camera is not None and result.path is None
+    assert value.renderer._async_path_failed and value.renderer._path_worker is None
+    assert "worker failed; fallback=synchronous" in caplog.text and "path painting failed" in caplog.text
+    monkeypatch.setattr(value.renderer, "_draw_hud", draw_hud)
+    assert value.render_layers().path is not None
+  finally:
+    release.set()
+
+
+def test_path_starts_during_hud_and_its_completion_is_used_in_the_same_frame(scene, monkeypatch):
+  value, _now = scene
   value.render_layers()
-  wait_done(value.renderer._path_worker)
-  now[0] += 0.02
-  result = value.render_layers()
-  assert result.camera is not None and result.path is None
-  assert value.renderer._async_path_failed and value.renderer._path_worker is None
-  assert "worker failed; fallback=synchronous" in caplog.text and "path painting failed" in caplog.text
-  assert value.render_layers().path is not None
+  entered, in_hud = threading.Event(), threading.Event()
+  owner = threading.get_ident()
+  paint, draw_hud = LayeredRenderer._paint_path_request, value.renderer._draw_hud
+  calls = []
+
+  def path(painter, request):
+    assert threading.get_ident() != owner
+    calls.append(request)
+    entered.set()
+    assert in_hud.wait(3)
+    return paint(painter, request)
+
+  def hud(*args):
+    assert threading.get_ident() == owner
+    assert entered.wait(3), "the path must start before this frame's HUD"
+    in_hud.set()
+    wait_done(value.renderer._path_worker)
+    return draw_hud(*args)
+
+  monkeypatch.setattr(LayeredRenderer, "_paint_path_request", path)
+  monkeypatch.setattr(value.renderer, "_draw_hud", hud)
+  try:
+    value.set_gpu_camera(True)
+    result = value.render_layers()
+    worker = value.renderer._path_worker
+    assert result.path is not None
+    assert worker.submitted == worker.completed == len(calls) == 1
+    assert worker._future is None
+    assert value.last_frame_timings["path"] is not None and value.last_frame_timings["path_wait"] == 0
+    value.render_layers()
+    assert worker.submitted == worker.completed == len(calls) == 1
+    assert value.last_frame_timings["path"] is None
+  finally:
+    in_hud.set()
+
+
+def test_early_completion_is_counted_once_when_the_late_poll_retains_it(scene, monkeypatch):
+  value, _now = scene
+  value.render_layers()
+  entered, release, requests = block_path(monkeypatch)
+  try:
+    value.set_gpu_camera(True)
+    value.render_layers()
+    assert entered.wait(3)
+    release.set()
+    worker = value.renderer._path_worker
+    wait_done(worker)
+    result = value.render_layers()
+    assert result.path is not None
+    assert worker.last_reason == "retained"
+    assert worker.submitted == worker.completed == len(requests) == 1
+    assert value.last_frame_timings["path"] is not None
+    value.render_layers()
+    assert value.last_frame_timings["path"] is None
+    assert worker.submitted == worker.completed == len(requests) == 1
+  finally:
+    release.set()
+
+
+def test_late_poll_hides_a_retained_path_that_expires_during_hud(scene, monkeypatch):
+  value, now = scene
+  value.render_layers()
+  entered, release, _requests = block_path(monkeypatch)
+  try:
+    value.set_gpu_camera(True)
+    value.render_layers()
+    assert entered.wait(3)
+    release.set()
+    wait_done(value.renderer._path_worker)
+    release.clear()
+    now[0] = 10.48
+    value.update(state())
+    video(value, 80)
+    draw_hud = value.renderer._draw_hud
+    def hud(*args):
+      now[0] = 10.51
+      return draw_hud(*args)
+    monkeypatch.setattr(value.renderer, "_draw_hud", hud)
+    result = value.render_layers()
+    assert result.camera is not None and result.path is None
+    assert value.last_status["model_valid"]
+    assert value.last_frame_timings["path_expired"] == 1
+    assert value.last_frame_timings["path"] is None
+  finally:
+    release.set()
 
 
 def test_gpu_fallback_and_close_join_and_release_the_path_worker(scene):

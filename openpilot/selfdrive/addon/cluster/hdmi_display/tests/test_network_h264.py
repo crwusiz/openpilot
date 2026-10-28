@@ -180,6 +180,37 @@ async def test_real_control_socket_negotiates_video_separately_and_streams_state
   assert not server.clients and server.active is None
 
 
+@pytest.mark.parametrize("offered", [None, "zlib", "unsupported"])
+@asyncio_test
+async def test_state_compression_is_negotiated_and_legacy_peers_stay_on_json(monkeypatch, offered):
+  monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
+  stream, track = factory()
+  server = network.H264NetworkServer(config(), models(), lambda _sdp: (stream, track))
+  await server.start()
+  reader, writer = await asyncio.open_connection(*server.server.sockets[0].getsockname())
+  try:
+    kind, _, hello = await network.read_control(reader)
+    assert kind == wire.HELLO and hello["state_compression"] == "zlib"
+    offer = {"type": "offer", "sdp": "v=0\r\noffer"}
+    if offered is not None:
+      offer["state_compression"] = offered
+    await network.write_control(writer, wire.OFFER, offer)
+    kind, _, answer = await network.read_control(reader)
+    assert kind == wire.ANSWER
+    assert answer.get("state_compression") == ("zlib" if offered == "zlib" else None)
+    for _ in range(2):
+      kind, sequence, size = wire.unpack_control_header(await reader.readexactly(wire.CONTROL_HEADER.size))
+      assert kind == (wire.STATE_ZLIB if offered == "zlib" else wire.STATE)
+      scene = wire.decode_state_payload(kind, await reader.readexactly(size))
+      assert scene["state_seq"] == sequence and scene["hud"]["v_ego"] == 12.5
+      assert wire.validate_scene(scene)
+  finally:
+    writer.close()
+    await writer.wait_closed()
+    await server.close()
+  assert stream.stopped and not server.clients
+
+
 @asyncio_test
 async def test_short_state_pause_keeps_video_session_and_resumes_with_latest_models(monkeypatch):
   monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
@@ -205,8 +236,8 @@ async def test_short_state_pause_keeps_video_session_and_resumes_with_latest_mod
         await resumed.wait()
       await self.writer.drain()
 
-  async def paused_states(writer, camera, rtc_stream):
-    await states(PausedWriter(writer), camera, rtc_stream)
+  async def paused_states(writer, camera, rtc_stream, compression=None):
+    await states(PausedWriter(writer), camera, rtc_stream, compression=compression)
 
   monkeypatch.setattr(server, "_states", paused_states)
   await server.start()

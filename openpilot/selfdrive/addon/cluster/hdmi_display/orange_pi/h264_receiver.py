@@ -10,10 +10,16 @@ import threading
 import time
 
 try:
-  from .h264_protocol import ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, STATE, decode_payload, pack_control, unpack_control_header
+  from .h264_protocol import (
+    ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, STATE, STATE_ZLIB,
+    decode_payload, decode_state_payload, pack_control, unpack_control_header,
+  )
   from .receiver_resources import ReceiverResourceSampler, format_receiver_resources
 except ImportError:
-  from h264_protocol import ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, STATE, decode_payload, pack_control, unpack_control_header
+  from h264_protocol import (
+    ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, STATE, STATE_ZLIB,
+    decode_payload, decode_state_payload, pack_control, unpack_control_header,
+  )
   from receiver_resources import ReceiverResourceSampler, format_receiver_resources
 
 
@@ -84,6 +90,7 @@ class H264Receiver:
     self.last_video_at = self.last_state_at = None
     self.screen_off = False
     self.gpu_camera = False
+    self.state_compression = None
     self.error = None
     self.done = self.closing = False
     self.loop = self.stop_event = None
@@ -95,6 +102,7 @@ class H264Receiver:
     self._sequence = 0
     self._stats = self._empty_stats()
     self._last_display_at = None
+    self._last_camera_display_at = None
     self._resources = ReceiverResourceSampler()
     self.thread = threading.Thread(target=self._run_thread, name="cluster-webrtc-receiver", daemon=True)
 
@@ -103,7 +111,8 @@ class H264Receiver:
 
   @staticmethod
   def _empty_stats():
-    keys = ["render_count", "render", "display", "queue_count", "queue", "convert_count", "convert", "gap"]
+    keys = ["render_count", "render", "display", "queue_count", "queue", "convert_count", "convert", "gap", "camera_gap",
+            "hdmi_upload_count", "hdmi_upload_bytes", "hdmi_camera_reused", "hdmi_path_reused"]
     keys.extend(("path_async_frames", *PATH_COUNTER_NAMES))
     for prefix, names in STAGE_NAMES.items():
       for name in names:
@@ -161,10 +170,21 @@ class H264Receiver:
           if type(value) in (int, float) and math.isfinite(value) and 0 <= value <= 10:
             self._stats[f"{prefix}_{name}"] += value
             self._stats[f"{prefix}_{name}_count"] += 1
+      if isinstance(display_timings, dict):
+        uploaded = display_timings.get("upload_bytes")
+        if type(uploaded) is int and 0 <= uploaded <= 64 * 1024 * 1024:
+          self._stats["hdmi_upload_count"] += 1
+          self._stats["hdmi_upload_bytes"] += uploaded
+          self._stats["hdmi_camera_reused"] += display_timings.get("camera_upload_skipped") == 1
+          self._stats["hdmi_path_reused"] += display_timings.get("path_upload_skipped") == 1
       if video_received_at is not None:
         self._stats["queue_count"] += 1
         self._stats["queue"] += max(0.0, render_started - video_received_at)
       if presented:
+        if video_received_at is not None and camera_visible:
+          if self._last_camera_display_at is not None:
+            self._stats["camera_gap"] = max(self._stats["camera_gap"], displayed_at - self._last_camera_display_at)
+          self._last_camera_display_at = displayed_at
         if isinstance(scene_timings, dict) and scene_timings.get("path_async") == 1:
           self._stats["path_async_frames"] += 1
           for name in PATH_COUNTER_NAMES:
@@ -216,7 +236,12 @@ class H264Receiver:
 
     async def read_packet():
       kind, _sequence, size = unpack_control_header(await read_exact(CONTROL_HEADER.size))
-      return kind, decode_payload(await read_exact(size))
+      data = await read_exact(size)
+      if kind == STATE_ZLIB:
+        if self.state_compression != "zlib":
+          raise ValueError("Compressed state was not negotiated")
+        return STATE, decode_state_payload(kind, data)
+      return kind, decode_payload(data)
 
     try:
       return await asyncio.wait_for(read_packet(), timeout=budget_s)
@@ -348,6 +373,7 @@ class H264Receiver:
           "queue_wait_avg_ms": stats["queue"] * 1000 / max(stats["queue_count"], 1),
           "rgb_convert_avg_ms": stats["convert"] * 1000 / max(stats["convert_count"], 1),
           "display_gap_max_ms": stats["gap"] * 1000,
+          "camera_display_gap_max_ms": stats["camera_gap"] * 1000,
           "video_age_ms": None if self.last_video_at is None else max(0, now - self.last_video_at) * 1000,
           "state_age_ms": None if self.last_state_at is None else max(0, now - self.last_state_at) * 1000,
           "video_stale": video_stale,
@@ -355,7 +381,7 @@ class H264Receiver:
         }
       await self._send_control(FEEDBACK, payload)
       for key in stats:
-        logged_stats[key] = max(logged_stats[key], stats[key]) if key == "gap" else logged_stats[key] + stats[key]
+        logged_stats[key] = max(logged_stats[key], stats[key]) if key in ("gap", "camera_gap") else logged_stats[key] + stats[key]
       if now - logged_at >= 10.0:
         elapsed = now - logged_at
         stages = "".join(f" | {prefix}_{name}_avg={logged_stats[f'{prefix}_{name}'] * 1000 / count:.1f}ms"
@@ -364,6 +390,11 @@ class H264Receiver:
         if logged_stats["path_async_frames"]:
           stages += " | path_async_frames=" + str(int(logged_stats["path_async_frames"]))
           stages += "".join(f" | {name}={int(logged_stats[name])}" for name in PATH_COUNTER_NAMES)
+        stages += f" | camera_display_gap_max={logged_stats['camera_gap'] * 1000:.1f}ms"
+        if logged_stats["hdmi_upload_count"]:
+          stages += (f" | hdmi_upload_kbps={logged_stats['hdmi_upload_bytes'] * 8 / (1000 * elapsed):.1f}"
+                     + f" | hdmi_camera_reused={int(logged_stats['hdmi_camera_reused'])}"
+                     + f" | hdmi_path_reused={int(logged_stats['hdmi_path_reused'])}")
         LOG.info("[CLUSTER_H264_RX_PERF] rx_fps=%.2f | display_fps=%.2f | dropped_display=%d | "
                  + "render_avg=%.1fms | display_avg=%.1fms | queue_wait_avg=%.1fms | rgb_convert_avg=%.1fms | "
                  + "display_gap_max=%.1fms | video_stale=%d | state_stale=%d | "
@@ -447,12 +478,19 @@ class H264Receiver:
 
       async def negotiate():
         await peer.setLocalDescription(await peer.createOffer())
-        await self._send_control(OFFER, {"type": "offer", "sdp": peer.localDescription.sdp})
+        offer = {"type": "offer", "sdp": peer.localDescription.sdp}
+        if self.hello.get("state_compression") == "zlib":
+          offer["state_compression"] = "zlib"
+        await self._send_control(OFFER, offer)
         while True:
           kind, payload = await self._read_control(NEGOTIATION_TIMEOUT)
           if kind == ANSWER:
             if payload.get("type") != "answer" or not isinstance(payload.get("sdp"), str):
               raise ValueError("Invalid C4 WebRTC answer")
+            selected = payload.get("state_compression")
+            if selected not in (None, "zlib") or selected is not None and offer.get("state_compression") != selected:
+              raise ValueError("C4 selected unoffered state compression")
+            self.state_compression = selected
             await peer.setRemoteDescription(RTCSessionDescription(sdp=payload["sdp"], type="answer"))
             return
           if kind == STATE:
@@ -463,6 +501,8 @@ class H264Receiver:
             raise ValueError(f"Expected C4 WebRTC answer, got {kind}")
 
       await asyncio.wait_for(negotiate(), timeout=NEGOTIATION_TIMEOUT)
+      LOG.info("[CLUSTER_H264_STATE_ENCODING] encoding=%s | negotiated=1 | decoded_limit_bytes=65536",
+               self.state_compression or "json")
       LOG.info("[CLUSTER_H264_MODE] WebRTC H.264, decoder=aiortc_pyav_software, TCP=metadata only")
       started = time.monotonic()
       tasks = [asyncio.create_task(self._read_states()), asyncio.create_task(self._feedback()),

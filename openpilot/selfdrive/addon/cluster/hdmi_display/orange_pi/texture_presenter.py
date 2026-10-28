@@ -59,6 +59,7 @@ class _LayerTextures:
     if not self.renderer:
       raise RuntimeError("SDL could not resolve the texture presenter's renderer")
     self.textures = {}
+    self.sources = {}
     # Premultiplied path RGB already includes alpha. Applying straight alpha
     # here would darken its edges and make overlapping paths too faint.
     self._premultiplied_blend = library.SDL_ComposeCustomBlendMode(2, 6, 1, 2, 6, 1)
@@ -70,12 +71,18 @@ class _LayerTextures:
       message = self.sdl.SDL_GetError()
       raise RuntimeError(message.decode("utf-8", errors="replace") if message else "SDL layer operation failed")
 
-  def upload(self, name, surface, alpha=False, premultiplied=False):
+  def upload(self, name, surface, alpha=False, premultiplied=False, source_token=None):
     size = tuple(surface.get_size())
     format_key = surface.get_bitsize(), *surface.get_masks()
     blend = self._premultiplied_blend if premultiplied else int(bool(alpha))
     key = size, format_key, blend
     current = self.textures.get(name)
+    # Only explicit immutable sources qualify. Ordinary Surface callers may
+    # mutate pixels in place and therefore upload on every call by default.
+    # Retain the object itself so recycled Python ids cannot match old pixels.
+    if source_token is not None and current is not None and current[0] == key and self.sources.get(name) is source_token:
+      return 0
+    self.sources.pop(name, None)
     if current is None or current[0] != key:
       if current is not None:
         self.sdl.SDL_DestroyTexture(current[1])
@@ -96,6 +103,12 @@ class _LayerTextures:
     pixels = surface.get_buffer()
     buffer = (ctypes.c_uint8 * pixels.length).from_buffer(pixels)
     self._check(self.sdl.SDL_UpdateTexture(texture, None, ctypes.addressof(buffer), surface.get_pitch()))
+    if source_token is not None:
+      self.sources[name] = source_token
+    return surface.get_pitch() * size[1]
+
+  def forget_source(self, name):
+    self.sources.pop(name, None)
 
   def draw(self, name, positions, uv, color):
     texture = self.textures[name][1]
@@ -113,6 +126,7 @@ class _LayerTextures:
     self._check(self.sdl.SDL_RenderFlush(self.renderer))
 
   def close(self):
+    self.sources.clear()
     for _, texture in self.textures.values():
       self.sdl.SDL_DestroyTexture(texture)
     self.textures.clear()
@@ -263,6 +277,8 @@ class TexturePresenter:
       self._frame_size = size
       self._has_frame = True
       self._layered_frame = None
+      if self._layers is not None:
+        self._layers.sources.clear()
     uploaded_at = time.monotonic()
     result = self.redraw(controls)
     result["convert"] = converted_at - started
@@ -272,17 +288,21 @@ class TexturePresenter:
     return result
 
   def present_layers(self, overlay_surface, camera_surface=None, camera_rect=None,
-                     camera_uv=(0.0, 0.0, 1.0, 1.0), controls=None, rotate_180=False, *, path_surface=None):
+                     camera_uv=(0.0, 0.0, 1.0, 1.0), controls=None, rotate_180=False, *, path_surface=None,
+                     camera_token=None, path_token=None):
     """Upload raw camera and RGBA HUD separately; let SDL's GPU compose them.
 
     UV bounds retain the original sensor's fractional crop in the scaled H264
     frame. The transparent camera hole and path/HUD come from the unchanged
     projection; no rounded source rectangle or CPU camera resize is needed.
+    Optional source tokens identify immutable pixel buffers; a changed buffer
+    must have a new token. Untokened mutable Surfaces always upload normally.
     """
     self._check_thread()
     if not self.can_present_layers:
       raise RuntimeError("SDL GPU camera layers are unavailable")
     started = time.monotonic()
+    upload_bytes = camera_skipped = path_skipped = 0
     if controls is None or not controls.screen_off:
       size = tuple(overlay_surface.get_size())
       if camera_surface is not None or path_surface is not None:
@@ -293,16 +313,29 @@ class TexturePresenter:
         if (len(camera_uv) != 4 or any(not math.isfinite(value) or not 0 <= value <= 1 for value in camera_uv)
             or camera_uv[0] >= camera_uv[2] or camera_uv[1] >= camera_uv[3]):
           raise ValueError("GPU camera UV bounds must be a nonempty normalized crop")
-        self._layers.upload("camera", camera_surface)
+      # Validate all geometry before touching texture/cache state.
+      if camera_surface is not None:
+        size_bytes = self._layers.upload("camera", camera_surface, source_token=camera_token)
+        upload_bytes += size_bytes
+        camera_skipped = int(size_bytes == 0)
+      else:
+        self._layers.forget_source("camera")
       if path_surface is not None:
-        self._layers.upload("path", path_surface, premultiplied=True)
-      self._layers.upload("overlay", overlay_surface, alpha=True)
+        size_bytes = self._layers.upload("path", path_surface, premultiplied=True, source_token=path_token)
+        upload_bytes += size_bytes
+        path_skipped = int(size_bytes == 0)
+      else:
+        self._layers.forget_source("path")
+      upload_bytes += self._layers.upload("overlay", overlay_surface, alpha=True)
       self._frame_size = size
       self._layered_frame = (camera_surface is not None, camera_rect, tuple(camera_uv), bool(rotate_180), path_surface is not None)
       self._has_frame = True
+    else:
+      self._layers.sources.clear()
     uploaded_at = time.monotonic()
     result = self.redraw(controls)
     result.update(convert=0.0, upload=uploaded_at - started, draw=result["blit"])
+    result.update(upload_bytes=upload_bytes, camera_upload_skipped=camera_skipped, path_upload_skipped=path_skipped)
     result["blit"] += uploaded_at - started
     return result
 
@@ -349,6 +382,8 @@ class TexturePresenter:
     self._check_thread()
     self._has_frame = False
     self._layered_frame = None
+    if self._layers is not None:
+      self._layers.sources.clear()
     if self.renderer is not None:
       self.renderer.clear()
       self.renderer.present()

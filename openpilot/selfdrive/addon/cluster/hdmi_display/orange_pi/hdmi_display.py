@@ -445,7 +445,8 @@ class HdmiDisplay:
         path = self._pygame.image.frombuffer(layers.path, (width, height), "RGBA")
       converted_at = time.monotonic()
       timings = self._presenter.present_layers(overlay, camera, layers.camera_rect, layers.camera_uv,
-                                               self.controls, rotate_180=layers.rotate_180, path_surface=path)
+                                               self.controls, rotate_180=layers.rotate_180, path_surface=path,
+                                               camera_token=layers.camera, path_token=layers.path)
       timings["rgb_surface"] = converted_at - started
       timings["decode"] = 0.0
       self.last_frame_timings = timings

@@ -311,6 +311,7 @@ class H264NetworkServer:
       for key in ("video_fps", "decoded_fps", "skipped_rgb", "display_fps", "camera_display_fps", "metadata_display_fps",
                   "hidden_camera_fps", "gpu_camera", "rgb_convert_avg_ms",
                   "render_avg_ms", "display_avg_ms", "queue_wait_avg_ms", "video_age_ms", "state_age_ms", "display_gap_max_ms",
+                  "camera_display_gap_max_ms",
                   "dropped_display", "decoder_errors"):
         value = payload.get(key)
         if type(value) in (float, int) and 0 <= value <= 1e9:
@@ -318,7 +319,7 @@ class H264NetworkServer:
       flog("[CLUSTER_H264_PI_PERF] codec=h264 | transport=webrtc | " + " | ".join(fields)
            + f" | screen_off={int(self.screen_off)}")
 
-  async def _states(self, writer, track, stream):
+  async def _states(self, writer, track, stream, compression=None):
     sequence, total_bytes = 0, 0
     started = time.monotonic()
     last_frames = last_video_bytes = 0
@@ -328,7 +329,7 @@ class H264NetworkServer:
       before, cpu_before = time.monotonic(), time.thread_time()
       scene = scene_snapshot(self.config, self.models, self.health, self.degraded)
       scene.update(video_frame_id=track.video_frame_id, video_timestamp_eof=track.video_timestamp_eof, state_seq=sequence)
-      packet = pack_scene(scene, sequence)
+      packet = pack_scene(scene, sequence, compression=compression)
       state_cpu += time.thread_time() - cpu_before
       writer.write(packet)
       await drain_state(writer)
@@ -360,6 +361,7 @@ class H264NetworkServer:
              + f" | state_fps={state_frames / elapsed:.2f} | state_kbps={total_bytes * 8 / (1000 * elapsed):.1f}"
              + f" | state_avg={state_wall * 1000 / state_frames:.1f}ms | state_cpu_avg={state_cpu * 1000 / state_frames:.1f}ms"
              + f" | video_source_age_ms={video_age} | resyncs={track.resyncs} | guard={int(self.degraded)}"
+             + f" | state_encoding={compression or 'json'}"
              + f" | encoder_bitrate_setting={bitrate}" + report_details
              + " | encoder=existing_livestream | camera_rgb=0 | cluster_render=0")
         started, last_frames, last_video_bytes = now, track.video_frames, track.video_bytes
@@ -388,22 +390,27 @@ class H264NetworkServer:
       flog(f"[CLUSTER_NETWORK_SUCCESS] Orange Pi connected from {peer[0]}:{peer[1]}.")
       await write_control(writer, HELLO, {"protocol": 1, "codec": "h264", "transport": "webrtc", "camera": "road",
                                         "width": self.config.width, "height": self.config.height, "fps": min(self.config.fps, 20),
-                                        "state_hz": 20}, budget_s=2)
+                                        "state_hz": 20, "state_compression": "zlib"}, budget_s=2)
       phase = "offer"
       kind, _sequence, offer = await read_control(reader, budget_s=15)
       if kind == ERROR:
         raise RuntimeError(f"Pi H.264 unavailable: {offer.get('error', 'unknown')} | {str(offer.get('detail', ''))[:512]}")
       if kind != OFFER or offer.get("type") != "offer" or not isinstance(offer.get("sdp"), str) or not offer["sdp"].startswith("v=0"):
         raise ValueError("Expected a WebRTC H.264 offer")
+      compression = "zlib" if offer.get("state_compression") == "zlib" else None
       phase = "start_stream"
       stream, track = self.stream_factory(offer["sdp"])
       answer = await asyncio.wait_for(stream.start(), 15)
       phase = "answer"
-      await write_control(writer, ANSWER, {"sdp": answer.sdp, "type": answer.type}, budget_s=2)
+      response = {"sdp": answer.sdp, "type": answer.type}
+      if compression is not None:
+        response["state_compression"] = compression
+      await write_control(writer, ANSWER, response, budget_s=2)
       phase = "connect"
       await asyncio.wait_for(stream.wait_for_connection(), 15)
       flog("[CLUSTER_H264_CONNECTED] codec=h264 | transport=webrtc | camera=road | compose=pi | ack=telemetry_only")
-      workers = [asyncio.create_task(self._states(writer, track, stream), name="scene_state"),
+      flog(f"[CLUSTER_H264_STATE_ENCODING] encoding={compression or 'json'} | negotiated=1 | decoded_limit_bytes=65536")
+      workers = [asyncio.create_task(self._states(writer, track, stream, compression=compression), name="scene_state"),
                  asyncio.create_task(self._feedback(reader, track), name="receiver_feedback"),
                  asyncio.create_task(stream.wait_for_disconnection(), name="video_transport")]
       done, _pending = await asyncio.wait(workers, return_when=asyncio.FIRST_COMPLETED)
