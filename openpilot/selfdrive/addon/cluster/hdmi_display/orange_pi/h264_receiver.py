@@ -28,6 +28,8 @@ NEGOTIATION_TIMEOUT = 15.0
 STREAM_TIMEOUT = 8.0
 FEEDBACK_INTERVAL = 1.0
 RECOVERY_INTERVAL = 0.5
+RECOVERY_POLL_INTERVAL = 0.1
+VIDEO_STALE_SECONDS = 0.5
 HUD_REFRESH_INTERVAL = 0.1
 GPU_BURST_FPS = 60
 GPU_CAMERA_GRACE_SECONDS = 0.2
@@ -99,6 +101,7 @@ class H264Receiver:
     self._send_lock = None
     self._recovery_event = None
     self._recovered_decoder_errors = 0
+    self._last_recovery_at = None
     self._sequence = 0
     self._stats = self._empty_stats()
     self._last_display_at = None
@@ -112,7 +115,7 @@ class H264Receiver:
   @staticmethod
   def _empty_stats():
     keys = ["render_count", "render", "display", "queue_count", "queue", "convert_count", "convert", "gap", "camera_gap",
-            "hdmi_upload_count", "hdmi_upload_bytes", "hdmi_camera_reused", "hdmi_path_reused"]
+            "hdmi_upload_count", "hdmi_upload_bytes", "hdmi_camera_reused", "hdmi_path_reused", "hdmi_overlay_reused"]
     keys.extend(("path_async_frames", *PATH_COUNTER_NAMES))
     for prefix, names in STAGE_NAMES.items():
       for name in names:
@@ -177,6 +180,7 @@ class H264Receiver:
           self._stats["hdmi_upload_bytes"] += uploaded
           self._stats["hdmi_camera_reused"] += display_timings.get("camera_upload_skipped") == 1
           self._stats["hdmi_path_reused"] += display_timings.get("path_upload_skipped") == 1
+          self._stats["hdmi_overlay_reused"] += display_timings.get("overlay_upload_skipped") == 1
       if video_received_at is not None:
         self._stats["queue_count"] += 1
         self._stats["queue"] += max(0.0, render_started - video_received_at)
@@ -312,23 +316,45 @@ class H264Receiver:
       else:
         raise ValueError(f"Unexpected H.264 control message: {kind}")
 
+  def _take_recovery_request(self, now, started=None):
+    # Called on the signaling loop by both recovery and regular telemetry.
+    # Claim before sending so simultaneous wakes cannot request duplicate IDRs.
+    with self.condition:
+      if self.closing:
+        return None
+      if self._last_recovery_at is not None and now - self._last_recovery_at < RECOVERY_INTERVAL:
+        return None
+      age = None if self.last_video_at is None else max(0.0, now - self.last_video_at)
+      if self.decoder_errors > self._recovered_decoder_errors:
+        reason = "decoder_error"
+      elif age is not None and age >= VIDEO_STALE_SECONDS:
+        reason = "video_stale"
+      elif age is None and started is not None and now - started >= VIDEO_STALE_SECONDS:
+        reason = "video_startup"
+      else:
+        return None
+      self._last_recovery_at = now
+      self._recovered_decoder_errors = self.decoder_errors
+      payload = {"screen_off": self.screen_off, "keyframe_request": True, "decoder_errors": self.decoder_errors,
+                 "recovery_reason": reason, "video_age_ms": None if age is None else age * 1000}
+    LOG.info("[CLUSTER_H264_RECOVERY_REQUEST] reason=%s | video_age_ms=%s | decoder_errors=%d",
+             reason, "none" if age is None else f"{age * 1000:.1f}", payload["decoder_errors"])
+    return payload
+
   async def _recover_video(self):
-    last_request_at = None
+    started = time.monotonic()
     while True:
-      await self._recovery_event.wait()
+      # Packet loss can leave no complete access unit for the decoder and no
+      # warning to wake us. Detect that silence at the existing 500ms limit
+      # instead of waiting for the next 1s FPS report (up to 1.5s after video).
+      try:
+        await asyncio.wait_for(self._recovery_event.wait(), timeout=RECOVERY_POLL_INTERVAL)
+      except TimeoutError:
+        pass
       self._recovery_event.clear()
-      if last_request_at is not None:
-        delay = last_request_at + RECOVERY_INTERVAL - time.monotonic()
-        if delay > 0:
-          await asyncio.sleep(delay)
-      with self.condition:
-        errors = self.decoder_errors
-      if errors <= self._recovered_decoder_errors:
-        continue
-      await self._send_control(FEEDBACK, {"screen_off": self.screen_off, "keyframe_request": True,
-                                          "decoder_errors": errors, "recovery_reason": "decoder_error"})
-      self._recovered_decoder_errors = errors
-      last_request_at = time.monotonic()
+      payload = self._take_recovery_request(time.monotonic(), started)
+      if payload is not None:
+        await self._send_control(FEEDBACK, payload)
 
   async def _feedback(self):
     previous_at = time.monotonic()
@@ -336,7 +362,6 @@ class H264Receiver:
     previous_camera_display = 0
     previous_metadata_display = previous_hidden_video = 0
     previous_decoded = 0
-    previous_decoder_errors = 0
     logged_at, logged_rx, logged_display, logged_dropped = previous_at, 0, 0, 0
     logged_camera_display = 0
     logged_decoder_errors = 0
@@ -351,7 +376,7 @@ class H264Receiver:
         metadata_displayed, hidden_video = self.metadata_displayed_frames, self.hidden_video_frames
         decoded, skipped = self.decoded_frames, self.skipped_rgb
         decoder_errors = self.decoder_errors
-        video_stale = self.last_video_at is None or now - self.last_video_at >= 0.5
+        video_stale = self.last_video_at is None or now - self.last_video_at >= VIDEO_STALE_SECONDS
         stats, self._stats = self._stats, self._empty_stats()
         payload = {
           "screen_off": self.screen_off,
@@ -365,8 +390,7 @@ class H264Receiver:
           "hidden_camera_fps": (hidden_video - previous_hidden_video) / max(now - previous_at, 0.001),
           "decoder_backend": "aiortc_pyav_software",
           "decoder_errors": decoder_errors,
-          "keyframe_request": (decoder_errors > max(previous_decoder_errors, self._recovered_decoder_errors)
-                               or (self.last_video_at is not None and video_stale)),
+          "keyframe_request": False,
           "dropped_display": self.dropped_frames,
           "render_avg_ms": stats["render"] * 1000 / max(stats["render_count"], 1),
           "display_avg_ms": stats["display"] * 1000 / max(stats["render_count"], 1),
@@ -379,6 +403,9 @@ class H264Receiver:
           "video_stale": video_stale,
           "state_stale": self.last_state_at is None or now - self.last_state_at >= 0.5,
         }
+      recovery = self._take_recovery_request(now)
+      if recovery is not None:
+        payload.update(recovery)
       await self._send_control(FEEDBACK, payload)
       for key in stats:
         logged_stats[key] = max(logged_stats[key], stats[key]) if key in ("gap", "camera_gap") else logged_stats[key] + stats[key]
@@ -394,7 +421,8 @@ class H264Receiver:
         if logged_stats["hdmi_upload_count"]:
           stages += (f" | hdmi_upload_kbps={logged_stats['hdmi_upload_bytes'] * 8 / (1000 * elapsed):.1f}"
                      + f" | hdmi_camera_reused={int(logged_stats['hdmi_camera_reused'])}"
-                     + f" | hdmi_path_reused={int(logged_stats['hdmi_path_reused'])}")
+                     + f" | hdmi_path_reused={int(logged_stats['hdmi_path_reused'])}"
+                     + f" | hdmi_overlay_reused={int(logged_stats['hdmi_overlay_reused'])}")
         LOG.info("[CLUSTER_H264_RX_PERF] rx_fps=%.2f | display_fps=%.2f | dropped_display=%d | "
                  + "render_avg=%.1fms | display_avg=%.1fms | queue_wait_avg=%.1fms | rgb_convert_avg=%.1fms | "
                  + "display_gap_max=%.1fms | video_stale=%d | state_stale=%d | "
@@ -420,7 +448,6 @@ class H264Receiver:
       previous_camera_display = camera_displayed
       previous_metadata_display, previous_hidden_video = metadata_displayed, hidden_video
       previous_decoded = decoded
-      previous_decoder_errors = decoder_errors
 
   async def _watchdog(self, started):
     while True:

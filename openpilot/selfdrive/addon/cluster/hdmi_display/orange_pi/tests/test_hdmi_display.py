@@ -723,6 +723,50 @@ def test_retained_camera_pixels_are_explicit_immutable_upload_tokens(raster_pyga
     display.close()
 
 
+def test_immutable_hud_skips_export_and_upload_with_current_camera_and_brightness(raster_pygame, monkeypatch):
+  display = _layered_display(raster_pygame, monkeypatch)
+  layers = _layers()
+  layers.overlay.putpixel((0, 0), (0, 255, 0, 255))
+  layers.overlay_token = layers.overlay
+  export = Mock(wraps=layers.overlay.tobytes)
+  monkeypatch.setattr(layers.overlay, "tobytes", export)
+  try:
+    assert display.send_layers(layers)
+    next_frame = _layers((0, 0, 255))
+    next_frame.overlay, next_frame.overlay_token = layers.overlay, layers.overlay_token
+    display.controls.set_brightness(40)
+    assert display.send_layers(next_frame)
+    assert export.call_count == 1
+    assert display.last_frame_timings["overlay_upload_skipped"] == 1
+    assert display.last_frame_timings["camera_upload_skipped"] == 0
+    pixels = display._presenter.renderer.to_surface()
+    assert pixels.get_at((0, 0))[:3] == (0, 102, 0)
+    assert pixels.get_at((10, 10))[:3] == (0, 0, 102)
+    assert display.show_waiting() and display._overlay_cache is None
+    assert display.send_layers(next_frame)
+    assert export.call_count == 2 and display.last_frame_timings["overlay_upload_skipped"] == 0
+    display.clear()
+    assert display._overlay_cache is None
+  finally:
+    display.close()
+  assert display._overlay_cache is None
+
+
+def test_mutable_hud_without_explicit_token_always_exports_current_pixels(raster_pygame, monkeypatch):
+  display = _layered_display(raster_pygame, monkeypatch)
+  layers = _layers()
+  try:
+    layers.overlay.putpixel((0, 0), (0, 255, 0, 255))
+    assert display.send_layers(layers)
+    layers.overlay.putpixel((0, 0), (0, 0, 255, 255))
+    assert display.send_layers(layers)
+    assert display._presenter.renderer.to_surface().get_at((0, 0))[:3] == (0, 0, 204)
+    assert display.last_frame_timings["overlay_upload_skipped"] == 0
+    assert display._overlay_cache is None
+  finally:
+    display.close()
+
+
 def test_layer_upload_failure_preserves_same_camera_and_fullframe_gpu(raster_pygame, monkeypatch):
   display = _layered_display(raster_pygame, monkeypatch)
   presenter = display._presenter

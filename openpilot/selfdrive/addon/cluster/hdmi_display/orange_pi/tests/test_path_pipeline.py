@@ -230,6 +230,7 @@ def test_normal_delivery_gaps_do_not_blank_lanes_before_the_original_source_expi
 def test_worker_failure_keeps_camera_live_and_restores_synchronous_paths(scene, monkeypatch, caplog, phase):
   value, now = scene
   value.render_layers()
+  value.update(state(hud={"v_ego": 21, "enabled": True, "lat_active": True}))
   entered, release = threading.Event(), threading.Event()
   def fail(_self, _request):
     entered.set()
@@ -265,6 +266,7 @@ def test_worker_failure_keeps_camera_live_and_restores_synchronous_paths(scene, 
 def test_path_starts_during_hud_and_its_completion_is_used_in_the_same_frame(scene, monkeypatch):
   value, _now = scene
   value.render_layers()
+  value.update(state(hud={"v_ego": 21, "enabled": True, "lat_active": True}))
   entered, in_hud = threading.Event(), threading.Event()
   owner = threading.get_ident()
   paint, draw_hud = LayeredRenderer._paint_path_request, value.renderer._draw_hud
@@ -336,7 +338,7 @@ def test_late_poll_hides_a_retained_path_that_expires_during_hud(scene, monkeypa
     wait_done(value.renderer._path_worker)
     release.clear()
     now[0] = 10.48
-    value.update(state())
+    value.update(state(hud={"v_ego": 21, "enabled": True, "lat_active": True}))
     video(value, 80)
     draw_hud = value.renderer._draw_hud
     def hud(*args):

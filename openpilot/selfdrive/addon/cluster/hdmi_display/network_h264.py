@@ -6,6 +6,7 @@ or cluster composition. The Pi renders the HUD locally.
 import asyncio
 import contextlib
 import json
+import math
 import signal
 import socket
 import threading
@@ -17,12 +18,13 @@ from openpilot.selfdrive.addon.cluster.cluster_runtime_metrics import ClusterRun
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import write_network_status
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol import (
   ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, PATH_KEYS,
-  decode_payload, pack_control, pack_scene, unpack_control_header,
+  decode_payload, pack_control, pack_scene, unpack_control_header, validate_scene,
 )
 
 STATE_DRAIN_WARN_S = 0.25
 STATE_DRAIN_TIMEOUT_S = 5.0
 STATE_SEND_BUFFER_BYTES = 16 * 1024
+STATE_INVALID_LOG_INTERVAL_S = 5.0
 KEYFRAME_REQUEST_INTERVAL = 1.0
 
 
@@ -105,6 +107,61 @@ def scene_snapshot(config, models, health, degraded=False):
     "state_created_mono_ns": time.monotonic_ns(),
   }
   return scene
+
+
+def invalid_scene_fallback(scene):
+  """Keep current usable HUD fields, never publish rejected model geometry.
+
+  This is a local producer recovery path, entered only after strict packing
+  rejected a snapshot. Reuse the wire validator instead of weakening the
+  protocol or rescanning normal model geometry. No previous snapshot is used.
+  """
+  fallback = {"model_valid": False, "hud": {}, "path": {}, "source_size": None,
+              "model_age_ms": None, "car_state_age_ms": None}
+  dropped = ["path"]
+  if not isinstance(scene, dict):
+    return fallback, dropped + ["scene"]
+
+  # These are the only other fields produced by scene_snapshot/_states.
+  # Check each against an otherwise empty scene so a rejected field cannot
+  # remove valid current display options or poison another field's check.
+  for key in ("source_size", "is_metric", "rotate_180", "camera_contrast", "state_created_mono_ns",
+              "video_frame_id", "video_timestamp_eof", "state_seq", "model_age_ms", "car_state_age_ms"):
+    if key not in scene:
+      continue
+    value = scene[key]
+    try:
+      if key.endswith("_age_ms") and value is not None and (
+          type(value) not in (int, float) or not 0 <= value <= 1e30 or not math.isfinite(value)):
+        raise ValueError("Invalid source age")
+      if key == "camera_contrast" and (type(value) not in (int, float) or not 0.5 <= value <= 2.0):
+        raise ValueError("Invalid camera contrast")
+      if key in ("state_created_mono_ns", "video_frame_id", "video_timestamp_eof", "state_seq") and value is not None and (
+          type(value) is not int or not 0 <= value <= 1e30):
+        raise ValueError("Invalid source identifier")
+      validate_scene({"model_valid": False, "hud": {}, "path": {}, key: value})
+    except ValueError:
+      dropped.append(key)
+    else:
+      fallback[key] = value
+
+  hud = scene.get("hud")
+  if isinstance(hud, dict):
+    for index, (key, value) in enumerate(hud.items()):
+      if index >= 96:
+        dropped.append("hud.remaining_fields")
+        break
+      try:
+        validate_scene({"model_valid": False, "hud": {key: value}, "path": {}})
+      except ValueError:
+        # TPMS is one field: omit all four readings rather than inventing
+        # replacement tyre pressures for any rejected sample.
+        dropped.append("hud." + str(key)[:96])
+      else:
+        fallback["hud"][key] = value
+  else:
+    dropped.append("hud")
+  return fallback, dropped
 
 
 async def read_control(reader, budget_s=8.0):
@@ -325,11 +382,35 @@ class H264NetworkServer:
     last_frames = last_video_bytes = 0
     state_frames = 0
     state_cpu = state_wall = 0.0
+    invalid_total = invalid_streak = 0
+    last_invalid_log = None
+    invalid_reported = False
     while True:
       before, cpu_before = time.monotonic(), time.thread_time()
       scene = scene_snapshot(self.config, self.models, self.health, self.degraded)
       scene.update(video_frame_id=track.video_frame_id, video_timestamp_eof=track.video_timestamp_eof, state_seq=sequence)
-      packet = pack_scene(scene, sequence, compression=compression)
+      try:
+        packet = pack_scene(scene, sequence, compression=compression)
+      except ValueError as error:
+        # A transient NaN/invalid model sample is unrelated to the healthy
+        # H.264 reference chain. Publish invalid geometry immediately while
+        # retaining only usable fields from this exact current HUD snapshot.
+        fallback, dropped = invalid_scene_fallback(scene)
+        packet = pack_scene(fallback, sequence, compression=compression)
+        invalid_total += 1
+        invalid_streak += 1
+        if last_invalid_log is None or before - last_invalid_log >= STATE_INVALID_LOG_INTERVAL_S:
+          fields = json.dumps(dropped[:8], ensure_ascii=True, separators=(",", ":"))
+          flog(f"[CLUSTER_H264_STATE_INVALID] action=omit_path_keep_video | rejected={str(error)[:160]}"
+               + f" | dropped={fields} | dropped_fields={len(dropped)} | total={invalid_total}")
+          last_invalid_log = before
+          invalid_reported = True
+      else:
+        if invalid_streak:
+          if invalid_reported:
+            flog(f"[CLUSTER_H264_STATE_VALID] invalid_samples={invalid_streak} | total={invalid_total} | action=resume_current_scene")
+            invalid_reported = False
+          invalid_streak = 0
       state_cpu += time.thread_time() - cpu_before
       writer.write(packet)
       await drain_state(writer)

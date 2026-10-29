@@ -53,6 +53,9 @@ class SceneLayers:
   camera_uv: tuple
   rotate_180: bool = False
   path: np.ndarray | None = None
+  # Only producers that never mutate a published HUD may opt into reuse.
+  # Other callers can keep supplying mutable PIL images without a token.
+  overlay_token: object | None = None
 
   def to_image(self):
     """Same retained layers on a software-only or failed GPU backend."""
@@ -95,6 +98,7 @@ class LayeredRenderer(ClusterRenderer):
     self._path_epoch = 0
     self._sync_path = None
     self._async_path_failed = False
+    self._hud_cache_key = self._hud_cache_image = None
     try:
       cores = len(os.sched_getaffinity(0))
     except (AttributeError, OSError):
@@ -115,6 +119,7 @@ class LayeredRenderer(ClusterRenderer):
     self._lead_text_bytes = 0
     self._lead_font = None
     self._sync_path = None
+    self._hud_cache_key = self._hud_cache_image = None
 
   def configure_path_pipeline(self, asynchronous, received_at, valid_until, clock=time.monotonic):
     enabled = bool(asynchronous) and self._parallel_path and not self._async_path_failed
@@ -268,10 +273,17 @@ class LayeredRenderer(ClusterRenderer):
       self._overlay_base[:, :, 3] = 255
       self._overlay_camera_base = self._overlay_base.copy()
       self._overlay_camera_base[self.camera_y:self.camera_y + self.camera_h, self.camera_x:self.camera_x + self.camera_w] = 0
-    frame = (self._overlay_camera_base if has_camera else self._overlay_base).copy()
-    copied_at = time.monotonic()
     model_valid, hud, path = models.get_render_data()
     snapshot_at = time.monotonic()
+    # Camera and metadata arrive independently. Reuse a complete immutable HUD
+    # while its current values are unchanged, including across path updates.
+    # Blinkers animate on the renderer's clock; stale-data text is drawn by the
+    # scene after this call. Both must get a fresh image on every render.
+    cacheable = not (hud.get("left_blinker") or hud.get("right_blinker") or hud.get("_state_stale"))
+    hud_key = bool(has_camera), bool(self.config.is_metric), hud
+    hud_reused = cacheable and self._hud_cache_image is not None and hud_key == self._hud_cache_key
+    frame = None if hud_reused else (self._overlay_camera_base if has_camera else self._overlay_base).copy()
+    copied_at = time.monotonic()
     path_pixels = None
     path_future = None
     path_elapsed = path_cpu = 0.0
@@ -325,8 +337,13 @@ class LayeredRenderer(ClusterRenderer):
     hud_started = time.monotonic()
     hud_cpu_started = thread_time()
     try:
-      image = Image.fromarray(frame)
-      self._draw_hud(image, hud, has_camera)
+      if hud_reused:
+        image = self._hud_cache_image
+      else:
+        image = Image.fromarray(frame)
+        self._draw_hud(image, hud, has_camera)
+        self._hud_cache_key = deepcopy(hud_key) if cacheable else None
+        self._hud_cache_image = image if cacheable else None
     finally:
       hud_elapsed = time.monotonic() - hud_started
       hud_cpu = thread_time() - hud_cpu_started
@@ -359,8 +376,9 @@ class LayeredRenderer(ClusterRenderer):
       lead_elapsed = self._lead_elapsed
       if eligible:
         self._sync_path = request, (path_pixels, {"path": path_elapsed, "path_cpu": path_cpu, "path_labels": lead_elapsed})
-    self.last_frame_timings = {"camera_copy": copied_at - started, "snapshot": snapshot_at - copied_at,
+    self.last_frame_timings = {"camera_copy": copied_at - snapshot_at, "snapshot": snapshot_at - started,
                                "path": path_elapsed, "path_cpu": path_cpu, "hud": hud_elapsed, "hud_cpu": hud_cpu,
+                               "hud_reused": int(hud_reused),
                                "path_wait": path_wait, "path_labels": lead_elapsed, "path_age": path_age,
                                "path_async": int(asynchronous), "path_visible": int(path_pixels is not None),
                                "path_ready": int(path_reason in ("ready", "retained")),

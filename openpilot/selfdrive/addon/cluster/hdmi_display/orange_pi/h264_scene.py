@@ -336,5 +336,6 @@ class H264Scene:
     self.last_status = {"state_fresh": state_fresh, "video_fresh": video_fresh, "model_valid": bool(model_valid)}
     if layered:
       return SceneLayers(image, pixels, (self.renderer.camera_x, self.renderer.camera_y,
-                                        self.renderer.camera_w, self.renderer.camera_h), uv, self.config.rotate_180, path_pixels)
+                                        self.renderer.camera_w, self.renderer.camera_h), uv, self.config.rotate_180, path_pixels,
+                         overlay_token=image)
     return image.transpose(Image.Transpose.ROTATE_180) if self.config.rotate_180 else image

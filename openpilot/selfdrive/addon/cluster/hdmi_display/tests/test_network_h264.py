@@ -114,6 +114,185 @@ def test_fast_float_list_rounding_cannot_bypass_wire_numeric_checks(bad):
     wire.pack_scene(network.scene_snapshot(config(), source, {}))
 
 
+@pytest.mark.parametrize("compression", [None, "zlib"])
+@pytest.mark.parametrize("model_valid", [False, True])
+@pytest.mark.parametrize("bad_field", ["path_nan", "calibration_inf", "oversized_path", "hud_speed", "hud_tpms",
+                                       "model_age_ms", "car_state_age_ms", "source_size", "camera_contrast"])
+@asyncio_test
+async def test_invalid_current_scene_recovers_over_same_real_socket(monkeypatch, compression, model_valid, bad_field):
+  messages = []
+  monkeypatch.setattr(network, "flog", messages.append)
+  monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
+  source, settings = models(), config()
+  valid, hud, path = source.get_render_data.return_value
+  healthy = deepcopy((valid, hud, path))
+  source.get_render_data.return_value = model_valid, hud, path
+  health = {"model_age_ms": 25.0, "car_state_age_ms": 5.0}
+  if bad_field == "path_nan":
+    path["path_y"][0] = float("nan")
+  elif bad_field == "calibration_inf":
+    path["calib_transform"][0, 0] = float("inf")
+  elif bad_field == "oversized_path":
+    path.update(path_x=[1.0] * 65, path_y=[0.0] * 65, path_z=[0.0] * 65)
+  elif bad_field == "hud_speed":
+    hud["v_ego"] = float("nan")
+  elif bad_field == "hud_tpms":
+    hud["tpms"][1] = float("inf")
+  elif bad_field in health:
+    health[bad_field] = float("nan")
+  elif bad_field == "source_size":
+    source.get_camera_source_size.return_value = [100_000, 760]
+  elif bad_field == "camera_contrast":
+    settings.camera_contrast = float("inf")
+  before = repr((source.get_render_data.return_value, source.get_camera_source_size.return_value, health, settings))
+  stream, track = factory()
+  make_stream = Mock(return_value=(stream, track))
+  server = network.H264NetworkServer(settings, source, make_stream)
+  server.health = health
+  await server.start()
+  reader, writer = await asyncio.open_connection(*server.server.sockets[0].getsockname())
+
+  async def read_scene():
+    kind, sequence, size = wire.unpack_control_header(await asyncio.wait_for(reader.readexactly(wire.CONTROL_HEADER.size), 1))
+    assert kind in (wire.STATE, wire.STATE_ZLIB)
+    payload = wire.decode_state_payload(kind, await reader.readexactly(size))
+    return sequence, wire.validate_scene(payload)
+
+  try:
+    assert (await network.read_control(reader))[0] == wire.HELLO
+    offer = {"type": "offer", "sdp": "v=0\r\noffer"}
+    if compression is not None:
+      offer["state_compression"] = compression
+    await network.write_control(writer, wire.OFFER, offer)
+    assert (await network.read_control(reader))[0] == wire.ANSWER
+    owner = server.active
+    sequence, rejected = await read_scene()
+    assert sequence == 0 and rejected["state_seq"] == sequence
+    assert rejected["model_valid"] is False and rejected["path"] == {}
+    assert rejected["hud"]["enabled"] is True
+    if bad_field == "hud_speed":
+      assert "v_ego" not in rejected["hud"]  # No previous speed or replacement zero.
+    else:
+      assert rejected["hud"]["v_ego"] == 12.5
+    if bad_field == "hud_tpms":
+      assert "tpms" not in rejected["hud"]
+    else:
+      assert rejected["hud"]["tpms"] == [34.0] * 4
+    if bad_field in health:
+      assert rejected[bad_field] is None  # Unknown age never becomes freshly received source data.
+    if bad_field == "source_size":
+      assert rejected["source_size"] is None
+    assert repr((source.get_render_data.return_value, source.get_camera_source_size.return_value, health, settings)) == before
+
+    # A fresh source sample resumes on this connection, including after a
+    # stale/invalid model snapshot. There is no cached HUD to replay.
+    source.get_render_data.return_value = healthy[0], {**healthy[1], "v_ego": 31.0}, healthy[2]
+    source.get_camera_source_size.return_value = [1344, 760]
+    settings.camera_contrast = 1.08
+    server.health = {"model_age_ms": 30.0, "car_state_age_ms": 7.0}
+    for _ in range(8):
+      next_sequence, current = await read_scene()
+      assert next_sequence == (sequence + 1) & 0xFFFFFFFF
+      sequence = next_sequence
+      if current["model_valid"]:
+        break
+    else:
+      pytest.fail("The same connection did not recover to the current valid scene")
+    assert current["hud"]["v_ego"] == 31.0 and current["path"]["path_x"] == [1.0, 2.0]
+    assert current["model_age_ms"] == 30.0 and current["car_state_age_ms"] == 7.0
+    assert server.active is owner and not stream.stopped and not track.stop.called
+    make_stream.assert_called_once()
+    assert sum("[CLUSTER_H264_CONNECTED]" in message for message in messages) == 1
+    assert sum("[CLUSTER_H264_STATE_INVALID]" in message for message in messages) == 1
+    assert sum("[CLUSTER_H264_STATE_VALID]" in message for message in messages) == 1
+    assert not any("[CLUSTER_H264_ERROR]" in message for message in messages)
+  finally:
+    writer.close()
+    await writer.wait_closed()
+    await server.close()
+
+
+def test_invalid_scene_fallback_is_bounded_and_preserves_only_current_valid_values():
+  scene = {"model_valid": True, "path": {"path_x": [float("nan")]}, "hud": {
+    "v_ego": 22.5, "enabled": True, "tpms": [34.0, float("nan"), 33.0, 33.0], "bad": {"nested": "HUD"},
+    **{f"unused_{index}": index for index in range(110)},
+  }, "model_age_ms": float("inf"), "car_state_age_ms": -1.0, "source_size": [1_000_000, 2],
+    "camera_contrast": "x" * wire.MAX_CONTROL_SIZE, "is_metric": "yes", "rotate_180": True,
+    "video_timestamp_eof": float("nan"), "video_frame_id": 12, "state_created_mono_ns": 1234, "state_seq": 8}
+  before = repr(scene)
+  fallback, dropped = network.invalid_scene_fallback(scene)
+  assert wire.validate_scene(fallback)
+  assert len(wire.pack_scene(fallback)) < wire.MAX_CONTROL_SIZE
+  assert fallback["model_valid"] is False and fallback["path"] == {}
+  assert fallback["hud"]["v_ego"] == 22.5 and fallback["hud"]["enabled"] is True
+  assert "tpms" not in fallback["hud"] and "bad" not in fallback["hud"] and len(fallback["hud"]) <= 96
+  assert fallback["source_size"] is None and fallback["model_age_ms"] is None and fallback["car_state_age_ms"] is None
+  assert fallback["rotate_180"] is True and "is_metric" not in fallback and "camera_contrast" not in fallback
+  assert fallback["video_frame_id"] == 12 and fallback["state_seq"] == 8 and "video_timestamp_eof" not in fallback
+  assert set(dropped) >= {"path", "hud.tpms", "hud.bad", "hud.remaining_fields", "model_age_ms", "car_state_age_ms"}
+  assert repr(scene) == before
+
+
+@pytest.mark.parametrize("age", [float("nan"), float("inf"), -float("inf"), -1, 10**400, "unknown", {}])
+def test_invalid_fallback_source_age_remains_explicitly_unknown(age):
+  fallback, dropped = network.invalid_scene_fallback({"model_valid": False, "hud": {}, "path": {},
+                                                     "model_age_ms": age, "car_state_age_ms": age})
+  assert fallback["model_age_ms"] is None and fallback["car_state_age_ms"] is None
+  assert set(dropped) >= {"model_age_ms", "car_state_age_ms"}
+  assert wire.validate_scene(fallback)
+
+
+@pytest.mark.parametrize("alternating", [False, True])
+@asyncio_test
+async def test_invalid_scene_diagnostics_are_rate_limited_and_transport_failures_still_propagate(monkeypatch, alternating):
+  clock, packets, messages = [0.0], [], []
+  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=lambda: clock[0], thread_time=lambda: 0,
+                                                     monotonic_ns=lambda: 12345))
+  monkeypatch.setattr(network, "flog", messages.append)
+  source = models()
+  healthy = deepcopy(source.get_render_data.return_value)
+  source.get_render_data.return_value[2]["path_y"][0] = float("nan")
+  if alternating:
+    source.get_render_data.side_effect = lambda: healthy if int(clock[0]) % 2 else source.get_render_data.return_value
+  server = network.H264NetworkServer(config(), source)
+  stream, track = factory()
+
+  def write(packet):
+    packets.append(packet)
+    if len(packets) == 7:
+      raise ValueError("injected transport write failure")
+
+  async def drain(_writer):
+    clock[0] += 1.0
+
+  monkeypatch.setattr(network, "drain_state", drain)
+  with pytest.raises(ValueError, match="injected transport write failure"):
+    await server._states(SimpleNamespace(write=write), track, stream)
+  assert len(packets) == 7
+  diagnostics = [line for line in messages if "[CLUSTER_H264_STATE_INVALID]" in line]
+  assert len(diagnostics) == 2 and all(len(line) < 600 for line in diagnostics)
+  assert "total=1" in diagnostics[0] and f"total={4 if alternating else 6}" in diagnostics[1]
+  assert all("action=omit_path_keep_video" in line and '"path"' in line for line in diagnostics)
+  # Alternating invalid/valid samples must not bypass the diagnostic limit
+  # by logging a fresh recovery on every otherwise suppressed invalid sample.
+  assert sum("[CLUSTER_H264_STATE_VALID]" in line for line in messages) == (1 if alternating else 0)
+
+
+@asyncio_test
+async def test_valid_scene_hot_path_keeps_one_pack_and_does_not_enter_fallback(monkeypatch):
+  pack = Mock(wraps=network.pack_scene)
+  fallback = Mock(side_effect=AssertionError("Normal scene must not enter recovery"))
+  monkeypatch.setattr(network, "pack_scene", pack)
+  monkeypatch.setattr(network, "invalid_scene_fallback", fallback)
+  stream, track = factory()
+  server = network.H264NetworkServer(config(), models())
+  writer = SimpleNamespace(write=Mock(side_effect=ConnectionError("closed socket")))
+  with pytest.raises(ConnectionError, match="closed socket"):
+    await server._states(writer, track, stream, compression="zlib")
+  pack.assert_called_once()
+  fallback.assert_not_called()
+
+
 @asyncio_test
 async def test_receiver_recovery_requests_are_rate_limited_and_decoder_errors_are_logged(monkeypatch):
   messages = []

@@ -713,3 +713,36 @@ def test_failed_native_upload_does_not_cache_the_failed_source(raster_pygame, mo
     assert native.sources["camera"] is token
   finally:
     presenter.close()
+
+
+@pytest.mark.parametrize("rotation", [0, 90])
+def test_immutable_overlay_cache_keeps_alpha_rotation_and_new_hud_pixels(accelerated_pygame, monkeypatch, rotation):
+  import numpy as np
+  pygame, video = accelerated_pygame
+  size = (16, 32) if rotation else (32, 16)
+  presenter = TexturePresenter(pygame, size=size, rotation=rotation, fullscreen=False,
+                               accelerated=True, vsync=False, hidden=True, video_module=video)
+  overlay = pygame.Surface((32, 16), pygame.SRCALPHA)
+  overlay.fill((0, 0, 0, 0))
+  overlay.fill((200, 0, 0, 128), (8, 4, 16, 8))
+  camera = pygame.Surface((32, 16), depth=24)
+  camera.fill((0, 0, 200))
+  token = object()
+  try:
+    calls = _record_layer_uploads(monkeypatch, presenter)
+    first = presenter.present_layers(overlay, camera, (0, 0, 32, 16), overlay_token=token)
+    pixels = pygame.surfarray.array3d(presenter.renderer.to_surface())
+    second = presenter.present_layers(overlay, camera, (0, 0, 32, 16), overlay_token=token)
+    assert calls == ["camera", "overlay", "camera"]
+    assert first["upload_bytes"] - second["upload_bytes"] == 32 * 16 * 4
+    assert second["overlay_upload_skipped"] == 1
+    np.testing.assert_array_equal(pygame.surfarray.array3d(presenter.renderer.to_surface()), pixels)
+    fresh = overlay.copy()
+    fresh.fill((0, 200, 0, 128), (8, 4, 16, 8))
+    changed = presenter.present_layers(fresh, camera, (0, 0, 32, 16), overlay_token=object())
+    assert changed["overlay_upload_skipped"] == 0 and calls[-2:] == ["camera", "overlay"]
+    assert not np.array_equal(pygame.surfarray.array3d(presenter.renderer.to_surface()), pixels)
+    presenter.clear()
+    assert not presenter._layers.sources
+  finally:
+    presenter.close()

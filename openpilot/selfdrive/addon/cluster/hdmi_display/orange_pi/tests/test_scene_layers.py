@@ -1,5 +1,6 @@
 from pathlib import Path
 import threading
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import numpy as np
@@ -37,6 +38,109 @@ def _driving_state(**updates):
                      "lane_line_probs": [0.5, 0.9, 0.9, 0.5],
                      "road_edges": [lane(-4.2), lane(4.2)], "road_edge_stds": [0.1, 0.2],
                      "leads": [{"present": True, "d_rel": 22, "d_camera": 22, "y_rel": 0.2, "v_rel": -1.5}]}, **updates)
+
+
+def test_unchanged_hud_reuses_pixels_while_camera_and_path_keep_updating(monkeypatch):
+  scene = H264Scene(ASSETS, clock=lambda: 10)
+  draw = Mock(wraps=scene.renderer._draw_hud)
+  monkeypatch.setattr(scene.renderer, "_draw_hud", draw)
+  try:
+    scene.update(_state())
+    scene.set_video(np.full((720, 1280, 3), 50, np.uint8))
+    first = scene.render_layers()
+    retained = first.overlay.tobytes()
+    scene.set_video(np.full((720, 1280, 3), 150, np.uint8))
+    second = scene.render_layers()
+    assert second.camera is not first.camera and not np.array_equal(first.camera, second.camera)
+    assert second.overlay is first.overlay and second.overlay_token is first.overlay_token
+    scene.update(_driving_state())
+    third = scene.render_layers()
+    assert third.path is not None and third.overlay is first.overlay
+    assert draw.call_count == 1 and scene.last_frame_timings["hud_reused"] == 1
+    assert first.overlay.tobytes() == retained
+    renderer = scene.renderer
+  finally:
+    scene.close()
+  assert renderer._hud_cache_key is renderer._hud_cache_image is None
+
+
+@pytest.mark.parametrize("updates", [
+  {"is_metric": False}, {"hud": {"v_ego": 28, "enabled": True, "lat_active": True}},
+  {"hud": {"v_ego": 20, "enabled": True, "lat_active": True, "steering_angle": 32}},
+  {"hud": {"v_ego": 20, "enabled": True, "lat_active": True, "brake_pressed": True}},
+  {"hud": {"v_ego": 20, "enabled": True, "lat_active": True, "tpms": [34, 35, 36, 37]}},
+])
+def test_current_hud_changes_render_immediately_and_match_an_uncached_scene(updates):
+  scene, reference = H264Scene(ASSETS, clock=lambda: 10), H264Scene(ASSETS, clock=lambda: 10)
+  try:
+    pixels = np.zeros((720, 1280, 3), np.uint8)
+    scene.set_video(pixels)
+    reference.set_video(pixels)
+    scene.update(_state())
+    first = scene.render_layers()
+    original = first.overlay.tobytes()
+    scene.update(_state(**updates))
+    reference.update(_state(**updates))
+    changed, expected = scene.render_layers(), reference.render_layers()
+    assert changed.overlay is not first.overlay and scene.last_frame_timings["hud_reused"] == 0
+    assert changed.overlay.tobytes() == expected.overlay.tobytes()
+    assert first.overlay.tobytes() == original
+  finally:
+    scene.close()
+    reference.close()
+
+
+def test_hud_cache_preserves_blinker_animation_and_resets_after_turn_off(monkeypatch):
+  from openpilot.selfdrive.addon.cluster import cluster_renderer
+  now = [10.0]
+  monkeypatch.setattr(cluster_renderer, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  scene = H264Scene(ASSETS, clock=lambda: now[0])
+  active = _state(hud={"v_ego": 20, "enabled": True, "lat_active": True, "left_blinker": True})
+  try:
+    scene.set_video(np.zeros((720, 1280, 3), np.uint8))
+    scene.update(active)
+    first = scene.render_layers()
+    original = first.overlay.tobytes()
+    now[0] += cluster_renderer.BLINKER_SEQUENCE_MS * 0.6 / 1000
+    animated = scene.render_layers()
+    assert animated.overlay is not first.overlay and animated.overlay.tobytes() != original
+    assert first.overlay.tobytes() == original
+    scene.update(_state())
+    scene.render_layers()
+    assert scene.renderer._blink_started_at is None
+    scene.update(active)
+    assert scene.render_layers().overlay.tobytes() == original
+  finally:
+    scene.close()
+
+
+def test_cached_hud_never_retains_expired_data_or_waiting_labels():
+  now = [10.0]
+  scene = H264Scene(ASSETS, clock=lambda: now[0])
+  try:
+    pixels = np.zeros((720, 1280, 3), np.uint8)
+    scene.set_video(pixels)
+    scene.update(_state())
+    first = scene.render_layers()
+    original = first.overlay.tobytes()
+    assert scene.render_layers().overlay is first.overlay
+    now[0] = 10.6
+    scene.set_video(pixels)
+    stale = scene.render_layers()
+    assert not scene.last_status["state_fresh"] and scene.last_status["video_fresh"]
+    assert stale.overlay is not first.overlay and stale.overlay.tobytes() != original
+    assert first.overlay.tobytes() == original
+    scene.update(_state())
+    restored = scene.render_layers()
+    assert restored.overlay.tobytes() == original
+    assert scene.last_status["state_fresh"]
+    now[0] = 11.2
+    scene.update(_state())
+    expired_camera = scene.render_layers()
+    assert expired_camera.camera is None and expired_camera.overlay is not restored.overlay
+    assert expired_camera.overlay.getpixel((900, 250))[3] == 255
+  finally:
+    scene.close()
 
 
 @pytest.mark.parametrize("raw_size,decoded_size", [((1344, 760), (1280, 720)), ((1600, 1200), (960, 720))])

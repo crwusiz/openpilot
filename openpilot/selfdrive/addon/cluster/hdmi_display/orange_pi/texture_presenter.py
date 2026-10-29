@@ -289,7 +289,7 @@ class TexturePresenter:
 
   def present_layers(self, overlay_surface, camera_surface=None, camera_rect=None,
                      camera_uv=(0.0, 0.0, 1.0, 1.0), controls=None, rotate_180=False, *, path_surface=None,
-                     camera_token=None, path_token=None):
+                     camera_token=None, path_token=None, overlay_token=None):
     """Upload raw camera and RGBA HUD separately; let SDL's GPU compose them.
 
     UV bounds retain the original sensor's fractional crop in the scaled H264
@@ -302,7 +302,7 @@ class TexturePresenter:
     if not self.can_present_layers:
       raise RuntimeError("SDL GPU camera layers are unavailable")
     started = time.monotonic()
-    upload_bytes = camera_skipped = path_skipped = 0
+    upload_bytes = camera_skipped = path_skipped = overlay_skipped = 0
     if controls is None or not controls.screen_off:
       size = tuple(overlay_surface.get_size())
       if camera_surface is not None or path_surface is not None:
@@ -326,7 +326,9 @@ class TexturePresenter:
         path_skipped = int(size_bytes == 0)
       else:
         self._layers.forget_source("path")
-      upload_bytes += self._layers.upload("overlay", overlay_surface, alpha=True)
+      size_bytes = self._layers.upload("overlay", overlay_surface, alpha=True, source_token=overlay_token)
+      upload_bytes += size_bytes
+      overlay_skipped = int(size_bytes == 0)
       self._frame_size = size
       self._layered_frame = (camera_surface is not None, camera_rect, tuple(camera_uv), bool(rotate_180), path_surface is not None)
       self._has_frame = True
@@ -335,7 +337,8 @@ class TexturePresenter:
     uploaded_at = time.monotonic()
     result = self.redraw(controls)
     result.update(convert=0.0, upload=uploaded_at - started, draw=result["blit"])
-    result.update(upload_bytes=upload_bytes, camera_upload_skipped=camera_skipped, path_upload_skipped=path_skipped)
+    result.update(upload_bytes=upload_bytes, camera_upload_skipped=camera_skipped, path_upload_skipped=path_skipped,
+                  overlay_upload_skipped=overlay_skipped)
     result["blit"] += uploaded_at - started
     return result
 

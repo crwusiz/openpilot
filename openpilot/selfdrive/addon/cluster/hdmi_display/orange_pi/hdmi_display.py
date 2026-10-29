@@ -111,6 +111,7 @@ class HdmiDisplay:
     self.last_frame_presented = False
     self._latest_frame = None
     self._latest_layers = None
+    self._overlay_cache = None
     self._waiting_requested = False
     self._controls_revision = None
     self._menu_surface = None
@@ -272,6 +273,7 @@ class HdmiDisplay:
     presenter = self._presenter
     self._presenter = None
     self.screen = None
+    self._overlay_cache = None
     reason = str(error)
     # A failed update's traceback can retain the Texture wrapper. Release
     # those frames before destroying the renderer and its native window.
@@ -364,6 +366,7 @@ class HdmiDisplay:
       self.show_waiting()
 
   def _draw_black(self):
+    self._overlay_cache = None
     if self._presenter is not None:
       try:
         self._presenter.clear()
@@ -377,6 +380,7 @@ class HdmiDisplay:
   def send_rgb(self, image):
     """Present the locally composed H.264 camera and HUD image."""
     self.last_frame_presented = False
+    self._overlay_cache = None
     if self.close_requested:
       return False
     if not self.connected and not self.open():
@@ -426,6 +430,7 @@ class HdmiDisplay:
     self._waiting_requested = False
     if self.controls.screen_off:
       self._latest_frame = self._latest_layers = None
+      self._overlay_cache = None
       if self._controls_revision != self.controls.revision:
         self._draw_black()
       self.last_frame_timings = dict.fromkeys(("decode", "rgb_surface", "convert", "upload", "draw", "flip"), 0.0)
@@ -434,7 +439,12 @@ class HdmiDisplay:
       if not self.can_present_layers:
         return self.send_rgb(layers.to_image())
       started = time.monotonic()
-      overlay = self._pygame.image.frombuffer(layers.overlay.tobytes(), layers.overlay.size, "RGBA")
+      overlay_token = getattr(layers, "overlay_token", None)
+      if overlay_token is not None and self._overlay_cache is not None and self._overlay_cache[0] is overlay_token:
+        overlay = self._overlay_cache[1]
+      else:
+        overlay = self._pygame.image.frombuffer(layers.overlay.tobytes(), layers.overlay.size, "RGBA")
+        self._overlay_cache = (overlay_token, overlay) if overlay_token is not None else None
       camera = None
       path = None
       if layers.camera is not None:
@@ -446,7 +456,7 @@ class HdmiDisplay:
       converted_at = time.monotonic()
       timings = self._presenter.present_layers(overlay, camera, layers.camera_rect, layers.camera_uv,
                                                self.controls, rotate_180=layers.rotate_180, path_surface=path,
-                                               camera_token=layers.camera, path_token=layers.path)
+                                               camera_token=layers.camera, path_token=layers.path, overlay_token=overlay_token)
       timings["rgb_surface"] = converted_at - started
       timings["decode"] = 0.0
       self.last_frame_timings = timings
@@ -570,6 +580,7 @@ class HdmiDisplay:
 
   def show_waiting(self):
     """Replace an unavailable C4 image with a local, correctly rotated status."""
+    self._overlay_cache = None
     if self.screen is None or self.close_requested:
       return False
     self.last_frame_presented = False
@@ -592,6 +603,7 @@ class HdmiDisplay:
 
   def clear(self):
     """Remove the last driving frame when the connection becomes unavailable."""
+    self._overlay_cache = None
     if self.screen is not None:
       if self._presenter is not None:
         self._presenter.clear()
@@ -612,6 +624,7 @@ class HdmiDisplay:
     self._showing_waiting = False
     self._latest_frame = None
     self._latest_layers = None
+    self._overlay_cache = None
     self._waiting_requested = False
     self._menu_surface = self._menu_rotated = None
     self.last_frame_presented = False

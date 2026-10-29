@@ -206,7 +206,8 @@ def test_camera_gap_and_gpu_upload_savings_are_logged_per_window(monkeypatch, ca
 
   def update(tick, now):
     receiver.record_display(now - 0.02, now - 0.01, now, video_received_at=now - 0.03 if tick % 3 == 0 else None,
-                            display_timings={"upload_bytes": 1000, "path_upload_skipped": 1, "camera_upload_skipped": 0})
+                            display_timings={"upload_bytes": 1000, "path_upload_skipped": 1, "camera_upload_skipped": 0,
+                                             "overlay_upload_skipped": 1})
 
   with caplog.at_level(logging.INFO, logger="cluster_receiver"):
     feedbacks = run_feedback_ticks(monkeypatch, receiver, 20, update)
@@ -216,6 +217,7 @@ def test_camera_gap_and_gpu_upload_savings_are_logged_per_window(monkeypatch, ca
   assert all("camera_display_gap_max=3000.0ms" in message for message in messages)
   assert all("hdmi_upload_kbps=8.0" in message and "hdmi_path_reused=10" in message for message in messages)
   assert all("hdmi_camera_reused=0" in message for message in messages)
+  assert all("hdmi_overlay_reused=10" in message for message in messages)
 
 
 def test_close_cancels_pending_answer_and_closes_peer_without_waiting_for_negotiation_timeout(fake_aiortc):
@@ -418,37 +420,65 @@ def test_decoder_warning_requests_idr_before_the_periodic_fps_report(monkeypatch
     pi_sock.close()
 
 
-def test_decoder_recovery_coalesces_warning_bursts_and_limits_idr_requests(monkeypatch):
+def test_decoder_recovery_coalesces_warning_bursts_and_limits_idr_requests():
   receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
-  now, sent, delays = [10.0], [], []
+  receiver.decoder_errors = 1
+  sent = [receiver._take_recovery_request(10.0)]
+  receiver.decoder_errors += 5
+  assert receiver._take_recovery_request(10.1) is None
+  assert receiver._take_recovery_request(10.49) is None
+  sent.append(receiver._take_recovery_request(10.5))
+  assert receiver._take_recovery_request(11.0) is None
+  assert [payload["decoder_errors"] for payload in sent] == [1, 6]
+  assert all(payload["recovery_reason"] == "decoder_error" for payload in sent)
 
-  async def pause(delay):
-    delays.append(delay)
-    now[0] += delay
 
-  async def send(kind, payload):
-    assert kind == FEEDBACK
-    sent.append((now[0], payload))
-    if len(sent) == 1:
-      receiver.decoder_errors += 5
-      receiver._recovery_event.set()
-    else:
-      raise asyncio.CancelledError
+def test_silent_video_stall_requests_idr_before_the_periodic_fps_report(monkeypatch, fake_aiortc, caplog):
+  monkeypatch.setattr(h264_receiver, "FEEDBACK_INTERVAL", 30.0)
+  c4_sock, pi_sock = socket.socketpair()
+  c4_sock.settimeout(1.0)
+  receiver = h264_receiver.H264Receiver(pi_sock, HELLO_DATA)
+  try:
+    with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+      receiver.start()
+      assert read_control(c4_sock)[0] == OFFER
+      c4_sock.sendall(pack_control(ANSWER, {"type": "answer", "sdp": "v=0\r\n"}))
+      wait_until(lambda: receiver.received_frames == 1)
+      kind, _, payload = read_control(c4_sock)
+    assert kind == FEEDBACK and payload["keyframe_request"] is True
+    assert payload["recovery_reason"] == "video_stale" and payload["decoder_errors"] == 0
+    assert 500 <= payload["video_age_ms"] < 900
+    assert "display_fps" not in payload
+    assert "reason=video_stale" in caplog.text
+  finally:
+    receiver.close()
+    c4_sock.close()
+    pi_sock.close()
 
-  async def run():
-    receiver._recovery_event = asyncio.Event()
-    receiver._recovery_event.set()
-    receiver.decoder_errors = 1
-    with pytest.raises(asyncio.CancelledError):
-      await receiver._recover_video()
 
-  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
-  monkeypatch.setattr(h264_receiver, "asyncio", SimpleNamespace(sleep=pause))
-  monkeypatch.setattr(receiver, "_send_control", send)
-  asyncio.run(run())
-  assert delays == [h264_receiver.RECOVERY_INTERVAL]
-  assert [payload["decoder_errors"] for _, payload in sent] == [1, 6]
-  assert sent[1][0] - sent[0][0] == pytest.approx(h264_receiver.RECOVERY_INTERVAL)
+def test_video_recovery_uses_original_arrival_and_does_not_spam_startup_or_healthy_video():
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  assert receiver._take_recovery_request(10.49, started=10.0) is None
+  startup = receiver._take_recovery_request(10.5, started=10.0)
+  assert startup["recovery_reason"] == "video_startup" and startup["video_age_ms"] is None
+  assert receiver._take_recovery_request(10.9, started=10.0) is None
+  receiver.publish_rgb("fresh", received_at=10.9)
+  assert receiver._take_recovery_request(11.0, started=10.0) is None
+  receiver.screen_off = True
+  stale = receiver._take_recovery_request(11.5, started=10.0)
+  assert stale["recovery_reason"] == "video_stale" and stale["screen_off"] is True
+  receiver.publish_rgb("recovered", received_at=11.6)
+  assert receiver._take_recovery_request(12.0, started=10.0) is None
+
+
+def test_fast_recovery_and_regular_feedback_share_one_cooldown(monkeypatch):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  receiver.last_video_at = 0.1
+  receiver.decoder_errors = 1
+  assert receiver._take_recovery_request(0.9)["recovery_reason"] == "decoder_error"
+  feedbacks = run_feedback_ticks(monkeypatch, receiver, 2, lambda *_args: None)
+  assert not feedbacks[0]["keyframe_request"]
+  assert feedbacks[1]["keyframe_request"] and feedbacks[1]["recovery_reason"] == "video_stale"
 
 
 def run_feedback_ticks(monkeypatch, receiver, tick_count, update):
