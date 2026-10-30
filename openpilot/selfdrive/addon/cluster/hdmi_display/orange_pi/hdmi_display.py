@@ -449,7 +449,8 @@ class HdmiDisplay:
       path = None
       if layers.camera is not None:
         height, width = layers.camera.shape[:2]
-        camera = self._pygame.image.frombuffer(layers.camera, (width, height), "RGB")
+        camera_mode = "RGBA" if layers.camera.shape[2] == 4 else "RGB"
+        camera = self._pygame.image.frombuffer(layers.camera, (width, height), camera_mode)
       if layers.path is not None:
         height, width = layers.path.shape[:2]
         path = self._pygame.image.frombuffer(layers.path, (width, height), "RGBA")

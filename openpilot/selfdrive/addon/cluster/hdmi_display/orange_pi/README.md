@@ -590,6 +590,45 @@ modeld를 재시작하는 경로가 있지만, 이 cluster 로그만으로 해�
 **C4 업데이트 후 Pi Update도 실행**합니다. 실제 FPS·정지 개선 폭은 다음 주행 로그로
 확인해야 하며, 복구 요청을 앞당기는 것만으로 RTP 손실 자체가 없어지는 것은 아닙니다.
 
+### 2026-10-30 Pi 카메라 업로드·UDP 수신 버스트 보완
+
+10/30 두 쌍의 로그는 전날 변경이 적용된 서로 다른 부팅입니다. Pi 서비스 재시작,
+영상 재접속, 상태 값 직렬화 실패는 기록되지 않았습니다. 수집된 Pi 성능 표본은 다음과 같습니다.
+
+| 업로드 시각 | 수신 / 실제 카메라 표시 FPS | 합성 / 출력 평균 | 최대 카메라 표시 공백 |
+| --- | --- | --- | --- |
+| 14:47 | 19.28 / 17.74 | 9.87 / 11.57ms | 0.78초 |
+| 18:19 | 19.03 / 17.91 | 9.60 / 11.51ms | 1.05초 |
+
+동일 HUD 재사용은 각각20,295 / 18,742회였고, 도로가 계속 필요한 표본의 차선 표시율은
+99.88 / 99.83%였습니다. CPU 전체 평균은 약18.8~18.9%, 최고 CPU 온도는60.7 / 57.8°C입니다.
+C4는20FPS·약5Mbps를 유지했고 modeldLagging·commIssue 기록은 없었습니다.
+영상 디코딩 오류는 각각161 / 193회 남았습니다. 수신 후 RGB 대체도2,170 / 1,464회여서
+출력 스레드의 여유와 패킷 수신을 함께 보완합니다. 이 수치는 중복 journal을 제거한 표본 기준입니다.
+
+- Pi 카메라 작업 스레드에서 기존 RGB 대비 LUT를 적용한 뒤 **불투명 RGBA32**까지 준비합니다.
+  [사용 중인 SDL GLES2의 기본 RGB 텍스처 형식](https://github.com/libsdl-org/SDL/blob/release-2.32.10/src/render/opengles2/SDL_render_gles2.c)은
+  32비트이며, RGB24 요청은 [SDL 내부 형식 변환](https://github.com/libsdl-org/SDL/blob/release-2.32.10/src/render/SDL_render.c)을
+  거칠 수 있습니다. 이를 매번 SDL 출력 스레드에서 처리하지 않도록 옮깁니다.
+  픽셀·크롭·투영·해상도·대비는 유지하고 낮은 대비에서도 alpha는255입니다.
+  `CLUSTER_HDMI_CAMERA_UPLOAD source_depth=32 ... packed_32=1`로 적용 여부를 확인합니다.
+  원본 업로드 바이트는 RGB24보다 커질 수 있지만, 네트워크 전송량 증가나 화질 변경은 아닙니다.
+- 수신기 전용 asyncio 루프가 생성한 ICE/WebRTC UDP 소켓의 `SO_RCVBUF`만 **최대1MiB 요청**으로
+  설정합니다. 기존 Linux `rmem_max`를 넘지 않고 이미 더 큰 소켓 버퍼는 줄이지 않습니다.
+  시스템 sysctl·TCP 버퍼·aiortc의 내부 jitter buffer·C4 인코더 설정은 변경하지 않습니다.
+  [Linux는 버퍼 관리 공간 때문에 요청값의 두 배를 반환](https://man7.org/linux/man-pages/man7/socket.7.html)하므로
+  `CLUSTER_H264_UDP_BUFFER before/requested/actual/kernel_max`를 함께 봅니다.
+  설정 실패 시 기존 소켓을 유지하고 Python3.10은 기존 루프로 실행합니다.
+  현재 Pi Python3.14에서는 전용 루프가 적용되며 새 패키지는 필요 없습니다.
+- Pi 로그 수집에 IPv4/IPv6 UDP의 `InErrors`, `RcvbufErrors`, `SndbufErrors`와 수신 버퍼 기본값·상한을
+  추가합니다. 모두 **부팅 이후 Pi 전체 누적값**이며 해당 주행이나 수신기만의 드롭 수는 아닙니다.
+  새 UDP 버퍼·카메라 업로드 설정 로그도 시작 정보에 따로 보존합니다.
+
+오늘 로그에는 기존 UDP 소켓 버퍼와 UDP 드롭 카운터가 없어, 소켓 버퍼 부족을 원인으로 확정하지
+않습니다. 새 로그로 버퍼 적용 크기·UDP 오류·RTP 손실·디코더 오류·표시 FPS를 함께 비교합니다.
+기존20FPS·5Mbps·GOP5와 영상 복구 제한은 유지합니다. **C4 업데이트 후 Pi Update도 실행**해야
+Pi 출력·수신 변경이 반영되며 실제 장비 개선 폭은 다음 주행에서 확인합니다.
+
 ### 터치 팝업의 CPU·GPU 상태
 
 터치 팝업의 상태 행에는 **CPU 사용률 / CPU 온도 / GPU 사용률 / GPU 온도 / FAN / FPS**를

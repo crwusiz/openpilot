@@ -6,6 +6,7 @@ import logging
 import math
 from pathlib import Path
 import socket
+import sys
 import threading
 import time
 
@@ -30,6 +31,7 @@ FEEDBACK_INTERVAL = 1.0
 RECOVERY_INTERVAL = 0.5
 RECOVERY_POLL_INTERVAL = 0.1
 VIDEO_STALE_SECONDS = 0.5
+UDP_RECEIVE_BUFFER_BYTES = 1024 * 1024
 HUD_REFRESH_INTERVAL = 0.1
 GPU_BURST_FPS = 60
 GPU_CAMERA_GRACE_SECONDS = 0.2
@@ -40,6 +42,57 @@ PATH_COUNTER_NAMES = ("path_expected", "path_ready", "path_visible", "path_pendi
 
 class H264ConfigurationError(RuntimeError):
   retry_delay_s = 5.0
+
+
+def configure_udp_receive_buffer(transport):
+  """Give reference-picture bursts room, within the kernel's existing limit.
+
+  This uses the public asyncio transport socket, not aiortc/ICE internals.
+  Only the receiver's dedicated loop calls it; TCP and system settings stay
+  untouched. Linux reports twice the requested SO_RCVBUF for bookkeeping.
+  """
+  sock = transport.get_extra_info("socket")
+  if sock is None:
+    return
+  try:
+    before = sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
+    requested = UDP_RECEIVE_BUFFER_BYTES
+    kernel_max = None
+    linux = sys.platform.startswith("linux")
+    if linux:
+      try:
+        kernel_max = int(Path("/proc/sys/net/core/rmem_max").read_text(encoding="ascii").strip())
+        if kernel_max <= 0:
+          raise ValueError("Invalid UDP buffer limit")
+      except (OSError, ValueError, UnicodeError):
+        # Without the cap we cannot know whether setsockopt would shrink an
+        # unusually large inherited default. Keep that socket unchanged.
+        LOG.info("[CLUSTER_H264_UDP_BUFFER] before=%d | actual=%d | action=keep_default | reason=limit_unavailable", before, before)
+        return
+      requested = min(requested, kernel_max)
+    if before < requested * (2 if linux else 1):
+      sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, requested)
+    actual = sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
+    LOG.info("[CLUSTER_H264_UDP_BUFFER] before=%d | requested=%d | actual=%d | kernel_max=%s | target=%d",
+             before, requested, actual, kernel_max if kernel_max is not None else "n/a", UDP_RECEIVE_BUFFER_BYTES)
+  except OSError as error:
+    # Buffer tuning must not turn a working ICE socket into a failed session.
+    LOG.warning("[CLUSTER_H264_UDP_BUFFER] action=keep_socket | error=%s", error)
+
+
+class _ReceiverEventLoop(asyncio.SelectorEventLoop):
+  async def create_datagram_endpoint(self, *args, **kwargs):
+    transport, protocol = await super().create_datagram_endpoint(*args, **kwargs)
+    configure_udp_receive_buffer(transport)
+    return transport, protocol
+
+
+def _receiver_event_loop():
+  # On Linux this is the same selector implementation as the default loop.
+  # Keep customization local to the WebRTC worker, without a global policy.
+  loop = _ReceiverEventLoop()
+  asyncio.set_event_loop(loop)
+  return loop
 
 
 class _DecoderErrorHandler(logging.Handler):
@@ -127,7 +180,14 @@ class H264Receiver:
     decoder_handler = _DecoderErrorHandler(self)
     decoder_log.addHandler(decoder_handler)
     try:
-      asyncio.run(self._run())
+      if hasattr(asyncio, "Runner"):
+        with asyncio.Runner(loop_factory=_receiver_event_loop) as runner:
+          runner.run(self._run())
+      else:
+        # Python 3.10 receivers remain functional; Runner is available from
+        # 3.11 and the installed Orange Pi uses 3.14.
+        LOG.info("[CLUSTER_H264_UDP_BUFFER] action=keep_default | reason=legacy_asyncio")
+        asyncio.run(self._run())
     except asyncio.CancelledError:
       pass
     except Exception as error:
@@ -135,6 +195,7 @@ class H264Receiver:
         if not self.closing:
           self.error = error
     finally:
+      asyncio.set_event_loop(None)
       decoder_log.removeHandler(decoder_handler)
       decoder_handler.close()
       with self.condition:

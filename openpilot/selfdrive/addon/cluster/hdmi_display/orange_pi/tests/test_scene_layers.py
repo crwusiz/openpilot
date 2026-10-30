@@ -189,6 +189,30 @@ def test_layer_camera_cache_owns_pixels_and_rebuilds_for_contrast_and_source_cha
   assert scene._layer_pixels is None and scene.renderer is None
 
 
+@pytest.mark.parametrize("contrast", [0.5, 0.75, 1.0, 1.08, 1.5, 2.0])
+def test_camera_worker_packs_exact_rgb_contrast_with_opaque_alpha(contrast):
+  scene = H264Scene(ASSETS, clock=lambda: 10)
+  color = np.array([32, 127, 223], np.uint8)
+  source = np.empty((720, 1280, 3), np.uint8)
+  source[:] = color
+  try:
+    scene.update(_state(camera_contrast=contrast))
+    scene.set_video(source, take_ownership=True)
+    layers = scene.render_layers()
+    assert layers.camera.shape[2] == 4 and layers.camera.flags.c_contiguous
+    expected = scene._contrast_lut[color]
+    assert np.all(layers.camera[:, :, :3] == expected)
+    assert np.all(layers.camera[:, :, 3] == 255)
+    assert np.all(source == color)
+    # Even low contrast must leave the camera opaque in software fallback.
+    fallback = layers.to_image()
+    x, y, width, height = layers.camera_rect
+    assert fallback.getpixel((x + width // 2, y + height // 2)) == tuple(map(int, expected))
+    assert scene.render_layers().camera is layers.camera
+  finally:
+    scene.close()
+
+
 def test_camera_preparation_overlaps_cpu_hud_work_and_closes_its_only_worker(monkeypatch):
   scene = H264Scene(ASSETS, clock=lambda: 10)
   scene.update(_state())

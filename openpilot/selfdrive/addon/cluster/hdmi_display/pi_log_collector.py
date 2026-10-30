@@ -53,7 +53,8 @@ import subprocess
 import sys
 
 LIFECYCLE_PATTERN = r'\[CLUSTER_(?![A-Z0-9_]*PERF\])'
-STARTUP_PATTERN = r'\[CLUSTER_(RX_(BUILD|NATIVE|RUNTIME)|HDMI_RENDERER|H264_COMPOSITOR|H264_PRESENT_POLICY|PATH_PIPELINE|SCENE_WORKERS)\]'
+STARTUP_PATTERN = (r'\[CLUSTER_(RX_(BUILD|NATIVE|RUNTIME)|HDMI_(RENDERER|CAMERA_UPLOAD)|'
+                   r'H264_(COMPOSITOR|PRESENT_POLICY|UDP_BUFFER)|PATH_PIPELINE|SCENE_WORKERS)\]')
 RECORD = re.compile(r'^(\S+) (\S+) ([^\[\]:]+)(?:\[(\d+)\])?: (.*)$')
 GPU_COMMAND = re.compile(
     r'^[a-z_][a-z0-9_-]*\$? : (?:TTY=[^;\n]* ; )?PWD=/opt/cluster-receiver ; '
@@ -270,6 +271,20 @@ for counter in rx_bytes rx_packets rx_errors rx_dropped tx_bytes tx_packets tx_e
   if [ -r "/sys/class/net/wlan0/statistics/$counter" ]; then
     printf '%s=' "$counter"
     cat "/sys/class/net/wlan0/statistics/$counter"
+  fi
+done
+printf '\n--- UDP stack counters (host-wide since boot; not specific to the receiver) ---\n'
+if [ -r /proc/net/snmp ]; then
+  sed -n '/^Udp:/p' /proc/net/snmp
+fi
+if [ -r /proc/net/snmp6 ]; then
+  sed -n -E '/^Udp6(InDatagrams|NoPorts|InErrors|OutDatagrams|RcvbufErrors|SndbufErrors)[[:space:]]/p' /proc/net/snmp6
+fi
+printf '\n--- UDP receive buffer defaults and limits (bytes) ---\n'
+for field in rmem_default rmem_max; do
+  if [ -r "/proc/sys/net/core/$field" ]; then
+    printf '%s=' "$field"
+    cat "/proc/sys/net/core/$field"
   fi
 done
 """ + "python3 -c " + shlex.quote(REMOTE_JOURNAL_SCRIPT) + "\n"

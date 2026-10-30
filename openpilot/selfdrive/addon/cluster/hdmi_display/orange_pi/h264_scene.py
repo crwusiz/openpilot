@@ -250,7 +250,11 @@ class H264Scene:
       # clamp at a fractional crop boundary. No CPU camera scaling is needed.
       x0, y0 = max(0, math.floor(left) - 1), max(0, math.floor(top) - 1)
       x1, y1 = min(decoded_w, math.ceil(right) + 1), min(decoded_h, math.ceil(bottom) + 1)
-      self._layer_pixels = cv2.LUT(rgb[y0:y1, x0:x1], self._contrast_lut)
+      # GLES2 natively accepts RGBA32, not RGB24. Prepare that exact layout on
+      # the camera worker instead of SDL converting every camera upload on
+      # the presentation thread. Preserve the RGB LUT and opaque alpha even
+      # when contrast is below 1.0; no CPU camera scaling or quality change.
+      self._layer_pixels = cv2.cvtColor(cv2.LUT(rgb[y0:y1, x0:x1], self._contrast_lut), cv2.COLOR_RGB2RGBA)
       self._layer_uv = ((left - x0) / (x1 - x0), (top - y0) / (y1 - y0),
                         (right - x0) / (x1 - x0), (bottom - y0) / (y1 - y0))
       self._layer_key = key

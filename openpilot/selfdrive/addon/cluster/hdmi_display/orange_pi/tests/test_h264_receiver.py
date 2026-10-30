@@ -25,6 +25,115 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol impo
 HELLO_DATA = {"codec": "h264", "transport": "webrtc", "camera": "road", "width": 1920, "height": 480, "fps": 20}
 
 
+@pytest.mark.parametrize("before,kernel_max,requested,actual", [
+  (212992, 212992, 212992, 425984),
+  (212992, 4 * 1024 * 1024, 1024 * 1024, 2 * 1024 * 1024),
+  (2 * 1024 * 1024, 4 * 1024 * 1024, None, 2 * 1024 * 1024),
+  (500000, 212992, None, 500000),  # A lowered cap must not shrink the socket.
+])
+def test_linux_udp_receive_buffer_respects_kernel_cap_and_existing_larger_buffers(monkeypatch, caplog,
+                                                                                  before, kernel_max, requested, actual):
+  sock = Mock(getsockopt=Mock(side_effect=[before, actual]))
+  transport = Mock(get_extra_info=Mock(return_value=sock))
+  monkeypatch.setattr(h264_receiver, "sys", SimpleNamespace(platform="linux"))
+  monkeypatch.setattr(h264_receiver.Path, "read_text", lambda *_args, **_kwargs: str(kernel_max))
+  with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+    h264_receiver.configure_udp_receive_buffer(transport)
+  transport.get_extra_info.assert_called_once_with("socket")
+  if requested is None:
+    sock.setsockopt.assert_not_called()
+  else:
+    sock.setsockopt.assert_called_once_with(socket.SOL_SOCKET, socket.SO_RCVBUF, requested)
+  assert f"before={before}" in caplog.text and f"actual={actual}" in caplog.text
+  assert f"kernel_max={kernel_max}" in caplog.text
+
+
+@pytest.mark.parametrize("limit", [None, "unavailable", "-1", "0"])
+def test_unreadable_or_invalid_linux_udp_limit_keeps_socket_usable(monkeypatch, caplog, limit):
+  sock = Mock(getsockopt=Mock(return_value=212992))
+  transport = Mock(get_extra_info=Mock(return_value=sock))
+  monkeypatch.setattr(h264_receiver, "sys", SimpleNamespace(platform="linux"))
+  def read(*_args, **_kwargs):
+    if limit is None:
+      raise OSError("proc unavailable")
+    return limit
+  monkeypatch.setattr(h264_receiver.Path, "read_text", read)
+  with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+    h264_receiver.configure_udp_receive_buffer(transport)
+  sock.setsockopt.assert_not_called()
+  assert "action=keep_default" in caplog.text and "reason=limit_unavailable" in caplog.text
+
+
+@pytest.mark.parametrize("before", [65536, 2 * 1024 * 1024])
+def test_non_linux_udp_buffer_uses_platform_reported_size(monkeypatch, before):
+  target = h264_receiver.UDP_RECEIVE_BUFFER_BYTES
+  sock = Mock(getsockopt=Mock(side_effect=[before, max(before, target)]))
+  monkeypatch.setattr(h264_receiver, "sys", SimpleNamespace(platform="win32"))
+  h264_receiver.configure_udp_receive_buffer(Mock(get_extra_info=Mock(return_value=sock)))
+  if before < target:
+    sock.setsockopt.assert_called_once_with(socket.SOL_SOCKET, socket.SO_RCVBUF, target)
+  else:
+    sock.setsockopt.assert_not_called()
+
+
+def test_udp_buffer_failure_does_not_close_the_transport(monkeypatch, caplog):
+  sock = Mock(getsockopt=Mock(return_value=65536), setsockopt=Mock(side_effect=OSError("not permitted")))
+  transport = Mock(get_extra_info=Mock(return_value=sock))
+  monkeypatch.setattr(h264_receiver, "sys", SimpleNamespace(platform="win32"))
+  h264_receiver.configure_udp_receive_buffer(transport)
+  transport.close.assert_not_called()
+  sock.close.assert_not_called()
+  assert "action=keep_socket" in caplog.text and "not permitted" in caplog.text
+  h264_receiver.configure_udp_receive_buffer(Mock(get_extra_info=Mock(return_value=None)))
+
+
+def test_receiver_loop_tunes_its_udp_only_and_still_delivers_datagrams(caplog):
+  control = Mock()
+  receiver = h264_receiver.H264Receiver(control, HELLO_DATA)
+  loops = []
+  async def run():
+    loop = asyncio.get_running_loop()
+    loops.append(loop)
+    received = loop.create_future()
+    class Protocol(asyncio.DatagramProtocol):
+      def datagram_received(self, data, address):
+        received.set_result(data)
+    transport, _protocol = await loop.create_datagram_endpoint(Protocol, local_addr=("127.0.0.1", 0))
+    sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+      sender.sendto(b"H264 packet", transport.get_extra_info("sockname"))
+      assert await asyncio.wait_for(received, 1.0) == b"H264 packet"
+    finally:
+      sender.close()
+      transport.close()
+      await asyncio.sleep(0)
+  receiver._run = run
+  with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+    receiver._run_thread()
+  assert receiver.done and receiver.error is None
+  assert isinstance(loops[0], h264_receiver._ReceiverEventLoop) and loops[0].is_closed()
+  assert "[CLUSTER_H264_UDP_BUFFER]" in caplog.text
+  control.getsockopt.assert_not_called()
+  control.setsockopt.assert_not_called()
+  default = asyncio.new_event_loop()
+  try:
+    assert not isinstance(default, h264_receiver._ReceiverEventLoop)
+  finally:
+    default.close()
+
+
+def test_legacy_asyncio_still_runs_receiver_without_changing_global_policy(monkeypatch, caplog):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  receiver._run = AsyncMock()
+  monkeypatch.setattr(h264_receiver, "asyncio", SimpleNamespace(run=asyncio.run, set_event_loop=asyncio.set_event_loop,
+                                                             CancelledError=asyncio.CancelledError))
+  with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+    receiver._run_thread()
+  receiver._run.assert_awaited_once()
+  assert receiver.done and receiver.error is None
+  assert "reason=legacy_asyncio" in caplog.text
+
+
 def read_control(sock):
   kind, sequence, size = unpack_control_header(recv_exact(sock, CONTROL_HEADER.size))
   return kind, sequence, decode_payload(recv_exact(sock, size))

@@ -492,7 +492,7 @@ def test_unsupported_premultiplied_blend_can_disable_layers_and_keep_fullframe(r
 
 @pytest.mark.parametrize("scene_rotation", [False, True])
 @pytest.mark.parametrize("async_path", [False, True])
-def test_accelerated_real_scene_layers_match_retained_software_fallback(accelerated_pygame, scene_rotation, async_path):
+def test_accelerated_real_scene_layers_match_retained_software_fallback(accelerated_pygame, scene_rotation, async_path, caplog):
   from pathlib import Path
   import numpy as np
   from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_scene import H264Scene
@@ -532,10 +532,12 @@ def test_accelerated_real_scene_layers_match_retained_software_fallback(accelera
       layers = scene.render_layers()
     assert layers.path is not None and np.count_nonzero(layers.path[:, :, 3]) > 1000
     overlay = pygame.image.frombuffer(layers.overlay.tobytes(), layers.overlay.size, "RGBA")
-    camera = pygame.image.frombuffer(layers.camera, layers.camera.shape[1::-1], "RGB")
+    camera = pygame.image.frombuffer(layers.camera, layers.camera.shape[1::-1], "RGBA")
     path = pygame.image.frombuffer(layers.path, layers.path.shape[1::-1], "RGBA")
-    presenter.present_layers(overlay, camera, layers.camera_rect, layers.camera_uv,
-                             rotate_180=layers.rotate_180, path_surface=path)
+    with caplog.at_level("INFO", logger="cluster_receiver.hdmi"):
+      presenter.present_layers(overlay, camera, layers.camera_rect, layers.camera_uv,
+                               rotate_180=layers.rotate_180, path_surface=path)
+    assert "[CLUSTER_HDMI_CAMERA_UPLOAD] source_depth=32" in caplog.text and "packed_32=1" in caplog.text
     actual = pygame.surfarray.array3d(presenter.renderer.to_surface()).transpose(1, 0, 2)
     expected = np.asarray(layers.to_image())
     difference = np.abs(actual.astype(np.int16) - expected.astype(np.int16))

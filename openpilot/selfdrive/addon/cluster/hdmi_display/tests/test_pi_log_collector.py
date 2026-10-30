@@ -284,6 +284,43 @@ def remote_journal():
   return SimpleNamespace(**namespace)
 
 
+@pytest.mark.parametrize("tag", ["CLUSTER_H264_UDP_BUFFER", "CLUSTER_HDMI_CAMERA_UPLOAD"])
+def test_udp_and_camera_layout_survive_the_reserved_startup_filter(remote_journal, tag):
+  assert re.search(remote_journal.STARTUP_PATTERN, f"[{tag}] requested=1048576")
+
+
+@pytest.mark.parametrize("available", [False, True])
+def test_udp_snapshot_reads_stack_errors_and_limits_without_host_addresses(tmp_path, available):
+  bash = Path("C:/Program Files/Git/bin/bash.exe") if os.name == "nt" else Path("/bin/bash")
+  if not bash.is_file():
+    pytest.skip("Bash is unavailable")
+  if available:
+    (tmp_path / "net").mkdir()
+    (tmp_path / "net/snmp").write_text("Ip: InReceives\nIp: 99\n"
+                                       + "Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors\n"
+                                       + "Udp: 100 0 7 80 5 0\n", encoding="ascii")
+    (tmp_path / "net/snmp6").write_text("Ip6InReceives 77\nUdp6InDatagrams 22\nUdp6RcvbufErrors 3\n"
+                                        + "Udp6SndbufErrors 1\n", encoding="ascii")
+    core = tmp_path / "sys/net/core"
+    core.mkdir(parents=True)
+    (core / "rmem_default").write_text("212992\n", encoding="ascii")
+    (core / "rmem_max").write_text("4194304\n", encoding="ascii")
+  script = collector.REMOTE_SCRIPT
+  begin = script.index("printf '\\n--- UDP stack counters")
+  end = script.index("python3 -c", begin)
+  fragment = script[begin:end].replace("/proc/net/snmp6", '"$CLUSTER_TEST_PROC/net/snmp6"')
+  fragment = fragment.replace("/proc/net/snmp", '"$CLUSTER_TEST_PROC/net/snmp"')
+  fragment = fragment.replace("/proc/sys/net/core", "$CLUSTER_TEST_PROC/sys/net/core")
+  result = subprocess.run([str(bash), "-c", fragment], capture_output=True, text=True, encoding="utf-8", timeout=5,
+                          env={**os.environ, "CLUSTER_TEST_PROC": tmp_path.as_posix()})
+  assert result.returncode == 0 and not result.stderr
+  assert "host-wide since boot" in result.stdout
+  if available:
+    assert "Udp: 100 0 7 80 5 0" in result.stdout and "Udp6RcvbufErrors 3" in result.stdout
+    assert "rmem_default=212992" in result.stdout and "rmem_max=4194304" in result.stdout
+    assert "Ip:" not in result.stdout and "Ip6InReceives" not in result.stdout
+
+
 def journal_line(message, *, second=0, pid=123, source="python3"):
   return f"2026-10-26T09:02:{second:02d}+00:00 pi {source}[{pid}]: {message}"
 

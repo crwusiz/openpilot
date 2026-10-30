@@ -96,6 +96,9 @@ class _LayerTextures:
       self.textures[name] = key, texture
       self._check(self.sdl.SDL_SetTextureBlendMode(texture, blend))
       self._check(self.sdl.SDL_SetTextureScaleMode(texture, 1))  # SDL_ScaleModeLinear
+      if name == "camera":
+        LOG.info("[CLUSTER_HDMI_CAMERA_UPLOAD] source_depth=%d | pixel_format=%d | size=%dx%d | packed_32=%d",
+                 format_key[0], pixel_format, *size, int(format_key[0] == 32))
     else:
       texture = current[1]
     # Keep the exported pixel buffer alive through the synchronous texture
