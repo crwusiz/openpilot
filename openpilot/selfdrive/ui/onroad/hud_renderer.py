@@ -199,7 +199,6 @@ class HudRenderer(Widget):
       self.speed = 0.0
       return
 
-    controls_state = sm['controlsState']
     car_state = sm['carState']
     car_control = sm['carControl']
     car_params = sm['carParams']
@@ -211,10 +210,8 @@ class HudRenderer(Widget):
     selfdrive_state = sm['selfdriveState']
 
     # Cruise speed
-    v_cruise_cluster = car_state.vCruiseCluster
-    self.cruise_speed = v_cruise_cluster if v_cruise_cluster > 0 else controls_state.deprecated.vCruise
     self.apply_speed = car_state.vCruise
-    self.set_speed = self.cruise_speed
+    self.set_speed = car_state.vCruiseCluster
     self.is_cruise_set = 0 < self.set_speed < SET_SPEED_NA
     self.is_cruise_available = self.set_speed != -1
 

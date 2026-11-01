@@ -47,7 +47,6 @@ Quick start: `bash <(curl -fsSL openpilot.comma.ai)`
 
 openpilot by crwusiz branch
 ------
- * version 0.10.4 [ only comma4 ]
  * event message, raylib ui kor translate ( language select )
  * brake, gps, wifi icon and wheel, N direction icon rotate, traffic signal
  * add community toggle / function / simple ui

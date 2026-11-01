@@ -434,7 +434,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.noGps: {},
   EventName.stockFcw: {},
-  EventName.actuatorsApiUnavailable: {},
 
   # ********** events only containing alerts displayed in all states **********
 
@@ -699,12 +698,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.SOFT_DISABLE: soft_disable_alert("locationd 일시적 오류"),
   },
 
-  EventName.locationdPermanentError: {
-    ET.NO_ENTRY: NoEntryAlert("locationd 오류"),
-    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("locationd 오류"),
-    ET.PERMANENT: NormalPermanentAlert("locationd 오류"),
-  },
-
   # openpilot tries to learn certain parameters about your car by observing
   # how the car behaves to steering inputs from both human and openpilot driving.
   # This includes:
@@ -716,12 +709,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   EventName.paramsdTemporaryError: {
     ET.NO_ENTRY: paramsd_invalid_alert,
     ET.SOFT_DISABLE: soft_disable_alert("paramsd 일시적 오류"),
-  },
-
-  EventName.paramsdPermanentError: {
-    ET.NO_ENTRY: NoEntryAlert("paramsd 오류"),
-    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("paramsd 오류"),
-    ET.PERMANENT: NormalPermanentAlert("paramsd 오류"),
   },
 
   # ********** events that affect controls state transitions **********

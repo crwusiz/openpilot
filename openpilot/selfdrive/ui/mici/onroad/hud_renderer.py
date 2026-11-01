@@ -160,15 +160,12 @@ class HudRenderer(Widget):
       self.ignore_limit_timer = 0.0
       return
 
-    controls_state = sm['controlsState']
     car_state = sm['carState']
     navi_data = sm['naviData']
     longitudinal_plan = sm['longitudinalPlan']
 
-    v_cruise_cluster = car_state.vCruiseCluster
-    self.cruise_speed = v_cruise_cluster if v_cruise_cluster > 0 else controls_state.deprecated.vCruise
+    set_speed = car_state.vCruiseCluster
     self.apply_speed = car_state.vCruise
-    set_speed = self.cruise_speed
 
     engaged = sm['selfdriveState'].enabled
     if (set_speed != self.set_speed and engaged) or (engaged and not self._engaged):

@@ -51,6 +51,9 @@ class LeadVehicle:
 
 
 class ModelRenderer(Widget):
+  LANE_LINE_WIDTHS = (0.025, 0.025, 0.025, 0.025)
+  ROAD_EDGE_WIDTH = 0.025
+
   def __init__(self):
     super().__init__()
     self._longitudinal_control = False
@@ -99,6 +102,9 @@ class ModelRenderer(Widget):
   def set_transform(self, transform: np.ndarray):
     self._car_space_transform = transform.astype(np.float32)
     self._transform_dirty = True
+
+  def _draw_offset(self) -> np.ndarray:
+    return np.zeros(2, dtype=np.float32)
 
   def _render(self, rect: rl.Rectangle):
     sm = ui_state.sm
@@ -228,21 +234,21 @@ class ModelRenderer(Widget):
     # Update lane lines using raw points
     for i, lane_line in enumerate(self._lane_lines):
       lane_line.projected_points = self._map_line_to_polygon(
-        lane_line.raw_points, 0.025 * self._lane_line_probs[i], 0.0, max_idx, max_distance
+        lane_line.raw_points, self.LANE_LINE_WIDTHS[i] * self._lane_line_probs[i], 0.0, max_idx, max_distance
       )
 
     # Update lane barriers for blindspot visualization (using lane lines 1 and 2)
     if self._left_blindspot or self._right_blindspot:
       self._lane_barriers[0].projected_points = self._map_line_to_polygon(
-        self._lane_lines[1].raw_points, 0.025, 0.0, max_idx, max_distance
+        self._lane_lines[1].raw_points, self.LANE_LINE_WIDTHS[i], 0.0, max_idx, max_distance
       )
       self._lane_barriers[1].projected_points = self._map_line_to_polygon(
-        self._lane_lines[2].raw_points, 0.025, 0.0, max_idx, max_distance
+        self._lane_lines[2].raw_points, self.LANE_LINE_WIDTHS[i], 0.0, max_idx, max_distance
       )
 
     # Update road edges using raw points
     for road_edge in self._road_edges:
-      road_edge.projected_points = self._map_line_to_polygon(road_edge.raw_points, 0.025, 0.0, max_idx, max_distance)
+      road_edge.projected_points = self._map_line_to_polygon(road_edge.raw_points, self.ROAD_EDGE_WIDTH, 0.0, max_idx, max_distance)
 
     # Update path using raw points
     if lead and lead.present:
@@ -257,7 +263,8 @@ class ModelRenderer(Widget):
     self._update_path_gradient()
 
   def _update_path_gradient(self):
-    max_len = min(len(self._path.projected_points) // 2, len(self._acceleration_x))
+    path_pts = self._path.projected_points + self._draw_offset()
+    max_len = min(len(path_pts) // 2, len(self._acceleration_x))
 
     segment_colors = []
     gradient_stops = []
@@ -265,7 +272,7 @@ class ModelRenderer(Widget):
     i = 0
     while i < max_len:
       # Some points (screen space) are out of frame (rect space)
-      track_y = self._path.projected_points[i][1]
+      track_y = path_pts[i][1]
       if track_y < self._rect.y or track_y > (self._rect.y + self._rect.height):
         i += 1
         continue
