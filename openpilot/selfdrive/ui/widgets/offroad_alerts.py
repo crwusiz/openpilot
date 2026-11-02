@@ -1,4 +1,4 @@
-import pyray as rl
+import raylib_nb as rl
 from enum import IntEnum
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -253,6 +253,8 @@ class OffroadAlert(AbstractAlert):
   def _build_alerts(self):
     self.sorted_alerts = []
     for key, config in sorted(OFFROAD_ALERTS.items(), key=lambda x: x[1].get("severity", 0), reverse=True):
+      if key == "Offroad_Pairing":
+        continue
       severity = config.get("severity", 0)
       alert_data = AlertData(key=key, text="", severity=severity)
       self.sorted_alerts.append(alert_data)

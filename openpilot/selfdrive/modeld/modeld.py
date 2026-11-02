@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 import base64
 import ctypes
 import gc
@@ -200,7 +200,7 @@ class ModelState:
   def slice_outputs(self, model_outputs: np.ndarray, output_slices: dict[str, slice]) -> dict[str, np.ndarray]:
     return {k: model_outputs[np.newaxis, v] for k,v in output_slices.items()}
 
-  def run(self, bufs: dict[str, VisionBuf], transforms: dict[str, np.ndarray],
+  def run(self, bufs: Mapping[str, VisionBuf | np.ndarray], transforms: dict[str, np.ndarray],
           inputs: dict[str, np.ndarray], after_enqueue: Callable[[], None] | None = None) -> dict[str, np.ndarray]:
     for i, key in enumerate(self.vision_input_names):
       np.copyto(self.frames[i], np.frombuffer(bufs[key].data, dtype=np.uint8, count=self.frame_copy_size))
@@ -273,7 +273,9 @@ def main(demo=False):
   while use_extra_client and not vipc_client_extra.connect(False):
     time.sleep(0.1)
 
-  cloudlog.warning(f"connected main cam with buffer size: {vipc_client_main.buffer_len} ({vipc_client_main.width} x {vipc_client_main.height})")
+  cam_w, cam_h = vipc_client_main.width, vipc_client_main.height
+  assert cam_w is not None and cam_h is not None
+  cloudlog.warning(f"connected main cam with buffer size: {vipc_client_main.buffer_len} ({cam_w} x {cam_h})")
   if use_extra_client:
     cloudlog.warning(f"connected extra cam with buffer size: {vipc_client_extra.buffer_len} ({vipc_client_extra.width} x {vipc_client_extra.height})")
 
@@ -281,22 +283,20 @@ def main(demo=False):
   cloudlog.warning("loading model")
   model = None
   if CHESTNUT:
-    # tinygrad Context settings are process-global. Check the deadline only after
-    # each stage returns, so its Context is restored before loading the small model.
-    stage = "USB enumeration"
-    try:
-      wait_for_chestnut()
-      stage = "initialization"
-      model = ModelState(vipc_client_main.width, vipc_client_main.height, True)
-      if time.monotonic() - st > BIG_MODEL_TIMEOUT:
-        raise TimeoutError("big model initialization timed out")
-      stage = "warmup"
-      model.warmup()
-      if time.monotonic() - st > BIG_MODEL_TIMEOUT:
-        raise TimeoutError("big model warmup timed out")
-    except Exception:
-      model = None
-      cloudlog.exception(f"big model {stage} failed, fall back to small")
+    big_model = None
+    def load_big():
+      nonlocal big_model
+      try:
+        wait_for_chestnut()
+        m = ModelState(cam_w, cam_h, True)
+        m.warmup()
+        big_model = m
+      except Exception:
+        cloudlog.exception("big model load failed")
+    loader = threading.Thread(target=load_big, daemon=True)
+    loader.start()
+    loader.join(BIG_MODEL_TIMEOUT)
+    model = big_model
     if model is None and not params.get_bool("ChestnutRetry"):
       # a crank can cut the chestnut power during the load, retry once with an onroad cycle
       cloudlog.error("big model load failed, cycling onroad to retry")
@@ -305,7 +305,7 @@ def main(demo=False):
     else:
       params.put_bool("ChestnutActive", model is not None)
 
-  small_model = ModelState(vipc_client_main.width, vipc_client_main.height, False) if model is None or CHESTNUT else None
+  small_model = ModelState(cam_w, cam_h, False) if model is None or CHESTNUT else None
   if model is None:
     model = small_model
   params.put_bool("ChestnutLoading", False)

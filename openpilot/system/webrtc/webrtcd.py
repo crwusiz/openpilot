@@ -3,6 +3,7 @@
 from abc import abstractmethod
 from collections.abc import Callable
 import os
+import socket
 import time
 import capnp
 import argparse
@@ -29,6 +30,18 @@ SESSION_TIMEOUT_SECONDS = 300
 # ice candidate parser for logging
 def _ice_candidates(sdp: str) -> list[str]:
   return [line.removeprefix("a=") for line in sdp.splitlines() if line.startswith("a=candidate:")]
+
+# socket trick: route lookup for 8.8.8.8 (nothing is sent or actually connected to)
+# return the source interfaces IP which is the default interface of the device
+def _default_route_ip() -> str | None:
+  s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  try:
+    s.connect(("8.8.8.8", 53))  # selects a route, sends nothing
+    return s.getsockname()[0]
+  except OSError:
+    return None
+  finally:
+    s.close()
 
 class AsyncTaskRunner:
   def __init__(self):
@@ -235,8 +248,7 @@ class StreamSession:
 
     self.identifier = str(uuid.uuid4())
     self.params = Params()
-    # Let ICE consider Wi-Fi even when cellular is the default route.
-    builder = WebRTCAnswerBuilder(body.sdp)
+    builder = WebRTCAnswerBuilder(body.sdp, bind_address=_default_route_ip())
 
     self.enabled = body.enabled
     self.video_tracks = []
@@ -466,11 +478,15 @@ async def handle_get_stream(state: ServerState, raw_body: bytes, content_type: s
           answer_candidates=_ice_candidates(answer.sdp),
         )
       except TimeoutError:
+        await session.stop()
+        stream_dict.pop(session.identifier, None)
         logging.getLogger("webrtcd").exception("Timed out creating stream answer")
         with cloudlog.ctx(session_id=session.identifier):
           cloudlog.warning("webrtcd.session.answer_timeout")
         raise
       except Exception:
+        await session.stop()
+        stream_dict.pop(session.identifier, None)
         logging.getLogger("webrtcd").exception("Failed to create stream answer")
         with cloudlog.ctx(session_id=session.identifier):
           cloudlog.exception("webrtcd.session.answer_exception")

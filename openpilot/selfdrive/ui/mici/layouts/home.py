@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import datetime
 import math
-import time
 
 from openpilot.cereal import log
-import pyray as rl
+import raylib_nb as rl
 from collections.abc import Callable
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.layouts import HBoxLayout
@@ -15,6 +14,7 @@ from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, T
 from openpilot.selfdrive.ui.ui_state import ui_state, ChestnutState
 from openpilot.common.version import RELEASE_BRANCHES
 
+import time
 import subprocess
 import threading
 from pathlib import Path

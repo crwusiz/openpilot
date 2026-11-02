@@ -1,10 +1,11 @@
-import pyray as rl
+import raylib_nb as rl
 from openpilot.cereal import log
 from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.selfdrive.ui.mici.onroad import RIGHT_ICON_CENTER_OFFSET
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
+
+from openpilot.selfdrive.ui.mici.onroad import RIGHT_ICON_CENTER_OFFSET
 
 HIGHLIGHT_TIME = 2.5  # seconds
 

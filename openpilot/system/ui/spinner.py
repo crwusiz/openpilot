@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import pyray as rl
+import raylib_nb as rl
 import select
 import sys
 
@@ -31,7 +31,7 @@ DEGREES_PER_SECOND = 360.0  # one full rotation per second
 DARKGRAY = (55, 55, 55, 255)
 
 
-def clamp(value: int, min_value: int, max_value: int) -> int:
+def clamp(value, min_value, max_value):
   return max(min(value, max_value), min_value)
 
 

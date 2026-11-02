@@ -1,8 +1,7 @@
 import math
-import pyray as rl
+import raylib_nb as rl
 from dataclasses import dataclass
 from openpilot.common.constants import CV
-from openpilot.selfdrive.ui.mici.onroad import RIGHT_ICON_CENTER_OFFSET, left_column_rect
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus, ChestnutState
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.multilang import tr
@@ -12,6 +11,7 @@ from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.cereal import log
 
 from openpilot.selfdrive.ui import Colors, colors_alpha
+from openpilot.selfdrive.ui.mici.onroad import RIGHT_ICON_CENTER_OFFSET, left_column_rect
 
 
 EventName = log.OnroadEvent.EventName
@@ -52,7 +52,7 @@ class TurnIntent(Widget):
       dest_rect = rl.Rectangle(self._rect.x + self._rect.width, self._rect.y + self._rect.height / 2,
                                turn_intent_texture.width, turn_intent_texture.height)
 
-      origin = (turn_intent_texture.width / 2, turn_intent_texture.height / 2)
+      origin = rl.Vector2(turn_intent_texture.width / 2, turn_intent_texture.height / 2)
       color = rl.Color(255, 255, 255, int(255 * self._turn_intent_alpha_filter.x))
       rl.draw_texture_pro(turn_intent_texture, src_rect, dest_rect, origin, self._turn_intent_rotation_filter.x, color)
 

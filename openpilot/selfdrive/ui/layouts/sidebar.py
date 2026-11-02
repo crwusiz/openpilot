@@ -1,4 +1,4 @@
-import pyray as rl
+import raylib_nb as rl
 import time
 from dataclasses import dataclass
 from collections.abc import Callable
@@ -336,17 +336,18 @@ class Sidebar(Widget):
       self._panda_status.update(tr_noop("VEHICLE"), tr_noop("ONLINE"), rl.WHITE)
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
-    if rl.check_collision_point_rec(mouse_pos, SETTINGS_BTN):
+    if rl.check_collision_point_rec(rl.Vector2(mouse_pos.x, mouse_pos.y), SETTINGS_BTN):
       if self._on_settings_click:
         self._on_settings_click()
-    elif rl.check_collision_point_rec(mouse_pos, HOME_BTN) and ui_state.started:
+    elif rl.check_collision_point_rec(rl.Vector2(mouse_pos.x, mouse_pos.y), HOME_BTN) and ui_state.started:
       #if self._on_flag_click:
       #  self._on_flag_click()
       # Home button click - reset calibration and request onroad cycle
       for param in ("CalibrationParams", "LiveTorqueParameters", "LiveParameters", "LiveParametersV2", "LiveDelay"):
         self._params.remove(param)
       self._params.put_bool("OnroadCycleRequested", True)
-    elif self._recording_audio and rl.check_collision_point_rec(mouse_pos, self._mic_indicator_rect):
+    elif self._recording_audio and rl.check_collision_point_rec(rl.Vector2(mouse_pos.x, mouse_pos.y),
+                                                                  self._mic_indicator_rect):
       if self._open_settings_callback:
         self._open_settings_callback()
     elif rl.check_collision_point_rec(mouse_pos, COMMIT_BTN):
@@ -363,12 +364,12 @@ class Sidebar(Widget):
     mouse_down = self.is_pressed and rl.is_mouse_button_down(rl.MouseButton.MOUSE_BUTTON_LEFT)
 
     # Settings button
-    settings_down = mouse_down and rl.check_collision_point_rec(mouse_pos, SETTINGS_BTN)
+    settings_down = mouse_down and rl.check_collision_point_rec(rl.Vector2(mouse_pos.x, mouse_pos.y), SETTINGS_BTN)
     tint = colors_alpha(rl.WHITE, 166) if settings_down else rl.WHITE
     rl.draw_texture_ex(self._settings_img, rl.Vector2(SETTINGS_BTN.x, SETTINGS_BTN.y), 0.0, 1.0, tint)
 
     # Home/Flag button
-    #flag_pressed = mouse_down and rl.check_collision_point_rec(mouse_pos, HOME_BTN)
+    #flag_pressed = mouse_down and rl.check_collision_point_rec(rl.Vector2(mouse_pos.x, mouse_pos.y), HOME_BTN)
     #button_img = self._flag_img if ui_state.started else self._home_img
 
     #tint = colors_alpha(rl.WHITE, 166) if (ui_state.started and flag_pressed) else rl.WHITE
@@ -383,7 +384,7 @@ class Sidebar(Widget):
     # Microphone button
     if self._recording_audio:
       self._mic_indicator_rect = rl.Rectangle(rect.x + rect.width - 130, rect.y + 245, 75, 40)
-      mic_pressed = mouse_down and rl.check_collision_point_rec(mouse_pos, self._mic_indicator_rect)
+      mic_pressed = mouse_down and rl.check_collision_point_rec(rl.Vector2(mouse_pos.x, mouse_pos.y), self._mic_indicator_rect)
       bg_color = colors_alpha(Colors.RED, int(255 * 0.65)) if mic_pressed else Colors.RED
 
       rl.draw_rectangle_rounded(self._mic_indicator_rect, 1, 10, bg_color)
