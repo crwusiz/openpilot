@@ -62,6 +62,7 @@ case "$action" in
       > /etc/systemd/system/cluster-hdmi.service.d/account.conf
     install_wifi_boot_setup
     bash /opt/cluster-receiver/scripts/fan_setup.sh install
+    bash /opt/cluster-receiver/scripts/udp_buffer_setup.sh install
     printf 'Enabling the console receiver: closing the desktop and selecting console boot.\n'
     stop_if_installed cluster-hdmi.service
     stop_if_installed display-manager.service

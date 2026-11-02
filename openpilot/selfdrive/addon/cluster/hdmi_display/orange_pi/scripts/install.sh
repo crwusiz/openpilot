@@ -34,6 +34,7 @@ for retired in cluster_protocol.py frame_stream.py tcp_diagnostics.py; do
   rm -f -- "$TARGET/$retired"
 done
 bash "$TARGET/scripts/fan_setup.sh" install
+bash "$TARGET/scripts/udp_buffer_setup.sh" install
 if [[ -f /etc/systemd/system/cluster-hdmi.service ]]; then
   # Repair a previously installed receiver without rewriting its custom unit,
   # account, HDMI options or boot target, and without restarting its connection.

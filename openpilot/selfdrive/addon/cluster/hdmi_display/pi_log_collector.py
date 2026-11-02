@@ -53,8 +53,9 @@ import subprocess
 import sys
 
 LIFECYCLE_PATTERN = r'\[CLUSTER_(?![A-Z0-9_]*PERF\])'
+SLOW_FRAME_PATTERN = r'\[CLUSTER_H264_SLOW_FRAME\]'
 STARTUP_PATTERN = (r'\[CLUSTER_(RX_(BUILD|NATIVE|RUNTIME)|HDMI_(RENDERER|CAMERA_UPLOAD)|'
-                   r'H264_(COMPOSITOR|PRESENT_POLICY|UDP_BUFFER)|PATH_PIPELINE|SCENE_WORKERS)\]')
+                   r'H264_(COMPOSITOR|PRESENT_POLICY|UDP_BUFFER)|PATH_PIPELINE|SCENE_WORKERS|UDP_LIMIT)\]')
 RECORD = re.compile(r'^(\S+) (\S+) ([^\[\]:]+)(?:\[(\d+)\])?: (.*)$')
 GPU_COMMAND = re.compile(
     r'^[a-z_][a-z0-9_-]*\$? : (?:TTY=[^;\n]* ; )?PWD=/opt/cluster-receiver ; '
@@ -160,6 +161,8 @@ def emit_section(title, lines, byte_limit, raw_limited=False, suppressed=0):
 def main():
     startup, startup_status, startup_limited = read_journal(
         ['--grep=' + STARTUP_PATTERN, '-n', '40'], 128 * 1024)
+    slow, slow_status, slow_limited = read_journal(
+        ['--grep=' + SLOW_FRAME_PATTERN, '-n', '20'], 32 * 1024)
     lifecycle, lifecycle_status, lifecycle_limited = read_journal(
         ['--grep=' + LIFECYCLE_PATTERN, '-n', '160'], 256 * 1024)
     # Older journalctl versions may lack --grep/PCRE. The recent pass remains
@@ -168,6 +171,10 @@ def main():
     if startup_status != 0:
         startup = [line for line in recent if re.search(STARTUP_PATTERN, line)][:40]
         startup_limited = recent_limited
+    if slow_status != 0:
+        slow = [line for line in recent if re.search(SLOW_FRAME_PATTERN, line)][:20]
+        slow_limited = recent_limited
+        print('[CLUSTER_JOURNAL_FILTER] slow-frame query unavailable or empty; bounded recent fallback used')
     if lifecycle_status != 0:
         lifecycle = [line for line in recent if '[CLUSTER_' in line and 'PERF]' not in line][:160]
         lifecycle_limited = recent_limited
@@ -175,6 +182,10 @@ def main():
     lifecycle, lifecycle_sudo = compact_journal(lifecycle)
     recent, recent_sudo = compact_journal(recent)
     emit_section('Receiver startup and renderer', startup, 48 * 1024, startup_limited)
+    # A slow frame near startup must survive later recovery messages and a
+    # long performance tail. Reserve its own rows/bytes rather than taking
+    # slots away from build/renderer records or expanding the global cap.
+    emit_section('Receiver slow frame events', slow[:20], 16 * 1024, slow_limited)
     emit_section('Receiver lifecycle events', lifecycle, 64 * 1024, lifecycle_limited, lifecycle_sudo)
     emit_section('Receiver recent performance and errors', recent, 320 * 1024, recent_limited, recent_sudo)
     return 0 if recent_status == 0 or recent_limited else recent_status
@@ -182,6 +193,102 @@ def main():
 
 if __name__ == '__main__':
     raise SystemExit(main())
+"""
+REMOTE_UDP_SCRIPT = r"""import os
+from pathlib import Path
+import re
+import sys
+
+MAX_FDS = 1024
+MAX_TABLE_BYTES = 128 * 1024
+MAX_SOCKETS = 32
+SOCKET_LINK = re.compile(r'socket:\[([0-9]{1,20})\]')
+DECIMAL = re.compile(r'[0-9]{1,20}')
+QUEUES = re.compile(r'[0-9A-Fa-f]{1,16}:([0-9A-Fa-f]{1,16})')
+
+
+def snapshot(pid, proc_root='/proc', readlink=os.readlink):
+    lines = ['--- Receiver-owned UDP socket counters ---',
+             'scope=receiver_owned_socket_lifetime; snapshot=collection_time; anonymous_sockets=1']
+    if not isinstance(pid, str) or not re.fullmatch(r'[1-9][0-9]{0,9}', pid) or int(pid) > 2147483647:
+        return lines + ['status=unknown reason=invalid_receiver_pid']
+    root = Path(proc_root) / pid
+    owned = set()
+    issues = set()
+    try:
+        with os.scandir(root / 'fd') as entries:
+            for count, entry in enumerate(entries, 1):
+                if entry.name.isascii() and entry.name.isdecimal():
+                    try:
+                        match = SOCKET_LINK.fullmatch(readlink(entry.path))
+                    except OSError:
+                        issues.add('fd_changed_or_unreadable')
+                    else:
+                        if match:
+                            owned.add(int(match[1]))
+                if count >= MAX_FDS:
+                    issues.add('fd_scan_limit')
+                    break
+    except OSError:
+        return lines + ['status=unknown reason=receiver_fd_unavailable']
+    rows = []
+    seen = set()
+    for table, family in (('udp', 'IPv4'), ('udp6', 'IPv6')):
+        try:
+            with (root / 'net' / table).open('rb') as stream:
+                data = stream.read(MAX_TABLE_BYTES + 1)
+        except OSError:
+            issues.add(family + '_table_unavailable')
+            continue
+        if len(data) > MAX_TABLE_BYTES:
+            issues.add(family + '_table_limit')
+            data = data[:MAX_TABLE_BYTES].rsplit(b'\n', 1)[0]
+        try:
+            records = data.decode('ascii').splitlines()
+        except UnicodeError:
+            issues.add(family + '_table_invalid')
+            continue
+        header = records[0].split() if records else []
+        if (len(header) != 15 or header[:2] != ['sl', 'local_address'] or header[2] not in ('rem_address', 'remote_address')
+                or header[3:] != ['st', 'tx_queue', 'rx_queue', 'tr', 'tm->when', 'retrnsmt', 'uid', 'timeout',
+                                 'inode', 'ref', 'pointer', 'drops']):
+            issues.add(family + '_header_unknown')
+            continue
+        for record in records[1:]:
+            fields = record.split()
+            if len(fields) < 10 or not DECIMAL.fullmatch(fields[9]):
+                issues.add(family + '_row_invalid')
+                continue
+            inode = int(fields[9])
+            if inode not in owned:
+                continue
+            if inode in seen:
+                issues.add('socket_changed_during_snapshot')
+                continue
+            if len(rows) >= MAX_SOCKETS:
+                issues.add('socket_row_limit')
+                break
+            seen.add(inode)
+            queue = QUEUES.fullmatch(fields[4])
+            valid = len(fields) == 13 and queue is not None and DECIMAL.fullmatch(fields[-1])
+            if valid and int(fields[-1]) <= 18446744073709551615:
+                rows.append((family, str(int(queue[1], 16)), fields[-1]))
+            else:
+                rows.append((family, 'unknown', 'unknown'))
+                issues.add(family + '_socket_counters_invalid')
+    for index, (family, queue, drops) in enumerate(rows, 1):
+        lines.append('socket_index=' + str(index) + ' family=' + family + ' rx_queue_bytes=' + queue + ' drops=' + drops)
+    if issues:
+        lines.append('status=' + ('partial' if rows else 'unknown') + ' reason=' + ','.join(sorted(issues)))
+    elif not rows:
+        lines.append('status=ok socket_count=0')
+    else:
+        lines.append('status=ok')
+    return lines
+
+
+if __name__ == '__main__':
+    print('\n'.join(snapshot(sys.argv[1] if len(sys.argv) == 2 else '')))
 """
 REMOTE_SCRIPT = r"""export LC_ALL=C SYSTEMD_COLORS=0
 printf '%s\n' '--- Pi UTC wall clock ---'
@@ -247,7 +354,7 @@ esac
 printf '\n--- Receiver SDL renderer settings ---\n'
 pid=$(systemctl show cluster-hdmi.service --property=MainPID --value)
 case "$pid" in
-  ''|*[!0-9]*) ;;
+  ''|*[!0-9]*) pid='';;
   *) if [ "$pid" -gt 0 ] && [ -r "/proc/$pid/environ" ]; then
        tr '\000' '\n' < "/proc/$pid/environ" | grep -E '^SDL_(VIDEODRIVER|RENDER_DRIVER)='
      fi;;
@@ -287,7 +394,7 @@ for field in rmem_default rmem_max; do
     cat "/proc/sys/net/core/$field"
   fi
 done
-""" + "python3 -c " + shlex.quote(REMOTE_JOURNAL_SCRIPT) + "\n"
+""" + "python3 -c " + shlex.quote(REMOTE_UDP_SCRIPT) + ' "$pid"\n' + "python3 -c " + shlex.quote(REMOTE_JOURNAL_SCRIPT) + "\n"
 REMOTE_COMMAND = "sh -c " + shlex.quote(REMOTE_SCRIPT)
 
 

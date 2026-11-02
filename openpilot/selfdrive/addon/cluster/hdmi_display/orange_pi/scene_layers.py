@@ -86,7 +86,12 @@ class LayeredRenderer(ClusterRenderer):
     self._straight_alpha_hud = True
     # Only the path worker uses these glyphs/font. A separate FreeType face is
     # important: a separate dictionary alone still races on the shared font.
-    self._lead_font = None
+    # Load both private faces before the receiver starts streaming. Opening a
+    # font lazily for the first lead can contend with the live video loop.
+    # Reserve the async face across worker restarts; it is used only after
+    # the previous painter has been joined, never by both painters at once.
+    self._lead_font = self._prepare_lead_font()
+    self._path_lead_font = self._prepare_lead_font()
     self._lead_text_cache = OrderedDict()
     self._lead_text_bytes = 0
     self._lead_elapsed = 0.0
@@ -118,6 +123,7 @@ class LayeredRenderer(ClusterRenderer):
     self._lead_text_cache.clear()
     self._lead_text_bytes = 0
     self._lead_font = None
+    self._path_lead_font = None
     self._sync_path = None
     self._hud_cache_key = self._hud_cache_image = None
 
@@ -147,7 +153,8 @@ class LayeredRenderer(ClusterRenderer):
     painter._color_blender = ColorBlendWorkspace(self.camera_w)
     painter._source_to_panel = self._source_to_panel.copy()
     painter._lead_vehicles, painter._lead_info = deepcopy((self._lead_vehicles, self._lead_info))
-    painter._lead_font = None
+    painter._lead_font = self._path_lead_font
+    painter._path_lead_font = None
     painter._lead_text_cache = OrderedDict()
     painter._lead_text_bytes = 0
     painter._sync_path = None
@@ -177,11 +184,15 @@ class LayeredRenderer(ClusterRenderer):
     pixels, elapsed, cpu_elapsed = self._render_path_layer(request.path, request.hud)
     return pixels, {"path": elapsed, "path_cpu": cpu_elapsed, "path_labels": self._lead_elapsed}
 
+  def _prepare_lead_font(self):
+    font = self.font_unit.font_variant()
+    # Warm the numeric/unit glyphs without retaining a second sprite cache.
+    TextGlyph("0123456789 km/h mph", font, 2, anchor="ms")
+    return font
+
   def _lead_glyph(self, label):
     glyph = self._lead_text_cache.get(label)
     if glyph is None:
-      if self._lead_font is None:
-        self._lead_font = self.font_unit.font_variant()
       glyph = TextGlyph(label, self._lead_font, 2, anchor="ms")
       if glyph.byte_size <= 2 * 1024 * 1024:
         self._lead_text_cache[label] = glyph

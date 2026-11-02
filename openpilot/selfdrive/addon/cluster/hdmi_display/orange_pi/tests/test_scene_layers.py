@@ -430,6 +430,34 @@ def test_path_text_uses_an_independent_font_and_cache_while_hud_draws(monkeypatc
   assert renderer._lead_font is None and not renderer._lead_text_cache
 
 
+def test_first_live_lead_uses_prepared_private_faces_without_opening_fonts(monkeypatch):
+  scene = H264Scene(ASSETS, clock=lambda: 10)
+  renderer = scene.renderer
+  renderer._parallel_path = True
+  root_font, async_font = renderer._lead_font, renderer._path_lead_font
+  assert root_font is not None and async_font is not None
+  assert len({id(root_font.font), id(async_font.font), id(renderer.font_unit.font)}) == 3
+  assert not renderer._lead_text_cache
+  monkeypatch.setattr(renderer.font_unit, "font_variant", lambda *_args, **_kwargs:
+                      pytest.fail("streaming must not open a new lead font face"))
+  try:
+    scene.update(_driving_state())
+    scene.set_video(np.zeros((720, 1280, 3), np.uint8))
+    assert scene.render_layers().path is not None
+    assert renderer._lead_font is root_font and renderer._lead_text_cache
+    scene.set_gpu_camera(True)
+    scene.render_layers()
+    painter, worker = renderer._path_painter, renderer._path_worker
+    if worker._future is not None:
+      worker._future.result(timeout=3)
+    scene.render_layers()
+    assert painter._lead_font is async_font and painter._lead_text_cache
+    assert painter._lead_font.font is not renderer._lead_font.font
+  finally:
+    scene.close()
+  assert renderer._lead_font is renderer._path_lead_font is None
+
+
 def test_independent_lead_glyphs_keep_existing_pixels_and_bounded_memory():
   scene = H264Scene(ASSETS)
   renderer = scene.renderer

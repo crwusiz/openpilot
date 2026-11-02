@@ -284,7 +284,129 @@ def remote_journal():
   return SimpleNamespace(**namespace)
 
 
-@pytest.mark.parametrize("tag", ["CLUSTER_H264_UDP_BUFFER", "CLUSTER_HDMI_CAMERA_UPLOAD"])
+@pytest.fixture
+def remote_udp():
+  namespace = {"__name__": "remote_udp_test"}
+  exec(collector.REMOTE_UDP_SCRIPT, namespace)
+  return SimpleNamespace(**namespace)
+
+
+UDP_HEADER = "sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode ref pointer drops\n"
+
+
+def udp_row(inode, queue="00000000:00001000", drops="17"):
+  return f"42: ABCDEF12:C0DE AABBCCDD:ABCD 07 {queue} 00:00000000 00000000 7777 0 {inode} 2 DEADBEEF12345678 {drops}\n"
+
+
+def fake_udp_proc(tmp_path, links, ipv4="", ipv6=""):
+  root = tmp_path / "123"
+  (root / "fd").mkdir(parents=True)
+  (root / "net").mkdir()
+  mapping = {}
+  for fd, target in enumerate(links):
+    path = root / "fd" / str(fd)
+    path.touch()
+    mapping[str(path)] = target
+  (root / "net/udp").write_text(UDP_HEADER + ipv4, encoding="ascii")
+  (root / "net/udp6").write_text(UDP_HEADER.replace("rem_address", "remote_address") + ipv6, encoding="ascii")
+  def readlink(path):
+    target = mapping[str(Path(path))]
+    if isinstance(target, OSError):
+      raise target
+    return target
+  return root, readlink
+
+
+def test_receiver_owned_udp_snapshot_matches_unique_fd_sockets_and_omits_private_fields(remote_udp, tmp_path):
+  _root, readlink = fake_udp_proc(tmp_path, ["/dev/null", "socket:[123456789]", "socket:[123456789]", "socket:[987654321]"],
+                                 ipv4=udp_row(999999999, drops="888") + udp_row(123456789),
+                                 ipv6=udp_row(987654321, queue="00000000:000000AA", drops="5"))
+  output = "\n".join(remote_udp.snapshot("123", tmp_path, readlink))
+  assert "scope=receiver_owned_socket_lifetime; snapshot=collection_time" in output
+  assert "socket_index=1 family=IPv4 rx_queue_bytes=4096 drops=17" in output
+  assert "socket_index=2 family=IPv6 rx_queue_bytes=170 drops=5" in output
+  assert output.endswith("status=ok") and output.count("socket_index=") == 2
+  for secret in ("ABCDEF12", "C0DE", "AABBCCDD", "ABCD", "7777", "123456789", "987654321", "999999999", "DEADBEEF", "888"):
+    assert secret not in output
+  assert "inode=" not in output and "fd=" not in output and "uid=" not in output
+
+
+@pytest.mark.parametrize("pid", ["", "0", "-1", "00123", "../123", "123;private", "١٢٣", "2147483648", "12345678901", 123])
+def test_receiver_udp_snapshot_rejects_invalid_pid_without_reading_proc(remote_udp, tmp_path, pid):
+  readlink = Mock(side_effect=AssertionError("invalid PID must not read links"))
+  output = "\n".join(remote_udp.snapshot(pid, tmp_path, readlink))
+  assert "status=unknown reason=invalid_receiver_pid" in output and "socket_count=0" not in output
+  assert "private" not in output
+  readlink.assert_not_called()
+
+
+def test_receiver_udp_snapshot_reports_missing_fd_directory_as_unknown(remote_udp, tmp_path):
+  output = "\n".join(remote_udp.snapshot("123", tmp_path))
+  assert output.endswith("status=unknown reason=receiver_fd_unavailable") and "socket_count=0" not in output
+
+
+def test_receiver_udp_snapshot_distinguishes_unavailable_table_and_true_zero(remote_udp, tmp_path):
+  root, readlink = fake_udp_proc(tmp_path, ["socket:[123456789]"], ipv4=udp_row(222222222))
+  assert remote_udp.snapshot("123", tmp_path, readlink)[-1] == "status=ok socket_count=0"
+  (root / "net/udp6").unlink()
+  output = "\n".join(remote_udp.snapshot("123", tmp_path, readlink))
+  assert "IPv6_table_unavailable" in output and "status=unknown" in output and "socket_count=0" not in output
+
+
+def test_receiver_udp_snapshot_reports_permissions_without_printing_exception_paths(remote_udp, tmp_path, monkeypatch):
+  root, readlink = fake_udp_proc(tmp_path, [PermissionError("private-fd-path"), "socket:[123456789]"], ipv4=udp_row(123456789))
+  original_open = Path.open
+  def open_table(path, *args, **kwargs):
+    if path == root / "net/udp6":
+      raise PermissionError("private-table-path")
+    return original_open(path, *args, **kwargs)
+  monkeypatch.setattr(Path, "open", open_table)
+  output = "\n".join(remote_udp.snapshot("123", tmp_path, readlink))
+  assert "status=partial" in output and "fd_changed_or_unreadable" in output and "IPv6_table_unavailable" in output
+  assert "rx_queue_bytes=4096 drops=17" in output and "private" not in output
+
+
+@pytest.mark.parametrize("row", [udp_row(123456789, queue="private:bad"), udp_row(123456789, drops="-1"),
+                                  udp_row(123456789, drops="private"), udp_row(123456789, drops="18446744073709551616"),
+                                  udp_row(123456789).rsplit(" ", 1)[0] + "\n"])
+def test_malformed_owned_udp_counters_are_unknown_not_zero(remote_udp, tmp_path, row):
+  _root, readlink = fake_udp_proc(tmp_path, ["socket:[123456789]"], ipv4=row)
+  output = "\n".join(remote_udp.snapshot("123", tmp_path, readlink))
+  assert "rx_queue_bytes=unknown drops=unknown" in output and "status=partial" in output
+  assert "IPv4_socket_counters_invalid" in output and "private" not in output
+
+
+def test_unknown_udp_header_does_not_invent_empty_socket_count(remote_udp, tmp_path):
+  root, readlink = fake_udp_proc(tmp_path, ["socket:[123456789]"], ipv4=udp_row(123456789))
+  (root / "net/udp").write_text("drops rx_queue inode tx_queue\n" + udp_row(123456789), encoding="ascii")
+  output = "\n".join(remote_udp.snapshot("123", tmp_path, readlink))
+  assert "IPv4_header_unknown" in output and "status=unknown" in output and "socket_count=0" not in output
+
+
+def test_receiver_fd_scan_is_bounded_and_never_claims_complete_zero(remote_udp, tmp_path):
+  assert remote_udp.MAX_FDS == 1024
+  remote_udp.snapshot.__globals__["MAX_FDS"] = 3
+  _root, readlink = fake_udp_proc(tmp_path, ["/dev/null"] * 4)
+  observe = Mock(side_effect=readlink)
+  output = "\n".join(remote_udp.snapshot("123", tmp_path, observe))
+  assert observe.call_count == 3
+  assert "status=unknown reason=fd_scan_limit" in output and "socket_count=0" not in output
+
+
+def test_receiver_udp_tables_and_socket_rows_are_bounded(remote_udp, tmp_path):
+  assert remote_udp.MAX_TABLE_BYTES == 128 * 1024 and remote_udp.MAX_SOCKETS == 32
+  root, readlink = fake_udp_proc(tmp_path, [f"socket:[{1000 + i}]" for i in range(40)],
+                                 ipv4="".join(udp_row(1000 + i) for i in range(40)))
+  output = "\n".join(remote_udp.snapshot("123", tmp_path, readlink))
+  assert output.count("socket_index=") == 32 and "socket_row_limit" in output and "status=partial" in output
+  with (root / "net/udp").open("a", encoding="ascii") as stream:
+    stream.write("private " * remote_udp.MAX_TABLE_BYTES)
+  output = "\n".join(remote_udp.snapshot("123", tmp_path, readlink))
+  assert "IPv4_table_limit" in output and "private" not in output
+  assert len(output.encode()) < 8 * 1024
+
+
+@pytest.mark.parametrize("tag", ["CLUSTER_H264_UDP_BUFFER", "CLUSTER_HDMI_CAMERA_UPLOAD", "CLUSTER_UDP_LIMIT"])
 def test_udp_and_camera_layout_survive_the_reserved_startup_filter(remote_journal, tag):
   assert re.search(remote_journal.STARTUP_PATTERN, f"[{tag}] requested=1048576")
 
@@ -425,6 +547,8 @@ def test_remote_journal_reserves_startup_before_long_performance_tail(remote_jou
     calls.append((arguments, limit))
     if arguments[0] == "--grep=" + remote_journal.STARTUP_PATTERN:
       return ([startup] if filter_status == 0 else []), filter_status, False
+    if arguments[0] == "--grep=" + remote_journal.SLOW_FRAME_PATTERN:
+      return [], filter_status, False
     if arguments[0].startswith("--grep="):
       return [journal_line("[CLUSTER_RX_CONNECT] C4 retry") for _ in range(160)], filter_status, False
     return raw, 0, False
@@ -438,8 +562,56 @@ def test_remote_journal_reserves_startup_before_long_performance_tail(remote_jou
   assert "JOURNAL SECTION LIMITED" in output
   assert len(output.encode()) < collector.MAX_OUTPUT_BYTES - 48 * 1024
   assert calls == [(["--grep=" + remote_journal.STARTUP_PATTERN, "-n", "40"], 128 * 1024),
+                   (["--grep=" + remote_journal.SLOW_FRAME_PATTERN, "-n", "20"], 32 * 1024),
                    (["--grep=" + remote_journal.LIFECYCLE_PATTERN, "-n", "160"], 256 * 1024),
                    (["-n", "20000"], 8 * 1024 * 1024)]
+
+
+@pytest.mark.parametrize("filter_status", [0, 1])
+def test_remote_journal_reserves_early_slow_frame_independent_of_lifecycle_and_recent_tail(remote_journal, capsys, filter_status):
+  slow = journal_line("[CLUSTER_H264_SLOW_FRAME] render_ms=1655.0 | phase=first_path", second=0)
+  startup = journal_line("[CLUSTER_RX_BUILD] source_sha256=installed-build", second=1)
+  recovery = journal_line("[CLUSTER_H264_RECOVERY_REQUEST] reason=decoder_error", second=2)
+  perf = journal_line("[CLUSTER_H264_RX_PERF] camera_display_fps=18", second=3)
+  def read_journal(arguments, _limit):
+    if arguments[0] == "--grep=" + remote_journal.STARTUP_PATTERN:
+      return [startup], 0, False
+    if arguments[0] == "--grep=" + remote_journal.SLOW_FRAME_PATTERN:
+      return ([slow] if filter_status == 0 else []), filter_status, False
+    if arguments[0] == "--grep=" + remote_journal.LIFECYCLE_PATTERN:
+      return [recovery] * 160, 0, False
+    # A functioning dedicated query can preserve an early slow frame that
+    # is absent from BOTH normal retained sections on a long drive.
+    return [perf] * 100 + ([slow] if filter_status else []), 0, False
+  remote_journal.main.__globals__["read_journal"] = read_journal
+  assert remote_journal.main() == 0
+  output = capsys.readouterr().out
+  slow_section = output.split("Receiver slow frame events", 1)[1].split("Receiver lifecycle events", 1)[0]
+  assert slow in slow_section and "source_sha256" not in slow_section
+  assert output.index("source_sha256=installed-build") < output.index("Receiver slow frame events")
+  assert "slow-frame query unavailable" in output if filter_status else "slow-frame query unavailable" not in output
+  assert not re.search(remote_journal.STARTUP_PATTERN, slow)
+
+
+@pytest.mark.parametrize("payload_bytes", [10, 900])
+def test_remote_slow_frame_reservation_has_separate_row_and_byte_limits(remote_journal, capsys, payload_bytes):
+  slow = [journal_line("[CLUSTER_H264_SLOW_FRAME] index=" + str(index) + " | " + "x" * payload_bytes) for index in range(30)]
+  def read_journal(arguments, _limit):
+    if arguments[0] == "--grep=" + remote_journal.SLOW_FRAME_PATTERN:
+      return slow, 0, False
+    return [], 0, False
+  remote_journal.main.__globals__["read_journal"] = read_journal
+  assert remote_journal.main() == 0
+  output = capsys.readouterr().out
+  section = output.split("Receiver slow frame events", 1)[1].split("Receiver lifecycle events", 1)[0]
+  assert section.count("[CLUSTER_H264_SLOW_FRAME]") <= 20
+  assert len(section.encode()) < 17 * 1024
+  if payload_bytes == 900:
+    assert "JOURNAL SECTION LIMITED" in section
+  else:
+    assert section.count("[CLUSTER_H264_SLOW_FRAME]") == 20
+    assert "index=20 |" not in section
+  assert len(output.encode()) < collector.MAX_OUTPUT_BYTES
 
 
 def test_subprocess_timeout_kills_detached_session_and_preserves_bounded_partial_output(monkeypatch):

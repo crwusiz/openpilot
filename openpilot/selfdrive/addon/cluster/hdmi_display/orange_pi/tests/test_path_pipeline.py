@@ -370,6 +370,33 @@ def test_gpu_fallback_and_close_join_and_release_the_path_worker(scene):
   assert worker._result is None and worker._render is None
 
 
+def test_gpu_toggles_reuse_reserved_private_lead_face_after_old_worker_joins(scene, monkeypatch):
+  value, now = scene
+  renderer = value.renderer
+  root_font, reserved_font = renderer._lead_font, renderer._path_lead_font
+  monkeypatch.setattr(renderer.font_unit, "font_variant", lambda *_args, **_kwargs:
+                      pytest.fail("a GPU toggle must reuse the prepared font face"))
+  value.render_layers()
+  painters = []
+  for _ in range(3):
+    value.set_gpu_camera(True)
+    value.render_layers()
+    painter, worker = renderer._path_painter, renderer._path_worker
+    painters.append(painter)
+    assert painter._lead_font is reserved_font and painter._lead_font is not root_font
+    wait_done(worker)
+    threads = list(worker._executor._threads)
+    now[0] += 0.02
+    value.set_gpu_camera(False)
+    assert value.render().mode == "RGB"
+    assert all(not thread.is_alive() for thread in threads)
+    assert painter._lead_font is None and renderer._path_lead_font is reserved_font
+    assert renderer._lead_font is root_font
+  value.close()
+  assert renderer._lead_font is renderer._path_lead_font is None
+  assert all(painter._lead_font is None for painter in painters)
+
+
 def test_parallel_opt_out_keeps_the_existing_synchronous_path(scene):
   value, _now = scene
   value.renderer._parallel_path = False

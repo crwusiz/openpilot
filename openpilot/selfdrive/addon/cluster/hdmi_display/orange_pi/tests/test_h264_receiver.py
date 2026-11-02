@@ -25,6 +25,24 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol impo
 HELLO_DATA = {"codec": "h264", "transport": "webrtc", "camera": "road", "width": 1920, "height": 480, "fps": 20}
 
 
+def test_slow_frame_keeps_render_and_present_stalls_separate_and_bounds_logs(caplog):
+  assert h264_receiver._log_slow_frame(None, 10, 10.01, 10.03, 0.01, None, None, 9.99) is None
+  assert not caplog.records
+  stamp = h264_receiver._log_slow_frame(None, 10, 11.6, 11.62, 0.03,
+                                        {"hud": 1.5, "path_wait": 0.0, "path": None, "unexpected": 50},
+                                        {"upload": 0.002, "flip": float("nan")}, 9.99)
+  assert stamp == 11.62
+  message = caplog.records[-1].getMessage()
+  assert "render_ms=1600.0" in message and "display_ms=20.0" in message
+  assert "owner_cpu_ms=30.0" in message and "decoded_video_age_ms=1630.0" in message
+  assert "scene_hud_ms=1500.0" in message and "hdmi_upload_ms=2.0" in message
+  assert "scene_path_ms" not in message and "unexpected" not in message and "flip_ms" not in message
+  assert h264_receiver._log_slow_frame(stamp, 12, 12.3, 12.32, 0.02, {}, {}, None) == stamp
+  assert len(caplog.records) == 1
+  assert h264_receiver._log_slow_frame(stamp, 17, 17.01, 17.5, 0.04, {}, {"upload": 0.49}, None) == 17.5
+  assert len(caplog.records) == 2 and "decoded_video_age_ms=none" in caplog.records[-1].getMessage()
+
+
 @pytest.mark.parametrize("before,kernel_max,requested,actual", [
   (212992, 212992, 212992, 425984),
   (212992, 4 * 1024 * 1024, 1024 * 1024, 2 * 1024 * 1024),

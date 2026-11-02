@@ -8,6 +8,7 @@ UNIT=cluster-hdmi.service
 WIFI_CONF=/etc/systemd/system/cluster-hdmi.service.d/wifi.conf
 WIFI_DISPATCHER=/etc/NetworkManager/dispatcher.d/90-cluster-wifi-power
 FAN_HELPER="$STATE/fan_setup.sh"
+UDP_HELPER="$STATE/udp_buffer_setup.sh"
 FILES=()
 REMOVE=()
 pending=0
@@ -17,6 +18,7 @@ recovery_goal=''
 backup=''
 wifi_rollback_snapshot=''
 fan_rollback_snapshot=''
+udp_rollback_snapshot=''
 update_action=''
 # Reserved for deploy.sh: recover any pending transaction, then retry once.
 RETRY_AFTER_RECOVERY=75
@@ -134,6 +136,23 @@ restore_fan_state() {
   [[ -f "$FAN_HELPER" && ! -L "$FAN_HELPER" ]] || return 1
   bash "$FAN_HELPER" restore "$directory"
 }
+snapshot_udp_state() {
+  local directory=$1
+  [[ -e "$UDP_HELPER" || -L "$UDP_HELPER" ]] || return 0
+  [[ -f "$UDP_HELPER" && ! -L "$UDP_HELPER" ]] || return 1
+  bash "$UDP_HELPER" snapshot "$directory"
+}
+restore_udp_state() {
+  local directory=$1 tracking=${2:-}
+  [[ -d "$directory" ]] || return 0
+  [[ -f "$UDP_HELPER" && ! -L "$UDP_HELPER" ]] || return 1
+  if [[ -n "$tracking" ]]; then
+    bash "$UDP_HELPER" restore "$directory" "$tracking" || return 1
+  else
+    bash "$UDP_HELPER" restore "$directory" || return 1
+  fi
+  systemctl daemon-reload
+}
 check_ready() {
   local marker=$1 invocation current journal successes=0 attempt
   invocation=$(systemctl show --property=InvocationID --value "$UNIT") || return 1
@@ -176,6 +195,7 @@ restore_backup() {
   clear_bytecode || return 1
   restore_wifi_state "$backup/wifi-system" || return 1
   restore_fan_state "$backup/fan-system" || return 1
+  restore_udp_state "$backup/udp-system" || return 1
   if [[ $resume == 1 ]]; then
     start_receiver || return 1
     check_ready 'Orange Pi HDMI display ready' || return 1
@@ -242,6 +262,7 @@ if [[ $1 == rollback ]]; then
   source_dir="$STATE/$latest/previous"
   wifi_rollback_snapshot="$STATE/$latest/wifi-system"
   fan_rollback_snapshot="$STATE/$latest/fan-system"
+  udp_rollback_snapshot="$STATE/$latest/udp-system"
   while IFS= read -r name; do
     valid_file "$name" || fail 'Invalid saved payload path.'
     [[ -f "$source_dir/$name" ]] || REMOVE+=("$name")
@@ -255,7 +276,7 @@ if [[ $1 == apply ]]; then
   for name in control_socket.py display_controls.py texture_presenter.py touch_status.py receiver_build.py receiver_resources.py \
     h264_receiver.py h264_protocol.py h264_scene.py scene_layers.py path_worker.py cluster_renderer.py cluster_render_support.py receiver_assets.txt \
     assets/fonts/NotoSansKR-Bold.ttf scripts/prepare_h264.sh scripts/package_sources.sh \
-    scripts/update.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh scripts/fan_setup.sh; do
+    scripts/update.sh scripts/ensure_wifi.sh scripts/wifi_boot_setup.sh scripts/wifi_power_save.sh scripts/fan_setup.sh scripts/udp_buffer_setup.sh; do
     [[ " ${FILES[*]} " == *" $name "* ]] || fail "Payload is missing $name."
   done
   while IFS= read -r name || [[ -n "$name" ]]; do
@@ -318,10 +339,17 @@ if [[ $1 == apply ]]; then
 elif [[ ! -e "$FAN_HELPER" && -f "$(dirname -- "${BASH_SOURCE[0]}")/fan_setup.sh" ]]; then
   install -m 700 -- "$(dirname -- "${BASH_SOURCE[0]}")/fan_setup.sh" "$FAN_HELPER"
 fi
+if [[ $1 == apply ]]; then
+  install -m 700 -- "$source_dir/scripts/udp_buffer_setup.sh" "$STATE/udp_buffer_setup.sh.tmp"
+  mv -f -- "$STATE/udp_buffer_setup.sh.tmp" "$UDP_HELPER"
+elif [[ ! -e "$UDP_HELPER" && -f "$(dirname -- "${BASH_SOURCE[0]}")/udp_buffer_setup.sh" ]]; then
+  install -m 700 -- "$(dirname -- "${BASH_SOURCE[0]}")/udp_buffer_setup.sh" "$UDP_HELPER"
+fi
 backup=$(mktemp -d "$STATE/$(date -u +%Y%m%dT%H%M%SZ).XXXXXXXX")
 printf '%s\n' "$resume" > "$backup/resume"
 snapshot_wifi_state "$backup/wifi-system" || fail 'Cannot safely back up receiver Wi-Fi setup.'
 snapshot_fan_state "$backup/fan-system" || fail 'Cannot safely back up Orange Pi fan boot setup.'
+snapshot_udp_state "$backup/udp-system" || fail 'Cannot safely back up receiver UDP setup.'
 install -d -m 700 -- "$backup/previous/scripts"
 shopt -s nullglob
 previous_paths=("$TARGET"/*.py "$TARGET"/scripts/*.sh "$TARGET/README.md" "$TARGET/requirements.txt" "$TARGET/receiver_assets.txt" "$TARGET/cluster-hdmi.service")
@@ -357,6 +385,7 @@ if [[ $1 == apply ]]; then
   # Boot-only preparation can install dtc without interrupting the current
   # receiver. The saved snapshot already covers any resulting boot changes.
   bash "$FAN_HELPER" install
+  bash "$UDP_HELPER" install "$backup/udp-system"
 fi
 # Retire obsolete receiver modules; the complete previous version is backed up
 # above and remains available to the existing rollback/recovery mechanism.
@@ -387,6 +416,7 @@ if [[ $1 == apply ]]; then
 else
   restore_wifi_state "$wifi_rollback_snapshot"
   restore_fan_state "$fan_rollback_snapshot"
+  restore_udp_state "$udp_rollback_snapshot" "$backup/udp-system"
 fi
 if [[ $resume == 1 ]]; then
   start_receiver

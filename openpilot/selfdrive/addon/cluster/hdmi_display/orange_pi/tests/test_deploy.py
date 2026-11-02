@@ -209,6 +209,7 @@ def test_standalone_installer_repairs_asset_permissions_in_place(deploy_sandbox)
                        .replace("/usr/bin/python3", "true"), encoding="utf-8", newline="\n")
   (package / "scripts/prepare_h264.sh").write_text("exit 0\n", encoding="utf-8", newline="\n")
   (package / "scripts/fan_setup.sh").write_text('printf "%s\\n" "$*" > fan-install.log\n', encoding="utf-8", newline="\n")
+  (package / "scripts/udp_buffer_setup.sh").write_text('printf "%s\\n" "$*" > udp-install.log\n', encoding="utf-8", newline="\n")
   for name, body in {
     "id": "printf '0\\n'",
     "apt-get": "exit 0",
@@ -223,6 +224,7 @@ def test_standalone_installer_repairs_asset_permissions_in_place(deploy_sandbox)
   result = _deploy(package, entrypoint=installer, extra_env={"MOCK_INSTALL_LOG": (root / "install.log").as_posix()})
   assert result.returncode == 0, result.stdout + result.stderr
   assert (root / "fan-install.log").read_text() == "install\n"
+  assert (root / "udp-install.log").read_text() == "install\n"
   calls = (root / "install.log").read_text().splitlines()
   for relative, directory in zip(("assets", "assets/fonts", "assets/icons"), directories, strict=True):
     assert any(call.startswith("-d -m 755 -- ") and call.endswith("/" + relative) for call in calls)
@@ -548,7 +550,7 @@ def test_shared_renderer_and_assets_are_mapped_from_full_checkout(deploy_sandbox
   assert _calls(deploy_sandbox) == []
 
 
-@pytest.mark.parametrize("helper", ["ensure_wifi.sh", "wifi_boot_setup.sh", "wifi_power_save.sh", "fan_setup.sh"])
+@pytest.mark.parametrize("helper", ["ensure_wifi.sh", "wifi_boot_setup.sh", "wifi_power_save.sh", "fan_setup.sh", "udp_buffer_setup.sh"])
 def test_incomplete_boot_setup_payload_is_rejected_before_ssh(deploy_sandbox, helper):
   (deploy_sandbox / "scripts" / helper).unlink()
   result = _deploy(deploy_sandbox, "192.168.0.84")

@@ -137,6 +137,7 @@ def _service_environment(script_sandbox):
                     .replace("WIFI_DISPATCHER=/etc/NetworkManager/dispatcher.d/90-cluster-wifi-power",
                              'WIFI_DISPATCHER="$TEST_DISPATCHER_DIR/90-cluster-wifi-power"'), encoding="utf-8", newline="\n")
   (scripts / "fan_setup.sh").write_text('printf "%s\\n" "$*" >> fan-setup.log\n', encoding="utf-8", newline="\n")
+  (scripts / "udp_buffer_setup.sh").write_text('printf "%s\\n" "$*" >> udp-setup.log\n', encoding="utf-8", newline="\n")
   (scripts.parent / "cluster_receiver.py").touch()
   shutil.copyfile(SCRIPTS.parent / "cluster-hdmi.service", scripts.parent / "cluster-hdmi.service")
   return {"TEST_STATE_DIR": "state with spaces", "TEST_UNIT_DIR": "units with spaces",
@@ -446,10 +447,12 @@ def update_sandbox(script_sandbox):
     "MOCK_WINDOWS_MODES": "1" if os.name == "nt" else "0",
     "TEST_WIFI_CONF": "unit dropins/wifi.conf", "TEST_WIFI_DISPATCHER": "NM dispatcher/90-cluster-wifi-power",
     "TEST_FAN_BOOT_FILE": "fan boot environment",
+    "TEST_UDP_CONF": "unit dropins/udp-buffer.conf", "TEST_UDP_MAX_FILE": "udp-rmem-max",
     "CLUSTER_OS_PYTHON": "preflight-python",
   }
   target = root / environment["TEST_TARGET_DIR"]
   incoming = root / "incoming with spaces"
+  (root / environment["TEST_UDP_MAX_FILE"]).write_text("212992\n", encoding="ascii")
   for directory, label in ((target, "old"), (incoming, "new")):
     (directory / "scripts").mkdir(parents=True)
     for name in ("cluster_receiver.py", "hdmi_display.py"):
@@ -466,6 +469,11 @@ def update_sandbox(script_sandbox):
     (incoming / name).write_text("# current runtime dependency\n", encoding="utf-8", newline="\n")
   for name in ("ensure_wifi.sh", "wifi_boot_setup.sh", "wifi_power_save.sh", "prepare_h264.sh", "package_sources.sh"):
     shutil.copyfile(scripts / name, incoming / "scripts" / name)
+  udp = scripts / "udp_buffer_setup.sh"
+  (incoming / "scripts" / "udp_buffer_setup.sh").write_text(udp.read_text(encoding="utf-8")
+    .replace("MAX_FILE=/proc/sys/net/core/rmem_max", 'MAX_FILE="$TEST_UDP_MAX_FILE"')
+    .replace("UNIT_CONF=/etc/systemd/system/cluster-hdmi.service.d/udp-buffer.conf", 'UNIT_CONF="$TEST_UDP_CONF"')
+    .replace("TARGET=/opt/cluster-receiver", 'TARGET="$TEST_TARGET_DIR"'), encoding="utf-8", newline="\n")
   # Exercise the real updater transaction without changing host boot files.
   # The helper's own sysfs/device-tree behavior is tested separately.
   (incoming / "scripts" / "fan_setup.sh").write_text('''#!/usr/bin/env bash
@@ -611,6 +619,9 @@ def test_remote_update_and_manual_rollback_preserve_configuration(update_sandbox
   assert (backup / "previous" / "cluster_receiver.py").read_text() == "# old\n"
   assert (state / "update.sh").exists()
   assert (state / "fan_setup.sh").exists()
+  assert (state / "udp_buffer_setup.sh").exists()
+  assert (root / environment["TEST_UDP_MAX_FILE"]).read_text() == "1048576\n"
+  assert (root / environment["TEST_UDP_CONF"]).exists()
 
   result = _update(update_sandbox, "rollback")
   assert result.returncode == 0, result.stdout + result.stderr
@@ -618,6 +629,9 @@ def test_remote_update_and_manual_rollback_preserve_configuration(update_sandbox
   assert not (target / "new_module.py").exists()
   assert not (target / "scripts" / "update.sh").exists()
   assert not (target / "scripts" / "fan_setup.sh").exists()
+  assert not (target / "scripts" / "udp_buffer_setup.sh").exists()
+  assert (root / environment["TEST_UDP_MAX_FILE"]).read_text() == "212992\n"
+  assert not (root / environment["TEST_UDP_CONF"]).exists()
   assert not (root / environment["TEST_FAN_BOOT_FILE"]).exists()
   assert (state / "update.sh").exists()
   # Recovery always has a standalone script outside the runtime directory.
@@ -625,6 +639,8 @@ def test_remote_update_and_manual_rollback_preserve_configuration(update_sandbox
   assert result.returncode == 0, result.stdout + result.stderr
   assert (target / "cluster_receiver.py").read_text() == "# new\n"
   assert (root / environment["TEST_FAN_BOOT_FILE"]).read_text() == "fan minimum 60%\n"
+  assert (root / environment["TEST_UDP_MAX_FILE"]).read_text() == "1048576\n"
+  assert (root / environment["TEST_UDP_CONF"]).exists()
   calls = (root / "systemctl.log").read_text().splitlines()
   assert "daemon-reload" in calls
   assert not any(line.startswith(("enable", "disable", "set-default")) or "display-manager" in line for line in calls)
@@ -816,7 +832,7 @@ def test_invalid_update_does_not_stop_running_receiver(update_sandbox, failure):
 @pytest.mark.parametrize("helper", [
   "control_socket.py", "display_controls.py", "texture_presenter.py", "receiver_build.py", "receiver_resources.py",
   "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "scene_layers.py", "path_worker.py",
-  "scripts/fan_setup.sh",
+  "scripts/fan_setup.sh", "scripts/udp_buffer_setup.sh",
 ])
 def test_incomplete_runtime_update_does_not_stop_running_receiver(update_sandbox, helper):
   sandbox, _environment, target, incoming = update_sandbox

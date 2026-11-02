@@ -9,6 +9,7 @@ import socket
 import sys
 import threading
 import time
+from time import thread_time
 
 try:
   from .h264_protocol import (
@@ -35,9 +36,29 @@ UDP_RECEIVE_BUFFER_BYTES = 1024 * 1024
 HUD_REFRESH_INTERVAL = 0.1
 GPU_BURST_FPS = 60
 GPU_CAMERA_GRACE_SECONDS = 0.2
+SLOW_FRAME_SECONDS = 0.25
+SLOW_FRAME_LOG_INTERVAL = 5.0
 STAGE_NAMES = {"scene": ("camera_copy", "camera_panel", "snapshot", "path", "path_cpu", "hud", "hud_cpu", "path_wait", "path_labels", "path_age"),
                "hdmi": ("rgb_surface", "convert", "upload", "draw", "flip")}
 PATH_COUNTER_NAMES = ("path_expected", "path_ready", "path_visible", "path_pending", "path_expired", "path_incompatible", "path_invalid", "path_reset")
+
+
+def _log_slow_frame(last_logged, started, rendered, displayed, owner_cpu, scene_timings, display_timings, video_at):
+  if displayed - started < SLOW_FRAME_SECONDS or (last_logged is not None and displayed - last_logged < SLOW_FRAME_LOG_INTERVAL):
+    return last_logged
+  stages = []
+  for prefix, timings in (("scene", scene_timings), ("hdmi", display_timings)):
+    if not isinstance(timings, dict):
+      continue
+    for name in STAGE_NAMES[prefix]:
+      value = timings.get(name)
+      if type(value) in (int, float) and math.isfinite(value) and 0 <= value <= 60:
+        stages.append(f"{prefix}_{name}_ms={value * 1000:.1f}")
+  LOG.warning("[CLUSTER_H264_SLOW_FRAME] render_ms=%.1f | display_ms=%.1f | owner_cpu_ms=%.1f | decoded_video_age_ms=%s%s",
+              max(0.0, rendered - started) * 1000, max(0.0, displayed - rendered) * 1000, max(0.0, owner_cpu) * 1000,
+              "none" if video_at is None else f"{max(0.0, displayed - video_at) * 1000:.1f}",
+              " | " + " | ".join(stages) if stages else "")
+  return displayed
 
 
 class H264ConfigurationError(RuntimeError):
@@ -670,6 +691,7 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
   pending_video_at = None
   freshness = None
   gpu_policy_logged = False
+  slow_frame_logged_at = None
 
   def hud_deadline():
     due = 0 if last_render_started is None else last_render_started + HUD_REFRESH_INTERVAL
@@ -722,6 +744,7 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         # and repeatedly present its predecessor. A stopped camera still gets
         # HUD refreshes at 100ms intervals; freshness changes bypass that wait.
         render_started = time.monotonic()
+        owner_cpu_started = thread_time()
         layered = bool(getattr(display, "can_present_layers", False))
         configure_gpu = getattr(scene, "set_gpu_camera", None)
         if callable(configure_gpu):
@@ -731,6 +754,10 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         if not (display.send_layers(image) if layered else display.send_rgb(image)):
           raise RuntimeError("Unable to display H.264 cluster frame")
         displayed_at = time.monotonic()
+        slow_frame_logged_at = _log_slow_frame(slow_frame_logged_at, render_started, rendered_at, displayed_at,
+                                               thread_time() - owner_cpu_started,
+                                               getattr(scene, "last_frame_timings", None),
+                                               getattr(display, "last_frame_timings", None), pending_video_at)
         with receiver.condition:
           receiver.gpu_camera = getattr(display, "compositor_backend", None) == "pi_gpu_camera"
         receiver.record_display(render_started, rendered_at, displayed_at, pending_video_at,
