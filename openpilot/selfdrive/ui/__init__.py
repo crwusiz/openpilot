@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-import pyray as rl
+import raylib_nb as rl
 
 
 UI_BORDER_SIZE = 30

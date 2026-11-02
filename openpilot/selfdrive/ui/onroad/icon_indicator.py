@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import pyray as rl
+import raylib_nb as rl
 from openpilot.selfdrive.ui import Colors, colors_alpha
 
 from openpilot.system.ui.lib.application import gui_app

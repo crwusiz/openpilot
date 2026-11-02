@@ -2,7 +2,7 @@ import subprocess
 import shutil
 import time
 import threading
-import pyray as rl
+import raylib_nb as rl
 
 from datetime import datetime
 from pathlib import Path
