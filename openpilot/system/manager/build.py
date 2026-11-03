@@ -9,7 +9,11 @@ from openpilot.common.text_window import TextWindow
 from openpilot.common.hardware import HARDWARE, AGNOS
 
 def build() -> None:
-  spinner = Spinner()
+  with Spinner(keep_alive=True) as spinner:
+    _build(spinner)
+
+
+def _build(spinner: Spinner) -> None:
   spinner.update_progress(0, 100)
 
   HARDWARE.set_power_save(False)

@@ -4,6 +4,24 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 source "$DIR/launch_env.sh"
 
+function enable_ssh {
+  local params_dir="$1"
+  local setup_keys="${2:-/usr/comma/setup_keys}"
+
+  mkdir -p "$params_dir" || return 1
+  if [ ! -f "$params_dir/GithubSshKeys" ]; then
+    cp "$setup_keys" "$params_dir/GithubSshKeys" || return 1
+    printf openpilot > "$params_dir/GithubUsername" || return 1
+  fi
+  printf 1 > "$params_dir/SshEnabled" || return 1
+
+  # AGNOS can remove the setup SSH parameters before starting this launcher.
+  # Start the service explicitly so access does not depend on a watcher event.
+  if ! sudo systemctl start ssh; then
+    echo "Failed to start SSH; continuing startup" >&2
+  fi
+}
+
 function install_addon_dependencies {
   local helper="$DIR/openpilot/selfdrive/addon/dependencies.py"
   local -a selection=(selected --params-root "$PARAMS_ROOT/d")
@@ -50,7 +68,12 @@ function agnos_init {
 }
 
 function launch {
-  # Prepare the shared log directory before starting any services.
+  PARAMS_ROOT="/data/params"
+  if [ -f /AGNOS ]; then
+    enable_ssh "$PARAMS_ROOT/d" || echo "Failed to prepare SSH; continuing startup" >&2
+  fi
+
+  # Prepare the shared application log directory.
   if [ ! -d /data/log ]; then
     mkdir -p /data/log || return 1
   fi
@@ -114,8 +137,6 @@ function launch {
   # write tmux scrollback to a file
   tmux capture-pane -pq -S-1000 > /tmp/launch_log
 
-  PARAMS_ROOT="/data/params"
-
   if [ ! -d "${PARAMS_ROOT}/crwusiz" ]; then
     mkdir -p ${PARAMS_ROOT}/crwusiz
   fi
@@ -151,16 +172,6 @@ function launch {
     cp -f $DIR/scripts/add/events_ko.py $DIR/openpilot/selfdrive/selfdrived/events.py
   elif [ "${LANG}" = "en" ] && [[ "${GITSTAT}" == *"modified:   openpilot/selfdrive/selfdrived/events.py"* ]]; then
     cp -f $DIR/scripts/add/events_en.py $DIR/openpilot/selfdrive/selfdrived/events.py
-  fi
-
-  # openpilot ssh key installer
-  if [ ! -f /data/params/d/GithubSshKeys ]; then
-    echo -n openpilot > /data/params/d/GithubUsername
-    cat /usr/comma/setup_keys > /data/params/d/GithubSshKeys
-  fi
-
-  if [ "$(cat /data/params/d/SshEnabled 2>/dev/null)" = "0" ]; then
-    echo -n 1 > /data/params/d/SshEnabled
   fi
 
   if [ "$(cat /data/params/d/AdbEnabled 2>/dev/null)" = "0" ]; then

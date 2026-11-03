@@ -19,7 +19,7 @@ signal.signal(signal.SIGTERM, stop_spinner)
 signal.signal(signal.SIGINT, stop_spinner)
 
 
-with Spinner() as spinner:
+with Spinner(keep_alive=True) as spinner:
   spinner.update("Installing add-on dependencies...")
   while running:
     time.sleep(0.5)
