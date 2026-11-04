@@ -369,6 +369,8 @@ class H264NetworkServer:
                   "hidden_camera_fps", "gpu_camera", "rgb_convert_avg_ms",
                   "render_avg_ms", "display_avg_ms", "queue_wait_avg_ms", "video_age_ms", "state_age_ms", "display_gap_max_ms",
                   "camera_display_gap_max_ms",
+                  "loop_lag_max_ms", "loop_wall_ms", "loop_cpu_ms", "loop_samples",
+                  "udp_sockets", "udp_drops_total", "udp_drops_delta", "udp_rmem_bytes", "udp_rcvbuf_bytes",
                   "dropped_display", "decoder_errors"):
         value = payload.get(key)
         if type(value) in (float, int) and 0 <= value <= 1e9:

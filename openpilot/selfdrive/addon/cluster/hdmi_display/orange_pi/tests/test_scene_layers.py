@@ -7,7 +7,9 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer, ColorBlendWorkspace, TextGlyph
+from openpilot.selfdrive.addon.cluster.cluster_renderer import (
+  TEXT_CACHE_MAX_BYTES, TEXT_CACHE_MAX_ENTRIES, ClusterRenderer, ColorBlendWorkspace, TextGlyph,
+)
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_scene import H264Scene, source_panel_geometry
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.scene_layers import LayeredRenderer
 
@@ -38,6 +40,82 @@ def _driving_state(**updates):
                      "lane_line_probs": [0.5, 0.9, 0.9, 0.5],
                      "road_edges": [lane(-4.2), lane(4.2)], "road_edge_stds": [0.1, 0.2],
                      "leads": [{"present": True, "d_rel": 22, "d_camera": 22, "y_rel": 0.2, "v_rel": -1.5}]}, **updates)
+
+
+def test_hud_preparation_keeps_inputs_filters_and_publication_empty():
+  scene = H264Scene(ASSETS, clock=lambda: 10)
+  renderer = scene.renderer
+  try:
+    assert scene._snapshot is scene._video is None
+    assert scene._state_received_at is scene._video_received_at is None
+    assert scene.last_status == {"state_fresh": False, "video_fresh": False, "model_valid": False}
+    assert renderer._last_render_at is renderer._blink_started_at is None
+    assert renderer._hud_cache_key is renderer._hud_cache_image is None
+    assert renderer._path_worker is renderer._path_executor is renderer._path_frame is None
+    assert renderer.last_frame_timings == {}
+    assert not renderer._lead_text_cache and not renderer._lead_info[0]
+    assert renderer._overlay_base.shape == (480, 1920, 4)
+    np.testing.assert_array_equal(renderer._overlay_base[:, :, :3], renderer.base_canvas)
+    assert np.all(renderer._overlay_base[:, :, 3] == 255)
+    camera = np.s_[renderer.camera_y:renderer.camera_y + renderer.camera_h,
+                   renderer.camera_x:renderer.camera_x + renderer.camera_w]
+    assert not np.any(renderer._overlay_camera_base[camera])
+    assert 0 < len(renderer._text_cache) <= TEXT_CACHE_MAX_ENTRIES
+    assert 0 < renderer._text_cache_bytes <= TEXT_CACHE_MAX_BYTES
+    assert renderer._text_cache_bytes == sum(glyph.byte_size for glyph in renderer._text_cache.values())
+  finally:
+    scene.close()
+
+
+def test_first_waiting_hud_uses_prepared_glyphs_and_icons(monkeypatch):
+  scene = H264Scene(ASSETS, clock=lambda: 10)
+  renderer = scene.renderer
+  glyph_keys, icon_keys = set(renderer._text_cache), set(renderer._icon_cache)
+  def no_cold_asset(*_args, **_kwargs):
+    pytest.fail("the first waiting frame must not rasterize cold glyphs or resize icons")
+  from openpilot.selfdrive.addon.cluster import cluster_renderer
+  monkeypatch.setattr(cluster_renderer, "TextGlyph", no_cold_asset)
+  monkeypatch.setattr(Image.Image, "resize", no_cold_asset)
+  try:
+    layers = scene.render_layers()
+    assert layers.camera is layers.path is None
+    assert layers.overlay.size == (1920, 480)
+    assert set(renderer._text_cache) == glyph_keys and set(renderer._icon_cache) == icon_keys
+    assert renderer._hud_cache_key is renderer._hud_cache_image is None
+    assert scene._snapshot is scene._video is None
+    assert scene._state_received_at is scene._video_received_at is None
+  finally:
+    scene.close()
+
+
+@pytest.mark.parametrize("live", [False, True])
+def test_prepared_hud_keeps_cold_reference_pixels_and_first_live_state(live):
+  warm = H264Scene(ASSETS, clock=lambda: 10)
+  cold = H264Scene(ASSETS, clock=lambda: 10)
+  cold.renderer._text_cache.clear()
+  cold.renderer._text_cache_bytes = 0
+  cold.renderer._icon_cache.clear()
+  cold.renderer._rotated_icon_cache.clear()
+  try:
+    if live:
+      hud = {"v_ego": 26.5, "accel": 0.5, "enabled": True, "lat_active": True, "steering_angle": 14.5,
+             "cruise_speed": 105, "set_speed": 105, "is_cruise_set": True, "tpms": [34, 35, 36, 37],
+             "wifi_strength": 4, "gps_satellites": 12, "gps_bearing": 42, "distance_level": 3}
+      for scene in (warm, cold):
+        scene.update(_driving_state(hud=hud))
+        scene.set_video(np.full((720, 1280, 3), 70, np.uint8))
+    actual, reference = warm.render_layers(), cold.render_layers()
+    assert actual.overlay.tobytes() == reference.overlay.tobytes()
+    assert warm.last_status == cold.last_status
+    np.testing.assert_array_equal(warm.renderer._source_to_panel, cold.renderer._source_to_panel)
+    if live:
+      assert warm.last_status == {"state_fresh": True, "video_fresh": True, "model_valid": True}
+      assert warm.renderer._hud_cache_key[2]["v_ego"] == 26.5
+      np.testing.assert_array_equal(actual.path, reference.path)
+      np.testing.assert_array_equal(actual.camera, reference.camera)
+  finally:
+    warm.close()
+    cold.close()
 
 
 def test_unchanged_hud_reuses_pixels_while_camera_and_path_keep_updating(monkeypatch):
@@ -401,6 +479,7 @@ def test_path_text_uses_an_independent_font_and_cache_while_hud_draws(monkeypatc
   hud_entered, labels_done = threading.Event(), threading.Event()
   owner = threading.get_ident()
   draw_hud, draw_leads = renderer._draw_hud, renderer._draw_lead_indicator
+  prepared_text = dict(renderer._text_cache)
 
   def hud(*args):
     assert threading.get_ident() == owner
@@ -414,7 +493,7 @@ def test_path_text_uses_an_independent_font_and_cache_while_hud_draws(monkeypatc
     result = draw_leads(*args)
     assert renderer._lead_font is not renderer.font_unit
     assert renderer._lead_font.font is not renderer.font_unit.font
-    assert renderer._lead_text_cache and not renderer._text_cache
+    assert renderer._lead_text_cache and dict(renderer._text_cache) == prepared_text
     labels_done.set()
     return result
 
@@ -461,6 +540,7 @@ def test_first_live_lead_uses_prepared_private_faces_without_opening_fonts(monke
 def test_independent_lead_glyphs_keep_existing_pixels_and_bounded_memory():
   scene = H264Scene(ASSETS)
   renderer = scene.renderer
+  prepared_text = dict(renderer._text_cache)
   try:
     for i in range(100):
       label = f"{i} km/h"
@@ -471,7 +551,7 @@ def test_independent_lead_glyphs_keep_existing_pixels_and_bounded_memory():
                                     np.asarray(expected.colored((255, 255, 255), (0, 0, 0))))
     assert len(renderer._lead_text_cache) <= 64 and renderer._lead_text_bytes <= 2 * 1024 * 1024
     assert renderer._lead_text_bytes == sum(glyph.byte_size for glyph in renderer._lead_text_cache.values())
-    assert not renderer._text_cache
+    assert dict(renderer._text_cache) == prepared_text
   finally:
     scene.close()
 

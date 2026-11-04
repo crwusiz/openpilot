@@ -1,15 +1,94 @@
-"""Bounded, read-only receiver resource samples for the ten-second H.264 log."""
+"""Bounded, read-only receiver process and owned UDP socket resource samples."""
 from itertools import islice
 import math
 from pathlib import Path
+import socket
+import struct
 import sys
 import time
+import weakref
 
 
 MAX_SENSOR_ENTRIES = 32
 MAX_STATUS_BYTES = 16384
 MAX_SENSOR_BYTES = 128
 MAX_CPU_LINE_BYTES = 512
+MAX_UDP_TRANSPORTS = 8
+UDP_METRIC_NAMES = ("udp_sockets", "udp_drops_total", "udp_drops_delta", "udp_rmem_bytes", "udp_rcvbuf_bytes")
+_SOCKET_MEMINFO = struct.Struct("=9I")
+
+
+class ReceiverUDPSampler:
+  """Sample only registered ICE sockets; never receive packets or enumerate process sockets.
+
+  Totals cover the current socket lifetimes. A delta is valid only when every
+  socket was readable in consecutive samples and the owned socket set is unchanged.
+  """
+  def __init__(self, platform=sys.platform, socket_api=socket):
+    self._level = socket_api.SOL_SOCKET
+    self._option = getattr(socket_api, "SO_MEMINFO", 55) if platform.startswith("linux") and self._level == 1 else None
+    self._transports = []
+    self._next_token = 0
+    self._previous = None
+    self._complete = True
+
+  @staticmethod
+  def empty_snapshot(socket_count=None):
+    return dict.fromkeys(UDP_METRIC_NAMES) | {"udp_sockets": socket_count}
+
+  def _active(self):
+    active = []
+    for token, reference in self._transports:
+      transport = reference()
+      try:
+        if transport is not None and not transport.is_closing():
+          active.append((token, reference))
+      except (AttributeError, OSError, RuntimeError):
+        pass
+    self._transports = active
+    return active
+
+  def register(self, transport):
+    active = self._active()
+    if any(reference() is transport for _, reference in active):
+      return True
+    if len(active) >= MAX_UDP_TRANSPORTS:
+      self._complete = False  # Untracked sockets make aggregate coverage unknown.
+      return False
+    try:
+      reference = weakref.ref(transport)
+    except TypeError:
+      self._complete = False
+      return False
+    self._next_token += 1
+    self._transports.append((self._next_token, reference))
+    return True
+
+  def sample(self):
+    active = self._active()
+    result = self.empty_snapshot(len(active))
+    current, allocated, capacity = {}, 0, 0
+    complete = self._complete and self._option is not None and bool(active)
+    for token, reference in active if complete else ():
+      transport = reference()
+      try:
+        sock = transport.get_extra_info("socket")
+        # Linux SO_MEMINFO returns the native-endian u32 SK_MEMINFO_* array.
+        values = _SOCKET_MEMINFO.unpack(sock.getsockopt(self._level, self._option, _SOCKET_MEMINFO.size))
+        current[(token, id(sock))] = values[8]
+        allocated += values[0]
+        capacity += values[1]
+      except (AttributeError, OSError, RuntimeError, TypeError, ValueError, struct.error):
+        complete = False
+        break
+    if complete:
+      result.update(udp_drops_total=sum(current.values()), udp_rmem_bytes=allocated, udp_rcvbuf_bytes=capacity)
+      if self._previous is not None and current.keys() == self._previous.keys():
+        differences = [value - self._previous[key] for key, value in current.items()]
+        if all(value >= 0 for value in differences):
+          result["udp_drops_delta"] = sum(differences)
+    self._previous = current if complete else None
+    return result
 
 
 def _read(path, limit=MAX_SENSOR_BYTES):

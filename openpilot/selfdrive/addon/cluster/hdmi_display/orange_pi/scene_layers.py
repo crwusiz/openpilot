@@ -104,6 +104,7 @@ class LayeredRenderer(ClusterRenderer):
     self._sync_path = None
     self._async_path_failed = False
     self._hud_cache_key = self._hud_cache_image = None
+    self._prepare_hud()
     try:
       cores = len(os.sched_getaffinity(0))
     except (AttributeError, OSError):
@@ -113,6 +114,19 @@ class LayeredRenderer(ClusterRenderer):
       "[CLUSTER_SCENE_WORKERS] camera_workers=1 | path_workers=%d | hud=owner | gpu=owner | queue=bounded | "
       + "text_cache=isolated | lane_projection=batched",
       int(self._parallel_path))
+
+  def _prepare_hud(self):
+    # The first waiting frame used to allocate both large RGBA backgrounds,
+    # resize icons and rasterize cold FreeType glyphs after WebRTC started.
+    # Do that work while constructing the scene, before its receiver thread
+    # can receive video. Retain only the ordinary bounded glyph/icon caches;
+    # the disposable warm-up image is never a published HUD or input snapshot.
+    self._overlay_base = np.empty((*self.base_canvas.shape[:2], 4), dtype=np.uint8)
+    self._overlay_base[:, :, :3] = self.base_canvas
+    self._overlay_base[:, :, 3] = 255
+    self._overlay_camera_base = self._overlay_base.copy()
+    self._overlay_camera_base[self.camera_y:self.camera_y + self.camera_h, self.camera_x:self.camera_x + self.camera_w] = 0
+    self._draw_hud(Image.fromarray(self._overlay_base.copy()), {"_state_stale": True}, False)
 
   def close(self):
     self._stop_path_pipeline()
@@ -278,12 +292,6 @@ class LayeredRenderer(ClusterRenderer):
     self._source_to_panel = transform.copy()
     self._source_to_panel[0, 2] += self.camera_x
     self._source_to_panel[1, 2] += self.camera_y
-    if not hasattr(self, "_overlay_base"):
-      self._overlay_base = np.empty((*self.base_canvas.shape[:2], 4), dtype=np.uint8)
-      self._overlay_base[:, :, :3] = self.base_canvas
-      self._overlay_base[:, :, 3] = 255
-      self._overlay_camera_base = self._overlay_base.copy()
-      self._overlay_camera_base[self.camera_y:self.camera_y + self.camera_h, self.camera_x:self.camera_x + self.camera_w] = 0
     model_valid, hud, path = models.get_render_data()
     snapshot_at = time.monotonic()
     # Camera and metadata arrive independently. Reuse a complete immutable HUD

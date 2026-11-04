@@ -121,10 +121,12 @@ def test_receiver_loop_tunes_its_udp_only_and_still_delivers_datagrams(caplog):
     try:
       sender.sendto(b"H264 packet", transport.get_extra_info("sockname"))
       assert await asyncio.wait_for(received, 1.0) == b"H264 packet"
+      assert loop.udp_sampler.sample()["udp_sockets"] == 1
     finally:
       sender.close()
       transport.close()
       await asyncio.sleep(0)
+      assert loop.udp_sampler.sample()["udp_sockets"] == 0
   receiver._run = run
   with caplog.at_level(logging.INFO, logger="cluster_receiver"):
     receiver._run_thread()
@@ -427,6 +429,31 @@ def test_receive_watchdog_keeps_video_that_recovers_after_more_than_two_seconds(
   assert receiver.received_frames == 10
 
 
+def test_existing_watchdog_records_loop_delay_and_its_own_cpu_separately(monkeypatch):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  now, cpu = [10.0], [4.0]
+  ticks = iter([(0.1, 0.002), (0.35, 0.03)])
+
+  async def tick(interval):
+    assert interval == 0.1
+    try:
+      wall_elapsed, cpu_elapsed = next(ticks)
+    except StopIteration:
+      raise asyncio.CancelledError from None
+    now[0] += wall_elapsed
+    cpu[0] += cpu_elapsed
+
+  unknown = h264_receiver._loop_metrics(receiver._stats)
+  assert unknown == {"loop_samples": 0, "loop_lag_max_ms": None, "loop_wall_ms": None, "loop_cpu_ms": None}
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(h264_receiver, "thread_time", lambda: cpu[0])
+  monkeypatch.setattr(h264_receiver, "asyncio", SimpleNamespace(sleep=tick))
+  with pytest.raises(asyncio.CancelledError):
+    asyncio.run(receiver._watchdog(started=10.0))
+  metrics = h264_receiver._loop_metrics(receiver._stats)
+  assert metrics == pytest.approx({"loop_samples": 2, "loop_lag_max_ms": 250, "loop_wall_ms": 450, "loop_cpu_ms": 32})
+
+
 def test_worker_failure_records_reason_and_stream_ages_without_a_traceback(caplog):
   receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
   receiver.last_video_at = receiver.last_state_at = time.monotonic() - 2
@@ -623,7 +650,7 @@ def run_feedback_ticks(monkeypatch, receiver, tick_count, update):
     feedbacks.append(payload)
 
   monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
-  monkeypatch.setattr(h264_receiver, "asyncio", SimpleNamespace(sleep=sleep))
+  monkeypatch.setattr(h264_receiver, "asyncio", SimpleNamespace(sleep=sleep, to_thread=asyncio.to_thread))
   monkeypatch.setattr(receiver, "_send_control", send)
   with pytest.raises(asyncio.CancelledError):
     asyncio.run(receiver._feedback())
@@ -662,6 +689,100 @@ def test_receiver_perf_logs_decode_error_delta_over_each_ten_seconds(monkeypatch
   assert len(messages) == 2
   assert "decoder_errors=1 |" in messages[0] and "decoder_errors=2 |" in messages[1]
   assert feedbacks[-1]["decoder_errors"] == 3
+
+
+def test_loop_feedback_and_ten_second_logs_preserve_maximum_and_unknown_windows(monkeypatch, caplog):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+
+  def update(tick, _now):
+    if tick in (1, 2, 11):
+      receiver._stats.update(loop_samples=10, loop_lag=0.25 if tick == 1 else 0.02, loop_wall=1.0, loop_cpu=0.03)
+
+  with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+    feedbacks = run_feedback_ticks(monkeypatch, receiver, 20, update)
+  assert feedbacks[0]["loop_lag_max_ms"] == 250
+  assert feedbacks[1]["loop_lag_max_ms"] == 20
+  assert feedbacks[2]["loop_samples"] == 0 and feedbacks[2]["loop_lag_max_ms"] is None
+  assert feedbacks[2]["loop_wall_ms"] is None and feedbacks[2]["loop_cpu_ms"] is None
+  messages = [record.getMessage() for record in caplog.records if "CLUSTER_H264_RX_PERF" in record.getMessage()]
+  assert "loop_samples=20.00 | loop_lag_max_ms=250.00 | loop_wall_ms=2000.00 | loop_cpu_ms=60.00" in messages[0]
+  assert "loop_samples=10.00 | loop_lag_max_ms=20.00 | loop_wall_ms=1000.00 | loop_cpu_ms=30.00" in messages[1]
+
+
+def test_udp_feedback_and_ten_second_logs_keep_window_delta_peak_and_unknowns(monkeypatch, caplog):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  snapshots = []
+  for tick in range(1, 41):
+    snapshot = {"udp_sockets": 1, "udp_drops_total": 100 + tick,
+                "udp_drops_delta": None if tick in (1, 21, 22) else 2 if 11 <= tick <= 20 else 0,
+                "udp_rmem_bytes": 500 if tick == 11 else 2, "udp_rcvbuf_bytes": 2097152}
+    if tick == 21:
+      snapshot.update(udp_drops_total=None, udp_rmem_bytes=None, udp_rcvbuf_bytes=None)
+    snapshots.append(snapshot)
+  sampler = SimpleNamespace(sample=Mock(side_effect=snapshots))
+  receiver.loop = SimpleNamespace(udp_sampler=sampler)
+  with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+    feedbacks = run_feedback_ticks(monkeypatch, receiver, 40, lambda *_args: None)
+  assert all(all(payload[name] == snapshot[name] for name in snapshot) for payload, snapshot in zip(feedbacks, snapshots, strict=True))
+  assert all(not payload["keyframe_request"] for payload in feedbacks)
+  assert sampler.sample.call_count == 40
+  messages = [record.getMessage() for record in caplog.records if "CLUSTER_H264_RX_PERF" in record.getMessage()]
+  assert len(messages) == 4
+  assert "udp_drops_delta=none" in messages[0] and "udp_drops_delta=20" in messages[1]
+  assert "udp_drops_delta=none" in messages[2] and "udp_drops_delta=0" in messages[3]
+  assert "udp_rmem_bytes=2" in messages[1] and "udp_rmem_peak_bytes=500" in messages[1]
+  assert "udp_drops_total=120" in messages[1] and "udp_rcvbuf_bytes=2097152" in messages[1]
+
+
+def test_slow_resource_sensor_reads_leave_the_rtc_loop_available(monkeypatch):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  release = threading.Event()
+  notifier = []
+  sample_threads, samples_released = [], []
+  now, sleeps = [0.0], [0]
+
+  def sample():
+    sample_threads.append(threading.get_ident())
+    loop, entered = notifier[0]
+    loop.call_soon_threadsafe(entered.set)
+    samples_released.append(release.wait(timeout=1.0))
+    return {}
+
+  async def tick(_interval):
+    sleeps[0] += 1
+    if sleeps[0] > 1:
+      raise asyncio.CancelledError
+    now[0] += 10.0
+    await asyncio.sleep(0)
+
+  async def run():
+    owner = threading.get_ident()
+    entered = asyncio.Event()
+    notifier.append((asyncio.get_running_loop(), entered))
+    task = asyncio.create_task(receiver._feedback())
+    try:
+      await asyncio.wait_for(entered.wait(), timeout=2.0)
+      # A decoded-video callback can still execute while the sysfs read is
+      # pending; a synchronous sample would have already timed out above.
+      assert not task.done() and not samples_released
+      receiver.publish_rgb("live callback", received_at=now[0])
+      assert receiver.received_frames == 1
+      assert len(sample_threads) == 1 and sample_threads[0] != owner
+      release.set()
+      with pytest.raises(asyncio.CancelledError):
+        await task
+    finally:
+      release.set()
+      if not task.done():
+        task.cancel()
+      await asyncio.gather(task, return_exceptions=True)
+
+  monkeypatch.setattr(receiver._resources, "sample", sample)
+  monkeypatch.setattr(receiver, "_send_control", AsyncMock())
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(h264_receiver, "asyncio", SimpleNamespace(sleep=tick, to_thread=asyncio.to_thread))
+  asyncio.run(run())
+  assert samples_released == [True] and len(sample_threads) == 1
 
 
 def test_receiver_stage_timings_average_only_present_valid_samples(monkeypatch, caplog):

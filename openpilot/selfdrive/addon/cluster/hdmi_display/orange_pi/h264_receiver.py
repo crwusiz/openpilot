@@ -16,13 +16,13 @@ try:
     ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, STATE, STATE_ZLIB,
     decode_payload, decode_state_payload, pack_control, unpack_control_header,
   )
-  from .receiver_resources import ReceiverResourceSampler, format_receiver_resources
+  from .receiver_resources import ReceiverResourceSampler, ReceiverUDPSampler, format_receiver_resources
 except ImportError:
   from h264_protocol import (
     ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, STATE, STATE_ZLIB,
     decode_payload, decode_state_payload, pack_control, unpack_control_header,
   )
-  from receiver_resources import ReceiverResourceSampler, format_receiver_resources
+  from receiver_resources import ReceiverResourceSampler, ReceiverUDPSampler, format_receiver_resources
 
 
 LOG = logging.getLogger("cluster_receiver")
@@ -31,6 +31,7 @@ STREAM_TIMEOUT = 8.0
 FEEDBACK_INTERVAL = 1.0
 RECOVERY_INTERVAL = 0.5
 RECOVERY_POLL_INTERVAL = 0.1
+LOOP_HEARTBEAT_INTERVAL = 0.1
 VIDEO_STALE_SECONDS = 0.5
 UDP_RECEIVE_BUFFER_BYTES = 1024 * 1024
 HUD_REFRESH_INTERVAL = 0.1
@@ -59,6 +60,14 @@ def _log_slow_frame(last_logged, started, rendered, displayed, owner_cpu, scene_
               "none" if video_at is None else f"{max(0.0, displayed - video_at) * 1000:.1f}",
               " | " + " | ".join(stages) if stages else "")
   return displayed
+
+
+def _loop_metrics(stats):
+  samples = int(stats["loop_samples"])
+  return {"loop_samples": samples,
+          "loop_lag_max_ms": stats["loop_lag"] * 1000 if samples else None,
+          "loop_wall_ms": stats["loop_wall"] * 1000 if samples else None,
+          "loop_cpu_ms": stats["loop_cpu"] * 1000 if samples else None}
 
 
 class H264ConfigurationError(RuntimeError):
@@ -102,9 +111,14 @@ def configure_udp_receive_buffer(transport):
 
 
 class _ReceiverEventLoop(asyncio.SelectorEventLoop):
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.udp_sampler = ReceiverUDPSampler()
+
   async def create_datagram_endpoint(self, *args, **kwargs):
     transport, protocol = await super().create_datagram_endpoint(*args, **kwargs)
     configure_udp_receive_buffer(transport)
+    self.udp_sampler.register(transport)
     return transport, protocol
 
 
@@ -189,7 +203,8 @@ class H264Receiver:
   @staticmethod
   def _empty_stats():
     keys = ["render_count", "render", "display", "queue_count", "queue", "convert_count", "convert", "gap", "camera_gap",
-            "hdmi_upload_count", "hdmi_upload_bytes", "hdmi_camera_reused", "hdmi_path_reused", "hdmi_overlay_reused"]
+            "hdmi_upload_count", "hdmi_upload_bytes", "hdmi_camera_reused", "hdmi_path_reused", "hdmi_overlay_reused",
+            "loop_samples", "loop_lag", "loop_wall", "loop_cpu"]
     keys.extend(("path_async_frames", *PATH_COUNTER_NAMES))
     for prefix, names in STAGE_NAMES.items():
       for name in names:
@@ -449,9 +464,21 @@ class H264Receiver:
     logged_decoder_errors = 0
     logged_decoded = logged_skipped = 0
     logged_stats = self._empty_stats()
+    logged_udp_drops = 0
+    logged_udp_complete = True
+    logged_udp_peak = None
     while True:
       await asyncio.sleep(FEEDBACK_INTERVAL)
       now = time.monotonic()
+      sampler = getattr(self.loop, "udp_sampler", None)
+      udp = sampler.sample() if sampler is not None else ReceiverUDPSampler.empty_snapshot()
+      delta = udp["udp_drops_delta"]
+      if delta is None:
+        logged_udp_complete = False
+      else:
+        logged_udp_drops += delta
+      if udp["udp_rmem_bytes"] is not None:
+        logged_udp_peak = max(logged_udp_peak or 0, udp["udp_rmem_bytes"])
       with self.condition:
         rx, displayed = self.received_frames, self.displayed_frames
         camera_displayed = self.displayed_video_frames
@@ -484,13 +511,15 @@ class H264Receiver:
           "state_age_ms": None if self.last_state_at is None else max(0, now - self.last_state_at) * 1000,
           "video_stale": video_stale,
           "state_stale": self.last_state_at is None or now - self.last_state_at >= 0.5,
+          **_loop_metrics(stats),
+          **udp,
         }
       recovery = self._take_recovery_request(now)
       if recovery is not None:
         payload.update(recovery)
       await self._send_control(FEEDBACK, payload)
       for key in stats:
-        logged_stats[key] = max(logged_stats[key], stats[key]) if key in ("gap", "camera_gap") else logged_stats[key] + stats[key]
+        logged_stats[key] = max(logged_stats[key], stats[key]) if key in ("gap", "camera_gap", "loop_lag") else logged_stats[key] + stats[key]
       if now - logged_at >= 10.0:
         elapsed = now - logged_at
         stages = "".join(f" | {prefix}_{name}_avg={logged_stats[f'{prefix}_{name}'] * 1000 / count:.1f}ms"
@@ -505,6 +534,12 @@ class H264Receiver:
                      + f" | hdmi_camera_reused={int(logged_stats['hdmi_camera_reused'])}"
                      + f" | hdmi_path_reused={int(logged_stats['hdmi_path_reused'])}"
                      + f" | hdmi_overlay_reused={int(logged_stats['hdmi_overlay_reused'])}")
+        stages += "".join(f" | {name}={value:.2f}" if value is not None else f" | {name}=none"
+                          for name, value in _loop_metrics(logged_stats).items())
+        udp_window = {**udp, "udp_drops_delta": logged_udp_drops if logged_udp_complete else None,
+                      "udp_rmem_peak_bytes": logged_udp_peak}
+        stages += "".join(f" | {name}={value}" if value is not None else f" | {name}=none"
+                          for name, value in udp_window.items())
         LOG.info("[CLUSTER_H264_RX_PERF] rx_fps=%.2f | display_fps=%.2f | dropped_display=%d | "
                  + "render_avg=%.1fms | display_avg=%.1fms | queue_wait_avg=%.1fms | rgb_convert_avg=%.1fms | "
                  + "display_gap_max=%.1fms | video_stale=%d | state_stale=%d | "
@@ -520,22 +555,40 @@ class H264Receiver:
                  decoder_errors - logged_decoder_errors, (decoded - logged_decoded) / elapsed,
                  skipped - logged_skipped, (camera_displayed - logged_camera_display) / elapsed,
                  payload["screen_off"], payload["gpu_camera"], stages)
-        LOG.info("[CLUSTER_PI_RESOURCE_PERF] %s", format_receiver_resources(self._resources.sample()))
+        # sysfs drivers may sleep during sensor reads. Use the existing RGB
+        # executor, and await this one sample before scheduling another, so
+        # resource logging cannot hold up ICE/RTP or queue sampler work.
+        resources = await asyncio.to_thread(self._resources.sample)
+        LOG.info("[CLUSTER_PI_RESOURCE_PERF] %s", format_receiver_resources(resources))
         logged_at, logged_rx, logged_display, logged_dropped = now, rx, displayed, payload["dropped_display"]
         logged_camera_display = camera_displayed
         logged_decoder_errors = decoder_errors
         logged_decoded, logged_skipped = decoded, skipped
         logged_stats = self._empty_stats()
+        logged_udp_drops = 0
+        logged_udp_complete = True
+        logged_udp_peak = None
       previous_at, previous_rx, previous_display = now, rx, displayed
       previous_camera_display = camera_displayed
       previous_metadata_display, previous_hidden_video = metadata_displayed, hidden_video
       previous_decoded = decoded
 
   async def _watchdog(self, started):
+    # Reuse the existing wakeup rather than adding another polling task.
+    # CPU belongs to this RTC thread; wall time also includes sleeps and time
+    # waiting for scheduling/GIL. Neither identifies the cause by itself.
+    previous_at, previous_cpu = time.monotonic(), thread_time()
     while True:
-      await asyncio.sleep(0.1)
-      now = time.monotonic()
+      await asyncio.sleep(LOOP_HEARTBEAT_INTERVAL)
+      now, cpu_now = time.monotonic(), thread_time()
+      elapsed, cpu_elapsed = now - previous_at, cpu_now - previous_cpu
+      previous_at, previous_cpu = now, cpu_now
       with self.condition:
+        if math.isfinite(elapsed) and math.isfinite(cpu_elapsed) and elapsed >= 0 and cpu_elapsed >= 0:
+          self._stats["loop_samples"] += 1
+          self._stats["loop_lag"] = max(self._stats["loop_lag"], elapsed - LOOP_HEARTBEAT_INTERVAL)
+          self._stats["loop_wall"] += elapsed
+          self._stats["loop_cpu"] += cpu_elapsed
         video_at, state_at = self.last_video_at, self.last_state_at
       if video_at is None:
         if now - started >= NEGOTIATION_TIMEOUT:

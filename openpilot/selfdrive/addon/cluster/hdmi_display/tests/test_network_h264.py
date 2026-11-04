@@ -313,6 +313,42 @@ async def test_receiver_recovery_requests_are_rate_limited_and_decoder_errors_ar
   assert any("camera_display_fps=14.75" in message for message in messages)
 
 
+@asyncio_test
+async def test_receiver_network_telemetry_is_logged_without_changing_recovery_or_vehicle_state(monkeypatch):
+  messages = []
+  monkeypatch.setattr(network, "flog", messages.append)
+  telemetry = {"loop_lag_max_ms": 153.25, "loop_wall_ms": 1005, "loop_cpu_ms": 82.75, "loop_samples": 8,
+               "udp_sockets": 1, "udp_drops_total": 103, "udp_drops_delta": 3,
+               "udp_rmem_bytes": 201216, "udp_rcvbuf_bytes": 2097152}
+  monkeypatch.setattr(network, "read_control", AsyncMock(side_effect=[(wire.FEEDBACK, 0, telemetry), EOFError()]))
+  track = SimpleNamespace(request_recovery=Mock())
+  server = network.H264NetworkServer(config(), models())
+  with pytest.raises(EOFError):
+    await server._feedback(None, track)
+  assert len(messages) == 1
+  for key, value in telemetry.items():
+    assert f"{key}={value:.2f}" in messages[0]
+  track.request_recovery.assert_not_called()
+  assert server.health == {} and not server.screen_off
+
+
+@pytest.mark.parametrize("invalid", [None, True, -1, float("nan"), float("inf"), 1e9 + 1, "bad\nlog", [], {}])
+@asyncio_test
+async def test_unavailable_or_malformed_receiver_network_telemetry_is_omitted(monkeypatch, invalid):
+  messages = []
+  monkeypatch.setattr(network, "flog", messages.append)
+  keys = ("loop_lag_max_ms", "loop_wall_ms", "loop_cpu_ms", "loop_samples", "udp_sockets",
+          "udp_drops_total", "udp_drops_delta", "udp_rmem_bytes", "udp_rcvbuf_bytes")
+  payload = dict.fromkeys(keys, invalid)
+  payload["camera_display_fps"] = 19.5
+  monkeypatch.setattr(network, "read_control", AsyncMock(side_effect=[(wire.FEEDBACK, 0, payload), EOFError()]))
+  server = network.H264NetworkServer(config(), models())
+  with pytest.raises(EOFError):
+    await server._feedback(None, SimpleNamespace())
+  assert len(messages) == 1 and "camera_display_fps=19.50" in messages[0]
+  assert all(f"{key}=" not in messages[0] for key in keys)
+
+
 def test_camera_age_uses_the_native_boot_clock_including_suspend(monkeypatch):
   get_boot = Mock(return_value=12_000_000_000)
   monkeypatch.setattr(network, "time", SimpleNamespace(CLOCK_BOOTTIME=7, clock_gettime_ns=get_boot, monotonic_ns=lambda: 9))

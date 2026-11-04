@@ -1,11 +1,17 @@
+import gc
+import struct
 from types import SimpleNamespace
+import weakref
 
 import pytest
 
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.receiver_resources import (
   MAX_SENSOR_ENTRIES,
   MAX_STATUS_BYTES,
+  MAX_UDP_TRANSPORTS,
+  UDP_METRIC_NAMES,
   ReceiverResourceSampler,
+  ReceiverUDPSampler,
   format_receiver_resources,
 )
 
@@ -188,3 +194,173 @@ def test_cpu_stat_read_stops_at_bounded_cpu_prefix_and_rejects_invalid_counters(
   result = sampler.sample()
   assert result["system_cpu_pct"] is None
   assert result["cpu_cores_pct"] is None
+
+
+class _UDPSocket:
+  def __init__(self, drops=0, allocated=0, capacity=2097152):
+    self.drops, self.allocated, self.capacity = drops, allocated, capacity
+    self.calls = []
+    self.failure = None
+    self.raw = None
+
+  def getsockopt(self, *args):
+    self.calls.append(args)
+    if self.failure is not None:
+      raise self.failure
+    return self.raw if self.raw is not None else struct.pack("=9I", self.allocated, self.capacity, 101, 102, 103, 104, 105, 106,
+                                                           self.drops)
+
+
+class _UDPTransport:
+  def __init__(self, sock=None):
+    self.sock = sock or _UDPSocket()
+    self.closing = False
+
+  def is_closing(self):
+    return self.closing
+
+  def get_extra_info(self, key):
+    assert key == "socket"
+    return self.sock
+
+
+def _udp_sampler(**kwargs):
+  return ReceiverUDPSampler(platform="linux", socket_api=SimpleNamespace(SOL_SOCKET=1, **kwargs))
+
+
+def test_udp_samples_only_owned_socket_meminfo_and_distinguishes_first_sample_from_zero_delta():
+  sampler = _udp_sampler()
+  transports = [_UDPTransport(_UDPSocket(0, 120)), _UDPTransport(_UDPSocket(7, 230))]
+  for transport in transports:
+    assert sampler.register(transport)
+  assert sampler.sample() == {"udp_sockets": 2, "udp_drops_total": 7, "udp_drops_delta": None,
+                              "udp_rmem_bytes": 350, "udp_rcvbuf_bytes": 4194304}
+  assert all(transport.sock.calls == [(1, 55, 36)] for transport in transports)
+  assert sampler.sample()["udp_drops_delta"] == 0
+  transports[0].sock.drops, transports[1].sock.drops = 2, 10
+  assert sampler.sample()["udp_drops_delta"] == 5
+
+
+def test_udp_zero_drops_from_readable_socket_are_known_but_no_socket_is_unknown():
+  sampler = _udp_sampler()
+  assert sampler.sample() == {"udp_sockets": 0, "udp_drops_total": None, "udp_drops_delta": None,
+                              "udp_rmem_bytes": None, "udp_rcvbuf_bytes": None}
+  transport = _UDPTransport()
+  sampler.register(transport)
+  assert sampler.sample()["udp_drops_total"] == 0
+
+
+def test_udp_unavailable_sampler_snapshot_has_no_claim_of_zero_owned_sockets():
+  result = ReceiverUDPSampler.empty_snapshot()
+  assert tuple(result) == UDP_METRIC_NAMES
+  assert all(value is None for value in result.values())
+
+
+@pytest.mark.parametrize("platform,level", [("win32", 65535), ("darwin", 65535), ("linux", 65535)])
+def test_udp_abi_fallback_does_not_read_meminfo_on_other_socket_platforms(platform, level):
+  sampler = ReceiverUDPSampler(platform=platform, socket_api=SimpleNamespace(SOL_SOCKET=level, SO_MEMINFO=55))
+  transport = _UDPTransport()
+  sampler.register(transport)
+  result = sampler.sample()
+  assert result["udp_sockets"] == 1
+  assert result["udp_drops_total"] is None
+  assert transport.sock.calls == []
+
+
+def test_udp_uses_exported_meminfo_option_when_available():
+  sampler = _udp_sampler(SO_MEMINFO=99)
+  transport = _UDPTransport()
+  sampler.register(transport)
+  assert sampler.sample()["udp_drops_total"] == 0
+  assert transport.sock.calls == [(1, 99, 36)]
+
+
+@pytest.mark.parametrize("failure,raw", [(OSError("unsupported socket option"), None), (ValueError("closed socket"), None),
+                                       (RuntimeError("transport closed"), None), (None, b""), (None, b"x" * 32),
+                                       (None, b"x" * 40), (None, "not bytes")])
+def test_udp_partial_or_unsupported_samples_are_unknown_and_require_a_new_baseline(failure, raw):
+  sampler = _udp_sampler()
+  first, second = _UDPTransport(_UDPSocket(3)), _UDPTransport(_UDPSocket(5))
+  sampler.register(first)
+  sampler.register(second)
+  sampler.sample()
+  second.sock.failure, second.sock.raw = failure, raw
+  result = sampler.sample()
+  assert result["udp_sockets"] == 2
+  assert all(value is None for key, value in result.items() if key != "udp_sockets")
+  second.sock.failure, second.sock.raw, second.sock.drops = None, None, 8
+  assert sampler.sample()["udp_drops_delta"] is None
+  assert sampler.sample()["udp_drops_delta"] == 0
+
+
+def test_udp_counter_reset_or_wrap_is_unknown_even_when_another_socket_keeps_total_increasing():
+  sampler = _udp_sampler()
+  first, second = _UDPTransport(_UDPSocket(0xFFFFFFFF)), _UDPTransport(_UDPSocket(10))
+  sampler.register(first)
+  sampler.register(second)
+  sampler.sample()
+  first.sock.drops, second.sock.drops = 0, 0xFFFFFFFF
+  assert sampler.sample()["udp_drops_delta"] is None
+  first.sock.drops = 5
+  assert sampler.sample()["udp_drops_delta"] == 5
+
+
+def test_udp_changed_owned_socket_set_rebases_and_duplicate_registration_does_not():
+  sampler = _udp_sampler()
+  first = _UDPTransport(_UDPSocket(10))
+  sampler.register(first)
+  sampler.sample()
+  assert sampler.register(first)
+  first.sock.drops = 11
+  assert sampler.sample()["udp_drops_delta"] == 1
+  second = _UDPTransport(_UDPSocket(12))
+  sampler.register(second)
+  assert sampler.sample()["udp_drops_delta"] is None
+  first.closing = True
+  assert sampler.sample()["udp_drops_delta"] is None
+  assert sampler.sample()["udp_sockets"] == 1
+  assert sampler.sample()["udp_drops_delta"] == 0
+  previous_socket = second.sock
+  second.sock = _UDPSocket(previous_socket.drops)
+  assert sampler.sample()["udp_drops_delta"] is None
+
+
+def test_udp_transport_tracking_releases_dead_and_closing_transports_without_owning_them():
+  sampler = _udp_sampler()
+  first, second = _UDPTransport(), _UDPTransport()
+  first_reference = weakref.ref(first)
+  sampler.register(first)
+  sampler.register(second)
+  sampler.sample()
+  del first
+  gc.collect()
+  assert first_reference() is None
+  result = sampler.sample()
+  assert result["udp_sockets"] == 1
+  assert result["udp_drops_delta"] is None
+  second.closing = True
+  assert sampler.sample()["udp_sockets"] == 0
+
+
+def test_udp_tracking_cap_preserves_unknown_coverage_instead_of_reporting_a_partial_zero():
+  sampler = _udp_sampler()
+  transports = [_UDPTransport() for _ in range(MAX_UDP_TRANSPORTS + 1)]
+  for transport in transports[:-1]:
+    assert sampler.register(transport)
+  assert not sampler.register(transports[-1])
+  result = sampler.sample()
+  assert result["udp_sockets"] == MAX_UDP_TRANSPORTS
+  assert result["udp_drops_total"] is None
+  transports[0].closing = True
+  assert sampler.register(transports[-1])
+  assert sampler.sample()["udp_sockets"] == MAX_UDP_TRANSPORTS
+  # An untracked interval keeps complete coverage unknown for this sampler.
+  assert sampler.sample()["udp_drops_delta"] is None
+
+
+def test_udp_nonweakrefable_transport_cannot_hold_resources_or_claim_complete_coverage():
+  sampler = _udp_sampler()
+  assert not sampler.register(SimpleNamespace())
+  transport = _UDPTransport()
+  assert sampler.register(transport)
+  assert sampler.sample()["udp_drops_total"] is None
