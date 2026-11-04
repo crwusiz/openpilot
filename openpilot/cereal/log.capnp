@@ -100,6 +100,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     startupNoControl @62;
     startupNoSecOcKey @63;
     startupMaster @64;
+    startupCruiseCanceled @105;
     fcw @65;
     steerSaturated @66;
     belowEngageSpeed @67;
@@ -133,7 +134,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     turningIndicatorOn @108;
     autoLaneChange @109;
 
-    ding @105;
+    ding @110;
     dong @106;
     beep @107;
 

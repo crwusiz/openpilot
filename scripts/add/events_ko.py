@@ -725,6 +725,14 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.USER_DISABLE: EngagementAlert(AudibleAlert.disengage),
   },
 
+  EventName.startupCruiseCanceled: {
+    ET.PERMANENT: Alert(
+      "크루즈 취소됨",
+      "",
+      AlertStatus.normal, AlertSize.mid,
+      Priority.MID, VisualAlert.none, AudibleAlert.disengage, 3.),
+  },
+
   EventName.buttonCancel: {
     ET.USER_DISABLE: EngagementAlert(AudibleAlert.disengage),
     ET.NO_ENTRY: NoEntryAlert("취소 버튼 눌림"),
