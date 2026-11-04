@@ -52,9 +52,11 @@ def load_lifecycle(loop, params):
   cloudlog.ctx.side_effect = lambda **_kwargs: contextlib.nullcontext()
   namespace = {
     'asyncio': SimpleNamespace(Lock=asyncio.Lock, TimerHandle=asyncio.TimerHandle, Task=asyncio.Task,
+                               create_task=asyncio.create_task, gather=asyncio.gather, current_task=asyncio.current_task,
+                               CancelledError=asyncio.CancelledError,
                                wait_for=asyncio.wait_for, get_running_loop=lambda: loop,
                                new_event_loop=Mock(return_value=loop), set_event_loop=Mock()),
-    'Any': Any, 'json': json, 'logging': logging, 'time': time, 'uuid': uuid, 'signal': signal,
+    'Any': Any, 'json': json, 'logging': logging, 'time': time, 'uuid': uuid, 'signal': signal, 'contextlib': contextlib,
     'StreamRequestBody': StreamRequestBody, 'Params': Mock(return_value=params), 'cloudlog': cloudlog,
     'DynamicPubMaster': Mock(), 'LivestreamBitrateController': Mock(),
     'CerealOutgoingMessageProxy': Mock(), 'CerealIncomingMessageProxy': Mock(),
@@ -87,7 +89,7 @@ class TestWebrtcIdleLifecycle(unittest.IsolatedAsyncioTestCase):
     self.api = load_lifecycle(self.timer_loop, self.params)
     self.state = self.api.ServerState()
     self.body = json.dumps({'sdp': 'v=0\r\na=candidate:wifi', 'cameras': ['road'], 'enabled': True}).encode()
-    self.session = Mock(identifier='new-session', enabled=True, run_task=None)
+    self.session = Mock(identifier='new-session', video_enabled=True, run_task=None)
     self.session.get_answer = AsyncMock(return_value=SimpleNamespace(sdp='v=0\r\na=candidate:c4-wifi', type='answer'))
     self.session.stop = AsyncMock()
     self.session.start.side_effect = self.start_session
@@ -177,7 +179,7 @@ class TestWebrtcIdleLifecycle(unittest.IsolatedAsyncioTestCase):
     self.fire_idle()
 
   async def test_old_completion_timer_cannot_stop_encoder_during_replacement_cleanup(self):
-    old = Mock(identifier='old-session', enabled=True, run_task=Mock(done=Mock(return_value=False)))
+    old = Mock(identifier='old-session', video_enabled=True, run_task=Mock(done=Mock(return_value=False)))
 
     async def stop_old():
       # The old run_task callback can remove it while stop() awaits cleanup.
@@ -196,7 +198,7 @@ class TestWebrtcIdleLifecycle(unittest.IsolatedAsyncioTestCase):
     self.params.put_bool.assert_not_called()
 
   async def test_active_session_is_preserved_when_disabled_prewarm_is_rejected(self):
-    old = Mock(identifier='active', enabled=True, run_task=Mock(done=Mock(return_value=False)))
+    old = Mock(identifier='active', video_enabled=True, run_task=Mock(done=Mock(return_value=False)))
     old.stop = AsyncMock()
     self.state.streams['active'] = old
     disabled = json.dumps({'sdp': 'v=0', 'cameras': ['road'], 'enabled': False}).encode()
@@ -207,6 +209,20 @@ class TestWebrtcIdleLifecycle(unittest.IsolatedAsyncioTestCase):
     old.stop.assert_not_awaited()
     self.assertIs(self.state.streams['active'], old)
 
+  async def test_disabled_prewarm_session_can_be_replaced(self):
+    old = Mock(identifier='prewarm', video_enabled=False, run_task=Mock(done=Mock(return_value=False)))
+    old.stop = AsyncMock()
+    self.state.streams[old.identifier] = old
+    disabled = json.dumps({'sdp': 'v=0', 'cameras': ['road'], 'enabled': False}).encode()
+
+    status, raw, _ = await self.request(disabled)
+
+    self.assertEqual(status, 200)
+    self.assertEqual(json.loads(raw)['type'], 'answer')
+    old.stop.assert_awaited_once()
+    self.assertEqual(list(self.state.streams), ['new-session'])
+    self.assertFalse(self.factory.call_args.args[0].enabled)
+
   async def test_session_end_releases_livestream_after_grace_period(self):
     await self.request()
     self.session.run_task.set_result(None)
@@ -216,7 +232,7 @@ class TestWebrtcIdleLifecycle(unittest.IsolatedAsyncioTestCase):
     self.params.put_bool.assert_called_once_with('IsLiveStreaming', False)
 
   async def test_previous_session_cleanup_failure_leaves_idle_state(self):
-    old = Mock(identifier='old-session', enabled=True, run_task=None, stop=AsyncMock(side_effect=RuntimeError('cleanup failed')))
+    old = Mock(identifier='old-session', video_enabled=True, run_task=None, stop=AsyncMock(side_effect=RuntimeError('cleanup failed')))
     self.state.streams['old-session'] = old
     with self.assertRaisesRegex(RuntimeError, 'cleanup failed'):
       await self.request()
