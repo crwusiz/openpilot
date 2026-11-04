@@ -28,6 +28,9 @@ from nicegui import app, ui
 
 from openpilot.selfdrive.addon.cluster.hdmi_display.maintenance import ACTION_PATH, ClusterActions
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import get_connected_pi_ip
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_profiles import (
+  DEFAULT_HDMI_PROFILE, HDMI_PROFILES, normalize_hdmi_profile,
+)
 from openpilot.selfdrive.addon.dashboard_drives import render_tab_drives
 from openpilot.selfdrive.addon.drive_video import DriveVideoLibrary, create_drive_video_router
 
@@ -818,6 +821,28 @@ def render_tab_toggles():
           ui.label('H.264 video. Changing the display transport restarts Cluster; new dependencies are prepared while offroad.').classes(
             'text-[0.75rem] md:text-sm text-gray-400 -mt-3 ml-1'
           )
+
+          if transport == "network":
+            profile = normalize_hdmi_profile(get_param_text("ClusterHdmiProfile", DEFAULT_HDMI_PROFILE))
+
+            def on_hdmi_profile_change(e):
+              if not isinstance(e.value, str) or e.value not in HDMI_PROFILES:
+                return
+              if e.value == normalize_hdmi_profile(get_param_text("ClusterHdmiProfile", DEFAULT_HDMI_PROFILE)):
+                return
+              params.put("ClusterHdmiProfile", e.value, block=True)
+              ui.notify(f"HDMI monitor: {e.value} (Cluster restarting)", position='top')
+              toggles_content.refresh()
+
+            ui.select(
+              {"1920x480": "8.8인치 · 1920×480", "1920x720": "10.3인치 · 1920×720"},
+              value=profile,
+              label="HDMI monitor",
+              on_change=on_hdmi_profile_change,
+            ).classes('w-full text-blue-200')
+            ui.label('모니터를 변경하면 Cluster가 재시작되고 새 해상도가 적용됩니다.').classes(
+              'text-[0.75rem] md:text-sm text-gray-400 -mt-3 ml-1'
+            )
 
         if key == "ClusterEnable":
           pi_status = ui.label(get_orange_pi_status_text()).classes('text-sm text-blue-200 break-words w-full')

@@ -34,7 +34,11 @@ def test_transport_selection_is_preserved_with_egpu(monkeypatch, transport, size
   assert config.usb_h264_gop == 1
   assert config.usb_h264_slice_max_bytes == 4096
   assert config.usb_h264_device.endswith("qcom_vidc-video-index1")
-  assert params.get.call_args_list == [call("ClusterDisplayTransport")]
+  expected_reads = [call("ClusterDisplayTransport")]
+  if transport == "network":
+    expected_reads.append(call("ClusterHdmiProfile"))
+    assert config.hdmi_profile == "1920x480"
+  assert params.get.call_args_list == expected_reads
   params.put.assert_not_called()
 
 
@@ -53,3 +57,24 @@ def test_network_fps_is_independent_of_the_main_ui(monkeypatch, cluster_fps, exp
   spec.loader.exec_module(module)
 
   assert module.ClusterConfig().fps == expected
+
+
+@pytest.mark.parametrize("profile,height", [(None, 480), ("1920x480", 480), ("1920x720", 720),
+                                           (b"1920x720", 720), ("unknown", 480)])
+@pytest.mark.parametrize("transport", ["network", "usb"])
+def test_hdmi_profile_selects_native_scene_dimensions_only_for_network(monkeypatch, profile, height, transport):
+  values = {"ClusterDisplayTransport": transport, "ClusterHdmiProfile": profile}
+  params = Mock(get=Mock(side_effect=values.get), get_bool=Mock(return_value=True))
+  monkeypatch.setitem(sys.modules, "openpilot.common.params", SimpleNamespace(Params=lambda: params))
+  monkeypatch.setitem(sys.modules, "openpilot.common.swaglog", SimpleNamespace(cloudlog=Mock()))
+  spec = importlib.util.spec_from_file_location("cluster_config_under_test", Path(__file__).parents[1] / "cluster_config.py")
+  module = importlib.util.module_from_spec(spec)
+  spec.loader.exec_module(module)
+
+  config = module.ClusterConfig()
+
+  assert (config.width, config.height) == (1920, height if transport == "network" else 462)
+  assert config.camera_panel_width > 0
+  assert config.camera_panel_height == config.height - 20
+  if transport == "network":
+    assert config.hdmi_profile == f"1920x{height}"

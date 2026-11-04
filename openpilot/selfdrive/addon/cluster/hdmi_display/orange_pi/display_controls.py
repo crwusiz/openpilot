@@ -74,6 +74,8 @@ class DisplayControls:
     if size == self.logical_size:
       return False
     self.logical_size = size
+    self._active_finger = None
+    self._dragging_slider = False
     self._layout = self._make_layout()
     self._fonts.clear()
     self.revision += 1

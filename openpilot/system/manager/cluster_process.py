@@ -1,6 +1,7 @@
 """Observe auxiliary cluster exits and restart explicitly selected modes."""
 
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog, record_process_exit
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_profiles import normalize_hdmi_profile
 
 
 def observe_cluster_exit(process):
@@ -20,7 +21,9 @@ def _selection(params):
       value = value.decode("utf-8", errors="replace")
     return str(value or default).strip().lower()
 
-  return text("ClusterDisplayTransport", "usb")
+  transport = text("ClusterDisplayTransport", "usb")
+  profile = normalize_hdmi_profile(params.get("ClusterHdmiProfile")) if transport == "network" else None
+  return transport, profile
 
 
 def prepare_cluster_start(process, params):
@@ -31,12 +34,12 @@ def prepare_cluster_start(process, params):
   if child is not None and child.exitcode is not None:
     observe_cluster_exit(process)
     changed = selection != getattr(process, "_cluster_selection", selection)
-    # A normal transport exit is an explicit restart request. A crash is
-    # left visible until the user changes transport or toggles Cluster, avoiding a
+    # A normal configuration exit is an explicit restart request. A crash is
+    # left visible until the user changes selection or toggles Cluster, avoiding a
     # tight loop around a failing hardware encoder.
     if child.exitcode == 0 or changed:
       reason = "selection_changed" if changed else "normal_exit"
-      flog(f"[CLUSTER_RESTART] reason={reason} transport={selection} codec=h264")
+      flog(f"[CLUSTER_RESTART] reason={reason} transport={selection[0]} hdmi_profile={selection[1]} codec=h264")
       process.stop()
   # start() also completes an earlier asynchronous stop before launching a new
   # child. Its configuration snapshot must describe that new child as well.

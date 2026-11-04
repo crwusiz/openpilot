@@ -23,6 +23,7 @@ def deploy_sandbox(tmp_path):
   scripts = package / "scripts"
   shutil.copytree(PACKAGE / "scripts", scripts)
   for name, content in {"cluster_receiver.py": "# receiver\n", "hdmi_display.py": "# display\n",
+                        "hdmi_profiles.py": "# HDMI profiles\n",
                         "display_controls.py": "# controls\n", "texture_presenter.py": "# presenter\n", "touch_status.py": "# touch status\n",
                          "receiver_build.py": "# receiver build\n",
                         "receiver_resources.py": "# receiver resources\n", "control_socket.py": "# control socket\n",
@@ -180,7 +181,7 @@ def test_c4_update_packages_receiver_only_with_checksums_and_cleans_staging(depl
     assert not data.startswith(b"\xef\xbb\xbf")
   assert files == {"README.md", "requirements.txt", "cluster-hdmi.service", "cluster_receiver.py", "hdmi_display.py",
                    "display_controls.py", "texture_presenter.py", "touch_status.py",  "receiver_build.py", "receiver_resources.py",
-                   "control_socket.py",
+                   "control_socket.py", "hdmi_profiles.py",
                    "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "scene_layers.py", "path_worker.py",
                    "cluster_renderer.py", "cluster_render_support.py", "receiver_assets.txt",
                    *(deploy_sandbox / "receiver_assets.txt").read_text().splitlines(),

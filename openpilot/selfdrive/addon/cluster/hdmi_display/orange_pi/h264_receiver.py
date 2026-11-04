@@ -12,12 +12,14 @@ import time
 from time import thread_time
 
 try:
+  from .hdmi_profiles import HDMI_PROFILES
   from .h264_protocol import (
     ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, STATE, STATE_ZLIB,
     decode_payload, decode_state_payload, pack_control, unpack_control_header,
   )
   from .receiver_resources import ReceiverResourceSampler, ReceiverUDPSampler, format_receiver_resources
 except ImportError:
+  from hdmi_profiles import HDMI_PROFILES
   from h264_protocol import (
     ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, STATE, STATE_ZLIB,
     decode_payload, decode_state_payload, pack_control, unpack_control_header,
@@ -160,6 +162,13 @@ def validate_hello(hello):
       raise ValueError(f"Invalid H.264 {name}")
   if hello["width"] * hello["height"] > 4 * 1024 * 1024:
     raise ValueError("H.264 scene exceeds pixel budget")
+  if "display_profile" in hello:
+    profile_name = hello["display_profile"]
+    if not isinstance(profile_name, str) or profile_name not in HDMI_PROFILES:
+      raise ValueError("Unsupported HDMI display profile")
+    profile = HDMI_PROFILES[profile_name]
+    if (hello["width"], hello["height"]) != (profile["width"], profile["height"]):
+      raise ValueError("HDMI display profile does not match scene dimensions")
 
 
 class H264Receiver:
@@ -716,6 +725,10 @@ class H264Receiver:
 
 def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=None):
   validate_hello(hello)
+  # The caller owns SDL; configure output before creating a scene or starting
+  # the WebRTC worker. Old C4 versions leave the current receiver output alone.
+  if "display_profile" in hello and not display.apply_profile(hello["display_profile"]):
+    raise RuntimeError("Unable to apply HDMI display profile")
   try:
     if __package__:
       from .h264_scene import H264Scene

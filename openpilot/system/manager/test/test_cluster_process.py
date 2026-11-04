@@ -120,3 +120,29 @@ def test_switch_during_async_stop_records_the_new_child_selection(manager):
   manager.process.proc.exitcode = 1
   manager.tick()
   assert manager.process.starts == 2
+
+
+def test_hdmi_profile_change_recovers_failed_network_process_once(manager):
+  manager.values.update(ClusterDisplayTransport="network", ClusterHdmiProfile="1920x480")
+  manager.tick()
+  manager.process.proc.exitcode = 1
+  manager.tick()
+  assert manager.process.starts == 1
+  manager.values["ClusterHdmiProfile"] = "1920x720"
+  manager.tick()
+  assert manager.process.starts == 2
+  assert "selection_changed" in manager.messages.call_args.args[0]
+  manager.process.proc.exitcode = 1
+  manager.tick()
+  assert manager.process.starts == 2
+
+
+@pytest.mark.parametrize("transport,profile", [("usb", "1920x720"), ("network", "unknown"), ("network", b"1920x480")])
+def test_unchanged_effective_profile_does_not_retry_failed_process(manager, transport, profile):
+  manager.values["ClusterDisplayTransport"] = transport
+  manager.tick()
+  manager.process.proc.exitcode = 1
+  manager.tick()
+  manager.values["ClusterHdmiProfile"] = profile
+  manager.tick()
+  assert manager.process.starts == 1

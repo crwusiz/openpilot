@@ -158,6 +158,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"PcmCruiseEnable", {PERSISTENT, BOOL}},
     {"ClusterEnable", {PERSISTENT, BOOL}},
     {"ClusterDisplayTransport", {PERSISTENT, STRING, "network"}},
+    {"ClusterHdmiProfile", {PERSISTENT, STRING, "1920x480"}},
 
     {"SelectedManufacturer", {PERSISTENT, STRING}},
     {"SelectedCar", {PERSISTENT, STRING}},

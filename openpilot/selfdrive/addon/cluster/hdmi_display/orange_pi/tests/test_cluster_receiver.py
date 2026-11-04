@@ -630,3 +630,19 @@ def test_main_does_not_report_ready_when_waiting_screen_fails(monkeypatch, caplo
     cluster_receiver.main()
   assert events == ["close"]
   assert "Cluster receiver ready" not in caplog.text
+
+
+def test_main_falls_back_to_active_mode_before_discovery_when_previous_panel_mode_is_rejected(monkeypatch, caplog):
+  events = []
+  display = SimpleNamespace(open=lambda: events.append("requested") or False,
+                            open_current_mode=lambda: events.append("active") or True,
+                            show_waiting=lambda: events.append("waiting") or True,
+                            pump_events=lambda: False, close=lambda: events.append("close"))
+  args = cluster_receiver.parse_args([])
+  monkeypatch.setattr(hdmi_display, "HdmiDisplay", lambda **_kwargs: display)
+  monkeypatch.setattr(cluster_receiver, "parse_args", lambda: args)
+  monkeypatch.setattr(cluster_receiver.signal, "signal", lambda *_args: None)
+  with caplog.at_level("INFO", logger="cluster_receiver"):
+    cluster_receiver.main()
+  assert events == ["requested", "active", "waiting", "waiting", "close"]
+  assert "Cluster receiver ready" in caplog.text

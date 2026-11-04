@@ -16,6 +16,7 @@ from openpilot.selfdrive.addon.cluster.cluster_health_guard import ClusterHealth
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 from openpilot.selfdrive.addon.cluster.cluster_runtime_metrics import ClusterRuntimeMetrics
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import write_network_status
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_profiles import normalize_hdmi_profile
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol import (
   ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, PATH_KEYS,
   decode_payload, pack_control, pack_scene, unpack_control_header, validate_scene,
@@ -473,6 +474,7 @@ class H264NetworkServer:
       flog(f"[CLUSTER_NETWORK_SUCCESS] Orange Pi connected from {peer[0]}:{peer[1]}.")
       await write_control(writer, HELLO, {"protocol": 1, "codec": "h264", "transport": "webrtc", "camera": "road",
                                         "width": self.config.width, "height": self.config.height, "fps": min(self.config.fps, 20),
+                                        "display_profile": self.config.hdmi_profile,
                                         "state_hz": 20, "state_compression": "zlib"}, budget_s=2)
       phase = "offer"
       kind, _sequence, offer = await read_control(reader, budget_s=15)
@@ -552,6 +554,9 @@ async def serve_h264(config, models):
         break
       if config.params.get("ClusterDisplayTransport") != "network":
         flog("[CLUSTER_H264_RESTART] Transport changed; restarting cluster.")
+        break
+      if normalize_hdmi_profile(config.params.get("ClusterHdmiProfile")) != config.hdmi_profile:
+        flog("[CLUSTER_H264_RESTART] HDMI monitor profile changed; restarting cluster.")
         break
       health = models.get_health_data()
       server.health = health

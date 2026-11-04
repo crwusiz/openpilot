@@ -3,6 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from openpilot.selfdrive.addon.cluster.cluster_render_support import Colors as Colors, colors_alpha as colors_alpha
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_profiles import HDMI_PROFILES, normalize_hdmi_profile
 
 DISPLAY = SimpleNamespace(
   transport="usb",  # "usb" or "network"
@@ -27,12 +28,6 @@ USB = SimpleNamespace(
   h264_device="/dev/v4l/by-path/platform-aa00000.qcom_vidc-video-index1",
 )
 
-# 8.8-inch HDMI panel; keep the standalone Orange Pi receiver defaults in sync.
-HDMI = SimpleNamespace(
-  width=1920,
-  height=480,
-)
-
 # C4 and the Orange Pi join the same hotspot. C4 listens on every Wi-Fi
 # address, and the Orange Pi discovers this port in its current IPv4 subnet.
 NETWORK = SimpleNamespace(
@@ -54,7 +49,9 @@ class ClusterConfig:
     if self.display_transport not in ("network", "usb"):
       raise ValueError(f"Unsupported cluster display transport: {self.display_transport}")
     if self.display_transport == "network":
-      self.width, self.height = HDMI.width, HDMI.height
+      self.hdmi_profile = normalize_hdmi_profile(self.params.get("ClusterHdmiProfile"))
+      profile = HDMI_PROFILES[self.hdmi_profile]
+      self.width, self.height = profile["width"], profile["height"]
     else:
       self.width, self.height = USB.width, USB.height
     # Keep the cluster cadence independent of the C4 UI's FPS override.

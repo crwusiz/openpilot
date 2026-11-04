@@ -25,7 +25,7 @@ def asyncio_test(function):
 
 def config():
   return SimpleNamespace(network_bind_host="127.0.0.1", network_port=0, width=1920, height=480, fps=20,
-                         is_metric=True, rotate_180=False, camera_contrast=1.08)
+                         hdmi_profile="1920x480", is_metric=True, rotate_180=False, camera_contrast=1.08)
 
 
 def models():
@@ -64,6 +64,51 @@ def factory():
     assert stream.stopped, "Native senders must stop before their producer is released"
   track.stop.side_effect = stop_track
   return stream, track
+
+
+@pytest.mark.parametrize("profile,height", [("1920x480", 480), ("1920x720", 720)])
+@asyncio_test
+async def test_hello_delivers_selected_native_hdmi_profile(monkeypatch, profile, height):
+  monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
+  settings = config()
+  settings.hdmi_profile, settings.height = profile, height
+  server = network.H264NetworkServer(settings, models(), Mock())
+  await server.start()
+  reader, writer = await asyncio.open_connection(*server.server.sockets[0].getsockname())
+  try:
+    kind, _sequence, hello = await network.read_control(reader)
+    assert kind == wire.HELLO
+    assert hello["display_profile"] == profile
+    assert (hello["width"], hello["height"]) == (1920, height)
+  finally:
+    writer.close()
+    await writer.wait_closed()
+    await server.close()
+
+
+@pytest.mark.parametrize("initial", [None, "unknown", "1920x480", b"1920x480"])
+@asyncio_test
+async def test_profile_change_closes_network_server_for_normal_restart(monkeypatch, initial):
+  monkeypatch.setitem(sys.modules, "openpilot.selfdrive.addon.cluster.cluster_policy",
+                      SimpleNamespace(enforce_cluster_transport=lambda *_args: True))
+  server = SimpleNamespace(start=AsyncMock(), close=AsyncMock())
+  monkeypatch.setattr(network, "H264NetworkServer", lambda *_args: server)
+  monkeypatch.setattr(network, "ClusterHealthGuard", lambda: SimpleNamespace(update=lambda *_args: None, degraded=False))
+  monkeypatch.setattr(network, "ClusterRuntimeMetrics", lambda: SimpleNamespace(sample=lambda *_args: None))
+  values = {"ClusterDisplayTransport": "network", "ClusterHdmiProfile": initial}
+  settings, source = config(), models()
+  settings.params, settings.display_transport = SimpleNamespace(get=values.get), "network"
+  source.get_health_data.return_value = {}
+  async def change_profile(_delay):
+    values["ClusterHdmiProfile"] = "1920x720"
+  sleep = AsyncMock(side_effect=change_profile)
+  monkeypatch.setattr(network.asyncio, "sleep", sleep)
+
+  await network.serve_h264(settings, source)
+
+  sleep.assert_awaited_once()
+  server.start.assert_awaited_once()
+  server.close.assert_awaited_once()
 
 
 def test_scene_snapshot_keeps_geometry_but_excludes_unused_duplicate_lines():

@@ -8,10 +8,12 @@ import subprocess
 import time
 
 try:
+  from .hdmi_profiles import HDMI_PROFILES
   from .display_controls import DEFAULT_BRIGHTNESS, DisplayControls, cluster_font_path
   from .texture_presenter import TexturePresenter
   from .touch_status import TouchWorker
 except ImportError:
+  from hdmi_profiles import HDMI_PROFILES
   from display_controls import DEFAULT_BRIGHTNESS, DisplayControls, cluster_font_path
   from texture_presenter import TexturePresenter
   from touch_status import TouchWorker
@@ -86,6 +88,7 @@ class HdmiDisplay:
                brightness=DEFAULT_BRIGHTNESS, renderer_mode="auto"):
     self.size = (max(1, int(width)), max(1, int(height)))
     self.rotation = int(rotation)
+    self._touch_rotation_override = touch_rotation
     # Touch coordinates are reported in panel orientation unless overridden for
     # a controller/desktop that has already rotated its input to landscape.
     self.touch_rotation = (-self.rotation) % 360 if touch_rotation is None else int(touch_rotation)
@@ -104,6 +107,7 @@ class HdmiDisplay:
     self.controls = None
     self._presenter = None
     self.screen = None
+    self._output_closed = False
     self.connected = False
     self.close_requested = False
     self.last_touch = None
@@ -187,6 +191,24 @@ class HdmiDisplay:
   def compositor_backend(self):
     return "pi_gpu_camera" if self._latest_layers is not None else "cpu_scene"
 
+  def apply_profile(self, profile_name):
+    """Apply a C4 monitor selection on SDL's owner thread, preserving controls."""
+    if not isinstance(profile_name, str) or profile_name not in HDMI_PROFILES:
+      raise ValueError("Unsupported HDMI display profile")
+    profile = HDMI_PROFILES[profile_name]
+    size = profile["output_width"], profile["output_height"]
+    rotation = profile["rotation"]
+    touch_rotation = (-rotation) % 360 if self._touch_rotation_override is None else int(self._touch_rotation_override)
+    if (self.size, self.rotation, self.touch_rotation) == (size, rotation, touch_rotation) and self.connected:
+      return True
+    # Rebuild only the native window. Keep brightness, screen-off state, queued
+    # actions and background status work attached to the same controls object.
+    self._close_output()
+    self.size, self.rotation, self.touch_rotation = size, rotation, touch_rotation
+    LOG.info("[CLUSTER_HDMI_PROFILE] profile=%s | output=%dx%d | rotation=%d | touch_rotation=%d",
+             profile_name, *size, rotation, touch_rotation)
+    return self.open()
+
   def open(self):
     if self.connected:
       return True
@@ -231,6 +253,7 @@ class HdmiDisplay:
       self._controls_revision = self.controls.revision
       self.close_requested = False
       self.connected = True
+      self._output_closed = False
       LOG.info("Orange Pi HDMI display ready at %dx%d, frame rotation=%d clockwise, touch correction=%d clockwise",
                *self.screen.get_size(), self.rotation, self.touch_rotation)
       return True
@@ -251,6 +274,32 @@ class HdmiDisplay:
       elif "gbm" in str(e).lower() or "egl" in str(e).lower():
         LOG.info("GBM/EGL window creation failed after SDL video initialization.")
         LOG.info("Run sudo bash scripts/diagnose.sh --egl to collect GBM/EGL details; see README.md for the X11 fallback.")
+      self.close()
+      return False
+
+  def open_current_mode(self):
+    """Use the active OS mode for startup if the old panel's mode is rejected.
+
+    A successful C4 handshake still applies the manually selected profile.
+    This fallback only keeps discovery and the local waiting screen available
+    while replacing a panel with a different HDMI mode.
+    """
+    try:
+      if self._pygame is None:
+        return False
+      self._pygame.display.init()
+      sizes = self._pygame.display.get_desktop_sizes()
+      width, height = sizes[self.display_index]
+      if width <= 0 or height <= 0:
+        raise ValueError("Invalid active HDMI output dimensions")
+      self.size = int(width), int(height)
+      self.rotation = 90 if height > width else 0
+      self.touch_rotation = (-self.rotation) % 360 if self._touch_rotation_override is None else int(self._touch_rotation_override)
+      LOG.warning("[CLUSTER_HDMI_STARTUP_FALLBACK] output=%dx%d | rotation=%d | waiting_for=dashboard_profile",
+                  *self.size, self.rotation)
+      return self.open()
+    except (AttributeError, IndexError, TypeError, ValueError, RuntimeError):
+      LOG.exception("Unable to use the active HDMI output mode")
       self.close()
       return False
 
@@ -290,6 +339,8 @@ class HdmiDisplay:
     pygame = self._pygame
     if pygame is None:
       return False
+    if self._output_closed:
+      return not self.close_requested
     for event in pygame.event.get():
       if event.type == pygame.QUIT or (
         event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
@@ -617,8 +668,9 @@ class HdmiDisplay:
     self._waiting_requested = False
     self.last_frame_presented = False
 
-  def close(self):
+  def _close_output(self):
     self.connected = False
+    self._output_closed = True
     screen = self.screen
     self.screen = None
     self._waiting_frame = None
@@ -629,11 +681,30 @@ class HdmiDisplay:
     self._waiting_requested = False
     self._menu_surface = self._menu_rotated = None
     self.last_frame_presented = False
+    self._frame_times.clear()
+    if self._pygame is None:
+      return
+    presenter, self._presenter = self._presenter, None
+    try:
+      if presenter is not None:
+        presenter.close()
+      elif screen is not None:
+        screen.fill((0, 0, 0))
+        self._pygame.display.flip()
+    except Exception:
+      LOG.debug("Unable to clear the previous HDMI output", exc_info=True)
+    finally:
+      try:
+        self._pygame.display.quit()
+      except Exception:
+        LOG.debug("Unable to close the previous HDMI output", exc_info=True)
+
+  def close(self):
+    self._close_output()
     self._network_status = None
     self._waiting_network_status = None
     self._network_future = None
     self._network_next_check = 0.0
-    self._frame_times.clear()
     self._panel_future = None
     self._panel_next_check = 0.0
     if self._panel_executor is not None:
@@ -642,15 +713,3 @@ class HdmiDisplay:
     if self._network_executor is not None:
       self._network_executor.shutdown(wait=False, cancel_futures=True)
       self._network_executor = None
-    if self._pygame is None:
-      return
-    try:
-      if self._presenter is not None:
-        self._presenter.close()
-        self._presenter = None
-      elif screen is not None:
-        screen.fill((0, 0, 0))
-        self._pygame.display.flip()
-      self._pygame.display.quit()
-    except Exception:
-      pass

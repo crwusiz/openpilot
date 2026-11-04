@@ -292,9 +292,10 @@ def parse_args(argv=None):
   parser.add_argument("--reconnect-delay", type=_positive_float, default=DEFAULT_RECONNECT_DELAY)
   parser.add_argument("--frame-timeout", type=_positive_float, default=FRAME_TIMEOUT_SECONDS,
                       help="Video freshness timeout and H.264 signaling handshake deadline in seconds")
-  parser.add_argument("--width", type=_positive_int, default=1920, help="Physical HDMI output width, after frame rotation")
-  parser.add_argument("--height", type=_positive_int, default=480, help="Physical HDMI output height, after frame rotation")
-  parser.add_argument("--rotation", type=int, choices=(0, 90, 180, 270), default=0, help="Clockwise display rotation in degrees")
+  parser.add_argument("--width", type=_positive_int, default=1920, help="Startup HDMI output width; C4 monitor profile overrides it")
+  parser.add_argument("--height", type=_positive_int, default=480, help="Startup HDMI output height; C4 monitor profile overrides it")
+  parser.add_argument("--rotation", type=int, choices=(0, 90, 180, 270), default=0,
+                      help="Startup clockwise display rotation; C4 monitor profile overrides it")
   parser.add_argument("--touch-rotation", type=int, choices=(0, 90, 180, 270),
                       help="Clockwise correction from raw touch to cluster coordinates (default: inverse of --rotation)")
   parser.add_argument("--log-touch", action="store_true", help="Log raw and corrected SDL finger coordinates")
@@ -352,7 +353,7 @@ def main():
   signal.signal(signal.SIGTERM, stop_receiver)
 
   try:
-    if not display.open():
+    if not display.open() and not display.open_current_mode():
       raise RuntimeError("Unable to initialize the Orange Pi HDMI display")
     if not display.show_waiting():
       raise RuntimeError("Unable to display the Orange Pi connection waiting screen")

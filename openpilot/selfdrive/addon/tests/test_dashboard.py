@@ -83,6 +83,12 @@ class TestDashboardHelpers(unittest.TestCase):
           dashboard.render_tab_toggles()
           selects = [element for element in client.elements.values() if isinstance(element, ui.select)]
           self.assertFalse(any('codec' in (element.label or '').lower() for element in selects))
+          monitors = [element for element in selects if element.label == 'HDMI monitor']
+          self.assertEqual(len(monitors), int(enabled and transport == 'network'))
+          if monitors:
+            self.assertEqual(monitors[0].value, '1920x480')
+            self.assertEqual(monitors[0].options,
+                             {'1920x480': '8.8인치 · 1920×480', '1920x720': '10.3인치 · 1920×720'})
           if enabled:
             control = next(element for element in selects if element.label == 'Cluster display transport')
             self.assertEqual(control.value, transport)
@@ -108,6 +114,51 @@ class TestDashboardHelpers(unittest.TestCase):
         self.assertIn('Cluster restarting', notify.call_args.args[0])
         self.assertFalse(any(isinstance(element, ui.select) and 'codec' in (element.label or '').lower()
                              for element in client.elements.values()))
+    asyncio.run(exercise())
+
+  def test_hdmi_monitor_uses_saved_profile_and_falls_back_for_stale_values(self):
+    for stored, expected in ((b'1920x720', '1920x720'), ('1920x480', '1920x480'), (None, '1920x480'), ('removed', '1920x480')):
+      with self.subTest(stored=stored):
+        client = Client(ui.page(f'/test-hdmi-profile-{expected}-{stored}'))
+        self.addCleanup(client.delete)
+        values = {'ClusterDisplayTransport': 'network', 'ClusterHdmiProfile': stored}
+        params = Mock(get=Mock(side_effect=values.get), get_bool=Mock(side_effect=lambda key: key == 'ClusterEnable'))
+        with client, patch.object(dashboard, 'params', params), patch.object(ui, 'timer'), \
+             patch.object(dashboard, 'get_connected_pi_ip', return_value=None):
+          dashboard.render_tab_toggles()
+          select = next(element for element in client.elements.values()
+                        if isinstance(element, ui.select) and element.label == 'HDMI monitor')
+          self.assertEqual(select.value, expected)
+          params.put.assert_not_called()
+
+  def test_hdmi_monitor_change_persists_and_reports_restart(self):
+    async def exercise():
+      client = Client(ui.page('/test-hdmi-profile-change'))
+      self.addCleanup(client.delete)
+      values = {'ClusterDisplayTransport': 'network'}
+      params = Mock(get=Mock(side_effect=values.get), get_bool=Mock(side_effect=lambda key: key == 'ClusterEnable'))
+      params.put.side_effect = lambda key, value, **_kwargs: values.__setitem__(key, value)
+      with client, patch.object(core, 'loop', asyncio.get_running_loop()), patch.object(dashboard, 'params', params), \
+           patch.object(ui, 'timer'), patch.object(ui, 'notify') as notify, patch.object(dashboard, 'get_connected_pi_ip', return_value=None):
+        dashboard.render_tab_toggles()
+        select = next(element for element in client.elements.values()
+                      if isinstance(element, ui.select) and element.label == 'HDMI monitor')
+        select.set_value('1920x720')
+        await asyncio.sleep(0)
+        params.put.assert_called_once_with('ClusterHdmiProfile', '1920x720', block=True)
+        self.assertIn('Cluster restarting', notify.call_args.args[0])
+        refreshed = next(element for element in client.elements.values()
+                         if isinstance(element, ui.select) and element.label == 'HDMI monitor')
+        self.assertEqual(refreshed.value, '1920x720')
+        params.put.reset_mock()
+        notify.reset_mock()
+        for invalid in (None, '1920x1080'):
+          refreshed.set_value(invalid)
+          await asyncio.sleep(0)
+        refreshed.set_value('1920x720')
+        await asyncio.sleep(0)
+        params.put.assert_not_called()
+        notify.assert_not_called()
     asyncio.run(exercise())
 
   def test_routes_ignore_invalid_names_and_sort_segments_numerically(self):
