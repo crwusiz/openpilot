@@ -76,7 +76,7 @@ class H264ConfigurationError(RuntimeError):
   retry_delay_s = 5.0
 
 
-def configure_udp_receive_buffer(transport):
+def configure_udp_receive_buffer(transport, *, phase="endpoint"):
   """Give reference-picture bursts room, within the kernel's existing limit.
 
   This uses the public asyncio transport socket, not aiortc/ICE internals.
@@ -99,17 +99,18 @@ def configure_udp_receive_buffer(transport):
       except (OSError, ValueError, UnicodeError):
         # Without the cap we cannot know whether setsockopt would shrink an
         # unusually large inherited default. Keep that socket unchanged.
-        LOG.info("[CLUSTER_H264_UDP_BUFFER] before=%d | actual=%d | action=keep_default | reason=limit_unavailable", before, before)
+        LOG.info("[CLUSTER_H264_UDP_BUFFER] before=%d | actual=%d | action=keep_default | reason=limit_unavailable | phase=%s",
+                 before, before, phase)
         return
       requested = min(requested, kernel_max)
     if before < requested * (2 if linux else 1):
       sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, requested)
     actual = sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
-    LOG.info("[CLUSTER_H264_UDP_BUFFER] before=%d | requested=%d | actual=%d | kernel_max=%s | target=%d",
-             before, requested, actual, kernel_max if kernel_max is not None else "n/a", UDP_RECEIVE_BUFFER_BYTES)
+    LOG.info("[CLUSTER_H264_UDP_BUFFER] before=%d | requested=%d | actual=%d | kernel_max=%s | target=%d | phase=%s",
+             before, requested, actual, kernel_max if kernel_max is not None else "n/a", UDP_RECEIVE_BUFFER_BYTES, phase)
   except OSError as error:
     # Buffer tuning must not turn a working ICE socket into a failed session.
-    LOG.warning("[CLUSTER_H264_UDP_BUFFER] action=keep_socket | error=%s", error)
+    LOG.warning("[CLUSTER_H264_UDP_BUFFER] action=keep_socket | error=%s | phase=%s", error, phase)
 
 
 class _ReceiverEventLoop(asyncio.SelectorEventLoop):
@@ -122,6 +123,13 @@ class _ReceiverEventLoop(asyncio.SelectorEventLoop):
     configure_udp_receive_buffer(transport)
     self.udp_sampler.register(transport)
     return transport, protocol
+
+  def configure_udp_receive_buffers(self):
+    # aioice sets its own SO_RCVBUF after create_datagram_endpoint returns.
+    # Reapply after public ICE gathering has completed, before sending the
+    # offer, rather than relying on callback ordering or its private sockets.
+    for transport in self.udp_sampler.active_transports():
+      configure_udp_receive_buffer(transport, phase="ice_ready")
 
 
 def _receiver_event_loop():
@@ -194,6 +202,7 @@ class H264Receiver:
     self.done = self.closing = False
     self.loop = self.stop_event = None
     self._main_task = None
+    self._tearing_down = self._cancel_requested = False
     self._async_error = None
     self._send_lock = None
     self._recovery_event = None
@@ -649,6 +658,9 @@ class H264Receiver:
 
       async def negotiate():
         await peer.setLocalDescription(await peer.createOffer())
+        configure_buffers = getattr(self.loop, "configure_udp_receive_buffers", None)
+        if callable(configure_buffers):
+          configure_buffers()
         offer = {"type": "offer", "sdp": peer.localDescription.sdp}
         if self.hello.get("state_compression") == "zlib":
           offer["state_compression"] = "zlib"
@@ -685,6 +697,7 @@ class H264Receiver:
       if self._async_error is not None and not self.closing:
         raise self._async_error
     finally:
+      self._tearing_down = True
       for task in tasks + video_tasks:
         task.cancel()
       await asyncio.gather(*(tasks + video_tasks), return_exceptions=True)
@@ -692,6 +705,18 @@ class H264Receiver:
         await asyncio.wait_for(peer.close(), timeout=3.0)
       except TimeoutError:
         LOG.warning("WebRTC peer did not close within three seconds")
+
+  def _cancel_if_running(self, task):
+    # Run this check on the RTC loop: EOF may already have entered teardown
+    # between close() scheduling cancellation and this callback executing.
+    # A late or repeated cancel would interrupt the awaited ICE/peer cleanup.
+    if task is not self._main_task or self._tearing_down or self._cancel_requested or task.done():
+      return
+    cancelling = getattr(task, "cancelling", None)
+    if callable(cancelling) and cancelling():
+      return
+    self._cancel_requested = True
+    task.cancel()
 
   def close(self):
     with self.condition:
@@ -701,7 +726,7 @@ class H264Receiver:
     loop, main_task = self.loop, self._main_task
     if loop is not None and main_task is not None:
       try:
-        loop.call_soon_threadsafe(main_task.cancel)
+        loop.call_soon_threadsafe(self._cancel_if_running, main_task)
       except RuntimeError:
         pass
     try:

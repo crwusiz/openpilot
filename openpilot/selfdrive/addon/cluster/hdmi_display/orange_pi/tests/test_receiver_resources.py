@@ -342,6 +342,20 @@ def test_udp_transport_tracking_releases_dead_and_closing_transports_without_own
   assert sampler.sample()["udp_sockets"] == 0
 
 
+def test_udp_transport_setup_borrows_only_the_registered_live_set():
+  sampler = _udp_sampler()
+  first, second = _UDPTransport(), _UDPTransport()
+  sampler.register(first)
+  sampler.register(second)
+  assert sampler.active_transports() == (first, second)
+  second.closing = True
+  assert sampler.active_transports() == (first,)
+  first_reference = weakref.ref(first)
+  del first
+  gc.collect()
+  assert first_reference() is None and sampler.active_transports() == ()
+
+
 def test_udp_tracking_cap_preserves_unknown_coverage_instead_of_reporting_a_partial_zero():
   sampler = _udp_sampler()
   transports = [_UDPTransport() for _ in range(MAX_UDP_TRANSPORTS + 1)]

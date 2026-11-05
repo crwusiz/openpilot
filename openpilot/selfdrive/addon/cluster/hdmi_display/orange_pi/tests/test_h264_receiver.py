@@ -1,5 +1,6 @@
 import asyncio
 import builtins
+import contextlib
 import gc
 import logging
 from pathlib import Path
@@ -142,6 +143,47 @@ def test_receiver_loop_tunes_its_udp_only_and_still_delivers_datagrams(caplog):
     default.close()
 
 
+@pytest.mark.parametrize("before,expected", [(524288, 2097152), (4194304, 4194304)])
+def test_ice_ready_buffer_setup_repairs_library_overwrite_and_keeps_larger_socket_buffers(monkeypatch, caplog, before, expected):
+  size = [before]
+  sock = Mock(getsockopt=lambda *_args: size[0])
+  sock.setsockopt.side_effect = lambda _level, _option, requested: size.__setitem__(0, requested * 2)
+  transport = Mock(is_closing=Mock(return_value=False), get_extra_info=Mock(return_value=sock))
+  closed = Mock(is_closing=Mock(return_value=True))
+  loop = h264_receiver._ReceiverEventLoop()
+  loop.udp_sampler.register(transport)
+  loop.udp_sampler.register(closed)
+  monkeypatch.setattr(h264_receiver, "sys", SimpleNamespace(platform="linux"))
+  monkeypatch.setattr(h264_receiver.Path, "read_text", lambda *_args, **_kwargs: "1048576")
+  try:
+    with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+      loop.configure_udp_receive_buffers()
+    assert size[0] == expected
+    assert "phase=ice_ready" in caplog.text and f"actual={expected}" in caplog.text
+    if before < expected:
+      sock.setsockopt.assert_called_once_with(socket.SOL_SOCKET, socket.SO_RCVBUF, 1048576)
+    else:
+      sock.setsockopt.assert_not_called()
+    closed.get_extra_info.assert_not_called()
+  finally:
+    loop.close()
+
+
+def test_ice_ready_socket_tuning_failure_keeps_connection_and_reports_phase(monkeypatch, caplog):
+  sock = Mock(getsockopt=Mock(return_value=262144), setsockopt=Mock(side_effect=OSError("unavailable")))
+  transport = Mock(is_closing=Mock(return_value=False), get_extra_info=Mock(return_value=sock))
+  loop = h264_receiver._ReceiverEventLoop()
+  loop.udp_sampler.register(transport)
+  monkeypatch.setattr(h264_receiver, "sys", SimpleNamespace(platform="win32"))
+  try:
+    loop.configure_udp_receive_buffers()
+    assert "action=keep_socket" in caplog.text and "phase=ice_ready" in caplog.text
+    transport.close.assert_not_called()
+    sock.close.assert_not_called()
+  finally:
+    loop.close()
+
+
 def test_legacy_asyncio_still_runs_receiver_without_changing_global_policy(monkeypatch, caplog):
   receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
   receiver._run = AsyncMock()
@@ -265,6 +307,142 @@ def test_webrtc_signaling_metadata_and_feedback_share_control_socket_without_fra
     c4_sock.close()
     pi_sock.close()
   assert fake_aiortc[0].closed and not receiver.thread.is_alive()
+
+
+def test_real_aioice_gathering_overwrite_is_repaired_before_receiver_offer(monkeypatch, fake_aiortc, caplog):
+  aioice = pytest.importorskip("aioice")
+  # Bind only local loopback; gathering has no STUN/TURN or external traffic.
+  monkeypatch.setattr(aioice.ice, "get_host_addresses", lambda **_kwargs: ["127.0.0.1"])
+  peer_type = sys.modules["aiortc"].RTCPeerConnection
+  original_local, original_close = peer_type.setLocalDescription, peer_type.close
+  target = h264_receiver.UDP_RECEIVE_BUFFER_BYTES
+  multiplier = 2 if sys.platform.startswith("linux") else 1
+  if multiplier == 2:
+    target = min(target, int(Path("/proc/sys/net/core/rmem_max").read_text(encoding="ascii")))
+
+  async def gather(peer, description):
+    await original_local(peer, description)
+    peer.ice = aioice.Connection(ice_controlling=False, stun_server=None, turn_server=None, use_ipv6=False)
+    await peer.ice.gather_candidates()
+    transports = asyncio.get_running_loop().udp_sampler.active_transports()
+    assert len(transports) == 1
+    peer.gather_socket = transports[0].get_extra_info("socket")
+    peer.after_gather_buffer = peer.gather_socket.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
+
+  async def close(peer):
+    if hasattr(peer, "ice"):
+      await peer.ice.close()
+    await original_close(peer)
+
+  monkeypatch.setattr(peer_type, "setLocalDescription", gather)
+  monkeypatch.setattr(peer_type, "close", close)
+  c4_sock, pi_sock = socket.socketpair()
+  c4_sock.settimeout(2.0)
+  receiver = h264_receiver.H264Receiver(pi_sock, HELLO_DATA)
+  try:
+    with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+      receiver.start()
+      assert read_control(c4_sock)[0] == OFFER
+    peer = fake_aiortc[0]
+    # The library shrinks the buffer after our endpoint hook. Its public
+    # gathering lifecycle has now finished and the offer is not sent until
+    # the receiver restores its own bounded request.
+    assert peer.after_gather_buffer <= aioice.turn.UDP_SOCKET_BUFFER_SIZE * multiplier
+    assert peer.gather_socket.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF) >= target * multiplier
+    assert "phase=endpoint" in caplog.text and "phase=ice_ready" in caplog.text
+  finally:
+    receiver.close()
+    c4_sock.close()
+    pi_sock.close()
+  assert not receiver.thread.is_alive() and fake_aiortc[0].closed
+
+
+def test_legacy_default_loop_still_negotiates_without_receiver_udp_setup(monkeypatch, fake_aiortc, caplog):
+  monkeypatch.delattr(asyncio, "Runner")
+  c4_sock, pi_sock = socket.socketpair()
+  c4_sock.settimeout(2.0)
+  receiver = h264_receiver.H264Receiver(pi_sock, HELLO_DATA)
+  try:
+    with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+      receiver.start()
+      assert read_control(c4_sock)[0] == OFFER
+    c4_sock.sendall(pack_control(ANSWER, {"type": "answer", "sdp": "v=0\r\n"}))
+    wait_until(lambda: receiver.received_frames == 1)
+    assert "reason=legacy_asyncio" in caplog.text
+    assert "phase=ice_ready" not in caplog.text
+  finally:
+    receiver.close()
+    c4_sock.close()
+    pi_sock.close()
+  assert not receiver.thread.is_alive() and fake_aiortc[0].closed
+
+
+def test_close_after_control_eof_finishes_peer_cleanup_without_a_second_cancellation(monkeypatch, fake_aiortc):
+  peer_type = sys.modules["aiortc"].RTCPeerConnection
+  original_close = peer_type.close
+  entered, completed = threading.Event(), threading.Event()
+  gate, cleanup_calls, cancel_callbacks = [], [], []
+
+  async def finish_peer_close(peer):
+    cleanup_calls.append(peer)
+    release = asyncio.Event()
+    gate.append(release)
+    entered.set()
+    await release.wait()
+    await original_close(peer)
+    completed.set()
+
+  monkeypatch.setattr(peer_type, "close", finish_peer_close)
+  c4_sock, pi_sock = socket.socketpair()
+  c4_sock.settimeout(2.0)
+  receiver = h264_receiver.H264Receiver(pi_sock, HELLO_DATA)
+  original_cancel = receiver._cancel_if_running
+
+  def cancel_then_release(task):
+    cancel_callbacks.append(task)
+    original_cancel(task)
+    # Release only after the actual close() cancellation callback ran. The
+    # old unconditional cancel propagates into this suspended peer cleanup
+    # before it can finish, so this controls the race without timing sleeps.
+    gate[0].set()
+
+  monkeypatch.setattr(receiver, "_cancel_if_running", cancel_then_release)
+  try:
+    receiver.start()
+    assert read_control(c4_sock)[0] == OFFER
+    c4_sock.shutdown(socket.SHUT_RDWR)
+    assert entered.wait(timeout=2.0), "Control EOF must start the real peer teardown before local close"
+    receiver.close()
+    receiver.close()  # Repeated local close must be harmless and bounded.
+    assert completed.is_set() and fake_aiortc[0].closed
+    assert len(cleanup_calls) == len(cancel_callbacks) == 1
+    assert receiver.done and not receiver.thread.is_alive() and receiver.loop is None
+  finally:
+    if receiver.loop is not None and gate:
+      with contextlib.suppress(RuntimeError):
+        receiver.loop.call_soon_threadsafe(gate[0].set)
+    receiver.close()
+    c4_sock.close()
+    pi_sock.close()
+
+
+@pytest.mark.parametrize("already_cancelled", [False, True])
+def test_receiver_stop_does_not_issue_repeated_cancellation_for_a_live_task(already_cancelled):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+
+  async def run():
+    task = asyncio.create_task(asyncio.Event().wait())
+    receiver._main_task = task
+    await asyncio.sleep(0)
+    if already_cancelled:
+      task.cancel()
+    receiver._cancel_if_running(task)
+    receiver._cancel_if_running(task)
+    assert task.cancelling() == 1
+    with pytest.raises(asyncio.CancelledError):
+      await task
+
+  asyncio.run(run())
 
 
 def test_camera_display_count_excludes_metadata_only_stale_and_unpresented_frames():

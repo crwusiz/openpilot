@@ -64,6 +64,10 @@ class ReceiverUDPSampler:
     self._transports.append((self._next_token, reference))
     return True
 
+  def active_transports(self):
+    """Borrow the bounded live set for a receiver-owned setup operation."""
+    return tuple(transport for _, reference in self._active() if (transport := reference()) is not None)
+
   def sample(self):
     active = self._active()
     result = self.empty_snapshot(len(active))
