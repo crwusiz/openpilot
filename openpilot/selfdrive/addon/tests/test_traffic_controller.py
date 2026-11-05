@@ -228,6 +228,71 @@ def test_lead_handoff_keeps_signal_stop_latched():
   assert plan.stop_distance < 1000.0
 
 
+def test_stopped_target_survives_lead_handoff_until_confirmed_release():
+  controller = TrafficStopController(dt=0.05)
+  car_state, model, radar_state = enter_stopped_signal_state(controller)
+  # November 5, 18:49:31.641: a growing endpoint and intermittent lead
+  # changed the stop target from zero to 47-52 m before go was confirmed.
+  model.position.x = [47.53] * 32 + [53.12]
+  model.velocity.x[-1] = 10.16
+  radar_state.leadOne.dRel = 39.50
+
+  for frame in range(20):
+    radar_state.leadOne.present = frame % 3 != 1
+    plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+    assert plan.signal_stop_active
+    assert plan.stop_distance == 0.0
+
+  # A departing lead still permits the normal confirmed go release.
+  radar_state.leadOne.present = True
+  for _ in range(20):
+    plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+  assert not plan.signal_stop_active
+  assert controller.x_state == XState.lead
+  assert plan.stop_distance == 1000.0
+
+
+def test_stop_behind_intervening_lead_does_not_latch_signal_hold():
+  controller = TrafficStopController(dt=0.05)
+  car_state, model, radar_state = make_inputs(v_ego=10.0, model_distance=80.0)
+  for _ in range(4):
+    plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+  assert plan.signal_stop_active
+  assert controller.x_state == XState.e2eStop
+
+  # A nearer lead can stop us before the signal. That is not yet a completed
+  # signal stop, so preserve the signal target when this lead moves again.
+  radar_state.leadOne.present = True
+  radar_state.leadOne.dRel = 30.0
+  car_state.vEgo = 0.0
+  for _ in range(10):
+    plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+  assert controller.x_state == XState.lead
+  assert plan.signal_stop_active
+  assert plan.stop_distance > radar_state.leadOne.dRel
+
+  radar_state.leadOne.dRel = 35.0
+  plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+  assert plan.stop_distance > radar_state.leadOne.dRel
+
+
+def test_gas_release_clears_stopped_hold_for_next_signal_approach():
+  controller = TrafficStopController(dt=0.05)
+  car_state, model, radar_state = enter_stopped_signal_state(controller)
+  car_state.gasPressed = True
+  plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+  assert not plan.signal_stop_active
+
+  car_state.gasPressed = False
+  car_state.vEgo = 10.0
+  model.position.x = [80.0] * 33
+  model.velocity.x = [10.0] * 32 + [0.0]
+  for _ in range(210):
+    plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+  assert plan.signal_stop_active
+  assert plan.stop_distance > 10.0
+
+
 def test_left_blinker_blocks_automatic_stop_release():
   controller = TrafficStopController(dt=0.05)
   car_state, model, radar_state = enter_stopped_signal_state(controller)

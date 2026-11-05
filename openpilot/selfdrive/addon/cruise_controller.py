@@ -846,9 +846,10 @@ class CruiseController:
     self.stock_curve_model_window = (float(x_positions[1]), float(x_positions[-2]))
     window_start = max(x_positions[1], distance - STOCK_CURVE.model_window_m)
     window_end = distance + STOCK_CURVE.model_window_m
-    # Exclude gradient endpoints and require the entire map-spot window to
-    # be observable before using the model to reject navigation information.
-    if x_positions[1] > distance:
+    # Exclude gradient endpoints, but keep comparing the observable forward
+    # window as the spot reaches ego. Testing the spot against the first
+    # interior sample would restore a rejected map cap for its final frame.
+    if x_positions[1] > window_end:
       self.stock_curve_validation = "spot_before_model"
       return None
     if x_positions[-2] < window_end:

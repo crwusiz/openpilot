@@ -223,7 +223,7 @@ def test_tracker_legacy_frozen_distance_releases_while_vehicle_moves():
   assert update_tracker(tracker, cam_type=3, rear_hold_dist=0.0, source_id=0) == (100.0, 0.0, True)
   for now in (101.0, 102.0, 103.0):
     assert update_tracker(tracker, cam_type=3, rear_hold_dist=0.0, source_id=0,
-                          received_at=now, now=now) == (100.0, 0.0, True)
+                          received_at=now, now=now) == (100.0 - 20.0 * (now - 100.0), 0.0, True)
   assert update_tracker(tracker, cam_type=3, rear_hold_dist=0.0, source_id=0,
                         received_at=103.01, now=103.01) == (0.0, 0.0, False)
 
@@ -233,6 +233,44 @@ def test_tracker_legacy_frozen_distance_remains_valid_while_vehicle_is_stopped()
   assert update_tracker(tracker, cam_type=3, rear_hold_dist=0.0, source_id=0, v_ego=0.0) == (100.0, 0.0, True)
   assert update_tracker(tracker, cam_type=3, rear_hold_dist=0.0, source_id=0, v_ego=0.0,
                         received_at=110.0, now=110.0) == (100.0, 0.0, True)
+
+
+def test_tracker_legacy_repeated_distance_cannot_revive_passed_camera():
+  # 11/5 18:45:25-26: raw 4 m is repeated after the compensated distance reaches zero.
+  tracker = CameraDistanceTracker()
+  values = {"raw_distance": 4.0, "cam_type": 1, "cam_speed": 50, "rear_hold_dist": 0.0, "source_id": 0, "v_ego": 8.0}
+  assert update_tracker(tracker, **values) == (4.0, 0.0, True)
+  assert update_tracker(tracker, **values, received_at=100.25, now=100.25) == (2.0, 0.0, True)
+  assert update_tracker(tracker, **values, received_at=100.5, now=100.5) == (0.0, 0.0, False)
+  assert update_tracker(tracker, **values, received_at=101.0, now=101.0) == (0.0, 0.0, False)
+  assert update_tracker(tracker, **(values | {"raw_distance": 80.0}), received_at=101.5, now=101.5) == (80.0, 0.0, True)
+
+
+def test_tracker_legacy_duplicate_integrates_speed_and_keeps_stopped_distance():
+  tracker = CameraDistanceTracker()
+  values = {"cam_type": 22, "cam_speed": 30, "rear_hold_dist": 0.0, "source_id": 0}
+  assert update_tracker(tracker, **values, v_ego=10.0, received_at=99.5) == (95.0, 0.0, True)
+  assert update_tracker(tracker, **values, v_ego=20.0, received_at=100.5, now=100.5) == (85.0, 0.0, True)
+  assert update_tracker(tracker, **values, v_ego=0.0, received_at=110.0, now=110.0) == (85.0, 0.0, True)
+
+
+@pytest.mark.parametrize("changed", [{"cam_type": 22}, {"cam_speed": 30}])
+def test_tracker_legacy_new_event_with_same_raw_distance_resets_compensation(changed):
+  tracker = CameraDistanceTracker()
+  values = {"cam_type": 1, "cam_speed": 60, "rear_hold_dist": 0.0, "source_id": 0, "v_ego": 10.0}
+  assert update_tracker(tracker, **values) == (100.0, 0.0, True)
+  assert update_tracker(tracker, **values, now=101.0) == (90.0, 0.0, True)
+  assert update_tracker(tracker, **values, received_at=104.0, now=104.0) == (0.0, 0.0, False)
+  assert update_tracker(tracker, **(values | changed), received_at=104.0, now=104.0) == (100.0, 0.0, True)
+
+
+def test_tracker_legacy_distance_is_fresh_after_rear_camera_transition():
+  tracker = CameraDistanceTracker()
+  values = {"cam_type": 1, "cam_speed": 50, "rear_hold_dist": 0.0, "source_id": 0, "v_ego": 10.0}
+  assert update_tracker(tracker, **values) == (100.0, 0.0, True)
+  assert update_tracker(tracker, **values, now=101.0) == (90.0, 0.0, True)
+  assert update_tracker(tracker, received_at=101.0, now=101.0) == (100.0, 0.0, True)
+  assert update_tracker(tracker, **values, received_at=102.0, now=102.0) == (100.0, 0.0, True)
 
 
 def test_tracker_fresh_rear_ids_cannot_keep_frozen_distance_valid_while_moving():

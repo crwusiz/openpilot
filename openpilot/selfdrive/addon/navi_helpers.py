@@ -54,7 +54,10 @@ class CameraDistanceTracker:
   def reset(self):
     self.last_time = None
     self.last_raw_distance = None
+    self.last_camera_signature = None
     self.frozen_time = 0.0
+    self.legacy_sample = None
+    self.legacy_distance = 0.0
     self.source_id = 0
     self.source_distance = 0.0
     self.source_signature = None
@@ -68,26 +71,38 @@ class CameraDistanceTracker:
     speed = max(float(v_ego), 0.0) if math.isfinite(v_ego) else 0.0
     since_received = max(now - received_at, 0.0)
     rear_metadata = cam_type in REAR_CAMERA_TYPES and (rear_hold_dist != 0 or source_age != 0 or source_id != 0)
+    signature = (cam_type, cam_speed, rear_hold_dist)
 
     if raw_distance > 0 or rear_metadata:
-      if raw_distance == self.last_raw_distance:
+      if raw_distance == self.last_raw_distance and signature == self.last_camera_signature:
         if speed > 1.0:
           self.frozen_time += dt
       else:
         self.frozen_time = 0.0
       self.last_raw_distance = raw_distance
+      self.last_camera_signature = signature
     else:
       self.last_raw_distance = None
+      self.last_camera_signature = None
       self.frozen_time = 0.0
 
     if not rear_metadata:
       if self.source_id:
         self.expired = True
         self.effective_age += dt
-      distance = max(raw_distance - speed * since_received, 0.0)
+      # Legacy senders repeat the previous distance before the next sample.
+      # A fresh UDP timestamp must not rewind travel or revive a passed camera.
+      sample = (raw_distance, cam_type, cam_speed)
+      if sample != self.legacy_sample:
+        self.legacy_distance = max(raw_distance - speed * since_received, 0.0)
+        self.legacy_sample = sample
+      else:
+        self.legacy_distance = max(self.legacy_distance - speed * dt, 0.0)
+      distance = self.legacy_distance
       valid = cam_speed > 0 and distance > 0 and self.frozen_time <= CAMERA_SOURCE_TIMEOUT
       return (distance if valid else 0.0), 0.0, valid
 
+    self.legacy_sample = None
     packet_age = source_age + since_received
     valid_source_id = isinstance(source_id, int) and not isinstance(source_id, bool) and 0 < source_id <= 2**63 - 1
     if not (math.isfinite(raw_distance) and math.isfinite(rear_hold_dist) and rear_hold_dist > 0
@@ -101,7 +116,6 @@ class CameraDistanceTracker:
     if source_id < self.source_id:
       return 0.0, packet_age, False
 
-    signature = (cam_type, cam_speed, rear_hold_dist)
     if source_id != self.source_id:
       self.source_id = source_id
       self.source_distance = raw_distance

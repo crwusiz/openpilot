@@ -320,7 +320,7 @@ def stock_curve_state(**overrides):
   return SimpleNamespace(**(values | overrides))
 
 
-@pytest.mark.parametrize("distance", [4.0, 20.0, 50.0])
+@pytest.mark.parametrize("distance", [0.01, 0.1, 0.3, 1.99, 4.0, 20.0, 50.0])
 @pytest.mark.parametrize("route_active", [True, False])
 def test_nearby_tight_map_curve_on_straight_model_path_is_rejected(distance, route_active):
   controller = make_stock_curve_controller()
@@ -337,6 +337,30 @@ def test_real_upcoming_curve_is_retained_even_before_vehicle_turns():
   x = np.linspace(0.0, 160.0, 81)
   y = 0.5 * 0.02736 * np.maximum(x - 10.0, 0.0) ** 2
   target = controller._cal_stock_navi_curve_speed(stock_curve_state(), make_model_sm(x, y))
+  assert target == pytest.approx(30.0)
+  assert not controller.stock_curve_rejected
+  assert controller.stock_curve_validation == 'matched_model'
+
+
+def test_rejected_map_curve_does_not_return_as_spot_reaches_model_origin():
+  # November 5, 18:41:01.698: a rejected map spot returned as a 30 km/h
+  # target for one frame when its distance fell below the first interior sample.
+  controller = make_stock_curve_controller()
+  sm = make_model_sm()
+  for distance in (20.0, 4.0, 0.1):
+    target = controller._cal_stock_navi_curve_speed(stock_curve_state(naviCurveDistance=distance), sm)
+    assert target == 255.0
+    assert controller.stock_curve_rejected
+    assert controller.stock_curve_validation == 'rejected_model'
+
+
+def test_real_curve_at_model_origin_keeps_navigation_limit():
+  controller = make_stock_curve_controller()
+  x = np.linspace(0.0, 160.0, 81)
+  y = 0.5 * 0.02736 * x ** 2
+
+  target = controller._cal_stock_navi_curve_speed(stock_curve_state(naviCurveDistance=0.1), make_model_sm(x, y))
+
   assert target == pytest.approx(30.0)
   assert not controller.stock_curve_rejected
   assert controller.stock_curve_validation == 'matched_model'
@@ -375,13 +399,13 @@ def test_distant_curve_keeps_navigation_preview():
 @pytest.mark.parametrize("distance, sm, validation, model_window", [
   (20.0, make_model_sm(valid=False), 'model_unavailable', None),
   (20.0, make_model_sm(x=np.zeros(20)), 'path_invalid', None),
-  (0.3, make_model_sm(), 'spot_before_model', (2.0, 158.0)),
+  (0.3, make_model_sm(x=np.linspace(50.0, 210.0, 81)), 'spot_before_model', (52.0, 208.0)),
   (150.0, make_model_sm(), 'window_beyond_model', (2.0, 158.0)),
   (250.0, make_model_sm(x=np.linspace(0.0, 900.0, 10)), 'window_sparse', (100.0, 800.0)),
 ])
 def test_stock_curve_preview_reports_why_model_cannot_validate(distance, sm, validation, model_window):
-  # October 23, 03:06:29: rejection at 7.1 m changed to preview at 0.3 m.
-  # A missing model comparison must be distinguishable from corroboration.
+  # An unavailable comparison window must remain distinguishable from
+  # corroboration, including a model path that starts beyond the whole window.
   controller = make_stock_curve_controller()
   target = controller._cal_stock_navi_curve_speed(stock_curve_state(naviCurveDistance=distance), sm)
 

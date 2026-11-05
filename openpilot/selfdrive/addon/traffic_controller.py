@@ -338,6 +338,7 @@ class TrafficStopController:
   x_state: XState
   x_stop: float
   signal_stop_latched: bool
+  signal_stop_hold: bool
   stopped_hold_time: float
   stop_entry_suppression_time: float
   adjusted_stop_distance: float
@@ -369,6 +370,7 @@ class TrafficStopController:
     self.x_state = XState.cruise
     self.x_stop = 0.0
     self.signal_stop_latched = False
+    self.signal_stop_hold = False
     self.stopped_hold_time = 0.0
     self.stop_entry_suppression_time = 0.0
     self.adjusted_stop_distance = 0.0
@@ -488,17 +490,20 @@ class TrafficStopController:
     return filtered_stop_distance
 
   def _update_stop_plan(self, raw_stop_distance: float, filtered_stop_distance: float,
-                        lead_present: bool, ego_distance: float,
+                        ego_distance: float,
                         v_ego: float, comfort_brake: float) -> TrafficStopPlan:
     self.adjusted_stop_distance = max(0.0, self.adjusted_stop_distance - ego_distance)
     signal_stop_active = self.signal_stop_latched
+    if signal_stop_active and self.x_state == XState.e2eStopped:
+      self.signal_stop_hold = True
     if not signal_stop_active:
+      self.signal_stop_hold = False
       filtered_stop_distance = self._INACTIVE_STOP_DISTANCE_M
       self.adjusted_stop_distance = 0.0
       self.reference_speed_kph = None
-    elif self.x_state == XState.e2eStopped and not lead_present:
-      # Once stopped, hold the ego position until release is confirmed. Neither
-      # a residual approach distance nor a growing model endpoint permits creep.
+    elif self.signal_stop_hold:
+      # Hold the stopped position through lead handoffs until release is
+      # confirmed. A growing model endpoint or intermittent lead cannot move it.
       filtered_stop_distance = 0.0
       self.adjusted_stop_distance = 0.0
     elif self.adjusted_stop_distance > 0.0:
@@ -545,7 +550,6 @@ class TrafficStopController:
     plan = self._update_stop_plan(
       raw_stop_distance,
       filtered_stop_distance,
-      lead_present,
       ego_distance,
       v_ego,
       comfort_brake,
@@ -594,7 +598,7 @@ class TrafficStopController:
     self._last_debug_log_time = now
     event = "transition" if state_changed else ("invalid" if not observation.valid else "sample")
     log_format = " ".join((
-      "event=%s big=%d valid=%d motion=%s traffic=%s x_state=%s latch=%d signal_active=%d",
+      "event=%s big=%d valid=%d motion=%s traffic=%s x_state=%s latch=%d signal_active=%d hold=%d",
       "v_ego=%.2f initial_v=%.2f terminal_v=%.2f filtered_v=%.2f terminal_x=%.2f lateral_y=%.2f",
       "stop_ev=%d go_ev=%d stop_ev_s=%.2f go_ev_s=%.2f raw_stop=%.2f stop=%.2f adjusted=%.2f",
       "lead=%d lead_d=%.2f gas=%d left_blinker=%d suppress_s=%.2f release_s=%.2f",
@@ -610,6 +614,7 @@ class TrafficStopController:
       self.x_state.name,
       int(self.signal_stop_latched),
       int(plan.signal_stop_active),
+      int(self.signal_stop_hold),
       max(0.0, float(car_state.vEgo)),
       observation.initial_speed_ms,
       observation.terminal_speed_ms,

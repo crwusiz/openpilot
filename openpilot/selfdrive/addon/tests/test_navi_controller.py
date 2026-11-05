@@ -428,6 +428,16 @@ def test_publisher_duplicate_udp_packets_cannot_restart_age_or_distance(monkeypa
   assert published[-1].camLimitSpeed == 0
 
 
+def test_publisher_legacy_duplicate_does_not_restart_passed_camera(monkeypatch):
+  def duplicate(server, frame, now):
+    server.last_updated = now
+
+  road_limit = {"cam_type": 1, "cam_limit_speed": 50, "cam_limit_speed_left_dist": 4}
+  published = run_publisher(monkeypatch, road_limit, frames=3, after_frame=duplicate)
+  assert [n.camLimitSpeedLeftDist for n in published] == [4, 0, 0]
+  assert [n.camLimitSpeed for n in published] == [50, 0, 0]
+
+
 def test_publisher_releases_when_rear_camera_payload_disappears(monkeypatch):
   from openpilot.selfdrive.addon.navi_helpers import camera_limit_active
 
