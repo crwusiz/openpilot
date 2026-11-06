@@ -7,6 +7,7 @@ the RTP timestamp explicitly rather than crossing the FrameInfo binding.
 
 import asyncio
 import re
+import struct
 import time
 
 from teleoprtc.stream import RTCSessionDescription, WebRTCAnswerStream
@@ -17,6 +18,52 @@ from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 START_CODE = re.compile(b"\x00\x00\x00\x01|\x00\x00\x01")
 MAX_ACCESS_UNIT_BYTES = 4 * 1024 * 1024
 MAX_NAL_UNITS = 256
+MAX_RTCP_BYTES = 8192
+MAX_RTCP_BLOCKS = 64
+MAX_NACK_REQUESTS = 512
+
+
+def parse_nack_feedback(message, media_ssrc):
+  """Return bounded observed requests, never a retransmission-success count.
+
+  Validate the complete compound packet before publishing any NACK prefix.
+  Foreign streams and other valid RTCP types remain uncounted.
+  """
+  if not isinstance(message, bytes) or not message:
+    return 0, (), "invalid"
+  if len(message) > MAX_RTCP_BYTES:
+    return 0, (), "limited"
+  offset, blocks, packets = 0, 0, 0
+  requested = []
+  while offset < len(message):
+    if blocks >= MAX_RTCP_BLOCKS:
+      return 0, (), "limited"
+    if len(message) - offset < 4:
+      return 0, (), "invalid"
+    flags, packet_type, words = struct.unpack_from("!BBH", message, offset)
+    end = offset + (words + 1) * 4
+    if flags >> 6 != 2 or not 192 <= packet_type <= 223 or end > len(message):
+      return 0, (), "invalid"
+    payload_end = end
+    if flags & 0x20:
+      padding = message[end - 1]
+      if end != len(message) or not 0 < padding <= end - offset - 4:
+        return 0, (), "invalid"
+      payload_end -= padding
+    if packet_type == 205 and flags & 0x1F == 1:
+      if payload_end - offset < 16 or (payload_end - offset - 12) % 4:
+        return 0, (), "invalid"
+      if struct.unpack_from("!I", message, offset + 8)[0] == media_ssrc:
+        packets += 1
+        for position in range(offset + 12, payload_end, 4):
+          pid, mask = struct.unpack_from("!HH", message, position)
+          if len(requested) + 1 + mask.bit_count() > MAX_NACK_REQUESTS:
+            return 0, (), "limited"
+          requested.append(pid)
+          requested.extend((pid + bit + 1) & 0xFFFF for bit in range(16) if mask & (1 << bit))
+    offset = end
+    blocks += 1
+  return packets, tuple(requested), None
 
 
 def normalize_access_unit(data):
@@ -79,12 +126,17 @@ class ClusterH264Stream(WebRTCAnswerStream):
     super().__init__(RTCSessionDescription(sdp=offer_sdp, type="offer"), consumed_camera_types=[], consume_audio=False,
                      video_producer_tracks=[track], audio_producer_tracks=[], should_add_data_channel=False)
     self._native_video_handlers = []
+    self._cluster_rtp_configs = {}
+    self._cluster_rtcp_stats = dict.fromkeys(("nack_packets", "nack_requested", "nack_distance_ge100",
+                                            "nack_distance_unavailable", "rtcp_invalid", "rtcp_limited"), 0)
+    self._nack_distance_max = None
 
   def _add_producer_tracks(self, remote_sdp=None):
     super()._add_producer_tracks(remote_sdp)
     # Retain the native chain's Python wrappers until this stream is closed,
     # including PLI callbacks. Shutdown still joins senders before closing ICE.
     for rtc_track, _producer, _config in self._track_state:
+      self._cluster_rtp_configs[_config.ssrc] = _config
       handler = rtc_track.get_media_handler()
       for _index in range(8):
         if handler is None:
@@ -94,9 +146,45 @@ class ClusterH264Stream(WebRTCAnswerStream):
       else:
         raise RuntimeError("Unexpected native H.264 media handler chain")
 
+  def _update_receiver_report(self, camera_type, ssrc, message):
+    packets, requested, status = parse_nack_feedback(message, ssrc)
+    # The existing RR parser still receives its bounded ordinary messages,
+    # including malformed prefixes it previously handled defensively.
+    if isinstance(message, bytes) and len(message) <= MAX_RTCP_BYTES:
+      super()._update_receiver_report(camera_type, ssrc, message)
+    if status is not None:
+      self._cluster_rtcp_stats[f"rtcp_{status}"] += 1
+      return
+    self._cluster_rtcp_stats["nack_packets"] += packets
+    self._cluster_rtcp_stats["nack_requested"] += len(requested)
+    config = self._cluster_rtp_configs.get(ssrc)
+    try:
+      next_sequence = config.sequence_number
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+      next_sequence = None
+    available = type(next_sequence) is int and 0 <= next_sequence <= 0xFFFF
+    for sequence in requested:
+      distance = ((next_sequence - 1 - sequence) & 0xFFFF) if available else None
+      if distance is None or distance >= 0x8000:
+        self._cluster_rtcp_stats["nack_distance_unavailable"] += 1
+      else:
+        self._cluster_rtcp_stats["nack_distance_ge100"] += distance >= 100
+        self._nack_distance_max = max(self._nack_distance_max or 0, distance)
+
+  def get_cluster_rtcp_stats(self):
+    """Cumulative request counters plus max observed distance since this call.
+
+    Polling happens after native handling, so distance is not the age when
+    retransmission was attempted, an RTT, or proof of a receiver reset.
+    """
+    snapshot = {**self._cluster_rtcp_stats, "nack_distance_max": self._nack_distance_max}
+    self._nack_distance_max = None
+    return snapshot
+
   async def stop(self):
     await super().stop()
     self._native_video_handlers.clear()
+    self._cluster_rtp_configs.clear()
 
   async def _send_track_loop(self, rtc_track, producer_track, rtp_config):
     clock = CaptureClock()

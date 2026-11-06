@@ -780,6 +780,52 @@ model/motion 데이터의 수신 시각은 신선하고 cluster는 부하 보호
 저녁 헤더의10/12 날짜는 부팅 초기 시계 보정 전 값으로, monotonic과 이후11/5 시각을 대조합니다.
 **C4 업데이트 후 Pi Update를 실행**해야 이번 Pi 수신 버퍼 수정이 반영됩니다.
 
+### 2026-11-06 수신 버퍼 유지 확인·RTP 재전송과 표시 공백 구분
+
+11/6 Pi 최근 성능381개 표본에서 운영 버퍼가 모두 **2097152(2MiB)**로 유지됐습니다.
+파일별 journal 중복을 제거한 평균은 다음과 같습니다. 전체 주행 평균과는 범위가 다릅니다.
+
+| 파일 접두사 | Pi 수신 / 카메라 표시 FPS | 최대 카메라 표시 간격 | 수집 시 소켓 drops 누적 |
+| --- | --- | --- | --- |
+| 09_07 | 19.35 / 18.33 | 797ms | 0 |
+| 10_01 | 19.49 / 18.75 | 769ms | 1 |
+| 11_08 | 19.40 / 18.49 | 983ms | 0 |
+
+10_01 C4 로그의 초기512KiB 구간은 이전 Pi 실행입니다.09:48:29 KST Pi 재부팅 이후
+09:49:09의 `phase=ice_ready actual=2097152`와 새 부팅의 운영 표본을 구분합니다.
+다시 버퍼가 축소된 재발은 아닙니다.09_07 파일은 실제 수집 UTC09:07/KST18:07이며,
+부팅 초기 시계 보정 때문에 파일 접두사만으로 오전·오후를 분류하지 않습니다.
+
+C4 송신·제출은 약20FPS를 유지했고 modeldLagging·commIssue·model drop은0입니다.
+locationd 입력 오류도 기동 직후 약1.8초 뒤 복구됐습니다. 재접속 없는 두 C4 세션에서
+500ms 초과 카메라 공백29/38회는 모두 UDP 드롭0이고, 해당 피드백의 루프 지연 평균도
+약17/19ms였습니다. 반면 디코더 오류와 RTP 손실은 남았습니다. 큰 공백을 추가 버퍼 부족이나
+렌더링의 긴 정체로 단정할 근거는 없습니다. 처음 metadata 화면의737ms 출력 지연1건은
+영상이 도착하기 전이므로 주행 중 카메라 공백과 구분합니다.
+
+이번 변경은 남은 손실·재전송과 도착 버스트를 구분하는 진단 보완입니다. 영상 화질·비트레이트·
+GOP·IDR 복구 제한이나 프레임 큐의 동작을 바꾸어 FPS 개선을 주장하는 변경은 아닙니다.
+
+- C4는 기존 RTCP 수신 경로에서 NACK 요청을 함께 집계합니다. 새 태스크나 패킷별 영상 처리를
+  추가하지 않습니다. compound RTCP의 version·길이·padding·media SSRC를 확인하며 최대8KiB,
+  64개 block,512개 요청까지만 진단합니다. 기존 Receiver Report와 네이티브 재전송 처리는 유지합니다.
+- `rtcp_nack_packets`, `rtcp_nack_requested`, `rtcp_nack_distance_ge100`,
+  `rtcp_nack_distance_unavailable`, `rtcp_invalid`, `rtcp_limited`는 연결 수명 누적입니다.
+  `rtcp_nack_distance_max`만 직전 성능 기록 이후 관측 최대값이며 관측이 없으면 `none`입니다.
+  요청 sequence 수에는 반복 요청이 포함되며 실제 재전송 성공 수가 아닙니다.
+- sequence 거리는 C4가 보고서를 읽을 때의 최신 송신 sequence와 요청 sequence의 차이입니다.
+  기존 최대50ms polling 지연이 포함되므로 RTT·패킷 나이·Pi 버퍼 재설정을 확정하는 값은 아닙니다.
+  오래된 재전송 가능성은 이 값과 디코더 오류·RTP 손실·카메라 공백을 함께 보고 판단합니다.
+- Pi는 `decoded_gap_max_ms`와 `rgb_gap_max_ms`로 디코딩 도착과 RGB 변환 완료의 최대 간격을
+  나누어 기록합니다. `rgb_burst_frames`는 이전 RGB 공개 이후25ms 미만으로 연이어 도착한 수이며
+  `rgb_intervals`는 관측한 RGB 간격 수입니다. 첫 간격이 없으면 최대값은 `none`으로 구분합니다.
+  C4 feedback은 약1초 창, Pi 성능 로그는 약10초 창의 최대값/합계이며 영상 신선도 기준은 유지합니다.
+
+[네이티브 NACK 구현](https://github.com/paullouisageneau/libdatachannel/blob/v0.24.0/src/rtcpnackresponder.cpp)은
+재전송 처리 후에도 RTCP 메시지를 기존 보고서 경로에 남깁니다. 이 경로를 관찰하며 수신기 내부
+jitter buffer나 네이티브 재전송 캐시 설정은 바꾸지 않습니다.
+**C4 업데이트 후 Pi Update도 실행**하면 다음 로그에서 양쪽 진단을 대조할 수 있습니다.
+
 ### 터치 팝업의 CPU·GPU 상태
 
 터치 팝업의 상태 행에는 **CPU 사용률 / CPU 온도 / GPU 사용률 / GPU 온도 / FAN / FPS**를

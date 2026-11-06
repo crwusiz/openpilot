@@ -869,6 +869,91 @@ def test_receiver_perf_logs_decode_error_delta_over_each_ten_seconds(monkeypatch
   assert feedbacks[-1]["decoder_errors"] == 3
 
 
+def test_rgb_arrival_metrics_use_publication_time_without_refreshing_decode_age_or_state(monkeypatch):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  clock = [0.0]
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+  assert h264_receiver._arrival_metrics(receiver._stats) == {
+    "decoded_gap_max_ms": None, "rgb_gap_max_ms": None, "rgb_burst_frames": 0, "rgb_intervals": 0,
+  }
+  receiver.publish_state({"state_seq": 7}, received_at=-1.0)
+  receiver.screen_off = True  # Telemetry observes reception independently of presentation.
+  for published_at in (0.0, 0.025, 0.049, 0.5, 0.5):
+    clock[0] = published_at
+    receiver.publish_rgb("pixels", received_at=published_at - 0.1, convert_elapsed=0.1)
+  metrics = h264_receiver._arrival_metrics(receiver._stats)
+  assert metrics.pop("decoded_gap_max_ms") is None
+  assert metrics == pytest.approx({"rgb_gap_max_ms": 451, "rgb_burst_frames": 2, "rgb_intervals": 4})
+  assert receiver.received_frames == 5 and receiver.dropped_frames == 4
+  assert receiver.last_video_at == pytest.approx(0.4) and receiver.last_state_at == -1.0
+  assert receiver.take_updates(timeout=0) == (("pixels", 0.4), ({"state_seq": 7}, -1.0))
+  # Resetting a feedback window does not reset the inter-publication clock.
+  receiver._stats = receiver._empty_stats()
+  clock[0] = 0.56
+  receiver.publish_rgb("next", received_at=0.46)
+  assert h264_receiver._arrival_metrics(receiver._stats)["rgb_gap_max_ms"] == pytest.approx(60)
+  assert receiver._stats["rgb_intervals"] == 1 and receiver._stats["rgb_burst_frames"] == 0
+  receiver.closing = True
+  receiver.publish_rgb("ignored", received_at=0.56)
+  assert receiver.received_frames == 6 and receiver._stats["rgb_intervals"] == 1
+
+
+def test_decoded_arrival_gap_counts_every_reference_picture_before_latest_rgb_conversion(monkeypatch):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  clock, arrivals = [0.0], iter((0.0, 0.01, 0.41, 0.42))
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+
+  async def recv():
+    try:
+      clock[0] = next(arrivals)
+    except StopIteration:
+      await asyncio.Event().wait()
+    return SimpleNamespace(width=2, height=2, to_ndarray=lambda **_kwargs: "RGB")
+
+  async def run():
+    receiver.stop_event = asyncio.Event()
+    task = asyncio.create_task(receiver._consume_video(SimpleNamespace(recv=recv)))
+    try:
+      for _ in range(200):
+        if receiver.received_frames:
+          break
+        await asyncio.sleep(0.001)
+      assert receiver.decoded_frames == 4 and receiver.skipped_rgb == 3
+      assert receiver.received_frames == 1 and receiver.latest_rgb == ("RGB", 0.42)
+      metrics = h264_receiver._arrival_metrics(receiver._stats)
+      assert metrics["decoded_gap_max_ms"] == pytest.approx(400)
+      assert metrics["rgb_gap_max_ms"] is None and metrics["rgb_intervals"] == 0
+    finally:
+      task.cancel()
+      with pytest.raises(asyncio.CancelledError):
+        await task
+
+  asyncio.run(run())
+
+
+def test_arrival_feedback_and_ten_second_logs_preserve_maximum_sums_and_unknown_windows(monkeypatch, caplog):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+
+  def update(tick, _now):
+    if tick == 1:
+      receiver._stats.update(decoded_intervals=2, decoded_gap=0.4, rgb_intervals=2, rgb_gap=0.3, rgb_burst_frames=1)
+    elif tick == 2:
+      receiver._stats.update(decoded_intervals=1, decoded_gap=0.05, rgb_intervals=1, rgb_gap=0.01, rgb_burst_frames=1)
+    elif tick == 11:
+      receiver._stats.update(decoded_intervals=1, decoded_gap=0.05, rgb_intervals=1, rgb_gap=0.05)
+
+  with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+    feedbacks = run_feedback_ticks(monkeypatch, receiver, 30, update)
+  assert feedbacks[0]["decoded_gap_max_ms"] == 400 and feedbacks[0]["rgb_gap_max_ms"] == 300
+  assert feedbacks[1]["rgb_burst_frames"] == 1 and feedbacks[1]["rgb_intervals"] == 1
+  assert feedbacks[2]["decoded_gap_max_ms"] is None and feedbacks[2]["rgb_gap_max_ms"] is None
+  messages = [record.getMessage() for record in caplog.records if "CLUSTER_H264_RX_PERF" in record.getMessage()]
+  assert len(messages) == 3
+  assert "decoded_gap_max_ms=400.00 | rgb_gap_max_ms=300.00 | rgb_burst_frames=2.00 | rgb_intervals=3.00" in messages[0]
+  assert "decoded_gap_max_ms=50.00 | rgb_gap_max_ms=50.00 | rgb_burst_frames=0.00 | rgb_intervals=1.00" in messages[1]
+  assert "decoded_gap_max_ms=none | rgb_gap_max_ms=none | rgb_burst_frames=0.00 | rgb_intervals=0.00" in messages[2]
+
+
 def test_loop_feedback_and_ten_second_logs_preserve_maximum_and_unknown_windows(monkeypatch, caplog):
   receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
 

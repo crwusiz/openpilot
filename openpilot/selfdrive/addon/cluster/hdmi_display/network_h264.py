@@ -368,6 +368,7 @@ class H264NetworkServer:
       fields = []
       for key in ("video_fps", "decoded_fps", "skipped_rgb", "display_fps", "camera_display_fps", "metadata_display_fps",
                   "hidden_camera_fps", "gpu_camera", "rgb_convert_avg_ms",
+                  "decoded_gap_max_ms", "rgb_gap_max_ms", "rgb_burst_frames", "rgb_intervals",
                   "render_avg_ms", "display_avg_ms", "queue_wait_avg_ms", "video_age_ms", "state_age_ms", "display_gap_max_ms",
                   "camera_display_gap_max_ms",
                   "loop_lag_max_ms", "loop_wall_ms", "loop_cpu_ms", "loop_samples",
@@ -435,6 +436,16 @@ class H264NetworkServer:
         if report is not None:
           report_details = (f" | rtcp_loss_pct={report.fraction_lost * 100 / 256:.2f}"
                             + f" | rtcp_packets_lost={report.packets_lost} | rtcp_jitter_ms={report.jitter / 90:.2f}")
+        get_cluster_rtcp = getattr(stream, "get_cluster_rtcp_stats", None)
+        cluster_rtcp = get_cluster_rtcp() if callable(get_cluster_rtcp) else None
+        if isinstance(cluster_rtcp, dict):
+          for name in ("nack_packets", "nack_requested", "nack_distance_ge100", "nack_distance_unavailable",
+                       "nack_distance_max", "rtcp_invalid", "rtcp_limited"):
+            value = cluster_rtcp.get(name)
+            if type(value) is int and 0 <= value <= 1e12:
+              report_details += f" | {name if name.startswith('rtcp_') else 'rtcp_' + name}={value}"
+            elif value is None and name == "nack_distance_max":
+              report_details += " | rtcp_nack_distance_max=none"
         params = getattr(track, "params", None)
         bitrate = params.get("LivestreamEncoderBitrate") if params is not None else None
         bitrate = str(bitrate) if bitrate else "encoder_default"

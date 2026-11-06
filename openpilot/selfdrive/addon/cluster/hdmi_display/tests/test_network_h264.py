@@ -359,10 +359,47 @@ async def test_receiver_recovery_requests_are_rate_limited_and_decoder_errors_ar
 
 
 @asyncio_test
+async def test_existing_perf_window_logs_bounded_nack_diagnostics_without_affecting_stream(monkeypatch):
+  clock, messages, writes = [0.0], [], []
+  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=lambda: clock[0], thread_time=lambda: 0.0,
+                                                     monotonic_ns=lambda: int(clock[0] * 1e9)))
+  monkeypatch.setattr(network, "flog", messages.append)
+  stream, track = factory()
+  stream.get_cluster_rtcp_stats = Mock(side_effect=[
+    {"nack_packets": 3, "nack_requested": 18, "nack_distance_ge100": 2, "nack_distance_unavailable": 1,
+     "nack_distance_max": 130, "rtcp_invalid": 0, "rtcp_limited": 0},
+    {"nack_packets": 3, "nack_requested": 18, "nack_distance_max": None,
+     "rtcp_invalid": -1, "rtcp_limited": True, "unknown": "bad\nlog"},
+  ])
+
+  def write(packet):
+    writes.append(packet)
+    if len(writes) == 3:
+      raise ConnectionError("end test stream")
+
+  async def drain(_writer):
+    clock[0] += 10.0
+
+  monkeypatch.setattr(network, "drain_state", drain)
+  server = network.H264NetworkServer(config(), models())
+  with pytest.raises(ConnectionError, match="end test stream"):
+    await server._states(SimpleNamespace(write=write), track, stream)
+  reports = [line for line in messages if "[CLUSTER_H264_PERF]" in line]
+  assert len(reports) == stream.get_cluster_rtcp_stats.call_count == 2
+  assert "rtcp_nack_requested=18" in reports[0] and "rtcp_nack_distance_max=130" in reports[0]
+  assert "rtcp_nack_distance_ge100=2" in reports[0] and "rtcp_nack_distance_unavailable=1" in reports[0]
+  assert "rtcp_invalid=0" in reports[0] and "rtcp_limited=0" in reports[0]
+  assert "rtcp_nack_distance_max=none" in reports[1] and "rtcp_nack_requested=18" in reports[1]
+  assert "rtcp_invalid=" not in reports[1] and "rtcp_limited=" not in reports[1] and "unknown" not in reports[1]
+  assert not stream.stopped and not track.stop.called
+
+
+@asyncio_test
 async def test_receiver_network_telemetry_is_logged_without_changing_recovery_or_vehicle_state(monkeypatch):
   messages = []
   monkeypatch.setattr(network, "flog", messages.append)
   telemetry = {"loop_lag_max_ms": 153.25, "loop_wall_ms": 1005, "loop_cpu_ms": 82.75, "loop_samples": 8,
+               "decoded_gap_max_ms": 151.25, "rgb_gap_max_ms": 148.5, "rgb_burst_frames": 3, "rgb_intervals": 20,
                "udp_sockets": 1, "udp_drops_total": 103, "udp_drops_delta": 3,
                "udp_rmem_bytes": 201216, "udp_rcvbuf_bytes": 2097152}
   monkeypatch.setattr(network, "read_control", AsyncMock(side_effect=[(wire.FEEDBACK, 0, telemetry), EOFError()]))
@@ -383,6 +420,7 @@ async def test_unavailable_or_malformed_receiver_network_telemetry_is_omitted(mo
   messages = []
   monkeypatch.setattr(network, "flog", messages.append)
   keys = ("loop_lag_max_ms", "loop_wall_ms", "loop_cpu_ms", "loop_samples", "udp_sockets",
+          "decoded_gap_max_ms", "rgb_gap_max_ms", "rgb_burst_frames", "rgb_intervals",
           "udp_drops_total", "udp_drops_delta", "udp_rmem_bytes", "udp_rcvbuf_bytes")
   payload = dict.fromkeys(keys, invalid)
   payload["camera_display_fps"] = 19.5

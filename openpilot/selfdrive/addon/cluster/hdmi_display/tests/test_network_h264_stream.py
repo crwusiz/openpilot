@@ -3,6 +3,7 @@ from fractions import Fraction
 import importlib.util
 from pathlib import Path
 import sys
+import struct
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -20,6 +21,13 @@ def sender(monkeypatch):
       self.options = kwargs
       self.connection_stopped_event = asyncio.Event()
       self.logger = Mock()
+      self.receiver_reports = []
+
+    def _add_producer_tracks(self, remote_sdp=None):
+      self.remote_sdp = remote_sdp
+
+    def _update_receiver_report(self, camera_type, ssrc, message):
+      self.receiver_reports.append((camera_type, ssrc, message))
 
     def _set_event(self, event):
       event.set()
@@ -345,3 +353,98 @@ def test_native_chain_wrappers_are_released_only_after_stream_stop(sender):
   stream._native_video_handlers.append(object())
   asyncio.run(stream.stop())
   assert stream.stopped and stream._native_video_handlers == []
+
+
+def rtcp_packet(packet_type, payload=b"", fmt=0, padding=0):
+  assert (len(payload) + padding) % 4 == 0
+  body = payload + (b"\x00" * (padding - 1) + bytes([padding]) if padding else b"")
+  return struct.pack("!BBH", 0x80 | fmt | (0x20 if padding else 0), packet_type, len(body) // 4) + body
+
+
+def nack_packet(media_ssrc=123, pairs=((100, 0),), padding=0):
+  return rtcp_packet(205, struct.pack("!II", 456, media_ssrc)
+                     + b"".join(struct.pack("!HH", *pair) for pair in pairs), fmt=1, padding=padding)
+
+
+def test_compound_nacks_validate_ssrc_padding_bitmask_and_wrapping_sequences(sender):
+  rr = rtcp_packet(201, struct.pack("!I", 456))
+  foreign = nack_packet(999)
+  current = nack_packet(pairs=((65534, 0b1011), (50, 0)), padding=4)
+  assert sender.parse_nack_feedback(rr + foreign + current, 123) == (1, (65534, 65535, 0, 2, 50), None)
+  assert sender.parse_nack_feedback(foreign, 123) == (0, (), None)
+  assert sender.parse_nack_feedback(rr, 123) == (0, (), None)
+  assert sender.parse_nack_feedback(rtcp_packet(205, b"\x00" * 8, fmt=15), 123) == (0, (), None)
+
+
+@pytest.mark.parametrize("message", [
+  b"", "not bytes", None, b"\x81\xcd\x00", b"\x81\xcd\x00\xff" + b"\x00" * 12,
+  b"\x41" + nack_packet()[1:], b"\x81\x60" + nack_packet()[2:],
+  nack_packet() + b"\x00", rtcp_packet(205, b"\x00" * 8, fmt=1),
+  bytes([0xA1]) + nack_packet()[1:-1] + b"\x00",  # Claimed padding, count zero.
+  nack_packet(padding=4)[:-1] + b"\xff",  # Padding cannot consume the header.
+  nack_packet(padding=4) + nack_packet(),  # Padding belongs only to final block.
+  nack_packet(padding=4)[:-1] + b"\x01",  # Leaves a non-FCI-aligned NACK body.
+])
+def test_malformed_nack_compounds_never_publish_partial_requests_or_raise(sender, message):
+  assert sender.parse_nack_feedback(message, 123) == (0, (), "invalid")
+
+
+def test_nack_byte_block_and_request_budgets_have_explicit_limited_results(sender):
+  unknown = rtcp_packet(204, b"\x00" * 4)
+  assert sender.parse_nack_feedback(unknown * sender.MAX_RTCP_BLOCKS, 123) == (0, (), None)
+  assert sender.parse_nack_feedback(unknown * (sender.MAX_RTCP_BLOCKS + 1), 123) == (0, (), "limited")
+  boundary = rtcp_packet(204, b"\x00" * (sender.MAX_RTCP_BYTES - 4))
+  assert sender.parse_nack_feedback(boundary, 123) == (0, (), None)
+  assert sender.parse_nack_feedback(boundary + unknown, 123) == (0, (), "limited")
+  pairs = [(0, 0xFFFF)] * 30 + [(10, 0), (20, 0)]
+  packets, requests, status = sender.parse_nack_feedback(nack_packet(pairs=pairs), 123)
+  assert packets == 1 and len(requests) == sender.MAX_NACK_REQUESTS and status is None
+  assert sender.parse_nack_feedback(nack_packet(pairs=[(0, 0xFFFF)] * 30 + [(1, 3)]), 123) == (0, (), "limited")
+
+
+def test_request_distance_uses_public_config_and_wraps_without_claiming_future_packet_age(sender):
+  stream = sender.ClusterH264Stream("v=0", object())
+  config = SimpleNamespace(ssrc=123, sequence_number=3)
+  stream._track_state = [(SimpleNamespace(get_media_handler=lambda: None), None, config)]
+  stream._add_producer_tracks("remote SDP")
+  assert stream.remote_sdp == "remote SDP"
+  assert stream.get_cluster_rtcp_stats()["nack_distance_max"] is None
+  message = nack_packet(pairs=((65534, 0b11), (2, 0), (65000, 0), (10, 0)))
+  stream._update_receiver_report("road", 123, message)
+  assert stream.receiver_reports == [("road", 123, message)]
+  stats = stream.get_cluster_rtcp_stats()
+  assert stats == {"nack_packets": 1, "nack_requested": 6, "nack_distance_ge100": 1,
+                   "nack_distance_unavailable": 1, "rtcp_invalid": 0, "rtcp_limited": 0, "nack_distance_max": 538}
+  # Counters are cumulative; only maximum distance resets between snapshots.
+  assert stream.get_cluster_rtcp_stats() == {**stats, "nack_distance_max": None}
+  config.sequence_number = 10
+  stream._update_receiver_report("road", 123, nack_packet(pairs=((9, 0),)))
+  assert stream.get_cluster_rtcp_stats() == {**stats, "nack_packets": 2, "nack_requested": 7, "nack_distance_max": 0}
+  asyncio.run(stream.stop())
+  assert not stream._cluster_rtp_configs
+
+
+@pytest.mark.parametrize("sequence", [None, -1, 65536, True, "3"])
+def test_unavailable_or_invalid_native_sequence_is_unknown_not_a_zero_distance(sender, sequence):
+  stream = sender.ClusterH264Stream("v=0", object())
+  if sequence is not None:
+    stream._cluster_rtp_configs[123] = SimpleNamespace(sequence_number=sequence)
+  stream._update_receiver_report("road", 123, nack_packet())
+  stats = stream.get_cluster_rtcp_stats()
+  assert stats["nack_requested"] == stats["nack_distance_unavailable"] == 1
+  assert stats["nack_distance_max"] is None and stats["nack_distance_ge100"] == 0
+
+
+def test_rr_passthrough_and_malformed_feedback_do_not_change_request_counters(sender):
+  stream = sender.ClusterH264Stream("v=0", object())
+  rr = rtcp_packet(201, struct.pack("!I", 456))
+  stream._update_receiver_report("road", 123, rr)
+  stream._update_receiver_report("road", 123, nack_packet(999))
+  invalid = nack_packet() + b"\x00"
+  stream._update_receiver_report("road", 123, invalid)
+  oversized = rtcp_packet(204, b"\x00" * sender.MAX_RTCP_BYTES)
+  stream._update_receiver_report("road", 123, oversized)
+  assert [entry[2] for entry in stream.receiver_reports] == [rr, nack_packet(999), invalid]
+  assert stream.get_cluster_rtcp_stats() == {"nack_packets": 0, "nack_requested": 0, "nack_distance_ge100": 0,
+                                           "nack_distance_unavailable": 0, "rtcp_invalid": 1, "rtcp_limited": 1,
+                                           "nack_distance_max": None}

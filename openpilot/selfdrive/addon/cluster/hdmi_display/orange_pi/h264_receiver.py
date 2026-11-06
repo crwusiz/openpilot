@@ -34,6 +34,7 @@ FEEDBACK_INTERVAL = 1.0
 RECOVERY_INTERVAL = 0.5
 RECOVERY_POLL_INTERVAL = 0.1
 LOOP_HEARTBEAT_INTERVAL = 0.1
+RGB_BURST_INTERVAL = 0.025
 VIDEO_STALE_SECONDS = 0.5
 UDP_RECEIVE_BUFFER_BYTES = 1024 * 1024
 HUD_REFRESH_INTERVAL = 0.1
@@ -70,6 +71,12 @@ def _loop_metrics(stats):
           "loop_lag_max_ms": stats["loop_lag"] * 1000 if samples else None,
           "loop_wall_ms": stats["loop_wall"] * 1000 if samples else None,
           "loop_cpu_ms": stats["loop_cpu"] * 1000 if samples else None}
+
+
+def _arrival_metrics(stats):
+  return {"decoded_gap_max_ms": stats["decoded_gap"] * 1000 if stats["decoded_intervals"] else None,
+          "rgb_gap_max_ms": stats["rgb_gap"] * 1000 if stats["rgb_intervals"] else None,
+          "rgb_burst_frames": int(stats["rgb_burst_frames"]), "rgb_intervals": int(stats["rgb_intervals"])}
 
 
 class H264ConfigurationError(RuntimeError):
@@ -212,6 +219,7 @@ class H264Receiver:
     self._stats = self._empty_stats()
     self._last_display_at = None
     self._last_camera_display_at = None
+    self._last_decoded_at = self._last_rgb_published_at = None
     self._resources = ReceiverResourceSampler()
     self.thread = threading.Thread(target=self._run_thread, name="cluster-webrtc-receiver", daemon=True)
 
@@ -222,7 +230,8 @@ class H264Receiver:
   def _empty_stats():
     keys = ["render_count", "render", "display", "queue_count", "queue", "convert_count", "convert", "gap", "camera_gap",
             "hdmi_upload_count", "hdmi_upload_bytes", "hdmi_camera_reused", "hdmi_path_reused", "hdmi_overlay_reused",
-            "loop_samples", "loop_lag", "loop_wall", "loop_cpu"]
+            "loop_samples", "loop_lag", "loop_wall", "loop_cpu",
+            "decoded_intervals", "decoded_gap", "rgb_intervals", "rgb_gap", "rgb_burst_frames"]
     keys.extend(("path_async_frames", *PATH_COUNTER_NAMES))
     for prefix, names in STAGE_NAMES.items():
       for name in names:
@@ -264,10 +273,19 @@ class H264Receiver:
         self.condition.notify_all()
 
   def publish_rgb(self, rgb, received_at=None, convert_elapsed=0.0):
-    received_at = time.monotonic() if received_at is None else received_at
+    published_at = time.monotonic()
+    received_at = published_at if received_at is None else received_at
     with self.condition:
       if self.closing:
         return
+      # Arrival burst timing is distinct from the original decode timestamp
+      # retained below for freshness and queue age. Never refresh that clock.
+      if self._last_rgb_published_at is not None:
+        gap = published_at - self._last_rgb_published_at
+        self._stats["rgb_intervals"] += 1
+        self._stats["rgb_gap"] = max(self._stats["rgb_gap"], gap)
+        self._stats["rgb_burst_frames"] += gap < RGB_BURST_INTERVAL
+      self._last_rgb_published_at = published_at
       self.dropped_frames += self.latest_rgb is not None
       self.latest_rgb = (rgb, received_at)
       self.received_frames += 1
@@ -385,10 +403,15 @@ class H264Receiver:
           raise ValueError("Decoded H.264 frame exceeds pixel budget")
         # These are already decoded reference pictures. Keep only one waiting
         # for RGB conversion instead of spending CPU converting an old burst.
+        decoded_at = time.monotonic()
         with self.condition:
           self.decoded_frames += 1
           self.skipped_rgb += pending is not None
-        pending = frame, time.monotonic()
+          if self._last_decoded_at is not None:
+            self._stats["decoded_intervals"] += 1
+            self._stats["decoded_gap"] = max(self._stats["decoded_gap"], decoded_at - self._last_decoded_at)
+          self._last_decoded_at = decoded_at
+        pending = frame, decoded_at
         ready.set()
         if self.decoded_frames % 32 == 0:
           await asyncio.sleep(0)
@@ -530,6 +553,7 @@ class H264Receiver:
           "video_stale": video_stale,
           "state_stale": self.last_state_at is None or now - self.last_state_at >= 0.5,
           **_loop_metrics(stats),
+          **_arrival_metrics(stats),
           **udp,
         }
       recovery = self._take_recovery_request(now)
@@ -537,7 +561,8 @@ class H264Receiver:
         payload.update(recovery)
       await self._send_control(FEEDBACK, payload)
       for key in stats:
-        logged_stats[key] = max(logged_stats[key], stats[key]) if key in ("gap", "camera_gap", "loop_lag") else logged_stats[key] + stats[key]
+        logged_stats[key] = (max(logged_stats[key], stats[key]) if key in ("gap", "camera_gap", "loop_lag", "decoded_gap", "rgb_gap")
+                             else logged_stats[key] + stats[key])
       if now - logged_at >= 10.0:
         elapsed = now - logged_at
         stages = "".join(f" | {prefix}_{name}_avg={logged_stats[f'{prefix}_{name}'] * 1000 / count:.1f}ms"
@@ -554,6 +579,8 @@ class H264Receiver:
                      + f" | hdmi_overlay_reused={int(logged_stats['hdmi_overlay_reused'])}")
         stages += "".join(f" | {name}={value:.2f}" if value is not None else f" | {name}=none"
                           for name, value in _loop_metrics(logged_stats).items())
+        stages += "".join(f" | {name}={value:.2f}" if value is not None else f" | {name}=none"
+                          for name, value in _arrival_metrics(logged_stats).items())
         udp_window = {**udp, "udp_drops_delta": logged_udp_drops if logged_udp_complete else None,
                       "udp_rmem_peak_bytes": logged_udp_peak}
         stages += "".join(f" | {name}={value}" if value is not None else f" | {name}=none"
