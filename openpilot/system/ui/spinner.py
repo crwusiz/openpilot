@@ -28,7 +28,7 @@ STATUS_FONT_SIZE = 48 if _BIG_UI else 28
 STATUS_LINE_MARGIN = 14 if _BIG_UI else 4
 
 DEGREES_PER_SECOND = 360.0  # one full rotation per second
-DARKGRAY = (55, 55, 55, 255)
+DARKGRAY = rl.Color(55, 55, 55, 255)
 
 
 def clamp(value, min_value, max_value):
