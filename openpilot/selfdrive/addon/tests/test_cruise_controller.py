@@ -493,11 +493,109 @@ def test_curve_engagement_starts_at_vehicle_speed(monkeypatch):
 
 def test_zero_confidence_estimates_do_not_create_curve_limit():
   controller = make_steer_controller()
-  controller.prev_model_mono_time = 0
-  controller.cached_curve_speed_ms = None
+  controller._reset_curve_state()
   controller._get_model_based_speed = lambda *args: (10.0, 0.0)
   controller._get_acc_based_speed = lambda *args: (12.0, 0.0)
   assert controller._cal_curve_speed_adaptive(make_model_sm(), 30.0, 110.0) == 255.0
+
+
+def make_curved_model_sm(*, radius=50.0, extent=40.0):
+  x = np.linspace(0.0, extent, 81)
+  sm = make_model_sm(x, radius - np.sqrt(radius ** 2 - x ** 2))
+  sm['modelV2'].orientationRate = SimpleNamespace(z=[0.0] * 81)
+  sm['modelV2'].velocity = SimpleNamespace(x=[10.0] * 81)
+  return sm
+
+
+def test_curve_cap_survives_slowing_below_its_safe_speed(monkeypatch):
+  # November 6, 08:56:38-52: curve targets repeatedly vanished near ego speed.
+  # A fixed curved path must retain its SET cap after slowing below that cap.
+  controller, _, _, _, _ = make_full_controller(monkeypatch)
+  sm = make_curved_model_sm()
+  for frame, ego_kph in enumerate((57.6, 50.4, 43.2, 36.0, 29.0, 30.0, 31.0, 0.0), 1):
+    sm.logMonoTime = {'modelV2': frame}
+    cap = controller._cal_curve_speed_adaptive(sm, ego_kph / 3.6, 60.6)
+    assert 30.0 <= cap < 60.6
+
+  # Reaching the cap alone cannot release it; a straight path can.
+  sm['modelV2'].position.y = np.zeros(81)
+  sm.logMonoTime = {'modelV2': 100}
+  assert controller._cal_curve_speed_adaptive(sm, 36.0 / 3.6, 60.6) == 255.0
+
+
+def test_yaw_curve_cap_above_ego_still_limits_requested_set(monkeypatch):
+  controller, _, _, _, _ = make_full_controller(monkeypatch)
+  sm = make_model_sm()
+  model = sm['modelV2']
+  model.orientationRate = SimpleNamespace(z=[0.09] * 81)
+  model.velocity = SimpleNamespace(x=[20.0] * 81)
+
+  cap = controller._cal_curve_speed_adaptive(sm, 44.0 / 3.6, 60.6)
+
+  assert 44.0 < cap < 60.6
+  model.orientationRate.z = [0.0] * 81
+  sm.logMonoTime = {'modelV2': 2}
+  assert controller._cal_curve_speed_adaptive(sm, 44.0 / 3.6, 60.6) == 255.0
+
+
+@pytest.mark.parametrize('source', ['path', 'yaw'])
+def test_set_changes_refresh_curve_estimates_without_new_model_frame(monkeypatch, source):
+  controller, _, _, _, _ = make_full_controller(monkeypatch)
+  sm = make_curved_model_sm() if source == 'path' else make_model_sm()
+  if source == 'yaw':
+    sm['modelV2'].orientationRate = SimpleNamespace(z=[0.09] * 81)
+    sm['modelV2'].velocity = SimpleNamespace(x=[20.0] * 81)
+
+  assert controller._cal_curve_speed_adaptive(sm, 44.0 / 3.6, 20.0) == 255.0
+  first_cap = controller._cal_curve_speed_adaptive(sm, 44.0 / 3.6, 60.6)
+  assert 20.0 < first_cap < 60.6
+  assert controller._cal_curve_speed_adaptive(sm, 44.0 / 3.6, 20.0) == 255.0
+  assert controller._cal_curve_speed_adaptive(sm, 44.0 / 3.6, 60.6) == pytest.approx(first_cap)
+
+
+def test_predictive_curve_above_ego_limits_set_with_straight_path_tail(monkeypatch):
+  controller, _, _, _, _ = make_full_controller(monkeypatch)
+  sm = make_curved_model_sm()
+  model = sm['modelV2']
+  model.position.x = np.linspace(0.0, 160.0, 81)
+  model.position.y = np.zeros(81)
+  curvatures = np.zeros(81)
+  curvatures[15] = 0.02  # Curve 30 m ahead, with a straight far endpoint.
+  monkeypatch.setattr(controller, '_get_model_path', lambda _: (model.position.x, curvatures))
+
+  cap = controller._cal_curve_speed_adaptive(sm, 28.8 / 3.6, 60.6)
+
+  assert 28.8 < cap < 60.6
+  curvatures[:] = 0.0
+  sm.logMonoTime = {'modelV2': 2}
+  assert controller._cal_curve_speed_adaptive(sm, 28.8 / 3.6, 60.6) == 255.0
+
+
+@pytest.mark.parametrize('is_metric', [True, False])
+@pytest.mark.parametrize('requested_kph', [10.0, 20.0])
+def test_set_below_minimum_curve_speed_does_not_create_curve_cap(monkeypatch, is_metric, requested_kph):
+  controller, _, _, _, _ = make_full_controller(monkeypatch, is_metric=is_metric)
+  sm = make_curved_model_sm()
+
+  cap = controller._cal_curve_speed_adaptive(sm, 30.0 / 3.6, controller.conv.kph_to_clu(requested_kph))
+
+  assert cap == 255.0
+
+
+@pytest.mark.parametrize('source', ['path', 'yaw'])
+def test_curve_set_caps_have_same_physical_speed_in_cluster_units(monkeypatch, source):
+  caps_kph = []
+  for is_metric in (True, False):
+    controller, _, _, _, _ = make_full_controller(monkeypatch, is_metric=is_metric)
+    sm = make_curved_model_sm(radius=200.0, extent=120.0) if source == 'path' else make_model_sm()
+    if source == 'yaw':
+      sm['modelV2'].orientationRate = SimpleNamespace(z=[0.075] * 81)
+      sm['modelV2'].velocity = SimpleNamespace(x=[20.0] * 81)
+    cap = controller._cal_curve_speed_adaptive(sm, 22.0, controller.conv.kph_to_clu(100.0))
+    assert cap != 255.0
+    caps_kph.append(controller.conv.clu_to_kph(cap))
+
+  assert caps_kph[1] == pytest.approx(caps_kph[0])
 
 
 @pytest.mark.parametrize("field", ['x', 'y'])
@@ -505,14 +603,14 @@ def test_invalid_model_path_does_not_create_curve_limit(field):
   controller = make_steer_controller()
   model = make_model_sm()['modelV2']
   setattr(model.position, field, [float('nan')] * 81)
-  assert controller._get_model_based_speed(model, 30.0, 15.0) == (255.0, 0.0)
+  assert controller._get_model_based_speed(model, 30.0, 15.0, 40.0) == (255.0, 0.0)
 
 
 @pytest.mark.parametrize("orientation, velocity", [([0.1], [30.0, 30.0]), ([float('nan')], [30.0])])
 def test_invalid_acceleration_model_does_not_create_curve_limit(orientation, velocity):
   controller = make_steer_controller()
   model = SimpleNamespace(orientationRate=SimpleNamespace(z=orientation), velocity=SimpleNamespace(x=velocity))
-  assert controller._get_acc_based_speed(model, 30.0, 15.0) == (255.0, 0.0)
+  assert controller._get_acc_based_speed(model, 30.0, 15.0, 40.0) == (255.0, 0.0)
 
 
 @pytest.mark.parametrize("camera_limit, expected", [(0.0, 95.8), (50.0, 50.0)])

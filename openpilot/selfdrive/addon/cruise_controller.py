@@ -323,6 +323,7 @@ class CruiseController:
 
   def _reset_curve_state(self):
     self.prev_model_mono_time = 0
+    self.prev_curve_requested_speed_clu: float | None = None
     self.cached_curve_speed_ms: float | None = None
     self.curve_estimates = None
     self.model_curve_geometry = None
@@ -862,7 +863,8 @@ class CruiseController:
     self.stock_curve_validation = "matched_model"
     return float(np.max(curvatures[visible]))
 
-  def _get_model_based_speed(self, model, current_speed_ms: float, min_curve_speed_ms: float):
+  def _get_model_based_speed(self, model, current_speed_ms: float, min_curve_speed_ms: float,
+                             requested_speed_ms: float):
     self.model_curve_geometry = None
     path = self._get_model_path(model)
     if path is None:
@@ -880,7 +882,7 @@ class CruiseController:
     current_curve_speed_ms = float(np.mean(np.sqrt(a_y_max / np.clip(curv_segment, 1e-4, None)))) * 0.85
 
     current_model_speed = float(max(current_curve_speed_ms, min_curve_speed_ms)) \
-      if not math.isnan(current_curve_speed_ms) and current_curve_speed_ms < current_speed_ms else SPEED_LIMIT.no_active
+      if math.isfinite(current_curve_speed_ms) and current_curve_speed_ms < requested_speed_ms else SPEED_LIMIT.no_active
 
     lookahead_distance = current_speed_ms * 5.0
     lookahead_indices = (x_positions <= lookahead_distance) & (x_positions > current_speed_ms * 0.5)
@@ -898,7 +900,7 @@ class CruiseController:
       if max_future_curv > 0.005:
         safe_speed_ms = np.sqrt(a_y_max / max_future_curv) * 0.9
 
-        if safe_speed_ms < current_speed_ms and curve_distance > 10:
+        if safe_speed_ms < requested_speed_ms and curve_distance > 10:
           required_decel = (current_speed_ms ** 2 - safe_speed_ms ** 2) / (2 * curve_distance)
           max_comfortable_decel = 1.8
 
@@ -918,9 +920,15 @@ class CruiseController:
     else:
       model_based_speed = current_model_speed
 
+    if model_based_speed != SPEED_LIMIT.no_active:
+      model_based_speed = float(max(model_based_speed, min_curve_speed_ms))
+      if model_based_speed >= requested_speed_ms:
+        model_based_speed = SPEED_LIMIT.no_active
+
     return model_based_speed, confidence
 
-  def _get_acc_based_speed(self, model, current_speed_ms: float, min_curve_speed_ms: float):
+  def _get_acc_based_speed(self, model, current_speed_ms: float, min_curve_speed_ms: float,
+                           requested_speed_ms: float):
     orientation_rate = np.array(model.orientationRate.z)
     velocity = np.array(model.velocity.x)
 
@@ -941,7 +949,9 @@ class CruiseController:
     acc_speed_ms = np.sqrt(a_y_max / np.clip(acc_based_curvature, 1e-4, None)) * 0.85
 
     acc_based_speed = float(max(acc_speed_ms, min_curve_speed_ms)) \
-      if not math.isnan(acc_speed_ms) and acc_speed_ms < current_speed_ms else SPEED_LIMIT.no_active
+      if math.isfinite(acc_speed_ms) else SPEED_LIMIT.no_active
+    if acc_based_speed >= requested_speed_ms:
+      acc_based_speed = SPEED_LIMIT.no_active
 
     return acc_based_speed, confidence
 
@@ -952,11 +962,18 @@ class CruiseController:
 
     model_mono_time = sm.logMonoTime['modelV2']
 
-    if model_mono_time != self.prev_model_mono_time:
+    if model_mono_time != self.prev_model_mono_time or requested_speed_clu != self.prev_curve_requested_speed_clu:
       model = sm['modelV2']
       min_curve_speed_ms = max(self.conv.clu_to_ms(CURVE.min_speed_clu), current_speed_ms * 0.5)
-      model_speed, model_confidence = self._get_model_based_speed(model, current_speed_ms, min_curve_speed_ms)
-      acc_speed, acc_confidence = self._get_acc_based_speed(model, current_speed_ms, min_curve_speed_ms)
+      # A curve still limits acceleration after ego slows below its safe speed.
+      # Release the cap when the model permits SET, not merely current speed.
+      requested_speed_ms = self.conv.clu_to_ms(requested_speed_clu)
+      model_speed, model_confidence = self._get_model_based_speed(
+        model, current_speed_ms, min_curve_speed_ms, requested_speed_ms,
+      )
+      acc_speed, acc_confidence = self._get_acc_based_speed(
+        model, current_speed_ms, min_curve_speed_ms, requested_speed_ms,
+      )
       self.curve_estimates = (model_speed, model_confidence, acc_speed, acc_confidence)
 
       base_model_weight = float(np.interp(
@@ -991,6 +1008,7 @@ class CruiseController:
         self.cached_curve_speed_ms = None
 
       self.prev_model_mono_time = model_mono_time
+      self.prev_curve_requested_speed_clu = requested_speed_clu
 
     if self.cached_curve_speed_ms is None:
       return SPEED_LIMIT.no_active

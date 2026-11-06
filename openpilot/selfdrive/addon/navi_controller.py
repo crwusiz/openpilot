@@ -491,7 +491,14 @@ class SpeedLimiter:
       is_school_zone_end = (cam_type == 21)
       is_speed_bump = (cam_type == 22)
 
-      if is_school_zone_start and not self.in_school_zone:
+      if is_speed_bump or is_school_zone_start:
+        min_limit = 10
+
+      has_camera_limit = camera_limit_active(navi_data)
+      # Expiry clears speed/distance but can leave the start marker's type.
+      # It must not re-enter a zone after a road change has ended it.
+      if (is_school_zone_start and not self.in_school_zone and has_camera_limit and
+          min_limit <= cam_limit_speed <= max_limit):
         log.info(f"school zone ENTER: limit={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
         self.in_school_zone = True
       elif is_school_zone_end and self.in_school_zone:
@@ -506,9 +513,6 @@ class SpeedLimiter:
           log.info("school zone FORCED EXIT (road changed or new cam detected)")
           self.in_school_zone = False
 
-      if is_speed_bump or is_school_zone_start:
-        min_limit = 10
-
       if is_speed_bump:
         self._log_throttled("bump_event", f"speed bump event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
 
@@ -522,7 +526,6 @@ class SpeedLimiter:
           f"cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}"
         )
 
-      has_camera_limit = camera_limit_active(navi_data)
       if has_camera_limit:
         self.sec_decel = False
         cluster_speed_ms = self.conv.clu_to_ms(cluster_speed_clu)

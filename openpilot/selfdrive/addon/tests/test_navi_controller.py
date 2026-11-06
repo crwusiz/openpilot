@@ -66,6 +66,58 @@ def make_navi_data(cam_type, *, distance=600, is_highway=False, rear=False):
   return data
 
 
+@pytest.mark.parametrize("distance,speed", [(0, 0), (202, 0), (0, 30), (202, 9), (202, 101)])
+def test_invalid_school_start_does_not_enter_zone(limiter, distance, speed, caplog):
+  limiter.naviData = make_navi_data(20, distance=distance)
+  limiter.naviData.camLimitSpeed = speed
+  with caplog.at_level("INFO", logger="navi"):
+    limiter.get_max_speed(30)
+  assert not limiter.get_in_school_zone()
+  assert "school zone ENTER" not in caplog.text
+
+
+@pytest.mark.parametrize("speed,is_highway", [(10, False), (30, False), (100, False), (120, True)])
+def test_valid_school_start_enters_and_keeps_zone_after_passing(limiter, speed, is_highway):
+  limiter.naviData = make_navi_data(20, distance=50, is_highway=is_highway)
+  limiter.naviData.camLimitSpeed = speed
+  limiter.get_max_speed(30)
+  assert limiter.get_in_school_zone()
+
+  # Passing the start marker must not end a legitimate school zone.
+  limiter.naviData.camLimitSpeed = 0
+  limiter.naviData.camLimitSpeedLeftDist = 0
+  limiter.get_max_speed(30)
+  assert limiter.get_in_school_zone()
+
+  limiter.naviData.camType = 21
+  limiter.get_max_speed(30)
+  assert not limiter.get_in_school_zone()
+
+
+def test_expired_school_start_cannot_reenter_after_road_change(limiter, caplog):
+  # 11/6 09:04:18.818: road change exits the zone; an expired type 20
+  # must not enter it again on the next control frame (limit=0, distance=0).
+  limiter.naviData = make_navi_data(20, distance=202)
+  limiter.naviData.camLimitSpeed = 30
+  limiter.naviData.currentRoadName = "지족로"
+  with caplog.at_level("INFO", logger="navi"):
+    limiter.get_max_speed(30)
+    assert limiter.get_in_school_zone()
+    limiter.naviData.camLimitSpeed = 0
+    limiter.naviData.camLimitSpeedLeftDist = 0
+    limiter.naviData.currentRoadName = "반석서로"
+    for _ in range(3):
+      limiter.get_max_speed(30)
+      assert not limiter.get_in_school_zone()
+  assert caplog.text.count("school zone ENTER") == 1
+
+  # A later fresh start on the new road still enters normally.
+  limiter.naviData.camLimitSpeed = 30
+  limiter.naviData.camLimitSpeedLeftDist = 150
+  limiter.get_max_speed(30)
+  assert limiter.get_in_school_zone()
+
+
 @pytest.mark.parametrize("cam_type", REAR_CAMERA_TYPES)
 def test_udp_accepts_rear_camera_payload(monkeypatch, cam_type):
   road_limit = {
