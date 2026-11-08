@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import datetime
 import math
+import re
+from functools import partial
+from queue import SimpleQueue
 
 from openpilot.cereal import log
 import raylib_nb as rl
@@ -181,6 +184,7 @@ class MiciHomeLayout(Widget):
 
     # --- Git Pull & Commit Check Variables ---
     self._params = Params()
+    self._commit_results: SimpleQueue[Callable[[], None]] = SimpleQueue()
     self._is_processing = False
     self._is_update_available = False
     self._initial_commit_check_done = False
@@ -211,6 +215,7 @@ class MiciHomeLayout(Widget):
 
   def _update_state(self):
     self.wifi_manager_ui._update_state()
+    self._process_commit_results()
 
     if rl.get_time() - self._last_refresh > 5.0:
       self._version_text = self._get_version_text()
@@ -264,30 +269,41 @@ class MiciHomeLayout(Widget):
       self._start_commit_check()
 
   def _start_git_pull(self):
+    if self._is_processing:
+      return
+
     self._is_processing = True
-    self._git_pull_exit_flag.unlink(missing_ok=True)
 
     def run_git_pull():
       try:
-        subprocess.Popen(["/bin/sh", "/data/openpilot/scripts/gitpull.sh"])
-        start_time = time.time()
-        while time.time() - start_time < 60:
+        self._git_pull_exit_flag.unlink(missing_ok=True)
+        process = subprocess.Popen(["/bin/bash", "/data/openpilot/scripts/gitpull.sh"])
+        start_time = time.monotonic()
+        while time.monotonic() - start_time < 60:
           if self._git_pull_exit_flag.exists():
-            self._on_git_pull_finished()
+            self._commit_results.put(self._on_git_pull_finished)
+            return
+          if process.poll() not in (None, 0):
+            self._commit_results.put(partial(self._on_git_pull_failed, "UPDATE FAILED"))
             return
           time.sleep(1)
-        self._on_git_pull_failed("TIMEOUT")
+        self._commit_results.put(partial(self._on_git_pull_failed, "TIMEOUT"))
       except Exception as e:
         print(f"Failed to start git pull: {e}")
-        self._on_git_pull_failed("FAILED TO START")
+        self._commit_results.put(partial(self._on_git_pull_failed, "FAILED TO START"))
 
     thread = threading.Thread(target=run_git_pull, daemon=True)
     thread.start()
 
   def _on_git_pull_finished(self):
     try:
-      self._git_pull_exit_flag.read_text().strip()
+      exit_code = int(self._git_pull_exit_flag.read_text().strip())
       self._git_pull_exit_flag.unlink(missing_ok=True)
+      if exit_code != 0:
+        self._on_git_pull_failed("UPDATE FAILED")
+        return
+
+      self._is_update_available = False
       self._is_processing = False
       self._commit_status.update("UPDATE", "COMPLETE", rl.WHITE)
     except Exception as e:
@@ -304,24 +320,27 @@ class MiciHomeLayout(Widget):
       return
 
     self._is_processing = True
-    self._commit_check_exit_flag.unlink(missing_ok=True)
 
     def run_commit_check():
       try:
-        subprocess.Popen(["/bin/sh", "/data/openpilot/scripts/commit_compare.sh"])
-        start_time = time.time()
-        while time.time() - start_time < 15:
-          if self._commit_check_exit_flag.exists():
-            self._on_commit_check_finished()
-            return
-          time.sleep(1)
-        self._on_commit_check_failed("TIMEOUT")
+        self._commit_check_exit_flag.unlink(missing_ok=True)
+        result = subprocess.run(["/bin/bash", "/data/openpilot/scripts/commit_compare.sh"], timeout=15, check=False)
+        if result.returncode != 0:
+          self._commit_results.put(partial(self._on_commit_check_failed, "CHECK FAILED"))
+          return
+        self._commit_results.put(self._on_commit_check_finished)
+      except subprocess.TimeoutExpired:
+        self._commit_results.put(partial(self._on_commit_check_failed, "TIMEOUT"))
       except Exception as e:
         print(f"Failed to start commit check: {e}")
-        self._on_commit_check_failed("FAILED TO START")
+        self._commit_results.put(partial(self._on_commit_check_failed, "FAILED TO START"))
 
     thread = threading.Thread(target=run_commit_check, daemon=True)
     thread.start()
+
+  def _process_commit_results(self):
+    while not self._commit_results.empty():
+      self._commit_results.get_nowait()()
 
   def _on_commit_check_finished(self):
     try:
@@ -345,11 +364,13 @@ class MiciHomeLayout(Widget):
     print(f"Commit check failed: {reason}")
     self._commit_status.update("CHECK", reason, Colors.RED)
 
-  def _parse_commit_compare_result(self, output: str):
+  def _parse_commit_compare_result(self, output: str | bytes | None):
     if not output:
       self._on_commit_check_failed("EMPTY RESULT")
       return
 
+    if isinstance(output, bytes):
+      output = output.decode("utf-8", errors="replace")
     output = output.strip().strip('"')
 
     if " == " in output:
@@ -369,11 +390,16 @@ class MiciHomeLayout(Widget):
     local_commit = parts[0].strip().strip('"')
     remote_commit = parts[1].strip().strip('"')
 
+    if (not all(re.fullmatch(r"[0-9a-f]{7,40}", commit) for commit in (local_commit, remote_commit)) or
+        (local_commit == remote_commit) != (operator == "==")):
+      self._on_commit_check_failed("INVALID RESULT")
+      return
+
     if operator == "==":
-      self._commit_status.update("UP TO DATE", local_commit, Colors.LIME)
+      self._commit_status.update("UP TO DATE", local_commit[:7], Colors.LIME)
       self._is_update_available = False
     else:
-      self._commit_status.update(local_commit, remote_commit, Colors.RED)
+      self._commit_status.update(local_commit[:7], remote_commit[:7], Colors.RED)
       self._is_update_available = True
 
   def _update_progress_indicator(self):

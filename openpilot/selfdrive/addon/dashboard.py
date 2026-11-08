@@ -5,6 +5,7 @@ import errno
 import html as html_lib
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -230,6 +231,16 @@ def get_param_text(key: str, default: str = "") -> str:
   if isinstance(value, bytes):
     value = value.decode('utf-8', errors='replace')
   return str(value) if value else default
+
+
+def _parse_commit_compare(output: str) -> tuple[str, str, str] | None:
+  match = re.fullmatch(r'"([0-9a-f]{7,40})"\s+(==|!=)\s+"([0-9a-f]{7,40})"', output.strip())
+  if match is None:
+    return None
+  local_commit, operator, remote_commit = match.groups()
+  if (local_commit == remote_commit) != (operator == "=="):
+    return None
+  return local_commit, operator, remote_commit
 
 
 def get_orange_pi_status_text() -> str:
@@ -675,6 +686,9 @@ def render_status_card(title: str, value: str, icon: str, card_class: str):
   ).classes('w-full')
 
 def render_tab_functions():
+  commit_check_running = False
+  commit_check_failed = False
+
   @ui.refreshable
   def functions_content():
     with ui.column().classes('w-full gap-3 mt-4'):
@@ -724,21 +738,52 @@ def render_tab_functions():
         ui.select(b_opts, value=c_b, label='🌿 Git Branch', on_change=on_b_change).classes('w-full text-blue-200')
 
       commit_output = get_param_text("CommitCompare")
-      commit_info = commit_output or "Check required"
+      comparison = _parse_commit_compare(commit_output)
+      if commit_check_running:
+        commit_info, card_cls, icon = "Checking...", "card-warning", "🔍"
+      elif commit_check_failed:
+        commit_info, card_cls, icon = "Check failed. Try again.", "card-danger", "❌"
+      elif comparison is not None:
+        local_commit, operator, remote_commit = comparison
+        commit_info = f'"{local_commit[:7]}" {operator} "{remote_commit[:7]}"'
+        card_cls, icon = ("card-success", "✅") if operator == "==" else ("card-danger", "⚠️")
+      elif commit_output:
+        commit_info, card_cls, icon = "Invalid comparison. Check again.", "card-danger", "❌"
+      else:
+        commit_info, card_cls, icon = "Check required", "card-warning", "🔍"
 
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         async def do_check_updates():
-          await run_script_async("Commit Check", f"{SCRIPTS_PATH}/commit_compare.sh")
+          nonlocal commit_check_running, commit_check_failed
+          if commit_check_running:
+            return
+          commit_check_running = True
+          commit_check_failed = True
           functions_content.refresh()
+          try:
+            return_code = await run_script_async("Commit Check", f"{SCRIPTS_PATH}/commit_compare.sh")
+            comparison_result = _parse_commit_compare(get_param_text("CommitCompare"))
+            commit_check_failed = return_code != 0 or comparison_result is None
+            if return_code == 0 and comparison_result is None:
+              ui.notify("[Commit Check] 비교 결과가 올바르지 않습니다. 다시 확인해주세요.", type='negative', position='top')
+          finally:
+            commit_check_running = False
+            functions_content.refresh()
 
-        ui.button('CHECK UPDATES', on_click=do_check_updates, color=None).classes('custom-btn btn-blue w-full')
+        check_button = ui.button('CHECK UPDATES', on_click=do_check_updates, color=None).classes('custom-btn btn-blue w-full')
+        if commit_check_running:
+          check_button.disable()
 
-        card_cls, icon = ('card-success', '✅') if " == " in commit_info else ('card-danger', '⚠️') if " != " in commit_info else ('card-warning', '🔍')
         render_status_card("UPDATE STATUS", commit_info, icon, card_cls)
 
-      if commit_output and " != " in commit_output:
+      if comparison is not None and comparison[1] == "!=" and not commit_check_running and not commit_check_failed:
         with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
           async def do_git_pull():
+            current_comparison = _parse_commit_compare(get_param_text("CommitCompare"))
+            if commit_check_running or commit_check_failed or current_comparison is None or current_comparison[1] != "!=":
+              ui.notify("커밋 상태를 다시 확인한 뒤 업데이트해주세요.", type='warning', position='top')
+              functions_content.refresh()
+              return
             await run_script_async("Git Pull", f"{SCRIPTS_PATH}/gitpull.sh", show_modal=True)
             functions_content.refresh()
 

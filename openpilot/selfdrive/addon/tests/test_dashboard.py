@@ -6,7 +6,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
@@ -569,6 +571,175 @@ class TestDashboardCameraJavascript(unittest.TestCase):
 
   def test_proxy_error_is_visible(self):
     self.run_browser('service_fail')
+
+
+class TestDashboardCommitUpdates(unittest.IsolatedAsyncioTestCase):
+  async def asyncSetUp(self):
+    loop = patch.object(core, 'loop', asyncio.get_running_loop())
+    loop.start()
+    self.addCleanup(loop.stop)
+
+  @contextmanager
+  def functions_page(self, values):
+    client = Client(ui.page(f'/test-dashboard-commits-{id(values)}'))
+    self.addCleanup(client.delete)
+    state = SimpleNamespace(client=client, callbacks={}, params=Mock(get=Mock(side_effect=values.get)), notify=Mock())
+    on_click = ui.button.on_click
+
+    def capture(button, callback):
+      state.callbacks[button.text] = callback
+      return on_click(button, callback)
+
+    with client, patch.object(dashboard, 'params', state.params), patch.object(dashboard, 'get_list_from_file', return_value=[]), \
+         patch.object(ui.button, 'on_click', capture), patch.object(ui, 'notify', state.notify):
+      dashboard.render_tab_functions()
+      yield state
+
+  @staticmethod
+  def button_texts(client):
+    return [element.text for element in client.elements.values() if isinstance(element, ui.button)]
+
+  @staticmethod
+  def status_card(client):
+    return next(element.content for element in client.elements.values() if isinstance(element, ui.html) and 'UPDATE STATUS' in element.content)
+
+  def test_parser_validates_full_hashes_and_preserves_short_hash_compatibility(self):
+    for local, remote in [('a' * 40, 'b' * 40), ('a' * 40, 'a' * 40), ('1234567', 'abcdef0')]:
+      operator = '==' if local == remote else '!='
+      with self.subTest(local=local, remote=remote):
+        self.assertEqual(dashboard._parse_commit_compare(f'"{local}" {operator} "{remote}"\n'), (local, operator, remote))
+    for output in ['', 'garbage', '"ERROR" != "ERROR"', '"aaaaaaa" != "aaaaaaa"', '"aaaaaaa" == "bbbbbbb"',
+                   '"aaaaaaa" != "bbbbbbb" != "ccccccc"', '"" == ""', '<script> != "bbbbbbb"']:
+      with self.subTest(output=output):
+        self.assertIsNone(dashboard._parse_commit_compare(output))
+
+  def test_full_hashes_are_shortened_for_display_without_changing_update_detection(self):
+    local = 'a' * 40
+    for remote in [local, 'b' * 40, local[:7] + 'b' * 33]:
+      operator = '==' if local == remote else '!='
+      for as_bytes in [False, True]:
+        comparison = f'"{local}" {operator} "{remote}"'
+        with self.subTest(remote=remote, as_bytes=as_bytes), \
+             self.functions_page({'CommitCompare': comparison.encode() if as_bytes else comparison}) as state:
+          status = self.status_card(state.client)
+          self.assertIn(f'{local[:7]}', status)
+          self.assertIn(remote[:7], status)
+          self.assertNotIn(local, status)
+          self.assertIn('card-success' if local == remote else 'card-danger', status)
+          self.assertEqual('GIT PULL NOW' in self.button_texts(state.client), local != remote)
+
+  def test_missing_or_invalid_result_never_offers_git_pull(self):
+    for output in [None, '', '"ERROR" != "ERROR"', '"aaaaaaa" != "aaaaaaa"', '"aaaaaaa" == "bbbbbbb"',
+                   'garbage != garbage', '"aaaaaaa" != "bbbbbbb" != "ccccccc"']:
+      with self.subTest(output=output), self.functions_page({'CommitCompare': output}) as state:
+        self.assertNotIn('GIT PULL NOW', self.button_texts(state.client))
+        self.assertNotIn('card-success', self.status_card(state.client))
+
+  async def test_successful_check_refreshes_status_and_enables_pull(self):
+    values = {}
+
+    async def check(*_args, **_kwargs):
+      values['CommitCompare'] = f'"{"a" * 40}" != "{"b" * 40}"'
+      return 0
+
+    with self.functions_page(values) as state, patch.object(dashboard, 'run_script_async', AsyncMock(side_effect=check)) as run:
+      await state.callbacks['CHECK UPDATES']()
+      await asyncio.sleep(0)
+      run.assert_awaited_once_with('Commit Check', f'{dashboard.SCRIPTS_PATH}/commit_compare.sh')
+      self.assertIn('GIT PULL NOW', self.button_texts(state.client))
+      self.assertIn('card-danger', self.status_card(state.client))
+      self.assertIn('aaaaaaa', self.status_card(state.client))
+
+  async def test_failed_check_hides_previous_update_even_if_process_cannot_clear_params(self):
+    for clear_result in [False, True]:
+      values = {'CommitCompare': '"aaaaaaa" != "bbbbbbb"'}
+
+      async def fail(*_args, clear=clear_result, stored=values, **_kwargs):
+        if clear:
+          stored.pop('CommitCompare')
+        return 1
+
+      with self.subTest(clear_result=clear_result), self.functions_page(values) as state, \
+           patch.object(dashboard, 'run_script_async', AsyncMock(side_effect=fail)):
+        self.assertIn('GIT PULL NOW', self.button_texts(state.client))
+        await state.callbacks['CHECK UPDATES']()
+        await asyncio.sleep(0)
+        self.assertNotIn('GIT PULL NOW', self.button_texts(state.client))
+        status = self.status_card(state.client)
+        self.assertIn('card-danger', status)
+        self.assertIn('failed', status.lower())
+
+  async def test_success_exit_without_valid_result_is_not_reported_as_current(self):
+    for output in [None, '"ERROR" != "ERROR"', '"aaaaaaa" == "bbbbbbb"']:
+      with self.subTest(output=output), self.functions_page({'CommitCompare': output}) as state, \
+           patch.object(dashboard, 'run_script_async', AsyncMock(return_value=0)):
+        await state.callbacks['CHECK UPDATES']()
+        await asyncio.sleep(0)
+        self.assertNotIn('GIT PULL NOW', self.button_texts(state.client))
+        status = self.status_card(state.client)
+        self.assertIn('card-danger', status)
+        self.assertIn('failed', status.lower())
+
+  async def test_running_check_hides_pull_and_ignores_duplicate_check(self):
+    entered, finish = asyncio.Event(), asyncio.Event()
+
+    async def wait_for_result(*_args, **_kwargs):
+      entered.set()
+      await finish.wait()
+      return 0
+
+    with self.functions_page({'CommitCompare': '"aaaaaaa" != "bbbbbbb"'}) as state, \
+         patch.object(dashboard, 'run_script_async', AsyncMock(side_effect=wait_for_result)) as run:
+      old_pull = state.callbacks['GIT PULL NOW']
+      first = asyncio.create_task(state.callbacks['CHECK UPDATES']())
+      try:
+        await asyncio.wait_for(entered.wait(), 1)
+        await asyncio.sleep(0)
+        self.assertNotIn('GIT PULL NOW', self.button_texts(state.client))
+        self.assertIn('checking', self.status_card(state.client).lower())
+        check = next(element for element in state.client.elements.values() if isinstance(element, ui.button) and element.text == 'CHECK UPDATES')
+        self.assertFalse(check.enabled)
+        await state.callbacks['CHECK UPDATES']()
+        await old_pull()
+        self.assertEqual(run.await_count, 1)
+      finally:
+        finish.set()
+        await first
+
+  async def test_old_pull_callback_rechecks_latest_result_before_launching(self):
+    for new_result in [None, '"aaaaaaa" == "aaaaaaa"', '"ERROR" != "ERROR"']:
+      values = {'CommitCompare': '"aaaaaaa" != "bbbbbbb"'}
+      with self.subTest(new_result=new_result), self.functions_page(values) as state, \
+           patch.object(dashboard, 'run_script_async', AsyncMock()) as run:
+        pull = state.callbacks['GIT PULL NOW']
+        values['CommitCompare'] = new_result
+        await pull()
+        await asyncio.sleep(0)
+        run.assert_not_awaited()
+        self.assertNotIn('GIT PULL NOW', self.button_texts(state.client))
+        state.notify.assert_called()
+
+  async def test_valid_pull_uses_existing_modal_runner(self):
+    with self.functions_page({'CommitCompare': '"aaaaaaa" != "bbbbbbb"'}) as state, \
+         patch.object(dashboard, 'run_script_async', AsyncMock(return_value=0)) as run:
+      await state.callbacks['GIT PULL NOW']()
+      await asyncio.sleep(0)
+      run.assert_awaited_once_with('Git Pull', f'{dashboard.SCRIPTS_PATH}/gitpull.sh', show_modal=True)
+
+  async def test_successful_retry_clears_failure_and_restores_update_button(self):
+    values = {'CommitCompare': '"aaaaaaa" != "bbbbbbb"'}
+    with self.functions_page(values) as state, patch.object(dashboard, 'run_script_async', AsyncMock(side_effect=[1, 0])) as run:
+      await state.callbacks['CHECK UPDATES']()
+      await asyncio.sleep(0)
+      self.assertIn('failed', self.status_card(state.client).lower())
+      self.assertNotIn('GIT PULL NOW', self.button_texts(state.client))
+      check = next(element for element in state.client.elements.values() if isinstance(element, ui.button) and element.text == 'CHECK UPDATES')
+      self.assertTrue(check.enabled)
+      await state.callbacks['CHECK UPDATES']()
+      await asyncio.sleep(0)
+      self.assertEqual(run.await_count, 2)
+      self.assertIn('GIT PULL NOW', self.button_texts(state.client))
+      self.assertNotIn('failed', self.status_card(state.client).lower())
 
 
 class TestDashboardAsync(unittest.IsolatedAsyncioTestCase):

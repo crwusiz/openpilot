@@ -247,10 +247,10 @@ class Sidebar(Widget):
     remote_commit = parts[1].strip().strip('"')
 
     if operator == "==":
-      self._commit_status.update(tr_noop("UP TO DATE"), local_commit, Colors.LIME)
+      self._commit_status.update(tr_noop("UP TO DATE"), local_commit[:7], Colors.LIME)
       self._is_update_available = False
     else:
-      self._commit_status.update(local_commit, remote_commit, Colors.RED)
+      self._commit_status.update(local_commit[:7], remote_commit[:7], Colors.RED)
       self._is_update_available = True
 
   def _update_progress_indicator(self):
