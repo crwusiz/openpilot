@@ -27,6 +27,7 @@ STATE_DRAIN_TIMEOUT_S = 5.0
 STATE_SEND_BUFFER_BYTES = 16 * 1024
 STATE_INVALID_LOG_INTERVAL_S = 5.0
 KEYFRAME_REQUEST_INTERVAL = 1.0
+INITIAL_OFFER_TIMEOUT_S = 30.0
 
 
 def configure_state_transport(writer):
@@ -488,7 +489,10 @@ class H264NetworkServer:
                                         "display_profile": self.config.hdmi_profile,
                                         "state_hz": 20, "state_compression": "zlib"}, budget_s=2)
       phase = "offer"
-      kind, _sequence, offer = await read_control(reader, budget_s=15)
+      # The Pi prepares fonts/scene assets and imports its decoder before
+      # sending the first offer. Keep this cold-start allowance separate
+      # from live control/video watchdogs and later negotiation deadlines.
+      kind, _sequence, offer = await read_control(reader, budget_s=INITIAL_OFFER_TIMEOUT_S)
       if kind == ERROR:
         raise RuntimeError(f"Pi H.264 unavailable: {offer.get('error', 'unknown')} | {str(offer.get('detail', ''))[:512]}")
       if kind != OFFER or offer.get("type") != "offer" or not isinstance(offer.get("sdp"), str) or not offer["sdp"].startswith("v=0"):

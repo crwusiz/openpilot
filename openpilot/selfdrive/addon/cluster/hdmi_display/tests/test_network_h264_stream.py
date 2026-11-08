@@ -16,6 +16,17 @@ START = b"\x00\x00\x00\x01"
 
 @pytest.fixture
 def sender(monkeypatch):
+  class NackResponder:
+    def __init__(self, max_size=512):
+      self.max_size = max_size
+      self._next = None
+
+    def next(self):
+      return self._next
+
+    def set_next(self, handler):
+      self._next = handler
+
   class Base:
     def __init__(self, *args, **kwargs):
       self.options = kwargs
@@ -36,7 +47,7 @@ def sender(monkeypatch):
       self.stopped = True
 
   monkeypatch.setitem(sys.modules, "teleoprtc.stream", SimpleNamespace(
-    RTCSessionDescription=SimpleNamespace, WebRTCAnswerStream=Base,
+    RTCSessionDescription=SimpleNamespace, WebRTCAnswerStream=Base, RtcpNackResponder=NackResponder,
   ))
   spec = importlib.util.spec_from_file_location("cluster_h264_sender_under_test",
                                                Path(__file__).parents[1] / "network_h264_stream.py")
@@ -353,6 +364,91 @@ def test_native_chain_wrappers_are_released_only_after_stream_stop(sender):
   stream._native_video_handlers.append(object())
   asyncio.run(stream.stop())
   assert stream.stopped and stream._native_video_handlers == []
+
+
+def test_only_cluster_nack_history_is_replaced_before_sending_and_all_wrappers_survive_until_stop(sender):
+  stream = sender.ClusterH264Stream("v=0", object())
+  old = sender.RtcpNackResponder()
+
+  class Handler:
+    def __init__(self, following):
+      self.following = following
+
+    def next(self):
+      return self.following
+
+    def set_next(self, following):
+      self.following = following
+
+  # Keep a downstream extension which is not another NACK responder.
+  extension = Handler(None)
+  old.set_next(extension)
+  pli, reporter = Handler(old), Handler(None)
+  reporter.set_next(pli)
+  packetizer = Handler(reporter)
+  config = SimpleNamespace(ssrc=123)
+  stream._track_state = [(SimpleNamespace(get_media_handler=lambda: packetizer), None, config)]
+  stream._add_producer_tracks("offer")
+  replacement = pli.next()
+  assert replacement is not old and isinstance(replacement, sender.RtcpNackResponder)
+  assert replacement.max_size == sender.NACK_HISTORY_PACKETS == 96
+  assert packetizer.next() is reporter and reporter.next() is pli and replacement.next() is extension
+  assert old in stream._native_video_handlers and replacement in stream._native_video_handlers
+  assert len(stream._native_video_handlers) == 6
+  asyncio.run(stream.stop())
+  assert stream.stopped and not stream._native_video_handlers and not stream._cluster_rtp_configs
+
+
+@pytest.mark.parametrize("kind", ["absent", "root", "multiple"])
+def test_unrecognized_native_chains_keep_their_original_repair_policy(sender, kind):
+  nack = sender.RtcpNackResponder()
+  if kind == "absent":
+    handlers = [object()]
+  elif kind == "root":
+    handlers = [nack]
+  else:
+    handlers = [object(), nack, sender.RtcpNackResponder()]
+  before = list(handlers)
+  assert sender.ClusterH264Stream._configure_nack_history(handlers) is handlers
+  assert handlers == before
+  assert "action=keep_default" in sender.flog.call_args.args[0]
+
+
+def test_recent_repairs_keep_real_receiver_frames_intact_after_obsolete_requests(sender):
+  jitter = pytest.importorskip("aiortc.jitterbuffer")
+
+  def packet(sequence):
+    return SimpleNamespace(sequence_number=sequence & 0xFFFF, timestamp=(sequence // 10) * 4500,
+                           _data=bytes([sequence & 255]))
+
+  def receive(history):
+    receiver = jitter.JitterBuffer(capacity=128, is_video=True)
+    for sequence in range(151):
+      receiver.add(packet(sequence))
+    # A repeat NACK for sequence 10 can arrive after the receiver has already
+    # advanced past that frame. The old 512-packet cache still contains it.
+    late_reset = receiver.add(packet(10))[0] if 150 - 10 < history else False
+    frames, resets = [], 0
+    for sequence in range(151, 171):
+      reset, frame = receiver.add(packet(sequence))
+      resets += reset
+      if frame is not None:
+        frames.append(frame.data)
+    return late_reset, resets, frames
+
+  original = receive(512)
+  recent = receive(sender.NACK_HISTORY_PACKETS)
+  assert original[0] and original[1] == 1 and len(original[2][0]) == 9
+  assert not recent[0] and recent[1] == 0
+  assert recent[2] == [bytes(range(150, 160)), bytes(range(160, 170))]
+
+  receiver = jitter.JitterBuffer(capacity=128, is_video=True)
+  for sequence in range(151):
+    if sequence != 144:
+      receiver.add(packet(sequence))
+  assert 150 - 144 < sender.NACK_HISTORY_PACKETS
+  reset, frame = receiver.add(packet(144))
+  assert not reset and frame.data == bytes(range(140, 150))
 
 
 def rtcp_packet(packet_type, payload=b"", fmt=0, padding=0):

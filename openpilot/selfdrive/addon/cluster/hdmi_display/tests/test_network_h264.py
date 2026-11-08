@@ -509,6 +509,46 @@ async def test_state_compression_is_negotiated_and_legacy_peers_stay_on_json(mon
   assert stream.stopped and not server.clients
 
 
+@pytest.mark.parametrize("send_offer", [False, True])
+@asyncio_test
+async def test_initial_offer_has_its_own_bounded_cold_start_budget(monkeypatch, send_offer):
+  assert network.INITIAL_OFFER_TIMEOUT_S == 30.0
+  monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
+  monkeypatch.setattr(network, "INITIAL_OFFER_TIMEOUT_S", 0.2 if send_offer else 0.03)
+  real_read, budgets = network.read_control, []
+
+  async def record_read(reader, budget_s=8.0):
+    budgets.append(budget_s)
+    return await real_read(reader, budget_s)
+
+  monkeypatch.setattr(network, "read_control", record_read)
+  stream, track = factory()
+  create_stream = Mock(return_value=(stream, track))
+  server = network.H264NetworkServer(config(), models(), create_stream)
+  await server.start()
+  reader, writer = await asyncio.open_connection(*server.server.sockets[0].getsockname())
+  try:
+    assert (await real_read(reader))[0] == wire.HELLO
+    if send_offer:
+      await asyncio.sleep(0.06)
+      await network.write_control(writer, wire.OFFER, {"type": "offer", "sdp": "v=0\r\noffer"})
+      assert (await real_read(reader))[0] == wire.ANSWER
+      assert (await real_read(reader))[0] == wire.STATE
+      assert budgets == [0.2, 8.0]  # Only initial preparation gets extra time.
+      create_stream.assert_called_once()
+    else:
+      kind, _, payload = await real_read(reader)
+      assert kind == wire.ERROR and payload["error"] == "TimeoutError"
+      assert budgets == [0.03]
+      create_stream.assert_not_called()
+  finally:
+    writer.close()
+    await writer.wait_closed()
+    await server.close()
+  assert not server.clients and server.active is None
+  assert stream.stopped == send_offer and track.stop.called == send_offer
+
+
 @asyncio_test
 async def test_short_state_pause_keeps_video_session_and_resumes_with_latest_models(monkeypatch):
   monkeypatch.setattr(network, "write_network_status", lambda _ip: None)

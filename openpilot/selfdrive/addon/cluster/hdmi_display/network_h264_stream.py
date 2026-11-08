@@ -10,7 +10,7 @@ import re
 import struct
 import time
 
-from teleoprtc.stream import RTCSessionDescription, WebRTCAnswerStream
+from teleoprtc.stream import RTCSessionDescription, RtcpNackResponder, WebRTCAnswerStream
 
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 
@@ -21,6 +21,10 @@ MAX_NAL_UNITS = 256
 MAX_RTCP_BYTES = 8192
 MAX_RTCP_BLOCKS = 64
 MAX_NACK_REQUESTS = 512
+# A late original-sequence retransmission can reset aiortc's video buffer
+# after it has advanced by 100 packets. Keep recent repairs, without sending
+# a much older reference chain back into an already recovered live stream.
+NACK_HISTORY_PACKETS = 96
 
 
 def parse_nack_feedback(message, media_ssrc):
@@ -137,14 +141,35 @@ class ClusterH264Stream(WebRTCAnswerStream):
     # including PLI callbacks. Shutdown still joins senders before closing ICE.
     for rtc_track, _producer, _config in self._track_state:
       self._cluster_rtp_configs[_config.ssrc] = _config
+      handlers = []
       handler = rtc_track.get_media_handler()
       for _index in range(8):
         if handler is None:
           break
-        self._native_video_handlers.append(handler)
+        handlers.append(handler)
         handler = handler.next()
       else:
         raise RuntimeError("Unexpected native H.264 media handler chain")
+      self._native_video_handlers.extend(self._configure_nack_history(handlers))
+
+  @staticmethod
+  def _configure_nack_history(handlers):
+    # Configure only this cluster's native chain, before connection/sending.
+    # Preserve packetization, SR, PLI and any downstream handlers. Retain the
+    # replaced wrapper until shutdown, just like all other native wrappers.
+    indices = [index for index, handler in enumerate(handlers) if isinstance(handler, RtcpNackResponder)]
+    if len(indices) != 1 or indices[0] == 0:
+      flog("[CLUSTER_H264_NACK_POLICY] action=keep_default | reason=unrecognized_chain")
+      return handlers
+    index = indices[0]
+    previous = handlers[index]
+    replacement = RtcpNackResponder(max_size=NACK_HISTORY_PACKETS)
+    if index + 1 < len(handlers):
+      replacement.set_next(handlers[index + 1])
+    handlers[index - 1].set_next(replacement)
+    handlers[index] = replacement
+    flog(f"[CLUSTER_H264_NACK_POLICY] cache_packets={NACK_HISTORY_PACKETS} | action=recent_repairs | native=1")
+    return [*handlers, previous]
 
   def _update_receiver_report(self, camera_type, ssrc, message):
     packets, requested, status = parse_nack_feedback(message, ssrc)
