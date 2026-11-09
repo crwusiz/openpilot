@@ -11,7 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
-import httpx
+import httpx2
 from nicegui import Client, core, ui
 from starlette.requests import Request
 
@@ -290,7 +290,7 @@ class TestDashboardCameraProxy(unittest.IsolatedAsyncioTestCase):
 
   async def test_http_route_is_available_at_browser_same_origin(self):
     with patch.object(dashboard, '_request_camera_stream', return_value=(200, {'type': 'answer', 'sdp': 'answer'})) as relay:
-      async with httpx.AsyncClient(transport=httpx.ASGITransport(app=dashboard.app), base_url='http://dashboard:7000') as client:
+      async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=dashboard.app), base_url='http://dashboard:7000') as client:
         response = await client.post('/api/camera/stream', json={'cameras': ['wideRoad'], 'sdp': 'v=0'})
     self.assertEqual(response.status_code, 200)
     self.assertEqual(response.json(), {'type': 'answer', 'sdp': 'answer'})
@@ -353,8 +353,8 @@ class TestDashboardClusterActions(unittest.IsolatedAsyncioTestCase):
       actions = dashboard.ClusterActions(root, root / 'cluster_debug.log', runner=runner)
       with patch.object(dashboard, 'CLUSTER_ACTIONS', actions), \
            patch.object(dashboard, 'get_connected_pi_ip', return_value='192.168.0.84') as peer:
-        transport = httpx.ASGITransport(app=dashboard.app, client=('192.168.0.84', 1234))
-        async with httpx.AsyncClient(transport=transport, base_url='http://c4:7000') as client:
+        transport = httpx2.ASGITransport(app=dashboard.app, client=('192.168.0.84', 1234))
+        async with httpx2.AsyncClient(transport=transport, base_url='http://c4:7000') as client:
           payload = {'action': 'upload_logs', 'request_id': 'c' * 32}
           response = await client.post('/api/cluster/actions', json=payload)
           self.assertEqual(response.status_code, 202)
@@ -373,8 +373,8 @@ class TestDashboardClusterActions(unittest.IsolatedAsyncioTestCase):
     actions = dashboard.ClusterActions(runner=AsyncMock())
     with patch.object(dashboard, 'CLUSTER_ACTIONS', actions), \
          patch.object(dashboard, 'get_connected_pi_ip', return_value='192.168.0.84'):
-      transport = httpx.ASGITransport(app=dashboard.app, client=('192.168.0.99', 1234))
-      async with httpx.AsyncClient(transport=transport, base_url='http://c4:7000') as client:
+      transport = httpx2.ASGITransport(app=dashboard.app, client=('192.168.0.99', 1234))
+      async with httpx2.AsyncClient(transport=transport, base_url='http://c4:7000') as client:
         self.assertEqual((await client.get('/api/cluster/actions')).status_code, 403)
         payload = {'action': 'pi_update', 'request_id': 'd' * 32}
         self.assertEqual((await client.post('/api/cluster/actions', json=payload)).status_code, 403)

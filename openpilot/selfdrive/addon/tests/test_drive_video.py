@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
-import httpx
+import httpx2
 from fastapi import FastAPI
 
 from openpilot.selfdrive.addon.drive_video import DriveVideoError, DriveVideoLibrary, create_drive_video_router
@@ -230,7 +230,7 @@ class TestDriveVideoAPI(DriveVideoFixture, unittest.IsolatedAsyncioTestCase):
   async def asyncSetUp(self):
     self.app = FastAPI()
     self.app.include_router(create_drive_video_router(self.library))
-    self.client = httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app), base_url='http://device')
+    self.client = httpx2.AsyncClient(transport=httpx2.ASGITransport(app=self.app), base_url='http://device')
     self.addAsyncCleanup(self.client.aclose)
 
   async def test_catalog_and_prepare_return_playable_url(self):
@@ -286,10 +286,12 @@ class TestDriveVideoAPI(DriveVideoFixture, unittest.IsolatedAsyncioTestCase):
     url = f'/api/drives/video/{source.parent.name}'
     scope = {'type': 'http', 'method': 'GET', 'path': url, 'raw_path': url.encode(), 'headers': [],
              'query_string': b'', 'scheme': 'http', 'http_version': '1.1', 'server': ('device', 80),
-             'client': ('browser', 123), 'asgi': {'version': '3.0'}}
+             'client': ('browser', 123), 'asgi': {'version': '3.0', 'spec_version': '2.4'}}
+    messages = asyncio.Queue()
+    messages.put_nowait({'type': 'http.request', 'body': b'', 'more_body': False})
 
     async def receive():
-      return {'type': 'http.request', 'body': b'', 'more_body': False}
+      return await messages.get()
 
     async def send(message):
       if message['type'] == 'http.response.start':

@@ -1217,7 +1217,7 @@ def main_page():
       ui.button(icon='refresh', on_click=lambda: ui.run_javascript('window.location.reload()')).classes(
         'refresh-btn rounded-full')
 
-    with ui.tabs().props('align="right" active-color="white" indicator-color="white" inline-label=false').classes(
+    with ui.tabs().props('align="right" active-color="white" indicator-color="white"').classes(
       'flex-1 overflow-x-auto tabs-custom') as tabs:
       ui.tab('FUNCTIONS', icon='rocket')
       ui.tab('TOGGLES', icon='settings')
