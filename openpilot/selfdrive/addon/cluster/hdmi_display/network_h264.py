@@ -15,6 +15,7 @@ import time
 from openpilot.selfdrive.addon.cluster.cluster_health_guard import ClusterHealthGuard
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 from openpilot.selfdrive.addon.cluster.cluster_runtime_metrics import ClusterRuntimeMetrics
+from openpilot.selfdrive.addon.cluster.hdmi_display.network_bitrate import ClusterBitrateController, SAMPLE_INTERVAL
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import write_network_status
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_profiles import normalize_hdmi_profile
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol import (
@@ -328,6 +329,7 @@ class H264NetworkServer:
     self.screen_off = False
     self.peer_ip = None
     self.status_updated = 0.0
+    self.bitrate = ClusterBitrateController(getattr(config, "params", None))
 
   async def start(self):
     self.server = await asyncio.start_server(self._client, self.config.network_bind_host, self.config.network_port,
@@ -336,18 +338,42 @@ class H264NetworkServer:
 
   async def close(self):
     server, self.server = self.server, None
-    if server is not None:
-      server.close()
-    tasks = list(self.clients)
-    for task in tasks:
-      task.cancel()
-    if tasks:
-      await asyncio.gather(*tasks, return_exceptions=True)
-    # Python 3.12 Server.wait_closed also waits for client transports. Cancel
-    # negotiations first; otherwise shutdown would wait their full 15s budget.
-    if server is not None:
-      await server.wait_closed()
-    publish_status(None)
+    try:
+      if server is not None:
+        server.close()
+      tasks = list(self.clients)
+      for task in tasks:
+        task.cancel()
+      if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+      # Python 3.12 Server.wait_closed also waits for client transports. Cancel
+      # negotiations first; otherwise shutdown would wait their full budget.
+      if server is not None:
+        await server.wait_closed()
+    finally:
+      self.bitrate.close()
+      publish_status(None)
+
+  async def _network_budget(self, writer, stream):
+    self.bitrate.reset_connection()
+    try:
+      while True:
+        await asyncio.sleep(SAMPLE_INTERVAL)
+        if self.bitrate.disabled:
+          await asyncio.Future()  # Stay supervised until normal cancellation.
+        get_reports = getattr(stream, "get_receiver_report_stats", None)
+        reports = get_reports() if callable(get_reports) else {}
+        self.bitrate.sample(time.monotonic(), reports.get("road"), writer.transport.get_write_buffer_size(),
+                            degraded=self.degraded)
+    except Exception as error:
+      # An auxiliary tuning failure cannot end FIRST_COMPLETED and tear down
+      # healthy media. The connection's normal control/video watchdogs remain.
+      flog(f"[CLUSTER_H264_BITRATE] action=suspend | reason={type(error).__name__}")
+      await asyncio.Future()
+    finally:
+      # Keep a reduced rate across reconnects instead of immediately refilling
+      # the same congested link at 5 Mbps. Fresh reports are required to raise it.
+      self.bitrate.reset_connection()
 
   async def _feedback(self, reader, track):
     last_keyframe_request = None
@@ -512,6 +538,7 @@ class H264NetworkServer:
       flog(f"[CLUSTER_H264_STATE_ENCODING] encoding={compression or 'json'} | negotiated=1 | decoded_limit_bytes=65536")
       workers = [asyncio.create_task(self._states(writer, track, stream, compression=compression), name="scene_state"),
                  asyncio.create_task(self._feedback(reader, track), name="receiver_feedback"),
+                 asyncio.create_task(self._network_budget(writer, stream), name="network_budget"),
                  asyncio.create_task(stream.wait_for_disconnection(), name="video_transport")]
       done, _pending = await asyncio.wait(workers, return_when=asyncio.FIRST_COMPLETED)
       for completed in done:

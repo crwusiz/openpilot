@@ -631,6 +631,63 @@ async def test_state_write_stall_has_a_hard_deadline_and_cleans_pending_drain(mo
 
 
 @asyncio_test
+async def test_network_budget_runs_while_state_drain_is_pending_and_survives_reconnect(monkeypatch):
+  monkeypatch.setattr(network, "SAMPLE_INTERVAL", 0.005)
+  clock = iter(index / 2 for index in range(100))
+  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=lambda: next(clock)))
+  monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
+  values, writes = {}, []
+  adapted = asyncio.Event()
+
+  def put(key, value, *, block):
+    assert not block
+    values[key] = value
+    writes.append(value)
+    adapted.set()
+
+  settings = config()
+  settings.params = SimpleNamespace(get=values.get, put=put)
+  server = network.H264NetworkServer(settings, models())
+  writer = SimpleNamespace(transport=SimpleNamespace(get_write_buffer_size=lambda: 1600))
+  monitor = asyncio.create_task(server._network_budget(writer, Stream()))
+  try:
+    await asyncio.wait_for(adapted.wait(), 1)
+  finally:
+    monitor.cancel()
+    with pytest.raises(asyncio.CancelledError):
+      await monitor
+  assert writes == [3_750_000]
+  assert server.bitrate.current == 3_750_000 and server.bitrate.last_report is None
+  # Closing the server (not each failed ICE session) restores the encoder.
+  await server.close()
+  assert writes == [3_750_000, 5_000_000]
+
+
+@asyncio_test
+async def test_optional_network_budget_failure_cannot_end_a_healthy_video_session(monkeypatch):
+  monkeypatch.setattr(network, "SAMPLE_INTERVAL", 0.005)
+  server = network.H264NetworkServer(config(), models())
+  server.bitrate = SimpleNamespace(disabled=False, reset_connection=Mock(), sample=Mock())
+  failed = asyncio.Event()
+
+  def unavailable():
+    failed.set()
+    raise RuntimeError("report unavailable")
+
+  monitor = asyncio.create_task(server._network_budget(None, SimpleNamespace(get_receiver_report_stats=unavailable)))
+  try:
+    await asyncio.wait_for(failed.wait(), 1)
+    await asyncio.sleep(0)
+    assert not monitor.done()
+    server.bitrate.sample.assert_not_called()
+  finally:
+    monitor.cancel()
+    with pytest.raises(asyncio.CancelledError):
+      await monitor
+  assert server.bitrate.reset_connection.call_count == 2
+
+
+@asyncio_test
 async def test_failed_connection_aborts_a_transport_that_cannot_finish_closing(monkeypatch):
   monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
   monkeypatch.setattr(network, "read_control", AsyncMock(return_value=(wire.OFFER, 0, {"type": "offer", "sdp": "v=0\r\noffer"})))
