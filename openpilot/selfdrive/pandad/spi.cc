@@ -226,7 +226,7 @@ static bool check_crc(const uint8_t *data, uint32_t len) {
 
 int PandaSpiHandle::spi_transfer_retry(uint8_t endpoint, uint8_t *tx_data, uint16_t tx_len, uint8_t *rx_data, uint16_t max_rx_len, unsigned int timeout) {
   // timeout of 0 means forever
-  double deadline = (timeout == 0) ? INFINITY : millis_since_boot() + std::max(timeout, SPI_MIN_TIMEOUT);
+  const double deadline = (timeout == 0) ? INFINITY : millis_since_boot() + std::max(timeout, SPI_MIN_TIMEOUT);
 
   // the id stays the same when we send the request again, so the panda never runs it twice
   uint32_t id = random_id();
@@ -247,9 +247,6 @@ int PandaSpiHandle::spi_transfer_retry(uint8_t endpoint, uint8_t *tx_data, uint1
       if (nack_count > 3) {
         usleep(std::clamp(nack_count*10, 200, 2000));
       }
-      // A NACK confirms the request was not executed. Backpressure must not
-      // consume the response budget for the next request with a new id.
-      deadline = (timeout == 0) ? INFINITY : millis_since_boot() + std::max(timeout, SPI_MIN_TIMEOUT);
     } else if (ret == SpiError::SILENT) {
       // the panda went quiet. let go of the bus for a bit, someone else might need it
       LOGW("SPI: panda isn't responding");
@@ -263,9 +260,7 @@ int PandaSpiHandle::spi_transfer_retry(uint8_t endpoint, uint8_t *tx_data, uint1
   }
 
   if (ret < 0) {
-    // spi_transfer has released the bus; another thread can already be using
-    // header and tx_buf, so report this request's local arguments instead.
-    LOGE("SPI: transfer failed with %d (endpoint=0x%x, tx_len=%u, max_rx_len=%u)", ret, endpoint, tx_len, max_rx_len);
+    SPILOG(LOGE, "SPI: transfer failed with %d", ret);
   }
   return ret;
 }
@@ -304,18 +299,14 @@ int PandaSpiHandle::lltransfer(spi_ioc_transfer &t) {
 // One request and its response. Resends until the panda got the request and we got its response,
 // or the deadline. Every transfer either sees all of what the panda queued from its first byte, or
 // nothing it can mistake for a response. Returns the response length, or a negative SpiError
-int PandaSpiHandle::spi_transfer(uint8_t endpoint, uint32_t id, uint8_t *tx_data, uint16_t tx_len, uint8_t *rx_data, uint16_t max_rx_len, double &deadline) {
+int PandaSpiHandle::spi_transfer(uint8_t endpoint, uint32_t id, uint8_t *tx_data, uint16_t tx_len, uint8_t *rx_data, uint16_t max_rx_len, double deadline) {
   static const auto poll = [] {
     std::array<uint8_t, SPI_BUF_SIZE> p;
     p.fill(SPI_POLL);
     return p;
   }();
 
-  const double wait_started = millis_since_boot();
   LockEx lock(spi_fd, hw_lock);
-  // Waiting behind RX and health requests must not consume this request's
-  // response budget. Retries still keep the remaining budget for the exchange.
-  deadline += millis_since_boot() - wait_started;
 
   // the response is always read in one transfer of rx_len
   const uint32_t rx_len = sizeof(spi_resp_header) + max_rx_len + SPI_CRC_SIZE;
