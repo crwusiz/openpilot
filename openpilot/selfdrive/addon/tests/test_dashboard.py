@@ -37,6 +37,38 @@ class TestDashboardHelpers(unittest.TestCase):
         params.get.return_value = value
         self.assertEqual(dashboard.get_param_text('key', 'default'), expected)
 
+  def test_params_factory_uses_memory_fallback_when_native_module_is_unavailable(self):
+    with patch.dict(sys.modules, {'openpilot.common.params': None}):
+      params = dashboard._create_params()
+    self.assertIsInstance(params, dashboard.MockParams)
+    params.put('SelectedManufacturer', 'HYUNDAI')
+    self.assertEqual(params.get('SelectedManufacturer'), 'HYUNDAI')
+
+  def test_params_factory_preserves_the_native_backend(self):
+    backend = Mock()
+    constructor = Mock(return_value=backend)
+    with patch.dict(sys.modules, {'openpilot.common.params': SimpleNamespace(Params=constructor)}):
+      self.assertIs(dashboard._create_params(), backend)
+    constructor.assert_called_once_with()
+
+  def test_memory_params_support_dashboard_settings_and_blocking_writes(self):
+    params = dashboard.MockParams()
+    self.assertIsNone(params.get('SelectedCar'))
+    self.assertFalse(params.get_bool('ClusterEnable'))
+    for block in (False, True):
+      with self.subTest(block=block):
+        params.put('SelectedCar', 'test car', block=block)
+        params.put_bool('ClusterEnable', True, block=block)
+        self.assertEqual(params.get('SelectedCar'), 'test car')
+        self.assertTrue(params.get_bool('ClusterEnable'))
+        params.put('SelectedCar', 'updated car', block)
+        params.put_bool('ClusterEnable', False, block)
+        self.assertEqual(params.get('SelectedCar'), 'updated car')
+        self.assertFalse(params.get_bool('ClusterEnable'))
+        params.remove('SelectedCar')
+        self.assertIsNone(params.get('SelectedCar'))
+        params.remove('SelectedCar')
+
   def test_error_summary_prefers_curl_error(self):
     self.assertEqual(dashboard._get_error_summary('progress\rcurl: (7) connection refused\nmore progress'), 'curl: (7) connection refused')
     self.assertEqual(dashboard._get_error_summary('starting\nERROR: upload failed'), 'ERROR: upload failed')
@@ -341,6 +373,18 @@ class TestDashboardCameraProxy(unittest.IsolatedAsyncioTestCase):
 
 
 class TestDashboardClusterActions(unittest.IsolatedAsyncioTestCase):
+  async def test_touch_endpoints_reject_requests_without_a_client_address(self):
+    actions = dashboard.ClusterActions(runner=AsyncMock())
+    with patch.object(dashboard, 'CLUSTER_ACTIONS', actions), \
+         patch.object(dashboard, 'get_connected_pi_ip', return_value='192.168.0.84'):
+      status = await dashboard.cluster_action_status(Request({'type': 'http', 'client': None}))
+      self.assertEqual(status.status_code, 403)
+      payload = {'action': 'pi_update', 'request_id': 'd' * 32}
+      receive = AsyncMock(return_value={'type': 'http.request', 'body': json.dumps(payload).encode(), 'more_body': False})
+      submitted = await dashboard.cluster_action_submit(Request({'type': 'http', 'client': None}, receive))
+      self.assertEqual(submitted.status_code, 400)
+    actions.runner.assert_not_called()
+
   async def test_touch_job_runs_after_the_http_reply_and_survives_video_disconnect(self):
     started, finish = asyncio.Event(), asyncio.Event()
 
@@ -860,6 +904,14 @@ class TestDashboardAsync(unittest.IsolatedAsyncioTestCase):
     with patch.object(dashboard.asyncio, 'create_subprocess_exec', AsyncMock(return_value=process)):
       code, output = await dashboard._run_command(['mock'])
     self.assertEqual((code, output), (0, '한'))
+
+  async def test_missing_command_output_pipe_reports_error_and_reaps_process(self):
+    process = SimpleNamespace(stdout=None, returncode=None, terminate=Mock(), wait=AsyncMock(return_value=0))
+    with patch.object(dashboard.asyncio, 'create_subprocess_exec', AsyncMock(return_value=process)), \
+         self.assertRaisesRegex(RuntimeError, 'Command output pipe was not created'):
+      await dashboard._run_command(['mock'])
+    process.terminate.assert_called_once_with()
+    process.wait.assert_awaited_once_with()
 
   async def test_cancellation_reaps_process(self):
     created = asyncio.Event()

@@ -16,6 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import Protocol
 
 from openpilot.selfdrive.addon.dependencies import activate_groups
 
@@ -53,6 +54,7 @@ REALDATA_PATH = Path('/data/media/0/realdata')
 DRIVE_VIDEOS = DriveVideoLibrary(REALDATA_PATH, Path('/data/dashboard/cache/drive-video'))
 app.include_router(create_drive_video_router(DRIVE_VIDEOS))
 LOG_FILES = {
+  "Update Check": LOG_DIR / 'commit_check.log',
   "CAN Missing": LOG_DIR / 'can_missing.log',
   "CAN Timeout": LOG_DIR / 'can_timeout.log',
   "Tmux Error": LOG_DIR / 'tmux_error.log',
@@ -67,7 +69,8 @@ CLUSTER_ACTIONS = ClusterActions()
 
 @app.get(ACTION_PATH)
 async def cluster_action_status(request: Request):
-  peer = request.client.host if request.client is not None else None
+  client_address = request.client
+  peer = client_address.host if client_address is not None else None
   try:
     return JSONResponse(CLUSTER_ACTIONS.status(peer, get_connected_pi_ip()))
   except PermissionError:
@@ -76,7 +79,8 @@ async def cluster_action_status(request: Request):
 
 @app.post(ACTION_PATH)
 async def cluster_action_submit(request: Request):
-  peer = request.client.host if request.client is not None else None
+  client_address = request.client
+  peer = client_address.host if client_address is not None else None
   try:
     body = bytearray()
     async for chunk in request.stream():
@@ -157,8 +161,8 @@ def _dashboard_port_available() -> bool:
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
       sock.bind((DASHBOARD_HOST, DASHBOARD_PORT))
-    except OSError as e:
-      if e.errno != errno.EADDRINUSE:
+    except OSError as bind_error:
+      if bind_error.errno != errno.EADDRINUSE:
         raise
       return False
   return True
@@ -205,19 +209,47 @@ def _prepare_dashboard_port():
     time.sleep(0.1)
   print(f"[dashboard] Port {DASHBOARD_PORT} released; starting dashboard.", flush=True)
 
-# Params (openpilot이 없는 PC 환경 테스트용 Mock 지원)
-try:
-  from openpilot.common.params import Params
-  params = Params()
-except ImportError:
-  class MockParams:
-    def __init__(self): self.data = {}
-    def get(self, k, encoding='utf-8'): return self.data.get(k)
-    def get_bool(self, k): return self.data.get(k, False)
-    def put(self, k, v, block=False): self.data[k] = v
-    def put_bool(self, k, v, block=False): self.data[k] = v
-    def remove(self, k): self.data.pop(k, None)
-  params = MockParams()
+class _ParamsBackend(Protocol):
+  def get(self, key: str, /) -> object: ...
+  def get_bool(self, key: str, /) -> bool: ...
+  def put(self, key: str, value: str, /, block: bool = False) -> None: ...
+  def put_bool(self, key: str, value: bool, /, block: bool = False) -> None: ...
+  def remove(self, key: str, /) -> None: ...
+
+
+class MockParams(_ParamsBackend):
+  """Synchronous in-memory settings for PCs without openpilot's native Params."""
+
+  def __init__(self):
+    self.data: dict[str, object] = {}
+
+  def get(self, key: str) -> object:
+    return self.data.get(key)
+
+  def get_bool(self, key: str) -> bool:
+    return bool(self.data.get(key, False))
+
+  def put(self, key: str, value: str, block: bool = False) -> None:
+    _ = block  # Memory writes complete immediately.
+    self.data[key] = value
+
+  def put_bool(self, key: str, value: bool, block: bool = False) -> None:
+    _ = block
+    self.data[key] = value
+
+  def remove(self, key: str) -> None:
+    self.data.pop(key, None)
+
+
+def _create_params() -> _ParamsBackend:
+  try:
+    from openpilot.common.params import Params
+    return Params()
+  except ImportError:
+    return MockParams()
+
+
+params: _ParamsBackend = _create_params()
 
 def get_list_from_file(path: str) -> list[str]:
   try:
@@ -271,7 +303,10 @@ async def _run_command(command: list[str], on_output: Callable[[str], None] | No
   output = ""
   decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')
   try:
-    while chunk := await process.stdout.read(4096):
+    stdout = process.stdout
+    if stdout is None:
+      raise RuntimeError('Command output pipe was not created')
+    while chunk := await stdout.read(4096):
       output = (output + decoder.decode(chunk))[-MAX_COMMAND_OUTPUT:]
       if on_output is not None:
         on_output(output)
@@ -294,12 +329,12 @@ async def _run_command(command: list[str], on_output: Callable[[str], None] | No
 
 
 def _get_error_summary(output: str) -> str:
-  """Prefer curl's actual error over its progress meter."""
+  """Prefer command errors over progress meters and wrapper messages."""
   lines = [line.strip() for line in output.replace('\r', '\n').splitlines() if line.strip()]
   if not lines:
     return "Unknown error"
-  curl_errors = [line for line in lines if line.lower().startswith('curl:')]
-  return (curl_errors[-1] if curl_errors else lines[-1])[:300]
+  command_errors = [line for line in lines if line.lower().startswith(('curl:', 'fatal:', 'error:', 'ssh:'))]
+  return (command_errors[-1] if command_errors else lines[-1])[:300]
 
 
 def _get_log_upload_warning(path: str, output: str) -> str | None:
@@ -310,7 +345,8 @@ def _get_log_upload_warning(path: str, output: str) -> str | None:
   return '; '.join(dict.fromkeys(warnings))[:600] if warnings else None
 
 
-async def run_script_async(name: str, path: str, args: list[str] | None = None, show_modal: bool = False) -> int:
+async def run_script_async(name: str, path: str, args: list[str] | None = None, show_modal: bool = False,
+                           on_error: Callable[[str], None] | None = None) -> int:
   command = _script_command(path, args)
   if not show_modal:
     ui.notify(f"[{name}] 진행 중...", type='info', position='top')
@@ -323,10 +359,15 @@ async def run_script_async(name: str, path: str, args: list[str] | None = None, 
         else:
           ui.notify(f"[{name}] 완료", type='positive', position='top')
       else:
-        ui.notify(f"[{name}] 에러: {_get_error_summary(output)}", type='negative', position='top')
+        error = _get_error_summary(output)
+        if on_error is not None:
+          on_error(error)
+        ui.notify(f"[{name}] 에러: {error}", type='negative', position='top')
       return return_code
-    except Exception as e:
-      ui.notify(f"[{name}] 실행 실패: {e}", type='negative', position='top')
+    except Exception as script_error:
+      if on_error is not None:
+        on_error(str(script_error) or type(script_error).__name__)
+      ui.notify(f"[{name}] 실행 실패: {script_error}", type='negative', position='top')
       return 1
 
   with ui.dialog().classes('backdrop-blur-sm') as dialog, ui.card().classes(
@@ -348,11 +389,11 @@ async def run_script_async(name: str, path: str, args: list[str] | None = None, 
       f'<div class="log-viewer" id="{viewer_id}" style="border:none; box-shadow:none; height:60vh;">'
       + f'{converter.convert(header + output, full=False)}</div>'
     )
-    ui.run_javascript(f'var v=document.getElementById("{viewer_id}");if(v)v.scrollTop=v.scrollHeight;')
+    _ = ui.run_javascript(f'var v=document.getElementById("{viewer_id}");if(v)v.scrollTop=v.scrollHeight;')
 
   output = ""
   render_output(output)
-  dialog.open()
+  dialog.value = True
   try:
     return_code, output = await _run_command(command, render_output)
     if return_code == 0:
@@ -364,10 +405,14 @@ async def run_script_async(name: str, path: str, args: list[str] | None = None, 
         message = "tmux에서 업데이트를 시작했습니다." if Path(path).name == "gitpull.sh" else "성공적으로 완료되었습니다."
         output += f"\n✅ [{datetime.now().strftime('%H:%M:%S')}] {message}\n"
     else:
+      if on_error is not None:
+        on_error(_get_error_summary(output))
       output += f"\n❌ 오류가 발생하여 중단되었습니다. (Exit Code: {return_code})\n"
     return return_code
-  except Exception as e:
-    output += f"\n❌ 실행 실패: {e}\n"
+  except Exception as modal_error:
+    if on_error is not None:
+      on_error(str(modal_error) or type(modal_error).__name__)
+    output += f"\n❌ 실행 실패: {modal_error}\n"
     return 1
   finally:
     close_btn.classes(remove='hidden')
@@ -423,7 +468,7 @@ def get_routes(root: Path) -> list[Route]:
     route.modified = max(route.modified, modified)
   for route in routes.values():
     route.paths.sort(key=lambda path: int(path.name.rsplit('--', 1)[1]))
-  return sorted(routes.values(), key=lambda route: route.modified, reverse=True)
+  return sorted(routes.values(), key=lambda candidate: candidate.modified, reverse=True)
 
 
 # ── 전역 CSS 스타일 정의 (모바일 텍스트 랩핑/비율 최적화) ───────
@@ -555,7 +600,7 @@ def apply_styles():
     }
     .pill-card-value {
         font-size: 0.95em; font-weight: 600; color: #E8EEFF; margin-top: 2px;
-        text-transform: none; white-space: normal !important; overflow: visible !important;
+        text-transform: none; white-space: normal !important; overflow: visible !important; overflow-wrap: anywhere;
     }
 
     .card-success { border-left: 4px solid #10B981; }
@@ -685,9 +730,16 @@ def render_status_card(title: str, value: str, icon: str, card_class: str):
     + f'<div class="pill-card-text">{title}<div class="pill-card-value">{html_lib.escape(value)}</div></div></div>'
   ).classes('w-full')
 
+@dataclass
+class _CommitCheckState:
+  running: bool = False
+  failed: bool = False
+  error: str = ""
+
+
 def render_tab_functions():
-  commit_check_running = False
-  commit_check_failed = False
+  client = ui.context.client
+  commit_state = _CommitCheckState()
 
   @ui.refreshable
   def functions_content():
@@ -699,17 +751,17 @@ def render_tab_functions():
         if c_m not in m_opts:
           c_m = m_opts[0]
 
-        def on_m_change(e):
-          if e.value != "[ Not Selected ]":
-            params.put("SelectedManufacturer", e.value)
+        def on_m_change(event):
+          if event.value != "[ Not Selected ]":
+            params.put("SelectedManufacturer", event.value)
             mapping = {"HYUNDAI": "CarList_Hyundai", "KIA": "CarList_Kia", "GENESIS": "CarList_Genesis"}
-            src = f"{BASE_PATH}/{mapping.get(e.value)}"
+            src = f"{BASE_PATH}/{mapping.get(event.value)}"
             if Path(src).exists():
               shutil.copy2(src, f"{BASE_PATH}/CarList")
           else:
             params.remove("SelectedManufacturer")
             params.remove("SelectedCar")
-          functions_content.refresh()
+          _ = functions_content.refresh()
 
         ui.select(m_opts, value=c_m, label='🌐 Manufacturer', on_change=on_m_change).classes('w-full text-blue-200')
 
@@ -717,32 +769,33 @@ def render_tab_functions():
         c_c = get_param_text("SelectedCar", c_opts[0])
         if c_c not in c_opts:
           c_c = c_opts[0]
-        def on_c_change(e):
-          if e.value != "[ Not Selected ]":
-            params.put("SelectedCar", e.value)
+        def on_c_change(event):
+          if event.value != "[ Not Selected ]":
+            params.put("SelectedCar", event.value)
           else:
             params.remove("SelectedCar")
-          functions_content.refresh()
+          _ = functions_content.refresh()
         ui.select(c_opts, value=c_c, label='🚗 Car Model', on_change=on_c_change).classes('w-full text-blue-200')
 
         b_opts = ["[ Not Selected ]"] + get_list_from_file(f"{BASE_PATH}/GitBranchList")
         c_b = get_param_text("SelectedBranch", b_opts[0])
         if c_b not in b_opts:
           c_b = b_opts[0]
-        def on_b_change(e):
-          if e.value != "[ Not Selected ]":
-            params.put("SelectedBranch", e.value)
+        def on_b_change(event):
+          if event.value != "[ Not Selected ]":
+            params.put("SelectedBranch", event.value)
           else:
             params.remove("SelectedBranch")
-          functions_content.refresh()
+          _ = functions_content.refresh()
         ui.select(b_opts, value=c_b, label='🌿 Git Branch', on_change=on_b_change).classes('w-full text-blue-200')
 
       commit_output = get_param_text("CommitCompare")
       comparison = _parse_commit_compare(commit_output)
-      if commit_check_running:
+      if commit_state.running:
         commit_info, card_cls, icon = "Checking...", "card-warning", "🔍"
-      elif commit_check_failed:
-        commit_info, card_cls, icon = "Check failed. Try again.", "card-danger", "❌"
+      elif commit_state.failed:
+        commit_info = f"Check failed. {commit_state.error or 'Try again.'}"
+        card_cls, icon = "card-danger", "❌"
       elif comparison is not None:
         local_commit, operator, remote_commit = comparison
         commit_info = f'"{local_commit[:7]}" {operator} "{remote_commit[:7]}"'
@@ -754,38 +807,47 @@ def render_tab_functions():
 
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         async def do_check_updates():
-          nonlocal commit_check_running, commit_check_failed
-          if commit_check_running:
+          if commit_state.running:
             return
-          commit_check_running = True
-          commit_check_failed = True
-          functions_content.refresh()
+          commit_state.running = True
+          commit_state.failed = True
+          commit_state.error = ""
+          _ = functions_content.refresh()
+
+          def record_error(message: str):
+            commit_state.error = message
+
           try:
-            return_code = await run_script_async("Commit Check", f"{SCRIPTS_PATH}/commit_compare.sh")
-            comparison_result = _parse_commit_compare(get_param_text("CommitCompare"))
-            commit_check_failed = return_code != 0 or comparison_result is None
-            if return_code == 0 and comparison_result is None:
-              ui.notify("[Commit Check] 비교 결과가 올바르지 않습니다. 다시 확인해주세요.", type='negative', position='top')
+            # Refresh deletes the clicked button's slot; notifications need a stable parent.
+            with client:
+              return_code = await run_script_async("Commit Check", f"{SCRIPTS_PATH}/commit_compare.sh", on_error=record_error)
+              comparison_result = _parse_commit_compare(get_param_text("CommitCompare"))
+              commit_state.failed = return_code != 0 or comparison_result is None
+              if return_code != 0 and not commit_state.error:
+                commit_state.error = f"Update check exited with code {return_code}."
+              if return_code == 0 and comparison_result is None:
+                commit_state.error = "비교 결과를 읽을 수 없습니다. 다시 확인해주세요."
+                ui.notify("[Commit Check] 비교 결과가 올바르지 않습니다. 다시 확인해주세요.", type='negative', position='top')
           finally:
-            commit_check_running = False
-            functions_content.refresh()
+            commit_state.running = False
+            _ = functions_content.refresh()
 
         check_button = ui.button('CHECK UPDATES', on_click=do_check_updates, color=None).classes('custom-btn btn-blue w-full')
-        if commit_check_running:
+        if commit_state.running:
           check_button.disable()
 
         render_status_card("UPDATE STATUS", commit_info, icon, card_cls)
 
-      if comparison is not None and comparison[1] == "!=" and not commit_check_running and not commit_check_failed:
+      if comparison is not None and comparison[1] == "!=" and not commit_state.running and not commit_state.failed:
         with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
           async def do_git_pull():
             current_comparison = _parse_commit_compare(get_param_text("CommitCompare"))
-            if commit_check_running or commit_check_failed or current_comparison is None or current_comparison[1] != "!=":
+            if commit_state.running or commit_state.failed or current_comparison is None or current_comparison[1] != "!=":
               ui.notify("커밋 상태를 다시 확인한 뒤 업데이트해주세요.", type='warning', position='top')
-              functions_content.refresh()
+              _ = functions_content.refresh()
               return
             await run_script_async("Git Pull", f"{SCRIPTS_PATH}/gitpull.sh", show_modal=True)
-            functions_content.refresh()
+            _ = functions_content.refresh()
 
           ui.button('GIT PULL NOW', on_click=do_git_pull, color=None).classes('custom-btn btn-blue-pull w-full')
           render_status_card("NEW UPDATE AVAILABLE", "Please pull the latest changes.", "⚠️", "card-warning")
@@ -793,7 +855,7 @@ def render_tab_functions():
       with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
         def do_reset_cal():
           reset_calibration()
-          functions_content.refresh()
+          _ = functions_content.refresh()
 
         ui.button('RESET CALIBRATION', on_click=do_reset_cal, color=None).classes('custom-btn btn-yellow w-full')
         render_status_card("DEVICE POSITION", get_param_text("DevicePosition", "--"), "📍", "card-info")
@@ -808,7 +870,7 @@ def render_tab_functions():
   functions_content()
 
 def render_tab_toggles():
-  TOGGLE_ITEMS = [
+  toggle_items = [
     ("PcmCruiseEnable", "PcmCruise", "Change the openpilot cruise engagement"),
     ("CruiseStateControl", "Cruise State Controls", "Openpilot controls cruise on/off, set speed"),
     ("IsHda2", "CANFD Car HDA2", "Highway Drive Assist 2, turn it on"),
@@ -824,38 +886,38 @@ def render_tab_toggles():
   @ui.refreshable
   def toggles_content():
     with ui.column().classes('w-full gap-4 mt-4'):
-      for key, label, desc in TOGGLE_ITEMS:
+      for key, toggle_label, description in toggle_items:
         if key == "LanguageSetting":
           init_val = get_param_text(key) == "ko"
         else:
           init_val = params.get_bool(key)
 
-        def on_change(e, k=key):
+        def on_change(event, k=key):
           if k == "LanguageSetting":
-            params.put(k, "ko" if e.value else "en")
+            params.put(k, "ko" if event.value else "en")
           else:
-            params.put_bool(k, e.value, block=k == "ClusterEnable")
-          ui.notify(f"{k} {'ON' if e.value else 'OFF'}", position='top')
+            params.put_bool(k, event.value, block=k == "ClusterEnable")
+          ui.notify(f"{k} {'ON' if event.value else 'OFF'}", position='top')
           if k == "ClusterEnable":
-            toggles_content.refresh()
+            _ = toggles_content.refresh()
 
         with ui.row().classes('w-full flex-nowrap items-center border-b border-gray-800 pb-3'):
           ui.switch(value=init_val, on_change=on_change).classes('custom-toggle shrink-0')
           with ui.column().classes('gap-1 ml-3 flex-1 min-w-0'):
-            ui.label(label).classes('text-[0.95rem] md:text-lg font-bold text-white leading-tight break-words whitespace-normal')
-            ui.label(desc).classes('text-[0.75rem] md:text-sm text-gray-400 leading-snug break-words whitespace-normal')
+            ui.label(toggle_label).classes('text-[0.95rem] md:text-lg font-bold text-white leading-tight break-words whitespace-normal')
+            ui.label(description).classes('text-[0.75rem] md:text-sm text-gray-400 leading-snug break-words whitespace-normal')
 
         if key == "ClusterEnable" and init_val:
           transport = get_param_text("ClusterDisplayTransport", "usb")
           if transport not in ("network", "usb"):
             transport = "usb"
 
-          def on_transport_change(e):
-            if e.value not in ("network", "usb"):
+          def on_transport_change(event):
+            if event.value not in ("network", "usb"):
               return
-            params.put("ClusterDisplayTransport", e.value, block=True)
-            ui.notify(f"Cluster display transport: {e.value} (Cluster restarting)", position='top')
-            toggles_content.refresh()
+            params.put("ClusterDisplayTransport", event.value, block=True)
+            ui.notify(f"Cluster display transport: {event.value} (Cluster restarting)", position='top')
+            _ = toggles_content.refresh()
 
           ui.select(
             {"network": "Network (Orange Pi HDMI)", "usb": "USB (TURZX Display)"},
@@ -870,14 +932,14 @@ def render_tab_toggles():
           if transport == "network":
             profile = normalize_hdmi_profile(get_param_text("ClusterHdmiProfile", DEFAULT_HDMI_PROFILE))
 
-            def on_hdmi_profile_change(e):
-              if not isinstance(e.value, str) or e.value not in HDMI_PROFILES:
+            def on_hdmi_profile_change(event):
+              if not isinstance(event.value, str) or event.value not in HDMI_PROFILES:
                 return
-              if e.value == normalize_hdmi_profile(get_param_text("ClusterHdmiProfile", DEFAULT_HDMI_PROFILE)):
+              if event.value == normalize_hdmi_profile(get_param_text("ClusterHdmiProfile", DEFAULT_HDMI_PROFILE)):
                 return
-              params.put("ClusterHdmiProfile", e.value, block=True)
-              ui.notify(f"HDMI monitor: {e.value} (Cluster restarting)", position='top')
-              toggles_content.refresh()
+              params.put("ClusterHdmiProfile", event.value, block=True)
+              ui.notify(f"HDMI monitor: {event.value} (Cluster restarting)", position='top')
+              _ = toggles_content.refresh()
 
             ui.select(
               {"1920x480": "8.8인치 · 1920×480", "1920x720": "10.3인치 · 1920×720"},
@@ -891,7 +953,7 @@ def render_tab_toggles():
 
         if key == "ClusterEnable":
           pi_status = ui.label(get_orange_pi_status_text()).classes('text-sm text-blue-200 break-words w-full')
-          ui.timer(1.0, lambda label=pi_status: label.set_text(get_orange_pi_status_text()))
+          ui.timer(1.0, lambda status_label=pi_status: status_label.set_text(get_orange_pi_status_text()))
 
   toggles_content()
 
@@ -903,9 +965,9 @@ def render_tab_logs():
       try:
         routes = get_routes(REALDATA_PATH)
         route_error = "" if REALDATA_PATH.exists() else f"Path not found: {REALDATA_PATH}"
-      except OSError as e:
+      except OSError as route_read_error:
         routes = []
-        route_error = f"Cannot read routes: {e}"
+        route_error = f"Cannot read routes: {route_read_error}"
 
       if route_error:
         ui.label(route_error).classes('text-red-300')
@@ -928,8 +990,8 @@ def render_tab_logs():
                 start_new_session=True, env=_subprocess_env(),
               )
               ui.notify(f"✅ Upload started in background! ({len(targets)} segments)", type='positive', position='top')
-            except OSError as e:
-              ui.notify(f"❌ Failed to start upload: {e}", type='negative', position='top')
+            except OSError as upload_error:
+              ui.notify(f"❌ Failed to start upload: {upload_error}", type='negative', position='top')
 
           ui.button('ROUTE UPLOAD', on_click=upload_route, color=None).classes('custom-btn btn-green-route col-span-1')
 
@@ -945,21 +1007,21 @@ def render_tab_logs():
             if path == TMUX_LOG_PATH:
               path = await save_tmux_log()
             content = await asyncio.to_thread(path.read_text, encoding='utf-8', errors='replace')
-          except (OSError, RuntimeError, TimeoutError) as e:
-            viewer_container.content = f'<div style="color:#FCA5A5; font-weight:bold;">❌ {html_lib.escape(str(e))}</div>'
+          except (OSError, RuntimeError, TimeoutError) as log_read_error:
+            viewer_container.content = f'<div style="color:#FCA5A5; font-weight:bold;">❌ {html_lib.escape(str(log_read_error))}</div>'
             status_container.content = '<div class="log-statusbar log-error">⚠️ 파일을 불러오지 못했습니다.</div>'
             return
           viewer_container.content = converter.convert(content, full=False)
           status_container.content = f'<div class="log-statusbar">📄 {name} | {len(content.splitlines())} lines | {len(content):,} chars</div>'
-          ui.run_javascript('var v=document.getElementById("logContainer");if(v)v.scrollTop=v.scrollHeight;')
+          _ = ui.run_javascript('var v=document.getElementById("logContainer");if(v)v.scrollTop=v.scrollHeight;')
 
         async def upload_log():
           path = LOG_FILES[sel_log.value]
           try:
             if path == TMUX_LOG_PATH:
               path = await save_tmux_log()
-          except (OSError, RuntimeError, TimeoutError) as e:
-            ui.notify(f"❌ Failed to capture tmux: {e}", type='negative', position='top')
+          except (OSError, RuntimeError, TimeoutError) as log_capture_error:
+            ui.notify(f"❌ Failed to capture tmux: {log_capture_error}", type='negative', position='top')
             return
           await run_script_async("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[str(path)])
 
@@ -972,7 +1034,7 @@ def render_tab_logs():
 
 def render_tab_terminal(tabs):
   conv = Ansi2HTMLConverter(inline=True, dark_bg=True)
-  updating = False
+  update_lock = asyncio.Lock()
 
   with ui.column().classes('w-full mt-4'):
     with ui.element('div').classes('log-viewer').props('id="termContainer"'):
@@ -980,26 +1042,24 @@ def render_tab_terminal(tabs):
     statusbar = ui.html('<div class="log-statusbar">Loading...</div>').classes('w-full')
 
   async def update_terminal():
-    nonlocal updating
-    if updating or tabs.value != 'TERMINAL':
+    if update_lock.locked() or tabs.value != 'TERMINAL':
       return
-    updating = True
-    try:
+    async with update_lock:
       if getattr(viewer, 'is_deleted', False) or viewer.parent_slot is None:
         return
 
-      error = False
+      capture_failed = False
       try:
         content = await get_tmux_capture()
-      except (OSError, RuntimeError, TimeoutError) as e:
-        error = True
-        content = str(e) or 'Tmux capture timed out'
+      except (OSError, RuntimeError, TimeoutError) as capture_error:
+        capture_failed = True
+        content = str(capture_error) or 'Tmux capture timed out'
       if tabs.value != 'TERMINAL' or getattr(viewer, 'is_deleted', False) or viewer.parent_slot is None:
         return
       lines = len(content.splitlines())
       now_str = datetime.now().strftime("%H:%M:%S")
 
-      if error:
+      if capture_failed:
         viewer.content = f'<div style="color:#FCA5A5; font-weight:bold;">❌ {html_lib.escape(content)}</div>'
         statusbar.content = '<div class="log-statusbar log-error">⚠️ tmux 세션을 찾을 수 없습니다.</div>'
       else:
@@ -1024,10 +1084,7 @@ def render_tab_terminal(tabs):
           }, 50);
       }
       """
-      ui.run_javascript(js_code)
-
-    finally:
-      updating = False
+      _ = ui.run_javascript(js_code)
 
   # 1초마다 터미널 업데이트 실행
   ui.timer(1.0, update_terminal)
@@ -1176,14 +1233,14 @@ def render_tab_camera():
 
   with ui.column().classes('w-full mt-4'):
     def start_stream():
-      ui.run_javascript(_camera_start_javascript())
+      _ = ui.run_javascript(_camera_start_javascript())
 
     def show_device():
       params.put_bool("CameraPreview", True, block=True)
       ui.notify("장치 화면에 카메라 보기(watch3)를 요청했습니다. STOP 또는 장치의 Close 버튼으로 종료할 수 있습니다.", type='info', position='top')
 
     def stop_stream():
-      ui.run_javascript(CAMERA_STOP_JAVASCRIPT)
+      _ = ui.run_javascript(CAMERA_STOP_JAVASCRIPT)
       params.put_bool("CameraPreview", False, block=True)
 
     with ui.element('div').classes('camera-controls w-full grid grid-cols-3 gap-2 items-stretch'):
