@@ -8,8 +8,8 @@ H264_MAGIC = b"OPCH"
 CONTROL_HEADER = struct.Struct("!4sBB2xII")
 PROTOCOL_VERSION = 1
 MAX_CONTROL_SIZE = 64 * 1024
-HELLO, OFFER, ANSWER, STATE, FEEDBACK, ERROR, STATE_ZLIB = range(1, 8)
-KINDS = frozenset((HELLO, OFFER, ANSWER, STATE, FEEDBACK, ERROR, STATE_ZLIB))
+HELLO, OFFER, ANSWER, STATE, FEEDBACK, ERROR, STATE_ZLIB, PREPARE = range(1, 9)
+KINDS = frozenset((HELLO, OFFER, ANSWER, STATE, FEEDBACK, ERROR, STATE_ZLIB, PREPARE))
 PATH_KEYS = ("path_x", "path_y", "path_z", "lane_lines", "lane_line_probs", "road_edges", "road_edge_stds",
              "leads", "camera_height", "calib_transform")
 

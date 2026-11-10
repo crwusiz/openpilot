@@ -499,6 +499,113 @@ def test_zero_confidence_estimates_do_not_create_curve_limit():
   assert controller._cal_curve_speed_adaptive(make_model_sm(), 30.0, 110.0) == 255.0
 
 
+@pytest.mark.parametrize('path_confidence', [0.0003, 0.001, 0.003])
+def test_logged_near_zero_confidence_path_does_not_create_curve_limit(path_confidence):
+  # November 10, 18:53:14-15 and 18:57:41-45: path confidence collapsed
+  # while its curvature spiked, but unrestricted yaw kept confidence 0.14+.
+  controller = make_steer_controller()
+  controller._reset_curve_state()
+  controller._get_model_based_speed = lambda *args: (30.0 / 3.6, path_confidence)
+  controller._get_acc_based_speed = lambda *args: (255.0, 0.14)
+
+  cap = controller._cal_curve_speed_adaptive(make_model_sm(), 49.0 / 3.6, 60.6)
+
+  assert cap == 255.0
+  assert controller.curve_estimates[0] == 30.0 / 3.6  # Raw evidence remains logged.
+
+
+def test_numerically_unstable_path_tail_does_not_create_curve_limit():
+  controller = make_steer_controller()
+  controller._reset_curve_state()
+  # The model tail can bunch up before becoming non-monotonic (path_invalid).
+  # Small lateral changes then produce curvature > 1/m despite a straight yaw.
+  x = np.r_[np.linspace(0.0, 43.0, 23), 43.0 + np.arange(1, 11) * 0.1]
+  y = np.zeros(33)
+  y[-2:] = [0.02, 0.05]
+  sm = make_model_sm(x, y)
+  sm['modelV2'].orientationRate = SimpleNamespace(z=[0.0] * 33)
+  sm['modelV2'].velocity = SimpleNamespace(x=[49.0 / 3.6] * 33)
+
+  cap = controller._cal_curve_speed_adaptive(sm, 49.0 / 3.6, 60.6)
+
+  assert controller.model_curve_geometry[0] > 1.0
+  assert controller.curve_estimates[1] < 0.003
+  assert cap == 255.0
+
+
+@pytest.mark.parametrize('other_confidence', [0.0, 0.7, float('nan')])
+@pytest.mark.parametrize('source', ['path', 'yaw'])
+def test_unrestricted_estimate_does_not_dilute_valid_curve(source, other_confidence):
+  controller = make_steer_controller()
+  controller._reset_curve_state()
+  def limiting(*args):
+    return 40.0 / 3.6, 0.7
+
+  def invalid(*args):
+    return 255.0, other_confidence
+
+  controller._get_model_based_speed = limiting if source == 'path' else invalid
+  controller._get_acc_based_speed = limiting if source == 'yaw' else invalid
+
+  assert controller._cal_curve_speed_adaptive(make_model_sm(), 45.0 / 3.6, 60.6) == pytest.approx(40.0)
+
+
+@pytest.mark.parametrize('ego_kph', [40.0, 70.0])
+def test_two_credible_curve_estimates_keep_curve_limit_and_strong_reduction(ego_kph):
+  controller = make_steer_controller()
+  controller._reset_curve_state()
+  controller._get_model_based_speed = lambda *args: (40.0 / 3.6, 0.8)
+  controller._get_acc_based_speed = lambda *args: (50.0 / 3.6, 0.6)
+
+  cap = controller._cal_curve_speed_adaptive(make_model_sm(), ego_kph / 3.6, 90.0)
+
+  if ego_kph == 40.0:
+    assert 40.0 < cap < 50.0
+  else:
+    assert 36.0 < cap < 45.0
+
+
+def test_two_credible_unrestricted_estimates_keep_no_curve_sentinel():
+  controller = make_steer_controller()
+  controller._reset_curve_state()
+  controller._get_model_based_speed = lambda *args: (255.0, 0.8)
+  controller._get_acc_based_speed = lambda *args: (255.0, 0.6)
+
+  assert controller._cal_curve_speed_adaptive(make_model_sm(), 45.0 / 3.6, 60.6) == 255.0
+
+
+@pytest.mark.parametrize('source', ['path', 'yaw'])
+@pytest.mark.parametrize('confidence, expected', [
+  (0.009999, 255.0), (0.01, 40.0), (0.010001, 40.0),
+  (0.012, 40.0), (0.058, 40.0), (float('nan'), 255.0),
+])
+def test_curve_confidence_floor_keeps_boundary_and_usable_estimates(source, confidence, expected):
+  controller = make_steer_controller()
+  controller._reset_curve_state()
+
+  def limiting(*args):
+    return 40.0 / 3.6, confidence
+
+  def unrestricted(*args):
+    return 255.0, 0.7
+
+  controller._get_model_based_speed = limiting if source == 'path' else unrestricted
+  controller._get_acc_based_speed = limiting if source == 'yaw' else unrestricted
+
+  cap = controller._cal_curve_speed_adaptive(make_model_sm(), 45.0 / 3.6, 100.0)
+
+  assert cap == pytest.approx(expected)
+
+
+def test_credible_path_preview_keeps_strong_curve_limit_before_yaw_changes():
+  controller = make_steer_controller()
+  controller._reset_curve_state()
+  controller._get_model_based_speed = lambda *args: (40.0 / 3.6, 0.8)
+  controller._get_acc_based_speed = lambda *args: (255.0, 0.7)
+
+  assert controller._cal_curve_speed_adaptive(make_model_sm(), 70.0 / 3.6, 100.0) == pytest.approx(36.0)
+
+
 def make_curved_model_sm(*, radius=50.0, extent=40.0):
   x = np.linspace(0.0, extent, 81)
   sm = make_model_sm(x, radius - np.sqrt(radius ** 2 - x ** 2))

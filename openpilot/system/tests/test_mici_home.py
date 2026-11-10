@@ -120,6 +120,62 @@ def test_check_timeout_releases_button_for_retry(home_module, home):
   assert home._commit_status.value == 'TIMEOUT'
 
 
+@pytest.mark.parametrize('completion_status, expected', [
+  (None, 'FILE READ ERROR'), ('invalid', 'FILE READ ERROR'), ('1', 'CHECK FAILED'), ('124', 'CHECK FAILED'),
+])
+def test_successful_process_requires_a_valid_success_completion_flag(home_module, home, completion_status, expected):
+  home._is_update_available = True
+
+  def compare(command, **kwargs):
+    if completion_status is not None:
+      home._commit_check_exit_flag.write_text(completion_status)
+    return subprocess.CompletedProcess(command, 0, stdout='', stderr='Commit check diagnostic')
+
+  home_module.subprocess.run.side_effect = compare
+  home._start_commit_check()
+  home._process_commit_results()
+
+  assert not home._is_processing
+  assert not home._is_update_available
+  assert home._commit_status.value == expected
+  home._params.get.assert_not_called()
+
+
+def test_failed_check_can_retry_with_empty_stdout_and_full_hash_result(home_module, home):
+  local = 'a' * 40
+  remote = 'a' * 7 + 'b' * 33
+
+  def compare(command, **kwargs):
+    status = 128 if home_module.subprocess.run.call_count == 1 else 0
+    home._commit_check_exit_flag.write_text(str(status))
+    if status == 0:
+      home._params.get.return_value = f'"{local}" != "{remote}"'
+    return subprocess.CompletedProcess(command, status, stdout='', stderr='Commit check diagnostic')
+
+  home_module.subprocess.run.side_effect = compare
+  home._handle_commit_button_press()
+  home._process_commit_results()
+  assert not home._is_processing
+  assert not home._is_update_available
+  assert home._commit_status.value == 'CHECK FAILED'
+  home._params.get.assert_not_called()
+
+  home._handle_commit_button_press()
+  home._process_commit_results()
+  assert home_module.subprocess.run.call_count == 2
+  assert not home._is_processing
+  assert home._is_update_available
+  assert home._commit_status.label == home._commit_status.value == 'aaaaaaa'
+  assert not home._commit_check_exit_flag.exists()
+
+  home._start_git_pull = Mock()
+  home._handle_commit_button_press()
+  home._start_git_pull.assert_called_once_with()
+  home_module.subprocess.run.assert_called_with(
+    ['/bin/bash', '/data/openpilot/scripts/commit_compare.sh'], timeout=15, check=False,
+  )
+
+
 @pytest.mark.parametrize('operation', ['_start_commit_check', '_start_git_pull'])
 def test_flag_cleanup_failure_releases_button(home_module, home, operation):
   blocked = Mock()

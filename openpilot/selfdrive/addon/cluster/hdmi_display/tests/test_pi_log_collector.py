@@ -406,7 +406,7 @@ def test_receiver_udp_tables_and_socket_rows_are_bounded(remote_udp, tmp_path):
   assert len(output.encode()) < 8 * 1024
 
 
-@pytest.mark.parametrize("tag", ["CLUSTER_H264_UDP_BUFFER", "CLUSTER_HDMI_CAMERA_UPLOAD", "CLUSTER_UDP_LIMIT"])
+@pytest.mark.parametrize("tag", ["CLUSTER_H264_UDP_BUFFER", "CLUSTER_HDMI_CAMERA_UPLOAD", "CLUSTER_UDP_LIMIT", "CLUSTER_H264_PREPARE"])
 def test_udp_and_camera_layout_survive_the_reserved_startup_filter(remote_journal, tag):
   assert re.search(remote_journal.STARTUP_PATTERN, f"[{tag}] requested=1048576")
 

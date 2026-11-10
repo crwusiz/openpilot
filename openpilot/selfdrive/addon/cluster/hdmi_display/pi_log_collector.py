@@ -55,7 +55,7 @@ import sys
 LIFECYCLE_PATTERN = r'\[CLUSTER_(?![A-Z0-9_]*PERF\])'
 SLOW_FRAME_PATTERN = r'\[CLUSTER_H264_SLOW_FRAME\]'
 STARTUP_PATTERN = (r'\[CLUSTER_(RX_(BUILD|NATIVE|RUNTIME)|HDMI_(RENDERER|CAMERA_UPLOAD)|'
-                   r'H264_(COMPOSITOR|PRESENT_POLICY|UDP_BUFFER)|PATH_PIPELINE|SCENE_WORKERS|UDP_LIMIT)\]')
+                   r'H264_(COMPOSITOR|PRESENT_POLICY|UDP_BUFFER|PREPARE)|PATH_PIPELINE|SCENE_WORKERS|UDP_LIMIT)\]')
 RECORD = re.compile(r'^(\S+) (\S+) ([^\[\]:]+)(?:\[(\d+)\])?: (.*)$')
 GPU_COMMAND = re.compile(
     r'^[a-z_][a-z0-9_-]*\$? : (?:TTY=[^;\n]* ; )?PWD=/opt/cluster-receiver ; '

@@ -11,6 +11,8 @@ SAMPLE_INTERVAL = 0.5
 DOWN_INTERVAL = 2.0
 RECOVERY_SECONDS = 20.0
 REPORT_MAX_AGE = 3.0
+TCP_PRESSURE_SECONDS = 1.0
+RECOVERY_DRAIN_LIMIT = 0.25
 
 
 def default_bitrate():
@@ -50,11 +52,14 @@ class ClusterBitrateController:
         self._disable(type(error).__name__)
 
   def reset_connection(self):
-    self.last_report = self.report_at = self.queued_since = self.healthy_since = None
+    self.last_report = self.report_at = self.healthy_since = None
     self.loss_samples = 0
+    self.drain_age_s = 0.0
+    self.recovery_blocked = "no_report"
 
   def _disable(self, reason):
     self.disabled = True
+    self.recovery_blocked = reason
     flog(f"[CLUSTER_H264_BITRATE] action=yield | reason={reason}")
 
   def _owns_parameter(self, now):
@@ -81,18 +86,16 @@ class ClusterBitrateController:
     flog(f"[CLUSTER_H264_BITRATE] action=adapt | from_bps={before} | to_bps={value} | "
          + f"ceiling_bps={self.ceiling} | reason={reason}")
 
-  def sample(self, now, report, queued_bytes, *, degraded=False):
+  def sample(self, now, report, queued_bytes, *, drain_age_s=None, degraded=False):
     if self.disabled:
       return
     try:
       if not self._owns_parameter(now):
         return
-      if queued_bytes > 0:
-        if self.queued_since is None:
-          self.queued_since = now
-      else:
-        self.queued_since = None
-      tcp_pressure = self.queued_since is not None and now - self.queued_since >= 1.0
+      # A 0.5s poll can hit a different short 20Hz write on every sample.
+      # Only the age of this exact pending drain proves sustained pressure.
+      self.drain_age_s = drain_age_s if type(drain_age_s) in (int, float) and 0 <= drain_age_s <= 60 else 0.0
+      tcp_pressure = queued_bytes > 0 and self.drain_age_s >= TCP_PRESSURE_SECONDS
 
       # Only a new RR with an advancing extended sequence is a loss sample.
       # Re-reading a cached report must not multiply loss or establish recovery.
@@ -112,23 +115,39 @@ class ClusterBitrateController:
       reason = "tcp_backpressure" if tcp_pressure else "rtcp_loss" if fresh and (loss >= 0.1 or self.loss_samples >= 2) else None
       if reason is not None:
         self.healthy_since = None
+        self.recovery_blocked = reason
         if self.last_change is None or now - self.last_change >= DOWN_INTERVAL:
           target = max(min(MIN_BITRATE, self.ceiling), self.current * 3 // 4)
           if target < self.current:
             self._publish(target, now, reason)
         return
 
-      if (degraded or queued_bytes > 0 or self.report_at is None or now - self.report_at > REPORT_MAX_AGE
-          or (fresh and loss > 0.01)):
+      blocked = ("driving_guard" if degraded else "tcp_drain" if self.drain_age_s >= RECOVERY_DRAIN_LIMIT
+                 else "no_report" if self.report_at is None or now - self.report_at > REPORT_MAX_AGE
+                 else "rtcp_loss" if fresh and loss > 0.01 else None)
+      if blocked is not None:
         self.healthy_since = None
-      elif fresh:
+        self.recovery_blocked = blocked
+      elif fresh and queued_bytes == 0:
+        self.recovery_blocked = "none"
         if self.healthy_since is None:
           self.healthy_since = now
         elif now - self.healthy_since >= RECOVERY_SECONDS and self.current < self.ceiling:
           self._publish(min(self.ceiling, self.current + 500_000), now, "link_recovered")
+      elif queued_bytes > 0:
+        # Do not raise while a write is pending, but a brief normal write must
+        # not erase all earlier healthy reports and permanently pin quality.
+        self.recovery_blocked = "write_pending"
     except (OSError, RuntimeError, ValueError, TypeError, AttributeError) as error:
       # Auxiliary tuning must not terminate a working video connection.
       self._disable(type(error).__name__)
+
+  def status_fields(self, now):
+    recovery_s = 0.0 if self.healthy_since is None else max(0.0, now - self.healthy_since)
+    report_age = "none" if self.report_at is None else f"{max(0.0, now - self.report_at) * 1000:.1f}"
+    return (f" | bitrate_target_bps={self.current} | bitrate_recovery_s={recovery_s:.1f}"
+            + f" | bitrate_blocked={self.recovery_blocked} | bitrate_rr_age_ms={report_age}"
+            + f" | state_drain_age_ms={self.drain_age_s * 1000:.1f}")
 
   def close(self):
     if not self.changed:

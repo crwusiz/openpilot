@@ -365,6 +365,46 @@ def test_git_pull_touch_requires_commit_check_and_is_disabled_while_busy(control
   assert not _tap(state, _target(state, "pull"))
 
 
+def test_failed_commit_recheck_disables_git_pull_and_displays_failure(controls):
+  state, _, _ = controls
+  state.set_actions_available(True)
+  _tap(state)
+  state.set_action_status({"action": "commit_check", "state": "succeeded", "update_available": True,
+                           "commit_state": "available", "commit_compare": f'"{"a" * 40}" != "{"b" * 40}"'})
+  assert state.button_enabled("pull")
+  state.set_action_status({"action": "commit_check", "state": "running", "update_available": False, "commit_state": "checking"})
+  assert not _tap(state, _target(state, "pull"))
+  state.set_action_status({"action": "commit_check", "state": "failed", "update_available": False,
+                           "commit_state": "failed", "message": "Command failed (exit 124); check C4 dashboard logs"})
+  assert not state.button_enabled("pull")
+  assert not _tap(state, _target(state, "pull"))
+  assert state.take_action() is None
+  assert "Failed" in state.action_label() and "exit 124" in state.action_label()
+
+
+@pytest.mark.parametrize("operator", ["==", "!="])
+def test_full_commit_hashes_display_both_short_hashes_without_truncation(raster_pygame, monkeypatch, operator):
+  state = DisplayControls(raster_pygame, brightness=100)
+  local = "1234567" + "a" * 33
+  remote = local if operator == "==" else "abcdef0" + "b" * 33
+  state.set_action_status({"action": "commit_check", "state": "succeeded", "update_available": operator == "!=",
+                           "commit_compare": f'"{local}" {operator} "{remote}"'})
+  _tap(state)
+  original_label = state._bounded_label
+  commit_labels = []
+
+  def draw_label(surface, text, size, position, max_width, align="center"):
+    if text.startswith("C4 COMMIT "):
+      assert text == f"C4 COMMIT {local[:7]} {operator} {remote[:7]}"
+      assert state._font(size).size(text)[0] <= max_width
+      commit_labels.append(text)
+    original_label(surface, text, size, position, max_width, align)
+
+  monkeypatch.setattr(state, "_bounded_label", draw_label)
+  state.render_menu()
+  assert commit_labels
+
+
 @pytest.mark.parametrize("available", [False, True])
 def test_pi_button_uses_its_own_package_difference(controls, available):
   state, _, _ = controls

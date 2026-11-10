@@ -40,6 +40,15 @@ def test_scene_wire_is_bounded_json_with_explicit_codec_magic():
   assert wire.validate_scene(wire.decode_payload(packet[16:])) == state
 
 
+def test_scene_preparation_uses_a_separate_bounded_control_kind():
+  packet = wire.pack_control(wire.PREPARE, {"phase": "scene"})
+  assert len(packet) < 64
+  assert wire.unpack_control_header(packet[:16]) == (wire.PREPARE, 0, len(packet) - 16)
+  assert wire.decode_payload(packet[16:]) == {"phase": "scene"}
+  with pytest.raises(ValueError, match="scene state"):
+    wire.decode_state_payload(wire.PREPARE, packet[16:])
+
+
 def test_scene_packing_preserves_wire_bytes_and_checks_numeric_tree_once(monkeypatch):
   state = scene()
   expected = wire.pack_control(wire.STATE, state, 2**32 + 3)
@@ -183,7 +192,7 @@ def test_malformed_or_nonfinite_control_is_rejected(payload):
     wire.decode_payload(payload)
 
 
-@pytest.mark.parametrize("kind,size", [(0, 1), (8, 1), (wire.STATE, 0), (wire.STATE, 65537), (wire.OFFER, 2**32 - 1)])
+@pytest.mark.parametrize("kind,size", [(0, 1), (255, 1), (wire.STATE, 0), (wire.STATE, 65537), (wire.OFFER, 2**32 - 1)])
 def test_invalid_header_is_rejected_before_allocating_payload(kind, size):
   with pytest.raises(ValueError):
     wire.unpack_control_header(wire.CONTROL_HEADER.pack(wire.H264_MAGIC, 1, kind, 0, size))

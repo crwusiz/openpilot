@@ -1,4 +1,5 @@
 import asyncio
+import gc
 import json
 import os
 import shutil
@@ -9,7 +10,7 @@ import unittest
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import ANY, AsyncMock, Mock, patch
 
 import httpx2
 from nicegui import Client, core, ui
@@ -39,6 +40,8 @@ class TestDashboardHelpers(unittest.TestCase):
   def test_error_summary_prefers_curl_error(self):
     self.assertEqual(dashboard._get_error_summary('progress\rcurl: (7) connection refused\nmore progress'), 'curl: (7) connection refused')
     self.assertEqual(dashboard._get_error_summary('starting\nERROR: upload failed'), 'ERROR: upload failed')
+    git_error = 'fatal: unable to access https://github.com/example/repo.git: Could not resolve host: github.com'
+    self.assertEqual(dashboard._get_error_summary(f'{git_error}\nCommit check failed: remote lookup failed; check Git error above.'), git_error)
     self.assertEqual(dashboard._get_error_summary(''), 'Unknown error')
 
   def test_orange_pi_ip_only_shows_for_enabled_network_transport(self):
@@ -645,7 +648,8 @@ class TestDashboardCommitUpdates(unittest.IsolatedAsyncioTestCase):
     with self.functions_page(values) as state, patch.object(dashboard, 'run_script_async', AsyncMock(side_effect=check)) as run:
       await state.callbacks['CHECK UPDATES']()
       await asyncio.sleep(0)
-      run.assert_awaited_once_with('Commit Check', f'{dashboard.SCRIPTS_PATH}/commit_compare.sh')
+      run.assert_awaited_once_with('Commit Check', f'{dashboard.SCRIPTS_PATH}/commit_compare.sh', on_error=ANY)
+      self.assertTrue(callable(run.await_args.kwargs['on_error']))
       self.assertIn('GIT PULL NOW', self.button_texts(state.client))
       self.assertIn('card-danger', self.status_card(state.client))
       self.assertIn('aaaaaaa', self.status_card(state.client))
@@ -654,20 +658,36 @@ class TestDashboardCommitUpdates(unittest.IsolatedAsyncioTestCase):
     for clear_result in [False, True]:
       values = {'CommitCompare': '"aaaaaaa" != "bbbbbbb"'}
 
-      async def fail(*_args, clear=clear_result, stored=values, **_kwargs):
+      async def fail(*_args, clear=clear_result, stored=values, on_error, **_kwargs):
         if clear:
           stored.pop('CommitCompare')
+        on_error('fatal: <branch> & proxy unavailable')
         return 1
 
       with self.subTest(clear_result=clear_result), self.functions_page(values) as state, \
-           patch.object(dashboard, 'run_script_async', AsyncMock(side_effect=fail)):
+           patch.object(dashboard, 'run_script_async', AsyncMock(side_effect=fail)) as run:
         self.assertIn('GIT PULL NOW', self.button_texts(state.client))
+        previous_pull = state.callbacks['GIT PULL NOW']
         await state.callbacks['CHECK UPDATES']()
         await asyncio.sleep(0)
         self.assertNotIn('GIT PULL NOW', self.button_texts(state.client))
         status = self.status_card(state.client)
         self.assertIn('card-danger', status)
         self.assertIn('failed', status.lower())
+        self.assertIn('fatal: &lt;branch&gt; &amp; proxy unavailable', status)
+        self.assertNotIn('<branch>', status)
+        await previous_pull()
+        await asyncio.sleep(0)
+        self.assertEqual(run.await_count, 1)
+        self.assertIn('fatal: &lt;branch&gt; &amp; proxy unavailable', self.status_card(state.client))
+
+  async def test_failed_check_without_error_output_displays_exit_code(self):
+    with self.functions_page({'CommitCompare': '"aaaaaaa" != "bbbbbbb"'}) as state, \
+         patch.object(dashboard, 'run_script_async', AsyncMock(return_value=7)):
+      await state.callbacks['CHECK UPDATES']()
+      await asyncio.sleep(0)
+      self.assertIn('exited with code 7', self.status_card(state.client))
+      self.assertNotIn('GIT PULL NOW', self.button_texts(state.client))
 
   async def test_success_exit_without_valid_result_is_not_reported_as_current(self):
     for output in [None, '"ERROR" != "ERROR"', '"aaaaaaa" == "bbbbbbb"']:
@@ -679,6 +699,7 @@ class TestDashboardCommitUpdates(unittest.IsolatedAsyncioTestCase):
         status = self.status_card(state.client)
         self.assertIn('card-danger', status)
         self.assertIn('failed', status.lower())
+        self.assertIn('비교 결과를 읽을 수 없습니다.', status)
 
   async def test_running_check_hides_pull_and_ignores_duplicate_check(self):
     entered, finish = asyncio.Event(), asyncio.Event()
@@ -728,10 +749,19 @@ class TestDashboardCommitUpdates(unittest.IsolatedAsyncioTestCase):
 
   async def test_successful_retry_clears_failure_and_restores_update_button(self):
     values = {'CommitCompare': '"aaaaaaa" != "bbbbbbb"'}
-    with self.functions_page(values) as state, patch.object(dashboard, 'run_script_async', AsyncMock(side_effect=[1, 0])) as run:
+    results = iter((1, 0))
+
+    async def check(*_args, on_error, **_kwargs):
+      result = next(results)
+      if result:
+        on_error('fatal: proxy unavailable')
+      return result
+
+    with self.functions_page(values) as state, patch.object(dashboard, 'run_script_async', AsyncMock(side_effect=check)) as run:
       await state.callbacks['CHECK UPDATES']()
       await asyncio.sleep(0)
       self.assertIn('failed', self.status_card(state.client).lower())
+      self.assertIn('fatal: proxy unavailable', self.status_card(state.client))
       self.assertNotIn('GIT PULL NOW', self.button_texts(state.client))
       check = next(element for element in state.client.elements.values() if isinstance(element, ui.button) and element.text == 'CHECK UPDATES')
       self.assertTrue(check.enabled)
@@ -740,9 +770,71 @@ class TestDashboardCommitUpdates(unittest.IsolatedAsyncioTestCase):
       self.assertEqual(run.await_count, 2)
       self.assertIn('GIT PULL NOW', self.button_texts(state.client))
       self.assertNotIn('failed', self.status_card(state.client).lower())
+      self.assertNotIn('proxy unavailable', self.status_card(state.client))
+
+  async def test_check_notifications_survive_refresh_of_clicked_button_slot(self):
+    notify = ui.notify
+    values = {'CommitCompare': '"aaaaaaa" != "bbbbbbb"'}
+    results = iter(((1, 'fatal: remote unavailable'), (0, '')))
+
+    async def command(*_args):
+      await asyncio.sleep(0)
+      gc.collect()
+      return next(results)
+
+    with self.functions_page(values) as state, patch.object(ui, 'notify', wraps=notify) as notifications, \
+         patch.object(dashboard, '_run_command', AsyncMock(side_effect=command)) as run:
+      for failed in (True, False):
+        check = next(element for element in state.client.elements.values() if isinstance(element, ui.button) and element.text == 'CHECK UPDATES')
+        with check.parent_slot:
+          await state.callbacks['CHECK UPDATES']()
+        await asyncio.sleep(0)
+        self.assertTrue(check.is_deleted)
+        self.assertEqual('GIT PULL NOW' in self.button_texts(state.client), not failed)
+        self.assertEqual('fatal: remote unavailable' in self.status_card(state.client), failed)
+      self.assertEqual(run.await_count, 2)
+      notifications.assert_any_call('[Commit Check] 에러: fatal: remote unavailable', type='negative', position='top')
+      notifications.assert_any_call('[Commit Check] 완료', type='positive', position='top')
 
 
 class TestDashboardAsync(unittest.IsolatedAsyncioTestCase):
+  async def test_runner_reports_stderr_failure_to_error_callback(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      script = Path(tmp) / 'failed_check.py'
+      script.write_text("import sys\nprint('fatal: remote unavailable', file=sys.stderr)\nsys.exit(1)\n", encoding='utf-8')
+      for show_modal in (False, True):
+        with self.subTest(show_modal=show_modal):
+          client = Client(ui.page(f'/test-dashboard-error-output-{show_modal}'))
+          self.addCleanup(client.delete)
+          error = Mock()
+          with client, patch.object(ui, 'notify'), patch.object(ui, 'run_javascript'):
+            result = await dashboard.run_script_async('Commit Check', str(script), show_modal=show_modal, on_error=error)
+          self.assertEqual(result, 1)
+          error.assert_called_once_with('fatal: remote unavailable')
+
+  async def test_runner_reports_process_launch_exception_to_error_callback(self):
+    for show_modal in (False, True):
+      with self.subTest(show_modal=show_modal):
+        client = Client(ui.page(f'/test-dashboard-error-launch-{show_modal}'))
+        self.addCleanup(client.delete)
+        error = Mock()
+        with client, patch.object(ui, 'notify'), patch.object(ui, 'run_javascript'), \
+             patch.object(dashboard.asyncio, 'create_subprocess_exec', AsyncMock(side_effect=FileNotFoundError('bash not found'))):
+          result = await dashboard.run_script_async('Commit Check', '/tmp/commit_compare.sh', show_modal=show_modal, on_error=error)
+        self.assertEqual(result, 1)
+        error.assert_called_once_with('bash not found')
+
+  async def test_successful_runner_does_not_report_error(self):
+    for show_modal in (False, True):
+      with self.subTest(show_modal=show_modal):
+        client = Client(ui.page(f'/test-dashboard-no-error-{show_modal}'))
+        self.addCleanup(client.delete)
+        error = Mock()
+        with client, patch.object(ui, 'notify'), patch.object(ui, 'run_javascript'), \
+             patch.object(dashboard, '_run_command', AsyncMock(return_value=(0, 'complete'))):
+          self.assertEqual(await dashboard.run_script_async('Commit Check', '/tmp/check.sh', show_modal=show_modal, on_error=error), 0)
+        error.assert_not_called()
+
   async def test_command_captures_stdout_and_stderr(self):
     snapshots = []
     code, output = await dashboard._run_command(

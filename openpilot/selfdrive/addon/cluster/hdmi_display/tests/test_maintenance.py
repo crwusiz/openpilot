@@ -129,16 +129,19 @@ def test_command_output_is_bounded_while_the_pipe_is_fully_drained(monkeypatch):
   async def run():
     chunks = [b"x" * 4096] * 20 + [b"latest error", b""]
     process = SimpleNamespace(returncode=0, stdout=SimpleNamespace(read=AsyncMock(side_effect=chunks)), wait=AsyncMock(return_value=0))
-    monkeypatch.setattr(maintenance.asyncio, "create_subprocess_exec", AsyncMock(return_value=process))
+    create = AsyncMock(return_value=process)
+    monkeypatch.setattr(maintenance.asyncio, "create_subprocess_exec", create)
     code, output = await maintenance.run_command(["bash", "log_upload.sh"], 1.0)
     assert code == 0 and len(output) == maintenance.MAX_OUTPUT
     assert output.endswith("latest error")
     assert process.stdout.read.await_count == len(chunks)
+    assert create.call_args.kwargs["stderr"] == asyncio.subprocess.STDOUT
   asyncio.run(run())
 
 
 @pytest.mark.parametrize("comparison, available, state", [
   ('"1234567" != "abcdef0"', True, "succeeded"), ('"1234567" == "1234567"', False, "succeeded"),
+  (f'"{"a" * 40}" != "{"b" * 40}"', True, "succeeded"), (f'"{"a" * 40}" == "{"a" * 40}"', False, "succeeded"),
   ('"ERROR" != "ERROR"', False, "failed"), ('"1234567" != "1234567"', False, "failed"),
 ])
 def test_git_pull_requires_successful_commit_check_with_different_commits(actions, comparison, available, state):
@@ -165,16 +168,29 @@ def test_git_pull_requires_successful_commit_check_with_different_commits(action
   asyncio.run(run())
 
 
-def test_failed_recheck_clears_previously_available_update(actions):
+@pytest.mark.parametrize("failure", ["command", "timeout", "invalid_result", "missing_result"])
+def test_failed_recheck_clears_previously_available_update(actions, failure):
   async def run():
     actions.commit_file.write_text('"1234567" != "abcdef0"')
     actions.submit("commit_check", PEER, "a" * 32, PEER)
     await asyncio.gather(*actions.tasks)
-    actions.runner.return_value = 1, "network failed"
-    actions.submit("commit_check", PEER, "b" * 32, PEER)
+    if failure == "command":
+      actions.runner.return_value = 124, "Commit check failed: remote lookup timed out after 10 seconds."
+    elif failure == "timeout":
+      actions.runner.side_effect = TimeoutError()
+    elif failure == "invalid_result":
+      actions.commit_file.write_text('"ERROR" != "ERROR"')
+    else:
+      actions.commit_file.unlink()
+    pending = actions.submit("commit_check", PEER, "b" * 32, PEER)
+    assert pending["commit_state"] == "checking" and not pending["update_available"]
+    assert "commit_compare" not in pending
     await asyncio.gather(*actions.tasks)
     result = actions.status(PEER, PEER)
     assert result["state"] == "failed" and not result["update_available"]
+    assert result["commit_state"] == "failed" and "commit_compare" not in result
+    with pytest.raises(ValueError, match="Check commits"):
+      actions.submit("git_pull", PEER, "c" * 32, PEER)
   asyncio.run(run())
 
 

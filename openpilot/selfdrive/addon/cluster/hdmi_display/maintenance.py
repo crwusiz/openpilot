@@ -102,6 +102,8 @@ class ClusterActions:
       raise ValueError("Check commits before requesting Git Pull")
     if action in ("commit_check", "git_pull"):
       self.checks[owner] = {**self.checks.get(owner, {}), "update_available": False, "commit_state": "checking"}
+    if action == "commit_check":
+      self.checks[owner].pop("commit_compare", None)
     job = {"job_id": uuid.uuid4().hex, "request_id": request_id, "owner": owner,
            "action": action, "state": "running", "message": ""}
     self.jobs[job["job_id"]] = job

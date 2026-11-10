@@ -122,6 +122,21 @@ def test_scene_snapshot_keeps_geometry_but_excludes_unused_duplicate_lines():
   assert not network.scene_snapshot(config(), data, {})["model_valid"]
 
 
+def test_driving_fault_guard_omits_path_serialization_while_retaining_current_hud_and_source_ages():
+  source = models()
+  class UnusedPath:
+    def __contains__(self, _key):
+      pytest.fail("Fault-guard metadata must not traverse hidden model geometry")
+
+  source.get_render_data.return_value = True, {"v_ego": 31.0, "enabled": True}, UnusedPath()
+  scene = network.scene_snapshot(config(), source, {"model_age_ms": 550.0, "car_state_age_ms": 7.0}, degraded=True)
+  decoded = wire.decode_payload(wire.pack_scene(scene)[wire.CONTROL_HEADER.size:])
+  assert decoded["model_valid"] is False and decoded["path"] == {}
+  assert decoded["hud"] == {"v_ego": 31.0, "enabled": True}
+  assert decoded["source_size"] == [1344, 760] and decoded["model_age_ms"] == 550.0
+  assert decoded["car_state_age_ms"] == 7.0
+
+
 def test_scene_rounding_reduces_payload_without_visible_projection_error():
   source = models()
   xs = np.linspace(1.0, 120.0, 33)
@@ -549,6 +564,53 @@ async def test_initial_offer_has_its_own_bounded_cold_start_budget(monkeypatch, 
   assert stream.stopped == send_offer and track.stop.called == send_offer
 
 
+@pytest.mark.parametrize("action", ["offer", "stall", "repeat", "invalid"])
+@asyncio_test
+async def test_negotiated_scene_preparation_is_one_bounded_extension_before_media(monkeypatch, action):
+  monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
+  monkeypatch.setattr(network, "INITIAL_OFFER_TIMEOUT_S", 0.08)
+  monkeypatch.setattr(network, "SCENE_PREPARATION_TIMEOUT_S", 0.3)
+  real_read, budgets = network.read_control, []
+
+  async def record_read(reader, budget_s=8.0):
+    budgets.append(budget_s)
+    return await real_read(reader, budget_s)
+
+  monkeypatch.setattr(network, "read_control", record_read)
+  stream, track = factory()
+  make_stream = Mock(return_value=(stream, track))
+  server = network.H264NetworkServer(config(), models(), make_stream)
+  await server.start()
+  reader, writer = await asyncio.open_connection(*server.server.sockets[0].getsockname())
+  try:
+    kind, _, hello = await real_read(reader)
+    assert kind == wire.HELLO and hello["scene_prepare"] is True
+    await asyncio.sleep(0.02)
+    await network.write_control(writer, wire.PREPARE, {"phase": "wrong" if action == "invalid" else "scene"})
+    if action == "offer":
+      await asyncio.sleep(0.1)  # Cold setup exceeds the ordinary initial budget.
+      await network.write_control(writer, wire.OFFER, {"type": "offer", "sdp": "v=0\r\noffer"})
+      assert (await real_read(reader))[0] == wire.ANSWER
+      assert (await real_read(reader))[0] == wire.STATE
+      assert budgets[-1] == 8.0  # Live watchdog has no preparation extension.
+      make_stream.assert_called_once()
+    else:
+      if action == "repeat":
+        await network.write_control(writer, wire.PREPARE, {"phase": "scene"})
+      kind, _, payload = await real_read(reader)
+      assert kind == wire.ERROR
+      assert payload["error"] == ("TimeoutError" if action == "stall" else "ValueError")
+      make_stream.assert_not_called()
+    assert budgets[0] == 0.08
+    if action != "invalid":
+      assert 0 < budgets[1] < 0.29  # Time already spent waiting is deducted.
+  finally:
+    writer.close()
+    await writer.wait_closed()
+    await server.close()
+  assert not server.clients and server.active is None and server.state_drain_started is None
+
+
 @asyncio_test
 async def test_short_state_pause_keeps_video_session_and_resumes_with_latest_models(monkeypatch):
   monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
@@ -587,6 +649,7 @@ async def test_short_state_pause_keeps_video_session_and_resumes_with_latest_mod
     assert (await network.read_control(reader))[0] == wire.STATE
     await asyncio.sleep(0.35)  # Exceeds the former 250 ms reconnect threshold.
     assert server.active is not None and not stream.stopped
+    assert server.state_drain_started is not None
     assert source.get_render_data.call_count == 1  # No pending snapshots accumulate.
     valid, hud, path = source.get_render_data.return_value
     source.get_render_data.return_value = valid, {**hud, "v_ego": 31.0}, path
@@ -648,6 +711,7 @@ async def test_network_budget_runs_while_state_drain_is_pending_and_survives_rec
   settings = config()
   settings.params = SimpleNamespace(get=values.get, put=put)
   server = network.H264NetworkServer(settings, models())
+  server.state_drain_started = 0.0
   writer = SimpleNamespace(transport=SimpleNamespace(get_write_buffer_size=lambda: 1600))
   monitor = asyncio.create_task(server._network_budget(writer, Stream()))
   try:

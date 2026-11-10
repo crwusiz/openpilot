@@ -1,4 +1,5 @@
 import math
+import re
 import time
 from pathlib import Path
 
@@ -323,7 +324,8 @@ class DisplayControls:
       self._label(surface, korean_title if korean else english_title, 30 * scale,
                   (rect[0] + rect[2] // 2, rect[1] + rect[3] // 2), (220, 229, 239) if enabled else (145, 154, 164))
     footer_y = round(310 * scale)
-    comparison = self.action_status.get("commit_compare", "").replace('"', "") or "--"
+    match = re.fullmatch(r'"([a-f0-9]{7,40})" (==|!=) "([a-f0-9]{7,40})"', self.action_status.get("commit_compare", ""))
+    comparison = f"{match[1][:7]} {match[2]} {match[3][:7]}" if match else "--"
     self._bounded_label(surface, "C4 COMMIT " + comparison, 21 * scale, (round(40 * scale), footer_y),
                         round(470 * scale), align="midleft")
     self._bounded_label(surface, self.action_label(korean), 23 * scale, (width // 2, footer_y), round(780 * scale))

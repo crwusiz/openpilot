@@ -33,7 +33,7 @@ def _setup_logger():
 
   try:
     handler = logging.FileHandler(LOG_FILE, mode="a")
-    handler.setFormatter(logging.Formatter("%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s", datefmt="%H:%M:%S"))
+    handler.setFormatter(logging.Formatter("%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
     logger.addHandler(handler)
 
   except OSError:
@@ -495,6 +495,7 @@ class SpeedLimiter:
         min_limit = 10
 
       has_camera_limit = camera_limit_active(navi_data)
+      was_in_school_zone = self.in_school_zone
       # Expiry clears speed/distance but can leave the start marker's type.
       # It must not re-enter a zone after a road change has ended it.
       if (is_school_zone_start and not self.in_school_zone and has_camera_limit and
@@ -507,7 +508,9 @@ class SpeedLimiter:
 
       current_road_name = str(getattr(navi_data, "currentRoadName", "") or "")
 
-      if self.in_school_zone:
+      # The previous road belongs to an existing zone. A newly received start
+      # marker may establish a zone on a different road in this same frame.
+      if self.in_school_zone and was_in_school_zone:
         if (self.last_road_name and current_road_name and current_road_name != self.last_road_name) or \
            (cam_type not in (20, 21) and camera_limit_active(navi_data)):
           log.info("school zone FORCED EXIT (road changed or new cam detected)")

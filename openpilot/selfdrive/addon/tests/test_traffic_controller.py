@@ -276,6 +276,64 @@ def test_stop_behind_intervening_lead_does_not_latch_signal_hold():
   assert plan.stop_distance > radar_state.leadOne.dRel
 
 
+@pytest.mark.parametrize("remaining_target", [2.04, 0.03, 0.0])
+def test_moving_lead_handoff_preserves_near_signal_target(remaining_target):
+  controller = TrafficStopController(dt=0.05)
+  car_state, model, radar_state = make_inputs(v_ego=8.12, model_distance=80.72)
+  for _ in range(4):
+    controller.update(car_state, model, radar_state, comfort_brake=1.5)
+  reference_speed = controller.reference_speed_kph
+
+  radar_state.leadOne.present = True
+  radar_state.leadOne.dRel = 58.10
+  controller.update(car_state, model, radar_state, comfort_brake=1.5)
+  assert controller.x_state == XState.lead
+
+  # November 10, 19:01:00: losing the lead reopened the same latched stop
+  # from 2.04 m to 5.07 m while the car was still moving at 1.45 m/s.
+  controller.adjusted_stop_distance = remaining_target
+  controller.distance_tracker.reset()
+  car_state.vEgo = 1.45
+  model.position.x = [5.15] * 33
+  radar_state.leadOne.present = False
+  plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+
+  expected_target = max(0.0, remaining_target - car_state.vEgo * controller.dt)
+  assert controller.x_state == XState.e2eStop
+  assert plan.signal_stop_active
+  assert not controller.signal_stop_hold
+  assert controller.reference_speed_kph == reference_speed
+  assert controller.adjusted_stop_distance == pytest.approx(expected_target)
+  assert plan.stop_distance == pytest.approx(max(expected_target, car_state.vEgo ** 2 / 3.0))
+
+  for lead_present in (True, False, True, False):
+    radar_state.leadOne.present = lead_present
+    previous_stop = plan.stop_distance
+    plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+    assert plan.signal_stop_active
+    assert plan.stop_distance <= previous_stop
+    assert controller.reference_speed_kph == reference_speed
+
+
+def test_signal_first_seen_behind_lead_initializes_target_after_lead_disappears():
+  controller = TrafficStopController(dt=0.05)
+  car_state, model, radar_state = make_inputs(v_ego=12.11, model_distance=103.25,
+                                             terminal_velocity=0.0)
+  radar_state.leadOne.present = True
+  radar_state.leadOne.dRel = 122.25
+  for _ in range(4):
+    plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+  assert controller.x_state == XState.lead
+  assert plan.signal_stop_active
+  assert controller.reference_speed_kph is None
+
+  radar_state.leadOne.present = False
+  plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+  assert controller.x_state == XState.e2eStop
+  assert controller.reference_speed_kph == pytest.approx(car_state.vEgo * 3.6)
+  assert 50.0 < plan.stop_distance < plan.raw_stop_distance
+
+
 def test_gas_release_clears_stopped_hold_for_next_signal_approach():
   controller = TrafficStopController(dt=0.05)
   car_state, model, radar_state = enter_stopped_signal_state(controller)

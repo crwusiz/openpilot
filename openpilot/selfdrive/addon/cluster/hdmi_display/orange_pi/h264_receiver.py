@@ -14,14 +14,14 @@ from time import thread_time
 try:
   from .hdmi_profiles import HDMI_PROFILES
   from .h264_protocol import (
-    ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, STATE, STATE_ZLIB,
+    ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, PREPARE, STATE, STATE_ZLIB,
     decode_payload, decode_state_payload, pack_control, unpack_control_header,
   )
   from .receiver_resources import ReceiverResourceSampler, ReceiverUDPSampler, format_receiver_resources
 except ImportError:
   from hdmi_profiles import HDMI_PROFILES
   from h264_protocol import (
-    ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, STATE, STATE_ZLIB,
+    ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, PREPARE, STATE, STATE_ZLIB,
     decode_payload, decode_state_payload, pack_control, unpack_control_header,
   )
   from receiver_resources import ReceiverResourceSampler, ReceiverUDPSampler, format_receiver_resources
@@ -777,6 +777,17 @@ class H264Receiver:
 
 def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=None):
   validate_hello(hello)
+  prepare_started = time.monotonic()
+  if hello.get("scene_prepare") is True:
+    # Declare cold dependency/font preparation before doing it. Old C4 versions
+    # do not advertise this extension and must never receive its new wire kind.
+    timeout = sock.gettimeout()
+    try:
+      sock.settimeout(0.25)
+      sock.sendall(pack_control(PREPARE, {"phase": "scene"}))
+    finally:
+      sock.settimeout(timeout)
+  LOG.info("[CLUSTER_H264_PREPARE] phase=scene")
   # The caller owns SDL; configure output before creating a scene or starting
   # the WebRTC worker. Old C4 versions leave the current receiver output alone.
   if "display_profile" in hello and not display.apply_profile(hello["display_profile"]):
@@ -799,6 +810,7 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
       sock.settimeout(0.25)
       sock.sendall(pack_control(ERROR, {"error": "h264_scene_unavailable", "detail": str(error)[:1000]}))
     raise H264ConfigurationError(str(error)) from error
+  LOG.info("[CLUSTER_H264_PREPARE] phase=ready | elapsed_ms=%.1f", (time.monotonic() - prepare_started) * 1000)
   receiver = H264Receiver(sock, hello)
   waiting_shown = False
   next_render_at = None

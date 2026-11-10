@@ -69,6 +69,7 @@ LEAD_DECEL = SimpleNamespace(
 
 CURVE = SimpleNamespace(
   min_speed_clu=30.0,
+  min_confidence=0.01,
   strong_reduction_ratio=1.3,
   strong_reduction_factor=0.9,
   limit_fall_rate_kph=20.0,
@@ -989,7 +990,10 @@ class CruiseController:
         if speed == SPEED_LIMIT.no_active or not np.isfinite(speed):
           continue
         confidence = float(np.clip(confidence, 0.0, 1.0)) if np.isfinite(confidence) else 0.0
-        if confidence <= 1e-6:
+        # An ill-conditioned path tail can have almost zero confidence but
+        # still predict a tight bend. Do not normalize that trace evidence
+        # into a full curve limit when it is the only limiting estimate.
+        if confidence < CURVE.min_confidence:
           continue
         estimates.append((float(speed), base_weight * confidence))
 

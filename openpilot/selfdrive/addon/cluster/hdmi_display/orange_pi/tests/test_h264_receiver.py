@@ -18,7 +18,7 @@ import pytest
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import cluster_receiver, h264_receiver
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.control_socket import recv_exact
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol import (
-  ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, STATE, STATE_ZLIB, decode_payload, pack_control, pack_scene,
+  ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, PREPARE, STATE, STATE_ZLIB, decode_payload, pack_control, pack_scene,
   unpack_control_header,
 )
 
@@ -706,6 +706,49 @@ def test_scene_asset_failure_reports_detail_before_starting_webrtc(monkeypatch):
   finally:
     c4_sock.close()
     pi_sock.close()
+
+
+@pytest.mark.parametrize("advertised", [None, False, "true", True])
+def test_scene_preparation_is_declared_before_cold_fonts_only_when_negotiated(monkeypatch, advertised):
+  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
+
+  c4_sock, pi_sock = socket.socketpair()
+  c4_sock.settimeout(1.0)
+  pi_sock.settimeout(1.75)
+  receiver = Mock()
+  monkeypatch.setattr(h264_receiver, "H264Receiver", receiver)
+  hello = {**HELLO_DATA, "scene_prepare": advertised}
+
+  def cold_scene(*_args):
+    assert pi_sock.gettimeout() == 1.75  # Declaration must restore socket mode.
+    if advertised is True:
+      assert read_control(c4_sock) == (PREPARE, 0, {"phase": "scene"})
+    raise RuntimeError("cold font failure")
+
+  monkeypatch.setattr(h264_scene, "H264Scene", cold_scene)
+  try:
+    with pytest.raises(h264_receiver.H264ConfigurationError, match="cold font failure"):
+      h264_receiver.receive_h264_session(pi_sock, None, hello)
+    kind, _, payload = read_control(c4_sock)
+    assert kind == ERROR and payload["error"] == "h264_scene_unavailable"
+    receiver.assert_not_called()
+  finally:
+    c4_sock.close()
+    pi_sock.close()
+
+
+def test_failed_preparation_declaration_does_not_allocate_scene_or_start_webrtc(monkeypatch):
+  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
+
+  scene, receiver = Mock(), Mock()
+  monkeypatch.setattr(h264_scene, "H264Scene", scene)
+  monkeypatch.setattr(h264_receiver, "H264Receiver", receiver)
+  sock = Mock(gettimeout=Mock(return_value=1.75), sendall=Mock(side_effect=OSError("closed")))
+  with pytest.raises(OSError, match="closed"):
+    h264_receiver.receive_h264_session(sock, None, {**HELLO_DATA, "scene_prepare": True})
+  assert sock.settimeout.call_args_list[-1].args == (1.75,)
+  scene.assert_not_called()
+  receiver.assert_not_called()
 
 
 def test_decoder_warning_counter_is_scoped_to_running_receiver(fake_aiortc):

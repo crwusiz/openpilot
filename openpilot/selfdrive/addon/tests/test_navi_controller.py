@@ -118,6 +118,42 @@ def test_expired_school_start_cannot_reenter_after_road_change(limiter, caplog):
   assert limiter.get_in_school_zone()
 
 
+def test_new_school_zone_on_different_road_keeps_first_entry(limiter, caplog):
+  # 11/10 18:47:19.950: a new start marker was immediately forced out by
+  # the road name retained from the previous navigation limit.
+  limiter.naviData = make_navi_data(1, distance=100)
+  limiter.naviData.currentRoadName = "이전 도로"
+  limiter.get_max_speed(80)
+  assert limiter.cam_decel
+
+  limiter.naviData = make_navi_data(20, distance=50)
+  limiter.naviData.camLimitSpeed = 30
+  limiter.naviData.currentRoadName = "동서대로"
+  with caplog.at_level("DEBUG", logger="navi"):
+    assert limiter.get_max_speed(40) == (40.0, True)
+    assert limiter.get_in_school_zone()
+    assert limiter.started_speed == 40
+    for _ in range(3):
+      limiter.get_max_speed(40)
+      assert limiter.get_in_school_zone()
+
+  assert caplog.text.count("school zone ENTER") == 1
+  assert "school zone FORCED EXIT" not in caplog.text
+  assert "decel reset (road changed)" in caplog.text
+
+
+@pytest.mark.parametrize("new_road,new_cam_type", [("다음 도로", 20), ("금벽로", 22)])
+def test_existing_school_zone_still_exits_on_road_or_camera_change(limiter, new_road, new_cam_type):
+  limiter.naviData = make_navi_data(20, distance=50)
+  limiter.get_max_speed(40)
+  assert limiter.get_in_school_zone()
+
+  limiter.naviData.currentRoadName = new_road
+  limiter.naviData.camType = new_cam_type
+  limiter.get_max_speed(40)
+  assert not limiter.get_in_school_zone()
+
+
 @pytest.mark.parametrize("cam_type", REAR_CAMERA_TYPES)
 def test_udp_accepts_rear_camera_payload(monkeypatch, cam_type):
   road_limit = {

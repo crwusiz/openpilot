@@ -481,9 +481,13 @@ class TrafficStopController:
         self.x_state = XState.lead
       elif self.signal_stop_latched:
         self.x_state = XState.e2eStop
-        reference_speed_kph = get_traffic_stop_reference_speed(v_ego_kph, None)
-        self.reference_speed_kph = reference_speed_kph
-        self.adjusted_stop_distance = get_virtual_traffic_stop_distance(self.x_stop, reference_speed_kph)
+        if self.reference_speed_kph is None:
+          self.reference_speed_kph = get_traffic_stop_reference_speed(v_ego_kph, None)
+          self.adjusted_stop_distance = get_virtual_traffic_stop_distance(self.x_stop, self.reference_speed_kph)
+        else:
+          # A lead handoff is still the same signal approach. Keep the target
+          # already advanced by ego motion, including an exhausted near line.
+          self.reference_speed_kph = get_traffic_stop_reference_speed(v_ego_kph, self.reference_speed_kph)
       else:
         self.x_state = XState.e2eCruise
 
@@ -506,7 +510,7 @@ class TrafficStopController:
       # confirmed. A growing model endpoint or intermittent lead cannot move it.
       filtered_stop_distance = 0.0
       self.adjusted_stop_distance = 0.0
-    elif self.adjusted_stop_distance > 0.0:
+    elif self.reference_speed_kph is not None or self.adjusted_stop_distance > 0.0:
       filtered_stop_distance = 0.0
 
     stop_distance = filtered_stop_distance + self.adjusted_stop_distance

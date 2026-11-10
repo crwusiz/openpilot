@@ -10,6 +10,7 @@ from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
 
 import subprocess
+import re
 import threading
 from pathlib import Path
 from openpilot.common.params import Params
@@ -183,15 +184,18 @@ class Sidebar(Widget):
       return
 
     self._is_processing = True
-    self._commit_check_exit_flag.unlink(missing_ok=True)
 
     def run_commit_check():
       try:
+        self._commit_check_exit_flag.unlink(missing_ok=True)
         if not self._check_github_connection():
           self._on_network_check_failed()
           return
 
-        subprocess.run(["/bin/sh", "/data/openpilot/scripts/commit_compare.sh"], timeout=15)
+        result = subprocess.run(["/bin/sh", "/data/openpilot/scripts/commit_compare.sh"], timeout=15, check=False)
+        if result.returncode != 0:
+          self._on_commit_check_failed(tr_noop("CHECK FAILED"))
+          return
 
         if self._commit_check_exit_flag.exists():
           self._on_commit_check_finished()
@@ -226,11 +230,13 @@ class Sidebar(Widget):
     print(f"Commit check failed: {reason}")
     self._commit_status.update(tr_noop("CHECK"), reason, Colors.RED)
 
-  def _parse_commit_compare_result(self, output: str | None):
+  def _parse_commit_compare_result(self, output: str | bytes | None):
     if not output:
       self._on_commit_check_failed(tr_noop("EMPTY RESULT"))
       return
 
+    if isinstance(output, bytes):
+      output = output.decode("utf-8", errors="replace")
     output = output.strip().strip('"')
 
     operator = "==" if " == " in output else "!=" if " != " in output else None
@@ -245,6 +251,11 @@ class Sidebar(Widget):
 
     local_commit = parts[0].strip().strip('"')
     remote_commit = parts[1].strip().strip('"')
+
+    if (not all(re.fullmatch(r"[0-9a-f]{7,40}", commit) for commit in (local_commit, remote_commit)) or
+        (local_commit == remote_commit) != (operator == "==")):
+      self._on_commit_check_failed(tr_noop("INVALID RESULT"))
+      return
 
     if operator == "==":
       self._commit_status.update(tr_noop("UP TO DATE"), local_commit[:7], Colors.LIME)

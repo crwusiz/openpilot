@@ -19,7 +19,7 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.network_bitrate import Clust
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import write_network_status
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_profiles import normalize_hdmi_profile
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol import (
-  ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, PATH_KEYS,
+  ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, PATH_KEYS, PREPARE,
   decode_payload, pack_control, pack_scene, unpack_control_header, validate_scene,
 )
 
@@ -29,6 +29,7 @@ STATE_SEND_BUFFER_BYTES = 16 * 1024
 STATE_INVALID_LOG_INTERVAL_S = 5.0
 KEYFRAME_REQUEST_INTERVAL = 1.0
 INITIAL_OFFER_TIMEOUT_S = 30.0
+SCENE_PREPARATION_TIMEOUT_S = 90.0
 
 
 def configure_state_transport(writer):
@@ -103,7 +104,8 @@ def scene_snapshot(config, models, health, degraded=False):
   source_size = models.get_camera_source_size()
   scene = {
     "model_valid": bool(valid and not degraded and source_size is not None),
-    "hud": _plain(hud), "path": {key: _plain(path[key], 6 if key == "calib_transform" else 3) for key in PATH_KEYS if key in path},
+    "hud": _plain(hud), "path": {} if degraded else {
+      key: _plain(path[key], 6 if key == "calib_transform" else 3) for key in PATH_KEYS if key in path},
     "source_size": source_size, "is_metric": bool(config.is_metric),
     "rotate_180": bool(config.rotate_180), "camera_contrast": float(config.camera_contrast),
     "model_age_ms": health.get("model_age_ms"), "car_state_age_ms": health.get("car_state_age_ms"),
@@ -172,6 +174,25 @@ async def read_control(reader, budget_s=8.0):
     kind, sequence, size = unpack_control_header(await reader.readexactly(CONTROL_HEADER.size))
     return kind, sequence, decode_payload(await reader.readexactly(size))
   return await asyncio.wait_for(read(), budget_s)
+
+
+async def read_initial_offer(reader):
+  started = time.monotonic()
+  message = await read_control(reader, budget_s=INITIAL_OFFER_TIMEOUT_S)
+  if message[0] == PREPARE:
+    if message[2] != {"phase": "scene"}:
+      raise ValueError("Invalid H.264 scene preparation declaration")
+    remaining = SCENE_PREPARATION_TIMEOUT_S - (time.monotonic() - started)
+    if remaining <= 0:
+      raise TimeoutError("H.264 scene preparation deadline exceeded")
+    flog(f"[CLUSTER_H264_PREPARE] phase=scene | remaining_s={remaining:.1f}")
+    # A single negotiated declaration can extend cold setup, never a live
+    # stream or an indefinitely renewed heartbeat. A second PREPARE is invalid.
+    try:
+      message = await read_control(reader, budget_s=remaining)
+    except TimeoutError as error:
+      raise TimeoutError(f"Pi scene preparation exceeded {SCENE_PREPARATION_TIMEOUT_S:g} second startup deadline") from error
+  return message
 
 
 async def write_control(writer, kind, payload, sequence=0, budget_s=0.25):
@@ -330,6 +351,7 @@ class H264NetworkServer:
     self.peer_ip = None
     self.status_updated = 0.0
     self.bitrate = ClusterBitrateController(getattr(config, "params", None))
+    self.state_drain_started = None
 
   async def start(self):
     self.server = await asyncio.start_server(self._client, self.config.network_bind_host, self.config.network_port,
@@ -363,8 +385,10 @@ class H264NetworkServer:
           await asyncio.Future()  # Stay supervised until normal cancellation.
         get_reports = getattr(stream, "get_receiver_report_stats", None)
         reports = get_reports() if callable(get_reports) else {}
-        self.bitrate.sample(time.monotonic(), reports.get("road"), writer.transport.get_write_buffer_size(),
-                            degraded=self.degraded)
+        now = time.monotonic()
+        drain_age = None if self.state_drain_started is None else max(0.0, now - self.state_drain_started)
+        self.bitrate.sample(now, reports.get("road"), writer.transport.get_write_buffer_size(),
+                            drain_age_s=drain_age, degraded=self.degraded)
     except Exception as error:
       # An auxiliary tuning failure cannot end FIRST_COMPLETED and tear down
       # healthy media. The connection's normal control/video watchdogs remain.
@@ -444,7 +468,11 @@ class H264NetworkServer:
           invalid_streak = 0
       state_cpu += time.thread_time() - cpu_before
       writer.write(packet)
-      await drain_state(writer)
+      self.state_drain_started = time.monotonic()
+      try:
+        await drain_state(writer)
+      finally:
+        self.state_drain_started = None
       sequence = (sequence + 1) & 0xFFFFFFFF
       state_frames += 1
       total_bytes += len(packet)
@@ -484,7 +512,7 @@ class H264NetworkServer:
              + f" | state_avg={state_wall * 1000 / state_frames:.1f}ms | state_cpu_avg={state_cpu * 1000 / state_frames:.1f}ms"
              + f" | video_source_age_ms={video_age} | resyncs={track.resyncs} | guard={int(self.degraded)}"
              + f" | state_encoding={compression or 'json'}"
-             + f" | encoder_bitrate_setting={bitrate}" + report_details
+             + f" | encoder_bitrate_setting={bitrate}" + self.bitrate.status_fields(now) + report_details
              + " | encoder=existing_livestream | camera_rgb=0 | cluster_render=0")
         started, last_frames, last_video_bytes = now, track.video_frames, track.video_bytes
         total_bytes = state_frames = 0
@@ -513,12 +541,12 @@ class H264NetworkServer:
       await write_control(writer, HELLO, {"protocol": 1, "codec": "h264", "transport": "webrtc", "camera": "road",
                                         "width": self.config.width, "height": self.config.height, "fps": min(self.config.fps, 20),
                                         "display_profile": self.config.hdmi_profile,
-                                        "state_hz": 20, "state_compression": "zlib"}, budget_s=2)
+                                        "state_hz": 20, "state_compression": "zlib", "scene_prepare": True}, budget_s=2)
       phase = "offer"
       # The Pi prepares fonts/scene assets and imports its decoder before
       # sending the first offer. Keep this cold-start allowance separate
       # from live control/video watchdogs and later negotiation deadlines.
-      kind, _sequence, offer = await read_control(reader, budget_s=INITIAL_OFFER_TIMEOUT_S)
+      kind, _sequence, offer = await read_initial_offer(reader)
       if kind == ERROR:
         raise RuntimeError(f"Pi H.264 unavailable: {offer.get('error', 'unknown')} | {str(offer.get('detail', ''))[:512]}")
       if kind != OFFER or offer.get("type") != "offer" or not isinstance(offer.get("sdp"), str) or not offer["sdp"].startswith("v=0"):
