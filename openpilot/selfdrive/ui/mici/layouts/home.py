@@ -239,12 +239,13 @@ class MiciHomeLayout(Widget):
     self._alerts_pill.set_alert_count_callback(alert_count_callback, alert_icon_callback)
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
+    point = rl.Vector2(mouse_pos.x, mouse_pos.y)
     relative_x = mouse_pos.x - self.rect.x
     has_alerts = self._alert_count_callback and self._alert_count_callback() > 0
-    if rl.check_collision_point_rec(mouse_pos, self._settings_icon.rect):
+    if rl.check_collision_point_rec(point, self._settings_icon.rect):
       if self._on_settings_click:
         self._on_settings_click()
-    elif rl.check_collision_point_rec(mouse_pos, self._commit_btn_rect):
+    elif rl.check_collision_point_rec(point, self._commit_btn_rect):
       self._handle_commit_button_press()
     elif has_alerts and relative_x > self.rect.width - ALERTS_ZONE_WIDTH:
       if self._on_alerts_click:

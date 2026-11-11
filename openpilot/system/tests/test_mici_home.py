@@ -1,6 +1,8 @@
 """Exercise the home update button without loading a window or native services."""
 
 import importlib.util
+from collections import namedtuple
+from dataclasses import dataclass
 from pathlib import Path
 from queue import SimpleQueue
 import subprocess
@@ -14,17 +16,28 @@ import pytest
 
 @pytest.fixture
 def home_module(monkeypatch):
+  @dataclass
+  class Vector2:
+    x: float
+    y: float
+
+  def check_collision_point_rec(point, rect):
+    if not isinstance(point, Vector2):
+      raise TypeError('point must be a Vector2')
+    return rect.x <= point.x <= rect.x + rect.width and rect.y <= point.y <= rect.y + rect.height
+
   colors = SimpleNamespace(WARNING='warning', RED='red', LIME='lime')
   network_types = SimpleNamespace(none=0, wifi=1, cell2G=2, cell3G=3, cell4G=4, cell5G=5, ethernet=6)
   dependencies = {
-    'raylib_nb': {'WHITE': 'white'},
+    'raylib_nb': {'WHITE': 'white', 'Vector2': Vector2, 'check_collision_point_rec': check_collision_point_rec},
     'openpilot.cereal': {'log': SimpleNamespace(DeviceState=SimpleNamespace(NetworkType=network_types))},
     'openpilot.system.ui.widgets': {'Widget': object},
     'openpilot.system.ui.widgets.layouts': {'HBoxLayout': object},
     'openpilot.system.ui.widgets.icon_widget': {'IconWidget': object},
     'openpilot.system.ui.widgets.label': {'UnifiedLabel': object, 'gui_label': Mock()},
     'openpilot.system.ui.lib.application': {
-      'gui_app': Mock(), 'FontWeight': Mock(), 'MousePos': object, 'TextAlignment': Mock(), 'TextAlignmentVertical': Mock(),
+      'gui_app': Mock(), 'FontWeight': Mock(), 'MousePos': namedtuple('MousePos', 'x y'),
+      'TextAlignment': Mock(), 'TextAlignmentVertical': Mock(),
     },
     'openpilot.selfdrive.ui.ui_state': {'ui_state': Mock(), 'ChestnutState': Mock()},
     'openpilot.common.version': {'RELEASE_BRANCHES': []},
@@ -67,6 +80,36 @@ def home(home_module, tmp_path):
   layout._git_pull_exit_flag = tmp_path / 'git_pull_exit_flag'
   layout._is_network_connected = lambda: True
   return layout
+
+
+@pytest.mark.parametrize('position, alert_count, update_available, expected_action', [
+  ((232, 132), 0, False, 'settings'),
+  ((700, 250), 0, False, 'check'),
+  ((700, 250), 0, True, 'pull'),
+  ((700, 250), 1, True, 'pull'),  # update button takes precedence over the alerts zone
+  ((800, 180), 1, False, 'alerts'),
+  ((800, 180), 0, False, 'settings'),
+  ((400, 200), 1, False, 'settings'),
+])
+def test_home_touch_routes_mousepos_to_the_correct_action(home_module, home, position, alert_count, update_available, expected_action):
+  home.rect = SimpleNamespace(x=200, y=100, width=640, height=200)
+  home._settings_icon = SimpleNamespace(rect=SimpleNamespace(x=208, y=108, width=48, height=48))
+  home._commit_btn_rect = SimpleNamespace(x=660, y=228, width=160, height=64)
+  home._alert_count_callback = lambda: alert_count
+  home._is_update_available = update_available
+  actions = {action: Mock() for action in ('settings', 'alerts', 'check', 'pull')}
+  home._on_settings_click = actions['settings']
+  home._on_alerts_click = actions['alerts']
+  home._start_commit_check = actions['check']
+  home._start_git_pull = actions['pull']
+
+  home._handle_mouse_release(home_module.MousePos(*position))
+
+  for action, callback in actions.items():
+    if action == expected_action:
+      callback.assert_called_once_with()
+    else:
+      callback.assert_not_called()
 
 
 @pytest.mark.parametrize('busy, connected', [(True, True), (False, False)])
