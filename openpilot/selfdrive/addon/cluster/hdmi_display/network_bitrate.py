@@ -54,6 +54,8 @@ class ClusterBitrateController:
   def reset_connection(self):
     self.last_report = self.report_at = self.healthy_since = None
     self.loss_samples = 0
+    self.report_sequence_bits = None
+    self.report_samples = self.report_wraps = 0
     self.drain_age_s = 0.0
     self.recovery_blocked = "no_report"
 
@@ -97,20 +99,30 @@ class ClusterBitrateController:
       self.drain_age_s = drain_age_s if type(drain_age_s) in (int, float) and 0 <= drain_age_s <= 60 else 0.0
       tcp_pressure = queued_bytes > 0 and self.drain_age_s >= TCP_PRESSURE_SECONDS
 
-      # Only a new RR with an advancing extended sequence is a loss sample.
-      # Re-reading a cached report must not multiply loss or establish recovery.
+      # aiortc puts its 16-bit max_seq in the RR's 32-bit sequence field.
+      # Accept its wrap as well as genuine extended 32-bit reports. Cached
+      # and backwards reports still cannot establish freshness or recovery.
       fresh, loss = False, None
       if report is not None:
         signature = (report.ssrc, report.highest_seq_no)
         fraction = report.fraction_lost
-        advancing = (self.last_report is None or signature[0] != self.last_report[0]
-                     or (type(signature[1]) is int and 0 < (signature[1] - self.last_report[1]) % (1 << 32) < (1 << 31)))
         if (type(signature[0]) is int and 0 <= signature[0] < 1 << 32
             and type(signature[1]) is int and 0 <= signature[1] < 1 << 32
-            and type(fraction) is int and 0 <= fraction <= 255 and advancing):
-          fresh, loss = True, fraction / 256
-          self.last_report, self.report_at = signature, now
-          self.loss_samples = self.loss_samples + 1 if loss >= 0.05 else 0
+            and type(fraction) is int and 0 <= fraction <= 255):
+          same_source = self.last_report is not None and signature[0] == self.last_report[0]
+          previous = self.last_report[1] if same_source else None
+          bits = 16 if signature[1] <= 0xFFFF and (previous is None or previous <= 0xFFFF) else 32
+          advancing = previous is None or 0 < (signature[1] - previous) % (1 << bits) < (1 << (bits - 1))
+          if advancing:
+            if self.last_report is not None and not same_source:
+              self.healthy_since = None
+              self.loss_samples = 0
+            fresh, loss = True, fraction / 256
+            self.report_wraps += int(previous is not None and signature[1] < previous)
+            self.report_samples += 1
+            self.report_sequence_bits = bits
+            self.last_report, self.report_at = signature, now
+            self.loss_samples = self.loss_samples + 1 if loss >= 0.05 else 0
 
       reason = "tcp_backpressure" if tcp_pressure else "rtcp_loss" if fresh and (loss >= 0.1 or self.loss_samples >= 2) else None
       if reason is not None:
@@ -147,6 +159,8 @@ class ClusterBitrateController:
     report_age = "none" if self.report_at is None else f"{max(0.0, now - self.report_at) * 1000:.1f}"
     return (f" | bitrate_target_bps={self.current} | bitrate_recovery_s={recovery_s:.1f}"
             + f" | bitrate_blocked={self.recovery_blocked} | bitrate_rr_age_ms={report_age}"
+            + f" | bitrate_rr_seq_bits={self.report_sequence_bits or 'none'}"
+            + f" | bitrate_rr_samples={self.report_samples} | bitrate_rr_wraps={self.report_wraps}"
             + f" | state_drain_age_ms={self.drain_age_s * 1000:.1f}")
 
   def close(self):
