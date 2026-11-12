@@ -46,7 +46,25 @@ private:
     uint16_t len;
   };
 
-  int spi_transfer(uint8_t endpoint, uint32_t id, uint8_t *tx_data, uint16_t tx_len, uint8_t *rx_data, uint16_t max_rx_len, double deadline);
+  // Per request, owned by the calling thread; never used for transport decisions.
+  struct SpiDiagnostics {
+    uint64_t lock_wait_ns = 0;
+    uint64_t lock_wait_max_ns = 0;
+    uint64_t last_lock_wait_ns = 0;
+    uint64_t transfer_ns = 0;
+    uint64_t ioctl_ns = 0;
+    uint64_t ioctl_max_ns = 0;
+    uint32_t attempts = 0;
+    uint32_t ioctls = 0;
+    uint32_t ioctl_errors = 0;
+    uint32_t polls = 0;
+    uint32_t invalid_responses = 0;
+    uint32_t stale_responses = 0;
+    uint32_t expired_at_lock = 0;
+  };
+
+  int spi_transfer(uint8_t endpoint, uint32_t id, uint8_t *tx_data, uint16_t tx_len, uint8_t *rx_data, uint16_t max_rx_len,
+                   double deadline, SpiDiagnostics &diagnostics);
   int spi_transfer_retry(uint8_t endpoint, uint8_t *tx_data, uint16_t tx_len, uint8_t *rx_data, uint16_t max_rx_len, unsigned int timeout);
   int lltransfer(struct spi_ioc_transfer &t);
 

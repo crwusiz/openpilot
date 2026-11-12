@@ -227,13 +227,44 @@ static bool check_crc(const uint8_t *data, uint32_t len) {
 int PandaSpiHandle::spi_transfer_retry(uint8_t endpoint, uint8_t *tx_data, uint16_t tx_len, uint8_t *rx_data, uint16_t max_rx_len, unsigned int timeout) {
   // timeout of 0 means forever
   const double deadline = (timeout == 0) ? INFINITY : millis_since_boot() + std::max(timeout, SPI_MIN_TIMEOUT);
+  const uint64_t diagnostic_start_ns = nanos_since_boot();
+  SpiDiagnostics diagnostics;
 
   // the id stays the same when we send the request again, so the panda never runs it twice
   uint32_t id = random_id();
   int ret;
   int nack_count = 0;
+  uint32_t diagnostic_last_id = id;
+  // Per-thread rate limits keep output outside the bus lock. A first failure is
+  // always recorded, and long NACK retries are reported before they finish.
+  static thread_local uint64_t last_diagnostic_ns = 0;
+  static thread_local bool previous_failure = false;
+  auto log_diagnostics = [&](int result, bool pending) {
+    const uint64_t now_ns = nanos_since_boot();
+    const uint64_t elapsed_us = (now_ns - diagnostic_start_ns) / 1000;
+    const bool slow = elapsed_us >= 5000 || nack_count > 0;
+    const uint64_t interval_ns = slow ? 100000000ULL : 1000000000ULL;
+    const bool first_failure = !pending && result < 0 && !previous_failure;
+    if (first_failure || now_ns - last_diagnostic_ns >= interval_ns) {
+      cloudlog(first_failure ? CLOUDLOG_ERROR : CLOUDLOG_DEBUG,
+           "SPI_DIAG ep=0x%x id=%u tx=%u rx=%u ret=%d pending=%d elapsed_us=%llu "
+           "lock_us=%llu lock_max_us=%llu transfer_us=%llu ioctl_us=%llu ioctl_max_us=%llu "
+           "tries=%u nacks=%d ioctls=%u ioctl_errors=%u polls=%u invalid=%u stale=%u expired_at_lock=%u tx_prefix=%s",
+           endpoint, diagnostic_last_id, tx_len, max_rx_len, result, pending, (unsigned long long)elapsed_us,
+           (unsigned long long)(diagnostics.lock_wait_ns / 1000), (unsigned long long)(diagnostics.lock_wait_max_ns / 1000),
+           (unsigned long long)(diagnostics.transfer_ns / 1000), (unsigned long long)(diagnostics.ioctl_ns / 1000),
+           (unsigned long long)(diagnostics.ioctl_max_ns / 1000), diagnostics.attempts, nack_count, diagnostics.ioctls,
+           diagnostics.ioctl_errors, diagnostics.polls, diagnostics.invalid_responses, diagnostics.stale_responses,
+           diagnostics.expired_at_lock, tx_data == nullptr ? "" : util::hexdump(tx_data, std::min((int)tx_len, 8)).c_str());
+      last_diagnostic_ns = now_ns;
+    }
+    if (!pending) previous_failure = result < 0;
+  };
   while (true) {
-    ret = spi_transfer(endpoint, id, tx_data, tx_len, rx_data, max_rx_len, deadline);
+    const uint64_t attempt_start_ns = nanos_since_boot();
+    diagnostic_last_id = id;
+    ret = spi_transfer(endpoint, id, tx_data, tx_len, rx_data, max_rx_len, deadline, diagnostics);
+    diagnostics.transfer_ns += nanos_since_boot() - attempt_start_ns - diagnostics.last_lock_wait_ns;
     if (ret >= 0 || !connected) {
       break;
     }
@@ -255,6 +286,7 @@ int PandaSpiHandle::spi_transfer_retry(uint8_t endpoint, uint8_t *tx_data, uint1
       break;
     }
 
+    log_diagnostics(ret, true);
     // give other threads a chance to run
     std::this_thread::yield();
   }
@@ -262,6 +294,7 @@ int PandaSpiHandle::spi_transfer_retry(uint8_t endpoint, uint8_t *tx_data, uint1
   if (ret < 0) {
     SPILOG(LOGE, "SPI: transfer failed with %d", ret);
   }
+  log_diagnostics(ret, false);
   return ret;
 }
 
@@ -299,14 +332,22 @@ int PandaSpiHandle::lltransfer(spi_ioc_transfer &t) {
 // One request and its response. Resends until the panda got the request and we got its response,
 // or the deadline. Every transfer either sees all of what the panda queued from its first byte, or
 // nothing it can mistake for a response. Returns the response length, or a negative SpiError
-int PandaSpiHandle::spi_transfer(uint8_t endpoint, uint32_t id, uint8_t *tx_data, uint16_t tx_len, uint8_t *rx_data, uint16_t max_rx_len, double deadline) {
+int PandaSpiHandle::spi_transfer(uint8_t endpoint, uint32_t id, uint8_t *tx_data, uint16_t tx_len, uint8_t *rx_data, uint16_t max_rx_len,
+                                 double deadline, SpiDiagnostics &diagnostics) {
   static const auto poll = [] {
     std::array<uint8_t, SPI_BUF_SIZE> p;
     p.fill(SPI_POLL);
     return p;
   }();
 
+  const uint64_t lock_start_ns = nanos_since_boot();
   LockEx lock(spi_fd, hw_lock);
+  const uint64_t lock_acquired_ns = nanos_since_boot();
+  diagnostics.last_lock_wait_ns = lock_acquired_ns - lock_start_ns;
+  diagnostics.lock_wait_ns += diagnostics.last_lock_wait_ns;
+  diagnostics.lock_wait_max_ns = std::max(diagnostics.lock_wait_max_ns, diagnostics.last_lock_wait_ns);
+  diagnostics.expired_at_lock += (lock_acquired_ns * 1e-6 > deadline);
+  diagnostics.attempts++;
 
   // the response is always read in one transfer of rx_len
   const uint32_t rx_len = sizeof(spi_resp_header) + max_rx_len + SPI_CRC_SIZE;
@@ -324,8 +365,14 @@ int PandaSpiHandle::spi_transfer(uint8_t endpoint, uint32_t id, uint8_t *tx_data
 
   auto xfer = [&](const uint8_t *tx, uint32_t len) {
     spi_ioc_transfer t = {.tx_buf = (uint64_t)tx, .rx_buf = (uint64_t)rx_buf, .len = len};
+    const uint64_t ioctl_start_ns = nanos_since_boot();
     int ret = lltransfer(t);
+    const uint64_t ioctl_elapsed_ns = nanos_since_boot() - ioctl_start_ns;
+    diagnostics.ioctl_ns += ioctl_elapsed_ns;
+    diagnostics.ioctl_max_ns = std::max(diagnostics.ioctl_max_ns, ioctl_elapsed_ns);
+    diagnostics.ioctls++;
     if (ret < 0) {
+      diagnostics.ioctl_errors++;
       SPILOG(LOGE, "SPI: transfer failed");
     }
     return ret;
@@ -346,6 +393,7 @@ int PandaSpiHandle::spi_transfer(uint8_t endpoint, uint32_t id, uint8_t *tx_data
       alive = millis_since_boot();
       // read until the response. if the panda is ready again, it never got the request
       do {
+        diagnostics.polls++;
         if (xfer(poll.data(), rx_len) < 0) {
           break;
         }
@@ -369,9 +417,11 @@ int PandaSpiHandle::spi_transfer(uint8_t endpoint, uint32_t id, uint8_t *tx_data
             }
             return resp.len;
           }
+          diagnostics.stale_responses++;
           alive = millis_since_boot();
           break;
         }
+        diagnostics.invalid_responses++;
       } while (millis_since_boot() < std::min(deadline, alive + SPI_SILENT_TIMEOUT));
     }
 
