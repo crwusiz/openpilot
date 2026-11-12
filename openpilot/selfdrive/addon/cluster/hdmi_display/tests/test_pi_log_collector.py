@@ -195,6 +195,7 @@ def test_transport_error_only_retries_port_22(state, error):
 
 @pytest.mark.parametrize("result", [
   collector.SSHResult(255, "", "root@pi: Permission denied (publickey,password)."),
+  collector.SSHResult(255, "", "Permission denied (publickey,password).\nConnection reset by pi port 9122\n"),
   collector.SSHResult(255, "", "WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!"),
   collector.SSHResult(1, "service diagnostics", "journalctl: permission denied"),
   collector.SSHResult(-9, "partial diagnostics", "", timed_out=True),
@@ -221,6 +222,95 @@ def test_retry_shares_collection_deadline(state, monkeypatch):
 
   assert collector.collect_pi_log(log, output, {}, runner)
   assert timeouts == [24.0, 16.0]
+
+
+@pytest.mark.parametrize("error", ["", "Connection reset by 192.168.0.84 port 9122\n"])
+def test_authenticated_partial_collection_retries_same_port_and_keeps_attempts_separate(state, error):
+  log, output = state
+  calls = []
+  partial = "--- Pi UTC wall clock ---\nfirst attempt\n--- Pi current boot ID ---\n"
+
+  def runner(command, _env, _timeout):
+    calls.append(command[command.index("-p") + 1])
+    return collector.SSHResult(255, partial, error) if len(calls) == 1 else collector.SSHResult(0, "complete diagnostics", "")
+
+  assert collector.collect_pi_log(log, output, {}, runner)
+  assert calls == ["9122", "9122"]
+  report = output.read_text(encoding="utf-8")
+  assert "Collection status: ok" in report and "retrying same port 9122 once" in report
+  assert "Interrupted remote diagnostics (separate attempt)" in report
+  assert "first attempt" in report and "complete diagnostics" in report
+  assert "retrying port 22" not in report
+
+
+def test_retry_of_interrupted_remote_is_bounded_and_does_not_fall_back_to_22(state):
+  log, output = state
+  responses = iter([collector.SSHResult(255, collector.REMOTE_STARTED_MARKER + "\npartial", ""),
+                    collector.SSHResult(255, "", "ssh: connect to host pi port 9122: Connection refused\n")])
+  calls = []
+
+  def runner(command, _env, _timeout):
+    calls.append(command[command.index("-p") + 1])
+    return next(responses)
+
+  assert not collector.collect_pi_log(log, output, {}, runner)
+  assert calls == ["9122", "9122"]
+  assert "Collection status: failed" in output.read_text(encoding="utf-8")
+
+
+def test_interrupted_collection_on_fallback_port_retries_that_port_only(state):
+  log, output = state
+  responses = iter([collector.SSHResult(255, "", "ssh: connect to host pi port 9122: Connection refused\n"),
+                    collector.SSHResult(255, collector.REMOTE_STARTED_MARKER + "\npartial", ""),
+                    collector.SSHResult(0, "complete", "")])
+  calls = []
+
+  def runner(command, _env, _timeout):
+    calls.append(command[command.index("-p") + 1])
+    return next(responses)
+
+  assert collector.collect_pi_log(log, output, {}, runner)
+  assert calls == ["9122", "22", "22"]
+
+
+@pytest.mark.parametrize("error,timed_out", [
+  ("Permission denied (publickey,password).", False),
+  ("WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!", False),
+  ("Host key verification failed.", False),
+  ("", True),
+])
+def test_authentication_and_deadline_failures_never_retry_even_with_partial_output(state, error, timed_out):
+  log, output = state
+  runner = Mock(return_value=collector.SSHResult(255, collector.REMOTE_STARTED_MARKER + "\npartial", error,
+                                               timed_out=timed_out))
+  assert not collector.collect_pi_log(log, output, {}, runner)
+  assert runner.call_count == 1
+
+
+@pytest.mark.parametrize("expires", [False, True])
+def test_partial_retry_uses_only_remaining_collection_budget(state, monkeypatch, expires):
+  log, output = state
+  ticks = iter([100.0, 101.0, 125.0 if expires else 114.0, 125.0 if expires else 118.0])
+  monkeypatch.setattr(collector, "time", SimpleNamespace(monotonic=lambda: next(ticks)))
+  monkeypatch.setattr(collector, "get_connected_pi_ip", lambda: "192.168.0.84")
+  budgets = []
+
+  def runner(_command, _env, timeout):
+    budgets.append(timeout)
+    return (collector.SSHResult(255, collector.REMOTE_STARTED_MARKER + "\npartial", "") if len(budgets) == 1
+            else collector.SSHResult(0, "complete", ""))
+
+  assert collector.collect_pi_log(log, output, {}, runner) is not expires
+  assert budgets == ([24.0] if expires else [24.0, 11.0])
+
+
+def test_interrupted_output_is_redacted_before_utf8_truncation():
+  password = "secret-value"
+  result = collector._interrupted_output("가" * 4 + password + "가" * 100, password, 20)
+  assert password not in result and "secret-" not in result
+  assert "INTERRUPTED OUTPUT TRUNCATED" in result
+  body = result.split("\n[INTERRUPTED OUTPUT TRUNCATED]")[0]
+  assert len(body.encode("utf-8")) <= 20
 
 
 def test_report_redacts_password_and_bounds_actual_utf8_file_size(state):

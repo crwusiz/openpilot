@@ -1,3 +1,4 @@
+from copy import deepcopy
 from pathlib import Path
 import threading
 from types import SimpleNamespace
@@ -40,6 +41,94 @@ def _driving_state(**updates):
                      "lane_line_probs": [0.5, 0.9, 0.9, 0.5],
                      "road_edges": [lane(-4.2), lane(4.2)], "road_edge_stds": [0.1, 0.2],
                      "leads": [{"present": True, "d_rel": 22, "d_camera": 22, "y_rel": 0.2, "v_rel": -1.5}]}, **updates)
+
+
+def _changing_hud():
+  return {"v_ego": 20.001, "accel": 0.1001, "enabled": True, "lat_active": True,
+          "steering_angle": 14.1, "gps_bearing": 42.1, "gps_satellites": 12, "wifi_strength": 3,
+          "distance_level": 3, "tpms": [34, 35, 36, 37]}
+
+
+def _hud_overlay(renderer, hud, *, valid=False):
+  models = SimpleNamespace(get_render_data=lambda: (valid, hud, {}))
+  return renderer.render_overlay(np.eye(3), models, True)[0]
+
+
+@pytest.mark.parametrize("metric", [False, True])
+@pytest.mark.parametrize("angles", [(14.1, 14.4, 42.1, 42.4), (0.0, 0.2, 359.9, -0.2)])
+def test_subpixel_hud_inputs_reuse_identical_pixels_without_mutating_source_values(metric, angles):
+  scene = H264Scene(ASSETS)
+  renderer = scene.renderer
+  renderer.config.is_metric = metric
+  renderer.config.speed_unit = "km/h" if metric else "mph"
+  try:
+    hud = _changing_hud()
+    hud.update(steering_angle=angles[0], gps_bearing=angles[2])
+    first = _hud_overlay(renderer, hud)
+    latest = {**hud, "v_ego": 20.010, "accel": 0.1005, "steering_angle": angles[1], "gps_bearing": angles[3]}
+    saved = deepcopy(latest)
+    reused = _hud_overlay(renderer, latest)
+    assert reused is first and renderer.last_frame_timings["hud_reused"] == 1
+    renderer._hud_cache_key = None  # Force the full actual painter as reference.
+    reference = _hud_overlay(renderer, latest)
+    assert reused.tobytes() == reference.tobytes()
+    assert latest == saved
+  finally:
+    scene.close()
+
+
+@pytest.mark.parametrize("update", [
+  {"v_ego": 20.6}, {"accel": 0.3}, {"steering_angle": 15.1}, {"gps_bearing": 43.1},
+  {"brake_pressed": True}, {"wifi_strength": 4}, {"gps_satellites": 0}, {"distance_level": 4},
+])
+def test_every_visible_hud_change_still_repaints_with_reference_pixels(update):
+  scene = H264Scene(ASSETS)
+  renderer = scene.renderer
+  try:
+    hud = _changing_hud()
+    first = _hud_overlay(renderer, hud)
+    latest = {**hud, **update}
+    changed = _hud_overlay(renderer, latest)
+    assert changed is not first and renderer.last_frame_timings["hud_reused"] == 0
+    assert changed.tobytes() != first.tobytes()
+    renderer._hud_cache_key = None
+    assert _hud_overlay(renderer, latest).tobytes() == changed.tobytes()
+  finally:
+    scene.close()
+
+
+def test_speed_threshold_border_changes_even_when_integer_speed_label_stays_the_same():
+  scene = H264Scene(ASSETS)
+  renderer = scene.renderer
+  try:
+    hud = {**_changing_hud(), "enabled": False, "lat_active": False, "cruise_available": True, "v_ego": 0.299}
+    first = _hud_overlay(renderer, hud)
+    changed = _hud_overlay(renderer, {**hud, "v_ego": 0.301})
+    assert renderer._current_speed_text(hud) == renderer._current_speed_text({**hud, "v_ego": 0.301})
+    assert changed is not first and changed.getpixel((0, 0)) != first.getpixel((0, 0))
+  finally:
+    scene.close()
+
+
+def test_hud_cache_does_not_round_path_inputs_or_ignore_unknown_fields(monkeypatch):
+  scene = H264Scene(ASSETS)
+  renderer = scene.renderer
+  paths = []
+
+  def path(_path, hud):
+    paths.append((hud["v_ego"], hud["steering_angle"]))
+    return None, 0.0, 0.0
+
+  monkeypatch.setattr(renderer, "_render_path_layer", path)
+  try:
+    first_hud = _changing_hud()
+    first = _hud_overlay(renderer, first_hud, valid=True)
+    latest = {**first_hud, "v_ego": 20.010, "steering_angle": 14.4}
+    assert _hud_overlay(renderer, latest, valid=True) is first
+    assert paths == [(20.001, 14.1), (20.010, 14.4)]
+    assert _hud_overlay(renderer, {**latest, "future_hud_field": 1}) is not first
+  finally:
+    scene.close()
 
 
 def test_hud_preparation_keeps_inputs_filters_and_publication_empty():
@@ -110,7 +199,7 @@ def test_prepared_hud_keeps_cold_reference_pixels_and_first_live_state(live):
     np.testing.assert_array_equal(warm.renderer._source_to_panel, cold.renderer._source_to_panel)
     if live:
       assert warm.last_status == {"state_fresh": True, "video_fresh": True, "model_valid": True}
-      assert warm.renderer._hud_cache_key[2]["v_ego"] == 26.5
+      assert warm._snapshot["hud"]["v_ego"] == 26.5
       np.testing.assert_array_equal(actual.path, reference.path)
       np.testing.assert_array_equal(actual.camera, reference.camera)
   finally:

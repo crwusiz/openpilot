@@ -25,6 +25,7 @@ except ImportError:
 COLLECTION_TIMEOUT = 25.0
 MAX_OUTPUT_BYTES = 512 * 1024
 MAX_STDERR_BYTES = 16 * 1024
+MAX_INTERRUPTED_OUTPUT_BYTES = 16 * 1024
 LOCAL_WIFI_TIMEOUT = 2.0
 MAX_LOCAL_WIFI_BYTES = 4 * 1024
 MAX_LOCAL_COMMAND_BYTES = 16 * 1024
@@ -39,6 +40,9 @@ TRANSPORT_ERRORS = re.compile(
   + r"No route to host|Network is unreachable)|^Connection to .* port 9122 timed out$|"
   + r"^Connection (?:closed|reset) by .* port 9122$", re.MULTILINE,
 )
+AUTH_ERRORS = re.compile(r"Permission denied|REMOTE HOST IDENTIFICATION HAS CHANGED|Host key verification failed|"
+                         + r"Too many authentication failures", re.IGNORECASE)
+REMOTE_STARTED_MARKER = "--- Pi UTC wall clock ---"
 ASKPASS_SCRIPT = """#!/bin/sh
 case ${1:-} in
   *[Pp]assword:*) printf '%s\\n' "$CLUSTER_PI_PASSWORD";;
@@ -624,6 +628,15 @@ def _write_report(output, content):
       temporary.unlink(missing_ok=True)
 
 
+def _interrupted_output(text, password, limit):
+  if password:
+    text = text.replace(password, "<redacted>")
+  encoded = text.encode("utf-8")
+  if len(encoded) <= limit:
+    return text
+  return encoded[:limit].decode("utf-8", errors="ignore") + "\n[INTERRUPTED OUTPUT TRUNCATED]"
+
+
 def collect_pi_log(c4_log, output, environ=None, runner=None):
   """Always write a sidecar, including connection/permission failure details."""
   environ = dict(os.environ if environ is None else environ)
@@ -668,7 +681,8 @@ def collect_pi_log(c4_log, output, environ=None, runner=None):
       askpass.chmod(0o700)
       ssh_env = {**environ, "CLUSTER_PI_PASSWORD": password, "SSH_ASKPASS": str(askpass),
                  "SSH_ASKPASS_REQUIRE": "force", "DISPLAY": environ.get("DISPLAY") or ":0", "LC_ALL": "C"}
-      for port in (9122, 22):
+      port, retried_remote, remote_started = 9122, False, False
+      while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
           raise TimeoutError("Orange Pi diagnostics exceeded the 25 second collection deadline")
@@ -681,8 +695,26 @@ def collect_pi_log(c4_log, output, environ=None, runner=None):
         command += [host, REMOTE_COMMAND]
         result = runner(command, ssh_env, remaining)
         report.append(f"SSH attempt: port={port} exit={result.returncode}")
-        if port == 9122 and result.returncode == 255 and not result.timed_out and TRANSPORT_ERRORS.search(result.stderr):
+        # The remote command's first stdout marker proves that authentication
+        # and command startup succeeded. A later SSH exit 255 may be a brief
+        # link interruption, including the empty-stderr failure seen on Nov 12.
+        remote_started |= result.stdout.lstrip("\r\n").startswith(REMOTE_STARTED_MARKER)
+        if (remote_started and not retried_remote and result.returncode == 255 and not result.timed_out
+            and not AUTH_ERRORS.search(result.stderr)):
+          retried_remote = True
+          report.append(f"Remote diagnostics interrupted; retrying same port {port} once within collection deadline")
+          if result.stdout:
+            report += ["\n--- Interrupted remote diagnostics (separate attempt) ---",
+                       _interrupted_output(result.stdout, password, MAX_INTERRUPTED_OUTPUT_BYTES)]
+          if result.stderr:
+            report += ["\n--- Interrupted SSH diagnostics stderr ---",
+                       _interrupted_output(result.stderr, password, MAX_STDERR_BYTES)]
+          save_progress()
+          continue
+        if (port == 9122 and not remote_started and result.returncode == 255 and not result.timed_out
+            and not AUTH_ERRORS.search(result.stderr) and TRANSPORT_ERRORS.search(result.stderr)):
           report.append("Port 9122 unavailable; retrying port 22")
+          port = 22
           continue
         success = result.returncode == 0 and not result.timed_out
         if not success:

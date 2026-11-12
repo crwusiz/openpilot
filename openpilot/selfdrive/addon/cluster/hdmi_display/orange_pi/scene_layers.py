@@ -286,6 +286,17 @@ class LayeredRenderer(ClusterRenderer):
       self._async_path_failed = True
       return None, "failed"
 
+  def _hud_cache_values(self, hud):
+    # Compare the exact display outputs for continuously changing values.
+    # Keep every other field conservative, including future/unknown fields.
+    # The path painter and vehicle inputs retain the original unrounded HUD.
+    values = dict(hud)
+    values["v_ego"] = self._current_speed_text(hud), self._get_border_color(hud)
+    values["accel"] = self._current_speed_color(hud)
+    for name in ("steering_angle", "gps_bearing"):
+      values[name] = self._icon_rotation_key(float(hud.get(name, 0.0) or 0.0))
+    return values
+
   def render_overlay(self, transform, models, has_camera):
     started = time.monotonic()
     self._update_filter_intervals(started)
@@ -299,7 +310,7 @@ class LayeredRenderer(ClusterRenderer):
     # Blinkers animate on the renderer's clock; stale-data text is drawn by the
     # scene after this call. Both must get a fresh image on every render.
     cacheable = not (hud.get("left_blinker") or hud.get("right_blinker") or hud.get("_state_stale"))
-    hud_key = bool(has_camera), bool(self.config.is_metric), hud
+    hud_key = (bool(has_camera), bool(self.config.is_metric), self._hud_cache_values(hud)) if cacheable else None
     hud_reused = cacheable and self._hud_cache_image is not None and hud_key == self._hud_cache_key
     frame = None if hud_reused else (self._overlay_camera_base if has_camera else self._overlay_base).copy()
     copied_at = time.monotonic()

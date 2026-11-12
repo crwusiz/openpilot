@@ -671,7 +671,7 @@ class ClusterRenderer:
       # Steering angle and bearing usually change by fractions of a degree.
       # Re-running PIL's bicubic transform for both icons on every camera frame
       # is expensive on-device and has no visible benefit at these icon sizes.
-      rotation_key = int(round(float(rotation) / 2.0) * 2) % 360
+      rotation_key = self._icon_rotation_key(rotation)
       key = (name, icon.size, bool(active), int(opacity), rotation_key)
       rotated = self._rotated_icon_cache.get(key)
       if rotated is None:
@@ -687,6 +687,10 @@ class ClusterRenderer:
       image.alpha_composite(icon, position)
     else:
       image.paste(icon, position, icon)
+
+  @staticmethod
+  def _icon_rotation_key(rotation):
+    return int(round(float(rotation) / 2.0) * 2) % 360
 
   def _icon_size_for_height(self, name, height):
     source = self.icons.get(name)
@@ -1022,18 +1026,22 @@ class ClusterRenderer:
       color = Colors.ORANGE if value == "--" else red if float(pressure) < 31 else Colors.SIGN_TEXT
       self._centered(draw, px, py, value, self.font_small, color)
 
-  def _draw_camera_overlays(self, draw, data, white):
-    # current speed
+  @staticmethod
+  def _current_speed_color(data):
     accel = float(data.get("accel", 0.0) or 0.0)
     if accel > 0:
       alpha = max(80, min(255, int(255 - 180 * min(accel / 3.0, 1.0))))
-      speed_color = (alpha, 255, alpha)
-    else:
-      alpha = max(60, min(255, int(255 - 255 * min(abs(accel) / 4.0, 1.0))))
-      speed_color = (255, alpha, alpha)
+      return alpha, 255, alpha
+    alpha = max(60, min(255, int(255 - 255 * min(abs(accel) / 4.0, 1.0))))
+    return 255, alpha, alpha
 
+  def _current_speed_text(self, data):
     conversion = 3.6 if getattr(self.config, "is_metric", True) else 2.236936
-    speed = "--" if data.get("_state_stale") else round(max(0.0, float(data.get("v_ego", 0.0) or 0.0) * conversion))
+    return "--" if data.get("_state_stale") else round(max(0.0, float(data.get("v_ego", 0.0) or 0.0) * conversion))
+
+  def _draw_camera_overlays(self, draw, data, white):
+    speed_color = self._current_speed_color(data)
+    speed = self._current_speed_text(data)
     center_x = self.camera_x + self.camera_w / 2
     # Align the current-speed value with the center of b's speed-limit cell.
     self._centered(draw, center_x, self.row_centers[0],
