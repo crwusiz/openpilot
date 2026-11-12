@@ -73,6 +73,12 @@ void can_send_thread(Panda *panda, bool fake_send) {
     capnp::FlatArrayMessageReader cmsg(aligned_buf.align(msg.get()));
     cereal::Event::Reader event = cmsg.getRoot<cereal::Event>();
 
+    // A transport failure can precede carState's CAN timeout. Stop injecting
+    // copied sensor values and counters as soon as either input is invalid.
+    if (!event.getValid() || !panda->comms_healthy()) {
+      continue;
+    }
+
     // Don't send if older than 1 second
     if ((nanos_since_boot() - event.getLogMonoTime() < 1e9) && !fake_send) {
       panda->can_send(event.getSendcan());
