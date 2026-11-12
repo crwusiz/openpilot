@@ -202,8 +202,12 @@ function launch {
 
   # start manager
   cd openpilot/system/manager
+  if [ -f "$DIR/prebuilt" ] && ! python3 ./check_params.py; then
+    echo "Prebuilt parameter registry is out of date; rebuilding..."
+    rm -f "$DIR/prebuilt" || exit 1
+  fi
   if [ ! -f "$DIR/prebuilt" ]; then
-    ./build.py
+    ./build.py || exit 1
   fi
   ./manager.py
 
