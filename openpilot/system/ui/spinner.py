@@ -3,7 +3,7 @@ import raylib_nb as rl
 import select
 import sys
 
-from openpilot.system.ui.lib.application import FONT_SCALE, FontWeight, gui_app
+from openpilot.system.ui.lib.application import FontWeight, gui_app
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.text import wrap_text
 from openpilot.system.ui.widgets import Widget
@@ -35,11 +35,11 @@ def clamp(value, min_value, max_value):
   return max(min(value, max_value), min_value)
 
 
-def fit_single_line(text: str, font: rl.Font, font_size: float, max_width: float) -> str:
+def fit_single_line(text: str, font: rl.Font, font_size: int, max_width: float) -> str:
   text = " ".join(text.split())
   if not text:
     return ""
-  if rl.measure_text_ex(font, text, font_size, 0.0).x <= max_width:
+  if measure_text_cached(font, text, font_size).x <= max_width:
     return text
 
   suffix = "..."
@@ -47,7 +47,7 @@ def fit_single_line(text: str, font: rl.Font, font_size: float, max_width: float
   while lo < hi:
     mid = (lo + hi + 1) // 2
     candidate = text[:mid].rstrip() + suffix
-    if rl.measure_text_ex(font, candidate, font_size, 0.0).x <= max_width:
+    if measure_text_cached(font, candidate, font_size).x <= max_width:
       lo = mid
     else:
       hi = mid - 1
@@ -90,36 +90,47 @@ class Spinner(Widget):
     ip_color = Colors.LIME if self._ip_address != "Offline" else rl.WHITE
 
     ip_font = gui_app.font(FontWeight.SEMI_BOLD)
-    ip_scaled_size = IP_FONT_SIZE * FONT_SCALE
-    ip_size = rl.measure_text_ex(ip_font, ip_label, ip_scaled_size, 0.0)
+    ip_size = measure_text_cached(ip_font, ip_label, IP_FONT_SIZE)
     ip_x = rect.x + rect.width / 2.0 - ip_size.x / 2.0
-    draw_text_ex = getattr(rl, "_orig_draw_text_ex", rl.draw_text_ex)
-    draw_text_ex(ip_font, ip_label, rl.Vector2(round(ip_x), rect.y + IP_TOP_MARGIN),
-                 ip_scaled_size, 0.0, ip_color)
+    rl.draw_text_ex(ip_font, ip_label, rl.Vector2(round(ip_x), rect.y + IP_TOP_MARGIN), IP_FONT_SIZE, 0.0, ip_color)
 
+    status_line = ""
+    status_size = rl.Vector2(0, 0)
+    if self._progress is not None and self._status_line:
+      status_line = fit_single_line(self._status_line, ip_font, STATUS_FONT_SIZE, rect.width - MARGIN_H)
+      status_size = measure_text_cached(ip_font, status_line, STATUS_FONT_SIZE)
+
+    # Reserve the IP header before laying out the logo and its message.
+    content_top = rect.y + IP_TOP_MARGIN + ip_size.y + WRAPPED_SPACING
+    available_height = max(0.0, rect.y + rect.height - IP_TOP_MARGIN - content_top)
     if self._wrapped_lines:
-      # Calculate total height required for spinner and text
       spacing = WRAPPED_SPACING
-      total_height = TEXTURE_SIZE + spacing + len(self._wrapped_lines) * LINE_HEIGHT
-      center_y = (rect.height - total_height) / 2.0 + TEXTURE_SIZE / 2.0
+      line_height = max(LINE_HEIGHT, measure_text_cached(gui_app.font(), self._wrapped_lines[-1], FONT_SIZE).y)
+      text_height = (len(self._wrapped_lines) - 1) * LINE_HEIGHT + line_height
+    elif self._progress is not None:
+      spacing = max(CENTERED_SPACING, status_size.y + STATUS_LINE_MARGIN + WRAPPED_SPACING) if status_line else CENTERED_SPACING
+      text_height = PROGRESS_BAR_HEIGHT
     else:
-      # Center spinner vertically
-      spacing = CENTERED_SPACING
-      center_y = rect.height / 2.0
-    y_pos = center_y + TEXTURE_SIZE / 2.0 + spacing
+      spacing = 0
+      text_height = 0
+    texture_size = min(TEXTURE_SIZE, max(0.0, available_height - spacing - text_height))
+    total_height = texture_size + spacing + text_height
+    center_y = content_top + max(0.0, (available_height - total_height) / 2.0) + texture_size / 2.0
+    y_pos = center_y + texture_size / 2.0 + spacing
 
-    center = rl.Vector2(rect.width / 2.0, center_y)
-    spinner_origin = rl.Vector2(TEXTURE_SIZE / 2.0, TEXTURE_SIZE / 2.0)
-    comma_position = rl.Vector2(center.x - TEXTURE_SIZE / 2.0, center.y - TEXTURE_SIZE / 2.0)
+    center = rl.Vector2(rect.x + rect.width / 2.0, center_y)
+    spinner_origin = rl.Vector2(texture_size / 2.0, texture_size / 2.0)
+    comma_rect = rl.Rectangle(center.x - texture_size / 2.0, center.y - texture_size / 2.0, texture_size, texture_size)
 
     delta_time = rl.get_frame_time()
     self._rotation = (self._rotation + DEGREES_PER_SECOND * delta_time) % 360.0
 
     # Draw rotating spinner and static comma logo
     rl.draw_texture_pro(self._spinner_texture, rl.Rectangle(0, 0, TEXTURE_SIZE, TEXTURE_SIZE),
-                        rl.Rectangle(center.x, center.y, TEXTURE_SIZE, TEXTURE_SIZE),
+                        rl.Rectangle(center.x, center.y, texture_size, texture_size),
                         spinner_origin, self._rotation, rl.WHITE)
-    rl.draw_texture_v(self._comma_texture, comma_position, rl.WHITE)
+    rl.draw_texture_pro(self._comma_texture, rl.Rectangle(0, 0, TEXTURE_SIZE, TEXTURE_SIZE),
+                        comma_rect, rl.Vector2(0, 0), 0, rl.WHITE)
 
     # Display the progress bar or text based on user input
     if self._progress is not None:
@@ -129,15 +140,10 @@ class Spinner(Widget):
       bar.width *= self._progress / 100.0
       rl.draw_rectangle_rounded(bar, 1, 10, rl.WHITE)
 
-      if self._status_line:
-        status_font = gui_app.font(FontWeight.SEMI_BOLD)
-        status_scaled_size = STATUS_FONT_SIZE * FONT_SCALE
-        status_line = fit_single_line(self._status_line, status_font, status_scaled_size, gui_app.width - MARGIN_H)
-        status_size = rl.measure_text_ex(status_font, status_line, status_scaled_size, 0.0)
+      if status_line:
         status_y = y_pos - STATUS_LINE_MARGIN - status_size.y
-        draw_text_ex = getattr(rl, "_orig_draw_text_ex", rl.draw_text_ex)
-        draw_text_ex(status_font, status_line, rl.Vector2(round(center.x - status_size.x / 2), status_y),
-                     status_scaled_size, 0.0, rl.WHITE)
+        rl.draw_text_ex(ip_font, status_line, rl.Vector2(round(center.x - status_size.x / 2), status_y),
+                        STATUS_FONT_SIZE, 0.0, rl.WHITE)
     elif self._wrapped_lines:
       for i, line in enumerate(self._wrapped_lines):
         text_size = measure_text_cached(gui_app.font(), line, FONT_SIZE)
