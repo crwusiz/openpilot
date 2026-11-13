@@ -1,5 +1,6 @@
 import gc
 import struct
+import threading
 from types import SimpleNamespace
 import weakref
 
@@ -12,8 +13,162 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.receiver_resources
   UDP_METRIC_NAMES,
   ReceiverResourceSampler,
   ReceiverUDPSampler,
+  ResourceSampleWorker,
   format_receiver_resources,
 )
+
+
+class _ResourceThread:
+  def __init__(self, *, target, args, name, daemon):
+    self.target, self.args, self.name, self.daemon = target, args, name, daemon
+    self.started = False
+
+  def start(self):
+    self.started = True
+
+  def run(self):
+    self.target(*self.args)
+
+
+def _resource_worker():
+  now, threads = [10.0], []
+
+  def create_thread(**kwargs):
+    thread = _ResourceThread(**kwargs)
+    threads.append(thread)
+    return thread
+
+  return ResourceSampleWorker(clock=lambda: now[0], thread_factory=create_thread), now, threads
+
+
+def test_resource_worker_rejects_inflight_requests_across_sessions_without_a_queue():
+  worker, now, threads = _resource_worker()
+  first = SimpleNamespace(sample=lambda: {"cpu_pct": 20.0})
+  second = SimpleNamespace(sample=first.sample)
+  assert first == second  # Ownership must use identity, not value equality.
+  assert worker.request(first)
+  assert len(threads) == 1 and threads[0].started and threads[0].daemon
+  assert threads[0].name == "cluster-resource"
+  assert not worker.request(first)
+  assert not worker.request(second)
+  assert worker.take(first) is None
+  assert len(threads) == 1
+  threads[0].run()
+  now[0] += 0.25
+  assert worker.take(second) is None
+  assert worker.take(first) == ({"cpu_pct": 20.0}, 0.25)
+  assert worker.take(first) is None
+  assert worker.request(second)
+  threads[1].run()
+  assert worker.take(second) == ({"cpu_pct": 20.0}, 0.0)
+
+
+def test_resource_worker_replaces_old_completed_result_and_preserves_new_session_ownership():
+  worker, _, threads = _resource_worker()
+  first = SimpleNamespace(sample=lambda: {"cpu_pct": 10.0})
+  second = SimpleNamespace(sample=lambda: {"cpu_pct": 30.0})
+  assert worker.request(first)
+  threads[0].run()
+  assert worker.request(second)
+  assert worker.take(first) is None
+  threads[1].run()
+  assert worker.take(first) is None
+  assert worker.take(second) == ({"cpu_pct": 30.0}, 0.0)
+
+
+@pytest.mark.parametrize("elapsed, fresh", [(0.0, True), (5.0, True), (5.01, False), (-0.01, False),
+                                           (float("nan"), False), (float("inf"), False)])
+def test_resource_worker_freshness_starts_at_request_time_and_discards_old_results(elapsed, fresh):
+  worker, now, threads = _resource_worker()
+  sampler = SimpleNamespace(sample=lambda: {"cpu_pct": 20.0})
+  assert worker.request(sampler)
+  now[0] += elapsed  # The read finishes only after this whole interval.
+  threads[0].run()
+  result = worker.take(sampler)
+  assert (result is not None) is fresh
+  if fresh:
+    assert result == ({"cpu_pct": 20.0}, elapsed)
+  assert worker.take(sampler) is None
+  assert worker.request(sampler)
+
+
+def test_resource_worker_sample_failure_does_not_prevent_later_samples():
+  worker, _, threads = _resource_worker()
+
+  def fail():
+    raise OSError("sensor read failed")
+
+  sampler = SimpleNamespace(sample=fail)
+  assert worker.request(sampler)
+  threads[0].run()
+  assert worker.take(sampler) is None
+  sampler.sample = lambda: {"cpu_pct": 20.0}
+  assert worker.request(sampler)
+  threads[1].run()
+  assert worker.take(sampler) == ({"cpu_pct": 20.0}, 0.0)
+
+
+@pytest.mark.parametrize("fail_constructor", [False, True])
+def test_resource_worker_thread_start_failure_releases_slot_for_retry(fail_constructor):
+  attempts, threads = [], []
+
+  def fail():
+    raise RuntimeError("cannot create worker thread")
+
+  def create_thread(**kwargs):
+    attempts.append(1)
+    if len(attempts) == 1 and fail_constructor:
+      fail()
+    thread = _ResourceThread(**kwargs)
+    if len(attempts) == 1:
+      thread.start = fail
+    threads.append(thread)
+    return thread
+
+  worker = ResourceSampleWorker(clock=lambda: 10.0, thread_factory=create_thread)
+  sampler = SimpleNamespace(sample=lambda: {"cpu_pct": 20.0})
+  assert not worker.request(sampler)
+  assert worker.take(sampler) is None
+  assert worker.request(sampler)
+  threads[-1].run()
+  assert worker.take(sampler) == ({"cpu_pct": 20.0}, 0.0)
+
+
+def test_resource_worker_blocked_read_uses_one_daemon_and_never_waits_for_completion():
+  entered, release, threads = threading.Event(), threading.Event(), []
+
+  def sample():
+    entered.set()
+    release.wait()
+    return {"cpu_pct": 20.0}
+
+  def create_thread(**kwargs):
+    thread = threading.Thread(**kwargs)
+    threads.append(thread)
+    return thread
+
+  worker = ResourceSampleWorker(thread_factory=create_thread)
+  first, second = SimpleNamespace(sample=sample), SimpleNamespace(sample=dict)
+  try:
+    assert worker.request(first)
+    assert entered.wait(1)
+    assert threads[0].is_alive() and threads[0].daemon
+    assert not worker.request(first)
+    assert not worker.request(second)
+    assert worker.take(first) is None
+    assert worker.take(second) is None
+    assert len(threads) == 1
+  finally:
+    release.set()
+    for thread in threads:
+      thread.join(1)
+      assert not thread.is_alive()
+  assert worker.take(second) is None
+  assert worker.take(first)[0] == {"cpu_pct": 20.0}
+  assert worker.request(second)
+  threads[-1].join(1)
+  assert not threads[-1].is_alive()
+  assert worker.take(second)[0] == {}
 
 
 def _write(path, value):

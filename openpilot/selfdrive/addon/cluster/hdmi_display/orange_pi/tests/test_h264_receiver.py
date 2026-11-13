@@ -21,6 +21,7 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol impo
   ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, PREPARE, STATE, STATE_ZLIB, decode_payload, pack_control, pack_scene,
   unpack_control_header,
 )
+from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.receiver_resources import ResourceSampleWorker
 
 
 HELLO_DATA = {"codec": "h264", "transport": "webrtc", "camera": "road", "width": 1920, "height": 480, "fps": 20}
@@ -856,7 +857,7 @@ def test_fast_recovery_and_regular_feedback_share_one_cooldown(monkeypatch):
   assert feedbacks[1]["keyframe_request"] and feedbacks[1]["recovery_reason"] == "video_stale"
 
 
-def run_feedback_ticks(monkeypatch, receiver, tick_count, update):
+def run_feedback_ticks(monkeypatch, receiver, tick_count, update, resource_worker=None):
   now, feedbacks = [0.0], []
 
   async def sleep(interval):
@@ -873,6 +874,8 @@ def run_feedback_ticks(monkeypatch, receiver, tick_count, update):
   monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
   monkeypatch.setattr(h264_receiver, "asyncio", SimpleNamespace(sleep=sleep, to_thread=asyncio.to_thread))
   monkeypatch.setattr(receiver, "_send_control", send)
+  monkeypatch.setattr(receiver, "_resource_worker", resource_worker if resource_worker is not None else
+                      SimpleNamespace(request=Mock(return_value=False), take=Mock(return_value=None)))
   with pytest.raises(asyncio.CancelledError):
     asyncio.run(receiver._feedback())
   return feedbacks
@@ -1040,55 +1043,133 @@ def test_udp_feedback_and_ten_second_logs_keep_window_delta_peak_and_unknowns(mo
   assert "udp_drops_total=120" in messages[1] and "udp_rcvbuf_bytes=2097152" in messages[1]
 
 
-def test_slow_resource_sensor_reads_leave_the_rtc_loop_available(monkeypatch):
+def test_blocked_sensor_cannot_stop_feedback_reconnect_or_asyncio_executor_shutdown(monkeypatch):
   receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
-  release = threading.Event()
-  notifier = []
-  sample_threads, samples_released = [], []
-  now, sleeps = [0.0], [0]
+  entered, release = threading.Event(), threading.Event()
+  threads, feedbacks, failures = [], [], []
+  samples_released, sample_threads, now = [], [], [0.0]
 
   def sample():
     sample_threads.append(threading.get_ident())
-    loop, entered = notifier[0]
-    loop.call_soon_threadsafe(entered.set)
-    samples_released.append(release.wait(timeout=1.0))
+    entered.set()
+    samples_released.append(release.wait(timeout=10))
     return {}
 
-  async def tick(_interval):
-    sleeps[0] += 1
-    if sleeps[0] > 1:
-      raise asyncio.CancelledError
-    now[0] += 10.0
-    await asyncio.sleep(0)
+  def create_thread(**kwargs):
+    thread = threading.Thread(**kwargs)
+    threads.append(thread)
+    return thread
 
-  async def run():
-    owner = threading.get_ident()
-    entered = asyncio.Event()
-    notifier.append((asyncio.get_running_loop(), entered))
-    task = asyncio.create_task(receiver._feedback())
+  worker = ResourceSampleWorker(clock=lambda: now[0], thread_factory=create_thread)
+
+  async def tick(_interval):
+    if len(feedbacks) >= 35:
+      raise asyncio.CancelledError
+    now[0] += 1.0
+    receiver.publish_rgb("healthy video", received_at=now[0])
+    await asyncio.sleep(0.001)
+
+  async def send(kind, payload):
+    assert kind == FEEDBACK
+    feedbacks.append(payload)
+
+  def run():
     try:
-      await asyncio.wait_for(entered.wait(), timeout=2.0)
-      # A decoded-video callback can still execute while the sysfs read is
-      # pending; a synchronous sample would have already timed out above.
-      assert not task.done() and not samples_released
-      receiver.publish_rgb("live callback", received_at=now[0])
-      assert receiver.received_frames == 1
-      assert len(sample_threads) == 1 and sample_threads[0] != owner
-      release.set()
       with pytest.raises(asyncio.CancelledError):
-        await task
-    finally:
-      release.set()
-      if not task.done():
-        task.cancel()
-      await asyncio.gather(task, return_exceptions=True)
+        asyncio.run(receiver._feedback())
+    except BaseException as error:
+      failures.append(error)
 
   monkeypatch.setattr(receiver._resources, "sample", sample)
-  monkeypatch.setattr(receiver, "_send_control", AsyncMock())
+  monkeypatch.setattr(receiver, "_resource_worker", worker)
+  monkeypatch.setattr(receiver, "_send_control", send)
   monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
   monkeypatch.setattr(h264_receiver, "asyncio", SimpleNamespace(sleep=tick, to_thread=asyncio.to_thread))
-  asyncio.run(run())
+  owner = threading.Thread(target=run, daemon=True)
+  try:
+    owner.start()
+    assert entered.wait(2)
+    owner.join(2)
+    # Even asyncio.run's executor shutdown must finish before the sensor is
+    # released. Merely moving its await into another task would fail here.
+    assert not owner.is_alive() and not failures
+    assert len(feedbacks) == 35 and not samples_released and not release.is_set()
+    assert all(not item["video_stale"] for item in feedbacks)
+    assert len(threads) == 1 and threads[0].daemon
+    assert len(sample_threads) == 1 and sample_threads[0] != owner.ident
+    another_session = h264_receiver.H264Receiver(None, HELLO_DATA)
+    assert not worker.request(another_session._resources)
+    assert worker.take(another_session._resources) is None
+  finally:
+    release.set()
+    owner.join(2)
+    for thread in threads:
+      thread.join(2)
+      assert not thread.is_alive()
+  assert not owner.is_alive()
   assert samples_released == [True] and len(sample_threads) == 1
+  # The late result cannot be accepted as a current sample after reconnect.
+  assert worker.take(receiver._resources) is None
+
+
+@pytest.mark.parametrize("completed_tick", [11, 16])
+def test_resource_results_are_polled_after_feedback_and_old_reads_are_not_logged(monkeypatch, caplog, completed_tick):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  clock, jobs, events = [0.0], [], []
+
+  def create_thread(**kwargs):
+    jobs.append(lambda: kwargs["target"](*kwargs["args"]))
+    return SimpleNamespace(start=lambda: None)
+
+  worker = ResourceSampleWorker(clock=lambda: clock[0], thread_factory=create_thread)
+  monkeypatch.setattr(receiver._resources, "sample", lambda: {"cpu_pct": 20.0})
+  formatter = h264_receiver.format_receiver_resources
+
+  def format_sample(snapshot):
+    # Completion must be consumed after this tick's feedback has been sent.
+    events.append(("sample", clock[0]))
+    return formatter(snapshot)
+
+  monkeypatch.setattr(h264_receiver, "format_receiver_resources", format_sample)
+
+  def update(tick, now):
+    clock[0] = now
+    if tick == 1:
+      send = receiver._send_control
+
+      async def observed_send(kind, payload):
+        await send(kind, payload)
+        events.append(("send", clock[0]))
+
+      receiver._send_control = observed_send
+    if tick == completed_tick:
+      assert len(jobs) == 1
+      jobs[0]()
+
+  with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+    feedbacks = run_feedback_ticks(monkeypatch, receiver, 18, update, resource_worker=worker)
+  assert len(feedbacks) == 18
+  messages = [record.getMessage() for record in caplog.records if "CLUSTER_PI_RESOURCE_PERF" in record.getMessage()]
+  if completed_tick == 11:
+    assert len(messages) == 1 and "sample_age_ms=1000.0 | cpu_pct=20.0" in messages[0]
+    assert events.index(("sample", 11)) == events.index(("send", 11)) + 1
+  else:
+    assert not messages and all(kind == "send" for kind, _now in events)
+
+
+@pytest.mark.parametrize("operation", ["take", "request", "format"])
+def test_optional_resource_failure_does_not_interrupt_feedback_or_flood_warnings(monkeypatch, caplog, operation):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  worker = SimpleNamespace(take=Mock(return_value=None), request=Mock(return_value=False))
+  if operation == "format":
+    worker.take.return_value = ({}, 0.1)
+    monkeypatch.setattr(h264_receiver, "format_receiver_resources", Mock(side_effect=ValueError("bad diagnostic")))
+  else:
+    getattr(worker, operation).side_effect = ValueError("bad diagnostic")
+  feedbacks = run_feedback_ticks(monkeypatch, receiver, 25, lambda *_args: None, resource_worker=worker)
+  assert len(feedbacks) == 25
+  messages = [record.getMessage() for record in caplog.records if "unavailable=" in record.getMessage()]
+  assert messages == ["[CLUSTER_PI_RESOURCE_PERF] unavailable=ValueError"]
 
 
 def test_receiver_stage_timings_average_only_present_valid_samples(monkeypatch, caplog):
@@ -1651,6 +1732,7 @@ def test_gpu_displays_decoded_bursts_without_the_extra_source_timer(monkeypatch)
 
       start = close = staticmethod(lambda: None)
       record_display = staticmethod(lambda *_args, **_kwargs: None)
+      record_pending_replacement = staticmethod(lambda: None)
 
     def present(_image):
       now[0] += 0.012

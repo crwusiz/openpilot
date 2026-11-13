@@ -17,14 +17,14 @@ try:
     ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, PREPARE, STATE, STATE_ZLIB,
     decode_payload, decode_state_payload, pack_control, unpack_control_header,
   )
-  from .receiver_resources import ReceiverResourceSampler, ReceiverUDPSampler, format_receiver_resources
+  from .receiver_resources import RESOURCE_SAMPLE_WORKER, ReceiverResourceSampler, ReceiverUDPSampler, format_receiver_resources
 except ImportError:
   from hdmi_profiles import HDMI_PROFILES
   from h264_protocol import (
     ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, PREPARE, STATE, STATE_ZLIB,
     decode_payload, decode_state_payload, pack_control, unpack_control_header,
   )
-  from receiver_resources import ReceiverResourceSampler, ReceiverUDPSampler, format_receiver_resources
+  from receiver_resources import RESOURCE_SAMPLE_WORKER, ReceiverResourceSampler, ReceiverUDPSampler, format_receiver_resources
 
 
 LOG = logging.getLogger("cluster_receiver")
@@ -221,6 +221,8 @@ class H264Receiver:
     self._last_camera_display_at = None
     self._last_decoded_at = self._last_rgb_published_at = None
     self._resources = ReceiverResourceSampler()
+    self._resource_worker = RESOURCE_SAMPLE_WORKER
+    self._resource_error_logged = False
     self.thread = threading.Thread(target=self._run_thread, name="cluster-webrtc-receiver", daemon=True)
 
   def start(self):
@@ -231,7 +233,7 @@ class H264Receiver:
     keys = ["render_count", "render", "display", "queue_count", "queue", "convert_count", "convert", "gap", "camera_gap",
             "hdmi_upload_count", "hdmi_upload_bytes", "hdmi_camera_reused", "hdmi_path_reused", "hdmi_overlay_reused",
             "loop_samples", "loop_lag", "loop_wall", "loop_cpu",
-            "decoded_intervals", "decoded_gap", "rgb_intervals", "rgb_gap", "rgb_burst_frames"]
+            "decoded_intervals", "decoded_gap", "rgb_intervals", "rgb_gap", "rgb_burst_frames", "pending_replaced"]
     keys.extend(("path_async_frames", *PATH_COUNTER_NAMES))
     for prefix, names in STAGE_NAMES.items():
       for name in names:
@@ -293,6 +295,13 @@ class H264Receiver:
       self._stats["convert_count"] += 1
       self._stats["convert"] += convert_elapsed
       self.condition.notify_all()
+
+  def record_pending_replacement(self):
+    # The owner has already consumed this RGB from latest_rgb, but a newer
+    # picture arrived before its display slot. Keep this distinct from the
+    # publish-slot replacements counted by dropped_frames.
+    with self.condition:
+      self._stats["pending_replaced"] += 1
 
   def record_display(self, render_started, rendered_at, displayed_at, video_received_at=None, presented=True,
                      scene_timings=None, display_timings=None, camera_visible=True):
@@ -494,6 +503,21 @@ class H264Receiver:
       if payload is not None:
         await self._send_control(FEEDBACK, payload)
 
+  def _poll_resources(self, *, request=False):
+    try:
+      completed = self._resource_worker.take(self._resources)
+      if completed is not None:
+        resources, age = completed
+        LOG.info("[CLUSTER_PI_RESOURCE_PERF] sample_age_ms=%.1f | %s", age * 1000, format_receiver_resources(resources))
+      if request:
+        self._resource_worker.request(self._resources)
+    except Exception as error:
+      # Optional diagnostics must not interrupt feedback or retain the RTC
+      # executor on shutdown, even when a sensor or formatter misbehaves.
+      if not self._resource_error_logged:
+        LOG.warning("[CLUSTER_PI_RESOURCE_PERF] unavailable=%s", type(error).__name__)
+        self._resource_error_logged = True
+
   async def _feedback(self):
     previous_at = time.monotonic()
     previous_rx = previous_display = 0
@@ -542,6 +566,7 @@ class H264Receiver:
           "decoder_errors": decoder_errors,
           "keyframe_request": False,
           "dropped_display": self.dropped_frames,
+          "pending_replaced_frames": int(stats["pending_replaced"]),
           "render_avg_ms": stats["render"] * 1000 / max(stats["render_count"], 1),
           "display_avg_ms": stats["display"] * 1000 / max(stats["render_count"], 1),
           "queue_wait_avg_ms": stats["queue"] * 1000 / max(stats["queue_count"], 1),
@@ -560,6 +585,7 @@ class H264Receiver:
       if recovery is not None:
         payload.update(recovery)
       await self._send_control(FEEDBACK, payload)
+      self._poll_resources()
       for key in stats:
         logged_stats[key] = (max(logged_stats[key], stats[key]) if key in ("gap", "camera_gap", "loop_lag", "decoded_gap", "rgb_gap")
                              else logged_stats[key] + stats[key])
@@ -572,6 +598,7 @@ class H264Receiver:
           stages += " | path_async_frames=" + str(int(logged_stats["path_async_frames"]))
           stages += "".join(f" | {name}={int(logged_stats[name])}" for name in PATH_COUNTER_NAMES)
         stages += f" | camera_display_gap_max={logged_stats['camera_gap'] * 1000:.1f}ms"
+        stages += f" | pending_replaced_frames={int(logged_stats['pending_replaced'])}"
         if logged_stats["hdmi_upload_count"]:
           stages += (f" | hdmi_upload_kbps={logged_stats['hdmi_upload_bytes'] * 8 / (1000 * elapsed):.1f}"
                      + f" | hdmi_camera_reused={int(logged_stats['hdmi_camera_reused'])}"
@@ -600,11 +627,10 @@ class H264Receiver:
                  decoder_errors - logged_decoder_errors, (decoded - logged_decoded) / elapsed,
                  skipped - logged_skipped, (camera_displayed - logged_camera_display) / elapsed,
                  payload["screen_off"], payload["gpu_camera"], stages)
-        # sysfs drivers may sleep during sensor reads. Use the existing RGB
-        # executor, and await this one sample before scheduling another, so
-        # resource logging cannot hold up ICE/RTP or queue sampler work.
-        resources = await asyncio.to_thread(self._resources.sample)
-        LOG.info("[CLUSTER_PI_RESOURCE_PERF] %s", format_receiver_resources(resources))
+        # A process-wide daemon permits one sensor sample, without a queue or
+        # an await in this heartbeat. A stuck read cannot stop later feedback,
+        # accumulate work across reconnects, or hold default executor shutdown.
+        self._poll_resources(request=True)
         logged_at, logged_rx, logged_display, logged_dropped = now, rx, displayed, payload["dropped_display"]
         logged_camera_display = camera_displayed
         logged_decoder_errors = decoder_errors
@@ -819,6 +845,7 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
   pending_state = False
   last_render_started = None
   pending_video_at = None
+  pending_camera_on_screen = False
   freshness = None
   gpu_policy_logged = False
   slow_frame_logged_at = None
@@ -837,6 +864,8 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         raise KeyboardInterrupt
       with receiver.condition:
         receiver.screen_off = bool(getattr(display, "screen_off", False))
+      if receiver.screen_off:
+        pending_camera_on_screen = False
       timeout = 0.02
       if (pending_render or pending_state) and next_render_at is not None and not receiver.screen_off:
         due_at = next_render_at
@@ -848,8 +877,11 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         scene.update(state[0], received_at=state[1])
         pending_state = True
       if rgb is not None:
+        if pending_render and pending_video_at is not None and pending_camera_on_screen and not receiver.screen_off:
+          receiver.record_pending_replacement()
         scene.set_video(rgb[0], received_at=rgb[1], take_ownership=True)
         pending_video_at = rgb[1]
+        pending_camera_on_screen = not receiver.screen_off
         pending_render = True
       now = time.monotonic()
       current_freshness = (receiver.last_video_at is not None and now - receiver.last_video_at < 0.5,
@@ -866,6 +898,8 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
           waiting_shown = True
         pending_render = False
         pending_state = False
+        pending_video_at = None
+        pending_camera_on_screen = False
       elif (pending_render or (pending_state and now >= hud_deadline())) \
           and (next_render_at is None or now >= next_render_at) and not receiver.screen_off:
         # Metadata and decoded camera pictures arrive on different clocks.
@@ -902,6 +936,7 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         pending_state = False
         last_render_started = render_started
         pending_video_at = None
+        pending_camera_on_screen = False
         if receiver.gpu_camera:
           # Wi-Fi can deliver several already decoded pictures close together.
           # A 50ms timer discards those pictures even when GPU composition takes

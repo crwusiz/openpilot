@@ -5,6 +5,7 @@ from pathlib import Path
 import socket
 import struct
 import sys
+import threading
 import time
 import weakref
 
@@ -16,6 +17,62 @@ MAX_CPU_LINE_BYTES = 512
 MAX_UDP_TRANSPORTS = 8
 UDP_METRIC_NAMES = ("udp_sockets", "udp_drops_total", "udp_drops_delta", "udp_rmem_bytes", "udp_rcvbuf_bytes")
 _SOCKET_MEMINFO = struct.Struct("=9I")
+
+
+class ResourceSampleWorker:
+  """Run at most one diagnostic read across receiver sessions, without a queue.
+
+  Sensor reads can stall indefinitely in the kernel. A daemon thread keeps that
+  optional work independent of the RTC loop and its default executor shutdown.
+  A stalled read prevents further samples, rather than accumulating threads.
+  """
+  def __init__(self, clock=time.monotonic, thread_factory=threading.Thread):
+    self._clock = clock
+    self._thread_factory = thread_factory
+    self._lock = threading.Lock()
+    self._running = False
+    self._completed = None
+
+  def request(self, sampler):
+    """Start a sample if idle; the worker only retains the sampler instance."""
+    with self._lock:
+      if self._running:
+        return False
+      started = self._clock()
+      self._running = True
+      self._completed = None
+      try:
+        thread = self._thread_factory(target=self._sample, args=(sampler, started), name="cluster-resource", daemon=True)
+        thread.start()
+      except Exception:
+        self._running = False
+        return False
+    return True
+
+  def _sample(self, sampler, started):
+    snapshot = None
+    try:
+      snapshot = sampler.sample()
+    except Exception:
+      pass  # Optional diagnostics must not stop media or receiver feedback.
+    finally:
+      with self._lock:
+        self._completed = (sampler, started, snapshot) if snapshot is not None else None
+        self._running = False
+
+  def take(self, sampler, max_age_s=5.0):
+    """Consume only this sampler's fresh result, returning (snapshot, age)."""
+    with self._lock:
+      if self._completed is None or self._completed[0] is not sampler:
+        return None
+      _, started, snapshot = self._completed
+      self._completed = None
+      age = self._clock() - started
+    # A delayed read is old even if it has only just completed.
+    return (snapshot, age) if math.isfinite(age) and 0 <= age <= max_age_s else None
+
+
+RESOURCE_SAMPLE_WORKER = ResourceSampleWorker()
 
 
 class ReceiverUDPSampler:

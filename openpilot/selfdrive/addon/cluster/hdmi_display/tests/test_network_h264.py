@@ -415,6 +415,7 @@ async def test_receiver_network_telemetry_is_logged_without_changing_recovery_or
   monkeypatch.setattr(network, "flog", messages.append)
   telemetry = {"loop_lag_max_ms": 153.25, "loop_wall_ms": 1005, "loop_cpu_ms": 82.75, "loop_samples": 8,
                "decoded_gap_max_ms": 151.25, "rgb_gap_max_ms": 148.5, "rgb_burst_frames": 3, "rgb_intervals": 20,
+               "pending_replaced_frames": 2,
                "udp_sockets": 1, "udp_drops_total": 103, "udp_drops_delta": 3,
                "udp_rmem_bytes": 201216, "udp_rcvbuf_bytes": 2097152}
   monkeypatch.setattr(network, "read_control", AsyncMock(side_effect=[(wire.FEEDBACK, 0, telemetry), EOFError()]))
@@ -435,7 +436,7 @@ async def test_unavailable_or_malformed_receiver_network_telemetry_is_omitted(mo
   messages = []
   monkeypatch.setattr(network, "flog", messages.append)
   keys = ("loop_lag_max_ms", "loop_wall_ms", "loop_cpu_ms", "loop_samples", "udp_sockets",
-          "decoded_gap_max_ms", "rgb_gap_max_ms", "rgb_burst_frames", "rgb_intervals",
+          "decoded_gap_max_ms", "rgb_gap_max_ms", "rgb_burst_frames", "rgb_intervals", "pending_replaced_frames",
           "udp_drops_total", "udp_drops_delta", "udp_rmem_bytes", "udp_rcvbuf_bytes")
   payload = dict.fromkeys(keys, invalid)
   payload["camera_display_fps"] = 19.5

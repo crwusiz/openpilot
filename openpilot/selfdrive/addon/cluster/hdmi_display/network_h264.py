@@ -424,7 +424,7 @@ class H264NetworkServer:
                   "camera_display_gap_max_ms",
                   "loop_lag_max_ms", "loop_wall_ms", "loop_cpu_ms", "loop_samples",
                   "udp_sockets", "udp_drops_total", "udp_drops_delta", "udp_rmem_bytes", "udp_rcvbuf_bytes",
-                  "dropped_display", "decoder_errors"):
+                  "dropped_display", "pending_replaced_frames", "decoder_errors"):
         value = payload.get(key)
         if type(value) in (float, int) and 0 <= value <= 1e9:
           fields.append(f"{key}={value:.2f}")
