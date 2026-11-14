@@ -13,7 +13,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.layouts import HBoxLayout
 from openpilot.system.ui.widgets.icon_widget import IconWidget
 from openpilot.system.ui.widgets.label import UnifiedLabel, gui_label
-from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, TextAlignment, TextAlignmentVertical
+from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, TextAlignment, TextAlignmentVertical, DEFAULT_TEXT_COLOR
 from openpilot.selfdrive.ui.ui_state import ui_state, ChestnutState
 from openpilot.common.version import RELEASE_BRANCHES
 
@@ -30,6 +30,13 @@ from openpilot.system.ui.widgets.network import WifiManagerUI, WifiManager
 HEAD_BUTTON_FONT_SIZE = 40
 HOME_PADDING = 8
 ALERTS_ZONE_WIDTH = 180
+
+# wake animation: (start, duration, slide distance) in seconds and px
+WAKE_TITLE = (0.0, 0.8, 44)
+WAKE_VERSION = (0.2, 0.8, 22)
+WAKE_ICONS_START = 0.7
+WAKE_ICON_STAGGER = 0.1
+WAKE_ICON_DURATION = 0.5
 
 NetworkType = log.DeviceState.NetworkType
 
@@ -203,6 +210,23 @@ class MiciHomeLayout(Widget):
     else:
       serial = "unknown"
     self._hostname = f"comma-{serial}"
+
+    self._wake_pending = True  # greet on boot
+    self._wake_start: float | None = None
+
+  def play_wake_animation(self):
+    self._wake_pending = True
+
+  def _wake_progress(self, start: float, duration: float) -> float:
+    if self._wake_start is None:
+      return 1.0
+    return min(max((rl.get_time() - self._wake_start - start) / duration, 0.0), 1.0)
+
+  @staticmethod
+  def _fade_in(rect: rl.Rectangle, progress: float):
+    # background is black, so fading in is drawing black over it
+    if progress < 1.0:
+      rl.draw_rectangle_rec(rect, rl.Color(0, 0, 0, int(255 * (1.0 - progress))))
 
   def _is_network_connected(self) -> bool:
     try:
@@ -464,8 +488,17 @@ class MiciHomeLayout(Widget):
       text_y += font_size + 2
 
   def _render(self, _):
+    # start once home is actually on screen, e.g. after swiping past boot alerts
+    if self._wake_pending and abs(self.rect.x) < self.rect.width / 2:
+      self._wake_pending = False
+      self._wake_start = rl.get_time()
+
+    # TODO: why is there extra space here to get it to be flush?
     text_pos = rl.Vector2(self.rect.x - 2 + HOME_PADDING, self.rect.y - 16)
-    self._openpilot_label.set_position(text_pos.x, text_pos.y)
+    title_progress = self._wake_progress(*WAKE_TITLE[:2])
+    title_y = text_pos.y + WAKE_TITLE[2] * (1.0 - title_progress) ** 3
+    self._openpilot_label.set_position(text_pos.x, title_y)
+    self._openpilot_label.set_text_color(colors_alpha(DEFAULT_TEXT_COLOR, int(DEFAULT_TEXT_COLOR.a * title_progress)))
     self._openpilot_label.render()
 
     openpilot_font = gui_app.font(FontWeight.DISPLAY)
@@ -474,24 +507,32 @@ class MiciHomeLayout(Widget):
 
     if self._version_text is not None:
       release_branch = self._version_text[1] in RELEASE_BRANCHES
+      version_progress = self._wake_progress(*WAKE_VERSION[:2])
+      version_offset = WAKE_VERSION[2] * (1.0 - version_progress) ** 3
+      version_alpha = int(255 * version_progress)
+
       branch_name = "release" if release_branch else self._version_text[1]
 
       font_size = 30
       version_text = f"v{self._version_text[0]}"
-      rl.draw_text_ex(self._font_semi_bold, version_text, rl.Vector2(openpilot_end_x + 12, text_pos.y + 32), font_size + 8, 0, rl.WHITE)
+      rl.draw_text_ex(self._font_semi_bold, version_text, rl.Vector2(openpilot_end_x + 12, title_y + 32),
+                      font_size + 8, 0, colors_alpha(rl.WHITE, int(255 * title_progress)))
 
       line2_text = f"{self._version_text[3]}   {branch_name}"
       line2_size = measure_text_cached(self._font_semi_bold, line2_text, font_size)
-      line2_y = text_pos.y + openpilot_text_size.y + 5
-      rl.draw_text_ex(self._font_semi_bold, line2_text, rl.Vector2(text_pos.x + 8, line2_y), font_size, 0, Colors.GRAY)
+      line2_y = text_pos.y + openpilot_text_size.y + 5 + version_offset
+      rl.draw_text_ex(self._font_semi_bold, line2_text, rl.Vector2(text_pos.x + 8, line2_y),
+                      font_size, 0, colors_alpha(Colors.GRAY, version_alpha))
 
       line3_y = line2_y + line2_size.y + 5
       ip_color = Colors.LIME if self._ip_address != "Offline" else Colors.GRAY
-      rl.draw_text_ex(self._font_semi_bold, self._ip_address, rl.Vector2(text_pos.x + 8, line3_y), font_size, 0, ip_color)
+      rl.draw_text_ex(self._font_semi_bold, self._ip_address, rl.Vector2(text_pos.x + 8, line3_y),
+                      font_size, 0, colors_alpha(ip_color, version_alpha))
 
       ip_size = measure_text_cached(self._font_semi_bold, self._ip_address, font_size)
       hostname_text = f" [{self._hostname}]"
-      rl.draw_text_ex(self._font_semi_bold, hostname_text, rl.Vector2(text_pos.x + 8 + ip_size.x, line3_y), font_size, 0, rl.WHITE)
+      rl.draw_text_ex(self._font_semi_bold, hostname_text, rl.Vector2(text_pos.x + 8 + ip_size.x, line3_y),
+                      font_size, 0, colors_alpha(rl.WHITE, version_alpha))
 
     # ***** Center-aligned bottom section icons *****
     usb_connected = ui_state.usb_connected
@@ -517,3 +558,11 @@ class MiciHomeLayout(Widget):
 
     self._alerts_pill.set_position(pill_x, pill_y)
     self._alerts_pill.render()
+
+    # status icons and the update button fade in one after another, alerts pill last
+    if self._wake_start is not None:
+      icons = [w.rect for w in self._status_bar_layout.widgets if w.is_visible] + [self._commit_btn_rect, self._alerts_pill.rect]
+      for i, rect in enumerate(icons):
+        self._fade_in(rect, self._wake_progress(WAKE_ICONS_START + i * WAKE_ICON_STAGGER, WAKE_ICON_DURATION))
+      if self._wake_progress(WAKE_ICONS_START + len(icons) * WAKE_ICON_STAGGER, WAKE_ICON_DURATION) >= 1.0:
+        self._wake_start = None

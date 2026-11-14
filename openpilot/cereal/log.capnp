@@ -854,7 +854,8 @@ struct SelfdriveState {
     refuse @3;
 
     warningSoft @4;
-    warningImmediate @5;
+    warningImmediateSystem @5;
+    warningImmediateUser @11;
 
     prompt @6;
     promptRepeat @7;
@@ -863,7 +864,7 @@ struct SelfdriveState {
     preAlert @9;
     complete @10;
 
-    ready @11;
+    ready @15;
     ding @12;
     dong @13;
     beep @14;

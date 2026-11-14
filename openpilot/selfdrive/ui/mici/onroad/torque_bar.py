@@ -7,17 +7,15 @@ import numpy as np
 import raylib_nb as rl
 from opendbc.car import ACCELERATION_DUE_TO_GRAVITY
 from openpilot.selfdrive.ui.mici.onroad import blend_colors
+from openpilot.selfdrive.ui.mici.onroad.status import status_fade
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.polygon import draw_polygon, Gradient
 from openpilot.system.ui.widgets import Widget
 from openpilot.common.filter_simple import FirstOrderFilter
 
-from openpilot.selfdrive.ui import Colors
-
-
 # TODO: arc_bar_pts doesn't consider rounded end caps part of the angle span
-TORQUE_ANGLE_SPAN = 12.7
+TORQUE_ANGLE_SPAN = 12.7  # degrees on the default 476 px camera view; narrower views beside the navigation panel scale down
 
 DEBUG = False
 
@@ -63,7 +61,7 @@ def arc_bar_pts(r_mid: float, thickness: float,
 
     mx, my = nx * r_mid, ny * r_mid  # mid-point at a1
     if DEBUG:
-      rl.draw_circle(int(mx), int(my), 4, Colors.PURPLE)
+      rl.draw_circle(int(mx), int(my), 4, rl.PURPLE)
 
     ex = mx + nx * (half - cap_radius)
     ey = my + ny * (half - cap_radius)
@@ -155,6 +153,10 @@ class TorqueBar(Widget):
     super().__init__()
     self._torque_filter = FirstOrderFilter(0, 0.1, 1 / gui_app.target_fps)
     self._torque_line_alpha_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
+    self._hidden = False
+
+  def set_hidden(self, hidden: bool):
+    self._hidden = hidden
 
   def _update_state(self):
     # torque line
@@ -175,12 +177,10 @@ class TorqueBar(Widget):
       lateral_acceleration = actual_lateral_accel - roll_compensation
       max_lateral_acceleration = ui_state.CP.maxLateralAccel if ui_state.CP else DEFAULT_MAX_LAT_ACCEL
 
-      if not car_control.latActive:
-        self._torque_filter.update(0.0)
-      else:
-        self._torque_filter.update(np.clip((lateral_acceleration + accel_diff) / max_lateral_acceleration, -1, 1))
+      torque = (lateral_acceleration + accel_diff) / max_lateral_acceleration if car_control.latActive else 0.0
     else:
-      self._torque_filter.update(-ui_state.sm['carOutput'].actuatorsOutput.torque)
+      torque = -ui_state.sm['carOutput'].actuatorsOutput.torque
+    self._torque_filter.update(float(np.clip(np.nan_to_num(torque), -1, 1)))
 
   def _render(self, rect: rl.Rectangle) -> None:
     # adjust y pos with torque
@@ -188,12 +188,12 @@ class TorqueBar(Widget):
     torque_line_height = np.interp(abs(self._torque_filter.x), [0.5, 1], [14, 56])
 
     # animate alpha and angle span
-    self._torque_line_alpha_filter.update(ui_state.status != UIStatus.DISENGAGED)
+    self._torque_line_alpha_filter.update(ui_state.status != UIStatus.DISENGAGED and not self._hidden)
+    engaged = status_fade.weight(UIStatus.ENGAGED)
 
-    torque_line_bg_alpha = np.interp(abs(self._torque_filter.x), [0.5, 1.0], [0.25, 0.5])
+    # dimmer while not engaged
+    torque_line_bg_alpha = 0.15 + (np.interp(abs(self._torque_filter.x), [0.5, 1.0], [0.25, 0.5]) - 0.15) * engaged
     torque_line_bg_color = rl.Color(255, 255, 255, int(255 * torque_line_bg_alpha * self._torque_line_alpha_filter.x))
-    if ui_state.status != UIStatus.ENGAGED:
-      torque_line_bg_color = rl.Color(255, 255, 255, int(255 * 0.15 * self._torque_line_alpha_filter.x))
 
     # draw curved line polygon torque bar
     torque_line_radius = 1200
@@ -204,7 +204,7 @@ class TorqueBar(Widget):
     # centerline radius & center (you already have these values)
     mid_r = torque_line_radius + torque_line_height / 2
 
-    cx = rect.x + rect.width / 2 + 8  # offset 8px to right of camera feed
+    cx = rect.x + rect.width / 2
     cy = rect.y + rect.height + torque_line_radius - torque_line_offset
     offset = np.array([cx, cy], dtype=np.float32)
 
@@ -218,11 +218,11 @@ class TorqueBar(Widget):
     sl_pts = arc_bar_pts(mid_r, torque_line_height, a0s, a1s) + offset
 
     # draw beautiful gradient from center to 65% of the bg torque bar width
-    start_grad_pt = cx / rect.width
+    start_grad_pt = (cx - rect.x) / rect.width
     if self._torque_filter.x < 0:
-      end_grad_pt = (cx * (1 - 0.65) + (min(bg_pts[:, 0]) * 0.65)) / rect.width
+      end_grad_pt = (cx * (1 - 0.65) + (min(bg_pts[:, 0]) * 0.65) - rect.x) / rect.width
     else:
-      end_grad_pt = (cx * (1 - 0.65) + (max(bg_pts[:, 0]) * 0.65)) / rect.width
+      end_grad_pt = (cx * (1 - 0.65) + (max(bg_pts[:, 0]) * 0.65) - rect.x) / rect.width
 
     # fade to orange as we approach max torque
     start_color = blend_colors(
@@ -236,8 +236,8 @@ class TorqueBar(Widget):
       max(0, abs(self._torque_filter.x) - 0.75) * 4,
     )
 
-    if ui_state.status != UIStatus.ENGAGED:
-      start_color = end_color = rl.Color(255, 255, 255, int(255 * 0.35 * self._torque_line_alpha_filter.x))
+    dimmed = rl.Color(255, 255, 255, int(255 * 0.35 * self._torque_line_alpha_filter.x))
+    start_color, end_color = blend_colors(dimmed, start_color, engaged), blend_colors(dimmed, end_color, engaged)
 
     gradient = Gradient(
       start=(start_grad_pt, 0),

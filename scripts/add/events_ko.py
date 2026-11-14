@@ -172,6 +172,7 @@ class UserSoftDisableAlert(SoftDisableAlert):
   def __init__(self, alert_text_2: str):
     super().__init__(alert_text_2),
     self.alert_text_1 = "오픈파일럿이 해제됩니다"
+    self.audible_alert = AudibleAlert.warningImmediateUser
 
 
 class ImmediateDisableAlert(Alert):
@@ -179,7 +180,14 @@ class ImmediateDisableAlert(Alert):
     super().__init__("핸들을 즉시 잡아주세요", alert_text_2,
                      AlertStatus.critical, AlertSize.full,
                      Priority.HIGHEST, VisualAlert.steerRequired,
-                     AudibleAlert.warningImmediate, 4.),
+                     AudibleAlert.warningImmediateSystem, 4.),
+
+
+# user-triggered ImmediateDisable, plays the driver sound
+class UserImmediateDisableAlert(ImmediateDisableAlert):
+  def __init__(self, alert_text_2: str):
+    super().__init__(alert_text_2)
+    self.audible_alert = AudibleAlert.warningImmediateUser
 
 
 class EngagementAlert(Alert):
@@ -231,7 +239,7 @@ def soft_disable_alert(alert_text_2: str) -> AlertCallbackType:
 def user_soft_disable_alert(alert_text_2: str) -> AlertCallbackType:
   def func(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
     if soft_disable_time < int(0.5 / DT_CTRL):
-      return ImmediateDisableAlert(alert_text_2)
+      return UserImmediateDisableAlert(alert_text_2)
     return UserSoftDisableAlert(alert_text_2)
   return func
 
@@ -586,7 +594,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       "조향제어가 해제됩니다",
       "운전자 주의 필요",
       AlertStatus.critical, AlertSize.full,
-      Priority.HIGH, VisualAlert.steerRequired, AudibleAlert.warningImmediate, .1),
+      Priority.HIGH, VisualAlert.steerRequired, AudibleAlert.warningImmediateUser, .1),
   },
 
   EventName.driverUnresponsive1: {
@@ -610,7 +618,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       "조향제어가 해제됩니다",
       "운전자 응답없음",
       AlertStatus.critical, AlertSize.full,
-      Priority.HIGH, VisualAlert.steerRequired, AudibleAlert.warningImmediate, .1),
+      Priority.HIGH, VisualAlert.steerRequired, AudibleAlert.warningImmediateUser, .1),
   },
 
   EventName.manualRestart: {
@@ -895,7 +903,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       "",
       AlertStatus.normal, AlertSize.full,
       Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .2, creation_delay=0.5),
-},
+  },
 
   EventName.espDisabled: {
     ET.SOFT_DISABLE: soft_disable_alert("ESC 해제됨"),
@@ -1165,6 +1173,7 @@ if HARDWARE.get_device_type() == 'mici':
       ET.USER_DISABLE: SoftDisableAlert("기어가 후진 상태입니다"),
       ET.NO_ENTRY: NoEntryAlert("기어가 후진 상태입니다"),
     },
+    EventName.personalityChanged: {},
   })
 
 
