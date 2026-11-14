@@ -124,8 +124,6 @@ class HudRenderer(Widget):
     self._wheel_alpha_filter = FirstOrderFilter(0, 0.05, 1 / gui_app.target_fps)
     self._wheel_critical_filter = FirstOrderFilter(0, STATUS_FADE_RC, 1 / gui_app.target_fps)
 
-    self._wheel_y_filter = FirstOrderFilter(0, 0.1, 1 / gui_app.target_fps)
-
     self._set_speed_alpha_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
     self._chestnut_alpha_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
 

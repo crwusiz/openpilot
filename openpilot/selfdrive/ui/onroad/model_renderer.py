@@ -4,15 +4,15 @@ import raylib_nb as rl
 from openpilot.cereal import log, messaging
 from opendbc.car.structs import car
 from dataclasses import dataclass, field
-from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params
-from openpilot.selfdrive.controls.radard import RADAR_TO_CAMERA
 from openpilot.selfdrive.locationd.calibrationd import HEIGHT_INIT
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
-from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.polygon import draw_polygon, Gradient
 from openpilot.system.ui.widgets import Widget
 
+from openpilot.common.filter_simple import FirstOrderFilter
+from openpilot.selfdrive.controls.radard import RADAR_TO_CAMERA
+from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.selfdrive.ui import Colors, colors_alpha
 
@@ -29,6 +29,7 @@ STOCK_PATH_GRADIENT = Gradient(
   colors=[rl.Color(13, 248, 122, 102), rl.Color(114, 255, 92, 89), rl.Color(114, 255, 92, 0)],
   stops=[0.0, 0.5, 1.0],
 )
+
 
 @dataclass
 class ModelPoints:

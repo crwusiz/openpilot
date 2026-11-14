@@ -15,8 +15,6 @@ from openpilot.common.hardware import HARDWARE
 from openpilot.system.manager.helpers import unblock_stdout, save_bootlog
 from openpilot.system.manager.process import ensure_running
 from openpilot.system.manager.process_config import managed_processes
-from openpilot.system.manager.modeld_recovery import ChestnutModeldRecovery
-from openpilot.selfdrive.modeld.helpers import chestnut_compiled
 from openpilot.system.athena.registration import register, UNREGISTERED_DONGLE_ID
 from openpilot.common.swaglog import cloudlog, add_file_handler
 from openpilot.common.version import get_build_metadata
@@ -24,6 +22,8 @@ from openpilot.common.hardware.hw import Paths
 
 from openpilot.common.log_paths import clear_log_files
 from openpilot.system.crash import UPLOAD_RETRY_INTERVAL, capture_exception, start_upload
+from openpilot.system.manager.modeld_recovery import ChestnutModeldRecovery
+from openpilot.selfdrive.modeld.helpers import chestnut_compiled
 
 def manager_init() -> None:
   clear_log_files()

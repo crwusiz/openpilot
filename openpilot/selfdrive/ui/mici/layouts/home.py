@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import datetime
 import math
-import re
-from functools import partial
-from queue import SimpleQueue
 
 from openpilot.cereal import log
 import raylib_nb as rl
@@ -20,7 +17,10 @@ from openpilot.common.version import RELEASE_BRANCHES
 import time
 import subprocess
 import threading
+import re
 from pathlib import Path
+from queue import SimpleQueue
+from functools import partial
 from dataclasses import dataclass
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui import Colors, colors_alpha
@@ -155,12 +155,10 @@ class MiciHomeLayout(Widget):
     self._on_alerts_click: Callable | None = None
     self._alert_count_callback: Callable[[], int] | None = None
 
-    self._last_refresh = 0
-
     self._version_text = self._get_version_text()
 
+    self._last_refresh = 0
     self._ip_address = "Offline"
-
     self.wifi_manager = WifiManager()
     self.wifi_manager_ui = WifiManagerUI(self.wifi_manager)
 

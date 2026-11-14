@@ -1,15 +1,18 @@
-from dataclasses import dataclass
 import numpy as np
 import raylib_nb as rl
 from openpilot.cereal import log
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.controls.radard import RADAR_TO_CAMERA
 from openpilot.selfdrive.locationd.calibrationd import HEIGHT_INIT
-from openpilot.selfdrive.ui import Colors, colors_alpha
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
+from openpilot.selfdrive.ui.mici.onroad import blend_colors
+from openpilot.selfdrive.ui.mici.onroad.status import status_fade
 from openpilot.selfdrive.ui.onroad.model_renderer import ModelRenderer as BaseModelRenderer, CLIP_MARGIN, MAX_DRAW_DISTANCE, STOCK_PATH_GRADIENT
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.polygon import draw_polygon
+
+from dataclasses import dataclass
+from openpilot.selfdrive.ui import Colors, colors_alpha
 
 LEAD_BAR_LENGTH = 12.0  # px
 LEAD_BAR_WIDTH = 1.8  # m
@@ -55,6 +58,7 @@ class ModelRenderer(BaseModelRenderer):
       rect.x - CLIP_MARGIN, rect.y - CLIP_MARGIN, rect.width + 2 * CLIP_MARGIN, rect.height + 2 * CLIP_MARGIN
     )
 
+    # Update state
     extrinsics_calibration = sm['extrinsicsCalibration']
     self._path_offset_z = extrinsics_calibration.height[0] if extrinsics_calibration.height else HEIGHT_INIT[0]
 
@@ -142,23 +146,22 @@ class ModelRenderer(BaseModelRenderer):
     return bar.astype(np.float32)
 
   def _draw_lane_lines(self):
-    """Draw lane lines and road edges using the default renderer colors."""
+    """Draw lane lines and road edges. Two closest lines should be green (lane line or road edges)."""
     offset = self._draw_offset()
 
     for i, lane_line in enumerate(self._lane_lines):
       if lane_line.projected_points.size == 0:
         continue
 
-      alpha = np.clip(self._lane_line_probs[i], 0.0, 0.7)
-      color = colors_alpha(rl.WHITE, int(alpha * 255))
+      color = self._get_ll_color(float(self._lane_line_probs[i]), i in (1, 2), i in (0, 1))
       draw_polygon(self._rect, lane_line.projected_points + offset, color)
 
     for i, road_edge in enumerate(self._road_edges):
       if road_edge.projected_points.size == 0:
         continue
 
-      alpha = np.clip(1.0 - self._road_edge_stds[i], 0.0, 1.0)
-      color = colors_alpha(Colors.RED, int(alpha * 255))
+      # if closest lane lines are not confident, make road edges green
+      color = self._get_ll_color(float(1.0 - self._road_edge_stds[i]), float(self._lane_line_probs[i + 1]) < 0.25, i == 0)
       draw_polygon(self._rect, road_edge.projected_points + offset, color)
 
   def _draw_path(self):
