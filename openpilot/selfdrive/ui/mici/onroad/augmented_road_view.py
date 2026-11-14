@@ -264,9 +264,9 @@ class AugmentedRoadView(CameraView):
     self._alert_renderer.render(self._content_rect)
     self._hud_renderer.render(self._content_rect)
 
-    if not show_navigation:
-      self._confidence_ball.set_hidden(alert_to_render is not None and not not_animating_out)
-      self._confidence_ball.render(self._content_rect)
+    #if not show_navigation:
+    #  self._confidence_ball.set_hidden(alert_to_render is not None and not not_animating_out)
+    #  self._confidence_ball.render(self._content_rect)
 
     # Draw fake rounded border
     rl.draw_rectangle_rounded_lines_ex(self._content_rect, 0.2 * 1.02, 10, 50, rl.BLACK)
