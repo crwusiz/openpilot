@@ -86,6 +86,7 @@ class HudRenderer(Widget):
     self.speed: float = 0.0
     self.v_ego_cluster_seen: bool = False
     self._engaged: bool = False
+    self._chestnut_fade_time: float = 0
 
     self.cruise_speed: float = 0.0
     self.apply_speed: float = 0.0
@@ -116,15 +117,16 @@ class HudRenderer(Widget):
     self._txt_chestnut: rl.Texture = gui_app.texture('icons_mici/chestnut.png', 48, 35)
     self._txt_chestnut_green: rl.Texture = gui_app.texture('icons_mici/chestnut_green.png', 48, 35)
     self._txt_chestnut_orange: rl.Texture = gui_app.texture('icons_mici/chestnut_orange.png', 60, 35)
+    self._chestnut_icon: rl.Texture | None = None
 
     self._txt_traffic_off = gui_app.texture("icons/traffic_off.png", 77, 154)
     self._txt_traffic_green = gui_app.texture("icons/traffic_green.png", 77, 154)
     self._txt_traffic_red = gui_app.texture("icons/traffic_red.png", 77, 154)
 
-    self._wheel_alpha_filter = FirstOrderFilter(0, 0.05, 1 / gui_app.target_fps)
     self._wheel_critical_filter = FirstOrderFilter(0, STATUS_FADE_RC, 1 / gui_app.target_fps)
 
     self._set_speed_alpha_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
+    self._set_speed_alpha = 0.0
     self._chestnut_alpha_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
 
   def set_wheel_critical_icon(self, critical: bool):
@@ -140,7 +142,7 @@ class HudRenderer(Widget):
 
   def drawing_top_icons(self) -> bool:
     # whether we're drawing any top icons currently
-    return bool(self._set_speed_alpha_filter.x > 1e-2)
+    return bool(self._set_speed_alpha > 1e-2)
 
   def _update_state(self) -> None:
     """Update HUD state based on car state and controls state."""
@@ -163,15 +165,13 @@ class HudRenderer(Widget):
     engaged = sm['selfdriveState'].enabled
     if (set_speed != self.set_speed and engaged) or (engaged and not self._engaged):
       self._set_speed_changed_time = rl.get_time()
+    if engaged != self._engaged:
+      self._chestnut_fade_time = rl.get_time() if engaged else 0
     self._engaged = engaged
     self.set_speed = set_speed
+    self.cruise_speed = set_speed
     self.is_cruise_set = 0 < self.set_speed < SET_SPEED_NA
     self.is_cruise_available = self.set_speed != -1
-
-    if self.is_cruise_set and not ui_state.is_metric:
-      self.set_speed *= KM_TO_MILE
-      self.cruise_speed *= KM_TO_MILE
-      self.apply_speed *= KM_TO_MILE
 
     # Update Current Speed
     v_ego_cluster = car_state.vEgoCluster
@@ -245,9 +245,9 @@ class HudRenderer(Widget):
 
     self._draw_current_speed(rect)
     self._draw_borders(rect)
+    self._draw_set_speed(rect)
 
     if not ui_state.cluster_enabled:
-      self._draw_set_speed(rect)
       self._draw_traffic_light(rect)
       self._draw_steering_wheel(rect)
     self._draw_ignore_limit_timer(rect)
@@ -270,20 +270,21 @@ class HudRenderer(Widget):
       icon = self._txt_chestnut_green
       opacity = 1.0
     else:
+      self._chestnut_alpha_filter.update(False)
+      self._chestnut_icon = None
       return
 
-    alpha = self._chestnut_alpha_filter.update(self._get_wheel_opacity())
+    if icon is not self._chestnut_icon:
+      self._chestnut_fade_time = rl.get_time()
+      self._chestnut_icon = icon
+    visible = loading or rl.get_time() - self._chestnut_fade_time < SET_SPEED_PERSISTENCE
+    alpha = self._chestnut_alpha_filter.update(visible)
     if alpha < 1e-2:
       return
 
     pos = rl.Vector2(rect.x + rect.width - RIGHT_ICON_CENTER_OFFSET - icon.width / 2,
                      rect.y + rect.height - 14 - (self._txt_wheel.height + icon.height) / 2 + (1 - alpha) * icon.height / 2)
     rl.draw_texture_ex(icon, pos, 0.0, 1.0, rl.Color(255, 255, 255, int(255 * opacity * alpha)))
-
-  def _get_wheel_opacity(self) -> float:
-    if self._show_wheel_critical or ui_state.status == UIStatus.BLINKER:
-      return 1.0
-    return 0.5 if ui_state.status == UIStatus.DISENGAGED else 0.9
 
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
     # The wheel is the source of truth for engagement: green if and only if openpilot is engaged.
@@ -295,17 +296,12 @@ class HudRenderer(Widget):
     glow = engaged + (1 - engaged) * critical
     wheel_txt = self._txt_wheel
 
-    if self._show_wheel_critical or ui_state.status != UIStatus.DISENGAGED:
-      self._wheel_alpha_filter.update(255)
-    else:
-      self._wheel_alpha_filter.update(255 * DIMMED_ICON_ALPHA)
-
     # pos
     pos_x = int(rect.x + rect.width / 2)
     pos_y = int(rect.y + rect.height - 10 - wheel_txt.height / 2)
-    rotation = -ui_state.sm['carState'].steeringAngleDeg
+    rotation = -ui_state.sm['carState'].steeringAngleDeg if ui_state.started else 0.0
 
-    alpha = self._wheel_alpha_filter.x
+    alpha = 255 * (1 - (1 - DIMMED_ICON_ALPHA) * status_fade.weight(UIStatus.DISENGAGED) * (1 - critical))
     origin = rl.Vector2(self._txt_wheel_glow.width / 2, self._txt_wheel_glow.height / 2)
     rl.draw_texture_pro(self._txt_wheel_glow, rl.Rectangle(0, 0, self._txt_wheel_glow.width, self._txt_wheel_glow.height),
                         rl.Rectangle(pos_x, pos_y, self._txt_wheel_glow.width, self._txt_wheel_glow.height), origin, rotation,
@@ -394,7 +390,11 @@ class HudRenderer(Widget):
 
   def _draw_set_speed(self, rect: rl.Rectangle) -> None:
     """Draw the MAX and SET speed indicator boxes on the left side."""
-    if not self._can_draw_top_icons or ui_state.status == UIStatus.DISENGAGED:
+    visible = (0 < rl.get_time() - self._set_speed_changed_time < SET_SPEED_PERSISTENCE and
+               self._can_draw_top_icons and self.is_cruise_set and not ui_state.cluster_enabled)
+    alpha = self._set_speed_alpha_filter.update(visible)
+    alpha = self._set_speed_alpha = 0.0 if ui_state.cluster_enabled else alpha * (1 - status_fade.weight(UIStatus.DISENGAGED))
+    if alpha < 1e-2:
       return
 
     max_color = colors_alpha(rl.WHITE, 200)
@@ -407,13 +407,20 @@ class HudRenderer(Widget):
       elif ui_state.status == UIStatus.OVERRIDE:
         max_color = Colors.OVERRIDE
 
+    max_color = colors_alpha(max_color, round(max_color.a * alpha))
+    speed_color = colors_alpha(speed_color, round(speed_color.a * alpha))
+    cruise_speed, apply_speed = self.cruise_speed, self.apply_speed
+    if not ui_state.is_metric:
+      cruise_speed *= KM_TO_MILE
+      apply_speed *= KM_TO_MILE
+
     # Max speed box
     max_speed_box_bg = left_column_rect(rect, 0)
-    rl.draw_rectangle_rounded(max_speed_box_bg, 0.2, 10, colors_alpha(rl.BLACK, 100))
+    rl.draw_rectangle_rounded(max_speed_box_bg, 0.2, 10, colors_alpha(rl.BLACK, round(100 * alpha)))
 
     max_speed_box = rl.Rectangle(max_speed_box_bg.x + 2, max_speed_box_bg.y + 2,
                                  max_speed_box_bg.width - 4, max_speed_box_bg.height - 4)
-    rl.draw_rectangle_rounded_lines_ex(max_speed_box, 0.2, 10, 1, colors_alpha(rl.WHITE, 200))
+    rl.draw_rectangle_rounded_lines_ex(max_speed_box, 0.2, 10, 1, colors_alpha(rl.WHITE, round(200 * alpha)))
 
     # MAX text
     self._draw_text(
@@ -425,7 +432,7 @@ class HudRenderer(Widget):
     )
 
     # MAX speed value
-    max_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(self.cruise_speed))
+    max_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(cruise_speed))
     self._draw_text(
       max_speed_box.x + max_speed_box.width / 2,
       max_speed_box.y + 32,
@@ -437,11 +444,11 @@ class HudRenderer(Widget):
     # SET speed box with background (only if NDA or stock limit is active)
     if self.nda_state > 0 or self.stock_limit_speed > 0:
       set_speed_box_bg = left_column_rect(rect, 1)
-      rl.draw_rectangle_rounded(set_speed_box_bg, 0.2, 10, colors_alpha(rl.BLACK, 100))
+      rl.draw_rectangle_rounded(set_speed_box_bg, 0.2, 10, colors_alpha(rl.BLACK, round(100 * alpha)))
 
       set_speed_box = rl.Rectangle(set_speed_box_bg.x + 2, set_speed_box_bg.y + 2,
                                    set_speed_box_bg.width - 4, set_speed_box_bg.height - 4)
-      rl.draw_rectangle_rounded_lines_ex(set_speed_box, 0.2, 10, 1, colors_alpha(rl.WHITE, 200))
+      rl.draw_rectangle_rounded_lines_ex(set_speed_box, 0.2, 10, 1, colors_alpha(rl.WHITE, round(200 * alpha)))
 
       # SET text
       self._draw_text(
@@ -453,7 +460,7 @@ class HudRenderer(Widget):
       )
 
       # SET speed value
-      set_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(self.apply_speed))
+      set_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(apply_speed))
       self._draw_text(
         set_speed_box.x + set_speed_box.width / 2,
         set_speed_box.y + 32,
