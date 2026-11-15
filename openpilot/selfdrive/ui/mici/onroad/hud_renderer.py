@@ -291,7 +291,7 @@ class HudRenderer(Widget):
     critical = self._wheel_critical_filter.update(self._show_wheel_critical)
     idle_color = lerp_color(WHEEL_WHITE, WHEEL_ORANGE, critical)
     wheel_color = status_fade.color({UIStatus.ENGAGED: WHEEL_GREEN, UIStatus.OVERRIDE: idle_color, UIStatus.DISENGAGED: idle_color})
-    engaged = status_fade.weight(UIStatus.ENGAGED)
+    engaged = status_fade.weight(UIStatus.ENGAGED) + status_fade.weight(UIStatus.ACTIVE)
     glow = engaged + (1 - engaged) * critical
     wheel_txt = self._txt_wheel
 

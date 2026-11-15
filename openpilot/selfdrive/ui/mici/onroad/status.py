@@ -47,7 +47,11 @@ class StatusFade:
     return float(self._update()[STATUSES.index(status)])
 
   def color(self, colors: dict[UIStatus, rl.Color]) -> rl.Color:
-    rgba = sum(w * np.array([c.r, c.g, c.b, c.a], dtype=float) for w, c in zip(self._update(), (colors[s] for s in STATUSES), strict=True))
+    # Widgets can supply the base palette without defining every extended UI status.
+    palette = dict.fromkeys(STATUSES, colors[UIStatus.DISENGAGED])
+    palette[UIStatus.ACTIVE] = colors[UIStatus.ENGAGED]
+    palette.update(colors)
+    rgba = sum(w * np.array([c.r, c.g, c.b, c.a], dtype=float) for w, c in zip(self._update(), (palette[s] for s in STATUSES), strict=True))
     return rl.Color(*np.round(rgba).astype(int).tolist())
 
 

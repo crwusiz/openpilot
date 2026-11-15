@@ -189,7 +189,7 @@ class TorqueBar(Widget):
 
     # animate alpha and angle span
     self._torque_line_alpha_filter.update(ui_state.status != UIStatus.DISENGAGED and not self._hidden)
-    engaged = status_fade.weight(UIStatus.ENGAGED)
+    engaged = status_fade.weight(UIStatus.ENGAGED) + status_fade.weight(UIStatus.ACTIVE)
 
     # dimmer while not engaged
     torque_line_bg_alpha = 0.15 + (np.interp(abs(self._torque_filter.x), [0.5, 1.0], [0.25, 0.5]) - 0.15) * engaged
