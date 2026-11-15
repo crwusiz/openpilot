@@ -46,15 +46,12 @@ struct can_frame {
 class Panda {
 private:
   std::unique_ptr<PandaSpiHandle> handle;
-  bool can_diagnostics_supported = true;
 
 public:
   Panda(std::string serial);
 
   cereal::PandaState::PandaType hw_type = cereal::PandaState::PandaType::UNKNOWN;
 
-  bool connected();
-  bool comms_healthy();
   std::string hw_serial();
 
   // Static functions
@@ -70,7 +67,6 @@ public:
   void set_ir_pwr(uint16_t ir_pwr);
   std::optional<health_t> get_state();
   std::optional<can_health_t> get_can_state(uint16_t can_number);
-  void log_can_diagnostics();
   void set_loopback(bool loopback);
   std::optional<std::vector<uint8_t>> get_firmware_version();
   bool up_to_date();

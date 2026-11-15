@@ -9,7 +9,6 @@
 #include "openpilot/cereal/messaging/messaging.h"
 #include "common/swaglog.h"
 #include "common/util.h"
-#include "panda/board/can_diagnostics.h"
 
 const bool PANDAD_MAXOUT = getenv("PANDAD_MAXOUT") != nullptr;
 
@@ -19,14 +18,6 @@ Panda::Panda(std::string serial) {
 
   hw_type = get_hw_type();
   can_reset_communications();
-}
-
-bool Panda::connected() {
-  return handle->connected;
-}
-
-bool Panda::comms_healthy() {
-  return handle->comms_healthy;
 }
 
 std::string Panda::hw_serial() {
@@ -92,41 +83,6 @@ std::optional<can_health_t> Panda::get_can_state(uint16_t can_number) {
   can_health_t can_health {0};
   int err = handle->control_read(0xc2, can_number, 0, (unsigned char*)&can_health, sizeof(can_health));
   return err >= 0 ? std::make_optional(can_health) : std::nullopt;
-}
-
-void Panda::log_can_diagnostics() {
-  if (!can_diagnostics_supported) return;
-
-  can_diagnostics_t diagnostics = {};
-  static_assert(sizeof(diagnostics) == USBPACKET_MAX_SIZE);
-  const uint64_t start_ns = nanos_since_boot();
-  int ret = handle->control_read(CAN_DIAGNOSTICS_REQUEST, CAN_DIAGNOSTICS_VERSION, 0,
-                                 reinterpret_cast<unsigned char *>(&diagnostics), sizeof(diagnostics));
-  const uint64_t read_us = (nanos_since_boot() - start_ns) / 1000;
-  if (ret != (int)sizeof(diagnostics)) {
-    // Older firmware has no handler. Probe once, without changing comms health.
-    can_diagnostics_supported = false;
-    LOGW("CAN_DIAG unavailable ret=%d", ret);
-    return;
-  }
-
-  // One bounded log per snapshot, outside the SPI lock and firmware interrupts.
-  // Maxima/counters cover the interval since the preceding diagnostic read.
-  const auto &b0 = diagnostics.bus[0];
-  const auto &b1 = diagnostics.bus[1];
-  const auto &b2 = diagnostics.bus[2];
-  LOGD("CAN_DIAG v=1 panda_us=%u read_us=%llu "
-       "queued=%u,%u,%u peak=%u,%u,%u wait_max_us=%u,%u,%u "
-       "tx_max_us=%u,%u,%u rx_safety_max_us=%u,%u,%u dropped=%u,%u,%u "
-       "hw_free=%u,%u,%u spi_nacks=%u first_nack_queued=%u,%u,%u spi_write_max_us=%u",
-       diagnostics.time_us, (unsigned long long)read_us,
-       b0.queued, b1.queued, b2.queued, b0.peak, b1.peak, b2.peak,
-       b0.wait_max_us, b1.wait_max_us, b2.wait_max_us,
-       b0.tx_max_us, b1.tx_max_us, b2.tx_max_us,
-       b0.rx_safety_max_us, b1.rx_safety_max_us, b2.rx_safety_max_us,
-       b0.dropped, b1.dropped, b2.dropped, b0.tx_fifo_free, b1.tx_fifo_free, b2.tx_fifo_free,
-       diagnostics.spi_nacks, diagnostics.first_nack_queued[0], diagnostics.first_nack_queued[1], diagnostics.first_nack_queued[2],
-       diagnostics.spi_write_max_us);
 }
 
 void Panda::set_loopback(bool loopback) {
@@ -224,7 +180,7 @@ void Panda::pack_can_buffer(const capnp::List<cereal::CanData>::Reader &can_data
 
 void Panda::can_send(const capnp::List<cereal::CanData>::Reader &can_data_list) {
   pack_can_buffer(can_data_list, [=](uint8_t* data, size_t size) {
-    handle->bulk_write(3, data, size, 5);
+    handle->bulk_write(3, data, size);
   });
 }
 
@@ -233,9 +189,6 @@ bool Panda::can_receive(std::vector<can_frame>& out_vec) {
   assert(receive_buffer_size + RECV_SIZE <= sizeof(receive_buffer));
 
   int recv = handle->bulk_read(0x81, &receive_buffer[receive_buffer_size], RECV_SIZE);
-  if (!comms_healthy()) {
-    return false;
-  }
 
   if (PANDAD_MAXOUT) {
     static uint8_t junk[RECV_SIZE];
