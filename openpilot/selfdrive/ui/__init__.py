@@ -44,7 +44,6 @@ def colors_alpha(color, alpha):
 
 
 class Colors:
-  TRANSPARENT = rl.BLANK
   RED = rl.Color(201, 34, 49, 255)
   ORANGE = rl.Color(255, 149, 0, 255)
   STEERING = rl.Color(0, 191, 255, 255)
@@ -56,7 +55,6 @@ class Colors:
   LIGHT_GRAY = rl.Color(170, 170, 170, 255)
   MEDIUM_GRAY = rl.GRAY
   DARK_RED = rl.Color(139, 0, 0, 255)
-  LIGHT_RED = rl.Color(255, 100, 100, 150)
   LIME = rl.Color(120, 255, 120, 255)
   LIGHT_ORANGE = rl.Color(255, 228, 191, 255)
   AMBER = rl.Color(255, 200, 100, 255)
@@ -137,19 +135,6 @@ class Colors:
     RED=rl.Color(231, 76, 60, 255),
     GRAY=rl.Color(68, 68, 68, 255),
     LIGHT_GRAY=rl.Color(228, 228, 228, 255),
-  )
-
-  ConfidenceBall = SimpleNamespace(
-    ACTIVE_TOP=rl.Color(0, 255, 204, 255),
-    ACTIVE_BOTTOM=rl.Color(0, 255, 38, 255),
-    WARNING_TOP=rl.Color(255, 200, 0, 255),
-    WARNING_BOTTOM=rl.Color(255, 115, 0, 255),
-    CRITICAL_TOP=rl.Color(255, 0, 21, 255),
-    CRITICAL_BOTTOM=rl.Color(255, 0, 89, 255),
-    INACTIVE_TOP=rl.WHITE,
-    INACTIVE_BOTTOM=rl.Color(82, 82, 82, 255),
-    HIDDEN_TOP=rl.Color(50, 50, 50, 255),
-    HIDDEN_BOTTOM=rl.Color(13, 13, 13, 255),
   )
 
   Pairing = SimpleNamespace(

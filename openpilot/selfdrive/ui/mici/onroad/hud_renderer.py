@@ -61,20 +61,20 @@ class HudRenderer(Widget):
 
     self._torque_bar = TorqueBar()
 
-    self._txt_wheel: rl.Texture = gui_app.texture('icons/steer.png', WHEEL_SIZE, WHEEL_SIZE)
+    self._wheel: rl.Texture = gui_app.texture('icons/steer.png', WHEEL_SIZE, WHEEL_SIZE)
+    self._wheel_critical: rl.Texture = gui_app.texture('icons/steer_critical.png', WHEEL_SIZE, WHEEL_SIZE)
+    self._wheel_green: rl.Texture = gui_app.texture('icons/steer_green.png', WHEEL_SIZE, WHEEL_SIZE)
+    self._wheel_blue: rl.Texture = gui_app.texture('icons/steer_blue.png', WHEEL_SIZE, WHEEL_SIZE)
 
-    self._txt_wheel_critical: rl.Texture = gui_app.texture('icons/steer_critical.png', WHEEL_SIZE, WHEEL_SIZE)
-    self._txt_wheel_green: rl.Texture = gui_app.texture('icons/steer_green.png', WHEEL_SIZE, WHEEL_SIZE)
-    self._txt_wheel_blue: rl.Texture = gui_app.texture('icons/steer_blue.png', WHEEL_SIZE, WHEEL_SIZE)
+    self._exclamation_point: rl.Texture = gui_app.texture('icons_mici/exclamation_point.png', 9, 44)
 
-    self._txt_exclamation_point: rl.Texture = gui_app.texture('icons_mici/exclamation_point.png', 9, 44)
-    self._txt_chestnut: rl.Texture = gui_app.texture('icons_mici/chestnut.png', 48, 35)
-    self._txt_chestnut_green: rl.Texture = gui_app.texture('icons_mici/chestnut_green.png', 48, 35)
-    self._txt_chestnut_orange: rl.Texture = gui_app.texture('icons_mici/chestnut_orange.png', 60, 35)
+    self._chestnut: rl.Texture = gui_app.texture('icons_mici/chestnut.png', 48, 35)
+    self._chestnut_green: rl.Texture = gui_app.texture('icons_mici/chestnut_green.png', 48, 35)
+    self._chestnut_orange: rl.Texture = gui_app.texture('icons_mici/chestnut_orange.png', 60, 35)
 
-    self._txt_traffic_off = gui_app.texture("icons/traffic_off.png", 77, 154)
-    self._txt_traffic_green = gui_app.texture("icons/traffic_green.png", 77, 154)
-    self._txt_traffic_red = gui_app.texture("icons/traffic_red.png", 77, 154)
+    self._traffic_off = gui_app.texture("icons/traffic_off.png", 77, 154)
+    self._traffic_green = gui_app.texture("icons/traffic_green.png", 77, 154)
+    self._traffic_red = gui_app.texture("icons/traffic_red.png", 77, 154)
 
     self._wheel_alpha_filter = FirstOrderFilter(0, 0.05, 1 / gui_app.target_fps)
 
@@ -141,12 +141,12 @@ class HudRenderer(Widget):
   def _get_wheel_texture(self) -> rl.Texture:
     """Return the correct wheel texture based on current UI status."""
     if self._show_wheel_critical or ui_state.status == UIStatus.BLINKER:
-      return self._txt_wheel_critical
+      return self._wheel_critical
     elif ui_state.status == UIStatus.STEERING:
-      return self._txt_wheel_blue
+      return self._wheel_blue
     elif ui_state.status in (UIStatus.ENGAGED, UIStatus.ACTIVE):
-      return self._txt_wheel_green
-    return self._txt_wheel
+      return self._wheel_green
+    return self._wheel
 
   def _draw_text(self, x: float, y: float, text: str, font_size: int, text_color: rl.Color, alignment: str = "C") -> None:
     """Helper method for drawing aligned text."""
@@ -204,13 +204,13 @@ class HudRenderer(Widget):
   def _draw_model_source(self, rect: rl.Rectangle) -> None:
     loading = ui_state.chestnut_state == ChestnutState.LOADING
     if loading:
-      icon = self._txt_chestnut
+      icon = self._chestnut
       opacity = 0.35 + 0.65 * (0.5 - 0.5 * math.cos(rl.get_time() * 6.0))
     elif ui_state.chestnut_state in (ChestnutState.UNCOMPILED, ChestnutState.FAILED):
-      icon = self._txt_chestnut_orange
+      icon = self._chestnut_orange
       opacity = 1.0
     elif ui_state.chestnut_state == ChestnutState.ACTIVE:
-      icon = self._txt_chestnut_green
+      icon = self._chestnut_green
       opacity = 1.0
     else:
       self._chestnut_alpha_filter.update(0.0)
@@ -221,7 +221,7 @@ class HudRenderer(Widget):
       return
 
     pos = rl.Vector2(rect.x + rect.width - RIGHT_ICON_CENTER_OFFSET - icon.width / 2,
-                     rect.y + rect.height - 14 - (self._txt_wheel.height + icon.height) / 2 + (1 - alpha) * icon.height / 2)
+                     rect.y + rect.height - 14 - (self._wheel.height + icon.height) / 2 + (1 - alpha) * icon.height / 2)
     rl.draw_texture_ex(icon, pos, 0.0, 1.0, rl.Color(255, 255, 255, int(255 * opacity * alpha)))
 
   def _get_wheel_opacity(self) -> float:
@@ -230,20 +230,20 @@ class HudRenderer(Widget):
     return 0.5 if ui_state.status == UIStatus.DISENGAGED else 0.9
 
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
-    wheel_txt = self._get_wheel_texture()
+    wheel = self._get_wheel_texture()
     alpha = self._wheel_alpha_filter.update(255 * self._get_wheel_opacity())
     wheel_rect = left_column_rect(rect, 2, column=1)
     pos_x = wheel_rect.x + wheel_rect.width / 2
     pos_y = wheel_rect.y + wheel_rect.height / 2
     rotation = -ui_state.sm['carState'].steeringAngleDeg if ui_state.started and ui_state.received_since_started('carState') else 0.0
 
-    rl.draw_texture_pro(wheel_txt, rl.Rectangle(0, 0, wheel_txt.width, wheel_txt.height),
+    rl.draw_texture_pro(wheel, rl.Rectangle(0, 0, wheel.width, wheel.height),
                         rl.Rectangle(pos_x, pos_y, wheel_rect.width, wheel_rect.height),
                         rl.Vector2(wheel_rect.width / 2, wheel_rect.height / 2), rotation, rl.Color(255, 255, 255, int(alpha)))
     if self._show_wheel_critical or ui_state.status == UIStatus.BLINKER:
-      pos = rl.Vector2(pos_x + wheel_rect.width / 2 + 10 - self._txt_exclamation_point.width / 2,
-                       pos_y - self._txt_exclamation_point.height / 2)
-      rl.draw_texture_ex(self._txt_exclamation_point, pos, 0.0, 1.0, rl.WHITE)
+      pos = rl.Vector2(pos_x + wheel_rect.width / 2 + 10 - self._exclamation_point.width / 2,
+                       pos_y - self._exclamation_point.height / 2)
+      rl.draw_texture_ex(self._exclamation_point, pos, 0.0, 1.0, rl.WHITE)
 
   def _draw_borders(self, rect: rl.Rectangle) -> None:
     """Draw borders for blinkers, blind spot, and system status."""
@@ -440,15 +440,15 @@ class HudRenderer(Widget):
     img_y = rect.y + 10
 
     if self.traffic_state == 1:
-      tex = self._txt_traffic_red
+      traffic = self._traffic_red
     elif self.traffic_state == 2:
-      tex = self._txt_traffic_green
+      traffic = self._traffic_green
     else:
-      tex = self._txt_traffic_off
+      traffic = self._traffic_off
 
     rl.draw_texture_pro(
-      tex,
-      rl.Rectangle(0, 0, tex.width, tex.height),
+      traffic,
+      rl.Rectangle(0, 0, traffic.width, traffic.height),
       rl.Rectangle(img_x, img_y, img_w, img_h),
       rl.Vector2(0, 0), 0, rl.WHITE
     )

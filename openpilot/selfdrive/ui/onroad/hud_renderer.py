@@ -339,7 +339,7 @@ class HudRenderer(Widget):
       int(rect.width),
       UIConfig.header_height,
       colors_alpha(rl.BLACK, 114),
-      Colors.TRANSPARENT,
+      rl.BLANK,
     )
 
     if self.is_cruise_available:
@@ -517,26 +517,18 @@ class HudRenderer(Widget):
     traffic_center_y = traffic_y + traffic_h / 2
 
     if self.traffic_state == 1:
-      rl.draw_texture_pro(
-        self.traffic_red_img,
-        rl.Rectangle(0, 0, traffic_w, traffic_h),
-        rl.Rectangle(traffic_x, traffic_y, traffic_w, traffic_h),
-        rl.Vector2(0, 0), 0, rl.WHITE
-      )
+      traffic = self.traffic_red_img
     elif self.traffic_state == 2:
-      rl.draw_texture_pro(
-        self.traffic_green_img,
-        rl.Rectangle(0, 0, traffic_w, traffic_h),
-        rl.Rectangle(traffic_x, traffic_y, traffic_w, traffic_h),
-        rl.Vector2(0, 0), 0, rl.WHITE
-      )
+      traffic = self.traffic_green_img
     else:
-      rl.draw_texture_pro(
-        self.traffic_off_img,
-        rl.Rectangle(0, 0, traffic_w, traffic_h),
-        rl.Rectangle(traffic_x, traffic_y, traffic_w, traffic_h),
-        rl.Vector2(0, 0), 0, rl.WHITE
-      )
+      traffic = self.traffic_off_img
+
+    rl.draw_texture_pro(
+      traffic,
+      rl.Rectangle(0, 0, traffic_w, traffic_h),
+      rl.Rectangle(traffic_x, traffic_y, traffic_w, traffic_h),
+      rl.Vector2(0, 0), 0, rl.WHITE
+    )
 
     # Draw speed limit sign
     if limit_speed > 0:
@@ -587,23 +579,17 @@ class HudRenderer(Widget):
     sign_x = traffic_x + 250
     sign_y = traffic_center_y - sign_h / 2
 
+    road_sign = None
     if self.speed_bump_distance > 0:
-      rl.draw_texture_pro(
-        self.speed_bump_img,
-        rl.Rectangle(0, 0, sign_w, sign_h),
-        rl.Rectangle(sign_x, sign_y, sign_w, sign_h),
-        rl.Vector2(0, 0), 0, rl.WHITE
-      )
+      road_sign = self.speed_bump_img
     elif self.school_zone_active:
-      rl.draw_texture_pro(
-        self.school_zone_img,
-        rl.Rectangle(0, 0, sign_w, sign_h),
-        rl.Rectangle(sign_x, sign_y, sign_w, sign_h),
-        rl.Vector2(0, 0), 0, rl.WHITE
-      )
+      road_sign = self.school_zone_img
     elif self.cam_limit_active:
+      road_sign = self.speed_camera_img
+
+    if road_sign is not None:
       rl.draw_texture_pro(
-        self.speed_camera_img,
+        road_sign,
         rl.Rectangle(0, 0, sign_w, sign_h),
         rl.Rectangle(sign_x, sign_y, sign_w, sign_h),
         rl.Vector2(0, 0), 0, rl.WHITE
