@@ -74,7 +74,8 @@ class DriverStateRenderer(Widget):
     # Load the driver face icon
     self.dm_img = gui_app.texture("icons/driver_face.png", IMG_SIZE, IMG_SIZE)
 
-    self.set_visible(lambda: ui_state.sm["selfdriveState"].alertSize == AlertSize.none)
+    self.set_visible(lambda: (ui_state.sm["selfdriveState"].alertSize == AlertSize.none and
+                              ui_state.received_since_started("driverStateV2")))
 
   def _render(self, rect):
     # Set opacity based on active state

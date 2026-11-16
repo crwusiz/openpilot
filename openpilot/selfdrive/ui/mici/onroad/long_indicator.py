@@ -7,8 +7,6 @@ from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
 
-from openpilot.selfdrive.ui.mici.onroad import RIGHT_ICON_CENTER_OFFSET
-
 HIGHLIGHT_TIME = 2.5  # seconds
 
 
@@ -36,9 +34,8 @@ class LongIndicator(Widget):
     self._should_draw = should_draw
 
   def _render(self, rect: rl.Rectangle) -> None:
-    sm = ui_state.sm
     # offroad shows the disengaged state
-    if not ui_state.has_longitudinal_control or (ui_state.started and sm.recv_frame['selfdriveState'] < ui_state.started_frame):
+    if not ui_state.has_longitudinal_control or (ui_state.started and not ui_state.received_since_started('selfdriveState')):
       self._personality = None
       self._personality_changed_time = -HIGHLIGHT_TIME
       self._alpha_filter.x = 0.0
@@ -64,8 +61,8 @@ class LongIndicator(Widget):
     white_alpha, green_alpha = white_alpha + (0.9 - white_alpha) * disengaged, green_alpha * (1 - disengaged)
 
     white, green = self._txt_lead_car
-    self._draw_centered(white, rect, -20, white_alpha * alpha)
-    self._draw_centered(green, rect, -20, green_alpha * alpha)
+    self._draw_centered(white, rect, 100, white_alpha * alpha)
+    self._draw_centered(green, rect, 100, green_alpha * alpha)
 
   def _draw_distance_bars(self, rect: rl.Rectangle, alpha: float, visible: bool) -> None:
     sm = ui_state.sm
@@ -80,15 +77,13 @@ class LongIndicator(Widget):
     highlight = now - self._personality_changed_time < HIGHLIGHT_TIME
 
     count = personality + 1
-    for i, ((white, green), y, (active_f, green_f)) in enumerate(zip(self._txt_distance, (2, 16, 32), self._distance_filters, strict=True)):
+    for i, ((white, green), y, (active_f, green_f)) in enumerate(zip(self._txt_distance, (122, 136, 152), self._distance_filters, strict=True)):
       active = active_f.update(float(i < count))
       green_alpha = green_f.update(float(highlight and i == count - 1))
       self._draw_centered(white, rect, y, (0.35 * (1 - active) + 0.9 * (active - green_alpha)) * alpha)
       self._draw_centered(green, rect, y, green_alpha * alpha)
 
   @staticmethod
-  def _draw_centered(texture: rl.Texture, rect: rl.Rectangle, y_offset: float, alpha: float) -> None:
-    # Stack the indicator between the traffic light and chestnut status.
-    pos = rl.Vector2(rect.x + rect.width - RIGHT_ICON_CENTER_OFFSET - texture.width / 2,
-                     rect.y + rect.height / 2 + y_offset - texture.height / 2)
+  def _draw_centered(texture: rl.Texture, rect: rl.Rectangle, y: float, alpha: float) -> None:
+    pos = rl.Vector2(rect.x + (rect.width - texture.width) / 2, rect.y + y - texture.height / 2)
     rl.draw_texture_ex(texture, pos, 0.0, 1.0, rl.Color(255, 255, 255, round(255 * alpha)))

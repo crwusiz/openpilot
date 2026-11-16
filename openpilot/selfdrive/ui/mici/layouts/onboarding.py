@@ -18,8 +18,6 @@ from openpilot.selfdrive.ui.mici.widgets.dialog import BigConfirmationCircleButt
 from openpilot.selfdrive.ui.mici.onroad.driver_state import DriverStateRenderer
 from openpilot.selfdrive.ui.mici.onroad.cabin_camera_dialog import BaseCabinCameraDialog
 
-from openpilot.selfdrive.ui import Colors
-
 
 class CabinCameraSetupDialog(BaseCabinCameraDialog):
   def __init__(self):
@@ -125,11 +123,10 @@ class TrainingGuideDMTutorial(NavWidget):
     if device.awake and not ui_state.params.get_bool("IsDriverViewEnabled"):
       ui_state.params.put_bool("IsDriverViewEnabled", True)
 
-    sm = ui_state.sm
-    if sm.recv_frame.get("driverMonitoringState", 0) == 0:
+    if not ui_state.received_since_started("driverMonitoringState"):
       return
 
-    dm_state = sm["driverMonitoringState"]
+    dm_state = ui_state.sm["driverMonitoringState"]
     driver_data = self._dialog.driver_state_renderer.get_driver_data()
 
     if len(driver_data.faceOrientation) == 3:
@@ -156,7 +153,7 @@ class TrainingGuideDMTutorial(NavWidget):
     gradient_y = int(self._rect.y + self._rect.height - 80)
     gradient_h = int(self._rect.y) + int(self._rect.height) - gradient_y
     rl.draw_rectangle_gradient_v(int(self._rect.x), gradient_y,
-                                 int(self._rect.width), gradient_h, Colors.TRANSPARENT, rl.BLACK)
+                                 int(self._rect.width), gradient_h, rl.BLANK, rl.BLACK)
 
     # draw white ring around dm icon to indicate progress
     ring_thickness = 8
