@@ -2,7 +2,9 @@ import ast
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 import sys
+import textwrap
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -122,7 +124,7 @@ def test_launcher_captures_bootstrap_failure_before_cloudlog_is_available(launch
     launcher.module.main()
   launcher.diagnostics.initialize_crash_log.assert_called_once()
   launcher.diagnostics.record_crash.assert_called_once_with(error, "runtime bootstrap")
-  launcher.diagnostics.close_crash_log.assert_called_once()
+  launcher.diagnostics.close_crash_log.assert_not_called()
   launcher.diagnostics.close_log.assert_called_once()
   launcher.runner.assert_not_called()
 
@@ -143,10 +145,121 @@ def test_launcher_preserves_runtime_failure_after_backend_cleanup(launcher):
   with pytest.raises(RuntimeError, match="backend failed"):
     launcher.module.main()
   launcher.diagnostics.record_crash.assert_called_once_with(error, "cluster startup or main loop")
-  launcher.diagnostics.close_crash_log.assert_called_once()
+  launcher.diagnostics.close_crash_log.assert_not_called()
 
 
 def test_launcher_normal_exit_does_not_record_a_crash(launcher):
   launcher.module.main()
   launcher.diagnostics.record_crash.assert_not_called()
-  launcher.diagnostics.close_crash_log.assert_called_once()
+  launcher.diagnostics.close_crash_log.assert_not_called()
+
+
+LATE_EXIT_SCRIPT = textwrap.dedent("""
+import atexit
+import faulthandler
+import os
+import sys
+from types import SimpleNamespace
+from openpilot.selfdrive.addon import cluster_run
+from openpilot.selfdrive.addon.cluster import cluster_logging
+
+if len(sys.argv) > 4:
+    try:
+        os.fstat(int(sys.argv[4]))
+    except OSError:
+        print('bootstrap_descriptor_closed=1', flush=True)
+    else:
+        raise AssertionError('Old crash descriptor survived exec')
+
+cluster_logging.CRASH_LOG_FILE, cluster_logging.LOG_FILE, mode = sys.argv[1:4]
+logger = SimpleNamespace(info=lambda *_a, **_k: None, bind=lambda *_a, **_k: None, exception=lambda *_a, **_k: None)
+sys.modules['openpilot.common.realtime'] = SimpleNamespace(set_core_affinity=lambda *_a: None)
+sys.modules['openpilot.common.swaglog'] = SimpleNamespace(cloudlog=logger)
+sys.modules['setproctitle'] = SimpleNamespace(setproctitle=lambda *_a: None)
+
+def fail():
+    raise RuntimeError('subprocess lifecycle test')
+
+cluster_run.configure_cluster_runtime = fail if mode == 'bootstrap_failure' else lambda: None
+sys.modules['openpilot.selfdrive.addon.cluster.main'] = None if mode == 'import_failure' else SimpleNamespace(
+    cluster_main=fail if mode == 'backend_failure' else lambda: None)
+
+def late_exit():
+    assert faulthandler.is_enabled()
+    handle = cluster_logging._crash_handle
+    assert handle is not None and not handle.closed
+    assert not os.get_inheritable(handle.fileno())
+    os.write(handle.fileno(), b'[CLUSTER_LATE_EXIT_TEST] descriptor_alive=1\\n')
+    print('late_handler=1 descriptor_alive=1', flush=True)
+    if mode == 'abort':
+        import resource
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        os.abort()
+
+atexit.register(late_exit)
+try:
+    cluster_run.main()
+    if mode == 'repeat':
+        descriptor = cluster_logging._crash_handle.fileno()
+        cluster_run.main()
+        assert cluster_logging._crash_handle.fileno() == descriptor
+except Exception:
+    sys.exit(17)
+""")
+
+
+@pytest.mark.parametrize("mode,exit_code,stage", [
+  ("normal", 0, None), ("repeat", 0, None), ("bootstrap_failure", 17, "runtime bootstrap"),
+  ("import_failure", 17, "cluster imports"), ("backend_failure", 17, "cluster startup or main loop"),
+])
+def test_actual_launcher_keeps_crash_descriptor_through_atexit(tmp_path, mode, exit_code, stage):
+  crash_path, debug_path = tmp_path / "cluster_crash.log", tmp_path / "cluster_debug.log"
+  result = subprocess.run([sys.executable, "-B", "-c", LATE_EXIT_SCRIPT, str(crash_path), str(debug_path), mode],
+                          cwd=Path(__file__).resolve().parents[5], capture_output=True, text=True, timeout=10)
+  assert result.returncode == exit_code, result.stderr
+  assert "late_handler=1 descriptor_alive=1" in result.stdout, result.stderr
+  crash = crash_path.read_text()
+  assert "[CLUSTER_LATE_EXIT_TEST] descriptor_alive=1" in crash
+  assert crash.count("[CLUSTER_PROCESS_START]") == (2 if mode == "repeat" else 1)
+  assert ("[CLUSTER_CRASH]" in crash) is (stage is not None)
+  if stage is not None:
+    assert f"stage={stage}" in crash
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Native abort regression uses Linux signals without a crash dialog")
+def test_native_abort_after_launcher_returns_retains_late_exit_stack(tmp_path):
+  crash_path, debug_path = tmp_path / "cluster_crash.log", tmp_path / "cluster_debug.log"
+  result = subprocess.run([sys.executable, "-B", "-c", LATE_EXIT_SCRIPT, str(crash_path), str(debug_path), "abort"],
+                          cwd=Path(__file__).resolve().parents[5], capture_output=True, text=True, timeout=10)
+  assert result.returncode == -6, result.stderr
+  crash = crash_path.read_text()
+  assert "Fatal Python error: Aborted" in crash
+  assert "late_exit" in crash and "[CLUSTER_LATE_EXIT_TEST] descriptor_alive=1" in crash
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Native bootstrap uses POSIX process replacement")
+def test_actual_native_bootstrap_closes_old_descriptor_and_installs_a_new_handler(tmp_path):
+  crash_path, debug_path = tmp_path / "cluster_crash.log", tmp_path / "cluster_debug.log"
+  script = textwrap.dedent("""
+import os
+import sys
+from openpilot.selfdrive.addon import cluster_run
+from openpilot.selfdrive.addon.cluster import cluster_logging
+
+cluster_logging.CRASH_LOG_FILE, cluster_logging.LOG_FILE = sys.argv[1:3]
+def exec_bootstrap():
+    descriptor = cluster_logging._crash_handle.fileno()
+    assert not os.get_inheritable(descriptor)
+    os.execve(sys.executable, [sys.executable, '-B', '-c', sys.argv[3], sys.argv[1], sys.argv[2], 'normal', str(descriptor)],
+              dict(os.environ, CLUSTER_NATIVE_BOOTSTRAP='1'))
+cluster_run.configure_cluster_runtime = exec_bootstrap
+cluster_run.main()
+""")
+  result = subprocess.run([sys.executable, "-B", "-c", script, str(crash_path), str(debug_path), LATE_EXIT_SCRIPT],
+                          cwd=Path(__file__).resolve().parents[5], capture_output=True, text=True, timeout=10)
+  assert result.returncode == 0, result.stderr
+  assert "bootstrap_descriptor_closed=1" in result.stdout
+  assert "late_handler=1 descriptor_alive=1" in result.stdout
+  crash = crash_path.read_text()
+  assert crash.count("[CLUSTER_PROCESS_START]") == 2
+  assert "native_bootstrap=1" in crash and "[CLUSTER_LATE_EXIT_TEST] descriptor_alive=1" in crash

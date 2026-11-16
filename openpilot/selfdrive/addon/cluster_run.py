@@ -49,7 +49,6 @@ def configure_cluster_runtime() -> None:
 def main() -> None:
   # Keep startup diagnostics available before imports that load native libraries.
   from openpilot.selfdrive.addon.cluster.cluster_logging import (
-    close_crash_log,
     close_log,
     initialize_crash_log,
     record_crash,
@@ -87,7 +86,9 @@ def main() -> None:
     raise
   finally:
     close_log()
-    close_crash_log()
+    # Native workers and interpreter finalizers can still abort after main
+    # returns. Keep faulthandler and its descriptor alive for that teardown;
+    # exec or process exit releases the non-inheritable descriptor.
 
 
 if __name__ == "__main__":

@@ -355,3 +355,166 @@ def test_restore_uses_the_hardware_stream_environment_default(monkeypatch, value
   controller.sample(0, report(0, 142), 0)
   controller.close()
   assert params.writes[-1] == expected
+
+
+def _healthy(controller, start, end):
+  for second in range(start, end + 1):
+    controller.sample(second, report(second * 400), 0)
+
+
+def _failed_probe():
+  params = Params()
+  controller = budget.ClusterBitrateController(params)
+  controller.sample(0, report(0, 40), 0)
+  _healthy(controller, 1, 21)
+  assert params.writes == [3_750_000, 4_250_000]
+  controller.sample(24, report(24 * 400, 40), 0)
+  assert controller.current == 3_187_500 and controller.recovery_wait_s == 40
+  return controller, params
+
+
+@pytest.mark.parametrize("cause", ["rtcp_loss", "tcp_backpressure"])
+def test_repeated_failed_probes_wait_longer_without_delaying_congestion_reductions(cause):
+  params = Params()
+  controller = budget.ClusterBitrateController(params)
+  controller.sample(0, report(0, 40), 0)
+  _healthy(controller, 1, 21)
+  probe_at = 21
+  for failures, wait in enumerate((40, 80, 120, 120), 1):
+    failed_at, previous = probe_at + 3, controller.current
+    controller.sample(failed_at, report(failed_at * 400, 40 if cause == "rtcp_loss" else 0),
+                      1600 if cause == "tcp_backpressure" else 0,
+                      drain_age_s=1.0 if cause == "tcp_backpressure" else None)
+    assert controller.current == max(budget.MIN_BITRATE, previous * 3 // 4)
+    assert controller.recovery_wait_s == wait and controller.probe_failures == failures
+    assert controller.probe_at is None
+    writes = len(params.writes)
+    _healthy(controller, failed_at + 1, failed_at + wait)
+    assert len(params.writes) == writes  # Stable at the lower rate does not erase the penalty.
+    probe_at = failed_at + wait + 1
+    controller.sample(probe_at, report(probe_at * 400), 0)
+    assert len(params.writes) == writes + 1 and controller.probe_at == probe_at
+    assert params.writes[-1] == min(controller.ceiling, params.writes[-2] + 500_000)
+
+
+def test_one_probe_is_penalized_once_and_cached_bad_reports_cannot_repeat_reductions():
+  controller, params = _failed_probe()
+  controller.sample(26, report(26 * 400, 40), 0)  # Actual additional down, without another up.
+  assert params.writes[-1] == 2_390_625
+  for second in range(27, 40):
+    controller.sample(second, report(26 * 400, 40), 0)
+  assert len(params.writes) == 4 and controller.probe_failures == 1
+  assert controller.recovery_wait_s == 40
+
+
+@pytest.mark.parametrize("delay,failures", [(30.0, 1), (30.001, 0)])
+def test_only_congestion_within_the_probe_window_increases_recovery_wait(delay, failures):
+  params = Params()
+  controller = budget.ClusterBitrateController(params)
+  controller.sample(0, report(0, 40), 0)
+  _healthy(controller, 1, 21)
+  for second in range(22, 51):
+    controller.sample(second, None, 0)
+  controller.sample(21 + delay, report(30_000, 40), 0)
+  assert controller.current == 3_187_500  # Congestion is reduced on either side of the boundary.
+  assert controller.probe_failures == failures
+  assert controller.recovery_wait_s == (40 if failures else 20)
+  assert controller.probe_at is None
+
+
+def test_replaced_media_source_does_not_charge_its_loss_to_the_previous_probe():
+  controller, params = _failed_probe()
+  _healthy(controller, 25, 65)
+  assert controller.probe_at == 65
+  controller.sample(67, report(100, 40, ssrc=2), 0)  # Retain the existing two-second down interval.
+  assert params.writes[-1] == 3_687_500 * 3 // 4
+  assert controller.probe_at is None and controller.healthy_since is None
+  assert controller.probe_failures == 1 and controller.recovery_wait_s == 40
+
+
+def test_backoff_relaxes_only_after_the_raised_probe_has_thirty_healthy_seconds():
+  controller, params = _failed_probe()
+  _healthy(controller, 25, 64)
+  assert controller.recovery_wait_s == 40 and len(params.writes) == 3
+  controller.sample(65, report(65 * 400), 0)
+  assert controller.current == 3_687_500 and controller.probe_at == 65
+  _healthy(controller, 66, 95)
+  assert len(params.writes) == 4 and controller.recovery_wait_s == 40
+  controller.sample(96, report(96 * 400), 0)
+  assert controller.recovery_wait_s == 20 and controller.probe_failures == 1
+  assert controller.current == 4_187_500 and controller.probe_at == 96
+  _healthy(controller, 97, 117)
+  assert controller.current == 4_687_500  # Normal twenty-second increases have resumed.
+  _healthy(controller, 118, 138)
+  assert controller.current == controller.ceiling == 5_000_000
+
+
+@pytest.mark.parametrize("interrupt", ["loss", "degraded", "slow_drain", "no_report", "cached_report"])
+def test_probe_validation_requires_uninterrupted_fresh_health(interrupt):
+  controller, params = _failed_probe()
+  _healthy(controller, 25, 94)  # Up at65, then29 healthy fresh reports.
+  assert controller.probe_at == 65 and controller.recovery_wait_s == 40
+  for second in range(95, 101):
+    current_report = (None if interrupt == "no_report" else
+                      report((94 if interrupt == "cached_report" else second) * 400, 4 if interrupt == "loss" else 0))
+    controller.sample(second, current_report, 1600 if interrupt == "slow_drain" else 0,
+                      drain_age_s=0.3 if interrupt == "slow_drain" else None, degraded=interrupt == "degraded")
+  assert len(params.writes) == 4 and controller.recovery_wait_s == 40
+  _healthy(controller, 101, 130)
+  assert len(params.writes) == 4 and controller.recovery_wait_s == 40
+  controller.sample(131, report(131 * 400), 0)
+  assert controller.recovery_wait_s == 20 and len(params.writes) == 5
+
+
+def test_reconnect_keeps_backoff_but_requires_new_reports_and_clears_probe_ownership():
+  controller, params = _failed_probe()
+  _healthy(controller, 25, 65)
+  assert controller.probe_at == 65
+  controller.reset_connection()
+  assert controller.probe_at is None and controller.healthy_since is None
+  assert controller.recovery_wait_s == 40 and controller.probe_failures == 1
+  controller.sample(100, None, 0)
+  _healthy(controller, 101, 140)
+  assert len(params.writes) == 4 and controller.recovery_wait_s == 40
+  controller.sample(141, report(141 * 400), 0)
+  assert controller.current == 4_187_500
+  fields = controller.status_fields(142)
+  assert "bitrate_recovery_wait_s=40.0" in fields and "bitrate_probe_failures=1" in fields
+  assert "bitrate_probe_age_s=1.0" in fields
+
+
+def test_external_parameter_owner_is_preserved_even_after_failed_probes():
+  controller, params = _failed_probe()
+  params.value = 777_777
+  controller.sample(25, report(25 * 400, 40), 0)
+  controller.close()
+  assert controller.disabled and len(params.writes) == 3
+  assert params.value == 777_777 and controller.probe_failures == 1
+
+
+def test_backoff_reduces_overshooting_probes_in_a_synthetic_nine_hundred_second_link():
+  class FixedRecoveryController(budget.ClusterBitrateController):
+    def _publish(self, value, now, reason):
+      super()._publish(value, now, reason)
+      # Baseline: the same existing loss/down/quality rules, with the old
+      # fixed20s recovery and no memory of a failed higher-rate probe.
+      self.probe_at = None
+      self.recovery_wait_s = budget.RECOVERY_SECONDS
+
+  def replay(controller_type):
+    params = Params()
+    controller = controller_type(params)
+    for second in range(900):
+      # This hypothetical link reports congestion above2.5Mbps; it is a
+      # deterministic controller experiment, not a decoder/FPS simulation.
+      controller.sample(second, report(second * 400, 40 if controller.current > 2_500_000 else 0), 0)
+    previous, increases, decreases = controller.ceiling, 0, 0
+    for value in params.writes:
+      increases += value > previous
+      decreases += value < previous
+      previous = value
+    assert budget.MIN_BITRATE <= controller.current <= controller.ceiling
+    return increases, decreases
+
+  fixed, adaptive = replay(FixedRecoveryController), replay(budget.ClusterBitrateController)
+  assert adaptive[0] < fixed[0] and adaptive[1] < fixed[1]

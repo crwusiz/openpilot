@@ -10,6 +10,8 @@ MIN_BITRATE = 1_500_000
 SAMPLE_INTERVAL = 0.5
 DOWN_INTERVAL = 2.0
 RECOVERY_SECONDS = 20.0
+RECOVERY_PROBE_SECONDS = 30.0
+MAX_RECOVERY_SECONDS = 120.0
 REPORT_MAX_AGE = 3.0
 TCP_PRESSURE_SECONDS = 1.0
 RECOVERY_DRAIN_LIMIT = 0.25
@@ -40,6 +42,10 @@ class ClusterBitrateController:
     self.pending_at = None
     self.changed = False
     self.last_change = None
+    # Keep failed-probe history for this server's lifetime, like its reduced
+    # bitrate. Reconnecting must not immediately retry the same higher load.
+    self.recovery_wait_s = RECOVERY_SECONDS
+    self.probe_failures = 0
     self.reset_connection()
     if not self.disabled:
       try:
@@ -53,6 +59,7 @@ class ClusterBitrateController:
 
   def reset_connection(self):
     self.last_report = self.report_at = self.healthy_since = None
+    self.probe_at = None
     self.loss_samples = 0
     self.report_sequence_bits = None
     self.report_samples = self.report_wraps = 0
@@ -81,12 +88,22 @@ class ClusterBitrateController:
   def _publish(self, value, now, reason):
     self.params.put(BITRATE_PARAM, value, block=False)
     before, self.current = self.current, value
+    if reason == "link_recovered":
+      self.probe_at = now
+    elif reason in ("rtcp_loss", "tcp_backpressure") and value < before:
+      if self.probe_at is not None and 0 <= now - self.probe_at <= RECOVERY_PROBE_SECONDS:
+        self.recovery_wait_s = min(MAX_RECOVERY_SECONDS, self.recovery_wait_s * 2)
+        self.probe_failures += 1
+      # Additional reductions repair this congestion episode, rather than
+      # charging the same failed higher-rate probe more than once.
+      self.probe_at = None
     self.pending, self.pending_at = value, now
     self.changed, self.last_change = True, now
     self.healthy_since = None
     self.loss_samples = 0
     flog(f"[CLUSTER_H264_BITRATE] action=adapt | from_bps={before} | to_bps={value} | "
-         + f"ceiling_bps={self.ceiling} | reason={reason}")
+         + f"ceiling_bps={self.ceiling} | reason={reason} | recovery_wait_s={self.recovery_wait_s:.1f}"
+         + f" | probe_failures={self.probe_failures}")
 
   def sample(self, now, report, queued_bytes, *, drain_age_s=None, degraded=False):
     if self.disabled:
@@ -116,6 +133,7 @@ class ClusterBitrateController:
           if advancing:
             if self.last_report is not None and not same_source:
               self.healthy_since = None
+              self.probe_at = None
               self.loss_samples = 0
             fresh, loss = True, fraction / 256
             self.report_wraps += int(previous is not None and signature[1] < previous)
@@ -144,8 +162,15 @@ class ClusterBitrateController:
         self.recovery_blocked = "none"
         if self.healthy_since is None:
           self.healthy_since = now
-        elif now - self.healthy_since >= RECOVERY_SECONDS and self.current < self.ceiling:
-          self._publish(min(self.ceiling, self.current + 500_000), now, "link_recovered")
+        else:
+          healthy_for = now - self.healthy_since
+          if self.probe_at is not None and healthy_for >= RECOVERY_PROBE_SECONDS:
+            # Only sustained health at the raised rate validates that probe.
+            # Waiting safely at its previous lower rate cannot erase backoff.
+            self.recovery_wait_s = RECOVERY_SECONDS
+            self.probe_at = None
+          if healthy_for >= self.recovery_wait_s and self.current < self.ceiling:
+            self._publish(min(self.ceiling, self.current + 500_000), now, "link_recovered")
       elif queued_bytes > 0:
         # Do not raise while a write is pending, but a brief normal write must
         # not erase all earlier healthy reports and permanently pin quality.
@@ -157,7 +182,10 @@ class ClusterBitrateController:
   def status_fields(self, now):
     recovery_s = 0.0 if self.healthy_since is None else max(0.0, now - self.healthy_since)
     report_age = "none" if self.report_at is None else f"{max(0.0, now - self.report_at) * 1000:.1f}"
+    probe_age = "none" if self.probe_at is None else f"{max(0.0, now - self.probe_at):.1f}"
     return (f" | bitrate_target_bps={self.current} | bitrate_recovery_s={recovery_s:.1f}"
+            + f" | bitrate_recovery_wait_s={self.recovery_wait_s:.1f} | bitrate_probe_failures={self.probe_failures}"
+            + f" | bitrate_probe_age_s={probe_age}"
             + f" | bitrate_blocked={self.recovery_blocked} | bitrate_rr_age_ms={report_age}"
             + f" | bitrate_rr_seq_bits={self.report_sequence_bits or 'none'}"
             + f" | bitrate_rr_samples={self.report_samples} | bitrate_rr_wraps={self.report_wraps}"
