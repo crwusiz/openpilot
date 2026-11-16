@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 import numpy as np
 import raylib_nb as rl
 
-from openpilot.selfdrive.ui.mici.onroad import model_renderer, status
+from openpilot.selfdrive.ui.mici.onroad import model_renderer
 from openpilot.selfdrive.ui.ui_state import UIStatus
 from openpilot.system.ui.lib.polygon import Gradient
 
@@ -92,19 +92,25 @@ class TestModelRendererUpdates(unittest.TestCase):
     self.assertEqual(renderer._lead_info[0].v_rel, -2.0)
     self.assertEqual(renderer._stop_point.fade_filter.x, 0.0)
 
-  def test_lane_colors_support_all_extended_statuses_and_visibility_fade(self):
+  def test_lane_and_road_edge_colors_match_big_ui_with_visibility_fade(self):
     renderer = model_renderer.ModelRenderer.__new__(model_renderer.ModelRenderer)
+    renderer._rect = rl.Rectangle(20, 30, 100, 100)
     renderer._visible = 0.5
-    renderer._torque_filter = SimpleNamespace(x=0.0)
+    points = np.array([[0, 0], [0, 5], [5, 5]], dtype=np.float32)
+    renderer._lane_lines = [SimpleNamespace(projected_points=points) for _ in range(4)]
+    renderer._road_edges = [SimpleNamespace(projected_points=points) for _ in range(2)]
+    renderer._lane_line_probs = np.array([0.0, 0.2, 1.0, 0.8])
+    renderer._road_edge_stds = np.array([0.2, 1.0])
     for ui_status in UIStatus:
       with self.subTest(status=ui_status):
-        ui_state = SimpleNamespace(status=ui_status, sm=SimpleNamespace(frame=0))
-        with (patch.object(status, 'ui_state', ui_state), patch.object(status.rl, 'get_time', return_value=0.0),
-              patch.object(model_renderer, 'status_fade', status.StatusFade())):
-          color = renderer._get_ll_color(1.0, adjacent=True, left=True)
-        self.assertEqual(color.a, int(0.7 * 0.5 * 255))
-        if ui_status in (UIStatus.ENGAGED, UIStatus.ACTIVE):
-          self.assertEqual((color.r, color.g, color.b), (0, 255, 64))
+        with (patch.object(model_renderer, 'ui_state', SimpleNamespace(status=ui_status)),
+              patch.object(model_renderer, 'draw_polygon') as draw):
+          renderer._draw_lane_lines()
+        colors = [call.args[2] for call in draw.call_args_list]
+        self.assertEqual([(color.r, color.g, color.b) for color in colors[:4]], [(255, 255, 255)] * 4)
+        self.assertEqual([(color.r, color.g, color.b) for color in colors[4:]], [(201, 34, 49)] * 2)
+        self.assertEqual([color.a for color in colors], [0, 25, 89, 89, 102, 0])
+        np.testing.assert_array_equal(draw.call_args.args[1], points + [20, 30])
 
   def test_custom_steering_path_gradient_fades_without_mutating_source(self):
     renderer = model_renderer.ModelRenderer.__new__(model_renderer.ModelRenderer)

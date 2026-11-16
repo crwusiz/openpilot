@@ -27,10 +27,10 @@ class DriverStateRenderer(Widget):
   LINES_ANGLE_INCREMENT = 5
   AWARENESS_UNFULL_PERCENT = 95  # ~0.5s
 
-  def __init__(self, lines: bool = False, inset: bool = False, background: bool = True, always_visible: bool = False):
+  def __init__(self, lines: bool = False, inset: bool = False, background: bool = True, always_visible: bool = False, size: int = BASE_SIZE):
     super().__init__()
     self._background = background
-    self.set_rect(rl.Rectangle(0, 0, self.BASE_SIZE, self.BASE_SIZE))
+    self.set_rect(rl.Rectangle(0, 0, size, size))
     self._lines = lines
     self._inset = inset
     self._always_visible = always_visible
@@ -90,7 +90,7 @@ class DriverStateRenderer(Widget):
   def should_draw(self):
     # dimmed doesn't need driver data, so it also shows offroad
     return (self._should_draw and (self._show_under_alerts or ui_state.sm["selfdriveState"].alertSize == AlertSize.none) and
-            (self._dimmed > 0 or ui_state.received_since_started("driverStateV2")))
+            (self._always_visible or self._dimmed > 0 or ui_state.received_since_started("driverStateV2")))
 
   def set_force_active(self, force_active: bool):
     """Force the dmoji to always appear active (green) regardless of actual state"""

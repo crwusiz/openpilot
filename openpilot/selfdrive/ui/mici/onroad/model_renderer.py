@@ -5,7 +5,6 @@ from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.controls.radard import RADAR_TO_CAMERA
 from openpilot.selfdrive.locationd.calibrationd import HEIGHT_INIT
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
-from openpilot.selfdrive.ui.mici.onroad import blend_colors
 from openpilot.selfdrive.ui.mici.onroad.status import status_fade
 from openpilot.selfdrive.ui.onroad.model_renderer import ModelRenderer as BaseModelRenderer, CLIP_MARGIN, MAX_DRAW_DISTANCE, STOCK_PATH_GRADIENT
 from openpilot.system.ui.lib.application import gui_app
@@ -20,13 +19,6 @@ LEAD_BAR_WIDTH = 1.8  # m
 STOP_SPEED = 1.0  # m/s, planned speed that counts as stopping
 STOP_APPEAR_DISTANCE = (8.0, 50.0)  # m
 STOP_LEAD_MARGIN = 15.0  # m, a lead this close past the stop is what it's stopping for
-
-LANE_LINE_COLORS = {
-  UIStatus.DISENGAGED: rl.Color(200, 200, 200, 255),
-  UIStatus.OVERRIDE: rl.Color(255, 255, 255, 255),
-  UIStatus.ENGAGED: rl.Color(0, 255, 64, 255),
-}
-
 
 def _faded(gradient: Gradient, alpha: float) -> Gradient:
   if alpha >= 1:
@@ -101,7 +93,6 @@ class ModelRenderer(BaseModelRenderer):
     self._lead_bars = [LeadVehicle(), LeadVehicle()]
     self._lead_info = [LeadInfo(), LeadInfo()]
     self._stop_point = StopPoint()
-    self._torque_filter = FirstOrderFilter(0, 0.1, 1 / gui_app.target_fps)
     self._visible = 0.0
 
   def _draw_offset(self) -> np.ndarray:
@@ -110,8 +101,6 @@ class ModelRenderer(BaseModelRenderer):
 
   def _render(self, rect: rl.Rectangle):
     sm = ui_state.sm
-
-    self._torque_filter.update(-ui_state.sm['carOutput'].actuatorsOutput.torque)
 
     # Check if data is up-to-date
     if not ui_state.received_since_started("extrinsicsCalibration") or not ui_state.received_since_started("modelV2"):
@@ -219,38 +208,24 @@ class ModelRenderer(BaseModelRenderer):
     bar[[1, 2]] = far + (near - far) * np.clip(length, 3.0, LEAD_BAR_LENGTH) / length
     return bar.astype(np.float32)
 
-  def _get_ll_color(self, prob: float, adjacent: bool, left: bool):
-    alpha = np.clip(prob, 0.0, 0.7) * self._visible
-    if adjacent:
-      base_color = status_fade.color(LANE_LINE_COLORS)
-      color = rl.Color(base_color.r, base_color.g, base_color.b, int(alpha * 255))
-
-      # Turn adjacent lane lines orange if torque is high.
-      torque = self._torque_filter.x
-      if abs(torque) > 0.6 and left == (torque > 0):
-        color = blend_colors(color, rl.Color(255, 115, 0, int(alpha * 255)), np.interp(abs(torque), [0.6, 0.8], [0.0, 1.0]))
-    else:
-      color = rl.Color(255, 255, 255, int(alpha * 255))
-
-    return color
-
   def _draw_lane_lines(self):
-    """Draw lane lines and road edges. Two closest lines should be green (lane line or road edges)."""
+    """Draw white lane lines and red road edges, matching the big UI."""
     offset = self._draw_offset()
 
     for i, lane_line in enumerate(self._lane_lines):
       if lane_line.projected_points.size == 0:
         continue
 
-      color = self._get_ll_color(float(self._lane_line_probs[i]), i in (1, 2), i in (0, 1))
+      alpha = np.clip(self._lane_line_probs[i], 0.0, 0.7) * self._visible
+      color = colors_alpha(rl.WHITE, int(alpha * 255))
       draw_polygon(self._rect, lane_line.projected_points + offset, color)
 
     for i, road_edge in enumerate(self._road_edges):
       if road_edge.projected_points.size == 0:
         continue
 
-      # if closest lane lines are not confident, make road edges green
-      color = self._get_ll_color(float(1.0 - self._road_edge_stds[i]), float(self._lane_line_probs[i + 1]) < 0.25, i == 0)
+      alpha = np.clip(1.0 - self._road_edge_stds[i], 0.0, 1.0) * self._visible
+      color = colors_alpha(Colors.RED, int(alpha * 255))
       draw_polygon(self._rect, road_edge.projected_points + offset, color)
 
   def _draw_path(self):
