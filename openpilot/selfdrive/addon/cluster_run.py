@@ -52,6 +52,7 @@ def main() -> None:
     close_log,
     initialize_crash_log,
     record_crash,
+    record_shutdown_stage,
   )
 
   initialize_crash_log()
@@ -85,7 +86,9 @@ def main() -> None:
       cloudlog.exception("Cluster crashed")
     raise
   finally:
+    record_shutdown_stage("launcher_finalize_begin")
     close_log()
+    record_shutdown_stage("launcher_finalize_end")
     # Native workers and interpreter finalizers can still abort after main
     # returns. Keep faulthandler and its descriptor alive for that teardown;
     # exec or process exit releases the non-inheritable descriptor.

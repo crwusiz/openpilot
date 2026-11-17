@@ -106,7 +106,8 @@ def launcher(monkeypatch):
   module = importlib.util.module_from_spec(spec)
   spec.loader.exec_module(module)
   logger = Mock()
-  diagnostics = SimpleNamespace(close_crash_log=Mock(), close_log=Mock(), initialize_crash_log=Mock(), record_crash=Mock())
+  diagnostics = SimpleNamespace(close_crash_log=Mock(), close_log=Mock(), initialize_crash_log=Mock(), record_crash=Mock(),
+                                record_shutdown_stage=Mock())
   runner = Mock()
   monkeypatch.setattr(module, "configure_cluster_runtime", Mock())
   monkeypatch.setitem(sys.modules, "openpilot.selfdrive.addon.cluster.cluster_logging", diagnostics)
@@ -151,6 +152,17 @@ def test_launcher_preserves_runtime_failure_after_backend_cleanup(launcher):
 def test_launcher_normal_exit_does_not_record_a_crash(launcher):
   launcher.module.main()
   launcher.diagnostics.record_crash.assert_not_called()
+  launcher.diagnostics.close_crash_log.assert_not_called()
+  assert [call.args[0] for call in launcher.diagnostics.record_shutdown_stage.call_args_list] == [
+    "launcher_finalize_begin", "launcher_finalize_end",
+  ]
+
+
+def test_launcher_finalization_does_not_mark_failed_close_as_completed(launcher):
+  launcher.diagnostics.close_log.side_effect = OSError("close failed")
+  with pytest.raises(OSError, match="close failed"):
+    launcher.module.main()
+  launcher.diagnostics.record_shutdown_stage.assert_called_once_with("launcher_finalize_begin")
   launcher.diagnostics.close_crash_log.assert_not_called()
 
 
@@ -221,6 +233,10 @@ def test_actual_launcher_keeps_crash_descriptor_through_atexit(tmp_path, mode, e
   crash = crash_path.read_text()
   assert "[CLUSTER_LATE_EXIT_TEST] descriptor_alive=1" in crash
   assert crash.count("[CLUSTER_PROCESS_START]") == (2 if mode == "repeat" else 1)
+  assert crash.count("stage=launcher_finalize_begin") == (2 if mode == "repeat" else 1)
+  assert crash.count("stage=launcher_finalize_end") == (2 if mode == "repeat" else 1)
+  assert crash.index("stage=launcher_finalize_begin") < crash.index("stage=launcher_finalize_end")
+  assert crash.index("stage=launcher_finalize_end") < crash.index("[CLUSTER_LATE_EXIT_TEST]")
   assert ("[CLUSTER_CRASH]" in crash) is (stage is not None)
   if stage is not None:
     assert f"stage={stage}" in crash

@@ -1,4 +1,5 @@
 import faulthandler
+import re
 import signal
 
 import pytest
@@ -89,6 +90,43 @@ def test_fault_handler_has_live_persistent_descriptor(crash_logs):
   assert cluster_logging._fault_handler_enabled
   faulthandler.dump_traceback(file=cluster_logging._crash_handle)
   assert "test_cluster_logging.py" in (crash_logs / "cluster_crash.log").read_text()
+
+
+def test_shutdown_stages_survive_debug_session_reset_without_logging_vehicle_data(crash_logs):
+  cluster_logging.initialize_crash_log()
+  handle = cluster_logging._crash_handle
+  for stage in sorted(cluster_logging.SHUTDOWN_STAGES):
+    cluster_logging.record_shutdown_stage(stage)
+  cluster_logging.initialize_log()
+  cluster_logging.close_log()
+  cluster_logging.initialize_log()
+  assert cluster_logging._crash_handle is handle and not handle.closed
+  assert faulthandler.is_enabled()
+  lines = (crash_logs / "cluster_crash.log").read_text().splitlines()[1:]
+  assert len(lines) == len(cluster_logging.SHUTDOWN_STAGES)
+  pattern = (r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] \[CLUSTER_SHUTDOWN_STAGE\] "
+             + r"pid=\d+ mono=\d+\.\d{6} stage=([a-z_]+)")
+  assert {re.fullmatch(pattern, line).group(1) for line in lines} == cluster_logging.SHUTDOWN_STAGES
+  assert "CLUSTER_SHUTDOWN_STAGE" not in (crash_logs / "cluster_debug.log").read_text()
+
+
+def test_shutdown_stages_use_bounded_rotation_and_reject_unknown_records(crash_logs, monkeypatch):
+  monkeypatch.setattr(cluster_logging, "MAX_CRASH_LOG_BYTES", 1024)
+  cluster_logging.initialize_crash_log()
+  for _ in range(40):
+    cluster_logging.record_shutdown_stage("native_stream_stop_begin")
+  files = list(crash_logs.glob("cluster_crash.log*"))
+  assert len(files) == 2 and all(path.stat().st_size <= 1024 for path in files)
+  before = {path.name: path.read_bytes() for path in files}
+  with pytest.raises(ValueError, match="Unknown cluster shutdown stage"):
+    cluster_logging.record_shutdown_stage("unknown vehicle contents\nFatal Python error")
+  assert {path.name: path.read_bytes() for path in files} == before
+
+
+def test_unwritable_shutdown_log_does_not_prevent_teardown(crash_logs, monkeypatch):
+  monkeypatch.setattr(cluster_logging, "CRASH_LOG_FILE", str(crash_logs / "missing/cluster_crash.log"))
+  cluster_logging.record_shutdown_stage("launcher_finalize_begin")
+  assert cluster_logging._crash_handle is None
 
 
 def test_native_failure_is_preserved_without_copying_into_next_debug_session(crash_logs):

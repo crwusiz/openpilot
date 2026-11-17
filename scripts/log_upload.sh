@@ -23,7 +23,7 @@ pi_log_upload_enabled() {
 }
 
 crash_log_has_diagnostics() {
-  local filename="$1" timestamp normal_records status=0
+  local filename="$1" timestamp normal_records shutdown_stages status=0
   [[ -f $filename ]] || return 1
   timestamp='\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]'
   # Ignore only complete, known benign records. Do not require an exception
@@ -31,7 +31,9 @@ crash_log_has_diagnostics() {
   normal_records="^([[:blank:]]*|$timestamp \\[CLUSTER_PROCESS_START\\] pid=[0-9]+ native_bootstrap=[01]"
   normal_records+="|$timestamp \\[CLUSTER_PROCESS_EXIT\\] pid=[0-9]+ (exit_code=0 reason=normal_exit manager_stop=[01]"
   normal_records+="|exit_code=-2 reason=SIGINT manager_stop=1|exit_code=-15 reason=SIGTERM manager_stop=1)"
-  normal_records+=" logs=/data/log/cluster_debug\\.log,/data/log/cluster_crash\\.log)"$'\r?'"$"
+  normal_records+=" logs=/data/log/cluster_debug\\.log,/data/log/cluster_crash\\.log"
+  shutdown_stages='launcher_finalize_(begin|end)|network_close_(begin|end)|native_stream_stop_(begin|end)|models_close_(begin|end)'
+  normal_records+="|$timestamp \\[CLUSTER_SHUTDOWN_STAGE\\] pid=[0-9]+ mono=[0-9]+\\.[0-9]{6} stage=($shutdown_stages))"$'\r?'"$"
   LC_ALL=C grep -aEvq -- "$normal_records" "$filename" || status=$?
   if (( status == 1 )); then return 1; fi
   # Inspection errors must not silently discard a potentially useful crash.

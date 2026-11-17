@@ -13,6 +13,10 @@ CRASH_LOG_FILE = "/data/log/cluster_crash.log"
 MAX_CRASH_LOG_BYTES = 256 * 1024
 MAX_CRASH_RECORD_BYTES = 64 * 1024
 MAX_CONSOLE_CRASH_BYTES = 8 * 1024
+SHUTDOWN_STAGES = frozenset({
+  "launcher_finalize_begin", "launcher_finalize_end", "network_close_begin", "network_close_end",
+  "native_stream_stop_begin", "native_stream_stop_end", "models_close_begin", "models_close_end",
+})
 
 _log_lock = threading.Lock()
 _log_handle = None
@@ -91,6 +95,14 @@ def initialize_crash_log():
             + f"native_bootstrap={os.environ.get('CLUSTER_NATIVE_BOOTSTRAP', '0')}\n")
   console_log(record)
   _write_crash_record(record)
+
+
+def record_shutdown_stage(stage):
+  """Keep fixed teardown breadcrumbs beside fatal output across later starts."""
+  if stage not in SHUTDOWN_STAGES:
+    raise ValueError("Unknown cluster shutdown stage")
+  _write_crash_record(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [CLUSTER_SHUTDOWN_STAGE] "
+                      + f"pid={os.getpid()} mono={time.monotonic():.6f} stage={stage}\n")
 
 
 def record_crash(error, stage):

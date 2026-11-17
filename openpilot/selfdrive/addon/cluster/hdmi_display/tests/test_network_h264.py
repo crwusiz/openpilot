@@ -16,6 +16,13 @@ from openpilot.selfdrive.addon.cluster.hdmi_display import network_h264 as netwo
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_protocol as wire
 
 
+@pytest.fixture(autouse=True)
+def shutdown_records(monkeypatch):
+  recorder = Mock()
+  monkeypatch.setattr(network, "record_shutdown_stage", recorder)
+  return recorder
+
+
 def asyncio_test(function):
   @wraps(function)
   def run(*args, **kwargs):
@@ -64,6 +71,71 @@ def factory():
     assert stream.stopped, "Native senders must stop before their producer is released"
   track.stop.side_effect = stop_track
   return stream, track
+
+
+@pytest.mark.parametrize("failed", [False, True])
+@asyncio_test
+async def test_shutdown_checkpoints_identify_native_stop_without_reordering_cleanup(monkeypatch, shutdown_records, failed):
+  monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
+  events = []
+  shutdown_records.side_effect = events.append
+  stream, track = factory()
+  stop = stream.stop
+
+  async def native_stop():
+    events.append("native_stop")
+    if failed:
+      raise RuntimeError("native close failed")
+    await stop()
+
+  stream.stop = native_stop
+  track.stop.side_effect = lambda: events.append("producer_stop")
+  server = network.H264NetworkServer(config(), models(), lambda _sdp: (stream, track))
+  await server.start()
+  reader, writer = await asyncio.open_connection(*server.server.sockets[0].getsockname())
+  try:
+    assert (await network.read_control(reader))[0] == wire.HELLO
+    await network.write_control(writer, wire.OFFER, {"type": "offer", "sdp": "v=0\r\noffer"})
+    assert (await network.read_control(reader))[0] == wire.ANSWER
+    assert (await network.read_control(reader))[0] == wire.STATE
+    await server.close()
+  finally:
+    writer.close()
+    await writer.wait_closed()
+  expected = ["network_close_begin", "native_stream_stop_begin", "native_stop"]
+  if not failed:
+    expected.append("native_stream_stop_end")
+  assert events == expected + ["producer_stop", "network_close_end"]
+  assert not server.clients and server.active is None
+
+
+@asyncio_test
+async def test_failed_server_close_does_not_publish_a_completed_checkpoint(monkeypatch, shutdown_records):
+  monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
+  server = network.H264NetworkServer(config(), models())
+  server.server = SimpleNamespace(close=Mock(), wait_closed=AsyncMock(side_effect=RuntimeError("server close failed")))
+  with pytest.raises(RuntimeError, match="server close failed"):
+    await server.close()
+  assert [call.args[0] for call in shutdown_records.call_args_list] == ["network_close_begin"]
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_models_close_checkpoints_record_only_successful_completion(monkeypatch, shutdown_records, failed):
+  source = SimpleNamespace(close=Mock(side_effect=RuntimeError("models close failed") if failed else None))
+  monkeypatch.setitem(sys.modules, "openpilot.selfdrive.addon.cluster.cluster_models", SimpleNamespace(ClusterModels=lambda **_kwargs: source))
+  monkeypatch.setattr(network, "signal", SimpleNamespace(SIGTERM=15, signal=Mock()))
+
+  async def serve(_config, _models):
+    pass
+
+  monkeypatch.setattr(network, "serve_h264", serve)
+  if failed:
+    with pytest.raises(RuntimeError, match="models close failed"):
+      network.run_h264_cluster(config())
+  else:
+    network.run_h264_cluster(config())
+  expected = ["models_close_begin"] + ([] if failed else ["models_close_end"])
+  assert [call.args[0] for call in shutdown_records.call_args_list] == expected
 
 
 @pytest.mark.parametrize("profile,height", [("1920x480", 480), ("1920x720", 720)])

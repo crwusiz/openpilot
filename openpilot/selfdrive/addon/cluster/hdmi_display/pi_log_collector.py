@@ -294,6 +294,171 @@ def snapshot(pid, proc_root='/proc', readlink=os.readlink):
 if __name__ == '__main__':
     print('\n'.join(snapshot(sys.argv[1] if len(sys.argv) == 2 else '')))
 """
+REMOTE_NETWORK_JOURNAL_SCRIPT = r"""from datetime import datetime, timezone
+import json
+import os
+import re
+import shutil
+import signal
+import subprocess
+
+RAW_LIMIT = 256 * 1024
+SECTION_LIMIT = 8 * 1024
+QUERY_ROWS = 128
+OUTPUT_ROWS = 64
+STATES = frozenset(('unknown', 'unmanaged', 'unavailable', 'disconnected', 'prepare', 'config', 'need-auth',
+                    'ip-config', 'ip-check', 'secondaries', 'activated', 'deactivating', 'failed'))
+SUPPLICANT_STATES = frozenset(('disconnected', 'inactive', 'interface_disabled', 'scanning', 'authenticating',
+                              'associating', 'associated', '4way_handshake', 'group_handshake', 'completed'))
+REASONS = frozenset(('none', 'unknown', 'now-managed', 'now-unmanaged', 'config-failed', 'ip-config-unavailable',
+                     'ip-config-expired', 'no-secrets', 'supplicant-disconnect', 'supplicant-config-failed',
+                     'supplicant-failed', 'supplicant-timeout', 'supplicant-available', 'dhcp-start-failed',
+                     'dhcp-error', 'dhcp-failed', 'autoip-start-failed', 'autoip-error', 'autoip-failed',
+                     'shared-start-failed', 'shared-failed', 'user-requested', 'carrier', 'connection-removed',
+                     'new-activation', 'parent-changed', 'parent-managed-changed', 'ssid-not-found', 'sleeping',
+                     'unmanaged', 'external-down', 'connection-assumed', 'connection-assumed-failed'))
+NM_STATE = re.compile(r"device \(wlan0\): state change: ([a-z-]+) -> ([a-z-]+) "
+                      r"\(reason '([a-z-]+)'(?:, sys-iface-state: '[a-z-]+')?\)$")
+NM_SUPPLICANT = re.compile(r'device \(wlan0\): supplicant interface state: ([a-z0-9_-]+) -> ([a-z0-9_-]+)$')
+MAC = r'(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}'
+KERNEL_REASON = re.compile(r'wlan0: (deauthenticated|disassociated|deauthenticating|disassociating) from ' + MAC
+                           + r'(?: by local choice)? \(Reason: ([0-9]{1,5})(?:=[A-Z0-9_]+)?\)$')
+KERNEL_SIMPLE = (
+    (re.compile(r'wlan0: [Cc]onnection to AP ' + MAC + r' lost$'), 'connection_lost'),
+    (re.compile(r'wlan0: authenticate with ' + MAC + r'(?: \(local address=' + MAC + r'\))?$'), 'authenticating'),
+    (re.compile(r'wlan0: authenticated$'), 'authenticated'),
+    (re.compile(r'wlan0: associate with ' + MAC + r' \(try [0-9]{1,3}/[0-9]{1,3}\)$'), 'associating'),
+    (re.compile(r'wlan0: associated$'), 'associated'),
+    (re.compile(r'wlan0: authentication with ' + MAC + r' timed out$'), 'authentication_timeout'),
+    (re.compile(r'wlan0: association with ' + MAC + r' timed out$'), 'association_timeout'),
+    (re.compile(r'wlan0: beacon (?:loss|timeout)$'), 'beacon_loss'),
+)
+QUERIES = (
+    ('networkmanager', ['-u', 'NetworkManager.service'], r'device \(wlan0\): (state change:|supplicant interface state:)'),
+    ('kernel', ['_TRANSPORT=kernel'], r'wlan0: (deauthenticat|disassociat|authenticat|associat|[Cc]onnection to AP|beacon)'),
+)
+
+
+def read_events(arguments, pattern):
+    timeout, journal = shutil.which('timeout'), shutil.which('journalctl')
+    if timeout is None or journal is None:
+        return [], 'required_tool_unavailable', False
+    command = [timeout, '--signal=KILL', '1s', journal, '--utc', '--no-pager', '--output=json', '--reverse',
+               *arguments, '--grep=' + pattern, '-n', str(QUERY_ROWS)]
+    try:
+        process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                   start_new_session=True)
+    except OSError:
+        return [], 'query_unavailable', False
+    data, limited, read_failed = bytearray(), False, False
+    status = None
+    try:
+        while True:
+            chunk = process.stdout.read(min(4096, RAW_LIMIT + 1 - len(data)))
+            if not chunk:
+                break
+            data.extend(chunk)
+            if len(data) > RAW_LIMIT:
+                limited = True
+                break
+    except (OSError, ValueError):
+        read_failed = True
+    finally:
+        try:
+            process.stdout.close()
+        except OSError:
+            read_failed = True
+        # Leave timeout alive to terminate its journal child at the deadline.
+        # Killing only that supervisor at the byte cap could strand the child.
+        try:
+            status = process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (AttributeError, OSError):
+                try:
+                    process.kill()
+                except OSError:
+                    pass
+            try:
+                status = process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                read_failed = True
+    if limited:
+        data = data[:RAW_LIMIT].rsplit(b'\n', 1)[0] if b'\n' in data[:RAW_LIMIT] else b''
+    result = ('query_read_failed' if read_failed else 'scan_limited' if limited else 'ok' if status == 0
+              else 'query_timeout_or_killed' if status in (124, 137, -9) else 'query_unavailable_or_empty')
+    return data.decode('utf-8', errors='replace').splitlines()[:QUERY_ROWS], result, limited
+
+
+def event_fields(message, source):
+    if source == 'networkmanager':
+        state = NM_STATE.search(message)
+        if state and state[1] in STATES and state[2] in STATES:
+            reason = state[3] if state[3] in REASONS else 'unknown'
+            return 'event=device_state from=' + state[1] + ' to=' + state[2] + ' reason=' + reason
+        state = NM_SUPPLICANT.search(message)
+        if state and state[1] in SUPPLICANT_STATES and state[2] in SUPPLICANT_STATES:
+            return 'event=supplicant_state from=' + state[1] + ' to=' + state[2]
+    elif source == 'kernel':
+        match = KERNEL_REASON.fullmatch(message)
+        if match and int(match[2]) <= 65535:
+            return 'event=' + match[1] + ' reason_code=' + str(int(match[2]))
+        for pattern, name in KERNEL_SIMPLE:
+            if pattern.fullmatch(message):
+                return 'event=' + name
+    return None
+
+
+def sanitize_record(line, source):
+    try:
+        record = json.loads(line)
+        if not isinstance(record, dict) or not isinstance(record.get('MESSAGE'), str):
+            return None
+        timestamp = record.get('__REALTIME_TIMESTAMP')
+        if not isinstance(timestamp, str) or re.fullmatch(r'[0-9]{1,20}', timestamp) is None:
+            return None
+        stamp = datetime.fromtimestamp(int(timestamp) / 1000000, timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+        fields = event_fields(record['MESSAGE'], source)
+        if fields is None:
+            return None
+        boot = record.get('_BOOT_ID')
+        boot_field = ' boot_id=' + boot.lower() if isinstance(boot, str) and re.fullmatch(r'[0-9a-fA-F]{32}', boot) else ''
+        mono = record.get('__MONOTONIC_TIMESTAMP')
+        mono_field = ' mono_s=' + f'{int(mono) / 1000000:.6f}' if isinstance(mono, str) and re.fullmatch(r'[0-9]{1,20}', mono) else ''
+        return 'utc=' + stamp + ' source=' + source + ' interface=wlan0 ' + fields + boot_field + mono_field
+    except (ValueError, TypeError, OverflowError, OSError, RecursionError):
+        return None
+
+
+def section(source, lines, status, raw_limited):
+    output = '\n--- Pi Wi-Fi ' + source + ' transitions (UTC, newest first) ---\n'
+    output += 'scope=bounded available journal boots; raw_messages_omitted=1\n'
+    output += 'status=' + status + ' raw_scan_limited=' + str(int(raw_limited)) + '\n'
+    marker = '[WIFI JOURNAL SECTION LIMITED: older events omitted]\n'
+    count = 0
+    for line in lines:
+        event = sanitize_record(line, source)
+        if event is None:
+            continue
+        if count >= OUTPUT_ROWS or len((output + event + '\n' + marker).encode('utf-8')) > SECTION_LIMIT:
+            output += marker
+            break
+        output += event + '\n'
+        count += 1
+    return output
+
+
+def main():
+    for source, arguments, pattern in QUERIES:
+        lines, status, limited = read_events(arguments, pattern)
+        print(section(source, lines, status, limited), end='')
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
+"""
 REMOTE_SCRIPT = r"""export LC_ALL=C SYSTEMD_COLORS=0
 printf '%s\n' '--- Pi UTC wall clock ---'
 date -u '+%Y-%m-%dT%H:%M:%SZ'
@@ -398,7 +563,9 @@ for field in rmem_default rmem_max; do
     cat "/proc/sys/net/core/$field"
   fi
 done
-""" + "python3 -c " + shlex.quote(REMOTE_UDP_SCRIPT) + ' "$pid"\n' + "python3 -c " + shlex.quote(REMOTE_JOURNAL_SCRIPT) + "\n"
+""" + "python3 -c " + shlex.quote(REMOTE_UDP_SCRIPT) + ' "$pid"\n' \
+  + "python3 -c " + shlex.quote(REMOTE_NETWORK_JOURNAL_SCRIPT) + "\n" \
+  + "python3 -c " + shlex.quote(REMOTE_JOURNAL_SCRIPT) + "\n"
 REMOTE_COMMAND = "sh -c " + shlex.quote(REMOTE_SCRIPT)
 
 

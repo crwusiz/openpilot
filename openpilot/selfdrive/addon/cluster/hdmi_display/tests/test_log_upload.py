@@ -9,6 +9,8 @@ from unittest.mock import Mock
 
 import pytest
 
+from openpilot.selfdrive.addon.cluster.cluster_logging import SHUTDOWN_STAGES
+
 
 ROOT = Path(__file__).resolve().parents[6]
 GIT_BASH = Path("C:/Program Files/Git/bin/bash.exe")
@@ -194,6 +196,8 @@ def test_empty_rotated_crash_is_not_uploaded_or_snapshotted(sandbox):
 NORMAL_START = b"[2026-10-21 08:32:09] [CLUSTER_PROCESS_START] pid=7329 native_bootstrap=0\n"
 NORMAL_EXIT = (b"[2026-10-21 09:15:30] [CLUSTER_PROCESS_EXIT] pid=7329 exit_code=0 reason=normal_exit "
                + b"manager_stop=1 logs=/data/log/cluster_debug.log,/data/log/cluster_crash.log\n")
+NORMAL_SHUTDOWN = b"".join(("[2026-11-17 12:20:11] [CLUSTER_SHUTDOWN_STAGE] pid=7329 mono=123.500000 stage="
+                            + stage + "\n").encode("ascii") for stage in sorted(SHUTDOWN_STAGES))
 
 
 def test_crash_classification_ignores_only_known_normal_records_and_preserves_bytes(sandbox):
@@ -201,6 +205,8 @@ def test_crash_classification_ignores_only_known_normal_records_and_preserves_by
             NORMAL_START + b"\n" + NORMAL_EXIT, NORMAL_EXIT.replace(b"manager_stop=1", b"manager_stop=0"),
             NORMAL_EXIT.replace(b"exit_code=0 reason=normal_exit", b"exit_code=-2 reason=SIGINT"),
             NORMAL_EXIT.replace(b"exit_code=0 reason=normal_exit", b"exit_code=-15 reason=SIGTERM"),
+            NORMAL_SHUTDOWN, NORMAL_START + NORMAL_SHUTDOWN + NORMAL_EXIT,
+            NORMAL_SHUTDOWN.replace(b"\n", b"\r\n"),
             (NORMAL_START + NORMAL_EXIT).replace(b"\n", b"\r\n")]
   diagnostic = [b"Fatal Python error: Segmentation fault\n", b"Traceback (most recent call last):\n",
                 b"[CLUSTER_CRASH] stage=process exit", b"unknown failure\x00\xff\r\n", b"\x00", b"\xff",
@@ -210,6 +216,13 @@ def test_crash_classification_ignores_only_known_normal_records_and_preserves_by
                 NORMAL_EXIT.replace(b"exit_code=0 reason=normal_exit", b"exit_code=1 reason=error_exit"),
                 NORMAL_EXIT.replace(b"exit_code=0 reason=normal_exit", b"exit_code=-9 reason=SIGKILL"),
                 NORMAL_EXIT.replace(b"exit_code=0 reason=normal_exit", b"exit_code=-2 reason=SIGINT").replace(b"manager_stop=1", b"manager_stop=0"),
+                NORMAL_SHUTDOWN + b"Fatal Python error: Aborted\nThread: native worker\n",
+                NORMAL_SHUTDOWN[:-4], NORMAL_SHUTDOWN.replace(b"launcher_finalize_begin", b"unknown_stage"),
+                NORMAL_SHUTDOWN.replace(b"mono=123.500000", b"mono=nan"),
+                NORMAL_SHUTDOWN.replace(b"mono=123.500000", b"mono=-1.500000"),
+                NORMAL_SHUTDOWN.replace(b"mono=123.500000", b"mono=123.5"),
+                NORMAL_SHUTDOWN.replace(b"pid=7329", b"pid=-1"),
+                NORMAL_SHUTDOWN.replace(b"stage=network_close_end", b"stage=network_close_end detail=unknown"),
                 b"[2026-10-21 09:15:30] [CLUSTER_PROCESS_EX", b"\xff" * (300 * 1024),
                 NORMAL_START + b"[CLUSTER_CRASH]" + b"x" * (300 * 1024)]
   script = sandbox / "scripts/log_upload.sh"
@@ -235,7 +248,7 @@ done
 
 @pytest.mark.parametrize("transport", ["network", "usb"])
 def test_normal_start_and_exit_crash_files_are_omitted_without_touching_originals(sandbox, transport):
-  current = NORMAL_START + b"\n" + NORMAL_EXIT
+  current = NORMAL_START + b"\n" + NORMAL_SHUTDOWN + NORMAL_EXIT
   sandbox.parent.joinpath("cluster_crash.log").write_bytes(current)
   sandbox.parent.joinpath("cluster_crash.log.1").write_bytes(NORMAL_START)
   result = _upload(sandbox, MOCK_CLUSTER_TRANSPORT=transport)
@@ -247,6 +260,20 @@ def test_normal_start_and_exit_crash_files_are_omitted_without_touching_original
   assert sandbox.parent.joinpath("cluster_crash.log.1").read_bytes() == NORMAL_START
   assert not list(sandbox.parent.joinpath(".cluster-pi-pending").glob("pending.*"))
   assert "CLUSTER_LOG_WARNING:" not in result.stdout
+
+
+@pytest.mark.parametrize("suffix", [b"Fatal Python error: Aborted\nThread: native worker\n",
+                                    b"[CLUSTER_SHUTDOWN_STAGE] pid=7329 mono=123.500000 stage=unknown\n",
+                                    b"[2026-11-17 12:20:11] [CLUSTER_SHUTDOWN_STAGE] pid=7329 mono=123.5"])
+def test_shutdown_breadcrumbs_do_not_hide_mixed_or_incomplete_crash_uploads(sandbox, suffix):
+  content = NORMAL_START + NORMAL_SHUTDOWN + suffix
+  sandbox.parent.joinpath("cluster_crash.log").write_bytes(content)
+  result = _upload(sandbox, MOCK_CLUSTER_TRANSPORT="usb")
+  assert result.returncode == 0, result.stderr
+  names = sandbox.parent.joinpath("upload-names.txt").read_text().splitlines()
+  assert len(names) == 2 and names[1].endswith("_cluster_crash.log")
+  assert sandbox.parent.joinpath("uploaded/cluster_crash.log").read_bytes() == content
+  assert sandbox.parent.joinpath("cluster_crash.log").read_bytes() == content
 
 
 @pytest.mark.parametrize("filename", ["cluster_crash.log", "cluster_crash.log.1"])

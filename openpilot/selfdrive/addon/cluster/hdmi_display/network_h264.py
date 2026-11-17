@@ -13,7 +13,7 @@ import threading
 import time
 
 from openpilot.selfdrive.addon.cluster.cluster_health_guard import ClusterHealthGuard
-from openpilot.selfdrive.addon.cluster.cluster_logging import flog
+from openpilot.selfdrive.addon.cluster.cluster_logging import flog, record_shutdown_stage
 from openpilot.selfdrive.addon.cluster.cluster_runtime_metrics import ClusterRuntimeMetrics
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_bitrate import ClusterBitrateController, SAMPLE_INTERVAL
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import write_network_status
@@ -359,6 +359,7 @@ class H264NetworkServer:
     flog(f"[CLUSTER_NETWORK_LISTEN] codec=h264 | transport=webrtc | signaling={self.config.network_bind_host}:{self.config.network_port}")
 
   async def close(self):
+    record_shutdown_stage("network_close_begin")
     server, self.server = self.server, None
     try:
       if server is not None:
@@ -375,6 +376,7 @@ class H264NetworkServer:
     finally:
       self.bitrate.close()
       publish_status(None)
+    record_shutdown_stage("network_close_end")
 
   async def _network_budget(self, writer, stream):
     self.bitrate.reset_connection()
@@ -589,8 +591,10 @@ class H264NetworkServer:
           # Stop/join the native send loop and PLI callbacks before releasing
           # their producer socket or clearing its pending keyframe request.
           if stream is not None:
+            record_shutdown_stage("native_stream_stop_begin")
             with contextlib.suppress(Exception, asyncio.CancelledError):
               await asyncio.wait_for(stream.stop(), 3)
+              record_shutdown_stage("native_stream_stop_end")
         finally:
           if track is not None:
             track.stop()
@@ -647,7 +651,8 @@ async def serve_h264(config, models):
 def run_h264_cluster(config):
   from openpilot.selfdrive.addon.cluster.cluster_models import ClusterModels
   def stop(signum, _frame):
-    flog(f"[CLUSTER_MAIN] H.264 stop signal received: {signum}")
+    # A signal can interrupt flog() while its non-reentrant lock is held.
+    # Unwind first; logging here would deadlock that same owner thread.
     raise KeyboardInterrupt
   signal.signal(signal.SIGTERM, stop)
   models = ClusterModels(defer_render_updates=True)
@@ -656,4 +661,6 @@ def run_h264_cluster(config):
   except KeyboardInterrupt:
     flog("[CLUSTER_MAIN] H.264 interrupted.")
   finally:
+    record_shutdown_stage("models_close_begin")
     models.close()
+    record_shutdown_stage("models_close_end")
