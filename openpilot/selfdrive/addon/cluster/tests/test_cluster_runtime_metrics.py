@@ -119,6 +119,46 @@ def test_manager_pid_changes_are_recorded_once_and_comm_issue_queue_is_bounded(c
   assert len(health['diagnostic_events']) == 16 and health['comm_issue_log_total'] == 40
 
 
+def test_received_model_failure_is_latched_without_comm_count_or_repeated_polling(cluster_models):
+  state = cluster_models
+  state.updated['errorLogMessage'] = True
+  state.messages['errorLogMessage'] = json.dumps({
+    'msg': 'big model failed, fall back to small', 'filename': 'modeld.py', 'module': 'modeld',
+    'ctx': {'daemon': 'modeld', 'private': 'never copy'}, 'process': 52780, 'created': 1794967714.5,
+    'exc_info': 'Traceback (most recent call last):\n  File "modeld.py", line 437, in main\nRuntimeError: GPU timed out',
+  })
+  state.models._update_health_data()
+  state.updated['errorLogMessage'] = False
+  for _ in range(5):
+    state.models._update_health_data()
+  health = state.models.get_health_data()
+  assert health['comm_issue_log_total'] == 0 and health['drive_fault_alert'] == ''
+  event, = health['diagnostic_events']
+  assert event['event'] == 'modeld_failure' and event['failure_kind'] == 'run_fallback'
+  assert event['exception_type'] == 'RuntimeError' and 'GPU timed out' in event['traceback']
+  assert event['process'] == 52780 and event['mono'] == state.clock.now and 'ctx' not in event
+  assert state.models.get_health_data()['diagnostic_events'] == ()
+  # Ordinary commIssue handling and its existing counter remain independent.
+  state.updated['errorLogMessage'] = True
+  state.messages['errorLogMessage'] = json.dumps({'msg': {'event': 'commIssue', 'not_alive': ['modelV2']}})
+  state.models._update_health_data()
+  health = state.models.get_health_data()
+  assert health['comm_issue_log_total'] == 1 and health['diagnostic_events'][0]['event'] == 'commIssue'
+
+
+def test_model_failure_events_share_the_existing_bounded_diagnostic_queue(cluster_models):
+  state = cluster_models
+  state.updated['errorLogMessage'] = True
+  state.messages['errorLogMessage'] = json.dumps({
+    'msg': 'big model load failed', 'filename': 'modeld.py', 'module': 'modeld', 'ctx': {}, 'process': 52780,
+  })
+  for _ in range(40):
+    state.models._update_health_data()
+  health = state.models.get_health_data()
+  assert len(health['diagnostic_events']) == 16 and health['comm_issue_log_total'] == 0
+  assert all(event['event'] == 'modeld_failure' for event in health['diagnostic_events'])
+
+
 def test_health_latches_transient_model_drop_and_locationd_errors(cluster_models):
   state = cluster_models
   state.updated.update(modelV2=True, deviceMotion=True)

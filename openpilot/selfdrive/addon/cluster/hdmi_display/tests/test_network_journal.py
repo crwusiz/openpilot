@@ -27,6 +27,10 @@ def record(message, **fields):
    + "(reason 'user-requested', sys-iface-state: 'managed')", "event=device_state from=activated to=deactivating reason=user-requested"),
   ("device (wlan0): state change: config -> failed (reason 'private-profile')", "event=device_state from=config to=failed reason=unknown"),
   ("device (wlan0): supplicant interface state: completed -> disconnected", "event=supplicant_state from=completed to=disconnected"),
+  ("device (wlan0): state change: activated -> disconnected (reason 'none', managed-type: 'full')",
+   "event=device_state from=activated to=disconnected reason=none"),
+  ("device (wlan0): state change: config -> failed (reason 'private-profile', managed-type: 'private-profile')",
+   "event=device_state from=config to=failed reason=unknown"),
 ])
 def test_networkmanager_rebuilds_only_fixed_states_and_known_reason(remote_network, message, expected):
   event = remote_network.sanitize_record(record(message), "networkmanager")
@@ -34,6 +38,20 @@ def test_networkmanager_rebuilds_only_fixed_states_and_known_reason(remote_netwo
   assert "mono_s=123.400000" in event
   assert "boot_id=" + "a" * 32 in event
   assert "private" not in event and "<info>" not in event and "[1700000000.0]" not in event
+  assert "sys-iface-state" not in event and "managed-type" not in event
+
+
+@pytest.mark.parametrize("suffix", [
+  ", managed-type: 'full'",  # Missing the closing event parenthesis.
+  ", managed-type: 'full') private-ssid",
+  ", managed-type: 'private profile')",
+  ", managed-type: 'full', profile: 'private-profile')",
+  ", profile: 'private-profile')",
+  ", managed-type: '" + "a" * 33 + "')",
+])
+def test_malformed_or_unknown_management_suffixes_never_copy_private_tails(remote_network, suffix):
+  message = "device (wlan0): state change: activated -> disconnected (reason 'none'" + suffix
+  assert remote_network.sanitize_record(record(message), "networkmanager") is None
 
 
 @pytest.mark.parametrize("message,event", [
@@ -133,6 +151,55 @@ def test_section_limits_include_headers_markers_rows_and_complete_records(remote
   assert "WIFI JOURNAL SECTION LIMITED" in section and "raw_scan_limited=1" in section
   assert "private-host" not in section
   assert all(line.startswith("utc=") for line in section.splitlines() if "utc=" in line)
+
+
+def counters(section):
+  line = next(line for line in section.splitlines() if line.startswith("source_rows="))
+  return {key: int(value) for key, value in (field.split("=", 1) for field in line.split())}
+
+
+def test_section_counts_recognized_ignored_and_emitted_rows_without_copying_them(remote_network):
+  rows = [record("device (wlan0): state change: activated -> disconnected (reason 'none', managed-type: 'full')"),
+          "not-json private-password", record("private-ssid"),
+          record("device (wlan0): supplicant interface state: completed -> disconnected")]
+  section = remote_network.section("networkmanager", rows, "ok", False)
+  assert counters(section) == {"source_rows": 4, "matched_events": 2, "emitted_events": 2, "ignored_rows": 2, "omitted_events": 0}
+  assert section.count("utc=") == 2 and "private" not in section
+  assert "WIFI JOURNAL SECTION LIMITED" not in section
+
+
+def test_successful_query_with_only_ignored_rows_is_distinct_from_an_empty_query(remote_network):
+  ignored = remote_network.section("networkmanager", ["invalid-json", record("private-ssid")], "ok", False)
+  empty = remote_network.section("networkmanager", [], "ok", False)
+  assert "status=ok" in ignored and "status=ok" in empty
+  assert counters(ignored) == {"source_rows": 2, "matched_events": 0, "emitted_events": 0, "ignored_rows": 2, "omitted_events": 0}
+  assert counters(empty) == dict.fromkeys(counters(ignored), 0)
+  assert "private" not in ignored and "utc=" not in ignored
+
+
+def test_row_and_byte_omissions_are_counted_inside_the_section_budget(remote_network):
+  short = record("wlan0: associated", _BOOT_ID=None, __MONOTONIC_TIMESTAMP=None)
+  row_limited = remote_network.section("kernel", [short] * 128, "ok", False)
+  counts = counters(row_limited)
+  assert counts == {"source_rows": 128, "matched_events": 128, "emitted_events": 64, "ignored_rows": 0, "omitted_events": 64}
+  long = record("device (wlan0): state change: activated -> deactivating (reason 'user-requested', managed-type: 'full')")
+  byte_limited = remote_network.section("networkmanager", [long] * 128, "ok", False)
+  counts = counters(byte_limited)
+  assert 0 < counts["emitted_events"] < 64
+  assert counts["matched_events"] == counts["emitted_events"] + counts["omitted_events"] == 128
+  assert counts["ignored_rows"] == 0 and byte_limited.count("utc=") == counts["emitted_events"]
+  assert all(len(section.encode()) <= 8192 for section in (row_limited, byte_limited))
+  assert all("WIFI JOURNAL SECTION LIMITED" in section for section in (row_limited, byte_limited))
+
+
+def test_section_recognition_work_is_limited_to_the_source_query_budget(remote_network):
+  namespace = remote_network.section.__globals__
+  parse = Mock(wraps=remote_network.sanitize_record)
+  namespace["sanitize_record"] = parse
+  section = remote_network.section("kernel", [record("wlan0: associated")] * 1000, "ok", True)
+  assert parse.call_count == 128
+  assert counters(section)["source_rows"] == counters(section)["matched_events"] == 128
+  assert "raw_scan_limited=1" in section
 
 
 def test_optional_failures_and_event_flood_leave_the_receiver_query_last(remote_network, capsys):

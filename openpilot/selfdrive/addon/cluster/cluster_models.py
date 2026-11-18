@@ -14,6 +14,7 @@ from openpilot.common.transformations.camera import DEVICE_CAMERAS, view_frame_f
 from openpilot.common.transformations.orientation import rot_from_euler
 from openpilot.selfdrive.controls.radard import RADAR_TO_CAMERA
 from openpilot.selfdrive.addon.cluster.cluster_health_guard import DRIVING_FAULT_ALERTS, parse_comm_issue
+from openpilot.selfdrive.addon.cluster.cluster_modeld_diagnostics import parse_modeld_failure
 from openpilot.selfdrive.addon.navi_helpers import camera_limit_active, camera_limit_distance
 
 GearShifter = structs.CarState.GearShifter
@@ -376,6 +377,9 @@ class ClusterModels:
       event = parse_comm_issue(self.sm['errorLogMessage'])
       if event is not None:
         health['comm_issue_log_total'] += 1
+      else:
+        event = parse_modeld_failure(self.sm['errorLogMessage'])
+      if event is not None:
         event['mono'] = received_at
         self._diagnostic_events.append(event)
 

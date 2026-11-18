@@ -318,7 +318,7 @@ REASONS = frozenset(('none', 'unknown', 'now-managed', 'now-unmanaged', 'config-
                      'new-activation', 'parent-changed', 'parent-managed-changed', 'ssid-not-found', 'sleeping',
                      'unmanaged', 'external-down', 'connection-assumed', 'connection-assumed-failed'))
 NM_STATE = re.compile(r"device \(wlan0\): state change: ([a-z-]+) -> ([a-z-]+) "
-                      r"\(reason '([a-z-]+)'(?:, sys-iface-state: '[a-z-]+')?\)$")
+                      r"\(reason '([a-z-]+)'(?:, (?:sys-iface-state|managed-type): '[a-z-]{1,32}')?\)$")
 NM_SUPPLICANT = re.compile(r'device \(wlan0\): supplicant interface state: ([a-z0-9_-]+) -> ([a-z0-9_-]+)$')
 MAC = r'(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}'
 KERNEL_REASON = re.compile(r'wlan0: (deauthenticated|disassociated|deauthenticating|disassociating) from ' + MAC
@@ -432,21 +432,24 @@ def sanitize_record(line, source):
 
 
 def section(source, lines, status, raw_limited):
-    output = '\n--- Pi Wi-Fi ' + source + ' transitions (UTC, newest first) ---\n'
-    output += 'scope=bounded available journal boots; raw_messages_omitted=1\n'
-    output += 'status=' + status + ' raw_scan_limited=' + str(int(raw_limited)) + '\n'
+    # Count recognition separately from emission: a successful query whose
+    # rows all use an unrecognized format must not look like an empty journal.
+    rows = lines[:QUERY_ROWS]
+    events = [event for line in rows if (event := sanitize_record(line, source)) is not None]
+    prefix = '\n--- Pi Wi-Fi ' + source + ' transitions (UTC, newest first) ---\n'
+    prefix += 'scope=bounded available journal boots; raw_messages_omitted=1\n'
+    prefix += 'status=' + status + ' raw_scan_limited=' + str(int(raw_limited)) + '\n'
     marker = '[WIFI JOURNAL SECTION LIMITED: older events omitted]\n'
-    count = 0
-    for line in lines:
-        event = sanitize_record(line, source)
-        if event is None:
-            continue
-        if count >= OUTPUT_ROWS or len((output + event + '\n' + marker).encode('utf-8')) > SECTION_LIMIT:
+    for count in range(min(len(events), OUTPUT_ROWS), -1, -1):
+        counters = ('source_rows=' + str(len(rows)) + ' matched_events=' + str(len(events))
+                    + ' emitted_events=' + str(count) + ' ignored_rows=' + str(len(rows) - len(events))
+                    + ' omitted_events=' + str(len(events) - count) + '\n')
+        output = prefix + counters + ''.join(event + '\n' for event in events[:count])
+        if count < len(events):
             output += marker
-            break
-        output += event + '\n'
-        count += 1
-    return output
+        if len(output.encode('utf-8')) <= SECTION_LIMIT:
+            return output
+    return ''  # Defensive if a changed budget cannot fit even fixed metadata.
 
 
 def main():
