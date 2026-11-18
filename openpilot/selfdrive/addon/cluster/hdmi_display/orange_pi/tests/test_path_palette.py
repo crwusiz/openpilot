@@ -3,7 +3,7 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer, ColorBlendWorkspace, STOCK_PATH_GRADIENT
+from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer, ColorBlendWorkspace, LeadVehicle, StopPoint, STOCK_PATH_GRADIENT
 from openpilot.selfdrive.addon.cluster.cluster_render_support import Colors
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.scene_layers import LayeredRenderer, _gradient_palette
 
@@ -13,6 +13,122 @@ PALETTES = [
   (Colors.STEERING_PRESSED, [0.0, 0.5, 1.0]),
   ([(231, 7, 83, 0), (11, 193, 247, 255), (93, 19, 117, 37), (255, 233, 1, 189)], [0, 0.17, 0.61, 1]),
 ]
+
+
+def _make_path_renderer(renderer_class):
+  renderer = renderer_class.__new__(renderer_class)
+  renderer.camera_x, renderer.camera_y = 4, 5
+  renderer.camera_w, renderer.camera_h = 160, 80
+  renderer.camera_height = 1.0
+  renderer._source_to_panel = np.eye(3, dtype=np.float32)
+  renderer._color_blender = ColorBlendWorkspace(renderer.camera_w)
+  renderer._lead_vehicles = [LeadVehicle(20), LeadVehicle(20)]
+  renderer._lead_info = [{}, {}]
+  renderer._stop_point = StopPoint(20)
+  if isinstance(renderer, LayeredRenderer):
+    renderer.base_canvas = np.zeros((85, 164, 3), dtype=np.uint8)
+    renderer._path_frame = None
+  return renderer
+
+
+def _render_path(renderer, path, hud):
+  if isinstance(renderer, LayeredRenderer):
+    pixels, _, _ = renderer._render_path_layer(path, hud)
+    assert pixels is not None
+    return pixels
+  frame = np.full((85, 164, 3), 128, dtype=np.uint8)
+  return renderer._draw_model_path(frame, path, hud)[renderer.camera_y:, renderer.camera_x:]
+
+
+def _render_path_samples(renderer_class, acceleration, hud_updates):
+  renderer = _make_path_renderer(renderer_class)
+  # The first two points are behind the car. The valid path projects to the
+  # center column at rows 76, 66, ..., 16 with the camera offset removed.
+  path = {
+    "path_x": [-10, -5, 0, 10, 20, 30, 40, 50, 60],
+    "path_y": [0.0] * 9,
+    "path_z": [0.0] * 9,
+    "calib_transform": [[0, -10, 81], [-1, 0, 81], [0, 0, 1]],
+  }
+  if acceleration is not None:
+    path["acceleration_x"] = acceleration
+  hud = {"enabled": True, "lat_active": True, **hud_updates}
+  return _render_path(renderer, path, hud)[[68, 35], 77]
+
+
+@pytest.mark.parametrize("renderer_class", [ClusterRenderer, LayeredRenderer], ids=["usb", "hdmi"])
+@pytest.mark.parametrize("acceleration,hud_updates,expected_channels", [
+  pytest.param([2.0] * 9, {}, (1, 1), id="accelerating"),
+  pytest.param([-2.0] * 9, {}, (0, 0), id="decelerating"),
+  pytest.param([-2.0] * 6 + [2.0] * 3, {}, (0, 1), id="clipped-mixed-acceleration"),
+  pytest.param([-2.0] * 9, {"steering_pressed": True}, (2, 2), id="steering-torque"),
+  pytest.param([-2.0] * 9, {"enabled": False, "cruise_available": True}, (1, 1), id="cruise-ready"),
+  pytest.param([-2.0] * 9, {"enabled": False, "cruise_available": True, "steering_pressed": True}, (2, 2), id="cruise-ready-torque"),
+])
+def test_path_pixels_reflect_acceleration_and_steering(renderer_class, acceleration, hud_updates, expected_channels):
+  pixels = _render_path_samples(renderer_class, acceleration, hud_updates)
+  for rgb, channel in zip(pixels[:, :3], expected_channels, strict=True):
+    assert rgb[channel] > max(np.delete(rgb, channel)), rgb
+
+
+@pytest.mark.parametrize("renderer_class", [ClusterRenderer, LayeredRenderer], ids=["usb", "hdmi"])
+@pytest.mark.parametrize("acceleration,hud_updates,value,alpha", [
+  pytest.param([-2.0] * 9, {"enabled": False, "steering_pressed": True}, 0, 90, id="disengaged-with-torque"),
+  pytest.param(None, {}, 255, 30, id="legacy-state"),
+  pytest.param([-2.0], {}, 255, 30, id="insufficient-acceleration"),
+])
+def test_path_uses_solid_color_when_disengaged_or_gradient_unavailable(renderer_class, acceleration, hud_updates, value, alpha):
+  pixels = _render_path_samples(renderer_class, acceleration, hud_updates)
+  if renderer_class is LayeredRenderer:
+    expected = (round(value * alpha / 255),) * 3 + (alpha,)
+  else:
+    expected = (round(value * alpha / 255 + 128 * (1 - alpha / 255)),) * 3
+  np.testing.assert_array_equal(pixels, [expected, expected])
+
+
+@pytest.mark.parametrize("renderer_class", [ClusterRenderer, LayeredRenderer], ids=["usb", "hdmi"])
+@pytest.mark.parametrize("has_velocity,longitudinal_control,lead_distance,shows_stop", [
+  pytest.param(True, True, None, True, id="planned-stop"),
+  pytest.param(True, False, None, False, id="stock-longitudinal"),
+  pytest.param(True, True, 25.0, False, id="nearby-lead"),
+  pytest.param(False, True, None, False, id="legacy-state"),
+])
+def test_planned_stop_is_rendered_with_longitudinal_control_and_no_nearby_lead(
+    renderer_class, has_velocity, longitudinal_control, lead_distance, shows_stop):
+  renderer = _make_path_renderer(renderer_class)
+  path = {
+    "path_x": [0.0, 10.0, 20.0, 30.0, 40.0],
+    "path_y": [0.0] * 5,
+    "path_z": [0.0] * 5,
+    "calib_transform": [[0, -10, 81], [-1, 0, 81], [0, 0, 1]],
+    "model_frame_id": 17,
+  }
+  if has_velocity:
+    path["velocity_x"] = [4.0, 2.0, 0.0, 0.0, 0.0]
+  if lead_distance is not None:
+    path["leads"] = [{"present": True, "d_camera": lead_distance}]
+  hud = {"v_ego": 0.0, "enabled": True, "lat_active": True, "longitudinal_control": longitudinal_control}
+
+  initial = _render_path(renderer, path, hud)
+  for _ in range(60):
+    pixels = _render_path(renderer, path, hud)
+
+  if shows_stop:
+    assert renderer._stop_point.d == pytest.approx(15.0)
+    # The center of the stop bar is about 15 m ahead, inside the path at row 61.
+    assert np.all(pixels[61, 77] > initial[61, 77])
+    assert np.all(pixels[61, 77, :3] == pixels[61, 77, 0])
+    np.testing.assert_array_equal(pixels[45, 77], initial[45, 77])
+
+    # Camera frames may repeat the same model frame, while the car keeps moving.
+    moving_hud = {**hud, "v_ego": 6.0}
+    _render_path(renderer, path, moving_hud)
+    _render_path(renderer, path, moving_hud)
+    assert renderer._stop_point.d == pytest.approx(15.0 - 2 * 6.0 / 20)
+    _render_path(renderer, {**path, "model_frame_id": 18}, hud)
+    assert 15.0 - 2 * 6.0 / 20 < renderer._stop_point.d <= 15.0
+  else:
+    np.testing.assert_array_equal(pixels, initial)
 
 
 def _polygon(kind, width, height):

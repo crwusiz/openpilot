@@ -6,6 +6,7 @@ import numpy as np
 import raylib_nb as rl
 
 from openpilot.selfdrive.ui.mici.onroad import model_renderer
+from openpilot.selfdrive.ui.onroad import model_renderer as big_renderer
 from openpilot.selfdrive.ui.ui_state import UIStatus
 from openpilot.system.ui.lib.polygon import Gradient
 
@@ -49,12 +50,18 @@ class TestStopPoint(unittest.TestCase):
 
 
 class TestModelRendererUpdates(unittest.TestCase):
-  def make_renderer(self, longitudinal_control):
-    renderer = model_renderer.ModelRenderer.__new__(model_renderer.ModelRenderer)
+  def make_renderer(self, longitudinal_control, renderer_module=model_renderer):
+    renderer = renderer_module.ModelRenderer.__new__(renderer_module.ModelRenderer)
     renderer._longitudinal_control = longitudinal_control
-    renderer._lead_bars = [model_renderer.LeadVehicle(), model_renderer.LeadVehicle()]
-    renderer._lead_info = [model_renderer.LeadInfo(), model_renderer.LeadInfo()]
-    renderer._stop_point = model_renderer.StopPoint()
+    leads = [renderer_module.LeadVehicle(), renderer_module.LeadVehicle()]
+    if renderer_module is big_renderer:
+      renderer._lead_vehicles = leads
+      renderer._lane_lines = [SimpleNamespace(raw_points=np.empty((0, 3), dtype=np.float32)) for _ in range(4)]
+    else:
+      renderer._lead_bars = leads
+    renderer._lead_info = [renderer_module.LeadInfo(), renderer_module.LeadInfo()]
+    renderer._stop_point = renderer_module.StopPoint()
+    renderer._rect = rl.Rectangle(20, 30, 100, 100)
     renderer._path = SimpleNamespace(raw_points=np.array([[0, 0, 0], [100, 0, 0]], dtype=np.float32))
     renderer._get_lead_bar = Mock(return_value=np.array([[0, 0], [0, 5], [5, 5], [5, 0]], dtype=np.float32))
     return renderer
@@ -71,16 +78,28 @@ class TestModelRendererUpdates(unittest.TestCase):
     return type('SubMaster', (dict,), {'updated': {'modelV2': True}})(sm)
 
   def test_planned_stop_is_updated_and_projected_without_lane_lines(self):
-    renderer = self.make_renderer(longitudinal_control=True)
-    with patch.object(model_renderer.status_fade, 'weight', return_value=0.0):
-      for _ in range(120):
-        renderer._update_lead_bars(self.make_sm())
-    self.assertGreater(renderer._stop_point.fade_filter.x, 0.5)
-    self.assertEqual(renderer._stop_point.bar.shape, (4, 2))
-    lane, distance, lateral_offset = renderer._get_lead_bar.call_args.args
-    self.assertIs(lane, renderer._path.raw_points)
-    self.assertAlmostEqual(distance, 50 / 3 + model_renderer.RADAR_TO_CAMERA)
-    self.assertEqual(lateral_offset, 0.0)
+    for renderer_module, update_method in ((big_renderer, '_update_leads'), (model_renderer, '_update_lead_bars')):
+      with self.subTest(renderer=renderer_module.__name__):
+        renderer = self.make_renderer(longitudinal_control=True, renderer_module=renderer_module)
+        with (patch.object(big_renderer, 'ui_state', SimpleNamespace(status=UIStatus.ACTIVE)),
+              patch.object(model_renderer.status_fade, 'weight', return_value=0.0)):
+          for _ in range(120):
+            getattr(renderer, update_method)(self.make_sm())
+        self.assertGreater(renderer._stop_point.fade_filter.x, 0.5)
+        self.assertEqual(renderer._stop_point.bar.shape, (4, 2))
+        lane, distance, lateral_offset = renderer._get_lead_bar.call_args.args
+        self.assertIs(lane, renderer._path.raw_points)
+        self.assertAlmostEqual(distance, 50 / 3 + renderer_module.RADAR_TO_CAMERA)
+        self.assertEqual(lateral_offset, 0.0)
+
+        with patch.object(big_renderer, 'draw_polygon') as draw:
+          renderer._draw_lead_indicator()
+        draw.assert_called_once()
+        rect, points, color = draw.call_args.args
+        self.assertIs(rect, renderer._rect)
+        np.testing.assert_array_equal(points, renderer._stop_point.bar + renderer._draw_offset())
+        self.assertEqual((color.r, color.g, color.b), (255, 255, 255))
+        self.assertGreater(color.a, 0)
 
   def test_stock_longitudinal_keeps_radar_lead_labels_without_stop_bar(self):
     renderer = self.make_renderer(longitudinal_control=False)
@@ -112,17 +131,36 @@ class TestModelRendererUpdates(unittest.TestCase):
         self.assertEqual([color.a for color in colors], [0, 25, 89, 89, 102, 0])
         np.testing.assert_array_equal(draw.call_args.args[1], points + [20, 30])
 
-  def test_custom_steering_path_gradient_fades_without_mutating_source(self):
-    renderer = model_renderer.ModelRenderer.__new__(model_renderer.ModelRenderer)
-    renderer._rect = rl.Rectangle(0, 0, 100, 100)
-    renderer._path = SimpleNamespace(projected_points=np.array([[0, 0], [0, 5], [5, 5]], dtype=np.float32))
-    renderer._visible = 0.5
-    renderer._steering_pressed_gradient = Gradient((0, 1), (0, 0), [rl.Color(0, 100, 255, 200)], [0.0])
-    ui_state = SimpleNamespace(status=UIStatus.STEERING, enabled=True, steeringPressed=True)
-    with patch.object(model_renderer, 'ui_state', ui_state), patch.object(model_renderer, 'draw_polygon') as draw:
-      renderer._draw_path()
-    self.assertEqual(draw.call_args.kwargs['gradient'].colors[0].a, 100)
-    self.assertEqual(renderer._steering_pressed_gradient.colors[0].a, 200)
+  def test_path_style_priority_and_visibility_fade_match_big_ui(self):
+    points = np.array([[0, 0], [0, 5], [5, 5]], dtype=np.float32)
+    steering = Gradient((0, 1), (0, 0), [rl.Color(0, 100, 255, 200)], [0.0])
+    acceleration = Gradient((0, 1), (0, 0), [rl.Color(255, 0, 0, 80), rl.Color(0, 255, 0, 20)], [0.0, 1.0])
+    empty = Gradient((0, 1), (0, 0), [], [])
+    cases = (
+      (UIStatus.DISENGAGED, False, True, acceleration, False, (0, 0, 0, 90)),
+      (UIStatus.STEERING, True, True, acceleration, True, (0, 100, 255, 200)),
+      (UIStatus.READY, False, True, acceleration, True, (0, 100, 255, 200)),
+      (UIStatus.READY, False, False, acceleration, True, (13, 248, 122, 102)),
+      (UIStatus.ACTIVE, True, False, acceleration, True, (255, 0, 0, 80)),
+      (UIStatus.ACTIVE, True, False, empty, False, (255, 255, 255, 30)),
+    )
+    for renderer_class, visible, offset in ((big_renderer.ModelRenderer, 1.0, [0, 0]), (model_renderer.ModelRenderer, 0.5, [20, 30])):
+      renderer = renderer_class.__new__(renderer_class)
+      renderer._rect = rl.Rectangle(20, 30, 100, 100)
+      renderer._path = SimpleNamespace(projected_points=points)
+      renderer._visible = visible
+      renderer._steering_pressed_gradient = steering
+      for status, enabled, pressed, gradient, uses_gradient, rgba in cases:
+        with self.subTest(renderer=renderer_class.__module__, status=status, pressed=pressed, uses_gradient=uses_gradient):
+          renderer._path_gradient = gradient
+          ui_state = SimpleNamespace(status=status, enabled=enabled, steeringPressed=pressed)
+          with patch.object(big_renderer, 'ui_state', ui_state), patch.object(big_renderer, 'draw_polygon') as draw:
+            renderer._draw_path()
+          draw.assert_called_once()
+          color = draw.call_args.kwargs['gradient'].colors[0] if uses_gradient else draw.call_args.args[2]
+          self.assertEqual((color.r, color.g, color.b, color.a), (*rgba[:3], round(rgba[3] * visible)))
+          np.testing.assert_array_equal(draw.call_args.args[1], points + offset)
+    self.assertEqual(steering.colors[0].a, 200)
 
 
 if __name__ == '__main__':

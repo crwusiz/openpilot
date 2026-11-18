@@ -319,6 +319,7 @@ def test_invalid_scene_is_rejected_before_replacing_valid_state(scene, bad_state
 
 def test_renderer_and_scene_run_from_standalone_pi_bundle_without_openpilot(tmp_path):
   for source in (CLUSTER / "cluster_renderer.py", CLUSTER / "cluster_render_support.py",
+                 CLUSTER.parents[1] / "model_render_support.py",
                  CLUSTER / "hdmi_display/orange_pi/h264_scene.py", CLUSTER / "hdmi_display/orange_pi/h264_protocol.py",
                  CLUSTER / "hdmi_display/orange_pi/scene_layers.py", CLUSTER / "hdmi_display/orange_pi/path_worker.py"):
     shutil.copyfile(source, tmp_path / source.name)
@@ -328,9 +329,11 @@ sys.path.insert(0, sys.argv[1])
 sys.modules['openpilot'] = None
 import numpy as np
 from h264_scene import H264Scene
-from cluster_renderer import FirstOrderFilter, Colors
+from cluster_renderer import FirstOrderFilter, Colors, PlannedStopTracker, get_path_style
 assert FirstOrderFilter.__module__ == 'cluster_render_support'
 assert Colors.__module__ == 'cluster_render_support'
+assert PlannedStopTracker.__module__ == 'model_render_support'
+assert get_path_style.__module__ == 'model_render_support'
 scene=H264Scene(sys.argv[2], clock=lambda: 10.0)
 scene.update({'model_valid':False,'hud':{},'path':{},'source_size':[1344,760]})
 scene.set_video(np.zeros((720,1280,3),np.uint8))

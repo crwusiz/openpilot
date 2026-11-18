@@ -9,10 +9,22 @@ BUILD_FILES = (
   "control_socket.py", "cluster_receiver.py", "display_controls.py",
   "hdmi_display.py", "hdmi_profiles.py", "receiver_build.py", "receiver_resources.py", "texture_presenter.py", "touch_status.py",
   "h264_protocol.py", "h264_receiver.py", "h264_scene.py", "scene_layers.py", "path_worker.py",
-  "cluster_renderer.py", "cluster_render_support.py", "receiver_assets.txt",
+  "cluster_renderer.py", "cluster_render_support.py", "model_render_support.py", "receiver_assets.txt",
 )
 
 RETIRED_FILES = {"cluster_protocol.py", "frame_stream.py", "tcp_diagnostics.py"}
+_CHECKOUT_SOURCES = {
+  "cluster_renderer.py": "../../cluster_renderer.py",
+  "cluster_render_support.py": "../../cluster_render_support.py",
+  "model_render_support.py": "../../../../model_render_support.py",
+}
+
+
+def _runtime_source(directory, name):
+  bundled = directory / name
+  if name in _CHECKOUT_SOURCES and not (bundled.exists() or bundled.is_symlink()):
+    return directory / _CHECKOUT_SOURCES[name]
+  return bundled
 
 
 def package_digest(directory=None):
@@ -23,9 +35,9 @@ def package_digest(directory=None):
     for path in directory.glob(pattern):
       if path.name not in RETIRED_FILES:
         sources[path.relative_to(directory).as_posix()] = path
-  for name in ("cluster_renderer.py", "cluster_render_support.py"):
+  for name in _CHECKOUT_SOURCES:
     if name not in sources:
-      sources[name] = directory.parent.parent / name
+      sources[name] = _runtime_source(directory, name)
   asset_root = directory if (directory / "assets").is_dir() else directory.parents[3]
   assets = (directory / "receiver_assets.txt").read_text(encoding="ascii").splitlines()
   if not assets or len(assets) > 128 or len(set(assets)) != len(assets):
@@ -102,7 +114,7 @@ def source_fingerprint(directory=None):
   unreadable = []
   for name in BUILD_FILES:
     try:
-      digest = hashlib.sha256((directory / name).read_bytes()).hexdigest()
+      digest = hashlib.sha256(_runtime_source(directory, name).read_bytes()).hexdigest()
     except FileNotFoundError:
       digest = "missing"
       missing.append(name)

@@ -5,6 +5,10 @@ from openpilot.cereal import log, messaging
 from opendbc.car.structs import car
 from dataclasses import dataclass, field
 from openpilot.common.params import Params
+from openpilot.selfdrive.model_render_support import (
+  DISENGAGED_PATH_ALPHA, FALLBACK_PATH_ALPHA, PathStyle, PlannedStopTracker, get_path_style, get_planned_stop_distance,
+  STOP_SPEED as STOP_SPEED, STOP_APPEAR_DISTANCE as STOP_APPEAR_DISTANCE, STOP_LEAD_MARGIN as STOP_LEAD_MARGIN,
+)
 from openpilot.selfdrive.locationd.calibrationd import HEIGHT_INIT
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.polygon import draw_polygon, Gradient
@@ -51,17 +55,33 @@ class LeadVehicle:
     self.fade_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
 
 
+class StopPoint(PlannedStopTracker):
+  """Where the model plans to stop with no lead to stop behind, e.g. at a stop sign or red light."""
+  def __init__(self):
+    super().__init__(1 / gui_app.target_fps, RADAR_TO_CAMERA, FirstOrderFilter)
+    self.bar = np.empty((0, 2), dtype=np.float32)
+
+  def update(self, model, model_updated: bool, v_ego: float, lead_distances: list[float]) -> bool:
+    return self.update_from_model(model.position.x, model.velocity.x, model_updated, v_ego, lead_distances)
+
+  @staticmethod
+  def _get_planned_stop(model) -> float | None:
+    return get_planned_stop_distance(model.position.x, model.velocity.x)
+
+
 class ModelRenderer(Widget):
   LANE_LINE_WIDTHS = (0.025, 0.025, 0.025, 0.025)
   ROAD_EDGE_WIDTH = 0.025
 
   def __init__(self):
     super().__init__()
+    self._visible = 1.0
     self._longitudinal_control = False
     self._lane_line_probs = np.zeros(4, dtype=np.float32)
     self._road_edge_stds = np.zeros(2, dtype=np.float32)
     self._lead_vehicles = [LeadVehicle(), LeadVehicle()]
     self._lead_info = [LeadInfo(), LeadInfo()]
+    self._stop_point = StopPoint()
     self._path_offset_z = HEIGHT_INIT[0]
     self._speed = 0.0
     self._left_blindspot = False
@@ -161,6 +181,7 @@ class ModelRenderer(Widget):
     else:
       self._lead_vehicles = [LeadVehicle(), LeadVehicle()]
       self._lead_info = [LeadInfo(), LeadInfo()]
+      self._stop_point = StopPoint()
 
   def _update_raw_points(self, model):
     """Update raw 3D points from model data"""
@@ -207,6 +228,20 @@ class ModelRenderer(Widget):
       if visible:
         lead.bar = self._get_lead_bar(lane, lead.d_filter.update(d_rel), lead.y_filter.update(y_rel))
         self._lead_info[i] = lead_info[i]
+
+    self._update_stop_point(sm, leads, available, opacity)
+
+  def _update_stop_point(self, sm, leads, available, opacity):
+    lead_distances = [d_rel for present, d_rel, _ in leads if present]
+    stop = self._stop_point
+    planning_stop = stop.update(sm['modelV2'], sm.updated['modelV2'], sm['carState'].vEgo, lead_distances)
+    # The radar is at the front of the car, which is what stops at the planned stop.
+    d_stop = stop.d + RADAR_TO_CAMERA
+    path = self._path.raw_points
+    visible = self._longitudinal_control and available and planning_stop and 0.0 < d_stop < MAX_DRAW_DISTANCE and len(path) > 0
+    stop.fade_filter.update(opacity if visible else 0.0)
+    if visible:
+      stop.bar = self._get_lead_bar(path, d_stop, 0.0)
 
   def _get_lead_bar(self, lane, d_rel, y_rel):
     # bar on the road behind the lead, following the lane
@@ -334,15 +369,30 @@ class ModelRenderer(Widget):
     if not self._path.projected_points.size:
       return
 
-    if ui_state.enabled:
-      if ui_state.steeringPressed:
-        draw_polygon(self._rect, self._path.projected_points, gradient=self._steering_pressed_gradient)
-      elif len(self._path_gradient.colors) > 1:
-        draw_polygon(self._rect, self._path.projected_points, gradient=self._path_gradient)
-      else:
-        draw_polygon(self._rect, self._path.projected_points, colors_alpha(rl.WHITE, 30))
-    else:
-      draw_polygon(self._rect, self._path.projected_points, gradient=STOCK_PATH_GRADIENT)
+    path_pts = self._path.projected_points + self._draw_offset()
+    style = get_path_style(
+      disengaged=ui_state.status == UIStatus.DISENGAGED,
+      steering_pressed=ui_state.steeringPressed,
+      enabled=ui_state.enabled,
+      has_acceleration_gradient=len(self._path_gradient.colors) > 1,
+    )
+    if style is PathStyle.DISENGAGED:
+      draw_polygon(self._rect, path_pts, colors_alpha(rl.BLACK, round(DISENGAGED_PATH_ALPHA * self._visible)))
+      return
+    if style is PathStyle.FALLBACK:
+      draw_polygon(self._rect, path_pts, colors_alpha(rl.WHITE, round(FALLBACK_PATH_ALPHA * self._visible)))
+      return
+
+    gradients = {
+      PathStyle.STEERING: self._steering_pressed_gradient,
+      PathStyle.STOCK: STOCK_PATH_GRADIENT,
+      PathStyle.ACCELERATION: self._path_gradient,
+    }
+    gradient = gradients[style]
+    if self._visible < 1.0:
+      colors = [rl.Color(c.r, c.g, c.b, round(c.a * self._visible)) for c in gradient.colors]
+      gradient = Gradient(gradient.start, gradient.end, colors, gradient.stops)
+    draw_polygon(self._rect, path_pts, gradient=gradient)
 
   def _draw_lead_indicator(self):
     for lead, lead_info in zip(self._lead_vehicles, self._lead_info, strict=True):
@@ -364,6 +414,14 @@ class ModelRenderer(Widget):
       sign = "+" if spd_val > 0 else ""
       speed_text = f"{sign} {spd_val:.0f} {spd_unit}"
       self._draw_text_centered(center_x, center_y + 20, speed_text, 32, colors_alpha(v_color, alpha), self._font_bold)
+
+    self._draw_stop_point()
+
+  def _draw_stop_point(self):
+    stop = self._stop_point
+    alpha = int(255 * stop.fade_filter.x)
+    if stop.bar.size > 0 and alpha > 0:
+      draw_polygon(self._rect, stop.bar + self._draw_offset(), colors_alpha(rl.WHITE, alpha))
 
   def _draw_text_centered(self, x: float, y: float, text: str, font_size: int, color: rl.Color, font: rl.Font):
     text_size = measure_text_cached(font, text, font_size)

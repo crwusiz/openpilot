@@ -254,7 +254,7 @@ def test_install_repairs_existing_wifi_without_changing_receiver_or_desktop(scri
   package = scripts.parent
   for source in Path(__file__).resolve().parents[1].glob("*.py"):
     shutil.copyfile(source, package / source.name)
-  for name in ("README.md", "requirements.txt", "cluster_renderer.py", "cluster_render_support.py"):
+  for name in ("README.md", "requirements.txt", "cluster_renderer.py", "cluster_render_support.py", "model_render_support.py"):
     (package / name).touch()
   (package / "receiver_assets.txt").write_text("assets/fonts/NotoSansKR-Bold.ttf\n", encoding="utf-8")
   font = package / "assets/fonts/NotoSansKR-Bold.ttf"

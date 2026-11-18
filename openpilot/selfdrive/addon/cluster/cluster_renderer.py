@@ -1,3 +1,5 @@
+import colorsys
+import math
 import os
 import time
 from collections import OrderedDict
@@ -7,6 +9,11 @@ import cv2
 import numpy as np
 
 from PIL import Image, ImageDraw, ImageFont
+
+try:
+  from openpilot.selfdrive.model_render_support import DISENGAGED_PATH_ALPHA, FALLBACK_PATH_ALPHA, PathStyle, PlannedStopTracker, get_path_style
+except ImportError:
+  from model_render_support import DISENGAGED_PATH_ALPHA, FALLBACK_PATH_ALPHA, PathStyle, PlannedStopTracker, get_path_style
 
 try:
   from openpilot.common.filter_simple import FirstOrderFilter
@@ -66,12 +73,40 @@ CLIP_MARGIN = 500
 GRADIENT_BANDS = 8
 ALPHA_BLEND_STRIP_HEIGHT = 64
 MAX_DRAW_DISTANCE = 100.0
+LANE_LINE_WIDTH = 0.025
+ROAD_EDGE_WIDTH = 0.025
 LEAD_BAR_LENGTH = 12.0  # px
 LEAD_BAR_WIDTH = 1.8  # m
+RADAR_TO_CAMERA = 1.52  # m, matches radard for the standalone renderer
 TEXT_CACHE_MAX_ENTRIES = 256
 TEXT_CACHE_MAX_BYTES = 8 * 1024 * 1024
 
 STOCK_PATH_GRADIENT = [(13, 248, 122, 102), (114, 255, 92, 89), (114, 255, 92, 0)]
+
+
+def _acceleration_path_gradient(track_y, sample_indices, acceleration_x, height):
+  colors, stops = [], []
+  denominator = max(height - 1, 1)
+  for y, index in zip(track_y, sample_indices, strict=True):
+    if not 0 <= y < height or index >= len(acceleration_x):
+      continue
+    acceleration = acceleration_x[index]
+    if not math.isfinite(acceleration):
+      continue
+    stop = 1.0 - y / denominator
+    if stops and stop <= stops[-1]:
+      continue
+
+    # Use the main UI's HSL colors and distance fade for the projected path.
+    hue = min(max(60.0 + acceleration * 35.0, 0.0), 120.0) / 360.0
+    saturation = min(abs(acceleration * 1.5), 1.0)
+    lightness = 0.95 - 0.33 * saturation
+    alpha = 0.4 * min(max((0.75 - stop) / 0.375, 0.0), 1.0)
+    rgb = colorsys.hls_to_rgb(hue, lightness, saturation)
+    colors.append(tuple(int(channel * 255) for channel in (*rgb, alpha)))
+    stops.append(stop)
+
+  return colors, stops
 
 
 @lru_cache(maxsize=128)
@@ -180,6 +215,13 @@ class LeadVehicle:
     self.fade_filter = FirstOrderFilter(0.0, 0.1, 1 / fps)
 
 
+class StopPoint(PlannedStopTracker):
+  def __init__(self, fps):
+    super().__init__(1 / fps, RADAR_TO_CAMERA, FirstOrderFilter)
+    self.bar = np.empty((0, 2), dtype=np.float32)
+    self.model_frame_id = None
+
+
 class ClusterRenderer:
   def __init__(self, config):
     cloudlog.info("Initializing ClusterRenderer...")
@@ -205,8 +247,7 @@ class ClusterRenderer:
     self.row_h = self.content_h / 3.0
     self.row_centers = tuple(self.content_y + self.row_h * (row + 0.5) for row in range(3))
     self._source_to_panel = np.eye(3, dtype=np.float32)
-    self._lead_vehicles = [LeadVehicle(self.config.fps), LeadVehicle(self.config.fps)]
-    self._lead_info = [{}, {}]
+    self._reset_leads()
     self._last_render_at = None
 
     try:
@@ -338,6 +379,7 @@ class ClusterRenderer:
       for filter_, rc in ((lead.d_filter, 0.2), (lead.y_filter, 0.2), (lead.fade_filter, 0.1)):
         filter_.dt = dt
         filter_.update_alpha(rc)
+    self._stop_point.update_dt(dt)
 
   def _crop_and_resize(self, frame, canvas=None):
     source_h, source_w = frame.shape[:2]
@@ -386,12 +428,14 @@ class ClusterRenderer:
       )
     return pixels, valid
 
-  def _map_line_to_polygon(self, xs, ys, zs, width, z_offset, calib_transform, max_distance=100.0, allow_invert=True):
+  def _map_line_to_polygon(self, xs, ys, zs, width, z_offset, calib_transform, max_distance=100.0, allow_invert=True,
+                           *, return_indices=False):
     count = min(len(xs), len(ys), len(zs))
     if count < 2:
       return None
     raw = np.column_stack((xs[:count], ys[:count], zs[:count])).astype(np.float32)
-    raw = raw[(raw[:, 0] >= 0.0) & (raw[:, 0] <= max_distance)]
+    in_range = (raw[:, 0] >= 0.0) & (raw[:, 0] <= max_distance)
+    raw = raw[in_range]
     if len(raw) < 2:
       return None
     left = raw + np.array([0.0, -width, z_offset], dtype=np.float32)
@@ -406,6 +450,7 @@ class ClusterRenderer:
     right_px = right_px[valid]
 
     # Prevent the path polygon from folding back over itself on hills.
+    keep = slice(None)
     if not allow_invert and len(left_px) > 1:
       keep = left_px[:, 1] == np.minimum.accumulate(left_px[:, 1])
       left_px = left_px[keep]
@@ -413,7 +458,10 @@ class ClusterRenderer:
       if len(left_px) < 2:
         return None
 
-    return np.vstack((left_px, right_px[::-1])).astype(np.int32)
+    polygon = np.vstack((left_px, right_px[::-1])).astype(np.int32)
+    if return_indices:
+      return polygon, np.flatnonzero(in_range)[valid][keep]
+    return polygon
 
   @staticmethod
   def _fill_polygon_alpha(image, polygon, color, alpha, blender=None):
@@ -499,30 +547,56 @@ class ClusterRenderer:
                           self.camera_x:self.camera_x + self.camera_w]
     camera_height = float(path_data.get("camera_height", self.camera_height) or self.camera_height)
 
-    # Equivalent to ui_state.status != UIStatus.DISENGAGED for the cluster process.
-    if self._get_border_color(hud_data) != Colors.Border.DISENGAGED:
+    disengaged = self._get_border_color(hud_data) == Colors.Border.DISENGAGED
+    if not disengaged:
       self._draw_lane_lines(camera_region, path_data, calib_transform)
-      self._draw_path(camera_region, path_data, hud_data, calib_transform, camera_height)
+    self._draw_path(camera_region, path_data, hud_data, calib_transform, camera_height, disengaged=disengaged)
 
     self._update_leads(path_data, hud_data, calib_transform, camera_height)
     self._draw_lead_indicator(camera_region, hud_data)
+    self._draw_stop_point(camera_region)
 
     return frame
 
-  def _draw_path(self, camera_region, path_data, hud_data, calib_transform, camera_height):
+  def _draw_path(self, camera_region, path_data, hud_data, calib_transform, camera_height, *, disengaged):
     path_z = path_data.get("path_z") or [0.0] * len(path_data["path_x"])
-    path_poly = self._map_line_to_polygon(
+    enabled = hud_data.get("enabled", False)
+    steering_pressed = hud_data.get("steering_pressed", False)
+    acceleration_x = path_data.get("acceleration_x")
+    use_acceleration = (enabled and not (disengaged or steering_pressed)
+                        and acceleration_x is not None and len(acceleration_x) >= 2)
+    projected = self._map_line_to_polygon(
       path_data["path_x"], path_data["path_y"], path_z,
-      0.9, camera_height, calib_transform, max_distance=100.0, allow_invert=False,
+      0.9, camera_height, calib_transform, max_distance=100.0, allow_invert=False, return_indices=use_acceleration,
     )
-    if path_poly is not None:
-      local_path_poly = path_poly - np.array([self.camera_x, self.camera_y], dtype=np.int32)
-      if hud_data.get("steering_pressed"):
-        self._fill_polygon_gradient(camera_region, local_path_poly, Colors.STEERING_PRESSED, [0.0, 0.5, 1.0],
-                                    blender=getattr(self, "_color_blender", None))
-      else:
-        self._fill_polygon_gradient(camera_region, local_path_poly, STOCK_PATH_GRADIENT, [0.0, 0.5, 1.0],
-                                    blender=getattr(self, "_color_blender", None))
+    if projected is None:
+      return
+
+    model_colors, model_stops = [], []
+    if use_acceleration:
+      path_poly, indices = projected
+      track_y = path_poly[:len(indices), 1] - self.camera_y
+      model_colors, model_stops = _acceleration_path_gradient(track_y, indices, acceleration_x, camera_region.shape[0])
+    else:
+      path_poly = projected
+
+    style = get_path_style(disengaged=disengaged, steering_pressed=steering_pressed, enabled=enabled,
+                           has_acceleration_gradient=len(model_colors) > 1)
+    local_path_poly = path_poly - np.array([self.camera_x, self.camera_y], dtype=np.int32)
+    blender = getattr(self, "_color_blender", None)
+    if style is PathStyle.DISENGAGED:
+      self._fill_polygon_alpha(camera_region, local_path_poly, Colors.BLACK, DISENGAGED_PATH_ALPHA / 255.0, blender=blender)
+      return
+    if style is PathStyle.FALLBACK:
+      self._fill_polygon_alpha(camera_region, local_path_poly, Colors.WHITE, FALLBACK_PATH_ALPHA / 255.0, blender=blender)
+      return
+
+    if style is PathStyle.ACCELERATION:
+      colors, stops = model_colors, model_stops
+    else:
+      colors = Colors.STEERING_PRESSED if style is PathStyle.STEERING else STOCK_PATH_GRADIENT
+      stops = [0.0, 0.5, 1.0]
+    self._fill_polygon_gradient(camera_region, local_path_poly, colors, stops, blender=blender)
 
   def _draw_lane_lines(self, camera_region, path_data, calib_transform):
     lane_lines = path_data.get("lane_lines") or []
@@ -535,7 +609,7 @@ class ClusterRenderer:
       # and projecting both 3D boundaries before the alpha fill rejects it.
       if probability <= 0.0:
         continue
-      width = 0.025 * probability
+      width = LANE_LINE_WIDTH * probability
       polygon = self._map_line_to_polygon(*line, width, 0.0, calib_transform)
       if polygon is not None:
         local_polygon = polygon - np.array([self.camera_x, self.camera_y], dtype=np.int32)
@@ -550,7 +624,7 @@ class ClusterRenderer:
       confidence = 1.0 - float(road_stds[index]) if index < len(road_stds) else 0.0
       if confidence <= 0.0:
         continue
-      polygon = self._map_line_to_polygon(*edge, 0.025, 0.0, calib_transform)
+      polygon = self._map_line_to_polygon(*edge, ROAD_EDGE_WIDTH, 0.0, calib_transform)
       if polygon is not None:
         local_polygon = polygon - np.array([self.camera_x, self.camera_y], dtype=np.int32)
         self._fill_polygon_alpha(camera_region, local_polygon, colors_alpha(Colors.RED, 100), np.clip(confidence, 0.0, 1.0),
@@ -559,6 +633,7 @@ class ClusterRenderer:
   def _reset_leads(self):
     self._lead_vehicles = [LeadVehicle(self.config.fps), LeadVehicle(self.config.fps)]
     self._lead_info = [{}, {}]
+    self._stop_point = StopPoint(self.config.fps)
 
   def _update_leads(self, path_data, hud_data, calib_transform, camera_height):
     lead_info = list(path_data.get("leads") or [])[:2]
@@ -592,6 +667,36 @@ class ClusterRenderer:
         lead.bar = self._get_lead_bar(lane, lead.d_filter.update(d_rel), lead.y_filter.update(y_rel),
                                       path_data, calib_transform, camera_height)
         self._lead_info[i] = lead_info[i]
+
+    self._update_stop_point(path_data, hud_data, leads, available, opacity, calib_transform, camera_height)
+
+  def _update_stop_point(self, path_data, hud_data, leads, available, opacity, calib_transform, camera_height):
+    stop = self._stop_point
+    path_x = path_data["path_x"]
+    velocity_x = path_data.get("velocity_x") or []
+    model_frame_id = path_data.get("model_frame_id")
+    if model_frame_id is None and velocity_x:
+      model_frame_id = (tuple(path_x), tuple(velocity_x))
+    model_updated = model_frame_id != stop.model_frame_id
+    stop.model_frame_id = model_frame_id
+    lead_distances = [d_rel for present, d_rel, _ in leads if present]
+    planning_stop = stop.update_from_model(path_x, velocity_x, model_updated, float(hud_data.get("v_ego", 0.0) or 0.0), lead_distances)
+    d_stop = stop.d + stop.radar_to_camera
+    path_y, path_z = path_data.get("path_y") or [], path_data.get("path_z") or []
+    visible = (hud_data.get("longitudinal_control") and available and planning_stop and 0.0 < d_stop < MAX_DRAW_DISTANCE
+               and len(path_x) == len(path_y) == len(path_z) > 0)
+    stop.fade_filter.update(opacity if visible else 0.0)
+    if visible:
+      path = np.column_stack((path_x, path_y, path_z))
+      stop.bar = self._get_lead_bar(path, d_stop, 0.0, path_data, calib_transform, camera_height)
+
+  def _draw_stop_point(self, camera_region):
+    stop = self._stop_point
+    opacity = stop.fade_filter.x
+    if stop.bar.size and int(255 * opacity) > 0:
+      offset = np.array([self.camera_x, self.camera_y], dtype=np.float32)
+      polygon = (stop.bar - offset).astype(np.int32)
+      self._fill_polygon_alpha(camera_region, polygon, Colors.WHITE, opacity, blender=self._color_blender)
 
   def _get_lead_bar(self, lane, d_rel, y_rel, path_data, calib_transform, camera_height):
     # bar on the road behind the lead, following the lane

@@ -10,8 +10,8 @@ PROTOCOL_VERSION = 1
 MAX_CONTROL_SIZE = 64 * 1024
 HELLO, OFFER, ANSWER, STATE, FEEDBACK, ERROR, STATE_ZLIB, PREPARE = range(1, 9)
 KINDS = frozenset((HELLO, OFFER, ANSWER, STATE, FEEDBACK, ERROR, STATE_ZLIB, PREPARE))
-PATH_KEYS = ("path_x", "path_y", "path_z", "lane_lines", "lane_line_probs", "road_edges", "road_edge_stds",
-             "leads", "camera_height", "calib_transform")
+PATH_KEYS = ("path_x", "path_y", "path_z", "model_frame_id", "velocity_x", "acceleration_x", "lane_lines", "lane_line_probs",
+             "road_edges", "road_edge_stds", "leads", "camera_height", "calib_transform")
 
 
 def _check_value(value, depth=0):
@@ -138,6 +138,9 @@ def validate_scene(state):
   height = path.get("camera_height")
   if height is not None and (type(height) not in (int, float) or not 0.1 <= height <= 10.0):
     raise ValueError("Invalid cluster camera height")
+  frame_id = path.get("model_frame_id")
+  if frame_id is not None and (type(frame_id) is not int or not 0 <= frame_id <= 0xFFFFFFFF):
+    raise ValueError("Invalid cluster model frame ID")
   for key in ("is_metric", "rotate_180"):
     if key in state and type(state[key]) is not bool:
       raise ValueError("Invalid cluster display option")
@@ -147,7 +150,7 @@ def validate_scene(state):
         raise ValueError("Invalid tire data")
     elif value is not None and type(value) not in (float, int, bool):
       raise ValueError("Invalid cluster HUD value")
-  for key in ("path_x", "path_y", "path_z", "lane_line_probs", "road_edge_stds"):
+  for key in ("path_x", "path_y", "path_z", "velocity_x", "acceleration_x", "lane_line_probs", "road_edge_stds"):
     values = path.get(key, [])
     if not isinstance(values, list) or len(values) > 64 or any(type(v) not in (float, int) for v in values):
       raise ValueError("Invalid cluster path coordinates")
@@ -175,5 +178,7 @@ def validate_scene(state):
       raise ValueError("Invalid cluster lead data")
   if len({len(path.get(axis, [])) for axis in ("path_x", "path_y", "path_z")}) != 1:
     raise ValueError("Cluster path axes differ in length")
+  if path.get("velocity_x") and len(path["velocity_x"]) != len(path.get("path_x", [])):
+    raise ValueError("Cluster path velocities differ in length")
   _check_value(state)
   return state

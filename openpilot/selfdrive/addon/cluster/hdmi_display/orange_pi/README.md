@@ -1270,7 +1270,7 @@ C4 대시보드의 **Toggles → Cluster Enable** 아래에 `Orange Pi 연결됨
 
 이 폴더를 파일 전송 도구로 Orange Pi에 복사한 뒤 설치 스크립트를 실행합니다. 이미 `/opt/cluster-receiver`에 복사했다면 다음을 사용합니다. 다른 위치라면 해당 위치의 `scripts/install.sh`를 실행하면 됩니다.
 
-H.264를 포함한 수동 배포본에는 공유 `cluster_renderer.py`·`cluster_render_support.py`와 `receiver_assets.txt`에 나열된 `assets/` 파일도 함께 있어야 합니다. 전체 저장소에서 설치하면 스크립트가 공유 파일을 찾아 복사합니다. C4의 `pi_update.sh`는 이 파일들을 자동으로 동봉하므로 기존 Pi 업데이트에 권장합니다.
+H.264를 포함한 수동 배포본에는 `cluster_renderer.py`, `cluster_render_support.py`, `model_render_support.py`와 `receiver_assets.txt`에 나열된 `assets/` 파일도 함께 있어야 합니다. 전체 저장소에서 설치하면 스크립트가 공유 파일을 찾아 복사합니다. C4의 `pi_update.sh`는 이 파일들을 자동으로 동봉하므로 기존 Pi 업데이트에 권장합니다.
 
 ```bash
 sudo bash /opt/cluster-receiver/scripts/install.sh

@@ -97,6 +97,7 @@ def test_gpu_camera_and_current_hud_continue_while_path_is_blocked(scene, monkey
     assert value.last_frame_timings["path_wait"] == 0
     assert value.renderer._path_painter.config is not value.config
     assert value.renderer._path_painter._lead_vehicles is not value.renderer._lead_vehicles
+    assert value.renderer._path_painter._stop_point is not value.renderer._stop_point
     assert value.renderer._path_executor is None
   finally:
     release.set()

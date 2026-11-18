@@ -15,10 +15,12 @@ import numpy as np
 from PIL import Image
 
 try:
-  from openpilot.selfdrive.addon.cluster.cluster_renderer import CLIP_MARGIN, GRADIENT_BANDS, ClusterRenderer, ColorBlendWorkspace, TextGlyph
+  from openpilot.selfdrive.addon.cluster.cluster_renderer import (
+    CLIP_MARGIN, GRADIENT_BANDS, LANE_LINE_WIDTH, ROAD_EDGE_WIDTH, ClusterRenderer, ColorBlendWorkspace, TextGlyph,
+  )
   from openpilot.selfdrive.addon.cluster.cluster_render_support import Colors, colors_alpha
 except ImportError:
-  from cluster_renderer import CLIP_MARGIN, GRADIENT_BANDS, ClusterRenderer, ColorBlendWorkspace, TextGlyph
+  from cluster_renderer import CLIP_MARGIN, GRADIENT_BANDS, LANE_LINE_WIDTH, ROAD_EDGE_WIDTH, ClusterRenderer, ColorBlendWorkspace, TextGlyph
   from cluster_render_support import Colors, colors_alpha
 
 
@@ -154,12 +156,13 @@ class LayeredRenderer(ClusterRenderer):
     painter, self._path_painter = self._path_painter, None
     if painter is not None:
       self._lead_vehicles, self._lead_info = painter._lead_vehicles, painter._lead_info
+      self._stop_point = painter._stop_point
       self._last_render_at = painter._last_render_at
       painter.close()
 
   def _start_path_pipeline(self):
     # Share immutable assets/layout only. Mutable path buffers, fonts, caches,
-    # configuration, transform and lead filters belong to one CPU worker.
+    # configuration, transform and lead/stop filters belong to one CPU worker.
     painter = copy(self)
     painter.config = copy(self.config)
     painter._path_worker = painter._path_painter = painter._path_executor = None
@@ -167,6 +170,7 @@ class LayeredRenderer(ClusterRenderer):
     painter._color_blender = ColorBlendWorkspace(self.camera_w)
     painter._source_to_panel = self._source_to_panel.copy()
     painter._lead_vehicles, painter._lead_info = deepcopy((self._lead_vehicles, self._lead_info))
+    painter._stop_point = deepcopy(self._stop_point)
     painter._lead_font = self._path_lead_font
     painter._path_lead_font = None
     painter._lead_text_cache = OrderedDict()
@@ -258,7 +262,7 @@ class LayeredRenderer(ClusterRenderer):
         raw = raw[(raw[:, 0] >= 0.0) & (raw[:, 0] <= 100.0)]
         if len(raw) < 2:
           continue
-        width = 0.025 if edge else 0.025 * alpha
+        width = ROAD_EDGE_WIDTH if edge else LANE_LINE_WIDTH * alpha
         points.extend((raw + np.array([0.0, -width, 0.0], dtype=np.float32),
                        raw + np.array([0.0, width, 0.0], dtype=np.float32)))
         draws.append((len(raw), colors_alpha(Colors.RED, 100) if edge else Colors.WHITE,
@@ -322,12 +326,12 @@ class LayeredRenderer(ClusterRenderer):
     asynchronous, received_at, valid_until, clock = self._path_context
     if not asynchronous and self._path_worker is not None:
       self._stop_path_pipeline()
-    road_visible = self._get_border_color(hud) != Colors.Border.DISENGAGED
+    lanes_visible = self._get_border_color(hud) != Colors.Border.DISENGAGED
     # Brake/blinker/steering colors do not change lane geometry. Keep the
     # compatible layer until the next style is ready instead of blanking all
     # lanes on every transient input change. Real visibility changes still
     # invalidate immediately, as do units, projection and input freshness.
-    key = tuple(self._source_to_panel.ravel()), bool(self.config.is_metric), road_visible
+    key = tuple(self._source_to_panel.ravel()), bool(self.config.is_metric), lanes_visible
     eligible = bool(has_camera and model_valid)
     signature = eligible, key
     invalidated = signature != self._path_signature
@@ -412,7 +416,7 @@ class LayeredRenderer(ClusterRenderer):
                                "path_wait": path_wait, "path_labels": lead_elapsed, "path_age": path_age,
                                "path_async": int(asynchronous), "path_visible": int(path_pixels is not None),
                                "path_ready": int(path_reason in ("ready", "retained")),
-                               "path_expected": int(eligible and road_visible and bool(path.get("path_x"))),
+                               "path_expected": int(eligible and bool(path.get("path_x"))),
                                "path_pending": int(path_reason == "pending"), "path_expired": int(path_reason == "expired"),
                                "path_incompatible": int(path_reason == "incompatible"),
                                "path_invalid": int(not eligible), "path_reset": int(invalidated)}

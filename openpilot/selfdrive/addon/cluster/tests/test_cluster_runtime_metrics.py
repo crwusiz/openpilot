@@ -337,13 +337,19 @@ def test_render_clears_stale_or_invalid_radar_leads_and_restores_new_radar(clust
 def test_render_hides_stale_path_keeps_fresh_car_hud_and_restores_new_model(cluster_models):
   state = cluster_models
   state.messages['modelV2'] = _model_message([0.0, 10.0, 20.0])
+  state.messages['modelV2'].acceleration = SimpleNamespace(x=[1.5, 0.0, -1.5])
+  state.messages['modelV2'].frameId = 123
+  state.messages['modelV2'].velocity = SimpleNamespace(x=[12.0, 4.0, 0.5])
   state.messages['carState'] = _car_message(10.0, 5.0)
   state.messages['controlsState'] = SimpleNamespace(deprecated=SimpleNamespace(vCruise=0.0))
   state.updated.update(modelV2=True, carState=True)
   state.models.sm.valid['modelV2'] = state.models.sm.alive['modelV2'] = True
   state.models._update_once()
   assert state.models.is_valid()
-  assert state.models.get_render_data()[0]
+  valid, _hud, path = state.models.get_render_data()
+  assert valid and path['acceleration_x'] == [1.5, 0.0, -1.5]
+  assert path['model_frame_id'] == 123
+  assert path['velocity_x'] == [12.0, 4.0, 0.5]
 
   state.clock.now += 1.0
   state.updated['modelV2'] = False
@@ -373,6 +379,9 @@ def test_render_hides_stale_path_keeps_fresh_car_hud_and_restores_new_model(clus
   valid, hud, path = state.models.get_render_data()
   assert valid and state.models.is_valid()
   assert path['path_x'] == [0.0, 15.0, 30.0]
+  assert path['acceleration_x'] == []
+  assert path['model_frame_id'] is None
+  assert path['velocity_x'] == []
   assert hud['v_ego'] == 12.0 and hud['steering_angle'] == 20.0
   assert state.models.get_health_data()['model_age_ms'] == 0.0
 

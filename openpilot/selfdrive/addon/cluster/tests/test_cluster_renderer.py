@@ -63,6 +63,7 @@ def test_smoothing_advances_during_transport_backpressure(renderer_module):
   renderer.config = SimpleNamespace(fps=60)
   renderer._last_render_at = None
   renderer._lead_vehicles = [renderer_module.LeadVehicle(60)]
+  renderer._stop_point = renderer_module.StopPoint(60)
   lead = renderer._lead_vehicles[0]
   renderer._update_filter_intervals(10.0)
   lead.d_filter.update(10.0)
@@ -72,6 +73,7 @@ def test_smoothing_advances_during_transport_backpressure(renderer_module):
 
   assert lead.d_filter.update(20.0) == pytest.approx(15.0)
   assert lead.fade_filter.update(1.0) == pytest.approx(2 / 3)
+  assert renderer._stop_point.fade_filter.update(1.0) == pytest.approx(2 / 3)
 
 
 def test_smoothing_recovers_to_normal_frame_interval(renderer_module):
@@ -79,6 +81,7 @@ def test_smoothing_recovers_to_normal_frame_interval(renderer_module):
   renderer.config = SimpleNamespace(fps=20)
   renderer._last_render_at = None
   renderer._lead_vehicles = [renderer_module.LeadVehicle(20)]
+  renderer._stop_point = renderer_module.StopPoint(20)
   renderer._update_filter_intervals(0.0)
   renderer._update_filter_intervals(2.0)
   assert renderer._lead_vehicles[0].fade_filter.update(1.0) > 0.9

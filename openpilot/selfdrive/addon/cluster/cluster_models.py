@@ -156,6 +156,9 @@ class ClusterModels:
     self.right_lane_x = []
     self.right_lane_y = []
     self.path_z = []
+    self.model_frame_id = None
+    self.velocity_x = []
+    self.acceleration_x = []
     self.lane_lines = []
     self.lane_line_probs = []
     self.road_edges = []
@@ -306,6 +309,11 @@ class ClusterModels:
         self.path_x = list(model.position.x)
         self.path_y = list(model.position.y)
         self.path_z = list(model.position.z)
+        self.model_frame_id = getattr(model, 'frameId', None)
+        velocity_x = list(getattr(getattr(model, 'velocity', None), 'x', ()))
+        self.velocity_x = velocity_x if len(velocity_x) == len(self.path_x) and all(map(math.isfinite, velocity_x)) else []
+        acceleration_x = list(getattr(getattr(model, 'acceleration', None), 'x', ()))[:len(self.path_x)]
+        self.acceleration_x = acceleration_x if all(map(math.isfinite, acceleration_x)) else []
         self.model_valid = True
       else:
         self.model_valid = False
@@ -618,6 +626,9 @@ class ClusterModels:
       "path_x": self.path_x,
       "path_y": self.path_y,
       "path_z": self.path_z,
+      "model_frame_id": self.model_frame_id,
+      "velocity_x": self.velocity_x,
+      "acceleration_x": self.acceleration_x,
       "left_lane_x": self.left_lane_x,
       "left_lane_y": self.left_lane_y,
       "right_lane_x": self.right_lane_x,

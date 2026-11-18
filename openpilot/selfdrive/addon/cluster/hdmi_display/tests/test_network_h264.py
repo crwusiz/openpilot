@@ -183,10 +183,16 @@ async def test_profile_change_closes_network_server_for_normal_restart(monkeypat
   server.close.assert_awaited_once()
 
 
-def test_scene_snapshot_keeps_geometry_but_excludes_unused_duplicate_lines():
+def test_scene_snapshot_keeps_path_motion_but_excludes_unused_duplicate_lines():
   data = models()
+  data.get_render_data.return_value[2]["acceleration_x"] = [1.23456, -1.23456]
+  data.get_render_data.return_value[2]["model_frame_id"] = 0
+  data.get_render_data.return_value[2]["velocity_x"] = [2.34567, 0.0]
   result = network.scene_snapshot(config(), data, {"model_age_ms": 10.0})
   assert result["path"]["calib_transform"] == [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+  assert result["path"]["acceleration_x"] == [1.235, -1.235]
+  assert result["path"]["model_frame_id"] == 0
+  assert result["path"]["velocity_x"] == [2.346, 0.0]
   assert "left_lane_x" not in result["path"]
   assert result["model_valid"] and result["hud"]["v_ego"] == 12.5
   assert not network.scene_snapshot(config(), data, {}, degraded=True)["model_valid"]

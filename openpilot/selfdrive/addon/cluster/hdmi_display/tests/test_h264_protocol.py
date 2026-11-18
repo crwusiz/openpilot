@@ -22,7 +22,8 @@ def realistic_scene():
     return [xs, [round(y + offset, 3) for y in ys], zs]
   state["hud"].update(enabled=True, lat_active=True, steering_angle=12.345, cruise_speed=100.0,
                       distance_level=3, wifi_strength=4, gps_satellites=12)
-  state["path"].update(path_x=xs, path_y=ys, path_z=zs,
+  state["path"].update(path_x=xs, path_y=ys, path_z=zs, model_frame_id=0xFFFFFFFF, acceleration_x=[round(1 - x / 20, 3) for x in xs],
+                       velocity_x=[max(0.0, round(10 - x / 2, 3)) for x in xs],
                        lane_lines=[line(-3.6), line(-1.8), line(1.8), line(3.6)],
                        lane_line_probs=[0.51, 0.99, 0.98, 0.49], road_edges=[line(-4.2), line(4.2)],
                        road_edge_stds=[0.1, 0.2], camera_height=1.22,
@@ -168,6 +169,8 @@ def test_local_scene_packer_rejects_non_scene_objects(state):
 @pytest.mark.parametrize("mutation", [
   lambda s: s["hud"].update(v_ego=math.nan),
   lambda s: s["path"].update(path_x=[math.inf, 2]),
+  lambda s: s["path"].update(acceleration_x=[math.nan, 0]),
+  lambda s: s["path"].update(velocity_x=[math.inf, 0]),
   lambda s: s["path"].update(calib_transform=[[math.inf, 0, 0]] * 3),
   lambda s: s.update(counter=10**400),
   lambda s: s.update(extra=[0] * 129),
@@ -207,6 +210,10 @@ def test_oversize_or_bad_local_control_is_not_encoded(payload):
 @pytest.mark.parametrize("mutation", [
   lambda s: s.update(source_size=[8193, 760]), lambda s: s.update(source_size=[1344.0, 760]),
   lambda s: s["path"].update(path_x=[0] * 65), lambda s: s["path"].update(lane_lines=[[[0], [0], [0]]] * 5),
+  lambda s: s["path"].update(acceleration_x=[0] * 65), lambda s: s["path"].update(acceleration_x=["invalid"]),
+  lambda s: s["path"].update(velocity_x=[0]), lambda s: s["path"].update(velocity_x=["invalid", 0]),
+  lambda s: s["path"].update(model_frame_id=True), lambda s: s["path"].update(model_frame_id=1.0),
+  lambda s: s["path"].update(model_frame_id=-1), lambda s: s["path"].update(model_frame_id=2**32),
   lambda s: s["path"].update(lane_lines=[[[0], [0, 1], [0]]]),
   lambda s: s["path"].update(calib_transform=[[1, 0], [0, 1]]),
   lambda s: s["path"].update(leads=[{"present": "yes"}]), lambda s: s["hud"].update(tpms=[1] * 100),
