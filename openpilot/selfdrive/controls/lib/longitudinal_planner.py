@@ -48,13 +48,15 @@ class LongitudinalPlanner:
     self.j_desired_trajectory = np.zeros(CONTROL_N)
 
   def update(self, sm):
-    v_ego = sm['carState'].vEgo
-    v_cruise_kph = min(sm['carState'].vCruise, V_CRUISE_MAX)
+    car_state = sm['carState']
+    model = sm['modelV2']
+    v_ego = car_state.vEgo
+    v_cruise_kph = min(car_state.vCruise, V_CRUISE_MAX)
     v_cruise = v_cruise_kph * CV.KPH_TO_MS
     if sm['controlsState'].forceDecel:
       v_cruise = 0.0
 
-    vCluRatio = sm['carState'].vCluRatio
+    vCluRatio = car_state.vCluRatio
     if vCluRatio > 0.5:
       v_cruise *= vCluRatio
       v_cruise += 0.069444
@@ -64,12 +66,12 @@ class LongitudinalPlanner:
     # Reset current state when not engaged, or user is controlling the speed
     reset_state = long_control_off if self.CP.openpilotLongitudinalControl else not sm['selfdriveState'].enabled
     # PCM cruise speed may be updated a few cycles later, check if initialized
-    v_cruise_initialized = sm['carState'].vCruise != V_CRUISE_UNSET
-    reset_state = any([reset_state, not v_cruise_initialized, sm['carState'].gasPressed, sm['carState'].brakePressed])
+    v_cruise_initialized = car_state.vCruise != V_CRUISE_UNSET
+    reset_state = reset_state or not v_cruise_initialized or car_state.gasPressed or car_state.brakePressed
 
     if reset_state:
       self.v_desired_filter.x = v_ego
-      self.output_a_target = np.clip(sm['carState'].aEgo, ACCEL_MIN, ACCEL_MAX)
+      self.output_a_target = np.clip(car_state.aEgo, ACCEL_MIN, ACCEL_MAX)
       self.a_cruise = self.output_a_target
       self.curve_speed.reset()
 
@@ -77,21 +79,22 @@ class LongitudinalPlanner:
     self.v_desired_filter.x = max(0.0, self.v_desired_filter.update(v_ego))
 
     # No change cost when user is controlling the speed, or when standstill
-    prev_accel_constraint = not (reset_state or sm['carState'].standstill)
+    prev_accel_constraint = not (reset_state or car_state.standstill)
 
-    self.mpc.set_weights(prev_accel_constraint, personality=sm['selfdriveState'].personality)
+    personality = sm['selfdriveState'].personality
+    self.mpc.set_weights(prev_accel_constraint, personality=personality)
     if self.CP.openpilotLongitudinalControl:
       self.mpc.set_cur_state(self.v_desired_filter.x, self.output_a_target)
     else:
-      self.mpc.set_cur_state(v_ego, sm['carState'].aEgo)
-    self.mpc.update(sm, personality=sm['selfdriveState'].personality)
+      self.mpc.set_cur_state(v_ego, car_state.aEgo)
+    self.mpc.update(model, sm['radarState'], personality=personality, car_state=car_state)
 
     self.v_desired_trajectory = np.interp(CONTROL_N_T_IDX, T_IDXS_MPC, self.mpc.v_solution)
     self.a_desired_trajectory = np.interp(CONTROL_N_T_IDX, T_IDXS_MPC, self.mpc.a_solution)
     self.j_desired_trajectory = np.interp(CONTROL_N_T_IDX, T_IDXS_MPC[:-1], self.mpc.j_solution)
 
     # TODO counter is only needed because radar is glitchy, remove once radar is gone
-    self.fcw = self.mpc.crash_cnt > 2 and not sm['carState'].standstill and not reset_state
+    self.fcw = self.mpc.crash_cnt > 2 and not car_state.standstill and not reset_state
     if self.fcw:
       cloudlog.info("FCW triggered")
 
@@ -102,9 +105,9 @@ class LongitudinalPlanner:
     output_a_target_mpc = get_accel_from_plan(self.v_desired_trajectory, self.a_desired_trajectory, CONTROL_N_T_IDX,
                                               action_t=action_t)
     output_should_stop_mpc = should_stop(v_ego, output_a_target_mpc)
-    curve_offset = self.curve_speed.update(sm['modelV2'], sm['vehicleParameters'].roll)
-    output_a_target_e2e = sm['modelV2'].action.desiredAcceleration + curve_offset
-    output_should_stop_e2e = sm['modelV2'].action.shouldStop
+    curve_offset = self.curve_speed.update(model, sm['vehicleParameters'].roll)
+    output_a_target_e2e = model.action.desiredAcceleration + curve_offset
+    output_should_stop_e2e = model.action.shouldStop
 
     self.a_cruise = get_cruise_accel(v_cruise, v_ego, self.a_cruise, self.output_a_target, self.dt)
     cruise_should_stop = should_stop(v_ego, self.a_cruise)
@@ -133,7 +136,7 @@ class LongitudinalPlanner:
     longitudinalPlan.accels = self.a_desired_trajectory.tolist()
     longitudinalPlan.jerks = self.j_desired_trajectory.tolist()
 
-    longitudinalPlan.hasLead = sm['radarState'].leadOne.present
+    longitudinalPlan.hasLead = sm['radarState'].leadOne.present or sm['radarState'].leadTwo.present
     longitudinalPlan.longitudinalPlanSource = self.mpc.source
     longitudinalPlan.fcw = self.fcw
 

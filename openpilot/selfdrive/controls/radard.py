@@ -728,7 +728,9 @@ class RadarD:
     radar = False
     if track is not None:
       vision_y_rel = float(-lead_msg.y[0]) if ready else 0.0
-      lead_dict = track.get_RadarState(lead_prob, vision_y_rel)
+      # The MPC uses modelProb to decide whether the vision trajectory belongs to this track.
+      model_prob = lead_prob if front_radar_vision_match else 0.0
+      lead_dict = track.get_RadarState(model_prob, vision_y_rel)
       radar = True
     elif ready and lead_prob > .5:
       lead_dict = get_RadarState_from_vision(lead_msg, v_ego, model_v_ego, lead_prob)
@@ -738,7 +740,7 @@ class RadarD:
                           key=lambda c: c.dRel, default=None)
       if closest_track is not None and (not lead_dict['present'] or closest_track.dRel < lead_dict['dRel']):
         vision_y_rel = float(-lead_msg.y[0]) if ready else 0.0
-        lead_dict = closest_track.get_RadarState(lead_prob, vision_y_rel)
+        lead_dict = closest_track.get_RadarState(vision_y_rel=vision_y_rel)
         front_radar_vision_match = False
 
     if index == 0:

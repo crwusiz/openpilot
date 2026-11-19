@@ -7,8 +7,9 @@ from opendbc.car.interfaces import ACCEL_MIN, ACCEL_MAX
 from openpilot.common.realtime import DT_MDL
 from openpilot.common.swaglog import cloudlog
 # WARNING: imports outside of constants will not trigger a rebuild
-from openpilot.selfdrive.modeld.constants import index_function
-from openpilot.selfdrive.controls.radard import _LEAD_ACCEL_TAU
+from openpilot.selfdrive.modeld.constants import index_function, ModelConstants
+
+LEAD_T_IDXS_MODEL = np.array(ModelConstants.LEAD_T_IDXS)  # [0, 2, 4, 6, 8, 10]s
 
 if __name__ == '__main__':  # generating code
   from acados.acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver
@@ -164,10 +165,7 @@ def gen_long_ocp():
 
   desired_dist_comfort = get_safe_obstacle_distance(v_ego, lead_t_follow, comfort_brake, stop_distance)
 
-  # The main cost in normal operation is how close you are to the "desired" distance
-  # from an obstacle at every timestep. This obstacle can be a lead car
-  # or other object. In e2e mode we can use x_position targets as a cost
-  # instead.
+  # Penalize deviation from the desired gap to the nearest obstacle at each timestep.
   costs = [((x_obstacle - x_ego) - desired_dist_comfort) / (v_ego + 10.),
            x_ego,
            v_ego,
@@ -188,7 +186,7 @@ def gen_long_ocp():
 
   x0 = np.zeros(X_DIM)
   ocp.constraints.x0 = x0
-  ocp.parameter_values = np.array([-1.2, 1.2, 0.0, 0.0, lead_t_follow, LEAD_DANGER_FACTOR, comfort_brake, stop_distance])
+  ocp.parameter_values = np.array([-1.2, 1.2, 0.0, 0.0, get_T_FOLLOW(), LEAD_DANGER_FACTOR, COMFORT_BRAKE, STOP_DISTANCE])
 
 
   # We put all constraint cost weights to 0 and only set them at runtime
@@ -231,6 +229,7 @@ class LongitudinalMpc:
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
     self.source = LongitudinalPlanSource.cruise
     self.traffic_controller = TrafficStopController(dt)
+    self.last_cloudlog_t = 0.0
     self.reset()
 
   def reset(self):
@@ -238,24 +237,22 @@ class LongitudinalMpc:
 
     self.x_sol = np.zeros((N+1, X_DIM))
     self.u_sol = np.zeros((N, 1))
-    self.v_solution = np.zeros(N+1)
-    self.a_solution = np.zeros(N+1)
-    self.j_solution = np.zeros(N)
-    self.a_prev = np.array(self.a_solution)
-    self.yref = np.zeros((N+1, COST_DIM))
+    self.v_solution = self.x_sol[:, 1]
+    self.a_solution = self.x_sol[:, 2]
+    self.j_solution = self.u_sol[:, 0]
+    self.a_prev = self.a_solution.copy()
 
+    # References are fixed at zero throughout the horizon.
+    yref = np.zeros(COST_DIM)
     for i in range(N):
-      self.solver.cost_set(i, "yref", self.yref[i])
-    self.solver.cost_set(N, "yref", self.yref[N][:COST_E_DIM])
+      self.solver.cost_set(i, "yref", yref)
+    self.solver.cost_set(N, "yref", yref[:COST_E_DIM])
     self.params = np.zeros((N+1, PARAM_DIM))
     self.traffic_controller.reset()
 
     for i in range(N+1):
       self.solver.set(i, 'x', np.zeros(X_DIM))
-    self.last_cloudlog_t = 0
     self.crash_cnt = 0.0
-    self.solution_status = 0
-    # timers
     self.solve_time = 0.0
     self.x0 = np.zeros(X_DIM)
     self.set_weights()
@@ -296,40 +293,48 @@ class LongitudinalMpc:
     a_lead_traj = a_lead * np.exp(-a_lead_tau * (T_IDXS**2)/2.)
     v_lead_traj = np.clip(v_lead + np.cumsum(T_DIFFS * a_lead_traj), 0.0, 1e8)
     x_lead_traj = x_lead + np.cumsum(T_DIFFS * v_lead_traj)
-    lead_xv = np.column_stack((x_lead_traj, v_lead_traj))
-    return lead_xv
+    return x_lead_traj, v_lead_traj
 
-  def process_lead(self, lead):
+  def process_lead(self, model_lead, radar_lead):
     v_ego = self.x0[1]
-    if lead is not None and lead.present:
-      x_lead = lead.dRel
-      v_lead = lead.vLead
-      a_lead = lead.aLeadK
-      a_lead_tau = lead.aLeadTau
+    if radar_lead.present:
+      x_lead = radar_lead.dRel
+      v_lead = radar_lead.vLead
+      a_lead = radar_lead.aLeadK
+      a_lead_tau = radar_lead.aLeadTau
     else:
       # Fake a fast lead car, so mpc can keep running in the same mode
       x_lead = 50.0
       v_lead = v_ego + 10.0
       a_lead = 0.0
-      a_lead_tau = _LEAD_ACCEL_TAU
+      a_lead_tau = 0.0
 
     # MPC will not converge if immediate crash is expected
     # Clip lead distance to what is still possible to brake for
     min_x_lead = MIN_X_LEAD_FACTOR * (v_ego + v_lead) * (v_ego - v_lead) / (-ACCEL_MIN * 2)
-    x_lead = np.clip(x_lead, min_x_lead, 1e8)
-    v_lead = np.clip(v_lead, 0.0, 1e8)
-    a_lead = np.clip(a_lead, -10., 5.)
+    x_start = np.clip(x_lead, min_x_lead, 1e8)
 
-    lead_xv = self.extrapolate_lead(x_lead, v_lead, a_lead, a_lead_tau)
-    return lead_xv, v_lead
+    if radar_lead.present and radar_lead.modelProb > 0.5 and model_lead is not None:
+      model_x = np.asarray(model_lead.x, dtype=np.float64)
+      model_v = np.asarray(model_lead.v, dtype=np.float64)
+      if (model_x.shape == model_v.shape == LEAD_T_IDXS_MODEL.shape and
+          np.isfinite(model_x).all() and np.isfinite(model_v).all()):
+        # Anchor the model's predicted deltas at the radar measurement.
+        x_traj = x_lead + (model_x - model_x[0])
+        v_traj = v_lead + (model_v - model_v[0])
+        x_traj[0] = x_start
+        x_mpc = np.interp(T_IDXS, LEAD_T_IDXS_MODEL, x_traj)
+        v_mpc = np.interp(T_IDXS, LEAD_T_IDXS_MODEL, np.clip(v_traj, 0.0, 1e8))
+        return np.column_stack((np.maximum.accumulate(x_mpc), v_mpc))
 
-  def update(self, sm, personality=log.LongitudinalPersonality.standard):
-    radarstate = sm['radarState']
-    t_follow = get_T_FOLLOW(personality)
-    v_ego = self.x0[1]
+    x_mpc, v_mpc = self.extrapolate_lead(x_start, np.clip(v_lead, 0.0, 1e8), np.clip(a_lead, -10., 5.), a_lead_tau)
+    return np.column_stack((x_mpc, v_mpc))
 
-    lead_xv_0, lead_v_0 = self.process_lead(radarstate.leadOne)
-    lead_xv_1, _ = self.process_lead(radarstate.leadTwo)
+  def update(self, modelV2, radarstate, personality=log.LongitudinalPersonality.standard, *, car_state):
+    model_leads = modelV2.leadsV3
+    lead_count = len(model_leads)
+    lead_xv_0 = self.process_lead(model_leads[0] if lead_count > 0 else None, radarstate.leadOne)
+    lead_xv_1 = self.process_lead(model_leads[1] if lead_count > 1 else None, radarstate.leadTwo)
 
     # To estimate a safe distance from a moving lead, we calculate how much stopping
     # distance that lead needs as a minimum. We can add that to the current distance
@@ -337,49 +342,48 @@ class LongitudinalMpc:
     lead_0_obstacle = lead_xv_0[:,0] + get_stopped_equivalence_factor(lead_xv_0[:,1])
     lead_1_obstacle = lead_xv_1[:,0] + get_stopped_equivalence_factor(lead_xv_1[:,1])
 
-    comfort_brake = COMFORT_BRAKE
-    stop_distance = STOP_DISTANCE
-
-    traffic_stop_plan = self.traffic_controller.update(sm['carState'], sm['modelV2'], radarstate, COMFORT_BRAKE)
-    stop_dist = traffic_stop_plan.stop_distance
-
-    traffic_stop_obstacle = get_traffic_stop_obstacle_distance(stop_dist, STOP_DISTANCE)
-    x2 = traffic_stop_obstacle * np.ones(N+1)
-
-    x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, x2])
+    traffic_stop_plan = self.traffic_controller.update(car_state, modelV2, radarstate, COMFORT_BRAKE)
+    traffic_stop_obstacle = get_traffic_stop_obstacle_distance(traffic_stop_plan.stop_distance, STOP_DISTANCE)
+    x_obstacles = np.column_stack((lead_0_obstacle, lead_1_obstacle, np.full(N+1, traffic_stop_obstacle)))
     self.source = MPC_SOURCES[np.argmin(x_obstacles[0])]
-
-    self.yref[:,:] = 0.0
-    for i in range(N):
-      self.solver.set(i, "yref", self.yref[i])
-    self.solver.set(N, "yref", self.yref[N][:COST_E_DIM])
 
     accel_min = ACCEL_MIN
     mpc_source = "e2e" if self.source == LongitudinalPlanSource.e2e else "lead"
     if should_limit_traffic_stop_accel(traffic_stop_plan.signal_stop_active, mpc_source):
-      accel_min = max(ACCEL_MIN, get_traffic_stop_accel_floor(v_ego, traffic_stop_plan.raw_stop_distance, stop_distance))
+      accel_min = max(ACCEL_MIN, get_traffic_stop_accel_floor(self.x0[1], traffic_stop_plan.raw_stop_distance, STOP_DISTANCE))
     self.params[:,0] = accel_min
     self.params[:,1] = ACCEL_MAX
     self.params[:,2] = np.min(x_obstacles, axis=1)
-    self.params[:,3] = np.copy(self.a_prev)
-    self.params[:,4] = t_follow
+    self.params[:,3] = self.a_prev
+    self.params[:,4] = get_T_FOLLOW(personality)
     self.params[:,5] = LEAD_DANGER_FACTOR
-    self.params[:,6] = comfort_brake
-    self.params[:,7] = stop_distance
+    self.params[:,6] = COMFORT_BRAKE
+    self.params[:,7] = STOP_DISTANCE
 
-    self.run()
-    if np.any(lead_xv_0[FCW_IDXS,0] - self.x_sol[FCW_IDXS,0] < CRASH_DISTANCE) and radarstate.leadOne.modelProb > 0.9:
+    if not self.run():
+      return
+
+    if (np.any(lead_xv_0[FCW_IDXS,0] - self.x_sol[FCW_IDXS,0] < CRASH_DISTANCE) and
+        radarstate.leadOne.modelProb > 0.9):
       self.crash_cnt += 1
     else:
       self.crash_cnt = 0
 
-  def run(self):
+  def run(self) -> bool:
     for i in range(N+1):
       self.solver.set(i, 'p', self.params[i])
     self.solver.constraints_set(0, "lbx", self.x0)
     self.solver.constraints_set(0, "ubx", self.x0)
 
-    self.solution_status = self.solver.solve()
+    solution_status = self.solver.solve()
+    if solution_status != 0:
+      t = time.monotonic()
+      if t > self.last_cloudlog_t + 5.0:
+        self.last_cloudlog_t = t
+        cloudlog.warning(f"Long mpc reset, solution_status: {solution_status}")
+      self.reset()
+      return False
+
     self.solve_time = float(self.solver.get_stats('time_tot')[0])
 
     for i in range(N+1):
@@ -387,18 +391,8 @@ class LongitudinalMpc:
     for i in range(N):
       self.u_sol[i] = self.solver.get(i, 'u')
 
-    self.v_solution = self.x_sol[:,1]
-    self.a_solution = self.x_sol[:,2]
-    self.j_solution = self.u_sol[:,0]
-
     self.a_prev = np.interp(T_IDXS + self.dt, T_IDXS, self.a_solution)
-
-    t = time.monotonic()
-    if self.solution_status != 0:
-      if t > self.last_cloudlog_t + 5.0:
-        self.last_cloudlog_t = t
-        cloudlog.warning(f"Long mpc reset, solution_status: {self.solution_status}")
-      self.reset()
+    return True
 
 if __name__ == "__main__":
   ocp = gen_long_ocp()

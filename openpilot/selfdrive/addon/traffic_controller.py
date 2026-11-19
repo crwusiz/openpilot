@@ -578,10 +578,11 @@ class TrafficStopController:
 
   def _update_motion_detector(self, model, v_ego_kph: float, lead_distance: float) -> TrafficModelObservation:
     try:
+      position_x = model.position.x
       return self.motion_detector.update(
         model.velocity.x,
         v_ego_kph,
-        model.position.x[-1],
+        position_x[-1] if len(position_x) else np.nan,
         model.position.y,
         lead_distance,
       )
