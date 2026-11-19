@@ -16,6 +16,7 @@ from openpilot.selfdrive.controls.radard import RADAR_TO_CAMERA
 from openpilot.selfdrive.addon.cluster.cluster_health_guard import DRIVING_FAULT_ALERTS, parse_comm_issue
 from openpilot.selfdrive.addon.cluster.cluster_modeld_diagnostics import parse_modeld_failure
 from openpilot.selfdrive.addon.navi_helpers import camera_limit_active, camera_limit_distance
+from openpilot.selfdrive.hud_render_support import is_cruise_speed_set, select_vehicle_speed
 
 GearShifter = structs.CarState.GearShifter
 HEALTH_AGE_SERVICES = {
@@ -210,8 +211,7 @@ class ClusterModels:
     if 'carState' in updated:
       car_state = self.sm['carState']
       v_ego_cluster = getattr(car_state, 'vEgoCluster', 0.0)
-      self.v_ego_cluster_seen = self.v_ego_cluster_seen or v_ego_cluster != 0.0
-      self.v_ego = v_ego_cluster if self.v_ego_cluster_seen else car_state.vEgo
+      self.v_ego, self.v_ego_cluster_seen = select_vehicle_speed(car_state.vEgo, v_ego_cluster, self.v_ego_cluster_seen)
       self.accel = getattr(car_state, 'aEgo', 0.0)
       self.cruise_available = bool(car_state.cruiseState.available)
       self.reverse = car_state.gearShifter == GearShifter.reverse
@@ -227,7 +227,7 @@ class ClusterModels:
       fallback_speed = getattr(self.sm['controlsState'].deprecated, 'vCruise', 0.0)
       self.cruise_speed = cluster_speed if cluster_speed > 0 else fallback_speed
       self.set_speed = getattr(car_state, 'vCruise', self.cruise_speed)
-      self.is_cruise_set = 0 < self.cruise_speed < 255
+      self.is_cruise_set = is_cruise_speed_set(self.cruise_speed)
       navi_active = bool(getattr(car_state, 'naviActive', False))
       navi_section_active = bool(getattr(car_state, 'naviSectionActive', False))
       navi_speed_kph = float(getattr(car_state, 'naviSpeed', 0.0) or 0.0)

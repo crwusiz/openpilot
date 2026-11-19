@@ -2,7 +2,7 @@ import importlib.util
 from pathlib import Path
 import sys
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 
@@ -16,6 +16,7 @@ def cluster(monkeypatch):
   display = Mock(connected=True)
   pipeline = Mock()
   pipeline.close.return_value = True
+  pipeline.get_stats.return_value = {"sent": 0}
   camera, models, renderer = Mock(), Mock(), Mock()
   camera_factory = Mock(return_value=camera)
   display_factory = Mock(return_value=display)
@@ -39,6 +40,7 @@ def cluster(monkeypatch):
   module = importlib.util.module_from_spec(spec)
   spec.loader.exec_module(module)
   module.ClusterFrameClock = ClusterFrameClock
+  monkeypatch.setattr(module, "publish_cluster_connection", Mock())
   monkeypatch.setitem(sys.modules, prefix + "usb_display.runtime", module)
   for backend in ("usb_display", "hdmi_display"):
     spec = importlib.util.spec_from_file_location(prefix + backend + ".main", Path(__file__).parents[1] / backend / "main.py")
@@ -96,6 +98,25 @@ def test_hotplug_stops_workers_without_sending_clear_frame(cluster):
   cluster.display.close.assert_called_once()
   cluster.camera.close.assert_called_once()
   cluster.models.close.assert_called_once()
+
+
+def test_usb_readiness_requires_advancing_successful_sends(cluster, monkeypatch):
+  cluster.config.fps = 1
+  now = [0.0]
+  monkeypatch.setattr(cluster.module, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  cluster.models.get_health_data.return_value = {}
+  cluster.module.ClusterRenderer(cluster.config).last_frame_timings = {}
+  cluster.policy.side_effect = [True] * 4 + [False]
+  cluster.pipeline.get_stats.side_effect = [{"sent": count} for count in (0, 1, 1, 2)]
+
+  def wait_for_frame(_camera, previous):
+    now[0] += 1.0
+    return previous
+
+  cluster.module.run_composed_cluster(cluster.config, cluster.display, wait_for_frame=wait_for_frame, check_runtime=lambda: None)
+  assert cluster.module.publish_cluster_connection.call_args_list == [
+    call("usb", False), call("usb", True), call("usb", False), call("usb", True), call("usb", False),
+  ]
 
 
 def test_network_dispatch_does_not_start_composition_pipeline_or_raw_rgb_camera(cluster, monkeypatch):

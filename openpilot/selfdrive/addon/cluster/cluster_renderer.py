@@ -11,8 +11,14 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 try:
+  from openpilot.selfdrive.hud_render_support import (
+    current_speed_color, format_speed_limit_distance, get_hud_status, ignore_limit_ratio,
+    is_cruise_speed_set, speed_limit_warning_level, tpms_reading, traffic_light_index,
+  )
   from openpilot.selfdrive.model_render_support import DISENGAGED_PATH_ALPHA, FALLBACK_PATH_ALPHA, PathStyle, PlannedStopTracker, get_path_style
 except ImportError:
+  from hud_render_support import (current_speed_color, format_speed_limit_distance, get_hud_status, ignore_limit_ratio,
+                                  is_cruise_speed_set, speed_limit_warning_level, tpms_reading, traffic_light_index)
   from model_render_support import DISENGAGED_PATH_ALPHA, FALLBACK_PATH_ALPHA, PathStyle, PlannedStopTracker, get_path_style
 
 try:
@@ -847,7 +853,8 @@ class ClusterRenderer:
 
   def _value(self, value, disabled="--"):
     try:
-      return disabled if value is None or float(value) <= 0 or float(value) >= 255 else str(round(float(value)))
+      speed = float(value)
+      return str(round(speed)) if is_cruise_speed_set(speed) else disabled
     except (TypeError, ValueError):
       return disabled
 
@@ -894,47 +901,20 @@ class ClusterRenderer:
 
   @staticmethod
   def _get_border_color(data):
-    steering_pressed = bool(data.get("steering_pressed"))
-    enabled = bool(data.get("enabled"))
-    lat_active = bool(data.get("lat_active"))
-
-    if data.get("pre_enabled_or_overriding") and not steering_pressed:
-      return Colors.Border.OVERRIDE
-    elif enabled and not lat_active:
-      if steering_pressed:
-        return Colors.Border.STEERING
-      elif data.get("brake_pressed"):
-        return Colors.Border.RED
-      elif data.get("left_blinker") or data.get("right_blinker"):
-        return Colors.Border.BLINKER
-      return Colors.Border.ENGAGED
-    elif enabled and lat_active:
-      if steering_pressed:
-        return Colors.Border.STEERING
-      elif data.get("brake_pressed"):
-        return Colors.Border.RED
-      elif data.get("left_blinker") or data.get("right_blinker"):
-        return Colors.Border.BLINKER
-      return Colors.Border.ACTIVE
-    elif data.get("reverse"):
-      return Colors.Border.RED
-    elif data.get("cruise_available") and lat_active:
-      return Colors.Border.READY
-    elif data.get("cruise_available") and not lat_active and float(data.get("v_ego", 0.0) or 0.0) > 0.3:
-      return Colors.Border.BLINKER
-    return Colors.Border.DISENGAGED
+    status = get_hud_status(
+      enabled=bool(data.get("enabled")), lat_active=bool(data.get("lat_active")),
+      pre_enabled_or_overriding=bool(data.get("pre_enabled_or_overriding")), steering_pressed=bool(data.get("steering_pressed")),
+      brake_pressed=bool(data.get("brake_pressed")), blinker=bool(data.get("left_blinker") or data.get("right_blinker")),
+      reverse=bool(data.get("reverse")), cruise_available=bool(data.get("cruise_available")), v_ego=float(data.get("v_ego", 0.0) or 0.0),
+    )
+    return getattr(Colors.Border, status.name)
 
   def _draw_ignore_limit_timer(self, image, data):
-    max_ticks = 3000.0
     try:
       timer = float(data.get("ignore_limit_timer", 0.0) or 0.0)
     except (TypeError, ValueError):
       return
-    if timer <= 0.0 or timer >= max_ticks:
-      return
-
-    ratio = max(0.0, min(1.0, (max_ticks - timer) / max_ticks))
-    bar_width = int(round(self.target_w * ratio))
+    bar_width = int(round(self.target_w * ignore_limit_ratio(timer)))
     if bar_width <= 0:
       return
     bar_x = (self.target_w - bar_width) // 2
@@ -1019,12 +999,8 @@ class ClusterRenderer:
 
       cruise_speed = float(data.get("cruise_speed", 0.0) or 0.0)
       if limit_speed > 0 and data.get("enabled"):
-        if cruise_speed > limit_speed + 25:
-          speed_color = Colors.RED
-        elif cruise_speed > limit_speed + 15:
-          speed_color = Colors.ORANGE
-        elif cruise_speed > limit_speed + 5:
-          speed_color = Colors.CAUTION
+        warning = speed_limit_warning_level(cruise_speed, limit_speed)
+        speed_color = (Colors.WHITE, Colors.CAUTION, Colors.ORANGE, Colors.RED)[warning]
 
     speed_draw = ImageDraw.Draw(image, "RGBA")
 
@@ -1067,7 +1043,7 @@ class ClusterRenderer:
 
     # Draw distance from the same source used for the displayed limit.
     if left_dist > 0:
-      dist_text = f"{left_dist / 1000:.1f} km" if left_dist >= 1000 else f"{int(left_dist)} m"
+      dist_text = format_speed_limit_distance(left_dist)
       text_y = speed_limit_y + outer_radius + 10
       bbox = draw.textbbox((left_cx, text_y), dist_text, font=self.font_small, anchor="mm")
       padding_x, padding_y = 7, 3
@@ -1108,7 +1084,7 @@ class ClusterRenderer:
     cx = self.right_panel_x + self.panel_w / 2
 
     # traffic icon
-    traffic_name = TRAFFIC_ICONS.get(data.get("traffic_state"), TRAFFIC_ICONS[0])
+    traffic_name = TRAFFIC_ICONS[traffic_light_index(data.get("traffic_state"))]
     self._icon(image, traffic_name, cx, self.row_centers[0], (68, 136), True)
 
     # distance icon
@@ -1135,18 +1111,13 @@ class ClusterRenderer:
         pressure = 0.0
       px = cx + (-36 if i % 2 == 0 else 36)
       py = self.content_y + self.row_h * 2.0 + (38 if i < 2 else 115)
-      value = "--" if not pressure or pressure < 5 or pressure > 60 else str(round(pressure))
-      color = Colors.ORANGE if value == "--" else red if float(pressure) < 31 else Colors.SIGN_TEXT
+      value, low = tpms_reading(pressure)
+      color = Colors.ORANGE if value == "--" else red if low else Colors.SIGN_TEXT
       self._centered(draw, px, py, value, self.font_small, color)
 
   @staticmethod
   def _current_speed_color(data):
-    accel = float(data.get("accel", 0.0) or 0.0)
-    if accel > 0:
-      alpha = max(80, min(255, int(255 - 180 * min(accel / 3.0, 1.0))))
-      return alpha, 255, alpha
-    alpha = max(60, min(255, int(255 - 255 * min(abs(accel) / 4.0, 1.0))))
-    return 255, alpha, alpha
+    return current_speed_color(float(data.get("accel", 0.0) or 0.0))
 
   def _current_speed_text(self, data):
     conversion = 3.6 if getattr(self.config, "is_metric", True) else 2.236936

@@ -1,6 +1,10 @@
 import raylib_nb as rl
 from dataclasses import dataclass
 from openpilot.common.constants import CV
+from openpilot.selfdrive.hud_render_support import (
+  KM_TO_MILE, SET_SPEED_NA, current_speed_color, format_speed_limit_distance, is_cruise_speed_set,
+  select_vehicle_speed, speed_limit_warning_level, tpms_reading, traffic_light_index,
+)
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.text_measure import measure_text_cached
@@ -15,8 +19,6 @@ from openpilot.selfdrive.ui.onroad.icon_indicator import IconIndicator, Rotatabl
 
 
 # Constants
-SET_SPEED_NA = 255
-KM_TO_MILE = 0.621371
 CRUISE_DISABLED_CHAR = "--"
 BLINKER_DRAW_COUNT = 8
 BLINK_PERIOD_MS = 900.0
@@ -212,7 +214,7 @@ class HudRenderer(Widget):
     # Cruise speed
     self.apply_speed = car_state.vCruise
     self.set_speed = car_state.vCruiseCluster
-    self.is_cruise_set = 0 < self.set_speed < SET_SPEED_NA
+    self.is_cruise_set = is_cruise_speed_set(self.set_speed)
     self.is_cruise_available = self.set_speed != -1
 
     if self.is_cruise_set and not ui_state.is_metric:
@@ -221,9 +223,7 @@ class HudRenderer(Widget):
       self.apply_speed *= KM_TO_MILE
 
     # Current speed
-    v_ego_cluster = car_state.vEgoCluster
-    self.v_ego_cluster_seen = self.v_ego_cluster_seen or v_ego_cluster != 0.0
-    v_ego = v_ego_cluster if self.v_ego_cluster_seen else car_state.vEgo
+    v_ego, self.v_ego_cluster_seen = select_vehicle_speed(car_state.vEgo, car_state.vEgoCluster, self.v_ego_cluster_seen)
     speed_conversion = CV.MS_TO_KPH if ui_state.is_metric else CV.MS_TO_MPH
     self.speed = max(0.0, v_ego * speed_conversion)
 
@@ -440,12 +440,8 @@ class HudRenderer(Widget):
 
       # Color based on speed limit
       if limit_speed > 0 and ui_state.status != UIStatus.DISENGAGED and ui_state.status != UIStatus.OVERRIDE:
-        if self.cruise_speed > limit_speed + 25:
-          speed_color = Colors.RED
-        elif self.cruise_speed > limit_speed + 15:
-          speed_color = Colors.ORANGE
-        elif self.cruise_speed > limit_speed + 5:
-          speed_color = Colors.AMBER
+        warning = speed_limit_warning_level(self.cruise_speed, limit_speed)
+        speed_color = (rl.WHITE, Colors.AMBER, Colors.ORANGE, Colors.RED)[warning]
 
     # Max speed box with background
     max_speed_box_bg = rl.Rectangle(rect.x + 30, rect.y + 45, 170, 170)
@@ -516,12 +512,7 @@ class HudRenderer(Widget):
     traffic_y = traffic_box.y + (traffic_box.height - traffic_h) / 2
     traffic_center_y = traffic_y + traffic_h / 2
 
-    if self.traffic_state == 1:
-      traffic = self.traffic_red_img
-    elif self.traffic_state == 2:
-      traffic = self.traffic_green_img
-    else:
-      traffic = self.traffic_off_img
+    traffic = (self.traffic_off_img, self.traffic_red_img, self.traffic_green_img)[traffic_light_index(self.traffic_state)]
 
     rl.draw_texture_pro(
       traffic,
@@ -560,15 +551,10 @@ class HudRenderer(Widget):
         left_dist = self.section_left_dist
 
       if left_dist > 0:
-        if left_dist >= 1000:
-          dist_text = f"{left_dist / 1000:.1f} km"
-        else:
-          dist_text = f"{int(left_dist)} m"
-
         self._draw_text_with_background(
           x=center_x,
           y=center_y + radius + 10,
-          text=dist_text,
+          text=format_speed_limit_distance(left_dist),
           font_size=FontSizes.middle,
           text_color=colors_alpha(rl.WHITE, 200),
         )
@@ -610,18 +596,7 @@ class HudRenderer(Widget):
     return 0
 
   def _draw_current_speed(self, rect: rl.Rectangle) -> None:
-    # Color based on accel/decel
-    if self.accel > 0:
-      # Accelerating - green
-      alpha = int(255 - (180 * min(self.accel / 3.0, 1.0)))
-      alpha = max(80, min(255, alpha))
-      speed_color = rl.Color(alpha, 255, alpha, 255)
-    else:
-      # Decelerating - red
-      alpha = int(255 - (255 * min(abs(self.accel) / 4.0, 1.0)))
-      alpha = max(60, min(255, alpha))
-      speed_color = rl.Color(255, alpha, alpha, 255)
-
+    speed_color = rl.Color(*current_speed_color(self.accel), 255)
     speed_text = str(round(self.speed))
     center_x = rect.x + rect.width / 2
 
@@ -770,46 +745,10 @@ class HudRenderer(Widget):
       rl.Vector2(0, 0), 0, colors_alpha(rl.WHITE, 200)
     )
 
-    def get_tpms_color(pressure):
-      if pressure < 5 or pressure > 60:
-        return Colors.ORANGE
-      if pressure < 31:
-        return Colors.RED
-      return rl.BLACK
-
-    def get_tpms_text(pressure):
-      if pressure < 5 or pressure > 60:
-        return "--"
-      return str(round(pressure))
-
-    self._draw_text(
-      tpms_x + 28,
-      tpms_y + 43,
-      get_tpms_text(self.fl),
-      FontSizes.info_text,
-      get_tpms_color(self.fl),
-    )
-    self._draw_text(
-      tpms_x + 136,
-      tpms_y + 43,
-      get_tpms_text(self.fr),
-      FontSizes.info_text,
-      get_tpms_color(self.fr),
-    )
-    self._draw_text(
-      tpms_x + 28,
-      tpms_y + 158,
-      get_tpms_text(self.rl),
-      FontSizes.info_text,
-      get_tpms_color(self.rl),
-    )
-    self._draw_text(
-      tpms_x + 136,
-      tpms_y + 158,
-      get_tpms_text(self.rr),
-      FontSizes.info_text,
-      get_tpms_color(self.rr),
-    )
+    for pressure, x, y in ((self.fl, 28, 43), (self.fr, 136, 43), (self.rl, 28, 158), (self.rr, 136, 158)):
+      value, low = tpms_reading(pressure)
+      color = Colors.ORANGE if value == "--" else Colors.RED if low else rl.BLACK
+      self._draw_text(tpms_x + x, tpms_y + y, value, FontSizes.info_text, color)
 
     personality = self.params.get("LongitudinalPersonality") or "1"
     dist_imgs = [self.dist1_img, self.dist2_img, self.dist3_img, self.dist4_img]

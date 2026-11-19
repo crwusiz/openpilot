@@ -7,7 +7,7 @@ import sys
 import threading
 import time
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, call
 
 import numpy as np
 import pytest
@@ -21,6 +21,13 @@ def shutdown_records(monkeypatch):
   recorder = Mock()
   monkeypatch.setattr(network, "record_shutdown_stage", recorder)
   return recorder
+
+
+@pytest.fixture(autouse=True)
+def display_readiness(monkeypatch):
+  readiness = Mock()
+  monkeypatch.setattr(network, "publish_cluster_connection", readiness)
+  return readiness
 
 
 def asyncio_test(function):
@@ -71,6 +78,25 @@ def factory():
     assert stream.stopped, "Native senders must stop before their producer is released"
   track.stop.side_effect = stop_track
   return stream, track
+
+
+@asyncio_test
+async def test_hud_readiness_requires_a_presented_fresh_scene(monkeypatch, display_readiness):
+  reports = [
+    {"display_fps": 0.0, "state_stale": False},
+    {"display_fps": 19.5, "state_stale": False},
+    {"keyframe_request": True, "screen_off": False},
+    {"display_fps": 19.5, "state_stale": True},
+    {"display_fps": 19.5, "state_stale": False},
+    {"screen_off": True},
+  ]
+  monkeypatch.setattr(network, "read_control", AsyncMock(side_effect=[
+    *((wire.FEEDBACK, i, report) for i, report in enumerate(reports)), EOFError(),
+  ]))
+  server = network.H264NetworkServer(config(), models())
+  with pytest.raises(EOFError):
+    await server._feedback(None, SimpleNamespace())
+  assert display_readiness.call_args_list == [call("network", ready) for ready in (False, True, False, True, False)]
 
 
 @pytest.mark.parametrize("failed", [False, True])
@@ -536,7 +562,7 @@ def test_camera_age_uses_the_native_boot_clock_including_suspend(monkeypatch):
 
 
 @asyncio_test
-async def test_real_control_socket_negotiates_video_separately_and_streams_state_without_frame_acks(monkeypatch):
+async def test_real_control_socket_negotiates_video_separately_and_streams_state_without_frame_acks(monkeypatch, display_readiness):
   messages, statuses = [], []
   monkeypatch.setattr(network, "flog", messages.append)
   monkeypatch.setattr(network, "write_network_status", statuses.append)
@@ -556,6 +582,7 @@ async def test_real_control_socket_negotiates_video_separately_and_streams_state
     server.status_updated = time.monotonic() - 2
     await network.read_control(reader)
     assert statuses.count("127.0.0.1") >= 2  # Connection status expires after 10s unless renewed.
+    display_readiness.assert_called_once_with("network", False)
     # A feedback packet reports telemetry only; state sends did not wait for it.
     await network.write_control(writer, wire.FEEDBACK, {"screen_off": True, "display_fps": 19.5})
     for _ in range(20):
@@ -570,6 +597,7 @@ async def test_real_control_socket_negotiates_video_separately_and_streams_state
     await server.close()
   assert stream.stopped and track.stop.called and statuses[-1] is None
   assert not server.clients and server.active is None
+  assert display_readiness.call_args == call("network", False)
 
 
 @pytest.mark.parametrize("offered", [None, "zlib", "unsupported"])

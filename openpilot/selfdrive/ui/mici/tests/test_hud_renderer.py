@@ -17,7 +17,8 @@ class FakeSubMaster(dict):
 class TestHudRenderer(unittest.TestCase):
   def setUp(self):
     self.ui_state = SimpleNamespace(is_metric=False, status=UIStatus.ACTIVE, started=True,
-                                    started_frame=0, cluster_enabled=False, chestnut_state=ChestnutState.ACTIVE,
+                                    started_frame=0, cluster_enabled=False, cluster_connected=False,
+                                    chestnut_state=ChestnutState.ACTIVE,
                                     received_since_started=lambda service: True)
     state_patch = patch.object(hud, 'ui_state', self.ui_state)
     state_patch.start()
@@ -42,14 +43,14 @@ class TestHudRenderer(unittest.TestCase):
     self.renderer._set_speed_alpha_filter = FirstOrderFilter(0.0, 0.1, 1 / 60)
     self.renderer._set_speed_alpha = 0.0
     self.renderer._chestnut_alpha_filter = FirstOrderFilter(0.0, 0.1, 1 / 60)
-    self.renderer._txt_chestnut = SimpleNamespace(width=48, height=35)
-    self.renderer._txt_chestnut_green = SimpleNamespace(width=48, height=35)
-    self.renderer._txt_chestnut_orange = SimpleNamespace(width=60, height=35)
-    self.renderer._txt_wheel = SimpleNamespace(width=50, height=50)
-    self.renderer._txt_wheel_green = SimpleNamespace(width=50, height=50)
-    self.renderer._txt_wheel_blue = SimpleNamespace(width=50, height=50)
-    self.renderer._txt_wheel_critical = SimpleNamespace(width=50, height=50)
-    self.renderer._txt_exclamation_point = SimpleNamespace(width=9, height=44)
+    self.renderer._chestnut = SimpleNamespace(width=48, height=35)
+    self.renderer._chestnut_green = SimpleNamespace(width=48, height=35)
+    self.renderer._chestnut_orange = SimpleNamespace(width=60, height=35)
+    self.renderer._wheel = SimpleNamespace(width=50, height=50)
+    self.renderer._wheel_green = SimpleNamespace(width=50, height=50)
+    self.renderer._wheel_blue = SimpleNamespace(width=50, height=50)
+    self.renderer._wheel_critical = SimpleNamespace(width=50, height=50)
+    self.renderer._exclamation_point = SimpleNamespace(width=9, height=44)
     self.renderer._wheel_alpha_filter = FirstOrderFilter(0, 0.05, 1 / 60)
     self.renderer._show_wheel_critical = False
     self.renderer._can_draw_top_icons = True
@@ -82,7 +83,7 @@ class TestHudRenderer(unittest.TestCase):
     self.assertEqual(self.renderer.cruise_speed, 100.0)
     self.assertEqual(self.renderer.apply_speed, 90.0)
 
-  def test_hidden_speed_icons_finish_fading_and_cluster_hides_them(self):
+  def test_speed_icons_hide_only_while_cluster_is_connected(self):
     self.renderer._set_speed_alpha_filter.x = 1.0
     self.renderer._set_speed_alpha = 1.0
     self.renderer._can_draw_top_icons = False
@@ -95,11 +96,34 @@ class TestHudRenderer(unittest.TestCase):
     self.renderer._set_speed_alpha_filter.x = 1.0
     self.renderer._set_speed_alpha = 1.0
     self.ui_state.cluster_enabled = True
+    self.renderer._draw_set_speed(self.rect)
+    self.assertTrue(self.renderer.drawing_top_icons())
+
+    self.ui_state.cluster_connected = True
     self.renderer._draw_text.reset_mock()
     self.renderer._draw_set_speed(self.rect)
     self.assertLess(self.renderer._set_speed_alpha_filter.x, 1.0)
     self.assertFalse(self.renderer.drawing_top_icons())
     self.renderer._draw_text.assert_not_called()
+
+    self.ui_state.cluster_connected = False
+    self.renderer._draw_set_speed(self.rect)
+    self.assertTrue(self.renderer.drawing_top_icons())
+
+  def test_wheel_and_traffic_icons_return_on_disconnect(self):
+    for name in ("_draw_current_speed", "_draw_borders", "_draw_set_speed", "_draw_ignore_limit_timer", "_draw_model_source",
+                 "_draw_traffic_light", "_draw_steering_wheel"):
+      setattr(self.renderer, name, Mock())
+    self.ui_state.cluster_enabled = True
+    self.renderer._render(self.rect)
+    self.ui_state.cluster_connected = True
+    self.renderer._render(self.rect)
+    self.renderer._draw_traffic_light.assert_called_once()
+    self.renderer._draw_steering_wheel.assert_called_once()
+    self.ui_state.cluster_connected = False
+    self.renderer._render(self.rect)
+    self.assertEqual(self.renderer._draw_traffic_light.call_count, 2)
+    self.assertEqual(self.renderer._draw_steering_wheel.call_count, 2)
 
   def test_speed_boxes_convert_display_values_and_apply_fade_alpha(self):
     self.renderer._set_speed_alpha_filter.x = 0.5
@@ -121,7 +145,7 @@ class TestHudRenderer(unittest.TestCase):
     self.renderer._draw_set_speed(self.rect)
     speed_alpha = self.renderer._set_speed_alpha
     self.renderer._draw_model_source(self.rect)
-    self.assertIs(self.draws['draw_texture_ex'].call_args.args[0], self.renderer._txt_chestnut_green)
+    self.assertIs(self.draws['draw_texture_ex'].call_args.args[0], self.renderer._chestnut_green)
     active_alpha = self.renderer._chestnut_alpha_filter.x
     self.clock.return_value = 104.0
     self.renderer._draw_set_speed(self.rect)
@@ -131,7 +155,7 @@ class TestHudRenderer(unittest.TestCase):
 
     self.ui_state.chestnut_state = ChestnutState.FAILED
     self.renderer._draw_model_source(self.rect)
-    self.assertIs(self.draws['draw_texture_ex'].call_args.args[0], self.renderer._txt_chestnut_orange)
+    self.assertIs(self.draws['draw_texture_ex'].call_args.args[0], self.renderer._chestnut_orange)
     self.ui_state.chestnut_state = ChestnutState.LOADING
     self.renderer._draw_model_source(self.rect)
     loading_alpha = self.renderer._chestnut_alpha_filter.x
@@ -148,11 +172,11 @@ class TestHudRenderer(unittest.TestCase):
 
   def test_wheel_uses_status_images_beside_driver_monitoring(self):
     self.ui_state.sm = FakeSubMaster(carState=SimpleNamespace(steeringAngleDeg=15.0))
-    for status, texture in ((UIStatus.DISENGAGED, self.renderer._txt_wheel),
-                            (UIStatus.ENGAGED, self.renderer._txt_wheel_green),
-                            (UIStatus.ACTIVE, self.renderer._txt_wheel_green),
-                            (UIStatus.STEERING, self.renderer._txt_wheel_blue),
-                            (UIStatus.BLINKER, self.renderer._txt_wheel_critical)):
+    for status, texture in ((UIStatus.DISENGAGED, self.renderer._wheel),
+                            (UIStatus.ENGAGED, self.renderer._wheel_green),
+                            (UIStatus.ACTIVE, self.renderer._wheel_green),
+                            (UIStatus.STEERING, self.renderer._wheel_blue),
+                            (UIStatus.BLINKER, self.renderer._wheel_critical)):
       with self.subTest(status=status):
         self.ui_state.status = status
         self.draws['draw_texture_pro'].reset_mock()
@@ -169,7 +193,7 @@ class TestHudRenderer(unittest.TestCase):
     self.renderer._show_wheel_critical = True
     self.ui_state.status = UIStatus.DISENGAGED
     self.renderer._draw_steering_wheel(self.rect)
-    self.assertIs(self.draws['draw_texture_pro'].call_args.args[0], self.renderer._txt_wheel_critical)
+    self.assertIs(self.draws['draw_texture_pro'].call_args.args[0], self.renderer._wheel_critical)
 
 
 if __name__ == '__main__':

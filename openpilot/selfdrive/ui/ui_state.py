@@ -5,10 +5,12 @@ from collections.abc import Callable
 from enum import Enum
 from openpilot.cereal import messaging, log
 from opendbc.car.structs import car
+from openpilot.common.cluster_connection import is_cluster_connected
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params
 from openpilot.common.realtime import drop_realtime
 from openpilot.common.swaglog import cloudlog
+from openpilot.selfdrive.hud_render_support import UIStatus, get_hud_status
 from openpilot.selfdrive.ui.lib.prime_state import PrimeState
 from openpilot.selfdrive.ui.lib.notifications import Notifications
 from openpilot.system.ui.lib.application import gui_app
@@ -26,17 +28,6 @@ BRIGHTNESS_MIN = BACKLIGHT_MIN * 0.6 if HARDWARE.get_device_type() == "mici" els
 PARAM_UPDATE_TIME = 1 / 5.0
 
 GearShifter = structs.CarState.GearShifter
-
-class UIStatus(Enum):
-  DISENGAGED = "disengaged"
-  ENGAGED = "engaged"
-  OVERRIDE = "override"
-  RED = "red"
-  STEERING = "steering"
-  BLINKER = "blinker"
-  ACTIVE = "active"
-  READY = "ready"
-
 
 class ChestnutState(Enum):
   DISCONNECTED = "disconnected"
@@ -135,6 +126,7 @@ class UIState:
     self.driver_camera: bool = self.params.get_bool("CabinCameraOnReverse")
     self.show_driver_camera: bool = False
     self.cluster_enabled: bool = self.params.get_bool("ClusterEnable")
+    self.cluster_connected: bool = False
 
     # Callbacks
     self._offroad_transition_callbacks: list[Callable[[], None]] = []
@@ -222,37 +214,12 @@ class UIState:
       self.steeringPressed = car_state.steeringPressed
       self.show_driver_camera = self.driver_camera and car_state.gearShifter == GearShifter.reverse
 
-      if state in (log.SelfdriveState.OpenpilotState.preEnabled, log.SelfdriveState.OpenpilotState.overriding) and not self.steeringPressed:
-        self.status = UIStatus.OVERRIDE
-      elif selfdrive_state.enabled and not car_control.latActive:
-        if self.steeringPressed:
-          self.status = UIStatus.STEERING
-        elif car_state.brakePressed:
-          self.status = UIStatus.RED
-        elif car_state.leftBlinker or car_state.rightBlinker:
-          self.status = UIStatus.BLINKER
-        else:
-          self.status = UIStatus.ENGAGED
-      elif selfdrive_state.enabled and car_control.latActive:
-        if self.steeringPressed:
-          self.status = UIStatus.STEERING
-        elif car_state.brakePressed:
-          self.status = UIStatus.RED
-        elif car_state.leftBlinker or car_state.rightBlinker:
-          self.status = UIStatus.BLINKER
-        else:
-          self.status = UIStatus.ACTIVE
-      elif car_state.gearShifter == GearShifter.reverse:
-        self.status = UIStatus.RED
-      elif car_state.cruiseState.available and car_control.latActive:
-        self.status = UIStatus.READY
-      elif car_state.cruiseState.available and not car_control.latActive and car_state.vEgo > 0.3:
-        self.status = UIStatus.BLINKER
-      else:
-        self.status = UIStatus.DISENGAGED
-
-      #else:
-      #  self.status = UIStatus.ENGAGED if selfdrive_state.enabled else UIStatus.DISENGAGED
+      self.status = get_hud_status(
+        enabled=self.enabled, lat_active=car_control.latActive,
+        pre_enabled_or_overriding=state in (log.SelfdriveState.OpenpilotState.preEnabled, log.SelfdriveState.OpenpilotState.overriding),
+        steering_pressed=self.steeringPressed, brake_pressed=car_state.brakePressed, blinker=car_state.leftBlinker or car_state.rightBlinker,
+        reverse=car_state.gearShifter == GearShifter.reverse, cruise_available=car_state.cruiseState.available, v_ego=car_state.vEgo,
+      )
 
     # Check for engagement state changes
     if self.engaged != self._engaged_prev:
@@ -319,6 +286,7 @@ class UIState:
     self.chestnut_alert = any(self.params.get(k) is not None for k, a in OFFROAD_ALERTS.items() if k.startswith("Offroad_Chestnut") and a["severity"] >= 0)
 
     self.cluster_enabled = self.params.get_bool("ClusterEnable")
+    self.cluster_connected = self.cluster_enabled and is_cluster_connected(self.params.get("ClusterDisplayTransport") or "usb")
     now = time.monotonic()
     if cable_connected():
       self.usb_disconnected_ts = None

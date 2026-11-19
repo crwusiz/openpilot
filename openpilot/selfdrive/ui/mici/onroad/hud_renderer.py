@@ -2,6 +2,9 @@ import math
 import raylib_nb as rl
 from dataclasses import dataclass
 from openpilot.common.constants import CV
+from openpilot.selfdrive.hud_render_support import (
+  KM_TO_MILE, SET_SPEED_NA, current_speed_color, ignore_limit_ratio, is_cruise_speed_set, select_vehicle_speed, traffic_light_index,
+)
 from openpilot.selfdrive.ui.mici.onroad.status import status_fade
 from openpilot.selfdrive.ui.mici.onroad.torque_bar import TorqueBar
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus, ChestnutState
@@ -16,8 +19,6 @@ from openpilot.selfdrive.ui.mici.onroad import RIGHT_ICON_CENTER_OFFSET, left_co
 
 
 # Constants
-SET_SPEED_NA = 255
-KM_TO_MILE = 0.621371
 CRUISE_DISABLED_CHAR = '–'
 
 WHEEL_SIZE = 50
@@ -117,13 +118,11 @@ class HudRenderer(Widget):
 
     self.set_speed = set_speed
     self.cruise_speed = set_speed
-    self.is_cruise_set = 0 < self.set_speed < SET_SPEED_NA
+    self.is_cruise_set = is_cruise_speed_set(self.set_speed)
     self.is_cruise_available = self.set_speed != -1
 
     # Update Current Speed
-    v_ego_cluster = car_state.vEgoCluster
-    self.v_ego_cluster_seen = self.v_ego_cluster_seen or v_ego_cluster != 0.0
-    v_ego = v_ego_cluster if self.v_ego_cluster_seen else car_state.vEgo
+    v_ego, self.v_ego_cluster_seen = select_vehicle_speed(car_state.vEgo, car_state.vEgoCluster, self.v_ego_cluster_seen)
     speed_conversion = CV.MS_TO_KPH if ui_state.is_metric else CV.MS_TO_MPH
     self.speed = max(0.0, v_ego * speed_conversion)
     self.accel = car_state.aEgo
@@ -169,12 +168,9 @@ class HudRenderer(Widget):
     )
 
   def _draw_ignore_limit_timer(self, rect: rl.Rectangle) -> None:
-    max_ticks = 3000.0
-
-    if self.ignore_limit_timer <= 0 or self.ignore_limit_timer >= max_ticks:
+    ratio = ignore_limit_ratio(self.ignore_limit_timer)
+    if ratio <= 0.0:
       return
-
-    ratio = max(0.0, min(1.0, (max_ticks - self.ignore_limit_timer) / max_ticks))
 
     bar_height = 10
     bar_width = rect.width * ratio
@@ -194,7 +190,7 @@ class HudRenderer(Widget):
     self._draw_borders(rect)
     self._draw_set_speed(rect)
 
-    if not ui_state.cluster_enabled:
+    if not ui_state.cluster_connected:
       self._draw_traffic_light(rect)
       self._draw_steering_wheel(rect)
     self._draw_ignore_limit_timer(rect)
@@ -321,9 +317,10 @@ class HudRenderer(Widget):
 
   def _draw_set_speed(self, rect: rl.Rectangle) -> None:
     """Draw the MAX and SET speed indicator boxes on the left side."""
-    visible = self._can_draw_top_icons and ui_state.status != UIStatus.DISENGAGED and not ui_state.cluster_enabled
+    cluster_connected = ui_state.cluster_connected
+    visible = self._can_draw_top_icons and ui_state.status != UIStatus.DISENGAGED and not cluster_connected
     alpha = self._set_speed_alpha_filter.update(visible)
-    alpha = self._set_speed_alpha = 0.0 if ui_state.cluster_enabled else alpha * (1 - status_fade.weight(UIStatus.DISENGAGED))
+    alpha = self._set_speed_alpha = 0.0 if cluster_connected else alpha * (1 - status_fade.weight(UIStatus.DISENGAGED))
     if alpha < 1e-2:
       return
 
@@ -405,18 +402,7 @@ class HudRenderer(Widget):
     if not self._can_draw_top_icons:
       return
 
-    # Color based on accel/decel
-    if self.accel > 0:
-      # Accelerating - green
-      alpha = int(255 - (180 * min(self.accel / 3.0, 1.0)))
-      alpha = max(80, min(255, alpha))
-      speed_color = rl.Color(alpha, 255, alpha, 255)
-    else:
-      # Decelerating - red
-      alpha = int(255 - (255 * min(abs(self.accel) / 4.0, 1.0)))
-      alpha = max(60, min(255, alpha))
-      speed_color = rl.Color(255, alpha, alpha, 255)
-
+    speed_color = rl.Color(*current_speed_color(self.accel), 255)
     speed_text = str(round(self.speed))
     center_x = rect.x + rect.width / 2
 
@@ -439,12 +425,7 @@ class HudRenderer(Widget):
     img_x = rect.x + rect.width - RIGHT_ICON_CENTER_OFFSET - img_w / 2
     img_y = rect.y + 10
 
-    if self.traffic_state == 1:
-      traffic = self._traffic_red
-    elif self.traffic_state == 2:
-      traffic = self._traffic_green
-    else:
-      traffic = self._traffic_off
+    traffic = (self._traffic_off, self._traffic_red, self._traffic_green)[traffic_light_index(self.traffic_state)]
 
     rl.draw_texture_pro(
       traffic,

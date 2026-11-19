@@ -12,6 +12,7 @@ import socket
 import threading
 import time
 
+from openpilot.common.cluster_connection import publish_cluster_connection
 from openpilot.selfdrive.addon.cluster.cluster_health_guard import ClusterHealthGuard
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog, record_shutdown_stage
 from openpilot.selfdrive.addon.cluster.cluster_runtime_metrics import ClusterRuntimeMetrics
@@ -354,6 +355,7 @@ class H264NetworkServer:
     self.state_drain_started = None
 
   async def start(self):
+    publish_cluster_connection("network", False)
     self.server = await asyncio.start_server(self._client, self.config.network_bind_host, self.config.network_port,
                                              limit=128 * 1024)
     flog(f"[CLUSTER_NETWORK_LISTEN] codec=h264 | transport=webrtc | signaling={self.config.network_bind_host}:{self.config.network_port}")
@@ -408,6 +410,13 @@ class H264NetworkServer:
       if kind != FEEDBACK:
         raise ValueError("Expected H.264 receiver feedback")
       self.screen_off = payload.get("screen_off") is True
+      # Transport negotiation alone does not confirm the Pi is showing its HUD.
+      # Recovery requests can arrive between regular display reports.
+      if "display_fps" in payload or self.screen_off:
+        display_fps = payload.get("display_fps")
+        connected = (not self.screen_off and payload.get("state_stale") is False
+                     and type(display_fps) in (int, float) and 0 < display_fps <= 1e9)
+        publish_cluster_connection("network", connected)
       if payload.get("keyframe_request") is True:
         now = time.monotonic()
         if last_keyframe_request is None or now - last_keyframe_request >= 0.5:
@@ -584,6 +593,8 @@ class H264NetworkServer:
     finally:
       for worker in workers:
         worker.cancel()
+      if owns:
+        publish_cluster_connection("network", False)
       if workers:
         await asyncio.gather(*workers, return_exceptions=True)
       try:

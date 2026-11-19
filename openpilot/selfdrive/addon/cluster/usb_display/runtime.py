@@ -8,6 +8,7 @@ from time import thread_time
 
 import cv2
 
+from openpilot.common.cluster_connection import publish_cluster_connection
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog
 from openpilot.selfdrive.addon.cluster.cluster_display_pipeline import ClusterDisplayPipeline
 from openpilot.selfdrive.addon.cluster.cluster_health_guard import ClusterHealthGuard
@@ -20,6 +21,7 @@ from openpilot.selfdrive.addon.cluster.cluster_runtime_metrics import ClusterRun
 
 def run_composed_cluster(config, display, *, wait_for_frame, check_runtime):
   """Compose frames with a backend-owned clock and bounded delivery pipeline."""
+  publish_cluster_connection(config.display_transport, False)
   # Camera preprocessing, path drawing and encoding already overlap. Native
   # OpenCV pools would add more workers on the same three auxiliary CPU cores.
   cv2.setNumThreads(1)
@@ -64,6 +66,8 @@ def run_composed_cluster(config, display, *, wait_for_frame, check_runtime):
   last_camera_frame = -1
   runtime_metrics = ClusterRuntimeMetrics()
   next_policy_check = 0.0
+  cluster_connected = False
+  last_sent_count = 0
   next_offline_frame = 0.0
   last_status_at = perf_started
   blocked_frames = 0
@@ -85,6 +89,12 @@ def run_composed_cluster(config, display, *, wait_for_frame, check_runtime):
           break
         # Surface fatal encoder errors even when backpressure pauses rendering.
         check_runtime()
+        sent_count = pipeline.get_stats()["sent"]
+        connected = display.connected and sent_count > last_sent_count
+        if connected or cluster_connected:
+          publish_cluster_connection(config.display_transport, connected)
+        cluster_connected = connected
+        last_sent_count = sent_count
 
       health = models.get_health_data()
       guard_log = health_guard.update(health, now)
@@ -154,6 +164,7 @@ def run_composed_cluster(config, display, *, wait_for_frame, check_runtime):
   except KeyboardInterrupt:
     flog("[CLUSTER_MAIN] Interrupted by user.")
   finally:
+    publish_cluster_connection(config.display_transport, False)
     flog("[CLUSTER_MAIN] Closing resources...")
     # Join workers before closing the hardware encoder and clearing the panel.
     pipeline_stopped = pipeline.close() if hasattr(pipeline, 'close') else True
