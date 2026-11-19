@@ -148,15 +148,23 @@ class ColorBlendWorkspace:
         return cv2.addWeighted(solid, alpha, image, 1.0 - alpha, 0)
       return cv2.LUT(image, _alpha_blend_lut(tuple(color), alpha))
     key = tuple(color)
-    solid = self._colors.get(key)
-    if solid is None:
-      solid = np.empty(self._shape, dtype=np.uint8)
-      cv2.rectangle(solid, (0, 0), (self._shape[1] - 1, self._shape[0] - 1), key, -1)
-      self._colors[key] = solid
-      if len(self._colors) > GRADIENT_BANDS + 4:
-        self._colors.popitem(last=False)
+    cached = self._colors.get(key)
+    if cached is None:
+      if len(self._colors) >= GRADIENT_BANDS + 4:
+        _, evicted = self._colors.popitem(last=False)
+        solid = evicted[0]
+      else:
+        solid = np.empty(self._shape, dtype=np.uint8)
+      filled_height = filled_width = 0
     else:
+      solid, filled_height, filled_width = cached
       self._colors.move_to_end(key)
+    if height > filled_height or width > filled_width:
+      # Dynamic gradients change colors often. Fill only the strip area used
+      # so far for this color and reuse the allocation when it is evicted.
+      filled_height, filled_width = max(height, filled_height), max(width, filled_width)
+      cv2.rectangle(solid, (0, 0), (filled_width - 1, filled_height - 1), key, -1)
+      self._colors[key] = solid, filled_height, filled_width
     # addWeighted processes RGB channels together; the colored lookup path
     # performs independent byte lookups. Reuse strips without per-band fills.
     output = self._output[:height, :width]

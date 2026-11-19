@@ -142,18 +142,13 @@ class H264Scene:
     # for acceleration or an untested SDL renderer setting.
     self._gpu_camera = bool(enabled)
 
-  def update(self, snapshot, received_at=None):
-    if not isinstance(snapshot, dict):
-      raise ValueError("Cluster scene metadata must be a dictionary")
+  def update(self, snapshot, received_at=None, *, take_ownership=False):
+    """Keep a validated snapshot. Transfer only private decoded metadata."""
     validate_scene(snapshot)
+    arrival = _arrival_time(received_at, self.clock)
     source_size = snapshot.get("source_size")
-    if source_size is not None and (not isinstance(source_size, (list, tuple)) or len(source_size) != 2 or any(
-      type(value) is not int or not 2 <= value <= 8192 for value in source_size
-    )):
-      raise ValueError("Raw camera source_size must contain two bounded pixel dimensions")
-    if not isinstance(snapshot.get("hud"), dict) or not isinstance(snapshot.get("path"), dict):
-      raise ValueError("Cluster scene metadata requires hud and path dictionaries")
-    snapshot = deepcopy(snapshot)
+    if not take_ownership:
+      snapshot = deepcopy(snapshot)
     snapshot["source_size"] = None if source_size is None else tuple(source_size)
     path = snapshot["path"]
     for name in ("path_x", "path_y", "path_z"):
@@ -164,7 +159,6 @@ class H264Scene:
       if calibration.shape != (3, 3) or not np.isfinite(calibration).all():
         raise ValueError("Camera calibration must be a finite 3x3 matrix")
       path["calib_transform"] = calibration
-    arrival = _arrival_time(received_at, self.clock)
     with self._lock:
       self._snapshot, self._state_received_at = snapshot, arrival
 

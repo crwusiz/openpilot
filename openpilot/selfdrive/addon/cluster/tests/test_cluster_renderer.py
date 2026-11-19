@@ -268,21 +268,37 @@ def test_lookup_cache_is_bounded_and_immutable(renderer_module):
   assert renderer_module._alpha_blend_lut.cache_info().currsize == 128
 
 
-def test_color_blend_workspace_reuses_output_and_bounds_color_memory(renderer_module):
-  blender = renderer_module.ColorBlendWorkspace(72)
-  image = np.random.default_rng(19).integers(0, 256, (37, 63, 3), dtype=np.uint8)
+@pytest.mark.parametrize("channels", [3, 4])
+def test_color_blend_workspace_reuses_output_and_bounds_color_memory(renderer_module, channels):
+  blender = renderer_module.ColorBlendWorkspace(72, channels=channels)
+  image = np.random.default_rng(19).integers(0, 256, (37, 63, channels), dtype=np.uint8)
   original = image.copy()
-  output = blender.blend(image, (20, 180, 99), 0.5)
-  saved = output.copy()
-  assert np.shares_memory(output, blender._output)
-  for value in range(32):
-    output = blender.blend(image, (value, 180, 99), 0.317)
+  alpha = 0.317
+
+  def verify(region, color):
+    output = blender.blend(region, color, alpha)
     assert np.shares_memory(output, blender._output)
-    expected = cv2.addWeighted(np.full_like(image, (value, 180, 99)), 0.317, image, 0.683, 0)
+    paint = (*color, 255) if channels == 4 else color
+    expected = cv2.addWeighted(np.full_like(region, paint), alpha, region, 1.0 - alpha, 0)
     np.testing.assert_array_equal(output, expected)
+
+  limit = renderer_module.GRADIENT_BANDS + 4
+  for value in range(limit):
+    verify(image[:4, :11], (value, 180, 99))
+  allocations = {id(solid) for solid, _, _ in blender._colors.values()}
+
+  # Growth in either dimension must initialize the entire newly used area.
+  verify(image[:4, :43], (0, 180, 99))
+  verify(image[:24, :11], (0, 180, 99))
+  verify(image[:24, :43], (0, 180, 99))
+  # New colors reuse evicted strips without leaking any previous color.
+  for value in range(limit, limit * 3):
+    verify(image[:5, :13], (value, 180, 99))
+    verify(image, (value, 180, 99))
+
   np.testing.assert_array_equal(image, original)
-  np.testing.assert_array_equal(saved, cv2.addWeighted(np.full_like(image, (20, 180, 99)), 0.5, image, 0.5, 0))
-  assert len(blender._colors) == renderer_module.GRADIENT_BANDS + 4
+  assert len(blender._colors) == limit
+  assert {id(solid) for solid, _, _ in blender._colors.values()} == allocations
 
 
 @pytest.mark.parametrize("preprocessed", [False, True])

@@ -1288,6 +1288,7 @@ def test_decoded_rgb_replacement_preserves_latest_state_arrival_time():
   receiver.publish_rgb("old decoded picture", received_at=10.1)
   receiver.publish_rgb("latest decoded picture", received_at=10.2)
   assert receiver.take_updates(timeout=0) == (("latest decoded picture", 10.2), ({"state_seq": 3}, 10.0))
+  assert receiver.latest_state is None
   assert receiver.received_frames == 2 and receiver.dropped_frames == 1
   receiver.publish_rgb("next picture", received_at=10.3)
   assert receiver.take_updates(timeout=0) == (("next picture", 10.3), None)
@@ -1490,7 +1491,8 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
       self.states, self.videos = [], []
       scenes.append(self)
 
-    def update(self, state, received_at):
+    def update(self, state, received_at, *, take_ownership):
+      assert take_ownership
       self.states.append((state, received_at))
 
     def set_video(self, rgb, received_at, take_ownership=False):
@@ -1776,7 +1778,8 @@ def test_metadata_waits_for_new_camera_picture_with_bounded_hud_fallback(monkeyp
       self.state = self.video = None
       scenes.append(self)
 
-    def update(self, state, received_at):
+    def update(self, state, received_at, *, take_ownership):
+      assert take_ownership
       self.state = state, received_at
 
     def set_video(self, video, received_at, **_kwargs):

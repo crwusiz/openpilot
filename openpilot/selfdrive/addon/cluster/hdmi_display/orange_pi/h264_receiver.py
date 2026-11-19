@@ -195,7 +195,7 @@ class H264Receiver:
     self.condition = threading.Condition()
     self.latest_rgb = None
     self.latest_state = None
-    self.state_revision = self.consumed_state_revision = 0
+    self.state_revision = 0
     self.received_frames = self.displayed_frames = self.dropped_frames = 0
     self.displayed_video_frames = 0
     self.metadata_displayed_frames = self.hidden_video_frames = 0
@@ -355,13 +355,12 @@ class H264Receiver:
 
   def take_updates(self, timeout=0.02):
     with self.condition:
-      self.condition.wait_for(lambda: self.latest_rgb is not None or self.state_revision != self.consumed_state_revision
+      self.condition.wait_for(lambda: self.latest_rgb is not None or self.latest_state is not None
                               or self.error is not None or self.done, timeout=timeout)
       if self.error is not None:
         raise self.error
       rgb, self.latest_rgb = self.latest_rgb, None
-      state = self.latest_state if self.state_revision != self.consumed_state_revision else None
-      self.consumed_state_revision = self.state_revision
+      state, self.latest_state = self.latest_state, None
       return rgb, state
 
   async def _send_control(self, kind, payload):
@@ -874,7 +873,9 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         timeout = min(timeout, max(0.0, due_at - time.monotonic()))
       rgb, state = receiver.take_updates(timeout=timeout)
       if state is not None:
-        scene.update(state[0], received_at=state[1])
+        # Each wire decode creates a private dict, and take_updates releases
+        # the receiver's slot. Transfer it to the scene without a deep copy.
+        scene.update(state[0], received_at=state[1], take_ownership=True)
         pending_state = True
       if rgb is not None:
         if pending_render and pending_video_at is not None and pending_camera_on_screen and not receiver.screen_off:

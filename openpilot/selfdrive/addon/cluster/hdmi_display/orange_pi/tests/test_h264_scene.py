@@ -271,6 +271,28 @@ def test_scene_owns_input_pixels_and_state_and_caches_only_current_video(scene, 
   assert not np.array_equal(np.asarray(first), np.asarray(second))
 
 
+def test_owned_metadata_matches_copied_scene_and_keeps_invalid_geometry_out(scene):
+  state = snapshot()
+  state["path"].update(path_x=[10.0, 20.0], path_y=[0.0, 0.0], path_z=[0.0, 0.0],
+                       calib_transform=[[0.0, -600.0, 536.0], [-4.0, 0.0, 600.0], [0.0, 0.0, 1.0]])
+  scene.set_video(np.full((180, 320, 3), 50, np.uint8), received_at=9.95)
+  scene.update(state, received_at=9.9)
+  expected = np.asarray(scene.render()).copy()
+
+  owned = deepcopy(state)
+  path_x = owned["path"]["path_x"]
+  scene.update(owned, received_at=9.9, take_ownership=True)
+  assert scene._snapshot["path"]["path_x"] is path_x
+  np.testing.assert_array_equal(np.asarray(scene.render()), expected)
+
+  malformed = deepcopy(state)
+  malformed["path"]["path_y"].pop()
+  with pytest.raises(ValueError, match="axes differ"):
+    scene.update(malformed, received_at=9.99, take_ownership=True)
+  assert scene._state_received_at == 9.9
+  np.testing.assert_array_equal(np.asarray(scene.render()), expected)
+
+
 @pytest.mark.parametrize("contiguous", [False, True])
 def test_scene_can_receive_exclusive_rgb_ownership_without_a_second_frame_copy(scene, contiguous):
   video = np.full((720, 1280, 3), 50, np.uint8)
