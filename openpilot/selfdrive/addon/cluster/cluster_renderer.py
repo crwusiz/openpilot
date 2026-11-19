@@ -1,4 +1,3 @@
-import colorsys
 import math
 import os
 import time
@@ -11,12 +10,14 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 try:
+  from openpilot.selfdrive.color_support import STOCK_PATH_COLORS, hsla_to_rgba
   from openpilot.selfdrive.hud_render_support import (
     current_speed_color, format_speed_limit_distance, get_hud_status, ignore_limit_ratio,
     is_cruise_speed_set, speed_limit_warning_level, tpms_reading, traffic_light_index,
   )
   from openpilot.selfdrive.model_render_support import DISENGAGED_PATH_ALPHA, FALLBACK_PATH_ALPHA, PathStyle, PlannedStopTracker, get_path_style
 except ImportError:
+  from color_support import STOCK_PATH_COLORS, hsla_to_rgba
   from hud_render_support import (current_speed_color, format_speed_limit_distance, get_hud_status, ignore_limit_ratio,
                                   is_cruise_speed_set, speed_limit_warning_level, tpms_reading, traffic_light_index)
   from model_render_support import DISENGAGED_PATH_ALPHA, FALLBACK_PATH_ALPHA, PathStyle, PlannedStopTracker, get_path_style
@@ -87,7 +88,7 @@ RADAR_TO_CAMERA = 1.52  # m, matches radard for the standalone renderer
 TEXT_CACHE_MAX_ENTRIES = 256
 TEXT_CACHE_MAX_BYTES = 8 * 1024 * 1024
 
-STOCK_PATH_GRADIENT = [(13, 248, 122, 102), (114, 255, 92, 89), (114, 255, 92, 0)]
+STOCK_PATH_GRADIENT = STOCK_PATH_COLORS
 
 
 def _acceleration_path_gradient(track_y, sample_indices, acceleration_x, height):
@@ -108,8 +109,7 @@ def _acceleration_path_gradient(track_y, sample_indices, acceleration_x, height)
     saturation = min(abs(acceleration * 1.5), 1.0)
     lightness = 0.95 - 0.33 * saturation
     alpha = 0.4 * min(max((0.75 - stop) / 0.375, 0.0), 1.0)
-    rgb = colorsys.hls_to_rgb(hue, lightness, saturation)
-    colors.append(tuple(int(channel * 255) for channel in (*rgb, alpha)))
+    colors.append(hsla_to_rgba(hue, saturation, lightness, alpha))
     stops.append(stop)
 
   return colors, stops

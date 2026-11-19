@@ -9,7 +9,7 @@ BUILD_FILES = (
   "control_socket.py", "cluster_receiver.py", "display_controls.py",
   "hdmi_display.py", "hdmi_profiles.py", "receiver_build.py", "receiver_resources.py", "texture_presenter.py", "touch_status.py",
   "h264_protocol.py", "h264_receiver.py", "h264_scene.py", "scene_layers.py", "path_worker.py",
-  "cluster_renderer.py", "cluster_render_support.py", "model_render_support.py", "hud_render_support.py", "receiver_assets.txt",
+  "cluster_renderer.py", "cluster_render_support.py", "model_render_support.py", "hud_render_support.py", "color_support.py", "receiver_assets.txt",
 )
 
 RETIRED_FILES = {"cluster_protocol.py", "frame_stream.py", "tcp_diagnostics.py"}
@@ -18,6 +18,7 @@ _CHECKOUT_SOURCES = {
   "cluster_render_support.py": "../../cluster_render_support.py",
   "model_render_support.py": "../../../../model_render_support.py",
   "hud_render_support.py": "../../../../hud_render_support.py",
+  "color_support.py": "../../../../color_support.py",
 }
 
 

@@ -1,10 +1,10 @@
-import colorsys
 import numpy as np
 import raylib_nb as rl
 from openpilot.cereal import log, messaging
 from opendbc.car.structs import car
 from dataclasses import dataclass, field
 from openpilot.common.params import Params
+from openpilot.selfdrive.color_support import hsla_to_rgba
 from openpilot.selfdrive.model_render_support import (
   DISENGAGED_PATH_ALPHA, FALLBACK_PATH_ALPHA, PathStyle, PlannedStopTracker, get_path_style, get_planned_stop_distance,
   STOP_SPEED as STOP_SPEED, STOP_APPEAR_DISTANCE as STOP_APPEAR_DISTANCE, STOP_LEAD_MARGIN as STOP_LEAD_MARGIN,
@@ -30,7 +30,7 @@ LEAD_BAR_WIDTH = 1.8  # m
 STOCK_PATH_GRADIENT = Gradient(
   start=(0.0, 1.0),
   end=(0.0, 0.0),
-  colors=[rl.Color(13, 248, 122, 102), rl.Color(114, 255, 92, 89), rl.Color(114, 255, 92, 0)],
+  colors=Colors.THROTTLE,
   stops=[0.0, 0.5, 1.0],
 )
 
@@ -520,10 +520,4 @@ class ModelRenderer(Widget):
 
   @staticmethod
   def _hsla_to_color(h, s, l, a):
-    rgb = colorsys.hls_to_rgb(h, l, s)
-    return rl.Color(
-      int(rgb[0] * 255),
-      int(rgb[1] * 255),
-      int(rgb[2] * 255),
-      int(a * 255)
-    )
+    return rl.Color(*hsla_to_rgba(h, s, l, a))

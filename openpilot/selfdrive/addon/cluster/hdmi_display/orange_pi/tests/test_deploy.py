@@ -32,6 +32,7 @@ def deploy_sandbox(tmp_path):
                         "cluster_renderer.py": "# shared renderer\n", "cluster_render_support.py": "# shared support\n",
                         "model_render_support.py": "# base UI model rendering support\n",
                         "hud_render_support.py": "# base UI HUD rendering support\n",
+                        "color_support.py": "# shared display colors\n",
                         "README.md": "연결 대기\r\n수신기\r\n", "requirements.txt": "pygame\n",
                         "cluster-hdmi.service": "[Service]\n"}.items():
     (package / name).write_bytes(content.encode("utf-8"))
@@ -185,7 +186,8 @@ def test_c4_update_packages_receiver_only_with_checksums_and_cleans_staging(depl
                    "display_controls.py", "texture_presenter.py", "touch_status.py",  "receiver_build.py", "receiver_resources.py",
                    "control_socket.py", "hdmi_profiles.py",
                    "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "scene_layers.py", "path_worker.py",
-                   "cluster_renderer.py", "cluster_render_support.py", "model_render_support.py", "hud_render_support.py", "receiver_assets.txt",
+                   "cluster_renderer.py", "cluster_render_support.py", "model_render_support.py", "hud_render_support.py", "color_support.py",
+                   "receiver_assets.txt",
                    *(deploy_sandbox / "receiver_assets.txt").read_text().splitlines(),
                    *("scripts/" + path.name for path in (deploy_sandbox / "scripts").glob("*.sh"))}
   assert (captured / "README.md").read_text(encoding="utf-8") == "연결 대기\n수신기\n"
@@ -540,7 +542,7 @@ def test_shared_renderer_and_assets_are_mapped_from_full_checkout(deploy_sandbox
   cluster_dir, selfdrive_dir = nested.parents[1], nested.parents[3]
   for name in ("cluster_renderer.py", "cluster_render_support.py"):
     (nested / name).rename(cluster_dir / name)
-  for name in ("model_render_support.py", "hud_render_support.py"):
+  for name in ("model_render_support.py", "hud_render_support.py", "color_support.py"):
     (nested / name).rename(selfdrive_dir / name)
   (nested / "assets").rename(selfdrive_dir / "assets")
   script = ('set -euo pipefail; PACKAGE_DIR=$(cd -- "$1" && pwd -P); '
@@ -552,6 +554,7 @@ def test_shared_renderer_and_assets_are_mapped_from_full_checkout(deploy_sandbox
   assert "/repo/selfdrive/addon/cluster/cluster_renderer.py" in result.stdout
   assert "/repo/selfdrive/model_render_support.py" in result.stdout
   assert "/repo/selfdrive/hud_render_support.py" in result.stdout
+  assert "/repo/selfdrive/color_support.py" in result.stdout
   assert "/repo/selfdrive/assets/fonts/NotoSansKR-Bold.ttf" in result.stdout
   assert package_digest(nested) == package_digest(deploy_sandbox)
   assert source_fingerprint(nested).split(" | assets_sha256=")[0] == source_fingerprint(deploy_sandbox).split(" | assets_sha256=")[0]
@@ -569,7 +572,7 @@ def test_incomplete_boot_setup_payload_is_rejected_before_ssh(deploy_sandbox, he
 
 @pytest.mark.parametrize("helper", [
   "control_socket.py",  "display_controls.py", "texture_presenter.py",  "receiver_build.py", "receiver_resources.py", "path_worker.py",
-  "model_render_support.py", "hud_render_support.py",
+  "model_render_support.py", "hud_render_support.py", "color_support.py",
 ])
 def test_incomplete_runtime_payload_is_rejected_before_ssh(deploy_sandbox, helper):
   (deploy_sandbox / helper).unlink()

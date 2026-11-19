@@ -466,7 +466,7 @@ def update_sandbox(script_sandbox):
   for name in ("control_socket.py", "hdmi_profiles.py", "display_controls.py", "texture_presenter.py", "touch_status.py",
                "receiver_build.py", "receiver_resources.py",
                "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "scene_layers.py", "path_worker.py",
-               "cluster_renderer.py", "cluster_render_support.py", "model_render_support.py", "hud_render_support.py"):
+               "cluster_renderer.py", "cluster_render_support.py", "model_render_support.py", "hud_render_support.py", "color_support.py"):
     (incoming / name).write_text("# current runtime dependency\n", encoding="utf-8", newline="\n")
   for name in ("ensure_wifi.sh", "wifi_boot_setup.sh", "wifi_power_save.sh", "prepare_h264.sh", "package_sources.sh"):
     shutil.copyfile(scripts / name, incoming / "scripts" / name)
@@ -611,6 +611,7 @@ def test_remote_update_and_manual_rollback_preserve_configuration(update_sandbox
   assert (target / "cluster_receiver.py").read_text() == "# new\n"
   assert (target / "model_render_support.py").read_bytes() == (incoming / "model_render_support.py").read_bytes()
   assert (target / "hud_render_support.py").read_bytes() == (incoming / "hud_render_support.py").read_bytes()
+  assert (target / "color_support.py").read_bytes() == (incoming / "color_support.py").read_bytes()
   assert (target / "new_module.py").exists()
   assert not list((target / "__pycache__").glob("*.pyc"))
   assert (target / "local-settings.json").read_text() == '{"rotation":270}\n'
@@ -631,6 +632,7 @@ def test_remote_update_and_manual_rollback_preserve_configuration(update_sandbox
   assert (target / "cluster_receiver.py").read_text() == "# old\n"
   assert not (target / "model_render_support.py").exists()
   assert not (target / "hud_render_support.py").exists()
+  assert not (target / "color_support.py").exists()
   assert not (target / "new_module.py").exists()
   assert not (target / "scripts" / "update.sh").exists()
   assert not (target / "scripts" / "fan_setup.sh").exists()
@@ -837,7 +839,7 @@ def test_invalid_update_does_not_stop_running_receiver(update_sandbox, failure):
 @pytest.mark.parametrize("helper", [
   "control_socket.py", "display_controls.py", "texture_presenter.py", "receiver_build.py", "receiver_resources.py",
   "h264_receiver.py", "h264_protocol.py", "h264_scene.py", "scene_layers.py", "path_worker.py",
-  "model_render_support.py", "hud_render_support.py",
+  "model_render_support.py", "hud_render_support.py", "color_support.py",
   "scripts/fan_setup.sh", "scripts/udp_buffer_setup.sh",
 ])
 def test_incomplete_runtime_update_does_not_stop_running_receiver(update_sandbox, helper):

@@ -342,6 +342,7 @@ def test_invalid_scene_is_rejected_before_replacing_valid_state(scene, bad_state
 def test_renderer_and_scene_run_from_standalone_pi_bundle_without_openpilot(tmp_path):
   for source in (CLUSTER / "cluster_renderer.py", CLUSTER / "cluster_render_support.py",
                  CLUSTER.parents[1] / "model_render_support.py", CLUSTER.parents[1] / "hud_render_support.py",
+                 CLUSTER.parents[1] / "color_support.py",
                  CLUSTER / "hdmi_display/orange_pi/h264_scene.py", CLUSTER / "hdmi_display/orange_pi/h264_protocol.py",
                  CLUSTER / "hdmi_display/orange_pi/scene_layers.py", CLUSTER / "hdmi_display/orange_pi/path_worker.py"):
     shutil.copyfile(source, tmp_path / source.name)
@@ -350,14 +351,17 @@ from pathlib import Path
 import sys
 sys.path.insert(0, sys.argv[1])
 sys.modules['openpilot'] = None
+sys.modules['raylib_nb'] = None
 import numpy as np
 from h264_scene import H264Scene
-from cluster_renderer import FirstOrderFilter, Colors, PlannedStopTracker, get_path_style
+from cluster_renderer import Colors, FirstOrderFilter, PlannedStopTracker, get_path_style
+from color_support import ClusterColors
+assert Colors is ClusterColors
 assert FirstOrderFilter.__module__ == 'cluster_render_support'
-assert Colors.__module__ == 'cluster_render_support'
 assert PlannedStopTracker.__module__ == 'model_render_support'
 assert get_path_style.__module__ == 'model_render_support'
 assert Path(sys.modules['hud_render_support'].__file__).parent == Path(sys.argv[1])
+assert Path(sys.modules['color_support'].__file__).parent == Path(sys.argv[1])
 scene=H264Scene(sys.argv[2], clock=lambda: 10.0)
 scene.update({'model_valid':False,'hud':{},'path':{},'source_size':[1344,760]})
 scene.set_video(np.zeros((720,1280,3),np.uint8))
