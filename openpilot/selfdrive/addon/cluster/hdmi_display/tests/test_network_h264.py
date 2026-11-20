@@ -478,12 +478,13 @@ async def test_receiver_recovery_requests_are_rate_limited_and_decoder_errors_ar
 
 
 @asyncio_test
-async def test_existing_perf_window_logs_bounded_nack_diagnostics_without_affecting_stream(monkeypatch):
+async def test_existing_perf_window_logs_source_and_bounded_nack_diagnostics_without_affecting_stream(monkeypatch):
   clock, messages, writes = [0.0], [], []
   monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=lambda: clock[0], thread_time=lambda: 0.0,
                                                      monotonic_ns=lambda: int(clock[0] * 1e9)))
   monkeypatch.setattr(network, "flog", messages.append)
   stream, track = factory()
+  track.take_source_status_fields = Mock(return_value=" | source_input_frames=0")
   stream.get_cluster_rtcp_stats = Mock(side_effect=[
     {"nack_packets": 3, "nack_requested": 18, "nack_distance_ge100": 2, "nack_distance_unavailable": 1,
      "nack_distance_max": 130, "rtcp_invalid": 0, "rtcp_limited": 0},
@@ -505,6 +506,8 @@ async def test_existing_perf_window_logs_bounded_nack_diagnostics_without_affect
     await server._states(SimpleNamespace(write=write), track, stream)
   reports = [line for line in messages if "[CLUSTER_H264_PERF]" in line]
   assert len(reports) == stream.get_cluster_rtcp_stats.call_count == 2
+  assert track.take_source_status_fields.call_args_list == [call(10.0), call(20.0)]
+  assert all("source_input_frames=0" in report for report in reports)
   assert "rtcp_nack_requested=18" in reports[0] and "rtcp_nack_distance_max=130" in reports[0]
   assert "rtcp_nack_distance_ge100=2" in reports[0] and "rtcp_nack_distance_unavailable=1" in reports[0]
   assert "rtcp_invalid=0" in reports[0] and "rtcp_limited=0" in reports[0]
@@ -993,6 +996,45 @@ def camera_backend(monkeypatch):
     return SimpleNamespace(which=lambda: "frame", frame=data)
 
   return SimpleNamespace(packets=packets, packet=packet, requests=requests, socket_options=socket_options)
+
+
+@asyncio_test
+async def test_source_window_distinguishes_starvation_and_input_rejection(camera_backend, monkeypatch):
+  clock = [10.0]
+  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+  monkeypatch.setattr(network, "camera_clock_ns", lambda: int(clock[0] * 1e9))
+  _stream, track = network.create_camera_stream("v=0")
+
+  def queue(index, timestamp_ns, *, key=False, header=b""):
+    packet = camera_backend.packet(index, key=key, header=header)
+    packet.frame.idx.timestampEof = timestamp_ns
+    camera_backend.packets.append(packet)
+
+  def window():
+    return dict(field.split("=") for field in track.take_source_status_fields(clock[0]).split(" | ") if field)
+
+  assert window()["source_input_age_ms"] == "n/a"
+  queue(10, 10_000_000_000, key=True, header=b"sps-pps")
+  assert bytes(await track.recv()) == b"sps-ppsencoded"
+  assert window() == {"source_input_frames": "1", "source_seq_gaps": "0", "source_stale_frames": "0",
+                      "source_idr_wait_frames": "0", "source_input_gap_max_ms": "n/a", "source_capture_gap_max_ms": "n/a",
+                      "source_input_age_ms": "0.0"}
+
+  clock[0] = 14.0
+  report = window()
+  assert report["source_input_frames"] == "0" and report["source_input_age_ms"] == "4000.0"
+  assert report["source_input_gap_max_ms"] == "n/a" and report["source_capture_gap_max_ms"] == "n/a"
+  # A missing sequence and stale payload can describe the same input. A
+  # later fresh P frame still has to wait for the next usable keyframe.
+  queue(12, 13_000_000_000)
+  queue(13, 13_950_000_000)
+  queue(14, 14_000_000_000, key=True)
+  assert bytes(await track.recv()) == b"sps-ppsencoded"
+  assert track.video_frames == 2 and track.resyncs == 1
+  assert window() == {"source_input_frames": "3", "source_seq_gaps": "1", "source_stale_frames": "1",
+                      "source_idr_wait_frames": "1", "source_input_gap_max_ms": "4000.0",
+                      "source_capture_gap_max_ms": "3000.0", "source_input_age_ms": "0.0"}
+  assert window()["source_stale_frames"] == "0"
 
 
 @asyncio_test

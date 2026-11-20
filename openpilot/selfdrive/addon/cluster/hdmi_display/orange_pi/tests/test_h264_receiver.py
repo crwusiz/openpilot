@@ -1477,9 +1477,9 @@ def test_failed_session_releases_renderer_without_waiting_for_cyclic_gc(monkeypa
       gc.enable()
 
 
-@pytest.mark.parametrize("stall", [False, True])
+@pytest.mark.parametrize("stall", ["none", "both", "video_only", "short_timeout", "short_timeout_race"])
 @pytest.mark.parametrize("layered", [False, True])
-def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(monkeypatch, stall, layered):
+def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(monkeypatch, caplog, stall, layered):
   from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
 
   owner = threading.get_ident()
@@ -1534,16 +1534,50 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
         self.received_frames = 1
         self.last_video_at = 9.99
         return ("first RGB", 9.99), ({"state_seq": 1}, 9.98)
-      if stall and self.step == 2:
+      if stall in ("short_timeout", "short_timeout_race") and self.step == 2:
+        now[0] = 10.21
+        self.last_state_at = 10.2
+        return None, ({"state_seq": 2}, self.last_state_at)
+      if stall == "short_timeout" and self.step == 3:
         now[0] = 10.6
+        self.last_state_at = 10.59
+        return None, ({"state_seq": 3}, self.last_state_at)
+      if stall == "short_timeout_race" and self.step == 3:
+        # Simulate publication just after the owner's dequeue returned empty.
+        now[0] = self.last_video_at = 10.3
         return None, None
-      if stall and self.step == 3:
+      if stall in ("both", "video_only") and self.step == 2:
+        now[0] = 10.6
+        if stall == "video_only":
+          self.last_state_at = 10.59
+          return None, ({"state_seq": 2}, self.last_state_at)
+        return None, None
+      if stall in ("both", "video_only") and self.step == 3:
         now[0] = 12.01
+        if stall == "video_only":
+          self.last_state_at = 12.0
+          return None, ({"state_seq": 3}, self.last_state_at)
         return None, None
-      if stall and self.step == 4:
+      if stall == "both" and self.step == 4:
         now[0] = 12.02
         return None, None
-      now[0] = 12.1 if stall else 10.1
+      if stall == "video_only":
+        if self.step in (4, 5):
+          now[0] = 12.7 if self.step == 4 else 12.71
+          return None, None
+        if self.step == 6:
+          now[0] = self.last_state_at = 12.8
+          return None, ({"state_seq": 4}, self.last_state_at)
+        assert "[CLUSTER_H264_RESUMED]" not in caplog.text
+        now[0] = 12.9
+      elif stall == "short_timeout":
+        assert "[CLUSTER_H264_RESUMED]" not in caplog.text
+        now[0] = 10.7
+      elif stall == "short_timeout_race":
+        assert "[CLUSTER_H264_RESUMED]" not in caplog.text
+        now[0] = 10.3
+      else:
+        now[0] = 12.1 if stall == "both" else 10.1
       self.received_frames = 2
       self.last_video_at = now[0]
       return ("second RGB", now[0]), None
@@ -1557,22 +1591,50 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
 
   def present(image):
     assert threading.get_ident() == owner
-    presented.append(image)
+    presented.append((now[0], image))
     return True
 
   display = SimpleNamespace(pump_events=lambda: threading.get_ident() == owner, screen_off=False,
-                            send_rgb=present, show_waiting=lambda: waiting.append(True) or True,
+                            send_rgb=present, show_waiting=lambda: waiting.append(now[0]) or True,
                             last_frame_presented=True, can_present_layers=layered, send_layers=present,
                             compositor_backend="pi_gpu_camera" if layered else "cpu_scene")
   monkeypatch.setattr(h264_scene, "H264Scene", Scene)
   monkeypatch.setattr(h264_receiver, "H264Receiver", Receiver)
-  assert h264_receiver.receive_h264_session(None, display, HELLO_DATA, max_frames=2) == 2
-  assert scenes[0].states == [({"state_seq": 1}, 9.98)]
-  assert scenes[0].videos == [("first RGB", 9.99), ("second RGB", 12.1 if stall else 10.1)]
-  assert presented == (["scene 1", "scene 1", "scene 2"] if stall else ["scene 1", "scene 2"])
-  assert waiting == ([True] if stall else [])
-  assert camera_visibility == ([True, False, True] if stall else [True, True])
-  assert receivers[0].closed and receivers[0].displayed_frames == (3 if stall else 2)
+  with caplog.at_level(logging.INFO, logger="cluster_receiver"):
+    frame_timeout = 0.2 if stall in ("short_timeout", "short_timeout_race") else 2.0
+    assert h264_receiver.receive_h264_session(None, display, HELLO_DATA, frame_timeout=frame_timeout, max_frames=2) == 2
+  if stall == "video_only":
+    # Fresh metadata keeps the HUD updating on the camera waiting pane even
+    # after 2s, and restores that pane when metadata returns by itself.
+    assert presented == [(10.0, "scene 1"), (10.6, "scene 1"), (12.01, "scene 1"), (12.8, "scene 1"), (12.9, "scene 2")]
+    assert waiting == [12.7]
+    assert camera_visibility == [True, False, False, False, True]
+    assert scenes[0].states == [({"state_seq": seq}, stamp) for seq, stamp in enumerate((9.98, 10.59, 12.0, 12.8), 1)]
+  elif stall == "short_timeout":
+    # The full waiting screen keeps the last video hidden until the scene
+    # considers it stale and can draw a metadata-only frame.
+    assert presented == [(10.0, "scene 1"), (10.6, "scene 1"), (10.7, "scene 2")]
+    assert waiting == [10.21]
+    assert camera_visibility == [True, False, True]
+    assert scenes[0].states == [({"state_seq": seq}, stamp) for seq, stamp in enumerate((9.98, 10.2, 10.59), 1)]
+  elif stall == "short_timeout_race":
+    assert presented == [(10.0, "scene 1"), (10.3, "scene 2")]
+    assert waiting == [10.21]
+    assert camera_visibility == [True, True]
+    assert scenes[0].states == [({"state_seq": 1}, 9.98), ({"state_seq": 2}, 10.2)]
+  elif stall == "both":
+    assert presented == [(10.0, "scene 1"), (10.6, "scene 1"), (12.1, "scene 2")]
+    assert waiting == [12.01]
+    assert camera_visibility == [True, False, True]
+    assert scenes[0].states == [({"state_seq": 1}, 9.98)]
+  else:
+    assert presented == [(10.0, "scene 1"), (10.1, "scene 2")]
+    assert not waiting
+    assert camera_visibility == [True, True]
+    assert scenes[0].states == [({"state_seq": 1}, 9.98)]
+  assert caplog.text.count("[CLUSTER_H264_RESUMED]") == int(stall != "none")
+  assert scenes[0].videos == [("first RGB", 9.99), ("second RGB", presented[-1][0])]
+  assert receivers[0].closed and receivers[0].displayed_frames == len(presented)
   assert receivers[0].gpu_camera == layered
 
 

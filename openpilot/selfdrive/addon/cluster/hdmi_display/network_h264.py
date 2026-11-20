@@ -212,6 +212,8 @@ def create_camera_stream(offer_sdp):
       self.video_frames = self.video_bytes = self.resyncs = 0
       self.video_frame_id = self.video_timestamp_eof = None
       self.last_video_at = None
+      self._source_last_input_at = None
+      self._source_window = self._new_source_window()
       self._encode_id = None
       self._ready = False
       self._header = b""
@@ -225,6 +227,27 @@ def create_camera_stream(offer_sdp):
       self._request_scheduled = False
       self._stopped = False
       super().__init__("road")
+
+    @staticmethod
+    def _new_source_window():
+      return {
+        "source_input_frames": 0, "source_seq_gaps": 0, "source_stale_frames": 0, "source_idr_wait_frames": 0,
+        "source_input_gap_max_ms": None, "source_capture_gap_max_ms": None,
+      }
+
+    def take_source_status_fields(self, now):
+      # Report from the state loop so an idle camera recv() cannot hide the
+      # gap. Reset window counters without forgetting the arrival baseline.
+      window, self._source_window = self._source_window, self._new_source_window()
+      window["source_input_age_ms"] = None if self._source_last_input_at is None else (now - self._source_last_input_at) * 1000
+      fields = []
+      for key, value in window.items():
+        if value is None:
+          value = "n/a"
+        elif isinstance(value, float):
+          value = f"{value:.1f}"
+        fields.append(f" | {key}={value}")
+      return "".join(fields)
 
     def request_keyframe(self):
       # Native PLI callbacks run outside asyncio. Params.put(block=False)
@@ -300,16 +323,31 @@ def create_camera_stream(offer_sdp):
     async def recv(self):
       while True:
         base_ack_pending = not self._seen_keyframe
+        previous_eof = self.video_timestamp_eof
         packet = await super().recv()
         now = time.monotonic()
         gap = self._encode_id is not None and self._current_encode_id != self._encode_id + 1
         self._encode_id = self._current_encode_id
         stale = self.video_timestamp_eof and camera_clock_ns() - self.video_timestamp_eof > 250_000_000
+        window = self._source_window
+        window["source_input_frames"] += 1
+        window["source_seq_gaps"] += gap
+        window["source_stale_frames"] += bool(stale)
+        if self._source_last_input_at is not None:
+          arrival_gap_ms = (now - self._source_last_input_at) * 1000
+          window["source_input_gap_max_ms"] = max(window["source_input_gap_max_ms"] or 0.0, arrival_gap_ms)
+        self._source_last_input_at = now
+        if previous_eof and self.video_timestamp_eof > previous_eof:
+          capture_gap_ms = (self.video_timestamp_eof - previous_eof) / 1e6
+          window["source_capture_gap_max_ms"] = max(window["source_capture_gap_max_ms"] or 0.0, capture_gap_ms)
         if gap or stale:
           self._ready = False
           self.resyncs += 1
         if not self._ready:
           if not self._current_keyframe or not self._header or stale:
+            # A stale frame can also lack an IDR, but it would be rejected
+            # even if it were a keyframe. Count it under staleness only.
+            window["source_idr_wait_frames"] += not stale
             if self._keyframe_at is None or now - self._keyframe_at >= KEYFRAME_REQUEST_INTERVAL:
               self.request_keyframe()
             await asyncio.sleep(0)
@@ -495,6 +533,8 @@ class H264NetworkServer:
       if now - started >= 10:
         elapsed = now - started
         video_age = "n/a" if not track.video_timestamp_eof else f"{max(0, camera_clock_ns() - track.video_timestamp_eof) / 1e6:.1f}"
+        take_source_status = getattr(track, "take_source_status_fields", None)
+        source_details = take_source_status(now) if callable(take_source_status) else ""
         report_details = ""
         get_reports = getattr(stream, "get_receiver_report_stats", None)
         reports = get_reports() if callable(get_reports) else {}
@@ -522,7 +562,7 @@ class H264NetworkServer:
              + f" | state_fps={state_frames / elapsed:.2f} | state_kbps={total_bytes * 8 / (1000 * elapsed):.1f}"
              + f" | state_avg={state_wall * 1000 / state_frames:.1f}ms | state_cpu_avg={state_cpu * 1000 / state_frames:.1f}ms"
              + f" | video_source_age_ms={video_age} | resyncs={track.resyncs} | guard={int(self.degraded)}"
-             + f" | state_encoding={compression or 'json'}"
+             + f" | state_encoding={compression or 'json'}" + source_details
              + f" | encoder_bitrate_setting={bitrate}" + self.bitrate.status_fields(now) + report_details
              + " | encoder=existing_livestream | camera_rgb=0 | cluster_render=0")
         started, last_frames, last_video_bytes = now, track.video_frames, track.video_bytes

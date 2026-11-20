@@ -395,7 +395,7 @@ class ClusterModels:
       selected = []
       for process in self.sm['managerState'].processes:
         name = str(process.name)
-        if name in ('modeld', 'locationd', 'selfdrived', 'controlsd', 'camerad', 'plannerd', 'radard'):
+        if name in ('modeld', 'locationd', 'selfdrived', 'controlsd', 'camerad', 'stream_encoderd', 'plannerd', 'radard'):
           selected.append((name, int(process.pid), bool(process.running), bool(process.shouldBeRunning), int(process.exitCode)))
           if name in ('modeld', 'locationd', 'selfdrived'):
             health[name + '_pid'] = int(process.pid)

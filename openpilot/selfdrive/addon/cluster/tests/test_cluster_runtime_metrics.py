@@ -102,14 +102,24 @@ def test_manager_pid_changes_are_recorded_once_and_comm_issue_queue_is_bounded(c
   state = cluster_models
   state.updated['managerState'] = True
   process = SimpleNamespace(name='modeld', pid=1200, running=True, shouldBeRunning=True, exitCode=0)
-  state.messages['managerState'] = SimpleNamespace(processes=[process])
+  encoder = SimpleNamespace(name='stream_encoderd', pid=1300, running=True, shouldBeRunning=True, exitCode=0)
+  state.messages['managerState'] = SimpleNamespace(processes=[process, encoder])
   state.models._update_health_data()
   state.models._update_health_data()
   health = state.models.get_health_data()
   assert health['modeld_pid'] == 1200 and len(health['diagnostic_events']) == 1
+  assert ('stream_encoderd', 1300, True, True, 0) in health['diagnostic_events'][0]['processes']
   process.pid = 1400
   state.models._update_health_data()
   assert state.models.get_health_data()['modeld_pid'] == 1400
+  encoder.running, encoder.exitCode = False, -6
+  state.models._update_health_data()
+  event, = state.models.get_health_data()['diagnostic_events']
+  assert ('stream_encoderd', 1300, False, True, -6) in event['processes']
+  encoder.pid, encoder.running, encoder.exitCode = 1500, True, 0
+  state.models._update_health_data()
+  event, = state.models.get_health_data()['diagnostic_events']
+  assert ('stream_encoderd', 1500, True, True, 0) in event['processes']
   state.updated['managerState'] = False
   state.updated['errorLogMessage'] = True
   state.messages['errorLogMessage'] = json.dumps({'msg': {'event': 'commIssue', 'not_alive': ['modelV2']}})

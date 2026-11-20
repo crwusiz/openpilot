@@ -838,6 +838,7 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
   LOG.info("[CLUSTER_H264_PREPARE] phase=ready | elapsed_ms=%.1f", (time.monotonic() - prepare_started) * 1000)
   receiver = H264Receiver(sock, hello)
   waiting_shown = False
+  video_stalled = False
   next_render_at = None
   render_interval = 1.0 / hello["fps"]
   pending_render = False
@@ -845,6 +846,7 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
   last_render_started = None
   pending_video_at = None
   pending_camera_on_screen = False
+  scene_video_at = scene_state_at = None
   freshness = None
   gpu_policy_logged = False
   slow_frame_logged_at = None
@@ -876,26 +878,40 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         # Each wire decode creates a private dict, and take_updates releases
         # the receiver's slot. Transfer it to the scene without a deep copy.
         scene.update(state[0], received_at=state[1], take_ownership=True)
+        scene_state_at = state[1]
         pending_state = True
       if rgb is not None:
         if pending_render and pending_video_at is not None and pending_camera_on_screen and not receiver.screen_off:
           receiver.record_pending_replacement()
         scene.set_video(rgb[0], received_at=rgb[1], take_ownership=True)
-        pending_video_at = rgb[1]
+        scene_video_at = pending_video_at = rgb[1]
         pending_camera_on_screen = not receiver.screen_off
         pending_render = True
       now = time.monotonic()
-      current_freshness = (receiver.last_video_at is not None and now - receiver.last_video_at < 0.5,
-                           receiver.last_state_at is not None and now - receiver.last_state_at < 0.5)
+      # Another packet may arrive after take_updates(). Only data already
+      # applied to the scene can make the waiting screen safe to dismiss.
+      video_age = None if scene_video_at is None else now - scene_video_at
+      current_freshness = (video_age is not None and video_age < VIDEO_STALE_SECONDS,
+                           scene_state_at is not None and now - scene_state_at < 0.5)
       if current_freshness != freshness:
         # Clear expired HUD/path even if both incoming streams stop together.
         pending_render = True
         freshness = current_freshness
-      if receiver.last_video_at is not None and now - receiver.last_video_at >= frame_timeout:
+      camera_timed_out = video_age is not None and video_age >= frame_timeout
+      # Keep the live HUD during a camera-only stall. The scene hides expired
+      # video and paths and checks HUD source age on every render. For a custom
+      # timeout shorter than scene freshness, hide the whole image immediately.
+      full_waiting = camera_timed_out and (not current_freshness[1] or video_age <= VIDEO_STALE_SECONDS)
+      if camera_timed_out and not video_stalled:
+        LOG.warning("[CLUSTER_H264_STALE] No decoded video within %.1fs | display=%s",
+                    frame_timeout, "connection_waiting" if full_waiting else "camera_waiting")
+        video_stalled = True
+      if waiting_shown and not full_waiting:
+        pending_render = True
+      if full_waiting:
         if not waiting_shown:
           if not display.show_waiting():
             raise RuntimeError("Unable to display WebRTC waiting screen")
-          LOG.warning("[CLUSTER_H264_STALE] No decoded video within %.1fs; waiting for live video", frame_timeout)
           waiting_shown = True
         pending_render = False
         pending_state = False
@@ -925,13 +941,15 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
                                                getattr(display, "last_frame_timings", None), pending_video_at)
         with receiver.condition:
           receiver.gpu_camera = getattr(display, "compositor_backend", None) == "pi_gpu_camera"
-        receiver.record_display(render_started, rendered_at, displayed_at, pending_video_at,
-                                bool(getattr(display, "last_frame_presented", True)),
+        presented = bool(getattr(display, "last_frame_presented", True))
+        camera_visible = getattr(scene, "last_status", {}).get("video_fresh", True)
+        receiver.record_display(render_started, rendered_at, displayed_at, pending_video_at, presented,
                                 scene_timings=getattr(scene, "last_frame_timings", None),
                                 display_timings=getattr(display, "last_frame_timings", None),
-                                camera_visible=getattr(scene, "last_status", {}).get("video_fresh", True))
-        if waiting_shown:
+                                camera_visible=camera_visible)
+        if video_stalled and pending_video_at is not None and presented and camera_visible:
           LOG.info("[CLUSTER_H264_RESUMED] Live WebRTC video received")
+          video_stalled = False
         waiting_shown = False
         pending_render = False
         pending_state = False

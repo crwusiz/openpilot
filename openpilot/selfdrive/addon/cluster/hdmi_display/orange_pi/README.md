@@ -123,7 +123,7 @@ bash scripts/pi_update.sh
 
 | 로그 | 확인할 항목 |
 | --- | --- |
-| C4 `[CLUSTER_H264_PERF]` | `video_fps`, `state_fps`, 소스 영상 age, 처리량, RTCP 손실·지터 |
+| C4 `[CLUSTER_H264_PERF]` | `video_fps`, `state_fps`, 인코딩된 프레임의 수신 수·수신/촬영 간격과 마지막 수신 후 경과 시간, 시퀀스 공백·만료·IDR 대기, 처리량, RTCP 손실·지터 |
 | C4 `[CLUSTER_H264_SENDER]`, `[CLUSTER_H264_SEND_PERF]` | `api=track_send`, `framing=validated_annexb4`, 촬영 EOF 기준 RTP 시각, 실제 제출 FPS·잘못된 프레임·IDR 대기·`send_not_ready` 수 |
 | C4 `[CLUSTER_H264_SEND_BACKPRESSURE]`, `[CLUSTER_H264_SEND_RECOVERED]`, `[CLUSTER_H264_ERROR]`; Pi `[CLUSTER_H264_STOP]` | 일시적 송신 실패·회복, 종료한 제어/영상 단계, 수신 종료 이유와 마지막 영상·상태 age |
 | Pi `[CLUSTER_H264_RX_PERF]`, C4 `[CLUSTER_H264_PI_PERF]` | `display_fps`, RGB 변환·합성·출력 시간, 큐 대기·최대 표시 간격, 영상·상태 stale |
@@ -1366,7 +1366,7 @@ C4 IP를 알고 있다면 자동 검색을 생략합니다. 아래 IP는 실제 
 sudo bash /opt/cluster-receiver/scripts/run_console.sh --host 192.168.43.10
 ```
 
-연결이 끊기거나 기본 2초 안에 완전한 프레임을 받지 못하면 마지막 운행 영상을 지우고 연결 대기 화면으로 돌아갑니다. `--frame-timeout`으로 시간을 조절합니다. 재연결 후 새 프레임이 도착하면 정상 영상으로 복구됩니다. ESC, 창 닫기, Ctrl+C는 수동 실행을 종료하며 종료 시 화면을 검게 지웁니다.
+영상이 멈추면 만료된 영상과 경로를 숨기고 카메라 영역에 대기 안내를 표시합니다. C4 상태가 계속 들어오는 동안에는 유효한 계기판 데이터를 갱신합니다. 연결이 끊기거나 영상 대기 시간(기본 2초)을 넘긴 상태에서 C4 상태도 만료되면 전체 연결 대기 화면으로 전환합니다. `--frame-timeout`으로 영상 대기 시간을 조절할 수 있습니다. 새 프레임이 표시되면 정상 영상으로 복구됩니다. ESC, 창 닫기, Ctrl+C는 수동 실행을 종료하며 종료 시 화면을 검게 지웁니다.
 
 ### 오렌지파이 부팅 로고
 
