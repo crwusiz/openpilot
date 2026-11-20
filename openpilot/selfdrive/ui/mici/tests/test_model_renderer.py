@@ -54,9 +54,10 @@ class TestModelRendererUpdates(unittest.TestCase):
     renderer = renderer_module.ModelRenderer.__new__(renderer_module.ModelRenderer)
     renderer._longitudinal_control = longitudinal_control
     leads = [renderer_module.LeadVehicle(), renderer_module.LeadVehicle()]
+    renderer._lane_lines = [SimpleNamespace(raw_points=np.empty((0, 3), dtype=np.float32)) for _ in range(4)]
+    renderer._lane_line_probs = np.zeros(4, dtype=np.float32)
     if renderer_module is big_renderer:
       renderer._lead_vehicles = leads
-      renderer._lane_lines = [SimpleNamespace(raw_points=np.empty((0, 3), dtype=np.float32)) for _ in range(4)]
     else:
       renderer._lead_bars = leads
     renderer._lead_info = [renderer_module.LeadInfo(), renderer_module.LeadInfo()]
@@ -85,12 +86,14 @@ class TestModelRendererUpdates(unittest.TestCase):
               patch.object(model_renderer.status_fade, 'weight', return_value=0.0)):
           for _ in range(120):
             getattr(renderer, update_method)(self.make_sm())
-        self.assertGreater(renderer._stop_point.fade_filter.x, 0.5)
+        self.assertAlmostEqual(renderer._stop_point.fade_filter.x, 0.8 if renderer_module is big_renderer else 1.0, places=2)
         self.assertEqual(renderer._stop_point.bar.shape, (4, 2))
-        lane, distance, lateral_offset = renderer._get_lead_bar.call_args.args
+        lane, distance, lateral_offset, *edges = renderer._get_lead_bar.call_args.args
         self.assertIs(lane, renderer._path.raw_points)
         self.assertAlmostEqual(distance, 50 / 3 + renderer_module.RADAR_TO_CAMERA)
         self.assertEqual(lateral_offset, 0.0)
+        if renderer_module is model_renderer:
+          np.testing.assert_allclose(edges[0], (-1.8, 1.8))
 
         with patch.object(big_renderer, 'draw_polygon') as draw:
           renderer._draw_lead_indicator()
@@ -100,6 +103,27 @@ class TestModelRendererUpdates(unittest.TestCase):
         np.testing.assert_array_equal(points, renderer._stop_point.bar + renderer._draw_offset())
         self.assertEqual((color.r, color.g, color.b), (255, 255, 255))
         self.assertGreater(color.a, 0)
+
+  def test_mici_stop_bar_spans_the_curve_using_confident_lane_lines(self):
+    path = np.array([[0, 0, 0], [100, 10, 0]], dtype=np.float32)
+    transform = np.array([[0, 100, 0], [0, 0, 1000], [1, 0, 0]], dtype=np.float32)
+    cases = ((model_renderer, [[-2, 50], [21, 50]], 10.0), (big_renderer, [[4.5, 50], [-4.5, 50]], 12.0))
+    for renderer_module, far_corners, target_length in cases:
+      with self.subTest(renderer=renderer_module.__name__):
+        renderer = self.make_renderer(longitudinal_control=True, renderer_module=renderer_module)
+        del renderer._get_lead_bar
+        renderer._path.raw_points = path
+        renderer._path_offset_z = 1.0
+        renderer._car_space_transform = transform
+        renderer._lane_lines[1].raw_points = np.array([[0, -2.4, 0], [100, 7.6, 0]], dtype=np.float32)
+        renderer._lane_lines[2].raw_points = np.array([[0, 2.2, 0], [100, 12.2, 0]], dtype=np.float32)
+        renderer._lane_line_probs[1:3] = [0.75, 0.8]
+
+        bar = renderer._get_stop_bar(path, 20.0)
+
+        np.testing.assert_allclose(bar[[0, 3]], far_corners, atol=1e-5)
+        length = np.linalg.norm(bar[[1, 2]].mean(axis=0) - bar[[0, 3]].mean(axis=0))
+        self.assertAlmostEqual(length, target_length, places=5)
 
   def test_stock_longitudinal_keeps_radar_lead_labels_without_stop_bar(self):
     renderer = self.make_renderer(longitudinal_control=False)

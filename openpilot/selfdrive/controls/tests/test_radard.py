@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from openpilot.selfdrive.controls import radard
 
@@ -14,7 +14,7 @@ class TestRadarLeadAssociation(unittest.TestCase):
     self.radar.corner_tracks_available = False
     self.model_lead = SimpleNamespace(x=[50.0], y=[0.0], v=[8.0], a=[0.0])
 
-  def test_unmatched_radar_lead_has_no_model_trajectory_confidence(self):
+  def test_unmatched_radar_lead_has_no_vision_match_confidence(self):
     sticky = radard.Track(1)
     sticky.cnt = 3
     sticky.selected_count = 2
@@ -37,7 +37,7 @@ class TestRadarLeadAssociation(unittest.TestCase):
         self.assertEqual(lead['radarTrackId'], track.identifier)
         self.assertEqual(lead['modelProb'], 0.0)
 
-  def test_matched_radar_lead_retains_model_trajectory_confidence(self):
+  def test_matched_radar_lead_retains_vision_match_confidence(self):
     track = radard.Track(1)
     track.dRel = 45.0
 
@@ -48,3 +48,30 @@ class TestRadarLeadAssociation(unittest.TestCase):
     self.assertTrue(lead['radar'])
     self.assertEqual(lead['radarTrackId'], track.identifier)
     self.assertEqual(lead['modelProb'], 0.9)
+
+
+class TestRadarDMain(unittest.TestCase):
+  def test_updates_only_on_new_model_frames(self):
+    setup_realtime = self.enterContext(patch.object(radard, 'config_realtime_process'))
+    params = self.enterContext(patch.object(radard, 'Params')).return_value
+    submaster = self.enterContext(patch.object(radard.messaging, 'SubMaster'))
+    sm = submaster.return_value
+    pm = self.enterContext(patch.object(radard.messaging, 'PubMaster')).return_value
+    radar = self.enterContext(patch.object(radard, 'RadarD')).return_value
+    fresh_tracks = (object(), object())
+    frames = iter(((False, None), (True, fresh_tracks[0]), (False, fresh_tracks[0]), (True, fresh_tracks[1])))
+
+    def poll_frame():
+      updated, tracks = next(frames)
+      sm.updated = {'modelV2': updated}
+      sm.__getitem__.return_value = tracks
+
+    sm.update.side_effect = poll_frame
+    with self.assertRaises(StopIteration):
+      radard.main()
+
+    setup_realtime.assert_called_once_with(6, radard.Priority.CTRL_LOW)
+    params.get.assert_called_once_with('CarParams', block=True)
+    submaster.assert_called_once_with(['modelV2', 'carState', 'radarTracks'], poll='modelV2')
+    self.assertEqual(radar.mock_calls, [call.update(sm, fresh_tracks[0]), call.publish(pm),
+                                       call.update(sm, fresh_tracks[1]), call.publish(pm)])

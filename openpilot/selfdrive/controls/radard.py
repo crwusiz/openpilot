@@ -728,7 +728,6 @@ class RadarD:
     radar = False
     if track is not None:
       vision_y_rel = float(-lead_msg.y[0]) if ready else 0.0
-      # The MPC uses modelProb to decide whether the vision trajectory belongs to this track.
       model_prob = lead_prob if front_radar_vision_match else 0.0
       lead_dict = track.get_RadarState(model_prob, vision_y_rel)
       radar = True
@@ -981,7 +980,7 @@ class RadarD:
 
 # fuses camera and radar data for best lead detection
 def main() -> None:
-  config_realtime_process(5, Priority.CTRL_LOW)
+  config_realtime_process(6, Priority.CTRL_LOW)
 
   # Wait for CarParams to be available before starting radar processing.
   cloudlog.info("radard is waiting for CarParams")

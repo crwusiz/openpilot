@@ -353,13 +353,16 @@ sys.path.insert(0, sys.argv[1])
 sys.modules['openpilot'] = None
 sys.modules['raylib_nb'] = None
 import numpy as np
+import cluster_renderer
+import model_render_support
+import scene_layers
 from h264_scene import H264Scene
-from cluster_renderer import Colors, FirstOrderFilter, PlannedStopTracker, get_path_style
 from color_support import ClusterColors
-assert Colors is ClusterColors
-assert FirstOrderFilter.__module__ == 'cluster_render_support'
-assert PlannedStopTracker.__module__ == 'model_render_support'
-assert get_path_style.__module__ == 'model_render_support'
+assert cluster_renderer.Colors is ClusterColors
+assert cluster_renderer.FirstOrderFilter.__module__ == 'cluster_render_support'
+assert cluster_renderer.model_render_support is scene_layers.model_render_support is model_render_support
+assert issubclass(cluster_renderer.StopPoint, model_render_support.PlannedStopTracker)
+assert Path(model_render_support.__file__).parent == Path(sys.argv[1])
 assert Path(sys.modules['hud_render_support'].__file__).parent == Path(sys.argv[1])
 assert Path(sys.modules['color_support'].__file__).parent == Path(sys.argv[1])
 scene=H264Scene(sys.argv[2], clock=lambda: 10.0)

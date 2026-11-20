@@ -2,14 +2,12 @@ import numpy as np
 import raylib_nb as rl
 from openpilot.cereal import log
 from openpilot.common.filter_simple import FirstOrderFilter
+from openpilot.selfdrive import model_render_support
 from openpilot.selfdrive.controls.radard import RADAR_TO_CAMERA
 from openpilot.selfdrive.locationd.calibrationd import HEIGHT_INIT
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.selfdrive.ui.mici.onroad.status import status_fade
-from openpilot.selfdrive.ui.onroad.model_renderer import (
-  ModelRenderer as BaseModelRenderer, CLIP_MARGIN, LEAD_BAR_LENGTH, LEAD_BAR_WIDTH, MAX_DRAW_DISTANCE, StopPoint,
-  STOP_SPEED as STOP_SPEED, STOP_APPEAR_DISTANCE as STOP_APPEAR_DISTANCE, STOP_LEAD_MARGIN as STOP_LEAD_MARGIN,
-)
+from openpilot.selfdrive.ui.onroad.model_renderer import ModelRenderer as BaseModelRenderer, StopPoint as BaseStopPoint
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.polygon import draw_polygon
 
@@ -31,7 +29,16 @@ class LeadVehicle:
     self.fade_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
 
 
+class StopPoint(BaseStopPoint):
+  def __init__(self):
+    super().__init__()
+    self.edges = [FirstOrderFilter(y, 0.2, 1 / gui_app.target_fps, initialized=False) for y in model_render_support.LANE_EDGES]
+
+
 class ModelRenderer(BaseModelRenderer):
+  LEAD_BAR_LENGTH = model_render_support.MICI_LEAD_BAR_LENGTH
+  _STOP_POINT_TYPE = StopPoint
+
   def __init__(self):
     super().__init__()
     self._lead_bars = [LeadVehicle(), LeadVehicle()]
@@ -50,8 +57,9 @@ class ModelRenderer(BaseModelRenderer):
       return
 
     # Set up clipping region
+    clip_margin = model_render_support.CLIP_MARGIN
     self._clip_region = rl.Rectangle(
-      rect.x - CLIP_MARGIN, rect.y - CLIP_MARGIN, rect.width + 2 * CLIP_MARGIN, rect.height + 2 * CLIP_MARGIN
+      rect.x - clip_margin, rect.y - clip_margin, rect.width + 2 * clip_margin, rect.height + 2 * clip_margin
     )
 
     # Update state
@@ -91,7 +99,7 @@ class ModelRenderer(BaseModelRenderer):
     else:
       self._lead_bars = [LeadVehicle(), LeadVehicle()]
       self._lead_info = [LeadInfo(), LeadInfo()]
-      self._stop_point = StopPoint()
+      self._stop_point = self._STOP_POINT_TYPE()
 
   def _update_lead_bars(self, sm):
     plan = sm['longitudinalPlan']
@@ -114,7 +122,8 @@ class ModelRenderer(BaseModelRenderer):
     lane = self._path.raw_points
     opacity = 0.8 - 0.4 * status_fade.weight(UIStatus.DISENGAGED)
     for i, (lead, (present, d_rel, y_rel)) in enumerate(zip(self._lead_bars, leads, strict=True)):
-      visible = available and present and 0.0 < d_rel < MAX_DRAW_DISTANCE and len(lane) > 0 and len(self._path.raw_points) > 0
+      visible = (available and present and 0.0 < d_rel < model_render_support.MAX_DRAW_DISTANCE
+                 and len(lane) > 0 and len(self._path.raw_points) > 0)
       visible = visible and np.isfinite(y_rel)
       # snap to a new vehicle instead of sliding over
       if not visible or abs(y_rel - lead.y_filter.x) > 3.0:
@@ -124,25 +133,18 @@ class ModelRenderer(BaseModelRenderer):
         lead.bar = self._get_lead_bar(lane, lead.d_filter.update(d_rel), lead.y_filter.update(y_rel))
         self._lead_info[i] = lead_info[i]
 
-    self._update_stop_point(sm, leads, available, opacity)
+    # A planned stop is brighter than a lead bar.
+    self._update_stop_point(sm, leads, available, opacity + 0.2)
 
-  def _get_lead_bar(self, lane, d_rel, y_rel):
-    # bar on the road behind the lead, following the lane
-    x = np.array([d_rel, d_rel - min(6.0, 0.25 * d_rel)])
-    y = np.interp(x, lane[:, 0], lane[:, 1]) - np.interp(d_rel, lane[:, 0], lane[:, 1]) - y_rel
-    z = np.interp(x, self._path.raw_points[:, 0], self._path.raw_points[:, 2]) + self._path_offset_z
-    corners = np.vstack((np.column_stack((x, y + LEAD_BAR_WIDTH / 2, z)), np.column_stack((x, y - LEAD_BAR_WIDTH / 2, z))[::-1]))
-    pts = self._car_space_transform @ corners.T
-    if not np.all(np.isfinite(pts)) or np.any(pts[2] <= 1e-6):
-      return np.empty((0, 2), dtype=np.float32)
-    bar = (pts[:2] / pts[2]).T
-
-    far, near = bar[[0, 3]], bar[[1, 2]]
-    length = np.linalg.norm(near.mean(axis=0) - far.mean(axis=0))
-    if length <= 1e-6:
-      return np.empty((0, 2), dtype=np.float32)
-    bar[[1, 2]] = far + (near - far) * np.clip(length, 3.0, LEAD_BAR_LENGTH) / length
-    return bar.astype(np.float32)
+  def _get_stop_bar(self, path, d_stop):
+    path_y = np.interp(d_stop, path[:, 0], path[:, 1])
+    edges = []
+    for edge_filter, lane_line, prob, default in zip(
+        self._stop_point.edges, self._lane_lines[1:3], self._lane_line_probs[1:3], model_render_support.LANE_EDGES, strict=True):
+      line = lane_line.raw_points
+      offset = np.interp(d_stop, line[:, 0], line[:, 1]) - path_y if prob > model_render_support.LANE_LINE_PROB and len(line) else default
+      edges.append(edge_filter.update(offset if np.isfinite(offset) else default))
+    return self._get_lead_bar(path, d_stop, -path_y, edges)
 
   def _draw_lane_lines(self):
     """Draw white lane lines and red road edges, matching the big UI."""

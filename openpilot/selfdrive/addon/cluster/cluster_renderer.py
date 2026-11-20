@@ -10,17 +10,17 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 try:
+  from openpilot.selfdrive import model_render_support
   from openpilot.selfdrive.color_support import STOCK_PATH_COLORS, hsla_to_rgba
   from openpilot.selfdrive.hud_render_support import (
     current_speed_color, format_speed_limit_distance, get_hud_status, ignore_limit_ratio,
     is_cruise_speed_set, speed_limit_warning_level, tpms_reading, traffic_light_index,
   )
-  from openpilot.selfdrive.model_render_support import DISENGAGED_PATH_ALPHA, FALLBACK_PATH_ALPHA, PathStyle, PlannedStopTracker, get_path_style
 except ImportError:
+  import model_render_support
   from color_support import STOCK_PATH_COLORS, hsla_to_rgba
   from hud_render_support import (current_speed_color, format_speed_limit_distance, get_hud_status, ignore_limit_ratio,
                                   is_cruise_speed_set, speed_limit_warning_level, tpms_reading, traffic_light_index)
-  from model_render_support import DISENGAGED_PATH_ALPHA, FALLBACK_PATH_ALPHA, PathStyle, PlannedStopTracker, get_path_style
 
 try:
   from openpilot.common.filter_simple import FirstOrderFilter
@@ -76,14 +76,8 @@ BLINKER_DRAW_COUNT = 10
 BLINKER_SEQUENCE_MS = 400.0
 BLINKER_PAUSE_MS = 250.0
 CAMERA_OVERLAY_ICON_HEIGHT = 94
-CLIP_MARGIN = 500
 GRADIENT_BANDS = 8
 ALPHA_BLEND_STRIP_HEIGHT = 64
-MAX_DRAW_DISTANCE = 100.0
-LANE_LINE_WIDTH = 0.025
-ROAD_EDGE_WIDTH = 0.025
-LEAD_BAR_LENGTH = 12.0  # px
-LEAD_BAR_WIDTH = 1.8  # m
 RADAR_TO_CAMERA = 1.52  # m, matches radard for the standalone renderer
 TEXT_CACHE_MAX_ENTRIES = 256
 TEXT_CACHE_MAX_BYTES = 8 * 1024 * 1024
@@ -229,7 +223,7 @@ class LeadVehicle:
     self.fade_filter = FirstOrderFilter(0.0, 0.1, 1 / fps)
 
 
-class StopPoint(PlannedStopTracker):
+class StopPoint(model_render_support.PlannedStopTracker):
   def __init__(self, fps):
     super().__init__(1 / fps, RADAR_TO_CAMERA, FirstOrderFilter)
     self.bar = np.empty((0, 2), dtype=np.float32)
@@ -442,8 +436,8 @@ class ClusterRenderer:
       )
     return pixels, valid
 
-  def _map_line_to_polygon(self, xs, ys, zs, width, z_offset, calib_transform, max_distance=100.0, allow_invert=True,
-                           *, return_indices=False):
+  def _map_line_to_polygon(self, xs, ys, zs, width, z_offset, calib_transform,
+                           max_distance=model_render_support.MAX_DRAW_DISTANCE, allow_invert=True, *, return_indices=False):
     count = min(len(xs), len(ys), len(zs))
     if count < 2:
       return None
@@ -454,8 +448,8 @@ class ClusterRenderer:
       return None
     left = raw + np.array([0.0, -width, z_offset], dtype=np.float32)
     right = raw + np.array([0.0, width, z_offset], dtype=np.float32)
-    left_px, left_valid = self._project_points(left, calib_transform, CLIP_MARGIN)
-    right_px, right_valid = self._project_points(right, calib_transform, CLIP_MARGIN)
+    left_px, left_valid = self._project_points(left, calib_transform, model_render_support.CLIP_MARGIN)
+    right_px, right_valid = self._project_points(right, calib_transform, model_render_support.CLIP_MARGIN)
     valid = left_valid & right_valid
     if np.count_nonzero(valid) < 2:
       return None
@@ -581,7 +575,7 @@ class ClusterRenderer:
                         and acceleration_x is not None and len(acceleration_x) >= 2)
     projected = self._map_line_to_polygon(
       path_data["path_x"], path_data["path_y"], path_z,
-      0.9, camera_height, calib_transform, max_distance=100.0, allow_invert=False, return_indices=use_acceleration,
+      0.9, camera_height, calib_transform, allow_invert=False, return_indices=use_acceleration,
     )
     if projected is None:
       return
@@ -594,21 +588,21 @@ class ClusterRenderer:
     else:
       path_poly = projected
 
-    style = get_path_style(disengaged=disengaged, steering_pressed=steering_pressed, enabled=enabled,
-                           has_acceleration_gradient=len(model_colors) > 1)
+    style = model_render_support.get_path_style(disengaged=disengaged, steering_pressed=steering_pressed, enabled=enabled,
+                                                has_acceleration_gradient=len(model_colors) > 1)
     local_path_poly = path_poly - np.array([self.camera_x, self.camera_y], dtype=np.int32)
     blender = getattr(self, "_color_blender", None)
-    if style is PathStyle.DISENGAGED:
-      self._fill_polygon_alpha(camera_region, local_path_poly, Colors.BLACK, DISENGAGED_PATH_ALPHA / 255.0, blender=blender)
+    if style is model_render_support.PathStyle.DISENGAGED:
+      self._fill_polygon_alpha(camera_region, local_path_poly, Colors.BLACK, model_render_support.DISENGAGED_PATH_ALPHA / 255.0, blender=blender)
       return
-    if style is PathStyle.FALLBACK:
-      self._fill_polygon_alpha(camera_region, local_path_poly, Colors.WHITE, FALLBACK_PATH_ALPHA / 255.0, blender=blender)
+    if style is model_render_support.PathStyle.FALLBACK:
+      self._fill_polygon_alpha(camera_region, local_path_poly, Colors.WHITE, model_render_support.FALLBACK_PATH_ALPHA / 255.0, blender=blender)
       return
 
-    if style is PathStyle.ACCELERATION:
+    if style is model_render_support.PathStyle.ACCELERATION:
       colors, stops = model_colors, model_stops
     else:
-      colors = Colors.STEERING_PRESSED if style is PathStyle.STEERING else STOCK_PATH_GRADIENT
+      colors = Colors.STEERING_PRESSED if style is model_render_support.PathStyle.STEERING else STOCK_PATH_GRADIENT
       stops = [0.0, 0.5, 1.0]
     self._fill_polygon_gradient(camera_region, local_path_poly, colors, stops, blender=blender)
 
@@ -623,7 +617,7 @@ class ClusterRenderer:
       # and projecting both 3D boundaries before the alpha fill rejects it.
       if probability <= 0.0:
         continue
-      width = LANE_LINE_WIDTH * probability
+      width = model_render_support.LANE_LINE_WIDTH * probability
       polygon = self._map_line_to_polygon(*line, width, 0.0, calib_transform)
       if polygon is not None:
         local_polygon = polygon - np.array([self.camera_x, self.camera_y], dtype=np.int32)
@@ -638,7 +632,7 @@ class ClusterRenderer:
       confidence = 1.0 - float(road_stds[index]) if index < len(road_stds) else 0.0
       if confidence <= 0.0:
         continue
-      polygon = self._map_line_to_polygon(*edge, ROAD_EDGE_WIDTH, 0.0, calib_transform)
+      polygon = self._map_line_to_polygon(*edge, model_render_support.ROAD_EDGE_WIDTH, 0.0, calib_transform)
       if polygon is not None:
         local_polygon = polygon - np.array([self.camera_x, self.camera_y], dtype=np.int32)
         self._fill_polygon_alpha(camera_region, local_polygon, colors_alpha(Colors.RED, 100), np.clip(confidence, 0.0, 1.0),
@@ -671,7 +665,8 @@ class ClusterRenderer:
     available = hud_data.get("enabled") or hud_data.get("engageable") or hud_data.get("brake_pressed")
     opacity = 0.4 if self._get_border_color(hud_data) == Colors.Border.DISENGAGED else 0.8
     for i, (lead, (present, d_rel, y_rel)) in enumerate(zip(self._lead_vehicles, leads, strict=True)):
-      visible = available and present and 0.0 < d_rel < MAX_DRAW_DISTANCE and len(lane) > 0 and len(path_x) == len(path_z) > 0
+      visible = (available and present and 0.0 < d_rel < model_render_support.MAX_DRAW_DISTANCE
+                 and len(lane) > 0 and len(path_x) == len(path_z) > 0)
       visible = visible and np.isfinite(y_rel)
       # snap to a new vehicle instead of sliding over
       if not visible or abs(y_rel - lead.y_filter.x) > 3.0:
@@ -697,8 +692,8 @@ class ClusterRenderer:
     planning_stop = stop.update_from_model(path_x, velocity_x, model_updated, float(hud_data.get("v_ego", 0.0) or 0.0), lead_distances)
     d_stop = stop.d + stop.radar_to_camera
     path_y, path_z = path_data.get("path_y") or [], path_data.get("path_z") or []
-    visible = (hud_data.get("longitudinal_control") and available and planning_stop and 0.0 < d_stop < MAX_DRAW_DISTANCE
-               and len(path_x) == len(path_y) == len(path_z) > 0)
+    visible = (hud_data.get("longitudinal_control") and available and planning_stop
+               and 0.0 < d_stop < model_render_support.MAX_DRAW_DISTANCE and len(path_x) == len(path_y) == len(path_z) > 0)
     stop.fade_filter.update(opacity if visible else 0.0)
     if visible:
       path = np.column_stack((path_x, path_y, path_z))
@@ -717,7 +712,8 @@ class ClusterRenderer:
     x = np.array([d_rel, d_rel - min(6.0, 0.25 * d_rel)])
     y = np.interp(x, lane[:, 0], lane[:, 1]) - np.interp(d_rel, lane[:, 0], lane[:, 1]) - y_rel
     z = np.interp(x, path_data["path_x"], path_data["path_z"]) + camera_height
-    corners = np.vstack((np.column_stack((x, y + LEAD_BAR_WIDTH / 2, z)), np.column_stack((x, y - LEAD_BAR_WIDTH / 2, z))[::-1]))
+    half_width = model_render_support.LEAD_BAR_WIDTH / 2
+    corners = np.vstack((np.column_stack((x, y + half_width, z)), np.column_stack((x, y - half_width, z))[::-1]))
     pts = self._source_to_panel @ np.asarray(calib_transform, dtype=np.float32) @ corners.T
     if not np.all(np.isfinite(pts)) or np.any(pts[2] <= 1e-6):
       return np.empty((0, 2), dtype=np.float32)
@@ -727,7 +723,7 @@ class ClusterRenderer:
     length = np.linalg.norm(near.mean(axis=0) - far.mean(axis=0))
     if length <= 1e-6:
       return np.empty((0, 2), dtype=np.float32)
-    bar[[1, 2]] = far + (near - far) * np.clip(length, 3.0, LEAD_BAR_LENGTH) / length
+    bar[[1, 2]] = far + (near - far) * np.clip(length, model_render_support.MIN_LEAD_BAR_LENGTH, model_render_support.LEAD_BAR_LENGTH) / length
     return bar.astype(np.float32)
 
   def _draw_lead_indicator(self, camera_region, hud_data):

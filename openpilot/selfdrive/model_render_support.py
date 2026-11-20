@@ -1,4 +1,4 @@
-"""Model path and planned-stop rules shared by the driving displays."""
+"""Model overlay geometry, path styling, and planned-stop rules shared by the driving displays."""
 
 from enum import Enum, auto
 import math
@@ -6,6 +6,18 @@ import math
 
 DISENGAGED_PATH_ALPHA = 90
 FALLBACK_PATH_ALPHA = 30
+CLIP_MARGIN = 500  # px
+MAX_DRAW_DISTANCE = 100.0  # m
+LANE_LINE_WIDTH = 0.025  # m, half-width at full confidence
+ROAD_EDGE_WIDTH = 0.025  # m, half-width
+
+MIN_LEAD_BAR_LENGTH = 3.0  # px
+LEAD_BAR_LENGTH = 12.0  # px, maximum for Big UI and the cluster
+MICI_LEAD_BAR_LENGTH = 10.0  # px, maximum for Mici
+LEAD_BAR_WIDTH = 1.8  # m
+LANE_EDGES = (-1.8, 1.8)  # m, offsets for a stop bar without lane lines
+LANE_LINE_PROB = 0.5  # minimum confidence for stop-bar lane edges
+
 STOP_SPEED = 1.0  # m/s, planned speed that counts as stopping
 STOP_APPEAR_DISTANCE = (8.0, 50.0)  # m
 STOP_LEAD_MARGIN = 15.0  # m, a lead this close past the stop is what it's stopping for

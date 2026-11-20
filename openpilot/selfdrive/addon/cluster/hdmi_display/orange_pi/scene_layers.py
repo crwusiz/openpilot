@@ -15,12 +15,12 @@ import numpy as np
 from PIL import Image
 
 try:
-  from openpilot.selfdrive.addon.cluster.cluster_renderer import (
-    CLIP_MARGIN, GRADIENT_BANDS, LANE_LINE_WIDTH, ROAD_EDGE_WIDTH, ClusterRenderer, ColorBlendWorkspace, TextGlyph,
-  )
+  from openpilot.selfdrive import model_render_support
+  from openpilot.selfdrive.addon.cluster.cluster_renderer import GRADIENT_BANDS, ClusterRenderer, ColorBlendWorkspace, TextGlyph
   from openpilot.selfdrive.addon.cluster.cluster_render_support import Colors, colors_alpha
 except ImportError:
-  from cluster_renderer import CLIP_MARGIN, GRADIENT_BANDS, LANE_LINE_WIDTH, ROAD_EDGE_WIDTH, ClusterRenderer, ColorBlendWorkspace, TextGlyph
+  import model_render_support
+  from cluster_renderer import GRADIENT_BANDS, ClusterRenderer, ColorBlendWorkspace, TextGlyph
   from cluster_render_support import Colors, colors_alpha
 
 
@@ -262,14 +262,14 @@ class LayeredRenderer(ClusterRenderer):
         raw = raw[(raw[:, 0] >= 0.0) & (raw[:, 0] <= 100.0)]
         if len(raw) < 2:
           continue
-        width = ROAD_EDGE_WIDTH if edge else LANE_LINE_WIDTH * alpha
+        width = model_render_support.ROAD_EDGE_WIDTH if edge else model_render_support.LANE_LINE_WIDTH * alpha
         points.extend((raw + np.array([0.0, -width, 0.0], dtype=np.float32),
                        raw + np.array([0.0, width, 0.0], dtype=np.float32)))
         draws.append((len(raw), colors_alpha(Colors.RED, 100) if edge else Colors.WHITE,
                       float(np.clip(alpha, 0.0, 1.0 if edge else 0.7))))
     if not points:
       return
-    pixels, visible = self._project_points(np.concatenate(points), calib_transform, CLIP_MARGIN)
+    pixels, visible = self._project_points(np.concatenate(points), calib_transform, model_render_support.CLIP_MARGIN)
     offset = np.array([self.camera_x, self.camera_y], dtype=np.int32)
     start = 0
     for count, color, alpha in draws:

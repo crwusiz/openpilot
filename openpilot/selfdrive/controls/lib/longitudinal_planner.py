@@ -3,6 +3,7 @@ import numpy as np
 
 import openpilot.cereal.messaging as messaging
 from opendbc.car.interfaces import ACCEL_MIN, ACCEL_MAX
+from openpilot.cereal import log
 from openpilot.common.constants import CV
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.realtime import DT_MDL
@@ -18,6 +19,12 @@ from openpilot.common.swaglog import cloudlog
 J_CRUISE_VALS = [1.6, 1.2, 0.8, 0.6]
 J_CRUISE_BP = [0., 10.0, 25., 40.]
 A_CRUISE_MIN = -0.5
+ACCEL_BOOST_BY_PERSONALITY = {  # m/s^2
+  log.LongitudinalPersonality.aggressive: 0.10,
+  log.LongitudinalPersonality.standard: 0.075,
+  log.LongitudinalPersonality.relaxed: 0.05,
+  log.LongitudinalPersonality.morerelaxed: 0.025,
+}
 CONTROL_N_T_IDX = ModelConstants.T_IDXS[:CONTROL_N]
 
 
@@ -107,6 +114,11 @@ class LongitudinalPlanner:
     output_should_stop_mpc = should_stop(v_ego, output_a_target_mpc)
     curve_offset = self.curve_speed.update(model, sm['vehicleParameters'].roll)
     output_a_target_e2e = model.action.desiredAcceleration + curve_offset
+    max_accel_boost = ACCEL_BOOST_BY_PERSONALITY.get(getattr(personality, 'raw', personality), 0.0)
+    if max_accel_boost > 0.0:
+      speed_scale = np.interp(v_ego, [5.0, 10.0], [0.0, 1.0])
+      accel_scale = np.interp(output_a_target_e2e, [-1.0, -0.5], [0.0, 1.0])
+      output_a_target_e2e += max_accel_boost * speed_scale * accel_scale
     output_should_stop_e2e = model.action.shouldStop
 
     self.a_cruise = get_cruise_accel(v_cruise, v_ego, self.a_cruise, self.output_a_target, self.dt)

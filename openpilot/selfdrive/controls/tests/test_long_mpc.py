@@ -1,12 +1,16 @@
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 
+from opendbc.car.structs import car
 from openpilot.cereal import log
 from openpilot.selfdrive.addon.traffic_controller import TrafficStopPlan
+from openpilot.selfdrive.controls.lib.longcontrol import LongCtrlState
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib import long_mpc
+from openpilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlanner
+from openpilot.selfdrive.modeld.constants import ModelConstants
 
 
 def make_radar_lead(distance=20.0, speed=8.0, accel=0.0, prob=0.95):
@@ -24,48 +28,88 @@ class TestLongitudinalMpc(unittest.TestCase):
     self.car_state = SimpleNamespace(vEgo=0.0, gasPressed=False, leftBlinker=False, steeringAngleDeg=0.0)
     self.no_lead = SimpleNamespace(present=False, modelProb=0.0)
 
-  def test_model_trajectory_is_anchored_to_radar(self):
-    radar_lead = make_radar_lead(speed=10.0)
+  def test_radar_lead_extrapolates_decaying_acceleration(self):
+    lead = make_radar_lead(speed=10.0, accel=-2.0)
+    trajectory = self.mpc.process_lead(lead)
+
+    expected_accel = lead.aLeadK * np.exp(-lead.aLeadTau * long_mpc.T_IDXS**2 / 2.0)
+    expected_speed = lead.vLead + np.cumsum(long_mpc.T_DIFFS * expected_accel)
+    expected_distance = lead.dRel + np.cumsum(long_mpc.T_DIFFS * expected_speed)
+    np.testing.assert_allclose(trajectory[:, 0], expected_distance)
+    np.testing.assert_allclose(trajectory[:, 1], expected_speed)
+
+  def test_model_lead_predictions_do_not_change_radar_obstacle(self):
+    radar_lead = make_radar_lead(speed=0.0)
+    radar_state = SimpleNamespace(leadOne=radar_lead, leadTwo=self.no_lead)
     model = log.ModelDataV2.new_message()
     model_lead = model.init('leadsV3', 1)[0]
-    model_lead.x = (80.0 + 5.0 * long_mpc.LEAD_T_IDXS_MODEL).tolist()
-    model_lead.v = (30.0 - long_mpc.LEAD_T_IDXS_MODEL).tolist()
+    model_lead.prob = 0.95
+    model_lead.x = [20.0 + 5.0 * t for t in ModelConstants.LEAD_T_IDXS]
+    model_lead.v = [5.0] * len(ModelConstants.LEAD_T_IDXS)
 
-    trajectory = self.mpc.process_lead(model_lead, radar_lead)
+    self.mpc.update(model, radar_state, car_state=self.car_state)
 
-    np.testing.assert_allclose(trajectory[:, 0], radar_lead.dRel + 5.0 * long_mpc.T_IDXS)
-    np.testing.assert_allclose(trajectory[:, 1], radar_lead.vLead - long_mpc.T_IDXS)
+    self.assertEqual(self.mpc.source, long_mpc.LongitudinalPlanSource.lead0)
+    np.testing.assert_allclose(self.mpc.params[:, 2], radar_lead.dRel)
 
-  def test_unusable_model_trajectory_falls_back_to_radar(self):
-    radar_lead = make_radar_lead(accel=-1.0)
-    radar_trajectory = np.column_stack(self.mpc.extrapolate_lead(radar_lead.dRel, radar_lead.vLead,
-                                                                radar_lead.aLeadK, radar_lead.aLeadTau))
-    model_x = 80.0 + 5.0 * long_mpc.LEAD_T_IDXS_MODEL
-    model_v = 30.0 - long_mpc.LEAD_T_IDXS_MODEL
-    unusable = (
-      ('missing', None, 0.95),
-      ('short position', SimpleNamespace(x=model_x[:-1], v=model_v), 0.95),
-      ('short velocity', SimpleNamespace(x=model_x, v=model_v[:-1]), 0.95),
-      ('nonfinite position', SimpleNamespace(x=np.r_[model_x[:-1], np.nan], v=model_v), 0.95),
-      ('nonfinite velocity', SimpleNamespace(x=model_x, v=np.r_[model_v[:-1], np.inf]), 0.95),
-      ('low confidence', SimpleNamespace(x=model_x, v=model_v), 0.5),
-    )
-    for case, model_lead, prob in unusable:
-      with self.subTest(case=case):
-        radar_lead.modelProb = prob
-        np.testing.assert_allclose(self.mpc.process_lead(model_lead, radar_lead), radar_trajectory)
-
-  def test_update_with_second_radar_lead_and_missing_model_slot(self):
+  def test_update_with_second_radar_lead_without_model_leads(self):
     radar_state = SimpleNamespace(leadOne=self.no_lead, leadTwo=make_radar_lead(speed=0.0))
+    self.mpc.update(log.ModelDataV2.new_message(), radar_state, car_state=self.car_state)
 
-    for lead_count in (0, 1):
-      with self.subTest(model_lead_count=lead_count):
-        model = log.ModelDataV2.new_message()
-        model.init('leadsV3', lead_count)
-        self.mpc.update(model, radar_state, car_state=self.car_state)
+    self.assertEqual(self.mpc.source, long_mpc.LongitudinalPlanSource.lead1)
+    np.testing.assert_allclose(self.mpc.params[:, 2], radar_state.leadTwo.dRel)
 
-        self.assertEqual(self.mpc.source, long_mpc.LongitudinalPlanSource.lead1)
-        np.testing.assert_allclose(self.mpc.params[:, 2], radar_state.leadTwo.dRel)
+  def test_planner_publishes_second_radar_lead_as_present(self):
+    planner = LongitudinalPlanner(car.CarParams(openpilotLongitudinalControl=True), init_v=10.0)
+    model = log.ModelDataV2.new_message()
+    model.action.desiredAcceleration = 0.5
+    radar = log.RadarState(leadTwo=log.RadarState.LeadData(dRel=20.0, present=True))
+    states = {
+      'carState': car.CarState(vEgo=10.0, vCruise=100.0),
+      'controlsState': log.ControlsState(longControlState=LongCtrlState.pid),
+      'modelV2': model,
+      'radarState': radar,
+      'selfdriveState': log.SelfdriveState(personality=log.LongitudinalPersonality.standard),
+      'vehicleParameters': log.VehicleParameters(),
+    }
+    sm = MagicMock(logMonoTime={'modelV2': 0})
+    sm.__getitem__.side_effect = states.__getitem__
+    sm.all_checks.return_value = True
+    pm = Mock()
+
+    planner.update(sm)
+    planner.publish(sm, pm)
+
+    pm.send.assert_called_once()
+    service, message = pm.send.call_args.args
+    self.assertEqual(service, 'longitudinalPlan')
+    self.assertTrue(message.longitudinalPlan.hasLead)
+    self.assertEqual(message.longitudinalPlan.longitudinalPlanSource, long_mpc.LongitudinalPlanSource.lead1)
+
+  def test_planner_scales_accel_boost_by_personality(self):
+    personalities = (
+      (log.LongitudinalPersonality.aggressive, 0.10),
+      (log.LongitudinalPersonality.standard, 0.075),
+      (log.LongitudinalPersonality.relaxed, 0.05),
+      (log.LongitudinalPersonality.morerelaxed, 0.025),
+    )
+    cases = ((12.0, -0.5, 1.0), (7.5, -0.75, 0.25), (5.0, -0.5, 0.0), (12.0, -1.0, 0.0))
+    for personality, max_boost in personalities:
+      for speed, model_accel, scale in cases:
+        with self.subTest(personality=personality, speed=speed, model_accel=model_accel):
+          planner = LongitudinalPlanner(car.CarParams(openpilotLongitudinalControl=True), init_v=speed)
+          model = log.ModelDataV2.new_message()
+          model.action.desiredAcceleration = model_accel
+          planner.update({
+            'carState': car.CarState(vEgo=speed, vCruise=100.0),
+            'controlsState': log.ControlsState(longControlState=LongCtrlState.pid),
+            'modelV2': model,
+            'radarState': log.RadarState(),
+            'selfdriveState': log.SelfdriveState(personality=personality),
+            'vehicleParameters': log.VehicleParameters(),
+          })
+
+          self.assertAlmostEqual(planner.output_a_target, model_accel + max_boost * scale)
 
   def test_traffic_stop_input_and_accel_floor(self):
     self.car_state.vEgo = 10.0

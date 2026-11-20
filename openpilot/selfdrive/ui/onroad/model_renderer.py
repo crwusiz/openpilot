@@ -4,11 +4,8 @@ from openpilot.cereal import log, messaging
 from opendbc.car.structs import car
 from dataclasses import dataclass, field
 from openpilot.common.params import Params
+from openpilot.selfdrive import model_render_support
 from openpilot.selfdrive.color_support import hsla_to_rgba
-from openpilot.selfdrive.model_render_support import (
-  DISENGAGED_PATH_ALPHA, FALLBACK_PATH_ALPHA, PathStyle, PlannedStopTracker, get_path_style, get_planned_stop_distance,
-  STOP_SPEED as STOP_SPEED, STOP_APPEAR_DISTANCE as STOP_APPEAR_DISTANCE, STOP_LEAD_MARGIN as STOP_LEAD_MARGIN,
-)
 from openpilot.selfdrive.locationd.calibrationd import HEIGHT_INIT
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.polygon import draw_polygon, Gradient
@@ -21,11 +18,7 @@ from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.selfdrive.ui import Colors, colors_alpha
 
 
-CLIP_MARGIN = 500
 MIN_DRAW_DISTANCE = 10.0
-MAX_DRAW_DISTANCE = 100.0
-LEAD_BAR_LENGTH = 12.0  # px
-LEAD_BAR_WIDTH = 1.8  # m
 
 STOCK_PATH_GRADIENT = Gradient(
   start=(0.0, 1.0),
@@ -55,7 +48,7 @@ class LeadVehicle:
     self.fade_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
 
 
-class StopPoint(PlannedStopTracker):
+class StopPoint(model_render_support.PlannedStopTracker):
   """Where the model plans to stop with no lead to stop behind, e.g. at a stop sign or red light."""
   def __init__(self):
     super().__init__(1 / gui_app.target_fps, RADAR_TO_CAMERA, FirstOrderFilter)
@@ -66,12 +59,14 @@ class StopPoint(PlannedStopTracker):
 
   @staticmethod
   def _get_planned_stop(model) -> float | None:
-    return get_planned_stop_distance(model.position.x, model.velocity.x)
+    return model_render_support.get_planned_stop_distance(model.position.x, model.velocity.x)
 
 
 class ModelRenderer(Widget):
-  LANE_LINE_WIDTHS = (0.025, 0.025, 0.025, 0.025)
-  ROAD_EDGE_WIDTH = 0.025
+  LANE_LINE_WIDTHS = (model_render_support.LANE_LINE_WIDTH,) * 4
+  ROAD_EDGE_WIDTH = model_render_support.ROAD_EDGE_WIDTH
+  LEAD_BAR_LENGTH = model_render_support.LEAD_BAR_LENGTH
+  _STOP_POINT_TYPE = StopPoint
 
   def __init__(self):
     super().__init__()
@@ -81,7 +76,7 @@ class ModelRenderer(Widget):
     self._road_edge_stds = np.zeros(2, dtype=np.float32)
     self._lead_vehicles = [LeadVehicle(), LeadVehicle()]
     self._lead_info = [LeadInfo(), LeadInfo()]
-    self._stop_point = StopPoint()
+    self._stop_point = self._STOP_POINT_TYPE()
     self._path_offset_z = HEIGHT_INIT[0]
     self._speed = 0.0
     self._left_blindspot = False
@@ -135,8 +130,9 @@ class ModelRenderer(Widget):
       return
 
     # Set up clipping region
+    clip_margin = model_render_support.CLIP_MARGIN
     self._clip_region = rl.Rectangle(
-      rect.x - CLIP_MARGIN, rect.y - CLIP_MARGIN, rect.width + 2 * CLIP_MARGIN, rect.height + 2 * CLIP_MARGIN
+      rect.x - clip_margin, rect.y - clip_margin, rect.width + 2 * clip_margin, rect.height + 2 * clip_margin
     )
 
     # Update speed and blindspot info
@@ -181,7 +177,7 @@ class ModelRenderer(Widget):
     else:
       self._lead_vehicles = [LeadVehicle(), LeadVehicle()]
       self._lead_info = [LeadInfo(), LeadInfo()]
-      self._stop_point = StopPoint()
+      self._stop_point = self._STOP_POINT_TYPE()
 
   def _update_raw_points(self, model):
     """Update raw 3D points from model data"""
@@ -219,7 +215,8 @@ class ModelRenderer(Widget):
     lane = (left + right) / 2 if left.shape == right.shape else np.empty((0, 3), dtype=np.float32)
     opacity = 0.4 if ui_state.status == UIStatus.DISENGAGED else 0.8
     for i, (lead, (present, d_rel, y_rel)) in enumerate(zip(self._lead_vehicles, leads, strict=True)):
-      visible = available and present and 0.0 < d_rel < MAX_DRAW_DISTANCE and len(lane) > 0 and len(self._path.raw_points) > 0
+      visible = (available and present and 0.0 < d_rel < model_render_support.MAX_DRAW_DISTANCE
+                 and len(lane) > 0 and len(self._path.raw_points) > 0)
       visible = visible and np.isfinite(y_rel)
       # snap to a new vehicle instead of sliding over
       if not visible or abs(y_rel - lead.y_filter.x) > 3.0:
@@ -238,17 +235,21 @@ class ModelRenderer(Widget):
     # The radar is at the front of the car, which is what stops at the planned stop.
     d_stop = stop.d + RADAR_TO_CAMERA
     path = self._path.raw_points
-    visible = self._longitudinal_control and available and planning_stop and 0.0 < d_stop < MAX_DRAW_DISTANCE and len(path) > 0
+    visible = (self._longitudinal_control and available and planning_stop
+               and 0.0 < d_stop < model_render_support.MAX_DRAW_DISTANCE and len(path) > 0)
     stop.fade_filter.update(opacity if visible else 0.0)
     if visible:
-      stop.bar = self._get_lead_bar(path, d_stop, 0.0)
+      stop.bar = self._get_stop_bar(path, d_stop)
 
-  def _get_lead_bar(self, lane, d_rel, y_rel):
+  def _get_stop_bar(self, path, d_stop):
+    return self._get_lead_bar(path, d_stop, 0.0)
+
+  def _get_lead_bar(self, lane, d_rel, y_rel, edges=(model_render_support.LEAD_BAR_WIDTH / 2, -model_render_support.LEAD_BAR_WIDTH / 2)):
     # bar on the road behind the lead, following the lane
     x = np.array([d_rel, d_rel - min(6.0, 0.25 * d_rel)])
     y = np.interp(x, lane[:, 0], lane[:, 1]) - np.interp(d_rel, lane[:, 0], lane[:, 1]) - y_rel
     z = np.interp(x, self._path.raw_points[:, 0], self._path.raw_points[:, 2]) + self._path_offset_z
-    corners = np.vstack((np.column_stack((x, y + LEAD_BAR_WIDTH / 2, z)), np.column_stack((x, y - LEAD_BAR_WIDTH / 2, z))[::-1]))
+    corners = np.vstack((np.column_stack((x, y + edges[0], z)), np.column_stack((x, y + edges[1], z))[::-1]))
     pts = self._car_space_transform @ corners.T
     if not np.all(np.isfinite(pts)) or np.any(pts[2] <= 1e-6):
       return np.empty((0, 2), dtype=np.float32)
@@ -258,12 +259,13 @@ class ModelRenderer(Widget):
     length = np.linalg.norm(near.mean(axis=0) - far.mean(axis=0))
     if length <= 1e-6:
       return np.empty((0, 2), dtype=np.float32)
-    bar[[1, 2]] = far + (near - far) * np.clip(length, 3.0, LEAD_BAR_LENGTH) / length
+    bar_length = np.clip(length, model_render_support.MIN_LEAD_BAR_LENGTH, self.LEAD_BAR_LENGTH)
+    bar[[1, 2]] = far + (near - far) * bar_length / length
     return bar.astype(np.float32)
 
   def _update_model(self, lead, path_x_array):
     """Update model visualization data based on model message"""
-    max_distance = np.clip(path_x_array[-1], MIN_DRAW_DISTANCE, MAX_DRAW_DISTANCE)
+    max_distance = np.clip(path_x_array[-1], MIN_DRAW_DISTANCE, model_render_support.MAX_DRAW_DISTANCE)
     max_idx = self._get_path_length_idx(self._lane_lines[0].raw_points[:, 0], max_distance)
 
     # Update lane lines using raw points
@@ -370,23 +372,23 @@ class ModelRenderer(Widget):
       return
 
     path_pts = self._path.projected_points + self._draw_offset()
-    style = get_path_style(
+    style = model_render_support.get_path_style(
       disengaged=ui_state.status == UIStatus.DISENGAGED,
       steering_pressed=ui_state.steeringPressed,
       enabled=ui_state.enabled,
       has_acceleration_gradient=len(self._path_gradient.colors) > 1,
     )
-    if style is PathStyle.DISENGAGED:
-      draw_polygon(self._rect, path_pts, colors_alpha(rl.BLACK, round(DISENGAGED_PATH_ALPHA * self._visible)))
+    if style is model_render_support.PathStyle.DISENGAGED:
+      draw_polygon(self._rect, path_pts, colors_alpha(rl.BLACK, round(model_render_support.DISENGAGED_PATH_ALPHA * self._visible)))
       return
-    if style is PathStyle.FALLBACK:
-      draw_polygon(self._rect, path_pts, colors_alpha(rl.WHITE, round(FALLBACK_PATH_ALPHA * self._visible)))
+    if style is model_render_support.PathStyle.FALLBACK:
+      draw_polygon(self._rect, path_pts, colors_alpha(rl.WHITE, round(model_render_support.FALLBACK_PATH_ALPHA * self._visible)))
       return
 
     gradients = {
-      PathStyle.STEERING: self._steering_pressed_gradient,
-      PathStyle.STOCK: STOCK_PATH_GRADIENT,
-      PathStyle.ACCELERATION: self._path_gradient,
+      model_render_support.PathStyle.STEERING: self._steering_pressed_gradient,
+      model_render_support.PathStyle.STOCK: STOCK_PATH_GRADIENT,
+      model_render_support.PathStyle.ACCELERATION: self._path_gradient,
     }
     gradient = gradients[style]
     if self._visible < 1.0:
