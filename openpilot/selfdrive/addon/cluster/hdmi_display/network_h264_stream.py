@@ -25,6 +25,9 @@ MAX_NACK_REQUESTS = 512
 # after it has advanced by 100 packets. Keep recent repairs, without sending
 # a much older reference chain back into an already recovered live stream.
 NACK_HISTORY_PACKETS = 96
+# Use only recent native write results. A source stall can leave the sender
+# waiting on recv() long after its last failed write.
+SEND_PRESSURE_MAX_AGE = 0.25
 
 
 def parse_nack_feedback(message, media_ssrc):
@@ -134,6 +137,7 @@ class ClusterH264Stream(WebRTCAnswerStream):
     self._cluster_rtcp_stats = dict.fromkeys(("nack_packets", "nack_requested", "nack_distance_ge100",
                                             "nack_distance_unavailable", "rtcp_invalid", "rtcp_limited"), 0)
     self._nack_distance_max = None
+    self._failed_send_streak = None
 
   def _add_producer_tracks(self, remote_sdp=None):
     super()._add_producer_tracks(remote_sdp)
@@ -206,6 +210,13 @@ class ClusterH264Stream(WebRTCAnswerStream):
     self._nack_distance_max = None
     return snapshot
 
+  def get_send_pressure_age(self, now):
+    streak = self._failed_send_streak
+    if streak is None or now - streak[1] >= SEND_PRESSURE_MAX_AGE:
+      return None
+    # An isolated failed write is not sustained, even if the next AU is late.
+    return streak[1] - streak[0]
+
   async def stop(self):
     await super().stop()
     self._native_video_handlers.clear()
@@ -272,6 +283,9 @@ class ClusterH264Stream(WebRTCAnswerStream):
           if send_not_ready_at is None:
             send_not_ready_at = now
             flog("[CLUSTER_H264_SEND_BACKPRESSURE] track_send=0 | action=keep_session")
+          streak = self._failed_send_streak
+          first = now if streak is None or now - streak[1] >= SEND_PRESSURE_MAX_AGE else streak[0]
+          self._failed_send_streak = (first, now)
           # Keep the live reference chain flowing, including P pictures. The
           # receiver requests an IDR if a packet was actually lost. A False
           # transport write alone must not create another burst of keyframes.
@@ -280,7 +294,7 @@ class ClusterH264Stream(WebRTCAnswerStream):
           if send_not_ready_at is not None:
             flog(f"[CLUSTER_H264_SEND_RECOVERED] pause_ms={(now - send_not_ready_at) * 1000:.1f} | "
                  + f"send_not_ready={send_not_ready}")
-            send_not_ready_at = None
+            send_not_ready_at = self._failed_send_streak = None
           sent += 1
         if now - report_at >= 10.0:
           keyframe_stats = tuple(getattr(producer_track, name, 0) for name in
@@ -302,4 +316,5 @@ class ClusterH264Stream(WebRTCAnswerStream):
            + f"invalid={invalid} | idr_gated={gated} | send_not_ready={send_not_ready}")
       self.logger.exception("Error in cluster H.264 send loop")
     finally:
+      self._failed_send_streak = None
       self._set_event(self.connection_stopped_event)

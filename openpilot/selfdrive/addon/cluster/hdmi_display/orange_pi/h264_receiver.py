@@ -33,6 +33,7 @@ STREAM_TIMEOUT = 8.0
 FEEDBACK_INTERVAL = 1.0
 RECOVERY_INTERVAL = 0.5
 RECOVERY_POLL_INTERVAL = 0.1
+DECODE_RECOVERY_SECONDS = 0.35
 LOOP_HEARTBEAT_INTERVAL = 0.1
 RGB_BURST_INTERVAL = 0.025
 VIDEO_STALE_SECONDS = 0.5
@@ -470,29 +471,32 @@ class H264Receiver:
         return None
       if self._last_recovery_at is not None and now - self._last_recovery_at < RECOVERY_INTERVAL:
         return None
-      age = None if self.last_video_at is None else max(0.0, now - self.last_video_at)
+      video_age_ms = None if self.last_video_at is None else max(0.0, now - self.last_video_at) * 1000
+      decoded_at = self._last_decoded_at
+      decode_age_ms = None if decoded_at is None else max(0.0, now - decoded_at) * 1000
       if self.decoder_errors > self._recovered_decoder_errors:
         reason = "decoder_error"
-      elif age is not None and age >= VIDEO_STALE_SECONDS:
+      elif decoded_at is not None and now >= decoded_at + DECODE_RECOVERY_SECONDS:
         reason = "video_stale"
-      elif age is None and started is not None and now - started >= VIDEO_STALE_SECONDS:
+      elif decoded_at is None and started is not None and now >= started + VIDEO_STALE_SECONDS:
         reason = "video_startup"
       else:
         return None
       self._last_recovery_at = now
       self._recovered_decoder_errors = self.decoder_errors
       payload = {"screen_off": self.screen_off, "keyframe_request": True, "decoder_errors": self.decoder_errors,
-                 "recovery_reason": reason, "video_age_ms": None if age is None else age * 1000}
-    LOG.info("[CLUSTER_H264_RECOVERY_REQUEST] reason=%s | video_age_ms=%s | decoder_errors=%d",
-             reason, "none" if age is None else f"{age * 1000:.1f}", payload["decoder_errors"])
+                 "recovery_reason": reason, "video_age_ms": video_age_ms}
+    LOG.info("[CLUSTER_H264_RECOVERY_REQUEST] reason=%s | video_age_ms=%s | decoder_errors=%d | decode_age_ms=%s",
+             reason, "none" if video_age_ms is None else f"{video_age_ms:.1f}", payload["decoder_errors"],
+             "none" if decode_age_ms is None else f"{decode_age_ms:.1f}")
     return payload
 
   async def _recover_video(self):
     started = time.monotonic()
     while True:
-      # Packet loss can leave no complete access unit for the decoder and no
-      # warning to wake us. Detect that silence at the existing 500ms limit
-      # instead of waiting for the next 1s FPS report (up to 1.5s after video).
+      # An incomplete access unit can stall decoding without a warning.
+      # Request an IDR before the display freshness limit, using decoded
+      # arrivals so slow RGB conversion cannot be mistaken for packet loss.
       try:
         await asyncio.wait_for(self._recovery_event.wait(), timeout=RECOVERY_POLL_INTERVAL)
       except TimeoutError:

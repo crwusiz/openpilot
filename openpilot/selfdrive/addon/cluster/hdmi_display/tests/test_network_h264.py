@@ -803,11 +803,12 @@ async def test_state_write_stall_has_a_hard_deadline_and_cleans_pending_drain(mo
   assert finished.is_set()
 
 
+@pytest.mark.parametrize("video_pressure", [False, True])
 @asyncio_test
-async def test_network_budget_runs_while_state_drain_is_pending_and_survives_reconnect(monkeypatch):
+async def test_network_budget_runs_while_state_drain_is_pending_and_survives_reconnect(monkeypatch, video_pressure):
   monkeypatch.setattr(network, "SAMPLE_INTERVAL", 0.005)
-  clock = iter(index / 2 for index in range(100))
-  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=lambda: next(clock)))
+  clock = Mock(side_effect=(index / 2 for index in range(100)))
+  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=clock))
   monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
   values, writes = {}, []
   adapted = asyncio.Event()
@@ -823,7 +824,10 @@ async def test_network_budget_runs_while_state_drain_is_pending_and_survives_rec
   server = network.H264NetworkServer(settings, models())
   server.state_drain_started = 0.0
   writer = SimpleNamespace(transport=SimpleNamespace(get_write_buffer_size=lambda: 1600))
-  monitor = asyncio.create_task(server._network_budget(writer, Stream()))
+  stream = Stream()
+  if video_pressure:
+    stream.get_send_pressure_age = Mock(return_value=0.35)
+  monitor = asyncio.create_task(server._network_budget(writer, stream))
   try:
     await asyncio.wait_for(adapted.wait(), 1)
   finally:
@@ -831,6 +835,7 @@ async def test_network_budget_runs_while_state_drain_is_pending_and_survives_rec
     with pytest.raises(asyncio.CancelledError):
       await monitor
   assert writes == [3_750_000]
+  assert clock.call_count == (2 if video_pressure else 3)
   assert server.bitrate.current == 3_750_000 and server.bitrate.last_report is None
   # Closing the server (not each failed ICE session) restores the encoder.
   await server.close()

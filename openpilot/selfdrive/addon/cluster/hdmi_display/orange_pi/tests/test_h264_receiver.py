@@ -823,33 +823,49 @@ def test_silent_video_stall_requests_idr_before_the_periodic_fps_report(monkeypa
       kind, _, payload = read_control(c4_sock)
     assert kind == FEEDBACK and payload["keyframe_request"] is True
     assert payload["recovery_reason"] == "video_stale" and payload["decoder_errors"] == 0
-    assert 500 <= payload["video_age_ms"] < 900
+    assert 350 <= payload["video_age_ms"] < 900
     assert "display_fps" not in payload
     assert "reason=video_stale" in caplog.text
+    assert "decode_age_ms=" in caplog.text
   finally:
     receiver.close()
     c4_sock.close()
     pi_sock.close()
 
 
-def test_video_recovery_uses_original_arrival_and_does_not_spam_startup_or_healthy_video():
+def test_video_recovery_uses_decode_progress_and_does_not_spam_startup_or_healthy_video():
   receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
   assert receiver._take_recovery_request(10.49, started=10.0) is None
   startup = receiver._take_recovery_request(10.5, started=10.0)
   assert startup["recovery_reason"] == "video_startup" and startup["video_age_ms"] is None
   assert receiver._take_recovery_request(10.9, started=10.0) is None
+  receiver._last_decoded_at = 10.9
   receiver.publish_rgb("fresh", received_at=10.9)
   assert receiver._take_recovery_request(11.0, started=10.0) is None
+  assert receiver._take_recovery_request(11.24, started=10.0) is None
   receiver.screen_off = True
-  stale = receiver._take_recovery_request(11.5, started=10.0)
+  stale = receiver._take_recovery_request(11.25, started=10.0)
   assert stale["recovery_reason"] == "video_stale" and stale["screen_off"] is True
+  assert stale["video_age_ms"] == pytest.approx(350)
+  receiver._last_decoded_at = 11.6
   receiver.publish_rgb("recovered", received_at=11.6)
-  assert receiver._take_recovery_request(12.0, started=10.0) is None
+  assert receiver._take_recovery_request(11.9, started=10.0) is None
+
+
+def test_decode_recovery_does_not_request_idr_when_only_rgb_is_stale():
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  receiver.publish_rgb("old RGB", received_at=10.0)
+  receiver._last_decoded_at = 10.7
+
+  assert receiver._take_recovery_request(10.8) is None
+  payload = receiver._take_recovery_request(11.1)
+  assert payload["recovery_reason"] == "video_stale"
+  assert payload["video_age_ms"] == pytest.approx(1100)
 
 
 def test_fast_recovery_and_regular_feedback_share_one_cooldown(monkeypatch):
   receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
-  receiver.last_video_at = 0.1
+  receiver.last_video_at = receiver._last_decoded_at = 0.1
   receiver.decoder_errors = 1
   assert receiver._take_recovery_request(0.9)["recovery_reason"] == "decoder_error"
   feedbacks = run_feedback_ticks(monkeypatch, receiver, 2, lambda *_args: None)
@@ -889,6 +905,7 @@ def test_keyframe_feedback_only_requests_new_decode_errors_or_existing_video_sta
       receiver.decoder_errors = 1
     if tick >= 4:
       receiver.publish_rgb("decoded", received_at=now - (0.5 if tick == 5 else 0.49))
+      receiver._last_decoded_at = now - (0.35 if tick == 5 else 0.34)
     if tick == 7:
       receiver.decoder_errors = 3
 

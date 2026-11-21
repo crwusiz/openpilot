@@ -429,8 +429,10 @@ class H264NetworkServer:
         reports = get_reports() if callable(get_reports) else {}
         now = time.monotonic()
         drain_age = None if self.state_drain_started is None else max(0.0, now - self.state_drain_started)
+        get_send_pressure = getattr(stream, "get_send_pressure_age", None)
+        send_pressure_age = get_send_pressure(now) if callable(get_send_pressure) else None
         self.bitrate.sample(now, reports.get("road"), writer.transport.get_write_buffer_size(),
-                            drain_age_s=drain_age, degraded=self.degraded)
+                            drain_age_s=drain_age, send_pressure_age_s=send_pressure_age, degraded=self.degraded)
     except Exception as error:
       # An auxiliary tuning failure cannot end FIRST_COMPLETED and tear down
       # healthy media. The connection's normal control/video watchdogs remain.

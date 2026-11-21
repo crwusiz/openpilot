@@ -55,6 +55,26 @@ def test_short_tcp_pauses_do_not_reduce_quality_or_require_receiver_feedback():
   assert params.writes == []
 
 
+def test_only_sustained_overlapping_video_and_state_pressure_can_reduce_before_rtcp_loss():
+  params = Params()
+  controller = budget.ClusterBitrateController(params)
+  cached = report(100)
+  controller.sample(0, cached, 0)
+  controller.sample(0.3, cached, 2400, drain_age_s=0.3, send_pressure_age_s=0.05)
+  controller.sample(0.6, cached, 0, drain_age_s=0.3, send_pressure_age_s=0.3)
+  controller.sample(0.9, cached, 2400, drain_age_s=0.05, send_pressure_age_s=0.6)
+  controller.sample(1.2, cached, 2400, drain_age_s=0.7)
+  assert params.writes == []
+
+  controller.sample(1.5, cached, 2400, drain_age_s=0.4, send_pressure_age_s=0.35)
+  assert params.writes == [3_750_000]
+  assert controller.recovery_blocked == "video_tcp_backpressure"
+  assert "reason=video_tcp_backpressure" in budget.flog.call_args.args[0]
+  assert "video_send_pressure_age_ms=350.0" in controller.status_fields(1.5)
+  controller.sample(2, report(200, 40), 2400, drain_age_s=0.6, send_pressure_age_s=0.5)
+  assert params.writes == [3_750_000]  # The late RR cannot immediately cause a second reduction.
+
+
 def test_high_loss_reduces_immediately_and_cannot_repeat_on_one_cached_report():
   params = Params()
   controller = budget.ClusterBitrateController(params)
@@ -204,7 +224,7 @@ def test_persistent_pressure_has_a_floor_and_never_raises_a_lower_existing_cap(c
   assert all(min(ceiling, budget.MIN_BITRATE) <= value <= ceiling for value in params.writes)
 
 
-@pytest.mark.parametrize("interrupt", ["no_report", "repeat_report", "loss", "degraded"])
+@pytest.mark.parametrize("interrupt", ["no_report", "repeat_report", "loss", "degraded", "video_pressure"])
 def test_recovery_requires_continuous_fresh_healthy_reports(interrupt):
   params = Params()
   controller = budget.ClusterBitrateController(params)
@@ -215,8 +235,10 @@ def test_recovery_requires_continuous_fresh_healthy_reports(interrupt):
   for second in range(20, 27):
     controller.sample(second, None if interrupt == "no_report" else report(19 if interrupt == "repeat_report" else second,
                                                                         4 if interrupt == "loss" else 0),
-                      0, degraded=interrupt == "degraded")
+                      0, send_pressure_age_s=0.3 if interrupt == "video_pressure" else None, degraded=interrupt == "degraded")
   assert params.writes == [3_750_000]
+  if interrupt == "video_pressure":
+    assert controller.recovery_blocked == "video_send_pressure"
   for second in range(27, 47):
     controller.sample(second, report(second), 0)
   assert params.writes == [3_750_000]
@@ -373,7 +395,7 @@ def _failed_probe():
   return controller, params
 
 
-@pytest.mark.parametrize("cause", ["rtcp_loss", "tcp_backpressure"])
+@pytest.mark.parametrize("cause", ["rtcp_loss", "tcp_backpressure", "video_tcp_backpressure"])
 def test_repeated_failed_probes_wait_longer_without_delaying_congestion_reductions(cause):
   params = Params()
   controller = budget.ClusterBitrateController(params)
@@ -383,8 +405,9 @@ def test_repeated_failed_probes_wait_longer_without_delaying_congestion_reductio
   for failures, wait in enumerate((40, 80, 120, 120), 1):
     failed_at, previous = probe_at + 3, controller.current
     controller.sample(failed_at, report(failed_at * 400, 40 if cause == "rtcp_loss" else 0),
-                      1600 if cause == "tcp_backpressure" else 0,
-                      drain_age_s=1.0 if cause == "tcp_backpressure" else None)
+                      0 if cause == "rtcp_loss" else 1600,
+                      drain_age_s={"tcp_backpressure": 1.0, "video_tcp_backpressure": 0.5}.get(cause),
+                      send_pressure_age_s=0.35 if cause == "video_tcp_backpressure" else None)
     assert controller.current == max(budget.MIN_BITRATE, previous * 3 // 4)
     assert controller.recovery_wait_s == wait and controller.probe_failures == failures
     assert controller.probe_at is None

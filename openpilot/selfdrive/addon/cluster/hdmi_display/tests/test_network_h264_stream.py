@@ -293,7 +293,31 @@ def test_sender_reports_actual_frame_peaks_idrs_and_request_deltas_even_during_f
   producer.request_keyframe.assert_not_called()
 
 
-def test_sender_cancellation_while_native_writes_are_false_stops_cleanly(sender):
+def test_sender_pressure_requires_recent_failed_writes_without_a_source_gap(sender, monkeypatch):
+  producer, native, config, sent = make_tracks([(START + PFRAME, index * 50_000_000) for index in range(1, 7)], 6)
+  receive, send = producer.recv, native.send.side_effect
+  now = [0.0]
+  arrivals = iter((0.0, 0.25, 0.375, 0.5, 0.625, 0.75))
+  observed = []
+  monkeypatch.setattr(sender, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  stream = sender.ClusterH264Stream("v=0", producer)
+
+  async def receive_live():
+    now[0] = next(arrivals)
+    return await receive()
+
+  def intermittent(data):
+    observed.append(stream.get_send_pressure_age(now[0]))
+    send(data)
+    return len(sent) >= 5
+
+  producer.recv, native.send.side_effect = receive_live, intermittent
+  asyncio.run(stream._send_track_loop(native, producer, config))
+  assert observed == [None, None, 0.0, 0.125, 0.25, None]
+
+
+def test_sender_cancellation_while_native_writes_are_false_stops_cleanly(sender, monkeypatch):
+  monkeypatch.setattr(sender, "time", SimpleNamespace(monotonic=lambda: 0.0))
   async def scenario():
     producer, native, config, _sent = make_tracks([], 1)
     native.send.side_effect = None
@@ -314,10 +338,12 @@ def test_sender_cancellation_while_native_writes_are_false_stops_cleanly(sender)
     task = asyncio.create_task(stream._send_track_loop(native, producer, config))
     await asyncio.wait_for(waiting.wait(), 1)
     assert not stream.connection_stopped_event.is_set()
+    assert stream.get_send_pressure_age(0.125) == 0.0
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
       await task
     assert native.send.call_count == 1
+    assert stream.get_send_pressure_age(0.125) is None
     assert stream.connection_stopped_event.is_set()
     assert not any("[CLUSTER_H264_SEND_ERROR]" in call.args[0] for call in sender.flog.call_args_list)
 
