@@ -347,27 +347,27 @@ class Sidebar(Widget):
       self._panda_status.update(tr_noop("VEHICLE"), tr_noop("ONLINE"), rl.WHITE)
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
-    if rl.check_collision_point_rec(rl.Vector2(mouse_pos.x, mouse_pos.y), SETTINGS_BTN):
+    point = rl.Vector2(mouse_pos.x, mouse_pos.y)
+    if rl.check_collision_point_rec(point, SETTINGS_BTN):
       if self._on_settings_click:
         self._on_settings_click()
-    elif rl.check_collision_point_rec(rl.Vector2(mouse_pos.x, mouse_pos.y), HOME_BTN) and ui_state.started:
+    elif rl.check_collision_point_rec(point, HOME_BTN) and ui_state.started:
       #if self._on_flag_click:
       #  self._on_flag_click()
       # Home button click - reset calibration and request onroad cycle
       for param in ("CalibrationParams", "LiveTorqueParameters", "LiveParameters", "LiveParametersV2", "LiveDelay"):
         self._params.remove(param)
       self._params.put_bool("OnroadCycleRequested", True)
-    elif self._recording_audio and rl.check_collision_point_rec(rl.Vector2(mouse_pos.x, mouse_pos.y),
-                                                                  self._mic_indicator_rect):
+    elif self._recording_audio and rl.check_collision_point_rec(point, self._mic_indicator_rect):
       if self._open_settings_callback:
         self._open_settings_callback()
-    elif rl.check_collision_point_rec(mouse_pos, COMMIT_BTN):
+    elif rl.check_collision_point_rec(point, COMMIT_BTN):
       self._handle_commit_button_press()
 
     self._commit_pressed = False
 
   def _handle_mouse_press(self, mouse_pos: MousePos):
-    if rl.check_collision_point_rec(mouse_pos, COMMIT_BTN):
+    if rl.check_collision_point_rec(rl.Vector2(mouse_pos.x, mouse_pos.y), COMMIT_BTN):
       self._commit_pressed = True
 
   def _draw_buttons(self, rect: rl.Rectangle):

@@ -1,6 +1,7 @@
-"""Exercise sidebar commit checks without a window or native services."""
+"""Exercise sidebar input and commit checks without a window or native services."""
 
 import importlib.util
+from collections import namedtuple
 from pathlib import Path
 import subprocess
 import sys
@@ -12,13 +13,23 @@ import pytest
 
 @pytest.fixture
 def sidebar_module(monkeypatch):
+  vector2 = namedtuple('Vector2', 'x y')
+  rectangle = namedtuple('Rectangle', 'x y width height')
+  mouse_pos = namedtuple('MousePos', 'x y')
+
+  def check_collision_point_rec(point, rect):
+    if not isinstance(point, vector2):
+      raise TypeError('point must be a Vector2')
+    return rect.x <= point.x <= rect.x + rect.width and rect.y <= point.y <= rect.y + rect.height
+
   colors = SimpleNamespace(WARNING='warning', RED='red', LIME='lime')
   network_types = SimpleNamespace(none=0, wifi=1, ethernet=2, cell2G=3, cell3G=4, cell4G=5, cell5G=6)
   dependencies = {
-    'raylib_nb': {'WHITE': 'white', 'Color': object, 'Rectangle': lambda *_args: Mock()},
+    'raylib_nb': {'WHITE': 'white', 'Color': object, 'Rectangle': rectangle, 'Vector2': vector2,
+                  'check_collision_point_rec': check_collision_point_rec},
     'openpilot.cereal': {'log': SimpleNamespace(DeviceState=SimpleNamespace(NetworkType=network_types, ThermalStatus=Mock()))},
     'openpilot.selfdrive.ui.ui_state': {'ui_state': Mock(), 'ChestnutState': Mock()},
-    'openpilot.system.ui.lib.application': {'gui_app': Mock(), 'FontWeight': Mock(), 'MousePos': object, 'FONT_SCALE': 1},
+    'openpilot.system.ui.lib.application': {'gui_app': Mock(), 'FontWeight': Mock(), 'MousePos': mouse_pos, 'FONT_SCALE': 1},
     'openpilot.system.ui.lib.multilang': {'tr': lambda text: text, 'tr_noop': lambda text: text},
     'openpilot.system.ui.lib.text_measure': {'measure_text_cached': Mock()},
     'openpilot.system.ui.widgets': {'Widget': object},
@@ -52,6 +63,26 @@ def sidebar(sidebar_module, tmp_path):
   layout._is_network_connected = lambda: True
   layout._check_github_connection = lambda: True
   return layout
+
+
+@pytest.mark.parametrize('position, action', [((10, 400), None), ((100, 80), 'settings'), ((100, 800), 'commit')])
+def test_sidebar_touch_routes_mousepos_to_buttons(sidebar_module, sidebar, position, action):
+  sidebar._commit_pressed = False
+  sidebar._recording_audio = False
+  actions = {'settings': Mock(), 'commit': Mock()}
+  sidebar.set_callbacks(on_settings=actions['settings'])
+  sidebar._handle_commit_button_press = actions['commit']
+  point = sidebar_module.MousePos(*position)
+
+  sidebar._handle_mouse_press(point)
+  assert sidebar._commit_pressed == (action == 'commit')
+  sidebar._handle_mouse_release(point)
+  assert not sidebar._commit_pressed
+  for name, callback in actions.items():
+    if name == action:
+      callback.assert_called_once_with()
+    else:
+      callback.assert_not_called()
 
 
 def test_check_button_accepts_file_result_without_stdout(sidebar_module, sidebar):
