@@ -17,7 +17,6 @@ OpState = log.SelfdriveState.OpenpilotState
 CALIBRATED = log.ExtrinsicsCalibration.Status.calibrated
 NARROW_ROAD_CAM = VisionStreamType.VISION_STREAM_NARROW_ROAD
 WIDE_CAM = VisionStreamType.VISION_STREAM_WIDE_ROAD
-CABIN_CAM = VisionStreamType.VISION_STREAM_CABIN
 DEFAULT_DEVICE_CAMERA = DEVICE_CAMERAS["tici", "ar0231"]
 
 WIDE_CAM_MAX_SPEED = 5.0  # m/s (11 mph)
@@ -106,21 +105,17 @@ class AugmentedRoadView(CameraView):
     rl.draw_rectangle_rounded_lines_ex(border_rect, border_roundness, 10, UI_BORDER_SIZE, border_color)
 
   def _switch_stream_if_needed(self, sm):
-    #if sm['carParams'].openpilotLongitudinalControl and WIDE_CAM in self.available_streams:
-    if ui_state.show_driver_camera:
-      target = CABIN_CAM
-    else:
-      if WIDE_CAM in self.available_streams:
-        v_ego = sm['carState'].vEgo
-        if v_ego < WIDE_CAM_MAX_SPEED:
-          target = WIDE_CAM
-        elif v_ego > ROAD_CAM_MIN_SPEED:
-          target = NARROW_ROAD_CAM
-        else:
-          # Hysteresis zone - keep current stream
-          target = self.stream_type
-      else:
+    if WIDE_CAM in self.available_streams:
+      v_ego = sm['carState'].vEgo
+      if v_ego < WIDE_CAM_MAX_SPEED:
+        target = WIDE_CAM
+      elif v_ego > ROAD_CAM_MIN_SPEED:
         target = NARROW_ROAD_CAM
+      else:
+        # Hysteresis zone - keep current stream
+        target = self.stream_type
+    else:
+      target = NARROW_ROAD_CAM
 
     if self.stream_type != target:
       if not self._switching or self._target_stream_type != target:

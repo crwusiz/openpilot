@@ -123,8 +123,6 @@ class UIState:
     #add
     self.enabled: bool = False
     self.steeringPressed: bool = False
-    self.driver_camera: bool = self.params.get_bool("CabinCameraOnReverse")
-    self.show_driver_camera: bool = False
     self.cluster_enabled: bool = self.params.get_bool("ClusterEnable")
     self.cluster_connected: bool = False
 
@@ -212,7 +210,6 @@ class UIState:
       state = selfdrive_state.state
       self.enabled = selfdrive_state.enabled
       self.steeringPressed = car_state.steeringPressed
-      self.show_driver_camera = self.driver_camera and car_state.gearShifter == GearShifter.reverse
 
       self.status = get_hud_status(
         enabled=self.enabled, lat_active=car_control.latActive,

@@ -290,10 +290,6 @@ msgid "Driver Camera"
 msgstr "운전자 카메라"
 
 #: openpilot/selfdrive/ui/layouts/settings/community.py
-msgid "Driver Camera On Reverse"
-msgstr "후진시 운전자카메라 표시"
-
-#: openpilot/selfdrive/ui/layouts/settings/community.py
 msgid "DriverCamera Hardware Missing"
 msgstr "운전자 카메라 미사용"
 
@@ -871,10 +867,6 @@ msgstr "소프트웨어"
 #: openpilot/selfdrive/ui/layouts/settings/toggles.py
 msgid "Standard"
 msgstr "표준"
-
-#: openpilot/selfdrive/ui/layouts/settings/community.py
-msgid "Switch to the driver camera view when in reverse gear."
-msgstr ""
 
 #: openpilot/selfdrive/ui/onroad/alert_renderer.py
 msgid "System Unresponsive"

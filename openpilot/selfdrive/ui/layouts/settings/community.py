@@ -38,9 +38,6 @@ DESCRIPTIONS = {
   'radar_track': tr_noop(
     "Enable the use of Radar Tracks (Note: This disables AEB)."
   ),
-  'driver_cam_reverse': tr_noop(
-    "Switch to the driver camera view when in reverse gear."
-  ),
   'driver_cam_missing': tr_noop(
     "Enable driving without the driver monitoring camera (hardware failure)."
   ),
@@ -384,12 +381,6 @@ class CommunityLayout(Widget):
         description=lambda: DESCRIPTIONS["radar_track"],
         initial_state=self._params.get_bool("RadarTrackEnable"),
         callback=lambda state: self._params.put_bool("RadarTrackEnable", state, block=True),
-      ),
-      toggle_item(
-        lambda: tr("Driver Camera On Reverse"),
-        description=lambda: DESCRIPTIONS["driver_cam_reverse"],
-        initial_state=self._params.get_bool("CabinCameraOnReverse"),
-        callback=lambda state: self._params.put_bool("CabinCameraOnReverse", state, block=True),
       ),
       toggle_item(
         lambda: tr("DriverCamera Hardware Missing"),

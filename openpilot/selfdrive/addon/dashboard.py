@@ -877,7 +877,6 @@ def render_tab_toggles():
     ("CameraSccEnable", "CameraSCC", "HDA1 CameraSCC CAR, HDA2 type ADAS harness cable, turn it on"),
     ("RadarTrackEnable", "Enable Radar Track use", "Enable Radar Track use (disable AEB)"),
     ("AlphaLongitudinalEnabled", "AlphaLongitudinalEnabled use", "AlphaLongitudinalEnabled"),
-    ("CabinCameraOnReverse", "Cabin Camera On Reverse", "Displays the Cabin camera when in reverse"),
     ("CabinCameraHardwareMissing", "Cabin Camera Hardware Missing", "Drive without the Cabin camera"),
     ("ClusterEnable", "Cluster Enable", "Enable Addon Cluster"),
     ("LanguageSetting", "Language (en/ko)", "Switch language between English and Korean"),
