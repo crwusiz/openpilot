@@ -1,6 +1,6 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import DEFAULT, Mock, patch
 
 import numpy as np
 import raylib_nb as rl
@@ -77,6 +77,28 @@ class TestModelRendererUpdates(unittest.TestCase):
       'carState': SimpleNamespace(brakePressed=False, vEgo=0.0),
     }
     return type('SubMaster', (dict,), {'updated': {'modelV2': True}})(sm)
+
+  def test_cluster_connection_hides_lane_lines_and_path_until_disconnected(self):
+    renderer = self.make_renderer(longitudinal_control=True)
+    renderer._transform_dirty = False
+    sm = self.make_sm(lead_present=True)
+    sm['extrinsicsCalibration'] = SimpleNamespace(height=[1.22])
+    sm.updated.update(modelV2=False, radarState=False, carParams=False)
+    sm.valid = {'radarState': True}
+    state = SimpleNamespace(sm=sm, cluster_connected=False, received_since_started=lambda _: True)
+
+    with (patch.object(model_renderer, 'ui_state', state),
+          patch.object(model_renderer.status_fade, 'weight', return_value=0.0),
+          patch.multiple(renderer, _draw_lane_lines=DEFAULT, _draw_path=DEFAULT,
+                         _update_lead_bars=DEFAULT, _draw_lead_indicator=DEFAULT) as calls):
+      for connected, draws in ((False, 1), (True, 1), (False, 2)):
+        state.cluster_connected = connected
+        renderer._render(renderer._rect)
+        self.assertEqual(calls['_draw_lane_lines'].call_count, draws)
+        self.assertEqual(calls['_draw_path'].call_count, draws)
+
+      self.assertEqual(calls['_update_lead_bars'].call_count, 3)
+      self.assertEqual(calls['_draw_lead_indicator'].call_count, 3)
 
   def test_planned_stop_is_updated_and_projected_without_lane_lines(self):
     for renderer_module, update_method in ((big_renderer, '_update_leads'), (model_renderer, '_update_lead_bars')):

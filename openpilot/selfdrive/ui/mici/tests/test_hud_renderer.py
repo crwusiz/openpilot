@@ -125,6 +125,22 @@ class TestHudRenderer(unittest.TestCase):
     self.assertEqual(self.renderer._draw_traffic_light.call_count, 2)
     self.assertEqual(self.renderer._draw_steering_wheel.call_count, 2)
 
+  def test_current_speed_and_unit_hide_only_while_cluster_is_connected(self):
+    self.renderer.speed = 45.0
+    self.renderer.accel = 0.0
+    self.renderer._font_bold = object()
+    self.renderer._font_medium = object()
+    self.ui_state.cluster_enabled = True
+
+    with (patch.object(rl, 'draw_text_ex') as draw_text,
+          patch.object(hud, 'measure_text_cached', return_value=rl.Vector2(40, 20))):
+      for cluster_connected, expected_text in ((False, ['45', 'mph']), (True, []), (False, ['45', 'mph'])):
+        with self.subTest(cluster_connected=cluster_connected):
+          self.ui_state.cluster_connected = cluster_connected
+          draw_text.reset_mock()
+          self.renderer._draw_current_speed(self.rect)
+          self.assertEqual([call.args[1] for call in draw_text.call_args_list], expected_text)
+
   def test_speed_boxes_convert_display_values_and_apply_fade_alpha(self):
     self.renderer._set_speed_alpha_filter.x = 0.5
     self.renderer._draw_set_speed(self.rect)

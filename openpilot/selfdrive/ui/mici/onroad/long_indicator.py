@@ -16,12 +16,13 @@ class LongIndicator(Widget):
     self._txt_lead_car = (self._texture('car', 35, 27), self._texture('car_green', 50, 42))
     self._txt_distance = [(self._texture('distance_1', 32, 7), self._texture('distance_1_green', 60, 35)),
                           (self._texture('distance_2', 40, 9), self._texture('distance_2_green', 68, 37)),
-                          (self._texture('distance_3', 48, 11), self._texture('distance_3_green', 76, 39))]
+                          (self._texture('distance_3', 48, 11), self._texture('distance_3_green', 76, 39)),
+                          (self._texture('distance_4', 56, 13), self._texture('distance_4_green', 84, 41))]
     self._alpha_filter = FirstOrderFilter(0.0, 0.05, 1 / gui_app.target_fps)
     # crossfade between states, a white and a green filter per icon
     self._lead_car_filters = (FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps), FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps))
     self._distance_filters = [(FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps), FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps))
-                              for _ in range(3)]
+                              for _ in self._txt_distance]
     self._personality: int | None = None
     self._personality_changed_time = -HIGHLIGHT_TIME
     self._should_draw = False
@@ -35,7 +36,8 @@ class LongIndicator(Widget):
 
   def _render(self, rect: rl.Rectangle) -> None:
     # offroad shows the disengaged state
-    if not ui_state.has_longitudinal_control or (ui_state.started and not ui_state.received_since_started('selfdriveState')):
+    if (ui_state.cluster_connected or not ui_state.has_longitudinal_control
+        or (ui_state.started and not ui_state.received_since_started('selfdriveState'))):
       self._personality = None
       self._personality_changed_time = -HIGHLIGHT_TIME
       self._alpha_filter.x = 0.0
@@ -77,7 +79,7 @@ class LongIndicator(Widget):
     highlight = now - self._personality_changed_time < HIGHLIGHT_TIME
 
     count = personality + 1
-    for i, ((white, green), y, (active_f, green_f)) in enumerate(zip(self._txt_distance, (2, 16, 32), self._distance_filters, strict=True)):
+    for i, ((white, green), y, (active_f, green_f)) in enumerate(zip(self._txt_distance, (2, 16, 32, 50), self._distance_filters, strict=True)):
       active = active_f.update(float(i < count))
       green_alpha = green_f.update(float(highlight and i == count - 1))
       self._draw_centered(white, rect, y, (0.35 * (1 - active) + 0.9 * (active - green_alpha)) * alpha)

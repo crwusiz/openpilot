@@ -89,7 +89,7 @@ class ModelRenderer(BaseModelRenderer):
 
     # lane lines and path fade out while disengaged
     self._visible = 1 - status_fade.weight(UIStatus.DISENGAGED)
-    if self._visible > 1e-2:
+    if not ui_state.cluster_connected and self._visible > 1e-2:
       self._draw_lane_lines()
       self._draw_path()
 

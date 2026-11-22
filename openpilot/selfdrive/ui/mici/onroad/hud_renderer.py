@@ -399,7 +399,7 @@ class HudRenderer(Widget):
   def _draw_current_speed(self, rect: rl.Rectangle) -> None:
     """Draw the current vehicle speed and unit at the top center."""
 
-    if not self._can_draw_top_icons:
+    if not self._can_draw_top_icons or ui_state.cluster_connected:
       return
 
     speed_color = rl.Color(*current_speed_color(self.accel), 255)
