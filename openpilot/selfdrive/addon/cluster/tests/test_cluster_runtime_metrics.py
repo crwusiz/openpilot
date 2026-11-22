@@ -303,6 +303,19 @@ def _car_message(speed, steering):
 
 
 @pytest.mark.parametrize('cluster_models', [False, True], indirect=True)
+def test_render_snapshot_tracks_auto_hold_state(cluster_models):
+  state = cluster_models
+  assert state.models.get_render_data()[1]['autohold_state'] == 0
+  state.updated['carState'] = True
+  state.messages['controlsState'] = SimpleNamespace(deprecated=SimpleNamespace(vCruise=0.0))
+  car_state = state.messages['carState'] = _car_message(0.0, 0.0)
+  for hold in (1, 2, 0):
+    car_state.autoHold = hold
+    state.models._update_once()
+    assert state.models.get_render_data()[1]['autohold_state'] == hold
+
+
+@pytest.mark.parametrize('cluster_models', [False, True], indirect=True)
 def test_parked_hud_requires_fresh_gear_and_reports_trip_from_every_valid_update(cluster_models):
   state = cluster_models
   models = state.models

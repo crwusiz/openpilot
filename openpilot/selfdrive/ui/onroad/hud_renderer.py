@@ -147,9 +147,15 @@ class HudRenderer(Widget):
 
     # Gas press indicator
     self._accel_indicator = IconIndicator("icons/accel_pressed.png", background_size, icon_size, bg_color)
+    self._accel_indicator.set_opacity(0.8)
+    self._accel_idle_indicator = IconIndicator("icons/accel_pressed_white.png", background_size, icon_size, bg_color)
+    self._accel_idle_indicator.set_opacity(0.2)
 
     # Brake/Autohold indicators
     self._brake_indicator = IconIndicator("icons/brake_pressed.png", background_size, icon_size, bg_color)
+    self._brake_indicator.set_opacity(0.8)
+    self._brake_idle_indicator = IconIndicator("icons/brake_pressed_white.png", background_size, icon_size, bg_color)
+    self._brake_idle_indicator.set_opacity(0.2)
     self._autohold_warning_indicator = IconIndicator("icons/autohold_warning.png", background_size, icon_size, bg_color)
     self._autohold_active_indicator = IconIndicator("icons/autohold_active.png", background_size, icon_size, bg_color)
 
@@ -304,8 +310,6 @@ class HudRenderer(Widget):
     self._wheel_indicator.set_rotation(-self.steer_angle)
     self._wheel_indicator.set_opacity(WHEEL_ICON_OPACITY)
 
-    self._accel_indicator.set_opacity(0.8 if self.accel_pressed else 0.2)
-    self._brake_indicator.set_opacity(0.8 if self.brake_pressed else 0.2)
     self._autohold_warning_indicator.set_opacity(0.8)
     self._autohold_active_indicator.set_opacity(0.8)
 
@@ -388,18 +392,9 @@ class HudRenderer(Widget):
     self._draw_text(wheel_x, y + icon_size / 2 + 75, sat_str, FontSizes.info_text, sat_color)
 
     # Right side icons (gas, brake/autohold)
-    gas_x = rect.x + rect.width - (icon_size * 3.7)
-
-    self._accel_indicator.set_rect(rl.Rectangle(
-      gas_x - icon_size / 2,
-      y - icon_size / 2,
-      icon_size,
-      icon_size
-    ))
-    self._accel_indicator.render()
-
     # Brake/Autohold
-    brake_x = gas_x + UIConfig.button_size
+    brake_x = rect.x + rect.width - (icon_size * 3.7)
+    gas_x = brake_x + UIConfig.button_size
 
     if self.autohold_state >= 1:
       autohold_indicator = self._autohold_warning_indicator if self.autohold_state > 1 else self._autohold_active_indicator
@@ -411,13 +406,23 @@ class HudRenderer(Widget):
       ))
       autohold_indicator.render()
     else:
-      self._brake_indicator.set_rect(rl.Rectangle(
+      brake_indicator = self._brake_indicator if self.brake_pressed else self._brake_idle_indicator
+      brake_indicator.set_rect(rl.Rectangle(
         brake_x - icon_size / 2,
         y - icon_size / 2,
         icon_size,
         icon_size
       ))
-      self._brake_indicator.render()
+      brake_indicator.render()
+
+    accel_indicator = self._accel_indicator if self.accel_pressed else self._accel_idle_indicator
+    accel_indicator.set_rect(rl.Rectangle(
+      gas_x - icon_size / 2,
+      y - icon_size / 2,
+      icon_size,
+      icon_size
+    ))
+    accel_indicator.render()
 
   def _draw_set_speed(self, rect: rl.Rectangle) -> None:
     # Determine speed color

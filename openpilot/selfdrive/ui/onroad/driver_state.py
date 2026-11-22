@@ -49,9 +49,11 @@ class ArcData:
 
 
 class DriverStateRenderer(Widget):
-  def __init__(self):
+  def __init__(self, *, always_visible: bool = False):
     super().__init__()
     # Initial state with NumPy arrays
+    self._always_visible = always_visible
+    self._has_pose = False
     self.face_kpts_draw = DEFAULT_FACE_KPTS_3D.copy()
     self.is_active = False
     self.is_rhd = False
@@ -75,7 +77,7 @@ class DriverStateRenderer(Widget):
     self.dm_img = gui_app.texture("icons/driver_face.png", IMG_SIZE, IMG_SIZE)
 
     self.set_visible(lambda: (ui_state.sm["selfdriveState"].alertSize == AlertSize.none and
-                              ui_state.received_since_started("driverStateV2")))
+                              (always_visible or ui_state.received_since_started("driverStateV2"))))
 
   def _render(self, rect):
     # Set opacity based on active state
@@ -87,6 +89,9 @@ class DriverStateRenderer(Widget):
     # Draw face icon
     icon_pos = rl.Vector2(self.position_x - self.dm_img.width // 2, self.position_y - self.dm_img.height // 2)
     rl.draw_texture_v(self.dm_img, icon_pos, colors_alpha(rl.WHITE, int(255 * opacity)))
+
+    if not self._has_pose:
+      return
 
     # Draw face outline
     white_color = colors_alpha(rl.WHITE, int(255 * opacity))
@@ -108,22 +113,31 @@ class DriverStateRenderer(Widget):
     if not self.is_visible:
       return
 
+    if self._always_visible and not all(sm.alive[service] and sm.valid[service] and ui_state.received_since_started(service)
+                                        for service in ("driverMonitoringState", "driverStateV2")):
+      self.is_active = self._has_pose = False
+      self._update_icon_position()
+      return
+
     # Get monitoring state
     dm_state = sm["driverMonitoringState"]
-    self.is_active = dm_state.activePolicy == log.DriverMonitoringState.MonitoringPolicy.vision
     self.is_rhd = dm_state.isRHD
+    self._update_icon_position()
+
+    # Get driver orientation data from appropriate camera
+    driverstate = sm["driverStateV2"]
+    driver_data = driverstate.rightDriverData if self.is_rhd else driverstate.leftDriverData
+    driver_orient = np.asarray(driver_data.faceOrientation)
+    self._has_pose = driver_orient.shape == (3,) and np.isfinite(driver_orient).all()
+    self.is_active = self._has_pose and dm_state.activePolicy == log.DriverMonitoringState.MonitoringPolicy.vision
+    if not self._has_pose:
+      return
 
     # Update fade state (smoother transition between active/inactive)
     fade_target = 0.0 if self.is_active else 0.5
     self.dm_fade_state = np.clip(self.dm_fade_state + 0.2 * (fade_target - self.dm_fade_state), 0.0, 1.0)
 
-    # Get driver orientation data from appropriate camera
-    driverstate = sm["driverStateV2"]
-    driver_data = driverstate.rightDriverData if self.is_rhd else driverstate.leftDriverData
-    driver_orient = driver_data.faceOrientation
-
     # Update pose values with scaling and smoothing
-    driver_orient = np.array(driver_orient)
     scales = np.where(driver_orient < 0, SCALES_NEG, SCALES_POS)
     v_this = driver_orient * scales
     self.driver_pose_diff = np.abs(self.driver_pose_vals - v_this)
@@ -156,14 +170,15 @@ class DriverStateRenderer(Widget):
     # Pre-calculate all drawing elements
     self._pre_calculate_drawing_elements()
 
-  def _pre_calculate_drawing_elements(self):
-    """Pre-calculate all drawing elements based on the current rectangle"""
+  def _update_icon_position(self):
     # Calculate icon position (bottom-left or bottom-right)
     width, height = self._rect.width, self._rect.height
     offset = UI_BORDER_SIZE + BTN_SIZE // 2
     self.position_x = self._rect.x + (width - offset if self.is_rhd else offset) - 10
     self.position_y = self._rect.y + height - offset - 20
 
+  def _pre_calculate_drawing_elements(self):
+    """Pre-calculate the tracked face outline and pose arcs"""
     # Pre-calculate the face lines positions
     positioned_keypoints = self.face_keypoints_transformed + np.array([self.position_x, self.position_y])
     for i in range(len(positioned_keypoints)):

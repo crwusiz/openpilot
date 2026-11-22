@@ -110,6 +110,7 @@ class ClusterModels:
     self.right_blindspot = False
     self.brake_pressed = False
     self.gas_pressed = False
+    self.autohold_state = 0
     self.steering_pressed = False
     self.steering_angle = 0.0
     self.cruise_speed = 0.0
@@ -283,6 +284,7 @@ class ClusterModels:
       self.right_blindspot = getattr(car_state, 'rightBlindspot', False)
       self.brake_pressed = car_state.brakePressed
       self.gas_pressed = car_state.gasPressed
+      self.autohold_state = getattr(car_state, 'autoHold', 0)
       self.steering_pressed = bool(getattr(car_state, 'steeringPressed', False))
       self.steering_angle = car_state.steeringAngleDeg
       cluster_speed = getattr(car_state, 'vCruiseCluster', 0.0)
@@ -656,6 +658,7 @@ class ClusterModels:
       "right_blindspot": self.right_blindspot,
       "brake_pressed": self.brake_pressed,
       "gas_pressed": self.gas_pressed,
+      "autohold_state": self.autohold_state,
       "steering_pressed": self.steering_pressed,
       "steering_angle": self.steering_angle,
       "cruise_speed": self.cruise_speed,

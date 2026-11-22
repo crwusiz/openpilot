@@ -22,6 +22,8 @@ assets/icons/traffic_red.png
 assets/icons/traffic_green.png
 assets/icons/accel_pressed.png
 assets/icons/brake_pressed.png
+assets/icons/autohold_active.png
+assets/icons/autohold_warning.png
 assets/icons/tpms.png
 assets/icons/gps.png
 assets/icons/ioniq5_park.png

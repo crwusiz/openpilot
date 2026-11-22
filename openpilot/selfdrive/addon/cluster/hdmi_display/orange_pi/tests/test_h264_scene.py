@@ -50,6 +50,22 @@ def test_required_assets_keep_original_font_sizes_and_all_hud_icons(scene):
   }
 
 
+@pytest.mark.parametrize("pedal_state, expected", [
+  ({}, []),
+  ({"gas_pressed": True}, ["accel_pressed"]),
+  ({"brake_pressed": True, "gas_pressed": True}, ["brake_pressed"]),
+  ({"autohold_state": 1, "brake_pressed": True}, ["autohold_active"]),
+  ({"autohold_state": 2, "gas_pressed": True}, ["autohold_warning"]),
+])
+def test_cluster_pedal_cell_shows_auto_hold_with_priority(scene, monkeypatch, pedal_state, expected):
+  draw_icon = Mock(wraps=scene.renderer._icon)
+  monkeypatch.setattr(scene.renderer, "_icon", draw_icon)
+  scene.update(snapshot(hud=pedal_state))
+  scene.render()
+  pedal_icons = {"accel_pressed", "brake_pressed", "autohold_active", "autohold_warning"}
+  assert [call.args[1] for call in draw_icon.call_args_list if call.args[1] in pedal_icons] == expected
+
+
 @pytest.mark.parametrize("relative", ["fonts/NotoSansKR-Bold.ttf", "icons/steer_green.png", "icons/wifi_strength_full.png",
                                       "icons_mici/longitudinal/distance_4_green.png"])
 @pytest.mark.parametrize("corrupt", [False, True])
@@ -393,6 +409,7 @@ def test_renderer_and_scene_run_from_standalone_pi_bundle_without_openpilot(tmp_
   code = """
 from pathlib import Path
 import sys
+from unittest.mock import Mock
 sys.path.insert(0, sys.argv[1])
 sys.modules['openpilot'] = None
 sys.modules['raylib_nb'] = None
@@ -410,14 +427,17 @@ assert Path(model_render_support.__file__).parent == Path(sys.argv[1])
 assert Path(sys.modules['hud_render_support'].__file__).parent == Path(sys.argv[1])
 assert Path(sys.modules['color_support'].__file__).parent == Path(sys.argv[1])
 scene=H264Scene(Path(sys.argv[1]) / 'assets', clock=lambda: 10.0)
-scene.update({'model_valid': False, 'hud': {'enabled': True, 'distance_level': 4, 'lead_present': True, 'lead_e2e': True},
-              'path': {}, 'source_size': [1344, 760]})
+scene.renderer._icon = Mock(wraps=scene.renderer._icon)
+scene.update({'model_valid': False, 'hud': {'enabled': True, 'distance_level': 4, 'lead_present': True, 'lead_e2e': True,
+                                         'autohold_state': 2, 'brake_pressed': True}, 'path': {}, 'source_size': [1344, 760]})
 scene.set_video(np.zeros((720,1280,3),np.uint8))
 image=scene.render()
 assert image.size==(1920,480) and image.mode=='RGB'
 assert scene.last_status['state_fresh'] and scene.last_status['video_fresh']
 assert scene.renderer._long_indicator_alphas[1] == 255
 assert scene.renderer._long_indicator_alphas[-2] > 0
+drawn_icons = [call.args[1] for call in scene.renderer._icon.call_args_list]
+assert 'autohold_warning' in drawn_icons and 'brake_pressed' not in drawn_icons
 """
   result = subprocess.run([sys.executable, "-I", "-c", code, str(tmp_path)],
                           check=False, capture_output=True, text=True, timeout=20)

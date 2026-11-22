@@ -56,7 +56,7 @@ TRAFFIC_ICONS = {
 PANEL_ICON_NAMES = (
   *WHEEL_ICONS.values(), *WIFI_ICONS.values(),
   *TRAFFIC_ICONS.values(),
-  "accel_pressed", "brake_pressed", "tpms", "gps", "compass",
+  "accel_pressed", "brake_pressed", "autohold_active", "autohold_warning", "tpms", "gps", "compass",
   "speed_bump", "school_zone", "speed_camera",
   "turnsignal_l", "turnsignal_r", "blind_spot_left", "blind_spot_right",
 )
@@ -1289,9 +1289,15 @@ class ClusterRenderer:
     if road_sign:
       self._icon(image, road_sign, left_cx, self.row_centers[1], 92, True)
 
-    # pedal_icon
-    pedal_icon = "brake_pressed" if data.get("brake_pressed") else \
-                 "accel_pressed" if data.get("gas_pressed") else None
+    autohold_state = data.get("autohold_state") or 0
+    if autohold_state >= 1:
+      pedal_icon = "autohold_warning" if autohold_state > 1 else "autohold_active"
+    elif data.get("brake_pressed"):
+      pedal_icon = "brake_pressed"
+    elif data.get("gas_pressed"):
+      pedal_icon = "accel_pressed"
+    else:
+      pedal_icon = None
     if pedal_icon is not None:
       self._icon(image, pedal_icon, left_cx, self.row_centers[2], 94, True)
 
