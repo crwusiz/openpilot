@@ -68,6 +68,9 @@ class IconIndicatorGroup:
   def __init__(self):
     self._indicators: list[IconIndicator] = []
 
+  def __len__(self) -> int:
+    return len(self._indicators)
+
   def add_indicator(self, indicator: IconIndicator) -> None:
     self._indicators.append(indicator)
 

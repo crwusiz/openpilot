@@ -6,7 +6,7 @@ from openpilot.selfdrive.hud_render_support import (
   select_vehicle_speed, speed_limit_warning_level, tpms_reading, traffic_light_index,
 )
 from openpilot.selfdrive.ui.mici.onroad.long_indicator import LongIndicator
-from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
+from openpilot.selfdrive.ui.ui_state import ui_state, ChestnutState, UIStatus
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
@@ -130,6 +130,9 @@ class HudRenderer(Widget):
     # Upper right indicator group
     self._upper_indicators = IconIndicatorGroup()
 
+    self._chestnut_indicator = IconIndicator("icons_mici/chestnut.png", background_size, icon_size, bg_color)
+    self._upper_indicators.add_indicator(self._chestnut_indicator)
+
     # Direction indicator (rotatable)
     self._compass_indicator = RotatableIconIndicator("icons/compass.png", background_size, icon_size, bg_color)
     self._upper_indicators.add_indicator(self._compass_indicator)
@@ -173,6 +176,10 @@ class HudRenderer(Widget):
     self.wifi_m_img = gui_app.texture("icons/wifi_strength_medium.png", icon_size, icon_size)
     self.wifi_h_img = gui_app.texture("icons/wifi_strength_high.png", icon_size, icon_size)
     self.wifi_f_img = gui_app.texture("icons/wifi_strength_full.png", icon_size, icon_size)
+
+    self.chestnut_img = gui_app.texture("icons_mici/chestnut.png", 96, 71)
+    self.chestnut_green_img = gui_app.texture("icons_mici/chestnut_green.png", 96, 71)
+    self.chestnut_orange_img = gui_app.texture("icons_mici/chestnut_orange.png", 120, 71)
 
     # Turn signals
     self.turnsignal_l_img = gui_app.texture("icons/turnsignal_l.png", icon_size, icon_size)
@@ -358,11 +365,24 @@ class HudRenderer(Widget):
     self._draw_blind_spot_detect(rect)
 
   def _draw_upper_icons(self, rect: rl.Rectangle) -> None:
+    chestnut_state = ui_state.chestnut_state
+    texture, opacity = self.chestnut_img, 0.2
+    if chestnut_state in (ChestnutState.READY, ChestnutState.ACTIVE):
+      texture, opacity = self.chestnut_green_img, 0.8
+    elif chestnut_state in (ChestnutState.UNCOMPILED, ChestnutState.FAILED):
+      texture, opacity = self.chestnut_orange_img, 0.8
+    elif chestnut_state == ChestnutState.LOADING:
+      opacity = 0.35 + 0.65 * (0.5 - 0.5 * math.cos(rl.get_time() * 6.0))
+    self._chestnut_indicator.set_texture(texture)
+    self._chestnut_indicator.set_opacity(opacity)
+
     icon_size = UIConfig.icon_size
-    start_x = rect.x + rect.width - (icon_size * 4.85)
+    button_size = UIConfig.button_size
+    right_edge = rect.x + rect.width - UIConfig.border_size
+    start_x = right_edge - (len(self._upper_indicators) - 0.5) * button_size
     y = rect.y + (icon_size / 2) + (UIConfig.border_size * 2)
 
-    self._upper_indicators.render_horizontal(start_x, y, UIConfig.button_size - UIConfig.icon_size)
+    self._upper_indicators.render_horizontal(start_x, y, button_size - icon_size)
 
   def _draw_bottom_icons(self, rect: rl.Rectangle) -> None:
     icon_size = UIConfig.icon_size
