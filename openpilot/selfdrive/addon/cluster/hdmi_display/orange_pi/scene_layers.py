@@ -314,13 +314,14 @@ class LayeredRenderer(ClusterRenderer):
     self._source_to_panel[0, 2] += self.camera_x
     self._source_to_panel[1, 2] += self.camera_y
     model_valid, hud, path = models.get_render_data()
+    self._update_long_indicator(hud, started)
     snapshot_at = time.monotonic()
     # Camera and metadata arrive independently. Reuse a complete immutable HUD
     # while its current values are unchanged, including across path updates.
     # Blinkers animate on the renderer's clock; stale-data text is drawn by the
-    # scene after this call. Both must get a fresh image on every render.
+    # scene after this call. The longitudinal indicator uses its current pixels.
     cacheable = not (hud.get("left_blinker") or hud.get("right_blinker") or hud.get("_state_stale"))
-    hud_key = (bool(has_camera), bool(self.config.is_metric), self._hud_cache_values(hud)) if cacheable else None
+    hud_key = (bool(has_camera), bool(self.config.is_metric), self._hud_cache_values(hud), self._long_indicator_alphas) if cacheable else None
     hud_reused = cacheable and self._hud_cache_image is not None and hud_key == self._hud_cache_key
     frame = None if hud_reused else (self._overlay_camera_base if has_camera else self._overlay_base).copy()
     copied_at = time.monotonic()

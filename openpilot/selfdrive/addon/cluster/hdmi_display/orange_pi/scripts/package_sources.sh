@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One mapping for a full checkout and an already bundled standalone receiver.
 package_valid_file() {
-  [[ "$1" =~ ^([a-zA-Z0-9_]+\.py|README\.md|requirements\.txt|receiver_assets\.txt|cluster-hdmi\.service|scripts/[a-zA-Z0-9_-]+\.sh|assets/fonts/[a-zA-Z0-9_-]+\.ttf|assets/icons/[a-zA-Z0-9_-]+\.png)$ ]]
+  [[ "$1" =~ ^([a-zA-Z0-9_]+\.py|README\.md|requirements\.txt|receiver_assets\.txt|cluster-hdmi\.service|scripts/[a-zA-Z0-9_-]+\.sh|assets/fonts/[a-zA-Z0-9_-]+\.ttf|assets/(icons|icons_mici/longitudinal)/[a-zA-Z0-9_-]+\.png)$ ]]
 }
 package_safe_parents() {
   local directory=$1 name=$2 parent=$2
@@ -56,7 +56,7 @@ package_collect_files() {
   fi
   while IFS= read -r relative || [[ -n "$relative" ]]; do
     relative=${relative%$'\r'}
-    [[ "$relative" =~ ^assets/(fonts/[a-zA-Z0-9_-]+\.ttf|icons/[a-zA-Z0-9_-]+\.png)$ ]] || fail 'Invalid receiver asset path.'
+    [[ "$relative" == assets/* ]] && package_valid_file "$relative" || fail 'Invalid receiver asset path.'
     package_add_file "$relative" "$asset_root"
   done < "$PACKAGE_DIR/receiver_assets.txt"
   for required in cluster_receiver.py control_socket.py hdmi_display.py hdmi_profiles.py display_controls.py texture_presenter.py touch_status.py \

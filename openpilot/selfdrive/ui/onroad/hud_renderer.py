@@ -5,6 +5,7 @@ from openpilot.selfdrive.hud_render_support import (
   KM_TO_MILE, SET_SPEED_NA, current_speed_color, format_speed_limit_distance, is_cruise_speed_set,
   select_vehicle_speed, speed_limit_warning_level, tpms_reading, traffic_light_index,
 )
+from openpilot.selfdrive.ui.mici.onroad.long_indicator import LongIndicator
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.text_measure import measure_text_cached
@@ -61,8 +62,8 @@ class HudRenderer(Widget):
 
     # Extended state variables
     self.accel: float = 0.0
-    self.brake_press: bool = False
-    self.gas_press: bool = False
+    self.brake_pressed: bool = False
+    self.accel_pressed: bool = False
     self.autohold_state: int = 0
     self.left_blinker: bool = False
     self.right_blinker: bool = False
@@ -116,6 +117,7 @@ class HudRenderer(Widget):
 
     # Initialize icon indicators
     self._init_icon_indicators()
+    self._long_indicator = LongIndicator(scale=2.0)
 
     # Load static icons (non-interactive)
     self._load_static_icons()
@@ -144,10 +146,10 @@ class HudRenderer(Widget):
     self._wheel_indicator = RotatableIconIndicator("icons/steer.png", background_size, icon_size, bg_color)
 
     # Gas press indicator
-    self._gas_indicator = IconIndicator("icons/disengage_on_accelerator.png", background_size, icon_size, bg_color)
+    self._accel_indicator = IconIndicator("icons/accel_pressed.png", background_size, icon_size, bg_color)
 
     # Brake/Autohold indicators
-    self._brake_indicator = IconIndicator("icons/brake_disc.png", background_size, icon_size, bg_color)
+    self._brake_indicator = IconIndicator("icons/brake_pressed.png", background_size, icon_size, bg_color)
     self._autohold_warning_indicator = IconIndicator("icons/autohold_warning.png", background_size, icon_size, bg_color)
     self._autohold_active_indicator = IconIndicator("icons/autohold_active.png", background_size, icon_size, bg_color)
 
@@ -174,12 +176,6 @@ class HudRenderer(Widget):
     self.traffic_off_img = gui_app.texture("icons/traffic_off.png", 77, 154)
     self.traffic_green_img = gui_app.texture("icons/traffic_green.png", 77, 154)
     self.traffic_red_img = gui_app.texture("icons/traffic_red.png", 77, 154)
-
-    # Distance settings
-    self.dist1_img = gui_app.texture("icons/dist1.png", 100, 250)
-    self.dist2_img = gui_app.texture("icons/dist2.png", 100, 250)
-    self.dist3_img = gui_app.texture("icons/dist3.png", 100, 250)
-    self.dist4_img = gui_app.texture("icons/dist4.png", 100, 250)
 
     # Road signs
     self.speed_bump_img = gui_app.texture("icons/speed_bump.png", 150, 150)
@@ -229,8 +225,8 @@ class HudRenderer(Widget):
 
     # Extended state
     self.accel = car_state.aEgo
-    self.brake_press = car_state.brakePressed
-    self.gas_press = car_state.gasPressed
+    self.brake_pressed = car_state.brakePressed
+    self.accel_pressed = car_state.gasPressed
     self.left_blinker = car_state.leftBlinker
     self.right_blinker = car_state.rightBlinker
     self.steer_angle = car_state.steeringAngleDeg
@@ -308,8 +304,8 @@ class HudRenderer(Widget):
     self._wheel_indicator.set_rotation(-self.steer_angle)
     self._wheel_indicator.set_opacity(WHEEL_ICON_OPACITY)
 
-    self._gas_indicator.set_opacity(0.8 if self.gas_press else 0.2)
-    self._brake_indicator.set_opacity(0.8 if self.brake_press else 0.2)
+    self._accel_indicator.set_opacity(0.8 if self.accel_pressed else 0.2)
+    self._brake_indicator.set_opacity(0.8 if self.brake_pressed else 0.2)
     self._autohold_warning_indicator.set_opacity(0.8)
     self._autohold_active_indicator.set_opacity(0.8)
 
@@ -394,13 +390,13 @@ class HudRenderer(Widget):
     # Right side icons (gas, brake/autohold)
     gas_x = rect.x + rect.width - (icon_size * 3.7)
 
-    self._gas_indicator.set_rect(rl.Rectangle(
+    self._accel_indicator.set_rect(rl.Rectangle(
       gas_x - icon_size / 2,
       y - icon_size / 2,
       icon_size,
       icon_size
     ))
-    self._gas_indicator.render()
+    self._accel_indicator.render()
 
     # Brake/Autohold
     brake_x = gas_x + UIConfig.button_size
@@ -750,21 +746,12 @@ class HudRenderer(Widget):
       color = Colors.ORANGE if value == "--" else Colors.RED if low else rl.BLACK
       self._draw_text(tpms_x + x, tpms_y + y, value, FontSizes.info_text, color)
 
-    personality = self.params.get("LongitudinalPersonality") or "1"
-    dist_imgs = [self.dist1_img, self.dist2_img, self.dist3_img, self.dist4_img]
-    dist_idx = min(int(personality), 3)
-
-    dist_w = 100
-    dist_h = 250
-    dist_x = tpms_x + (tpms_w / 2) - (dist_w / 2)
-    dist_y = tpms_y - dist_h - 10
-
-    rl.draw_texture_pro(
-      dist_imgs[dist_idx],
-      rl.Rectangle(0, 0, dist_w, dist_h),
-      rl.Rectangle(dist_x, dist_y, dist_w, dist_h),
-      rl.Vector2(0, 0), 0, colors_alpha(rl.WHITE, 200)
-    )
+    personality = ui_state.personality_param
+    if ui_state.received_since_started('selfdriveState') and ui_state.sm.alive['selfdriveState']:
+      personality = ui_state.sm['selfdriveState'].personality.raw
+    # The stacked icons extend farther below their origin, so offset it up within the slot above TPMS.
+    self._long_indicator.draw(tpms_x + tpms_w / 2, tpms_y - 165, personality + 1,
+                              disengaged=float(ui_state.status == UIStatus.DISENGAGED))
 
   def _get_color_for_angle(self, angle: float) -> rl.Color:
     abs_angle = abs(angle)

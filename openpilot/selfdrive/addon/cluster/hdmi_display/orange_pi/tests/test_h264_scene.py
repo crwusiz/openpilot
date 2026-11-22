@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer, REQUIRED_ICON_NAMES
+from openpilot.selfdrive.addon.cluster.cluster_renderer import ClusterRenderer, REQUIRED_ICON_PATHS
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_scene import H264Scene, source_panel_geometry
 
 
@@ -41,20 +41,21 @@ def test_required_assets_keep_original_font_sizes_and_all_hud_icons(scene):
   assert scene.renderer.font_unit.size == 20
   for name in ("speed", "current_speed", "value", "unit", "current_unit", "small", "label", "warning"):
     assert Path(getattr(scene.renderer, f"font_{name}").path).name == "NotoSansKR-Bold.ttf"
-  assert set(scene.renderer.icons) == set(REQUIRED_ICON_NAMES)
+  assert set(scene.renderer.icons) == set(REQUIRED_ICON_PATHS)
   manifest = Path(__file__).resolve().parents[1] / "receiver_assets.txt"
   assert set(manifest.read_text().splitlines()) == {
     "assets/fonts/NotoSansKR-Bold.ttf",
     "assets/icons/ioniq5_park.png",
-    *(f"assets/icons/{name}.png" for name in REQUIRED_ICON_NAMES),
+    *(f"assets/{path}" for path in REQUIRED_ICON_PATHS.values()),
   }
 
 
-@pytest.mark.parametrize("relative", ["fonts/NotoSansKR-Bold.ttf", "icons/steer_green.png", "icons/wifi_strength_full.png"])
+@pytest.mark.parametrize("relative", ["fonts/NotoSansKR-Bold.ttf", "icons/steer_green.png", "icons/wifi_strength_full.png",
+                                      "icons_mici/longitudinal/distance_4_green.png"])
 @pytest.mark.parametrize("corrupt", [False, True])
 def test_incomplete_assets_reject_h264_instead_of_showing_tiny_fonts_or_missing_icons(tmp_path, relative, corrupt):
   assets = tmp_path / "assets"
-  for name in ("fonts/NotoSansKR-Bold.ttf", *(f"icons/{name}.png" for name in REQUIRED_ICON_NAMES)):
+  for name in ("fonts/NotoSansKR-Bold.ttf", *REQUIRED_ICON_PATHS.values()):
     destination = assets / name
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(ASSETS / name, destination)
@@ -73,7 +74,7 @@ def test_incomplete_assets_reject_h264_instead_of_showing_tiny_fonts_or_missing_
   shutil.copyfile(ASSETS / relative, path)
   repaired = H264Scene(assets)
   assert repaired.renderer.font_current_speed.size == 92
-  assert set(repaired.renderer.icons) == set(REQUIRED_ICON_NAMES)
+  assert set(repaired.renderer.icons) == set(REQUIRED_ICON_PATHS)
 
 
 def test_raw_sensor_crop_matches_existing_even_nv12_geometry():
@@ -384,6 +385,11 @@ def test_renderer_and_scene_run_from_standalone_pi_bundle_without_openpilot(tmp_
                  CLUSTER / "hdmi_display/orange_pi/h264_scene.py", CLUSTER / "hdmi_display/orange_pi/h264_protocol.py",
                  CLUSTER / "hdmi_display/orange_pi/scene_layers.py", CLUSTER / "hdmi_display/orange_pi/path_worker.py"):
     shutil.copyfile(source, tmp_path / source.name)
+  manifest = Path(__file__).resolve().parents[1] / "receiver_assets.txt"
+  for name in manifest.read_text().splitlines():
+    path = tmp_path / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(ASSETS.parent / name, path)
   code = """
 from pathlib import Path
 import sys
@@ -403,13 +409,16 @@ assert issubclass(cluster_renderer.StopPoint, model_render_support.PlannedStopTr
 assert Path(model_render_support.__file__).parent == Path(sys.argv[1])
 assert Path(sys.modules['hud_render_support'].__file__).parent == Path(sys.argv[1])
 assert Path(sys.modules['color_support'].__file__).parent == Path(sys.argv[1])
-scene=H264Scene(sys.argv[2], clock=lambda: 10.0)
-scene.update({'model_valid':False,'hud':{},'path':{},'source_size':[1344,760]})
+scene=H264Scene(Path(sys.argv[1]) / 'assets', clock=lambda: 10.0)
+scene.update({'model_valid': False, 'hud': {'enabled': True, 'distance_level': 4, 'lead_present': True, 'lead_e2e': True},
+              'path': {}, 'source_size': [1344, 760]})
 scene.set_video(np.zeros((720,1280,3),np.uint8))
 image=scene.render()
 assert image.size==(1920,480) and image.mode=='RGB'
 assert scene.last_status['state_fresh'] and scene.last_status['video_fresh']
+assert scene.renderer._long_indicator_alphas[1] == 255
+assert scene.renderer._long_indicator_alphas[-2] > 0
 """
-  result = subprocess.run([sys.executable, "-I", "-c", code, str(tmp_path), str(ASSETS)],
+  result = subprocess.run([sys.executable, "-I", "-c", code, str(tmp_path)],
                           check=False, capture_output=True, text=True, timeout=20)
   assert result.returncode == 0, result.stderr

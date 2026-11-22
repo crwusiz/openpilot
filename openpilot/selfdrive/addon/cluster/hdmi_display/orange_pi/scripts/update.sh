@@ -25,7 +25,7 @@ RETRY_AFTER_RECOVERY=75
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 valid_file() {
-  [[ "$1" =~ ^([a-zA-Z0-9_]+\.py|README\.md|requirements\.txt|receiver_assets\.txt|cluster-hdmi\.service|scripts/[a-zA-Z0-9_-]+\.sh|assets/fonts/[a-zA-Z0-9_-]+\.ttf|assets/icons/[a-zA-Z0-9_-]+\.png)$ ]]
+  [[ "$1" =~ ^([a-zA-Z0-9_]+\.py|README\.md|requirements\.txt|receiver_assets\.txt|cluster-hdmi\.service|scripts/[a-zA-Z0-9_-]+\.sh|assets/fonts/[a-zA-Z0-9_-]+\.ttf|assets/(icons|icons_mici/longitudinal)/[a-zA-Z0-9_-]+\.png)$ ]]
 }
 safe_parents() {
   local directory=$1 name=$2 parent=$2
@@ -282,7 +282,7 @@ if [[ $1 == apply ]]; then
   done
   while IFS= read -r name || [[ -n "$name" ]]; do
     name=${name%$'\r'}
-    [[ "$name" =~ ^assets/(fonts/[a-zA-Z0-9_-]+\.ttf|icons/[a-zA-Z0-9_-]+\.png)$ ]] || fail 'Invalid receiver asset path.'
+    [[ "$name" == assets/* ]] && valid_file "$name" || fail 'Invalid receiver asset path.'
     [[ " ${FILES[*]} " == *" $name "* ]] || fail "Payload is missing $name."
   done < "$source_dir/receiver_assets.txt"
   # Only skip a previously completed installation. Legacy installs still run

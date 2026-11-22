@@ -1,35 +1,24 @@
 import raylib_nb as rl
 from openpilot.cereal import log
 from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.selfdrive.ui.mici.onroad import DIMMED_ICON_ALPHA, RIGHT_ICON_CENTER_OFFSET
+from openpilot.selfdrive import hud_render_support
+from openpilot.selfdrive.ui.mici.onroad import RIGHT_ICON_CENTER_OFFSET
 from openpilot.selfdrive.ui.mici.onroad.status import status_fade
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
 
-HIGHLIGHT_TIME = 2.5  # seconds
-
-
 class LongIndicator(Widget):
-  def __init__(self):
+  def __init__(self, scale: float = 1.0):
     super().__init__()
-    self._txt_lead_car = (self._texture('car', 35, 27), self._texture('car_green', 50, 42))
-    self._txt_distance = [(self._texture('distance_1', 32, 7), self._texture('distance_1_green', 60, 35)),
-                          (self._texture('distance_2', 40, 9), self._texture('distance_2_green', 68, 37)),
-                          (self._texture('distance_3', 48, 11), self._texture('distance_3_green', 76, 39)),
-                          (self._texture('distance_4', 56, 13), self._texture('distance_4_green', 84, 41))]
-    self._alpha_filter = FirstOrderFilter(0.0, 0.05, 1 / gui_app.target_fps)
-    # crossfade between states, a white and a green filter per icon
-    self._lead_car_filters = (FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps), FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps))
-    self._distance_filters = [(FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps), FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps))
-                              for _ in self._txt_distance]
-    self._personality: int | None = None
-    self._personality_changed_time = -HIGHLIGHT_TIME
+    self._icons = [(self._texture(name, round(width * scale), round(height * scale)), y * scale)
+                   for name, (width, height), y in hud_render_support.LONG_INDICATOR_ICONS]
+    self._indicator_state = hud_render_support.LongIndicatorState(1 / gui_app.target_fps, FirstOrderFilter)
     self._should_draw = False
 
   @staticmethod
   def _texture(name: str, width: int, height: int) -> rl.Texture:
-    return gui_app.texture(f'icons_mici/longitudinal/{name}.png', width, height, keep_aspect_ratio=False)
+    return gui_app.texture(f'{hud_render_support.LONG_INDICATOR_ASSET_DIR}/{name}.png', width, height, keep_aspect_ratio=False)
 
   def set_should_draw(self, should_draw: bool):
     self._should_draw = should_draw
@@ -38,55 +27,24 @@ class LongIndicator(Widget):
     # offroad shows the disengaged state
     if (ui_state.cluster_connected or not ui_state.has_longitudinal_control
         or (ui_state.started and not ui_state.received_since_started('selfdriveState'))):
-      self._personality = None
-      self._personality_changed_time = -HIGHLIGHT_TIME
-      self._alpha_filter.x = 0.0
+      self._indicator_state.reset()
       return
 
-    # grayed out while disengaged, with the lit bars at the dimmed icon alpha
-    visible = self._should_draw
-    dim = 1 - (1 - DIMMED_ICON_ALPHA / 0.9) * status_fade.weight(UIStatus.DISENGAGED)
-    alpha = self._alpha_filter.update(visible) * dim
-    self._draw_lead_car(rect, alpha)
-    self._draw_distance_bars(rect, alpha, visible)
+    personality = ui_state.sm['selfdriveState'].personality.raw if ui_state.started else ui_state.personality_param
+    self.draw(rect.x + rect.width - RIGHT_ICON_CENTER_OFFSET, rect.y + rect.height / 2, personality + 1,
+              disengaged=status_fade.weight(UIStatus.DISENGAGED), visible=self._should_draw)
 
-  def _draw_lead_car(self, rect: rl.Rectangle, alpha: float) -> None:
+  def draw(self, center_x: float, center_y: float, distance_level: int, *, disengaged: float, visible: bool = True) -> None:
     sm = ui_state.sm
     plan = sm['longitudinalPlan']
     has_lead = sm.alive['longitudinalPlan'] and plan.hasLead
     e2e = has_lead and plan.longitudinalPlanSource == log.LongitudinalPlan.LongitudinalPlanSource.e2e
-    white_f, green_f = self._lead_car_filters
-    white_alpha = white_f.update(0.0 if e2e else 0.9 if has_lead else 0.35)
-    green_alpha = green_f.update(float(e2e))
-    # static and filled in while disengaged, like the lit distance bars
-    disengaged = status_fade.weight(UIStatus.DISENGAGED)
-    white_alpha, green_alpha = white_alpha + (0.9 - white_alpha) * disengaged, green_alpha * (1 - disengaged)
-
-    white, green = self._txt_lead_car
-    self._draw_centered(white, rect, -20, white_alpha * alpha)
-    self._draw_centered(green, rect, -20, green_alpha * alpha)
-
-  def _draw_distance_bars(self, rect: rl.Rectangle, alpha: float, visible: bool) -> None:
-    sm = ui_state.sm
-    now = rl.get_time()
-    personality = sm['selfdriveState'].personality.raw if ui_state.started else ui_state.personality_param
-    if self._personality is not None and personality != self._personality:
-      self._personality_changed_time = now
-    self._personality = personality
-    # hold the highlight until the bars show
-    if not visible and now - self._personality_changed_time < HIGHLIGHT_TIME:
-      self._personality_changed_time = now
-    highlight = now - self._personality_changed_time < HIGHLIGHT_TIME
-
-    count = personality + 1
-    for i, ((white, green), y, (active_f, green_f)) in enumerate(zip(self._txt_distance, (2, 16, 32, 50), self._distance_filters, strict=True)):
-      active = active_f.update(float(i < count))
-      green_alpha = green_f.update(float(highlight and i == count - 1))
-      self._draw_centered(white, rect, y, (0.35 * (1 - active) + 0.9 * (active - green_alpha)) * alpha)
-      self._draw_centered(green, rect, y, green_alpha * alpha)
+    alphas = self._indicator_state.update(rl.get_time(), distance_level=distance_level, has_lead=has_lead,
+                                          e2e_lead=e2e, disengaged=disengaged, visible=visible)
+    for (texture, y), alpha in zip(self._icons, alphas, strict=True):
+      self._draw_centered(texture, center_x, center_y + y, alpha)
 
   @staticmethod
-  def _draw_centered(texture: rl.Texture, rect: rl.Rectangle, y_offset: float, alpha: float) -> None:
-    pos = rl.Vector2(rect.x + rect.width - RIGHT_ICON_CENTER_OFFSET - texture.width / 2,
-                     rect.y + rect.height / 2 + y_offset - texture.height / 2)
+  def _draw_centered(texture: rl.Texture, center_x: float, center_y: float, alpha: float) -> None:
+    pos = rl.Vector2(center_x - texture.width / 2, center_y - texture.height / 2)
     rl.draw_texture_ex(texture, pos, 0.0, 1.0, rl.Color(255, 255, 255, round(255 * alpha)))

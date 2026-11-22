@@ -8,7 +8,7 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.receiver_build imp
 def _populate_sources(directory):
   for name in BUILD_FILES:
     (directory / name).write_bytes(f"# {name}\n".encode())
-  assets = ["assets/fonts/NotoSansKR-Bold.ttf", "assets/icons/steer.png"]
+  assets = ["assets/fonts/NotoSansKR-Bold.ttf", "assets/icons/steer.png", "assets/icons_mici/longitudinal/distance_4_green.png"]
   (directory / "receiver_assets.txt").write_text("\n".join(assets) + "\n", encoding="utf-8")
   for name in assets:
     path = directory / name
@@ -87,8 +87,8 @@ def test_missing_and_unreadable_sources_are_reported_without_preventing_startup(
 def test_asset_fingerprint_changes_and_reports_missing_font(tmp_path):
   _populate_sources(tmp_path)
   startup = source_fingerprint(tmp_path)
-  assert "asset_files=2 | missing_assets=none" in startup
-  (tmp_path / "assets/icons/steer.png").write_bytes(b"updated icon")
+  assert "asset_files=3 | missing_assets=none" in startup
+  (tmp_path / "assets/icons_mici/longitudinal/distance_4_green.png").write_bytes(b"updated icon")
   changed = source_fingerprint(tmp_path)
   assert changed != startup
   # Runtime source hashes stay stable while the asset aggregate changes.
@@ -119,7 +119,7 @@ def test_package_version_normalizes_text_but_includes_binary_assets_and_scripts(
   (tmp_path / "scripts/common.sh").write_bytes(b"# new setup\n")
   assert package_digest(tmp_path) != initial
   changed = package_digest(tmp_path)
-  (tmp_path / "assets/icons/steer.png").write_bytes(b"updated icon")
+  (tmp_path / "assets/icons_mici/longitudinal/distance_4_green.png").write_bytes(b"updated icon")
   assert package_digest(tmp_path) != changed
 
 

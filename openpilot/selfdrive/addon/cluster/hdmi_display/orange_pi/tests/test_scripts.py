@@ -871,18 +871,27 @@ def test_update_and_rollback_restore_binary_assets_with_runtime(update_sandbox):
   old_font.parent.mkdir(parents=True)
   old_font.write_bytes(b"old font\x00\r\n")
   (target / "receiver_assets.txt").write_text("assets/fonts/Inter-Bold.ttf\n")
+  indicator_name = "assets/icons_mici/longitudinal/distance_4_green.png"
+  indicator = incoming / indicator_name
+  indicator.parent.mkdir(parents=True)
+  indicator.write_bytes(b"new icon\x00\r\n")
+  with (incoming / "receiver_assets.txt").open("a") as manifest:
+    manifest.write(indicator_name + "\n")
+  _write_checksums(incoming)
   result = _update(update_sandbox)
   assert result.returncode == 0, result.stdout + result.stderr
   new_font = target / "assets/fonts/NotoSansKR-Bold.ttf"
   assert new_font.read_bytes() == (incoming / "assets/fonts/NotoSansKR-Bold.ttf").read_bytes()
   assert (target / "receiver_assets.txt").read_text() == (incoming / "receiver_assets.txt").read_text()
   assert (target / "assets/icons/steer.png").exists()
+  assert (target / indicator_name).read_bytes() == indicator.read_bytes()
   result = _update(update_sandbox, "rollback")
   assert result.returncode == 0, result.stdout + result.stderr
   assert old_font.read_bytes() == b"old font\x00\r\n"
   assert (target / "receiver_assets.txt").read_text() == "assets/fonts/Inter-Bold.ttf\n"
   assert not new_font.exists()
   assert not (target / "assets/icons/steer.png").exists()
+  assert not (target / indicator_name).exists()
 
 
 def test_update_repairs_root_only_asset_ancestors_for_the_service_account(update_sandbox):

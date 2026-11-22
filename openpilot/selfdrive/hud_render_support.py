@@ -6,6 +6,65 @@ from enum import Enum
 SET_SPEED_NA = 255
 KM_TO_MILE = 0.621371
 
+LONG_INDICATOR_ASSET_DIR = "icons_mici/longitudinal"
+LONG_INDICATOR_HIGHLIGHT_TIME = 2.5  # seconds
+_LONG_INDICATOR_DISTANCE_BARS = (
+  ((32, 7), (60, 35), 2),
+  ((40, 9), (68, 37), 16),
+  ((48, 11), (76, 39), 32),
+  ((56, 13), (84, 41), 50),
+)
+LONG_INDICATOR_ICONS = (("car", (35, 27), -20), ("car_green", (50, 42), -20)) + tuple(
+  (f"distance_{i}{suffix}", size, y)
+  for i, (white, green, y) in enumerate(_LONG_INDICATOR_DISTANCE_BARS, start=1)
+  for suffix, size in (("", white), ("_green", green))
+)
+
+
+class LongIndicatorState:
+  """Compute icon opacities in LONG_INDICATOR_ICONS order for either renderer."""
+
+  def __init__(self, dt: float, filter_type, *, settle_first: bool = False):
+    self._settle_first = settle_first
+    self._alpha_filter = filter_type(0.0, 0.05, dt)
+    self._lead_filters = (filter_type(0.0, 0.1, dt), filter_type(0.0, 0.1, dt))
+    self._distance_filters = [(filter_type(0.0, 0.1, dt), filter_type(0.0, 0.1, dt)) for _ in _LONG_INDICATOR_DISTANCE_BARS]
+    self._distance_level: int | None = None
+    self.reset()
+
+  def reset(self) -> None:
+    self._distance_level = None
+    self._changed_at = -LONG_INDICATOR_HIGHLIGHT_TIME
+    self._alpha_filter.x = 0.0
+    if self._settle_first:
+      self._alpha_filter.initialized = False
+      for white, green in (self._lead_filters, *self._distance_filters):
+        white.initialized = green.initialized = False
+
+  def update(self, now: float, *, distance_level: int, has_lead: bool, e2e_lead: bool,
+             disengaged: float, visible: bool = True) -> tuple[float, ...]:
+    dim = 1 - (1 - 0.32 / 0.9) * disengaged
+    alpha = self._alpha_filter.update(visible) * dim
+    white_filter, green_filter = self._lead_filters
+    e2e_lead = has_lead and e2e_lead
+    white = white_filter.update(0.0 if e2e_lead else 0.9 if has_lead else 0.35)
+    green = green_filter.update(float(e2e_lead))
+    alphas = [(white + (0.9 - white) * disengaged) * alpha, green * (1 - disengaged) * alpha]
+
+    if self._distance_level is not None and distance_level != self._distance_level:
+      self._changed_at = now
+    self._distance_level = distance_level
+    # Keep a distance change highlighted until the indicator can be seen.
+    if not visible and now - self._changed_at < LONG_INDICATOR_HIGHLIGHT_TIME:
+      self._changed_at = now
+    highlight = now - self._changed_at < LONG_INDICATOR_HIGHLIGHT_TIME
+
+    for i, (active_filter, green_filter) in enumerate(self._distance_filters, start=1):
+      active = active_filter.update(float(i <= distance_level))
+      green = green_filter.update(float(highlight and i == distance_level))
+      alphas.extend(((0.35 * (1 - active) + 0.9 * (active - green)) * alpha, green * alpha))
+    return tuple(alphas)
+
 
 class UIStatus(Enum):
   DISENGAGED = "disengaged"

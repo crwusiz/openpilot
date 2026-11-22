@@ -10,17 +10,12 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 try:
-  from openpilot.selfdrive import model_render_support
+  from openpilot.selfdrive import hud_render_support, model_render_support
   from openpilot.selfdrive.color_support import STOCK_PATH_COLORS, hsla_to_rgba
-  from openpilot.selfdrive.hud_render_support import (
-    KM_TO_MILE, current_speed_color, format_speed_limit_distance, get_hud_status, ignore_limit_ratio,
-    is_cruise_speed_set, speed_limit_warning_level, tpms_reading, traffic_light_index,
-  )
 except ImportError:
+  import hud_render_support
   import model_render_support
   from color_support import STOCK_PATH_COLORS, hsla_to_rgba
-  from hud_render_support import (KM_TO_MILE, current_speed_color, format_speed_limit_distance, get_hud_status, ignore_limit_ratio,
-                                  is_cruise_speed_set, speed_limit_warning_level, tpms_reading, traffic_light_index)
 
 try:
   from openpilot.common.filter_simple import FirstOrderFilter
@@ -37,13 +32,6 @@ except ImportError:
     from cluster_render_support import Colors, FirstOrderFilter, colors_alpha, park_layout, park_upload_button_bounds
   cloudlog = logging.getLogger("cluster_renderer")
 
-
-DISTANCE_ICONS = {
-  1: "dist1",
-  2: "dist2",
-  3: "dist3",
-  4: "dist4",
-}
 
 WIFI_ICONS = {
   1: "wifi_strength_low",
@@ -65,13 +53,17 @@ TRAFFIC_ICONS = {
   2: "traffic_green",
 }
 
-REQUIRED_ICON_NAMES = (
+PANEL_ICON_NAMES = (
   *WHEEL_ICONS.values(), *WIFI_ICONS.values(),
-  *TRAFFIC_ICONS.values(), *DISTANCE_ICONS.values(),
+  *TRAFFIC_ICONS.values(),
   "accel_pressed", "brake_pressed", "tpms", "gps", "compass",
   "speed_bump", "school_zone", "speed_camera",
   "turnsignal_l", "turnsignal_r", "blind_spot_left", "blind_spot_right",
 )
+REQUIRED_ICON_PATHS = {
+  **{name: f"icons/{name}.png" for name in PANEL_ICON_NAMES},
+  **{name: f"{hud_render_support.LONG_INDICATOR_ASSET_DIR}/{name}.png" for name, _, _ in hud_render_support.LONG_INDICATOR_ICONS},
+}
 
 BLINKER_DRAW_COUNT = 10
 BLINKER_SEQUENCE_MS = 400.0
@@ -82,6 +74,7 @@ ALPHA_BLEND_STRIP_HEIGHT = 64
 RADAR_TO_CAMERA = 1.52  # m, matches radard for the standalone renderer
 TEXT_CACHE_MAX_ENTRIES = 256
 TEXT_CACHE_MAX_BYTES = 8 * 1024 * 1024
+ICON_CACHE_MAX_ENTRIES = 256
 PARK_CAR_IMAGE = "ioniq5_park.png"
 
 STOCK_PATH_GRADIENT = STOCK_PATH_COLORS
@@ -387,7 +380,7 @@ class ParkScreen:
     km = data.get("trip_distance_km")
     distance = "--"
     if km is not None:
-      distance = f"{km:.1f} km" if metric else f"{km * KM_TO_MILE:.1f} mi"
+      distance = f"{km:.1f} km" if metric else f"{km * hud_render_support.KM_TO_MILE:.1f} mi"
     duration = self._duration(data.get("trip_duration_s"))
     upload_enabled = data.get("park_log_upload_enabled") is True
     upload_state = data.get("park_log_upload_state")
@@ -442,6 +435,16 @@ class ClusterRenderer:
     self.right_panel_x = self.right_aux_x + self.panel_w
     self.row_h = self.content_h / 3.0
     self.row_centers = tuple(self.content_y + self.row_h * (row + 0.5) for row in range(3))
+    self._long_indicator = hud_render_support.LongIndicatorState(1 / config.fps, FirstOrderFilter, settle_first=True)
+    self._long_indicator_alphas = ()
+    indicator_icons = hud_render_support.LONG_INDICATOR_ICONS
+    top = min(offset - size[1] / 2 for _, size, offset in indicator_icons)
+    bottom = max(offset + size[1] / 2 for _, size, offset in indicator_icons)
+    max_width = max(size[0] for _, size, _ in indicator_icons)
+    scale = min(1.0, self.row_h / (bottom - top), self.panel_w / max_width)
+    center = (top + bottom) / 2
+    self._long_indicator_layout = tuple((name, tuple(max(1, round(value * scale)) for value in size), (offset - center) * scale)
+                                        for name, size, offset in indicator_icons)
     self._source_to_panel = np.eye(3, dtype=np.float32)
     self._reset_leads()
     self._last_render_at = None
@@ -477,7 +480,7 @@ class ClusterRenderer:
     self.camera_height = 1.22
     self.focal_length = 910.0
     self.icons = {}
-    self._icon_cache = {}
+    self._icon_cache = OrderedDict()
     self._rotated_icon_cache = OrderedDict()
     self._text_cache = OrderedDict()
     self._text_cache_bytes = 0
@@ -489,14 +492,14 @@ class ClusterRenderer:
     self._park_screen = None
     self._park_active = False
     icon_errors = []
-    for name in REQUIRED_ICON_NAMES:
+    for name, relative_path in REQUIRED_ICON_PATHS.items():
       try:
-        with Image.open(os.path.join(icon_dir, f"{name}.png")) as icon:
+        with Image.open(os.path.join(asset_dir, relative_path)) as icon:
           self.icons[name] = icon.convert("RGBA")
       except Exception as e:
-        icon_errors.append(f"{name}.png: {e}")
+        icon_errors.append(f"{relative_path}: {e}")
     if icon_errors:
-      message = f"Failed to load cluster icons from {icon_dir}: {'; '.join(icon_errors)}"
+      message = f"Failed to load cluster icons from {asset_dir}: {'; '.join(icon_errors)}"
       if getattr(config, "require_assets", False):
         raise RuntimeError(message + "; reinstall the receiver assets and check service-account directory permissions")
       cloudlog.error(message)
@@ -529,6 +532,7 @@ class ClusterRenderer:
       self.last_frame_timings = {"snapshot": snapshot_at - started, "hud": time.monotonic() - snapshot_at}
       return image
     self._park_active = False
+    self._update_long_indicator(hud_data, started)
 
     # Fetch once so a stale-stream reset cannot clear the frame between a
     # separate has_frame() check and get_frame() call.
@@ -576,11 +580,26 @@ class ClusterRenderer:
   def render_park(self, hud_data):
     if not self._park_active:
       self._reset_leads()
+      self._long_indicator.reset()
+      self._long_indicator_alphas = ()
       self._blink_started_at = None
       self._park_active = True
     if self._park_screen is None:
       self._park_screen = ParkScreen((self.target_w, self.target_h), self.config.font_bold, self._park_image_path)
     return self._park_screen.render(hud_data, metric=self.config.speed_unit == "km/h")
+
+  def _update_long_indicator(self, hud_data, now):
+    if hud_data.get("_state_stale"):
+      self._long_indicator.reset()
+      self._long_indicator_alphas = ()
+      return
+
+    distance_level = min(max(int(hud_data.get("distance_level", 1) or 1), 1), 4)
+    alphas = self._long_indicator.update(
+      now, distance_level=distance_level, has_lead=bool(hud_data.get("lead_present")), e2e_lead=bool(hud_data.get("lead_e2e")),
+      disengaged=float(self._get_border_color(hud_data) == Colors.Border.DISENGAGED),
+    )
+    self._long_indicator_alphas = tuple(round(min(max(alpha, 0.0), 1.0) * 255) for alpha in alphas)
 
   def _update_filter_intervals(self, now):
     # Transport backpressure can reduce actual rendering far below the target.
@@ -982,6 +1001,10 @@ class ClusterRenderer:
         alpha = image.getchannel("A").point(lambda p: p * alpha_scale // 255)
         image.putalpha(alpha)
       self._icon_cache[key] = image
+      if len(self._icon_cache) > ICON_CACHE_MAX_ENTRIES:
+        self._icon_cache.popitem(last=False)
+    else:
+      self._icon_cache.move_to_end(key)
     return image
 
   def _icon(self, image, name, cx, cy, size, active=True, rotation=0.0, opacity=255):
@@ -1056,7 +1079,7 @@ class ClusterRenderer:
   def _value(self, value, disabled="--"):
     try:
       speed = float(value)
-      return str(round(speed)) if is_cruise_speed_set(speed) else disabled
+      return str(round(speed)) if hud_render_support.is_cruise_speed_set(speed) else disabled
     except (TypeError, ValueError):
       return disabled
 
@@ -1103,7 +1126,7 @@ class ClusterRenderer:
 
   @staticmethod
   def _get_border_color(data):
-    status = get_hud_status(
+    status = hud_render_support.get_hud_status(
       enabled=bool(data.get("enabled")), lat_active=bool(data.get("lat_active")),
       pre_enabled_or_overriding=bool(data.get("pre_enabled_or_overriding")), steering_pressed=bool(data.get("steering_pressed")),
       brake_pressed=bool(data.get("brake_pressed")), blinker=bool(data.get("left_blinker") or data.get("right_blinker")),
@@ -1116,7 +1139,7 @@ class ClusterRenderer:
       timer = float(data.get("ignore_limit_timer", 0.0) or 0.0)
     except (TypeError, ValueError):
       return
-    bar_width = int(round(self.target_w * ignore_limit_ratio(timer)))
+    bar_width = int(round(self.target_w * hud_render_support.ignore_limit_ratio(timer)))
     if bar_width <= 0:
       return
     bar_x = (self.target_w - bar_width) // 2
@@ -1201,7 +1224,7 @@ class ClusterRenderer:
 
       cruise_speed = float(data.get("cruise_speed", 0.0) or 0.0)
       if limit_speed > 0 and data.get("enabled"):
-        warning = speed_limit_warning_level(cruise_speed, limit_speed)
+        warning = hud_render_support.speed_limit_warning_level(cruise_speed, limit_speed)
         speed_color = (Colors.WHITE, Colors.CAUTION, Colors.ORANGE, Colors.RED)[warning]
 
     speed_draw = ImageDraw.Draw(image, "RGBA")
@@ -1245,7 +1268,7 @@ class ClusterRenderer:
 
     # Draw distance from the same source used for the displayed limit.
     if left_dist > 0:
-      dist_text = format_speed_limit_distance(left_dist)
+      dist_text = hud_render_support.format_speed_limit_distance(left_dist)
       text_y = speed_limit_y + outer_radius + 10
       bbox = draw.textbbox((left_cx, text_y), dist_text, font=self.font_small, anchor="mm")
       padding_x, padding_y = 7, 3
@@ -1286,13 +1309,13 @@ class ClusterRenderer:
     cx = self.right_panel_x + self.panel_w / 2
 
     # traffic icon
-    traffic_name = TRAFFIC_ICONS[traffic_light_index(data.get("traffic_state"))]
+    traffic_name = TRAFFIC_ICONS[hud_render_support.traffic_light_index(data.get("traffic_state"))]
     self._icon(image, traffic_name, cx, self.row_centers[0], (68, 136), True)
 
-    # distance icon
-    gap = min(max(int(data.get("distance_level", 1) or 1), 1), 4)
-    gap_name = DISTANCE_ICONS[gap]
-    self._icon(image, gap_name, cx, self.row_centers[1], (56, 132), True)
+    # Longitudinal indicator occupies the same middle cell as the old gap icon.
+    for (name, size, offset), opacity in zip(self._long_indicator_layout, self._long_indicator_alphas, strict=False):
+      if opacity:
+        self._icon(image, name, cx, self.row_centers[1] + offset, size, opacity=opacity)
 
     # tpms icon
     tpms = self._base_icon("tpms", (108, 140), True)
@@ -1313,13 +1336,13 @@ class ClusterRenderer:
         pressure = 0.0
       px = cx + (-36 if i % 2 == 0 else 36)
       py = self.content_y + self.row_h * 2.0 + (38 if i < 2 else 115)
-      value, low = tpms_reading(pressure)
+      value, low = hud_render_support.tpms_reading(pressure)
       color = Colors.ORANGE if value == "--" else red if low else Colors.SIGN_TEXT
       self._centered(draw, px, py, value, self.font_small, color)
 
   @staticmethod
   def _current_speed_color(data):
-    return current_speed_color(float(data.get("accel", 0.0) or 0.0))
+    return hud_render_support.current_speed_color(float(data.get("accel", 0.0) or 0.0))
 
   def _current_speed_text(self, data):
     conversion = 3.6 if getattr(self.config, "is_metric", True) else 2.236936

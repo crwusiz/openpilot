@@ -1,7 +1,5 @@
 import raylib_nb as rl
 
-DIMMED_ICON_ALPHA = 0.32  # side panel icons while disengaged
-
 RIGHT_ICON_CENTER_OFFSET = 46
 LEFT_ICON_SIZE = 50
 LEFT_COLUMN_SIZES = (LEFT_ICON_SIZE,) * 3  # cruise, set, driver monitoring + steering wheel

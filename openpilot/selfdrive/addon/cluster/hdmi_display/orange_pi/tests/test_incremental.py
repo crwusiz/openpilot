@@ -22,7 +22,8 @@ def run_helper(mode, stage, target):
 def package(tmp_path):
   target, stage = tmp_path / "installed files", tmp_path / "staged files"
   stage.mkdir()
-  files = {"hdmi_display.py": b"old code", "assets/fonts/NotoSansKR-Bold.ttf": b"font\x00\r\n"}
+  files = {"hdmi_display.py": b"old code", "assets/fonts/NotoSansKR-Bold.ttf": b"font\x00\r\n",
+           "assets/icons_mici/longitudinal/distance_4_green.png": b"icon\x00\r\n"}
   for name, data in files.items():
     path = target / name
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -39,7 +40,7 @@ def test_hash_comparison_reuses_only_identical_files_and_hydrates_full_package(p
   stage, target, files = package
   result = run_helper("plan", stage, target)
   assert result.returncode == 0, result.stderr
-  assert result.stdout.splitlines() == ["assets/fonts/NotoSansKR-Bold.ttf"]
+  assert result.stdout.splitlines() == ["assets/fonts/NotoSansKR-Bold.ttf", "assets/icons_mici/longitudinal/distance_4_green.png"]
   assert list(stage.iterdir()) == [stage / "SHA256SUMS"]
   for name in ("hdmi_display.py", "new_module.py"):
     (stage / name).write_bytes(files[name])

@@ -5,6 +5,7 @@ from unittest.mock import patch
 import raylib_nb as rl
 
 from openpilot.cereal import log
+from openpilot.selfdrive import hud_render_support
 from openpilot.selfdrive.ui.mici.onroad import long_indicator
 
 
@@ -33,7 +34,7 @@ class TestLongIndicator(unittest.TestCase):
   def _settle_distance_bars(self):
     for _ in range(120):
       self.draw.reset_mock()
-      self.indicator._draw_distance_bars(self.rect, 1.0, True)
+      self.indicator._render(self.rect)
     return self._draw_alphas()
 
   def test_each_personality_lights_the_matching_number_of_bars(self):
@@ -42,15 +43,15 @@ class TestLongIndicator(unittest.TestCase):
     for count, personality in enumerate(personalities, start=1):
       with self.subTest(personality=personality):
         self.personality.raw = personality
-        self.indicator._draw_distance_bars(self.rect, 1.0, True)
-        self.clock.return_value += long_indicator.HIGHLIGHT_TIME
+        self.indicator._render(self.rect)
+        self.clock.return_value += hud_render_support.LONG_INDICATOR_HIGHLIGHT_TIME
         alphas = self._settle_distance_bars()
         for bar in range(1, 5):
           self.assertAlmostEqual(alphas[f'distance_{bar}'], 0.9 if bar <= count else 0.35)
           self.assertAlmostEqual(alphas[f'distance_{bar}_green'], 0.0)
 
   def test_more_relaxed_highlights_the_fourth_bar(self):
-    self.indicator._draw_distance_bars(self.rect, 1.0, True)
+    self.indicator._render(self.rect)
     self.personality.raw = log.LongitudinalPersonality.morerelaxed
 
     alphas = self._settle_distance_bars()

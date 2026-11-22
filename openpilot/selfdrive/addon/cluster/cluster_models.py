@@ -631,6 +631,9 @@ class ClusterModels:
   def _get_hud_data_unlocked(self):
     car_state_age = time.monotonic() - self.sm.logMonoTime['carState'] / 1e9
     parked = self._parked and self.sm.alive['carState'] and 0 <= car_state_age <= CAR_STATE_FRESH_S
+    plan = self.sm['longitudinalPlan'] if self.sm.alive['longitudinalPlan'] and self.sm.valid['longitudinalPlan'] else None
+    lead_present = bool(getattr(plan, 'hasLead', False))
+    lead_e2e = lead_present and plan.longitudinalPlanSource == log.LongitudinalPlan.LongitudinalPlanSource.e2e
     return {
       "v_ego": self.v_ego,
       "accel": self.accel,
@@ -663,6 +666,8 @@ class ClusterModels:
       "wifi_strength": self.wifi_strength,
       "tpms": self.tpms,
       "distance_level": self.distance_level,
+      "lead_present": lead_present,
+      "lead_e2e": lead_e2e,
       "traffic_state": self.traffic_state,
       "nda_state": self.nda_state,
       "stock_limit_speed": self.stock_limit_speed,

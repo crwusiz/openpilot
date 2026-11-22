@@ -13,6 +13,7 @@ BUILD_FILES = (
 )
 
 RETIRED_FILES = {"cluster_protocol.py", "frame_stream.py", "tcp_diagnostics.py"}
+_ASSET_PATH = re.compile(r"assets/(?:fonts/[a-zA-Z0-9_-]+\.ttf|(?:icons|icons_mici/longitudinal)/[a-zA-Z0-9_-]+\.png)")
 _CHECKOUT_SOURCES = {
   "cluster_renderer.py": "../../cluster_renderer.py",
   "cluster_render_support.py": "../../cluster_render_support.py",
@@ -45,7 +46,7 @@ def package_digest(directory=None):
   if not assets or len(assets) > 128 or len(set(assets)) != len(assets):
     raise ValueError("Invalid receiver asset manifest")
   for name in assets:
-    if re.fullmatch(r"assets/(?:fonts/[a-zA-Z0-9_-]+\.ttf|icons/[a-zA-Z0-9_-]+\.png)", name) is None:
+    if _ASSET_PATH.fullmatch(name) is None:
       raise ValueError("Invalid receiver asset path")
     sources[name] = asset_root / name
   entries = []
@@ -92,13 +93,13 @@ def _asset_snapshot(directory):
   except (OSError, UnicodeError):
     return "assets_sha256=unavailable | missing_assets=manifest"
   if not names or len(names) > 128 or len(set(names)) != len(names) or any(
-    re.fullmatch(r"assets/(?:fonts/[a-zA-Z0-9_-]+\.ttf|icons/[a-zA-Z0-9_-]+\.png)", name) is None for name in names
+    _ASSET_PATH.fullmatch(name) is None for name in names
   ):
     return "assets_sha256=unavailable | missing_assets=invalid_manifest"
   for name in names:
     path = directory / name
     try:
-      if any((directory / parent).is_symlink() for parent in (name, str(Path(name).parent), "assets")):
+      if path.is_symlink() or any((directory / parent).is_symlink() for parent in Path(name).parents):
         raise OSError("unsafe asset path")
       digest = hashlib.sha256(path.read_bytes()).hexdigest()
     except OSError:

@@ -310,6 +310,7 @@ def test_retained_render_frames_survive_camera_changes_and_stalls(renderer_modul
   renderer._frame = renderer.base_canvas.copy()
   renderer.camera_x, renderer.camera_y, renderer.camera_w, renderer.camera_h = 4, 2, 8, 6
   renderer._update_filter_intervals = Mock()
+  renderer._update_long_indicator = Mock()
   renderer._reset_leads = Mock()
   region = np.s_[2:8, 4:12]
 
@@ -355,6 +356,7 @@ def test_render_reports_path_cpu_separately_from_waits_and_hud(renderer_module, 
   renderer._frame = renderer.base_canvas.copy()
   renderer.camera_x, renderer.camera_y, renderer.camera_w, renderer.camera_h = 4, 2, 8, 6
   renderer._update_filter_intervals = Mock()
+  renderer._update_long_indicator = Mock()
   clock = {"wall": 10.0, "cpu": 1.0}
   monkeypatch.setattr(renderer_module, "time", SimpleNamespace(monotonic=lambda: clock["wall"]))
   monkeypatch.setattr(renderer_module, "thread_time", lambda: clock["cpu"])

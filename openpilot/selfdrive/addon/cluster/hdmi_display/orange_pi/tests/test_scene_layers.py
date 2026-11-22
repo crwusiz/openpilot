@@ -79,7 +79,7 @@ def test_subpixel_hud_inputs_reuse_identical_pixels_without_mutating_source_valu
 
 @pytest.mark.parametrize("update", [
   {"v_ego": 20.6}, {"accel": 0.3}, {"steering_angle": 15.1}, {"gps_bearing": 43.1},
-  {"brake_pressed": True}, {"wifi_strength": 4}, {"gps_satellites": 0}, {"distance_level": 4},
+  {"brake_pressed": True}, {"wifi_strength": 4}, {"gps_satellites": 0},
 ])
 def test_every_visible_hud_change_still_repaints_with_reference_pixels(update):
   scene = H264Scene(ASSETS)
@@ -93,6 +93,23 @@ def test_every_visible_hud_change_still_repaints_with_reference_pixels(update):
     assert changed.tobytes() != first.tobytes()
     renderer._hud_cache_key = None
     assert _hud_overlay(renderer, latest).tobytes() == changed.tobytes()
+  finally:
+    scene.close()
+
+
+def test_distance_level_crossfade_updates_the_hud_with_an_unchanged_snapshot():
+  scene = H264Scene(ASSETS)
+  renderer = scene.renderer
+  try:
+    baseline = _hud_overlay(renderer, _changing_hud())
+    latest = {**_changing_hud(), "distance_level": 4}
+    changing = _hud_overlay(renderer, latest)
+    next_frame = _hud_overlay(renderer, latest)
+
+    assert baseline.tobytes() != changing.tobytes()
+    assert changing.tobytes() != next_frame.tobytes()
+    assert renderer.last_frame_timings["hud_reused"] == 0
+    assert renderer._long_indicator_alphas[-1] > 0
   finally:
     scene.close()
 

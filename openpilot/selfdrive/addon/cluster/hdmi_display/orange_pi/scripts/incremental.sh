@@ -21,7 +21,7 @@ while IFS= read -r line; do
   hash=${line:0:64}
   name=${line:66}
   [[ "$hash" =~ ^[a-f0-9]{64}$ && "${line:64:2}" == '  ' ]] || exit 1
-  [[ "$name" =~ ^([a-zA-Z0-9_]+\.py|README\.md|requirements\.txt|receiver_assets\.txt|cluster-hdmi\.service|scripts/[a-zA-Z0-9_-]+\.sh|assets/fonts/[a-zA-Z0-9_-]+\.ttf|assets/icons/[a-zA-Z0-9_-]+\.png)$ ]] || exit 1
+  [[ "$name" =~ ^([a-zA-Z0-9_]+\.py|README\.md|requirements\.txt|receiver_assets\.txt|cluster-hdmi\.service|scripts/[a-zA-Z0-9_-]+\.sh|assets/fonts/[a-zA-Z0-9_-]+\.ttf|assets/(icons|icons_mici/longitudinal)/[a-zA-Z0-9_-]+\.png)$ ]] || exit 1
   [[ "$seen" != *" $name "* ]] || exit 1
   seen+="$name "
   safe_path "$stage" "$name" && safe_path "$target" "$name" || exit 1
