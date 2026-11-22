@@ -383,6 +383,13 @@ def test_render_reports_path_cpu_separately_from_waits_and_hud(renderer_module, 
   assert renderer.last_frame_timings["hud"] == pytest.approx(0.010)
 
 
+@pytest.mark.parametrize(("seconds", "label"), [
+  (None, "--"), (59, "0분"), (60, "1분"), (3599, "59분"), (3600, "1시간 00분"), (3915, "1시간 05분"),
+])
+def test_park_trip_duration_omits_seconds_at_minute_and_hour_boundaries(renderer_module, seconds, label):
+  assert renderer_module.ParkScreen._duration(seconds) == label
+
+
 @pytest.mark.parametrize("size", [(1920, 462), (1920, 480), (1920, 720)])
 def test_park_replaces_the_camera_and_restores_the_previous_driving_view(renderer_module, monkeypatch, size):
   assets = Path(__file__).parents[3] / "assets"
@@ -391,6 +398,16 @@ def test_park_replaces_the_camera_and_restores_the_previous_driving_view(rendere
                            font_bold=font_path, font_regular=font_path, is_metric=True, speed_unit="km/h")
   monkeypatch.setattr(renderer_module, "Colors", Colors)
   monkeypatch.setattr(renderer_module, "colors_alpha", colors_alpha)
+  trip_labels = {"거리", "시간", "42.7 km", "1시간 04분", "클러스터 로그 전송"}
+  drawn_sizes = {}
+  original_text = ImageDraw.ImageDraw.text
+
+  def draw_text(draw, position, label, **kwargs):
+    if label in trip_labels:
+      drawn_sizes[label] = kwargs["font"].size
+    return original_text(draw, position, label, **kwargs)
+
+  monkeypatch.setattr(ImageDraw.ImageDraw, "text", draw_text)
   renderer = renderer_module.ClusterRenderer(config)
   camera = Mock()
   camera.get_frame.return_value = np.full((renderer.camera_h, renderer.camera_w, 3), 100, dtype=np.uint8)
@@ -411,12 +428,26 @@ def test_park_replaces_the_camera_and_restores_the_previous_driving_view(rendere
   camera.get_frame.assert_not_called()
   assert parked.mode == "RGB" and parked.size == size
   assert parked.tobytes() != before.tobytes()
-  left, top, _, _ = renderer_module.park_upload_button_bounds(size)
-  button_pixel = (left + 20, top + 5)
-  assert parked.getpixel(button_pixel) == (30, 44, 64)
+  left, top, _, bottom = renderer_module.park_upload_button_bounds(size)
+  park_screen = renderer._park_screen
+  assert drawn_sizes == dict.fromkeys(trip_labels, round(28 * park_screen.scale))
+  assert park_screen._point(1468, park_screen.TRIP_DURATION_Y)[1] < top < bottom < park_screen._point(1468, 414)[1]
+  assert (top, bottom) == (park_screen._point(1621, 329)[1], park_screen._point(1621, 393)[1])
+  for center_y in (108, park_screen.TRIP_DISTANCE_Y, park_screen.TRIP_DURATION_Y):
+    x, y = park_screen._point(1468, center_y)
+    icon_region = parked.crop((x - 12, y - 12, x + 13, y + 13))
+    assert np.any(np.all(np.asarray(icon_region) == renderer_module.ParkScreen.ACCENT, axis=-1))
+  button_pixels = ((left + 20, top + 5), (left + 20, bottom - 5))
+  icon_pixel = (left + round(34 * park_screen.scale), (top + bottom) // 2)
+  assert all(parked.getpixel(pixel) == (30, 44, 64) for pixel in button_pixels)
+  assert parked.getpixel(icon_pixel) == renderer_module.ParkScreen.MUTED
   park_hud = parking.get_render_data.return_value[1]
   enabled = renderer.render_park({**park_hud, "park_log_upload_enabled": True})
-  assert enabled.getpixel(button_pixel) == (24, 56, 94)
+  assert all(enabled.getpixel(pixel) == (24, 56, 94) for pixel in button_pixels)
+  assert enabled.getpixel(icon_pixel) == renderer_module.ParkScreen.TEXT
+  running = renderer.render_park({**park_hud, "park_log_upload_state": "running"})
+  assert running.getpixel(icon_pixel) == renderer_module.ParkScreen.MUTED
+  assert running.crop(renderer._park_screen.upload_bounds).tobytes() != parked.crop(renderer._park_screen.upload_bounds).tobytes()
   np.testing.assert_array_equal(renderer.render(camera, driving), before)
   camera.get_frame.assert_called_once_with()
 

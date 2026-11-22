@@ -176,7 +176,7 @@ class ClusterActions:
         if match is None or (match[1] == match[3]) != (match[2] == "=="):
           job.update(state="failed", message="Invalid commit comparison; check again")
         else:
-          self.checks[job["owner"]].update(update_available=match[2] == "!=", commit_compare=comparison,
+          self.checks[job["owner"]].update(update_available=match[2] == "!=", commit_compare=comparison, current_commit=match[1],
                                            commit_state="available" if match[2] == "!=" else "current")
           job.update(state="succeeded", message="Commit check completed")
       elif action == "git_pull":

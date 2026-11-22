@@ -634,10 +634,19 @@ def test_failed_live_frame_flip_restores_waiting_instead_of_skipping_redraw(rast
     display.close()
 
 
-def _control_target(display, name, fraction=0.5):
+def _control_target(display, name):
   left, top, width, height = display.controls.layout[name]
   logical_width, logical_height = display.controls.logical_size
-  return (left + width * fraction) / logical_width, (top + height / 2) / logical_height
+  return (left + width / 2) / logical_width, (top + height / 2) / logical_height
+
+
+def _assert_full_screen_menu(display):
+  menu, position = display.controls.render_menu()
+  assert position == (0, 0)
+  assert menu.get_size() == display.controls.logical_size
+  output = display._presenter.renderer.to_surface() if display._presenter is not None else display.screen
+  pixels = display._pygame.surfarray.array3d
+  np.testing.assert_array_equal(pixels(output), np.rot90(pixels(menu), display.rotation // 90))
 
 
 def _post_touch(display, event_type, point=(0.5, 0.5), finger_id=7):
@@ -695,7 +704,9 @@ def test_layered_camera_keeps_touch_brightness_and_does_not_cpu_scale(raster_pyg
     assert display._presenter.renderer.to_surface().get_at((0, 0))[:3] == (204, 0, 0)
     _tap_display(display)
     assert display.controls.menu_visible
-    _tap_display(display, _control_target(display, "slider", 0.5))
+    _assert_full_screen_menu(display)
+    _tap_display(display, _control_target(display, "brightness_down"))
+    _tap_display(display, _control_target(display, "brightness_down"))
     _tap_display(display, _control_target(display, "close"))
     assert display._presenter.renderer.to_surface().get_at((0, 0))[:3] == (153, 0, 0)
     assert display._latest_layers is layers
@@ -791,8 +802,10 @@ def test_touch_redraw_gpu_failure_restores_retained_camera_in_surface_fallback(r
     monkeypatch.setattr(display._presenter, "redraw", Mock(side_effect=RuntimeError("page flip failed")))
     _tap_display(display)
     assert display._presenter is None
-    assert display.screen.get_at((0, 0))[:3] == (204, 0, 0)
     assert display._latest_layers is None and display._latest_frame is not None
+    _assert_full_screen_menu(display)
+    _tap_display(display, _control_target(display, "close"))
+    assert display.screen.get_at((0, 0))[:3] == (204, 0, 0)
   finally:
     display.close()
 
@@ -826,7 +839,9 @@ def test_default_brightness_dims_received_frame_once(raster_pygame, monkeypatch)
     _tap_display(display)
     assert display.controls.menu_visible
     assert not display.last_frame_presented, "local menu redraw is not another received frame"
-    _tap_display(display, _control_target(display, "slider", 0.5))
+    _assert_full_screen_menu(display)
+    _tap_display(display, _control_target(display, "brightness_down"))
+    _tap_display(display, _control_target(display, "brightness_down"))
     assert display.controls.brightness == 60
     _tap_display(display, _control_target(display, "close"))
     assert display.screen.get_at((0, 0))[:3] == (153, 60, 30)
@@ -1074,7 +1089,7 @@ def test_live_texture_failure_preserves_rotation_menu_brightness_and_off_wake(ra
     assert controls.menu_visible
     assert controls.brightness == 40
     assert display.screen.get_size() == (96, 384)
-    assert display.screen.get_at((0, 0))[:3] == (102, 0, 0)
+    _assert_full_screen_menu(display)
     _tap_display(display, _control_target(display, "off"))
     assert display.screen_off
     assert not any(pygame.image.tobytes(display.screen, "RGB"))

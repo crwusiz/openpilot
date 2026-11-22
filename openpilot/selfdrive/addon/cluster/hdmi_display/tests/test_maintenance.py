@@ -202,6 +202,7 @@ def test_git_pull_requires_successful_commit_check_with_different_commits(action
     assert result["state"] == state and result["update_available"] is available
     assert result["c4_pi_sha256"] == "a" * 64
     assert result["commit_state"] == ("available" if available else "current" if state == "succeeded" else "failed")
+    assert result.get("current_commit") == (comparison.split('"')[1] if state == "succeeded" else None)
     if available:
       first = actions.submit("git_pull", PEER, "c" * 32, PEER)
       assert actions.submit("git_pull", PEER, "c" * 32, None) == first
@@ -232,10 +233,12 @@ def test_failed_recheck_clears_previously_available_update(actions, failure):
     pending = actions.submit("commit_check", PEER, "b" * 32, PEER)
     assert pending["commit_state"] == "checking" and not pending["update_available"]
     assert "commit_compare" not in pending
+    assert pending["current_commit"] == "1234567"
     await asyncio.gather(*actions.tasks)
     result = actions.status(PEER, PEER)
     assert result["state"] == "failed" and not result["update_available"]
     assert result["commit_state"] == "failed" and "commit_compare" not in result
+    assert result["current_commit"] == "1234567"
     with pytest.raises(ValueError, match="Check commits"):
       actions.submit("git_pull", PEER, "c" * 32, PEER)
   asyncio.run(run())

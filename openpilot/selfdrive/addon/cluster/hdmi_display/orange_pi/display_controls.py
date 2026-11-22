@@ -14,6 +14,17 @@ MIN_BRIGHTNESS = 10
 BRIGHTNESS_STEP = 10
 MENU_TIMEOUT_SECONDS = 8.0
 
+MENU_BACKGROUND = (11, 17, 29)
+CARD_BACKGROUND = (20, 29, 46)
+CARD_BORDER = (42, 56, 78)
+GAUGE_TRACK = (48, 63, 86)
+TEXT_COLOR = (238, 246, 255)
+MUTED_TEXT = (164, 183, 207)
+USAGE_COLOR = (97, 179, 255)
+FAN_COLOR = (87, 219, 195)
+BRIGHTNESS_COLOR = (255, 205, 113)
+UPDATE_ACTIONS = {"pull": ("commit_check", "git_pull"), "update": ("pi_update",)}
+
 
 def cluster_font_path():
   for directory in Path(__file__).resolve().parents:
@@ -48,7 +59,6 @@ class DisplayControls:
     self.revision = 0
     self._last_interaction = self.clock()
     self._active_finger = None
-    self._dragging_slider = False
     self._park_upload_target = None
     self._park_upload_pressed = False
     self._menu_surface = None
@@ -83,7 +93,6 @@ class DisplayControls:
       return False
     self.logical_size = size
     self._active_finger = None
-    self._dragging_slider = False
     self.set_park_touch()
     self._layout = self._make_layout()
     self._fonts.clear()
@@ -93,20 +102,26 @@ class DisplayControls:
   def _make_layout(self):
     width, height = self.logical_size
     scale = min(width / 1920, height / 480)
-    panel_width, panel_height = max(1, round(1840 * scale)), max(1, round(340 * scale))
-    left, top = (width - panel_width) // 2, height - panel_height - round(12 * scale)
+    left = (width - round(1920 * scale)) // 2
+    top = (height - round(480 * scale)) // 2
 
     def rect(x, y, w, h):
       return (left + round(x * scale), top + round(y * scale),
               max(1, round(w * scale)), max(1, round(h * scale)))
 
+    edge, button = round(24 * scale), max(1, round(64 * scale))
     return {
-      "panel": (left, top, panel_width, panel_height),
-      "slider": rect(390, 108, 1400, 64),
-      "off": rect(40, 200, 336, 78),
-      "pull": rect(396, 200, 336, 78),
-      "update": rect(752, 200, 336, 78),
-      "close": rect(1108, 200, 692, 78),
+      "panel": (0, 0, width, height),
+      "off": (edge, edge, button, button),
+      "close": (width - edge - button, edge, button, button),
+      "cpu": rect(47, 104, 298, 284),
+      "gpu": rect(371, 104, 298, 284),
+      "fan": rect(695, 104, 298, 284),
+      "brightness": rect(1019, 104, 298, 284),
+      "brightness_down": rect(1096, 281, 64, 60),
+      "brightness_up": rect(1176, 281, 64, 60),
+      "pull": rect(1371, 123, 500, 109),
+      "update": rect(1371, 252, 500, 109),
       "scale": scale,
     }
 
@@ -206,11 +221,22 @@ class DisplayControls:
   def button_color(self, name):
     if name not in ("pull", "update"):
       return (38, 46, 58) if self.button_enabled(name) else (27, 31, 37)
-    key = "commit_state" if name == "pull" else "pi_version_state"
-    state = self.action_status.get(key, "unknown")
-    if self.action_busy:
+    if self.action_busy and self.action_status.get("action") in UPDATE_ACTIONS[name]:
       return 108, 87, 34
-    return {"current": (30, 85, 53), "available": (112, 39, 44), "failed": (82, 40, 44)}.get(state, (87, 74, 36))
+    colors = {"current": (30, 85, 53), "available": (112, 39, 44), "failed": (82, 40, 44)}
+    return colors.get(self._version_state(name), (87, 74, 36))
+
+  def _version_state(self, name):
+    key = "commit_state" if name == "pull" else "pi_version_state"
+    return self.action_status.get(key, "unknown")
+
+  def _current_commit(self):
+    commit = self.action_status.get("current_commit")
+    if isinstance(commit, str) and re.fullmatch(r"[a-f0-9]{7,40}", commit):
+      return commit[:7]
+    comparison = self.action_status.get("commit_compare")
+    match = re.fullmatch(r'"([a-f0-9]{7,40})" (?:==|!=) "[a-f0-9]{7,40}"', comparison) if isinstance(comparison, str) else None
+    return match[1][:7] if match else "--"
 
   def set_brightness(self, value):
     value = _quantize_brightness(value)
@@ -222,14 +248,8 @@ class DisplayControls:
   def turn_off(self):
     self.screen_off = True
     self.menu_visible = False
-    self._dragging_slider = False
     self._cancel_park_press()
     return self._changed()
-
-  def _set_slider(self, x):
-    left, _, width, _ = self._layout["slider"]
-    fraction = max(0.0, min(1.0, (x - left) / width))
-    return self.set_brightness(MIN_BRIGHTNESS + (100 - MIN_BRIGHTNESS) * fraction)
 
   def handle_touch(self, touch):
     """Consume corrected SDL finger events (normalized x/y, type, finger_id).
@@ -247,7 +267,6 @@ class DisplayControls:
     if event_type == self.pygame.FINGERDOWN:
       if self.screen_off:
         self._active_finger = finger
-        self._dragging_slider = False
         self._last_interaction = self.clock()
         self.screen_off = False
         self.menu_visible = False
@@ -269,7 +288,6 @@ class DisplayControls:
       submit_park_upload = self._park_upload_pressed and over_park_button
       self._park_upload_pressed = False
       self._active_finger = None
-      self._dragging_slider = False
       self._last_interaction = self.clock()
       return submit_park_upload and self._request_action("park_upload_logs")
 
@@ -281,19 +299,18 @@ class DisplayControls:
     point = x * self.logical_size[0], y * self.logical_size[1]
     self._last_interaction = self.clock()
     if event_type == self.pygame.FINGERMOTION:
-      if self._dragging_slider and self.menu_visible:
-        return self._set_slider(point[0])
       return False
 
-    if self._contains(self._layout["slider"], point):
-      self._dragging_slider = True
-      return self._set_slider(point[0])
+    if self._contains(self._layout["brightness_down"], point):
+      return self.set_brightness(self.brightness - BRIGHTNESS_STEP)
+    if self._contains(self._layout["brightness_up"], point):
+      return self.set_brightness(self.brightness + BRIGHTNESS_STEP)
     for name, action in (("update", "pi_update"), ("pull", "git_pull")):
       if self._contains(self._layout[name], point):
         return self._request_action(action)
     if self._contains(self._layout["off"], point):
       return self.turn_off()
-    if self._contains(self._layout["close"], point) or not self._contains(self._layout["panel"], point):
+    if self._contains(self._layout["close"], point):
       self.menu_visible = False
       return self._changed()
     return False
@@ -324,121 +341,268 @@ class DisplayControls:
     return self._fonts[size]
 
   def render_menu(self):
-    """Return (cached menu Surface, logical position), or None when hidden.
-
-    Upload this small Surface only when its identity changes. Draw it after
-    dimming the frame so controls stay readable at low brightness. The Surface
-    already contains the selected brightness's tint, limiting menu glare too.
-    """
+    """Return the cached, dimmed full-screen menu, or None when hidden."""
     if not self.menu_visible or self.screen_off:
       return None
-    left, top, width, height = self._layout["panel"]
     if self._menu_surface is not None and self._menu_revision == self.revision:
-      return self._menu_surface, (left, top)
-    pygame = self.pygame
+      return self._menu_surface, (0, 0)
+    _, height = self.logical_size
+    surface = self.pygame.Surface(self.logical_size)
+    surface.fill(MENU_BACKGROUND)
     scale = self._layout["scale"]
-    surface = pygame.Surface((width, height))
-    surface.fill((18, 22, 28))
-    self._font(34 * scale)
+    self._font(28 * scale)
     korean = self._font_path is not None
-    labels = self.status_labels(korean)
-    # Small telemetry strip in the panel header, leaving the controls prominent.
-    column_width = (width - 80 * scale) / len(labels)
-    for index, (text, color) in enumerate(zip(labels, self.status_colors(), strict=True)):
-      center_x = round(40 * scale + column_width * (index + 0.5))
-      self._label(surface, text, 23 * scale, (center_x, round(30 * scale)), color)
-    title = f"밝기 {self.brightness}%" if korean else f"Light {self.brightness}%"
-    self._label(surface, title, 34 * scale, (round(200 * scale), round(140 * scale)), (225, 232, 240))
 
-    slider = self._local_rect(self._layout["slider"], left, top)
-    center_y = slider[1] + slider[3] // 2
-    track_height = max(4, round(10 * scale))
-    pygame.draw.rect(surface, (65, 73, 84), (slider[0], center_y - track_height // 2, slider[2], track_height))
-    fraction = (self.brightness - MIN_BRIGHTNESS) / (100 - MIN_BRIGHTNESS)
-    selected_width = round(slider[2] * fraction)
-    if selected_width:
-      pygame.draw.rect(surface, (100, 180, 220), (slider[0], center_y - track_height // 2, selected_width, track_height))
-    for value in range(MIN_BRIGHTNESS, 101, BRIGHTNESS_STEP):
-      tick_x = slider[0] + round(slider[2] * (value - MIN_BRIGHTNESS) / (100 - MIN_BRIGHTNESS))
-      pygame.draw.circle(surface, (150, 162, 175), (tick_x, center_y), max(3, round(7 * scale)))
-    pygame.draw.circle(surface, (195, 220, 235), (slider[0] + selected_width, center_y), max(8, round(22 * scale)))
-    buttons = (("off", "화면 끄기", "Screen off"), ("pull", "Git Pull", "Git Pull"),
-               ("update", "Pi 업데이트", "Pi update"), ("close", "닫기", "Close"))
-    for name, korean_title, english_title in buttons:
-      rect = self._local_rect(self._layout[name], left, top)
-      enabled = self.button_enabled(name)
-      pygame.draw.rect(surface, self.button_color(name), rect, border_radius=max(1, round(10 * scale)))
-      self._label(surface, korean_title if korean else english_title, 30 * scale,
-                  (rect[0] + rect[2] // 2, rect[1] + rect[3] // 2), (220, 229, 239) if enabled else (145, 154, 164))
-    footer_y = round(310 * scale)
-    match = re.fullmatch(r'"([a-f0-9]{7,40})" (==|!=) "([a-f0-9]{7,40})"', self.action_status.get("commit_compare", ""))
-    comparison = f"{match[1][:7]} {match[2]} {match[3][:7]}" if match else "--"
-    self._bounded_label(surface, "C4 COMMIT " + comparison, 21 * scale, (round(40 * scale), footer_y),
-                        round(470 * scale), align="midleft")
-    self._bounded_label(surface, self.action_label(korean), 23 * scale, (width // 2, footer_y), round(780 * scale))
-    self._bounded_label(surface, "Pi " + self.action_status.get("pi_version", "--"), 21 * scale,
-                        (width - round(40 * scale), footer_y), round(470 * scale), align="midright")
+    self._draw_icon_button(surface, "off", (255, 146, 152))
+    self._draw_icon_button(surface, "close", TEXT_COLOR)
+    for key, title, temperature_key in (("cpu", "CPU", "temperature"), ("gpu", "GPU", "gpu_temperature")):
+      center = self._draw_gauge_card(surface, key, title, USAGE_COLOR)
+      self._draw_processor_gauge(surface, center, self._measurement(temperature_key), self._measurement(key), korean)
+
+    center = self._draw_gauge_card(surface, "fan", "FAN", FAN_COLOR)
+    fan_pwm = self._measurement("fan_pwm")
+    self._draw_ring(surface, center, -44, 224, fan_pwm, FAN_COLOR, reverse=True)
+    self._label(surface, f"{self._number(self._measurement('fan_rpm'))} RPM", 32 * scale, center, TEXT_COLOR)
+    power = self._number(fan_pwm, "%")
+    self._label(surface, f"{'출력' if korean else 'Power'} {power}", 21 * scale,
+                (center[0], center[1] + round(39 * scale)), FAN_COLOR)
+
+    center = self._draw_gauge_card(surface, "brightness", "밝기" if korean else "Brightness", BRIGHTNESS_COLOR)
+    self._draw_ring(surface, center, -44, 224, self.brightness, BRIGHTNESS_COLOR, reverse=True)
+    self._label(surface, f"{self.brightness}%", 46 * scale, (center[0], center[1] - round(16 * scale)), TEXT_COLOR)
+    self._draw_icon_button(surface, "brightness_down", BRIGHTNESS_COLOR, enabled=self.brightness > MIN_BRIGHTNESS)
+    self._draw_icon_button(surface, "brightness_up", BRIGHTNESS_COLOR, enabled=self.brightness < 100)
+
+    self._draw_action_button(surface, "pull", "GIT PULL", self._current_commit(), self.action_label("pull", korean))
+    self._draw_action_button(surface, "update", "PI UPDATE", self.action_status.get("pi_version") or "--",
+                             self.action_label("update", korean))
+
+    fps_x, fps_y = round(110 * scale), height - round(29 * scale)
+    self._draw_box(surface, (fps_x - round(86 * scale), fps_y - round(18 * scale),
+                             round(172 * scale), round(36 * scale)), radius=18)
+    self._label(surface, "FPS " + self._number(self._measurement("fps"), precision=1), 21 * scale,
+                (fps_x, fps_y), USAGE_COLOR)
     self.apply_dimming(surface)
     self._menu_surface = surface
     self._menu_revision = self.revision
-    return surface, (left, top)
+    return surface, (0, 0)
 
-  def status_labels(self, korean=False):
-    def number(key, suffix, precision=0):
-      value = self.status.get(key)
-      return "--" if value is None or not math.isfinite(value) else f"{value:.{precision}f}{suffix}"
-    fan = number("fan_rpm", " RPM") if self.status.get("fan_rpm") is not None else number("fan_pwm", "%")
-    return (f"CPU [ {number('cpu', '%')} | {number('temperature', '°C', 1)} ]",
-            f"GPU [ {number('gpu', '%')} | {number('gpu_temperature', '°C', 1)} ]",
-            "FAN " + fan, "FPS " + number("fps", "", 1))
-
-  def status_colors(self):
-    neutral = (175, 201, 217)
-    def temperature_color(key):
-      temperature = self.status.get(key)
-      if temperature is None or not math.isfinite(temperature):
-        return neutral
-      # Display thresholds only; fan and thermal policies are unchanged.
-      return ((108, 211, 145) if temperature < 60 else (238, 211, 105) if temperature < 70
-              else (246, 164, 80) if temperature < 80 else (241, 101, 101))
-    return temperature_color("temperature"), temperature_color("gpu_temperature"), neutral, neutral
-
-  def action_label(self, korean=False):
-    state, action = self.action_status.get("state"), self.action_status.get("action")
-    if action == "park_upload_logs":
-      return ""
-    if action in ("commit_check", "git_pull") and state in ("running", "succeeded"):
-      if action == "git_pull":
-        return ("C4 Git Pull 시작 중…" if state == "running" else "C4 tmux 업데이트 시작 · 완료 후 C4 재시작") if korean else (
-          "Starting C4 Git Pull…" if state == "running" else "C4 update started in tmux · C4 restarts after updating")
-      if state == "running":
-        return "C4 커밋 확인 중…" if korean else "Checking C4 commits…"
-      return (("새 커밋 있음 · Git Pull을 눌러 업데이트" if self.action_status.get("update_available") else "C4 최신 버전입니다") if korean
-              else ("Update available · tap Git Pull" if self.action_status.get("update_available") else "C4 is up to date"))
-    if state == "succeeded" and action == "pi_update" and self.action_status.get("unchanged"):
-      return "Pi 변경 사항 없음 · 최신 버전입니다" if korean else "Pi is up to date · no changes"
-    if state == "running" and action == "pi_update":
-      return "Pi 업데이트 중 · 완료 후 자동 재부팅" if korean else "Updating Pi · automatic reboot on completion"
-    if state == "checking":
-      return "C4 응답 확인 중…" if korean else "Waiting for C4 response…"
-    if state == "succeeded" and action == "pi_update":
-      return "Pi 업데이트 완료 · 재부팅 예정" if korean else "Pi updated · reboot scheduled"
-    reason = self.action_status.get("reason")
-    if reason == "update_c4":
-      return "C4 코드를 업데이트하고 대시보드를 재시작하세요" if korean else "Update C4 code and restart its dashboard"
-    if reason == "busy":
-      return "다른 작업이 진행 중입니다" if korean else "Another maintenance job is running"
-    if state == "failed":
-      if self.action_status.get("message"):
-        return ("작업 실패 · " if korean else "Failed · ") + self.action_status["message"][:120]
-      return "작업 실패 · C4 연결과 대시보드 로그를 확인하세요" if korean else "Action failed · check C4 connection and dashboard logs"
-    if not self.actions_available or state == "unavailable":
-      return "C4 연결 후 업데이트를 사용할 수 있습니다" if korean else "Connect C4 to use updates"
-    return ""
+  def _measurement(self, key):
+    value = self.status.get(key)
+    return value if value is not None and math.isfinite(value) else None
 
   @staticmethod
-  def _local_rect(rect, left, top):
-    return rect[0] - left, rect[1] - top, rect[2], rect[3]
+  def _number(value, suffix="", precision=0):
+    return "--" if value is None else f"{value:.{precision}f}{suffix}"
+
+  @staticmethod
+  def _temperature_color(temperature):
+    if temperature is None:
+      return (175, 201, 217)
+    # Display thresholds only; fan and thermal policies are unchanged.
+    return ((108, 211, 145) if temperature < 60 else (238, 211, 105) if temperature < 70
+            else (246, 164, 80) if temperature < 80 else (241, 101, 101))
+
+  def _draw_box(self, surface, rect, *, fill=CARD_BACKGROUND, border=CARD_BORDER, radius=22):
+    scale = self._layout["scale"]
+    draw = self.pygame.draw
+    radius = max(1, round(radius * scale))
+    draw.rect(surface, fill, rect, border_radius=radius)
+    draw.rect(surface, border, rect, width=max(1, round(scale)), border_radius=radius)
+
+  def _draw_icon_button(self, surface, name, color, *, enabled=True):
+    x, y, width, height = self._layout[name]
+    self._draw_box(surface, (x, y, width, height), radius=16)
+    self._draw_icon(surface, name, (x + width // 2, y + height // 2), color if enabled else MUTED_TEXT, size=28)
+
+  def _draw_gauge_card(self, surface, name, title, color):
+    x, y, width, height = self._layout[name]
+    self._draw_box(surface, (x, y, width, height))
+    scale = self._layout["scale"]
+    center_x = x + width // 2
+    title_y = y + round(35 * scale)
+    title_width = self._font(25 * scale).size(title)[0]
+    icon_width = round(24 * scale)
+    self._draw_icon(surface, name, (center_x - title_width // 2 - round(6 * scale), title_y), color, size=24)
+    self._label(surface, title, 25 * scale, (center_x + icon_width // 2 + round(6 * scale), title_y), TEXT_COLOR)
+    return center_x, y + round(157 * scale)
+
+  def _draw_processor_gauge(self, surface, center, temperature, utilization, korean):
+    scale = self._layout["scale"]
+    color = self._temperature_color(temperature)
+    self._draw_ring(surface, center, 109, 251, temperature, color, reverse=True)
+    self._draw_ring(surface, center, -71, 71, utilization, USAGE_COLOR)
+    x, y = center
+    self.pygame.draw.line(surface, CARD_BORDER, (x, y - round(24 * scale)), (x, y + round(35 * scale)),
+                          max(1, round(scale)))
+    for side, value, caption, text_color in (
+      (-1, self._number(temperature, "°C", 1), "온도" if korean else "Temp", color),
+      (1, self._number(utilization, "%"), "사용량" if korean else "Load", TEXT_COLOR),
+    ):
+      value_x = x + round(side * 50 * scale)
+      self._label(surface, value, 27 * scale, (value_x, y - round(6 * scale)), text_color)
+      self._label(surface, caption, 17 * scale, (value_x, y + round(26 * scale)), MUTED_TEXT)
+
+  def _draw_ring(self, surface, center, start_degrees, end_degrees, percent, color, *, reverse=False):
+    from pygame import gfxdraw
+
+    scale = self._layout["scale"]
+    outer = max(1, round(104 * scale))
+    thickness = max(1, round(10 * scale))
+    inner = max(0, outer - thickness)
+    x, y = center
+
+    def point(angle, radius):
+      return round(x + radius * math.cos(angle)), round(y - radius * math.sin(angle))
+
+    def draw_arc(start, end, arc_color):
+      segments = max(1, math.ceil((end - start) / math.radians(4)))
+      angles = [start + (end - start) * index / segments for index in range(segments + 1)]
+      points = [point(angle, outer) for angle in angles]
+      points.extend(point(angle, inner) for angle in reversed(angles))
+      gfxdraw.filled_polygon(surface, points, arc_color)
+      gfxdraw.aapolygon(surface, points, arc_color)
+      midpoint = (outer + inner) / 2
+      cap = max(1, thickness // 2)
+      for angle in (start, end):
+        cap_x, cap_y = point(angle, midpoint)
+        gfxdraw.filled_circle(surface, cap_x, cap_y, cap, arc_color)
+        gfxdraw.aacircle(surface, cap_x, cap_y, cap, arc_color)
+
+    start, end = math.radians(start_degrees), math.radians(end_degrees)
+    draw_arc(start, end, GAUGE_TRACK)
+    if percent is not None and percent > 0:
+      sweep = (end - start) * min(percent / 100, 1)
+      start, end = (end - sweep, end) if reverse else (start, start + sweep)
+      draw_arc(start, end, color)
+
+  def _draw_action_button(self, surface, name, title, version, status):
+    x, y, width, height = self._layout[name]
+    scale = self._layout["scale"]
+    enabled = self.button_enabled(name)
+    self._draw_box(surface, (x, y, width, height))
+    icon_size = max(1, round(62 * scale))
+    icon_x, icon_y = x + round(19 * scale), y + (height - icon_size) // 2
+    self._draw_box(surface, (icon_x, icon_y, icon_size, icon_size), fill=self.button_color(name), radius=15)
+    self._draw_icon(surface, name, (icon_x + icon_size // 2, icon_y + icon_size // 2),
+                    TEXT_COLOR if enabled else MUTED_TEXT, size=29)
+    label_x = icon_x + icon_size + round(20 * scale)
+    color = TEXT_COLOR if enabled else MUTED_TEXT
+    label = self._font(30 * scale).render(title, True, color)
+    title_y = y + round(37 * scale)
+    surface.blit(label, label.get_rect(midleft=(label_x, title_y)))
+    text_right = x + width - round(14 * scale)
+    version_x = label_x + label.get_width() + round(12 * scale)
+    self._bounded_label(surface, f"({version})", 20 * scale, (version_x, title_y),
+                        text_right - version_x, align="midleft")
+    self._bounded_label(surface, status, 20 * scale, (label_x, y + round(74 * scale)),
+                        text_right - label_x, align="midleft")
+
+  def _draw_icon(self, surface, name, center, color, *, size):
+    pygame = self.pygame
+    x, y = center
+    unit = size * self._layout["scale"] / 24
+    stroke = max(1, round(2 * unit))
+
+    def point(dx, dy):
+      return round(x + dx * unit), round(y + dy * unit)
+
+    def line(*points):
+      pygame.draw.lines(surface, color, False, [point(*p) for p in points], stroke)
+
+    def circle(radius, width):
+      pygame.draw.circle(surface, color, center, max(1, round(radius * unit)), width)
+
+    if name == "off":
+      radius = max(1, round(10 * unit))
+      pygame.draw.arc(surface, color, (x - radius, y - radius, 2 * radius, 2 * radius),
+                      math.radians(123), math.radians(417), stroke)
+      line((0, -12), (0, 0))
+    elif name == "close":
+      line((-8, -8), (8, 8))
+      line((-8, 8), (8, -8))
+    elif name in ("brightness_down", "brightness_up"):
+      direction = -1 if name == "brightness_down" else 1
+      line((-direction * 4, -8), (direction * 4, 0), (-direction * 4, 8))
+    elif name == "brightness":
+      circle(5, stroke)
+      for tick in range(8):
+        angle = math.tau * tick / 8
+        dx, dy = math.cos(angle), math.sin(angle)
+        line((8 * dx, 8 * dy), (11 * dx, 11 * dy))
+    elif name == "fan":
+      circle(10, stroke)
+      for blade in range(3):
+        angle = math.tau * blade / 3
+        dx, dy = math.cos(angle), math.sin(angle)
+        line((0, 0), (4 * dx - 2 * dy, 4 * dy + 2 * dx), (6 * dx, 6 * dy))
+      circle(2, 0)
+    elif name == "pull":
+      line((0, -10), (0, 5))
+      line((-5, 0), (0, 5), (5, 0))
+      line((-9, 5), (-9, 9), (9, 9), (9, 5))
+    else:
+      rect_x, rect_y = point(-7, -7)
+      side = max(1, round(14 * unit))
+      pygame.draw.rect(surface, color, (rect_x, rect_y, side, side), width=stroke, border_radius=stroke)
+      for offset in (-4, 4):
+        line((offset, -10), (offset, -7))
+        line((offset, 7), (offset, 10))
+        line((-10, offset), (-7, offset))
+        line((7, offset), (10, offset))
+      if name == "gpu":
+        line((-3, 3), (-3, 0), (0, 0), (0, -3), (3, -3))
+      elif name == "update":
+        line((0, 3), (0, -3))
+        line((-2, -1), (0, -3), (2, -1))
+      else:
+        pygame.draw.circle(surface, color, center, max(1, round(2 * unit)))
+
+  def action_label(self, name, korean=False):
+    state, action = self.action_status.get("state"), self.action_status.get("action")
+    reason = self.action_status.get("reason")
+    if action is None and (not self.actions_available or state == "unavailable"):
+      if reason == "update_c4":
+        return "대시보드 업데이트 필요" if korean else "Dashboard update required"
+      return "연결 필요" if korean else "Connection required"
+    if action not in UPDATE_ACTIONS[name]:
+      return self._version_label(name, korean)
+    if state == "checking":
+      return "요청 확인 중…" if korean else "Checking request…"
+    if state == "running":
+      if action == "commit_check":
+        return "커밋 확인 중…" if korean else "Checking commits…"
+      if action == "git_pull":
+        return "업데이트 시작 중…" if korean else "Starting update…"
+      return "업데이트 중 · 완료 후 자동 재부팅" if korean else "Updating · auto reboot on completion"
+    if state == "succeeded":
+      if action == "git_pull":
+        return "tmux에서 시작 · 완료 후 재시작" if korean else "Update started in tmux · restarts after update"
+      if action == "pi_update":
+        if self.action_status.get("unchanged"):
+          return "변경 사항 없음" if korean else "Up to date · no changes"
+        return "업데이트 완료 · 재부팅 예정" if korean else "Updated · reboot scheduled"
+    if state in ("failed", "warning"):
+      if reason == "update_c4":
+        return "대시보드 업데이트 필요" if korean else "Dashboard update required"
+      if reason == "busy":
+        return "다른 작업 진행 중" if korean else "Another job is running"
+      if state == "warning":
+        label = "완료 · 경고" if korean else "Completed with warnings"
+      else:
+        label = "작업 실패" if korean else "Failed"
+      message = self.action_status.get("message")
+      return f"{label} · {message[:120]}" if message else label
+    return self._version_label(name, korean)
+
+  def _version_label(self, name, korean):
+    labels = {
+      "current": ("최신 버전", "Up to date"),
+      "available": ("업데이트 가능", "Update available"),
+      "checking": ("버전 확인 중…", "Checking version…"),
+      "failed": ("버전 확인 실패", "Version check failed"),
+    }
+    return labels.get(self._version_state(name), ("버전 미확인", "Not checked"))[0 if korean else 1]
 
   def _label(self, surface, text, size, center, color):
     label = self._font(size).render(text, True, color)

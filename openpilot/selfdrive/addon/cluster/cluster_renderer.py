@@ -249,13 +249,16 @@ class ParkScreen:
   TEXT = (241, 246, 255)
   MUTED = (172, 191, 218)
   ACCENT = (98, 187, 255)
+  TRIP_DISTANCE_Y = 191
+  TRIP_DURATION_Y = 269
+  TRIP_LABEL_SIZE = 28
   DUST_GRADES = (("좋음", (117, 211, 158)), ("보통", (255, 197, 101)),
                  ("나쁨", (255, 145, 133)), ("매우 나쁨", (210, 157, 255)))
   UPLOAD_LABELS = {
     "checking": "전송 준비 중…",
     "running": "로그 전송 중…",
     "succeeded": "로그 전송 완료",
-    "warning": "일부 전송 완료 · 다시 시도",
+    "warning": "일부 전송 완료 · 재시도",
     "failed": "전송 실패 · 다시 시도",
   }
 
@@ -263,7 +266,7 @@ class ParkScreen:
     width, height = size
     self.scale, self.left, self.top = park_layout(size)
     self.upload_bounds = park_upload_button_bounds(size)
-    self.fonts = {size: self._font(font_path, size) for size in (24, 26, 28, 30, 34, 40, 54, 124)}
+    self.fonts = {size: self._font(font_path, size) for size in (24, 26, self.TRIP_LABEL_SIZE, 30, 54, 124)}
     x = np.linspace(-1, 1, width, dtype=np.float32)[None, :]
     y = np.linspace(-1, 1, height, dtype=np.float32)[:, None]
     glow = np.exp(-2.8 * x**2 - 1.15 * (y + 0.35)**2)
@@ -297,19 +300,64 @@ class ParkScreen:
     return draw.textlength(value, font=self.fonts[size]) / self.scale
 
   def _draw_fixed_labels(self, draw):
+    border = (43, 63, 94)
     draw.rounded_rectangle((self._point(1400, 66), self._point(1842, 414)), radius=max(1, round(22 * self.scale)),
-                           fill=(15, 26, 47), outline=(43, 63, 94), width=max(1, round(2 * self.scale)))
-    draw.line((self._point(1434, 146), self._point(1808, 146)), fill=(43, 63, 94), width=max(1, round(self.scale)))
-    self._text(draw, 1434, 176, "주행 정보", 34)
-    self._text(draw, 1434, 260, "거리", 28, self.MUTED)
-    self._text(draw, 1434, 344, "시간", 28, self.MUTED)
+                           fill=(15, 26, 47), outline=border, width=max(1, round(2 * self.scale)))
+    for y in (145, 230, 308):
+      draw.line((self._point(1434, y), self._point(1808, y)), fill=border, width=max(1, round(self.scale)))
+    for name, label, y, color in (
+      ("trip", "주행 정보", 108, self.TEXT),
+      ("distance", "거리", self.TRIP_DISTANCE_Y, self.MUTED),
+      ("time", "시간", self.TRIP_DURATION_Y, self.MUTED),
+    ):
+      self._draw_trip_icon(draw, name, self._point(1468, y), self.ACCENT, border)
+      self._text(draw, 1496, y, label, self.TRIP_LABEL_SIZE, color, "lm")
+
+  def _draw_trip_icon(self, draw, name, center, color, border):
+    x, y = center
+    icon_scale = 1.25 * self.scale
+
+    def point(dx, dy):
+      return x + round(dx * icon_scale), y + round(dy * icon_scale)
+
+    stroke = math.ceil(2 * icon_scale)
+
+    def line(*points):
+      draw.line([point(dx, dy) for dx, dy in points], fill=color, width=stroke, joint="curve")
+
+    draw.rounded_rectangle((point(-16, -16), point(16, 16)), radius=max(1, round(8 * icon_scale)),
+                           fill=(15, 26, 47), outline=border, width=max(1, round(self.scale)))
+    if name == "trip":
+      line((-9, -1), (-6, -7), (6, -7), (9, -1))
+      draw.rounded_rectangle((point(-10, -1), point(10, 7)), radius=max(1, round(3 * icon_scale)),
+                             outline=color, width=stroke)
+      line((-8, 7), (-8, 10))
+      line((8, 7), (8, 10))
+      line((-6, 3), (-4, 3))
+      line((4, 3), (6, 3))
+    elif name == "distance":
+      line((-9, 9), (-5, -9))
+      line((9, 9), (5, -9))
+      line((0, -8), (0, -5))
+      line((0, -2), (0, 1))
+      line((0, 5), (0, 9))
+    elif name == "time":
+      draw.ellipse((point(-9, -9), point(9, 9)), outline=color, width=stroke)
+      line((0, -5), (0, 0), (4, 3))
+    elif name == "upload":
+      line((0, 4), (0, -8))
+      line((-5, -3), (0, -8), (5, -3))
+      line((-9, 3), (-9, 8), (9, 8), (9, 3))
 
   def _draw_upload_button(self, draw, enabled, state):
     fill, border, text = ((24, 56, 94), (76, 145, 210), self.TEXT) if enabled else ((30, 44, 64), (53, 72, 99), self.MUTED)
     draw.rounded_rectangle(self.upload_bounds, radius=max(1, round(11 * self.scale)),
                            fill=fill, outline=border, width=max(1, round(2 * self.scale)))
+    left, top, _, bottom = self.upload_bounds
+    center_y = (top + bottom) // 2
+    self._draw_trip_icon(draw, "upload", (left + round(34 * self.scale), center_y), text, border)
     label = self.UPLOAD_LABELS.get(state, "로그 전송")
-    self._text(draw, 1621, 110, label, 26, text, "mm")
+    draw.text((left + round(62 * self.scale), center_y), label, font=self.fonts[self.TRIP_LABEL_SIZE], fill=text, anchor="lm")
 
   def _draw_weather_icon(self, draw, kind, left, top):
     def point(x, y):
@@ -363,7 +411,7 @@ class ParkScreen:
     if seconds is None:
       return "--"
     hours, minutes = divmod(int(seconds) // 60, 60)
-    return f"{hours}시간 {minutes:02d}분" if hours else f"{minutes}분 {int(seconds) % 60:02d}초"
+    return f"{hours}시간 {minutes:02d}분" if hours else f"{minutes}분"
 
   def render(self, data, *, metric):
     offset = data.get("park_utc_offset_s")
@@ -405,8 +453,8 @@ class ParkScreen:
     dot_left = details_left + dot_offset
     draw.ellipse((self._point(dot_left, 369), self._point(dot_left + 11, 380)), fill=grade_color)
     self._text(draw, dot_left + 21, 363, dust_label, 24, self.MUTED)
-    self._text(draw, 1808, 249, distance, 40, anchor="rt")
-    self._text(draw, 1808, 333, duration, 40, anchor="rt")
+    self._text(draw, 1790, self.TRIP_DISTANCE_Y, distance, self.TRIP_LABEL_SIZE, anchor="rm")
+    self._text(draw, 1790, self.TRIP_DURATION_Y, duration, self.TRIP_LABEL_SIZE, anchor="rm")
     self._last_key, self._last_image = key, image
     return image
 
