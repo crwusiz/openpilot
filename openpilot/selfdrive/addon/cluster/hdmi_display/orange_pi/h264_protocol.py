@@ -12,6 +12,29 @@ HELLO, OFFER, ANSWER, STATE, FEEDBACK, ERROR, STATE_ZLIB, PREPARE = range(1, 9)
 KINDS = frozenset((HELLO, OFFER, ANSWER, STATE, FEEDBACK, ERROR, STATE_ZLIB, PREPARE))
 PATH_KEYS = ("path_x", "path_y", "path_z", "model_frame_id", "velocity_x", "acceleration_x", "lane_lines", "lane_line_probs",
              "road_edges", "road_edge_stds", "leads", "camera_height", "calib_transform")
+PARK_WEATHER_FIELDS = ("code", "temperature_c", "max_c", "min_c", "dust_grade")
+DEFAULT_STATE_FRESHNESS_SECONDS = 0.5
+
+
+def source_input_deadline(state, field, received_at):
+  health = state.get("health", {})
+  if field in state:
+    age_ms = state[field]
+  elif isinstance(health, dict) and field in health:
+    age_ms = health[field]
+  else:
+    # Older snapshots only carry receiver-side freshness information.
+    return math.inf
+  if type(age_ms) not in (int, float) or not 0 <= age_ms <= DEFAULT_STATE_FRESHNESS_SECONDS * 1000:
+    return -math.inf
+  return received_at + DEFAULT_STATE_FRESHNESS_SECONDS - age_ms / 1000
+
+
+def park_state_deadline(state, received_at, timeout=DEFAULT_STATE_FRESHNESS_SECONDS):
+  hud = state.get("hud")
+  if not isinstance(hud, dict) or hud.get("parked") is not True:
+    return -math.inf
+  return min(received_at + timeout, source_input_deadline(state, "car_state_age_ms", received_at))
 
 
 def _check_value(value, depth=0):
@@ -148,6 +171,19 @@ def validate_scene(state):
     if key == "tpms":
       if not isinstance(value, list) or len(value) != 4 or any(type(v) not in (float, int) for v in value):
         raise ValueError("Invalid tire data")
+    elif key == "parked" and type(value) is not bool:
+      raise ValueError("Invalid Park state")
+    elif key == "park_utc_offset_s" and (type(value) is not int or not -86400 < value < 86400):
+      raise ValueError("Invalid Park UTC offset")
+    elif key in ("trip_distance_km", "trip_duration_s") and (type(value) not in (float, int) or not 0 <= value):
+      raise ValueError("Invalid trip data")
+    elif key == "park_weather_code" and value is not None and (type(value) is not int or not 0 <= value <= 99):
+      raise ValueError("Invalid Park weather code")
+    elif key == "park_weather_dust_grade" and value is not None and (type(value) is not int or not 0 <= value <= 3):
+      raise ValueError("Invalid Park dust grade")
+    elif key in ("park_weather_temperature_c", "park_weather_max_c", "park_weather_min_c") and value is not None and (
+        type(value) not in (float, int) or not -100 <= value <= 100):
+      raise ValueError("Invalid Park temperature")
     elif value is not None and type(value) not in (float, int, bool):
       raise ValueError("Invalid cluster HUD value")
   for key in ("path_x", "path_y", "path_z", "velocity_x", "acceleration_x", "lane_line_probs", "road_edge_stds"):

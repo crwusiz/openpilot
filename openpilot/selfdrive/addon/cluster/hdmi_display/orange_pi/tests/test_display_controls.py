@@ -48,26 +48,89 @@ def test_action_requires_a_peer_and_only_one_down_gesture_can_start_it(controls)
   assert _touch(state, pygame.FINGERDOWN, _target(state, "update"))
   assert state.take_action() == "pi_update"
   assert state.action_busy and state.take_action() is None
-  assert not _touch(state, pygame.FINGERMOTION, _target(state, "upload"))
-  _touch(state, pygame.FINGERUP, _target(state, "upload"))
-  assert not _tap(state, _target(state, "upload"))
-  state.set_action_status({"state": "succeeded", "action": "pi_update"})
-  assert _tap(state, _target(state, "upload"))
-  assert state.take_action() == "upload_logs"
+  assert not _touch(state, pygame.FINGERMOTION, _target(state, "update"))
+  _touch(state, pygame.FINGERUP, _target(state, "update"))
+  assert not _tap(state, _target(state, "update"))
+
+
+def test_former_upload_target_only_closes_the_panel(controls):
+  state, _, _ = controls
+  state.set_actions_available(True)
+  state.set_action_status({"state": "idle", "pi_update_available": True, "update_available": True})
+  _tap(state)
+  assert "upload" not in state.layout
+  assert _tap(state, (1316 / 1920, 367 / 480))
+  assert not state.menu_visible and state.take_action() is None
+
+
+@pytest.mark.parametrize("height,rotate_180", [(480, False), (480, True), (720, False), (720, True)])
+def test_park_button_only_dispatches_on_release_in_the_displayed_hitbox(controls, height, rotate_180):
+  state, pygame, _ = controls
+  state.set_actions_available(True)
+  state.set_size((1920, height))
+  state.set_park_touch((1920, height), rotate_180)
+  x, y = 1621 / 1920, (110 + (height - 480) / 2) / height
+  point = (1 - x, 1 - y) if rotate_180 else (x, y)
+  assert state.park_log_upload_status() == (True, None)
+
+  assert not _touch(state, pygame.FINGERDOWN, point)
+  assert state.pending_action is None and not state.menu_visible
+  state.set_park_touch((1920, height), rotate_180)
+  assert not _touch(state, pygame.FINGERUP, point, finger_id=8)
+  assert _touch(state, pygame.FINGERUP, point)
+  assert state.pending_action == "park_upload_logs" and not state.menu_visible
+  assert state.park_log_upload_status() == (False, "checking")
+  assert state.take_action() == "park_upload_logs"
+  assert not _touch(state, pygame.FINGERDOWN, point)
+  assert not _touch(state, pygame.FINGERUP, point)
+  assert state.take_action() is None
+
+
+@pytest.mark.parametrize("interrupt", ["left_park", "disconnect", "drag", "screen_off"])
+def test_park_button_discards_interrupted_gestures(controls, interrupt):
+  state, pygame, _ = controls
+  state.set_actions_available(True)
+  state.set_park_touch((1920, 480))
+  point = 1621 / 1920, 110 / 480
+  assert not _touch(state, pygame.FINGERDOWN, point)
+  if interrupt == "left_park":
+    state.set_park_touch()
+    state.set_park_touch((1920, 480))
+  elif interrupt == "disconnect":
+    state.set_actions_available(False)
+    state.set_actions_available(True)
+  elif interrupt == "drag":
+    _touch(state, pygame.FINGERMOTION, (0.1, 0.5))
+  else:
+    state.turn_off()
+  assert not _touch(state, pygame.FINGERUP, point)
+  assert state.take_action() is None
+
+
+def test_park_button_clears_an_unsent_upload_on_leaving_park(controls):
+  state, pygame, _ = controls
+  state.set_actions_available(True)
+  state.set_park_touch((1920, 480))
+  point = 1621 / 1920, 110 / 480
+  _touch(state, pygame.FINGERDOWN, point)
+  assert _touch(state, pygame.FINGERUP, point)
+  state.set_park_touch()
+  assert state.take_action() is None and not state.action_busy
 
 
 def test_running_action_can_be_hidden_and_completion_remains_visible_for_the_timeout(controls):
   state, _, now = controls
   state.set_actions_available(True)
+  state.set_action_status({"state": "idle", "pi_update_available": True})
   _tap(state)
-  _tap(state, _target(state, "upload"))
+  _tap(state, _target(state, "update"))
   now[0] = 100.0
   assert not state.update() and state.menu_visible
   _tap(state, _target(state, "close"))
   assert not state.menu_visible and state.action_busy
   _tap(state)
-  state.set_action_status({"state": "warning", "action": "upload_logs"})
-  assert "Pi log retry" in state.action_label()
+  state.set_action_status({"state": "succeeded", "action": "pi_update"})
+  assert "Pi updated" in state.action_label()
   now[0] += state.menu_timeout - 0.01
   assert not state.update()
   now[0] += 0.02
@@ -243,7 +306,7 @@ def test_motion_and_unknown_events_cannot_open_menu(controls):
 def test_menu_and_touch_targets_fit_logical_screen(size):
   pygame = SimpleNamespace(FINGERDOWN=1, FINGERMOTION=2, FINGERUP=3)
   state = DisplayControls(pygame, logical_size=size)
-  for name in ("panel", "slider", "off", "close", "update", "upload", "pull"):
+  for name in ("panel", "slider", "off", "close", "update", "pull"):
     left, top, width, height = state.layout[name]
     assert 0 <= left < left + width <= size[0]
     assert 0 <= top < top + height <= size[1]

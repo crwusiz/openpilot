@@ -13,27 +13,28 @@ try:
   from openpilot.selfdrive import model_render_support
   from openpilot.selfdrive.color_support import STOCK_PATH_COLORS, hsla_to_rgba
   from openpilot.selfdrive.hud_render_support import (
-    current_speed_color, format_speed_limit_distance, get_hud_status, ignore_limit_ratio,
+    KM_TO_MILE, current_speed_color, format_speed_limit_distance, get_hud_status, ignore_limit_ratio,
     is_cruise_speed_set, speed_limit_warning_level, tpms_reading, traffic_light_index,
   )
 except ImportError:
   import model_render_support
   from color_support import STOCK_PATH_COLORS, hsla_to_rgba
-  from hud_render_support import (current_speed_color, format_speed_limit_distance, get_hud_status, ignore_limit_ratio,
+  from hud_render_support import (KM_TO_MILE, current_speed_color, format_speed_limit_distance, get_hud_status, ignore_limit_ratio,
                                   is_cruise_speed_set, speed_limit_warning_level, tpms_reading, traffic_light_index)
 
 try:
   from openpilot.common.filter_simple import FirstOrderFilter
   from openpilot.common.swaglog import cloudlog
   from openpilot.selfdrive.addon.cluster.cluster_config import Colors, colors_alpha
+  from openpilot.selfdrive.addon.cluster.cluster_render_support import park_layout, park_upload_button_bounds
 except ImportError:
   # deploy.sh copies this exact renderer alongside the portable support file.
   # The Pi does not need Params, cereal or an openpilot installation.
   import logging
   try:
-    from .cluster_render_support import Colors, FirstOrderFilter, colors_alpha
+    from .cluster_render_support import Colors, FirstOrderFilter, colors_alpha, park_layout, park_upload_button_bounds
   except ImportError:
-    from cluster_render_support import Colors, FirstOrderFilter, colors_alpha
+    from cluster_render_support import Colors, FirstOrderFilter, colors_alpha, park_layout, park_upload_button_bounds
   cloudlog = logging.getLogger("cluster_renderer")
 
 
@@ -81,6 +82,7 @@ ALPHA_BLEND_STRIP_HEIGHT = 64
 RADAR_TO_CAMERA = 1.52  # m, matches radard for the standalone renderer
 TEXT_CACHE_MAX_ENTRIES = 256
 TEXT_CACHE_MAX_BYTES = 8 * 1024 * 1024
+PARK_CAR_IMAGE = "ioniq5_park.png"
 
 STOCK_PATH_GRADIENT = STOCK_PATH_COLORS
 
@@ -230,6 +232,192 @@ class StopPoint(model_render_support.PlannedStopTracker):
     self.model_frame_id = None
 
 
+def _park_weather_kind(code):
+  if code is None:
+    return None, "날씨 정보 없음"
+  if code == 0:
+    return "clear", "맑음"
+  if code in (1, 2):
+    return "partly", "구름 조금"
+  if code in (45, 48):
+    return "cloudy", "안개"
+  if code in (71, 73, 75, 77, 85, 86):
+    return "snow", "눈"
+  if code >= 95:
+    return "rain", "뇌우"
+  if 51 <= code <= 67 or 80 <= code <= 82:
+    return "rain", "비"
+  return "cloudy", "흐림"
+
+
+class ParkScreen:
+  """Compose the shared USB and Pi parking view at the display's logical size."""
+
+  TEXT = (241, 246, 255)
+  MUTED = (172, 191, 218)
+  ACCENT = (98, 187, 255)
+  DUST_GRADES = (("좋음", (117, 211, 158)), ("보통", (255, 197, 101)),
+                 ("나쁨", (255, 145, 133)), ("매우 나쁨", (210, 157, 255)))
+  UPLOAD_LABELS = {
+    "checking": "전송 준비 중…",
+    "running": "로그 전송 중…",
+    "succeeded": "로그 전송 완료",
+    "warning": "일부 전송 완료 · 다시 시도",
+    "failed": "전송 실패 · 다시 시도",
+  }
+
+  def __init__(self, size, font_path, asset_path):
+    width, height = size
+    self.scale, self.left, self.top = park_layout(size)
+    self.upload_bounds = park_upload_button_bounds(size)
+    self.fonts = {size: self._font(font_path, size) for size in (24, 26, 28, 30, 34, 40, 54, 124)}
+    x = np.linspace(-1, 1, width, dtype=np.float32)[None, :]
+    y = np.linspace(-1, 1, height, dtype=np.float32)[:, None]
+    glow = np.exp(-2.8 * x**2 - 1.15 * (y + 0.35)**2)
+    background = np.array((10, 17, 33), dtype=np.float32) + glow[:, :, None] * np.array((21, 35, 64), dtype=np.float32)
+    self.base = Image.fromarray(background.astype(np.uint8))
+    self._draw_fixed_labels(ImageDraw.Draw(self.base))
+    try:
+      with Image.open(asset_path) as image:
+        car = image.convert("RGBA")
+      car.thumbnail((round(850 * self.scale), round(382 * self.scale)), Image.Resampling.LANCZOS)
+      cx, cy = self._point(960, 240)
+      self.base.paste(car, (cx - car.width // 2, cy - car.height // 2), car)
+    except (OSError, ValueError) as exc:
+      cloudlog.error(f"Failed to load parked car image from {asset_path}: {exc}")
+    self._last_key = None
+    self._last_image = None
+
+  def _font(self, path, size):
+    try:
+      return ImageFont.truetype(path, max(1, round(size * self.scale)))
+    except OSError:
+      return ImageFont.load_default()
+
+  def _point(self, x, y):
+    return round(self.left + x * self.scale), round(self.top + y * self.scale)
+
+  def _text(self, draw, x, y, value, size, color=TEXT, anchor="lt"):
+    draw.text(self._point(x, y), value, font=self.fonts[size], fill=color, anchor=anchor)
+
+  def _text_width(self, draw, value, size):
+    return draw.textlength(value, font=self.fonts[size]) / self.scale
+
+  def _draw_fixed_labels(self, draw):
+    draw.rounded_rectangle((self._point(1400, 66), self._point(1842, 414)), radius=max(1, round(22 * self.scale)),
+                           fill=(15, 26, 47), outline=(43, 63, 94), width=max(1, round(2 * self.scale)))
+    draw.line((self._point(1434, 146), self._point(1808, 146)), fill=(43, 63, 94), width=max(1, round(self.scale)))
+    self._text(draw, 1434, 176, "주행 정보", 34)
+    self._text(draw, 1434, 260, "거리", 28, self.MUTED)
+    self._text(draw, 1434, 344, "시간", 28, self.MUTED)
+
+  def _draw_upload_button(self, draw, enabled, state):
+    fill, border, text = ((24, 56, 94), (76, 145, 210), self.TEXT) if enabled else ((30, 44, 64), (53, 72, 99), self.MUTED)
+    draw.rounded_rectangle(self.upload_bounds, radius=max(1, round(11 * self.scale)),
+                           fill=fill, outline=border, width=max(1, round(2 * self.scale)))
+    label = self.UPLOAD_LABELS.get(state, "로그 전송")
+    self._text(draw, 1621, 110, label, 26, text, "mm")
+
+  def _draw_weather_icon(self, draw, kind, left, top):
+    def point(x, y):
+      return self._point(left + x, top + y)
+
+    def circle(x, y, r, fill):
+      draw.ellipse((point(x - r, y - r), point(x + r, y + r)), fill=fill)
+
+    if kind in ("clear", "partly"):
+      x, y = (29, 39) if kind == "clear" else (24, 27)
+      gold = (255, 208, 95)
+      circle(x, y, 14, gold)
+      for index in range(8):
+        angle = index * math.pi / 4
+        dx, dy = math.cos(angle), math.sin(angle)
+        draw.line((point(x + dx * 19, y + dy * 19), point(x + dx * 24, y + dy * 24)),
+                  fill=gold, width=max(1, round(3 * self.scale)))
+    if kind != "clear":
+      cloud = (210, 226, 246)
+      circle(16, 48, 13, cloud)
+      circle(33, 41, 17, cloud)
+      circle(47, 50, 11, cloud)
+      draw.rectangle((point(15, 46), point(47, 61)), fill=cloud)
+    if kind in ("rain", "snow"):
+      for x in (18, 32, 46):
+        if kind == "snow":
+          circle(x, 69, 2.5, self.TEXT)
+        else:
+          draw.line((point(x + 2, 65), point(x - 2, 72)), fill=self.ACCENT, width=max(1, round(3 * self.scale)))
+
+  def _draw_weather(self, draw, center, kind, current, description):
+    if kind is None and current == "--":
+      self._text(draw, center, 299, description, 30, self.MUTED, "mt")
+      return
+
+    icon_space = 58 + 16 if kind is not None else 0
+    temperature_space = self._text_width(draw, current, 54) + 24
+    width = icon_space + temperature_space + self._text_width(draw, description, 30)
+    left = center - width / 2
+    if kind is not None:
+      self._draw_weather_icon(draw, kind, left, 264)
+    self._text(draw, left + icon_space, 283, current, 54)
+    self._text(draw, left + icon_space + temperature_space, 299, description, 30)
+
+  @staticmethod
+  def _temperature(value):
+    return "--" if value is None else f"{value:.0f}°"
+
+  @staticmethod
+  def _duration(seconds):
+    if seconds is None:
+      return "--"
+    hours, minutes = divmod(int(seconds) // 60, 60)
+    return f"{hours}시간 {minutes:02d}분" if hours else f"{minutes}분 {int(seconds) % 60:02d}초"
+
+  def render(self, data, *, metric):
+    offset = data.get("park_utc_offset_s")
+    now = time.localtime() if offset is None else time.gmtime(time.time() + offset)  # noqa: TID251
+    clock = time.strftime("%H:%M", now)
+    weekday = "월화수목금토일"[now.tm_wday]
+    date = f"{now.tm_mon}월 {now.tm_mday}일 {weekday}요일"
+    weather = data.get("park_weather") or {}
+    kind, description = _park_weather_kind(weather.get("code"))
+    current = self._temperature(weather.get("temperature_c"))
+    high = self._temperature(weather.get("max_c"))
+    low = self._temperature(weather.get("min_c"))
+    dust = weather.get("dust_grade")
+    km = data.get("trip_distance_km")
+    distance = "--"
+    if km is not None:
+      distance = f"{km:.1f} km" if metric else f"{km * KM_TO_MILE:.1f} mi"
+    duration = self._duration(data.get("trip_duration_s"))
+    upload_enabled = data.get("park_log_upload_enabled") is True
+    upload_state = data.get("park_log_upload_state")
+    key = (clock, date, kind, description, current, high, low, dust, distance, duration, upload_enabled, upload_state)
+    if key == self._last_key:
+      return self._last_image
+
+    image = self.base.copy()
+    draw = ImageDraw.Draw(image)
+    self._draw_upload_button(draw, upload_enabled, upload_state)
+    temperatures = f"최고 {high}  최저 {low}"
+    grade, grade_color = self.DUST_GRADES[dust] if type(dust) is int and 0 <= dust < len(self.DUST_GRADES) else ("--", self.MUTED)
+    dust_label = f"미세먼지 {grade}"
+    dot_offset = self._text_width(draw, temperatures, 26) + 32
+    details_width = dot_offset + 21 + self._text_width(draw, dust_label, 24)
+    details_left = min(86, 510 - details_width)
+    center = details_left + details_width / 2
+    self._text(draw, center, 92, date, 30, self.MUTED, "mt")
+    self._text(draw, center, 141, clock, 124, anchor="mt")
+    self._draw_weather(draw, center, kind, current, description)
+    self._text(draw, details_left, 363, temperatures, 26, self.MUTED)
+    dot_left = details_left + dot_offset
+    draw.ellipse((self._point(dot_left, 369), self._point(dot_left + 11, 380)), fill=grade_color)
+    self._text(draw, dot_left + 21, 363, dust_label, 24, self.MUTED)
+    self._text(draw, 1808, 249, distance, 40, anchor="rt")
+    self._text(draw, 1808, 333, duration, 40, anchor="rt")
+    self._last_key, self._last_image = key, image
+    return image
+
+
 class ClusterRenderer:
   def __init__(self, config):
     cloudlog.info("Initializing ClusterRenderer...")
@@ -297,6 +485,9 @@ class ClusterRenderer:
     self._blink_started_at = None
     asset_dir = getattr(self.config, "asset_dir", os.path.join(str(self.config.BASEDIR), "selfdrive", "assets"))
     icon_dir = os.path.join(str(asset_dir), "icons")
+    self._park_image_path = os.path.join(icon_dir, PARK_CAR_IMAGE)
+    self._park_screen = None
+    self._park_active = False
     icon_errors = []
     for name in REQUIRED_ICON_NAMES:
       try:
@@ -331,6 +522,14 @@ class ClusterRenderer:
   def render(self, camera, models):
     started = time.monotonic()
     self._update_filter_intervals(started)
+    model_valid, hud_data, path_data = models.get_render_data()
+    snapshot_at = time.monotonic()
+    if hud_data.get("parked") is True:
+      image = self.render_park(hud_data)
+      self.last_frame_timings = {"snapshot": snapshot_at - started, "hud": time.monotonic() - snapshot_at}
+      return image
+    self._park_active = False
+
     # Fetch once so a stale-stream reset cannot clear the frame between a
     # separate has_frame() check and get_frame() call.
     camera_frame = camera.get_frame()
@@ -350,8 +549,6 @@ class ClusterRenderer:
                                          self.camera_x:self.camera_x + self.camera_w]
 
     camera_copied_at = time.monotonic()
-    model_valid, hud_data, path_data = models.get_render_data()
-    snapshot_at = time.monotonic()
     path_cpu_started = thread_time()
     if has_camera and model_valid:
       frame = self._draw_model_path(frame, path_data, hud_data)
@@ -365,9 +562,9 @@ class ClusterRenderer:
     pil_img = Image.fromarray(frame)
     self._draw_hud(pil_img, hud_data, has_camera)
     self.last_frame_timings = {
-      "camera_copy": camera_copied_at - started,
-      "snapshot": snapshot_at - camera_copied_at,
-      "path": path_drawn_at - snapshot_at,
+      "camera_copy": camera_copied_at - snapshot_at,
+      "snapshot": snapshot_at - started,
+      "path": path_drawn_at - camera_copied_at,
       "path_cpu": path_cpu_elapsed,
       "hud": time.monotonic() - path_drawn_at,
     }
@@ -375,6 +572,15 @@ class ClusterRenderer:
     # complete 1920x462 image back to NumPy here only for it to be converted to
     # NV12 in the encoder thread was a full-frame copy on every update.
     return pil_img
+
+  def render_park(self, hud_data):
+    if not self._park_active:
+      self._reset_leads()
+      self._blink_started_at = None
+      self._park_active = True
+    if self._park_screen is None:
+      self._park_screen = ParkScreen((self.target_w, self.target_h), self.config.font_bold, self._park_image_path)
+    return self._park_screen.render(hud_data, metric=self.config.speed_unit == "km/h")
 
   def _update_filter_intervals(self, now):
     # Transport backpressure can reduce actual rendering far below the target.

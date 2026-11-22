@@ -18,6 +18,7 @@ assets/icons/accel_pressed.png
 assets/icons/brake_pressed.png
 assets/icons/tpms.png
 assets/icons/gps.png
+assets/icons/ioniq5_park.png
 assets/icons/compass.png
 assets/icons/speed_bump.png
 assets/icons/school_zone.png

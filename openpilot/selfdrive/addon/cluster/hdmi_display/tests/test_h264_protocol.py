@@ -232,3 +232,14 @@ def test_unknown_source_geometry_is_explicit_and_valid_for_bootstrap():
   state = scene()
   state.update(source_size=None, model_valid=False)
   assert wire.validate_scene(state) is state
+
+
+@pytest.mark.parametrize("hud", [
+  {"parked": 1}, {"park_utc_offset_s": 86400}, {"park_weather_dust_grade": 4},
+  {"park_weather_code": False}, {"park_weather_max_c": "18"}, {"trip_duration_s": -1},
+])
+def test_park_hud_rejects_invalid_fields(hud):
+  state = scene()
+  state["hud"].update(hud)
+  with pytest.raises(ValueError):
+    wire.pack_scene(state)

@@ -15,14 +15,14 @@ try:
   from .hdmi_profiles import HDMI_PROFILES
   from .h264_protocol import (
     ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, PREPARE, STATE, STATE_ZLIB,
-    decode_payload, decode_state_payload, pack_control, unpack_control_header,
+    decode_payload, decode_state_payload, pack_control, park_state_deadline, unpack_control_header,
   )
   from .receiver_resources import RESOURCE_SAMPLE_WORKER, ReceiverResourceSampler, ReceiverUDPSampler, format_receiver_resources
 except ImportError:
   from hdmi_profiles import HDMI_PROFILES
   from h264_protocol import (
     ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, OFFER, PREPARE, STATE, STATE_ZLIB,
-    decode_payload, decode_state_payload, pack_control, unpack_control_header,
+    decode_payload, decode_state_payload, pack_control, park_state_deadline, unpack_control_header,
   )
   from receiver_resources import RESOURCE_SAMPLE_WORKER, ReceiverResourceSampler, ReceiverUDPSampler, format_receiver_resources
 
@@ -203,6 +203,7 @@ class H264Receiver:
     self.decoded_frames = self.skipped_rgb = 0
     self.decoder_errors = 0
     self.last_video_at = self.last_state_at = None
+    self._park_state_deadline = -math.inf
     self.screen_off = False
     self.gpu_camera = False
     self.state_compression = None
@@ -352,7 +353,13 @@ class H264Receiver:
       self.latest_state = (state, received_at)
       self.state_revision += 1
       self.last_state_at = received_at
+      self._park_state_deadline = park_state_deadline(state, received_at)
       self.condition.notify_all()
+
+  def parked_at(self, now):
+    with self.condition:
+      return (not self.closing and not self.done and self.error is None and self.last_state_at is not None
+              and self.last_state_at <= now <= self._park_state_deadline)
 
   def take_updates(self, timeout=0.02):
     with self.condition:
@@ -664,11 +671,13 @@ class H264Receiver:
           self._stats["loop_wall"] += elapsed
           self._stats["loop_cpu"] += cpu_elapsed
         video_at, state_at = self.last_video_at, self.last_state_at
-      if video_at is None:
-        if now - started >= NEGOTIATION_TIMEOUT:
-          raise TimeoutError("No decoded WebRTC video within 15 seconds")
-      elif now - video_at >= STREAM_TIMEOUT:
-        raise TimeoutError("WebRTC video stalled for eight seconds")
+        parked = state_at is not None and state_at <= now <= self._park_state_deadline
+      if not parked:
+        if video_at is None:
+          if now - started >= NEGOTIATION_TIMEOUT:
+            raise TimeoutError("No decoded WebRTC video within 15 seconds")
+        elif now - video_at >= STREAM_TIMEOUT:
+          raise TimeoutError("WebRTC video stalled for eight seconds")
       if state_at is not None and now - state_at >= STREAM_TIMEOUT:
         raise TimeoutError("H.264 metadata stalled for eight seconds")
 
@@ -852,8 +861,22 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
   pending_camera_on_screen = False
   scene_video_at = scene_state_at = None
   freshness = None
+  parked_at = getattr(scene, "parked_at", lambda _now: False)
+  latest_parked_at = getattr(receiver, "parked_at", parked_at)
+  set_park_touch = getattr(display, "set_park_touch", None)
+  park_log_upload_status = getattr(display, "park_log_upload_status", None)
+  set_park_log_upload_status = getattr(scene, "set_park_log_upload_status", None)
+  park_presented = park_rotate_180 = False
+  frame_size = hello["width"], hello["height"]
   gpu_policy_logged = False
   slow_frame_logged_at = None
+
+  def refresh_park_touch(now):
+    if set_park_touch is not None:
+      if park_presented and parked_at(now) and latest_parked_at(now):
+        set_park_touch(frame_size, park_rotate_180)
+      else:
+        set_park_touch()
 
   def hud_deadline():
     due = 0 if last_render_started is None else last_render_started + HUD_REFRESH_INTERVAL
@@ -865,6 +888,8 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
   try:
     receiver.start()
     while True:
+      if set_park_touch is not None:
+        refresh_park_touch(time.monotonic())
       if not display.pump_events():
         raise KeyboardInterrupt
       with receiver.condition:
@@ -892,11 +917,13 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         pending_camera_on_screen = not receiver.screen_off
         pending_render = True
       now = time.monotonic()
+      refresh_park_touch(now)
       # Another packet may arrive after take_updates(). Only data already
       # applied to the scene can make the waiting screen safe to dismiss.
       video_age = None if scene_video_at is None else now - scene_video_at
       current_freshness = (video_age is not None and video_age < VIDEO_STALE_SECONDS,
-                           scene_state_at is not None and now - scene_state_at < 0.5)
+                           scene_state_at is not None and now - scene_state_at < 0.5,
+                           parked_at(now))
       if current_freshness != freshness:
         # Clear expired HUD/path even if both incoming streams stop together.
         pending_render = True
@@ -905,7 +932,8 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
       # Keep the live HUD during a camera-only stall. The scene hides expired
       # video and paths and checks HUD source age on every render. For a custom
       # timeout shorter than scene freshness, hide the whole image immediately.
-      full_waiting = camera_timed_out and (not current_freshness[1] or video_age <= VIDEO_STALE_SECONDS)
+      full_waiting = (camera_timed_out and not current_freshness[2]
+                      and (not current_freshness[1] or video_age <= VIDEO_STALE_SECONDS))
       if camera_timed_out and not video_stalled:
         LOG.warning("[CLUSTER_H264_STALE] No decoded video within %.1fs | display=%s",
                     frame_timeout, "connection_waiting" if full_waiting else "camera_waiting")
@@ -934,6 +962,8 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         configure_gpu = getattr(scene, "set_gpu_camera", None)
         if callable(configure_gpu):
           configure_gpu(layered and receiver.gpu_camera)
+        if park_log_upload_status is not None and set_park_log_upload_status is not None:
+          set_park_log_upload_status(*park_log_upload_status())
         image = scene.render_layers() if layered else scene.render()
         rendered_at = time.monotonic()
         if not (display.send_layers(image) if layered else display.send_rgb(image)):
@@ -946,7 +976,10 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         with receiver.condition:
           receiver.gpu_camera = getattr(display, "compositor_backend", None) == "pi_gpu_camera"
         presented = bool(getattr(display, "last_frame_presented", True))
-        camera_visible = getattr(scene, "last_status", {}).get("video_fresh", True)
+        scene_status = getattr(scene, "last_status", {})
+        park_presented = presented and scene_status.get("parked", False)
+        park_rotate_180 = getattr(getattr(scene, "config", None), "rotate_180", False)
+        camera_visible = scene_status.get("video_fresh", True) and not scene_status.get("parked", False)
         receiver.record_display(render_started, rendered_at, displayed_at, pending_video_at, presented,
                                 scene_timings=getattr(scene, "last_frame_timings", None),
                                 display_timings=getattr(display, "last_frame_timings", None),
@@ -986,6 +1019,8 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         return receiver.received_frames
   finally:
     try:
+      if set_park_touch is not None:
+        set_park_touch()
       receiver.close()
     finally:
       scene.close()

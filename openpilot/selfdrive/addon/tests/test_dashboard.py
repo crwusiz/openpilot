@@ -391,18 +391,17 @@ class TestDashboardClusterActions(unittest.IsolatedAsyncioTestCase):
     async def runner(_command, _timeout):
       started.set()
       await finish.wait()
-      return 0, 'CLUSTER_PI_LOG_WARNING: Pi file retained for retry'
+      return 0, 'CLUSTER_PI_UNCHANGED: already current'
 
     with tempfile.TemporaryDirectory() as directory:
       root = Path(directory)
-      (root / 'log_upload.sh').touch()
-      (root / 'cluster_debug.log').touch()
-      actions = dashboard.ClusterActions(root, root / 'cluster_debug.log', runner=runner)
+      (root / 'pi_update.sh').touch()
+      actions = dashboard.ClusterActions(root, runner=runner)
       with patch.object(dashboard, 'CLUSTER_ACTIONS', actions), \
            patch.object(dashboard, 'get_connected_pi_ip', return_value='192.168.0.84') as peer:
         transport = httpx2.ASGITransport(app=dashboard.app, client=('192.168.0.84', 1234))
         async with httpx2.AsyncClient(transport=transport, base_url='http://c4:7000') as client:
-          payload = {'action': 'upload_logs', 'request_id': 'c' * 32}
+          payload = {'action': 'pi_update', 'request_id': 'c' * 32}
           response = await client.post('/api/cluster/actions', json=payload)
           self.assertEqual(response.status_code, 202)
           self.assertEqual(response.json()['state'], 'running')
@@ -414,7 +413,8 @@ class TestDashboardClusterActions(unittest.IsolatedAsyncioTestCase):
           finish.set()
           await asyncio.gather(*actions.tasks)
           result = (await client.get('/api/cluster/actions')).json()
-          self.assertEqual(result['state'], 'warning')
+          self.assertEqual(result['state'], 'succeeded')
+          self.assertTrue(result['unchanged'])
 
   async def test_touch_endpoint_rejects_other_clients_and_arbitrary_targets(self):
     actions = dashboard.ClusterActions(runner=AsyncMock())

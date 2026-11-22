@@ -160,6 +160,11 @@ class LayeredRenderer(ClusterRenderer):
       self._last_render_at = painter._last_render_at
       painter.close()
 
+  def reset_path_for_park(self):
+    self._stop_path_pipeline()
+    self._sync_path = self._path_signature = None
+    self._last_render_at = None
+
   def _start_path_pipeline(self):
     # Share immutable assets/layout only. Mutable path buffers, fonts, caches,
     # configuration, transform and lead/stop filters belong to one CPU worker.
@@ -303,6 +308,7 @@ class LayeredRenderer(ClusterRenderer):
 
   def render_overlay(self, transform, models, has_camera):
     started = time.monotonic()
+    self._park_active = False
     self._update_filter_intervals(started)
     self._source_to_panel = transform.copy()
     self._source_to_panel[0, 2] += self.camera_x

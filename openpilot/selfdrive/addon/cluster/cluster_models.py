@@ -15,10 +15,12 @@ from openpilot.common.transformations.orientation import rot_from_euler
 from openpilot.selfdrive.controls.radard import RADAR_TO_CAMERA
 from openpilot.selfdrive.addon.cluster.cluster_health_guard import DRIVING_FAULT_ALERTS, parse_comm_issue
 from openpilot.selfdrive.addon.cluster.cluster_modeld_diagnostics import parse_modeld_failure
+from openpilot.selfdrive.addon.cluster.cluster_park_weather import ParkWeather, weather_position
 from openpilot.selfdrive.addon.navi_helpers import camera_limit_active, camera_limit_distance
 from openpilot.selfdrive.hud_render_support import is_cruise_speed_set, select_vehicle_speed
 
 GearShifter = structs.CarState.GearShifter
+CAR_STATE_FRESH_S = 0.5
 HEALTH_AGE_SERVICES = {
   'modelV2': 'model_age_ms',
   'deviceMotion': 'device_motion_age_ms',
@@ -78,7 +80,7 @@ class ClusterModels:
 
     self.sm = messaging.SubMaster([
       'modelV2', 'carState', 'selfdriveState', 'controlsState', 'carControl',
-      'carParams', 'deviceState', 'gpsLocationExternal', 'naviData',
+      'carParams', 'deviceState', 'gpsLocationExternal', 'gpsLocation', 'naviData',
       'longitudinalPlan', 'vehicleParameters', 'extrinsicsCalibration',
       'narrowRoadCameraState', 'radarState', 'deviceMotion',
       'managerState', 'errorLogMessage',
@@ -95,6 +97,13 @@ class ClusterModels:
     self.lat_active = False
     self.cruise_available = False
     self.reverse = False
+    self._parked = False
+    self._trip_onroad = None
+    self._trip_sample = None
+    self._trip_distance_m = 0.0
+    self._trip_duration_s = 0.0
+    self._weather_position = None
+    self._park_weather = ParkWeather(self._last_weather_position)
     self.left_blinker = False
     self.right_blinker = False
     self.left_blindspot = False
@@ -178,6 +187,7 @@ class ClusterModels:
   def _update_once(self):
     self.sm.update(0)
     self._update_health_data()
+    self._update_park_data()
     updated = {service for service in RENDER_SERVICES if self.sm.updated[service]}
     if self._defer_render_updates:
       # Keep polling/diagnostics at the input rate, but derive display state
@@ -194,6 +204,58 @@ class ClusterModels:
         self._update_calibration(self.sm['extrinsicsCalibration'])
     else:
       self._update_render_data(updated)
+
+  @staticmethod
+  def _last_weather_position():
+    try:
+      position = Params().get('LastGPSPosition')
+      if position:
+        with log.Event.from_bytes(position) as event:
+          return weather_position(event.gpsLocationExternal)
+    except Exception:
+      # The persisted fix may be missing, corrupt or from a different schema.
+      return None
+    return None
+
+  def _update_park_data(self):
+    for service in ('gpsLocation', 'gpsLocationExternal'):
+      if self.sm.updated[service] and self.sm.valid[service]:
+        position = weather_position(self.sm[service])
+        if position is not None:
+          self._weather_position = position
+
+    if self.sm.updated['deviceState'] and self.sm.valid['deviceState']:
+      onroad = self.sm['deviceState'].started
+      if onroad and self._trip_onroad is False:
+        self._trip_distance_m = self._trip_duration_s = 0.0
+      if not onroad:
+        self._trip_sample = None
+      self._trip_onroad = onroad
+
+    if not self.sm.updated['carState']:
+      return
+    if not self.sm.valid['carState']:
+      self._parked = False
+      self._trip_sample = None
+      return
+
+    car_state = self.sm['carState']
+    self._parked = car_state.gearShifter == GearShifter.park
+    speed = _finite_number(car_state.vEgo)
+    if self._trip_onroad is False or speed is None:
+      self._trip_sample = None
+      return
+
+    # Sample before render updates are coalesced, so both displays track the
+    # same trip and a parked frame cannot accrue distance or time.
+    sample_at = self.sm.logMonoTime['carState'] * 1e-9
+    if self._trip_sample is not None:
+      previous_at, previous_speed = self._trip_sample
+      dt = sample_at - previous_at
+      if 0 < dt <= CAR_STATE_FRESH_S:
+        self._trip_distance_m += (previous_speed + abs(speed)) * 0.5 * dt
+        self._trip_duration_s += dt
+    self._trip_sample = None if self._parked else (sample_at, abs(speed))
 
   def _flush_render_updates(self):
     # The caller holds _state_lock, so HUD/path/calibration use one coherent
@@ -567,6 +629,8 @@ class ClusterModels:
       return self._get_hud_data_unlocked()
 
   def _get_hud_data_unlocked(self):
+    car_state_age = time.monotonic() - self.sm.logMonoTime['carState'] / 1e9
+    parked = self._parked and self.sm.alive['carState'] and 0 <= car_state_age <= CAR_STATE_FRESH_S
     return {
       "v_ego": self.v_ego,
       "accel": self.accel,
@@ -578,6 +642,11 @@ class ClusterModels:
       "lat_active": self.lat_active,
       "cruise_available": self.cruise_available,
       "reverse": self.reverse,
+      "parked": parked,
+      "_park_car_state_age_ms": car_state_age * 1000 if parked else None,
+      "park_weather": self._park_weather.snapshot(self._weather_position) if parked else None,
+      "trip_distance_km": self._trip_distance_m / 1000.0,
+      "trip_duration_s": self._trip_duration_s,
       "left_blinker": self.left_blinker,
       "right_blinker": self.right_blinker,
       "left_blindspot": self.left_blindspot,

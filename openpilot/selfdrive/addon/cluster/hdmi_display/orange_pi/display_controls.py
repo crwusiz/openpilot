@@ -3,6 +3,11 @@ import re
 import time
 from pathlib import Path
 
+try:
+  from openpilot.selfdrive.addon.cluster.cluster_render_support import park_upload_button_bounds
+except ImportError:
+  from cluster_render_support import park_upload_button_bounds
+
 
 DEFAULT_BRIGHTNESS = 80
 MIN_BRIGHTNESS = 10
@@ -44,6 +49,8 @@ class DisplayControls:
     self._last_interaction = self.clock()
     self._active_finger = None
     self._dragging_slider = False
+    self._park_upload_target = None
+    self._park_upload_pressed = False
     self._menu_surface = None
     self._menu_revision = None
     self._fonts = {}
@@ -77,6 +84,7 @@ class DisplayControls:
     self.logical_size = size
     self._active_finger = None
     self._dragging_slider = False
+    self.set_park_touch()
     self._layout = self._make_layout()
     self._fonts.clear()
     self.revision += 1
@@ -98,8 +106,7 @@ class DisplayControls:
       "off": rect(40, 200, 336, 78),
       "pull": rect(396, 200, 336, 78),
       "update": rect(752, 200, 336, 78),
-      "upload": rect(1108, 200, 336, 78),
-      "close": rect(1464, 200, 336, 78),
+      "close": rect(1108, 200, 692, 78),
       "scale": scale,
     }
 
@@ -125,7 +132,36 @@ class DisplayControls:
   def set_actions_available(self, available):
     if self.actions_available != bool(available):
       self.actions_available = bool(available)
+      if not self.actions_available:
+        self._cancel_park_press()
       self._panel_changed()
+
+  def set_park_touch(self, frame_size=None, rotate_180=False):
+    target = None
+    if frame_size is not None:
+      width, height = frame_size
+      left, top, right, bottom = park_upload_button_bounds(frame_size)
+      button_width, button_height = right - left, bottom - top
+      if rotate_180:
+        left, top = width - right, height - bottom
+      target = left / width, top / height, button_width / width, button_height / height
+    if target != self._park_upload_target:
+      self._park_upload_target = target
+      self._cancel_park_press()
+
+  def _cancel_park_press(self):
+    self._park_upload_pressed = False
+    if self._pending_action == "park_upload_logs":
+      self._pending_action = None
+      self.set_action_status({**self.action_status, "action": None, "state": "idle"})
+
+  @property
+  def park_touch_active(self):
+    return self._park_upload_target is not None and self.actions_available and not self.screen_off
+
+  def park_log_upload_status(self):
+    state = self.action_status.get("state") if self.action_status.get("action") == "park_upload_logs" else None
+    return self.actions_available and not self.action_busy, state
 
   def set_action_status(self, status):
     if status is None or status == self.action_status:
@@ -146,7 +182,9 @@ class DisplayControls:
     return action
 
   def _request_action(self, action):
-    if self.action_busy or not self.actions_available:
+    if action not in ("pi_update", "git_pull", "park_upload_logs") or self.action_busy or not self.actions_available:
+      return False
+    if action == "park_upload_logs" and not self.park_touch_active:
       return False
     if action == "git_pull" and not self.action_status.get("update_available"):
       return False
@@ -158,12 +196,12 @@ class DisplayControls:
     return self._changed()
 
   def button_enabled(self, name):
-    if name not in ("pull", "update", "upload"):
+    if name not in ("pull", "update"):
       return True
     if not self.actions_available or self.action_busy:
       return False
-    key = {"pull": "update_available", "update": "pi_update_available"}.get(name)
-    return key is None or self.action_status.get(key, False)
+    key = "update_available" if name == "pull" else "pi_update_available"
+    return self.action_status.get(key, False)
 
   def button_color(self, name):
     if name not in ("pull", "update"):
@@ -185,6 +223,7 @@ class DisplayControls:
     self.screen_off = True
     self.menu_visible = False
     self._dragging_slider = False
+    self._cancel_park_press()
     return self._changed()
 
   def _set_slider(self, x):
@@ -203,6 +242,8 @@ class DisplayControls:
     if event_type not in (self.pygame.FINGERDOWN, self.pygame.FINGERMOTION, self.pygame.FINGERUP):
       return False
     finger = touch.get("finger_id", 0)
+    over_park_button = (self._park_upload_target is not None
+                        and self._contains(self._park_upload_target, (float(touch["x"]), float(touch["y"]))))
     if event_type == self.pygame.FINGERDOWN:
       if self.screen_off:
         self._active_finger = finger
@@ -216,17 +257,24 @@ class DisplayControls:
       self._active_finger = finger
       self._last_interaction = self.clock()
       if not self.menu_visible:
+        if over_park_button:
+          self._park_upload_pressed = self.park_touch_active and self.park_log_upload_status()[0]
+          return False
         self.menu_visible = True
         return self._changed()
     elif finger != self._active_finger:
       return False
 
     if event_type == self.pygame.FINGERUP:
+      submit_park_upload = self._park_upload_pressed and over_park_button
+      self._park_upload_pressed = False
       self._active_finger = None
       self._dragging_slider = False
       self._last_interaction = self.clock()
-      return False
+      return submit_park_upload and self._request_action("park_upload_logs")
 
+    if event_type == self.pygame.FINGERMOTION and not over_park_button:
+      self._park_upload_pressed = False
     x, y = float(touch["x"]), float(touch["y"])
     if not math.isfinite(x) or not math.isfinite(y):
       return False
@@ -240,7 +288,7 @@ class DisplayControls:
     if self._contains(self._layout["slider"], point):
       self._dragging_slider = True
       return self._set_slider(point[0])
-    for name, action in (("update", "pi_update"), ("upload", "upload_logs"), ("pull", "git_pull")):
+    for name, action in (("update", "pi_update"), ("pull", "git_pull")):
       if self._contains(self._layout[name], point):
         return self._request_action(action)
     if self._contains(self._layout["off"], point):
@@ -315,8 +363,7 @@ class DisplayControls:
       pygame.draw.circle(surface, (150, 162, 175), (tick_x, center_y), max(3, round(7 * scale)))
     pygame.draw.circle(surface, (195, 220, 235), (slider[0] + selected_width, center_y), max(8, round(22 * scale)))
     buttons = (("off", "화면 끄기", "Screen off"), ("pull", "Git Pull", "Git Pull"),
-               ("update", "Pi 업데이트", "Pi update"),
-               ("upload", "로그 전송", "Upload logs"), ("close", "닫기", "Close"))
+               ("update", "Pi 업데이트", "Pi update"), ("close", "닫기", "Close"))
     for name, korean_title, english_title in buttons:
       rect = self._local_rect(self._layout[name], left, top)
       enabled = self.button_enabled(name)
@@ -358,6 +405,8 @@ class DisplayControls:
 
   def action_label(self, korean=False):
     state, action = self.action_status.get("state"), self.action_status.get("action")
+    if action == "park_upload_logs":
+      return ""
     if action in ("commit_check", "git_pull") and state in ("running", "succeeded"):
       if action == "git_pull":
         return ("C4 Git Pull 시작 중…" if state == "running" else "C4 tmux 업데이트 시작 · 완료 후 C4 재시작") if korean else (
@@ -368,16 +417,12 @@ class DisplayControls:
               else ("Update available · tap Git Pull" if self.action_status.get("update_available") else "C4 is up to date"))
     if state == "succeeded" and action == "pi_update" and self.action_status.get("unchanged"):
       return "Pi 변경 사항 없음 · 최신 버전입니다" if korean else "Pi is up to date · no changes"
-    if state == "running":
-      return (("Pi 업데이트 중 · 완료 후 자동 재부팅" if action == "pi_update" else "C4·Pi 로그 수집·전송 중") if korean
-              else ("Updating Pi · automatic reboot on completion" if action == "pi_update" else "Collecting and uploading C4 + Pi logs"))
+    if state == "running" and action == "pi_update":
+      return "Pi 업데이트 중 · 완료 후 자동 재부팅" if korean else "Updating Pi · automatic reboot on completion"
     if state == "checking":
       return "C4 응답 확인 중…" if korean else "Waiting for C4 response…"
-    if state == "succeeded":
-      return (("Pi 업데이트 완료 · 재부팅 예정" if action == "pi_update" else "C4·Pi 로그 전송 완료") if korean
-              else ("Pi updated · reboot scheduled" if action == "pi_update" else "C4 + Pi logs uploaded"))
-    if state == "warning":
-      return "C4 로그 전송 완료 · Pi 로그 재시도 필요" if korean else "C4 log uploaded · Pi log retry needed"
+    if state == "succeeded" and action == "pi_update":
+      return "Pi 업데이트 완료 · 재부팅 예정" if korean else "Pi updated · reboot scheduled"
     reason = self.action_status.get("reason")
     if reason == "update_c4":
       return "C4 코드를 업데이트하고 대시보드를 재시작하세요" if korean else "Update C4 code and restart its dashboard"
@@ -388,7 +433,7 @@ class DisplayControls:
         return ("작업 실패 · " if korean else "Failed · ") + self.action_status["message"][:120]
       return "작업 실패 · C4 연결과 대시보드 로그를 확인하세요" if korean else "Action failed · check C4 connection and dashboard logs"
     if not self.actions_available or state == "unavailable":
-      return "C4 연결 후 업데이트·로그 전송을 사용할 수 있습니다" if korean else "Connect C4 to use update and log upload"
+      return "C4 연결 후 업데이트를 사용할 수 있습니다" if korean else "Connect C4 to use updates"
     return ""
 
   @staticmethod

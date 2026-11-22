@@ -10,6 +10,8 @@ import numpy as np
 import pytest
 from PIL import Image, ImageDraw, ImageFont
 
+from openpilot.selfdrive.addon.cluster.cluster_render_support import Colors, colors_alpha
+
 
 @pytest.fixture
 def renderer_module(monkeypatch):
@@ -377,6 +379,44 @@ def test_render_reports_path_cpu_separately_from_waits_and_hud(renderer_module, 
   assert renderer.last_frame_timings["path"] == pytest.approx(0.020)
   assert renderer.last_frame_timings["path_cpu"] == pytest.approx(0.003)
   assert renderer.last_frame_timings["hud"] == pytest.approx(0.010)
+
+
+@pytest.mark.parametrize("size", [(1920, 462), (1920, 480), (1920, 720)])
+def test_park_replaces_the_camera_and_restores_the_previous_driving_view(renderer_module, monkeypatch, size):
+  assets = Path(__file__).parents[3] / "assets"
+  font_path = str(assets / "fonts" / "NotoSansKR-Bold.ttf")
+  config = SimpleNamespace(width=size[0], height=size[1], fps=20, BASEDIR=assets.parent, asset_dir=assets,
+                           font_bold=font_path, font_regular=font_path, is_metric=True, speed_unit="km/h")
+  monkeypatch.setattr(renderer_module, "Colors", Colors)
+  monkeypatch.setattr(renderer_module, "colors_alpha", colors_alpha)
+  renderer = renderer_module.ClusterRenderer(config)
+  camera = Mock()
+  camera.get_frame.return_value = np.full((renderer.camera_h, renderer.camera_w, 3), 100, dtype=np.uint8)
+  camera.get_source_to_panel_transform.return_value = np.eye(3)
+  driving = Mock()
+  driving.get_render_data.return_value = False, {"v_ego": 12.0}, {}
+  before = renderer.render(camera, driving)
+  camera.reset_mock()
+
+  parking = Mock()
+  parking.get_render_data.return_value = True, {
+    "parked": True, "trip_distance_km": 42.7, "trip_duration_s": 3840,
+    "park_weather": {"code": 2, "temperature_c": 17, "max_c": 18, "min_c": 10, "dust_grade": 1},
+  }, {"path_x": []}
+  parked = renderer.render(camera, parking)
+
+  parking.get_render_data.assert_called_once_with()
+  camera.get_frame.assert_not_called()
+  assert parked.mode == "RGB" and parked.size == size
+  assert parked.tobytes() != before.tobytes()
+  left, top, _, _ = renderer_module.park_upload_button_bounds(size)
+  button_pixel = (left + 20, top + 5)
+  assert parked.getpixel(button_pixel) == (30, 44, 64)
+  park_hud = parking.get_render_data.return_value[1]
+  enabled = renderer.render_park({**park_hud, "park_log_upload_enabled": True})
+  assert enabled.getpixel(button_pixel) == (24, 56, 94)
+  np.testing.assert_array_equal(renderer.render(camera, driving), before)
+  camera.get_frame.assert_called_once_with()
 
 
 @pytest.mark.parametrize("x", [-30, 4, 80, 156, 195])

@@ -49,7 +49,8 @@ def test_profile_switch_rebuilds_output_and_touch_without_losing_local_controls_
   controls.set_brightness(30)
   controls.screen_off = True
   controls.set_actions_available(True)
-  controls._request_action("log_upload")
+  controls.set_action_status({"state": "idle", "pi_update_available": True})
+  assert controls._request_action("pi_update")
   pending = controls.pending_action
   network_job, panel_job = object(), object()
   display._network_future, display._panel_future = network_job, panel_job

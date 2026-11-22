@@ -20,7 +20,7 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.network_bitrate import Clust
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import write_network_status
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_profiles import normalize_hdmi_profile
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol import (
-  ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, PATH_KEYS, PREPARE,
+  ANSWER, CONTROL_HEADER, ERROR, FEEDBACK, HELLO, OFFER, PARK_WEATHER_FIELDS, PATH_KEYS, PREPARE,
   decode_payload, pack_control, pack_scene, unpack_control_header, validate_scene,
 )
 
@@ -102,14 +102,25 @@ def _plain(value, precision=3):
 def scene_snapshot(config, models, health, degraded=False):
   """Build plain scene data; pack_scene validates it once before transmission."""
   valid, hud, path = models.get_render_data()
+  hud = _plain(hud)
+  weather = hud.pop("park_weather", None)
+  parked_age_ms = hud.pop("_park_car_state_age_ms", None)
+  if hud.get("parked") is True:
+    utc_offset = getattr(time.localtime(), "tm_gmtoff", None)
+    if utc_offset is not None:
+      hud["park_utc_offset_s"] = utc_offset
+    if weather is not None:
+      # Older Pi receivers accept additional scalar HUD fields.
+      hud.update({f"park_weather_{key}": weather.get(key) for key in PARK_WEATHER_FIELDS})
   source_size = models.get_camera_source_size()
   scene = {
     "model_valid": bool(valid and not degraded and source_size is not None),
-    "hud": _plain(hud), "path": {} if degraded else {
+    "hud": hud, "path": {} if degraded else {
       key: _plain(path[key], 6 if key == "calib_transform" else 3) for key in PATH_KEYS if key in path},
     "source_size": source_size, "is_metric": bool(config.is_metric),
     "rotate_180": bool(config.rotate_180), "camera_contrast": float(config.camera_contrast),
-    "model_age_ms": health.get("model_age_ms"), "car_state_age_ms": health.get("car_state_age_ms"),
+    "model_age_ms": health.get("model_age_ms"),
+    "car_state_age_ms": parked_age_ms if parked_age_ms is not None else health.get("car_state_age_ms"),
     "state_created_mono_ns": time.monotonic_ns(),
   }
   return scene

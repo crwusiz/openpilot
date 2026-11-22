@@ -18,14 +18,14 @@ except ImportError:
   from cluster_render_support import Colors
 
 try:
-  from .h264_protocol import validate_scene
+  from .h264_protocol import DEFAULT_STATE_FRESHNESS_SECONDS, PARK_WEATHER_FIELDS, park_state_deadline, source_input_deadline, validate_scene
   from .scene_layers import PATH_MAX_AGE_SECONDS, LayeredRenderer, SceneLayers
 except ImportError:
-  from h264_protocol import validate_scene
+  from h264_protocol import DEFAULT_STATE_FRESHNESS_SECONDS, PARK_WEATHER_FIELDS, park_state_deadline, source_input_deadline, validate_scene
   from scene_layers import PATH_MAX_AGE_SECONDS, LayeredRenderer, SceneLayers
 
 
-DEFAULT_FRESHNESS_SECONDS = 0.5
+DEFAULT_FRESHNESS_SECONDS = DEFAULT_STATE_FRESHNESS_SECONDS
 
 
 def source_panel_geometry(source_size, panel_size):
@@ -115,6 +115,8 @@ class H264Scene:
     self._video_generation = 0
     self._panel_key = self._panel = self._panel_transform = None
     self._layer_key = self._layer_pixels = self._layer_uv = None
+    self._park_image = self._park_overlay = None
+    self._park_log_upload_status = (False, None)
     self._camera_executor = None
     self._gpu_camera = False
     self._contrast = self._contrast_lut = None
@@ -136,11 +138,15 @@ class H264Scene:
       self._snapshot = self._video = self._panel = self._panel_transform = None
       self._panel_key = self._contrast_lut = None
       self._layer_key = self._layer_pixels = self._layer_uv = None
+      self._park_image = self._park_overlay = None
 
   def set_gpu_camera(self, enabled):
     # Activated only after successful real GPU presentation, not by a request
     # for acceleration or an untested SDL renderer setting.
     self._gpu_camera = bool(enabled)
+
+  def set_park_log_upload_status(self, enabled, state):
+    self._park_log_upload_status = enabled, state
 
   def update(self, snapshot, received_at=None, *, take_ownership=False):
     """Keep a validated snapshot. Transfer only private decoded metadata."""
@@ -192,17 +198,14 @@ class H264Scene:
       self._contrast_lut = np.clip((values - 127.5) * contrast + 127.5, 0, 255).astype(np.uint8)
       self._contrast = contrast
 
-  @staticmethod
-  def _source_input_fresh(snapshot, field, elapsed_ms):
-    health = snapshot.get("health", {})
-    if field in snapshot:
-      age = snapshot[field]
-    elif isinstance(health, dict) and field in health:
-      age = health[field]
-    else:
-      # Older snapshots have only local transport freshness information.
-      return True
-    return type(age) in (int, float) and math.isfinite(age) and 0 <= age and age + elapsed_ms <= 500
+  def _fresh_car_state(self, snapshot, state_at, now):
+    return (state_at is not None and 0 <= now - state_at <= self.state_timeout
+            and now <= source_input_deadline(snapshot, "car_state_age_ms", state_at))
+
+  def parked_at(self, now):
+    with self._lock:
+      snapshot, state_at = self._snapshot, self._state_received_at
+    return state_at is not None and state_at <= now <= park_state_deadline(snapshot, state_at, self.state_timeout)
 
   def _camera_panel(self, rgb, source_size, generation):
     key = generation, source_size, self._contrast
@@ -270,25 +273,25 @@ class H264Scene:
       snapshot, state_at = self._snapshot, self._state_received_at
       rgb, video_at = self._video, self._video_received_at
       video_generation = self._video_generation
-    metadata_fresh = state_at is not None and 0 <= now - state_at <= self.state_timeout
     video_fresh = video_at is not None and 0 <= now - video_at <= self.video_timeout
     snapshot = {} if snapshot is None else snapshot
-    elapsed_ms = max(0.0, now - state_at) * 1000 if state_at is not None else 0.0
-    state_fresh = metadata_fresh and self._source_input_fresh(snapshot, "car_state_age_ms", elapsed_ms)
+    state_fresh = self._fresh_car_state(snapshot, state_at, now)
     self.config.is_metric = snapshot.get("is_metric") is not False
     self.config.speed_unit = "km/h" if self.config.is_metric else "mph"
     self.config.rotate_180 = snapshot.get("rotate_180") is True
-    self._update_contrast(snapshot.get("camera_contrast", 1.08))
     hud = snapshot.get("hud", {}) if state_fresh else {"_state_stale": True}
+    if hud.get("parked") is True:
+      return self._render_park(hud, video_fresh, layered)
+    self._park_image = self._park_overlay = None
+    self._update_contrast(snapshot.get("camera_contrast", 1.08))
     path = snapshot.get("path", {"path_x": [], "path_y": [], "path_z": [], "calib_transform": None})
     model_valid = (state_fresh and video_fresh and snapshot.get("model_valid") is True
-                   and self._source_input_fresh(snapshot, "model_age_ms", elapsed_ms))
-    path_deadline = now if state_at is None else state_at + min(self.state_timeout, PATH_MAX_AGE_SECONDS)
-    health = snapshot.get("health", {})
-    for field in ("car_state_age_ms", "model_age_ms"):
-      age = snapshot.get(field, health.get(field) if isinstance(health, dict) else None)
-      if type(age) in (int, float) and math.isfinite(age):
-        path_deadline = min(path_deadline, state_at + 0.5 - age / 1000)
+                   and now <= source_input_deadline(snapshot, "model_age_ms", state_at))
+    path_deadline = now if state_at is None else min(
+      state_at + min(self.state_timeout, PATH_MAX_AGE_SECONDS),
+      source_input_deadline(snapshot, "car_state_age_ms", state_at),
+      source_input_deadline(snapshot, "model_age_ms", state_at),
+    )
     self.renderer.configure_path_pipeline(layered and self._gpu_camera, now if state_at is None else state_at,
                                           path_deadline, self.clock)
     panel_started = time.monotonic()
@@ -336,4 +339,23 @@ class H264Scene:
       return SceneLayers(image, pixels, (self.renderer.camera_x, self.renderer.camera_y,
                                         self.renderer.camera_w, self.renderer.camera_h), uv, self.config.rotate_180, path_pixels,
                          overlay_token=image)
+    return image.transpose(Image.Transpose.ROTATE_180) if self.config.rotate_180 else image
+
+  def _render_park(self, hud, video_fresh, layered):
+    started = time.monotonic()
+    if self._park_image is None:
+      self.renderer.reset_path_for_park()
+    weather = {key: hud.get(f"park_weather_{key}") for key in PARK_WEATHER_FIELDS}
+    upload_enabled, upload_state = self._park_log_upload_status
+    image = self.renderer.render_park({**hud, "park_weather": weather if any(v is not None for v in weather.values()) else None,
+                                       "park_log_upload_enabled": upload_enabled, "park_log_upload_state": upload_state})
+    if image is not self._park_image:
+      self._park_image, self._park_overlay = image, None
+    self.last_frame_timings = {"hud": time.monotonic() - started}
+    self.last_status = {"state_fresh": True, "video_fresh": video_fresh, "model_valid": False, "parked": True}
+    if layered:
+      if self._park_overlay is None:
+        self._park_overlay = image.convert("RGBA")
+      return SceneLayers(self._park_overlay, None, (0, 0, 0, 0), (0, 0, 1, 1), self.config.rotate_180,
+                         overlay_token=self._park_overlay)
     return image.transpose(Image.Transpose.ROTATE_180) if self.config.rotate_180 else image

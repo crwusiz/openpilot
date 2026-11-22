@@ -608,6 +608,23 @@ def test_receive_watchdog_keeps_video_that_recovers_after_more_than_two_seconds(
   assert receiver.received_frames == 10
 
 
+@pytest.mark.parametrize("video_at", [None, 10.0])
+def test_receive_watchdog_uses_fresh_park_metadata_until_park_ends(monkeypatch, video_at):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  receiver.last_video_at = video_at
+  now = [10.0]
+
+  async def tick(_interval):
+    now[0] += 1.0
+    receiver.publish_state({"hud": {"parked": now[0] < 30.0}, "car_state_age_ms": 10.0}, received_at=now[0])
+
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(h264_receiver, "asyncio", SimpleNamespace(sleep=tick))
+  with pytest.raises(TimeoutError, match="WebRTC video"):
+    asyncio.run(receiver._watchdog(started=10.0))
+  assert now[0] == 30.0
+
+
 def test_existing_watchdog_records_loop_delay_and_its_own_cpu_separately(monkeypatch):
   receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
   now, cpu = [10.0], [4.0]
@@ -1492,6 +1509,68 @@ def test_failed_session_releases_renderer_without_waiting_for_cyclic_gc(monkeypa
     retained_error = None
     if was_enabled:
       gc.enable()
+
+
+@pytest.mark.parametrize("layered", [False, True])
+def test_receive_session_presents_park_from_metadata_before_any_camera_frames(monkeypatch, layered):
+  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
+
+  scene = h264_scene.H264Scene(Path(__file__).resolve().parents[5] / "assets", clock=lambda: 10.0)
+  monkeypatch.setattr(h264_scene, "H264Scene", lambda *_args: scene)
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: 10.0))
+  state = {"model_valid": False, "hud": {"parked": True}, "path": {}, "car_state_age_ms": 15.0}
+  receiver = SimpleNamespace(condition=threading.Condition(), start=Mock(), close=Mock(), done=True,
+                             received_frames=0, gpu_camera=False, record_display=Mock(),
+                             take_updates=Mock(side_effect=[(None, (state, 10.0)), (None, None)]))
+  monkeypatch.setattr(h264_receiver, "H264Receiver", lambda *_args: receiver)
+  sent = Mock(return_value=True)
+  display = SimpleNamespace(pump_events=lambda: True, can_present_layers=layered,
+                            send_layers=sent, send_rgb=sent, show_waiting=Mock())
+
+  assert h264_receiver.receive_h264_session(None, display, HELLO_DATA) == 0
+  sent.assert_called_once()
+  display.show_waiting.assert_not_called()
+  assert scene.last_status["parked"] is True
+  assert receiver.record_display.call_args.kwargs["camera_visible"] is False
+
+
+@pytest.mark.parametrize("newer_drive_pending", [False, True])
+def test_park_touch_target_requires_a_presented_park_screen_and_latest_gear(monkeypatch, newer_drive_pending):
+  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
+
+  now = [10.0]
+  scene = h264_scene.H264Scene(Path(__file__).resolve().parents[5] / "assets", clock=lambda: now[0])
+  monkeypatch.setattr(h264_scene, "H264Scene", lambda *_args: scene)
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  park = {"model_valid": False, "hud": {"parked": True}, "path": {}, "car_state_age_ms": 15.0, "rotate_180": True}
+  statuses = iter((park, {**park, "hud": {"parked": False}}, None, None))
+  sent = Mock(return_value=True)
+  receiver = SimpleNamespace(condition=threading.Condition(), start=Mock(), close=Mock(), done=False,
+                             received_frames=0, gpu_camera=False, record_display=Mock(),
+                             parked_at=lambda _now: not newer_drive_pending or not sent.call_count)
+
+  def take_updates(timeout):
+    state = next(statuses)
+    now[0] += 0.1
+    if state is None:
+      receiver.done = True
+    return None, None if state is None else (state, now[0])
+
+  receiver.take_updates = take_updates
+  monkeypatch.setattr(h264_receiver, "H264Receiver", lambda *_args: receiver)
+  touch = Mock()
+  targets = []
+
+  def pump_events():
+    targets.append(touch.call_args.args)
+    return True
+
+  display = SimpleNamespace(pump_events=pump_events, can_present_layers=False, send_rgb=sent,
+                            show_waiting=Mock(), set_park_touch=touch, park_log_upload_status=lambda: (True, None))
+  assert h264_receiver.receive_h264_session(None, display, HELLO_DATA) == 0
+  assert sent.call_count == 2
+  assert targets == [(), () if newer_drive_pending else ((1920, 480), True), ()]
+  assert touch.call_args.args == ()
 
 
 @pytest.mark.parametrize("stall", ["none", "both", "video_only", "short_timeout", "short_timeout_race"])

@@ -1,4 +1,4 @@
-"""Fixed C4 maintenance jobs requested by the connected Orange Pi touch panel."""
+"""Fixed C4 maintenance jobs requested by the connected Orange Pi cluster."""
 import asyncio
 from collections import OrderedDict
 import ipaddress
@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import signal
+import time
 import uuid
 
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.receiver_build import package_digest
@@ -14,6 +15,20 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.receiver_build imp
 LOG = logging.getLogger(__name__)
 ACTION_PATH = "/api/cluster/actions"
 MAX_OUTPUT = 64 * 1024
+PARK_UPLOAD_ACTION = "park_upload_logs"
+
+
+def car_is_parked():
+  from openpilot.cereal import messaging
+  from opendbc.car import structs
+
+  socket = messaging.sub_sock("carState", timeout=200, conflate=True)
+  event = messaging.recv_one(socket)
+  return (
+    event is not None and event.valid and event.which() == "carState"
+    and 0 <= time.monotonic() - event.logMonoTime / 1e9 <= 0.5
+    and event.carState.gearShifter == structs.CarState.GearShifter.park
+  )
 
 
 async def run_command(command, budget_s):
@@ -34,8 +49,7 @@ async def run_command(command, budget_s):
     return await asyncio.wait_for(read(), budget_s)
   finally:
     if process.returncode is None:
-      # Deployment/upload shell children must stop too if the dashboard exits
-      # or a job expires; otherwise a retry could start a second deployment.
+      # Stop shell children too so a retry cannot overlap a previous job.
       def stop(sig):
         try:
           if os.name == "posix":
@@ -55,10 +69,12 @@ async def run_command(command, budget_s):
 
 
 class ClusterActions:
-  def __init__(self, scripts="/data/openpilot/scripts", log_file="/data/log/cluster_debug.log", runner=run_command,
-               commit_file="/data/params/d/CommitCompare", package_reader=None):
+  def __init__(self, scripts="/data/openpilot/scripts", runner=run_command,
+               commit_file="/data/params/d/CommitCompare", package_reader=None,
+               log_file="/data/log/cluster_debug.log", park_check=car_is_parked):
     self.scripts = Path(scripts)
     self.log_file = Path(log_file)
+    self.park_check = park_check
     self.runner = runner
     self.jobs = OrderedDict()
     self.active = None
@@ -83,7 +99,7 @@ class ClusterActions:
 
   def submit(self, action, owner, request_id, connected_peer):
     owner = str(ipaddress.IPv4Address(owner))
-    if action not in ("pi_update", "upload_logs", "commit_check", "git_pull"):
+    if action not in ("pi_update", "commit_check", "git_pull", PARK_UPLOAD_ACTION):
       raise ValueError("Unknown cluster action")
     if not isinstance(request_id, str) or re.fullmatch(r"[a-f0-9]{32}", request_id) is None:
       raise ValueError("Invalid action request ID")
@@ -117,9 +133,13 @@ class ClusterActions:
 
   async def _run(self, job):
     action = job["action"]
-    script = self.scripts / {"pi_update": "pi_update.sh", "upload_logs": "log_upload.sh",
+    script = self.scripts / {"pi_update": "pi_update.sh", PARK_UPLOAD_ACTION: "log_upload.sh",
                              "commit_check": "commit_compare.sh", "git_pull": "gitpull.sh"}[action]
-    args = [job["owner"]] if action == "pi_update" else [str(self.log_file)] if action == "upload_logs" else []
+    args = []
+    if action == "pi_update":
+      args.append(job["owner"])
+    elif action == PARK_UPLOAD_ACTION:
+      args.append(str(self.log_file))
     LOG.info("[CLUSTER_TOUCH_ACTION] action=%s job=%s state=running", action, job["job_id"])
     try:
       if action == "commit_check":
@@ -129,17 +149,27 @@ class ClusterActions:
         except (OSError, UnicodeError, ValueError):
           self.checks[job["owner"]].pop("c4_pi_sha256", None)
           LOG.warning("C4 receiver package version unavailable", exc_info=True)
-      if not script.is_file() or (action == "upload_logs" and not self.log_file.is_file()):
-        job.update(state="failed", message="Required script or cluster log is missing")
+      if not script.is_file():
+        job.update(state="failed", message="Required script is missing")
         return
+      if action == PARK_UPLOAD_ACTION:
+        if not self.log_file.is_file():
+          job.update(state="failed", message="Cluster log is missing")
+          return
+        if not await asyncio.to_thread(self.park_check):
+          job.update(state="failed", reason="park_required", message="Shift into Park to upload cluster logs")
+          return
       code, output = await self.runner(["bash", str(script), *args], 900.0 if action == "pi_update" else 20.0 if action == "commit_check" else 240.0)
       if code != 0:
         job.update(state="failed", message=f"Command failed (exit {code}); check C4 dashboard logs")
         LOG.warning("[CLUSTER_TOUCH_ACTION] action=%s job=%s exit=%s output_tail=%s", action, job["job_id"], code, output[-4096:])
-      elif action == "upload_logs" and "CLUSTER_LOG_WARNING:" in output:
-        job.update(state="warning", message="Cluster log uploaded; some diagnostic logs need collection/upload retry")
-      elif action == "upload_logs" and "CLUSTER_PI_LOG_WARNING:" in output:
-        job.update(state="warning", message="C4 log uploaded; Pi log needs collection/upload retry")
+      elif action == PARK_UPLOAD_ACTION:
+        if "CLUSTER_LOG_WARNING:" in output:
+          job.update(state="warning", message="Cluster log uploaded; some diagnostic logs need collection/upload retry")
+        elif "CLUSTER_PI_LOG_WARNING:" in output:
+          job.update(state="warning", message="C4 log uploaded; Pi log needs collection/upload retry")
+        else:
+          job.update(state="succeeded", message="Cluster log upload completed")
       elif action == "commit_check":
         comparison = self.commit_file.read_text(encoding="ascii").strip()
         match = re.fullmatch(r'"([a-f0-9]{7,40})" (==|!=) "([a-f0-9]{7,40})"', comparison)
@@ -153,9 +183,9 @@ class ClusterActions:
         self.checks[job["owner"]]["commit_state"] = "checking"
         job.update(state="succeeded", message="C4 Git Pull started in tmux; C4 will restart after updating")
       else:
-        unchanged = action == "pi_update" and "CLUSTER_PI_UNCHANGED" in output
+        unchanged = "CLUSTER_PI_UNCHANGED" in output
         job.update(state="succeeded", unchanged=unchanged,
-                   message="Pi already up to date" if unchanged else "Pi reboot scheduled" if action == "pi_update" else "Cluster log upload completed")
+                   message="Pi already up to date" if unchanged else "Pi reboot scheduled")
     except TimeoutError:
       job.update(state="failed", message="Operation timed out")
     except asyncio.CancelledError:

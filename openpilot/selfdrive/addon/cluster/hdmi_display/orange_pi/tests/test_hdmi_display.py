@@ -72,7 +72,8 @@ def test_an_older_status_reply_cannot_unlock_a_newly_queued_touch_action():
 
   assert controls.action_busy and controls.action_status["state"] == "checking"
   assert controls.pending_action is None
-  display._panel_executor.submit.assert_called_once_with(display._panel_worker.exchange, "192.168.0.82", "pi_update")
+  display._panel_executor.submit.assert_called_once_with(display._panel_worker.exchange, "192.168.0.82", "pi_update",
+                                                        park_allowed=False, check_updates=True)
 
 
 @pytest.mark.parametrize("rotation, expected", [

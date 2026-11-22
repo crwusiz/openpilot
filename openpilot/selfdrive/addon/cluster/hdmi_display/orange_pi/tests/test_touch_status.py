@@ -200,6 +200,36 @@ def test_lost_post_reply_retries_the_same_id_and_then_polls_instead_of_redeployi
   assert calls[2][1] is None
 
 
+@pytest.mark.parametrize("stays_in_park", [True, False])
+def test_park_upload_retries_a_lost_post_only_if_still_parked(stays_in_park):
+  calls = []
+
+  def request(_host, payload):
+    calls.append(None if payload is None else dict(payload))
+    if len(calls) == 1:
+      raise OSError("response lost after acceptance")
+    return {**calls[0], "state": "running" if payload else "succeeded"}
+
+  worker = _worker(request)
+  worker.check_interval = 60.0
+  host = "192.168.0.82"
+  assert worker.exchange(host, "park_upload_logs", park_allowed=True, check_updates=False)[1]["state"] == "checking"
+  job = worker.exchange(host, park_allowed=stays_in_park, check_updates=False)[1]
+  assert job["action"] == "park_upload_logs"
+  assert job["state"] == ("running" if stays_in_park else "succeeded")
+  assert calls[1] == (calls[0] if stays_in_park else None)
+  assert worker.exchange(host, park_allowed=False, check_updates=False)[1]["state"] == "succeeded"
+  assert calls[2] is None
+
+
+def test_park_upload_never_posts_without_fresh_park():
+  request = Mock()
+  worker = _worker(request)
+  result = worker.exchange("192.168.0.82", "park_upload_logs")[1]
+  assert result["state"] == "failed" and result["reason"] == "park_required"
+  request.assert_not_called()
+
+
 def test_a_rejected_action_is_not_replaced_by_an_older_success_and_a_new_retry_can_start():
   def request(_host, payload):
     if payload is not None and request.reject:
@@ -207,11 +237,11 @@ def test_a_rejected_action_is_not_replaced_by_an_older_success_and_a_new_retry_c
     return {**payload, "state": "running"} if payload else {"state": "idle"}
   request.reject = True
   worker = _worker(request)
-  failed = worker.exchange("192.168.0.82", "upload_logs")[1]
+  failed = worker.exchange("192.168.0.82", "pi_update")[1]
   assert failed["state"] == "failed" and failed["reason"] == "not_connected"
   assert worker.exchange("192.168.0.82")[1] == failed
   request.reject = False
-  retried = worker.exchange("192.168.0.82", "upload_logs")[1]
+  retried = worker.exchange("192.168.0.82", "pi_update")[1]
   assert retried["state"] == "running"
   assert retried["request_id"] != failed["request_id"]
 

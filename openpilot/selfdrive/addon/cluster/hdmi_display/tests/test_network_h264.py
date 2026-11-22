@@ -241,6 +241,21 @@ def test_driving_fault_guard_omits_path_serialization_while_retaining_current_hu
   assert decoded["car_state_age_ms"] == 7.0
 
 
+def test_park_fields_use_backward_compatible_scalar_hud_values(monkeypatch):
+  source = models()
+  hud = {"parked": True, "_park_car_state_age_ms": 14.0, "trip_distance_km": 12.45, "trip_duration_s": 504.0,
+         "park_weather": {"code": 2, "temperature_c": 17.1234, "max_c": 18, "min_c": 10, "dust_grade": 1}}
+  source.get_render_data.return_value = True, hud, {}
+  monkeypatch.setattr(network.time, "localtime", lambda: SimpleNamespace(tm_gmtoff=32400))
+  state = network.scene_snapshot(config(), source, {"car_state_age_ms": 10.0})
+  payload = wire.decode_payload(wire.pack_scene(state)[wire.CONTROL_HEADER.size:])
+  assert payload["car_state_age_ms"] == 14.0
+  assert payload["hud"] == {"parked": True, "trip_distance_km": 12.45, "trip_duration_s": 504.0, "park_utc_offset_s": 32400,
+                            "park_weather_code": 2, "park_weather_temperature_c": 17.123, "park_weather_max_c": 18,
+                            "park_weather_min_c": 10, "park_weather_dust_grade": 1}
+  assert hud["park_weather"]["temperature_c"] == 17.1234
+
+
 def test_scene_rounding_reduces_payload_without_visible_projection_error():
   source = models()
   xs = np.linspace(1.0, 120.0, 33)

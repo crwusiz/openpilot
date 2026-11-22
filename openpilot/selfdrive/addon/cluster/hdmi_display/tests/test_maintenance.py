@@ -1,6 +1,7 @@
 import asyncio
 import os
 import signal
+import sys
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
@@ -15,10 +16,11 @@ PEER = "192.168.0.84"
 
 @pytest.fixture
 def actions(tmp_path):
-  for name in ("pi_update.sh", "log_upload.sh", "commit_compare.sh", "gitpull.sh", "cluster_debug.log"):
+  for name in ("pi_update.sh", "commit_compare.sh", "gitpull.sh", "log_upload.sh", "cluster_debug.log"):
     (tmp_path / name).touch()
-  return ClusterActions(tmp_path, tmp_path / "cluster_debug.log", runner=AsyncMock(return_value=(0, "done")),
-                        commit_file=tmp_path / "CommitCompare", package_reader=lambda: "a" * 64)
+  return ClusterActions(tmp_path, runner=AsyncMock(return_value=(0, "done")),
+                        commit_file=tmp_path / "CommitCompare", package_reader=lambda: "a" * 64,
+                        log_file=tmp_path / "cluster_debug.log", park_check=Mock(return_value=True))
 
 
 def test_update_targets_only_the_connected_pi_and_retries_do_not_deploy_twice(actions):
@@ -27,7 +29,7 @@ def test_update_targets_only_the_connected_pi_and_retries_do_not_deploy_twice(ac
     # A lost HTTP response followed by video disconnection retains the job.
     assert actions.submit("pi_update", PEER, "a" * 32, None) == first
     with pytest.raises(RuntimeError, match="already running"):
-      actions.submit("upload_logs", PEER, "b" * 32, PEER)
+      actions.submit("commit_check", PEER, "b" * 32, PEER)
     await asyncio.gather(*actions.tasks)
     actions.runner.assert_awaited_once_with(["bash", str(actions.scripts / "pi_update.sh"), PEER], 900.0)
     completed = actions.status(PEER, None)
@@ -38,25 +40,70 @@ def test_update_targets_only_the_connected_pi_and_retries_do_not_deploy_twice(ac
   asyncio.run(run())
 
 
-@pytest.mark.parametrize("output, state", [
-  ("upload done", "succeeded"), ("CLUSTER_PI_LOG_WARNING: Pi upload failed", "warning"),
-  ("CLUSTER_LOG_WARNING: Crash log upload failed", "warning"),
-  ("CLUSTER_LOG_WARNING: Crash log upload failed\nCLUSTER_PI_LOG_WARNING: Pi collection failed", "warning"),
-])
-def test_log_button_uses_existing_paired_log_upload_and_reports_partial_failure(actions, output, state):
-  async def run():
-    actions.runner.return_value = 0, output
+def test_stale_pi_receivers_cannot_start_touch_uploads(actions):
+  with pytest.raises(ValueError, match="Unknown cluster action"):
     actions.submit("upload_logs", PEER, "b" * 32, PEER)
+  assert actions.status(PEER, PEER) == {"state": "idle"}
+  actions.runner.assert_not_called()
+
+
+@pytest.mark.parametrize(("valid", "service", "gear", "age", "parked"), [
+  (True, "carState", "park", 0.1, True),
+  (True, "carState", "reverse", 0.1, False),
+  (True, "carState", "drive", 0.1, False),
+  (True, "carState", "park", 0.6, False),
+  (True, "carState", "park", -0.1, False),
+  (False, "carState", "park", 0.1, False),
+  (True, "controlsState", "park", 0.1, False),
+  (False, None, None, 0.0, False),
+])
+def test_car_is_parked_requires_latest_valid_car_state(monkeypatch, valid, service, gear, age, parked):
+  socket = object()
+  event = SimpleNamespace(valid=valid, which=lambda: service, logMonoTime=int((10.0 - age) * 1e9),
+                          carState=SimpleNamespace(gearShifter=gear)) if service else None
+  messaging = SimpleNamespace(sub_sock=Mock(return_value=socket), recv_one=Mock(return_value=event))
+  structs = SimpleNamespace(CarState=SimpleNamespace(GearShifter=SimpleNamespace(park="park")))
+  monkeypatch.setitem(sys.modules, "openpilot.cereal", SimpleNamespace(messaging=messaging))
+  monkeypatch.setitem(sys.modules, "opendbc.car", SimpleNamespace(structs=structs))
+  monkeypatch.setattr(maintenance, "time", SimpleNamespace(monotonic=lambda: 10.0))
+
+  assert maintenance.car_is_parked() is parked
+  messaging.sub_sock.assert_called_once_with("carState", timeout=200, conflate=True)
+  messaging.recv_one.assert_called_once_with(socket)
+
+
+def test_park_upload_cannot_run_without_fresh_gear_or_connected_pi(actions):
+  async def run():
+    action = maintenance.PARK_UPLOAD_ACTION
+    with pytest.raises(PermissionError, match="Connected Orange Pi required"):
+      actions.submit(action, "192.168.0.99", "a" * 32, PEER)
+    actions.park_check.assert_not_called()
+    actions.park_check.return_value = False
+    job = actions.submit(action, PEER, "a" * 32, PEER)
     await asyncio.gather(*actions.tasks)
+    result = actions.status(PEER, PEER)
+    assert result["job_id"] == job["job_id"]
+    assert result["state"] == "failed" and result["reason"] == "park_required"
+    actions.park_check.assert_called_once_with()
+    actions.runner.assert_not_called()
+
+  asyncio.run(run())
+
+
+@pytest.mark.parametrize(("output", "state"), [
+  ("uploaded", "succeeded"), ("CLUSTER_PI_LOG_WARNING: retry", "warning"), ("CLUSTER_LOG_WARNING: retry", "warning"),
+])
+def test_park_upload_uses_fixed_cluster_log_and_deduplicates_retries(actions, output, state):
+  async def run():
+    action = maintenance.PARK_UPLOAD_ACTION
+    actions.runner.return_value = 0, output
+    job = actions.submit(action, PEER, "a" * 32, PEER)
+    assert actions.submit(action, PEER, "a" * 32, PEER) == job
+    await asyncio.gather(*actions.tasks)
+    actions.park_check.assert_called_once_with()
     actions.runner.assert_awaited_once_with(["bash", str(actions.scripts / "log_upload.sh"), str(actions.log_file)], 240.0)
     assert actions.status(PEER, PEER)["state"] == state
-    message = actions.status(PEER, PEER)["message"]
-    if "CLUSTER_LOG_WARNING:" in output:
-      assert "diagnostic logs" in message and "retry" in message
-    elif state == "warning":
-      assert "Pi log" in message and "retry" in message
-    else:
-      assert message == "Cluster log upload completed"
+
   asyncio.run(run())
 
 
@@ -89,7 +136,7 @@ def test_failed_jobs_release_the_busy_state_and_do_not_publish_command_output(ac
     assert actions.status(PEER, None)["state"] == "failed"
     actions.runner.side_effect = None
     actions.runner.return_value = 5, "private command output must not be returned"
-    actions.submit("upload_logs", PEER, "b" * 32, PEER)
+    actions.submit("pi_update", PEER, "b" * 32, PEER)
     await asyncio.gather(*actions.tasks)
     result = actions.status(PEER, None)
     assert result["state"] == "failed" and "exit 5" in result["message"]

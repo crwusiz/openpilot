@@ -191,11 +191,14 @@ def request_action(host, payload=None):
     result = json.loads(data)
     if not isinstance(result, dict) or result.get("state") not in ("idle", "running", "succeeded", "warning", "failed"):
       raise ValueError("Invalid C4 action response")
-    if result["state"] != "idle" and (result.get("action") not in ("pi_update", "upload_logs", "commit_check", "git_pull")
+    if result["state"] != "idle" and (result.get("action") not in ("pi_update", "park_upload_logs", "upload_logs", "commit_check", "git_pull")
                                        or not isinstance(result.get("request_id"), str)):
       raise ValueError("Invalid C4 action identity")
     if payload is not None and (result.get("request_id") != payload["request_id"] or result.get("action") != payload["action"]):
       raise ValueError("C4 action reply does not match the request")
+    # A previous C4 version may still report a completed touch upload.
+    if result.get("action") == "upload_logs" and result["state"] != "running":
+      result = {**result, "action": None, "state": "idle"}
     return result
   finally:
     connection.close()
@@ -221,13 +224,22 @@ class TouchWorker:
     result["pi_version_state"] = "available" if result["pi_update_available"] else "current" if known else "unknown"
     return result
 
-  def exchange(self, host, action=None):
+  def exchange(self, host, action=None, *, park_allowed=False, check_updates=True):
     """One serialized worker call; no pygame objects cross this boundary."""
+    if action not in (None, "pi_update", "git_pull", "park_upload_logs"):
+      raise ValueError("Unsupported touch action")
     stats = self.sampler.sample()
     version = self.versions.sample()
     if host != self.host:
       self.host, self.pending, self.job = host, None, None
       self._next_check = 0.0
+    if not park_allowed:
+      if self.pending is not None and self.pending["action"] == "park_upload_logs":
+        # A reply may have been lost. Poll the server without repeating the
+        # POST after P is no longer confirmed.
+        self.pending = None
+      if action == "park_upload_logs":
+        return stats, self._version_status({"action": action, "state": "failed", "reason": "park_required"}, version)
     if action is not None:
       self.pending = {"action": action, "request_id": uuid.uuid4().hex}
       self.pending_at = self.clock()
@@ -238,7 +250,7 @@ class TouchWorker:
       job = self.request(host, self.pending)
       # The single Git Pull button reflects an automatic, periodically refreshed
       # commit check. Poll existing jobs before starting a new background check.
-      if (self.pending is None and action is None and job["state"] != "running"
+      if (check_updates and self.pending is None and action is None and job["state"] != "running"
           and self.check_interval is not None and self.clock() >= self._next_check):
         self.pending = {"action": "commit_check", "request_id": uuid.uuid4().hex}
         self.pending_at = self.clock()

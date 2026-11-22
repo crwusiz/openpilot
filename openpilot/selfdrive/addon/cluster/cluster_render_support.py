@@ -6,7 +6,20 @@ except ImportError:
   from color_support import ClusterColors as Colors, RGBColor, RGBAColor, colors_alpha
 
 
-__all__ = ["Colors", "FirstOrderFilter", "RGBColor", "RGBAColor", "colors_alpha"]
+__all__ = ["Colors", "FirstOrderFilter", "RGBColor", "RGBAColor", "colors_alpha", "park_layout", "park_upload_button_bounds"]
+
+
+def park_layout(size):
+  width, height = size
+  scale = min(width / 1920, height / 480)
+  return scale, (width - 1920 * scale) / 2, (height - 480 * scale) / 2
+
+
+def park_upload_button_bounds(size):
+  """Inclusive edges in the unrotated logical frame."""
+  scale, left, top = park_layout(size)
+  return (round(left + 1434 * scale), round(top + 85 * scale),
+          round(left + 1808 * scale), round(top + 135 * scale))
 
 
 class FirstOrderFilter:

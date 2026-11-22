@@ -45,6 +45,7 @@ def test_required_assets_keep_original_font_sizes_and_all_hud_icons(scene):
   manifest = Path(__file__).resolve().parents[1] / "receiver_assets.txt"
   assert set(manifest.read_text().splitlines()) == {
     "assets/fonts/NotoSansKR-Bold.ttf",
+    "assets/icons/ioniq5_park.png",
     *(f"assets/icons/{name}.png" for name in REQUIRED_ICON_NAMES),
   }
 
@@ -169,6 +170,43 @@ def test_metadata_and_video_have_independent_freshness_and_recover(scene, monkey
   assert scene.last_status == {"state_fresh": True, "video_fresh": False, "model_valid": False}
   assert camera.call_args.args[2] is False
   assert speeds[-1] == 72
+
+
+def test_fresh_park_metadata_renders_opaque_screen_with_or_without_video(scene, monkeypatch):
+  dark_background = Image.new("RGB", (1920, 480), (19, 26, 57))
+  dark_background.putpixel((0, 0), (255, 0, 0))
+  parked_renderer = Mock(return_value=dark_background)
+  monkeypatch.setattr(scene.renderer, "render_park", parked_renderer)
+  state = snapshot(car_state_age_ms=400.0, rotate_180=True)
+  state["hud"].update(parked=True, trip_distance_km=8.2, trip_duration_s=310, park_utc_offset_s=32400,
+                      park_weather_code=2, park_weather_temperature_c=16, park_weather_dust_grade=1)
+  scene.update(state)
+  scene.set_park_log_upload_status(True, "succeeded")
+  expected = dark_background.transpose(Image.Transpose.ROTATE_180)
+  assert scene.parked_at(10.0)
+  assert scene.render(now=10.0).tobytes() == expected.tobytes()
+  received_hud = parked_renderer.call_args.args[0]
+  assert received_hud["park_log_upload_enabled"] and received_hud["park_log_upload_state"] == "succeeded"
+  assert received_hud["trip_distance_km"] == 8.2 and received_hud["trip_duration_s"] == 310
+  assert received_hud["park_utc_offset_s"] == 32400
+  assert received_hud["park_weather"] == {"code": 2, "temperature_c": 16, "max_c": None, "min_c": None, "dust_grade": 1}
+
+  scene.set_video(np.zeros((720, 1280, 3), np.uint8))
+  layers = scene.render_layers(now=10.05)
+  assert layers.camera is None and layers.path is None
+  assert layers.overlay.mode == "RGBA" and layers.overlay.getpixel((0, 0))[3] == 255
+  assert layers.to_image().tobytes() == expected.tobytes()
+  assert scene.render_layers(now=10.06).overlay is layers.overlay
+  assert scene.last_status == {"state_fresh": True, "video_fresh": True, "model_valid": False, "parked": True}
+
+  # A fresh TCP packet alone cannot extend the source carState lifetime.
+  assert not scene.parked_at(10.11)
+  assert scene.render_layers(now=10.11).camera is not None
+  assert not scene.last_status["state_fresh"]
+  scene.update(snapshot(hud={"parked": False}, car_state_age_ms=0.0), received_at=10.12)
+  assert not scene.parked_at(10.12)
+  assert scene.render_layers(now=10.12).camera is not None
+  assert scene.last_status["model_valid"]
 
 
 def test_source_model_staleness_hides_path_while_hud_keeps_updating(scene):

@@ -24,6 +24,7 @@ def cluster_models(monkeypatch, request):
       self.updated = updated
       self.valid = dict.fromkeys(services, False)
       self.alive = dict.fromkeys(services, False)
+      self.logMonoTime = dict.fromkeys(services, 0)
 
     def update(self, _timeout):
       # Tests choose which queued services update and the SubMaster health flags.
@@ -37,7 +38,7 @@ def cluster_models(monkeypatch, request):
       log=SimpleNamespace(LongitudinalPlan=SimpleNamespace(LongitudinalPlanSource=SimpleNamespace(e2e=1))),
       messaging=SimpleNamespace(SubMaster=SubMaster),
     ),
-    "opendbc.car": SimpleNamespace(structs=SimpleNamespace(CarState=SimpleNamespace(GearShifter=SimpleNamespace(reverse=1)))),
+    "opendbc.car": SimpleNamespace(structs=SimpleNamespace(CarState=SimpleNamespace(GearShifter=SimpleNamespace(park=1, reverse=4)))),
     "openpilot.common.constants": SimpleNamespace(UnitConverter=lambda: SimpleNamespace()),
     "openpilot.common.swaglog": SimpleNamespace(cloudlog=Mock()),
     "openpilot.common.params": SimpleNamespace(Params=lambda: SimpleNamespace(get=lambda _key: b"1")),
@@ -299,6 +300,50 @@ def _car_message(speed, steering):
     schoolZoneActive=False, speedBumpDistance=0.0,
     tpms=SimpleNamespace(fl=35.0, fr=35.0, rl=35.0, rr=35.0), naviLimitSpeed=0.0, ignoreLimitTimer=0.0,
   )
+
+
+@pytest.mark.parametrize('cluster_models', [False, True], indirect=True)
+def test_parked_hud_requires_fresh_gear_and_reports_trip_from_every_valid_update(cluster_models):
+  state = cluster_models
+  models = state.models
+  models._park_weather = Mock()
+  weather = {'code': 0, 'temperature_c': 18, 'max_c': 20, 'min_c': 12, 'dust_grade': 1}
+  models._park_weather.snapshot.return_value = weather
+  state.messages['controlsState'] = SimpleNamespace(deprecated=SimpleNamespace(vCruise=0.0))
+  state.messages['gpsLocation'] = SimpleNamespace(hasFix=True, latitude=37.123, longitude=126.987)
+  state.updated.update(carState=True, gpsLocation=True)
+  models.sm.valid.update(carState=True, gpsLocation=True)
+  models.sm.alive['carState'] = True
+
+  def car_update(seconds, gear, speed):
+    state.messages['carState'] = _car_message(speed, 0.0)
+    state.messages['carState'].gearShifter = gear
+    state.clock.now = 100 + seconds
+    models.sm.logMonoTime['carState'] = round(state.clock.now * 1e9)
+    models._update_once()
+
+  car_update(0.0, 2, 10.0)
+  car_update(0.2, 2, 10.0)
+  car_update(0.4, 1, 0.0)
+  car_update(0.6, 1, 0.0)
+  hud = models.get_hud_data()
+  assert hud['parked'] and hud['park_weather'] == weather
+  assert hud['trip_distance_km'] == pytest.approx(0.003)
+  assert hud['trip_duration_s'] == pytest.approx(0.4)
+  models._park_weather.snapshot.assert_called_once_with((37.12, 126.99))
+
+  state.clock.now += 1.0
+  models._update_once()  # Receiving the same old P sample cannot refresh it.
+  assert not models.get_hud_data()['parked']
+  car_update(1.8, 1, 0.0)
+  assert models.get_hud_data()['parked']
+  car_update(2.0, 4, 0.0)
+  reset = models.get_hud_data()
+  assert not reset['parked'] and reset['park_weather'] is None
+  assert reset['reverse']
+  models.sm.valid['carState'] = False
+  car_update(2.2, 1, 0.0)
+  assert not models.get_hud_data()['parked']
 
 
 @pytest.mark.parametrize("valid, alive", [(True, False), (False, True)])

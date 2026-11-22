@@ -142,6 +142,13 @@ class HdmiDisplay:
     if self.controls is not None:
       self.controls.set_actions_available(host is not None)
 
+  def set_park_touch(self, frame_size=None, rotate_180=False):
+    if self.controls is not None:
+      self.controls.set_park_touch(frame_size, rotate_180)
+
+  def park_log_upload_status(self):
+    return (False, None) if self.controls is None else self.controls.park_log_upload_status()
+
   def _display_fps(self, now):
     while self._frame_times and self._frame_times[0] < now - 2.0:
       self._frame_times.popleft()
@@ -169,13 +176,14 @@ class HdmiDisplay:
       except Exception:
         LOG.warning("Touch panel status refresh failed", exc_info=True)
         if controls.pending_action is None:
-          controls.set_action_status({"state": "failed", "reason": "connection"})
+          controls.set_action_status({"action": controls.action_status.get("action"), "state": "failed", "reason": "connection"})
       self._panel_future = None
     if (self._panel_future is None and (controls.menu_visible or controls.action_busy)
         and (now >= self._panel_next_check or controls.pending_action is not None)):
       if self._panel_executor is None:
         self._panel_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="cluster-panel")
-      self._panel_future = self._panel_executor.submit(self._panel_worker.exchange, self._c4_host, controls.take_action())
+      self._panel_future = self._panel_executor.submit(self._panel_worker.exchange, self._c4_host, controls.take_action(),
+                                                       park_allowed=controls.park_touch_active, check_updates=controls.menu_visible)
       self._panel_next_check = now + 1.0
 
   @property
