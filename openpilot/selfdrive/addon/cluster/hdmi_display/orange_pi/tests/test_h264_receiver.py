@@ -509,6 +509,24 @@ def test_camera_gap_excludes_intervening_hud_refreshes_and_ignores_hidden_or_unp
   assert receiver._last_camera_display_at == pytest.approx(3.12)
 
 
+def test_camera_gap_restarts_after_presented_park_but_includes_stale_driving_gap():
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  receiver.record_display(1.0, 1.01, 1.02, video_received_at=1.0)
+  receiver.record_display(1.1, 1.11, 1.12, video_received_at=1.1)
+  receiver.record_display(2.0, 2.01, 2.02, presented=False, camera_visible=False, parked=True)
+  assert receiver._last_camera_display_at == pytest.approx(1.12)
+
+  receiver.record_display(2.1, 2.11, 2.12, video_received_at=2.1, camera_visible=False, parked=True)
+  receiver.record_display(12.0, 12.01, 12.02, video_received_at=12.0)
+  assert receiver._stats["camera_gap"] == pytest.approx(0.1)
+
+  receiver.record_display(12.5, 12.51, 12.52, video_received_at=12.0, camera_visible=False)
+  receiver.record_display(13.0, 13.01, 13.02, video_received_at=13.0)
+  assert receiver._stats["camera_gap"] == pytest.approx(1.0)
+  assert receiver.displayed_video_frames == 4
+  assert receiver.hidden_video_frames == 2
+
+
 def test_camera_gap_and_gpu_upload_savings_are_logged_per_window(monkeypatch, caplog):
   receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
 
@@ -878,6 +896,29 @@ def test_decode_recovery_does_not_request_idr_when_only_rgb_is_stale():
   payload = receiver._take_recovery_request(11.1)
   assert payload["recovery_reason"] == "video_stale"
   assert payload["video_age_ms"] == pytest.approx(1100)
+
+
+def test_decode_recovery_pauses_during_total_link_outage_and_resumes_on_state():
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  receiver.publish_state({}, received_at=10.0)
+  receiver._last_decoded_at = 10.0
+
+  assert receiver._take_recovery_request(10.4)["recovery_reason"] == "video_stale"
+  receiver.decoder_errors = 1
+  assert receiver._take_recovery_request(12.0) is None
+  assert receiver._take_recovery_request(15.0) is None
+  receiver.publish_state({}, received_at=15.1)
+  request = receiver._take_recovery_request(15.1)
+  assert request["recovery_reason"] == "decoder_error" and request["decoder_errors"] == 1
+
+
+def test_decode_error_recovery_still_runs_when_only_control_is_stale():
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  receiver.publish_state({}, received_at=10.0)
+  receiver._last_decoded_at = 13.0
+  receiver.decoder_errors = 1
+
+  assert receiver._take_recovery_request(13.1)["recovery_reason"] == "decoder_error"
 
 
 def test_fast_recovery_and_regular_feedback_share_one_cooldown(monkeypatch):
@@ -1532,6 +1573,7 @@ def test_receive_session_presents_park_from_metadata_before_any_camera_frames(mo
   display.show_waiting.assert_not_called()
   assert scene.last_status["parked"] is True
   assert receiver.record_display.call_args.kwargs["camera_visible"] is False
+  assert receiver.record_display.call_args.kwargs["parked"] is True
 
 
 @pytest.mark.parametrize("newer_drive_pending", [False, True])
@@ -1769,6 +1811,7 @@ def test_render_deadlines_preserve_phase_without_discarding_a_slot_after_overrun
       self.condition = threading.Condition()
       self.received_frames = 0
       self.last_video_at = self.last_state_at = None
+      self._last_camera_display_at = self._last_display_at = 0.95
       self.screen_off = self.done = self.closed = False
       receivers.append(self)
 
@@ -1808,6 +1851,7 @@ def test_render_deadlines_preserve_phase_without_discarding_a_slot_after_overrun
   if screen_off:
     assert not starts
     assert all(timeout == 0.02 for timeout in waits)
+    assert receivers[0]._last_camera_display_at is None and receivers[0]._last_display_at is None
   elif render_cost + display_cost < 0.05:
     # Replay the previous fixed-poll/reset-to-now policy with the same
     # arrivals and work. A pending picture can miss the next 50ms slot.

@@ -1,4 +1,5 @@
 #include <cassert>
+#include <chrono>
 #ifdef __COMMA_HARDWARE__
 #include <exception>
 #include <stdexcept>
@@ -59,16 +60,26 @@ void encoder_set_bitrate(std::unique_ptr<Encoder> &e) {
   e->set_bitrate(bitrate);
 }
 
-void encoder_request_keyframe(std::unique_ptr<Encoder> &e) {
+void encoder_request_keyframe(std::unique_ptr<Encoder> &e, std::chrono::steady_clock::time_point now,
+                              std::chrono::steady_clock::time_point &next_request) {
   static Params params;
-  if (!params.getBool("LivestreamRequestKeyframe")) return;
+  if (!params.getBool("LivestreamRequestKeyframe")) {
+    next_request = std::chrono::steady_clock::time_point::min();
+    return;
+  }
+  if (now < next_request) return;
+  // A shared request can stay set while a WebRTC client waits for or misses
+  // its acknowledgement. Keep forcing at most once per GOP until it clears.
   e->request_keyframe();
+  next_request = now + std::chrono::milliseconds(1000 * LIVESTREAM_GOP_SIZE / MAIN_FPS);
 }
 
 void encoder_thread(EncoderdState *s, const LogCameraInfo &cam_info) {
   util::set_thread_name(cam_info.thread_name);
 
   std::vector<std::unique_ptr<Encoder>> encoders;
+  std::vector<std::chrono::steady_clock::time_point> next_keyframe_requests(
+      cam_info.encoder_infos.size(), std::chrono::steady_clock::time_point::min());
 
   VisionIpcClient vipc_client = VisionIpcClient("camerad", cam_info.stream_type, false);
 
@@ -144,7 +155,7 @@ void encoder_thread(EncoderdState *s, const LogCameraInfo &cam_info) {
       for (int i = 0; i < encoders.size(); ++i) {
         if (cam_info.encoder_infos[i].is_live) {
           encoder_set_bitrate(encoders[i]);
-          encoder_request_keyframe(encoders[i]);
+          encoder_request_keyframe(encoders[i], std::chrono::steady_clock::now(), next_keyframe_requests[i]);
         }
 
         int out_id = encoders[i]->encode_frame(buf, &extra);

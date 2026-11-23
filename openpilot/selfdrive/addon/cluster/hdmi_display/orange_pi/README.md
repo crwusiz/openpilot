@@ -131,8 +131,8 @@ bash scripts/pi_update.sh
 | C4 `[CLUSTER_H264_SENDER]`, `[CLUSTER_H264_SEND_PERF]` | `api=track_send`, `framing=validated_annexb4`, 촬영 EOF 기준 RTP 시각, 실제 제출 FPS·잘못된 프레임·IDR 대기·`send_not_ready` 수 |
 | C4 `[CLUSTER_H264_SEND_BACKPRESSURE]`, `[CLUSTER_H264_SEND_RECOVERED]`, `[CLUSTER_H264_ERROR]`; Pi `[CLUSTER_H264_STOP]` | 일시적 송신 실패·회복, 종료한 제어/영상 단계, 수신 종료 이유와 마지막 영상·상태 age |
 | C4 `[CLUSTER_H264_BITRATE]` | 비트레이트 조정 이유. 영상 송신 실패와 TCP 상태 전송 대기가 각각 250ms 이상 지속 중이면 `video_tcp_backpressure`로 하향을 판단합니다. |
-| Pi `[CLUSTER_H264_RX_PERF]`, C4 `[CLUSTER_H264_PI_PERF]` | `display_fps`, RGB 변환·합성·출력 시간, 큐 대기·최대 표시 간격, 영상·상태 stale |
-| Pi `[CLUSTER_H264_RECOVERY_REQUEST]` | 복구 요청 이유, 마지막 디코딩과 RGB 준비 후 경과 시간. 연결 후 영상 디코딩이 350ms 이상 중단되면 IDR을 요청합니다. |
+| Pi `[CLUSTER_H264_RX_PERF]`, C4 `[CLUSTER_H264_PI_PERF]` | `display_fps`, RGB 변환·합성·출력 시간, 큐 대기·최대 표시 간격, 영상·상태 stale. 카메라 표시 간격 집계는 주차 화면과 화면 끄기 구간에서 끊습니다. |
+| Pi `[CLUSTER_H264_RECOVERY_REQUEST]` | 복구 요청 이유, 마지막 디코딩과 RGB 준비 후 경과 시간. 디코딩이 350ms 이상 중단되면 IDR을 요청하며, 상태 수신도 2초 이상 중단되면 요청을 보류합니다. |
 | C4 `[CLUSTER_RESOURCE_PERF]`, `[CLUSTER_LOAD_GUARD]`, `[CLUSTER_INPUT_DIAG]` | CPU·RSS, 모델·위치 입력 age, 통신 경고, 부하 보호와 복구 |
 | Pi `[CLUSTER_PI_RESOURCE_PERF]` | CPU·RSS·스레드·온도·주파수·팬 PWM |
 

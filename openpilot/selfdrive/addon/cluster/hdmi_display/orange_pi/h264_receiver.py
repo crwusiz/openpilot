@@ -34,6 +34,7 @@ FEEDBACK_INTERVAL = 1.0
 RECOVERY_INTERVAL = 0.5
 RECOVERY_POLL_INTERVAL = 0.1
 DECODE_RECOVERY_SECONDS = 0.35
+RECOVERY_CONTROL_STALE_SECONDS = 2.0
 LOOP_HEARTBEAT_INTERVAL = 0.1
 RGB_BURST_INTERVAL = 0.025
 VIDEO_STALE_SECONDS = 0.5
@@ -306,7 +307,7 @@ class H264Receiver:
       self._stats["pending_replaced"] += 1
 
   def record_display(self, render_started, rendered_at, displayed_at, video_received_at=None, presented=True,
-                     scene_timings=None, display_timings=None, camera_visible=True):
+                     scene_timings=None, display_timings=None, camera_visible=True, *, parked=False):
     with self.condition:
       self._stats["render_count"] += 1
       self._stats["render"] += max(0.0, rendered_at - render_started)
@@ -329,7 +330,11 @@ class H264Receiver:
         self._stats["queue_count"] += 1
         self._stats["queue"] += max(0.0, render_started - video_received_at)
       if presented:
-        if video_received_at is not None and camera_visible:
+        if parked:
+          # Park deliberately replaces the camera. Keep stale driving gaps
+          # measurable but start a new camera interval after leaving Park.
+          self._last_camera_display_at = None
+        elif video_received_at is not None and camera_visible:
           if self._last_camera_display_at is not None:
             self._stats["camera_gap"] = max(self._stats["camera_gap"], displayed_at - self._last_camera_display_at)
           self._last_camera_display_at = displayed_at
@@ -478,12 +483,16 @@ class H264Receiver:
         return None
       if self._last_recovery_at is not None and now - self._last_recovery_at < RECOVERY_INTERVAL:
         return None
-      video_age_ms = None if self.last_video_at is None else max(0.0, now - self.last_video_at) * 1000
       decoded_at = self._last_decoded_at
-      decode_age_ms = None if decoded_at is None else max(0.0, now - decoded_at) * 1000
+      decode_stale = decoded_at is not None and now >= decoded_at + DECODE_RECOVERY_SECONDS
+      if ((decoded_at is None or decode_stale) and self.last_state_at is not None
+          and now >= self.last_state_at + RECOVERY_CONTROL_STALE_SECONDS):
+        # Neither stream is progressing. More IDR requests cannot repair
+        # the link and may queue up until the control socket recovers.
+        return None
       if self.decoder_errors > self._recovered_decoder_errors:
         reason = "decoder_error"
-      elif decoded_at is not None and now >= decoded_at + DECODE_RECOVERY_SECONDS:
+      elif decode_stale:
         reason = "video_stale"
       elif decoded_at is None and started is not None and now >= started + VIDEO_STALE_SECONDS:
         reason = "video_startup"
@@ -491,6 +500,8 @@ class H264Receiver:
         return None
       self._last_recovery_at = now
       self._recovered_decoder_errors = self.decoder_errors
+      video_age_ms = None if self.last_video_at is None else max(0.0, now - self.last_video_at) * 1000
+      decode_age_ms = None if decoded_at is None else max(0.0, now - decoded_at) * 1000
       payload = {"screen_off": self.screen_off, "keyframe_request": True, "decoder_errors": self.decoder_errors,
                  "recovery_reason": reason, "video_age_ms": video_age_ms}
     LOG.info("[CLUSTER_H264_RECOVERY_REQUEST] reason=%s | video_age_ms=%s | decoder_errors=%d | decode_age_ms=%s",
@@ -894,6 +905,8 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         raise KeyboardInterrupt
       with receiver.condition:
         receiver.screen_off = bool(getattr(display, "screen_off", False))
+        if receiver.screen_off:
+          receiver._last_camera_display_at = receiver._last_display_at = None
       if receiver.screen_off:
         pending_camera_on_screen = False
       timeout = 0.02
@@ -983,7 +996,7 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         receiver.record_display(render_started, rendered_at, displayed_at, pending_video_at, presented,
                                 scene_timings=getattr(scene, "last_frame_timings", None),
                                 display_timings=getattr(display, "last_frame_timings", None),
-                                camera_visible=camera_visible)
+                                camera_visible=camera_visible, parked=park_presented)
         if video_stalled and pending_video_at is not None and presented and camera_visible:
           LOG.info("[CLUSTER_H264_RESUMED] Live WebRTC video received")
           video_stalled = False

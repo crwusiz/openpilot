@@ -398,7 +398,7 @@ def test_park_replaces_the_camera_and_restores_the_previous_driving_view(rendere
                            font_bold=font_path, font_regular=font_path, is_metric=True, speed_unit="km/h")
   monkeypatch.setattr(renderer_module, "Colors", Colors)
   monkeypatch.setattr(renderer_module, "colors_alpha", colors_alpha)
-  trip_labels = {"거리", "시간", "42.7 km", "1시간 04분", "클러스터 로그 전송"}
+  trip_labels = {"거리", "시간", "42.7 km", "1시간 04분", "로그 전송"}
   drawn_sizes = {}
   original_text = ImageDraw.ImageDraw.text
 

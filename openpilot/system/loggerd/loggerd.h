@@ -15,6 +15,7 @@
 #include "system/loggerd/logger.h"
 
 constexpr int MAIN_FPS = 20;
+constexpr int LIVESTREAM_GOP_SIZE = 5;
 const auto MAIN_ENCODE_TYPE = Hardware::PC() ? cereal::EncodeIndex::Type::BIG_BOX_LOSSLESS : cereal::EncodeIndex::Type::FULL_H_E_V_C;
 #define NO_CAMERA_PATIENCE 500  // fall back to time-based rotation if all cameras are dead
 
@@ -65,7 +66,7 @@ struct EncoderSettings {
 
   static EncoderSettings StreamEncoderSettings() {
     int _stream_bitrate = getenv("STREAM_BITRATE") ? atoi(getenv("STREAM_BITRATE")) : 5'000'000;
-    return EncoderSettings{.encode_type = cereal::EncodeIndex::Type::QCAMERA_H264, .bitrate = _stream_bitrate , .gop_size = 5};
+    return EncoderSettings{.encode_type = cereal::EncodeIndex::Type::QCAMERA_H264, .bitrate = _stream_bitrate, .gop_size = LIVESTREAM_GOP_SIZE};
   }
 };
 
