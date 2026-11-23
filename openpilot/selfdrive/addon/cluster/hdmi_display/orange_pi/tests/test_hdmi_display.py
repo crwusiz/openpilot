@@ -328,7 +328,7 @@ def test_screen_off_skips_rgb_conversion_and_waits_for_new_live_frame_after_wake
   display = _raster_display(raster_pygame)
   try:
     assert display.send_rgb(Image.new("RGB", (384, 96), (255, 0, 0)))
-    _tap_display(display)
+    _swipe_right(display)
     _tap_display(display, _control_target(display, "off"))
     assert display.screen_off
     skipped = SimpleNamespace(tobytes=lambda: pytest.fail("screen off must skip pixel conversion"))
@@ -398,10 +398,13 @@ def test_frame_rotation_preserves_pixels_and_touch_positions(raster_pygame, monk
       source_index = colors.index(actual[y][x])
       pygame.event.post(pygame.event.Event(pygame.FINGERDOWN, finger_id=7,
                                           x=x / (width - 1), y=y / (height - 1)))
+      pygame.event.post(pygame.event.Event(pygame.FINGERUP, finger_id=7,
+                                          x=x / (width - 1), y=y / (height - 1)))
       assert display.pump_events()
       assert (touches[-1]["x"], touches[-1]["y"]) == (
         (source_index % 4) / 3, source_index // 4,
       )
+      assert not display.controls.menu_visible
   finally:
     display.close()
 
@@ -649,15 +652,20 @@ def _assert_full_screen_menu(display):
   np.testing.assert_array_equal(pixels(output), np.rot90(pixels(menu), display.rotation // 90))
 
 
-def _post_touch(display, event_type, point=(0.5, 0.5), finger_id=7):
+def _raw_touch_position(display, point):
   x, y = point
   # Convert a logical cluster position to the panel's default raw coordinates.
   if display.rotation == 90:
-    x, y = 1 - y, x
-  elif display.rotation == 180:
-    x, y = 1 - x, 1 - y
-  elif display.rotation == 270:
-    x, y = y, 1 - x
+    return 1 - y, x
+  if display.rotation == 180:
+    return 1 - x, 1 - y
+  if display.rotation == 270:
+    return y, 1 - x
+  return x, y
+
+
+def _post_touch(display, event_type, point=(0.5, 0.5), finger_id=7):
+  x, y = _raw_touch_position(display, point)
   pygame = display._pygame
   pygame.event.post(pygame.event.Event(event_type, finger_id=finger_id, x=x, y=y))
 
@@ -666,6 +674,22 @@ def _tap_display(display, point=(0.5, 0.5)):
   _post_touch(display, display._pygame.FINGERDOWN, point)
   _post_touch(display, display._pygame.FINGERUP, point)
   assert display.pump_events()
+
+
+def _swipe_display(display, start, end):
+  pygame = display._pygame
+  _post_touch(display, pygame.FINGERDOWN, start)
+  _post_touch(display, pygame.FINGERMOTION)
+  _post_touch(display, pygame.FINGERUP, end)
+  assert display.pump_events()
+
+
+def _swipe_right(display):
+  _swipe_display(display, (0.25, 0.5), (0.75, 0.5))
+
+
+def _swipe_left(display):
+  _swipe_display(display, (0.75, 0.5), (0.25, 0.5))
 
 
 def _raster_display(pygame, rotation=0, renderer_mode="surface"):
@@ -702,12 +726,12 @@ def test_layered_camera_keeps_touch_brightness_and_does_not_cpu_scale(raster_pyg
     assert display.send_layers(layers) and display.last_frame_presented
     assert display.compositor_backend == "pi_gpu_camera"
     assert display._presenter.renderer.to_surface().get_at((0, 0))[:3] == (204, 0, 0)
-    _tap_display(display)
+    _swipe_right(display)
     assert display.controls.menu_visible
     _assert_full_screen_menu(display)
     _tap_display(display, _control_target(display, "brightness_down"))
     _tap_display(display, _control_target(display, "brightness_down"))
-    _tap_display(display, _control_target(display, "close"))
+    _swipe_left(display)
     assert display._presenter.renderer.to_surface().get_at((0, 0))[:3] == (153, 0, 0)
     assert display._latest_layers is layers
   finally:
@@ -800,11 +824,11 @@ def test_touch_redraw_gpu_failure_restores_retained_camera_in_surface_fallback(r
   try:
     assert display.send_layers(_layers())
     monkeypatch.setattr(display._presenter, "redraw", Mock(side_effect=RuntimeError("page flip failed")))
-    _tap_display(display)
+    _swipe_right(display)
     assert display._presenter is None
     assert display._latest_layers is None and display._latest_frame is not None
     _assert_full_screen_menu(display)
-    _tap_display(display, _control_target(display, "close"))
+    _swipe_left(display)
     assert display.screen.get_at((0, 0))[:3] == (204, 0, 0)
   finally:
     display.close()
@@ -819,8 +843,8 @@ def test_expired_camera_layer_does_not_redraw_the_last_gpu_camera(raster_pygame,
     stale.overlay = Image.new("RGBA", (384, 96), (0, 0, 0, 255))
     assert display.send_layers(stale)
     assert display._presenter.renderer.to_surface().get_at((0, 0))[:3] == (0, 0, 0)
-    _tap_display(display)
-    _tap_display(display, _control_target(display, "close"))
+    _swipe_right(display)
+    _swipe_left(display)
     assert display._presenter.renderer.to_surface().get_at((0, 0))[:3] == (0, 0, 0)
   finally:
     display.close()
@@ -836,14 +860,19 @@ def test_default_brightness_dims_received_frame_once(raster_pygame, monkeypatch)
     assert display.send_rgb(Image.new("RGB", (384, 96), (255, 100, 50)))
     assert display.last_frame_presented
     assert display.screen.get_at((0, 0))[:3] == (204, 80, 40)
-    _tap_display(display)
+    _swipe_right(display)
     assert display.controls.menu_visible
     assert not display.last_frame_presented, "local menu redraw is not another received frame"
     _assert_full_screen_menu(display)
-    _tap_display(display, _control_target(display, "brightness_down"))
+    target = _control_target(display, "brightness_down")
+    _post_touch(display, pygame.FINGERDOWN, target)
+    assert display.pump_events()
+    assert display.controls.brightness == 80
+    _post_touch(display, pygame.FINGERUP, target)
+    assert display.pump_events()
     _tap_display(display, _control_target(display, "brightness_down"))
     assert display.controls.brightness == 60
-    _tap_display(display, _control_target(display, "close"))
+    _swipe_left(display)
     assert display.screen.get_at((0, 0))[:3] == (153, 60, 30)
     for _ in range(3):
       assert display.pump_events()
@@ -878,6 +907,9 @@ def test_controls_open_and_auto_hide_without_incoming_frames(raster_pygame, monk
     assert display.send_rgb(Image.new("RGB", (384, 96), (255, 0, 0)))
     initial = pygame.image.tobytes(display.screen, "RGB")
     _tap_display(display)
+    assert not display.controls.menu_visible
+    assert pygame.image.tobytes(display.screen, "RGB") == initial
+    _swipe_right(display)
     assert pygame.image.tobytes(display.screen, "RGB") != initial
     now[0] += display.controls.menu_timeout
     assert display.pump_events()
@@ -892,7 +924,7 @@ def test_waiting_screen_controls_wake_without_any_network_frame(raster_pygame):
   display = _raster_display(pygame)
   try:
     assert display.show_waiting()
-    _tap_display(display)
+    _swipe_right(display)
     assert display.controls.menu_visible
     _tap_display(display, _control_target(display, "off"))
     assert not any(pygame.image.tobytes(display.screen, "RGB"))
@@ -908,36 +940,65 @@ def test_waiting_screen_controls_wake_without_any_network_frame(raster_pygame):
 
 
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+def test_finger_swipes_use_logical_direction_and_switch_one_panel_at_a_time(raster_pygame, rotation):
+  display = _raster_display(raster_pygame, rotation)
+  try:
+    _swipe_left(display)
+    assert not display.park_visible
+
+    display.set_park_available(True)
+    assert not display.park_visible
+    _swipe_left(display)
+    assert display.park_visible and not display.controls.menu_visible
+    _swipe_right(display)
+    assert not display.park_visible and not display.controls.menu_visible
+
+    _swipe_right(display)
+    assert display.controls.menu_visible
+    _swipe_left(display)
+    assert not display.controls.menu_visible and not display.park_visible
+
+    _swipe_left(display)
+    assert display.park_visible
+    display.set_park_available(False)
+    assert not display.park_visible
+  finally:
+    display.close()
+
+
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
 def test_desktop_mouse_uses_touch_rotation_and_synthetic_mouse_is_ignored(raster_pygame, rotation):
   pygame = raster_pygame
   display = _raster_display(pygame, rotation)
 
-  def click(point, synthetic=False):
-    x, y = point
-    if rotation == 90:
-      x, y = 1 - y, x
-    elif rotation == 180:
-      x, y = 1 - x, 1 - y
-    elif rotation == 270:
-      x, y = y, 1 - x
+  def mouse_position(point):
+    x, y = _raw_touch_position(display, point)
     width, height = display.screen.get_size()
-    pos = round(x * width), round(y * height)
-    for event_type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
-      pygame.event.post(pygame.event.Event(event_type, button=1, pos=pos, touch=synthetic))
+    return round(x * width), round(y * height)
+
+  def gesture(start, end=None, synthetic=False):
+    pygame.event.post(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=mouse_position(start), touch=synthetic))
+    if end is not None:
+      pygame.event.post(pygame.event.Event(pygame.MOUSEMOTION, buttons=(1, 0, 0),
+                                          pos=mouse_position((0.5, 0.5)), touch=synthetic))
+    pygame.event.post(pygame.event.Event(pygame.MOUSEBUTTONUP, button=1,
+                                        pos=mouse_position(start if end is None else end), touch=synthetic))
     assert display.pump_events()
 
   try:
     assert display.show_waiting()
-    click((0.5, 0.5), synthetic=True)
+    gesture((0.25, 0.5), (0.75, 0.5), synthetic=True)
     assert not display.controls.menu_visible
-    click((0.5, 0.5))
+    gesture((0.5, 0.5))
+    assert not display.controls.menu_visible
+    gesture((0.25, 0.5), (0.75, 0.5))
     assert display.controls.menu_visible
     assert display.last_touch["finger_id"] == -1
-    click(_control_target(display, "off"))
+    gesture(_control_target(display, "off"))
     assert display.controls.screen_off
-    click((0.5, 0.5), synthetic=True)
+    gesture((0.5, 0.5), synthetic=True)
     assert display.controls.screen_off
-    click((0.5, 0.5))
+    gesture((0.5, 0.5))
     assert not display.controls.screen_off
     assert not display.controls.menu_visible
   finally:
@@ -956,7 +1017,7 @@ def test_auto_gpu_failure_logs_and_uses_usable_surface(raster_pygame, monkeypatc
     assert "falling back to Surface" in caplog.text
     assert "old distro pygame" in caplog.text
     assert display.show_waiting()
-    _tap_display(display)
+    _swipe_right(display)
     assert display.controls.menu_visible
   finally:
     display.close()
@@ -985,7 +1046,7 @@ def test_gpu_path_avoids_surface_conversion_and_cpu_rotation(raster_pygame, monk
     assert display.last_frame_timings["rotate"] == display.last_frame_timings["scale"] == 0
     output = display._presenter.renderer.to_surface()
     assert output.get_at((0, 0))[:3] == (204, 0, 0)
-    _tap_display(display)
+    _swipe_right(display)
     assert display.controls.menu_visible
     _tap_display(display, _control_target(display, "off"))
     assert not any(pygame.image.tobytes(display._presenter.renderer.to_surface(), "RGB"))
@@ -1077,7 +1138,7 @@ def test_live_texture_failure_preserves_rotation_menu_brightness_and_off_wake(ra
     assert display.send_rgb(Image.new("RGB", (384, 96), (255, 0, 0)))
     controls = display.controls
     controls.set_brightness(35)
-    _tap_display(display)
+    _swipe_right(display)
     assert controls.menu_visible
     failure[0] = stage
     assert display.send_rgb(Image.new("RGB", (192, 48), (255, 0, 0)))

@@ -146,6 +146,14 @@ class HdmiDisplay:
     if self.controls is not None:
       self.controls.set_park_touch(frame_size, rotate_180)
 
+  def set_park_available(self, available):
+    if self.controls is not None:
+      self.controls.set_park_available(available)
+
+  @property
+  def park_visible(self):
+    return self.controls is not None and self.controls.park_visible
+
   def park_log_upload_status(self):
     return (False, None) if self.controls is None else self.controls.park_log_upload_status()
 

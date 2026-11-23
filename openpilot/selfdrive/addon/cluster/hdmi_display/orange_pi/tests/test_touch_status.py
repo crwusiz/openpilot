@@ -47,6 +47,39 @@ def test_missing_or_invalid_sensors_are_unknown_rather_than_zero(tmp_path):
   assert sampler.sample()["temperature"] is None
 
 
+def test_fan_prefers_a_supported_device_with_both_pwm_and_a_real_tach_channel(tmp_path):
+  sampler = PiStatus(tmp_path / "proc", tmp_path / "sys")
+  hwmon = sampler.sysfs / "class/hwmon"
+  _write(hwmon / "hwmon0/name", "gpu")
+  _write(hwmon / "hwmon0/pwm1", 255)
+  _write(hwmon / "hwmon0/fan1_input", 950)
+  _write(hwmon / "hwmon1/name", "pwmfan")
+  _write(hwmon / "hwmon1/pwm1", 153)
+  fan = hwmon / "hwmon2"
+  _write(fan / "name", "pwm-fan")
+  _write(fan / "pwm1", 204)
+  _write(fan / "fan1_input", -1)
+  _write(fan / "fan2_input", 2895)
+  _write(fan / "fan10_input", 4200)
+
+  result = sampler.sample()
+  assert (result["fan_pwm"], result["fan_rpm"]) == (80, 2895)
+  _write(fan / "fan1_input", 0)
+  assert sampler.sample()["fan_rpm"] == 0
+
+
+def test_fan_does_not_estimate_rpm_or_mix_different_devices(tmp_path):
+  sampler = PiStatus(tmp_path / "proc", tmp_path / "sys")
+  hwmon = sampler.sysfs / "class/hwmon"
+  _write(hwmon / "hwmon0/name", "pwmfan")
+  _write(hwmon / "hwmon0/pwm1", 153)
+  _write(hwmon / "hwmon1/name", "pwm-fan")
+  _write(hwmon / "hwmon1/fan1_input", 2895)
+
+  result = sampler.sample()
+  assert (result["fan_pwm"], result["fan_rpm"]) == (60, None)
+
+
 @pytest.mark.parametrize("usage", [0, 28.5, 100])
 def test_gpu_uses_powervr_total_load_and_dedicated_temperature(tmp_path, usage):
   sampler = PiStatus(tmp_path / "proc", tmp_path / "sys")

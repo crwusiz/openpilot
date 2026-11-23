@@ -874,7 +874,9 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
   freshness = None
   parked_at = getattr(scene, "parked_at", lambda _now: False)
   latest_parked_at = getattr(receiver, "parked_at", parked_at)
+  set_park_available = getattr(display, "set_park_available", None)
   set_park_touch = getattr(display, "set_park_touch", None)
+  set_park_visible = getattr(scene, "set_park_visible", None)
   park_log_upload_status = getattr(display, "park_log_upload_status", None)
   set_park_log_upload_status = getattr(scene, "set_park_log_upload_status", None)
   park_presented = park_rotate_180 = False
@@ -882,12 +884,17 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
   gpu_policy_logged = False
   slow_frame_logged_at = None
 
-  def refresh_park_touch(now):
+  def refresh_park_controls(now):
+    available = parked_at(now) and latest_parked_at(now)
+    if set_park_available is not None:
+      set_park_available(available)
+    visible = available and getattr(display, "park_visible", False) is True
     if set_park_touch is not None:
-      if park_presented and parked_at(now) and latest_parked_at(now):
+      if park_presented and visible:
         set_park_touch(frame_size, park_rotate_180)
       else:
         set_park_touch()
+    return visible
 
   def hud_deadline():
     due = 0 if last_render_started is None else last_render_started + HUD_REFRESH_INTERVAL
@@ -899,8 +906,7 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
   try:
     receiver.start()
     while True:
-      if set_park_touch is not None:
-        refresh_park_touch(time.monotonic())
+      refresh_park_controls(time.monotonic())
       if not display.pump_events():
         raise KeyboardInterrupt
       with receiver.condition:
@@ -930,22 +936,25 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         pending_camera_on_screen = not receiver.screen_off
         pending_render = True
       now = time.monotonic()
-      refresh_park_touch(now)
+      park_visible = refresh_park_controls(now)
       # Another packet may arrive after take_updates(). Only data already
       # applied to the scene can make the waiting screen safe to dismiss.
       video_age = None if scene_video_at is None else now - scene_video_at
       current_freshness = (video_age is not None and video_age < VIDEO_STALE_SECONDS,
                            scene_state_at is not None and now - scene_state_at < 0.5,
-                           parked_at(now))
+                           park_visible)
       if current_freshness != freshness:
         # Clear expired HUD/path even if both incoming streams stop together.
         pending_render = True
+        if freshness is not None and park_visible != freshness[2]:
+          # A swipe or a fresh gear change can switch views without a camera frame.
+          next_render_at = None
         freshness = current_freshness
       camera_timed_out = video_age is not None and video_age >= frame_timeout
       # Keep the live HUD during a camera-only stall. The scene hides expired
       # video and paths and checks HUD source age on every render. For a custom
       # timeout shorter than scene freshness, hide the whole image immediately.
-      full_waiting = (camera_timed_out and not current_freshness[2]
+      full_waiting = (camera_timed_out and not park_visible
                       and (not current_freshness[1] or video_age <= VIDEO_STALE_SECONDS))
       if camera_timed_out and not video_stalled:
         LOG.warning("[CLUSTER_H264_STALE] No decoded video within %.1fs | display=%s",
@@ -977,8 +986,13 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
           configure_gpu(layered and receiver.gpu_camera)
         if park_log_upload_status is not None and set_park_log_upload_status is not None:
           set_park_log_upload_status(*park_log_upload_status())
+        if set_park_visible is not None:
+          set_park_visible(park_visible)
         image = scene.render_layers() if layered else scene.render()
         rendered_at = time.monotonic()
+        if park_visible and not refresh_park_controls(rendered_at):
+          # Discard a Park composition if a newer gear arrived while rendering it.
+          continue
         if not (display.send_layers(image) if layered else display.send_rgb(image)):
           raise RuntimeError("Unable to display H.264 cluster frame")
         displayed_at = time.monotonic()
@@ -1032,6 +1046,8 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         return receiver.received_frames
   finally:
     try:
+      if set_park_available is not None:
+        set_park_available(False)
       if set_park_touch is not None:
         set_park_touch()
       receiver.close()

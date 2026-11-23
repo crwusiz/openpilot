@@ -42,6 +42,30 @@ def _read_sensor(path):
     return None
 
 
+def _pwm_fan_status(sysfs):
+  partial = (None, None)
+  for hwmon in islice((sysfs / "class/hwmon").glob("hwmon*"), 32):
+    if _read_sensor(hwmon / "name") not in ("pwmfan", "pwm-fan"):
+      continue
+    duty = _integer(hwmon / "pwm1")
+    pwm = round(duty * 100 / 255) if duty is not None and 0 <= duty <= 255 else None
+    rpm = None
+    # The kernel exports fanN_input only for configured tachometer channels.
+    channels = sorted(islice(hwmon.glob("fan[1-9]*_input"), 32), key=lambda path: (len(path.name), path.name))
+    for channel in channels:
+      if re.fullmatch(r"fan[1-9][0-9]*_input", channel.name):
+        speed = _integer(channel)
+        if speed is not None and 0 <= speed <= 100000:
+          rpm = speed
+          break
+    if pwm is not None and rpm is not None:
+      return pwm, rpm
+    # Keep a useful partial sample without pairing readings from different fans.
+    if partial == (None, None) or (partial[0] is None and pwm is not None):
+      partial = pwm, rpm
+  return partial
+
+
 def _privileged_gpu_read():
   try:
     result = subprocess.run(["/usr/bin/sudo", "-n", "--", "/usr/bin/head", "-c", str(MAX_SENSOR_BYTES + 1), "--",
@@ -151,20 +175,7 @@ class PiStatus:
       except (OSError, UnicodeError):
         pass
 
-    pwm, rpm = None, None
-    for hwmon in (self.sysfs / "class/hwmon").glob("hwmon*"):
-      try:
-        if (hwmon / "name").read_text(encoding="ascii").strip() != "pwmfan":
-          continue
-      except (OSError, UnicodeError):
-        continue
-      value = _integer(hwmon / "pwm1")
-      if value is not None and 0 <= value <= 255:
-        pwm = round(value * 100 / 255)
-      value = _integer(hwmon / "fan1_input")
-      if value is not None and 0 <= value <= 100000:
-        rpm = value
-      break
+    pwm, rpm = _pwm_fan_status(self.sysfs)
     return {"cpu": cpu, "temperature": max(temperatures, default=None), "gpu": _gpu_usage(self.sysfs, self._privileged_gpu_status),
             "gpu_temperature": max(gpu_temperatures, default=None), "fan_pwm": pwm, "fan_rpm": rpm}
 

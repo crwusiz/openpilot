@@ -201,6 +201,10 @@ def test_fresh_park_metadata_renders_opaque_screen_with_or_without_video(scene, 
   scene.set_park_log_upload_status(True, "succeeded")
   expected = dark_background.transpose(Image.Transpose.ROTATE_180)
   assert scene.parked_at(10.0)
+  assert scene.render(now=10.0).tobytes() != expected.tobytes()
+  parked_renderer.assert_not_called()
+
+  scene.set_park_visible(True)
   assert scene.render(now=10.0).tobytes() == expected.tobytes()
   received_hud = parked_renderer.call_args.args[0]
   assert received_hud["park_log_upload_enabled"] and received_hud["park_log_upload_state"] == "succeeded"
@@ -215,6 +219,11 @@ def test_fresh_park_metadata_renders_opaque_screen_with_or_without_video(scene, 
   assert layers.to_image().tobytes() == expected.tobytes()
   assert scene.render_layers(now=10.06).overlay is layers.overlay
   assert scene.last_status == {"state_fresh": True, "video_fresh": True, "model_valid": False, "parked": True}
+
+  scene.set_park_visible(False)
+  assert scene.render_layers(now=10.07).camera is not None
+  assert not scene.last_status.get("parked") and scene.parked_at(10.07)
+  scene.set_park_visible(True)
 
   # A fresh TCP packet alone cannot extend the source carState lifetime.
   assert not scene.parked_at(10.11)

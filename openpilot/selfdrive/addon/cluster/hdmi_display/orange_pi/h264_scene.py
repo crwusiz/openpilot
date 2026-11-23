@@ -116,6 +116,7 @@ class H264Scene:
     self._panel_key = self._panel = self._panel_transform = None
     self._layer_key = self._layer_pixels = self._layer_uv = None
     self._park_image = self._park_overlay = None
+    self._park_visible = False
     self._park_log_upload_status = (False, None)
     self._camera_executor = None
     self._gpu_camera = False
@@ -147,6 +148,9 @@ class H264Scene:
 
   def set_park_log_upload_status(self, enabled, state):
     self._park_log_upload_status = enabled, state
+
+  def set_park_visible(self, visible):
+    self._park_visible = bool(visible)
 
   def update(self, snapshot, received_at=None, *, take_ownership=False):
     """Keep a validated snapshot. Transfer only private decoded metadata."""
@@ -281,7 +285,10 @@ class H264Scene:
     self.config.rotate_180 = snapshot.get("rotate_180") is True
     hud = snapshot.get("hud", {}) if state_fresh else {"_state_stale": True}
     if hud.get("parked") is True:
-      return self._render_park(hud, video_fresh, layered)
+      if self._park_visible:
+        return self._render_park(hud, video_fresh, layered)
+      # The shared RGB renderer uses the parked flag to switch views for USB.
+      hud = {**hud, "parked": False}
     self._park_image = self._park_overlay = None
     self._update_contrast(snapshot.get("camera_contrast", 1.08))
     path = snapshot.get("path", {"path_x": [], "path_y": [], "path_z": [], "calib_transform": None})

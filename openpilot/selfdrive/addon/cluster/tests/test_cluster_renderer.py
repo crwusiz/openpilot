@@ -431,14 +431,16 @@ def test_park_replaces_the_camera_and_restores_the_previous_driving_view(rendere
   left, top, _, bottom = renderer_module.park_upload_button_bounds(size)
   park_screen = renderer._park_screen
   assert drawn_sizes == dict.fromkeys(trip_labels, round(28 * park_screen.scale))
-  assert park_screen._point(1468, park_screen.TRIP_DURATION_Y)[1] < top < bottom < park_screen._point(1468, 414)[1]
-  assert (top, bottom) == (park_screen._point(1621, 329)[1], park_screen._point(1621, 393)[1])
-  for center_y in (108, park_screen.TRIP_DISTANCE_Y, park_screen.TRIP_DURATION_Y):
-    x, y = park_screen._point(1468, center_y)
+  assert park_screen._point(1468, park_screen.TRIP_DURATION_Y)[1] < top < bottom < park_screen._point(1468, 416)[1]
+  assert (top, bottom) == (park_screen._point(1621, 321)[1], park_screen._point(1621, 401)[1])
+  for center_y in (park_screen.TRIP_TITLE_Y, park_screen.TRIP_DISTANCE_Y, park_screen.TRIP_DURATION_Y):
+    x, y = park_screen._point(park_screen.TRIP_ICON_X, center_y)
     icon_region = parked.crop((x - 12, y - 12, x + 13, y + 13))
     assert np.any(np.all(np.asarray(icon_region) == renderer_module.ParkScreen.ACCENT, axis=-1))
+    assert parked.getpixel((x, y - round(24 * park_screen.scale))) == (43, 63, 94)
+    assert parked.getpixel((x, y + round(24 * park_screen.scale))) == (43, 63, 94)
   button_pixels = ((left + 20, top + 5), (left + 20, bottom - 5))
-  icon_pixel = (left + round(34 * park_screen.scale), (top + bottom) // 2)
+  icon_pixel = (park_screen._point(park_screen.TRIP_ICON_X, 0)[0], (top + bottom) // 2)
   assert all(parked.getpixel(pixel) == (30, 44, 64) for pixel in button_pixels)
   assert parked.getpixel(icon_pixel) == renderer_module.ParkScreen.MUTED
   park_hud = parking.get_render_data.return_value[1]

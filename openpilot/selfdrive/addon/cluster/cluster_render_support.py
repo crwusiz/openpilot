@@ -18,8 +18,8 @@ def park_layout(size):
 def park_upload_button_bounds(size):
   """Inclusive edges in the unrotated logical frame."""
   scale, left, top = park_layout(size)
-  return (round(left + 1434 * scale), round(top + 329 * scale),
-          round(left + 1808 * scale), round(top + 393 * scale))
+  return (round(left + 1434 * scale), round(top + 321 * scale),
+          round(left + 1808 * scale), round(top + 401 * scale))
 
 
 class FirstOrderFilter:

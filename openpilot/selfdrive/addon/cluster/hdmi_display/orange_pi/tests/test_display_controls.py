@@ -20,8 +20,14 @@ def _touch(controls, event_type, point=(0.5, 0.5), finger_id=7):
 
 def _tap(controls, point=(0.5, 0.5), finger_id=7):
   changed = _touch(controls, controls.pygame.FINGERDOWN, point, finger_id)
-  _touch(controls, controls.pygame.FINGERUP, point, finger_id)
-  return changed
+  return _touch(controls, controls.pygame.FINGERUP, point, finger_id) or changed
+
+
+def _swipe(controls, *, rightward=True, finger_id=7):
+  start, end = ((0.15, 0.5), (0.85, 0.5)) if rightward else ((0.85, 0.5), (0.15, 0.5))
+  _touch(controls, controls.pygame.FINGERDOWN, start, finger_id)
+  _touch(controls, controls.pygame.FINGERMOTION, end, finger_id)
+  return _touch(controls, controls.pygame.FINGERUP, end, finger_id)
 
 
 def _target(controls, name):
@@ -39,27 +45,31 @@ def test_default_brightness_is_eighty_percent_and_menu_is_hidden(controls):
   assert state.render_menu() is None
 
 
-def test_action_requires_a_peer_and_only_one_down_gesture_can_start_it(controls):
+def test_action_requires_peer_and_a_complete_button_tap(controls):
   state, pygame, _ = controls
-  _tap(state)
+  assert _swipe(state)
   assert not _tap(state, _target(state, "update"))
   assert state.pending_action is None
   state.set_actions_available(True)
   state.set_action_status({"state": "idle", "pi_update_available": True})
-  assert _touch(state, pygame.FINGERDOWN, _target(state, "update"))
+  point = _target(state, "update")
+  assert not _touch(state, pygame.FINGERDOWN, point)
+  assert state.take_action() is None
+  assert not _touch(state, pygame.FINGERMOTION, point)
+  assert _touch(state, pygame.FINGERUP, point)
   assert state.take_action() == "pi_update"
   assert state.action_busy and state.take_action() is None
-  assert not _touch(state, pygame.FINGERMOTION, _target(state, "update"))
-  _touch(state, pygame.FINGERUP, _target(state, "update"))
-  assert not _tap(state, _target(state, "update"))
+  assert not _tap(state, point)
 
 
 @pytest.mark.parametrize("height,rotate_180", [(480, False), (480, True), (720, False), (720, True)])
-@pytest.mark.parametrize("tap_y", [332, 361, 390])
+@pytest.mark.parametrize("tap_y", [325, 361, 397])
 def test_park_button_only_dispatches_on_release_in_the_displayed_hitbox(controls, height, rotate_180, tap_y):
   state, pygame, _ = controls
   state.set_actions_available(True)
   state.set_size((1920, height))
+  state.set_park_available(True)
+  assert _swipe(state, rightward=False) and state.park_visible
   state.set_park_touch((1920, height), rotate_180)
   x, y = 1621 / 1920, (tap_y + (height - 480) / 2) / height
   point = (1 - x, 1 - y) if rotate_180 else (x, y)
@@ -79,20 +89,23 @@ def test_park_button_only_dispatches_on_release_in_the_displayed_hitbox(controls
 
   old_x, old_y = x, (110 + (height - 480) / 2) / height
   old_point = (1 - old_x, 1 - old_y) if rotate_180 else (old_x, old_y)
-  assert _tap(state, old_point)
-  assert state.menu_visible and state.take_action() is None
+  assert not _tap(state, old_point)
+  assert state.park_visible and state.take_action() is None
 
 
 @pytest.mark.parametrize("interrupt", ["left_park", "disconnect", "drag", "screen_off"])
 def test_park_button_discards_interrupted_gestures(controls, interrupt):
   state, pygame, _ = controls
   state.set_actions_available(True)
+  state.set_park_available(True)
+  assert _swipe(state, rightward=False)
   state.set_park_touch((1920, 480))
   point = 1621 / 1920, 361 / 480
   assert not _touch(state, pygame.FINGERDOWN, point)
   if interrupt == "left_park":
-    state.set_park_touch()
+    state.set_park_available(False)
     state.set_park_touch((1920, 480))
+    state.set_park_available(True)
   elif interrupt == "disconnect":
     state.set_actions_available(False)
     state.set_actions_available(True)
@@ -104,28 +117,37 @@ def test_park_button_discards_interrupted_gestures(controls, interrupt):
   assert state.take_action() is None
 
 
-def test_park_button_clears_an_unsent_upload_on_leaving_park(controls):
+@pytest.mark.parametrize("leave_park", ["gear_change", "swipe", "hidden_frame"])
+def test_park_button_clears_an_unsent_upload_on_leaving_park(controls, leave_park):
   state, pygame, _ = controls
   state.set_actions_available(True)
+  state.set_park_available(True)
+  assert _swipe(state, rightward=False)
   state.set_park_touch((1920, 480))
   point = 1621 / 1920, 361 / 480
   _touch(state, pygame.FINGERDOWN, point)
   assert _touch(state, pygame.FINGERUP, point)
-  state.set_park_touch()
+  if leave_park == "gear_change":
+    state.set_park_available(False)
+  elif leave_park == "swipe":
+    assert _swipe(state)
+  else:
+    state.set_park_touch()
   assert state.take_action() is None and not state.action_busy
+  assert not state.park_touch_active
 
 
 def test_running_action_can_be_hidden_and_completion_remains_visible_for_the_timeout(controls):
   state, _, now = controls
   state.set_actions_available(True)
   state.set_action_status({"state": "idle", "pi_update_available": True})
-  _tap(state)
+  assert _swipe(state)
   _tap(state, _target(state, "update"))
   now[0] = 100.0
   assert not state.update() and state.menu_visible
-  _tap(state, _target(state, "close"))
+  assert _swipe(state, rightward=False)
   assert not state.menu_visible and state.action_busy
-  _tap(state)
+  assert _swipe(state)
   state.set_action_status({"state": "succeeded", "action": "pi_update"})
   assert state.action_label("update")
   assert state.action_label("pull") == "Not checked"
@@ -141,7 +163,7 @@ def test_status_updates_only_redraw_when_menu_is_visible(controls):
   state.set_status({"cpu": 25.0, "temperature": 54.2, "gpu": 40.0, "gpu_temperature": 58.7,
                     "fan_pwm": 60, "fan_rpm": None, "fps": 17.5})
   assert state.revision == revision
-  _tap(state)
+  assert _swipe(state)
   revision = state.revision
   state.set_status({**state.status, "fan_rpm": 3200})
   assert state.revision == revision + 1
@@ -149,22 +171,91 @@ def test_status_updates_only_redraw_when_menu_is_visible(controls):
   assert state.revision == revision + 1
 
 
-def test_tap_opens_controls_and_only_close_dismisses_them(controls):
+def test_horizontal_swipe_opens_and_closes_controls(controls):
   state, _, _ = controls
   state.set_actions_available(True)
-  assert _tap(state)
+  assert not _tap(state)
+  assert not state.menu_visible
+  assert _swipe(state)
   assert state.menu_visible
-  assert "upload" not in state.layout
+  assert "upload" not in state.layout and "close" not in state.layout
   assert not _tap(state, (0, 0))
   assert state.menu_visible and state.take_action() is None
-  assert _tap(state, _target(state, "close"))
+  assert not _swipe(state)
+  assert state.menu_visible
+  assert _swipe(state, rightward=False)
   assert not state.menu_visible
+
+
+@pytest.mark.parametrize("start,end", [
+  ((0.4, 0.5), (0.46, 0.5)),
+  ((0.2, 0.1), (0.33, 0.9)),
+  ((0.5, 0.1), (0.5, 0.9)),
+])
+def test_short_and_vertical_gestures_do_not_open_menu(controls, start, end):
+  state, pygame, _ = controls
+  _touch(state, pygame.FINGERDOWN, start)
+  _touch(state, pygame.FINGERMOTION, end)
+  assert not _touch(state, pygame.FINGERUP, end)
+  assert not (state.menu_visible or state.park_visible)
+
+
+def test_park_swipes_require_availability_and_do_not_reopen_the_other_view(controls):
+  state, _, _ = controls
+  assert not _swipe(state, rightward=False)
+  assert not state.park_visible
+  state.set_park_available(True)
+  assert not state.park_visible
+  assert _swipe(state, rightward=False)
+  assert state.park_visible and not state.menu_visible
+  assert not _swipe(state, rightward=False)
+  assert state.park_visible
+  assert _swipe(state)
+  assert not (state.park_visible or state.menu_visible)
+  assert _swipe(state)
+  assert state.menu_visible and not state.park_visible
+  assert _swipe(state, rightward=False)
+  assert not (state.menu_visible or state.park_visible)
+  assert _swipe(state, rightward=False) and state.park_visible
+  state.set_park_available(False)
+  assert not state.park_visible
+
+
+def test_swiping_right_from_the_park_button_closes_park_without_uploading(controls):
+  state, pygame, _ = controls
+  state.set_actions_available(True)
+  state.set_park_available(True)
+  assert _swipe(state, rightward=False)
+  state.set_park_touch((1920, 480))
+  start = (1450 / 1920, 361 / 480)
+  end = (0.97, start[1])
+  assert not _touch(state, pygame.FINGERDOWN, start)
+  assert not _touch(state, pygame.FINGERMOTION, end)
+  assert _touch(state, pygame.FINGERUP, end)
+  assert not (state.menu_visible or state.park_visible)
+  assert state.take_action() is None
+
+
+@pytest.mark.parametrize("button", ["update", "pull", "brightness_down", "off"])
+def test_swiping_from_a_control_button_cannot_trigger_it(controls, button):
+  state, pygame, _ = controls
+  state.set_actions_available(True)
+  state.set_action_status({"state": "idle", "pi_update_available": True, "update_available": True})
+  assert _swipe(state)
+  start = _target(state, button)
+  # Start on the control itself in either direction. The far-left power button
+  # can only start a rightward swipe, which keeps the menu open.
+  end = (0.85 if button == "off" else 0.12, start[1])
+  assert not _touch(state, pygame.FINGERDOWN, start)
+  assert not _touch(state, pygame.FINGERMOTION, end)
+  assert _touch(state, pygame.FINGERUP, end) is (button != "off")
+  assert state.take_action() is None and state.brightness == 80 and not state.screen_off
 
 
 def test_waking_touch_restores_previous_brightness_without_opening_menu(controls):
   state, pygame, _ = controls
   state.set_brightness(35)
-  _tap(state)
+  assert _swipe(state)
   assert _tap(state, _target(state, "off"))
   assert state.screen_off
   assert state.brightness_factor == 0
@@ -179,25 +270,7 @@ def test_waking_touch_restores_previous_brightness_without_opening_menu(controls
   assert not _touch(state, pygame.FINGERUP)
   assert state.brightness == 40
   assert not state.menu_visible
-  assert _tap(state)
-  assert state.menu_visible
-
-
-def test_new_touch_down_wakes_screen_even_if_previous_release_was_missing(controls):
-  state, pygame, _ = controls
-  _tap(state)
-  assert _touch(state, pygame.FINGERDOWN, _target(state, "off"), finger_id=7)
-  assert state.screen_off
-  assert not _touch(state, pygame.FINGERMOTION, _target(state, "brightness_down"), finger_id=7)
-  assert state.screen_off
-  assert _touch(state, pygame.FINGERDOWN, (0.5, 0.5), finger_id=9)
-  assert not state.screen_off
-  assert not state.menu_visible
-  assert not _touch(state, pygame.FINGERUP, finger_id=7)
-  assert not _touch(state, pygame.FINGERMOTION, _target(state, "brightness_down"), finger_id=9)
-  assert state.brightness == 80
-  _touch(state, pygame.FINGERUP, finger_id=9)
-  assert _tap(state, finger_id=9)
+  assert _swipe(state)
   assert state.menu_visible
 
 
@@ -205,9 +278,10 @@ def test_new_touch_down_wakes_screen_even_if_previous_release_was_missing(contro
 def test_controller_reconnect_after_off_can_wake_with_reused_or_new_finger_id(controls, next_finger):
   state, pygame, now = controls
   state.set_brightness(35)
-  _tap(state)
+  assert _swipe(state)
   _touch(state, pygame.FINGERDOWN, _target(state, "off"), finger_id=7)
-  # The touch device disappears before UP, then is detected again much later.
+  state.turn_off()
+  # The device can lose an active contact while the output goes dark.
   now[0] += 100
   state.update()
   assert _touch(state, pygame.FINGERDOWN, _target(state, "off"), finger_id=next_finger)
@@ -215,17 +289,29 @@ def test_controller_reconnect_after_off_can_wake_with_reused_or_new_finger_id(co
   assert not state.menu_visible
   assert state.brightness == 40
   _touch(state, pygame.FINGERUP, finger_id=next_finger)
-  assert _tap(state, finger_id=next_finger)
+  assert _swipe(state, finger_id=next_finger)
   assert state.menu_visible
 
 
 def test_screen_off_gesture_motion_and_release_do_not_restore_screen(controls):
   state, pygame, _ = controls
-  _tap(state)
-  _touch(state, pygame.FINGERDOWN, _target(state, "off"))
+  assert _swipe(state)
+  assert _tap(state, _target(state, "off"))
   assert not _touch(state, pygame.FINGERMOTION, (0.5, 0.5))
   assert not _touch(state, pygame.FINGERUP, (0.5, 0.5))
   assert state.screen_off
+
+
+@pytest.mark.parametrize("rightward", [False, True])
+def test_waking_swipe_only_wakes_even_if_park_is_available(controls, rightward):
+  state, pygame, _ = controls
+  state.set_park_available(True)
+  state.turn_off()
+  start, end = ((0.15, 0.5), (0.85, 0.5)) if rightward else ((0.85, 0.5), (0.15, 0.5))
+  assert _touch(state, pygame.FINGERDOWN, start)
+  assert not _touch(state, pygame.FINGERMOTION, end)
+  assert not _touch(state, pygame.FINGERUP, end)
+  assert not (state.screen_off or state.park_visible or state.menu_visible)
 
 
 @pytest.mark.parametrize("name,initial,expected", [
@@ -236,7 +322,7 @@ def test_screen_off_gesture_motion_and_release_do_not_restore_screen(controls):
 def test_brightness_button_steps_and_clamps(controls, name, initial, expected):
   state, _, _ = controls
   state.set_brightness(initial)
-  _tap(state)
+  assert _swipe(state)
   assert _tap(state, _target(state, name)) == (initial != expected)
   assert state.brightness == expected
   assert state.menu_visible
@@ -244,38 +330,46 @@ def test_brightness_button_steps_and_clamps(controls, name, initial, expected):
 
 def test_moving_or_holding_a_brightness_press_does_not_adjust_it_again(controls):
   state, pygame, _ = controls
-  _tap(state)
+  assert _swipe(state)
   down = _target(state, "brightness_down")
   up = _target(state, "brightness_up")
-  assert _touch(state, pygame.FINGERDOWN, down)
+  assert not _touch(state, pygame.FINGERDOWN, down)
   assert not _touch(state, pygame.FINGERMOTION, up)
   assert not _touch(state, pygame.FINGERDOWN, down)
-  assert not _touch(state, pygame.FINGERUP, up)
-  assert state.brightness == 70
+  assert not _touch(state, pygame.FINGERUP, down)
+  assert state.brightness == 80
 
 
 def test_second_finger_cannot_change_brightness_or_turn_off_screen(controls):
   state, pygame, _ = controls
-  _tap(state)
-  _touch(state, pygame.FINGERDOWN, _target(state, "brightness_down"), finger_id=7)
+  assert _swipe(state)
+  point = _target(state, "brightness_down")
+  _touch(state, pygame.FINGERDOWN, point, finger_id=7)
   assert not _touch(state, pygame.FINGERDOWN, _target(state, "brightness_up"), finger_id=9)
   assert not _touch(state, pygame.FINGERDOWN, _target(state, "off"), finger_id=9)
+  assert not _touch(state, pygame.FINGERUP, _target(state, "off"), finger_id=9)
+  assert state.brightness == 80
+  assert _touch(state, pygame.FINGERUP, point, finger_id=7)
   assert state.brightness == 70
   assert not state.screen_off
 
 
 def test_release_over_power_does_not_activate_it(controls):
   state, pygame, _ = controls
-  _tap(state)
-  _touch(state, pygame.FINGERDOWN, _target(state, "brightness_down"))
-  assert not _touch(state, pygame.FINGERUP, _target(state, "off"))
+  assert _swipe(state)
+  left, top, _, height = state.layout["off"]
+  y = (top + height / 2) / state.logical_size[1]
+  start = ((left - 1) / state.logical_size[0], y)
+  end = ((left + 1) / state.logical_size[0], y)
+  assert not _touch(state, pygame.FINGERDOWN, start)
+  assert not _touch(state, pygame.FINGERUP, end)
   assert not state.screen_off
   assert state.menu_visible
 
 
 def test_idle_menu_hides_but_stays_open_while_touch_is_held(controls):
   state, pygame, now = controls
-  _tap(state)
+  assert _swipe(state)
   now[0] = state.menu_timeout - 0.01
   assert not state.update()
   _touch(state, pygame.FINGERDOWN, _target(state, "brightness_down"))
@@ -291,7 +385,7 @@ def test_idle_menu_hides_but_stays_open_while_touch_is_held(controls):
 @pytest.mark.parametrize("point", [(float("nan"), 0.5), (0.5, float("inf"))])
 def test_nonfinite_touch_coordinates_are_ignored(controls, point):
   state, pygame, _ = controls
-  _tap(state)
+  assert _swipe(state)
   assert not _touch(state, pygame.FINGERDOWN, point)
   assert not _touch(state, pygame.FINGERUP, point)
   assert state.brightness == 80
@@ -311,16 +405,15 @@ def test_menu_and_touch_targets_fit_logical_screen(size):
   pygame = SimpleNamespace(FINGERDOWN=1, FINGERMOTION=2, FINGERUP=3)
   state = DisplayControls(pygame, logical_size=size)
   assert state.layout["panel"] == (0, 0, *size)
-  for name in ("brightness_down", "brightness_up", "off", "close", "update", "pull"):
+  for name in ("brightness_down", "brightness_up", "off", "update", "pull"):
     left, top, width, height = state.layout[name]
     assert 0 <= left < left + width <= size[0]
     assert 0 <= top < top + height <= size[1]
   off_x, off_y = _target(state, "off")
-  close_x, close_y = _target(state, "close")
-  assert off_x < 0.1 and close_x > 0.9 and off_y == close_y < 0.2
+  assert off_x < 0.1 and off_y < 0.2
   assert _target(state, "brightness_down")[0] < _target(state, "brightness_up")[0]
   assert _target(state, "pull")[1] < _target(state, "update")[1]
-  _tap(state)
+  assert _swipe(state)
   _tap(state, _target(state, "brightness_down"))
   assert state.brightness == 70
 
@@ -368,7 +461,7 @@ def test_software_dimming_matches_texture_tint_and_off_is_black(raster_pygame):
 
 def test_menu_surface_is_cached_and_only_changed_state_redraws(raster_pygame):
   state = DisplayControls(raster_pygame)
-  _tap(state)
+  assert _swipe(state)
   surface, position = state.render_menu()
   assert surface.get_size() == state.logical_size
   assert position == (0, 0)
@@ -396,7 +489,7 @@ def test_menu_renders_gauge_values_and_temperature_colors(raster_pygame, monkeyp
   state.set_status({"cpu": 99.0, "temperature": temperature, "gpu": 100.0, "gpu_temperature": 75,
                     "fan_rpm": 99999, "fan_pwm": 60, "fps": 60.0})
   state.set_actions_available(True)
-  _tap(state)
+  assert _swipe(state)
   state._font(34)
   if not korean:
     state._font_path = None
@@ -427,18 +520,28 @@ def test_menu_renders_gauge_values_and_temperature_colors(raster_pygame, monkeyp
 
 def test_missing_telemetry_has_independent_placeholders(raster_pygame, monkeypatch):
   state = DisplayControls(raster_pygame)
-  _tap(state)
+  assert _swipe(state)
   labels = []
   monkeypatch.setattr(state, "_label", lambda _surface, text, *_args: labels.append(text))
   state.render_menu()
   assert labels.count("--") >= 4
-  assert "-- RPM" in labels and "출력 --" in labels and "FPS --" in labels
+  assert "RPM 미수신" in labels and "출력 --" in labels and "FPS --" in labels
+
+
+def test_fan_without_tachometer_still_displays_output_percent(raster_pygame, monkeypatch):
+  state = DisplayControls(raster_pygame)
+  state.set_status({"fan_pwm": 60})
+  assert _swipe(state)
+  labels = {}
+  monkeypatch.setattr(state, "_label", lambda _surface, text, size, *_args: labels.update({text: size}))
+  state.render_menu()
+  assert labels["출력 60%"] > labels["RPM 미수신"]
 
 
 def test_git_pull_touch_requires_commit_check_and_is_disabled_while_busy(controls):
   state, _, _ = controls
   state.set_actions_available(True)
-  _tap(state)
+  assert _swipe(state)
   assert not _tap(state, _target(state, "pull"))
   assert "check" not in state.layout
   state.set_action_status({"action": "commit_check", "state": "succeeded", "update_available": True,
@@ -454,7 +557,7 @@ def test_git_pull_touch_requires_commit_check_and_is_disabled_while_busy(control
 def test_failed_commit_recheck_disables_git_pull_and_displays_failure(controls):
   state, _, _ = controls
   state.set_actions_available(True)
-  _tap(state)
+  assert _swipe(state)
   state.set_action_status({"action": "commit_check", "state": "succeeded", "update_available": True,
                            "commit_state": "available", "commit_compare": f'"{"a" * 40}" != "{"b" * 40}"'})
   assert state.button_enabled("pull")
@@ -491,7 +594,7 @@ def test_current_versions_and_status_fit_on_two_lines_in_each_action_button(
   if current_commit is not None:
     status["current_commit"] = current_commit
   state.set_action_status(status)
-  _tap(state)
+  assert _swipe(state)
   expected = {"pull": f"({expected_commit})", "update": "(20261122093000)"}
   original_label = state._bounded_label
   labels = {}
@@ -520,7 +623,7 @@ def test_pi_button_uses_its_own_package_difference(controls, available):
   state.set_actions_available(True)
   state.set_action_status({"state": "idle", "update_available": False, "pi_update_available": available,
                            "pi_version_state": "available" if available else "current"})
-  _tap(state)
+  assert _swipe(state)
   assert state.button_enabled("update") is available
   assert state.button_enabled("pull") is False
   assert _tap(state, _target(state, "update")) is available
@@ -575,7 +678,7 @@ def test_action_progress_is_drawn_inside_its_own_button_with_both_versions(raste
   state.set_action_status({"action": action, "state": job_state,
                            "commit_compare": '"1234567" != "abcdef0"', "pi_version": "20261122093000",
                            "commit_state": "available", "pi_version_state": "current"})
-  _tap(state)
+  assert _swipe(state)
   label = state.action_label(active_button, korean=True)
   other_button = "update" if active_button == "pull" else "pull"
   other_label = "최신 버전" if other_button == "update" else "업데이트 가능"
