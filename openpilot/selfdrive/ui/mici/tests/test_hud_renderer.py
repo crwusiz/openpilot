@@ -7,6 +7,7 @@ import raylib_nb as rl
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.ui.mici.onroad import left_column_rect
 from openpilot.selfdrive.ui.mici.onroad import hud_renderer as hud
+from openpilot.selfdrive.ui.mici.onroad import status as onroad_status
 from openpilot.selfdrive.ui.ui_state import ChestnutState, UIStatus
 
 
@@ -16,7 +17,7 @@ class FakeSubMaster(dict):
 
 class TestHudRenderer(unittest.TestCase):
   def setUp(self):
-    self.ui_state = SimpleNamespace(is_metric=False, status=UIStatus.ACTIVE, started=True,
+    self.ui_state = SimpleNamespace(is_metric=False, status=UIStatus.ACTIVE, started=True, engaged=True,
                                     started_frame=0, cluster_enabled=False, cluster_connected=False,
                                     chestnut_state=ChestnutState.ACTIVE,
                                     received_since_started=lambda service: True)
@@ -47,11 +48,10 @@ class TestHudRenderer(unittest.TestCase):
     self.renderer._chestnut_green = SimpleNamespace(width=48, height=35)
     self.renderer._chestnut_orange = SimpleNamespace(width=60, height=35)
     self.renderer._wheel = SimpleNamespace(width=50, height=50)
-    self.renderer._wheel_green = SimpleNamespace(width=50, height=50)
-    self.renderer._wheel_blue = SimpleNamespace(width=50, height=50)
-    self.renderer._wheel_critical = SimpleNamespace(width=50, height=50)
+    self.renderer._wheel_glow = SimpleNamespace(width=74, height=74)
+    self.renderer._wheel_highlight = SimpleNamespace(width=50, height=50)
     self.renderer._exclamation_point = SimpleNamespace(width=9, height=44)
-    self.renderer._wheel_alpha_filter = FirstOrderFilter(0, 0.05, 1 / 60)
+    self.renderer._wheel_critical_filter = FirstOrderFilter(0, onroad_status.STATUS_FADE_RC, 1 / 60)
     self.renderer._show_wheel_critical = False
     self.renderer._can_draw_top_icons = True
     self.renderer.is_cruise_set = True
@@ -186,30 +186,71 @@ class TestHudRenderer(unittest.TestCase):
     self.assertLess(self.renderer._chestnut_alpha_filter.x, loading_alpha)
     self.draws['draw_texture_ex'].assert_not_called()
 
-  def test_wheel_uses_status_images_beside_driver_monitoring(self):
+  def _draw_wheel(self):
     self.ui_state.sm = FakeSubMaster(carState=SimpleNamespace(steeringAngleDeg=15.0))
-    for status, texture in ((UIStatus.DISENGAGED, self.renderer._wheel),
-                            (UIStatus.ENGAGED, self.renderer._wheel_green),
-                            (UIStatus.ACTIVE, self.renderer._wheel_green),
-                            (UIStatus.STEERING, self.renderer._wheel_blue),
-                            (UIStatus.BLINKER, self.renderer._wheel_critical)):
+    self.ui_state.sm.frame = 0
+    self.draws['draw_texture_pro'].reset_mock()
+    self.draws['draw_texture_ex'].reset_mock()
+    with (patch.object(onroad_status, 'ui_state', self.ui_state),
+          patch.object(hud, 'status_fade', onroad_status.StatusFade())):
+      self.renderer._draw_steering_wheel(self.rect)
+    return [call.args for call in self.draws['draw_texture_pro'].call_args_list]
+
+  def test_wheel_effects_center_beside_driver_monitoring(self):
+    layers = self._draw_wheel()
+    textures = (self.renderer._wheel_glow, self.renderer._wheel, self.renderer._wheel_highlight)
+    wheel_rect = left_column_rect(self.rect, 2, column=1)
+    for (drawn, _, dest, origin, rotation, tint), texture in zip(layers, textures, strict=True):
+      self.assertIs(drawn, texture)
+      self.assertEqual(dest.x, wheel_rect.x + wheel_rect.width / 2)
+      self.assertEqual(dest.y, wheel_rect.y + wheel_rect.height / 2)
+      self.assertEqual((origin.x, origin.y), (dest.width / 2, dest.height / 2))
+      self.assertEqual(rotation, -15.0)
+      self.assertGreater(tint.a, 0)
+    self.assertEqual((layers[1][2].width, layers[1][2].height), (wheel_rect.width, wheel_rect.height))
+
+  def test_wheel_tint_respects_local_status_palette(self):
+    for status, color in ((UIStatus.DISENGAGED, hud.WHEEL_WHITE),
+                          (UIStatus.ENGAGED, hud.WHEEL_GREEN),
+                          (UIStatus.ACTIVE, hud.WHEEL_GREEN),
+                          (UIStatus.STEERING, hud.Colors.STEERING),
+                          (UIStatus.BLINKER, hud.WHEEL_ORANGE),
+                          (UIStatus.OVERRIDE, hud.WHEEL_WHITE),
+                          (UIStatus.RED, hud.WHEEL_WHITE)):
       with self.subTest(status=status):
         self.ui_state.status = status
-        self.draws['draw_texture_pro'].reset_mock()
-        self.renderer._draw_steering_wheel(self.rect)
-        self.draws['draw_texture_pro'].assert_called_once()
-        drawn_texture, _, dest, origin, rotation, tint = self.draws['draw_texture_pro'].call_args.args
-        self.assertIs(drawn_texture, texture)
-        dm_rect = left_column_rect(self.rect, 2)
-        self.assertGreater(dest.x - origin.x, dm_rect.x + dm_rect.width)
-        self.assertEqual(dest.y - origin.y, dm_rect.y)
-        self.assertEqual(rotation, -15.0)
-        self.assertEqual((tint.r, tint.g, tint.b), (255, 255, 255))
+        glow, wheel, highlight = self._draw_wheel()
+        tint = wheel[-1]
+        self.assertEqual((tint.r, tint.g, tint.b), (color.r, color.g, color.b))
+        if status == UIStatus.DISENGAGED:
+          self.assertAlmostEqual(tint.a, 255 * hud.DIMMED_ICON_ALPHA, delta=1)
+          self.assertEqual((glow[-1].a, highlight[-1].a), (0, 0))
+        if status == UIStatus.BLINKER:
+          self.draws['draw_texture_ex'].assert_called_once()
+          self.assertIs(self.draws['draw_texture_ex'].call_args.args[0], self.renderer._exclamation_point)
+        else:
+          self.draws['draw_texture_ex'].assert_not_called()
 
+  def test_steer_required_alert_only_colors_the_wheel_while_engaged(self):
     self.renderer._show_wheel_critical = True
-    self.ui_state.status = UIStatus.DISENGAGED
-    self.renderer._draw_steering_wheel(self.rect)
-    self.assertIs(self.draws['draw_texture_pro'].call_args.args[0], self.renderer._wheel_critical)
+    for status, engaged in ((UIStatus.DISENGAGED, True), (UIStatus.RED, False), (UIStatus.ACTIVE, True)):
+      with self.subTest(status=status, engaged=engaged):
+        self.ui_state.status, self.ui_state.engaged = status, engaged
+        tint = self._draw_wheel()[1][-1]
+        if status == UIStatus.ACTIVE:
+          self.assertGreater(tint.r, hud.WHEEL_GREEN.r)
+          self.assertLess(tint.g, hud.WHEEL_GREEN.g)
+          self.draws['draw_texture_ex'].assert_called_once()
+        else:
+          self.assertEqual((tint.r, tint.g, tint.b), (255, 255, 255))
+          self.draws['draw_texture_ex'].assert_not_called()
+
+  def test_wheel_starts_straight_before_fresh_car_state(self):
+    for started, received in ((False, True), (True, False)):
+      with self.subTest(started=started, received=received):
+        self.ui_state.started = started
+        self.ui_state.received_since_started = Mock(return_value=received)
+        self.assertEqual([args[-2] for args in self._draw_wheel()], [0.0] * 3)
 
 
 if __name__ == '__main__':
