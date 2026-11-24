@@ -481,7 +481,7 @@ class H264NetworkServer:
       fields = []
       for key in ("video_fps", "decoded_fps", "skipped_rgb", "display_fps", "camera_display_fps", "metadata_display_fps",
                   "hidden_camera_fps", "gpu_camera", "rgb_convert_avg_ms",
-                  "decoded_gap_max_ms", "rgb_gap_max_ms", "rgb_burst_frames", "rgb_intervals",
+                  "decoded_gap_max_ms", "rgb_gap_max_ms", "rgb_burst_frames", "rgb_intervals", "rgb_catchup_dequeued",
                   "render_avg_ms", "display_avg_ms", "queue_wait_avg_ms", "video_age_ms", "state_age_ms", "display_gap_max_ms",
                   "camera_display_gap_max_ms",
                   "loop_lag_max_ms", "loop_wall_ms", "loop_cpu_ms", "loop_samples",

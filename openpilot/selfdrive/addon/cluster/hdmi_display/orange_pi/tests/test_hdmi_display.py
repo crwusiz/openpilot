@@ -947,8 +947,6 @@ def test_finger_swipes_use_logical_direction_and_switch_one_panel_at_a_time(rast
     assert not display.park_visible
 
     display.set_park_available(True)
-    assert not display.park_visible
-    _swipe_left(display)
     assert display.park_visible and not display.controls.menu_visible
     _swipe_right(display)
     assert not display.park_visible and not display.controls.menu_visible
@@ -962,6 +960,24 @@ def test_finger_swipes_use_logical_direction_and_switch_one_panel_at_a_time(rast
     assert display.park_visible
     display.set_park_available(False)
     assert not display.park_visible
+    display.set_park_available(True)
+    assert display.park_visible
+  finally:
+    display.close()
+
+
+def test_rotated_gpu_waiting_display_opens_swipe_menu_before_touch_release(raster_pygame, monkeypatch):
+  display = _layered_display(raster_pygame, monkeypatch, rotation=90)
+  pygame = display._pygame
+  try:
+    assert display.show_waiting()
+    _post_touch(display, pygame.FINGERDOWN, (0.4, 0.48))
+    _post_touch(display, pygame.FINGERMOTION, (0.49, 0.53))
+    assert display.pump_events()
+    _assert_full_screen_menu(display)
+    _post_touch(display, pygame.FINGERUP, (0.4, 0.48))
+    assert display.pump_events()
+    _assert_full_screen_menu(display)
   finally:
     display.close()
 

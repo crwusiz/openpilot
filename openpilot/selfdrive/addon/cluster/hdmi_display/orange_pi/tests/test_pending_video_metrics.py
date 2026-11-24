@@ -62,13 +62,15 @@ def run_updates(monkeypatch, updates):
       self.last_video_at = self.last_state_at = None
       self.done = self.closed = self.gpu_camera = self.screen_off = False
       self.index = 0
+      self.catchup_times = []
       instances.append(self)
 
     def start(self):
       pass
 
-    def take_updates(self, timeout=0.02):
+    def take_updates(self, timeout=0.02, *, catchup_at=None):
       assert 0 <= timeout <= 0.02
+      self.catchup_times.append(catchup_at)
       if self.index == len(updates):
         return None, None  # The session rechecks its terminal error once.
       arrived_at, picture, state_at, _off = updates[self.index]
@@ -118,6 +120,9 @@ def test_two_rgb_updates_before_gpu_deadline_count_one_owner_pending_replacement
   ])
   assert received == 3 and pictures == [1, 3] and not waiting
   assert receiver.pending_replacements == 1
+  assert receiver.catchup_times[0] is None
+  assert receiver.catchup_times[1] == pytest.approx(1.0 + 1 / h264_receiver.GPU_BURST_FPS)
+  assert receiver.catchup_times[2:4] == [float("inf"), float("inf")]
 
 
 @pytest.mark.parametrize("updates,expected", [

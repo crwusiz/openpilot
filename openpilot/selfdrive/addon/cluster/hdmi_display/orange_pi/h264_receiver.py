@@ -37,6 +37,7 @@ DECODE_RECOVERY_SECONDS = 0.35
 RECOVERY_CONTROL_STALE_SECONDS = 2.0
 LOOP_HEARTBEAT_INTERVAL = 0.1
 RGB_BURST_INTERVAL = 0.025
+RGB_CATCHUP_MAX_AGE = 0.030
 VIDEO_STALE_SECONDS = 0.5
 UDP_RECEIVE_BUFFER_BYTES = 1024 * 1024
 HUD_REFRESH_INTERVAL = 0.1
@@ -78,7 +79,8 @@ def _loop_metrics(stats):
 def _arrival_metrics(stats):
   return {"decoded_gap_max_ms": stats["decoded_gap"] * 1000 if stats["decoded_intervals"] else None,
           "rgb_gap_max_ms": stats["rgb_gap"] * 1000 if stats["rgb_intervals"] else None,
-          "rgb_burst_frames": int(stats["rgb_burst_frames"]), "rgb_intervals": int(stats["rgb_intervals"])}
+          "rgb_burst_frames": int(stats["rgb_burst_frames"]), "rgb_intervals": int(stats["rgb_intervals"]),
+          "rgb_catchup_dequeued": int(stats["rgb_catchup_dequeued"])}
 
 
 class H264ConfigurationError(RuntimeError):
@@ -195,7 +197,7 @@ class H264Receiver:
     validate_hello(hello)
     self.sock, self.hello = sock, hello
     self.condition = threading.Condition()
-    self.latest_rgb = None
+    self.latest_rgb = self._previous_rgb = None
     self.latest_state = None
     self.state_revision = 0
     self.received_frames = self.displayed_frames = self.dropped_frames = 0
@@ -236,7 +238,8 @@ class H264Receiver:
     keys = ["render_count", "render", "display", "queue_count", "queue", "convert_count", "convert", "gap", "camera_gap",
             "hdmi_upload_count", "hdmi_upload_bytes", "hdmi_camera_reused", "hdmi_path_reused", "hdmi_overlay_reused",
             "loop_samples", "loop_lag", "loop_wall", "loop_cpu",
-            "decoded_intervals", "decoded_gap", "rgb_intervals", "rgb_gap", "rgb_burst_frames", "pending_replaced"]
+            "decoded_intervals", "decoded_gap", "rgb_intervals", "rgb_gap", "rgb_burst_frames", "rgb_catchup_dequeued",
+            "pending_replaced"]
     keys.extend(("path_async_frames", *PATH_COUNTER_NAMES))
     for prefix, names in STAGE_NAMES.items():
       for name in names:
@@ -291,7 +294,13 @@ class H264Receiver:
         self._stats["rgb_gap"] = max(self._stats["rgb_gap"], gap)
         self._stats["rgb_burst_frames"] += gap < RGB_BURST_INTERVAL
       self._last_rgb_published_at = published_at
-      self.dropped_frames += self.latest_rgb is not None
+      if self.latest_rgb is not None:
+        last_decoded_at = self.latest_rgb[1]
+        keep_previous = (self.gpu_camera and not self.screen_off
+                         and 0 < received_at - last_decoded_at < RGB_BURST_INTERVAL
+                         and 0 <= published_at - last_decoded_at <= RGB_CATCHUP_MAX_AGE)
+        self.dropped_frames += int(self._previous_rgb is not None) + int(not keep_previous)
+        self._previous_rgb = self.latest_rgb if keep_previous else None
       self.latest_rgb = (rgb, received_at)
       self.received_frames += 1
       self.last_video_at = received_at
@@ -366,14 +375,24 @@ class H264Receiver:
       return (not self.closing and not self.done and self.error is None and self.last_state_at is not None
               and self.last_state_at <= now <= self._park_state_deadline)
 
-  def take_updates(self, timeout=0.02):
+  def take_updates(self, timeout=0.02, *, catchup_at=None):
     with self.condition:
       self.condition.wait_for(lambda: self.latest_rgb is not None or self.latest_state is not None
                               or self.error is not None or self.done, timeout=timeout)
       if self.error is not None:
         raise self.error
-      rgb, self.latest_rgb = self.latest_rgb, None
       state, self.latest_state = self.latest_state, None
+      previous, self._previous_rgb = self._previous_rgb, None
+      if previous is not None:
+        now = time.monotonic()
+        # GPU can drain a short burst if it has a display slot now. Never
+        # wait for the extra picture or take it ahead of a pending render.
+        if (self.gpu_camera and not self.screen_off and (catchup_at is None or now >= catchup_at)
+            and 0 <= now - previous[1] <= RGB_CATCHUP_MAX_AGE):
+          self._stats["rgb_catchup_dequeued"] += 1
+          return previous, state
+        self.dropped_frames += 1
+      rgb, self.latest_rgb = self.latest_rgb, None
       return rgb, state
 
   async def _send_control(self, kind, payload):
@@ -797,7 +816,7 @@ class H264Receiver:
   def close(self):
     with self.condition:
       self.closing = True
-      self.latest_rgb = None
+      self.latest_rgb = self._previous_rgb = None
       self.condition.notify_all()
     loop, main_task = self.loop, self._main_task
     if loop is not None and main_task is not None:
@@ -921,7 +940,8 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         if not pending_render:
           due_at = max(due_at, hud_deadline())
         timeout = min(timeout, max(0.0, due_at - time.monotonic()))
-      rgb, state = receiver.take_updates(timeout=timeout)
+      catchup_at = next_render_at if pending_video_at is None else math.inf
+      rgb, state = receiver.take_updates(timeout=timeout, catchup_at=catchup_at)
       if state is not None:
         # Each wire decode creates a private dict, and take_updates releases
         # the receiver's slot. Transfer it to the scene without a deep copy.

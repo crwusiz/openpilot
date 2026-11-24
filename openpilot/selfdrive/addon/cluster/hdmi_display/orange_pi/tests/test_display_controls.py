@@ -26,8 +26,8 @@ def _tap(controls, point=(0.5, 0.5), finger_id=7):
 def _swipe(controls, *, rightward=True, finger_id=7):
   start, end = ((0.15, 0.5), (0.85, 0.5)) if rightward else ((0.85, 0.5), (0.15, 0.5))
   _touch(controls, controls.pygame.FINGERDOWN, start, finger_id)
-  _touch(controls, controls.pygame.FINGERMOTION, end, finger_id)
-  return _touch(controls, controls.pygame.FINGERUP, end, finger_id)
+  changed = _touch(controls, controls.pygame.FINGERMOTION, end, finger_id)
+  return _touch(controls, controls.pygame.FINGERUP, end, finger_id) or changed
 
 
 def _target(controls, name):
@@ -69,7 +69,7 @@ def test_park_button_only_dispatches_on_release_in_the_displayed_hitbox(controls
   state.set_actions_available(True)
   state.set_size((1920, height))
   state.set_park_available(True)
-  assert _swipe(state, rightward=False) and state.park_visible
+  assert state.park_visible
   state.set_park_touch((1920, height), rotate_180)
   x, y = 1621 / 1920, (tap_y + (height - 480) / 2) / height
   point = (1 - x, 1 - y) if rotate_180 else (x, y)
@@ -98,7 +98,6 @@ def test_park_button_discards_interrupted_gestures(controls, interrupt):
   state, pygame, _ = controls
   state.set_actions_available(True)
   state.set_park_available(True)
-  assert _swipe(state, rightward=False)
   state.set_park_touch((1920, 480))
   point = 1621 / 1920, 361 / 480
   assert not _touch(state, pygame.FINGERDOWN, point)
@@ -122,7 +121,6 @@ def test_park_button_clears_an_unsent_upload_on_leaving_park(controls, leave_par
   state, pygame, _ = controls
   state.set_actions_available(True)
   state.set_park_available(True)
-  assert _swipe(state, rightward=False)
   state.set_park_touch((1920, 480))
   point = 1621 / 1920, 361 / 480
   _touch(state, pygame.FINGERDOWN, point)
@@ -187,6 +185,34 @@ def test_horizontal_swipe_opens_and_closes_controls(controls):
   assert not state.menu_visible
 
 
+def test_horizontal_motion_opens_menu_even_if_release_position_repeats_the_start(controls):
+  state, pygame, _ = controls
+  start, end = (0.4, 0.45), (0.49, 0.66)
+  assert not _touch(state, pygame.FINGERDOWN, start)
+  assert _touch(state, pygame.FINGERMOTION, end)
+  revision = state.revision
+  assert not _touch(state, pygame.FINGERMOTION, (0.2, 0.45))
+  assert not _touch(state, pygame.FINGERUP, start)
+  assert state.menu_visible and state.revision == revision
+
+
+@pytest.mark.parametrize("next_finger", [7, 9])
+def test_lost_release_cannot_block_the_next_swipe_after_a_gap(controls, next_finger):
+  state, pygame, now = controls
+  assert not _touch(state, pygame.FINGERDOWN, (0.1, 0.5))
+  assert _touch(state, pygame.FINGERMOTION, (0.3, 0.5))
+  now[0] += 1.0
+  assert _swipe(state, rightward=False, finger_id=next_finger)
+  assert not state.menu_visible
+
+
+def test_swipe_can_still_be_recognized_from_release_without_motion(controls):
+  state, pygame, _ = controls
+  assert not _touch(state, pygame.FINGERDOWN, (0.4, 0.5))
+  assert _touch(state, pygame.FINGERUP, (0.49, 0.5))
+  assert state.menu_visible
+
+
 @pytest.mark.parametrize("start,end", [
   ((0.4, 0.5), (0.46, 0.5)),
   ((0.2, 0.1), (0.33, 0.9)),
@@ -200,18 +226,18 @@ def test_short_and_vertical_gestures_do_not_open_menu(controls, start, end):
   assert not (state.menu_visible or state.park_visible)
 
 
-def test_park_swipes_require_availability_and_do_not_reopen_the_other_view(controls):
+def test_park_opens_on_gear_entry_and_honors_swipe_dismissal(controls):
   state, _, _ = controls
   assert not _swipe(state, rightward=False)
   assert not state.park_visible
   state.set_park_available(True)
-  assert not state.park_visible
-  assert _swipe(state, rightward=False)
   assert state.park_visible and not state.menu_visible
   assert not _swipe(state, rightward=False)
   assert state.park_visible
   assert _swipe(state)
   assert not (state.park_visible or state.menu_visible)
+  state.set_park_available(True)
+  assert not state.park_visible
   assert _swipe(state)
   assert state.menu_visible and not state.park_visible
   assert _swipe(state, rightward=False)
@@ -219,19 +245,20 @@ def test_park_swipes_require_availability_and_do_not_reopen_the_other_view(contr
   assert _swipe(state, rightward=False) and state.park_visible
   state.set_park_available(False)
   assert not state.park_visible
+  state.set_park_available(True)
+  assert state.park_visible
 
 
 def test_swiping_right_from_the_park_button_closes_park_without_uploading(controls):
   state, pygame, _ = controls
   state.set_actions_available(True)
   state.set_park_available(True)
-  assert _swipe(state, rightward=False)
   state.set_park_touch((1920, 480))
   start = (1450 / 1920, 361 / 480)
   end = (0.97, start[1])
   assert not _touch(state, pygame.FINGERDOWN, start)
-  assert not _touch(state, pygame.FINGERMOTION, end)
-  assert _touch(state, pygame.FINGERUP, end)
+  assert _touch(state, pygame.FINGERMOTION, end)
+  assert not _touch(state, pygame.FINGERUP, end)
   assert not (state.menu_visible or state.park_visible)
   assert state.take_action() is None
 
@@ -247,8 +274,8 @@ def test_swiping_from_a_control_button_cannot_trigger_it(controls, button):
   # can only start a rightward swipe, which keeps the menu open.
   end = (0.85 if button == "off" else 0.12, start[1])
   assert not _touch(state, pygame.FINGERDOWN, start)
-  assert not _touch(state, pygame.FINGERMOTION, end)
-  assert _touch(state, pygame.FINGERUP, end) is (button != "off")
+  assert _touch(state, pygame.FINGERMOTION, end) is (button != "off")
+  assert not _touch(state, pygame.FINGERUP, end)
   assert state.take_action() is None and state.brightness == 80 and not state.screen_off
 
 
@@ -311,7 +338,8 @@ def test_waking_swipe_only_wakes_even_if_park_is_available(controls, rightward):
   assert _touch(state, pygame.FINGERDOWN, start)
   assert not _touch(state, pygame.FINGERMOTION, end)
   assert not _touch(state, pygame.FINGERUP, end)
-  assert not (state.screen_off or state.park_visible or state.menu_visible)
+  assert not (state.screen_off or state.menu_visible)
+  assert state.park_visible
 
 
 @pytest.mark.parametrize("name,initial,expected", [

@@ -13,7 +13,9 @@ DEFAULT_BRIGHTNESS = 80
 MIN_BRIGHTNESS = 10
 BRIGHTNESS_STEP = 10
 MENU_TIMEOUT_SECONDS = 8.0
-SWIPE_WIDTH_FRACTION = 0.12
+SWIPE_WIDTH_FRACTION = 0.08
+SWIPE_HORIZONTAL_RATIO = 1.5
+TOUCH_IDLE_SECONDS = 0.75
 TAP_SLOP = 24
 
 MENU_BACKGROUND = (11, 17, 29)
@@ -171,11 +173,15 @@ class DisplayControls:
       self._cancel_park_press()
 
   def set_park_available(self, available):
-    self._park_available = bool(available)
-    if not self._park_available and self.park_visible:
-      self.park_visible = False
+    available = bool(available)
+    if available == self._park_available:
+      return
+    # Select Park once on entry. A swipe can dismiss it for the rest of
+    # this Park interval even while fresh gear updates keep arriving.
+    self._park_available = self.park_visible = available
+    if not self.menu_visible:
       self._touch_start = None
-      self.set_park_touch()
+    self.set_park_touch()
 
   def _cancel_park_press(self):
     self._park_upload_pressed = False
@@ -265,7 +271,7 @@ class DisplayControls:
     return self._changed()
 
   def handle_touch(self, touch):
-    """Classify a corrected SDL touch on release before activating a button."""
+    """Recognize corrected SDL swipes during motion; activate buttons on release."""
     event_type = touch["type"]
     if event_type not in (self.pygame.FINGERDOWN, self.pygame.FINGERMOTION, self.pygame.FINGERUP):
       return False
@@ -281,24 +287,37 @@ class DisplayControls:
         self.screen_off = False
         self.menu_visible = False
         return self._changed()
-      if self._active_finger is not None or not finite:
+      now = self.clock()
+      # A lost UP can leave a contact active even after the next gesture starts.
+      if not finite or (self._active_finger is not None and now - self._last_interaction < TOUCH_IDLE_SECONDS):
         return False
       self._active_finger = finger
       self._touch_start = point
       self._tap_moved = False
-      self._last_interaction = self.clock()
+      self._last_interaction = now
       self._park_upload_pressed = (self.park_touch_active and self.park_log_upload_status()[0]
                                    and self._contains(self._park_upload_target, point))
       return False
     if finger != self._active_finger:
       return False
 
-    self._last_interaction = self.clock()
+    now = self.clock()
+    recent_contact = now - self._last_interaction < TOUCH_IDLE_SECONDS
+    self._last_interaction = now
     start = self._touch_start
     width, height = self.logical_size
     if start is not None and finite:
       dx, dy = point[0] - start[0], point[1] - start[1]
       self._tap_moved |= math.hypot(dx * width, dy * height) > TAP_SLOP * self._layout["scale"]
+      if ((event_type == self.pygame.FINGERMOTION or recent_contact)
+          and abs(dx) >= SWIPE_WIDTH_FRACTION and abs(dx * width) >= SWIPE_HORIZONTAL_RATIO * abs(dy * height)):
+        # Consume this contact once. Some controllers report the original
+        # position on UP or lose the release altogether.
+        self._touch_start = None
+        self._park_upload_pressed = False
+        if event_type == self.pygame.FINGERUP:
+          self._active_finger = None
+        return self._handle_swipe(dx > 0)
     if event_type == self.pygame.FINGERMOTION:
       if self._park_upload_pressed and (not finite or not self._contains(self._park_upload_target, point)):
         self._park_upload_pressed = False
@@ -307,8 +326,6 @@ class DisplayControls:
     park_pressed, self._park_upload_pressed = self._park_upload_pressed, False
     if start is None or not finite:
       return False
-    if abs(dx) >= SWIPE_WIDTH_FRACTION and abs(dx * width) >= 2 * abs(dy * height):
-      return self._handle_swipe(dx > 0)
     if self._tap_moved:
       return False
     if self.menu_visible:
@@ -353,7 +370,7 @@ class DisplayControls:
 
   def update(self):
     """Hide idle controls after the touch is released."""
-    if self.menu_visible and not self.action_busy and self._active_finger is None and self.clock() - self._last_interaction >= self.menu_timeout:
+    if self.menu_visible and not self.action_busy and self._touch_start is None and self.clock() - self._last_interaction >= self.menu_timeout:
       self.menu_visible = False
       return self._changed()
     return False

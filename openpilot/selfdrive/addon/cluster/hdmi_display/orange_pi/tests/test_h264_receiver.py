@@ -995,7 +995,7 @@ def test_rgb_arrival_metrics_use_publication_time_without_refreshing_decode_age_
   clock = [0.0]
   monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: clock[0]))
   assert h264_receiver._arrival_metrics(receiver._stats) == {
-    "decoded_gap_max_ms": None, "rgb_gap_max_ms": None, "rgb_burst_frames": 0, "rgb_intervals": 0,
+    "decoded_gap_max_ms": None, "rgb_gap_max_ms": None, "rgb_burst_frames": 0, "rgb_intervals": 0, "rgb_catchup_dequeued": 0,
   }
   receiver.publish_state({"state_seq": 7}, received_at=-1.0)
   receiver.screen_off = True  # Telemetry observes reception independently of presentation.
@@ -1004,7 +1004,7 @@ def test_rgb_arrival_metrics_use_publication_time_without_refreshing_decode_age_
     receiver.publish_rgb("pixels", received_at=published_at - 0.1, convert_elapsed=0.1)
   metrics = h264_receiver._arrival_metrics(receiver._stats)
   assert metrics.pop("decoded_gap_max_ms") is None
-  assert metrics == pytest.approx({"rgb_gap_max_ms": 451, "rgb_burst_frames": 2, "rgb_intervals": 4})
+  assert metrics == pytest.approx({"rgb_gap_max_ms": 451, "rgb_burst_frames": 2, "rgb_intervals": 4, "rgb_catchup_dequeued": 0})
   assert receiver.received_frames == 5 and receiver.dropped_frames == 4
   assert receiver.last_video_at == pytest.approx(0.4) and receiver.last_state_at == -1.0
   assert receiver.take_updates(timeout=0) == (("pixels", 0.4), ({"state_seq": 7}, -1.0))
@@ -1370,6 +1370,45 @@ def test_decoded_rgb_replacement_preserves_latest_state_arrival_time():
   assert receiver.last_state_at == 10.0
 
 
+def test_gpu_catchup_keeps_at_most_two_recent_rgb_frames_without_waiting(monkeypatch):
+  now = [10.004]
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  receiver.gpu_camera = True
+  receiver.publish_rgb("one", received_at=10.0)
+  assert receiver.take_updates(timeout=0) == (("one", 10.0), None)
+
+  for number, decoded_at in enumerate((10.05, 10.06, 10.07), 2):
+    now[0] = decoded_at + 0.004
+    receiver.publish_rgb(number, received_at=decoded_at)
+  receiver.publish_state({"state_seq": 1}, received_at=10.072)
+
+  assert receiver.take_updates(timeout=0, catchup_at=10.071) == ((3, 10.06), ({"state_seq": 1}, 10.072))
+  assert receiver.take_updates(timeout=0) == ((4, 10.07), None)
+  assert receiver.last_video_at == 10.07 and receiver.dropped_frames == 1
+  assert receiver._stats["rgb_catchup_dequeued"] == 1
+
+
+@pytest.mark.parametrize("skip", ["expired", "render_not_due", "pending_picture", "cpu", "screen_off", "outside_burst"])
+def test_rgb_catchup_uses_latest_when_previous_frame_is_not_eligible(monkeypatch, skip):
+  now = [10.004]
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  receiver.gpu_camera = skip != "cpu"
+  receiver.screen_off = skip == "screen_off"
+  receiver.publish_rgb("previous", received_at=10.0)
+  decoded_at = 10.026 if skip == "outside_burst" else 10.012
+  now[0] = decoded_at + 0.004
+  receiver.publish_rgb("latest", received_at=decoded_at)
+  if skip == "expired":
+    now[0] = 10.035
+  catchup_at = {"render_not_due": 10.02, "pending_picture": float("inf")}.get(skip)
+
+  assert receiver.take_updates(timeout=0, catchup_at=catchup_at) == (("latest", decoded_at), None)
+  assert receiver.dropped_frames == 1
+  assert receiver._stats["rgb_catchup_dequeued"] == 0
+
+
 def test_decoded_burst_converts_only_the_latest_pending_picture_and_keeps_control_responsive():
   receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
   started, release = threading.Event(), threading.Event()
@@ -1503,7 +1542,7 @@ def test_failure_after_taking_updates_is_not_mistaken_for_normal_session_complet
   receiver = SimpleNamespace(condition=threading.Condition(), last_video_at=None, last_state_at=None,
                              screen_off=False, done=False, received_frames=0, start=Mock(), close=Mock())
 
-  def take_updates(timeout=0.02):
+  def take_updates(timeout=0.02, *, catchup_at=None):
     if receiver.done:
       raise error
     receiver.done = True
@@ -1554,8 +1593,8 @@ def test_failed_session_releases_renderer_without_waiting_for_cyclic_gc(monkeypa
 
 @pytest.mark.parametrize("layered", [False, True])
 @pytest.mark.parametrize("camera_waiting", [False, True])
-def test_receive_session_switches_park_view_without_new_camera_or_metadata(monkeypatch, layered, camera_waiting):
-  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import h264_scene
+def test_receive_session_opens_park_from_metadata_and_dismisses_it_without_new_frames(monkeypatch, layered, camera_waiting):
+  from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi import display_controls, h264_scene
 
   scene = h264_scene.H264Scene(Path(__file__).resolve().parents[5] / "assets", clock=lambda: 10.0)
   monkeypatch.setattr(h264_scene, "H264Scene", lambda *_args: scene)
@@ -1564,39 +1603,41 @@ def test_receive_session_switches_park_view_without_new_camera_or_metadata(monke
   video = (np.zeros((64, 128, 3), np.uint8), 9.8) if camera_waiting else None
   receiver = SimpleNamespace(condition=threading.Condition(), start=Mock(), close=Mock(), done=False,
                              received_frames=0, gpu_camera=False, record_display=Mock())
-  updates = iter(((video, (state, 10.0)), (None, None), (None, None)))
+  updates = iter(((video, (state, 10.0)), (None, None)))
 
-  def take_updates(timeout):
+  def take_updates(timeout, **kwargs):
     rgb, metadata = next(updates, (None, None))
-    if pump_events.call_count == 3:
+    if pump_events.call_count == 2:
       receiver.done = True
     return rgb, metadata
 
   receiver.take_updates = take_updates
   monkeypatch.setattr(h264_receiver, "H264Receiver", lambda *_args: receiver)
+  controls = display_controls.DisplayControls(None)
   sent = Mock(return_value=True)
-  def select_view():
-    if pump_events.call_count in (2, 3):
-      assert display.park_available
-      display.park_visible = pump_events.call_count == 2
+
+  def dismiss_park():
+    if pump_events.call_count == 2:
+      assert controls.park_visible
+      assert controls._handle_swipe(True)
     return True
 
-  def set_park_available(available):
-    display.park_available = available
-    if not available:
-      display.park_visible = False
+  class Display(SimpleNamespace):
+    @property
+    def park_visible(self):
+      return controls.park_visible
 
-  pump_events = Mock(side_effect=select_view)
-  display = SimpleNamespace(pump_events=pump_events, can_present_layers=layered,
-                            send_layers=sent, send_rgb=sent, show_waiting=Mock(return_value=True),
-                            set_park_available=set_park_available, park_available=False, park_visible=False)
+  pump_events = Mock(side_effect=dismiss_park)
+  display = Display(pump_events=pump_events, can_present_layers=layered,
+                    send_layers=sent, send_rgb=sent, show_waiting=Mock(return_value=True),
+                    set_park_available=controls.set_park_available)
 
   assert h264_receiver.receive_h264_session(None, display, HELLO_DATA, frame_timeout=0.1) == 0
-  assert sent.call_count == (1 if camera_waiting else 3)
-  assert display.show_waiting.call_count == (2 if camera_waiting else 0)
+  assert sent.call_count == (1 if camera_waiting else 2)
+  assert display.show_waiting.call_count == int(camera_waiting)
   presented = [call.kwargs["parked"] for call in receiver.record_display.call_args_list]
-  assert presented == ([True] if camera_waiting else [False, True, False])
-  assert not display.park_available and not display.park_visible
+  assert presented == ([True] if camera_waiting else [True, False])
+  assert not controls.park_visible and not controls._handle_swipe(False)
 
 
 @pytest.mark.parametrize("gear_change", ["after_touch", "before_touch", "while_rendering"])
@@ -1620,7 +1661,7 @@ def test_park_touch_target_requires_a_presented_park_screen_and_latest_gear(monk
                              received_frames=0, gpu_camera=False, record_display=Mock(),
                              parked_at=latest_parked_at)
 
-  def take_updates(timeout):
+  def take_updates(timeout, *, catchup_at=None):
     state = next(statuses)
     now[0] += 0.1
     if state is None:
@@ -1697,7 +1738,7 @@ def test_scene_updates_preserve_arrival_times_and_sdl_stays_on_caller_thread(mon
     def start(self):
       pass
 
-    def take_updates(self, timeout=0.02):
+    def take_updates(self, timeout=0.02, *, catchup_at=None):
       self.step += 1
       if self.step == 1:
         self.received_frames = 1
@@ -1849,7 +1890,7 @@ def test_render_deadlines_preserve_phase_without_discarding_a_slot_after_overrun
     def start(self):
       pass
 
-    def take_updates(self, timeout=0.02):
+    def take_updates(self, timeout=0.02, *, catchup_at=None):
       waits.append(timeout)
       assert 0.0 <= timeout <= 0.02
       assert len(waits) < 2000, "A receiver with no pending updates must block, not spin"
@@ -1947,7 +1988,7 @@ def test_gpu_displays_decoded_bursts_without_the_extra_source_timer(monkeypatch)
         self.last_video_at = self.last_state_at = None
         self.done = False
 
-      def take_updates(self, timeout):
+      def take_updates(self, timeout, *, catchup_at=None):
         self.polls += 1
         assert self.polls < 1000, "Camera delivery must wait instead of busy polling"
         wake_at = min(now[0] + timeout, max(now[0], arrivals[self.received_frames]),
@@ -2041,7 +2082,7 @@ def test_metadata_waits_for_new_camera_picture_with_bounded_hud_fallback(monkeyp
     def start(self):
       pass
 
-    def take_updates(self, timeout=0.02):
+    def take_updates(self, timeout=0.02, *, catchup_at=None):
       self.polls += 1
       assert self.polls < 300, "Metadata coalescing must wait without busy polling"
       wake_at = clock[0] + timeout
