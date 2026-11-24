@@ -1619,7 +1619,7 @@ def test_receive_session_opens_park_from_metadata_and_dismisses_it_without_new_f
   def dismiss_park():
     if pump_events.call_count == 2:
       assert controls.park_visible
-      assert controls._handle_swipe(True)
+      assert controls._swipe_park(True)
     return True
 
   class Display(SimpleNamespace):
@@ -1630,14 +1630,15 @@ def test_receive_session_opens_park_from_metadata_and_dismisses_it_without_new_f
   pump_events = Mock(side_effect=dismiss_park)
   display = Display(pump_events=pump_events, can_present_layers=layered,
                     send_layers=sent, send_rgb=sent, show_waiting=Mock(return_value=True),
-                    set_park_available=controls.set_park_available)
+                    set_park_available=controls.set_park_available, set_park_presented=Mock())
 
   assert h264_receiver.receive_h264_session(None, display, HELLO_DATA, frame_timeout=0.1) == 0
   assert sent.call_count == (1 if camera_waiting else 2)
   assert display.show_waiting.call_count == int(camera_waiting)
   presented = [call.kwargs["parked"] for call in receiver.record_display.call_args_list]
   assert presented == ([True] if camera_waiting else [True, False])
-  assert not controls.park_visible and not controls._handle_swipe(False)
+  assert [call.args[0] for call in display.set_park_presented.call_args_list] == presented
+  assert not controls.park_visible
 
 
 @pytest.mark.parametrize("gear_change", ["after_touch", "before_touch", "while_rendering"])

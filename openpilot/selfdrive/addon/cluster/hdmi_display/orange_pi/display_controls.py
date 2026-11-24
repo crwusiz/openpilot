@@ -122,6 +122,7 @@ class DisplayControls:
     return {
       "panel": (0, 0, width, height),
       "off": (edge, edge, button, button),
+      "close": (width - edge - button, edge, button, button),
       "cpu": rect(47, 104, 298, 284),
       "gpu": rect(371, 104, 298, 284),
       "fan": rect(695, 104, 298, 284),
@@ -179,9 +180,16 @@ class DisplayControls:
     # Select Park once on entry. A swipe can dismiss it for the rest of
     # this Park interval even while fresh gear updates keep arriving.
     self._park_available = self.park_visible = available
+    if available:
+      self._close_menu()
     if not self.menu_visible:
-      self._touch_start = None
+      self._active_finger = self._touch_start = None
     self.set_park_touch()
+
+  def on_waiting(self):
+    self._active_finger = self._touch_start = None
+    self.set_park_touch()
+    self._close_menu()
 
   def _cancel_park_press(self):
     self._park_upload_pressed = False
@@ -270,8 +278,8 @@ class DisplayControls:
     self._cancel_park_press()
     return self._changed()
 
-  def handle_touch(self, touch):
-    """Recognize corrected SDL swipes during motion; activate buttons on release."""
+  def handle_touch(self, touch, *, view_available=True):
+    """Use paired taps for the menu and buttons; recognize swipes for the Park view."""
     event_type = touch["type"]
     if event_type not in (self.pygame.FINGERDOWN, self.pygame.FINGERMOTION, self.pygame.FINGERUP):
       return False
@@ -289,7 +297,7 @@ class DisplayControls:
         return self._changed()
       now = self.clock()
       # A lost UP can leave a contact active even after the next gesture starts.
-      if not finite or (self._active_finger is not None and now - self._last_interaction < TOUCH_IDLE_SECONDS):
+      if not finite or not view_available or (self._active_finger is not None and now - self._last_interaction < TOUCH_IDLE_SECONDS):
         return False
       self._active_finger = finger
       self._touch_start = point
@@ -309,7 +317,8 @@ class DisplayControls:
     if start is not None and finite:
       dx, dy = point[0] - start[0], point[1] - start[1]
       self._tap_moved |= math.hypot(dx * width, dy * height) > TAP_SLOP * self._layout["scale"]
-      if ((event_type == self.pygame.FINGERMOTION or recent_contact)
+      if (view_available and self._park_available and not self.menu_visible
+          and (event_type == self.pygame.FINGERMOTION or recent_contact)
           and abs(dx) >= SWIPE_WIDTH_FRACTION and abs(dx * width) >= SWIPE_HORIZONTAL_RATIO * abs(dy * height)):
         # Consume this contact once. Some controllers report the original
         # position on UP or lose the release altogether.
@@ -317,46 +326,45 @@ class DisplayControls:
         self._park_upload_pressed = False
         if event_type == self.pygame.FINGERUP:
           self._active_finger = None
-        return self._handle_swipe(dx > 0)
+        return self._swipe_park(dx > 0)
     if event_type == self.pygame.FINGERMOTION:
       if self._park_upload_pressed and (not finite or not self._contains(self._park_upload_target, point)):
         self._park_upload_pressed = False
       return False
     self._active_finger = self._touch_start = None
     park_pressed, self._park_upload_pressed = self._park_upload_pressed, False
-    if start is None or not finite:
-      return False
-    if self._tap_moved:
+    if start is None or not finite or not view_available or self._tap_moved:
       return False
     if self.menu_visible:
       return self._tap_menu((start[0] * width, start[1] * height), (point[0] * width, point[1] * height))
-    if park_pressed and self.park_touch_active and self._contains(self._park_upload_target, point):
-      return self._request_action("park_upload_logs")
-    return False
+    if self.park_visible:
+      if park_pressed and self.park_touch_active and self._contains(self._park_upload_target, point):
+        return self._request_action("park_upload_logs")
+      return False
+    self.menu_visible = True
+    return self._changed()
 
-  def _handle_swipe(self, rightward):
-    if self.menu_visible:
-      if not rightward:
-        self.menu_visible = False
-        return self._changed()
-    elif self.park_visible:
-      if rightward:
-        self.park_visible = False
-        self.set_park_touch()
-        return True
-    elif rightward:
-      self.menu_visible = True
-      return self._changed()
-    elif self._park_available:
-      self.park_visible = True
-      return True
-    return False
+  def _swipe_park(self, rightward):
+    visible = not rightward
+    if self.park_visible == visible:
+      return False
+    self.park_visible = visible
+    self.set_park_touch()
+    return True
+
+  def _close_menu(self):
+    if not self.menu_visible:
+      return False
+    self.menu_visible = False
+    return self._changed()
 
   def _tap_menu(self, start, end):
     def hit(name):
       rect = self._layout[name]
       return self._contains(rect, start) and self._contains(rect, end)
 
+    if hit("close"):
+      return self._close_menu()
     if hit("brightness_down"):
       return self.set_brightness(self.brightness - BRIGHTNESS_STEP)
     if hit("brightness_up"):
@@ -371,8 +379,7 @@ class DisplayControls:
   def update(self):
     """Hide idle controls after the touch is released."""
     if self.menu_visible and not self.action_busy and self._touch_start is None and self.clock() - self._last_interaction >= self.menu_timeout:
-      self.menu_visible = False
-      return self._changed()
+      return self._close_menu()
     return False
 
   def apply_dimming(self, surface):
@@ -407,8 +414,7 @@ class DisplayControls:
     korean = self._font_path is not None
 
     self._draw_icon_button(surface, "off", (255, 146, 152))
-    self._label(surface, "← 밀어 닫기" if korean else "← Swipe to close", 21 * scale,
-                (width - round(108 * scale), round(56 * scale)), MUTED_TEXT)
+    self._draw_icon_button(surface, "close", TEXT_COLOR)
     for key, title, temperature_key in (("cpu", "CPU", "temperature"), ("gpu", "GPU", "gpu_temperature")):
       center = self._draw_gauge_card(surface, key, title, USAGE_COLOR)
       self._draw_processor_gauge(surface, center, self._measurement(temperature_key), self._measurement(key), korean)
@@ -576,6 +582,9 @@ class DisplayControls:
       pygame.draw.arc(surface, color, (x - radius, y - radius, 2 * radius, 2 * radius),
                       math.radians(123), math.radians(417), stroke)
       line((0, -12), (0, 0))
+    elif name == "close":
+      line((-8, -8), (8, 8))
+      line((-8, 8), (8, -8))
     elif name in ("brightness_down", "brightness_up"):
       direction = -1 if name == "brightness_down" else 1
       line((-direction * 4, -8), (direction * 4, 0), (-direction * 4, 8))

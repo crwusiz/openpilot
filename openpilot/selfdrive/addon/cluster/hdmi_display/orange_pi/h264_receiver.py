@@ -895,6 +895,7 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
   latest_parked_at = getattr(receiver, "parked_at", parked_at)
   set_park_available = getattr(display, "set_park_available", None)
   set_park_touch = getattr(display, "set_park_touch", None)
+  set_park_presented = getattr(display, "set_park_presented", None)
   set_park_visible = getattr(scene, "set_park_visible", None)
   park_log_upload_status = getattr(display, "park_log_upload_status", None)
   set_park_log_upload_status = getattr(scene, "set_park_log_upload_status", None)
@@ -1025,6 +1026,8 @@ def receive_h264_session(sock, display, hello, frame_timeout=2.0, max_frames=Non
         presented = bool(getattr(display, "last_frame_presented", True))
         scene_status = getattr(scene, "last_status", {})
         park_presented = presented and scene_status.get("parked", False)
+        if presented and set_park_presented is not None:
+          set_park_presented(park_presented)
         park_rotate_180 = getattr(getattr(scene, "config", None), "rotate_180", False)
         camera_visible = scene_status.get("video_fresh", True) and not scene_status.get("parked", False)
         receiver.record_display(render_started, rendered_at, displayed_at, pending_video_at, presented,

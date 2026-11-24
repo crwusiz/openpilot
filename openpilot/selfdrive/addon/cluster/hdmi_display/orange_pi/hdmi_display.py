@@ -115,6 +115,7 @@ class HdmiDisplay:
     self.last_frame_presented = False
     self._latest_frame = None
     self._latest_layers = None
+    self._park_frame_presented = False
     self._overlay_cache = None
     self._waiting_requested = False
     self._controls_revision = None
@@ -149,6 +150,9 @@ class HdmiDisplay:
   def set_park_available(self, available):
     if self.controls is not None:
       self.controls.set_park_available(available)
+
+  def set_park_presented(self, parked):
+    self._park_frame_presented = parked
 
   @property
   def park_visible(self):
@@ -409,7 +413,10 @@ class HdmiDisplay:
       LOG.info("Touch type=%s finger=%s raw=(%.4f, %.4f) cluster=(%.4f, %.4f)",
                event_type, finger_id, raw_x, raw_y, x, y)
     if self.controls is not None:
-      self.controls.handle_touch(self.last_touch)
+      # Gear can leave P before the next live frame replaces the Park view.
+      view_available = (not self._waiting_requested and (self._latest_frame is not None or self._latest_layers is not None)
+                        and (self.park_visible or not self._park_frame_presented))
+      self.controls.handle_touch(self.last_touch, view_available=view_available)
     if self.touch_handler is not None:
       self.touch_handler(self.last_touch)
 
@@ -652,9 +659,12 @@ class HdmiDisplay:
     if self.screen is None or self.close_requested:
       return False
     self.last_frame_presented = False
+    if not self._waiting_requested:
+      self.controls.on_waiting()
     self._waiting_requested = True
     self._latest_frame = None
     self._latest_layers = None
+    self._park_frame_presented = False
     if self.controls.screen_off:
       if self._controls_revision != self.controls.revision:
         self._draw_black()
@@ -681,6 +691,7 @@ class HdmiDisplay:
       self._showing_waiting = False
     self._latest_frame = None
     self._latest_layers = None
+    self._park_frame_presented = False
     self._waiting_requested = False
     self.last_frame_presented = False
 
