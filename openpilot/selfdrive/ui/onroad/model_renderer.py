@@ -379,7 +379,7 @@ class ModelRenderer(Widget):
       has_acceleration_gradient=len(self._path_gradient.colors) > 1,
     )
     if style is model_render_support.PathStyle.DISENGAGED:
-      draw_polygon(self._rect, path_pts, colors_alpha(rl.BLACK, round(model_render_support.DISENGAGED_PATH_ALPHA * self._visible)))
+      draw_polygon(self._rect, path_pts, colors_alpha(rl.WHITE, round(model_render_support.DISENGAGED_PATH_ALPHA * self._visible)))
       return
     if style is model_render_support.PathStyle.FALLBACK:
       draw_polygon(self._rect, path_pts, colors_alpha(rl.WHITE, round(model_render_support.FALLBACK_PATH_ALPHA * self._visible)))

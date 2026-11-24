@@ -78,7 +78,7 @@ class TestModelRendererUpdates(unittest.TestCase):
     }
     return type('SubMaster', (dict,), {'updated': {'modelV2': True}})(sm)
 
-  def test_cluster_connection_hides_lane_lines_and_path_until_disconnected(self):
+  def test_cluster_connection_hides_lane_lines_path_and_lead_indicator_until_disconnected(self):
     renderer = self.make_renderer(longitudinal_control=True)
     renderer._transform_dirty = False
     sm = self.make_sm(lead_present=True)
@@ -96,9 +96,8 @@ class TestModelRendererUpdates(unittest.TestCase):
         renderer._render(renderer._rect)
         self.assertEqual(calls['_draw_lane_lines'].call_count, draws)
         self.assertEqual(calls['_draw_path'].call_count, draws)
-
-      self.assertEqual(calls['_update_lead_bars'].call_count, 3)
-      self.assertEqual(calls['_draw_lead_indicator'].call_count, 3)
+        self.assertEqual(calls['_update_lead_bars'].call_count, draws)
+        self.assertEqual(calls['_draw_lead_indicator'].call_count, draws)
 
   def test_planned_stop_is_updated_and_projected_without_lane_lines(self):
     for renderer_module, update_method in ((big_renderer, '_update_leads'), (model_renderer, '_update_lead_bars')):

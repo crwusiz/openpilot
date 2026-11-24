@@ -871,10 +871,10 @@ class ClusterRenderer:
     local_path_poly = path_poly - np.array([self.camera_x, self.camera_y], dtype=np.int32)
     blender = getattr(self, "_color_blender", None)
     if style is model_render_support.PathStyle.DISENGAGED:
-      self._fill_polygon_alpha(camera_region, local_path_poly, Colors.BLACK, model_render_support.DISENGAGED_PATH_ALPHA / 255.0, blender=blender)
+      self._fill_polygon_alpha(camera_region, local_path_poly, rl.WHITE, model_render_support.DISENGAGED_PATH_ALPHA / 255.0, blender=blender)
       return
     if style is model_render_support.PathStyle.FALLBACK:
-      self._fill_polygon_alpha(camera_region, local_path_poly, Colors.WHITE, model_render_support.FALLBACK_PATH_ALPHA / 255.0, blender=blender)
+      self._fill_polygon_alpha(camera_region, local_path_poly, rl.WHITE, model_render_support.FALLBACK_PATH_ALPHA / 255.0, blender=blender)
       return
 
     if style is model_render_support.PathStyle.ACCELERATION:

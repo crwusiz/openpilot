@@ -2,7 +2,7 @@ import raylib_nb as rl
 from dataclasses import dataclass
 from openpilot.common.constants import CV
 from openpilot.selfdrive.hud_render_support import (
-  KM_TO_MILE, SET_SPEED_NA, current_speed_color, format_speed_limit_distance, is_cruise_speed_set,
+  KM_TO_MILE, SET_SPEED_NA, current_speed_color, format_speed_limit_distance, ignore_limit_ratio, is_cruise_speed_set,
   select_vehicle_speed, speed_limit_warning_level, tpms_reading, traffic_light_index,
 )
 from openpilot.selfdrive.ui.mici.onroad.long_indicator import LongIndicator
@@ -23,7 +23,6 @@ from openpilot.selfdrive.ui.onroad.icon_indicator import IconIndicator, Rotatabl
 CRUISE_DISABLED_CHAR = "--"
 BLINKER_DRAW_COUNT = 8
 BLINK_PERIOD_MS = 900.0
-WHEEL_ICON_OPACITY = 0.8
 
 
 @dataclass(frozen=True)
@@ -87,6 +86,7 @@ class HudRenderer(Widget):
     self.rr: float = 0.0
 
     # Speed limits and navigation
+    self.ignore_limit_timer: float = 0.0
     self.nav_limit_speed: float = 0.0
     self.stock_limit_speed: float = 0.0
     self.road_limit_speed: float = 0.0
@@ -208,6 +208,7 @@ class HudRenderer(Widget):
       self.is_cruise_set = False
       self.set_speed = SET_SPEED_NA
       self.speed = 0.0
+      self.ignore_limit_timer = 0.0
       return
 
     car_state = sm['carState']
@@ -237,6 +238,7 @@ class HudRenderer(Widget):
     self.speed = max(0.0, v_ego * speed_conversion)
 
     # Extended state
+    self.ignore_limit_timer = car_state.ignoreLimitTimer
     self.accel = car_state.aEgo
     self.brake_pressed = car_state.brakePressed
     self.accel_pressed = car_state.gasPressed
@@ -315,7 +317,7 @@ class HudRenderer(Widget):
     # Bottom indicators
     self._wheel_indicator.set_texture(self._get_wheel_texture())
     self._wheel_indicator.set_rotation(-self.steer_angle)
-    self._wheel_indicator.set_opacity(WHEEL_ICON_OPACITY)
+    self._wheel_indicator.set_opacity(0.8)
 
     self._autohold_warning_indicator.set_opacity(0.8)
     self._autohold_active_indicator.set_opacity(0.8)
@@ -363,6 +365,13 @@ class HudRenderer(Widget):
 
     self._draw_blinkers(rect)
     self._draw_blind_spot_detect(rect)
+    self._draw_ignore_limit_timer(rect)
+
+  def _draw_ignore_limit_timer(self, rect: rl.Rectangle) -> None:
+    bar_width = int(rect.width * ignore_limit_ratio(self.ignore_limit_timer))
+    if bar_width > 0:
+      bar_x = rect.x + (rect.width - bar_width) / 2
+      rl.draw_rectangle(int(bar_x), int(rect.y), bar_width, 10, colors_alpha(Colors.ORANGE, 150))
 
   def _draw_upper_icons(self, rect: rl.Rectangle) -> None:
     chestnut_state = ui_state.chestnut_state

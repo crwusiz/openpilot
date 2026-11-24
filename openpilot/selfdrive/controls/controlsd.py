@@ -104,7 +104,6 @@ class Controls:
     CC.longActive = CC.enabled and not any(e.overrideLongitudinal for e in self.sm['onroadEvents']) and self.CP.openpilotLongitudinalControl
 
     actuators = CC.actuators
-    actuators.longControlState = self.LoC.long_control_state
 
     # Enable blinkers while lane changing
     if model_v2.meta.laneChangeState != LaneChangeState.off:
@@ -113,13 +112,11 @@ class Controls:
 
     if not CC.latActive:
       self.LaC.reset()
-    if not CC.longActive:
-      self.LoC.reset()
 
     # accel PID loop
     pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, CS.vEgo, CS.vCruise * CV.KPH_TO_MS)
-    #actuators.accel = float(self.LoC.update(CC.longActive, CS, long_plan.aTarget, long_plan.shouldStop, pid_accel_limits))
-    actuators.accel = float(self.LoC.update(CC.longActive, CS, long_plan, pid_accel_limits, self.sm))
+    actuators.accel = self.LoC.update(CC.longActive, CS, long_plan, pid_accel_limits)
+    actuators.longControlState = self.LoC.long_control_state
 
     # Steering PID loop and lateral MPC
     # Reset desired curvature to current to avoid violating the limits on engage
@@ -163,7 +160,7 @@ class Controls:
 
     CC.cruiseControl.override = CC.enabled and not CC.longActive and self.CP.openpilotLongitudinalControl
     CC.cruiseControl.cancel = CS.cruiseState.enabled and not CC.enabled #or not self.CP.pcmCruise)
-    CC.cruiseControl.resume = CC.enabled and CS.cruiseState.standstill and not self.sm['longitudinalPlan'].shouldStop
+    CC.cruiseControl.resume = CC.enabled and CS.cruiseState.standstill and not CS.brakePressed and not self.sm['longitudinalPlan'].shouldStop
 
     hudControl = CC.hudControl
     hudControl.setSpeed = float(CS.vCruiseCluster * CV.KPH_TO_MS)

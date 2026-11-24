@@ -20,10 +20,10 @@ J_CRUISE_VALS = [1.6, 1.2, 0.8, 0.6]
 J_CRUISE_BP = [0., 10.0, 25., 40.]
 A_CRUISE_MIN = -0.5
 ACCEL_BOOST_BY_PERSONALITY = {  # m/s^2
-  log.LongitudinalPersonality.aggressive: 0.10,
-  log.LongitudinalPersonality.standard: 0.075,
-  log.LongitudinalPersonality.relaxed: 0.05,
-  log.LongitudinalPersonality.morerelaxed: 0.025,
+  log.LongitudinalPersonality.aggressive: 0.15,
+  log.LongitudinalPersonality.standard: 0.10,
+  log.LongitudinalPersonality.relaxed: 0.075,
+  log.LongitudinalPersonality.morerelaxed: 0.05,
 }
 CONTROL_N_T_IDX = ModelConstants.T_IDXS[:CONTROL_N]
 
@@ -148,7 +148,7 @@ class LongitudinalPlanner:
     longitudinalPlan.accels = self.a_desired_trajectory.tolist()
     longitudinalPlan.jerks = self.j_desired_trajectory.tolist()
 
-    longitudinalPlan.hasLead = sm['radarState'].leadOne.present or sm['radarState'].leadTwo.present
+    longitudinalPlan.hasLead = sm['radarState'].leadOne.present
     longitudinalPlan.longitudinalPlanSource = self.mpc.source
     longitudinalPlan.fcw = self.fcw
 

@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 import unittest
-from unittest.mock import call, patch
+from unittest.mock import MagicMock, call, patch
 
 from openpilot.selfdrive.controls import radard
 
@@ -48,6 +48,48 @@ class TestRadarLeadAssociation(unittest.TestCase):
     self.assertTrue(lead['radar'])
     self.assertEqual(lead['radarTrackId'], track.identifier)
     self.assertEqual(lead['modelProb'], 0.9)
+
+
+class TestRadarDState(unittest.TestCase):
+  def setUp(self):
+    params = self.enterContext(patch.object(radard, 'Params')).return_value
+    params.get_bool.return_value = False
+    self.radar = radard.RadarD()
+    model_lead = SimpleNamespace(x=[50.0], y=[0.0], v=[8.0], a=[0.0], prob=0.9)
+    lane_line = SimpleNamespace(x=[], y=[])
+    self.model = SimpleNamespace(leadsV3=[model_lead, SimpleNamespace(prob=0.0)],
+                                 position=SimpleNamespace(x=[], y=[], yStd=[]), velocity=SimpleNamespace(x=[2.0]),
+                                 laneLines=[lane_line] * 4, laneLineProbs=[0.0] * 4)
+    self.sm = MagicMock(seen={'modelV2': True}, updated={'modelV2': True}, recv_frame={'carState': 1},
+                        logMonoTime={'modelV2': 1})
+    messages = {'modelV2': self.model, 'carState': SimpleNamespace(vEgo=2.0)}
+    self.sm.__getitem__.side_effect = messages.__getitem__
+    self.sm.all_checks.return_value = True
+    self.radar_data = radard.car.RadarData.new_message()
+
+  def test_complete_frames_use_a_fresh_message(self):
+    self.radar.update(self.sm, self.radar_data.as_reader())
+    first_state = self.radar.radar_state
+    self.assertTrue(first_state.leadOne.present)
+
+    self.model.leadsV3[0].x[0] = 60.0
+    self.radar.update(self.sm, self.radar_data.as_reader())
+    self.assertIsNot(self.radar.radar_state, first_state)
+    self.assertAlmostEqual(self.radar.radar_state.leadOne.dRel - first_state.leadOne.dRel, 10.0, places=4)
+
+  def test_valid_incomplete_frames_keep_leads_and_refresh_metadata(self):
+    self.radar.update(self.sm, self.radar_data.as_reader())
+    first_state = self.radar.radar_state
+    self.model.leadsV3.pop()
+    self.sm.logMonoTime['modelV2'] = 2
+    self.radar_data.errors.radarFault = True
+    self.radar.update(self.sm, self.radar_data.as_reader())
+
+    state = self.radar.radar_state
+    self.assertIsNot(state, first_state)
+    self.assertEqual(state.leadOne.to_dict(), first_state.leadOne.to_dict())
+    self.assertEqual(state.mdMonoTime, 2)
+    self.assertTrue(state.radarErrors.radarFault)
 
 
 class TestRadarDMain(unittest.TestCase):

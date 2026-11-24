@@ -93,7 +93,7 @@ class ModelRenderer(BaseModelRenderer):
       self._draw_lane_lines()
       self._draw_path()
 
-    if render_lead_indicator:
+    if render_lead_indicator and not ui_state.cluster_connected:
       self._update_lead_bars(sm)
       self._draw_lead_indicator()
     else:
