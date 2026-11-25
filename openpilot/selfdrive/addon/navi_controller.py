@@ -18,6 +18,7 @@ from threading import Thread
 from openpilot.cereal import messaging
 from openpilot.common.realtime import Ratekeeper
 from openpilot.common.constants import UnitConverter
+from openpilot.common.logging_extra import queued_file_logging
 from openpilot.selfdrive.addon.navi_helpers import (
   CAMERA_SOURCE_TIMEOUT, NAVI_SERVICE_MESSAGE, REAR_CAMERA_TYPES, CameraDistanceTracker,
   camera_limit_active, camera_limit_distance, rear_camera_hold_active,
@@ -27,21 +28,14 @@ terminate_flag = threading.Event()
 
 LOG_FILE = "/data/log/navi_debug.log"
 
-def _setup_logger():
-  logger = logging.getLogger("navi")
-  logger.setLevel(logging.DEBUG)
+log = logging.getLogger("navi")
+log.setLevel(logging.DEBUG)
+log.propagate = False
+log.addHandler(logging.NullHandler())
 
-  try:
-    handler = logging.FileHandler(LOG_FILE, mode="a")
-    handler.setFormatter(logging.Formatter("%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
-    logger.addHandler(handler)
 
-  except OSError:
-    pass
-
-  return logger
-
-log = _setup_logger()
+def navi_debug_logging():
+  return queued_file_logging(log, LOG_FILE, mode="a")
 
 class Port:
   BROADCAST_PORT = 2899
@@ -355,18 +349,19 @@ def main():
   except OSError:
     pass
 
-  server = NaviServer()
-  Thread(target=publish_thread, args=[server], daemon=True).start()
+  with navi_debug_logging():
+    server = NaviServer()
+    Thread(target=publish_thread, args=[server], daemon=True).start()
 
-  with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-    try:
-      sock.bind(('0.0.0.0', Port.RECEIVE_PORT))
-      sock.setblocking(True)
-      while not terminate_flag.is_set():
-        server.udp_recv(sock)
-        server.send_sdp(sock)
-    except Exception:
-      log.exception("UDP Server encountered a critical error")
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+      try:
+        sock.bind(('0.0.0.0', Port.RECEIVE_PORT))
+        sock.setblocking(True)
+        while not terminate_flag.is_set():
+          server.udp_recv(sock)
+          server.send_sdp(sock)
+      except Exception:
+        log.exception("UDP Server encountered a critical error")
 
 
 class SpeedLimiter:
@@ -380,7 +375,7 @@ class SpeedLimiter:
     self.last_road_name = ""
     self.in_school_zone = False
 
-    self.sock = messaging.sub_sock("naviData")
+    self.sock = messaging.sub_sock("naviData", conflate=True)
     self.naviData = None
     self.conv = UnitConverter()
 
@@ -398,7 +393,7 @@ class SpeedLimiter:
 
   def recv(self):
     try:
-      dat = messaging.recv_sock(self.sock, wait=False)
+      dat = messaging.recv_one_or_none(self.sock)
       if dat is not None:
         was_active = self.naviData is not None and self.naviData.active > 0
         self.naviData = dat.naviData
@@ -512,7 +507,7 @@ class SpeedLimiter:
       # marker may establish a zone on a different road in this same frame.
       if self.in_school_zone and was_in_school_zone:
         if (self.last_road_name and current_road_name and current_road_name != self.last_road_name) or \
-           (cam_type not in (20, 21) and camera_limit_active(navi_data)):
+           (cam_type not in (20, 21) and has_camera_limit):
           log.info("school zone FORCED EXIT (road changed or new cam detected)")
           self.in_school_zone = False
 

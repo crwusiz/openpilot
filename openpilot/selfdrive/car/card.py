@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import time
-import threading
 
 import openpilot.cereal.messaging as messaging
 
@@ -19,9 +18,8 @@ from opendbc.car.fw_versions import ObdCallback
 from opendbc.car.car_helpers import get_car, interfaces
 from opendbc.car.interfaces import CarInterfaceBase, RadarInterfaceBase
 from openpilot.selfdrive.pandad import can_capnp_to_list, can_list_to_can_capnp
-from openpilot.selfdrive.car.cruise import VCruiseHelper
-
 from openpilot.selfdrive.addon.cruise_controller import CruiseController, cruise_debug_logging
+from openpilot.selfdrive.addon.navi_controller import navi_debug_logging
 
 REPLAY = "REPLAY" in os.environ
 
@@ -151,11 +149,6 @@ class Car:
     self.params.put("CarParamsCache", cp_bytes)
     self.params.put("CarParamsPersistent", cp_bytes)
 
-    self.v_cruise_helper = VCruiseHelper(self.CP)
-
-    self.is_metric = self.params.get_bool("IsMetric")
-    self.initial_cruise_speed = self.params.get("InitialCruiseSpeedKph", return_default=True)
-
     # card is driven by can recv, expected at 100Hz
     self.rk = Ratekeeper(100, print_delay_threshold=None)
 
@@ -183,12 +176,6 @@ class Car:
 
     if can_rcv_valid and REPLAY:
       self.can_log_mono_time = messaging.log_from_bytes(can_strs[0]).logMonoTime
-
-    #self.v_cruise_helper.update_v_cruise(CS, self.sm['carControl'].enabled, self.is_metric)
-
-    # TODO: mirror the carState.cruiseState struct?
-    #CS.vCruise = float(self.v_cruise_helper.v_cruise_kph)
-    #CS.vCruiseCluster = float(self.v_cruise_helper.v_cruise_cluster_kph)
 
     # neokii cruise controller
     self.cruise_controller.update_v_cruise(CS, self.sm, self.sm['carControl'].enabled)
@@ -261,28 +248,15 @@ class Car:
     self.initialized_prev = initialized
     self.CS_prev = CS
 
-  def params_thread(self, evt):
-    while not evt.is_set():
-      self.is_metric = self.params.get_bool("IsMetric")
-      self.initial_cruise_speed = self.params.get("InitialCruiseSpeedKph", return_default=True)
-      time.sleep(0.1)
-
   def card_thread(self):
-    e = threading.Event()
-    t = threading.Thread(target=self.params_thread, args=(e, ))
-    try:
-      t.start()
-      while True:
-        self.step()
-        self.rk.monitor_time()
-    finally:
-      e.set()
-      t.join()
+    while True:
+      self.step()
+      self.rk.monitor_time()
 
 
 def main():
-  # Start the log writer before setting the vehicle loop's real-time priority and affinity.
-  with cruise_debug_logging():
+  # Start the log writers before setting the vehicle loop's real-time priority and affinity.
+  with cruise_debug_logging(), navi_debug_logging():
     config_realtime_process(4, Priority.CTRL_HIGH)
     car = Car()
     car.card_thread()

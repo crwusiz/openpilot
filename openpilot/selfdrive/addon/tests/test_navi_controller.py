@@ -15,7 +15,7 @@ REAR_CAMERA_TYPES = (75, 76, 86, 87, 88, 89)
 
 def load_navi_controller():
   cereal = ModuleType("openpilot.cereal")
-  cereal.messaging = SimpleNamespace(sub_sock=lambda service: None)
+  cereal.messaging = SimpleNamespace(sub_sock=lambda service, **kwargs: None)
   realtime = ModuleType("openpilot.common.realtime")
   realtime.Ratekeeper = type("Ratekeeper", (), {})
   stubs = {
@@ -64,6 +64,37 @@ def make_navi_data(cam_type, *, distance=600, is_highway=False, rear=False):
     data.camDistanceId = 1234567890123456
     data.camLimitSpeedLeftDistPrecise = float(distance)
   return data
+
+
+def test_speed_limiter_receives_only_latest_navigation_state(monkeypatch, tmp_path):
+  active = make_navi_data(20, distance=50)
+  active.camLimitSpeed = 30
+  inactive = SimpleNamespace(active=0)
+  messaging = SimpleNamespace(
+    sub_sock=MagicMock(return_value=object()),
+    recv_one_or_none=MagicMock(side_effect=[SimpleNamespace(naviData=active), None, SimpleNamespace(naviData=inactive)]),
+  )
+  debug_path = tmp_path / 'navi_debug.log'
+  conv = UnitConverter.__new__(UnitConverter)
+  conv.is_metric = True
+  monkeypatch.setattr(navi_controller, 'UnitConverter', lambda: conv)
+  monkeypatch.setattr(navi_controller, 'messaging', messaging)
+  monkeypatch.setattr(navi_controller, 'LOG_FILE', debug_path)
+
+  with navi_controller.navi_debug_logging():
+    limiter = navi_controller.SpeedLimiter()
+    messaging.sub_sock.assert_called_once_with('naviData', conflate=True)
+    limiter.recv()
+    limiter.get_max_speed(40)
+    assert limiter.get_in_school_zone()
+    limiter.recv()
+    assert limiter.naviData is active
+    limiter.recv()
+    assert limiter.naviData is inactive
+    assert not limiter.get_in_school_zone()
+    assert messaging.recv_one_or_none.call_count == 3
+
+  assert 'first naviData received' in debug_path.read_text()
 
 
 @pytest.mark.parametrize("distance,speed", [(0, 0), (202, 0), (0, 30), (202, 9), (202, 101)])

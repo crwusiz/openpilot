@@ -6,11 +6,52 @@ import json
 import uuid
 import socket
 import logging
+import queue
 import traceback
 import numpy as np
 from threading import local
 from collections import OrderedDict
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
+from logging.handlers import QueueHandler, QueueListener
+
+
+class _FileQueueHandler(QueueHandler):
+  def enqueue(self, record):
+    try:
+      self.queue.put_nowait(record)
+    except queue.Full:
+      # Diagnostics must never hold up a producer when disk writes fall behind.
+      pass
+
+
+class _FileQueueListener(QueueListener):
+  def enqueue_sentinel(self):
+    # Drain pending records on shutdown, after detaching the producer.
+    self.queue.put(self._sentinel)
+
+
+@contextmanager
+def queued_file_logging(logger, path, mode):
+  try:
+    file_handler = logging.FileHandler(path, mode=mode)
+  except OSError:
+    yield
+    return
+
+  with closing(file_handler):
+    file_handler.setFormatter(logging.Formatter(
+      "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    ))
+    records = queue.Queue(maxsize=256)
+    queue_handler = _FileQueueHandler(records)
+    listener = _FileQueueListener(records, file_handler)
+    listener.start()
+    logger.addHandler(queue_handler)
+    try:
+      yield
+    finally:
+      logger.removeHandler(queue_handler)
+      listener.stop()
 
 
 def json_handler(obj):

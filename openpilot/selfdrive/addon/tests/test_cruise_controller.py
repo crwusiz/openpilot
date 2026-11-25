@@ -256,7 +256,7 @@ def test_school_zone_limit_selection(monkeypatch, options, expected_camera, expe
 
   controller._cal_limit_speed(car_state, sm, 33.0 / 3.6, 33.0, 60.6)
 
-  assert controller.camera_limit_speed_clu == expected_camera
+  assert debug_state["speed_candidates"][1] == expected_camera
   assert debug_state["calculated_max_speed_clu"] == expected_target
 
 
@@ -285,6 +285,7 @@ def make_steer_controller():
   controller.steer_decel_active = False
   controller.steer_decel_entry_speed_ms = None
   controller.prev_steering_angle = 0.0
+  controller._reset_curve_state()
   return controller
 
 
@@ -358,13 +359,6 @@ def make_stock_curve_controller():
   controller = make_steer_controller()
   controller.conv.kph_to_ms = lambda speed: speed / 3.6
   controller.conv.ms_to_kph = lambda speed: speed * 3.6
-  controller._update_vehicle_navi_curve_params = lambda: None
-  controller.vehicle_navi_curve_control = True
-  controller.vehicle_navi_curve_mpp_control = True
-  controller.vehicle_navi_curve_lower_limit = 30.0
-  controller.vehicle_navi_curve_speed_factor = 1.0
-  controller.vehicle_navi_curve_decel_rate = 2.0
-  controller.vehicle_navi_curve_control_end = 3.0
   return controller
 
 
@@ -529,7 +523,7 @@ def test_curve_limit_combines_model_and_stock_navigation(monkeypatch, model_spee
   controller._cal_stock_navi_curve_speed = lambda *args: stock_speed
   controller._cal_limit_speed(car_state, sm, 60.0 / 3.6, 60.0, 100.0)
 
-  assert controller.curve_speed_clu == expected
+  assert debug['speed_candidates'][3] == expected
   assert debug['model_curve_speed_clu'] == model_speed
   assert debug['stock_navi_curve_speed_clu'] == stock_speed
 
@@ -547,7 +541,6 @@ def test_curve_engagement_starts_at_vehicle_speed(monkeypatch):
 
 def test_zero_confidence_estimates_do_not_create_curve_limit():
   controller = make_steer_controller()
-  controller._reset_curve_state()
   controller._get_model_based_speed = lambda *args: (10.0, 0.0)
   controller._get_acc_based_speed = lambda *args: (12.0, 0.0)
   assert controller._cal_curve_speed_adaptive(make_model_sm(), 30.0, 110.0) == 255.0
@@ -558,7 +551,6 @@ def test_logged_near_zero_confidence_path_does_not_create_curve_limit(path_confi
   # November 10, 18:53:14-15 and 18:57:41-45: path confidence collapsed
   # while its curvature spiked, but unrestricted yaw kept confidence 0.14+.
   controller = make_steer_controller()
-  controller._reset_curve_state()
   controller._get_model_based_speed = lambda *args: (30.0 / 3.6, path_confidence)
   controller._get_acc_based_speed = lambda *args: (255.0, 0.14)
 
@@ -570,7 +562,6 @@ def test_logged_near_zero_confidence_path_does_not_create_curve_limit(path_confi
 
 def test_numerically_unstable_path_tail_does_not_create_curve_limit():
   controller = make_steer_controller()
-  controller._reset_curve_state()
   # The model tail can bunch up before becoming non-monotonic (path_invalid).
   # Small lateral changes then produce curvature > 1/m despite a straight yaw.
   x = np.r_[np.linspace(0.0, 43.0, 23), 43.0 + np.arange(1, 11) * 0.1]
@@ -591,7 +582,6 @@ def test_numerically_unstable_path_tail_does_not_create_curve_limit():
 @pytest.mark.parametrize('source', ['path', 'yaw'])
 def test_unrestricted_estimate_does_not_dilute_valid_curve(source, other_confidence):
   controller = make_steer_controller()
-  controller._reset_curve_state()
   def limiting(*args):
     return 40.0 / 3.6, 0.7
 
@@ -607,7 +597,6 @@ def test_unrestricted_estimate_does_not_dilute_valid_curve(source, other_confide
 @pytest.mark.parametrize('ego_kph', [40.0, 70.0])
 def test_two_credible_curve_estimates_keep_curve_limit_and_strong_reduction(ego_kph):
   controller = make_steer_controller()
-  controller._reset_curve_state()
   controller._get_model_based_speed = lambda *args: (40.0 / 3.6, 0.8)
   controller._get_acc_based_speed = lambda *args: (50.0 / 3.6, 0.6)
 
@@ -621,7 +610,6 @@ def test_two_credible_curve_estimates_keep_curve_limit_and_strong_reduction(ego_
 
 def test_two_credible_unrestricted_estimates_keep_no_curve_sentinel():
   controller = make_steer_controller()
-  controller._reset_curve_state()
   controller._get_model_based_speed = lambda *args: (255.0, 0.8)
   controller._get_acc_based_speed = lambda *args: (255.0, 0.6)
 
@@ -635,7 +623,6 @@ def test_two_credible_unrestricted_estimates_keep_no_curve_sentinel():
 ])
 def test_curve_confidence_floor_keeps_boundary_and_usable_estimates(source, confidence, expected):
   controller = make_steer_controller()
-  controller._reset_curve_state()
 
   def limiting(*args):
     return 40.0 / 3.6, confidence
@@ -653,7 +640,6 @@ def test_curve_confidence_floor_keeps_boundary_and_usable_estimates(source, conf
 
 def test_credible_path_preview_keeps_strong_curve_limit_before_yaw_changes():
   controller = make_steer_controller()
-  controller._reset_curve_state()
   controller._get_model_based_speed = lambda *args: (40.0 / 3.6, 0.8)
   controller._get_acc_based_speed = lambda *args: (255.0, 0.7)
 
@@ -668,6 +654,41 @@ def make_curved_model_sm(*, radius=50.0, extent=40.0):
   return sm
 
 
+def test_model_and_navigation_reuse_geometry_but_update_curve_window(monkeypatch):
+  controller = make_stock_curve_controller()
+  sm = make_curved_model_sm()
+  cs = stock_curve_state()
+  calculate_curvature = controller._calculate_curvature
+  geometry_calls = 0
+
+  def count_curvature(x, y):
+    nonlocal geometry_calls
+    geometry_calls += 1
+    return calculate_curvature(x, y)
+
+  monkeypatch.setattr(controller, '_calculate_curvature', count_curvature)
+
+  assert controller._cal_curve_speed_adaptive(sm, 60.0 / 3.6, 100.0) < 255.0
+  assert controller._cal_stock_navi_curve_speed(cs, sm) == pytest.approx(30.0)
+  assert controller.stock_curve_validation == 'matched_model'
+
+  cs.naviCurveDistance = 50.0
+  assert 30.0 < controller._cal_stock_navi_curve_speed(cs, sm) < 255.0
+  assert controller.stock_curve_validation == 'window_beyond_model'
+  assert controller._cal_curve_speed_adaptive(sm, 60.0 / 3.6, 90.0) < 255.0
+  assert geometry_calls == 1
+
+  with monkeypatch.context() as invalid_model:
+    invalid_model.setattr(sm, 'all_checks', lambda _: False)
+    assert controller._cal_curve_speed_adaptive(sm, 60.0 / 3.6, 90.0) == 255.0
+    assert 30.0 < controller._cal_stock_navi_curve_speed(cs, sm) < 255.0
+    assert controller.stock_curve_validation == 'model_unavailable'
+    assert geometry_calls == 1
+
+  assert controller._cal_curve_speed_adaptive(sm, 60.0 / 3.6, 90.0) < 255.0
+  assert geometry_calls == 2
+
+
 def test_curve_cap_survives_slowing_below_its_safe_speed(monkeypatch):
   # November 6, 08:56:38-52: curve targets repeatedly vanished near ego speed.
   # A fixed curved path must retain its SET cap after slowing below that cap.
@@ -679,7 +700,9 @@ def test_curve_cap_survives_slowing_below_its_safe_speed(monkeypatch):
     assert 30.0 <= cap < 60.6
 
   # Reaching the cap alone cannot release it; a straight path can.
-  sm['modelV2'].position.y = np.zeros(81)
+  model = sm['modelV2']
+  sm['modelV2'] = SimpleNamespace(position=SimpleNamespace(x=model.position.x, y=np.zeros(81)),
+                                  orientationRate=model.orientationRate, velocity=model.velocity)
   sm.logMonoTime = {'modelV2': 100}
   assert controller._cal_curve_speed_adaptive(sm, 36.0 / 3.6, 60.6) == 255.0
 
@@ -722,7 +745,7 @@ def test_predictive_curve_above_ego_limits_set_with_straight_path_tail(monkeypat
   model.position.y = np.zeros(81)
   curvatures = np.zeros(81)
   curvatures[15] = 0.02  # Curve 30 m ahead, with a straight far endpoint.
-  monkeypatch.setattr(controller, '_get_model_path', lambda _: (model.position.x, curvatures))
+  monkeypatch.setattr(controller, '_get_model_path', lambda _: (model.position.x, model.position.y, curvatures))
 
   cap = controller._cal_curve_speed_adaptive(sm, 28.8 / 3.6, 60.6)
 
@@ -822,6 +845,27 @@ def make_full_controller(monkeypatch, *, stock_long=False, pcm_cruise=True, stat
   return controller, car_state, sm, manager, limiter
 
 
+@pytest.mark.parametrize('stock_long, pcm_cruise', [(True, True), (False, False)])
+def test_active_cruise_without_buttons_polls_navigation_once(monkeypatch, stock_long, pcm_cruise):
+  controller, cs, sm, _, limiter = make_full_controller(
+    monkeypatch, stock_long=stock_long, pcm_cruise=pcm_cruise, state_control=not stock_long,
+  )
+  polls = 0
+
+  def recv():
+    nonlocal polls
+    polls += 1
+
+  limiter.recv = recv
+  controller.update_v_cruise(cs, sm, True)
+  assert polls == 1
+
+  controller.requested_speed_clu = 84.6
+  controller.update_v_cruise(cs, sm, True)
+  assert polls == 2
+  assert controller.v_cruise_cluster_kph == pytest.approx(85.0)
+
+
 @pytest.mark.parametrize("is_metric", [True, False])
 @pytest.mark.parametrize("source", ['road', 'section'])
 def test_automatic_set_speed_respects_maximum(monkeypatch, is_metric, source):
@@ -849,7 +893,7 @@ def test_stock_navigation_non_speed_values_do_not_change_set(monkeypatch, road):
 
   assert controller.requested_speed_clu == pytest.approx(90.0)
   assert controller.prev_road_limit_speed == 0.0
-  assert controller.road_limit_speed_clu == 255.0
+  assert controller.v_cruise_kph == pytest.approx(90.0)
   assert cruise_controller._get_button_limit(limiter, cs) == (0.0, False)
 
 
