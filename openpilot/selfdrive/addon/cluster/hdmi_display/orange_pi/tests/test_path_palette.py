@@ -73,7 +73,7 @@ def test_path_pixels_reflect_acceleration_and_steering(renderer_class, accelerat
 
 @pytest.mark.parametrize("renderer_class", [ClusterRenderer, LayeredRenderer], ids=["usb", "hdmi"])
 @pytest.mark.parametrize("acceleration,hud_updates,value,alpha", [
-  pytest.param([-2.0] * 9, {"enabled": False, "steering_pressed": True}, 0, 90, id="disengaged-with-torque"),
+  pytest.param([-2.0] * 9, {"enabled": False, "steering_pressed": True}, 255, 90, id="disengaged-with-torque"),
   pytest.param(None, {}, 255, 30, id="legacy-state"),
   pytest.param([-2.0], {}, 255, 30, id="insufficient-acceleration"),
 ])

@@ -447,6 +447,23 @@ assert scene.renderer._long_indicator_alphas[1] == 255
 assert scene.renderer._long_indicator_alphas[-2] > 0
 drawn_icons = [call.args[1] for call in scene.renderer._icon.call_args_list]
 assert 'autohold_warning' in drawn_icons and 'brake_pressed' not in drawn_icons
+
+xs = list(range(5, 81, 5))
+path = {'path_x': xs, 'path_y': [0.0] * len(xs), 'path_z': [0.0] * len(xs),
+        'calib_transform': [[672, -910, 0], [380, 0, 910], [1, 0, 0]]}
+scene.set_gpu_camera(True)
+for enabled, alpha in ((False, model_render_support.DISENGAGED_PATH_ALPHA), (True, model_render_support.FALLBACK_PATH_ALPHA)):
+    scene.update({'model_valid': True, 'hud': {'enabled': enabled, 'lat_active': enabled},
+                  'path': path, 'source_size': [1344, 760]})
+    layers = scene.render_layers()
+    if layers.path is None:
+        scene.renderer._path_worker._future.result(timeout=2)
+        layers = scene.render_layers()
+    assert scene.last_frame_timings['path_async'] == 1
+    assert layers.path is not None and layers.path[:, :, 3].max() == alpha
+    # The path layer stores premultiplied white.
+    assert np.any(np.all(layers.path == alpha, axis=2))
+scene.close()
 """
   result = subprocess.run([sys.executable, "-I", "-c", code, str(tmp_path)],
                           check=False, capture_output=True, text=True, timeout=20)
