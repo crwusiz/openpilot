@@ -1067,14 +1067,14 @@ class TestDashboardAsync(unittest.IsolatedAsyncioTestCase):
   async def test_page_builds_with_stale_selections_and_byte_params(self):
     client = Client(ui.page('/test-dashboard-page'))
     self.addCleanup(client.delete)
-    values = {'SelectedManufacturer': b'HYUNDAI', 'SelectedCar': 'removed car', 'SelectedBranch': 'removed branch', 'DevicePosition': '<device>'}
+    values = {'SelectedManufacturer': b'HYUNDAI', 'SelectedCar': 'removed car', 'SelectedBranch': 'removed branch'}
     params = Mock(get=Mock(side_effect=values.get), get_bool=Mock(return_value=False))
     with client, patch.object(dashboard, 'params', params), patch.object(ui, 'run_javascript'), patch.object(ui, 'timer'), \
          patch.object(dashboard, 'get_list_from_file', return_value=[]), patch.object(dashboard, 'get_routes', return_value=[]):
       dashboard.main_page()
     selects = [element for element in client.elements.values() if isinstance(element, ui.select)]
     self.assertEqual([element.value for element in selects[:3]], ['HYUNDAI', '[ Not Selected ]', '[ Not Selected ]'])
-    self.assertTrue(any('&lt;device&gt;' in element.content for element in client.elements.values() if isinstance(element, ui.html)))
+    self.assertIn('DEVICE', [element._props['name'] for element in client.elements.values() if isinstance(element, ui.tab)])
 
 
 if __name__ == '__main__':

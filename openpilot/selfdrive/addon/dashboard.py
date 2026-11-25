@@ -4,6 +4,7 @@ import codecs
 import errno
 import html as html_lib
 import json
+import math
 import os
 import re
 import shutil
@@ -57,7 +58,6 @@ REALDATA_PATH = Path('/data/media/0/realdata')
 DRIVE_VIDEOS = DriveVideoLibrary(REALDATA_PATH, Path('/data/dashboard/cache/drive-video'))
 app.include_router(create_drive_video_router(DRIVE_VIDEOS))
 LOG_FILES = {
-  "Update Check": LOG_DIR / 'commit_check.log',
   "CAN Missing": LOG_DIR / 'can_missing.log',
   "CAN Timeout": LOG_DIR / 'can_timeout.log',
   "Tmux Error": LOG_DIR / 'tmux_error.log',
@@ -424,6 +424,34 @@ def reset_calibration():
   params.put_bool("OnroadCycleRequested", True)
   ui.notify("캘리브레이션 초기화 요청 완료!", type='positive', position='top')
 
+
+def _read_device_position() -> tuple[float, float] | None:
+  raw = params.get('CalibrationParams')
+  if not isinstance(raw, bytes) or not raw:
+    return None
+
+  try:
+    from capnp import KjException
+    from openpilot.cereal import log
+  except ImportError:
+    return None
+
+  try:
+    with log.Event.from_bytes(raw) as event:
+      if event.which() != 'extrinsicsCalibration':
+        return None
+      calibration = event.extrinsicsCalibration
+      if calibration.calStatus != log.ExtrinsicsCalibration.Status.calibrated or len(calibration.rpyCalib) != 3:
+        return None
+      roll, pitch, yaw = calibration.rpyCalib
+  except (KjException, ValueError):
+    return None
+
+  if not all(math.isfinite(value) for value in (roll, pitch, yaw)):
+    return None
+  return round(math.degrees(pitch), 1), round(math.degrees(yaw), 1)
+
+
 async def get_tmux_capture(lines: int = 100) -> str:
   resize = ["tmux", "resize-window", "-t", "0", "-x", "250", "-y", "100"]
   capture = ["tmux", "capture-pane", "-pe", "-t", "0", "-S", f"-{lines}"]
@@ -688,6 +716,41 @@ def apply_styles():
     }
     .log-error { border-left-color: #EF4444 !important; color: #FCA5A5 !important; }
 
+    .device-position-panel {
+        background: #111827; border: 1.5px solid #3A4A6B; border-radius: 12px;
+        padding: 20px; width: 100%;
+    }
+    .device-position-grid {
+        display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+        align-items: center; gap: 16px;
+    }
+    .device-position-chart { width: min(100%, 348px); margin: 0 auto; padding: 24px 38px 0; text-align: center; }
+    .device-position-plot {
+        position: relative; aspect-ratio: 1; background-color: #0D1117;
+        background-image: linear-gradient(#243249 1px, transparent 1px), linear-gradient(90deg, #243249 1px, transparent 1px);
+        background-size: 25% 25%; border: 1px solid #3A4A6B; border-radius: 8px;
+    }
+    .device-position-plot::before, .device-position-plot::after {
+        content: ''; position: absolute; background: #617497;
+    }
+    .device-position-plot::before { left: 50%; top: 0; bottom: 0; width: 1px; }
+    .device-position-plot::after { top: 50%; left: 0; right: 0; height: 1px; }
+    .device-position-axis { position: absolute; color: #B2C0D8; font-size: 0.8rem; white-space: nowrap; }
+    .device-position-axis-up { bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); }
+    .device-position-axis-down { top: calc(100% + 4px); left: 50%; transform: translateX(-50%); }
+    .device-position-axis-left { right: calc(100% + 4px); top: 50%; transform: translateY(-50%); }
+    .device-position-axis-right { left: calc(100% + 4px); top: 50%; transform: translateY(-50%); }
+    .device-position-marker {
+        position: absolute; width: 14px; height: 14px; z-index: 1;
+        transform: translate(-50%, -50%); border: 2px solid #CFFAFE; border-radius: 50%;
+        background: #22D3EE; box-shadow: 0 0 0 4px rgba(34,211,238,0.22);
+    }
+    .device-position-scale { margin-top: 25px; color: #B2C0D8; font-size: 0.8rem; }
+    .device-position-readings { display: grid; gap: 10px; margin: 0; }
+    .device-position-readings > div { background: #1A2235; border-radius: 8px; padding: 12px; min-width: 0; }
+    .device-position-readings dt { color: #B2C0D8; font-size: 0.875rem; }
+    .device-position-readings dd { margin: 3px 0 0; font-size: 1.25rem; font-weight: 700; color: #E8EEFF; font-variant-numeric: tabular-nums; }
+
     /* ── 모바일 환경 강제 최적화 미디어 쿼리 ── */
     @media (max-width: 768px) {
         .camera-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 3fr) minmax(0, 2fr); }
@@ -715,9 +778,12 @@ def apply_styles():
         .q-field__control { height: 48px !important; min-height: 48px !important; padding: 0 14px !important;}
         .q-field__native { font-size: 0.85em !important; }
 
-        .tabs-custom .q-tab { padding: 0 4px !important; min-width: 48px !important; min-height: 48px !important; }
+        .tabs-custom .q-tab { flex: 0 0 auto !important; padding: 0 6px !important; min-width: 48px !important; min-height: 48px !important; }
         .tabs-custom .q-tab__icon { font-size: 1.25em !important; }
         .tabs-custom .q-tab__label { font-size: 0.6rem !important; }
+        .device-position-panel { padding: 14px; }
+        .device-position-grid { grid-template-columns: minmax(0, 1fr); }
+        .device-position-readings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     </style>
   """)
@@ -852,14 +918,6 @@ def render_tab_functions():
           ui.button('GIT PULL NOW', on_click=do_git_pull, color=None).classes('custom-btn btn-blue-pull w-full')
           render_status_card("NEW UPDATE AVAILABLE", "Please pull the latest changes.", "⚠️", "card-warning")
 
-      with ui.element('div').classes('w-full grid grid-cols-1 sm:grid-cols-3 gap-3 items-center mt-2'):
-        def do_reset_cal():
-          reset_calibration()
-          _ = functions_content.refresh()
-
-        ui.button('RESET CALIBRATION', on_click=do_reset_cal, color=None).classes('custom-btn btn-yellow w-full')
-        render_status_card("DEVICE POSITION", get_param_text("DevicePosition", "--"), "📍", "card-info")
-
       with ui.element('div').classes('w-full grid grid-cols-2 sm:grid-cols-3 gap-3 items-center mt-2'):
         async def do_restart():
           await run_script_async("Restart", f"{SCRIPTS_PATH}/restart.sh")
@@ -868,6 +926,88 @@ def render_tab_functions():
         ui.button('RESTART', on_click=do_restart, color=None).classes('custom-btn btn-restart w-full')
 
   functions_content()
+
+def _device_position_html(position: tuple[float, float] | None) -> str:
+  extent = 10
+  marker = ''
+  pitch_text = yaw_text = '—'
+  status = '표시할 보정 각도가 없습니다.'
+
+  if position is not None:
+    pitch, yaw = position
+    extent = max(extent, 5 * math.ceil(max(abs(pitch), abs(yaw)) / 5))
+    marker_left = 50 - yaw / extent * 50
+    marker_top = 50 + pitch / extent * 50
+    marker = f'<span class="device-position-marker" style="left: {marker_left:.2f}%; top: {marker_top:.2f}%"></span>'
+    pitch_direction = '아래' if pitch > 0 else '위' if pitch < 0 else '중앙'
+    yaw_direction = '왼쪽' if yaw > 0 else '오른쪽' if yaw < 0 else '중앙'
+    pitch_text = f'{abs(pitch):.1f}° {pitch_direction}'
+    yaw_text = f'{abs(yaw):.1f}° {yaw_direction}'
+    status = '저장된 캘리브레이션 기준'
+
+  return f'''
+    <div class="device-position-grid">
+      <div class="device-position-chart" aria-hidden="true">
+        <div class="device-position-plot">
+          <span class="device-position-axis device-position-axis-up">위</span>
+          <span class="device-position-axis device-position-axis-down">아래</span>
+          <span class="device-position-axis device-position-axis-left">왼쪽</span>
+          <span class="device-position-axis device-position-axis-right">오른쪽</span>
+          {marker}
+        </div>
+        <div class="device-position-scale">±{extent}°</div>
+      </div>
+      <div>
+        <dl class="device-position-readings">
+          <div><dt>Pitch · 상하</dt><dd>{pitch_text}</dd></div>
+          <div><dt>Yaw · 좌우</dt><dd>{yaw_text}</dd></div>
+        </dl>
+        <p class="text-sm text-slate-300 mt-3 mb-0">{status}</p>
+      </div>
+    </div>
+  '''
+
+
+def render_tab_device(tabs):
+  lock = asyncio.Lock()
+  last_position = None
+
+  def update_position(position):
+    nonlocal last_position
+    if position != last_position and not position_panel.is_deleted:
+      position_panel.content = _device_position_html(position)
+      last_position = position
+
+  async def refresh_position():
+    if tabs.value != 'DEVICE' or lock.locked():
+      return
+    async with lock:
+      position = await asyncio.to_thread(_read_device_position)
+      if tabs.value == 'DEVICE':
+        update_position(position)
+
+  async def reset_position():
+    async with lock:
+      reset_calibration()
+      update_position(None)
+
+  with ui.column().classes('w-full max-w-4xl mt-4 mx-auto gap-4'):
+    with ui.column().classes('device-position-panel gap-2'):
+      ui.label('Device Position').classes('text-lg font-bold')
+      position_panel = ui.html(_device_position_html(None)).classes('w-full').props('id="device-position"')
+    ui.button('RESET CALIBRATION', on_click=reset_position, color=None).classes('custom-btn btn-yellow w-full sm:w-auto')
+
+  timer = ui.timer(1.0, refresh_position, active=tabs.value == 'DEVICE')
+
+  async def change_tab(event):
+    if event.value == 'DEVICE':
+      timer.activate()
+      await refresh_position()
+    else:
+      timer.deactivate()
+
+  tabs.on_value_change(change_tab)
+
 
 def render_tab_toggles():
   toggle_items = [
@@ -1313,6 +1453,7 @@ def main_page():
     with ui.tabs().props('align="right" active-color="white" indicator-color="white"').classes(
       'flex-1 overflow-x-auto tabs-custom') as tabs:
       ui.tab('FUNCTIONS', icon='rocket')
+      ui.tab('DEVICE', icon='devices')
       ui.tab('TOGGLES', icon='settings')
       ui.tab('CAMERA', icon='photo_camera')
       ui.tab('DRIVES', icon='video_library')
@@ -1322,6 +1463,8 @@ def main_page():
   with ui.tab_panels(tabs, value='FUNCTIONS').classes('w-full bg-transparent px-2 md:px-4'):
     with ui.tab_panel('FUNCTIONS'):
       render_tab_functions()
+    with ui.tab_panel('DEVICE'):
+      render_tab_device(tabs)
     with ui.tab_panel('TOGGLES'):
       render_tab_toggles()
     with ui.tab_panel('CAMERA'):
