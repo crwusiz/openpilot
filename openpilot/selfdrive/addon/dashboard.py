@@ -33,6 +33,7 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import get_co
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_profiles import (
   DEFAULT_HDMI_PROFILE, HDMI_PROFILES, normalize_hdmi_profile,
 )
+from openpilot.selfdrive.addon.dashboard_driving_log import read_driving_log
 from openpilot.selfdrive.addon.dashboard_drives import render_tab_drives
 from openpilot.selfdrive.addon.drive_video import DriveVideoLibrary, create_drive_video_router
 
@@ -50,6 +51,7 @@ CAMERA_STREAM_LOCK = asyncio.Lock()
 MAX_COMMAND_OUTPUT = 100_000
 LOG_DIR = Path('/data/log')
 TMUX_LOG_PATH = LOG_DIR / 'tmux_console.log'
+DRIVING_DEBUG_LOG = 'Driving Debug'
 REALDATA_PATH = Path('/data/media/0/realdata')
 DRIVE_VIDEOS = DriveVideoLibrary(REALDATA_PATH, Path('/data/dashboard/cache/drive-video'))
 app.include_router(create_drive_video_router(DRIVE_VIDEOS))
@@ -59,9 +61,6 @@ LOG_FILES = {
   "CAN Timeout": LOG_DIR / 'can_timeout.log',
   "Tmux Error": LOG_DIR / 'tmux_error.log',
   "Tmux Console": TMUX_LOG_PATH,
-  "Navi Debug": LOG_DIR / 'navi_debug.log',
-  "Cruise Debug": LOG_DIR / 'cruise_debug.log',
-  "Traffic Debug": LOG_DIR / 'traffic_debug.log',
   "Cluster Debug": LOG_DIR / 'cluster_debug.log',
 }
 CLUSTER_ACTIONS = ClusterActions()
@@ -958,6 +957,8 @@ def render_tab_toggles():
 
 def render_tab_logs():
   converter = Ansi2HTMLConverter(inline=True, dark_bg=True)
+  log_read_lock = asyncio.Lock()
+  driving_log_content: str | None = None
   with ui.column().classes('w-full mt-2 gap-6'):
     with ui.column().classes('w-full gap-2'):
       ui.label('📂 Route Data Upload').classes('text-green-200 text-lg font-bold')
@@ -997,24 +998,47 @@ def render_tab_logs():
     with ui.column().classes('w-full gap-2'):
       ui.label('📄 System Logs').classes('text-blue-200 text-lg font-bold')
       with ui.element('div').classes('w-full grid grid-cols-4 gap-2 items-center'):
-        sel_log = ui.select(list(LOG_FILES), value="CAN Missing", label="Select Log File").classes('col-span-2 min-w-0')
+        sel_log = ui.select([DRIVING_DEBUG_LOG, *LOG_FILES], value="CAN Missing", label="Select Log File").classes('col-span-2 min-w-0')
 
         async def view_log():
-          name = sel_log.value
-          try:
-            path = LOG_FILES[name]
-            if path == TMUX_LOG_PATH:
-              path = await save_tmux_log()
-            content = await asyncio.to_thread(path.read_text, encoding='utf-8', errors='replace')
-          except (OSError, RuntimeError, TimeoutError) as log_read_error:
-            viewer_container.content = f'<div style="color:#FCA5A5; font-weight:bold;">❌ {html_lib.escape(str(log_read_error))}</div>'
-            status_container.content = '<div class="log-statusbar log-error">⚠️ 파일을 불러오지 못했습니다.</div>'
-            return
-          viewer_container.content = converter.convert(content, full=False)
-          status_container.content = f'<div class="log-statusbar">📄 {name} | {len(content.splitlines())} lines | {len(content):,} chars</div>'
-          _ = ui.run_javascript('var v=document.getElementById("logContainer");if(v)v.scrollTop=v.scrollHeight;')
+          nonlocal driving_log_content
+          async with log_read_lock:
+            name = sel_log.value
+            try:
+              if name == DRIVING_DEBUG_LOG:
+                snapshot = await asyncio.to_thread(read_driving_log, LOG_DIR, LOG_DIR)
+                content = snapshot.text
+                count = f'{snapshot.entry_count:,} entries'
+              else:
+                path = LOG_FILES[name]
+                if path == TMUX_LOG_PATH:
+                  path = await save_tmux_log()
+                content = await asyncio.to_thread(path.read_text, encoding='utf-8', errors='replace')
+                count = f'{len(content.splitlines())} lines'
+            except (OSError, RuntimeError, TimeoutError) as log_read_error:
+              if name == sel_log.value:
+                driving_log_content = None
+                viewer_container.content = f'<div style="color:#FCA5A5; font-weight:bold;">❌ {html_lib.escape(str(log_read_error))}</div>'
+                status_container.content = '<div class="log-statusbar log-error">⚠️ 파일을 불러오지 못했습니다.</div>'
+              return
+            if name != sel_log.value:
+              return
+            if name == DRIVING_DEBUG_LOG:
+              driving_log_content = content
+              viewer_container.content = html_lib.escape(content)
+            else:
+              viewer_container.content = converter.convert(content, full=False)
+            status_container.content = f'<div class="log-statusbar">📄 {name} | {count} | {len(content):,} chars</div>'
+            _ = ui.run_javascript('var v=document.getElementById("logContainer");if(v)v.scrollTop=v.scrollHeight;')
 
-        async def upload_log():
+        async def export_log():
+          if sel_log.value == DRIVING_DEBUG_LOG:
+            if driving_log_content is None:
+              await view_log()
+            if sel_log.value == DRIVING_DEBUG_LOG and driving_log_content is not None:
+              ui.download.content(driving_log_content, filename='driving_debug.log', media_type='text/plain; charset=utf-8')
+            return
+
           path = LOG_FILES[sel_log.value]
           try:
             if path == TMUX_LOG_PATH:
@@ -1025,7 +1049,14 @@ def render_tab_logs():
           await run_script_async("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[str(path)])
 
         ui.button('VIEW', on_click=view_log, color=None).classes('custom-btn btn-default col-span-1')
-        ui.button('UPLOAD', on_click=upload_log, color=None).classes('custom-btn btn-green col-span-1')
+        export_button = ui.button('UPLOAD', on_click=export_log, color=None).classes('custom-btn btn-green col-span-1')
+
+        def change_log(event):
+          nonlocal driving_log_content
+          driving_log_content = None
+          export_button.set_text('DOWNLOAD' if event.value == DRIVING_DEBUG_LOG else 'UPLOAD')
+
+        sel_log.on_value_change(change_log)
 
       with ui.element('div').classes('log-viewer w-full mt-2').props('id="logContainer"'):
         viewer_container = ui.html('파일을 선택한 후 View 버튼을 눌러주세요.')

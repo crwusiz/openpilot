@@ -1,7 +1,12 @@
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from logging.handlers import RotatingFileHandler
+from threading import Event
 from types import SimpleNamespace
 
 import pytest
 
+from openpilot.selfdrive.addon import traffic_controller as traffic_module
 from openpilot.selfdrive.addon.traffic_controller import (TrafficState, TrafficStopController, TrafficStopDistanceTracker, XState,
                                                           get_traffic_stop_accel_floor, get_traffic_stop_obstacle_distance,
                                                           should_limit_traffic_stop_accel)
@@ -37,6 +42,53 @@ def enter_stopped_signal_state(controller):
 def set_go_prediction(model):
   model.position.x = [30.0] * 33
   model.velocity.x = [0.0] * 32 + [6.0]
+
+
+def test_traffic_controller_does_not_wait_for_log_rotation(monkeypatch, tmp_path):
+  log_path = tmp_path / 'traffic_debug.log'
+  log_path.write_text('Previous traffic diagnostics\n' * 20, encoding='utf-8')
+  monkeypatch.setattr(traffic_module, 'TRAFFIC_DEBUG_LOG', log_path)
+  monkeypatch.setattr(traffic_module, 'TRAFFIC_DEBUG_LOG_MAX_BYTES', 256)
+  rotation_started = Event()
+  release_rotation = Event()
+  do_rollover = RotatingFileHandler.doRollover
+
+  def stall_rollover(handler):
+    if handler.baseFilename == str(log_path):
+      rotation_started.set()
+      release_rotation.wait()
+    do_rollover(handler)
+
+  monkeypatch.setattr(RotatingFileHandler, 'doRollover', stall_rollover)
+  controller = TrafficStopController(dt=0.05)
+
+  with traffic_module.traffic_debug_logging(), ThreadPoolExecutor(max_workers=1) as executor:
+    result = executor.submit(enter_stopped_signal_state, controller)
+    try:
+      assert rotation_started.wait(timeout=5)
+      result.result(timeout=5)
+      assert controller.x_state == XState.e2eStopped
+    finally:
+      release_rotation.set()
+
+  assert 'x_state=e2eStopped' in log_path.read_text(encoding='utf-8')
+
+
+def test_traffic_debug_logging_keeps_rotating_backups_and_format(monkeypatch, tmp_path):
+  monkeypatch.setattr(traffic_module, 'TRAFFIC_DEBUG_LOG', tmp_path / 'traffic_debug.log')
+  monkeypatch.setattr(traffic_module, 'TRAFFIC_DEBUG_LOG_MAX_BYTES', 256)
+  message = 'x' * 150
+
+  with traffic_module.traffic_debug_logging():
+    for i in range(4):
+      traffic_module.traffic_log.debug('rotation record %d %s', i, message)
+
+  assert sorted(path.name for path in tmp_path.iterdir()) == ['traffic_debug.log', 'traffic_debug.log.1', 'traffic_debug.log.2']
+  for suffix, i in [('', 3), ('.1', 2), ('.2', 1)]:
+    line, = (tmp_path / f'traffic_debug.log{suffix}').read_text(encoding='utf-8').splitlines()
+    timestamp, record = line.split(' [DEBUG] ', 1)
+    datetime.fromisoformat(timestamp)
+    assert record == f'rotation record {i} {message}'
 
 
 def test_distance_tracker_rejects_transient_closer_estimate():

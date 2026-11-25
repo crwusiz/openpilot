@@ -4,46 +4,26 @@ from collections import deque
 from dataclasses import dataclass
 from enum import Enum
 import logging
-from logging.handlers import RotatingFileHandler
 import time
 
 import numpy as np
 
 from openpilot.common.constants import UnitConverter
+from openpilot.common.logging_extra import queued_file_logging
 
 
 TRAFFIC_DEBUG_LOG = "/data/log/traffic_debug.log"
+TRAFFIC_DEBUG_LOG_MAX_BYTES = 10 * 1024 * 1024
 TRAFFIC_DEBUG_LOG_INTERVAL_S = 0.5
 
-
-def _setup_traffic_logger() -> logging.Logger:
-  logger = logging.getLogger("traffic")
-  logger.setLevel(logging.DEBUG)
-  logger.propagate = False
-
-  if any(isinstance(handler, RotatingFileHandler) and handler.baseFilename == TRAFFIC_DEBUG_LOG
-         for handler in logger.handlers):
-    return logger
-
-  try:
-    handler = RotatingFileHandler(
-      TRAFFIC_DEBUG_LOG,
-      mode="a",
-      maxBytes=10 * 1024 * 1024,
-      backupCount=2,
-    )
-    handler.setFormatter(logging.Formatter(
-      "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s",
-      datefmt="%Y-%m-%d %H:%M:%S",
-    ))
-    logger.addHandler(handler)
-  except OSError:
-    pass
-
-  return logger
+traffic_log = logging.getLogger("traffic")
+traffic_log.setLevel(logging.DEBUG)
+traffic_log.propagate = False
+traffic_log.addHandler(logging.NullHandler())
 
 
-traffic_log = _setup_traffic_logger()
+def traffic_debug_logging():
+  return queued_file_logging(traffic_log, TRAFFIC_DEBUG_LOG, mode="a", max_bytes=TRAFFIC_DEBUG_LOG_MAX_BYTES, backup_count=2)
 
 
 class XState(Enum):

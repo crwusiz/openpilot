@@ -12,7 +12,7 @@ import numpy as np
 from threading import local
 from collections import OrderedDict
 from contextlib import closing, contextmanager
-from logging.handlers import QueueHandler, QueueListener
+from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
 
 
 class _FileQueueHandler(QueueHandler):
@@ -31,9 +31,12 @@ class _FileQueueListener(QueueListener):
 
 
 @contextmanager
-def queued_file_logging(logger, path, mode):
+def queued_file_logging(logger, path, mode, *, max_bytes=0, backup_count=0):
   try:
-    file_handler = logging.FileHandler(path, mode=mode)
+    if max_bytes:
+      file_handler = RotatingFileHandler(path, mode=mode, maxBytes=max_bytes, backupCount=backup_count)
+    else:
+      file_handler = logging.FileHandler(path, mode=mode)
   except OSError:
     yield
     return
