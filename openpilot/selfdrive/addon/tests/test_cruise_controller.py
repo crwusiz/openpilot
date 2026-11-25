@@ -1,7 +1,9 @@
 from enum import IntEnum
 from importlib.util import module_from_spec, spec_from_file_location
+import logging
 from pathlib import Path
 import sys
+from threading import Event, Thread
 from types import SimpleNamespace
 from types import ModuleType
 
@@ -90,6 +92,58 @@ def load_cruise_controller():
 
 cruise_controller = load_cruise_controller()
 CruiseController = cruise_controller.CruiseController
+
+
+def test_cruise_debug_logging_survives_stalled_file_sink(monkeypatch, tmp_path):
+  log_path = tmp_path / 'cruise_debug.log'
+  monkeypatch.setattr(cruise_controller.DEBUG, 'log_path', log_path)
+  sink_stalled = Event()
+  release_sink = Event()
+  producer_finished = Event()
+  file_emit = logging.FileHandler.emit
+
+  def stall_first_record(handler, record):
+    if handler.baseFilename == str(log_path) and record.getMessage() == 'stall file sink':
+      sink_stalled.set()
+      release_sink.wait()
+    file_emit(handler, record)
+
+  monkeypatch.setattr(logging.FileHandler, 'emit', stall_first_record)
+
+  def produce_records():
+    cruise_controller.cruise_log.info('stall file sink')
+    if sink_stalled.wait(timeout=5):
+      for index in range(300):
+        cruise_controller.cruise_log.debug('pending diagnostic %d', index)
+      producer_finished.set()
+
+  with cruise_controller.cruise_debug_logging():
+    producer = Thread(target=produce_records, daemon=True)
+    producer.start()
+    try:
+      assert sink_stalled.wait(timeout=5)
+      assert producer_finished.wait(timeout=5)
+    finally:
+      release_sink.set()
+      producer.join(timeout=5)
+
+  assert not producer.is_alive()
+  messages = [line.split(' [', 1)[1] for line in log_path.read_text().splitlines()]
+  assert messages == [
+    'INFO] === Cruise Controller Session Started ===',
+    'INFO] stall file sink',
+    *(f'DEBUG] pending diagnostic {index}' for index in range(256)),
+  ]
+
+
+def test_cruise_debug_logging_handles_unavailable_file(monkeypatch, tmp_path):
+  log_path = tmp_path / 'missing_directory' / 'cruise_debug.log'
+  monkeypatch.setattr(cruise_controller.DEBUG, 'log_path', log_path)
+
+  with cruise_controller.cruise_debug_logging():
+    cruise_controller.cruise_log.info('diagnostics are optional')
+
+  assert not log_path.exists()
 
 
 def make_controller(applied_speed_clu: float):

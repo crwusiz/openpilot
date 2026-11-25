@@ -21,7 +21,7 @@ from opendbc.car.interfaces import CarInterfaceBase, RadarInterfaceBase
 from openpilot.selfdrive.pandad import can_capnp_to_list, can_list_to_can_capnp
 from openpilot.selfdrive.car.cruise import VCruiseHelper
 
-from openpilot.selfdrive.addon.cruise_controller import CruiseController
+from openpilot.selfdrive.addon.cruise_controller import CruiseController, cruise_debug_logging
 
 REPLAY = "REPLAY" in os.environ
 
@@ -281,9 +281,11 @@ class Car:
 
 
 def main():
-  config_realtime_process(4, Priority.CTRL_HIGH)
-  car = Car()
-  car.card_thread()
+  # Start the log writer before setting the vehicle loop's real-time priority and affinity.
+  with cruise_debug_logging():
+    config_realtime_process(4, Priority.CTRL_HIGH)
+    car = Car()
+    car.card_thread()
 
 
 if __name__ == "__main__":

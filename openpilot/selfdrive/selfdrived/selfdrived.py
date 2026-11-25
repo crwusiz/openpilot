@@ -2,6 +2,7 @@
 import os
 import time
 import threading
+from collections import deque
 
 import openpilot.cereal.messaging as messaging
 
@@ -18,7 +19,7 @@ from openpilot.common.gps import get_gps_location_service
 
 from openpilot.selfdrive.car.car_events import CarEvents
 from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose
-from openpilot.selfdrive.selfdrived.events import Events, ET
+from openpilot.selfdrive.selfdrived.events import EVENT_NAME, Events, ET
 from openpilot.selfdrive.selfdrived.helpers import ExcessiveActuationCheck
 from openpilot.selfdrive.selfdrived.state import StateMachine
 from openpilot.selfdrive.selfdrived.alertmanager import AlertManager, set_offroad_alert
@@ -139,6 +140,10 @@ class SelfdriveD:
     self.dm_uncertain_alerted = False
     self.state_machine = StateMachine()
     self.rk = Ratekeeper(100, print_delay_threshold=None)
+    self.loop_timings = deque(maxlen=self.rk.avg_dt.window_size)
+    self.car_state_receive_s = 0.
+    self.car_state_timed_out = False
+    self.lagging_prev = False
 
     self.ignored_processes = set()
     if self.dcam_is_missing:
@@ -251,8 +256,9 @@ class SelfdriveD:
 
     # Add car events, ignore if CAN isn't valid
     if CS.canValid:
-      car_events = self.car_events.update(CS, self.CS_prev, self.sm['carControl']).to_msg()
-      self.events.add_from_msg(car_events)
+      car_events = self.car_events.update(CS, self.CS_prev, self.sm['carControl'])
+      for event_name in car_events.names:
+        self.events.add(event_name)
 
       if self.CP.notCar:
         # wait for everything to init first
@@ -498,7 +504,10 @@ class SelfdriveD:
         #self.events.add(EventName.personalityChanged)
 
   def data_sample(self):
+    receive_start = time.monotonic()
     _car_state = messaging.recv_one(self.car_state_sock)
+    self.car_state_receive_s = time.monotonic() - receive_start
+    self.car_state_timed_out = _car_state is None
     CS = _car_state.carState if _car_state else self.CS_prev
 
     self.sm.update(0)
@@ -605,14 +614,39 @@ class SelfdriveD:
       self.personality = self.params.get("LongitudinalPersonality", return_default=True)
       time.sleep(0.1)
 
+  def _monitor_loop_time(self, step_s):
+    lagging = EventName.selfdrivedLagging in self.events.names
+    lag_started = lagging and not self.lagging_prev
+    if lag_started:
+      # update_events used the timing window ending at the previous iteration.
+      loop_avg_ms = self.rk.avg_dt.get_average() * 1000.
+    self.rk.monitor_time()
+
+    if lag_started:
+      receive_times, processing_times, timeouts = zip(*self.loop_timings, strict=True)
+      cloudlog.event("selfdrived.lagging",
+                     loop_avg_ms=loop_avg_ms,
+                     car_state_receive_max_ms=max(receive_times) * 1000.,
+                     processing_max_ms=max(processing_times) * 1000.,
+                     car_state_timeouts=sum(timeouts),
+                     card_lag_ms=self.CS_prev.cumLagMs,
+                     brake_pressed=self.CS_prev.brakePressed,
+                     longitudinal_accel=self.CS_prev.aEgo,
+                     can_valid=self.CS_prev.canValid,
+                     can_timeout=self.CS_prev.canTimeout,
+                     active_events=[EVENT_NAME[name] for name in self.events.names])
+    self.loop_timings.append((self.car_state_receive_s, step_s - self.car_state_receive_s, self.car_state_timed_out))
+    self.lagging_prev = lagging
+
   def run(self):
     e = threading.Event()
     t = threading.Thread(target=self.params_thread, args=(e, ))
     try:
       t.start()
       while True:
+        start = time.monotonic()
         self.step()
-        self.rk.monitor_time()
+        self._monitor_loop_time(time.monotonic() - start)
     finally:
       e.set()
       t.join()

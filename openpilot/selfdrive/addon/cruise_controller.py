@@ -1,7 +1,10 @@
 import math
 import logging
+import queue
 import time
 import numpy as np
+from contextlib import contextmanager
+from logging.handlers import QueueHandler, QueueListener
 from types import SimpleNamespace
 
 from opendbc.car import structs
@@ -96,28 +99,50 @@ STEER_DECEL = SimpleNamespace(
 )
 
 
-def _setup_debug_logger():
-  logger = logging.getLogger("cruise_controller")
-  logger.setLevel(logging.DEBUG)
-  logger.propagate = False
+cruise_log = logging.getLogger("cruise_controller")
+cruise_log.setLevel(logging.DEBUG)
+cruise_log.propagate = False
+cruise_log.addHandler(logging.NullHandler())
 
-  if logger.handlers:
-    return logger
 
+class CruiseLogQueueHandler(QueueHandler):
+  def enqueue(self, record):
+    try:
+      self.queue.put_nowait(record)
+    except queue.Full:
+      # A slow disk must never back up the vehicle state loop.
+      pass
+
+
+class CruiseLogListener(QueueListener):
+  def enqueue_sentinel(self):
+    # Only called on shutdown, after the producer has stopped.
+    self.queue.put(self._sentinel)
+
+
+@contextmanager
+def cruise_debug_logging():
   try:
-    handler = logging.FileHandler(DEBUG.log_path, mode="w")
-    handler.setFormatter(logging.Formatter(
-      "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    ))
-    logger.addHandler(handler)
-    logger.info("=== Cruise Controller Session Started ===")
+    file_handler = logging.FileHandler(DEBUG.log_path, mode="w")
   except OSError:
-    pass
+    yield
+    return
 
-  return logger
-
-
-cruise_log = _setup_debug_logger()
+  file_handler.setFormatter(logging.Formatter(
+    "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+  ))
+  records = queue.Queue(maxsize=256)
+  queue_handler = CruiseLogQueueHandler(records)
+  listener = CruiseLogListener(records, file_handler)
+  try:
+    listener.start()
+    cruise_log.addHandler(queue_handler)
+    cruise_log.info("=== Cruise Controller Session Started ===")
+    yield
+  finally:
+    cruise_log.removeHandler(queue_handler)
+    listener.stop()
+    file_handler.close()
 
 
 def _road_limit_target_speed(road_limit_speed: float, conv) -> float:
