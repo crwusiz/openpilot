@@ -1,11 +1,16 @@
 import importlib.util
 from io import BytesIO
 from pathlib import Path
+import runpy
+import signal
 import sys
+import time
 from types import ModuleType, SimpleNamespace
 from unittest.mock import MagicMock, Mock
 
 import pytest
+
+from openpilot.common import spinner as spinner_module
 
 
 @pytest.fixture
@@ -42,7 +47,7 @@ def test_success_stops_build_spinner(build_module):
   module, spinner = build_module
   module.subprocess.Popen.return_value = completed_build(0)
   module.build()
-  module.Spinner.assert_called_once_with(keep_alive=True)
+  module.Spinner.assert_called_once_with()
   spinner.close.assert_called_once()
   assert not spinner.active
 
@@ -79,3 +84,43 @@ def test_failed_build_stops_spinner_before_showing_error(build_module, monkeypat
   assert module.subprocess.Popen.call_count == 3
   window.wait_for_exit.assert_called_once()
   assert not spinner.active
+
+
+def test_boot_spinner_stays_open_until_sigterm(monkeypatch):
+  process = Mock()
+  launcher = Mock(return_value=process)
+  monkeypatch.setattr(spinner_module.subprocess, 'Popen', launcher)
+  handlers = {}
+  monkeypatch.setattr(signal, 'signal', handlers.__setitem__)
+
+  def stop_after_start(_interval):
+    process.stdin.write.assert_called_once_with(b'Installing add-on dependencies...\n')
+    process.terminate.assert_not_called()
+    handlers[signal.SIGTERM](signal.SIGTERM, None)
+
+  sleep = Mock(side_effect=stop_after_start)
+  monkeypatch.setattr(time, 'sleep', sleep)
+  runpy.run_path(str(Path(__file__).resolve().parents[1] / 'boot_spinner.py'), run_name='__main__')
+
+  launcher.assert_called_once()
+  sleep.assert_called_once_with(0.5)
+  process.stdin.flush.assert_called_once()
+  process.terminate.assert_called_once()
+  process.communicate.assert_called_once_with(timeout=2.)
+
+
+def test_uninitialized_spinner_can_be_closed():
+  spinner = spinner_module.Spinner.__new__(spinner_module.Spinner)
+  spinner.close()
+
+
+def test_spinner_update_handles_broken_pipe_during_write(monkeypatch):
+  process = Mock()
+  process.stdin.write.side_effect = BrokenPipeError
+  monkeypatch.setattr(spinner_module.subprocess, 'Popen', Mock(return_value=process))
+
+  with spinner_module.Spinner() as spinner:
+    spinner.update('Installing add-on dependencies...')
+
+  process.stdin.write.assert_called_once()
+  process.terminate.assert_called_once()

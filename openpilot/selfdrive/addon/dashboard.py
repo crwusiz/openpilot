@@ -11,6 +11,7 @@ import signal
 import socket
 import subprocess
 import sys
+from tempfile import TemporaryDirectory
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -1031,12 +1032,18 @@ def render_tab_logs():
             status_container.content = f'<div class="log-statusbar">📄 {name} | {count} | {len(content):,} chars</div>'
             _ = ui.run_javascript('var v=document.getElementById("logContainer");if(v)v.scrollTop=v.scrollHeight;')
 
-        async def export_log():
+        async def upload_log():
           if sel_log.value == DRIVING_DEBUG_LOG:
             if driving_log_content is None:
               await view_log()
             if sel_log.value == DRIVING_DEBUG_LOG and driving_log_content is not None:
-              ui.download.content(driving_log_content, filename='driving_debug.log', media_type='text/plain; charset=utf-8')
+              try:
+                with TemporaryDirectory(prefix='driving-log-') as directory:
+                  path = Path(directory) / 'driving_debug.log'
+                  await asyncio.to_thread(path.write_text, driving_log_content, encoding='utf-8', newline='\n')
+                  await run_script_async("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[str(path)])
+              except OSError as snapshot_error:
+                ui.notify(f"❌ Failed to prepare Driving Debug: {snapshot_error}", type='negative', position='top')
             return
 
           path = LOG_FILES[sel_log.value]
@@ -1049,12 +1056,11 @@ def render_tab_logs():
           await run_script_async("Log Upload", f"{SCRIPTS_PATH}/log_upload.sh", args=[str(path)])
 
         ui.button('VIEW', on_click=view_log, color=None).classes('custom-btn btn-default col-span-1')
-        export_button = ui.button('UPLOAD', on_click=export_log, color=None).classes('custom-btn btn-green col-span-1')
+        ui.button('UPLOAD', on_click=upload_log, color=None).classes('custom-btn btn-green col-span-1')
 
-        def change_log(event):
+        def change_log():
           nonlocal driving_log_content
           driving_log_content = None
-          export_button.set_text('DOWNLOAD' if event.value == DRIVING_DEBUG_LOG else 'UPLOAD')
 
         sel_log.on_value_change(change_log)
 

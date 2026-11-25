@@ -621,15 +621,21 @@ class TestDashboardCameraJavascript(unittest.TestCase):
 
 
 class TestDashboardDrivingLog(unittest.IsolatedAsyncioTestCase):
-  async def test_driving_debug_view_and_download_share_the_displayed_snapshot(self):
+  async def test_driving_debug_upload_uses_the_displayed_snapshot(self):
     client = Client(ui.page('/test-dashboard-driving-debug'))
     self.addCleanup(client.delete)
     callbacks = {}
+    uploaded = []
     on_click = ui.button.on_click
 
     def capture(button, callback):
       callbacks[button.text] = callback
       return on_click(button, callback)
+
+    def record_upload(_name, _script, args):
+      path = Path(args[0])
+      uploaded.append((path, path.read_bytes().decode('utf-8')))
+      return 0
 
     with tempfile.TemporaryDirectory() as directory:
       root = Path(directory)
@@ -647,14 +653,14 @@ class TestDashboardDrivingLog(unittest.IsolatedAsyncioTestCase):
       with client, patch.object(core, 'loop', asyncio.get_running_loop()), \
            patch.object(dashboard, 'LOG_DIR', root), patch.dict(dashboard.LOG_FILES, {'CAN Missing': can_missing}), \
            patch.object(dashboard, 'get_routes', return_value=[]), patch.object(ui, 'run_javascript'), \
-           patch.object(ui.button, 'on_click', capture), patch.object(ui.download, 'content') as download, \
-           patch.object(dashboard, 'run_script_async', AsyncMock()) as run_script:
+           patch.object(ui.button, 'on_click', capture), \
+           patch.object(dashboard, 'run_script_async', AsyncMock(side_effect=record_upload)) as run_script:
         dashboard.render_tab_logs()
         selection = next(element for element in client.elements.values() if isinstance(element, ui.select))
         self.assertTrue({'Navi Debug', 'Cruise Debug', 'Traffic Debug'}.isdisjoint(selection.options))
-        export = next(element for element in client.elements.values() if isinstance(element, ui.button) and element.text == 'UPLOAD')
         selection.set_value(dashboard.DRIVING_DEBUG_LOG)
-        self.assertEqual(export.text, 'DOWNLOAD')
+        self.assertIn('UPLOAD', callbacks)
+        self.assertNotIn('DOWNLOAD', callbacks)
         await callbacks['VIEW']()
 
         viewer = next(element for element in client.elements.values() if isinstance(element, ui.html) and '[NAVI]' in element.content)
@@ -666,20 +672,20 @@ class TestDashboardDrivingLog(unittest.IsolatedAsyncioTestCase):
           log_file.write('2026-11-26 10:05:01.000 [INFO] subsequent update\n')
 
         await callbacks['UPLOAD']()
-        download.assert_called_once()
-        text, = download.call_args.args
+        (snapshot, text), = uploaded
+        run_script.assert_awaited_once_with('Log Upload', f'{dashboard.SCRIPTS_PATH}/log_upload.sh', args=[str(snapshot)])
         self.assertEqual(displayed, dashboard.html_lib.escape(text))
-        self.assertEqual(download.call_args.kwargs['filename'], 'driving_debug.log')
-        run_script.assert_not_awaited()
+        self.assertEqual(snapshot.name, 'driving_debug.log')
+        self.assertFalse(snapshot.parent.exists())
 
         selection.set_value('CAN Missing')
-        self.assertEqual(export.text, 'UPLOAD')
         await callbacks['UPLOAD']()
-        run_script.assert_awaited_once_with('Log Upload', f'{dashboard.SCRIPTS_PATH}/log_upload.sh', args=[str(can_missing)])
+        self.assertEqual(run_script.await_count, 2)
+        self.assertEqual(uploaded[-1][0], can_missing)
 
         selection.set_value(dashboard.DRIVING_DEBUG_LOG)
         await callbacks['UPLOAD']()
-        self.assertIn('subsequent update', download.call_args.args[0])
+        self.assertIn('subsequent update', uploaded[-1][1])
         self.assertIn('subsequent update', viewer.content)
 
 

@@ -754,12 +754,14 @@ def test_failed_c4_upload_does_not_start_pi_collection(sandbox):
   assert pending[0].read_text() == "C4 driving log\n"
 
 
-def test_unrelated_log_upload_keeps_single_file_behavior(sandbox):
-  (sandbox.parent / "navi_debug.log").write_text("navigation log\n")
-  result = _upload(sandbox, filename="navi_debug.log")
+@pytest.mark.parametrize("filename", ["navi_debug.log", "driving_debug.log"])
+def test_unrelated_log_upload_keeps_single_file_behavior(sandbox, filename):
+  (sandbox.parent / filename).write_text("driving diagnostics\n")
+  result = _upload(sandbox, filename=filename)
   assert result.returncode == 0
   assert not (sandbox.parent / "collector-call.txt").exists()
-  assert len((sandbox.parent / "upload-names.txt").read_text().splitlines()) == 1
+  name, = (sandbox.parent / "upload-names.txt").read_text().splitlines()
+  assert name.endswith(f"_TEST_CAR_test-dongle_{filename}")
 
 
 @pytest.mark.parametrize("filename", ["traffic_debug.log", "navi_debug.log", "cruise_debug.log"])

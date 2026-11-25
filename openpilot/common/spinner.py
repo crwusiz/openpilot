@@ -18,8 +18,8 @@ class Spinner:
 
   def update(self, spinner_text: str):
     if self.spinner_proc is not None:
-      self.spinner_proc.stdin.write(spinner_text.encode('utf8') + b"\n")
       try:
+        self.spinner_proc.stdin.write(spinner_text.encode('utf8') + b"\n")
         self.spinner_proc.stdin.flush()
       except BrokenPipeError:
         pass
@@ -28,12 +28,13 @@ class Spinner:
     self.update(str(round(100 * cur / total)))
 
   def close(self):
-    if self.spinner_proc is not None:
-      self.spinner_proc.terminate()  # lets it restore the display
+    proc = getattr(self, "spinner_proc", None)
+    if proc is not None:
+      proc.terminate()  # lets it restore the display
       try:
-        self.spinner_proc.communicate(timeout=2.)
+        proc.communicate(timeout=2.)
       except subprocess.TimeoutExpired:
-        self.spinner_proc.kill()
+        proc.kill()
         print("WARNING: failed to stop spinner")
       self.spinner_proc = None
 
