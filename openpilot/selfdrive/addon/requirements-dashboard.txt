@@ -1,2 +1,2 @@
-nicegui==4.0.0
+nicegui==4.1.0
 ansi2html==1.9.5
