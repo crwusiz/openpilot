@@ -37,6 +37,8 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_profiles impo
 )
 from openpilot.selfdrive.addon.dashboard_driving_log import read_driving_log
 from openpilot.selfdrive.addon.dashboard_drives import render_tab_drives
+from openpilot.selfdrive.addon.dashboard_mount import MountAdjustment
+from openpilot.selfdrive.addon.dashboard_mount_stream import MountSensorStream, get_mount_sensor_stream
 from openpilot.selfdrive.addon.drive_video import DriveVideoLibrary, create_drive_video_router
 
 # ── 환경 설정 및 유틸리티 ───────────────────────────────────────
@@ -723,7 +725,7 @@ def apply_styles():
     .device-position-grid {
         display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
         align-items: stretch; gap: 12px;
-        --pitch-color: #7DC7FF; --yaw-color: #69E2B5; --roll-color: #A6B4CB;
+        --pitch-color: #7DC7FF; --yaw-color: #69E2B5;
     }
     .device-orientation-scene {
         position: relative; min-width: 0; height: clamp(205px, 42vh, 320px); isolation: isolate;
@@ -770,9 +772,6 @@ def apply_styles():
     .device-orbit-pitch {
         left: 15%; width: 22%; top: 36%; height: 49%; color: var(--pitch-color); border-right-color: transparent; transform: rotate(-18deg);
     }
-    .device-orbit-roll {
-        left: 59%; top: 54%; width: 21%; height: 36%; color: var(--roll-color); border-style: dashed; transform: rotate(-26deg);
-    }
     .device-orbit[data-turn]::after {
         content: ''; position: absolute; width: 14px; height: 14px; background: currentColor;
         clip-path: polygon(0 0, 100% 50%, 0 100%);
@@ -784,7 +783,6 @@ def apply_styles():
     .device-axis-tag { position: absolute; z-index: 2; font-size: 0.75rem; font-weight: 800; }
     .device-axis-tag-yaw { right: 12%; top: 10%; color: var(--yaw-color); }
     .device-axis-tag-pitch { left: 4%; top: 48%; color: var(--pitch-color); }
-    .device-axis-tag-roll { right: 7%; bottom: 11%; color: var(--roll-color); }
     .device-orientation-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0 0; color: #C0CDE3; font-size: 0.75rem; }
     .device-orientation-legend i { display: inline-block; width: 14px; margin-right: 5px; vertical-align: middle; border-top: 2px dashed #A6B4CB; }
     .device-orientation-legend .measured { border-top-style: solid; border-color: #7DC7FF; }
@@ -795,18 +793,23 @@ def apply_styles():
     }
     .device-reading-pitch { --axis-color: var(--pitch-color); }
     .device-reading-yaw { --axis-color: var(--yaw-color); }
-    .device-reading-roll { --axis-color: var(--roll-color); }
     .device-position-readings dt { color: var(--axis-color); font-size: 0.78rem; font-weight: 700; }
     .device-position-readings dd { margin: 0; }
     .device-position-value { font-size: 1.08rem; font-weight: 800; color: #E8EEFF; font-variant-numeric: tabular-nums; }
     .device-position-adjustment { color: #D4DFF3; font-size: 0.82rem; }
     .device-position-adjustment span { color: var(--axis-color); font-weight: 800; }
     .device-position-status { color: #B2C0D8; font-size: 0.75rem; margin: 6px 0 0; }
-    .device-position-reset { min-height: 36px; }
+    .device-position-panel button { min-height: 36px; }
+    .device-mount-controls { border-top: 1px solid #354662; padding-top: 8px; }
+    .device-mount-status { color: #C0CDE3; font-size: 0.82rem; }
+    .device-saved-position {
+        background: #1A2235; border-radius: 7px; color: #D4DFF3; padding: 6px 10px; font-size: 0.82rem;
+    }
 
     @media (min-width: 769px) and (max-height: 540px) {
         .device-position-panel { padding: 10px; }
-        .device-orientation-scene { height: clamp(100px, 58vh, 228px); }
+        .device-orientation-scene { height: clamp(100px, calc(100vh - 320px), 228px); }
+        .device-camera-guide, .device-camera-posed { width: min(44%, 196px); height: 51%; }
     }
     @media (min-width: 769px) and (max-height: 335px) {
         .device-position-readings > div { padding: 3px 8px; }
@@ -848,11 +851,9 @@ def apply_styles():
         .device-orientation-scene { height: 226px; }
         .device-camera-guide, .device-camera-posed { width: min(53%, 212px); height: 43%; }
         .device-position-readings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .device-reading-roll { grid-column: span 2; }
     }
     @media (max-width: 440px) {
         .device-position-readings { grid-template-columns: minmax(0, 1fr); }
-        .device-reading-roll { grid-column: auto; }
     }
     </style>
   """)
@@ -996,12 +997,23 @@ def render_tab_functions():
 
   functions_content()
 
-def _device_position_html(position: tuple[float, float] | None) -> str:
+def _device_angle_labels(position: tuple[float, float] | None) -> tuple[str, str]:
+  if position is None:
+    return '—', '—'
+  pitch, yaw = position
+  pitch_direction = ' 아래' if pitch > 0 else ' 위' if pitch < 0 else ''
+  yaw_direction = ' 왼쪽' if yaw > 0 else ' 오른쪽' if yaw < 0 else ''
+  return f'{abs(pitch):.1f}°{pitch_direction}', f'{abs(yaw):.1f}°{yaw_direction}'
+
+
+def _device_position_html(position: tuple[float, float] | None, *, live: bool = False) -> str:
   camera = ''
-  pitch_text = yaw_text = '—'
+  pitch_text, yaw_text = _device_angle_labels(position)
   pitch_turn = yaw_turn = ''
   pitch_adjustment = yaw_adjustment = ''
-  status = '표시할 보정 각도가 없습니다.'
+  reference_label = '시작 자세' if live else '정면 기준'
+  measured_label = '현재 자세' if live else '저장된 자세'
+  status = '' if live else '표시할 보정 각도가 없습니다.'
 
   if position is not None:
     pitch, yaw = position
@@ -1017,23 +1029,19 @@ def _device_position_html(position: tuple[float, float] | None) -> str:
         </div>
       </div>
     '''
-    pitch_text = f'{abs(pitch):.1f}°' + (' 아래' if pitch > 0 else ' 위' if pitch < 0 else '')
-    yaw_text = f'{abs(yaw):.1f}°' + (' 왼쪽' if yaw > 0 else ' 오른쪽' if yaw < 0 else '')
-    pitch_adjustment = '기준 방향'
-    yaw_adjustment = '기준 방향'
-    if pitch > 0:
-      pitch_turn = ' data-turn="up"'
-      pitch_adjustment = '<span>↑</span> 렌즈를 위로 기울이기'
-    elif pitch < 0:
-      pitch_turn = ' data-turn="down"'
-      pitch_adjustment = '<span>↓</span> 렌즈를 아래로 기울이기'
-    if yaw > 0:
-      yaw_turn = ' data-turn="right"'
-      yaw_adjustment = '<span>→</span> 렌즈를 오른쪽으로 돌리기'
-    elif yaw < 0:
-      yaw_turn = ' data-turn="left"'
-      yaw_adjustment = '<span>←</span> 렌즈를 왼쪽으로 돌리기'
-    status = '저장 보정값 기준 · 모형 기울기 확대 표시'
+    arrow_pitch, arrow_yaw = (pitch, yaw) if live else (-pitch, -yaw)
+    if arrow_pitch:
+      pitch_turn = ' data-turn="down"' if arrow_pitch > 0 else ' data-turn="up"'
+    if arrow_yaw:
+      yaw_turn = ' data-turn="left"' if arrow_yaw > 0 else ' data-turn="right"'
+    if live:
+      status = '기준 자세 대비 변화량 · 모형 기울기 확대 표시'
+    else:
+      pitch_adjustment = ('<span>↑</span> 렌즈를 위로 기울이기' if pitch > 0 else
+                          '<span>↓</span> 렌즈를 아래로 기울이기' if pitch < 0 else '기준 방향')
+      yaw_adjustment = ('<span>→</span> 렌즈를 오른쪽으로 돌리기' if yaw > 0 else
+                        '<span>←</span> 렌즈를 왼쪽으로 돌리기' if yaw < 0 else '기준 방향')
+      status = '저장 보정값 기준 · 모형 기울기 확대 표시'
 
   return f'''
     <div class="device-position-grid">
@@ -1045,14 +1053,12 @@ def _device_position_html(position: tuple[float, float] | None) -> str:
           {camera}
           <div class="device-orbit device-orbit-yaw"{yaw_turn}></div>
           <div class="device-orbit device-orbit-pitch"{pitch_turn}></div>
-          <div class="device-orbit device-orbit-roll"></div>
           <span class="device-axis-tag device-axis-tag-yaw">YAW</span>
           <span class="device-axis-tag device-axis-tag-pitch">PITCH</span>
-          <span class="device-axis-tag device-axis-tag-roll">ROLL</span>
         </div>
         <div class="device-orientation-legend">
-          <span><i></i>정면 기준</span>
-          <span><i class="measured"></i>저장된 자세</span>
+          <span><i></i>{reference_label}</span>
+          <span><i class="measured"></i>{measured_label}</span>
         </div>
       </div>
       <div>
@@ -1067,10 +1073,6 @@ def _device_position_html(position: tuple[float, float] | None) -> str:
             <dd class="device-position-value">{yaw_text}</dd>
             <dd class="device-position-adjustment">{yaw_adjustment}</dd>
           </div>
-          <div class="device-reading-roll">
-            <dt>Roll · 수평 비틀림</dt>
-            <dd class="device-position-adjustment">측정값 없음</dd>
-          </div>
         </dl>
         <p class="device-position-status">{status}</p>
       </div>
@@ -1078,15 +1080,44 @@ def _device_position_html(position: tuple[float, float] | None) -> str:
   '''
 
 
+MOUNT_READY_TIMEOUT_NS = 5_000_000_000
+MOUNT_IDLE_STATUS = '시동이 켜진 정차 상태에서 기준을 잡으세요.'
+
+
+@dataclass
+class DeviceMountSession:
+  stream: MountSensorStream
+  estimator: MountAdjustment
+  started_ns: int = field(default_factory=time.monotonic_ns)
+  after_accel_ns: int = field(init=False)
+  after_gyro_ns: int = field(init=False)
+  has_reference: bool = False
+
+  def __post_init__(self):
+    self.after_accel_ns = self.after_gyro_ns = self.started_ns
+
+
 def render_tab_device(tabs):
   lock = asyncio.Lock()
-  last_position = None
+  saved_position = None
+  displayed_position = (None, False)
+  mount = None
 
-  def update_position(position):
-    nonlocal last_position
-    if position != last_position and not position_panel.is_deleted:
-      position_panel.content = _device_position_html(position)
-      last_position = position
+  def update_position(position, *, live=False):
+    nonlocal displayed_position
+    if (position, live) != displayed_position and not position_panel.is_deleted:
+      position_panel.content = _device_position_html(position, live=live)
+      displayed_position = position, live
+
+  def update_saved_position(position):
+    nonlocal saved_position
+    if position_panel.is_deleted:
+      return
+    saved_position = position
+    pitch, yaw = _device_angle_labels(position)
+    saved_angles.set_text(f'Pitch {pitch} · Yaw {yaw}')
+    if mount is None:
+      update_position(position)
 
   async def refresh_position():
     if tabs.value != 'DEVICE' or lock.locked():
@@ -1094,22 +1125,93 @@ def render_tab_device(tabs):
     async with lock:
       position = await asyncio.to_thread(_read_device_position)
       if tabs.value == 'DEVICE':
-        update_position(position)
+        update_saved_position(position)
+
+  def finish_mount(status=MOUNT_IDLE_STATUS):
+    nonlocal mount
+    if mount is not None:
+      mount = None
+      live_timer.deactivate()
+    if not position_panel.is_deleted:
+      stop_button.set_visibility(False)
+      saved_row.set_visibility(False)
+      mount_status.set_text(status)
+      update_position(saved_position)
+
+  def start_mount():
+    nonlocal mount
+    if tabs.value != 'DEVICE':
+      return
+    try:
+      stream = get_mount_sensor_stream()
+    except (ImportError, OSError, RuntimeError):
+      finish_mount('장착 조정용 센서를 열 수 없습니다.')
+      return
+    mount = DeviceMountSession(stream, MountAdjustment())
+    stop_button.set_visibility(True)
+    saved_row.set_visibility(True)
+    mount_status.set_text('기준 잡는 중 · 기기를 잠시 움직이지 마세요.')
+    update_position(None, live=True)
+    live_timer.activate()
+
+  def refresh_mount():
+    if mount is None or tabs.value != 'DEVICE':
+      return
+    try:
+      samples = mount.stream.read(mount.after_accel_ns, mount.after_gyro_ns)
+      position = None
+      if samples is not None:
+        accel, gyro = samples
+        if accel:
+          mount.after_accel_ns = accel[-1][0]
+        if gyro:
+          mount.after_gyro_ns = gyro[-1][0]
+        position = mount.estimator.update(accel, gyro)
+    except RuntimeError as error:
+      finish_mount(str(error))
+      return
+    except (ValueError, OSError):
+      finish_mount('센서 입력이 끊겼거나 불안정합니다. 기준을 다시 잡으세요.')
+      return
+
+    if position is None:
+      if mount.has_reference:
+        finish_mount('차량 상태 또는 센서 입력이 끊겼습니다. 기준을 다시 잡으세요.')
+      elif time.monotonic_ns() - mount.started_ns >= MOUNT_READY_TIMEOUT_NS:
+        finish_mount('기준 자세를 잡지 못했습니다. 시동과 정차 상태를 확인하고 기기를 잠시 고정하세요.')
+      return
+
+    if not mount.has_reference:
+      mount.has_reference = True
+      mount_status.set_text('조정 중 · Yaw는 시작 자세를 기준으로 추정하며 시간이 지나면 오차가 쌓일 수 있습니다.')
+    pitch, yaw = position
+    update_position((round(pitch, 1), round(yaw, 1)), live=True)
 
   async def reset_position():
     async with lock:
+      finish_mount()
       reset_calibration()
-      update_position(None)
+      update_saved_position(None)
 
   with ui.column().classes('w-full max-w-4xl mt-2 mx-auto'):
     with ui.column().classes('device-position-panel gap-2'):
       with ui.row().classes('w-full items-center justify-between gap-2'):
         ui.label('Device Position').classes('text-lg font-bold')
-        ui.button('RESET CALIBRATION', icon='restart_alt', on_click=reset_position).props('outline dense color=amber-5').classes(
-          'device-position-reset px-2')
+        ui.button('RESET CALIBRATION', icon='restart_alt', on_click=reset_position).props('outline dense color=amber-5').classes('px-2')
+      with ui.row().classes('device-mount-controls w-full items-center gap-x-3 gap-y-1'):
+        ui.label('장착 조정 모드').classes('font-bold')
+        ui.button('기준 잡기', icon='adjust', on_click=start_mount).props('dense color=blue-8').classes('px-2')
+        stop_button = ui.button('조정 종료', on_click=lambda: finish_mount()).props('dense outline color=blue-3').classes('px-2')
+        stop_button.set_visibility(False)
+        mount_status = ui.label(MOUNT_IDLE_STATUS).classes('device-mount-status').props('role=status')
       position_panel = ui.html(_device_position_html(None)).classes('w-full').props('id="device-position"')
+      with ui.row().classes('device-saved-position w-full items-center justify-between gap-1') as saved_row:
+        ui.label('저장된 보정값').classes('font-bold')
+        saved_angles = ui.label('Pitch — · Yaw —')
+      saved_row.set_visibility(False)
 
   timer = ui.timer(1.0, refresh_position, active=tabs.value == 'DEVICE')
+  live_timer = ui.timer(0.1, refresh_mount, active=False)
 
   async def change_tab(event):
     if event.value == 'DEVICE':
@@ -1117,8 +1219,10 @@ def render_tab_device(tabs):
       await refresh_position()
     else:
       timer.deactivate()
+      finish_mount()
 
   tabs.on_value_change(change_tab)
+  ui.context.client.on_disconnect(lambda: finish_mount())
 
 
 def render_tab_toggles():
