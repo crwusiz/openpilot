@@ -55,6 +55,7 @@ NAVI_INT_FIELDS = frozenset({
 NAVI_BOOL_FIELDS = frozenset({"is_highway", "section_adjust_speed"})
 NAVI_ACTIVE_MIN = 0
 NAVI_ACTIVE_MAX = 32767
+NAVI_ROAD_LOG_DUPLICATE_S = 0.02
 
 class NaviServer:
   def __init__(self, start_broadcast=True):
@@ -63,6 +64,8 @@ class NaviServer:
     self.active = 0
     self.last_updated = 0
     self.last_updated_active = 0
+    self.last_road_log_time = 0.0
+    self.last_road_log_addr = None
     self.lock = threading.Lock()
     self.remote_addr = None
     self.last_camera_source_id = 0
@@ -213,9 +216,15 @@ class NaviServer:
             self.last_updated_active = time.monotonic()
 
           if 'road_limit' in json_obj:
-            self.json_road_limit = json_obj['road_limit']
-            self.last_updated = time.monotonic()
-            log.debug(f"[3843 RECV] {json_obj['road_limit']}")
+            road_limit = json_obj['road_limit']
+            received_at = time.monotonic()
+            if (road_limit != self.json_road_limit or remote_addr != self.last_road_log_addr or
+                received_at - self.last_road_log_time >= NAVI_ROAD_LOG_DUPLICATE_S):
+              log.debug("[3843 RECV] %s", road_limit)
+              self.last_road_log_time = received_at
+              self.last_road_log_addr = remote_addr
+            self.json_road_limit = road_limit
+            self.last_updated = received_at
 
           if 'traffic_signal' in json_obj:
             self.json_traffic_signal = json_obj['traffic_signal']
@@ -373,7 +382,7 @@ class SpeedLimiter:
     self.started_speed = 0
     self.last_limit_speed_left_dist = 0
     self.last_road_name = ""
-    self.in_school_zone = False
+    self.school_zone_limit_kph = 0
 
     self.sock = messaging.sub_sock("naviData", conflate=True)
     self.naviData = None
@@ -429,7 +438,10 @@ class SpeedLimiter:
     return camera_active or section_active
 
   def get_in_school_zone(self):
-    return self.in_school_zone
+    return self.school_zone_limit_kph > 0
+
+  def get_school_zone_limit_speed(self):
+    return self.school_zone_limit_kph
 
   def _reset_camera_decel(self):
     self.cam_decel = False
@@ -444,7 +456,7 @@ class SpeedLimiter:
 
   def _reset_navigation_state(self):
     self._reset_decel_states()
-    self.in_school_zone = False
+    self.school_zone_limit_kph = 0
     self.last_road_name = ""
 
   def _log_reset(self, msg):
@@ -490,26 +502,31 @@ class SpeedLimiter:
         min_limit = 10
 
       has_camera_limit = camera_limit_active(navi_data)
-      was_in_school_zone = self.in_school_zone
+      was_in_school_zone = self.get_in_school_zone()
       # Expiry clears speed/distance but can leave the start marker's type.
       # It must not re-enter a zone after a road change has ended it.
-      if (is_school_zone_start and not self.in_school_zone and has_camera_limit and
-          min_limit <= cam_limit_speed <= max_limit):
-        log.info(f"school zone ENTER: limit={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
-        self.in_school_zone = True
-      elif is_school_zone_end and self.in_school_zone:
+      if is_school_zone_start and has_camera_limit and min_limit <= cam_limit_speed <= max_limit:
+        if not was_in_school_zone:
+          log.info(f"school zone ENTER: limit={cam_limit_speed}, dist={cam_limit_speed_left_dist}")
+        self.school_zone_limit_kph = cam_limit_speed
+      elif is_school_zone_end and was_in_school_zone:
         log.info("school zone EXIT")
-        self.in_school_zone = False
+        self.school_zone_limit_kph = 0
 
       current_road_name = str(getattr(navi_data, "currentRoadName", "") or "")
 
       # The previous road belongs to an existing zone. A newly received start
       # marker may establish a zone on a different road in this same frame.
-      if self.in_school_zone and was_in_school_zone:
-        if (self.last_road_name and current_road_name and current_road_name != self.last_road_name) or \
-           (cam_type not in (20, 21) and has_camera_limit):
+      if self.get_in_school_zone() and was_in_school_zone:
+        road_changed = self.last_road_name and current_road_name and current_road_name != self.last_road_name
+        # An unnamed speed bump may be inside the last known school zone.
+        unnamed_bump = is_speed_bump and not current_road_name
+        new_camera = not (is_school_zone_start or is_school_zone_end or unnamed_bump) and has_camera_limit
+        if road_changed or new_camera:
           log.info("school zone FORCED EXIT (road changed or new cam detected)")
-          self.in_school_zone = False
+          self.school_zone_limit_kph = 0
+        elif not current_road_name:
+          current_road_name = self.last_road_name
 
       if is_speed_bump:
         self._log_throttled("bump_event", f"speed bump event: cam_limit_speed={cam_limit_speed}, dist={cam_limit_speed_left_dist}")

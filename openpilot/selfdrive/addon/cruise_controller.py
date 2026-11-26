@@ -534,6 +534,8 @@ class CruiseController:
     camera_target_active = 0 < camera_limit_speed_clu < SPEED_LIMIT.no_active
     if is_school_zone and (not camera_event_active or not camera_target_active):
       school_zone_max_limit = self.conv.kph_to_clu(SPEED_LIMIT.school_zone_max_kph)
+      if nda_active and not camera_event_active and (school_zone_limit := speed_limiter.get_school_zone_limit_speed()) > 0:
+        school_zone_max_limit = min(school_zone_max_limit, self.conv.kph_to_clu(school_zone_limit))
       if 0 < camera_limit_speed_clu < SPEED_LIMIT.no_active:
         camera_limit_speed_clu = min(camera_limit_speed_clu, school_zone_max_limit)
       elif road_limit_speed_nda > 0 and nda_active:
@@ -543,7 +545,7 @@ class CruiseController:
       elif road_limit_speed_stock > 0 and not nda_active:
         camera_limit_speed_clu = min(road_limit_speed_stock, school_zone_max_limit)
       else:
-        camera_limit_speed_clu = self.conv.kph_to_clu(SPEED_LIMIT.school_zone_kph)
+        camera_limit_speed_clu = min(self.conv.kph_to_clu(SPEED_LIMIT.school_zone_kph), school_zone_max_limit)
 
     # 2. Track the observed road limit even while camera/section/protection-zone
     # targets own the applied speed. This prevents a stale road limit when an

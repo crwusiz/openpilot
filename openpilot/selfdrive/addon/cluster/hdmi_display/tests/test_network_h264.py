@@ -124,6 +124,7 @@ async def test_shutdown_checkpoints_identify_native_stop_without_reordering_clea
     await network.write_control(writer, wire.OFFER, {"type": "offer", "sdp": "v=0\r\noffer"})
     assert (await network.read_control(reader))[0] == wire.ANSWER
     assert (await network.read_control(reader))[0] == wire.STATE
+    server.receiver_stall_at = time.monotonic()
     await server.close()
   finally:
     writer.close()
@@ -132,7 +133,7 @@ async def test_shutdown_checkpoints_identify_native_stop_without_reordering_clea
   if not failed:
     expected.append("native_stream_stop_end")
   assert events == expected + ["producer_stop", "network_close_end"]
-  assert not server.clients and server.active is None
+  assert not server.clients and server.active is None and server.receiver_stall_at is None
 
 
 @asyncio_test
@@ -492,6 +493,34 @@ async def test_receiver_recovery_requests_are_rate_limited_and_decoder_errors_ar
   assert any("camera_display_fps=14.75" in message for message in messages)
 
 
+@pytest.mark.parametrize("changes,following,accepted", [
+  ({}, None, True),
+  ({"recovery_reason": "decoder_error"}, None, False),
+  ({"recovery_reason": "video_startup"}, None, False),
+  ({"keyframe_request": 1}, None, False),
+  ({"video_age_ms": True}, None, False),
+  ({"video_age_ms": 349}, None, False),
+  ({"video_age_ms": 2001}, None, False),
+  ({"screen_off": True}, None, False),
+  ({}, {"decoded_fps": 10, "video_age_ms": 438}, True),
+  ({}, {"decoded_fps": 4, "video_age_ms": 50}, False),
+  ({}, {"screen_off": True}, False),
+])
+@asyncio_test
+async def test_only_recent_video_stale_recovery_feedback_is_kept_as_receiver_pressure(monkeypatch, changes, following, accepted):
+  monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=lambda: 10.0))
+  reports = [{"keyframe_request": True, "recovery_reason": "video_stale", "video_age_ms": 350, **changes}]
+  if following is not None:
+    reports.append(following)
+  monkeypatch.setattr(network, "read_control", AsyncMock(side_effect=[
+    *((wire.FEEDBACK, i, report) for i, report in enumerate(reports)), EOFError(),
+  ]))
+  server = network.H264NetworkServer(config(), models())
+  with pytest.raises(EOFError):
+    await server._feedback(None, SimpleNamespace())
+  assert server.receiver_stall_at == (10.0 if accepted else None)
+
+
 @asyncio_test
 async def test_existing_perf_window_logs_source_and_bounded_nack_diagnostics_without_affecting_stream(monkeypatch):
   clock, messages, writes = [0.0], [], []
@@ -818,11 +847,11 @@ async def test_state_write_stall_has_a_hard_deadline_and_cleans_pending_drain(mo
   assert finished.is_set()
 
 
-@pytest.mark.parametrize("video_pressure", [False, True])
+@pytest.mark.parametrize("pressure", ["tcp_only", "video_send", "receiver", "expired_receiver"])
 @asyncio_test
-async def test_network_budget_runs_while_state_drain_is_pending_and_survives_reconnect(monkeypatch, video_pressure):
+async def test_network_budget_runs_while_state_drain_is_pending_and_survives_reconnect(monkeypatch, pressure):
   monkeypatch.setattr(network, "SAMPLE_INTERVAL", 0.005)
-  clock = Mock(side_effect=(index / 2 for index in range(100)))
+  clock = Mock(side_effect=(10 + index / 2 for index in range(100)))
   monkeypatch.setattr(network, "time", SimpleNamespace(monotonic=clock))
   monkeypatch.setattr(network, "write_network_status", lambda _ip: None)
   values, writes = {}, []
@@ -837,11 +866,13 @@ async def test_network_budget_runs_while_state_drain_is_pending_and_survives_rec
   settings = config()
   settings.params = SimpleNamespace(get=values.get, put=put)
   server = network.H264NetworkServer(settings, models())
-  server.state_drain_started = 0.0
+  server.state_drain_started = 10.0
   writer = SimpleNamespace(transport=SimpleNamespace(get_write_buffer_size=lambda: 1600))
   stream = Stream()
-  if video_pressure:
+  if pressure == "video_send":
     stream.get_send_pressure_age = Mock(return_value=0.35)
+  elif pressure in ("receiver", "expired_receiver"):
+    server.receiver_stall_at = 10.0 if pressure == "receiver" else 9.5
   monitor = asyncio.create_task(server._network_budget(writer, stream))
   try:
     await asyncio.wait_for(adapted.wait(), 1)
@@ -850,7 +881,7 @@ async def test_network_budget_runs_while_state_drain_is_pending_and_survives_rec
     with pytest.raises(asyncio.CancelledError):
       await monitor
   assert writes == [3_750_000]
-  assert clock.call_count == (2 if video_pressure else 3)
+  assert clock.call_count == (2 if pressure in ("video_send", "receiver") else 3)
   assert server.bitrate.current == 3_750_000 and server.bitrate.last_report is None
   # Closing the server (not each failed ICE session) restores the encoder.
   await server.close()

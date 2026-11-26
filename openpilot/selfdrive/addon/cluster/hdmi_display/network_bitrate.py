@@ -92,7 +92,7 @@ class ClusterBitrateController:
     before, self.current = self.current, value
     if reason == "link_recovered":
       self.probe_at = now
-    elif reason in ("rtcp_loss", "tcp_backpressure", "video_tcp_backpressure") and value < before:
+    elif reason in ("rtcp_loss", "tcp_backpressure", "video_tcp_backpressure", "receiver_tcp_backpressure") and value < before:
       if self.probe_at is not None and 0 <= now - self.probe_at <= RECOVERY_PROBE_SECONDS:
         self.recovery_wait_s = min(MAX_RECOVERY_SECONDS, self.recovery_wait_s * 2)
         self.probe_failures += 1
@@ -107,7 +107,7 @@ class ClusterBitrateController:
          + f"ceiling_bps={self.ceiling} | reason={reason} | recovery_wait_s={self.recovery_wait_s:.1f}"
          + f" | probe_failures={self.probe_failures}")
 
-  def sample(self, now, report, queued_bytes, *, drain_age_s=None, send_pressure_age_s=None, degraded=False):
+  def sample(self, now, report, queued_bytes, *, drain_age_s=None, send_pressure_age_s=None, receiver_stalled=False, degraded=False):
     if self.disabled:
       return
     try:
@@ -122,7 +122,9 @@ class ClusterBitrateController:
       # The native bool alone can fail while the Pi still decodes video.
       # A sustained state write on the same session corroborates link pressure.
       video_pressure = self.send_pressure_age_s >= VIDEO_TCP_PRESSURE_SECONDS
-      video_tcp_pressure = video_pressure and queued_bytes > 0 and self.drain_age_s >= VIDEO_TCP_PRESSURE_SECONDS
+      queued_state_pressure = queued_bytes > 0 and self.drain_age_s >= VIDEO_TCP_PRESSURE_SECONDS
+      video_tcp_pressure = video_pressure and queued_state_pressure
+      receiver_tcp_pressure = receiver_stalled and queued_state_pressure
 
       # aiortc puts its 16-bit max_seq in the RR's 32-bit sequence field.
       # Accept its wrap as well as genuine extended 32-bit reports. Cached
@@ -151,6 +153,7 @@ class ClusterBitrateController:
             self.loss_samples = self.loss_samples + 1 if loss >= 0.05 else 0
 
       reason = ("tcp_backpressure" if tcp_pressure else "video_tcp_backpressure" if video_tcp_pressure
+                else "receiver_tcp_backpressure" if receiver_tcp_pressure
                 else "rtcp_loss" if fresh and (loss >= 0.1 or self.loss_samples >= 2) else None)
       if reason is not None:
         self.healthy_since = None

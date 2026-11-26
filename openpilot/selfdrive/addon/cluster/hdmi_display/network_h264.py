@@ -29,6 +29,10 @@ STATE_DRAIN_TIMEOUT_S = 5.0
 STATE_SEND_BUFFER_BYTES = 16 * 1024
 STATE_INVALID_LOG_INTERVAL_S = 5.0
 KEYFRAME_REQUEST_INTERVAL = 1.0
+# Pi requests video_stale recovery after 350ms without a decoded picture.
+RECEIVER_STALL_MIN_MS = 350
+RECEIVER_STALL_MAX_MS = 2000
+RECEIVER_STALL_FEEDBACK_TTL_S = 0.75
 INITIAL_OFFER_TIMEOUT_S = 30.0
 SCENE_PREPARATION_TIMEOUT_S = 90.0
 
@@ -402,6 +406,7 @@ class H264NetworkServer:
     self.status_updated = 0.0
     self.bitrate = ClusterBitrateController(getattr(config, "params", None))
     self.state_drain_started = None
+    self.receiver_stall_at = None
 
   async def start(self):
     publish_cluster_connection("network", False)
@@ -442,8 +447,10 @@ class H264NetworkServer:
         drain_age = None if self.state_drain_started is None else max(0.0, now - self.state_drain_started)
         get_send_pressure = getattr(stream, "get_send_pressure_age", None)
         send_pressure_age = get_send_pressure(now) if callable(get_send_pressure) else None
+        receiver_stalled = self.receiver_stall_at is not None and 0 <= now - self.receiver_stall_at <= RECEIVER_STALL_FEEDBACK_TTL_S
         self.bitrate.sample(now, reports.get("road"), writer.transport.get_write_buffer_size(),
-                            drain_age_s=drain_age, send_pressure_age_s=send_pressure_age, degraded=self.degraded)
+                            drain_age_s=drain_age, send_pressure_age_s=send_pressure_age, receiver_stalled=receiver_stalled,
+                            degraded=self.degraded)
     except Exception as error:
       # An auxiliary tuning failure cannot end FIRST_COMPLETED and tear down
       # healthy media. The connection's normal control/video watchdogs remain.
@@ -461,6 +468,11 @@ class H264NetworkServer:
       if kind != FEEDBACK:
         raise ValueError("Expected H.264 receiver feedback")
       self.screen_off = payload.get("screen_off") is True
+      video_age_ms = payload.get("video_age_ms")
+      decoded_fps = payload.get("decoded_fps")
+      if self.screen_off or (type(decoded_fps) in (int, float) and 0 < decoded_fps <= 1e9
+                             and type(video_age_ms) in (int, float) and 0 <= video_age_ms < RECEIVER_STALL_MIN_MS):
+        self.receiver_stall_at = None
       # Transport negotiation alone does not confirm the Pi is showing its HUD.
       # Recovery requests can arrive between regular display reports.
       if "display_fps" in payload or self.screen_off:
@@ -470,6 +482,11 @@ class H264NetworkServer:
         publish_cluster_connection("network", connected)
       if payload.get("keyframe_request") is True:
         now = time.monotonic()
+        # Native sends can still succeed while the Pi is missing video.
+        # Only use its recent recovery request together with a queued state drain.
+        if (not self.screen_off and payload.get("recovery_reason") == "video_stale"
+            and type(video_age_ms) in (int, float) and RECEIVER_STALL_MIN_MS <= video_age_ms <= RECEIVER_STALL_MAX_MS):
+          self.receiver_stall_at = now
         if last_keyframe_request is None or now - last_keyframe_request >= 0.5:
           resync = getattr(track, "request_recovery", None)
           if callable(resync):
@@ -676,6 +693,7 @@ class H264NetworkServer:
             self.active = None
             self.peer_ip = None
             self.screen_off = False
+            self.receiver_stall_at = None
             publish_status(None)
           self.clients.discard(task)
 

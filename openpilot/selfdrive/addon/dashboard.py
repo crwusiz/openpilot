@@ -718,38 +718,100 @@ def apply_styles():
 
     .device-position-panel {
         background: #111827; border: 1.5px solid #3A4A6B; border-radius: 12px;
-        padding: 20px; width: 100%;
+        padding: 16px; width: 100%;
     }
     .device-position-grid {
-        display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-        align-items: center; gap: 16px;
+        display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+        align-items: stretch; gap: 12px;
+        --pitch-color: #7DC7FF; --yaw-color: #69E2B5; --roll-color: #A6B4CB;
     }
-    .device-position-chart { width: min(100%, 348px); margin: 0 auto; padding: 24px 38px 0; text-align: center; }
-    .device-position-plot {
-        position: relative; aspect-ratio: 1; background-color: #0D1117;
-        background-image: linear-gradient(#243249 1px, transparent 1px), linear-gradient(90deg, #243249 1px, transparent 1px);
-        background-size: 25% 25%; border: 1px solid #3A4A6B; border-radius: 8px;
+    .device-orientation-scene {
+        position: relative; min-width: 0; height: clamp(205px, 42vh, 320px); isolation: isolate;
+        overflow: hidden; border: 1px solid #354662; border-radius: 10px;
+        background: radial-gradient(ellipse at 50% 44%, #243650 0%, #151F31 52%, #0B111B 100%);
     }
-    .device-position-plot::before, .device-position-plot::after {
-        content: ''; position: absolute; background: #617497;
+    .device-orientation-scene::before {
+        content: ''; position: absolute; inset: 0; opacity: 0.35;
+        background-image: linear-gradient(#344B68 1px, transparent 1px), linear-gradient(90deg, #344B68 1px, transparent 1px);
+        background-size: 18px 18px; mask-image: radial-gradient(ellipse at center, black 5%, transparent 74%);
     }
-    .device-position-plot::before { left: 50%; top: 0; bottom: 0; width: 1px; }
-    .device-position-plot::after { top: 50%; left: 0; right: 0; height: 1px; }
-    .device-position-axis { position: absolute; color: #B2C0D8; font-size: 0.8rem; white-space: nowrap; }
-    .device-position-axis-up { bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); }
-    .device-position-axis-down { top: calc(100% + 4px); left: 50%; transform: translateX(-50%); }
-    .device-position-axis-left { right: calc(100% + 4px); top: 50%; transform: translateY(-50%); }
-    .device-position-axis-right { left: calc(100% + 4px); top: 50%; transform: translateY(-50%); }
-    .device-position-marker {
-        position: absolute; width: 14px; height: 14px; z-index: 1;
-        transform: translate(-50%, -50%); border: 2px solid #CFFAFE; border-radius: 50%;
-        background: #22D3EE; box-shadow: 0 0 0 4px rgba(34,211,238,0.22);
+    .device-camera-guide, .device-camera-posed {
+        position: absolute; left: 50%; top: 55%; width: min(46%, 248px); height: 47%; border-radius: 20px 20px 24px 24px;
+        transform: translate(-50%, -50%) perspective(420px) rotateX(calc(12deg + var(--pitch, 0deg))) rotateY(calc(-18deg + var(--yaw, 0deg)));
     }
-    .device-position-scale { margin-top: 25px; color: #B2C0D8; font-size: 0.8rem; }
-    .device-position-readings { display: grid; gap: 10px; margin: 0; }
-    .device-position-readings > div { background: #1A2235; border-radius: 8px; padding: 12px; min-width: 0; }
-    .device-position-readings dt { color: #B2C0D8; font-size: 0.875rem; }
-    .device-position-readings dd { margin: 3px 0 0; font-size: 1.25rem; font-weight: 700; color: #E8EEFF; font-variant-numeric: tabular-nums; }
+    .device-camera-guide { outline: 1px dashed #C3D0E8; outline-offset: 5px; opacity: 0.55; }
+    .device-camera-posed {
+        background: linear-gradient(155deg, #48566C 0%, #263144 28%, #121B28 65%, #0C121C 100%);
+        border: 1px solid #8395B1; box-shadow: 6px 7px 0 #090E16, 11px 14px 22px #000A, inset 0 1px 0 #BAC8DE80;
+    }
+    .device-camera-vents {
+        position: absolute; inset: 13% 25% auto; height: 17%; opacity: 0.85;
+        background: radial-gradient(ellipse at center, #080D15 46%, transparent 53%) 0 0 / 12px 8px;
+    }
+    .device-camera-face {
+        position: absolute; inset: 35% 10% 12%; border-radius: 12px; border: 1px solid #53617A;
+        background: linear-gradient(145deg, #151F2D, #060A11 80%); box-shadow: inset 0 3px 6px #000A;
+    }
+    .device-camera-lens {
+        position: absolute; top: 50%; width: 27%; height: 81%; max-width: 48px;
+        border: 2px solid #627490; border-radius: 45%; transform: translateY(-50%);
+        background: radial-gradient(circle at 40% 34%, #BDEBFF 0%, #66BCFA 5%, #305A91 14%, #111B32 30%, #080C15 52%, #273B55 68%, #03070D 70%);
+        box-shadow: 0 0 0 2px #06080E, inset 0 0 5px #466C90;
+    }
+    .device-camera-lens:first-child { left: 15%; }
+    .device-camera-lens:last-child { right: 15%; }
+    .device-axis-line { position: absolute; opacity: 0.55; }
+    .device-axis-line-yaw { left: 50%; top: 8%; bottom: 16%; border-left: 1px dashed var(--yaw-color); }
+    .device-axis-line-pitch { left: 9%; right: 12%; top: 61%; border-top: 1px dashed var(--pitch-color); transform: rotate(-12deg); }
+    .device-orbit { position: absolute; border: 2px solid currentColor; border-radius: 50%; z-index: 1; }
+    .device-orbit-yaw {
+        left: 20%; width: 60%; top: 18%; height: 22%; color: var(--yaw-color); border-top-color: transparent;
+    }
+    .device-orbit-pitch {
+        left: 15%; width: 22%; top: 36%; height: 49%; color: var(--pitch-color); border-right-color: transparent; transform: rotate(-18deg);
+    }
+    .device-orbit-roll {
+        left: 59%; top: 54%; width: 21%; height: 36%; color: var(--roll-color); border-style: dashed; transform: rotate(-26deg);
+    }
+    .device-orbit[data-turn]::after {
+        content: ''; position: absolute; width: 14px; height: 14px; background: currentColor;
+        clip-path: polygon(0 0, 100% 50%, 0 100%);
+    }
+    .device-orbit[data-turn="left"]::after { left: 3%; bottom: 5%; transform: rotate(198deg); }
+    .device-orbit[data-turn="right"]::after { right: 3%; bottom: 5%; transform: rotate(-18deg); }
+    .device-orbit[data-turn="up"]::after { left: 7%; top: 12%; transform: rotate(-37deg); }
+    .device-orbit[data-turn="down"]::after { left: 41%; bottom: -6%; transform: rotate(13deg); }
+    .device-axis-tag { position: absolute; z-index: 2; font-size: 0.75rem; font-weight: 800; }
+    .device-axis-tag-yaw { right: 12%; top: 10%; color: var(--yaw-color); }
+    .device-axis-tag-pitch { left: 4%; top: 48%; color: var(--pitch-color); }
+    .device-axis-tag-roll { right: 7%; bottom: 11%; color: var(--roll-color); }
+    .device-orientation-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0 0; color: #C0CDE3; font-size: 0.75rem; }
+    .device-orientation-legend i { display: inline-block; width: 14px; margin-right: 5px; vertical-align: middle; border-top: 2px dashed #A6B4CB; }
+    .device-orientation-legend .measured { border-top-style: solid; border-color: #7DC7FF; }
+    .device-position-readings { display: grid; gap: 7px; margin: 0; }
+    .device-position-readings > div {
+        background: #1A2235; border-left: 3px solid var(--axis-color); border-radius: 7px;
+        padding: 7px 10px; min-width: 0;
+    }
+    .device-reading-pitch { --axis-color: var(--pitch-color); }
+    .device-reading-yaw { --axis-color: var(--yaw-color); }
+    .device-reading-roll { --axis-color: var(--roll-color); }
+    .device-position-readings dt { color: var(--axis-color); font-size: 0.78rem; font-weight: 700; }
+    .device-position-readings dd { margin: 0; }
+    .device-position-value { font-size: 1.08rem; font-weight: 800; color: #E8EEFF; font-variant-numeric: tabular-nums; }
+    .device-position-adjustment { color: #D4DFF3; font-size: 0.82rem; }
+    .device-position-adjustment span { color: var(--axis-color); font-weight: 800; }
+    .device-position-status { color: #B2C0D8; font-size: 0.75rem; margin: 6px 0 0; }
+    .device-position-reset { min-height: 36px; }
+
+    @media (min-width: 769px) and (max-height: 540px) {
+        .device-position-panel { padding: 10px; }
+        .device-orientation-scene { height: clamp(100px, 58vh, 228px); }
+    }
+    @media (min-width: 769px) and (max-height: 335px) {
+        .device-position-readings > div { padding: 3px 8px; }
+        .device-position-readings div { line-height: 1.15; }
+    }
 
     /* ── 모바일 환경 강제 최적화 미디어 쿼리 ── */
     @media (max-width: 768px) {
@@ -783,7 +845,14 @@ def apply_styles():
         .tabs-custom .q-tab__label { font-size: 0.6rem !important; }
         .device-position-panel { padding: 14px; }
         .device-position-grid { grid-template-columns: minmax(0, 1fr); }
+        .device-orientation-scene { height: 226px; }
+        .device-camera-guide, .device-camera-posed { width: min(53%, 212px); height: 43%; }
         .device-position-readings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .device-reading-roll { grid-column: span 2; }
+    }
+    @media (max-width: 440px) {
+        .device-position-readings { grid-template-columns: minmax(0, 1fr); }
+        .device-reading-roll { grid-column: auto; }
     }
     </style>
   """)
@@ -928,41 +997,82 @@ def render_tab_functions():
   functions_content()
 
 def _device_position_html(position: tuple[float, float] | None) -> str:
-  extent = 10
-  marker = ''
+  camera = ''
   pitch_text = yaw_text = '—'
+  pitch_turn = yaw_turn = ''
+  pitch_adjustment = yaw_adjustment = ''
   status = '표시할 보정 각도가 없습니다.'
 
   if position is not None:
     pitch, yaw = position
-    extent = max(extent, 5 * math.ceil(max(abs(pitch), abs(yaw)) / 5))
-    marker_left = 50 - yaw / extent * 50
-    marker_top = 50 + pitch / extent * 50
-    marker = f'<span class="device-position-marker" style="left: {marker_left:.2f}%; top: {marker_top:.2f}%"></span>'
-    pitch_direction = '아래' if pitch > 0 else '위' if pitch < 0 else '중앙'
-    yaw_direction = '왼쪽' if yaw > 0 else '오른쪽' if yaw < 0 else '중앙'
-    pitch_text = f'{abs(pitch):.1f}° {pitch_direction}'
-    yaw_text = f'{abs(yaw):.1f}° {yaw_direction}'
-    status = '저장된 캘리브레이션 기준'
+    # CSS uses screen coordinates. Amplify the displayed pose while keeping the readouts in real degrees.
+    visual_pitch = max(-28.0, min(28.0, -4.0 * pitch))
+    visual_yaw = max(-28.0, min(28.0, -4.0 * yaw))
+    camera = f'''
+      <div class="device-camera-posed" style="--pitch: {visual_pitch:.1f}deg; --yaw: {visual_yaw:.1f}deg">
+        <div class="device-camera-vents"></div>
+        <div class="device-camera-face">
+          <div class="device-camera-lens"></div>
+          <div class="device-camera-lens"></div>
+        </div>
+      </div>
+    '''
+    pitch_text = f'{abs(pitch):.1f}°' + (' 아래' if pitch > 0 else ' 위' if pitch < 0 else '')
+    yaw_text = f'{abs(yaw):.1f}°' + (' 왼쪽' if yaw > 0 else ' 오른쪽' if yaw < 0 else '')
+    pitch_adjustment = '기준 방향'
+    yaw_adjustment = '기준 방향'
+    if pitch > 0:
+      pitch_turn = ' data-turn="up"'
+      pitch_adjustment = '<span>↑</span> 렌즈를 위로 기울이기'
+    elif pitch < 0:
+      pitch_turn = ' data-turn="down"'
+      pitch_adjustment = '<span>↓</span> 렌즈를 아래로 기울이기'
+    if yaw > 0:
+      yaw_turn = ' data-turn="right"'
+      yaw_adjustment = '<span>→</span> 렌즈를 오른쪽으로 돌리기'
+    elif yaw < 0:
+      yaw_turn = ' data-turn="left"'
+      yaw_adjustment = '<span>←</span> 렌즈를 왼쪽으로 돌리기'
+    status = '저장 보정값 기준 · 모형 기울기 확대 표시'
 
   return f'''
     <div class="device-position-grid">
-      <div class="device-position-chart" aria-hidden="true">
-        <div class="device-position-plot">
-          <span class="device-position-axis device-position-axis-up">위</span>
-          <span class="device-position-axis device-position-axis-down">아래</span>
-          <span class="device-position-axis device-position-axis-left">왼쪽</span>
-          <span class="device-position-axis device-position-axis-right">오른쪽</span>
-          {marker}
+      <div aria-hidden="true">
+        <div class="device-orientation-scene">
+          <div class="device-axis-line device-axis-line-yaw"></div>
+          <div class="device-axis-line device-axis-line-pitch"></div>
+          <div class="device-camera-guide"></div>
+          {camera}
+          <div class="device-orbit device-orbit-yaw"{yaw_turn}></div>
+          <div class="device-orbit device-orbit-pitch"{pitch_turn}></div>
+          <div class="device-orbit device-orbit-roll"></div>
+          <span class="device-axis-tag device-axis-tag-yaw">YAW</span>
+          <span class="device-axis-tag device-axis-tag-pitch">PITCH</span>
+          <span class="device-axis-tag device-axis-tag-roll">ROLL</span>
         </div>
-        <div class="device-position-scale">±{extent}°</div>
+        <div class="device-orientation-legend">
+          <span><i></i>정면 기준</span>
+          <span><i class="measured"></i>저장된 자세</span>
+        </div>
       </div>
       <div>
         <dl class="device-position-readings">
-          <div><dt>Pitch · 상하</dt><dd>{pitch_text}</dd></div>
-          <div><dt>Yaw · 좌우</dt><dd>{yaw_text}</dd></div>
+          <div class="device-reading-pitch">
+            <dt>Pitch · 상하 회전</dt>
+            <dd class="device-position-value">{pitch_text}</dd>
+            <dd class="device-position-adjustment">{pitch_adjustment}</dd>
+          </div>
+          <div class="device-reading-yaw">
+            <dt>Yaw · 좌우 회전</dt>
+            <dd class="device-position-value">{yaw_text}</dd>
+            <dd class="device-position-adjustment">{yaw_adjustment}</dd>
+          </div>
+          <div class="device-reading-roll">
+            <dt>Roll · 수평 비틀림</dt>
+            <dd class="device-position-adjustment">측정값 없음</dd>
+          </div>
         </dl>
-        <p class="text-sm text-slate-300 mt-3 mb-0">{status}</p>
+        <p class="device-position-status">{status}</p>
       </div>
     </div>
   '''
@@ -991,11 +1101,13 @@ def render_tab_device(tabs):
       reset_calibration()
       update_position(None)
 
-  with ui.column().classes('w-full max-w-4xl mt-4 mx-auto gap-4'):
+  with ui.column().classes('w-full max-w-4xl mt-2 mx-auto'):
     with ui.column().classes('device-position-panel gap-2'):
-      ui.label('Device Position').classes('text-lg font-bold')
+      with ui.row().classes('w-full items-center justify-between gap-2'):
+        ui.label('Device Position').classes('text-lg font-bold')
+        ui.button('RESET CALIBRATION', icon='restart_alt', on_click=reset_position).props('outline dense color=amber-5').classes(
+          'device-position-reset px-2')
       position_panel = ui.html(_device_position_html(None)).classes('w-full').props('id="device-position"')
-    ui.button('RESET CALIBRATION', on_click=reset_position, color=None).classes('custom-btn btn-yellow w-full sm:w-auto')
 
   timer = ui.timer(1.0, refresh_position, active=tabs.value == 'DEVICE')
 

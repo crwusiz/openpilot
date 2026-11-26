@@ -125,6 +125,31 @@ def test_valid_school_start_enters_and_keeps_zone_after_passing(limiter, speed, 
   assert not limiter.get_in_school_zone()
 
 
+def test_school_zone_keeps_limit_through_expiry_and_unnamed_speed_bump(limiter):
+  limiter.naviData = make_navi_data(20, distance=15)
+  limiter.naviData.camLimitSpeed = 30
+  limiter.get_max_speed(34)
+  assert limiter.get_school_zone_limit_speed() == 30
+
+  limiter.naviData.camLimitSpeed = 0
+  limiter.naviData.camLimitSpeedLeftDist = 0
+  limiter.get_max_speed(35)
+  assert limiter.get_school_zone_limit_speed() == 30
+
+  limiter.naviData = make_navi_data(22, distance=17)
+  limiter.naviData.camLimitSpeed = 30
+  limiter.naviData.currentRoadName = ""
+  limiter.get_max_speed(35)
+  assert limiter.get_in_school_zone()
+  assert limiter.get_school_zone_limit_speed() == 30
+
+  limiter.naviData = make_navi_data(0, distance=0)
+  limiter.naviData.currentRoadName = "다음 도로"
+  limiter.get_max_speed(35)
+  assert not limiter.get_in_school_zone()
+  assert limiter.get_school_zone_limit_speed() == 0
+
+
 def test_expired_school_start_cannot_reenter_after_road_change(limiter, caplog):
   # 11/6 09:04:18.818: road change exits the zone; an expired type 20
   # must not enter it again on the next control frame (limit=0, distance=0).
@@ -204,6 +229,32 @@ def test_udp_accepts_rear_camera_payload(monkeypatch, cam_type):
   assert server.get_limit_val("cam_type", 0) == cam_type
   assert server.get_limit_val("cam_limit_speed", 0) == 70
   assert server.get_limit_val("cam_limit_speed_left_dist", 0) == 600
+
+
+def test_udp_logs_distinct_and_periodic_road_limit_snapshots(monkeypatch):
+  server = navi_controller.NaviServer(start_broadcast=False)
+  addr = ("192.0.2.1", 20000)
+  road = {"road_limit_speed": 70, "cam_limit_speed_left_dist": 520}
+  closer_road = {**road, "cam_limit_speed_left_dist": 510}
+  sock = MagicMock()
+  now = 100.0
+  monkeypatch.setattr(navi_controller.select, "select", lambda *args: ([sock], [], []))
+  monkeypatch.setattr(navi_controller.time, "monotonic", lambda: now)
+
+  with patch.object(navi_controller.log, "debug") as debug:
+    for now, snapshot, remote, log_count in (
+      (100.000, road, addr, 1),
+      (100.005, road, addr, 1),
+      (101.000, road, addr, 2),
+      (101.005, closer_road, addr, 3),
+      (101.010, closer_road, (addr[0], addr[1] + 1), 4),
+    ):
+      sock.recvfrom.return_value = (json.dumps({"active": 1, "road_limit": snapshot}).encode(), remote)
+      assert server.udp_recv(sock)
+      assert server.last_updated == now
+      assert server.json_road_limit == snapshot
+      assert debug.call_count == log_count
+    debug.assert_called_with("[3843 RECV] %s", closer_road)
 
 
 @pytest.mark.parametrize("cam_type", REAR_CAMERA_TYPES)

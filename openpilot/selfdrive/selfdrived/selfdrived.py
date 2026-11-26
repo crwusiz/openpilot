@@ -143,6 +143,9 @@ class SelfdriveD:
     self.loop_timings = deque(maxlen=self.rk.avg_dt.window_size)
     self.car_state_receive_s = 0.
     self.car_state_timed_out = False
+    self.last_car_state_publish_ns = 0
+    self.car_state_publish_gap_ms = None
+    self.car_state_delivery_ms = None
     self.lagging_prev = False
 
     self.ignored_processes = set()
@@ -506,8 +509,22 @@ class SelfdriveD:
   def data_sample(self):
     receive_start = time.monotonic()
     _car_state = messaging.recv_one(self.car_state_sock)
-    self.car_state_receive_s = time.monotonic() - receive_start
+    receive_end = time.monotonic()
+    self.car_state_receive_s = receive_end - receive_start
     self.car_state_timed_out = _car_state is None
+    self.car_state_publish_gap_ms = None
+    self.car_state_delivery_ms = None
+    if _car_state is not None:
+      # Event.logMonoTime uses the publisher's monotonic clock.
+      publish_ns = _car_state.logMonoTime
+      receive_ns = int(receive_end * 1e9)
+      if 0 < publish_ns <= receive_ns:
+        if 0 < self.last_car_state_publish_ns < publish_ns:
+          self.car_state_publish_gap_ms = (publish_ns - self.last_car_state_publish_ns) / 1e6
+        self.car_state_delivery_ms = (receive_ns - publish_ns) / 1e6
+        self.last_car_state_publish_ns = publish_ns
+      else:
+        self.last_car_state_publish_ns = 0
     CS = _car_state.carState if _car_state else self.CS_prev
 
     self.sm.update(0)
@@ -623,19 +640,37 @@ class SelfdriveD:
     self.rk.monitor_time()
 
     if lag_started:
-      receive_times, processing_times, timeouts = zip(*self.loop_timings, strict=True)
+      (receive_times, processing_times, timeouts, card_lags, publish_gaps, delivery_times,
+       brake_states, gas_states, longitudinal_accels) = zip(*self.loop_timings, strict=True)
+      receive_max = max(receive_times)
+      slowest_receive = receive_times.index(receive_max)
       cloudlog.event("selfdrived.lagging",
                      loop_avg_ms=loop_avg_ms,
-                     car_state_receive_max_ms=max(receive_times) * 1000.,
+                     car_state_receive_max_ms=receive_max * 1000.,
                      processing_max_ms=max(processing_times) * 1000.,
                      car_state_timeouts=sum(timeouts),
                      card_lag_ms=self.CS_prev.cumLagMs,
+                     card_lag_max_ms=max((lag for lag in card_lags if lag is not None), default=None),
+                     car_state_publish_gap_max_ms=max((gap for gap in publish_gaps if gap is not None), default=None),
+                     car_state_delivery_max_ms=max((delay for delay in delivery_times if delay is not None), default=None),
+                     brake_pressed_at_receive_max=brake_states[slowest_receive],
+                     gas_pressed_at_receive_max=gas_states[slowest_receive],
+                     longitudinal_accel_at_receive_max=longitudinal_accels[slowest_receive],
                      brake_pressed=self.CS_prev.brakePressed,
                      longitudinal_accel=self.CS_prev.aEgo,
                      can_valid=self.CS_prev.canValid,
                      can_timeout=self.CS_prev.canTimeout,
                      active_events=[EVENT_NAME[name] for name in self.events.names])
-    self.loop_timings.append((self.car_state_receive_s, step_s - self.car_state_receive_s, self.car_state_timed_out))
+    if self.car_state_timed_out:
+      card_lag_ms = brake_pressed = gas_pressed = longitudinal_accel = None
+    else:
+      card_lag_ms = self.CS_prev.cumLagMs
+      brake_pressed = self.CS_prev.brakePressed
+      gas_pressed = self.CS_prev.gasPressed
+      longitudinal_accel = self.CS_prev.aEgo
+    self.loop_timings.append((self.car_state_receive_s, step_s - self.car_state_receive_s, self.car_state_timed_out,
+                             card_lag_ms, self.car_state_publish_gap_ms, self.car_state_delivery_ms,
+                             brake_pressed, gas_pressed, longitudinal_accel))
     self.lagging_prev = lagging
 
   def run(self):

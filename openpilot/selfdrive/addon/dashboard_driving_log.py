@@ -13,6 +13,7 @@ MAX_SOURCE_BYTES = 2 * 1024**2
 MAX_SWAGLOG_FILES = 180
 MAX_SWAGLOG_BYTES = 12 * 1024**2
 MAX_ENTRIES = 3000
+MAX_PRIORITIZED_LAG_ENTRIES = 32
 MAX_OUTPUT_BYTES = 1024**2
 
 _TEXT_SOURCES = {
@@ -25,7 +26,9 @@ _SWAGLOG_NAME = re.compile(r'swaglog\.([0-9]+)')
 _LAG_EVENT = 'selfdrived.lagging'
 _LAG_FIELDS = frozenset({
   'loop_avg_ms', 'car_state_receive_max_ms', 'processing_max_ms', 'car_state_timeouts',
-  'card_lag_ms', 'brake_pressed', 'longitudinal_accel', 'can_valid', 'can_timeout', 'active_events',
+  'card_lag_ms', 'card_lag_max_ms', 'car_state_publish_gap_max_ms', 'car_state_delivery_max_ms',
+  'brake_pressed_at_receive_max', 'gas_pressed_at_receive_max', 'longitudinal_accel_at_receive_max',
+  'brake_pressed', 'longitudinal_accel', 'can_valid', 'can_timeout', 'active_events',
 })
 
 
@@ -142,9 +145,10 @@ def read_driving_log(log_dir: Path, swaglog_dir: Path) -> DrivingLogSnapshot:
     f'# Text sources: latest {MAX_SOURCE_BYTES:,} bytes each across available files (traffic .log, .1 and .2).',
     f'# Swaglog scan: newest {MAX_SWAGLOG_FILES} rotations, up to {MAX_SWAGLOG_BYTES:,} bytes. Includes selfdrived.lagging only.',
     f'# Output: up to {MAX_ENTRIES:,} entries and {MAX_OUTPUT_BYTES:,} UTF-8 bytes.',
+    f'# Latest {MAX_PRIORITIZED_LAG_ENTRIES} scanned lag events take priority and may predate the text log window.',
   ]
 
-  def entries():
+  def text_entries():
     for source, filenames in _TEXT_SOURCES.items():
       chunks = _read_chunks([log_dir / name for name in filenames], MAX_SOURCE_BYTES)
       found = False
@@ -155,6 +159,7 @@ def read_driving_log(log_dir: Path, swaglog_dir: Path) -> DrivingLogSnapshot:
       if not found:
         notes.append(f'# {source}: ' + ('no complete entries' if chunks else 'missing or unreadable'))
 
+  def lag_entries():
     chunks = _read_chunks(_swaglog_paths(swaglog_dir), MAX_SWAGLOG_BYTES)
     found = False
     for data in reversed(chunks):
@@ -164,19 +169,27 @@ def read_driving_log(log_dir: Path, swaglog_dir: Path) -> DrivingLogSnapshot:
     if not found:
       notes.append('# SELFDRIVED: ' + ('no lag entries in scanned files' if chunks else 'swaglog missing or unreadable'))
 
-  # Select the most recent records with bounded memory, keeping source order for timestamp ties.
-  newest = nlargest(MAX_ENTRIES, ((stamp, i, text) for i, (stamp, text) in enumerate(entries())))
+  def ranked_entries():
+    for i, (stamp, text) in enumerate(text_entries()):
+      yield False, stamp, False, i, text
+
+    # Give recent lag events room even when debug samples fill the merged log.
+    recent_lags = nlargest(MAX_ENTRIES, ((stamp, i, text) for i, (stamp, text) in enumerate(lag_entries())))
+    for rank, (stamp, i, text) in enumerate(recent_lags):
+      yield rank < MAX_PRIORITIZED_LAG_ENTRIES, stamp, True, i, text
+
+  newest = nlargest(MAX_ENTRIES, ranked_entries())
   header = '\n'.join(notes) + '\n\n'
   body_budget = MAX_OUTPUT_BYTES - len(header.encode('utf-8'))
   available = body_budget
   selected = []
-  for _, _, text in newest:
+  for _, stamp, is_lag, i, text in newest:
     size = len(text.encode('utf-8')) + 1
     if size > body_budget:
       continue
     if size > available:
       break
     available -= size
-    selected.append(text + '\n')
+    selected.append((stamp, is_lag, i, text))
 
-  return DrivingLogSnapshot(header + ''.join(reversed(selected)), len(selected))
+  return DrivingLogSnapshot(header + ''.join(text + '\n' for _, _, _, text in sorted(selected)), len(selected))

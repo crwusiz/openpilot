@@ -304,6 +304,36 @@ def test_stopped_target_survives_lead_handoff_until_confirmed_release():
   assert plan.stop_distance == 1000.0
 
 
+def test_stop_at_line_with_lead_preserves_target_until_confirmed_release():
+  controller = TrafficStopController(dt=0.05)
+  car_state, model, radar_state = make_inputs(v_ego=0.0, model_distance=0.56)
+  car_state.cruiseState = SimpleNamespace(enabled=True)
+  radar_state.leadOne.present = True
+  radar_state.leadOne.dRel = 6.0
+  for _ in range(4):
+    plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+  assert controller.x_state == XState.lead
+  assert controller.signal_stop_hold
+  assert plan.signal_stop_active
+  assert plan.raw_stop_distance == pytest.approx(0.56)
+  assert plan.stop_distance == 0.0
+
+  # November 26, 12:15:16–20: the target jumped to 27.77 m before go was confirmed.
+  set_go_prediction(model)
+  for _ in range(20):
+    plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+    assert controller.x_state == XState.lead
+    assert plan.signal_stop_active
+    assert plan.raw_stop_distance == 30.0
+    assert plan.stop_distance == 0.0
+
+  for _ in range(20):
+    plan = controller.update(car_state, model, radar_state, comfort_brake=1.5)
+  assert not controller.signal_stop_hold
+  assert not plan.signal_stop_active
+  assert plan.stop_distance == 1000.0
+
+
 def test_stop_behind_intervening_lead_does_not_latch_signal_hold():
   controller = TrafficStopController(dt=0.05)
   car_state, model, radar_state = make_inputs(v_ego=10.0, model_distance=80.0)

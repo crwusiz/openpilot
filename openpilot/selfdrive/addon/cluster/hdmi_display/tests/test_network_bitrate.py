@@ -75,6 +75,24 @@ def test_only_sustained_overlapping_video_and_state_pressure_can_reduce_before_r
   assert params.writes == [3_750_000]  # The late RR cannot immediately cause a second reduction.
 
 
+def test_receiver_stall_needs_a_pending_state_drain_before_reducing_bitrate():
+  params = Params()
+  controller = budget.ClusterBitrateController(params)
+  cached = report(100)
+  controller.sample(0, cached, 0, receiver_stalled=True)
+  controller.sample(0.5, cached, 2400, drain_age_s=0.20, receiver_stalled=True)
+  controller.sample(1.0, cached, 0, drain_age_s=0.5, receiver_stalled=True)
+  controller.sample(1.5, cached, 2400, drain_age_s=0.4)
+  assert params.writes == []
+
+  controller.sample(2.0, cached, 2400, drain_age_s=0.4, receiver_stalled=True)
+  assert params.writes == [3_750_000]
+  assert controller.recovery_blocked == "receiver_tcp_backpressure"
+  assert "reason=receiver_tcp_backpressure" in budget.flog.call_args.args[0]
+  controller.sample(2.5, report(200, 40), 2400, drain_age_s=0.9, receiver_stalled=True)
+  assert params.writes == [3_750_000]
+
+
 def test_high_loss_reduces_immediately_and_cannot_repeat_on_one_cached_report():
   params = Params()
   controller = budget.ClusterBitrateController(params)
@@ -395,7 +413,7 @@ def _failed_probe():
   return controller, params
 
 
-@pytest.mark.parametrize("cause", ["rtcp_loss", "tcp_backpressure", "video_tcp_backpressure"])
+@pytest.mark.parametrize("cause", ["rtcp_loss", "tcp_backpressure", "video_tcp_backpressure", "receiver_tcp_backpressure"])
 def test_repeated_failed_probes_wait_longer_without_delaying_congestion_reductions(cause):
   params = Params()
   controller = budget.ClusterBitrateController(params)
@@ -406,8 +424,9 @@ def test_repeated_failed_probes_wait_longer_without_delaying_congestion_reductio
     failed_at, previous = probe_at + 3, controller.current
     controller.sample(failed_at, report(failed_at * 400, 40 if cause == "rtcp_loss" else 0),
                       0 if cause == "rtcp_loss" else 1600,
-                      drain_age_s={"tcp_backpressure": 1.0, "video_tcp_backpressure": 0.5}.get(cause),
-                      send_pressure_age_s=0.35 if cause == "video_tcp_backpressure" else None)
+                      drain_age_s=1.0 if cause == "tcp_backpressure" else 0.5,
+                      send_pressure_age_s=0.35 if cause == "video_tcp_backpressure" else None,
+                      receiver_stalled=cause == "receiver_tcp_backpressure")
     assert controller.current == max(budget.MIN_BITRATE, previous * 3 // 4)
     assert controller.recovery_wait_s == wait and controller.probe_failures == failures
     assert controller.probe_at is None

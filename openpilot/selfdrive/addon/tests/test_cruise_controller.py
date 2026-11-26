@@ -192,7 +192,7 @@ def test_curve_smoothing_still_honors_other_limits(immediate):
 
 
 def make_limit_inputs(monkeypatch, *, nda=True, school=True, camera_event=True,
-                      camera_target=0.0, road=50.0, stock_speed=30.0, section=0.0):
+                      camera_target=0.0, road=50.0, stock_speed=30.0, section=0.0, school_limit=0.0):
   controller = make_controller(30.0)
   controller.CP = SimpleNamespace(openpilotLongitudinalControl=True)
   controller.min_set_speed_clu = 10.0
@@ -222,6 +222,7 @@ def make_limit_inputs(monkeypatch, *, nda=True, school=True, camera_event=True,
     get_road_limit_speed=lambda: road if nda else 0.0,
     get_max_speed=lambda speed: (camera_target, False),
     get_in_school_zone=lambda: school,
+    get_school_zone_limit_speed=lambda: school_limit,
     get_camera_limit_speed_stock=lambda *args: (camera_target, False),
   )
   monkeypatch.setitem(CruiseController._cal_limit_speed.__globals__, "SpeedLimiter",
@@ -245,6 +246,9 @@ def make_limit_inputs(monkeypatch, *, nda=True, school=True, camera_event=True,
   ({"nda": False, "stock_speed": 0.0, "road": 40.0}, 40.0, 40.0),
   ({"nda": False, "stock_speed": 0.0, "road": 0.0}, 30.0, 30.0),
   ({"camera_event": False}, 50.0, 50.0),
+  ({"camera_event": False, "road": 70.0, "school_limit": 30.0}, 30.0, 30.0),
+  ({"camera_event": False, "road": 20.0, "school_limit": 30.0}, 20.0, 20.0),
+  ({"camera_event": True, "road": 70.0, "school_limit": 30.0}, 50.0, 50.0),
   ({"camera_target": 80.0}, 80.0, 60.6),  # Preserve a valid camera approach target.
   ({"camera_event": False, "camera_target": 80.0}, 50.0, 50.0),
   ({"section": 60.0}, 60.0, 60.0),  # Preserve section ownership of SET.

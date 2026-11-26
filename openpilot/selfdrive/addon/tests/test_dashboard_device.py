@@ -46,27 +46,39 @@ def test_read_device_position_rejects_missing_or_unusable_calibration(monkeypatc
   assert dashboard._read_device_position() is None
 
 
-def marker_coordinates(html):
-  marker = re.search(r'<[^>]+class="[^"<>]*\bdevice-position-marker\b[^"<>]*"[^>]*>', html)
-  assert marker is not None
-  position = re.search(r'left:\s*([\d.]+)%;\s*top:\s*([\d.]+)%', marker[0])
-  assert position is not None
-  return float(position[1]), float(position[2])
+def camera_rotation(html):
+  assert 'device-camera-posed' in html
+  angles = re.search(r'--pitch:\s*([+\-\d.]+)deg;\s*--yaw:\s*([+\-\d.]+)deg', html)
+  assert angles is not None
+  return float(angles[1]), float(angles[2])
 
 
-def test_device_position_marker_follows_calibration_signs():
-  center_x, center_y = marker_coordinates(dashboard._device_position_html((0.0, 0.0)))
-  down_left = dashboard._device_position_html((2.0, 3.0))
-  up_right = dashboard._device_position_html((-2.0, -3.0))
-  down_left_x, down_left_y = marker_coordinates(down_left)
-  up_right_x, up_right_y = marker_coordinates(up_right)
+def test_device_orientation_shows_measured_pose_and_when_to_correct_it():
+  up_right = dashboard._device_position_html((-1.5, -3.2))
+  assert camera_rotation(up_right) == pytest.approx((6.0, 12.8))
+  assert '1.5° 위' in up_right and '3.2° 오른쪽' in up_right
+  assert '렌즈를 아래로 기울이기' in up_right and '렌즈를 왼쪽으로 돌리기' in up_right
 
-  assert (center_x, center_y) == pytest.approx((50.0, 50.0))
-  assert down_left_x < center_x < up_right_x
-  assert up_right_y < center_y < down_left_y
-  assert '2.0° 아래' in down_left and '3.0° 왼쪽' in down_left
-  assert '2.0° 위' in up_right and '3.0° 오른쪽' in up_right
-  assert 'device-position-marker' not in dashboard._device_position_html(None)
+  down_left = dashboard._device_position_html((1.5, 3.2))
+  assert camera_rotation(down_left) == pytest.approx((-6.0, -12.8))
+  assert '1.5° 아래' in down_left and '3.2° 왼쪽' in down_left
+  assert '렌즈를 위로 기울이기' in down_left and '렌즈를 오른쪽으로 돌리기' in down_left
+
+  centered = dashboard._device_position_html((0.0, 0.0))
+  assert camera_rotation(centered) == pytest.approx((0.0, 0.0))
+  assert '0.0°' in centered and '기준 방향' in centered
+  assert '측정값 없음' in centered
+
+
+def test_device_orientation_clamps_visual_tilt_and_omits_pose_if_unavailable():
+  exaggerated = dashboard._device_position_html((-40.0, 100.0))
+  assert camera_rotation(exaggerated) == pytest.approx((28.0, -28.0))
+  assert '40.0° 위' in exaggerated and '100.0° 왼쪽' in exaggerated
+
+  unavailable = dashboard._device_position_html(None)
+  assert 'device-camera-posed' not in unavailable
+  assert '표시할 보정 각도가 없습니다.' in unavailable
+  assert '측정값 없음' in unavailable
 
 
 async def invoke(callback, *args):
@@ -76,7 +88,7 @@ async def invoke(callback, *args):
 
 
 class TestDashboardDevice(unittest.IsolatedAsyncioTestCase):
-  async def test_position_refreshes_only_on_device_tab_and_reset_clears_marker(self):
+  async def test_position_refreshes_only_on_device_tab_and_reset_clears_pose(self):
     client = Client(ui.page('/test-dashboard-device-position'))
     self.addCleanup(client.delete)
     tabs = SimpleNamespace(value='FUNCTIONS', on_value_change=Mock())
@@ -101,22 +113,22 @@ class TestDashboardDevice(unittest.IsolatedAsyncioTestCase):
 
       await invoke(refresh)
       params.get.assert_not_called()
-      self.assertNotIn('device-position-marker', position.content)
+      self.assertNotIn('device-camera-posed', position.content)
 
       tabs.value = 'DEVICE'
       await invoke(tab_change, SimpleNamespace(value='DEVICE'))
       timer.return_value.activate.assert_called_once()
       params.get.assert_called_once_with('CalibrationParams')
-      self.assertIn('device-position-marker', position.content)
+      self.assertIn('device-camera-posed', position.content)
 
       await invoke(callbacks['RESET CALIBRATION'])
       self.assertEqual(params.remove.call_args_list, [call('CalibrationParams'), call('LiveTorqueParameters'),
                                                     call('LiveParametersV2'), call('LiveDelay')])
       params.put_bool.assert_called_once_with('OnroadCycleRequested', True)
       notify.assert_called_once()
-      self.assertNotIn('device-position-marker', position.content)
+      self.assertNotIn('device-camera-posed', position.content)
       await invoke(refresh)
-      self.assertNotIn('device-position-marker', position.content)
+      self.assertNotIn('device-camera-posed', position.content)
 
       tabs.value = 'FUNCTIONS'
       await invoke(tab_change, SimpleNamespace(value='FUNCTIONS'))

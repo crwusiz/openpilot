@@ -15,6 +15,7 @@ from openpilot.common.logging_extra import queued_file_logging
 TRAFFIC_DEBUG_LOG = "/data/log/traffic_debug.log"
 TRAFFIC_DEBUG_LOG_MAX_BYTES = 10 * 1024 * 1024
 TRAFFIC_DEBUG_LOG_INTERVAL_S = 0.5
+_STOP_LINE_BUFFER_M = 1.0
 
 traffic_log = logging.getLogger("traffic")
 traffic_log.setLevel(logging.DEBUG)
@@ -265,7 +266,7 @@ def get_virtual_traffic_stop_distance(model_distance: float, v_ego_kph: float) -
 
 def get_traffic_stop_obstacle_distance(stop_distance: float, mpc_stop_distance: float) -> float:
   """Convert an ego stop target to an MPC obstacle while retaining a small stop-line buffer."""
-  obstacle_offset = max(0.0, float(mpc_stop_distance) - 1.0)
+  obstacle_offset = max(0.0, float(mpc_stop_distance) - _STOP_LINE_BUFFER_M)
   return max(0.0, float(stop_distance) + obstacle_offset)
 
 
@@ -478,20 +479,22 @@ class TrafficStopController:
                         v_ego: float, comfort_brake: float) -> TrafficStopPlan:
     self.adjusted_stop_distance = max(0.0, self.adjusted_stop_distance - ego_distance)
     signal_stop_active = self.signal_stop_latched
-    if signal_stop_active and self.x_state == XState.e2eStopped:
-      self.signal_stop_hold = True
     if not signal_stop_active:
       self.signal_stop_hold = False
       filtered_stop_distance = self._INACTIVE_STOP_DISTANCE_M
       self.adjusted_stop_distance = 0.0
       self.reference_speed_kph = None
-    elif self.signal_stop_hold:
-      # Hold the stopped position through lead handoffs until release is
-      # confirmed. A growing model endpoint or intermittent lead cannot move it.
-      filtered_stop_distance = 0.0
-      self.adjusted_stop_distance = 0.0
-    elif self.reference_speed_kph is not None or self.adjusted_stop_distance > 0.0:
-      filtered_stop_distance = 0.0
+    else:
+      if self.reference_speed_kph is not None or self.adjusted_stop_distance > 0.0:
+        filtered_stop_distance = 0.0
+      stopped_in_line_buffer = (self.x_state == XState.lead and v_ego < self._STOPPED_SPEED_MS and
+                                filtered_stop_distance + self.adjusted_stop_distance <= _STOP_LINE_BUFFER_M)
+      if self.x_state == XState.e2eStopped or stopped_in_line_buffer:
+        self.signal_stop_hold = True
+      if self.signal_stop_hold:
+        # Keep the completed stop through lead handoffs until release is confirmed.
+        filtered_stop_distance = 0.0
+        self.adjusted_stop_distance = 0.0
 
     stop_distance = filtered_stop_distance + self.adjusted_stop_distance
     stop_distance = max(stop_distance, v_ego ** 2 / (2.0 * float(comfort_brake)))

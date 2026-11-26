@@ -30,6 +30,12 @@ def test_driving_log_merges_local_timestamps_and_typed_lag_event(tmp_path):
     'event': 'selfdrived.lagging',
     'loop_avg_ms': 12.5,
     'car_state_timeouts': 2,
+    'card_lag_max_ms': 18.5,
+    'car_state_publish_gap_max_ms': 30.0,
+    'car_state_delivery_max_ms': None,
+    'brake_pressed_at_receive_max': True,
+    'gas_pressed_at_receive_max': False,
+    'longitudinal_accel_at_receive_max': -2.5,
     'brake_pressed': True,
     'active_events': ['selfdrivedLagging'],
   })
@@ -54,6 +60,12 @@ def test_driving_log_merges_local_timestamps_and_typed_lag_event(tmp_path):
   payload = json.loads(lag_line.split('selfdrived.lagging ', 1)[1])
   assert payload['loop_avg_ms'] == 12.5
   assert payload['car_state_timeouts'] == 2
+  assert payload['card_lag_max_ms'] == 18.5
+  assert payload['car_state_publish_gap_max_ms'] == 30.0
+  assert payload['car_state_delivery_max_ms'] is None
+  assert payload['brake_pressed_at_receive_max'] is True
+  assert payload['gas_pressed_at_receive_max'] is False
+  assert payload['longitudinal_accel_at_receive_max'] == -2.5
   assert payload['brake_pressed'] is True
   assert payload['active_events'] == ['selfdrivedLagging']
 
@@ -114,6 +126,33 @@ def test_driving_log_tail_and_entry_limits_keep_most_recent_records(tmp_path, mo
   assert latest.entry_count == 2
   assert 'oldest retained navi record' not in latest.text
   assert latest.text.index('latest cruise record') < latest.text.index('newest navi record')
+
+
+@pytest.mark.parametrize('limit', ['entries', 'bytes'])
+def test_driving_log_keeps_lag_events_when_debug_records_fill_the_export(tmp_path, monkeypatch, limit):
+  timestamp = '2026-11-26 19:30:05'
+  created = datetime.fromisoformat(timestamp).timestamp()
+  write_log(tmp_path, 'navi_debug.log', ''.join(
+    f'{timestamp}.{ms:03d} [DEBUG] sample {ms} {"x" * 300}\n' for ms in (250, 500, 750)
+  ))
+  write_log(tmp_path, 'swaglog.0000000000', '\n'.join(
+    swag_record(created - offset, {'event': 'selfdrived.lagging', 'loop_avg_ms': loop_ms})
+    for offset, loop_ms in ((4, 11.5), (2, 12.5))
+  ) + '\n')
+  monkeypatch.setattr(dashboard_driving_log, 'MAX_PRIORITIZED_LAG_ENTRIES', 1)
+  if limit == 'entries':
+    monkeypatch.setattr(dashboard_driving_log, 'MAX_ENTRIES', 2)
+  else:
+    monkeypatch.setattr(dashboard_driving_log, 'MAX_OUTPUT_BYTES', 1000)
+
+  snapshot = dashboard_driving_log.read_driving_log(tmp_path, tmp_path)
+
+  assert snapshot.entry_count == 2
+  assert len(snapshot.text.encode('utf-8')) <= dashboard_driving_log.MAX_OUTPUT_BYTES
+  assert '11.5' not in snapshot.text
+  assert 'sample 500' not in snapshot.text
+  assert snapshot.text.index('[SELFDRIVED]') < snapshot.text.index('sample 750')
+  assert '12.5' in snapshot.text
 
 
 @pytest.mark.parametrize('create_dirs', [False, True])
