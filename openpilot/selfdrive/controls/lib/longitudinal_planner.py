@@ -3,11 +3,11 @@ import numpy as np
 
 import openpilot.cereal.messaging as messaging
 from opendbc.car.interfaces import ACCEL_MIN, ACCEL_MAX
-from openpilot.cereal import log
 from openpilot.common.constants import CV
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.realtime import DT_MDL
 from openpilot.selfdrive.modeld.constants import ModelConstants
+from openpilot.selfdrive.controls.lib.accel_boost import AccelBoost
 from openpilot.selfdrive.controls.lib.curve_speed import CurveSpeed
 from openpilot.selfdrive.controls.lib.longcontrol import LongCtrlState
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import LongitudinalMpc, LongitudinalPlanSource
@@ -19,12 +19,6 @@ from openpilot.common.swaglog import cloudlog
 J_CRUISE_VALS = [1.6, 1.2, 0.8, 0.6]
 J_CRUISE_BP = [0., 10.0, 25., 40.]
 A_CRUISE_MIN = -0.5
-ACCEL_BOOST_BY_PERSONALITY = {  # m/s^2
-  log.LongitudinalPersonality.aggressive: 0.15,
-  log.LongitudinalPersonality.standard: 0.10,
-  log.LongitudinalPersonality.relaxed: 0.075,
-  log.LongitudinalPersonality.morerelaxed: 0.05,
-}
 CONTROL_N_T_IDX = ModelConstants.T_IDXS[:CONTROL_N]
 
 
@@ -43,6 +37,7 @@ class LongitudinalPlanner:
     self.mpc = LongitudinalMpc(dt=dt)
     self.fcw = False
     self.dt = dt
+    self.accel_boost = AccelBoost(dt)
     self.curve_speed = CurveSpeed(dt)
 
     self.v_desired_filter = FirstOrderFilter(init_v, 2.0, self.dt)
@@ -56,11 +51,13 @@ class LongitudinalPlanner:
 
   def update(self, sm):
     car_state = sm['carState']
+    controls_state = sm['controlsState']
     model = sm['modelV2']
     v_ego = car_state.vEgo
     v_cruise_kph = min(car_state.vCruise, V_CRUISE_MAX)
     v_cruise = v_cruise_kph * CV.KPH_TO_MS
-    if sm['controlsState'].forceDecel:
+    force_decel = controls_state.forceDecel
+    if force_decel:
       v_cruise = 0.0
 
     vCluRatio = car_state.vCluRatio
@@ -68,7 +65,7 @@ class LongitudinalPlanner:
       v_cruise *= vCluRatio
       v_cruise += 0.069444
 
-    long_control_off = sm['controlsState'].longControlState == LongCtrlState.off
+    long_control_off = controls_state.longControlState == LongCtrlState.off
 
     # Reset current state when not engaged, or user is controlling the speed
     reset_state = long_control_off if self.CP.openpilotLongitudinalControl else not sm['selfdriveState'].enabled
@@ -114,12 +111,11 @@ class LongitudinalPlanner:
     output_should_stop_mpc = should_stop(v_ego, output_a_target_mpc)
     curve_offset = self.curve_speed.update(model, sm['vehicleParameters'].roll)
     output_a_target_e2e = model.action.desiredAcceleration + curve_offset
-    max_accel_boost = ACCEL_BOOST_BY_PERSONALITY.get(getattr(personality, 'raw', personality), 0.0)
-    if max_accel_boost > 0.0:
-      speed_scale = np.interp(v_ego, [5.0, 10.0], [0.0, 1.0])
-      accel_scale = np.interp(output_a_target_e2e, [-1.0, -0.5], [0.0, 1.0])
-      output_a_target_e2e += max_accel_boost * speed_scale * accel_scale
     output_should_stop_e2e = model.action.shouldStop
+    if reset_state or force_decel or output_should_stop_e2e:
+      self.accel_boost.reset()
+    else:
+      output_a_target_e2e = self.accel_boost.update(sm, output_a_target_e2e, curve_offset)
 
     self.a_cruise = get_cruise_accel(v_cruise, v_ego, self.a_cruise, self.output_a_target, self.dt)
     cruise_should_stop = should_stop(v_ego, self.a_cruise)

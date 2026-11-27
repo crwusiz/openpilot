@@ -7,6 +7,7 @@ import numpy as np
 from opendbc.car.structs import car
 from openpilot.cereal import log
 from openpilot.selfdrive.addon.traffic_controller import TrafficStopPlan
+from openpilot.selfdrive.controls.lib.accel_boost import AccelBoost
 from openpilot.selfdrive.controls.lib.longcontrol import LongCtrlState
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib import long_mpc
 from openpilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlanner
@@ -15,6 +16,48 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 
 def make_radar_lead(distance=20.0, speed=8.0, accel=0.0, prob=0.95):
   return SimpleNamespace(present=True, dRel=distance, vLead=speed, aLeadK=accel, aLeadTau=1.5, modelProb=prob)
+
+
+def make_boost_inputs(personality=log.LongitudinalPersonality.aggressive, plan_ahead=2.0, model_accel=0.5):
+  v_ego = 12.0
+  model = log.ModelDataV2.new_message()
+  model.position.x = [0.0, (v_ego + plan_ahead) * 10.0]
+  model.position.t = [0.0, 10.0]
+  model.action.desiredAcceleration = model_accel
+  return {
+    'carState': car.CarState(vEgo=v_ego, vCruise=100.0),
+    'controlsState': log.ControlsState(longControlState=LongCtrlState.pid),
+    'modelV2': model,
+    'radarState': log.RadarState(),
+    'selfdriveState': log.SelfdriveState(personality=personality),
+    'vehicleParameters': log.VehicleParameters(),
+  }
+
+
+class TestAccelBoost(unittest.TestCase):
+  def test_curve_drops_bias_immediately_and_bias_recovers_gradually(self):
+    boost = AccelBoost(dt=0.05)
+    sm = make_boost_inputs()
+    for _ in range(60):
+      output = boost.update(sm, 0.5, 0.0)
+    self.assertAlmostEqual(boost.update(sm, 0.4, -0.1), 0.4)
+    recovered = boost.update(sm, 0.5, 0.0)
+    self.assertAlmostEqual(recovered, 0.5 + 0.1 * 0.5 + 0.15 * 0.05 / 1.05)
+    self.assertLess(recovered, output)
+
+  def test_invalid_trajectory_drops_boost_and_clears_filters(self):
+    cases = (([], []), ([0.0, 140.0], []), ([0.0, 140.0], [0.0, 0.0]),
+             ([0.0, float('nan')], [0.0, 10.0]), ([0.0, 140.0], [0.0, float('inf')]))
+    for x, t in cases:
+      with self.subTest(x=x, t=t):
+        boost = AccelBoost(dt=0.05)
+        sm = make_boost_inputs()
+        first_output = boost.update(sm, 0.5, 0.0)
+        self.assertGreater(boost.update(sm, 0.5, 0.0), first_output)
+        sm['modelV2'].position.x = x
+        sm['modelV2'].position.t = t
+        self.assertEqual(boost.update(sm, 0.5, 0.0), 0.5)
+        self.assertAlmostEqual(boost.update(make_boost_inputs(), 0.5, 0.0), first_output)
 
 
 class TestLongitudinalMpc(unittest.TestCase):
@@ -59,7 +102,7 @@ class TestLongitudinalMpc(unittest.TestCase):
     self.assertEqual(self.mpc.source, long_mpc.LongitudinalPlanSource.lead1)
     np.testing.assert_allclose(self.mpc.params[:, 2], radar_state.leadTwo.dRel)
 
-  def test_planner_publishes_second_radar_lead_as_present(self):
+  def test_planner_can_use_second_radar_lead_without_a_primary_lead_indicator(self):
     planner = LongitudinalPlanner(car.CarParams(openpilotLongitudinalControl=True), init_v=10.0)
     model = log.ModelDataV2.new_message()
     model.action.desiredAcceleration = 0.5
@@ -83,33 +126,47 @@ class TestLongitudinalMpc(unittest.TestCase):
     pm.send.assert_called_once()
     service, message = pm.send.call_args.args
     self.assertEqual(service, 'longitudinalPlan')
-    self.assertTrue(message.longitudinalPlan.hasLead)
+    self.assertFalse(message.longitudinalPlan.hasLead)
     self.assertEqual(message.longitudinalPlan.longitudinalPlanSource, long_mpc.LongitudinalPlanSource.lead1)
 
   def test_planner_scales_accel_boost_by_personality(self):
     personalities = (
-      (log.LongitudinalPersonality.aggressive, 0.10),
-      (log.LongitudinalPersonality.standard, 0.075),
-      (log.LongitudinalPersonality.relaxed, 0.05),
-      (log.LongitudinalPersonality.morerelaxed, 0.025),
+      (log.LongitudinalPersonality.aggressive, 0.15, 0.10),
+      (log.LongitudinalPersonality.standard, 0.10, 1 / 15),
+      (log.LongitudinalPersonality.relaxed, 0.075, 0.05),
+      (log.LongitudinalPersonality.morerelaxed, 0.05, 1 / 30),
     )
-    cases = ((12.0, -0.5, 1.0), (7.5, -0.75, 0.25), (5.0, -0.5, 0.0), (12.0, -1.0, 0.0))
-    for personality, max_boost in personalities:
-      for speed, model_accel, scale in cases:
-        with self.subTest(personality=personality, speed=speed, model_accel=model_accel):
-          planner = LongitudinalPlanner(car.CarParams(openpilotLongitudinalControl=True), init_v=speed)
-          model = log.ModelDataV2.new_message()
-          model.action.desiredAcceleration = model_accel
-          planner.update({
-            'carState': car.CarState(vEgo=speed, vCruise=100.0),
-            'controlsState': log.ControlsState(longControlState=LongCtrlState.pid),
-            'modelV2': model,
-            'radarState': log.RadarState(),
-            'selfdriveState': log.SelfdriveState(personality=personality),
-            'vehicleParameters': log.VehicleParameters(),
-          })
+    cases = ((2.0, 0.5, 1.0), (0.25, 0.5, 0.5), (-0.5, 0.5, 0.0), (2.0, -0.5, 1.0))
+    dt = 0.10
+    self.enterContext(patch('openpilot.selfdrive.controls.lib.longitudinal_planner.get_accel_from_plan', return_value=1.0))
+    self.enterContext(patch('openpilot.selfdrive.controls.lib.longitudinal_planner.get_cruise_accel', return_value=1.0))
+    for personality, bias, gain in personalities:
+      for plan_ahead, model_accel, gate in cases:
+        with self.subTest(personality=personality, plan_ahead=plan_ahead, model_accel=model_accel):
+          sm = make_boost_inputs(personality, plan_ahead, model_accel)
+          planner = LongitudinalPlanner(car.CarParams(openpilotLongitudinalControl=True), init_v=12.0, dt=dt)
+          planner.update(sm)
 
-          self.assertAlmostEqual(planner.output_a_target, model_accel + max_boost * scale)
+          expected_boost = gate * (bias * dt / (1.0 + dt) + gain * max(model_accel, 0.0))
+          self.assertAlmostEqual(planner.output_a_target, model_accel + expected_boost)
+
+  def test_planner_resets_boost_on_driver_input_or_stop_request(self):
+    cases = (('carState', 'gasPressed'), ('carState', 'brakePressed'),
+             ('controlsState', 'forceDecel'), ('modelV2', 'shouldStop'))
+    for service, field in cases:
+      with self.subTest(service=service, field=field):
+        sm = make_boost_inputs(model_accel=-0.5)
+        planner = LongitudinalPlanner(car.CarParams(openpilotLongitudinalControl=True), init_v=12.0)
+        planner.update(sm)
+        self.assertGreater(planner.output_a_target, -0.5)
+
+        target = sm[service].action if service == 'modelV2' else sm[service]
+        setattr(target, field, True)
+        planner.update(sm)
+
+        self.assertEqual(planner.output_a_target, -0.5)
+        self.assertEqual(planner.accel_boost.bias_filter.x, 0.0)
+        self.assertFalse(planner.accel_boost.plan_ahead_filter.initialized)
 
   def test_traffic_stop_input_and_accel_floor(self):
     self.car_state.vEgo = 10.0
