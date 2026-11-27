@@ -13,9 +13,48 @@ from openpilot.system.ui.widgets.button import Button
 from openpilot.selfdrive.ui import UI_BORDER_SIZE
 from openpilot.selfdrive.ui.onroad.alert_renderer import (ALERT_BORDER_RADIUS, ALERT_COLORS, ALERT_FONT_BIG, ALERT_FONT_SMALL, ALERT_HEIGHTS,
                                                           ALERT_LINE_SPACING, ALERT_MARGIN, ALERT_PADDING, AlertSize, AlertStatus)
-from openpilot.selfdrive.ui.onroad.augmented_road_view import BORDER_COLORS
-from openpilot.selfdrive.ui.onroad.hud_renderer import COLORS, FONT_SIZES, UI_CONFIG
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
+
+from dataclasses import dataclass
+
+BORDER_COLORS = {
+  UIStatus.DISENGAGED: rl.Color(0x12, 0x28, 0x39, 0xFF),  # Blue for disengaged state
+  UIStatus.OVERRIDE: rl.Color(0x89, 0x92, 0x8D, 0xFF),  # Gray for override state
+  UIStatus.ENGAGED: rl.Color(0x16, 0x7F, 0x40, 0xFF),  # Green for engaged state
+}
+
+@dataclass(frozen=True)
+class UIConfig:
+  header_height: int = 300
+  set_speed_width_metric: int = 200
+  set_speed_width_imperial: int = 172
+  set_speed_height: int = 204
+
+@dataclass(frozen=True)
+class FontSizes:
+  current_speed: int = 176
+  speed_unit: int = 66
+  max_speed: int = 40
+  set_speed: int = 90
+
+@dataclass(frozen=True)
+class Colors:
+  WHITE = rl.WHITE
+  DISENGAGED = rl.Color(145, 155, 149, 255)
+  OVERRIDE = rl.Color(145, 155, 149, 255)  # Added
+  ENGAGED = rl.Color(128, 216, 166, 255)
+  GREY = rl.Color(166, 166, 166, 255)
+  DARK_GREY = rl.Color(114, 114, 114, 255)
+  BLACK_TRANSLUCENT = rl.Color(0, 0, 0, 166)
+  WHITE_TRANSLUCENT = rl.Color(255, 255, 255, 200)
+  BORDER_TRANSLUCENT = rl.Color(255, 255, 255, 75)
+  HEADER_GRADIENT_START = rl.Color(0, 0, 0, 114)
+  HEADER_GRADIENT_END = rl.BLANK
+
+UI_CONFIG = UIConfig()
+FONT_SIZES = FontSizes()
+COLORS = Colors()
+
 
 ASSETS = "training"
 MARGIN = 112
