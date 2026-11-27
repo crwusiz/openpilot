@@ -10,50 +10,10 @@ from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.button import Button
-from openpilot.selfdrive.ui import UI_BORDER_SIZE
+from openpilot.selfdrive.ui import Colors, UI_BORDER_SIZE, colors_alpha
 from openpilot.selfdrive.ui.onroad.alert_renderer import (ALERT_BORDER_RADIUS, ALERT_COLORS, ALERT_FONT_BIG, ALERT_FONT_SMALL, ALERT_HEIGHTS,
                                                           ALERT_LINE_SPACING, ALERT_MARGIN, ALERT_PADDING, AlertSize, AlertStatus)
-from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
-
-from dataclasses import dataclass
-
-BORDER_COLORS = {
-  UIStatus.DISENGAGED: rl.Color(0x12, 0x28, 0x39, 0xFF),  # Blue for disengaged state
-  UIStatus.OVERRIDE: rl.Color(0x89, 0x92, 0x8D, 0xFF),  # Gray for override state
-  UIStatus.ENGAGED: rl.Color(0x16, 0x7F, 0x40, 0xFF),  # Green for engaged state
-}
-
-@dataclass(frozen=True)
-class UIConfig:
-  header_height: int = 300
-  set_speed_width_metric: int = 200
-  set_speed_width_imperial: int = 172
-  set_speed_height: int = 204
-
-@dataclass(frozen=True)
-class FontSizes:
-  current_speed: int = 176
-  speed_unit: int = 66
-  max_speed: int = 40
-  set_speed: int = 90
-
-@dataclass(frozen=True)
-class Colors:
-  WHITE = rl.WHITE
-  DISENGAGED = rl.Color(145, 155, 149, 255)
-  OVERRIDE = rl.Color(145, 155, 149, 255)  # Added
-  ENGAGED = rl.Color(128, 216, 166, 255)
-  GREY = rl.Color(166, 166, 166, 255)
-  DARK_GREY = rl.Color(114, 114, 114, 255)
-  BLACK_TRANSLUCENT = rl.Color(0, 0, 0, 166)
-  WHITE_TRANSLUCENT = rl.Color(255, 255, 255, 200)
-  BORDER_TRANSLUCENT = rl.Color(255, 255, 255, 75)
-  HEADER_GRADIENT_START = rl.Color(0, 0, 0, 114)
-  HEADER_GRADIENT_END = rl.BLANK
-
-UI_CONFIG = UIConfig()
-FONT_SIZES = FontSizes()
-COLORS = Colors()
+from openpilot.selfdrive.ui.ui_state import ui_state
 
 
 ASSETS = "training"
@@ -68,6 +28,10 @@ BODY_GAP = 48
 INTRO_SIZE = 62
 INTRO_LINE = 90
 ITEM_SIZE = 59
+
+SPEED_BOX_BACKGROUND = colors_alpha(Colors.BLACK, 166)
+SPEED_BOX_BORDER = colors_alpha(Colors.WHITE, 75)
+SPEED_UNIT_COLOR = colors_alpha(Colors.WHITE, 200)
 
 # step background, next button
 NAVY = (rl.Color(11, 16, 55, 255), rl.Color(70, 91, 234, 255))
@@ -174,21 +138,21 @@ def draw_distracted_screen(origin: rl.Vector2, photo: rl.Texture):
   rl.rl_scalef(screen.width / w, screen.height / h, 1)
 
   # engaged border, road camera (the road in front of the car in the photo)
-  rl.draw_rectangle(0, 0, w, h, BORDER_COLORS[UIStatus.ENGAGED])
+  rl.draw_rectangle(0, 0, w, h, Colors.Border.ENGAGED)
   content = rl.Rectangle(UI_BORDER_SIZE, UI_BORDER_SIZE, w - 2 * UI_BORDER_SIZE, h - 2 * UI_BORDER_SIZE)
   rl.draw_texture_pro(photo, rl.Rectangle(80, 720, 650, 325), content, rl.Vector2(0, 0), 0, rl.WHITE)
 
   # max and current speed
   bold, semi_bold, medium = gui_app.font(FontWeight.BOLD), gui_app.font(FontWeight.SEMI_BOLD), gui_app.font(FontWeight.MEDIUM)
-  box = rl.Rectangle(content.x + 60, content.y + 45, UI_CONFIG.set_speed_width_imperial, UI_CONFIG.set_speed_height)
-  rl.draw_rectangle_rounded(box, 0.35, 10, COLORS.BLACK_TRANSLUCENT)
-  rl.draw_rectangle_rounded_lines_ex(box, 0.35, 10, 6, COLORS.BORDER_TRANSLUCENT)
-  for text, font, size, y, color in ((tr("MAX"), semi_bold, FONT_SIZES.max_speed, box.y + 27, COLORS.ENGAGED),
-                                     ("70", bold, FONT_SIZES.set_speed, box.y + 77, COLORS.WHITE)):
+  box = rl.Rectangle(content.x + 60, content.y + 45, 172, 204)
+  rl.draw_rectangle_rounded(box, 0.35, 10, SPEED_BOX_BACKGROUND)
+  rl.draw_rectangle_rounded_lines_ex(box, 0.35, 10, 6, SPEED_BOX_BORDER)
+  for text, font, size, y, color in ((tr("MAX"), semi_bold, 40, box.y + 27, Colors.ENGAGED),
+                                     ("70", bold, 90, box.y + 77, Colors.WHITE)):
     tw = measure_text_cached(font, text, size).x
     rl.draw_text_ex(font, text, rl.Vector2(box.x + (box.width - tw) / 2, y), size, 0, color)
-  for text, font, size, y, color in (("70", bold, FONT_SIZES.current_speed, 180, COLORS.WHITE),
-                                     (tr("mph"), medium, FONT_SIZES.speed_unit, 290, COLORS.WHITE_TRANSLUCENT)):
+  for text, font, size, y, color in (("70", bold, 176, 180, Colors.WHITE),
+                                     (tr("mph"), medium, 66, 290, SPEED_UNIT_COLOR)):
     ts = measure_text_cached(font, text, size)
     rl.draw_text_ex(font, text, rl.Vector2(content.x + (content.width - ts.x) / 2, y - ts.y / 2), size, 0, color)
 

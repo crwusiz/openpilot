@@ -37,7 +37,7 @@ def home_module(monkeypatch):
     'openpilot.system.ui.widgets.label': {'UnifiedLabel': object, 'gui_label': Mock()},
     'openpilot.system.ui.lib.application': {
       'gui_app': Mock(), 'FontWeight': Mock(), 'MousePos': namedtuple('MousePos', 'x y'),
-      'TextAlignment': Mock(), 'TextAlignmentVertical': Mock(),
+      'TextAlignment': Mock(), 'TextAlignmentVertical': Mock(), 'DEFAULT_TEXT_COLOR': SimpleNamespace(a=229),
     },
     'openpilot.selfdrive.ui.ui_state': {'ui_state': Mock(), 'ChestnutState': Mock()},
     'openpilot.common.version': {'RELEASE_BRANCHES': []},
