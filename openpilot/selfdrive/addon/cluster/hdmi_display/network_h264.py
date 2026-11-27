@@ -16,7 +16,9 @@ from openpilot.common.cluster_connection import publish_cluster_connection
 from openpilot.selfdrive.addon.cluster.cluster_health_guard import ClusterHealthGuard
 from openpilot.selfdrive.addon.cluster.cluster_logging import flog, record_shutdown_stage
 from openpilot.selfdrive.addon.cluster.cluster_runtime_metrics import ClusterRuntimeMetrics
-from openpilot.selfdrive.addon.cluster.hdmi_display.network_bitrate import ClusterBitrateController, SAMPLE_INTERVAL
+from openpilot.selfdrive.addon.cluster.hdmi_display.network_bitrate import (
+  ClusterBitrateController, SAMPLE_INTERVAL, VIDEO_TCP_PRESSURE_SECONDS,
+)
 from openpilot.selfdrive.addon.cluster.hdmi_display.network_status import write_network_status
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.hdmi_profiles import normalize_hdmi_profile
 from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol import (
@@ -24,7 +26,7 @@ from openpilot.selfdrive.addon.cluster.hdmi_display.orange_pi.h264_protocol impo
   decode_payload, pack_control, pack_scene, unpack_control_header, validate_scene,
 )
 
-STATE_DRAIN_WARN_S = 0.25
+STATE_DRAIN_WARN_S = VIDEO_TCP_PRESSURE_SECONDS
 STATE_DRAIN_TIMEOUT_S = 5.0
 STATE_SEND_BUFFER_BYTES = 16 * 1024
 STATE_INVALID_LOG_INTERVAL_S = 5.0
@@ -49,13 +51,15 @@ def configure_state_transport(writer):
       flog(f"[CLUSTER_H264_STATE_WARN] Cannot bound TCP send buffer: {error}")
 
 
-async def drain_state(writer):
+async def drain_state(writer, *, on_backpressure=None):
   """Wait on one write without queuing obsolete states or resetting video."""
   started = time.monotonic()
   pending = asyncio.create_task(writer.drain())
   try:
     done, _ = await asyncio.wait({pending}, timeout=STATE_DRAIN_WARN_S)
     if not done:
+      if on_backpressure is not None:
+        on_backpressure(time.monotonic())
       flog(f"[CLUSTER_H264_STATE_BACKPRESSURE] action=keep_video | queued_bytes={writer.transport.get_write_buffer_size()}")
       try:
         await asyncio.wait_for(pending, max(0.001, STATE_DRAIN_TIMEOUT_S - (time.monotonic() - started)))
@@ -407,6 +411,7 @@ class H264NetworkServer:
     self.bitrate = ClusterBitrateController(getattr(config, "params", None))
     self.state_drain_started = None
     self.receiver_stall_at = None
+    self._bitrate_sample_requested = asyncio.Event()
 
   async def start(self):
     publish_cluster_connection("network", False)
@@ -434,21 +439,49 @@ class H264NetworkServer:
       publish_status(None)
     record_shutdown_stage("network_close_end")
 
+  def _receiver_stalled(self, now):
+    return self.receiver_stall_at is not None and 0 <= now - self.receiver_stall_at <= RECEIVER_STALL_FEEDBACK_TTL_S
+
+  def _request_bitrate_sample(self, now):
+    # Notify once either the TCP drain threshold or stale Pi feedback arrives
+    # second. Their overlap can end before the next regular bitrate sample.
+    if (self.state_drain_started is not None and now - self.state_drain_started >= VIDEO_TCP_PRESSURE_SECONDS
+        and self._receiver_stalled(now)):
+      self._bitrate_sample_requested.set()
+
   async def _network_budget(self, writer, stream):
     self.bitrate.reset_connection()
     try:
+      loop = asyncio.get_running_loop()
+      next_poll = loop.time() + SAMPLE_INTERVAL
       while True:
-        await asyncio.sleep(SAMPLE_INTERVAL)
         if self.bitrate.disabled:
           await asyncio.Future()  # Stay supervised until normal cancellation.
-        get_reports = getattr(stream, "get_receiver_report_stats", None)
-        reports = get_reports() if callable(get_reports) else {}
+        try:
+          async with asyncio.timeout_at(next_poll):
+            await self._bitrate_sample_requested.wait()
+        except TimeoutError:
+          regular_sample = True
+        else:
+          regular_sample = loop.time() >= next_poll
+        self._bitrate_sample_requested.clear()
+        report = None
+        if regular_sample:
+          next_poll = loop.time() + SAMPLE_INTERVAL
+          get_reports = getattr(stream, "get_receiver_report_stats", None)
+          if callable(get_reports):
+            report = get_reports().get("road")
+
         now = time.monotonic()
         drain_age = None if self.state_drain_started is None else max(0.0, now - self.state_drain_started)
+        receiver_stalled = self._receiver_stalled(now)
+        queued_bytes = writer.transport.get_write_buffer_size()
+        if not regular_sample and not (receiver_stalled and queued_bytes > 0 and drain_age is not None
+                                       and drain_age >= VIDEO_TCP_PRESSURE_SECONDS):
+          continue
         get_send_pressure = getattr(stream, "get_send_pressure_age", None)
         send_pressure_age = get_send_pressure(now) if callable(get_send_pressure) else None
-        receiver_stalled = self.receiver_stall_at is not None and 0 <= now - self.receiver_stall_at <= RECEIVER_STALL_FEEDBACK_TTL_S
-        self.bitrate.sample(now, reports.get("road"), writer.transport.get_write_buffer_size(),
+        self.bitrate.sample(now, report, queued_bytes,
                             drain_age_s=drain_age, send_pressure_age_s=send_pressure_age, receiver_stalled=receiver_stalled,
                             degraded=self.degraded)
     except Exception as error:
@@ -487,6 +520,7 @@ class H264NetworkServer:
         if (not self.screen_off and payload.get("recovery_reason") == "video_stale"
             and type(video_age_ms) in (int, float) and RECEIVER_STALL_MIN_MS <= video_age_ms <= RECEIVER_STALL_MAX_MS):
           self.receiver_stall_at = now
+          self._request_bitrate_sample(now)
         if last_keyframe_request is None or now - last_keyframe_request >= 0.5:
           resync = getattr(track, "request_recovery", None)
           if callable(resync):
@@ -549,7 +583,7 @@ class H264NetworkServer:
       writer.write(packet)
       self.state_drain_started = time.monotonic()
       try:
-        await drain_state(writer)
+        await drain_state(writer, on_backpressure=self._request_bitrate_sample)
       finally:
         self.state_drain_started = None
       sequence = (sequence + 1) & 0xFFFFFFFF
@@ -694,6 +728,7 @@ class H264NetworkServer:
             self.peer_ip = None
             self.screen_off = False
             self.receiver_stall_at = None
+            self._bitrate_sample_requested.clear()
             publish_status(None)
           self.clients.discard(task)
 

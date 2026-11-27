@@ -55,7 +55,8 @@ NAVI_INT_FIELDS = frozenset({
 NAVI_BOOL_FIELDS = frozenset({"is_highway", "section_adjust_speed"})
 NAVI_ACTIVE_MIN = 0
 NAVI_ACTIVE_MAX = 32767
-NAVI_ROAD_LOG_DUPLICATE_S = 0.02
+NAVI_ROAD_LOG_DUPLICATE_S = 1.0
+NAVI_EVENT_LOG_INTERVAL_S = 1.0
 
 class NaviServer:
   def __init__(self, start_broadcast=True):
@@ -464,10 +465,10 @@ class SpeedLimiter:
       log.debug(msg)
       self._last_reset_log_msg = msg
 
-  def _log_throttled(self, key, msg, min_interval=0.25):
+  def _log_throttled(self, key, msg, *, force=False):
     now = time.monotonic()
-    last = self._last_log_time.get(key, 0)
-    if now - last >= min_interval:
+    last = self._last_log_time.get(key)
+    if force or last is None or now - last >= NAVI_EVENT_LOG_INTERVAL_S:
       log.debug(msg)
       self._last_log_time[key] = now
 
@@ -606,7 +607,8 @@ class SpeedLimiter:
           self._log_throttled(
             "target_speed",
             f"cam_type={cam_type} target_speed={target_speed:.1f}, is_limit_zone={is_limit_zone}, " +
-            f"dist={cam_limit_speed_left_dist}, starting_dist={starting_dist:.1f}"
+            f"dist={cam_limit_speed_left_dist}, starting_dist={starting_dist:.1f}",
+            force=is_limit_zone,
           )
 
           return target_speed, is_limit_zone

@@ -245,6 +245,8 @@ def test_udp_logs_distinct_and_periodic_road_limit_snapshots(monkeypatch):
     for now, snapshot, remote, log_count in (
       (100.000, road, addr, 1),
       (100.005, road, addr, 1),
+      (100.250, road, addr, 1),
+      (100.999, road, addr, 1),
       (101.000, road, addr, 2),
       (101.005, closer_road, addr, 3),
       (101.010, closer_road, (addr[0], addr[1] + 1), 4),
@@ -255,6 +257,29 @@ def test_udp_logs_distinct_and_periodic_road_limit_snapshots(monkeypatch):
       assert server.json_road_limit == snapshot
       assert debug.call_count == log_count
     debug.assert_called_with("[3843 RECV] %s", closer_road)
+
+
+def test_target_speed_logs_new_deceleration_immediately(limiter, monkeypatch, caplog):
+  limiter.naviData = make_navi_data(75, distance=399)
+  monotonic = MagicMock()
+  monkeypatch.setattr(navi_controller.time, "monotonic", monotonic)
+  caplog.set_level("DEBUG", logger="navi")
+
+  for now, distance, new_zone, log_count in (
+    (100.000, 399, True, 1),
+    (100.250, 394, False, 1),
+    (101.000, 380, False, 2),
+    (101.125, 0, False, 2),
+    (101.250, 399, True, 3),
+  ):
+    monotonic.return_value = now
+    limiter.naviData.camLimitSpeedLeftDist = distance
+    _, is_limit_zone = limiter.get_max_speed(80)
+    assert is_limit_zone is new_zone
+    target_logs = [record.message for record in caplog.records if " target_speed=" in record.message]
+    assert len(target_logs) == log_count
+
+  assert "is_limit_zone=True" in target_logs[-1]
 
 
 @pytest.mark.parametrize("cam_type", REAR_CAMERA_TYPES)

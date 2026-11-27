@@ -125,6 +125,7 @@ async def test_shutdown_checkpoints_identify_native_stop_without_reordering_clea
     assert (await network.read_control(reader))[0] == wire.ANSWER
     assert (await network.read_control(reader))[0] == wire.STATE
     server.receiver_stall_at = time.monotonic()
+    server._bitrate_sample_requested.set()
     await server.close()
   finally:
     writer.close()
@@ -134,6 +135,7 @@ async def test_shutdown_checkpoints_identify_native_stop_without_reordering_clea
     expected.append("native_stream_stop_end")
   assert events == expected + ["producer_stop", "network_close_end"]
   assert not server.clients and server.active is None and server.receiver_stall_at is None
+  assert not server._bitrate_sample_requested.is_set()
 
 
 @asyncio_test
@@ -442,7 +444,7 @@ async def test_invalid_scene_diagnostics_are_rate_limited_and_transport_failures
     if len(packets) == 7:
       raise ValueError("injected transport write failure")
 
-  async def drain(_writer):
+  async def drain(_writer, *, on_backpressure=None):
     clock[0] += 1.0
 
   monkeypatch.setattr(network, "drain_state", drain)
@@ -541,7 +543,7 @@ async def test_existing_perf_window_logs_source_and_bounded_nack_diagnostics_wit
     if len(writes) == 3:
       raise ConnectionError("end test stream")
 
-  async def drain(_writer):
+  async def drain(_writer, *, on_backpressure=None):
     clock[0] += 10.0
 
   monkeypatch.setattr(network, "drain_state", drain)
@@ -886,6 +888,57 @@ async def test_network_budget_runs_while_state_drain_is_pending_and_survives_rec
   # Closing the server (not each failed ICE session) restores the encoder.
   await server.close()
   assert writes == [3_750_000, 5_000_000]
+
+
+@pytest.mark.parametrize("feedback_first", [False, True])
+@asyncio_test
+async def test_short_receiver_tcp_overlap_adapts_before_the_regular_poll(monkeypatch, feedback_first):
+  monkeypatch.setattr(network, "SAMPLE_INTERVAL", 60)
+  tcp_blocked, release_drain, adapted = asyncio.Event(), asyncio.Event(), asyncio.Event()
+  values, logs = {}, []
+
+  def log(line):
+    logs.append(line)
+    if "STATE_BACKPRESSURE" in line:
+      tcp_blocked.set()
+
+  def put(key, value, *, block):
+    assert not block
+    values[key] = value
+    adapted.set()
+
+  monkeypatch.setattr(network, "flog", log)
+  settings = config()
+  settings.params = SimpleNamespace(get=values.get, put=put)
+  server = network.H264NetworkServer(settings, models())
+  stream, track = factory()
+  stream.get_receiver_report_stats = Mock(return_value={})
+  writer = SimpleNamespace(write=Mock(), drain=release_drain.wait,
+                           transport=SimpleNamespace(get_write_buffer_size=lambda: 1600))
+
+  async def feedback():
+    report = {"keyframe_request": True, "recovery_reason": "video_stale", "video_age_ms": 700}
+    monkeypatch.setattr(network, "read_control", AsyncMock(side_effect=[(wire.FEEDBACK, 0, report), EOFError()]))
+    with pytest.raises(EOFError):
+      await server._feedback(None, track)
+
+  if feedback_first:
+    await feedback()
+  monitor = asyncio.create_task(server._network_budget(writer, stream))
+  states = asyncio.create_task(server._states(writer, track, stream))
+  try:
+    await asyncio.wait_for(tcp_blocked.wait(), 1)
+    if not feedback_first:
+      assert not adapted.is_set()
+      await feedback()
+    await asyncio.wait_for(adapted.wait(), 1)
+    assert server.bitrate.current == 3_750_000
+    assert server.bitrate.recovery_blocked == "receiver_tcp_backpressure"
+    stream.get_receiver_report_stats.assert_not_called()
+  finally:
+    states.cancel()
+    monitor.cancel()
+    await asyncio.gather(states, monitor, return_exceptions=True)
 
 
 @asyncio_test
