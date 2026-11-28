@@ -58,12 +58,12 @@ def test_device_orientation_shows_measured_pose_and_when_to_correct_it():
   up_right = dashboard._device_position_html((-1.5, -3.2))
   assert camera_rotation(up_right) == pytest.approx((6.0, 12.8))
   assert '1.5° 위' in up_right and '3.2° 오른쪽' in up_right
-  assert '렌즈를 아래로 기울이기' in up_right and '렌즈를 왼쪽으로 돌리기' in up_right
+  assert '기기를 아래로 기울이기' in up_right and '기기를 왼쪽으로 돌리기' in up_right
 
   down_left = dashboard._device_position_html((1.5, 3.2))
   assert camera_rotation(down_left) == pytest.approx((-6.0, -12.8))
   assert '1.5° 아래' in down_left and '3.2° 왼쪽' in down_left
-  assert '렌즈를 위로 기울이기' in down_left and '렌즈를 오른쪽으로 돌리기' in down_left
+  assert '기기를 위로 기울이기' in down_left and '기기를 오른쪽으로 돌리기' in down_left
 
   centered = dashboard._device_position_html((0.0, 0.0))
   assert camera_rotation(centered) == pytest.approx((0.0, 0.0))
@@ -90,12 +90,12 @@ async def invoke(callback, *args):
 
 class TestDashboardDevice(unittest.IsolatedAsyncioTestCase):
   @contextmanager
-  def device_page(self):
+  def device_page(self, *, with_calibration=True):
     client = Client(ui.page(f'/test-dashboard-device-{self._testMethodName}'))
     self.addCleanup(client.delete)
     tabs = SimpleNamespace(value='FUNCTIONS', on_value_change=Mock())
     payload = calibration_bytes([0.0, math.radians(-1.5), math.radians(-3.2)])
-    values = {'CalibrationParams': payload}
+    values = {'CalibrationParams': payload} if with_calibration else {}
     params = Mock(get=Mock(side_effect=values.get), remove=Mock(side_effect=lambda key: values.pop(key, None)))
     callbacks = {}
     timers = {}
@@ -117,7 +117,7 @@ class TestDashboardDevice(unittest.IsolatedAsyncioTestCase):
          patch.object(ui.button, 'on_click', capture):
       dashboard.render_tab_device(tabs)
       yield SimpleNamespace(
-        client=client, tabs=tabs, params=params, callbacks=callbacks, timers=timers, notify=notify,
+        client=client, tabs=tabs, params=params, values=values, callbacks=callbacks, timers=timers, notify=notify,
         position=next(element for element in client.elements.values()
                       if isinstance(element, ui.html) and element.props.get('id') == 'device-position'),
       )
@@ -154,51 +154,89 @@ class TestDashboardDevice(unittest.IsolatedAsyncioTestCase):
       await invoke(saved_timer.tick)
       page.params.get.assert_not_called()
 
-  async def test_live_adjustment_keeps_saved_position_and_stops_on_vehicle_movement(self):
-    first_batch = ([(101, (0.0, 0.0, -9.81))], [(102, (0.0, 0.0, 0.0))])
-    second_batch = ([(201, (0.0, 0.0, -9.81))], [(202, (0.0, 0.0, 0.0))])
-    stream = Mock(read=Mock(side_effect=[first_batch, second_batch, RuntimeError('차량이 움직였습니다')]))
-    adjustment = Mock(update=Mock(side_effect=[None, (2.0, -3.0)]))
+  async def test_live_adjustment_uses_saved_snapshot_until_vehicle_movement_or_stop(self):
+    batches = [([(timestamp + 1, (0.0, 0.0, -9.81))], [(timestamp + 2, (0.0, 0.0, 0.0))])
+               for timestamp in (100, 200, 300, 400)]
+    stream = Mock(read=Mock(side_effect=[*batches, RuntimeError('차량이 움직였습니다')]))
+    adjustment = Mock(update=Mock(side_effect=[None, (0.0, 0.0), (1.8, 4.9), (3.6, 5.7)]))
 
     with patch.object(dashboard, 'get_mount_sensor_stream', return_value=stream), \
          patch.object(dashboard, 'MountAdjustment', return_value=adjustment), self.device_page() as page:
       live_timer = page.timers[0.1]
+      saved_timer = page.timers[1.0]
       self.assertFalse(live_timer.initially_active)
       await self.select_tab(page, 'DEVICE')
-      saved_rotation = camera_rotation(page.position.content)
-      self.assertEqual(saved_rotation, (6.0, 12.8))
+      self.assertEqual(camera_rotation(page.position.content), (6.0, 12.8))
       await invoke(live_timer.tick)
       stream.read.assert_not_called()
 
+      # Pick up a change made since the previous saved orientation refresh.
+      page.values['CalibrationParams'] = calibration_bytes([0.0, math.radians(-1.8), math.radians(-4.9)])
       await invoke(page.callbacks['기준 잡기'])
       live_timer.handle.activate.assert_called_once()
       await invoke(live_timer.tick)
+      self.assertEqual(camera_rotation(page.position.content), (7.2, 19.6))
+      self.assertNotIn('현재 장착 추정', page.position.content)
       await invoke(live_timer.tick)
       self.assertEqual(stream.read.call_args, call(101, 102))
-      self.assertEqual(adjustment.update.call_args_list, [call(*first_batch), call(*second_batch)])
-      self.assertIn('기준 자세 대비', page.position.content)
-      self.assertEqual(camera_rotation(page.position.content), (-8.0, 12.0))
+      self.assertIn('목표 자세 (0° / 0°)', page.position.content)
+      self.assertIn('현재 장착 추정', page.position.content)
+      self.assertEqual(camera_rotation(page.position.content), (7.2, 19.6))
+      self.assertIn('기기를 아래로 1.8° 기울이세요.', page.position.content)
+      self.assertIn('기기를 왼쪽으로 4.9° 돌리세요.', page.position.content)
       saved_title = next(element for element in page.client.elements.values()
                          if isinstance(element, ui.label) and element.text == '저장된 보정값')
       saved_row = saved_title.parent_slot.parent
       self.assertTrue(saved_row.visible)
-      self.assertIn('Pitch 1.5° 위 · Yaw 3.2° 오른쪽', [label.text for label in saved_row if isinstance(label, ui.label)])
+      saved_angles = next(label for label in saved_row if isinstance(label, ui.label) and label.text.startswith('Pitch'))
+      self.assertEqual(saved_angles.text, 'Pitch 1.8° 위 · Yaw 4.9° 오른쪽')
+
+      # The estimate and saved row keep the snapshot when the stored value changes again.
+      page.values['CalibrationParams'] = calibration_bytes([0.0, math.radians(1.0), math.radians(-1.0)])
+      await invoke(saved_timer.tick)
+      self.assertEqual(saved_angles.text, 'Pitch 1.8° 위 · Yaw 4.9° 오른쪽')
+      await invoke(live_timer.tick)
+      self.assertEqual(camera_rotation(page.position.content), (0.0, 0.0))
+      self.assertNotIn('data-turn=', page.position.content)
+      self.assertIn('목표 자세에 근접했습니다.', page.position.content)
 
       await invoke(live_timer.tick)
-      self.assertEqual(stream.read.call_args, call(201, 202))
-      live_timer.handle.deactivate.assert_called_once()
-      self.assertEqual(camera_rotation(page.position.content), saved_rotation)
-      self.assertNotIn('기준 자세 대비', page.position.content)
-      self.assertFalse(saved_row.visible)
+      self.assertEqual(camera_rotation(page.position.content), (-7.2, -3.2))
+      self.assertIn('기기를 위로 1.8° 기울이세요.', page.position.content)
+      self.assertIn('기기를 오른쪽으로 0.8° 돌리세요.', page.position.content)
+      self.assertEqual(adjustment.update.call_args_list, [call(*batch) for batch in batches])
+
       await invoke(live_timer.tick)
-      self.assertEqual(stream.read.call_count, 3)
+      self.assertEqual(stream.read.call_args, call(401, 402))
+      live_timer.handle.deactivate.assert_called_once()
+      self.assertNotIn('현재 장착 추정', page.position.content)
+      self.assertFalse(saved_row.visible)
+      await invoke(saved_timer.tick)
+      self.assertEqual(camera_rotation(page.position.content), (-4.0, 4.0))
+      await invoke(live_timer.tick)
+      self.assertEqual(stream.read.call_count, 5)
 
       await invoke(page.callbacks['기준 잡기'])
       self.assertTrue(live_timer.handle.active)
       await invoke(page.callbacks['조정 종료'])
       self.assertFalse(live_timer.handle.active)
       await invoke(live_timer.tick)
-      self.assertEqual(stream.read.call_count, 3)
+      self.assertEqual(stream.read.call_count, 5)
       page.params.remove.assert_not_called()
       page.params.put.assert_not_called()
       page.params.put_bool.assert_not_called()
+
+  async def test_live_adjustment_without_saved_calibration_shows_only_relative_change(self):
+    stream = Mock(read=Mock(return_value=([(101, (0.0, 0.0, -9.81))], [(102, (0.0, 0.0, 0.0))])))
+    adjustment = Mock(update=Mock(return_value=(2.0, -3.0)))
+
+    with patch.object(dashboard, 'get_mount_sensor_stream', return_value=stream), \
+         patch.object(dashboard, 'MountAdjustment', return_value=adjustment), self.device_page(with_calibration=False) as page:
+      await self.select_tab(page, 'DEVICE')
+      await invoke(page.callbacks['기준 잡기'])
+      await invoke(page.timers[0.1].tick)
+
+      self.assertEqual(camera_rotation(page.position.content), (-8.0, 12.0))
+      self.assertIn('시작 자세 대비 변화량', page.position.content)
+      self.assertNotIn('목표 자세 (0° / 0°)', page.position.content)
+      self.assertNotIn('data-turn=', page.position.content)
