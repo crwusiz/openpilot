@@ -130,7 +130,7 @@ bash scripts/pi_update.sh
 | C4 `[CLUSTER_H264_PERF]` | `video_fps`, `state_fps`, 인코딩된 프레임의 수신 수·수신/촬영 간격과 마지막 수신 후 경과 시간, 시퀀스 공백·만료·IDR 대기, 처리량, RTCP 손실·지터 |
 | C4 `[CLUSTER_H264_SENDER]`, `[CLUSTER_H264_SEND_PERF]` | `api=track_send`, `framing=validated_annexb4`, 촬영 EOF 기준 RTP 시각, 실제 제출 FPS·잘못된 프레임·IDR 대기·`send_not_ready` 수 |
 | C4 `[CLUSTER_H264_SEND_BACKPRESSURE]`, `[CLUSTER_H264_SEND_RECOVERED]`, `[CLUSTER_H264_ERROR]`; Pi `[CLUSTER_H264_STOP]` | 일시적 송신 실패·회복, 종료한 제어/영상 단계, 수신 종료 이유와 마지막 영상·상태 age |
-| C4 `[CLUSTER_H264_BITRATE]` | 비트레이트 조정 이유. TCP 상태 전송이 250ms 이상 밀렸을 때 C4 영상 송신 실패가 250ms 이상 지속되면 `video_tcp_backpressure`, Pi 영상 정체 보고가 최근에 들어왔으면 `receiver_tcp_backpressure`로 하향을 판단합니다. Pi 정체 보고와 TCP 쓰기 대기가 겹치면 500ms 정기 점검을 기다리지 않고 평가합니다. |
+| C4 `[CLUSTER_H264_BITRATE]` | 비트레이트 조정 이유. TCP 상태 전송이 250ms 이상 밀렸을 때 C4 영상 송신 실패가 250ms 이상 지속되면 `video_tcp_backpressure`, Pi 영상 정체 보고가 최근에 들어왔으면 `receiver_tcp_backpressure`로 하향을 판단합니다. Pi 정체 보고와 TCP 쓰기 대기가 겹치면 500ms 정기 점검을 기다리지 않고 평가합니다. Pi가 영상 정체를 보고하면 비트레이트 상향에 필요한 연속 정상 구간을 다시 집계합니다. |
 | Pi `[CLUSTER_H264_RX_PERF]`, C4 `[CLUSTER_H264_PI_PERF]` | `display_fps`, RGB 변환·합성·출력 시간, 큐 대기·최대 표시 간격, 영상·상태 stale. `rgb_catchup_dequeued`는 GPU가 바로 그릴 수 있어 추가로 꺼낸 디코딩 후 30ms 이내 RGB 프레임 수입니다. 카메라 표시 간격 집계는 주차 화면과 화면 끄기 구간에서 끊습니다. |
 | Pi `[CLUSTER_H264_RECOVERY_REQUEST]` | 복구 요청 이유, 마지막 디코딩과 RGB 준비 후 경과 시간. 디코딩이 350ms 이상 중단되면 IDR을 요청하며, 상태 수신도 2초 이상 중단되면 요청을 보류합니다. |
 | C4 `[CLUSTER_RESOURCE_PERF]`, `[CLUSTER_LOAD_GUARD]`, `[CLUSTER_INPUT_DIAG]` | CPU·RSS, 모델·위치 입력 age, 통신 경고, 부하 보호와 복구 |
@@ -1626,6 +1626,8 @@ sudo bash /opt/cluster-receiver/scripts/service.sh status
 --windowed              창 모드
 --show-cursor           포인터 표시; 터치 좌표 표시 기능은 아님
 ```
+
+자동 재연결은 마지막 C4 주소를 먼저 시도합니다. 이 시도가 실패해 병렬 검색으로 넘어가면, 현재 서브넷에 있는 마지막 주소에만 최소 1초의 연결 시간을 주고 다른 주소는 `--scan-timeout`으로 검색합니다. 다른 주소에 먼저 연결되면 마지막 주소의 시도를 중단합니다.
 
 PC 창 모드 점검에서는 `requirements.txt`를 PC 가상 환경에 설치하고 Python 수신기를 직접 실행합니다. PC pip 설치와 Orange Pi OS pygame 설치는 별개입니다.
 

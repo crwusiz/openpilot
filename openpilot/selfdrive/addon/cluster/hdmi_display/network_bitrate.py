@@ -107,7 +107,8 @@ class ClusterBitrateController:
          + f"ceiling_bps={self.ceiling} | reason={reason} | recovery_wait_s={self.recovery_wait_s:.1f}"
          + f" | probe_failures={self.probe_failures}")
 
-  def sample(self, now, report, queued_bytes, *, drain_age_s=None, send_pressure_age_s=None, receiver_stalled=False, degraded=False):
+  def sample(self, now, report, queued_bytes, *, drain_age_s=None, send_pressure_age_s=None,
+             receiver_stalled=False, receiver_stall_observed=False, degraded=False):
     if self.disabled:
       return
     try:
@@ -164,8 +165,11 @@ class ClusterBitrateController:
             self._publish(target, now, reason)
         return
 
+      # An observed stall interrupts a healthy streak even if it recovered
+      # before this sample. Reductions still require current corroboration.
       blocked = ("driving_guard" if degraded else "tcp_drain" if self.drain_age_s >= RECOVERY_DRAIN_LIMIT
                  else "video_send_pressure" if video_pressure
+                 else "receiver_video_stale" if receiver_stalled or receiver_stall_observed
                  else "no_report" if self.report_at is None or now - self.report_at > REPORT_MAX_AGE
                  else "rtcp_loss" if fresh and loss > 0.01 else None)
       if blocked is not None:

@@ -125,6 +125,7 @@ async def test_shutdown_checkpoints_identify_native_stop_without_reordering_clea
     assert (await network.read_control(reader))[0] == wire.ANSWER
     assert (await network.read_control(reader))[0] == wire.STATE
     server.receiver_stall_at = time.monotonic()
+    server.receiver_stall_pending = True
     server._bitrate_sample_requested.set()
     await server.close()
   finally:
@@ -135,6 +136,7 @@ async def test_shutdown_checkpoints_identify_native_stop_without_reordering_clea
     expected.append("native_stream_stop_end")
   assert events == expected + ["producer_stop", "network_close_end"]
   assert not server.clients and server.active is None and server.receiver_stall_at is None
+  assert not server.receiver_stall_pending
   assert not server._bitrate_sample_requested.is_set()
 
 
@@ -521,6 +523,41 @@ async def test_only_recent_video_stale_recovery_feedback_is_kept_as_receiver_pre
   with pytest.raises(EOFError):
     await server._feedback(None, SimpleNamespace())
   assert server.receiver_stall_at == (10.0 if accepted else None)
+
+
+@asyncio_test
+async def test_recovered_feedback_cannot_hide_stall_from_next_bitrate_sample(monkeypatch):
+  monkeypatch.setattr(network, "SAMPLE_INTERVAL", 0.005)
+  bad_report = {"keyframe_request": True, "recovery_reason": "video_stale", "video_age_ms": 360}
+  recovered_report = {"decoded_fps": 20, "video_age_ms": 50}
+  monkeypatch.setattr(network, "read_control", AsyncMock(side_effect=[
+    (wire.FEEDBACK, 0, bad_report), (wire.FEEDBACK, 1, recovered_report), EOFError(),
+  ]))
+  settings = config()
+  settings.params = SimpleNamespace(get=lambda _key: None)
+  server = network.H264NetworkServer(settings, models())
+  with pytest.raises(EOFError):
+    await server._feedback(None, SimpleNamespace())
+  assert server.receiver_stall_at is None and server.receiver_stall_pending
+
+  sampled = asyncio.Event()
+  samples = []
+
+  def sample(_now, _report, _queued_bytes, **status):
+    samples.append((status["receiver_stalled"], status["receiver_stall_observed"]))
+    if len(samples) == 2:
+      sampled.set()
+
+  monkeypatch.setattr(server.bitrate, "sample", sample)
+  writer = SimpleNamespace(transport=SimpleNamespace(get_write_buffer_size=lambda: 0))
+  monitor = asyncio.create_task(server._network_budget(writer, Stream()))
+  try:
+    await asyncio.wait_for(sampled.wait(), 1)
+    assert samples[:2] == [(False, True), (False, False)]
+  finally:
+    monitor.cancel()
+    with pytest.raises(asyncio.CancelledError):
+      await monitor
 
 
 @asyncio_test

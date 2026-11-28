@@ -411,6 +411,7 @@ class H264NetworkServer:
     self.bitrate = ClusterBitrateController(getattr(config, "params", None))
     self.state_drain_started = None
     self.receiver_stall_at = None
+    self.receiver_stall_pending = False
     self._bitrate_sample_requested = asyncio.Event()
 
   async def start(self):
@@ -483,7 +484,8 @@ class H264NetworkServer:
         send_pressure_age = get_send_pressure(now) if callable(get_send_pressure) else None
         self.bitrate.sample(now, report, queued_bytes,
                             drain_age_s=drain_age, send_pressure_age_s=send_pressure_age, receiver_stalled=receiver_stalled,
-                            degraded=self.degraded)
+                            receiver_stall_observed=self.receiver_stall_pending, degraded=self.degraded)
+        self.receiver_stall_pending = False
     except Exception as error:
       # An auxiliary tuning failure cannot end FIRST_COMPLETED and tear down
       # healthy media. The connection's normal control/video watchdogs remain.
@@ -516,10 +518,12 @@ class H264NetworkServer:
       if payload.get("keyframe_request") is True:
         now = time.monotonic()
         # Native sends can still succeed while the Pi is missing video.
-        # Only use its recent recovery request together with a queued state drain.
+        # A fast good report clears active pressure, but recovery must still
+        # account for the stall even if both reports arrived between samples.
         if (not self.screen_off and payload.get("recovery_reason") == "video_stale"
             and type(video_age_ms) in (int, float) and RECEIVER_STALL_MIN_MS <= video_age_ms <= RECEIVER_STALL_MAX_MS):
           self.receiver_stall_at = now
+          self.receiver_stall_pending = True
           self._request_bitrate_sample(now)
         if last_keyframe_request is None or now - last_keyframe_request >= 0.5:
           resync = getattr(track, "request_recovery", None)
@@ -728,6 +732,7 @@ class H264NetworkServer:
             self.peer_ip = None
             self.screen_off = False
             self.receiver_stall_at = None
+            self.receiver_stall_pending = False
             self._bitrate_sample_requested.clear()
             publish_status(None)
           self.clients.discard(task)

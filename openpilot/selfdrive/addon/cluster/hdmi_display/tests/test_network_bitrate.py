@@ -82,7 +82,7 @@ def test_receiver_stall_needs_a_pending_state_drain_before_reducing_bitrate():
   controller.sample(0, cached, 0, receiver_stalled=True)
   controller.sample(0.5, cached, 2400, drain_age_s=0.20, receiver_stalled=True)
   controller.sample(1.0, cached, 0, drain_age_s=0.5, receiver_stalled=True)
-  controller.sample(1.5, cached, 2400, drain_age_s=0.4)
+  controller.sample(1.5, cached, 2400, drain_age_s=0.4, receiver_stall_observed=True)
   assert params.writes == []
 
   controller.sample(2.0, cached, 2400, drain_age_s=0.4, receiver_stalled=True)
@@ -261,6 +261,23 @@ def test_recovery_requires_continuous_fresh_healthy_reports(interrupt):
     controller.sample(second, report(second), 0)
   assert params.writes == [3_750_000]
   controller.sample(47, report(47), 0)
+  assert params.writes == [3_750_000, 4_250_000]
+
+
+@pytest.mark.parametrize("still_stalled", [False, True])
+def test_receiver_video_stall_restarts_quality_recovery_without_reducing_rate(still_stalled):
+  params = Params()
+  controller = budget.ClusterBitrateController(params)
+  controller.sample(0, report(0, 40), 0)
+  for second in range(1, 21):
+    controller.sample(second, report(second), 0)
+  controller.sample(21, report(21), 0, receiver_stalled=still_stalled, receiver_stall_observed=not still_stalled)
+  assert controller.recovery_blocked == "receiver_video_stale"
+  assert controller.healthy_since is None and params.writes == [3_750_000]
+  for second in range(22, 42):
+    controller.sample(second, report(second), 0)
+  assert params.writes == [3_750_000]
+  controller.sample(42, report(42), 0)
   assert params.writes == [3_750_000, 4_250_000]
 
 

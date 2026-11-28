@@ -356,6 +356,66 @@ def test_discovery_quit_closes_probe_sockets(monkeypatch):
   assert all(sock.fileno() == -1 for sock in sockets)
 
 
+@pytest.mark.parametrize("preferred_address, workers", [("192.168.1.6", 2), ("192.168.1.1", 2), ("192.168.2.6", 2), ("192.168.1.6", 1)])
+def test_discovery_gives_only_a_same_subnet_cached_peer_a_longer_probe(monkeypatch, preferred_address, workers):
+  cached_address = "192.168.1.6"
+  attempts = []
+  ordinary_probes_done = threading.Event()
+  sock = SimpleNamespace(getpeername=lambda: (cached_address, 9200), close=lambda: pytest.fail("winner must stay open"))
+  monkeypatch.setattr(cluster_receiver, "get_interface_network", lambda _interface: (
+    ipaddress.ip_address("192.168.1.1"), ipaddress.ip_network("192.168.1.0/29"),
+  ))
+
+  def probe(address, _port, timeout, _stop, *, cancellable=False):
+    attempts.append((address, timeout, cancellable))
+    if address == cached_address and timeout >= 0.3:
+      assert ordinary_probes_done.wait(1.0)
+      return sock
+    if address == "192.168.1.5":
+      ordinary_probes_done.set()
+    return None
+
+  monkeypatch.setattr(cluster_receiver, "_probe", probe)
+  winner = cluster_receiver.discover_c4("wlan0", 9200, 0.12, workers, preferred_address=preferred_address)
+  preferred = preferred_address == cached_address and workers > 1
+  assert winner is (sock if preferred else None)
+  expected = [(f"192.168.1.{i}", 0.12, False) for i in range(2, 7)]
+  if preferred:
+    expected[-1] = (cached_address, cluster_receiver.KNOWN_CONNECT_TIMEOUT, True)
+  assert sorted(attempts) == expected
+
+
+def test_discovery_cancels_the_preferred_probe_when_a_different_peer_wins(monkeypatch):
+  preferred_started, closed = threading.Event(), []
+  winner = SimpleNamespace(getpeername=lambda: ("192.168.1.2", 9200), close=lambda: pytest.fail("winner must stay open"))
+  monkeypatch.setattr(cluster_receiver, "get_interface_network", lambda _interface: (
+    ipaddress.ip_address("192.168.1.1"), ipaddress.ip_network("192.168.1.0/29"),
+  ))
+
+  def probe(address, _port, _timeout, stop, *, cancellable=False):
+    if cancellable:
+      preferred_started.set()
+      assert stop.wait(1.0)
+      return SimpleNamespace(close=lambda: closed.append(address))
+    assert preferred_started.wait(1.0)
+    return winner if address == "192.168.1.2" else None
+
+  monkeypatch.setattr(cluster_receiver, "_probe", probe)
+  assert cluster_receiver.discover_c4("wlan0", 9200, 0.12, 2, preferred_address="192.168.1.6") is winner
+  assert closed == ["192.168.1.6"]
+
+
+def test_cancellable_probe_connects_and_returns_a_bounded_socket():
+  with socket.socket() as server:
+    server.bind(("127.0.0.1", 0))
+    server.listen()
+    address, port = server.getsockname()
+    stop = threading.Event()
+    with cluster_receiver._probe(address, port, 1.0, stop, cancellable=True) as sock:
+      assert sock.getpeername() == (address, port)
+      assert sock.gettimeout() == cluster_receiver.FRAME_TIMEOUT_SECONDS
+
+
 def test_known_c4_allows_handshake_longer_than_subnet_scan_timeout(monkeypatch):
   sock = SimpleNamespace(close=lambda: pytest.fail("successful socket must stay open"))
   attempts, polls = [], []
@@ -514,7 +574,8 @@ def test_main_keeps_waiting_when_wifi_or_c4_is_unavailable(monkeypatch, wifi_ava
   monkeypatch.setattr(cluster_receiver, "parse_args", lambda: args)
   monkeypatch.setattr(cluster_receiver.signal, "signal", lambda *_args: None)
 
-  def discover(*_args):
+  def discover(*_args, preferred_address):
+    assert preferred_address is None
     events.append("discover")
     if not wifi_available:
       raise RuntimeError("No IPv4 address assigned to wlan0")
@@ -584,9 +645,9 @@ def test_main_retries_last_c4_before_scanning_and_backs_off_only_short_sessions(
 
   discoveries = iter(["192.168.77.40", "192.168.77.41"])
 
-  def discover(*_args):
+  def discover(*_args, preferred_address):
     address = next(discoveries)
-    events.append(("discover", address))
+    events.append(("discover", address, preferred_address))
     return Connection(address)
 
   def probe(address, *_args):
@@ -606,13 +667,13 @@ def test_main_retries_last_c4_before_scanning_and_backs_off_only_short_sessions(
   monkeypatch.setattr(cluster_receiver, "receive_frames", receive)
   cluster_receiver.main()
   recovered_address = "192.168.77.40" if cached_available else "192.168.77.41"
-  expected = [("discover", "192.168.77.40"), ("receive", "192.168.77.40"), ("disconnect", "192.168.77.40")]
+  expected = [("discover", "192.168.77.40", None), ("receive", "192.168.77.40"), ("disconnect", "192.168.77.40")]
   if connection_duration < args.reconnect_delay:
     expected.append(("retry", args.reconnect_delay))
   expected.append(("probe", "192.168.77.40"))
   if not cached_available:
     expected.append(("probe", "192.168.77.40"))
-    expected.append(("discover", recovered_address))
+    expected.append(("discover", recovered_address, "192.168.77.40"))
   assert events == expected + [("receive", recovered_address), ("disconnect", recovered_address), "close"]
 
 

@@ -6,6 +6,7 @@ import json
 import logging
 import math
 import os
+import selectors
 import signal
 import socket
 import subprocess
@@ -117,13 +118,37 @@ def get_interface_network(interface: str) -> tuple[ipaddress.IPv4Address, ipaddr
   return local_ip, network
 
 
-def _probe(address: str, port: int, timeout: float, stop) -> socket.socket | None:
+def _connect_cancellable(sock, endpoint, timeout, stop):
+  sock.setblocking(False)
+  try:
+    sock.connect(endpoint)
+    return
+  except BlockingIOError:
+    pass
+  deadline = time.monotonic() + timeout
+  with selectors.DefaultSelector() as selector:
+    selector.register(sock, selectors.EVENT_WRITE)
+    while not stop.is_set():
+      remaining = deadline - time.monotonic()
+      if remaining <= 0:
+        raise TimeoutError("TCP connection timed out")
+      if selector.select(min(remaining, 0.05)):
+        error = sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+        if error:
+          raise OSError(error, os.strerror(error))
+        return
+
+
+def _probe(address: str, port: int, timeout: float, stop, *, cancellable=False) -> socket.socket | None:
   if stop.is_set():
     return None
   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-  sock.settimeout(timeout)
   try:
-    sock.connect((address, port))
+    if cancellable:
+      _connect_cancellable(sock, (address, port), timeout, stop)
+    else:
+      sock.settimeout(timeout)
+      sock.connect((address, port))
     if stop.is_set():
       sock.close()
       return None
@@ -194,7 +219,7 @@ def connect_known_c4(address: str, port: int, poll_events=None):
   return winner
 
 
-def discover_c4(interface: str, port: int, timeout: float, workers: int, poll_events=None):
+def discover_c4(interface: str, port: int, timeout: float, workers: int, poll_events=None, *, preferred_address=None):
   local_ip, network = get_interface_network(interface)
   candidates = [str(address) for address in network.hosts() if address != local_ip]
   LOG.info("Scanning %s on TCP port %d via %s", network, port, interface)
@@ -205,13 +230,23 @@ def discover_c4(interface: str, port: int, timeout: float, workers: int, poll_ev
 
   try:
     with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
-      futures = [executor.submit(_probe, address, port, timeout, stop) for address in candidates]
+      preferred = None
+      if workers > 1 and preferred_address in candidates:
+        # The initial cached-peer attempts can overlap DHCP recovery. Give it
+        # the normal known-peer deadline during fallback without probing twice.
+        candidates.remove(preferred_address)
+        preferred = executor.submit(_probe, preferred_address, port, max(timeout, KNOWN_CONNECT_TIMEOUT), stop, cancellable=True)
+        futures.append(preferred)
+      futures.extend(executor.submit(_probe, address, port, timeout, stop) for address in candidates)
       pending = set(futures)
       try:
         while pending:
           if poll_events is not None:
             poll_events()
           done, pending = wait(pending, timeout=0.05, return_when=FIRST_COMPLETED)
+          if preferred in done:
+            done.remove(preferred)
+            done = (preferred, *done)
           for future in done:
             sock = future.result()
             if sock is not None and winner is None:
@@ -374,7 +409,8 @@ def main():
             if sock is not None:
               LOG.info("[CLUSTER_RX_RECONNECT] Connected to last C4 at %s:%d", last_c4_address, args.port)
           if sock is None:
-            sock = discover_c4(args.interface, args.port, args.scan_timeout, args.scan_workers, lambda: _poll_display(display))
+            sock = discover_c4(args.interface, args.port, args.scan_timeout, args.scan_workers, lambda: _poll_display(display),
+                               preferred_address=last_c4_address)
           if sock is not None:
             last_c4_address = sock.getpeername()[0]
         if sock is not None:
