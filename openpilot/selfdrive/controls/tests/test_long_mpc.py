@@ -73,7 +73,7 @@ class TestLongitudinalMpc(unittest.TestCase):
 
   def test_radar_lead_extrapolates_decaying_acceleration(self):
     lead = make_radar_lead(speed=10.0, accel=-2.0)
-    trajectory = self.mpc.process_lead(lead)
+    trajectory = self.mpc.process_lead(None, lead)
 
     expected_accel = lead.aLeadK * np.exp(-lead.aLeadTau * long_mpc.T_IDXS**2 / 2.0)
     expected_speed = lead.vLead + np.cumsum(long_mpc.T_DIFFS * expected_accel)
@@ -81,19 +81,51 @@ class TestLongitudinalMpc(unittest.TestCase):
     np.testing.assert_allclose(trajectory[:, 0], expected_distance)
     np.testing.assert_allclose(trajectory[:, 1], expected_speed)
 
-  def test_model_lead_predictions_do_not_change_radar_obstacle(self):
-    radar_lead = make_radar_lead(speed=0.0)
+  def test_model_lead_accel_changes_obstacle_after_radar_initial_state(self):
+    radar_lead = make_radar_lead(speed=2.0)
     radar_state = SimpleNamespace(leadOne=radar_lead, leadTwo=self.no_lead)
     model = log.ModelDataV2.new_message()
     model_lead = model.init('leadsV3', 1)[0]
-    model_lead.prob = 0.95
-    model_lead.x = [20.0 + 5.0 * t for t in ModelConstants.LEAD_T_IDXS]
-    model_lead.v = [5.0] * len(ModelConstants.LEAD_T_IDXS)
+    model_lead.a = [1.0] * len(ModelConstants.LEAD_T_IDXS)
+    self.mpc.update(model, radar_state, car_state=self.car_state, use_model_leads=False)
+    radar_obstacle = self.mpc.params[:, 2].copy()
 
     self.mpc.update(model, radar_state, car_state=self.car_state)
-
     self.assertEqual(self.mpc.source, long_mpc.LongitudinalPlanSource.lead0)
-    np.testing.assert_allclose(self.mpc.params[:, 2], radar_lead.dRel)
+    self.assertEqual(self.mpc.params[0, 2], radar_obstacle[0])
+    self.assertGreater(self.mpc.params[-1, 2], radar_obstacle[-1])
+
+  def test_invalid_model_accel_or_low_confidence_uses_radar(self):
+    sample_count = len(ModelConstants.LEAD_T_IDXS)
+    model_lead = log.ModelDataV2.new_message().init('leadsV3', 1)[0]
+    cases = ((0.5, [1.0] * sample_count), (0.95, []), (0.95, [1.0]), (0.95, [float('nan')] * sample_count))
+    for probability, accelerations in cases:
+      with self.subTest(probability=probability, accelerations=accelerations):
+        radar_lead = make_radar_lead(prob=probability)
+        model_lead.a = accelerations
+        np.testing.assert_array_equal(self.mpc.process_lead(model_lead, radar_lead), self.mpc.process_lead(None, radar_lead))
+
+  def test_hard_braking_prefers_the_more_conservative_radar_trajectory(self):
+    self.mpc.set_cur_state(20.0, 0.0)
+    radar_lead = make_radar_lead(distance=24.0, speed=8.0, accel=-4.0)
+    model_lead = log.ModelDataV2.new_message().init('leadsV3', 1)[0]
+    model_lead.a = [2.0] * len(ModelConstants.LEAD_T_IDXS)
+
+    np.testing.assert_allclose(self.mpc.process_lead(model_lead, radar_lead), self.mpc.process_lead(None, radar_lead))
+
+  def test_second_radar_lead_uses_the_second_model_slot(self):
+    radar_lead = make_radar_lead(speed=2.0)
+    radar_state = SimpleNamespace(leadOne=self.no_lead, leadTwo=radar_lead)
+    model = log.ModelDataV2.new_message()
+    first_model_lead, second_model_lead = model.init('leadsV3', 2)
+    first_model_lead.a = [-1.0] * len(ModelConstants.LEAD_T_IDXS)
+    second_model_lead.a = [1.0] * len(ModelConstants.LEAD_T_IDXS)
+
+    self.mpc.update(model, radar_state, car_state=self.car_state)
+    self.assertEqual(self.mpc.source, long_mpc.LongitudinalPlanSource.lead1)
+    trajectory = self.mpc.process_lead(second_model_lead, radar_lead)
+    expected_obstacles = trajectory[:, 0] + long_mpc.get_stopped_equivalence_factor(trajectory[:, 1])
+    np.testing.assert_allclose(self.mpc.params[:, 2], expected_obstacles)
 
   def test_update_with_second_radar_lead_without_model_leads(self):
     radar_state = SimpleNamespace(leadOne=self.no_lead, leadTwo=make_radar_lead(speed=0.0))
@@ -101,6 +133,22 @@ class TestLongitudinalMpc(unittest.TestCase):
 
     self.assertEqual(self.mpc.source, long_mpc.LongitudinalPlanSource.lead1)
     np.testing.assert_allclose(self.mpc.params[:, 2], radar_state.leadTwo.dRel)
+
+  def test_planner_enables_model_lead_fusion_for_openpilot_longitudinal_control(self):
+    sm = make_boost_inputs()
+    model = sm['modelV2']
+    model.init('leadsV3', 1)[0].a = [1.0] * len(ModelConstants.LEAD_T_IDXS)
+    sm['radarState'].leadOne = log.RadarState.LeadData(dRel=50.0, vLead=8.0, present=True, modelProb=0.95)
+
+    obstacles = []
+    for openpilot_long in (False, True):
+      planner = LongitudinalPlanner(car.CarParams(openpilotLongitudinalControl=openpilot_long), init_v=12.0)
+      with patch.object(planner.mpc.traffic_controller, 'update', wraps=planner.mpc.traffic_controller.update) as update_traffic:
+        planner.update(sm)
+        update_traffic.assert_called_once_with(sm['carState'], model, sm['radarState'], long_mpc.COMFORT_BRAKE)
+      obstacles.append(planner.mpc.params[-1, 2])
+
+    self.assertGreater(obstacles[1], obstacles[0])
 
   def test_planner_can_use_second_radar_lead_without_a_primary_lead_indicator(self):
     planner = LongitudinalPlanner(car.CarParams(openpilotLongitudinalControl=True), init_v=10.0)
@@ -190,7 +238,8 @@ class TestLongitudinalMpc(unittest.TestCase):
 
   def test_failed_solution_is_not_used_for_fcw(self):
     radar_state = SimpleNamespace(leadOne=make_radar_lead(distance=0.0, speed=0.0), leadTwo=self.no_lead)
-    model = SimpleNamespace(leadsV3=[])
+    model = log.ModelDataV2.new_message()
+    model.init('leadsV3', 1)[0].a = [1.0] * len(ModelConstants.LEAD_T_IDXS)
     self.mpc.update(model, radar_state, car_state=self.car_state)
     self.assertEqual(self.mpc.crash_cnt, 1)
 
