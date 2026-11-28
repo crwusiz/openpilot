@@ -500,7 +500,7 @@ class H264Receiver:
     with self.condition:
       if self.closing:
         return None
-      if self._last_recovery_at is not None and now - self._last_recovery_at < RECOVERY_INTERVAL:
+      if self._last_recovery_at is not None and now < self._last_recovery_at + RECOVERY_INTERVAL:
         return None
       decoded_at = self._last_decoded_at
       decode_stale = decoded_at is not None and now >= decoded_at + DECODE_RECOVERY_SECONDS
@@ -531,17 +531,32 @@ class H264Receiver:
   async def _recover_video(self):
     started = time.monotonic()
     while True:
+      now = time.monotonic()
+      payload = self._take_recovery_request(now, started)
+      if payload is not None:
+        await self._send_control(FEEDBACK, payload)
+        now = time.monotonic()
+
       # An incomplete access unit can stall decoding without a warning.
-      # Request an IDR before the display freshness limit, using decoded
-      # arrivals so slow RGB conversion cannot be mistaken for packet loss.
+      # The current decode deadline can only move later when a frame arrives,
+      # so there is no need to wake this task on every successful decode.
+      with self.condition:
+        if self._last_decoded_at is None:
+          # Keep checking for the first decoded frame during startup.
+          due = min(started + VIDEO_STALE_SECONDS, now + RECOVERY_POLL_INTERVAL)
+        else:
+          due = self._last_decoded_at + DECODE_RECOVERY_SECONDS
+        if self.decoder_errors > self._recovered_decoder_errors:
+          due = now
+        if self._last_recovery_at is not None:
+          due = max(due, self._last_recovery_at + RECOVERY_INTERVAL)
+      # A past deadline may be blocked by stale control. Recheck without spinning.
+      timeout = due - now if due > now else RECOVERY_POLL_INTERVAL
       try:
-        await asyncio.wait_for(self._recovery_event.wait(), timeout=RECOVERY_POLL_INTERVAL)
+        await asyncio.wait_for(self._recovery_event.wait(), timeout=timeout)
       except TimeoutError:
         pass
       self._recovery_event.clear()
-      payload = self._take_recovery_request(time.monotonic(), started)
-      if payload is not None:
-        await self._send_control(FEEDBACK, payload)
 
   def _poll_resources(self, *, request=False):
     try:

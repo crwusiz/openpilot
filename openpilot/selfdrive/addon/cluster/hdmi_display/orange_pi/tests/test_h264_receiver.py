@@ -868,6 +868,68 @@ def test_silent_video_stall_requests_idr_before_the_periodic_fps_report(monkeypa
     pi_sock.close()
 
 
+@pytest.mark.parametrize("new_frame_at", [None, 10.15])
+def test_fast_recovery_checks_the_actual_decode_deadline_and_retry_interval(monkeypatch, new_frame_at):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  receiver._recovery_event = asyncio.Event()
+  receiver._last_decoded_at = receiver.last_video_at = 10.0
+  now, timeouts, requests = [10.08], [], []
+
+  async def wait_for(wait, **options):
+    wait.close()
+    timeout = options["timeout"]
+    timeouts.append(timeout)
+    assert len(timeouts) <= 3
+    now[0] += timeout
+    if len(timeouts) == 1 and new_frame_at is not None:
+      receiver._last_decoded_at = receiver.last_video_at = new_frame_at
+    raise TimeoutError
+
+  async def send(kind, payload):
+    assert kind == FEEDBACK and payload["recovery_reason"] == "video_stale"
+    requests.append(now[0])
+    if len(requests) == 2:
+      raise asyncio.CancelledError
+
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(h264_receiver.asyncio, "wait_for", wait_for)
+  monkeypatch.setattr(receiver, "_send_control", send)
+  with pytest.raises(asyncio.CancelledError):
+    asyncio.run(receiver._recover_video())
+
+  first_request_at = (new_frame_at or 10.0) + h264_receiver.DECODE_RECOVERY_SECONDS
+  assert requests == pytest.approx([first_request_at, first_request_at + h264_receiver.RECOVERY_INTERVAL])
+  assert len(timeouts) == (3 if new_frame_at is not None else 2)
+
+
+def test_fast_recovery_polls_past_due_deadline_while_control_is_stale(monkeypatch):
+  receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
+  receiver._recovery_event = asyncio.Event()
+  receiver._last_decoded_at = receiver.last_state_at = 10.0
+  now, timeouts = [12.1], []
+
+  async def wait_for(wait, **options):
+    wait.close()
+    timeout = options["timeout"]
+    timeouts.append(timeout)
+    assert len(timeouts) <= 2 and timeout == pytest.approx(h264_receiver.RECOVERY_POLL_INTERVAL)
+    now[0] += timeout
+    if len(timeouts) == 2:
+      receiver.last_state_at = now[0]
+    raise TimeoutError
+
+  async def send(kind, payload):
+    assert kind == FEEDBACK and payload["recovery_reason"] == "video_stale"
+    assert len(timeouts) == 2
+    raise asyncio.CancelledError
+
+  monkeypatch.setattr(h264_receiver, "time", SimpleNamespace(monotonic=lambda: now[0]))
+  monkeypatch.setattr(h264_receiver.asyncio, "wait_for", wait_for)
+  monkeypatch.setattr(receiver, "_send_control", send)
+  with pytest.raises(asyncio.CancelledError):
+    asyncio.run(receiver._recover_video())
+
+
 def test_video_recovery_uses_decode_progress_and_does_not_spam_startup_or_healthy_video():
   receiver = h264_receiver.H264Receiver(None, HELLO_DATA)
   assert receiver._take_recovery_request(10.49, started=10.0) is None
